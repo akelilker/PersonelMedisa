@@ -33,6 +33,7 @@ type DemoBildirim = {
   bildirim_turu: string;
   aciklama?: string;
   state?: string;
+  okundu_mi?: boolean;
 };
 
 type DemoFinansKalem = {
@@ -113,7 +114,8 @@ const demoState: {
       personel_id: 1,
       bildirim_turu: "GEC_GELDI",
       aciklama: "Demo bildirim",
-      state: "AKTIF"
+      state: "AKTIF",
+      okundu_mi: false
     }
   ],
   finansKalemleri: [
@@ -393,7 +395,8 @@ export function resolveDemoApiResponse(
       personel_id: toNumber(body.personel_id) ?? undefined,
       bildirim_turu: toStringValue(body.bildirim_turu) ?? "GEC_GELDI",
       aciklama: toStringValue(body.aciklama) ?? undefined,
-      state: "AKTIF"
+      state: "AKTIF",
+      okundu_mi: false
     };
     demoState.bildirimler.unshift(next);
     return ok(next);

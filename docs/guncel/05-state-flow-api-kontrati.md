@@ -482,6 +482,16 @@ Kural:
 - iptal edilen bildirim fiziksel silinmez
 - rapor ve audit katmanında iz bırakır
 
+### Okunma (`okundu_mi`)
+
+Kayıt modeli V1’de kullanıcı bazlı okunma bilgisini `okundu_mi` (boolean) ile taşır; varsayılan `false`, iptal kayıtlarında liste/üst bildirim politikasına göre hariç tutulabilir.
+
+Okundu işaretlemek için aynı güncelleme uç noktası kullanılır:
+
+- `PUT /api/bildirimler/{bildirimId}` gövde örneği: `{ "okundu_mi": true }` (kısmi güncelleme; yalnızca okunma alanını yazmak yeterlidir)
+
+Header bildirim paneli ve liste görünümleri bu alana göre okunmamış / okunmuş ayrımı yapar. Takvim hatırlatmaları (maaş / SGK) gerçek `bildirim` kaydı değildir; yalnızca istemci tarafında geçici olarak okundu kabul edilir.
+
 ## 9. Günlük Puantaj State Flow
 
 ### 9.1 State Modeli

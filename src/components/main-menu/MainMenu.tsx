@@ -12,6 +12,7 @@ export function MainMenu({ onKayitOpen }: MainMenuProps) {
   const navigate = useNavigate();
   const { hasPermission } = useRoleAccess();
 
+  const canKayitSection = hasPermission("personeller.create") || hasPermission("surecler.create");
   const canViewBildirimler = hasPermission("bildirimler.view");
   const canViewPuantaj = hasPermission("puantaj.view");
   const canViewHaftalikKapanis = hasPermission("haftalik-kapanis.view");
@@ -38,17 +39,19 @@ export function MainMenu({ onKayitOpen }: MainMenuProps) {
 
   return (
     <div id="main-menu" className="menu-container">
-      <button
-        type="button"
-        className={`menu-btn${isKayitSectionActive ? " is-active" : ""}`}
-        onClick={() => {
-          const tab: KayitTab =
-            isKayitSectionActive && location.pathname.startsWith("/surecler") ? "surec" : "yeni-kayit";
-          onKayitOpen(tab);
-        }}
-      >
-        <div className="ttl">KAYIT ISLEMLERI</div>
-      </button>
+      {canKayitSection ? (
+        <button
+          type="button"
+          className={`menu-btn${isKayitSectionActive ? " is-active" : ""}`}
+          onClick={() => {
+            const tab: KayitTab =
+              isKayitSectionActive && location.pathname.startsWith("/surecler") ? "surec" : "yeni-kayit";
+            onKayitOpen(tab);
+          }}
+        >
+          <div className="ttl">KAYIT ISLEMLERI</div>
+        </button>
+      ) : null}
 
       <button
         type="button"

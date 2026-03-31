@@ -6,4 +6,5 @@ export type Bildirim = {
   bildirim_turu: string;
   aciklama?: string;
   state?: string;
+  okundu_mi?: boolean;
 };

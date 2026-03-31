@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { fetchBildirimlerList } from "../../api/bildirimler.api";
+import { fetchBildirimlerList, markBildirimOkundu } from "../../api/bildirimler.api";
 import { useRoleAccess } from "../../hooks/use-role-access";
 import { useAuth } from "../../state/auth.store";
 
@@ -211,7 +211,7 @@ export function ShellHeaderActions() {
               subtitle,
               level: mapBildirimLevel(item.bildirim_turu),
               route: canViewBildirimDetay ? `/bildirimler/${item.id}` : "/bildirimler",
-              unread: item.state !== "IPTAL"
+              unread: item.state !== "IPTAL" && item.okundu_mi !== true
             });
           });
         }
@@ -249,25 +249,65 @@ export function ShellHeaderActions() {
   }
 
   function handleNotificationClick(notification: HeaderNotification) {
-    setReadNotificationIds((prev) => ({
-      ...prev,
-      [notification.id]: true
-    }));
+    if (notification.id.startsWith("api-")) {
+      const numericId = Number.parseInt(notification.id.slice(4), 10);
+      if (Number.isFinite(numericId)) {
+        void markBildirimOkundu(numericId)
+          .then(() => {
+            setNotifications((prev) =>
+              prev.map((item) => (item.id === notification.id ? { ...item, unread: false } : item))
+            );
+          })
+          .catch((error) => {
+            setNotificationError(
+              error instanceof Error ? error.message : "Bildirim okundu isaretlenemedi."
+            );
+          });
+      }
+    } else {
+      setReadNotificationIds((prev) => ({
+        ...prev,
+        [notification.id]: true
+      }));
+    }
     navigateTo(notification.route);
   }
 
   function markAllNotificationsAsRead() {
-    const nextMap: Record<string, true> = {};
-    visibleNotifications.forEach((item) => {
-      if (item.unread) {
-        nextMap[item.id] = true;
+    const unreadItems = visibleNotifications.filter((item) => item.unread);
+    const unreadApiIds = unreadItems
+      .filter((item) => item.id.startsWith("api-"))
+      .map((item) => Number.parseInt(item.id.slice(4), 10))
+      .filter((id) => Number.isFinite(id));
+
+    if (unreadApiIds.length > 0) {
+      void Promise.all(unreadApiIds.map((id) => markBildirimOkundu(id)))
+        .then(() => {
+          setNotifications((prev) =>
+            prev.map((item) =>
+              unreadApiIds.some((id) => item.id === `api-${id}`) ? { ...item, unread: false } : item
+            )
+          );
+        })
+        .catch((error) => {
+          setNotificationError(
+            error instanceof Error ? error.message : "Bildirimler okundu isaretlenemedi."
+          );
+        });
+    }
+
+    const reminderMap: Record<string, true> = {};
+    unreadItems.forEach((item) => {
+      if (item.id.startsWith("reminder-")) {
+        reminderMap[item.id] = true;
       }
     });
-
-    setReadNotificationIds((prev) => ({
-      ...prev,
-      ...nextMap
-    }));
+    if (Object.keys(reminderMap).length > 0) {
+      setReadNotificationIds((prev) => ({
+        ...prev,
+        ...reminderMap
+      }));
+    }
   }
 
   const notificationButtonClassName = [

@@ -22,7 +22,9 @@ export type CreateBildirimPayload = {
   aciklama?: string;
 };
 
-export type UpdateBildirimPayload = Partial<CreateBildirimPayload>;
+export type UpdateBildirimPayload = Partial<CreateBildirimPayload> & {
+  okundu_mi?: boolean;
+};
 
 function normalizeBildirim(data: unknown): Bildirim {
   if (typeof data !== "object" || data === null) {
@@ -83,4 +85,8 @@ export async function cancelBildirim(bildirimId: number | string): Promise<void>
   await apiRequest<ApiResponse<unknown>>(`${endpoints.bildirimler.detail(bildirimId)}/iptal`, {
     method: "POST"
   });
+}
+
+export async function markBildirimOkundu(bildirimId: number | string): Promise<Bildirim> {
+  return updateBildirim(bildirimId, { okundu_mi: true });
 }

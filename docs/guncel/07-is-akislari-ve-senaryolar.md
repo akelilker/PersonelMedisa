@@ -108,7 +108,8 @@ Kullanıcı header sağ üstteki bildirim ikonundan paneli açar.
 
 ### 4.3 Sistem Etkisi
 
-- Bildirimin okunma durumu güncellenir.
+- Bildirimin okunma durumu güncellenir (`okundu_mi`, `PUT /api/bildirimler/{bildirimId}`; ayrıntı `05-state-flow-api-kontrati.md`).
+- Takvim hatırlatmaları (ör. maaş / SGK) kayıt tabanlı bildirim değildir; okundu bilgisi yalnızca istemci oturumunda tutulur.
 - Bildirim ile süreç kaydı birbirine otomatik bağlanmaz.
 - Uyarı katmanı ile işlem katmanı bilinçli olarak ayrılır.
 

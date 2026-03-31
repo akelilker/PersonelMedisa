@@ -1,7 +1,26 @@
-import { getCurrentUser } from "../auth/auth-manager";
+import { MEDISA_AUTH_SESSION_KEY } from "../auth/auth-constants";
 
 const AUDIT_STORAGE_KEY = "medisa_audit_trail";
 const AUDIT_MAX_ENTRIES = 500;
+
+function readUserIdFromAuthStorage(): number | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+  try {
+    const raw =
+      window.sessionStorage.getItem(MEDISA_AUTH_SESSION_KEY) ??
+      window.localStorage.getItem(MEDISA_AUTH_SESSION_KEY);
+    if (!raw?.trim()) {
+      return null;
+    }
+    const parsed = JSON.parse(raw) as { user?: { id?: unknown } };
+    const id = parsed.user?.id;
+    return typeof id === "number" && Number.isFinite(id) ? id : null;
+  } catch {
+    return null;
+  }
+}
 
 export type AuditAction =
   | "PERSONEL_CREATE"
@@ -32,7 +51,7 @@ export function logAction(params: {
   payload?: unknown;
   timestamp?: string;
 }): void {
-  const user_id = params.user_id ?? getCurrentUser()?.id ?? null;
+  const user_id = params.user_id ?? readUserIdFromAuthStorage();
   const entry: AuditLogEntry = {
     action: params.action,
     user_id,
@@ -41,7 +60,6 @@ export function logAction(params: {
   };
 
   if (import.meta.env.DEV) {
-    // eslint-disable-next-line no-console
     console.info("[medisa-audit]", entry);
   }
 

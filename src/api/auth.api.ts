@@ -1,5 +1,5 @@
 import type { AuthSession, LoginCredentials } from "../types/auth";
-import { apiRequest, ApiRequestError } from "./client";
+import { apiRequest, ApiRequestError } from "./api-client";
 import { endpoints } from "./endpoints";
 
 const DEMO_LOGIN_ENABLED = true;

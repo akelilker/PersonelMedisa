@@ -43,7 +43,10 @@ export function AppShell({ children }: AppShellProps) {
         <div className="shell-user-bar">
           <div className="user-chip">
             <strong>{session?.user.ad_soyad ?? "-"}</strong>
-            <span>({session?.user.rol ?? "-"})</span>
+            <span>
+              ({session?.user.rol ?? "-"} ·{" "}
+              {session?.ui_profile === "birim_amiri" ? "Birim profili" : session ? "Yonetim profili" : "-"})
+            </span>
           </div>
           <button type="button" className="logout-btn" onClick={logout}>
             Cikis

@@ -1,7 +1,8 @@
 import type { ApiResponse, PaginatedResult } from "../types/api";
 import type { Surec } from "../types/surec";
 import { appendQueryParams } from "../utils/append-query-params";
-import { apiRequest } from "./client";
+import { logAction } from "../audit/audit-service";
+import { apiRequest } from "./api-client";
 import { endpoints } from "./endpoints";
 import { normalizePaginatedList } from "./response-normalizers";
 
@@ -70,7 +71,9 @@ export async function createSurec(payload: CreateSurecPayload): Promise<Surec> {
     method: "POST",
     body: JSON.stringify(payload)
   });
-  return normalizeSurec(response.data);
+  const created = normalizeSurec(response.data);
+  logAction({ action: "SUREC_CREATE", payload: { surec_id: created.id } });
+  return created;
 }
 
 export async function fetchSurecDetail(surecId: number | string): Promise<Surec> {
@@ -86,11 +89,14 @@ export async function updateSurec(
     method: "PUT",
     body: JSON.stringify(payload)
   });
-  return normalizeSurec(response.data);
+  const updated = normalizeSurec(response.data);
+  logAction({ action: "SUREC_UPDATE", payload: { surec_id: updated.id } });
+  return updated;
 }
 
 export async function cancelSurec(surecId: number | string): Promise<void> {
   await apiRequest<ApiResponse<unknown>>(`${endpoints.surecler.detail(surecId)}/iptal`, {
     method: "POST"
   });
+  logAction({ action: "SUREC_CANCEL", payload: { surec_id: surecId } });
 }

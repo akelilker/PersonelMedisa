@@ -21,6 +21,8 @@ export type AuthSession = {
 export type LoginCredentials = {
   username: string;
   password: string;
+  /** true ise token localStorage'da; aksi halde sessionStorage (varsayilan). */
+  rememberMe?: boolean;
 };
 
 export const MANAGEMENT_ROLES: UserRole[] = [

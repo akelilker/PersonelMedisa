@@ -30,6 +30,16 @@
   outline-offset: 0;
 }
 
+.auth-field-inline {
+  flex-direction: row;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+.auth-field-inline input[type="checkbox"] {
+  margin-top: 0.2rem;
+}
+
 .auth-error {
   margin: 0;
   color: var(--red);

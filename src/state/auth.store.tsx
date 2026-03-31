@@ -7,13 +7,8 @@ import {
   useState,
   type ReactNode
 } from "react";
-import { login as loginApi } from "../api/auth.api";
+import { login as loginWithStorage, clearSession as clearAuthEverywhere, getSession } from "../auth/auth-manager";
 import { onAuthUnauthorized } from "../lib/storage/auth-events";
-import {
-  clearStoredAuthSession,
-  getStoredAuthSession,
-  setStoredAuthSession
-} from "../lib/storage/auth-session";
 import type { AuthSession, LoginCredentials } from "../types/auth";
 
 type AuthContextValue = {
@@ -30,22 +25,26 @@ type AuthProviderProps = {
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export function AuthProvider({ children }: AuthProviderProps) {
-  const [session, setSession] = useState<AuthSession | null>(() => getStoredAuthSession());
+  const [session, setSession] = useState<AuthSession | null>(() => getSession());
 
   const forceLogout = useCallback(() => {
+    clearAuthEverywhere();
     setSession(null);
-    clearStoredAuthSession();
   }, []);
 
   const login = useCallback(async (credentials: LoginCredentials) => {
-    const nextSession = await loginApi(credentials);
+    const nextSession = await loginWithStorage(
+      credentials.username.trim(),
+      credentials.password,
+      credentials.rememberMe === true
+    );
     setSession(nextSession);
-    setStoredAuthSession(nextSession);
   }, []);
 
   const logout = useCallback(() => {
-    forceLogout();
-  }, [forceLogout]);
+    clearAuthEverywhere();
+    setSession(null);
+  }, []);
 
   useEffect(() => {
     return onAuthUnauthorized(() => {

@@ -10,7 +10,7 @@ type MainMenuProps = {
 export function MainMenu({ onKayitOpen }: MainMenuProps) {
   const location = useLocation();
   const navigate = useNavigate();
-  const { hasPermission } = useRoleAccess();
+  const { hasPermission, uiProfile } = useRoleAccess();
 
   const canKayitSection = hasPermission("personeller.create") || hasPermission("surecler.create");
   const canViewBildirimler = hasPermission("bildirimler.view");
@@ -36,6 +36,8 @@ export function MainMenu({ onKayitOpen }: MainMenuProps) {
     location.pathname.startsWith("/haftalik-kapanis");
   const isRaporSectionActive =
     location.pathname.startsWith("/raporlar") || location.pathname.startsWith("/finans");
+
+  const raporButtonLabel = uiProfile === "birim_amiri" ? "RAPOR" : "RAPOR VE FINANS";
 
   return (
     <div id="main-menu" className="menu-container">
@@ -76,7 +78,7 @@ export function MainMenu({ onKayitOpen }: MainMenuProps) {
         }}
         disabled={!raporTarget}
       >
-        <div className="ttl">RAPOR VE FINANS</div>
+        <div className="ttl">{raporButtonLabel}</div>
       </button>
     </div>
   );

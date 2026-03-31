@@ -1,6 +1,7 @@
 import type { ApiResponse } from "../types/api";
 import type { ComplianceUyari, GunlukPuantaj, UpsertGunlukPuantajPayload } from "../types/puantaj";
-import { apiRequest } from "./client";
+import { logAction } from "../audit/audit-service";
+import { apiRequest } from "./api-client";
 import { endpoints } from "./endpoints";
 
 function toRecord(value: unknown): Record<string, unknown> | null {
@@ -165,5 +166,7 @@ export async function upsertGunlukPuantaj(
     body: JSON.stringify(payload)
   });
 
-  return normalizeGunlukPuantaj(response.data, personelId, tarih);
+  const row = normalizeGunlukPuantaj(response.data, personelId, tarih);
+  logAction({ action: "PUANTAJ_UPSERT", payload: { personel_id: personelId, tarih } });
+  return row;
 }

@@ -8,6 +8,7 @@ import { useAuth } from "../state/auth.store";
 export function useRoleAccess() {
   const { session } = useAuth();
   const activeRole = session?.user.rol;
+  const uiProfile = session?.ui_profile ?? null;
 
   function hasRole(role: UserRole) {
     return activeRole === role;
@@ -35,6 +36,7 @@ export function useRoleAccess() {
 
   return {
     activeRole,
+    uiProfile,
     hasRole,
     hasAnyRole,
     hasPermission,

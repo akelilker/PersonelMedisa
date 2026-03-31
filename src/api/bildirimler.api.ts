@@ -1,7 +1,8 @@
 import type { ApiResponse, PaginatedResult } from "../types/api";
 import type { Bildirim } from "../types/bildirim";
 import { appendQueryParams } from "../utils/append-query-params";
-import { apiRequest } from "./client";
+import { logAction } from "../audit/audit-service";
+import { apiRequest } from "./api-client";
 import { endpoints } from "./endpoints";
 import { normalizePaginatedList } from "./response-normalizers";
 
@@ -62,7 +63,9 @@ export async function createBildirim(payload: CreateBildirimPayload): Promise<Bi
     method: "POST",
     body: JSON.stringify(payload)
   });
-  return normalizeBildirim(response.data);
+  const created = normalizeBildirim(response.data);
+  logAction({ action: "BILDIRIM_CREATE", payload: { bildirim_id: created.id } });
+  return created;
 }
 
 export async function fetchBildirimDetail(bildirimId: number | string): Promise<Bildirim> {
@@ -78,13 +81,20 @@ export async function updateBildirim(
     method: "PUT",
     body: JSON.stringify(payload)
   });
-  return normalizeBildirim(response.data);
+  const updated = normalizeBildirim(response.data);
+  if (payload.okundu_mi === true) {
+    logAction({ action: "BILDIRIM_MARK_READ", payload: { bildirim_id: updated.id } });
+  } else {
+    logAction({ action: "BILDIRIM_UPDATE", payload: { bildirim_id: updated.id } });
+  }
+  return updated;
 }
 
 export async function cancelBildirim(bildirimId: number | string): Promise<void> {
   await apiRequest<ApiResponse<unknown>>(`${endpoints.bildirimler.detail(bildirimId)}/iptal`, {
     method: "POST"
   });
+  logAction({ action: "BILDIRIM_CANCEL", payload: { bildirim_id: bildirimId } });
 }
 
 export async function markBildirimOkundu(bildirimId: number | string): Promise<Bildirim> {

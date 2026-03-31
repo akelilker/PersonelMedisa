@@ -5,7 +5,8 @@ import type {
   UpdateFinansKalemPayload
 } from "../types/finans";
 import { appendQueryParams } from "../utils/append-query-params";
-import { apiRequest } from "./client";
+import { logAction } from "../audit/audit-service";
+import { apiRequest } from "./api-client";
 import { endpoints } from "./endpoints";
 import { normalizePaginatedList } from "./response-normalizers";
 
@@ -99,7 +100,9 @@ export async function createFinansKalem(payload: CreateFinansKalemPayload): Prom
     body: JSON.stringify(payload)
   });
 
-  return normalizeFinansKalem(response.data);
+  const created = normalizeFinansKalem(response.data);
+  logAction({ action: "FINANS_CREATE", payload: { finans_id: created.id } });
+  return created;
 }
 
 export async function updateFinansKalem(
@@ -111,11 +114,14 @@ export async function updateFinansKalem(
     body: JSON.stringify(payload)
   });
 
-  return normalizeFinansKalem(response.data);
+  const updated = normalizeFinansKalem(response.data);
+  logAction({ action: "FINANS_UPDATE", payload: { finans_id: updated.id } });
+  return updated;
 }
 
 export async function cancelFinansKalem(kalemId: number | string): Promise<void> {
   await apiRequest<ApiResponse<unknown>>(`${endpoints.finans.detail(kalemId)}/iptal`, {
     method: "POST"
   });
+  logAction({ action: "FINANS_CANCEL", payload: { finans_id: kalemId } });
 }

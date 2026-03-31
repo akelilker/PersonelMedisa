@@ -116,7 +116,7 @@ export function ShellHeaderActions() {
   const navigate = useNavigate();
   const location = useLocation();
   const { logout } = useAuth();
-  const { hasPermission } = useRoleAccess();
+  const { hasPermission, uiProfile } = useRoleAccess();
 
   const canViewPersoneller = hasPermission("personeller.view");
   const canViewSurecler = hasPermission("surecler.view");
@@ -149,7 +149,8 @@ export function ShellHeaderActions() {
         : "/personeller";
 
   const notifications = useMemo(() => {
-    const reminderItems = buildReminderNotifications(new Date(), reminderRoute);
+    const reminderItems =
+      uiProfile === "birim_amiri" ? [] : buildReminderNotifications(new Date(), reminderRoute);
     const apiItems: HeaderNotification[] = headerBildirimler.map((item) => {
       const tarihText = item.tarih ? `Tarih: ${item.tarih}` : "";
       const personelText = item.personel_id ? `Personel: ${item.personel_id}` : "";
@@ -166,7 +167,7 @@ export function ShellHeaderActions() {
     });
 
     return [...reminderItems, ...apiItems];
-  }, [canViewBildirimDetay, headerBildirimler, reminderRoute]);
+  }, [canViewBildirimDetay, headerBildirimler, reminderRoute, uiProfile]);
 
   const visibleNotifications = useMemo(
     () =>

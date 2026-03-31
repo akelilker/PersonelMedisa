@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AUTH_FORBIDDEN_EVENT, AUTH_UNAUTHORIZED_EVENT } from "../../src/lib/storage/auth-events";
-import { apiRequest } from "../../src/api/client";
-import { getStoredAuthToken } from "../../src/lib/storage/auth-session";
+import { apiRequest } from "../../src/api/api-client";
+import { getAuthTokenForApi } from "../../src/auth/auth-token-provider";
 
-vi.mock("../../src/lib/storage/auth-session", () => ({
-  getStoredAuthToken: vi.fn(() => "test-token")
+vi.mock("../../src/auth/auth-token-provider", () => ({
+  getAuthTokenForApi: vi.fn(() => "test-token")
 }));
 
 type WindowLike = EventTarget;
@@ -23,12 +23,12 @@ function createJsonResponse(body: unknown, status: number) {
 }
 
 describe("apiRequest", () => {
-  const getStoredAuthTokenMock = vi.mocked(getStoredAuthToken);
+  const getAuthTokenForApiMock = vi.mocked(getAuthTokenForApi);
 
   beforeEach(() => {
     vi.stubGlobal("window", createWindowLike());
-    getStoredAuthTokenMock.mockReset();
-    getStoredAuthTokenMock.mockReturnValue("test-token");
+    getAuthTokenForApiMock.mockReset();
+    getAuthTokenForApiMock.mockReturnValue("test-token");
   });
 
   afterEach(() => {
@@ -47,7 +47,7 @@ describe("apiRequest", () => {
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     const headers = new Headers(init?.headers);
     expect(headers.get("Authorization")).toBe("Bearer test-token");
-    expect(getStoredAuthTokenMock).toHaveBeenCalledTimes(1);
+    expect(getAuthTokenForApiMock).toHaveBeenCalledTimes(1);
   });
 
   it("does not attach auth header for login endpoint", async () => {
@@ -64,7 +64,7 @@ describe("apiRequest", () => {
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     const headers = new Headers(init?.headers);
     expect(headers.get("Authorization")).toBeNull();
-    expect(getStoredAuthTokenMock).not.toHaveBeenCalled();
+    expect(getAuthTokenForApiMock).not.toHaveBeenCalled();
   });
 
   it("emits unauthorized event and throws ApiRequestError for 401 response", async () => {

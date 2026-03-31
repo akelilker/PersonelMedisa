@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from "react";
-import { ApiRequestError } from "../api/client";
+import { ApiRequestError } from "../api/api-client";
 import {
   cancelBildirim,
   createBildirim,

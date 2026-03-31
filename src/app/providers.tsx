@@ -1,6 +1,10 @@
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { BrowserRouter, useLocation, useNavigate } from "react-router-dom";
 import { onAuthForbidden } from "../lib/storage/auth-events";
+import {
+  onApiServerError,
+  type ApiServerErrorDetail
+} from "../lib/storage/api-global-events";
 import { AuthProvider } from "../state/auth.store";
 
 type AppProvidersProps = {
@@ -23,6 +27,29 @@ function resolveRouterBasename(): string | undefined {
 
 const ROUTER_BASENAME = resolveRouterBasename();
 
+function GlobalApiErrorBanner() {
+  const [detail, setDetail] = useState<ApiServerErrorDetail | null>(null);
+
+  useEffect(() => {
+    return onApiServerError((next) => {
+      setDetail(next);
+    });
+  }, []);
+
+  if (!detail) {
+    return null;
+  }
+
+  return (
+    <div className="global-api-error-banner" role="alert">
+      <p>{detail.message}</p>
+      <button type="button" onClick={() => setDetail(null)}>
+        Kapat
+      </button>
+    </div>
+  );
+}
+
 function AuthNavigationEffects() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -44,6 +71,7 @@ export function AppProviders({ children }: AppProvidersProps) {
   return (
     <BrowserRouter basename={ROUTER_BASENAME} future={ROUTER_FUTURE_FLAGS}>
       <AuthProvider>
+        <GlobalApiErrorBanner />
         <AuthNavigationEffects />
         {children}
       </AuthProvider>

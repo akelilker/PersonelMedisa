@@ -1,7 +1,8 @@
 import type { ApiResponse, PaginatedResult } from "../types/api";
 import type { Personel } from "../types/personel";
 import { appendQueryParams } from "../utils/append-query-params";
-import { apiRequest } from "./client";
+import { logAction } from "../audit/audit-service";
+import { apiRequest } from "./api-client";
 import { endpoints } from "./endpoints";
 import { normalizePaginatedList } from "./response-normalizers";
 
@@ -78,7 +79,9 @@ export async function createPersonel(payload: CreatePersonelPayload): Promise<Pe
     body: JSON.stringify(payload)
   });
 
-  return normalizePersonel(response.data);
+  const created = normalizePersonel(response.data);
+  logAction({ action: "PERSONEL_CREATE", payload: { personel_id: created.id } });
+  return created;
 }
 
 export async function fetchPersonelDetail(personelId: number | string): Promise<Personel> {
@@ -94,5 +97,7 @@ export async function updatePersonel(
     method: "PUT",
     body: JSON.stringify(payload)
   });
-  return normalizePersonel(response.data);
+  const updated = normalizePersonel(response.data);
+  logAction({ action: "PERSONEL_UPDATE", payload: { personel_id: updated.id } });
+  return updated;
 }

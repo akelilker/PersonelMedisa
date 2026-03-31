@@ -1,7 +1,7 @@
 import type { ApiMeta, ApiResponse } from "../types/api";
 import type { RaporFiltreleri, RaporSatiri, RaporSonuc, RaporTipi } from "../types/rapor";
 import { appendQueryParams } from "../utils/append-query-params";
-import { apiRequest } from "./client";
+import { apiRequest } from "./api-client";
 import { endpoints } from "./endpoints";
 import { extractListItems } from "./response-normalizers";
 

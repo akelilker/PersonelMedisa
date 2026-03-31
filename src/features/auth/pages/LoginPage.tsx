@@ -9,6 +9,7 @@ type LoginLocationState = {
 export function LoginPage() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [rememberMe, setRememberMe] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { isAuthenticated, login } = useAuth();
@@ -75,6 +76,16 @@ export function LoginPage() {
             onChange={(event) => setPassword(event.target.value)}
             required
           />
+        </label>
+
+        <label className="auth-field auth-field-inline">
+          <input
+            type="checkbox"
+            name="rememberMe"
+            checked={rememberMe}
+            onChange={(event) => setRememberMe(event.target.checked)}
+          />
+          <span>Beni hatirla (oturum tarayici kapansa da surer)</span>
         </label>
 
         {formError ? <p className="auth-error">{formError}</p> : null}

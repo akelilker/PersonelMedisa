@@ -3,10 +3,10 @@
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
-import { AuthGuard } from "../../src/app/auth-guard";
 import { AppProviders } from "../../src/app/providers";
+import { MEDISA_AUTH_SESSION_KEY } from "../../src/auth/auth-constants";
 import { emitAuthForbidden, emitAuthUnauthorized } from "../../src/lib/storage/auth-events";
-import { AUTH_STORAGE_KEY } from "../../src/lib/storage/auth-session";
+import { ProtectedRoute } from "../../src/router/ProtectedRoute";
 import { AuthProvider, useAuth } from "../../src/state/auth.store";
 import type { AuthSession, UserRole } from "../../src/types/auth";
 
@@ -18,7 +18,7 @@ const ROUTER_FUTURE_FLAGS = {
 function buildSession(role: UserRole): AuthSession {
   return {
     token: "test-token",
-    ui_profile: role === "BIRIM_AMIRI" ? "birim" : "yonetim",
+    ui_profile: role === "BIRIM_AMIRI" ? "birim_amiri" : "yonetim",
     user: {
       id: 1,
       ad_soyad: "Test Kullanici",
@@ -35,15 +35,17 @@ function AuthStateProbe() {
 describe("auth flow integration", () => {
   beforeEach(() => {
     window.localStorage.clear();
+    window.sessionStorage.clear();
   });
 
   afterEach(() => {
     cleanup();
     window.localStorage.clear();
+    window.sessionStorage.clear();
   });
 
   it("loads existing session from storage and authenticates provider state", () => {
-    window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(buildSession("GENEL_YONETICI")));
+    window.localStorage.setItem(MEDISA_AUTH_SESSION_KEY, JSON.stringify(buildSession("GENEL_YONETICI")));
 
     render(
       <AuthProvider>
@@ -55,7 +57,7 @@ describe("auth flow integration", () => {
   });
 
   it("force-logs out when unauthorized event is emitted", async () => {
-    window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(buildSession("MUHASEBE")));
+    window.localStorage.setItem(MEDISA_AUTH_SESSION_KEY, JSON.stringify(buildSession("MUHASEBE")));
 
     render(
       <AuthProvider>
@@ -76,7 +78,8 @@ describe("auth flow integration", () => {
       expect(screen.getByText("anon")).not.toBeNull();
     });
 
-    expect(window.localStorage.getItem(AUTH_STORAGE_KEY)).toBeNull();
+    expect(window.localStorage.getItem(MEDISA_AUTH_SESSION_KEY)).toBeNull();
+    expect(window.sessionStorage.getItem(MEDISA_AUTH_SESSION_KEY)).toBeNull();
   });
 
   it("redirects unauthenticated user to login route", () => {
@@ -87,9 +90,9 @@ describe("auth flow integration", () => {
             <Route
               path="/secured"
               element={
-                <AuthGuard>
+                <ProtectedRoute>
                   <div>Secure Page</div>
-                </AuthGuard>
+                </ProtectedRoute>
               }
             />
             <Route path="/login" element={<div>Login Page</div>} />
@@ -102,8 +105,8 @@ describe("auth flow integration", () => {
     expect(screen.queryByText("Secure Page")).toBeNull();
   });
 
-  it("redirects authenticated but unauthorized role to yetkisiz route", () => {
-    window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(buildSession("BIRIM_AMIRI")));
+  it("redirects authenticated but unauthorized permission to yetkisiz route", () => {
+    window.localStorage.setItem(MEDISA_AUTH_SESSION_KEY, JSON.stringify(buildSession("BIRIM_AMIRI")));
 
     render(
       <MemoryRouter initialEntries={["/secured"]} future={ROUTER_FUTURE_FLAGS}>
@@ -112,9 +115,9 @@ describe("auth flow integration", () => {
             <Route
               path="/secured"
               element={
-                <AuthGuard allowedRoles={["GENEL_YONETICI"]}>
+                <ProtectedRoute requirePermission="personeller.create">
                   <div>Secure Page</div>
-                </AuthGuard>
+                </ProtectedRoute>
               }
             />
             <Route path="/yetkisiz" element={<div>Yetkisiz Page</div>} />
@@ -128,7 +131,7 @@ describe("auth flow integration", () => {
   });
 
   it("navigates to yetkisiz page on forbidden auth event", async () => {
-    window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(buildSession("GENEL_YONETICI")));
+    window.localStorage.setItem(MEDISA_AUTH_SESSION_KEY, JSON.stringify(buildSession("GENEL_YONETICI")));
     window.history.pushState({}, "", "/surecler");
 
     render(

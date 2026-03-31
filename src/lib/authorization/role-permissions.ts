@@ -142,3 +142,14 @@ export const PUANTAJ_ALLOWED_ROLES = getRolesWithPermission("puantaj.view");
 export const HAFTALIK_KAPANIS_ALLOWED_ROLES = getRolesWithPermission("haftalik-kapanis.view");
 export const RAPORLAR_ALLOWED_ROLES = getRolesWithPermission("raporlar.view");
 export const FINANS_ALLOWED_ROLES = getRolesWithPermission("finans.view");
+
+/** Route guard: permission tek kaynak — roller derived. */
+export const ROUTE_PERMISSION = {
+  personelDetail: "personeller.detail.view",
+  surecDetail: "surecler.detail.view",
+  bildirimDetail: "bildirimler.detail.view",
+  puantajPage: "puantaj.view",
+  haftalikKapanisPage: "haftalik-kapanis.view",
+  raporlarPage: "raporlar.view",
+  finansPage: "finans.view"
+} as const satisfies Record<string, AppPermission>;

@@ -1,6 +1,7 @@
 import type { ApiResponse } from "../types/api";
 import type { HaftalikKapanisPayload, HaftalikKapanisSonuc } from "../types/haftalik-kapanis";
-import { apiRequest } from "./client";
+import { logAction } from "../audit/audit-service";
+import { apiRequest } from "./api-client";
 import { endpoints } from "./endpoints";
 
 function toRecord(value: unknown): Record<string, unknown> | null {
@@ -60,5 +61,10 @@ export async function createHaftalikKapanis(
     body: JSON.stringify(payload)
   });
 
-  return normalizeHaftalikKapanisSonuc(response.data);
+  const sonuc = normalizeHaftalikKapanisSonuc(response.data);
+  logAction({
+    action: "HAFTALIK_KAPANIS_CLOSE",
+    payload: { hafta_baslangic: payload.hafta_baslangic }
+  });
+  return sonuc;
 }

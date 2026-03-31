@@ -248,7 +248,7 @@ export function resolveDemoApiResponse(
   if (pathname === "/auth/login" && method === "POST") {
     const username = toStringValue(body.username) ?? "demo";
     const role = resolveDemoRole(username);
-    const profile = role === "BIRIM_AMIRI" ? "birim" : "yonetim";
+    const profile = role === "BIRIM_AMIRI" ? "birim_amiri" : "yonetim";
 
     return ok({
       token: "demo-token",

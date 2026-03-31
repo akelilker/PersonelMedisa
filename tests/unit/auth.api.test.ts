@@ -66,7 +66,7 @@ describe("auth.api login", () => {
     const session = await login({ username: "birim", password: "secret" });
     expect(session).toEqual({
       token: "raw-token",
-      ui_profile: "birim",
+      ui_profile: "birim_amiri",
       user: {
         id: 12,
         ad_soyad: "Birim Kullanici",
@@ -107,7 +107,7 @@ describe("auth.api login", () => {
 
     const session = await login({ username: "birim_demo", password: "secret" });
     expect(session.user.rol).toBe("BIRIM_AMIRI");
-    expect(session.ui_profile).toBe("birim");
+    expect(session.ui_profile).toBe("birim_amiri");
   });
 
   it("falls back to demo session when backend returns html payload", async () => {

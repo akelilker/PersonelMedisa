@@ -1,6 +1,6 @@
 import type { ApiResponse } from "../types/api";
 import type { IdOption, KeyOption } from "../types/referans";
-import { apiRequest } from "./client";
+import { apiRequest } from "./api-client";
 import { endpoints } from "./endpoints";
 import { extractListItems } from "./response-normalizers";
 

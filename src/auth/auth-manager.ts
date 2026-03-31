@@ -1,9 +1,32 @@
 import { clearAllAppPersistence } from "../data/data-manager";
 import type { AuthSession, AuthUser, LoginCredentials } from "../types/auth";
 import { login as requestLoginSession } from "../api/auth.api";
+import { MEDISA_AUTH_SESSION_KEY } from "./auth-constants";
 import { registerAuthTokenSource } from "./auth-token-provider";
 
-export const MEDISA_AUTH_SESSION_KEY = "medisa_auth_session";
+export { MEDISA_AUTH_SESSION_KEY };
+const LEGACY_AUTH_SESSION_KEY = "medisa.auth.session.v1";
+
+function migrateLegacyAuthIfNeeded(): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    const raw = window.localStorage.getItem(LEGACY_AUTH_SESSION_KEY);
+    if (!raw) {
+      return;
+    }
+
+    const session = parseStored(raw);
+    if (session) {
+      window.localStorage.setItem(MEDISA_AUTH_SESSION_KEY, JSON.stringify(session));
+    }
+    window.localStorage.removeItem(LEGACY_AUTH_SESSION_KEY);
+  } catch {
+    /* ignore */
+  }
+}
 
 function isAuthSession(value: unknown): value is AuthSession {
   if (typeof value !== "object" || value === null) {
@@ -56,6 +79,8 @@ function readRawFromStorages(): { storage: Storage; raw: string } | null {
 }
 
 export function getSession(): AuthSession | null {
+  migrateLegacyAuthIfNeeded();
+
   const located = readRawFromStorages();
   if (!located) {
     return null;

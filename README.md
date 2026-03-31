@@ -1,4 +1,4 @@
-﻿# Medisa Personel ve Puantaj Yonetim Sistemi
+# Medisa Personel ve Puantaj Yonetim Sistemi
 
 Bu repo, Medisa Personel ve Puantaj Yonetim Sistemi icin React + Vite + TypeScript tabanli calisan baslangic scaffold'idir.
 

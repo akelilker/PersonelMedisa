@@ -61,6 +61,7 @@ function RealtimeBridge() {
       return () => undefined;
     }
 
+    disconnect();
     connect();
     const unsub = onMessage(handleRealtimeEnvelope);
 
@@ -68,7 +69,7 @@ function RealtimeBridge() {
       unsub();
       disconnect();
     };
-  }, [session?.token]);
+  }, [session?.token, session?.active_sube_id]);
 
   return null;
 }

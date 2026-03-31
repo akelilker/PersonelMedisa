@@ -14,6 +14,7 @@ import {
   setActiveSubeId as persistActiveSubeId
 } from "../auth/auth-manager";
 import { bumpAppDataRevision, clearAllAppPersistence, loadDataFromServer } from "../data/data-manager";
+import { disconnect as disconnectRealtime } from "../realtime/realtime-manager";
 import { onAuthUnauthorized } from "../lib/storage/auth-events";
 import type { AuthSession, LoginCredentials } from "../types/auth";
 
@@ -35,6 +36,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [session, setSession] = useState<AuthSession | null>(() => getSession());
 
   const forceLogout = useCallback(() => {
+    disconnectRealtime();
     clearAuthEverywhere();
     clearAllAppPersistence();
     setSession(null);
@@ -52,6 +54,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, []);
 
   const logout = useCallback(() => {
+    disconnectRealtime();
     clearAuthEverywhere();
     clearAllAppPersistence();
     setSession(null);

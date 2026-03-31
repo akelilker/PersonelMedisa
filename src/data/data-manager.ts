@@ -724,7 +724,7 @@ function realtimeSubeMatchesActive(eventSube: number | undefined): boolean {
     return true;
   }
   if (eventSube === undefined) {
-    return true;
+    return false;
   }
   return eventSube === active;
 }

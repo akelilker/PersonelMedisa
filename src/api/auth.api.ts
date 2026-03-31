@@ -56,7 +56,7 @@ function normalizeRole(value: unknown): AuthSession["user"]["rol"] | null {
 }
 
 function deriveUiProfile(role: AuthSession["user"]["rol"]): AuthSession["ui_profile"] {
-  return role === "BIRIM_AMIRI" ? "birim" : "yonetim";
+  return role === "BIRIM_AMIRI" ? "birim_amiri" : "yonetim";
 }
 
 function extractErrorMessage(payload: unknown): string | null {
@@ -104,12 +104,14 @@ function normalizeAuthSession(payload: unknown): AuthSession | null {
     readString(userSource.ad);
 
   const uiProfileRaw = readString(source.ui_profile) ?? readString(source.uiProfile);
-  const uiProfile =
-    uiProfileRaw === "yonetim" || uiProfileRaw === "birim"
-      ? uiProfileRaw
-      : role
-      ? deriveUiProfile(role)
-      : null;
+  let uiProfile: AuthSession["ui_profile"] | null = null;
+  if (uiProfileRaw === "yonetim" || uiProfileRaw === "birim_amiri") {
+    uiProfile = uiProfileRaw;
+  } else if (uiProfileRaw === "birim") {
+    uiProfile = "birim_amiri";
+  } else if (role) {
+    uiProfile = deriveUiProfile(role);
+  }
 
   if (!token || userId === null || !fullName || !role || !uiProfile) {
     return null;

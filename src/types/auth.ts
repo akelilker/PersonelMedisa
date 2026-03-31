@@ -4,7 +4,7 @@ export type UserRole =
   | "MUHASEBE"
   | "BIRIM_AMIRI";
 
-export type UiProfile = "yonetim" | "birim";
+export type UiProfile = "yonetim" | "birim_amiri";
 
 export type AuthUser = {
   id: number;

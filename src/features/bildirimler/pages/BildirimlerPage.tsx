@@ -303,7 +303,7 @@ export function BildirimlerPage() {
         {canCreateBildirim ? (
           <button
             type="button"
-            className="state-action-btn"
+            className="universal-btn-aux"
             onClick={() => {
               setCreateErrorMessage(null);
               setCreateForm(INITIAL_BILDIRIM_FORM);
@@ -362,10 +362,10 @@ export function BildirimlerPage() {
         </div>
 
         <div className="module-filter-actions">
-          <button type="submit" className="state-action-btn">
+          <button type="submit" className="universal-btn-aux">
             Filtrele
           </button>
-          <button type="button" className="state-action-btn" onClick={handleFilterClear}>
+          <button type="button" className="universal-btn-aux" onClick={handleFilterClear}>
             Temizle
           </button>
         </div>
@@ -396,14 +396,14 @@ export function BildirimlerPage() {
               {canOpenBildirimDetail || canEditBildirim || canCancelBildirim ? (
                 <div className="module-item-actions">
                   {canOpenBildirimDetail ? (
-                    <Link to={`/bildirimler/${bildirim.id}`} className="state-action-btn">
+                    <Link to={`/bildirimler/${bildirim.id}`} className="universal-btn-aux">
                       Detay
                     </Link>
                   ) : null}
                   {canEditBildirim ? (
                     <button
                       type="button"
-                      className="state-action-btn"
+                      className="universal-btn-aux"
                       onClick={() => openEditModal(bildirim)}
                       disabled={cancelingBildirimId === bildirim.id}
                     >
@@ -413,7 +413,7 @@ export function BildirimlerPage() {
                   {canCancelBildirim ? (
                     <button
                       type="button"
-                      className="state-action-btn"
+                      className="universal-btn-aux"
                       onClick={() => void handleCancelBildirim(bildirim)}
                       disabled={cancelingBildirimId === bildirim.id}
                     >
@@ -430,7 +430,7 @@ export function BildirimlerPage() {
       <div className="module-pagination">
         <button
           type="button"
-          className="state-action-btn"
+          className="universal-btn-aux"
           onClick={() => setPage((prev) => Math.max(1, prev - 1))}
           disabled={isLoading || page <= 1}
         >
@@ -442,7 +442,7 @@ export function BildirimlerPage() {
         </span>
         <button
           type="button"
-          className="state-action-btn"
+          className="universal-btn-aux"
           onClick={() => setPage((prev) => prev + 1)}
           disabled={isLoading || !hasNextPage}
         >

@@ -312,7 +312,7 @@ export function SurecTakipPage() {
         {canCreateSurec ? (
           <button
             type="button"
-            className="state-action-btn"
+            className="universal-btn-aux"
             onClick={() => {
               setCreateErrorMessage(null);
               setCreateForm(INITIAL_SUREC_FORM);
@@ -387,10 +387,10 @@ export function SurecTakipPage() {
         </div>
 
         <div className="module-filter-actions">
-          <button type="submit" className="state-action-btn">
+          <button type="submit" className="universal-btn-aux">
             Filtrele
           </button>
-          <button type="button" className="state-action-btn" onClick={handleFilterClear}>
+          <button type="button" className="universal-btn-aux" onClick={handleFilterClear}>
             Temizle
           </button>
         </div>
@@ -421,14 +421,14 @@ export function SurecTakipPage() {
               {canOpenSurecDetail || canEditSurec || canCancelSurec ? (
                 <div className="module-item-actions">
                   {canOpenSurecDetail ? (
-                    <Link to={`/surecler/${surec.id}`} className="state-action-btn">
+                    <Link to={`/surecler/${surec.id}`} className="universal-btn-aux">
                       Detay
                     </Link>
                   ) : null}
                   {canEditSurec ? (
                     <button
                       type="button"
-                      className="state-action-btn"
+                      className="universal-btn-aux"
                       onClick={() => openEditModal(surec)}
                       disabled={cancelingSurecId === surec.id}
                     >
@@ -438,7 +438,7 @@ export function SurecTakipPage() {
                   {canCancelSurec ? (
                     <button
                       type="button"
-                      className="state-action-btn"
+                      className="universal-btn-aux"
                       onClick={() => void handleCancelSurec(surec)}
                       disabled={cancelingSurecId === surec.id}
                     >
@@ -455,7 +455,7 @@ export function SurecTakipPage() {
       <div className="module-pagination">
         <button
           type="button"
-          className="state-action-btn"
+          className="universal-btn-aux"
           onClick={() => setPage((prev) => Math.max(1, prev - 1))}
           disabled={isLoading || page <= 1}
         >
@@ -467,7 +467,7 @@ export function SurecTakipPage() {
         </span>
         <button
           type="button"
-          className="state-action-btn"
+          className="universal-btn-aux"
           onClick={() => setPage((prev) => prev + 1)}
           disabled={isLoading || !hasNextPage}
         >

@@ -4,7 +4,11 @@ import footerLogo from "../../assets/brand/logo-footer.svg";
 export function AppFooter() {
   const [isDimmed, setIsDimmed] = useState(true);
   const [isDelayed, setIsDelayed] = useState(false);
-  const systemStatus: "ready" | "error" = "ready";
+  const [online, setOnline] = useState(() =>
+    typeof navigator !== "undefined" ? navigator.onLine : true
+  );
+
+  const systemStatus: "ready" | "error" = online ? "ready" : "error";
 
   useEffect(() => {
     setIsDimmed(true);
@@ -19,11 +23,27 @@ export function AppFooter() {
     };
   }, []);
 
+  useEffect(() => {
+    function onOnline() {
+      setOnline(true);
+    }
+    function onOffline() {
+      setOnline(false);
+    }
+
+    window.addEventListener("online", onOnline);
+    window.addEventListener("offline", onOffline);
+    return () => {
+      window.removeEventListener("online", onOnline);
+      window.removeEventListener("offline", onOffline);
+    };
+  }, []);
+
   const footerStateClasses = [isDimmed ? "dimmed" : "", isDelayed ? "delayed" : ""]
     .filter(Boolean)
     .join(" ");
   const statusClassName = `status ${systemStatus === "ready" ? "status-ready" : "status-error"}`;
-  const statusLabel = systemStatus === "ready" ? "Sistem Hazir" : "Sistem Hata";
+  const statusLabel = systemStatus === "ready" ? "Sistem Hazir" : "Baglanti Yok";
 
   return (
     <footer id="app-footer" className={footerStateClasses || undefined}>

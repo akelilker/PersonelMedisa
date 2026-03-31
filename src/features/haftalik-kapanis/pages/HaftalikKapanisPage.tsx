@@ -176,7 +176,7 @@ export function HaftalikKapanisPage() {
         </div>
 
         <div className="module-filter-actions">
-          <button type="submit" className="state-action-btn" disabled={!canCloseWeek || isSubmitting}>
+          <button type="submit" className="universal-btn-aux" disabled={!canCloseWeek || isSubmitting}>
             {isSubmitting ? "Kapanis Aliniyor..." : "Haftayi Kapat"}
           </button>
         </div>

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { createPersonel, fetchPersonellerList } from "../../../api/personeller.api";
 import {
+  fetchBagliAmirOptions,
   fetchDepartmanOptions,
   fetchGorevOptions,
   fetchPersonelTipiOptions
@@ -35,6 +36,9 @@ type CreatePersonelFormState = {
   gorevId: string;
   personelTipiId: string;
   aktifDurum: "AKTIF" | "PASIF";
+  dogumYeri: string;
+  kanGrubu: string;
+  bagliAmirId: string;
 };
 
 const INITIAL_CREATE_FORM: CreatePersonelFormState = {
@@ -50,7 +54,10 @@ const INITIAL_CREATE_FORM: CreatePersonelFormState = {
   departmanId: "",
   gorevId: "",
   personelTipiId: "",
-  aktifDurum: "AKTIF"
+  aktifDurum: "AKTIF",
+  dogumYeri: "",
+  kanGrubu: "",
+  bagliAmirId: ""
 };
 
 function parseRequiredPositiveInt(value: string, label: string) {
@@ -59,6 +66,18 @@ function parseRequiredPositiveInt(value: string, label: string) {
     throw new Error(`${label} pozitif sayi olmalidir.`);
   }
 
+  return number;
+}
+
+function parseOptionalPositiveInt(value: string): number | undefined {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+  const number = Number.parseInt(trimmed, 10);
+  if (Number.isNaN(number) || number <= 0) {
+    return undefined;
+  }
   return number;
 }
 
@@ -82,6 +101,7 @@ export function PersonellerPage() {
   const [departmanOptions, setDepartmanOptions] = useState<IdOption[]>([]);
   const [gorevOptions, setGorevOptions] = useState<IdOption[]>([]);
   const [personelTipiOptions, setPersonelTipiOptions] = useState<IdOption[]>([]);
+  const [bagliAmirOptions, setBagliAmirOptions] = useState<IdOption[]>([]);
   const [referenceError, setReferenceError] = useState<string | null>(null);
   const { hasPermission } = useRoleAccess();
   const canCreatePersonel = hasPermission("personeller.create");
@@ -120,10 +140,11 @@ export function PersonellerPage() {
     async function loadReferences() {
       setReferenceError(null);
       try {
-        const [departmanlar, gorevler, personelTipleri] = await Promise.all([
+        const [departmanlar, gorevler, personelTipleri, bagliAmirler] = await Promise.all([
           fetchDepartmanOptions(),
           fetchGorevOptions(),
-          fetchPersonelTipiOptions()
+          fetchPersonelTipiOptions(),
+          fetchBagliAmirOptions()
         ]);
 
         if (isCancelled) {
@@ -133,6 +154,7 @@ export function PersonellerPage() {
         setDepartmanOptions(departmanlar);
         setGorevOptions(gorevler);
         setPersonelTipiOptions(personelTipleri);
+        setBagliAmirOptions(bagliAmirler);
       } catch (error) {
         if (isCancelled) {
           return;
@@ -185,6 +207,7 @@ export function PersonellerPage() {
     setIsCreateSubmitting(true);
 
     try {
+      const bagliAmirId = parseOptionalPositiveInt(createForm.bagliAmirId);
       await createPersonel({
         tc_kimlik_no: createForm.tcKimlikNo.trim(),
         ad: createForm.ad.trim(),
@@ -198,7 +221,10 @@ export function PersonellerPage() {
         departman_id: parseRequiredPositiveInt(createForm.departmanId, "Departman ID"),
         gorev_id: parseRequiredPositiveInt(createForm.gorevId, "Gorev ID"),
         personel_tipi_id: parseRequiredPositiveInt(createForm.personelTipiId, "Personel Tipi ID"),
-        aktif_durum: createForm.aktifDurum
+        aktif_durum: createForm.aktifDurum,
+        ...(createForm.dogumYeri.trim() ? { dogum_yeri: createForm.dogumYeri.trim() } : {}),
+        ...(createForm.kanGrubu.trim() ? { kan_grubu: createForm.kanGrubu.trim() } : {}),
+        ...(bagliAmirId !== undefined ? { bagli_amir_id: bagliAmirId } : {})
       });
 
       setIsCreateModalOpen(false);
@@ -224,7 +250,7 @@ export function PersonellerPage() {
         {canCreatePersonel ? (
           <button
             type="button"
-            className="state-action-btn"
+            className="universal-btn-aux"
             onClick={() => {
               setCreateErrorMessage(null);
               setIsCreateModalOpen(true);
@@ -263,10 +289,10 @@ export function PersonellerPage() {
         </div>
 
         <div className="module-filter-actions">
-          <button type="submit" className="state-action-btn">
+          <button type="submit" className="universal-btn-aux">
             Filtrele
           </button>
-          <button type="button" className="state-action-btn" onClick={handleFilterClear}>
+          <button type="button" className="universal-btn-aux" onClick={handleFilterClear}>
             Temizle
           </button>
         </div>
@@ -302,7 +328,7 @@ export function PersonellerPage() {
       <div className="module-pagination">
         <button
           type="button"
-          className="state-action-btn"
+          className="universal-btn-aux"
           onClick={() => setPage((prev) => Math.max(1, prev - 1))}
           disabled={isLoading || page <= 1}
         >
@@ -314,7 +340,7 @@ export function PersonellerPage() {
         </span>
         <button
           type="button"
-          className="state-action-btn"
+          className="universal-btn-aux"
           onClick={() => setPage((prev) => prev + 1)}
           disabled={isLoading || !hasNextPage}
         >
@@ -415,6 +441,28 @@ export function PersonellerPage() {
               </label>
 
               <label className="module-filter-field">
+                <span>Dogum Yeri</span>
+                <input
+                  type="text"
+                  value={createForm.dogumYeri}
+                  onChange={(event) =>
+                    setCreateForm((prev) => ({ ...prev, dogumYeri: event.target.value }))
+                  }
+                />
+              </label>
+
+              <label className="module-filter-field">
+                <span>Kan Grubu</span>
+                <input
+                  type="text"
+                  value={createForm.kanGrubu}
+                  onChange={(event) =>
+                    setCreateForm((prev) => ({ ...prev, kanGrubu: event.target.value }))
+                  }
+                />
+              </label>
+
+              <label className="module-filter-field">
                 <span>Sicil No</span>
                 <input
                   type="text"
@@ -494,6 +542,34 @@ export function PersonellerPage() {
                     setCreateForm((prev) => ({ ...prev, gorevId: event.target.value }))
                   }
                   required
+                />
+              )}
+            </label>
+
+            <label className="module-filter-field">
+              <span>Bagli Amir</span>
+              {bagliAmirOptions.length > 0 ? (
+                <select
+                  value={createForm.bagliAmirId}
+                  onChange={(event) =>
+                    setCreateForm((prev) => ({ ...prev, bagliAmirId: event.target.value }))
+                  }
+                >
+                  <option value="">Seciniz</option>
+                  {bagliAmirOptions.map((option) => (
+                    <option key={option.id} value={option.id}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  type="number"
+                  min={1}
+                  value={createForm.bagliAmirId}
+                  onChange={(event) =>
+                    setCreateForm((prev) => ({ ...prev, bagliAmirId: event.target.value }))
+                  }
                 />
               )}
             </label>

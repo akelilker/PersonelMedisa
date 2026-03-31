@@ -64,6 +64,7 @@ docs/
     06-proje-scaffold.md
     07-is-akislari-ve-senaryolar.md
     08-frontend-teknik-mimari.md
+    09-rol-yetki-matrisi.md
 ```
 
 ## 3. `public/` Klasörü
@@ -184,7 +185,8 @@ Uygulamanın ortak, tekrar kullanılabilir UI parçaları burada yaşar.
 
 ```text
 src/components/
-  app-shell/
+  shell/
+  main-menu/
   hero/
   icons-row/
   notifications/

@@ -3,10 +3,11 @@ import { useEffect, type ReactNode } from "react";
 type AppModalProps = {
   title: string;
   children?: ReactNode;
+  footer?: ReactNode;
   onClose?: () => void;
 };
 
-export function AppModal({ title, children, onClose }: AppModalProps) {
+export function AppModal({ title, children, footer, onClose }: AppModalProps) {
   useEffect(() => {
     const body = document.body;
     const currentOpenCount = Number.parseInt(body.dataset.modalOpenCount ?? "0", 10) || 0;
@@ -62,6 +63,7 @@ export function AppModal({ title, children, onClose }: AppModalProps) {
           ) : null}
         </div>
         <div className="modal-body">{children}</div>
+        {footer ? <div className="modal-footer">{footer}</div> : null}
       </div>
     </div>
   );

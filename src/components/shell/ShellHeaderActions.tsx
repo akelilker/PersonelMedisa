@@ -1,0 +1,443 @@
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { fetchBildirimlerList } from "../../api/bildirimler.api";
+import { useRoleAccess } from "../../hooks/use-role-access";
+import { useAuth } from "../../state/auth.store";
+
+type NotificationLevel = "neutral" | "warning" | "critical";
+
+type HeaderNotification = {
+  id: string;
+  title: string;
+  subtitle: string;
+  level: NotificationLevel;
+  route: string;
+  unread: boolean;
+};
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function startOfDay(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function formatDate(date: Date) {
+  return new Intl.DateTimeFormat("tr-TR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric"
+  }).format(date);
+}
+
+function getReminderSubtitle(daysLeft: number, dueDate: Date) {
+  if (daysLeft <= 0) {
+    return `Bugun son gun (${formatDate(dueDate)})`;
+  }
+
+  return `${daysLeft} gun kaldi (${formatDate(dueDate)})`;
+}
+
+function buildReminderNotifications(baseDate: Date, route: string): HeaderNotification[] {
+  const start = startOfDay(baseDate);
+  const reminders = [
+    {
+      key: "salary",
+      dayOfMonth: 5,
+      title: "Maas odeme zamani yaklasiyor",
+      route
+    },
+    {
+      key: "sgk",
+      dayOfMonth: 26,
+      title: "SGK prim odeme takibini kontrol et",
+      route
+    }
+  ];
+
+  return reminders
+    .map((reminder): HeaderNotification | null => {
+      const dueDate = new Date(start.getFullYear(), start.getMonth(), reminder.dayOfMonth);
+      if (dueDate.getTime() < start.getTime()) {
+        dueDate.setMonth(dueDate.getMonth() + 1);
+      }
+
+      const daysLeft = Math.ceil((startOfDay(dueDate).getTime() - start.getTime()) / DAY_MS);
+      if (daysLeft > 10) {
+        return null;
+      }
+
+      return {
+        id: `reminder-${reminder.key}`,
+        title: reminder.title,
+        subtitle: getReminderSubtitle(daysLeft, dueDate),
+        level: daysLeft <= 2 ? "critical" : "warning",
+        route: reminder.route,
+        unread: true
+      };
+    })
+    .filter((item): item is HeaderNotification => item !== null);
+}
+
+function formatBildirimTuru(value: string) {
+  return value
+    .toLowerCase()
+    .split("_")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function mapBildirimLevel(bildirimTuru: string): NotificationLevel {
+  const normalized = bildirimTuru.toUpperCase();
+
+  if (
+    normalized.includes("DEVAMSIZLIK") ||
+    normalized.includes("GELMEDI") ||
+    normalized.includes("IZINSIZ") ||
+    normalized.includes("UYARI")
+  ) {
+    return "critical";
+  }
+
+  if (
+    normalized.includes("GEC") ||
+    normalized.includes("RAPOR") ||
+    normalized.includes("YAKLASAN")
+  ) {
+    return "warning";
+  }
+
+  return "neutral";
+}
+
+export function ShellHeaderActions() {
+  const rootRef = useRef<HTMLDivElement | null>(null);
+
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { logout } = useAuth();
+  const { hasPermission } = useRoleAccess();
+
+  const canViewPersoneller = hasPermission("personeller.view");
+  const canViewSurecler = hasPermission("surecler.view");
+  const canViewBildirimler = hasPermission("bildirimler.view");
+  const canViewBildirimDetay = hasPermission("bildirimler.detail.view");
+  const canViewPuantaj = hasPermission("puantaj.view");
+  const canViewHaftalikKapanis = hasPermission("haftalik-kapanis.view");
+  const canViewRaporlar = hasPermission("raporlar.view");
+  const canViewFinans = hasPermission("finans.view");
+
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isNotificationsLoading, setIsNotificationsLoading] = useState(false);
+  const [notificationError, setNotificationError] = useState<string | null>(null);
+  const [notifications, setNotifications] = useState<HeaderNotification[]>([]);
+  const [readNotificationIds, setReadNotificationIds] = useState<Record<string, true>>({});
+
+  const reminderRoute = canViewFinans
+    ? "/finans"
+    : canViewRaporlar
+      ? "/raporlar"
+      : canViewBildirimler
+        ? "/bildirimler"
+        : "/personeller";
+
+  const visibleNotifications = useMemo(
+    () =>
+      notifications.map((item) => ({
+        ...item,
+        unread: item.unread && !readNotificationIds[item.id]
+      })),
+    [notifications, readNotificationIds]
+  );
+
+  const unreadCount = visibleNotifications.filter((item) => item.unread).length;
+  const hasCriticalUnread = visibleNotifications.some(
+    (item) => item.unread && item.level === "critical"
+  );
+  const hasWarningUnread = visibleNotifications.some((item) => item.unread && item.level === "warning");
+
+  useEffect(() => {
+    setIsNotificationsOpen(false);
+    setIsSettingsOpen(false);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    function handleDocumentClick(event: MouseEvent) {
+      const target = event.target as Node;
+      if (rootRef.current && !rootRef.current.contains(target)) {
+        setIsNotificationsOpen(false);
+        setIsSettingsOpen(false);
+      }
+    }
+
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setIsNotificationsOpen(false);
+        setIsSettingsOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleDocumentClick);
+    document.addEventListener("keydown", handleEscape);
+
+    return () => {
+      document.removeEventListener("mousedown", handleDocumentClick);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, []);
+
+  useEffect(() => {
+    let isCancelled = false;
+
+    async function loadHeaderNotifications() {
+      setIsNotificationsLoading(true);
+      setNotificationError(null);
+
+      try {
+        const reminderItems = buildReminderNotifications(new Date(), reminderRoute);
+        const apiItems: HeaderNotification[] = [];
+
+        if (canViewBildirimler) {
+          const response = await fetchBildirimlerList({ page: 1, limit: 8 });
+          response.items.forEach((item) => {
+            const tarihText = item.tarih ? `Tarih: ${item.tarih}` : "";
+            const personelText = item.personel_id ? `Personel: ${item.personel_id}` : "";
+            const subtitle = [tarihText, personelText].filter(Boolean).join(" | ") || "Islem gerektiriyor";
+
+            apiItems.push({
+              id: `api-${item.id}`,
+              title: formatBildirimTuru(item.bildirim_turu),
+              subtitle,
+              level: mapBildirimLevel(item.bildirim_turu),
+              route: canViewBildirimDetay ? `/bildirimler/${item.id}` : "/bildirimler",
+              unread: item.state !== "IPTAL"
+            });
+          });
+        }
+
+        if (!isCancelled) {
+          setNotifications([...reminderItems, ...apiItems]);
+        }
+      } catch (error) {
+        if (isCancelled) {
+          return;
+        }
+
+        setNotificationError(
+          error instanceof Error ? error.message : "Bildirimler yuklenemedi, hatirlatmalar gosteriliyor."
+        );
+        setNotifications(buildReminderNotifications(new Date(), reminderRoute));
+      } finally {
+        if (!isCancelled) {
+          setIsNotificationsLoading(false);
+        }
+      }
+    }
+
+    void loadHeaderNotifications();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [canViewBildirimDetay, canViewBildirimler, canViewFinans, canViewRaporlar, reminderRoute]);
+
+  function navigateTo(path: string) {
+    setIsNotificationsOpen(false);
+    setIsSettingsOpen(false);
+    navigate(path);
+  }
+
+  function handleNotificationClick(notification: HeaderNotification) {
+    setReadNotificationIds((prev) => ({
+      ...prev,
+      [notification.id]: true
+    }));
+    navigateTo(notification.route);
+  }
+
+  function markAllNotificationsAsRead() {
+    const nextMap: Record<string, true> = {};
+    visibleNotifications.forEach((item) => {
+      if (item.unread) {
+        nextMap[item.id] = true;
+      }
+    });
+
+    setReadNotificationIds((prev) => ({
+      ...prev,
+      ...nextMap
+    }));
+  }
+
+  const notificationButtonClassName = [
+    "icon-btn",
+    hasCriticalUnread ? "notification-red" : "",
+    !hasCriticalUnread && hasWarningUnread ? "notification-orange" : "",
+    hasCriticalUnread ? "notification-pulse" : ""
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  return (
+    <div className="icons-row" ref={rootRef}>
+      <div className="icons-row-left" />
+      <div className="pwa-install-center" />
+      <div className="icons-row-right">
+        <button
+          id="notifications-toggle-btn"
+          type="button"
+          className={notificationButtonClassName}
+          onClick={() => {
+            setIsNotificationsOpen((prev) => !prev);
+            setIsSettingsOpen(false);
+          }}
+          aria-label="Bildirimleri ac"
+          aria-expanded={isNotificationsOpen}
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="22"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
+            <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+          </svg>
+        </button>
+
+        <div
+          id="notifications-dropdown"
+          className={`settings-dropdown notifications-dropdown${isNotificationsOpen ? " open" : ""}`}
+        >
+          {isNotificationsLoading ? (
+            <button type="button" className="notification-item notification-empty" disabled>
+              Bildirimler yukleniyor...
+            </button>
+          ) : null}
+
+          {!isNotificationsLoading && unreadCount > 0 ? (
+            <div className="notifications-toolbar">
+              <button
+                type="button"
+                className="notifications-mark-all-read-btn"
+                onClick={markAllNotificationsAsRead}
+              >
+                Tumunu okundu isaretle
+              </button>
+            </div>
+          ) : null}
+
+          {!isNotificationsLoading &&
+            visibleNotifications.map((notification) => (
+              <button
+                key={notification.id}
+                type="button"
+                className={[
+                  "notification-item",
+                  notification.level === "critical" ? "date-warning-red-border" : "",
+                  notification.level === "warning" ? "date-warning-orange-border" : "",
+                  notification.unread ? "notification-unread" : ""
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
+                onClick={() => handleNotificationClick(notification)}
+              >
+                <div className="notif-line1">{notification.title}</div>
+                <div className="notif-line2">{notification.subtitle}</div>
+              </button>
+            ))}
+
+          {!isNotificationsLoading && visibleNotifications.length === 0 ? (
+            <button type="button" className="notification-item notification-empty" disabled>
+              Bildirim Yok
+            </button>
+          ) : null}
+
+          {notificationError ? <p className="notification-error">{notificationError}</p> : null}
+        </div>
+
+        <button
+          type="button"
+          className="icon-btn"
+          onClick={() => {
+            setIsSettingsOpen((prev) => !prev);
+            setIsNotificationsOpen(false);
+          }}
+          aria-label="Ayar menusu"
+          aria-expanded={isSettingsOpen}
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" />
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.6h.09a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9v.09a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+          </svg>
+        </button>
+
+        <div id="settings-menu" className={`settings-dropdown${isSettingsOpen ? " open" : ""}`}>
+          {canViewPersoneller ? (
+            <button type="button" onClick={() => navigateTo("/personeller")}>
+              Personeller
+            </button>
+          ) : null}
+          {canViewSurecler ? (
+            <button type="button" onClick={() => navigateTo("/surecler")}>
+              Surecler
+            </button>
+          ) : null}
+          {canViewBildirimler ? (
+            <button type="button" onClick={() => navigateTo("/bildirimler")}>
+              Bildirimler
+            </button>
+          ) : null}
+          {canViewPuantaj ? (
+            <button type="button" onClick={() => navigateTo("/puantaj")}>
+              Puantaj
+            </button>
+          ) : null}
+          {canViewHaftalikKapanis ? (
+            <button type="button" onClick={() => navigateTo("/haftalik-kapanis")}>
+              Haftalik Kapanis
+            </button>
+          ) : null}
+          {canViewRaporlar ? (
+            <button type="button" onClick={() => navigateTo("/raporlar")}>
+              Raporlar
+            </button>
+          ) : null}
+          {canViewFinans ? (
+            <button type="button" onClick={() => navigateTo("/finans")}>
+              Finans
+            </button>
+          ) : null}
+          <button
+            type="button"
+            className="settings-logout-btn"
+            onClick={() => {
+              setIsSettingsOpen(false);
+              logout();
+            }}
+          >
+            Cikis
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}

@@ -218,10 +218,10 @@ export function RaporlarPage() {
         </div>
 
         <div className="module-filter-actions">
-          <button type="submit" className="state-action-btn" disabled={isLoading}>
+          <button type="submit" className="universal-btn-aux" disabled={isLoading}>
             Raporu Calistir
           </button>
-          <button type="button" className="state-action-btn" onClick={handleClear} disabled={isLoading}>
+          <button type="button" className="universal-btn-aux" onClick={handleClear} disabled={isLoading}>
             Temizle
           </button>
         </div>

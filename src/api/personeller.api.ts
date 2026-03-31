@@ -28,6 +28,9 @@ export type CreatePersonelPayload = {
   gorev_id: number;
   personel_tipi_id: number;
   aktif_durum: "AKTIF" | "PASIF";
+  dogum_yeri?: string;
+  kan_grubu?: string;
+  bagli_amir_id?: number;
 };
 
 export type UpdatePersonelPayload = Partial<CreatePersonelPayload>;

@@ -8,7 +8,7 @@ export function ErrorState({ message, onRetry }: ErrorStateProps) {
     <div className="state-card state-error">
       <p>{message}</p>
       {onRetry ? (
-        <button type="button" className="state-action-btn" onClick={onRetry}>
+        <button type="button" className="universal-btn-aux" onClick={onRetry}>
           Tekrar Dene
         </button>
       ) : null}

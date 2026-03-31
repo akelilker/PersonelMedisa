@@ -60,3 +60,34 @@
   font-weight: 700;
   box-shadow: inset 0 0 0 1px rgba(var(--theme-color-rgb), 0.35);
 }
+
+/* Ikincil sayfa aksiyonlari: filtre, liste baglantisi, sayfalama — tek yardimci tur, universal save/cancel ile ayni dosyada */
+.universal-btn-aux {
+  justify-self: start;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: inherit;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  font-weight: 500;
+}
+
+.universal-btn-aux[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+a.universal-btn-aux {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+  box-sizing: border-box;
+}
+
+a.universal-btn-aux:hover {
+  border-color: rgba(var(--theme-color-rgb), 0.65);
+  color: #fff;
+}

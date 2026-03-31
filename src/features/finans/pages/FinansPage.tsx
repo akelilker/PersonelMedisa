@@ -310,7 +310,7 @@ export function FinansPage() {
         {canCreateFinans ? (
           <button
             type="button"
-            className="state-action-btn"
+            className="universal-btn-aux"
             onClick={() => {
               setCreateErrorMessage(null);
               setIsCreateModalOpen(true);
@@ -360,10 +360,10 @@ export function FinansPage() {
         </div>
 
         <div className="module-filter-actions">
-          <button type="submit" className="state-action-btn">
+          <button type="submit" className="universal-btn-aux">
             Filtrele
           </button>
-          <button type="button" className="state-action-btn" onClick={handleFilterClear}>
+          <button type="button" className="universal-btn-aux" onClick={handleFilterClear}>
             Temizle
           </button>
         </div>
@@ -392,7 +392,7 @@ export function FinansPage() {
                   {canEditFinans ? (
                     <button
                       type="button"
-                      className="state-action-btn"
+                      className="universal-btn-aux"
                       onClick={() => openEditModal(item)}
                       disabled={cancelingItemId === item.id}
                     >
@@ -402,7 +402,7 @@ export function FinansPage() {
                   {canCancelFinans ? (
                     <button
                       type="button"
-                      className="state-action-btn"
+                      className="universal-btn-aux"
                       onClick={() => void handleCancel(item)}
                       disabled={cancelingItemId === item.id}
                     >
@@ -419,7 +419,7 @@ export function FinansPage() {
       <div className="module-pagination">
         <button
           type="button"
-          className="state-action-btn"
+          className="universal-btn-aux"
           onClick={() => setPage((prev) => Math.max(1, prev - 1))}
           disabled={isLoading || page <= 1}
         >
@@ -431,7 +431,7 @@ export function FinansPage() {
         </span>
         <button
           type="button"
-          className="state-action-btn"
+          className="universal-btn-aux"
           onClick={() => setPage((prev) => prev + 1)}
           disabled={isLoading || !hasNextPage}
         >

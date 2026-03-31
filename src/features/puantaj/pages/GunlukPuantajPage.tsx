@@ -201,10 +201,10 @@ export function GunlukPuantajPage() {
         </div>
 
         <div className="module-filter-actions">
-          <button type="submit" className="state-action-btn" disabled={isLoading}>
+          <button type="submit" className="universal-btn-aux" disabled={isLoading}>
             Kaydi Getir
           </button>
-          <button type="button" className="state-action-btn" onClick={handleQueryClear} disabled={isLoading}>
+          <button type="button" className="universal-btn-aux" onClick={handleQueryClear} disabled={isLoading}>
             Temizle
           </button>
         </div>
@@ -306,7 +306,7 @@ export function GunlukPuantajPage() {
           <div className="module-filter-actions">
             <button
               type="submit"
-              className="state-action-btn"
+              className="universal-btn-aux"
               disabled={!activeQuery || !canUpdatePuantaj || isSubmitting}
             >
               {isSubmitting ? "Kaydediliyor..." : "Kaydet"}

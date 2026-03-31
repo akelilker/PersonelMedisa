@@ -42,17 +42,12 @@
   z-index: 1;
 }
 
-.app-toolbar {
-  display: grid;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-
-.user-panel-link {
+.shell-user-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
+  margin-bottom: var(--space-2);
 }
 
 .user-chip {

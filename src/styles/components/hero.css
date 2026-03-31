@@ -3,7 +3,7 @@
   display: flex;
   align-items: center;
   min-height: 64px;
-  margin-bottom: var(--space-3);
+  margin-bottom: var(--space-2);
   padding: 10px 14px;
   border: 1px solid rgba(255, 255, 255, 0.32);
   border-radius: 14px;
@@ -19,7 +19,10 @@
   letter-spacing: 2px;
   font-size: clamp(15px, 2.3vw, 20px);
   font-weight: 800;
-  color: #e7edf3;
+  background: linear-gradient(180deg, #f4f7ff 0%, #c8d4e6 45%, #8fa3bd 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
 .hero-logo,

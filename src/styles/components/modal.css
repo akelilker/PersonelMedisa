@@ -85,6 +85,18 @@
   padding: var(--space-3);
 }
 
+.modal-footer {
+  flex-shrink: 0;
+  padding: var(--space-3);
+  padding-top: var(--space-2);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  box-sizing: border-box;
+}
+
+.modal-footer .modal-footer-actions {
+  margin: 0;
+}
+
 .modal-close-btn {
   position: absolute;
   right: 14px;

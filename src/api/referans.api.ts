@@ -92,6 +92,11 @@ export async function fetchPersonelTipiOptions(): Promise<IdOption[]> {
   return normalizeIdOptions(response.data);
 }
 
+export async function fetchBagliAmirOptions(): Promise<IdOption[]> {
+  const response = await apiRequest<ApiResponse<unknown>>(endpoints.referans.bagliAmirler);
+  return normalizeIdOptions(response.data);
+}
+
 export async function fetchSurecTuruOptions(): Promise<KeyOption[]> {
   const response = await apiRequest<ApiResponse<unknown>>(endpoints.referans.surecTurleri);
   return normalizeKeyOptions(response.data);

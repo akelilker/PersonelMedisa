@@ -27,21 +27,6 @@
   border-color: rgba(239, 68, 68, 0.6);
 }
 
-.state-action-btn {
-  justify-self: start;
-  border: 1px solid var(--line-soft);
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: inherit;
-  padding: 6px 10px;
-  cursor: pointer;
-}
-
-.state-action-btn[disabled] {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
 .module-filter-form {
   display: grid;
   gap: var(--space-2);

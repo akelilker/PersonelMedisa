@@ -132,7 +132,7 @@ export function PersonelDetayPage() {
               </p>
 
               {canEditPersonel ? (
-                <button type="button" className="state-action-btn" onClick={() => setIsEditing(true)}>
+                <button type="button" className="universal-btn-aux" onClick={() => setIsEditing(true)}>
                   Duzenle
                 </button>
               ) : null}
@@ -191,12 +191,12 @@ export function PersonelDetayPage() {
               {editErrorMessage ? <p className="personel-create-error">{editErrorMessage}</p> : null}
 
               <div className="module-filter-actions">
-                <button type="submit" className="state-action-btn" disabled={isSubmitting}>
+                <button type="submit" className="universal-btn-aux" disabled={isSubmitting}>
                   {isSubmitting ? "Kaydediliyor..." : "Kaydet"}
                 </button>
                 <button
                   type="button"
-                  className="state-action-btn"
+                  className="universal-btn-aux"
                   onClick={() => {
                     setIsEditing(false);
                     setEditErrorMessage(null);

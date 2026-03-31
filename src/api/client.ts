@@ -6,6 +6,9 @@ import { resolveDemoApiResponse } from "./mock-demo";
 const ENV_API_BASE_URL = (
   import.meta as ImportMeta & { env?: Record<string, string | undefined> }
 ).env?.VITE_API_BASE_URL;
+const ENV_API_MODE = (
+  import.meta as ImportMeta & { env?: Record<string, string | undefined> }
+).env?.VITE_API_MODE;
 const DEMO_API_FALLBACK_ENABLED =
   (
     (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env
@@ -28,6 +31,41 @@ function readWindowPathname() {
 
   const maybeLocation = (window as Window & { location?: Location }).location;
   return typeof maybeLocation?.pathname === "string" ? maybeLocation.pathname : "";
+}
+
+function resolveApiMode() {
+  const normalized = (ENV_API_MODE ?? "").trim().toLowerCase();
+  if (normalized === "real") {
+    return "real";
+  }
+
+  if (normalized === "demo" || normalized === "mock") {
+    return "demo";
+  }
+
+  return "auto";
+}
+
+function shouldPreferDemoApi() {
+  if (!DEMO_API_FALLBACK_ENABLED) {
+    return false;
+  }
+
+  const mode = resolveApiMode();
+  if (mode === "real") {
+    return false;
+  }
+
+  if (mode === "demo") {
+    return true;
+  }
+
+  const envBase = normalizeBase(ENV_API_BASE_URL ?? "");
+  if (envBase) {
+    return false;
+  }
+
+  return readWindowPathname().startsWith("/personelmedisa");
 }
 
 function resolveApiBaseCandidates() {
@@ -134,16 +172,32 @@ function buildRequestHeaders(path: string, init?: RequestInit): Headers {
 }
 
 export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
+  if (shouldPreferDemoApi()) {
+    const mock = resolveDemoApiResponse(path, init);
+    if (mock !== null) {
+      return mock as T;
+    }
+  }
+
   const baseCandidates = resolveApiBaseCandidates();
   const requestHeaders = buildRequestHeaders(path, init);
 
   let lastError: ApiRequestError | null = null;
 
   for (const base of baseCandidates) {
-    const response = await fetch(buildApiUrl(path, base), {
-      ...init,
-      headers: requestHeaders
-    });
+    let response: Response;
+    try {
+      response = await fetch(buildApiUrl(path, base), {
+        ...init,
+        headers: requestHeaders
+      });
+    } catch (error) {
+      lastError = new ApiRequestError(
+        error instanceof Error ? error.message : "API request failed.",
+        0
+      );
+      continue;
+    }
 
     const payload = await parseResponseBody(response);
 

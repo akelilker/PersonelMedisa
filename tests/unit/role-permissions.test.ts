@@ -21,7 +21,10 @@ describe("role permissions", () => {
   });
 
   it("keeps birim amiri as read-only for mutating actions", () => {
-    expect(hasRolePermission("BIRIM_AMIRI", "personeller.view")).toBe(true);
+    expect(hasRolePermission("BIRIM_AMIRI", "personeller.view.sube")).toBe(true);
+    expect(hasRolePermission("BIRIM_AMIRI", "surecler.view.sube")).toBe(true);
+    expect(hasRolePermission("BIRIM_AMIRI", "personeller.view")).toBe(false);
+    expect(hasRolePermission("BIRIM_AMIRI", "surecler.view")).toBe(false);
     expect(hasRolePermission("BIRIM_AMIRI", "surecler.detail.view")).toBe(true);
     expect(hasRolePermission("BIRIM_AMIRI", "puantaj.view")).toBe(true);
     expect(hasRolePermission("BIRIM_AMIRI", "raporlar.view")).toBe(true);

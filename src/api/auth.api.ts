@@ -59,6 +59,47 @@ function deriveUiProfile(role: AuthSession["user"]["rol"]): AuthSession["ui_prof
   return role === "BIRIM_AMIRI" ? "birim_amiri" : "yonetim";
 }
 
+function readSubeIds(record: Record<string, unknown>): number[] {
+  const raw =
+    record.sube_ids ??
+    record.subeIds ??
+    record.branch_ids ??
+    record.branchIds ??
+    record.allowed_sube_ids;
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  const ids: number[] = [];
+  for (const item of raw) {
+    const n = readNumber(item);
+    if (n !== null) {
+      ids.push(n);
+    }
+  }
+  return ids;
+}
+
+function readSubeList(record: Record<string, unknown>): AuthSession["sube_list"] {
+  const raw = record.sube_list ?? record.subeler ?? record.branches;
+  if (!Array.isArray(raw)) {
+    return undefined;
+  }
+  const out: NonNullable<AuthSession["sube_list"]> = [];
+  for (const item of raw) {
+    if (typeof item !== "object" || item === null) {
+      continue;
+    }
+    const row = item as Record<string, unknown>;
+    const id = readNumber(row.id);
+    const ad =
+      readString(row.ad) ?? readString(row.name) ?? readString(row.label) ?? (id !== null ? `Sube ${id}` : null);
+    if (id !== null && ad) {
+      out.push({ id, ad });
+    }
+  }
+  return out.length ? out : undefined;
+}
+
 function extractErrorMessage(payload: unknown): string | null {
   const record = toRecord(payload);
   if (!record) {
@@ -117,13 +158,20 @@ function normalizeAuthSession(payload: unknown): AuthSession | null {
     return null;
   }
 
+  const fromUser = readSubeIds(userSource ?? {});
+  const fromRoot = readSubeIds(toRecord(source) ?? {});
+  const sube_ids = fromUser.length > 0 ? fromUser : fromRoot;
+  const sube_list = readSubeList(toRecord(source) ?? {});
+
   return {
     token,
     ui_profile: uiProfile,
+    sube_list,
     user: {
       id: userId,
       ad_soyad: fullName,
-      rol: role
+      rol: role,
+      sube_ids
     }
   };
 }
@@ -159,13 +207,22 @@ function createDemoSession(credentials: LoginCredentials): AuthSession {
       .split("")
       .reduce((acc, ch) => acc + ch.charCodeAt(0), 0) % 10_000 || 1;
 
+  const sube_ids = role === "BIRIM_AMIRI" ? [1] : role === "MUHASEBE" ? [1, 2] : [];
+
+  const sube_list: NonNullable<AuthSession["sube_list"]> =
+    sube_ids.length === 0
+      ? []
+      : sube_ids.map((id) => ({ id, ad: id === 1 ? "Merkez" : `Sube ${id}` }));
+
   return {
     token: "demo-token",
     ui_profile: deriveUiProfile(role),
+    sube_list: sube_list.length ? sube_list : undefined,
     user: {
       id: userId,
       ad_soyad: toDisplayName(credentials.username),
-      rol: role
+      rol: role,
+      sube_ids
     }
   };
 }
@@ -190,7 +247,10 @@ export async function login(credentials: LoginCredentials): Promise<AuthSession>
   try {
     const response = await apiRequest<unknown>(endpoints.auth.login, {
       method: "POST",
-      body: JSON.stringify(credentials)
+      body: JSON.stringify({
+        username: credentials.username,
+        password: credentials.password
+      })
     });
 
     const session = normalizeAuthSession(response);

@@ -13,6 +13,7 @@ export type SureclerListParams = {
   bitis_tarihi?: string;
   state?: string;
   departman_id?: number;
+  sube_id?: number;
   page?: number;
   limit?: number;
 };
@@ -56,6 +57,7 @@ export async function fetchSureclerList(
     bitis_tarihi: params?.bitis_tarihi,
     state: params?.state,
     departman_id: params?.departman_id,
+    sube_id: params?.sube_id,
     page: params?.page,
     limit: params?.limit
   });

@@ -14,7 +14,9 @@ import {
   dataCacheKeys,
   enqueueSyncOperation,
   fetchWithCacheMerge,
+  getActiveSube,
   getCacheEntry,
+  getSubeIdForApiRequest,
   mergeCacheEntry,
   optimisticPrependToList,
   processSyncQueue,
@@ -114,15 +116,18 @@ export function useBildirimler() {
   const applied = listQuery.applied;
   const listPage = listQuery.page;
 
+  const activeSube = useMemo(() => getActiveSube(), [revision]);
+
   const listKey = useMemo(
     () =>
       dataCacheKeys.bildirimlerList(
+        activeSube,
         applied.personelId,
         applied.bildirimTuru,
         applied.tarih,
         listPage
       ),
-    [applied.bildirimTuru, applied.personelId, applied.tarih, listPage]
+    [activeSube, applied.bildirimTuru, applied.personelId, applied.tarih, listPage]
   );
 
   const listSnapshot = useMemo(
@@ -152,6 +157,7 @@ export function useBildirimler() {
           personel_id: parsePositiveInt(applied.personelId),
           bildirim_turu: applied.bildirimTuru || undefined,
           tarih: applied.tarih || undefined,
+          sube_id: getSubeIdForApiRequest(),
           page: listPage,
           limit: PAGE_SIZE
         })
@@ -173,6 +179,7 @@ export function useBildirimler() {
               personel_id: parsePositiveInt(applied.personelId),
               bildirim_turu: applied.bildirimTuru || undefined,
               tarih: applied.tarih || undefined,
+              sube_id: getSubeIdForApiRequest(),
               page: listPage,
               limit: PAGE_SIZE
             })
@@ -262,6 +269,7 @@ export function useBildirimler() {
 
   const refreshPageOne = useCallback(async () => {
     const pageOneKey = dataCacheKeys.bildirimlerList(
+      activeSube,
       listQuery.applied.personelId,
       listQuery.applied.bildirimTuru,
       listQuery.applied.tarih,
@@ -273,12 +281,13 @@ export function useBildirimler() {
           personel_id: parsePositiveInt(listQuery.applied.personelId),
           bildirim_turu: listQuery.applied.bildirimTuru || undefined,
           tarih: listQuery.applied.tarih || undefined,
+          sube_id: getSubeIdForApiRequest(),
           page: 1,
           limit: PAGE_SIZE
         })
       )
     );
-  }, [listQuery.applied]);
+  }, [activeSube, listQuery.applied]);
 
   const createBildirimHandler = useCallback(
     async (event: FormEvent<HTMLFormElement>, canCreate: boolean) => {
@@ -304,6 +313,7 @@ export function useBildirimler() {
         };
 
         const pageOneKey = dataCacheKeys.bildirimlerList(
+          activeSube,
           listQuery.applied.personelId,
           listQuery.applied.bildirimTuru,
           listQuery.applied.tarih,
@@ -335,7 +345,7 @@ export function useBildirimler() {
         setIsCreateSubmitting(false);
       }
     },
-    [createForm, isCreateSubmitting, listQuery.applied, refreshPageOne]
+    [activeSube, createForm, isCreateSubmitting, listQuery.applied, refreshPageOne]
   );
 
   const openEditModal = useCallback((bildirim: Bildirim, canEdit: boolean) => {
@@ -481,7 +491,8 @@ export function useBildirimler() {
 
 export function useBildirimlerHeaderPreview(enabled: boolean) {
   const revision = useAppDataRevision();
-  const key = dataCacheKeys.bildirimlerHeader();
+  const activeSube = useMemo(() => getActiveSube(), [revision]);
+  const key = useMemo(() => dataCacheKeys.bildirimlerHeader(activeSube), [activeSube]);
 
   const items = useMemo(() => {
     if (!enabled) {
@@ -502,7 +513,9 @@ export function useBildirimlerHeaderPreview(enabled: boolean) {
       return;
     }
     await fetchWithCacheMerge(key, () =>
-      runDeduped(key, () => fetchBildirimlerList({ page: 1, limit: 8 }))
+      runDeduped(key, () =>
+        fetchBildirimlerList({ page: 1, limit: 8, sube_id: getSubeIdForApiRequest() })
+      )
     );
   }, [enabled, key]);
 
@@ -514,7 +527,9 @@ export function useBildirimlerHeaderPreview(enabled: boolean) {
       }
       try {
         await fetchWithCacheMerge(key, () =>
-          runDeduped(key, () => fetchBildirimlerList({ page: 1, limit: 8 }))
+          runDeduped(key, () =>
+            fetchBildirimlerList({ page: 1, limit: 8, sube_id: getSubeIdForApiRequest() })
+          )
         );
       } finally {
         if (!cancelled) {

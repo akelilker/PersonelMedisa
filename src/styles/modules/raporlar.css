@@ -43,3 +43,32 @@
   padding: 8px;
   vertical-align: top;
 }
+
+.raporlar-engine-card {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-md);
+}
+
+.raporlar-engine-title {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.raporlar-engine-hint {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-muted, #666);
+}
+
+.raporlar-engine-empty {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-muted, #666);
+}
+
+.raporlar-engine-table {
+  margin-top: var(--space-2);
+}

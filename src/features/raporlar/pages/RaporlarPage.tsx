@@ -5,6 +5,13 @@ import { FormField } from "../../../components/form/FormField";
 import { EmptyState } from "../../../components/states/EmptyState";
 import { ErrorState } from "../../../components/states/ErrorState";
 import { LoadingState } from "../../../components/states/LoadingState";
+import { useAppDataRevision } from "../../../data/data-manager";
+import type { ModuleFilterBase } from "../../../lib/filters/module-filter-schema";
+import {
+  downloadReportCsv,
+  printCurrentReportWindow
+} from "../../../reports/export-report";
+import { generateReport, type ReportEngineRow, type ReportEngineType } from "../../../reports/report-engine";
 import type { RaporAktiflik, RaporFiltreleri, RaporSatiri, RaporTipi } from "../../../types/rapor";
 
 type RaporFormState = {
@@ -76,7 +83,55 @@ function collectColumns(rows: RaporSatiri[]): string[] {
   return Array.from(keys);
 }
 
+function collectEngineColumns(rows: ReportEngineRow[]): string[] {
+  const keys = new Set<string>();
+  for (const row of rows) {
+    for (const key of Object.keys(row)) {
+      keys.add(key);
+    }
+  }
+  return Array.from(keys);
+}
+
+const ENGINE_OPTIONS: Array<{ value: ReportEngineType; label: string }> = [
+  { value: "personel-ozet", label: "Personel ozeti (onbellek)" },
+  { value: "izin-durumu", label: "Izin durumu (onbellek)" },
+  { value: "puantaj", label: "Puantaj (onbellek)" },
+  { value: "finans", label: "Finans (onbellek, 1. sayfa)" }
+];
+
 export function RaporlarPage() {
+  const cacheRevision = useAppDataRevision();
+  const [engineType, setEngineType] = useState<ReportEngineType>("personel-ozet");
+  const [enginePersonelId, setEnginePersonelId] = useState("");
+  const [engineDurum, setEngineDurum] = useState("");
+  const [engineBas, setEngineBas] = useState("");
+  const [engineBit, setEngineBit] = useState("");
+
+  const engineFilters = useMemo<ModuleFilterBase>(() => {
+    const trimmed = enginePersonelId.trim();
+    let personel_id: number | null = null;
+    if (trimmed !== "") {
+      const n = Number.parseInt(trimmed, 10);
+      personel_id = Number.isFinite(n) ? n : null;
+    }
+    const dr = engineDurum.trim();
+    return {
+      personel_id,
+      durum: dr !== "" ? dr : null,
+      date_range:
+        engineBas.trim() !== "" || engineBit.trim() !== ""
+          ? { bas: engineBas.trim(), bit: engineBit.trim() }
+          : undefined
+    };
+  }, [enginePersonelId, engineDurum, engineBas, engineBit]);
+
+  const engineRows = useMemo(
+    () => generateReport(engineType, engineFilters),
+    [engineType, engineFilters, cacheRevision]
+  );
+  const engineColumns = useMemo(() => collectEngineColumns(engineRows), [engineRows]);
+
   const [form, setForm] = useState<RaporFormState>({
     raporTipi: "personel-ozet",
     personelId: "",
@@ -143,6 +198,98 @@ export function RaporlarPage() {
     <section className="raporlar-page">
       <div className="raporlar-header-row">
         <h2>Raporlar</h2>
+      </div>
+
+      <div className="raporlar-engine-card">
+        <h3 className="raporlar-engine-title">Onbellek rapor motoru</h3>
+        <p className="raporlar-engine-hint">
+          Ham veri mevcut onbellekte; ek ag cagrisi yapilmaz. Sube, header&apos;daki aktif sube ile uyumludur.
+        </p>
+        <div className="form-field-grid">
+          <FormField
+            as="select"
+            label="Motor turu"
+            name="engine-turu"
+            value={engineType}
+            onChange={(value) => setEngineType(value as ReportEngineType)}
+            selectOptions={ENGINE_OPTIONS}
+          />
+          <FormField
+            label="Personel ID (bos = tumu)"
+            name="engine-personel"
+            type="number"
+            min={1}
+            value={enginePersonelId}
+            onChange={(value) => setEnginePersonelId(value)}
+          />
+          <FormField
+            label="Durum (bos = tumu)"
+            name="engine-durum"
+            value={engineDurum}
+            onChange={(value) => setEngineDurum(value)}
+            placeholder="ORN: AKTIF, TAMAMLANDI"
+          />
+          <FormField
+            label="Tarih bas (yyyy-mm-dd)"
+            name="engine-bas"
+            type="date"
+            value={engineBas}
+            onChange={(value) => setEngineBas(value)}
+          />
+          <FormField
+            label="Tarih bit (yyyy-mm-dd)"
+            name="engine-bit"
+            type="date"
+            value={engineBit}
+            onChange={(value) => setEngineBit(value)}
+          />
+        </div>
+        <div className="form-actions-row">
+          <button
+            type="button"
+            className="universal-btn-aux"
+            disabled={engineRows.length === 0}
+            onClick={() => {
+              downloadReportCsv(`rapor-${engineType}.csv`, engineColumns, engineRows);
+            }}
+          >
+            CSV indir
+          </button>
+          <button
+            type="button"
+            className="universal-btn-aux"
+            disabled={engineRows.length === 0}
+            onClick={() => {
+              printCurrentReportWindow(`Rapor: ${engineType}`, engineColumns, engineRows);
+            }}
+          >
+            Yazdir / PDF
+          </button>
+        </div>
+        {engineRows.length === 0 ? (
+          <p className="raporlar-engine-empty">Bu tur icin onbellekte satir yok; ilgili modulu bir kez acin.</p>
+        ) : (
+          <div className="raporlar-table-wrap raporlar-engine-table">
+            <table className="raporlar-table">
+              <thead>
+                <tr>
+                  {engineColumns.map((column) => (
+                    <th key={column}>{column}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {engineRows.map((row, index) => (
+                  <tr key={index}>
+                    {engineColumns.map((column) => (
+                      <td key={`${index}-${column}`}>{formatCellValue(row[column])}</td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       <form className="form-filter-panel" onSubmit={handleSubmit}>

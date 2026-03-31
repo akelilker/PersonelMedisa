@@ -2,10 +2,12 @@ import type { UserRole } from "../../types/auth";
 
 export type AppPermission =
   | "personeller.view"
+  | "personeller.view.sube"
   | "personeller.create"
   | "personeller.update"
   | "personeller.detail.view"
   | "surecler.view"
+  | "surecler.view.sube"
   | "surecler.create"
   | "surecler.update"
   | "surecler.cancel"
@@ -28,10 +30,12 @@ export type AppPermission =
 const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
   GENEL_YONETICI: [
     "personeller.view",
+    "personeller.view.sube",
     "personeller.create",
     "personeller.update",
     "personeller.detail.view",
     "surecler.view",
+    "surecler.view.sube",
     "surecler.create",
     "surecler.update",
     "surecler.cancel",
@@ -53,10 +57,12 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
   ],
   BOLUM_YONETICISI: [
     "personeller.view",
+    "personeller.view.sube",
     "personeller.create",
     "personeller.update",
     "personeller.detail.view",
     "surecler.view",
+    "surecler.view.sube",
     "surecler.create",
     "surecler.update",
     "surecler.cancel",
@@ -78,10 +84,12 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
   ],
   MUHASEBE: [
     "personeller.view",
+    "personeller.view.sube",
     "personeller.create",
     "personeller.update",
     "personeller.detail.view",
     "surecler.view",
+    "surecler.view.sube",
     "surecler.create",
     "surecler.update",
     "surecler.cancel",
@@ -102,9 +110,9 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "finans.cancel"
   ],
   BIRIM_AMIRI: [
-    "personeller.view",
+    "personeller.view.sube",
     "personeller.detail.view",
-    "surecler.view",
+    "surecler.view.sube",
     "surecler.detail.view",
     "bildirimler.view",
     "bildirimler.detail.view",
@@ -142,6 +150,10 @@ export const PUANTAJ_ALLOWED_ROLES = getRolesWithPermission("puantaj.view");
 export const HAFTALIK_KAPANIS_ALLOWED_ROLES = getRolesWithPermission("haftalik-kapanis.view");
 export const RAPORLAR_ALLOWED_ROLES = getRolesWithPermission("raporlar.view");
 export const FINANS_ALLOWED_ROLES = getRolesWithPermission("finans.view");
+
+/** Liste rotalari: genel veya sube kapsamli goruntuleme */
+export const PERSONELLER_LIST_ANY: AppPermission[] = ["personeller.view", "personeller.view.sube"];
+export const SURECLER_LIST_ANY: AppPermission[] = ["surecler.view", "surecler.view.sube"];
 
 /** Route guard: permission tek kaynak — roller derived. */
 export const ROUTE_PERMISSION = {

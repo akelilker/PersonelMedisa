@@ -249,14 +249,21 @@ export function resolveDemoApiResponse(
     const username = toStringValue(body.username) ?? "demo";
     const role = resolveDemoRole(username);
     const profile = role === "BIRIM_AMIRI" ? "birim_amiri" : "yonetim";
+    const sube_ids = role === "BIRIM_AMIRI" ? [1] : role === "MUHASEBE" ? [1, 2] : [];
+    const sube_list =
+      sube_ids.length > 0
+        ? sube_ids.map((id) => ({ id, ad: id === 1 ? "Merkez" : `Sube ${id}` }))
+        : undefined;
 
     return ok({
       token: "demo-token",
       ui_profile: profile,
+      sube_list,
       user: {
         id: username.length + 1,
         ad_soyad: username,
-        rol: role
+        rol: role,
+        sube_ids
       }
     });
   }

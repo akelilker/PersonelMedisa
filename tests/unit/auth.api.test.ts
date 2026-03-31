@@ -43,7 +43,8 @@ describe("auth.api login", () => {
       user: {
         id: 1,
         ad_soyad: "Ilker A",
-        rol: "GENEL_YONETICI"
+        rol: "GENEL_YONETICI",
+        sube_ids: []
       }
     });
   });
@@ -70,7 +71,8 @@ describe("auth.api login", () => {
       user: {
         id: 12,
         ad_soyad: "Birim Kullanici",
-        rol: "BIRIM_AMIRI"
+        rol: "BIRIM_AMIRI",
+        sube_ids: []
       }
     });
   });
@@ -108,6 +110,8 @@ describe("auth.api login", () => {
     const session = await login({ username: "birim_demo", password: "secret" });
     expect(session.user.rol).toBe("BIRIM_AMIRI");
     expect(session.ui_profile).toBe("birim_amiri");
+    expect(session.user.sube_ids).toEqual([1]);
+    expect(session.sube_list).toEqual([{ id: 1, ad: "Merkez" }]);
   });
 
   it("falls back to demo session when backend returns html payload", async () => {

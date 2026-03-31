@@ -13,7 +13,9 @@ import {
   dataCacheKeys,
   enqueueSyncOperation,
   fetchWithCacheMerge,
+  getActiveSube,
   getCacheEntry,
+  getSubeIdForApiRequest,
   mergeCacheEntry,
   optimisticPrependToList,
   processSyncQueue,
@@ -144,9 +146,12 @@ export function useSurecler() {
   const applied = listQuery.applied;
   const listPage = listQuery.page;
 
+  const activeSube = useMemo(() => getActiveSube(), [revision]);
+
   const listKey = useMemo(
     () =>
       dataCacheKeys.sureclerList(
+        activeSube,
         applied.personelId,
         applied.surecTuru,
         applied.state,
@@ -155,6 +160,7 @@ export function useSurecler() {
         listPage
       ),
     [
+      activeSube,
       applied.baslangicTarihi,
       applied.bitisTarihi,
       applied.personelId,
@@ -187,6 +193,7 @@ export function useSurecler() {
           state: applied.state || undefined,
           baslangic_tarihi: applied.baslangicTarihi || undefined,
           bitis_tarihi: applied.bitisTarihi || undefined,
+          sube_id: getSubeIdForApiRequest(),
           page: listPage,
           limit: PAGE_SIZE
         })
@@ -210,6 +217,7 @@ export function useSurecler() {
               state: applied.state || undefined,
               baslangic_tarihi: applied.baslangicTarihi || undefined,
               bitis_tarihi: applied.bitisTarihi || undefined,
+              sube_id: getSubeIdForApiRequest(),
               page: listPage,
               limit: PAGE_SIZE
             })
@@ -299,6 +307,7 @@ export function useSurecler() {
 
   const refreshPageOne = useCallback(async () => {
     const pageOneKey = dataCacheKeys.sureclerList(
+      activeSube,
       listQuery.applied.personelId,
       listQuery.applied.surecTuru,
       listQuery.applied.state,
@@ -314,12 +323,13 @@ export function useSurecler() {
           state: listQuery.applied.state || undefined,
           baslangic_tarihi: listQuery.applied.baslangicTarihi || undefined,
           bitis_tarihi: listQuery.applied.bitisTarihi || undefined,
+          sube_id: getSubeIdForApiRequest(),
           page: 1,
           limit: PAGE_SIZE
         })
       )
     );
-  }, [listQuery.applied]);
+  }, [activeSube, listQuery.applied]);
 
   const createSurecHandler = useCallback(
     async (event: FormEvent<HTMLFormElement>, canCreate: boolean) => {
@@ -347,6 +357,7 @@ export function useSurecler() {
         };
 
         const pageOneKey = dataCacheKeys.sureclerList(
+          activeSube,
           listQuery.applied.personelId,
           listQuery.applied.surecTuru,
           listQuery.applied.state,
@@ -380,7 +391,7 @@ export function useSurecler() {
         setIsCreateSubmitting(false);
       }
     },
-    [createForm, isCreateSubmitting, listQuery.applied, refreshPageOne]
+    [activeSube, createForm, isCreateSubmitting, listQuery.applied, refreshPageOne]
   );
 
   const openEditModal = useCallback((surec: Surec, canEdit: boolean) => {

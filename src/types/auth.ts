@@ -6,16 +6,25 @@ export type UserRole =
 
 export type UiProfile = "yonetim" | "birim_amiri";
 
+export type SubeInfo = {
+  id: number;
+  ad: string;
+};
+
 export type AuthUser = {
   id: number;
   ad_soyad: string;
   rol: UserRole;
+  /** Bos ise tum subelere erisim (yonetim); dolu ise yalnizca bu id'ler */
+  sube_ids: number[];
 };
 
 export type AuthSession = {
   token: string;
   user: AuthUser;
   ui_profile: UiProfile;
+  /** Opsiyonel etiketler (login yaniti) */
+  sube_list?: SubeInfo[];
 };
 
 export type LoginCredentials = {

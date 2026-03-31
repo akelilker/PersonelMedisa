@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { getActiveSube, setActiveSube, useAppDataRevision } from "../../data/data-manager";
 import { useBildirimlerHeaderPreview } from "../../hooks/useBildirimler";
 import { useRoleAccess } from "../../hooks/use-role-access";
 import { useAuth } from "../../state/auth.store";
@@ -115,11 +116,14 @@ export function ShellHeaderActions() {
 
   const navigate = useNavigate();
   const location = useLocation();
-  const { logout } = useAuth();
-  const { hasPermission, uiProfile } = useRoleAccess();
+  const { logout, session } = useAuth();
+  const { hasPermission, hasAnyPermission, uiProfile } = useRoleAccess();
 
-  const canViewPersoneller = hasPermission("personeller.view");
-  const canViewSurecler = hasPermission("surecler.view");
+  useAppDataRevision();
+  const activeSubeId = getActiveSube();
+
+  const canViewPersoneller = hasAnyPermission(["personeller.view", "personeller.view.sube"]);
+  const canViewSurecler = hasAnyPermission(["surecler.view", "surecler.view.sube"]);
   const canViewBildirimler = hasPermission("bildirimler.view");
   const canViewBildirimDetay = hasPermission("bildirimler.detail.view");
   const canViewPuantaj = hasPermission("puantaj.view");
@@ -129,6 +133,7 @@ export function ShellHeaderActions() {
 
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isSubeOpen, setIsSubeOpen] = useState(false);
   const [notificationActionError, setNotificationActionError] = useState<string | null>(null);
   const [readNotificationIds, setReadNotificationIds] = useState<Record<string, true>>({});
 
@@ -184,9 +189,25 @@ export function ShellHeaderActions() {
   );
   const hasWarningUnread = visibleNotifications.some((item) => item.unread && item.level === "warning");
 
+  const subeIds = session?.user.sube_ids ?? [];
+  const subeList = session?.sube_list ?? [];
+
+  const subeControl = useMemo(() => {
+    if (subeIds.length === 0) {
+      return { kind: "all" as const };
+    }
+    if (subeIds.length === 1) {
+      const id = subeIds[0];
+      const label = subeList.find((s) => s.id === id)?.ad ?? `Sube ${id}`;
+      return { kind: "single" as const, id, label };
+    }
+    return { kind: "multi" as const };
+  }, [subeIds, subeList]);
+
   useEffect(() => {
     setIsNotificationsOpen(false);
     setIsSettingsOpen(false);
+    setIsSubeOpen(false);
   }, [location.pathname]);
 
   useEffect(() => {
@@ -295,6 +316,73 @@ export function ShellHeaderActions() {
       <div className="icons-row-left" />
       <div className="pwa-install-center" />
       <div className="icons-row-right">
+        {subeControl.kind === "all" ? (
+          <span className="sube-header-badge" title="Aktif sube filtresi yok">
+            Tum subeler
+          </span>
+        ) : null}
+        {subeControl.kind === "single" ? (
+          <span className="sube-header-badge" title="Atanan sube">
+            {subeControl.label}
+          </span>
+        ) : null}
+        {subeControl.kind === "multi" ? (
+          <div className="sube-selector-wrap">
+            <button
+              type="button"
+              className="icon-btn sube-selector-toggle"
+              onClick={() => {
+                setIsSubeOpen((prev) => !prev);
+                setIsNotificationsOpen(false);
+                setIsSettingsOpen(false);
+              }}
+              aria-label="Sube sec"
+              aria-expanded={isSubeOpen}
+              title="Sube degistir"
+            >
+              <span className="sube-selector-label">
+                {activeSubeId != null
+                  ? subeList.find((s) => s.id === activeSubeId)?.ad ?? `Sube ${activeSubeId}`
+                  : "Sube"}
+              </span>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                aria-hidden="true"
+              >
+                <path d="M6 9l6 6 6-6" />
+              </svg>
+            </button>
+            <div
+              id="sube-selector-menu"
+              className={`settings-dropdown sube-selector-dropdown${isSubeOpen ? " open" : ""}`}
+            >
+              {subeIds.map((id) => {
+                const label = subeList.find((s) => s.id === id)?.ad ?? `Sube ${id}`;
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    className={activeSubeId === id ? "sube-option-active" : undefined}
+                    onClick={() => {
+                      setActiveSube(id);
+                      setIsSubeOpen(false);
+                    }}
+                  >
+                    {label}
+                    {activeSubeId === id ? " ✓" : ""}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
+
         <button
           id="notifications-toggle-btn"
           type="button"
@@ -302,6 +390,7 @@ export function ShellHeaderActions() {
           onClick={() => {
             setIsNotificationsOpen((prev) => !prev);
             setIsSettingsOpen(false);
+            setIsSubeOpen(false);
           }}
           aria-label="Bildirimleri ac"
           aria-expanded={isNotificationsOpen}
@@ -380,6 +469,7 @@ export function ShellHeaderActions() {
           onClick={() => {
             setIsSettingsOpen((prev) => !prev);
             setIsNotificationsOpen(false);
+            setIsSubeOpen(false);
           }}
           aria-label="Ayar menusu"
           aria-expanded={isSettingsOpen}

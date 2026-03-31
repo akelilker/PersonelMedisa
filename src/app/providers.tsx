@@ -5,7 +5,9 @@ import {
   onApiServerError,
   type ApiServerErrorDetail
 } from "../lib/storage/api-global-events";
-import { AuthProvider } from "../state/auth.store";
+import { handleRealtimeEnvelope } from "../data/data-manager";
+import { connect, disconnect, onMessage } from "../realtime/realtime-manager";
+import { AuthProvider, useAuth } from "../state/auth.store";
 
 type AppProvidersProps = {
   children: ReactNode;
@@ -50,6 +52,27 @@ function GlobalApiErrorBanner() {
   );
 }
 
+function RealtimeBridge() {
+  const { session } = useAuth();
+
+  useEffect(() => {
+    if (!session) {
+      disconnect();
+      return () => undefined;
+    }
+
+    connect();
+    const unsub = onMessage(handleRealtimeEnvelope);
+
+    return () => {
+      unsub();
+      disconnect();
+    };
+  }, [session?.token]);
+
+  return null;
+}
+
 function AuthNavigationEffects() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -73,6 +96,7 @@ export function AppProviders({ children }: AppProvidersProps) {
       <AuthProvider>
         <GlobalApiErrorBanner />
         <AuthNavigationEffects />
+        <RealtimeBridge />
         {children}
       </AuthProvider>
     </BrowserRouter>

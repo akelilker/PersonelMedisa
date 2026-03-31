@@ -12,7 +12,11 @@ import { HaftalikKapanisPage } from "../features/haftalik-kapanis/pages/Haftalik
 import { RaporlarPage } from "../features/raporlar/pages/RaporlarPage";
 import { FinansPage } from "../features/finans/pages/FinansPage";
 import { LoginPage } from "../features/auth/pages/LoginPage";
-import { ROUTE_PERMISSION } from "../lib/authorization/role-permissions";
+import {
+  PERSONELLER_LIST_ANY,
+  ROUTE_PERMISSION,
+  SURECLER_LIST_ANY
+} from "../lib/authorization/role-permissions";
 
 function AppLayout() {
   return (
@@ -56,7 +60,14 @@ export function AppRoutes() {
         }
       >
         <Route index element={<Navigate to="/personeller" replace />} />
-        <Route path="personeller" element={<PersonellerPage />} />
+        <Route
+          path="personeller"
+          element={
+            <ProtectedRoute requireAny={PERSONELLER_LIST_ANY}>
+              <PersonellerPage />
+            </ProtectedRoute>
+          }
+        />
         <Route
           path="personeller/:personelId"
           element={
@@ -65,7 +76,14 @@ export function AppRoutes() {
             </ProtectedRoute>
           }
         />
-        <Route path="surecler" element={<SurecTakipPage />} />
+        <Route
+          path="surecler"
+          element={
+            <ProtectedRoute requireAny={SURECLER_LIST_ANY}>
+              <SurecTakipPage />
+            </ProtectedRoute>
+          }
+        />
         <Route
           path="surecler/:surecId"
           element={

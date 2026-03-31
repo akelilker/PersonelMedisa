@@ -54,7 +54,11 @@ function parseStored(raw: string | null): AuthSession | null {
     if (!isAuthSession(parsed)) {
       return null;
     }
-    return parsed;
+    const s = parsed as AuthSession;
+    if (!Array.isArray(s.user.sube_ids)) {
+      return { ...s, user: { ...s.user, sube_ids: [] } };
+    }
+    return s;
   } catch {
     return null;
   }

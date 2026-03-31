@@ -15,6 +15,7 @@ export type FinansListParams = {
   donem?: string;
   kalem_turu?: string;
   state?: string;
+  sube_id?: number;
   page?: number;
   limit?: number;
 };
@@ -78,6 +79,7 @@ export async function fetchFinansKalemList(
     donem: params?.donem,
     kalem_turu: params?.kalem_turu,
     state: params?.state,
+    sube_id: params?.sube_id,
     page: params?.page,
     limit: params?.limit
   });

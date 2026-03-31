@@ -25,6 +25,47 @@
   gap: 16px;
 }
 
+.sube-selector-wrap {
+  position: relative;
+}
+
+.sube-header-badge {
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(240, 240, 240, 0.72);
+  white-space: nowrap;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sube-selector-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 180px;
+}
+
+.sube-selector-label {
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(240, 240, 240, 0.88);
+}
+
+.sube-selector-dropdown {
+  left: 0;
+  right: auto;
+  top: 36px;
+}
+
+.sube-option-active {
+  border-color: rgba(var(--theme-color-rgb), 0.85) !important;
+}
+
 .icon-btn {
   flex-shrink: 0;
   background: none;

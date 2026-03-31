@@ -8,6 +8,7 @@ import {
   type ReactNode
 } from "react";
 import { login as loginWithStorage, clearSession as clearAuthEverywhere, getSession } from "../auth/auth-manager";
+import { syncActiveSubeFromAuthUser } from "../data/data-manager";
 import { onAuthUnauthorized } from "../lib/storage/auth-events";
 import type { AuthSession, LoginCredentials } from "../types/auth";
 
@@ -51,6 +52,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
       forceLogout();
     });
   }, [forceLogout]);
+
+  useEffect(() => {
+    if (session) {
+      syncActiveSubeFromAuthUser(session.user.sube_ids);
+    }
+  }, [session?.token, session?.user.id]);
 
   const value = useMemo<AuthContextValue>(
     () => ({

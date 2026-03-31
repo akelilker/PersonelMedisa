@@ -18,7 +18,7 @@ import type { Surec } from "../types/surec";
 
 export const APP_DATA_STORAGE_KEY = "medisa_app_data";
 export const APP_SYNC_QUEUE_KEY = "medisa_sync_queue";
-export const APP_DATA_SCHEMA_VERSION = 1;
+export const APP_DATA_SCHEMA_VERSION = 2;
 
 export type CacheEnvelope<T> = {
   data: T;
@@ -36,6 +36,8 @@ export type AppData = {
   schemaVersion: number;
   revision: number;
   updatedAt: string | null;
+  /** null = tum subeler (backend dogrular); sayı = aktif şube filtresi */
+  activeSubeId: number | null;
   cache: Record<string, CacheEnvelope<unknown>>;
 };
 

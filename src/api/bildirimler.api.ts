@@ -11,6 +11,7 @@ export type BildirimlerListParams = {
   departman_id?: number;
   personel_id?: number;
   bildirim_turu?: string;
+  sube_id?: number;
   page?: number;
   limit?: number;
 };
@@ -48,6 +49,7 @@ export async function fetchBildirimlerList(
     departman_id: params?.departman_id,
     personel_id: params?.personel_id,
     bildirim_turu: params?.bildirim_turu,
+    sube_id: params?.sube_id,
     page: params?.page,
     limit: params?.limit
   });

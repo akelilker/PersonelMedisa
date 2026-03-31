@@ -13,7 +13,9 @@ import {
   draftPersonelFromPayload,
   enqueueSyncOperation,
   fetchWithCacheMerge,
+  getActiveSube,
   getCacheEntry,
+  getSubeIdForApiRequest,
   mergeCacheEntry,
   optimisticPrependPersonel,
   processSyncQueue,
@@ -109,9 +111,11 @@ export function usePersoneller() {
   const appliedFilters = listQuery.applied;
   const listPage = listQuery.page;
 
+  const activeSube = useMemo(() => getActiveSube(), [revision]);
+
   const listKey = useMemo(
-    () => dataCacheKeys.personellerList(appliedFilters.search, appliedFilters.aktiflik, listPage),
-    [appliedFilters.aktiflik, appliedFilters.search, listPage]
+    () => dataCacheKeys.personellerList(activeSube, appliedFilters.search, appliedFilters.aktiflik, listPage),
+    [activeSube, appliedFilters.aktiflik, appliedFilters.search, listPage]
   );
 
   const listSnapshot = useMemo(
@@ -140,6 +144,7 @@ export function usePersoneller() {
         fetchPersonellerList({
           search: appliedFilters.search || undefined,
           aktiflik: appliedFilters.aktiflik,
+          sube_id: getSubeIdForApiRequest(),
           page: listPage,
           limit: PAGE_SIZE
         })
@@ -160,6 +165,7 @@ export function usePersoneller() {
             fetchPersonellerList({
               search: appliedFilters.search || undefined,
               aktiflik: appliedFilters.aktiflik,
+              sube_id: getSubeIdForApiRequest(),
               page: listPage,
               limit: PAGE_SIZE
             })
@@ -291,7 +297,12 @@ export function usePersoneller() {
           ...(bagliAmirId !== undefined ? { bagli_amir_id: bagliAmirId } : {})
         };
 
-        const pageOneKey = dataCacheKeys.personellerList(listQuery.applied.search, listQuery.applied.aktiflik, 1);
+        const pageOneKey = dataCacheKeys.personellerList(
+          activeSube,
+          listQuery.applied.search,
+          listQuery.applied.aktiflik,
+          1
+        );
 
         try {
           await createPersonel(payload);
@@ -303,6 +314,7 @@ export function usePersoneller() {
               fetchPersonellerList({
                 search: listQuery.applied.search || undefined,
                 aktiflik: listQuery.applied.aktiflik,
+                sube_id: getSubeIdForApiRequest(),
                 page: 1,
                 limit: PAGE_SIZE
               })
@@ -330,7 +342,7 @@ export function usePersoneller() {
         setIsCreateSubmitting(false);
       }
     },
-    [createForm, isCreateSubmitting, listQuery.applied.aktiflik, listQuery.applied.search]
+    [activeSube, createForm, isCreateSubmitting, listQuery.applied.aktiflik, listQuery.applied.search]
   );
 
   return {

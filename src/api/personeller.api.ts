@@ -9,6 +9,7 @@ import { normalizePaginatedList } from "./response-normalizers";
 export type PersonellerListParams = {
   search?: string;
   departman_id?: number;
+  sube_id?: number;
   aktiflik?: "aktif" | "pasif" | "tum";
   personel_tipi_id?: number;
   page?: number;
@@ -61,6 +62,7 @@ export async function fetchPersonellerList(
   const path = appendQueryParams(endpoints.personeller.list, {
     search: params?.search,
     departman_id: params?.departman_id,
+    sube_id: params?.sube_id,
     aktiflik: params?.aktiflik,
     personel_tipi_id: params?.personel_tipi_id,
     page: params?.page,

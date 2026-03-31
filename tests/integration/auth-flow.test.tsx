@@ -16,13 +16,16 @@ const ROUTER_FUTURE_FLAGS = {
 } as const;
 
 function buildSession(role: UserRole): AuthSession {
+  const sube_ids =
+    role === "BIRIM_AMIRI" ? [1] : role === "MUHASEBE" ? [1, 2] : role === "BOLUM_YONETICISI" ? [1] : [];
   return {
     token: "test-token",
     ui_profile: role === "BIRIM_AMIRI" ? "birim_amiri" : "yonetim",
     user: {
       id: 1,
       ad_soyad: "Test Kullanici",
-      rol: role
+      rol: role,
+      sube_ids
     }
   };
 }

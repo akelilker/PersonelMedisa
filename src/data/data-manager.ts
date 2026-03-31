@@ -33,6 +33,7 @@ import type { FinansKalem } from "../types/finans";
 import type { Personel } from "../types/personel";
 import type { Surec } from "../types/surec";
 import type { GunlukPuantaj } from "../types/puantaj";
+import type { RealtimeEnvelope } from "../realtime/realtime-manager";
 import {
   APP_DATA_SCHEMA_VERSION,
   APP_DATA_STORAGE_KEY,
@@ -72,6 +73,7 @@ function createEmptyAppData(): AppData {
     schemaVersion: APP_DATA_SCHEMA_VERSION,
     revision: 0,
     updatedAt: null,
+    activeSubeId: null,
     cache: {}
   };
 }
@@ -139,6 +141,7 @@ export function clearAllAppPersistence(): void {
   }
 
   const empty = createEmptyAppData();
+  empty.activeSubeId = null;
   window.appData = empty;
 
   try {
@@ -181,7 +184,15 @@ export function safeParseStoredAppData(raw: string | null): AppData | null {
     return null;
   }
 
-  return parsed as AppData;
+  const data = parsed as AppData;
+  if (data.activeSubeId !== null && data.activeSubeId !== undefined && typeof data.activeSubeId !== "number") {
+    return null;
+  }
+  if (data.activeSubeId === undefined) {
+    data.activeSubeId = null;
+  }
+
+  return data;
 }
 
 export function initAppDataFromStorage(): AppData {
@@ -202,10 +213,15 @@ export function initAppDataFromStorage(): AppData {
   return window.appData;
 }
 
-export function setAppData(partial: Partial<Pick<AppData, "cache">> & Partial<Pick<AppData, "updatedAt">>): void {
+export function setAppData(
+  partial: Partial<Pick<AppData, "cache" | "activeSubeId">> & Partial<Pick<AppData, "updatedAt">>
+): void {
   const data = ensureAppData();
   if (partial.cache) {
     data.cache = { ...data.cache, ...partial.cache };
+  }
+  if (partial.activeSubeId !== undefined) {
+    data.activeSubeId = partial.activeSubeId;
   }
   if (partial.updatedAt !== undefined) {
     data.updatedAt = partial.updatedAt;
@@ -215,28 +231,70 @@ export function setAppData(partial: Partial<Pick<AppData, "cache">> & Partial<Pi
   notifyAppData();
 }
 
+export function getActiveSube(): number | null {
+  return ensureAppData().activeSubeId ?? null;
+}
+
+export function setActiveSube(subeId: number | null): void {
+  const data = ensureAppData();
+  if (data.activeSubeId === subeId) {
+    return;
+  }
+  data.activeSubeId = subeId;
+  bumpRevision(data);
+  persistAppData();
+  notifyAppData();
+  void loadDataFromServer();
+}
+
+export function syncActiveSubeFromAuthUser(subeIds: number[] | undefined): void {
+  const ids = Array.isArray(subeIds) ? subeIds : [];
+  const data = ensureAppData();
+  if (ids.length === 0) {
+    if (data.activeSubeId !== null) {
+      setActiveSube(null);
+    }
+    return;
+  }
+  const current = data.activeSubeId;
+  if (current !== null && ids.includes(current)) {
+    return;
+  }
+  setActiveSube(ids[0] ?? null);
+}
+
+export function getSubeIdForApiRequest(): number | undefined {
+  const id = getActiveSube();
+  return id === null ? undefined : id;
+}
+
+function subeSeg(subeId: number | null): string {
+  return subeId === null ? "all" : String(subeId);
+}
+
 export const dataCacheKeys = {
-  personellerList: (search: string, aktiflik: string, page: number) =>
-    `personeller:list:${search}|${aktiflik}|${page}`,
+  personellerList: (subeId: number | null, search: string, aktiflik: string, page: number) =>
+    `personeller:list:s${subeSeg(subeId)}:${search}|${aktiflik}|${page}`,
   personelDetail: (id: number) => `personeller:detail:${id}`,
   referansPersonel: () => `referans:personel-bundle`,
   sureclerList: (
+    subeId: number | null,
     personelId: string,
     surecTuru: string,
     state: string,
     bas: string,
     bit: string,
     page: number
-  ) => `surecler:list:${personelId}|${surecTuru}|${state}|${bas}|${bit}|${page}`,
+  ) => `surecler:list:s${subeSeg(subeId)}:${personelId}|${surecTuru}|${state}|${bas}|${bit}|${page}`,
   surecDetail: (id: number) => `surecler:detail:${id}`,
   surecTuruRef: () => `referans:surec-turu`,
-  bildirimlerList: (personelId: string, tur: string, tarih: string, page: number) =>
-    `bildirimler:list:${personelId}|${tur}|${tarih}|${page}`,
-  bildirimlerHeader: () => `bildirimler:header:8`,
+  bildirimlerList: (subeId: number | null, personelId: string, tur: string, tarih: string, page: number) =>
+    `bildirimler:list:s${subeSeg(subeId)}:${personelId}|${tur}|${tarih}|${page}`,
+  bildirimlerHeader: (subeId: number | null) => `bildirimler:header:8:s${subeSeg(subeId)}`,
   bildirimDetail: (id: number) => `bildirimler:detail:${id}`,
   bildirimRef: () => `referans:bildirim-meta`,
-  finansList: (personelId: string, donem: string, kalem: string, state: string, page: number) =>
-    `finans:list:${personelId}|${donem}|${kalem}|${state}|${page}`,
+  finansList: (subeId: number | null, personelId: string, donem: string, kalem: string, state: string, page: number) =>
+    `finans:list:s${subeSeg(subeId)}:${personelId}|${donem}|${kalem}|${state}|${page}`,
   puantajDetail: (personelId: number, tarih: string) => `puantaj:${personelId}|${tarih}`
 };
 
@@ -609,21 +667,215 @@ export function draftPersonelFromPayload(payload: CreatePersonelPayload, tempId:
   };
 }
 
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v !== null;
+}
+
+function parsePersonelRealtimePayload(p: unknown): Personel | null {
+  if (!isRecord(p) || typeof p.id !== "number") {
+    return null;
+  }
+  if (typeof p.ad !== "string" || typeof p.soyad !== "string" || typeof p.tc_kimlik_no !== "string") {
+    return null;
+  }
+  const ad = p.ad;
+  const soyad = p.soyad;
+  const durum = p.aktif_durum;
+  if (durum !== "AKTIF" && durum !== "PASIF") {
+    return null;
+  }
+  return {
+    id: p.id,
+    tc_kimlik_no: p.tc_kimlik_no,
+    ad,
+    soyad,
+    aktif_durum: durum,
+    telefon: typeof p.telefon === "string" ? p.telefon : undefined,
+    dogum_tarihi: typeof p.dogum_tarihi === "string" ? p.dogum_tarihi : undefined,
+    sicil_no: typeof p.sicil_no === "string" ? p.sicil_no : undefined
+  };
+}
+
+function parseSurecRealtimePayload(p: unknown): Surec | null {
+  if (!isRecord(p) || typeof p.id !== "number" || typeof p.personel_id !== "number") {
+    return null;
+  }
+  if (typeof p.surec_turu !== "string") {
+    return null;
+  }
+  return {
+    id: p.id,
+    personel_id: p.personel_id,
+    surec_turu: p.surec_turu,
+    alt_tur: typeof p.alt_tur === "string" ? p.alt_tur : undefined,
+    baslangic_tarihi: typeof p.baslangic_tarihi === "string" ? p.baslangic_tarihi : undefined,
+    bitis_tarihi: typeof p.bitis_tarihi === "string" ? p.bitis_tarihi : undefined,
+    ucretli_mi: typeof p.ucretli_mi === "boolean" ? p.ucretli_mi : undefined,
+    aciklama: typeof p.aciklama === "string" ? p.aciklama : undefined,
+    state: typeof p.state === "string" ? p.state : undefined
+  };
+}
+
+function parseBildirimRealtimePayload(p: unknown): Bildirim | null {
+  if (!isRecord(p) || typeof p.id !== "number" || typeof p.bildirim_turu !== "string") {
+    return null;
+  }
+  return {
+    id: p.id,
+    bildirim_turu: p.bildirim_turu,
+    tarih: typeof p.tarih === "string" ? p.tarih : undefined,
+    departman_id: typeof p.departman_id === "number" ? p.departman_id : undefined,
+    personel_id: typeof p.personel_id === "number" ? p.personel_id : undefined,
+    aciklama: typeof p.aciklama === "string" ? p.aciklama : undefined,
+    state: typeof p.state === "string" ? p.state : undefined,
+    okundu_mi: typeof p.okundu_mi === "boolean" ? p.okundu_mi : undefined
+  };
+}
+
+function realtimeSubeMatchesActive(eventSube: number | undefined): boolean {
+  const active = getActiveSube();
+  if (active === null) {
+    return true;
+  }
+  if (eventSube === undefined) {
+    return true;
+  }
+  return eventSube === active;
+}
+
+function mergePersonelIntoListCaches(row: Personel): void {
+  for (const key of Object.keys(ensureAppData().cache)) {
+    if (!key.startsWith("personeller:list:")) {
+      continue;
+    }
+    const prev = getCacheEntry<PaginatedResult<Personel>>(key);
+    if (!prev) {
+      continue;
+    }
+    const idx = prev.items.findIndex((i) => i.id === row.id);
+    if (idx === -1) {
+      continue;
+    }
+    mergeCacheEntry<PaginatedResult<Personel>>(key, (base) => {
+      const cur = base!;
+      const items = [...cur.items];
+      items[idx] = row;
+      return { ...cur, items };
+    });
+  }
+}
+
+function mergeSurecIntoListCaches(row: Surec): void {
+  for (const key of Object.keys(ensureAppData().cache)) {
+    if (!key.startsWith("surecler:list:")) {
+      continue;
+    }
+    const prev = getCacheEntry<PaginatedResult<Surec>>(key);
+    if (!prev) {
+      continue;
+    }
+    const idx = prev.items.findIndex((i) => i.id === row.id);
+    if (idx === -1) {
+      continue;
+    }
+    mergeCacheEntry<PaginatedResult<Surec>>(key, (base) => {
+      const cur = base!;
+      const items = [...cur.items];
+      items[idx] = row;
+      return { ...cur, items };
+    });
+  }
+}
+
+function mergeBildirimHeader(sube: number | null, b: Bildirim): void {
+  const key = dataCacheKeys.bildirimlerHeader(sube);
+  mergeCacheEntry<PaginatedResult<Bildirim>>(key, (prev) => {
+    const base = prev ?? emptyPaginated<Bildirim>();
+    const withoutDup = base.items.filter((i) => i.id !== b.id);
+    return { ...base, items: [b, ...withoutDup].slice(0, 32) };
+  });
+}
+
+function prependBildirimToFirstPageLists(sube: number | null, b: Bildirim): void {
+  const seg = subeSeg(sube);
+  const prefix = `bildirimler:list:s${seg}:`;
+  for (const key of Object.keys(ensureAppData().cache)) {
+    if (!key.startsWith(prefix) || !key.endsWith("|1")) {
+      continue;
+    }
+    const prev = getCacheEntry<PaginatedResult<Bildirim>>(key);
+    if (!prev) {
+      continue;
+    }
+    mergeCacheEntry<PaginatedResult<Bildirim>>(key, (base) => {
+      const cur = base!;
+      const withoutDup = cur.items.filter((i) => i.id !== b.id);
+      return { ...cur, items: [b, ...withoutDup] };
+    });
+  }
+}
+
+/**
+ * Sunucu / WebSocket pusundan gelen olaylari tek veri kaynagina yazar.
+ * Optimistic gecici id'ler degistirilmez; eslesen kalici id'ler uzerine yazilir.
+ */
+export function handleRealtimeEnvelope(env: RealtimeEnvelope): void {
+  if (!realtimeSubeMatchesActive(env.sube_id)) {
+    return;
+  }
+  const keySube = getActiveSube() ?? (typeof env.sube_id === "number" ? env.sube_id : null);
+
+  switch (env.type) {
+    case "PERSONEL_GUNCELLENDI": {
+      const row = parsePersonelRealtimePayload(env.payload);
+      if (!row) {
+        return;
+      }
+      setCacheEntry(dataCacheKeys.personelDetail(row.id), row);
+      mergePersonelIntoListCaches(row);
+      return;
+    }
+    case "SUREC_GUNCELLENDI": {
+      const row = parseSurecRealtimePayload(env.payload);
+      if (!row) {
+        return;
+      }
+      setCacheEntry(dataCacheKeys.surecDetail(row.id), row);
+      mergeSurecIntoListCaches(row);
+      return;
+    }
+    case "BILDIRIM_YENI": {
+      const b = parseBildirimRealtimePayload(env.payload);
+      if (!b) {
+        return;
+      }
+      setCacheEntry(dataCacheKeys.bildirimDetail(b.id), b);
+      mergeBildirimHeader(keySube, b);
+      prependBildirimToFirstPageLists(keySube, b);
+      return;
+    }
+    default:
+      return;
+  }
+}
+
 export async function loadDataFromServer(): Promise<void> {
+  const sube = getActiveSube();
+  const subeQ = getSubeIdForApiRequest();
   const tasks: Array<Promise<void>> = [
     (async () => {
-      const key = dataCacheKeys.personellerList("", "tum", 1);
+      const key = dataCacheKeys.personellerList(sube, "", "tum", 1);
       try {
-        const data = await fetchPersonellerList({ aktiflik: "tum", page: 1, limit: 10 });
+        const data = await fetchPersonellerList({ aktiflik: "tum", page: 1, limit: 10, sube_id: subeQ });
         setCacheEntry(key, data);
       } catch {
         /* sessiz */
       }
     })(),
     (async () => {
-      const key = dataCacheKeys.bildirimlerHeader();
+      const key = dataCacheKeys.bildirimlerHeader(sube);
       try {
-        const data = await fetchBildirimlerList({ page: 1, limit: 8 });
+        const data = await fetchBildirimlerList({ page: 1, limit: 8, sube_id: subeQ });
         setCacheEntry(key, data);
       } catch {
         /* sessiz */

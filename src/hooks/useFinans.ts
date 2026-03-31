@@ -10,7 +10,9 @@ import {
   dataCacheKeys,
   enqueueSyncOperation,
   fetchWithCacheMerge,
+  getActiveSube,
   getCacheEntry,
+  getSubeIdForApiRequest,
   mergeCacheEntry,
   optimisticPrependToList,
   processSyncQueue,
@@ -138,16 +140,19 @@ export function useFinans() {
   const applied = listQuery.applied;
   const listPage = listQuery.page;
 
+  const activeSube = useMemo(() => getActiveSube(), [revision]);
+
   const listKey = useMemo(
     () =>
       dataCacheKeys.finansList(
+        activeSube,
         applied.personelId,
         applied.donem,
         applied.kalemTuru,
         applied.state,
         listPage
       ),
-    [applied.donem, applied.kalemTuru, applied.personelId, applied.state, listPage]
+    [activeSube, applied.donem, applied.kalemTuru, applied.personelId, applied.state, listPage]
   );
 
   const listSnapshot = useMemo(
@@ -167,6 +172,7 @@ export function useFinans() {
           donem: applied.donem || undefined,
           kalem_turu: applied.kalemTuru || undefined,
           state: applied.state || undefined,
+          sube_id: getSubeIdForApiRequest(),
           page: listPage,
           limit: PAGE_SIZE
         })
@@ -189,6 +195,7 @@ export function useFinans() {
               donem: applied.donem || undefined,
               kalem_turu: applied.kalemTuru || undefined,
               state: applied.state || undefined,
+              sube_id: getSubeIdForApiRequest(),
               page: listPage,
               limit: PAGE_SIZE
             })
@@ -250,6 +257,7 @@ export function useFinans() {
 
   const refreshPageOne = useCallback(async () => {
     const pageOneKey = dataCacheKeys.finansList(
+      activeSube,
       listQuery.applied.personelId,
       listQuery.applied.donem,
       listQuery.applied.kalemTuru,
@@ -263,12 +271,13 @@ export function useFinans() {
           donem: listQuery.applied.donem || undefined,
           kalem_turu: listQuery.applied.kalemTuru || undefined,
           state: listQuery.applied.state || undefined,
+          sube_id: getSubeIdForApiRequest(),
           page: 1,
           limit: PAGE_SIZE
         })
       )
     );
-  }, [listQuery.applied]);
+  }, [activeSube, listQuery.applied]);
 
   const createFinansHandler = useCallback(
     async (event: FormEvent<HTMLFormElement>, canCreate: boolean) => {
@@ -294,6 +303,7 @@ export function useFinans() {
         };
 
         const pageOneKey = dataCacheKeys.finansList(
+          activeSube,
           listQuery.applied.personelId,
           listQuery.applied.donem,
           listQuery.applied.kalemTuru,
@@ -326,7 +336,7 @@ export function useFinans() {
         setIsCreateSubmitting(false);
       }
     },
-    [createForm, isCreateSubmitting, listQuery.applied, refreshPageOne]
+    [activeSube, createForm, isCreateSubmitting, listQuery.applied, refreshPageOne]
   );
 
   const openEditModal = useCallback((item: FinansKalem, canEdit: boolean) => {

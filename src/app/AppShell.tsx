@@ -1,5 +1,5 @@
-﻿import type { ReactNode } from "react";
-import { Link } from "react-router-dom";
+import type { ReactNode } from "react";
+import { NavLink } from "react-router-dom";
 import { Hero } from "../components/hero/Hero";
 import { AppFooter } from "../components/footer/AppFooter";
 import { useRoleAccess } from "../hooks/use-role-access";
@@ -19,24 +19,61 @@ export function AppShell({ children }: AppShellProps) {
   const canViewHaftalikKapanis = hasPermission("haftalik-kapanis.view");
   const canViewRaporlar = hasPermission("raporlar.view");
   const canViewFinans = hasPermission("finans.view");
+  const displayUser = session?.user.ad_soyad ?? "-";
+  const displayRole = session?.user.rol ?? "-";
 
   return (
     <div className="app-container app-shell">
       <main className="content-wrap">
-        <Hero title="Personel ve Puantaj Yonetim Sistemi" />
+        <Hero title="PERSONEL YONETIM SISTEMI" />
         <div className="app-toolbar">
           <div className="app-toolbar-links">
-            {canViewPersoneller ? <Link to="/personeller">Personeller</Link> : null}
-            {canViewSurecler ? <Link to="/surecler">Surecler</Link> : null}
-            {canViewBildirimler ? <Link to="/bildirimler">Bildirimler</Link> : null}
-            {canViewPuantaj ? <Link to="/puantaj">Puantaj</Link> : null}
-            {canViewHaftalikKapanis ? <Link to="/haftalik-kapanis">Haftalik Kapanis</Link> : null}
-            {canViewRaporlar ? <Link to="/raporlar">Raporlar</Link> : null}
-            {canViewFinans ? <Link to="/finans">Finans</Link> : null}
+            {canViewPersoneller ? (
+              <NavLink to="/personeller" className={({ isActive }) => `menu-btn${isActive ? " is-active" : ""}`}>
+                Personeller
+              </NavLink>
+            ) : null}
+            {canViewSurecler ? (
+              <NavLink to="/surecler" className={({ isActive }) => `menu-btn${isActive ? " is-active" : ""}`}>
+                Surecler
+              </NavLink>
+            ) : null}
+            {canViewBildirimler ? (
+              <NavLink to="/bildirimler" className={({ isActive }) => `menu-btn${isActive ? " is-active" : ""}`}>
+                Bildirimler
+              </NavLink>
+            ) : null}
+            {canViewPuantaj ? (
+              <NavLink to="/puantaj" className={({ isActive }) => `menu-btn${isActive ? " is-active" : ""}`}>
+                Puantaj
+              </NavLink>
+            ) : null}
+            {canViewHaftalikKapanis ? (
+              <NavLink
+                to="/haftalik-kapanis"
+                className={({ isActive }) => `menu-btn${isActive ? " is-active" : ""}`}
+              >
+                Haftalik Kapanis
+              </NavLink>
+            ) : null}
+            {canViewRaporlar ? (
+              <NavLink to="/raporlar" className={({ isActive }) => `menu-btn${isActive ? " is-active" : ""}`}>
+                Raporlar
+              </NavLink>
+            ) : null}
+            {canViewFinans ? (
+              <NavLink to="/finans" className={({ isActive }) => `menu-btn${isActive ? " is-active" : ""}`}>
+                Finans
+              </NavLink>
+            ) : null}
           </div>
+
           <div className="app-toolbar-user">
-            <span>{session ? `${session.user.ad_soyad} (${session.user.rol})` : "-"}</span>
-            <button type="button" onClick={logout}>
+            <div className="user-chip">
+              <strong>{displayUser}</strong>
+              <span>({displayRole})</span>
+            </div>
+            <button type="button" className="logout-btn" onClick={logout}>
               Cikis
             </button>
           </div>

@@ -3,9 +3,25 @@ import { AUTH_FORBIDDEN_EVENT, AUTH_UNAUTHORIZED_EVENT } from "../../src/lib/sto
 import { apiRequest } from "../../src/api/api-client";
 import { getAuthTokenForApi } from "../../src/auth/auth-token-provider";
 
-vi.mock("../../src/auth/auth-token-provider", () => ({
-  getAuthTokenForApi: vi.fn(() => "test-token")
+const { mockActiveSubeHeader } = vi.hoisted(() => ({
+  mockActiveSubeHeader: vi.fn<[], string | null>(() => null)
 }));
+
+vi.mock("../../src/auth/auth-token-provider", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../src/auth/auth-token-provider")>();
+  return {
+    ...actual,
+    getAuthTokenForApi: vi.fn(() => "test-token")
+  };
+});
+
+vi.mock("../../src/auth/auth-manager", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../src/auth/auth-manager")>();
+  return {
+    ...actual,
+    getActiveSubeIdForApiHeader: mockActiveSubeHeader
+  };
+});
 
 type WindowLike = EventTarget;
 
@@ -29,11 +45,28 @@ describe("apiRequest", () => {
     vi.stubGlobal("window", createWindowLike());
     getAuthTokenForApiMock.mockReset();
     getAuthTokenForApiMock.mockReturnValue("test-token");
+    mockActiveSubeHeader.mockReset();
+    mockActiveSubeHeader.mockReturnValue(null);
   });
 
   afterEach(() => {
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
+  });
+
+  it("attaches X-Active-Sube-Id when session sube header provider returns a value", async () => {
+    mockActiveSubeHeader.mockReturnValue("7");
+
+    const fetchMock = vi.fn(async () =>
+      createJsonResponse({ data: { ok: true }, meta: {}, errors: [] }, 200)
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await apiRequest("/personeller");
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const headers = new Headers(init?.headers);
+    expect(headers.get("X-Active-Sube-Id")).toBe("7");
   });
 
   it("attaches auth header for protected endpoints", async () => {
@@ -47,6 +80,7 @@ describe("apiRequest", () => {
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     const headers = new Headers(init?.headers);
     expect(headers.get("Authorization")).toBe("Bearer test-token");
+    expect(headers.get("X-Active-Sube-Id")).toBeNull();
     expect(getAuthTokenForApiMock).toHaveBeenCalledTimes(1);
   });
 

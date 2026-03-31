@@ -1,3 +1,4 @@
+import { finalizeAuthSessionSube } from "../auth/auth-session-sube";
 import type { AuthSession, LoginCredentials } from "../types/auth";
 import { apiRequest, ApiRequestError } from "./api-client";
 import { endpoints } from "./endpoints";
@@ -163,10 +164,17 @@ function normalizeAuthSession(payload: unknown): AuthSession | null {
   const sube_ids = fromUser.length > 0 ? fromUser : fromRoot;
   const sube_list = readSubeList(toRecord(source) ?? {});
 
-  return {
+  const preferredActive =
+    readNumber(userSource.active_sube_id) ??
+    readNumber(userSource.activeSubeId) ??
+    readNumber(source.active_sube_id) ??
+    readNumber(source.activeSubeId);
+
+  const draft: AuthSession = {
     token,
     ui_profile: uiProfile,
     sube_list,
+    active_sube_id: preferredActive,
     user: {
       id: userId,
       ad_soyad: fullName,
@@ -174,6 +182,8 @@ function normalizeAuthSession(payload: unknown): AuthSession | null {
       sube_ids
     }
   };
+
+  return finalizeAuthSessionSube(draft);
 }
 
 function resolveDemoRole(username: string): AuthSession["user"]["rol"] {
@@ -214,17 +224,18 @@ function createDemoSession(credentials: LoginCredentials): AuthSession {
       ? []
       : sube_ids.map((id) => ({ id, ad: id === 1 ? "Merkez" : `Sube ${id}` }));
 
-  return {
+  return finalizeAuthSessionSube({
     token: "demo-token",
     ui_profile: deriveUiProfile(role),
     sube_list: sube_list.length ? sube_list : undefined,
+    active_sube_id: null,
     user: {
       id: userId,
       ad_soyad: toDisplayName(credentials.username),
       rol: role,
       sube_ids
     }
-  };
+  });
 }
 
 function shouldUseDemoFallback(error: unknown): boolean {

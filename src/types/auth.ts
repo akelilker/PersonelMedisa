@@ -23,6 +23,11 @@ export type AuthSession = {
   token: string;
   user: AuthUser;
   ui_profile: UiProfile;
+  /**
+   * Yetkili sube listesi (user.sube_ids) icinden secili aktif sube.
+   * sube_ids bos ise tum subeler modu; null.
+   */
+  active_sube_id: number | null;
   /** Opsiyonel etiketler (login yaniti) */
   sube_list?: SubeInfo[];
 };

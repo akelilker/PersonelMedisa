@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   createPersonel,
   fetchPersonelDetail,
@@ -10,6 +11,7 @@ import { fetchBagliAmirOptions, fetchDepartmanOptions, fetchGorevOptions, fetchP
 import { makeTempId, type PersonelReferenceBundle } from "../data/app-data.types";
 import {
   dataCacheKeys,
+  deleteCacheEntry,
   draftPersonelFromPayload,
   enqueueSyncOperation,
   fetchWithCacheMerge,
@@ -21,8 +23,14 @@ import {
   processSyncQueue,
   useAppDataRevision
 } from "../data/data-manager";
+import {
+  SUBE_DETAIL_REDIRECT_MESSAGE,
+  SUBE_DETAIL_REDIRECT_STATE_KEY,
+  shouldRedirectDetailAfterSubeMismatch
+} from "../lib/detail-sube-context";
 import type { PaginatedResult } from "../types/api";
 import { runDeduped } from "../lib/in-flight-dedupe";
+import { useAuth } from "../state/auth.store";
 import type { Personel } from "../types/personel";
 const PAGE_SIZE = 10;
 
@@ -379,6 +387,9 @@ type EditPersonelFormState = {
 };
 
 export function usePersonelDetail(parsedPersonelId: number, hasValidId: boolean) {
+  const navigate = useNavigate();
+  const { session } = useAuth();
+  const activeSubeId = session?.active_sube_id ?? null;
   const revision = useAppDataRevision();
   const detailKey = useMemo(() => dataCacheKeys.personelDetail(parsedPersonelId), [parsedPersonelId]);
   const cached = useMemo(() => getCacheEntry<Personel>(detailKey), [detailKey, revision]);
@@ -408,6 +419,10 @@ export function usePersonelDetail(parsedPersonelId: number, hasValidId: boolean)
     }
   }, [cached]);
 
+  useEffect(() => {
+    deleteCacheEntry(detailKey);
+  }, [detailKey, activeSubeId]);
+
   const refetch = useCallback(async () => {
     if (!hasValidId) {
       setIsLoading(false);
@@ -429,14 +444,22 @@ export function usePersonelDetail(parsedPersonelId: number, hasValidId: boolean)
         telefon: data.telefon ?? "",
         aktifDurum: data.aktif_durum
       });
-    } catch {
+    } catch (error) {
+      if (shouldRedirectDetailAfterSubeMismatch(error)) {
+        setPersonel(null);
+        navigate("/personeller", {
+          replace: true,
+          state: { [SUBE_DETAIL_REDIRECT_STATE_KEY]: SUBE_DETAIL_REDIRECT_MESSAGE }
+        });
+        return;
+      }
       if (!getCacheEntry<Personel>(detailKey)) {
         setErrorMessage("Personel detayi su an guncellenemiyor.");
       }
     } finally {
       setIsLoading(false);
     }
-  }, [detailKey, hasValidId, parsedPersonelId]);
+  }, [activeSubeId, detailKey, hasValidId, navigate, parsedPersonelId]);
 
   useEffect(() => {
     void refetch();
@@ -493,7 +516,14 @@ export function usePersonelDetail(parsedPersonelId: number, hasValidId: boolean)
           aktifDurum: updated.aktif_durum
         });
         setIsEditing(false);
-      } catch {
+      } catch (error) {
+        if (shouldRedirectDetailAfterSubeMismatch(error)) {
+          navigate("/personeller", {
+            replace: true,
+            state: { [SUBE_DETAIL_REDIRECT_STATE_KEY]: SUBE_DETAIL_REDIRECT_MESSAGE }
+          });
+          return;
+        }
         enqueueSyncOperation({
           op: "personeller.update",
           payload: { personelId: personel.id, body },
@@ -506,7 +536,7 @@ export function usePersonelDetail(parsedPersonelId: number, hasValidId: boolean)
         setIsSubmitting(false);
       }
     },
-    [detailKey, editForm, isSubmitting, personel]
+    [detailKey, editForm, isSubmitting, navigate, personel]
   );
 
   return {

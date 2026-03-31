@@ -5,6 +5,7 @@ import { FormField } from "../../../components/form/FormField";
 import { EmptyState } from "../../../components/states/EmptyState";
 import { ErrorState } from "../../../components/states/ErrorState";
 import { LoadingState } from "../../../components/states/LoadingState";
+import { SubeDetailListNotice } from "../../../components/states/SubeDetailListNotice";
 import { useRoleAccess } from "../../../hooks/use-role-access";
 import { usePersoneller, type CreatePersonelFormState } from "../../../hooks/usePersoneller";
 import type { Personel } from "../../../types/personel";
@@ -74,6 +75,8 @@ export function PersonellerPage() {
           </button>
         ) : null}
       </div>
+
+      <SubeDetailListNotice />
 
       <form className="form-filter-panel" onSubmit={submitFilters}>
         <div className="form-field-grid">

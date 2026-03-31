@@ -7,6 +7,7 @@ import { AppProviders } from "../../src/app/providers";
 import { MEDISA_AUTH_SESSION_KEY } from "../../src/auth/auth-constants";
 import { emitAuthForbidden, emitAuthUnauthorized } from "../../src/lib/storage/auth-events";
 import { ProtectedRoute } from "../../src/router/ProtectedRoute";
+import { finalizeAuthSessionSube } from "../../src/auth/auth-session-sube";
 import { AuthProvider, useAuth } from "../../src/state/auth.store";
 import type { AuthSession, UserRole } from "../../src/types/auth";
 
@@ -18,16 +19,17 @@ const ROUTER_FUTURE_FLAGS = {
 function buildSession(role: UserRole): AuthSession {
   const sube_ids =
     role === "BIRIM_AMIRI" ? [1] : role === "MUHASEBE" ? [1, 2] : role === "BOLUM_YONETICISI" ? [1] : [];
-  return {
+  return finalizeAuthSessionSube({
     token: "test-token",
     ui_profile: role === "BIRIM_AMIRI" ? "birim_amiri" : "yonetim",
+    active_sube_id: null,
     user: {
       id: 1,
       ad_soyad: "Test Kullanici",
       rol: role,
       sube_ids
     }
-  };
+  });
 }
 
 function AuthStateProbe() {

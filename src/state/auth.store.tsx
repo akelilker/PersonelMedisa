@@ -7,8 +7,13 @@ import {
   useState,
   type ReactNode
 } from "react";
-import { login as loginWithStorage, clearSession as clearAuthEverywhere, getSession } from "../auth/auth-manager";
-import { syncActiveSubeFromAuthUser } from "../data/data-manager";
+import {
+  login as loginWithStorage,
+  clearSession as clearAuthEverywhere,
+  getSession,
+  setActiveSubeId as persistActiveSubeId
+} from "../auth/auth-manager";
+import { bumpAppDataRevision, clearAllAppPersistence, loadDataFromServer } from "../data/data-manager";
 import { onAuthUnauthorized } from "../lib/storage/auth-events";
 import type { AuthSession, LoginCredentials } from "../types/auth";
 
@@ -17,6 +22,7 @@ type AuthContextValue = {
   isAuthenticated: boolean;
   login: (credentials: LoginCredentials) => Promise<void>;
   logout: () => void;
+  setActiveSubeId: (subeId: number | null) => void;
 };
 
 type AuthProviderProps = {
@@ -30,6 +36,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const forceLogout = useCallback(() => {
     clearAuthEverywhere();
+    clearAllAppPersistence();
     setSession(null);
   }, []);
 
@@ -40,11 +47,21 @@ export function AuthProvider({ children }: AuthProviderProps) {
       credentials.rememberMe === true
     );
     setSession(nextSession);
+    bumpAppDataRevision();
+    void loadDataFromServer();
   }, []);
 
   const logout = useCallback(() => {
     clearAuthEverywhere();
+    clearAllAppPersistence();
     setSession(null);
+  }, []);
+
+  const setActiveSubeId = useCallback((subeId: number | null) => {
+    persistActiveSubeId(subeId);
+    setSession(getSession());
+    bumpAppDataRevision();
+    void loadDataFromServer();
   }, []);
 
   useEffect(() => {
@@ -53,20 +70,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
     });
   }, [forceLogout]);
 
-  useEffect(() => {
-    if (session) {
-      syncActiveSubeFromAuthUser(session.user.sube_ids);
-    }
-  }, [session?.token, session?.user.id]);
-
   const value = useMemo<AuthContextValue>(
     () => ({
       session,
       isAuthenticated: session !== null,
       login,
-      logout
+      logout,
+      setActiveSubeId
     }),
-    [login, logout, session]
+    [login, logout, session, setActiveSubeId]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

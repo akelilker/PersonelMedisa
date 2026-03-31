@@ -8,8 +8,10 @@ import {
   RAPORLAR_ALLOWED_ROLES,
   SUREC_DETAIL_ALLOWED_ROLES,
   getRolePermissions,
-  hasRolePermission
+  hasRolePermission,
+  sessionAllowsSubeAccess
 } from "../../src/lib/authorization/role-permissions";
+import type { AuthSession } from "../../src/types/auth";
 
 describe("role permissions", () => {
   it("grants management roles full personel and process actions", () => {
@@ -65,5 +67,26 @@ describe("role permissions", () => {
   it("returns empty permissions for unknown/empty role input", () => {
     expect(getRolePermissions(null)).toEqual([]);
     expect(getRolePermissions(undefined)).toEqual([]);
+  });
+
+  it("sessionAllowsSubeAccess allows any sube when allowed list empty", () => {
+    const session = {
+      token: "t",
+      ui_profile: "yonetim",
+      active_sube_id: null,
+      user: { id: 1, ad_soyad: "A", rol: "GENEL_YONETICI", sube_ids: [] }
+    } satisfies AuthSession;
+    expect(sessionAllowsSubeAccess(session, 99)).toBe(true);
+  });
+
+  it("sessionAllowsSubeAccess restricts to sube_ids when list non-empty", () => {
+    const session = {
+      token: "t",
+      ui_profile: "yonetim",
+      active_sube_id: 1,
+      user: { id: 1, ad_soyad: "Genel Muh", rol: "MUHASEBE", sube_ids: [1, 2] }
+    } satisfies AuthSession;
+    expect(sessionAllowsSubeAccess(session, 1)).toBe(true);
+    expect(sessionAllowsSubeAccess(session, 3)).toBe(false);
   });
 });

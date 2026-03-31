@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   cancelSurec,
   createSurec,
@@ -11,6 +12,7 @@ import { fetchSurecTuruOptions } from "../api/referans.api";
 import { emptyPaginated, makeTempId } from "../data/app-data.types";
 import {
   dataCacheKeys,
+  deleteCacheEntry,
   enqueueSyncOperation,
   fetchWithCacheMerge,
   getActiveSube,
@@ -21,9 +23,15 @@ import {
   processSyncQueue,
   useAppDataRevision
 } from "../data/data-manager";
+import {
+  SUBE_DETAIL_REDIRECT_MESSAGE,
+  SUBE_DETAIL_REDIRECT_STATE_KEY,
+  shouldRedirectDetailAfterSubeMismatch
+} from "../lib/detail-sube-context";
 import { runDeduped } from "../lib/in-flight-dedupe";
 import type { PaginatedResult } from "../types/api";
 import type { KeyOption } from "../types/referans";
+import { useAuth } from "../state/auth.store";
 import type { Surec } from "../types/surec";
 
 const PAGE_SIZE = 10;
@@ -537,6 +545,9 @@ export function useSurecler() {
 }
 
 export function useSurecDetail(parsedSurecId: number, hasValidId: boolean) {
+  const navigate = useNavigate();
+  const { session } = useAuth();
+  const activeSubeId = session?.active_sube_id ?? null;
   const revision = useAppDataRevision();
   const detailKey = useMemo(() => dataCacheKeys.surecDetail(parsedSurecId), [parsedSurecId]);
   const cached = useMemo(() => getCacheEntry<Surec>(detailKey), [detailKey, revision]);
@@ -549,6 +560,10 @@ export function useSurecDetail(parsedSurecId: number, hasValidId: boolean) {
       setSurec(cached);
     }
   }, [cached]);
+
+  useEffect(() => {
+    deleteCacheEntry(detailKey);
+  }, [detailKey, activeSubeId]);
 
   const refetch = useCallback(async () => {
     if (!hasValidId) {
@@ -565,14 +580,22 @@ export function useSurecDetail(parsedSurecId: number, hasValidId: boolean) {
         runDeduped(detailKey, () => fetchSurecDetail(parsedSurecId))
       );
       setSurec(data);
-    } catch {
+    } catch (error) {
+      if (shouldRedirectDetailAfterSubeMismatch(error)) {
+        setSurec(null);
+        navigate("/surecler", {
+          replace: true,
+          state: { [SUBE_DETAIL_REDIRECT_STATE_KEY]: SUBE_DETAIL_REDIRECT_MESSAGE }
+        });
+        return;
+      }
       if (!getCacheEntry<Surec>(detailKey)) {
         setErrorMessage("Surec detayi su an guncellenemiyor.");
       }
     } finally {
       setIsLoading(false);
     }
-  }, [detailKey, hasValidId, parsedSurecId]);
+  }, [activeSubeId, detailKey, hasValidId, navigate, parsedSurecId]);
 
   useEffect(() => {
     void refetch();

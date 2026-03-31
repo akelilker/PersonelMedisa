@@ -1,7 +1,7 @@
-import { clearAllAppPersistence } from "../data/data-manager";
 import type { AuthSession, AuthUser, LoginCredentials } from "../types/auth";
 import { login as requestLoginSession } from "../api/auth.api";
 import { MEDISA_AUTH_SESSION_KEY } from "./auth-constants";
+import { finalizeAuthSessionSube } from "./auth-session-sube";
 import { registerAuthTokenSource } from "./auth-token-provider";
 
 export { MEDISA_AUTH_SESSION_KEY };
@@ -55,10 +55,16 @@ function parseStored(raw: string | null): AuthSession | null {
       return null;
     }
     const s = parsed as AuthSession;
-    if (!Array.isArray(s.user.sube_ids)) {
-      return { ...s, user: { ...s.user, sube_ids: [] } };
-    }
-    return s;
+    const sube_ids = Array.isArray(s.user.sube_ids) ? s.user.sube_ids : [];
+    const active_raw = s.active_sube_id;
+    const active_sube_id =
+      active_raw !== null && active_raw !== undefined && typeof active_raw === "number" ? active_raw : null;
+    const base: AuthSession = {
+      ...s,
+      user: { ...s.user, sube_ids },
+      active_sube_id
+    };
+    return finalizeAuthSessionSube(base);
   } catch {
     return null;
   }
@@ -107,6 +113,51 @@ export function getCurrentUser(): AuthUser | null {
   return getSession()?.user ?? null;
 }
 
+/** Oturumdaki yetkili sube id listesi (bos = tum subeler). */
+export function getAllowedSubeIds(): number[] {
+  return getSession()?.user.sube_ids ?? [];
+}
+
+/** Secili aktif sube; tum sube modunda null. */
+export function getActiveSubeId(): number | null {
+  return getSession()?.active_sube_id ?? null;
+}
+
+/** api-client: header degeri veya yok. */
+export function getActiveSubeIdForApiHeader(): string | null {
+  const id = getActiveSubeId();
+  return id === null ? null : String(id);
+}
+
+/**
+ * Aktif subeyi oturuma yazar (ayni storage konumu).
+ * Coklu sube disinda veya yetkisiz id icin no-op.
+ */
+export function setActiveSubeId(nextId: number | null): void {
+  const located = readRawFromStorages();
+  const current = located ? parseStored(located.raw) : null;
+  if (!current || !located) {
+    return;
+  }
+
+  const ids = Array.isArray(current.user.sube_ids) ? current.user.sube_ids : [];
+
+  if (ids.length === 0) {
+    if (nextId !== null) {
+      return;
+    }
+  } else if (nextId !== null && !ids.includes(nextId)) {
+    return;
+  }
+
+  const next = finalizeAuthSessionSube({ ...current, active_sube_id: nextId });
+  try {
+    located.storage.setItem(MEDISA_AUTH_SESSION_KEY, JSON.stringify(next));
+  } catch {
+    /* quota */
+  }
+}
+
 export function isAuthenticated(): boolean {
   return getSession() !== null;
 }
@@ -118,7 +169,7 @@ export function setToken(nextToken: string): void {
     return;
   }
 
-  const next: AuthSession = { ...current, token: nextToken };
+  const next = finalizeAuthSessionSube({ ...current, token: nextToken });
   try {
     located.storage.setItem(MEDISA_AUTH_SESSION_KEY, JSON.stringify(next));
   } catch {
@@ -145,6 +196,7 @@ function writeSession(session: AuthSession, rememberMe: boolean): void {
   }
 }
 
+/** Yalnizca auth anahtarlari; uygulama onbellegi auth.store / logout zincirinde temizlenir. */
 export function clearSession(): void {
   if (typeof window === "undefined") {
     return;
@@ -161,15 +213,14 @@ export function clearSession(): void {
   } catch {
     /* ignore */
   }
-
-  clearAllAppPersistence();
 }
 
 export async function login(username: string, password: string, rememberMe = false): Promise<AuthSession> {
   const credentials: LoginCredentials = { username, password };
   const session = await requestLoginSession(credentials);
-  writeSession(session, rememberMe);
-  return session;
+  const finalized = finalizeAuthSessionSube(session);
+  writeSession(finalized, rememberMe);
+  return finalized;
 }
 
 export function logout(): void {

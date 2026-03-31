@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import { getActiveSubeId } from "../auth/auth-manager";
 import { ApiRequestError } from "../api/api-client";
 import {
   cancelBildirim,
@@ -73,7 +74,6 @@ function createEmptyAppData(): AppData {
     schemaVersion: APP_DATA_SCHEMA_VERSION,
     revision: 0,
     updatedAt: null,
-    activeSubeId: null,
     cache: {}
   };
 }
@@ -141,7 +141,6 @@ export function clearAllAppPersistence(): void {
   }
 
   const empty = createEmptyAppData();
-  empty.activeSubeId = null;
   window.appData = empty;
 
   try {
@@ -176,6 +175,10 @@ export function safeParseStoredAppData(raw: string | null): AppData | null {
   }
 
   const record = parsed as Record<string, unknown>;
+  if (record.schemaVersion === 2) {
+    record.schemaVersion = APP_DATA_SCHEMA_VERSION;
+    delete record.activeSubeId;
+  }
   if (record.schemaVersion !== APP_DATA_SCHEMA_VERSION) {
     return null;
   }
@@ -184,15 +187,7 @@ export function safeParseStoredAppData(raw: string | null): AppData | null {
     return null;
   }
 
-  const data = parsed as AppData;
-  if (data.activeSubeId !== null && data.activeSubeId !== undefined && typeof data.activeSubeId !== "number") {
-    return null;
-  }
-  if (data.activeSubeId === undefined) {
-    data.activeSubeId = null;
-  }
-
-  return data;
+  return parsed as AppData;
 }
 
 export function initAppDataFromStorage(): AppData {
@@ -213,15 +208,10 @@ export function initAppDataFromStorage(): AppData {
   return window.appData;
 }
 
-export function setAppData(
-  partial: Partial<Pick<AppData, "cache" | "activeSubeId">> & Partial<Pick<AppData, "updatedAt">>
-): void {
+export function setAppData(partial: Partial<Pick<AppData, "cache">> & Partial<Pick<AppData, "updatedAt">>): void {
   const data = ensureAppData();
   if (partial.cache) {
     data.cache = { ...data.cache, ...partial.cache };
-  }
-  if (partial.activeSubeId !== undefined) {
-    data.activeSubeId = partial.activeSubeId;
   }
   if (partial.updatedAt !== undefined) {
     data.updatedAt = partial.updatedAt;
@@ -231,36 +221,20 @@ export function setAppData(
   notifyAppData();
 }
 
+/** Aktif sube tek kaynak: auth oturumu (session). */
 export function getActiveSube(): number | null {
-  return ensureAppData().activeSubeId ?? null;
+  if (typeof window === "undefined") {
+    return null;
+  }
+  return getActiveSubeId();
 }
 
-export function setActiveSube(subeId: number | null): void {
+/** Sube degisimi sonrasi onbellek aboneliklerini uyandirir. */
+export function bumpAppDataRevision(): void {
   const data = ensureAppData();
-  if (data.activeSubeId === subeId) {
-    return;
-  }
-  data.activeSubeId = subeId;
   bumpRevision(data);
   persistAppData();
   notifyAppData();
-  void loadDataFromServer();
-}
-
-export function syncActiveSubeFromAuthUser(subeIds: number[] | undefined): void {
-  const ids = Array.isArray(subeIds) ? subeIds : [];
-  const data = ensureAppData();
-  if (ids.length === 0) {
-    if (data.activeSubeId !== null) {
-      setActiveSube(null);
-    }
-    return;
-  }
-  const current = data.activeSubeId;
-  if (current !== null && ids.includes(current)) {
-    return;
-  }
-  setActiveSube(ids[0] ?? null);
 }
 
 export function getSubeIdForApiRequest(): number | undefined {
@@ -295,7 +269,8 @@ export const dataCacheKeys = {
   bildirimRef: () => `referans:bildirim-meta`,
   finansList: (subeId: number | null, personelId: string, donem: string, kalem: string, state: string, page: number) =>
     `finans:list:s${subeSeg(subeId)}:${personelId}|${donem}|${kalem}|${state}|${page}`,
-  puantajDetail: (personelId: number, tarih: string) => `puantaj:${personelId}|${tarih}`
+  puantajDetail: (subeId: number | null, personelId: number, tarih: string) =>
+    `puantaj:s${subeSeg(subeId)}:${personelId}|${tarih}`
 };
 
 function wrapEnvelope<T>(data: T): CacheEnvelope<T> {
@@ -310,6 +285,17 @@ export function getCacheEntry<T>(key: string): T | undefined {
 export function setCacheEntry<T>(key: string, data: T): void {
   const app = ensureAppData();
   app.cache[key] = wrapEnvelope(data) as CacheEnvelope<unknown>;
+  bumpRevision(app);
+  persistAppData();
+  notifyAppData();
+}
+
+export function deleteCacheEntry(key: string): void {
+  const app = ensureAppData();
+  if (!(key in app.cache)) {
+    return;
+  }
+  delete app.cache[key];
   bumpRevision(app);
   persistAppData();
   notifyAppData();
@@ -368,7 +354,7 @@ function resolveFallbackForKey(key: string): unknown {
   if (key.startsWith("referans:bildirim-meta")) {
     return { departman: [], bildirimTuru: [] };
   }
-  if (key.startsWith("puantaj:")) {
+  if (key.startsWith("puantaj:s") || key.startsWith("puantaj:")) {
     return null;
   }
   return undefined;
@@ -941,5 +927,5 @@ export function attachConnectivityListeners(): () => void {
 }
 
 export function mergePuantajCache(personelId: number, tarih: string, row: GunlukPuantaj | null): void {
-  setCacheEntry(dataCacheKeys.puantajDetail(personelId, tarih), row);
+  setCacheEntry(dataCacheKeys.puantajDetail(getActiveSube(), personelId, tarih), row);
 }

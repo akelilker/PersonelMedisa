@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   cancelBildirim,
   createBildirim,
@@ -12,6 +13,7 @@ import { fetchBildirimTuruOptions, fetchDepartmanOptions } from "../api/referans
 import { emptyPaginated, makeTempId } from "../data/app-data.types";
 import {
   dataCacheKeys,
+  deleteCacheEntry,
   enqueueSyncOperation,
   fetchWithCacheMerge,
   getActiveSube,
@@ -22,9 +24,15 @@ import {
   processSyncQueue,
   useAppDataRevision
 } from "../data/data-manager";
+import {
+  SUBE_DETAIL_REDIRECT_MESSAGE,
+  SUBE_DETAIL_REDIRECT_STATE_KEY,
+  shouldRedirectDetailAfterSubeMismatch
+} from "../lib/detail-sube-context";
 import { runDeduped } from "../lib/in-flight-dedupe";
 import type { PaginatedResult } from "../types/api";
 import type { Bildirim } from "../types/bildirim";
+import { useAuth } from "../state/auth.store";
 import type { IdOption, KeyOption } from "../types/referans";
 
 const PAGE_SIZE = 10;
@@ -548,6 +556,9 @@ export function useBildirimlerHeaderPreview(enabled: boolean) {
 }
 
 export function useBildirimDetail(parsedBildirimId: number, hasValidId: boolean) {
+  const navigate = useNavigate();
+  const { session } = useAuth();
+  const activeSubeId = session?.active_sube_id ?? null;
   const revision = useAppDataRevision();
   const detailKey = useMemo(() => dataCacheKeys.bildirimDetail(parsedBildirimId), [parsedBildirimId]);
   const cached = useMemo(() => getCacheEntry<Bildirim>(detailKey), [detailKey, revision]);
@@ -561,6 +572,10 @@ export function useBildirimDetail(parsedBildirimId: number, hasValidId: boolean)
       setBildirim(cached);
     }
   }, [cached]);
+
+  useEffect(() => {
+    deleteCacheEntry(detailKey);
+  }, [detailKey, activeSubeId]);
 
   const refetch = useCallback(async () => {
     if (!hasValidId) {
@@ -577,14 +592,22 @@ export function useBildirimDetail(parsedBildirimId: number, hasValidId: boolean)
         runDeduped(detailKey, () => fetchBildirimDetail(parsedBildirimId))
       );
       setBildirim(data);
-    } catch {
+    } catch (error) {
+      if (shouldRedirectDetailAfterSubeMismatch(error)) {
+        setBildirim(null);
+        navigate("/bildirimler", {
+          replace: true,
+          state: { [SUBE_DETAIL_REDIRECT_STATE_KEY]: SUBE_DETAIL_REDIRECT_MESSAGE }
+        });
+        return;
+      }
       if (!getCacheEntry<Bildirim>(detailKey)) {
         setErrorMessage("Bildirim detayi su an guncellenemiyor.");
       }
     } finally {
       setIsLoading(false);
     }
-  }, [detailKey, hasValidId, parsedBildirimId]);
+  }, [activeSubeId, detailKey, hasValidId, navigate, parsedBildirimId]);
 
   useEffect(() => {
     void refetch();

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { getActiveSube, setActiveSube, useAppDataRevision } from "../../data/data-manager";
+import { useAppDataRevision } from "../../data/data-manager";
 import { useBildirimlerHeaderPreview } from "../../hooks/useBildirimler";
 import { useRoleAccess } from "../../hooks/use-role-access";
 import { useAuth } from "../../state/auth.store";
@@ -116,11 +116,11 @@ export function ShellHeaderActions() {
 
   const navigate = useNavigate();
   const location = useLocation();
-  const { logout, session } = useAuth();
+  const { logout, session, setActiveSubeId } = useAuth();
   const { hasPermission, hasAnyPermission, uiProfile } = useRoleAccess();
 
   useAppDataRevision();
-  const activeSubeId = getActiveSube();
+  const activeSubeId = session?.active_sube_id ?? null;
 
   const canViewPersoneller = hasAnyPermission(["personeller.view", "personeller.view.sube"]);
   const canViewSurecler = hasAnyPermission(["surecler.view", "surecler.view.sube"]);
@@ -370,7 +370,7 @@ export function ShellHeaderActions() {
                     type="button"
                     className={activeSubeId === id ? "sube-option-active" : undefined}
                     onClick={() => {
-                      setActiveSube(id);
+                      setActiveSubeId(id);
                       setIsSubeOpen(false);
                     }}
                   >

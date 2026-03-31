@@ -1,3 +1,4 @@
+import { getActiveSubeIdForApiHeader } from "../auth/auth-manager";
 import { getAuthTokenForApi } from "../auth/auth-token-provider";
 import { emitAuthForbidden, emitAuthUnauthorized } from "../lib/storage/auth-events";
 import { emitApiServerError } from "../lib/storage/api-global-events";
@@ -165,6 +166,13 @@ function buildRequestHeaders(path: string, init?: RequestInit): Headers {
     const token = getAuthTokenForApi();
     if (token) {
       headers.set("Authorization", `Bearer ${token}`);
+    }
+  }
+
+  if (shouldAttachAuthHeader(path)) {
+    const subeHeader = getActiveSubeIdForApiHeader();
+    if (subeHeader && !headers.has("X-Active-Sube-Id")) {
+      headers.set("X-Active-Sube-Id", subeHeader);
     }
   }
 

@@ -1,4 +1,4 @@
-import type { UserRole } from "../../types/auth";
+import type { AuthSession, UserRole } from "../../types/auth";
 
 export type AppPermission =
   | "personeller.view"
@@ -136,6 +136,20 @@ export function hasRolePermission(
   permission: AppPermission
 ): boolean {
   return getRolePermissions(role).includes(permission);
+}
+
+/** Oturumdaki yetkili sube listesi; bos ise yonetim (tum subeler) varsayimi. */
+export function getAllowedSubeIdsFromSession(session: AuthSession | null): number[] {
+  return session?.user.sube_ids ?? [];
+}
+
+/** Backend dogrulamasi zorunlu; frontend UX icin daraltma. */
+export function sessionAllowsSubeAccess(session: AuthSession | null, subeId: number): boolean {
+  const allowed = getAllowedSubeIdsFromSession(session);
+  if (allowed.length === 0) {
+    return true;
+  }
+  return allowed.includes(subeId);
 }
 
 export function getRolesWithPermission(permission: AppPermission): UserRole[] {

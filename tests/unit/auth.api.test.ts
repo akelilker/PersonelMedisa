@@ -40,6 +40,7 @@ describe("auth.api login", () => {
     expect(session).toEqual({
       token: "wrapped-token",
       ui_profile: "yonetim",
+      active_sube_id: null,
       user: {
         id: 1,
         ad_soyad: "Ilker A",
@@ -68,6 +69,7 @@ describe("auth.api login", () => {
     expect(session).toEqual({
       token: "raw-token",
       ui_profile: "birim_amiri",
+      active_sube_id: null,
       user: {
         id: 12,
         ad_soyad: "Birim Kullanici",
@@ -111,6 +113,7 @@ describe("auth.api login", () => {
     expect(session.user.rol).toBe("BIRIM_AMIRI");
     expect(session.ui_profile).toBe("birim_amiri");
     expect(session.user.sube_ids).toEqual([1]);
+    expect(session.active_sube_id).toBe(1);
     expect(session.sube_list).toEqual([{ id: 1, ad: "Merkez" }]);
   });
 
@@ -130,5 +133,6 @@ describe("auth.api login", () => {
     const session = await login({ username: "yonetici_demo", password: "secret" });
     expect(session.user.rol).toBe("GENEL_YONETICI");
     expect(session.ui_profile).toBe("yonetim");
+    expect(session.active_sube_id).toBeNull();
   });
 });

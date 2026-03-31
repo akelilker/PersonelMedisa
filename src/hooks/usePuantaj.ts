@@ -1,4 +1,4 @@
-import { useCallback, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { fetchGunlukPuantaj, upsertGunlukPuantaj } from "../api/puantaj.api";
 import {
   dataCacheKeys,
@@ -9,6 +9,7 @@ import {
   processSyncQueue
 } from "../data/data-manager";
 import { runDeduped } from "../lib/in-flight-dedupe";
+import { useAuth } from "../state/auth.store";
 import type { GunlukPuantaj } from "../types/puantaj";
 
 type ActiveQuery = {
@@ -74,6 +75,9 @@ const INITIAL_FORM: GunlukPuantajFormState = {
 };
 
 export function usePuantaj() {
+  const { session } = useAuth();
+  const activeSube = session?.active_sube_id ?? null;
+
   const [formState, setFormState] = useState<GunlukPuantajFormState>({ ...INITIAL_FORM });
   const [activeQuery, setActiveQuery] = useState<ActiveQuery | null>(null);
   const [puantaj, setPuantaj] = useState<GunlukPuantaj | null>(null);
@@ -86,9 +90,10 @@ export function usePuantaj() {
     setFormState((prev) => ({ ...prev, ...partial }));
   }, []);
 
-  const detailKeyFor = useCallback((query: ActiveQuery) => {
-    return dataCacheKeys.puantajDetail(query.personelId, query.tarih);
-  }, []);
+  const detailKeyFor = useCallback(
+    (query: ActiveQuery) => dataCacheKeys.puantajDetail(activeSube, query.personelId, query.tarih),
+    [activeSube]
+  );
 
   const loadPuantaj = useCallback(
     async (query: ActiveQuery) => {
@@ -118,6 +123,13 @@ export function usePuantaj() {
     },
     [detailKeyFor, patchFormState]
   );
+
+  useEffect(() => {
+    if (!activeQuery) {
+      return;
+    }
+    void loadPuantaj(activeQuery);
+  }, [activeSube, activeQuery, loadPuantaj]);
 
   const submitQuery = useCallback(
     async (event: FormEvent<HTMLFormElement>) => {

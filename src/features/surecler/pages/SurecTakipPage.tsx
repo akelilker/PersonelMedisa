@@ -5,6 +5,7 @@ import { AppModal } from "../../../components/modal/AppModal";
 import { EmptyState } from "../../../components/states/EmptyState";
 import { ErrorState } from "../../../components/states/ErrorState";
 import { LoadingState } from "../../../components/states/LoadingState";
+import { SubeDetailListNotice } from "../../../components/states/SubeDetailListNotice";
 import { useRoleAccess } from "../../../hooks/use-role-access";
 import { useSurecler } from "../../../hooks/useSurecler";
 import type { KeyOption } from "../../../types/referans";
@@ -84,6 +85,8 @@ export function SurecTakipPage() {
           </button>
         ) : null}
       </div>
+
+      <SubeDetailListNotice />
 
       <form className="form-filter-panel" onSubmit={submitFilters}>
         <div className="form-field-grid">

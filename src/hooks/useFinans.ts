@@ -1,12 +1,24 @@
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   cancelFinansKalem,
   createFinansKalem,
   fetchFinansKalemList,
   updateFinansKalem
 } from "../api/finans.api";
+import { emptyPaginated, makeTempId } from "../data/app-data.types";
+import {
+  dataCacheKeys,
+  enqueueSyncOperation,
+  fetchWithCacheMerge,
+  getCacheEntry,
+  mergeCacheEntry,
+  optimisticPrependToList,
+  processSyncQueue,
+  useAppDataRevision
+} from "../data/data-manager";
 import { runDeduped } from "../lib/in-flight-dedupe";
-import type { FinansKalem } from "../types/finans";
+import type { PaginatedResult } from "../types/api";
+import type { CreateFinansKalemPayload, FinansKalem } from "../types/finans";
 
 const PAGE_SIZE = 10;
 
@@ -75,6 +87,18 @@ function toFormState(item: FinansKalem): FinansFormState {
   };
 }
 
+function draftFinansFromPayload(payload: CreateFinansKalemPayload, tempId: number): FinansKalem {
+  return {
+    id: tempId,
+    personel_id: payload.personel_id,
+    donem: payload.donem,
+    kalem_turu: payload.kalem_turu,
+    tutar: payload.tutar,
+    aciklama: payload.aciklama,
+    state: "AKTIF"
+  };
+}
+
 const INITIAL_CREATE_FINANS_FORM: FinansFormState = {
   personelId: "",
   donem: toMonthInputValue(new Date()),
@@ -83,20 +107,14 @@ const INITIAL_CREATE_FINANS_FORM: FinansFormState = {
   aciklama: ""
 };
 
-function listCacheKey(applied: FinansListQueryState["applied"], page: number) {
-  return `finans|${applied.personelId}|${applied.donem}|${applied.kalemTuru}|${applied.state}|${page}`;
-}
-
 export function useFinans() {
+  const revision = useAppDataRevision();
   const [listQuery, setListQuery] = useState<FinansListQueryState>({
     draft: { personelId: "", donem: "", kalemTuru: "", state: "" },
     applied: { personelId: "", donem: "", kalemTuru: "", state: "" },
     page: 1
   });
 
-  const [items, setItems] = useState<FinansKalem[]>([]);
-  const [hasNextPage, setHasNextPage] = useState(false);
-  const [totalPages, setTotalPages] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -120,13 +138,30 @@ export function useFinans() {
   const applied = listQuery.applied;
   const listPage = listQuery.page;
 
-  const refetch = useCallback(async () => {
-    setIsLoading(true);
-    setErrorMessage(null);
-    const key = listCacheKey(applied, listPage);
+  const listKey = useMemo(
+    () =>
+      dataCacheKeys.finansList(
+        applied.personelId,
+        applied.donem,
+        applied.kalemTuru,
+        applied.state,
+        listPage
+      ),
+    [applied.donem, applied.kalemTuru, applied.personelId, applied.state, listPage]
+  );
 
-    try {
-      const result = await runDeduped(key, () =>
+  const listSnapshot = useMemo(
+    () => getCacheEntry<PaginatedResult<FinansKalem>>(listKey),
+    [listKey, revision]
+  );
+
+  const items = listSnapshot?.items ?? [];
+  const hasNextPage = listSnapshot?.pagination.hasNextPage ?? false;
+  const totalPages = listSnapshot?.pagination.totalPages ?? null;
+
+  const refetch = useCallback(async () => {
+    await fetchWithCacheMerge(listKey, () =>
+      runDeduped(listKey, () =>
         fetchFinansKalemList({
           personel_id: parsePositiveInt(applied.personelId),
           donem: applied.donem || undefined,
@@ -135,23 +170,45 @@ export function useFinans() {
           page: listPage,
           limit: PAGE_SIZE
         })
-      );
-      setItems(result.items);
-      setHasNextPage(result.pagination.hasNextPage ?? result.items.length === PAGE_SIZE);
-      setTotalPages(result.pagination.totalPages);
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Finans kayitlari alinamadi.");
-      setItems([]);
-      setHasNextPage(false);
-      setTotalPages(null);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [applied.donem, applied.kalemTuru, applied.personelId, applied.state, listPage]);
+      )
+    );
+  }, [applied, listKey, listPage]);
 
   useEffect(() => {
-    void refetch();
-  }, [refetch]);
+    let cancelled = false;
+    const hasSeed = getCacheEntry<PaginatedResult<FinansKalem>>(listKey) !== undefined;
+    setIsLoading(!hasSeed);
+    setErrorMessage(null);
+
+    void (async () => {
+      try {
+        await fetchWithCacheMerge(listKey, () =>
+          runDeduped(listKey, () =>
+            fetchFinansKalemList({
+              personel_id: parsePositiveInt(applied.personelId),
+              donem: applied.donem || undefined,
+              kalem_turu: applied.kalemTuru || undefined,
+              state: applied.state || undefined,
+              page: listPage,
+              limit: PAGE_SIZE
+            })
+          )
+        );
+      } catch {
+        if (!getCacheEntry<PaginatedResult<FinansKalem>>(listKey)) {
+          setErrorMessage("Finans kayitlari su an guncellenemiyor.");
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoading(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [applied, listKey, listPage]);
 
   const submitFilters = useCallback((event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -191,6 +248,28 @@ export function useFinans() {
     setIsCreateModalOpen(false);
   }, []);
 
+  const refreshPageOne = useCallback(async () => {
+    const pageOneKey = dataCacheKeys.finansList(
+      listQuery.applied.personelId,
+      listQuery.applied.donem,
+      listQuery.applied.kalemTuru,
+      listQuery.applied.state,
+      1
+    );
+    await fetchWithCacheMerge(pageOneKey, () =>
+      runDeduped(pageOneKey, () =>
+        fetchFinansKalemList({
+          personel_id: parsePositiveInt(listQuery.applied.personelId),
+          donem: listQuery.applied.donem || undefined,
+          kalem_turu: listQuery.applied.kalemTuru || undefined,
+          state: listQuery.applied.state || undefined,
+          page: 1,
+          limit: PAGE_SIZE
+        })
+      )
+    );
+  }, [listQuery.applied]);
+
   const createFinansHandler = useCallback(
     async (event: FormEvent<HTMLFormElement>, canCreate: boolean) => {
       event.preventDefault();
@@ -206,25 +285,40 @@ export function useFinans() {
       setIsCreateSubmitting(true);
 
       try {
-        await createFinansKalem({
+        const payload: CreateFinansKalemPayload = {
           personel_id: parseRequiredPositiveInt(createForm.personelId, "Personel ID"),
           donem: validateDonem(createForm.donem),
           kalem_turu: createForm.kalemTuru.trim(),
           tutar: parseRequiredPositiveNumber(createForm.tutar, "Tutar"),
           aciklama: createForm.aciklama.trim() || undefined
-        });
+        };
 
-        setIsCreateModalOpen(false);
-        setCreateForm({ ...INITIAL_CREATE_FINANS_FORM });
-        setListQuery((prev) => {
-          if (prev.page !== 1) {
-            return { ...prev, page: 1 };
-          }
-          return prev;
-        });
+        const pageOneKey = dataCacheKeys.finansList(
+          listQuery.applied.personelId,
+          listQuery.applied.donem,
+          listQuery.applied.kalemTuru,
+          listQuery.applied.state,
+          1
+        );
 
-        if (listPage === 1) {
-          void refetch();
+        try {
+          await createFinansKalem(payload);
+          setIsCreateModalOpen(false);
+          setCreateForm({ ...INITIAL_CREATE_FINANS_FORM });
+          setListQuery((prev) => ({ ...prev, page: 1 }));
+          await refreshPageOne();
+        } catch {
+          const tempId = makeTempId();
+          optimisticPrependToList(pageOneKey, draftFinansFromPayload(payload, tempId));
+          enqueueSyncOperation({
+            op: "finans.create",
+            payload,
+            meta: { listKey: pageOneKey, tempId }
+          });
+          setIsCreateModalOpen(false);
+          setCreateForm({ ...INITIAL_CREATE_FINANS_FORM });
+          setListQuery((prev) => ({ ...prev, page: 1 }));
+          void processSyncQueue();
         }
       } catch (error) {
         setCreateErrorMessage(error instanceof Error ? error.message : "Finans kaydi olusturulamadi.");
@@ -232,7 +326,7 @@ export function useFinans() {
         setIsCreateSubmitting(false);
       }
     },
-    [createForm, isCreateSubmitting, listPage, refetch]
+    [createForm, isCreateSubmitting, listQuery.applied, refreshPageOne]
   );
 
   const openEditModal = useCallback((item: FinansKalem, canEdit: boolean) => {
@@ -263,33 +357,42 @@ export function useFinans() {
       setEditErrorMessage(null);
       setIsEditSubmitting(true);
 
+      const body = {
+        personel_id: parseRequiredPositiveInt(editForm.personelId, "Personel ID"),
+        donem: validateDonem(editForm.donem),
+        kalem_turu: editForm.kalemTuru.trim(),
+        tutar: parseRequiredPositiveNumber(editForm.tutar, "Tutar"),
+        aciklama: editForm.aciklama.trim() || undefined
+      };
+
+      mergeCacheEntry<PaginatedResult<FinansKalem>>(listKey, (prev) => {
+        const base = prev ?? emptyPaginated<FinansKalem>();
+        return {
+          ...base,
+          items: base.items.map((row) =>
+            row.id === editingItem.id ? { ...row, ...body } : row
+          )
+        };
+      });
+
       try {
-        await updateFinansKalem(editingItem.id, {
-          personel_id: parseRequiredPositiveInt(editForm.personelId, "Personel ID"),
-          donem: validateDonem(editForm.donem),
-          kalem_turu: editForm.kalemTuru.trim(),
-          tutar: parseRequiredPositiveNumber(editForm.tutar, "Tutar"),
-          aciklama: editForm.aciklama.trim() || undefined
-        });
-
+        await updateFinansKalem(editingItem.id, body);
         setEditingItem(null);
-        setListQuery((prev) => {
-          if (prev.page !== 1) {
-            return { ...prev, page: 1 };
-          }
-          return prev;
+        setListQuery((prev) => ({ ...prev, page: 1 }));
+        await refreshPageOne();
+      } catch {
+        enqueueSyncOperation({
+          op: "finans.update",
+          payload: { kalemId: editingItem.id, body },
+          meta: { listKey }
         });
-
-        if (listPage === 1) {
-          void refetch();
-        }
-      } catch (error) {
-        setEditErrorMessage(error instanceof Error ? error.message : "Finans kaydi guncellenemedi.");
+        setEditingItem(null);
+        void processSyncQueue();
       } finally {
         setIsEditSubmitting(false);
       }
     },
-    [editForm, editingItem, isEditSubmitting, listPage, refetch]
+    [editForm, editingItem, isEditSubmitting, listKey, refreshPageOne]
   );
 
   const cancelFinansHandler = useCallback(
@@ -305,25 +408,33 @@ export function useFinans() {
       }
 
       setCancelOngoingId(item.id);
+
+      mergeCacheEntry<PaginatedResult<FinansKalem>>(listKey, (prev) => {
+        const base = prev ?? emptyPaginated<FinansKalem>();
+        return {
+          ...base,
+          items: base.items.map((row) =>
+            row.id === item.id ? { ...row, state: "IPTAL" } : row
+          )
+        };
+      });
+
       try {
         await cancelFinansKalem(item.id);
-        setListQuery((prev) => {
-          if (prev.page !== 1) {
-            return { ...prev, page: 1 };
-          }
-          return prev;
+        setListQuery((prev) => ({ ...prev, page: 1 }));
+        await refreshPageOne();
+      } catch {
+        enqueueSyncOperation({
+          op: "finans.cancel",
+          payload: { kalemId: item.id },
+          meta: { listKey }
         });
-
-        if (listPage === 1) {
-          void refetch();
-        }
-      } catch (error) {
-        setErrorMessage(error instanceof Error ? error.message : "Finans kaydi iptal edilemedi.");
+        void processSyncQueue();
       } finally {
         setCancelOngoingId(null);
       }
     },
-    [listPage, refetch]
+    [listKey, refreshPageOne]
   );
 
   return {

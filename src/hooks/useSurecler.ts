@@ -1,34 +1,30 @@
-import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { cancelSurec, createSurec, fetchSurecDetail, fetchSureclerList, updateSurec } from "../api/surecler.api";
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import {
+  cancelSurec,
+  createSurec,
+  fetchSurecDetail,
+  fetchSureclerList,
+  updateSurec,
+  type CreateSurecPayload
+} from "../api/surecler.api";
 import { fetchSurecTuruOptions } from "../api/referans.api";
+import { emptyPaginated, makeTempId } from "../data/app-data.types";
+import {
+  dataCacheKeys,
+  enqueueSyncOperation,
+  fetchWithCacheMerge,
+  getCacheEntry,
+  mergeCacheEntry,
+  optimisticPrependToList,
+  processSyncQueue,
+  useAppDataRevision
+} from "../data/data-manager";
 import { runDeduped } from "../lib/in-flight-dedupe";
+import type { PaginatedResult } from "../types/api";
 import type { KeyOption } from "../types/referans";
 import type { Surec } from "../types/surec";
 
 const PAGE_SIZE = 10;
-
-let surecTuruCache: KeyOption[] | null = null;
-let surecTuruPromise: Promise<KeyOption[]> | null = null;
-
-async function loadSurecTuruReferences(): Promise<KeyOption[]> {
-  if (surecTuruCache) {
-    return surecTuruCache;
-  }
-  if (surecTuruPromise) {
-    return surecTuruPromise;
-  }
-
-  surecTuruPromise = fetchSurecTuruOptions()
-    .then((options) => {
-      surecTuruCache = options;
-      return options;
-    })
-    .finally(() => {
-      surecTuruPromise = null;
-    });
-
-  return surecTuruPromise;
-}
 
 export type SurecListQueryState = {
   draft: {
@@ -96,11 +92,22 @@ function toSurecFormState(surec: Surec): SurecFormState {
   };
 }
 
-function listCacheKey(applied: SurecListQueryState["applied"], page: number) {
-  return `surecler|${applied.personelId}|${applied.surecTuru}|${applied.state}|${applied.baslangicTarihi}|${applied.bitisTarihi}|${page}`;
+function draftSurecFromCreatePayload(payload: CreateSurecPayload, tempId: number): Surec {
+  return {
+    id: tempId,
+    personel_id: payload.personel_id,
+    surec_turu: payload.surec_turu,
+    alt_tur: payload.alt_tur,
+    baslangic_tarihi: payload.baslangic_tarihi,
+    bitis_tarihi: payload.bitis_tarihi,
+    ucretli_mi: payload.ucretli_mi,
+    aciklama: payload.aciklama,
+    state: "BEKLEMEDE"
+  };
 }
 
 export function useSurecler() {
+  const revision = useAppDataRevision();
   const [listQuery, setListQuery] = useState<SurecListQueryState>({
     draft: {
       personelId: "",
@@ -119,13 +126,8 @@ export function useSurecler() {
     page: 1
   });
 
-  const [surecler, setSurecler] = useState<Surec[]>([]);
-  const [hasNextPage, setHasNextPage] = useState(false);
-  const [totalPages, setTotalPages] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-
-  const [surecTuruOptions, setSurecTuruOptions] = useState<KeyOption[]>([]);
   const [referenceError, setReferenceError] = useState<string | null>(null);
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -142,13 +144,43 @@ export function useSurecler() {
   const applied = listQuery.applied;
   const listPage = listQuery.page;
 
-  const refetch = useCallback(async () => {
-    setIsLoading(true);
-    setErrorMessage(null);
-    const key = listCacheKey(applied, listPage);
+  const listKey = useMemo(
+    () =>
+      dataCacheKeys.sureclerList(
+        applied.personelId,
+        applied.surecTuru,
+        applied.state,
+        applied.baslangicTarihi,
+        applied.bitisTarihi,
+        listPage
+      ),
+    [
+      applied.baslangicTarihi,
+      applied.bitisTarihi,
+      applied.personelId,
+      applied.state,
+      applied.surecTuru,
+      listPage
+    ]
+  );
 
-    try {
-      const nextData = await runDeduped(key, () =>
+  const listSnapshot = useMemo(
+    () => getCacheEntry<PaginatedResult<Surec>>(listKey),
+    [listKey, revision]
+  );
+
+  const surecler = listSnapshot?.items ?? [];
+  const hasNextPage = listSnapshot?.pagination.hasNextPage ?? false;
+  const totalPages = listSnapshot?.pagination.totalPages ?? null;
+
+  const surecTuruOptions = useMemo(
+    () => getCacheEntry<KeyOption[]>(dataCacheKeys.surecTuruRef()) ?? [],
+    [revision]
+  );
+
+  const refetch = useCallback(async () => {
+    await fetchWithCacheMerge(listKey, () =>
+      runDeduped(listKey, () =>
         fetchSureclerList({
           personel_id: parsePositiveInt(applied.personelId),
           surec_turu: applied.surecTuru || undefined,
@@ -158,45 +190,59 @@ export function useSurecler() {
           page: listPage,
           limit: PAGE_SIZE
         })
-      );
-      setSurecler(nextData.items);
-      setHasNextPage(nextData.pagination.hasNextPage ?? nextData.items.length === PAGE_SIZE);
-      setTotalPages(nextData.pagination.totalPages);
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Surec listesi alinamadi.");
-      setHasNextPage(false);
-      setTotalPages(null);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [
-    applied.baslangicTarihi,
-    applied.bitisTarihi,
-    applied.personelId,
-    applied.state,
-    applied.surecTuru,
-    listPage
-  ]);
-
-  useEffect(() => {
-    void refetch();
-  }, [refetch]);
+      )
+    );
+  }, [applied, listKey, listPage]);
 
   useEffect(() => {
     let cancelled = false;
+    const hasSeed = getCacheEntry<PaginatedResult<Surec>>(listKey) !== undefined;
+    setIsLoading(!hasSeed);
+    setErrorMessage(null);
 
     void (async () => {
-      setReferenceError(null);
       try {
-        const options = await loadSurecTuruReferences();
-        if (!cancelled) {
-          setSurecTuruOptions(options);
+        await fetchWithCacheMerge(listKey, () =>
+          runDeduped(listKey, () =>
+            fetchSureclerList({
+              personel_id: parsePositiveInt(applied.personelId),
+              surec_turu: applied.surecTuru || undefined,
+              state: applied.state || undefined,
+              baslangic_tarihi: applied.baslangicTarihi || undefined,
+              bitis_tarihi: applied.bitisTarihi || undefined,
+              page: listPage,
+              limit: PAGE_SIZE
+            })
+          )
+        );
+      } catch {
+        if (!getCacheEntry<PaginatedResult<Surec>>(listKey)) {
+          setErrorMessage("Surec listesi su an guncellenemiyor.");
         }
-      } catch (error) {
+      } finally {
         if (!cancelled) {
-          setReferenceError(
-            error instanceof Error ? error.message : "Surec turleri alinamadi, manuel giris aktif."
-          );
+          setIsLoading(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [applied, listKey, listPage]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setReferenceError(null);
+
+    void (async () => {
+      try {
+        await fetchWithCacheMerge(dataCacheKeys.surecTuruRef(), () =>
+          runDeduped(dataCacheKeys.surecTuruRef(), () => fetchSurecTuruOptions())
+        );
+      } catch {
+        if (!cancelled) {
+          setReferenceError("Surec turleri su an guncellenemiyor, manuel giris kullanilabilir.");
         }
       }
     })();
@@ -251,6 +297,30 @@ export function useSurecler() {
     setIsCreateModalOpen(false);
   }, []);
 
+  const refreshPageOne = useCallback(async () => {
+    const pageOneKey = dataCacheKeys.sureclerList(
+      listQuery.applied.personelId,
+      listQuery.applied.surecTuru,
+      listQuery.applied.state,
+      listQuery.applied.baslangicTarihi,
+      listQuery.applied.bitisTarihi,
+      1
+    );
+    await fetchWithCacheMerge(pageOneKey, () =>
+      runDeduped(pageOneKey, () =>
+        fetchSureclerList({
+          personel_id: parsePositiveInt(listQuery.applied.personelId),
+          surec_turu: listQuery.applied.surecTuru || undefined,
+          state: listQuery.applied.state || undefined,
+          baslangic_tarihi: listQuery.applied.baslangicTarihi || undefined,
+          bitis_tarihi: listQuery.applied.bitisTarihi || undefined,
+          page: 1,
+          limit: PAGE_SIZE
+        })
+      )
+    );
+  }, [listQuery.applied]);
+
   const createSurecHandler = useCallback(
     async (event: FormEvent<HTMLFormElement>, canCreate: boolean) => {
       event.preventDefault();
@@ -266,7 +336,7 @@ export function useSurecler() {
       setIsCreateSubmitting(true);
 
       try {
-        await createSurec({
+        const payload: CreateSurecPayload = {
           personel_id: parseRequiredPositiveInt(createForm.personelId, "Personel ID"),
           surec_turu: createForm.surecTuru.trim(),
           alt_tur: createForm.altTur.trim() || undefined,
@@ -274,19 +344,35 @@ export function useSurecler() {
           bitis_tarihi: createForm.bitisTarihi,
           ucretli_mi: createForm.ucretliMi,
           aciklama: createForm.aciklama.trim() || undefined
-        });
+        };
 
-        setIsCreateModalOpen(false);
-        setCreateForm(INITIAL_SUREC_FORM);
-        setListQuery((prev) => {
-          if (prev.page !== 1) {
-            return { ...prev, page: 1 };
-          }
-          return prev;
-        });
+        const pageOneKey = dataCacheKeys.sureclerList(
+          listQuery.applied.personelId,
+          listQuery.applied.surecTuru,
+          listQuery.applied.state,
+          listQuery.applied.baslangicTarihi,
+          listQuery.applied.bitisTarihi,
+          1
+        );
 
-        if (listPage === 1) {
-          void refetch();
+        try {
+          await createSurec(payload);
+          setIsCreateModalOpen(false);
+          setCreateForm(INITIAL_SUREC_FORM);
+          setListQuery((prev) => ({ ...prev, page: 1 }));
+          await refreshPageOne();
+        } catch {
+          const tempId = makeTempId();
+          optimisticPrependToList(pageOneKey, draftSurecFromCreatePayload(payload, tempId));
+          enqueueSyncOperation({
+            op: "surecler.create",
+            payload,
+            meta: { listKey: pageOneKey, tempId }
+          });
+          setIsCreateModalOpen(false);
+          setCreateForm(INITIAL_SUREC_FORM);
+          setListQuery((prev) => ({ ...prev, page: 1 }));
+          void processSyncQueue();
         }
       } catch (error) {
         setCreateErrorMessage(error instanceof Error ? error.message : "Surec kaydi yapilamadi.");
@@ -294,7 +380,7 @@ export function useSurecler() {
         setIsCreateSubmitting(false);
       }
     },
-    [createForm, isCreateSubmitting, listPage, refetch]
+    [createForm, isCreateSubmitting, listQuery.applied, refreshPageOne]
   );
 
   const openEditModal = useCallback((surec: Surec, canEdit: boolean) => {
@@ -325,35 +411,42 @@ export function useSurecler() {
       setEditErrorMessage(null);
       setIsEditSubmitting(true);
 
+      const body = {
+        personel_id: parseRequiredPositiveInt(editForm.personelId, "Personel ID"),
+        surec_turu: editForm.surecTuru.trim(),
+        alt_tur: editForm.altTur.trim() || undefined,
+        baslangic_tarihi: editForm.baslangicTarihi,
+        bitis_tarihi: editForm.bitisTarihi,
+        ucretli_mi: editForm.ucretliMi,
+        aciklama: editForm.aciklama.trim() || undefined
+      };
+
+      mergeCacheEntry<PaginatedResult<Surec>>(listKey, (prev) => {
+        const base = prev ?? emptyPaginated<Surec>();
+        return {
+          ...base,
+          items: base.items.map((row) => (row.id === editingSurec.id ? { ...row, ...body } : row))
+        };
+      });
+
       try {
-        await updateSurec(editingSurec.id, {
-          personel_id: parseRequiredPositiveInt(editForm.personelId, "Personel ID"),
-          surec_turu: editForm.surecTuru.trim(),
-          alt_tur: editForm.altTur.trim() || undefined,
-          baslangic_tarihi: editForm.baslangicTarihi,
-          bitis_tarihi: editForm.bitisTarihi,
-          ucretli_mi: editForm.ucretliMi,
-          aciklama: editForm.aciklama.trim() || undefined
-        });
-
+        await updateSurec(editingSurec.id, body);
         setEditingSurec(null);
-        setListQuery((prev) => {
-          if (prev.page !== 1) {
-            return { ...prev, page: 1 };
-          }
-          return prev;
+        setListQuery((prev) => ({ ...prev, page: 1 }));
+        await refreshPageOne();
+      } catch {
+        enqueueSyncOperation({
+          op: "surecler.update",
+          payload: { surecId: editingSurec.id, body },
+          meta: { listKey }
         });
-
-        if (listPage === 1) {
-          void refetch();
-        }
-      } catch (error) {
-        setEditErrorMessage(error instanceof Error ? error.message : "Surec guncellenemedi.");
+        setEditingSurec(null);
+        void processSyncQueue();
       } finally {
         setIsEditSubmitting(false);
       }
     },
-    [editForm, editingSurec, isEditSubmitting, listPage, refetch]
+    [editForm, editingSurec, isEditSubmitting, listKey, refreshPageOne]
   );
 
   const cancelSurecHandler = useCallback(
@@ -369,25 +462,31 @@ export function useSurecler() {
       }
 
       setCancelingSurecId(surec.id);
+
+      mergeCacheEntry<PaginatedResult<Surec>>(listKey, (prev) => {
+        const base = prev ?? emptyPaginated<Surec>();
+        return {
+          ...base,
+          items: base.items.map((row) => (row.id === surec.id ? { ...row, state: "IPTAL" } : row))
+        };
+      });
+
       try {
         await cancelSurec(surec.id);
-        setListQuery((prev) => {
-          if (prev.page !== 1) {
-            return { ...prev, page: 1 };
-          }
-          return prev;
+        setListQuery((prev) => ({ ...prev, page: 1 }));
+        await refreshPageOne();
+      } catch {
+        enqueueSyncOperation({
+          op: "surecler.cancel",
+          payload: { surecId: surec.id },
+          meta: { listKey }
         });
-
-        if (listPage === 1) {
-          void refetch();
-        }
-      } catch (error) {
-        setErrorMessage(error instanceof Error ? error.message : "Surec iptal edilemedi.");
+        void processSyncQueue();
       } finally {
         setCancelingSurecId(null);
       }
     },
-    [listPage, refetch]
+    [listKey, refreshPageOne]
   );
 
   return {
@@ -398,6 +497,7 @@ export function useSurecler() {
     totalPages,
     isLoading,
     errorMessage,
+    setErrorMessage,
     refetch,
     surecTuruOptions,
     referenceError,
@@ -426,9 +526,18 @@ export function useSurecler() {
 }
 
 export function useSurecDetail(parsedSurecId: number, hasValidId: boolean) {
+  const revision = useAppDataRevision();
+  const detailKey = useMemo(() => dataCacheKeys.surecDetail(parsedSurecId), [parsedSurecId]);
+  const cached = useMemo(() => getCacheEntry<Surec>(detailKey), [detailKey, revision]);
   const [surec, setSurec] = useState<Surec | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (cached) {
+      setSurec(cached);
+    }
+  }, [cached]);
 
   const refetch = useCallback(async () => {
     if (!hasValidId) {
@@ -439,17 +548,20 @@ export function useSurecDetail(parsedSurecId: number, hasValidId: boolean) {
 
     setIsLoading(true);
     setErrorMessage(null);
-    const key = `surec-detail|${parsedSurecId}`;
 
     try {
-      const data = await runDeduped(key, () => fetchSurecDetail(parsedSurecId));
+      const data = await fetchWithCacheMerge(detailKey, () =>
+        runDeduped(detailKey, () => fetchSurecDetail(parsedSurecId))
+      );
       setSurec(data);
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Surec detayi alinamadi.");
+    } catch {
+      if (!getCacheEntry<Surec>(detailKey)) {
+        setErrorMessage("Surec detayi su an guncellenemiyor.");
+      }
     } finally {
       setIsLoading(false);
     }
-  }, [hasValidId, parsedSurecId]);
+  }, [detailKey, hasValidId, parsedSurecId]);
 
   useEffect(() => {
     void refetch();

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   createPersonel,
   fetchPersonelDetail,
@@ -6,59 +6,23 @@ import {
   updatePersonel,
   type CreatePersonelPayload
 } from "../api/personeller.api";
+import { fetchBagliAmirOptions, fetchDepartmanOptions, fetchGorevOptions, fetchPersonelTipiOptions } from "../api/referans.api";
+import { makeTempId, type PersonelReferenceBundle } from "../data/app-data.types";
 import {
-  fetchBagliAmirOptions,
-  fetchDepartmanOptions,
-  fetchGorevOptions,
-  fetchPersonelTipiOptions
-} from "../api/referans.api";
+  dataCacheKeys,
+  draftPersonelFromPayload,
+  enqueueSyncOperation,
+  fetchWithCacheMerge,
+  getCacheEntry,
+  mergeCacheEntry,
+  optimisticPrependPersonel,
+  processSyncQueue,
+  useAppDataRevision
+} from "../data/data-manager";
+import type { PaginatedResult } from "../types/api";
 import { runDeduped } from "../lib/in-flight-dedupe";
 import type { Personel } from "../types/personel";
-import type { IdOption } from "../types/referans";
-
 const PAGE_SIZE = 10;
-
-type PersonelReferences = {
-  departmanOptions: IdOption[];
-  gorevOptions: IdOption[];
-  personelTipiOptions: IdOption[];
-  bagliAmirOptions: IdOption[];
-};
-
-let personelReferencesCache: PersonelReferences | null = null;
-let personelReferencesPromise: Promise<PersonelReferences> | null = null;
-
-async function loadPersonelReferences(): Promise<PersonelReferences> {
-  if (personelReferencesCache) {
-    return personelReferencesCache;
-  }
-  if (personelReferencesPromise) {
-    return personelReferencesPromise;
-  }
-
-  personelReferencesPromise = (async () => {
-    const [departmanOptions, gorevOptions, personelTipiOptions, bagliAmirOptions] = await Promise.all([
-      fetchDepartmanOptions(),
-      fetchGorevOptions(),
-      fetchPersonelTipiOptions(),
-      fetchBagliAmirOptions()
-    ]);
-    const snapshot: PersonelReferences = {
-      departmanOptions,
-      gorevOptions,
-      personelTipiOptions,
-      bagliAmirOptions
-    };
-    personelReferencesCache = snapshot;
-    return snapshot;
-  })();
-
-  try {
-    return await personelReferencesPromise;
-  } finally {
-    personelReferencesPromise = null;
-  }
-}
 
 export type PersonelListQueryState = {
   draft: { search: string; aktiflik: "aktif" | "pasif" | "tum" };
@@ -124,29 +88,17 @@ function parseOptionalPositiveInt(value: string): number | undefined {
   return number;
 }
 
-function listCacheKey(query: PersonelListQueryState["applied"], page: number) {
-  return `personeller|${query.search}|${query.aktiflik}|${page}`;
-}
-
 export function usePersoneller() {
+  const revision = useAppDataRevision();
   const [listQuery, setListQuery] = useState<PersonelListQueryState>({
     draft: { search: "", aktiflik: "tum" },
     applied: { search: "", aktiflik: "tum" },
     page: 1
   });
 
-  const [personeller, setPersoneller] = useState<Personel[]>([]);
-  const [hasNextPage, setHasNextPage] = useState(false);
-  const [totalPages, setTotalPages] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const [refs, setRefs] = useState<PersonelReferences>({
-    departmanOptions: [],
-    gorevOptions: [],
-    personelTipiOptions: [],
-    bagliAmirOptions: []
-  });
   const [referenceError, setReferenceError] = useState<string | null>(null);
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -157,54 +109,104 @@ export function usePersoneller() {
   const appliedFilters = listQuery.applied;
   const listPage = listQuery.page;
 
-  const refetch = useCallback(async () => {
-    setIsLoading(true);
-    setErrorMessage(null);
-    const key = listCacheKey(appliedFilters, listPage);
+  const listKey = useMemo(
+    () => dataCacheKeys.personellerList(appliedFilters.search, appliedFilters.aktiflik, listPage),
+    [appliedFilters.aktiflik, appliedFilters.search, listPage]
+  );
 
-    try {
-      const nextData = await runDeduped(key, () =>
+  const listSnapshot = useMemo(
+    () => getCacheEntry<PaginatedResult<Personel>>(listKey),
+    [listKey, revision]
+  );
+
+  const personeller = listSnapshot?.items ?? [];
+  const hasNextPage = listSnapshot?.pagination.hasNextPage ?? false;
+  const totalPages = listSnapshot?.pagination.totalPages ?? null;
+
+  const refs = useMemo((): PersonelReferenceBundle => {
+    return (
+      getCacheEntry<PersonelReferenceBundle>(dataCacheKeys.referansPersonel()) ?? {
+        departmanOptions: [],
+        gorevOptions: [],
+        personelTipiOptions: [],
+        bagliAmirOptions: []
+      }
+    );
+  }, [revision]);
+
+  const refetch = useCallback(async () => {
+    await fetchWithCacheMerge(listKey, () =>
+      runDeduped(listKey, () =>
         fetchPersonellerList({
           search: appliedFilters.search || undefined,
           aktiflik: appliedFilters.aktiflik,
           page: listPage,
           limit: PAGE_SIZE
         })
-      );
-      setPersoneller(nextData.items);
-      setHasNextPage(nextData.pagination.hasNextPage ?? nextData.items.length === PAGE_SIZE);
-      setTotalPages(nextData.pagination.totalPages);
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Personel listesi alinamadi.");
-      setHasNextPage(false);
-      setTotalPages(null);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [appliedFilters.aktiflik, appliedFilters.search, listPage]);
-
-  useEffect(() => {
-    void refetch();
-  }, [refetch]);
+      )
+    );
+  }, [appliedFilters.aktiflik, appliedFilters.search, listKey, listPage]);
 
   useEffect(() => {
     let cancelled = false;
+    const hasSeed = getCacheEntry<PaginatedResult<Personel>>(listKey) !== undefined;
+    setIsLoading(!hasSeed);
+    setErrorMessage(null);
 
     void (async () => {
-      setReferenceError(null);
       try {
-        const snapshot = await loadPersonelReferences();
-        if (cancelled) {
-          return;
-        }
-        setRefs(snapshot);
-      } catch (error) {
-        if (cancelled) {
-          return;
-        }
-        setReferenceError(
-          error instanceof Error ? error.message : "Referans veriler alinamadi, manuel giris aktif."
+        await fetchWithCacheMerge(listKey, () =>
+          runDeduped(listKey, () =>
+            fetchPersonellerList({
+              search: appliedFilters.search || undefined,
+              aktiflik: appliedFilters.aktiflik,
+              page: listPage,
+              limit: PAGE_SIZE
+            })
+          )
         );
+      } catch {
+        if (!getCacheEntry<PaginatedResult<Personel>>(listKey)) {
+          setErrorMessage("Personel listesi su an guncellenemiyor.");
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoading(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [appliedFilters.aktiflik, appliedFilters.search, listKey, listPage]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setReferenceError(null);
+
+    void (async () => {
+      try {
+        await fetchWithCacheMerge(dataCacheKeys.referansPersonel(), () =>
+          runDeduped(dataCacheKeys.referansPersonel(), async () => {
+            const [departmanOptions, gorevOptions, personelTipiOptions, bagliAmirOptions] = await Promise.all([
+              fetchDepartmanOptions(),
+              fetchGorevOptions(),
+              fetchPersonelTipiOptions(),
+              fetchBagliAmirOptions()
+            ]);
+            return {
+              departmanOptions,
+              gorevOptions,
+              personelTipiOptions,
+              bagliAmirOptions
+            } satisfies PersonelReferenceBundle;
+          })
+        );
+      } catch {
+        if (!cancelled) {
+          setReferenceError("Referans veriler su an guncellenemiyor, manuel giris kullanilabilir.");
+        }
       }
     })();
 
@@ -270,7 +272,7 @@ export function usePersoneller() {
 
       try {
         const bagliAmirId = parseOptionalPositiveInt(createForm.bagliAmirId);
-        await createPersonel({
+        const payload: CreatePersonelPayload = {
           tc_kimlik_no: createForm.tcKimlikNo.trim(),
           ad: createForm.ad.trim(),
           soyad: createForm.soyad.trim(),
@@ -287,19 +289,38 @@ export function usePersoneller() {
           ...(createForm.dogumYeri.trim() ? { dogum_yeri: createForm.dogumYeri.trim() } : {}),
           ...(createForm.kanGrubu.trim() ? { kan_grubu: createForm.kanGrubu.trim() } : {}),
           ...(bagliAmirId !== undefined ? { bagli_amir_id: bagliAmirId } : {})
-        } satisfies CreatePersonelPayload);
+        };
 
-        setIsCreateModalOpen(false);
-        setCreateForm(INITIAL_CREATE_PERSONEL_FORM);
-        setListQuery((prev) => {
-          if (prev.page === 1) {
-            return prev;
-          }
-          return { ...prev, page: 1 };
-        });
+        const pageOneKey = dataCacheKeys.personellerList(listQuery.applied.search, listQuery.applied.aktiflik, 1);
 
-        if (listPage === 1) {
-          void refetch();
+        try {
+          await createPersonel(payload);
+          setIsCreateModalOpen(false);
+          setCreateForm(INITIAL_CREATE_PERSONEL_FORM);
+          setListQuery((prev) => ({ ...prev, page: 1 }));
+          await fetchWithCacheMerge(pageOneKey, () =>
+            runDeduped(pageOneKey, () =>
+              fetchPersonellerList({
+                search: listQuery.applied.search || undefined,
+                aktiflik: listQuery.applied.aktiflik,
+                page: 1,
+                limit: PAGE_SIZE
+              })
+            )
+          );
+        } catch {
+          const tempId = makeTempId();
+          const draft = draftPersonelFromPayload(payload, tempId);
+          optimisticPrependPersonel(pageOneKey, draft);
+          enqueueSyncOperation({
+            op: "personeller.create",
+            payload,
+            meta: { listKey: pageOneKey, tempId }
+          });
+          setIsCreateModalOpen(false);
+          setCreateForm(INITIAL_CREATE_PERSONEL_FORM);
+          setListQuery((prev) => ({ ...prev, page: 1 }));
+          void processSyncQueue();
         }
       } catch (error) {
         setCreateErrorMessage(
@@ -309,7 +330,7 @@ export function usePersoneller() {
         setIsCreateSubmitting(false);
       }
     },
-    [createForm, isCreateSubmitting, listPage, refetch]
+    [createForm, isCreateSubmitting, listQuery.applied.aktiflik, listQuery.applied.search]
   );
 
   return {
@@ -346,6 +367,10 @@ type EditPersonelFormState = {
 };
 
 export function usePersonelDetail(parsedPersonelId: number, hasValidId: boolean) {
+  const revision = useAppDataRevision();
+  const detailKey = useMemo(() => dataCacheKeys.personelDetail(parsedPersonelId), [parsedPersonelId]);
+  const cached = useMemo(() => getCacheEntry<Personel>(detailKey), [detailKey, revision]);
+
   const [personel, setPersonel] = useState<Personel | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -359,6 +384,18 @@ export function usePersonelDetail(parsedPersonelId: number, hasValidId: boolean)
     aktifDurum: "AKTIF"
   });
 
+  useEffect(() => {
+    if (cached) {
+      setPersonel(cached);
+      setEditForm({
+        ad: cached.ad,
+        soyad: cached.soyad,
+        telefon: cached.telefon ?? "",
+        aktifDurum: cached.aktif_durum
+      });
+    }
+  }, [cached]);
+
   const refetch = useCallback(async () => {
     if (!hasValidId) {
       setIsLoading(false);
@@ -368,10 +405,11 @@ export function usePersonelDetail(parsedPersonelId: number, hasValidId: boolean)
 
     setIsLoading(true);
     setErrorMessage(null);
-    const key = `personel-detail|${parsedPersonelId}`;
 
     try {
-      const data = await runDeduped(key, () => fetchPersonelDetail(parsedPersonelId));
+      const data = await fetchWithCacheMerge(detailKey, () =>
+        runDeduped(detailKey, () => fetchPersonelDetail(parsedPersonelId))
+      );
       setPersonel(data);
       setEditForm({
         ad: data.ad,
@@ -379,12 +417,14 @@ export function usePersonelDetail(parsedPersonelId: number, hasValidId: boolean)
         telefon: data.telefon ?? "",
         aktifDurum: data.aktif_durum
       });
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Personel detayi alinamadi.");
+    } catch {
+      if (!getCacheEntry<Personel>(detailKey)) {
+        setErrorMessage("Personel detayi su an guncellenemiyor.");
+      }
     } finally {
       setIsLoading(false);
     }
-  }, [hasValidId, parsedPersonelId]);
+  }, [detailKey, hasValidId, parsedPersonelId]);
 
   useEffect(() => {
     void refetch();
@@ -418,14 +458,21 @@ export function usePersonelDetail(parsedPersonelId: number, hasValidId: boolean)
       setEditErrorMessage(null);
       setIsSubmitting(true);
 
-      try {
-        const updated = await updatePersonel(personel.id, {
-          ad: editForm.ad.trim(),
-          soyad: editForm.soyad.trim(),
-          telefon: editForm.telefon.trim(),
-          aktif_durum: editForm.aktifDurum
-        });
+      const body = {
+        ad: editForm.ad.trim(),
+        soyad: editForm.soyad.trim(),
+        telefon: editForm.telefon.trim(),
+        aktif_durum: editForm.aktifDurum
+      };
 
+      const optimistic: Personel = { ...personel, ...body };
+
+      mergeCacheEntry<Personel>(detailKey, () => optimistic);
+      setPersonel(optimistic);
+
+      try {
+        const updated = await updatePersonel(personel.id, body);
+        mergeCacheEntry<Personel>(detailKey, () => updated);
         setPersonel(updated);
         setEditForm({
           ad: updated.ad,
@@ -434,13 +481,20 @@ export function usePersonelDetail(parsedPersonelId: number, hasValidId: boolean)
           aktifDurum: updated.aktif_durum
         });
         setIsEditing(false);
-      } catch (error) {
-        setEditErrorMessage(error instanceof Error ? error.message : "Kayit guncellenemedi.");
+      } catch {
+        enqueueSyncOperation({
+          op: "personeller.update",
+          payload: { personelId: personel.id, body },
+          meta: { detailKey }
+        });
+        void processSyncQueue();
+        setEditErrorMessage(null);
+        setIsEditing(false);
       } finally {
         setIsSubmitting(false);
       }
     },
-    [editForm, isSubmitting, personel]
+    [detailKey, editForm, isSubmitting, personel]
   );
 
   return {

@@ -1,51 +1,31 @@
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   cancelBildirim,
   createBildirim,
   fetchBildirimDetail,
   fetchBildirimlerList,
   markBildirimOkundu,
-  updateBildirim
+  updateBildirim,
+  type CreateBildirimPayload
 } from "../api/bildirimler.api";
 import { fetchBildirimTuruOptions, fetchDepartmanOptions } from "../api/referans.api";
+import { emptyPaginated, makeTempId } from "../data/app-data.types";
+import {
+  dataCacheKeys,
+  enqueueSyncOperation,
+  fetchWithCacheMerge,
+  getCacheEntry,
+  mergeCacheEntry,
+  optimisticPrependToList,
+  processSyncQueue,
+  useAppDataRevision
+} from "../data/data-manager";
 import { runDeduped } from "../lib/in-flight-dedupe";
-import type { IdOption, KeyOption } from "../types/referans";
+import type { PaginatedResult } from "../types/api";
 import type { Bildirim } from "../types/bildirim";
+import type { IdOption, KeyOption } from "../types/referans";
 
 const PAGE_SIZE = 10;
-
-type BildirimReferences = {
-  departmanOptions: IdOption[];
-  bildirimTuruOptions: KeyOption[];
-};
-
-let bildirimReferencesCache: BildirimReferences | null = null;
-let bildirimReferencesPromise: Promise<BildirimReferences> | null = null;
-
-async function loadBildirimReferences(): Promise<BildirimReferences> {
-  if (bildirimReferencesCache) {
-    return bildirimReferencesCache;
-  }
-  if (bildirimReferencesPromise) {
-    return bildirimReferencesPromise;
-  }
-
-  bildirimReferencesPromise = (async () => {
-    const [departmanOptions, bildirimTuruOptions] = await Promise.all([
-      fetchDepartmanOptions(),
-      fetchBildirimTuruOptions()
-    ]);
-    const snapshot = { departmanOptions, bildirimTuruOptions };
-    bildirimReferencesCache = snapshot;
-    return snapshot;
-  })();
-
-  try {
-    return await bildirimReferencesPromise;
-  } finally {
-    bildirimReferencesPromise = null;
-  }
-}
 
 export type BildirimListQueryState = {
   draft: { personelId: string; bildirimTuru: string; tarih: string };
@@ -95,25 +75,29 @@ function toBildirimFormState(bildirim: Bildirim): BildirimFormState {
   };
 }
 
-function listCacheKey(applied: BildirimListQueryState["applied"], page: number) {
-  return `bildirimler|${applied.personelId}|${applied.bildirimTuru}|${applied.tarih}|${page}`;
+function draftBildirimFromPayload(payload: CreateBildirimPayload, tempId: number): Bildirim {
+  return {
+    id: tempId,
+    tarih: payload.tarih,
+    departman_id: payload.departman_id,
+    personel_id: payload.personel_id,
+    bildirim_turu: payload.bildirim_turu,
+    aciklama: payload.aciklama,
+    state: "AKTIF",
+    okundu_mi: false
+  };
 }
 
 export function useBildirimler() {
+  const revision = useAppDataRevision();
   const [listQuery, setListQuery] = useState<BildirimListQueryState>({
     draft: { personelId: "", bildirimTuru: "", tarih: "" },
     applied: { personelId: "", bildirimTuru: "", tarih: "" },
     page: 1
   });
 
-  const [bildirimler, setBildirimler] = useState<Bildirim[]>([]);
-  const [hasNextPage, setHasNextPage] = useState(false);
-  const [totalPages, setTotalPages] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-
-  const [departmanOptions, setDepartmanOptions] = useState<IdOption[]>([]);
-  const [bildirimTuruOptions, setBildirimTuruOptions] = useState<KeyOption[]>([]);
   const [referenceError, setReferenceError] = useState<string | null>(null);
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -130,13 +114,40 @@ export function useBildirimler() {
   const applied = listQuery.applied;
   const listPage = listQuery.page;
 
-  const refetch = useCallback(async () => {
-    setIsLoading(true);
-    setErrorMessage(null);
-    const key = listCacheKey(applied, listPage);
+  const listKey = useMemo(
+    () =>
+      dataCacheKeys.bildirimlerList(
+        applied.personelId,
+        applied.bildirimTuru,
+        applied.tarih,
+        listPage
+      ),
+    [applied.bildirimTuru, applied.personelId, applied.tarih, listPage]
+  );
 
-    try {
-      const nextData = await runDeduped(key, () =>
+  const listSnapshot = useMemo(
+    () => getCacheEntry<PaginatedResult<Bildirim>>(listKey),
+    [listKey, revision]
+  );
+
+  const bildirimler = listSnapshot?.items ?? [];
+  const hasNextPage = listSnapshot?.pagination.hasNextPage ?? false;
+  const totalPages = listSnapshot?.pagination.totalPages ?? null;
+
+  const refMeta = useMemo(
+    () =>
+      getCacheEntry<{ departman: IdOption[]; bildirimTuru: KeyOption[] }>(dataCacheKeys.bildirimRef()) ?? {
+        departman: [],
+        bildirimTuru: []
+      },
+    [revision]
+  );
+  const departmanOptions = refMeta.departman;
+  const bildirimTuruOptions = refMeta.bildirimTuru;
+
+  const refetch = useCallback(async () => {
+    await fetchWithCacheMerge(listKey, () =>
+      runDeduped(listKey, () =>
         fetchBildirimlerList({
           personel_id: parsePositiveInt(applied.personelId),
           bildirim_turu: applied.bildirimTuru || undefined,
@@ -144,42 +155,64 @@ export function useBildirimler() {
           page: listPage,
           limit: PAGE_SIZE
         })
-      );
-      setBildirimler(nextData.items);
-      setHasNextPage(nextData.pagination.hasNextPage ?? nextData.items.length === PAGE_SIZE);
-      setTotalPages(nextData.pagination.totalPages);
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Bildirim listesi alinamadi.");
-      setHasNextPage(false);
-      setTotalPages(null);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [applied.bildirimTuru, applied.personelId, applied.tarih, listPage]);
-
-  useEffect(() => {
-    void refetch();
-  }, [refetch]);
+      )
+    );
+  }, [applied, listKey, listPage]);
 
   useEffect(() => {
     let cancelled = false;
+    const hasSeed = getCacheEntry<PaginatedResult<Bildirim>>(listKey) !== undefined;
+    setIsLoading(!hasSeed);
+    setErrorMessage(null);
 
     void (async () => {
-      setReferenceError(null);
       try {
-        const snapshot = await loadBildirimReferences();
-        if (cancelled) {
-          return;
-        }
-        setDepartmanOptions(snapshot.departmanOptions);
-        setBildirimTuruOptions(snapshot.bildirimTuruOptions);
-      } catch (error) {
-        if (cancelled) {
-          return;
-        }
-        setReferenceError(
-          error instanceof Error ? error.message : "Bildirim referanslari alinamadi, manuel giris aktif."
+        await fetchWithCacheMerge(listKey, () =>
+          runDeduped(listKey, () =>
+            fetchBildirimlerList({
+              personel_id: parsePositiveInt(applied.personelId),
+              bildirim_turu: applied.bildirimTuru || undefined,
+              tarih: applied.tarih || undefined,
+              page: listPage,
+              limit: PAGE_SIZE
+            })
+          )
         );
+      } catch {
+        if (!getCacheEntry<PaginatedResult<Bildirim>>(listKey)) {
+          setErrorMessage("Bildirim listesi su an guncellenemiyor.");
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoading(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [applied, listKey, listPage]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setReferenceError(null);
+
+    void (async () => {
+      try {
+        await fetchWithCacheMerge(dataCacheKeys.bildirimRef(), () =>
+          runDeduped(dataCacheKeys.bildirimRef(), async () => {
+            const [departman, bildirimTuru] = await Promise.all([
+              fetchDepartmanOptions(),
+              fetchBildirimTuruOptions()
+            ]);
+            return { departman, bildirimTuru };
+          })
+        );
+      } catch {
+        if (!cancelled) {
+          setReferenceError("Bildirim referanslari su an guncellenemiyor, manuel giris kullanilabilir.");
+        }
       }
     })();
 
@@ -227,6 +260,26 @@ export function useBildirimler() {
     setIsCreateModalOpen(false);
   }, []);
 
+  const refreshPageOne = useCallback(async () => {
+    const pageOneKey = dataCacheKeys.bildirimlerList(
+      listQuery.applied.personelId,
+      listQuery.applied.bildirimTuru,
+      listQuery.applied.tarih,
+      1
+    );
+    await fetchWithCacheMerge(pageOneKey, () =>
+      runDeduped(pageOneKey, () =>
+        fetchBildirimlerList({
+          personel_id: parsePositiveInt(listQuery.applied.personelId),
+          bildirim_turu: listQuery.applied.bildirimTuru || undefined,
+          tarih: listQuery.applied.tarih || undefined,
+          page: 1,
+          limit: PAGE_SIZE
+        })
+      )
+    );
+  }, [listQuery.applied]);
+
   const createBildirimHandler = useCallback(
     async (event: FormEvent<HTMLFormElement>, canCreate: boolean) => {
       event.preventDefault();
@@ -242,25 +295,39 @@ export function useBildirimler() {
       setIsCreateSubmitting(true);
 
       try {
-        await createBildirim({
+        const payload: CreateBildirimPayload = {
           tarih: createForm.tarih,
           departman_id: parseRequiredPositiveInt(createForm.departmanId, "Departman ID"),
           personel_id: parseRequiredPositiveInt(createForm.personelId, "Personel ID"),
           bildirim_turu: createForm.bildirimTuru.trim(),
           aciklama: createForm.aciklama.trim() || undefined
-        });
+        };
 
-        setIsCreateModalOpen(false);
-        setCreateForm(INITIAL_BILDIRIM_FORM);
-        setListQuery((prev) => {
-          if (prev.page !== 1) {
-            return { ...prev, page: 1 };
-          }
-          return prev;
-        });
+        const pageOneKey = dataCacheKeys.bildirimlerList(
+          listQuery.applied.personelId,
+          listQuery.applied.bildirimTuru,
+          listQuery.applied.tarih,
+          1
+        );
 
-        if (listPage === 1) {
-          void refetch();
+        try {
+          await createBildirim(payload);
+          setIsCreateModalOpen(false);
+          setCreateForm(INITIAL_BILDIRIM_FORM);
+          setListQuery((prev) => ({ ...prev, page: 1 }));
+          await refreshPageOne();
+        } catch {
+          const tempId = makeTempId();
+          optimisticPrependToList(pageOneKey, draftBildirimFromPayload(payload, tempId));
+          enqueueSyncOperation({
+            op: "bildirimler.create",
+            payload,
+            meta: { listKey: pageOneKey, tempId }
+          });
+          setIsCreateModalOpen(false);
+          setCreateForm(INITIAL_BILDIRIM_FORM);
+          setListQuery((prev) => ({ ...prev, page: 1 }));
+          void processSyncQueue();
         }
       } catch (error) {
         setCreateErrorMessage(error instanceof Error ? error.message : "Bildirim kaydi yapilamadi.");
@@ -268,7 +335,7 @@ export function useBildirimler() {
         setIsCreateSubmitting(false);
       }
     },
-    [createForm, isCreateSubmitting, listPage, refetch]
+    [createForm, isCreateSubmitting, listQuery.applied, refreshPageOne]
   );
 
   const openEditModal = useCallback((bildirim: Bildirim, canEdit: boolean) => {
@@ -299,33 +366,40 @@ export function useBildirimler() {
       setEditErrorMessage(null);
       setIsEditSubmitting(true);
 
+      const body = {
+        tarih: editForm.tarih,
+        departman_id: parseRequiredPositiveInt(editForm.departmanId, "Departman ID"),
+        personel_id: parseRequiredPositiveInt(editForm.personelId, "Personel ID"),
+        bildirim_turu: editForm.bildirimTuru.trim(),
+        aciklama: editForm.aciklama.trim() || undefined
+      };
+
+      mergeCacheEntry<PaginatedResult<Bildirim>>(listKey, (prev) => {
+        const base = prev ?? emptyPaginated<Bildirim>();
+        return {
+          ...base,
+          items: base.items.map((row) => (row.id === editingBildirim.id ? { ...row, ...body } : row))
+        };
+      });
+
       try {
-        await updateBildirim(editingBildirim.id, {
-          tarih: editForm.tarih,
-          departman_id: parseRequiredPositiveInt(editForm.departmanId, "Departman ID"),
-          personel_id: parseRequiredPositiveInt(editForm.personelId, "Personel ID"),
-          bildirim_turu: editForm.bildirimTuru.trim(),
-          aciklama: editForm.aciklama.trim() || undefined
-        });
-
+        await updateBildirim(editingBildirim.id, body);
         setEditingBildirim(null);
-        setListQuery((prev) => {
-          if (prev.page !== 1) {
-            return { ...prev, page: 1 };
-          }
-          return prev;
+        setListQuery((prev) => ({ ...prev, page: 1 }));
+        await refreshPageOne();
+      } catch {
+        enqueueSyncOperation({
+          op: "bildirimler.update",
+          payload: { bildirimId: editingBildirim.id, body },
+          meta: { listKey }
         });
-
-        if (listPage === 1) {
-          void refetch();
-        }
-      } catch (error) {
-        setEditErrorMessage(error instanceof Error ? error.message : "Bildirim guncellenemedi.");
+        setEditingBildirim(null);
+        void processSyncQueue();
       } finally {
         setIsEditSubmitting(false);
       }
     },
-    [editForm, editingBildirim, isEditSubmitting, listPage, refetch]
+    [editForm, editingBildirim, isEditSubmitting, listKey, refreshPageOne]
   );
 
   const cancelBildirimHandler = useCallback(
@@ -341,25 +415,31 @@ export function useBildirimler() {
       }
 
       setCancelingBildirimId(bildirim.id);
+
+      mergeCacheEntry<PaginatedResult<Bildirim>>(listKey, (prev) => {
+        const base = prev ?? emptyPaginated<Bildirim>();
+        return {
+          ...base,
+          items: base.items.map((row) => (row.id === bildirim.id ? { ...row, state: "IPTAL" } : row))
+        };
+      });
+
       try {
         await cancelBildirim(bildirim.id);
-        setListQuery((prev) => {
-          if (prev.page !== 1) {
-            return { ...prev, page: 1 };
-          }
-          return prev;
+        setListQuery((prev) => ({ ...prev, page: 1 }));
+        await refreshPageOne();
+      } catch {
+        enqueueSyncOperation({
+          op: "bildirimler.cancel",
+          payload: { bildirimId: bildirim.id },
+          meta: { listKey }
         });
-
-        if (listPage === 1) {
-          void refetch();
-        }
-      } catch (error) {
-        setErrorMessage(error instanceof Error ? error.message : "Bildirim iptal edilemedi.");
+        void processSyncQueue();
       } finally {
         setCancelingBildirimId(null);
       }
     },
-    [listPage, refetch]
+    [listKey, refreshPageOne]
   );
 
   return {
@@ -370,6 +450,7 @@ export function useBildirimler() {
     totalPages,
     isLoading,
     errorMessage,
+    setErrorMessage,
     refetch,
     departmanOptions,
     bildirimTuruOptions,
@@ -398,49 +479,73 @@ export function useBildirimler() {
   };
 }
 
-const HEADER_PREVIEW_DEDUPE_KEY = "bildirimler:header-preview:1:8";
-
 export function useBildirimlerHeaderPreview(enabled: boolean) {
-  const [items, setItems] = useState<Bildirim[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const revision = useAppDataRevision();
+  const key = dataCacheKeys.bildirimlerHeader();
+
+  const items = useMemo(() => {
+    if (!enabled) {
+      return [];
+    }
+    return getCacheEntry<PaginatedResult<Bildirim>>(key)?.items ?? [];
+  }, [enabled, key, revision]);
+
+  const isLoading = useMemo(() => {
+    if (!enabled) {
+      return false;
+    }
+    return getCacheEntry<PaginatedResult<Bildirim>>(key) === undefined;
+  }, [enabled, key, revision]);
 
   const reload = useCallback(async () => {
     if (!enabled) {
-      setItems([]);
-      setErrorMessage(null);
       return;
     }
-
-    setIsLoading(true);
-    setErrorMessage(null);
-
-    try {
-      const response = await runDeduped(HEADER_PREVIEW_DEDUPE_KEY, () =>
-        fetchBildirimlerList({ page: 1, limit: 8 })
-      );
-      setItems(response.items);
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Bildirimler yuklenemedi.");
-      setItems([]);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [enabled]);
+    await fetchWithCacheMerge(key, () =>
+      runDeduped(key, () => fetchBildirimlerList({ page: 1, limit: 8 }))
+    );
+  }, [enabled, key]);
 
   useEffect(() => {
-    void reload();
-  }, [reload]);
+    let cancelled = false;
+    void (async () => {
+      if (!enabled) {
+        return;
+      }
+      try {
+        await fetchWithCacheMerge(key, () =>
+          runDeduped(key, () => fetchBildirimlerList({ page: 1, limit: 8 }))
+        );
+      } finally {
+        if (!cancelled) {
+          /* revision notifies */
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [enabled, key]);
 
   const markOkundu = useCallback((id: number) => markBildirimOkundu(id), []);
 
-  return { items, isLoading, errorMessage, reload, markOkundu };
+  return { items, isLoading, errorMessage: null as string | null, reload, markOkundu };
 }
 
 export function useBildirimDetail(parsedBildirimId: number, hasValidId: boolean) {
+  const revision = useAppDataRevision();
+  const detailKey = useMemo(() => dataCacheKeys.bildirimDetail(parsedBildirimId), [parsedBildirimId]);
+  const cached = useMemo(() => getCacheEntry<Bildirim>(detailKey), [detailKey, revision]);
+
   const [bildirim, setBildirim] = useState<Bildirim | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (cached) {
+      setBildirim(cached);
+    }
+  }, [cached]);
 
   const refetch = useCallback(async () => {
     if (!hasValidId) {
@@ -451,17 +556,20 @@ export function useBildirimDetail(parsedBildirimId: number, hasValidId: boolean)
 
     setIsLoading(true);
     setErrorMessage(null);
-    const key = `bildirim-detail|${parsedBildirimId}`;
 
     try {
-      const data = await runDeduped(key, () => fetchBildirimDetail(parsedBildirimId));
+      const data = await fetchWithCacheMerge(detailKey, () =>
+        runDeduped(detailKey, () => fetchBildirimDetail(parsedBildirimId))
+      );
       setBildirim(data);
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Bildirim detayi alinamadi.");
+    } catch {
+      if (!getCacheEntry<Bildirim>(detailKey)) {
+        setErrorMessage("Bildirim detayi su an guncellenemiyor.");
+      }
     } finally {
       setIsLoading(false);
     }
-  }, [hasValidId, parsedBildirimId]);
+  }, [detailKey, hasValidId, parsedBildirimId]);
 
   useEffect(() => {
     void refetch();

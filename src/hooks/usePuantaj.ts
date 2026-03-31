@@ -1,5 +1,13 @@
 import { useCallback, useState, type FormEvent } from "react";
 import { fetchGunlukPuantaj, upsertGunlukPuantaj } from "../api/puantaj.api";
+import {
+  dataCacheKeys,
+  enqueueSyncOperation,
+  fetchWithCacheMerge,
+  getCacheEntry,
+  mergePuantajCache,
+  processSyncQueue
+} from "../data/data-manager";
 import { runDeduped } from "../lib/in-flight-dedupe";
 import type { GunlukPuantaj } from "../types/puantaj";
 
@@ -78,23 +86,38 @@ export function usePuantaj() {
     setFormState((prev) => ({ ...prev, ...partial }));
   }, []);
 
-  const loadPuantaj = useCallback(async (query: ActiveQuery) => {
-    setIsLoading(true);
-    setErrorMessage(null);
-    const key = `puantaj|${query.personelId}|${query.tarih}`;
+  const detailKeyFor = useCallback((query: ActiveQuery) => {
+    return dataCacheKeys.puantajDetail(query.personelId, query.tarih);
+  }, []);
 
-    try {
-      const data = await runDeduped(key, () => fetchGunlukPuantaj(query.personelId, query.tarih));
-      setPuantaj(data);
-      patchFormState(toPuantajFormState(data));
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Gunluk puantaj kaydi alinamadi.");
-      setPuantaj(null);
-      patchFormState(toPuantajFormState(null));
-    } finally {
-      setIsLoading(false);
-    }
-  }, [patchFormState]);
+  const loadPuantaj = useCallback(
+    async (query: ActiveQuery) => {
+      setIsLoading(true);
+      setErrorMessage(null);
+      const key = detailKeyFor(query);
+
+      try {
+        const data = await fetchWithCacheMerge(key, () =>
+          runDeduped(key, () => fetchGunlukPuantaj(query.personelId, query.tarih))
+        );
+        setPuantaj(data);
+        patchFormState(toPuantajFormState(data));
+      } catch {
+        setErrorMessage("Gunluk puantaj kaydi su an guncellenemiyor.");
+        const cached = getCacheEntry<GunlukPuantaj | null>(key);
+        if (cached !== undefined) {
+          setPuantaj(cached);
+          patchFormState(toPuantajFormState(cached));
+        } else {
+          setPuantaj(null);
+          patchFormState(toPuantajFormState(null));
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [detailKeyFor, patchFormState]
+  );
 
   const submitQuery = useCallback(
     async (event: FormEvent<HTMLFormElement>) => {
@@ -164,21 +187,54 @@ export function usePuantaj() {
           throw new Error("Giris ve cikis saati zorunludur.");
         }
 
-        const updated = await upsertGunlukPuantaj(activeQuery.personelId, activeQuery.tarih, {
+        const body = {
           giris_saati: girisSaati,
           cikis_saati: cikisSaati,
           gercek_mola_dakika: parseOptionalNonNegativeInt(formState.entryGercekMolaDakika)
-        });
+        };
 
-        setPuantaj(updated);
-        patchFormState(toPuantajFormState(updated));
+        const optimistic: GunlukPuantaj = {
+          personel_id: activeQuery.personelId,
+          tarih: activeQuery.tarih,
+          giris_saati: body.giris_saati,
+          cikis_saati: body.cikis_saati,
+          gercek_mola_dakika: body.gercek_mola_dakika,
+          compliance_uyarilari: []
+        };
+        mergePuantajCache(activeQuery.personelId, activeQuery.tarih, optimistic);
+        setPuantaj(optimistic);
+        patchFormState(toPuantajFormState(optimistic));
+
+        try {
+          const updated = await upsertGunlukPuantaj(activeQuery.personelId, activeQuery.tarih, body);
+          mergePuantajCache(activeQuery.personelId, activeQuery.tarih, updated);
+          setPuantaj(updated);
+          patchFormState(toPuantajFormState(updated));
+        } catch {
+          enqueueSyncOperation({
+            op: "puantaj.upsert",
+            payload: {
+              personelId: activeQuery.personelId,
+              tarih: activeQuery.tarih,
+              body
+            }
+          });
+          void processSyncQueue();
+        }
       } catch (error) {
         setSubmitErrorMessage(error instanceof Error ? error.message : "Puantaj kaydi guncellenemedi.");
       } finally {
         setIsSubmitting(false);
       }
     },
-    [activeQuery, formState.entryCikisSaati, formState.entryGercekMolaDakika, formState.entryGirisSaati, isSubmitting, patchFormState]
+    [
+      activeQuery,
+      formState.entryCikisSaati,
+      formState.entryGercekMolaDakika,
+      formState.entryGirisSaati,
+      isSubmitting,
+      patchFormState
+    ]
   );
 
   return {

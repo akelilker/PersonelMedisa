@@ -1,174 +1,37 @@
-import { useState, type FormEvent } from "react";
+import { type FormEvent } from "react";
 import { Link } from "react-router-dom";
-import { fetchGunlukPuantaj, upsertGunlukPuantaj } from "../../../api/puantaj.api";
 import { FormField } from "../../../components/form/FormField";
 import { EmptyState } from "../../../components/states/EmptyState";
 import { ErrorState } from "../../../components/states/ErrorState";
 import { LoadingState } from "../../../components/states/LoadingState";
 import { useRoleAccess } from "../../../hooks/use-role-access";
-import type { GunlukPuantaj } from "../../../types/puantaj";
-
-type QueryFormState = {
-  personelId: string;
-  tarih: string;
-};
-
-type PuantajFormState = {
-  girisSaati: string;
-  cikisSaati: string;
-  gercekMolaDakika: string;
-};
-
-type ActiveQuery = {
-  personelId: number;
-  tarih: string;
-};
-
-function toDateInputValue(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-function parseRequiredPositiveInt(value: string, label: string) {
-  const number = Number.parseInt(value, 10);
-  if (Number.isNaN(number) || number <= 0) {
-    throw new Error(`${label} pozitif sayi olmalidir.`);
-  }
-
-  return number;
-}
-
-function parseOptionalNonNegativeInt(value: string) {
-  const trimmed = value.trim();
-  if (!trimmed) {
-    return undefined;
-  }
-
-  const number = Number.parseInt(trimmed, 10);
-  if (Number.isNaN(number) || number < 0) {
-    throw new Error("Gercek mola dakika sifirdan kucuk olamaz.");
-  }
-
-  return number;
-}
-
-function toPuantajFormState(puantaj: GunlukPuantaj | null): PuantajFormState {
-  return {
-    girisSaati: puantaj?.giris_saati ?? "",
-    cikisSaati: puantaj?.cikis_saati ?? "",
-    gercekMolaDakika:
-      puantaj?.gercek_mola_dakika !== undefined ? String(puantaj.gercek_mola_dakika) : ""
-  };
-}
+import { usePuantaj } from "../../../hooks/usePuantaj";
 
 export function GunlukPuantajPage() {
   const { hasPermission } = useRoleAccess();
   const canUpdatePuantaj = hasPermission("puantaj.update");
 
-  const [queryForm, setQueryForm] = useState<QueryFormState>({
-    personelId: "",
-    tarih: toDateInputValue(new Date())
-  });
-  const [activeQuery, setActiveQuery] = useState<ActiveQuery | null>(null);
-  const [puantaj, setPuantaj] = useState<GunlukPuantaj | null>(null);
-  const [puantajForm, setPuantajForm] = useState<PuantajFormState>(toPuantajFormState(null));
-  const [isLoading, setIsLoading] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [submitErrorMessage, setSubmitErrorMessage] = useState<string | null>(null);
+  const {
+    formState,
+    patchFormState,
+    activeQuery,
+    puantaj,
+    isLoading,
+    isSubmitting,
+    errorMessage,
+    submitErrorMessage,
+    submitQuery,
+    clearQuery,
+    refetchActive,
+    submitPuantaj
+  } = usePuantaj();
 
-  async function loadPuantaj(query: ActiveQuery) {
-    setIsLoading(true);
-    setErrorMessage(null);
-
-    try {
-      const data = await fetchGunlukPuantaj(query.personelId, query.tarih);
-      setPuantaj(data);
-      setPuantajForm(toPuantajFormState(data));
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Gunluk puantaj kaydi alinamadi.");
-      setPuantaj(null);
-      setPuantajForm(toPuantajFormState(null));
-    } finally {
-      setIsLoading(false);
-    }
+  function handleQuerySubmit(event: FormEvent<HTMLFormElement>) {
+    void submitQuery(event);
   }
 
-  async function handleQuerySubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
-    try {
-      const personelId = parseRequiredPositiveInt(queryForm.personelId, "Personel ID");
-      if (!queryForm.tarih) {
-        throw new Error("Tarih zorunludur.");
-      }
-
-      const nextQuery = {
-        personelId,
-        tarih: queryForm.tarih
-      };
-
-      setActiveQuery(nextQuery);
-      await loadPuantaj(nextQuery);
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Puantaj sorgusu gecersiz.");
-    }
-  }
-
-  function handleQueryClear() {
-    setQueryForm({
-      personelId: "",
-      tarih: toDateInputValue(new Date())
-    });
-    setActiveQuery(null);
-    setPuantaj(null);
-    setPuantajForm(toPuantajFormState(null));
-    setErrorMessage(null);
-    setSubmitErrorMessage(null);
-  }
-
-  async function handlePuantajSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (isSubmitting) {
-      return;
-    }
-
-    if (!activeQuery) {
-      setSubmitErrorMessage("Kayit guncellemek icin once personel ve tarih sec.");
-      return;
-    }
-
-    if (!canUpdatePuantaj) {
-      setSubmitErrorMessage("Bu islem icin yetkin bulunmuyor.");
-      return;
-    }
-
-    setSubmitErrorMessage(null);
-    setIsSubmitting(true);
-
-    try {
-      const girisSaati = puantajForm.girisSaati.trim();
-      const cikisSaati = puantajForm.cikisSaati.trim();
-
-      if (!girisSaati || !cikisSaati) {
-        throw new Error("Giris ve cikis saati zorunludur.");
-      }
-
-      const updated = await upsertGunlukPuantaj(activeQuery.personelId, activeQuery.tarih, {
-        giris_saati: girisSaati,
-        cikis_saati: cikisSaati,
-        gercek_mola_dakika: parseOptionalNonNegativeInt(puantajForm.gercekMolaDakika)
-      });
-
-      setPuantaj(updated);
-      setPuantajForm(toPuantajFormState(updated));
-    } catch (error) {
-      setSubmitErrorMessage(error instanceof Error ? error.message : "Puantaj kaydi guncellenemedi.");
-    } finally {
-      setIsSubmitting(false);
-    }
+  function handlePuantajSubmit(event: FormEvent<HTMLFormElement>) {
+    void submitPuantaj(event, canUpdatePuantaj);
   }
 
   return (
@@ -184,16 +47,16 @@ export function GunlukPuantajPage() {
             name="puantaj-query-personel"
             type="number"
             min={1}
-            value={queryForm.personelId}
-            onChange={(value) => setQueryForm((prev) => ({ ...prev, personelId: value }))}
+            value={formState.queryPersonelId}
+            onChange={(value) => patchFormState({ queryPersonelId: value })}
             required
           />
           <FormField
             label="Tarih"
             name="puantaj-query-tarih"
             type="date"
-            value={queryForm.tarih}
-            onChange={(value) => setQueryForm((prev) => ({ ...prev, tarih: value }))}
+            value={formState.queryTarih}
+            onChange={(value) => patchFormState({ queryTarih: value })}
             required
           />
         </div>
@@ -202,7 +65,7 @@ export function GunlukPuantajPage() {
           <button type="submit" className="universal-btn-aux" disabled={isLoading}>
             Kaydi Getir
           </button>
-          <button type="button" className="universal-btn-aux" onClick={handleQueryClear} disabled={isLoading}>
+          <button type="button" className="universal-btn-aux" onClick={clearQuery} disabled={isLoading}>
             Temizle
           </button>
         </div>
@@ -213,7 +76,7 @@ export function GunlukPuantajPage() {
       {!isLoading && errorMessage ? (
         <ErrorState
           message={errorMessage}
-          onRetry={activeQuery ? () => void loadPuantaj(activeQuery) : undefined}
+          onRetry={activeQuery ? () => void refetchActive() : undefined}
         />
       ) : null}
 
@@ -268,16 +131,16 @@ export function GunlukPuantajPage() {
             label="Giris Saati"
             name="puantaj-giris"
             type="time"
-            value={puantajForm.girisSaati}
-            onChange={(value) => setPuantajForm((prev) => ({ ...prev, girisSaati: value }))}
+            value={formState.entryGirisSaati}
+            onChange={(value) => patchFormState({ entryGirisSaati: value })}
             required
           />
           <FormField
             label="Cikis Saati"
             name="puantaj-cikis"
             type="time"
-            value={puantajForm.cikisSaati}
-            onChange={(value) => setPuantajForm((prev) => ({ ...prev, cikisSaati: value }))}
+            value={formState.entryCikisSaati}
+            onChange={(value) => patchFormState({ entryCikisSaati: value })}
             required
           />
           <FormField
@@ -285,8 +148,8 @@ export function GunlukPuantajPage() {
             name="puantaj-mola"
             type="number"
             min={0}
-            value={puantajForm.gercekMolaDakika}
-            onChange={(value) => setPuantajForm((prev) => ({ ...prev, gercekMolaDakika: value }))}
+            value={formState.entryGercekMolaDakika}
+            onChange={(value) => patchFormState({ entryGercekMolaDakika: value })}
           />
 
           {submitErrorMessage ? <p className="puantaj-form-error">{submitErrorMessage}</p> : null}

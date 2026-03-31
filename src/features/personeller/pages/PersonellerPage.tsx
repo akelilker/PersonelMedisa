@@ -1,253 +1,53 @@
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { type FormEvent } from "react";
 import { Link } from "react-router-dom";
-import { createPersonel, fetchPersonellerList } from "../../../api/personeller.api";
-import {
-  fetchBagliAmirOptions,
-  fetchDepartmanOptions,
-  fetchGorevOptions,
-  fetchPersonelTipiOptions
-} from "../../../api/referans.api";
 import { AppModal } from "../../../components/modal/AppModal";
 import { FormField } from "../../../components/form/FormField";
 import { EmptyState } from "../../../components/states/EmptyState";
 import { ErrorState } from "../../../components/states/ErrorState";
 import { LoadingState } from "../../../components/states/LoadingState";
 import { useRoleAccess } from "../../../hooks/use-role-access";
+import { usePersoneller, type CreatePersonelFormState } from "../../../hooks/usePersoneller";
 import type { Personel } from "../../../types/personel";
 import type { IdOption } from "../../../types/referans";
 
-const PAGE_SIZE = 10;
-
 const PERSONEL_CREATE_FORM_ID = "personel-create-form";
-
-type PersonellerFilters = {
-  search: string;
-  aktiflik: "aktif" | "pasif" | "tum";
-};
-
-type CreatePersonelFormState = {
-  tcKimlikNo: string;
-  ad: string;
-  soyad: string;
-  dogumTarihi: string;
-  telefon: string;
-  acilDurumKisi: string;
-  acilDurumTelefon: string;
-  sicilNo: string;
-  iseGirisTarihi: string;
-  departmanId: string;
-  gorevId: string;
-  personelTipiId: string;
-  aktifDurum: "AKTIF" | "PASIF";
-  dogumYeri: string;
-  kanGrubu: string;
-  bagliAmirId: string;
-};
-
-const INITIAL_CREATE_FORM: CreatePersonelFormState = {
-  tcKimlikNo: "",
-  ad: "",
-  soyad: "",
-  dogumTarihi: "",
-  telefon: "",
-  acilDurumKisi: "",
-  acilDurumTelefon: "",
-  sicilNo: "",
-  iseGirisTarihi: "",
-  departmanId: "",
-  gorevId: "",
-  personelTipiId: "",
-  aktifDurum: "AKTIF",
-  dogumYeri: "",
-  kanGrubu: "",
-  bagliAmirId: ""
-};
-
-function parseRequiredPositiveInt(value: string, label: string) {
-  const number = Number.parseInt(value, 10);
-  if (Number.isNaN(number) || number <= 0) {
-    throw new Error(`${label} pozitif sayi olmalidir.`);
-  }
-
-  return number;
-}
-
-function parseOptionalPositiveInt(value: string): number | undefined {
-  const trimmed = value.trim();
-  if (!trimmed) {
-    return undefined;
-  }
-  const number = Number.parseInt(trimmed, 10);
-  if (Number.isNaN(number) || number <= 0) {
-    return undefined;
-  }
-  return number;
-}
 
 function toSelectOptions(options: IdOption[]) {
   return options.map((option) => ({ value: String(option.id), label: option.label }));
 }
 
 export function PersonellerPage() {
-  const [filters, setFilters] = useState<PersonellerFilters>({
-    search: "",
-    aktiflik: "tum"
-  });
-  const [searchInput, setSearchInput] = useState("");
-  const [aktiflikInput, setAktiflikInput] = useState<"aktif" | "pasif" | "tum">("tum");
-  const [page, setPage] = useState(1);
-  const [personeller, setPersoneller] = useState<Personel[]>([]);
-  const [hasNextPage, setHasNextPage] = useState(false);
-  const [totalPages, setTotalPages] = useState<number | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [isCreateSubmitting, setIsCreateSubmitting] = useState(false);
-  const [createErrorMessage, setCreateErrorMessage] = useState<string | null>(null);
-  const [createForm, setCreateForm] = useState<CreatePersonelFormState>(INITIAL_CREATE_FORM);
-  const [departmanOptions, setDepartmanOptions] = useState<IdOption[]>([]);
-  const [gorevOptions, setGorevOptions] = useState<IdOption[]>([]);
-  const [personelTipiOptions, setPersonelTipiOptions] = useState<IdOption[]>([]);
-  const [bagliAmirOptions, setBagliAmirOptions] = useState<IdOption[]>([]);
-  const [referenceError, setReferenceError] = useState<string | null>(null);
+  const {
+    listQuery,
+    personeller,
+    hasNextPage,
+    totalPages,
+    isLoading,
+    errorMessage,
+    refetch,
+    refs,
+    referenceError,
+    isCreateModalOpen,
+    openCreateModal,
+    closeCreateModal,
+    isCreateSubmitting,
+    createErrorMessage,
+    createForm,
+    setCreateForm,
+    createPersonelHandler,
+    submitFilters,
+    clearFilters,
+    setDraftSearch,
+    setDraftAktiflik,
+    setPage
+  } = usePersoneller();
+
   const { hasPermission } = useRoleAccess();
   const canCreatePersonel = hasPermission("personeller.create");
   const canOpenDetail = hasPermission("personeller.detail.view");
 
-  const loadPersoneller = useCallback(async () => {
-    setIsLoading(true);
-    setErrorMessage(null);
-
-    try {
-      const nextData = await fetchPersonellerList({
-        search: filters.search || undefined,
-        aktiflik: filters.aktiflik,
-        page,
-        limit: PAGE_SIZE
-      });
-      setPersoneller(nextData.items);
-      setHasNextPage(nextData.pagination.hasNextPage ?? nextData.items.length === PAGE_SIZE);
-      setTotalPages(nextData.pagination.totalPages);
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Personel listesi alinamadi.");
-      setHasNextPage(false);
-      setTotalPages(null);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [filters.aktiflik, filters.search, page]);
-
-  useEffect(() => {
-    void loadPersoneller();
-  }, [loadPersoneller]);
-
-  useEffect(() => {
-    let isCancelled = false;
-
-    async function loadReferences() {
-      setReferenceError(null);
-      try {
-        const [departmanlar, gorevler, personelTipleri, bagliAmirler] = await Promise.all([
-          fetchDepartmanOptions(),
-          fetchGorevOptions(),
-          fetchPersonelTipiOptions(),
-          fetchBagliAmirOptions()
-        ]);
-
-        if (isCancelled) {
-          return;
-        }
-
-        setDepartmanOptions(departmanlar);
-        setGorevOptions(gorevler);
-        setPersonelTipiOptions(personelTipleri);
-        setBagliAmirOptions(bagliAmirler);
-      } catch (error) {
-        if (isCancelled) {
-          return;
-        }
-
-        setReferenceError(
-          error instanceof Error ? error.message : "Referans veriler alinamadi, manuel giris aktif."
-        );
-      }
-    }
-
-    void loadReferences();
-
-    return () => {
-      isCancelled = true;
-    };
-  }, []);
-
-  function handleFilterSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
-    setFilters({
-      search: searchInput.trim(),
-      aktiflik: aktiflikInput
-    });
-    setPage(1);
-  }
-
-  function handleFilterClear() {
-    setSearchInput("");
-    setAktiflikInput("tum");
-    setFilters({
-      search: "",
-      aktiflik: "tum"
-    });
-    setPage(1);
-  }
-
-  async function handleCreateSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (isCreateSubmitting) {
-      return;
-    }
-    if (!canCreatePersonel) {
-      setCreateErrorMessage("Bu islem icin yetkin bulunmuyor.");
-      return;
-    }
-
-    setCreateErrorMessage(null);
-    setIsCreateSubmitting(true);
-
-    try {
-      const bagliAmirId = parseOptionalPositiveInt(createForm.bagliAmirId);
-      await createPersonel({
-        tc_kimlik_no: createForm.tcKimlikNo.trim(),
-        ad: createForm.ad.trim(),
-        soyad: createForm.soyad.trim(),
-        dogum_tarihi: createForm.dogumTarihi,
-        telefon: createForm.telefon.trim(),
-        acil_durum_kisi: createForm.acilDurumKisi.trim(),
-        acil_durum_telefon: createForm.acilDurumTelefon.trim(),
-        sicil_no: createForm.sicilNo.trim(),
-        ise_giris_tarihi: createForm.iseGirisTarihi,
-        departman_id: parseRequiredPositiveInt(createForm.departmanId, "Departman ID"),
-        gorev_id: parseRequiredPositiveInt(createForm.gorevId, "Gorev ID"),
-        personel_tipi_id: parseRequiredPositiveInt(createForm.personelTipiId, "Personel Tipi ID"),
-        aktif_durum: createForm.aktifDurum,
-        ...(createForm.dogumYeri.trim() ? { dogum_yeri: createForm.dogumYeri.trim() } : {}),
-        ...(createForm.kanGrubu.trim() ? { kan_grubu: createForm.kanGrubu.trim() } : {}),
-        ...(bagliAmirId !== undefined ? { bagli_amir_id: bagliAmirId } : {})
-      });
-
-      setIsCreateModalOpen(false);
-      setCreateForm(INITIAL_CREATE_FORM);
-      if (page === 1) {
-        await loadPersoneller();
-      } else {
-        setPage(1);
-      }
-    } catch (error) {
-      setCreateErrorMessage(
-        error instanceof Error ? error.message : "Personel kaydi sirasinda bir hata olustu."
-      );
-    } finally {
-      setIsCreateSubmitting(false);
-    }
+  function handleCreateSubmit(event: FormEvent<HTMLFormElement>) {
+    void createPersonelHandler(event, canCreatePersonel);
   }
 
   const aktiflikSelectOptions = [
@@ -261,39 +61,35 @@ export function PersonellerPage() {
     { value: "PASIF", label: "PASIF" }
   ];
 
+  const { draft } = listQuery;
+  const page = listQuery.page;
+
   return (
     <section className="personeller-page">
       <div className="personeller-header-row">
         <h2>Personeller</h2>
         {canCreatePersonel ? (
-          <button
-            type="button"
-            className="universal-btn-aux"
-            onClick={() => {
-              setCreateErrorMessage(null);
-              setIsCreateModalOpen(true);
-            }}
-          >
+          <button type="button" className="universal-btn-aux" onClick={openCreateModal}>
             Yeni Personel
           </button>
         ) : null}
       </div>
 
-      <form className="form-filter-panel" onSubmit={handleFilterSubmit}>
+      <form className="form-filter-panel" onSubmit={submitFilters}>
         <div className="form-field-grid">
           <FormField
             label="Ara"
             name="personel-filter-search"
             placeholder="Ad, soyad veya T.C. Kimlik No"
-            value={searchInput}
-            onChange={setSearchInput}
+            value={draft.search}
+            onChange={setDraftSearch}
           />
           <FormField
             as="select"
             label="Aktiflik"
             name="personel-filter-aktiflik"
-            value={aktiflikInput}
-            onChange={(value) => setAktiflikInput(value as "aktif" | "pasif" | "tum")}
+            value={draft.aktiflik}
+            onChange={(value) => setDraftAktiflik(value as "aktif" | "pasif" | "tum")}
             selectOptions={aktiflikSelectOptions}
           />
         </div>
@@ -302,7 +98,7 @@ export function PersonellerPage() {
           <button type="submit" className="universal-btn-aux">
             Filtrele
           </button>
-          <button type="button" className="universal-btn-aux" onClick={handleFilterClear}>
+          <button type="button" className="universal-btn-aux" onClick={clearFilters}>
             Temizle
           </button>
         </div>
@@ -311,7 +107,7 @@ export function PersonellerPage() {
       {isLoading ? <LoadingState label="Personel verileri yukleniyor..." /> : null}
 
       {!isLoading && errorMessage ? (
-        <ErrorState message={errorMessage} onRetry={() => void loadPersoneller()} />
+        <ErrorState message={errorMessage} onRetry={() => void refetch()} />
       ) : null}
 
       {!isLoading && !errorMessage && personeller.length === 0 ? (
@@ -323,7 +119,7 @@ export function PersonellerPage() {
 
       {!isLoading && !errorMessage && personeller.length > 0 ? (
         <ul className="personeller-list">
-          {personeller.map((personel) => (
+          {personeller.map((personel: Personel) => (
             <li key={personel.id} className="personeller-item">
               <div>
                 <strong>{`${personel.ad} ${personel.soyad}`}</strong>
@@ -367,7 +163,7 @@ export function PersonellerPage() {
       {canCreatePersonel && isCreateModalOpen ? (
         <AppModal
           title="Yeni Personel Ekle"
-          onClose={() => setIsCreateModalOpen(false)}
+          onClose={closeCreateModal}
           footer={
             <div className="universal-btn-group modal-footer-actions">
               <button
@@ -381,7 +177,7 @@ export function PersonellerPage() {
               <button
                 type="button"
                 className="universal-btn-cancel"
-                onClick={() => setIsCreateModalOpen(false)}
+                onClick={closeCreateModal}
                 disabled={isCreateSubmitting}
               >
                 Vazgec
@@ -399,7 +195,7 @@ export function PersonellerPage() {
                 label="T.C. Kimlik No"
                 name="create-tc"
                 value={createForm.tcKimlikNo}
-                onChange={(value) => setCreateForm((prev) => ({ ...prev, tcKimlikNo: value }))}
+                onChange={(value) => setCreateForm((prev: CreatePersonelFormState) => ({ ...prev, tcKimlikNo: value }))}
                 required
               />
               <FormField
@@ -474,7 +270,7 @@ export function PersonellerPage() {
                 onChange={(value) => setCreateForm((prev) => ({ ...prev, iseGirisTarihi: value }))}
                 required
               />
-              {departmanOptions.length > 0 ? (
+              {refs.departmanOptions.length > 0 ? (
                 <FormField
                   as="select"
                   label="Departman ID"
@@ -483,7 +279,7 @@ export function PersonellerPage() {
                   onChange={(value) => setCreateForm((prev) => ({ ...prev, departmanId: value }))}
                   required
                   placeholderOption={{ value: "", label: "Seciniz" }}
-                  selectOptions={toSelectOptions(departmanOptions)}
+                  selectOptions={toSelectOptions(refs.departmanOptions)}
                 />
               ) : (
                 <FormField
@@ -496,7 +292,7 @@ export function PersonellerPage() {
                   required
                 />
               )}
-              {gorevOptions.length > 0 ? (
+              {refs.gorevOptions.length > 0 ? (
                 <FormField
                   as="select"
                   label="Gorev ID"
@@ -505,7 +301,7 @@ export function PersonellerPage() {
                   onChange={(value) => setCreateForm((prev) => ({ ...prev, gorevId: value }))}
                   required
                   placeholderOption={{ value: "", label: "Seciniz" }}
-                  selectOptions={toSelectOptions(gorevOptions)}
+                  selectOptions={toSelectOptions(refs.gorevOptions)}
                 />
               ) : (
                 <FormField
@@ -518,7 +314,7 @@ export function PersonellerPage() {
                   required
                 />
               )}
-              {bagliAmirOptions.length > 0 ? (
+              {refs.bagliAmirOptions.length > 0 ? (
                 <FormField
                   as="select"
                   label="Bagli Amir"
@@ -526,7 +322,7 @@ export function PersonellerPage() {
                   value={createForm.bagliAmirId}
                   onChange={(value) => setCreateForm((prev) => ({ ...prev, bagliAmirId: value }))}
                   placeholderOption={{ value: "", label: "Seciniz" }}
-                  selectOptions={toSelectOptions(bagliAmirOptions)}
+                  selectOptions={toSelectOptions(refs.bagliAmirOptions)}
                 />
               ) : (
                 <FormField
@@ -538,7 +334,7 @@ export function PersonellerPage() {
                   onChange={(value) => setCreateForm((prev) => ({ ...prev, bagliAmirId: value }))}
                 />
               )}
-              {personelTipiOptions.length > 0 ? (
+              {refs.personelTipiOptions.length > 0 ? (
                 <FormField
                   as="select"
                   label="Personel Tipi ID"
@@ -547,7 +343,7 @@ export function PersonellerPage() {
                   onChange={(value) => setCreateForm((prev) => ({ ...prev, personelTipiId: value }))}
                   required
                   placeholderOption={{ value: "", label: "Seciniz" }}
-                  selectOptions={toSelectOptions(personelTipiOptions)}
+                  selectOptions={toSelectOptions(refs.personelTipiOptions)}
                 />
               ) : (
                 <FormField

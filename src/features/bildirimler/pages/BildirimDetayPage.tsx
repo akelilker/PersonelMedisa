@@ -1,43 +1,15 @@
-import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { fetchBildirimDetail } from "../../../api/bildirimler.api";
 import { EmptyState } from "../../../components/states/EmptyState";
 import { ErrorState } from "../../../components/states/ErrorState";
 import { LoadingState } from "../../../components/states/LoadingState";
-import type { Bildirim } from "../../../types/bildirim";
+import { useBildirimDetail } from "../../../hooks/useBildirimler";
 
 export function BildirimDetayPage() {
   const { bildirimId } = useParams();
   const parsedBildirimId = Number.parseInt(bildirimId ?? "", 10);
   const hasValidId = !Number.isNaN(parsedBildirimId) && parsedBildirimId > 0;
 
-  const [bildirim, setBildirim] = useState<Bildirim | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-
-  const loadBildirimDetail = useCallback(async () => {
-    if (!hasValidId) {
-      setIsLoading(false);
-      setErrorMessage("Gecerli bir bildirim id verilmedi.");
-      return;
-    }
-
-    setIsLoading(true);
-    setErrorMessage(null);
-
-    try {
-      const data = await fetchBildirimDetail(parsedBildirimId);
-      setBildirim(data);
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Bildirim detayi alinamadi.");
-    } finally {
-      setIsLoading(false);
-    }
-  }, [hasValidId, parsedBildirimId]);
-
-  useEffect(() => {
-    void loadBildirimDetail();
-  }, [loadBildirimDetail]);
+  const { bildirim, isLoading, errorMessage, refetch } = useBildirimDetail(parsedBildirimId, hasValidId);
 
   return (
     <section className="bildirimler-page bildirim-detay-page">
@@ -46,7 +18,7 @@ export function BildirimDetayPage() {
       {isLoading ? <LoadingState label="Bildirim detayi yukleniyor..." /> : null}
 
       {!isLoading && errorMessage ? (
-        <ErrorState message={errorMessage} onRetry={() => void loadBildirimDetail()} />
+        <ErrorState message={errorMessage} onRetry={() => void refetch()} />
       ) : null}
 
       {!isLoading && !errorMessage && !bildirim ? (

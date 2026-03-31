@@ -1,17 +1,14 @@
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { type FormEvent } from "react";
 import { Link } from "react-router-dom";
-import { cancelSurec, createSurec, fetchSureclerList, updateSurec } from "../../../api/surecler.api";
-import { fetchSurecTuruOptions } from "../../../api/referans.api";
 import { FormField } from "../../../components/form/FormField";
 import { AppModal } from "../../../components/modal/AppModal";
 import { EmptyState } from "../../../components/states/EmptyState";
 import { ErrorState } from "../../../components/states/ErrorState";
 import { LoadingState } from "../../../components/states/LoadingState";
 import { useRoleAccess } from "../../../hooks/use-role-access";
+import { useSurecler } from "../../../hooks/useSurecler";
 import type { KeyOption } from "../../../types/referans";
 import type { Surec } from "../../../types/surec";
-
-const PAGE_SIZE = 10;
 
 const SUREC_CREATE_FORM_ID = "surec-create-form";
 const SUREC_EDIT_FORM_ID = "surec-edit-form";
@@ -25,297 +22,56 @@ const UCRETLI_SELECT_OPTIONS = [
   { value: "hayir", label: "Hayir" }
 ];
 
-type SurecFilters = {
-  personelId: string;
-  surecTuru: string;
-  state: string;
-  baslangicTarihi: string;
-  bitisTarihi: string;
-};
-
-type SurecFormState = {
-  personelId: string;
-  surecTuru: string;
-  altTur: string;
-  baslangicTarihi: string;
-  bitisTarihi: string;
-  ucretliMi: boolean;
-  aciklama: string;
-};
-
-const INITIAL_SUREC_FORM: SurecFormState = {
-  personelId: "",
-  surecTuru: "",
-  altTur: "",
-  baslangicTarihi: "",
-  bitisTarihi: "",
-  ucretliMi: true,
-  aciklama: ""
-};
-
-function parsePositiveInt(value: string) {
-  const number = Number.parseInt(value, 10);
-  if (Number.isNaN(number) || number <= 0) {
-    return undefined;
-  }
-
-  return number;
-}
-
-function parseRequiredPositiveInt(value: string, label: string) {
-  const number = parsePositiveInt(value);
-  if (!number) {
-    throw new Error(`${label} pozitif sayi olmalidir.`);
-  }
-
-  return number;
-}
-
-function toSurecFormState(surec: Surec): SurecFormState {
-  return {
-    personelId: String(surec.personel_id),
-    surecTuru: surec.surec_turu,
-    altTur: surec.alt_tur ?? "",
-    baslangicTarihi: surec.baslangic_tarihi ?? "",
-    bitisTarihi: surec.bitis_tarihi ?? "",
-    ucretliMi: surec.ucretli_mi ?? true,
-    aciklama: surec.aciklama ?? ""
-  };
-}
-
 export function SurecTakipPage() {
-  const [filters, setFilters] = useState<SurecFilters>({
-    personelId: "",
-    surecTuru: "",
-    state: "",
-    baslangicTarihi: "",
-    bitisTarihi: ""
-  });
-  const [personelIdInput, setPersonelIdInput] = useState("");
-  const [surecTuruInput, setSurecTuruInput] = useState("");
-  const [stateInput, setStateInput] = useState("");
-  const [baslangicInput, setBaslangicInput] = useState("");
-  const [bitisInput, setBitisInput] = useState("");
-  const [page, setPage] = useState(1);
-  const [surecler, setSurecler] = useState<Surec[]>([]);
-  const [hasNextPage, setHasNextPage] = useState(false);
-  const [totalPages, setTotalPages] = useState<number | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const {
+    listQuery,
+    updateDraft,
+    surecler,
+    hasNextPage,
+    totalPages,
+    isLoading,
+    errorMessage,
+    refetch,
+    surecTuruOptions,
+    referenceError,
+    isCreateModalOpen,
+    openCreateModal,
+    closeCreateModal,
+    createForm,
+    setCreateForm,
+    createErrorMessage,
+    isCreateSubmitting,
+    createSurecHandler,
+    editingSurec,
+    openEditModal,
+    closeEditModal,
+    editForm,
+    setEditForm,
+    editErrorMessage,
+    isEditSubmitting,
+    updateSurecHandler,
+    cancelingSurecId,
+    cancelSurecHandler,
+    submitFilters,
+    clearFilters,
+    setPage
+  } = useSurecler();
 
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [createForm, setCreateForm] = useState<SurecFormState>(INITIAL_SUREC_FORM);
-  const [createErrorMessage, setCreateErrorMessage] = useState<string | null>(null);
-  const [isCreateSubmitting, setIsCreateSubmitting] = useState(false);
-
-  const [editingSurec, setEditingSurec] = useState<Surec | null>(null);
-  const [editForm, setEditForm] = useState<SurecFormState>(INITIAL_SUREC_FORM);
-  const [editErrorMessage, setEditErrorMessage] = useState<string | null>(null);
-  const [isEditSubmitting, setIsEditSubmitting] = useState(false);
-  const [cancelingSurecId, setCancelingSurecId] = useState<number | null>(null);
-  const [surecTuruOptions, setSurecTuruOptions] = useState<KeyOption[]>([]);
-  const [referenceError, setReferenceError] = useState<string | null>(null);
   const { hasPermission } = useRoleAccess();
   const canCreateSurec = hasPermission("surecler.create");
   const canEditSurec = hasPermission("surecler.update");
   const canCancelSurec = hasPermission("surecler.cancel");
   const canOpenSurecDetail = hasPermission("surecler.detail.view");
 
-  const loadSurecler = useCallback(async () => {
-    setIsLoading(true);
-    setErrorMessage(null);
+  const { draft } = listQuery;
+  const page = listQuery.page;
 
-    try {
-      const nextData = await fetchSureclerList({
-        personel_id: parsePositiveInt(filters.personelId),
-        surec_turu: filters.surecTuru || undefined,
-        state: filters.state || undefined,
-        baslangic_tarihi: filters.baslangicTarihi || undefined,
-        bitis_tarihi: filters.bitisTarihi || undefined,
-        page,
-        limit: PAGE_SIZE
-      });
-      setSurecler(nextData.items);
-      setHasNextPage(nextData.pagination.hasNextPage ?? nextData.items.length === PAGE_SIZE);
-      setTotalPages(nextData.pagination.totalPages);
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Surec listesi alinamadi.");
-      setHasNextPage(false);
-      setTotalPages(null);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [filters.baslangicTarihi, filters.bitisTarihi, filters.personelId, filters.state, filters.surecTuru, page]);
-
-  useEffect(() => {
-    void loadSurecler();
-  }, [loadSurecler]);
-
-  useEffect(() => {
-    let isCancelled = false;
-
-    async function loadReferences() {
-      setReferenceError(null);
-      try {
-        const options = await fetchSurecTuruOptions();
-        if (!isCancelled) {
-          setSurecTuruOptions(options);
-        }
-      } catch (error) {
-        if (!isCancelled) {
-          setReferenceError(
-            error instanceof Error ? error.message : "Surec turleri alinamadi, manuel giris aktif."
-          );
-        }
-      }
-    }
-
-    void loadReferences();
-
-    return () => {
-      isCancelled = true;
-    };
-  }, []);
-
-  function handleFilterSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
-    setFilters({
-      personelId: personelIdInput.trim(),
-      surecTuru: surecTuruInput.trim(),
-      state: stateInput.trim(),
-      baslangicTarihi: baslangicInput,
-      bitisTarihi: bitisInput
-    });
-    setPage(1);
+  function handleCreateSubmit(event: FormEvent<HTMLFormElement>) {
+    void createSurecHandler(event, canCreateSurec);
   }
 
-  function handleFilterClear() {
-    setPersonelIdInput("");
-    setSurecTuruInput("");
-    setStateInput("");
-    setBaslangicInput("");
-    setBitisInput("");
-    setFilters({
-      personelId: "",
-      surecTuru: "",
-      state: "",
-      baslangicTarihi: "",
-      bitisTarihi: ""
-    });
-    setPage(1);
-  }
-
-  async function handleCreateSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (isCreateSubmitting) {
-      return;
-    }
-    if (!canCreateSurec) {
-      setCreateErrorMessage("Bu islem icin yetkin bulunmuyor.");
-      return;
-    }
-
-    setCreateErrorMessage(null);
-    setIsCreateSubmitting(true);
-
-    try {
-      await createSurec({
-        personel_id: parseRequiredPositiveInt(createForm.personelId, "Personel ID"),
-        surec_turu: createForm.surecTuru.trim(),
-        alt_tur: createForm.altTur.trim() || undefined,
-        baslangic_tarihi: createForm.baslangicTarihi,
-        bitis_tarihi: createForm.bitisTarihi,
-        ucretli_mi: createForm.ucretliMi,
-        aciklama: createForm.aciklama.trim() || undefined
-      });
-
-      setIsCreateModalOpen(false);
-      setCreateForm(INITIAL_SUREC_FORM);
-      if (page === 1) {
-        await loadSurecler();
-      } else {
-        setPage(1);
-      }
-    } catch (error) {
-      setCreateErrorMessage(error instanceof Error ? error.message : "Surec kaydi yapilamadi.");
-    } finally {
-      setIsCreateSubmitting(false);
-    }
-  }
-
-  function openEditModal(surec: Surec) {
-    if (!canEditSurec) {
-      setErrorMessage("Bu sureci duzenlemek icin yetkin bulunmuyor.");
-      return;
-    }
-
-    setEditErrorMessage(null);
-    setEditingSurec(surec);
-    setEditForm(toSurecFormState(surec));
-  }
-
-  async function handleEditSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!editingSurec || isEditSubmitting) {
-      return;
-    }
-    if (!canEditSurec) {
-      setEditErrorMessage("Bu sureci duzenlemek icin yetkin bulunmuyor.");
-      return;
-    }
-
-    setEditErrorMessage(null);
-    setIsEditSubmitting(true);
-
-    try {
-      await updateSurec(editingSurec.id, {
-        personel_id: parseRequiredPositiveInt(editForm.personelId, "Personel ID"),
-        surec_turu: editForm.surecTuru.trim(),
-        alt_tur: editForm.altTur.trim() || undefined,
-        baslangic_tarihi: editForm.baslangicTarihi,
-        bitis_tarihi: editForm.bitisTarihi,
-        ucretli_mi: editForm.ucretliMi,
-        aciklama: editForm.aciklama.trim() || undefined
-      });
-
-      setEditingSurec(null);
-      if (page === 1) {
-        await loadSurecler();
-      } else {
-        setPage(1);
-      }
-    } catch (error) {
-      setEditErrorMessage(error instanceof Error ? error.message : "Surec guncellenemedi.");
-    } finally {
-      setIsEditSubmitting(false);
-    }
-  }
-
-  async function handleCancelSurec(surec: Surec) {
-    if (!canCancelSurec) {
-      setErrorMessage("Bu sureci iptal etmek icin yetkin bulunmuyor.");
-      return;
-    }
-
-    const confirmed = window.confirm(`Surec #${surec.id} kaydini iptal etmek istiyor musun?`);
-    if (!confirmed) {
-      return;
-    }
-
-    setCancelingSurecId(surec.id);
-    try {
-      await cancelSurec(surec.id);
-      if (page === 1) {
-        await loadSurecler();
-      } else {
-        setPage(1);
-      }
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Surec iptal edilemedi.");
-    } finally {
-      setCancelingSurecId(null);
-    }
+  function handleEditSubmit(event: FormEvent<HTMLFormElement>) {
+    void updateSurecHandler(event, canEditSurec);
   }
 
   return (
@@ -323,37 +79,29 @@ export function SurecTakipPage() {
       <div className="surecler-header-row">
         <h2>Surec Takibi</h2>
         {canCreateSurec ? (
-          <button
-            type="button"
-            className="universal-btn-aux"
-            onClick={() => {
-              setCreateErrorMessage(null);
-              setCreateForm(INITIAL_SUREC_FORM);
-              setIsCreateModalOpen(true);
-            }}
-          >
+          <button type="button" className="universal-btn-aux" onClick={openCreateModal}>
             Yeni Surec
           </button>
         ) : null}
       </div>
 
-      <form className="form-filter-panel" onSubmit={handleFilterSubmit}>
+      <form className="form-filter-panel" onSubmit={submitFilters}>
         <div className="form-field-grid">
           <FormField
             label="Personel ID"
             name="surec-filter-personel"
             type="number"
             min={1}
-            value={personelIdInput}
-            onChange={setPersonelIdInput}
+            value={draft.personelId}
+            onChange={(value) => updateDraft({ personelId: value })}
           />
           {surecTuruOptions.length > 0 ? (
             <FormField
               as="select"
               label="Surec Turu"
               name="surec-filter-turu"
-              value={surecTuruInput}
-              onChange={setSurecTuruInput}
+              value={draft.surecTuru}
+              onChange={(value) => updateDraft({ surecTuru: value })}
               placeholderOption={{ value: "", label: "Tum" }}
               selectOptions={keyOptionsToSelectOptions(surecTuruOptions)}
             />
@@ -362,30 +110,30 @@ export function SurecTakipPage() {
               label="Surec Turu"
               name="surec-filter-turu-text"
               placeholder="IZIN, RAPOR..."
-              value={surecTuruInput}
-              onChange={setSurecTuruInput}
+              value={draft.surecTuru}
+              onChange={(value) => updateDraft({ surecTuru: value })}
             />
           )}
           <FormField
             label="Durum"
             name="surec-filter-state"
             placeholder="AKTIF, IPTAL..."
-            value={stateInput}
-            onChange={setStateInput}
+            value={draft.state}
+            onChange={(value) => updateDraft({ state: value })}
           />
           <FormField
             label="Baslangic"
             name="surec-filter-bas"
             type="date"
-            value={baslangicInput}
-            onChange={setBaslangicInput}
+            value={draft.baslangicTarihi}
+            onChange={(value) => updateDraft({ baslangicTarihi: value })}
           />
           <FormField
             label="Bitis"
             name="surec-filter-bitis"
             type="date"
-            value={bitisInput}
-            onChange={setBitisInput}
+            value={draft.bitisTarihi}
+            onChange={(value) => updateDraft({ bitisTarihi: value })}
           />
         </div>
 
@@ -393,7 +141,7 @@ export function SurecTakipPage() {
           <button type="submit" className="universal-btn-aux">
             Filtrele
           </button>
-          <button type="button" className="universal-btn-aux" onClick={handleFilterClear}>
+          <button type="button" className="universal-btn-aux" onClick={clearFilters}>
             Temizle
           </button>
         </div>
@@ -402,7 +150,7 @@ export function SurecTakipPage() {
       {isLoading ? <LoadingState label="Surec verileri yukleniyor..." /> : null}
 
       {!isLoading && errorMessage ? (
-        <ErrorState message={errorMessage} onRetry={() => void loadSurecler()} />
+        <ErrorState message={errorMessage} onRetry={() => void refetch()} />
       ) : null}
 
       {!isLoading && !errorMessage && surecler.length === 0 ? (
@@ -411,7 +159,7 @@ export function SurecTakipPage() {
 
       {!isLoading && !errorMessage && surecler.length > 0 ? (
         <ul className="surecler-list">
-          {surecler.map((surec) => (
+          {surecler.map((surec: Surec) => (
             <li key={surec.id} className="surecler-item">
               <div>
                 <strong>{surec.surec_turu}</strong>
@@ -432,7 +180,7 @@ export function SurecTakipPage() {
                     <button
                       type="button"
                       className="universal-btn-aux"
-                      onClick={() => openEditModal(surec)}
+                      onClick={() => openEditModal(surec, canEditSurec)}
                       disabled={cancelingSurecId === surec.id}
                     >
                       Duzenle
@@ -442,7 +190,7 @@ export function SurecTakipPage() {
                     <button
                       type="button"
                       className="universal-btn-aux"
-                      onClick={() => void handleCancelSurec(surec)}
+                      onClick={() => void cancelSurecHandler(surec, canCancelSurec)}
                       disabled={cancelingSurecId === surec.id}
                     >
                       {cancelingSurecId === surec.id ? "Iptal Ediliyor..." : "Iptal"}
@@ -487,7 +235,7 @@ export function SurecTakipPage() {
       {canCreateSurec && isCreateModalOpen ? (
         <AppModal
           title="Yeni Surec Ekle"
-          onClose={() => setIsCreateModalOpen(false)}
+          onClose={closeCreateModal}
           footer={
             <div className="universal-btn-group modal-footer-actions">
               <button
@@ -501,7 +249,7 @@ export function SurecTakipPage() {
               <button
                 type="button"
                 className="universal-btn-cancel"
-                onClick={() => setIsCreateModalOpen(false)}
+                onClick={closeCreateModal}
                 disabled={isCreateSubmitting}
               >
                 Vazgec
@@ -586,7 +334,7 @@ export function SurecTakipPage() {
       {canEditSurec && editingSurec ? (
         <AppModal
           title={`Surec Duzenle #${editingSurec.id}`}
-          onClose={() => setEditingSurec(null)}
+          onClose={closeEditModal}
           footer={
             <div className="universal-btn-group modal-footer-actions">
               <button
@@ -600,7 +348,7 @@ export function SurecTakipPage() {
               <button
                 type="button"
                 className="universal-btn-cancel"
-                onClick={() => setEditingSurec(null)}
+                onClick={closeEditModal}
                 disabled={isEditSubmitting}
               >
                 Vazgec

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { fetchBildirimlerList, markBildirimOkundu } from "../../api/bildirimler.api";
+import { useBildirimlerHeaderPreview } from "../../hooks/useBildirimler";
 import { useRoleAccess } from "../../hooks/use-role-access";
 import { useAuth } from "../../state/auth.store";
 
@@ -129,10 +129,16 @@ export function ShellHeaderActions() {
 
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [isNotificationsLoading, setIsNotificationsLoading] = useState(false);
-  const [notificationError, setNotificationError] = useState<string | null>(null);
-  const [notifications, setNotifications] = useState<HeaderNotification[]>([]);
+  const [notificationActionError, setNotificationActionError] = useState<string | null>(null);
   const [readNotificationIds, setReadNotificationIds] = useState<Record<string, true>>({});
+
+  const {
+    items: headerBildirimler,
+    isLoading: headerBildirimlerLoading,
+    errorMessage: headerBildirimlerError,
+    reload: reloadHeaderBildirimler,
+    markOkundu
+  } = useBildirimlerHeaderPreview(canViewBildirimler);
 
   const reminderRoute = canViewFinans
     ? "/finans"
@@ -141,6 +147,26 @@ export function ShellHeaderActions() {
       : canViewBildirimler
         ? "/bildirimler"
         : "/personeller";
+
+  const notifications = useMemo(() => {
+    const reminderItems = buildReminderNotifications(new Date(), reminderRoute);
+    const apiItems: HeaderNotification[] = headerBildirimler.map((item) => {
+      const tarihText = item.tarih ? `Tarih: ${item.tarih}` : "";
+      const personelText = item.personel_id ? `Personel: ${item.personel_id}` : "";
+      const subtitle = [tarihText, personelText].filter(Boolean).join(" | ") || "Islem gerektiriyor";
+
+      return {
+        id: `api-${item.id}`,
+        title: formatBildirimTuru(item.bildirim_turu),
+        subtitle,
+        level: mapBildirimLevel(item.bildirim_turu),
+        route: canViewBildirimDetay ? `/bildirimler/${item.id}` : "/bildirimler",
+        unread: item.state !== "IPTAL" && item.okundu_mi !== true
+      };
+    });
+
+    return [...reminderItems, ...apiItems];
+  }, [canViewBildirimDetay, headerBildirimler, reminderRoute]);
 
   const visibleNotifications = useMemo(
     () =>
@@ -187,60 +213,8 @@ export function ShellHeaderActions() {
     };
   }, []);
 
-  useEffect(() => {
-    let isCancelled = false;
-
-    async function loadHeaderNotifications() {
-      setIsNotificationsLoading(true);
-      setNotificationError(null);
-
-      try {
-        const reminderItems = buildReminderNotifications(new Date(), reminderRoute);
-        const apiItems: HeaderNotification[] = [];
-
-        if (canViewBildirimler) {
-          const response = await fetchBildirimlerList({ page: 1, limit: 8 });
-          response.items.forEach((item) => {
-            const tarihText = item.tarih ? `Tarih: ${item.tarih}` : "";
-            const personelText = item.personel_id ? `Personel: ${item.personel_id}` : "";
-            const subtitle = [tarihText, personelText].filter(Boolean).join(" | ") || "Islem gerektiriyor";
-
-            apiItems.push({
-              id: `api-${item.id}`,
-              title: formatBildirimTuru(item.bildirim_turu),
-              subtitle,
-              level: mapBildirimLevel(item.bildirim_turu),
-              route: canViewBildirimDetay ? `/bildirimler/${item.id}` : "/bildirimler",
-              unread: item.state !== "IPTAL" && item.okundu_mi !== true
-            });
-          });
-        }
-
-        if (!isCancelled) {
-          setNotifications([...reminderItems, ...apiItems]);
-        }
-      } catch (error) {
-        if (isCancelled) {
-          return;
-        }
-
-        setNotificationError(
-          error instanceof Error ? error.message : "Bildirimler yuklenemedi, hatirlatmalar gosteriliyor."
-        );
-        setNotifications(buildReminderNotifications(new Date(), reminderRoute));
-      } finally {
-        if (!isCancelled) {
-          setIsNotificationsLoading(false);
-        }
-      }
-    }
-
-    void loadHeaderNotifications();
-
-    return () => {
-      isCancelled = true;
-    };
-  }, [canViewBildirimDetay, canViewBildirimler, canViewFinans, canViewRaporlar, reminderRoute]);
+  const isNotificationsLoading = canViewBildirimler ? headerBildirimlerLoading : false;
+  const notificationError = notificationActionError ?? headerBildirimlerError;
 
   function navigateTo(path: string) {
     setIsNotificationsOpen(false);
@@ -252,14 +226,13 @@ export function ShellHeaderActions() {
     if (notification.id.startsWith("api-")) {
       const numericId = Number.parseInt(notification.id.slice(4), 10);
       if (Number.isFinite(numericId)) {
-        void markBildirimOkundu(numericId)
+        void markOkundu(numericId)
           .then(() => {
-            setNotifications((prev) =>
-              prev.map((item) => (item.id === notification.id ? { ...item, unread: false } : item))
-            );
+            setNotificationActionError(null);
+            void reloadHeaderBildirimler();
           })
           .catch((error) => {
-            setNotificationError(
+            setNotificationActionError(
               error instanceof Error ? error.message : "Bildirim okundu isaretlenemedi."
             );
           });
@@ -281,16 +254,13 @@ export function ShellHeaderActions() {
       .filter((id) => Number.isFinite(id));
 
     if (unreadApiIds.length > 0) {
-      void Promise.all(unreadApiIds.map((id) => markBildirimOkundu(id)))
+      void Promise.all(unreadApiIds.map((id) => markOkundu(id)))
         .then(() => {
-          setNotifications((prev) =>
-            prev.map((item) =>
-              unreadApiIds.some((id) => item.id === `api-${id}`) ? { ...item, unread: false } : item
-            )
-          );
+          setNotificationActionError(null);
+          void reloadHeaderBildirimler();
         })
         .catch((error) => {
-          setNotificationError(
+          setNotificationActionError(
             error instanceof Error ? error.message : "Bildirimler okundu isaretlenemedi."
           );
         });

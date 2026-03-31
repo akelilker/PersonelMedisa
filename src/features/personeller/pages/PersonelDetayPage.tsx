@@ -1,19 +1,11 @@
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { type FormEvent } from "react";
 import { useParams } from "react-router-dom";
-import { fetchPersonelDetail, updatePersonel } from "../../../api/personeller.api";
 import { FormField } from "../../../components/form/FormField";
 import { EmptyState } from "../../../components/states/EmptyState";
 import { ErrorState } from "../../../components/states/ErrorState";
 import { LoadingState } from "../../../components/states/LoadingState";
 import { useRoleAccess } from "../../../hooks/use-role-access";
-import type { Personel } from "../../../types/personel";
-
-type EditFormState = {
-  ad: string;
-  soyad: string;
-  telefon: string;
-  aktifDurum: "AKTIF" | "PASIF";
-};
+import { usePersonelDetail } from "../../../hooks/usePersoneller";
 
 export function PersonelDetayPage() {
   const { personelId } = useParams();
@@ -22,88 +14,41 @@ export function PersonelDetayPage() {
   const { hasPermission } = useRoleAccess();
   const canEditPersonel = hasPermission("personeller.update");
 
-  const [personel, setPersonel] = useState<Personel | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [isEditing, setIsEditing] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [editErrorMessage, setEditErrorMessage] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState<EditFormState>({
-    ad: "",
-    soyad: "",
-    telefon: "",
-    aktifDurum: "AKTIF"
-  });
+  const {
+    personel,
+    isLoading,
+    errorMessage,
+    refetch,
+    isEditing,
+    setIsEditing,
+    isSubmitting,
+    editErrorMessage,
+    editForm,
+    setEditForm,
+    discardEdit,
+    updatePersonelHandler
+  } = usePersonelDetail(parsedPersonelId, hasValidId);
 
   const aktifDurumOptions = [
     { value: "AKTIF", label: "AKTIF" },
     { value: "PASIF", label: "PASIF" }
   ];
 
-  const loadPersonel = useCallback(async () => {
-    if (!hasValidId) {
-      setIsLoading(false);
-      setErrorMessage("Gecerli bir personel id verilmedi.");
+  function handleEditSubmit(event: FormEvent<HTMLFormElement>) {
+    void updatePersonelHandler(event, canEditPersonel);
+  }
+
+  function cancelEdit() {
+    if (!personel) {
       return;
     }
-
-    setIsLoading(true);
-    setErrorMessage(null);
-
-    try {
-      const data = await fetchPersonelDetail(parsedPersonelId);
-      setPersonel(data);
-      setEditForm({
-        ad: data.ad,
-        soyad: data.soyad,
-        telefon: data.telefon ?? "",
-        aktifDurum: data.aktif_durum
-      });
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Personel detayi alinamadi.");
-    } finally {
-      setIsLoading(false);
-    }
-  }, [hasValidId, parsedPersonelId]);
-
-  useEffect(() => {
-    void loadPersonel();
-  }, [loadPersonel]);
-
-  async function handleEditSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!personel || isSubmitting) {
-      return;
-    }
-    if (!canEditPersonel) {
-      setEditErrorMessage("Bu kaydi guncellemek icin yetkin bulunmuyor.");
-      return;
-    }
-
-    setEditErrorMessage(null);
-    setIsSubmitting(true);
-
-    try {
-      const updated = await updatePersonel(personel.id, {
-        ad: editForm.ad.trim(),
-        soyad: editForm.soyad.trim(),
-        telefon: editForm.telefon.trim(),
-        aktif_durum: editForm.aktifDurum
-      });
-
-      setPersonel(updated);
-      setEditForm({
-        ad: updated.ad,
-        soyad: updated.soyad,
-        telefon: updated.telefon ?? "",
-        aktifDurum: updated.aktif_durum
-      });
-      setIsEditing(false);
-    } catch (error) {
-      setEditErrorMessage(error instanceof Error ? error.message : "Kayit guncellenemedi.");
-    } finally {
-      setIsSubmitting(false);
-    }
+    setIsEditing(false);
+    setEditForm({
+      ad: personel.ad,
+      soyad: personel.soyad,
+      telefon: personel.telefon ?? "",
+      aktifDurum: personel.aktif_durum
+    });
   }
 
   return (
@@ -113,7 +58,7 @@ export function PersonelDetayPage() {
       {isLoading ? <LoadingState label="Personel detayi yukleniyor..." /> : null}
 
       {!isLoading && errorMessage ? (
-        <ErrorState message={errorMessage} onRetry={() => void loadPersonel()} />
+        <ErrorState message={errorMessage} onRetry={() => void refetch()} />
       ) : null}
 
       {!isLoading && !errorMessage && !personel ? (
@@ -183,21 +128,7 @@ export function PersonelDetayPage() {
                 <button type="submit" className="universal-btn-aux" disabled={isSubmitting}>
                   {isSubmitting ? "Kaydediliyor..." : "Kaydet"}
                 </button>
-                <button
-                  type="button"
-                  className="universal-btn-aux"
-                  onClick={() => {
-                    setIsEditing(false);
-                    setEditErrorMessage(null);
-                    setEditForm({
-                      ad: personel.ad,
-                      soyad: personel.soyad,
-                      telefon: personel.telefon ?? "",
-                      aktifDurum: personel.aktif_durum
-                    });
-                  }}
-                  disabled={isSubmitting}
-                >
+                <button type="button" className="universal-btn-aux" onClick={discardEdit} disabled={isSubmitting}>
                   Vazgec
                 </button>
               </div>

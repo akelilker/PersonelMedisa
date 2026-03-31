@@ -1,94 +1,16 @@
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { type FormEvent } from "react";
 import { Link } from "react-router-dom";
-import {
-  cancelFinansKalem,
-  createFinansKalem,
-  fetchFinansKalemList,
-  updateFinansKalem
-} from "../../../api/finans.api";
 import { FormField } from "../../../components/form/FormField";
 import { AppModal } from "../../../components/modal/AppModal";
 import { EmptyState } from "../../../components/states/EmptyState";
 import { ErrorState } from "../../../components/states/ErrorState";
 import { LoadingState } from "../../../components/states/LoadingState";
 import { useRoleAccess } from "../../../hooks/use-role-access";
+import { useFinans } from "../../../hooks/useFinans";
 import type { FinansKalem } from "../../../types/finans";
-
-const PAGE_SIZE = 10;
 
 const FINANS_CREATE_FORM_ID = "finans-create-form";
 const FINANS_EDIT_FORM_ID = "finans-edit-form";
-
-type FinansFilters = {
-  personelId: string;
-  donem: string;
-  kalemTuru: string;
-  state: string;
-};
-
-type FinansFormState = {
-  personelId: string;
-  donem: string;
-  kalemTuru: string;
-  tutar: string;
-  aciklama: string;
-};
-
-function toMonthInputValue(date: Date): string {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
-}
-
-function parsePositiveInt(value: string): number | undefined {
-  const trimmed = value.trim();
-  if (!trimmed) {
-    return undefined;
-  }
-
-  const parsed = Number.parseInt(trimmed, 10);
-  if (Number.isNaN(parsed) || parsed <= 0) {
-    return undefined;
-  }
-
-  return parsed;
-}
-
-function parseRequiredPositiveInt(value: string, label: string): number {
-  const parsed = parsePositiveInt(value);
-  if (!parsed) {
-    throw new Error(`${label} pozitif sayi olmalidir.`);
-  }
-
-  return parsed;
-}
-
-function parseRequiredPositiveNumber(value: string, label: string): number {
-  const trimmed = value.trim();
-  const parsed = Number.parseFloat(trimmed);
-  if (!trimmed || Number.isNaN(parsed) || parsed <= 0) {
-    throw new Error(`${label} sifirdan buyuk olmali.`);
-  }
-
-  return parsed;
-}
-
-function validateDonem(donem: string): string {
-  const value = donem.trim();
-  if (!/^\d{4}-\d{2}$/.test(value)) {
-    throw new Error("Donem YYYY-MM formatinda olmali.");
-  }
-
-  return value;
-}
-
-function toFormState(item: FinansKalem): FinansFormState {
-  return {
-    personelId: String(item.personel_id),
-    donem: item.donem,
-    kalemTuru: item.kalem_turu,
-    tutar: String(item.tutar),
-    aciklama: item.aciklama ?? ""
-  };
-}
 
 export function FinansPage() {
   const { hasPermission } = useRoleAccess();
@@ -96,215 +18,47 @@ export function FinansPage() {
   const canEditFinans = hasPermission("finans.update");
   const canCancelFinans = hasPermission("finans.cancel");
 
-  const [filters, setFilters] = useState<FinansFilters>({
-    personelId: "",
-    donem: "",
-    kalemTuru: "",
-    state: ""
-  });
-  const [personelIdInput, setPersonelIdInput] = useState("");
-  const [donemInput, setDonemInput] = useState("");
-  const [kalemTuruInput, setKalemTuruInput] = useState("");
-  const [stateInput, setStateInput] = useState("");
-  const [page, setPage] = useState(1);
-  const [items, setItems] = useState<FinansKalem[]>([]);
-  const [hasNextPage, setHasNextPage] = useState(false);
-  const [totalPages, setTotalPages] = useState<number | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const {
+    listQuery,
+    updateDraft,
+    items,
+    hasNextPage,
+    totalPages,
+    isLoading,
+    errorMessage,
+    refetch,
+    isCreateModalOpen,
+    openCreateModal,
+    closeCreateModal,
+    createForm,
+    setCreateForm,
+    createErrorMessage,
+    isCreateSubmitting,
+    createFinansHandler,
+    editingItem,
+    openEditModal,
+    closeEditModal,
+    editForm,
+    setEditForm,
+    editErrorMessage,
+    isEditSubmitting,
+    cancelOngoingId,
+    cancelFinansHandler,
+    updateFinansHandler,
+    submitFilters,
+    clearFilters,
+    setPage
+  } = useFinans();
 
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [createForm, setCreateForm] = useState<FinansFormState>({
-    personelId: "",
-    donem: toMonthInputValue(new Date()),
-    kalemTuru: "AVANS",
-    tutar: "",
-    aciklama: ""
-  });
-  const [createErrorMessage, setCreateErrorMessage] = useState<string | null>(null);
-  const [isCreateSubmitting, setIsCreateSubmitting] = useState(false);
+  const { draft } = listQuery;
+  const page = listQuery.page;
 
-  const [editingItem, setEditingItem] = useState<FinansKalem | null>(null);
-  const [editForm, setEditForm] = useState<FinansFormState>({
-    personelId: "",
-    donem: "",
-    kalemTuru: "",
-    tutar: "",
-    aciklama: ""
-  });
-  const [editErrorMessage, setEditErrorMessage] = useState<string | null>(null);
-  const [isEditSubmitting, setIsEditSubmitting] = useState(false);
-  const [cancelingItemId, setCancelingItemId] = useState<number | null>(null);
-
-  const loadItems = useCallback(async () => {
-    setIsLoading(true);
-    setErrorMessage(null);
-
-    try {
-      const result = await fetchFinansKalemList({
-        personel_id: parsePositiveInt(filters.personelId),
-        donem: filters.donem || undefined,
-        kalem_turu: filters.kalemTuru || undefined,
-        state: filters.state || undefined,
-        page,
-        limit: PAGE_SIZE
-      });
-
-      setItems(result.items);
-      setHasNextPage(result.pagination.hasNextPage ?? result.items.length === PAGE_SIZE);
-      setTotalPages(result.pagination.totalPages);
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Finans kayitlari alinamadi.");
-      setItems([]);
-      setHasNextPage(false);
-      setTotalPages(null);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [filters.donem, filters.kalemTuru, filters.personelId, filters.state, page]);
-
-  useEffect(() => {
-    void loadItems();
-  }, [loadItems]);
-
-  function handleFilterSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setFilters({
-      personelId: personelIdInput.trim(),
-      donem: donemInput.trim(),
-      kalemTuru: kalemTuruInput.trim(),
-      state: stateInput.trim()
-    });
-    setPage(1);
+  function handleCreateSubmit(event: FormEvent<HTMLFormElement>) {
+    void createFinansHandler(event, canCreateFinans);
   }
 
-  function handleFilterClear() {
-    setPersonelIdInput("");
-    setDonemInput("");
-    setKalemTuruInput("");
-    setStateInput("");
-    setFilters({
-      personelId: "",
-      donem: "",
-      kalemTuru: "",
-      state: ""
-    });
-    setPage(1);
-  }
-
-  async function handleCreateSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (isCreateSubmitting) {
-      return;
-    }
-    if (!canCreateFinans) {
-      setCreateErrorMessage("Bu islem icin yetkin bulunmuyor.");
-      return;
-    }
-
-    setCreateErrorMessage(null);
-    setIsCreateSubmitting(true);
-
-    try {
-      await createFinansKalem({
-        personel_id: parseRequiredPositiveInt(createForm.personelId, "Personel ID"),
-        donem: validateDonem(createForm.donem),
-        kalem_turu: createForm.kalemTuru.trim(),
-        tutar: parseRequiredPositiveNumber(createForm.tutar, "Tutar"),
-        aciklama: createForm.aciklama.trim() || undefined
-      });
-
-      setIsCreateModalOpen(false);
-      setCreateForm({
-        personelId: "",
-        donem: toMonthInputValue(new Date()),
-        kalemTuru: "AVANS",
-        tutar: "",
-        aciklama: ""
-      });
-
-      if (page === 1) {
-        await loadItems();
-      } else {
-        setPage(1);
-      }
-    } catch (error) {
-      setCreateErrorMessage(error instanceof Error ? error.message : "Finans kaydi olusturulamadi.");
-    } finally {
-      setIsCreateSubmitting(false);
-    }
-  }
-
-  function openEditModal(item: FinansKalem) {
-    if (!canEditFinans) {
-      setErrorMessage("Bu kaydi duzenlemek icin yetkin bulunmuyor.");
-      return;
-    }
-
-    setEditingItem(item);
-    setEditForm(toFormState(item));
-    setEditErrorMessage(null);
-  }
-
-  async function handleEditSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!editingItem || isEditSubmitting) {
-      return;
-    }
-    if (!canEditFinans) {
-      setEditErrorMessage("Bu kaydi duzenlemek icin yetkin bulunmuyor.");
-      return;
-    }
-
-    setEditErrorMessage(null);
-    setIsEditSubmitting(true);
-
-    try {
-      await updateFinansKalem(editingItem.id, {
-        personel_id: parseRequiredPositiveInt(editForm.personelId, "Personel ID"),
-        donem: validateDonem(editForm.donem),
-        kalem_turu: editForm.kalemTuru.trim(),
-        tutar: parseRequiredPositiveNumber(editForm.tutar, "Tutar"),
-        aciklama: editForm.aciklama.trim() || undefined
-      });
-
-      setEditingItem(null);
-      if (page === 1) {
-        await loadItems();
-      } else {
-        setPage(1);
-      }
-    } catch (error) {
-      setEditErrorMessage(error instanceof Error ? error.message : "Finans kaydi guncellenemedi.");
-    } finally {
-      setIsEditSubmitting(false);
-    }
-  }
-
-  async function handleCancel(item: FinansKalem) {
-    if (!canCancelFinans) {
-      setErrorMessage("Bu kaydi iptal etmek icin yetkin bulunmuyor.");
-      return;
-    }
-
-    const confirmed = window.confirm(`Finans kaydi #${item.id} iptal edilsin mi?`);
-    if (!confirmed) {
-      return;
-    }
-
-    setCancelingItemId(item.id);
-    try {
-      await cancelFinansKalem(item.id);
-      if (page === 1) {
-        await loadItems();
-      } else {
-        setPage(1);
-      }
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Finans kaydi iptal edilemedi.");
-    } finally {
-      setCancelingItemId(null);
-    }
+  function handleEditSubmit(event: FormEvent<HTMLFormElement>) {
+    void updateFinansHandler(event, canEditFinans);
   }
 
   return (
@@ -312,49 +66,42 @@ export function FinansPage() {
       <div className="finans-header-row">
         <h2>Finans</h2>
         {canCreateFinans ? (
-          <button
-            type="button"
-            className="universal-btn-aux"
-            onClick={() => {
-              setCreateErrorMessage(null);
-              setIsCreateModalOpen(true);
-            }}
-          >
+          <button type="button" className="universal-btn-aux" onClick={openCreateModal}>
             Yeni Finans Kalemi
           </button>
         ) : null}
       </div>
 
-      <form className="form-filter-panel" onSubmit={handleFilterSubmit}>
+      <form className="form-filter-panel" onSubmit={submitFilters}>
         <div className="form-field-grid">
           <FormField
             label="Personel ID"
             name="finans-filter-personel"
             type="number"
             min={1}
-            value={personelIdInput}
-            onChange={setPersonelIdInput}
+            value={draft.personelId}
+            onChange={(value) => updateDraft({ personelId: value })}
           />
           <FormField
             label="Donem (YYYY-MM)"
             name="finans-filter-donem"
             type="month"
-            value={donemInput}
-            onChange={setDonemInput}
+            value={draft.donem}
+            onChange={(value) => updateDraft({ donem: value })}
           />
           <FormField
             label="Kalem Turu"
             name="finans-filter-kalem"
             placeholder="AVANS, PRIM..."
-            value={kalemTuruInput}
-            onChange={setKalemTuruInput}
+            value={draft.kalemTuru}
+            onChange={(value) => updateDraft({ kalemTuru: value })}
           />
           <FormField
             label="Durum"
             name="finans-filter-state"
             placeholder="AKTIF, IPTAL..."
-            value={stateInput}
-            onChange={setStateInput}
+            value={draft.state}
+            onChange={(value) => updateDraft({ state: value })}
           />
         </div>
 
@@ -362,21 +109,23 @@ export function FinansPage() {
           <button type="submit" className="universal-btn-aux">
             Filtrele
           </button>
-          <button type="button" className="universal-btn-aux" onClick={handleFilterClear}>
+          <button type="button" className="universal-btn-aux" onClick={clearFilters}>
             Temizle
           </button>
         </div>
       </form>
 
       {isLoading ? <LoadingState label="Finans verileri yukleniyor..." /> : null}
-      {!isLoading && errorMessage ? <ErrorState message={errorMessage} onRetry={() => void loadItems()} /> : null}
+      {!isLoading && errorMessage ? (
+        <ErrorState message={errorMessage} onRetry={() => void refetch()} />
+      ) : null}
       {!isLoading && !errorMessage && items.length === 0 ? (
         <EmptyState title="Finans kaydi yok" message="Bu filtrede gosterilecek finans kalemi bulunamadi." />
       ) : null}
 
       {!isLoading && !errorMessage && items.length > 0 ? (
         <ul className="finans-list">
-          {items.map((item) => (
+          {items.map((item: FinansKalem) => (
             <li key={item.id} className="finans-item">
               <div>
                 <strong>{item.kalem_turu}</strong>
@@ -392,8 +141,8 @@ export function FinansPage() {
                     <button
                       type="button"
                       className="universal-btn-aux"
-                      onClick={() => openEditModal(item)}
-                      disabled={cancelingItemId === item.id}
+                      onClick={() => openEditModal(item, canEditFinans)}
+                      disabled={cancelOngoingId === item.id}
                     >
                       Duzenle
                     </button>
@@ -402,10 +151,10 @@ export function FinansPage() {
                     <button
                       type="button"
                       className="universal-btn-aux"
-                      onClick={() => void handleCancel(item)}
-                      disabled={cancelingItemId === item.id}
+                      onClick={() => void cancelFinansHandler(item, canCancelFinans)}
+                      disabled={cancelOngoingId === item.id}
                     >
-                      {cancelingItemId === item.id ? "Iptal Ediliyor..." : "Iptal"}
+                      {cancelOngoingId === item.id ? "Iptal Ediliyor..." : "Iptal"}
                     </button>
                   ) : null}
                 </div>
@@ -446,7 +195,7 @@ export function FinansPage() {
       {canCreateFinans && isCreateModalOpen ? (
         <AppModal
           title="Yeni Finans Kalemi"
-          onClose={() => setIsCreateModalOpen(false)}
+          onClose={closeCreateModal}
           footer={
             <div className="universal-btn-group modal-footer-actions">
               <button
@@ -460,7 +209,7 @@ export function FinansPage() {
               <button
                 type="button"
                 className="universal-btn-cancel"
-                onClick={() => setIsCreateModalOpen(false)}
+                onClick={closeCreateModal}
                 disabled={isCreateSubmitting}
               >
                 Vazgec
@@ -517,7 +266,7 @@ export function FinansPage() {
       {canEditFinans && editingItem ? (
         <AppModal
           title={`Finans Duzenle #${editingItem.id}`}
-          onClose={() => setEditingItem(null)}
+          onClose={closeEditModal}
           footer={
             <div className="universal-btn-group modal-footer-actions">
               <button
@@ -531,7 +280,7 @@ export function FinansPage() {
               <button
                 type="button"
                 className="universal-btn-cancel"
-                onClick={() => setEditingItem(null)}
+                onClick={closeEditModal}
                 disabled={isEditSubmitting}
               >
                 Vazgec

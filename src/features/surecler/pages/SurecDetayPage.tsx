@@ -1,43 +1,15 @@
-import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { fetchSurecDetail } from "../../../api/surecler.api";
 import { EmptyState } from "../../../components/states/EmptyState";
 import { ErrorState } from "../../../components/states/ErrorState";
 import { LoadingState } from "../../../components/states/LoadingState";
-import type { Surec } from "../../../types/surec";
+import { useSurecDetail } from "../../../hooks/useSurecler";
 
 export function SurecDetayPage() {
   const { surecId } = useParams();
   const parsedSurecId = Number.parseInt(surecId ?? "", 10);
   const hasValidId = !Number.isNaN(parsedSurecId) && parsedSurecId > 0;
 
-  const [surec, setSurec] = useState<Surec | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-
-  const loadSurecDetail = useCallback(async () => {
-    if (!hasValidId) {
-      setIsLoading(false);
-      setErrorMessage("Gecerli bir surec id verilmedi.");
-      return;
-    }
-
-    setIsLoading(true);
-    setErrorMessage(null);
-
-    try {
-      const data = await fetchSurecDetail(parsedSurecId);
-      setSurec(data);
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Surec detayi alinamadi.");
-    } finally {
-      setIsLoading(false);
-    }
-  }, [hasValidId, parsedSurecId]);
-
-  useEffect(() => {
-    void loadSurecDetail();
-  }, [loadSurecDetail]);
+  const { surec, isLoading, errorMessage, refetch } = useSurecDetail(parsedSurecId, hasValidId);
 
   return (
     <section className="surec-page surec-detay-page">
@@ -46,7 +18,7 @@ export function SurecDetayPage() {
       {isLoading ? <LoadingState label="Surec detayi yukleniyor..." /> : null}
 
       {!isLoading && errorMessage ? (
-        <ErrorState message={errorMessage} onRetry={() => void loadSurecDetail()} />
+        <ErrorState message={errorMessage} onRetry={() => void refetch()} />
       ) : null}
 
       {!isLoading && !errorMessage && !surec ? (
@@ -74,7 +46,8 @@ export function SurecDetayPage() {
             <strong>Bitis:</strong> {surec.bitis_tarihi ?? "-"}
           </p>
           <p>
-            <strong>Ucretli Mi:</strong> {surec.ucretli_mi === undefined ? "-" : surec.ucretli_mi ? "Evet" : "Hayir"}
+            <strong>Ucretli Mi:</strong>{" "}
+            {surec.ucretli_mi === undefined ? "-" : surec.ucretli_mi ? "Evet" : "Hayir"}
           </p>
           <p>
             <strong>Durum:</strong> {surec.state ?? "-"}

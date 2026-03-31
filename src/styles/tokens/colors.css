@@ -1,0 +1,11 @@
+:root {
+  --theme-color: #d40000;
+  --theme-color-rgb: 212, 0, 0;
+  --bg: #080d16;
+  --bg-content: #0d131f;
+  --txt: #f0f0f0;
+  --txt-muted: #999;
+  --line-soft: rgba(240, 240, 240, 0.2);
+  --green: #4ade80;
+  --red: #ef4444;
+}

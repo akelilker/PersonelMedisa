@@ -1,0 +1,51 @@
+.puantaj-page {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.puantaj-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.puantaj-header-row h2 {
+  margin: 0;
+}
+
+.puantaj-detail-card,
+.puantaj-edit-card {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-md);
+}
+
+.puantaj-detail-card p,
+.puantaj-edit-card h3 {
+  margin: 0;
+}
+
+.puantaj-alert-list {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: var(--space-1);
+}
+
+.puantaj-form-grid {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.puantaj-form-error {
+  margin: 0;
+  color: var(--red);
+}
+
+.puantaj-form-readonly {
+  margin: 0;
+  color: var(--txt-muted);
+}

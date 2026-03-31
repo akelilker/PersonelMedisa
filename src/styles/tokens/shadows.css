@@ -1,0 +1,4 @@
+:root {
+  --shadow-panel: 0 4px 15px rgba(0, 0, 0, 0.5);
+  --shadow-glow-red: 0 4px 22px rgba(var(--theme-color-rgb), 0.08);
+}

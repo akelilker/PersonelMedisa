@@ -1,0 +1,21 @@
+#app-footer {
+  position: fixed;
+  left: 50%;
+  bottom: 0;
+  width: 100%;
+  max-width: 500px;
+  transform: translateX(-50%);
+  background: var(--bg);
+  z-index: var(--z-footer);
+}
+
+.footer-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+}
+
+.status-ready {
+  color: var(--green);
+}

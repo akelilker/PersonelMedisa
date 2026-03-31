@@ -1,0 +1,35 @@
+.hero {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-height: 60px;
+  margin-bottom: var(--space-2);
+  padding: 12px 16px;
+  border: 1px solid rgba(184, 192, 201, 0.72);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(180deg, #060d16, #08090c);
+  box-shadow: var(--shadow-panel), var(--shadow-glow-red);
+}
+
+.hero h1 {
+  flex: 1;
+  margin: 0;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.hero-logo,
+.hero-spacer {
+  width: 48px;
+  flex: 0 0 48px;
+}
+
+.animated-line {
+  position: absolute;
+  left: 50%;
+  bottom: 16px;
+  width: 74%;
+  height: 2px;
+  transform: translateX(-50%);
+  background: linear-gradient(90deg, transparent, var(--theme-color), transparent);
+}

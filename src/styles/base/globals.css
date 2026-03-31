@@ -1,0 +1,7 @@
+body {
+  background: var(--bg);
+}
+
+a {
+  color: inherit;
+}

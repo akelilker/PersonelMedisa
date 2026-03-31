@@ -1,0 +1,71 @@
+.personeller-page,
+.personel-detay-page {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.personeller-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.personeller-header-row h2 {
+  margin: 0;
+}
+
+.personeller-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.personeller-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-sm);
+}
+
+.personeller-item p {
+  margin: 0;
+}
+
+.personel-create-form {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.personel-create-grid {
+  display: grid;
+  gap: var(--space-2);
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.personel-create-error {
+  margin: 0;
+  color: var(--red);
+}
+
+.personel-detail-card {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-md);
+}
+
+.personel-detail-card p {
+  margin: 0;
+}
+
+.personel-edit-form {
+  display: grid;
+  gap: var(--space-2);
+}

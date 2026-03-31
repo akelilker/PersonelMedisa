@@ -1,0 +1,156 @@
+// @vitest-environment jsdom
+
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { AuthGuard } from "../../src/app/auth-guard";
+import { AppProviders } from "../../src/app/providers";
+import { emitAuthForbidden, emitAuthUnauthorized } from "../../src/lib/storage/auth-events";
+import { AUTH_STORAGE_KEY } from "../../src/lib/storage/auth-session";
+import { AuthProvider, useAuth } from "../../src/state/auth.store";
+import type { AuthSession, UserRole } from "../../src/types/auth";
+
+const ROUTER_FUTURE_FLAGS = {
+  v7_startTransition: true,
+  v7_relativeSplatPath: true
+} as const;
+
+function buildSession(role: UserRole): AuthSession {
+  return {
+    token: "test-token",
+    ui_profile: role === "BIRIM_AMIRI" ? "birim" : "yonetim",
+    user: {
+      id: 1,
+      ad_soyad: "Test Kullanici",
+      rol: role
+    }
+  };
+}
+
+function AuthStateProbe() {
+  const { isAuthenticated, session } = useAuth();
+  return <div>{isAuthenticated ? `auth:${session?.user.rol}` : "anon"}</div>;
+}
+
+describe("auth flow integration", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+  });
+
+  afterEach(() => {
+    cleanup();
+    window.localStorage.clear();
+  });
+
+  it("loads existing session from storage and authenticates provider state", () => {
+    window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(buildSession("GENEL_YONETICI")));
+
+    render(
+      <AuthProvider>
+        <AuthStateProbe />
+      </AuthProvider>
+    );
+
+    expect(screen.getByText("auth:GENEL_YONETICI")).not.toBeNull();
+  });
+
+  it("force-logs out when unauthorized event is emitted", async () => {
+    window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(buildSession("MUHASEBE")));
+
+    render(
+      <AuthProvider>
+        <AuthStateProbe />
+      </AuthProvider>
+    );
+
+    expect(screen.getByText("auth:MUHASEBE")).not.toBeNull();
+
+    act(() => {
+      emitAuthUnauthorized({
+        status: 401,
+        path: "/personeller"
+      });
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("anon")).not.toBeNull();
+    });
+
+    expect(window.localStorage.getItem(AUTH_STORAGE_KEY)).toBeNull();
+  });
+
+  it("redirects unauthenticated user to login route", () => {
+    render(
+      <MemoryRouter initialEntries={["/secured"]} future={ROUTER_FUTURE_FLAGS}>
+        <AuthProvider>
+          <Routes>
+            <Route
+              path="/secured"
+              element={
+                <AuthGuard>
+                  <div>Secure Page</div>
+                </AuthGuard>
+              }
+            />
+            <Route path="/login" element={<div>Login Page</div>} />
+          </Routes>
+        </AuthProvider>
+      </MemoryRouter>
+    );
+
+    expect(screen.getByText("Login Page")).not.toBeNull();
+    expect(screen.queryByText("Secure Page")).toBeNull();
+  });
+
+  it("redirects authenticated but unauthorized role to yetkisiz route", () => {
+    window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(buildSession("BIRIM_AMIRI")));
+
+    render(
+      <MemoryRouter initialEntries={["/secured"]} future={ROUTER_FUTURE_FLAGS}>
+        <AuthProvider>
+          <Routes>
+            <Route
+              path="/secured"
+              element={
+                <AuthGuard allowedRoles={["GENEL_YONETICI"]}>
+                  <div>Secure Page</div>
+                </AuthGuard>
+              }
+            />
+            <Route path="/yetkisiz" element={<div>Yetkisiz Page</div>} />
+          </Routes>
+        </AuthProvider>
+      </MemoryRouter>
+    );
+
+    expect(screen.getByText("Yetkisiz Page")).not.toBeNull();
+    expect(screen.queryByText("Secure Page")).toBeNull();
+  });
+
+  it("navigates to yetkisiz page on forbidden auth event", async () => {
+    window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(buildSession("GENEL_YONETICI")));
+    window.history.pushState({}, "", "/surecler");
+
+    render(
+      <AppProviders>
+        <Routes>
+          <Route path="/surecler" element={<div>Surecler Page</div>} />
+          <Route path="/yetkisiz" element={<div>Yetkisiz Page</div>} />
+        </Routes>
+      </AppProviders>
+    );
+
+    expect(screen.getByText("Surecler Page")).not.toBeNull();
+
+    act(() => {
+      emitAuthForbidden({
+        status: 403,
+        path: "/surecler"
+      });
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("Yetkisiz Page")).not.toBeNull();
+    });
+  });
+});

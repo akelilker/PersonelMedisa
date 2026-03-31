@@ -1,0 +1,6 @@
+.universal-back-bar {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding-top: var(--space-2);
+}

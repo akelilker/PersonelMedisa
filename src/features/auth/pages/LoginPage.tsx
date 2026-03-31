@@ -1,0 +1,92 @@
+import { useMemo, useState, type FormEvent } from "react";
+import { Navigate, useLocation, useNavigate } from "react-router-dom";
+import { useAuth } from "../../../state/auth.store";
+
+type LoginLocationState = {
+  from?: string;
+};
+
+export function LoginPage() {
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [formError, setFormError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { isAuthenticated, login } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  const redirectPath = useMemo(() => {
+    const state = location.state as LoginLocationState | null;
+    return state?.from ?? "/personeller";
+  }, [location.state]);
+
+  if (isAuthenticated) {
+    return <Navigate to={redirectPath} replace />;
+  }
+
+  async function handleLogin(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (isSubmitting) {
+      return;
+    }
+
+    setFormError(null);
+    setIsSubmitting(true);
+
+    try {
+      await login({
+        username: username.trim(),
+        password
+      });
+      navigate(redirectPath, { replace: true });
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : "Giris sirasinda bir hata olustu.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  return (
+    <section className="auth-login-page">
+      <h2>Sisteme Giris</h2>
+      <p>Kimlik dogrulama backend uzerinden /api/auth/login ile yapilir.</p>
+
+      <form className="auth-login-form" onSubmit={handleLogin}>
+        <label className="auth-field">
+          <span>Kullanici Adi</span>
+          <input
+            type="text"
+            name="username"
+            autoComplete="username"
+            value={username}
+            onChange={(event) => setUsername(event.target.value)}
+            required
+          />
+        </label>
+
+        <label className="auth-field">
+          <span>Sifre</span>
+          <input
+            type="password"
+            name="password"
+            autoComplete="current-password"
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            required
+          />
+        </label>
+
+        {formError ? <p className="auth-error">{formError}</p> : null}
+
+        <button
+          type="submit"
+          className="auth-login-btn"
+          disabled={isSubmitting || username.trim().length === 0 || password.length === 0}
+        >
+          {isSubmitting ? "Giris Yapiliyor..." : "Giris Yap"}
+        </button>
+      </form>
+    </section>
+  );
+}

@@ -1,0 +1,51 @@
+.auth-login-page {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-md);
+}
+
+.auth-login-form {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.auth-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.auth-field input {
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-sm);
+  background: var(--bg-content);
+  color: var(--txt);
+  padding: 8px 10px;
+}
+
+.auth-field input:focus {
+  outline: 1px solid var(--theme-color);
+  outline-offset: 0;
+}
+
+.auth-error {
+  margin: 0;
+  color: var(--red);
+}
+
+.auth-login-btn {
+  justify-self: start;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: inherit;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+
+.auth-login-btn[disabled] {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

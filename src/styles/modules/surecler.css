@@ -1,0 +1,64 @@
+.surec-page {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.surecler-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.surecler-header-row h2 {
+  margin: 0;
+}
+
+.surecler-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.surecler-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-sm);
+}
+
+.surecler-item p {
+  margin: 0;
+}
+
+.surec-form-grid {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.surec-form-error {
+  margin: 0;
+  color: var(--red);
+}
+
+.surec-detay-page {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.surec-detail-card {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-md);
+}
+
+.surec-detail-card p {
+  margin: 0;
+}

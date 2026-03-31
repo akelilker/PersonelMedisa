@@ -1,0 +1,32 @@
+.universal-btn-group {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  width: 100%;
+}
+
+.universal-btn-save,
+.universal-btn-cancel {
+  height: 32px;
+  border-radius: 8px;
+  border-width: 1px;
+  border-style: solid;
+  background: transparent;
+  cursor: pointer;
+}
+
+.universal-btn-save[disabled],
+.universal-btn-cancel[disabled] {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.universal-btn-save {
+  color: var(--green);
+  border-color: rgba(74, 222, 128, 0.6);
+}
+
+.universal-btn-cancel {
+  color: var(--theme-color);
+  border-color: rgba(var(--theme-color-rgb), 0.5);
+}

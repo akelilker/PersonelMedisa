@@ -2,10 +2,50 @@ import { emitAuthForbidden, emitAuthUnauthorized } from "../lib/storage/auth-eve
 import { getStoredAuthToken } from "../lib/storage/auth-session";
 import type { ApiError, ApiResponse } from "../types/api";
 
-const API_BASE_URL = "/api";
+const ENV_API_BASE_URL = (
+  import.meta as ImportMeta & { env?: Record<string, string | undefined> }
+).env?.VITE_API_BASE_URL;
 
-export function buildApiUrl(path: string) {
-  return `${API_BASE_URL}${path.startsWith("/") ? path : `/${path}`}`;
+function normalizeBase(base: string) {
+  const trimmed = base.trim();
+  if (!trimmed) {
+    return "";
+  }
+
+  return trimmed.endsWith("/") ? trimmed.slice(0, -1) : trimmed;
+}
+
+function readWindowPathname() {
+  if (typeof window === "undefined") {
+    return "";
+  }
+
+  const maybeLocation = (window as Window & { location?: Location }).location;
+  return typeof maybeLocation?.pathname === "string" ? maybeLocation.pathname : "";
+}
+
+function resolveApiBaseCandidates() {
+  const candidates: string[] = [];
+  const envBase = normalizeBase(ENV_API_BASE_URL ?? "");
+  const pathname = readWindowPathname();
+  const isSubfolderDeployment = pathname.startsWith("/personelmedisa");
+
+  if (envBase) {
+    candidates.push(envBase);
+  }
+
+  if (isSubfolderDeployment) {
+    candidates.push("/personelmedisa/api");
+    candidates.push("/api");
+  } else {
+    candidates.push("/api");
+  }
+
+  return candidates.filter((candidate, index) => candidates.indexOf(candidate) === index);
+}
+
+export function buildApiUrl(path: string, baseUrl = resolveApiBaseCandidates()[0] ?? "/api") {
+  return `${baseUrl}${path.startsWith("/") ? path : `/${path}`}`;
 }
 
 export class ApiRequestError extends Error {
@@ -88,14 +128,23 @@ function buildRequestHeaders(path: string, init?: RequestInit): Headers {
 }
 
 export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(buildApiUrl(path), {
-    ...init,
-    headers: buildRequestHeaders(path, init)
-  });
+  const baseCandidates = resolveApiBaseCandidates();
+  const requestHeaders = buildRequestHeaders(path, init);
 
-  const payload = await parseResponseBody(response);
+  let lastError: ApiRequestError | null = null;
 
-  if (!response.ok) {
+  for (const base of baseCandidates) {
+    const response = await fetch(buildApiUrl(path, base), {
+      ...init,
+      headers: requestHeaders
+    });
+
+    const payload = await parseResponseBody(response);
+
+    if (response.ok) {
+      return payload as T;
+    }
+
     if (isUnauthorizedStatus(response.status)) {
       emitAuthUnauthorized({ status: response.status, path });
     } else if (isForbiddenStatus(response.status)) {
@@ -103,12 +152,16 @@ export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T
     }
 
     const apiError = extractFirstApiError(payload);
-    throw new ApiRequestError(
+    lastError = new ApiRequestError(
       apiError?.message ?? `API request failed: ${response.status}`,
       response.status,
       apiError ?? undefined
     );
+
+    if (response.status !== 404) {
+      throw lastError;
+    }
   }
 
-  return payload as T;
+  throw lastError ?? new ApiRequestError("API request failed.", 500);
 }

@@ -12,6 +12,17 @@ const ROUTER_FUTURE_FLAGS = {
   v7_relativeSplatPath: true
 } as const;
 
+function resolveRouterBasename(): string | undefined {
+  if (typeof window === "undefined") {
+    return undefined;
+  }
+
+  const subfolderBase = "/personelmedisa";
+  return window.location.pathname.startsWith(subfolderBase) ? subfolderBase : undefined;
+}
+
+const ROUTER_BASENAME = resolveRouterBasename();
+
 function AuthNavigationEffects() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -31,7 +42,7 @@ function AuthNavigationEffects() {
 
 export function AppProviders({ children }: AppProvidersProps) {
   return (
-    <BrowserRouter future={ROUTER_FUTURE_FLAGS}>
+    <BrowserRouter basename={ROUTER_BASENAME} future={ROUTER_FUTURE_FLAGS}>
       <AuthProvider>
         <AuthNavigationEffects />
         {children}

@@ -4,4 +4,13 @@
   --space-3: 12px;
   --space-4: 16px;
   --space-5: 20px;
+  --app-footer-real-height: 42px;
+  --app-footer-gap: 17px;
+  --modal-gap-above-footer: 1px;
+}
+
+@media (max-width: 640px) {
+  :root {
+    --modal-gap-above-footer: 5px;
+  }
 }

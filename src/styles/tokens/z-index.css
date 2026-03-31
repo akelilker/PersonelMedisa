@@ -1,5 +1,6 @@
 :root {
   --z-footer: 10000;
   --z-notifications: 10060;
+  --z-modal-overlay: 10020;
   --z-modal: 10100;
 }

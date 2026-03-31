@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 
 type AppModalProps = {
   title: string;
@@ -7,8 +7,26 @@ type AppModalProps = {
 };
 
 export function AppModal({ title, children, onClose }: AppModalProps) {
+  useEffect(() => {
+    const body = document.body;
+    const currentOpenCount = Number.parseInt(body.dataset.modalOpenCount ?? "0", 10) || 0;
+    const nextOpenCount = currentOpenCount + 1;
+    body.dataset.modalOpenCount = String(nextOpenCount);
+    body.classList.add("modal-open");
+
+    return () => {
+      const activeOpenCount = Number.parseInt(body.dataset.modalOpenCount ?? "0", 10) || 0;
+      const remainingOpenCount = Math.max(0, activeOpenCount - 1);
+      body.dataset.modalOpenCount = String(remainingOpenCount);
+
+      if (remainingOpenCount === 0) {
+        body.classList.remove("modal-open");
+      }
+    };
+  }, []);
+
   return (
-    <div className="modal-overlay">
+    <div className="modal-overlay open">
       <div className="modal-container">
         <div className="modal-header">
           <h2>{title}</h2>

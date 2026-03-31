@@ -133,6 +133,24 @@ export function persistAppData(): void {
   }
 }
 
+export function clearAllAppPersistence(): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  const empty = createEmptyAppData();
+  window.appData = empty;
+
+  try {
+    window.localStorage.removeItem(APP_DATA_STORAGE_KEY);
+    window.localStorage.removeItem(APP_SYNC_QUEUE_KEY);
+  } catch {
+    /* ignore */
+  }
+
+  notifyAppData();
+}
+
 export function safeParseStoredAppData(raw: string | null): AppData | null {
   if (raw === null || raw === undefined || raw.trim() === "") {
     return null;

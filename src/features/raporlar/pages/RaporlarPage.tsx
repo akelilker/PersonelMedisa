@@ -1,6 +1,7 @@
 import { useMemo, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { fetchRapor } from "../../../api/raporlar.api";
+import { FormField } from "../../../components/form/FormField";
 import { EmptyState } from "../../../components/states/EmptyState";
 import { ErrorState } from "../../../components/states/ErrorState";
 import { LoadingState } from "../../../components/states/LoadingState";
@@ -144,80 +145,61 @@ export function RaporlarPage() {
         <h2>Raporlar</h2>
       </div>
 
-      <form className="module-filter-form" onSubmit={handleSubmit}>
-        <div className="module-filter-grid">
-          <label className="module-filter-field">
-            <span>Rapor Turu</span>
-            <select
-              value={form.raporTipi}
-              onChange={(event) =>
-                setForm((prev) => ({ ...prev, raporTipi: event.target.value as RaporTipi }))
-              }
-            >
-              {RAPOR_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="module-filter-field">
-            <span>Personel ID</span>
-            <input
-              type="number"
-              min={1}
-              value={form.personelId}
-              onChange={(event) => setForm((prev) => ({ ...prev, personelId: event.target.value }))}
-            />
-          </label>
-
-          <label className="module-filter-field">
-            <span>Departman ID</span>
-            <input
-              type="number"
-              min={1}
-              value={form.departmanId}
-              onChange={(event) => setForm((prev) => ({ ...prev, departmanId: event.target.value }))}
-            />
-          </label>
-
-          <label className="module-filter-field">
-            <span>Baslangic Tarihi</span>
-            <input
-              type="date"
-              value={form.baslangicTarihi}
-              onChange={(event) =>
-                setForm((prev) => ({ ...prev, baslangicTarihi: event.target.value }))
-              }
-            />
-          </label>
-
-          <label className="module-filter-field">
-            <span>Bitis Tarihi</span>
-            <input
-              type="date"
-              value={form.bitisTarihi}
-              onChange={(event) => setForm((prev) => ({ ...prev, bitisTarihi: event.target.value }))}
-            />
-          </label>
-
-          <label className="module-filter-field">
-            <span>Aktiflik</span>
-            <select
-              value={form.aktiflik}
-              onChange={(event) =>
-                setForm((prev) => ({ ...prev, aktiflik: event.target.value as RaporAktiflik }))
-              }
-            >
-              <option value="tum">Tum</option>
-              <option value="aktif">Aktif</option>
-              <option value="pasif">Pasif</option>
-            </select>
-          </label>
+      <form className="form-filter-panel" onSubmit={handleSubmit}>
+        <div className="form-field-grid">
+          <FormField
+            as="select"
+            label="Rapor Turu"
+            name="rapor-turu"
+            value={form.raporTipi}
+            onChange={(value) => setForm((prev) => ({ ...prev, raporTipi: value as RaporTipi }))}
+            selectOptions={RAPOR_OPTIONS}
+          />
+          <FormField
+            label="Personel ID"
+            name="rapor-personel"
+            type="number"
+            min={1}
+            value={form.personelId}
+            onChange={(value) => setForm((prev) => ({ ...prev, personelId: value }))}
+          />
+          <FormField
+            label="Departman ID"
+            name="rapor-departman"
+            type="number"
+            min={1}
+            value={form.departmanId}
+            onChange={(value) => setForm((prev) => ({ ...prev, departmanId: value }))}
+          />
+          <FormField
+            label="Baslangic Tarihi"
+            name="rapor-bas"
+            type="date"
+            value={form.baslangicTarihi}
+            onChange={(value) => setForm((prev) => ({ ...prev, baslangicTarihi: value }))}
+          />
+          <FormField
+            label="Bitis Tarihi"
+            name="rapor-bitis"
+            type="date"
+            value={form.bitisTarihi}
+            onChange={(value) => setForm((prev) => ({ ...prev, bitisTarihi: value }))}
+          />
+          <FormField
+            as="select"
+            label="Aktiflik"
+            name="rapor-aktiflik"
+            value={form.aktiflik}
+            onChange={(value) => setForm((prev) => ({ ...prev, aktiflik: value as RaporAktiflik }))}
+            selectOptions={[
+              { value: "tum", label: "Tum" },
+              { value: "aktif", label: "Aktif" },
+              { value: "pasif", label: "Pasif" }
+            ]}
+          />
         </div>
 
-        <div className="module-filter-actions">
+        <div className="form-actions-row">
           <button type="submit" className="universal-btn-aux" disabled={isLoading}>
             Raporu Calistir
           </button>

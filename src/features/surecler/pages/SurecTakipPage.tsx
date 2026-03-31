@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { cancelSurec, createSurec, fetchSureclerList, updateSurec } from "../../../api/surecler.api";
 import { fetchSurecTuruOptions } from "../../../api/referans.api";
+import { FormField } from "../../../components/form/FormField";
 import { AppModal } from "../../../components/modal/AppModal";
 import { EmptyState } from "../../../components/states/EmptyState";
 import { ErrorState } from "../../../components/states/ErrorState";
@@ -11,6 +12,18 @@ import type { KeyOption } from "../../../types/referans";
 import type { Surec } from "../../../types/surec";
 
 const PAGE_SIZE = 10;
+
+const SUREC_CREATE_FORM_ID = "surec-create-form";
+const SUREC_EDIT_FORM_ID = "surec-edit-form";
+
+function keyOptionsToSelectOptions(options: KeyOption[]) {
+  return options.map((option) => ({ value: option.key, label: option.label }));
+}
+
+const UCRETLI_SELECT_OPTIONS = [
+  { value: "evet", label: "Evet" },
+  { value: "hayir", label: "Hayir" }
+];
 
 type SurecFilters = {
   personelId: string;
@@ -324,69 +337,59 @@ export function SurecTakipPage() {
         ) : null}
       </div>
 
-      <form className="module-filter-form" onSubmit={handleFilterSubmit}>
-        <div className="module-filter-grid">
-          <label className="module-filter-field">
-            <span>Personel ID</span>
-            <input
-              type="number"
-              min={1}
-              value={personelIdInput}
-              onChange={(event) => setPersonelIdInput(event.target.value)}
+      <form className="form-filter-panel" onSubmit={handleFilterSubmit}>
+        <div className="form-field-grid">
+          <FormField
+            label="Personel ID"
+            name="surec-filter-personel"
+            type="number"
+            min={1}
+            value={personelIdInput}
+            onChange={setPersonelIdInput}
+          />
+          {surecTuruOptions.length > 0 ? (
+            <FormField
+              as="select"
+              label="Surec Turu"
+              name="surec-filter-turu"
+              value={surecTuruInput}
+              onChange={setSurecTuruInput}
+              placeholderOption={{ value: "", label: "Tum" }}
+              selectOptions={keyOptionsToSelectOptions(surecTuruOptions)}
             />
-          </label>
-
-          <label className="module-filter-field">
-            <span>Surec Turu</span>
-            {surecTuruOptions.length > 0 ? (
-              <select value={surecTuruInput} onChange={(event) => setSurecTuruInput(event.target.value)}>
-                <option value="">Tum</option>
-                {surecTuruOptions.map((option) => (
-                  <option key={option.key} value={option.key}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <input
-                type="text"
-                placeholder="IZIN, RAPOR..."
-                value={surecTuruInput}
-                onChange={(event) => setSurecTuruInput(event.target.value)}
-              />
-            )}
-          </label>
-
-          <label className="module-filter-field">
-            <span>Durum</span>
-            <input
-              type="text"
-              placeholder="AKTIF, IPTAL..."
-              value={stateInput}
-              onChange={(event) => setStateInput(event.target.value)}
+          ) : (
+            <FormField
+              label="Surec Turu"
+              name="surec-filter-turu-text"
+              placeholder="IZIN, RAPOR..."
+              value={surecTuruInput}
+              onChange={setSurecTuruInput}
             />
-          </label>
-
-          <label className="module-filter-field">
-            <span>Baslangic</span>
-            <input
-              type="date"
-              value={baslangicInput}
-              onChange={(event) => setBaslangicInput(event.target.value)}
-            />
-          </label>
-
-          <label className="module-filter-field">
-            <span>Bitis</span>
-            <input
-              type="date"
-              value={bitisInput}
-              onChange={(event) => setBitisInput(event.target.value)}
-            />
-          </label>
+          )}
+          <FormField
+            label="Durum"
+            name="surec-filter-state"
+            placeholder="AKTIF, IPTAL..."
+            value={stateInput}
+            onChange={setStateInput}
+          />
+          <FormField
+            label="Baslangic"
+            name="surec-filter-bas"
+            type="date"
+            value={baslangicInput}
+            onChange={setBaslangicInput}
+          />
+          <FormField
+            label="Bitis"
+            name="surec-filter-bitis"
+            type="date"
+            value={bitisInput}
+            onChange={setBitisInput}
+          />
         </div>
 
-        <div className="module-filter-actions">
+        <div className="form-actions-row">
           <button type="submit" className="universal-btn-aux">
             Filtrele
           </button>
@@ -482,112 +485,17 @@ export function SurecTakipPage() {
       </div>
 
       {canCreateSurec && isCreateModalOpen ? (
-        <AppModal title="Yeni Surec Ekle" onClose={() => setIsCreateModalOpen(false)}>
-          <form className="surec-form-grid" onSubmit={handleCreateSubmit}>
-            <label className="module-filter-field">
-              <span>Personel ID</span>
-              <input
-                type="number"
-                min={1}
-                value={createForm.personelId}
-                onChange={(event) =>
-                  setCreateForm((prev) => ({ ...prev, personelId: event.target.value }))
-                }
-                required
-              />
-            </label>
-
-            <label className="module-filter-field">
-              <span>Surec Turu</span>
-              {surecTuruOptions.length > 0 ? (
-                <select
-                  value={createForm.surecTuru}
-                  onChange={(event) =>
-                    setCreateForm((prev) => ({ ...prev, surecTuru: event.target.value }))
-                  }
-                  required
-                >
-                  <option value="">Seciniz</option>
-                  {surecTuruOptions.map((option) => (
-                    <option key={option.key} value={option.key}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <input
-                  type="text"
-                  value={createForm.surecTuru}
-                  onChange={(event) =>
-                    setCreateForm((prev) => ({ ...prev, surecTuru: event.target.value }))
-                  }
-                  required
-                />
-              )}
-            </label>
-
-            <label className="module-filter-field">
-              <span>Alt Tur</span>
-              <input
-                type="text"
-                value={createForm.altTur}
-                onChange={(event) => setCreateForm((prev) => ({ ...prev, altTur: event.target.value }))}
-              />
-            </label>
-
-            <label className="module-filter-field">
-              <span>Baslangic Tarihi</span>
-              <input
-                type="date"
-                value={createForm.baslangicTarihi}
-                onChange={(event) =>
-                  setCreateForm((prev) => ({ ...prev, baslangicTarihi: event.target.value }))
-                }
-                required
-              />
-            </label>
-
-            <label className="module-filter-field">
-              <span>Bitis Tarihi</span>
-              <input
-                type="date"
-                value={createForm.bitisTarihi}
-                onChange={(event) =>
-                  setCreateForm((prev) => ({ ...prev, bitisTarihi: event.target.value }))
-                }
-                required
-              />
-            </label>
-
-            <label className="module-filter-field">
-              <span>Ucretli Mi</span>
-              <select
-                value={createForm.ucretliMi ? "evet" : "hayir"}
-                onChange={(event) =>
-                  setCreateForm((prev) => ({ ...prev, ucretliMi: event.target.value === "evet" }))
-                }
+        <AppModal
+          title="Yeni Surec Ekle"
+          onClose={() => setIsCreateModalOpen(false)}
+          footer={
+            <div className="universal-btn-group modal-footer-actions">
+              <button
+                type="submit"
+                form={SUREC_CREATE_FORM_ID}
+                className="universal-btn-save"
+                disabled={isCreateSubmitting}
               >
-                <option value="evet">Evet</option>
-                <option value="hayir">Hayir</option>
-              </select>
-            </label>
-
-            <label className="module-filter-field">
-              <span>Aciklama</span>
-              <input
-                type="text"
-                value={createForm.aciklama}
-                onChange={(event) =>
-                  setCreateForm((prev) => ({ ...prev, aciklama: event.target.value }))
-                }
-              />
-            </label>
-
-            {createErrorMessage ? <p className="surec-form-error">{createErrorMessage}</p> : null}
-            {referenceError ? <p className="surec-form-error">{referenceError}</p> : null}
-
-            <div className="universal-btn-group">
-              <button type="submit" className="universal-btn-save" disabled={isCreateSubmitting}>
                 {isCreateSubmitting ? "Kaydediliyor..." : "Kaydet"}
               </button>
               <button
@@ -599,109 +507,94 @@ export function SurecTakipPage() {
                 Vazgec
               </button>
             </div>
+          }
+        >
+          <form id={SUREC_CREATE_FORM_ID} className="surec-form-grid" onSubmit={handleCreateSubmit}>
+            <FormField
+              label="Personel ID"
+              name="surec-create-personel"
+              type="number"
+              min={1}
+              value={createForm.personelId}
+              onChange={(value) => setCreateForm((prev) => ({ ...prev, personelId: value }))}
+              required
+            />
+            {surecTuruOptions.length > 0 ? (
+              <FormField
+                as="select"
+                label="Surec Turu"
+                name="surec-create-turu"
+                value={createForm.surecTuru}
+                onChange={(value) => setCreateForm((prev) => ({ ...prev, surecTuru: value }))}
+                required
+                placeholderOption={{ value: "", label: "Seciniz" }}
+                selectOptions={keyOptionsToSelectOptions(surecTuruOptions)}
+              />
+            ) : (
+              <FormField
+                label="Surec Turu"
+                name="surec-create-turu-text"
+                value={createForm.surecTuru}
+                onChange={(value) => setCreateForm((prev) => ({ ...prev, surecTuru: value }))}
+                required
+              />
+            )}
+            <FormField
+              label="Alt Tur"
+              name="surec-create-alt"
+              value={createForm.altTur}
+              onChange={(value) => setCreateForm((prev) => ({ ...prev, altTur: value }))}
+            />
+            <FormField
+              label="Baslangic Tarihi"
+              name="surec-create-bas"
+              type="date"
+              value={createForm.baslangicTarihi}
+              onChange={(value) => setCreateForm((prev) => ({ ...prev, baslangicTarihi: value }))}
+              required
+            />
+            <FormField
+              label="Bitis Tarihi"
+              name="surec-create-bitis"
+              type="date"
+              value={createForm.bitisTarihi}
+              onChange={(value) => setCreateForm((prev) => ({ ...prev, bitisTarihi: value }))}
+              required
+            />
+            <FormField
+              as="select"
+              label="Ucretli Mi"
+              name="surec-create-ucret"
+              value={createForm.ucretliMi ? "evet" : "hayir"}
+              onChange={(value) =>
+                setCreateForm((prev) => ({ ...prev, ucretliMi: value === "evet" }))
+              }
+              selectOptions={UCRETLI_SELECT_OPTIONS}
+            />
+            <FormField
+              label="Aciklama"
+              name="surec-create-aciklama"
+              value={createForm.aciklama}
+              onChange={(value) => setCreateForm((prev) => ({ ...prev, aciklama: value }))}
+            />
+            {createErrorMessage ? <p className="surec-form-error">{createErrorMessage}</p> : null}
+            {referenceError ? <p className="surec-form-error">{referenceError}</p> : null}
           </form>
         </AppModal>
       ) : null}
 
       {canEditSurec && editingSurec ? (
-        <AppModal title={`Surec Duzenle #${editingSurec.id}`} onClose={() => setEditingSurec(null)}>
-          <form className="surec-form-grid" onSubmit={handleEditSubmit}>
-            <label className="module-filter-field">
-              <span>Personel ID</span>
-              <input
-                type="number"
-                min={1}
-                value={editForm.personelId}
-                onChange={(event) => setEditForm((prev) => ({ ...prev, personelId: event.target.value }))}
-                required
-              />
-            </label>
-
-            <label className="module-filter-field">
-              <span>Surec Turu</span>
-              {surecTuruOptions.length > 0 ? (
-                <select
-                  value={editForm.surecTuru}
-                  onChange={(event) => setEditForm((prev) => ({ ...prev, surecTuru: event.target.value }))}
-                  required
-                >
-                  <option value="">Seciniz</option>
-                  {surecTuruOptions.map((option) => (
-                    <option key={option.key} value={option.key}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <input
-                  type="text"
-                  value={editForm.surecTuru}
-                  onChange={(event) => setEditForm((prev) => ({ ...prev, surecTuru: event.target.value }))}
-                  required
-                />
-              )}
-            </label>
-
-            <label className="module-filter-field">
-              <span>Alt Tur</span>
-              <input
-                type="text"
-                value={editForm.altTur}
-                onChange={(event) => setEditForm((prev) => ({ ...prev, altTur: event.target.value }))}
-              />
-            </label>
-
-            <label className="module-filter-field">
-              <span>Baslangic Tarihi</span>
-              <input
-                type="date"
-                value={editForm.baslangicTarihi}
-                onChange={(event) =>
-                  setEditForm((prev) => ({ ...prev, baslangicTarihi: event.target.value }))
-                }
-                required
-              />
-            </label>
-
-            <label className="module-filter-field">
-              <span>Bitis Tarihi</span>
-              <input
-                type="date"
-                value={editForm.bitisTarihi}
-                onChange={(event) =>
-                  setEditForm((prev) => ({ ...prev, bitisTarihi: event.target.value }))
-                }
-                required
-              />
-            </label>
-
-            <label className="module-filter-field">
-              <span>Ucretli Mi</span>
-              <select
-                value={editForm.ucretliMi ? "evet" : "hayir"}
-                onChange={(event) =>
-                  setEditForm((prev) => ({ ...prev, ucretliMi: event.target.value === "evet" }))
-                }
+        <AppModal
+          title={`Surec Duzenle #${editingSurec.id}`}
+          onClose={() => setEditingSurec(null)}
+          footer={
+            <div className="universal-btn-group modal-footer-actions">
+              <button
+                type="submit"
+                form={SUREC_EDIT_FORM_ID}
+                className="universal-btn-save"
+                disabled={isEditSubmitting}
               >
-                <option value="evet">Evet</option>
-                <option value="hayir">Hayir</option>
-              </select>
-            </label>
-
-            <label className="module-filter-field">
-              <span>Aciklama</span>
-              <input
-                type="text"
-                value={editForm.aciklama}
-                onChange={(event) => setEditForm((prev) => ({ ...prev, aciklama: event.target.value }))}
-              />
-            </label>
-
-            {editErrorMessage ? <p className="surec-form-error">{editErrorMessage}</p> : null}
-            {referenceError ? <p className="surec-form-error">{referenceError}</p> : null}
-
-            <div className="universal-btn-group">
-              <button type="submit" className="universal-btn-save" disabled={isEditSubmitting}>
                 {isEditSubmitting ? "Kaydediliyor..." : "Kaydet"}
               </button>
               <button
@@ -713,6 +606,78 @@ export function SurecTakipPage() {
                 Vazgec
               </button>
             </div>
+          }
+        >
+          <form id={SUREC_EDIT_FORM_ID} className="surec-form-grid" onSubmit={handleEditSubmit}>
+            <FormField
+              label="Personel ID"
+              name="surec-edit-personel"
+              type="number"
+              min={1}
+              value={editForm.personelId}
+              onChange={(value) => setEditForm((prev) => ({ ...prev, personelId: value }))}
+              required
+            />
+            {surecTuruOptions.length > 0 ? (
+              <FormField
+                as="select"
+                label="Surec Turu"
+                name="surec-edit-turu"
+                value={editForm.surecTuru}
+                onChange={(value) => setEditForm((prev) => ({ ...prev, surecTuru: value }))}
+                required
+                placeholderOption={{ value: "", label: "Seciniz" }}
+                selectOptions={keyOptionsToSelectOptions(surecTuruOptions)}
+              />
+            ) : (
+              <FormField
+                label="Surec Turu"
+                name="surec-edit-turu-text"
+                value={editForm.surecTuru}
+                onChange={(value) => setEditForm((prev) => ({ ...prev, surecTuru: value }))}
+                required
+              />
+            )}
+            <FormField
+              label="Alt Tur"
+              name="surec-edit-alt"
+              value={editForm.altTur}
+              onChange={(value) => setEditForm((prev) => ({ ...prev, altTur: value }))}
+            />
+            <FormField
+              label="Baslangic Tarihi"
+              name="surec-edit-start"
+              type="date"
+              value={editForm.baslangicTarihi}
+              onChange={(value) => setEditForm((prev) => ({ ...prev, baslangicTarihi: value }))}
+              required
+            />
+            <FormField
+              label="Bitis Tarihi"
+              name="surec-edit-end"
+              type="date"
+              value={editForm.bitisTarihi}
+              onChange={(value) => setEditForm((prev) => ({ ...prev, bitisTarihi: value }))}
+              required
+            />
+            <FormField
+              as="select"
+              label="Ucretli Mi"
+              name="surec-edit-ucret"
+              value={editForm.ucretliMi ? "evet" : "hayir"}
+              onChange={(value) =>
+                setEditForm((prev) => ({ ...prev, ucretliMi: value === "evet" }))
+              }
+              selectOptions={UCRETLI_SELECT_OPTIONS}
+            />
+            <FormField
+              label="Aciklama"
+              name="surec-edit-aciklama"
+              value={editForm.aciklama}
+              onChange={(value) => setEditForm((prev) => ({ ...prev, aciklama: value }))}
+            />
+            {editErrorMessage ? <p className="surec-form-error">{editErrorMessage}</p> : null}
+            {referenceError ? <p className="surec-form-error">{referenceError}</p> : null}
           </form>
         </AppModal>
       ) : null}

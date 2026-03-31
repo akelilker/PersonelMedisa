@@ -1,6 +1,7 @@
 import { useMemo, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { createHaftalikKapanis } from "../../../api/haftalik-kapanis.api";
+import { FormField } from "../../../components/form/FormField";
 import { ErrorState } from "../../../components/states/ErrorState";
 import { useRoleAccess } from "../../../hooks/use-role-access";
 import type { HaftalikKapanisSonuc } from "../../../types/haftalik-kapanis";
@@ -141,41 +142,36 @@ export function HaftalikKapanisPage() {
         <h2>Haftalik Kapanis</h2>
       </div>
 
-      <form className="module-filter-form" onSubmit={handleSubmit}>
-        <div className="module-filter-grid">
-          <label className="module-filter-field">
-            <span>Hafta Baslangic</span>
-            <input
-              type="date"
-              value={form.haftaBaslangic}
-              onChange={(event) => setForm((prev) => ({ ...prev, haftaBaslangic: event.target.value }))}
-              required
-            />
-          </label>
-
-          <label className="module-filter-field">
-            <span>Hafta Bitis</span>
-            <input
-              type="date"
-              value={form.haftaBitis}
-              onChange={(event) => setForm((prev) => ({ ...prev, haftaBitis: event.target.value }))}
-              required
-            />
-          </label>
-
-          <label className="module-filter-field">
-            <span>Departman ID (Opsiyonel)</span>
-            <input
-              type="number"
-              min={1}
-              value={form.departmanId}
-              onChange={(event) => setForm((prev) => ({ ...prev, departmanId: event.target.value }))}
-              placeholder="Tum departmanlar icin bos birak"
-            />
-          </label>
+      <form className="form-filter-panel" onSubmit={handleSubmit}>
+        <div className="form-field-grid">
+          <FormField
+            label="Hafta Baslangic"
+            name="kapanis-bas"
+            type="date"
+            value={form.haftaBaslangic}
+            onChange={(value) => setForm((prev) => ({ ...prev, haftaBaslangic: value }))}
+            required
+          />
+          <FormField
+            label="Hafta Bitis"
+            name="kapanis-bitis"
+            type="date"
+            value={form.haftaBitis}
+            onChange={(value) => setForm((prev) => ({ ...prev, haftaBitis: value }))}
+            required
+          />
+          <FormField
+            label="Departman ID (Opsiyonel)"
+            name="kapanis-departman"
+            type="number"
+            min={1}
+            value={form.departmanId}
+            onChange={(value) => setForm((prev) => ({ ...prev, departmanId: value }))}
+            placeholder="Tum departmanlar icin bos birak"
+          />
         </div>
 
-        <div className="module-filter-actions">
+        <div className="form-actions-row">
           <button type="submit" className="universal-btn-aux" disabled={!canCloseWeek || isSubmitting}>
             {isSubmitting ? "Kapanis Aliniyor..." : "Haftayi Kapat"}
           </button>

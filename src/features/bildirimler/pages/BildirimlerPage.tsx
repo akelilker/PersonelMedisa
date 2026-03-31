@@ -7,6 +7,7 @@ import {
   updateBildirim
 } from "../../../api/bildirimler.api";
 import { fetchBildirimTuruOptions, fetchDepartmanOptions } from "../../../api/referans.api";
+import { FormField } from "../../../components/form/FormField";
 import { AppModal } from "../../../components/modal/AppModal";
 import { EmptyState } from "../../../components/states/EmptyState";
 import { ErrorState } from "../../../components/states/ErrorState";
@@ -16,6 +17,17 @@ import type { IdOption, KeyOption } from "../../../types/referans";
 import type { Bildirim } from "../../../types/bildirim";
 
 const PAGE_SIZE = 10;
+
+const BILDIRIM_CREATE_FORM_ID = "bildirim-create-form";
+const BILDIRIM_EDIT_FORM_ID = "bildirim-edit-form";
+
+function idOptionsToSelectOptions(options: IdOption[]) {
+  return options.map((option) => ({ value: String(option.id), label: option.label }));
+}
+
+function keyOptionsToSelectOptions(options: KeyOption[]) {
+  return options.map((option) => ({ value: option.key, label: option.label }));
+}
 
 type BildirimFilters = {
   personelId: string;
@@ -315,53 +327,45 @@ export function BildirimlerPage() {
         ) : null}
       </div>
 
-      <form className="module-filter-form" onSubmit={handleFilterSubmit}>
-        <div className="module-filter-grid">
-          <label className="module-filter-field">
-            <span>Personel ID</span>
-            <input
-              type="number"
-              min={1}
-              value={personelIdInput}
-              onChange={(event) => setPersonelIdInput(event.target.value)}
+      <form className="form-filter-panel" onSubmit={handleFilterSubmit}>
+        <div className="form-field-grid">
+          <FormField
+            label="Personel ID"
+            name="bildirim-filter-personel"
+            type="number"
+            min={1}
+            value={personelIdInput}
+            onChange={setPersonelIdInput}
+          />
+          {bildirimTuruOptions.length > 0 ? (
+            <FormField
+              as="select"
+              label="Bildirim Turu"
+              name="bildirim-filter-turu"
+              value={bildirimTuruInput}
+              onChange={setBildirimTuruInput}
+              placeholderOption={{ value: "", label: "Tum" }}
+              selectOptions={keyOptionsToSelectOptions(bildirimTuruOptions)}
             />
-          </label>
-
-          <label className="module-filter-field">
-            <span>Bildirim Turu</span>
-            {bildirimTuruOptions.length > 0 ? (
-              <select
-                value={bildirimTuruInput}
-                onChange={(event) => setBildirimTuruInput(event.target.value)}
-              >
-                <option value="">Tum</option>
-                {bildirimTuruOptions.map((option) => (
-                  <option key={option.key} value={option.key}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <input
-                type="text"
-                placeholder="GEC_GELDI, DEVAMSIZLIK..."
-                value={bildirimTuruInput}
-                onChange={(event) => setBildirimTuruInput(event.target.value)}
-              />
-            )}
-          </label>
-
-          <label className="module-filter-field">
-            <span>Tarih</span>
-            <input
-              type="date"
-              value={tarihInput}
-              onChange={(event) => setTarihInput(event.target.value)}
+          ) : (
+            <FormField
+              label="Bildirim Turu"
+              name="bildirim-filter-turu-text"
+              placeholder="GEC_GELDI, DEVAMSIZLIK..."
+              value={bildirimTuruInput}
+              onChange={setBildirimTuruInput}
             />
-          </label>
+          )}
+          <FormField
+            label="Tarih"
+            name="bildirim-filter-tarih"
+            type="date"
+            value={tarihInput}
+            onChange={setTarihInput}
+          />
         </div>
 
-        <div className="module-filter-actions">
+        <div className="form-actions-row">
           <button type="submit" className="universal-btn-aux">
             Filtrele
           </button>
@@ -457,106 +461,17 @@ export function BildirimlerPage() {
       </div>
 
       {canCreateBildirim && isCreateModalOpen ? (
-        <AppModal title="Yeni Bildirim Ekle" onClose={() => setIsCreateModalOpen(false)}>
-          <form className="bildirim-form-grid" onSubmit={handleCreateSubmit}>
-            <label className="module-filter-field">
-              <span>Tarih</span>
-              <input
-                type="date"
-                value={createForm.tarih}
-                onChange={(event) => setCreateForm((prev) => ({ ...prev, tarih: event.target.value }))}
-                required
-              />
-            </label>
-
-            <label className="module-filter-field">
-              <span>Departman ID</span>
-              {departmanOptions.length > 0 ? (
-                <select
-                  value={createForm.departmanId}
-                  onChange={(event) =>
-                    setCreateForm((prev) => ({ ...prev, departmanId: event.target.value }))
-                  }
-                  required
-                >
-                  <option value="">Seciniz</option>
-                  {departmanOptions.map((option) => (
-                    <option key={option.id} value={option.id}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <input
-                  type="number"
-                  min={1}
-                  value={createForm.departmanId}
-                  onChange={(event) =>
-                    setCreateForm((prev) => ({ ...prev, departmanId: event.target.value }))
-                  }
-                  required
-                />
-              )}
-            </label>
-
-            <label className="module-filter-field">
-              <span>Personel ID</span>
-              <input
-                type="number"
-                min={1}
-                value={createForm.personelId}
-                onChange={(event) =>
-                  setCreateForm((prev) => ({ ...prev, personelId: event.target.value }))
-                }
-                required
-              />
-            </label>
-
-            <label className="module-filter-field">
-              <span>Bildirim Turu</span>
-              {bildirimTuruOptions.length > 0 ? (
-                <select
-                  value={createForm.bildirimTuru}
-                  onChange={(event) =>
-                    setCreateForm((prev) => ({ ...prev, bildirimTuru: event.target.value }))
-                  }
-                  required
-                >
-                  <option value="">Seciniz</option>
-                  {bildirimTuruOptions.map((option) => (
-                    <option key={option.key} value={option.key}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <input
-                  type="text"
-                  value={createForm.bildirimTuru}
-                  onChange={(event) =>
-                    setCreateForm((prev) => ({ ...prev, bildirimTuru: event.target.value }))
-                  }
-                  required
-                />
-              )}
-            </label>
-
-            <label className="module-filter-field">
-              <span>Aciklama</span>
-              <input
-                type="text"
-                value={createForm.aciklama}
-                onChange={(event) =>
-                  setCreateForm((prev) => ({ ...prev, aciklama: event.target.value }))
-                }
-              />
-            </label>
-
-            {createErrorMessage ? <p className="bildirim-form-error">{createErrorMessage}</p> : null}
-            {referenceError ? <p className="bildirim-form-error">{referenceError}</p> : null}
-
-            <div className="universal-btn-group">
-              <button type="submit" className="universal-btn-save" disabled={isCreateSubmitting}>
+        <AppModal
+          title="Yeni Bildirim Ekle"
+          onClose={() => setIsCreateModalOpen(false)}
+          footer={
+            <div className="universal-btn-group modal-footer-actions">
+              <button
+                type="submit"
+                form={BILDIRIM_CREATE_FORM_ID}
+                className="universal-btn-save"
+                disabled={isCreateSubmitting}
+              >
                 {isCreateSubmitting ? "Kaydediliyor..." : "Kaydet"}
               </button>
               <button
@@ -568,6 +483,76 @@ export function BildirimlerPage() {
                 Vazgec
               </button>
             </div>
+          }
+        >
+          <form id={BILDIRIM_CREATE_FORM_ID} className="bildirim-form-grid" onSubmit={handleCreateSubmit}>
+            <FormField
+              label="Tarih"
+              name="bildirim-create-tarih"
+              type="date"
+              value={createForm.tarih}
+              onChange={(value) => setCreateForm((prev) => ({ ...prev, tarih: value }))}
+              required
+            />
+            {departmanOptions.length > 0 ? (
+              <FormField
+                as="select"
+                label="Departman ID"
+                name="bildirim-create-departman"
+                value={createForm.departmanId}
+                onChange={(value) => setCreateForm((prev) => ({ ...prev, departmanId: value }))}
+                required
+                placeholderOption={{ value: "", label: "Seciniz" }}
+                selectOptions={idOptionsToSelectOptions(departmanOptions)}
+              />
+            ) : (
+              <FormField
+                label="Departman ID"
+                name="bildirim-create-departman-num"
+                type="number"
+                min={1}
+                value={createForm.departmanId}
+                onChange={(value) => setCreateForm((prev) => ({ ...prev, departmanId: value }))}
+                required
+              />
+            )}
+            <FormField
+              label="Personel ID"
+              name="bildirim-create-personel"
+              type="number"
+              min={1}
+              value={createForm.personelId}
+              onChange={(value) => setCreateForm((prev) => ({ ...prev, personelId: value }))}
+              required
+            />
+            {bildirimTuruOptions.length > 0 ? (
+              <FormField
+                as="select"
+                label="Bildirim Turu"
+                name="bildirim-create-turu"
+                value={createForm.bildirimTuru}
+                onChange={(value) => setCreateForm((prev) => ({ ...prev, bildirimTuru: value }))}
+                required
+                placeholderOption={{ value: "", label: "Seciniz" }}
+                selectOptions={keyOptionsToSelectOptions(bildirimTuruOptions)}
+              />
+            ) : (
+              <FormField
+                label="Bildirim Turu"
+                name="bildirim-create-turu-text"
+                value={createForm.bildirimTuru}
+                onChange={(value) => setCreateForm((prev) => ({ ...prev, bildirimTuru: value }))}
+                required
+              />
+            )}
+            <FormField
+              label="Aciklama"
+              name="bildirim-create-aciklama"
+              value={createForm.aciklama}
+              onChange={(value) => setCreateForm((prev) => ({ ...prev, aciklama: value }))}
+            />
+            {createErrorMessage ? <p className="bildirim-form-error">{createErrorMessage}</p> : null}
+            {referenceError ? <p className="bildirim-form-error">{referenceError}</p> : null}
           </form>
         </AppModal>
       ) : null}
@@ -576,104 +561,14 @@ export function BildirimlerPage() {
         <AppModal
           title={`Bildirim Duzenle #${editingBildirim.id}`}
           onClose={() => setEditingBildirim(null)}
-        >
-          <form className="bildirim-form-grid" onSubmit={handleEditSubmit}>
-            <label className="module-filter-field">
-              <span>Tarih</span>
-              <input
-                type="date"
-                value={editForm.tarih}
-                onChange={(event) => setEditForm((prev) => ({ ...prev, tarih: event.target.value }))}
-                required
-              />
-            </label>
-
-            <label className="module-filter-field">
-              <span>Departman ID</span>
-              {departmanOptions.length > 0 ? (
-                <select
-                  value={editForm.departmanId}
-                  onChange={(event) =>
-                    setEditForm((prev) => ({ ...prev, departmanId: event.target.value }))
-                  }
-                  required
-                >
-                  <option value="">Seciniz</option>
-                  {departmanOptions.map((option) => (
-                    <option key={option.id} value={option.id}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <input
-                  type="number"
-                  min={1}
-                  value={editForm.departmanId}
-                  onChange={(event) =>
-                    setEditForm((prev) => ({ ...prev, departmanId: event.target.value }))
-                  }
-                  required
-                />
-              )}
-            </label>
-
-            <label className="module-filter-field">
-              <span>Personel ID</span>
-              <input
-                type="number"
-                min={1}
-                value={editForm.personelId}
-                onChange={(event) =>
-                  setEditForm((prev) => ({ ...prev, personelId: event.target.value }))
-                }
-                required
-              />
-            </label>
-
-            <label className="module-filter-field">
-              <span>Bildirim Turu</span>
-              {bildirimTuruOptions.length > 0 ? (
-                <select
-                  value={editForm.bildirimTuru}
-                  onChange={(event) =>
-                    setEditForm((prev) => ({ ...prev, bildirimTuru: event.target.value }))
-                  }
-                  required
-                >
-                  <option value="">Seciniz</option>
-                  {bildirimTuruOptions.map((option) => (
-                    <option key={option.key} value={option.key}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <input
-                  type="text"
-                  value={editForm.bildirimTuru}
-                  onChange={(event) =>
-                    setEditForm((prev) => ({ ...prev, bildirimTuru: event.target.value }))
-                  }
-                  required
-                />
-              )}
-            </label>
-
-            <label className="module-filter-field">
-              <span>Aciklama</span>
-              <input
-                type="text"
-                value={editForm.aciklama}
-                onChange={(event) => setEditForm((prev) => ({ ...prev, aciklama: event.target.value }))}
-              />
-            </label>
-
-            {editErrorMessage ? <p className="bildirim-form-error">{editErrorMessage}</p> : null}
-            {referenceError ? <p className="bildirim-form-error">{referenceError}</p> : null}
-
-            <div className="universal-btn-group">
-              <button type="submit" className="universal-btn-save" disabled={isEditSubmitting}>
+          footer={
+            <div className="universal-btn-group modal-footer-actions">
+              <button
+                type="submit"
+                form={BILDIRIM_EDIT_FORM_ID}
+                className="universal-btn-save"
+                disabled={isEditSubmitting}
+              >
                 {isEditSubmitting ? "Kaydediliyor..." : "Kaydet"}
               </button>
               <button
@@ -685,6 +580,76 @@ export function BildirimlerPage() {
                 Vazgec
               </button>
             </div>
+          }
+        >
+          <form id={BILDIRIM_EDIT_FORM_ID} className="bildirim-form-grid" onSubmit={handleEditSubmit}>
+            <FormField
+              label="Tarih"
+              name="bildirim-edit-tarih"
+              type="date"
+              value={editForm.tarih}
+              onChange={(value) => setEditForm((prev) => ({ ...prev, tarih: value }))}
+              required
+            />
+            {departmanOptions.length > 0 ? (
+              <FormField
+                as="select"
+                label="Departman ID"
+                name="bildirim-edit-departman"
+                value={editForm.departmanId}
+                onChange={(value) => setEditForm((prev) => ({ ...prev, departmanId: value }))}
+                required
+                placeholderOption={{ value: "", label: "Seciniz" }}
+                selectOptions={idOptionsToSelectOptions(departmanOptions)}
+              />
+            ) : (
+              <FormField
+                label="Departman ID"
+                name="bildirim-edit-departman-num"
+                type="number"
+                min={1}
+                value={editForm.departmanId}
+                onChange={(value) => setEditForm((prev) => ({ ...prev, departmanId: value }))}
+                required
+              />
+            )}
+            <FormField
+              label="Personel ID"
+              name="bildirim-edit-personel"
+              type="number"
+              min={1}
+              value={editForm.personelId}
+              onChange={(value) => setEditForm((prev) => ({ ...prev, personelId: value }))}
+              required
+            />
+            {bildirimTuruOptions.length > 0 ? (
+              <FormField
+                as="select"
+                label="Bildirim Turu"
+                name="bildirim-edit-turu"
+                value={editForm.bildirimTuru}
+                onChange={(value) => setEditForm((prev) => ({ ...prev, bildirimTuru: value }))}
+                required
+                placeholderOption={{ value: "", label: "Seciniz" }}
+                selectOptions={keyOptionsToSelectOptions(bildirimTuruOptions)}
+              />
+            ) : (
+              <FormField
+                label="Bildirim Turu"
+                name="bildirim-edit-turu-text"
+                value={editForm.bildirimTuru}
+                onChange={(value) => setEditForm((prev) => ({ ...prev, bildirimTuru: value }))}
+                required
+              />
+            )}
+            <FormField
+              label="Aciklama"
+              name="bildirim-edit-aciklama"
+              value={editForm.aciklama}
+              onChange={(value) => setEditForm((prev) => ({ ...prev, aciklama: value }))}
+            />
+            {editErrorMessage ? <p className="bildirim-form-error">{editErrorMessage}</p> : null}
+            {referenceError ? <p className="bildirim-form-error">{referenceError}</p> : null}
           </form>
         </AppModal>
       ) : null}

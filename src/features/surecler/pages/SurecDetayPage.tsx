@@ -86,7 +86,6 @@ export function SurecDetayPage() {
       ) : null}
 
       <div className="module-links">
-        <Link to="/surecler">Surec listesine don</Link>
         <Link to="/bildirimler">Bildirimlere git</Link>
       </div>
     </section>

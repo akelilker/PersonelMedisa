@@ -6,6 +6,7 @@ import {
   fetchFinansKalemList,
   updateFinansKalem
 } from "../../../api/finans.api";
+import { FormField } from "../../../components/form/FormField";
 import { AppModal } from "../../../components/modal/AppModal";
 import { EmptyState } from "../../../components/states/EmptyState";
 import { ErrorState } from "../../../components/states/ErrorState";
@@ -14,6 +15,9 @@ import { useRoleAccess } from "../../../hooks/use-role-access";
 import type { FinansKalem } from "../../../types/finans";
 
 const PAGE_SIZE = 10;
+
+const FINANS_CREATE_FORM_ID = "finans-create-form";
+const FINANS_EDIT_FORM_ID = "finans-edit-form";
 
 type FinansFilters = {
   personelId: string;
@@ -321,45 +325,40 @@ export function FinansPage() {
         ) : null}
       </div>
 
-      <form className="module-filter-form" onSubmit={handleFilterSubmit}>
-        <div className="module-filter-grid">
-          <label className="module-filter-field">
-            <span>Personel ID</span>
-            <input
-              type="number"
-              min={1}
-              value={personelIdInput}
-              onChange={(event) => setPersonelIdInput(event.target.value)}
-            />
-          </label>
-
-          <label className="module-filter-field">
-            <span>Donem (YYYY-MM)</span>
-            <input type="month" value={donemInput} onChange={(event) => setDonemInput(event.target.value)} />
-          </label>
-
-          <label className="module-filter-field">
-            <span>Kalem Turu</span>
-            <input
-              type="text"
-              placeholder="AVANS, PRIM..."
-              value={kalemTuruInput}
-              onChange={(event) => setKalemTuruInput(event.target.value)}
-            />
-          </label>
-
-          <label className="module-filter-field">
-            <span>Durum</span>
-            <input
-              type="text"
-              placeholder="AKTIF, IPTAL..."
-              value={stateInput}
-              onChange={(event) => setStateInput(event.target.value)}
-            />
-          </label>
+      <form className="form-filter-panel" onSubmit={handleFilterSubmit}>
+        <div className="form-field-grid">
+          <FormField
+            label="Personel ID"
+            name="finans-filter-personel"
+            type="number"
+            min={1}
+            value={personelIdInput}
+            onChange={setPersonelIdInput}
+          />
+          <FormField
+            label="Donem (YYYY-MM)"
+            name="finans-filter-donem"
+            type="month"
+            value={donemInput}
+            onChange={setDonemInput}
+          />
+          <FormField
+            label="Kalem Turu"
+            name="finans-filter-kalem"
+            placeholder="AVANS, PRIM..."
+            value={kalemTuruInput}
+            onChange={setKalemTuruInput}
+          />
+          <FormField
+            label="Durum"
+            name="finans-filter-state"
+            placeholder="AKTIF, IPTAL..."
+            value={stateInput}
+            onChange={setStateInput}
+          />
         </div>
 
-        <div className="module-filter-actions">
+        <div className="form-actions-row">
           <button type="submit" className="universal-btn-aux">
             Filtrele
           </button>
@@ -445,70 +444,17 @@ export function FinansPage() {
       </div>
 
       {canCreateFinans && isCreateModalOpen ? (
-        <AppModal title="Yeni Finans Kalemi" onClose={() => setIsCreateModalOpen(false)}>
-          <form className="finans-form-grid" onSubmit={handleCreateSubmit}>
-            <label className="module-filter-field">
-              <span>Personel ID</span>
-              <input
-                type="number"
-                min={1}
-                value={createForm.personelId}
-                onChange={(event) =>
-                  setCreateForm((prev) => ({ ...prev, personelId: event.target.value }))
-                }
-                required
-              />
-            </label>
-
-            <label className="module-filter-field">
-              <span>Donem</span>
-              <input
-                type="month"
-                value={createForm.donem}
-                onChange={(event) => setCreateForm((prev) => ({ ...prev, donem: event.target.value }))}
-                required
-              />
-            </label>
-
-            <label className="module-filter-field">
-              <span>Kalem Turu</span>
-              <input
-                type="text"
-                value={createForm.kalemTuru}
-                onChange={(event) =>
-                  setCreateForm((prev) => ({ ...prev, kalemTuru: event.target.value }))
-                }
-                required
-              />
-            </label>
-
-            <label className="module-filter-field">
-              <span>Tutar</span>
-              <input
-                type="number"
-                min={0.01}
-                step="0.01"
-                value={createForm.tutar}
-                onChange={(event) => setCreateForm((prev) => ({ ...prev, tutar: event.target.value }))}
-                required
-              />
-            </label>
-
-            <label className="module-filter-field">
-              <span>Aciklama</span>
-              <input
-                type="text"
-                value={createForm.aciklama}
-                onChange={(event) =>
-                  setCreateForm((prev) => ({ ...prev, aciklama: event.target.value }))
-                }
-              />
-            </label>
-
-            {createErrorMessage ? <p className="finans-form-error">{createErrorMessage}</p> : null}
-
-            <div className="universal-btn-group">
-              <button type="submit" className="universal-btn-save" disabled={isCreateSubmitting}>
+        <AppModal
+          title="Yeni Finans Kalemi"
+          onClose={() => setIsCreateModalOpen(false)}
+          footer={
+            <div className="universal-btn-group modal-footer-actions">
+              <button
+                type="submit"
+                form={FINANS_CREATE_FORM_ID}
+                className="universal-btn-save"
+                disabled={isCreateSubmitting}
+              >
                 {isCreateSubmitting ? "Kaydediliyor..." : "Kaydet"}
               </button>
               <button
@@ -520,69 +466,66 @@ export function FinansPage() {
                 Vazgec
               </button>
             </div>
+          }
+        >
+          <form id={FINANS_CREATE_FORM_ID} className="finans-form-grid" onSubmit={handleCreateSubmit}>
+            <FormField
+              label="Personel ID"
+              name="finans-create-personel"
+              type="number"
+              min={1}
+              value={createForm.personelId}
+              onChange={(value) => setCreateForm((prev) => ({ ...prev, personelId: value }))}
+              required
+            />
+            <FormField
+              label="Donem"
+              name="finans-create-donem"
+              type="month"
+              value={createForm.donem}
+              onChange={(value) => setCreateForm((prev) => ({ ...prev, donem: value }))}
+              required
+            />
+            <FormField
+              label="Kalem Turu"
+              name="finans-create-kalem"
+              value={createForm.kalemTuru}
+              onChange={(value) => setCreateForm((prev) => ({ ...prev, kalemTuru: value }))}
+              required
+            />
+            <FormField
+              label="Tutar"
+              name="finans-create-tutar"
+              type="number"
+              min={0.01}
+              step="0.01"
+              value={createForm.tutar}
+              onChange={(value) => setCreateForm((prev) => ({ ...prev, tutar: value }))}
+              required
+            />
+            <FormField
+              label="Aciklama"
+              name="finans-create-aciklama"
+              value={createForm.aciklama}
+              onChange={(value) => setCreateForm((prev) => ({ ...prev, aciklama: value }))}
+            />
+            {createErrorMessage ? <p className="finans-form-error">{createErrorMessage}</p> : null}
           </form>
         </AppModal>
       ) : null}
 
       {canEditFinans && editingItem ? (
-        <AppModal title={`Finans Duzenle #${editingItem.id}`} onClose={() => setEditingItem(null)}>
-          <form className="finans-form-grid" onSubmit={handleEditSubmit}>
-            <label className="module-filter-field">
-              <span>Personel ID</span>
-              <input
-                type="number"
-                min={1}
-                value={editForm.personelId}
-                onChange={(event) => setEditForm((prev) => ({ ...prev, personelId: event.target.value }))}
-                required
-              />
-            </label>
-
-            <label className="module-filter-field">
-              <span>Donem</span>
-              <input
-                type="month"
-                value={editForm.donem}
-                onChange={(event) => setEditForm((prev) => ({ ...prev, donem: event.target.value }))}
-                required
-              />
-            </label>
-
-            <label className="module-filter-field">
-              <span>Kalem Turu</span>
-              <input
-                type="text"
-                value={editForm.kalemTuru}
-                onChange={(event) => setEditForm((prev) => ({ ...prev, kalemTuru: event.target.value }))}
-                required
-              />
-            </label>
-
-            <label className="module-filter-field">
-              <span>Tutar</span>
-              <input
-                type="number"
-                min={0.01}
-                step="0.01"
-                value={editForm.tutar}
-                onChange={(event) => setEditForm((prev) => ({ ...prev, tutar: event.target.value }))}
-                required
-              />
-            </label>
-
-            <label className="module-filter-field">
-              <span>Aciklama</span>
-              <input
-                type="text"
-                value={editForm.aciklama}
-                onChange={(event) => setEditForm((prev) => ({ ...prev, aciklama: event.target.value }))}
-              />
-            </label>
-
-            {editErrorMessage ? <p className="finans-form-error">{editErrorMessage}</p> : null}
-
-            <div className="universal-btn-group">
-              <button type="submit" className="universal-btn-save" disabled={isEditSubmitting}>
+        <AppModal
+          title={`Finans Duzenle #${editingItem.id}`}
+          onClose={() => setEditingItem(null)}
+          footer={
+            <div className="universal-btn-group modal-footer-actions">
+              <button
+                type="submit"
+                form={FINANS_EDIT_FORM_ID}
+                className="universal-btn-save"
+                disabled={isEditSubmitting}
+              >
                 {isEditSubmitting ? "Kaydediliyor..." : "Kaydet"}
               </button>
               <button
@@ -594,6 +537,50 @@ export function FinansPage() {
                 Vazgec
               </button>
             </div>
+          }
+        >
+          <form id={FINANS_EDIT_FORM_ID} className="finans-form-grid" onSubmit={handleEditSubmit}>
+            <FormField
+              label="Personel ID"
+              name="finans-edit-personel"
+              type="number"
+              min={1}
+              value={editForm.personelId}
+              onChange={(value) => setEditForm((prev) => ({ ...prev, personelId: value }))}
+              required
+            />
+            <FormField
+              label="Donem"
+              name="finans-edit-donem"
+              type="month"
+              value={editForm.donem}
+              onChange={(value) => setEditForm((prev) => ({ ...prev, donem: value }))}
+              required
+            />
+            <FormField
+              label="Kalem Turu"
+              name="finans-edit-kalem"
+              value={editForm.kalemTuru}
+              onChange={(value) => setEditForm((prev) => ({ ...prev, kalemTuru: value }))}
+              required
+            />
+            <FormField
+              label="Tutar"
+              name="finans-edit-tutar"
+              type="number"
+              min={0.01}
+              step="0.01"
+              value={editForm.tutar}
+              onChange={(value) => setEditForm((prev) => ({ ...prev, tutar: value }))}
+              required
+            />
+            <FormField
+              label="Aciklama"
+              name="finans-edit-aciklama"
+              value={editForm.aciklama}
+              onChange={(value) => setEditForm((prev) => ({ ...prev, aciklama: value }))}
+            />
+            {editErrorMessage ? <p className="finans-form-error">{editErrorMessage}</p> : null}
           </form>
         </AppModal>
       ) : null}

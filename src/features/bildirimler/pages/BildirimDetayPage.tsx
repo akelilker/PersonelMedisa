@@ -80,7 +80,6 @@ export function BildirimDetayPage() {
       ) : null}
 
       <div className="module-links">
-        <Link to="/bildirimler">Bildirim listesine don</Link>
         <Link to="/surecler">Surec takibe git</Link>
       </div>
     </section>

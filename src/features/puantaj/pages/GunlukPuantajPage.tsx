@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { fetchGunlukPuantaj, upsertGunlukPuantaj } from "../../../api/puantaj.api";
+import { FormField } from "../../../components/form/FormField";
 import { EmptyState } from "../../../components/states/EmptyState";
 import { ErrorState } from "../../../components/states/ErrorState";
 import { LoadingState } from "../../../components/states/LoadingState";
@@ -176,31 +177,28 @@ export function GunlukPuantajPage() {
         <h2>Gunluk Puantaj</h2>
       </div>
 
-      <form className="module-filter-form" onSubmit={handleQuerySubmit}>
-        <div className="module-filter-grid">
-          <label className="module-filter-field">
-            <span>Personel ID</span>
-            <input
-              type="number"
-              min={1}
-              value={queryForm.personelId}
-              onChange={(event) => setQueryForm((prev) => ({ ...prev, personelId: event.target.value }))}
-              required
-            />
-          </label>
-
-          <label className="module-filter-field">
-            <span>Tarih</span>
-            <input
-              type="date"
-              value={queryForm.tarih}
-              onChange={(event) => setQueryForm((prev) => ({ ...prev, tarih: event.target.value }))}
-              required
-            />
-          </label>
+      <form className="form-filter-panel" onSubmit={handleQuerySubmit}>
+        <div className="form-field-grid">
+          <FormField
+            label="Personel ID"
+            name="puantaj-query-personel"
+            type="number"
+            min={1}
+            value={queryForm.personelId}
+            onChange={(value) => setQueryForm((prev) => ({ ...prev, personelId: value }))}
+            required
+          />
+          <FormField
+            label="Tarih"
+            name="puantaj-query-tarih"
+            type="date"
+            value={queryForm.tarih}
+            onChange={(value) => setQueryForm((prev) => ({ ...prev, tarih: value }))}
+            required
+          />
         </div>
 
-        <div className="module-filter-actions">
+        <div className="form-actions-row">
           <button type="submit" className="universal-btn-aux" disabled={isLoading}>
             Kaydi Getir
           </button>
@@ -266,44 +264,37 @@ export function GunlukPuantajPage() {
         <h3>Giris Cikis Kaydi</h3>
 
         <form className="puantaj-form-grid" onSubmit={handlePuantajSubmit}>
-          <label className="module-filter-field">
-            <span>Giris Saati</span>
-            <input
-              type="time"
-              value={puantajForm.girisSaati}
-              onChange={(event) => setPuantajForm((prev) => ({ ...prev, girisSaati: event.target.value }))}
-              required
-            />
-          </label>
-
-          <label className="module-filter-field">
-            <span>Cikis Saati</span>
-            <input
-              type="time"
-              value={puantajForm.cikisSaati}
-              onChange={(event) => setPuantajForm((prev) => ({ ...prev, cikisSaati: event.target.value }))}
-              required
-            />
-          </label>
-
-          <label className="module-filter-field">
-            <span>Gercek Mola (dk)</span>
-            <input
-              type="number"
-              min={0}
-              value={puantajForm.gercekMolaDakika}
-              onChange={(event) =>
-                setPuantajForm((prev) => ({ ...prev, gercekMolaDakika: event.target.value }))
-              }
-            />
-          </label>
+          <FormField
+            label="Giris Saati"
+            name="puantaj-giris"
+            type="time"
+            value={puantajForm.girisSaati}
+            onChange={(value) => setPuantajForm((prev) => ({ ...prev, girisSaati: value }))}
+            required
+          />
+          <FormField
+            label="Cikis Saati"
+            name="puantaj-cikis"
+            type="time"
+            value={puantajForm.cikisSaati}
+            onChange={(value) => setPuantajForm((prev) => ({ ...prev, cikisSaati: value }))}
+            required
+          />
+          <FormField
+            label="Gercek Mola (dk)"
+            name="puantaj-mola"
+            type="number"
+            min={0}
+            value={puantajForm.gercekMolaDakika}
+            onChange={(value) => setPuantajForm((prev) => ({ ...prev, gercekMolaDakika: value }))}
+          />
 
           {submitErrorMessage ? <p className="puantaj-form-error">{submitErrorMessage}</p> : null}
           {!canUpdatePuantaj ? (
             <p className="puantaj-form-readonly">Bu modulu sadece goruntuleme yetkin var.</p>
           ) : null}
 
-          <div className="module-filter-actions">
+          <div className="form-actions-row">
             <button
               type="submit"
               className="universal-btn-aux"

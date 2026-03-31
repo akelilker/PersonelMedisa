@@ -1,6 +1,42 @@
 .universal-back-bar {
   display: flex;
   align-items: center;
-  gap: 3px;
+  gap: var(--space-1);
   padding-top: var(--space-2);
+  padding-bottom: var(--space-1);
+}
+
+.universal-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  margin: 0;
+  border: none;
+  background: none;
+  color: rgba(200, 210, 225, 0.88);
+  font: inherit;
+  text-decoration: none;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.universal-back-btn:hover {
+  color: #ffffff;
+}
+
+.universal-back-label {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.back-icon-svg {
+  flex-shrink: 0;
+  display: block;
+  color: rgba(240, 240, 240, 0.75);
+}
+
+.universal-back-btn:hover .back-icon-svg {
+  color: #ffffff;
 }

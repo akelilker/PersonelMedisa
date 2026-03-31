@@ -8,6 +8,7 @@ import {
   fetchPersonelTipiOptions
 } from "../../../api/referans.api";
 import { AppModal } from "../../../components/modal/AppModal";
+import { FormField } from "../../../components/form/FormField";
 import { EmptyState } from "../../../components/states/EmptyState";
 import { ErrorState } from "../../../components/states/ErrorState";
 import { LoadingState } from "../../../components/states/LoadingState";
@@ -16,6 +17,8 @@ import type { Personel } from "../../../types/personel";
 import type { IdOption } from "../../../types/referans";
 
 const PAGE_SIZE = 10;
+
+const PERSONEL_CREATE_FORM_ID = "personel-create-form";
 
 type PersonellerFilters = {
   search: string;
@@ -79,6 +82,10 @@ function parseOptionalPositiveInt(value: string): number | undefined {
     return undefined;
   }
   return number;
+}
+
+function toSelectOptions(options: IdOption[]) {
+  return options.map((option) => ({ value: String(option.id), label: option.label }));
 }
 
 export function PersonellerPage() {
@@ -243,6 +250,17 @@ export function PersonellerPage() {
     }
   }
 
+  const aktiflikSelectOptions = [
+    { value: "tum", label: "Tum" },
+    { value: "aktif", label: "Aktif" },
+    { value: "pasif", label: "Pasif" }
+  ];
+
+  const aktifDurumOptions = [
+    { value: "AKTIF", label: "AKTIF" },
+    { value: "PASIF", label: "PASIF" }
+  ];
+
   return (
     <section className="personeller-page">
       <div className="personeller-header-row">
@@ -261,34 +279,26 @@ export function PersonellerPage() {
         ) : null}
       </div>
 
-      <form className="module-filter-form" onSubmit={handleFilterSubmit}>
-        <div className="module-filter-grid">
-          <label className="module-filter-field">
-            <span>Ara</span>
-            <input
-              type="text"
-              placeholder="Ad, soyad veya T.C. Kimlik No"
-              value={searchInput}
-              onChange={(event) => setSearchInput(event.target.value)}
-            />
-          </label>
-
-          <label className="module-filter-field">
-            <span>Aktiflik</span>
-            <select
-              value={aktiflikInput}
-              onChange={(event) =>
-                setAktiflikInput(event.target.value as "aktif" | "pasif" | "tum")
-              }
-            >
-              <option value="tum">Tum</option>
-              <option value="aktif">Aktif</option>
-              <option value="pasif">Pasif</option>
-            </select>
-          </label>
+      <form className="form-filter-panel" onSubmit={handleFilterSubmit}>
+        <div className="form-field-grid">
+          <FormField
+            label="Ara"
+            name="personel-filter-search"
+            placeholder="Ad, soyad veya T.C. Kimlik No"
+            value={searchInput}
+            onChange={setSearchInput}
+          />
+          <FormField
+            as="select"
+            label="Aktiflik"
+            name="personel-filter-aktiflik"
+            value={aktiflikInput}
+            onChange={(value) => setAktiflikInput(value as "aktif" | "pasif" | "tum")}
+            selectOptions={aktiflikSelectOptions}
+          />
         </div>
 
-        <div className="module-filter-actions">
+        <div className="form-actions-row">
           <button type="submit" className="universal-btn-aux">
             Filtrele
           </button>
@@ -355,277 +365,17 @@ export function PersonellerPage() {
       </div>
 
       {canCreatePersonel && isCreateModalOpen ? (
-        <AppModal title="Yeni Personel Ekle" onClose={() => setIsCreateModalOpen(false)}>
-          <form className="personel-create-form" onSubmit={handleCreateSubmit}>
-            <div className="personel-create-grid">
-              <label className="module-filter-field">
-                <span>T.C. Kimlik No</span>
-                <input
-                  type="text"
-                  value={createForm.tcKimlikNo}
-                  onChange={(event) =>
-                    setCreateForm((prev) => ({ ...prev, tcKimlikNo: event.target.value }))
-                  }
-                  required
-                />
-              </label>
-
-              <label className="module-filter-field">
-                <span>Ad</span>
-                <input
-                  type="text"
-                  value={createForm.ad}
-                  onChange={(event) => setCreateForm((prev) => ({ ...prev, ad: event.target.value }))}
-                  required
-                />
-              </label>
-
-              <label className="module-filter-field">
-                <span>Soyad</span>
-                <input
-                  type="text"
-                  value={createForm.soyad}
-                  onChange={(event) =>
-                    setCreateForm((prev) => ({ ...prev, soyad: event.target.value }))
-                  }
-                  required
-                />
-              </label>
-
-              <label className="module-filter-field">
-                <span>Dogum Tarihi</span>
-                <input
-                  type="date"
-                  value={createForm.dogumTarihi}
-                  onChange={(event) =>
-                    setCreateForm((prev) => ({ ...prev, dogumTarihi: event.target.value }))
-                  }
-                  required
-                />
-              </label>
-
-              <label className="module-filter-field">
-                <span>Telefon</span>
-                <input
-                  type="tel"
-                  value={createForm.telefon}
-                  onChange={(event) =>
-                    setCreateForm((prev) => ({ ...prev, telefon: event.target.value }))
-                  }
-                  required
-                />
-              </label>
-
-              <label className="module-filter-field">
-                <span>Acil Durum Kisi</span>
-                <input
-                  type="text"
-                  value={createForm.acilDurumKisi}
-                  onChange={(event) =>
-                    setCreateForm((prev) => ({ ...prev, acilDurumKisi: event.target.value }))
-                  }
-                  required
-                />
-              </label>
-
-              <label className="module-filter-field">
-                <span>Acil Durum Telefon</span>
-                <input
-                  type="tel"
-                  value={createForm.acilDurumTelefon}
-                  onChange={(event) =>
-                    setCreateForm((prev) => ({ ...prev, acilDurumTelefon: event.target.value }))
-                  }
-                  required
-                />
-              </label>
-
-              <label className="module-filter-field">
-                <span>Dogum Yeri</span>
-                <input
-                  type="text"
-                  value={createForm.dogumYeri}
-                  onChange={(event) =>
-                    setCreateForm((prev) => ({ ...prev, dogumYeri: event.target.value }))
-                  }
-                />
-              </label>
-
-              <label className="module-filter-field">
-                <span>Kan Grubu</span>
-                <input
-                  type="text"
-                  value={createForm.kanGrubu}
-                  onChange={(event) =>
-                    setCreateForm((prev) => ({ ...prev, kanGrubu: event.target.value }))
-                  }
-                />
-              </label>
-
-              <label className="module-filter-field">
-                <span>Sicil No</span>
-                <input
-                  type="text"
-                  value={createForm.sicilNo}
-                  onChange={(event) =>
-                    setCreateForm((prev) => ({ ...prev, sicilNo: event.target.value }))
-                  }
-                  required
-                />
-              </label>
-
-              <label className="module-filter-field">
-                <span>Ise Giris Tarihi</span>
-                <input
-                  type="date"
-                  value={createForm.iseGirisTarihi}
-                  onChange={(event) =>
-                    setCreateForm((prev) => ({ ...prev, iseGirisTarihi: event.target.value }))
-                  }
-                  required
-                />
-              </label>
-
-            <label className="module-filter-field">
-              <span>Departman ID</span>
-              {departmanOptions.length > 0 ? (
-                <select
-                  value={createForm.departmanId}
-                  onChange={(event) =>
-                    setCreateForm((prev) => ({ ...prev, departmanId: event.target.value }))
-                  }
-                  required
-                >
-                  <option value="">Seciniz</option>
-                  {departmanOptions.map((option) => (
-                    <option key={option.id} value={option.id}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <input
-                  type="number"
-                  min={1}
-                  value={createForm.departmanId}
-                  onChange={(event) =>
-                    setCreateForm((prev) => ({ ...prev, departmanId: event.target.value }))
-                  }
-                  required
-                />
-              )}
-            </label>
-
-            <label className="module-filter-field">
-              <span>Gorev ID</span>
-              {gorevOptions.length > 0 ? (
-                <select
-                  value={createForm.gorevId}
-                  onChange={(event) =>
-                    setCreateForm((prev) => ({ ...prev, gorevId: event.target.value }))
-                  }
-                  required
-                >
-                  <option value="">Seciniz</option>
-                  {gorevOptions.map((option) => (
-                    <option key={option.id} value={option.id}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <input
-                  type="number"
-                  min={1}
-                  value={createForm.gorevId}
-                  onChange={(event) =>
-                    setCreateForm((prev) => ({ ...prev, gorevId: event.target.value }))
-                  }
-                  required
-                />
-              )}
-            </label>
-
-            <label className="module-filter-field">
-              <span>Bagli Amir</span>
-              {bagliAmirOptions.length > 0 ? (
-                <select
-                  value={createForm.bagliAmirId}
-                  onChange={(event) =>
-                    setCreateForm((prev) => ({ ...prev, bagliAmirId: event.target.value }))
-                  }
-                >
-                  <option value="">Seciniz</option>
-                  {bagliAmirOptions.map((option) => (
-                    <option key={option.id} value={option.id}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <input
-                  type="number"
-                  min={1}
-                  value={createForm.bagliAmirId}
-                  onChange={(event) =>
-                    setCreateForm((prev) => ({ ...prev, bagliAmirId: event.target.value }))
-                  }
-                />
-              )}
-            </label>
-
-            <label className="module-filter-field">
-              <span>Personel Tipi ID</span>
-              {personelTipiOptions.length > 0 ? (
-                <select
-                  value={createForm.personelTipiId}
-                  onChange={(event) =>
-                    setCreateForm((prev) => ({ ...prev, personelTipiId: event.target.value }))
-                  }
-                  required
-                >
-                  <option value="">Seciniz</option>
-                  {personelTipiOptions.map((option) => (
-                    <option key={option.id} value={option.id}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <input
-                  type="number"
-                  min={1}
-                  value={createForm.personelTipiId}
-                  onChange={(event) =>
-                    setCreateForm((prev) => ({ ...prev, personelTipiId: event.target.value }))
-                  }
-                  required
-                />
-              )}
-            </label>
-
-              <label className="module-filter-field">
-                <span>Aktif Durum</span>
-                <select
-                  value={createForm.aktifDurum}
-                  onChange={(event) =>
-                    setCreateForm((prev) => ({
-                      ...prev,
-                      aktifDurum: event.target.value as "AKTIF" | "PASIF"
-                    }))
-                  }
-                >
-                  <option value="AKTIF">AKTIF</option>
-                  <option value="PASIF">PASIF</option>
-                </select>
-              </label>
-            </div>
-
-            {createErrorMessage ? <p className="personel-create-error">{createErrorMessage}</p> : null}
-            {referenceError ? <p className="personel-create-error">{referenceError}</p> : null}
-
-            <div className="universal-btn-group">
-              <button type="submit" className="universal-btn-save" disabled={isCreateSubmitting}>
+        <AppModal
+          title="Yeni Personel Ekle"
+          onClose={() => setIsCreateModalOpen(false)}
+          footer={
+            <div className="universal-btn-group modal-footer-actions">
+              <button
+                type="submit"
+                form={PERSONEL_CREATE_FORM_ID}
+                className="universal-btn-save"
+                disabled={isCreateSubmitting}
+              >
                 {isCreateSubmitting ? "Kaydediliyor..." : "Kaydet"}
               </button>
               <button
@@ -637,6 +387,193 @@ export function PersonellerPage() {
                 Vazgec
               </button>
             </div>
+          }
+        >
+          <form
+            id={PERSONEL_CREATE_FORM_ID}
+            className="personel-create-form"
+            onSubmit={handleCreateSubmit}
+          >
+            <div className="personel-create-grid">
+              <FormField
+                label="T.C. Kimlik No"
+                name="create-tc"
+                value={createForm.tcKimlikNo}
+                onChange={(value) => setCreateForm((prev) => ({ ...prev, tcKimlikNo: value }))}
+                required
+              />
+              <FormField
+                label="Ad"
+                name="create-ad"
+                value={createForm.ad}
+                onChange={(value) => setCreateForm((prev) => ({ ...prev, ad: value }))}
+                required
+              />
+              <FormField
+                label="Soyad"
+                name="create-soyad"
+                value={createForm.soyad}
+                onChange={(value) => setCreateForm((prev) => ({ ...prev, soyad: value }))}
+                required
+              />
+              <FormField
+                label="Dogum Tarihi"
+                name="create-dogum"
+                type="date"
+                value={createForm.dogumTarihi}
+                onChange={(value) => setCreateForm((prev) => ({ ...prev, dogumTarihi: value }))}
+                required
+              />
+              <FormField
+                label="Telefon"
+                name="create-telefon"
+                type="tel"
+                value={createForm.telefon}
+                onChange={(value) => setCreateForm((prev) => ({ ...prev, telefon: value }))}
+                required
+              />
+              <FormField
+                label="Acil Durum Kisi"
+                name="create-acil-kisi"
+                value={createForm.acilDurumKisi}
+                onChange={(value) => setCreateForm((prev) => ({ ...prev, acilDurumKisi: value }))}
+                required
+              />
+              <FormField
+                label="Acil Durum Telefon"
+                name="create-acil-tel"
+                type="tel"
+                value={createForm.acilDurumTelefon}
+                onChange={(value) => setCreateForm((prev) => ({ ...prev, acilDurumTelefon: value }))}
+                required
+              />
+              <FormField
+                label="Dogum Yeri"
+                name="create-dogum-yeri"
+                value={createForm.dogumYeri}
+                onChange={(value) => setCreateForm((prev) => ({ ...prev, dogumYeri: value }))}
+              />
+              <FormField
+                label="Kan Grubu"
+                name="create-kan"
+                value={createForm.kanGrubu}
+                onChange={(value) => setCreateForm((prev) => ({ ...prev, kanGrubu: value }))}
+              />
+              <FormField
+                label="Sicil No"
+                name="create-sicil"
+                value={createForm.sicilNo}
+                onChange={(value) => setCreateForm((prev) => ({ ...prev, sicilNo: value }))}
+                required
+              />
+              <FormField
+                label="Ise Giris Tarihi"
+                name="create-ise-giris"
+                type="date"
+                value={createForm.iseGirisTarihi}
+                onChange={(value) => setCreateForm((prev) => ({ ...prev, iseGirisTarihi: value }))}
+                required
+              />
+              {departmanOptions.length > 0 ? (
+                <FormField
+                  as="select"
+                  label="Departman ID"
+                  name="create-departman"
+                  value={createForm.departmanId}
+                  onChange={(value) => setCreateForm((prev) => ({ ...prev, departmanId: value }))}
+                  required
+                  placeholderOption={{ value: "", label: "Seciniz" }}
+                  selectOptions={toSelectOptions(departmanOptions)}
+                />
+              ) : (
+                <FormField
+                  label="Departman ID"
+                  name="create-departman-num"
+                  type="number"
+                  min={1}
+                  value={createForm.departmanId}
+                  onChange={(value) => setCreateForm((prev) => ({ ...prev, departmanId: value }))}
+                  required
+                />
+              )}
+              {gorevOptions.length > 0 ? (
+                <FormField
+                  as="select"
+                  label="Gorev ID"
+                  name="create-gorev"
+                  value={createForm.gorevId}
+                  onChange={(value) => setCreateForm((prev) => ({ ...prev, gorevId: value }))}
+                  required
+                  placeholderOption={{ value: "", label: "Seciniz" }}
+                  selectOptions={toSelectOptions(gorevOptions)}
+                />
+              ) : (
+                <FormField
+                  label="Gorev ID"
+                  name="create-gorev-num"
+                  type="number"
+                  min={1}
+                  value={createForm.gorevId}
+                  onChange={(value) => setCreateForm((prev) => ({ ...prev, gorevId: value }))}
+                  required
+                />
+              )}
+              {bagliAmirOptions.length > 0 ? (
+                <FormField
+                  as="select"
+                  label="Bagli Amir"
+                  name="create-bagli-amir"
+                  value={createForm.bagliAmirId}
+                  onChange={(value) => setCreateForm((prev) => ({ ...prev, bagliAmirId: value }))}
+                  placeholderOption={{ value: "", label: "Seciniz" }}
+                  selectOptions={toSelectOptions(bagliAmirOptions)}
+                />
+              ) : (
+                <FormField
+                  label="Bagli Amir"
+                  name="create-bagli-amir-num"
+                  type="number"
+                  min={1}
+                  value={createForm.bagliAmirId}
+                  onChange={(value) => setCreateForm((prev) => ({ ...prev, bagliAmirId: value }))}
+                />
+              )}
+              {personelTipiOptions.length > 0 ? (
+                <FormField
+                  as="select"
+                  label="Personel Tipi ID"
+                  name="create-personel-tipi"
+                  value={createForm.personelTipiId}
+                  onChange={(value) => setCreateForm((prev) => ({ ...prev, personelTipiId: value }))}
+                  required
+                  placeholderOption={{ value: "", label: "Seciniz" }}
+                  selectOptions={toSelectOptions(personelTipiOptions)}
+                />
+              ) : (
+                <FormField
+                  label="Personel Tipi ID"
+                  name="create-personel-tipi-num"
+                  type="number"
+                  min={1}
+                  value={createForm.personelTipiId}
+                  onChange={(value) => setCreateForm((prev) => ({ ...prev, personelTipiId: value }))}
+                  required
+                />
+              )}
+              <FormField
+                as="select"
+                label="Aktif Durum"
+                name="create-aktif-durum"
+                value={createForm.aktifDurum}
+                onChange={(value) =>
+                  setCreateForm((prev) => ({ ...prev, aktifDurum: value as "AKTIF" | "PASIF" }))
+                }
+                selectOptions={aktifDurumOptions}
+              />
+            </div>
+
+            {createErrorMessage ? <p className="personel-create-error">{createErrorMessage}</p> : null}
+            {referenceError ? <p className="personel-create-error">{referenceError}</p> : null}
           </form>
         </AppModal>
       ) : null}

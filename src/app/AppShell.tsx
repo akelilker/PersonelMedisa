@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
+import { BackBar } from "../components/BackBar";
 import { Hero } from "../components/hero/Hero";
 import { AppFooter } from "../components/footer/AppFooter";
 import { AppModal } from "../components/modal/AppModal";
@@ -11,9 +12,24 @@ type AppShellProps = {
   children?: ReactNode;
 };
 
+function resolveBackBar(pathname: string): { to: string; label: string } | null {
+  if (/^\/personeller\/\d+$/.test(pathname)) {
+    return { to: "/personeller", label: "Personel listesine don" };
+  }
+  if (/^\/surecler\/\d+$/.test(pathname)) {
+    return { to: "/surecler", label: "Surec listesine don" };
+  }
+  if (/^\/bildirimler\/\d+$/.test(pathname)) {
+    return { to: "/bildirimler", label: "Bildirim listesine don" };
+  }
+  return null;
+}
+
 export function AppShell({ children }: AppShellProps) {
   const { session, logout } = useAuth();
   const navigate = useNavigate();
+  const { pathname } = useLocation();
+  const backBarTarget = resolveBackBar(pathname);
   const [isKayitModalOpen, setIsKayitModalOpen] = useState(false);
   const [kayitTab, setKayitTab] = useState<KayitTab>("yeni-kayit");
 
@@ -40,6 +56,8 @@ export function AppShell({ children }: AppShellProps) {
             setIsKayitModalOpen(true);
           }}
         />
+
+        {backBarTarget ? <BackBar to={backBarTarget.to} label={backBarTarget.label} /> : null}
 
         {children}
       </main>

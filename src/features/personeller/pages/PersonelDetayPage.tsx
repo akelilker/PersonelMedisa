@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { fetchPersonelDetail, updatePersonel } from "../../../api/personeller.api";
+import { FormField } from "../../../components/form/FormField";
 import { EmptyState } from "../../../components/states/EmptyState";
 import { ErrorState } from "../../../components/states/ErrorState";
 import { LoadingState } from "../../../components/states/LoadingState";
@@ -33,6 +34,11 @@ export function PersonelDetayPage() {
     telefon: "",
     aktifDurum: "AKTIF"
   });
+
+  const aktifDurumOptions = [
+    { value: "AKTIF", label: "AKTIF" },
+    { value: "PASIF", label: "PASIF" }
+  ];
 
   const loadPersonel = useCallback(async () => {
     if (!hasValidId) {
@@ -139,58 +145,41 @@ export function PersonelDetayPage() {
             </>
           ) : (
             <form className="personel-edit-form" onSubmit={handleEditSubmit}>
-              <label className="module-filter-field">
-                <span>Ad</span>
-                <input
-                  type="text"
-                  value={editForm.ad}
-                  onChange={(event) => setEditForm((prev) => ({ ...prev, ad: event.target.value }))}
-                  required
-                />
-              </label>
-
-              <label className="module-filter-field">
-                <span>Soyad</span>
-                <input
-                  type="text"
-                  value={editForm.soyad}
-                  onChange={(event) =>
-                    setEditForm((prev) => ({ ...prev, soyad: event.target.value }))
-                  }
-                  required
-                />
-              </label>
-
-              <label className="module-filter-field">
-                <span>Telefon</span>
-                <input
-                  type="tel"
-                  value={editForm.telefon}
-                  onChange={(event) =>
-                    setEditForm((prev) => ({ ...prev, telefon: event.target.value }))
-                  }
-                />
-              </label>
-
-              <label className="module-filter-field">
-                <span>Durum</span>
-                <select
-                  value={editForm.aktifDurum}
-                  onChange={(event) =>
-                    setEditForm((prev) => ({
-                      ...prev,
-                      aktifDurum: event.target.value as "AKTIF" | "PASIF"
-                    }))
-                  }
-                >
-                  <option value="AKTIF">AKTIF</option>
-                  <option value="PASIF">PASIF</option>
-                </select>
-              </label>
+              <FormField
+                label="Ad"
+                name="edit-ad"
+                value={editForm.ad}
+                onChange={(value) => setEditForm((prev) => ({ ...prev, ad: value }))}
+                required
+              />
+              <FormField
+                label="Soyad"
+                name="edit-soyad"
+                value={editForm.soyad}
+                onChange={(value) => setEditForm((prev) => ({ ...prev, soyad: value }))}
+                required
+              />
+              <FormField
+                label="Telefon"
+                name="edit-telefon"
+                type="tel"
+                value={editForm.telefon}
+                onChange={(value) => setEditForm((prev) => ({ ...prev, telefon: value }))}
+              />
+              <FormField
+                as="select"
+                label="Durum"
+                name="edit-aktif"
+                value={editForm.aktifDurum}
+                onChange={(value) =>
+                  setEditForm((prev) => ({ ...prev, aktifDurum: value as "AKTIF" | "PASIF" }))
+                }
+                selectOptions={aktifDurumOptions}
+              />
 
               {editErrorMessage ? <p className="personel-create-error">{editErrorMessage}</p> : null}
 
-              <div className="module-filter-actions">
+              <div className="form-actions-row">
                 <button type="submit" className="universal-btn-aux" disabled={isSubmitting}>
                   {isSubmitting ? "Kaydediliyor..." : "Kaydet"}
                 </button>
@@ -216,8 +205,6 @@ export function PersonelDetayPage() {
           )}
         </div>
       ) : null}
-
-      <Link to="/personeller">Personel listesine don</Link>
     </section>
   );
 }

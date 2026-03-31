@@ -27,47 +27,6 @@
   border-color: rgba(239, 68, 68, 0.6);
 }
 
-.module-filter-form {
-  display: grid;
-  gap: var(--space-2);
-  padding: var(--space-2);
-  border: 1px solid var(--line-soft);
-  border-radius: var(--radius-md);
-}
-
-.module-filter-grid {
-  display: grid;
-  gap: var(--space-2);
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-}
-
-.module-filter-field {
-  display: grid;
-  gap: var(--space-1);
-}
-
-.module-filter-field input,
-.module-filter-field select {
-  width: 100%;
-  border: 1px solid var(--line-soft);
-  border-radius: var(--radius-sm);
-  background: var(--bg-content);
-  color: var(--txt);
-  padding: 8px 10px;
-}
-
-.module-filter-field input:focus,
-.module-filter-field select:focus {
-  outline: 1px solid var(--theme-color);
-  outline-offset: 0;
-}
-
-.module-filter-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-}
-
 .module-pagination {
   display: flex;
   align-items: center;

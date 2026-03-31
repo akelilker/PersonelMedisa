@@ -1,10 +1,16 @@
 import { emitAuthForbidden, emitAuthUnauthorized } from "../lib/storage/auth-events";
 import { getStoredAuthToken } from "../lib/storage/auth-session";
 import type { ApiError, ApiResponse } from "../types/api";
+import { resolveDemoApiResponse } from "./mock-demo";
 
 const ENV_API_BASE_URL = (
   import.meta as ImportMeta & { env?: Record<string, string | undefined> }
 ).env?.VITE_API_BASE_URL;
+const DEMO_API_FALLBACK_ENABLED =
+  (
+    (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env
+      ?.VITE_DEMO_API_FALLBACK ?? "true"
+  ).toLowerCase() !== "false";
 
 function normalizeBase(base: string) {
   const trimmed = base.trim();
@@ -160,6 +166,13 @@ export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T
 
     if (response.status !== 404) {
       throw lastError;
+    }
+  }
+
+  if (DEMO_API_FALLBACK_ENABLED) {
+    const mock = resolveDemoApiResponse(path, init);
+    if (mock !== null) {
+      return mock as T;
     }
   }
 

@@ -90,4 +90,41 @@ describe("auth.api login", () => {
       message: "Kullanici adi veya sifre hatali."
     });
   });
+
+  it("falls back to demo session when login endpoint returns 404", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        createJsonResponse(
+          {
+            data: null,
+            errors: [{ code: "NOT_FOUND", message: "Endpoint bulunamadi." }]
+          },
+          404
+        )
+      )
+    );
+
+    const session = await login({ username: "birim_demo", password: "secret" });
+    expect(session.user.rol).toBe("BIRIM_AMIRI");
+    expect(session.ui_profile).toBe("birim");
+  });
+
+  it("falls back to demo session when backend returns html payload", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response("<!doctype html><html><body>fallback</body></html>", {
+          status: 200,
+          headers: {
+            "Content-Type": "text/html"
+          }
+        })
+      )
+    );
+
+    const session = await login({ username: "yonetici_demo", password: "secret" });
+    expect(session.user.rol).toBe("GENEL_YONETICI");
+    expect(session.ui_profile).toBe("yonetim");
+  });
 });

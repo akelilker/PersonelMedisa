@@ -3,10 +3,7 @@
   top: 0;
   left: 0;
   right: 0;
-  bottom: calc(
-    var(--app-footer-real-height) + var(--app-footer-gap) + var(--modal-gap-above-footer) +
-      env(safe-area-inset-bottom, 0px)
-  );
+  bottom: calc(var(--app-footer-real-height) + var(--app-footer-gap) + env(safe-area-inset-bottom, 0px));
   z-index: var(--z-modal-overlay);
   display: none;
   justify-content: center;
@@ -15,6 +12,7 @@
   box-sizing: border-box;
   overflow: visible;
   background: var(--bg);
+  isolation: isolate;
 }
 
 .modal-overlay.open,
@@ -23,6 +21,7 @@
 }
 
 .modal-container {
+  position: relative;
   width: min(100%, 500px);
   height: 100%;
   max-height: 100%;
@@ -63,14 +62,16 @@
   position: absolute;
   left: 50%;
   transform: translateX(-50%);
-  width: 100%;
+  width: calc(100% - 140px);
   text-align: center;
   pointer-events: none;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   line-height: 1;
   color: var(--txt);
   font-size: 17px;
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: 0.05em;
 }
 
@@ -89,16 +90,18 @@
   right: 14px;
   top: 50%;
   transform: translateY(-50%);
-  border: 1px solid var(--line-soft);
+  border: 1px solid rgba(255, 255, 255, 0.22);
   border-radius: var(--radius-sm);
   background: transparent;
-  color: inherit;
+  color: var(--txt);
   padding: 4px 8px;
   cursor: pointer;
+  transition: border-color 0.2s ease, color 0.2s ease;
 }
 
 .modal-close-btn:hover {
-  border-color: rgba(var(--theme-color-rgb), 0.82);
+  border-color: rgba(var(--theme-color-rgb), 0.85);
+  color: #ffffff;
 }
 
 body.modal-open {

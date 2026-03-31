@@ -1,6 +1,72 @@
 .icons-row {
-  display: flex;
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  justify-content: space-between;
-  margin-bottom: var(--space-2);
+  gap: 8px;
+  min-height: 34px;
+}
+
+.icons-row-left {
+  min-width: 0;
+}
+
+.pwa-install-center {
+  min-width: 0;
+}
+
+.icons-row-right {
+  position: relative;
+  min-width: 0;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 16px;
+}
+
+.icon-btn {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  color: rgba(240, 240, 240, 0.66);
+  cursor: pointer;
+  padding: 4px;
+  transition: color 0.2s ease, transform 0.2s ease;
+}
+
+.icon-btn svg {
+  display: block;
+}
+
+.icon-btn:hover {
+  color: #ffffff;
+}
+
+.icon-btn.notification-red {
+  color: var(--theme-color);
+}
+
+.icon-btn.notification-orange {
+  color: #ff9f2f;
+}
+
+.icon-btn.notification-pulse {
+  animation: notificationPulse 2s ease-in-out infinite;
+}
+
+@keyframes notificationPulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.08);
+  }
+}
+
+@media (max-width: 640px) {
+  .icons-row-right {
+    gap: 12px;
+  }
 }

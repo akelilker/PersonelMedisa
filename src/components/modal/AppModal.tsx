@@ -25,8 +25,33 @@ export function AppModal({ title, children, onClose }: AppModalProps) {
     };
   }, []);
 
+  useEffect(() => {
+    const handleClose = onClose;
+    if (!handleClose) {
+      return;
+    }
+
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        handleClose?.();
+      }
+    }
+
+    document.addEventListener("keydown", handleEscape);
+    return () => {
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [onClose]);
+
   return (
-    <div className="modal-overlay open">
+    <div
+      className="modal-overlay open"
+      onMouseDown={(event) => {
+        if (onClose && event.target === event.currentTarget) {
+          onClose();
+        }
+      }}
+    >
       <div className="modal-container">
         <div className="modal-header">
           <h2>{title}</h2>

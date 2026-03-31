@@ -1,3 +1,51 @@
 .settings-dropdown {
+  display: none;
   position: absolute;
+  top: 32px;
+  right: 0;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  width: min(275px, calc(100vw - 32px));
+  z-index: var(--z-notifications);
+  padding: 0;
+  box-shadow: none;
+  overflow: visible;
+}
+
+.settings-dropdown.open {
+  display: block;
+}
+
+.settings-dropdown button {
+  width: 100%;
+  margin: 0 0 2px;
+  padding: 12px;
+  min-height: 48px;
+  text-align: right;
+  background: var(--bg);
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 10px;
+  color: rgba(240, 240, 240, 0.88);
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  transition: border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+  box-sizing: border-box;
+}
+
+.settings-dropdown button:hover {
+  border-color: rgba(var(--theme-color-rgb), 0.85);
+  color: #ffffff;
+}
+
+.settings-dropdown .settings-logout-btn {
+  color: var(--theme-color);
+}
+
+@media (max-width: 640px) {
+  .settings-dropdown {
+    width: min(300px, calc(100vw - 28px));
+  }
 }

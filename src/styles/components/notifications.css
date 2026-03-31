@@ -1,4 +1,128 @@
-.notification-item {
+.notifications-dropdown {
+  overflow-y: auto;
+  overflow-x: hidden;
+  max-height: min(56vh, 420px);
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.notifications-dropdown::-webkit-scrollbar {
+  display: none;
+}
+
+.notifications-dropdown .notifications-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  margin-bottom: 6px;
+  padding: 2px 0;
+  background: linear-gradient(
+    180deg,
+    rgba(8, 13, 22, 0.98) 0%,
+    rgba(8, 13, 22, 0.92) 70%,
+    rgba(8, 13, 22, 0) 100%
+  );
+}
+
+.notifications-dropdown .notifications-mark-all-read-btn {
+  min-height: 0;
+  height: auto;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: rgba(240, 240, 240, 0.88);
+  font-size: 11.5px;
+  font-weight: 600;
+  text-align: left;
+  justify-content: flex-start;
+}
+
+.notifications-dropdown .notifications-mark-all-read-btn:hover {
+  background: transparent;
+  box-shadow: none;
+  border: none;
+  color: var(--theme-color);
+  text-decoration: underline;
+}
+
+.notifications-dropdown .notification-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  min-height: 48px;
+  padding: 10px 12px 8px;
+  text-align: left;
+  white-space: normal;
   border: 1px solid rgba(255, 255, 255, 0.25);
-  border-radius: 6px;
+}
+
+.notifications-dropdown .notification-item:hover {
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.notifications-dropdown .notification-item.notification-unread {
+  border-color: rgba(var(--theme-color-rgb), 0.82);
+}
+
+.notifications-dropdown .notification-item.date-warning-red-border {
+  border-color: rgba(var(--theme-color-rgb), 0.66);
+  box-shadow: 0 0 8px rgba(var(--theme-color-rgb), 0.18);
+}
+
+.notifications-dropdown .notification-item.date-warning-orange-border {
+  border-color: rgba(255, 159, 47, 0.72);
+  box-shadow: 0 0 8px rgba(255, 159, 47, 0.18);
+}
+
+.notifications-dropdown .notification-item.notification-empty {
+  justify-content: center;
+  text-align: center;
+}
+
+.notifications-dropdown .notif-line1 {
+  width: 100%;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+  margin-bottom: 2px;
+  word-break: break-word;
+}
+
+.notifications-dropdown .notif-line2 {
+  width: 100%;
+  color: rgba(240, 240, 240, 0.64);
+  font-size: 11px;
+  line-height: 1.2;
+  word-break: break-word;
+}
+
+.notifications-dropdown .notification-error {
+  margin: 2px 2px 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(var(--theme-color-rgb), 0.28);
+  color: rgba(240, 240, 240, 0.75);
+  font-size: 11px;
+  line-height: 1.25;
+  background: rgba(var(--theme-color-rgb), 0.08);
+}
+
+body:not(.modal-open):has(.notifications-dropdown.open) .app-shell {
+  overflow: visible;
+  isolation: auto;
+}
+
+body:not(.modal-open):has(.notifications-dropdown.open) .content-wrap {
+  overflow-y: visible;
+  position: relative;
+  z-index: calc(var(--z-footer) + 15);
+}
+
+body:not(.modal-open):has(.notifications-dropdown.open) .icons-row {
+  z-index: 2;
 }

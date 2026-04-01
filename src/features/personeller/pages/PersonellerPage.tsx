@@ -61,6 +61,16 @@ export function PersonellerPage() {
     { value: "AKTIF", label: "AKTIF" },
     { value: "PASIF", label: "PASIF" }
   ];
+  const kanGrubuOptions = [
+    { value: "A Rh+", label: "A Rh+" },
+    { value: "A Rh-", label: "A Rh-" },
+    { value: "B Rh+", label: "B Rh+" },
+    { value: "B Rh-", label: "B Rh-" },
+    { value: "AB Rh+", label: "AB Rh+" },
+    { value: "AB Rh-", label: "AB Rh-" },
+    { value: "0 Rh+", label: "0 Rh+" },
+    { value: "0 Rh-", label: "0 Rh-" }
+  ];
 
   const { draft } = listQuery;
   const page = listQuery.page;
@@ -253,10 +263,13 @@ export function PersonellerPage() {
                 onChange={(value) => setCreateForm((prev) => ({ ...prev, dogumYeri: value }))}
               />
               <FormField
+                as="select"
                 label="Kan Grubu"
                 name="create-kan"
                 value={createForm.kanGrubu}
                 onChange={(value) => setCreateForm((prev) => ({ ...prev, kanGrubu: value }))}
+                placeholderOption={{ value: "", label: "Seciniz" }}
+                selectOptions={kanGrubuOptions}
               />
               <FormField
                 label="Sicil No"

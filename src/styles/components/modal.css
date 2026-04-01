@@ -3,7 +3,9 @@
   top: 0;
   left: 0;
   right: 0;
-  bottom: calc(var(--app-footer-real-height) + var(--app-footer-gap) + env(safe-area-inset-bottom, 0px));
+  bottom: calc(
+    var(--app-footer-real-height) + var(--modal-footer-gap) + env(safe-area-inset-bottom, 0px)
+  );
   z-index: var(--z-modal-overlay);
   display: none;
   justify-content: center;

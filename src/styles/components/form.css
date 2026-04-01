@@ -19,6 +19,13 @@
   color: var(--txt);
 }
 
+input.form-input[type="date"],
+input.form-input[type="month"],
+input.form-input[type="time"] {
+  appearance: auto;
+  -webkit-appearance: auto;
+}
+
 textarea.form-input {
   min-height: 80px;
   padding: 8px 12px;

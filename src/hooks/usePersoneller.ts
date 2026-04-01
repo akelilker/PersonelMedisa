@@ -391,7 +391,10 @@ export function usePersonelDetail(parsedPersonelId: number, hasValidId: boolean)
   const { session } = useAuth();
   const activeSubeId = session?.active_sube_id ?? null;
   const revision = useAppDataRevision();
-  const detailKey = useMemo(() => dataCacheKeys.personelDetail(parsedPersonelId), [parsedPersonelId]);
+  const detailKey = useMemo(
+    () => dataCacheKeys.personelDetail(activeSubeId, parsedPersonelId),
+    [activeSubeId, parsedPersonelId]
+  );
   const cached = useMemo(() => getCacheEntry<Personel>(detailKey), [detailKey, revision]);
 
   const [personel, setPersonel] = useState<Personel | null>(null);

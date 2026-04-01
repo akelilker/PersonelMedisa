@@ -12,6 +12,7 @@ import { HaftalikKapanisPage } from "../features/haftalik-kapanis/pages/Haftalik
 import { RaporlarPage } from "../features/raporlar/pages/RaporlarPage";
 import { FinansPage } from "../features/finans/pages/FinansPage";
 import { LoginPage } from "../features/auth/pages/LoginPage";
+import { InternalDiagnosticsPage } from "./InternalDiagnosticsPage";
 import {
   PERSONELLER_LIST_ANY,
   ROUTE_PERMISSION,
@@ -51,6 +52,7 @@ export function AppRoutes() {
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/yetkisiz" element={<UnauthorizedPage />} />
+      <Route path="/internal/diagnostics" element={<InternalDiagnosticsPage />} />
 
       <Route
         element={

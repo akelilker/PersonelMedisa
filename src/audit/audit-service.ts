@@ -23,6 +23,8 @@ function readUserIdFromAuthStorage(): number | null {
 }
 
 export type AuditAction =
+  | "AUTH_LOGIN_SUCCESS"
+  | "AUTH_LOGOUT"
   | "PERSONEL_CREATE"
   | "PERSONEL_UPDATE"
   | "SUREC_CREATE"

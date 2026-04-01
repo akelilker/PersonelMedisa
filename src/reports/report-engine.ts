@@ -2,7 +2,10 @@ import type { Personel } from "../types/personel";
 import type { Surec } from "../types/surec";
 import type { FinansKalem } from "../types/finans";
 import type { GunlukPuantaj } from "../types/puantaj";
-import { dataCacheKeys, getActiveSube, getAppData } from "../data/data-manager";
+import { dataCacheKeys, getActiveSube, getAppData, getAppDataRevision } from "../data/data-manager";
+import { getReportCacheMeta, recordOfflineReportGeneration } from "./report-cache-meta";
+
+export { getReportCacheMeta };
 import type { ModuleFilterBase } from "../lib/filters/module-filter-schema";
 import { matchesDateRange } from "../lib/filters/module-filter-schema";
 
@@ -99,19 +102,21 @@ function collectPuantajFromCache(filters: ModuleFilterBase): GunlukPuantaj[] {
  */
 export function generateReport(type: ReportEngineType, filters: ModuleFilterBase): ReportEngineRow[] {
   const sube = subeForEngine(filters);
+  let rows: ReportEngineRow[];
 
   switch (type) {
     case "personel-ozet": {
-      return readCachedPersonelFirstPage(sube, filters).map((p) => ({
+      rows = readCachedPersonelFirstPage(sube, filters).map((p) => ({
         personel_id: p.id,
         ad: p.ad,
         soyad: p.soyad,
         aktif_durum: p.aktif_durum,
         tc_kimlik_no: p.tc_kimlik_no
       }));
+      break;
     }
     case "izin-durumu": {
-      return readCachedSureclerFirstPage(sube, filters)
+      rows = readCachedSureclerFirstPage(sube, filters)
         .filter((s) => /IZIN|İZIN|RAPOR|URLA/i.test(s.surec_turu))
         .map((s) => ({
           surec_id: s.id,
@@ -121,20 +126,22 @@ export function generateReport(type: ReportEngineType, filters: ModuleFilterBase
           bitis: s.bitis_tarihi ?? "",
           state: s.state ?? ""
         }));
+      break;
     }
     case "puantaj": {
-      return collectPuantajFromCache(filters).map((p) => ({
+      rows = collectPuantajFromCache(filters).map((p) => ({
         personel_id: p.personel_id,
         tarih: p.tarih,
         giris: p.giris_saati ?? "",
         cikis: p.cikis_saati ?? "",
         state: p.state ?? ""
       }));
+      break;
     }
     case "finans": {
-      const rows = readCachedFinansFirstPage(sube, filters);
-      const toplam = rows.reduce((acc, r) => acc + (r.tutar ?? 0), 0);
-      const mapped = rows.map((r) => ({
+      const fin = readCachedFinansFirstPage(sube, filters);
+      const toplam = fin.reduce((acc, r) => acc + (r.tutar ?? 0), 0);
+      const mapped = fin.map((r) => ({
         id: r.id,
         personel_id: r.personel_id,
         donem: r.donem,
@@ -142,7 +149,7 @@ export function generateReport(type: ReportEngineType, filters: ModuleFilterBase
         tutar: r.tutar,
         state: r.state ?? ""
       }));
-      return [
+      rows = [
         ...mapped,
         {
           id: -1,
@@ -153,8 +160,12 @@ export function generateReport(type: ReportEngineType, filters: ModuleFilterBase
           state: ""
         }
       ];
+      break;
     }
     default:
-      return [];
+      rows = [];
   }
+
+  recordOfflineReportGeneration(getAppDataRevision());
+  return rows;
 }

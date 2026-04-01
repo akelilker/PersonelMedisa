@@ -34,7 +34,8 @@ import type { FinansKalem } from "../types/finans";
 import type { Personel } from "../types/personel";
 import type { Surec } from "../types/surec";
 import type { GunlukPuantaj } from "../types/puantaj";
-import type { RealtimeEnvelope } from "../realtime/realtime-manager";
+import type { RealtimeEnvelope, RealtimeEventType } from "../realtime/realtime-manager";
+import { markReportCacheStale } from "../reports/report-cache-meta";
 import {
   APP_DATA_SCHEMA_VERSION,
   APP_DATA_STORAGE_KEY,
@@ -249,7 +250,8 @@ function subeSeg(subeId: number | null): string {
 export const dataCacheKeys = {
   personellerList: (subeId: number | null, search: string, aktiflik: string, page: number) =>
     `personeller:list:s${subeSeg(subeId)}:${search}|${aktiflik}|${page}`,
-  personelDetail: (id: number) => `personeller:detail:${id}`,
+  personelDetail: (subeId: number | null, id: number) =>
+    `personeller:detail:s${subeSeg(subeId)}:${id}`,
   referansPersonel: () => `referans:personel-bundle`,
   sureclerList: (
     subeId: number | null,
@@ -260,12 +262,12 @@ export const dataCacheKeys = {
     bit: string,
     page: number
   ) => `surecler:list:s${subeSeg(subeId)}:${personelId}|${surecTuru}|${state}|${bas}|${bit}|${page}`,
-  surecDetail: (id: number) => `surecler:detail:${id}`,
+  surecDetail: (subeId: number | null, id: number) => `surecler:detail:s${subeSeg(subeId)}:${id}`,
   surecTuruRef: () => `referans:surec-turu`,
   bildirimlerList: (subeId: number | null, personelId: string, tur: string, tarih: string, page: number) =>
     `bildirimler:list:s${subeSeg(subeId)}:${personelId}|${tur}|${tarih}|${page}`,
   bildirimlerHeader: (subeId: number | null) => `bildirimler:header:8:s${subeSeg(subeId)}`,
-  bildirimDetail: (id: number) => `bildirimler:detail:${id}`,
+  bildirimDetail: (subeId: number | null, id: number) => `bildirimler:detail:s${subeSeg(subeId)}:${id}`,
   bildirimRef: () => `referans:bildirim-meta`,
   finansList: (subeId: number | null, personelId: string, donem: string, kalem: string, state: string, page: number) =>
     `finans:list:s${subeSeg(subeId)}:${personelId}|${donem}|${kalem}|${state}|${page}`,
@@ -657,6 +659,127 @@ function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null;
 }
 
+function combineEntityMeta(entity: unknown, raw: unknown): Record<string, unknown> | null {
+  const e = isRecord(entity) ? entity : {};
+  const r = isRecord(raw) ? raw : {};
+  return { ...r, ...e };
+}
+
+function extractVersion(meta: Record<string, unknown> | null): number | null {
+  if (!meta) {
+    return null;
+  }
+  if (typeof meta.version === "number" && Number.isFinite(meta.version)) {
+    return meta.version;
+  }
+  if (typeof meta.__v === "number" && Number.isFinite(meta.__v)) {
+    return meta.__v;
+  }
+  return null;
+}
+
+function extractTimeMs(meta: Record<string, unknown> | null): number | null {
+  if (!meta) {
+    return null;
+  }
+  const keys = ["updated_at", "updatedAt", "timestamp", "tarih"] as const;
+  for (const k of keys) {
+    const v = meta[k];
+    if (typeof v === "string" && v.trim() !== "") {
+      const ms = Date.parse(v);
+      if (!Number.isNaN(ms)) {
+        return ms;
+      }
+    }
+    if (typeof v === "number" && Number.isFinite(v)) {
+      return v;
+    }
+  }
+  return null;
+}
+
+/**
+ * Realtime / optimistic carpismalarinda tek karar noktasi:
+ * version > tarih > fallback last-write-wins (incoming uygulanir).
+ */
+export function shouldApplyRealtimeUpdate<T>(
+  current: T | undefined,
+  incoming: T,
+  incomingRaw?: unknown
+): boolean {
+  if (current === undefined) {
+    return true;
+  }
+  const cur = combineEntityMeta(current as unknown, undefined);
+  const inc = combineEntityMeta(incoming as unknown, incomingRaw);
+  if (!cur || !inc) {
+    return true;
+  }
+
+  const cv = extractVersion(cur);
+  const iv = extractVersion(inc);
+
+  if (cv !== null && iv !== null) {
+    if (iv > cv) {
+      return true;
+    }
+    if (iv < cv) {
+      return false;
+    }
+  } else if (iv !== null && cv === null) {
+    return true;
+  }
+
+  const ct = extractTimeMs(cur);
+  const it = extractTimeMs(inc);
+
+  if (ct !== null && it !== null) {
+    if (it > ct) {
+      return true;
+    }
+    if (it < ct) {
+      return false;
+    }
+  } else if (it !== null && ct === null) {
+    return true;
+  } else if (ct !== null && it === null) {
+    return false;
+  }
+
+  return true;
+}
+
+export type RealtimeCacheImpact = {
+  detailCacheKey: string;
+  listKeyPrefixes: readonly string[];
+};
+
+/** Realtime olayinin guncelledigi onbellek anahtarlari (tek safta / matris). */
+export function getRealtimeCacheImpact(
+  type: RealtimeEventType,
+  subeKey: number | null,
+  entityId: number
+): RealtimeCacheImpact {
+  const seg = subeSeg(subeKey);
+  switch (type) {
+    case "PERSONEL_GUNCELLENDI":
+      return {
+        detailCacheKey: dataCacheKeys.personelDetail(subeKey, entityId),
+        listKeyPrefixes: [`personeller:list:s${seg}:`]
+      };
+    case "SUREC_GUNCELLENDI":
+      return {
+        detailCacheKey: dataCacheKeys.surecDetail(subeKey, entityId),
+        listKeyPrefixes: [`surecler:list:s${seg}:`]
+      };
+    case "BILDIRIM_YENI":
+      return {
+        detailCacheKey: dataCacheKeys.bildirimDetail(subeKey, entityId),
+        listKeyPrefixes: [`bildirimler:list:s${seg}:`]
+      };
+  }
+}
+
 function parsePersonelRealtimePayload(p: unknown): Personel | null {
   if (!isRecord(p) || typeof p.id !== "number") {
     return null;
@@ -729,9 +852,10 @@ function realtimeSubeMatchesActive(eventSube: number | undefined): boolean {
   return eventSube === active;
 }
 
-function mergePersonelIntoListCaches(row: Personel): void {
+function mergePersonelIntoListCachesForSube(row: Personel, subeKey: number | null, incomingRaw: unknown): void {
+  const prefix = `personeller:list:s${subeSeg(subeKey)}:`;
   for (const key of Object.keys(ensureAppData().cache)) {
-    if (!key.startsWith("personeller:list:")) {
+    if (!key.startsWith(prefix)) {
       continue;
     }
     const prev = getCacheEntry<PaginatedResult<Personel>>(key);
@@ -740,6 +864,10 @@ function mergePersonelIntoListCaches(row: Personel): void {
     }
     const idx = prev.items.findIndex((i) => i.id === row.id);
     if (idx === -1) {
+      continue;
+    }
+    const curRow = prev.items[idx];
+    if (!shouldApplyRealtimeUpdate(curRow, row, incomingRaw)) {
       continue;
     }
     mergeCacheEntry<PaginatedResult<Personel>>(key, (base) => {
@@ -751,9 +879,10 @@ function mergePersonelIntoListCaches(row: Personel): void {
   }
 }
 
-function mergeSurecIntoListCaches(row: Surec): void {
+function mergeSurecIntoListCachesForSube(row: Surec, subeKey: number | null, incomingRaw: unknown): void {
+  const prefix = `surecler:list:s${subeSeg(subeKey)}:`;
   for (const key of Object.keys(ensureAppData().cache)) {
-    if (!key.startsWith("surecler:list:")) {
+    if (!key.startsWith(prefix)) {
       continue;
     }
     const prev = getCacheEntry<PaginatedResult<Surec>>(key);
@@ -762,6 +891,10 @@ function mergeSurecIntoListCaches(row: Surec): void {
     }
     const idx = prev.items.findIndex((i) => i.id === row.id);
     if (idx === -1) {
+      continue;
+    }
+    const curRow = prev.items[idx];
+    if (!shouldApplyRealtimeUpdate(curRow, row, incomingRaw)) {
       continue;
     }
     mergeCacheEntry<PaginatedResult<Surec>>(key, (base) => {
@@ -773,16 +906,20 @@ function mergeSurecIntoListCaches(row: Surec): void {
   }
 }
 
-function mergeBildirimHeader(sube: number | null, b: Bildirim): void {
+function mergeBildirimHeader(sube: number | null, b: Bildirim, incomingRaw: unknown): void {
   const key = dataCacheKeys.bildirimlerHeader(sube);
   mergeCacheEntry<PaginatedResult<Bildirim>>(key, (prev) => {
     const base = prev ?? emptyPaginated<Bildirim>();
+    const existing = base.items.find((i) => i.id === b.id);
+    if (existing && !shouldApplyRealtimeUpdate(existing, b, incomingRaw)) {
+      return base;
+    }
     const withoutDup = base.items.filter((i) => i.id !== b.id);
     return { ...base, items: [b, ...withoutDup].slice(0, 32) };
   });
 }
 
-function prependBildirimToFirstPageLists(sube: number | null, b: Bildirim): void {
+function prependBildirimToFirstPageLists(sube: number | null, b: Bildirim, incomingRaw: unknown): void {
   const seg = subeSeg(sube);
   const prefix = `bildirimler:list:s${seg}:`;
   for (const key of Object.keys(ensureAppData().cache)) {
@@ -795,8 +932,17 @@ function prependBildirimToFirstPageLists(sube: number | null, b: Bildirim): void
     }
     mergeCacheEntry<PaginatedResult<Bildirim>>(key, (base) => {
       const cur = base!;
-      const withoutDup = cur.items.filter((i) => i.id !== b.id);
-      return { ...cur, items: [b, ...withoutDup] };
+      const idx = cur.items.findIndex((i) => i.id === b.id);
+      if (idx === -1) {
+        return { ...cur, items: [b, ...cur.items] };
+      }
+      const existing = cur.items[idx];
+      if (!shouldApplyRealtimeUpdate(existing, b, incomingRaw)) {
+        return cur;
+      }
+      const items = [...cur.items];
+      items[idx] = b;
+      return { ...cur, items };
     });
   }
 }
@@ -817,8 +963,13 @@ export function handleRealtimeEnvelope(env: RealtimeEnvelope): void {
       if (!row) {
         return;
       }
-      setCacheEntry(dataCacheKeys.personelDetail(row.id), row);
-      mergePersonelIntoListCaches(row);
+      const impact = getRealtimeCacheImpact("PERSONEL_GUNCELLENDI", keySube, row.id);
+      const prevDetail = getCacheEntry<Personel>(impact.detailCacheKey);
+      if (shouldApplyRealtimeUpdate(prevDetail, row, env.payload)) {
+        setCacheEntry(impact.detailCacheKey, row);
+      }
+      mergePersonelIntoListCachesForSube(row, keySube, env.payload);
+      markReportCacheStale();
       return;
     }
     case "SUREC_GUNCELLENDI": {
@@ -826,8 +977,13 @@ export function handleRealtimeEnvelope(env: RealtimeEnvelope): void {
       if (!row) {
         return;
       }
-      setCacheEntry(dataCacheKeys.surecDetail(row.id), row);
-      mergeSurecIntoListCaches(row);
+      const impact = getRealtimeCacheImpact("SUREC_GUNCELLENDI", keySube, row.id);
+      const prevDetail = getCacheEntry<Surec>(impact.detailCacheKey);
+      if (shouldApplyRealtimeUpdate(prevDetail, row, env.payload)) {
+        setCacheEntry(impact.detailCacheKey, row);
+      }
+      mergeSurecIntoListCachesForSube(row, keySube, env.payload);
+      markReportCacheStale();
       return;
     }
     case "BILDIRIM_YENI": {
@@ -835,9 +991,14 @@ export function handleRealtimeEnvelope(env: RealtimeEnvelope): void {
       if (!b) {
         return;
       }
-      setCacheEntry(dataCacheKeys.bildirimDetail(b.id), b);
-      mergeBildirimHeader(keySube, b);
-      prependBildirimToFirstPageLists(keySube, b);
+      const impact = getRealtimeCacheImpact("BILDIRIM_YENI", keySube, b.id);
+      const prevDetail = getCacheEntry<Bildirim>(impact.detailCacheKey);
+      if (shouldApplyRealtimeUpdate(prevDetail, b, env.payload)) {
+        setCacheEntry(impact.detailCacheKey, b);
+      }
+      mergeBildirimHeader(keySube, b, env.payload);
+      prependBildirimToFirstPageLists(keySube, b, env.payload);
+      markReportCacheStale();
       return;
     }
     default:

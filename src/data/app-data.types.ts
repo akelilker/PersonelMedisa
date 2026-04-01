@@ -18,7 +18,7 @@ import type { Surec } from "../types/surec";
 
 export const APP_DATA_STORAGE_KEY = "medisa_app_data";
 export const APP_SYNC_QUEUE_KEY = "medisa_sync_queue";
-export const APP_DATA_SCHEMA_VERSION = 3;
+export const APP_DATA_SCHEMA_VERSION = 4;
 
 export type CacheEnvelope<T> = {
   data: T;

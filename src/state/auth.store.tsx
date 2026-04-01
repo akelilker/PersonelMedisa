@@ -13,6 +13,7 @@ import {
   getSession,
   setActiveSubeId as persistActiveSubeId
 } from "../auth/auth-manager";
+import { logAction } from "../audit/audit-service";
 import { bumpAppDataRevision, clearAllAppPersistence, loadDataFromServer } from "../data/data-manager";
 import { disconnect as disconnectRealtime } from "../realtime/realtime-manager";
 import { onAuthUnauthorized } from "../lib/storage/auth-events";
@@ -36,6 +37,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [session, setSession] = useState<AuthSession | null>(() => getSession());
 
   const forceLogout = useCallback(() => {
+    const before = getSession();
+    logAction({
+      action: "AUTH_LOGOUT",
+      user_id: before?.user?.id ?? null,
+      payload: { reason: "unauthorized_or_forbidden" }
+    });
     disconnectRealtime();
     clearAuthEverywhere();
     clearAllAppPersistence();
@@ -49,11 +56,22 @@ export function AuthProvider({ children }: AuthProviderProps) {
       credentials.rememberMe === true
     );
     setSession(nextSession);
+    logAction({
+      action: "AUTH_LOGIN_SUCCESS",
+      user_id: nextSession.user.id,
+      payload: { username: credentials.username.trim(), ui_profile: nextSession.ui_profile }
+    });
     bumpAppDataRevision();
     void loadDataFromServer();
   }, []);
 
   const logout = useCallback(() => {
+    const before = getSession();
+    logAction({
+      action: "AUTH_LOGOUT",
+      user_id: before?.user?.id ?? null,
+      payload: { reason: "user_initiated" }
+    });
     disconnectRealtime();
     clearAuthEverywhere();
     clearAllAppPersistence();

@@ -1,10 +1,13 @@
 import { AppProviders } from "./providers";
 import { AppRoutes } from "./routes";
+import { ErrorBoundary } from "./ErrorBoundary";
 
 export function App() {
   return (
     <AppProviders>
-      <AppRoutes />
+      <ErrorBoundary>
+        <AppRoutes />
+      </ErrorBoundary>
     </AppProviders>
   );
 }

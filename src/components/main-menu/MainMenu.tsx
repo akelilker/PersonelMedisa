@@ -45,6 +45,7 @@ export function MainMenu({ onKayitOpen }: MainMenuProps) {
         <button
           type="button"
           className={`menu-btn${isKayitSectionActive ? " is-active" : ""}`}
+          data-testid="menu-kayit"
           onClick={() => {
             const tab: KayitTab =
               isKayitSectionActive && location.pathname.startsWith("/surecler") ? "surec" : "yeni-kayit";
@@ -58,6 +59,7 @@ export function MainMenu({ onKayitOpen }: MainMenuProps) {
       <button
         type="button"
         className={`menu-btn${isOperasyonSectionActive ? " is-active" : ""}`}
+        data-testid="menu-operasyon"
         onClick={() => {
           if (operasyonTarget) {
             navigate(operasyonTarget);
@@ -71,6 +73,7 @@ export function MainMenu({ onKayitOpen }: MainMenuProps) {
       <button
         type="button"
         className={`menu-btn${isRaporSectionActive ? " is-active" : ""}`}
+        data-testid="menu-rapor"
         onClick={() => {
           if (raporTarget) {
             navigate(raporTarget);

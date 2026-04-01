@@ -560,7 +560,10 @@ export function useBildirimDetail(parsedBildirimId: number, hasValidId: boolean)
   const { session } = useAuth();
   const activeSubeId = session?.active_sube_id ?? null;
   const revision = useAppDataRevision();
-  const detailKey = useMemo(() => dataCacheKeys.bildirimDetail(parsedBildirimId), [parsedBildirimId]);
+  const detailKey = useMemo(
+    () => dataCacheKeys.bildirimDetail(activeSubeId, parsedBildirimId),
+    [activeSubeId, parsedBildirimId]
+  );
   const cached = useMemo(() => getCacheEntry<Bildirim>(detailKey), [detailKey, revision]);
 
   const [bildirim, setBildirim] = useState<Bildirim | null>(null);

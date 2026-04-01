@@ -8,6 +8,7 @@ import {
 import { handleRealtimeEnvelope } from "../data/data-manager";
 import { connect, disconnect, onMessage } from "../realtime/realtime-manager";
 import { AuthProvider, useAuth } from "../state/auth.store";
+import { GlobalErrorTelemetry } from "./GlobalErrorTelemetry";
 
 type AppProvidersProps = {
   children: ReactNode;
@@ -94,6 +95,7 @@ function AuthNavigationEffects() {
 export function AppProviders({ children }: AppProvidersProps) {
   return (
     <BrowserRouter basename={ROUTER_BASENAME} future={ROUTER_FUTURE_FLAGS}>
+      <GlobalErrorTelemetry />
       <AuthProvider>
         <GlobalApiErrorBanner />
         <AuthNavigationEffects />

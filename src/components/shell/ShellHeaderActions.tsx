@@ -466,6 +466,7 @@ export function ShellHeaderActions() {
         <button
           type="button"
           className="icon-btn"
+          data-testid="header-settings-toggle"
           onClick={() => {
             setIsSettingsOpen((prev) => !prev);
             setIsNotificationsOpen(false);
@@ -493,37 +494,37 @@ export function ShellHeaderActions() {
 
         <div id="settings-menu" className={`settings-dropdown${isSettingsOpen ? " open" : ""}`}>
           {canViewPersoneller ? (
-            <button type="button" onClick={() => navigateTo("/personeller")}>
+            <button type="button" data-testid="menu-personeller" onClick={() => navigateTo("/personeller")}>
               Personeller
             </button>
           ) : null}
           {canViewSurecler ? (
-            <button type="button" onClick={() => navigateTo("/surecler")}>
+            <button type="button" data-testid="menu-surecler" onClick={() => navigateTo("/surecler")}>
               Surecler
             </button>
           ) : null}
           {canViewBildirimler ? (
-            <button type="button" onClick={() => navigateTo("/bildirimler")}>
+            <button type="button" data-testid="menu-bildirimler" onClick={() => navigateTo("/bildirimler")}>
               Bildirimler
             </button>
           ) : null}
           {canViewPuantaj ? (
-            <button type="button" onClick={() => navigateTo("/puantaj")}>
+            <button type="button" data-testid="menu-puantaj" onClick={() => navigateTo("/puantaj")}>
               Puantaj
             </button>
           ) : null}
           {canViewHaftalikKapanis ? (
-            <button type="button" onClick={() => navigateTo("/haftalik-kapanis")}>
+            <button type="button" data-testid="menu-haftalik-kapanis" onClick={() => navigateTo("/haftalik-kapanis")}>
               Haftalik Kapanis
             </button>
           ) : null}
           {canViewRaporlar ? (
-            <button type="button" onClick={() => navigateTo("/raporlar")}>
+            <button type="button" data-testid="menu-raporlar" onClick={() => navigateTo("/raporlar")}>
               Raporlar
             </button>
           ) : null}
           {canViewFinans ? (
-            <button type="button" onClick={() => navigateTo("/finans")}>
+            <button type="button" data-testid="menu-finans" onClick={() => navigateTo("/finans")}>
               Finans
             </button>
           ) : null}

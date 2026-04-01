@@ -549,7 +549,10 @@ export function useSurecDetail(parsedSurecId: number, hasValidId: boolean) {
   const { session } = useAuth();
   const activeSubeId = session?.active_sube_id ?? null;
   const revision = useAppDataRevision();
-  const detailKey = useMemo(() => dataCacheKeys.surecDetail(parsedSurecId), [parsedSurecId]);
+  const detailKey = useMemo(
+    () => dataCacheKeys.surecDetail(activeSubeId, parsedSurecId),
+    [activeSubeId, parsedSurecId]
+  );
   const cached = useMemo(() => getCacheEntry<Surec>(detailKey), [detailKey, revision]);
   const [surec, setSurec] = useState<Surec | null>(null);
   const [isLoading, setIsLoading] = useState(true);

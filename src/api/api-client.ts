@@ -4,6 +4,7 @@ import { emitAuthForbidden, emitAuthUnauthorized } from "../lib/storage/auth-eve
 import { emitApiServerError } from "../lib/storage/api-global-events";
 import type { ApiError, ApiResponse } from "../types/api";
 import { resolveDemoApiResponse } from "./mock-demo";
+import { logApiFailure5xx, summarizeRequestBodyForLogs } from "../logging/error-logger";
 
 const ENV_API_BASE_URL = (
   import.meta as ImportMeta & { env?: Record<string, string | undefined> }
@@ -218,6 +219,13 @@ export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T
     } else if (isForbiddenStatus(response.status)) {
       emitAuthForbidden({ status: response.status, path });
     } else if (response.status >= 500) {
+      const method = (init?.method ?? "GET").toUpperCase();
+      logApiFailure5xx({
+        endpoint: path,
+        status: response.status,
+        method,
+        payload_summary: summarizeRequestBodyForLogs(init)
+      });
       const apiError = extractFirstApiError(payload);
       emitApiServerError({
         message: apiError?.message ?? "Sunucu hatasi. Lutfen daha sonra tekrar deneyin.",

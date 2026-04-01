@@ -30,6 +30,10 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Validate SPA rewrite file
+        run: |
+          test -f dist/.htaccess || (echo "dist/.htaccess missing. SPA routes will 404." && exit 1)
+
       - name: Upload dist to cPanel public_html/personelmedisa
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:

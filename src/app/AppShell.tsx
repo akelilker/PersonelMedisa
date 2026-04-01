@@ -44,7 +44,7 @@ export function AppShell({ children }: AppShellProps) {
           <div className="user-chip">
             <strong>{session?.user.ad_soyad ?? "-"}</strong>
             <span>
-              ({session?.user.rol ?? "-"} ·{" "}
+              ({session?.user.rol ?? "-"} -{" "}
               {session?.ui_profile === "birim_amiri" ? "Birim profili" : session ? "Yonetim profili" : "-"})
             </span>
           </div>
@@ -142,3 +142,4 @@ export function AppShell({ children }: AppShellProps) {
     </div>
   );
 }
+

@@ -16,21 +16,15 @@ export function MainMenu({ onKayitOpen }: MainMenuProps) {
   const canViewPersoneller = hasPermission("personeller.view") || hasPermission("personeller.view.sube");
   const canViewRaporlar = hasPermission("raporlar.view");
 
-  const isKayitSectionActive =
-    location.pathname.startsWith("/personeller") || location.pathname.startsWith("/surecler");
-  const isPersonelKartiActive = location.pathname.startsWith("/personeller");
-  const isRaporlarActive = location.pathname.startsWith("/raporlar");
-
   return (
     <div id="main-menu" className="menu-container">
       {canKayitSection ? (
         <button
           type="button"
-          className={`menu-btn${isKayitSectionActive ? " is-active" : ""}`}
+          className="menu-btn"
           data-testid="menu-giris-surec"
           onClick={() => {
-            const tab: KayitTab =
-              isKayitSectionActive && location.pathname.startsWith("/surecler") ? "surec" : "yeni-kayit";
+            const tab: KayitTab = location.pathname.startsWith("/surecler") ? "surec" : "yeni-kayit";
             onKayitOpen(tab);
           }}
         >
@@ -40,7 +34,7 @@ export function MainMenu({ onKayitOpen }: MainMenuProps) {
 
       <button
         type="button"
-        className={`menu-btn${isPersonelKartiActive ? " is-active" : ""}`}
+        className="menu-btn"
         data-testid="menu-personel-karti"
         onClick={() => {
           navigate("/personeller");
@@ -52,7 +46,7 @@ export function MainMenu({ onKayitOpen }: MainMenuProps) {
 
       <button
         type="button"
-        className={`menu-btn${isRaporlarActive ? " is-active" : ""}`}
+        className="menu-btn"
         data-testid="menu-raporlar"
         onClick={() => {
           navigate("/raporlar");

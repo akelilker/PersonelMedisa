@@ -4,7 +4,7 @@
   left: 0;
   right: 0;
   bottom: calc(
-    var(--app-footer-real-height) + var(--modal-footer-gap) + env(safe-area-inset-bottom, 0px)
+    var(--app-footer-real-height) + var(--modal-gap-above-footer) + env(safe-area-inset-bottom, 0px)
   );
   z-index: var(--z-modal-overlay);
   display: none;
@@ -120,4 +120,12 @@
 
 body.modal-open {
   overflow: hidden;
+}
+
+body.modal-open .modal-overlay {
+  isolation: auto;
+  background: var(--bg);
+  background-color: var(--bg);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }

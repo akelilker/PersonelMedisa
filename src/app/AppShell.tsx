@@ -67,7 +67,7 @@ export function AppShell({ children }: AppShellProps) {
 
       {isKayitModalOpen ? (
         <AppModal
-          title="KAYIT ISLEMLERI"
+          title="Personel Giris ve Surec Takibi"
           onClose={() => {
             setIsKayitModalOpen(false);
           }}

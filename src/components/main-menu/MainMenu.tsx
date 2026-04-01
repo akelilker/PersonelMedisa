@@ -10,34 +10,16 @@ type MainMenuProps = {
 export function MainMenu({ onKayitOpen }: MainMenuProps) {
   const location = useLocation();
   const navigate = useNavigate();
-  const { hasPermission, uiProfile } = useRoleAccess();
+  const { hasPermission } = useRoleAccess();
 
   const canKayitSection = hasPermission("personeller.create") || hasPermission("surecler.create");
-  const canViewBildirimler = hasPermission("bildirimler.view");
-  const canViewPuantaj = hasPermission("puantaj.view");
-  const canViewHaftalikKapanis = hasPermission("haftalik-kapanis.view");
+  const canViewPersoneller = hasPermission("personeller.view") || hasPermission("personeller.view.sube");
   const canViewRaporlar = hasPermission("raporlar.view");
-  const canViewFinans = hasPermission("finans.view");
-
-  const operasyonTarget = canViewBildirimler
-    ? "/bildirimler"
-    : canViewPuantaj
-      ? "/puantaj"
-      : canViewHaftalikKapanis
-        ? "/haftalik-kapanis"
-        : null;
-  const raporTarget = canViewRaporlar ? "/raporlar" : canViewFinans ? "/finans" : null;
 
   const isKayitSectionActive =
     location.pathname.startsWith("/personeller") || location.pathname.startsWith("/surecler");
-  const isOperasyonSectionActive =
-    location.pathname.startsWith("/bildirimler") ||
-    location.pathname.startsWith("/puantaj") ||
-    location.pathname.startsWith("/haftalik-kapanis");
-  const isRaporSectionActive =
-    location.pathname.startsWith("/raporlar") || location.pathname.startsWith("/finans");
-
-  const raporButtonLabel = uiProfile === "birim_amiri" ? "RAPOR" : "RAPOR VE FINANS";
+  const isPersonelKartiActive = location.pathname.startsWith("/personeller");
+  const isRaporlarActive = location.pathname.startsWith("/raporlar");
 
   return (
     <div id="main-menu" className="menu-container">
@@ -45,43 +27,39 @@ export function MainMenu({ onKayitOpen }: MainMenuProps) {
         <button
           type="button"
           className={`menu-btn${isKayitSectionActive ? " is-active" : ""}`}
-          data-testid="menu-kayit"
+          data-testid="menu-giris-surec"
           onClick={() => {
             const tab: KayitTab =
               isKayitSectionActive && location.pathname.startsWith("/surecler") ? "surec" : "yeni-kayit";
             onKayitOpen(tab);
           }}
         >
-          <div className="ttl">KAYIT ISLEMLERI</div>
+          <div className="ttl">Personel Giris ve Surec Takibi</div>
         </button>
       ) : null}
 
       <button
         type="button"
-        className={`menu-btn${isOperasyonSectionActive ? " is-active" : ""}`}
-        data-testid="menu-operasyon"
+        className={`menu-btn${isPersonelKartiActive ? " is-active" : ""}`}
+        data-testid="menu-personel-karti"
         onClick={() => {
-          if (operasyonTarget) {
-            navigate(operasyonTarget);
-          }
+          navigate("/personeller");
         }}
-        disabled={!operasyonTarget}
+        disabled={!canViewPersoneller}
       >
-        <div className="ttl">OPERASYON</div>
+        <div className="ttl">Personel Karti</div>
       </button>
 
       <button
         type="button"
-        className={`menu-btn${isRaporSectionActive ? " is-active" : ""}`}
-        data-testid="menu-rapor"
+        className={`menu-btn${isRaporlarActive ? " is-active" : ""}`}
+        data-testid="menu-raporlar"
         onClick={() => {
-          if (raporTarget) {
-            navigate(raporTarget);
-          }
+          navigate("/raporlar");
         }}
-        disabled={!raporTarget}
+        disabled={!canViewRaporlar}
       >
-        <div className="ttl">{raporButtonLabel}</div>
+        <div className="ttl">Raporlar</div>
       </button>
     </div>
   );

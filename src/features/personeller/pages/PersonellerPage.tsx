@@ -1,5 +1,5 @@
-import { type FormEvent } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, type FormEvent } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { AppModal } from "../../../components/modal/AppModal";
 import { FormField } from "../../../components/form/FormField";
 import { EmptyState } from "../../../components/states/EmptyState";
@@ -46,6 +46,27 @@ export function PersonellerPage() {
   const { hasPermission } = useRoleAccess();
   const canCreatePersonel = hasPermission("personeller.create");
   const canOpenDetail = hasPermission("personeller.detail.view");
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const currentState = (location.state ?? null) as Record<string, unknown> | null;
+    if (!currentState?.openCreateModal) {
+      return;
+    }
+
+    if (canCreatePersonel) {
+      openCreateModal();
+    }
+
+    const nextState = { ...currentState };
+    delete nextState.openCreateModal;
+
+    navigate(location.pathname, {
+      replace: true,
+      state: Object.keys(nextState).length > 0 ? nextState : null
+    });
+  }, [canCreatePersonel, location.pathname, location.state, navigate, openCreateModal]);
 
   function handleCreateSubmit(event: FormEvent<HTMLFormElement>) {
     void createPersonelHandler(event, canCreatePersonel);

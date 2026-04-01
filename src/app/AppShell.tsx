@@ -82,10 +82,12 @@ export function AppShell({ children }: AppShellProps) {
                   className="universal-btn-save"
                   onClick={() => {
                     setIsKayitModalOpen(false);
-                    navigate("/personeller");
+                    navigate("/personeller", {
+                      state: { openCreateModal: true }
+                    });
                   }}
                 >
-                  Yeni Kayit Ekranina Git
+                  Yeni Kisi Ekle
                 </button>
                 <button type="button" className="universal-btn-cancel" onClick={() => setIsKayitModalOpen(false)}>
                   Kapat

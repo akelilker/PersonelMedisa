@@ -9,6 +9,7 @@ import { handleRealtimeEnvelope } from "../data/data-manager";
 import { connect, disconnect, onMessage } from "../realtime/realtime-manager";
 import { AuthProvider, useAuth } from "../state/auth.store";
 import { GlobalErrorTelemetry } from "./GlobalErrorTelemetry";
+import { getAppPublicPath } from "../config/public-base";
 
 type AppProvidersProps = {
   children: ReactNode;
@@ -20,12 +21,8 @@ const ROUTER_FUTURE_FLAGS = {
 } as const;
 
 function resolveRouterBasename(): string | undefined {
-  if (typeof window === "undefined") {
-    return undefined;
-  }
-
-  const subfolderBase = "/personelmedisa";
-  return window.location.pathname.startsWith(subfolderBase) ? subfolderBase : undefined;
+  const p = getAppPublicPath();
+  return p.length > 0 ? p : undefined;
 }
 
 const ROUTER_BASENAME = resolveRouterBasename();

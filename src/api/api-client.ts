@@ -5,6 +5,7 @@ import { emitApiServerError } from "../lib/storage/api-global-events";
 import type { ApiError, ApiResponse } from "../types/api";
 import { resolveDemoApiResponse } from "./mock-demo";
 import { logApiFailure5xx, summarizeRequestBodyForLogs } from "../logging/error-logger";
+import { getAppPublicPath } from "../config/public-base";
 
 const ENV_API_BASE_URL = (
   import.meta as ImportMeta & { env?: Record<string, string | undefined> }
@@ -67,21 +68,29 @@ function shouldPreferDemoApi() {
     return false;
   }
 
-  return readWindowPathname().startsWith("/personelmedisa");
+  const pub = getAppPublicPath();
+  const path = readWindowPathname();
+  if (pub && path.startsWith(pub)) {
+    return true;
+  }
+  return path.startsWith("/personelmedisa");
 }
 
 function resolveApiBaseCandidates() {
   const candidates: string[] = [];
   const envBase = normalizeBase(ENV_API_BASE_URL ?? "");
   const pathname = readWindowPathname();
-  const isSubfolderDeployment = pathname.startsWith("/personelmedisa");
+  const publicPath = getAppPublicPath();
+  const subPath = publicPath || "/personelmedisa";
+  const isSubfolderDeployment =
+    (publicPath.length > 0 && pathname.startsWith(publicPath)) || pathname.startsWith("/personelmedisa");
 
   if (envBase) {
     candidates.push(envBase);
   }
 
   if (isSubfolderDeployment) {
-    candidates.push("/personelmedisa/api");
+    candidates.push(`${subPath}/api`);
     candidates.push("/api");
   } else {
     candidates.push("/api");

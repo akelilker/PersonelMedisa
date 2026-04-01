@@ -38,7 +38,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
             </button>
           </p>
           <p>
-            <Link to="/personeller">Personellere don</Link>
+            <Link to="/">Ana ekrana don</Link>
           </p>
         </section>
       );

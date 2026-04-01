@@ -20,7 +20,7 @@ export function InternalDiagnosticsPage() {
         Surum: {getAppVersion()} · Ortam: {getAppEnv()}
       </p>
       <p>
-        <Link to="/personeller">Personellere don</Link>
+        <Link to="/">Ana ekrana don</Link>
       </p>
 
       <h3>Son istemci hatalari</h3>

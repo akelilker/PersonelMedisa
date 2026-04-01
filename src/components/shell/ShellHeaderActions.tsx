@@ -147,7 +147,7 @@ export function ShellHeaderActions() {
       ? "/raporlar"
       : canViewBildirimler
         ? "/bildirimler"
-        : "/personeller";
+        : "/";
 
   const notifications = useMemo(() => {
     const reminderItems =

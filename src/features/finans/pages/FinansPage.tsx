@@ -189,7 +189,7 @@ export function FinansPage() {
 
       <div className="module-links">
         <Link to="/raporlar">Raporlara git</Link>
-        <Link to="/personeller">Personellere don</Link>
+        <Link to="/">Ana ekrana don</Link>
       </div>
 
       {canCreateFinans && isCreateModalOpen ? (

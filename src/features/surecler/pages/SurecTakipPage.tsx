@@ -230,7 +230,7 @@ export function SurecTakipPage() {
       </div>
 
       <div className="module-links">
-        <Link to="/personeller">Personellere don</Link>
+        <Link to="/">Ana ekrana don</Link>
         <Link to="/bildirimler">Bildirimlere git</Link>
         <Link to="/puantaj">Puantaja git</Link>
       </div>

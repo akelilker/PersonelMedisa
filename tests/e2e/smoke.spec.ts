@@ -1,6 +1,5 @@
 import { expect, test } from "@playwright/test";
 import { login } from "./helpers/auth";
-import { openHeaderSettingsMenu } from "./helpers/header-nav";
 import { mockApi } from "./helpers/mock-api";
 
 test.describe("e2e smoke", () => {
@@ -9,6 +8,10 @@ test.describe("e2e smoke", () => {
 
     await login(page, { username: "yonetici", password: "secret" });
 
+    await expect(page).toHaveURL("/");
+    await expect(page.getByTestId("menu-personel-karti")).toBeVisible();
+
+    await page.getByTestId("menu-personel-karti").click();
     await expect(page).toHaveURL(/\/personeller$/);
     await expect(page.getByRole("heading", { name: "Personeller" })).toBeVisible();
     await expect(page.getByText("Ayse Yilmaz")).toBeVisible();
@@ -17,8 +20,7 @@ test.describe("e2e smoke", () => {
     await expect(page).toHaveURL(/\/personeller\/1$/);
     await expect(page.getByRole("heading", { name: "Personel Detay" })).toBeVisible();
 
-    await openHeaderSettingsMenu(page);
-    await page.getByTestId("menu-puantaj").click();
+    await page.goto("/puantaj");
     await expect(page).toHaveURL(/\/puantaj$/);
 
     await page.getByLabel("Personel ID").fill("1");
@@ -45,8 +47,7 @@ test.describe("e2e smoke", () => {
     await expect(page.getByText("Durum: KAPANDI")).toBeVisible();
     await expect(page.getByText("Kapanis ID: 99")).toBeVisible();
 
-    await openHeaderSettingsMenu(page);
-    await page.getByTestId("menu-raporlar").click();
+    await page.goto("/raporlar");
     await expect(page).toHaveURL(/\/raporlar$/);
     await page.getByRole("button", { name: "Raporu Calistir" }).click();
     await expect(page.getByText("Toplam Kayit: 1")).toBeVisible();
@@ -57,15 +58,13 @@ test.describe("e2e smoke", () => {
 
     await login(page, { username: "birim", password: "secret" });
 
+    await expect(page).toHaveURL("/");
+
+    await page.goto("/personeller");
     await expect(page).toHaveURL(/\/personeller$/);
     await expect(page.getByRole("button", { name: "Yeni Personel" })).toHaveCount(0);
 
-    await openHeaderSettingsMenu(page);
-    await expect(page.getByTestId("menu-haftalik-kapanis")).toHaveCount(0);
-    await expect(page.getByTestId("menu-raporlar")).toBeVisible();
-    await expect(page.getByTestId("menu-finans")).toHaveCount(0);
-
-    await page.getByTestId("menu-puantaj").click();
+    await page.goto("/puantaj");
     await expect(page).toHaveURL(/\/puantaj$/);
     await expect(page.getByText("Bu modulu sadece goruntuleme yetkin var.")).toBeVisible();
     await expect(page.getByRole("button", { name: "Kaydet" })).toBeDisabled();
@@ -88,10 +87,9 @@ test.describe("e2e smoke", () => {
 
     await login(page, { username: "yonetici", password: "secret" });
 
-    await expect(page).toHaveURL(/\/personeller$/);
+    await expect(page).toHaveURL("/");
 
-    await openHeaderSettingsMenu(page);
-    await page.getByTestId("menu-surecler").click();
+    await page.goto("/surecler");
     await expect(page).toHaveURL(/\/surecler$/);
     await expect(page.getByRole("heading", { name: "Surec Takibi" })).toBeVisible();
 
@@ -119,8 +117,7 @@ test.describe("e2e smoke", () => {
     await page.getByRole("button", { name: "Iptal" }).first().click();
     await expect(page.locator(".surecler-list")).toContainText("Durum: IPTAL");
 
-    await openHeaderSettingsMenu(page);
-    await page.getByTestId("menu-bildirimler").click();
+    await page.goto("/bildirimler");
     await expect(page).toHaveURL(/\/bildirimler$/);
     await expect(page.getByRole("heading", { name: "Bildirimler" })).toBeVisible();
 
@@ -148,8 +145,7 @@ test.describe("e2e smoke", () => {
     await page.getByRole("button", { name: "Iptal" }).first().click();
     await expect(page.locator(".bildirimler-list")).toContainText("IPTAL_EDILDI");
 
-    await openHeaderSettingsMenu(page);
-    await page.getByTestId("menu-finans").click();
+    await page.goto("/finans");
     await expect(page).toHaveURL(/\/finans$/);
     await expect(page.getByRole("heading", { name: "Finans" })).toBeVisible();
 

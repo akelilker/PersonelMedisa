@@ -1,6 +1,5 @@
 import { expect, test } from "@playwright/test";
 import { login } from "./helpers/auth";
-import { openHeaderSettingsMenu } from "./helpers/header-nav";
 import { mockApi } from "./helpers/mock-api";
 
 const users = {
@@ -11,39 +10,63 @@ const users = {
 };
 
 test.describe("Rol bazli smoke", () => {
-  test("Genel yonetici ana modulleri ayar menusunde gorur", async ({ page }) => {
+  test("Genel yonetici ana modullere dogrudan erisebilir", async ({ page }) => {
     await mockApi(page, "GENEL_YONETICI");
     await login(page, users.genelYonetici);
-    await openHeaderSettingsMenu(page);
-    await expect(page.getByTestId("menu-personeller")).toBeVisible();
-    await expect(page.getByTestId("menu-surecler")).toBeVisible();
-    await expect(page.getByTestId("menu-puantaj")).toBeVisible();
-    await expect(page.getByTestId("menu-raporlar")).toBeVisible();
+    await expect(page).toHaveURL("/");
+
+    await page.goto("/personeller");
+    await expect(page.getByRole("heading", { name: "Personeller" })).toBeVisible();
+
+    await page.goto("/surecler");
+    await expect(page.getByRole("heading", { name: "Surec Takibi" })).toBeVisible();
+
+    await page.goto("/puantaj");
+    await expect(page.getByRole("heading", { name: "Gunluk Puantaj" })).toBeVisible();
+
+    await page.goto("/raporlar");
+    await expect(page.getByRole("heading", { name: "Raporlar" })).toBeVisible();
   });
 
-  test("Bolum yoneticisi yetkili modulleri ayar menusunde gorur", async ({ page }) => {
+  test("Bolum yoneticisi yetkili modullere erisebilir", async ({ page }) => {
     await mockApi(page, "BOLUM_YONETICISI");
     await login(page, users.bolumYonetici);
-    await openHeaderSettingsMenu(page);
-    await expect(page.getByTestId("menu-personeller")).toBeVisible();
-    await expect(page.getByTestId("menu-surecler")).toBeVisible();
-    await expect(page.getByTestId("menu-raporlar")).toBeVisible();
+    await expect(page).toHaveURL("/");
+
+    await page.goto("/personeller");
+    await expect(page.getByRole("heading", { name: "Personeller" })).toBeVisible();
+
+    await page.goto("/surecler");
+    await expect(page.getByRole("heading", { name: "Surec Takibi" })).toBeVisible();
+
+    await page.goto("/raporlar");
+    await expect(page.getByRole("heading", { name: "Raporlar" })).toBeVisible();
   });
 
   test("Muhasebe finans ve rapor modullerine erisebilir", async ({ page }) => {
     await mockApi(page, "MUHASEBE");
     await login(page, users.muhasebe);
-    await openHeaderSettingsMenu(page);
-    await expect(page.getByTestId("menu-raporlar")).toBeVisible();
-    await expect(page.getByTestId("menu-finans")).toBeVisible();
+    await expect(page).toHaveURL("/");
+
+    await page.goto("/raporlar");
+    await expect(page.getByRole("heading", { name: "Raporlar" })).toBeVisible();
+
+    await page.goto("/finans");
+    await expect(page.getByRole("heading", { name: "Finans" })).toBeVisible();
   });
 
-  test("Birim amiri finans ve haftalik kapanis menusunu gormez", async ({ page }) => {
+  test("Birim amiri finans ve haftalik kapanisa erisemez", async ({ page }) => {
     await mockApi(page, "BIRIM_AMIRI");
     await login(page, users.birimAmiri);
-    await openHeaderSettingsMenu(page);
-    await expect(page.getByTestId("menu-raporlar")).toBeVisible();
-    await expect(page.getByTestId("menu-finans")).toHaveCount(0);
-    await expect(page.getByTestId("menu-haftalik-kapanis")).toHaveCount(0);
+    await expect(page).toHaveURL("/");
+
+    await page.goto("/raporlar");
+    await expect(page.getByRole("heading", { name: "Raporlar" })).toBeVisible();
+
+    await page.goto("/finans");
+    await expect(page).toHaveURL(/\/yetkisiz$/);
+
+    await page.goto("/haftalik-kapanis");
+    await expect(page).toHaveURL(/\/yetkisiz$/);
   });
 });

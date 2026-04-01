@@ -18,7 +18,7 @@ export function LoginPage() {
 
   const redirectPath = useMemo(() => {
     const state = location.state as LoginLocationState | null;
-    return state?.from ?? "/personeller";
+    return state?.from ?? "/";
   }, [location.state]);
 
   if (isAuthenticated) {

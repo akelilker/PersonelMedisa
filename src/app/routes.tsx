@@ -1,5 +1,6 @@
-import { Link, Navigate, Outlet, Route, Routes } from "react-router-dom";
+import { Link, Outlet, Route, Routes } from "react-router-dom";
 import { AppShell } from "./AppShell";
+import { HomeDashboard } from "./HomeDashboard";
 import { ProtectedRoute } from "../router/ProtectedRoute";
 import { PersonellerPage } from "../features/personeller/pages/PersonellerPage";
 import { PersonelDetayPage } from "../features/personeller/pages/PersonelDetayPage";
@@ -32,7 +33,7 @@ function NotFoundPage() {
     <section className="states-page">
       <h2>Sayfa Bulunamadi</h2>
       <p>Istedigin ekran bulunamadi. Lutfen gecerli bir modula gec.</p>
-      <Link to="/personeller">Personellere don</Link>
+      <Link to="/">Ana ekrana don</Link>
     </section>
   );
 }
@@ -42,7 +43,7 @@ function UnauthorizedPage() {
     <section className="states-page">
       <h2>Yetkisiz Erisim</h2>
       <p>Bu modulu gormek icin yeterli yetkin yok.</p>
-      <Link to="/personeller">Izinli sayfalara don</Link>
+      <Link to="/">Ana ekrana don</Link>
     </section>
   );
 }
@@ -61,7 +62,7 @@ export function AppRoutes() {
           </ProtectedRoute>
         }
       >
-        <Route index element={<Navigate to="/personeller" replace />} />
+        <Route index element={<HomeDashboard />} />
         <Route
           path="personeller"
           element={

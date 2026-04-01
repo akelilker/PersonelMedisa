@@ -216,7 +216,7 @@ export function BildirimlerPage() {
       </div>
 
       <div className="module-links">
-        <Link to="/personeller">Personellere don</Link>
+        <Link to="/">Ana ekrana don</Link>
         <Link to="/surecler">Surec takibe git</Link>
         <Link to="/puantaj">Puantaja git</Link>
       </div>

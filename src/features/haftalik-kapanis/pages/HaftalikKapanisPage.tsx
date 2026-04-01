@@ -208,7 +208,7 @@ export function HaftalikKapanisPage() {
 
       <div className="module-links">
         <Link to="/puantaj">Gunluk puantaja git</Link>
-        <Link to="/personeller">Personellere git</Link>
+        <Link to="/">Ana ekrana don</Link>
       </div>
     </section>
   );

@@ -394,7 +394,7 @@ export function RaporlarPage() {
 
       <div className="module-links">
         <Link to="/finans">Finans modulune git</Link>
-        <Link to="/personeller">Personellere don</Link>
+        <Link to="/">Ana ekrana don</Link>
       </div>
     </section>
   );

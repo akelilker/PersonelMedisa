@@ -29,6 +29,7 @@ export function AppShell({ children }: AppShellProps) {
   const { session, logout } = useAuth();
   const navigate = useNavigate();
   const { pathname } = useLocation();
+  const isHomeRoute = pathname === "/";
   const backBarTarget = resolveBackBar(pathname);
   const [isKayitModalOpen, setIsKayitModalOpen] = useState(false);
   const [kayitTab, setKayitTab] = useState<KayitTab>("yeni-kayit");
@@ -38,20 +39,22 @@ export function AppShell({ children }: AppShellProps) {
       <main className="content-wrap">
         <Hero title="PERSONEL YONETIM SISTEMI" />
 
-        <ShellHeaderActions />
+        {isHomeRoute ? null : <ShellHeaderActions />}
 
-        <div className="shell-user-bar">
-          <div className="user-chip">
-            <strong>{session?.user.ad_soyad ?? "-"}</strong>
-            <span>
-              ({session?.user.rol ?? "-"} -{" "}
-              {session?.ui_profile === "birim_amiri" ? "Birim profili" : session ? "Yonetim profili" : "-"})
-            </span>
+        {isHomeRoute ? null : (
+          <div className="shell-user-bar">
+            <div className="user-chip">
+              <strong>{session?.user.ad_soyad ?? "-"}</strong>
+              <span>
+                ({session?.user.rol ?? "-"} -{" "}
+                {session?.ui_profile === "birim_amiri" ? "Birim profili" : session ? "Yonetim profili" : "-"})
+              </span>
+            </div>
+            <button type="button" className="logout-btn" onClick={logout}>
+              Cikis
+            </button>
           </div>
-          <button type="button" className="logout-btn" onClick={logout}>
-            Cikis
-          </button>
-        </div>
+        )}
 
         <MainMenu
           onKayitOpen={(tab) => {
@@ -60,7 +63,7 @@ export function AppShell({ children }: AppShellProps) {
           }}
         />
 
-        {backBarTarget ? <BackBar to={backBarTarget.to} label={backBarTarget.label} /> : null}
+        {isHomeRoute ? null : backBarTarget ? <BackBar to={backBarTarget.to} label={backBarTarget.label} /> : null}
 
         {children}
       </main>

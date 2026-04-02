@@ -78,6 +78,7 @@ export function AppShell({ children }: AppShellProps) {
   const backBarTarget = resolveBackBar(pathname);
   const [isKayitModalOpen, setIsKayitModalOpen] = useState(false);
   const [kayitTab, setKayitTab] = useState<KayitTab>("yeni-kayit");
+  const isAnyModalOpen = isKayitModalOpen || isModuleOverlayRoute;
 
   return (
     <div className="app-container app-shell">
@@ -101,7 +102,7 @@ export function AppShell({ children }: AppShellProps) {
           </div>
         ) : null}
 
-        {isHomeRoute ? (
+        {isHomeRoute && !isAnyModalOpen ? (
           <MainMenu
             onKayitOpen={(tab) => {
               setKayitTab(tab);

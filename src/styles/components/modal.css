@@ -9,6 +9,7 @@
   transform: translateX(-50%);
   z-index: var(--z-modal-overlay, 1000);
   display: none;
+  flex-direction: column;
   justify-content: center;
   align-items: flex-start;
   padding: 0;
@@ -38,6 +39,7 @@
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  flex: 1;
   box-shadow:
     0 24px 48px rgba(0, 0, 0, 0.55),
     0 0 0 1px rgba(var(--theme-color-rgb), 0.16);

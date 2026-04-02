@@ -56,6 +56,14 @@
   z-index: 1;
 }
 
+body.modal-open .app-shell {
+  border-top-color: transparent;
+}
+
+body.modal-open .app-shell::before {
+  opacity: 0;
+}
+
 .shell-top-stack {
   display: grid;
   gap: var(--shell-top-stack-gap);

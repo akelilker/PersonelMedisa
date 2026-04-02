@@ -91,7 +91,7 @@ export function LoginPage() {
               checked={rememberMe}
               onChange={(event) => setRememberMe(event.target.checked)}
             />
-            <span>Beni hatırla (oturum tarayıcı kapansa da sürer)</span>
+            <span>Beni hatırla</span>
           </label>
 
           {formError ? <p className="auth-error">{formError}</p> : null}

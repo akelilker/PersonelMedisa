@@ -35,20 +35,40 @@
 
 .auth-field input {
   width: 100%;
-  height: 46px;
+  height: 40px;
   border: 1px solid rgba(255, 255, 255, 0.22);
   border-radius: 12px;
-  background: rgba(18, 24, 34, 0.86);
+  background: rgba(12, 16, 24, 0.94);
   color: #f4f7ff;
-  padding: 0 16px;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
-  font-size: 16px;
+  padding: 0 14px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 0 0 1px rgba(0, 0, 0, 0.08);
+  font-size: 15px;
   line-height: 1;
 }
 
 .auth-field input:focus {
   outline: 1px solid var(--theme-color);
   outline-offset: 0;
+}
+
+.auth-field input:-webkit-autofill,
+.auth-field input:-webkit-autofill:hover,
+.auth-field input:-webkit-autofill:focus,
+.auth-field input:-webkit-autofill:active {
+  -webkit-text-fill-color: #f4f7ff;
+  caret-color: #f4f7ff;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 0 0 1px rgba(0, 0, 0, 0.08),
+    0 0 0 1000px rgba(12, 16, 24, 0.94) inset;
+  -webkit-box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 0 0 1px rgba(0, 0, 0, 0.08),
+    0 0 0 1000px rgba(12, 16, 24, 0.94) inset;
+  transition: background-color 9999s ease-out 0s;
 }
 
 .auth-field-inline {
@@ -58,11 +78,35 @@
 }
 
 .auth-field-inline input[type="checkbox"] {
-  width: 18px;
-  height: 18px;
+  appearance: none;
+  width: 20px;
+  height: 20px;
   margin: 0;
-  accent-color: var(--theme-color);
+  border: 1px solid rgba(var(--theme-color-rgb), 0.55);
+  border-radius: 6px;
+  background: rgba(12, 16, 24, 0.94);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
   flex-shrink: 0;
+  position: relative;
+  cursor: pointer;
+}
+
+.auth-field-inline input[type="checkbox"]:checked {
+  background: rgba(var(--theme-color-rgb), 0.18);
+  border-color: rgba(var(--theme-color-rgb), 0.85);
+}
+
+.auth-field-inline input[type="checkbox"]:checked::after {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  border-radius: 3px;
+  background: var(--theme-color);
+}
+
+.auth-field-inline input[type="checkbox"]:focus-visible {
+  outline: 1px solid rgba(var(--theme-color-rgb), 0.85);
+  outline-offset: 2px;
 }
 
 .auth-field-inline span {
@@ -82,7 +126,7 @@
 }
 
 .auth-login-form .universal-btn-save {
-  height: 48px;
+  height: 44px;
   border-radius: 14px;
   font-size: 15px;
   font-weight: 600;

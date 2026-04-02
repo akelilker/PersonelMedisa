@@ -25,7 +25,8 @@
    * - alt bosluk footer ustunde sabit 8px olarak korunur
    */
   --shell-content-top-padding: max(12px, env(safe-area-inset-top, 0px));
-  --shell-modal-top: 0px;
+  --shell-modal-top-inset: 3px;
+  --shell-modal-top: var(--shell-modal-top-inset);
 }
 
 .app-shell::before {

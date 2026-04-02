@@ -51,7 +51,10 @@ function UnauthorizedPage() {
 export function AppRoutes() {
   return (
     <Routes>
-      <Route path="/login" element={<LoginPage />} />
+      <Route element={<AppLayout />}>
+        <Route path="/login" element={<LoginPage />} />
+      </Route>
+
       <Route path="/yetkisiz" element={<UnauthorizedPage />} />
       <Route path="/internal/diagnostics" element={<InternalDiagnosticsPage />} />
 

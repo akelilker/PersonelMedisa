@@ -1,9 +1,7 @@
-.auth-login-page {
+.auth-login {
   display: grid;
   gap: var(--space-3);
-  padding: var(--space-4);
-  border: 1px solid var(--line-soft);
-  border-radius: var(--radius-md);
+  min-width: 0;
 }
 
 .auth-login-form {
@@ -43,19 +41,4 @@
 .auth-error {
   margin: 0;
   color: var(--red);
-}
-
-.auth-login-btn {
-  justify-self: start;
-  border: 1px solid var(--line-soft);
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: inherit;
-  padding: 6px 12px;
-  cursor: pointer;
-}
-
-.auth-login-btn[disabled] {
-  opacity: 0.6;
-  cursor: not-allowed;
 }

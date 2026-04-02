@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { BackBar } from "../components/BackBar";
 import { Hero } from "../components/hero/Hero";
@@ -71,10 +71,16 @@ export function AppShell({ children }: AppShellProps) {
   const { session, logout } = useAuth();
   const navigate = useNavigate();
   const { pathname } = useLocation();
+  const isLoginRoute = pathname === "/login";
   const isHomeRoute = pathname === "/";
-  const moduleModal = resolveModuleModal(pathname);
+  const moduleModal = useMemo(() => {
+    if (pathname === "/login") {
+      return null;
+    }
+    return resolveModuleModal(pathname);
+  }, [pathname]);
   const isModuleOverlayRoute = moduleModal !== null;
-  const shouldShowShellMeta = !isHomeRoute && !isModuleOverlayRoute;
+  const showUserBar = !isHomeRoute && !isModuleOverlayRoute;
   const backBarTarget = resolveBackBar(pathname);
   const [isKayitModalOpen, setIsKayitModalOpen] = useState(false);
   const [kayitTab, setKayitTab] = useState<KayitTab>("yeni-kayit");
@@ -85,9 +91,9 @@ export function AppShell({ children }: AppShellProps) {
       <main className="content-wrap">
         <Hero title="PERSONEL YONETIM SISTEMI" />
 
-        <ShellHeaderActions />
+        {!moduleModal && !isLoginRoute ? <ShellHeaderActions /> : null}
 
-        {shouldShowShellMeta ? (
+        {showUserBar && !isLoginRoute ? (
           <div className="shell-user-bar">
             <div className="user-chip">
               <strong>{session?.user.ad_soyad ?? "-"}</strong>
@@ -102,7 +108,7 @@ export function AppShell({ children }: AppShellProps) {
           </div>
         ) : null}
 
-        {isHomeRoute && !isAnyModalOpen ? (
+        {isHomeRoute && !isLoginRoute && !isAnyModalOpen ? (
           <MainMenu
             onKayitOpen={(tab) => {
               setKayitTab(tab);

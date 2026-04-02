@@ -49,10 +49,7 @@ export function LoginPage() {
   }
 
   return (
-    <section className="auth-login-page">
-      <h2>Sisteme Giris</h2>
-      <p>Kimlik dogrulama backend uzerinden /api/auth/login ile yapilir.</p>
-
+    <section className="auth-login" aria-label="Giris">
       <form className="auth-login-form" onSubmit={handleLogin}>
         <label className="auth-field">
           <span>Kullanici Adi</span>
@@ -92,7 +89,7 @@ export function LoginPage() {
 
         <button
           type="submit"
-          className="auth-login-btn"
+          className="universal-btn-save"
           disabled={isSubmitting || username.trim().length === 0 || password.length === 0}
         >
           {isSubmitting ? "Giris Yapiliyor..." : "Giris Yap"}

@@ -9,11 +9,11 @@
   bottom: calc(
     var(--app-footer-real-height) + var(--modal-gap-above-footer) + env(safe-area-inset-bottom, 0px)
   );
-  z-index: var(--z-modal-overlay);
+  z-index: 2;
   display: none;
   justify-content: center;
   align-items: flex-start;
-  padding: 0 4px;
+  padding: 0;
   box-sizing: border-box;
   overflow: hidden;
   background: rgba(4, 9, 19, 0.56);

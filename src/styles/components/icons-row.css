@@ -4,7 +4,7 @@
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
   gap: 8px;
-  min-height: var(--shell-icons-row-block-height, 34px);
+  min-height: 34px;
 }
 
 .icons-row-left {

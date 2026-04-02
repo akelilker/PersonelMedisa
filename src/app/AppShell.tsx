@@ -84,7 +84,7 @@ export function AppShell({ children }: AppShellProps) {
       <main className="content-wrap">
         <Hero title="PERSONEL YONETIM SISTEMI" />
 
-        {shouldShowShellMeta ? <ShellHeaderActions /> : null}
+        <ShellHeaderActions />
 
         {shouldShowShellMeta ? (
           <div className="shell-user-bar">

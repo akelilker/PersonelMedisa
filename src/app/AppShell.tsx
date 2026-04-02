@@ -101,12 +101,14 @@ export function AppShell({ children }: AppShellProps) {
           </div>
         ) : null}
 
-        <MainMenu
-          onKayitOpen={(tab) => {
-            setKayitTab(tab);
-            setIsKayitModalOpen(true);
-          }}
-        />
+        {isHomeRoute ? (
+          <MainMenu
+            onKayitOpen={(tab) => {
+              setKayitTab(tab);
+              setIsKayitModalOpen(true);
+            }}
+          />
+        ) : null}
 
         {!isModuleOverlayRoute && backBarTarget ? <BackBar to={backBarTarget.to} label={backBarTarget.label} /> : null}
         {!isModuleOverlayRoute ? children : null}

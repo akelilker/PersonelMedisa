@@ -4,7 +4,7 @@
   overflow-y: auto;
   overflow-x: hidden;
   padding: 4px;
-  padding-top: max(12px, env(safe-area-inset-top, 0px));
+  padding-top: var(--shell-content-top-padding, max(12px, env(safe-area-inset-top, 0px)));
   padding-bottom: calc(
     var(--app-footer-real-height) + var(--app-footer-gap) + 16px + env(safe-area-inset-bottom, 0px)
   );

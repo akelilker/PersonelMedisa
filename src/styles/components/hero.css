@@ -13,8 +13,7 @@
     0 4px 22px rgba(var(--theme-color-rgb), 0.08),
     inset 0 1px 0 rgba(255, 255, 255, 0.18),
     inset 0 -1px 0 rgba(92, 102, 114, 0.28);
-  margin-bottom: 8px;
-  min-height: 66px;
+  min-height: var(--shell-hero-block-height, 66px);
   display: flex;
   align-items: center;
 }
@@ -92,7 +91,6 @@
   .hero {
     --hero-logo-width: 40px;
     --hero-spacer-width: 20px;
-    min-height: 71px;
     padding: 10px 12px;
   }
 

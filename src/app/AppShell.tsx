@@ -81,6 +81,8 @@ export function AppShell({ children }: AppShellProps) {
     return resolveModuleModal(pathname);
   }, [pathname]);
   const isModuleOverlayRoute = moduleModal !== null;
+  const showShellHeaderActions = !moduleModal && !isLoginRoute;
+  const reserveShellHeaderActionsSlot = isModuleOverlayRoute && !isLoginRoute;
   const showUserBar = !isHomeRoute && !isModuleOverlayRoute;
   const backBarTarget = resolveBackBar(pathname);
   const [isKayitModalOpen, setIsKayitModalOpen] = useState(false);
@@ -90,9 +92,12 @@ export function AppShell({ children }: AppShellProps) {
   return (
     <div className="app-container app-shell">
       <main className="content-wrap">
-        <Hero title="Personel Yönetim Sistemi" />
-
-        {!moduleModal && !isLoginRoute ? <ShellHeaderActions /> : null}
+        <div
+          className={`shell-top-stack${reserveShellHeaderActionsSlot ? " shell-top-stack--reserve-actions" : ""}`}
+        >
+          <Hero title="Personel Yönetim Sistemi" />
+          {showShellHeaderActions ? <ShellHeaderActions /> : null}
+        </div>
 
         {showUserBar && !isLoginRoute ? (
           <div className="shell-user-bar">

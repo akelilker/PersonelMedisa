@@ -20,11 +20,21 @@
     inset 0 0 80px rgba(10, 13, 28, 0.22);
   /*
    * Modal shell contract:
-   * - modal ustten app shell ust cercevesine kadar cikar
-   * - hero ve header aksiyonlari modalin altinda kalir
+   * - modal hero + icons-row alt sinirindan baslar
+   * - icons-row modal route'ta render edilmese de yuksekligi kontrata dahildir
    * - alt bosluk footer ustunde sabit 8px olarak korunur
    */
-  --shell-modal-top: 0px;
+  --shell-content-top-padding: max(12px, env(safe-area-inset-top, 0px));
+  --shell-hero-block-height: 66px;
+  --shell-icons-row-block-height: 34px;
+  --shell-top-stack-gap: var(--space-2);
+  --shell-top-stack-bottom-gap: var(--space-2);
+  --shell-top-stack-block-size: calc(
+    var(--shell-hero-block-height) + var(--shell-top-stack-gap) + var(--shell-icons-row-block-height)
+  );
+  --shell-modal-top: calc(
+    var(--shell-content-top-padding) + var(--shell-top-stack-block-size) + var(--shell-top-stack-bottom-gap)
+  );
 }
 
 .app-shell::before {
@@ -52,6 +62,23 @@
 .app-shell > * {
   position: relative;
   z-index: 1;
+}
+
+.shell-top-stack {
+  display: grid;
+  gap: var(--shell-top-stack-gap);
+  margin-bottom: var(--shell-top-stack-bottom-gap);
+  min-width: 0;
+}
+
+.shell-top-stack > * {
+  min-width: 0;
+}
+
+.shell-top-stack--reserve-actions::after {
+  content: "";
+  display: block;
+  min-height: var(--shell-icons-row-block-height);
 }
 
 .shell-user-bar {
@@ -230,6 +257,7 @@
   .app-shell {
     border-top-left-radius: 18px;
     border-top-right-radius: 18px;
+    --shell-hero-block-height: 71px;
   }
 
   .app-shell::before {

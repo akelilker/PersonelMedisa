@@ -17,7 +17,7 @@ export function MainMenu({ onKayitOpen }: MainMenuProps) {
   const canViewRaporlar = hasPermission("raporlar.view");
 
   const { pathname } = location;
-  const isGirisSurecActive = pathname === "/" || pathname.startsWith("/surecler");
+  const isGirisSurecActive = pathname.startsWith("/surecler");
   const isPersonelActive = pathname.startsWith("/personeller");
   const isRaporlarActive = pathname.startsWith("/raporlar");
 

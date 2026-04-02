@@ -14,7 +14,7 @@
     inset 0 1px 0 rgba(255, 255, 255, 0.18),
     inset 0 -1px 0 rgba(92, 102, 114, 0.28);
   margin-bottom: 8px;
-  min-height: 60px;
+  min-height: 66px;
   display: flex;
   align-items: center;
 }
@@ -25,14 +25,15 @@
   align-items: center;
   width: var(--hero-logo-width);
   margin-left: -5px;
-  transform: translateY(-1px);
+  transform: translateY(-2px);
   opacity: 1;
   filter: none;
   backdrop-filter: none;
 }
 
 .hero-logo picture {
-  display: block;
+  display: flex;
+  align-items: center;
   width: 100%;
 }
 
@@ -59,7 +60,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   padding: 0 4px;
-  line-height: 1.2;
+  line-height: 1.1;
   transform: none;
   background: linear-gradient(to bottom, #c2d4df 0%, #ffffff 40%, #9aadba 52%, #d6e0e8 100%);
   -webkit-background-clip: text;

@@ -110,8 +110,8 @@
   margin: 0 auto;
   padding: 18px;
   background: linear-gradient(180deg, #050d18 0%, #0a0e16 100%);
-  border: 1px solid rgba(184, 192, 201, 0.72);
-  border-radius: 18px;
+  border: 1px solid var(--line-hero-card);
+  border-radius: var(--radius-lg);
   cursor: pointer;
   text-align: center;
   transition: transform 0.2s ease, box-shadow 0.2s ease;

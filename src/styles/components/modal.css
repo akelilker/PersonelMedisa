@@ -1,16 +1,19 @@
 .modal-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
+  top: max(12px, env(safe-area-inset-top, 0px));
+  left: 50%;
+  right: auto;
+  width: 100%;
+  max-width: 500px;
+  transform: translateX(-50%);
   bottom: calc(
     var(--app-footer-real-height) + var(--modal-gap-above-footer) + env(safe-area-inset-bottom, 0px)
   );
   z-index: var(--z-modal-overlay);
   display: none;
   justify-content: center;
-  align-items: center;
-  padding: 20px 12px;
+  align-items: flex-start;
+  padding: 0 4px;
   box-sizing: border-box;
   overflow: auto;
   background: rgba(4, 9, 19, 0.56);
@@ -25,10 +28,10 @@
 
 .modal-container {
   position: relative;
-  width: min(100%, 500px);
+  width: 100%;
   height: auto;
   max-height: 100%;
-  margin: auto;
+  margin: 0;
   background: var(--bg-content);
   border: 1px solid rgba(255, 255, 255, 0.35);
   border-bottom: 1px solid rgba(255, 255, 255, 0.35);

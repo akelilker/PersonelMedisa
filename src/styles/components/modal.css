@@ -1,6 +1,4 @@
 .modal-overlay {
-  height: auto;
-  min-height: 100%;
   position: fixed;
   top: max(12px, env(safe-area-inset-top, 0px));
   bottom: calc(var(--modal-gap-above-footer) + 8px);
@@ -11,9 +9,8 @@
   transform: translateX(-50%);
   z-index: var(--z-modal-overlay, 1000);
   display: none;
-  flex-direction: column;
   justify-content: center;
-  align-items: stretch;
+  align-items: flex-start;
   padding: 0;
   box-sizing: border-box;
   overflow: hidden;
@@ -41,7 +38,6 @@
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  flex: 1;
   box-shadow:
     0 24px 48px rgba(0, 0, 0, 0.55),
     0 0 0 1px rgba(var(--theme-color-rgb), 0.16);

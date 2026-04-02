@@ -25,11 +25,56 @@ function resolveBackBar(pathname: string): { to: string; label: string } | null 
   return null;
 }
 
+function resolveModuleModal(pathname: string): { title: string; closeTo: string } | null {
+  if (pathname === "/") {
+    return null;
+  }
+
+  if (/^\/personeller\/\d+$/.test(pathname)) {
+    return { title: "Personel Detay", closeTo: "/personeller" };
+  }
+  if (pathname === "/personeller") {
+    return { title: "Personel Karti", closeTo: "/" };
+  }
+
+  if (/^\/surecler\/\d+$/.test(pathname)) {
+    return { title: "Surec Detay", closeTo: "/surecler" };
+  }
+  if (pathname === "/surecler") {
+    return { title: "Surec Takibi", closeTo: "/" };
+  }
+
+  if (/^\/bildirimler\/\d+$/.test(pathname)) {
+    return { title: "Bildirim Detay", closeTo: "/bildirimler" };
+  }
+  if (pathname === "/bildirimler") {
+    return { title: "Bildirimler", closeTo: "/" };
+  }
+
+  if (pathname === "/raporlar") {
+    return { title: "Raporlar", closeTo: "/" };
+  }
+  if (pathname === "/puantaj") {
+    return { title: "Gunluk Puantaj", closeTo: "/" };
+  }
+  if (pathname === "/haftalik-kapanis") {
+    return { title: "Haftalik Kapanis", closeTo: "/" };
+  }
+  if (pathname === "/finans") {
+    return { title: "Finans", closeTo: "/" };
+  }
+
+  return { title: "Modul", closeTo: "/" };
+}
+
 export function AppShell({ children }: AppShellProps) {
   const { session, logout } = useAuth();
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const isHomeRoute = pathname === "/";
+  const moduleModal = resolveModuleModal(pathname);
+  const isModuleOverlayRoute = moduleModal !== null;
+  const shouldShowShellMeta = !isHomeRoute && !isModuleOverlayRoute;
   const backBarTarget = resolveBackBar(pathname);
   const [isKayitModalOpen, setIsKayitModalOpen] = useState(false);
   const [kayitTab, setKayitTab] = useState<KayitTab>("yeni-kayit");
@@ -39,9 +84,9 @@ export function AppShell({ children }: AppShellProps) {
       <main className="content-wrap">
         <Hero title="PERSONEL YONETIM SISTEMI" />
 
-        {isHomeRoute ? null : <ShellHeaderActions />}
+        {shouldShowShellMeta ? <ShellHeaderActions /> : null}
 
-        {isHomeRoute ? null : (
+        {shouldShowShellMeta ? (
           <div className="shell-user-bar">
             <div className="user-chip">
               <strong>{session?.user.ad_soyad ?? "-"}</strong>
@@ -54,7 +99,7 @@ export function AppShell({ children }: AppShellProps) {
               Cikis
             </button>
           </div>
-        )}
+        ) : null}
 
         <MainMenu
           onKayitOpen={(tab) => {
@@ -63,9 +108,8 @@ export function AppShell({ children }: AppShellProps) {
           }}
         />
 
-        {isHomeRoute ? null : backBarTarget ? <BackBar to={backBarTarget.to} label={backBarTarget.label} /> : null}
-
-        {children}
+        {!isModuleOverlayRoute && backBarTarget ? <BackBar to={backBarTarget.to} label={backBarTarget.label} /> : null}
+        {!isModuleOverlayRoute ? children : null}
       </main>
 
       {isKayitModalOpen ? (
@@ -140,6 +184,18 @@ export function AppShell({ children }: AppShellProps) {
               <p>Surec olusturma, duzenleme ve takip islemleri bu sekmede yonetilir.</p>
             </div>
           ) : null}
+        </AppModal>
+      ) : null}
+
+      {isModuleOverlayRoute && moduleModal ? (
+        <AppModal
+          title={moduleModal.title}
+          onClose={() => {
+            navigate(moduleModal.closeTo);
+          }}
+        >
+          {backBarTarget ? <BackBar to={backBarTarget.to} label={backBarTarget.label} /> : null}
+          {children}
         </AppModal>
       ) : null}
 

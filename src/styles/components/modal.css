@@ -12,9 +12,10 @@
   align-items: center;
   padding: 20px 12px;
   box-sizing: border-box;
-  overflow: visible;
-  background: var(--bg);
-  isolation: isolate;
+  overflow: auto;
+  background: rgba(4, 9, 19, 0.56);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
 }
 
 .modal-overlay.open,
@@ -25,17 +26,20 @@
 .modal-container {
   position: relative;
   width: min(100%, 500px);
-  height: 100%;
+  height: auto;
   max-height: 100%;
-  margin: max(12px, env(safe-area-inset-top, 0px)) auto 0;
+  margin: auto;
   background: var(--bg-content);
-  border: 0.5px solid rgba(255, 255, 255, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.35);
   border-bottom: 1px solid rgba(255, 255, 255, 0.35);
   border-radius: 10px;
   box-sizing: border-box;
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  box-shadow:
+    0 24px 48px rgba(0, 0, 0, 0.55),
+    0 0 0 1px rgba(var(--theme-color-rgb), 0.16);
 }
 
 .modal-header {
@@ -120,12 +124,4 @@
 
 body.modal-open {
   overflow: hidden;
-}
-
-body.modal-open .modal-overlay {
-  isolation: auto;
-  background: var(--bg);
-  background-color: var(--bg);
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
 }

@@ -1,6 +1,10 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import { login } from "./helpers/auth";
 import { mockApi } from "./helpers/mock-api";
+
+function modalRouteHeading(page: Page, name: string) {
+  return page.locator(".modal-header").first().getByRole("heading", { name });
+}
 
 test.describe("e2e smoke", () => {
   test("management user completes login to kapanis flow", async ({ page }) => {
@@ -18,7 +22,7 @@ test.describe("e2e smoke", () => {
 
     await page.getByRole("link", { name: "Detay" }).first().click();
     await expect(page).toHaveURL(/\/personeller\/1$/);
-    await expect(page.getByRole("heading", { name: "Personel Detay" })).toBeVisible();
+    await expect(modalRouteHeading(page, "Personel Detay")).toBeVisible();
 
     await page.goto("/puantaj");
     await expect(page).toHaveURL(/\/puantaj$/);
@@ -75,7 +79,7 @@ test.describe("e2e smoke", () => {
 
     await page.goto("/raporlar");
     await expect(page).toHaveURL(/\/raporlar$/);
-    await expect(page.getByRole("heading", { name: "Raporlar" })).toBeVisible();
+    await expect(modalRouteHeading(page, "Raporlar")).toBeVisible();
 
     await page.goto("/finans");
     await expect(page).toHaveURL(/\/yetkisiz$/);
@@ -91,7 +95,7 @@ test.describe("e2e smoke", () => {
 
     await page.goto("/surecler");
     await expect(page).toHaveURL(/\/surecler$/);
-    await expect(page.getByRole("heading", { name: "Surec Takibi" })).toBeVisible();
+    await expect(modalRouteHeading(page, "Surec Takibi")).toBeVisible();
 
     await page.getByRole("button", { name: "Yeni Surec" }).click();
     const surecCreateModal = page.locator(".modal-container").last();
@@ -119,7 +123,7 @@ test.describe("e2e smoke", () => {
 
     await page.goto("/bildirimler");
     await expect(page).toHaveURL(/\/bildirimler$/);
-    await expect(page.getByRole("heading", { name: "Bildirimler" })).toBeVisible();
+    await expect(modalRouteHeading(page, "Bildirimler")).toBeVisible();
 
     await page.getByRole("button", { name: "Yeni Bildirim" }).click();
     const bildirimCreateModal = page.locator(".modal-container").last();
@@ -147,7 +151,7 @@ test.describe("e2e smoke", () => {
 
     await page.goto("/finans");
     await expect(page).toHaveURL(/\/finans$/);
-    await expect(page.getByRole("heading", { name: "Finans" })).toBeVisible();
+    await expect(modalRouteHeading(page, "Finans")).toBeVisible();
 
     await page.getByRole("button", { name: "Yeni Finans Kalemi" }).click();
     const finansCreateModal = page.locator(".modal-container").last();

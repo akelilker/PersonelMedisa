@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import { login } from "./helpers/auth";
 import { mockApi } from "./helpers/mock-api";
 
@@ -8,6 +8,10 @@ const users = {
   muhasebe: { username: "muhasebe", password: "demo123" },
   birimAmiri: { username: "birim_amiri", password: "demo123" }
 };
+
+function modalRouteHeading(page: Page, name: string) {
+  return page.locator(".modal-header").first().getByRole("heading", { name });
+}
 
 test.describe("Rol bazli smoke", () => {
   test("Genel yonetici ana modullere dogrudan erisebilir", async ({ page }) => {
@@ -19,13 +23,13 @@ test.describe("Rol bazli smoke", () => {
     await expect(page.getByRole("heading", { name: "Personeller" })).toBeVisible();
 
     await page.goto("/surecler");
-    await expect(page.getByRole("heading", { name: "Surec Takibi" })).toBeVisible();
+    await expect(modalRouteHeading(page, "Surec Takibi")).toBeVisible();
 
     await page.goto("/puantaj");
-    await expect(page.getByRole("heading", { name: "Gunluk Puantaj" })).toBeVisible();
+    await expect(modalRouteHeading(page, "Gunluk Puantaj")).toBeVisible();
 
     await page.goto("/raporlar");
-    await expect(page.getByRole("heading", { name: "Raporlar" })).toBeVisible();
+    await expect(modalRouteHeading(page, "Raporlar")).toBeVisible();
   });
 
   test("Bolum yoneticisi yetkili modullere erisebilir", async ({ page }) => {
@@ -37,10 +41,10 @@ test.describe("Rol bazli smoke", () => {
     await expect(page.getByRole("heading", { name: "Personeller" })).toBeVisible();
 
     await page.goto("/surecler");
-    await expect(page.getByRole("heading", { name: "Surec Takibi" })).toBeVisible();
+    await expect(modalRouteHeading(page, "Surec Takibi")).toBeVisible();
 
     await page.goto("/raporlar");
-    await expect(page.getByRole("heading", { name: "Raporlar" })).toBeVisible();
+    await expect(modalRouteHeading(page, "Raporlar")).toBeVisible();
   });
 
   test("Muhasebe finans ve rapor modullerine erisebilir", async ({ page }) => {
@@ -49,10 +53,10 @@ test.describe("Rol bazli smoke", () => {
     await expect(page).toHaveURL("/");
 
     await page.goto("/raporlar");
-    await expect(page.getByRole("heading", { name: "Raporlar" })).toBeVisible();
+    await expect(modalRouteHeading(page, "Raporlar")).toBeVisible();
 
     await page.goto("/finans");
-    await expect(page.getByRole("heading", { name: "Finans" })).toBeVisible();
+    await expect(modalRouteHeading(page, "Finans")).toBeVisible();
   });
 
   test("Birim amiri finans ve haftalik kapanisa erisemez", async ({ page }) => {
@@ -61,7 +65,7 @@ test.describe("Rol bazli smoke", () => {
     await expect(page).toHaveURL("/");
 
     await page.goto("/raporlar");
-    await expect(page.getByRole("heading", { name: "Raporlar" })).toBeVisible();
+    await expect(modalRouteHeading(page, "Raporlar")).toBeVisible();
 
     await page.goto("/finans");
     await expect(page).toHaveURL(/\/yetkisiz$/);

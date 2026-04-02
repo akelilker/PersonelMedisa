@@ -19,11 +19,12 @@
     0 2px 14px rgba(var(--theme-color-rgb), 0.1),
     inset 0 0 80px rgba(10, 13, 28, 0.22);
   /*
-   * Modal top (locked): min-height tabanli hero + icons-row; alt/footer/modal-body/glow kontrati onayli.
-   * Ileride: hero/icons gercek icerik yuksekligi min-height'i asarsa, ayri gorev olarak shell header
-   * olcum tabanli modal top hizasi (su an kapsam disi).
+   * Modal shell contract:
+   * - modal ustten app shell ust cercevesine kadar cikar
+   * - hero ve header aksiyonlari modalin altinda kalir
+   * - alt bosluk footer ustunde sabit 8px olarak korunur
    */
-  --shell-modal-top: calc(max(12px, env(safe-area-inset-top, 0px)) + 60px + 8px + 34px);
+  --shell-modal-top: 0px;
 }
 
 .app-shell::before {
@@ -229,7 +230,6 @@
   .app-shell {
     border-top-left-radius: 18px;
     border-top-right-radius: 18px;
-    --shell-modal-top: calc(max(12px, env(safe-area-inset-top, 0px)) + 65px + 8px + 34px);
   }
 
   .app-shell::before {

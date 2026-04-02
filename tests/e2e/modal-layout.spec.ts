@@ -8,6 +8,15 @@ test("home modal shell aligns to app container and footer gap contract", async (
 
   await expect(page).toHaveURL("/");
 
+  const initialFooterBoxShadow = await page.evaluate(() => {
+    const footer = document.querySelector("#app-footer");
+    if (!(footer instanceof HTMLElement)) {
+      throw new Error("Missing footer");
+    }
+
+    return getComputedStyle(footer).boxShadow;
+  });
+
   await page.getByTestId("menu-giris-surec").click();
   await page.locator(".modal-container").waitFor({ state: "visible" });
 
@@ -39,7 +48,8 @@ test("home modal shell aligns to app container and footer gap contract", async (
       modalTopDelta: modal.top - appShell.top,
       modalLeftDelta: modal.left - appShell.left,
       modalRightDelta: appShell.right - modal.right,
-      footerGapDelta: footer.top - modal.bottom
+      footerGapDelta: footer.top - modal.bottom,
+      footerBoxShadow: getComputedStyle(document.querySelector("#app-footer") as Element).boxShadow
     };
   });
 
@@ -50,4 +60,5 @@ test("home modal shell aligns to app container and footer gap contract", async (
   expect(metrics.modalLeftDelta).toBeCloseTo(0, 1);
   expect(metrics.modalRightDelta).toBeCloseTo(0, 1);
   expect(metrics.footerGapDelta).toBeCloseTo(18, 1);
+  expect(metrics.footerBoxShadow).toBe(initialFooterBoxShadow);
 });

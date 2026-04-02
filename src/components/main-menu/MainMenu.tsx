@@ -16,12 +16,18 @@ export function MainMenu({ onKayitOpen }: MainMenuProps) {
   const canViewPersoneller = hasPermission("personeller.view") || hasPermission("personeller.view.sube");
   const canViewRaporlar = hasPermission("raporlar.view");
 
+  const { pathname } = location;
+  const isGirisSurecActive = pathname === "/" || pathname.startsWith("/surecler");
+  const isPersonelActive = pathname.startsWith("/personeller");
+  const isRaporlarActive = pathname.startsWith("/raporlar");
+
   return (
     <div id="main-menu" className="menu-container">
       {canKayitSection ? (
         <button
           type="button"
-          className="menu-btn"
+          className={`menu-btn${isGirisSurecActive ? " is-active" : ""}`}
+          aria-current={isGirisSurecActive ? "page" : undefined}
           data-testid="menu-giris-surec"
           onClick={() => {
             const tab: KayitTab = location.pathname.startsWith("/surecler") ? "surec" : "yeni-kayit";
@@ -34,7 +40,8 @@ export function MainMenu({ onKayitOpen }: MainMenuProps) {
 
       <button
         type="button"
-        className="menu-btn"
+        className={`menu-btn${isPersonelActive ? " is-active" : ""}`}
+        aria-current={isPersonelActive ? "page" : undefined}
         data-testid="menu-personel-karti"
         onClick={() => {
           navigate("/personeller");
@@ -46,7 +53,8 @@ export function MainMenu({ onKayitOpen }: MainMenuProps) {
 
       <button
         type="button"
-        className="menu-btn"
+        className={`menu-btn${isRaporlarActive ? " is-active" : ""}`}
+        aria-current={isRaporlarActive ? "page" : undefined}
         data-testid="menu-raporlar"
         onClick={() => {
           navigate("/raporlar");

@@ -1,14 +1,12 @@
 .modal-overlay {
   position: fixed;
   top: max(12px, env(safe-area-inset-top, 0px));
+  bottom: calc(var(--modal-gap-above-footer) + 8px);
   left: 50%;
   right: auto;
   width: 100%;
   max-width: 500px;
   transform: translateX(-50%);
-  bottom: calc(
-    var(--app-footer-real-height) + var(--modal-gap-above-footer) + env(safe-area-inset-bottom, 0px)
-  );
   z-index: var(--z-modal-overlay, 1000);
   display: none;
   justify-content: center;
@@ -29,7 +27,6 @@
 .modal-container {
   position: relative;
   width: 100%;
-  height: auto;
   max-height: 100%;
   min-height: 0;
   margin: 0;

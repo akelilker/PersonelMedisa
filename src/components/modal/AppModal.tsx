@@ -58,7 +58,7 @@ export function AppModal({ title, children, footer, onClose }: AppModalProps) {
           <h2>{title}</h2>
           {onClose ? (
             <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Kapat">
-              Kapat
+              X
             </button>
           ) : null}
         </div>

@@ -1,7 +1,7 @@
 .modal-overlay {
   position: fixed;
-  top: max(12px, env(safe-area-inset-top, 0px));
-  bottom: calc(var(--modal-gap-above-footer) + 8px);
+  top: var(--shell-modal-top);
+  bottom: calc(var(--app-footer-real-height) + var(--modal-gap-above-footer));
   left: 50%;
   right: auto;
   width: 100%;

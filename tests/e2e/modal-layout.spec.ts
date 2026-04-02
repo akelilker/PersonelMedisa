@@ -59,6 +59,6 @@ test("home modal shell aligns to app container and footer gap contract", async (
   expect(metrics.modalTopDelta).toBeCloseTo(0, 1);
   expect(metrics.modalLeftDelta).toBeCloseTo(0, 1);
   expect(metrics.modalRightDelta).toBeCloseTo(0, 1);
-  expect(metrics.footerGapDelta).toBeCloseTo(18, 1);
+  expect(metrics.footerGapDelta).toBeCloseTo(16, 1);
   expect(metrics.footerBoxShadow).toBe(initialFooterBoxShadow);
 });

@@ -10,7 +10,7 @@
   --modal-footer-gap: 12px;
   --modal-footer-reserve: calc(var(--app-footer-height) + var(--modal-footer-gap));
   --modal-gap-above-footer: 8px;
-  --modal-footer-optical-reserve: 10px;
+  --modal-footer-optical-reserve: 8px;
 }
 
 @media (max-width: 640px) {

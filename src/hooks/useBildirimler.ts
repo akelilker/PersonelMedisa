@@ -195,7 +195,7 @@ export function useBildirimler() {
         );
       } catch {
         if (!getCacheEntry<PaginatedResult<Bildirim>>(listKey)) {
-          setErrorMessage("Bildirim listesi su an guncellenemiyor.");
+      setErrorMessage("Bildirim listesi şu an güncellenemiyor.");
         }
       } finally {
         if (!cancelled) {
@@ -226,7 +226,7 @@ export function useBildirimler() {
         );
       } catch {
         if (!cancelled) {
-          setReferenceError("Bildirim referanslari su an guncellenemiyor, manuel giris kullanilabilir.");
+      setReferenceError("Bildirim referansları şu an güncellenemiyor, manuel giriş kullanılabilir.");
         }
       }
     })();
@@ -304,7 +304,7 @@ export function useBildirimler() {
         return;
       }
       if (!canCreate) {
-        setCreateErrorMessage("Bu islem icin yetkin bulunmuyor.");
+      setCreateErrorMessage("Bu işlem için yetkin bulunmuyor.");
         return;
       }
 
@@ -348,7 +348,7 @@ export function useBildirimler() {
           void processSyncQueue();
         }
       } catch (error) {
-        setCreateErrorMessage(error instanceof Error ? error.message : "Bildirim kaydi yapilamadi.");
+        setCreateErrorMessage(error instanceof Error ? error.message : "Bildirim kaydı yapılamadı.");
       } finally {
         setIsCreateSubmitting(false);
       }
@@ -358,7 +358,7 @@ export function useBildirimler() {
 
   const openEditModal = useCallback((bildirim: Bildirim, canEdit: boolean) => {
     if (!canEdit) {
-      setErrorMessage("Bu bildirimi duzenlemek icin yetkin bulunmuyor.");
+      setErrorMessage("Bu bildirimi düzenlemek için yetkin bulunmuyor.");
       return;
     }
     setEditErrorMessage(null);
@@ -377,7 +377,7 @@ export function useBildirimler() {
         return;
       }
       if (!canEdit) {
-        setEditErrorMessage("Bu bildirimi duzenlemek icin yetkin bulunmuyor.");
+        setEditErrorMessage("Bu bildirimi düzenlemek için yetkin bulunmuyor.");
         return;
       }
 
@@ -423,11 +423,11 @@ export function useBildirimler() {
   const cancelBildirimHandler = useCallback(
     async (bildirim: Bildirim, canCancel: boolean) => {
       if (!canCancel) {
-        setErrorMessage("Bu bildirimi iptal etmek icin yetkin bulunmuyor.");
+        setErrorMessage("Bu bildirimi iptal etmek için yetkin bulunmuyor.");
         return;
       }
 
-      const confirmed = window.confirm(`Bildirim #${bildirim.id} kaydini iptal etmek istiyor musun?`);
+      const confirmed = window.confirm(`Bildirim #${bildirim.id} kaydını iptal etmek istiyor musun?`);
       if (!confirmed) {
         return;
       }
@@ -583,7 +583,7 @@ export function useBildirimDetail(parsedBildirimId: number, hasValidId: boolean)
   const refetch = useCallback(async () => {
     if (!hasValidId) {
       setIsLoading(false);
-      setErrorMessage("Gecerli bir bildirim id verilmedi.");
+      setErrorMessage("Geçerli bir bildirim ID verilmedi.");
       return;
     }
 
@@ -605,7 +605,7 @@ export function useBildirimDetail(parsedBildirimId: number, hasValidId: boolean)
         return;
       }
       if (!getCacheEntry<Bildirim>(detailKey)) {
-        setErrorMessage("Bildirim detayi su an guncellenemiyor.");
+        setErrorMessage("Bildirim detayı şu an güncellenemiyor.");
       }
     } finally {
       setIsLoading(false);

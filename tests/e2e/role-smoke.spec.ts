@@ -23,10 +23,10 @@ test.describe("Rol bazli smoke", () => {
     await expect(page.getByRole("heading", { name: "Personeller" })).toBeVisible();
 
     await page.goto("/surecler");
-    await expect(modalRouteHeading(page, "Surec Takibi")).toBeVisible();
+    await expect(modalRouteHeading(page, "Süreç Takibi")).toBeVisible();
 
     await page.goto("/puantaj");
-    await expect(modalRouteHeading(page, "Gunluk Puantaj")).toBeVisible();
+    await expect(modalRouteHeading(page, "Günlük Puantaj")).toBeVisible();
 
     await page.goto("/raporlar");
     await expect(modalRouteHeading(page, "Raporlar")).toBeVisible();
@@ -41,7 +41,7 @@ test.describe("Rol bazli smoke", () => {
     await expect(page.getByRole("heading", { name: "Personeller" })).toBeVisible();
 
     await page.goto("/surecler");
-    await expect(modalRouteHeading(page, "Surec Takibi")).toBeVisible();
+    await expect(modalRouteHeading(page, "Süreç Takibi")).toBeVisible();
 
     await page.goto("/raporlar");
     await expect(modalRouteHeading(page, "Raporlar")).toBeVisible();

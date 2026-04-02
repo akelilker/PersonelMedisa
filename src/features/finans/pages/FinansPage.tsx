@@ -83,7 +83,7 @@ export function FinansPage() {
             onChange={(value) => updateDraft({ personelId: value })}
           />
           <FormField
-            label="Donem (YYYY-MM)"
+            label="Dönem (YYYY-MM)"
             name="finans-filter-donem"
             type="month"
             value={draft.donem}
@@ -92,7 +92,7 @@ export function FinansPage() {
           <FormField
             label="Kalem Turu"
             name="finans-filter-kalem"
-            placeholder="AVANS, PRIM..."
+            placeholder="AVANS, PRİM..."
             value={draft.kalemTuru}
             onChange={(value) => updateDraft({ kalemTuru: value })}
           />
@@ -115,12 +115,12 @@ export function FinansPage() {
         </div>
       </form>
 
-      {isLoading ? <LoadingState label="Finans verileri yukleniyor..." /> : null}
+      {isLoading ? <LoadingState label="Finans verileri yükleniyor..." /> : null}
       {!isLoading && errorMessage ? (
         <ErrorState message={errorMessage} onRetry={() => void refetch()} />
       ) : null}
       {!isLoading && !errorMessage && items.length === 0 ? (
-        <EmptyState title="Finans kaydi yok" message="Bu filtrede gosterilecek finans kalemi bulunamadi." />
+        <EmptyState title="Finans kaydı yok" message="Bu filtrede gösterilecek finans kalemi bulunamadı." />
       ) : null}
 
       {!isLoading && !errorMessage && items.length > 0 ? (
@@ -130,7 +130,7 @@ export function FinansPage() {
               <div>
                 <strong>{item.kalem_turu}</strong>
                 <p>Personel: {item.personel_id}</p>
-                <p>Donem: {item.donem}</p>
+                <p>Dönem: {item.donem}</p>
                 <p>Tutar: {item.tutar}</p>
                 <p>Durum: {item.state ?? "-"}</p>
               </div>
@@ -144,7 +144,7 @@ export function FinansPage() {
                       onClick={() => openEditModal(item, canEditFinans)}
                       disabled={cancelOngoingId === item.id}
                     >
-                      Duzenle
+                      Düzenle
                     </button>
                   ) : null}
                   {canCancelFinans ? (
@@ -154,7 +154,7 @@ export function FinansPage() {
                       onClick={() => void cancelFinansHandler(item, canCancelFinans)}
                       disabled={cancelOngoingId === item.id}
                     >
-                      {cancelOngoingId === item.id ? "Iptal Ediliyor..." : "Iptal"}
+                      {cancelOngoingId === item.id ? "İptal Ediliyor..." : "İptal"}
                     </button>
                   ) : null}
                 </div>
@@ -171,7 +171,7 @@ export function FinansPage() {
           onClick={() => setPage((prev) => Math.max(1, prev - 1))}
           disabled={isLoading || page <= 1}
         >
-          Onceki
+          Önceki
         </button>
         <span className="module-page-info">
           Sayfa {page}
@@ -189,7 +189,7 @@ export function FinansPage() {
 
       <div className="module-links">
         <Link to="/raporlar">Raporlara git</Link>
-        <Link to="/">Ana ekrana don</Link>
+        <Link to="/">Ana ekrana dön</Link>
       </div>
 
       {canCreateFinans && isCreateModalOpen ? (
@@ -212,7 +212,7 @@ export function FinansPage() {
                 onClick={closeCreateModal}
                 disabled={isCreateSubmitting}
               >
-                Vazgec
+                Vazgeç
               </button>
             </div>
           }
@@ -228,7 +228,7 @@ export function FinansPage() {
               required
             />
             <FormField
-              label="Donem"
+              label="Dönem"
               name="finans-create-donem"
               type="month"
               value={createForm.donem}
@@ -253,7 +253,7 @@ export function FinansPage() {
               required
             />
             <FormField
-              label="Aciklama"
+              label="Açıklama"
               name="finans-create-aciklama"
               value={createForm.aciklama}
               onChange={(value) => setCreateForm((prev) => ({ ...prev, aciklama: value }))}
@@ -265,7 +265,7 @@ export function FinansPage() {
 
       {canEditFinans && editingItem ? (
         <AppModal
-          title={`Finans Duzenle #${editingItem.id}`}
+          title={`Finans Düzenle #${editingItem.id}`}
           onClose={closeEditModal}
           footer={
             <div className="universal-btn-group modal-footer-actions">
@@ -283,7 +283,7 @@ export function FinansPage() {
                 onClick={closeEditModal}
                 disabled={isEditSubmitting}
               >
-                Vazgec
+                Vazgeç
               </button>
             </div>
           }
@@ -299,7 +299,7 @@ export function FinansPage() {
               required
             />
             <FormField
-              label="Donem"
+              label="Dönem"
               name="finans-edit-donem"
               type="month"
               value={editForm.donem}
@@ -324,7 +324,7 @@ export function FinansPage() {
               required
             />
             <FormField
-              label="Aciklama"
+              label="Açıklama"
               name="finans-edit-aciklama"
               value={editForm.aciklama}
               onChange={(value) => setEditForm((prev) => ({ ...prev, aciklama: value }))}

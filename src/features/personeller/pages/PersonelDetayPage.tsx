@@ -53,16 +53,16 @@ export function PersonelDetayPage() {
 
   return (
     <section className="personel-detay-page">
-      <h2>Personel Detay</h2>
+      <h2>Personel Detayı</h2>
 
-      {isLoading ? <LoadingState label="Personel detayi yukleniyor..." /> : null}
+      {isLoading ? <LoadingState label="Personel detayı yükleniyor..." /> : null}
 
       {!isLoading && errorMessage ? (
         <ErrorState message={errorMessage} onRetry={() => void refetch()} />
       ) : null}
 
       {!isLoading && !errorMessage && !personel ? (
-        <EmptyState title="Personel bulunamadi" message="Belirtilen id ile kayit bulunamadi." />
+        <EmptyState title="Personel bulunamadı" message="Belirtilen ID ile kayıt bulunamadı." />
       ) : null}
 
       {!isLoading && !errorMessage && personel ? (
@@ -84,7 +84,7 @@ export function PersonelDetayPage() {
 
               {canEditPersonel ? (
                 <button type="button" className="universal-btn-aux" onClick={() => setIsEditing(true)}>
-                  Duzenle
+                  Düzenle
                 </button>
               ) : null}
             </>
@@ -129,7 +129,7 @@ export function PersonelDetayPage() {
                   {isSubmitting ? "Kaydediliyor..." : "Kaydet"}
                 </button>
                 <button type="button" className="universal-btn-aux" onClick={discardEdit} disabled={isSubmitting}>
-                  Vazgec
+                  Vazgeç
                 </button>
               </div>
             </form>

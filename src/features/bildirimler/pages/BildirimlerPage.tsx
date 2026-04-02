@@ -105,14 +105,14 @@ export function BildirimlerPage() {
               name="bildirim-filter-turu"
               value={draft.bildirimTuru}
               onChange={(value) => updateDraft({ bildirimTuru: value })}
-              placeholderOption={{ value: "", label: "Tum" }}
+              placeholderOption={{ value: "", label: "Tüm" }}
               selectOptions={keyOptionsToSelectOptions(bildirimTuruOptions)}
             />
           ) : (
             <FormField
               label="Bildirim Turu"
               name="bildirim-filter-turu-text"
-              placeholder="GEC_GELDI, DEVAMSIZLIK..."
+              placeholder="GEÇ_GELDİ, DEVAMSIZLIK..."
               value={draft.bildirimTuru}
               onChange={(value) => updateDraft({ bildirimTuru: value })}
             />
@@ -136,7 +136,7 @@ export function BildirimlerPage() {
         </div>
       </form>
 
-      {isLoading ? <LoadingState label="Bildirim verileri yukleniyor..." /> : null}
+      {isLoading ? <LoadingState label="Bildirim verileri yükleniyor..." /> : null}
 
       {!isLoading && errorMessage ? (
         <ErrorState message={errorMessage} onRetry={() => void refetch()} />
@@ -144,8 +144,8 @@ export function BildirimlerPage() {
 
       {!isLoading && !errorMessage && bildirimler.length === 0 ? (
         <EmptyState
-          title="Bildirim bulunamadi"
-          message="Secilen tarihte veya filtrede bildirim kaydi yok."
+          title="Bildirim bulunamadı"
+          message="Seçilen tarihte veya filtrede bildirim kaydı yok."
         />
       ) : null}
 
@@ -172,7 +172,7 @@ export function BildirimlerPage() {
                       onClick={() => openEditModal(bildirim, canEditBildirim)}
                       disabled={cancelingBildirimId === bildirim.id}
                     >
-                      Duzenle
+                      Düzenle
                     </button>
                   ) : null}
                   {canCancelBildirim ? (
@@ -182,7 +182,7 @@ export function BildirimlerPage() {
                       onClick={() => void cancelBildirimHandler(bildirim, canCancelBildirim)}
                       disabled={cancelingBildirimId === bildirim.id}
                     >
-                      {cancelingBildirimId === bildirim.id ? "Iptal Ediliyor..." : "Iptal"}
+                      {cancelingBildirimId === bildirim.id ? "İptal Ediliyor..." : "İptal"}
                     </button>
                   ) : null}
                 </div>
@@ -199,7 +199,7 @@ export function BildirimlerPage() {
           onClick={() => setPage((prev) => Math.max(1, prev - 1))}
           disabled={isLoading || page <= 1}
         >
-          Onceki
+          Önceki
         </button>
         <span className="module-page-info">
           Sayfa {page}
@@ -216,8 +216,8 @@ export function BildirimlerPage() {
       </div>
 
       <div className="module-links">
-        <Link to="/">Ana ekrana don</Link>
-        <Link to="/surecler">Surec takibe git</Link>
+        <Link to="/">Ana ekrana dön</Link>
+        <Link to="/surecler">Süreç takibe git</Link>
         <Link to="/puantaj">Puantaja git</Link>
       </div>
 
@@ -241,7 +241,7 @@ export function BildirimlerPage() {
                 onClick={closeCreateModal}
                 disabled={isCreateSubmitting}
               >
-                Vazgec
+                Vazgeç
               </button>
             </div>
           }
@@ -263,7 +263,7 @@ export function BildirimlerPage() {
                 value={createForm.departmanId}
                 onChange={(value) => setCreateForm((prev) => ({ ...prev, departmanId: value }))}
                 required
-                placeholderOption={{ value: "", label: "Seciniz" }}
+                placeholderOption={{ value: "", label: "Seçiniz" }}
                 selectOptions={idOptionsToSelectOptions(departmanOptions)}
               />
             ) : (
@@ -294,7 +294,7 @@ export function BildirimlerPage() {
                 value={createForm.bildirimTuru}
                 onChange={(value) => setCreateForm((prev) => ({ ...prev, bildirimTuru: value }))}
                 required
-                placeholderOption={{ value: "", label: "Seciniz" }}
+                placeholderOption={{ value: "", label: "Seçiniz" }}
                 selectOptions={keyOptionsToSelectOptions(bildirimTuruOptions)}
               />
             ) : (
@@ -307,7 +307,7 @@ export function BildirimlerPage() {
               />
             )}
             <FormField
-              label="Aciklama"
+              label="Açıklama"
               name="bildirim-create-aciklama"
               value={createForm.aciklama}
               onChange={(value) => setCreateForm((prev) => ({ ...prev, aciklama: value }))}
@@ -320,7 +320,7 @@ export function BildirimlerPage() {
 
       {canEditBildirim && editingBildirim ? (
         <AppModal
-          title={`Bildirim Duzenle #${editingBildirim.id}`}
+          title={`Bildirim Düzenle #${editingBildirim.id}`}
           onClose={closeEditModal}
           footer={
             <div className="universal-btn-group modal-footer-actions">
@@ -338,7 +338,7 @@ export function BildirimlerPage() {
                 onClick={closeEditModal}
                 disabled={isEditSubmitting}
               >
-                Vazgec
+                Vazgeç
               </button>
             </div>
           }
@@ -360,7 +360,7 @@ export function BildirimlerPage() {
                 value={editForm.departmanId}
                 onChange={(value) => setEditForm((prev) => ({ ...prev, departmanId: value }))}
                 required
-                placeholderOption={{ value: "", label: "Seciniz" }}
+                placeholderOption={{ value: "", label: "Seçiniz" }}
                 selectOptions={idOptionsToSelectOptions(departmanOptions)}
               />
             ) : (
@@ -391,7 +391,7 @@ export function BildirimlerPage() {
                 value={editForm.bildirimTuru}
                 onChange={(value) => setEditForm((prev) => ({ ...prev, bildirimTuru: value }))}
                 required
-                placeholderOption={{ value: "", label: "Seciniz" }}
+                placeholderOption={{ value: "", label: "Seçiniz" }}
                 selectOptions={keyOptionsToSelectOptions(bildirimTuruOptions)}
               />
             ) : (
@@ -404,7 +404,7 @@ export function BildirimlerPage() {
               />
             )}
             <FormField
-              label="Aciklama"
+              label="Açıklama"
               name="bildirim-edit-aciklama"
               value={editForm.aciklama}
               onChange={(value) => setEditForm((prev) => ({ ...prev, aciklama: value }))}

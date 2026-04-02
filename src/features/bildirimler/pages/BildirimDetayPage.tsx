@@ -13,16 +13,16 @@ export function BildirimDetayPage() {
 
   return (
     <section className="bildirimler-page bildirim-detay-page">
-      <h2>Bildirim Detay</h2>
+      <h2>Bildirim Detayı</h2>
 
-      {isLoading ? <LoadingState label="Bildirim detayi yukleniyor..." /> : null}
+      {isLoading ? <LoadingState label="Bildirim detayı yükleniyor..." /> : null}
 
       {!isLoading && errorMessage ? (
         <ErrorState message={errorMessage} onRetry={() => void refetch()} />
       ) : null}
 
       {!isLoading && !errorMessage && !bildirim ? (
-        <EmptyState title="Bildirim bulunamadi" message="Belirtilen id ile kayit bulunamadi." />
+        <EmptyState title="Bildirim bulunamadı" message="Belirtilen ID ile kayıt bulunamadı." />
       ) : null}
 
       {!isLoading && !errorMessage && bildirim ? (
@@ -40,19 +40,19 @@ export function BildirimDetayPage() {
             <strong>Personel ID:</strong> {bildirim.personel_id ?? "-"}
           </p>
           <p>
-            <strong>Bildirim Turu:</strong> {bildirim.bildirim_turu}
+            <strong>Bildirim Türü:</strong> {bildirim.bildirim_turu}
           </p>
           <p>
             <strong>Durum:</strong> {bildirim.state ?? "-"}
           </p>
           <p>
-            <strong>Aciklama:</strong> {bildirim.aciklama ?? "-"}
+            <strong>Açıklama:</strong> {bildirim.aciklama ?? "-"}
           </p>
         </div>
       ) : null}
 
       <div className="module-links">
-        <Link to="/surecler">Surec takibe git</Link>
+        <Link to="/surecler">Süreç takibe git</Link>
       </div>
     </section>
   );

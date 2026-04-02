@@ -17,13 +17,14 @@ type HeaderNotification = {
 };
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+const TR_LOCALE = "tr-TR";
 
 function startOfDay(date: Date) {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate());
 }
 
 function formatDate(date: Date) {
-  return new Intl.DateTimeFormat("tr-TR", {
+  return new Intl.DateTimeFormat(TR_LOCALE, {
     day: "2-digit",
     month: "2-digit",
     year: "numeric"
@@ -32,10 +33,10 @@ function formatDate(date: Date) {
 
 function getReminderSubtitle(daysLeft: number, dueDate: Date) {
   if (daysLeft <= 0) {
-    return `Bugun son gun (${formatDate(dueDate)})`;
+    return `Bugün son gün (${formatDate(dueDate)})`;
   }
 
-  return `${daysLeft} gun kaldi (${formatDate(dueDate)})`;
+  return `${daysLeft} gün kaldı (${formatDate(dueDate)})`;
 }
 
 function buildReminderNotifications(baseDate: Date, route: string): HeaderNotification[] {
@@ -44,13 +45,13 @@ function buildReminderNotifications(baseDate: Date, route: string): HeaderNotifi
     {
       key: "salary",
       dayOfMonth: 5,
-      title: "Maas odeme zamani yaklasiyor",
+      title: "Maaş ödeme zamanı yaklaşıyor",
       route
     },
     {
       key: "sgk",
       dayOfMonth: 26,
-      title: "SGK prim odeme takibini kontrol et",
+      title: "SGK prim ödeme takibini kontrol et",
       route
     }
   ];
@@ -81,20 +82,22 @@ function buildReminderNotifications(baseDate: Date, route: string): HeaderNotifi
 
 function formatBildirimTuru(value: string) {
   return value
-    .toLowerCase()
+    .toLocaleLowerCase(TR_LOCALE)
     .split("_")
     .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .map((part) => part.slice(0, 1).toLocaleUpperCase(TR_LOCALE) + part.slice(1))
     .join(" ");
 }
 
 function mapBildirimLevel(bildirimTuru: string): NotificationLevel {
-  const normalized = bildirimTuru.toUpperCase();
+  const normalized = bildirimTuru.toLocaleUpperCase(TR_LOCALE);
 
   if (
     normalized.includes("DEVAMSIZLIK") ||
     normalized.includes("GELMEDI") ||
+    normalized.includes("GELMEDİ") ||
     normalized.includes("IZINSIZ") ||
+    normalized.includes("İZİNSİZ") ||
     normalized.includes("UYARI")
   ) {
     return "critical";
@@ -102,8 +105,10 @@ function mapBildirimLevel(bildirimTuru: string): NotificationLevel {
 
   if (
     normalized.includes("GEC") ||
+    normalized.includes("GEÇ") ||
     normalized.includes("RAPOR") ||
-    normalized.includes("YAKLASAN")
+    normalized.includes("YAKLASAN") ||
+    normalized.includes("YAKLAŞAN")
   ) {
     return "warning";
   }
@@ -117,7 +122,7 @@ export function ShellHeaderActions() {
   const navigate = useNavigate();
   const location = useLocation();
   const { logout, session, setActiveSubeId } = useAuth();
-  const { hasPermission, hasAnyPermission, uiProfile } = useRoleAccess();
+  const { hasPermission, uiProfile } = useRoleAccess();
 
   useAppDataRevision();
   const activeSubeId = session?.active_sube_id ?? null;
@@ -155,7 +160,7 @@ export function ShellHeaderActions() {
     const apiItems: HeaderNotification[] = headerBildirimler.map((item) => {
       const tarihText = item.tarih ? `Tarih: ${item.tarih}` : "";
       const personelText = item.personel_id ? `Personel: ${item.personel_id}` : "";
-      const subtitle = [tarihText, personelText].filter(Boolean).join(" | ") || "Islem gerektiriyor";
+      const subtitle = [tarihText, personelText].filter(Boolean).join(" | ") || "İşlem gerektiriyor";
 
       return {
         id: `api-${item.id}`,
@@ -194,7 +199,7 @@ export function ShellHeaderActions() {
     }
     if (subeIds.length === 1) {
       const id = subeIds[0];
-      const label = subeList.find((s) => s.id === id)?.ad ?? `Sube ${id}`;
+      const label = subeList.find((s) => s.id === id)?.ad ?? `Şube ${id}`;
       return { kind: "single" as const, id, label };
     }
     return { kind: "multi" as const };
@@ -251,7 +256,7 @@ export function ShellHeaderActions() {
           })
           .catch((error) => {
             setNotificationActionError(
-              error instanceof Error ? error.message : "Bildirim okundu isaretlenemedi."
+              error instanceof Error ? error.message : "Bildirim okundu işaretlenemedi."
             );
           });
       }
@@ -279,7 +284,7 @@ export function ShellHeaderActions() {
         })
         .catch((error) => {
           setNotificationActionError(
-            error instanceof Error ? error.message : "Bildirimler okundu isaretlenemedi."
+            error instanceof Error ? error.message : "Bildirimler okundu işaretlenemedi."
           );
         });
     }
@@ -313,12 +318,12 @@ export function ShellHeaderActions() {
       <div className="pwa-install-center" />
       <div className="icons-row-right">
         {subeControl.kind === "all" ? (
-          <span className="sube-header-badge" title="Aktif sube filtresi yok">
-            Tum subeler
+          <span className="sube-header-badge" title="Aktif şube filtresi yok">
+            Tüm şubeler
           </span>
         ) : null}
         {subeControl.kind === "single" ? (
-          <span className="sube-header-badge" title="Atanan sube">
+          <span className="sube-header-badge" title="Atanan şube">
             {subeControl.label}
           </span>
         ) : null}
@@ -332,14 +337,14 @@ export function ShellHeaderActions() {
                 setIsNotificationsOpen(false);
                 setIsSettingsOpen(false);
               }}
-              aria-label="Sube sec"
+              aria-label="Şube seç"
               aria-expanded={isSubeOpen}
-              title="Sube degistir"
+              title="Şube değiştir"
             >
               <span className="sube-selector-label">
                 {activeSubeId != null
-                  ? subeList.find((s) => s.id === activeSubeId)?.ad ?? `Sube ${activeSubeId}`
-                  : "Sube"}
+                  ? subeList.find((s) => s.id === activeSubeId)?.ad ?? `Şube ${activeSubeId}`
+                  : "Şube"}
               </span>
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -359,7 +364,7 @@ export function ShellHeaderActions() {
               className={`settings-dropdown sube-selector-dropdown${isSubeOpen ? " open" : ""}`}
             >
               {subeIds.map((id) => {
-                const label = subeList.find((s) => s.id === id)?.ad ?? `Sube ${id}`;
+                const label = subeList.find((s) => s.id === id)?.ad ?? `Şube ${id}`;
                 return (
                   <button
                     key={id}
@@ -371,7 +376,7 @@ export function ShellHeaderActions() {
                     }}
                   >
                     {label}
-                    {activeSubeId === id ? " ✓" : ""}
+                    {activeSubeId === id ? " (seçili)" : ""}
                   </button>
                 );
               })}
@@ -388,7 +393,7 @@ export function ShellHeaderActions() {
             setIsSettingsOpen(false);
             setIsSubeOpen(false);
           }}
-          aria-label="Bildirimleri ac"
+          aria-label="Bildirimleri aç"
           aria-expanded={isNotificationsOpen}
         >
           <svg
@@ -414,7 +419,7 @@ export function ShellHeaderActions() {
         >
           {isNotificationsLoading ? (
             <button type="button" className="notification-item notification-empty" disabled>
-              Bildirimler yukleniyor...
+              Bildirimler yükleniyor...
             </button>
           ) : null}
 
@@ -425,7 +430,7 @@ export function ShellHeaderActions() {
                 className="notifications-mark-all-read-btn"
                 onClick={markAllNotificationsAsRead}
               >
-                Tumunu okundu isaretle
+                Tümünü okundu işaretle
               </button>
             </div>
           ) : null}
@@ -452,7 +457,7 @@ export function ShellHeaderActions() {
 
           {!isNotificationsLoading && visibleNotifications.length === 0 ? (
             <button type="button" className="notification-item notification-empty" disabled>
-              Bildirim Yok
+              Bildirim yok
             </button>
           ) : null}
 
@@ -468,7 +473,7 @@ export function ShellHeaderActions() {
             setIsNotificationsOpen(false);
             setIsSubeOpen(false);
           }}
-          aria-label="Ayar menusu"
+          aria-label="Ayar menüsü"
           aria-expanded={isSettingsOpen}
         >
           <svg
@@ -497,7 +502,7 @@ export function ShellHeaderActions() {
               logout();
             }}
           >
-            Cikis
+            Çıkış
           </button>
         </div>
       </div>

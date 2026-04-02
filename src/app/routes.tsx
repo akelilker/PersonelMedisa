@@ -31,9 +31,9 @@ function AppLayout() {
 function NotFoundPage() {
   return (
     <section className="states-page">
-      <h2>Sayfa Bulunamadi</h2>
-      <p>Istedigin ekran bulunamadi. Lutfen gecerli bir modula gec.</p>
-      <Link to="/">Ana ekrana don</Link>
+      <h2>Sayfa Bulunamadı</h2>
+      <p>İstediğin ekran bulunamadı. Lütfen geçerli bir modüle geç.</p>
+      <Link to="/">Ana ekrana dön</Link>
     </section>
   );
 }
@@ -41,9 +41,9 @@ function NotFoundPage() {
 function UnauthorizedPage() {
   return (
     <section className="states-page">
-      <h2>Yetkisiz Erisim</h2>
-      <p>Bu modulu gormek icin yeterli yetkin yok.</p>
-      <Link to="/">Ana ekrana don</Link>
+      <h2>Yetkisiz Erişim</h2>
+      <p>Bu modülü görmek için yeterli yetkin yok.</p>
+      <Link to="/">Ana ekrana dön</Link>
     </section>
   );
 }

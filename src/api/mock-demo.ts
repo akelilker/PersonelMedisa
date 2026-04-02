@@ -252,7 +252,7 @@ export function resolveDemoApiResponse(
     const sube_ids = role === "BIRIM_AMIRI" ? [1] : role === "MUHASEBE" ? [1, 2] : [];
     const sube_list =
       sube_ids.length > 0
-        ? sube_ids.map((id) => ({ id, ad: id === 1 ? "Merkez" : `Sube ${id}` }))
+      ? sube_ids.map((id) => ({ id, ad: id === 1 ? "Merkez" : `Şube ${id}` }))
         : undefined;
 
     return ok({
@@ -477,7 +477,7 @@ export function resolveDemoApiResponse(
   if (pathname.startsWith("/referans/") && method === "GET") {
     if (pathname === "/referans/departmanlar") {
       return ok([
-        { id: 1, ad: "Yonetim" },
+      { id: 1, ad: "Yönetim" },
         { id: 2, ad: "Muhasebe" },
         { id: 3, ad: "Operasyon" }
       ]);
@@ -500,7 +500,7 @@ export function resolveDemoApiResponse(
 
     if (pathname === "/referans/surec-turleri") {
       return ok([
-        { key: "IZIN", label: "Izin" },
+        { key: "IZIN", label: "İzin" },
         { key: "RAPOR", label: "Rapor" },
         { key: "ISTEN_AYRILMA", label: "Isten Ayrilma" }
       ]);
@@ -509,7 +509,7 @@ export function resolveDemoApiResponse(
     if (pathname === "/referans/bildirim-turleri") {
       return ok([
         { key: "GEC_GELDI", label: "Gec Geldi" },
-        { key: "DEVAMSIZLIK", label: "Devamsizlik" },
+        { key: "DEVAMSIZLIK", label: "Devamsızlık" },
         { key: "RAPORLU", label: "Raporlu" }
       ]);
     }

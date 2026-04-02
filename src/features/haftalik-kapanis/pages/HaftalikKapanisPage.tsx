@@ -43,7 +43,7 @@ function parseOptionalPositiveInt(value: string) {
 
   const number = Number.parseInt(trimmed, 10);
   if (Number.isNaN(number) || number <= 0) {
-    throw new Error("Departman ID pozitif sayi olmalidir.");
+    throw new Error("Departman ID pozitif sayı olmalıdır.");
   }
 
   return number;
@@ -99,7 +99,7 @@ export function HaftalikKapanisPage() {
     }
 
     if (!canCloseWeek) {
-      setErrorMessage("Bu hafta icin kapanis alma yetkin bulunmuyor.");
+      setErrorMessage("Bu hafta için kapanış alma yetkin bulunmuyor.");
       return;
     }
 
@@ -108,11 +108,11 @@ export function HaftalikKapanisPage() {
 
     try {
       if (!form.haftaBaslangic || !form.haftaBitis) {
-        throw new Error("Hafta baslangic ve bitis tarihi zorunludur.");
+        throw new Error("Hafta başlangıç ve bitiş tarihi zorunludur.");
       }
 
       if (form.haftaBaslangic > form.haftaBitis) {
-        throw new Error("Hafta baslangic tarihi bitis tarihinden buyuk olamaz.");
+        throw new Error("Hafta başlangıç tarihi bitiş tarihinden büyük olamaz.");
       }
 
       const response = await createHaftalikKapanis({
@@ -123,7 +123,7 @@ export function HaftalikKapanisPage() {
 
       setResult(response);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Haftalik kapanis olusturulamadi.");
+      setErrorMessage(error instanceof Error ? error.message : "Haftalık kapanış oluşturulamadı.");
       setResult(null);
     } finally {
       setIsSubmitting(false);
@@ -139,13 +139,13 @@ export function HaftalikKapanisPage() {
   return (
     <section className="kapanis-page">
       <div className="kapanis-header-row">
-        <h2>Haftalik Kapanis</h2>
+        <h2>Haftalık Kapanış</h2>
       </div>
 
       <form className="form-filter-panel" onSubmit={handleSubmit}>
         <div className="form-field-grid">
           <FormField
-            label="Hafta Baslangic"
+            label="Hafta Başlangıç"
             name="kapanis-bas"
             type="date"
             value={form.haftaBaslangic}
@@ -153,7 +153,7 @@ export function HaftalikKapanisPage() {
             required
           />
           <FormField
-            label="Hafta Bitis"
+            label="Hafta Bitiş"
             name="kapanis-bitis"
             type="date"
             value={form.haftaBitis}
@@ -167,13 +167,13 @@ export function HaftalikKapanisPage() {
             min={1}
             value={form.departmanId}
             onChange={(value) => setForm((prev) => ({ ...prev, departmanId: value }))}
-            placeholder="Tum departmanlar icin bos birak"
+            placeholder="Tüm departmanlar için boş bırak"
           />
         </div>
 
         <div className="form-actions-row">
           <button type="submit" className="universal-btn-aux" disabled={!canCloseWeek || isSubmitting}>
-            {isSubmitting ? "Kapanis Aliniyor..." : "Haftayi Kapat"}
+            {isSubmitting ? "Kapanış Alınıyor..." : "Haftayı Kapat"}
           </button>
         </div>
       </form>
@@ -181,13 +181,13 @@ export function HaftalikKapanisPage() {
       {errorMessage ? <ErrorState message={errorMessage} /> : null}
 
       {!canCloseWeek ? (
-        <p className="kapanis-readonly-note">Bu modulu sadece goruntuleme yetkin var.</p>
+        <p className="kapanis-readonly-note">Bu modülü sadece görüntüleme yetkin var.</p>
       ) : null}
 
       {result ? (
         <div className="kapanis-result-card">
           <p>
-            <strong>Kapanis ID:</strong> {resultId ?? "-"}
+            <strong>Kapanış ID:</strong> {resultId ?? "-"}
           </p>
           <p>
             <strong>Durum:</strong> {resultState ?? "-"}
@@ -207,8 +207,8 @@ export function HaftalikKapanisPage() {
       ) : null}
 
       <div className="module-links">
-        <Link to="/puantaj">Gunluk puantaja git</Link>
-        <Link to="/">Ana ekrana don</Link>
+        <Link to="/puantaj">Günlük puantaja git</Link>
+        <Link to="/">Ana ekrana dön</Link>
       </div>
     </section>
   );

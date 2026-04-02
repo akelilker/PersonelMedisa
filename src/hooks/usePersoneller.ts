@@ -219,7 +219,7 @@ export function usePersoneller() {
         );
       } catch {
         if (!cancelled) {
-          setReferenceError("Referans veriler su an guncellenemiyor, manuel giris kullanilabilir.");
+      setReferenceError("Referans veriler şu an güncellenemiyor, manuel giriş kullanılabilir.");
         }
       }
     })();
@@ -277,7 +277,7 @@ export function usePersoneller() {
         return;
       }
       if (!canCreate) {
-        setCreateErrorMessage("Bu islem icin yetkin bulunmuyor.");
+      setCreateErrorMessage("Bu işlem için yetkin bulunmuyor.");
         return;
       }
 
@@ -344,7 +344,7 @@ export function usePersoneller() {
         }
       } catch (error) {
         setCreateErrorMessage(
-          error instanceof Error ? error.message : "Personel kaydi sirasinda bir hata olustu."
+        error instanceof Error ? error.message : "Personel kaydı sırasında bir hata oluştu."
         );
       } finally {
         setIsCreateSubmitting(false);
@@ -429,7 +429,7 @@ export function usePersonelDetail(parsedPersonelId: number, hasValidId: boolean)
   const refetch = useCallback(async () => {
     if (!hasValidId) {
       setIsLoading(false);
-      setErrorMessage("Gecerli bir personel id verilmedi.");
+      setErrorMessage("Geçerli bir personel ID verilmedi.");
       return;
     }
 
@@ -489,7 +489,7 @@ export function usePersonelDetail(parsedPersonelId: number, hasValidId: boolean)
         return;
       }
       if (!canEdit) {
-        setEditErrorMessage("Bu kaydi guncellemek icin yetkin bulunmuyor.");
+        setEditErrorMessage("Bu kaydı güncellemek için yetkin bulunmuyor.");
         return;
       }
 

@@ -233,7 +233,7 @@ export function useSurecler() {
         );
       } catch {
         if (!getCacheEntry<PaginatedResult<Surec>>(listKey)) {
-          setErrorMessage("Surec listesi su an guncellenemiyor.");
+      setErrorMessage("Süreç listesi şu an güncellenemiyor.");
         }
       } finally {
         if (!cancelled) {
@@ -258,7 +258,7 @@ export function useSurecler() {
         );
       } catch {
         if (!cancelled) {
-          setReferenceError("Surec turleri su an guncellenemiyor, manuel giris kullanilabilir.");
+      setReferenceError("Süreç türleri şu an güncellenemiyor, manuel giriş kullanılabilir.");
         }
       }
     })();
@@ -346,7 +346,7 @@ export function useSurecler() {
         return;
       }
       if (!canCreate) {
-        setCreateErrorMessage("Bu islem icin yetkin bulunmuyor.");
+      setCreateErrorMessage("Bu işlem için yetkin bulunmuyor.");
         return;
       }
 
@@ -394,7 +394,7 @@ export function useSurecler() {
           void processSyncQueue();
         }
       } catch (error) {
-        setCreateErrorMessage(error instanceof Error ? error.message : "Surec kaydi yapilamadi.");
+        setCreateErrorMessage(error instanceof Error ? error.message : "Süreç kaydı yapılamadı.");
       } finally {
         setIsCreateSubmitting(false);
       }
@@ -404,7 +404,7 @@ export function useSurecler() {
 
   const openEditModal = useCallback((surec: Surec, canEdit: boolean) => {
     if (!canEdit) {
-      setErrorMessage("Bu sureci duzenlemek icin yetkin bulunmuyor.");
+      setErrorMessage("Bu süreci düzenlemek için yetkin bulunmuyor.");
       return;
     }
     setEditErrorMessage(null);
@@ -423,7 +423,7 @@ export function useSurecler() {
         return;
       }
       if (!canEdit) {
-        setEditErrorMessage("Bu sureci duzenlemek icin yetkin bulunmuyor.");
+        setEditErrorMessage("Bu süreci düzenlemek için yetkin bulunmuyor.");
         return;
       }
 
@@ -471,11 +471,11 @@ export function useSurecler() {
   const cancelSurecHandler = useCallback(
     async (surec: Surec, canCancel: boolean) => {
       if (!canCancel) {
-        setErrorMessage("Bu sureci iptal etmek icin yetkin bulunmuyor.");
+        setErrorMessage("Bu süreci iptal etmek için yetkin bulunmuyor.");
         return;
       }
 
-      const confirmed = window.confirm(`Surec #${surec.id} kaydini iptal etmek istiyor musun?`);
+      const confirmed = window.confirm(`Süreç #${surec.id} kaydını iptal etmek istiyor musun?`);
       if (!confirmed) {
         return;
       }
@@ -571,7 +571,7 @@ export function useSurecDetail(parsedSurecId: number, hasValidId: boolean) {
   const refetch = useCallback(async () => {
     if (!hasValidId) {
       setIsLoading(false);
-      setErrorMessage("Gecerli bir surec id verilmedi.");
+      setErrorMessage("Geçerli bir süreç ID verilmedi.");
       return;
     }
 
@@ -593,7 +593,7 @@ export function useSurecDetail(parsedSurecId: number, hasValidId: boolean) {
         return;
       }
       if (!getCacheEntry<Surec>(detailKey)) {
-        setErrorMessage("Surec detayi su an guncellenemiyor.");
+        setErrorMessage("Süreç detayı şu an güncellenemiyor.");
       }
     } finally {
       setIsLoading(false);

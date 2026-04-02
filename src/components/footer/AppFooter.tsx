@@ -43,7 +43,7 @@ export function AppFooter() {
     .filter(Boolean)
     .join(" ");
   const statusClassName = `status ${systemStatus === "ready" ? "status-ready" : "status-error"}`;
-  const statusLabel = systemStatus === "ready" ? "Sistem Hazir" : "Baglanti Yok";
+  const statusLabel = systemStatus === "ready" ? "Sistem Hazır" : "Bağlantı Yok";
 
   return (
     <footer id="app-footer" className={footerStateClasses || undefined}>

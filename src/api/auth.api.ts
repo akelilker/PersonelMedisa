@@ -93,7 +93,7 @@ function readSubeList(record: Record<string, unknown>): AuthSession["sube_list"]
     const row = item as Record<string, unknown>;
     const id = readNumber(row.id);
     const ad =
-      readString(row.ad) ?? readString(row.name) ?? readString(row.label) ?? (id !== null ? `Sube ${id}` : null);
+        readString(row.ad) ?? readString(row.name) ?? readString(row.label) ?? (id !== null ? `Şube ${id}` : null);
     if (id !== null && ad) {
       out.push({ id, ad });
     }
@@ -222,7 +222,7 @@ function createDemoSession(credentials: LoginCredentials): AuthSession {
   const sube_list: NonNullable<AuthSession["sube_list"]> =
     sube_ids.length === 0
       ? []
-      : sube_ids.map((id) => ({ id, ad: id === 1 ? "Merkez" : `Sube ${id}` }));
+    : sube_ids.map((id) => ({ id, ad: id === 1 ? "Merkez" : `Şube ${id}` }));
 
   return finalizeAuthSessionSube({
     token: "demo-token",

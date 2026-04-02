@@ -22,39 +22,39 @@ test.describe("e2e smoke", () => {
 
     await page.getByRole("link", { name: "Detay" }).first().click();
     await expect(page).toHaveURL(/\/personeller\/1$/);
-    await expect(modalRouteHeading(page, "Personel Detay")).toBeVisible();
+    await expect(modalRouteHeading(page, "Personel Detayı")).toBeVisible();
 
     await page.goto("/puantaj");
     await expect(page).toHaveURL(/\/puantaj$/);
 
     await page.getByLabel("Personel ID").fill("1");
     await page.getByLabel("Tarih").fill("2026-04-12");
-    await page.getByRole("button", { name: "Kaydi Getir" }).click();
+    await page.getByRole("button", { name: "Kaydı Getir" }).click();
 
     await expect(page.getByText("HESAPLANDI")).toBeVisible();
-    await expect(page.getByText("Net Calisma (dk): 510")).toBeVisible();
+    await expect(page.getByText("Net Çalışma (dk): 510")).toBeVisible();
 
-    await page.getByLabel("Giris Saati").fill("08:30");
-    await page.getByLabel("Cikis Saati").fill("18:00");
-    await page.getByLabel("Gercek Mola (dk)").fill("60");
+    await page.getByLabel("Giriş Saati").fill("08:30");
+    await page.getByLabel("Çıkış Saati").fill("18:00");
+    await page.getByLabel("Gerçek Mola (dk)").fill("60");
     await page.getByRole("button", { name: "Kaydet" }).click();
-    await expect(page.getByText("Gunluk Brut Sure (dk): 570")).toBeVisible();
+    await expect(page.getByText("Günlük Brüt Süre (dk): 570")).toBeVisible();
 
     await page.goto("/haftalik-kapanis");
     await expect(page).toHaveURL(/\/haftalik-kapanis$/);
 
-    await page.getByLabel("Hafta Baslangic").fill("2026-04-06");
-    await page.getByLabel("Hafta Bitis").fill("2026-04-12");
+    await page.getByLabel("Hafta Başlangıç").fill("2026-04-06");
+    await page.getByLabel("Hafta Bitiş").fill("2026-04-12");
     await page.getByLabel("Departman ID (Opsiyonel)").fill("3");
-    await page.getByRole("button", { name: "Haftayi Kapat" }).click();
+    await page.getByRole("button", { name: "Haftayı Kapat" }).click();
 
     await expect(page.getByText("Durum: KAPANDI")).toBeVisible();
-    await expect(page.getByText("Kapanis ID: 99")).toBeVisible();
+    await expect(page.getByText("Kapanış ID: 99")).toBeVisible();
 
     await page.goto("/raporlar");
     await expect(page).toHaveURL(/\/raporlar$/);
-    await page.getByRole("button", { name: "Raporu Calistir" }).click();
-    await expect(page.getByText("Toplam Kayit: 1")).toBeVisible();
+    await page.getByRole("button", { name: "Raporu Çalıştır" }).click();
+    await expect(page.getByText("Toplam Kayıt: 1")).toBeVisible();
   });
 
   test("birim amiri remains read-only and cannot access kapanis route", async ({ page }) => {
@@ -70,12 +70,12 @@ test.describe("e2e smoke", () => {
 
     await page.goto("/puantaj");
     await expect(page).toHaveURL(/\/puantaj$/);
-    await expect(page.getByText("Bu modulu sadece goruntuleme yetkin var.")).toBeVisible();
+    await expect(page.getByText("Bu modülü sadece görüntüleme yetkin var.")).toBeVisible();
     await expect(page.getByRole("button", { name: "Kaydet" })).toBeDisabled();
 
     await page.goto("/haftalik-kapanis");
     await expect(page).toHaveURL(/\/yetkisiz$/);
-    await expect(page.getByRole("heading", { name: "Yetkisiz Erisim" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Yetkisiz Erişim" })).toBeVisible();
 
     await page.goto("/raporlar");
     await expect(page).toHaveURL(/\/raporlar$/);
@@ -83,7 +83,7 @@ test.describe("e2e smoke", () => {
 
     await page.goto("/finans");
     await expect(page).toHaveURL(/\/yetkisiz$/);
-    await expect(page.getByRole("heading", { name: "Yetkisiz Erisim" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Yetkisiz Erişim" })).toBeVisible();
   });
 
   test("management user can create update and cancel surec bildirim and finans", async ({ page }) => {
@@ -95,30 +95,30 @@ test.describe("e2e smoke", () => {
 
     await page.goto("/surecler");
     await expect(page).toHaveURL(/\/surecler$/);
-    await expect(modalRouteHeading(page, "Surec Takibi")).toBeVisible();
+    await expect(modalRouteHeading(page, "Süreç Takibi")).toBeVisible();
 
-    await page.getByRole("button", { name: "Yeni Surec" }).click();
+    await page.getByRole("button", { name: "Yeni Süreç" }).click();
     const surecCreateModal = page.locator(".modal-container").last();
     await expect(surecCreateModal).toBeVisible();
     await surecCreateModal.getByLabel("Personel ID").fill("1");
-    await surecCreateModal.getByLabel("Surec Turu").fill("RAPOR");
-    await surecCreateModal.getByLabel("Baslangic Tarihi").fill("2026-04-12");
-    await surecCreateModal.getByLabel("Bitis Tarihi").fill("2026-04-12");
-    await surecCreateModal.getByLabel("Aciklama").fill("Yeni surec kaydi");
+    await surecCreateModal.getByLabel("Süreç Türü").fill("RAPOR");
+    await surecCreateModal.getByLabel("Başlangıç Tarihi").fill("2026-04-12");
+    await surecCreateModal.getByLabel("Bitiş Tarihi").fill("2026-04-12");
+    await surecCreateModal.getByLabel("Açıklama").fill("Yeni süreç kaydı");
     await surecCreateModal.getByRole("button", { name: "Kaydet" }).click();
 
     await expect(page.locator(".surecler-list")).toContainText("RAPOR");
 
-    await page.getByRole("button", { name: "Duzenle" }).first().click();
+    await page.getByRole("button", { name: "Düzenle" }).first().click();
     const surecEditModal = page.locator(".modal-container").last();
     await expect(surecEditModal).toBeVisible();
-    await surecEditModal.getByLabel("Surec Turu").fill("RAPOR_GUNCEL");
+    await surecEditModal.getByLabel("Süreç Türü").fill("RAPOR_GUNCEL");
     await surecEditModal.getByRole("button", { name: "Kaydet" }).click();
 
     await expect(page.locator(".surecler-list")).toContainText("RAPOR_GUNCEL");
 
     page.once("dialog", (dialog) => void dialog.accept());
-    await page.getByRole("button", { name: "Iptal" }).first().click();
+    await page.getByRole("button", { name: "İptal" }).first().click();
     await expect(page.locator(".surecler-list")).toContainText("Durum: IPTAL");
 
     await page.goto("/bildirimler");
@@ -132,12 +132,12 @@ test.describe("e2e smoke", () => {
     await bildirimCreateModal.getByLabel("Departman ID").fill("3");
     await bildirimCreateModal.getByLabel("Personel ID").fill("1");
     await bildirimCreateModal.getByLabel("Bildirim Turu").fill("DEVAMSIZLIK");
-    await bildirimCreateModal.getByLabel("Aciklama").fill("Yeni bildirim kaydi");
+    await bildirimCreateModal.getByLabel("Açıklama").fill("Yeni bildirim kaydı");
     await bildirimCreateModal.getByRole("button", { name: "Kaydet" }).click();
 
     await expect(page.locator(".bildirimler-list")).toContainText("DEVAMSIZLIK");
 
-    await page.getByRole("button", { name: "Duzenle" }).first().click();
+    await page.getByRole("button", { name: "Düzenle" }).first().click();
     const bildirimEditModal = page.locator(".modal-container").last();
     await expect(bildirimEditModal).toBeVisible();
     await bildirimEditModal.getByLabel("Bildirim Turu").fill("RAPORLU");
@@ -146,7 +146,7 @@ test.describe("e2e smoke", () => {
     await expect(page.locator(".bildirimler-list")).toContainText("RAPORLU");
 
     page.once("dialog", (dialog) => void dialog.accept());
-    await page.getByRole("button", { name: "Iptal" }).first().click();
+    await page.getByRole("button", { name: "İptal" }).first().click();
     await expect(page.locator(".bildirimler-list")).toContainText("IPTAL_EDILDI");
 
     await page.goto("/finans");
@@ -157,15 +157,15 @@ test.describe("e2e smoke", () => {
     const finansCreateModal = page.locator(".modal-container").last();
     await expect(finansCreateModal).toBeVisible();
     await finansCreateModal.getByLabel("Personel ID").fill("1");
-    await finansCreateModal.getByLabel("Donem").fill("2026-04");
+    await finansCreateModal.getByLabel("Dönem").fill("2026-04");
     await finansCreateModal.getByLabel("Kalem Turu").fill("PRIM");
     await finansCreateModal.getByLabel("Tutar").fill("1500");
-    await finansCreateModal.getByLabel("Aciklama").fill("Yeni finans kalemi");
+    await finansCreateModal.getByLabel("Açıklama").fill("Yeni finans kalemi");
     await finansCreateModal.getByRole("button", { name: "Kaydet" }).click();
 
     await expect(page.locator(".finans-list")).toContainText("PRIM");
 
-    await page.getByRole("button", { name: "Duzenle" }).first().click();
+    await page.getByRole("button", { name: "Düzenle" }).first().click();
     const finansEditModal = page.locator(".modal-container").last();
     await expect(finansEditModal).toBeVisible();
     await finansEditModal.getByLabel("Kalem Turu").fill("CEZA");
@@ -174,7 +174,7 @@ test.describe("e2e smoke", () => {
     await expect(page.locator(".finans-list")).toContainText("CEZA");
 
     page.once("dialog", (dialog) => void dialog.accept());
-    await page.getByRole("button", { name: "Iptal" }).first().click();
+    await page.getByRole("button", { name: "İptal" }).first().click();
     await expect(page.locator(".finans-list")).toContainText("Durum: IPTAL");
   });
 });

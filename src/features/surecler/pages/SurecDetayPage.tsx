@@ -13,47 +13,47 @@ export function SurecDetayPage() {
 
   return (
     <section className="surec-page surec-detay-page">
-      <h2>Surec Detay</h2>
+      <h2>Süreç Detayı</h2>
 
-      {isLoading ? <LoadingState label="Surec detayi yukleniyor..." /> : null}
+      {isLoading ? <LoadingState label="Süreç detayı yükleniyor..." /> : null}
 
       {!isLoading && errorMessage ? (
         <ErrorState message={errorMessage} onRetry={() => void refetch()} />
       ) : null}
 
       {!isLoading && !errorMessage && !surec ? (
-        <EmptyState title="Surec bulunamadi" message="Belirtilen id ile kayit bulunamadi." />
+        <EmptyState title="Süreç bulunamadı" message="Belirtilen ID ile kayıt bulunamadı." />
       ) : null}
 
       {!isLoading && !errorMessage && surec ? (
         <div className="surec-detail-card">
           <p>
-            <strong>Surec ID:</strong> {surec.id}
+            <strong>Süreç ID:</strong> {surec.id}
           </p>
           <p>
             <strong>Personel ID:</strong> {surec.personel_id}
           </p>
           <p>
-            <strong>Surec Turu:</strong> {surec.surec_turu}
+            <strong>Süreç Türü:</strong> {surec.surec_turu}
           </p>
           <p>
             <strong>Alt Tur:</strong> {surec.alt_tur ?? "-"}
           </p>
           <p>
-            <strong>Baslangic:</strong> {surec.baslangic_tarihi ?? "-"}
+            <strong>Başlangıç:</strong> {surec.baslangic_tarihi ?? "-"}
           </p>
           <p>
-            <strong>Bitis:</strong> {surec.bitis_tarihi ?? "-"}
+            <strong>Bitiş:</strong> {surec.bitis_tarihi ?? "-"}
           </p>
           <p>
-            <strong>Ucretli Mi:</strong>{" "}
-            {surec.ucretli_mi === undefined ? "-" : surec.ucretli_mi ? "Evet" : "Hayir"}
+            <strong>Ücretli Mi:</strong>{" "}
+            {surec.ucretli_mi === undefined ? "-" : surec.ucretli_mi ? "Evet" : "Hayır"}
           </p>
           <p>
             <strong>Durum:</strong> {surec.state ?? "-"}
           </p>
           <p>
-            <strong>Aciklama:</strong> {surec.aciklama ?? "-"}
+            <strong>Açıklama:</strong> {surec.aciklama ?? "-"}
           </p>
         </div>
       ) : null}

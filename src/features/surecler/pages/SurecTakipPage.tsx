@@ -20,7 +20,7 @@ function keyOptionsToSelectOptions(options: KeyOption[]) {
 
 const UCRETLI_SELECT_OPTIONS = [
   { value: "evet", label: "Evet" },
-  { value: "hayir", label: "Hayir" }
+  { value: "hayir", label: "Hayır" }
 ];
 
 export function SurecTakipPage() {
@@ -78,10 +78,10 @@ export function SurecTakipPage() {
   return (
     <section className="surec-page">
       <div className="surecler-header-row">
-        <h2>Surec Takibi</h2>
+        <h2>Süreç Takibi</h2>
         {canCreateSurec ? (
           <button type="button" className="universal-btn-aux" onClick={openCreateModal}>
-            Yeni Surec
+            Yeni Süreç
           </button>
         ) : null}
       </div>
@@ -101,18 +101,18 @@ export function SurecTakipPage() {
           {surecTuruOptions.length > 0 ? (
             <FormField
               as="select"
-              label="Surec Turu"
+              label="Süreç Türü"
               name="surec-filter-turu"
               value={draft.surecTuru}
               onChange={(value) => updateDraft({ surecTuru: value })}
-              placeholderOption={{ value: "", label: "Tum" }}
+              placeholderOption={{ value: "", label: "Tüm" }}
               selectOptions={keyOptionsToSelectOptions(surecTuruOptions)}
             />
           ) : (
             <FormField
-              label="Surec Turu"
+              label="Süreç Türü"
               name="surec-filter-turu-text"
-              placeholder="IZIN, RAPOR..."
+              placeholder="İZİN, RAPOR..."
               value={draft.surecTuru}
               onChange={(value) => updateDraft({ surecTuru: value })}
             />
@@ -125,14 +125,14 @@ export function SurecTakipPage() {
             onChange={(value) => updateDraft({ state: value })}
           />
           <FormField
-            label="Baslangic"
+            label="Başlangıç"
             name="surec-filter-bas"
             type="date"
             value={draft.baslangicTarihi}
             onChange={(value) => updateDraft({ baslangicTarihi: value })}
           />
           <FormField
-            label="Bitis"
+            label="Bitiş"
             name="surec-filter-bitis"
             type="date"
             value={draft.bitisTarihi}
@@ -150,14 +150,14 @@ export function SurecTakipPage() {
         </div>
       </form>
 
-      {isLoading ? <LoadingState label="Surec verileri yukleniyor..." /> : null}
+      {isLoading ? <LoadingState label="Süreç verileri yükleniyor..." /> : null}
 
       {!isLoading && errorMessage ? (
         <ErrorState message={errorMessage} onRetry={() => void refetch()} />
       ) : null}
 
       {!isLoading && !errorMessage && surecler.length === 0 ? (
-        <EmptyState title="Surec kaydi yok" message="Bu filtrede gosterilecek surec bulunamadi." />
+        <EmptyState title="Süreç kaydı yok" message="Bu filtrede gösterilecek süreç bulunamadı." />
       ) : null}
 
       {!isLoading && !errorMessage && surecler.length > 0 ? (
@@ -186,7 +186,7 @@ export function SurecTakipPage() {
                       onClick={() => openEditModal(surec, canEditSurec)}
                       disabled={cancelingSurecId === surec.id}
                     >
-                      Duzenle
+                      Düzenle
                     </button>
                   ) : null}
                   {canCancelSurec ? (
@@ -196,7 +196,7 @@ export function SurecTakipPage() {
                       onClick={() => void cancelSurecHandler(surec, canCancelSurec)}
                       disabled={cancelingSurecId === surec.id}
                     >
-                      {cancelingSurecId === surec.id ? "Iptal Ediliyor..." : "Iptal"}
+                      {cancelingSurecId === surec.id ? "İptal Ediliyor..." : "İptal"}
                     </button>
                   ) : null}
                 </div>
@@ -213,7 +213,7 @@ export function SurecTakipPage() {
           onClick={() => setPage((prev) => Math.max(1, prev - 1))}
           disabled={isLoading || page <= 1}
         >
-          Onceki
+          Önceki
         </button>
         <span className="module-page-info">
           Sayfa {page}
@@ -230,14 +230,14 @@ export function SurecTakipPage() {
       </div>
 
       <div className="module-links">
-        <Link to="/">Ana ekrana don</Link>
+        <Link to="/">Ana ekrana dön</Link>
         <Link to="/bildirimler">Bildirimlere git</Link>
         <Link to="/puantaj">Puantaja git</Link>
       </div>
 
       {canCreateSurec && isCreateModalOpen ? (
         <AppModal
-          title="Yeni Surec Ekle"
+          title="Yeni Süreç Ekle"
           onClose={closeCreateModal}
           footer={
             <div className="universal-btn-group modal-footer-actions">
@@ -255,7 +255,7 @@ export function SurecTakipPage() {
                 onClick={closeCreateModal}
                 disabled={isCreateSubmitting}
               >
-                Vazgec
+                Vazgeç
               </button>
             </div>
           }
@@ -273,17 +273,17 @@ export function SurecTakipPage() {
             {surecTuruOptions.length > 0 ? (
               <FormField
                 as="select"
-                label="Surec Turu"
+                label="Süreç Türü"
                 name="surec-create-turu"
                 value={createForm.surecTuru}
                 onChange={(value) => setCreateForm((prev) => ({ ...prev, surecTuru: value }))}
                 required
-                placeholderOption={{ value: "", label: "Seciniz" }}
+                placeholderOption={{ value: "", label: "Seçiniz" }}
                 selectOptions={keyOptionsToSelectOptions(surecTuruOptions)}
               />
             ) : (
               <FormField
-                label="Surec Turu"
+                label="Süreç Türü"
                 name="surec-create-turu-text"
                 value={createForm.surecTuru}
                 onChange={(value) => setCreateForm((prev) => ({ ...prev, surecTuru: value }))}
@@ -297,7 +297,7 @@ export function SurecTakipPage() {
               onChange={(value) => setCreateForm((prev) => ({ ...prev, altTur: value }))}
             />
             <FormField
-              label="Baslangic Tarihi"
+              label="Başlangıç Tarihi"
               name="surec-create-bas"
               type="date"
               value={createForm.baslangicTarihi}
@@ -305,7 +305,7 @@ export function SurecTakipPage() {
               required
             />
             <FormField
-              label="Bitis Tarihi"
+              label="Bitiş Tarihi"
               name="surec-create-bitis"
               type="date"
               value={createForm.bitisTarihi}
@@ -314,7 +314,7 @@ export function SurecTakipPage() {
             />
             <FormField
               as="select"
-              label="Ucretli Mi"
+              label="Ücretli Mi"
               name="surec-create-ucret"
               value={createForm.ucretliMi ? "evet" : "hayir"}
               onChange={(value) =>
@@ -323,7 +323,7 @@ export function SurecTakipPage() {
               selectOptions={UCRETLI_SELECT_OPTIONS}
             />
             <FormField
-              label="Aciklama"
+              label="Açıklama"
               name="surec-create-aciklama"
               value={createForm.aciklama}
               onChange={(value) => setCreateForm((prev) => ({ ...prev, aciklama: value }))}
@@ -336,7 +336,7 @@ export function SurecTakipPage() {
 
       {canEditSurec && editingSurec ? (
         <AppModal
-          title={`Surec Duzenle #${editingSurec.id}`}
+          title={`Süreç Düzenle #${editingSurec.id}`}
           onClose={closeEditModal}
           footer={
             <div className="universal-btn-group modal-footer-actions">
@@ -354,7 +354,7 @@ export function SurecTakipPage() {
                 onClick={closeEditModal}
                 disabled={isEditSubmitting}
               >
-                Vazgec
+                Vazgeç
               </button>
             </div>
           }
@@ -372,17 +372,17 @@ export function SurecTakipPage() {
             {surecTuruOptions.length > 0 ? (
               <FormField
                 as="select"
-                label="Surec Turu"
+                label="Süreç Türü"
                 name="surec-edit-turu"
                 value={editForm.surecTuru}
                 onChange={(value) => setEditForm((prev) => ({ ...prev, surecTuru: value }))}
                 required
-                placeholderOption={{ value: "", label: "Seciniz" }}
+                placeholderOption={{ value: "", label: "Seçiniz" }}
                 selectOptions={keyOptionsToSelectOptions(surecTuruOptions)}
               />
             ) : (
               <FormField
-                label="Surec Turu"
+                label="Süreç Türü"
                 name="surec-edit-turu-text"
                 value={editForm.surecTuru}
                 onChange={(value) => setEditForm((prev) => ({ ...prev, surecTuru: value }))}
@@ -396,7 +396,7 @@ export function SurecTakipPage() {
               onChange={(value) => setEditForm((prev) => ({ ...prev, altTur: value }))}
             />
             <FormField
-              label="Baslangic Tarihi"
+              label="Başlangıç Tarihi"
               name="surec-edit-start"
               type="date"
               value={editForm.baslangicTarihi}
@@ -404,7 +404,7 @@ export function SurecTakipPage() {
               required
             />
             <FormField
-              label="Bitis Tarihi"
+              label="Bitiş Tarihi"
               name="surec-edit-end"
               type="date"
               value={editForm.bitisTarihi}
@@ -413,7 +413,7 @@ export function SurecTakipPage() {
             />
             <FormField
               as="select"
-              label="Ucretli Mi"
+              label="Ücretli Mi"
               name="surec-edit-ucret"
               value={editForm.ucretliMi ? "evet" : "hayir"}
               onChange={(value) =>
@@ -422,7 +422,7 @@ export function SurecTakipPage() {
               selectOptions={UCRETLI_SELECT_OPTIONS}
             />
             <FormField
-              label="Aciklama"
+              label="Açıklama"
               name="surec-edit-aciklama"
               value={editForm.aciklama}
               onChange={(value) => setEditForm((prev) => ({ ...prev, aciklama: value }))}

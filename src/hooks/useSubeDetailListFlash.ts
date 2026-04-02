@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { SUBE_DETAIL_REDIRECT_STATE_KEY } from "../lib/detail-sube-context";
 
-/** Detay sayfasindan listeye yonlendirmede location.state mesajini okur ve URL state temizler. */
+/** Detay sayfasından listeye yönlendirmede location.state mesajını okur ve URL state temizler. */
 export function useSubeDetailListFlash(): { flash: string | null; dismiss: () => void } {
   const location = useLocation();
   const navigate = useNavigate();

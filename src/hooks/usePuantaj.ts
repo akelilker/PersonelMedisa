@@ -108,7 +108,7 @@ export function usePuantaj() {
         setPuantaj(data);
         patchFormState(toPuantajFormState(data));
       } catch {
-        setErrorMessage("Gunluk puantaj kaydi su an guncellenemiyor.");
+      setErrorMessage("Günlük puantaj kaydı şu an güncellenemiyor.");
         const cached = getCacheEntry<GunlukPuantaj | null>(key);
         if (cached !== undefined) {
           setPuantaj(cached);
@@ -150,7 +150,7 @@ export function usePuantaj() {
         setSubmitErrorMessage(null);
         await loadPuantaj(nextQuery);
       } catch (error) {
-        setErrorMessage(error instanceof Error ? error.message : "Puantaj sorgusu gecersiz.");
+      setErrorMessage(error instanceof Error ? error.message : "Puantaj sorgusu geçersiz.");
       }
     },
     [formState.queryPersonelId, formState.queryTarih, loadPuantaj]
@@ -179,12 +179,12 @@ export function usePuantaj() {
       }
 
       if (!activeQuery) {
-        setSubmitErrorMessage("Kayit guncellemek icin once personel ve tarih sec.");
+      setSubmitErrorMessage("Kayıt güncellemek için önce personel ve tarih seç.");
         return;
       }
 
       if (!canUpdate) {
-        setSubmitErrorMessage("Bu islem icin yetkin bulunmuyor.");
+      setSubmitErrorMessage("Bu işlem için yetkin bulunmuyor.");
         return;
       }
 
@@ -196,7 +196,7 @@ export function usePuantaj() {
         const cikisSaati = formState.entryCikisSaati.trim();
 
         if (!girisSaati || !cikisSaati) {
-          throw new Error("Giris ve cikis saati zorunludur.");
+        throw new Error("Giriş ve çıkış saati zorunludur.");
         }
 
         const body = {
@@ -234,7 +234,7 @@ export function usePuantaj() {
           void processSyncQueue();
         }
       } catch (error) {
-        setSubmitErrorMessage(error instanceof Error ? error.message : "Puantaj kaydi guncellenemedi.");
+      setSubmitErrorMessage(error instanceof Error ? error.message : "Puantaj kaydı güncellenemedi.");
       } finally {
         setIsSubmitting(false);
       }

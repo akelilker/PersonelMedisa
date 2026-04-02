@@ -37,7 +37,7 @@ export function GunlukPuantajPage() {
   return (
     <section className="puantaj-page">
       <div className="puantaj-header-row">
-        <h2>Gunluk Puantaj</h2>
+        <h2>Günlük Puantaj</h2>
       </div>
 
       <form className="form-filter-panel" onSubmit={handleQuerySubmit}>
@@ -63,7 +63,7 @@ export function GunlukPuantajPage() {
 
         <div className="form-actions-row">
           <button type="submit" className="universal-btn-aux" disabled={isLoading}>
-            Kaydi Getir
+            Kaydı Getir
           </button>
           <button type="button" className="universal-btn-aux" onClick={clearQuery} disabled={isLoading}>
             Temizle
@@ -71,7 +71,7 @@ export function GunlukPuantajPage() {
         </div>
       </form>
 
-      {isLoading ? <LoadingState label="Puantaj verisi yukleniyor..." /> : null}
+      {isLoading ? <LoadingState label="Puantaj verisi yükleniyor..." /> : null}
 
       {!isLoading && errorMessage ? (
         <ErrorState
@@ -82,8 +82,8 @@ export function GunlukPuantajPage() {
 
       {!isLoading && !errorMessage && activeQuery && !puantaj ? (
         <EmptyState
-          title="Kayit bulunamadi"
-          message="Secilen gun icin puantaj kaydi yok. Asagidan kayit olusturabilirsin."
+          title="Kayıt bulunamadı"
+          message="Seçilen gün için puantaj kaydı yok. Aşağıdan kayıt oluşturabilirsin."
         />
       ) : null}
 
@@ -103,11 +103,11 @@ export function GunlukPuantajPage() {
             {puantaj.hesaplanan_mola_dakika !== undefined ? puantaj.hesaplanan_mola_dakika : "-"}
           </p>
           <p>
-            <strong>Net Calisma (dk):</strong>{" "}
+            <strong>Net Çalışma (dk):</strong>{" "}
             {puantaj.net_calisma_suresi_dakika !== undefined ? puantaj.net_calisma_suresi_dakika : "-"}
           </p>
           <p>
-            <strong>Gunluk Brut Sure (dk):</strong>{" "}
+            <strong>Günlük Brüt Süre (dk):</strong>{" "}
             {puantaj.gunluk_brut_sure_dakika !== undefined ? puantaj.gunluk_brut_sure_dakika : "-"}
           </p>
 
@@ -124,11 +124,11 @@ export function GunlukPuantajPage() {
       ) : null}
 
       <div className="puantaj-edit-card">
-        <h3>Giris Cikis Kaydi</h3>
+        <h3>Giriş Çıkış Kaydı</h3>
 
         <form className="puantaj-form-grid" onSubmit={handlePuantajSubmit}>
           <FormField
-            label="Giris Saati"
+            label="Giriş Saati"
             name="puantaj-giris"
             type="time"
             value={formState.entryGirisSaati}
@@ -136,7 +136,7 @@ export function GunlukPuantajPage() {
             required
           />
           <FormField
-            label="Cikis Saati"
+            label="Çıkış Saati"
             name="puantaj-cikis"
             type="time"
             value={formState.entryCikisSaati}
@@ -144,7 +144,7 @@ export function GunlukPuantajPage() {
             required
           />
           <FormField
-            label="Gercek Mola (dk)"
+            label="Gerçek Mola (dk)"
             name="puantaj-mola"
             type="number"
             min={0}
@@ -154,7 +154,7 @@ export function GunlukPuantajPage() {
 
           {submitErrorMessage ? <p className="puantaj-form-error">{submitErrorMessage}</p> : null}
           {!canUpdatePuantaj ? (
-            <p className="puantaj-form-readonly">Bu modulu sadece goruntuleme yetkin var.</p>
+            <p className="puantaj-form-readonly">Bu modülü sadece görüntüleme yetkin var.</p>
           ) : null}
 
           <div className="form-actions-row">
@@ -170,8 +170,8 @@ export function GunlukPuantajPage() {
       </div>
 
       <div className="module-links">
-        <Link to="/haftalik-kapanis">Haftalik kapanisa git</Link>
-        <Link to="/surecler">Surec takibe don</Link>
+        <Link to="/haftalik-kapanis">Haftalık kapanışa git</Link>
+        <Link to="/surecler">Süreç takibe dön</Link>
       </div>
     </section>
   );

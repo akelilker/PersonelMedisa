@@ -14,13 +14,13 @@ type AppShellProps = {
 
 function resolveBackBar(pathname: string): { to: string; label: string } | null {
   if (/^\/personeller\/\d+$/.test(pathname)) {
-    return { to: "/personeller", label: "Personel listesine don" };
+    return { to: "/personeller", label: "Personel listesine dön" };
   }
   if (/^\/surecler\/\d+$/.test(pathname)) {
-    return { to: "/surecler", label: "Surec listesine don" };
+    return { to: "/surecler", label: "Süreç listesine dön" };
   }
   if (/^\/bildirimler\/\d+$/.test(pathname)) {
-    return { to: "/bildirimler", label: "Bildirim listesine don" };
+    return { to: "/bildirimler", label: "Bildirim listesine dön" };
   }
   return null;
 }
@@ -31,21 +31,21 @@ function resolveModuleModal(pathname: string): { title: string; closeTo: string 
   }
 
   if (/^\/personeller\/\d+$/.test(pathname)) {
-    return { title: "Personel Detay", closeTo: "/personeller" };
+    return { title: "Personel Detayı", closeTo: "/personeller" };
   }
   if (pathname === "/personeller") {
-    return { title: "Personel Karti", closeTo: "/" };
+    return { title: "Personel Kartı", closeTo: "/" };
   }
 
   if (/^\/surecler\/\d+$/.test(pathname)) {
-    return { title: "Surec Detay", closeTo: "/surecler" };
+    return { title: "Süreç Detayı", closeTo: "/surecler" };
   }
   if (pathname === "/surecler") {
-    return { title: "Surec Takibi", closeTo: "/" };
+    return { title: "Süreç Takibi", closeTo: "/" };
   }
 
   if (/^\/bildirimler\/\d+$/.test(pathname)) {
-    return { title: "Bildirim Detay", closeTo: "/bildirimler" };
+    return { title: "Bildirim Detayı", closeTo: "/bildirimler" };
   }
   if (pathname === "/bildirimler") {
     return { title: "Bildirimler", closeTo: "/" };
@@ -55,16 +55,16 @@ function resolveModuleModal(pathname: string): { title: string; closeTo: string 
     return { title: "Raporlar", closeTo: "/" };
   }
   if (pathname === "/puantaj") {
-    return { title: "Gunluk Puantaj", closeTo: "/" };
+    return { title: "Günlük Puantaj", closeTo: "/" };
   }
   if (pathname === "/haftalik-kapanis") {
-    return { title: "Haftalik Kapanis", closeTo: "/" };
+    return { title: "Haftalık Kapanış", closeTo: "/" };
   }
   if (pathname === "/finans") {
     return { title: "Finans", closeTo: "/" };
   }
 
-  return { title: "Modul", closeTo: "/" };
+  return { title: "Modül", closeTo: "/" };
 }
 
 export function AppShell({ children }: AppShellProps) {
@@ -89,7 +89,7 @@ export function AppShell({ children }: AppShellProps) {
   return (
     <div className="app-container app-shell">
       <main className="content-wrap">
-        <Hero title="PERSONEL YONETIM SISTEMI" />
+        <Hero title="Personel Yönetim Sistemi" />
 
         {!moduleModal && !isLoginRoute ? <ShellHeaderActions /> : null}
 
@@ -99,11 +99,11 @@ export function AppShell({ children }: AppShellProps) {
               <strong>{session?.user.ad_soyad ?? "-"}</strong>
               <span>
                 ({session?.user.rol ?? "-"} -{" "}
-                {session?.ui_profile === "birim_amiri" ? "Birim profili" : session ? "Yonetim profili" : "-"})
+                {session?.ui_profile === "birim_amiri" ? "Birim profili" : session ? "Yönetim profili" : "-"})
               </span>
             </div>
             <button type="button" className="logout-btn" onClick={logout}>
-              Cikis
+              Çıkış
             </button>
           </div>
         ) : null}
@@ -123,7 +123,7 @@ export function AppShell({ children }: AppShellProps) {
 
       {isKayitModalOpen ? (
         <AppModal
-          title="Personel Giris ve Surec Takibi"
+          title="Personel Giriş ve Süreç Takibi"
           onClose={() => {
             setIsKayitModalOpen(false);
           }}
@@ -140,7 +140,7 @@ export function AppShell({ children }: AppShellProps) {
                     });
                   }}
                 >
-                  Yeni Kisi Ekle
+                  Yeni Kişi Ekle
                 </button>
                 <button type="button" className="universal-btn-cancel" onClick={() => setIsKayitModalOpen(false)}>
                   Kapat
@@ -156,7 +156,7 @@ export function AppShell({ children }: AppShellProps) {
                     navigate("/surecler");
                   }}
                 >
-                  Surec Ekranina Git
+                  Süreç Ekranına Git
                 </button>
                 <button type="button" className="universal-btn-cancel" onClick={() => setIsKayitModalOpen(false)}>
                   Kapat
@@ -171,26 +171,26 @@ export function AppShell({ children }: AppShellProps) {
               className={`kayit-tab-btn${kayitTab === "yeni-kayit" ? " is-active" : ""}`}
               onClick={() => setKayitTab("yeni-kayit")}
             >
-              Yeni Kayit
+              Yeni Kayıt
             </button>
             <button
               type="button"
               className={`kayit-tab-btn${kayitTab === "surec" ? " is-active" : ""}`}
               onClick={() => setKayitTab("surec")}
             >
-              Surec
+              Süreç
             </button>
           </div>
 
           {kayitTab === "yeni-kayit" ? (
             <div className="kayit-tab-panel">
-              <p>Personel karti acmak ve yeni personel kaydi icin bu sekmeyi kullan.</p>
+              <p>Personel kartı açmak ve yeni personel kaydı için bu sekmeyi kullan.</p>
             </div>
           ) : null}
 
           {kayitTab === "surec" ? (
             <div className="kayit-tab-panel">
-              <p>Surec olusturma, duzenleme ve takip islemleri bu sekmede yonetilir.</p>
+              <p>Süreç oluşturma, düzenleme ve takip işlemleri bu sekmede yönetilir.</p>
             </div>
           ) : null}
         </AppModal>

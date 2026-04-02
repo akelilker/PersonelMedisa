@@ -42,17 +42,17 @@ export function LoginPage() {
       });
       navigate(redirectPath, { replace: true });
     } catch (error) {
-      setFormError(error instanceof Error ? error.message : "Giris sirasinda bir hata olustu.");
+      setFormError(error instanceof Error ? error.message : "Giriş sırasında bir hata oluştu.");
     } finally {
       setIsSubmitting(false);
     }
   }
 
   return (
-    <section className="auth-login" aria-label="Giris">
+    <section className="auth-login" aria-label="Giriş">
       <form className="auth-login-form" onSubmit={handleLogin}>
         <label className="auth-field">
-          <span>Kullanici Adi</span>
+          <span>Kullanıcı Adı</span>
           <input
             type="text"
             name="username"
@@ -64,7 +64,7 @@ export function LoginPage() {
         </label>
 
         <label className="auth-field">
-          <span>Sifre</span>
+          <span>Şifre</span>
           <input
             type="password"
             name="password"
@@ -82,7 +82,7 @@ export function LoginPage() {
             checked={rememberMe}
             onChange={(event) => setRememberMe(event.target.checked)}
           />
-          <span>Beni hatirla (oturum tarayici kapansa da surer)</span>
+          <span>Beni hatırla (oturum tarayıcı kapansa da sürer)</span>
         </label>
 
         {formError ? <p className="auth-error">{formError}</p> : null}
@@ -92,7 +92,7 @@ export function LoginPage() {
           className="universal-btn-save"
           disabled={isSubmitting || username.trim().length === 0 || password.length === 0}
         >
-          {isSubmitting ? "Giris Yapiliyor..." : "Giris Yap"}
+          {isSubmitting ? "Giriş Yapılıyor..." : "Giriş Yap"}
         </button>
       </form>
     </section>

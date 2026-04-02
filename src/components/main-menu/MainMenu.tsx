@@ -34,7 +34,7 @@ export function MainMenu({ onKayitOpen }: MainMenuProps) {
             onKayitOpen(tab);
           }}
         >
-          <div className="ttl">Personel Giris ve Surec Takibi</div>
+          <div className="ttl">Personel Giriş ve Süreç Takibi</div>
         </button>
       ) : null}
 
@@ -48,7 +48,7 @@ export function MainMenu({ onKayitOpen }: MainMenuProps) {
         }}
         disabled={!canViewPersoneller}
       >
-        <div className="ttl">Personel Karti</div>
+        <div className="ttl">Personel Kartı</div>
       </button>
 
       <button

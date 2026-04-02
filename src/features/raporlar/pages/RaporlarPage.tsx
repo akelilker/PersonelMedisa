@@ -24,13 +24,13 @@ type RaporFormState = {
 };
 
 const RAPOR_OPTIONS: Array<{ value: RaporTipi; label: string }> = [
-  { value: "personel-ozet", label: "Personel Ozet" },
-  { value: "izin", label: "Izin" },
-  { value: "devamsizlik", label: "Devamsizlik" },
-  { value: "tesvik", label: "Tesvik" },
+  { value: "personel-ozet", label: "Personel Özeti" },
+  { value: "izin", label: "İzin" },
+  { value: "devamsizlik", label: "Devamsızlık" },
+  { value: "tesvik", label: "Teşvik" },
   { value: "ceza", label: "Ceza" },
   { value: "ekstra-prim", label: "Ekstra Prim" },
-  { value: "is-kazasi", label: "Is Kazasi" },
+  { value: "is-kazasi", label: "İş Kazası" },
   { value: "bildirim", label: "Bildirim" }
 ];
 
@@ -42,7 +42,7 @@ function parseOptionalPositiveInt(value: string): number | undefined {
 
   const parsed = Number.parseInt(trimmed, 10);
   if (Number.isNaN(parsed) || parsed <= 0) {
-    throw new Error("Personel ve departman alanlari pozitif sayi olmalidir.");
+    throw new Error("Personel ve departman alanları pozitif sayı olmalıdır.");
   }
 
   return parsed;
@@ -94,10 +94,10 @@ function collectEngineColumns(rows: ReportEngineRow[]): string[] {
 }
 
 const ENGINE_OPTIONS: Array<{ value: ReportEngineType; label: string }> = [
-  { value: "personel-ozet", label: "Personel ozeti (onbellek)" },
-  { value: "izin-durumu", label: "Izin durumu (onbellek)" },
-  { value: "puantaj", label: "Puantaj (onbellek)" },
-  { value: "finans", label: "Finans (onbellek, 1. sayfa)" }
+  { value: "personel-ozet", label: "Personel özeti (önbellek)" },
+  { value: "izin-durumu", label: "İzin durumu (önbellek)" },
+  { value: "puantaj", label: "Puantaj (önbellek)" },
+  { value: "finans", label: "Finans (önbellek, 1. sayfa)" }
 ];
 
 export function RaporlarPage() {
@@ -155,7 +155,7 @@ export function RaporlarPage() {
 
     try {
       if (form.baslangicTarihi && form.bitisTarihi && form.baslangicTarihi > form.bitisTarihi) {
-        throw new Error("Baslangic tarihi bitis tarihinden buyuk olamaz.");
+        throw new Error("Başlangıç tarihi bitiş tarihinden büyük olamaz.");
       }
 
       const filters: RaporFiltreleri = {
@@ -171,7 +171,7 @@ export function RaporlarPage() {
       setTotal(result.total);
       setHasSearched(true);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Rapor verisi alinamadi.");
+      setErrorMessage(error instanceof Error ? error.message : "Rapor verisi alınamadı.");
       setRows([]);
       setTotal(null);
     } finally {
@@ -201,21 +201,21 @@ export function RaporlarPage() {
       </div>
 
       <div className="raporlar-engine-card">
-        <h3 className="raporlar-engine-title">Onbellek rapor motoru</h3>
+        <h3 className="raporlar-engine-title">Önbellek rapor motoru</h3>
         <p className="raporlar-engine-hint">
-          Ham veri mevcut onbellekte; ek ag cagrisi yapilmaz. Sube, header&apos;daki aktif sube ile uyumludur.
+          Ham veri mevcut önbellekte; ek ağ çağrısı yapılmaz. Şube, header&apos;daki aktif şube ile uyumludur.
         </p>
         <div className="form-field-grid">
           <FormField
             as="select"
-            label="Motor turu"
+            label="Motor türü"
             name="engine-turu"
             value={engineType}
             onChange={(value) => setEngineType(value as ReportEngineType)}
             selectOptions={ENGINE_OPTIONS}
           />
           <FormField
-            label="Personel ID (bos = tumu)"
+            label="Personel ID (boş = tümü)"
             name="engine-personel"
             type="number"
             min={1}
@@ -223,21 +223,21 @@ export function RaporlarPage() {
             onChange={(value) => setEnginePersonelId(value)}
           />
           <FormField
-            label="Durum (bos = tumu)"
+            label="Durum (boş = tümü)"
             name="engine-durum"
             value={engineDurum}
             onChange={(value) => setEngineDurum(value)}
-            placeholder="ORN: AKTIF, TAMAMLANDI"
+            placeholder="Örn: AKTİF, TAMAMLANDI"
           />
           <FormField
-            label="Tarih bas (yyyy-mm-dd)"
+            label="Tarih başlangıç (yyyy-mm-dd)"
             name="engine-bas"
             type="date"
             value={engineBas}
             onChange={(value) => setEngineBas(value)}
           />
           <FormField
-            label="Tarih bit (yyyy-mm-dd)"
+            label="Tarih bitiş (yyyy-mm-dd)"
             name="engine-bit"
             type="date"
             value={engineBit}
@@ -263,11 +263,11 @@ export function RaporlarPage() {
               printCurrentReportWindow(`Rapor: ${engineType}`, engineColumns, engineRows);
             }}
           >
-            Yazdir / PDF
+            Yazdır / PDF
           </button>
         </div>
         {engineRows.length === 0 ? (
-          <p className="raporlar-engine-empty">Bu tur icin onbellekte satir yok; ilgili modulu bir kez acin.</p>
+          <p className="raporlar-engine-empty">Bu tür için önbellekte satır yok; ilgili modülü bir kez açın.</p>
         ) : (
           <div className="raporlar-table-wrap raporlar-engine-table">
             <table className="raporlar-table">
@@ -296,7 +296,7 @@ export function RaporlarPage() {
         <div className="form-field-grid">
           <FormField
             as="select"
-            label="Rapor Turu"
+            label="Rapor Türü"
             name="rapor-turu"
             value={form.raporTipi}
             onChange={(value) => setForm((prev) => ({ ...prev, raporTipi: value as RaporTipi }))}
@@ -319,14 +319,14 @@ export function RaporlarPage() {
             onChange={(value) => setForm((prev) => ({ ...prev, departmanId: value }))}
           />
           <FormField
-            label="Baslangic Tarihi"
+            label="Başlangıç Tarihi"
             name="rapor-bas"
             type="date"
             value={form.baslangicTarihi}
             onChange={(value) => setForm((prev) => ({ ...prev, baslangicTarihi: value }))}
           />
           <FormField
-            label="Bitis Tarihi"
+            label="Bitiş Tarihi"
             name="rapor-bitis"
             type="date"
             value={form.bitisTarihi}
@@ -339,7 +339,7 @@ export function RaporlarPage() {
             value={form.aktiflik}
             onChange={(value) => setForm((prev) => ({ ...prev, aktiflik: value as RaporAktiflik }))}
             selectOptions={[
-              { value: "tum", label: "Tum" },
+              { value: "tum", label: "Tüm" },
               { value: "aktif", label: "Aktif" },
               { value: "pasif", label: "Pasif" }
             ]}
@@ -348,7 +348,7 @@ export function RaporlarPage() {
 
         <div className="form-actions-row">
           <button type="submit" className="universal-btn-aux" disabled={isLoading}>
-            Raporu Calistir
+            Raporu Çalıştır
           </button>
           <button type="button" className="universal-btn-aux" onClick={handleClear} disabled={isLoading}>
             Temizle
@@ -356,18 +356,18 @@ export function RaporlarPage() {
         </div>
       </form>
 
-      {isLoading ? <LoadingState label="Rapor verileri yukleniyor..." /> : null}
+      {isLoading ? <LoadingState label="Rapor verileri yükleniyor..." /> : null}
 
       {!isLoading && errorMessage ? <ErrorState message={errorMessage} /> : null}
 
       {!isLoading && !errorMessage && hasSearched && rows.length === 0 ? (
-        <EmptyState title="Rapor verisi yok" message="Bu filtrede gosterilecek kayit bulunamadi." />
+        <EmptyState title="Rapor verisi yok" message="Bu filtrede gösterilecek kayıt bulunamadı." />
       ) : null}
 
       {!isLoading && !errorMessage && rows.length > 0 ? (
         <div className="raporlar-result-card">
           <p>
-            <strong>Toplam Kayit:</strong> {total ?? rows.length}
+            <strong>Toplam Kayıt:</strong> {total ?? rows.length}
           </p>
           <div className="raporlar-table-wrap">
             <table className="raporlar-table">
@@ -393,8 +393,8 @@ export function RaporlarPage() {
       ) : null}
 
       <div className="module-links">
-        <Link to="/finans">Finans modulune git</Link>
-        <Link to="/">Ana ekrana don</Link>
+        <Link to="/finans">Finans modülüne git</Link>
+        <Link to="/">Ana ekrana dön</Link>
       </div>
     </section>
   );

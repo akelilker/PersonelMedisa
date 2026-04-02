@@ -74,7 +74,7 @@ function parseRequiredPositiveNumber(value: string, label: string): number {
 function validateDonem(donem: string): string {
   const value = donem.trim();
   if (!/^\d{4}-\d{2}$/.test(value)) {
-    throw new Error("Donem YYYY-MM formatinda olmali.");
+    throw new Error("Dönem YYYY-MM formatında olmalı.");
   }
   return value;
 }
@@ -203,7 +203,7 @@ export function useFinans() {
         );
       } catch {
         if (!getCacheEntry<PaginatedResult<FinansKalem>>(listKey)) {
-          setErrorMessage("Finans kayitlari su an guncellenemiyor.");
+      setErrorMessage("Finans kayıtları şu an güncellenemiyor.");
         }
       } finally {
         if (!cancelled) {
@@ -286,7 +286,7 @@ export function useFinans() {
         return;
       }
       if (!canCreate) {
-        setCreateErrorMessage("Bu islem icin yetkin bulunmuyor.");
+      setCreateErrorMessage("Bu işlem için yetkin bulunmuyor.");
         return;
       }
 
@@ -331,7 +331,7 @@ export function useFinans() {
           void processSyncQueue();
         }
       } catch (error) {
-        setCreateErrorMessage(error instanceof Error ? error.message : "Finans kaydi olusturulamadi.");
+        setCreateErrorMessage(error instanceof Error ? error.message : "Finans kaydı oluşturulamadı.");
       } finally {
         setIsCreateSubmitting(false);
       }
@@ -341,7 +341,7 @@ export function useFinans() {
 
   const openEditModal = useCallback((item: FinansKalem, canEdit: boolean) => {
     if (!canEdit) {
-      setErrorMessage("Bu kaydi duzenlemek icin yetkin bulunmuyor.");
+      setErrorMessage("Bu kaydı düzenlemek için yetkin bulunmuyor.");
       return;
     }
     setEditingItem(item);
@@ -360,7 +360,7 @@ export function useFinans() {
         return;
       }
       if (!canEdit) {
-        setEditErrorMessage("Bu kaydi duzenlemek icin yetkin bulunmuyor.");
+        setEditErrorMessage("Bu kaydı düzenlemek için yetkin bulunmuyor.");
         return;
       }
 
@@ -408,11 +408,11 @@ export function useFinans() {
   const cancelFinansHandler = useCallback(
     async (item: FinansKalem, canCancel: boolean) => {
       if (!canCancel) {
-        setErrorMessage("Bu kaydi iptal etmek icin yetkin bulunmuyor.");
+        setErrorMessage("Bu kaydı iptal etmek için yetkin bulunmuyor.");
         return;
       }
 
-      const confirmed = window.confirm(`Finans kaydi #${item.id} iptal edilsin mi?`);
+      const confirmed = window.confirm(`Finans kaydı #${item.id} iptal edilsin mi?`);
       if (!confirmed) {
         return;
       }

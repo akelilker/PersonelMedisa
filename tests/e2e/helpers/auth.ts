@@ -41,13 +41,13 @@ export async function login(page: Page, options: LoginOptions): Promise<void> {
   await page.locator('input[name="password"]').fill(password);
 
   if (rememberMe) {
-    const remember = page.getByLabel(/Beni hatirla/i);
+      const remember = page.getByLabel(/Beni hatırla/i);
     if ((await remember.count()) > 0) {
       await remember.check();
     }
   }
 
-  await page.getByRole("button", { name: "Giris Yap" }).click();
+  await page.getByRole("button", { name: "Giriş Yap" }).click();
 
   await expect(page).not.toHaveURL(/\/login$/);
 }

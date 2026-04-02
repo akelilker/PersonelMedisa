@@ -16,3 +16,8 @@
 body.modal-open .content-wrap {
   overflow: hidden;
 }
+
+body.login-page .content-wrap {
+  display: flex;
+  flex-direction: column;
+}

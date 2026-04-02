@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../../state/auth.store";
 
@@ -20,6 +20,14 @@ export function LoginPage() {
     const state = location.state as LoginLocationState | null;
     return state?.from ?? "/";
   }, [location.state]);
+
+  useEffect(() => {
+    document.body.classList.add("login-page");
+
+    return () => {
+      document.body.classList.remove("login-page");
+    };
+  }, []);
 
   if (isAuthenticated) {
     return <Navigate to={redirectPath} replace />;
@@ -50,51 +58,53 @@ export function LoginPage() {
 
   return (
     <section className="auth-login" aria-label="Giriş">
-      <form className="auth-login-form" onSubmit={handleLogin}>
-        <label className="auth-field">
-          <span>Kullanıcı Adı</span>
-          <input
-            type="text"
-            name="username"
-            autoComplete="username"
-            value={username}
-            onChange={(event) => setUsername(event.target.value)}
-            required
-          />
-        </label>
+      <div className="auth-login-stage">
+        <form className="auth-login-form" onSubmit={handleLogin}>
+          <label className="auth-field">
+            <span>Kullanıcı Adı</span>
+            <input
+              type="text"
+              name="username"
+              autoComplete="username"
+              value={username}
+              onChange={(event) => setUsername(event.target.value)}
+              required
+            />
+          </label>
 
-        <label className="auth-field">
-          <span>Şifre</span>
-          <input
-            type="password"
-            name="password"
-            autoComplete="current-password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            required
-          />
-        </label>
+          <label className="auth-field">
+            <span>Şifre</span>
+            <input
+              type="password"
+              name="password"
+              autoComplete="current-password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              required
+            />
+          </label>
 
-        <label className="auth-field auth-field-inline">
-          <input
-            type="checkbox"
-            name="rememberMe"
-            checked={rememberMe}
-            onChange={(event) => setRememberMe(event.target.checked)}
-          />
-          <span>Beni hatırla (oturum tarayıcı kapansa da sürer)</span>
-        </label>
+          <label className="auth-field auth-field-inline">
+            <input
+              type="checkbox"
+              name="rememberMe"
+              checked={rememberMe}
+              onChange={(event) => setRememberMe(event.target.checked)}
+            />
+            <span>Beni hatırla (oturum tarayıcı kapansa da sürer)</span>
+          </label>
 
-        {formError ? <p className="auth-error">{formError}</p> : null}
+          {formError ? <p className="auth-error">{formError}</p> : null}
 
-        <button
-          type="submit"
-          className="universal-btn-save"
-          disabled={isSubmitting || username.trim().length === 0 || password.length === 0}
-        >
-          {isSubmitting ? "Giriş Yapılıyor..." : "Giriş Yap"}
-        </button>
-      </form>
+          <button
+            type="submit"
+            className="universal-btn-save"
+            disabled={isSubmitting || username.trim().length === 0 || password.length === 0}
+          >
+            {isSubmitting ? "Giriş Yapılıyor..." : "Giriş Yap"}
+          </button>
+        </form>
+      </div>
     </section>
   );
 }

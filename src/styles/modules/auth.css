@@ -1,26 +1,49 @@
 .auth-login {
-  display: grid;
-  gap: var(--space-3);
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(28px, 5vh, 52px) 0 clamp(56px, 10vh, 96px);
+}
+
+.auth-login-stage {
+  width: 100%;
+  display: flex;
+  justify-content: center;
   min-width: 0;
 }
 
 .auth-login-form {
   display: grid;
-  gap: var(--space-3);
+  gap: 22px;
+  width: min(100%, 392px);
 }
 
 .auth-field {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
+  display: grid;
+  gap: 8px;
+}
+
+.auth-field span {
+  color: #f4f7ff;
+  font-size: 15px;
+  line-height: 1.15;
+  font-weight: 600;
 }
 
 .auth-field input {
-  border: 1px solid var(--line-soft);
-  border-radius: var(--radius-sm);
-  background: var(--bg-content);
-  color: var(--txt);
-  padding: 8px 10px;
+  width: 100%;
+  height: 46px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 12px;
+  background: rgba(18, 24, 34, 0.86);
+  color: #f4f7ff;
+  padding: 0 16px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  font-size: 16px;
+  line-height: 1;
 }
 
 .auth-field input:focus {
@@ -29,16 +52,57 @@
 }
 
 .auth-field-inline {
-  flex-direction: row;
-  align-items: flex-start;
-  gap: var(--space-2);
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .auth-field-inline input[type="checkbox"] {
-  margin-top: 0.2rem;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--theme-color);
+  flex-shrink: 0;
+}
+
+.auth-field-inline span {
+  color: rgba(240, 240, 240, 0.92);
+  font-size: 14px;
+  line-height: 1.35;
+  font-weight: 500;
 }
 
 .auth-error {
   margin: 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(var(--theme-color-rgb), 0.24);
+  border-radius: 12px;
+  background: rgba(var(--theme-color-rgb), 0.08);
   color: var(--red);
+}
+
+.auth-login-form .universal-btn-save {
+  height: 48px;
+  border-radius: 14px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+@media (max-width: 640px) {
+  .auth-login {
+    padding: 20px 0 48px;
+  }
+
+  .auth-login-form {
+    width: 100%;
+    gap: 18px;
+  }
+
+  .auth-field span {
+    font-size: 14px;
+  }
+
+  .auth-field-inline span {
+    font-size: 13px;
+  }
 }

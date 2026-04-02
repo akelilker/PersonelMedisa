@@ -31,7 +31,7 @@ test.describe("e2e smoke", () => {
     await page.getByLabel("Tarih").fill("2026-04-12");
     await page.getByRole("button", { name: "Kaydı Getir" }).click();
 
-    await expect(page.getByText("HESAPLANDI")).toBeVisible();
+    await expect(page.getByText("Hesaplandı")).toBeVisible();
     await expect(page.getByText("Net Çalışma (dk): 510")).toBeVisible();
 
     await page.getByLabel("Giriş Saati").fill("08:30");
@@ -48,7 +48,7 @@ test.describe("e2e smoke", () => {
     await page.getByLabel("Departman ID (Opsiyonel)").fill("3");
     await page.getByRole("button", { name: "Haftayı Kapat" }).click();
 
-    await expect(page.getByText("Durum: KAPANDI")).toBeVisible();
+    await expect(page.getByText("Durum: Kapandı")).toBeVisible();
     await expect(page.getByText("Kapanış ID: 99")).toBeVisible();
 
     await page.goto("/raporlar");
@@ -107,7 +107,7 @@ test.describe("e2e smoke", () => {
     await surecCreateModal.getByLabel("Açıklama").fill("Yeni süreç kaydı");
     await surecCreateModal.getByRole("button", { name: "Kaydet" }).click();
 
-    await expect(page.locator(".surecler-list")).toContainText("RAPOR");
+    await expect(page.locator(".surecler-list")).toContainText("Rapor");
 
     await page.getByRole("button", { name: "Düzenle" }).first().click();
     const surecEditModal = page.locator(".modal-container").last();
@@ -115,11 +115,11 @@ test.describe("e2e smoke", () => {
     await surecEditModal.getByLabel("Süreç Türü").fill("RAPOR_GUNCEL");
     await surecEditModal.getByRole("button", { name: "Kaydet" }).click();
 
-    await expect(page.locator(".surecler-list")).toContainText("RAPOR_GUNCEL");
+    await expect(page.locator(".surecler-list")).toContainText("Rapor Guncel");
 
     page.once("dialog", (dialog) => void dialog.accept());
     await page.getByRole("button", { name: "İptal" }).first().click();
-    await expect(page.locator(".surecler-list")).toContainText("Durum: IPTAL");
+    await expect(page.locator(".surecler-list")).toContainText("Durum: İptal");
 
     await page.goto("/bildirimler");
     await expect(page).toHaveURL(/\/bildirimler$/);
@@ -135,7 +135,7 @@ test.describe("e2e smoke", () => {
     await bildirimCreateModal.getByLabel("Açıklama").fill("Yeni bildirim kaydı");
     await bildirimCreateModal.getByRole("button", { name: "Kaydet" }).click();
 
-    await expect(page.locator(".bildirimler-list")).toContainText("DEVAMSIZLIK");
+    await expect(page.locator(".bildirimler-list")).toContainText("Devamsızlık");
 
     await page.getByRole("button", { name: "Düzenle" }).first().click();
     const bildirimEditModal = page.locator(".modal-container").last();
@@ -143,11 +143,11 @@ test.describe("e2e smoke", () => {
     await bildirimEditModal.getByLabel("Bildirim Turu").fill("RAPORLU");
     await bildirimEditModal.getByRole("button", { name: "Kaydet" }).click();
 
-    await expect(page.locator(".bildirimler-list")).toContainText("RAPORLU");
+    await expect(page.locator(".bildirimler-list")).toContainText("Raporlu");
 
     page.once("dialog", (dialog) => void dialog.accept());
     await page.getByRole("button", { name: "İptal" }).first().click();
-    await expect(page.locator(".bildirimler-list")).toContainText("IPTAL_EDILDI");
+    await expect(page.locator(".bildirimler-list")).toContainText("İptal Edildi");
 
     await page.goto("/finans");
     await expect(page).toHaveURL(/\/finans$/);
@@ -163,7 +163,7 @@ test.describe("e2e smoke", () => {
     await finansCreateModal.getByLabel("Açıklama").fill("Yeni finans kalemi");
     await finansCreateModal.getByRole("button", { name: "Kaydet" }).click();
 
-    await expect(page.locator(".finans-list")).toContainText("PRIM");
+    await expect(page.locator(".finans-list")).toContainText("Prim");
 
     await page.getByRole("button", { name: "Düzenle" }).first().click();
     const finansEditModal = page.locator(".modal-container").last();
@@ -171,10 +171,10 @@ test.describe("e2e smoke", () => {
     await finansEditModal.getByLabel("Kalem Turu").fill("CEZA");
     await finansEditModal.getByRole("button", { name: "Kaydet" }).click();
 
-    await expect(page.locator(".finans-list")).toContainText("CEZA");
+    await expect(page.locator(".finans-list")).toContainText("Ceza");
 
     page.once("dialog", (dialog) => void dialog.accept());
     await page.getByRole("button", { name: "İptal" }).first().click();
-    await expect(page.locator(".finans-list")).toContainText("Durum: IPTAL");
+    await expect(page.locator(".finans-list")).toContainText("Durum: İptal");
   });
 });

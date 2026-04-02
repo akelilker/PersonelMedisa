@@ -8,6 +8,7 @@ import { LoadingState } from "../../../components/states/LoadingState";
 import { SubeDetailListNotice } from "../../../components/states/SubeDetailListNotice";
 import { useRoleAccess } from "../../../hooks/use-role-access";
 import { usePersoneller, type CreatePersonelFormState } from "../../../hooks/usePersoneller";
+import { formatAktifDurumLabel } from "../../../lib/display/enum-display";
 import type { Personel } from "../../../types/personel";
 import type { IdOption } from "../../../types/referans";
 
@@ -79,8 +80,8 @@ export function PersonellerPage() {
   ];
 
   const aktifDurumOptions = [
-    { value: "AKTIF", label: "Aktif" },
-    { value: "PASIF", label: "Pasif" }
+    { value: "AKTIF", label: formatAktifDurumLabel("AKTIF") },
+    { value: "PASIF", label: formatAktifDurumLabel("PASIF") }
   ];
   const kanGrubuOptions = [
     { value: "A Rh+", label: "A Rh+" },
@@ -157,7 +158,7 @@ export function PersonellerPage() {
             <li key={personel.id} className="personeller-item">
               <div>
                 <strong>{`${personel.ad} ${personel.soyad}`}</strong>
-                <p>Durum: {personel.aktif_durum}</p>
+                <p>Durum: {formatAktifDurumLabel(personel.aktif_durum)}</p>
               </div>
               {canOpenDetail ? <Link to={`/personeller/${personel.id}`}>Detay</Link> : null}
             </li>

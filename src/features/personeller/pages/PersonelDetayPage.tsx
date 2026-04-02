@@ -6,6 +6,7 @@ import { ErrorState } from "../../../components/states/ErrorState";
 import { LoadingState } from "../../../components/states/LoadingState";
 import { useRoleAccess } from "../../../hooks/use-role-access";
 import { usePersonelDetail } from "../../../hooks/usePersoneller";
+import { formatAktifDurumLabel } from "../../../lib/display/enum-display";
 
 export function PersonelDetayPage() {
   const { personelId } = useParams();
@@ -30,8 +31,8 @@ export function PersonelDetayPage() {
   } = usePersonelDetail(parsedPersonelId, hasValidId);
 
   const aktifDurumOptions = [
-    { value: "AKTIF", label: "AKTIF" },
-    { value: "PASIF", label: "PASIF" }
+    { value: "AKTIF", label: formatAktifDurumLabel("AKTIF") },
+    { value: "PASIF", label: formatAktifDurumLabel("PASIF") }
   ];
 
   function handleEditSubmit(event: FormEvent<HTMLFormElement>) {
@@ -79,7 +80,7 @@ export function PersonelDetayPage() {
                 <strong>Telefon:</strong> {personel.telefon ?? "-"}
               </p>
               <p>
-                <strong>Durum:</strong> {personel.aktif_durum}
+                <strong>Durum:</strong> {formatAktifDurumLabel(personel.aktif_durum)}
               </p>
 
               {canEditPersonel ? (

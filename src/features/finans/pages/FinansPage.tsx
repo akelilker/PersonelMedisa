@@ -7,6 +7,7 @@ import { ErrorState } from "../../../components/states/ErrorState";
 import { LoadingState } from "../../../components/states/LoadingState";
 import { useRoleAccess } from "../../../hooks/use-role-access";
 import { useFinans } from "../../../hooks/useFinans";
+import { formatFinansKalemTuruLabel, formatFinansStateLabel } from "../../../lib/display/enum-display";
 import type { FinansKalem } from "../../../types/finans";
 
 const FINANS_CREATE_FORM_ID = "finans-create-form";
@@ -128,11 +129,11 @@ export function FinansPage() {
           {items.map((item: FinansKalem) => (
             <li key={item.id} className="finans-item">
               <div>
-                <strong>{item.kalem_turu}</strong>
+                <strong>{formatFinansKalemTuruLabel(item.kalem_turu)}</strong>
                 <p>Personel: {item.personel_id}</p>
                 <p>Dönem: {item.donem}</p>
                 <p>Tutar: {item.tutar}</p>
-                <p>Durum: {item.state ?? "-"}</p>
+                <p>Durum: {formatFinansStateLabel(item.state)}</p>
               </div>
 
               {canEditFinans || canCancelFinans ? (

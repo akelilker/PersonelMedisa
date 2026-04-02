@@ -7,6 +7,7 @@ import { ErrorState } from "../../../components/states/ErrorState";
 import { LoadingState } from "../../../components/states/LoadingState";
 import { useAppDataRevision } from "../../../data/data-manager";
 import type { ModuleFilterBase } from "../../../lib/filters/module-filter-schema";
+import { formatReportCellValue } from "../../../lib/display/enum-display";
 import {
   downloadReportCsv,
   printCurrentReportWindow
@@ -48,7 +49,12 @@ function parseOptionalPositiveInt(value: string): number | undefined {
   return parsed;
 }
 
-function formatCellValue(value: unknown): string {
+function formatCellValue(column: string, value: unknown): string {
+  const displayValue = formatReportCellValue(column, value);
+  if (displayValue !== null) {
+    return displayValue;
+  }
+
   if (value === null || value === undefined) {
     return "-";
   }
@@ -282,7 +288,7 @@ export function RaporlarPage() {
                 {engineRows.map((row, index) => (
                   <tr key={index}>
                     {engineColumns.map((column) => (
-                      <td key={`${index}-${column}`}>{formatCellValue(row[column])}</td>
+                      <td key={`${index}-${column}`}>{formatCellValue(column, row[column])}</td>
                     ))}
                   </tr>
                 ))}
@@ -382,7 +388,7 @@ export function RaporlarPage() {
                 {rows.map((row, index) => (
                   <tr key={index}>
                     {columns.map((column) => (
-                      <td key={`${index}-${column}`}>{formatCellValue(row[column])}</td>
+                      <td key={`${index}-${column}`}>{formatCellValue(column, row[column])}</td>
                     ))}
                   </tr>
                 ))}

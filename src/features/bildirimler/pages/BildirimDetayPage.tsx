@@ -3,6 +3,7 @@ import { EmptyState } from "../../../components/states/EmptyState";
 import { ErrorState } from "../../../components/states/ErrorState";
 import { LoadingState } from "../../../components/states/LoadingState";
 import { useBildirimDetail } from "../../../hooks/useBildirimler";
+import { formatBildirimStateLabel, formatBildirimTuruLabel } from "../../../lib/display/enum-display";
 
 export function BildirimDetayPage() {
   const { bildirimId } = useParams();
@@ -40,10 +41,10 @@ export function BildirimDetayPage() {
             <strong>Personel ID:</strong> {bildirim.personel_id ?? "-"}
           </p>
           <p>
-            <strong>Bildirim Türü:</strong> {bildirim.bildirim_turu}
+            <strong>Bildirim Türü:</strong> {formatBildirimTuruLabel(bildirim.bildirim_turu)}
           </p>
           <p>
-            <strong>Durum:</strong> {bildirim.state ?? "-"}
+            <strong>Durum:</strong> {formatBildirimStateLabel(bildirim.state)}
           </p>
           <p>
             <strong>Açıklama:</strong> {bildirim.aciklama ?? "-"}

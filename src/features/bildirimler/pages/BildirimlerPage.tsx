@@ -8,6 +8,7 @@ import { LoadingState } from "../../../components/states/LoadingState";
 import { SubeDetailListNotice } from "../../../components/states/SubeDetailListNotice";
 import { useRoleAccess } from "../../../hooks/use-role-access";
 import { useBildirimler } from "../../../hooks/useBildirimler";
+import { formatBildirimTuruLabel } from "../../../lib/display/enum-display";
 import type { IdOption, KeyOption } from "../../../types/referans";
 import type { Bildirim } from "../../../types/bildirim";
 
@@ -154,7 +155,7 @@ export function BildirimlerPage() {
           {bildirimler.map((bildirim: Bildirim) => (
             <li key={bildirim.id} className="bildirimler-item">
               <div>
-                <strong>{bildirim.bildirim_turu}</strong>
+                <strong>{formatBildirimTuruLabel(bildirim.bildirim_turu)}</strong>
                 <p>Tarih: {bildirim.tarih ?? "-"}</p>
                 <p>Personel: {bildirim.personel_id ?? "-"}</p>
               </div>

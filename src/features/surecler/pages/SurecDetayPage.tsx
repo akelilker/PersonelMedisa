@@ -3,6 +3,11 @@ import { EmptyState } from "../../../components/states/EmptyState";
 import { ErrorState } from "../../../components/states/ErrorState";
 import { LoadingState } from "../../../components/states/LoadingState";
 import { useSurecDetail } from "../../../hooks/useSurecler";
+import {
+  formatSurecStateLabel,
+  formatSurecTuruLabel,
+  formatUcretliMiLabel
+} from "../../../lib/display/enum-display";
 
 export function SurecDetayPage() {
   const { surecId } = useParams();
@@ -34,7 +39,7 @@ export function SurecDetayPage() {
             <strong>Personel ID:</strong> {surec.personel_id}
           </p>
           <p>
-            <strong>Süreç Türü:</strong> {surec.surec_turu}
+            <strong>Süreç Türü:</strong> {formatSurecTuruLabel(surec.surec_turu)}
           </p>
           <p>
             <strong>Alt Tur:</strong> {surec.alt_tur ?? "-"}
@@ -46,11 +51,10 @@ export function SurecDetayPage() {
             <strong>Bitiş:</strong> {surec.bitis_tarihi ?? "-"}
           </p>
           <p>
-            <strong>Ücretli Mi:</strong>{" "}
-            {surec.ucretli_mi === undefined ? "-" : surec.ucretli_mi ? "Evet" : "Hayır"}
+            <strong>Ücretli Mi:</strong> {formatUcretliMiLabel(surec.ucretli_mi)}
           </p>
           <p>
-            <strong>Durum:</strong> {surec.state ?? "-"}
+            <strong>Durum:</strong> {formatSurecStateLabel(surec.state)}
           </p>
           <p>
             <strong>Açıklama:</strong> {surec.aciklama ?? "-"}

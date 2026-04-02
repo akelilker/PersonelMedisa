@@ -6,6 +6,7 @@ import { AppFooter } from "../components/footer/AppFooter";
 import { AppModal } from "../components/modal/AppModal";
 import { MainMenu, type KayitTab } from "../components/main-menu/MainMenu";
 import { ShellHeaderActions } from "../components/shell/ShellHeaderActions";
+import { formatUiProfileLabel, formatUserRoleLabel } from "../lib/display/enum-display";
 import { useAuth } from "../state/auth.store";
 
 type AppShellProps = {
@@ -98,8 +99,7 @@ export function AppShell({ children }: AppShellProps) {
             <div className="user-chip">
               <strong>{session?.user.ad_soyad ?? "-"}</strong>
               <span>
-                ({session?.user.rol ?? "-"} -{" "}
-                {session?.ui_profile === "birim_amiri" ? "Birim profili" : session ? "Yönetim profili" : "-"})
+                ({formatUserRoleLabel(session?.user.rol)} - {formatUiProfileLabel(session?.ui_profile)})
               </span>
             </div>
             <button type="button" className="logout-btn" onClick={logout}>

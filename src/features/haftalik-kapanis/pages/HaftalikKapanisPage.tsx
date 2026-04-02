@@ -4,6 +4,7 @@ import { createHaftalikKapanis } from "../../../api/haftalik-kapanis.api";
 import { FormField } from "../../../components/form/FormField";
 import { ErrorState } from "../../../components/states/ErrorState";
 import { useRoleAccess } from "../../../hooks/use-role-access";
+import { formatHaftalikKapanisStateLabel } from "../../../lib/display/enum-display";
 import type { HaftalikKapanisSonuc } from "../../../types/haftalik-kapanis";
 
 type KapanisFormState = {
@@ -190,7 +191,7 @@ export function HaftalikKapanisPage() {
             <strong>Kapanış ID:</strong> {resultId ?? "-"}
           </p>
           <p>
-            <strong>Durum:</strong> {resultState ?? "-"}
+            <strong>Durum:</strong> {formatHaftalikKapanisStateLabel(resultState)}
           </p>
           <p>
             <strong>Hafta:</strong> {readResultString(result, ["hafta_baslangic"]) ?? form.haftaBaslangic} /{" "}

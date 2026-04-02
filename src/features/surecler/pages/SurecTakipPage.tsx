@@ -8,6 +8,7 @@ import { LoadingState } from "../../../components/states/LoadingState";
 import { SubeDetailListNotice } from "../../../components/states/SubeDetailListNotice";
 import { useRoleAccess } from "../../../hooks/use-role-access";
 import { useSurecler } from "../../../hooks/useSurecler";
+import { formatSurecStateLabel, formatSurecTuruLabel } from "../../../lib/display/enum-display";
 import type { KeyOption } from "../../../types/referans";
 import type { Surec } from "../../../types/surec";
 
@@ -165,9 +166,9 @@ export function SurecTakipPage() {
           {surecler.map((surec: Surec) => (
             <li key={surec.id} className="surecler-item">
               <div>
-                <strong>{surec.surec_turu}</strong>
+                <strong>{formatSurecTuruLabel(surec.surec_turu)}</strong>
                 <p>Personel: {surec.personel_id}</p>
-                <p>Durum: {surec.state ?? "-"}</p>
+                <p>Durum: {formatSurecStateLabel(surec.state)}</p>
                 <p>
                   Tarih: {surec.baslangic_tarihi ?? "-"} / {surec.bitis_tarihi ?? "-"}
                 </p>

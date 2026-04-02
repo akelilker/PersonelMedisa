@@ -6,6 +6,7 @@ import { ErrorState } from "../../../components/states/ErrorState";
 import { LoadingState } from "../../../components/states/LoadingState";
 import { useRoleAccess } from "../../../hooks/use-role-access";
 import { usePuantaj } from "../../../hooks/usePuantaj";
+import { formatComplianceLevelLabel, formatPuantajStateLabel } from "../../../lib/display/enum-display";
 
 export function GunlukPuantajPage() {
   const { hasPermission } = useRoleAccess();
@@ -96,7 +97,7 @@ export function GunlukPuantajPage() {
             <strong>Tarih:</strong> {puantaj.tarih}
           </p>
           <p>
-            <strong>Durum:</strong> {puantaj.state ?? "-"}
+            <strong>Durum:</strong> {formatPuantajStateLabel(puantaj.state)}
           </p>
           <p>
             <strong>Hesaplanan Mola (dk):</strong>{" "}
@@ -115,7 +116,7 @@ export function GunlukPuantajPage() {
             <ul className="puantaj-alert-list">
               {puantaj.compliance_uyarilari.map((uyari, index) => (
                 <li key={`${uyari.code}-${index}`}>
-                  <strong>{uyari.level ?? "UYARI"}:</strong> {uyari.message}
+                  <strong>{formatComplianceLevelLabel(uyari.level ?? "UYARI")}:</strong> {uyari.message}
                 </li>
               ))}
             </ul>

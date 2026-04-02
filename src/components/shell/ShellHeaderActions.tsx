@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useAppDataRevision } from "../../data/data-manager";
 import { useBildirimlerHeaderPreview } from "../../hooks/useBildirimler";
 import { useRoleAccess } from "../../hooks/use-role-access";
+import { formatBildirimTuruLabel } from "../../lib/display/enum-display";
 import { useAuth } from "../../state/auth.store";
 
 type NotificationLevel = "neutral" | "warning" | "critical";
@@ -81,12 +82,7 @@ function buildReminderNotifications(baseDate: Date, route: string): HeaderNotifi
 }
 
 function formatBildirimTuru(value: string) {
-  return value
-    .toLocaleLowerCase(TR_LOCALE)
-    .split("_")
-    .filter(Boolean)
-    .map((part) => part.slice(0, 1).toLocaleUpperCase(TR_LOCALE) + part.slice(1))
-    .join(" ");
+  return formatBildirimTuruLabel(value);
 }
 
 function mapBildirimLevel(bildirimTuru: string): NotificationLevel {

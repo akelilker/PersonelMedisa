@@ -24,7 +24,8 @@ Kaynagi:
 
 ### Personeller
 
-- `personeller.view`: tum roller
+- `personeller.view`: yonetim rolleri
+- `personeller.view.sube`: tum roller
 - `personeller.detail.view`: tum roller
 - `personeller.create`: yonetim rolleri
 - `personeller.update`: yonetim rolleri
@@ -37,7 +38,8 @@ Yonetim rolleri:
 
 ### Surecler
 
-- `surecler.view`: tum roller
+- `surecler.view`: yonetim rolleri
+- `surecler.view.sube`: tum roller
 - `surecler.detail.view`: tum roller
 - `surecler.create`: yonetim rolleri
 - `surecler.update`: yonetim rolleri
@@ -76,8 +78,11 @@ Yonetim rolleri:
 
 Aktif route guard kurallari:
 
+- `/personeller` -> `personeller.view` veya `personeller.view.sube`
 - `/personeller/:personelId` -> `personeller.detail.view`
+- `/surecler` -> `surecler.view` veya `surecler.view.sube`
 - `/surecler/:surecId` -> `surecler.detail.view`
+- `/bildirimler` -> `bildirimler.view`
 - `/bildirimler/:bildirimId` -> `bildirimler.detail.view`
 - `/puantaj` -> `puantaj.view`
 - `/haftalik-kapanis` -> `haftalik-kapanis.view`
@@ -88,7 +93,7 @@ Aktif route guard kurallari:
 
 - Yetkisiz aksiyon butonlari (create/update/cancel/close) kullaniciya gosterilmez.
 - Yetkisiz route denemelerinde kullanici `yetkisiz` ekranina yonlendirilir.
-- `BIRIM_AMIRI` rolunde liste ve detay goruntuleme acik, mutasyon aksiyonlari kapali kalir.
+- `BIRIM_AMIRI` rolunde liste ve detay goruntuleme sube kapsami ile acik, mutasyon aksiyonlari kapali kalir.
 
 ## Notlar
 

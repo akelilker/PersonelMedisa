@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
+import { getApiErrorMessage, shouldQueueOfflineMutation } from "../api/api-client";
 import {
   createPersonel,
   fetchPersonelDetail,
@@ -35,8 +36,18 @@ import type { Personel } from "../types/personel";
 const PAGE_SIZE = 10;
 
 export type PersonelListQueryState = {
-  draft: { search: string; aktiflik: "aktif" | "pasif" | "tum" };
-  applied: { search: string; aktiflik: "aktif" | "pasif" | "tum" };
+  draft: {
+    search: string;
+    aktiflik: "aktif" | "pasif" | "tum";
+    departmanId: string;
+    personelTipiId: string;
+  };
+  applied: {
+    search: string;
+    aktiflik: "aktif" | "pasif" | "tum";
+    departmanId: string;
+    personelTipiId: string;
+  };
   page: number;
 };
 
@@ -98,11 +109,27 @@ function parseOptionalPositiveInt(value: string): number | undefined {
   return number;
 }
 
+function digitsOnly(value: string) {
+  return value.replace(/\D+/g, "");
+}
+
+function validateTcKimlikNo(value: string) {
+  if (!/^\d{11}$/.test(value)) {
+    throw new Error("T.C. Kimlik No 11 hane ve yalnizca rakamlardan olusmalidir.");
+  }
+}
+
+function validatePhoneNumber(value: string, label: string) {
+  if (!/^\d{10,11}$/.test(value)) {
+    throw new Error(`${label} yalnizca rakamlardan olusmali ve 10-11 hane olmali.`);
+  }
+}
+
 export function usePersoneller() {
   const revision = useAppDataRevision();
   const [listQuery, setListQuery] = useState<PersonelListQueryState>({
-    draft: { search: "", aktiflik: "tum" },
-    applied: { search: "", aktiflik: "tum" },
+    draft: { search: "", aktiflik: "tum", departmanId: "", personelTipiId: "" },
+    applied: { search: "", aktiflik: "tum", departmanId: "", personelTipiId: "" },
     page: 1
   });
 
@@ -122,8 +149,23 @@ export function usePersoneller() {
   const activeSube = useMemo(() => getActiveSube(), [revision]);
 
   const listKey = useMemo(
-    () => dataCacheKeys.personellerList(activeSube, appliedFilters.search, appliedFilters.aktiflik, listPage),
-    [activeSube, appliedFilters.aktiflik, appliedFilters.search, listPage]
+    () =>
+      dataCacheKeys.personellerList(
+        activeSube,
+        appliedFilters.search,
+        appliedFilters.aktiflik,
+        appliedFilters.departmanId,
+        appliedFilters.personelTipiId,
+        listPage
+      ),
+    [
+      activeSube,
+      appliedFilters.aktiflik,
+      appliedFilters.departmanId,
+      appliedFilters.personelTipiId,
+      appliedFilters.search,
+      listPage
+    ]
   );
 
   const listSnapshot = useMemo(
@@ -151,14 +193,23 @@ export function usePersoneller() {
       runDeduped(listKey, () =>
         fetchPersonellerList({
           search: appliedFilters.search || undefined,
+          departman_id: parseOptionalPositiveInt(appliedFilters.departmanId),
           aktiflik: appliedFilters.aktiflik,
+          personel_tipi_id: parseOptionalPositiveInt(appliedFilters.personelTipiId),
           sube_id: getSubeIdForApiRequest(),
           page: listPage,
           limit: PAGE_SIZE
         })
       )
     );
-  }, [appliedFilters.aktiflik, appliedFilters.search, listKey, listPage]);
+  }, [
+    appliedFilters.aktiflik,
+    appliedFilters.departmanId,
+    appliedFilters.personelTipiId,
+    appliedFilters.search,
+    listKey,
+    listPage
+  ]);
 
   useEffect(() => {
     let cancelled = false;
@@ -172,7 +223,9 @@ export function usePersoneller() {
           runDeduped(listKey, () =>
             fetchPersonellerList({
               search: appliedFilters.search || undefined,
+              departman_id: parseOptionalPositiveInt(appliedFilters.departmanId),
               aktiflik: appliedFilters.aktiflik,
+              personel_tipi_id: parseOptionalPositiveInt(appliedFilters.personelTipiId),
               sube_id: getSubeIdForApiRequest(),
               page: listPage,
               limit: PAGE_SIZE
@@ -193,7 +246,14 @@ export function usePersoneller() {
     return () => {
       cancelled = true;
     };
-  }, [appliedFilters.aktiflik, appliedFilters.search, listKey, listPage]);
+  }, [
+    appliedFilters.aktiflik,
+    appliedFilters.departmanId,
+    appliedFilters.personelTipiId,
+    appliedFilters.search,
+    listKey,
+    listPage
+  ]);
 
   useEffect(() => {
     let cancelled = false;
@@ -240,8 +300,8 @@ export function usePersoneller() {
 
   const clearFilters = useCallback(() => {
     setListQuery({
-      draft: { search: "", aktiflik: "tum" },
-      applied: { search: "", aktiflik: "tum" },
+      draft: { search: "", aktiflik: "tum", departmanId: "", personelTipiId: "" },
+      applied: { search: "", aktiflik: "tum", departmanId: "", personelTipiId: "" },
       page: 1
     });
   }, []);
@@ -252,6 +312,14 @@ export function usePersoneller() {
 
   const setDraftAktiflik = useCallback((aktiflik: "aktif" | "pasif" | "tum") => {
     setListQuery((prev) => ({ ...prev, draft: { ...prev.draft, aktiflik } }));
+  }, []);
+
+  const setDraftDepartmanId = useCallback((departmanId: string) => {
+    setListQuery((prev) => ({ ...prev, draft: { ...prev.draft, departmanId } }));
+  }, []);
+
+  const setDraftPersonelTipiId = useCallback((personelTipiId: string) => {
+    setListQuery((prev) => ({ ...prev, draft: { ...prev.draft, personelTipiId } }));
   }, []);
 
   const setPage = useCallback((next: number | ((p: number) => number)) => {
@@ -285,15 +353,22 @@ export function usePersoneller() {
       setIsCreateSubmitting(true);
 
       try {
+        const tcKimlikNo = digitsOnly(createForm.tcKimlikNo);
+        const telefon = digitsOnly(createForm.telefon);
+        const acilDurumTelefon = digitsOnly(createForm.acilDurumTelefon);
+        validateTcKimlikNo(tcKimlikNo);
+        validatePhoneNumber(telefon, "Telefon");
+        validatePhoneNumber(acilDurumTelefon, "Acil durum telefonu");
+
         const bagliAmirId = parseOptionalPositiveInt(createForm.bagliAmirId);
         const payload: CreatePersonelPayload = {
-          tc_kimlik_no: createForm.tcKimlikNo.trim(),
+          tc_kimlik_no: tcKimlikNo,
           ad: createForm.ad.trim(),
           soyad: createForm.soyad.trim(),
           dogum_tarihi: createForm.dogumTarihi,
-          telefon: createForm.telefon.trim(),
+          telefon,
           acil_durum_kisi: createForm.acilDurumKisi.trim(),
-          acil_durum_telefon: createForm.acilDurumTelefon.trim(),
+          acil_durum_telefon: acilDurumTelefon,
           sicil_no: createForm.sicilNo.trim(),
           ise_giris_tarihi: createForm.iseGirisTarihi,
           departman_id: parseRequiredPositiveInt(createForm.departmanId, "Departman ID"),
@@ -309,6 +384,8 @@ export function usePersoneller() {
           activeSube,
           listQuery.applied.search,
           listQuery.applied.aktiflik,
+          listQuery.applied.departmanId,
+          listQuery.applied.personelTipiId,
           1
         );
 
@@ -321,14 +398,20 @@ export function usePersoneller() {
             runDeduped(pageOneKey, () =>
               fetchPersonellerList({
                 search: listQuery.applied.search || undefined,
+                departman_id: parseOptionalPositiveInt(listQuery.applied.departmanId),
                 aktiflik: listQuery.applied.aktiflik,
+                personel_tipi_id: parseOptionalPositiveInt(listQuery.applied.personelTipiId),
                 sube_id: getSubeIdForApiRequest(),
                 page: 1,
                 limit: PAGE_SIZE
               })
             )
           );
-        } catch {
+        } catch (error) {
+          if (!shouldQueueOfflineMutation(error)) {
+            throw error;
+          }
+
           const tempId = makeTempId();
           const draft = draftPersonelFromPayload(payload, tempId);
           optimisticPrependPersonel(pageOneKey, draft);
@@ -343,14 +426,12 @@ export function usePersoneller() {
           void processSyncQueue();
         }
       } catch (error) {
-        setCreateErrorMessage(
-        error instanceof Error ? error.message : "Personel kaydı sırasında bir hata oluştu."
-        );
+        setCreateErrorMessage(getApiErrorMessage(error, "Personel kaydi sirasinda bir hata olustu."));
       } finally {
         setIsCreateSubmitting(false);
       }
     },
-    [activeSube, createForm, isCreateSubmitting, listQuery.applied.aktiflik, listQuery.applied.search]
+    [activeSube, createForm, isCreateSubmitting, listQuery.applied]
   );
 
   return {
@@ -375,6 +456,8 @@ export function usePersoneller() {
     clearFilters,
     setDraftSearch,
     setDraftAktiflik,
+    setDraftDepartmanId,
+    setDraftPersonelTipiId,
     setPage
   };
 }
@@ -496,6 +579,7 @@ export function usePersonelDetail(parsedPersonelId: number, hasValidId: boolean)
       setEditErrorMessage(null);
       setIsSubmitting(true);
 
+      const previousPersonel = personel;
       const body = {
         ad: editForm.ad.trim(),
         soyad: editForm.soyad.trim(),
@@ -527,14 +611,22 @@ export function usePersonelDetail(parsedPersonelId: number, hasValidId: boolean)
           });
           return;
         }
-        enqueueSyncOperation({
-          op: "personeller.update",
-          payload: { personelId: personel.id, body },
-          meta: { detailKey }
-        });
-        void processSyncQueue();
-        setEditErrorMessage(null);
-        setIsEditing(false);
+
+        if (shouldQueueOfflineMutation(error)) {
+          enqueueSyncOperation({
+            op: "personeller.update",
+            payload: { personelId: personel.id, body },
+            meta: { detailKey }
+          });
+          void processSyncQueue();
+          setEditErrorMessage(null);
+          setIsEditing(false);
+          return;
+        }
+
+        mergeCacheEntry<Personel>(detailKey, () => previousPersonel);
+        setPersonel(previousPersonel);
+        setEditErrorMessage(getApiErrorMessage(error, "Personel kaydi guncellenemedi."));
       } finally {
         setIsSubmitting(false);
       }

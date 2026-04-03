@@ -11,6 +11,15 @@ type DemoPersonel = {
   telefon?: string;
   dogum_tarihi?: string;
   sicil_no?: string;
+  dogum_yeri?: string;
+  kan_grubu?: string;
+  ise_giris_tarihi?: string;
+  acil_durum_kisi?: string;
+  acil_durum_telefon?: string;
+  departman_id?: number;
+  gorev_id?: number;
+  personel_tipi_id?: number;
+  bagli_amir_id?: number;
 };
 
 type DemoSurec = {
@@ -81,7 +90,17 @@ const demoState: {
       soyad: "Yilmaz",
       aktif_durum: "AKTIF",
       telefon: "05550000000",
-      sicil_no: "P-001"
+      dogum_tarihi: "1992-03-14",
+      sicil_no: "P-001",
+      dogum_yeri: "Istanbul",
+      kan_grubu: "A Rh+",
+      ise_giris_tarihi: "2023-02-01",
+      acil_durum_kisi: "Fatma Yilmaz",
+      acil_durum_telefon: "05553334455",
+      departman_id: 3,
+      gorev_id: 1,
+      personel_tipi_id: 1,
+      bagli_amir_id: 1
     },
     {
       id: 2,
@@ -90,7 +109,17 @@ const demoState: {
       soyad: "Kaya",
       aktif_durum: "AKTIF",
       telefon: "05551111111",
-      sicil_no: "P-002"
+      dogum_tarihi: "1989-11-02",
+      sicil_no: "P-002",
+      dogum_yeri: "Ankara",
+      kan_grubu: "0 Rh+",
+      ise_giris_tarihi: "2024-07-15",
+      acil_durum_kisi: "Zeynep Kaya",
+      acil_durum_telefon: "05556667788",
+      departman_id: 2,
+      gorev_id: 2,
+      personel_tipi_id: 2,
+      bagli_amir_id: 1
     }
   ],
   surecler: [
@@ -137,6 +166,27 @@ const demoState: {
     finans: 950,
     kapanis: 1000
   }
+};
+
+const DEMO_DEPARTMAN_LABELS: Record<number, string> = {
+  1: "Yonetim",
+  2: "Muhasebe",
+  3: "Operasyon"
+};
+
+const DEMO_GOREV_LABELS: Record<number, string> = {
+  1: "Uzman",
+  2: "Sef",
+  3: "Mudur"
+};
+
+const DEMO_PERSONEL_TIPI_LABELS: Record<number, string> = {
+  1: "Tam Zamanli",
+  2: "Yari Zamanli"
+};
+
+const DEMO_BAGLI_AMIR_LABELS: Record<number, string> = {
+  1: "Demo Amir"
 };
 
 function toRecord(value: unknown): Record<string, unknown> | null {
@@ -236,6 +286,36 @@ function defaultPuantaj(personelId: number, tarih: string): DemoPuantaj {
   };
 }
 
+function getLabel(map: Record<number, string>, id: number | undefined) {
+  if (typeof id !== "number") {
+    return undefined;
+  }
+
+  return map[id] ?? `#${id}`;
+}
+
+function buildDemoPersonelDetail(personel: DemoPersonel) {
+  return {
+    ana_kart: { ...personel },
+    sistem_ozeti: {
+      hizmet_suresi: personel.id === 1 ? "3 yil 2 ay" : "1 yil 8 ay",
+      toplam_izin_hakki: personel.id === 1 ? 14 : 10,
+      kullanilan_izin: personel.id === 1 ? 4 : 2,
+      kalan_izin: personel.id === 1 ? 10 : 8
+    },
+    pasiflik_durumu: {
+      aktif_durum: personel.aktif_durum,
+      etiket: personel.aktif_durum === "PASIF" ? "Pasif" : null
+    },
+    referans_adlari: {
+      departman: getLabel(DEMO_DEPARTMAN_LABELS, personel.departman_id),
+      gorev: getLabel(DEMO_GOREV_LABELS, personel.gorev_id),
+      personel_tipi: getLabel(DEMO_PERSONEL_TIPI_LABELS, personel.personel_tipi_id),
+      bagli_amir: getLabel(DEMO_BAGLI_AMIR_LABELS, personel.bagli_amir_id)
+    }
+  };
+}
+
 export function resolveDemoApiResponse(
   path: string,
   init?: RequestInit
@@ -273,12 +353,20 @@ export function resolveDemoApiResponse(
     const limit = toNumber(requestUrl.searchParams.get("limit")) ?? 10;
     const aktiflik = toStringValue(requestUrl.searchParams.get("aktiflik")) ?? "tum";
     const search = (toStringValue(requestUrl.searchParams.get("search")) ?? "").toLowerCase();
+    const departmanId = toNumber(requestUrl.searchParams.get("departman_id"));
+    const personelTipiId = toNumber(requestUrl.searchParams.get("personel_tipi_id"));
 
     const filtered = demoState.personeller.filter((item) => {
       if (aktiflik === "aktif" && item.aktif_durum !== "AKTIF") {
         return false;
       }
       if (aktiflik === "pasif" && item.aktif_durum !== "PASIF") {
+        return false;
+      }
+      if (departmanId !== null && item.departman_id !== departmanId) {
+        return false;
+      }
+      if (personelTipiId !== null && item.personel_tipi_id !== personelTipiId) {
         return false;
       }
       if (!search) {
@@ -316,7 +404,16 @@ export function resolveDemoApiResponse(
       aktif_durum: (toStringValue(body.aktif_durum) as "AKTIF" | "PASIF") ?? "AKTIF",
       telefon: toStringValue(body.telefon) ?? undefined,
       dogum_tarihi: toStringValue(body.dogum_tarihi) ?? undefined,
-      sicil_no: toStringValue(body.sicil_no) ?? undefined
+      sicil_no: toStringValue(body.sicil_no) ?? undefined,
+      dogum_yeri: toStringValue(body.dogum_yeri) ?? undefined,
+      kan_grubu: toStringValue(body.kan_grubu) ?? undefined,
+      ise_giris_tarihi: toStringValue(body.ise_giris_tarihi) ?? undefined,
+      acil_durum_kisi: toStringValue(body.acil_durum_kisi) ?? undefined,
+      acil_durum_telefon: toStringValue(body.acil_durum_telefon) ?? undefined,
+      departman_id: toNumber(body.departman_id) ?? undefined,
+      gorev_id: toNumber(body.gorev_id) ?? undefined,
+      personel_tipi_id: toNumber(body.personel_tipi_id) ?? undefined,
+      bagli_amir_id: toNumber(body.bagli_amir_id) ?? undefined
     };
     demoState.personeller.unshift(next);
     return ok(next);
@@ -331,7 +428,7 @@ export function resolveDemoApiResponse(
     }
 
     if (method === "GET") {
-      return ok(personel);
+      return ok(buildDemoPersonelDetail(personel));
     }
 
     if (method === "PUT") {

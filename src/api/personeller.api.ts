@@ -1,5 +1,5 @@
 import type { ApiResponse, PaginatedResult } from "../types/api";
-import type { Personel } from "../types/personel";
+import type { Personel, PersonelAktifDurum } from "../types/personel";
 import { appendQueryParams } from "../utils/append-query-params";
 import { logAction } from "../audit/audit-service";
 import { apiRequest } from "./api-client";
@@ -37,23 +37,179 @@ export type CreatePersonelPayload = {
 
 export type UpdatePersonelPayload = Partial<CreatePersonelPayload>;
 
+function toRecord(value: unknown): Record<string, unknown> | null {
+  if (typeof value !== "object" || value === null) {
+    return null;
+  }
+
+  return value as Record<string, unknown>;
+}
+
+function pickValue(sources: Array<Record<string, unknown> | null>, keys: string[]): unknown {
+  for (const source of sources) {
+    if (!source) {
+      continue;
+    }
+
+    for (const key of keys) {
+      if (key in source) {
+        const value = source[key];
+        if (value !== undefined) {
+          return value;
+        }
+      }
+    }
+  }
+
+  return undefined;
+}
+
+function readStringValue(value: unknown): string | undefined {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+
+  const trimmed = value.trim();
+  return trimmed ? trimmed : undefined;
+}
+
+function readNullableStringValue(value: unknown): string | null | undefined {
+  if (value === null) {
+    return null;
+  }
+
+  return readStringValue(value);
+}
+
+function readNumberValue(value: unknown): number | undefined {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+
+  return undefined;
+}
+
+function readString(sources: Array<Record<string, unknown> | null>, ...keys: string[]): string | undefined {
+  return readStringValue(pickValue(sources, keys));
+}
+
+function readNullableString(
+  sources: Array<Record<string, unknown> | null>,
+  ...keys: string[]
+): string | null | undefined {
+  return readNullableStringValue(pickValue(sources, keys));
+}
+
+function readNumber(sources: Array<Record<string, unknown> | null>, ...keys: string[]): number | undefined {
+  return readNumberValue(pickValue(sources, keys));
+}
+
+function readRequiredString(
+  sources: Array<Record<string, unknown> | null>,
+  fieldLabel: string,
+  ...keys: string[]
+): string {
+  const value = readString(sources, ...keys);
+  if (!value) {
+    throw new Error(`Personel yaniti ${fieldLabel} alanini icermiyor.`);
+  }
+  return value;
+}
+
+function readRequiredNumber(
+  sources: Array<Record<string, unknown> | null>,
+  fieldLabel: string,
+  ...keys: string[]
+): number {
+  const value = readNumber(sources, ...keys);
+  if (value === undefined) {
+    throw new Error(`Personel yaniti ${fieldLabel} alanini icermiyor.`);
+  }
+  return value;
+}
+
+function normalizeAktifDurum(value: unknown): PersonelAktifDurum | null {
+  if (value === "AKTIF" || value === "PASIF") {
+    return value;
+  }
+
+  return null;
+}
+
 function normalizePersonel(data: unknown): Personel {
-  if (typeof data !== "object" || data === null) {
+  const root = toRecord(data);
+  if (!root) {
     throw new Error("Personel yaniti beklenen formatta degil.");
   }
 
-  const personel = data as Partial<Personel>;
-  if (
-    typeof personel.id !== "number" ||
-    typeof personel.ad !== "string" ||
-    typeof personel.soyad !== "string" ||
-    typeof personel.aktif_durum !== "string" ||
-    typeof personel.tc_kimlik_no !== "string"
-  ) {
-    throw new Error("Personel yaniti eksik alan iceriyor.");
+  const anaKart = toRecord(root.ana_kart) ?? root;
+  const sistemOzeti = toRecord(root.sistem_ozeti);
+  const pasiflikDurumu = toRecord(root.pasiflik_durumu);
+  const referansAdlari = toRecord(root.referans_adlari);
+
+  const baseSources = [anaKart, root];
+  const summarySources = [sistemOzeti, root];
+  const referenceSources = [referansAdlari, root];
+  const aktifDurum = normalizeAktifDurum(
+    pickValue([pasiflikDurumu, ...baseSources], ["aktif_durum"])
+  );
+
+  if (!aktifDurum) {
+    throw new Error("Personel yaniti aktif_durum alanini icermiyor.");
   }
 
-  return personel as Personel;
+  return {
+    id: readRequiredNumber(baseSources, "id", "id"),
+    tc_kimlik_no: readRequiredString(baseSources, "tc_kimlik_no", "tc_kimlik_no"),
+    ad: readRequiredString(baseSources, "ad", "ad"),
+    soyad: readRequiredString(baseSources, "soyad", "soyad"),
+    aktif_durum: aktifDurum,
+    telefon: readString(baseSources, "telefon"),
+    dogum_tarihi: readString(baseSources, "dogum_tarihi"),
+    sicil_no: readString(baseSources, "sicil_no"),
+    dogum_yeri: readString(baseSources, "dogum_yeri"),
+    kan_grubu: readString(baseSources, "kan_grubu"),
+    ise_giris_tarihi: readString(baseSources, "ise_giris_tarihi"),
+    acil_durum_kisi: readString(baseSources, "acil_durum_kisi"),
+    acil_durum_telefon: readString(baseSources, "acil_durum_telefon"),
+    departman_id: readNumber(baseSources, "departman_id"),
+    gorev_id: readNumber(baseSources, "gorev_id"),
+    personel_tipi_id: readNumber(baseSources, "personel_tipi_id"),
+    bagli_amir_id: readNumber(baseSources, "bagli_amir_id"),
+    departman_adi: readString(referenceSources, "departman", "departman_adi", "departmanAdi"),
+    gorev_adi: readString(referenceSources, "gorev", "gorev_adi", "gorevAdi"),
+    personel_tipi_adi: readString(
+      referenceSources,
+      "personel_tipi",
+      "personel_tipi_adi",
+      "personelTipi",
+      "personelTipiAdi"
+    ),
+    bagli_amir_adi: readString(
+      referenceSources,
+      "bagli_amir",
+      "bagli_amir_adi",
+      "bagliAmir",
+      "bagliAmirAdi"
+    ),
+    hizmet_suresi: readString(summarySources, "hizmet_suresi"),
+    toplam_izin_hakki: readNumber(summarySources, "toplam_izin_hakki"),
+    kullanilan_izin: readNumber(summarySources, "kullanilan_izin"),
+    kalan_izin: readNumber(summarySources, "kalan_izin"),
+    pasiflik_durumu_etiketi: readNullableString(
+      [pasiflikDurumu, root],
+      "etiket",
+      "pasiflik_durumu_etiketi",
+      "pasiflikDurumuEtiketi"
+    )
+  };
 }
 
 export async function fetchPersonellerList(

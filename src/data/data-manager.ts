@@ -248,8 +248,14 @@ function subeSeg(subeId: number | null): string {
 }
 
 export const dataCacheKeys = {
-  personellerList: (subeId: number | null, search: string, aktiflik: string, page: number) =>
-    `personeller:list:s${subeSeg(subeId)}:${search}|${aktiflik}|${page}`,
+  personellerList: (
+    subeId: number | null,
+    search: string,
+    aktiflik: string,
+    departmanId: string,
+    personelTipiId: string,
+    page: number
+  ) => `personeller:list:s${subeSeg(subeId)}:${search}|${aktiflik}|${departmanId}|${personelTipiId}|${page}`,
   personelDetail: (subeId: number | null, id: number) =>
     `personeller:detail:s${subeSeg(subeId)}:${id}`,
   referansPersonel: () => `referans:personel-bundle`,
@@ -651,6 +657,13 @@ export function draftPersonelFromPayload(payload: CreatePersonelPayload, tempId:
     dogum_tarihi: payload.dogum_tarihi,
     telefon: payload.telefon,
     sicil_no: payload.sicil_no,
+    ise_giris_tarihi: payload.ise_giris_tarihi,
+    departman_id: payload.departman_id,
+    gorev_id: payload.gorev_id,
+    personel_tipi_id: payload.personel_tipi_id,
+    bagli_amir_id: payload.bagli_amir_id,
+    dogum_yeri: payload.dogum_yeri,
+    kan_grubu: payload.kan_grubu,
     aktif_durum: payload.aktif_durum
   };
 }
@@ -801,7 +814,30 @@ function parsePersonelRealtimePayload(p: unknown): Personel | null {
     aktif_durum: durum,
     telefon: typeof p.telefon === "string" ? p.telefon : undefined,
     dogum_tarihi: typeof p.dogum_tarihi === "string" ? p.dogum_tarihi : undefined,
-    sicil_no: typeof p.sicil_no === "string" ? p.sicil_no : undefined
+    sicil_no: typeof p.sicil_no === "string" ? p.sicil_no : undefined,
+    dogum_yeri: typeof p.dogum_yeri === "string" ? p.dogum_yeri : undefined,
+    kan_grubu: typeof p.kan_grubu === "string" ? p.kan_grubu : undefined,
+    ise_giris_tarihi: typeof p.ise_giris_tarihi === "string" ? p.ise_giris_tarihi : undefined,
+    acil_durum_kisi: typeof p.acil_durum_kisi === "string" ? p.acil_durum_kisi : undefined,
+    acil_durum_telefon:
+      typeof p.acil_durum_telefon === "string" ? p.acil_durum_telefon : undefined,
+    departman_id: typeof p.departman_id === "number" ? p.departman_id : undefined,
+    gorev_id: typeof p.gorev_id === "number" ? p.gorev_id : undefined,
+    personel_tipi_id: typeof p.personel_tipi_id === "number" ? p.personel_tipi_id : undefined,
+    bagli_amir_id: typeof p.bagli_amir_id === "number" ? p.bagli_amir_id : undefined,
+    departman_adi: typeof p.departman_adi === "string" ? p.departman_adi : undefined,
+    gorev_adi: typeof p.gorev_adi === "string" ? p.gorev_adi : undefined,
+    personel_tipi_adi: typeof p.personel_tipi_adi === "string" ? p.personel_tipi_adi : undefined,
+    bagli_amir_adi: typeof p.bagli_amir_adi === "string" ? p.bagli_amir_adi : undefined,
+    hizmet_suresi: typeof p.hizmet_suresi === "string" ? p.hizmet_suresi : undefined,
+    toplam_izin_hakki:
+      typeof p.toplam_izin_hakki === "number" ? p.toplam_izin_hakki : undefined,
+    kullanilan_izin: typeof p.kullanilan_izin === "number" ? p.kullanilan_izin : undefined,
+    kalan_izin: typeof p.kalan_izin === "number" ? p.kalan_izin : undefined,
+    pasiflik_durumu_etiketi:
+      typeof p.pasiflik_durumu_etiketi === "string" || p.pasiflik_durumu_etiketi === null
+        ? p.pasiflik_durumu_etiketi
+        : undefined
   };
 }
 
@@ -1011,7 +1047,7 @@ export async function loadDataFromServer(): Promise<void> {
   const subeQ = getSubeIdForApiRequest();
   const tasks: Array<Promise<void>> = [
     (async () => {
-      const key = dataCacheKeys.personellerList(sube, "", "tum", 1);
+      const key = dataCacheKeys.personellerList(sube, "", "tum", "", "", 1);
       try {
         const data = await fetchPersonellerList({ aktiflik: "tum", page: 1, limit: 10, sube_id: subeQ });
         setCacheEntry(key, data);

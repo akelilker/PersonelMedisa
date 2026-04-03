@@ -1,10 +1,30 @@
+export type PersonelAktifDurum = "AKTIF" | "PASIF";
+
 export type Personel = {
   id: number;
   tc_kimlik_no: string;
   ad: string;
   soyad: string;
-  aktif_durum: "AKTIF" | "PASIF";
+  aktif_durum: PersonelAktifDurum;
   telefon?: string;
   dogum_tarihi?: string;
   sicil_no?: string;
+  dogum_yeri?: string;
+  kan_grubu?: string;
+  ise_giris_tarihi?: string;
+  acil_durum_kisi?: string;
+  acil_durum_telefon?: string;
+  departman_id?: number;
+  gorev_id?: number;
+  personel_tipi_id?: number;
+  bagli_amir_id?: number;
+  departman_adi?: string;
+  gorev_adi?: string;
+  personel_tipi_adi?: string;
+  bagli_amir_adi?: string;
+  hizmet_suresi?: string;
+  toplam_izin_hakki?: number;
+  kullanilan_izin?: number;
+  kalan_izin?: number;
+  pasiflik_durumu_etiketi?: string | null;
 };

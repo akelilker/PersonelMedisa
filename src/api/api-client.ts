@@ -117,6 +117,26 @@ export class ApiRequestError extends Error {
   }
 }
 
+export function shouldQueueOfflineMutation(error: unknown): boolean {
+  if (typeof navigator !== "undefined" && navigator.onLine === false) {
+    return true;
+  }
+
+  return error instanceof ApiRequestError && error.status === 0;
+}
+
+export function getApiErrorMessage(error: unknown, fallbackMessage: string): string {
+  if (error instanceof ApiRequestError && error.message.trim()) {
+    return error.message;
+  }
+
+  if (error instanceof Error && error.message.trim()) {
+    return error.message;
+  }
+
+  return fallbackMessage;
+}
+
 function extractFirstApiError(payload: unknown): ApiError | null {
   if (typeof payload !== "object" || payload === null) {
     return null;

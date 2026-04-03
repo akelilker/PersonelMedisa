@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
+import { getApiErrorMessage, shouldQueueOfflineMutation } from "../api/api-client";
 import {
   cancelSurec,
   createSurec,
@@ -380,7 +381,11 @@ export function useSurecler() {
           setCreateForm(INITIAL_SUREC_FORM);
           setListQuery((prev) => ({ ...prev, page: 1 }));
           await refreshPageOne();
-        } catch {
+        } catch (error) {
+          if (!shouldQueueOfflineMutation(error)) {
+            throw error;
+          }
+
           const tempId = makeTempId();
           optimisticPrependToList(pageOneKey, draftSurecFromCreatePayload(payload, tempId));
           enqueueSyncOperation({
@@ -394,7 +399,7 @@ export function useSurecler() {
           void processSyncQueue();
         }
       } catch (error) {
-        setCreateErrorMessage(error instanceof Error ? error.message : "Süreç kaydı yapılamadı.");
+        setCreateErrorMessage(getApiErrorMessage(error, "Surec kaydi yapilamadi."));
       } finally {
         setIsCreateSubmitting(false);
       }
@@ -430,6 +435,7 @@ export function useSurecler() {
       setEditErrorMessage(null);
       setIsEditSubmitting(true);
 
+      const previousSurec = editingSurec;
       const body = {
         personel_id: parseRequiredPositiveInt(editForm.personelId, "Personel ID"),
         surec_turu: editForm.surecTuru.trim(),
@@ -453,14 +459,26 @@ export function useSurecler() {
         setEditingSurec(null);
         setListQuery((prev) => ({ ...prev, page: 1 }));
         await refreshPageOne();
-      } catch {
-        enqueueSyncOperation({
-          op: "surecler.update",
-          payload: { surecId: editingSurec.id, body },
-          meta: { listKey }
+      } catch (error) {
+        if (shouldQueueOfflineMutation(error)) {
+          enqueueSyncOperation({
+            op: "surecler.update",
+            payload: { surecId: editingSurec.id, body },
+            meta: { listKey }
+          });
+          setEditingSurec(null);
+          void processSyncQueue();
+          return;
+        }
+
+        mergeCacheEntry<PaginatedResult<Surec>>(listKey, (prev) => {
+          const base = prev ?? emptyPaginated<Surec>();
+          return {
+            ...base,
+            items: base.items.map((row) => (row.id === previousSurec.id ? previousSurec : row))
+          };
         });
-        setEditingSurec(null);
-        void processSyncQueue();
+        setEditErrorMessage(getApiErrorMessage(error, "Surec kaydi guncellenemedi."));
       } finally {
         setIsEditSubmitting(false);
       }
@@ -494,13 +512,25 @@ export function useSurecler() {
         await cancelSurec(surec.id);
         setListQuery((prev) => ({ ...prev, page: 1 }));
         await refreshPageOne();
-      } catch {
-        enqueueSyncOperation({
-          op: "surecler.cancel",
-          payload: { surecId: surec.id },
-          meta: { listKey }
+      } catch (error) {
+        if (shouldQueueOfflineMutation(error)) {
+          enqueueSyncOperation({
+            op: "surecler.cancel",
+            payload: { surecId: surec.id },
+            meta: { listKey }
+          });
+          void processSyncQueue();
+          return;
+        }
+
+        mergeCacheEntry<PaginatedResult<Surec>>(listKey, (prev) => {
+          const base = prev ?? emptyPaginated<Surec>();
+          return {
+            ...base,
+            items: base.items.map((row) => (row.id === surec.id ? surec : row))
+          };
         });
-        void processSyncQueue();
+        setErrorMessage(getApiErrorMessage(error, "Surec iptal edilemedi."));
       } finally {
         setCancelingSurecId(null);
       }

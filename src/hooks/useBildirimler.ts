@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
+import { getApiErrorMessage, shouldQueueOfflineMutation } from "../api/api-client";
 import {
   cancelBildirim,
   createBildirim,
@@ -334,7 +335,11 @@ export function useBildirimler() {
           setCreateForm(INITIAL_BILDIRIM_FORM);
           setListQuery((prev) => ({ ...prev, page: 1 }));
           await refreshPageOne();
-        } catch {
+        } catch (error) {
+          if (!shouldQueueOfflineMutation(error)) {
+            throw error;
+          }
+
           const tempId = makeTempId();
           optimisticPrependToList(pageOneKey, draftBildirimFromPayload(payload, tempId));
           enqueueSyncOperation({
@@ -348,7 +353,7 @@ export function useBildirimler() {
           void processSyncQueue();
         }
       } catch (error) {
-        setCreateErrorMessage(error instanceof Error ? error.message : "Bildirim kaydı yapılamadı.");
+        setCreateErrorMessage(getApiErrorMessage(error, "Bildirim kaydi yapilamadi."));
       } finally {
         setIsCreateSubmitting(false);
       }
@@ -384,6 +389,7 @@ export function useBildirimler() {
       setEditErrorMessage(null);
       setIsEditSubmitting(true);
 
+      const previousBildirim = editingBildirim;
       const body = {
         tarih: editForm.tarih,
         departman_id: parseRequiredPositiveInt(editForm.departmanId, "Departman ID"),
@@ -405,14 +411,26 @@ export function useBildirimler() {
         setEditingBildirim(null);
         setListQuery((prev) => ({ ...prev, page: 1 }));
         await refreshPageOne();
-      } catch {
-        enqueueSyncOperation({
-          op: "bildirimler.update",
-          payload: { bildirimId: editingBildirim.id, body },
-          meta: { listKey }
+      } catch (error) {
+        if (shouldQueueOfflineMutation(error)) {
+          enqueueSyncOperation({
+            op: "bildirimler.update",
+            payload: { bildirimId: editingBildirim.id, body },
+            meta: { listKey }
+          });
+          setEditingBildirim(null);
+          void processSyncQueue();
+          return;
+        }
+
+        mergeCacheEntry<PaginatedResult<Bildirim>>(listKey, (prev) => {
+          const base = prev ?? emptyPaginated<Bildirim>();
+          return {
+            ...base,
+            items: base.items.map((row) => (row.id === previousBildirim.id ? previousBildirim : row))
+          };
         });
-        setEditingBildirim(null);
-        void processSyncQueue();
+        setEditErrorMessage(getApiErrorMessage(error, "Bildirim kaydi guncellenemedi."));
       } finally {
         setIsEditSubmitting(false);
       }
@@ -446,13 +464,25 @@ export function useBildirimler() {
         await cancelBildirim(bildirim.id);
         setListQuery((prev) => ({ ...prev, page: 1 }));
         await refreshPageOne();
-      } catch {
-        enqueueSyncOperation({
-          op: "bildirimler.cancel",
-          payload: { bildirimId: bildirim.id },
-          meta: { listKey }
+      } catch (error) {
+        if (shouldQueueOfflineMutation(error)) {
+          enqueueSyncOperation({
+            op: "bildirimler.cancel",
+            payload: { bildirimId: bildirim.id },
+            meta: { listKey }
+          });
+          void processSyncQueue();
+          return;
+        }
+
+        mergeCacheEntry<PaginatedResult<Bildirim>>(listKey, (prev) => {
+          const base = prev ?? emptyPaginated<Bildirim>();
+          return {
+            ...base,
+            items: base.items.map((row) => (row.id === bildirim.id ? bildirim : row))
+          };
         });
-        void processSyncQueue();
+        setErrorMessage(getApiErrorMessage(error, "Bildirim iptal edilemedi."));
       } finally {
         setCancelingBildirimId(null);
       }

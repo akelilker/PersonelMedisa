@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { getApiErrorMessage, shouldQueueOfflineMutation } from "../api/api-client";
 import { fetchGunlukPuantaj, upsertGunlukPuantaj } from "../api/puantaj.api";
 import {
   dataCacheKeys,
@@ -213,6 +214,7 @@ export function usePuantaj() {
           gercek_mola_dakika: body.gercek_mola_dakika,
           compliance_uyarilari: []
         };
+        const previousPuantaj = puantaj;
         mergePuantajCache(activeQuery.personelId, activeQuery.tarih, optimistic);
         setPuantaj(optimistic);
         patchFormState(toPuantajFormState(optimistic));
@@ -222,19 +224,27 @@ export function usePuantaj() {
           mergePuantajCache(activeQuery.personelId, activeQuery.tarih, updated);
           setPuantaj(updated);
           patchFormState(toPuantajFormState(updated));
-        } catch {
-          enqueueSyncOperation({
-            op: "puantaj.upsert",
-            payload: {
-              personelId: activeQuery.personelId,
-              tarih: activeQuery.tarih,
-              body
-            }
-          });
-          void processSyncQueue();
+        } catch (error) {
+          if (shouldQueueOfflineMutation(error)) {
+            enqueueSyncOperation({
+              op: "puantaj.upsert",
+              payload: {
+                personelId: activeQuery.personelId,
+                tarih: activeQuery.tarih,
+                body
+              }
+            });
+            void processSyncQueue();
+            return;
+          }
+
+          mergePuantajCache(activeQuery.personelId, activeQuery.tarih, previousPuantaj ?? null);
+          setPuantaj(previousPuantaj ?? null);
+          patchFormState(toPuantajFormState(previousPuantaj ?? null));
+          setSubmitErrorMessage(getApiErrorMessage(error, "Puantaj kaydi guncellenemedi."));
         }
       } catch (error) {
-      setSubmitErrorMessage(error instanceof Error ? error.message : "Puantaj kaydı güncellenemedi.");
+      setSubmitErrorMessage(getApiErrorMessage(error, "Puantaj kaydi guncellenemedi."));
       } finally {
         setIsSubmitting(false);
       }

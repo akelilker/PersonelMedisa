@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { getApiErrorMessage, shouldQueueOfflineMutation } from "../api/api-client";
 import {
   cancelFinansKalem,
   createFinansKalem,
@@ -317,7 +318,11 @@ export function useFinans() {
           setCreateForm({ ...INITIAL_CREATE_FINANS_FORM });
           setListQuery((prev) => ({ ...prev, page: 1 }));
           await refreshPageOne();
-        } catch {
+        } catch (error) {
+          if (!shouldQueueOfflineMutation(error)) {
+            throw error;
+          }
+
           const tempId = makeTempId();
           optimisticPrependToList(pageOneKey, draftFinansFromPayload(payload, tempId));
           enqueueSyncOperation({
@@ -331,7 +336,7 @@ export function useFinans() {
           void processSyncQueue();
         }
       } catch (error) {
-        setCreateErrorMessage(error instanceof Error ? error.message : "Finans kaydı oluşturulamadı.");
+        setCreateErrorMessage(getApiErrorMessage(error, "Finans kaydi olusturulamadi."));
       } finally {
         setIsCreateSubmitting(false);
       }
@@ -367,6 +372,7 @@ export function useFinans() {
       setEditErrorMessage(null);
       setIsEditSubmitting(true);
 
+      const previousItem = editingItem;
       const body = {
         personel_id: parseRequiredPositiveInt(editForm.personelId, "Personel ID"),
         donem: validateDonem(editForm.donem),
@@ -390,14 +396,26 @@ export function useFinans() {
         setEditingItem(null);
         setListQuery((prev) => ({ ...prev, page: 1 }));
         await refreshPageOne();
-      } catch {
-        enqueueSyncOperation({
-          op: "finans.update",
-          payload: { kalemId: editingItem.id, body },
-          meta: { listKey }
+      } catch (error) {
+        if (shouldQueueOfflineMutation(error)) {
+          enqueueSyncOperation({
+            op: "finans.update",
+            payload: { kalemId: editingItem.id, body },
+            meta: { listKey }
+          });
+          setEditingItem(null);
+          void processSyncQueue();
+          return;
+        }
+
+        mergeCacheEntry<PaginatedResult<FinansKalem>>(listKey, (prev) => {
+          const base = prev ?? emptyPaginated<FinansKalem>();
+          return {
+            ...base,
+            items: base.items.map((row) => (row.id === previousItem.id ? previousItem : row))
+          };
         });
-        setEditingItem(null);
-        void processSyncQueue();
+        setEditErrorMessage(getApiErrorMessage(error, "Finans kaydi guncellenemedi."));
       } finally {
         setIsEditSubmitting(false);
       }
@@ -433,13 +451,25 @@ export function useFinans() {
         await cancelFinansKalem(item.id);
         setListQuery((prev) => ({ ...prev, page: 1 }));
         await refreshPageOne();
-      } catch {
-        enqueueSyncOperation({
-          op: "finans.cancel",
-          payload: { kalemId: item.id },
-          meta: { listKey }
+      } catch (error) {
+        if (shouldQueueOfflineMutation(error)) {
+          enqueueSyncOperation({
+            op: "finans.cancel",
+            payload: { kalemId: item.id },
+            meta: { listKey }
+          });
+          void processSyncQueue();
+          return;
+        }
+
+        mergeCacheEntry<PaginatedResult<FinansKalem>>(listKey, (prev) => {
+          const base = prev ?? emptyPaginated<FinansKalem>();
+          return {
+            ...base,
+            items: base.items.map((row) => (row.id === item.id ? item : row))
+          };
         });
-        void processSyncQueue();
+        setErrorMessage(getApiErrorMessage(error, "Finans kaydi iptal edilemedi."));
       } finally {
         setCancelOngoingId(null);
       }

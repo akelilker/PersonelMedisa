@@ -98,7 +98,14 @@ export function AppRoutes() {
             </ProtectedRoute>
           }
         />
-        <Route path="bildirimler" element={<BildirimlerPage />} />
+        <Route
+          path="bildirimler"
+          element={
+            <ProtectedRoute requirePermission={ROUTE_PERMISSION.bildirimlerPage}>
+              <BildirimlerPage />
+            </ProtectedRoute>
+          }
+        />
         <Route
           path="bildirimler/:bildirimId"
           element={

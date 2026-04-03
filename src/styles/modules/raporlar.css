@@ -26,6 +26,28 @@
   margin: 0;
 }
 
+.raporlar-source-card {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-md);
+}
+
+.raporlar-source-title,
+.raporlar-source-hint {
+  margin: 0;
+}
+
+.raporlar-source-title {
+  font-weight: 700;
+}
+
+.raporlar-source-hint {
+  font-size: 13px;
+  color: var(--text-muted, #666);
+}
+
 .raporlar-table-wrap {
   overflow-x: auto;
 }

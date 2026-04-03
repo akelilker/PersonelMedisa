@@ -65,6 +65,24 @@
   margin: 0;
 }
 
+.personel-detail-grid {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.personel-detail-section {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-sm);
+}
+
+.personel-detail-section h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
 .personel-edit-form {
   display: grid;
   gap: var(--space-2);

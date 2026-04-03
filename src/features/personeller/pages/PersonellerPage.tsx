@@ -41,6 +41,8 @@ export function PersonellerPage() {
     clearFilters,
     setDraftSearch,
     setDraftAktiflik,
+    setDraftDepartmanId,
+    setDraftPersonelTipiId,
     setPage
   } = usePersoneller();
 
@@ -96,6 +98,8 @@ export function PersonellerPage() {
 
   const { draft } = listQuery;
   const page = listQuery.page;
+  const departmanFilterOptions = toSelectOptions(refs.departmanOptions);
+  const personelTipiFilterOptions = toSelectOptions(refs.personelTipiOptions);
 
   return (
     <section className="personeller-page">
@@ -119,6 +123,48 @@ export function PersonellerPage() {
             value={draft.search}
             onChange={setDraftSearch}
           />
+          {departmanFilterOptions.length > 0 ? (
+            <FormField
+              as="select"
+              label="Bölüm"
+              name="personel-filter-departman"
+              value={draft.departmanId}
+              onChange={setDraftDepartmanId}
+              placeholderOption={{ value: "", label: "Tümü" }}
+              selectOptions={departmanFilterOptions}
+            />
+          ) : (
+            <FormField
+              label="Bölüm"
+              name="personel-filter-departman-num"
+              type="number"
+              min={1}
+              placeholder="Tümü"
+              value={draft.departmanId}
+              onChange={setDraftDepartmanId}
+            />
+          )}
+          {personelTipiFilterOptions.length > 0 ? (
+            <FormField
+              as="select"
+              label="Personel Tipi"
+              name="personel-filter-personel-tipi"
+              value={draft.personelTipiId}
+              onChange={setDraftPersonelTipiId}
+              placeholderOption={{ value: "", label: "Tümü" }}
+              selectOptions={personelTipiFilterOptions}
+            />
+          ) : (
+            <FormField
+              label="Personel Tipi"
+              name="personel-filter-personel-tipi-num"
+              type="number"
+              min={1}
+              placeholder="Tümü"
+              value={draft.personelTipiId}
+              onChange={setDraftPersonelTipiId}
+            />
+          )}
           <FormField
             as="select"
             label="Aktiflik"
@@ -311,7 +357,7 @@ export function PersonellerPage() {
               {refs.departmanOptions.length > 0 ? (
                 <FormField
                   as="select"
-                  label="Departman ID"
+                  label="Bölüm"
                   name="create-departman"
                   value={createForm.departmanId}
                   onChange={(value) => setCreateForm((prev) => ({ ...prev, departmanId: value }))}
@@ -321,7 +367,7 @@ export function PersonellerPage() {
                 />
               ) : (
                 <FormField
-                  label="Departman ID"
+                  label="Bölüm"
                   name="create-departman-num"
                   type="number"
                   min={1}
@@ -333,7 +379,7 @@ export function PersonellerPage() {
               {refs.gorevOptions.length > 0 ? (
                 <FormField
                   as="select"
-                  label="Görev ID"
+                  label="Görev"
                   name="create-gorev"
                   value={createForm.gorevId}
                   onChange={(value) => setCreateForm((prev) => ({ ...prev, gorevId: value }))}
@@ -343,7 +389,7 @@ export function PersonellerPage() {
                 />
               ) : (
                 <FormField
-                  label="Gorev ID"
+                  label="Görev"
                   name="create-gorev-num"
                   type="number"
                   min={1}
@@ -375,7 +421,7 @@ export function PersonellerPage() {
               {refs.personelTipiOptions.length > 0 ? (
                 <FormField
                   as="select"
-                  label="Personel Tipi ID"
+                  label="Personel Tipi"
                   name="create-personel-tipi"
                   value={createForm.personelTipiId}
                   onChange={(value) => setCreateForm((prev) => ({ ...prev, personelTipiId: value }))}
@@ -385,7 +431,7 @@ export function PersonellerPage() {
                 />
               ) : (
                 <FormField
-                  label="Personel Tipi ID"
+                  label="Personel Tipi"
                   name="create-personel-tipi-num"
                   type="number"
                   min={1}

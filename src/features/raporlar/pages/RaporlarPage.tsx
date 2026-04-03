@@ -206,96 +206,12 @@ export function RaporlarPage() {
         <h2>Raporlar</h2>
       </div>
 
-      <div className="raporlar-engine-card">
-        <h3 className="raporlar-engine-title">Önbellek rapor motoru</h3>
-        <p className="raporlar-engine-hint">
-          Ham veri mevcut önbellekte; ek ağ çağrısı yapılmaz. Şube, header&apos;daki aktif şube ile uyumludur.
+      <div className="raporlar-source-card">
+        <p className="raporlar-source-title">Resmi rapor kaynağı backend&apos;dir.</p>
+        <p className="raporlar-source-hint">
+          Bu form `/api/raporlar/*` endpoint&apos;lerinden veri çeker. Aşağıdaki önbellek aracı yalnızca yardımcı
+          inceleme ve demo/offline kullanım içindir.
         </p>
-        <div className="form-field-grid">
-          <FormField
-            as="select"
-            label="Motor türü"
-            name="engine-turu"
-            value={engineType}
-            onChange={(value) => setEngineType(value as ReportEngineType)}
-            selectOptions={ENGINE_OPTIONS}
-          />
-          <FormField
-            label="Personel ID (boş = tümü)"
-            name="engine-personel"
-            type="number"
-            min={1}
-            value={enginePersonelId}
-            onChange={(value) => setEnginePersonelId(value)}
-          />
-          <FormField
-            label="Durum (boş = tümü)"
-            name="engine-durum"
-            value={engineDurum}
-            onChange={(value) => setEngineDurum(value)}
-            placeholder="Örn: AKTİF, TAMAMLANDI"
-          />
-          <FormField
-            label="Tarih başlangıç (yyyy-mm-dd)"
-            name="engine-bas"
-            type="date"
-            value={engineBas}
-            onChange={(value) => setEngineBas(value)}
-          />
-          <FormField
-            label="Tarih bitiş (yyyy-mm-dd)"
-            name="engine-bit"
-            type="date"
-            value={engineBit}
-            onChange={(value) => setEngineBit(value)}
-          />
-        </div>
-        <div className="form-actions-row">
-          <button
-            type="button"
-            className="universal-btn-aux"
-            disabled={engineRows.length === 0}
-            onClick={() => {
-              downloadReportCsv(`rapor-${engineType}.csv`, engineColumns, engineRows);
-            }}
-          >
-            CSV indir
-          </button>
-          <button
-            type="button"
-            className="universal-btn-aux"
-            disabled={engineRows.length === 0}
-            onClick={() => {
-              printCurrentReportWindow(`Rapor: ${engineType}`, engineColumns, engineRows);
-            }}
-          >
-            Yazdır / PDF
-          </button>
-        </div>
-        {engineRows.length === 0 ? (
-          <p className="raporlar-engine-empty">Bu tür için önbellekte satır yok; ilgili modülü bir kez açın.</p>
-        ) : (
-          <div className="raporlar-table-wrap raporlar-engine-table">
-            <table className="raporlar-table">
-              <thead>
-                <tr>
-                  {engineColumns.map((column) => (
-                    <th key={column}>{column}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {engineRows.map((row, index) => (
-                  <tr key={index}>
-                    {engineColumns.map((column) => (
-                      <td key={`${index}-${column}`}>{formatCellValue(column, row[column])}</td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
       </div>
 
       <form className="form-filter-panel" onSubmit={handleSubmit}>
@@ -397,6 +313,98 @@ export function RaporlarPage() {
           </div>
         </div>
       ) : null}
+
+      <div className="raporlar-engine-card">
+        <h3 className="raporlar-engine-title">Yardımcı önbellek aracı</h3>
+        <p className="raporlar-engine-hint">
+          Bu bölüm ağ çağrısı yapmaz; yalnızca bu cihazdaki önbelleği okur. Resmi rapor yerine geçmez.
+        </p>
+        <div className="form-field-grid">
+          <FormField
+            as="select"
+            label="Motor türü"
+            name="engine-turu"
+            value={engineType}
+            onChange={(value) => setEngineType(value as ReportEngineType)}
+            selectOptions={ENGINE_OPTIONS}
+          />
+          <FormField
+            label="Personel ID (boş = tümü)"
+            name="engine-personel"
+            type="number"
+            min={1}
+            value={enginePersonelId}
+            onChange={(value) => setEnginePersonelId(value)}
+          />
+          <FormField
+            label="Durum (boş = tümü)"
+            name="engine-durum"
+            value={engineDurum}
+            onChange={(value) => setEngineDurum(value)}
+            placeholder="Örn: AKTİF, TAMAMLANDI"
+          />
+          <FormField
+            label="Tarih başlangıç (yyyy-mm-dd)"
+            name="engine-bas"
+            type="date"
+            value={engineBas}
+            onChange={(value) => setEngineBas(value)}
+          />
+          <FormField
+            label="Tarih bitiş (yyyy-mm-dd)"
+            name="engine-bit"
+            type="date"
+            value={engineBit}
+            onChange={(value) => setEngineBit(value)}
+          />
+        </div>
+        <div className="form-actions-row">
+          <button
+            type="button"
+            className="universal-btn-aux"
+            disabled={engineRows.length === 0}
+            onClick={() => {
+              downloadReportCsv(`rapor-${engineType}.csv`, engineColumns, engineRows);
+            }}
+          >
+            CSV indir
+          </button>
+          <button
+            type="button"
+            className="universal-btn-aux"
+            disabled={engineRows.length === 0}
+            onClick={() => {
+              printCurrentReportWindow(`Rapor: ${engineType}`, engineColumns, engineRows);
+            }}
+          >
+            Yazdır / PDF
+          </button>
+        </div>
+        {engineRows.length === 0 ? (
+          <p className="raporlar-engine-empty">Bu tür için önbellekte satır yok; ilgili modülü en az bir kez açın.</p>
+        ) : (
+          <div className="raporlar-table-wrap raporlar-engine-table">
+            <table className="raporlar-table">
+              <thead>
+                <tr>
+                  {engineColumns.map((column) => (
+                    <th key={column}>{column}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {engineRows.map((row, index) => (
+                  <tr key={index}>
+                    {engineColumns.map((column) => (
+                      <td key={`${index}-${column}`}>{formatCellValue(column, row[column])}</td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
 
       <div className="module-links">
         <Link to="/finans">Finans modülüne git</Link>

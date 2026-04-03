@@ -171,6 +171,7 @@ export const SURECLER_LIST_ANY: AppPermission[] = ["surecler.view", "surecler.vi
 
 /** Route guard: permission tek kaynak — roller derived. */
 export const ROUTE_PERMISSION = {
+  bildirimlerPage: "bildirimler.view",
   personelDetail: "personeller.detail.view",
   surecDetail: "surecler.detail.view",
   bildirimDetail: "bildirimler.detail.view",

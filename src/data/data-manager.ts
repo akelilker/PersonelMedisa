@@ -48,6 +48,7 @@ import {
 } from "./app-data.types";
 
 const listeners = new Set<() => void>();
+const BILDIRIM_PERSONEL_FETCH_LIMIT = 250;
 
 export function subscribeAppData(onStoreChange: () => void): () => void {
   listeners.add(onStoreChange);
@@ -360,7 +361,7 @@ function resolveFallbackForKey(key: string): unknown {
     return [];
   }
   if (key.startsWith("referans:bildirim-meta")) {
-    return { departman: [], bildirimTuru: [] };
+    return { departman: [], bildirimTuru: [], personeller: [] };
   }
   if (key.startsWith("puantaj:s") || key.startsWith("puantaj:")) {
     return null;
@@ -1090,11 +1091,17 @@ export async function loadDataFromServer(): Promise<void> {
     (async () => {
       const key = dataCacheKeys.bildirimRef();
       try {
-        const [departman, bildirimTuru] = await Promise.all([
+        const [departman, bildirimTuru, personeller] = await Promise.all([
           fetchDepartmanOptions(),
-          fetchBildirimTuruOptions()
+          fetchBildirimTuruOptions(),
+          fetchPersonellerList({
+            aktiflik: "aktif",
+            sube_id: subeQ,
+            page: 1,
+            limit: BILDIRIM_PERSONEL_FETCH_LIMIT
+          })
         ]);
-        setCacheEntry(key, { departman, bildirimTuru });
+        setCacheEntry(key, { departman, bildirimTuru, personeller: personeller.items });
       } catch {
         /* sessiz */
       }

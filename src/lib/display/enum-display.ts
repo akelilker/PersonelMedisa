@@ -5,14 +5,14 @@ import type { ComplianceUyariSeviye, GunlukPuantajState } from "../../types/puan
 const TR_LOCALE = "tr-TR";
 
 const USER_ROLE_LABELS: Record<UserRole, string> = {
-  GENEL_YONETICI: "Genel Yönetici",
-  BOLUM_YONETICISI: "Bölüm Yöneticisi",
+  GENEL_YONETICI: "Genel Yonetici",
+  BOLUM_YONETICISI: "Bolum Yonetici",
   MUHASEBE: "Muhasebe",
   BIRIM_AMIRI: "Birim Amiri"
 };
 
 const UI_PROFILE_LABELS: Record<UiProfile, string> = {
-  yonetim: "Yönetim profili",
+  yonetim: "Yonetim profili",
   birim_amiri: "Birim profili"
 };
 
@@ -22,45 +22,47 @@ const PERSONEL_DURUM_LABELS: Record<string, string> = {
 };
 
 const SUREC_TURU_LABELS: Record<string, string> = {
-  IZIN: "İzin",
+  IZIN: "Izin",
   RAPOR: "Rapor",
-  YILLIK_IZIN: "Yıllık İzin",
-  MAZERET_IZNI: "Mazeret İzni",
-  UCRETSIZ_IZIN: "Ücretsiz İzin",
-  DOGUM_IZNI: "Doğum İzni",
-  EVLILIK_IZNI: "Evlilik İzni",
-  GOREVLENDIRME: "Görevlendirme",
-  EGITIM: "Eğitim"
+  YILLIK_IZIN: "Yillik Izin",
+  MAZERET_IZNI: "Mazeret Izni",
+  UCRETSIZ_IZIN: "Ucretsiz Izin",
+  DOGUM_IZNI: "Dogum Izni",
+  EVLILIK_IZNI: "Evlilik Izni",
+  GOREVLENDIRME: "Gorevlendirme",
+  EGITIM: "Egitim"
 };
 
 const COMMON_STATE_LABELS: Record<string, string> = {
   AKTIF: "Aktif",
   PASIF: "Pasif",
-  ACIK: "Açık",
+  ACIK: "Acik",
   BEKLEMEDE: "Beklemede",
-  HESAPLANDI: "Hesaplandı",
-  IPTAL: "İptal",
-  IPTAL_EDILDI: "İptal Edildi",
-  KAPANDI: "Kapandı",
-  MUHURLENDI: "Mühürlendi",
-  MUHURLU: "Mühürlü",
+  HESAPLANDI: "Hesaplandi",
+  IPTAL: "Iptal",
+  IPTAL_EDILDI: "Iptal Edildi",
+  KAPANDI: "Kapandi",
+  MUHURLENDI: "Muhurlendi",
+  MUHURLU: "Muhurlu",
   OKUNDU: "Okundu",
-  TAMAMLANDI: "Tamamlandı",
+  TAMAMLANDI: "Tamamlandi",
   TASLAK: "Taslak",
   YENI: "Yeni"
 };
 
 const BILDIRIM_TURU_LABELS: Record<string, string> = {
-  DEVAMSIZLIK: "Devamsızlık",
-  GEC_GELDI: "Geç Geldi",
-  GEC_CIKTI: "Geç Çıktı",
+  DEVAMSIZLIK: "Devamsizlik",
+  GEC_GELDI: "Gec Geldi",
+  GEC_CIKTI: "Gec Cikti",
   GELMEDI: "Gelmedi",
-  IPTAL: "İptal",
-  IPTAL_EDILDI: "İptal Edildi",
-  IZINSIZ: "İzinsiz",
-  IZINSIZ_DEVAMSIZLIK: "İzinsiz Devamsızlık",
+  IPTAL: "Iptal",
+  IPTAL_EDILDI: "Iptal Edildi",
+  IZINLI_GELMEDI: "Izinli Gelmedi",
+  IZINSIZ: "Izinsiz",
+  IZINSIZ_GELMEDI: "Izinsiz Gelmedi",
+  IZINSIZ_DEVAMSIZLIK: "Izinsiz Devamsizlik",
   RAPORLU: "Raporlu",
-  UYARI: "Uyarı"
+  UYARI: "Uyari"
 };
 
 const FINANS_KALEM_TURU_LABELS: Record<string, string> = {
@@ -68,8 +70,8 @@ const FINANS_KALEM_TURU_LABELS: Record<string, string> = {
   BONUS: "Bonus",
   CEZA: "Ceza",
   EKSTRA_PRIM: "Ekstra Prim",
-  IKRAMIYE: "İkramiye",
-  MAAS: "Maaş",
+  IKRAMIYE: "Ikramiye",
+  MAAS: "Maas",
   MESAI: "Mesai",
   PRIM: "Prim"
 };
@@ -77,7 +79,7 @@ const FINANS_KALEM_TURU_LABELS: Record<string, string> = {
 const COMPLIANCE_LEVEL_LABELS: Record<string, string> = {
   BILGI: "Bilgi",
   KRITIK: "Kritik",
-  UYARI: "Uyarı"
+  UYARI: "Uyari"
 };
 
 const SPECIAL_TOKEN_LABELS: Record<string, string> = {
@@ -126,7 +128,7 @@ export function formatBooleanLabel(
   }
 
   if (value === false) {
-    return labels.falseLabel ?? "Hayır";
+    return labels.falseLabel ?? "Hayir";
   }
 
   return "-";
@@ -205,7 +207,7 @@ function coerceBooleanValue(value: unknown): boolean | null {
   if (normalized === "true" || normalized === "1" || normalized === "evet") {
     return true;
   }
-  if (normalized === "false" || normalized === "0" || normalized === "hayir" || normalized === "hayır") {
+  if (normalized === "false" || normalized === "0" || normalized === "hayir") {
     return false;
   }
 
@@ -246,7 +248,7 @@ export function formatReportCellValue(column: string, value: unknown): string | 
       if (booleanValue === null) {
         return null;
       }
-      return formatBooleanLabel(booleanValue, { trueLabel: "Okundu", falseLabel: "Okunmadı" });
+      return formatBooleanLabel(booleanValue, { trueLabel: "Okundu", falseLabel: "Okunmadi" });
     }
     default:
       return null;

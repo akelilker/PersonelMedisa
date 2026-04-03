@@ -9,7 +9,7 @@ const users = {
   birimAmiri: { username: "birim_amiri", password: "demo123" }
 };
 
-function modalRouteHeading(page: Page, name: string) {
+function modalRouteHeading(page: Page, name: string | RegExp) {
   return page.locator(".modal-header").first().getByRole("heading", { name });
 }
 
@@ -23,10 +23,10 @@ test.describe("Rol bazli smoke", () => {
     await expect(page.getByRole("heading", { name: "Personeller" })).toBeVisible();
 
     await page.goto("/surecler");
-    await expect(modalRouteHeading(page, "Süreç Takibi")).toBeVisible();
+    await expect(modalRouteHeading(page, /Surec Takibi|Süreç Takibi/i)).toBeVisible();
 
     await page.goto("/puantaj");
-    await expect(modalRouteHeading(page, "Günlük Puantaj")).toBeVisible();
+    await expect(modalRouteHeading(page, /Gunluk Puantaj|Günlük Puantaj/i)).toBeVisible();
 
     await page.goto("/raporlar");
     await expect(modalRouteHeading(page, "Raporlar")).toBeVisible();
@@ -41,7 +41,7 @@ test.describe("Rol bazli smoke", () => {
     await expect(page.getByRole("heading", { name: "Personeller" })).toBeVisible();
 
     await page.goto("/surecler");
-    await expect(modalRouteHeading(page, "Süreç Takibi")).toBeVisible();
+    await expect(modalRouteHeading(page, /Surec Takibi|Süreç Takibi/i)).toBeVisible();
 
     await page.goto("/raporlar");
     await expect(modalRouteHeading(page, "Raporlar")).toBeVisible();
@@ -59,10 +59,16 @@ test.describe("Rol bazli smoke", () => {
     await expect(modalRouteHeading(page, "Finans")).toBeVisible();
   });
 
-  test("Birim amiri finans ve haftalik kapanisa erisemez", async ({ page }) => {
+  test("Birim amiri bildirim akisini kullanir ama finans ve haftalik kapanisa erisemez", async ({ page }) => {
     await mockApi(page, "BIRIM_AMIRI");
     await login(page, users.birimAmiri);
     await expect(page).toHaveURL("/");
+
+    await expect(page.getByTestId("menu-gunluk-durum")).toBeVisible();
+
+    await page.goto("/bildirimler");
+    await expect(modalRouteHeading(page, "Bildirimler")).toBeVisible();
+    await expect(page.getByRole("button", { name: /Gunluk Durum Bildir|Yeni Bildirim/i })).toBeVisible();
 
     await page.goto("/raporlar");
     await expect(modalRouteHeading(page, "Raporlar")).toBeVisible();

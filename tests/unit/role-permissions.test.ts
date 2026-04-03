@@ -22,17 +22,20 @@ describe("role permissions", () => {
     expect(hasRolePermission("MUHASEBE", "finans.cancel")).toBe(true);
   });
 
-  it("keeps birim amiri as read-only for mutating actions", () => {
+  it("keeps birim amiri focused on sube visibility and daily bildirim workflow", () => {
     expect(hasRolePermission("BIRIM_AMIRI", "personeller.view.sube")).toBe(true);
     expect(hasRolePermission("BIRIM_AMIRI", "surecler.view.sube")).toBe(true);
     expect(hasRolePermission("BIRIM_AMIRI", "personeller.view")).toBe(false);
     expect(hasRolePermission("BIRIM_AMIRI", "surecler.view")).toBe(false);
     expect(hasRolePermission("BIRIM_AMIRI", "surecler.detail.view")).toBe(true);
+    expect(hasRolePermission("BIRIM_AMIRI", "bildirimler.view")).toBe(true);
+    expect(hasRolePermission("BIRIM_AMIRI", "bildirimler.create")).toBe(true);
+    expect(hasRolePermission("BIRIM_AMIRI", "bildirimler.update")).toBe(true);
+    expect(hasRolePermission("BIRIM_AMIRI", "bildirimler.cancel")).toBe(true);
     expect(hasRolePermission("BIRIM_AMIRI", "puantaj.view")).toBe(true);
     expect(hasRolePermission("BIRIM_AMIRI", "raporlar.view")).toBe(true);
     expect(hasRolePermission("BIRIM_AMIRI", "personeller.create")).toBe(false);
     expect(hasRolePermission("BIRIM_AMIRI", "surecler.update")).toBe(false);
-    expect(hasRolePermission("BIRIM_AMIRI", "bildirimler.cancel")).toBe(false);
     expect(hasRolePermission("BIRIM_AMIRI", "puantaj.update")).toBe(false);
     expect(hasRolePermission("BIRIM_AMIRI", "haftalik-kapanis.view")).toBe(false);
     expect(hasRolePermission("BIRIM_AMIRI", "haftalik-kapanis.close")).toBe(false);

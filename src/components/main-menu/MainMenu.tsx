@@ -10,14 +10,16 @@ type MainMenuProps = {
 export function MainMenu({ onKayitOpen }: MainMenuProps) {
   const location = useLocation();
   const navigate = useNavigate();
-  const { hasPermission } = useRoleAccess();
+  const { hasPermission, uiProfile } = useRoleAccess();
 
   const canKayitSection = hasPermission("personeller.create") || hasPermission("surecler.create");
   const canViewPersoneller = hasPermission("personeller.view") || hasPermission("personeller.view.sube");
   const canViewRaporlar = hasPermission("raporlar.view");
+  const canOpenDailyStatus = uiProfile === "birim_amiri" && hasPermission("bildirimler.create");
 
   const { pathname } = location;
   const isGirisSurecActive = pathname.startsWith("/surecler");
+  const isBildirimlerActive = pathname.startsWith("/bildirimler");
   const isPersonelActive = pathname.startsWith("/personeller");
   const isRaporlarActive = pathname.startsWith("/raporlar");
 
@@ -35,6 +37,20 @@ export function MainMenu({ onKayitOpen }: MainMenuProps) {
           }}
         >
           <div className="ttl">Personel Giriş ve Süreç Takibi</div>
+        </button>
+      ) : null}
+
+      {canOpenDailyStatus ? (
+        <button
+          type="button"
+          className={`menu-btn${isBildirimlerActive ? " is-active" : ""}`}
+          aria-current={isBildirimlerActive ? "page" : undefined}
+          data-testid="menu-gunluk-durum"
+          onClick={() => {
+            navigate("/bildirimler", { state: { openCreateModal: true } });
+          }}
+        >
+          <div className="ttl">Günlük Durum Bildir</div>
         </button>
       ) : null}
 

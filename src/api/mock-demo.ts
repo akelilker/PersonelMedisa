@@ -145,6 +145,16 @@ const demoState: {
       aciklama: "Demo bildirim",
       state: "AKTIF",
       okundu_mi: false
+    },
+    {
+      id: 702,
+      tarih: "2026-04-10",
+      departman_id: 2,
+      personel_id: 2,
+      bildirim_turu: "IZINLI_GELMEDI",
+      aciklama: "Onayli izin nedeniyle bugun yok.",
+      state: "AKTIF",
+      okundu_mi: false
     }
   ],
   finansKalemleri: [
@@ -378,7 +388,13 @@ export function resolveDemoApiResponse(
     });
 
     const start = (page - 1) * limit;
-    const items = filtered.slice(start, start + limit);
+    const items = filtered.slice(start, start + limit).map((item) => ({
+      ...item,
+      departman_adi: getLabel(DEMO_DEPARTMAN_LABELS, item.departman_id),
+      gorev_adi: getLabel(DEMO_GOREV_LABELS, item.gorev_id),
+      personel_tipi_adi: getLabel(DEMO_PERSONEL_TIPI_LABELS, item.personel_tipi_id),
+      bagli_amir_adi: getLabel(DEMO_BAGLI_AMIR_LABELS, item.bagli_amir_id)
+    }));
     const total = filtered.length;
     const totalPages = Math.max(1, Math.ceil(total / limit));
 
@@ -488,7 +504,43 @@ export function resolveDemoApiResponse(
   }
 
   if (pathname === "/bildirimler" && method === "GET") {
-    return ok({ items: demoState.bildirimler });
+    const page = toNumber(requestUrl.searchParams.get("page")) ?? 1;
+    const limit = toNumber(requestUrl.searchParams.get("limit")) ?? 10;
+    const tarih = toStringValue(requestUrl.searchParams.get("tarih"));
+    const departmanId = toNumber(requestUrl.searchParams.get("departman_id"));
+    const personelId = toNumber(requestUrl.searchParams.get("personel_id"));
+    const bildirimTuru = toStringValue(requestUrl.searchParams.get("bildirim_turu"));
+
+    const filtered = demoState.bildirimler.filter((item) => {
+      if (tarih && item.tarih !== tarih) {
+        return false;
+      }
+      if (departmanId !== null && item.departman_id !== departmanId) {
+        return false;
+      }
+      if (personelId !== null && item.personel_id !== personelId) {
+        return false;
+      }
+      if (bildirimTuru && item.bildirim_turu !== bildirimTuru) {
+        return false;
+      }
+      return true;
+    });
+
+    const start = (page - 1) * limit;
+    const items = filtered.slice(start, start + limit);
+    const total = filtered.length;
+    const totalPages = Math.max(1, Math.ceil(total / limit));
+
+    return ok(
+      { items },
+      {
+        page,
+        limit,
+        total,
+        total_pages: totalPages
+      }
+    );
   }
 
   if (pathname === "/bildirimler" && method === "POST") {
@@ -606,6 +658,9 @@ export function resolveDemoApiResponse(
     if (pathname === "/referans/bildirim-turleri") {
       return ok([
         { key: "GEC_GELDI", label: "Gec Geldi" },
+        { key: "GELMEDI", label: "Gelmedi" },
+        { key: "IZINLI_GELMEDI", label: "Izinli Gelmedi" },
+        { key: "IZINSIZ_GELMEDI", label: "Izinsiz Gelmedi" },
         { key: "DEVAMSIZLIK", label: "Devamsızlık" },
         { key: "RAPORLU", label: "Raporlu" }
       ]);

@@ -93,25 +93,30 @@ Yetkili kullanıcı devamsızlık, hastalık raporu veya benzeri yokluk sürecin
 - İlgili hesap başlıkları `04-hesap-motoru-kurallari.md` kurallarına göre üretilir.
 - Manuel kullanıcı yorumu ile sistem hesabı birbirine karışmaz.
 
-## 4. Bildirim Degerlendirme Senaryosu
+## 4. Gunluk Durum Bildirimi ve Bildirim Degerlendirme Senaryosu
 
 ### 4.1 Tetikleyici
 
-Kullanıcı header sağ üstteki bildirim ikonundan paneli açar.
+Bir birim amiri gunluk durum girmek ister ya da kullanici header sag ustteki bildirim ikonundan paneli acar.
 
 ### 4.2 Akış
 
-- Sistem okunmamış bildirimleri listeler.
-- Kullanıcı bildirimi okur, gerekirse ilgili ekrana gider.
-- Bildirim ilk sürümde otomatik süreçe dönüşmez.
-- Operasyon gerekiyorsa kullanıcı ilgili süreç veya kayıt ekranında ayrı işlem yapar.
+- Birim amiri `Bildirimler` ekranindan personel secer.
+- Sistem secilen personelin bolumunu ve hizli iletisim bilgilerini ayni ekranda gosterir.
+- Amir `GEC_GELDI`, `GELMEDI`, `IZINLI_GELMEDI`, `IZINSIZ_GELMEDI` veya `RAPORLU` tiplerinden birini secerek kayit girer.
+- Gunluk durum bildirimi bildirim kaydi olarak yazilir; surece otomatik donusmez.
+- Sistem okunmamis bildirimleri listeler.
+- Kullanici bildirimi okur, gerekirse ilgili ekrana gider.
+- Bildirim ilk surumde otomatik surece donusmez.
+- Operasyon gerekiyorsa kullanici ilgili surec veya kayit ekraninda ayri islem yapar.
 
 ### 4.3 Sistem Etkisi
 
-- Bildirimin okunma durumu güncellenir (`okundu_mi`, `PUT /api/bildirimler/{bildirimId}`; ayrıntı `05-state-flow-api-kontrati.md`).
-- Takvim hatırlatmaları (ör. maaş / SGK) kayıt tabanlı bildirim değildir; okundu bilgisi yalnızca istemci oturumunda tutulur.
-- Bildirim ile süreç kaydı birbirine otomatik bağlanmaz.
-- Uyarı katmanı ile işlem katmanı bilinçli olarak ayrılır.
+- Birim amiri personel kartindaki telefon, acil durum kisisi, acil telefon ve kan grubu gibi bilgilere hizli ulasir.
+- Bildirimin okunma durumu guncellenir (`okundu_mi`, `PUT /api/bildirimler/{bildirimId}`; ayrinti `05-state-flow-api-kontrati.md`).
+- Takvim hatirlatmalari (or. maas / SGK) kayit tabanli bildirim degildir; okundu bilgisi yalnizca istemci oturumunda tutulur.
+- Bildirim ile surec kaydi birbirine otomatik baglanmaz.
+- Uyari katmani ile islem katmani bilincli olarak ayrilir.
 
 ## 5. Isten Ayrilma Senaryosu
 

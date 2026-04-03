@@ -24,16 +24,40 @@
 }
 
 .personeller-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
   gap: var(--space-2);
   padding: var(--space-2);
   border: 1px solid var(--line-soft);
   border-radius: var(--radius-sm);
 }
 
-.personeller-item p {
+.personeller-item-content {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.personeller-item-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.personeller-status-badge,
+.personeller-meta-badge {
+  border: 1px solid var(--line-soft);
+  border-radius: 999px;
+  padding: 2px 8px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.personeller-item-meta {
+  display: grid;
+  gap: 4px;
+}
+
+.personeller-item-meta p {
   margin: 0;
 }
 
@@ -68,6 +92,7 @@
 .personel-detail-grid {
   display: grid;
   gap: var(--space-2);
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 }
 
 .personel-detail-section {
@@ -83,7 +108,19 @@
   font-size: 1rem;
 }
 
+.personel-detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
 .personel-edit-form {
   display: grid;
   gap: var(--space-2);
+}
+
+@media (max-width: 720px) {
+  .personeller-item {
+    grid-template-columns: 1fr;
+  }
 }

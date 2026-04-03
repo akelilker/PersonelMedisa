@@ -23,13 +23,18 @@
 }
 
 .bildirimler-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
   gap: var(--space-2);
   padding: var(--space-2);
   border: 1px solid var(--line-soft);
   border-radius: var(--radius-sm);
+}
+
+.bildirimler-item-content {
+  display: grid;
+  gap: 4px;
 }
 
 .bildirimler-item p {
@@ -44,6 +49,37 @@
 .bildirim-form-error {
   margin: 0;
   color: var(--red);
+}
+
+.bildirim-personel-context {
+  display: grid;
+  gap: 6px;
+  padding: var(--space-2);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.bildirim-personel-context p {
+  margin: 0;
+}
+
+.bildirim-quick-types {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-sm);
+}
+
+.bildirim-quick-types-label {
+  font-weight: 600;
+}
+
+.bildirim-quick-types-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
 }
 
 .bildirim-detay-page {
@@ -61,4 +97,10 @@
 
 .bildirim-detail-card p {
   margin: 0;
+}
+
+@media (max-width: 720px) {
+  .bildirimler-item {
+    grid-template-columns: 1fr;
+  }
 }

@@ -115,6 +115,9 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "surecler.view.sube",
     "surecler.detail.view",
     "bildirimler.view",
+    "bildirimler.create",
+    "bildirimler.update",
+    "bildirimler.cancel",
     "bildirimler.detail.view",
     "puantaj.view",
     "raporlar.view"

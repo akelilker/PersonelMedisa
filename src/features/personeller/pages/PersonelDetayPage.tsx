@@ -29,6 +29,15 @@ function formatReferenceValue(label?: string, id?: number) {
   return typeof id === "number" ? `#${id}` : "-";
 }
 
+function digitsOnly(value: string | null | undefined) {
+  return (value ?? "").replace(/\D+/g, "");
+}
+
+function buildTelHref(value: string | null | undefined) {
+  const digits = digitsOnly(value);
+  return digits ? `tel:${digits}` : null;
+}
+
 export function PersonelDetayPage() {
   const { personelId } = useParams();
   const parsedPersonelId = Number.parseInt(personelId ?? "", 10);
@@ -56,35 +65,25 @@ export function PersonelDetayPage() {
     { value: "PASIF", label: formatAktifDurumLabel("PASIF") }
   ];
 
+  const personelCallHref = buildTelHref(personel?.telefon);
+  const emergencyCallHref = buildTelHref(personel?.acil_durum_telefon);
+
   function handleEditSubmit(event: FormEvent<HTMLFormElement>) {
     void updatePersonelHandler(event, canEditPersonel);
   }
 
-  function cancelEdit() {
-    if (!personel) {
-      return;
-    }
-    setIsEditing(false);
-    setEditForm({
-      ad: personel.ad,
-      soyad: personel.soyad,
-      telefon: personel.telefon ?? "",
-      aktifDurum: personel.aktif_durum
-    });
-  }
-
   return (
     <section className="personel-detay-page">
-      <h2>Personel Detayı</h2>
+      <h2>Personel Detayi</h2>
 
-      {isLoading ? <LoadingState label="Personel detayı yükleniyor..." /> : null}
+      {isLoading ? <LoadingState label="Personel detayi yukleniyor..." /> : null}
 
       {!isLoading && errorMessage ? (
         <ErrorState message={errorMessage} onRetry={() => void refetch()} />
       ) : null}
 
       {!isLoading && !errorMessage && !personel ? (
-        <EmptyState title="Personel bulunamadı" message="Belirtilen ID ile kayıt bulunamadı." />
+        <EmptyState title="Personel bulunamadi" message="Belirtilen ID ile kayit bulunamadi." />
       ) : null}
 
       {!isLoading && !errorMessage && personel ? (
@@ -104,10 +103,10 @@ export function PersonelDetayPage() {
                     <strong>Telefon:</strong> {formatDetailValue(personel.telefon)}
                   </p>
                   <p>
-                    <strong>Doğum Tarihi:</strong> {formatDetailValue(personel.dogum_tarihi)}
+                    <strong>Dogum Tarihi:</strong> {formatDetailValue(personel.dogum_tarihi)}
                   </p>
                   <p>
-                    <strong>Doğum Yeri:</strong> {formatDetailValue(personel.dogum_yeri)}
+                    <strong>Dogum Yeri:</strong> {formatDetailValue(personel.dogum_yeri)}
                   </p>
                   <p>
                     <strong>Kan Grubu:</strong> {formatDetailValue(personel.kan_grubu)}
@@ -116,7 +115,7 @@ export function PersonelDetayPage() {
                     <strong>Sicil No:</strong> {formatDetailValue(personel.sicil_no)}
                   </p>
                   <p>
-                    <strong>İşe Giriş Tarihi:</strong> {formatDetailValue(personel.ise_giris_tarihi)}
+                    <strong>Ise Giris Tarihi:</strong> {formatDetailValue(personel.ise_giris_tarihi)}
                   </p>
                   <p>
                     <strong>Durum:</strong> {formatAktifDurumLabel(personel.aktif_durum)}
@@ -126,20 +125,20 @@ export function PersonelDetayPage() {
                 <section className="personel-detail-section">
                   <h3>Referanslar</h3>
                   <p>
-                    <strong>Bölüm:</strong> {formatReferenceValue(personel.departman_adi, personel.departman_id)}
+                    <strong>Bolum:</strong> {formatReferenceValue(personel.departman_adi, personel.departman_id)}
                   </p>
                   <p>
-                    <strong>Görev:</strong> {formatReferenceValue(personel.gorev_adi, personel.gorev_id)}
+                    <strong>Gorev:</strong> {formatReferenceValue(personel.gorev_adi, personel.gorev_id)}
                   </p>
                   <p>
                     <strong>Personel Tipi:</strong>{" "}
                     {formatReferenceValue(personel.personel_tipi_adi, personel.personel_tipi_id)}
                   </p>
                   <p>
-                    <strong>Bağlı Amir:</strong> {formatReferenceValue(personel.bagli_amir_adi, personel.bagli_amir_id)}
+                    <strong>Bagli Amir:</strong> {formatReferenceValue(personel.bagli_amir_adi, personel.bagli_amir_id)}
                   </p>
                   <p>
-                    <strong>Acil Durum Kişisi:</strong> {formatDetailValue(personel.acil_durum_kisi)}
+                    <strong>Acil Durum Kisisi:</strong> {formatDetailValue(personel.acil_durum_kisi)}
                   </p>
                   <p>
                     <strong>Acil Durum Telefonu:</strong> {formatDetailValue(personel.acil_durum_telefon)}
@@ -147,18 +146,18 @@ export function PersonelDetayPage() {
                 </section>
 
                 <section className="personel-detail-section">
-                  <h3>Sistem Özeti</h3>
+                  <h3>Sistem Ozeti</h3>
                   <p>
-                    <strong>Hizmet Süresi:</strong> {formatDetailValue(personel.hizmet_suresi)}
+                    <strong>Hizmet Suresi:</strong> {formatDetailValue(personel.hizmet_suresi)}
                   </p>
                   <p>
-                    <strong>Toplam İzin Hakkı:</strong> {formatDetailNumber(personel.toplam_izin_hakki)}
+                    <strong>Toplam Izin Hakki:</strong> {formatDetailNumber(personel.toplam_izin_hakki)}
                   </p>
                   <p>
-                    <strong>Kullanılan İzin:</strong> {formatDetailNumber(personel.kullanilan_izin)}
+                    <strong>Kullanilan Izin:</strong> {formatDetailNumber(personel.kullanilan_izin)}
                   </p>
                   <p>
-                    <strong>Kalan İzin:</strong> {formatDetailNumber(personel.kalan_izin)}
+                    <strong>Kalan Izin:</strong> {formatDetailNumber(personel.kalan_izin)}
                   </p>
                   <p>
                     <strong>Pasiflik Etiketi:</strong> {formatDetailValue(personel.pasiflik_durumu_etiketi)}
@@ -166,11 +165,23 @@ export function PersonelDetayPage() {
                 </section>
               </div>
 
-              {canEditPersonel ? (
-                <button type="button" className="universal-btn-aux" onClick={() => setIsEditing(true)}>
-                  Düzenle
-                </button>
-              ) : null}
+              <div className="personel-detail-actions">
+                {personelCallHref ? (
+                  <a className="universal-btn-aux" href={personelCallHref}>
+                    Personeli Ara
+                  </a>
+                ) : null}
+                {emergencyCallHref ? (
+                  <a className="universal-btn-aux" href={emergencyCallHref}>
+                    Acil Kisiyi Ara
+                  </a>
+                ) : null}
+                {canEditPersonel ? (
+                  <button type="button" className="universal-btn-aux" onClick={() => setIsEditing(true)}>
+                    Duzenle
+                  </button>
+                ) : null}
+              </div>
             </>
           ) : (
             <form className="personel-edit-form" onSubmit={handleEditSubmit}>
@@ -213,7 +224,7 @@ export function PersonelDetayPage() {
                   {isSubmitting ? "Kaydediliyor..." : "Kaydet"}
                 </button>
                 <button type="button" className="universal-btn-aux" onClick={discardEdit} disabled={isSubmitting}>
-                  Vazgeç
+                  Vazgec
                 </button>
               </div>
             </form>

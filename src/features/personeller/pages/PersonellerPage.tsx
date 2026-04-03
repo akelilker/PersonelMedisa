@@ -18,6 +18,23 @@ function toSelectOptions(options: IdOption[]) {
   return options.map((option) => ({ value: String(option.id), label: option.label }));
 }
 
+function digitsOnly(value: string | null | undefined) {
+  return (value ?? "").replace(/\D+/g, "");
+}
+
+function buildTelHref(value: string | null | undefined) {
+  const digits = digitsOnly(value);
+  return digits ? `tel:${digits}` : null;
+}
+
+function formatReferenceValue(label: string | undefined, id: number | undefined) {
+  if (label) {
+    return label;
+  }
+
+  return typeof id === "number" ? `#${id}` : "-";
+}
+
 export function PersonellerPage() {
   const {
     listQuery,
@@ -76,7 +93,7 @@ export function PersonellerPage() {
   }
 
   const aktiflikSelectOptions = [
-    { value: "tum", label: "Tüm" },
+    { value: "tum", label: "Tumu" },
     { value: "aktif", label: "Aktif" },
     { value: "pasif", label: "Pasif" }
   ];
@@ -126,20 +143,20 @@ export function PersonellerPage() {
           {departmanFilterOptions.length > 0 ? (
             <FormField
               as="select"
-              label="Bölüm"
+              label="Bolum"
               name="personel-filter-departman"
               value={draft.departmanId}
               onChange={setDraftDepartmanId}
-              placeholderOption={{ value: "", label: "Tümü" }}
+              placeholderOption={{ value: "", label: "Tumu" }}
               selectOptions={departmanFilterOptions}
             />
           ) : (
             <FormField
-              label="Bölüm"
+              label="Bolum"
               name="personel-filter-departman-num"
               type="number"
               min={1}
-              placeholder="Tümü"
+              placeholder="Tumu"
               value={draft.departmanId}
               onChange={setDraftDepartmanId}
             />
@@ -151,7 +168,7 @@ export function PersonellerPage() {
               name="personel-filter-personel-tipi"
               value={draft.personelTipiId}
               onChange={setDraftPersonelTipiId}
-              placeholderOption={{ value: "", label: "Tümü" }}
+              placeholderOption={{ value: "", label: "Tumu" }}
               selectOptions={personelTipiFilterOptions}
             />
           ) : (
@@ -160,7 +177,7 @@ export function PersonellerPage() {
               name="personel-filter-personel-tipi-num"
               type="number"
               min={1}
-              placeholder="Tümü"
+              placeholder="Tumu"
               value={draft.personelTipiId}
               onChange={setDraftPersonelTipiId}
             />
@@ -185,7 +202,7 @@ export function PersonellerPage() {
         </div>
       </form>
 
-      {isLoading ? <LoadingState label="Personel verileri yükleniyor..." /> : null}
+      {isLoading ? <LoadingState label="Personel verileri yukleniyor..." /> : null}
 
       {!isLoading && errorMessage ? (
         <ErrorState message={errorMessage} onRetry={() => void refetch()} />
@@ -193,22 +210,65 @@ export function PersonellerPage() {
 
       {!isLoading && !errorMessage && personeller.length === 0 ? (
         <EmptyState
-          title="Personel kaydı bulunamadı"
+          title="Personel kaydi bulunamadi"
           message="Filtre veya kaynak veri durumunu kontrol et."
         />
       ) : null}
 
       {!isLoading && !errorMessage && personeller.length > 0 ? (
         <ul className="personeller-list">
-          {personeller.map((personel: Personel) => (
-            <li key={personel.id} className="personeller-item">
-              <div>
-                <strong>{`${personel.ad} ${personel.soyad}`}</strong>
-                <p>Durum: {formatAktifDurumLabel(personel.aktif_durum)}</p>
-              </div>
-              {canOpenDetail ? <Link to={`/personeller/${personel.id}`}>Detay</Link> : null}
-            </li>
-          ))}
+          {personeller.map((personel: Personel) => {
+            const personelCallHref = buildTelHref(personel.telefon);
+            const emergencyCallHref = buildTelHref(personel.acil_durum_telefon);
+            const hasActions = Boolean(personelCallHref || emergencyCallHref || canOpenDetail);
+
+            return (
+              <li key={personel.id} className="personeller-item">
+                <div className="personeller-item-content">
+                  <strong>{`${personel.ad} ${personel.soyad}`}</strong>
+                  <div className="personeller-item-badges">
+                    <span className="badge personeller-status-badge">
+                      {formatAktifDurumLabel(personel.aktif_durum)}
+                    </span>
+                    {personel.kan_grubu ? (
+                      <span className="badge personeller-meta-badge">Kan: {personel.kan_grubu}</span>
+                    ) : null}
+                  </div>
+                  <div className="personeller-item-meta">
+                    <p>
+                      Bolum: {formatReferenceValue(personel.departman_adi, personel.departman_id)}
+                      {" | "}
+                      Gorev: {formatReferenceValue(personel.gorev_adi, personel.gorev_id)}
+                    </p>
+                    <p>Telefon: {personel.telefon ?? "-"}</p>
+                    <p>
+                      Acil Durum: {personel.acil_durum_kisi ?? "-"}
+                      {personel.acil_durum_telefon ? ` | ${personel.acil_durum_telefon}` : ""}
+                    </p>
+                  </div>
+                </div>
+                {hasActions ? (
+                  <div className="module-item-actions">
+                    {personelCallHref ? (
+                      <a className="universal-btn-aux" href={personelCallHref}>
+                        Ara
+                      </a>
+                    ) : null}
+                    {emergencyCallHref ? (
+                      <a className="universal-btn-aux" href={emergencyCallHref}>
+                        Acil Ara
+                      </a>
+                    ) : null}
+                    {canOpenDetail ? (
+                      <Link to={`/personeller/${personel.id}`} className="universal-btn-aux">
+                        Detay
+                      </Link>
+                    ) : null}
+                  </div>
+                ) : null}
+              </li>
+            );
+          })}
         </ul>
       ) : null}
 
@@ -219,7 +279,7 @@ export function PersonellerPage() {
           onClick={() => setPage((prev) => Math.max(1, prev - 1))}
           disabled={isLoading || page <= 1}
         >
-          Önceki
+          Onceki
         </button>
         <span className="module-page-info">
           Sayfa {page}
@@ -236,7 +296,7 @@ export function PersonellerPage() {
       </div>
 
       <div className="module-links">
-        <Link to="/surecler">Süreç takibe git</Link>
+        <Link to="/surecler">Surec takibe git</Link>
         <Link to="/bildirimler">Bildirimlere git</Link>
         <Link to="/puantaj">Puantaja git</Link>
       </div>
@@ -261,7 +321,7 @@ export function PersonellerPage() {
                 onClick={closeCreateModal}
                 disabled={isCreateSubmitting}
               >
-                Vazgeç
+                Vazgec
               </button>
             </div>
           }
@@ -276,7 +336,9 @@ export function PersonellerPage() {
                 label="T.C. Kimlik No"
                 name="create-tc"
                 value={createForm.tcKimlikNo}
-                onChange={(value) => setCreateForm((prev: CreatePersonelFormState) => ({ ...prev, tcKimlikNo: value }))}
+                onChange={(value) =>
+                  setCreateForm((prev: CreatePersonelFormState) => ({ ...prev, tcKimlikNo: value }))
+                }
                 required
               />
               <FormField
@@ -294,7 +356,7 @@ export function PersonellerPage() {
                 required
               />
               <FormField
-                label="Doğum Tarihi"
+                label="Dogum Tarihi"
                 name="create-dogum"
                 type="date"
                 value={createForm.dogumTarihi}
@@ -310,7 +372,7 @@ export function PersonellerPage() {
                 required
               />
               <FormField
-                label="Acil Durum Kişisi"
+                label="Acil Durum Kisisi"
                 name="create-acil-kisi"
                 value={createForm.acilDurumKisi}
                 onChange={(value) => setCreateForm((prev) => ({ ...prev, acilDurumKisi: value }))}
@@ -325,7 +387,7 @@ export function PersonellerPage() {
                 required
               />
               <FormField
-                label="Doğum Yeri"
+                label="Dogum Yeri"
                 name="create-dogum-yeri"
                 value={createForm.dogumYeri}
                 onChange={(value) => setCreateForm((prev) => ({ ...prev, dogumYeri: value }))}
@@ -336,7 +398,7 @@ export function PersonellerPage() {
                 name="create-kan"
                 value={createForm.kanGrubu}
                 onChange={(value) => setCreateForm((prev) => ({ ...prev, kanGrubu: value }))}
-                placeholderOption={{ value: "", label: "Seçiniz" }}
+                placeholderOption={{ value: "", label: "Seciniz" }}
                 selectOptions={kanGrubuOptions}
               />
               <FormField
@@ -347,7 +409,7 @@ export function PersonellerPage() {
                 required
               />
               <FormField
-                label="İşe Giriş Tarihi"
+                label="Ise Giris Tarihi"
                 name="create-ise-giris"
                 type="date"
                 value={createForm.iseGirisTarihi}
@@ -357,17 +419,17 @@ export function PersonellerPage() {
               {refs.departmanOptions.length > 0 ? (
                 <FormField
                   as="select"
-                  label="Bölüm"
+                  label="Bolum"
                   name="create-departman"
                   value={createForm.departmanId}
                   onChange={(value) => setCreateForm((prev) => ({ ...prev, departmanId: value }))}
                   required
-                  placeholderOption={{ value: "", label: "Seçiniz" }}
+                  placeholderOption={{ value: "", label: "Seciniz" }}
                   selectOptions={toSelectOptions(refs.departmanOptions)}
                 />
               ) : (
                 <FormField
-                  label="Bölüm"
+                  label="Bolum"
                   name="create-departman-num"
                   type="number"
                   min={1}
@@ -379,17 +441,17 @@ export function PersonellerPage() {
               {refs.gorevOptions.length > 0 ? (
                 <FormField
                   as="select"
-                  label="Görev"
+                  label="Gorev"
                   name="create-gorev"
                   value={createForm.gorevId}
                   onChange={(value) => setCreateForm((prev) => ({ ...prev, gorevId: value }))}
                   required
-                  placeholderOption={{ value: "", label: "Seçiniz" }}
+                  placeholderOption={{ value: "", label: "Seciniz" }}
                   selectOptions={toSelectOptions(refs.gorevOptions)}
                 />
               ) : (
                 <FormField
-                  label="Görev"
+                  label="Gorev"
                   name="create-gorev-num"
                   type="number"
                   min={1}
@@ -401,16 +463,16 @@ export function PersonellerPage() {
               {refs.bagliAmirOptions.length > 0 ? (
                 <FormField
                   as="select"
-                  label="Bağlı Amir"
+                  label="Bagli Amir"
                   name="create-bagli-amir"
                   value={createForm.bagliAmirId}
                   onChange={(value) => setCreateForm((prev) => ({ ...prev, bagliAmirId: value }))}
-                  placeholderOption={{ value: "", label: "Seçiniz" }}
+                  placeholderOption={{ value: "", label: "Seciniz" }}
                   selectOptions={toSelectOptions(refs.bagliAmirOptions)}
                 />
               ) : (
                 <FormField
-                  label="Bağlı Amir"
+                  label="Bagli Amir"
                   name="create-bagli-amir-num"
                   type="number"
                   min={1}
@@ -426,7 +488,7 @@ export function PersonellerPage() {
                   value={createForm.personelTipiId}
                   onChange={(value) => setCreateForm((prev) => ({ ...prev, personelTipiId: value }))}
                   required
-                  placeholderOption={{ value: "", label: "Seçiniz" }}
+                  placeholderOption={{ value: "", label: "Seciniz" }}
                   selectOptions={toSelectOptions(refs.personelTipiOptions)}
                 />
               ) : (

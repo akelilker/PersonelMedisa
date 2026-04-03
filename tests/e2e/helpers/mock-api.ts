@@ -27,6 +27,77 @@ async function fulfillJson(route: Route, status: number, body: string) {
 }
 
 export async function mockApi(page: Page, role: MockUserRole) {
+  const personeller: Array<{
+    id: number;
+    tc_kimlik_no: string;
+    ad: string;
+    soyad: string;
+    aktif_durum: "AKTIF" | "PASIF";
+    telefon?: string;
+    dogum_tarihi?: string;
+    dogum_yeri?: string;
+    kan_grubu?: string;
+    sicil_no?: string;
+    ise_giris_tarihi?: string;
+    acil_durum_kisi?: string;
+    acil_durum_telefon?: string;
+    departman_id?: number;
+    gorev_id?: number;
+    personel_tipi_id?: number;
+    bagli_amir_id?: number;
+    departman_adi?: string;
+    gorev_adi?: string;
+    personel_tipi_adi?: string;
+    bagli_amir_adi?: string;
+  }> = [
+    {
+      id: 1,
+      tc_kimlik_no: "12345678901",
+      ad: "Ayse",
+      soyad: "Yilmaz",
+      aktif_durum: "AKTIF",
+      telefon: "05550000000",
+      dogum_tarihi: "1992-03-14",
+      dogum_yeri: "Istanbul",
+      kan_grubu: "A Rh+",
+      sicil_no: "P-001",
+      ise_giris_tarihi: "2023-02-01",
+      acil_durum_kisi: "Fatma Yilmaz",
+      acil_durum_telefon: "05553334455",
+      departman_id: 3,
+      gorev_id: 1,
+      personel_tipi_id: 1,
+      bagli_amir_id: 9,
+      departman_adi: "Operasyon",
+      gorev_adi: "Uzman",
+      personel_tipi_adi: "Tam Zamanli",
+      bagli_amir_adi: "Demo Amir"
+    },
+    {
+      id: 2,
+      tc_kimlik_no: "23456789012",
+      ad: "Mehmet",
+      soyad: "Kaya",
+      aktif_durum: "AKTIF",
+      telefon: "05551111111",
+      dogum_tarihi: "1989-11-02",
+      dogum_yeri: "Ankara",
+      kan_grubu: "0 Rh+",
+      sicil_no: "P-002",
+      ise_giris_tarihi: "2024-07-15",
+      acil_durum_kisi: "Zeynep Kaya",
+      acil_durum_telefon: "05556667788",
+      departman_id: 2,
+      gorev_id: 2,
+      personel_tipi_id: 2,
+      bagli_amir_id: 9,
+      departman_adi: "Muhasebe",
+      gorev_adi: "Sef",
+      personel_tipi_adi: "Yari Zamanli",
+      bagli_amir_adi: "Demo Amir"
+    }
+  ];
+
   const surecler: Array<{
     id: number;
     personel_id: number;
@@ -59,6 +130,7 @@ export async function mockApi(page: Page, role: MockUserRole) {
     bildirim_turu: string;
     aciklama?: string;
     state: string;
+    okundu_mi?: boolean;
   }> = [
     {
       id: 701,
@@ -67,7 +139,8 @@ export async function mockApi(page: Page, role: MockUserRole) {
       personel_id: 1,
       bildirim_turu: "GEC_GELDI",
       aciklama: "Mevcut bildirim",
-      state: "AKTIF"
+      state: "AKTIF",
+      okundu_mi: false
     }
   ];
 
@@ -110,16 +183,19 @@ export async function mockApi(page: Page, role: MockUserRole) {
     const method = request.method();
 
     if (path === "/api/auth/login" && method === "POST") {
+      const subeIds = role === "BIRIM_AMIRI" ? [1] : role === "MUHASEBE" ? [1, 2] : [];
       await fulfillJson(
         route,
         200,
         okBody({
           token: "mock-token",
           ui_profile: role === "BIRIM_AMIRI" ? "birim_amiri" : "yonetim",
+          sube_list: subeIds.map((id) => ({ id, ad: id === 1 ? "Merkez" : `Sube ${id}` })),
           user: {
             id: 1,
             ad_soyad: "Mock Kullanici",
-            rol: role
+            rol: role,
+            sube_ids: subeIds
           }
         })
       );
@@ -127,20 +203,49 @@ export async function mockApi(page: Page, role: MockUserRole) {
     }
 
     if (path === "/api/personeller" && method === "GET") {
+      const pageNumber = Number.parseInt(url.searchParams.get("page") ?? "1", 10) || 1;
+      const pageLimit = Number.parseInt(url.searchParams.get("limit") ?? "10", 10) || 10;
+      const search = (url.searchParams.get("search") ?? "").toLowerCase();
+      const departmanId = Number.parseInt(url.searchParams.get("departman_id") ?? "", 10);
+      const personelTipiId = Number.parseInt(url.searchParams.get("personel_tipi_id") ?? "", 10);
+      const aktiflik = url.searchParams.get("aktiflik") ?? "tum";
+
+      const filtered = personeller.filter((item) => {
+        if (aktiflik === "aktif" && item.aktif_durum !== "AKTIF") {
+          return false;
+        }
+        if (aktiflik === "pasif" && item.aktif_durum !== "PASIF") {
+          return false;
+        }
+        if (Number.isFinite(departmanId) && item.departman_id !== departmanId) {
+          return false;
+        }
+        if (Number.isFinite(personelTipiId) && item.personel_tipi_id !== personelTipiId) {
+          return false;
+        }
+        if (!search) {
+          return true;
+        }
+
+        const fullText = `${item.ad} ${item.soyad} ${item.tc_kimlik_no}`.toLowerCase();
+        return fullText.includes(search);
+      });
+
+      const start = (pageNumber - 1) * pageLimit;
+      const items = filtered.slice(start, start + pageLimit);
+
       await fulfillJson(
         route,
         200,
-        okBody({
-          items: [
-            {
-              id: 1,
-              tc_kimlik_no: "12345678901",
-              ad: "Ayse",
-              soyad: "Yilmaz",
-              aktif_durum: "AKTIF",
-              telefon: "05550000000"
-            }
-          ]
+        JSON.stringify({
+          data: { items },
+          meta: {
+            page: pageNumber,
+            limit: pageLimit,
+            total: filtered.length,
+            total_pages: Math.max(1, Math.ceil(filtered.length / pageLimit))
+          },
+          errors: []
         })
       );
       return;
@@ -151,12 +256,41 @@ export async function mockApi(page: Page, role: MockUserRole) {
         route,
         200,
         okBody({
-          id: 1,
-          tc_kimlik_no: "12345678901",
-          ad: "Ayse",
-          soyad: "Yilmaz",
-          aktif_durum: "AKTIF",
-          telefon: "05550000000"
+          ana_kart: {
+            id: 1,
+            tc_kimlik_no: "12345678901",
+            ad: "Ayse",
+            soyad: "Yilmaz",
+            aktif_durum: "AKTIF",
+            telefon: "05550000000",
+            dogum_tarihi: "1992-03-14",
+            dogum_yeri: "Istanbul",
+            kan_grubu: "A Rh+",
+            sicil_no: "P-001",
+            ise_giris_tarihi: "2023-02-01",
+            acil_durum_kisi: "Fatma Yilmaz",
+            acil_durum_telefon: "05553334455",
+            departman_id: 3,
+            gorev_id: 1,
+            personel_tipi_id: 1,
+            bagli_amir_id: 9
+          },
+          sistem_ozeti: {
+            hizmet_suresi: "3 yil 2 ay",
+            toplam_izin_hakki: 14,
+            kullanilan_izin: 4,
+            kalan_izin: 10
+          },
+          pasiflik_durumu: {
+            aktif_durum: "AKTIF",
+            etiket: null
+          },
+          referans_adlari: {
+            departman: "Operasyon",
+            gorev: "Uzman",
+            personel_tipi: "Tam Zamanli",
+            bagli_amir: "Demo Amir"
+          }
         })
       );
       return;
@@ -236,7 +370,42 @@ export async function mockApi(page: Page, role: MockUserRole) {
     }
 
     if (path === "/api/bildirimler" && method === "GET") {
-      await fulfillJson(route, 200, okBody({ items: bildirimler }));
+      const pageNumber = Number.parseInt(url.searchParams.get("page") ?? "1", 10) || 1;
+      const pageLimit = Number.parseInt(url.searchParams.get("limit") ?? "10", 10) || 10;
+      const tarih = url.searchParams.get("tarih");
+      const personelId = Number.parseInt(url.searchParams.get("personel_id") ?? "", 10);
+      const bildirimTuru = url.searchParams.get("bildirim_turu");
+
+      const filtered = bildirimler.filter((item) => {
+        if (tarih && item.tarih !== tarih) {
+          return false;
+        }
+        if (Number.isFinite(personelId) && item.personel_id !== personelId) {
+          return false;
+        }
+        if (bildirimTuru && item.bildirim_turu !== bildirimTuru) {
+          return false;
+        }
+        return true;
+      });
+
+      const start = (pageNumber - 1) * pageLimit;
+      const items = filtered.slice(start, start + pageLimit);
+
+      await fulfillJson(
+        route,
+        200,
+        JSON.stringify({
+          data: { items },
+          meta: {
+            page: pageNumber,
+            limit: pageLimit,
+            total: filtered.length,
+            total_pages: Math.max(1, Math.ceil(filtered.length / pageLimit))
+          },
+          errors: []
+        })
+      );
       return;
     }
 
@@ -300,12 +469,70 @@ export async function mockApi(page: Page, role: MockUserRole) {
       }
 
       bildirim.state = "IPTAL";
-      bildirim.bildirim_turu = "IPTAL_EDILDI";
       await fulfillJson(route, 200, okBody({ id: bildirim.id, state: bildirim.state }));
       return;
     }
 
     if (path.startsWith("/api/referans/") && method === "GET") {
+      if (path === "/api/referans/departmanlar") {
+        await fulfillJson(
+          route,
+          200,
+          okBody([
+            { id: 1, ad: "Yonetim" },
+            { id: 2, ad: "Muhasebe" },
+            { id: 3, ad: "Operasyon" }
+          ])
+        );
+        return;
+      }
+
+      if (path === "/api/referans/gorevler") {
+        await fulfillJson(
+          route,
+          200,
+          okBody([
+            { id: 1, ad: "Uzman" },
+            { id: 2, ad: "Sef" },
+            { id: 3, ad: "Mudur" }
+          ])
+        );
+        return;
+      }
+
+      if (path === "/api/referans/personel-tipleri") {
+        await fulfillJson(
+          route,
+          200,
+          okBody([
+            { id: 1, ad: "Tam Zamanli" },
+            { id: 2, ad: "Yari Zamanli" }
+          ])
+        );
+        return;
+      }
+
+      if (path === "/api/referans/bagli-amirler") {
+        await fulfillJson(route, 200, okBody([{ id: 9, ad: "Demo Amir" }]));
+        return;
+      }
+
+      if (path === "/api/referans/bildirim-turleri") {
+        await fulfillJson(
+          route,
+          200,
+          okBody([
+            { key: "GEC_GELDI", label: "Gec Geldi" },
+            { key: "GELMEDI", label: "Gelmedi" },
+            { key: "IZINLI_GELMEDI", label: "Izinli Gelmedi" },
+            { key: "IZINSIZ_GELMEDI", label: "Izinsiz Gelmedi" },
+            { key: "DEVAMSIZLIK", label: "Devamsizlik" },
+            { key: "RAPORLU", label: "Raporlu" }
+          ])
+        );
+        return;
+      }
+
       await fulfillJson(route, 200, okBody([]));
       return;
     }

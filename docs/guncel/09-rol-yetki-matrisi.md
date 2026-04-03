@@ -49,9 +49,9 @@ Yonetim rolleri:
 
 - `bildirimler.view`: tum roller
 - `bildirimler.detail.view`: tum roller
-- `bildirimler.create`: yonetim rolleri
-- `bildirimler.update`: yonetim rolleri
-- `bildirimler.cancel`: yonetim rolleri
+- `bildirimler.create`: yonetim rolleri + `BIRIM_AMIRI`
+- `bildirimler.update`: yonetim rolleri + `BIRIM_AMIRI`
+- `bildirimler.cancel`: yonetim rolleri + `BIRIM_AMIRI`
 
 ### Gunluk Puantaj
 
@@ -93,7 +93,9 @@ Aktif route guard kurallari:
 
 - Yetkisiz aksiyon butonlari (create/update/cancel/close) kullaniciya gosterilmez.
 - Yetkisiz route denemelerinde kullanici `yetkisiz` ekranina yonlendirilir.
-- `BIRIM_AMIRI` rolunde liste ve detay goruntuleme sube kapsami ile acik, mutasyon aksiyonlari kapali kalir.
+- `BIRIM_AMIRI` rolunde personel ve surec listeleri sube kapsami ile aciktir.
+- `BIRIM_AMIRI`, bildirim modulu uzerinden gunluk durum bildirimi girebilir, guncelleyebilir ve iptal edebilir.
+- `BIRIM_AMIRI` icin puantaj guncelleme, haftalik kapanis ve finans aksiyonlari kapali kalir.
 
 ## Notlar
 

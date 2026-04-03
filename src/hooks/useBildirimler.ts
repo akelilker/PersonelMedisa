@@ -10,6 +10,7 @@ import {
   updateBildirim,
   type CreateBildirimPayload
 } from "../api/bildirimler.api";
+import { fetchPersonellerList } from "../api/personeller.api";
 import { fetchBildirimTuruOptions, fetchDepartmanOptions } from "../api/referans.api";
 import { emptyPaginated, makeTempId } from "../data/app-data.types";
 import {
@@ -30,13 +31,22 @@ import {
   SUBE_DETAIL_REDIRECT_STATE_KEY,
   shouldRedirectDetailAfterSubeMismatch
 } from "../lib/detail-sube-context";
+import { normalizeEnumKey } from "../lib/display/enum-display";
 import { runDeduped } from "../lib/in-flight-dedupe";
 import type { PaginatedResult } from "../types/api";
 import type { Bildirim } from "../types/bildirim";
+import type { Personel } from "../types/personel";
 import { useAuth } from "../state/auth.store";
 import type { IdOption, KeyOption } from "../types/referans";
 
 const PAGE_SIZE = 10;
+const BILDIRIM_PERSONEL_FETCH_LIMIT = 250;
+
+type BildirimReferenceMeta = {
+  departman: IdOption[];
+  bildirimTuru: KeyOption[];
+  personeller: Personel[];
+};
 
 export type BildirimListQueryState = {
   draft: { personelId: string; bildirimTuru: string; tarih: string };
@@ -99,6 +109,36 @@ function draftBildirimFromPayload(payload: CreateBildirimPayload, tempId: number
   };
 }
 
+function getTodayIsoDate() {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, "0");
+  const day = String(today.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function resolveBildirimTuru(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    throw new Error("Bildirim durumu secilmelidir.");
+  }
+
+  return normalizeEnumKey(trimmed);
+}
+
+function resolveDepartmanIdForBildirim(
+  personelIdValue: string,
+  departmanIdValue: string,
+  personeller: Personel[]
+) {
+  const selected = personeller.find((item) => String(item.id) === personelIdValue);
+  if (typeof selected?.departman_id === "number") {
+    return selected.departman_id;
+  }
+
+  return parseRequiredPositiveInt(departmanIdValue, "Bolum");
+}
+
 export function useBildirimler() {
   const revision = useAppDataRevision();
   const [listQuery, setListQuery] = useState<BildirimListQueryState>({
@@ -150,14 +190,16 @@ export function useBildirimler() {
 
   const refMeta = useMemo(
     () =>
-      getCacheEntry<{ departman: IdOption[]; bildirimTuru: KeyOption[] }>(dataCacheKeys.bildirimRef()) ?? {
+      getCacheEntry<BildirimReferenceMeta>(dataCacheKeys.bildirimRef()) ?? {
         departman: [],
-        bildirimTuru: []
+        bildirimTuru: [],
+        personeller: []
       },
     [revision]
   );
   const departmanOptions = refMeta.departman;
   const bildirimTuruOptions = refMeta.bildirimTuru;
+  const personelOptions = refMeta.personeller;
 
   const refetch = useCallback(async () => {
     await fetchWithCacheMerge(listKey, () =>
@@ -218,11 +260,17 @@ export function useBildirimler() {
       try {
         await fetchWithCacheMerge(dataCacheKeys.bildirimRef(), () =>
           runDeduped(dataCacheKeys.bildirimRef(), async () => {
-            const [departman, bildirimTuru] = await Promise.all([
+            const [departman, bildirimTuru, personeller] = await Promise.all([
               fetchDepartmanOptions(),
-              fetchBildirimTuruOptions()
+              fetchBildirimTuruOptions(),
+              fetchPersonellerList({
+                aktiflik: "aktif",
+                sube_id: getSubeIdForApiRequest(),
+                page: 1,
+                limit: BILDIRIM_PERSONEL_FETCH_LIMIT
+              })
             ]);
-            return { departman, bildirimTuru };
+            return { departman, bildirimTuru, personeller: personeller.items };
           })
         );
       } catch {
@@ -235,7 +283,7 @@ export function useBildirimler() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [activeSube]);
 
   const submitFilters = useCallback((event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -268,11 +316,13 @@ export function useBildirimler() {
 
   const openCreateModal = useCallback(() => {
     setCreateErrorMessage(null);
-    setCreateForm(INITIAL_BILDIRIM_FORM);
+    setCreateForm({ ...INITIAL_BILDIRIM_FORM, tarih: getTodayIsoDate() });
     setIsCreateModalOpen(true);
   }, []);
 
   const closeCreateModal = useCallback(() => {
+    setCreateErrorMessage(null);
+    setCreateForm(INITIAL_BILDIRIM_FORM);
     setIsCreateModalOpen(false);
   }, []);
 
@@ -313,11 +363,16 @@ export function useBildirimler() {
       setIsCreateSubmitting(true);
 
       try {
+        const personelId = parseRequiredPositiveInt(createForm.personelId, "Personel");
         const payload: CreateBildirimPayload = {
-          tarih: createForm.tarih,
-          departman_id: parseRequiredPositiveInt(createForm.departmanId, "Departman ID"),
-          personel_id: parseRequiredPositiveInt(createForm.personelId, "Personel ID"),
-          bildirim_turu: createForm.bildirimTuru.trim(),
+          tarih: createForm.tarih || getTodayIsoDate(),
+          departman_id: resolveDepartmanIdForBildirim(
+            createForm.personelId,
+            createForm.departmanId,
+            personelOptions
+          ),
+          personel_id: personelId,
+          bildirim_turu: resolveBildirimTuru(createForm.bildirimTuru),
           aciklama: createForm.aciklama.trim() || undefined
         };
 
@@ -358,7 +413,7 @@ export function useBildirimler() {
         setIsCreateSubmitting(false);
       }
     },
-    [activeSube, createForm, isCreateSubmitting, listQuery.applied, refreshPageOne]
+    [activeSube, createForm, isCreateSubmitting, listQuery.applied, personelOptions, refreshPageOne]
   );
 
   const openEditModal = useCallback((bildirim: Bildirim, canEdit: boolean) => {
@@ -372,6 +427,8 @@ export function useBildirimler() {
   }, []);
 
   const closeEditModal = useCallback(() => {
+    setEditErrorMessage(null);
+    setEditForm(INITIAL_BILDIRIM_FORM);
     setEditingBildirim(null);
   }, []);
 
@@ -392,9 +449,13 @@ export function useBildirimler() {
       const previousBildirim = editingBildirim;
       const body = {
         tarih: editForm.tarih,
-        departman_id: parseRequiredPositiveInt(editForm.departmanId, "Departman ID"),
-        personel_id: parseRequiredPositiveInt(editForm.personelId, "Personel ID"),
-        bildirim_turu: editForm.bildirimTuru.trim(),
+        departman_id: resolveDepartmanIdForBildirim(
+          editForm.personelId,
+          editForm.departmanId,
+          personelOptions
+        ),
+        personel_id: parseRequiredPositiveInt(editForm.personelId, "Personel"),
+        bildirim_turu: resolveBildirimTuru(editForm.bildirimTuru),
         aciklama: editForm.aciklama.trim() || undefined
       };
 
@@ -435,7 +496,7 @@ export function useBildirimler() {
         setIsEditSubmitting(false);
       }
     },
-    [editForm, editingBildirim, isEditSubmitting, listKey, refreshPageOne]
+    [editForm, editingBildirim, isEditSubmitting, listKey, personelOptions, refreshPageOne]
   );
 
   const cancelBildirimHandler = useCallback(
@@ -502,6 +563,7 @@ export function useBildirimler() {
     refetch,
     departmanOptions,
     bildirimTuruOptions,
+    personelOptions,
     referenceError,
     isCreateModalOpen,
     openCreateModal,

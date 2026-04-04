@@ -33,6 +33,7 @@
 @import "./modules/raporlar.css";
 @import "./modules/finans.css";
 @import "./modules/auth.css";
+@import "./modules/home.css";
 
 @import "./platform/mobile.css";
 @import "./platform/desktop.css";

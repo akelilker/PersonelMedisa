@@ -68,6 +68,19 @@ function resolveModuleModal(pathname: string): { title: string; closeTo: string 
   return { title: "Modül", closeTo: "/" };
 }
 
+function openKayitFlow(tab: KayitTab, navigate: ReturnType<typeof useNavigate>, closeModal: () => void) {
+  closeModal();
+
+  if (tab === "yeni-kayit") {
+    navigate("/personeller", {
+      state: { openCreateModal: true }
+    });
+    return;
+  }
+
+  navigate("/surecler");
+}
+
 export function AppShell({ children }: AppShellProps) {
   const { session, logout } = useAuth();
   const navigate = useNavigate();
@@ -87,6 +100,7 @@ export function AppShell({ children }: AppShellProps) {
   const [isKayitModalOpen, setIsKayitModalOpen] = useState(false);
   const [kayitTab, setKayitTab] = useState<KayitTab>("yeni-kayit");
   const isAnyModalOpen = isKayitModalOpen;
+  const closeKayitModal = () => setIsKayitModalOpen(false);
 
   return (
     <div className="app-container app-shell">
@@ -126,45 +140,20 @@ export function AppShell({ children }: AppShellProps) {
       {isKayitModalOpen ? (
         <AppModal
           title="Personel Giriş ve Süreç Takibi"
-          onClose={() => {
-            setIsKayitModalOpen(false);
-          }}
+          onClose={closeKayitModal}
           footer={
-            kayitTab === "yeni-kayit" ? (
-              <div className="universal-btn-group modal-footer-actions">
-                <button
-                  type="button"
-                  className="universal-btn-save"
-                  onClick={() => {
-                    setIsKayitModalOpen(false);
-                    navigate("/personeller", {
-                      state: { openCreateModal: true }
-                    });
-                  }}
-                >
-                  Yeni Kişi Ekle
-                </button>
-                <button type="button" className="universal-btn-cancel" onClick={() => setIsKayitModalOpen(false)}>
-                  Kapat
-                </button>
-              </div>
-            ) : (
-              <div className="universal-btn-group modal-footer-actions">
-                <button
-                  type="button"
-                  className="universal-btn-save"
-                  onClick={() => {
-                    setIsKayitModalOpen(false);
-                    navigate("/surecler");
-                  }}
-                >
-                  Süreç Ekranına Git
-                </button>
-                <button type="button" className="universal-btn-cancel" onClick={() => setIsKayitModalOpen(false)}>
-                  Kapat
-                </button>
-              </div>
-            )
+            <div className="universal-btn-group modal-footer-actions">
+              <button
+                type="button"
+                className="universal-btn-save"
+                onClick={() => openKayitFlow(kayitTab, navigate, closeKayitModal)}
+              >
+                {kayitTab === "yeni-kayit" ? "Yeni Kişi Ekle" : "Süreç Ekranına Git"}
+              </button>
+              <button type="button" className="universal-btn-cancel" onClick={closeKayitModal}>
+                Kapat
+              </button>
+            </div>
           }
         >
           <div className="kayit-tabs">
@@ -186,13 +175,13 @@ export function AppShell({ children }: AppShellProps) {
 
           {kayitTab === "yeni-kayit" ? (
             <div className="kayit-tab-panel">
-              <p>Personel kartı açmak ve yeni personel kaydı için bu sekmeyi kullan.</p>
+              <p>Yeni personel ekleme ekranını açar.</p>
             </div>
           ) : null}
 
           {kayitTab === "surec" ? (
             <div className="kayit-tab-panel">
-              <p>Süreç oluşturma, düzenleme ve takip işlemleri bu sekmede yönetilir.</p>
+              <p>Süreç listesine gider ve süreç takibini açar.</p>
             </div>
           ) : null}
         </AppModal>
@@ -214,4 +203,3 @@ export function AppShell({ children }: AppShellProps) {
     </div>
   );
 }
-

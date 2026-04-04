@@ -2,11 +2,12 @@ import { expect, test } from "@playwright/test";
 import { login } from "./helpers/auth";
 import { mockApi } from "./helpers/mock-api";
 
-test("home modal shell aligns to app container and footer gap contract", async ({ page }) => {
+test("module modal aligns to app container and footer gap contract", async ({ page }) => {
   await mockApi(page, "GENEL_YONETICI");
   await login(page, { username: "genel_yonetici", password: "demo123" });
 
-  await expect(page).toHaveURL("/");
+  await page.goto("/personeller");
+  await expect(page).toHaveURL(/\/personeller$/);
 
   const initialFooterBoxShadow = await page.evaluate(() => {
     const footer = document.querySelector("#app-footer");
@@ -17,7 +18,7 @@ test("home modal shell aligns to app container and footer gap contract", async (
     return getComputedStyle(footer).boxShadow;
   });
 
-  await page.getByTestId("menu-giris-surec").click();
+  await page.locator(".personeller-header-row").getByRole("button", { name: "Yeni Personel" }).click();
   await page.locator(".modal-container").waitFor({ state: "visible" });
 
   const metrics = await page.evaluate(() => {
@@ -37,7 +38,7 @@ test("home modal shell aligns to app container and footer gap contract", async (
     }
 
     const appShell = rect(".app-shell");
-    const overlay = rect(".modal-overlay");
+    const overlay = rect(".modal-overlay.open");
     const modal = rect(".modal-container");
     const footer = rect("#app-footer");
 

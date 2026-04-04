@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { dataCacheKeys, getCacheEntry, useAppDataRevision } from "../../data/data-manager";
+import { dataCacheKeys, getAppData, getCacheEntry, useAppDataRevision } from "../../data/data-manager";
 import { useBildirimlerHeaderPreview } from "../../hooks/useBildirimler";
 import { useRoleAccess } from "../../hooks/use-role-access";
 import { formatBildirimTuruLabel, normalizeEnumKey } from "../../lib/display/enum-display";
@@ -18,6 +18,10 @@ type HeaderNotification = {
   unread: boolean;
 };
 
+type ShellHeaderActionsProps = {
+  contextLabel: string;
+};
+
 const DAY_MS = 24 * 60 * 60 * 1000;
 const TR_LOCALE = "tr-TR";
 
@@ -31,6 +35,22 @@ function formatDate(date: Date) {
     month: "2-digit",
     year: "numeric"
   }).format(date);
+}
+
+function formatSyncLabel(updatedAt: string | null) {
+  if (!updatedAt) {
+    return "Veri hazir";
+  }
+
+  const parsed = new Date(updatedAt);
+  if (Number.isNaN(parsed.getTime())) {
+    return "Veri hazir";
+  }
+
+  return `Son veri ${new Intl.DateTimeFormat(TR_LOCALE, {
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(parsed)}`;
 }
 
 function getReminderSubtitle(daysLeft: number, dueDate: Date) {
@@ -102,7 +122,7 @@ function mapBildirimLevel(bildirimTuru: string): NotificationLevel {
   return "neutral";
 }
 
-export function ShellHeaderActions() {
+export function ShellHeaderActions({ contextLabel }: ShellHeaderActionsProps) {
   const rootRef = useRef<HTMLDivElement | null>(null);
 
   const revision = useAppDataRevision();
@@ -144,6 +164,8 @@ export function ShellHeaderActions() {
     const meta = getCacheEntry<{ personeller?: Personel[] }>(dataCacheKeys.bildirimRef());
     return new Map((meta?.personeller ?? []).map((personel) => [personel.id, personel]));
   }, [revision]);
+
+  const syncLabel = useMemo(() => formatSyncLabel(getAppData().updatedAt), [revision]);
 
   const notifications = useMemo(() => {
     const reminderItems =
@@ -316,8 +338,16 @@ export function ShellHeaderActions() {
 
   return (
     <div className="icons-row" ref={rootRef}>
-      <div className="icons-row-left" />
-      <div className="pwa-install-center" />
+      <div className="icons-row-left">
+        <span className="shell-context-label" title="Aktif ekran">
+          {contextLabel}
+        </span>
+      </div>
+      <div className="pwa-install-center">
+        <span className="shell-sync-label" title="Uygulama veri durumu">
+          {syncLabel}
+        </span>
+      </div>
       <div className="icons-row-right">
         {subeControl.kind === "all" ? (
           <span className="sube-header-badge" title="Aktif sube filtresi yok">

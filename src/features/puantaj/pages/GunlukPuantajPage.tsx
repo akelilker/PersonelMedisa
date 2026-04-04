@@ -1,5 +1,5 @@
-import { type FormEvent } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, type FormEvent } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { FormField } from "../../../components/form/FormField";
 import { EmptyState } from "../../../components/states/EmptyState";
 import { ErrorState } from "../../../components/states/ErrorState";
@@ -11,6 +11,8 @@ import { formatComplianceLevelLabel, formatPuantajStateLabel } from "../../../li
 export function GunlukPuantajPage() {
   const { hasPermission } = useRoleAccess();
   const canUpdatePuantaj = hasPermission("puantaj.update");
+  const location = useLocation();
+  const navigate = useNavigate();
 
   const {
     formState,
@@ -26,6 +28,30 @@ export function GunlukPuantajPage() {
     refetchActive,
     submitPuantaj
   } = usePuantaj();
+
+  useEffect(() => {
+    const currentState = (location.state ?? null) as Record<string, unknown> | null;
+    const prefillPersonelId =
+      typeof currentState?.prefillPersonelId === "number"
+        ? String(currentState.prefillPersonelId)
+        : typeof currentState?.prefillPersonelId === "string"
+          ? currentState.prefillPersonelId
+          : "";
+
+    if (!prefillPersonelId) {
+      return;
+    }
+
+    patchFormState({ queryPersonelId: prefillPersonelId });
+
+    const nextState = { ...currentState };
+    delete nextState.prefillPersonelId;
+
+    navigate(location.pathname, {
+      replace: true,
+      state: Object.keys(nextState).length > 0 ? nextState : null
+    });
+  }, [location.pathname, location.state, navigate, patchFormState]);
 
   function handleQuerySubmit(event: FormEvent<HTMLFormElement>) {
     void submitQuery(event);

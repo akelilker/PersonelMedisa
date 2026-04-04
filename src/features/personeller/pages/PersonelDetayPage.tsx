@@ -1,5 +1,5 @@
 import { type FormEvent } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { FormField } from "../../../components/form/FormField";
 import { EmptyState } from "../../../components/states/EmptyState";
 import { ErrorState } from "../../../components/states/ErrorState";
@@ -44,6 +44,11 @@ export function PersonelDetayPage() {
   const hasValidId = !Number.isNaN(parsedPersonelId) && parsedPersonelId > 0;
   const { hasPermission } = useRoleAccess();
   const canEditPersonel = hasPermission("personeller.update");
+  const canCreateSurec = hasPermission("surecler.create");
+  const canViewSurecler = hasPermission("surecler.view") || hasPermission("surecler.view.sube");
+  const canCreateBildirim = hasPermission("bildirimler.create");
+  const canViewBildirimler = hasPermission("bildirimler.view");
+  const canViewPuantaj = hasPermission("puantaj.view");
 
   const {
     personel,
@@ -175,6 +180,35 @@ export function PersonelDetayPage() {
                   <a className="universal-btn-aux" href={emergencyCallHref}>
                     Acil Kisiyi Ara
                   </a>
+                ) : null}
+                {canViewSurecler ? (
+                  <Link
+                    to="/surecler"
+                    state={{
+                      prefillPersonelId: personel.id,
+                      ...(canCreateSurec ? { openCreateModal: true } : {})
+                    }}
+                    className="universal-btn-aux"
+                  >
+                    {canCreateSurec ? "Yeni Surec" : "Surecleri Ac"}
+                  </Link>
+                ) : null}
+                {canViewBildirimler ? (
+                  <Link
+                    to="/bildirimler"
+                    state={{
+                      prefillPersonelId: personel.id,
+                      ...(canCreateBildirim ? { openCreateModal: true } : {})
+                    }}
+                    className="universal-btn-aux"
+                  >
+                    {canCreateBildirim ? "Bildirim Olustur" : "Bildirimleri Ac"}
+                  </Link>
+                ) : null}
+                {canViewPuantaj ? (
+                  <Link to="/puantaj" state={{ prefillPersonelId: personel.id }} className="universal-btn-aux">
+                    Puantaji Ac
+                  </Link>
                 ) : null}
                 {canEditPersonel ? (
                   <button type="button" className="universal-btn-aux" onClick={() => setIsEditing(true)}>

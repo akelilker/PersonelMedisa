@@ -1,5 +1,5 @@
-import { type FormEvent } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, type FormEvent } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { FormField } from "../../../components/form/FormField";
 import { AppModal } from "../../../components/modal/AppModal";
 import { EmptyState } from "../../../components/states/EmptyState";
@@ -64,9 +64,45 @@ export function SurecTakipPage() {
   const canEditSurec = hasPermission("surecler.update");
   const canCancelSurec = hasPermission("surecler.cancel");
   const canOpenSurecDetail = hasPermission("surecler.detail.view");
+  const location = useLocation();
+  const navigate = useNavigate();
 
   const { draft } = listQuery;
   const page = listQuery.page;
+
+  useEffect(() => {
+    const currentState = (location.state ?? null) as Record<string, unknown> | null;
+    const prefillPersonelId =
+      typeof currentState?.prefillPersonelId === "number"
+        ? String(currentState.prefillPersonelId)
+        : typeof currentState?.prefillPersonelId === "string"
+          ? currentState.prefillPersonelId
+          : "";
+
+    if (!currentState?.openCreateModal && !prefillPersonelId) {
+      return;
+    }
+
+    if (prefillPersonelId) {
+      updateDraft({ personelId: prefillPersonelId });
+    }
+
+    if (canCreateSurec && currentState?.openCreateModal) {
+      openCreateModal();
+      if (prefillPersonelId) {
+        setCreateForm((prev) => ({ ...prev, personelId: prefillPersonelId }));
+      }
+    }
+
+    const nextState = { ...currentState };
+    delete nextState.openCreateModal;
+    delete nextState.prefillPersonelId;
+
+    navigate(location.pathname, {
+      replace: true,
+      state: Object.keys(nextState).length > 0 ? nextState : null
+    });
+  }, [canCreateSurec, location.pathname, location.state, navigate, openCreateModal, setCreateForm, updateDraft]);
 
   function handleCreateSubmit(event: FormEvent<HTMLFormElement>) {
     void createSurecHandler(event, canCreateSurec);

@@ -201,22 +201,52 @@ export function BildirimlerPage() {
 
   useEffect(() => {
     const currentState = (location.state ?? null) as Record<string, unknown> | null;
-    if (!currentState?.openCreateModal) {
+    const prefillPersonelId =
+      typeof currentState?.prefillPersonelId === "number"
+        ? String(currentState.prefillPersonelId)
+        : typeof currentState?.prefillPersonelId === "string"
+          ? currentState.prefillPersonelId
+          : "";
+
+    if (!currentState?.openCreateModal && !prefillPersonelId) {
       return;
     }
 
-    if (canCreateBildirim) {
+    if (prefillPersonelId) {
+      updateDraft({ personelId: prefillPersonelId });
+    }
+
+    if (canCreateBildirim && (currentState?.openCreateModal || prefillPersonelId)) {
       openCreateModal();
+      if (prefillPersonelId) {
+        const selected = personelOptions.find((option) => String(option.id) === prefillPersonelId);
+        setCreateForm((prev) => ({
+          ...prev,
+          personelId: prefillPersonelId,
+          departmanId:
+            typeof selected?.departman_id === "number" ? String(selected.departman_id) : prev.departmanId
+        }));
+      }
     }
 
     const nextState = { ...currentState };
     delete nextState.openCreateModal;
+    delete nextState.prefillPersonelId;
 
     navigate(location.pathname, {
       replace: true,
       state: Object.keys(nextState).length > 0 ? nextState : null
     });
-  }, [canCreateBildirim, location.pathname, location.state, navigate, openCreateModal]);
+  }, [
+    canCreateBildirim,
+    location.pathname,
+    location.state,
+    navigate,
+    openCreateModal,
+    personelOptions,
+    setCreateForm,
+    updateDraft
+  ]);
 
   function handleCreateSubmit(event: FormEvent<HTMLFormElement>) {
     void createBildirimHandler(event, canCreateBildirim);

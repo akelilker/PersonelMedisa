@@ -1,10 +1,6 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import { login } from "./helpers/auth";
 import { mockApi } from "./helpers/mock-api";
-
-function modalRouteHeading(page: Page, name: string | RegExp) {
-  return page.locator(".modal-header").first().getByRole("heading", { name });
-}
 
 test.describe("e2e smoke", () => {
   test("management user completes login to kapanis flow", async ({ page }) => {
@@ -22,10 +18,11 @@ test.describe("e2e smoke", () => {
 
     await page.getByRole("link", { name: "Detay" }).first().click();
     await expect(page).toHaveURL(/\/personeller\/1$/);
-    await expect(modalRouteHeading(page, /Personel Detay/i)).toBeVisible();
+    await expect(page.getByRole("heading", { name: /Personel Detay/i })).toBeVisible();
 
     await page.goto("/puantaj");
     await expect(page).toHaveURL(/\/puantaj$/);
+    await expect(page.getByRole("heading", { name: /Puantaj/i })).toBeVisible();
 
     await page.getByLabel("Personel ID").fill("1");
     await page.getByLabel("Tarih").fill("2026-04-12");
@@ -42,6 +39,7 @@ test.describe("e2e smoke", () => {
 
     await page.goto("/haftalik-kapanis");
     await expect(page).toHaveURL(/\/haftalik-kapanis$/);
+    await expect(page.getByRole("heading", { name: /Haftalik Kapanis|Haftalık Kapanış/i })).toBeVisible();
 
     await page.getByLabel("Hafta Başlangıç").fill("2026-04-06");
     await page.getByLabel("Hafta Bitiş").fill("2026-04-12");
@@ -53,6 +51,7 @@ test.describe("e2e smoke", () => {
 
     await page.goto("/raporlar");
     await expect(page).toHaveURL(/\/raporlar$/);
+    await expect(page.getByRole("heading", { name: "Raporlar" })).toBeVisible();
     await page.getByRole("button", { name: /Raporu .*al.*/i }).click();
     await expect(page.getByText(/Toplam Kayit|Toplam Kayıt/i)).toBeVisible();
   });
@@ -67,6 +66,7 @@ test.describe("e2e smoke", () => {
 
     await page.getByTestId("menu-gunluk-durum").click();
     await expect(page).toHaveURL(/\/bildirimler$/);
+    await expect(page.getByRole("heading", { name: "Bildirimler" })).toBeVisible();
 
     const amirBildirimModal = page.locator(".modal-container").last();
     await expect(amirBildirimModal).toBeVisible();
@@ -93,7 +93,7 @@ test.describe("e2e smoke", () => {
 
     await page.goto("/raporlar");
     await expect(page).toHaveURL(/\/raporlar$/);
-    await expect(modalRouteHeading(page, "Raporlar")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Raporlar" })).toBeVisible();
 
     await page.goto("/finans");
     await expect(page).toHaveURL(/\/yetkisiz$/);
@@ -109,7 +109,7 @@ test.describe("e2e smoke", () => {
 
     await page.goto("/surecler");
     await expect(page).toHaveURL(/\/surecler$/);
-    await expect(modalRouteHeading(page, /Surec Takibi|Süreç Takibi/i)).toBeVisible();
+    await expect(page.getByRole("heading", { name: /Surec Takibi|Süreç Takibi/i })).toBeVisible();
 
     await page.getByRole("button", { name: /Yeni S.*re.*/i }).click();
     const surecCreateModal = page.locator(".modal-container").last();
@@ -137,7 +137,7 @@ test.describe("e2e smoke", () => {
 
     await page.goto("/bildirimler");
     await expect(page).toHaveURL(/\/bildirimler$/);
-    await expect(modalRouteHeading(page, "Bildirimler")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Bildirimler" })).toBeVisible();
 
     await page.getByRole("button", { name: "Yeni Bildirim" }).click();
     const bildirimCreateModal = page.locator(".modal-container").last();
@@ -164,7 +164,7 @@ test.describe("e2e smoke", () => {
 
     await page.goto("/finans");
     await expect(page).toHaveURL(/\/finans$/);
-    await expect(modalRouteHeading(page, "Finans")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Finans" })).toBeVisible();
 
     await page.getByRole("button", { name: /Yeni Finans Kalemi/i }).click();
     const finansCreateModal = page.locator(".modal-container").last();

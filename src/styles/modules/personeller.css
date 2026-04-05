@@ -19,14 +19,55 @@
 .personeller-toolbar {
   position: relative;
   display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  margin: 0 calc(-1 * var(--space-2, 8px));
+  padding: 0 var(--space-2, 8px) var(--space-2, 8px);
+  border-bottom: 1px solid var(--line-soft);
+  background: rgba(0, 0, 0, 0.15);
+}
+
+.personeller-toolbar-top {
+  padding-top: var(--space-1, 4px);
+}
+
+.personeller-toolbar-module-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3, 12px);
+}
+
+.personeller-toolbar-module-link {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--txt);
+  text-decoration: none;
+  padding: 4px 0;
+  border-bottom: 2px solid transparent;
+}
+
+.personeller-toolbar-module-link:hover {
+  color: var(--theme-color);
+  border-bottom-color: var(--theme-color);
+}
+
+.personeller-toolbar-main {
+  display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-2);
   min-height: 44px;
-  margin: 0 calc(-1 * var(--space-2, 8px));
-  padding: 0 var(--space-2, 8px);
-  border-bottom: 1px solid var(--line-soft);
-  background: rgba(0, 0, 0, 0.15);
+}
+
+.personeller-toolbar--has-module-links .personeller-toolbar-main {
+  margin-top: 12px;
+}
+
+.personeller-toolbar-back-link {
+  text-decoration: none;
 }
 
 .personeller-toolbar-left,
@@ -71,16 +112,6 @@
   background: rgba(255, 255, 255, 0.06);
 }
 
-.personeller-view-toggle {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  padding: 2px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--line-soft);
-  background: rgba(255, 255, 255, 0.02);
-}
-
 .personeller-icon-btn {
   display: inline-flex;
   align-items: center;
@@ -97,12 +128,6 @@
 
 .personeller-icon-btn:hover {
   background: rgba(255, 255, 255, 0.06);
-}
-
-.personeller-icon-btn[aria-pressed="true"] {
-  background: rgba(255, 255, 255, 0.1);
-  outline: 1px solid var(--theme-color);
-  outline-offset: -1px;
 }
 
 .personeller-add-icon-btn {

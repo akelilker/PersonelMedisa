@@ -208,6 +208,8 @@ export function PersonellerPage() {
   const { hasPermission } = useRoleAccess();
   const canCreatePersonel = hasPermission("personeller.create");
   const canOpenDetail = hasPermission("personeller.detail.view");
+  const canViewPuantaj = hasPermission("puantaj.view");
+  const canViewBildirimler = hasPermission("bildirimler.view");
   const location = useLocation();
   const navigate = useNavigate();
   const [searchExpanded, setSearchExpanded] = useState(false);
@@ -264,113 +266,109 @@ export function PersonellerPage() {
         Personeller
       </h2>
 
-      <div className="personeller-toolbar">
-        <div className="personeller-toolbar-left">
-          <button
-            type="button"
-            className="personeller-icon-btn"
-            aria-label="Onceki sayfaya don"
-            onClick={() => navigate(-1)}
-          >
-            <IconBack />
-          </button>
-        </div>
-        <div className="personeller-toolbar-right">
-          <button
-            type="button"
-            className="personeller-icon-btn"
-            aria-expanded={searchExpanded}
-            aria-controls="personeller-filter-form"
-            aria-label={searchExpanded ? "Aramayi kapat" : "Arama ac"}
-            onClick={() => setSearchExpanded((open) => !open)}
-          >
-            <IconSearch />
-          </button>
-          <button
-            type="button"
-            className="personeller-icon-btn"
-            aria-expanded={filterExpanded}
-            aria-controls="personeller-filter-form"
-            aria-label={filterExpanded ? "Detayli filtreyi kapat" : "Detayli filtre ac"}
-            onClick={() => setFilterExpanded((open) => !open)}
-          >
-            <IconFilter />
-          </button>
-          <div className="personeller-view-toggle" role="group" aria-label="Liste gorunumu">
-            <button
-              type="button"
-              className="personeller-icon-btn"
-              aria-pressed={viewMode === "list"}
-              aria-label="Tablo listesi"
-              onClick={() => setViewMode("list")}
-            >
-              <IconList />
-            </button>
-            <button
-              type="button"
-              className="personeller-icon-btn"
-              aria-pressed={viewMode === "grid"}
-              aria-label="Izgara kartlari"
-              onClick={() => setViewMode("grid")}
-            >
-              <IconGrid />
-            </button>
-          </div>
-          <div className="personeller-toolbar-menu-host">
-            <button
-              type="button"
-              className="personeller-icon-btn"
-              aria-expanded={moduleMenuOpen}
-              aria-controls="personeller-module-menu"
-              aria-haspopup="true"
-              aria-label="Modul menu"
-              onClick={() => setModuleMenuOpen((open) => !open)}
-            >
-              <IconMenu />
-            </button>
-            {moduleMenuOpen ? (
-              <div
-                id="personeller-module-menu"
-                className="personeller-module-flyout"
-                role="menu"
-              >
-                <Link
-                  to="/surecler"
-                  className="personeller-module-flyout-link"
-                  role="menuitem"
-                  onClick={() => setModuleMenuOpen(false)}
-                >
-                  Surec takibi
-                </Link>
-                <Link
-                  to="/bildirimler"
-                  className="personeller-module-flyout-link"
-                  role="menuitem"
-                  onClick={() => setModuleMenuOpen(false)}
-                >
-                  Bildirimler
-                </Link>
-                <Link
-                  to="/puantaj"
-                  className="personeller-module-flyout-link"
-                  role="menuitem"
-                  onClick={() => setModuleMenuOpen(false)}
-                >
+      <div
+        className={`personeller-toolbar${
+          canViewPuantaj || canViewBildirimler ? " personeller-toolbar--has-module-links" : ""
+        }`}
+      >
+        {canViewPuantaj || canViewBildirimler ? (
+          <nav className="personeller-toolbar-top" aria-label="Personel karti iliskili moduller">
+            <div className="personeller-toolbar-module-links">
+              {canViewPuantaj ? (
+                <Link className="personeller-toolbar-module-link" to="/puantaj">
                   Puantaj
                 </Link>
-              </div>
-            ) : null}
-          </div>
-          {canCreatePersonel ? (
+              ) : null}
+              {canViewBildirimler ? (
+                <Link className="personeller-toolbar-module-link" to="/bildirimler">
+                  Bildirim
+                </Link>
+              ) : null}
+            </div>
+          </nav>
+        ) : null}
+
+        <div className="personeller-toolbar-main">
+          <div className="personeller-toolbar-left">
+            <Link
+              to="/"
+              className="personeller-icon-btn personeller-toolbar-back-link"
+              aria-label="Ana panele don"
+            >
+              <IconBack />
+            </Link>
             <button
               type="button"
-              className="personeller-add-icon-btn"
-              onClick={openCreateModal}
-              aria-label="Yeni personel ekle"
+              className="personeller-icon-btn"
+              aria-expanded={searchExpanded}
+              aria-controls="personeller-filter-form"
+              aria-label={searchExpanded ? "Aramayi kapat" : "Arama ac"}
+              onClick={() => setSearchExpanded((open) => !open)}
             >
-              +
+              <IconSearch />
             </button>
-          ) : null}
+            <button
+              type="button"
+              className="personeller-icon-btn"
+              aria-expanded={filterExpanded}
+              aria-controls="personeller-filter-form"
+              aria-label={filterExpanded ? "Detayli filtreyi kapat" : "Detayli filtre ac"}
+              onClick={() => setFilterExpanded((open) => !open)}
+            >
+              <IconFilter />
+            </button>
+          </div>
+          <div className="personeller-toolbar-right">
+            <button
+              type="button"
+              className="personeller-icon-btn"
+              aria-label={
+                viewMode === "grid" ? "Liste gorunumune gec" : "Kart gorunumune gec"
+              }
+              onClick={() => setViewMode((mode) => (mode === "grid" ? "list" : "grid"))}
+            >
+              {viewMode === "grid" ? <IconList /> : <IconGrid />}
+            </button>
+            <div className="personeller-toolbar-menu-host">
+              <button
+                type="button"
+                className="personeller-icon-btn"
+                aria-expanded={moduleMenuOpen}
+                aria-controls="personeller-module-menu"
+                aria-haspopup="true"
+                aria-label="Modul menu"
+                onClick={() => setModuleMenuOpen((open) => !open)}
+              >
+                <IconMenu />
+              </button>
+              {moduleMenuOpen ? (
+                <div
+                  id="personeller-module-menu"
+                  className="personeller-module-flyout"
+                  role="menu"
+                >
+                  <Link
+                    to="/surecler"
+                    className="personeller-module-flyout-link"
+                    role="menuitem"
+                    onClick={() => setModuleMenuOpen(false)}
+                  >
+                    Surec takibi
+                  </Link>
+                </div>
+              ) : null}
+            </div>
+            {canCreatePersonel ? (
+              <button
+                type="button"
+                className="personeller-add-icon-btn"
+                onClick={openCreateModal}
+                aria-label="Yeni personel ekle"
+              >
+                +
+              </button>
+            ) : null}
+          </div>
         </div>
       </div>
 

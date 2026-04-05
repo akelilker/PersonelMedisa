@@ -36,7 +36,7 @@ export function MainMenu({ onKayitOpen }: MainMenuProps) {
             onKayitOpen(tab);
           }}
         >
-          <div className="ttl">Kayit ve Surec</div>
+          <div className="ttl">Kayıt ve Süreç</div>
         </button>
       ) : null}
 
@@ -50,7 +50,7 @@ export function MainMenu({ onKayitOpen }: MainMenuProps) {
             navigate("/bildirimler", { state: { openCreateModal: true } });
           }}
         >
-          <div className="ttl">Gunluk Durum Bildir</div>
+          <div className="ttl">Günlük Durum Bildir</div>
         </button>
       ) : null}
 
@@ -64,7 +64,7 @@ export function MainMenu({ onKayitOpen }: MainMenuProps) {
         }}
         disabled={!canViewPersoneller}
       >
-        <div className="ttl">Personel Karti</div>
+        <div className="ttl">Personel Kartı</div>
       </button>
 
       <button

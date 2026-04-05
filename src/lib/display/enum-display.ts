@@ -6,14 +6,14 @@ import type { AylikOzetState, KullaniciTipi } from "../../types/yonetim";
 const TR_LOCALE = "tr-TR";
 
 const USER_ROLE_LABELS: Record<UserRole, string> = {
-  GENEL_YONETICI: "Genel Yonetici",
-  BOLUM_YONETICISI: "Bolum Yonetici",
+  GENEL_YONETICI: "Genel Yönetici",
+  BOLUM_YONETICISI: "Bölüm Yöneticisi",
   MUHASEBE: "Muhasebe",
   BIRIM_AMIRI: "Birim Amiri"
 };
 
 const UI_PROFILE_LABELS: Record<UiProfile, string> = {
-  yonetim: "Yonetim profili",
+  yonetim: "Yönetim profili",
   birim_amiri: "Birim profili"
 };
 
@@ -23,55 +23,55 @@ const PERSONEL_DURUM_LABELS: Record<string, string> = {
 };
 
 const SUREC_TURU_LABELS: Record<string, string> = {
-  IZIN: "Izin",
+  IZIN: "İzin",
   RAPOR: "Rapor",
-  YILLIK_IZIN: "Yillik Izin",
-  MAZERET_IZNI: "Mazeret Izni",
-  UCRETSIZ_IZIN: "Ucretsiz Izin",
-  DOGUM_IZNI: "Dogum Izni",
-  EVLILIK_IZNI: "Evlilik Izni",
-  GOREVLENDIRME: "Gorevlendirme",
-  EGITIM: "Egitim"
+  YILLIK_IZIN: "Yıllık İzin",
+  MAZERET_IZNI: "Mazeret İzni",
+  UCRETSIZ_IZIN: "Ücretsiz İzin",
+  DOGUM_IZNI: "Doğum İzni",
+  EVLILIK_IZNI: "Evlilik İzni",
+  GOREVLENDIRME: "Görevlendirme",
+  EGITIM: "Eğitim"
 };
 
 const COMMON_STATE_LABELS: Record<string, string> = {
   AKTIF: "Aktif",
   PASIF: "Pasif",
-  ACIK: "Acik",
+  ACIK: "Açık",
   BEKLEMEDE: "Beklemede",
-  HESAPLANDI: "Hesaplandi",
-  IPTAL: "Iptal",
-  IPTAL_EDILDI: "Iptal Edildi",
-  KAPANDI: "Kapandi",
-  MUHURLENDI: "Muhurlendi",
-  MUHURLU: "Muhurlu",
+  HESAPLANDI: "Hesaplandı",
+  IPTAL: "İptal",
+  IPTAL_EDILDI: "İptal Edildi",
+  KAPANDI: "Kapandı",
+  MUHURLENDI: "Mühürlendi",
+  MUHURLU: "Mühürlü",
   OKUNDU: "Okundu",
-  BOLUM_ONAYINDA: "Bolum Onayinda",
-  BOLUM_ONAYLANDI: "Bolum Onaylandi",
-  REVIZE_ISTENDI: "Revize Istendi",
-  TAMAMLANDI: "Tamamlandi",
+  BOLUM_ONAYINDA: "Bölüm Onayında",
+  BOLUM_ONAYLANDI: "Bölüm Onaylandı",
+  REVIZE_ISTENDI: "Revize İstendi",
+  TAMAMLANDI: "Tamamlandı",
   TASLAK: "Taslak",
   YENI: "Yeni"
 };
 
 const KULLANICI_TIPI_LABELS: Record<KullaniciTipi, string> = {
-  IC_PERSONEL: "Ic Personel",
+  IC_PERSONEL: "İç Personel",
   HARICI: "Harici"
 };
 
 const BILDIRIM_TURU_LABELS: Record<string, string> = {
-  DEVAMSIZLIK: "Devamsizlik",
-  GEC_GELDI: "Gec Geldi",
-  GEC_CIKTI: "Gec Cikti",
+  DEVAMSIZLIK: "Devamsızlık",
+  GEC_GELDI: "Geç Geldi",
+  GEC_CIKTI: "Geç Çıktı",
   GELMEDI: "Gelmedi",
-  IPTAL: "Iptal",
-  IPTAL_EDILDI: "Iptal Edildi",
-  IZINLI_GELMEDI: "Izinli Gelmedi",
-  IZINSIZ: "Izinsiz",
-  IZINSIZ_GELMEDI: "Izinsiz Gelmedi",
-  IZINSIZ_DEVAMSIZLIK: "Izinsiz Devamsizlik",
+  IPTAL: "İptal",
+  IPTAL_EDILDI: "İptal Edildi",
+  IZINLI_GELMEDI: "İzinli Gelmedi",
+  IZINSIZ: "İzinsiz",
+  IZINSIZ_GELMEDI: "İzinsiz Gelmedi",
+  IZINSIZ_DEVAMSIZLIK: "İzinsiz Devamsızlık",
   RAPORLU: "Raporlu",
-  UYARI: "Uyari"
+  UYARI: "Uyarı"
 };
 
 const FINANS_KALEM_TURU_LABELS: Record<string, string> = {
@@ -79,8 +79,8 @@ const FINANS_KALEM_TURU_LABELS: Record<string, string> = {
   BONUS: "Bonus",
   CEZA: "Ceza",
   EKSTRA_PRIM: "Ekstra Prim",
-  IKRAMIYE: "Ikramiye",
-  MAAS: "Maas",
+  IKRAMIYE: "İkramiye",
+  MAAS: "Maaş",
   MESAI: "Mesai",
   PRIM: "Prim"
 };
@@ -88,7 +88,7 @@ const FINANS_KALEM_TURU_LABELS: Record<string, string> = {
 const COMPLIANCE_LEVEL_LABELS: Record<string, string> = {
   BILGI: "Bilgi",
   KRITIK: "Kritik",
-  UYARI: "Uyari"
+  UYARI: "Uyarı"
 };
 
 const SPECIAL_TOKEN_LABELS: Record<string, string> = {
@@ -137,7 +137,7 @@ export function formatBooleanLabel(
   }
 
   if (value === false) {
-    return labels.falseLabel ?? "Hayir";
+    return labels.falseLabel ?? "Hayır";
   }
 
   return "-";
@@ -269,7 +269,7 @@ export function formatReportCellValue(column: string, value: unknown): string | 
       if (booleanValue === null) {
         return null;
       }
-      return formatBooleanLabel(booleanValue, { trueLabel: "Okundu", falseLabel: "Okunmadi" });
+      return formatBooleanLabel(booleanValue, { trueLabel: "Okundu", falseLabel: "Okunmadı" });
     }
     default:
       return null;

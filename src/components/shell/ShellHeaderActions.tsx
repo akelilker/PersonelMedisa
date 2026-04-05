@@ -39,12 +39,12 @@ function formatDate(date: Date) {
 
 function formatSyncLabel(updatedAt: string | null) {
   if (!updatedAt) {
-    return "Veri hazir";
+    return "Veri hazır";
   }
 
   const parsed = new Date(updatedAt);
   if (Number.isNaN(parsed.getTime())) {
-    return "Veri hazir";
+    return "Veri hazır";
   }
 
   return `Son veri ${new Intl.DateTimeFormat(TR_LOCALE, {
@@ -55,10 +55,10 @@ function formatSyncLabel(updatedAt: string | null) {
 
 function getReminderSubtitle(daysLeft: number, dueDate: Date) {
   if (daysLeft <= 0) {
-    return `Bugun son gun (${formatDate(dueDate)})`;
+    return `Bugün son gün (${formatDate(dueDate)})`;
   }
 
-  return `${daysLeft} gun kaldi (${formatDate(dueDate)})`;
+  return `${daysLeft} gün kaldı (${formatDate(dueDate)})`;
 }
 
 function buildReminderNotifications(baseDate: Date, route: string): HeaderNotification[] {
@@ -67,7 +67,7 @@ function buildReminderNotifications(baseDate: Date, route: string): HeaderNotifi
     {
       key: "salary",
       dayOfMonth: 5,
-      title: "Maas odeme zamani yaklasiyor",
+      title: "Maaş ödeme zamanı yaklaşıyor",
       route
     },
     {
@@ -138,7 +138,6 @@ export function ShellHeaderActions({ contextLabel }: ShellHeaderActionsProps) {
   const canViewRaporlar = hasPermission("raporlar.view");
   const canViewFinans = hasPermission("finans.view");
   const canViewYonetimPanel = hasPermission("yonetim-paneli.view");
-  const canViewAylikOzet = hasPermission("aylik-ozet.view");
 
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -181,7 +180,7 @@ export function ShellHeaderActions({ contextLabel }: ShellHeaderActionsProps) {
         : item.personel_id
           ? `Personel: ${item.personel_id}`
           : "";
-      const subtitle = [tarihText, personelText].filter(Boolean).join(" | ") || "Islem gerektiriyor";
+      const subtitle = [tarihText, personelText].filter(Boolean).join(" | ") || "İşlem gerektiriyor";
 
       return {
         id: `api-${item.id}`,
@@ -220,7 +219,7 @@ export function ShellHeaderActions({ contextLabel }: ShellHeaderActionsProps) {
     }
     if (subeIds.length === 1) {
       const id = subeIds[0];
-      const label = subeList.find((sube) => sube.id === id)?.ad ?? `Sube ${id}`;
+      const label = subeList.find((sube) => sube.id === id)?.ad ?? `Şube ${id}`;
       return { kind: "single" as const, id, label };
     }
     return { kind: "multi" as const };
@@ -280,7 +279,7 @@ export function ShellHeaderActions({ contextLabel }: ShellHeaderActionsProps) {
           })
           .catch((error) => {
             setNotificationActionError(
-              error instanceof Error ? error.message : "Bildirim okundu isaretlenemedi."
+              error instanceof Error ? error.message : "Bildirim okundu işaretlenemedi."
             );
           });
       }
@@ -309,7 +308,7 @@ export function ShellHeaderActions({ contextLabel }: ShellHeaderActionsProps) {
         })
         .catch((error) => {
           setNotificationActionError(
-            error instanceof Error ? error.message : "Bildirimler okundu isaretlenemedi."
+            error instanceof Error ? error.message : "Bildirimler okundu işaretlenemedi."
           );
         });
     }
@@ -352,12 +351,12 @@ export function ShellHeaderActions({ contextLabel }: ShellHeaderActionsProps) {
       </div>
       <div className="icons-row-right">
         {subeControl.kind === "all" ? (
-          <span className="sube-header-badge" title="Aktif sube filtresi yok">
-            Tum subeler
+          <span className="sube-header-badge" title="Aktif şube filtresi yok">
+            Tüm şubeler
           </span>
         ) : null}
         {subeControl.kind === "single" ? (
-          <span className="sube-header-badge" title="Atanan sube">
+          <span className="sube-header-badge" title="Atanan şube">
             {subeControl.label}
           </span>
         ) : null}
@@ -371,14 +370,14 @@ export function ShellHeaderActions({ contextLabel }: ShellHeaderActionsProps) {
                 setIsNotificationsOpen(false);
                 setIsSettingsOpen(false);
               }}
-              aria-label="Sube sec"
+              aria-label="Şube seç"
               aria-expanded={isSubeOpen}
-              title="Sube degistir"
+              title="Şube değiştir"
             >
               <span className="sube-selector-label">
                 {activeSubeId != null
-                  ? subeList.find((sube) => sube.id === activeSubeId)?.ad ?? `Sube ${activeSubeId}`
-                  : "Sube"}
+                  ? subeList.find((sube) => sube.id === activeSubeId)?.ad ?? `Şube ${activeSubeId}`
+                  : "Şube"}
               </span>
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -398,7 +397,7 @@ export function ShellHeaderActions({ contextLabel }: ShellHeaderActionsProps) {
               className={`settings-dropdown sube-selector-dropdown${isSubeOpen ? " open" : ""}`}
             >
               {subeIds.map((id) => {
-                const label = subeList.find((sube) => sube.id === id)?.ad ?? `Sube ${id}`;
+                const label = subeList.find((sube) => sube.id === id)?.ad ?? `Şube ${id}`;
                 return (
                   <button
                     key={id}
@@ -410,7 +409,7 @@ export function ShellHeaderActions({ contextLabel }: ShellHeaderActionsProps) {
                     }}
                   >
                     {label}
-                    {activeSubeId === id ? " (secili)" : ""}
+                    {activeSubeId === id ? " (seçili)" : ""}
                   </button>
                 );
               })}
@@ -427,7 +426,7 @@ export function ShellHeaderActions({ contextLabel }: ShellHeaderActionsProps) {
             setIsSettingsOpen(false);
             setIsSubeOpen(false);
           }}
-          aria-label="Bildirimleri ac"
+          aria-label="Bildirimleri aç"
           aria-expanded={isNotificationsOpen}
         >
           <svg
@@ -453,7 +452,7 @@ export function ShellHeaderActions({ contextLabel }: ShellHeaderActionsProps) {
         >
           {isNotificationsLoading ? (
             <button type="button" className="notification-item notification-empty" disabled>
-              Bildirimler yukleniyor...
+              Bildirimler yükleniyor...
             </button>
           ) : null}
 
@@ -464,7 +463,7 @@ export function ShellHeaderActions({ contextLabel }: ShellHeaderActionsProps) {
                 className="notifications-mark-all-read-btn"
                 onClick={markAllNotificationsAsRead}
               >
-                Tumunu okundu isaretle
+                Tümünü okundu işaretle
               </button>
             </div>
           ) : null}
@@ -507,7 +506,7 @@ export function ShellHeaderActions({ contextLabel }: ShellHeaderActionsProps) {
             setIsNotificationsOpen(false);
             setIsSubeOpen(false);
           }}
-          aria-label="Ayar menusu"
+          aria-label="Ayar menüsü"
           aria-expanded={isSettingsOpen}
         >
           <svg
@@ -536,18 +535,7 @@ export function ShellHeaderActions({ contextLabel }: ShellHeaderActionsProps) {
                 navigateTo("/yonetim-paneli");
               }}
             >
-              Yonetim Paneli
-            </button>
-          ) : null}
-          {canViewAylikOzet ? (
-            <button
-              type="button"
-              data-testid="settings-aylik-ozet"
-              onClick={() => {
-                navigateTo("/aylik-kapanis-ozeti");
-              }}
-            >
-              Aylik Kapanis Ozeti
+              Yönetim Paneli
             </button>
           ) : null}
           <button
@@ -558,7 +546,7 @@ export function ShellHeaderActions({ contextLabel }: ShellHeaderActionsProps) {
               logout();
             }}
           >
-            Cikis
+            Çıkış
           </button>
         </div>
       </div>

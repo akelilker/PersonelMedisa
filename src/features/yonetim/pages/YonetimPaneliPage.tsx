@@ -65,8 +65,8 @@ const INITIAL_SUBE_FORM: SubeFormState = {
 
 function roleOptions() {
   return [
-    { value: "GENEL_YONETICI", label: "Genel Yonetici" },
-    { value: "BOLUM_YONETICISI", label: "Bolum Yonetici" },
+    { value: "GENEL_YONETICI", label: "Genel Yönetici" },
+    { value: "BOLUM_YONETICISI", label: "Bölüm Yöneticisi" },
     { value: "BIRIM_AMIRI", label: "Birim Amiri" },
     { value: "MUHASEBE", label: "Muhasebe" }
   ];
@@ -116,11 +116,11 @@ function toKullaniciPayload(form: KullaniciFormState): UpsertYonetimKullaniciPay
   }
 
   if (form.kullaniciTipi === "IC_PERSONEL" && !form.personelId) {
-    throw new Error("Ic personel kullanicisi icin personel secilmelidir.");
+    throw new Error("İç personel kullanıcısı için personel seçilmelidir.");
   }
 
   if (form.varsayilanSubeId && !form.subeIds.includes(Number.parseInt(form.varsayilanSubeId, 10))) {
-    throw new Error("Varsayilan sube secimi yetki verilen subeler icinde olmalidir.");
+    throw new Error("Varsayılan şube seçimi yetki verilen şubeler içinde olmalıdır.");
   }
 
   return {
@@ -140,7 +140,7 @@ function toSubePayload(form: SubeFormState): UpsertYonetimSubePayload {
   const kod = form.kod.trim().toUpperCase();
   const ad = form.ad.trim();
   if (!kod || !ad) {
-    throw new Error("Sube kodu ve adi zorunludur.");
+    throw new Error("Şube kodu ve adı zorunludur.");
   }
 
   return {
@@ -196,7 +196,7 @@ export function YonetimPaneliPage() {
       setSubeler(subeList);
       setPersoneller(personelList.items);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Yonetim paneli yuklenemedi.");
+      setErrorMessage(error instanceof Error ? error.message : "Yönetim paneli yüklenemedi.");
     } finally {
       setIsLoading(false);
     }
@@ -237,17 +237,17 @@ export function YonetimPaneliPage() {
       const payload = toKullaniciPayload(kullaniciForm);
       if (editingKullaniciId != null) {
         await updateYonetimKullanici(editingKullaniciId, payload);
-        setSuccessMessage("Kullanici yetkileri guncellendi.");
+        setSuccessMessage("Kullanıcı yetkileri güncellendi.");
       } else {
         await createYonetimKullanici(payload);
-        setSuccessMessage("Kullanici kaydi olusturuldu.");
+        setSuccessMessage("Kullanıcı kaydı oluşturuldu.");
       }
 
       setKullaniciForm(INITIAL_KULLANICI_FORM);
       setEditingKullaniciId(null);
       await loadPanel();
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Kullanici kaydi kaydedilemedi.");
+      setErrorMessage(error instanceof Error ? error.message : "Kullanıcı kaydı kaydedilemedi.");
     } finally {
       setIsSubmitting(false);
     }
@@ -267,17 +267,17 @@ export function YonetimPaneliPage() {
       const payload = toSubePayload(subeForm);
       if (editingSubeId != null) {
         await updateYonetimSube(editingSubeId, payload);
-        setSuccessMessage("Sube tanimi guncellendi.");
+        setSuccessMessage("Şube tanımı güncellendi.");
       } else {
         await createYonetimSube(payload);
-        setSuccessMessage("Sube tanimi eklendi.");
+        setSuccessMessage("Şube tanımı eklendi.");
       }
 
       setSubeForm(INITIAL_SUBE_FORM);
       setEditingSubeId(null);
       await loadPanel();
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Sube tanimi kaydedilemedi.");
+      setErrorMessage(error instanceof Error ? error.message : "Şube tanımı kaydedilemedi.");
     } finally {
       setIsSubmitting(false);
     }
@@ -303,18 +303,18 @@ export function YonetimPaneliPage() {
   return (
     <section className="yonetim-page">
       <div className="yonetim-header-row">
-        <h2>Yonetim Paneli</h2>
-        <p>Uygulamayi kullanacak kisileri, rollerini ve sube kapsamlarini buradan yonet.</p>
+        <h2>Yönetim Paneli</h2>
+        <p>Uygulamayı kullanacak kişileri, rollerini ve şube kapsamlarını buradan yönet.</p>
       </div>
 
-      <div className="yonetim-tabs" role="tablist" aria-label="Yonetim sekmeleri">
+      <div className="yonetim-tabs" role="tablist" aria-label="Yönetim sekmeleri">
         <button
           type="button"
           data-testid="yonetim-tab-kullanicilar"
           className={`yonetim-tab-btn${activeTab === "kullanicilar" ? " is-active" : ""}`}
           onClick={() => setActiveTab("kullanicilar")}
         >
-          Kullanicilar
+          Kullanıcılar
         </button>
         <button
           type="button"
@@ -322,22 +322,22 @@ export function YonetimPaneliPage() {
           className={`yonetim-tab-btn${activeTab === "subeler" ? " is-active" : ""}`}
           onClick={() => setActiveTab("subeler")}
         >
-          Sube Tanimlari
+          Şube Tanımları
         </button>
       </div>
 
-      {isLoading ? <LoadingState label="Yonetim paneli yukleniyor..." /> : null}
+      {isLoading ? <LoadingState label="Yönetim paneli yükleniyor..." /> : null}
       {!isLoading && errorMessage ? <ErrorState message={errorMessage} onRetry={() => void loadPanel()} /> : null}
       {!isLoading && successMessage ? <p className="yonetim-success">{successMessage}</p> : null}
 
       {!isLoading && !errorMessage && activeTab === "kullanicilar" ? (
         <div className="yonetim-section-grid">
           <form className="form-filter-panel yonetim-form-panel" onSubmit={handleKullaniciSubmit}>
-            <h3>{editingKullaniciId != null ? "Kullanici Duzenle" : "Yeni Kullanici"}</h3>
+            <h3>{editingKullaniciId != null ? "Kullanıcı Düzenle" : "Yeni Kullanıcı"}</h3>
             <div className="form-field-grid">
               <FormField
                 as="select"
-                label="Kullanici Tipi"
+                label="Kullanıcı Tipi"
                 name="yonetim-kullanici-tipi"
                 value={kullaniciForm.kullaniciTipi}
                 onChange={(value) =>
@@ -348,7 +348,7 @@ export function YonetimPaneliPage() {
                   }))
                 }
                 selectOptions={[
-                  { value: "IC_PERSONEL", label: "Ic Personel" },
+                  { value: "IC_PERSONEL", label: "İç Personel" },
                   { value: "HARICI", label: "Harici" }
                 ]}
               />
@@ -371,11 +371,11 @@ export function YonetimPaneliPage() {
               {kullaniciForm.kullaniciTipi === "IC_PERSONEL" ? (
                 <FormField
                   as="select"
-                  label="Bagli Personel"
+                  label="Bağlı Personel"
                   name="yonetim-kullanici-personel"
                   value={kullaniciForm.personelId}
                   onChange={(value) => setKullaniciForm((prev) => ({ ...prev, personelId: value }))}
-                  placeholderOption={{ value: "", label: "Seciniz" }}
+                  placeholderOption={{ value: "", label: "Seçiniz" }}
                   selectOptions={personelOptions}
                 />
               ) : null}
@@ -397,11 +397,11 @@ export function YonetimPaneliPage() {
               />
               <FormField
                 as="select"
-                label="Varsayilan Sube"
+                label="Varsayılan Şube"
                 name="yonetim-kullanici-varsayilan-sube"
                 value={kullaniciForm.varsayilanSubeId}
                 onChange={(value) => setKullaniciForm((prev) => ({ ...prev, varsayilanSubeId: value }))}
-                placeholderOption={{ value: "", label: "Tum Subeler / Secimsiz" }}
+                placeholderOption={{ value: "", label: "Tüm Şubeler / Seçimsiz" }}
                 selectOptions={subeler.map((sube) => ({ value: String(sube.id), label: sube.ad }))}
               />
               <FormField
@@ -410,13 +410,13 @@ export function YonetimPaneliPage() {
                 name="yonetim-kullanici-notlar"
                 value={kullaniciForm.notlar}
                 onChange={(value) => setKullaniciForm((prev) => ({ ...prev, notlar: value }))}
-                placeholder="Opsiyonel aciklama"
+                placeholder="Opsiyonel açıklama"
               />
             </div>
 
             <div className="yonetim-checkbox-section">
-              <p className="yonetim-checkbox-title">Sube Yetkisi</p>
-              <p className="yonetim-hint">Bos birakilirsa kullanici tum subelerde calisir.</p>
+              <p className="yonetim-checkbox-title">Şube Yetkisi</p>
+              <p className="yonetim-hint">Boş bırakılırsa kullanıcı tüm şubelerde çalışır.</p>
               <div className="yonetim-checkbox-grid">
                 {subeler.map((sube) => (
                   <label key={sube.id} className="yonetim-checkbox-item">
@@ -433,7 +433,7 @@ export function YonetimPaneliPage() {
 
             <div className="form-actions-row">
               <button type="submit" className="universal-btn-save" data-testid="yonetim-kullanici-kaydet">
-                {editingKullaniciId != null ? "Kullaniciyi Guncelle" : "Kullaniciyi Kaydet"}
+                {editingKullaniciId != null ? "Kullanıcıyı Güncelle" : "Kullanıcıyı Kaydet"}
               </button>
               <button
                 type="button"
@@ -450,7 +450,7 @@ export function YonetimPaneliPage() {
           </form>
 
           <div className="yonetim-list-panel">
-            <h3>Mevcut Kullanicilar</h3>
+            <h3>Mevcut Kullanıcılar</h3>
             <ul className="yonetim-entity-list">
               {kullanicilar.map((item) => (
                 <li key={item.id} className="yonetim-entity-item">
@@ -461,18 +461,18 @@ export function YonetimPaneliPage() {
                       {formatAktifDurumLabel(item.durum)}
                     </p>
                     <p>Telefon: {item.telefon ?? "-"}</p>
-                    <p>Bagli Personel: {item.personel_ad_soyad ?? "-"}</p>
+                    <p>Bağlı Personel: {item.personel_ad_soyad ?? "-"}</p>
                     <p>
-                      Yetkili Subeler:{" "}
+                      Yetkili Şubeler:{" "}
                       {item.sube_ids.length > 0
-                        ? item.sube_ids.map((subeId) => subeNameMap.get(subeId) ?? `Sube ${subeId}`).join(", ")
-                        : "Tum Subeler"}
+                        ? item.sube_ids.map((subeId) => subeNameMap.get(subeId) ?? `Şube ${subeId}`).join(", ")
+                        : "Tüm Şubeler"}
                     </p>
                     <p>
-                      Varsayilan Sube:{" "}
+                      Varsayılan Şube:{" "}
                       {item.varsayilan_sube_id != null
-                        ? subeNameMap.get(item.varsayilan_sube_id) ?? `Sube ${item.varsayilan_sube_id}`
-                        : "Tanimsiz"}
+                        ? subeNameMap.get(item.varsayilan_sube_id) ?? `Şube ${item.varsayilan_sube_id}`
+                        : "Tanımsız"}
                     </p>
                   </div>
                   <div className="module-item-actions">
@@ -485,7 +485,7 @@ export function YonetimPaneliPage() {
                         setSuccessMessage(null);
                       }}
                     >
-                      Duzenle
+                      Düzenle
                     </button>
                   </div>
                 </li>
@@ -498,17 +498,17 @@ export function YonetimPaneliPage() {
       {!isLoading && !errorMessage && activeTab === "subeler" ? (
         <div className="yonetim-section-grid">
           <form className="form-filter-panel yonetim-form-panel" onSubmit={handleSubeSubmit}>
-            <h3>{editingSubeId != null ? "Sube Duzenle" : "Yeni Sube"}</h3>
+            <h3>{editingSubeId != null ? "Şube Düzenle" : "Yeni Şube"}</h3>
             <div className="form-field-grid">
               <FormField
-                label="Sube Kodu"
+                label="Şube Kodu"
                 name="yonetim-sube-kod"
                 value={subeForm.kod}
                 onChange={(value) => setSubeForm((prev) => ({ ...prev, kod: value }))}
                 required
               />
               <FormField
-                label="Sube Adi"
+                label="Şube Adı"
                 name="yonetim-sube-ad"
                 value={subeForm.ad}
                 onChange={(value) => setSubeForm((prev) => ({ ...prev, ad: value }))}
@@ -528,13 +528,13 @@ export function YonetimPaneliPage() {
                 name="yonetim-sube-departmanlar"
                 value={subeForm.departmanlar}
                 onChange={(value) => setSubeForm((prev) => ({ ...prev, departmanlar: value }))}
-                placeholder="Virgul ile ayir: Doseme, Depolama"
+                placeholder="Virgül ile ayır: Döşeme, Depolama"
               />
             </div>
 
             <div className="form-actions-row">
               <button type="submit" className="universal-btn-save" data-testid="yonetim-sube-kaydet">
-                {editingSubeId != null ? "Subeyi Guncelle" : "Subeyi Kaydet"}
+                {editingSubeId != null ? "Şubeyi Güncelle" : "Şubeyi Kaydet"}
               </button>
               <button
                 type="button"
@@ -551,7 +551,7 @@ export function YonetimPaneliPage() {
           </form>
 
           <div className="yonetim-list-panel">
-            <h3>Tanimli Subeler</h3>
+            <h3>Tanımlı Şubeler</h3>
             <ul className="yonetim-entity-list">
               {subeler.map((item) => (
                 <li key={item.id} className="yonetim-entity-item">
@@ -572,7 +572,7 @@ export function YonetimPaneliPage() {
                         setSuccessMessage(null);
                       }}
                     >
-                      Duzenle
+                      Düzenle
                     </button>
                   </div>
                 </li>

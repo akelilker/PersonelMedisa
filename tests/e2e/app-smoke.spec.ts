@@ -15,16 +15,14 @@ test("Ana akis smoke", async ({ page }) => {
 
   await page.getByTestId("menu-kayit-surec").click();
   const homeFlowModal = page.locator(".modal-container").last();
-  await expect(
-    homeFlowModal.getByRole("heading", { name: /Personel Giris ve Surec Takibi/i })
-  ).toBeVisible();
-  await expect(homeFlowModal.getByRole("button", { name: "Yeni Kayit" })).toBeVisible();
-  await expect(homeFlowModal.getByRole("button", { name: "Surec" })).toBeVisible();
-  await homeFlowModal.getByRole("button", { name: "Surec" }).click();
-  await homeFlowModal.getByRole("button", { name: /Surec Ekranina Git/i }).click();
+  await expect(homeFlowModal.getByRole("heading", { name: /Personel Giriş ve Süreç Takibi/i })).toBeVisible();
+  await expect(homeFlowModal.getByRole("button", { name: "Yeni Kayıt" })).toBeVisible();
+  await expect(homeFlowModal.getByRole("button", { name: "Süreç" })).toBeVisible();
+  await homeFlowModal.getByRole("button", { name: "Süreç" }).click();
+  await homeFlowModal.getByRole("button", { name: /Süreç Ekranına Git/i }).click();
 
   await expect(page).toHaveURL(/\/surecler$/);
-  await expect(page.locator(".modal-header h2").first()).toContainText("Surec Takibi");
+  await expect(page.locator(".modal-header h2").first()).toContainText("Süreç Takibi");
   await page.locator(".modal-container").first().getByRole("button", { name: "Kapat" }).click();
   await expect(page).toHaveURL("/");
   await expect(page.locator("#main-menu .menu-btn")).toHaveCount(3);

@@ -21,17 +21,17 @@ test.describe("e2e smoke", () => {
 
     await page.getByRole("link", { name: "Detay" }).first().click();
     await expect(page).toHaveURL(/\/personeller\/1$/);
-    await expect(page.locator(".modal-header h2").first()).toContainText("Personel Detayi");
+    await expect(page.locator(".modal-header h2").first()).toContainText("Personel Detayı");
 
     await page.goto("/puantaj");
     await expect(page).toHaveURL(/\/puantaj$/);
-    await expect(page.locator(".modal-header h2").first()).toContainText("Gunluk Puantaj");
+    await expect(page.locator(".modal-header h2").first()).toContainText("Günlük Puantaj");
 
     await page.getByLabel("Personel ID").fill("1");
     await page.getByLabel("Tarih").fill("2026-04-12");
     await page.getByRole("button", { name: /Kayd.*Getir/i }).click();
 
-    await expect(page.getByText(/Hesapland/i)).toBeVisible();
+    await expect(page.getByText(/Hesaplandı/i)).toBeVisible();
     await expect(page.getByText(/510/)).toBeVisible();
 
     await page.locator("[name='puantaj-giris']").fill("08:30");
@@ -42,7 +42,7 @@ test.describe("e2e smoke", () => {
 
     await page.goto("/haftalik-kapanis");
     await expect(page).toHaveURL(/\/haftalik-kapanis$/);
-    await expect(page.locator(".modal-header h2").first()).toContainText("Haftalik Kapanis");
+    await expect(page.locator(".modal-header h2").first()).toContainText("Haftalık Kapanış");
 
     await page.locator("[name='kapanis-bas']").fill("2026-04-06");
     await page.locator("[name='kapanis-bitis']").fill("2026-04-12");
@@ -50,7 +50,7 @@ test.describe("e2e smoke", () => {
     await page.locator(".form-filter-panel button[type='submit']").click();
 
     await expect(page.getByText(/Durum: /)).toBeVisible();
-    await expect(page.getByText(/Kapan.. ID:|KapanÄ±ÅŸ ID:|Kapanis ID:/)).toBeVisible();
+    await expect(page.getByText(/Kapanış ID:/)).toBeVisible();
 
     await page.goto("/raporlar");
     await expect(page).toHaveURL(/\/raporlar$/);
@@ -80,10 +80,10 @@ test.describe("e2e smoke", () => {
     await amirBildirimModal.getByLabel("Tarih").fill("2026-04-11");
     await amirBildirimModal.getByLabel("Personel").selectOption("2");
     await amirBildirimModal.getByLabel("Durum").selectOption("IZINSIZ_GELMEDI");
-    await amirBildirimModal.getByLabel("Aciklama").fill("Habersiz devamsizlik");
+    await amirBildirimModal.getByLabel("Açıklama").fill("Habersiz devamsızlık");
     await amirBildirimModal.getByRole("button", { name: "Kaydet" }).click();
 
-    await expect(page.locator(".bildirimler-list")).toContainText("Izinsiz Gelmedi");
+    await expect(page.locator(".bildirimler-list")).toContainText("İzinsiz Gelmedi");
     await expect(page.locator(".bildirimler-list")).toContainText("Mehmet Kaya");
 
     await page.goto("/personeller");
@@ -116,7 +116,7 @@ test.describe("e2e smoke", () => {
 
     await page.goto("/surecler");
     await expect(page).toHaveURL(/\/surecler$/);
-    await expect(page.locator(".modal-header h2").first()).toContainText("Surec Takibi");
+    await expect(page.locator(".modal-header h2").first()).toContainText("Süreç Takibi");
 
     await page.getByRole("button", { name: /Yeni S.*re.*/i }).click();
     const surecCreateModal = page.locator(".modal-container").last();
@@ -140,7 +140,7 @@ test.describe("e2e smoke", () => {
 
     page.once("dialog", (dialog) => void dialog.accept());
     await page.locator(".surecler-list .module-item-actions button").nth(1).click();
-    await expect(page.locator(".surecler-list")).toContainText(/Iptal|Ä°ptal/i);
+    await expect(page.locator(".surecler-list")).toContainText(/İptal|Iptal/i);
 
     await page.goto("/bildirimler");
     await expect(page).toHaveURL(/\/bildirimler$/);
@@ -152,12 +152,12 @@ test.describe("e2e smoke", () => {
     await bildirimCreateModal.getByLabel("Tarih").fill("2026-04-11");
     await bildirimCreateModal.getByLabel("Personel").selectOption("1");
     await bildirimCreateModal.getByLabel("Durum").selectOption("DEVAMSIZLIK");
-    await bildirimCreateModal.getByLabel("Aciklama").fill("Yeni bildirim kaydi");
+    await bildirimCreateModal.getByLabel("Açıklama").fill("Yeni bildirim kaydı");
     await bildirimCreateModal.getByRole("button", { name: "Kaydet" }).click();
 
-    await expect(page.locator(".bildirimler-list")).toContainText("Devamsizlik");
+    await expect(page.locator(".bildirimler-list")).toContainText("Devamsızlık");
 
-    await page.getByRole("button", { name: "Duzenle" }).first().click();
+    await page.getByRole("button", { name: /Düzenle|Duzenle/i }).first().click();
     const bildirimEditModal = page.locator(".modal-container").last();
     await expect(bildirimEditModal).toBeVisible();
     await bildirimEditModal.getByLabel("Durum").selectOption("RAPORLU");
@@ -166,8 +166,8 @@ test.describe("e2e smoke", () => {
     await expect(page.locator(".bildirimler-list")).toContainText("Raporlu");
 
     page.once("dialog", (dialog) => void dialog.accept());
-    await page.getByRole("button", { name: "Iptal" }).first().click();
-    await expect(page.locator(".bildirimler-list")).toContainText("Durum: Iptal");
+    await page.getByRole("button", { name: /İptal|Iptal/i }).first().click();
+    await expect(page.locator(".bildirimler-list")).toContainText("Durum: İptal");
 
     await page.goto("/finans");
     await expect(page).toHaveURL(/\/finans$/);
@@ -195,6 +195,6 @@ test.describe("e2e smoke", () => {
 
     page.once("dialog", (dialog) => void dialog.accept());
     await page.locator(".finans-list .module-item-actions button").nth(1).click();
-    await expect(page.locator(".finans-list")).toContainText(/Iptal|Ä°ptal/i);
+    await expect(page.locator(".finans-list")).toContainText(/İptal|Iptal/i);
   });
 });

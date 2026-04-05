@@ -24,10 +24,10 @@ test.describe("Rol bazli smoke", () => {
     await expect(page.getByRole("heading", { name: "Personeller" })).toBeVisible();
 
     await page.goto("/surecler");
-    await expect(page.locator(".modal-header h2").first()).toContainText("Surec Takibi");
+    await expect(page.locator(".modal-header h2").first()).toContainText("Süreç Takibi");
 
     await page.goto("/puantaj");
-    await expect(page.locator(".modal-header h2").first()).toContainText("Gunluk Puantaj");
+    await expect(page.locator(".modal-header h2").first()).toContainText("Günlük Puantaj");
 
     await page.goto("/raporlar");
     await expect(page.locator(".modal-header h2").first()).toContainText("Raporlar");
@@ -46,7 +46,7 @@ test.describe("Rol bazli smoke", () => {
     await expect(page.getByRole("heading", { name: "Personeller" })).toBeVisible();
 
     await page.goto("/surecler");
-    await expect(page.locator(".modal-header h2").first()).toContainText("Surec Takibi");
+    await expect(page.locator(".modal-header h2").first()).toContainText("Süreç Takibi");
 
     await page.goto("/raporlar");
     await expect(page.locator(".modal-header h2").first()).toContainText("Raporlar");
@@ -68,7 +68,9 @@ test.describe("Rol bazli smoke", () => {
     await expect(page.locator(".modal-header h2").first()).toContainText("Finans");
   });
 
-  test("Birim amiri 3 ana buton gorur, bildirim akisini kullanir ama finans ve haftalik kapanisa erisemez", async ({ page }) => {
+  test("Birim amiri 3 ana buton gorur, bildirim akisini kullanir ama finans ve haftalik kapanisa erisemez", async ({
+    page
+  }) => {
     await mockApi(page, "BIRIM_AMIRI");
     await login(page, users.birimAmiri);
     await expect(page).toHaveURL("/");
@@ -81,7 +83,7 @@ test.describe("Rol bazli smoke", () => {
     await page.goto("/bildirimler");
     await expect(page.locator(".modal-header h2").first()).toContainText("Bildirimler");
     await expect(
-      page.locator(".bildirimler-header-row").getByRole("button", { name: /Gunluk Durum Bildir|Yeni Bildirim/i })
+      page.locator(".bildirimler-header-row").getByRole("button", { name: /Günlük Durum Bildir|Yeni Bildirim/i })
     ).toBeVisible();
 
     await page.goto("/raporlar");

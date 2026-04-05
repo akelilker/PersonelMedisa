@@ -6,12 +6,10 @@ import { EmptyState } from "../../../components/states/EmptyState";
 import { ErrorState } from "../../../components/states/ErrorState";
 import { LoadingState } from "../../../components/states/LoadingState";
 import { useAppDataRevision } from "../../../data/data-manager";
+import { useRoleAccess } from "../../../hooks/use-role-access";
 import type { ModuleFilterBase } from "../../../lib/filters/module-filter-schema";
 import { formatReportCellValue } from "../../../lib/display/enum-display";
-import {
-  downloadReportCsv,
-  printCurrentReportWindow
-} from "../../../reports/export-report";
+import { downloadReportCsv, printCurrentReportWindow } from "../../../reports/export-report";
 import { generateReport, type ReportEngineRow, type ReportEngineType } from "../../../reports/report-engine";
 import type { RaporAktiflik, RaporFiltreleri, RaporSatiri, RaporTipi } from "../../../types/rapor";
 
@@ -107,6 +105,8 @@ const ENGINE_OPTIONS: Array<{ value: ReportEngineType; label: string }> = [
 ];
 
 export function RaporlarPage() {
+  const { hasPermission } = useRoleAccess();
+  const canViewAylikOzet = hasPermission("aylik-ozet.view");
   const cacheRevision = useAppDataRevision();
   const [engineType, setEngineType] = useState<ReportEngineType>("personel-ozet");
   const [enginePersonelId, setEnginePersonelId] = useState("");
@@ -204,6 +204,7 @@ export function RaporlarPage() {
     <section className="raporlar-page">
       <div className="raporlar-header-row">
         <h2>Raporlar</h2>
+        {canViewAylikOzet ? <Link to="/aylik-kapanis-ozeti">Aylık Kapanış Özeti</Link> : null}
       </div>
 
       <div className="raporlar-source-card">

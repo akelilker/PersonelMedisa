@@ -11,44 +11,47 @@ test.describe("yonetim paneli ve aylik ozet", () => {
 
     await page.getByTestId("header-settings-toggle").click();
     await expect(page.getByTestId("settings-yonetim-paneli")).toBeVisible();
-    await expect(page.getByTestId("settings-aylik-ozet")).toBeVisible();
+    await expect(page.getByTestId("settings-aylik-ozet")).toHaveCount(0);
 
     await page.getByTestId("settings-yonetim-paneli").click();
     await expect(page).toHaveURL(/\/yonetim-paneli$/);
-    await expect(page.locator(".modal-header h2").first()).toContainText("Yonetim Paneli");
-    await expect(page.locator(".yonetim-page .yonetim-header-row h2")).toHaveText("Yonetim Paneli");
+    await expect(page.locator(".modal-header h2").first()).toContainText("Yönetim Paneli");
+    await expect(page.locator(".yonetim-page .yonetim-header-row h2")).toHaveText("Yönetim Paneli");
 
-    await page.getByLabel("Kullanici Tipi").selectOption("HARICI");
+    await page.getByLabel("Kullanıcı Tipi").selectOption("HARICI");
     await page.getByLabel("Rol").selectOption("GENEL_YONETICI");
-    await page.getByLabel("Ad Soyad").fill("Danisman Kullanici");
+    await page.getByLabel("Ad Soyad").fill("Danışman Kullanıcı");
     await page.getByLabel("Telefon").fill("05559998877");
-    await page.getByLabel("Notlar").fill("Disaridan danisman erisimi");
+    await page.getByLabel("Notlar").fill("Dışarıdan danışman erişimi");
     await page.getByTestId("yonetim-kullanici-kaydet").click();
 
-    await expect(page.getByText("Kullanici kaydi olusturuldu.")).toBeVisible();
-    await expect(page.locator(".yonetim-entity-list")).toContainText("Danisman Kullanici");
+    await expect(page.getByText("Kullanıcı kaydı oluşturuldu.")).toBeVisible();
+    await expect(page.locator(".yonetim-entity-list")).toContainText("Danışman Kullanıcı");
     await expect(page.locator(".yonetim-entity-list")).toContainText("Harici");
   });
 
-  test("bolum yoneticisi aylik ozeti gorur, bolum onayi verebilir ve yonetim paneline giremez", async ({
+  test("bolum yoneticisi raporlardan aylik ozeti gorur, bolum onayi verebilir ve yonetim paneline giremez", async ({
     page
   }) => {
     await mockApi(page, "BOLUM_YONETICISI");
     await login(page, { username: "bolum_yonetici", password: "demo123" });
 
     await page.getByTestId("header-settings-toggle").click();
-    await expect(page.getByTestId("settings-aylik-ozet")).toBeVisible();
     await expect(page.getByTestId("settings-yonetim-paneli")).toHaveCount(0);
+    await page.keyboard.press("Escape");
 
-    await page.getByTestId("settings-aylik-ozet").click();
+    await page.getByTestId("menu-raporlar").click();
+    await expect(page).toHaveURL(/\/raporlar$/);
+    await page.getByRole("link", { name: "Aylık Kapanış Özeti" }).click();
+
     await expect(page).toHaveURL(/\/aylik-kapanis-ozeti$/);
-    await expect(page.locator(".modal-header h2").first()).toContainText("Aylik Kapanis Ozeti");
-    await expect(page.locator(".yonetim-page .yonetim-header-row h2")).toHaveText("Aylik Kapanis Ozeti");
+    await expect(page.locator(".modal-header h2").first()).toContainText("Aylık Kapanış Özeti");
+    await expect(page.locator(".yonetim-page .yonetim-header-row h2")).toHaveText("Aylık Kapanış Özeti");
     await expect(page.locator(".raporlar-table tbody tr")).toHaveCount(2);
 
     await page.getByTestId("aylik-ozet-bolum-onay").click();
-    await expect(page.getByText("Secili ay icin bolum onayi verildi.")).toBeVisible();
-    await expect(page.locator(".yonetim-summary-card").first()).toContainText(/BOLUM_ONAYLANDI|Bolum Onaylandi/i);
+    await expect(page.getByText("Seçili ay için bölüm onayı verildi.")).toBeVisible();
+    await expect(page.locator(".yonetim-summary-card").first()).toContainText(/Bölüm Onaylandı/i);
 
     await page.goto("/yonetim-paneli");
     await expect(page).toHaveURL(/\/yetkisiz$/);

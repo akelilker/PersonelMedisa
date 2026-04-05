@@ -15,13 +15,13 @@ type AppShellProps = {
 
 function resolveBackBar(pathname: string): { to: string; label: string } | null {
   if (/^\/personeller\/\d+$/.test(pathname)) {
-    return { to: "/personeller", label: "Personel listesine don" };
+    return { to: "/personeller", label: "Personel listesine dön" };
   }
   if (/^\/surecler\/\d+$/.test(pathname)) {
-    return { to: "/surecler", label: "Surec listesine don" };
+    return { to: "/surecler", label: "Süreç listesine dön" };
   }
   if (/^\/bildirimler\/\d+$/.test(pathname)) {
-    return { to: "/bildirimler", label: "Bildirim listesine don" };
+    return { to: "/bildirimler", label: "Bildirim listesine dön" };
   }
   return null;
 }
@@ -32,21 +32,21 @@ function resolveModuleModal(pathname: string): { title: string; closeTo: string 
   }
 
   if (/^\/personeller\/\d+$/.test(pathname)) {
-    return { title: "Personel Detayi", closeTo: "/personeller" };
+    return { title: "Personel Detayı", closeTo: "/personeller" };
   }
   if (pathname === "/personeller") {
-    return { title: "Personel Karti", closeTo: "/" };
+    return { title: "Personel Kartı", closeTo: "/" };
   }
 
   if (/^\/surecler\/\d+$/.test(pathname)) {
-    return { title: "Surec Detayi", closeTo: "/surecler" };
+    return { title: "Süreç Detayı", closeTo: "/surecler" };
   }
   if (pathname === "/surecler") {
-    return { title: "Surec Takibi", closeTo: "/" };
+    return { title: "Süreç Takibi", closeTo: "/" };
   }
 
   if (/^\/bildirimler\/\d+$/.test(pathname)) {
-    return { title: "Bildirim Detayi", closeTo: "/bildirimler" };
+    return { title: "Bildirim Detayı", closeTo: "/bildirimler" };
   }
   if (pathname === "/bildirimler") {
     return { title: "Bildirimler", closeTo: "/" };
@@ -56,22 +56,22 @@ function resolveModuleModal(pathname: string): { title: string; closeTo: string 
     return { title: "Raporlar", closeTo: "/" };
   }
   if (pathname === "/puantaj") {
-    return { title: "Gunluk Puantaj", closeTo: "/" };
+    return { title: "Günlük Puantaj", closeTo: "/" };
   }
   if (pathname === "/haftalik-kapanis") {
-    return { title: "Haftalik Kapanis", closeTo: "/" };
+    return { title: "Haftalık Kapanış", closeTo: "/" };
   }
   if (pathname === "/finans") {
     return { title: "Finans", closeTo: "/" };
   }
   if (pathname === "/yonetim-paneli") {
-    return { title: "Yonetim Paneli", closeTo: "/" };
+    return { title: "Yönetim Paneli", closeTo: "/" };
   }
   if (pathname === "/aylik-kapanis-ozeti") {
-    return { title: "Aylik Kapanis Ozeti", closeTo: "/" };
+    return { title: "Aylık Kapanış Özeti", closeTo: "/raporlar" };
   }
 
-  return { title: "Modul", closeTo: "/" };
+  return { title: "Modül", closeTo: "/" };
 }
 
 function openKayitFlow(tab: KayitTab, navigate: ReturnType<typeof useNavigate>, closeModal: () => void) {
@@ -117,7 +117,7 @@ export function AppShell({ children }: AppShellProps) {
     <div className="app-container app-shell">
       <main className="content-wrap">
         <div className="shell-top-stack">
-          <Hero title="Personel Yonetim Sistemi" />
+          <Hero title="Personel Yönetim Sistemi" />
           {showShellHeaderActions ? <ShellHeaderActions contextLabel="Ana panel" /> : null}
         </div>
 
@@ -130,7 +130,7 @@ export function AppShell({ children }: AppShellProps) {
               </span>
             </div>
             <button type="button" className="logout-btn" onClick={logout}>
-              Cikis
+              Çıkış
             </button>
           </div>
         ) : null}
@@ -150,7 +150,7 @@ export function AppShell({ children }: AppShellProps) {
 
       {isKayitModalOpen ? (
         <AppModal
-          title="Personel Giris ve Surec Takibi"
+          title="Personel Giriş ve Süreç Takibi"
           onClose={() => setIsKayitModalOpen(false)}
           footer={
             <div className="universal-btn-group modal-footer-actions">
@@ -159,7 +159,7 @@ export function AppShell({ children }: AppShellProps) {
                 className="universal-btn-save"
                 onClick={() => openKayitFlow(kayitTab, navigate, () => setIsKayitModalOpen(false))}
               >
-                {kayitTab === "yeni-kayit" ? "Yeni Personel Ekle" : "Surec Ekranina Git"}
+                {kayitTab === "yeni-kayit" ? "Yeni Personel Ekle" : "Süreç Ekranına Git"}
               </button>
               <button
                 type="button"
@@ -177,26 +177,26 @@ export function AppShell({ children }: AppShellProps) {
               className={`kayit-tab-btn${kayitTab === "yeni-kayit" ? " is-active" : ""}`}
               onClick={() => setKayitTab("yeni-kayit")}
             >
-              Yeni Kayit
+              Yeni Kayıt
             </button>
             <button
               type="button"
               className={`kayit-tab-btn${kayitTab === "surec" ? " is-active" : ""}`}
               onClick={() => setKayitTab("surec")}
             >
-              Surec
+              Süreç
             </button>
           </div>
 
           {kayitTab === "yeni-kayit" ? (
             <div className="kayit-tab-panel">
-              <p>Yeni personel kaydini acip personel karti olusturma akisini baslatir.</p>
+              <p>Yeni personel kaydını açıp personel kartı oluşturma akışını başlatır.</p>
             </div>
           ) : null}
 
           {kayitTab === "surec" ? (
             <div className="kayit-tab-panel">
-              <p>Surec listesini acar ve izin, rapor veya hareket takibine gecis yapar.</p>
+              <p>Süreç listesini açar ve izin, rapor veya hareket takibine geçiş yapar.</p>
             </div>
           ) : null}
         </AppModal>

@@ -6,10 +6,7 @@ import { LoadingState } from "../../../components/states/LoadingState";
 import { fetchDepartmanOptions } from "../../../api/referans.api";
 import { ayiKapat, bolumOnayiVer, fetchAylikKapanisOzeti, fetchYonetimSubeleri } from "../../../api/yonetim.api";
 import { useRoleAccess } from "../../../hooks/use-role-access";
-import {
-  formatAylikOzetStateLabel,
-  formatBooleanLabel
-} from "../../../lib/display/enum-display";
+import { formatAylikOzetStateLabel, formatBooleanLabel } from "../../../lib/display/enum-display";
 import { downloadReportCsv } from "../../../reports/export-report";
 import type { IdOption } from "../../../types/referans";
 import type { AylikOzetResponse } from "../../../types/yonetim";
@@ -71,7 +68,7 @@ export function AylikKapanisOzetiPage() {
       });
       setResult(next);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Aylik ozet yuklenemedi.");
+      setErrorMessage(error instanceof Error ? error.message : "Aylık özet yüklenemedi.");
       setResult(null);
     } finally {
       setIsLoading(false);
@@ -87,7 +84,7 @@ export function AylikKapanisOzetiPage() {
         await loadBaseData();
         await loadSummary(filters);
       } catch (error) {
-        setErrorMessage(error instanceof Error ? error.message : "Aylik ozet yuklenemedi.");
+        setErrorMessage(error instanceof Error ? error.message : "Aylık özet yüklenemedi.");
         setIsLoading(false);
       }
     })();
@@ -116,9 +113,9 @@ export function AylikKapanisOzetiPage() {
         sadece_revizeli: filters.sadeceRevizeli
       });
       setResult(next);
-      setInfoMessage("Secili ay icin bolum onayi verildi.");
+      setInfoMessage("Seçili ay için bölüm onayı verildi.");
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Bolum onayi tamamlanamadi.");
+      setErrorMessage(error instanceof Error ? error.message : "Bölüm onayı tamamlanamadı.");
     } finally {
       setIsActing(false);
     }
@@ -141,9 +138,9 @@ export function AylikKapanisOzetiPage() {
         sadece_revizeli: filters.sadeceRevizeli
       });
       setResult(next);
-      setInfoMessage("Secili ay genel yonetici tarafindan kapatildi.");
+      setInfoMessage("Seçili ay genel yönetici tarafından kapatıldı.");
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Ay kapatilamadi.");
+      setErrorMessage(error instanceof Error ? error.message : "Ay kapatılamadı.");
     } finally {
       setIsActing(false);
     }
@@ -154,22 +151,22 @@ export function AylikKapanisOzetiPage() {
       (result?.items ?? []).map((item) => ({
         "Ad Soyad": item.ad_soyad,
         "Sicil No": item.sicil_no ?? "-",
-        Sube: item.sube,
-        Bolum: item.bolum,
+        Şube: item.sube,
+        Bölüm: item.bolum,
         "Birim Amiri": item.birim_amiri,
-        "Devamsizlik Gun": item.devamsizlik_gun,
-        "Gec Kalma": item.gec_kalma_adet,
-        "Izinli Gelmedi": item.izinli_gelmedi,
-        "Izinsiz Gelmedi": item.izinsiz_gelmedi,
+        "Devamsızlık Gün": item.devamsizlik_gun,
+        "Geç Kalma": item.gec_kalma_adet,
+        "İzinli Gelmedi": item.izinli_gelmedi,
+        "İzinsiz Gelmedi": item.izinsiz_gelmedi,
         Raporlu: item.raporlu,
-        "Tesvik Tutari": item.tesvik_tutari,
-        "Ceza Kesinti Tutari": item.ceza_kesinti_tutari,
-        "Bolum Onay Durumu": formatAylikOzetStateLabel(item.bolum_onay_durumu),
-        "Revize Var Mi": formatBooleanLabel(item.revize_var_mi, {
+        "Teşvik Tutarı": item.tesvik_tutari,
+        "Ceza Kesinti Tutarı": item.ceza_kesinti_tutari,
+        "Bölüm Onay Durumu": formatAylikOzetStateLabel(item.bolum_onay_durumu),
+        "Revize Var Mı": formatBooleanLabel(item.revize_var_mi, {
           trueLabel: "Evet",
-          falseLabel: "Hayir"
+          falseLabel: "Hayır"
         }),
-        "Son Islem": item.son_islem
+        "Son İşlem": item.son_islem
       })),
     [result?.items]
   );
@@ -177,8 +174,8 @@ export function AylikKapanisOzetiPage() {
   return (
     <section className="yonetim-page aylik-ozet-page">
       <div className="yonetim-header-row">
-        <h2>Aylik Kapanis Ozeti</h2>
-        <p>Bolum bazli kontrol, toplu ozet ve ay kapatma akisini buradan yonet.</p>
+        <h2>Aylık Kapanış Özeti</h2>
+        <p>Bölüm bazlı kontrol, toplu özet ve ay kapatma akışını buradan yönet.</p>
       </div>
 
       <form className="form-filter-panel" onSubmit={handleFilterSubmit}>
@@ -193,20 +190,20 @@ export function AylikKapanisOzetiPage() {
           />
           <FormField
             as="select"
-            label="Sube"
+            label="Şube"
             name="aylik-ozet-sube"
             value={filters.subeId}
             onChange={(value) => setFilters((prev) => ({ ...prev, subeId: value }))}
-            placeholderOption={{ value: "", label: "Tum Subeler" }}
+            placeholderOption={{ value: "", label: "Tüm Şubeler" }}
             selectOptions={subeOptions.map((item) => ({ value: String(item.id), label: item.label }))}
           />
           <FormField
             as="select"
-            label="Bolum"
+            label="Bölüm"
             name="aylik-ozet-bolum"
             value={filters.departmanId}
             onChange={(value) => setFilters((prev) => ({ ...prev, departmanId: value }))}
-            placeholderOption={{ value: "", label: "Tum Bolumler" }}
+            placeholderOption={{ value: "", label: "Tüm Bölümler" }}
             selectOptions={departmanOptions.map((item) => ({ value: String(item.id), label: item.label }))}
           />
         </div>
@@ -223,13 +220,13 @@ export function AylikKapanisOzetiPage() {
                 }))
               }
             />
-            <span>Sadece revizeli kayitlar</span>
+            <span>Sadece revizeli kayıtlar</span>
           </label>
         </div>
 
         <div className="form-actions-row">
           <button type="submit" className="universal-btn-aux">
-            Ozeti Getir
+            Özeti Getir
           </button>
           <button
             type="button"
@@ -241,7 +238,7 @@ export function AylikKapanisOzetiPage() {
               downloadReportCsv(`aylik-kapanis-ozeti-${filters.ay}.csv`, Object.keys(exportRows[0]), exportRows);
             }}
           >
-            Excel'e Aktar
+            Excel&apos;e Aktar
           </button>
           {canReview ? (
             <button
@@ -251,7 +248,7 @@ export function AylikKapanisOzetiPage() {
               onClick={() => void handleBolumOnayi()}
               disabled={isActing || !result || result.items.length === 0}
             >
-              Bolum Onayi Ver
+              Bölüm Onayı Ver
             </button>
           ) : null}
           {canFinalize ? (
@@ -262,13 +259,13 @@ export function AylikKapanisOzetiPage() {
               onClick={() => void handleAyKapat()}
               disabled={isActing || !result || result.items.length === 0 || result.pending_bolum_onayi > 0}
             >
-              Ayi Kapat
+              Ayı Kapat
             </button>
           ) : null}
         </div>
       </form>
 
-      {isLoading ? <LoadingState label="Aylik ozet yukleniyor..." /> : null}
+      {isLoading ? <LoadingState label="Aylık özet yükleniyor..." /> : null}
       {!isLoading && errorMessage ? <ErrorState message={errorMessage} onRetry={() => void loadSummary(filters)} /> : null}
       {!isLoading && infoMessage ? <p className="yonetim-success">{infoMessage}</p> : null}
 
@@ -284,11 +281,11 @@ export function AylikKapanisOzetiPage() {
               <strong>{result.summary.toplam_personel}</strong>
             </article>
             <article className="yonetim-summary-card">
-              <span>Toplam Devamsizlik</span>
+              <span>Toplam Devamsızlık</span>
               <strong>{result.summary.toplam_devamsizlik_gun}</strong>
             </article>
             <article className="yonetim-summary-card">
-              <span>Toplam Gec Kalma</span>
+              <span>Toplam Geç Kalma</span>
               <strong>{result.summary.toplam_gec_kalma}</strong>
             </article>
             <article className="yonetim-summary-card">
@@ -296,7 +293,7 @@ export function AylikKapanisOzetiPage() {
               <strong>{result.summary.toplam_raporlu}</strong>
             </article>
             <article className="yonetim-summary-card">
-              <span>Tesvik / Ceza</span>
+              <span>Teşvik / Ceza</span>
               <strong>
                 {toCurrency(result.summary.toplam_tesvik_tutari)} / {toCurrency(result.summary.toplam_ceza_kesinti_tutari)}
               </strong>
@@ -305,7 +302,7 @@ export function AylikKapanisOzetiPage() {
 
           {result.pending_bolum_onayi > 0 ? (
             <p className="yonetim-hint">
-              Bolum onayi bekleyen {result.pending_bolum_onayi} kayit var. Genel yonetici kapatmadan once toplu ozeti
+              Bölüm onayı bekleyen {result.pending_bolum_onayi} kayıt var. Genel yönetici kapatmadan önce toplu özeti
               inceleyebilir.
             </p>
           ) : null}
@@ -316,19 +313,19 @@ export function AylikKapanisOzetiPage() {
                 <tr>
                   <th>Ad Soyad</th>
                   <th>Sicil</th>
-                  <th>Sube</th>
-                  <th>Bolum</th>
+                  <th>Şube</th>
+                  <th>Bölüm</th>
                   <th>Birim Amiri</th>
-                  <th>Devamsizlik</th>
-                  <th>Gec Kalma</th>
-                  <th>Izinli</th>
-                  <th>Izinsiz</th>
+                  <th>Devamsızlık</th>
+                  <th>Geç Kalma</th>
+                  <th>İzinli</th>
+                  <th>İzinsiz</th>
                   <th>Raporlu</th>
-                  <th>Tesvik</th>
+                  <th>Teşvik</th>
                   <th>Ceza</th>
-                  <th>Bolum Onayi</th>
+                  <th>Bölüm Onayı</th>
                   <th>Revize</th>
-                  <th>Son Islem</th>
+                  <th>Son İşlem</th>
                   <th>Detay</th>
                 </tr>
               </thead>
@@ -348,7 +345,7 @@ export function AylikKapanisOzetiPage() {
                     <td>{toCurrency(item.tesvik_tutari)}</td>
                     <td>{toCurrency(item.ceza_kesinti_tutari)}</td>
                     <td>{formatAylikOzetStateLabel(item.bolum_onay_durumu)}</td>
-                    <td>{formatBooleanLabel(item.revize_var_mi, { trueLabel: "Evet", falseLabel: "Hayir" })}</td>
+                    <td>{formatBooleanLabel(item.revize_var_mi, { trueLabel: "Evet", falseLabel: "Hayır" })}</td>
                     <td>{item.son_islem}</td>
                     <td>
                       <Link to={`/personeller/${item.personel_id}`}>Detay</Link>

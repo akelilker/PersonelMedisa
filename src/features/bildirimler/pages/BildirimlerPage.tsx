@@ -94,8 +94,8 @@ function PersonelContextCard({ personel }: PersonelContextCardProps) {
         {personel.ad} {personel.soyad}
       </strong>
       <p>
-        Bolum: {personel.departman_adi ?? "-"}
-        {personel.gorev_adi ? ` | Gorev: ${personel.gorev_adi}` : ""}
+        Bölüm: {personel.departman_adi ?? "-"}
+        {personel.gorev_adi ? ` | Görev: ${personel.gorev_adi}` : ""}
       </p>
       <p>
         Telefon: {personel.telefon ?? "-"}
@@ -292,8 +292,8 @@ export function BildirimlerPage() {
     setEditForm((prev) => ({ ...prev, bildirimTuru: value }));
   }
 
-  const createTitle = isBirimAmiri ? "Gunluk Durum Bildir" : "Yeni Bildirim Ekle";
-  const createButtonLabel = isBirimAmiri ? "Gunluk Durum Bildir" : "Yeni Bildirim";
+  const createTitle = isBirimAmiri ? "Günlük Durum Bildir" : "Yeni Bildirim Ekle";
+  const createButtonLabel = isBirimAmiri ? "Günlük Durum Bildir" : "Yeni Bildirim";
 
   return (
     <section className="bildirimler-page">
@@ -308,10 +308,10 @@ export function BildirimlerPage() {
 
       {isBirimAmiri ? (
         <div className="state-card">
-          <h3>Gunluk Durum Akisi</h3>
+          <h3>Günlük Durum Akışı</h3>
           <p>
-            Gec geldi, gelmedi, izinli gelmedi, izinsiz gelmedi veya raporlu gibi gunluk durumlari
-            personel secerek bu ekrandan kaydedebilirsin.
+            Geç geldi, gelmedi, izinli gelmedi, izinsiz gelmedi veya raporlu gibi günlük durumları
+            personel seçerek bu ekrandan kaydedebilirsin.
           </p>
         </div>
       ) : null}
@@ -327,7 +327,7 @@ export function BildirimlerPage() {
               name="bildirim-filter-personel"
               value={draft.personelId}
               onChange={(value) => updateDraft({ personelId: value })}
-              placeholderOption={{ value: "", label: "Tumu" }}
+              placeholderOption={{ value: "", label: "Tümü" }}
               selectOptions={personelSelectOptions}
             />
           ) : (
@@ -347,14 +347,14 @@ export function BildirimlerPage() {
               name="bildirim-filter-turu"
               value={draft.bildirimTuru}
               onChange={(value) => updateDraft({ bildirimTuru: value })}
-              placeholderOption={{ value: "", label: "Tumu" }}
+              placeholderOption={{ value: "", label: "Tümü" }}
               selectOptions={keyOptionsToSelectOptions(bildirimTuruOptions)}
             />
           ) : (
             <FormField
               label="Durum"
               name="bildirim-filter-turu-text"
-              placeholder="GEC_GELDI, GELMEDI..."
+              placeholder="Örn. GEC_GELDI, GELMEDI..."
               value={draft.bildirimTuru}
               onChange={(value) => updateDraft({ bildirimTuru: value })}
             />
@@ -378,7 +378,7 @@ export function BildirimlerPage() {
         </div>
       </form>
 
-      {isLoading ? <LoadingState label="Bildirim verileri yukleniyor..." /> : null}
+      {isLoading ? <LoadingState label="Bildirim verileri yükleniyor..." /> : null}
 
       {!isLoading && errorMessage ? (
         <ErrorState message={errorMessage} onRetry={() => void refetch()} />
@@ -386,8 +386,8 @@ export function BildirimlerPage() {
 
       {!isLoading && !errorMessage && bildirimler.length === 0 ? (
         <EmptyState
-          title="Bildirim bulunamadi"
-          message="Secilen tarihte veya filtrede bildirim kaydi yok."
+          title="Bildirim bulunamadı"
+          message="Seçilen tarihte veya filtrede bildirim kaydı yok."
         />
       ) : null}
 
@@ -412,7 +412,7 @@ export function BildirimlerPage() {
                     {personel ? `${personel.ad} ${personel.soyad}` : bildirim.personel_id ?? "-"}
                   </p>
                   <p>
-                    Bolum:{" "}
+                    Bölüm:{" "}
                     {formatDepartmanLabel(
                       bildirim.departman_id,
                       personel?.departman_adi,
@@ -420,7 +420,7 @@ export function BildirimlerPage() {
                     )}
                   </p>
                   {personel?.telefon ? <p>Telefon: {personel.telefon}</p> : null}
-                  {bildirim.aciklama ? <p>Aciklama: {bildirim.aciklama}</p> : null}
+                  {bildirim.aciklama ? <p>Açıklama: {bildirim.aciklama}</p> : null}
                 </div>
 
                 <div className="module-item-actions">
@@ -446,7 +446,7 @@ export function BildirimlerPage() {
                       onClick={() => openEditModal(bildirim, canEditBildirim)}
                       disabled={cancelingBildirimId === bildirim.id}
                     >
-                      Duzenle
+                      Düzenle
                     </button>
                   ) : null}
                   {canCancelBildirim ? (
@@ -456,7 +456,7 @@ export function BildirimlerPage() {
                       onClick={() => void cancelBildirimHandler(bildirim, canCancelBildirim)}
                       disabled={cancelingBildirimId === bildirim.id}
                     >
-                      {cancelingBildirimId === bildirim.id ? "Iptal Ediliyor..." : "Iptal"}
+                      {cancelingBildirimId === bildirim.id ? "İptal Ediliyor..." : "İptal"}
                     </button>
                   ) : null}
                 </div>
@@ -473,7 +473,7 @@ export function BildirimlerPage() {
           onClick={() => setPage((prev) => Math.max(1, prev - 1))}
           disabled={isLoading || page <= 1}
         >
-          Onceki
+          Önceki
         </button>
         <span className="module-page-info">
           Sayfa {page}
@@ -490,8 +490,8 @@ export function BildirimlerPage() {
       </div>
 
       <div className="module-links">
-        <Link to="/">Ana ekrana don</Link>
-        <Link to="/surecler">Surec takibe git</Link>
+        <Link to="/">Ana ekrana dön</Link>
+        <Link to="/surecler">Süreç takibe git</Link>
         <Link to="/puantaj">Puantaja git</Link>
       </div>
 
@@ -515,7 +515,7 @@ export function BildirimlerPage() {
                 onClick={closeCreateModal}
                 disabled={isCreateSubmitting}
               >
-                Vazgec
+                Vazgeç
               </button>
             </div>
           }
@@ -538,7 +538,7 @@ export function BildirimlerPage() {
                 value={createForm.personelId}
                 onChange={handleCreatePersonelChange}
                 required
-                placeholderOption={{ value: "", label: "Seciniz" }}
+                placeholderOption={{ value: "", label: "Seçiniz" }}
                 selectOptions={personelSelectOptions}
               />
             ) : (
@@ -555,7 +555,7 @@ export function BildirimlerPage() {
 
             {personelSelectOptions.length > 0 ? (
               <FormField
-                label="Bolum"
+                label="Bölüm"
                 name="bildirim-create-departman-info"
                 value={formatDepartmanLabel(
                   selectedCreatePersonel?.departman_id,
@@ -568,17 +568,17 @@ export function BildirimlerPage() {
             ) : departmanOptions.length > 0 ? (
               <FormField
                 as="select"
-                label="Bolum"
+                label="Bölüm"
                 name="bildirim-create-departman"
                 value={createForm.departmanId}
                 onChange={(value) => setCreateForm((prev) => ({ ...prev, departmanId: value }))}
                 required
-                placeholderOption={{ value: "", label: "Seciniz" }}
+                placeholderOption={{ value: "", label: "Seçiniz" }}
                 selectOptions={idOptionsToSelectOptions(departmanOptions)}
               />
             ) : (
               <FormField
-                label="Bolum"
+                label="Bölüm"
                 name="bildirim-create-departman-num"
                 type="number"
                 min={1}
@@ -591,7 +591,7 @@ export function BildirimlerPage() {
             <PersonelContextCard personel={selectedCreatePersonel} />
 
             <div className="bildirim-quick-types">
-              <span className="bildirim-quick-types-label">Hizli Durum Sec</span>
+              <span className="bildirim-quick-types-label">Hızlı Durum Seç</span>
               <div className="bildirim-quick-types-row">
                 {quickBildirimOptions.map((option) => (
                   <button
@@ -614,7 +614,7 @@ export function BildirimlerPage() {
                 value={createForm.bildirimTuru}
                 onChange={(value) => setCreateForm((prev) => ({ ...prev, bildirimTuru: value }))}
                 required
-                placeholderOption={{ value: "", label: "Seciniz" }}
+                placeholderOption={{ value: "", label: "Seçiniz" }}
                 selectOptions={keyOptionsToSelectOptions(bildirimTuruOptions)}
               />
             ) : (
@@ -629,7 +629,7 @@ export function BildirimlerPage() {
 
             <FormField
               as="textarea"
-              label="Aciklama"
+              label="Açıklama"
               name="bildirim-create-aciklama"
               value={createForm.aciklama}
               onChange={(value) => setCreateForm((prev) => ({ ...prev, aciklama: value }))}
@@ -643,7 +643,7 @@ export function BildirimlerPage() {
 
       {canEditBildirim && editingBildirim ? (
         <AppModal
-          title={`Bildirim Duzenle #${editingBildirim.id}`}
+          title={`Bildirim Düzenle #${editingBildirim.id}`}
           onClose={closeEditModal}
           footer={
             <div className="universal-btn-group modal-footer-actions">
@@ -661,7 +661,7 @@ export function BildirimlerPage() {
                 onClick={closeEditModal}
                 disabled={isEditSubmitting}
               >
-                Vazgec
+                Vazgeç
               </button>
             </div>
           }
@@ -684,7 +684,7 @@ export function BildirimlerPage() {
                 value={editForm.personelId}
                 onChange={handleEditPersonelChange}
                 required
-                placeholderOption={{ value: "", label: "Seciniz" }}
+                placeholderOption={{ value: "", label: "Seçiniz" }}
                 selectOptions={personelSelectOptions}
               />
             ) : (
@@ -701,7 +701,7 @@ export function BildirimlerPage() {
 
             {personelSelectOptions.length > 0 ? (
               <FormField
-                label="Bolum"
+                label="Bölüm"
                 name="bildirim-edit-departman-info"
                 value={formatDepartmanLabel(
                   selectedEditPersonel?.departman_id,
@@ -714,17 +714,17 @@ export function BildirimlerPage() {
             ) : departmanOptions.length > 0 ? (
               <FormField
                 as="select"
-                label="Bolum"
+                label="Bölüm"
                 name="bildirim-edit-departman"
                 value={editForm.departmanId}
                 onChange={(value) => setEditForm((prev) => ({ ...prev, departmanId: value }))}
                 required
-                placeholderOption={{ value: "", label: "Seciniz" }}
+                placeholderOption={{ value: "", label: "Seçiniz" }}
                 selectOptions={idOptionsToSelectOptions(departmanOptions)}
               />
             ) : (
               <FormField
-                label="Bolum"
+                label="Bölüm"
                 name="bildirim-edit-departman-num"
                 type="number"
                 min={1}
@@ -737,7 +737,7 @@ export function BildirimlerPage() {
             <PersonelContextCard personel={selectedEditPersonel} />
 
             <div className="bildirim-quick-types">
-              <span className="bildirim-quick-types-label">Hizli Durum Sec</span>
+              <span className="bildirim-quick-types-label">Hızlı Durum Seç</span>
               <div className="bildirim-quick-types-row">
                 {quickBildirimOptions.map((option) => (
                   <button
@@ -760,7 +760,7 @@ export function BildirimlerPage() {
                 value={editForm.bildirimTuru}
                 onChange={(value) => setEditForm((prev) => ({ ...prev, bildirimTuru: value }))}
                 required
-                placeholderOption={{ value: "", label: "Seciniz" }}
+                placeholderOption={{ value: "", label: "Seçiniz" }}
                 selectOptions={keyOptionsToSelectOptions(bildirimTuruOptions)}
               />
             ) : (
@@ -775,7 +775,7 @@ export function BildirimlerPage() {
 
             <FormField
               as="textarea"
-              label="Aciklama"
+              label="Açıklama"
               name="bildirim-edit-aciklama"
               value={editForm.aciklama}
               onChange={(value) => setEditForm((prev) => ({ ...prev, aciklama: value }))}

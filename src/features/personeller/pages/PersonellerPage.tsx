@@ -1,4 +1,4 @@
-import { useEffect, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { AppModal } from "../../../components/modal/AppModal";
 import { FormField } from "../../../components/form/FormField";
@@ -13,6 +13,67 @@ import type { Personel } from "../../../types/personel";
 import type { IdOption } from "../../../types/referans";
 
 const PERSONEL_CREATE_FORM_ID = "personel-create-form";
+
+function IconSearch(props: { className?: string }) {
+  return (
+    <svg
+      className={props.className}
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <circle cx="11" cy="11" r="8" />
+      <path d="m21 21-4.3-4.3" />
+    </svg>
+  );
+}
+
+function IconList(props: { className?: string }) {
+  return (
+    <svg
+      className={props.className}
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />
+    </svg>
+  );
+}
+
+function IconGrid(props: { className?: string }) {
+  return (
+    <svg
+      className={props.className}
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <rect x="3" y="3" width="7" height="7" rx="1" />
+      <rect x="14" y="3" width="7" height="7" rx="1" />
+      <rect x="3" y="14" width="7" height="7" rx="1" />
+      <rect x="14" y="14" width="7" height="7" rx="1" />
+    </svg>
+  );
+}
 
 function toSelectOptions(options: IdOption[]) {
   return options.map((option) => ({ value: String(option.id), label: option.label }));
@@ -68,6 +129,8 @@ export function PersonellerPage() {
   const canOpenDetail = hasPermission("personeller.detail.view");
   const location = useLocation();
   const navigate = useNavigate();
+  const [filtersExpanded, setFiltersExpanded] = useState(false);
+  const [viewMode, setViewMode] = useState<"list" | "grid">("list");
 
   useEffect(() => {
     const currentState = (location.state ?? null) as Record<string, unknown> | null;
@@ -92,12 +155,6 @@ export function PersonellerPage() {
     void createPersonelHandler(event, canCreatePersonel);
   }
 
-  const aktiflikSelectOptions = [
-    { value: "tum", label: "Tumu" },
-    { value: "aktif", label: "Aktif" },
-    { value: "pasif", label: "Pasif" }
-  ];
-
   const aktifDurumOptions = [
     { value: "AKTIF", label: formatAktifDurumLabel("AKTIF") },
     { value: "PASIF", label: formatAktifDurumLabel("PASIF") }
@@ -119,88 +176,166 @@ export function PersonellerPage() {
   const personelTipiFilterOptions = toSelectOptions(refs.personelTipiOptions);
 
   return (
-    <section className="personeller-page">
-      <div className="personeller-header-row">
-        <h2>Personeller</h2>
-        {canCreatePersonel ? (
-          <button type="button" className="universal-btn-aux" onClick={openCreateModal}>
-            Yeni Personel
+    <section className="personeller-page" aria-labelledby="personeller-page-heading">
+      <h2 id="personeller-page-heading" className="personeller-sr-only">
+        Personeller
+      </h2>
+
+      <div className="personeller-toolbar">
+        <div className="personeller-toolbar-left">
+          <button
+            type="button"
+            className="personeller-icon-btn"
+            aria-expanded={filtersExpanded}
+            aria-controls="personeller-filter-panel"
+            aria-label={filtersExpanded ? "Filtreleri kapat" : "Filtreleri ac"}
+            onClick={() => setFiltersExpanded((open) => !open)}
+          >
+            <IconSearch />
           </button>
-        ) : null}
+        </div>
+        <div className="personeller-toolbar-right">
+          <div className="personeller-view-toggle" role="group" aria-label="Liste gorunumu">
+            <button
+              type="button"
+              className="personeller-icon-btn"
+              aria-pressed={viewMode === "list"}
+              aria-label="Liste gorunumu"
+              onClick={() => setViewMode("list")}
+            >
+              <IconList />
+            </button>
+            <button
+              type="button"
+              className="personeller-icon-btn"
+              aria-pressed={viewMode === "grid"}
+              aria-label="Izgara gorunumu"
+              onClick={() => setViewMode("grid")}
+            >
+              <IconGrid />
+            </button>
+          </div>
+          {canCreatePersonel ? (
+            <button
+              type="button"
+              className="personeller-add-icon-btn"
+              onClick={openCreateModal}
+              aria-label="Yeni personel ekle"
+            >
+              +
+            </button>
+          ) : null}
+        </div>
       </div>
 
       <SubeDetailListNotice />
 
-      <form className="form-filter-panel" onSubmit={submitFilters}>
-        <div className="form-field-grid">
-          <FormField
-            label="Ara"
-            name="personel-filter-search"
-            placeholder="Ad, soyad veya T.C. Kimlik No"
-            value={draft.search}
-            onChange={setDraftSearch}
-          />
-          {departmanFilterOptions.length > 0 ? (
+      {filtersExpanded ? (
+        <form
+          id="personeller-filter-panel"
+          className="personeller-filter-panel"
+          onSubmit={submitFilters}
+        >
+          <div className="personeller-filter-primary form-field-grid">
             <FormField
-              as="select"
-              label="Bolum"
-              name="personel-filter-departman"
-              value={draft.departmanId}
-              onChange={setDraftDepartmanId}
-              placeholderOption={{ value: "", label: "Tumu" }}
-              selectOptions={departmanFilterOptions}
+              label="Ara"
+              name="personel-filter-search"
+              placeholder="Ad, soyad veya T.C. Kimlik No"
+              value={draft.search}
+              onChange={setDraftSearch}
             />
-          ) : (
-            <FormField
-              label="Bolum"
-              name="personel-filter-departman-num"
-              type="number"
-              min={1}
-              placeholder="Tumu"
-              value={draft.departmanId}
-              onChange={setDraftDepartmanId}
-            />
-          )}
-          {personelTipiFilterOptions.length > 0 ? (
-            <FormField
-              as="select"
-              label="Personel Tipi"
-              name="personel-filter-personel-tipi"
-              value={draft.personelTipiId}
-              onChange={setDraftPersonelTipiId}
-              placeholderOption={{ value: "", label: "Tumu" }}
-              selectOptions={personelTipiFilterOptions}
-            />
-          ) : (
-            <FormField
-              label="Personel Tipi"
-              name="personel-filter-personel-tipi-num"
-              type="number"
-              min={1}
-              placeholder="Tumu"
-              value={draft.personelTipiId}
-              onChange={setDraftPersonelTipiId}
-            />
-          )}
-          <FormField
-            as="select"
-            label="Aktiflik"
-            name="personel-filter-aktiflik"
-            value={draft.aktiflik}
-            onChange={(value) => setDraftAktiflik(value as "aktif" | "pasif" | "tum")}
-            selectOptions={aktiflikSelectOptions}
-          />
-        </div>
+            {departmanFilterOptions.length > 0 ? (
+              <FormField
+                as="select"
+                label="Bolum"
+                name="personel-filter-departman"
+                value={draft.departmanId}
+                onChange={setDraftDepartmanId}
+                placeholderOption={{ value: "", label: "Tumu" }}
+                selectOptions={departmanFilterOptions}
+              />
+            ) : (
+              <FormField
+                label="Bolum"
+                name="personel-filter-departman-num"
+                type="number"
+                min={1}
+                placeholder="Tumu"
+                value={draft.departmanId}
+                onChange={setDraftDepartmanId}
+              />
+            )}
+          </div>
 
-        <div className="form-actions-row">
-          <button type="submit" className="universal-btn-aux">
-            Filtrele
-          </button>
-          <button type="button" className="universal-btn-aux" onClick={clearFilters}>
-            Temizle
-          </button>
-        </div>
-      </form>
+          <div className="personeller-filter-secondary">
+            {personelTipiFilterOptions.length > 0 ? (
+              <FormField
+                as="select"
+                label="Personel tipi"
+                name="personel-filter-personel-tipi"
+                value={draft.personelTipiId}
+                onChange={setDraftPersonelTipiId}
+                placeholderOption={{ value: "", label: "Tumu" }}
+                selectOptions={personelTipiFilterOptions}
+              />
+            ) : (
+              <FormField
+                label="Personel tipi"
+                name="personel-filter-personel-tipi-num"
+                type="number"
+                min={1}
+                placeholder="Tumu"
+                value={draft.personelTipiId}
+                onChange={setDraftPersonelTipiId}
+              />
+            )}
+            <div className="personeller-aktiflik-group" role="group" aria-label="Aktiflik">
+              <span className="personeller-aktiflik-label">Aktiflik</span>
+              <div className="personeller-aktiflik-checks">
+                <label className="personeller-checkbox-inline">
+                  <input
+                    type="checkbox"
+                    name="personel-filter-aktif"
+                    checked={draft.aktiflik === "aktif"}
+                    onChange={(event) => {
+                      if (event.target.checked) {
+                        setDraftAktiflik("aktif");
+                      } else if (draft.aktiflik === "aktif") {
+                        setDraftAktiflik("tum");
+                      }
+                    }}
+                  />
+                  <span>Aktif</span>
+                </label>
+                <label className="personeller-checkbox-inline">
+                  <input
+                    type="checkbox"
+                    name="personel-filter-pasif"
+                    checked={draft.aktiflik === "pasif"}
+                    onChange={(event) => {
+                      if (event.target.checked) {
+                        setDraftAktiflik("pasif");
+                      } else if (draft.aktiflik === "pasif") {
+                        setDraftAktiflik("tum");
+                      }
+                    }}
+                  />
+                  <span>Pasif</span>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div className="form-actions-row personeller-filter-actions">
+            <button type="submit" className="universal-btn-aux">
+              Filtrele
+            </button>
+            <button type="button" className="universal-btn-aux" onClick={clearFilters}>
+              Temizle
+            </button>
+          </div>
+        </form>
+      ) : null}
 
       {isLoading ? <LoadingState label="Personel verileri yukleniyor..." /> : null}
 
@@ -216,14 +351,22 @@ export function PersonellerPage() {
       ) : null}
 
       {!isLoading && !errorMessage && personeller.length > 0 ? (
-        <ul className="personeller-list">
+        <div
+          className={`personeller-list-wrap${viewMode === "grid" ? " personeller-list-wrap--grid" : ""}`}
+        >
+          <ul
+            className={`personeller-list${viewMode === "grid" ? " personeller-list--grid" : ""}`}
+          >
           {personeller.map((personel: Personel) => {
             const personelCallHref = buildTelHref(personel.telefon);
             const emergencyCallHref = buildTelHref(personel.acil_durum_telefon);
             const hasActions = Boolean(personelCallHref || emergencyCallHref || canOpenDetail);
 
             return (
-              <li key={personel.id} className="personeller-item">
+              <li
+                key={personel.id}
+                className={`personeller-item${viewMode === "grid" ? " personeller-item--grid" : ""}`}
+              >
                 <div className="personeller-item-content">
                   <strong>{`${personel.ad} ${personel.soyad}`}</strong>
                   <div className="personeller-item-badges">
@@ -269,7 +412,8 @@ export function PersonellerPage() {
               </li>
             );
           })}
-        </ul>
+          </ul>
+        </div>
       ) : null}
 
       <div className="module-pagination">

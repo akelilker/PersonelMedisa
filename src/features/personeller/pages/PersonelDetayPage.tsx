@@ -1,4 +1,4 @@
-import { type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Link, useParams } from "react-router-dom";
 import { FormField } from "../../../components/form/FormField";
 import { EmptyState } from "../../../components/states/EmptyState";
@@ -7,6 +7,17 @@ import { LoadingState } from "../../../components/states/LoadingState";
 import { useRoleAccess } from "../../../hooks/use-role-access";
 import { usePersonelDetail } from "../../../hooks/usePersoneller";
 import { formatAktifDurumLabel } from "../../../lib/display/enum-display";
+import type { Personel } from "../../../types/personel";
+
+const PERSONEL_KART_TABS = [
+  { id: "genel", label: "Genel" },
+  { id: "izin", label: "Izin ve hizmet" },
+  { id: "puantaj", label: "Puantaj" },
+  { id: "tesvik", label: "Tesvik" },
+  { id: "finans", label: "Finans" }
+] as const;
+
+type PersonelKartTabId = (typeof PERSONEL_KART_TABS)[number]["id"];
 
 function formatDetailValue(value: string | null | undefined) {
   if (typeof value !== "string") {
@@ -38,6 +49,91 @@ function buildTelHref(value: string | null | undefined) {
   return digits ? `tel:${digits}` : null;
 }
 
+function PersonelKartPanelGenel({ personel }: { personel: Personel }) {
+  return (
+    <div className="personel-detail-grid">
+      <section className="personel-detail-section">
+        <h3>Ana kart</h3>
+        <p>
+          <strong>Ad Soyad:</strong> {personel.ad} {personel.soyad}
+        </p>
+        <p>
+          <strong>T.C. Kimlik No:</strong> {personel.tc_kimlik_no}
+        </p>
+        <p>
+          <strong>Telefon:</strong> {formatDetailValue(personel.telefon)}
+        </p>
+        <p>
+          <strong>Dogum Tarihi:</strong> {formatDetailValue(personel.dogum_tarihi)}
+        </p>
+        <p>
+          <strong>Dogum Yeri:</strong> {formatDetailValue(personel.dogum_yeri)}
+        </p>
+        <p>
+          <strong>Kan Grubu:</strong> {formatDetailValue(personel.kan_grubu)}
+        </p>
+        <p>
+          <strong>Sicil No:</strong> {formatDetailValue(personel.sicil_no)}
+        </p>
+        <p>
+          <strong>Ise Giris Tarihi:</strong> {formatDetailValue(personel.ise_giris_tarihi)}
+        </p>
+        <p>
+          <strong>Durum:</strong> {formatAktifDurumLabel(personel.aktif_durum)}
+        </p>
+      </section>
+
+      <section className="personel-detail-section">
+        <h3>Referanslar</h3>
+        <p>
+          <strong>Bolum:</strong> {formatReferenceValue(personel.departman_adi, personel.departman_id)}
+        </p>
+        <p>
+          <strong>Gorev:</strong> {formatReferenceValue(personel.gorev_adi, personel.gorev_id)}
+        </p>
+        <p>
+          <strong>Personel Tipi:</strong>{" "}
+          {formatReferenceValue(personel.personel_tipi_adi, personel.personel_tipi_id)}
+        </p>
+        <p>
+          <strong>Bagli Amir:</strong> {formatReferenceValue(personel.bagli_amir_adi, personel.bagli_amir_id)}
+        </p>
+        <p>
+          <strong>Acil Durum Kisisi:</strong> {formatDetailValue(personel.acil_durum_kisi)}
+        </p>
+        <p>
+          <strong>Acil Durum Telefonu:</strong> {formatDetailValue(personel.acil_durum_telefon)}
+        </p>
+      </section>
+    </div>
+  );
+}
+
+function PersonelKartPanelIzin({ personel }: { personel: Personel }) {
+  return (
+    <div className="personel-detail-grid">
+      <section className="personel-detail-section personel-kart-panel-wide">
+        <h3>Sistem ozeti</h3>
+        <p>
+          <strong>Hizmet Suresi:</strong> {formatDetailValue(personel.hizmet_suresi)}
+        </p>
+        <p>
+          <strong>Toplam Izin Hakki:</strong> {formatDetailNumber(personel.toplam_izin_hakki)}
+        </p>
+        <p>
+          <strong>Kullanilan Izin:</strong> {formatDetailNumber(personel.kullanilan_izin)}
+        </p>
+        <p>
+          <strong>Kalan Izin:</strong> {formatDetailNumber(personel.kalan_izin)}
+        </p>
+        <p>
+          <strong>Pasiflik Etiketi:</strong> {formatDetailValue(personel.pasiflik_durumu_etiketi)}
+        </p>
+      </section>
+    </div>
+  );
+}
+
 export function PersonelDetayPage() {
   const { personelId } = useParams();
   const parsedPersonelId = Number.parseInt(personelId ?? "", 10);
@@ -49,6 +145,9 @@ export function PersonelDetayPage() {
   const canCreateBildirim = hasPermission("bildirimler.create");
   const canViewBildirimler = hasPermission("bildirimler.view");
   const canViewPuantaj = hasPermission("puantaj.view");
+  const canViewFinans = hasPermission("finans.view");
+
+  const [activeTab, setActiveTab] = useState<PersonelKartTabId>("genel");
 
   const {
     personel,
@@ -65,6 +164,10 @@ export function PersonelDetayPage() {
     updatePersonelHandler
   } = usePersonelDetail(parsedPersonelId, hasValidId);
 
+  useEffect(() => {
+    setActiveTab("genel");
+  }, [parsedPersonelId]);
+
   const aktifDurumOptions = [
     { value: "AKTIF", label: formatAktifDurumLabel("AKTIF") },
     { value: "PASIF", label: formatAktifDurumLabel("PASIF") }
@@ -77,9 +180,12 @@ export function PersonelDetayPage() {
     void updatePersonelHandler(event, canEditPersonel);
   }
 
+  const pageHeading =
+    personel != null ? `${personel.ad} ${personel.soyad} kisi karti` : "Personel detayi";
+
   return (
-    <section className="personel-detay-page">
-      <h2>Personel Detayi</h2>
+    <section className="personel-detay-page" aria-label={pageHeading}>
+      <h2 className="personeller-sr-only">{pageHeading}</h2>
 
       {isLoading ? <LoadingState label="Personel detayi yukleniyor..." /> : null}
 
@@ -95,81 +201,6 @@ export function PersonelDetayPage() {
         <div className="personel-detail-card">
           {!isEditing ? (
             <>
-              <div className="personel-detail-grid">
-                <section className="personel-detail-section">
-                  <h3>Ana Kart</h3>
-                  <p>
-                    <strong>Ad Soyad:</strong> {personel.ad} {personel.soyad}
-                  </p>
-                  <p>
-                    <strong>T.C. Kimlik No:</strong> {personel.tc_kimlik_no}
-                  </p>
-                  <p>
-                    <strong>Telefon:</strong> {formatDetailValue(personel.telefon)}
-                  </p>
-                  <p>
-                    <strong>Dogum Tarihi:</strong> {formatDetailValue(personel.dogum_tarihi)}
-                  </p>
-                  <p>
-                    <strong>Dogum Yeri:</strong> {formatDetailValue(personel.dogum_yeri)}
-                  </p>
-                  <p>
-                    <strong>Kan Grubu:</strong> {formatDetailValue(personel.kan_grubu)}
-                  </p>
-                  <p>
-                    <strong>Sicil No:</strong> {formatDetailValue(personel.sicil_no)}
-                  </p>
-                  <p>
-                    <strong>Ise Giris Tarihi:</strong> {formatDetailValue(personel.ise_giris_tarihi)}
-                  </p>
-                  <p>
-                    <strong>Durum:</strong> {formatAktifDurumLabel(personel.aktif_durum)}
-                  </p>
-                </section>
-
-                <section className="personel-detail-section">
-                  <h3>Referanslar</h3>
-                  <p>
-                    <strong>Bolum:</strong> {formatReferenceValue(personel.departman_adi, personel.departman_id)}
-                  </p>
-                  <p>
-                    <strong>Gorev:</strong> {formatReferenceValue(personel.gorev_adi, personel.gorev_id)}
-                  </p>
-                  <p>
-                    <strong>Personel Tipi:</strong>{" "}
-                    {formatReferenceValue(personel.personel_tipi_adi, personel.personel_tipi_id)}
-                  </p>
-                  <p>
-                    <strong>Bagli Amir:</strong> {formatReferenceValue(personel.bagli_amir_adi, personel.bagli_amir_id)}
-                  </p>
-                  <p>
-                    <strong>Acil Durum Kisisi:</strong> {formatDetailValue(personel.acil_durum_kisi)}
-                  </p>
-                  <p>
-                    <strong>Acil Durum Telefonu:</strong> {formatDetailValue(personel.acil_durum_telefon)}
-                  </p>
-                </section>
-
-                <section className="personel-detail-section">
-                  <h3>Sistem Ozeti</h3>
-                  <p>
-                    <strong>Hizmet Suresi:</strong> {formatDetailValue(personel.hizmet_suresi)}
-                  </p>
-                  <p>
-                    <strong>Toplam Izin Hakki:</strong> {formatDetailNumber(personel.toplam_izin_hakki)}
-                  </p>
-                  <p>
-                    <strong>Kullanilan Izin:</strong> {formatDetailNumber(personel.kullanilan_izin)}
-                  </p>
-                  <p>
-                    <strong>Kalan Izin:</strong> {formatDetailNumber(personel.kalan_izin)}
-                  </p>
-                  <p>
-                    <strong>Pasiflik Etiketi:</strong> {formatDetailValue(personel.pasiflik_durumu_etiketi)}
-                  </p>
-                </section>
-              </div>
-
               <div className="personel-detail-actions">
                 {personelCallHref ? (
                   <a className="universal-btn-aux" href={personelCallHref}>
@@ -215,6 +246,98 @@ export function PersonelDetayPage() {
                     Duzenle
                   </button>
                 ) : null}
+              </div>
+
+              <div className="personel-kart-tablist" role="tablist" aria-label="Kisi karti sekmeleri">
+                {PERSONEL_KART_TABS.map((tab) => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    role="tab"
+                    id={`personel-kart-tab-${tab.id}`}
+                    className={`personel-kart-tab${activeTab === tab.id ? " is-active" : ""}`}
+                    aria-selected={activeTab === tab.id}
+                    aria-controls={`personel-kart-panel-${tab.id}`}
+                    tabIndex={activeTab === tab.id ? 0 : -1}
+                    onClick={() => setActiveTab(tab.id)}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+
+              <div
+                id="personel-kart-panel-genel"
+                role="tabpanel"
+                className="personel-kart-panel"
+                aria-labelledby="personel-kart-tab-genel"
+                hidden={activeTab !== "genel"}
+              >
+                <PersonelKartPanelGenel personel={personel} />
+              </div>
+
+              <div
+                id="personel-kart-panel-izin"
+                role="tabpanel"
+                className="personel-kart-panel"
+                aria-labelledby="personel-kart-tab-izin"
+                hidden={activeTab !== "izin"}
+              >
+                <PersonelKartPanelIzin personel={personel} />
+              </div>
+
+              <div
+                id="personel-kart-panel-puantaj"
+                role="tabpanel"
+                className="personel-kart-panel"
+                aria-labelledby="personel-kart-tab-puantaj"
+                hidden={activeTab !== "puantaj"}
+              >
+                <div className="personel-kart-placeholder">
+                  <p>
+                    Gunluk puantaj ve calisma ozeti bu sekmede toplanacak. Simdilik tam ekran modulu
+                    kullanabilirsiniz.
+                  </p>
+                  {canViewPuantaj ? (
+                    <Link to="/puantaj" state={{ prefillPersonelId: personel.id }} className="universal-btn-aux">
+                      Puantaj modulune git
+                    </Link>
+                  ) : (
+                    <p className="personel-kart-placeholder-note">Puantaj goruntuleme yetkiniz yok.</p>
+                  )}
+                </div>
+              </div>
+
+              <div
+                id="personel-kart-panel-tesvik"
+                role="tabpanel"
+                className="personel-kart-panel"
+                aria-labelledby="personel-kart-tab-tesvik"
+                hidden={activeTab !== "tesvik"}
+              >
+                <div className="personel-kart-placeholder">
+                  <p>Tesvik ve performans odemeleri ile ilgili kayitlar bu sekmede listelenecek.</p>
+                  <p className="personel-kart-placeholder-note">Icerik yakinda baglanacak.</p>
+                </div>
+              </div>
+
+              <div
+                id="personel-kart-panel-finans"
+                role="tabpanel"
+                className="personel-kart-panel"
+                aria-labelledby="personel-kart-tab-finans"
+                hidden={activeTab !== "finans"}
+              >
+                <div className="personel-kart-placeholder">
+                  <p>Prim, kesinti ve diger finans kalemleri bu sekmede ozetlenecek.</p>
+                  {canViewFinans ? (
+                    <Link to="/finans" className="universal-btn-aux">
+                      Finans modulune git
+                    </Link>
+                  ) : (
+                    <p className="personel-kart-placeholder-note">Finans goruntuleme yetkiniz yok.</p>
+                  )}
+                </div>
               </div>
             </>
           ) : (

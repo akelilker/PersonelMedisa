@@ -4,6 +4,8 @@
   --space-3: 12px;
   --space-4: 16px;
   --space-5: 20px;
+  /* Portal modallar body altinda; .app-shell disinda da gecerli olsun */
+  --shell-modal-top: 0px;
   --app-footer-height: 30px;
   --app-footer-real-height: 38px;
   --app-footer-gap: 17px;

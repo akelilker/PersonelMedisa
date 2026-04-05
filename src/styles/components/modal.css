@@ -1,6 +1,6 @@
 .modal-overlay {
   position: fixed;
-  top: var(--shell-modal-top);
+  top: var(--shell-modal-top, 0px);
   bottom: calc(
     var(--app-footer-real-height) + var(--modal-gap-above-footer) + var(--modal-footer-optical-reserve)
   );

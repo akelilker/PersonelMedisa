@@ -1,4 +1,5 @@
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 
 type AppModalProps = {
   title: string;
@@ -7,7 +8,17 @@ type AppModalProps = {
   onClose?: () => void;
 };
 
+function getModalPortalRoot(): HTMLElement | null {
+  if (typeof document === "undefined") {
+    return null;
+  }
+
+  return document.body;
+}
+
 export function AppModal({ title, children, footer, onClose }: AppModalProps) {
+  const overlayRef = useRef<HTMLDivElement | null>(null);
+
   useEffect(() => {
     const body = document.body;
     const currentOpenCount = Number.parseInt(body.dataset.modalOpenCount ?? "0", 10) || 0;
@@ -27,15 +38,30 @@ export function AppModal({ title, children, footer, onClose }: AppModalProps) {
   }, []);
 
   useEffect(() => {
-    const handleClose = onClose;
-    if (!handleClose) {
+    if (!onClose) {
       return;
     }
 
+    const close = onClose;
+
     function handleEscape(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        handleClose?.();
+      if (event.key !== "Escape") {
+        return;
       }
+
+      const node = overlayRef.current;
+      if (!node) {
+        return;
+      }
+
+      const stack = document.querySelectorAll(".modal-overlay.open");
+      const top = stack.item(stack.length - 1);
+      if (top !== node) {
+        return;
+      }
+
+      event.preventDefault();
+      close();
     }
 
     document.addEventListener("keydown", handleEscape);
@@ -44,8 +70,11 @@ export function AppModal({ title, children, footer, onClose }: AppModalProps) {
     };
   }, [onClose]);
 
-  return (
+  const portalRoot = getModalPortalRoot();
+
+  const modalTree = (
     <div
+      ref={overlayRef}
       className="modal-overlay open"
       onMouseDown={(event) => {
         if (onClose && event.target === event.currentTarget) {
@@ -67,4 +96,10 @@ export function AppModal({ title, children, footer, onClose }: AppModalProps) {
       </div>
     </div>
   );
+
+  if (!portalRoot) {
+    return null;
+  }
+
+  return createPortal(modalTree, portalRoot);
 }

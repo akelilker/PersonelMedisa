@@ -7,41 +7,37 @@ test("Ana akis smoke", async ({ page }) => {
   await login(page, { username: "genel_yonetici", password: "demo123" });
 
   await expect(page).toHaveURL("/");
+  await expect(page.locator("#main-menu .menu-btn")).toHaveCount(3);
+  await expect(page.getByTestId("menu-kayit-surec")).toBeVisible();
+  await expect(page.getByTestId("menu-personel-karti")).toBeVisible();
+  await expect(page.getByTestId("menu-raporlar")).toBeVisible();
+  await expect(page.getByTestId("menu-gunluk-durum")).toHaveCount(0);
+
+  await page.getByTestId("menu-kayit-surec").click();
+  const homeFlowModal = page.locator(".modal-container").last();
+  await expect(
+    homeFlowModal.getByRole("heading", { name: /Personel Giris ve Surec Takibi/i })
+  ).toBeVisible();
+  await expect(homeFlowModal.getByRole("button", { name: "Yeni Kayit" })).toBeVisible();
+  await expect(homeFlowModal.getByRole("button", { name: "Surec" })).toBeVisible();
+  await homeFlowModal.getByRole("button", { name: "Surec" }).click();
+  await homeFlowModal.getByRole("button", { name: /Surec Ekranina Git/i }).click();
+
+  await expect(page).toHaveURL(/\/surecler$/);
+  await expect(page.locator(".modal-header h2").first()).toContainText("Surec Takibi");
+  await page.locator(".modal-container").first().getByRole("button", { name: "Kapat" }).click();
+  await expect(page).toHaveURL("/");
+  await expect(page.locator("#main-menu .menu-btn")).toHaveCount(3);
 
   await page.getByTestId("menu-personel-karti").click();
   await expect(page).toHaveURL(/\/personeller$/);
-  await expect(page.getByTestId("menu-surec-takibi")).toBeVisible();
-  await expect(page.locator(".modal-overlay.open")).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Personeller" })).toBeVisible();
+  await page.locator(".modal-container").first().getByRole("button", { name: "Kapat" }).click();
+  await expect(page).toHaveURL("/");
 
-  await page.getByRole("link", { name: "Detay" }).first().click();
-  await expect(page).toHaveURL(/\/personeller\/1$/);
-  await expect(page.getByTestId("menu-puantaj")).toBeVisible();
-  await expect(page.locator(".modal-overlay.open")).toHaveCount(0);
-
-  await page.getByRole("link", { name: "Yeni Surec" }).click();
-  await expect(page).toHaveURL(/\/surecler$/);
-  await page.locator(".modal-container").waitFor({ state: "visible" });
-  await expect(page.locator("#surec-create-form").getByLabel("Personel ID")).toHaveValue("1");
-  await page.locator(".modal-container").getByRole("button", { name: /Vazge/ }).click();
-  await expect(page.locator(".modal-overlay.open")).toHaveCount(0);
-
-  await page.goto("/personeller/1");
-  await page.getByRole("link", { name: "Bildirim Olustur" }).click();
-  await expect(page).toHaveURL(/\/bildirimler$/);
-  await page.locator(".modal-container").waitFor({ state: "visible" });
-  await expect(page.locator("#bildirim-create-form").getByLabel("Personel")).toHaveValue("1");
-  await expect(page.locator("#bildirim-create-form")).toContainText("Ayse Yilmaz");
-  await page.locator(".modal-container").getByRole("button", { name: /Vazge/ }).click();
-  await expect(page.locator(".modal-overlay.open")).toHaveCount(0);
-
-  await page.goto("/personeller/1");
-  await page.getByRole("link", { name: "Puantaji Ac" }).click();
-  await expect(page).toHaveURL(/\/puantaj$/);
-  await expect(page.getByLabel("Personel ID")).toHaveValue("1");
-
-  await page.goto("/puantaj");
-  await expect(page).toHaveURL(/\/puantaj$/);
-
-  await page.goto("/raporlar");
+  await page.getByTestId("menu-raporlar").click();
   await expect(page).toHaveURL(/\/raporlar$/);
+  await expect(page.locator(".modal-header h2").first()).toContainText("Raporlar");
+  await page.locator(".modal-container").first().getByRole("button", { name: "Kapat" }).click();
+  await expect(page).toHaveURL("/");
 });

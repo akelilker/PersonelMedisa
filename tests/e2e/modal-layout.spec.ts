@@ -8,6 +8,7 @@ test("module modal aligns to app container and footer gap contract", async ({ pa
 
   await page.goto("/personeller");
   await expect(page).toHaveURL(/\/personeller$/);
+  await page.locator(".modal-container").waitFor({ state: "visible" });
 
   const initialFooterBoxShadow = await page.evaluate(() => {
     const footer = document.querySelector("#app-footer");
@@ -17,9 +18,6 @@ test("module modal aligns to app container and footer gap contract", async ({ pa
 
     return getComputedStyle(footer).boxShadow;
   });
-
-  await page.locator(".personeller-header-row").getByRole("button", { name: "Yeni Personel" }).click();
-  await page.locator(".modal-container").waitFor({ state: "visible" });
 
   const metrics = await page.evaluate(() => {
     function rect(selector: string) {

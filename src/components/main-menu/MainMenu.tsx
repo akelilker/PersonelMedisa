@@ -1,195 +1,84 @@
-import { useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useRoleAccess } from "../../hooks/use-role-access";
 
-export type MainMenuVariant = "dashboard" | "compact";
+export type KayitTab = "yeni-kayit" | "surec";
 
 type MainMenuProps = {
-  variant?: MainMenuVariant;
+  onKayitOpen: (tab: KayitTab) => void;
 };
 
-type MenuItem = {
-  key: string;
-  label: string;
-  subtitle: string;
-  testId: string;
-  isActive: boolean;
-  onClick: () => void;
-};
-
-export function MainMenu({ variant = "dashboard" }: MainMenuProps) {
+export function MainMenu({ onKayitOpen }: MainMenuProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const { hasPermission, uiProfile } = useRoleAccess();
 
-  const canCreatePersonel = hasPermission("personeller.create");
+  const canKayitSection = hasPermission("personeller.create") || hasPermission("surecler.create");
   const canViewPersoneller = hasPermission("personeller.view") || hasPermission("personeller.view.sube");
-  const canViewSurecler = hasPermission("surecler.view") || hasPermission("surecler.view.sube");
-  const canViewBildirimler = hasPermission("bildirimler.view");
   const canOpenDailyStatus = uiProfile === "birim_amiri" && hasPermission("bildirimler.create");
-  const canViewPuantaj = hasPermission("puantaj.view");
-  const canViewHaftalikKapanis = hasPermission("haftalik-kapanis.view");
   const canViewRaporlar = hasPermission("raporlar.view");
-  const canViewFinans = hasPermission("finans.view");
 
   const { pathname } = location;
-
-  const items = useMemo<MenuItem[]>(() => {
-    const nextItems: MenuItem[] = [];
-
-    if (canCreatePersonel) {
-      nextItems.push({
-        key: "yeni-personel",
-        label: "Yeni Personel",
-        subtitle: "Kaydi dogrudan personel ekraninda ac",
-        testId: "menu-yeni-personel",
-        isActive: pathname.startsWith("/personeller"),
-        onClick: () => {
-          navigate("/personeller", { state: { openCreateModal: true } });
-        }
-      });
-    }
-
-    if (canViewSurecler) {
-      nextItems.push({
-        key: "surec-takibi",
-        label: "Surec Takibi",
-        subtitle: "Izin, rapor ve hareket akisini yonet",
-        testId: "menu-surec-takibi",
-        isActive: pathname.startsWith("/surecler"),
-        onClick: () => {
-          navigate("/surecler");
-        }
-      });
-    }
-
-    if (canOpenDailyStatus) {
-      nextItems.push({
-        key: "gunluk-durum",
-        label: "Gunluk Durum Bildir",
-        subtitle: "Birim icin hizli bildirim akisini ac",
-        testId: "menu-gunluk-durum",
-        isActive: pathname.startsWith("/bildirimler"),
-        onClick: () => {
-          navigate("/bildirimler", { state: { openCreateModal: true } });
-        }
-      });
-    }
-
-    if (canViewPersoneller) {
-      nextItems.push({
-        key: "personel-karti",
-        label: "Personel Karti",
-        subtitle: "Liste, detay ve ozet gorunumleri ac",
-        testId: "menu-personel-karti",
-        isActive: pathname.startsWith("/personeller"),
-        onClick: () => {
-          navigate("/personeller");
-        }
-      });
-    }
-
-    if (canViewBildirimler) {
-      nextItems.push({
-        key: "bildirimler",
-        label: "Bildirimler",
-        subtitle: "Gunluk durum ve yonetim kayitlarini izle",
-        testId: "menu-bildirimler",
-        isActive: pathname.startsWith("/bildirimler"),
-        onClick: () => {
-          navigate("/bildirimler");
-        }
-      });
-    }
-
-    if (canViewPuantaj) {
-      nextItems.push({
-        key: "puantaj",
-        label: "Gunluk Puantaj",
-        subtitle: "Giris, cikis ve uyari kayitlarini kontrol et",
-        testId: "menu-puantaj",
-        isActive: pathname.startsWith("/puantaj"),
-        onClick: () => {
-          navigate("/puantaj");
-        }
-      });
-    }
-
-    if (canViewHaftalikKapanis) {
-      nextItems.push({
-        key: "haftalik-kapanis",
-        label: "Haftalik Kapanis",
-        subtitle: "Hafta muhru ve sonuc ozetini al",
-        testId: "menu-haftalik-kapanis",
-        isActive: pathname.startsWith("/haftalik-kapanis"),
-        onClick: () => {
-          navigate("/haftalik-kapanis");
-        }
-      });
-    }
-
-    if (canViewRaporlar) {
-      nextItems.push({
-        key: "raporlar",
-        label: "Raporlar",
-        subtitle: "Backend raporu ve onbellek ozetini calistir",
-        testId: "menu-raporlar",
-        isActive: pathname.startsWith("/raporlar"),
-        onClick: () => {
-          navigate("/raporlar");
-        }
-      });
-    }
-
-    if (canViewFinans) {
-      nextItems.push({
-        key: "finans",
-        label: "Finans",
-        subtitle: "Ek odeme ve kesinti kalemlerini yonet",
-        testId: "menu-finans",
-        isActive: pathname.startsWith("/finans"),
-        onClick: () => {
-          navigate("/finans");
-        }
-      });
-    }
-
-    return nextItems;
-  }, [
-    canCreatePersonel,
-    canOpenDailyStatus,
-    canViewBildirimler,
-    canViewFinans,
-    canViewHaftalikKapanis,
-    canViewPersoneller,
-    canViewPuantaj,
-    canViewRaporlar,
-    canViewSurecler,
-    navigate,
-    pathname
-  ]);
-
-  if (items.length === 0) {
-    return null;
-  }
+  const isKayitSurecActive = pathname.startsWith("/personeller") || pathname.startsWith("/surecler");
+  const isBildirimlerActive = pathname.startsWith("/bildirimler");
+  const isPersonelActive = pathname.startsWith("/personeller");
+  const isRaporlarActive = pathname.startsWith("/raporlar");
 
   return (
-    <nav id="main-menu" className={`menu-container menu-container--${variant}`} aria-label="Ana moduller">
-      {items.map((item) => (
+    <nav id="main-menu" className="menu-container" aria-label="Ana moduller">
+      {canKayitSection ? (
         <button
-          key={item.key}
           type="button"
-          className={`menu-btn menu-btn--${variant}${item.isActive ? " is-active" : ""}`}
-          aria-current={item.isActive ? "page" : undefined}
-          data-testid={item.testId}
-          onClick={item.onClick}
+          className={`menu-btn${isKayitSurecActive ? " is-active" : ""}`}
+          aria-current={isKayitSurecActive ? "page" : undefined}
+          data-testid="menu-kayit-surec"
+          onClick={() => {
+            const tab: KayitTab = pathname.startsWith("/surecler") ? "surec" : "yeni-kayit";
+            onKayitOpen(tab);
+          }}
         >
-          <div className="menu-btn-content">
-            <div className="ttl">{item.label}</div>
-            <div className="menu-btn-subtitle">{item.subtitle}</div>
-          </div>
+          <div className="ttl">Kayit ve Surec</div>
         </button>
-      ))}
+      ) : null}
+
+      {canOpenDailyStatus ? (
+        <button
+          type="button"
+          className={`menu-btn${isBildirimlerActive ? " is-active" : ""}`}
+          aria-current={isBildirimlerActive ? "page" : undefined}
+          data-testid="menu-gunluk-durum"
+          onClick={() => {
+            navigate("/bildirimler", { state: { openCreateModal: true } });
+          }}
+        >
+          <div className="ttl">Gunluk Durum Bildir</div>
+        </button>
+      ) : null}
+
+      <button
+        type="button"
+        className={`menu-btn${isPersonelActive ? " is-active" : ""}`}
+        aria-current={isPersonelActive ? "page" : undefined}
+        data-testid="menu-personel-karti"
+        onClick={() => {
+          navigate("/personeller");
+        }}
+        disabled={!canViewPersoneller}
+      >
+        <div className="ttl">Personel Karti</div>
+      </button>
+
+      <button
+        type="button"
+        className={`menu-btn${isRaporlarActive ? " is-active" : ""}`}
+        aria-current={isRaporlarActive ? "page" : undefined}
+        data-testid="menu-raporlar"
+        onClick={() => {
+          navigate("/raporlar");
+        }}
+        disabled={!canViewRaporlar}
+      >
+        <div className="ttl">Raporlar</div>
+      </button>
     </nav>
   );
 }

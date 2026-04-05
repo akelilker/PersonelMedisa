@@ -137,6 +137,8 @@ export function ShellHeaderActions({ contextLabel }: ShellHeaderActionsProps) {
   const canViewBildirimDetay = hasPermission("bildirimler.detail.view");
   const canViewRaporlar = hasPermission("raporlar.view");
   const canViewFinans = hasPermission("finans.view");
+  const canViewYonetimPanel = hasPermission("yonetim-paneli.view");
+  const canViewAylikOzet = hasPermission("aylik-ozet.view");
 
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -526,6 +528,28 @@ export function ShellHeaderActions({ contextLabel }: ShellHeaderActionsProps) {
         </button>
 
         <div id="settings-menu" className={`settings-dropdown${isSettingsOpen ? " open" : ""}`}>
+          {canViewYonetimPanel ? (
+            <button
+              type="button"
+              data-testid="settings-yonetim-paneli"
+              onClick={() => {
+                navigateTo("/yonetim-paneli");
+              }}
+            >
+              Yonetim Paneli
+            </button>
+          ) : null}
+          {canViewAylikOzet ? (
+            <button
+              type="button"
+              data-testid="settings-aylik-ozet"
+              onClick={() => {
+                navigateTo("/aylik-kapanis-ozeti");
+              }}
+            >
+              Aylik Kapanis Ozeti
+            </button>
+          ) : null}
           <button
             type="button"
             className="settings-logout-btn"

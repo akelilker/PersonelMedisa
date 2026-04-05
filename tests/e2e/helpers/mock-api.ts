@@ -33,6 +33,7 @@ export async function mockApi(page: Page, role: MockUserRole) {
     ad: string;
     soyad: string;
     aktif_durum: "AKTIF" | "PASIF";
+    sube_id?: number;
     telefon?: string;
     dogum_tarihi?: string;
     dogum_yeri?: string;
@@ -45,6 +46,7 @@ export async function mockApi(page: Page, role: MockUserRole) {
     gorev_id?: number;
     personel_tipi_id?: number;
     bagli_amir_id?: number;
+    sube_adi?: string;
     departman_adi?: string;
     gorev_adi?: string;
     personel_tipi_adi?: string;
@@ -56,6 +58,7 @@ export async function mockApi(page: Page, role: MockUserRole) {
       ad: "Ayse",
       soyad: "Yilmaz",
       aktif_durum: "AKTIF",
+      sube_id: 1,
       telefon: "05550000000",
       dogum_tarihi: "1992-03-14",
       dogum_yeri: "Istanbul",
@@ -68,6 +71,7 @@ export async function mockApi(page: Page, role: MockUserRole) {
       gorev_id: 1,
       personel_tipi_id: 1,
       bagli_amir_id: 9,
+      sube_adi: "Merkez",
       departman_adi: "Operasyon",
       gorev_adi: "Uzman",
       personel_tipi_adi: "Tam Zamanli",
@@ -79,6 +83,7 @@ export async function mockApi(page: Page, role: MockUserRole) {
       ad: "Mehmet",
       soyad: "Kaya",
       aktif_durum: "AKTIF",
+      sube_id: 2,
       telefon: "05551111111",
       dogum_tarihi: "1989-11-02",
       dogum_yeri: "Ankara",
@@ -91,6 +96,7 @@ export async function mockApi(page: Page, role: MockUserRole) {
       gorev_id: 2,
       personel_tipi_id: 2,
       bagli_amir_id: 9,
+      sube_adi: "Depolama",
       departman_adi: "Muhasebe",
       gorev_adi: "Sef",
       personel_tipi_adi: "Yari Zamanli",
@@ -164,9 +170,214 @@ export async function mockApi(page: Page, role: MockUserRole) {
     }
   ];
 
+  const subeler: Array<{
+    id: number;
+    kod: string;
+    ad: string;
+    departmanlar: string[];
+    durum: "AKTIF" | "PASIF";
+  }> = [
+    {
+      id: 1,
+      kod: "MRK",
+      ad: "Merkez",
+      departmanlar: ["Yonetim", "Operasyon"],
+      durum: "AKTIF"
+    },
+    {
+      id: 2,
+      kod: "DPL",
+      ad: "Depolama",
+      departmanlar: ["Depolama", "Sevkiyat"],
+      durum: "AKTIF"
+    }
+  ];
+
+  const yonetimKullanicilari: Array<{
+    id: number;
+    ad_soyad: string;
+    telefon?: string;
+    kullanici_tipi: "IC_PERSONEL" | "HARICI";
+    rol: MockUserRole;
+    personel_id: number | null;
+    sube_ids: number[];
+    varsayilan_sube_id: number | null;
+    durum: "AKTIF" | "PASIF";
+    notlar?: string;
+  }> = [
+    {
+      id: 1,
+      ad_soyad: "Ilker Akel",
+      telefon: "05550000001",
+      kullanici_tipi: "HARICI",
+      rol: "GENEL_YONETICI",
+      personel_id: null,
+      sube_ids: [],
+      varsayilan_sube_id: null,
+      durum: "AKTIF",
+      notlar: "Tum yapiyi yonetir"
+    },
+    {
+      id: 2,
+      ad_soyad: "Adnan Bulut",
+      telefon: "05550000002",
+      kullanici_tipi: "HARICI",
+      rol: "BOLUM_YONETICISI",
+      personel_id: null,
+      sube_ids: [2],
+      varsayilan_sube_id: 2,
+      durum: "AKTIF",
+      notlar: "Depolama kapsaminda bolum onayi verir"
+    },
+    {
+      id: 3,
+      ad_soyad: "Serhan Kose",
+      telefon: "05550000003",
+      kullanici_tipi: "IC_PERSONEL",
+      rol: "BIRIM_AMIRI",
+      personel_id: 1,
+      sube_ids: [1],
+      varsayilan_sube_id: 1,
+      durum: "AKTIF",
+      notlar: "Gunluk bildirimleri girer"
+    }
+  ];
+
+  const aylikOzetRows: Array<{
+    ay: string;
+    personel_id: number;
+    ad_soyad: string;
+    sicil_no?: string;
+    sube_id: number;
+    sube: string;
+    departman_id: number;
+    bolum: string;
+    birim_amiri: string;
+    devamsizlik_gun: number;
+    gec_kalma_adet: number;
+    izinli_gelmedi: number;
+    izinsiz_gelmedi: number;
+    raporlu: number;
+    tesvik_tutari: number;
+    ceza_kesinti_tutari: number;
+    bolum_onay_durumu: "BOLUM_ONAYINDA" | "BOLUM_ONAYLANDI" | "REVIZE_ISTENDI" | "KAPANDI";
+    revize_var_mi: boolean;
+    son_islem: string;
+    kapanis_durumu: "ACIK" | "KAPANDI";
+  }> = [
+    {
+      ay: "2026-04",
+      personel_id: 1,
+      ad_soyad: "Ayse Yilmaz",
+      sicil_no: "P-001",
+      sube_id: 1,
+      sube: "Merkez",
+      departman_id: 3,
+      bolum: "Operasyon",
+      birim_amiri: "Serhan Kose",
+      devamsizlik_gun: 0,
+      gec_kalma_adet: 1,
+      izinli_gelmedi: 0,
+      izinsiz_gelmedi: 0,
+      raporlu: 0,
+      tesvik_tutari: 1200,
+      ceza_kesinti_tutari: 0,
+      bolum_onay_durumu: "BOLUM_ONAYINDA",
+      revize_var_mi: false,
+      son_islem: "Birim amiri gunluk kayitlari hazirladi",
+      kapanis_durumu: "ACIK"
+    },
+    {
+      ay: "2026-04",
+      personel_id: 2,
+      ad_soyad: "Mehmet Kaya",
+      sicil_no: "P-002",
+      sube_id: 2,
+      sube: "Depolama",
+      departman_id: 2,
+      bolum: "Muhasebe",
+      birim_amiri: "Serhan Kose",
+      devamsizlik_gun: 1,
+      gec_kalma_adet: 0,
+      izinli_gelmedi: 1,
+      izinsiz_gelmedi: 1,
+      raporlu: 0,
+      tesvik_tutari: 0,
+      ceza_kesinti_tutari: 450,
+      bolum_onay_durumu: "REVIZE_ISTENDI",
+      revize_var_mi: true,
+      son_islem: "Bolum yoneticisi revize istedi",
+      kapanis_durumu: "ACIK"
+    }
+  ];
+
   let surecIdCounter = 600;
   let bildirimIdCounter = 800;
   let finansIdCounter = 950;
+  let kullaniciIdCounter = 3;
+  let subeIdCounter = 2;
+
+  function buildAylikOzetResponse(searchUrl: URL) {
+    const ay = urlValue(searchUrl.searchParams.get("ay")) ?? "2026-04";
+    const subeId = numberValue(searchUrl.searchParams.get("sube_id"));
+    const departmanId = numberValue(searchUrl.searchParams.get("departman_id"));
+    const sadeceRevizeli = searchUrl.searchParams.get("sadece_revizeli") === "true";
+
+    const items = aylikOzetRows.filter((item) => {
+      if (item.ay !== ay) {
+        return false;
+      }
+      if (Number.isFinite(subeId) && item.sube_id !== subeId) {
+        return false;
+      }
+      if (Number.isFinite(departmanId) && item.departman_id !== departmanId) {
+        return false;
+      }
+      if (sadeceRevizeli && !item.revize_var_mi) {
+        return false;
+      }
+      return true;
+    });
+
+    const pendingBolumOnayi = items.filter(
+      (item) => item.kapanis_durumu !== "KAPANDI" && item.bolum_onay_durumu !== "BOLUM_ONAYLANDI"
+    ).length;
+
+    const state =
+      items.length > 0 && items.every((item) => item.kapanis_durumu === "KAPANDI")
+        ? "KAPANDI"
+        : items.some((item) => item.bolum_onay_durumu === "REVIZE_ISTENDI")
+          ? "REVIZE_ISTENDI"
+          : pendingBolumOnayi === 0
+            ? "BOLUM_ONAYLANDI"
+            : "BOLUM_ONAYINDA";
+
+    return {
+      ay,
+      state,
+      summary: {
+        toplam_personel: items.length,
+        toplam_devamsizlik_gun: items.reduce((acc, item) => acc + item.devamsizlik_gun, 0),
+        toplam_gec_kalma: items.reduce((acc, item) => acc + item.gec_kalma_adet, 0),
+        toplam_izinli_gelmedi: items.reduce((acc, item) => acc + item.izinli_gelmedi, 0),
+        toplam_izinsiz_gelmedi: items.reduce((acc, item) => acc + item.izinsiz_gelmedi, 0),
+        toplam_raporlu: items.reduce((acc, item) => acc + item.raporlu, 0),
+        toplam_tesvik_tutari: items.reduce((acc, item) => acc + item.tesvik_tutari, 0),
+        toplam_ceza_kesinti_tutari: items.reduce((acc, item) => acc + item.ceza_kesinti_tutari, 0)
+      },
+      items,
+      pending_bolum_onayi: pendingBolumOnayi
+    };
+  }
+
+  function urlValue(value: string | null) {
+    return value && value.trim() ? value : null;
+  }
+
+  function numberValue(value: string | null) {
+    const parsed = Number.parseInt(value ?? "", 10);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
 
   await page.route(
     (testUrl) => {
@@ -183,14 +394,15 @@ export async function mockApi(page: Page, role: MockUserRole) {
     const method = request.method();
 
     if (path === "/api/auth/login" && method === "POST") {
-      const subeIds = role === "BIRIM_AMIRI" ? [1] : role === "MUHASEBE" ? [1, 2] : [];
+      const subeIds =
+        role === "BIRIM_AMIRI" ? [1] : role === "MUHASEBE" ? [1, 2] : role === "BOLUM_YONETICISI" ? [2] : [];
       await fulfillJson(
         route,
         200,
         okBody({
           token: "mock-token",
           ui_profile: role === "BIRIM_AMIRI" ? "birim_amiri" : "yonetim",
-          sube_list: subeIds.map((id) => ({ id, ad: id === 1 ? "Merkez" : `Sube ${id}` })),
+          sube_list: subeIds.map((id) => ({ id, ad: subeler.find((item) => item.id === id)?.ad ?? `Sube ${id}` })),
           user: {
             id: 1,
             ad_soyad: "Mock Kullanici",
@@ -262,6 +474,7 @@ export async function mockApi(page: Page, role: MockUserRole) {
             ad: "Ayse",
             soyad: "Yilmaz",
             aktif_durum: "AKTIF",
+            sube_id: 1,
             telefon: "05550000000",
             dogum_tarihi: "1992-03-14",
             dogum_yeri: "Istanbul",
@@ -286,6 +499,7 @@ export async function mockApi(page: Page, role: MockUserRole) {
             etiket: null
           },
           referans_adlari: {
+            sube: "Merkez",
             departman: "Operasyon",
             gorev: "Uzman",
             personel_tipi: "Tam Zamanli",
@@ -609,6 +823,247 @@ export async function mockApi(page: Page, role: MockUserRole) {
           personel_sayisi: 24
         })
       );
+      return;
+    }
+
+    if (path === "/api/yonetim/kullanicilar" && method === "GET") {
+      await fulfillJson(
+        route,
+        200,
+        okBody({
+          items: yonetimKullanicilari.map((item) => ({
+            ...item,
+            personel_ad_soyad:
+              item.personel_id != null
+                ? personeller.find((personel) => personel.id === item.personel_id)
+                  ? `${personeller.find((personel) => personel.id === item.personel_id)?.ad} ${
+                      personeller.find((personel) => personel.id === item.personel_id)?.soyad
+                    }`
+                  : null
+                : null
+          }))
+        })
+      );
+      return;
+    }
+
+    if (path === "/api/yonetim/kullanicilar" && method === "POST") {
+      const payload = request.postDataJSON() as {
+        ad_soyad: string;
+        telefon?: string;
+        kullanici_tipi: "IC_PERSONEL" | "HARICI";
+        rol: MockUserRole;
+        personel_id?: number | null;
+        sube_ids?: number[];
+        varsayilan_sube_id?: number | null;
+        durum: "AKTIF" | "PASIF";
+        notlar?: string;
+      };
+
+      const linkedPersonel =
+        payload.personel_id != null ? personeller.find((item) => item.id === payload.personel_id) ?? null : null;
+
+      const created = {
+        id: ++kullaniciIdCounter,
+        ad_soyad: payload.ad_soyad,
+        telefon: payload.telefon,
+        kullanici_tipi: payload.kullanici_tipi,
+        rol: payload.rol,
+        personel_id: payload.personel_id ?? null,
+        sube_ids: payload.sube_ids ?? [],
+        varsayilan_sube_id: payload.varsayilan_sube_id ?? null,
+        durum: payload.durum,
+        notlar: payload.notlar
+      };
+
+      yonetimKullanicilari.unshift(created);
+
+      await fulfillJson(
+        route,
+        200,
+        okBody({
+          ...created,
+          personel_ad_soyad: linkedPersonel ? `${linkedPersonel.ad} ${linkedPersonel.soyad}` : null
+        })
+      );
+      return;
+    }
+
+    if (path.match(/^\/api\/yonetim\/kullanicilar\/\d+$/) && method === "PUT") {
+      const kullaniciId = Number.parseInt(path.split("/")[4] ?? "0", 10);
+      const target = yonetimKullanicilari.find((item) => item.id === kullaniciId);
+      if (!target) {
+        await fulfillJson(route, 404, errorBody("NOT_FOUND", "Kullanici bulunamadi."));
+        return;
+      }
+
+      const payload = request.postDataJSON() as {
+        ad_soyad?: string;
+        telefon?: string;
+        kullanici_tipi?: "IC_PERSONEL" | "HARICI";
+        rol?: MockUserRole;
+        personel_id?: number | null;
+        sube_ids?: number[];
+        varsayilan_sube_id?: number | null;
+        durum?: "AKTIF" | "PASIF";
+        notlar?: string;
+      };
+      const linkedPersonel =
+        payload.personel_id != null ? personeller.find((item) => item.id === payload.personel_id) ?? null : null;
+
+      Object.assign(target, {
+        ad_soyad: payload.ad_soyad ?? target.ad_soyad,
+        telefon: payload.telefon ?? target.telefon,
+        kullanici_tipi: payload.kullanici_tipi ?? target.kullanici_tipi,
+        rol: payload.rol ?? target.rol,
+        personel_id: payload.personel_id ?? null,
+        sube_ids: payload.sube_ids ?? target.sube_ids,
+        varsayilan_sube_id: payload.varsayilan_sube_id ?? target.varsayilan_sube_id,
+        durum: payload.durum ?? target.durum,
+        notlar: payload.notlar ?? target.notlar
+      });
+
+      await fulfillJson(
+        route,
+        200,
+        okBody({
+          ...target,
+          personel_ad_soyad: linkedPersonel ? `${linkedPersonel.ad} ${linkedPersonel.soyad}` : null
+        })
+      );
+      return;
+    }
+
+    if (path === "/api/yonetim/subeler" && method === "GET") {
+      await fulfillJson(route, 200, okBody({ items: subeler }));
+      return;
+    }
+
+    if (path === "/api/yonetim/subeler" && method === "POST") {
+      const payload = request.postDataJSON() as {
+        kod: string;
+        ad: string;
+        departmanlar?: string[];
+        durum: "AKTIF" | "PASIF";
+      };
+
+      const created = {
+        id: ++subeIdCounter,
+        kod: payload.kod,
+        ad: payload.ad,
+        departmanlar: payload.departmanlar ?? [],
+        durum: payload.durum
+      };
+
+      subeler.unshift(created);
+      await fulfillJson(route, 200, okBody(created));
+      return;
+    }
+
+    if (path.match(/^\/api\/yonetim\/subeler\/\d+$/) && method === "PUT") {
+      const subeId = Number.parseInt(path.split("/")[4] ?? "0", 10);
+      const target = subeler.find((item) => item.id === subeId);
+      if (!target) {
+        await fulfillJson(route, 404, errorBody("NOT_FOUND", "Sube bulunamadi."));
+        return;
+      }
+
+      const payload = request.postDataJSON() as Partial<(typeof subeler)[number]>;
+      Object.assign(target, payload);
+      await fulfillJson(route, 200, okBody(target));
+      return;
+    }
+
+    if (path === "/api/yonetim/aylik-ozet" && method === "GET") {
+      await fulfillJson(route, 200, okBody(buildAylikOzetResponse(url)));
+      return;
+    }
+
+    if (path === "/api/yonetim/aylik-ozet/bolum-onay" && method === "POST") {
+      const payload = request.postDataJSON() as {
+        ay?: string;
+        sube_id?: number;
+        departman_id?: number;
+      };
+
+      aylikOzetRows.forEach((item) => {
+        if (item.ay !== (payload.ay ?? "2026-04")) {
+          return;
+        }
+        if (payload.sube_id != null && item.sube_id !== payload.sube_id) {
+          return;
+        }
+        if (payload.departman_id != null && item.departman_id !== payload.departman_id) {
+          return;
+        }
+        if (item.kapanis_durumu === "KAPANDI") {
+          return;
+        }
+
+        item.bolum_onay_durumu = "BOLUM_ONAYLANDI";
+        item.revize_var_mi = false;
+        item.son_islem = "Bolum yoneticisi toplu onay verdi";
+      });
+
+      const responseUrl = new URL(url.toString());
+      if (payload.ay) {
+        responseUrl.searchParams.set("ay", payload.ay);
+      }
+      if (payload.sube_id != null) {
+        responseUrl.searchParams.set("sube_id", String(payload.sube_id));
+      }
+      if (payload.departman_id != null) {
+        responseUrl.searchParams.set("departman_id", String(payload.departman_id));
+      }
+      await fulfillJson(route, 200, okBody(buildAylikOzetResponse(responseUrl)));
+      return;
+    }
+
+    if (path === "/api/yonetim/aylik-ozet/ay-kapat" && method === "POST") {
+      const payload = request.postDataJSON() as {
+        ay?: string;
+        sube_id?: number;
+        departman_id?: number;
+      };
+
+      const responseUrl = new URL(url.toString());
+      if (payload.ay) {
+        responseUrl.searchParams.set("ay", payload.ay);
+      }
+      if (payload.sube_id != null) {
+        responseUrl.searchParams.set("sube_id", String(payload.sube_id));
+      }
+      if (payload.departman_id != null) {
+        responseUrl.searchParams.set("departman_id", String(payload.departman_id));
+      }
+
+      const current = buildAylikOzetResponse(responseUrl);
+      if (current.pending_bolum_onayi > 0) {
+        await fulfillJson(
+          route,
+          400,
+          errorBody("PENDING_BOLUM_APPROVAL", "Bolum onayi bekleyen kayitlar var. Ay kapatilamadi.")
+        );
+        return;
+      }
+
+      aylikOzetRows.forEach((item) => {
+        if (item.ay !== (payload.ay ?? "2026-04")) {
+          return;
+        }
+        if (payload.sube_id != null && item.sube_id !== payload.sube_id) {
+          return;
+        }
+        if (payload.departman_id != null && item.departman_id !== payload.departman_id) {
+          return;
+        }
+
+        item.kapanis_durumu = "KAPANDI";
+        item.bolum_onay_durumu = "KAPANDI";
+        item.son_islem = "Genel yonetici ayi kapatti";
+      });
+
+      await fulfillJson(route, 200, okBody(buildAylikOzetResponse(responseUrl)));
       return;
     }
 

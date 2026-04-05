@@ -1,6 +1,7 @@
 import type { UiProfile, UserRole } from "../../types/auth";
 import type { FinansDurum } from "../../types/finans";
 import type { ComplianceUyariSeviye, GunlukPuantajState } from "../../types/puantaj";
+import type { AylikOzetState, KullaniciTipi } from "../../types/yonetim";
 
 const TR_LOCALE = "tr-TR";
 
@@ -45,9 +46,17 @@ const COMMON_STATE_LABELS: Record<string, string> = {
   MUHURLENDI: "Muhurlendi",
   MUHURLU: "Muhurlu",
   OKUNDU: "Okundu",
+  BOLUM_ONAYINDA: "Bolum Onayinda",
+  BOLUM_ONAYLANDI: "Bolum Onaylandi",
+  REVIZE_ISTENDI: "Revize Istendi",
   TAMAMLANDI: "Tamamlandi",
   TASLAK: "Taslak",
   YENI: "Yeni"
+};
+
+const KULLANICI_TIPI_LABELS: Record<KullaniciTipi, string> = {
+  IC_PERSONEL: "Ic Personel",
+  HARICI: "Harici"
 };
 
 const BILDIRIM_TURU_LABELS: Record<string, string> = {
@@ -191,6 +200,18 @@ export function formatComplianceLevelLabel(value: ComplianceUyariSeviye | null |
 }
 
 export function formatHaftalikKapanisStateLabel(value: string | null | undefined): string {
+  return formatMappedLabel(value, COMMON_STATE_LABELS);
+}
+
+export function formatKullaniciTipiLabel(value: KullaniciTipi | null | undefined): string {
+  if (!value) {
+    return "-";
+  }
+
+  return KULLANICI_TIPI_LABELS[value] ?? humanizeEnumFallback(value);
+}
+
+export function formatAylikOzetStateLabel(value: AylikOzetState | "KAPANDI" | null | undefined): string {
   return formatMappedLabel(value, COMMON_STATE_LABELS);
 }
 

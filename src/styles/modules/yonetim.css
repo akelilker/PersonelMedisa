@@ -1,0 +1,162 @@
+.yonetim-page {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.yonetim-header-row {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.yonetim-header-row h2,
+.yonetim-header-row p,
+.yonetim-form-panel h3,
+.yonetim-list-panel h3,
+.yonetim-entity-copy p,
+.yonetim-hint,
+.yonetim-success,
+.yonetim-checkbox-title {
+  margin: 0;
+}
+
+.yonetim-tabs {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.yonetim-tab-btn {
+  min-height: 42px;
+  padding: 0 14px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 12px;
+  background: rgba(7, 10, 18, 0.72);
+  color: rgba(240, 240, 240, 0.9);
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, color 0.2s ease;
+}
+
+.yonetim-tab-btn.is-active {
+  border-color: rgba(var(--theme-color-rgb), 0.88);
+  box-shadow: inset 0 0 0 1px rgba(var(--theme-color-rgb), 0.32);
+  color: #ffffff;
+}
+
+.yonetim-section-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+  gap: var(--space-3);
+  align-items: start;
+}
+
+.yonetim-form-panel,
+.yonetim-list-panel,
+.yonetim-summary-card {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-md);
+  background: rgba(6, 9, 17, 0.48);
+}
+
+.yonetim-entity-list {
+  list-style: none;
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+}
+
+.yonetim-entity-item {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-md);
+  background: rgba(7, 10, 18, 0.56);
+}
+
+.yonetim-entity-copy {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.yonetim-checkbox-section {
+  display: grid;
+  gap: var(--space-2);
+  padding-top: var(--space-1);
+}
+
+.yonetim-checkbox-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.yonetim-checkbox-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+}
+
+.yonetim-checkbox-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 0 12px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 10px;
+  background: rgba(7, 10, 18, 0.58);
+}
+
+.yonetim-checkbox-item input {
+  margin: 0;
+}
+
+.yonetim-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--space-2);
+}
+
+.yonetim-summary-card span {
+  color: rgba(240, 240, 240, 0.7);
+  font-size: 0.82rem;
+}
+
+.yonetim-summary-card strong {
+  font-size: 1.15rem;
+  color: #ffffff;
+}
+
+.yonetim-success {
+  padding: 10px 12px;
+  border: 1px solid rgba(34, 197, 94, 0.35);
+  border-radius: 10px;
+  color: #d8ffe2;
+  background: rgba(22, 101, 52, 0.24);
+}
+
+.yonetim-hint {
+  color: rgba(240, 240, 240, 0.72);
+  font-size: 0.88rem;
+}
+
+.yonetim-table-wrap {
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-md);
+}
+
+@media (max-width: 720px) {
+  .yonetim-section-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .yonetim-entity-item {
+    flex-direction: column;
+  }
+}

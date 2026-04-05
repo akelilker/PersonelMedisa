@@ -25,7 +25,12 @@ export type AppPermission =
   | "finans.view"
   | "finans.create"
   | "finans.update"
-  | "finans.cancel";
+  | "finans.cancel"
+  | "yonetim-paneli.view"
+  | "yonetim-paneli.manage"
+  | "aylik-ozet.view"
+  | "aylik-ozet.review"
+  | "aylik-ozet.finalize";
 
 const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
   GENEL_YONETICI: [
@@ -53,7 +58,11 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "finans.view",
     "finans.create",
     "finans.update",
-    "finans.cancel"
+    "finans.cancel",
+    "yonetim-paneli.view",
+    "yonetim-paneli.manage",
+    "aylik-ozet.view",
+    "aylik-ozet.finalize"
   ],
   BOLUM_YONETICISI: [
     "personeller.view",
@@ -80,7 +89,9 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "finans.view",
     "finans.create",
     "finans.update",
-    "finans.cancel"
+    "finans.cancel",
+    "aylik-ozet.view",
+    "aylik-ozet.review"
   ],
   MUHASEBE: [
     "personeller.view",
@@ -167,6 +178,7 @@ export const PUANTAJ_ALLOWED_ROLES = getRolesWithPermission("puantaj.view");
 export const HAFTALIK_KAPANIS_ALLOWED_ROLES = getRolesWithPermission("haftalik-kapanis.view");
 export const RAPORLAR_ALLOWED_ROLES = getRolesWithPermission("raporlar.view");
 export const FINANS_ALLOWED_ROLES = getRolesWithPermission("finans.view");
+export const AYLIK_OZET_ALLOWED_ROLES = getRolesWithPermission("aylik-ozet.view");
 
 /** Liste rotalari: genel veya sube kapsamli goruntuleme */
 export const PERSONELLER_LIST_ANY: AppPermission[] = ["personeller.view", "personeller.view.sube"];
@@ -181,5 +193,7 @@ export const ROUTE_PERMISSION = {
   puantajPage: "puantaj.view",
   haftalikKapanisPage: "haftalik-kapanis.view",
   raporlarPage: "raporlar.view",
-  finansPage: "finans.view"
+  finansPage: "finans.view",
+  yonetimPaneliPage: "yonetim-paneli.view",
+  aylikOzetPage: "aylik-ozet.view"
 } as const satisfies Record<string, AppPermission>;

@@ -64,6 +64,12 @@ function resolveModuleModal(pathname: string): { title: string; closeTo: string 
   if (pathname === "/finans") {
     return { title: "Finans", closeTo: "/" };
   }
+  if (pathname === "/yonetim-paneli") {
+    return { title: "Yonetim Paneli", closeTo: "/" };
+  }
+  if (pathname === "/aylik-kapanis-ozeti") {
+    return { title: "Aylik Kapanis Ozeti", closeTo: "/" };
+  }
 
   return { title: "Modul", closeTo: "/" };
 }

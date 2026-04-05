@@ -171,6 +171,7 @@ function normalizePersonel(data: unknown): Personel {
     ad: readRequiredString(baseSources, "ad", "ad"),
     soyad: readRequiredString(baseSources, "soyad", "soyad"),
     aktif_durum: aktifDurum,
+    sube_id: readNumber(baseSources, "sube_id"),
     telefon: readString(baseSources, "telefon"),
     dogum_tarihi: readString(baseSources, "dogum_tarihi"),
     sicil_no: readString(baseSources, "sicil_no"),
@@ -183,6 +184,7 @@ function normalizePersonel(data: unknown): Personel {
     gorev_id: readNumber(baseSources, "gorev_id"),
     personel_tipi_id: readNumber(baseSources, "personel_tipi_id"),
     bagli_amir_id: readNumber(baseSources, "bagli_amir_id"),
+    sube_adi: readString(referenceSources, "sube", "sube_adi", "subeAdi"),
     departman_adi: readString(referenceSources, "departman", "departman_adi", "departmanAdi"),
     gorev_adi: readString(referenceSources, "gorev", "gorev_adi", "gorevAdi"),
     personel_tipi_adi: readString(

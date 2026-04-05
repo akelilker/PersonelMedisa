@@ -8,6 +8,7 @@ type DemoPersonel = {
   ad: string;
   soyad: string;
   aktif_durum: "AKTIF" | "PASIF";
+  sube_id?: number;
   telefon?: string;
   dogum_tarihi?: string;
   sicil_no?: string;
@@ -68,18 +69,53 @@ type DemoPuantaj = {
   compliance_uyarilari: Array<{ code: string; message: string; level?: string }>;
 };
 
+type DemoYonetimKullanici = {
+  id: number;
+  ad_soyad: string;
+  telefon?: string;
+  kullanici_tipi: "IC_PERSONEL" | "HARICI";
+  rol: "GENEL_YONETICI" | "BOLUM_YONETICISI" | "MUHASEBE" | "BIRIM_AMIRI";
+  personel_id?: number | null;
+  sube_ids: number[];
+  varsayilan_sube_id: number | null;
+  durum: "AKTIF" | "PASIF";
+  notlar?: string;
+};
+
+type DemoSube = {
+  id: number;
+  kod: string;
+  ad: string;
+  departmanlar: string[];
+  durum: "AKTIF" | "PASIF";
+};
+
+type DemoAylikDurum = {
+  ay: string;
+  personel_id: number;
+  bolum_onay_durumu: "BOLUM_ONAYINDA" | "BOLUM_ONAYLANDI" | "REVIZE_ISTENDI";
+  revize_var_mi: boolean;
+  son_islem: string;
+  kapanis_durumu: "ACIK" | "KAPANDI";
+};
+
 const demoState: {
   personeller: DemoPersonel[];
   surecler: DemoSurec[];
   bildirimler: DemoBildirim[];
   finansKalemleri: DemoFinansKalem[];
   puantajMap: Record<string, DemoPuantaj>;
+  yonetimKullanicilari: DemoYonetimKullanici[];
+  subeler: DemoSube[];
+  aylikDurumMap: Record<string, DemoAylikDurum>;
   nextIds: {
     personel: number;
     surec: number;
     bildirim: number;
     finans: number;
     kapanis: number;
+    kullanici: number;
+    sube: number;
   };
 } = {
   personeller: [
@@ -89,6 +125,7 @@ const demoState: {
       ad: "Ayse",
       soyad: "Yilmaz",
       aktif_durum: "AKTIF",
+      sube_id: 1,
       telefon: "05550000000",
       dogum_tarihi: "1992-03-14",
       sicil_no: "P-001",
@@ -108,6 +145,7 @@ const demoState: {
       ad: "Mehmet",
       soyad: "Kaya",
       aktif_durum: "AKTIF",
+      sube_id: 2,
       telefon: "05551111111",
       dogum_tarihi: "1989-11-02",
       sicil_no: "P-002",
@@ -169,13 +207,92 @@ const demoState: {
     }
   ],
   puantajMap: {},
+  yonetimKullanicilari: [
+    {
+      id: 1,
+      ad_soyad: "Ilker Akel",
+      telefon: "05550000001",
+      kullanici_tipi: "HARICI",
+      rol: "GENEL_YONETICI",
+      personel_id: null,
+      sube_ids: [],
+      varsayilan_sube_id: null,
+      durum: "AKTIF",
+      notlar: "Tum yapinin yonetim ve son kapanis yetkilisi"
+    },
+    {
+      id: 2,
+      ad_soyad: "Adnan Bulut",
+      telefon: "05550000002",
+      kullanici_tipi: "HARICI",
+      rol: "BOLUM_YONETICISI",
+      personel_id: null,
+      sube_ids: [2],
+      varsayilan_sube_id: 2,
+      durum: "AKTIF",
+      notlar: "Depolama biriminin aylik kontrol sorumlusu"
+    },
+    {
+      id: 3,
+      ad_soyad: "Serhan Kose",
+      telefon: "05550000003",
+      kullanici_tipi: "IC_PERSONEL",
+      rol: "BIRIM_AMIRI",
+      personel_id: 1,
+      sube_ids: [1],
+      varsayilan_sube_id: 1,
+      durum: "AKTIF",
+      notlar: "Gunluk bildirim sorumlusu"
+    }
+  ],
+  subeler: [
+    {
+      id: 1,
+      kod: "MRK",
+      ad: "Merkez",
+      departmanlar: ["Yonetim", "Operasyon"],
+      durum: "AKTIF"
+    },
+    {
+      id: 2,
+      kod: "DPL",
+      ad: "Depolama",
+      departmanlar: ["Depolama", "Sevkiyat"],
+      durum: "AKTIF"
+    }
+  ],
+  aylikDurumMap: {
+    "2026-04|1": {
+      ay: "2026-04",
+      personel_id: 1,
+      bolum_onay_durumu: "BOLUM_ONAYINDA",
+      revize_var_mi: false,
+      son_islem: "Birim amiri gunluk kayitlari hazirladi",
+      kapanis_durumu: "ACIK"
+    },
+    "2026-04|2": {
+      ay: "2026-04",
+      personel_id: 2,
+      bolum_onay_durumu: "REVIZE_ISTENDI",
+      revize_var_mi: true,
+      son_islem: "Bolum yoneticisi duzeltme istedi",
+      kapanis_durumu: "ACIK"
+    }
+  },
   nextIds: {
     personel: 100,
     surec: 600,
     bildirim: 800,
     finans: 950,
-    kapanis: 1000
+    kapanis: 1000,
+    kullanici: 3,
+    sube: 2
   }
+};
+
+const DEMO_SUBE_LABELS: Record<number, string> = {
+  1: "Merkez",
+  2: "Depolama"
 };
 
 const DEMO_DEPARTMAN_LABELS: Record<number, string> = {
@@ -304,6 +421,179 @@ function getLabel(map: Record<number, string>, id: number | undefined) {
   return map[id] ?? `#${id}`;
 }
 
+function monthKey(ay: string, personelId: number) {
+  return `${ay}|${personelId}`;
+}
+
+function ensureAylikDurum(ay: string, personelId: number): DemoAylikDurum {
+  const key = monthKey(ay, personelId);
+  const existing = demoState.aylikDurumMap[key];
+  if (existing) {
+    return existing;
+  }
+
+  const created: DemoAylikDurum = {
+    ay,
+    personel_id: personelId,
+    bolum_onay_durumu: "BOLUM_ONAYINDA",
+    revize_var_mi: false,
+    son_islem: "Birim amiri gunluk kayitlari hazirladi",
+    kapanis_durumu: "ACIK"
+  };
+  demoState.aylikDurumMap[key] = created;
+  return created;
+}
+
+function formatAylikIslemTimestamp() {
+  return new Intl.DateTimeFormat("tr-TR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(new Date());
+}
+
+function isTesvikKalemi(kalemTuru: string | undefined) {
+  return ["PRIM", "BONUS", "IKRAMIYE", "EKSTRA_PRIM"].includes((kalemTuru ?? "").toUpperCase());
+}
+
+function isCezaKalemi(kalemTuru: string | undefined) {
+  return (kalemTuru ?? "").toUpperCase() === "CEZA";
+}
+
+function summarizeBildirimForPersonel(ay: string, personelId: number) {
+  const matching = demoState.bildirimler.filter(
+    (item) => item.personel_id === personelId && (item.tarih ?? "").startsWith(`${ay}-`) && item.state !== "IPTAL"
+  );
+
+  let devamsizlikGun = 0;
+  let gecKalmaAdet = 0;
+  let izinliGelmedi = 0;
+  let izinsizGelmedi = 0;
+  let raporlu = 0;
+
+  for (const item of matching) {
+    switch ((item.bildirim_turu ?? "").toUpperCase()) {
+      case "GEC_GELDI":
+        gecKalmaAdet += 1;
+        break;
+      case "IZINLI_GELMEDI":
+        izinliGelmedi += 1;
+        break;
+      case "IZINSIZ_GELMEDI":
+        izinsizGelmedi += 1;
+        devamsizlikGun += 1;
+        break;
+      case "DEVAMSIZLIK":
+      case "GELMEDI":
+        devamsizlikGun += 1;
+        break;
+      case "RAPORLU":
+        raporlu += 1;
+        break;
+      default:
+        break;
+    }
+  }
+
+  return {
+    devamsizlikGun,
+    gecKalmaAdet,
+    izinliGelmedi,
+    izinsizGelmedi,
+    raporlu
+  };
+}
+
+function summarizeFinansForPersonel(ay: string, personelId: number) {
+  const matching = demoState.finansKalemleri.filter(
+    (item) => item.personel_id === personelId && item.donem === ay && item.state !== "IPTAL"
+  );
+
+  return matching.reduce(
+    (acc, item) => {
+      if (isTesvikKalemi(item.kalem_turu)) {
+        acc.tesvikTutari += item.tutar;
+      }
+      if (isCezaKalemi(item.kalem_turu)) {
+        acc.cezaKesintiTutari += item.tutar;
+      }
+      return acc;
+    },
+    { tesvikTutari: 0, cezaKesintiTutari: 0 }
+  );
+}
+
+function buildAylikOzetResponse(ay: string, subeId?: number | null, departmanId?: number | null, sadeceRevizeli = false) {
+  const items = demoState.personeller
+    .filter((personel) => {
+      if (subeId !== null && subeId !== undefined && personel.sube_id !== subeId) {
+        return false;
+      }
+      if (departmanId !== null && departmanId !== undefined && personel.departman_id !== departmanId) {
+        return false;
+      }
+      return personel.aktif_durum === "AKTIF";
+    })
+    .map((personel) => {
+      const bildirimOzet = summarizeBildirimForPersonel(ay, personel.id);
+      const finansOzet = summarizeFinansForPersonel(ay, personel.id);
+      const durum = ensureAylikDurum(ay, personel.id);
+
+      return {
+        personel_id: personel.id,
+        ad_soyad: `${personel.ad} ${personel.soyad}`,
+        sicil_no: personel.sicil_no,
+        sube: getLabel(DEMO_SUBE_LABELS, personel.sube_id) ?? "-",
+        bolum: getLabel(DEMO_DEPARTMAN_LABELS, personel.departman_id) ?? "-",
+        birim_amiri: getLabel(DEMO_BAGLI_AMIR_LABELS, personel.bagli_amir_id) ?? "-",
+        devamsizlik_gun: bildirimOzet.devamsizlikGun,
+        gec_kalma_adet: bildirimOzet.gecKalmaAdet,
+        izinli_gelmedi: bildirimOzet.izinliGelmedi,
+        izinsiz_gelmedi: bildirimOzet.izinsizGelmedi,
+        raporlu: bildirimOzet.raporlu,
+        tesvik_tutari: finansOzet.tesvikTutari,
+        ceza_kesinti_tutari: finansOzet.cezaKesintiTutari,
+        bolum_onay_durumu: durum.kapanis_durumu === "KAPANDI" ? "KAPANDI" : durum.bolum_onay_durumu,
+        revize_var_mi: durum.revize_var_mi,
+        son_islem: durum.son_islem,
+        kapanis_durumu: durum.kapanis_durumu
+      };
+    })
+    .filter((item) => (sadeceRevizeli ? item.revize_var_mi : true));
+
+  const pendingBolumOnayi = items.filter(
+    (item) => item.kapanis_durumu !== "KAPANDI" && item.bolum_onay_durumu !== "BOLUM_ONAYLANDI"
+  ).length;
+
+  const state =
+    items.length > 0 && items.every((item) => item.kapanis_durumu === "KAPANDI")
+      ? "KAPANDI"
+      : items.some((item) => item.bolum_onay_durumu === "REVIZE_ISTENDI")
+        ? "REVIZE_ISTENDI"
+        : pendingBolumOnayi === 0
+          ? "BOLUM_ONAYLANDI"
+          : "BOLUM_ONAYINDA";
+
+  return {
+    ay,
+    state,
+    summary: {
+      toplam_personel: items.length,
+      toplam_devamsizlik_gun: items.reduce((acc, item) => acc + item.devamsizlik_gun, 0),
+      toplam_gec_kalma: items.reduce((acc, item) => acc + item.gec_kalma_adet, 0),
+      toplam_izinli_gelmedi: items.reduce((acc, item) => acc + item.izinli_gelmedi, 0),
+      toplam_izinsiz_gelmedi: items.reduce((acc, item) => acc + item.izinsiz_gelmedi, 0),
+      toplam_raporlu: items.reduce((acc, item) => acc + item.raporlu, 0),
+      toplam_tesvik_tutari: items.reduce((acc, item) => acc + item.tesvik_tutari, 0),
+      toplam_ceza_kesinti_tutari: items.reduce((acc, item) => acc + item.ceza_kesinti_tutari, 0)
+    },
+    items,
+    pending_bolum_onayi: pendingBolumOnayi
+  };
+}
+
 function buildDemoPersonelDetail(personel: DemoPersonel) {
   return {
     ana_kart: { ...personel },
@@ -318,6 +608,7 @@ function buildDemoPersonelDetail(personel: DemoPersonel) {
       etiket: personel.aktif_durum === "PASIF" ? "Pasif" : null
     },
     referans_adlari: {
+      sube: getLabel(DEMO_SUBE_LABELS, personel.sube_id),
       departman: getLabel(DEMO_DEPARTMAN_LABELS, personel.departman_id),
       gorev: getLabel(DEMO_GOREV_LABELS, personel.gorev_id),
       personel_tipi: getLabel(DEMO_PERSONEL_TIPI_LABELS, personel.personel_tipi_id),
@@ -339,7 +630,8 @@ export function resolveDemoApiResponse(
     const username = toStringValue(body.username) ?? "demo";
     const role = resolveDemoRole(username);
     const profile = role === "BIRIM_AMIRI" ? "birim_amiri" : "yonetim";
-    const sube_ids = role === "BIRIM_AMIRI" ? [1] : role === "MUHASEBE" ? [1, 2] : [];
+    const sube_ids =
+      role === "BIRIM_AMIRI" ? [1] : role === "MUHASEBE" ? [1, 2] : role === "BOLUM_YONETICISI" ? [2] : [];
     const sube_list =
       sube_ids.length > 0
       ? sube_ids.map((id) => ({ id, ad: id === 1 ? "Merkez" : `Şube ${id}` }))
@@ -363,6 +655,7 @@ export function resolveDemoApiResponse(
     const limit = toNumber(requestUrl.searchParams.get("limit")) ?? 10;
     const aktiflik = toStringValue(requestUrl.searchParams.get("aktiflik")) ?? "tum";
     const search = (toStringValue(requestUrl.searchParams.get("search")) ?? "").toLowerCase();
+    const subeId = toNumber(requestUrl.searchParams.get("sube_id"));
     const departmanId = toNumber(requestUrl.searchParams.get("departman_id"));
     const personelTipiId = toNumber(requestUrl.searchParams.get("personel_tipi_id"));
 
@@ -371,6 +664,9 @@ export function resolveDemoApiResponse(
         return false;
       }
       if (aktiflik === "pasif" && item.aktif_durum !== "PASIF") {
+        return false;
+      }
+      if (subeId !== null && item.sube_id !== subeId) {
         return false;
       }
       if (departmanId !== null && item.departman_id !== departmanId) {
@@ -390,6 +686,7 @@ export function resolveDemoApiResponse(
     const start = (page - 1) * limit;
     const items = filtered.slice(start, start + limit).map((item) => ({
       ...item,
+      sube_adi: getLabel(DEMO_SUBE_LABELS, item.sube_id),
       departman_adi: getLabel(DEMO_DEPARTMAN_LABELS, item.departman_id),
       gorev_adi: getLabel(DEMO_GOREV_LABELS, item.gorev_id),
       personel_tipi_adi: getLabel(DEMO_PERSONEL_TIPI_LABELS, item.personel_tipi_id),
@@ -418,6 +715,7 @@ export function resolveDemoApiResponse(
       ad: toStringValue(body.ad) ?? "Yeni",
       soyad: toStringValue(body.soyad) ?? "Personel",
       aktif_durum: (toStringValue(body.aktif_durum) as "AKTIF" | "PASIF") ?? "AKTIF",
+      sube_id: toNumber(body.sube_id) ?? (toNumber(body.departman_id) === 2 ? 2 : 1),
       telefon: toStringValue(body.telefon) ?? undefined,
       dogum_tarihi: toStringValue(body.dogum_tarihi) ?? undefined,
       sicil_no: toStringValue(body.sicil_no) ?? undefined,
@@ -621,6 +919,202 @@ export function resolveDemoApiResponse(
       state: "KAPANDI",
       personel_sayisi: demoState.personeller.length
     });
+  }
+
+  if (pathname === "/yonetim/kullanicilar" && method === "GET") {
+    return ok({
+      items: demoState.yonetimKullanicilari.map((item) => ({
+        ...item,
+        personel_ad_soyad:
+          item.personel_id != null
+            ? demoState.personeller
+                .filter((personel) => personel.id === item.personel_id)
+                .map((personel) => `${personel.ad} ${personel.soyad}`)[0] ?? null
+            : null
+      }))
+    });
+  }
+
+  if (pathname === "/yonetim/kullanicilar" && method === "POST") {
+    const personelId = toNumber(body.personel_id);
+    const linkedPersonel =
+      personelId !== null ? demoState.personeller.find((personel) => personel.id === personelId) ?? null : null;
+    const next: DemoYonetimKullanici = {
+      id: ++demoState.nextIds.kullanici,
+      ad_soyad:
+        toStringValue(body.ad_soyad) ??
+        (linkedPersonel ? `${linkedPersonel.ad} ${linkedPersonel.soyad}` : "Yeni Kullanici"),
+      telefon: toStringValue(body.telefon) ?? linkedPersonel?.telefon ?? undefined,
+      kullanici_tipi: body.kullanici_tipi === "HARICI" ? "HARICI" : "IC_PERSONEL",
+      rol:
+        body.rol === "GENEL_YONETICI" ||
+        body.rol === "BOLUM_YONETICISI" ||
+        body.rol === "MUHASEBE" ||
+        body.rol === "BIRIM_AMIRI"
+          ? body.rol
+          : "BIRIM_AMIRI",
+      personel_id: personelId,
+      sube_ids: Array.isArray(body.sube_ids)
+        ? body.sube_ids
+            .map((item) => toNumber(item))
+            .filter((item): item is number => item !== null)
+        : [],
+      varsayilan_sube_id: toNumber(body.varsayilan_sube_id),
+      durum: body.durum === "PASIF" ? "PASIF" : "AKTIF",
+      notlar: toStringValue(body.notlar) ?? undefined
+    };
+    demoState.yonetimKullanicilari.unshift(next);
+    return ok({
+      ...next,
+      personel_ad_soyad: linkedPersonel ? `${linkedPersonel.ad} ${linkedPersonel.soyad}` : null
+    });
+  }
+
+  const yonetimKullaniciMatch = pathname.match(/^\/yonetim\/kullanicilar\/(\d+)$/);
+  if (yonetimKullaniciMatch && method === "PUT") {
+    const id = Number.parseInt(yonetimKullaniciMatch[1], 10);
+    const target = demoState.yonetimKullanicilari.find((item) => item.id === id);
+    if (!target) {
+      return null;
+    }
+
+    const personelId = toNumber(body.personel_id);
+    const linkedPersonel =
+      personelId !== null ? demoState.personeller.find((personel) => personel.id === personelId) ?? null : null;
+    Object.assign(target, {
+      ad_soyad:
+        toStringValue(body.ad_soyad) ??
+        (linkedPersonel ? `${linkedPersonel.ad} ${linkedPersonel.soyad}` : target.ad_soyad),
+      telefon: toStringValue(body.telefon) ?? linkedPersonel?.telefon ?? target.telefon,
+      kullanici_tipi: body.kullanici_tipi === "HARICI" ? "HARICI" : "IC_PERSONEL",
+      rol:
+        body.rol === "GENEL_YONETICI" ||
+        body.rol === "BOLUM_YONETICISI" ||
+        body.rol === "MUHASEBE" ||
+        body.rol === "BIRIM_AMIRI"
+          ? body.rol
+          : target.rol,
+      personel_id: personelId,
+      sube_ids: Array.isArray(body.sube_ids)
+        ? body.sube_ids
+            .map((item) => toNumber(item))
+            .filter((item): item is number => item !== null)
+        : target.sube_ids,
+      varsayilan_sube_id: toNumber(body.varsayilan_sube_id),
+      durum: body.durum === "PASIF" ? "PASIF" : "AKTIF",
+      notlar: toStringValue(body.notlar) ?? undefined
+    });
+    return ok({
+      ...target,
+      personel_ad_soyad: linkedPersonel ? `${linkedPersonel.ad} ${linkedPersonel.soyad}` : null
+    });
+  }
+
+  if (pathname === "/yonetim/subeler" && method === "GET") {
+    return ok({ items: demoState.subeler });
+  }
+
+  if (pathname === "/yonetim/subeler" && method === "POST") {
+    const next: DemoSube = {
+      id: ++demoState.nextIds.sube,
+      kod: toStringValue(body.kod) ?? `SBE-${demoState.nextIds.sube}`,
+      ad: toStringValue(body.ad) ?? "Yeni Sube",
+      departmanlar: Array.isArray(body.departmanlar)
+        ? body.departmanlar
+            .map((item) => toStringValue(item))
+            .filter((item): item is string => item !== null)
+        : [],
+      durum: body.durum === "PASIF" ? "PASIF" : "AKTIF"
+    };
+    demoState.subeler.unshift(next);
+    return ok(next);
+  }
+
+  const yonetimSubeMatch = pathname.match(/^\/yonetim\/subeler\/(\d+)$/);
+  if (yonetimSubeMatch && method === "PUT") {
+    const id = Number.parseInt(yonetimSubeMatch[1], 10);
+    const target = demoState.subeler.find((item) => item.id === id);
+    if (!target) {
+      return null;
+    }
+
+    Object.assign(target, {
+      kod: toStringValue(body.kod) ?? target.kod,
+      ad: toStringValue(body.ad) ?? target.ad,
+      departmanlar: Array.isArray(body.departmanlar)
+        ? body.departmanlar
+            .map((item) => toStringValue(item))
+            .filter((item): item is string => item !== null)
+        : target.departmanlar,
+      durum: body.durum === "PASIF" ? "PASIF" : "AKTIF"
+    });
+    return ok(target);
+  }
+
+  if (pathname === "/yonetim/aylik-ozet" && method === "GET") {
+    const ay = toStringValue(requestUrl.searchParams.get("ay")) ?? "2026-04";
+    const subeId = toNumber(requestUrl.searchParams.get("sube_id"));
+    const departmanId = toNumber(requestUrl.searchParams.get("departman_id"));
+    const sadeceRevizeli = toStringValue(requestUrl.searchParams.get("sadece_revizeli")) === "true";
+    return ok(buildAylikOzetResponse(ay, subeId, departmanId, sadeceRevizeli));
+  }
+
+  if (pathname === "/yonetim/aylik-ozet/bolum-onay" && method === "POST") {
+    const ay = toStringValue(body.ay) ?? "2026-04";
+    const subeId = toNumber(body.sube_id);
+    const departmanId = toNumber(body.departman_id);
+    const sadeceRevizeli = Boolean(body.sadece_revizeli);
+
+    demoState.personeller.forEach((personel) => {
+      if (personel.aktif_durum !== "AKTIF") {
+        return;
+      }
+      if (subeId !== null && personel.sube_id !== subeId) {
+        return;
+      }
+      if (departmanId !== null && personel.departman_id !== departmanId) {
+        return;
+      }
+
+      const durum = ensureAylikDurum(ay, personel.id);
+      if (durum.kapanis_durumu === "KAPANDI") {
+        return;
+      }
+      durum.bolum_onay_durumu = "BOLUM_ONAYLANDI";
+      durum.revize_var_mi = false;
+      durum.son_islem = `Bolum yoneticisi onay verdi (${formatAylikIslemTimestamp()})`;
+    });
+
+    return ok(buildAylikOzetResponse(ay, subeId, departmanId, sadeceRevizeli));
+  }
+
+  if (pathname === "/yonetim/aylik-ozet/ay-kapat" && method === "POST") {
+    const ay = toStringValue(body.ay) ?? "2026-04";
+    const subeId = toNumber(body.sube_id);
+    const departmanId = toNumber(body.departman_id);
+    const sadeceRevizeli = Boolean(body.sadece_revizeli);
+    const current = buildAylikOzetResponse(ay, subeId, departmanId, false);
+
+    if (current.pending_bolum_onayi > 0) {
+      return {
+        data: null,
+        meta: {},
+        errors: [
+          {
+            code: "PENDING_BOLUM_APPROVAL",
+            message: "Bolum onayi bekleyen kayitlar var. Ay kapatilamadi."
+          }
+        ]
+      };
+    }
+
+    current.items.forEach((item) => {
+      const durum = ensureAylikDurum(ay, item.personel_id);
+      durum.kapanis_durumu = "KAPANDI";
+      durum.son_islem = `Genel yonetici ayi kapatti (${formatAylikIslemTimestamp()})`;
+    });
+
+    return ok(buildAylikOzetResponse(ay, subeId, departmanId, sadeceRevizeli));
   }
 
   if (pathname.startsWith("/referans/") && method === "GET") {

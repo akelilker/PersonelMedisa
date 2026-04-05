@@ -6,6 +6,7 @@ export type Personel = {
   ad: string;
   soyad: string;
   aktif_durum: PersonelAktifDurum;
+  sube_id?: number;
   telefon?: string;
   dogum_tarihi?: string;
   sicil_no?: string;
@@ -18,6 +19,7 @@ export type Personel = {
   gorev_id?: number;
   personel_tipi_id?: number;
   bagli_amir_id?: number;
+  sube_adi?: string;
   departman_adi?: string;
   gorev_adi?: string;
   personel_tipi_adi?: string;

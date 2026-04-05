@@ -42,5 +42,14 @@ export const endpoints = {
     bagliAmirler: "/referans/bagli-amirler",
     bildirimTurleri: "/referans/bildirim-turleri",
     surecTurleri: "/referans/surec-turleri"
+  },
+  yonetim: {
+    kullanicilar: "/yonetim/kullanicilar",
+    kullaniciDetail: (id: number | string) => `/yonetim/kullanicilar/${id}`,
+    subeler: "/yonetim/subeler",
+    subeDetail: (id: number | string) => `/yonetim/subeler/${id}`,
+    aylikOzet: "/yonetim/aylik-ozet",
+    aylikOzetBolumOnay: "/yonetim/aylik-ozet/bolum-onay",
+    aylikOzetKapat: "/yonetim/aylik-ozet/ay-kapat"
   }
 };

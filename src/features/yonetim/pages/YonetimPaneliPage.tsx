@@ -443,315 +443,293 @@ export function YonetimPaneliPage() {
       {!isLoading && successMessage ? <p className="yonetim-success">{successMessage}</p> : null}
 
       {!isLoading && !errorMessage && activeTab === "kullanicilar" ? (
-        <div className="yonetim-panel-grid">
-          <section className="yonetim-section-card">
-            <div className="yonetim-section-copy">
-              <span className="yonetim-section-eyebrow">Kullanıcı Atama</span>
-              <h3>{editingKullaniciId != null ? "Kullanıcıyı Düzenle" : "Yeni Kullanıcı"}</h3>
-              <p>Önce kişiyi belirle, sonra rolünü ve hangi şubelerde çalışacağını tanımla.</p>
+        <section className="yonetim-section-card yonetim-list-surface">
+          <div className="yonetim-list-header">
+            <button
+              type="button"
+              className="yonetim-create-link"
+              data-testid="yonetim-kullanici-yeni"
+              onClick={openYeniKullaniciForm}
+            >
+              + Yeni Kullanıcı
+            </button>
+          </div>
+
+          {kullanicilar.length === 0 ? (
+            <EmptyState title="Kullanıcı kaydı yok" message="İlk kullanıcı atamasını buradan oluşturabilirsin." />
+          ) : (
+            <div className="yonetim-card-grid yonetim-card-grid--users">
+              {kullanicilar.map((item) => (
+                <article
+                  key={item.id}
+                  className="yonetim-entity-card yonetim-entity-card--interactive"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => openKullaniciEditor(item)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      openKullaniciEditor(item);
+                    }
+                  }}
+                >
+                  <div className="yonetim-card-meta">
+                    <strong>{item.ad_soyad}</strong>
+                    <span>
+                      {KULLANICI_TIPI_LABELS[item.kullanici_tipi]} • {ROLE_LABELS[item.rol]}
+                    </span>
+                  </div>
+                  <p>Durum: {DURUM_LABELS[item.durum]}</p>
+                  <p>Telefon: {item.telefon ?? "-"}</p>
+                  <p>Bağlı Personel: {item.personel_ad_soyad ?? "-"}</p>
+                  <p>Yetki Kapsamı: {formatSubeScopeLabel(item.sube_ids, subeNameMap)}</p>
+                  <p>
+                    Varsayılan Şube:{" "}
+                    {item.varsayilan_sube_id != null
+                      ? subeNameMap.get(item.varsayilan_sube_id) ?? `Şube ${item.varsayilan_sube_id}`
+                      : "Tanımsız"}
+                  </p>
+                </article>
+              ))}
             </div>
-
-            <form className="yonetim-form-stack" onSubmit={handleKullaniciSubmit}>
-              <div className="form-field-grid">
-                <FormField
-                  as="select"
-                  label="Kullanıcı Tipi"
-                  name="yonetim-kullanici-tipi"
-                  value={kullaniciForm.kullaniciTipi}
-                  onChange={(value) =>
-                    setKullaniciForm((prev) => ({
-                      ...prev,
-                      kullaniciTipi: value as KullaniciTipi,
-                      personelId: value === "HARICI" ? "" : prev.personelId
-                    }))
-                  }
-                  selectOptions={[
-                    { value: "IC_PERSONEL", label: "İç Personel" },
-                    { value: "HARICI", label: "Harici" }
-                  ]}
-                />
-                <FormField
-                  as="select"
-                  label="Rol"
-                  name="yonetim-kullanici-rol"
-                  value={kullaniciForm.rol}
-                  onChange={(value) => setKullaniciForm((prev) => ({ ...prev, rol: value as UserRole }))}
-                  selectOptions={roleOptions()}
-                />
-                <FormField
-                  as="select"
-                  label="Durum"
-                  name="yonetim-kullanici-durum"
-                  value={kullaniciForm.durum}
-                  onChange={(value) => setKullaniciForm((prev) => ({ ...prev, durum: value as KayitDurumu }))}
-                  selectOptions={statusOptions()}
-                />
-                {kullaniciForm.kullaniciTipi === "IC_PERSONEL" ? (
-                  <FormField
-                    as="select"
-                    label="Bağlı Personel"
-                    name="yonetim-kullanici-personel"
-                    value={kullaniciForm.personelId}
-                    onChange={(value) => setKullaniciForm((prev) => ({ ...prev, personelId: value }))}
-                    placeholderOption={{ value: "", label: "Seçiniz" }}
-                    selectOptions={personelOptions}
-                  />
-                ) : null}
-                <FormField
-                  label="Ad Soyad"
-                  name="yonetim-kullanici-ad"
-                  value={kullaniciForm.adSoyad}
-                  onChange={(value) => setKullaniciForm((prev) => ({ ...prev, adSoyad: value }))}
-                  disabled={kullaniciForm.kullaniciTipi === "IC_PERSONEL" && kullaniciForm.personelId !== ""}
-                  required
-                />
-                <FormField
-                  label="Telefon"
-                  name="yonetim-kullanici-telefon"
-                  type="tel"
-                  value={kullaniciForm.telefon}
-                  onChange={(value) => setKullaniciForm((prev) => ({ ...prev, telefon: value }))}
-                  disabled={kullaniciForm.kullaniciTipi === "IC_PERSONEL" && kullaniciForm.personelId !== ""}
-                />
-                <FormField
-                  as="select"
-                  label="Varsayılan Şube"
-                  name="yonetim-kullanici-varsayilan-sube"
-                  value={kullaniciForm.varsayilanSubeId}
-                  onChange={(value) => setKullaniciForm((prev) => ({ ...prev, varsayilanSubeId: value }))}
-                  placeholderOption={{ value: "", label: "Tüm Şubeler / Seçimsiz" }}
-                  selectOptions={subeler
-                    .filter((sube) => kullaniciForm.subeIds.includes(sube.id))
-                    .map((sube) => ({ value: String(sube.id), label: sube.ad }))}
-                />
-                <FormField
-                  as="textarea"
-                  label="Notlar"
-                  name="yonetim-kullanici-notlar"
-                  value={kullaniciForm.notlar}
-                  onChange={(value) => setKullaniciForm((prev) => ({ ...prev, notlar: value }))}
-                  placeholder="Opsiyonel açıklama"
-                />
-              </div>
-
-              <div className="yonetim-checkbox-section">
-                <p className="yonetim-checkbox-title">Şube Yetkisi</p>
-                <p className="yonetim-hint">Boş bırakırsan kullanıcı tüm şubelerde çalışır.</p>
-                <div className="yonetim-selection-grid">
-                  {subeler.map((sube) => (
-                    <button
-                      key={sube.id}
-                      type="button"
-                      className={`yonetim-selection-pill${
-                        kullaniciForm.subeIds.includes(sube.id) ? " is-selected" : ""
-                      }`}
-                      onClick={() => toggleSubeSelection(sube.id)}
-                    >
-                      <strong>{sube.ad}</strong>
-                      <span>{sube.departman_adlari.join(", ") || "Departman tanımlı değil"}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="form-actions-row">
-                <button type="submit" className="universal-btn-save" data-testid="yonetim-kullanici-kaydet">
-                  {editingKullaniciId != null ? "Kullanıcıyı Güncelle" : "Kullanıcıyı Kaydet"}
-                </button>
-                <button type="button" className="universal-btn-cancel" onClick={resetKullaniciEditor}>
-                  Temizle
-                </button>
-              </div>
-            </form>
-          </section>
-
-          <section className="yonetim-section-card">
-            <div className="yonetim-section-copy">
-              <span className="yonetim-section-eyebrow">Mevcut Kullanıcılar</span>
-              <h3>Rol ve kapsam görünümü</h3>
-              <p>Bir kullanıcıyı seçip formu aynı panelde düzenleyebilirsin.</p>
-            </div>
-
-            {kullanicilar.length === 0 ? (
-              <EmptyState title="Kullanıcı kaydı yok" message="İlk kullanıcı atamasını sol taraftaki formdan yap." />
-            ) : (
-              <div className="yonetim-card-grid">
-                {kullanicilar.map((item) => (
-                  <article key={item.id} className="yonetim-entity-card">
-                    <div className="yonetim-card-meta">
-                      <strong>{item.ad_soyad}</strong>
-                      <span>
-                        {KULLANICI_TIPI_LABELS[item.kullanici_tipi]} • {ROLE_LABELS[item.rol]}
-                      </span>
-                    </div>
-                    <p>Durum: {DURUM_LABELS[item.durum]}</p>
-                    <p>Telefon: {item.telefon ?? "-"}</p>
-                    <p>Bağlı Personel: {item.personel_ad_soyad ?? "-"}</p>
-                    <p>Yetki Kapsamı: {formatSubeScopeLabel(item.sube_ids, subeNameMap)}</p>
-                    <p>
-                      Varsayılan Şube:{" "}
-                      {item.varsayilan_sube_id != null
-                        ? subeNameMap.get(item.varsayilan_sube_id) ?? `Şube ${item.varsayilan_sube_id}`
-                        : "Tanımsız"}
-                    </p>
-                    <div className="module-item-actions">
-                      <button
-                        type="button"
-                        className="universal-btn-aux"
-                        onClick={() => {
-                          setEditingKullaniciId(item.id);
-                          setKullaniciForm(userFormFromItem(item));
-                          setSuccessMessage(null);
-                          setErrorMessage(null);
-                        }}
-                      >
-                        Düzenle
-                      </button>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            )}
-          </section>
-        </div>
+          )}
+        </section>
       ) : null}
 
       {!isLoading && !errorMessage && activeTab === "subeler" ? (
-        subeViewMode === "liste" ? (
-          <section className="yonetim-section-card">
-            <div className="yonetim-section-copy yonetim-section-copy--row">
-              <div>
-                <span className="yonetim-section-eyebrow">Şube Yönetimi</span>
-                <h3>Tanımlı şubeler</h3>
-                <p>Şube kartını seçerek düzenle, yeni şube için üstteki aksiyonu kullan.</p>
-              </div>
-              <button
-                type="button"
-                className="universal-btn-aux yonetim-add-action"
-                data-testid="yonetim-sube-yeni"
-                onClick={openYeniSubeForm}
-              >
-                + Yeni Şube
-              </button>
-            </div>
-
-            {subeler.length === 0 ? (
-              <EmptyState title="Şube tanımı yok" message="İlk şube kaydını buradan oluşturmaya başlayabilirsin." />
-            ) : (
-              <div className="yonetim-card-grid yonetim-card-grid--branches">
-                {subeler.map((item) => (
-                  <article
-                    key={item.id}
-                    className="yonetim-entity-card yonetim-entity-card--branch"
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => openSubeEditor(item)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter" || event.key === " ") {
-                        event.preventDefault();
-                        openSubeEditor(item);
-                      }
-                    }}
-                  >
-                    <div className="yonetim-card-meta">
-                      <strong>{item.ad}</strong>
-                      <span>{item.kod}</span>
-                    </div>
-                    <p>{item.departman_adlari.length} departman</p>
-                    <p>{item.departman_adlari.join(", ") || "Departman tanımlı değil"}</p>
-                    <p>Durum: {DURUM_LABELS[item.durum]}</p>
-                  </article>
-                ))}
-              </div>
-            )}
-          </section>
-        ) : (
-          <section className="yonetim-section-card">
-            <button type="button" className="yonetim-back-link" onClick={resetSubeEditor}>
-              ← Şubelere Dön
+        <section className="yonetim-section-card yonetim-list-surface">
+          <div className="yonetim-list-header">
+            <button
+              type="button"
+              className="yonetim-create-link"
+              data-testid="yonetim-sube-yeni"
+              onClick={openYeniSubeForm}
+            >
+              + Yeni Şube
             </button>
+          </div>
 
-            <div className="yonetim-section-copy">
-              <span className="yonetim-section-eyebrow">Şube Formu</span>
-              <h3>{editingSubeId != null ? "Şubeyi Düzenle" : "Yeni Şube"}</h3>
-              <p>Şube kodu, bağlı departmanlar ve durum bilgisini bu ekrandan yönet.</p>
+          {subeler.length === 0 ? (
+            <EmptyState title="Şube tanımı yok" message="İlk şube kaydını buradan oluşturmaya başlayabilirsin." />
+          ) : (
+            <div className="yonetim-card-grid yonetim-card-grid--branches">
+              {subeler.map((item) => (
+                <article
+                  key={item.id}
+                  className="yonetim-entity-card yonetim-entity-card--branch yonetim-entity-card--interactive"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => openSubeEditor(item)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      openSubeEditor(item);
+                    }
+                  }}
+                >
+                  <div className="yonetim-card-meta">
+                    <strong>{item.ad}</strong>
+                    <span>{item.kod}</span>
+                  </div>
+                  <p>{item.departman_adlari.length} departman</p>
+                  <p>{item.departman_adlari.join(", ") || "Departman tanımlı değil"}</p>
+                  <p>Durum: {DURUM_LABELS[item.durum]}</p>
+                </article>
+              ))}
             </div>
+          )}
+        </section>
+      ) : null}
 
-            <form className="yonetim-form-stack" onSubmit={handleSubeSubmit}>
-              <div className="form-field-grid">
-                <FormField
-                  label="Şube Kodu"
-                  name="yonetim-sube-kod"
-                  value={subeForm.kod}
-                  onChange={(value) => setSubeForm((prev) => ({ ...prev, kod: value }))}
-                  required
-                />
-                <FormField
-                  label="Şube Adı"
-                  name="yonetim-sube-ad"
-                  value={subeForm.ad}
-                  onChange={(value) => setSubeForm((prev) => ({ ...prev, ad: value }))}
-                  required
-                />
+      {isKullaniciFormOpen ? (
+        <AppModal title={editingKullaniciId != null ? "Kullanıcı Yönetimi" : "Yeni Kullanıcı"} onClose={resetKullaniciEditor}>
+          <form className="yonetim-form-stack" id={YONETIM_KULLANICI_FORM_ID} onSubmit={handleKullaniciSubmit}>
+            <div className="form-field-grid">
+              <FormField
+                as="select"
+                label="Kullanıcı Tipi"
+                name="yonetim-kullanici-tipi"
+                value={kullaniciForm.kullaniciTipi}
+                onChange={(value) =>
+                  setKullaniciForm((prev) => ({
+                    ...prev,
+                    kullaniciTipi: value as KullaniciTipi,
+                    personelId: value === "HARICI" ? "" : prev.personelId
+                  }))
+                }
+                selectOptions={[
+                  { value: "IC_PERSONEL", label: "İç Personel" },
+                  { value: "HARICI", label: "Harici" }
+                ]}
+              />
+              <FormField
+                as="select"
+                label="Rol"
+                name="yonetim-kullanici-rol"
+                value={kullaniciForm.rol}
+                onChange={(value) => setKullaniciForm((prev) => ({ ...prev, rol: value as UserRole }))}
+                selectOptions={roleOptions()}
+              />
+              <FormField
+                as="select"
+                label="Durum"
+                name="yonetim-kullanici-durum"
+                value={kullaniciForm.durum}
+                onChange={(value) => setKullaniciForm((prev) => ({ ...prev, durum: value as KayitDurumu }))}
+                selectOptions={statusOptions()}
+              />
+              {kullaniciForm.kullaniciTipi === "IC_PERSONEL" ? (
                 <FormField
                   as="select"
-                  label="Durum"
-                  name="yonetim-sube-durum"
-                  value={subeForm.durum}
-                  onChange={(value) => setSubeForm((prev) => ({ ...prev, durum: value as KayitDurumu }))}
-                  selectOptions={statusOptions()}
+                  label="Bağlı Personel"
+                  name="yonetim-kullanici-personel"
+                  value={kullaniciForm.personelId}
+                  onChange={(value) => setKullaniciForm((prev) => ({ ...prev, personelId: value }))}
+                  placeholderOption={{ value: "", label: "Seçiniz" }}
+                  selectOptions={personelOptions}
                 />
-              </div>
+              ) : null}
+              <FormField
+                label="Ad Soyad"
+                name="yonetim-kullanici-ad"
+                value={kullaniciForm.adSoyad}
+                onChange={(value) => setKullaniciForm((prev) => ({ ...prev, adSoyad: value }))}
+                disabled={kullaniciForm.kullaniciTipi === "IC_PERSONEL" && kullaniciForm.personelId !== ""}
+                required
+              />
+              <FormField
+                label="Telefon"
+                name="yonetim-kullanici-telefon"
+                type="tel"
+                value={kullaniciForm.telefon}
+                onChange={(value) => setKullaniciForm((prev) => ({ ...prev, telefon: value }))}
+                disabled={kullaniciForm.kullaniciTipi === "IC_PERSONEL" && kullaniciForm.personelId !== ""}
+              />
+              <FormField
+                as="select"
+                label="Varsayılan Şube"
+                name="yonetim-kullanici-varsayilan-sube"
+                value={kullaniciForm.varsayilanSubeId}
+                onChange={(value) => setKullaniciForm((prev) => ({ ...prev, varsayilanSubeId: value }))}
+                placeholderOption={{ value: "", label: "Tüm Şubeler / Seçimsiz" }}
+                selectOptions={subeler
+                  .filter((sube) => kullaniciForm.subeIds.includes(sube.id))
+                  .map((sube) => ({ value: String(sube.id), label: sube.ad }))}
+              />
+              <FormField
+                as="textarea"
+                label="Notlar"
+                name="yonetim-kullanici-notlar"
+                value={kullaniciForm.notlar}
+                onChange={(value) => setKullaniciForm((prev) => ({ ...prev, notlar: value }))}
+                placeholder="Opsiyonel açıklama"
+              />
+            </div>
 
-              <div className="yonetim-checkbox-section">
-                <p className="yonetim-checkbox-title">Departmanlar</p>
-                <p className="yonetim-hint">Şube kapsamındaki departmanları seç. Yeni seçenek gerekirse sağdaki artı ile ekle.</p>
-                <div className="yonetim-selection-grid">
-                  {departmanOptions.map((departman) => (
-                    <button
-                      key={departman.id}
-                      type="button"
-                      className={`yonetim-selection-pill${
-                        subeForm.departmanIds.includes(departman.id) ? " is-selected" : ""
-                      }`}
-                      onClick={() => toggleDepartmanSelection(departman.id)}
-                    >
-                      <strong>{departman.label}</strong>
-                    </button>
-                  ))}
-                </div>
-
-                <div className="yonetim-inline-add-row">
-                  <input
-                    className="form-input"
-                    type="text"
-                    value={yeniDepartmanAdi}
-                    onChange={(event) => setYeniDepartmanAdi(event.target.value)}
-                    placeholder="Yeni departman adı"
-                  />
+            <div className="yonetim-checkbox-section">
+              <p className="yonetim-checkbox-title">Şube Yetkisi</p>
+              <p className="yonetim-hint">Boş bırakırsan kullanıcı tüm şubelerde çalışır.</p>
+              <div className="yonetim-selection-grid">
+                {subeler.map((sube) => (
                   <button
+                    key={sube.id}
                     type="button"
-                    className="yonetim-inline-add-btn"
-                    onClick={() => void handleDepartmanAdd()}
-                    disabled={isAddingDepartman || yeniDepartmanAdi.trim().length === 0}
-                    aria-label="Departman ekle"
+                    className={`yonetim-selection-pill${kullaniciForm.subeIds.includes(sube.id) ? " is-selected" : ""}`}
+                    onClick={() => toggleSubeSelection(sube.id)}
                   >
-                    +
+                    <strong>{sube.ad}</strong>
+                    <span>{sube.departman_adlari.join(", ") || "Departman tanımlı değil"}</span>
                   </button>
-                </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="form-actions-row">
+              <button type="submit" className="universal-btn-save" data-testid="yonetim-kullanici-kaydet">
+                {editingKullaniciId != null ? "Kullanıcıyı Güncelle" : "Kullanıcıyı Kaydet"}
+              </button>
+              <button type="button" className="universal-btn-cancel" onClick={resetKullaniciEditor}>
+                Vazgeç
+              </button>
+            </div>
+          </form>
+        </AppModal>
+      ) : null}
+
+      {isSubeFormOpen ? (
+        <AppModal title={editingSubeId != null ? "Şube Yönetimi" : "Yeni Şube"} onClose={resetSubeEditor}>
+          <form className="yonetim-form-stack" id={YONETIM_SUBE_FORM_ID} onSubmit={handleSubeSubmit}>
+            <div className="form-field-grid">
+              <FormField
+                label="Şube Kodu"
+                name="yonetim-sube-kod"
+                value={subeForm.kod}
+                onChange={(value) => setSubeForm((prev) => ({ ...prev, kod: value }))}
+                required
+              />
+              <FormField
+                label="Şube Adı"
+                name="yonetim-sube-ad"
+                value={subeForm.ad}
+                onChange={(value) => setSubeForm((prev) => ({ ...prev, ad: value }))}
+                required
+              />
+              <FormField
+                as="select"
+                label="Durum"
+                name="yonetim-sube-durum"
+                value={subeForm.durum}
+                onChange={(value) => setSubeForm((prev) => ({ ...prev, durum: value as KayitDurumu }))}
+                selectOptions={statusOptions()}
+              />
+            </div>
+
+            <div className="yonetim-checkbox-section">
+              <p className="yonetim-checkbox-title">Departmanlar</p>
+              <p className="yonetim-hint">Şube kapsamındaki departmanları seç. Yeni seçenek gerekirse sağdaki artı ile ekle.</p>
+              <div className="yonetim-selection-grid">
+                {departmanOptions.map((departman) => (
+                  <button
+                    key={departman.id}
+                    type="button"
+                    className={`yonetim-selection-pill${subeForm.departmanIds.includes(departman.id) ? " is-selected" : ""}`}
+                    onClick={() => toggleDepartmanSelection(departman.id)}
+                  >
+                    <strong>{departman.label}</strong>
+                  </button>
+                ))}
               </div>
 
-              <div className="form-actions-row">
-                <button type="submit" className="universal-btn-save" data-testid="yonetim-sube-kaydet">
-                  {editingSubeId != null ? "Şubeyi Güncelle" : "Şubeyi Kaydet"}
-                </button>
-                <button type="button" className="universal-btn-cancel" onClick={resetSubeEditor}>
-                  Vazgeç
+              <div className="yonetim-inline-add-row">
+                <input
+                  className="form-input"
+                  type="text"
+                  value={yeniDepartmanAdi}
+                  onChange={(event) => setYeniDepartmanAdi(event.target.value)}
+                  placeholder="Yeni departman adı"
+                />
+                <button
+                  type="button"
+                  className="yonetim-inline-add-btn"
+                  onClick={() => void handleDepartmanAdd()}
+                  disabled={isAddingDepartman || yeniDepartmanAdi.trim().length === 0}
+                  aria-label="Departman ekle"
+                >
+                  +
                 </button>
               </div>
-            </form>
-          </section>
-        )
+            </div>
+
+            <div className="form-actions-row">
+              <button type="submit" className="universal-btn-save" data-testid="yonetim-sube-kaydet">
+                {editingSubeId != null ? "Şubeyi Güncelle" : "Şubeyi Kaydet"}
+              </button>
+              <button type="button" className="universal-btn-cancel" onClick={resetSubeEditor}>
+                Vazgeç
+              </button>
+            </div>
+          </form>
+        </AppModal>
       ) : null}
     </section>
   );

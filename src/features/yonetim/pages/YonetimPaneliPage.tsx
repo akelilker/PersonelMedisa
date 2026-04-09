@@ -398,12 +398,6 @@ export function YonetimPaneliPage() {
 
   return (
     <section className="yonetim-page">
-      <div className="yonetim-header-row">
-        <p className="yonetim-kicker">Ayarlar</p>
-        <h2>Yönetim Paneli</h2>
-        <p>Uygulamayı kullanacak kişileri, rollerini ve şube kapsamlarını buradan yönet.</p>
-      </div>
-
       <div className="yonetim-tabs" role="tablist" aria-label="Yönetim sekmeleri">
         <button
           type="button"

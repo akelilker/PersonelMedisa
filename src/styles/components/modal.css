@@ -7,7 +7,7 @@
   left: 50%;
   right: auto;
   width: 100%;
-  max-width: 720px;
+  max-width: var(--app-shell-max-width);
   transform: translateX(-50%);
   z-index: var(--z-modal-overlay, 1000);
   display: none;
@@ -99,6 +99,11 @@
 
 .modal-footer .modal-footer-actions {
   margin: 0;
+}
+
+.modal-body--yonetim {
+  gap: 14px;
+  padding-top: 0;
 }
 
 .modal-close-btn {

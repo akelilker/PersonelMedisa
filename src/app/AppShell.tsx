@@ -18,6 +18,13 @@ type AppShellProps = {
   children?: ReactNode;
 };
 
+type ModuleModalConfig = {
+  title: string;
+  closeTo: string;
+  className?: string;
+  bodyClassName?: string;
+};
+
 function resolveBackBar(pathname: string): { to: string; label: string } | null {
   if (/^\/personeller\/\d+$/.test(pathname)) {
     return { to: "/personeller", label: "Personel listesine dön" };
@@ -31,7 +38,7 @@ function resolveBackBar(pathname: string): { to: string; label: string } | null 
   return null;
 }
 
-function resolveModuleModal(pathname: string): { title: string; closeTo: string } | null {
+function resolveModuleModal(pathname: string): ModuleModalConfig | null {
   if (pathname === "/") {
     return null;
   }
@@ -70,7 +77,12 @@ function resolveModuleModal(pathname: string): { title: string; closeTo: string 
     return { title: "Finans", closeTo: "/" };
   }
   if (pathname === "/yonetim-paneli") {
-    return { title: "Yönetim Paneli", closeTo: "/" };
+    return {
+      title: "Yönetim Paneli",
+      closeTo: "/",
+      className: "modal-container--yonetim",
+      bodyClassName: "modal-body--yonetim"
+    };
   }
   if (pathname === "/aylik-kapanis-ozeti") {
     return { title: "Aylık Kapanış Özeti", closeTo: "/raporlar" };
@@ -162,7 +174,12 @@ export function AppShell({ children }: AppShellProps) {
       ) : null}
 
       {isModuleOverlayRoute && moduleModal ? (
-        <AppModal title={moduleModal.title} onClose={() => navigate(moduleModal.closeTo)}>
+        <AppModal
+          title={moduleModal.title}
+          onClose={() => navigate(moduleModal.closeTo)}
+          className={moduleModal.className}
+          bodyClassName={moduleModal.bodyClassName}
+        >
           {backBarTarget ? <BackBar to={backBarTarget.to} label={backBarTarget.label} /> : null}
           {children}
         </AppModal>

@@ -5,7 +5,7 @@
   transform: translateX(-50%);
   flex-shrink: 0;
   width: 100%;
-  max-width: 500px;
+  max-width: var(--app-shell-max-width);
   margin: 0 auto;
   background: var(--bg);
   isolation: isolate;
@@ -50,7 +50,7 @@ body:not(.dashboard-page):not(.login-page):not(.admin-report-page) #app-footer {
   position: relative;
   z-index: 1;
   width: 100%;
-  max-width: 500px;
+  max-width: var(--app-shell-max-width);
   height: 100%;
   margin: 0 auto;
   padding: 6px 12px;

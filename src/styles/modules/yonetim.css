@@ -57,24 +57,19 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0;
   margin: 0 -18px;
-  padding: 0 18px 6px;
-  background: linear-gradient(
-    180deg,
-    rgba(122, 8, 20, 0.98) 0%,
-    rgba(99, 12, 22, 0.94) 42%,
-    rgba(29, 16, 24, 0.98) 100%
-  );
-  box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.06);
+  padding: 0 18px;
+  background: rgba(8, 11, 18, 0.94);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .yonetim-tab-btn {
-  min-height: 44px;
+  min-height: 46px;
   padding: 0 14px;
   border: none;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  border-bottom: 1px solid transparent;
   border-radius: 0;
   background: transparent;
-  color: rgba(244, 246, 250, 0.76);
+  color: rgba(244, 246, 250, 0.68);
   font-weight: 700;
   letter-spacing: 0.02em;
   cursor: pointer;
@@ -86,7 +81,7 @@
 }
 
 .yonetim-tab-btn + .yonetim-tab-btn {
-  box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.1);
+  box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.08);
 }
 
 .yonetim-tab-btn:hover {
@@ -94,10 +89,7 @@
 }
 
 .yonetim-tab-btn.is-active {
-  background: rgba(8, 12, 20, 0.1);
-  box-shadow:
-    inset 0 -2px 0 rgba(var(--theme-color-rgb), 0.9),
-    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  border-bottom-color: rgba(var(--theme-color-rgb), 0.92);
   color: #ffffff;
 }
 
@@ -129,23 +121,25 @@
 }
 
 .yonetim-list-surface {
+  display: grid;
+  gap: 12px;
   align-content: start;
-  padding-top: 14px;
+  padding: 8px 6px 0;
 }
 
 .yonetim-list-header {
   display: flex;
-  justify-content: center;
+  justify-content: flex-start;
   align-items: center;
-  min-height: 30px;
+  min-height: 24px;
 }
 
 .yonetim-create-link {
   padding: 0;
   border: none;
   background: transparent;
-  color: rgba(226, 213, 188, 0.88);
-  font-size: 1.05rem;
+  color: rgba(226, 213, 188, 0.78);
+  font-size: 0.96rem;
   font-weight: 700;
   letter-spacing: 0.01em;
   cursor: pointer;
@@ -221,7 +215,7 @@
 
 .yonetim-card-grid {
   display: grid;
-  gap: 14px;
+  gap: 10px;
 }
 
 .yonetim-card-grid--users {
@@ -234,11 +228,11 @@
 
 .yonetim-entity-card {
   display: grid;
-  gap: 10px;
+  gap: 8px;
   min-height: 100%;
-  padding: 16px;
+  padding: 14px 16px;
   border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 16px;
+  border-radius: 14px;
   background: rgba(9, 13, 22, 0.86);
 }
 
@@ -257,7 +251,7 @@
 
 .yonetim-entity-card--branch {
   align-content: center;
-  min-height: 122px;
+  min-height: 110px;
   text-align: center;
 }
 
@@ -267,14 +261,19 @@
 
 .yonetim-card-meta strong {
   color: #ffffff;
-  font-size: 1.02rem;
+  font-size: 0.98rem;
 }
 
 .yonetim-card-meta span {
   color: rgba(224, 212, 192, 0.8);
-  font-size: 0.84rem;
-  letter-spacing: 0.04em;
+  font-size: 0.76rem;
+  letter-spacing: 0.03em;
   text-transform: uppercase;
+}
+
+.yonetim-entity-card p {
+  font-size: 0.93rem;
+  line-height: 1.35;
 }
 
 .yonetim-add-action {

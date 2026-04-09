@@ -86,8 +86,13 @@ type DemoSube = {
   id: number;
   kod: string;
   ad: string;
-  departmanlar: string[];
+  departman_ids: number[];
   durum: "AKTIF" | "PASIF";
+};
+
+type DemoDepartman = {
+  id: number;
+  ad: string;
 };
 
 type DemoAylikDurum = {
@@ -106,6 +111,7 @@ const demoState: {
   finansKalemleri: DemoFinansKalem[];
   puantajMap: Record<string, DemoPuantaj>;
   yonetimKullanicilari: DemoYonetimKullanici[];
+  departmanlar: DemoDepartman[];
   subeler: DemoSube[];
   aylikDurumMap: Record<string, DemoAylikDurum>;
   nextIds: {
@@ -116,6 +122,7 @@ const demoState: {
     kapanis: number;
     kullanici: number;
     sube: number;
+    departman: number;
   };
 } = {
   personeller: [
@@ -245,19 +252,25 @@ const demoState: {
       notlar: "Gunluk bildirim sorumlusu"
     }
   ],
+  departmanlar: [
+    { id: 1, ad: "Depo" },
+    { id: 2, ad: "Döşeme" },
+    { id: 3, ad: "Atölye" },
+    { id: 4, ad: "Finans" }
+  ],
   subeler: [
     {
       id: 1,
       kod: "MRK",
       ad: "Merkez",
-      departmanlar: ["Yonetim", "Operasyon"],
+      departman_ids: [1, 3],
       durum: "AKTIF"
     },
     {
       id: 2,
       kod: "DPL",
       ad: "Depolama",
-      departmanlar: ["Depolama", "Sevkiyat"],
+      departman_ids: [1],
       durum: "AKTIF"
     }
   ],
@@ -286,19 +299,9 @@ const demoState: {
     finans: 950,
     kapanis: 1000,
     kullanici: 3,
-    sube: 2
+    sube: 2,
+    departman: 4
   }
-};
-
-const DEMO_SUBE_LABELS: Record<number, string> = {
-  1: "Merkez",
-  2: "Depolama"
-};
-
-const DEMO_DEPARTMAN_LABELS: Record<number, string> = {
-  1: "Yonetim",
-  2: "Muhasebe",
-  3: "Operasyon"
 };
 
 const DEMO_GOREV_LABELS: Record<number, string> = {
@@ -419,6 +422,22 @@ function getLabel(map: Record<number, string>, id: number | undefined) {
   }
 
   return map[id] ?? `#${id}`;
+}
+
+function getSubeLabel(id: number | undefined) {
+  if (typeof id !== "number") {
+    return undefined;
+  }
+
+  return demoState.subeler.find((item) => item.id === id)?.ad;
+}
+
+function getDepartmanLabel(id: number | undefined) {
+  if (typeof id !== "number") {
+    return undefined;
+  }
+
+  return demoState.departmanlar.find((item) => item.id === id)?.ad;
 }
 
 function monthKey(ay: string, personelId: number) {
@@ -545,8 +564,8 @@ function buildAylikOzetResponse(ay: string, subeId?: number | null, departmanId?
         personel_id: personel.id,
         ad_soyad: `${personel.ad} ${personel.soyad}`,
         sicil_no: personel.sicil_no,
-        sube: getLabel(DEMO_SUBE_LABELS, personel.sube_id) ?? "-",
-        bolum: getLabel(DEMO_DEPARTMAN_LABELS, personel.departman_id) ?? "-",
+        sube: getSubeLabel(personel.sube_id) ?? "-",
+        bolum: getDepartmanLabel(personel.departman_id) ?? "-",
         birim_amiri: getLabel(DEMO_BAGLI_AMIR_LABELS, personel.bagli_amir_id) ?? "-",
         devamsizlik_gun: bildirimOzet.devamsizlikGun,
         gec_kalma_adet: bildirimOzet.gecKalmaAdet,
@@ -608,8 +627,8 @@ function buildDemoPersonelDetail(personel: DemoPersonel) {
       etiket: personel.aktif_durum === "PASIF" ? "Pasif" : null
     },
     referans_adlari: {
-      sube: getLabel(DEMO_SUBE_LABELS, personel.sube_id),
-      departman: getLabel(DEMO_DEPARTMAN_LABELS, personel.departman_id),
+      sube: getSubeLabel(personel.sube_id),
+      departman: getDepartmanLabel(personel.departman_id),
       gorev: getLabel(DEMO_GOREV_LABELS, personel.gorev_id),
       personel_tipi: getLabel(DEMO_PERSONEL_TIPI_LABELS, personel.personel_tipi_id),
       bagli_amir: getLabel(DEMO_BAGLI_AMIR_LABELS, personel.bagli_amir_id)
@@ -686,8 +705,8 @@ export function resolveDemoApiResponse(
     const start = (page - 1) * limit;
     const items = filtered.slice(start, start + limit).map((item) => ({
       ...item,
-      sube_adi: getLabel(DEMO_SUBE_LABELS, item.sube_id),
-      departman_adi: getLabel(DEMO_DEPARTMAN_LABELS, item.departman_id),
+      sube_adi: getSubeLabel(item.sube_id),
+      departman_adi: getDepartmanLabel(item.departman_id),
       gorev_adi: getLabel(DEMO_GOREV_LABELS, item.gorev_id),
       personel_tipi_adi: getLabel(DEMO_PERSONEL_TIPI_LABELS, item.personel_tipi_id),
       bagli_amir_adi: getLabel(DEMO_BAGLI_AMIR_LABELS, item.bagli_amir_id)
@@ -1011,7 +1030,14 @@ export function resolveDemoApiResponse(
   }
 
   if (pathname === "/yonetim/subeler" && method === "GET") {
-    return ok({ items: demoState.subeler });
+    return ok({
+      items: demoState.subeler.map((item) => ({
+        ...item,
+        departman_adlari: item.departman_ids
+          .map((departmanId) => getDepartmanLabel(departmanId))
+          .filter((label): label is string => typeof label === "string")
+      }))
+    });
   }
 
   if (pathname === "/yonetim/subeler" && method === "POST") {
@@ -1019,15 +1045,20 @@ export function resolveDemoApiResponse(
       id: ++demoState.nextIds.sube,
       kod: toStringValue(body.kod) ?? `SBE-${demoState.nextIds.sube}`,
       ad: toStringValue(body.ad) ?? "Yeni Sube",
-      departmanlar: Array.isArray(body.departmanlar)
-        ? body.departmanlar
-            .map((item) => toStringValue(item))
-            .filter((item): item is string => item !== null)
+      departman_ids: Array.isArray(body.departman_ids)
+        ? body.departman_ids
+            .map((item) => toNumber(item))
+            .filter((item): item is number => item !== null)
         : [],
       durum: body.durum === "PASIF" ? "PASIF" : "AKTIF"
     };
     demoState.subeler.unshift(next);
-    return ok(next);
+    return ok({
+      ...next,
+      departman_adlari: next.departman_ids
+        .map((departmanId) => getDepartmanLabel(departmanId))
+        .filter((label): label is string => typeof label === "string")
+    });
   }
 
   const yonetimSubeMatch = pathname.match(/^\/yonetim\/subeler\/(\d+)$/);
@@ -1041,14 +1072,19 @@ export function resolveDemoApiResponse(
     Object.assign(target, {
       kod: toStringValue(body.kod) ?? target.kod,
       ad: toStringValue(body.ad) ?? target.ad,
-      departmanlar: Array.isArray(body.departmanlar)
-        ? body.departmanlar
-            .map((item) => toStringValue(item))
-            .filter((item): item is string => item !== null)
-        : target.departmanlar,
+      departman_ids: Array.isArray(body.departman_ids)
+        ? body.departman_ids
+            .map((item) => toNumber(item))
+            .filter((item): item is number => item !== null)
+        : target.departman_ids,
       durum: body.durum === "PASIF" ? "PASIF" : "AKTIF"
     });
-    return ok(target);
+    return ok({
+      ...target,
+      departman_adlari: target.departman_ids
+        .map((departmanId) => getDepartmanLabel(departmanId))
+        .filter((label): label is string => typeof label === "string")
+    });
   }
 
   if (pathname === "/yonetim/aylik-ozet" && method === "GET") {
@@ -1117,7 +1153,77 @@ export function resolveDemoApiResponse(
     return ok(buildAylikOzetResponse(ay, subeId, departmanId, sadeceRevizeli));
   }
 
+  if (pathname === "/referans/departmanlar" && method === "POST") {
+    const ad = toStringValue(body.ad);
+    if (!ad) {
+      return {
+        data: null,
+        meta: {},
+        errors: [
+          {
+            code: "DEPARTMAN_NAME_REQUIRED",
+            message: "Departman adı zorunludur."
+          }
+        ]
+      };
+    }
+
+    const normalized = ad.toLocaleLowerCase("tr-TR");
+    const existing = demoState.departmanlar.find((item) => item.ad.toLocaleLowerCase("tr-TR") === normalized);
+    if (existing) {
+      return ok(existing);
+    }
+
+    const created: DemoDepartman = {
+      id: ++demoState.nextIds.departman,
+      ad
+    };
+    demoState.departmanlar.push(created);
+    return ok(created);
+  }
+
   if (pathname.startsWith("/referans/") && method === "GET") {
+    if (pathname === "/referans/departmanlar") {
+      return ok(demoState.departmanlar);
+    }
+
+    if (pathname === "/referans/gorevler") {
+      return ok([
+        { id: 1, ad: "Uzman" },
+        { id: 2, ad: "Şef" },
+        { id: 3, ad: "Müdür" }
+      ]);
+    }
+
+    if (pathname === "/referans/personel-tipleri") {
+      return ok([
+        { id: 1, ad: "Tam Zamanlı" },
+        { id: 2, ad: "Yarı Zamanlı" }
+      ]);
+    }
+
+    if (pathname === "/referans/surec-turleri") {
+      return ok([
+        { key: "IZIN", label: "İzin" },
+        { key: "RAPOR", label: "Rapor" },
+        { key: "ISTEN_AYRILMA", label: "İşten Ayrılma" }
+      ]);
+    }
+
+    if (pathname === "/referans/bildirim-turleri") {
+      return ok([
+        { key: "GEC_GELDI", label: "Geç Geldi" },
+        { key: "GELMEDI", label: "Gelmedi" },
+        { key: "IZINLI_GELMEDI", label: "İzinli Gelmedi" },
+        { key: "IZINSIZ_GELMEDI", label: "İzinsiz Gelmedi" },
+        { key: "DEVAMSIZLIK", label: "Devamsızlık" },
+        { key: "RAPORLU", label: "Raporlu" }
+      ]);
+    }
+
+    if (pathname === "/referans/bagli-amirler") {
+      return ok([{ id: 1, ad: "Demo Amir" }]);
+    }
     if (pathname === "/referans/departmanlar") {
       return ok([
       { id: 1, ad: "Yönetim" },

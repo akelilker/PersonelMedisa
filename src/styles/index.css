@@ -26,6 +26,7 @@
 @import "./components/states.css";
 
 @import "./modules/personeller.css";
+@import "./modules/kayit-surec.css";
 @import "./modules/surecler.css";
 @import "./modules/bildirimler.css";
 @import "./modules/puantaj.css";

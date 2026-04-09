@@ -258,20 +258,19 @@ export function formatReportCellValue(column: string, value: unknown): string | 
       return formatSurecStateLabel(typeof value === "string" ? value : null);
     case "UCRETLI_MI": {
       const booleanValue = coerceBooleanValue(value);
-      return booleanValue === null ? null : formatUcretliMiLabel(booleanValue);
-    }
-    case "LEVEL":
-    case "SEVIYE":
-      return formatComplianceLevelLabel(typeof value === "string" ? value : null);
-    case "OKUNDU_MI":
-    case "OKUNDU_MU": {
-      const booleanValue = coerceBooleanValue(value);
-      if (booleanValue === null) {
-        return null;
-      }
-      return formatBooleanLabel(booleanValue, { trueLabel: "Okundu", falseLabel: "Okunmadı" });
+      return formatBooleanLabel(booleanValue);
     }
     default:
-      return null;
+      break;
   }
+
+  if (value === null || value === undefined) {
+    return "-";
+  }
+
+  if (typeof value === "string") {
+    return value;
+  }
+
+  return String(value);
 }

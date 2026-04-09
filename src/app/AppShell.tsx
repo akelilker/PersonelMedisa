@@ -1,11 +1,16 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { BackBar } from "../components/BackBar";
-import { Hero } from "../components/hero/Hero";
 import { AppFooter } from "../components/footer/AppFooter";
-import { AppModal } from "../components/modal/AppModal";
+import { Hero } from "../components/hero/Hero";
 import { MainMenu, type KayitTab } from "../components/main-menu/MainMenu";
+import { AppModal } from "../components/modal/AppModal";
 import { ShellHeaderActions } from "../components/shell/ShellHeaderActions";
+import {
+  KAYIT_SUREC_PERSONEL_FORM_ID,
+  KAYIT_SUREC_SUREC_FORM_ID,
+  KayitSurecWorkspace
+} from "../features/kayit/components/KayitSurecWorkspace";
 import { formatUiProfileLabel, formatUserRoleLabel } from "../lib/display/enum-display";
 import { useAuth } from "../state/auth.store";
 
@@ -74,34 +79,19 @@ function resolveModuleModal(pathname: string): { title: string; closeTo: string 
   return { title: "Modül", closeTo: "/" };
 }
 
-function openKayitFlow(tab: KayitTab, navigate: ReturnType<typeof useNavigate>, closeModal: () => void) {
-  closeModal();
-
-  if (tab === "yeni-kayit") {
-    navigate("/personeller", { state: { openCreateModal: true } });
-    return;
-  }
-
-  navigate("/surecler");
-}
-
 export function AppShell({ children }: AppShellProps) {
   const { session, logout } = useAuth();
   const navigate = useNavigate();
   const { pathname } = useLocation();
+
   const isLoginRoute = pathname === "/login";
   const isHomeRoute = pathname === "/";
-  const moduleModal = useMemo(() => {
-    if (isLoginRoute) {
-      return null;
-    }
-
-    return resolveModuleModal(pathname);
-  }, [isLoginRoute, pathname]);
+  const moduleModal = useMemo(() => (isLoginRoute ? null : resolveModuleModal(pathname)), [isLoginRoute, pathname]);
   const isModuleOverlayRoute = moduleModal !== null;
   const showShellHeaderActions = !isModuleOverlayRoute && !isLoginRoute;
   const showUserBar = !isLoginRoute && !isModuleOverlayRoute;
   const backBarTarget = resolveBackBar(pathname);
+
   const [isKayitModalOpen, setIsKayitModalOpen] = useState(false);
   const [kayitTab, setKayitTab] = useState<KayitTab>("yeni-kayit");
 
@@ -112,6 +102,10 @@ export function AppShell({ children }: AppShellProps) {
       document.body.classList.remove("dashboard-page");
     };
   }, [isHomeRoute, isLoginRoute]);
+
+  const kayitPrimaryLabel = kayitTab === "yeni-kayit" ? "Personeli Kaydet" : "Süreci Kaydet";
+  const kayitPrimaryFormId =
+    kayitTab === "yeni-kayit" ? KAYIT_SUREC_PERSONEL_FORM_ID : KAYIT_SUREC_SUREC_FORM_ID;
 
   return (
     <div className="app-container app-shell">
@@ -150,55 +144,20 @@ export function AppShell({ children }: AppShellProps) {
 
       {isKayitModalOpen ? (
         <AppModal
-          title="Personel Giriş ve Süreç Takibi"
+          title="Kayıt ve Süreç İşlemleri"
           onClose={() => setIsKayitModalOpen(false)}
           footer={
             <div className="universal-btn-group modal-footer-actions">
-              <button
-                type="button"
-                className="universal-btn-save"
-                onClick={() => openKayitFlow(kayitTab, navigate, () => setIsKayitModalOpen(false))}
-              >
-                {kayitTab === "yeni-kayit" ? "Yeni Personel Ekle" : "Süreç Ekranına Git"}
+              <button type="submit" form={kayitPrimaryFormId} className="universal-btn-save">
+                {kayitPrimaryLabel}
               </button>
-              <button
-                type="button"
-                className="universal-btn-cancel"
-                onClick={() => setIsKayitModalOpen(false)}
-              >
+              <button type="button" className="universal-btn-cancel" onClick={() => setIsKayitModalOpen(false)}>
                 Kapat
               </button>
             </div>
           }
         >
-          <div className="kayit-tabs">
-            <button
-              type="button"
-              className={`kayit-tab-btn${kayitTab === "yeni-kayit" ? " is-active" : ""}`}
-              onClick={() => setKayitTab("yeni-kayit")}
-            >
-              Yeni Kayıt
-            </button>
-            <button
-              type="button"
-              className={`kayit-tab-btn${kayitTab === "surec" ? " is-active" : ""}`}
-              onClick={() => setKayitTab("surec")}
-            >
-              Süreç
-            </button>
-          </div>
-
-          {kayitTab === "yeni-kayit" ? (
-            <div className="kayit-tab-panel">
-              <p>Yeni personel kaydını açıp personel kartı oluşturma akışını başlatır.</p>
-            </div>
-          ) : null}
-
-          {kayitTab === "surec" ? (
-            <div className="kayit-tab-panel">
-              <p>Süreç listesini açar ve izin, rapor veya hareket takibine geçiş yapar.</p>
-            </div>
-          ) : null}
+          <KayitSurecWorkspace activeTab={kayitTab} onTabChange={setKayitTab} />
         </AppModal>
       ) : null}
 

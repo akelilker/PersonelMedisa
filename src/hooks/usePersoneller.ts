@@ -29,6 +29,10 @@ import {
   SUBE_DETAIL_REDIRECT_STATE_KEY,
   shouldRedirectDetailAfterSubeMismatch
 } from "../lib/detail-sube-context";
+import {
+  buildCreatePersonelPayload,
+  parseOptionalPositiveInt
+} from "../features/personeller/personel-create-utils";
 import type { PaginatedResult } from "../types/api";
 import { runDeduped } from "../lib/in-flight-dedupe";
 import { useAuth } from "../state/auth.store";
@@ -88,42 +92,6 @@ export const INITIAL_CREATE_PERSONEL_FORM: CreatePersonelFormState = {
   kanGrubu: "",
   bagliAmirId: ""
 };
-
-function parseRequiredPositiveInt(value: string, label: string) {
-  const number = Number.parseInt(value, 10);
-  if (Number.isNaN(number) || number <= 0) {
-    throw new Error(`${label} pozitif sayi olmalidir.`);
-  }
-  return number;
-}
-
-function parseOptionalPositiveInt(value: string): number | undefined {
-  const trimmed = value.trim();
-  if (!trimmed) {
-    return undefined;
-  }
-  const number = Number.parseInt(trimmed, 10);
-  if (Number.isNaN(number) || number <= 0) {
-    return undefined;
-  }
-  return number;
-}
-
-function digitsOnly(value: string) {
-  return value.replace(/\D+/g, "");
-}
-
-function validateTcKimlikNo(value: string) {
-  if (!/^\d{11}$/.test(value)) {
-    throw new Error("T.C. Kimlik No 11 hane ve yalnizca rakamlardan olusmalidir.");
-  }
-}
-
-function validatePhoneNumber(value: string, label: string) {
-  if (!/^\d{10,11}$/.test(value)) {
-    throw new Error(`${label} yalnizca rakamlardan olusmali ve 10-11 hane olmali.`);
-  }
-}
 
 export function usePersoneller() {
   const revision = useAppDataRevision();
@@ -353,32 +321,7 @@ export function usePersoneller() {
       setIsCreateSubmitting(true);
 
       try {
-        const tcKimlikNo = digitsOnly(createForm.tcKimlikNo);
-        const telefon = digitsOnly(createForm.telefon);
-        const acilDurumTelefon = digitsOnly(createForm.acilDurumTelefon);
-        validateTcKimlikNo(tcKimlikNo);
-        validatePhoneNumber(telefon, "Telefon");
-        validatePhoneNumber(acilDurumTelefon, "Acil durum telefonu");
-
-        const bagliAmirId = parseOptionalPositiveInt(createForm.bagliAmirId);
-        const payload: CreatePersonelPayload = {
-          tc_kimlik_no: tcKimlikNo,
-          ad: createForm.ad.trim(),
-          soyad: createForm.soyad.trim(),
-          dogum_tarihi: createForm.dogumTarihi,
-          telefon,
-          acil_durum_kisi: createForm.acilDurumKisi.trim(),
-          acil_durum_telefon: acilDurumTelefon,
-          sicil_no: createForm.sicilNo.trim(),
-          ise_giris_tarihi: createForm.iseGirisTarihi,
-          departman_id: parseRequiredPositiveInt(createForm.departmanId, "Departman ID"),
-          gorev_id: parseRequiredPositiveInt(createForm.gorevId, "Gorev ID"),
-          personel_tipi_id: parseRequiredPositiveInt(createForm.personelTipiId, "Personel Tipi ID"),
-          aktif_durum: createForm.aktifDurum,
-          ...(createForm.dogumYeri.trim() ? { dogum_yeri: createForm.dogumYeri.trim() } : {}),
-          ...(createForm.kanGrubu.trim() ? { kan_grubu: createForm.kanGrubu.trim() } : {}),
-          ...(bagliAmirId !== undefined ? { bagli_amir_id: bagliAmirId } : {})
-        };
+        const payload: CreatePersonelPayload = buildCreatePersonelPayload(createForm);
 
         const pageOneKey = dataCacheKeys.personellerList(
           activeSube,

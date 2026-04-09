@@ -6,6 +6,8 @@ type AppModalProps = {
   children?: ReactNode;
   footer?: ReactNode;
   onClose?: () => void;
+  className?: string;
+  bodyClassName?: string;
 };
 
 function getModalPortalRoot(): HTMLElement | null {
@@ -16,7 +18,7 @@ function getModalPortalRoot(): HTMLElement | null {
   return document.body;
 }
 
-export function AppModal({ title, children, footer, onClose }: AppModalProps) {
+export function AppModal({ title, children, footer, onClose, className, bodyClassName }: AppModalProps) {
   const overlayRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -38,11 +40,11 @@ export function AppModal({ title, children, footer, onClose }: AppModalProps) {
   }, []);
 
   useEffect(() => {
-    if (!onClose) {
+    const handleClose = onClose;
+    if (!handleClose) {
       return;
     }
-
-    const close = onClose;
+    const closeModal: () => void = handleClose;
 
     function handleEscape(event: KeyboardEvent) {
       if (event.key !== "Escape") {
@@ -61,7 +63,7 @@ export function AppModal({ title, children, footer, onClose }: AppModalProps) {
       }
 
       event.preventDefault();
-      close();
+      closeModal();
     }
 
     document.addEventListener("keydown", handleEscape);
@@ -82,16 +84,16 @@ export function AppModal({ title, children, footer, onClose }: AppModalProps) {
         }
       }}
     >
-      <div className="modal-container">
+      <div className={["modal-container", className].filter(Boolean).join(" ")}>
         <div className="modal-header">
           <h2>{title}</h2>
           {onClose ? (
             <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Kapat">
-              X
+              ×
             </button>
           ) : null}
         </div>
-        <div className="modal-body">{children}</div>
+        <div className={["modal-body", bodyClassName].filter(Boolean).join(" ")}>{children}</div>
         {footer ? <div className="modal-footer">{footer}</div> : null}
       </div>
     </div>

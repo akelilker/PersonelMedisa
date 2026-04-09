@@ -24,7 +24,7 @@ export function MainMenu({ onKayitOpen }: MainMenuProps) {
   const isRaporlarActive = pathname.startsWith("/raporlar");
 
   return (
-    <nav id="main-menu" className="menu-container" aria-label="Ana moduller">
+    <nav id="main-menu" className="menu-container" aria-label="Ana modüller">
       {canKayitSection ? (
         <button
           type="button"

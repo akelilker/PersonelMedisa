@@ -18,11 +18,13 @@ function getObjectLabel(item: Record<string, unknown>) {
 
 function normalizeIdOptions(data: unknown): IdOption[] {
   const entries = extractListItems<unknown>(data);
-  if (entries.length === 0) {
+  const normalizedEntries =
+    entries.length > 0 ? entries : typeof data === "object" && data !== null ? [data] : [];
+  if (normalizedEntries.length === 0) {
     return [];
   }
 
-  return entries
+  return normalizedEntries
     .map((entry) => {
       if (typeof entry !== "object" || entry === null) {
         return null;
@@ -43,11 +45,13 @@ function normalizeIdOptions(data: unknown): IdOption[] {
 
 function normalizeKeyOptions(data: unknown): KeyOption[] {
   const entries = extractListItems<unknown>(data);
-  if (entries.length === 0) {
+  const normalizedEntries =
+    entries.length > 0 ? entries : typeof data === "object" && data !== null ? [data] : [];
+  if (normalizedEntries.length === 0) {
     return [];
   }
 
-  return entries
+  return normalizedEntries
     .map((entry) => {
       if (typeof entry === "string" && entry.trim().length > 0) {
         return { key: entry, label: entry };
@@ -80,6 +84,20 @@ function normalizeKeyOptions(data: unknown): KeyOption[] {
 export async function fetchDepartmanOptions(): Promise<IdOption[]> {
   const response = await apiRequest<ApiResponse<unknown>>(endpoints.referans.departmanlar);
   return normalizeIdOptions(response.data);
+}
+
+export async function createDepartmanOption(ad: string): Promise<IdOption> {
+  const response = await apiRequest<ApiResponse<unknown>>(endpoints.referans.departmanlar, {
+    method: "POST",
+    body: JSON.stringify({ ad })
+  });
+
+  const items = normalizeIdOptions(response.data);
+  if (items.length === 0) {
+    throw new Error("Departman kaydı oluşturuldu ama yanıt beklenen formatta değil.");
+  }
+
+  return items[0];
 }
 
 export async function fetchGorevOptions(): Promise<IdOption[]> {

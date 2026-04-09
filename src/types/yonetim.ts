@@ -33,14 +33,15 @@ export type YonetimSube = {
   id: number;
   kod: string;
   ad: string;
-  departmanlar: string[];
+  departman_ids: number[];
+  departman_adlari: string[];
   durum: KayitDurumu;
 };
 
 export type UpsertYonetimSubePayload = {
   kod: string;
   ad: string;
-  departmanlar: string[];
+  departman_ids: number[];
   durum: KayitDurumu;
 };
 

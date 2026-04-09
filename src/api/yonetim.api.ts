@@ -145,11 +145,16 @@ function normalizeYonetimSube(data: unknown): YonetimSube {
     id,
     kod,
     ad,
-    departmanlar: Array.isArray(record.departmanlar)
-      ? record.departmanlar
+    departman_ids: readNumberArray(record.departman_ids),
+    departman_adlari: Array.isArray(record.departman_adlari)
+      ? record.departman_adlari
           .map((item) => readString(item))
           .filter((item): item is string => typeof item === "string")
-      : [],
+      : Array.isArray(record.departmanlar)
+        ? record.departmanlar
+            .map((item) => readString(item))
+            .filter((item): item is string => typeof item === "string")
+        : [],
     durum: normalizeKayitDurumu(record.durum)
   };
 }

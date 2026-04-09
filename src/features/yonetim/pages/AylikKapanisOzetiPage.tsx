@@ -6,16 +6,22 @@ import { LoadingState } from "../../../components/states/LoadingState";
 import { fetchDepartmanOptions } from "../../../api/referans.api";
 import { ayiKapat, bolumOnayiVer, fetchAylikKapanisOzeti, fetchYonetimSubeleri } from "../../../api/yonetim.api";
 import { useRoleAccess } from "../../../hooks/use-role-access";
-import { formatAylikOzetStateLabel, formatBooleanLabel } from "../../../lib/display/enum-display";
 import { downloadReportCsv } from "../../../reports/export-report";
 import type { IdOption } from "../../../types/referans";
-import type { AylikOzetResponse } from "../../../types/yonetim";
+import type { AylikOzetResponse, AylikOzetState } from "../../../types/yonetim";
 
 type FilterState = {
   ay: string;
   subeId: string;
   departmanId: string;
   sadeceRevizeli: boolean;
+};
+
+const AYLIK_STATE_LABELS: Record<AylikOzetState | "KAPANDI", string> = {
+  BOLUM_ONAYINDA: "Bölüm Onayında",
+  BOLUM_ONAYLANDI: "Bölüm Onaylandı",
+  REVIZE_ISTENDI: "Revize İstendi",
+  KAPANDI: "Kapandı"
 };
 
 function currentMonthValue() {
@@ -28,6 +34,14 @@ function toCurrency(value: number) {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0
   }).format(value);
+}
+
+function formatStateLabel(value: AylikOzetState | "KAPANDI") {
+  return AYLIK_STATE_LABELS[value] ?? value;
+}
+
+function formatBooleanLabel(value: boolean) {
+  return value ? "Evet" : "Hayır";
 }
 
 export function AylikKapanisOzetiPage() {
@@ -161,11 +175,8 @@ export function AylikKapanisOzetiPage() {
         Raporlu: item.raporlu,
         "Teşvik Tutarı": item.tesvik_tutari,
         "Ceza Kesinti Tutarı": item.ceza_kesinti_tutari,
-        "Bölüm Onay Durumu": formatAylikOzetStateLabel(item.bolum_onay_durumu),
-        "Revize Var Mı": formatBooleanLabel(item.revize_var_mi, {
-          trueLabel: "Evet",
-          falseLabel: "Hayır"
-        }),
+        "Bölüm Onay Durumu": formatStateLabel(item.bolum_onay_durumu),
+        "Revize Var Mı": formatBooleanLabel(item.revize_var_mi),
         "Son İşlem": item.son_islem
       })),
     [result?.items]
@@ -174,6 +185,7 @@ export function AylikKapanisOzetiPage() {
   return (
     <section className="yonetim-page aylik-ozet-page">
       <div className="yonetim-header-row">
+        <p className="yonetim-kicker">Raporlar</p>
         <h2>Aylık Kapanış Özeti</h2>
         <p>Bölüm bazlı kontrol, toplu özet ve ay kapatma akışını buradan yönet.</p>
       </div>
@@ -209,7 +221,7 @@ export function AylikKapanisOzetiPage() {
         </div>
 
         <div className="yonetim-checkbox-section">
-          <label className="yonetim-checkbox-item">
+          <label className="yonetim-selection-pill is-selected">
             <input
               type="checkbox"
               checked={filters.sadeceRevizeli}
@@ -220,7 +232,7 @@ export function AylikKapanisOzetiPage() {
                 }))
               }
             />
-            <span>Sadece revizeli kayıtlar</span>
+            <strong>Sadece revizeli kayıtlar</strong>
           </label>
         </div>
 
@@ -235,6 +247,7 @@ export function AylikKapanisOzetiPage() {
               if (exportRows.length === 0) {
                 return;
               }
+
               downloadReportCsv(`aylik-kapanis-ozeti-${filters.ay}.csv`, Object.keys(exportRows[0]), exportRows);
             }}
           >
@@ -274,7 +287,7 @@ export function AylikKapanisOzetiPage() {
           <div className="yonetim-summary-grid">
             <article className="yonetim-summary-card">
               <span>Durum</span>
-              <strong>{formatAylikOzetStateLabel(result.state)}</strong>
+              <strong>{formatStateLabel(result.state)}</strong>
             </article>
             <article className="yonetim-summary-card">
               <span>Toplam Personel</span>
@@ -344,8 +357,8 @@ export function AylikKapanisOzetiPage() {
                     <td>{item.raporlu}</td>
                     <td>{toCurrency(item.tesvik_tutari)}</td>
                     <td>{toCurrency(item.ceza_kesinti_tutari)}</td>
-                    <td>{formatAylikOzetStateLabel(item.bolum_onay_durumu)}</td>
-                    <td>{formatBooleanLabel(item.revize_var_mi, { trueLabel: "Evet", falseLabel: "Hayır" })}</td>
+                    <td>{formatStateLabel(item.bolum_onay_durumu)}</td>
+                    <td>{formatBooleanLabel(item.revize_var_mi)}</td>
                     <td>{item.son_islem}</td>
                     <td>
                       <Link to={`/personeller/${item.personel_id}`}>Detay</Link>

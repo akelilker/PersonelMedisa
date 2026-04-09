@@ -29,6 +29,13 @@ import {
   SUBE_DETAIL_REDIRECT_STATE_KEY,
   shouldRedirectDetailAfterSubeMismatch
 } from "../lib/detail-sube-context";
+import {
+  buildCreateSurecPayload,
+  buildUpdateSurecPayload,
+  parsePositiveInt,
+  parseRequiredPositiveInt,
+  toSurecFormState
+} from "../features/surecler/surec-form-utils";
 import { runDeduped } from "../lib/in-flight-dedupe";
 import type { PaginatedResult } from "../types/api";
 import type { KeyOption } from "../types/referans";
@@ -74,34 +81,6 @@ export const INITIAL_SUREC_FORM: SurecFormState = {
   ucretliMi: true,
   aciklama: ""
 };
-
-function parsePositiveInt(value: string) {
-  const number = Number.parseInt(value, 10);
-  if (Number.isNaN(number) || number <= 0) {
-    return undefined;
-  }
-  return number;
-}
-
-function parseRequiredPositiveInt(value: string, label: string) {
-  const number = parsePositiveInt(value);
-  if (!number) {
-    throw new Error(`${label} pozitif sayi olmalidir.`);
-  }
-  return number;
-}
-
-function toSurecFormState(surec: Surec): SurecFormState {
-  return {
-    personelId: String(surec.personel_id),
-    surecTuru: surec.surec_turu,
-    altTur: surec.alt_tur ?? "",
-    baslangicTarihi: surec.baslangic_tarihi ?? "",
-    bitisTarihi: surec.bitis_tarihi ?? "",
-    ucretliMi: surec.ucretli_mi ?? true,
-    aciklama: surec.aciklama ?? ""
-  };
-}
 
 function draftSurecFromCreatePayload(payload: CreateSurecPayload, tempId: number): Surec {
   return {
@@ -355,15 +334,7 @@ export function useSurecler() {
       setIsCreateSubmitting(true);
 
       try {
-        const payload: CreateSurecPayload = {
-          personel_id: parseRequiredPositiveInt(createForm.personelId, "Personel ID"),
-          surec_turu: createForm.surecTuru.trim(),
-          alt_tur: createForm.altTur.trim() || undefined,
-          baslangic_tarihi: createForm.baslangicTarihi,
-          bitis_tarihi: createForm.bitisTarihi,
-          ucretli_mi: createForm.ucretliMi,
-          aciklama: createForm.aciklama.trim() || undefined
-        };
+        const payload: CreateSurecPayload = buildCreateSurecPayload(createForm);
 
         const pageOneKey = dataCacheKeys.sureclerList(
           activeSube,
@@ -436,15 +407,7 @@ export function useSurecler() {
       setIsEditSubmitting(true);
 
       const previousSurec = editingSurec;
-      const body = {
-        personel_id: parseRequiredPositiveInt(editForm.personelId, "Personel ID"),
-        surec_turu: editForm.surecTuru.trim(),
-        alt_tur: editForm.altTur.trim() || undefined,
-        baslangic_tarihi: editForm.baslangicTarihi,
-        bitis_tarihi: editForm.bitisTarihi,
-        ucretli_mi: editForm.ucretliMi,
-        aciklama: editForm.aciklama.trim() || undefined
-      };
+      const body = buildUpdateSurecPayload(editForm);
 
       mergeCacheEntry<PaginatedResult<Surec>>(listKey, (prev) => {
         const base = prev ?? emptyPaginated<Surec>();

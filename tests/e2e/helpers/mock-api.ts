@@ -72,7 +72,7 @@ export async function mockApi(page: Page, role: MockUserRole) {
       personel_tipi_id: 1,
       bagli_amir_id: 9,
       sube_adi: "Merkez",
-      departman_adi: "Operasyon",
+      departman_adi: "Atölye",
       gorev_adi: "Uzman",
       personel_tipi_adi: "Tam Zamanli",
       bagli_amir_adi: "Demo Amir"
@@ -92,12 +92,12 @@ export async function mockApi(page: Page, role: MockUserRole) {
       ise_giris_tarihi: "2024-07-15",
       acil_durum_kisi: "Zeynep Kaya",
       acil_durum_telefon: "05556667788",
-      departman_id: 2,
+      departman_id: 1,
       gorev_id: 2,
       personel_tipi_id: 2,
       bagli_amir_id: 9,
       sube_adi: "Depolama",
-      departman_adi: "Muhasebe",
+      departman_adi: "Depo",
       gorev_adi: "Sef",
       personel_tipi_adi: "Yari Zamanli",
       bagli_amir_adi: "Demo Amir"
@@ -170,25 +170,35 @@ export async function mockApi(page: Page, role: MockUserRole) {
     }
   ];
 
+  const departmanOptions: Array<{ id: number; ad: string }> = [
+    { id: 1, ad: "Depo" },
+    { id: 2, ad: "Döşeme" },
+    { id: 3, ad: "Atölye" },
+    { id: 4, ad: "Finans" }
+  ];
+
   const subeler: Array<{
     id: number;
     kod: string;
     ad: string;
-    departmanlar: string[];
+    departman_ids: number[];
+    departman_adlari: string[];
     durum: "AKTIF" | "PASIF";
   }> = [
     {
       id: 1,
       kod: "MRK",
       ad: "Merkez",
-      departmanlar: ["Yonetim", "Operasyon"],
+      departman_ids: [3, 4],
+      departman_adlari: ["Atölye", "Finans"],
       durum: "AKTIF"
     },
     {
       id: 2,
       kod: "DPL",
       ad: "Depolama",
-      departmanlar: ["Depolama", "Sevkiyat"],
+      departman_ids: [1],
+      departman_adlari: ["Depo"],
       durum: "AKTIF"
     }
   ];
@@ -273,7 +283,7 @@ export async function mockApi(page: Page, role: MockUserRole) {
       sube_id: 1,
       sube: "Merkez",
       departman_id: 3,
-      bolum: "Operasyon",
+      bolum: "Atölye",
       birim_amiri: "Serhan Kose",
       devamsizlik_gun: 0,
       gec_kalma_adet: 1,
@@ -294,8 +304,8 @@ export async function mockApi(page: Page, role: MockUserRole) {
       sicil_no: "P-002",
       sube_id: 2,
       sube: "Depolama",
-      departman_id: 2,
-      bolum: "Muhasebe",
+      departman_id: 1,
+      bolum: "Depo",
       birim_amiri: "Serhan Kose",
       devamsizlik_gun: 1,
       gec_kalma_adet: 0,
@@ -316,6 +326,22 @@ export async function mockApi(page: Page, role: MockUserRole) {
   let finansIdCounter = 950;
   let kullaniciIdCounter = 3;
   let subeIdCounter = 2;
+  let departmanIdCounter = 4;
+
+  function getDepartmanLabel(id: number) {
+    return departmanOptions.find((item) => item.id === id)?.ad ?? `Departman ${id}`;
+  }
+
+  function normalizeSubePayload(payload: { kod: string; ad: string; departman_ids?: number[]; durum: "AKTIF" | "PASIF" }) {
+    const departmanIds = payload.departman_ids ?? [];
+    return {
+      kod: payload.kod,
+      ad: payload.ad,
+      departman_ids: departmanIds,
+      departman_adlari: departmanIds.map((id) => getDepartmanLabel(id)),
+      durum: payload.durum
+    };
+  }
 
   function buildAylikOzetResponse(searchUrl: URL) {
     const ay = urlValue(searchUrl.searchParams.get("ay")) ?? "2026-04";
@@ -500,7 +526,7 @@ export async function mockApi(page: Page, role: MockUserRole) {
           },
           referans_adlari: {
             sube: "Merkez",
-            departman: "Operasyon",
+            departman: "Atölye",
             gorev: "Uzman",
             personel_tipi: "Tam Zamanli",
             bagli_amir: "Demo Amir"
@@ -687,17 +713,32 @@ export async function mockApi(page: Page, role: MockUserRole) {
       return;
     }
 
+    if (path === "/api/referans/departmanlar" && method === "POST") {
+      const payload = request.postDataJSON() as { ad?: string };
+      const ad = (payload.ad ?? "").trim();
+      if (!ad) {
+        await fulfillJson(route, 400, errorBody("DEPARTMAN_NAME_REQUIRED", "Departman adı zorunludur."));
+        return;
+      }
+
+      const existing = departmanOptions.find((item) => item.ad.toLocaleLowerCase("tr-TR") === ad.toLocaleLowerCase("tr-TR"));
+      if (existing) {
+        await fulfillJson(route, 200, okBody(existing));
+        return;
+      }
+
+      const created = {
+        id: ++departmanIdCounter,
+        ad
+      };
+      departmanOptions.push(created);
+      await fulfillJson(route, 200, okBody(created));
+      return;
+    }
+
     if (path.startsWith("/api/referans/") && method === "GET") {
       if (path === "/api/referans/departmanlar") {
-        await fulfillJson(
-          route,
-          200,
-          okBody([
-            { id: 1, ad: "Yonetim" },
-            { id: 2, ad: "Muhasebe" },
-            { id: 3, ad: "Operasyon" }
-          ])
-        );
+        await fulfillJson(route, 200, okBody(departmanOptions));
         return;
       }
 
@@ -943,16 +984,13 @@ export async function mockApi(page: Page, role: MockUserRole) {
       const payload = request.postDataJSON() as {
         kod: string;
         ad: string;
-        departmanlar?: string[];
+        departman_ids?: number[];
         durum: "AKTIF" | "PASIF";
       };
 
       const created = {
         id: ++subeIdCounter,
-        kod: payload.kod,
-        ad: payload.ad,
-        departmanlar: payload.departmanlar ?? [],
-        durum: payload.durum
+        ...normalizeSubePayload(payload)
       };
 
       subeler.unshift(created);
@@ -969,7 +1007,15 @@ export async function mockApi(page: Page, role: MockUserRole) {
       }
 
       const payload = request.postDataJSON() as Partial<(typeof subeler)[number]>;
-      Object.assign(target, payload);
+      Object.assign(target, {
+        ...(payload.kod ? { kod: payload.kod } : {}),
+        ...(payload.ad ? { ad: payload.ad } : {}),
+        ...(payload.departman_ids ? {
+          departman_ids: payload.departman_ids,
+          departman_adlari: payload.departman_ids.map((id) => getDepartmanLabel(id))
+        } : {}),
+        ...(payload.durum ? { durum: payload.durum } : {})
+      });
       await fulfillJson(route, 200, okBody(target));
       return;
     }

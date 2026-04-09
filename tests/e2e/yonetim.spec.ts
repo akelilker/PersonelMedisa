@@ -2,8 +2,8 @@ import { expect, test } from "@playwright/test";
 import { login } from "./helpers/auth";
 import { mockApi } from "./helpers/mock-api";
 
-test.describe("yonetim paneli ve aylik ozet", () => {
-  test("genel yonetici ayarlar menusu uzerinden yonetim paneline gider ve harici kullanici ekler", async ({
+test.describe("yönetim paneli ve aylık özet", () => {
+  test("genel yönetici ayarlar menüsünden yönetim paneline gider, kullanıcı ekler ve şube tanımlar", async ({
     page
   }) => {
     await mockApi(page, "GENEL_YONETICI");
@@ -26,11 +26,28 @@ test.describe("yonetim paneli ve aylik ozet", () => {
     await page.getByTestId("yonetim-kullanici-kaydet").click();
 
     await expect(page.getByText("Kullanıcı kaydı oluşturuldu.")).toBeVisible();
-    await expect(page.locator(".yonetim-entity-list")).toContainText("Danışman Kullanıcı");
-    await expect(page.locator(".yonetim-entity-list")).toContainText("Harici");
+    await expect(page.locator(".yonetim-card-grid")).toContainText("Danışman Kullanıcı");
+    await expect(page.locator(".yonetim-card-grid")).toContainText("Harici");
+
+    await page.getByTestId("yonetim-tab-subeler").click();
+    await expect(page.getByRole("button", { name: /\+ Yeni Şube/i })).toBeVisible();
+    await expect(page.locator(".yonetim-card-grid--branches")).toContainText("Merkez");
+
+    await page.getByTestId("yonetim-sube-yeni").click();
+    await page.getByLabel("Şube Kodu").fill("ANK");
+    await page.getByLabel("Şube Adı").fill("Ankara");
+    await page.getByRole("button", { name: "Depo" }).click();
+    await page.getByPlaceholder("Yeni departman adı").fill("Kalite");
+    await page.getByRole("button", { name: "Departman ekle" }).click();
+    await expect(page.locator(".yonetim-selection-grid")).toContainText("Kalite");
+    await page.getByTestId("yonetim-sube-kaydet").click();
+
+    await expect(page.getByText("Şube tanımı eklendi.")).toBeVisible();
+    await expect(page.locator(".yonetim-card-grid--branches")).toContainText("Ankara");
+    await expect(page.locator(".yonetim-card-grid--branches")).toContainText("Kalite");
   });
 
-  test("bolum yoneticisi raporlardan aylik ozeti gorur, bolum onayi verebilir ve yonetim paneline giremez", async ({
+  test("bölüm yöneticisi raporlardan aylık özeti görür, bölüm onayı verir ve yönetim paneline giremez", async ({
     page
   }) => {
     await mockApi(page, "BOLUM_YONETICISI");

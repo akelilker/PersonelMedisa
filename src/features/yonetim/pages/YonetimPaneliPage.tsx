@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { FormField } from "../../../components/form/FormField";
+import { AppModal } from "../../../components/modal/AppModal";
 import { EmptyState } from "../../../components/states/EmptyState";
 import { ErrorState } from "../../../components/states/ErrorState";
 import { LoadingState } from "../../../components/states/LoadingState";
@@ -26,7 +27,6 @@ import type {
 } from "../../../types/yonetim";
 
 type ActiveTab = "kullanicilar" | "subeler";
-type SubeViewMode = "liste" | "form";
 
 type KullaniciFormState = {
   kullaniciTipi: KullaniciTipi;
@@ -82,6 +82,9 @@ const INITIAL_SUBE_FORM: SubeFormState = {
   departmanIds: [],
   durum: "AKTIF"
 };
+
+const YONETIM_KULLANICI_FORM_ID = "yonetim-kullanici-form";
+const YONETIM_SUBE_FORM_ID = "yonetim-sube-form";
 
 function roleOptions() {
   return Object.entries(ROLE_LABELS).map(([value, label]) => ({ value, label }));
@@ -181,7 +184,8 @@ function formatSubeScopeLabel(subeIds: number[], subeNameMap: Map<number, string
 
 export function YonetimPaneliPage() {
   const [activeTab, setActiveTab] = useState<ActiveTab>("kullanicilar");
-  const [subeViewMode, setSubeViewMode] = useState<SubeViewMode>("liste");
+  const [isKullaniciFormOpen, setIsKullaniciFormOpen] = useState(false);
+  const [isSubeFormOpen, setIsSubeFormOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isAddingDepartman, setIsAddingDepartman] = useState(false);
@@ -257,13 +261,30 @@ export function YonetimPaneliPage() {
   function resetKullaniciEditor() {
     setEditingKullaniciId(null);
     setKullaniciForm(INITIAL_KULLANICI_FORM);
+    setIsKullaniciFormOpen(false);
   }
 
   function resetSubeEditor() {
     setEditingSubeId(null);
     setSubeForm(INITIAL_SUBE_FORM);
     setYeniDepartmanAdi("");
-    setSubeViewMode("liste");
+    setIsSubeFormOpen(false);
+  }
+
+  function openYeniKullaniciForm() {
+    setSuccessMessage(null);
+    setErrorMessage(null);
+    setEditingKullaniciId(null);
+    setKullaniciForm(INITIAL_KULLANICI_FORM);
+    setIsKullaniciFormOpen(true);
+  }
+
+  function openKullaniciEditor(item: YonetimKullanici) {
+    setSuccessMessage(null);
+    setErrorMessage(null);
+    setEditingKullaniciId(item.id);
+    setKullaniciForm(userFormFromItem(item));
+    setIsKullaniciFormOpen(true);
   }
 
   function openYeniSubeForm() {
@@ -272,7 +293,7 @@ export function YonetimPaneliPage() {
     setEditingSubeId(null);
     setSubeForm(INITIAL_SUBE_FORM);
     setYeniDepartmanAdi("");
-    setSubeViewMode("form");
+    setIsSubeFormOpen(true);
   }
 
   function openSubeEditor(item: YonetimSube) {
@@ -281,7 +302,7 @@ export function YonetimPaneliPage() {
     setEditingSubeId(item.id);
     setSubeForm(subeFormFromItem(item));
     setYeniDepartmanAdi("");
-    setSubeViewMode("form");
+    setIsSubeFormOpen(true);
   }
 
   function toggleSubeSelection(subeId: number) {

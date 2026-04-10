@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useNavigate } from "react-router-dom";
 import { FormField } from "../../../components/form/FormField";
 import { AppModal } from "../../../components/modal/AppModal";
 import { EmptyState } from "../../../components/states/EmptyState";
@@ -183,6 +184,7 @@ function formatSubeScopeLabel(subeIds: number[], subeNameMap: Map<number, string
 }
 
 export function YonetimPaneliPage() {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<ActiveTab>("kullanicilar");
   const [isKullaniciFormOpen, setIsKullaniciFormOpen] = useState(false);
   const [isSubeFormOpen, setIsSubeFormOpen] = useState(false);
@@ -419,6 +421,17 @@ export function YonetimPaneliPage() {
 
   return (
     <section className="yonetim-page">
+      <div className="yonetim-toolbar">
+        <button type="button" className="yonetim-toolbar-back" onClick={() => navigate("/")}>
+          <span aria-hidden="true">←</span>
+          <span>Ayarlar</span>
+        </button>
+
+        <div className="yonetim-toolbar-meta" aria-label="Yönetim özeti">
+          <span className="yonetim-toolbar-pill">{kullanicilar.length} Kullanıcı</span>
+          <span className="yonetim-toolbar-pill">{subeler.length} Şube</span>
+        </div>
+      </div>
       <div className="yonetim-tabs" role="tablist" aria-label="Yönetim sekmeleri">
         <button
           type="button"
@@ -443,7 +456,7 @@ export function YonetimPaneliPage() {
       {!isLoading && successMessage ? <p className="yonetim-success">{successMessage}</p> : null}
 
       {!isLoading && !errorMessage && activeTab === "kullanicilar" ? (
-        <section className="yonetim-section-card yonetim-list-surface">
+        <section className="yonetim-list-surface">
           <div className="yonetim-list-header">
             <button
               type="button"
@@ -497,7 +510,7 @@ export function YonetimPaneliPage() {
       ) : null}
 
       {!isLoading && !errorMessage && activeTab === "subeler" ? (
-        <section className="yonetim-section-card yonetim-list-surface">
+        <section className="yonetim-list-surface">
           <div className="yonetim-list-header">
             <button
               type="button"
@@ -516,7 +529,7 @@ export function YonetimPaneliPage() {
               {subeler.map((item) => (
                 <article
                   key={item.id}
-                  className="yonetim-entity-card yonetim-entity-card--branch yonetim-entity-card--interactive"
+                  className="yonetim-entity-card yonetim-entity-card--branch-preview yonetim-entity-card--interactive"
                   role="button"
                   tabIndex={0}
                   onClick={() => openSubeEditor(item)}

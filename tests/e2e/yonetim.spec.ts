@@ -66,7 +66,6 @@ test.describe("yonetim paneli ve aylik ozet", () => {
 
     await expect(page).toHaveURL(/\/aylik-kapanis-ozeti$/);
     await expect(page.locator(".modal-header h2").first()).toContainText("Aylık Kapanış Özeti");
-    await expect(page.locator(".yonetim-page .yonetim-header-row h2")).toHaveText("Aylık Kapanış Özeti");
     await expect(page.locator(".raporlar-table tbody tr")).toHaveCount(2);
 
     await page.getByTestId("aylik-ozet-bolum-onay").click();

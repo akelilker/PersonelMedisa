@@ -35,6 +35,9 @@ function resolveBackBar(pathname: string): { to: string; label: string } | null 
   if (/^\/bildirimler\/\d+$/.test(pathname)) {
     return { to: "/bildirimler", label: "Bildirim listesine dön" };
   }
+  if (/^\/isg\/\d+$/.test(pathname)) {
+    return { to: "/isg", label: "Makine listesine don" };
+  }
   return null;
 }
 
@@ -78,6 +81,9 @@ function resolveModuleModal(pathname: string): ModuleModalConfig | null {
   }
   if (pathname === "/isg") {
     return { title: "ISG", closeTo: "/raporlar" };
+  }
+  if (/^\/isg\/\d+$/.test(pathname)) {
+    return { title: "Makine Detayi", closeTo: "/isg" };
   }
   if (pathname === "/yonetim-paneli") {
     return {

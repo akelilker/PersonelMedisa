@@ -17,6 +17,25 @@ export type IsgMakineListItem = {
   uyariDurumu: MakineBakimDurumuOzet;
 };
 
+export type IsgMakineDetail = {
+  id: number;
+  ad: string;
+  tip: string;
+  konum: string | null;
+  durum: IsgMakineDurum;
+  subeId: number | null;
+  subeAdi: string | null;
+  bakimPeriyotGun: number | null;
+};
+
+export type IsgBakimKaydi = {
+  id: number;
+  makineId: number | null;
+  bakimTarihi: string | null;
+  yapan: string | null;
+  notlar: string | null;
+};
+
 export type ListIsgMakinelerParams = {
   search?: string;
   durum?: IsgMakineDurum | "tum";

@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { FormField } from "../../../components/form/FormField";
 import { EmptyState } from "../../../components/states/EmptyState";
 import { ErrorState } from "../../../components/states/ErrorState";
@@ -123,7 +124,12 @@ export function IsgMakinelerPage() {
       {!isLoading && !errorMessage && makineler.length > 0 ? (
         <div className="isg-list-grid">
           {makineler.map((makine) => (
-            <article key={makine.id} className="isg-list-card" data-testid={`isg-machine-${makine.id}`}>
+            <Link
+              key={makine.id}
+              to={`/isg/${makine.id}`}
+              className="isg-list-card isg-list-card--link"
+              data-testid={`isg-machine-${makine.id}`}
+            >
               <div className="isg-list-card__header">
                 <div>
                   <h3>{makine.ad}</h3>
@@ -164,7 +170,7 @@ export function IsgMakinelerPage() {
                   <dd>{renderGecikme(makine)}</dd>
                 </div>
               </dl>
-            </article>
+            </Link>
           ))}
         </div>
       ) : null}

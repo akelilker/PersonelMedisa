@@ -245,6 +245,50 @@ export async function mockApi(page: Page, role: MockUserRole) {
     }
   ];
 
+  const bakimKayitlari: Array<{
+    id: number;
+    makine_id: number;
+    bakim_tarihi?: string | null;
+    yapan?: string | null;
+    notlar?: string | null;
+  }> = [
+    {
+      id: 2101,
+      makine_id: 1101,
+      bakim_tarihi: "2026-03-01",
+      yapan: "Bakim Ekibi A",
+      notlar: "Aylik kontrol"
+    },
+    {
+      id: 2102,
+      makine_id: 1101,
+      bakim_tarihi: "2026-04-01",
+      yapan: "Bakim Ekibi B",
+      notlar: "Rutin mekanik bakim"
+    },
+    {
+      id: 2104,
+      makine_id: 1102,
+      bakim_tarihi: "2026-02-10",
+      yapan: "Servis",
+      notlar: "Fren ayari"
+    },
+    {
+      id: 2103,
+      makine_id: 1102,
+      bakim_tarihi: "2026-01-05",
+      yapan: "Servis",
+      notlar: "Yag degisimi"
+    },
+    {
+      id: 2105,
+      makine_id: 1103,
+      bakim_tarihi: "gecersiz-tarih",
+      yapan: "Kayit Hatasi",
+      notlar: "Tarih dogrulanamadi"
+    }
+  ];
+
   const yonetimKullanicilari: Array<{
     id: number;
     ad_soyad: string;
@@ -564,6 +608,62 @@ export async function mockApi(page: Page, role: MockUserRole) {
           sube: subeler.find((sube) => sube.id === item.sube_id)?.ad ?? "-"
         }
       }));
+
+      await fulfillJson(
+        route,
+        200,
+        JSON.stringify({
+          data: { items },
+          meta: {
+            page: pageNumber,
+            limit: pageLimit,
+            total: filtered.length,
+            total_pages: Math.max(1, Math.ceil(filtered.length / pageLimit))
+          },
+          errors: []
+        })
+      );
+      return;
+    }
+
+    if (path.match(/^\/api\/isg\/makineler\/\d+$/) && method === "GET") {
+      const makineId = Number.parseInt(path.split("/")[4] ?? "0", 10);
+      const subeId = Number.parseInt(url.searchParams.get("sube_id") ?? "", 10);
+      const makine = makineler.find((item) => item.id === makineId);
+
+      if (!makine || (Number.isFinite(subeId) && makine.sube_id !== subeId)) {
+        await fulfillJson(route, 404, errorBody("NOT_FOUND", "Makine bulunamadi."));
+        return;
+      }
+
+      await fulfillJson(
+        route,
+        200,
+        okBody({
+          ...makine,
+          referans_adlari: {
+            sube: subeler.find((sube) => sube.id === makine.sube_id)?.ad ?? "-"
+          }
+        })
+      );
+      return;
+    }
+
+    if (path.match(/^\/api\/isg\/makineler\/\d+\/bakimlar$/) && method === "GET") {
+      const makineId = Number.parseInt(path.split("/")[4] ?? "0", 10);
+      const subeId = Number.parseInt(url.searchParams.get("sube_id") ?? "", 10);
+      const pageNumber = Number.parseInt(url.searchParams.get("page") ?? "1", 10) || 1;
+      const pageLimit = Number.parseInt(url.searchParams.get("limit") ?? "10", 10) || 10;
+      const makine = makineler.find((item) => item.id === makineId);
+
+      if (!makine || (Number.isFinite(subeId) && makine.sube_id !== subeId)) {
+        await fulfillJson(route, 404, errorBody("NOT_FOUND", "Bakim gecmisi bulunamadi."));
+        return;
+      }
+
+      const filtered = bakimKayitlari.filter((item) => item.makine_id === makineId);
+      const start = (pageNumber - 1) * pageLimit;
+      const items = filtered.slice(start, start + pageLimit);
 
       await fulfillJson(
         route,

@@ -1,5 +1,7 @@
 import type { ApiResponse, PaginatedResult } from "../types/api";
 import type {
+  IsgBakimKaydi,
+  IsgMakineDetail,
   IsgMakineDurum,
   IsgMakineListItem,
   ListIsgMakinelerParams,
@@ -9,6 +11,7 @@ import { appendQueryParams } from "../utils/append-query-params";
 import { apiRequest } from "./api-client";
 import { endpoints } from "./endpoints";
 import { normalizePaginatedList } from "./response-normalizers";
+import { buildIsgBakimProjectionFromDates } from "../features/isg/isg-bakim-utils";
 
 function toRecord(value: unknown): Record<string, unknown> | null {
   if (typeof value !== "object" || value === null) {
@@ -92,23 +95,6 @@ function normalizeIsoDate(value: unknown): string | null {
   return new Date(parsed).toISOString();
 }
 
-function addDays(isoDate: string, days: number): string | null {
-  const parsed = Date.parse(isoDate);
-  if (Number.isNaN(parsed) || !Number.isFinite(days)) {
-    return null;
-  }
-
-  const next = new Date(parsed);
-  next.setUTCDate(next.getUTCDate() + days);
-  return next.toISOString();
-}
-
-function startOfTodayMs(): number {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  return today.getTime();
-}
-
 function deriveBakimDurumu(
   durum: IsgMakineDurum,
   sonBakim: string | null,
@@ -118,44 +104,16 @@ function deriveBakimDurumu(
   sonrakiBakim: string | null;
   gecikmeGun: number | null;
 } {
-  if (durum === "aktif" && (!sonBakim || !bakimPeriyotGun || bakimPeriyotGun <= 0)) {
-    return {
-      uyariDurumu: "eksik_veri",
-      sonrakiBakim: null,
-      gecikmeGun: null
-    };
-  }
-
-  if (!sonBakim || !bakimPeriyotGun || bakimPeriyotGun <= 0) {
-    return {
-      uyariDurumu: "guncel",
-      sonrakiBakim: null,
-      gecikmeGun: null
-    };
-  }
-
-  const sonrakiBakim = addDays(sonBakim, bakimPeriyotGun);
-  if (!sonrakiBakim) {
-    return {
-      uyariDurumu: "eksik_veri",
-      sonrakiBakim: null,
-      gecikmeGun: null
-    };
-  }
-
-  const diffMs = startOfTodayMs() - new Date(sonrakiBakim).getTime();
-  if (diffMs > 0) {
-    return {
-      uyariDurumu: "gecikmis",
-      sonrakiBakim,
-      gecikmeGun: Math.max(1, Math.ceil(diffMs / 86400000))
-    };
-  }
+  const derived = buildIsgBakimProjectionFromDates({
+    tarihler: [sonBakim],
+    durum,
+    bakimPeriyotGun
+  });
 
   return {
-    uyariDurumu: "guncel",
-    sonrakiBakim,
-    gecikmeGun: null
+    uyariDurumu: derived.uyariDurumu,
+    sonrakiBakim: derived.sonrakiBakim,
+    gecikmeGun: derived.gecikmeGun > 0 ? derived.gecikmeGun : null
   };
 }
 
@@ -198,6 +156,58 @@ function normalizeIsgMakineListItem(data: unknown): IsgMakineListItem {
   };
 }
 
+function normalizeIsgMakineDetail(data: unknown): IsgMakineDetail {
+  const root = toRecord(data);
+  if (!root) {
+    throw new Error("Makine detayi beklenen formatta degil.");
+  }
+
+  const kaynak = toRecord(root.makine) ?? root;
+  const referans = toRecord(root.referans_adlari);
+  const sources = [kaynak, root];
+  const refSources = [referans, root];
+
+  const id = readNumber(sources, "id");
+  const ad = readString(sources, "ad", "makine_adi");
+  const tip = readString(sources, "tip", "makine_tipi");
+  if (id === undefined || !ad || !tip) {
+    throw new Error("Makine detayi zorunlu alanlari icermiyor.");
+  }
+
+  return {
+    id,
+    ad,
+    tip,
+    konum: readString(sources, "konum") ?? null,
+    durum: normalizeMakineDurum(pickValue(sources, ["durum", "state"])),
+    subeId: readNumber(sources, "sube_id", "subeId") ?? null,
+    subeAdi: readString(refSources, "sube", "sube_adi", "subeAdi") ?? null,
+    bakimPeriyotGun: readNumber(sources, "bakim_periyot_gun", "bakimPeriyotGun") ?? null
+  };
+}
+
+function normalizeIsgBakimKaydi(data: unknown): IsgBakimKaydi {
+  const root = toRecord(data);
+  if (!root) {
+    throw new Error("Bakim kaydi beklenen formatta degil.");
+  }
+
+  const kaynak = toRecord(root.kayit) ?? root;
+  const sources = [kaynak, root];
+  const id = readNumber(sources, "id");
+  if (id === undefined) {
+    throw new Error("Bakim kaydi zorunlu alanlari icermiyor.");
+  }
+
+  return {
+    id,
+    makineId: readNumber(sources, "makine_id", "makineId") ?? null,
+    bakimTarihi: normalizeIsoDate(pickValue(sources, ["bakim_tarihi", "bakimTarihi", "tarih"])),
+    yapan: readString(sources, "yapan", "yapan_kisi", "olusturan") ?? null,
+    notlar: readString(sources, "notlar", "aciklama") ?? null
+  };
+}
+
 export async function listIsgMakineler(
   params?: ListIsgMakinelerParams
 ): Promise<PaginatedResult<IsgMakineListItem>> {
@@ -219,5 +229,39 @@ export async function listIsgMakineler(
   return {
     ...normalized,
     items: normalized.items.map((item) => normalizeIsgMakineListItem(item))
+  };
+}
+
+export async function fetchIsgMakineDetail(
+  makineId: number,
+  subeId?: number
+): Promise<IsgMakineDetail> {
+  const path = appendQueryParams(endpoints.isg.detail(makineId), {
+    sube_id: subeId
+  });
+  const response = await apiRequest<ApiResponse<unknown>>(path);
+  return normalizeIsgMakineDetail(response.data);
+}
+
+export async function fetchIsgMakineBakimlari(
+  makineId: number,
+  subeId?: number,
+  page?: number,
+  limit?: number
+): Promise<PaginatedResult<IsgBakimKaydi>> {
+  const path = appendQueryParams(endpoints.isg.bakimlar(makineId), {
+    sube_id: subeId,
+    page,
+    limit
+  });
+  const response = await apiRequest<ApiResponse<unknown>>(path);
+  const normalized = normalizePaginatedList<unknown>(response, {
+    requestedPage: page,
+    requestedLimit: limit
+  });
+
+  return {
+    ...normalized,
+    items: normalized.items.map((item) => normalizeIsgBakimKaydi(item))
   };
 }

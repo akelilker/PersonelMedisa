@@ -80,6 +80,14 @@ type DemoMakine = {
   bakim_periyot_gun?: number | null;
 };
 
+type DemoMakineBakimKaydi = {
+  id: number;
+  makine_id: number;
+  bakim_tarihi?: string | null;
+  yapan?: string;
+  notlar?: string;
+};
+
 type DemoYonetimKullanici = {
   id: number;
   ad_soyad: string;
@@ -122,6 +130,7 @@ const demoState: {
   finansKalemleri: DemoFinansKalem[];
   puantajMap: Record<string, DemoPuantaj>;
   makineler: DemoMakine[];
+  bakimKayitlari: DemoMakineBakimKaydi[];
   yonetimKullanicilari: DemoYonetimKullanici[];
   departmanlar: DemoDepartman[];
   subeler: DemoSube[];
@@ -256,6 +265,43 @@ const demoState: {
       sube_id: 1,
       son_bakim: null,
       bakim_periyot_gun: 45
+    }
+  ],
+  bakimKayitlari: [
+    {
+      id: 2101,
+      makine_id: 1101,
+      bakim_tarihi: "2026-03-01",
+      yapan: "Bakim Ekibi A",
+      notlar: "Aylik kontrol"
+    },
+    {
+      id: 2102,
+      makine_id: 1101,
+      bakim_tarihi: "2026-04-01",
+      yapan: "Bakim Ekibi B",
+      notlar: "Rutin mekanik bakim"
+    },
+    {
+      id: 2104,
+      makine_id: 1102,
+      bakim_tarihi: "2026-02-10",
+      yapan: "Servis",
+      notlar: "Fren ayari"
+    },
+    {
+      id: 2103,
+      makine_id: 1102,
+      bakim_tarihi: "2026-01-05",
+      yapan: "Servis",
+      notlar: "Yag degisimi"
+    },
+    {
+      id: 2105,
+      makine_id: 1103,
+      bakim_tarihi: "gecersiz-tarih",
+      yapan: "Kayit Hatasi",
+      notlar: "Tarih dogrulanamadi"
     }
   ],
   yonetimKullanicilari: [
@@ -729,6 +775,60 @@ function buildDemoIsgMakineListResponse(searchUrl: URL) {
   );
 }
 
+function findDemoMakineByScope(makineId: number, subeId: number | null) {
+  const makine = demoState.makineler.find((item) => item.id === makineId);
+  if (!makine) {
+    return null;
+  }
+  if (subeId !== null && makine.sube_id !== subeId) {
+    return null;
+  }
+  return makine;
+}
+
+function buildDemoIsgMakineDetailResponse(searchUrl: URL, makineId: number) {
+  const subeId = toNumber(searchUrl.searchParams.get("sube_id"));
+  const makine = findDemoMakineByScope(makineId, subeId);
+  if (!makine) {
+    return null;
+  }
+
+  return ok({
+    ...makine,
+    referans_adlari: {
+      sube: getSubeLabel(makine.sube_id) ?? "-"
+    }
+  });
+}
+
+function buildDemoIsgMakineBakimResponse(searchUrl: URL, makineId: number) {
+  const subeId = toNumber(searchUrl.searchParams.get("sube_id"));
+  const page = toNumber(searchUrl.searchParams.get("page")) ?? 1;
+  const limit = toNumber(searchUrl.searchParams.get("limit")) ?? 10;
+  const makine = findDemoMakineByScope(makineId, subeId);
+  if (!makine) {
+    return null;
+  }
+
+  const filtered = demoState.bakimKayitlari.filter((item) => item.makine_id === makineId);
+  const start = (page - 1) * limit;
+  const items = filtered.slice(start, start + limit);
+  const total = filtered.length;
+  const totalPages = Math.max(1, Math.ceil(total / limit));
+
+  return ok(
+    {
+      items
+    },
+    {
+      page,
+      limit,
+      total,
+      total_pages: totalPages
+    }
+  );
+}
+
 export function resolveDemoApiResponse(
   path: string,
   init?: RequestInit
@@ -764,6 +864,16 @@ export function resolveDemoApiResponse(
 
   if (pathname === "/isg/makineler" && method === "GET") {
     return buildDemoIsgMakineListResponse(requestUrl);
+  }
+
+  const isgMakineDetailMatch = pathname.match(/^\/isg\/makineler\/(\d+)$/);
+  if (isgMakineDetailMatch && method === "GET") {
+    return buildDemoIsgMakineDetailResponse(requestUrl, Number.parseInt(isgMakineDetailMatch[1], 10));
+  }
+
+  const isgMakineBakimMatch = pathname.match(/^\/isg\/makineler\/(\d+)\/bakimlar$/);
+  if (isgMakineBakimMatch && method === "GET") {
+    return buildDemoIsgMakineBakimResponse(requestUrl, Number.parseInt(isgMakineBakimMatch[1], 10));
   }
 
   if (pathname === "/personeller" && method === "GET") {

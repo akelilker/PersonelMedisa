@@ -1265,6 +1265,15 @@ let bildirimIdCounter = 800;
       return;
     }
 
+    if (path === "/api/puantaj/muhurle" && method === "POST") {
+      await fulfillJson(
+        route,
+        200,
+        okBody({ muhurlenen_kayit_sayisi: 5, donem: "2026-04" })
+      );
+      return;
+    }
+
     if (path === "/api/haftalik-kapanis" && method === "POST") {
       const payload = request.postDataJSON() as {
         hafta_baslangic?: string;

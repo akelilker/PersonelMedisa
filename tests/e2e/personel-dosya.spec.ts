@@ -31,8 +31,10 @@ test.describe("personel dosyasi surec akisi", () => {
     await surecModal.getByRole("button", { name: "Kaydet" }).click();
 
     await expect(page.locator(".personel-dosya-hero")).toContainText(/Isten Ayrildi|Pasif/i);
-    await expect(page.locator(".personel-surec-list")).toContainText(/Isten Ayr[\u0131i]lma/i);
-    await expect(page.locator(".personel-surec-list")).toContainText("Is akdi sonlandirildi");
+    await page.getByRole("tab", { name: "Surec Gecmisi" }).click();
+    const surecPanel = page.locator("#personel-kart-panel-surec-gecmisi");
+    await expect(surecPanel.locator(".personel-surec-list")).toContainText(/Isten Ayr[\u0131i]lma/i);
+    await expect(surecPanel.locator(".personel-surec-list")).toContainText("Is akdi sonlandirildi");
   });
 
   test("yonetici zimmet ekler ve zimmet tablosunda kaydi gorur", async ({ page }) => {

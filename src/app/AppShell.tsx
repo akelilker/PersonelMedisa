@@ -76,6 +76,9 @@ function resolveModuleModal(pathname: string): ModuleModalConfig | null {
   if (pathname === "/finans") {
     return { title: "Finans", closeTo: "/" };
   }
+  if (pathname === "/isg") {
+    return { title: "ISG", closeTo: "/raporlar" };
+  }
   if (pathname === "/yonetim-paneli") {
     return {
       title: "Yönetim Paneli",

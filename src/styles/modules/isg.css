@@ -1,0 +1,115 @@
+.isg-page {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.isg-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.isg-header-row h2 {
+  margin: 0;
+}
+
+.isg-list-grid {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.isg-list-card {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-md);
+  background: rgba(9, 12, 20, 0.72);
+}
+
+.isg-list-card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.isg-list-card__header h3,
+.isg-list-card__header p {
+  margin: 0;
+}
+
+.isg-list-card__header p {
+  color: var(--text-muted, #aeb6c7);
+  font-size: 0.92rem;
+}
+
+.isg-list-card__meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px 14px;
+  margin: 0;
+}
+
+.isg-list-card__meta div {
+  display: grid;
+  gap: 4px;
+}
+
+.isg-list-card__meta dt {
+  color: var(--text-muted, #aeb6c7);
+  font-size: 12px;
+}
+
+.isg-list-card__meta dd {
+  margin: 0;
+}
+
+.isg-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.isg-badge--guncel {
+  color: #7be3a0;
+  border-color: rgba(123, 227, 160, 0.35);
+  background: rgba(34, 82, 48, 0.22);
+}
+
+.isg-badge--gecikmis {
+  color: #ffbf6f;
+  border-color: rgba(255, 191, 111, 0.35);
+  background: rgba(108, 64, 18, 0.22);
+}
+
+.isg-badge--eksik_veri {
+  color: #ff8f8f;
+  border-color: rgba(255, 143, 143, 0.35);
+  background: rgba(108, 24, 24, 0.22);
+}
+
+.isg-pagination-row {
+  align-items: center;
+  justify-content: space-between;
+}
+
+.isg-pagination-copy {
+  color: var(--text-muted, #aeb6c7);
+  font-size: 13px;
+}
+
+@media (max-width: 640px) {
+  .isg-list-card__header,
+  .isg-pagination-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

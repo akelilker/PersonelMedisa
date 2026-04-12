@@ -69,6 +69,17 @@ type DemoPuantaj = {
   compliance_uyarilari: Array<{ code: string; message: string; level?: string }>;
 };
 
+type DemoMakine = {
+  id: number;
+  ad: string;
+  tip: string;
+  konum?: string | null;
+  durum: "aktif" | "arizali" | "pasif";
+  sube_id: number;
+  son_bakim?: string | null;
+  bakim_periyot_gun?: number | null;
+};
+
 type DemoYonetimKullanici = {
   id: number;
   ad_soyad: string;
@@ -110,6 +121,7 @@ const demoState: {
   bildirimler: DemoBildirim[];
   finansKalemleri: DemoFinansKalem[];
   puantajMap: Record<string, DemoPuantaj>;
+  makineler: DemoMakine[];
   yonetimKullanicilari: DemoYonetimKullanici[];
   departmanlar: DemoDepartman[];
   subeler: DemoSube[];
@@ -214,6 +226,38 @@ const demoState: {
     }
   ],
   puantajMap: {},
+  makineler: [
+    {
+      id: 1101,
+      ad: "Kesim Robotu",
+      tip: "Kesim",
+      konum: "Atolye A",
+      durum: "aktif",
+      sube_id: 1,
+      son_bakim: "2026-04-01",
+      bakim_periyot_gun: 30
+    },
+    {
+      id: 1102,
+      ad: "Forklift 02",
+      tip: "Tasima",
+      konum: "Depo Giris",
+      durum: "aktif",
+      sube_id: 2,
+      son_bakim: "2026-02-10",
+      bakim_periyot_gun: 30
+    },
+    {
+      id: 1103,
+      ad: "Pres Hatti",
+      tip: "Pres",
+      konum: "Atolye B",
+      durum: "aktif",
+      sube_id: 1,
+      son_bakim: null,
+      bakim_periyot_gun: 45
+    }
+  ],
   yonetimKullanicilari: [
     {
       id: 1,
@@ -636,6 +680,55 @@ function buildDemoPersonelDetail(personel: DemoPersonel) {
   };
 }
 
+function buildDemoIsgMakineListResponse(searchUrl: URL) {
+  const page = toNumber(searchUrl.searchParams.get("page")) ?? 1;
+  const limit = toNumber(searchUrl.searchParams.get("limit")) ?? 10;
+  const search = (toStringValue(searchUrl.searchParams.get("search")) ?? "").toLowerCase();
+  const durum = (toStringValue(searchUrl.searchParams.get("durum")) ?? "tum").toLowerCase();
+  const tip = (toStringValue(searchUrl.searchParams.get("tip")) ?? "").toLowerCase();
+  const subeId = toNumber(searchUrl.searchParams.get("sube_id"));
+
+  const filtered = demoState.makineler.filter((item) => {
+    if (subeId !== null && item.sube_id !== subeId) {
+      return false;
+    }
+    if (durum !== "tum" && item.durum !== durum) {
+      return false;
+    }
+    if (tip && !item.tip.toLowerCase().includes(tip)) {
+      return false;
+    }
+    if (!search) {
+      return true;
+    }
+
+    const fullText = `${item.ad} ${item.tip} ${item.konum ?? ""}`.toLowerCase();
+    return fullText.includes(search);
+  });
+
+  const start = (page - 1) * limit;
+  const items = filtered.slice(start, start + limit).map((item) => ({
+    ...item,
+    referans_adlari: {
+      sube: getSubeLabel(item.sube_id) ?? "-"
+    }
+  }));
+  const total = filtered.length;
+  const totalPages = Math.max(1, Math.ceil(total / limit));
+
+  return ok(
+    {
+      items
+    },
+    {
+      page,
+      limit,
+      total,
+      total_pages: totalPages
+    }
+  );
+}
+
 export function resolveDemoApiResponse(
   path: string,
   init?: RequestInit
@@ -667,6 +760,10 @@ export function resolveDemoApiResponse(
         sube_ids
       }
     });
+  }
+
+  if (pathname === "/isg/makineler" && method === "GET") {
+    return buildDemoIsgMakineListResponse(requestUrl);
   }
 
   if (pathname === "/personeller" && method === "GET") {

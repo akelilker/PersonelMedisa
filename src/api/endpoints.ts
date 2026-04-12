@@ -35,6 +35,9 @@ export const endpoints = {
     list: "/ek-odeme-kesinti",
     detail: (id: number | string) => `/ek-odeme-kesinti/${id}`
   },
+  isg: {
+    list: "/isg/makineler"
+  },
   referans: {
     departmanlar: "/referans/departmanlar",
     gorevler: "/referans/gorevler",

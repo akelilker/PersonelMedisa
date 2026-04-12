@@ -203,6 +203,48 @@ export async function mockApi(page: Page, role: MockUserRole) {
     }
   ];
 
+  const makineler: Array<{
+    id: number;
+    ad: string;
+    tip: string;
+    konum?: string | null;
+    durum: "aktif" | "arizali" | "pasif";
+    sube_id: number;
+    son_bakim?: string | null;
+    bakim_periyot_gun?: number | null;
+  }> = [
+    {
+      id: 1101,
+      ad: "Kesim Robotu",
+      tip: "Kesim",
+      konum: "Atolye A",
+      durum: "aktif",
+      sube_id: 1,
+      son_bakim: "2026-04-01",
+      bakim_periyot_gun: 30
+    },
+    {
+      id: 1102,
+      ad: "Forklift 02",
+      tip: "Tasima",
+      konum: "Depo Giris",
+      durum: "aktif",
+      sube_id: 2,
+      son_bakim: "2026-02-10",
+      bakim_periyot_gun: 30
+    },
+    {
+      id: 1103,
+      ad: "Pres Hatti",
+      tip: "Pres",
+      konum: "Atolye B",
+      durum: "aktif",
+      sube_id: 1,
+      son_bakim: null,
+      bakim_periyot_gun: 45
+    }
+  ];
+
   const yonetimKullanicilari: Array<{
     id: number;
     ad_soyad: string;
@@ -471,6 +513,57 @@ export async function mockApi(page: Page, role: MockUserRole) {
 
       const start = (pageNumber - 1) * pageLimit;
       const items = filtered.slice(start, start + pageLimit);
+
+      await fulfillJson(
+        route,
+        200,
+        JSON.stringify({
+          data: { items },
+          meta: {
+            page: pageNumber,
+            limit: pageLimit,
+            total: filtered.length,
+            total_pages: Math.max(1, Math.ceil(filtered.length / pageLimit))
+          },
+          errors: []
+        })
+      );
+      return;
+    }
+
+    if (path === "/api/isg/makineler" && method === "GET") {
+      const pageNumber = Number.parseInt(url.searchParams.get("page") ?? "1", 10) || 1;
+      const pageLimit = Number.parseInt(url.searchParams.get("limit") ?? "10", 10) || 10;
+      const search = (url.searchParams.get("search") ?? "").toLowerCase();
+      const durum = (url.searchParams.get("durum") ?? "tum").toLowerCase();
+      const tip = (url.searchParams.get("tip") ?? "").toLowerCase();
+      const subeId = Number.parseInt(url.searchParams.get("sube_id") ?? "", 10);
+
+      const filtered = makineler.filter((item) => {
+        if (Number.isFinite(subeId) && item.sube_id !== subeId) {
+          return false;
+        }
+        if (durum !== "tum" && item.durum !== durum) {
+          return false;
+        }
+        if (tip && !item.tip.toLowerCase().includes(tip)) {
+          return false;
+        }
+        if (!search) {
+          return true;
+        }
+
+        const fullText = `${item.ad} ${item.tip} ${item.konum ?? ""}`.toLowerCase();
+        return fullText.includes(search);
+      });
+
+      const start = (pageNumber - 1) * pageLimit;
+      const items = filtered.slice(start, start + pageLimit).map((item) => ({
+        ...item,
+        referans_adlari: {
+          sube: subeler.find((sube) => sube.id === item.sube_id)?.ad ?? "-"
+        }
+      }));
 
       await fulfillJson(
         route,

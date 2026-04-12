@@ -278,6 +278,8 @@ export const dataCacheKeys = {
   bildirimRef: () => `referans:bildirim-meta`,
   finansList: (subeId: number | null, personelId: string, donem: string, kalem: string, state: string, page: number) =>
     `finans:list:s${subeSeg(subeId)}:${personelId}|${donem}|${kalem}|${state}|${page}`,
+  isgMakinelerList: (subeId: number | null, search: string, durum: string, tip: string, page: number) =>
+    `isg:makineler:list:s${subeSeg(subeId)}:${search}|${durum}|${tip}|${page}`,
   puantajDetail: (subeId: number | null, personelId: number, tarih: string) =>
     `puantaj:s${subeSeg(subeId)}:${personelId}|${tarih}`
 };
@@ -347,6 +349,9 @@ function resolveFallbackForKey(key: string): unknown {
     return emptyPaginated();
   }
   if (key.startsWith("finans:list:")) {
+    return emptyPaginated();
+  }
+  if (key.startsWith("isg:makineler:list:")) {
     return emptyPaginated();
   }
   if (key.startsWith("referans:personel-bundle")) {

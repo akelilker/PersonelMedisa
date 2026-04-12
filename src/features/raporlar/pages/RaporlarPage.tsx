@@ -7,8 +7,8 @@ import { ErrorState } from "../../../components/states/ErrorState";
 import { LoadingState } from "../../../components/states/LoadingState";
 import { useAppDataRevision } from "../../../data/data-manager";
 import { useRoleAccess } from "../../../hooks/use-role-access";
-import type { ModuleFilterBase } from "../../../lib/filters/module-filter-schema";
 import { formatReportCellValue } from "../../../lib/display/enum-display";
+import type { ModuleFilterBase } from "../../../lib/filters/module-filter-schema";
 import { downloadReportCsv, printCurrentReportWindow } from "../../../reports/export-report";
 import { generateReport, type ReportEngineRow, type ReportEngineType } from "../../../reports/report-engine";
 import type { RaporAktiflik, RaporFiltreleri, RaporSatiri, RaporTipi } from "../../../types/rapor";
@@ -23,13 +23,13 @@ type RaporFormState = {
 };
 
 const RAPOR_OPTIONS: Array<{ value: RaporTipi; label: string }> = [
-  { value: "personel-ozet", label: "Personel Özeti" },
-  { value: "izin", label: "İzin" },
-  { value: "devamsizlik", label: "Devamsızlık" },
-  { value: "tesvik", label: "Teşvik" },
+  { value: "personel-ozet", label: "Personel Ã–zeti" },
+  { value: "izin", label: "Ä°zin" },
+  { value: "devamsizlik", label: "DevamsÄ±zlÄ±k" },
+  { value: "tesvik", label: "TeÅŸvik" },
   { value: "ceza", label: "Ceza" },
   { value: "ekstra-prim", label: "Ekstra Prim" },
-  { value: "is-kazasi", label: "İş Kazası" },
+  { value: "is-kazasi", label: "Ä°ÅŸ KazasÄ±" },
   { value: "bildirim", label: "Bildirim" }
 ];
 
@@ -41,7 +41,7 @@ function parseOptionalPositiveInt(value: string): number | undefined {
 
   const parsed = Number.parseInt(trimmed, 10);
   if (Number.isNaN(parsed) || parsed <= 0) {
-    throw new Error("Personel ve departman alanları pozitif sayı olmalıdır.");
+    throw new Error("Personel ve departman alanlarÄ± pozitif sayÄ± olmalÄ±dÄ±r.");
   }
 
   return parsed;
@@ -98,15 +98,16 @@ function collectEngineColumns(rows: ReportEngineRow[]): string[] {
 }
 
 const ENGINE_OPTIONS: Array<{ value: ReportEngineType; label: string }> = [
-  { value: "personel-ozet", label: "Personel özeti (önbellek)" },
-  { value: "izin-durumu", label: "İzin durumu (önbellek)" },
-  { value: "puantaj", label: "Puantaj (önbellek)" },
-  { value: "finans", label: "Finans (önbellek, 1. sayfa)" }
+  { value: "personel-ozet", label: "Personel Ã¶zeti (Ã¶nbellek)" },
+  { value: "izin-durumu", label: "Ä°zin durumu (Ã¶nbellek)" },
+  { value: "puantaj", label: "Puantaj (Ã¶nbellek)" },
+  { value: "finans", label: "Finans (Ã¶nbellek, 1. sayfa)" }
 ];
 
 export function RaporlarPage() {
   const { hasPermission } = useRoleAccess();
   const canViewAylikOzet = hasPermission("aylik-ozet.view");
+  const canViewIsg = hasPermission("isg.view");
   const cacheRevision = useAppDataRevision();
   const [engineType, setEngineType] = useState<ReportEngineType>("personel-ozet");
   const [enginePersonelId, setEnginePersonelId] = useState("");
@@ -161,7 +162,7 @@ export function RaporlarPage() {
 
     try {
       if (form.baslangicTarihi && form.bitisTarihi && form.baslangicTarihi > form.bitisTarihi) {
-        throw new Error("Başlangıç tarihi bitiş tarihinden büyük olamaz.");
+        throw new Error("BaÅŸlangÄ±Ã§ tarihi bitiÅŸ tarihinden bÃ¼yÃ¼k olamaz.");
       }
 
       const filters: RaporFiltreleri = {
@@ -177,7 +178,7 @@ export function RaporlarPage() {
       setTotal(result.total);
       setHasSearched(true);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Rapor verisi alınamadı.");
+      setErrorMessage(error instanceof Error ? error.message : "Rapor verisi alÄ±namadÄ±.");
       setRows([]);
       setTotal(null);
     } finally {
@@ -204,22 +205,28 @@ export function RaporlarPage() {
     <section className="raporlar-page">
       <div className="raporlar-header-row">
         <h2>Raporlar</h2>
-        {canViewAylikOzet ? <Link to="/aylik-kapanis-ozeti">Aylık Kapanış Özeti</Link> : null}
+        {canViewAylikOzet ? <Link to="/aylik-kapanis-ozeti">AylÄ±k KapanÄ±ÅŸ Ã–zeti</Link> : null}
       </div>
 
       <div className="raporlar-source-card">
-        <p className="raporlar-source-title">Resmi rapor kaynağı backend&apos;dir.</p>
+        <p className="raporlar-source-title">Resmi rapor kaynaÄŸÄ± backend&apos;dir.</p>
         <p className="raporlar-source-hint">
-          Bu form `/api/raporlar/*` endpoint&apos;lerinden veri çeker. Aşağıdaki önbellek aracı yalnızca yardımcı
-          inceleme ve demo/offline kullanım içindir.
+          Bu form `/api/raporlar/*` endpoint&apos;lerinden veri Ã§eker. AÅŸaÄŸÄ±daki Ã¶nbellek aracÄ± yalnÄ±zca yardÄ±mcÄ±
+          inceleme ve demo/offline kullanÄ±m iÃ§indir.
         </p>
       </div>
+
+      {canViewIsg ? (
+        <div className="module-links raporlar-module-links">
+          <Link to="/isg">ISG Makine Listesi</Link>
+        </div>
+      ) : null}
 
       <form className="form-filter-panel" onSubmit={handleSubmit}>
         <div className="form-field-grid">
           <FormField
             as="select"
-            label="Rapor Türü"
+            label="Rapor TÃ¼rÃ¼"
             name="rapor-turu"
             value={form.raporTipi}
             onChange={(value) => setForm((prev) => ({ ...prev, raporTipi: value as RaporTipi }))}
@@ -242,14 +249,14 @@ export function RaporlarPage() {
             onChange={(value) => setForm((prev) => ({ ...prev, departmanId: value }))}
           />
           <FormField
-            label="Başlangıç Tarihi"
+            label="BaÅŸlangÄ±Ã§ Tarihi"
             name="rapor-bas"
             type="date"
             value={form.baslangicTarihi}
             onChange={(value) => setForm((prev) => ({ ...prev, baslangicTarihi: value }))}
           />
           <FormField
-            label="Bitiş Tarihi"
+            label="BitiÅŸ Tarihi"
             name="rapor-bitis"
             type="date"
             value={form.bitisTarihi}
@@ -262,7 +269,7 @@ export function RaporlarPage() {
             value={form.aktiflik}
             onChange={(value) => setForm((prev) => ({ ...prev, aktiflik: value as RaporAktiflik }))}
             selectOptions={[
-              { value: "tum", label: "Tüm" },
+              { value: "tum", label: "TÃ¼m" },
               { value: "aktif", label: "Aktif" },
               { value: "pasif", label: "Pasif" }
             ]}
@@ -271,7 +278,7 @@ export function RaporlarPage() {
 
         <div className="form-actions-row">
           <button type="submit" className="universal-btn-aux" disabled={isLoading}>
-            Raporu Çalıştır
+            Raporu Ã‡alÄ±ÅŸtÄ±r
           </button>
           <button type="button" className="universal-btn-aux" onClick={handleClear} disabled={isLoading}>
             Temizle
@@ -279,18 +286,18 @@ export function RaporlarPage() {
         </div>
       </form>
 
-      {isLoading ? <LoadingState label="Rapor verileri yükleniyor..." /> : null}
+      {isLoading ? <LoadingState label="Rapor verileri yÃ¼kleniyor..." /> : null}
 
       {!isLoading && errorMessage ? <ErrorState message={errorMessage} /> : null}
 
       {!isLoading && !errorMessage && hasSearched && rows.length === 0 ? (
-        <EmptyState title="Rapor verisi yok" message="Bu filtrede gösterilecek kayıt bulunamadı." />
+        <EmptyState title="Rapor verisi yok" message="Bu filtrede gÃ¶sterilecek kayÄ±t bulunamadÄ±." />
       ) : null}
 
       {!isLoading && !errorMessage && rows.length > 0 ? (
         <div className="raporlar-result-card">
           <p>
-            <strong>Toplam Kayıt:</strong> {total ?? rows.length}
+            <strong>Toplam KayÄ±t:</strong> {total ?? rows.length}
           </p>
           <div className="raporlar-table-wrap">
             <table className="raporlar-table">
@@ -316,21 +323,21 @@ export function RaporlarPage() {
       ) : null}
 
       <div className="raporlar-engine-card">
-        <h3 className="raporlar-engine-title">Yardımcı önbellek aracı</h3>
+        <h3 className="raporlar-engine-title">YardÄ±mcÄ± Ã¶nbellek aracÄ±</h3>
         <p className="raporlar-engine-hint">
-          Bu bölüm ağ çağrısı yapmaz; yalnızca bu cihazdaki önbelleği okur. Resmi rapor yerine geçmez.
+          Bu bÃ¶lÃ¼m aÄŸ Ã§aÄŸrÄ±sÄ± yapmaz; yalnÄ±zca bu cihazdaki Ã¶nbelleÄŸi okur. Resmi rapor yerine geÃ§mez.
         </p>
         <div className="form-field-grid">
           <FormField
             as="select"
-            label="Motor türü"
+            label="Motor tÃ¼rÃ¼"
             name="engine-turu"
             value={engineType}
             onChange={(value) => setEngineType(value as ReportEngineType)}
             selectOptions={ENGINE_OPTIONS}
           />
           <FormField
-            label="Personel ID (boş = tümü)"
+            label="Personel ID (boÅŸ = tÃ¼mÃ¼)"
             name="engine-personel"
             type="number"
             min={1}
@@ -338,21 +345,21 @@ export function RaporlarPage() {
             onChange={(value) => setEnginePersonelId(value)}
           />
           <FormField
-            label="Durum (boş = tümü)"
+            label="Durum (boÅŸ = tÃ¼mÃ¼)"
             name="engine-durum"
             value={engineDurum}
             onChange={(value) => setEngineDurum(value)}
-            placeholder="Örn: AKTİF, TAMAMLANDI"
+            placeholder="Ã–rn: AKTÄ°F, TAMAMLANDI"
           />
           <FormField
-            label="Tarih başlangıç (yyyy-mm-dd)"
+            label="Tarih baÅŸlangÄ±Ã§ (yyyy-mm-dd)"
             name="engine-bas"
             type="date"
             value={engineBas}
             onChange={(value) => setEngineBas(value)}
           />
           <FormField
-            label="Tarih bitiş (yyyy-mm-dd)"
+            label="Tarih bitiÅŸ (yyyy-mm-dd)"
             name="engine-bit"
             type="date"
             value={engineBit}
@@ -378,11 +385,11 @@ export function RaporlarPage() {
               printCurrentReportWindow(`Rapor: ${engineType}`, engineColumns, engineRows);
             }}
           >
-            Yazdır / PDF
+            YazdÄ±r / PDF
           </button>
         </div>
         {engineRows.length === 0 ? (
-          <p className="raporlar-engine-empty">Bu tür için önbellekte satır yok; ilgili modülü en az bir kez açın.</p>
+          <p className="raporlar-engine-empty">Bu tÃ¼r iÃ§in Ã¶nbellekte satÄ±r yok; ilgili modÃ¼lÃ¼ en az bir kez aÃ§Ä±n.</p>
         ) : (
           <div className="raporlar-table-wrap raporlar-engine-table">
             <table className="raporlar-table">
@@ -408,8 +415,8 @@ export function RaporlarPage() {
       </div>
 
       <div className="module-links">
-        <Link to="/finans">Finans modülüne git</Link>
-        <Link to="/">Ana ekrana dön</Link>
+        <Link to="/finans">Finans modÃ¼lÃ¼ne git</Link>
+        <Link to="/">Ana ekrana dÃ¶n</Link>
       </div>
     </section>
   );

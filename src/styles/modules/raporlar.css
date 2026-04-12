@@ -43,6 +43,10 @@
   font-weight: 700;
 }
 
+.raporlar-module-links {
+  margin-top: calc(var(--space-2) * -1);
+}
+
 .raporlar-source-hint {
   font-size: 13px;
   color: var(--text-muted, #666);

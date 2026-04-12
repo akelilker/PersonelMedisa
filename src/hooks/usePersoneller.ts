@@ -8,8 +8,9 @@ import {
   updatePersonel,
   type CreatePersonelPayload
 } from "../api/personeller.api";
-import { fetchBagliAmirOptions, fetchDepartmanOptions, fetchGorevOptions, fetchPersonelTipiOptions } from "../api/referans.api";
-import { makeTempId, type PersonelReferenceBundle } from "../data/app-data.types";
+import { fetchBagliAmirOptions, fetchDepartmanOptions, fetchGorevOptions, fetchPersonelTipiOptions, fetchSurecTuruOptions } from "../api/referans.api";
+import { createSurec, fetchSureclerList } from "../api/surecler.api";
+import { emptyPaginated, makeTempId, type PersonelReferenceBundle } from "../data/app-data.types";
 import {
   dataCacheKeys,
   deleteCacheEntry,
@@ -37,7 +38,10 @@ import type { PaginatedResult } from "../types/api";
 import { runDeduped } from "../lib/in-flight-dedupe";
 import { useAuth } from "../state/auth.store";
 import type { Personel } from "../types/personel";
+import type { KeyOption } from "../types/referans";
+import type { Surec } from "../types/surec";
 const PAGE_SIZE = 10;
+const PERSONEL_DETAIL_SUREC_PAGE_SIZE = 20;
 
 export type PersonelListQueryState = {
   draft: {
@@ -412,16 +416,147 @@ type EditPersonelFormState = {
   aktifDurum: "AKTIF" | "PASIF";
 };
 
-export function usePersonelDetail(parsedPersonelId: number, hasValidId: boolean) {
+type PersonelSurecFormState = {
+  surecTuru: string;
+  baslangicTarihi: string;
+  bitisTarihi: string;
+  aciklama: string;
+};
+
+const INITIAL_PERSONEL_SUREC_FORM: PersonelSurecFormState = {
+  surecTuru: "",
+  baslangicTarihi: "",
+  bitisTarihi: "",
+  aciklama: ""
+};
+
+function normalizeSurecDateValue(value: string | undefined) {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  const parsed = Date.parse(`${trimmed}T00:00:00`);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function sortSurecHistory(items: Surec[]) {
+  return [...items].sort((left, right) => {
+    const rightStart = normalizeSurecDateValue(right.baslangic_tarihi);
+    const leftStart = normalizeSurecDateValue(left.baslangic_tarihi);
+
+    if (rightStart !== null && leftStart !== null && rightStart !== leftStart) {
+      return rightStart - leftStart;
+    }
+
+    if (rightStart !== null) {
+      return -1;
+    }
+
+    if (leftStart !== null) {
+      return 1;
+    }
+
+    const rightEnd = normalizeSurecDateValue(right.bitis_tarihi);
+    const leftEnd = normalizeSurecDateValue(left.bitis_tarihi);
+    if (rightEnd !== null && leftEnd !== null && rightEnd !== leftEnd) {
+      return rightEnd - leftEnd;
+    }
+    if (rightEnd !== null) {
+      return -1;
+    }
+    if (leftEnd !== null) {
+      return 1;
+    }
+
+    return right.id - left.id;
+  });
+}
+
+function mergeSurecHistoryRow(items: Surec[], next: Surec) {
+  return sortSurecHistory([next, ...items.filter((item) => item.id !== next.id)]);
+}
+
+function buildPersonelSurecPayload(
+  personelId: number,
+  form: PersonelSurecFormState
+) {
+  const surecTuru = form.surecTuru.trim();
+  const baslangicTarihi = form.baslangicTarihi.trim();
+
+  if (!surecTuru) {
+    throw new Error("Surec turu zorunludur.");
+  }
+
+  if (!baslangicTarihi) {
+    throw new Error("Baslangic tarihi zorunludur.");
+  }
+
+  return {
+    personel_id: personelId,
+    surec_turu: surecTuru,
+    baslangic_tarihi: baslangicTarihi,
+    bitis_tarihi: form.bitisTarihi.trim() || undefined,
+    aciklama: form.aciklama.trim() || undefined
+  };
+}
+
+function draftSurecFromPayload(personelId: number, form: PersonelSurecFormState, tempId: number): Surec {
+  return {
+    id: tempId,
+    personel_id: personelId,
+    surec_turu: form.surecTuru.trim(),
+    baslangic_tarihi: form.baslangicTarihi.trim(),
+    bitis_tarihi: form.bitisTarihi.trim() || undefined,
+    aciklama: form.aciklama.trim() || undefined,
+    state: "BEKLEMEDE"
+  };
+}
+
+function applyTerminationToPersonel(personel: Personel): Personel {
+  return {
+    ...personel,
+    aktif_durum: "PASIF",
+    pasiflik_durumu_etiketi: "Isten Ayrildi"
+  };
+}
+
+export function usePersonelDetail(
+  parsedPersonelId: number,
+  hasValidId: boolean,
+  options: {
+    canViewSurecler?: boolean;
+    canCreateSurec?: boolean;
+  } = {}
+) {
   const navigate = useNavigate();
   const { session } = useAuth();
   const activeSubeId = session?.active_sube_id ?? null;
   const revision = useAppDataRevision();
+  const canAccessSurecler = Boolean(options.canViewSurecler || options.canCreateSurec);
+  const canCreateSurec = Boolean(options.canCreateSurec);
   const detailKey = useMemo(
     () => dataCacheKeys.personelDetail(activeSubeId, parsedPersonelId),
     [activeSubeId, parsedPersonelId]
   );
+  const surecHistoryKey = useMemo(
+    () => dataCacheKeys.sureclerList(activeSubeId, String(parsedPersonelId), "", "", "", "", 1),
+    [activeSubeId, parsedPersonelId]
+  );
+  const surecTuruRefKey = dataCacheKeys.surecTuruRef();
   const cached = useMemo(() => getCacheEntry<Personel>(detailKey), [detailKey, revision]);
+  const surecHistorySnapshot = useMemo(
+    () => getCacheEntry<PaginatedResult<Surec>>(surecHistoryKey),
+    [revision, surecHistoryKey]
+  );
+  const surecTuruOptions = useMemo(
+    () => getCacheEntry<KeyOption[]>(surecTuruRefKey) ?? [],
+    [revision, surecTuruRefKey]
+  );
 
   const [personel, setPersonel] = useState<Personel | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -435,6 +570,13 @@ export function usePersonelDetail(parsedPersonelId: number, hasValidId: boolean)
     telefon: "",
     aktifDurum: "AKTIF"
   });
+  const [isSurecModalOpen, setIsSurecModalOpen] = useState(false);
+  const [isSurecSubmitting, setIsSurecSubmitting] = useState(false);
+  const [surecCreateErrorMessage, setSurecCreateErrorMessage] = useState<string | null>(null);
+  const [surecHistoryErrorMessage, setSurecHistoryErrorMessage] = useState<string | null>(null);
+  const [surecReferenceErrorMessage, setSurecReferenceErrorMessage] = useState<string | null>(null);
+  const [isSurecHistoryLoading, setIsSurecHistoryLoading] = useState(false);
+  const [surecForm, setSurecForm] = useState<PersonelSurecFormState>(INITIAL_PERSONEL_SUREC_FORM);
 
   useEffect(() => {
     if (cached) {
@@ -493,6 +635,103 @@ export function usePersonelDetail(parsedPersonelId: number, hasValidId: boolean)
   useEffect(() => {
     void refetch();
   }, [refetch]);
+
+  useEffect(() => {
+    setIsSurecModalOpen(false);
+    setSurecCreateErrorMessage(null);
+    setSurecHistoryErrorMessage(null);
+    setSurecReferenceErrorMessage(null);
+    setSurecForm(INITIAL_PERSONEL_SUREC_FORM);
+  }, [parsedPersonelId]);
+
+  useEffect(() => {
+    if (!hasValidId || !canAccessSurecler) {
+      setIsSurecHistoryLoading(false);
+      setSurecHistoryErrorMessage(null);
+      return;
+    }
+
+    let cancelled = false;
+    const hasSeed = getCacheEntry<PaginatedResult<Surec>>(surecHistoryKey) !== undefined;
+    setIsSurecHistoryLoading(!hasSeed);
+    setSurecHistoryErrorMessage(null);
+
+    void (async () => {
+      try {
+        await fetchWithCacheMerge(surecHistoryKey, () =>
+          runDeduped(surecHistoryKey, () =>
+            fetchSureclerList({
+              personel_id: parsedPersonelId,
+              sube_id: getSubeIdForApiRequest(),
+              page: 1,
+              limit: PERSONEL_DETAIL_SUREC_PAGE_SIZE
+            })
+          )
+        );
+      } catch {
+        if (!getCacheEntry<PaginatedResult<Surec>>(surecHistoryKey)) {
+          setSurecHistoryErrorMessage("Surec gecmisi su an guncellenemiyor.");
+        }
+      } finally {
+        if (!cancelled) {
+          setIsSurecHistoryLoading(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [canAccessSurecler, hasValidId, parsedPersonelId, surecHistoryKey]);
+
+  useEffect(() => {
+    if (!canCreateSurec) {
+      setSurecReferenceErrorMessage(null);
+      return;
+    }
+
+    let cancelled = false;
+    setSurecReferenceErrorMessage(null);
+
+    void (async () => {
+      try {
+        await fetchWithCacheMerge(surecTuruRefKey, () =>
+          runDeduped(surecTuruRefKey, () => fetchSurecTuruOptions())
+        );
+      } catch {
+        if (!cancelled) {
+          setSurecReferenceErrorMessage("Surec turleri su an guncellenemiyor.");
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [canCreateSurec, surecTuruRefKey]);
+
+  const surecHistory = useMemo(() => {
+    if (!canAccessSurecler) {
+      return [];
+    }
+
+    return sortSurecHistory(surecHistorySnapshot?.items ?? []);
+  }, [canAccessSurecler, surecHistorySnapshot]);
+
+  const openSurecModal = useCallback(() => {
+    if (!canCreateSurec) {
+      setSurecCreateErrorMessage("Bu islem icin yetkin bulunmuyor.");
+      return;
+    }
+
+    setSurecCreateErrorMessage(null);
+    setSurecForm(INITIAL_PERSONEL_SUREC_FORM);
+    setIsSurecModalOpen(true);
+  }, [canCreateSurec]);
+
+  const closeSurecModal = useCallback(() => {
+    setIsSurecModalOpen(false);
+  }, []);
 
   const discardEdit = useCallback(() => {
     if (!personel) {
@@ -577,6 +816,83 @@ export function usePersonelDetail(parsedPersonelId: number, hasValidId: boolean)
     [detailKey, editForm, isSubmitting, navigate, personel]
   );
 
+  const createSurecHandler = useCallback(
+    async (event: FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      if (!personel || isSurecSubmitting) {
+        return;
+      }
+
+      if (!canCreateSurec) {
+        setSurecCreateErrorMessage("Bu islem icin yetkin bulunmuyor.");
+        return;
+      }
+
+      setSurecCreateErrorMessage(null);
+      setIsSurecSubmitting(true);
+
+      try {
+        const payload = buildPersonelSurecPayload(personel.id, surecForm);
+
+        try {
+          const created = await createSurec(payload);
+          mergeCacheEntry<PaginatedResult<Surec>>(surecHistoryKey, (prev) => {
+            const base = prev ?? emptyPaginated<Surec>();
+            return {
+              ...base,
+              items: mergeSurecHistoryRow(base.items, created)
+            };
+          });
+
+          if (payload.surec_turu === "ISTEN_AYRILMA") {
+            const nextPersonel = applyTerminationToPersonel(personel);
+            mergeCacheEntry<Personel>(detailKey, () => nextPersonel);
+            setPersonel(nextPersonel);
+            setEditForm((prev) => ({ ...prev, aktifDurum: "PASIF" }));
+          }
+
+          setIsSurecModalOpen(false);
+          setSurecForm(INITIAL_PERSONEL_SUREC_FORM);
+        } catch (error) {
+          if (!shouldQueueOfflineMutation(error)) {
+            throw error;
+          }
+
+          const tempId = makeTempId();
+          const draft = draftSurecFromPayload(personel.id, surecForm, tempId);
+          mergeCacheEntry<PaginatedResult<Surec>>(surecHistoryKey, (prev) => {
+            const base = prev ?? emptyPaginated<Surec>();
+            return {
+              ...base,
+              items: mergeSurecHistoryRow(base.items, draft)
+            };
+          });
+          enqueueSyncOperation({
+            op: "surecler.create",
+            payload,
+            meta: { listKey: surecHistoryKey, tempId }
+          });
+
+          if (payload.surec_turu === "ISTEN_AYRILMA") {
+            const nextPersonel = applyTerminationToPersonel(personel);
+            mergeCacheEntry<Personel>(detailKey, () => nextPersonel);
+            setPersonel(nextPersonel);
+            setEditForm((prev) => ({ ...prev, aktifDurum: "PASIF" }));
+          }
+
+          setIsSurecModalOpen(false);
+          setSurecForm(INITIAL_PERSONEL_SUREC_FORM);
+          void processSyncQueue();
+        }
+      } catch (error) {
+        setSurecCreateErrorMessage(getApiErrorMessage(error, "Surec kaydi yapilamadi."));
+      } finally {
+        setIsSurecSubmitting(false);
+      }
+    },
+    [canCreateSurec, detailKey, isSurecSubmitting, personel, surecForm, surecHistoryKey]
+  );
+
   return {
     personel,
     isLoading,
@@ -589,6 +905,19 @@ export function usePersonelDetail(parsedPersonelId: number, hasValidId: boolean)
     editForm,
     setEditForm,
     discardEdit,
-    updatePersonelHandler
+    updatePersonelHandler,
+    isSurecModalOpen,
+    openSurecModal,
+    closeSurecModal,
+    surecForm,
+    setSurecForm,
+    createSurecHandler,
+    isSurecSubmitting,
+    surecCreateErrorMessage,
+    surecHistory,
+    isSurecHistoryLoading,
+    surecHistoryErrorMessage,
+    surecTuruOptions,
+    surecReferenceErrorMessage
   };
 }

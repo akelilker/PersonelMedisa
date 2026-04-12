@@ -36,7 +36,7 @@ export function buildCreateSurecPayload(form: SurecFormState): CreateSurecPayloa
     surec_turu: form.surecTuru.trim(),
     alt_tur: form.altTur.trim() || undefined,
     baslangic_tarihi: form.baslangicTarihi,
-    bitis_tarihi: form.bitisTarihi,
+    bitis_tarihi: form.bitisTarihi.trim() || undefined,
     ucretli_mi: form.ucretliMi,
     aciklama: form.aciklama.trim() || undefined
   };
@@ -48,7 +48,7 @@ export function buildUpdateSurecPayload(form: SurecFormState): UpdateSurecPayloa
     surec_turu: form.surecTuru.trim(),
     alt_tur: form.altTur.trim() || undefined,
     baslangic_tarihi: form.baslangicTarihi,
-    bitis_tarihi: form.bitisTarihi,
+    bitis_tarihi: form.bitisTarihi.trim() || undefined,
     ucretli_mi: form.ucretliMi,
     aciklama: form.aciklama.trim() || undefined
   };

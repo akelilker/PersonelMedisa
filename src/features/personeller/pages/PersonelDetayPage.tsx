@@ -1,13 +1,20 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { FormField } from "../../../components/form/FormField";
+import { AppModal } from "../../../components/modal/AppModal";
 import { EmptyState } from "../../../components/states/EmptyState";
 import { ErrorState } from "../../../components/states/ErrorState";
 import { LoadingState } from "../../../components/states/LoadingState";
 import { useRoleAccess } from "../../../hooks/use-role-access";
 import { usePersonelDetail } from "../../../hooks/usePersoneller";
-import { formatAktifDurumLabel } from "../../../lib/display/enum-display";
+import {
+  formatAktifDurumLabel,
+  formatSurecStateLabel,
+  formatSurecTuruLabel
+} from "../../../lib/display/enum-display";
+import type { KeyOption } from "../../../types/referans";
 import type { Personel } from "../../../types/personel";
+import type { Surec } from "../../../types/surec";
 
 const PERSONEL_DOSYA_TABS = [
   { id: "genel-bilgiler", label: "Genel Bilgiler" },
@@ -16,6 +23,8 @@ const PERSONEL_DOSYA_TABS = [
   { id: "zimmet-envanter", label: "Zimmet & Envanter" },
   { id: "surec-gecmisi", label: "Surec Gecmisi" }
 ] as const;
+
+const PERSONEL_SUREC_FORM_ID = "personel-surec-form";
 
 type PersonelDosyaTabId = (typeof PERSONEL_DOSYA_TABS)[number]["id"];
 
@@ -40,11 +49,23 @@ function formatReferenceValue(label?: string, id?: number) {
   return typeof id === "number" ? `#${id}` : "-";
 }
 
-function DossierField({ label, value }: { label: string; value: string }) {
+function keyOptionsToSelectOptions(options: KeyOption[]) {
+  return options.map((option) => ({ value: option.key, label: option.label }));
+}
+
+function DossierField({
+  label,
+  value,
+  valueClassName
+}: {
+  label: string;
+  value: string;
+  valueClassName?: string;
+}) {
   return (
     <div className="personel-dosya-field">
       <span className="personel-dosya-field-label">{label}</span>
-      <strong className="personel-dosya-field-value">{value}</strong>
+      <strong className={valueClassName ?? "personel-dosya-field-value"}>{value}</strong>
     </div>
   );
 }
@@ -52,39 +73,45 @@ function DossierField({ label, value }: { label: string; value: string }) {
 function PersonelDosyaHero({
   personel,
   canEditPersonel,
-  canViewSurecler,
+  canAccessSurecler,
   canCreateSurec,
   isActionMenuOpen,
   onToggleActionMenu,
   onCloseActionMenu,
-  onStartEdit
+  onStartEdit,
+  onOpenSurecModal,
+  onOpenSurecHistory
 }: {
   personel: Personel;
   canEditPersonel: boolean;
-  canViewSurecler: boolean;
+  canAccessSurecler: boolean;
   canCreateSurec: boolean;
   isActionMenuOpen: boolean;
   onToggleActionMenu: () => void;
   onCloseActionMenu: () => void;
   onStartEdit: () => void;
+  onOpenSurecModal: () => void;
+  onOpenSurecHistory: () => void;
 }) {
-  const navigate = useNavigate();
-
   const actionItems = useMemo(() => {
     const items: Array<{ id: string; label: string; onSelect: () => void }> = [];
 
-    if (canCreateSurec || canViewSurecler) {
+    if (canCreateSurec) {
       items.push({
-        id: "surec",
-        label: canCreateSurec ? "Surec Baslat" : "Surecleri Ac",
+        id: "surec-ekle",
+        label: "Surec Ekle",
         onSelect: () => {
           onCloseActionMenu();
-          navigate("/surecler", {
-            state: {
-              prefillPersonelId: personel.id,
-              ...(canCreateSurec ? { openCreateModal: true } : {})
-            }
-          });
+          onOpenSurecModal();
+        }
+      });
+    } else if (canAccessSurecler) {
+      items.push({
+        id: "surec-gecmisi",
+        label: "Surec Gecmisini Ac",
+        onSelect: () => {
+          onCloseActionMenu();
+          onOpenSurecHistory();
         }
       });
     }
@@ -101,14 +128,23 @@ function PersonelDosyaHero({
     }
 
     return items;
-  }, [canCreateSurec, canEditPersonel, canViewSurecler, navigate, onCloseActionMenu, onStartEdit, personel.id]);
+  }, [canAccessSurecler, canCreateSurec, canEditPersonel, onCloseActionMenu, onOpenSurecHistory, onOpenSurecModal, onStartEdit]);
+
+  const durumLabel =
+    personel.aktif_durum === "PASIF"
+      ? formatDetailValue(personel.pasiflik_durumu_etiketi) !== "-"
+        ? formatDetailValue(personel.pasiflik_durumu_etiketi)
+        : formatAktifDurumLabel(personel.aktif_durum)
+      : formatAktifDurumLabel(personel.aktif_durum);
 
   return (
     <section className="personel-dosya-hero">
       <div className="personel-dosya-hero-head">
         <div className="personel-dosya-hero-copy">
           <p className="personel-dosya-kicker">Personel Dosyasi</p>
-          <h3>{personel.ad} {personel.soyad}</h3>
+          <h3>
+            {personel.ad} {personel.soyad}
+          </h3>
           <p className="personel-dosya-sub">
             Bilgi merkezi gorunumu. Kart icerigi salt okunur dosya mantigiyla izlenir.
           </p>
@@ -116,7 +152,12 @@ function PersonelDosyaHero({
 
         {actionItems.length > 0 ? (
           <div className="personel-dosya-action-host">
-            <button type="button" className="universal-btn-aux" onClick={onToggleActionMenu} aria-expanded={isActionMenuOpen}>
+            <button
+              type="button"
+              className="universal-btn-aux"
+              onClick={onToggleActionMenu}
+              aria-expanded={isActionMenuOpen}
+            >
               Islemler
             </button>
             <div className={`settings-dropdown personel-dosya-action-menu${isActionMenuOpen ? " open" : ""}`}>
@@ -136,7 +177,15 @@ function PersonelDosyaHero({
         <DossierField label="Sicil No" value={formatDetailValue(personel.sicil_no)} />
         <DossierField label="Departman / Birim" value={formatReferenceValue(personel.departman_adi, personel.departman_id)} />
         <DossierField label="Gorev / Unvan" value={formatReferenceValue(personel.gorev_adi, personel.gorev_id)} />
-        <DossierField label="Durum" value={formatAktifDurumLabel(personel.aktif_durum)} />
+        <DossierField
+          label="Durum"
+          value={durumLabel}
+          valueClassName={
+            personel.aktif_durum === "PASIF"
+              ? "personel-dosya-field-value personel-dosya-field-value--danger"
+              : "personel-dosya-field-value"
+          }
+        />
         <DossierField label="Ise Giris Tarihi" value={formatDetailValue(personel.ise_giris_tarihi)} />
       </div>
     </section>
@@ -226,6 +275,76 @@ function PlaceholderPanel({
   );
 }
 
+function PersonelSurecGecmisiPanel({
+  canAccessSurecler,
+  canCreateSurec,
+  isLoading,
+  errorMessage,
+  surecler,
+  onOpenCreateModal
+}: {
+  canAccessSurecler: boolean;
+  canCreateSurec: boolean;
+  isLoading: boolean;
+  errorMessage: string | null;
+  surecler: Surec[];
+  onOpenCreateModal: () => void;
+}) {
+  if (!canAccessSurecler) {
+    return (
+      <div className="personel-kart-placeholder">
+        <h3>Surec Gecmisi</h3>
+        <p>Bu dosya yalnizca surec goruntuleme yetkisi olan kullanicilar icin acilir.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="personel-surec-history">
+      <div className="personel-surec-history-head">
+        <div>
+          <h3>Surec Gecmisi</h3>
+          <p>Personelin tum surec hareketleri kronolojik olay gunlugu olarak izlenir.</p>
+        </div>
+        {canCreateSurec ? (
+          <button type="button" className="universal-btn-aux" onClick={onOpenCreateModal}>
+            Surec Ekle
+          </button>
+        ) : null}
+      </div>
+
+      {isLoading ? <p className="personel-kart-placeholder-note">Surec gecmisi yukleniyor...</p> : null}
+      {!isLoading && errorMessage ? <p className="personel-create-error">{errorMessage}</p> : null}
+      {!isLoading && !errorMessage && surecler.length === 0 ? (
+        <div className="personel-kart-placeholder">
+          <h3>Kayit Bulunamadi</h3>
+          <p>Bu personel icin henuz surec kaydi bulunmuyor.</p>
+        </div>
+      ) : null}
+
+      {!isLoading && !errorMessage && surecler.length > 0 ? (
+        <ul className="personel-surec-list">
+          {surecler.map((surec) => (
+            <li key={surec.id} className="personel-surec-item">
+              <div className="personel-surec-item-head">
+                <strong>{formatSurecTuruLabel(surec.surec_turu)}</strong>
+                <span className={`personel-surec-state${surec.state === "IPTAL" ? " is-cancelled" : ""}`}>
+                  {formatSurecStateLabel(surec.state)}
+                </span>
+              </div>
+              <div className="personel-surec-item-meta">
+                <span>Baslangic: {formatDetailValue(surec.baslangic_tarihi)}</span>
+                <span>Bitis: {formatDetailValue(surec.bitis_tarihi)}</span>
+              </div>
+              <p className="personel-surec-item-note">{formatDetailValue(surec.aciklama)}</p>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
+  );
+}
+
 export function PersonelDetayPage() {
   const { personelId } = useParams();
   const parsedPersonelId = Number.parseInt(personelId ?? "", 10);
@@ -234,6 +353,7 @@ export function PersonelDetayPage() {
   const canEditPersonel = hasPermission("personeller.update");
   const canCreateSurec = hasPermission("surecler.create");
   const canViewSurecler = hasPermission("surecler.view") || hasPermission("surecler.view.sube");
+  const canAccessSurecler = canCreateSurec || canViewSurecler;
   const canViewPuantaj = hasPermission("puantaj.view");
 
   const [activeTab, setActiveTab] = useState<PersonelDosyaTabId>("genel-bilgiler");
@@ -251,8 +371,24 @@ export function PersonelDetayPage() {
     editForm,
     setEditForm,
     discardEdit,
-    updatePersonelHandler
-  } = usePersonelDetail(parsedPersonelId, hasValidId);
+    updatePersonelHandler,
+    isSurecModalOpen,
+    openSurecModal,
+    closeSurecModal,
+    surecForm,
+    setSurecForm,
+    createSurecHandler,
+    isSurecSubmitting,
+    surecCreateErrorMessage,
+    surecHistory,
+    isSurecHistoryLoading,
+    surecHistoryErrorMessage,
+    surecTuruOptions,
+    surecReferenceErrorMessage
+  } = usePersonelDetail(parsedPersonelId, hasValidId, {
+    canViewSurecler,
+    canCreateSurec
+  });
 
   useEffect(() => {
     setActiveTab("genel-bilgiler");
@@ -260,10 +396,10 @@ export function PersonelDetayPage() {
   }, [parsedPersonelId]);
 
   useEffect(() => {
-    if (isEditing) {
+    if (isEditing || isSurecModalOpen) {
       setIsActionMenuOpen(false);
     }
-  }, [isEditing]);
+  }, [isEditing, isSurecModalOpen]);
 
   const aktifDurumOptions = [
     { value: "AKTIF", label: formatAktifDurumLabel("AKTIF") },
@@ -272,6 +408,19 @@ export function PersonelDetayPage() {
 
   function handleEditSubmit(event: FormEvent<HTMLFormElement>) {
     void updatePersonelHandler(event, canEditPersonel);
+  }
+
+  function handleSurecCreateSubmit(event: FormEvent<HTMLFormElement>) {
+    void createSurecHandler(event);
+  }
+
+  function handleOpenSurecModal() {
+    setActiveTab("surec-gecmisi");
+    openSurecModal();
+  }
+
+  function handleOpenSurecHistory() {
+    setActiveTab("surec-gecmisi");
   }
 
   const pageHeading =
@@ -296,12 +445,14 @@ export function PersonelDetayPage() {
           <PersonelDosyaHero
             personel={personel}
             canEditPersonel={canEditPersonel}
-            canViewSurecler={canViewSurecler}
+            canAccessSurecler={canAccessSurecler}
             canCreateSurec={canCreateSurec}
             isActionMenuOpen={isActionMenuOpen}
             onToggleActionMenu={() => setIsActionMenuOpen((prev) => !prev)}
             onCloseActionMenu={() => setIsActionMenuOpen(false)}
             onStartEdit={() => setIsEditing(true)}
+            onOpenSurecModal={handleOpenSurecModal}
+            onOpenSurecHistory={handleOpenSurecHistory}
           />
 
           {isEditing ? (
@@ -451,22 +602,94 @@ export function PersonelDetayPage() {
                 aria-labelledby="personel-kart-tab-surec-gecmisi"
                 hidden={activeTab !== "surec-gecmisi"}
               >
-                <PlaceholderPanel
-                  title="Surec Gecmisi"
-                  description="Departman degisikligi, gorev gecisi, ucret hareketi ve diger personel olaylari bu sekmede zaman cizgisi mantigiyla yer alacak."
-                  actionLabel={canCreateSurec ? "Surec Baslat" : canViewSurecler ? "Surecleri Ac" : undefined}
-                  actionTo={canViewSurecler ? "/surecler" : undefined}
-                  actionState={{
-                    prefillPersonelId: personel.id,
-                    ...(canCreateSurec ? { openCreateModal: true } : {})
-                  }}
-                  canOpen={canViewSurecler}
-                  noPermissionMessage="Surec goruntuleme yetkiniz yok."
+                <PersonelSurecGecmisiPanel
+                  canAccessSurecler={canAccessSurecler}
+                  canCreateSurec={canCreateSurec}
+                  isLoading={isSurecHistoryLoading}
+                  errorMessage={surecHistoryErrorMessage}
+                  surecler={surecHistory}
+                  onOpenCreateModal={handleOpenSurecModal}
                 />
               </div>
             </>
           )}
         </div>
+      ) : null}
+
+      {personel && canCreateSurec && isSurecModalOpen ? (
+        <AppModal
+          title="Surec Ekle"
+          onClose={closeSurecModal}
+          footer={
+            <div className="universal-btn-group modal-footer-actions">
+              <button
+                type="submit"
+                form={PERSONEL_SUREC_FORM_ID}
+                className="universal-btn-save"
+                disabled={isSurecSubmitting}
+              >
+                {isSurecSubmitting ? "Kaydediliyor..." : "Kaydet"}
+              </button>
+              <button
+                type="button"
+                className="universal-btn-cancel"
+                onClick={closeSurecModal}
+                disabled={isSurecSubmitting}
+              >
+                Vazgec
+              </button>
+            </div>
+          }
+        >
+          <form id={PERSONEL_SUREC_FORM_ID} className="personel-surec-form-grid" onSubmit={handleSurecCreateSubmit}>
+            {surecTuruOptions.length > 0 ? (
+              <FormField
+                as="select"
+                label="Surec Turu"
+                name="personel-surec-turu"
+                value={surecForm.surecTuru}
+                onChange={(value) => setSurecForm((prev) => ({ ...prev, surecTuru: value }))}
+                required
+                placeholderOption={{ value: "", label: "Seciniz" }}
+                selectOptions={keyOptionsToSelectOptions(surecTuruOptions)}
+              />
+            ) : (
+              <FormField
+                label="Surec Turu"
+                name="personel-surec-turu-text"
+                value={surecForm.surecTuru}
+                onChange={(value) => setSurecForm((prev) => ({ ...prev, surecTuru: value }))}
+                required
+                placeholder="IZIN, RAPOR, ISTEN_AYRILMA"
+              />
+            )}
+            <FormField
+              label="Baslangic Tarihi"
+              name="personel-surec-baslangic"
+              type="date"
+              value={surecForm.baslangicTarihi}
+              onChange={(value) => setSurecForm((prev) => ({ ...prev, baslangicTarihi: value }))}
+              required
+            />
+            <FormField
+              label="Bitis Tarihi"
+              name="personel-surec-bitis"
+              type="date"
+              value={surecForm.bitisTarihi}
+              onChange={(value) => setSurecForm((prev) => ({ ...prev, bitisTarihi: value }))}
+            />
+            <FormField
+              as="textarea"
+              label="Aciklama"
+              name="personel-surec-aciklama"
+              value={surecForm.aciklama}
+              onChange={(value) => setSurecForm((prev) => ({ ...prev, aciklama: value }))}
+              rows={4}
+            />
+            {surecCreateErrorMessage ? <p className="personel-create-error">{surecCreateErrorMessage}</p> : null}
+            {surecReferenceErrorMessage ? <p className="personel-create-error">{surecReferenceErrorMessage}</p> : null}
+          </form>
+        </AppModal>
       ) : null}
     </section>
   );

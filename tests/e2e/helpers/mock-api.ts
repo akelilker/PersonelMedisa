@@ -110,7 +110,7 @@ export async function mockApi(page: Page, role: MockUserRole) {
     surec_turu: string;
     alt_tur?: string;
     baslangic_tarihi: string;
-    bitis_tarihi: string;
+    bitis_tarihi?: string;
     ucretli_mi?: boolean;
     aciklama?: string;
     state: string;
@@ -429,6 +429,48 @@ export async function mockApi(page: Page, role: MockUserRole) {
     };
   }
 
+  function buildPersonelDetail(personel: (typeof personeller)[number]) {
+    return {
+      ana_kart: {
+        id: personel.id,
+        tc_kimlik_no: personel.tc_kimlik_no,
+        ad: personel.ad,
+        soyad: personel.soyad,
+        aktif_durum: personel.aktif_durum,
+        sube_id: personel.sube_id,
+        telefon: personel.telefon,
+        dogum_tarihi: personel.dogum_tarihi,
+        dogum_yeri: personel.dogum_yeri,
+        kan_grubu: personel.kan_grubu,
+        sicil_no: personel.sicil_no,
+        ise_giris_tarihi: personel.ise_giris_tarihi,
+        acil_durum_kisi: personel.acil_durum_kisi,
+        acil_durum_telefon: personel.acil_durum_telefon,
+        departman_id: personel.departman_id,
+        gorev_id: personel.gorev_id,
+        personel_tipi_id: personel.personel_tipi_id,
+        bagli_amir_id: personel.bagli_amir_id
+      },
+      sistem_ozeti: {
+        hizmet_suresi: personel.id === 1 ? "3 yil 2 ay" : "1 yil 8 ay",
+        toplam_izin_hakki: personel.id === 1 ? 14 : 10,
+        kullanilan_izin: personel.id === 1 ? 4 : 2,
+        kalan_izin: personel.id === 1 ? 10 : 8
+      },
+      pasiflik_durumu: {
+        aktif_durum: personel.aktif_durum,
+        etiket: personel.aktif_durum === "PASIF" ? "Isten Ayrildi" : null
+      },
+      referans_adlari: {
+        sube: personel.sube_adi,
+        departman: personel.departman_adi,
+        gorev: personel.gorev_adi,
+        personel_tipi: personel.personel_tipi_adi,
+        bagli_amir: personel.bagli_amir_adi
+      }
+    };
+  }
+
   function buildAylikOzetResponse(searchUrl: URL) {
     const ay = urlValue(searchUrl.searchParams.get("ay")) ?? "2026-04";
     const subeId = numberValue(searchUrl.searchParams.get("sube_id"));
@@ -679,6 +721,90 @@ export async function mockApi(page: Page, role: MockUserRole) {
           errors: []
         })
       );
+      return;
+    }
+
+    if (path.match(/^\/api\/personeller\/\d+$/) && method === "GET") {
+      const personelId = Number.parseInt(path.split("/")[3] ?? "0", 10);
+      const personel = personeller.find((item) => item.id === personelId);
+      if (!personel) {
+        await fulfillJson(route, 404, errorBody("NOT_FOUND", "Personel bulunamadi."));
+        return;
+      }
+
+      await fulfillJson(route, 200, okBody(buildPersonelDetail(personel)));
+      return;
+    }
+
+    if (path === "/api/surecler" && method === "GET") {
+      const personelId = Number.parseInt(url.searchParams.get("personel_id") ?? "", 10);
+      const surecTuru = url.searchParams.get("surec_turu");
+      const state = url.searchParams.get("state");
+      const baslangicTarihi = url.searchParams.get("baslangic_tarihi");
+      const bitisTarihi = url.searchParams.get("bitis_tarihi");
+      const subeId = Number.parseInt(url.searchParams.get("sube_id") ?? "", 10);
+
+      const filtered = surecler.filter((item) => {
+        if (Number.isFinite(personelId) && item.personel_id !== personelId) {
+          return false;
+        }
+        if (surecTuru && item.surec_turu !== surecTuru) {
+          return false;
+        }
+        if (state && item.state !== state) {
+          return false;
+        }
+        if (baslangicTarihi && item.baslangic_tarihi !== baslangicTarihi) {
+          return false;
+        }
+        if (bitisTarihi && item.bitis_tarihi !== bitisTarihi) {
+          return false;
+        }
+        if (Number.isFinite(subeId)) {
+          const linkedPersonel = personellers.find((personel) => personel.id === item.personel_id);
+          if (!linkedPersonel || linkedPersonel.sube_id !== subeId) {
+            return false;
+          }
+        }
+        return true;
+      });
+
+      await fulfillJson(route, 200, okBody({ items: filtered }));
+      return;
+    }
+
+    if (path === "/api/surecler" && method === "POST") {
+      const payload = request.postDataJSON() as {
+        personel_id: number;
+        surec_turu: string;
+        alt_tur?: string;
+        baslangic_tarihi: string;
+        bitis_tarihi?: string;
+        ucretli_mi?: boolean;
+        aciklama?: string;
+      };
+
+      const created = {
+        id: ++surecIdCounter,
+        personel_id: payload.personel_id,
+        surec_turu: payload.surec_turu,
+        alt_tur: payload.alt_tur,
+        baslangic_tarihi: payload.baslangic_tarihi,
+        bitis_tarihi: payload.bitis_tarihi,
+        ucretli_mi: payload.ucretli_mi,
+        aciklama: payload.aciklama,
+        state: "AKTIF"
+      };
+      surecler.unshift(created);
+
+      if (created.surec_turu === "ISTEN_AYRILMA") {
+        const targetPersonel = personellers.find((item) => item.id === created.personel_id);
+        if (targetPersonel) {
+          targetPersonel.aktif_durum = "PASIF";
+        }
+      }
+
+      await fulfillJson(route, 200, okBody(created));
       return;
     }
 

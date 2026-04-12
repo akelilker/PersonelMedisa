@@ -547,6 +547,10 @@
   line-height: 1.35;
 }
 
+.personel-dosya-field-value--danger {
+  color: var(--red);
+}
+
 .personel-detail-card p {
   margin: 0;
 }
@@ -618,6 +622,82 @@
   grid-column: 1 / -1;
 }
 
+.personel-surec-history {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.personel-surec-history-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.personel-surec-history-head h3,
+.personel-surec-history-head p {
+  margin: 0;
+}
+
+.personel-surec-history-head p {
+  color: var(--txt-muted);
+  font-size: 13px;
+}
+
+.personel-surec-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.personel-surec-item {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.personel-surec-item-head,
+.personel-surec-item-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.personel-surec-item-meta {
+  font-size: 13px;
+  color: var(--txt-muted);
+}
+
+.personel-surec-state {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--line-soft);
+  border-radius: 999px;
+  padding: 2px 8px;
+  background: rgba(255, 255, 255, 0.05);
+  font-size: 12px;
+}
+
+.personel-surec-state.is-cancelled {
+  border-color: rgba(255, 84, 84, 0.45);
+  color: var(--red);
+}
+
+.personel-surec-item-note {
+  color: var(--txt);
+}
+
+.personel-surec-form-grid {
+  display: grid;
+  gap: var(--space-2);
+}
+
 .personel-kart-placeholder {
   display: grid;
   gap: var(--space-2);
@@ -668,5 +748,10 @@
 
   .personeller-item {
     grid-template-columns: 1fr;
+  }
+
+  .personel-surec-history-head {
+    flex-direction: column;
+    align-items: stretch;
   }
 }

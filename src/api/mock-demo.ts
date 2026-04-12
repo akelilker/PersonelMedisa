@@ -875,7 +875,7 @@ function buildDemoPersonelDetail(personel: DemoPersonel) {
     },
     pasiflik_durumu: {
       aktif_durum: personel.aktif_durum,
-      etiket: personel.aktif_durum === "PASIF" ? "Pasif" : null
+      etiket: personel.aktif_durum === "PASIF" ? "Isten Ayrildi" : null
     },
     referans_adlari: {
       sube: getSubeLabel(personel.sube_id),
@@ -1139,7 +1139,45 @@ export function resolveDemoApiResponse(
   }
 
   if (pathname === "/surecler" && method === "GET") {
-    return ok({ items: demoState.surecler });
+    const personelId = toNumber(requestUrl.searchParams.get("personel_id"));
+    const surecTuru = toStringValue(requestUrl.searchParams.get("surec_turu"));
+    const state = toStringValue(requestUrl.searchParams.get("state"));
+    const baslangicTarihi = toStringValue(requestUrl.searchParams.get("baslangic_tarihi"));
+    const bitisTarihi = toStringValue(requestUrl.searchParams.get("bitis_tarihi"));
+    const subeId = toNumber(requestUrl.searchParams.get("sube_id"));
+
+    const filtered = demoState.surecler.filter((item) => {
+      if (personelId !== null && item.personel_id !== personelId) {
+        return false;
+      }
+
+      if (surecTuru && item.surec_turu !== surecTuru) {
+        return false;
+      }
+
+      if (state && item.state !== state) {
+        return false;
+      }
+
+      if (baslangicTarihi && item.baslangic_tarihi !== baslangicTarihi) {
+        return false;
+      }
+
+      if (bitisTarihi && item.bitis_tarihi !== bitisTarihi) {
+        return false;
+      }
+
+      if (subeId !== null) {
+        const linkedPersonel = demoState.personeller.find((personel) => personel.id === item.personel_id);
+        if (!linkedPersonel || linkedPersonel.sube_id !== subeId) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+
+    return ok({ items: filtered });
   }
 
   if (pathname === "/surecler" && method === "POST") {
@@ -1155,6 +1193,14 @@ export function resolveDemoApiResponse(
       state: "AKTIF"
     };
     demoState.surecler.unshift(next);
+
+    if (next.surec_turu === "ISTEN_AYRILMA") {
+      const targetPersonel = demoState.personeller.find((personel) => personel.id === next.personel_id);
+      if (targetPersonel) {
+        targetPersonel.aktif_durum = "PASIF";
+      }
+    }
+
     return ok(next);
   }
 
@@ -1578,6 +1624,8 @@ export function resolveDemoApiResponse(
       return ok([
         { key: "IZIN", label: "İzin" },
         { key: "RAPOR", label: "Rapor" },
+        { key: "IS_KAZASI", label: "İş Kazası" },
+        { key: "DEVAMSIZLIK", label: "Devamsızlık" },
         { key: "ISTEN_AYRILMA", label: "İşten Ayrılma" }
       ]);
     }
@@ -1623,6 +1671,8 @@ export function resolveDemoApiResponse(
       return ok([
         { key: "IZIN", label: "İzin" },
         { key: "RAPOR", label: "Rapor" },
+        { key: "IS_KAZASI", label: "Is Kazasi" },
+        { key: "DEVAMSIZLIK", label: "Devamsizlik" },
         { key: "ISTEN_AYRILMA", label: "Isten Ayrilma" }
       ]);
     }

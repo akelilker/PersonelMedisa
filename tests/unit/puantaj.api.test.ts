@@ -60,12 +60,17 @@ describe("puantaj.api", () => {
     expect(result).toEqual({
       personel_id: 7,
       tarih: "2026-04-15",
+      gun_tipi: "Normal_Is_Gunu",
+      hareket_durumu: "Geldi",
+      dayanak: undefined,
+      hesap_etkisi: "Tam_Yevmiye_Ver",
       giris_saati: "08:10",
       cikis_saati: "18:05",
       gercek_mola_dakika: undefined,
       hesaplanan_mola_dakika: 60,
       net_calisma_suresi_dakika: 475,
       gunluk_brut_sure_dakika: undefined,
+      hafta_tatili_hak_kazandi_mi: true,
       state: "HESAPLANDI",
       compliance_uyarilari: [
         {

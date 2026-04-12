@@ -49,3 +49,8 @@
   margin: 0;
   color: var(--txt-muted);
 }
+
+.puantaj-readonly-value {
+  display: flex;
+  align-items: center;
+}

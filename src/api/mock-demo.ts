@@ -59,12 +59,23 @@ type DemoFinansKalem = {
 type DemoPuantaj = {
   personel_id: number;
   tarih: string;
+  gun_tipi?: "Normal_Is_Gunu" | "Hafta_Tatili_Pazar" | "UBGT_Resmi_Tatil";
+  hareket_durumu?: "Geldi" | "Gelmedi" | "Gec_Geldi" | "Erken_Cikti";
+  dayanak?:
+    | "Yok_Izinsiz"
+    | "Ucretli_Izinli"
+    | "Raporlu_Hastalik"
+    | "Raporlu_Is_Kazasi"
+    | "Yillik_Izin"
+    | "Telafi_Calismasi";
+  hesap_etkisi?: "Kesinti_Yap" | "Tam_Yevmiye_Ver" | "Mesai_Yaz";
   giris_saati?: string;
   cikis_saati?: string;
   gercek_mola_dakika?: number;
   hesaplanan_mola_dakika?: number;
   net_calisma_suresi_dakika?: number;
   gunluk_brut_sure_dakika?: number;
+  hafta_tatili_hak_kazandi_mi?: boolean;
   state?: string;
   compliance_uyarilari: Array<{ code: string; message: string; level?: string }>;
 };
@@ -234,7 +245,60 @@ const demoState: {
       state: "AKTIF"
     }
   ],
-  puantajMap: {},
+  puantajMap: {
+    "1|2026-04-09": buildDemoPuantaj({
+      personelId: 1,
+      tarih: "2026-04-09",
+      gunTipi: "Normal_Is_Gunu",
+      hareketDurumu: "Geldi",
+      hesapEtkisi: "Tam_Yevmiye_Ver",
+      girisSaati: "08:30",
+      cikisSaati: "18:00",
+      gercekMolaDakika: 60,
+      hesaplananMolaDakika: 60,
+      netCalismaSuresiDakika: 510,
+      gunlukBrutSureDakika: 570,
+      haftaTatiliHakKazandiMi: true
+    }),
+    "2|2026-04-09": buildDemoPuantaj({
+      personelId: 2,
+      tarih: "2026-04-09",
+      gunTipi: "Normal_Is_Gunu",
+      hareketDurumu: "Gelmedi",
+      dayanak: "Yok_Izinsiz",
+      hesapEtkisi: "Kesinti_Yap",
+      haftaTatiliHakKazandiMi: false,
+      complianceUyarilari: [
+        {
+          code: "DEVAMSIZLIK",
+          message: "Mazeretsiz devamsizlik hafta tatili hakkini bozabilir.",
+          level: "KRITIK"
+        }
+      ]
+    }),
+    "1|2026-04-10": buildDemoPuantaj({
+      personelId: 1,
+      tarih: "2026-04-10",
+      gunTipi: "Normal_Is_Gunu",
+      hareketDurumu: "Gec_Geldi",
+      dayanak: "Ucretli_Izinli",
+      hesapEtkisi: "Tam_Yevmiye_Ver",
+      girisSaati: "09:15",
+      cikisSaati: "18:00",
+      gercekMolaDakika: 60,
+      hesaplananMolaDakika: 60,
+      netCalismaSuresiDakika: 465,
+      gunlukBrutSureDakika: 525,
+      haftaTatiliHakKazandiMi: true,
+      complianceUyarilari: [
+        {
+          code: "MAZERET",
+          message: "Gec giris ucretli mazeret kapsaminda degerlendirildi.",
+          level: "BILGI"
+        }
+      ]
+    })
+  },
   makineler: [
     {
       id: 1101,
@@ -491,19 +555,116 @@ function resolveDemoRole(username: string) {
   return "GENEL_YONETICI";
 }
 
-function defaultPuantaj(personelId: number, tarih: string): DemoPuantaj {
+type DemoPuantajBuildParams = {
+  personelId: number;
+  tarih: string;
+  gunTipi: NonNullable<DemoPuantaj["gun_tipi"]>;
+  hareketDurumu: NonNullable<DemoPuantaj["hareket_durumu"]>;
+  dayanak?: DemoPuantaj["dayanak"];
+  hesapEtkisi?: DemoPuantaj["hesap_etkisi"];
+  girisSaati?: string;
+  cikisSaati?: string;
+  gercekMolaDakika?: number;
+  hesaplananMolaDakika?: number;
+  netCalismaSuresiDakika?: number;
+  gunlukBrutSureDakika?: number;
+  haftaTatiliHakKazandiMi?: boolean;
+  state?: string;
+  complianceUyarilari?: DemoPuantaj["compliance_uyarilari"];
+};
+
+const DEMO_PUANTAJ_GUN_TIPI_MAP: Record<string, NonNullable<DemoPuantaj["gun_tipi"]>> = {
+  NORMAL_IS_GUNU: "Normal_Is_Gunu",
+  HAFTA_TATILI_PAZAR: "Hafta_Tatili_Pazar",
+  UBGT_RESMI_TATIL: "UBGT_Resmi_Tatil"
+};
+
+const DEMO_PUANTAJ_HAREKET_DURUMU_MAP: Record<string, NonNullable<DemoPuantaj["hareket_durumu"]>> = {
+  GELDI: "Geldi",
+  GELMEDI: "Gelmedi",
+  GEC_GELDI: "Gec_Geldi",
+  ERKEN_CIKTI: "Erken_Cikti"
+};
+
+const DEMO_PUANTAJ_DAYANAK_MAP: Record<string, NonNullable<DemoPuantaj["dayanak"]>> = {
+  YOK_IZINSIZ: "Yok_Izinsiz",
+  UCRETLI_IZINLI: "Ucretli_Izinli",
+  RAPORLU_HASTALIK: "Raporlu_Hastalik",
+  RAPORLU_IS_KAZASI: "Raporlu_Is_Kazasi",
+  YILLIK_IZIN: "Yillik_Izin",
+  TELAFI_CALISMASI: "Telafi_Calismasi"
+};
+
+const DEMO_PUANTAJ_HESAP_ETKISI_MAP: Record<string, NonNullable<DemoPuantaj["hesap_etkisi"]>> = {
+  KESINTI_YAP: "Kesinti_Yap",
+  TAM_YEVMIYE_VER: "Tam_Yevmiye_Ver",
+  MESAI_YAZ: "Mesai_Yaz"
+};
+
+function normalizeDemoLiteralToken(value: unknown) {
+  const stringValue = toStringValue(value);
+  if (!stringValue) {
+    return undefined;
+  }
+
+  return stringValue.replace(/[\s-]+/g, "_").toUpperCase();
+}
+
+function readDemoPuantajGunTipi(value: unknown): DemoPuantaj["gun_tipi"] | undefined {
+  const token = normalizeDemoLiteralToken(value);
+  return token ? DEMO_PUANTAJ_GUN_TIPI_MAP[token] : undefined;
+}
+
+function readDemoPuantajHareketDurumu(value: unknown): DemoPuantaj["hareket_durumu"] | undefined {
+  const token = normalizeDemoLiteralToken(value);
+  return token ? DEMO_PUANTAJ_HAREKET_DURUMU_MAP[token] : undefined;
+}
+
+function readDemoPuantajDayanak(value: unknown): DemoPuantaj["dayanak"] | undefined {
+  const token = normalizeDemoLiteralToken(value);
+  return token ? DEMO_PUANTAJ_DAYANAK_MAP[token] : undefined;
+}
+
+function readDemoPuantajHesapEtkisi(value: unknown): DemoPuantaj["hesap_etkisi"] | undefined {
+  const token = normalizeDemoLiteralToken(value);
+  return token ? DEMO_PUANTAJ_HESAP_ETKISI_MAP[token] : undefined;
+}
+
+function buildDemoPuantaj(params: DemoPuantajBuildParams): DemoPuantaj {
   return {
-    personel_id: personelId,
-    tarih,
-    giris_saati: "08:30",
-    cikis_saati: "18:00",
-    gercek_mola_dakika: 60,
-    hesaplanan_mola_dakika: 60,
-    net_calisma_suresi_dakika: 510,
-    gunluk_brut_sure_dakika: 570,
-    state: "HESAPLANDI",
-    compliance_uyarilari: []
+    personel_id: params.personelId,
+    tarih: params.tarih,
+    gun_tipi: params.gunTipi,
+    hareket_durumu: params.hareketDurumu,
+    dayanak: params.dayanak,
+    hesap_etkisi: params.hesapEtkisi,
+    giris_saati: params.girisSaati,
+    cikis_saati: params.cikisSaati,
+    gercek_mola_dakika: params.gercekMolaDakika,
+    hesaplanan_mola_dakika: params.hesaplananMolaDakika,
+    net_calisma_suresi_dakika: params.netCalismaSuresiDakika,
+    gunluk_brut_sure_dakika: params.gunlukBrutSureDakika,
+    hafta_tatili_hak_kazandi_mi: params.haftaTatiliHakKazandiMi,
+    state: params.state ?? "HESAPLANDI",
+    compliance_uyarilari: params.complianceUyarilari ?? []
   };
+}
+
+function defaultPuantaj(personelId: number, tarih: string): DemoPuantaj {
+  return buildDemoPuantaj({
+    personelId,
+    tarih,
+    gunTipi: "Normal_Is_Gunu",
+    hareketDurumu: "Geldi",
+    hesapEtkisi: "Tam_Yevmiye_Ver",
+    girisSaati: "08:30",
+    cikisSaati: "18:00",
+    gercekMolaDakika: 60,
+    hesaplananMolaDakika: 60,
+    netCalismaSuresiDakika: 510,
+    gunlukBrutSureDakika: 570,
+    haftaTatiliHakKazandiMi: true
+  });
 }
 
 function getLabel(map: Record<number, string>, id: number | undefined) {
@@ -1127,6 +1288,10 @@ export function resolveDemoApiResponse(
     if (method === "PUT") {
       const updated: DemoPuantaj = {
         ...existing,
+        gun_tipi: readDemoPuantajGunTipi(body.gun_tipi) ?? existing.gun_tipi,
+        hareket_durumu: readDemoPuantajHareketDurumu(body.hareket_durumu) ?? existing.hareket_durumu,
+        dayanak: readDemoPuantajDayanak(body.dayanak) ?? existing.dayanak,
+        hesap_etkisi: readDemoPuantajHesapEtkisi(body.hesap_etkisi) ?? existing.hesap_etkisi,
         giris_saati: toStringValue(body.giris_saati) ?? existing.giris_saati,
         cikis_saati: toStringValue(body.cikis_saati) ?? existing.cikis_saati,
         gercek_mola_dakika: toNumber(body.gercek_mola_dakika) ?? existing.gercek_mola_dakika

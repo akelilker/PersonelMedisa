@@ -473,6 +473,80 @@
   border-radius: var(--radius-md);
 }
 
+.personel-dosya-hero {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-2);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.personel-dosya-hero-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.personel-dosya-hero-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.personel-dosya-kicker {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--txt-muted);
+}
+
+.personel-dosya-hero-copy h3 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.personel-dosya-sub {
+  margin: 0;
+  color: var(--txt-muted);
+  font-size: 13px;
+}
+
+.personel-dosya-action-host {
+  position: relative;
+}
+
+.personel-dosya-action-menu {
+  min-width: 220px;
+}
+
+.personel-dosya-hero-grid {
+  display: grid;
+  gap: var(--space-2);
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+}
+
+.personel-dosya-field {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.personel-dosya-field-label {
+  font-size: 12px;
+  color: var(--txt-muted);
+}
+
+.personel-dosya-field-value {
+  font-size: 14px;
+  line-height: 1.35;
+}
+
 .personel-detail-card p {
   margin: 0;
 }
@@ -553,6 +627,11 @@
   font-size: 14px;
 }
 
+.personel-kart-placeholder h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
 .personel-kart-placeholder p {
   margin: 0;
 }
@@ -574,6 +653,19 @@
 }
 
 @media (max-width: 720px) {
+  .personel-dosya-hero-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .personel-dosya-action-host {
+    width: 100%;
+  }
+
+  .personel-dosya-action-host .universal-btn-aux {
+    width: 100%;
+  }
+
   .personeller-item {
     grid-template-columns: 1fr;
   }

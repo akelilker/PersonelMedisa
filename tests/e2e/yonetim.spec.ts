@@ -62,7 +62,7 @@ test.describe("yonetim paneli ve aylik ozet", () => {
 
     await page.getByTestId("menu-raporlar").click();
     await expect(page).toHaveURL(/\/raporlar$/);
-    await page.getByRole("link", { name: "Aylık Kapanış Özeti" }).click();
+    await page.getByTestId("link-aylik-ozet").click();
 
     await expect(page).toHaveURL(/\/aylik-kapanis-ozeti$/);
     await expect(page.locator(".modal-header h2").first()).toContainText("Aylık Kapanış Özeti");

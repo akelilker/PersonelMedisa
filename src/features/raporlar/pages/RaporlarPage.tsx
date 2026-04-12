@@ -23,13 +23,13 @@ type RaporFormState = {
 };
 
 const RAPOR_OPTIONS: Array<{ value: RaporTipi; label: string }> = [
-  { value: "personel-ozet", label: "Personel Ã–zeti" },
-  { value: "izin", label: "Ä°zin" },
-  { value: "devamsizlik", label: "DevamsÄ±zlÄ±k" },
-  { value: "tesvik", label: "TeÅŸvik" },
+  { value: "personel-ozet", label: "Personel Özeti" },
+  { value: "izin", label: "İzin" },
+  { value: "devamsizlik", label: "Devamsızlık" },
+  { value: "tesvik", label: "Teşvik" },
   { value: "ceza", label: "Ceza" },
   { value: "ekstra-prim", label: "Ekstra Prim" },
-  { value: "is-kazasi", label: "Ä°ÅŸ KazasÄ±" },
+  { value: "is-kazasi", label: "İş Kazası" },
   { value: "bildirim", label: "Bildirim" }
 ];
 
@@ -41,7 +41,7 @@ function parseOptionalPositiveInt(value: string): number | undefined {
 
   const parsed = Number.parseInt(trimmed, 10);
   if (Number.isNaN(parsed) || parsed <= 0) {
-    throw new Error("Personel ve departman alanlarÄ± pozitif sayÄ± olmalÄ±dÄ±r.");
+    throw new Error("Personel ve departman alanları pozitif sayı olmalıdır.");
   }
 
   return parsed;
@@ -98,10 +98,10 @@ function collectEngineColumns(rows: ReportEngineRow[]): string[] {
 }
 
 const ENGINE_OPTIONS: Array<{ value: ReportEngineType; label: string }> = [
-  { value: "personel-ozet", label: "Personel Ã¶zeti (Ã¶nbellek)" },
-  { value: "izin-durumu", label: "Ä°zin durumu (Ã¶nbellek)" },
-  { value: "puantaj", label: "Puantaj (Ã¶nbellek)" },
-  { value: "finans", label: "Finans (Ã¶nbellek, 1. sayfa)" }
+  { value: "personel-ozet", label: "Personel özeti (önbellek)" },
+  { value: "izin-durumu", label: "İzin durumu (önbellek)" },
+  { value: "puantaj", label: "Puantaj (önbellek)" },
+  { value: "finans", label: "Finans (önbellek, 1. sayfa)" }
 ];
 
 export function RaporlarPage() {
@@ -161,7 +161,7 @@ export function RaporlarPage() {
 
     try {
       if (form.baslangicTarihi && form.bitisTarihi && form.baslangicTarihi > form.bitisTarihi) {
-        throw new Error("BaÅŸlangÄ±Ã§ tarihi bitiÅŸ tarihinden bÃ¼yÃ¼k olamaz.");
+        throw new Error("Başlangıç tarihi bitiş tarihinden büyük olamaz.");
       }
 
       const filters: RaporFiltreleri = {
@@ -177,7 +177,7 @@ export function RaporlarPage() {
       setTotal(result.total);
       setHasSearched(true);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Rapor verisi alÄ±namadÄ±.");
+      setErrorMessage(error instanceof Error ? error.message : "Rapor verisi alınamadı.");
       setRows([]);
       setTotal(null);
     } finally {
@@ -204,14 +204,18 @@ export function RaporlarPage() {
     <section className="raporlar-page">
       <div className="raporlar-header-row">
         <h2>Raporlar</h2>
-        {canViewAylikOzet ? <Link to="/aylik-kapanis-ozeti">AylÄ±k KapanÄ±ÅŸ Ã–zeti</Link> : null}
+        {canViewAylikOzet ? (
+          <Link to="/aylik-kapanis-ozeti" data-testid="link-aylik-ozet">
+            Aylık Kapanış Özeti
+          </Link>
+        ) : null}
       </div>
 
       <div className="raporlar-source-card">
-        <p className="raporlar-source-title">Resmi rapor kaynaÄŸÄ± backend&apos;dir.</p>
+        <p className="raporlar-source-title">Resmi rapor kaynağı backend&apos;dir.</p>
         <p className="raporlar-source-hint">
-          Bu form `/api/raporlar/*` endpoint&apos;lerinden veri Ã§eker. AÅŸaÄŸÄ±daki Ã¶nbellek aracÄ± yalnÄ±zca yardÄ±mcÄ±
-          inceleme ve demo/offline kullanÄ±m iÃ§indir.
+          Bu form `/api/raporlar/*` endpoint&apos;lerinden veri çeker. Aşağıdaki önbellek aracı yalnızca yardımcı
+          inceleme ve demo/offline kullanım içindir.
         </p>
       </div>
 
@@ -219,7 +223,7 @@ export function RaporlarPage() {
         <div className="form-field-grid">
           <FormField
             as="select"
-            label="Rapor TÃ¼rÃ¼"
+            label="Rapor Türü"
             name="rapor-turu"
             value={form.raporTipi}
             onChange={(value) => setForm((prev) => ({ ...prev, raporTipi: value as RaporTipi }))}
@@ -242,14 +246,14 @@ export function RaporlarPage() {
             onChange={(value) => setForm((prev) => ({ ...prev, departmanId: value }))}
           />
           <FormField
-            label="BaÅŸlangÄ±Ã§ Tarihi"
+            label="Başlangıç Tarihi"
             name="rapor-bas"
             type="date"
             value={form.baslangicTarihi}
             onChange={(value) => setForm((prev) => ({ ...prev, baslangicTarihi: value }))}
           />
           <FormField
-            label="BitiÅŸ Tarihi"
+            label="Bitiş Tarihi"
             name="rapor-bitis"
             type="date"
             value={form.bitisTarihi}
@@ -262,7 +266,7 @@ export function RaporlarPage() {
             value={form.aktiflik}
             onChange={(value) => setForm((prev) => ({ ...prev, aktiflik: value as RaporAktiflik }))}
             selectOptions={[
-              { value: "tum", label: "TÃ¼m" },
+              { value: "tum", label: "Tüm" },
               { value: "aktif", label: "Aktif" },
               { value: "pasif", label: "Pasif" }
             ]}
@@ -270,27 +274,33 @@ export function RaporlarPage() {
         </div>
 
         <div className="form-actions-row">
-          <button type="submit" className="universal-btn-aux" disabled={isLoading}>
-            Raporu Ã‡alÄ±ÅŸtÄ±r
+          <button type="submit" className="universal-btn-aux" disabled={isLoading} data-testid="raporlar-submit-run">
+            Raporu Çalıştır
           </button>
-          <button type="button" className="universal-btn-aux" onClick={handleClear} disabled={isLoading}>
+          <button
+            type="button"
+            className="universal-btn-aux"
+            onClick={handleClear}
+            disabled={isLoading}
+            data-testid="raporlar-clear-filters"
+          >
             Temizle
           </button>
         </div>
       </form>
 
-      {isLoading ? <LoadingState label="Rapor verileri yÃ¼kleniyor..." /> : null}
+      {isLoading ? <LoadingState label="Rapor verileri yükleniyor..." /> : null}
 
       {!isLoading && errorMessage ? <ErrorState message={errorMessage} /> : null}
 
       {!isLoading && !errorMessage && hasSearched && rows.length === 0 ? (
-        <EmptyState title="Rapor verisi yok" message="Bu filtrede gÃ¶sterilecek kayÄ±t bulunamadÄ±." />
+        <EmptyState title="Rapor verisi yok" message="Bu filtrede gösterilecek kayıt bulunamadı." />
       ) : null}
 
       {!isLoading && !errorMessage && rows.length > 0 ? (
         <div className="raporlar-result-card">
           <p>
-            <strong>Toplam KayÄ±t:</strong> {total ?? rows.length}
+            <strong>Toplam Kayıt:</strong> {total ?? rows.length}
           </p>
           <div className="raporlar-table-wrap">
             <table className="raporlar-table">
@@ -316,21 +326,21 @@ export function RaporlarPage() {
       ) : null}
 
       <div className="raporlar-engine-card">
-        <h3 className="raporlar-engine-title">YardÄ±mcÄ± Ã¶nbellek aracÄ±</h3>
+        <h3 className="raporlar-engine-title">Yardımcı önbellek aracı</h3>
         <p className="raporlar-engine-hint">
-          Bu bÃ¶lÃ¼m aÄŸ Ã§aÄŸrÄ±sÄ± yapmaz; yalnÄ±zca bu cihazdaki Ã¶nbelleÄŸi okur. Resmi rapor yerine geÃ§mez.
+          Bu bölüm ağ çağrısı yapmaz; yalnızca bu cihazdaki önbelleği okur. Resmi rapor yerine geçmez.
         </p>
         <div className="form-field-grid">
           <FormField
             as="select"
-            label="Motor tÃ¼rÃ¼"
+            label="Motor türü"
             name="engine-turu"
             value={engineType}
             onChange={(value) => setEngineType(value as ReportEngineType)}
             selectOptions={ENGINE_OPTIONS}
           />
           <FormField
-            label="Personel ID (boÅŸ = tÃ¼mÃ¼)"
+            label="Personel ID (boş = tümü)"
             name="engine-personel"
             type="number"
             min={1}
@@ -338,21 +348,21 @@ export function RaporlarPage() {
             onChange={(value) => setEnginePersonelId(value)}
           />
           <FormField
-            label="Durum (boÅŸ = tÃ¼mÃ¼)"
+            label="Durum (boş = tümü)"
             name="engine-durum"
             value={engineDurum}
             onChange={(value) => setEngineDurum(value)}
-            placeholder="Ã–rn: AKTÄ°F, TAMAMLANDI"
+            placeholder="Örn: AKTİF, TAMAMLANDI"
           />
           <FormField
-            label="Tarih baÅŸlangÄ±Ã§ (yyyy-mm-dd)"
+            label="Tarih başlangıç (yyyy-mm-dd)"
             name="engine-bas"
             type="date"
             value={engineBas}
             onChange={(value) => setEngineBas(value)}
           />
           <FormField
-            label="Tarih bitiÅŸ (yyyy-mm-dd)"
+            label="Tarih bitiş (yyyy-mm-dd)"
             name="engine-bit"
             type="date"
             value={engineBit}
@@ -364,6 +374,7 @@ export function RaporlarPage() {
             type="button"
             className="universal-btn-aux"
             disabled={engineRows.length === 0}
+            data-testid="raporlar-engine-csv"
             onClick={() => {
               downloadReportCsv(`rapor-${engineType}.csv`, engineColumns, engineRows);
             }}
@@ -374,15 +385,18 @@ export function RaporlarPage() {
             type="button"
             className="universal-btn-aux"
             disabled={engineRows.length === 0}
+            data-testid="raporlar-engine-print"
             onClick={() => {
               printCurrentReportWindow(`Rapor: ${engineType}`, engineColumns, engineRows);
             }}
           >
-            YazdÄ±r / PDF
+            Yazdır / PDF
           </button>
         </div>
         {engineRows.length === 0 ? (
-          <p className="raporlar-engine-empty">Bu tÃ¼r iÃ§in Ã¶nbellekte satÄ±r yok; ilgili modÃ¼lÃ¼ en az bir kez aÃ§Ä±n.</p>
+          <p className="raporlar-engine-empty">
+            Bu tür için önbellekte satır yok; ilgili modülü en az bir kez açın.
+          </p>
         ) : (
           <div className="raporlar-table-wrap raporlar-engine-table">
             <table className="raporlar-table">
@@ -408,8 +422,12 @@ export function RaporlarPage() {
       </div>
 
       <div className="module-links">
-        <Link to="/finans">Finans modÃ¼lÃ¼ne git</Link>
-        <Link to="/">Ana ekrana dÃ¶n</Link>
+        <Link to="/finans" data-testid="link-raporlar-finans">
+          Finans modülüne git
+        </Link>
+        <Link to="/" data-testid="link-raporlar-home">
+          Ana ekrana dön
+        </Link>
       </div>
     </section>
   );

@@ -1,5 +1,6 @@
 root = true
 
+# Kaynak dosyalar UTF-8 olmalı; Türkçe arayüz metinlerinde mojibake oluşmasını önler.
 [*]
 charset = utf-8
 end_of_line = lf

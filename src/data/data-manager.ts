@@ -33,6 +33,7 @@ import type { Bildirim } from "../types/bildirim";
 import type { FinansKalem } from "../types/finans";
 import type { Personel } from "../types/personel";
 import type { Surec } from "../types/surec";
+import type { Zimmet } from "../types/zimmet";
 import type { GunlukPuantaj } from "../types/puantaj";
 import type { RealtimeEnvelope, RealtimeEventType } from "../realtime/realtime-manager";
 import { markReportCacheStale } from "../reports/report-cache-meta";
@@ -271,6 +272,8 @@ export const dataCacheKeys = {
   ) => `surecler:list:s${subeSeg(subeId)}:${personelId}|${surecTuru}|${state}|${bas}|${bit}|${page}`,
   surecDetail: (subeId: number | null, id: number) => `surecler:detail:s${subeSeg(subeId)}:${id}`,
   surecTuruRef: () => `referans:surec-turu`,
+  zimmetlerList: (subeId: number | null, personelId: string, page: number) =>
+    `zimmetler:list:s${subeSeg(subeId)}:${personelId}|${page}`,
   bildirimlerList: (subeId: number | null, personelId: string, tur: string, tarih: string, page: number) =>
     `bildirimler:list:s${subeSeg(subeId)}:${personelId}|${tur}|${tarih}|${page}`,
   bildirimlerHeader: (subeId: number | null) => `bildirimler:header:8:s${subeSeg(subeId)}`,
@@ -348,6 +351,9 @@ function resolveFallbackForKey(key: string): unknown {
   }
   if (key.startsWith("surecler:list:")) {
     return emptyPaginated();
+  }
+  if (key.startsWith("zimmetler:list:")) {
+    return emptyPaginated<Zimmet>();
   }
   if (key.startsWith("bildirimler:list:") || key.startsWith("bildirimler:header:")) {
     return emptyPaginated();

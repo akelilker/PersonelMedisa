@@ -10,6 +10,7 @@ import {
 } from "../api/personeller.api";
 import { fetchBagliAmirOptions, fetchDepartmanOptions, fetchGorevOptions, fetchPersonelTipiOptions, fetchSurecTuruOptions } from "../api/referans.api";
 import { createSurec, fetchSureclerList } from "../api/surecler.api";
+import { createZimmet, fetchZimmetlerList } from "../api/zimmetler.api";
 import { emptyPaginated, makeTempId, type PersonelReferenceBundle } from "../data/app-data.types";
 import {
   dataCacheKeys,
@@ -40,8 +41,10 @@ import { useAuth } from "../state/auth.store";
 import type { Personel } from "../types/personel";
 import type { KeyOption } from "../types/referans";
 import type { Surec } from "../types/surec";
+import type { CreateZimmetPayload, Zimmet } from "../types/zimmet";
 const PAGE_SIZE = 10;
 const PERSONEL_DETAIL_SUREC_PAGE_SIZE = 20;
+const PERSONEL_DETAIL_ZIMMET_PAGE_SIZE = 20;
 
 export type PersonelListQueryState = {
   draft: {
@@ -423,11 +426,27 @@ type PersonelSurecFormState = {
   aciklama: string;
 };
 
+type PersonelZimmetFormState = {
+  urunTuru: string;
+  teslimTarihi: string;
+  teslimEden: string;
+  aciklama: string;
+  teslimDurumu: string;
+};
+
 const INITIAL_PERSONEL_SUREC_FORM: PersonelSurecFormState = {
   surecTuru: "",
   baslangicTarihi: "",
   bitisTarihi: "",
   aciklama: ""
+};
+
+const INITIAL_PERSONEL_ZIMMET_FORM: PersonelZimmetFormState = {
+  urunTuru: "",
+  teslimTarihi: "",
+  teslimEden: "",
+  aciklama: "",
+  teslimDurumu: "YENI"
 };
 
 function normalizeSurecDateValue(value: string | undefined) {
@@ -525,12 +544,87 @@ function applyTerminationToPersonel(personel: Personel): Personel {
   };
 }
 
+function normalizeZimmetDateValue(value: string | undefined) {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  const parsed = Date.parse(`${trimmed}T00:00:00`);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function sortZimmetHistory(items: Zimmet[]) {
+  return [...items].sort((left, right) => {
+    const rightDate = normalizeZimmetDateValue(right.teslim_tarihi);
+    const leftDate = normalizeZimmetDateValue(left.teslim_tarihi);
+
+    if (rightDate !== null && leftDate !== null && rightDate !== leftDate) {
+      return rightDate - leftDate;
+    }
+
+    if (rightDate !== null) {
+      return -1;
+    }
+
+    if (leftDate !== null) {
+      return 1;
+    }
+
+    return right.id - left.id;
+  });
+}
+
+function mergeZimmetHistoryRow(items: Zimmet[], next: Zimmet) {
+  return sortZimmetHistory([next, ...items.filter((item) => item.id !== next.id)]);
+}
+
+function buildPersonelZimmetPayload(
+  personelId: number,
+  form: PersonelZimmetFormState
+): CreateZimmetPayload {
+  const urunTuru = form.urunTuru.trim();
+  const teslimTarihi = form.teslimTarihi.trim();
+  const teslimEden = form.teslimEden.trim();
+  const teslimDurumu = form.teslimDurumu.trim();
+
+  if (!urunTuru) {
+    throw new Error("Urun turu zorunludur.");
+  }
+
+  if (!teslimTarihi) {
+    throw new Error("Teslim tarihi zorunludur.");
+  }
+
+  if (!teslimEden) {
+    throw new Error("Teslim eden bilgisi zorunludur.");
+  }
+
+  if (!teslimDurumu) {
+    throw new Error("Teslim durumu zorunludur.");
+  }
+
+  return {
+    personel_id: personelId,
+    urun_turu: urunTuru,
+    teslim_tarihi: teslimTarihi,
+    teslim_eden: teslimEden,
+    aciklama: form.aciklama.trim() || undefined,
+    teslim_durumu: teslimDurumu
+  };
+}
+
 export function usePersonelDetail(
   parsedPersonelId: number,
   hasValidId: boolean,
   options: {
     canViewSurecler?: boolean;
     canCreateSurec?: boolean;
+    canCreateZimmet?: boolean;
   } = {}
 ) {
   const navigate = useNavigate();
@@ -539,6 +633,7 @@ export function usePersonelDetail(
   const revision = useAppDataRevision();
   const canAccessSurecler = Boolean(options.canViewSurecler || options.canCreateSurec);
   const canCreateSurec = Boolean(options.canCreateSurec);
+  const canCreateZimmet = Boolean(options.canCreateZimmet);
   const detailKey = useMemo(
     () => dataCacheKeys.personelDetail(activeSubeId, parsedPersonelId),
     [activeSubeId, parsedPersonelId]
@@ -548,6 +643,10 @@ export function usePersonelDetail(
     [activeSubeId, parsedPersonelId]
   );
   const surecTuruRefKey = dataCacheKeys.surecTuruRef();
+  const zimmetHistoryKey = useMemo(
+    () => dataCacheKeys.zimmetlerList(activeSubeId, String(parsedPersonelId), 1),
+    [activeSubeId, parsedPersonelId]
+  );
   const cached = useMemo(() => getCacheEntry<Personel>(detailKey), [detailKey, revision]);
   const surecHistorySnapshot = useMemo(
     () => getCacheEntry<PaginatedResult<Surec>>(surecHistoryKey),
@@ -556,6 +655,10 @@ export function usePersonelDetail(
   const surecTuruOptions = useMemo(
     () => getCacheEntry<KeyOption[]>(surecTuruRefKey) ?? [],
     [revision, surecTuruRefKey]
+  );
+  const zimmetHistorySnapshot = useMemo(
+    () => getCacheEntry<PaginatedResult<Zimmet>>(zimmetHistoryKey),
+    [revision, zimmetHistoryKey]
   );
 
   const [personel, setPersonel] = useState<Personel | null>(null);
@@ -577,6 +680,12 @@ export function usePersonelDetail(
   const [surecReferenceErrorMessage, setSurecReferenceErrorMessage] = useState<string | null>(null);
   const [isSurecHistoryLoading, setIsSurecHistoryLoading] = useState(false);
   const [surecForm, setSurecForm] = useState<PersonelSurecFormState>(INITIAL_PERSONEL_SUREC_FORM);
+  const [isZimmetModalOpen, setIsZimmetModalOpen] = useState(false);
+  const [isZimmetSubmitting, setIsZimmetSubmitting] = useState(false);
+  const [zimmetCreateErrorMessage, setZimmetCreateErrorMessage] = useState<string | null>(null);
+  const [zimmetHistoryErrorMessage, setZimmetHistoryErrorMessage] = useState<string | null>(null);
+  const [isZimmetHistoryLoading, setIsZimmetHistoryLoading] = useState(false);
+  const [zimmetForm, setZimmetForm] = useState<PersonelZimmetFormState>(INITIAL_PERSONEL_ZIMMET_FORM);
 
   useEffect(() => {
     if (cached) {
@@ -642,6 +751,10 @@ export function usePersonelDetail(
     setSurecHistoryErrorMessage(null);
     setSurecReferenceErrorMessage(null);
     setSurecForm(INITIAL_PERSONEL_SUREC_FORM);
+    setIsZimmetModalOpen(false);
+    setZimmetCreateErrorMessage(null);
+    setZimmetHistoryErrorMessage(null);
+    setZimmetForm(INITIAL_PERSONEL_ZIMMET_FORM);
   }, [parsedPersonelId]);
 
   useEffect(() => {
@@ -710,6 +823,46 @@ export function usePersonelDetail(
     };
   }, [canCreateSurec, surecTuruRefKey]);
 
+  useEffect(() => {
+    if (!hasValidId) {
+      setIsZimmetHistoryLoading(false);
+      setZimmetHistoryErrorMessage(null);
+      return;
+    }
+
+    let cancelled = false;
+    const hasSeed = getCacheEntry<PaginatedResult<Zimmet>>(zimmetHistoryKey) !== undefined;
+    setIsZimmetHistoryLoading(!hasSeed);
+    setZimmetHistoryErrorMessage(null);
+
+    void (async () => {
+      try {
+        await fetchWithCacheMerge(zimmetHistoryKey, () =>
+          runDeduped(zimmetHistoryKey, () =>
+            fetchZimmetlerList({
+              personel_id: parsedPersonelId,
+              sube_id: getSubeIdForApiRequest(),
+              page: 1,
+              limit: PERSONEL_DETAIL_ZIMMET_PAGE_SIZE
+            })
+          )
+        );
+      } catch {
+        if (!getCacheEntry<PaginatedResult<Zimmet>>(zimmetHistoryKey)) {
+          setZimmetHistoryErrorMessage("Zimmet kayitlari su an guncellenemiyor.");
+        }
+      } finally {
+        if (!cancelled) {
+          setIsZimmetHistoryLoading(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [hasValidId, parsedPersonelId, zimmetHistoryKey]);
+
   const surecHistory = useMemo(() => {
     if (!canAccessSurecler) {
       return [];
@@ -717,6 +870,11 @@ export function usePersonelDetail(
 
     return sortSurecHistory(surecHistorySnapshot?.items ?? []);
   }, [canAccessSurecler, surecHistorySnapshot]);
+
+  const zimmetHistory = useMemo(
+    () => sortZimmetHistory(zimmetHistorySnapshot?.items ?? []),
+    [zimmetHistorySnapshot]
+  );
 
   const openSurecModal = useCallback(() => {
     if (!canCreateSurec) {
@@ -731,6 +889,21 @@ export function usePersonelDetail(
 
   const closeSurecModal = useCallback(() => {
     setIsSurecModalOpen(false);
+  }, []);
+
+  const openZimmetModal = useCallback(() => {
+    if (!canCreateZimmet) {
+      setZimmetCreateErrorMessage("Bu islem icin yetkin bulunmuyor.");
+      return;
+    }
+
+    setZimmetCreateErrorMessage(null);
+    setZimmetForm(INITIAL_PERSONEL_ZIMMET_FORM);
+    setIsZimmetModalOpen(true);
+  }, [canCreateZimmet]);
+
+  const closeZimmetModal = useCallback(() => {
+    setIsZimmetModalOpen(false);
   }, []);
 
   const discardEdit = useCallback(() => {
@@ -893,6 +1066,42 @@ export function usePersonelDetail(
     [canCreateSurec, detailKey, isSurecSubmitting, personel, surecForm, surecHistoryKey]
   );
 
+  const createZimmetHandler = useCallback(
+    async (event: FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      if (!personel || isZimmetSubmitting) {
+        return;
+      }
+
+      if (!canCreateZimmet) {
+        setZimmetCreateErrorMessage("Bu islem icin yetkin bulunmuyor.");
+        return;
+      }
+
+      setZimmetCreateErrorMessage(null);
+      setIsZimmetSubmitting(true);
+
+      try {
+        const payload = buildPersonelZimmetPayload(personel.id, zimmetForm);
+        const created = await createZimmet(payload);
+        mergeCacheEntry<PaginatedResult<Zimmet>>(zimmetHistoryKey, (prev) => {
+          const base = prev ?? emptyPaginated<Zimmet>();
+          return {
+            ...base,
+            items: mergeZimmetHistoryRow(base.items, created)
+          };
+        });
+        setIsZimmetModalOpen(false);
+        setZimmetForm(INITIAL_PERSONEL_ZIMMET_FORM);
+      } catch (error) {
+        setZimmetCreateErrorMessage(getApiErrorMessage(error, "Zimmet kaydi yapilamadi."));
+      } finally {
+        setIsZimmetSubmitting(false);
+      }
+    },
+    [canCreateZimmet, isZimmetSubmitting, personel, zimmetForm, zimmetHistoryKey]
+  );
+
   return {
     personel,
     isLoading,
@@ -918,6 +1127,17 @@ export function usePersonelDetail(
     isSurecHistoryLoading,
     surecHistoryErrorMessage,
     surecTuruOptions,
-    surecReferenceErrorMessage
+    surecReferenceErrorMessage,
+    isZimmetModalOpen,
+    openZimmetModal,
+    closeZimmetModal,
+    zimmetForm,
+    setZimmetForm,
+    createZimmetHandler,
+    isZimmetSubmitting,
+    zimmetCreateErrorMessage,
+    zimmetHistory,
+    isZimmetHistoryLoading,
+    zimmetHistoryErrorMessage
   };
 }

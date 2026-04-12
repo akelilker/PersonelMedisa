@@ -50,7 +50,7 @@ export function MainMenu({ onKayitOpen }: MainMenuProps) {
             navigate("/bildirimler", { state: { openCreateModal: true } });
           }}
         >
-          <div className="ttl">Günlük Durum Bildir</div>
+          <div className="ttl">Gunluk Kayit</div>
         </button>
       ) : null}
 

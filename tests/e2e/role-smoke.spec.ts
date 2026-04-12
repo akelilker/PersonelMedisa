@@ -68,7 +68,7 @@ test.describe("Rol bazli smoke", () => {
     await expect(page.locator(".modal-header h2").first()).toContainText("Finans");
   });
 
-  test("Birim amiri 3 ana buton gorur, bildirim akisini kullanir ama finans ve haftalik kapanisa erisemez", async ({
+  test("Birim amiri 3 ana buton gorur, gunluk kayit akisini kullanir ama finans ve haftalik kapanisa erisemez", async ({
     page
   }) => {
     await mockApi(page, "BIRIM_AMIRI");
@@ -81,9 +81,9 @@ test.describe("Rol bazli smoke", () => {
     await expect(page.getByTestId("menu-kayit-surec")).toHaveCount(0);
 
     await page.goto("/bildirimler");
-    await expect(page.locator(".modal-header h2").first()).toContainText("Bildirimler");
+    await expect(page.locator(".modal-header h2").first()).toContainText("Gunluk Kayit Merkezi");
     await expect(
-      page.locator(".bildirimler-header-row").getByRole("button", { name: /Günlük Durum Bildir|Yeni Bildirim/i })
+      page.locator(".bildirimler-header-row").getByRole("button", { name: /Gunluk Kayit Gir|Yeni Gunluk Kayit/i })
     ).toBeVisible();
 
     await page.goto("/raporlar");

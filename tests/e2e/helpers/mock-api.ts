@@ -128,6 +128,40 @@ export async function mockApi(page: Page, role: MockUserRole) {
     }
   ];
 
+  const zimmetler: Array<{
+    id: number;
+    personel_id: number;
+    urun_turu: string;
+    teslim_tarihi: string;
+    teslim_eden?: string;
+    aciklama?: string;
+    teslim_durumu: string;
+    zimmet_durumu: string;
+    iade_tarihi?: string;
+  }> = [
+    {
+      id: 551,
+      personel_id: 1,
+      urun_turu: "KASK",
+      teslim_tarihi: "2026-03-01",
+      teslim_eden: "IK Gorevlisi",
+      aciklama: "Seri No: KSK-001",
+      teslim_durumu: "YENI",
+      zimmet_durumu: "AKTIF"
+    },
+    {
+      id: 552,
+      personel_id: 1,
+      urun_turu: "KULAKLIK",
+      teslim_tarihi: "2026-01-15",
+      teslim_eden: "Birim Amiri",
+      aciklama: "Onceki vardiyadan teslim alindi",
+      teslim_durumu: "IKINCI_EL",
+      zimmet_durumu: "IADE_EDILDI",
+      iade_tarihi: "2026-02-20"
+    }
+  ];
+
   const bildirimler: Array<{
     id: number;
     tarih: string;
@@ -335,7 +369,7 @@ export async function mockApi(page: Page, role: MockUserRole) {
       sube_ids: [1],
       varsayilan_sube_id: 1,
       durum: "AKTIF",
-      notlar: "Gunluk bildirimleri girer"
+      notlar: "Gunluk kayitlari girer"
     }
   ];
 
@@ -407,8 +441,9 @@ export async function mockApi(page: Page, role: MockUserRole) {
     }
   ];
 
-  let surecIdCounter = 600;
-  let bildirimIdCounter = 800;
+let surecIdCounter = 600;
+let zimmetIdCounter = 560;
+let bildirimIdCounter = 800;
   let finansIdCounter = 950;
   let kullaniciIdCounter = 3;
   let subeIdCounter = 2;
@@ -803,6 +838,57 @@ export async function mockApi(page: Page, role: MockUserRole) {
           targetPersonel.aktif_durum = "PASIF";
         }
       }
+
+      await fulfillJson(route, 200, okBody(created));
+      return;
+    }
+
+    if (path === "/api/zimmetler" && method === "GET") {
+      const personelId = Number.parseInt(url.searchParams.get("personel_id") ?? "", 10);
+      const zimmetDurumu = url.searchParams.get("zimmet_durumu");
+      const subeId = Number.parseInt(url.searchParams.get("sube_id") ?? "", 10);
+
+      const filtered = zimmetler.filter((item) => {
+        if (Number.isFinite(personelId) && item.personel_id !== personelId) {
+          return false;
+        }
+        if (zimmetDurumu && item.zimmet_durumu !== zimmetDurumu) {
+          return false;
+        }
+        if (Number.isFinite(subeId)) {
+          const linkedPersonel = personeller.find((personel) => personel.id === item.personel_id);
+          if (!linkedPersonel || linkedPersonel.sube_id !== subeId) {
+            return false;
+          }
+        }
+        return true;
+      });
+
+      await fulfillJson(route, 200, okBody({ items: filtered }));
+      return;
+    }
+
+    if (path === "/api/zimmetler" && method === "POST") {
+      const payload = request.postDataJSON() as {
+        personel_id: number;
+        urun_turu: string;
+        teslim_tarihi: string;
+        teslim_eden?: string;
+        aciklama?: string;
+        teslim_durumu: string;
+      };
+
+      const created = {
+        id: ++zimmetIdCounter,
+        personel_id: payload.personel_id,
+        urun_turu: payload.urun_turu,
+        teslim_tarihi: payload.teslim_tarihi,
+        teslim_eden: payload.teslim_eden,
+        aciklama: payload.aciklama,
+        teslim_durumu: payload.teslim_durumu,
+        zimmet_durumu: "AKTIF"
+      };
+      zimmetler.unshift(created);
 
       await fulfillJson(route, 200, okBody(created));
       return;

@@ -267,7 +267,7 @@ export function PersonellerPage() {
               ) : null}
               {canViewBildirimler ? (
                 <Link className="personeller-toolbar-module-link" to="/bildirimler">
-                  Bildirim
+                  Gunluk Kayit
                 </Link>
               ) : null}
             </div>

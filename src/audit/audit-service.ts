@@ -30,6 +30,7 @@ export type AuditAction =
   | "SUREC_CREATE"
   | "SUREC_UPDATE"
   | "SUREC_CANCEL"
+  | "ZIMMET_CREATE"
   | "BILDIRIM_CREATE"
   | "BILDIRIM_UPDATE"
   | "BILDIRIM_CANCEL"

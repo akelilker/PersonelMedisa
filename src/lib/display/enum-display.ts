@@ -103,6 +103,26 @@ const ISG_BAKIM_DURUM_LABELS: Record<string, string> = {
   EKSIK_VERI: "Eksik Veri"
 };
 
+const ZIMMET_URUN_TURU_LABELS: Record<string, string> = {
+  AYAKKABI: "Ayakkabi",
+  KASK: "Kask",
+  KULAKLIK: "Kulaklik",
+  MASKE: "Maske",
+  TELEFON: "Telefon",
+  DIGER: "Diger"
+};
+
+const ZIMMET_TESLIM_DURUMU_LABELS: Record<string, string> = {
+  YENI: "Yeni",
+  IKINCI_EL: "Ikinci El",
+  ARIZALI: "Arizali"
+};
+
+const ZIMMET_KAYIT_DURUMU_LABELS: Record<string, string> = {
+  AKTIF: "Aktif Zimmet",
+  IADE_EDILDI: "Iade Edildi"
+};
+
 const SPECIAL_TOKEN_LABELS: Record<string, string> = {
   ID: "ID",
   SGK: "SGK",
@@ -217,6 +237,18 @@ export function formatIsgMakineDurumLabel(value: string | null | undefined): str
 
 export function formatIsgBakimDurumuLabel(value: string | null | undefined): string {
   return formatMappedLabel(value, ISG_BAKIM_DURUM_LABELS);
+}
+
+export function formatZimmetUrunTuruLabel(value: string | null | undefined): string {
+  return formatMappedLabel(value, ZIMMET_URUN_TURU_LABELS);
+}
+
+export function formatZimmetTeslimDurumuLabel(value: string | null | undefined): string {
+  return formatMappedLabel(value, ZIMMET_TESLIM_DURUMU_LABELS);
+}
+
+export function formatZimmetKayitDurumuLabel(value: string | null | undefined): string {
+  return formatMappedLabel(value, ZIMMET_KAYIT_DURUMU_LABELS);
 }
 
 export function formatHaftalikKapanisStateLabel(value: string | null | undefined): string {

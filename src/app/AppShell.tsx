@@ -33,7 +33,7 @@ function resolveBackBar(pathname: string): { to: string; label: string } | null 
     return { to: "/surecler", label: "Süreç listesine dön" };
   }
   if (/^\/bildirimler\/\d+$/.test(pathname)) {
-    return { to: "/bildirimler", label: "Bildirim listesine dön" };
+    return { to: "/bildirimler", label: "Gunluk kayit listesine don" };
   }
   return null;
 }
@@ -58,10 +58,10 @@ function resolveModuleModal(pathname: string): ModuleModalConfig | null {
   }
 
   if (/^\/bildirimler\/\d+$/.test(pathname)) {
-    return { title: "Bildirim Detayı", closeTo: "/bildirimler" };
+    return { title: "Gunluk Kayit Detayi", closeTo: "/bildirimler" };
   }
   if (pathname === "/bildirimler") {
-    return { title: "Bildirimler", closeTo: "/" };
+    return { title: "Gunluk Kayit Merkezi", closeTo: "/" };
   }
 
   if (pathname === "/raporlar") {

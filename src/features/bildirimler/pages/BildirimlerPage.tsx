@@ -9,31 +9,31 @@ import { SubeDetailListNotice } from "../../../components/states/SubeDetailListN
 import { useRoleAccess } from "../../../hooks/use-role-access";
 import { useBildirimler } from "../../../hooks/useBildirimler";
 import {
-  formatBildirimStateLabel,
-  formatBildirimTuruLabel
+  formatBildirimStateLabel
 } from "../../../lib/display/enum-display";
 import type { Bildirim } from "../../../types/bildirim";
 import type { Personel } from "../../../types/personel";
-import type { IdOption, KeyOption } from "../../../types/referans";
+import type { IdOption } from "../../../types/referans";
+import {
+  formatGunlukKayitDayanak,
+  formatGunlukKayitGunTipi,
+  formatGunlukKayitHareketDurumu,
+  formatGunlukKayitHesapEtkisi,
+  resolveGunlukKayitPreset,
+  type GunlukKayitOption,
+  type GunlukKayitPreset
+} from "../gunluk-kayit-presets";
 
-const BILDIRIM_CREATE_FORM_ID = "bildirim-create-form";
-const BILDIRIM_EDIT_FORM_ID = "bildirim-edit-form";
+const GUNLUK_KAYIT_CREATE_FORM_ID = "gunluk-kayit-create-form";
+const GUNLUK_KAYIT_EDIT_FORM_ID = "gunluk-kayit-edit-form";
 
-const QUICK_BILDIRIM_TYPES = [
+const QUICK_KAYIT_KEYS = [
   "GEC_GELDI",
   "GELMEDI",
   "IZINLI_GELMEDI",
   "IZINSIZ_GELMEDI",
   "RAPORLU"
 ] as const;
-
-function idOptionsToSelectOptions(options: IdOption[]) {
-  return options.map((option) => ({ value: String(option.id), label: option.label }));
-}
-
-function keyOptionsToSelectOptions(options: KeyOption[]) {
-  return options.map((option) => ({ value: option.key, label: option.label }));
-}
 
 function digitsOnly(value: string | null | undefined) {
   return (value ?? "").replace(/\D+/g, "");
@@ -50,14 +50,6 @@ function formatPersonelOptionLabel(personel: Personel) {
     .filter(Boolean)
     .join(" | ");
   return meta ? `${title} | ${meta}` : title;
-}
-
-function buildQuickBildirimOptions(options: KeyOption[]) {
-  const optionMap = new Map(options.map((option) => [option.key, option]));
-  return QUICK_BILDIRIM_TYPES.map((key) => {
-    const option = optionMap.get(key);
-    return option ?? { key, label: formatBildirimTuruLabel(key) };
-  });
 }
 
 function formatDepartmanLabel(
@@ -94,8 +86,8 @@ function PersonelContextCard({ personel }: PersonelContextCardProps) {
         {personel.ad} {personel.soyad}
       </strong>
       <p>
-        Bölüm: {personel.departman_adi ?? "-"}
-        {personel.gorev_adi ? ` | Görev: ${personel.gorev_adi}` : ""}
+        Bolum: {personel.departman_adi ?? "-"}
+        {personel.gorev_adi ? ` | Gorev: ${personel.gorev_adi}` : ""}
       </p>
       <p>
         Telefon: {personel.telefon ?? "-"}
@@ -123,6 +115,45 @@ function PersonelContextCard({ personel }: PersonelContextCardProps) {
   );
 }
 
+type GunlukKayitModelCardProps = {
+  preset: GunlukKayitPreset;
+  title?: string;
+};
+
+function GunlukKayitModelCard({ preset, title = "Puantaj Yansimasi" }: GunlukKayitModelCardProps) {
+  return (
+    <div className="bildirim-model-panel">
+      <div className="bildirim-model-panel-head">
+        <strong>{title}</strong>
+        <span>{preset.label}</span>
+      </div>
+      <div className="bildirim-model-grid">
+        <div className="bildirim-model-card">
+          <span className="bildirim-model-label">Gun Tipi</span>
+          <strong>{formatGunlukKayitGunTipi(preset.gunTipi)}</strong>
+        </div>
+        <div className="bildirim-model-card">
+          <span className="bildirim-model-label">Hareket Durumu</span>
+          <strong>{formatGunlukKayitHareketDurumu(preset.hareketDurumu)}</strong>
+        </div>
+        <div className="bildirim-model-card">
+          <span className="bildirim-model-label">Dayanak</span>
+          <strong>{formatGunlukKayitDayanak(preset.dayanak)}</strong>
+        </div>
+        <div className="bildirim-model-card">
+          <span className="bildirim-model-label">Hesap Etkisi</span>
+          <strong>{formatGunlukKayitHesapEtkisi(preset.hesapEtkisi)}</strong>
+        </div>
+      </div>
+      <p className="bildirim-model-note">{preset.aciklama}</p>
+    </div>
+  );
+}
+
+function toSelectOptions(options: GunlukKayitOption[]) {
+  return options.map((option) => ({ value: option.key, label: option.label }));
+}
+
 export function BildirimlerPage() {
   const {
     listQuery,
@@ -134,13 +165,14 @@ export function BildirimlerPage() {
     errorMessage,
     refetch,
     departmanOptions,
-    bildirimTuruOptions,
+    gunlukKayitOptions,
     personelOptions,
     referenceError,
     isCreateModalOpen,
     openCreateModal,
     closeCreateModal,
     createForm,
+    createPreview,
     setCreateForm,
     createErrorMessage,
     isCreateSubmitting,
@@ -149,6 +181,7 @@ export function BildirimlerPage() {
     openEditModal,
     closeEditModal,
     editForm,
+    editPreview,
     setEditForm,
     editErrorMessage,
     isEditSubmitting,
@@ -176,6 +209,7 @@ export function BildirimlerPage() {
     () => new Map(personelOptions.map((personel) => [personel.id, personel])),
     [personelOptions]
   );
+
   const personelSelectOptions = useMemo(
     () =>
       personelOptions.map((personel) => ({
@@ -184,9 +218,19 @@ export function BildirimlerPage() {
       })),
     [personelOptions]
   );
-  const quickBildirimOptions = useMemo(
-    () => buildQuickBildirimOptions(bildirimTuruOptions),
-    [bildirimTuruOptions]
+
+  const quickKayitOptions = useMemo(
+    () =>
+      QUICK_KAYIT_KEYS.map((key) => {
+        const option = gunlukKayitOptions.find((item) => item.key === key);
+        if (option) {
+          return option;
+        }
+
+        const preset = resolveGunlukKayitPreset(key);
+        return { key, label: preset.label, preset };
+      }),
+    [gunlukKayitOptions]
   );
 
   const selectedCreatePersonel = useMemo(() => {
@@ -292,13 +336,13 @@ export function BildirimlerPage() {
     setEditForm((prev) => ({ ...prev, bildirimTuru: value }));
   }
 
-  const createTitle = isBirimAmiri ? "Günlük Durum Bildir" : "Yeni Bildirim Ekle";
-  const createButtonLabel = isBirimAmiri ? "Günlük Durum Bildir" : "Yeni Bildirim";
+  const createTitle = isBirimAmiri ? "Gunluk Kayit Gir" : "Yeni Gunluk Kayit";
+  const createButtonLabel = isBirimAmiri ? "Gunluk Kayit Gir" : "Yeni Gunluk Kayit";
 
   return (
     <section className="bildirimler-page">
       <div className="bildirimler-header-row">
-        <h2>Bildirimler</h2>
+        <h2>Gunluk Kayit Merkezi</h2>
         {canCreateBildirim ? (
           <button type="button" className="universal-btn-aux" onClick={openCreateModal}>
             {createButtonLabel}
@@ -306,15 +350,14 @@ export function BildirimlerPage() {
         ) : null}
       </div>
 
-      {isBirimAmiri ? (
-        <div className="state-card">
-          <h3>Günlük Durum Akışı</h3>
-          <p>
-            Geç geldi, gelmedi, izinli gelmedi, izinsiz gelmedi veya raporlu gibi günlük durumları
-            personel seçerek bu ekrandan kaydedebilirsin.
-          </p>
-        </div>
-      ) : null}
+      <div className="state-card">
+        <h3>Gunluk Kayit Akisi</h3>
+        <p>
+          Bu ekran, puantaj ham verisini hizli toplamak icin kullanilir. Kayit senaryosu secilir,
+          personel ve tarih belirlenir, sistem puantaj tarafina gidecek temel hareket ve dayanak
+          bilgisini ayni kayitta toplar.
+        </p>
+      </div>
 
       <SubeDetailListNotice />
 
@@ -327,7 +370,7 @@ export function BildirimlerPage() {
               name="bildirim-filter-personel"
               value={draft.personelId}
               onChange={(value) => updateDraft({ personelId: value })}
-              placeholderOption={{ value: "", label: "Tümü" }}
+              placeholderOption={{ value: "", label: "Tumu" }}
               selectOptions={personelSelectOptions}
             />
           ) : (
@@ -340,21 +383,21 @@ export function BildirimlerPage() {
               onChange={(value) => updateDraft({ personelId: value })}
             />
           )}
-          {bildirimTuruOptions.length > 0 ? (
+          {gunlukKayitOptions.length > 0 ? (
             <FormField
               as="select"
-              label="Durum"
+              label="Kayit Senaryosu"
               name="bildirim-filter-turu"
               value={draft.bildirimTuru}
               onChange={(value) => updateDraft({ bildirimTuru: value })}
-              placeholderOption={{ value: "", label: "Tümü" }}
-              selectOptions={keyOptionsToSelectOptions(bildirimTuruOptions)}
+              placeholderOption={{ value: "", label: "Tumu" }}
+              selectOptions={toSelectOptions(gunlukKayitOptions)}
             />
           ) : (
             <FormField
-              label="Durum"
+              label="Kayit Senaryosu"
               name="bildirim-filter-turu-text"
-              placeholder="Örn. GEC_GELDI, GELMEDI..."
+              placeholder="Orn. GEC_GELDI, GELMEDI..."
               value={draft.bildirimTuru}
               onChange={(value) => updateDraft({ bildirimTuru: value })}
             />
@@ -378,7 +421,7 @@ export function BildirimlerPage() {
         </div>
       </form>
 
-      {isLoading ? <LoadingState label="Bildirim verileri yükleniyor..." /> : null}
+      {isLoading ? <LoadingState label="Gunluk kayit verileri yukleniyor..." /> : null}
 
       {!isLoading && errorMessage ? (
         <ErrorState message={errorMessage} onRetry={() => void refetch()} />
@@ -386,8 +429,8 @@ export function BildirimlerPage() {
 
       {!isLoading && !errorMessage && bildirimler.length === 0 ? (
         <EmptyState
-          title="Bildirim bulunamadı"
-          message="Seçilen tarihte veya filtrede bildirim kaydı yok."
+          title="Gunluk kayit bulunamadi"
+          message="Secilen tarih veya filtre icin gunluk kayit bulunmuyor."
         />
       ) : null}
 
@@ -398,21 +441,17 @@ export function BildirimlerPage() {
               typeof bildirim.personel_id === "number" ? personelMap.get(bildirim.personel_id) ?? null : null;
             const personelCallHref = buildTelHref(personel?.telefon);
             const emergencyCallHref = buildTelHref(personel?.acil_durum_telefon);
+            const preset = resolveGunlukKayitPreset(bildirim.bildirim_turu);
 
             return (
               <li key={bildirim.id} className="bildirimler-item">
                 <div className="bildirimler-item-content">
-                  <strong>{formatBildirimTuruLabel(bildirim.bildirim_turu)}</strong>
-                  <p>
-                    Durum: {formatBildirimStateLabel(bildirim.state)}
-                  </p>
+                  <strong>{preset.label}</strong>
+                  <p>Kayit Durumu: {formatBildirimStateLabel(bildirim.state)}</p>
                   <p>Tarih: {bildirim.tarih ?? "-"}</p>
+                  <p>Personel: {personel ? `${personel.ad} ${personel.soyad}` : bildirim.personel_id ?? "-"}</p>
                   <p>
-                    Personel:{" "}
-                    {personel ? `${personel.ad} ${personel.soyad}` : bildirim.personel_id ?? "-"}
-                  </p>
-                  <p>
-                    Bölüm:{" "}
+                    Bolum:{" "}
                     {formatDepartmanLabel(
                       bildirim.departman_id,
                       personel?.departman_adi,
@@ -420,7 +459,8 @@ export function BildirimlerPage() {
                     )}
                   </p>
                   {personel?.telefon ? <p>Telefon: {personel.telefon}</p> : null}
-                  {bildirim.aciklama ? <p>Açıklama: {bildirim.aciklama}</p> : null}
+                  {bildirim.aciklama ? <p>Aciklama: {bildirim.aciklama}</p> : null}
+                  <GunlukKayitModelCard preset={preset} title="Puantaj Katmani" />
                 </div>
 
                 <div className="module-item-actions">
@@ -446,7 +486,7 @@ export function BildirimlerPage() {
                       onClick={() => openEditModal(bildirim, canEditBildirim)}
                       disabled={cancelingBildirimId === bildirim.id}
                     >
-                      Düzenle
+                      Duzenle
                     </button>
                   ) : null}
                   {canCancelBildirim ? (
@@ -456,7 +496,7 @@ export function BildirimlerPage() {
                       onClick={() => void cancelBildirimHandler(bildirim, canCancelBildirim)}
                       disabled={cancelingBildirimId === bildirim.id}
                     >
-                      {cancelingBildirimId === bildirim.id ? "İptal Ediliyor..." : "İptal"}
+                      {cancelingBildirimId === bildirim.id ? "Iptal Ediliyor..." : "Iptal"}
                     </button>
                   ) : null}
                 </div>
@@ -473,7 +513,7 @@ export function BildirimlerPage() {
           onClick={() => setPage((prev) => Math.max(1, prev - 1))}
           disabled={isLoading || page <= 1}
         >
-          Önceki
+          Onceki
         </button>
         <span className="module-page-info">
           Sayfa {page}
@@ -490,9 +530,9 @@ export function BildirimlerPage() {
       </div>
 
       <div className="module-links">
-        <Link to="/">Ana ekrana dön</Link>
-        <Link to="/surecler">Süreç takibe git</Link>
-        <Link to="/puantaj">Puantaja git</Link>
+        <Link to="/">Ana ekrana don</Link>
+        <Link to="/surecler">Surec takibe git</Link>
+        <Link to="/puantaj">Puantaj ekranina git</Link>
       </div>
 
       {canCreateBildirim && isCreateModalOpen ? (
@@ -503,7 +543,7 @@ export function BildirimlerPage() {
             <div className="universal-btn-group modal-footer-actions">
               <button
                 type="submit"
-                form={BILDIRIM_CREATE_FORM_ID}
+                form={GUNLUK_KAYIT_CREATE_FORM_ID}
                 className="universal-btn-save"
                 disabled={isCreateSubmitting}
               >
@@ -515,12 +555,12 @@ export function BildirimlerPage() {
                 onClick={closeCreateModal}
                 disabled={isCreateSubmitting}
               >
-                Vazgeç
+                Vazgec
               </button>
             </div>
           }
         >
-          <form id={BILDIRIM_CREATE_FORM_ID} className="bildirim-form-grid" onSubmit={handleCreateSubmit}>
+          <form id={GUNLUK_KAYIT_CREATE_FORM_ID} className="bildirim-form-grid" onSubmit={handleCreateSubmit}>
             <FormField
               label="Tarih"
               name="bildirim-create-tarih"
@@ -538,7 +578,7 @@ export function BildirimlerPage() {
                 value={createForm.personelId}
                 onChange={handleCreatePersonelChange}
                 required
-                placeholderOption={{ value: "", label: "Seçiniz" }}
+                placeholderOption={{ value: "", label: "Seciniz" }}
                 selectOptions={personelSelectOptions}
               />
             ) : (
@@ -555,7 +595,7 @@ export function BildirimlerPage() {
 
             {personelSelectOptions.length > 0 ? (
               <FormField
-                label="Bölüm"
+                label="Bolum"
                 name="bildirim-create-departman-info"
                 value={formatDepartmanLabel(
                   selectedCreatePersonel?.departman_id,
@@ -565,20 +605,9 @@ export function BildirimlerPage() {
                 onChange={() => undefined}
                 disabled
               />
-            ) : departmanOptions.length > 0 ? (
-              <FormField
-                as="select"
-                label="Bölüm"
-                name="bildirim-create-departman"
-                value={createForm.departmanId}
-                onChange={(value) => setCreateForm((prev) => ({ ...prev, departmanId: value }))}
-                required
-                placeholderOption={{ value: "", label: "Seçiniz" }}
-                selectOptions={idOptionsToSelectOptions(departmanOptions)}
-              />
             ) : (
               <FormField
-                label="Bölüm"
+                label="Bolum"
                 name="bildirim-create-departman-num"
                 type="number"
                 min={1}
@@ -591,9 +620,9 @@ export function BildirimlerPage() {
             <PersonelContextCard personel={selectedCreatePersonel} />
 
             <div className="bildirim-quick-types">
-              <span className="bildirim-quick-types-label">Hızlı Durum Seç</span>
+              <span className="bildirim-quick-types-label">Hazir Gunluk Kayit Sec</span>
               <div className="bildirim-quick-types-row">
-                {quickBildirimOptions.map((option) => (
+                {quickKayitOptions.map((option) => (
                   <button
                     key={option.key}
                     type="button"
@@ -606,20 +635,20 @@ export function BildirimlerPage() {
               </div>
             </div>
 
-            {bildirimTuruOptions.length > 0 ? (
+            {gunlukKayitOptions.length > 0 ? (
               <FormField
                 as="select"
-                label="Durum"
+                label="Kayit Senaryosu"
                 name="bildirim-create-turu"
                 value={createForm.bildirimTuru}
                 onChange={(value) => setCreateForm((prev) => ({ ...prev, bildirimTuru: value }))}
                 required
-                placeholderOption={{ value: "", label: "Seçiniz" }}
-                selectOptions={keyOptionsToSelectOptions(bildirimTuruOptions)}
+                placeholderOption={{ value: "", label: "Seciniz" }}
+                selectOptions={toSelectOptions(gunlukKayitOptions)}
               />
             ) : (
               <FormField
-                label="Durum"
+                label="Kayit Senaryosu"
                 name="bildirim-create-turu-text"
                 value={createForm.bildirimTuru}
                 onChange={(value) => setCreateForm((prev) => ({ ...prev, bildirimTuru: value }))}
@@ -627,9 +656,11 @@ export function BildirimlerPage() {
               />
             )}
 
+            <GunlukKayitModelCard preset={createPreview} />
+
             <FormField
               as="textarea"
-              label="Açıklama"
+              label="Not / Aciklama"
               name="bildirim-create-aciklama"
               value={createForm.aciklama}
               onChange={(value) => setCreateForm((prev) => ({ ...prev, aciklama: value }))}
@@ -643,13 +674,13 @@ export function BildirimlerPage() {
 
       {canEditBildirim && editingBildirim ? (
         <AppModal
-          title={`Bildirim Düzenle #${editingBildirim.id}`}
+          title={`Gunluk Kaydi Duzenle #${editingBildirim.id}`}
           onClose={closeEditModal}
           footer={
             <div className="universal-btn-group modal-footer-actions">
               <button
                 type="submit"
-                form={BILDIRIM_EDIT_FORM_ID}
+                form={GUNLUK_KAYIT_EDIT_FORM_ID}
                 className="universal-btn-save"
                 disabled={isEditSubmitting}
               >
@@ -661,12 +692,12 @@ export function BildirimlerPage() {
                 onClick={closeEditModal}
                 disabled={isEditSubmitting}
               >
-                Vazgeç
+                Vazgec
               </button>
             </div>
           }
         >
-          <form id={BILDIRIM_EDIT_FORM_ID} className="bildirim-form-grid" onSubmit={handleEditSubmit}>
+          <form id={GUNLUK_KAYIT_EDIT_FORM_ID} className="bildirim-form-grid" onSubmit={handleEditSubmit}>
             <FormField
               label="Tarih"
               name="bildirim-edit-tarih"
@@ -684,7 +715,7 @@ export function BildirimlerPage() {
                 value={editForm.personelId}
                 onChange={handleEditPersonelChange}
                 required
-                placeholderOption={{ value: "", label: "Seçiniz" }}
+                placeholderOption={{ value: "", label: "Seciniz" }}
                 selectOptions={personelSelectOptions}
               />
             ) : (
@@ -701,7 +732,7 @@ export function BildirimlerPage() {
 
             {personelSelectOptions.length > 0 ? (
               <FormField
-                label="Bölüm"
+                label="Bolum"
                 name="bildirim-edit-departman-info"
                 value={formatDepartmanLabel(
                   selectedEditPersonel?.departman_id,
@@ -711,20 +742,9 @@ export function BildirimlerPage() {
                 onChange={() => undefined}
                 disabled
               />
-            ) : departmanOptions.length > 0 ? (
-              <FormField
-                as="select"
-                label="Bölüm"
-                name="bildirim-edit-departman"
-                value={editForm.departmanId}
-                onChange={(value) => setEditForm((prev) => ({ ...prev, departmanId: value }))}
-                required
-                placeholderOption={{ value: "", label: "Seçiniz" }}
-                selectOptions={idOptionsToSelectOptions(departmanOptions)}
-              />
             ) : (
               <FormField
-                label="Bölüm"
+                label="Bolum"
                 name="bildirim-edit-departman-num"
                 type="number"
                 min={1}
@@ -737,9 +757,9 @@ export function BildirimlerPage() {
             <PersonelContextCard personel={selectedEditPersonel} />
 
             <div className="bildirim-quick-types">
-              <span className="bildirim-quick-types-label">Hızlı Durum Seç</span>
+              <span className="bildirim-quick-types-label">Hazir Gunluk Kayit Sec</span>
               <div className="bildirim-quick-types-row">
-                {quickBildirimOptions.map((option) => (
+                {quickKayitOptions.map((option) => (
                   <button
                     key={option.key}
                     type="button"
@@ -752,20 +772,20 @@ export function BildirimlerPage() {
               </div>
             </div>
 
-            {bildirimTuruOptions.length > 0 ? (
+            {gunlukKayitOptions.length > 0 ? (
               <FormField
                 as="select"
-                label="Durum"
+                label="Kayit Senaryosu"
                 name="bildirim-edit-turu"
                 value={editForm.bildirimTuru}
                 onChange={(value) => setEditForm((prev) => ({ ...prev, bildirimTuru: value }))}
                 required
-                placeholderOption={{ value: "", label: "Seçiniz" }}
-                selectOptions={keyOptionsToSelectOptions(bildirimTuruOptions)}
+                placeholderOption={{ value: "", label: "Seciniz" }}
+                selectOptions={toSelectOptions(gunlukKayitOptions)}
               />
             ) : (
               <FormField
-                label="Durum"
+                label="Kayit Senaryosu"
                 name="bildirim-edit-turu-text"
                 value={editForm.bildirimTuru}
                 onChange={(value) => setEditForm((prev) => ({ ...prev, bildirimTuru: value }))}
@@ -773,9 +793,11 @@ export function BildirimlerPage() {
               />
             )}
 
+            <GunlukKayitModelCard preset={editPreview} />
+
             <FormField
               as="textarea"
-              label="Açıklama"
+              label="Not / Aciklama"
               name="bildirim-edit-aciklama"
               value={editForm.aciklama}
               onChange={(value) => setEditForm((prev) => ({ ...prev, aciklama: value }))}

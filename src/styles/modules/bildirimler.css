@@ -64,6 +64,45 @@
   margin: 0;
 }
 
+.bildirim-model-panel {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.bildirim-model-panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.bildirim-model-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: var(--space-2);
+}
+
+.bildirim-model-card {
+  display: grid;
+  gap: 4px;
+  padding: var(--space-2);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-sm);
+}
+
+.bildirim-model-label,
+.bildirim-model-note {
+  color: var(--text-muted, #666);
+}
+
+.bildirim-model-note {
+  margin: 0;
+}
+
 .bildirim-quick-types {
   display: grid;
   gap: var(--space-2);

@@ -38,6 +38,10 @@ import type { Bildirim } from "../types/bildirim";
 import type { Personel } from "../types/personel";
 import { useAuth } from "../state/auth.store";
 import type { IdOption, KeyOption } from "../types/referans";
+import {
+  buildGunlukKayitOptions,
+  resolveGunlukKayitPreset
+} from "../features/bildirimler/gunluk-kayit-presets";
 
 const PAGE_SIZE = 10;
 const BILDIRIM_PERSONEL_FETCH_LIMIT = 250;
@@ -120,7 +124,7 @@ function getTodayIsoDate() {
 function resolveBildirimTuru(value: string) {
   const trimmed = value.trim();
   if (!trimmed) {
-    throw new Error("Bildirim durumu secilmelidir.");
+    throw new Error("Kayit senaryosu secilmelidir.");
   }
 
   return normalizeEnumKey(trimmed);
@@ -238,7 +242,7 @@ export function useBildirimler() {
         );
       } catch {
         if (!getCacheEntry<PaginatedResult<Bildirim>>(listKey)) {
-      setErrorMessage("Bildirim listesi şu an güncellenemiyor.");
+        setErrorMessage("Gunluk kayit listesi su an guncellenemiyor.");
         }
       } finally {
         if (!cancelled) {
@@ -275,7 +279,7 @@ export function useBildirimler() {
         );
       } catch {
         if (!cancelled) {
-      setReferenceError("Bildirim referansları şu an güncellenemiyor, manuel giriş kullanılabilir.");
+          setReferenceError("Kayit senaryosu referanslari su an guncellenemiyor, manuel giris kullanilabilir.");
         }
       }
     })();
@@ -355,7 +359,7 @@ export function useBildirimler() {
         return;
       }
       if (!canCreate) {
-      setCreateErrorMessage("Bu işlem için yetkin bulunmuyor.");
+        setCreateErrorMessage("Bu islem icin yetkin bulunmuyor.");
         return;
       }
 
@@ -408,7 +412,7 @@ export function useBildirimler() {
           void processSyncQueue();
         }
       } catch (error) {
-        setCreateErrorMessage(getApiErrorMessage(error, "Bildirim kaydi yapilamadi."));
+        setCreateErrorMessage(getApiErrorMessage(error, "Gunluk kayit olusturulamadi."));
       } finally {
         setIsCreateSubmitting(false);
       }
@@ -418,7 +422,7 @@ export function useBildirimler() {
 
   const openEditModal = useCallback((bildirim: Bildirim, canEdit: boolean) => {
     if (!canEdit) {
-      setErrorMessage("Bu bildirimi düzenlemek için yetkin bulunmuyor.");
+      setErrorMessage("Bu gunluk kaydi duzenlemek icin yetkin bulunmuyor.");
       return;
     }
     setEditErrorMessage(null);
@@ -439,7 +443,7 @@ export function useBildirimler() {
         return;
       }
       if (!canEdit) {
-        setEditErrorMessage("Bu bildirimi düzenlemek için yetkin bulunmuyor.");
+        setEditErrorMessage("Bu gunluk kaydi duzenlemek icin yetkin bulunmuyor.");
         return;
       }
 
@@ -491,7 +495,7 @@ export function useBildirimler() {
             items: base.items.map((row) => (row.id === previousBildirim.id ? previousBildirim : row))
           };
         });
-        setEditErrorMessage(getApiErrorMessage(error, "Bildirim kaydi guncellenemedi."));
+        setEditErrorMessage(getApiErrorMessage(error, "Gunluk kayit guncellenemedi."));
       } finally {
         setIsEditSubmitting(false);
       }
@@ -502,11 +506,11 @@ export function useBildirimler() {
   const cancelBildirimHandler = useCallback(
     async (bildirim: Bildirim, canCancel: boolean) => {
       if (!canCancel) {
-        setErrorMessage("Bu bildirimi iptal etmek için yetkin bulunmuyor.");
+        setErrorMessage("Bu gunluk kaydi iptal etmek icin yetkin bulunmuyor.");
         return;
       }
 
-      const confirmed = window.confirm(`Bildirim #${bildirim.id} kaydını iptal etmek istiyor musun?`);
+      const confirmed = window.confirm(`Gunluk kayit #${bildirim.id} kaydini iptal etmek istiyor musun?`);
       if (!confirmed) {
         return;
       }
@@ -543,12 +547,27 @@ export function useBildirimler() {
             items: base.items.map((row) => (row.id === bildirim.id ? bildirim : row))
           };
         });
-        setErrorMessage(getApiErrorMessage(error, "Bildirim iptal edilemedi."));
+        setErrorMessage(getApiErrorMessage(error, "Gunluk kayit iptal edilemedi."));
       } finally {
         setCancelingBildirimId(null);
       }
     },
     [listKey, refreshPageOne]
+  );
+
+  const gunlukKayitOptions = useMemo(
+    () => buildGunlukKayitOptions(bildirimTuruOptions),
+    [bildirimTuruOptions]
+  );
+
+  const createPreview = useMemo(
+    () => resolveGunlukKayitPreset(createForm.bildirimTuru),
+    [createForm.bildirimTuru]
+  );
+
+  const editPreview = useMemo(
+    () => resolveGunlukKayitPreset(editForm.bildirimTuru),
+    [editForm.bildirimTuru]
   );
 
   return {
@@ -563,12 +582,14 @@ export function useBildirimler() {
     refetch,
     departmanOptions,
     bildirimTuruOptions,
+    gunlukKayitOptions,
     personelOptions,
     referenceError,
     isCreateModalOpen,
     openCreateModal,
     closeCreateModal,
     createForm,
+    createPreview,
     setCreateForm,
     createErrorMessage,
     isCreateSubmitting,
@@ -577,6 +598,7 @@ export function useBildirimler() {
     openEditModal,
     closeEditModal,
     editForm,
+    editPreview,
     setEditForm,
     editErrorMessage,
     isEditSubmitting,
@@ -675,7 +697,7 @@ export function useBildirimDetail(parsedBildirimId: number, hasValidId: boolean)
   const refetch = useCallback(async () => {
     if (!hasValidId) {
       setIsLoading(false);
-      setErrorMessage("Geçerli bir bildirim ID verilmedi.");
+      setErrorMessage("Gecerli bir gunluk kayit ID verilmedi.");
       return;
     }
 
@@ -697,7 +719,7 @@ export function useBildirimDetail(parsedBildirimId: number, hasValidId: boolean)
         return;
       }
       if (!getCacheEntry<Bildirim>(detailKey)) {
-        setErrorMessage("Bildirim detayı şu an güncellenemiyor.");
+        setErrorMessage("Gunluk kayit detayi su an guncellenemiyor.");
       }
     } finally {
       setIsLoading(false);

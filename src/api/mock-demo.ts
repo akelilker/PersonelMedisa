@@ -35,6 +35,18 @@ type DemoSurec = {
   state?: string;
 };
 
+type DemoZimmet = {
+  id: number;
+  personel_id: number;
+  urun_turu: string;
+  teslim_tarihi: string;
+  teslim_eden?: string;
+  aciklama?: string;
+  teslim_durumu: string;
+  zimmet_durumu: string;
+  iade_tarihi?: string;
+};
+
 type DemoBildirim = {
   id: number;
   tarih?: string;
@@ -137,6 +149,7 @@ type DemoAylikDurum = {
 const demoState: {
   personeller: DemoPersonel[];
   surecler: DemoSurec[];
+  zimmetler: DemoZimmet[];
   bildirimler: DemoBildirim[];
   finansKalemleri: DemoFinansKalem[];
   puantajMap: Record<string, DemoPuantaj>;
@@ -149,6 +162,7 @@ const demoState: {
   nextIds: {
     personel: number;
     surec: number;
+    zimmet: number;
     bildirim: number;
     finans: number;
     kapanis: number;
@@ -210,6 +224,39 @@ const demoState: {
       ucretli_mi: true,
       aciklama: "Demo izin kaydi",
       state: "AKTIF"
+    }
+  ],
+  zimmetler: [
+    {
+      id: 551,
+      personel_id: 1,
+      urun_turu: "KASK",
+      teslim_tarihi: "2026-03-01",
+      teslim_eden: "IK Gorevlisi",
+      aciklama: "Seri No: KSK-001",
+      teslim_durumu: "YENI",
+      zimmet_durumu: "AKTIF"
+    },
+    {
+      id: 552,
+      personel_id: 1,
+      urun_turu: "KULAKLIK",
+      teslim_tarihi: "2026-01-15",
+      teslim_eden: "Birim Amiri",
+      aciklama: "Onceki vardiyadan teslim alindi",
+      teslim_durumu: "IKINCI_EL",
+      zimmet_durumu: "IADE_EDILDI",
+      iade_tarihi: "2026-02-20"
+    },
+    {
+      id: 553,
+      personel_id: 2,
+      urun_turu: "AYAKKABI",
+      teslim_tarihi: "2026-02-05",
+      teslim_eden: "IK Gorevlisi",
+      aciklama: "Seri No: AYK-204",
+      teslim_durumu: "YENI",
+      zimmet_durumu: "AKTIF"
     }
   ],
   bildirimler: [
@@ -403,7 +450,7 @@ const demoState: {
       sube_ids: [1],
       varsayilan_sube_id: 1,
       durum: "AKTIF",
-      notlar: "Gunluk bildirim sorumlusu"
+      notlar: "Gunluk kayit sorumlusu"
     }
   ],
   departmanlar: [
@@ -449,6 +496,7 @@ const demoState: {
   nextIds: {
     personel: 100,
     surec: 600,
+    zimmet: 560,
     bildirim: 800,
     finans: 950,
     kapanis: 1000,
@@ -1201,6 +1249,60 @@ export function resolveDemoApiResponse(
       }
     }
 
+    return ok(next);
+  }
+
+  if (pathname === "/zimmetler" && method === "GET") {
+    const personelId = toNumber(requestUrl.searchParams.get("personel_id"));
+    const subeId = toNumber(requestUrl.searchParams.get("sube_id"));
+    const zimmetDurumu = toStringValue(requestUrl.searchParams.get("zimmet_durumu"));
+    const page = toNumber(requestUrl.searchParams.get("page")) ?? 1;
+    const limit = toNumber(requestUrl.searchParams.get("limit")) ?? 10;
+
+    const filtered = demoState.zimmetler.filter((item) => {
+      if (personelId !== null && item.personel_id !== personelId) {
+        return false;
+      }
+      if (zimmetDurumu && item.zimmet_durumu !== zimmetDurumu) {
+        return false;
+      }
+      if (subeId !== null) {
+        const linkedPersonel = demoState.personeller.find((personel) => personel.id === item.personel_id);
+        if (!linkedPersonel || linkedPersonel.sube_id !== subeId) {
+          return false;
+        }
+      }
+      return true;
+    });
+
+    const start = (page - 1) * limit;
+    const items = filtered.slice(start, start + limit);
+    const total = filtered.length;
+    const totalPages = Math.max(1, Math.ceil(total / limit));
+
+    return ok(
+      { items },
+      {
+        page,
+        limit,
+        total,
+        total_pages: totalPages
+      }
+    );
+  }
+
+  if (pathname === "/zimmetler" && method === "POST") {
+    const next: DemoZimmet = {
+      id: ++demoState.nextIds.zimmet,
+      personel_id: toNumber(body.personel_id) ?? 1,
+      urun_turu: toStringValue(body.urun_turu) ?? "DIGER",
+      teslim_tarihi: toStringValue(body.teslim_tarihi) ?? new Date().toISOString().slice(0, 10),
+      teslim_eden: toStringValue(body.teslim_eden) ?? undefined,
+      aciklama: toStringValue(body.aciklama) ?? undefined,
+      teslim_durumu: toStringValue(body.teslim_durumu) ?? "YENI",
+      zimmet_durumu: "AKTIF"
+    };
+    demoState.zimmetler.unshift(next);
     return ok(next);
   }
 

@@ -9,12 +9,16 @@ import { useRoleAccess } from "../../../hooks/use-role-access";
 import { usePersonelDetail } from "../../../hooks/usePersoneller";
 import {
   formatAktifDurumLabel,
+  formatZimmetKayitDurumuLabel,
+  formatZimmetTeslimDurumuLabel,
+  formatZimmetUrunTuruLabel,
   formatSurecStateLabel,
   formatSurecTuruLabel
 } from "../../../lib/display/enum-display";
 import type { KeyOption } from "../../../types/referans";
 import type { Personel } from "../../../types/personel";
 import type { Surec } from "../../../types/surec";
+import { ZIMMET_TESLIM_DURUMU_OPTIONS, ZIMMET_URUN_TURU_OPTIONS, type Zimmet } from "../../../types/zimmet";
 
 const PERSONEL_DOSYA_TABS = [
   { id: "genel-bilgiler", label: "Genel Bilgiler" },
@@ -25,6 +29,7 @@ const PERSONEL_DOSYA_TABS = [
 ] as const;
 
 const PERSONEL_SUREC_FORM_ID = "personel-surec-form";
+const PERSONEL_ZIMMET_FORM_ID = "personel-zimmet-form";
 
 type PersonelDosyaTabId = (typeof PERSONEL_DOSYA_TABS)[number]["id"];
 
@@ -345,6 +350,81 @@ function PersonelSurecGecmisiPanel({
   );
 }
 
+function PersonelZimmetEnvanterPanel({
+  canCreateZimmet,
+  isLoading,
+  errorMessage,
+  zimmetler,
+  onOpenCreateModal
+}: {
+  canCreateZimmet: boolean;
+  isLoading: boolean;
+  errorMessage: string | null;
+  zimmetler: Zimmet[];
+  onOpenCreateModal: () => void;
+}) {
+  return (
+    <div className="personel-zimmet-panel">
+      <div className="personel-zimmet-head">
+        <div>
+          <h3>Zimmet ve Envanter Kayitlari</h3>
+          <p>Kullaniciya teslim edilen ekipmanlar ve geri alinmis kayitlar bu listede izlenir.</p>
+        </div>
+        {canCreateZimmet ? (
+          <button type="button" className="universal-btn-aux" onClick={onOpenCreateModal}>
+            Yeni Zimmet Ekle
+          </button>
+        ) : null}
+      </div>
+
+      {isLoading ? <p className="personel-kart-placeholder-note">Zimmet kayitlari yukleniyor...</p> : null}
+      {!isLoading && errorMessage ? <p className="personel-create-error">{errorMessage}</p> : null}
+
+      {!isLoading && !errorMessage && zimmetler.length === 0 ? (
+        <div className="personel-kart-placeholder">
+          <h3>Zimmet Kaydi Bulunamadi</h3>
+          <p>Bu personel icin henuz zimmetlenmis urun kaydi bulunmuyor.</p>
+        </div>
+      ) : null}
+
+      {!isLoading && !errorMessage && zimmetler.length > 0 ? (
+        <div className="personel-zimmet-table-wrap">
+          <table className="personel-zimmet-table">
+            <thead>
+              <tr>
+                <th>Urun Turu</th>
+                <th>Teslim Tarihi</th>
+                <th>Teslim Eden</th>
+                <th>Teslim Durumu</th>
+                <th>Kayit Durumu</th>
+                <th>Seri No / Aciklama</th>
+              </tr>
+            </thead>
+            <tbody>
+              {zimmetler.map((zimmet) => (
+                <tr key={zimmet.id}>
+                  <td className="personel-zimmet-cell-strong">{formatZimmetUrunTuruLabel(zimmet.urun_turu)}</td>
+                  <td>{formatDetailValue(zimmet.teslim_tarihi)}</td>
+                  <td>{formatDetailValue(zimmet.teslim_eden)}</td>
+                  <td>{formatZimmetTeslimDurumuLabel(zimmet.teslim_durumu)}</td>
+                  <td>
+                    <span
+                      className={`personel-zimmet-state${zimmet.zimmet_durumu === "IADE_EDILDI" ? " is-returned" : ""}`}
+                    >
+                      {formatZimmetKayitDurumuLabel(zimmet.zimmet_durumu)}
+                    </span>
+                  </td>
+                  <td className="personel-zimmet-note-cell">{formatDetailValue(zimmet.aciklama)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export function PersonelDetayPage() {
   const { personelId } = useParams();
   const parsedPersonelId = Number.parseInt(personelId ?? "", 10);
@@ -355,6 +435,7 @@ export function PersonelDetayPage() {
   const canViewSurecler = hasPermission("surecler.view") || hasPermission("surecler.view.sube");
   const canAccessSurecler = canCreateSurec || canViewSurecler;
   const canViewPuantaj = hasPermission("puantaj.view");
+  const canCreateZimmet = canEditPersonel;
 
   const [activeTab, setActiveTab] = useState<PersonelDosyaTabId>("genel-bilgiler");
   const [isActionMenuOpen, setIsActionMenuOpen] = useState(false);
@@ -384,10 +465,22 @@ export function PersonelDetayPage() {
     isSurecHistoryLoading,
     surecHistoryErrorMessage,
     surecTuruOptions,
-    surecReferenceErrorMessage
+    surecReferenceErrorMessage,
+    isZimmetModalOpen,
+    openZimmetModal,
+    closeZimmetModal,
+    zimmetForm,
+    setZimmetForm,
+    createZimmetHandler,
+    isZimmetSubmitting,
+    zimmetCreateErrorMessage,
+    zimmetHistory,
+    isZimmetHistoryLoading,
+    zimmetHistoryErrorMessage
   } = usePersonelDetail(parsedPersonelId, hasValidId, {
     canViewSurecler,
-    canCreateSurec
+    canCreateSurec,
+    canCreateZimmet
   });
 
   useEffect(() => {
@@ -396,10 +489,10 @@ export function PersonelDetayPage() {
   }, [parsedPersonelId]);
 
   useEffect(() => {
-    if (isEditing || isSurecModalOpen) {
+    if (isEditing || isSurecModalOpen || isZimmetModalOpen) {
       setIsActionMenuOpen(false);
     }
-  }, [isEditing, isSurecModalOpen]);
+  }, [isEditing, isSurecModalOpen, isZimmetModalOpen]);
 
   const aktifDurumOptions = [
     { value: "AKTIF", label: formatAktifDurumLabel("AKTIF") },
@@ -414,6 +507,10 @@ export function PersonelDetayPage() {
     void createSurecHandler(event);
   }
 
+  function handleZimmetCreateSubmit(event: FormEvent<HTMLFormElement>) {
+    void createZimmetHandler(event);
+  }
+
   function handleOpenSurecModal() {
     setActiveTab("surec-gecmisi");
     openSurecModal();
@@ -421,6 +518,11 @@ export function PersonelDetayPage() {
 
   function handleOpenSurecHistory() {
     setActiveTab("surec-gecmisi");
+  }
+
+  function handleOpenZimmetModal() {
+    setActiveTab("zimmet-envanter");
+    openZimmetModal();
   }
 
   const pageHeading =
@@ -589,9 +691,12 @@ export function PersonelDetayPage() {
                 aria-labelledby="personel-kart-tab-zimmet-envanter"
                 hidden={activeTab !== "zimmet-envanter"}
               >
-                <PlaceholderPanel
-                  title="Zimmet ve Envanter Dosyasi"
-                  description="Kullaniciya teslim edilen ekipmanlar ve teslim geri alma hareketleri bu sekmede toplanacak."
+                <PersonelZimmetEnvanterPanel
+                  canCreateZimmet={canCreateZimmet}
+                  isLoading={isZimmetHistoryLoading}
+                  errorMessage={zimmetHistoryErrorMessage}
+                  zimmetler={zimmetHistory}
+                  onOpenCreateModal={handleOpenZimmetModal}
                 />
               </div>
 
@@ -688,6 +793,80 @@ export function PersonelDetayPage() {
             />
             {surecCreateErrorMessage ? <p className="personel-create-error">{surecCreateErrorMessage}</p> : null}
             {surecReferenceErrorMessage ? <p className="personel-create-error">{surecReferenceErrorMessage}</p> : null}
+          </form>
+        </AppModal>
+      ) : null}
+
+      {personel && canCreateZimmet && isZimmetModalOpen ? (
+        <AppModal
+          title="Yeni Zimmet Ekle"
+          onClose={closeZimmetModal}
+          footer={
+            <div className="universal-btn-group modal-footer-actions">
+              <button
+                type="submit"
+                form={PERSONEL_ZIMMET_FORM_ID}
+                className="universal-btn-save"
+                disabled={isZimmetSubmitting}
+              >
+                {isZimmetSubmitting ? "Kaydediliyor..." : "Kaydet"}
+              </button>
+              <button
+                type="button"
+                className="universal-btn-cancel"
+                onClick={closeZimmetModal}
+                disabled={isZimmetSubmitting}
+              >
+                Vazgec
+              </button>
+            </div>
+          }
+        >
+          <form id={PERSONEL_ZIMMET_FORM_ID} className="personel-zimmet-form-grid" onSubmit={handleZimmetCreateSubmit}>
+            <FormField
+              as="select"
+              label="Urun Turu"
+              name="personel-zimmet-urun-turu"
+              value={zimmetForm.urunTuru}
+              onChange={(value) => setZimmetForm((prev) => ({ ...prev, urunTuru: value }))}
+              required
+              placeholderOption={{ value: "", label: "Seciniz" }}
+              selectOptions={[...ZIMMET_URUN_TURU_OPTIONS]}
+            />
+            <FormField
+              label="Teslim Tarihi"
+              name="personel-zimmet-teslim-tarihi"
+              type="date"
+              value={zimmetForm.teslimTarihi}
+              onChange={(value) => setZimmetForm((prev) => ({ ...prev, teslimTarihi: value }))}
+              required
+            />
+            <FormField
+              label="Teslim Eden"
+              name="personel-zimmet-teslim-eden"
+              value={zimmetForm.teslimEden}
+              onChange={(value) => setZimmetForm((prev) => ({ ...prev, teslimEden: value }))}
+              required
+              placeholder="Birim Amiri veya IK gorevlisi"
+            />
+            <FormField
+              as="select"
+              label="Teslim Durumu"
+              name="personel-zimmet-teslim-durumu"
+              value={zimmetForm.teslimDurumu}
+              onChange={(value) => setZimmetForm((prev) => ({ ...prev, teslimDurumu: value }))}
+              required
+              selectOptions={[...ZIMMET_TESLIM_DURUMU_OPTIONS]}
+            />
+            <FormField
+              as="textarea"
+              label="Seri No / Aciklama"
+              name="personel-zimmet-aciklama"
+              value={zimmetForm.aciklama}
+              onChange={(value) => setZimmetForm((prev) => ({ ...prev, aciklama: value }))}
+              rows={4}
+            />
+            {zimmetCreateErrorMessage ? <p className="personel-create-error">{zimmetCreateErrorMessage}</p> : null}
           </form>
         </AppModal>
       ) : null}

@@ -10,6 +10,10 @@ export const endpoints = {
     list: "/surecler",
     detail: (id: number | string) => `/surecler/${id}`
   },
+  zimmetler: {
+    list: "/zimmetler",
+    detail: (id: number | string) => `/zimmetler/${id}`
+  },
   bildirimler: {
     list: "/bildirimler",
     detail: (id: number | string) => `/bildirimler/${id}`

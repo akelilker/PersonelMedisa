@@ -59,7 +59,7 @@ test.describe("e2e smoke", () => {
     await expect(page.locator(".raporlar-result-card")).toContainText("1");
   });
 
-  test("birim amiri gunluk durum bildirir ama puantaj ve kapanis tarafinda read-only kalir", async ({ page }) => {
+  test("birim amiri gunluk kayit girer ama puantaj ve kapanis tarafinda read-only kalir", async ({ page }) => {
     await mockApi(page, "BIRIM_AMIRI");
 
     await login(page, { username: "birim", password: "secret" });
@@ -73,17 +73,17 @@ test.describe("e2e smoke", () => {
 
     await page.getByTestId("menu-gunluk-durum").click();
     await expect(page).toHaveURL(/\/bildirimler$/);
-    await expect(page.locator(".modal-header h2").first()).toContainText("Bildirimler");
+    await expect(page.locator(".modal-header h2").first()).toContainText("Gunluk Kayit Merkezi");
 
     const amirBildirimModal = page.locator(".modal-container").last();
     await expect(amirBildirimModal).toBeVisible();
     await amirBildirimModal.getByLabel("Tarih").fill("2026-04-11");
     await amirBildirimModal.getByLabel("Personel").selectOption("2");
-    await amirBildirimModal.getByLabel("Durum").selectOption("IZINSIZ_GELMEDI");
-    await amirBildirimModal.getByLabel("Açıklama").fill("Habersiz devamsızlık");
+    await amirBildirimModal.getByLabel("Kayit Senaryosu").selectOption("IZINSIZ_GELMEDI");
+    await amirBildirimModal.getByLabel("Not / Aciklama").fill("Habersiz devamsizlik");
     await amirBildirimModal.getByRole("button", { name: "Kaydet" }).click();
 
-    await expect(page.locator(".bildirimler-list")).toContainText("İzinsiz Gelmedi");
+    await expect(page.locator(".bildirimler-list")).toContainText(/[Iİ]zinsiz Gelmedi/i);
     await expect(page.locator(".bildirimler-list")).toContainText("Mehmet Kaya");
 
     await page.goto("/personeller");
@@ -152,30 +152,30 @@ test.describe("e2e smoke", () => {
 
     await page.goto("/bildirimler");
     await expect(page).toHaveURL(/\/bildirimler$/);
-    await expect(page.locator(".modal-header h2").first()).toContainText("Bildirimler");
+    await expect(page.locator(".modal-header h2").first()).toContainText("Gunluk Kayit Merkezi");
 
-    await page.getByRole("button", { name: "Yeni Bildirim" }).click();
+    await page.getByRole("button", { name: "Yeni Gunluk Kayit" }).click();
     const bildirimCreateModal = page.locator(".modal-container").last();
     await expect(bildirimCreateModal).toBeVisible();
     await bildirimCreateModal.getByLabel("Tarih").fill("2026-04-11");
     await bildirimCreateModal.getByLabel("Personel").selectOption("1");
-    await bildirimCreateModal.getByLabel("Durum").selectOption("DEVAMSIZLIK");
-    await bildirimCreateModal.getByLabel("Açıklama").fill("Yeni bildirim kaydı");
+    await bildirimCreateModal.getByLabel("Kayit Senaryosu").selectOption("DEVAMSIZLIK");
+    await bildirimCreateModal.getByLabel("Not / Aciklama").fill("Yeni gunluk kayit");
     await bildirimCreateModal.getByRole("button", { name: "Kaydet" }).click();
 
-    await expect(page.locator(".bildirimler-list")).toContainText("Devamsızlık");
+    await expect(page.locator(".bildirimler-list")).toContainText(/Devams/i);
 
     await page.getByRole("button", { name: /Düzenle|Duzenle/i }).first().click();
     const bildirimEditModal = page.locator(".modal-container").last();
     await expect(bildirimEditModal).toBeVisible();
-    await bildirimEditModal.getByLabel("Durum").selectOption("RAPORLU");
+    await bildirimEditModal.getByLabel("Kayit Senaryosu").selectOption("RAPORLU");
     await bildirimEditModal.getByRole("button", { name: "Kaydet" }).click();
 
     await expect(page.locator(".bildirimler-list")).toContainText("Raporlu");
 
     page.once("dialog", (dialog) => void dialog.accept());
     await page.getByRole("button", { name: /İptal|Iptal/i }).first().click();
-    await expect(page.locator(".bildirimler-list")).toContainText("Durum: İptal");
+    await expect(page.locator(".bildirimler-list")).toContainText(/Kayit Durumu: .*ptal/i);
 
     await page.goto("/finans");
     await expect(page).toHaveURL(/\/finans$/);

@@ -23,7 +23,7 @@ export type CreateSurecPayload = {
   surec_turu: string;
   alt_tur?: string;
   baslangic_tarihi: string;
-  bitis_tarihi: string;
+  bitis_tarihi?: string;
   ucretli_mi?: boolean;
   aciklama?: string;
 };

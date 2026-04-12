@@ -39,6 +39,7 @@ export type AuditAction =
   | "FINANS_UPDATE"
   | "FINANS_CANCEL"
   | "PUANTAJ_UPSERT"
+  | "PUANTAJ_MUHURLE"
   | "HAFTALIK_KAPANIS_CLOSE";
 
 export type AuditLogEntry = {

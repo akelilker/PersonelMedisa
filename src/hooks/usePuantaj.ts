@@ -10,6 +10,7 @@ import {
   processSyncQueue
 } from "../data/data-manager";
 import { runDeduped } from "../lib/in-flight-dedupe";
+import { hesapla, hesapSonucuToGunlukPuantaj } from "../services/puantaj-hesap-motoru";
 import { useAuth } from "../state/auth.store";
 import type {
   GunlukPuantaj,
@@ -277,23 +278,17 @@ export function usePuantaj() {
             : undefined
         };
 
-        const optimistic: GunlukPuantaj = {
+        const hesapSonucu = hesapla({
           personel_id: activeQuery.personelId,
           tarih: activeQuery.tarih,
           gun_tipi: body.gun_tipi,
           hareket_durumu: body.hareket_durumu,
           dayanak: body.dayanak,
-          hesap_etkisi: puantaj?.hesap_etkisi,
           giris_saati: body.giris_saati,
           cikis_saati: body.cikis_saati,
-          gercek_mola_dakika: body.gercek_mola_dakika,
-          hesaplanan_mola_dakika: puantaj?.hesaplanan_mola_dakika,
-          net_calisma_suresi_dakika: puantaj?.net_calisma_suresi_dakika,
-          gunluk_brut_sure_dakika: puantaj?.gunluk_brut_sure_dakika,
-          hafta_tatili_hak_kazandi_mi: puantaj?.hafta_tatili_hak_kazandi_mi,
-          state: puantaj?.state ?? "ACIK",
-          compliance_uyarilari: puantaj?.compliance_uyarilari ?? []
-        };
+          gercek_mola_dakika: body.gercek_mola_dakika
+        });
+        const optimistic = hesapSonucuToGunlukPuantaj(hesapSonucu, puantaj?.state ?? "ACIK");
 
         const previousPuantaj = puantaj;
         mergePuantajCache(activeQuery.personelId, activeQuery.tarih, optimistic);

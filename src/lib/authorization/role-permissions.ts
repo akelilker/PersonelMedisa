@@ -19,6 +19,7 @@ export type AppPermission =
   | "bildirimler.detail.view"
   | "puantaj.view"
   | "puantaj.update"
+  | "puantaj.muhurle"
   | "haftalik-kapanis.view"
   | "haftalik-kapanis.close"
   | "raporlar.view"
@@ -53,6 +54,7 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "bildirimler.detail.view",
     "puantaj.view",
     "puantaj.update",
+    "puantaj.muhurle",
     "haftalik-kapanis.view",
     "haftalik-kapanis.close",
     "raporlar.view",
@@ -85,6 +87,7 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "bildirimler.detail.view",
     "puantaj.view",
     "puantaj.update",
+    "puantaj.muhurle",
     "haftalik-kapanis.view",
     "haftalik-kapanis.close",
     "raporlar.view",

@@ -15,6 +15,7 @@ import {
   formatSurecStateLabel,
   formatSurecTuruLabel
 } from "../../../lib/display/enum-display";
+import { hesaplaIzinBakiye } from "../../../services/izin-hesap-motoru";
 import type { KeyOption } from "../../../types/referans";
 import type { Personel } from "../../../types/personel";
 import type { Surec } from "../../../types/surec";
@@ -276,6 +277,100 @@ function PlaceholderPanel({
       ) : (
         <p className="personel-kart-placeholder-note">Icerik bir sonraki keside baglanacak.</p>
       )}
+    </div>
+  );
+}
+
+function PersonelIzinDevamsizlikPanel({
+  personel,
+  surecler
+}: {
+  personel: Personel;
+  surecler: Surec[];
+}) {
+  const bakiye = useMemo(() => {
+    if (!personel.ise_giris_tarihi) return null;
+    return hesaplaIzinBakiye(
+      {
+        ise_giris_tarihi: personel.ise_giris_tarihi,
+        dogum_tarihi: personel.dogum_tarihi
+      },
+      surecler
+    );
+  }, [personel.ise_giris_tarihi, personel.dogum_tarihi, surecler]);
+
+  const izinSurecleri = useMemo(
+    () =>
+      surecler.filter(
+        (s) => s.surec_turu === "IZIN" && s.state !== "IPTAL"
+      ),
+    [surecler]
+  );
+
+  return (
+    <div
+      id="personel-kart-panel-izin-devamsizlik"
+      role="tabpanel"
+      className="personel-kart-panel"
+      aria-labelledby="personel-kart-tab-izin-devamsizlik"
+    >
+      <div className="personel-detail-grid">
+        <section className="personel-detail-section">
+          <h3>Izin Hakki</h3>
+          {bakiye ? (
+            <div className="personel-izin-infobox" data-testid="izin-bakiye-infobox">
+              <p>
+                <strong>Kidem:</strong> {bakiye.hak_edis.kidem_yil} yil
+              </p>
+              {bakiye.hak_edis.yas !== null ? (
+                <p>
+                  <strong>Yas:</strong> {bakiye.hak_edis.yas}
+                </p>
+              ) : null}
+              <p>
+                <strong>Yillik Izin Hakki:</strong> {bakiye.hak_edis.yillik_izin_gun} gun
+                {bakiye.hak_edis.yas_istisna_uygulandi ? (
+                  <span className="personel-izin-istisna-badge"> (50 yas istisnasi)</span>
+                ) : null}
+              </p>
+              <p>
+                <strong>Kullanilan:</strong> {bakiye.kullanilan_gun} gun
+              </p>
+              <p className="personel-izin-kalan">
+                <strong>Kalan Izin:</strong> {bakiye.kalan_gun} gun
+              </p>
+            </div>
+          ) : (
+            <p>Ise giris tarihi bilgisi eksik; izin hakki hesaplanamadi.</p>
+          )}
+        </section>
+
+        <section className="personel-detail-section">
+          <h3>Izin Hareketleri</h3>
+          {izinSurecleri.length === 0 ? (
+            <p>Kayitli izin hareketi bulunamadi.</p>
+          ) : (
+            <ul className="personel-surec-list personel-izin-list" data-testid="izin-hareket-listesi">
+              {izinSurecleri.map((surec) => (
+                <li key={surec.id} className="personel-surec-card">
+                  <span className="personel-surec-card-type">
+                    {formatSurecTuruLabel(surec.surec_turu)}
+                    {surec.alt_tur ? ` / ${surec.alt_tur}` : ""}
+                  </span>
+                  <span className="personel-surec-card-state">{formatSurecStateLabel(surec.state)}</span>
+                  <span className="personel-surec-card-dates">
+                    Baslangic: {formatDetailValue(surec.baslangic_tarihi)}
+                    {surec.bitis_tarihi ? ` — Bitis: ${surec.bitis_tarihi}` : ""}
+                  </span>
+                  {surec.aciklama ? (
+                    <span className="personel-surec-card-desc">{surec.aciklama}</span>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      </div>
     </div>
   );
 }
@@ -652,37 +747,10 @@ export function PersonelDetayPage() {
                 />
               </div>
 
-              <div
-                id="personel-kart-panel-izin-devamsizlik"
-                role="tabpanel"
-                className="personel-kart-panel"
-                aria-labelledby="personel-kart-tab-izin-devamsizlik"
-                hidden={activeTab !== "izin-devamsizlik"}
-              >
-                <div className="personel-detail-grid">
-                  <section className="personel-detail-section">
-                    <h3>Izin Hakki</h3>
-                    <p>
-                      <strong>Hizmet Suresi:</strong> {formatDetailValue(personel.hizmet_suresi)}
-                    </p>
-                    <p>
-                      <strong>Toplam Izin Hakki:</strong> {formatDetailNumber(personel.toplam_izin_hakki)}
-                    </p>
-                    <p>
-                      <strong>Kullanilan Izin:</strong> {formatDetailNumber(personel.kullanilan_izin)}
-                    </p>
-                    <p>
-                      <strong>Kalan Izin:</strong> {formatDetailNumber(personel.kalan_izin)}
-                    </p>
-                  </section>
-
-                  <section className="personel-detail-section">
-                    <h3>Devamsizlik Dosyasi</h3>
-                    <p>Yasal dayanakli izin ve devamsizlik hareketleri bu sekmede kronolojik olarak izlenecek.</p>
-                    <p className="personel-kart-placeholder-note">Icerik bir sonraki keside baglanacak.</p>
-                  </section>
-                </div>
-              </div>
+              <PersonelIzinDevamsizlikPanel
+                personel={personel}
+                surecler={surecHistory}
+              />
 
               <div
                 id="personel-kart-panel-zimmet-envanter"

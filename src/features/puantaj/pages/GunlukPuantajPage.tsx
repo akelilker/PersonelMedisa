@@ -1,6 +1,8 @@
-import { useEffect, type FormEvent } from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import { muhurleAylikPuantaj } from "../../../api/puantaj.api";
 import { FormField } from "../../../components/form/FormField";
+import { AppModal } from "../../../components/modal/AppModal";
 import { EmptyState } from "../../../components/states/EmptyState";
 import { ErrorState } from "../../../components/states/ErrorState";
 import { LoadingState } from "../../../components/states/LoadingState";
@@ -108,9 +110,15 @@ function ReadonlyField({ label, value }: { label: string; value: string }) {
   );
 }
 
+function currentMonthValue() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+}
+
 export function GunlukPuantajPage() {
   const { hasPermission } = useRoleAccess();
   const canUpdatePuantaj = hasPermission("puantaj.update");
+  const canMuhurle = hasPermission("puantaj.muhurle");
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -129,6 +137,42 @@ export function GunlukPuantajPage() {
     submitPuantaj,
     entryRequiresSaatBilgisi
   } = usePuantaj();
+
+  const isMuhurlendi = puantaj?.state === "MUHURLENDI";
+  const canEdit = canUpdatePuantaj && !isMuhurlendi;
+
+  const [isMuhurModalOpen, setIsMuhurModalOpen] = useState(false);
+  const [muhurDonem, setMuhurDonem] = useState(currentMonthValue());
+  const [isMuhurlemeSending, setIsMuhurlemeSending] = useState(false);
+  const [muhurSonuc, setMuhurSonuc] = useState<string | null>(null);
+  const [muhurHata, setMuhurHata] = useState<string | null>(null);
+
+  const handleMuhurleConfirm = useCallback(async () => {
+    const match = /^(\d{4})-(\d{2})$/.exec(muhurDonem);
+    if (!match) {
+      setMuhurHata("Gecerli bir donem seciniz (YYYY-AA).");
+      return;
+    }
+
+    setIsMuhurlemeSending(true);
+    setMuhurHata(null);
+    setMuhurSonuc(null);
+
+    try {
+      const result = await muhurleAylikPuantaj({
+        yil: Number.parseInt(match[1], 10),
+        ay: Number.parseInt(match[2], 10)
+      });
+      setMuhurSonuc(`${result.donem} donemi icin ${result.muhurlenen_kayit_sayisi} kayit muhurlendi.`);
+      if (activeQuery) {
+        void refetchActive();
+      }
+    } catch {
+      setMuhurHata("Muhurleme islemi basarisiz oldu. Lutfen tekrar deneyin.");
+    } finally {
+      setIsMuhurlemeSending(false);
+    }
+  }, [muhurDonem, activeQuery, refetchActive]);
 
   useEffect(() => {
     const currentState = (location.state ?? null) as Record<string, unknown> | null;
@@ -159,7 +203,7 @@ export function GunlukPuantajPage() {
   }
 
   function handlePuantajSubmit(event: FormEvent<HTMLFormElement>) {
-    void submitPuantaj(event, canUpdatePuantaj);
+    void submitPuantaj(event, canEdit);
   }
 
   return (
@@ -339,7 +383,11 @@ export function GunlukPuantajPage() {
           ) : null}
 
           {submitErrorMessage ? <p className="puantaj-form-error">{submitErrorMessage}</p> : null}
-          {!canUpdatePuantaj ? (
+          {isMuhurlendi ? (
+            <p className="puantaj-form-readonly puantaj-muhur-uyari" data-testid="muhur-uyari">
+              Bu kayit muhurlenistir ve duzenlenemez.
+            </p>
+          ) : !canUpdatePuantaj ? (
             <p className="puantaj-form-readonly">Bu modulu sadece goruntuleme yetkin var.</p>
           ) : null}
 
@@ -347,13 +395,72 @@ export function GunlukPuantajPage() {
             <button
               type="submit"
               className="universal-btn-aux"
-              disabled={!activeQuery || !canUpdatePuantaj || isSubmitting}
+              disabled={!activeQuery || !canEdit || isSubmitting}
+              data-testid="puantaj-kaydet"
             >
               {isSubmitting ? "Kaydediliyor..." : "Kaydet"}
             </button>
           </div>
         </form>
       </div>
+
+      {canMuhurle ? (
+        <div className="puantaj-muhur-section">
+          <button
+            type="button"
+            className="universal-btn-aux puantaj-muhur-btn"
+            data-testid="muhur-ay-kapat-btn"
+            onClick={() => {
+              setIsMuhurModalOpen(true);
+              setMuhurSonuc(null);
+              setMuhurHata(null);
+            }}
+          >
+            Ayi Kapat / Muhurle
+          </button>
+        </div>
+      ) : null}
+
+      {isMuhurModalOpen ? (
+        <AppModal
+          onClose={() => setIsMuhurModalOpen(false)}
+          title="Aylik Puantaj Muhurle"
+        >
+          <div className="muhur-modal-content" data-testid="muhur-modal">
+          <p className="muhur-modal-uyari">
+            <strong>Dikkat:</strong> Bu islem geri alinamaz. Muhurlenen kayitlar degistirilemez ve silinemez.
+          </p>
+          <FormField
+            label="Donem (Yil-Ay)"
+            name="muhur-donem"
+            type="month"
+            value={muhurDonem}
+            onChange={(value) => setMuhurDonem(value)}
+            required
+          />
+          {muhurHata ? <p className="puantaj-form-error">{muhurHata}</p> : null}
+          {muhurSonuc ? <p className="puantaj-form-success" data-testid="muhur-sonuc">{muhurSonuc}</p> : null}
+          <div className="form-actions-row">
+            <button
+              type="button"
+              className="universal-btn-aux"
+              disabled={isMuhurlemeSending}
+              data-testid="muhur-onayla-btn"
+              onClick={() => void handleMuhurleConfirm()}
+            >
+              {isMuhurlemeSending ? "Muhurleniyor..." : "Onayla ve Muhurle"}
+            </button>
+            <button
+              type="button"
+              className="universal-btn-aux"
+              onClick={() => setIsMuhurModalOpen(false)}
+            >
+              Vazgec
+            </button>
+          </div>
+        </div>
+        </AppModal>
+      ) : null}
 
       <div className="module-links">
         <Link to="/haftalik-kapanis">Haftalik kapanisa git</Link>

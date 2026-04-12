@@ -1449,6 +1449,20 @@ export function resolveDemoApiResponse(
     }
   }
 
+  if (pathname === "/puantaj/muhurle" && method === "POST") {
+    const yil = toNumber(body.yil) ?? new Date().getFullYear();
+    const ay = toNumber(body.ay) ?? new Date().getMonth() + 1;
+    const donemPrefix = `${yil}-${String(ay).padStart(2, "0")}`;
+    let count = 0;
+    for (const [key, entry] of Object.entries(demoState.puantajMap)) {
+      if (key.includes(`|${donemPrefix}`) && entry.state !== "MUHURLENDI") {
+        entry.state = "MUHURLENDI";
+        count++;
+      }
+    }
+    return ok({ muhurlenen_kayit_sayisi: count, donem: donemPrefix });
+  }
+
   if (pathname === "/haftalik-kapanis" && method === "POST") {
     return ok({
       id: ++demoState.nextIds.kapanis,

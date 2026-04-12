@@ -451,3 +451,27 @@ export async function upsertGunlukPuantaj(
   logAction({ action: "PUANTAJ_UPSERT", payload: { personel_id: personelId, tarih } });
   return row;
 }
+
+export type MuhurlePayload = {
+  yil: number;
+  ay: number;
+};
+
+export type MuhurleResponse = {
+  muhurlenen_kayit_sayisi: number;
+  donem: string;
+};
+
+export async function muhurleAylikPuantaj(payload: MuhurlePayload): Promise<MuhurleResponse> {
+  const response = await apiRequest<ApiResponse<MuhurleResponse>>(endpoints.puantaj.muhurle, {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+
+  logAction({
+    action: "PUANTAJ_MUHURLE",
+    payload: { yil: payload.yil, ay: payload.ay }
+  });
+
+  return response.data;
+}

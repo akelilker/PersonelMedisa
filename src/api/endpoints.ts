@@ -20,7 +20,8 @@ export const endpoints = {
   },
   puantaj: {
     detail: (personelId: number | string, tarih: string) =>
-      `/gunluk-puantaj/${personelId}/${encodeURIComponent(tarih)}`
+      `/gunluk-puantaj/${personelId}/${encodeURIComponent(tarih)}`,
+    muhurle: "/puantaj/muhurle"
   },
   haftalikKapanis: {
     close: "/haftalik-kapanis"

@@ -107,7 +107,6 @@ const ENGINE_OPTIONS: Array<{ value: ReportEngineType; label: string }> = [
 export function RaporlarPage() {
   const { hasPermission } = useRoleAccess();
   const canViewAylikOzet = hasPermission("aylik-ozet.view");
-  const canViewIsg = hasPermission("isg.view");
   const cacheRevision = useAppDataRevision();
   const [engineType, setEngineType] = useState<ReportEngineType>("personel-ozet");
   const [enginePersonelId, setEnginePersonelId] = useState("");
@@ -215,12 +214,6 @@ export function RaporlarPage() {
           inceleme ve demo/offline kullanÄ±m iÃ§indir.
         </p>
       </div>
-
-      {canViewIsg ? (
-        <div className="module-links raporlar-module-links">
-          <Link to="/isg">ISG Makine Listesi</Link>
-        </div>
-      ) : null}
 
       <form className="form-filter-panel" onSubmit={handleSubmit}>
         <div className="form-field-grid">

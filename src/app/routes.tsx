@@ -12,8 +12,6 @@ import { GunlukPuantajPage } from "../features/puantaj/pages/GunlukPuantajPage";
 import { HaftalikKapanisPage } from "../features/haftalik-kapanis/pages/HaftalikKapanisPage";
 import { RaporlarPage } from "../features/raporlar/pages/RaporlarPage";
 import { FinansPage } from "../features/finans/pages/FinansPage";
-import { IsgMakinelerPage } from "../features/isg/pages/IsgMakinelerPage";
-import { IsgMakineDetayPage } from "../features/isg/pages/IsgMakineDetayPage";
 import { YonetimPaneliPage } from "../features/yonetim/pages/YonetimPaneliPage";
 import { AylikKapanisOzetiPage } from "../features/yonetim/pages/AylikKapanisOzetiPage";
 import { LoginPage } from "../features/auth/pages/LoginPage";
@@ -147,22 +145,6 @@ export function AppRoutes() {
           element={
             <ProtectedRoute requirePermission={ROUTE_PERMISSION.finansPage}>
               <FinansPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="isg"
-          element={
-            <ProtectedRoute requirePermission={ROUTE_PERMISSION.isgPage}>
-              <IsgMakinelerPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="isg/:makineId"
-          element={
-            <ProtectedRoute requirePermission={ROUTE_PERMISSION.isgPage}>
-              <IsgMakineDetayPage />
             </ProtectedRoute>
           }
         />

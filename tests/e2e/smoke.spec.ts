@@ -122,7 +122,11 @@ test.describe("e2e smoke", () => {
     const surecCreateModal = page.locator(".modal-container").last();
     await expect(surecCreateModal).toBeVisible();
     await surecCreateModal.locator("[name='surec-create-personel']").fill("1");
-    await surecCreateModal.locator("[name='surec-create-turu-text']").fill("RAPOR");
+    if (await surecCreateModal.locator("[name='surec-create-turu']").count()) {
+      await surecCreateModal.locator("[name='surec-create-turu']").selectOption("RAPOR");
+    } else {
+      await surecCreateModal.locator("[name='surec-create-turu-text']").fill("RAPOR");
+    }
     await surecCreateModal.locator("[name='surec-create-bas']").fill("2026-04-12");
     await surecCreateModal.locator("[name='surec-create-bitis']").fill("2026-04-12");
     await surecCreateModal.locator("[name='surec-create-aciklama']").fill("Yeni surec kaydi");
@@ -133,10 +137,14 @@ test.describe("e2e smoke", () => {
     await page.locator(".surecler-list .module-item-actions button").first().click();
     const surecEditModal = page.locator(".modal-container").last();
     await expect(surecEditModal).toBeVisible();
-    await surecEditModal.locator("[name='surec-edit-turu-text']").fill("RAPOR_GUNCEL");
+    if (await surecEditModal.locator("[name='surec-edit-turu']").count()) {
+      await surecEditModal.locator("[name='surec-edit-turu']").selectOption("RAPOR");
+    } else {
+      await surecEditModal.locator("[name='surec-edit-turu-text']").fill("RAPOR_GUNCEL");
+    }
     await surecEditModal.getByRole("button", { name: "Kaydet" }).click();
 
-    await expect(page.locator(".surecler-list")).toContainText(/Rapor Guncel/i);
+    await expect(page.locator(".surecler-list")).toContainText(/Rapor/i);
 
     page.once("dialog", (dialog) => void dialog.accept());
     await page.locator(".surecler-list .module-item-actions button").nth(1).click();

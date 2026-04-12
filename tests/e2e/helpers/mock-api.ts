@@ -761,7 +761,7 @@ export async function mockApi(page: Page, role: MockUserRole) {
           return false;
         }
         if (Number.isFinite(subeId)) {
-          const linkedPersonel = personellers.find((personel) => personel.id === item.personel_id);
+          const linkedPersonel = personeller.find((personel) => personel.id === item.personel_id);
           if (!linkedPersonel || linkedPersonel.sube_id !== subeId) {
             return false;
           }
@@ -798,7 +798,7 @@ export async function mockApi(page: Page, role: MockUserRole) {
       surecler.unshift(created);
 
       if (created.surec_turu === "ISTEN_AYRILMA") {
-        const targetPersonel = personellers.find((item) => item.id === created.personel_id);
+        const targetPersonel = personeller.find((item) => item.id === created.personel_id);
         if (targetPersonel) {
           targetPersonel.aktif_durum = "PASIF";
         }
@@ -1081,6 +1081,21 @@ export async function mockApi(page: Page, role: MockUserRole) {
           okBody([
             { id: 1, ad: "Tam Zamanli" },
             { id: 2, ad: "Yari Zamanli" }
+          ])
+        );
+        return;
+      }
+
+      if (path === "/api/referans/surec-turleri") {
+        await fulfillJson(
+          route,
+          200,
+          okBody([
+            { key: "IZIN", label: "Izin" },
+            { key: "RAPOR", label: "Rapor" },
+            { key: "IS_KAZASI", label: "Is Kazasi" },
+            { key: "DEVAMSIZLIK", label: "Devamsizlik" },
+            { key: "ISTEN_AYRILMA", label: "Isten Ayrilma" }
           ])
         );
         return;

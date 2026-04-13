@@ -28,11 +28,6 @@ const kanGrubuOptions = [
   { value: "0 Rh-", label: "0 Rh-" }
 ];
 
-const aktifDurumOptions = [
-  { value: "AKTIF", label: "Aktif" },
-  { value: "PASIF", label: "Pasif" }
-];
-
 export function PersonelCreateFields({
   form,
   setForm,
@@ -218,14 +213,6 @@ export function PersonelCreateFields({
               required
             />
           )}
-          <FormField
-            as="select"
-            label="Aktif Durum"
-            name="create-aktif-durum"
-            value={form.aktifDurum}
-            onChange={(value) => setForm((prev) => ({ ...prev, aktifDurum: value as "AKTIF" | "PASIF" }))}
-            selectOptions={aktifDurumOptions}
-          />
         </div>
       </div>
 

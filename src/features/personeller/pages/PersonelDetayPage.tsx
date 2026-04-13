@@ -303,7 +303,7 @@ function PersonelDosyaHero({
         <DossierField label="Departman / Birim" value={formatReferenceValue(personel.departman_adi, personel.departman_id)} />
         <DossierField label="Gorev / Unvan" value={formatReferenceValue(personel.gorev_adi, personel.gorev_id)} />
         <DossierField
-          label="Durum"
+          label="Calisma Durumu"
           value={durumLabel}
           valueClassName={
             personel.aktif_durum === "PASIF"
@@ -795,11 +795,6 @@ export function PersonelDetayPage() {
     }
   }, [isEditing, isSurecModalOpen, isZimmetModalOpen]);
 
-  const aktifDurumOptions = [
-    { value: "AKTIF", label: formatAktifDurumLabel("AKTIF") },
-    { value: "PASIF", label: formatAktifDurumLabel("PASIF") }
-  ];
-
   function handleEditSubmit(event: FormEvent<HTMLFormElement>) {
     void updatePersonelHandler(event, canEditPersonel);
   }
@@ -884,16 +879,6 @@ export function PersonelDetayPage() {
                   type="tel"
                   value={editForm.telefon}
                   onChange={(value) => setEditForm((prev) => ({ ...prev, telefon: value }))}
-                />
-                <FormField
-                  as="select"
-                  label="Durum"
-                  name="edit-aktif"
-                  value={editForm.aktifDurum}
-                  onChange={(value) =>
-                    setEditForm((prev) => ({ ...prev, aktifDurum: value as "AKTIF" | "PASIF" }))
-                  }
-                  selectOptions={aktifDurumOptions}
                 />
               </div>
 

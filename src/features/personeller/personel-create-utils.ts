@@ -63,7 +63,7 @@ export function buildCreatePersonelPayload(form: CreatePersonelFormState): Creat
     departman_id: parseRequiredPositiveInt(form.departmanId, "Departman ID"),
     gorev_id: parseRequiredPositiveInt(form.gorevId, "Görev ID"),
     personel_tipi_id: parseRequiredPositiveInt(form.personelTipiId, "Personel Tipi ID"),
-    aktif_durum: form.aktifDurum,
+    aktif_durum: "AKTIF",
     ...(form.dogumYeri.trim() ? { dogum_yeri: form.dogumYeri.trim() } : {}),
     ...(form.kanGrubu.trim() ? { kan_grubu: form.kanGrubu.trim() } : {}),
     ...(bagliAmirId !== undefined ? { bagli_amir_id: bagliAmirId } : {})

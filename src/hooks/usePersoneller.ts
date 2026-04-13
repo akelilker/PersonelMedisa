@@ -75,7 +75,6 @@ export type CreatePersonelFormState = {
   departmanId: string;
   gorevId: string;
   personelTipiId: string;
-  aktifDurum: "AKTIF" | "PASIF";
   dogumYeri: string;
   kanGrubu: string;
   bagliAmirId: string;
@@ -94,7 +93,6 @@ export const INITIAL_CREATE_PERSONEL_FORM: CreatePersonelFormState = {
   departmanId: "",
   gorevId: "",
   personelTipiId: "",
-  aktifDurum: "AKTIF",
   dogumYeri: "",
   kanGrubu: "",
   bagliAmirId: ""
@@ -416,7 +414,6 @@ type EditPersonelFormState = {
   ad: string;
   soyad: string;
   telefon: string;
-  aktifDurum: "AKTIF" | "PASIF";
 };
 
 type PersonelSurecFormState = {
@@ -670,8 +667,7 @@ export function usePersonelDetail(
   const [editForm, setEditForm] = useState<EditPersonelFormState>({
     ad: "",
     soyad: "",
-    telefon: "",
-    aktifDurum: "AKTIF"
+    telefon: ""
   });
   const [isSurecModalOpen, setIsSurecModalOpen] = useState(false);
   const [isSurecSubmitting, setIsSurecSubmitting] = useState(false);
@@ -693,8 +689,7 @@ export function usePersonelDetail(
       setEditForm({
         ad: cached.ad,
         soyad: cached.soyad,
-        telefon: cached.telefon ?? "",
-        aktifDurum: cached.aktif_durum
+        telefon: cached.telefon ?? ""
       });
     }
   }, [cached]);
@@ -721,8 +716,7 @@ export function usePersonelDetail(
       setEditForm({
         ad: data.ad,
         soyad: data.soyad,
-        telefon: data.telefon ?? "",
-        aktifDurum: data.aktif_durum
+        telefon: data.telefon ?? ""
       });
     } catch (error) {
       if (shouldRedirectDetailAfterSubeMismatch(error)) {
@@ -915,8 +909,7 @@ export function usePersonelDetail(
     setEditForm({
       ad: personel.ad,
       soyad: personel.soyad,
-      telefon: personel.telefon ?? "",
-      aktifDurum: personel.aktif_durum
+      telefon: personel.telefon ?? ""
     });
   }, [personel]);
 
@@ -938,8 +931,7 @@ export function usePersonelDetail(
       const body = {
         ad: editForm.ad.trim(),
         soyad: editForm.soyad.trim(),
-        telefon: editForm.telefon.trim(),
-        aktif_durum: editForm.aktifDurum
+        telefon: editForm.telefon.trim()
       };
 
       const optimistic: Personel = { ...personel, ...body };
@@ -954,8 +946,7 @@ export function usePersonelDetail(
         setEditForm({
           ad: updated.ad,
           soyad: updated.soyad,
-          telefon: updated.telefon ?? "",
-          aktifDurum: updated.aktif_durum
+          telefon: updated.telefon ?? ""
         });
         setIsEditing(false);
       } catch (error) {
@@ -1021,7 +1012,6 @@ export function usePersonelDetail(
             const nextPersonel = applyTerminationToPersonel(personel);
             mergeCacheEntry<Personel>(detailKey, () => nextPersonel);
             setPersonel(nextPersonel);
-            setEditForm((prev) => ({ ...prev, aktifDurum: "PASIF" }));
           }
 
           setIsSurecModalOpen(false);
@@ -1050,7 +1040,6 @@ export function usePersonelDetail(
             const nextPersonel = applyTerminationToPersonel(personel);
             mergeCacheEntry<Personel>(detailKey, () => nextPersonel);
             setPersonel(nextPersonel);
-            setEditForm((prev) => ({ ...prev, aktifDurum: "PASIF" }));
           }
 
           setIsSurecModalOpen(false);

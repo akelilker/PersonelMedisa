@@ -18,8 +18,8 @@ const UI_PROFILE_LABELS: Record<UiProfile, string> = {
 };
 
 const PERSONEL_DURUM_LABELS: Record<string, string> = {
-  AKTIF: "Aktif",
-  PASIF: "Pasif"
+  AKTIF: "Calisiyor",
+  PASIF: "Ayrildi"
 };
 
 const SUREC_TURU_LABELS: Record<string, string> = {

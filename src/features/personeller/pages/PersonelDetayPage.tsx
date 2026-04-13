@@ -33,6 +33,20 @@ const PERSONEL_SUREC_FORM_ID = "personel-surec-form";
 const PERSONEL_ZIMMET_FORM_ID = "personel-zimmet-form";
 
 type PersonelDosyaTabId = (typeof PERSONEL_DOSYA_TABS)[number]["id"];
+type PersonelTimelineEventTone = "default" | "danger";
+
+type PersonelTimelineEvent = {
+  id: string;
+  tarih: string | null;
+  baslik: string;
+  kaynak: string;
+  ozet: string;
+  aciklama?: string;
+  etiket?: string;
+  tone?: PersonelTimelineEventTone;
+  sortValue: number;
+  sortRank: number;
+};
 
 function formatDetailValue(value: string | null | undefined) {
   if (typeof value !== "string") {
@@ -57,6 +71,147 @@ function formatReferenceValue(label?: string, id?: number) {
 
 function keyOptionsToSelectOptions(options: KeyOption[]) {
   return options.map((option) => ({ value: option.key, label: option.label }));
+}
+
+function parseTimelineDate(value: string | null | undefined) {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  const parsed = Date.parse(`${trimmed}T00:00:00`);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function normalizeTimelineText(value: string | null | undefined) {
+  const formatted = formatDetailValue(value);
+  return formatted === "-" ? null : formatted;
+}
+
+function createTimelineSortValue(value: string | null | undefined) {
+  const parsed = parseTimelineDate(value);
+  return parsed ?? Number.NEGATIVE_INFINITY;
+}
+
+function buildSurecTitle(surec: Surec) {
+  const anaBaslik = formatSurecTuruLabel(surec.surec_turu);
+  const altBaslik = normalizeTimelineText(
+    surec.alt_tur ? formatSurecTuruLabel(surec.alt_tur) : null
+  );
+
+  if (altBaslik && altBaslik !== anaBaslik) {
+    return `${anaBaslik} / ${altBaslik}`;
+  }
+
+  return anaBaslik;
+}
+
+function buildSurecOzet(surec: Surec) {
+  const parts = [
+    surec.baslangic_tarihi ? `Baslangic: ${surec.baslangic_tarihi}` : null,
+    surec.bitis_tarihi ? `Bitis: ${surec.bitis_tarihi}` : null
+  ].filter((part): part is string => part !== null);
+
+  return parts.length > 0 ? parts.join(" / ") : "Surec kaydi";
+}
+
+function buildPersonelTimeline(
+  personel: Personel,
+  surecler: Surec[],
+  zimmetler: Zimmet[]
+): PersonelTimelineEvent[] {
+  const events: PersonelTimelineEvent[] = [];
+  const iseGirisTarihi = normalizeTimelineText(personel.ise_giris_tarihi);
+
+  if (iseGirisTarihi) {
+    const iseGirisOzeti = [
+      normalizeTimelineText(personel.sicil_no) ? `Sicil ${personel.sicil_no}` : null,
+      normalizeTimelineText(personel.departman_adi),
+      normalizeTimelineText(personel.gorev_adi)
+    ]
+      .filter((part): part is string => part !== null)
+      .join(" / ");
+
+    events.push({
+      id: `personel-ise-giris-${personel.id}`,
+      tarih: iseGirisTarihi,
+      baslik: "Ise Giris",
+      kaynak: "Personel",
+      ozet: iseGirisOzeti || "Personel kaydi olusturuldu.",
+      sortValue: createTimelineSortValue(iseGirisTarihi),
+      sortRank: 4
+    });
+  }
+
+  for (const surec of surecler) {
+    const tarih = normalizeTimelineText(surec.baslangic_tarihi ?? surec.bitis_tarihi);
+    const surecTuru = surec.surec_turu.trim().toUpperCase();
+    events.push({
+      id: `surec-${surec.id}`,
+      tarih,
+      baslik: buildSurecTitle(surec),
+      kaynak: "Surec",
+      ozet: buildSurecOzet(surec),
+      aciklama: normalizeTimelineText(surec.aciklama) ?? undefined,
+      etiket: normalizeTimelineText(formatSurecStateLabel(surec.state)) ?? undefined,
+      tone: surecTuru === "ISTEN_AYRILMA" ? "danger" : "default",
+      sortValue: createTimelineSortValue(tarih),
+      sortRank: surecTuru === "ISTEN_AYRILMA" ? 0 : 1
+    });
+  }
+
+  for (const zimmet of zimmetler) {
+    const teslimTarihi = normalizeTimelineText(zimmet.teslim_tarihi);
+    const urun = formatZimmetUrunTuruLabel(zimmet.urun_turu);
+    const teslimDurumu = formatZimmetTeslimDurumuLabel(zimmet.teslim_durumu);
+    const teslimEden = normalizeTimelineText(zimmet.teslim_eden);
+    const ortakAciklama = normalizeTimelineText(zimmet.aciklama) ?? undefined;
+
+    if (teslimTarihi) {
+      events.push({
+        id: `zimmet-teslim-${zimmet.id}`,
+        tarih: teslimTarihi,
+        baslik: "Zimmet Teslim",
+        kaynak: "Zimmet",
+        ozet: [urun, teslimDurumu, teslimEden].filter((part): part is string => Boolean(part)).join(" / "),
+        aciklama: ortakAciklama,
+        etiket: normalizeTimelineText(formatZimmetKayitDurumuLabel(zimmet.zimmet_durumu)) ?? undefined,
+        sortValue: createTimelineSortValue(teslimTarihi),
+        sortRank: 2
+      });
+    }
+
+    const iadeTarihi = normalizeTimelineText(zimmet.iade_tarihi);
+    if (iadeTarihi) {
+      events.push({
+        id: `zimmet-iade-${zimmet.id}`,
+        tarih: iadeTarihi,
+        baslik: "Zimmet Iadesi",
+        kaynak: "Zimmet",
+        ozet: [urun, teslimEden].filter((part): part is string => Boolean(part)).join(" / "),
+        aciklama: ortakAciklama,
+        etiket: formatZimmetKayitDurumuLabel("IADE_EDILDI"),
+        sortValue: createTimelineSortValue(iadeTarihi),
+        sortRank: 3
+      });
+    }
+  }
+
+  return [...events].sort((left, right) => {
+    if (right.sortValue !== left.sortValue) {
+      return right.sortValue - left.sortValue;
+    }
+
+    if (left.sortRank !== right.sortRank) {
+      return left.sortRank - right.sortRank;
+    }
+
+    return right.id.localeCompare(left.id, "tr");
+  });
 }
 
 function DossierField({
@@ -411,20 +566,29 @@ function PersonelIzinDevamsizlikPanel({
 }
 
 function PersonelSurecGecmisiPanel({
+  personel,
   canAccessSurecler,
   canCreateSurec,
   isLoading,
   errorMessage,
   surecler,
+  zimmetler,
   onOpenCreateModal
 }: {
+  personel: Personel;
   canAccessSurecler: boolean;
   canCreateSurec: boolean;
   isLoading: boolean;
   errorMessage: string | null;
   surecler: Surec[];
+  zimmetler: Zimmet[];
   onOpenCreateModal: () => void;
 }) {
+  const timeline = useMemo(
+    () => buildPersonelTimeline(personel, surecler, zimmetler),
+    [personel, surecler, zimmetler]
+  );
+
   if (!canAccessSurecler) {
     return (
       <div className="personel-kart-placeholder">
@@ -450,31 +614,38 @@ function PersonelSurecGecmisiPanel({
 
       {isLoading ? <p className="personel-kart-placeholder-note">Surec gecmisi yukleniyor...</p> : null}
       {!isLoading && errorMessage ? <p className="personel-create-error">{errorMessage}</p> : null}
-      {!isLoading && !errorMessage && surecler.length === 0 ? (
+      {!isLoading && !errorMessage && timeline.length === 0 ? (
         <div className="personel-kart-placeholder">
           <h3>Kayit Bulunamadi</h3>
-          <p>Bu personel icin henuz surec kaydi bulunmuyor.</p>
+          <p>Bu personel icin henuz kronolojik olay kaydi bulunmuyor.</p>
         </div>
       ) : null}
 
-      {!isLoading && !errorMessage && surecler.length > 0 ? (
-        <ul className="personel-surec-list">
-          {surecler.map((surec) => (
-            <li key={surec.id} className="personel-surec-item">
-              <div className="personel-surec-item-head">
-                <strong>{formatSurecTuruLabel(surec.surec_turu)}</strong>
-                <span className={`personel-surec-state${surec.state === "IPTAL" ? " is-cancelled" : ""}`}>
-                  {formatSurecStateLabel(surec.state)}
-                </span>
+      {!isLoading && !errorMessage && timeline.length > 0 ? (
+        <ol className="personel-timeline" data-testid="personel-surec-timeline">
+          {timeline.map((event) => (
+            <li
+              key={event.id}
+              className={`personel-timeline-item${event.tone === "danger" ? " is-danger" : ""}`}
+            >
+              <div className="personel-timeline-marker" aria-hidden="true" />
+              <div className="personel-timeline-body">
+                <div className="personel-timeline-head">
+                  <strong>{event.baslik}</strong>
+                  {event.etiket ? <span className="personel-surec-state">{event.etiket}</span> : null}
+                </div>
+                <div className="personel-timeline-meta">
+                  <span>{event.tarih ?? "-"}</span>
+                  <span>{event.kaynak}</span>
+                </div>
+                <p className="personel-timeline-summary">{event.ozet}</p>
+                {event.aciklama ? (
+                  <p className="personel-timeline-note">{event.aciklama}</p>
+                ) : null}
               </div>
-              <div className="personel-surec-item-meta">
-                <span>Baslangic: {formatDetailValue(surec.baslangic_tarihi)}</span>
-                <span>Bitis: {formatDetailValue(surec.bitis_tarihi)}</span>
-              </div>
-              <p className="personel-surec-item-note">{formatDetailValue(surec.aciklama)}</p>
             </li>
           ))}
-        </ul>
+        </ol>
       ) : null}
     </div>
   );
@@ -814,11 +985,13 @@ export function PersonelDetayPage() {
                 hidden={activeTab !== "surec-gecmisi"}
               >
                 <PersonelSurecGecmisiPanel
+                  personel={personel}
                   canAccessSurecler={canAccessSurecler}
                   canCreateSurec={canCreateSurec}
                   isLoading={isSurecHistoryLoading}
                   errorMessage={surecHistoryErrorMessage}
                   surecler={surecHistory}
+                  zimmetler={zimmetHistory}
                   onOpenCreateModal={handleOpenSurecModal}
                 />
               </div>

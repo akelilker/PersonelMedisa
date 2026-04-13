@@ -34,6 +34,9 @@ export const KAYIT_SUREC_SUREC_FORM_ID = "kayit-surec-surec-form";
 type KayitSurecWorkspaceProps = {
   activeTab: KayitTab;
   onTabChange: (tab: KayitTab) => void;
+  onClose: () => void;
+  primaryActionLabel: string;
+  primaryFormId: string;
 };
 
 const EMPTY_REFS: PersonelReferenceBundle = {
@@ -96,7 +99,13 @@ function resetSurecFormKeepingPersonel(personelId: string) {
   };
 }
 
-export function KayitSurecWorkspace({ activeTab, onTabChange }: KayitSurecWorkspaceProps) {
+export function KayitSurecWorkspace({
+  activeTab,
+  onTabChange,
+  onClose,
+  primaryActionLabel,
+  primaryFormId
+}: KayitSurecWorkspaceProps) {
   const { hasPermission } = useRoleAccess();
   const canCreatePersonel = hasPermission("personeller.create");
   const canCreateSurec = hasPermission("surecler.create");
@@ -357,6 +366,14 @@ export function KayitSurecWorkspace({ activeTab, onTabChange }: KayitSurecWorksp
                   />
                 </form>
                 {personelInfo ? <p className="workspace-success">{personelInfo}</p> : null}
+                <div className="universal-btn-group workspace-form-actions">
+                  <button type="submit" form={primaryFormId} className="universal-btn-save" disabled={personelSubmitting}>
+                    {primaryActionLabel}
+                  </button>
+                  <button type="button" className="universal-btn-cancel" onClick={onClose}>
+                    Kapat
+                  </button>
+                </div>
               </>
             ) : null}
           </section>
@@ -405,6 +422,14 @@ export function KayitSurecWorkspace({ activeTab, onTabChange }: KayitSurecWorksp
                     </button>
                   ) : null}
                   {surecInfo ? <p className="workspace-success workspace-success--inline">{surecInfo}</p> : null}
+                </div>
+                <div className="universal-btn-group workspace-form-actions">
+                  <button type="submit" form={primaryFormId} className="universal-btn-save" disabled={surecSubmitting}>
+                    {primaryActionLabel}
+                  </button>
+                  <button type="button" className="universal-btn-cancel" onClick={onClose}>
+                    Kapat
+                  </button>
                 </div>
               </>
             ) : null}

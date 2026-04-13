@@ -158,18 +158,14 @@ export function AppShell({ children }: AppShellProps) {
         <AppModal
           title="Kayıt ve Süreç İşlemleri"
           onClose={() => setIsKayitModalOpen(false)}
-          footer={
-            <div className="universal-btn-group modal-footer-actions">
-              <button type="submit" form={kayitPrimaryFormId} className="universal-btn-save">
-                {kayitPrimaryLabel}
-              </button>
-              <button type="button" className="universal-btn-cancel" onClick={() => setIsKayitModalOpen(false)}>
-                Kapat
-              </button>
-            </div>
-          }
         >
-          <KayitSurecWorkspace activeTab={kayitTab} onTabChange={setKayitTab} />
+          <KayitSurecWorkspace
+            activeTab={kayitTab}
+            onTabChange={setKayitTab}
+            onClose={() => setIsKayitModalOpen(false)}
+            primaryActionLabel={kayitPrimaryLabel}
+            primaryFormId={kayitPrimaryFormId}
+          />
         </AppModal>
       ) : null}
 

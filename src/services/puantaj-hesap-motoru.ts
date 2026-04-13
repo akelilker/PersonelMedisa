@@ -72,13 +72,15 @@ export function hesaplaBrutSure(giris?: string, cikis?: string): number {
 
 // ---------------------------------------------------------------------------
 // İş Kanunu md.68 – Otomatik mola düşümü
-//   <= 240 dk (4 saat)        → 0 dk mola
+//   0 dk                      → 0 dk mola
+//   1 – 240 dk (4 saat)       → 15 dk mola
 //   241 – 450 dk (4-7.5 saat) → 30 dk mola
 //   > 450 dk (7.5 saat+)      → 60 dk mola
 // ---------------------------------------------------------------------------
 
 export function hesaplaYasalMolaDakika(brutDakika: number): number {
-  if (brutDakika <= 240) return 0;
+  if (brutDakika <= 0) return 0;
+  if (brutDakika <= 240) return 15;
   if (brutDakika <= 450) return 30;
   return 60;
 }

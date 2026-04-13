@@ -49,10 +49,13 @@ describe("hesaplaBrutSure", () => {
 // =========================================================================
 
 describe("hesaplaYasalMolaDakika", () => {
-  it("4 saat ve altı → mola yok", () => {
-    expect(hesaplaYasalMolaDakika(240)).toBe(0);
-    expect(hesaplaYasalMolaDakika(120)).toBe(0);
+  it("0 dakika çalışma → mola yok", () => {
     expect(hesaplaYasalMolaDakika(0)).toBe(0);
+  });
+
+  it("4 saat ve altı çalışma → 15 dk mola", () => {
+    expect(hesaplaYasalMolaDakika(240)).toBe(15);
+    expect(hesaplaYasalMolaDakika(120)).toBe(15);
   });
 
   it("4-7.5 saat arası → 30 dk mola", () => {
@@ -283,7 +286,7 @@ describe("hesapla – entegre senaryolar", () => {
     expect(sonuc.hafta_tatili_hak_kazandi_mi).toBe(true);
   });
 
-  it("kısa mesai: 09:00-13:00 → mola 0", () => {
+  it("kısa mesai: 09:00-13:00 → 15 dk mola", () => {
     const sonuc = hesapla({
       personel_id: 2,
       tarih: "2026-04-14",
@@ -292,8 +295,8 @@ describe("hesapla – entegre senaryolar", () => {
     });
 
     expect(sonuc.gunluk_brut_sure_dakika).toBe(240);
-    expect(sonuc.hesaplanan_mola_dakika).toBe(0);
-    expect(sonuc.net_calisma_suresi_dakika).toBe(240);
+    expect(sonuc.hesaplanan_mola_dakika).toBe(15);
+    expect(sonuc.net_calisma_suresi_dakika).toBe(225);
   });
 
   it("yarım gün: 08:00-12:30 → 270 dk brüt, 30 dk mola, 240 dk net", () => {

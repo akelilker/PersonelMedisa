@@ -100,8 +100,8 @@ export function AppShell({ children }: AppShellProps) {
   const isHomeRoute = pathname === "/";
   const moduleModal = useMemo(() => (isLoginRoute ? null : resolveModuleModal(pathname)), [isLoginRoute, pathname]);
   const isModuleOverlayRoute = moduleModal !== null;
-  const showShellHeaderActions = !isModuleOverlayRoute && !isLoginRoute;
-  const showUserBar = !isLoginRoute && !isModuleOverlayRoute;
+  const showShellHeaderActions = !isModuleOverlayRoute && !isLoginRoute && !isHomeRoute;
+  const showUserBar = !isLoginRoute && !isModuleOverlayRoute && !isHomeRoute;
   const backBarTarget = resolveBackBar(pathname);
 
   const [isKayitModalOpen, setIsKayitModalOpen] = useState(false);

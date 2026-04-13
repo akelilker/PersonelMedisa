@@ -1,6 +1,5 @@
 import { Link, Outlet, Route, Routes } from "react-router-dom";
 import { AppShell } from "./AppShell";
-import { HomeDashboard } from "./HomeDashboard";
 import { ProtectedRoute } from "../router/ProtectedRoute";
 import { PersonellerPage } from "../features/personeller/pages/PersonellerPage";
 import { PersonelDetayPage } from "../features/personeller/pages/PersonelDetayPage";
@@ -67,7 +66,7 @@ export function AppRoutes() {
           </ProtectedRoute>
         }
       >
-        <Route index element={<HomeDashboard />} />
+        <Route index element={<></>} />
         <Route
           path="personeller"
           element={

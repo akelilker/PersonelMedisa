@@ -20,6 +20,7 @@ type HeaderNotification = {
 
 type ShellHeaderActionsProps = {
   contextLabel: string;
+  minimal?: boolean;
 };
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -122,7 +123,7 @@ function mapBildirimLevel(bildirimTuru: string): NotificationLevel {
   return "neutral";
 }
 
-export function ShellHeaderActions({ contextLabel }: ShellHeaderActionsProps) {
+export function ShellHeaderActions({ contextLabel, minimal = false }: ShellHeaderActionsProps) {
   const rootRef = useRef<HTMLDivElement | null>(null);
 
   const revision = useAppDataRevision();
@@ -338,29 +339,33 @@ export function ShellHeaderActions({ contextLabel }: ShellHeaderActionsProps) {
     .join(" ");
 
   return (
-    <div className="icons-row" ref={rootRef}>
-      <div className="icons-row-left">
-        <span className="shell-context-label" title="Aktif ekran">
-          {contextLabel}
-        </span>
-      </div>
-      <div className="pwa-install-center">
-        <span className="shell-sync-label" title="Uygulama veri durumu">
-          {syncLabel}
-        </span>
-      </div>
+    <div className={`icons-row${minimal ? " icons-row--minimal" : ""}`} ref={rootRef}>
+      {!minimal ? (
+        <div className="icons-row-left">
+          <span className="shell-context-label" title="Aktif ekran">
+            {contextLabel}
+          </span>
+        </div>
+      ) : null}
+      {!minimal ? (
+        <div className="pwa-install-center">
+          <span className="shell-sync-label" title="Uygulama veri durumu">
+            {syncLabel}
+          </span>
+        </div>
+      ) : null}
       <div className="icons-row-right">
-        {subeControl.kind === "all" ? (
+        {!minimal && subeControl.kind === "all" ? (
           <span className="sube-header-badge" title="Aktif şube filtresi yok">
             Tüm şubeler
           </span>
         ) : null}
-        {subeControl.kind === "single" ? (
+        {!minimal && subeControl.kind === "single" ? (
           <span className="sube-header-badge" title="Atanan şube">
             {subeControl.label}
           </span>
         ) : null}
-        {subeControl.kind === "multi" ? (
+        {!minimal && subeControl.kind === "multi" ? (
           <div className="sube-selector-wrap">
             <button
               type="button"

@@ -7,6 +7,12 @@
   min-height: 34px;
 }
 
+.icons-row--minimal {
+  grid-template-columns: 1fr;
+  justify-items: end;
+  min-height: 38px;
+}
+
 .icons-row-left {
   display: flex;
   align-items: center;
@@ -46,6 +52,10 @@
   justify-content: flex-end;
   align-items: center;
   gap: 16px;
+}
+
+.icons-row--minimal .icons-row-right {
+  gap: 14px;
 }
 
 .sube-selector-wrap {
@@ -97,6 +107,10 @@
   cursor: pointer;
   padding: 4px;
   transition: color 0.2s ease, transform 0.2s ease;
+}
+
+.icons-row--minimal .icon-btn {
+  padding: 2px;
 }
 
 .icon-btn svg {

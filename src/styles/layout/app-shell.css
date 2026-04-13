@@ -136,18 +136,18 @@ body.modal-open .app-shell::before {
   max-width: var(--app-shell-max-width);
   width: 100%;
   margin: 0 auto;
-  padding: 18px;
+  padding: 16px 18px;
   background: linear-gradient(180deg, #050d18 0%, #0a0e16 100%);
-  border: 1px solid var(--line-hero-card);
+  border: 0.75px solid rgba(198, 212, 224, 0.56);
   border-radius: var(--radius-lg);
   cursor: pointer;
   text-align: center;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
   box-shadow:
-    0 4px 10px rgba(0, 0, 0, 0.22),
-    0 4px 16px rgba(var(--theme-color-rgb), 0.1);
+    0 2px 7px rgba(0, 0, 0, 0.2),
+    0 2px 10px rgba(var(--theme-color-rgb), 0.07);
   margin-bottom: 5px;
-  height: 58px;
+  height: 54px;
   overflow: hidden;
   box-sizing: border-box;
   display: flex;
@@ -187,9 +187,11 @@ body.modal-open .app-shell::before {
 @media (hover: hover) {
   .menu-btn:hover:not(:disabled) {
     transform: translateY(-1px);
+    border-color: rgba(227, 235, 243, 0.82);
     box-shadow:
       0 6px 14px rgba(0, 0, 0, 0.25),
-      0 6px 22px rgba(var(--theme-color-rgb), 0.14);
+      0 6px 22px rgba(var(--theme-color-rgb), 0.14),
+      0 0 0 1px rgba(227, 235, 243, 0.2);
   }
 
   .menu-btn:hover:not(:disabled).is-active {
@@ -267,7 +269,7 @@ body.modal-open .app-shell::before {
   }
 
   .menu-btn {
-    height: 53px;
+    height: 49px;
     margin-bottom: 8px;
   }
 

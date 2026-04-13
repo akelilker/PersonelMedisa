@@ -100,7 +100,7 @@ export function AppShell({ children }: AppShellProps) {
   const isHomeRoute = pathname === "/";
   const moduleModal = useMemo(() => (isLoginRoute ? null : resolveModuleModal(pathname)), [isLoginRoute, pathname]);
   const isModuleOverlayRoute = moduleModal !== null;
-  const showShellHeaderActions = !isModuleOverlayRoute && !isLoginRoute && !isHomeRoute;
+  const showShellHeaderActions = !isModuleOverlayRoute && !isLoginRoute;
   const showUserBar = !isLoginRoute && !isModuleOverlayRoute && !isHomeRoute;
   const backBarTarget = resolveBackBar(pathname);
 
@@ -124,7 +124,7 @@ export function AppShell({ children }: AppShellProps) {
       <main className="content-wrap">
         <div className="shell-top-stack">
           <Hero title="Personel Yönetim Sistemi" />
-          {showShellHeaderActions ? <ShellHeaderActions contextLabel="Ana panel" /> : null}
+          {showShellHeaderActions ? <ShellHeaderActions contextLabel="Ana panel" minimal={isHomeRoute} /> : null}
         </div>
 
         {showUserBar ? (

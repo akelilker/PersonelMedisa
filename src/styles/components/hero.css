@@ -7,13 +7,13 @@
   background: linear-gradient(180deg, #060d16 0%, #08090c 100%);
   border: 1px solid var(--line-hero-card);
   border-radius: var(--radius-lg);
-  padding: 12px 16px 16px;
+  padding: 14px 16px 18px;
   box-shadow:
     0 4px 15px rgba(0, 0, 0, 0.5),
     0 4px 22px rgba(var(--theme-color-rgb), 0.08),
     inset 0 1px 0 rgba(255, 255, 255, 0.18),
     inset 0 -1px 0 rgba(92, 102, 114, 0.28);
-  min-height: 66px;
+  min-height: 72px;
   display: flex;
   align-items: center;
 }
@@ -91,8 +91,8 @@
   .hero {
     --hero-logo-width: 40px;
     --hero-spacer-width: 20px;
-    min-height: 71px;
-    padding: 10px 12px;
+    min-height: 77px;
+    padding: 12px 12px 16px;
   }
 
   .hero h1 {

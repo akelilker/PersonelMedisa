@@ -57,8 +57,10 @@ test.describe("e2e smoke", () => {
     await expect(page.locator(".modal-header h2").first()).toContainText("Raporlar");
     await page.getByRole("button", { name: /Raporu .*al.*/i }).click();
     await expect(page.locator(".raporlar-result-card")).toContainText("1");
+    await expect(page.locator(".raporlar-result-card")).toContainText("sgk_prim_gun");
     await page.locator("[name='engine-turu']").selectOption("puantaj");
     await expect(page.locator(".raporlar-engine-card")).toContainText("sgk_prim_gun");
+    await expect(page.locator(".raporlar-engine-card")).toContainText("eksik_gun_nedeni_kodu");
     await expect(page.locator(".raporlar-engine-table")).toContainText("2026-04");
     await expect(page.locator(".raporlar-engine-table")).toContainText("30");
   });

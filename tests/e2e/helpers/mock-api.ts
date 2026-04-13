@@ -549,6 +549,7 @@ let bildirimIdCounter = 800;
         sgk_donem: sgkOzeti?.donem,
         sgk_prim_gun: sgkOzeti?.sgk_prim_gun,
         sgk_eksik_gun_sayisi: sgkOzeti?.eksik_gun_sayisi,
+        sgk_eksik_gun_nedeni_kodu: sgkOzeti?.eksik_gun_nedeni_kodu ?? null,
         sgk_ayin_takvim_gun_sayisi: sgkOzeti?.ayin_takvim_gun_sayisi,
         sgk_hesaplama_modu: sgkOzeti?.hesaplama_modu
       },
@@ -1642,7 +1643,8 @@ let bildirimIdCounter = 800;
                 ad_soyad: "Ayse Yilmaz",
                 net_calisma_dakika: 510,
                 sgk_donem: sgkOzeti?.donem ?? "2026-04",
-                sgk_prim_gun: sgkOzeti?.sgk_prim_gun ?? 30
+                sgk_prim_gun: sgkOzeti?.sgk_prim_gun ?? 30,
+                eksik_gun_nedeni_kodu: sgkOzeti?.eksik_gun_nedeni_kodu ?? "-"
               }
             ]
           })

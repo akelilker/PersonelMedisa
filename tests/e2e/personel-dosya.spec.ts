@@ -17,6 +17,8 @@ test.describe("personel dosyasi surec akisi", () => {
     await page.getByRole("tab", { name: "Puantaj" }).click();
     await expect(page.getByTestId("personel-sgk-prim-gun-card")).toContainText(/30 Gun/i);
     await expect(page.getByText(/30 gun standart/i)).toBeVisible();
+    await expect(page.locator("#personel-kart-panel-puantaj")).toContainText(/Eksik Gun Nedeni/i);
+    await expect(page.locator("#personel-kart-panel-puantaj")).toContainText("-");
 
     await page.getByRole("button", { name: "Islemler" }).click();
     await page.getByRole("button", { name: "Surec Ekle" }).click();

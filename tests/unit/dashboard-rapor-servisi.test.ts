@@ -206,6 +206,7 @@ describe("hesaplaAylikSgkPuantajOzeti", () => {
     expect(sonuc.kayit_gun_sayisi).toBe(3);
     expect(sonuc.eksik_gun_sayisi).toBe(1);
     expect(sonuc.sgk_prim_gun).toBe(29);
+    expect(sonuc.eksik_gun_nedeni_kodu).toBe("15 - Devamsizlik");
     expect(sonuc.hesaplama_modu).toBe("TAKVIM_GUNU");
   });
 
@@ -228,6 +229,49 @@ describe("hesaplaAylikSgkPuantajOzeti", () => {
     const sonuc = hesaplaAylikSgkPuantajOzeti(kayitlar, 2026, 4);
     expect(sonuc.eksik_gun_sayisi).toBe(0);
     expect(sonuc.sgk_prim_gun).toBe(30);
+    expect(sonuc.eksik_gun_nedeni_kodu).toBeNull();
     expect(sonuc.hesaplama_modu).toBe("OTUZ_GUN_STANDART");
+  });
+
+  it("sadece raporlu eksik gunlerde istirahat kodunu doner", () => {
+    const kayitlar = [
+      makePuantaj({
+        personel_id: 1,
+        tarih: "2026-04-10",
+        hareket_durumu: "Gelmedi",
+        dayanak: "Raporlu_Hastalik"
+      }),
+      makePuantaj({
+        personel_id: 1,
+        tarih: "2026-04-11",
+        hareket_durumu: "Gelmedi",
+        dayanak: "Raporlu_Is_Kazasi"
+      })
+    ];
+
+    const sonuc = hesaplaAylikSgkPuantajOzeti(kayitlar, 2026, 4);
+    expect(sonuc.eksik_gun_sayisi).toBe(2);
+    expect(sonuc.eksik_gun_nedeni_kodu).toBe("01 - Istirahat");
+  });
+
+  it("rapor ve devamsizlik ayni ayda birlikte varsa birden fazla kodunu doner", () => {
+    const kayitlar = [
+      makePuantaj({
+        personel_id: 1,
+        tarih: "2026-04-10",
+        hareket_durumu: "Gelmedi",
+        dayanak: "Raporlu_Hastalik"
+      }),
+      makePuantaj({
+        personel_id: 1,
+        tarih: "2026-04-11",
+        hareket_durumu: "Gelmedi",
+        dayanak: "Yok_Izinsiz"
+      })
+    ];
+
+    const sonuc = hesaplaAylikSgkPuantajOzeti(kayitlar, 2026, 4);
+    expect(sonuc.eksik_gun_sayisi).toBe(2);
+    expect(sonuc.eksik_gun_nedeni_kodu).toBe("12 - Birden Fazla");
   });
 });

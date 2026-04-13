@@ -456,6 +456,7 @@ function PersonelPuantajPanel({
 }) {
   const sgkPrimGunu = typeof personel.sgk_prim_gun === "number" ? `${personel.sgk_prim_gun} Gun` : "-";
   const eksikGun = typeof personel.sgk_eksik_gun_sayisi === "number" ? `${personel.sgk_eksik_gun_sayisi} Gun` : "-";
+  const eksikGunNedeni = formatDetailValue(personel.sgk_eksik_gun_nedeni_kodu);
   const takvimGun = typeof personel.sgk_ayin_takvim_gun_sayisi === "number" ? `${personel.sgk_ayin_takvim_gun_sayisi} Gun` : "-";
   const donem = formatDetailValue(personel.sgk_donem);
   const hesaplamaModu = formatSgkHesaplamaModuLabel(personel.sgk_hesaplama_modu);
@@ -479,6 +480,7 @@ function PersonelPuantajPanel({
         <DossierRecord label="Donem" value={donem} />
         <DossierRecord label="SGK Prim Gunu" value={sgkPrimGunu} />
         <DossierRecord label="Eksik Gun" value={eksikGun} />
+        <DossierRecord label="Eksik Gun Nedeni" value={eksikGunNedeni} />
         <DossierRecord label="Takvim Gun Sayisi" value={takvimGun} />
         <DossierRecord label="Hesaplama Modu" value={hesaplamaModu} />
       </DossierSection>

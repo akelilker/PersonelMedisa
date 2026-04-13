@@ -31,6 +31,7 @@ export type AylikSgkPuantajOzeti = {
   donem: string;
   kayit_gun_sayisi: number;
   eksik_gun_sayisi: number;
+  eksik_gun_nedeni_kodu: string | null;
   sgk_prim_gun: number;
   ayin_takvim_gun_sayisi: number;
   hesaplama_modu: SgkPrimGunuHesaplamaModu;
@@ -74,6 +75,41 @@ function shouldCountAsEksikGun(kayit: GunlukPuantaj) {
   );
 }
 
+function hesaplaEksikGunNedeniKodu(kayitlar: GunlukPuantaj[], yil: number, ay: number) {
+  let raporVar = false;
+  let devamsizlikVar = false;
+
+  for (const kayit of kayitlar) {
+    const parsed = parsePuantajYearMonth(kayit.tarih);
+    if (!parsed || parsed.yil !== yil || parsed.ay !== ay || !shouldCountAsEksikGun(kayit)) {
+      continue;
+    }
+
+    if (kayit.dayanak === "Raporlu_Hastalik" || kayit.dayanak === "Raporlu_Is_Kazasi") {
+      raporVar = true;
+      continue;
+    }
+
+    if (kayit.dayanak === "Yok_Izinsiz" || kayit.dayanak === undefined) {
+      devamsizlikVar = true;
+    }
+  }
+
+  if (raporVar && devamsizlikVar) {
+    return "12 - Birden Fazla";
+  }
+
+  if (raporVar) {
+    return "01 - Istirahat";
+  }
+
+  if (devamsizlikVar) {
+    return "15 - Devamsizlik";
+  }
+
+  return null;
+}
+
 export function hesaplaAylikSgkPuantajOzeti(
   kayitlar: GunlukPuantaj[],
   yil: number,
@@ -102,6 +138,8 @@ export function hesaplaAylikSgkPuantajOzeti(
     eksik_gun_sayisi: eksikGunAnahtarlari.size,
     ucret_tipi: ucretTipi
   });
+  const eksikGunNedeniKodu =
+    sgkSonucu.eksik_gun_sayisi > 0 ? hesaplaEksikGunNedeniKodu(kayitlar, yil, ay) : null;
 
   return {
     yil,
@@ -109,6 +147,7 @@ export function hesaplaAylikSgkPuantajOzeti(
     donem,
     kayit_gun_sayisi: gunAnahtarlari.size,
     eksik_gun_sayisi: sgkSonucu.eksik_gun_sayisi,
+    eksik_gun_nedeni_kodu: eksikGunNedeniKodu,
     sgk_prim_gun: sgkSonucu.sgk_prim_gun,
     ayin_takvim_gun_sayisi: sgkSonucu.ayin_takvim_gun_sayisi,
     hesaplama_modu: sgkSonucu.hesaplama_modu,

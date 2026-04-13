@@ -151,6 +151,7 @@ export function generateReport(type: ReportEngineType, filters: ModuleFilterBase
           donem: ozet.donem,
           kayit_gun_sayisi: ozet.kayit_gun_sayisi,
           eksik_gun_sayisi: ozet.eksik_gun_sayisi,
+          eksik_gun_nedeni_kodu: ozet.eksik_gun_nedeni_kodu ?? "-",
           sgk_prim_gun: ozet.sgk_prim_gun,
           ayin_takvim_gun_sayisi: ozet.ayin_takvim_gun_sayisi,
           hesaplama_modu: ozet.hesaplama_modu

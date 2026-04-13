@@ -31,6 +31,7 @@ export type Personel = {
   sgk_donem?: string;
   sgk_prim_gun?: number;
   sgk_eksik_gun_sayisi?: number;
+  sgk_eksik_gun_nedeni_kodu?: string | null;
   sgk_ayin_takvim_gun_sayisi?: number;
   sgk_hesaplama_modu?: string;
   pasiflik_durumu_etiketi?: string | null;

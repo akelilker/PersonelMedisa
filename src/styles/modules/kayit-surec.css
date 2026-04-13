@@ -35,7 +35,7 @@
 .kayit-workspace-grid,
 .surec-workspace-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 16px;
   align-items: start;
 }
@@ -246,3 +246,5 @@
     border-top: 1px solid rgba(var(--theme-color-rgb), 0.26);
   }
 }
+
+

@@ -113,7 +113,6 @@ export function KayitSurecWorkspace({ activeTab, onTabChange }: KayitSurecWorksp
   const [personelSubmitting, setPersonelSubmitting] = useState(false);
   const [personelError, setPersonelError] = useState<string | null>(null);
   const [personelInfo, setPersonelInfo] = useState<string | null>(null);
-  const [lastCreatedPersonel, setLastCreatedPersonel] = useState<Personel | null>(null);
 
   const [surecForm, setSurecForm] = useState<SurecFormState>(INITIAL_SUREC_FORM);
   const [surecSubmitting, setSurecSubmitting] = useState(false);
@@ -217,7 +216,6 @@ export function KayitSurecWorkspace({ activeTab, onTabChange }: KayitSurecWorksp
     try {
       const created = await createPersonel(buildCreatePersonelPayload(personelForm));
       setPersoneller((prev) => [created, ...prev.filter((item) => item.id !== created.id)]);
-      setLastCreatedPersonel(created);
       setPersonelForm(INITIAL_CREATE_PERSONEL_FORM);
       setSurecForm(resetSurecFormKeepingPersonel(String(created.id)));
       setPersonelInfo("Personel kaydı oluşturuldu. Süreç sekmesine geçiliyor.");
@@ -347,47 +345,20 @@ export function KayitSurecWorkspace({ activeTab, onTabChange }: KayitSurecWorksp
             ) : null}
 
             {!bootstrapLoading && !bootstrapError ? (
-              <form id={KAYIT_SUREC_PERSONEL_FORM_ID} className="workspace-form" onSubmit={handlePersonelSubmit}>
-                <PersonelCreateFields
-                  form={personelForm}
-                  setForm={setPersonelForm}
-                  refs={refs}
-                  createErrorMessage={personelError}
-                  referenceError={null}
-                  className="workspace-form-stack"
-                />
-              </form>
+              <>
+                <form id={KAYIT_SUREC_PERSONEL_FORM_ID} className="workspace-form" onSubmit={handlePersonelSubmit}>
+                  <PersonelCreateFields
+                    form={personelForm}
+                    setForm={setPersonelForm}
+                    refs={refs}
+                    createErrorMessage={personelError}
+                    referenceError={null}
+                    className="workspace-form-stack"
+                  />
+                </form>
+                {personelInfo ? <p className="workspace-success">{personelInfo}</p> : null}
+              </>
             ) : null}
-          </section>
-
-          <section className="workspace-surface-card workspace-surface-card--supporting">
-            <div className="workspace-surface-header">
-              <h3>Akış Özeti</h3>
-              <p>Bu modal veri giriş merkezi olarak çalışır. Personel kartı ayrı butonda görüntülenir.</p>
-            </div>
-
-            <div className="workspace-checklist">
-              <div className="workspace-check-item">1. Personel bilgilerini eksiksiz gir.</div>
-              <div className="workspace-check-item">2. Kaydettiğin kişiyi süreç sekmesine otomatik taşı.</div>
-              <div className="workspace-check-item">3. İzin, rapor veya hareket kaydını aynı modal içinde aç.</div>
-            </div>
-
-            {personelInfo ? <p className="workspace-success">{personelInfo}</p> : null}
-
-            {lastCreatedPersonel ? (
-              <div className="workspace-personel-preview">
-                <strong>
-                  {lastCreatedPersonel.ad} {lastCreatedPersonel.soyad}
-                </strong>
-                <p>Sicil: {lastCreatedPersonel.sicil_no ?? "-"}</p>
-                <p>Bölüm: {lastCreatedPersonel.departman_adi ?? lastCreatedPersonel.departman_id ?? "-"}</p>
-                <p>Telefon: {lastCreatedPersonel.telefon ?? "-"}</p>
-              </div>
-            ) : (
-              <div className="workspace-empty-hint">
-                Henüz yeni personel kaydı oluşturulmadı. Kayıt sonrası bu alanda seçilen kişi özeti görünür.
-              </div>
-            )}
           </section>
         </div>
       ) : (
@@ -506,3 +477,5 @@ export function KayitSurecWorkspace({ activeTab, onTabChange }: KayitSurecWorksp
     </div>
   );
 }
+
+

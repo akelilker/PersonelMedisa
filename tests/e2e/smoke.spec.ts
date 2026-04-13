@@ -56,8 +56,12 @@ test.describe("e2e smoke", () => {
     await expect(page).toHaveURL(/\/raporlar$/);
     await expect(page.locator(".modal-header h2").first()).toContainText("Raporlar");
     await page.getByRole("button", { name: /Raporu .*al.*/i }).click();
-    await expect(page.locator(".raporlar-result-card")).toContainText("1");
-    await expect(page.locator(".raporlar-result-card")).toContainText("sgk_prim_gun");
+    await expect(page.getByTestId("raporlar-resmi-sonuc")).toContainText("1");
+    await expect(page.getByTestId("raporlar-resmi-sonuc")).toContainText("sgk_prim_gun");
+    await expect(page.getByTestId("raporlar-aylik-kapanis")).toContainText("Ayl");
+    await expect(page.getByTestId("raporlar-aylik-kapanis-table")).toContainText("Personel Ad");
+    await expect(page.getByTestId("raporlar-aylik-kapanis-table")).toContainText("SGK Prim G");
+    await expect(page.getByTestId("raporlar-aylik-kapanis-table")).toContainText("30");
     await page.locator("[name='engine-turu']").selectOption("puantaj");
     await expect(page.locator(".raporlar-engine-card")).toContainText("sgk_prim_gun");
     await expect(page.locator(".raporlar-engine-card")).toContainText("eksik_gun_nedeni_kodu");

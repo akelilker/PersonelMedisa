@@ -5,12 +5,22 @@ import { FormField } from "../../../components/form/FormField";
 import { EmptyState } from "../../../components/states/EmptyState";
 import { ErrorState } from "../../../components/states/ErrorState";
 import { LoadingState } from "../../../components/states/LoadingState";
-import { useAppDataRevision } from "../../../data/data-manager";
+import {
+  dataCacheKeys,
+  getActiveSube,
+  getAppData,
+  getCacheEntry,
+  useAppDataRevision
+} from "../../../data/data-manager";
 import { useRoleAccess } from "../../../hooks/use-role-access";
 import { formatReportCellValue } from "../../../lib/display/enum-display";
 import type { ModuleFilterBase } from "../../../lib/filters/module-filter-schema";
 import { downloadReportCsv, printCurrentReportWindow } from "../../../reports/export-report";
 import { generateReport, type ReportEngineRow, type ReportEngineType } from "../../../reports/report-engine";
+import { hesaplaAylikKapanisListesi } from "../../../services/dashboard-rapor-servisi";
+import type { PaginatedResult } from "../../../types/api";
+import type { Personel } from "../../../types/personel";
+import type { GunlukPuantaj } from "../../../types/puantaj";
 import type { RaporAktiflik, RaporFiltreleri, RaporSatiri, RaporTipi } from "../../../types/rapor";
 
 type RaporFormState = {
@@ -104,6 +114,35 @@ const ENGINE_OPTIONS: Array<{ value: ReportEngineType; label: string }> = [
   { value: "finans", label: "Finans (önbellek, 1. sayfa)" }
 ];
 
+function readCachedKapanisPersoneller(subeId: number | null): Personel[] {
+  const key = dataCacheKeys.personellerList(subeId, "", "tum", "", "", 1);
+  return getCacheEntry<PaginatedResult<Personel>>(key)?.items ?? [];
+}
+
+function readCachedPuantajKayitlari(): GunlukPuantaj[] {
+  const cache = getAppData().cache;
+  const kayitlar: GunlukPuantaj[] = [];
+
+  for (const key of Object.keys(cache)) {
+    if (!key.startsWith("puantaj:")) {
+      continue;
+    }
+
+    const row = cache[key]?.data as GunlukPuantaj | null | undefined;
+    if (!row || typeof row !== "object") {
+      continue;
+    }
+
+    kayitlar.push(row);
+  }
+
+  return kayitlar;
+}
+
+function formatKapanisEksikGunNedeni(value: string | null) {
+  return value && value.trim() ? value : "-";
+}
+
 export function RaporlarPage() {
   const { hasPermission } = useRoleAccess();
   const canViewAylikOzet = hasPermission("aylik-ozet.view");
@@ -151,8 +190,26 @@ export function RaporlarPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
+  const [appliedFilters, setAppliedFilters] = useState<RaporFiltreleri | null>(null);
 
   const columns = useMemo(() => collectColumns(rows), [rows]);
+  const aylikKapanisRows = useMemo(() => {
+    if (!canViewAylikOzet || !appliedFilters) {
+      return [];
+    }
+
+    return hesaplaAylikKapanisListesi(
+      readCachedKapanisPersoneller(getActiveSube()),
+      readCachedPuantajKayitlari(),
+      {
+        personel_id: appliedFilters.personel_id,
+        departman_id: appliedFilters.departman_id,
+        aktiflik: appliedFilters.aktiflik,
+        baslangic_tarihi: appliedFilters.baslangic_tarihi,
+        bitis_tarihi: appliedFilters.bitis_tarihi
+      }
+    );
+  }, [appliedFilters, cacheRevision, canViewAylikOzet]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -171,6 +228,7 @@ export function RaporlarPage() {
         bitis_tarihi: form.bitisTarihi || undefined,
         aktiflik: form.aktiflik
       };
+      setAppliedFilters(filters);
 
       const result = await fetchRapor(form.raporTipi, filters);
       setRows(result.rows);
@@ -198,6 +256,7 @@ export function RaporlarPage() {
     setTotal(null);
     setErrorMessage(null);
     setHasSearched(false);
+    setAppliedFilters(null);
   }
 
   return (
@@ -298,7 +357,7 @@ export function RaporlarPage() {
       ) : null}
 
       {!isLoading && !errorMessage && rows.length > 0 ? (
-        <div className="raporlar-result-card">
+        <div className="raporlar-result-card" data-testid="raporlar-resmi-sonuc">
           <p>
             <strong>Toplam Kayıt:</strong> {total ?? rows.length}
           </p>
@@ -322,6 +381,48 @@ export function RaporlarPage() {
               </tbody>
             </table>
           </div>
+        </div>
+      ) : null}
+
+      {canViewAylikOzet ? (
+        <div className="raporlar-result-card raporlar-kapanis-card" data-testid="raporlar-aylik-kapanis">
+          <div className="raporlar-kapanis-header">
+            <div>
+              <h3>Aylik Kapanis Ozeti</h3>
+              <p>Personel puantaj kapanisini tek listede SGK prim gunuyle birlikte gosterir.</p>
+            </div>
+          </div>
+
+          {!hasSearched ? (
+            <p className="raporlar-engine-empty">Filtreleri calistirdiginda aylik kapanis listesi burada gorunecek.</p>
+          ) : aylikKapanisRows.length === 0 ? (
+            <EmptyState title="Kapanis verisi yok" message="Bu filtrede gosterilecek personel puantaj kapanisi bulunamadi." />
+          ) : (
+            <div className="raporlar-table-wrap" data-testid="raporlar-aylik-kapanis-table">
+              <table className="raporlar-table">
+                <thead>
+                  <tr>
+                    <th>Personel Adi</th>
+                    <th>Donem</th>
+                    <th>SGK Prim Gunu</th>
+                    <th>Eksik Gun Sayisi</th>
+                    <th>Eksik Gun Nedeni</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {aylikKapanisRows.map((row) => (
+                    <tr key={`${row.personel_id}-${row.donem}`}>
+                      <td>{row.personel_adi}</td>
+                      <td>{row.donem}</td>
+                      <td>{row.sgk_prim_gun}</td>
+                      <td>{row.eksik_gun_sayisi}</td>
+                      <td>{formatKapanisEksikGunNedeni(row.eksik_gun_nedeni_kodu)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       ) : null}
 

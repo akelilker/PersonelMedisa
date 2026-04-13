@@ -4,7 +4,7 @@ import type { FinansKalem } from "../types/finans";
 import type { GunlukPuantaj } from "../types/puantaj";
 import { dataCacheKeys, getActiveSube, getAppData, getAppDataRevision } from "../data/data-manager";
 import { getReportCacheMeta, recordOfflineReportGeneration } from "./report-cache-meta";
-import { hesaplaAylikSgkPuantajOzetleri } from "../services/dashboard-rapor-servisi";
+import { hesaplaAylikKapanisListesi } from "../services/dashboard-rapor-servisi";
 
 export { getReportCacheMeta };
 import type { ModuleFilterBase } from "../lib/filters/module-filter-schema";
@@ -131,32 +131,20 @@ export function generateReport(type: ReportEngineType, filters: ModuleFilterBase
     }
     case "puantaj": {
       const kayitlar = collectPuantajFromCache(filters);
-      const personelMap = new Map(
-        readCachedPersonelFirstPage(sube, { ...filters, personel_id: null }).map((personel) => [
-          personel.id,
-          `${personel.ad} ${personel.soyad}`
-        ])
-      );
-      const kayitlarByPersonel = new Map<number, GunlukPuantaj[]>();
-      for (const kayit of kayitlar) {
-        const personelKayitlari = kayitlarByPersonel.get(kayit.personel_id) ?? [];
-        personelKayitlari.push(kayit);
-        kayitlarByPersonel.set(kayit.personel_id, personelKayitlari);
-      }
-
-      rows = Array.from(kayitlarByPersonel.entries()).flatMap(([personelId, personelKayitlari]) =>
-        hesaplaAylikSgkPuantajOzetleri(personelKayitlari).map((ozet) => ({
-          personel_id: personelId,
-          ad_soyad: personelMap.get(personelId) ?? "-",
-          donem: ozet.donem,
-          kayit_gun_sayisi: ozet.kayit_gun_sayisi,
-          eksik_gun_sayisi: ozet.eksik_gun_sayisi,
-          eksik_gun_nedeni_kodu: ozet.eksik_gun_nedeni_kodu ?? "-",
-          sgk_prim_gun: ozet.sgk_prim_gun,
-          ayin_takvim_gun_sayisi: ozet.ayin_takvim_gun_sayisi,
-          hesaplama_modu: ozet.hesaplama_modu
-        }))
-      );
+      const personeller = readCachedPersonelFirstPage(sube, { ...filters, personel_id: null });
+      rows = hesaplaAylikKapanisListesi(personeller, kayitlar, {
+        personel_id: filters.personel_id ?? undefined,
+        aktiflik: filters.durum === "AKTIF" || filters.durum === "PASIF" ? filters.durum.toLowerCase() as "aktif" | "pasif" : "tum",
+        baslangic_tarihi: filters.date_range?.bas,
+        bitis_tarihi: filters.date_range?.bit
+      }).map((satir) => ({
+        personel_id: satir.personel_id,
+        ad_soyad: satir.personel_adi,
+        donem: satir.donem,
+        eksik_gun_sayisi: satir.eksik_gun_sayisi,
+        eksik_gun_nedeni_kodu: satir.eksik_gun_nedeni_kodu ?? "-",
+        sgk_prim_gun: satir.sgk_prim_gun
+      }));
       break;
     }
     case "finans": {

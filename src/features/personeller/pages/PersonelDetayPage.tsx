@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { Link, useParams } from "react-router-dom";
 import { FormField } from "../../../components/form/FormField";
 import { AppModal } from "../../../components/modal/AppModal";
@@ -76,8 +76,93 @@ function DossierField({
   );
 }
 
+function DossierRecord({
+  label,
+  value
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="personel-dosya-record">
+      <span className="personel-dosya-record-label">{label}</span>
+      <span className="personel-dosya-record-value">{value}</span>
+    </div>
+  );
+}
+
+function DossierSection({
+  title,
+  description,
+  children
+}: {
+  title: string;
+  description?: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className="personel-dosya-section">
+      <div className="personel-dosya-section-head">
+        <h3>{title}</h3>
+        {description ? <p>{description}</p> : null}
+      </div>
+      <div className="personel-dosya-record-list">{children}</div>
+    </section>
+  );
+}
+
 function PersonelDosyaHero({
-  personel,
+  personel
+}: {
+  personel: Personel;
+}) {
+  const durumLabel =
+    personel.aktif_durum === "PASIF"
+      ? formatDetailValue(personel.pasiflik_durumu_etiketi) !== "-"
+        ? formatDetailValue(personel.pasiflik_durumu_etiketi)
+        : formatAktifDurumLabel(personel.aktif_durum)
+      : formatAktifDurumLabel(personel.aktif_durum);
+  const sicil = formatDetailValue(personel.sicil_no);
+  const departman = formatReferenceValue(personel.departman_adi, personel.departman_id);
+  const gorev = formatReferenceValue(personel.gorev_adi, personel.gorev_id);
+  const heroSummary = [sicil !== "-" ? `Sicil ${sicil}` : null, departman !== "-" ? departman : null, gorev !== "-" ? gorev : null]
+    .filter((part): part is string => part != null)
+    .join(" / ");
+
+  return (
+    <section className="personel-dosya-hero">
+      <div className="personel-dosya-hero-head">
+        <div className="personel-dosya-hero-copy">
+          <p className="personel-dosya-kicker">Personel Dosyasi</p>
+          <h3>
+            {personel.ad} {personel.soyad}
+          </h3>
+          <p className="personel-dosya-sub">{heroSummary || "Kurumsal personel kaydi"}</p>
+        </div>
+      </div>
+
+      <div className="personel-dosya-hero-grid">
+        <DossierField label="Ad" value={personel.ad} />
+        <DossierField label="Soyad" value={personel.soyad} />
+        <DossierField label="Sicil No" value={formatDetailValue(personel.sicil_no)} />
+        <DossierField label="Departman / Birim" value={formatReferenceValue(personel.departman_adi, personel.departman_id)} />
+        <DossierField label="Gorev / Unvan" value={formatReferenceValue(personel.gorev_adi, personel.gorev_id)} />
+        <DossierField
+          label="Durum"
+          value={durumLabel}
+          valueClassName={
+            personel.aktif_durum === "PASIF"
+              ? "personel-dosya-field-value personel-dosya-field-value--danger"
+              : "personel-dosya-field-value"
+          }
+        />
+        <DossierField label="Ise Giris Tarihi" value={formatDetailValue(personel.ise_giris_tarihi)} />
+      </div>
+    </section>
+  );
+}
+
+function PersonelDosyaActionRow({
   canEditPersonel,
   canAccessSurecler,
   canCreateSurec,
@@ -88,7 +173,6 @@ function PersonelDosyaHero({
   onOpenSurecModal,
   onOpenSurecHistory
 }: {
-  personel: Personel;
   canEditPersonel: boolean;
   canAccessSurecler: boolean;
   canCreateSurec: boolean;
@@ -136,111 +220,62 @@ function PersonelDosyaHero({
     return items;
   }, [canAccessSurecler, canCreateSurec, canEditPersonel, onCloseActionMenu, onOpenSurecHistory, onOpenSurecModal, onStartEdit]);
 
-  const durumLabel =
-    personel.aktif_durum === "PASIF"
-      ? formatDetailValue(personel.pasiflik_durumu_etiketi) !== "-"
-        ? formatDetailValue(personel.pasiflik_durumu_etiketi)
-        : formatAktifDurumLabel(personel.aktif_durum)
-      : formatAktifDurumLabel(personel.aktif_durum);
+  if (actionItems.length === 0) {
+    return null;
+  }
 
   return (
-    <section className="personel-dosya-hero">
-      <div className="personel-dosya-hero-head">
-        <div className="personel-dosya-hero-copy">
-          <p className="personel-dosya-kicker">Personel Dosyasi</p>
-          <h3>
-            {personel.ad} {personel.soyad}
-          </h3>
-          <p className="personel-dosya-sub">
-            Bilgi merkezi gorunumu. Kart icerigi salt okunur dosya mantigiyla izlenir.
-          </p>
-        </div>
-
-        {actionItems.length > 0 ? (
-          <div className="personel-dosya-action-host">
-            <button
-              type="button"
-              className="universal-btn-aux"
-              onClick={onToggleActionMenu}
-              aria-expanded={isActionMenuOpen}
-            >
-              Islemler
+    <div className="personel-dosya-actions-row">
+      <div className="personel-dosya-actions-spacer" aria-hidden="true" />
+      <div className="personel-dosya-action-host">
+        <button
+          type="button"
+          className="universal-btn-aux"
+          onClick={onToggleActionMenu}
+          aria-expanded={isActionMenuOpen}
+        >
+          Islemler
+        </button>
+        <div className={`settings-dropdown personel-dosya-action-menu${isActionMenuOpen ? " open" : ""}`}>
+          {actionItems.map((item) => (
+            <button key={item.id} type="button" onClick={item.onSelect}>
+              {item.label}
             </button>
-            <div className={`settings-dropdown personel-dosya-action-menu${isActionMenuOpen ? " open" : ""}`}>
-              {actionItems.map((item) => (
-                <button key={item.id} type="button" onClick={item.onSelect}>
-                  {item.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        ) : null}
+          ))}
+        </div>
       </div>
-
-      <div className="personel-dosya-hero-grid">
-        <DossierField label="Ad" value={personel.ad} />
-        <DossierField label="Soyad" value={personel.soyad} />
-        <DossierField label="Sicil No" value={formatDetailValue(personel.sicil_no)} />
-        <DossierField label="Departman / Birim" value={formatReferenceValue(personel.departman_adi, personel.departman_id)} />
-        <DossierField label="Gorev / Unvan" value={formatReferenceValue(personel.gorev_adi, personel.gorev_id)} />
-        <DossierField
-          label="Durum"
-          value={durumLabel}
-          valueClassName={
-            personel.aktif_durum === "PASIF"
-              ? "personel-dosya-field-value personel-dosya-field-value--danger"
-              : "personel-dosya-field-value"
-          }
-        />
-        <DossierField label="Ise Giris Tarihi" value={formatDetailValue(personel.ise_giris_tarihi)} />
-      </div>
-    </section>
+    </div>
   );
 }
 
 function PersonelKartPanelGenelBilgiler({ personel }: { personel: Personel }) {
   return (
-    <div className="personel-detail-grid">
-      <section className="personel-detail-section">
-        <h3>Kimlik ve Iletisim</h3>
-        <p>
-          <strong>T.C. Kimlik No:</strong> {personel.tc_kimlik_no}
-        </p>
-        <p>
-          <strong>Telefon:</strong> {formatDetailValue(personel.telefon)}
-        </p>
-        <p>
-          <strong>Dogum Tarihi:</strong> {formatDetailValue(personel.dogum_tarihi)}
-        </p>
-        <p>
-          <strong>Dogum Yeri:</strong> {formatDetailValue(personel.dogum_yeri)}
-        </p>
-        <p>
-          <strong>Kan Grubu:</strong> {formatDetailValue(personel.kan_grubu)}
-        </p>
-        <p>
-          <strong>Sube:</strong> {formatReferenceValue(personel.sube_adi, personel.sube_id)}
-        </p>
-      </section>
+    <div className="personel-dosya-sections">
+      <DossierSection
+        title="Kimlik ve Iletisim"
+        description="Temel kimlik, iletisim ve lokasyon verileri bu dosyada salt okunur izlenir."
+      >
+        <DossierRecord label="T.C. Kimlik No" value={formatDetailValue(personel.tc_kimlik_no)} />
+        <DossierRecord label="Telefon" value={formatDetailValue(personel.telefon)} />
+        <DossierRecord label="Dogum Tarihi" value={formatDetailValue(personel.dogum_tarihi)} />
+        <DossierRecord label="Dogum Yeri" value={formatDetailValue(personel.dogum_yeri)} />
+        <DossierRecord label="Kan Grubu" value={formatDetailValue(personel.kan_grubu)} />
+        <DossierRecord label="Sube" value={formatReferenceValue(personel.sube_adi, personel.sube_id)} />
+      </DossierSection>
 
-      <section className="personel-detail-section">
-        <h3>Organizasyon ve Acil Durum</h3>
-        <p>
-          <strong>Personel Tipi:</strong> {formatReferenceValue(personel.personel_tipi_adi, personel.personel_tipi_id)}
-        </p>
-        <p>
-          <strong>Bagli Amir:</strong> {formatReferenceValue(personel.bagli_amir_adi, personel.bagli_amir_id)}
-        </p>
-        <p>
-          <strong>Acil Durum Kisisi:</strong> {formatDetailValue(personel.acil_durum_kisi)}
-        </p>
-        <p>
-          <strong>Acil Durum Telefonu:</strong> {formatDetailValue(personel.acil_durum_telefon)}
-        </p>
-        <p>
-          <strong>Pasiflik Etiketi:</strong> {formatDetailValue(personel.pasiflik_durumu_etiketi)}
-        </p>
-      </section>
+      <DossierSection
+        title="Organizasyon ve Acil Durum"
+        description="Bagli organizasyon, yonetim hatti ve acil durum bilgileri burada tutulur."
+      >
+        <DossierRecord
+          label="Personel Tipi"
+          value={formatReferenceValue(personel.personel_tipi_adi, personel.personel_tipi_id)}
+        />
+        <DossierRecord label="Bagli Amir" value={formatReferenceValue(personel.bagli_amir_adi, personel.bagli_amir_id)} />
+        <DossierRecord label="Acil Durum Kisisi" value={formatDetailValue(personel.acil_durum_kisi)} />
+        <DossierRecord label="Acil Durum Telefonu" value={formatDetailValue(personel.acil_durum_telefon)} />
+        <DossierRecord label="Pasiflik Etiketi" value={formatDetailValue(personel.pasiflik_durumu_etiketi)} />
+      </DossierSection>
     </div>
   );
 }
@@ -360,7 +395,7 @@ function PersonelIzinDevamsizlikPanel({
                   <span className="personel-surec-card-state">{formatSurecStateLabel(surec.state)}</span>
                   <span className="personel-surec-card-dates">
                     Baslangic: {formatDetailValue(surec.baslangic_tarihi)}
-                    {surec.bitis_tarihi ? ` — Bitis: ${surec.bitis_tarihi}` : ""}
+                    {surec.bitis_tarihi ? ` | Bitis: ${surec.bitis_tarihi}` : ""}
                   </span>
                   {surec.aciklama ? (
                     <span className="personel-surec-card-desc">{surec.aciklama}</span>
@@ -639,18 +674,21 @@ export function PersonelDetayPage() {
 
       {!isLoading && !errorMessage && personel ? (
         <div className="personel-detail-card">
-          <PersonelDosyaHero
-            personel={personel}
-            canEditPersonel={canEditPersonel}
-            canAccessSurecler={canAccessSurecler}
-            canCreateSurec={canCreateSurec}
-            isActionMenuOpen={isActionMenuOpen}
-            onToggleActionMenu={() => setIsActionMenuOpen((prev) => !prev)}
-            onCloseActionMenu={() => setIsActionMenuOpen(false)}
-            onStartEdit={() => setIsEditing(true)}
-            onOpenSurecModal={handleOpenSurecModal}
-            onOpenSurecHistory={handleOpenSurecHistory}
-          />
+          <PersonelDosyaHero personel={personel} />
+
+          {!isEditing ? (
+            <PersonelDosyaActionRow
+              canEditPersonel={canEditPersonel}
+              canAccessSurecler={canAccessSurecler}
+              canCreateSurec={canCreateSurec}
+              isActionMenuOpen={isActionMenuOpen}
+              onToggleActionMenu={() => setIsActionMenuOpen((prev) => !prev)}
+              onCloseActionMenu={() => setIsActionMenuOpen(false)}
+              onStartEdit={() => setIsEditing(true)}
+              onOpenSurecModal={handleOpenSurecModal}
+              onOpenSurecHistory={handleOpenSurecHistory}
+            />
+          ) : null}
 
           {isEditing ? (
             <form className="personel-edit-form" onSubmit={handleEditSubmit}>

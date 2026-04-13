@@ -467,31 +467,27 @@
 
 .personel-detail-card {
   display: grid;
-  gap: var(--space-2);
-  padding: var(--space-3);
-  border: 1px solid var(--line-soft);
-  border-radius: var(--radius-md);
+  gap: var(--space-3);
 }
 
 .personel-dosya-hero {
   display: grid;
   gap: var(--space-3);
-  padding: var(--space-2);
+  padding: var(--space-3);
   border: 1px solid var(--line-soft);
-  border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.02);
+  border-radius: var(--radius-md);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.015));
 }
 
 .personel-dosya-hero-head {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
+  align-items: flex-end;
   gap: var(--space-2);
 }
 
 .personel-dosya-hero-copy {
   display: grid;
-  gap: 4px;
+  gap: 6px;
 }
 
 .personel-dosya-kicker {
@@ -505,13 +501,27 @@
 
 .personel-dosya-hero-copy h3 {
   margin: 0;
-  font-size: 1.15rem;
+  font-size: 1.3rem;
 }
 
 .personel-dosya-sub {
   margin: 0;
   color: var(--txt-muted);
   font-size: 13px;
+  line-height: 1.45;
+}
+
+.personel-dosya-actions-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.personel-dosya-actions-spacer {
+  flex: 1 1 auto;
 }
 
 .personel-dosya-action-host {
@@ -525,21 +535,23 @@
 .personel-dosya-hero-grid {
   display: grid;
   gap: var(--space-2);
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  padding-top: var(--space-2);
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
 }
 
 .personel-dosya-field {
   display: grid;
   gap: 4px;
-  padding: 10px 12px;
-  border: 1px solid var(--line-soft);
-  border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.02);
+  min-width: 0;
 }
 
 .personel-dosya-field-label {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--txt-muted);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .personel-dosya-field-value {
@@ -557,16 +569,14 @@
 
 .personel-detail-grid {
   display: grid;
-  gap: var(--space-2);
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--space-3);
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
 }
 
 .personel-detail-section {
   display: grid;
   gap: var(--space-2);
-  padding: var(--space-2);
-  border: 1px solid var(--line-soft);
-  border-radius: var(--radius-sm);
+  padding: 0;
 }
 
 .personel-detail-section h3 {
@@ -574,21 +584,82 @@
   font-size: 1rem;
 }
 
+.personel-dosya-sections {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.personel-dosya-section {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.personel-dosya-section + .personel-dosya-section {
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--line-soft);
+}
+
+.personel-dosya-section-head {
+  display: grid;
+  gap: 4px;
+}
+
+.personel-dosya-section-head h3,
+.personel-dosya-section-head p {
+  margin: 0;
+}
+
+.personel-dosya-section-head p {
+  color: var(--txt-muted);
+  font-size: 13px;
+}
+
+.personel-dosya-record-list {
+  display: grid;
+  gap: 0;
+}
+
+.personel-dosya-record {
+  display: grid;
+  grid-template-columns: minmax(150px, 220px) minmax(0, 1fr);
+  gap: var(--space-2);
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.personel-dosya-record:last-child {
+  border-bottom: none;
+}
+
+.personel-dosya-record-label {
+  color: var(--txt-muted);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.personel-dosya-record-value {
+  min-width: 0;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
 .personel-kart-tablist {
   display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
+  flex-wrap: nowrap;
+  gap: 0;
   margin-bottom: var(--space-2);
-  padding-bottom: var(--space-2);
+  padding-bottom: 0;
   border-bottom: 1px solid var(--line-soft);
   overflow-x: auto;
 }
 
 .personel-kart-tab {
   flex: 0 0 auto;
-  padding: 8px 14px;
-  border: 1px solid transparent;
-  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  border: none;
+  border-radius: 0;
   background: transparent;
   color: var(--txt);
   font-size: 13px;
@@ -599,13 +670,12 @@
 
 .personel-kart-tab:hover {
   opacity: 1;
-  background: rgba(255, 255, 255, 0.05);
+  background: transparent;
 }
 
 .personel-kart-tab.is-active {
   opacity: 1;
-  border-color: var(--line-soft);
-  background: rgba(255, 255, 255, 0.08);
+  background: transparent;
   box-shadow: inset 0 -2px 0 var(--theme-color);
 }
 
@@ -792,10 +862,8 @@
 
 .personel-kart-placeholder {
   display: grid;
-  gap: var(--space-2);
-  padding: var(--space-2);
-  border: 1px dashed var(--line-soft);
-  border-radius: var(--radius-sm);
+  gap: var(--space-1);
+  padding: 0;
   font-size: 14px;
 }
 
@@ -830,12 +898,25 @@
     align-items: stretch;
   }
 
+  .personel-dosya-actions-row {
+    justify-content: stretch;
+  }
+
+  .personel-dosya-actions-spacer {
+    display: none;
+  }
+
   .personel-dosya-action-host {
     width: 100%;
   }
 
   .personel-dosya-action-host .universal-btn-aux {
     width: 100%;
+  }
+
+  .personel-dosya-record {
+    grid-template-columns: 1fr;
+    gap: 4px;
   }
 
   .personeller-item {

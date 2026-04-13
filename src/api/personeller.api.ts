@@ -205,6 +205,11 @@ function normalizePersonel(data: unknown): Personel {
     toplam_izin_hakki: readNumber(summarySources, "toplam_izin_hakki"),
     kullanilan_izin: readNumber(summarySources, "kullanilan_izin"),
     kalan_izin: readNumber(summarySources, "kalan_izin"),
+    sgk_donem: readString(summarySources, "sgk_donem"),
+    sgk_prim_gun: readNumber(summarySources, "sgk_prim_gun"),
+    sgk_eksik_gun_sayisi: readNumber(summarySources, "sgk_eksik_gun_sayisi"),
+    sgk_ayin_takvim_gun_sayisi: readNumber(summarySources, "sgk_ayin_takvim_gun_sayisi"),
+    sgk_hesaplama_modu: readString(summarySources, "sgk_hesaplama_modu"),
     pasiflik_durumu_etiketi: readNullableString(
       [pasiflikDurumu, root],
       "etiket",

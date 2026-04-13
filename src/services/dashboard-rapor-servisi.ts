@@ -1,7 +1,12 @@
 import type { GunlukPuantaj } from "../types/puantaj";
 import type { Personel } from "../types/personel";
 import type { Surec } from "../types/surec";
-import { hesaplaIzinBakiye, type IzinBakiye } from "./izin-hesap-motoru";
+import { hesaplaIzinBakiye } from "./izin-hesap-motoru";
+import {
+  hesaplaSgkPrimGunu,
+  type SgkPrimGunuHesaplamaModu,
+  type SgkUcretTipi
+} from "./sgk-prim-gunu-hesap";
 
 // ---------------------------------------------------------------------------
 // Dashboard KPI çıktı tipleri
@@ -19,6 +24,117 @@ export type DashboardKpi = {
   ortalama_kalan_izin: number;
   hafta_tatili_hak_kaybi_sayisi: number;
 };
+
+export type AylikSgkPuantajOzeti = {
+  yil: number;
+  ay: number;
+  donem: string;
+  kayit_gun_sayisi: number;
+  eksik_gun_sayisi: number;
+  sgk_prim_gun: number;
+  ayin_takvim_gun_sayisi: number;
+  hesaplama_modu: SgkPrimGunuHesaplamaModu;
+  ucret_tipi: SgkUcretTipi;
+};
+
+function parsePuantajYearMonth(tarih: string | undefined) {
+  if (typeof tarih !== "string") {
+    return null;
+  }
+
+  const match = tarih.trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) {
+    return null;
+  }
+
+  const yil = Number.parseInt(match[1], 10);
+  const ay = Number.parseInt(match[2], 10);
+  if (!Number.isInteger(yil) || !Number.isInteger(ay) || ay < 1 || ay > 12) {
+    return null;
+  }
+
+  return {
+    yil,
+    ay,
+    donem: `${match[1]}-${match[2]}`,
+    gunAnahtari: `${match[1]}-${match[2]}-${match[3]}`
+  };
+}
+
+function shouldCountAsEksikGun(kayit: GunlukPuantaj) {
+  if (kayit.hareket_durumu !== "Gelmedi") {
+    return false;
+  }
+
+  return (
+    kayit.dayanak === undefined ||
+    kayit.dayanak === "Yok_Izinsiz" ||
+    kayit.dayanak === "Raporlu_Hastalik" ||
+    kayit.dayanak === "Raporlu_Is_Kazasi"
+  );
+}
+
+export function hesaplaAylikSgkPuantajOzeti(
+  kayitlar: GunlukPuantaj[],
+  yil: number,
+  ay: number,
+  ucretTipi: SgkUcretTipi = "MAKTU_AYLIK"
+): AylikSgkPuantajOzeti {
+  const donem = `${yil}-${String(ay).padStart(2, "0")}`;
+  const gunAnahtarlari = new Set<string>();
+  const eksikGunAnahtarlari = new Set<string>();
+
+  for (const kayit of kayitlar) {
+    const parsed = parsePuantajYearMonth(kayit.tarih);
+    if (!parsed || parsed.yil !== yil || parsed.ay !== ay) {
+      continue;
+    }
+
+    gunAnahtarlari.add(parsed.gunAnahtari);
+    if (shouldCountAsEksikGun(kayit)) {
+      eksikGunAnahtarlari.add(parsed.gunAnahtari);
+    }
+  }
+
+  const sgkSonucu = hesaplaSgkPrimGunu({
+    yil,
+    ay,
+    eksik_gun_sayisi: eksikGunAnahtarlari.size,
+    ucret_tipi: ucretTipi
+  });
+
+  return {
+    yil,
+    ay,
+    donem,
+    kayit_gun_sayisi: gunAnahtarlari.size,
+    eksik_gun_sayisi: sgkSonucu.eksik_gun_sayisi,
+    sgk_prim_gun: sgkSonucu.sgk_prim_gun,
+    ayin_takvim_gun_sayisi: sgkSonucu.ayin_takvim_gun_sayisi,
+    hesaplama_modu: sgkSonucu.hesaplama_modu,
+    ucret_tipi: sgkSonucu.ucret_tipi
+  };
+}
+
+export function hesaplaAylikSgkPuantajOzetleri(
+  kayitlar: GunlukPuantaj[],
+  ucretTipi: SgkUcretTipi = "MAKTU_AYLIK"
+): AylikSgkPuantajOzeti[] {
+  const donemler = new Map<string, { yil: number; ay: number }>();
+
+  for (const kayit of kayitlar) {
+    const parsed = parsePuantajYearMonth(kayit.tarih);
+    if (!parsed) {
+      continue;
+    }
+
+    donemler.set(parsed.donem, { yil: parsed.yil, ay: parsed.ay });
+  }
+
+  return Array.from(donemler.values())
+    .map((donem) => hesaplaAylikSgkPuantajOzeti(kayitlar, donem.yil, donem.ay, ucretTipi))
+    .sort((left, right) => right.donem.localeCompare(left.donem, "tr"));
+}
 
 // ---------------------------------------------------------------------------
 // Personel istatistikleri

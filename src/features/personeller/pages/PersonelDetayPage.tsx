@@ -69,6 +69,18 @@ function formatReferenceValue(label?: string, id?: number) {
   return typeof id === "number" ? `#${id}` : "-";
 }
 
+function formatSgkHesaplamaModuLabel(value?: string) {
+  if (value === "OTUZ_GUN_STANDART") {
+    return "30 gun standart";
+  }
+
+  if (value === "TAKVIM_GUNU") {
+    return "Takvim gunu";
+  }
+
+  return "-";
+}
+
 function keyOptionsToSelectOptions(options: KeyOption[]) {
   return options.map((option) => ({ value: option.key, label: option.label }));
 }
@@ -431,6 +443,55 @@ function PersonelKartPanelGenelBilgiler({ personel }: { personel: Personel }) {
         <DossierRecord label="Acil Durum Telefonu" value={formatDetailValue(personel.acil_durum_telefon)} />
         <DossierRecord label="Pasiflik Etiketi" value={formatDetailValue(personel.pasiflik_durumu_etiketi)} />
       </DossierSection>
+    </div>
+  );
+}
+
+function PersonelPuantajPanel({
+  personel,
+  canViewPuantaj
+}: {
+  personel: Personel;
+  canViewPuantaj: boolean;
+}) {
+  const sgkPrimGunu = typeof personel.sgk_prim_gun === "number" ? `${personel.sgk_prim_gun} Gun` : "-";
+  const eksikGun = typeof personel.sgk_eksik_gun_sayisi === "number" ? `${personel.sgk_eksik_gun_sayisi} Gun` : "-";
+  const takvimGun = typeof personel.sgk_ayin_takvim_gun_sayisi === "number" ? `${personel.sgk_ayin_takvim_gun_sayisi} Gun` : "-";
+  const donem = formatDetailValue(personel.sgk_donem);
+  const hesaplamaModu = formatSgkHesaplamaModuLabel(personel.sgk_hesaplama_modu);
+
+  return (
+    <div className="personel-dosya-sections">
+      <section className="personel-puantaj-summary-card" data-testid="personel-sgk-prim-gun-card">
+        <span className="personel-puantaj-summary-kicker">SGK Prim Gunu</span>
+        <strong className="personel-puantaj-summary-value" data-testid="personel-sgk-prim-gun">
+          {sgkPrimGunu}
+        </strong>
+        <p className="personel-puantaj-summary-note">
+          Aylik puantajdan turetilen resmi prim gunu ozeti burada read-only izlenir.
+        </p>
+      </section>
+
+      <DossierSection
+        title="Aylik Puantaj Ozeti"
+        description="Bu dosya SGK prim gunu, eksik gun ve hesaplama modunu tek bakista gosterir."
+      >
+        <DossierRecord label="Donem" value={donem} />
+        <DossierRecord label="SGK Prim Gunu" value={sgkPrimGunu} />
+        <DossierRecord label="Eksik Gun" value={eksikGun} />
+        <DossierRecord label="Takvim Gun Sayisi" value={takvimGun} />
+        <DossierRecord label="Hesaplama Modu" value={hesaplamaModu} />
+      </DossierSection>
+
+      <PlaceholderPanel
+        title="Gunluk Puantaj Dosyasi"
+        description="Gunluk giris-cikis kayitlari ve detayli puantaj duzenleme akisi ayri puantaj ekraninda kalir."
+        actionLabel="Puantaj ekranina git"
+        actionTo="/puantaj"
+        actionState={{ prefillPersonelId: personel.id }}
+        canOpen={canViewPuantaj}
+        noPermissionMessage="Puantaj goruntuleme yetkiniz yok."
+      />
     </div>
   );
 }
@@ -930,15 +991,7 @@ export function PersonelDetayPage() {
                 aria-labelledby="personel-kart-tab-puantaj"
                 hidden={activeTab !== "puantaj"}
               >
-                <PlaceholderPanel
-                  title="Puantaj Ozet Dosyasi"
-                  description="Bu sekme sadece aylik net puantaj ozeti ve mevzuata dayali hesap ciktilarini gosterecek."
-                  actionLabel="Puantaj ekranina git"
-                  actionTo="/puantaj"
-                  actionState={{ prefillPersonelId: personel.id }}
-                  canOpen={canViewPuantaj}
-                  noPermissionMessage="Puantaj goruntuleme yetkiniz yok."
-                />
+                <PersonelPuantajPanel personel={personel} canViewPuantaj={canViewPuantaj} />
               </div>
 
               <PersonelIzinDevamsizlikPanel

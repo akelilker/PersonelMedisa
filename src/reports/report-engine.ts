@@ -4,6 +4,7 @@ import type { FinansKalem } from "../types/finans";
 import type { GunlukPuantaj } from "../types/puantaj";
 import { dataCacheKeys, getActiveSube, getAppData, getAppDataRevision } from "../data/data-manager";
 import { getReportCacheMeta, recordOfflineReportGeneration } from "./report-cache-meta";
+import { hesaplaAylikSgkPuantajOzetleri } from "../services/dashboard-rapor-servisi";
 
 export { getReportCacheMeta };
 import type { ModuleFilterBase } from "../lib/filters/module-filter-schema";
@@ -129,13 +130,32 @@ export function generateReport(type: ReportEngineType, filters: ModuleFilterBase
       break;
     }
     case "puantaj": {
-      rows = collectPuantajFromCache(filters).map((p) => ({
-        personel_id: p.personel_id,
-        tarih: p.tarih,
-        giris: p.giris_saati ?? "",
-        cikis: p.cikis_saati ?? "",
-        state: p.state ?? ""
-      }));
+      const kayitlar = collectPuantajFromCache(filters);
+      const personelMap = new Map(
+        readCachedPersonelFirstPage(sube, { ...filters, personel_id: null }).map((personel) => [
+          personel.id,
+          `${personel.ad} ${personel.soyad}`
+        ])
+      );
+      const kayitlarByPersonel = new Map<number, GunlukPuantaj[]>();
+      for (const kayit of kayitlar) {
+        const personelKayitlari = kayitlarByPersonel.get(kayit.personel_id) ?? [];
+        personelKayitlari.push(kayit);
+        kayitlarByPersonel.set(kayit.personel_id, personelKayitlari);
+      }
+
+      rows = Array.from(kayitlarByPersonel.entries()).flatMap(([personelId, personelKayitlari]) =>
+        hesaplaAylikSgkPuantajOzetleri(personelKayitlari).map((ozet) => ({
+          personel_id: personelId,
+          ad_soyad: personelMap.get(personelId) ?? "-",
+          donem: ozet.donem,
+          kayit_gun_sayisi: ozet.kayit_gun_sayisi,
+          eksik_gun_sayisi: ozet.eksik_gun_sayisi,
+          sgk_prim_gun: ozet.sgk_prim_gun,
+          ayin_takvim_gun_sayisi: ozet.ayin_takvim_gun_sayisi,
+          hesaplama_modu: ozet.hesaplama_modu
+        }))
+      );
       break;
     }
     case "finans": {

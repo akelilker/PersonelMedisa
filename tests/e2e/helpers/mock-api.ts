@@ -1,4 +1,6 @@
 import type { Page, Route } from "@playwright/test";
+import type { GunlukPuantaj } from "../../../src/types/puantaj";
+import { hesaplaAylikSgkPuantajOzetleri } from "../../../src/services/dashboard-rapor-servisi";
 
 export type MockUserRole = "GENEL_YONETICI" | "BOLUM_YONETICISI" | "MUHASEBE" | "BIRIM_AMIRI";
 
@@ -201,6 +203,53 @@ export async function mockApi(page: Page, role: MockUserRole) {
       tutar: 2500,
       aciklama: "Mevcut finans kalemi",
       state: "AKTIF"
+    }
+  ];
+
+  const puantajKayitlari: GunlukPuantaj[] = [
+    {
+      personel_id: 1,
+      tarih: "2026-04-09",
+      gun_tipi: "Normal_Is_Gunu",
+      hareket_durumu: "Geldi",
+      hesap_etkisi: "Tam_Yevmiye_Ver",
+      giris_saati: "08:30",
+      cikis_saati: "18:00",
+      gercek_mola_dakika: 60,
+      hesaplanan_mola_dakika: 60,
+      net_calisma_suresi_dakika: 510,
+      gunluk_brut_sure_dakika: 570,
+      hafta_tatili_hak_kazandi_mi: true,
+      state: "HESAPLANDI",
+      compliance_uyarilari: []
+    },
+    {
+      personel_id: 1,
+      tarih: "2026-04-10",
+      gun_tipi: "Normal_Is_Gunu",
+      hareket_durumu: "Gec_Geldi",
+      dayanak: "Ucretli_Izinli",
+      hesap_etkisi: "Tam_Yevmiye_Ver",
+      giris_saati: "09:15",
+      cikis_saati: "18:00",
+      gercek_mola_dakika: 60,
+      hesaplanan_mola_dakika: 60,
+      net_calisma_suresi_dakika: 465,
+      gunluk_brut_sure_dakika: 525,
+      hafta_tatili_hak_kazandi_mi: true,
+      state: "HESAPLANDI",
+      compliance_uyarilari: []
+    },
+    {
+      personel_id: 2,
+      tarih: "2026-04-09",
+      gun_tipi: "Normal_Is_Gunu",
+      hareket_durumu: "Gelmedi",
+      dayanak: "Yok_Izinsiz",
+      hesap_etkisi: "Kesinti_Yap",
+      hafta_tatili_hak_kazandi_mi: false,
+      state: "HESAPLANDI",
+      compliance_uyarilari: []
     }
   ];
 
@@ -464,7 +513,13 @@ let bildirimIdCounter = 800;
     };
   }
 
+  function getPuantajRowsForPersonel(personelId: number) {
+    return puantajKayitlari.filter((kayit) => kayit.personel_id === personelId);
+  }
+
   function buildPersonelDetail(personel: (typeof personeller)[number]) {
+    const sgkOzeti = hesaplaAylikSgkPuantajOzetleri(getPuantajRowsForPersonel(personel.id))[0] ?? null;
+
     return {
       ana_kart: {
         id: personel.id,
@@ -490,7 +545,12 @@ let bildirimIdCounter = 800;
         hizmet_suresi: personel.id === 1 ? "3 yil 2 ay" : "1 yil 8 ay",
         toplam_izin_hakki: personel.id === 1 ? 14 : 10,
         kullanilan_izin: personel.id === 1 ? 4 : 2,
-        kalan_izin: personel.id === 1 ? 10 : 8
+        kalan_izin: personel.id === 1 ? 10 : 8,
+        sgk_donem: sgkOzeti?.donem,
+        sgk_prim_gun: sgkOzeti?.sgk_prim_gun,
+        sgk_eksik_gun_sayisi: sgkOzeti?.eksik_gun_sayisi,
+        sgk_ayin_takvim_gun_sayisi: sgkOzeti?.ayin_takvim_gun_sayisi,
+        sgk_hesaplama_modu: sgkOzeti?.hesaplama_modu
       },
       pasiflik_durumu: {
         aktif_durum: personel.aktif_durum,
@@ -1216,22 +1276,30 @@ let bildirimIdCounter = 800;
       const segments = path.split("/");
       const personelId = Number.parseInt(segments[3] ?? "0", 10);
       const tarih = decodeURIComponent(segments[4] ?? "");
+      const mevcutKayit =
+        puantajKayitlari.find((item) => item.personel_id === personelId && item.tarih === tarih) ?? null;
 
       await fulfillJson(
         route,
         200,
-        okBody({
-          personel_id: personelId,
-          tarih,
-          giris_saati: "08:30",
-          cikis_saati: "18:00",
-          gercek_mola_dakika: 60,
-          hesaplanan_mola_dakika: 60,
-          net_calisma_suresi_dakika: 510,
-          gunluk_brut_sure_dakika: 570,
-          state: "HESAPLANDI",
-          compliance_uyarilari: []
-        })
+        okBody(
+          mevcutKayit ?? {
+            personel_id: personelId,
+            tarih,
+            gun_tipi: "Normal_Is_Gunu",
+            hareket_durumu: "Geldi",
+            hesap_etkisi: "Tam_Yevmiye_Ver",
+            giris_saati: "08:30",
+            cikis_saati: "18:00",
+            gercek_mola_dakika: 60,
+            hesaplanan_mola_dakika: 60,
+            net_calisma_suresi_dakika: 510,
+            gunluk_brut_sure_dakika: 570,
+            hafta_tatili_hak_kazandi_mi: true,
+            state: "HESAPLANDI",
+            compliance_uyarilari: []
+          }
+        )
       );
       return;
     }
@@ -1245,22 +1313,40 @@ let bildirimIdCounter = 800;
         cikis_saati?: string;
         gercek_mola_dakika?: number;
       };
+      const mevcutIndex = puantajKayitlari.findIndex((item) => item.personel_id === personelId && item.tarih === tarih);
+      const oncekiKayit =
+        mevcutIndex >= 0
+          ? puantajKayitlari[mevcutIndex]
+          : {
+              personel_id: personelId,
+              tarih,
+              gun_tipi: "Normal_Is_Gunu" as const,
+              hareket_durumu: "Geldi" as const,
+              hesap_etkisi: "Tam_Yevmiye_Ver" as const,
+              hafta_tatili_hak_kazandi_mi: true,
+              state: "HESAPLANDI",
+              compliance_uyarilari: []
+            };
+      const updated = {
+        ...oncekiKayit,
+        giris_saati: payload.giris_saati ?? oncekiKayit.giris_saati ?? "08:30",
+        cikis_saati: payload.cikis_saati ?? oncekiKayit.cikis_saati ?? "18:00",
+        gercek_mola_dakika: payload.gercek_mola_dakika ?? oncekiKayit.gercek_mola_dakika ?? 60,
+        hesaplanan_mola_dakika: payload.gercek_mola_dakika ?? oncekiKayit.hesaplanan_mola_dakika ?? 60,
+        net_calisma_suresi_dakika: oncekiKayit.net_calisma_suresi_dakika ?? 510,
+        gunluk_brut_sure_dakika: oncekiKayit.gunluk_brut_sure_dakika ?? 570
+      };
+
+      if (mevcutIndex >= 0) {
+        puantajKayitlari[mevcutIndex] = updated;
+      } else {
+        puantajKayitlari.push(updated);
+      }
 
       await fulfillJson(
         route,
         200,
-        okBody({
-          personel_id: personelId,
-          tarih,
-          giris_saati: payload.giris_saati ?? "08:30",
-          cikis_saati: payload.cikis_saati ?? "18:00",
-          gercek_mola_dakika: payload.gercek_mola_dakika ?? 60,
-          hesaplanan_mola_dakika: payload.gercek_mola_dakika ?? 60,
-          net_calisma_suresi_dakika: 510,
-          gunluk_brut_sure_dakika: 570,
-          state: "HESAPLANDI",
-          compliance_uyarilari: []
-        })
+        okBody(updated)
       );
       return;
     }
@@ -1544,6 +1630,8 @@ let bildirimIdCounter = 800;
 
     if (path.startsWith("/api/raporlar/") && method === "GET") {
       if (path === "/api/raporlar/personel-ozet") {
+        const sgkOzeti = hesaplaAylikSgkPuantajOzetleri(getPuantajRowsForPersonel(1))[0] ?? null;
+
         await fulfillJson(
           route,
           200,
@@ -1552,7 +1640,9 @@ let bildirimIdCounter = 800;
               {
                 personel_id: 1,
                 ad_soyad: "Ayse Yilmaz",
-                net_calisma_dakika: 510
+                net_calisma_dakika: 510,
+                sgk_donem: sgkOzeti?.donem ?? "2026-04",
+                sgk_prim_gun: sgkOzeti?.sgk_prim_gun ?? 30
               }
             ]
           })

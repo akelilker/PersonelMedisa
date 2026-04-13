@@ -1,4 +1,5 @@
 import type { ApiResponse } from "../types/api";
+import { hesaplaAylikSgkPuantajOzetleri } from "../services/dashboard-rapor-servisi";
 
 type DemoMethod = "GET" | "POST" | "PUT" | "DELETE";
 
@@ -912,14 +913,25 @@ function buildAylikOzetResponse(ay: string, subeId?: number | null, departmanId?
   };
 }
 
+function getDemoPuantajRowsForPersonel(personelId: number) {
+  return Object.values(demoState.puantajMap).filter((kayit) => kayit.personel_id === personelId);
+}
+
 function buildDemoPersonelDetail(personel: DemoPersonel) {
+  const sgkOzeti = hesaplaAylikSgkPuantajOzetleri(getDemoPuantajRowsForPersonel(personel.id))[0] ?? null;
+
   return {
     ana_kart: { ...personel },
     sistem_ozeti: {
       hizmet_suresi: personel.id === 1 ? "3 yil 2 ay" : "1 yil 8 ay",
       toplam_izin_hakki: personel.id === 1 ? 14 : 10,
       kullanilan_izin: personel.id === 1 ? 4 : 2,
-      kalan_izin: personel.id === 1 ? 10 : 8
+      kalan_izin: personel.id === 1 ? 10 : 8,
+      sgk_donem: sgkOzeti?.donem,
+      sgk_prim_gun: sgkOzeti?.sgk_prim_gun,
+      sgk_eksik_gun_sayisi: sgkOzeti?.eksik_gun_sayisi,
+      sgk_ayin_takvim_gun_sayisi: sgkOzeti?.ayin_takvim_gun_sayisi,
+      sgk_hesaplama_modu: sgkOzeti?.hesaplama_modu
     },
     pasiflik_durumu: {
       aktif_durum: personel.aktif_durum,
@@ -1812,14 +1824,20 @@ export function resolveDemoApiResponse(
   }
 
   if (pathname.startsWith("/raporlar/") && method === "GET") {
+    const personel = demoState.personeller[0];
+    const sgkOzeti =
+      personel != null ? hesaplaAylikSgkPuantajOzetleri(getDemoPuantajRowsForPersonel(personel.id))[0] ?? null : null;
+
     return ok(
       {
         items: [
           {
-            personel_id: 1,
-            ad_soyad: "Ayse Yilmaz",
+            personel_id: personel?.id ?? 1,
+            ad_soyad: personel != null ? `${personel.ad} ${personel.soyad}` : "Ayse Yilmaz",
             rapor_tipi: pathname.replace("/raporlar/", ""),
-            net_calisma_dakika: 510
+            net_calisma_dakika: 510,
+            sgk_donem: sgkOzeti?.donem ?? "2026-04",
+            sgk_prim_gun: sgkOzeti?.sgk_prim_gun ?? 30
           }
         ]
       },

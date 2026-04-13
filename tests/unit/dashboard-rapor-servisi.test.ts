@@ -3,7 +3,8 @@ import {
   hesaplaPersonelIstatistikleri,
   hesaplaPuantajIstatistikleri,
   hesaplaOrtalamaKalanIzin,
-  hesaplaDashboardKpi
+  hesaplaDashboardKpi,
+  hesaplaAylikSgkPuantajOzeti
 } from "../../src/services/dashboard-rapor-servisi";
 import type { GunlukPuantaj } from "../../src/types/puantaj";
 import type { Personel } from "../../src/types/personel";
@@ -176,5 +177,57 @@ describe("hesaplaDashboardKpi", () => {
     expect(kpi.ortalama_gunluk_net_calisma_dakika).toBe(470);
     expect(kpi.hafta_tatili_hak_kaybi_sayisi).toBe(1);
     expect(kpi.ortalama_kalan_izin).toBe(20);
+  });
+});
+
+// =========================================================================
+// 5. Aylik SGK puantaj ozeti
+// =========================================================================
+
+describe("hesaplaAylikSgkPuantajOzeti", () => {
+  it("aylik kayitlardan eksik gun ve SGK prim gununu hesaplar", () => {
+    const kayitlar = [
+      makePuantaj({ personel_id: 1, tarih: "2026-04-09", hareket_durumu: "Geldi" }),
+      makePuantaj({
+        personel_id: 1,
+        tarih: "2026-04-10",
+        hareket_durumu: "Gelmedi",
+        dayanak: "Yok_Izinsiz"
+      }),
+      makePuantaj({
+        personel_id: 1,
+        tarih: "2026-04-11",
+        hareket_durumu: "Gelmedi",
+        dayanak: "Ucretli_Izinli"
+      })
+    ];
+
+    const sonuc = hesaplaAylikSgkPuantajOzeti(kayitlar, 2026, 4);
+    expect(sonuc.kayit_gun_sayisi).toBe(3);
+    expect(sonuc.eksik_gun_sayisi).toBe(1);
+    expect(sonuc.sgk_prim_gun).toBe(29);
+    expect(sonuc.hesaplama_modu).toBe("TAKVIM_GUNU");
+  });
+
+  it("ucretli izin ve yillik izin gunlerini eksik gune saymaz", () => {
+    const kayitlar = [
+      makePuantaj({
+        personel_id: 1,
+        tarih: "2026-04-10",
+        hareket_durumu: "Gelmedi",
+        dayanak: "Ucretli_Izinli"
+      }),
+      makePuantaj({
+        personel_id: 1,
+        tarih: "2026-04-11",
+        hareket_durumu: "Gelmedi",
+        dayanak: "Yillik_Izin"
+      })
+    ];
+
+    const sonuc = hesaplaAylikSgkPuantajOzeti(kayitlar, 2026, 4);
+    expect(sonuc.eksik_gun_sayisi).toBe(0);
+    expect(sonuc.sgk_prim_gun).toBe(30);
+    expect(sonuc.hesaplama_modu).toBe("OTUZ_GUN_STANDART");
   });
 });

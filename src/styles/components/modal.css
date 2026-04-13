@@ -37,14 +37,15 @@
   flex-direction: column;
   overflow: hidden;
   box-sizing: border-box;
-  border: 1px solid rgba(255, 255, 255, 0.28);
+  border: 1px solid rgba(255, 255, 255, 0.34);
   border-radius: 18px 18px 0 0;
   background:
     radial-gradient(circle at bottom center, rgba(var(--theme-color-rgb), 0.08) 0%, rgba(8, 11, 19, 0) 28%),
     linear-gradient(180deg, rgba(7, 10, 19, 0.98) 0%, rgba(6, 9, 17, 0.98) 100%);
   box-shadow:
     0 28px 48px rgba(0, 0, 0, 0.46),
-    0 0 0 1px rgba(var(--theme-color-rgb), 0.12);
+    0 0 0 1px rgba(var(--theme-color-rgb), 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .modal-header {
@@ -60,10 +61,12 @@
     rgba(255, 0, 0, 0.27) 25%,
     rgba(255, 0, 0, 0.2) 50%,
     rgba(255, 0, 0, 0.14) 75%,
-    rgba(255, 0, 0, 0) 100%
+    rgba(10, 13, 22, 0.96) 100%
   );
   border-top-left-radius: inherit;
   border-top-right-radius: inherit;
+  background-clip: padding-box;
+  overflow: hidden;
 }
 
 .modal-header h2 {
@@ -76,7 +79,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   color: #f0f0f0;
-  font-size: clamp(17px, 1.8vw, 21px);
+  font-size: clamp(16px, 1.7vw, 20px);
   line-height: 1;
   font-weight: 800;
   letter-spacing: 0.04em;

@@ -85,16 +85,16 @@
 
 .workspace-form {
   display: grid;
-  gap: 8px;
+  gap: 6px;
 }
 
 .workspace-form-stack {
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .workspace-form-stack--compact {
-  gap: 10px;
+  gap: 8px;
 }
 
 .workspace-checklist {
@@ -161,27 +161,27 @@
 }
 
 .kayit-workspace .form-section {
-  gap: 4px;
+  gap: 3px;
 }
 
 .kayit-workspace .form-label {
-  font-size: 12px;
+  font-size: 11px;
   line-height: 1.15;
 }
 
 .kayit-workspace .form-input {
-  min-height: 36px;
-  padding: 0 10px;
+  min-height: 30px;
+  padding: 0 9px;
   border-radius: 10px;
 }
 
 .kayit-workspace select.form-input {
-  padding: 6px 10px;
+  padding: 4px 9px;
 }
 
 .kayit-workspace textarea.form-input {
-  min-height: 84px;
-  padding: 8px 10px;
+  min-height: 64px;
+  padding: 7px 9px;
 }
 
 .workspace-surec-list {
@@ -233,19 +233,33 @@
 .personel-form-columns {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 16px;
+  gap: 22px;
+  position: relative;
+}
+
+.personel-form-columns::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 1px;
+  transform: translateX(-50%);
+  background: rgba(var(--theme-color-rgb), 0.22);
+  pointer-events: none;
 }
 
 .personel-form-column {
   display: grid;
-  gap: 12px;
+  gap: 8px;
   align-content: start;
   min-width: 0;
+  padding-inline: 2px;
 }
 
 .personel-form-column + .personel-form-column {
-  padding-left: 16px;
-  border-left: 1px solid rgba(var(--theme-color-rgb), 0.26);
+  padding-left: 2px;
+  border-left: none;
 }
 
 .personel-form-column-heading {
@@ -268,6 +282,10 @@
     padding-top: 12px;
     border-left: none;
     border-top: 1px solid rgba(var(--theme-color-rgb), 0.26);
+  }
+
+  .personel-form-columns::after {
+    display: none;
   }
 }
 

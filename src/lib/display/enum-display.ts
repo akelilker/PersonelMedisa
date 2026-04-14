@@ -1,7 +1,7 @@
 import type { UiProfile, UserRole } from "../../types/auth";
 import type { FinansDurum } from "../../types/finans";
 import type { ComplianceUyariSeviye, GunlukPuantajState } from "../../types/puantaj";
-import type { AylikOzetState, KullaniciTipi } from "../../types/yonetim";
+import type { AylikOzetAggregateState, KullaniciTipi } from "../../types/yonetim";
 
 const TR_LOCALE = "tr-TR";
 
@@ -259,7 +259,7 @@ export function formatKullaniciTipiLabel(value: KullaniciTipi | null | undefined
   return KULLANICI_TIPI_LABELS[value] ?? humanizeEnumFallback(value);
 }
 
-export function formatAylikOzetStateLabel(value: AylikOzetState | "KAPANDI" | null | undefined): string {
+export function formatAylikOzetStateLabel(value: AylikOzetAggregateState | null | undefined): string {
   return formatMappedLabel(value, COMMON_STATE_LABELS);
 }
 

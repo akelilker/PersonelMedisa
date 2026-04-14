@@ -70,7 +70,7 @@ test.describe("yonetim paneli ve aylik ozet", () => {
 
     await page.getByTestId("aylik-ozet-bolum-onay").click();
     await expect(page.getByText("Seçili ay için bölüm onayı verildi.")).toBeVisible();
-    await expect(page.locator(".yonetim-summary-card").first()).toContainText(/Bölüm Onaylandı/i);
+    await expect(page.locator(".yonetim-summary-card").first()).toContainText(/Operasyonel Tamamlandı/i);
 
     await page.goto("/yonetim-paneli");
     await expect(page).toHaveURL(/\/yetkisiz$/);

@@ -50,7 +50,11 @@ test.describe("e2e smoke", () => {
     await expect(page.getByTestId("raporlar-resmi-sonuc")).toContainText("1");
     await expect(page.getByTestId("raporlar-resmi-sonuc")).toContainText("sgk_prim_gun");
     await page.locator("[name='engine-turu']").selectOption("finans");
-    await expect(page.locator(".raporlar-engine-card")).toContainText("TOPLAM");
+    await expect(page.locator("[name='engine-turu']")).toHaveValue("finans");
+    const engineCard = page.locator(".raporlar-engine-card");
+    await expect(engineCard).toBeVisible();
+    await expect(engineCard.locator("h3.raporlar-engine-title")).toHaveText("Yardımcı önbellek aracı");
+    await expect(engineCard.locator(".raporlar-engine-table")).toBeVisible();
   });
 
   test("birim amiri gunluk kayit girer ama puantaj ve kapanis tarafinda read-only kalir", async ({ page }) => {

@@ -45,7 +45,11 @@ export type UpsertYonetimSubePayload = {
   durum: KayitDurumu;
 };
 
-export type AylikOzetState = "BOLUM_ONAYINDA" | "BOLUM_ONAYLANDI" | "KAPANDI" | "REVIZE_ISTENDI";
+/** Bölüm satırı: üst onay `kapanis_durumu` ile taşınır; bu alanda KAPANDI kullanılmaz. */
+export type AylikBolumOnayDurumu = "BOLUM_ONAYINDA" | "BOLUM_ONAYLANDI" | "REVIZE_ISTENDI";
+
+/** Özet üst state: KAPANDI yalnızca genel yönetici üst onayı sonrası (geriye uyumlu string). */
+export type AylikOzetAggregateState = AylikBolumOnayDurumu | "KAPANDI";
 
 export type AylikOzetFilters = {
   ay: string;
@@ -68,7 +72,7 @@ export type AylikOzetRow = {
   raporlu: number;
   tesvik_tutari: number;
   ceza_kesinti_tutari: number;
-  bolum_onay_durumu: AylikOzetState;
+  bolum_onay_durumu: AylikBolumOnayDurumu;
   revize_var_mi: boolean;
   son_islem: string;
   kapanis_durumu: "ACIK" | "KAPANDI";
@@ -87,7 +91,7 @@ export type AylikOzetSummary = {
 
 export type AylikOzetResponse = {
   ay: string;
-  state: AylikOzetState | "KAPANDI";
+  state: AylikOzetAggregateState;
   summary: AylikOzetSummary;
   items: AylikOzetRow[];
   pending_bolum_onayi: number;

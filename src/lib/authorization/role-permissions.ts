@@ -30,7 +30,7 @@ export type AppPermission =
   | "yonetim-paneli.manage"
   | "aylik-ozet.view"
   | "aylik-ozet.review"
-  | "aylik-ozet.finalize";
+  | "aylik-ozet.executive_ack";
 
 const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
   GENEL_YONETICI: [
@@ -62,7 +62,7 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "yonetim-paneli.view",
     "yonetim-paneli.manage",
     "aylik-ozet.view",
-    "aylik-ozet.finalize"
+    "aylik-ozet.executive_ack"
   ],
   BOLUM_YONETICISI: [
     "personeller.view",

@@ -2,7 +2,7 @@
 
 ## Rol Yetki Matrisi
 
-Surum: `V1`
+Surum: `V2`
 
 ## Belgenin Amaci
 
@@ -58,10 +58,16 @@ Yonetim rolleri:
 - `puantaj.view`: tum roller
 - `puantaj.update`: yonetim rolleri
 
-### Haftalik Kapanis
+### Haftalik Kapanis (UI kaldirildi)
 
-- `haftalik-kapanis.view`: yonetim rolleri
-- `haftalik-kapanis.close`: yonetim rolleri
+- Onceki `haftalik-kapanis.*` izinleri kaldirildi; haftalik kapanis ekrani yok.
+- `/haftalik-kapanis` rotasi oturum icinde ana sayfaya yonlenir.
+
+### Aylik kapanis ozeti
+
+- `aylik-ozet.view`: `GENEL_YONETICI`, `BOLUM_YONETICISI` (sayfa erisimi)
+- `aylik-ozet.review`: `BOLUM_YONETICISI` — bolum onayi (operasyonel tamamlama)
+- `aylik-ozet.executive_ack`: `GENEL_YONETICI` — ust kontrol / teyit (istege bagli, akisi kilitlemez)
 
 ### Raporlar
 
@@ -85,8 +91,9 @@ Aktif route guard kurallari:
 - `/bildirimler` -> `bildirimler.view`
 - `/bildirimler/:bildirimId` -> `bildirimler.detail.view`
 - `/puantaj` -> `puantaj.view`
-- `/haftalik-kapanis` -> `haftalik-kapanis.view`
+- `/haftalik-kapanis` -> oturumlu kullanicida `/` yonlendirmesi (ayri izin yok)
 - `/raporlar` -> `raporlar.view`
+- `/aylik-kapanis-ozeti` -> `aylik-ozet.view`
 - `/finans` -> `finans.view`
 
 ## UI Davranis Kurallari
@@ -95,9 +102,9 @@ Aktif route guard kurallari:
 - Yetkisiz route denemelerinde kullanici `yetkisiz` ekranina yonlendirilir.
 - `BIRIM_AMIRI` rolunde personel ve surec listeleri sube kapsami ile aciktir.
 - `BIRIM_AMIRI`, bildirim modulu uzerinden gunluk durum bildirimi girebilir, guncelleyebilir ve iptal edebilir.
-- `BIRIM_AMIRI` icin puantaj guncelleme, haftalik kapanis ve finans aksiyonlari kapali kalir.
+- `BIRIM_AMIRI` icin puantaj guncelleme ve finans aksiyonlari kapali kalir.
 
 ## Notlar
 
-- Bu belge V1 koduna gore sabitlenmistir.
+- Bu belge `role-permissions.ts` ile senkron tutulur.
 - Yeni rol veya yeni modul eklendiginde once permission matrisi, sonra bu dokuman guncellenmelidir.

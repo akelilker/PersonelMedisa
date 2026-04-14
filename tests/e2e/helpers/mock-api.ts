@@ -439,7 +439,7 @@ export async function mockApi(page: Page, role: MockUserRole) {
     raporlu: number;
     tesvik_tutari: number;
     ceza_kesinti_tutari: number;
-    bolum_onay_durumu: "BOLUM_ONAYINDA" | "BOLUM_ONAYLANDI" | "REVIZE_ISTENDI" | "KAPANDI";
+    bolum_onay_durumu: "BOLUM_ONAYINDA" | "BOLUM_ONAYLANDI" | "REVIZE_ISTENDI";
     revize_var_mi: boolean;
     son_islem: string;
     kapanis_durumu: "ACIK" | "KAPANDI";
@@ -589,18 +589,23 @@ let bildirimIdCounter = 800;
       return true;
     });
 
-    const pendingBolumOnayi = items.filter(
-      (item) => item.kapanis_durumu !== "KAPANDI" && item.bolum_onay_durumu !== "BOLUM_ONAYLANDI"
-    ).length;
+    const pendingBolumOnayi = items.filter((item) => item.bolum_onay_durumu === "BOLUM_ONAYINDA").length;
 
-    const state =
-      items.length > 0 && items.every((item) => item.kapanis_durumu === "KAPANDI")
-        ? "KAPANDI"
-        : items.some((item) => item.bolum_onay_durumu === "REVIZE_ISTENDI")
-          ? "REVIZE_ISTENDI"
-          : pendingBolumOnayi === 0
-            ? "BOLUM_ONAYLANDI"
-            : "BOLUM_ONAYINDA";
+    const state = (() => {
+      if (items.length === 0) {
+        return "BOLUM_ONAYINDA";
+      }
+      if (items.every((item) => item.kapanis_durumu === "KAPANDI")) {
+        return "KAPANDI";
+      }
+      if (items.some((item) => item.bolum_onay_durumu === "REVIZE_ISTENDI")) {
+        return "REVIZE_ISTENDI";
+      }
+      if (pendingBolumOnayi === 0) {
+        return "BOLUM_ONAYLANDI";
+      }
+      return "BOLUM_ONAYINDA";
+    })();
 
     return {
       ay,
@@ -1599,16 +1604,6 @@ let bildirimIdCounter = 800;
         responseUrl.searchParams.set("departman_id", String(payload.departman_id));
       }
 
-      const current = buildAylikOzetResponse(responseUrl);
-      if (current.pending_bolum_onayi > 0) {
-        await fulfillJson(
-          route,
-          400,
-          errorBody("PENDING_BOLUM_APPROVAL", "Bolum onayi bekleyen kayitlar var. Ay kapatilamadi.")
-        );
-        return;
-      }
-
       aylikOzetRows.forEach((item) => {
         if (item.ay !== (payload.ay ?? "2026-04")) {
           return;
@@ -1621,8 +1616,7 @@ let bildirimIdCounter = 800;
         }
 
         item.kapanis_durumu = "KAPANDI";
-        item.bolum_onay_durumu = "KAPANDI";
-        item.son_islem = "Genel yonetici ayi kapatti";
+        item.son_islem = "Genel yonetici ust onay verdi";
       });
 
       await fulfillJson(route, 200, okBody(buildAylikOzetResponse(responseUrl)));

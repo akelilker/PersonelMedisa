@@ -1,5 +1,7 @@
 import type { ApiResponse } from "../types/api";
 import type {
+  AylikBolumOnayDurumu,
+  AylikOzetAggregateState,
   AylikOzetFilters,
   AylikOzetResponse,
   AylikOzetRow,
@@ -159,6 +161,42 @@ function normalizeYonetimSube(data: unknown): YonetimSube {
   };
 }
 
+function normalizeAylikBolumOnayDurumu(value: unknown): AylikBolumOnayDurumu {
+  if (value === "BOLUM_ONAYLANDI" || value === "REVIZE_ISTENDI") {
+    return value;
+  }
+  if (value === "KAPANDI") {
+    return "BOLUM_ONAYLANDI";
+  }
+  return "BOLUM_ONAYINDA";
+}
+
+function normalizeAylikAggregateState(value: unknown): AylikOzetAggregateState {
+  if (
+    value === "BOLUM_ONAYLANDI" ||
+    value === "REVIZE_ISTENDI" ||
+    value === "KAPANDI" ||
+    value === "BOLUM_ONAYINDA"
+  ) {
+    return value;
+  }
+  return "BOLUM_ONAYINDA";
+}
+
+function buildAylikOzetResponse(
+  filters: AylikOzetFilters,
+  data: Record<string, unknown> | null | undefined
+): AylikOzetResponse {
+  const ay = readString(data?.ay) ?? filters.ay;
+  return {
+    ay,
+    state: normalizeAylikAggregateState(data?.state),
+    summary: normalizeAylikOzetSummary(data?.summary),
+    items: extractListItems(data?.items).map(normalizeAylikOzetRow),
+    pending_bolum_onayi: readNumber(data?.pending_bolum_onayi) ?? 0
+  };
+}
+
 function normalizeAylikOzetSummary(data: unknown): AylikOzetSummary {
   const record = toRecord(data);
   return {
@@ -199,12 +237,7 @@ function normalizeAylikOzetRow(data: unknown): AylikOzetRow {
     raporlu: readNumber(record.raporlu) ?? 0,
     tesvik_tutari: readNumber(record.tesvik_tutari) ?? 0,
     ceza_kesinti_tutari: readNumber(record.ceza_kesinti_tutari) ?? 0,
-    bolum_onay_durumu:
-      record.bolum_onay_durumu === "BOLUM_ONAYLANDI" ||
-      record.bolum_onay_durumu === "KAPANDI" ||
-      record.bolum_onay_durumu === "REVIZE_ISTENDI"
-        ? record.bolum_onay_durumu
-        : "BOLUM_ONAYINDA",
+    bolum_onay_durumu: normalizeAylikBolumOnayDurumu(record.bolum_onay_durumu),
     revize_var_mi: readBoolean(record.revize_var_mi),
     son_islem: readString(record.son_islem) ?? "-",
     kapanis_durumu: record.kapanis_durumu === "KAPANDI" ? "KAPANDI" : "ACIK"
@@ -270,19 +303,7 @@ export async function fetchAylikKapanisOzeti(filters: AylikOzetFilters): Promise
   });
   const response = await apiRequest<ApiResponse<unknown>>(path);
   const data = toRecord(response.data);
-
-  return {
-    ay: readString(data?.ay) ?? filters.ay,
-    state:
-      data?.state === "BOLUM_ONAYLANDI" ||
-      data?.state === "REVIZE_ISTENDI" ||
-      data?.state === "KAPANDI"
-        ? data.state
-        : "BOLUM_ONAYINDA",
-    summary: normalizeAylikOzetSummary(data?.summary),
-    items: extractListItems(data?.items).map(normalizeAylikOzetRow),
-    pending_bolum_onayi: readNumber(data?.pending_bolum_onayi) ?? 0
-  };
+  return buildAylikOzetResponse(filters, data);
 }
 
 export async function bolumOnayiVer(filters: AylikOzetFilters): Promise<AylikOzetResponse> {
@@ -291,36 +312,15 @@ export async function bolumOnayiVer(filters: AylikOzetFilters): Promise<AylikOze
     body: JSON.stringify(filters)
   });
   const data = toRecord(response.data);
-  return {
-    ay: readString(data?.ay) ?? filters.ay,
-    state:
-      data?.state === "BOLUM_ONAYLANDI" ||
-      data?.state === "REVIZE_ISTENDI" ||
-      data?.state === "KAPANDI"
-        ? data.state
-        : "BOLUM_ONAYINDA",
-    summary: normalizeAylikOzetSummary(data?.summary),
-    items: extractListItems(data?.items).map(normalizeAylikOzetRow),
-    pending_bolum_onayi: readNumber(data?.pending_bolum_onayi) ?? 0
-  };
+  return buildAylikOzetResponse(filters, data);
 }
 
-export async function ayiKapat(filters: AylikOzetFilters): Promise<AylikOzetResponse> {
+/** Genel yönetici üst kontrol onayı (`/yonetim/aylik-ozet/ay-kapat`). State KAPANDI yalnızca bu akışta oluşur. */
+export async function ustOnayVer(filters: AylikOzetFilters): Promise<AylikOzetResponse> {
   const response = await apiRequest<ApiResponse<unknown>>(endpoints.yonetim.aylikOzetKapat, {
     method: "POST",
     body: JSON.stringify(filters)
   });
   const data = toRecord(response.data);
-  return {
-    ay: readString(data?.ay) ?? filters.ay,
-    state:
-      data?.state === "BOLUM_ONAYLANDI" ||
-      data?.state === "REVIZE_ISTENDI" ||
-      data?.state === "KAPANDI"
-        ? data.state
-        : "BOLUM_ONAYINDA",
-    summary: normalizeAylikOzetSummary(data?.summary),
-    items: extractListItems(data?.items).map(normalizeAylikOzetRow),
-    pending_bolum_onayi: readNumber(data?.pending_bolum_onayi) ?? 0
-  };
+  return buildAylikOzetResponse(filters, data);
 }

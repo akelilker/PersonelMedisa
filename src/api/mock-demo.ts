@@ -874,7 +874,7 @@ function buildAylikOzetResponse(ay: string, subeId?: number | null, departmanId?
         raporlu: bildirimOzet.raporlu,
         tesvik_tutari: finansOzet.tesvikTutari,
         ceza_kesinti_tutari: finansOzet.cezaKesintiTutari,
-        bolum_onay_durumu: durum.kapanis_durumu === "KAPANDI" ? "KAPANDI" : durum.bolum_onay_durumu,
+        bolum_onay_durumu: durum.bolum_onay_durumu,
         revize_var_mi: durum.revize_var_mi,
         son_islem: durum.son_islem,
         kapanis_durumu: durum.kapanis_durumu
@@ -882,18 +882,23 @@ function buildAylikOzetResponse(ay: string, subeId?: number | null, departmanId?
     })
     .filter((item) => (sadeceRevizeli ? item.revize_var_mi : true));
 
-  const pendingBolumOnayi = items.filter(
-    (item) => item.kapanis_durumu !== "KAPANDI" && item.bolum_onay_durumu !== "BOLUM_ONAYLANDI"
-  ).length;
+  const pendingBolumOnayi = items.filter((item) => item.bolum_onay_durumu === "BOLUM_ONAYINDA").length;
 
-  const state =
-    items.length > 0 && items.every((item) => item.kapanis_durumu === "KAPANDI")
-      ? "KAPANDI"
-      : items.some((item) => item.bolum_onay_durumu === "REVIZE_ISTENDI")
-        ? "REVIZE_ISTENDI"
-        : pendingBolumOnayi === 0
-          ? "BOLUM_ONAYLANDI"
-          : "BOLUM_ONAYINDA";
+  const state = (() => {
+    if (items.length === 0) {
+      return "BOLUM_ONAYINDA";
+    }
+    if (items.every((item) => item.kapanis_durumu === "KAPANDI")) {
+      return "KAPANDI";
+    }
+    if (items.some((item) => item.bolum_onay_durumu === "REVIZE_ISTENDI")) {
+      return "REVIZE_ISTENDI";
+    }
+    if (pendingBolumOnayi === 0) {
+      return "BOLUM_ONAYLANDI";
+    }
+    return "BOLUM_ONAYINDA";
+  })();
 
   return {
     ay,
@@ -1676,25 +1681,21 @@ export function resolveDemoApiResponse(
     const subeId = toNumber(body.sube_id);
     const departmanId = toNumber(body.departman_id);
     const sadeceRevizeli = Boolean(body.sadece_revizeli);
-    const current = buildAylikOzetResponse(ay, subeId, departmanId, false);
 
-    if (current.pending_bolum_onayi > 0) {
-      return {
-        data: null,
-        meta: {},
-        errors: [
-          {
-            code: "PENDING_BOLUM_APPROVAL",
-            message: "Bolum onayi bekleyen kayitlar var. Ay kapatilamadi."
-          }
-        ]
-      };
-    }
+    demoState.personeller.forEach((personel) => {
+      if (personel.aktif_durum !== "AKTIF") {
+        return;
+      }
+      if (subeId !== null && personel.sube_id !== subeId) {
+        return;
+      }
+      if (departmanId !== null && personel.departman_id !== departmanId) {
+        return;
+      }
 
-    current.items.forEach((item) => {
-      const durum = ensureAylikDurum(ay, item.personel_id);
+      const durum = ensureAylikDurum(ay, personel.id);
       durum.kapanis_durumu = "KAPANDI";
-      durum.son_islem = `Genel yonetici ayi kapatti (${formatAylikIslemTimestamp()})`;
+      durum.son_islem = `Genel yonetici ust onay verdi (${formatAylikIslemTimestamp()})`;
     });
 
     return ok(buildAylikOzetResponse(ay, subeId, departmanId, sadeceRevizeli));

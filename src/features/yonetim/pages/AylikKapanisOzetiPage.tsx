@@ -4,11 +4,11 @@ import { FormField } from "../../../components/form/FormField";
 import { ErrorState } from "../../../components/states/ErrorState";
 import { LoadingState } from "../../../components/states/LoadingState";
 import { fetchDepartmanOptions } from "../../../api/referans.api";
-import { ayiKapat, bolumOnayiVer, fetchAylikKapanisOzeti, fetchYonetimSubeleri } from "../../../api/yonetim.api";
+import { bolumOnayiVer, fetchAylikKapanisOzeti, fetchYonetimSubeleri, ustOnayVer } from "../../../api/yonetim.api";
 import { useRoleAccess } from "../../../hooks/use-role-access";
 import { downloadReportCsv } from "../../../reports/export-report";
 import type { IdOption } from "../../../types/referans";
-import type { AylikOzetResponse, AylikOzetState } from "../../../types/yonetim";
+import type { AylikBolumOnayDurumu, AylikOzetAggregateState, AylikOzetResponse } from "../../../types/yonetim";
 
 type FilterState = {
   ay: string;
@@ -17,11 +17,17 @@ type FilterState = {
   sadeceRevizeli: boolean;
 };
 
-const AYLIK_STATE_LABELS: Record<AylikOzetState | "KAPANDI", string> = {
+const AYLIK_AGGREGATE_LABELS: Record<AylikOzetAggregateState, string> = {
+  BOLUM_ONAYINDA: "Bölüm Onayında",
+  BOLUM_ONAYLANDI: "Operasyonel Tamamlandı",
+  REVIZE_ISTENDI: "Revize İstendi",
+  KAPANDI: "Üst Onay Verildi"
+};
+
+const AYLIK_BOLUM_SATIR_LABELS: Record<AylikBolumOnayDurumu, string> = {
   BOLUM_ONAYINDA: "Bölüm Onayında",
   BOLUM_ONAYLANDI: "Bölüm Onaylandı",
-  REVIZE_ISTENDI: "Revize İstendi",
-  KAPANDI: "Kapandı"
+  REVIZE_ISTENDI: "Revize İstendi"
 };
 
 function currentMonthValue() {
@@ -36,8 +42,12 @@ function toCurrency(value: number) {
   }).format(value);
 }
 
-function formatStateLabel(value: AylikOzetState | "KAPANDI") {
-  return AYLIK_STATE_LABELS[value] ?? value;
+function formatAggregateStateLabel(value: AylikOzetAggregateState) {
+  return AYLIK_AGGREGATE_LABELS[value] ?? value;
+}
+
+function formatBolumSatirLabel(value: AylikBolumOnayDurumu) {
+  return AYLIK_BOLUM_SATIR_LABELS[value] ?? value;
 }
 
 function formatBooleanLabel(value: boolean) {
@@ -47,7 +57,7 @@ function formatBooleanLabel(value: boolean) {
 export function AylikKapanisOzetiPage() {
   const { hasPermission } = useRoleAccess();
   const canReview = hasPermission("aylik-ozet.review");
-  const canFinalize = hasPermission("aylik-ozet.finalize");
+  const canExecutiveAck = hasPermission("aylik-ozet.executive_ack");
 
   const [filters, setFilters] = useState<FilterState>({
     ay: currentMonthValue(),
@@ -135,7 +145,7 @@ export function AylikKapanisOzetiPage() {
     }
   }
 
-  async function handleAyKapat() {
+  async function handleUstOnay() {
     if (!result || isActing) {
       return;
     }
@@ -145,16 +155,16 @@ export function AylikKapanisOzetiPage() {
     setInfoMessage(null);
 
     try {
-      const next = await ayiKapat({
+      const next = await ustOnayVer({
         ay: filters.ay,
         sube_id: filters.subeId ? Number.parseInt(filters.subeId, 10) : undefined,
         departman_id: filters.departmanId ? Number.parseInt(filters.departmanId, 10) : undefined,
         sadece_revizeli: filters.sadeceRevizeli
       });
       setResult(next);
-      setInfoMessage("Seçili ay genel yönetici tarafından kapatıldı.");
+      setInfoMessage("Üst kontrol onayı kaydedildi.");
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Ay kapatılamadı.");
+      setErrorMessage(error instanceof Error ? error.message : "Üst onay tamamlanamadı.");
     } finally {
       setIsActing(false);
     }
@@ -175,7 +185,7 @@ export function AylikKapanisOzetiPage() {
         Raporlu: item.raporlu,
         "Teşvik Tutarı": item.tesvik_tutari,
         "Ceza Kesinti Tutarı": item.ceza_kesinti_tutari,
-        "Bölüm Onay Durumu": formatStateLabel(item.bolum_onay_durumu),
+        "Bölüm Onay Durumu": formatBolumSatirLabel(item.bolum_onay_durumu),
         "Revize Var Mı": formatBooleanLabel(item.revize_var_mi),
         "Son İşlem": item.son_islem
       })),
@@ -187,7 +197,7 @@ export function AylikKapanisOzetiPage() {
       <div className="yonetim-header-row">
         <p className="yonetim-kicker">Raporlar</p>
         <h2>Aylık Kapanış Özeti</h2>
-        <p>Bölüm bazlı kontrol, toplu özet ve ay kapatma akışını buradan yönet.</p>
+        <p>Bölüm onayı operasyonel tamamlanmayı; üst kontrol onayı isteğe bağlı teyidi temsil eder.</p>
       </div>
 
       <form className="form-filter-panel" onSubmit={handleFilterSubmit}>
@@ -264,15 +274,22 @@ export function AylikKapanisOzetiPage() {
               Bölüm Onayı Ver
             </button>
           ) : null}
-          {canFinalize ? (
+          {canExecutiveAck ? (
             <button
               type="button"
               className="universal-btn-save"
-              data-testid="aylik-ozet-ay-kapat"
-              onClick={() => void handleAyKapat()}
-              disabled={isActing || !result || result.items.length === 0 || result.pending_bolum_onayi > 0}
+              data-testid="aylik-ozet-ust-onay"
+              onClick={() => void handleUstOnay()}
+              disabled={
+                isActing || !result || result.items.length === 0 || result.state === "KAPANDI"
+              }
+              title={
+                result && result.pending_bolum_onayi > 0
+                  ? "Bölüm onayı bekleyen kayıtlar var; yine de üst onay verebilirsiniz."
+                  : undefined
+              }
             >
-              Ayı Kapat
+              Üst Kontrol Onayı Ver
             </button>
           ) : null}
         </div>
@@ -287,7 +304,7 @@ export function AylikKapanisOzetiPage() {
           <div className="yonetim-summary-grid">
             <article className="yonetim-summary-card">
               <span>Durum</span>
-              <strong>{formatStateLabel(result.state)}</strong>
+              <strong>{formatAggregateStateLabel(result.state)}</strong>
             </article>
             <article className="yonetim-summary-card">
               <span>Toplam Personel</span>
@@ -315,8 +332,7 @@ export function AylikKapanisOzetiPage() {
 
           {result.pending_bolum_onayi > 0 ? (
             <p className="yonetim-hint">
-              Bölüm onayı bekleyen {result.pending_bolum_onayi} kayıt var. Genel yönetici kapatmadan önce toplu özeti
-              inceleyebilir.
+              Bölüm onayı bekleyen {result.pending_bolum_onayi} kayıt var. Akış genel yönetici onayına kilitlenmez.
             </p>
           ) : null}
 
@@ -357,7 +373,7 @@ export function AylikKapanisOzetiPage() {
                     <td>{item.raporlu}</td>
                     <td>{toCurrency(item.tesvik_tutari)}</td>
                     <td>{toCurrency(item.ceza_kesinti_tutari)}</td>
-                    <td>{formatStateLabel(item.bolum_onay_durumu)}</td>
+                    <td>{formatBolumSatirLabel(item.bolum_onay_durumu)}</td>
                     <td>{formatBooleanLabel(item.revize_var_mi)}</td>
                     <td>{item.son_islem}</td>
                     <td>

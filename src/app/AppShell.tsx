@@ -70,9 +70,6 @@ function resolveModuleModal(pathname: string): ModuleModalConfig | null {
   if (pathname === "/puantaj") {
     return { title: "Günlük Puantaj", closeTo: "/" };
   }
-  if (pathname === "/haftalik-kapanis") {
-    return { title: "Haftalık Kapanış", closeTo: "/" };
-  }
   if (pathname === "/finans") {
     return { title: "Finans", closeTo: "/" };
   }
@@ -85,7 +82,7 @@ function resolveModuleModal(pathname: string): ModuleModalConfig | null {
     };
   }
   if (pathname === "/aylik-kapanis-ozeti") {
-    return { title: "Aylık Kapanış Özeti", closeTo: "/raporlar" };
+    return { title: "Aylık Kapanış Özeti", closeTo: "/" };
   }
 
   return { title: "Modül", closeTo: "/" };

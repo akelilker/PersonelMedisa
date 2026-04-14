@@ -1,4 +1,4 @@
-import { Link, Outlet, Route, Routes } from "react-router-dom";
+import { Link, Navigate, Outlet, Route, Routes } from "react-router-dom";
 import { AppShell } from "./AppShell";
 import { ProtectedRoute } from "../router/ProtectedRoute";
 import { PersonellerPage } from "../features/personeller/pages/PersonellerPage";
@@ -8,7 +8,6 @@ import { SurecDetayPage } from "../features/surecler/pages/SurecDetayPage";
 import { BildirimlerPage } from "../features/bildirimler/pages/BildirimlerPage";
 import { BildirimDetayPage } from "../features/bildirimler/pages/BildirimDetayPage";
 import { GunlukPuantajPage } from "../features/puantaj/pages/GunlukPuantajPage";
-import { HaftalikKapanisPage } from "../features/haftalik-kapanis/pages/HaftalikKapanisPage";
 import { RaporlarPage } from "../features/raporlar/pages/RaporlarPage";
 import { FinansPage } from "../features/finans/pages/FinansPage";
 import { YonetimPaneliPage } from "../features/yonetim/pages/YonetimPaneliPage";
@@ -123,14 +122,7 @@ export function AppRoutes() {
             </ProtectedRoute>
           }
         />
-        <Route
-          path="haftalik-kapanis"
-          element={
-            <ProtectedRoute requirePermission={ROUTE_PERMISSION.haftalikKapanisPage}>
-              <HaftalikKapanisPage />
-            </ProtectedRoute>
-          }
-        />
+        <Route path="haftalik-kapanis" element={<Navigate to="/" replace />} />
         <Route
           path="raporlar"
           element={

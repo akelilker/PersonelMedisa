@@ -463,7 +463,6 @@ export function GunlukPuantajPage() {
       ) : null}
 
       <div className="module-links">
-        <Link to="/haftalik-kapanis">Haftalik kapanisa git</Link>
         <Link to="/surecler">Surec takibe don</Link>
       </div>
     </section>

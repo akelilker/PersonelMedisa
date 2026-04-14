@@ -41,16 +41,7 @@ test.describe("e2e smoke", () => {
     await expect(page.getByText(/570/)).toBeVisible();
 
     await page.goto("/haftalik-kapanis");
-    await expect(page).toHaveURL(/\/haftalik-kapanis$/);
-    await expect(page.locator(".modal-header h2").first()).toContainText("Haftalık Kapanış");
-
-    await page.locator("[name='kapanis-bas']").fill("2026-04-06");
-    await page.locator("[name='kapanis-bitis']").fill("2026-04-12");
-    await page.locator("[name='kapanis-departman']").fill("3");
-    await page.locator(".form-filter-panel button[type='submit']").click();
-
-    await expect(page.getByText(/Durum: /)).toBeVisible();
-    await expect(page.getByText(/Kapanış ID:/)).toBeVisible();
+    await expect(page).toHaveURL(/\/$/);
 
     await page.goto("/raporlar");
     await expect(page).toHaveURL(/\/raporlar$/);
@@ -58,15 +49,8 @@ test.describe("e2e smoke", () => {
     await page.getByRole("button", { name: /Raporu .*al.*/i }).click();
     await expect(page.getByTestId("raporlar-resmi-sonuc")).toContainText("1");
     await expect(page.getByTestId("raporlar-resmi-sonuc")).toContainText("sgk_prim_gun");
-    await expect(page.getByTestId("raporlar-aylik-kapanis")).toContainText("Ayl");
-    await expect(page.getByTestId("raporlar-aylik-kapanis-table")).toContainText("Personel Ad");
-    await expect(page.getByTestId("raporlar-aylik-kapanis-table")).toContainText("SGK Prim G");
-    await expect(page.getByTestId("raporlar-aylik-kapanis-table")).toContainText("30");
-    await page.locator("[name='engine-turu']").selectOption("puantaj");
-    await expect(page.locator(".raporlar-engine-card")).toContainText("sgk_prim_gun");
-    await expect(page.locator(".raporlar-engine-card")).toContainText("eksik_gun_nedeni_kodu");
-    await expect(page.locator(".raporlar-engine-table")).toContainText("2026-04");
-    await expect(page.locator(".raporlar-engine-table")).toContainText("30");
+    await page.locator("[name='engine-turu']").selectOption("finans");
+    await expect(page.locator(".raporlar-engine-card")).toContainText("TOPLAM");
   });
 
   test("birim amiri gunluk kayit girer ama puantaj ve kapanis tarafinda read-only kalir", async ({ page }) => {
@@ -105,8 +89,7 @@ test.describe("e2e smoke", () => {
     await expect(page.getByRole("button", { name: "Kaydet" })).toBeDisabled();
 
     await page.goto("/haftalik-kapanis");
-    await expect(page).toHaveURL(/\/yetkisiz$/);
-    await expect(page.getByRole("heading", { name: /Yetkisiz/i })).toBeVisible();
+    await expect(page).toHaveURL(/\/$/);
 
     await page.goto("/raporlar");
     await expect(page).toHaveURL(/\/raporlar$/);

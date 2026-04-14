@@ -68,7 +68,7 @@ test.describe("Rol bazli smoke", () => {
     await expect(page.locator(".modal-header h2").first()).toContainText("Finans");
   });
 
-  test("Birim amiri 3 ana buton gorur, gunluk kayit akisini kullanir ama finans ve haftalik kapanisa erisemez", async ({
+  test("Birim amiri 3 ana buton gorur, gunluk kayit akisini kullanir ama finansa erisemez; eski haftalik URL ana sayfaya doner", async ({
     page
   }) => {
     await mockApi(page, "BIRIM_AMIRI");
@@ -93,6 +93,6 @@ test.describe("Rol bazli smoke", () => {
     await expect(page).toHaveURL(/\/yetkisiz$/);
 
     await page.goto("/haftalik-kapanis");
-    await expect(page).toHaveURL(/\/yetkisiz$/);
+    await expect(page).toHaveURL(/\/$/);
   });
 });

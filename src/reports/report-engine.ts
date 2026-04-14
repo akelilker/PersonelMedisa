@@ -1,16 +1,14 @@
 import type { Personel } from "../types/personel";
 import type { Surec } from "../types/surec";
 import type { FinansKalem } from "../types/finans";
-import type { GunlukPuantaj } from "../types/puantaj";
 import { dataCacheKeys, getActiveSube, getAppData, getAppDataRevision } from "../data/data-manager";
 import { getReportCacheMeta, recordOfflineReportGeneration } from "./report-cache-meta";
-import { hesaplaAylikKapanisListesi } from "../services/dashboard-rapor-servisi";
 
 export { getReportCacheMeta };
 import type { ModuleFilterBase } from "../lib/filters/module-filter-schema";
 import { matchesDateRange } from "../lib/filters/module-filter-schema";
 
-export type ReportEngineType = "personel-ozet" | "izin-durumu" | "puantaj" | "finans";
+export type ReportEngineType = "personel-ozet" | "izin-durumu" | "finans";
 
 export type ReportEngineRow = Record<string, string | number | boolean | null>;
 
@@ -75,29 +73,6 @@ function readCachedFinansFirstPage(sube: number | null, filters: ModuleFilterBas
   return list;
 }
 
-function collectPuantajFromCache(filters: ModuleFilterBase): GunlukPuantaj[] {
-  const out: GunlukPuantaj[] = [];
-  const cache = getAppData().cache;
-  for (const key of Object.keys(cache)) {
-    if (!key.startsWith("puantaj:")) {
-      continue;
-    }
-    const env = cache[key];
-    const row = env?.data as GunlukPuantaj | null | undefined;
-    if (!row || typeof row !== "object") {
-      continue;
-    }
-    if (filters.personel_id != null && row.personel_id !== filters.personel_id) {
-      continue;
-    }
-    if (!matchesDateRange(row.tarih, filters.date_range)) {
-      continue;
-    }
-    out.push(row);
-  }
-  return out;
-}
-
 /**
  * Onbellekteki ham verilerden rapor satirlari uretir (ek ag cagrisi yok).
  */
@@ -127,24 +102,6 @@ export function generateReport(type: ReportEngineType, filters: ModuleFilterBase
           bitis: s.bitis_tarihi ?? "",
           state: s.state ?? ""
         }));
-      break;
-    }
-    case "puantaj": {
-      const kayitlar = collectPuantajFromCache(filters);
-      const personeller = readCachedPersonelFirstPage(sube, { ...filters, personel_id: null });
-      rows = hesaplaAylikKapanisListesi(personeller, kayitlar, {
-        personel_id: filters.personel_id ?? undefined,
-        aktiflik: filters.durum === "AKTIF" || filters.durum === "PASIF" ? filters.durum.toLowerCase() as "aktif" | "pasif" : "tum",
-        baslangic_tarihi: filters.date_range?.bas,
-        bitis_tarihi: filters.date_range?.bit
-      }).map((satir) => ({
-        personel_id: satir.personel_id,
-        ad_soyad: satir.personel_adi,
-        donem: satir.donem,
-        eksik_gun_sayisi: satir.eksik_gun_sayisi,
-        eksik_gun_nedeni_kodu: satir.eksik_gun_nedeni_kodu ?? "-",
-        sgk_prim_gun: satir.sgk_prim_gun
-      }));
       break;
     }
     case "finans": {

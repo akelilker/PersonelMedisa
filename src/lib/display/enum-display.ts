@@ -251,10 +251,6 @@ export function formatZimmetKayitDurumuLabel(value: string | null | undefined): 
   return formatMappedLabel(value, ZIMMET_KAYIT_DURUMU_LABELS);
 }
 
-export function formatHaftalikKapanisStateLabel(value: string | null | undefined): string {
-  return formatMappedLabel(value, COMMON_STATE_LABELS);
-}
-
 export function formatKullaniciTipiLabel(value: KullaniciTipi | null | undefined): string {
   if (!value) {
     return "-";

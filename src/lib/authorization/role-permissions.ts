@@ -20,8 +20,6 @@ export type AppPermission =
   | "puantaj.view"
   | "puantaj.update"
   | "puantaj.muhurle"
-  | "haftalik-kapanis.view"
-  | "haftalik-kapanis.close"
   | "raporlar.view"
   | "finans.view"
   | "finans.create"
@@ -55,8 +53,6 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "puantaj.view",
     "puantaj.update",
     "puantaj.muhurle",
-    "haftalik-kapanis.view",
-    "haftalik-kapanis.close",
     "raporlar.view",
     "finans.view",
     "finans.create",
@@ -88,8 +84,6 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "puantaj.view",
     "puantaj.update",
     "puantaj.muhurle",
-    "haftalik-kapanis.view",
-    "haftalik-kapanis.close",
     "raporlar.view",
     "finans.view",
     "finans.create",
@@ -118,8 +112,6 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "bildirimler.detail.view",
     "puantaj.view",
     "puantaj.update",
-    "haftalik-kapanis.view",
-    "haftalik-kapanis.close",
     "raporlar.view",
     "finans.view",
     "finans.create",
@@ -182,7 +174,6 @@ export const PERSONEL_DETAIL_ALLOWED_ROLES = getRolesWithPermission("personeller
 export const SUREC_DETAIL_ALLOWED_ROLES = getRolesWithPermission("surecler.detail.view");
 export const BILDIRIM_DETAIL_ALLOWED_ROLES = getRolesWithPermission("bildirimler.detail.view");
 export const PUANTAJ_ALLOWED_ROLES = getRolesWithPermission("puantaj.view");
-export const HAFTALIK_KAPANIS_ALLOWED_ROLES = getRolesWithPermission("haftalik-kapanis.view");
 export const RAPORLAR_ALLOWED_ROLES = getRolesWithPermission("raporlar.view");
 export const FINANS_ALLOWED_ROLES = getRolesWithPermission("finans.view");
 export const AYLIK_OZET_ALLOWED_ROLES = getRolesWithPermission("aylik-ozet.view");
@@ -199,7 +190,6 @@ export const ROUTE_PERMISSION = {
   surecDetail: "surecler.detail.view",
   bildirimDetail: "bildirimler.detail.view",
   puantajPage: "puantaj.view",
-  haftalikKapanisPage: "haftalik-kapanis.view",
   raporlarPage: "raporlar.view",
   finansPage: "finans.view",
   isgPage: "isg.view",

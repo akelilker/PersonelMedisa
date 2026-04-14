@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import {
   BILDIRIM_DETAIL_ALLOWED_ROLES,
   FINANS_ALLOWED_ROLES,
-  HAFTALIK_KAPANIS_ALLOWED_ROLES,
   PERSONEL_DETAIL_ALLOWED_ROLES,
   PUANTAJ_ALLOWED_ROLES,
   RAPORLAR_ALLOWED_ROLES,
@@ -37,8 +36,6 @@ describe("role permissions", () => {
     expect(hasRolePermission("BIRIM_AMIRI", "personeller.create")).toBe(false);
     expect(hasRolePermission("BIRIM_AMIRI", "surecler.update")).toBe(false);
     expect(hasRolePermission("BIRIM_AMIRI", "puantaj.update")).toBe(false);
-    expect(hasRolePermission("BIRIM_AMIRI", "haftalik-kapanis.view")).toBe(false);
-    expect(hasRolePermission("BIRIM_AMIRI", "haftalik-kapanis.close")).toBe(false);
     expect(hasRolePermission("BIRIM_AMIRI", "finans.view")).toBe(false);
     expect(hasRolePermission("BIRIM_AMIRI", "finans.create")).toBe(false);
   });
@@ -55,9 +52,6 @@ describe("role permissions", () => {
     );
     expect(PUANTAJ_ALLOWED_ROLES).toEqual(
       expect.arrayContaining(["GENEL_YONETICI", "BOLUM_YONETICISI", "MUHASEBE", "BIRIM_AMIRI"])
-    );
-    expect(HAFTALIK_KAPANIS_ALLOWED_ROLES).toEqual(
-      expect.arrayContaining(["GENEL_YONETICI", "BOLUM_YONETICISI", "MUHASEBE"])
     );
     expect(RAPORLAR_ALLOWED_ROLES).toEqual(
       expect.arrayContaining(["GENEL_YONETICI", "BOLUM_YONETICISI", "MUHASEBE", "BIRIM_AMIRI"])

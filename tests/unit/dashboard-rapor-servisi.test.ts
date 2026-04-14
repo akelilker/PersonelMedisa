@@ -4,8 +4,7 @@ import {
   hesaplaPuantajIstatistikleri,
   hesaplaOrtalamaKalanIzin,
   hesaplaDashboardKpi,
-  hesaplaAylikSgkPuantajOzeti,
-  hesaplaAylikKapanisListesi
+  hesaplaAylikSgkPuantajOzeti
 } from "../../src/services/dashboard-rapor-servisi";
 import type { GunlukPuantaj } from "../../src/types/puantaj";
 import type { Personel } from "../../src/types/personel";
@@ -277,66 +276,3 @@ describe("hesaplaAylikSgkPuantajOzeti", () => {
   });
 });
 
-describe("hesaplaAylikKapanisListesi", () => {
-  it("personel bazli aylik SGK kapanis satirlarini sade kolonlarla uretir", () => {
-    const personeller = [
-      makePersonel({ id: 1, ad: "Ayse", soyad: "Yilmaz", departman_id: 3, aktif_durum: "AKTIF" }),
-      makePersonel({ id: 2, ad: "Mehmet", soyad: "Kaya", departman_id: 4, aktif_durum: "PASIF" })
-    ];
-    const kayitlar = [
-      makePuantaj({ personel_id: 1, tarih: "2026-04-09", hareket_durumu: "Geldi" }),
-      makePuantaj({ personel_id: 1, tarih: "2026-04-10", hareket_durumu: "Gelmedi", dayanak: "Yok_Izinsiz" }),
-      makePuantaj({ personel_id: 2, tarih: "2026-04-11", hareket_durumu: "Gelmedi", dayanak: "Raporlu_Hastalik" })
-    ];
-
-    const sonuc = hesaplaAylikKapanisListesi(personeller, kayitlar);
-
-    expect(sonuc).toEqual([
-      {
-        personel_id: 1,
-        personel_adi: "Ayse Yilmaz",
-        donem: "2026-04",
-        sgk_prim_gun: 29,
-        eksik_gun_sayisi: 1,
-        eksik_gun_nedeni_kodu: "15 - Devamsizlik"
-      },
-      {
-        personel_id: 2,
-        personel_adi: "Mehmet Kaya",
-        donem: "2026-04",
-        sgk_prim_gun: 29,
-        eksik_gun_sayisi: 1,
-        eksik_gun_nedeni_kodu: "01 - Istirahat"
-      }
-    ]);
-  });
-
-  it("aktiflik, departman ve tarih filtresini uygular", () => {
-    const personeller = [
-      makePersonel({ id: 1, ad: "Ayse", soyad: "Yilmaz", departman_id: 3, aktif_durum: "AKTIF" }),
-      makePersonel({ id: 2, ad: "Mehmet", soyad: "Kaya", departman_id: 4, aktif_durum: "PASIF" })
-    ];
-    const kayitlar = [
-      makePuantaj({ personel_id: 1, tarih: "2026-04-10", hareket_durumu: "Gelmedi", dayanak: "Yok_Izinsiz" }),
-      makePuantaj({ personel_id: 2, tarih: "2026-03-10", hareket_durumu: "Gelmedi", dayanak: "Raporlu_Hastalik" })
-    ];
-
-    const sonuc = hesaplaAylikKapanisListesi(personeller, kayitlar, {
-      aktiflik: "aktif",
-      departman_id: 3,
-      baslangic_tarihi: "2026-04-01",
-      bitis_tarihi: "2026-04-30"
-    });
-
-    expect(sonuc).toEqual([
-      {
-        personel_id: 1,
-        personel_adi: "Ayse Yilmaz",
-        donem: "2026-04",
-        sgk_prim_gun: 29,
-        eksik_gun_sayisi: 1,
-        eksik_gun_nedeni_kodu: "15 - Devamsizlik"
-      }
-    ]);
-  });
-});

@@ -1,14 +1,12 @@
 import type { GunlukPuantaj } from "../types/puantaj";
 import type { Personel } from "../types/personel";
 import type { Surec } from "../types/surec";
-import type { RaporAktiflik } from "../types/rapor";
 import { hesaplaIzinBakiye } from "./izin-hesap-motoru";
 import {
   hesaplaSgkPrimGunu,
   type SgkPrimGunuHesaplamaModu,
   type SgkUcretTipi
 } from "./sgk-prim-gunu-hesap";
-import { matchesDateRange } from "../lib/filters/module-filter-schema";
 
 // ---------------------------------------------------------------------------
 // Dashboard KPI çıktı tipleri
@@ -38,23 +36,6 @@ export type AylikSgkPuantajOzeti = {
   ayin_takvim_gun_sayisi: number;
   hesaplama_modu: SgkPrimGunuHesaplamaModu;
   ucret_tipi: SgkUcretTipi;
-};
-
-export type AylikKapanisListesiSatiri = {
-  personel_id: number;
-  personel_adi: string;
-  donem: string;
-  sgk_prim_gun: number;
-  eksik_gun_sayisi: number;
-  eksik_gun_nedeni_kodu: string | null;
-};
-
-export type AylikKapanisListesiFiltreleri = {
-  personel_id?: number;
-  departman_id?: number;
-  aktiflik?: RaporAktiflik;
-  baslangic_tarihi?: string;
-  bitis_tarihi?: string;
 };
 
 function parsePuantajYearMonth(tarih: string | undefined) {
@@ -192,79 +173,6 @@ export function hesaplaAylikSgkPuantajOzetleri(
   return Array.from(donemler.values())
     .map((donem) => hesaplaAylikSgkPuantajOzeti(kayitlar, donem.yil, donem.ay, ucretTipi))
     .sort((left, right) => right.donem.localeCompare(left.donem, "tr"));
-}
-
-export function hesaplaAylikKapanisListesi(
-  personeller: Personel[],
-  kayitlar: GunlukPuantaj[],
-  filtreler: AylikKapanisListesiFiltreleri = {},
-  ucretTipi: SgkUcretTipi = "MAKTU_AYLIK"
-): AylikKapanisListesiSatiri[] {
-  const kapsamPersoneller = personeller.filter((personel) => {
-    if (filtreler.personel_id !== undefined && personel.id !== filtreler.personel_id) {
-      return false;
-    }
-    if (filtreler.departman_id !== undefined && personel.departman_id !== filtreler.departman_id) {
-      return false;
-    }
-    if (filtreler.aktiflik === "aktif" && personel.aktif_durum !== "AKTIF") {
-      return false;
-    }
-    if (filtreler.aktiflik === "pasif" && personel.aktif_durum !== "PASIF") {
-      return false;
-    }
-    return true;
-  });
-
-  if (kapsamPersoneller.length === 0) {
-    return [];
-  }
-
-  const kapsamPersonelIdleri = new Set(kapsamPersoneller.map((personel) => personel.id));
-  const tarihAraligi =
-    filtreler.baslangic_tarihi || filtreler.bitis_tarihi
-      ? {
-          bas: filtreler.baslangic_tarihi ?? "",
-          bit: filtreler.bitis_tarihi ?? ""
-        }
-      : undefined;
-
-  const kayitlarByPersonel = new Map<number, GunlukPuantaj[]>();
-  for (const kayit of kayitlar) {
-    if (!kapsamPersonelIdleri.has(kayit.personel_id) || !matchesDateRange(kayit.tarih, tarihAraligi)) {
-      continue;
-    }
-
-    const personelKayitlari = kayitlarByPersonel.get(kayit.personel_id) ?? [];
-    personelKayitlari.push(kayit);
-    kayitlarByPersonel.set(kayit.personel_id, personelKayitlari);
-  }
-
-  return kapsamPersoneller
-    .flatMap((personel) => {
-      const personelKayitlari = kayitlarByPersonel.get(personel.id) ?? [];
-      if (personelKayitlari.length === 0) {
-        return [];
-      }
-
-      const personelAdi = `${personel.ad} ${personel.soyad}`.trim();
-      return hesaplaAylikSgkPuantajOzetleri(personelKayitlari, ucretTipi).map((ozet) => ({
-        personel_id: personel.id,
-        personel_adi: personelAdi,
-        donem: ozet.donem,
-        sgk_prim_gun: ozet.sgk_prim_gun,
-        eksik_gun_sayisi: ozet.eksik_gun_sayisi,
-        eksik_gun_nedeni_kodu: ozet.eksik_gun_nedeni_kodu
-      }));
-    })
-    .sort((left, right) => {
-      const donemKarsilastirma = right.donem.localeCompare(left.donem, "tr");
-      if (donemKarsilastirma !== 0) {
-        return donemKarsilastirma;
-      }
-
-      return left.personel_adi.localeCompare(right.personel_adi, "tr");
-    });
 }
 
 // ---------------------------------------------------------------------------

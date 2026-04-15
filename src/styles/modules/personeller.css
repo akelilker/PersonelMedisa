@@ -815,6 +815,11 @@
   color: var(--txt-muted);
 }
 
+.personel-timeline-meta-secondary {
+  opacity: 0.88;
+  font-weight: 400;
+}
+
 .personel-timeline-summary,
 .personel-timeline-note {
   margin: 0;

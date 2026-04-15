@@ -42,6 +42,7 @@ import {
   snapshotFromLifecycleForm,
   type LifecycleFormFields
 } from "../lib/personel-lifecycle-diff";
+import { sortSurecHistoryDescending } from "../lib/surec-history-sort";
 import type { PaginatedResult } from "../types/api";
 import { runDeduped } from "../lib/in-flight-dedupe";
 import { useAuth } from "../state/auth.store";
@@ -535,55 +536,8 @@ const INITIAL_PERSONEL_ZIMMET_FORM: PersonelZimmetFormState = {
   teslimDurumu: "YENI"
 };
 
-function normalizeSurecDateValue(value: string | undefined) {
-  if (typeof value !== "string") {
-    return null;
-  }
-
-  const trimmed = value.trim();
-  if (!trimmed) {
-    return null;
-  }
-
-  const parsed = Date.parse(`${trimmed}T00:00:00`);
-  return Number.isFinite(parsed) ? parsed : null;
-}
-
-function sortSurecHistory(items: Surec[]) {
-  return [...items].sort((left, right) => {
-    const rightStart = normalizeSurecDateValue(right.baslangic_tarihi);
-    const leftStart = normalizeSurecDateValue(left.baslangic_tarihi);
-
-    if (rightStart !== null && leftStart !== null && rightStart !== leftStart) {
-      return rightStart - leftStart;
-    }
-
-    if (rightStart !== null) {
-      return -1;
-    }
-
-    if (leftStart !== null) {
-      return 1;
-    }
-
-    const rightEnd = normalizeSurecDateValue(right.bitis_tarihi);
-    const leftEnd = normalizeSurecDateValue(left.bitis_tarihi);
-    if (rightEnd !== null && leftEnd !== null && rightEnd !== leftEnd) {
-      return rightEnd - leftEnd;
-    }
-    if (rightEnd !== null) {
-      return -1;
-    }
-    if (leftEnd !== null) {
-      return 1;
-    }
-
-    return right.id - left.id;
-  });
-}
-
 function mergeSurecHistoryRow(items: Surec[], next: Surec) {
-  return sortSurecHistory([next, ...items.filter((item) => item.id !== next.id)]);
+  return sortSurecHistoryDescending([next, ...items.filter((item) => item.id !== next.id)]);
 }
 
 function buildPersonelSurecPayload(
@@ -950,7 +904,7 @@ export function usePersonelDetail(
       return [];
     }
 
-    return sortSurecHistory(surecHistorySnapshot?.items ?? []);
+    return sortSurecHistoryDescending(surecHistorySnapshot?.items ?? []);
   }, [canAccessSurecler, surecHistorySnapshot]);
 
   const zimmetHistory = useMemo(
@@ -1066,7 +1020,7 @@ export function usePersonelDetail(
       const previousPersonel = personel;
 
       if (hasLifecycleDiff && !editForm.effectiveDate.trim()) {
-        setEditErrorMessage("Gecerlilik tarihi zorunludur.");
+        setEditErrorMessage("Geçerlilik tarihi zorunludur.");
         setIsSubmitting(false);
         return;
       }
@@ -1091,6 +1045,19 @@ export function usePersonelDetail(
         setPersonel(updated);
         setEditForm(personelToEditForm(updated));
         setIsEditing(false);
+
+        if (canAccessSurecler) {
+          void fetchWithCacheMerge(surecHistoryKey, () =>
+            runDeduped(surecHistoryKey, () =>
+              fetchSureclerList({
+                personel_id: parsedPersonelId,
+                sube_id: getSubeIdForApiRequest(),
+                page: 1,
+                limit: PERSONEL_DETAIL_SUREC_PAGE_SIZE
+              })
+            )
+          );
+        }
       } catch (error) {
         if (shouldRedirectDetailAfterSubeMismatch(error)) {
           navigate("/personeller", {
@@ -1119,7 +1086,17 @@ export function usePersonelDetail(
         setIsSubmitting(false);
       }
     },
-    [detailKey, editForm, hasLifecycleDiff, isSubmitting, navigate, personel]
+    [
+      canAccessSurecler,
+      detailKey,
+      editForm,
+      hasLifecycleDiff,
+      isSubmitting,
+      navigate,
+      parsedPersonelId,
+      personel,
+      surecHistoryKey
+    ]
   );
 
   const createSurecHandler = useCallback(

@@ -15,6 +15,7 @@ import {
   formatSurecStateLabel,
   formatSurecTuruLabel
 } from "../../../lib/display/enum-display";
+import { getSurecTimelineSortWeight } from "../../../lib/surec-history-sort";
 import { hesaplaIzinBakiye } from "../../../services/izin-hesap-motoru";
 import type { IdOption, KeyOption } from "../../../types/referans";
 import type { Personel } from "../../../types/personel";
@@ -38,6 +39,7 @@ type PersonelTimelineEventTone = "default" | "danger";
 type PersonelTimelineEvent = {
   id: string;
   tarih: string | null;
+  zamanIkincil?: string;
   baslik: string;
   kaynak: string;
   ozet: string;
@@ -126,13 +128,31 @@ function buildSurecTitle(surec: Surec) {
   return anaBaslik;
 }
 
+function formatSurecKayitZamani(value: string | undefined): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  const parsed = Date.parse(trimmed);
+  if (!Number.isFinite(parsed)) {
+    return null;
+  }
+
+  return new Intl.DateTimeFormat("tr-TR", { dateStyle: "short", timeStyle: "short" }).format(new Date(parsed));
+}
+
 function buildSurecOzet(surec: Surec) {
   const parts = [
-    surec.baslangic_tarihi ? `Baslangic: ${surec.baslangic_tarihi}` : null,
-    surec.bitis_tarihi ? `Bitis: ${surec.bitis_tarihi}` : null
+    surec.baslangic_tarihi ? `Başlangıç: ${surec.baslangic_tarihi}` : null,
+    surec.bitis_tarihi ? `Bitiş: ${surec.bitis_tarihi}` : null
   ].filter((part): part is string => part !== null);
 
-  return parts.length > 0 ? parts.join(" / ") : "Surec kaydi";
+  return parts.length > 0 ? parts.join(" / ") : "Süreç kaydı";
 }
 
 function buildPersonelTimeline(
@@ -164,18 +184,23 @@ function buildPersonelTimeline(
   }
 
   for (const surec of surecler) {
-    const tarih = normalizeTimelineText(surec.baslangic_tarihi ?? surec.bitis_tarihi);
+    const eff = normalizeTimelineText(surec.effective_date);
+    const basB = normalizeTimelineText(surec.baslangic_tarihi);
+    const bitB = normalizeTimelineText(surec.bitis_tarihi);
+    const tarih = eff ? `Geçerlilik: ${eff}` : basB ?? bitB ?? null;
+    const kayit = formatSurecKayitZamani(surec.created_at);
     const surecTuru = surec.surec_turu.trim().toUpperCase();
     events.push({
       id: `surec-${surec.id}`,
       tarih,
+      zamanIkincil: kayit ? `Kayıt: ${kayit}` : undefined,
       baslik: buildSurecTitle(surec),
-      kaynak: "Surec",
+      kaynak: "Süreç",
       ozet: buildSurecOzet(surec),
       aciklama: normalizeTimelineText(surec.aciklama) ?? undefined,
       etiket: normalizeTimelineText(formatSurecStateLabel(surec.state)) ?? undefined,
       tone: surecTuru === "ISTEN_AYRILMA" ? "danger" : "default",
-      sortValue: createTimelineSortValue(tarih),
+      sortValue: getSurecTimelineSortWeight(surec),
       sortRank: surecTuru === "ISTEN_AYRILMA" ? 0 : 1
     });
   }
@@ -703,6 +728,9 @@ function PersonelSurecGecmisiPanel({
                 </div>
                 <div className="personel-timeline-meta">
                   <span>{event.tarih ?? "-"}</span>
+                  {event.zamanIkincil ? (
+                    <span className="personel-timeline-meta-secondary">{event.zamanIkincil}</span>
+                  ) : null}
                   <span>{event.kaynak}</span>
                 </div>
                 <p className="personel-timeline-summary">{event.ozet}</p>
@@ -956,7 +984,7 @@ export function PersonelDetayPage() {
                     name="edit-departman"
                     value={editForm.departmanId}
                     onChange={(value) => setEditForm((prev) => ({ ...prev, departmanId: value }))}
-                    placeholderOption={{ value: "", label: "Seciniz" }}
+                    placeholderOption={{ value: "", label: "Seçiniz" }}
                     selectOptions={idOptionsToSelectOptions(personelRefs.departmanOptions)}
                   />
                 ) : (
@@ -972,16 +1000,16 @@ export function PersonelDetayPage() {
                 {personelRefs.gorevOptions.length > 0 ? (
                   <FormField
                     as="select"
-                    label="Gorev"
+                    label="Görev"
                     name="edit-gorev"
                     value={editForm.gorevId}
                     onChange={(value) => setEditForm((prev) => ({ ...prev, gorevId: value }))}
-                    placeholderOption={{ value: "", label: "Seciniz" }}
+                    placeholderOption={{ value: "", label: "Seçiniz" }}
                     selectOptions={idOptionsToSelectOptions(personelRefs.gorevOptions)}
                   />
                 ) : (
                   <FormField
-                    label="Gorev ID"
+                    label="Görev ID"
                     name="edit-gorev-id"
                     type="number"
                     min={1}
@@ -992,16 +1020,16 @@ export function PersonelDetayPage() {
                 {personelRefs.bagliAmirOptions.length > 0 ? (
                   <FormField
                     as="select"
-                    label="Bagli amir"
+                    label="Bağlı amir"
                     name="edit-bagli-amir"
                     value={editForm.bagliAmirId}
                     onChange={(value) => setEditForm((prev) => ({ ...prev, bagliAmirId: value }))}
-                    placeholderOption={{ value: "", label: "Seciniz" }}
+                    placeholderOption={{ value: "", label: "Seçiniz" }}
                     selectOptions={idOptionsToSelectOptions(personelRefs.bagliAmirOptions)}
                   />
                 ) : (
                   <FormField
-                    label="Bagli amir ID"
+                    label="Bağlı amir ID"
                     name="edit-bagli-amir-id"
                     type="number"
                     min={1}
@@ -1010,14 +1038,14 @@ export function PersonelDetayPage() {
                   />
                 )}
                 <FormField
-                  label="Ucret tipi"
+                  label="Ücret tipi"
                   name="edit-ucret-tipi"
                   value={editForm.ucretTipi}
                   onChange={(value) => setEditForm((prev) => ({ ...prev, ucretTipi: value }))}
-                  placeholder="Ornek: MAKTU_AYLIK"
+                  placeholder="Örnek: MAKTU_AYLIK"
                 />
                 <FormField
-                  label="Maas tutari"
+                  label="Maaş tutarı"
                   name="edit-maas"
                   type="number"
                   min={0}
@@ -1026,7 +1054,7 @@ export function PersonelDetayPage() {
                   onChange={(value) => setEditForm((prev) => ({ ...prev, maasTutari: value }))}
                 />
                 <FormField
-                  label="Prim kurali ID"
+                  label="Prim kuralı ID"
                   name="edit-prim-kurali"
                   type="number"
                   min={1}
@@ -1035,7 +1063,7 @@ export function PersonelDetayPage() {
                 />
                 {hasLifecycleDiff ? (
                   <FormField
-                    label="Gecerlilik Tarihi"
+                    label="Geçerlilik Tarihi"
                     name="edit-effective-date"
                     type="date"
                     value={editForm.effectiveDate}

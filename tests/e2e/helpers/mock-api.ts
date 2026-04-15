@@ -79,8 +79,8 @@ export async function mockApi(page: Page, role: MockUserRole) {
       personel_tipi_id: 1,
       bagli_amir_id: 9,
       sube_adi: "Merkez",
-      departman_adi: "Atölye",
-      gorev_adi: "Uzman",
+      departman_adi: "Döşeme",
+      gorev_adi: "Genel Müdür",
       personel_tipi_adi: "Tam Zamanli",
       bagli_amir_adi: "Demo Amir",
       ucret_tipi_id: 1,
@@ -104,13 +104,13 @@ export async function mockApi(page: Page, role: MockUserRole) {
       ise_giris_tarihi: "2024-07-15",
       acil_durum_kisi: "Zeynep Kaya",
       acil_durum_telefon: "05556667788",
-      departman_id: 1,
+      departman_id: 6,
       gorev_id: 2,
       personel_tipi_id: 2,
       bagli_amir_id: 9,
       sube_adi: "Depolama",
       departman_adi: "Depo",
-      gorev_adi: "Sef",
+      gorev_adi: "Üretim Müdürü",
       personel_tipi_adi: "Yari Zamanli",
       bagli_amir_adi: "Demo Amir",
       ucret_tipi_id: 2,
@@ -273,10 +273,18 @@ export async function mockApi(page: Page, role: MockUserRole) {
   ];
 
   const departmanOptions: Array<{ id: number; ad: string }> = [
-    { id: 1, ad: "Depo" },
-    { id: 2, ad: "Döşeme" },
-    { id: 3, ad: "Atölye" },
-    { id: 4, ad: "Finans" }
+    { id: 1, ad: "Muhasebe" },
+    { id: 2, ad: "Finans" },
+    { id: 3, ad: "Döşeme" },
+    { id: 4, ad: "Panel" },
+    { id: 5, ad: "Hammadde Depo" },
+    { id: 6, ad: "Depo" },
+    { id: 7, ad: "E-ticaret Depo" },
+    { id: 8, ad: "Yönetim Personeli" },
+    { id: 9, ad: "Dış Ticaret" },
+    { id: 10, ad: "İdari İşler" },
+    { id: 11, ad: "Pazarlama" },
+    { id: 12, ad: "Ar-Ge" }
   ];
 
   const ucretTipiReferans: Array<{ id: number; ad: string }> = [
@@ -301,8 +309,8 @@ export async function mockApi(page: Page, role: MockUserRole) {
       id: 1,
       kod: "MRK",
       ad: "Merkez",
-      departman_ids: [3, 4],
-      departman_adlari: ["Atölye", "Finans"],
+      departman_ids: [1, 3],
+      departman_adlari: ["Muhasebe", "Döşeme"],
       durum: "AKTIF"
     },
     {
@@ -481,7 +489,7 @@ export async function mockApi(page: Page, role: MockUserRole) {
       sube_id: 1,
       sube: "Merkez",
       departman_id: 3,
-      bolum: "Atölye",
+      bolum: "Döşeme",
       bagli_amir_adi: "Serhan Kose",
       devamsizlik_gun: 0,
       gec_kalma_adet: 1,
@@ -502,7 +510,7 @@ export async function mockApi(page: Page, role: MockUserRole) {
       sicil_no: "P-002",
       sube_id: 2,
       sube: "Depolama",
-      departman_id: 1,
+      departman_id: 6,
       bolum: "Depo",
       bagli_amir_adi: "Serhan Kose",
       devamsizlik_gun: 1,
@@ -525,7 +533,7 @@ let bildirimIdCounter = 800;
   let finansIdCounter = 950;
   let kullaniciIdCounter = 3;
   let subeIdCounter = 2;
-  let departmanIdCounter = 4;
+  let departmanIdCounter = 12;
 
   function getDepartmanLabel(id: number) {
     return departmanOptions.find((item) => item.id === id)?.ad ?? `Departman ${id}`;
@@ -602,9 +610,21 @@ let bildirimIdCounter = 800;
   }
 
   const gorevAdlari: Array<{ id: number; ad: string }> = [
-    { id: 1, ad: "Uzman" },
-    { id: 2, ad: "Sef" },
-    { id: 3, ad: "Mudur" }
+    { id: 1, ad: "Genel Müdür" },
+    { id: 2, ad: "Üretim Müdürü" },
+    { id: 3, ad: "Finans Müdürü" },
+    { id: 4, ad: "Fabrika Müdürü" },
+    { id: 5, ad: "İdari İşler Müdürü" },
+    { id: 6, ad: "Pazarlama Müdürü" },
+    { id: 7, ad: "Dış Ticaret Müdürü" },
+    { id: 8, ad: "Satış Destek Personeli" },
+    { id: 9, ad: "Dış Ticaret Personeli" },
+    { id: 10, ad: "Satış Personeli" },
+    { id: 11, ad: "Temizlik Personeli" },
+    { id: 12, ad: "Güvenlik Personeli" },
+    { id: 13, ad: "Satış Sonrası (SSH)" },
+    { id: 14, ad: "Şoför" },
+    { id: 15, ad: "Aşçı" }
   ];
 
   function normalizeLifecycleSnapshot(p: (typeof personeller)[number]) {
@@ -1191,8 +1211,8 @@ let bildirimIdCounter = 800;
           },
           referans_adlari: {
             sube: "Merkez",
-            departman: "Atölye",
-            gorev: "Uzman",
+            departman: "Döşeme",
+            gorev: "Genel Müdür",
             personel_tipi: "Tam Zamanli",
             bagli_amir: "Demo Amir"
           }
@@ -1408,15 +1428,7 @@ let bildirimIdCounter = 800;
       }
 
       if (path === "/api/referans/gorevler") {
-        await fulfillJson(
-          route,
-          200,
-          okBody([
-            { id: 1, ad: "Uzman" },
-            { id: 2, ad: "Sef" },
-            { id: 3, ad: "Mudur" }
-          ])
-        );
+        await fulfillJson(route, 200, okBody(gorevAdlari));
         return;
       }
 

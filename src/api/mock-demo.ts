@@ -138,6 +138,49 @@ type DemoDepartman = {
   ad: string;
 };
 
+/** Şirket birim/departman referans listesi (sabit ID sırası). */
+const DEMO_DEPARTMANLAR: DemoDepartman[] = [
+  { id: 1, ad: "Muhasebe" },
+  { id: 2, ad: "Finans" },
+  { id: 3, ad: "Döşeme" },
+  { id: 4, ad: "Panel" },
+  { id: 5, ad: "Hammadde Depo" },
+  { id: 6, ad: "Depo" },
+  { id: 7, ad: "E-ticaret Depo" },
+  { id: 8, ad: "Yönetim Personeli" },
+  { id: 9, ad: "Dış Ticaret" },
+  { id: 10, ad: "İdari İşler" },
+  { id: 11, ad: "Pazarlama" },
+  { id: 12, ad: "Ar-Ge" }
+];
+
+/** Görev/unvan referans listesi (sabit ID sırası). */
+const DEMO_GOREVLER: Array<{ id: number; ad: string }> = [
+  { id: 1, ad: "Genel Müdür" },
+  { id: 2, ad: "Üretim Müdürü" },
+  { id: 3, ad: "Finans Müdürü" },
+  { id: 4, ad: "Fabrika Müdürü" },
+  { id: 5, ad: "İdari İşler Müdürü" },
+  { id: 6, ad: "Pazarlama Müdürü" },
+  { id: 7, ad: "Dış Ticaret Müdürü" },
+  { id: 8, ad: "Satış Destek Personeli" },
+  { id: 9, ad: "Dış Ticaret Personeli" },
+  { id: 10, ad: "Satış Personeli" },
+  { id: 11, ad: "Temizlik Personeli" },
+  { id: 12, ad: "Güvenlik Personeli" },
+  { id: 13, ad: "Satış Sonrası (SSH)" },
+  { id: 14, ad: "Şoför" },
+  { id: 15, ad: "Aşçı" }
+];
+
+const DEMO_GOREV_LABELS: Record<number, string> = DEMO_GOREVLER.reduce(
+  (acc, row) => {
+    acc[row.id] = row.ad;
+    return acc;
+  },
+  {} as Record<number, string>
+);
+
 type DemoAylikDurum = {
   ay: string;
   personel_id: number;
@@ -208,7 +251,7 @@ const demoState: {
       ise_giris_tarihi: "2024-07-15",
       acil_durum_kisi: "Zeynep Kaya",
       acil_durum_telefon: "05556667788",
-      departman_id: 2,
+      departman_id: 6,
       gorev_id: 2,
       personel_tipi_id: 2,
       bagli_amir_id: 1
@@ -274,7 +317,7 @@ const demoState: {
     {
       id: 702,
       tarih: "2026-04-10",
-      departman_id: 2,
+      departman_id: 6,
       personel_id: 2,
       bildirim_turu: "IZINLI_GELMEDI",
       aciklama: "Onayli izin nedeniyle bugun yok.",
@@ -454,12 +497,7 @@ const demoState: {
       notlar: "Gunluk kayit sorumlusu"
     }
   ],
-  departmanlar: [
-    { id: 1, ad: "Depo" },
-    { id: 2, ad: "Döşeme" },
-    { id: 3, ad: "Atölye" },
-    { id: 4, ad: "Finans" }
-  ],
+  departmanlar: [...DEMO_DEPARTMANLAR],
   subeler: [
     {
       id: 1,
@@ -472,7 +510,7 @@ const demoState: {
       id: 2,
       kod: "DPL",
       ad: "Depolama",
-      departman_ids: [1],
+      departman_ids: [6],
       durum: "AKTIF"
     }
   ],
@@ -503,14 +541,8 @@ const demoState: {
     kapanis: 1000,
     kullanici: 3,
     sube: 2,
-    departman: 4
+    departman: 12
   }
-};
-
-const DEMO_GOREV_LABELS: Record<number, string> = {
-  1: "Uzman",
-  2: "Sef",
-  3: "Mudur"
 };
 
 const DEMO_PERSONEL_TIPI_LABELS: Record<number, string> = {
@@ -1736,11 +1768,7 @@ export function resolveDemoApiResponse(
     }
 
     if (pathname === "/referans/gorevler") {
-      return ok([
-        { id: 1, ad: "Uzman" },
-        { id: 2, ad: "Şef" },
-        { id: 3, ad: "Müdür" }
-      ]);
+      return ok(DEMO_GOREVLER);
     }
 
     if (pathname === "/referans/personel-tipleri") {
@@ -1766,53 +1794,6 @@ export function resolveDemoApiResponse(
         { key: "GELMEDI", label: "Gelmedi" },
         { key: "IZINLI_GELMEDI", label: "İzinli Gelmedi" },
         { key: "IZINSIZ_GELMEDI", label: "İzinsiz Gelmedi" },
-        { key: "DEVAMSIZLIK", label: "Devamsızlık" },
-        { key: "RAPORLU", label: "Raporlu" }
-      ]);
-    }
-
-    if (pathname === "/referans/bagli-amirler") {
-      return ok([{ id: 1, ad: "Demo Amir" }]);
-    }
-    if (pathname === "/referans/departmanlar") {
-      return ok([
-      { id: 1, ad: "Yönetim" },
-        { id: 2, ad: "Muhasebe" },
-        { id: 3, ad: "Operasyon" }
-      ]);
-    }
-
-    if (pathname === "/referans/gorevler") {
-      return ok([
-        { id: 1, ad: "Uzman" },
-        { id: 2, ad: "Sef" },
-        { id: 3, ad: "Mudür" }
-      ]);
-    }
-
-    if (pathname === "/referans/personel-tipleri") {
-      return ok([
-        { id: 1, ad: "Tam Zamanli" },
-        { id: 2, ad: "Yari Zamanli" }
-      ]);
-    }
-
-    if (pathname === "/referans/surec-turleri") {
-      return ok([
-        { key: "IZIN", label: "İzin" },
-        { key: "RAPOR", label: "Rapor" },
-        { key: "IS_KAZASI", label: "Is Kazasi" },
-        { key: "DEVAMSIZLIK", label: "Devamsizlik" },
-        { key: "ISTEN_AYRILMA", label: "Isten Ayrilma" }
-      ]);
-    }
-
-    if (pathname === "/referans/bildirim-turleri") {
-      return ok([
-        { key: "GEC_GELDI", label: "Gec Geldi" },
-        { key: "GELMEDI", label: "Gelmedi" },
-        { key: "IZINLI_GELMEDI", label: "Izinli Gelmedi" },
-        { key: "IZINSIZ_GELMEDI", label: "Izinsiz Gelmedi" },
         { key: "DEVAMSIZLIK", label: "Devamsızlık" },
         { key: "RAPORLU", label: "Raporlu" }
       ]);

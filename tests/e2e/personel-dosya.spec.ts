@@ -94,7 +94,7 @@ test.describe("personel dosyasi surec akisi", () => {
     await page.getByRole("button", { name: "Islemler" }).click();
     await page.getByRole("button", { name: "Karti Duzenle" }).click();
 
-    await page.locator('[name="edit-departman"]').selectOption("4");
+    await page.locator('[name="edit-departman"]').selectOption("2");
     await page.locator('[name="edit-effective-date"]').fill("2026-06-01");
     await page.getByRole("button", { name: "Kaydet" }).click();
 

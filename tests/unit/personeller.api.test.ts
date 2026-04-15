@@ -51,8 +51,8 @@ describe("personeller.api", () => {
               etiket: null
             },
             referans_adlari: {
-              departman: "Operasyon",
-              gorev: "Uzman",
+              departman: "Döşeme",
+              gorev: "Genel Müdür",
               personel_tipi: "Tam Zamanli",
               bagli_amir: "Demo Amir"
             }
@@ -87,8 +87,8 @@ describe("personeller.api", () => {
       gorev_id: 1,
       personel_tipi_id: 2,
       bagli_amir_id: 44,
-      departman_adi: "Operasyon",
-      gorev_adi: "Uzman",
+      departman_adi: "Döşeme",
+      gorev_adi: "Genel Müdür",
       personel_tipi_adi: "Tam Zamanli",
       bagli_amir_adi: "Demo Amir",
       hizmet_suresi: "3 yil 2 ay",

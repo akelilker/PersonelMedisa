@@ -100,7 +100,7 @@ export function HomeDashboard() {
   if (isLoading) {
     return (
       <section className="dashboard-page">
-        <LoadingState label="Dashboard verileri yukleniyor..." />
+        <LoadingState label="Dashboard verileri yükleniyor..." />
       </section>
     );
   }
@@ -110,10 +110,10 @@ export function HomeDashboard() {
   return (
     <section className="dashboard-page" data-testid="dashboard-page">
       <div className="dashboard-header">
-        <h2>Yonetim Paneli</h2>
+        <h2>Yönetim Paneli</h2>
         {canViewRaporlar ? (
           <Link to="/raporlar" className="universal-btn-aux">
-            Detayli Raporlar
+            Detaylı Raporlar
           </Link>
         ) : null}
       </div>

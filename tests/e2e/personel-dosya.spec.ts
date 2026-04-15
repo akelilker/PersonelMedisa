@@ -77,4 +77,59 @@ test.describe("personel dosyasi surec akisi", () => {
     await expect(page.locator(".personel-zimmet-table")).toContainText(/Seri No: TEL-900/i);
     await expect(page.locator(".personel-zimmet-table")).toContainText(/Aktif Zimmet/i);
   });
+
+  test("yonetici departman ve gecerlilik tarihi ile org surecini uretir ve timeline tepesinde gosterir", async ({
+    page
+  }) => {
+    await mockApi(page, "GENEL_YONETICI");
+
+    await login(page, { username: "yonetici", password: "secret" });
+
+    await page.getByTestId("menu-personel-karti").click();
+    await expect(page).toHaveURL(/\/personeller$/);
+
+    await page.getByRole("link", { name: /Ayse Yilmaz.*kisisi kartini ac/i }).first().click();
+    await expect(page).toHaveURL(/\/personeller\/1$/);
+
+    await page.getByRole("button", { name: "Islemler" }).click();
+    await page.getByRole("button", { name: "Karti Duzenle" }).click();
+
+    await page.locator('[name="edit-departman"]').selectOption("4");
+    await page.locator('[name="edit-effective-date"]').fill("2026-06-01");
+    await page.getByRole("button", { name: "Kaydet" }).click();
+
+    await expect(page.locator(".personel-create-error")).toHaveCount(0);
+    await expect(page.locator(".personel-dosya-hero")).toContainText(/Finans/i);
+
+    await page.getByRole("tab", { name: "Surec Gecmisi" }).click();
+    const timeline = page.locator("#personel-kart-panel-surec-gecmisi").locator("[data-testid='personel-surec-timeline']");
+    await expect(timeline.locator("li").first()).toContainText(/Org/i);
+  });
+
+  test("yonetici izlenen org alanlarina dokunmadan kaydettiginde otomatik surec olusmaz", async ({ page }) => {
+    await mockApi(page, "GENEL_YONETICI");
+
+    await login(page, { username: "yonetici", password: "secret" });
+
+    await page.getByTestId("menu-personel-karti").click();
+    await expect(page).toHaveURL(/\/personeller$/);
+
+    await page.getByRole("link", { name: /Ayse Yilmaz.*kisisi kartini ac/i }).first().click();
+    await expect(page).toHaveURL(/\/personeller\/1$/);
+
+    await page.getByRole("tab", { name: "Surec Gecmisi" }).click();
+    const timelineBefore = page.locator("#personel-kart-panel-surec-gecmisi").locator("[data-testid='personel-surec-timeline']");
+    const countBefore = await timelineBefore.locator("li").count();
+
+    await page.getByRole("button", { name: "Islemler" }).click();
+    await page.getByRole("button", { name: "Karti Duzenle" }).click();
+    await page.getByRole("button", { name: "Kaydet" }).click();
+
+    await expect(page.locator(".personel-create-error")).toHaveCount(0);
+
+    await page.getByRole("tab", { name: "Surec Gecmisi" }).click();
+    const timelineAfter = page.locator("#personel-kart-panel-surec-gecmisi").locator("[data-testid='personel-surec-timeline']");
+    await expect(timelineAfter.locator("li")).toHaveCount(countBefore);
+    await expect(timelineAfter).not.toContainText("Mock otomatik org gecmis kaydi");
+  });
 });

@@ -53,6 +53,9 @@ export async function mockApi(page: Page, role: MockUserRole) {
     gorev_adi?: string;
     personel_tipi_adi?: string;
     bagli_amir_adi?: string;
+    ucret_tipi?: string;
+    maas_tutari?: number;
+    prim_kurali_id?: number;
   }> = [
     {
       id: 1,
@@ -77,7 +80,10 @@ export async function mockApi(page: Page, role: MockUserRole) {
       departman_adi: "Atölye",
       gorev_adi: "Uzman",
       personel_tipi_adi: "Tam Zamanli",
-      bagli_amir_adi: "Demo Amir"
+      bagli_amir_adi: "Demo Amir",
+      ucret_tipi: "MAKTU_AYLIK",
+      maas_tutari: 35000,
+      prim_kurali_id: 7
     },
     {
       id: 2,
@@ -102,7 +108,10 @@ export async function mockApi(page: Page, role: MockUserRole) {
       departman_adi: "Depo",
       gorev_adi: "Sef",
       personel_tipi_adi: "Yari Zamanli",
-      bagli_amir_adi: "Demo Amir"
+      bagli_amir_adi: "Demo Amir",
+      ucret_tipi: "SAATLIK",
+      maas_tutari: 25000,
+      prim_kurali_id: 8
     }
   ];
 
@@ -113,6 +122,8 @@ export async function mockApi(page: Page, role: MockUserRole) {
     alt_tur?: string;
     baslangic_tarihi: string;
     bitis_tarihi?: string;
+    effective_date?: string;
+    created_at?: string;
     ucretli_mi?: boolean;
     aciklama?: string;
     state: string;
@@ -124,6 +135,8 @@ export async function mockApi(page: Page, role: MockUserRole) {
       alt_tur: "YILLIK_IZIN",
       baslangic_tarihi: "2026-04-10",
       bitis_tarihi: "2026-04-11",
+      effective_date: "2026-04-10",
+      created_at: "2026-04-10T10:00:00.000Z",
       ucretli_mi: true,
       aciklama: "Mevcut surec",
       state: "AKTIF"
@@ -539,7 +552,10 @@ let bildirimIdCounter = 800;
         departman_id: personel.departman_id,
         gorev_id: personel.gorev_id,
         personel_tipi_id: personel.personel_tipi_id,
-        bagli_amir_id: personel.bagli_amir_id
+        bagli_amir_id: personel.bagli_amir_id,
+        ucret_tipi: personel.ucret_tipi,
+        maas_tutari: personel.maas_tutari,
+        prim_kurali_id: personel.prim_kurali_id
       },
       sistem_ozeti: {
         hizmet_suresi: personel.id === 1 ? "3 yil 2 ay" : "1 yil 8 ay",
@@ -565,6 +581,94 @@ let bildirimIdCounter = 800;
         bagli_amir: personel.bagli_amir_adi
       }
     };
+  }
+
+  const gorevAdlari: Array<{ id: number; ad: string }> = [
+    { id: 1, ad: "Uzman" },
+    { id: 2, ad: "Sef" },
+    { id: 3, ad: "Mudur" }
+  ];
+
+  function normalizeLifecycleSnapshot(p: (typeof personeller)[number]) {
+    const n = (v: number | undefined | null) =>
+      v === undefined || v === null || !Number.isFinite(v) ? null : v;
+    const ns = (v: string | undefined | null) =>
+      typeof v === "string" && v.trim() ? v.trim() : null;
+    const nm = (v: number | undefined | null) =>
+      v === undefined || v === null || !Number.isFinite(v) ? null : v;
+    return {
+      departman_id: n(p.departman_id),
+      gorev_id: n(p.gorev_id),
+      bagli_amir_id: n(p.bagli_amir_id),
+      ucret_tipi: ns(p.ucret_tipi),
+      maas_tutari: nm(p.maas_tutari),
+      prim_kurali_id: n(p.prim_kurali_id)
+    };
+  }
+
+  function lifecycleSnapshotsEqual(
+    a: ReturnType<typeof normalizeLifecycleSnapshot>,
+    b: ReturnType<typeof normalizeLifecycleSnapshot>
+  ) {
+    return (
+      a.departman_id === b.departman_id &&
+      a.gorev_id === b.gorev_id &&
+      a.bagli_amir_id === b.bagli_amir_id &&
+      a.ucret_tipi === b.ucret_tipi &&
+      a.maas_tutari === b.maas_tutari &&
+      a.prim_kurali_id === b.prim_kurali_id
+    );
+  }
+
+  function mergePersonelFromPutPayload(
+    base: (typeof personeller)[number],
+    payload: Record<string, unknown>
+  ) {
+    const next: (typeof personeller)[number] = { ...base };
+    if (typeof payload.ad === "string") next.ad = payload.ad.trim();
+    if (typeof payload.soyad === "string") next.soyad = payload.soyad.trim();
+    if (typeof payload.telefon === "string") next.telefon = payload.telefon.trim();
+
+    const setId = (key: "departman_id" | "gorev_id" | "bagli_amir_id" | "prim_kurali_id") => {
+      if (!(key in payload)) return;
+      const v = payload[key];
+      if (v === null) {
+        next[key] = undefined;
+        return;
+      }
+      if (typeof v === "number" && Number.isFinite(v)) {
+        next[key] = v;
+        return;
+      }
+      if (typeof v === "string" && v.trim()) {
+        const parsed = Number.parseInt(v.trim(), 10);
+        if (Number.isFinite(parsed)) next[key] = parsed;
+      }
+    };
+    setId("departman_id");
+    setId("gorev_id");
+    setId("bagli_amir_id");
+    setId("prim_kurali_id");
+
+    if ("ucret_tipi" in payload) {
+      const v = payload.ucret_tipi;
+      next.ucret_tipi = v === null || v === undefined ? undefined : String(v).trim() || undefined;
+    }
+    if ("maas_tutari" in payload) {
+      const v = payload.maas_tutari;
+      if (v === null || v === undefined) next.maas_tutari = undefined;
+      else next.maas_tutari = typeof v === "number" ? v : Number.parseFloat(String(v));
+    }
+    return next;
+  }
+
+  function syncPersonelReferansAdlari(target: (typeof personeller)[number]) {
+    if (target.departman_id !== undefined) {
+      target.departman_adi = getDepartmanLabel(target.departman_id);
+    }
+    if (target.gorev_id !== undefined) {
+      target.gorev_adi = gorevAdlari.find((g) => g.id === target.gorev_id)?.ad ?? target.gorev_adi;
+    }
   }
 
   function buildAylikOzetResponse(searchUrl: URL) {
@@ -822,6 +926,76 @@ let bildirimIdCounter = 800;
           errors: []
         })
       );
+      return;
+    }
+
+    if (path.match(/^\/api\/personeller\/\d+$/) && method === "PUT") {
+      const personelId = Number.parseInt(path.split("/")[3] ?? "0", 10);
+      const personel = personeller.find((item) => item.id === personelId);
+      if (!personel) {
+        await fulfillJson(route, 404, errorBody("NOT_FOUND", "Personel bulunamadi."));
+        return;
+      }
+
+      const payload = request.postDataJSON() as Record<string, unknown>;
+
+      const hasLifecycleKeys =
+        "departman_id" in payload ||
+        "gorev_id" in payload ||
+        "bagli_amir_id" in payload ||
+        "ucret_tipi" in payload ||
+        "maas_tutari" in payload ||
+        "prim_kurali_id" in payload;
+
+      if (!hasLifecycleKeys) {
+        if (typeof payload.ad === "string") personel.ad = payload.ad.trim();
+        if (typeof payload.soyad === "string") personel.soyad = payload.soyad.trim();
+        if (typeof payload.telefon === "string") personel.telefon = payload.telefon.trim();
+        await fulfillJson(route, 200, okBody(buildPersonelDetail(personel)));
+        return;
+      }
+
+      const merged = mergePersonelFromPutPayload(personel, payload);
+      const beforeSnap = normalizeLifecycleSnapshot(personel);
+      const afterSnap = normalizeLifecycleSnapshot(merged);
+      const hasLifecycleDiff = !lifecycleSnapshotsEqual(beforeSnap, afterSnap);
+
+      if (!hasLifecycleDiff) {
+        personel.ad = merged.ad;
+        personel.soyad = merged.soyad;
+        personel.telefon = merged.telefon;
+        await fulfillJson(route, 200, okBody(buildPersonelDetail(personel)));
+        return;
+      }
+
+      const effectiveRaw = payload.effective_date;
+      const effective =
+        typeof effectiveRaw === "string" && effectiveRaw.trim() ? effectiveRaw.trim() : "";
+      if (!effective) {
+        await fulfillJson(
+          route,
+          400,
+          errorBody("VALIDATION_ERROR", "Gecerlilik tarihi zorunludur.")
+        );
+        return;
+      }
+
+      Object.assign(personel, merged);
+      syncPersonelReferansAdlari(personel);
+
+      const createdAt = new Date().toISOString();
+      surecler.unshift({
+        id: ++surecIdCounter,
+        personel_id: personelId,
+        surec_turu: "ORG_DEGISIKLIK",
+        baslangic_tarihi: effective,
+        effective_date: effective,
+        created_at: createdAt,
+        state: "TAMAMLANDI",
+        aciklama: "Mock otomatik org gecmis kaydi"
+      });
+
+      await fulfillJson(route, 200, okBody(buildPersonelDetail(personel)));
       return;
     }
 

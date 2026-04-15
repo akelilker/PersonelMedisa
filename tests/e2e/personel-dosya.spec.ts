@@ -58,8 +58,13 @@ test.describe("personel dosyasi surec akisi", () => {
     await expect(page).toHaveURL(/\/personeller\/1$/);
 
     await page.getByRole("tab", { name: "Zimmet & Envanter" }).click();
-    await expect(page.locator(".personel-zimmet-table")).toContainText(/Kask/i);
-    await expect(page.locator(".personel-zimmet-table")).toContainText(/Iade Edildi/i);
+
+    const zimmetRow = (product: RegExp) =>
+      page.locator(".personel-zimmet-table tbody tr").filter({ has: page.locator("td", { hasText: product }) });
+
+    const kaskRow = zimmetRow(/Kask/i);
+    await expect(kaskRow).toHaveCount(1);
+    await expect(kaskRow.getByTestId("zimmet-durum")).toContainText(/Edildi/);
 
     await page.getByRole("button", { name: "Yeni Zimmet Ekle" }).click();
 
@@ -73,9 +78,10 @@ test.describe("personel dosyasi surec akisi", () => {
     await zimmetModal.locator("[name='personel-zimmet-aciklama']").fill("Seri No: TEL-900");
     await zimmetModal.getByRole("button", { name: "Kaydet" }).click();
 
-    await expect(page.locator(".personel-zimmet-table")).toContainText(/Telefon/i);
-    await expect(page.locator(".personel-zimmet-table")).toContainText(/Seri No: TEL-900/i);
-    await expect(page.locator(".personel-zimmet-table")).toContainText(/Aktif Zimmet/i);
+    const telefonRow = zimmetRow(/Telefon/i);
+    await expect(telefonRow).toHaveCount(1);
+    await expect(telefonRow.getByTestId("zimmet-durum")).toContainText(/Aktif/);
+    await expect(telefonRow.locator(".personel-zimmet-note-cell")).toContainText(/TEL-900/);
   });
 
   test("yonetici departman ve gecerlilik tarihi ile org surecini uretir ve timeline tepesinde gosterir", async ({

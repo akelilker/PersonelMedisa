@@ -806,6 +806,7 @@ function PersonelZimmetEnvanterPanel({
                   <td>
                     <span
                       className={`personel-zimmet-state${zimmet.zimmet_durumu === "IADE_EDILDI" ? " is-returned" : ""}`}
+                      data-testid="zimmet-durum"
                     >
                       {formatZimmetKayitDurumuLabel(zimmet.zimmet_durumu)}
                     </span>

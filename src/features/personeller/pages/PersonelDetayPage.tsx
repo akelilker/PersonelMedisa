@@ -438,7 +438,7 @@ function PersonelKartPanelGenelBilgiler({ personel }: { personel: Personel }) {
           label="Personel Tipi"
           value={formatReferenceValue(personel.personel_tipi_adi, personel.personel_tipi_id)}
         />
-        <DossierRecord label="Bagli Amir" value={formatReferenceValue(personel.bagli_amir_adi, personel.bagli_amir_id)} />
+        <DossierRecord label="Bağlı Amir" value={formatReferenceValue(personel.bagli_amir_adi, personel.bagli_amir_id)} />
         <DossierRecord label="Acil Durum Kisisi" value={formatDetailValue(personel.acil_durum_kisi)} />
         <DossierRecord label="Acil Durum Telefonu" value={formatDetailValue(personel.acil_durum_telefon)} />
         <DossierRecord label="Pasiflik Etiketi" value={formatDetailValue(personel.pasiflik_durumu_etiketi)} />
@@ -1166,7 +1166,7 @@ export function PersonelDetayPage() {
               value={zimmetForm.teslimEden}
               onChange={(value) => setZimmetForm((prev) => ({ ...prev, teslimEden: value }))}
               required
-              placeholder="Birim Amiri veya IK gorevlisi"
+              placeholder="Bağlı Amir veya IK gorevlisi"
             />
             <FormField
               as="select"

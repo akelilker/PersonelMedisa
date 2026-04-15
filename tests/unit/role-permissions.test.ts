@@ -21,7 +21,7 @@ describe("role permissions", () => {
     expect(hasRolePermission("MUHASEBE", "finans.cancel")).toBe(true);
   });
 
-  it("keeps birim amiri focused on sube visibility and daily bildirim workflow", () => {
+  it("keeps BIRIM_AMIRI role focused on sube visibility and daily bildirim workflow", () => {
     expect(hasRolePermission("BIRIM_AMIRI", "personeller.view.sube")).toBe(true);
     expect(hasRolePermission("BIRIM_AMIRI", "surecler.view.sube")).toBe(true);
     expect(hasRolePermission("BIRIM_AMIRI", "personeller.view")).toBe(false);

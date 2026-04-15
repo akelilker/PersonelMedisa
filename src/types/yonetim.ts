@@ -64,7 +64,7 @@ export type AylikOzetRow = {
   sicil_no?: string;
   sube: string;
   bolum: string;
-  birim_amiri: string;
+  bagli_amir_adi: string;
   devamsizlik_gun: number;
   gec_kalma_adet: number;
   izinli_gelmedi: number;

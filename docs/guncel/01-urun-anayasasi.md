@@ -108,13 +108,13 @@ V1'de amaç tam bordro motoru kurmak değil; doğru veri, doğru state ve doğru
 - genel yönetici
 - bölüm yöneticisi
 - muhasebe
-- birim amiri
+- birim amiri rolü (`BIRIM_AMIRI`)
 
 Ana ilke:
 
 - ürün dili ortaktır
 - yetki ve görünürlük role göre değişir
-- birim amiri için daha sade yüz kurgulanır
+- Birim Amiri Rolü için daha sade yüz kurgulanır
 
 ## 6. Tasarım ve Teknik Sınır
 

@@ -156,7 +156,7 @@ export async function mockApi(page: Page, role: MockUserRole) {
       personel_id: 1,
       urun_turu: "KULAKLIK",
       teslim_tarihi: "2026-01-15",
-      teslim_eden: "Birim Amiri",
+      teslim_eden: "Bağlı Amir",
       aciklama: "Onceki vardiyadan teslim alindi",
       teslim_durumu: "IKINCI_EL",
       zimmet_durumu: "IADE_EDILDI",
@@ -431,7 +431,7 @@ export async function mockApi(page: Page, role: MockUserRole) {
     sube: string;
     departman_id: number;
     bolum: string;
-    birim_amiri: string;
+    bagli_amir_adi: string;
     devamsizlik_gun: number;
     gec_kalma_adet: number;
     izinli_gelmedi: number;
@@ -453,7 +453,7 @@ export async function mockApi(page: Page, role: MockUserRole) {
       sube: "Merkez",
       departman_id: 3,
       bolum: "Atölye",
-      birim_amiri: "Serhan Kose",
+      bagli_amir_adi: "Serhan Kose",
       devamsizlik_gun: 0,
       gec_kalma_adet: 1,
       izinli_gelmedi: 0,
@@ -463,7 +463,7 @@ export async function mockApi(page: Page, role: MockUserRole) {
       ceza_kesinti_tutari: 0,
       bolum_onay_durumu: "BOLUM_ONAYINDA",
       revize_var_mi: false,
-      son_islem: "Birim amiri gunluk kayitlari hazirladi",
+      son_islem: "Bagli amir gunluk kayitlari hazirladi",
       kapanis_durumu: "ACIK"
     },
     {
@@ -475,7 +475,7 @@ export async function mockApi(page: Page, role: MockUserRole) {
       sube: "Depolama",
       departman_id: 1,
       bolum: "Depo",
-      birim_amiri: "Serhan Kose",
+      bagli_amir_adi: "Serhan Kose",
       devamsizlik_gun: 1,
       gec_kalma_adet: 0,
       izinli_gelmedi: 1,

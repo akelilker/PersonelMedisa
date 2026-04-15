@@ -177,7 +177,7 @@ export function AylikKapanisOzetiPage() {
         "Sicil No": item.sicil_no ?? "-",
         Şube: item.sube,
         Bölüm: item.bolum,
-        "Birim Amiri": item.birim_amiri,
+        "Bağlı Amir": item.bagli_amir_adi,
         "Devamsızlık Gün": item.devamsizlik_gun,
         "Geç Kalma": item.gec_kalma_adet,
         "İzinli Gelmedi": item.izinli_gelmedi,
@@ -344,7 +344,7 @@ export function AylikKapanisOzetiPage() {
                   <th>Sicil</th>
                   <th>Şube</th>
                   <th>Bölüm</th>
-                  <th>Birim Amiri</th>
+                  <th>Bağlı Amir</th>
                   <th>Devamsızlık</th>
                   <th>Geç Kalma</th>
                   <th>İzinli</th>
@@ -365,7 +365,7 @@ export function AylikKapanisOzetiPage() {
                     <td>{item.sicil_no ?? "-"}</td>
                     <td>{item.sube}</td>
                     <td>{item.bolum}</td>
-                    <td>{item.birim_amiri}</td>
+                    <td>{item.bagli_amir_adi}</td>
                     <td>{item.devamsizlik_gun}</td>
                     <td>{item.gec_kalma_adet}</td>
                     <td>{item.izinli_gelmedi}</td>

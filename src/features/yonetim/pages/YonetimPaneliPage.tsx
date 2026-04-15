@@ -51,7 +51,7 @@ type SubeFormState = {
 const ROLE_LABELS: Record<UserRole, string> = {
   GENEL_YONETICI: "Genel Yönetici",
   BOLUM_YONETICISI: "Bölüm Yöneticisi",
-  BIRIM_AMIRI: "Birim Amiri",
+  BIRIM_AMIRI: "Birim Amiri Rolü",
   MUHASEBE: "Muhasebe"
 };
 

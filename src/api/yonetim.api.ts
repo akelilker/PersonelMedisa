@@ -229,7 +229,7 @@ function normalizeAylikOzetRow(data: unknown): AylikOzetRow {
     sicil_no: readString(record.sicil_no),
     sube: readString(record.sube) ?? "-",
     bolum: readString(record.bolum) ?? "-",
-    birim_amiri: readString(record.birim_amiri) ?? "-",
+    bagli_amir_adi: readString(record.bagli_amir_adi) ?? "-",
     devamsizlik_gun: readNumber(record.devamsizlik_gun) ?? 0,
     gec_kalma_adet: readNumber(record.gec_kalma_adet) ?? 0,
     izinli_gelmedi: readNumber(record.izinli_gelmedi) ?? 0,

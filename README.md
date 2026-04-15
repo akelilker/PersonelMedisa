@@ -23,7 +23,7 @@ Bu repo, Medisa Personel ve Puantaj Yonetim Sistemi icin React + Vite + TypeScri
 - haftalik kapanis modulu aktif (`POST /api/haftalik-kapanis`)
 - raporlar modulu aktif (`GET /api/raporlar/*`)
 - finans modulu aktif (`GET/POST/PUT /api/ek-odeme-kesinti`, `POST /api/ek-odeme-kesinti/{id}/iptal`)
-- rol bazli permission matrisi aktif; birim amiri create/update/cancel aksiyonlarinda read-only
+- rol bazli permission matrisi aktif; `BIRIM_AMIRI` (Birim Amiri Rolü) create/update/cancel aksiyonlarinda read-only
 - referans veri endpointleri form dropdownlarina baglandi (departman/gorev/personel tipi/surec turu/bildirim turu)
 - ortak loading / error / empty state bilesenleri bagli
 - Vitest test altyapisi aktif; query util + normalize + api client + permission + auth integration + puantaj/kapanis + rapor/finans API testleri yazildi

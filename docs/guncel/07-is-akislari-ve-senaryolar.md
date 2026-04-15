@@ -97,11 +97,11 @@ Yetkili kullanıcı devamsızlık, hastalık raporu veya benzeri yokluk sürecin
 
 ### 4.1 Tetikleyici
 
-Bir birim amiri gunluk durum girmek ister ya da kullanici header sag ustteki bildirim ikonundan paneli acar.
+Birim Amiri Rolü (`BIRIM_AMIRI`) ile oturum acmis bir kullanici gunluk durum girmek ister ya da kullanici header sag ustteki bildirim ikonundan paneli acar.
 
 ### 4.2 Akış
 
-- Birim amiri `Bildirimler` ekranindan personel secer.
+- Bu roldeki kullanici `Bildirimler` ekranindan personel secer.
 - Sistem secilen personelin bolumunu ve hizli iletisim bilgilerini ayni ekranda gosterir.
 - Amir `GEC_GELDI`, `GELMEDI`, `IZINLI_GELMEDI`, `IZINSIZ_GELMEDI` veya `RAPORLU` tiplerinden birini secerek kayit girer.
 - Gunluk durum bildirimi bildirim kaydi olarak yazilir; surece otomatik donusmez.
@@ -112,7 +112,7 @@ Bir birim amiri gunluk durum girmek ister ya da kullanici header sag ustteki bil
 
 ### 4.3 Sistem Etkisi
 
-- Birim amiri personel kartindaki telefon, acil durum kisisi, acil telefon ve kan grubu gibi bilgilere hizli ulasir.
+- Bu rol personel kartindaki telefon, acil durum kisisi, acil telefon ve kan grubu gibi bilgilere hizli ulasir.
 - Bildirimin okunma durumu guncellenir (`okundu_mi`, `PUT /api/bildirimler/{bildirimId}`; ayrinti `05-state-flow-api-kontrati.md`).
 - Takvim hatirlatmalari (or. maas / SGK) kayit tabanli bildirim degildir; okundu bilgisi yalnizca istemci oturumunda tutulur.
 - Bildirim ile surec kaydi birbirine otomatik baglanmaz.

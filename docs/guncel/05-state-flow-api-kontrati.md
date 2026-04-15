@@ -141,7 +141,7 @@ kontrol eder.
 Örnek:
 
 - bölüm yöneticisi başka bölüm personelini göremez
-- birim amiri tam personel kartı API'sini sınırsız kullanamaz
+- `BIRIM_AMIRI` rolündeki kullanıcı tam personel kartı API'sini sınırsız kullanamaz
 
 ## 3. Mantıksal Kaynaklar
 

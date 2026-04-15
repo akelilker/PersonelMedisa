@@ -63,7 +63,7 @@ Bu başlıklar sırasıyla `08-frontend-teknik-mimari.md` ve `05-state-flow-api-
 
 - Tek login ekranı vardır.
 - Yönetim rolleri tam ürün yüzüne girer.
-- Birim amiri aynı tema ailesini taşıyan sadeleştirilmiş yüz ile çalışır.
+- Birim Amiri Rolü aynı tema ailesini taşıyan sadeleştirilmiş yüz ile çalışır.
 - Rol farkı yeni tema üretmez; görünürlük, yoğunluk ve akışı sadeleştirir.
 
 ## Modul Baglami
@@ -157,7 +157,7 @@ Kural:
 
 - Yönetim kabuğundaki ana ekranlarda bildirim ve ayarlar ikonları görünür
 - Login ekranı bu contract'ın dışında tutulabilir
-- Birim amiri sade yüzünde aynı aile korunur, ancak yetkisiz ikonlar görünmez
+- Birim Amiri Rolü sade yüzünde aynı aile korunur, ancak yetkisiz ikonlar görünmez
 
 ## 4. Bildirim Component Contract'ı
 

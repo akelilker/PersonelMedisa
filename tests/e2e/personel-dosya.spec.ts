@@ -64,7 +64,11 @@ test.describe("personel dosyasi surec akisi", () => {
 
     const kaskRow = zimmetRow(/Kask/i);
     await expect(kaskRow).toHaveCount(1);
-    await expect(kaskRow.getByTestId("zimmet-durum")).toContainText(/Edildi/);
+    await expect(kaskRow.getByTestId("zimmet-durum")).toContainText(/Aktif/);
+
+    const iadeRow = zimmetRow(/Kulak/i);
+    await expect(iadeRow).toHaveCount(1);
+    await expect(iadeRow.getByTestId("zimmet-durum")).toContainText(/Edildi/);
 
     await page.getByRole("button", { name: "Yeni Zimmet Ekle" }).click();
 

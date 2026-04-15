@@ -1,55 +1,120 @@
-.raporlar-page {
+/* -------------------------------------------------------------------------- */
+/* Raporlar — sade kurumsal düzen                                               */
+/* -------------------------------------------------------------------------- */
+
+.raporlar-page--premium {
   display: grid;
-  gap: var(--space-3);
+  gap: var(--space-4);
+  max-width: 1200px;
 }
 
-.raporlar-header-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+.raporlar-page-head {
+  display: grid;
+  gap: 0.35rem;
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.raporlar-page-head h2 {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.raporlar-page-lead {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--text-muted, #5c5c5c);
+  line-height: 1.45;
+}
+
+/* Aylık özet bölümü — başlık sadeleştirme */
+.raporlar-aylik-head h2 {
+  margin: 0 0 0.35rem;
+}
+
+.raporlar-aylik-lead {
+  margin: 0;
+  max-width: 42rem;
+  font-size: 0.9rem;
+  color: var(--text-muted, #5c5c5c);
+  line-height: 1.45;
+}
+
+.raporlar-aylik-filters {
+  padding-top: var(--space-1);
+}
+
+.raporlar-aylik-hint {
+  margin: var(--space-2) 0 0;
+}
+
+/* Liste raporu paneli */
+.raporlar-standart-panel {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--surface-elevated, var(--surface, #fafafa));
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-md);
+}
+
+.raporlar-panel-title {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted, #5c5c5c);
+}
+
+.raporlar-standart-form .form-field-grid {
   gap: var(--space-2);
 }
 
-.raporlar-header-row h2 {
-  margin: 0;
+.raporlar-standart-actions {
+  flex-wrap: wrap;
+  gap: var(--space-2);
 }
 
 .raporlar-result-card {
   display: grid;
   gap: var(--space-2);
-  padding: var(--space-3);
-  border: 1px solid var(--line-soft);
-  border-radius: var(--radius-md);
+  margin-top: var(--space-1);
+  padding: 0;
+  border: none;
+  background: transparent;
 }
 
-.raporlar-result-card p {
+.raporlar-result-meta {
   margin: 0;
+  font-size: 0.875rem;
+  color: var(--text-muted, #5c5c5c);
 }
 
-.raporlar-source-card {
-  display: grid;
-  gap: var(--space-1);
-  padding: var(--space-3);
+.raporlar-result-count {
+  font-weight: 600;
+  color: var(--text, inherit);
+}
+
+.raporlar-table-wrap--premium {
+  border-radius: var(--radius-sm);
   border: 1px solid var(--line-soft);
-  border-radius: var(--radius-md);
+  background: #fff;
 }
 
-.raporlar-source-title,
-.raporlar-source-hint {
-  margin: 0;
+.raporlar-table--premium th {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+  color: var(--text-muted, #5c5c5c);
+  background: rgba(0, 0, 0, 0.02);
 }
 
-.raporlar-source-title {
-  font-weight: 700;
-}
-
-.raporlar-module-links {
-  margin-top: calc(var(--space-2) * -1);
-}
-
-.raporlar-source-hint {
-  font-size: 13px;
-  color: var(--text-muted, #666);
+.raporlar-table--premium td {
+  font-size: 0.875rem;
 }
 
 .raporlar-table-wrap {
@@ -66,35 +131,29 @@
 .raporlar-table td {
   text-align: left;
   border: 1px solid var(--line-soft);
-  padding: 8px;
+  padding: 8px 10px;
   vertical-align: top;
 }
 
-.raporlar-engine-card {
-  display: grid;
-  gap: var(--space-2);
-  padding: var(--space-3);
-  border: 1px solid var(--line-soft);
-  border-radius: var(--radius-md);
+.raporlar-quick-nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  padding-top: var(--space-2);
+  font-size: 0.875rem;
 }
 
-.raporlar-engine-title {
-  margin: 0;
-  font-size: 1.05rem;
+.raporlar-quick-nav a {
+  color: var(--text-muted, #5c5c5c);
+  text-decoration: none;
 }
 
-.raporlar-engine-hint {
-  margin: 0;
-  font-size: 13px;
-  color: var(--text-muted, #666);
+.raporlar-quick-nav a:hover {
+  text-decoration: underline;
 }
 
-.raporlar-engine-empty {
-  margin: 0;
-  font-size: 13px;
-  color: var(--text-muted, #666);
-}
-
-.raporlar-engine-table {
-  margin-top: var(--space-2);
+.raporlar-quick-nav-sep {
+  color: var(--line-soft);
+  user-select: none;
 }

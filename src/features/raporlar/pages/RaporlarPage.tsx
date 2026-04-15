@@ -12,12 +12,9 @@ import { FormField } from "../../../components/form/FormField";
 import { EmptyState } from "../../../components/states/EmptyState";
 import { ErrorState } from "../../../components/states/ErrorState";
 import { LoadingState } from "../../../components/states/LoadingState";
-import { useAppDataRevision } from "../../../data/data-manager";
 import { useRoleAccess } from "../../../hooks/use-role-access";
 import { formatReportCellValue } from "../../../lib/display/enum-display";
-import type { ModuleFilterBase } from "../../../lib/filters/module-filter-schema";
-import { downloadReportCsv, printCurrentReportWindow } from "../../../reports/export-report";
-import { generateReport, type ReportEngineRow, type ReportEngineType } from "../../../reports/report-engine";
+import { downloadReportCsv } from "../../../reports/export-report";
 import type { IdOption } from "../../../types/referans";
 import type { RaporAktiflik, RaporFiltreleri, RaporSatiri, RaporTipi } from "../../../types/rapor";
 import type { AylikBolumOnayDurumu, AylikOzetAggregateState, AylikOzetResponse } from "../../../types/yonetim";
@@ -95,22 +92,6 @@ function collectColumns(rows: RaporSatiri[]): string[] {
 
   return Array.from(keys);
 }
-
-function collectEngineColumns(rows: ReportEngineRow[]): string[] {
-  const keys = new Set<string>();
-  for (const row of rows) {
-    for (const key of Object.keys(row)) {
-      keys.add(key);
-    }
-  }
-  return Array.from(keys);
-}
-
-const ENGINE_OPTIONS: Array<{ value: ReportEngineType; label: string }> = [
-  { value: "personel-ozet", label: "Personel özeti (önbellek)" },
-  { value: "izin-durumu", label: "İzin durumu (önbellek)" },
-  { value: "finans", label: "Finans (önbellek, 1. sayfa)" }
-];
 
 type AylikFilterState = {
   ay: string;
@@ -300,13 +281,12 @@ function AylikKapanisOzetiSection() {
       data-testid="aylik-kapanis-ozeti-section"
       aria-label="Aylık kapanış özeti"
     >
-      <div className="yonetim-header-row">
-        <p className="yonetim-kicker">Raporlar</p>
+      <div className="yonetim-header-row raporlar-aylik-head">
         <h2>Aylık Kapanış Özeti</h2>
-        <p>Bölüm onayı operasyonel tamamlanmayı; üst kontrol onayı isteğe bağlı teyidi temsil eder.</p>
+        <p className="raporlar-aylik-lead">Ay sonu puantaj ve onay durumunu görüntüleyin; gerekirse Excel ile aktarın.</p>
       </div>
 
-      <form className="form-filter-panel" onSubmit={handleAylikFilterSubmit}>
+      <form className="form-filter-panel raporlar-aylik-filters" onSubmit={handleAylikFilterSubmit}>
         <div className="form-field-grid">
           <FormField
             label="Ay"
@@ -336,7 +316,7 @@ function AylikKapanisOzetiSection() {
           />
         </div>
 
-        <div className="yonetim-checkbox-section">
+        <div className="yonetim-checkbox-section raporlar-aylik-checkbox">
           <label className="yonetim-selection-pill is-selected">
             <input
               type="checkbox"
@@ -352,7 +332,7 @@ function AylikKapanisOzetiSection() {
           </label>
         </div>
 
-        <div className="form-actions-row">
+        <div className="form-actions-row raporlar-aylik-actions">
           <button type="submit" className="universal-btn-aux">
             Özeti Getir
           </button>
@@ -440,8 +420,8 @@ function AylikKapanisOzetiSection() {
           </div>
 
           {result.pending_bolum_onayi > 0 ? (
-            <p className="yonetim-hint">
-              Bölüm onayı bekleyen {result.pending_bolum_onayi} kayıt var. Akış genel yönetici onayına kilitlenmez.
+            <p className="yonetim-hint raporlar-aylik-hint">
+              Bölüm onayı bekleyen {result.pending_bolum_onayi} kayıt var.
             </p>
           ) : null}
 
@@ -502,36 +482,6 @@ function AylikKapanisOzetiSection() {
 export function RaporlarPage() {
   const { hasPermission } = useRoleAccess();
   const canViewAylikOzet = hasPermission("aylik-ozet.view");
-  const cacheRevision = useAppDataRevision();
-  const [engineType, setEngineType] = useState<ReportEngineType>("personel-ozet");
-  const [enginePersonelId, setEnginePersonelId] = useState("");
-  const [engineDurum, setEngineDurum] = useState("");
-  const [engineBas, setEngineBas] = useState("");
-  const [engineBit, setEngineBit] = useState("");
-
-  const engineFilters = useMemo<ModuleFilterBase>(() => {
-    const trimmed = enginePersonelId.trim();
-    let personel_id: number | null = null;
-    if (trimmed !== "") {
-      const n = Number.parseInt(trimmed, 10);
-      personel_id = Number.isFinite(n) ? n : null;
-    }
-    const dr = engineDurum.trim();
-    return {
-      personel_id,
-      durum: dr !== "" ? dr : null,
-      date_range:
-        engineBas.trim() !== "" || engineBit.trim() !== ""
-          ? { bas: engineBas.trim(), bit: engineBit.trim() }
-          : undefined
-    };
-  }, [enginePersonelId, engineDurum, engineBas, engineBit]);
-
-  const engineRows = useMemo(
-    () => generateReport(engineType, engineFilters),
-    [engineType, engineFilters, cacheRevision]
-  );
-  const engineColumns = useMemo(() => collectEngineColumns(engineRows), [engineRows]);
 
   const [form, setForm] = useState<RaporFormState>({
     raporTipi: "personel-ozet",
@@ -546,7 +496,6 @@ export function RaporlarPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
-  const [appliedFilters, setAppliedFilters] = useState<RaporFiltreleri | null>(null);
 
   const columns = useMemo(() => collectColumns(rows), [rows]);
 
@@ -567,8 +516,6 @@ export function RaporlarPage() {
         bitis_tarihi: form.bitisTarihi || undefined,
         aktiflik: form.aktiflik
       };
-      setAppliedFilters(filters);
-
       const result = await fetchRapor(form.raporTipi, filters);
       setRows(result.rows);
       setTotal(result.total);
@@ -595,27 +542,21 @@ export function RaporlarPage() {
     setTotal(null);
     setErrorMessage(null);
     setHasSearched(false);
-    setAppliedFilters(null);
   }
 
   return (
-    <section className="raporlar-page">
-      <div className="raporlar-header-row">
+    <section className="raporlar-page raporlar-page--premium">
+      <header className="raporlar-page-head">
         <h2>Raporlar</h2>
-      </div>
+        <p className="raporlar-page-lead">Filtreleri kullanarak liste raporları oluşturun.</p>
+      </header>
 
       {canViewAylikOzet ? <AylikKapanisOzetiSection /> : null}
 
-      <div className="raporlar-source-card">
-        <p className="raporlar-source-title">Resmi rapor kaynağı backend&apos;dir.</p>
-        <p className="raporlar-source-hint">
-          Bu form `/api/raporlar/*` endpoint&apos;lerinden veri çeker. Aşağıdaki önbellek aracı yalnızca yardımcı
-          inceleme ve demo/offline kullanım içindir.
-        </p>
-      </div>
-
-      <form className="form-filter-panel" onSubmit={handleSubmit}>
-        <div className="form-field-grid">
+      <div className="raporlar-standart-panel">
+        <h3 className="raporlar-panel-title">Liste raporu</h3>
+        <form className="form-filter-panel raporlar-standart-form" onSubmit={handleSubmit}>
+        <div className="form-field-grid raporlar-standart-grid">
           <FormField
             as="select"
             label="Rapor Türü"
@@ -625,7 +566,7 @@ export function RaporlarPage() {
             selectOptions={RAPOR_OPTIONS}
           />
           <FormField
-            label="Personel ID"
+            label="Personel no"
             name="rapor-personel"
             type="number"
             min={1}
@@ -633,7 +574,7 @@ export function RaporlarPage() {
             onChange={(value) => setForm((prev) => ({ ...prev, personelId: value }))}
           />
           <FormField
-            label="Departman ID"
+            label="Departman"
             name="rapor-departman"
             type="number"
             min={1}
@@ -668,9 +609,9 @@ export function RaporlarPage() {
           />
         </div>
 
-        <div className="form-actions-row">
+        <div className="form-actions-row raporlar-standart-actions">
           <button type="submit" className="universal-btn-aux" disabled={isLoading} data-testid="raporlar-submit-run">
-            Raporu Çalıştır
+            Raporu getir
           </button>
           <button
             type="button"
@@ -684,21 +625,21 @@ export function RaporlarPage() {
         </div>
       </form>
 
-      {isLoading ? <LoadingState label="Rapor verileri yükleniyor..." /> : null}
+      {isLoading ? <LoadingState label="Rapor hazırlanıyor..." /> : null}
 
       {!isLoading && errorMessage ? <ErrorState message={errorMessage} /> : null}
 
       {!isLoading && !errorMessage && hasSearched && rows.length === 0 ? (
-        <EmptyState title="Rapor verisi yok" message="Bu filtrede gösterilecek kayıt bulunamadı." />
+        <EmptyState title="Kayıt bulunamadı" message="Seçtiğiniz filtrelere uygun satır yok." />
       ) : null}
 
       {!isLoading && !errorMessage && rows.length > 0 ? (
         <div className="raporlar-result-card" data-testid="raporlar-resmi-sonuc">
-          <p>
-            <strong>Toplam Kayıt:</strong> {total ?? rows.length}
+          <p className="raporlar-result-meta">
+            <span className="raporlar-result-count">{total ?? rows.length}</span> kayıt listeleniyor
           </p>
-          <div className="raporlar-table-wrap">
-            <table className="raporlar-table">
+          <div className="raporlar-table-wrap raporlar-table-wrap--premium">
+            <table className="raporlar-table raporlar-table--premium">
               <thead>
                 <tr>
                   {columns.map((column) => (
@@ -719,111 +660,19 @@ export function RaporlarPage() {
           </div>
         </div>
       ) : null}
-
-      <div className="raporlar-engine-card">
-        <h3 className="raporlar-engine-title">Yardımcı önbellek aracı</h3>
-        <p className="raporlar-engine-hint">
-          Bu bölüm ağ çağrısı yapmaz; yalnızca bu cihazdaki önbelleği okur. Resmi rapor yerine geçmez.
-        </p>
-        <div className="form-field-grid">
-          <FormField
-            as="select"
-            label="Motor türü"
-            name="engine-turu"
-            value={engineType}
-            onChange={(value) => setEngineType(value as ReportEngineType)}
-            selectOptions={ENGINE_OPTIONS}
-          />
-          <FormField
-            label="Personel ID (boş = tümü)"
-            name="engine-personel"
-            type="number"
-            min={1}
-            value={enginePersonelId}
-            onChange={(value) => setEnginePersonelId(value)}
-          />
-          <FormField
-            label="Durum (boş = tümü)"
-            name="engine-durum"
-            value={engineDurum}
-            onChange={(value) => setEngineDurum(value)}
-            placeholder="Örn: AKTİF, TAMAMLANDI"
-          />
-          <FormField
-            label="Tarih başlangıç (yyyy-mm-dd)"
-            name="engine-bas"
-            type="date"
-            value={engineBas}
-            onChange={(value) => setEngineBas(value)}
-          />
-          <FormField
-            label="Tarih bitiş (yyyy-mm-dd)"
-            name="engine-bit"
-            type="date"
-            value={engineBit}
-            onChange={(value) => setEngineBit(value)}
-          />
-        </div>
-        <div className="form-actions-row">
-          <button
-            type="button"
-            className="universal-btn-aux"
-            disabled={engineRows.length === 0}
-            data-testid="raporlar-engine-csv"
-            onClick={() => {
-              downloadReportCsv(`rapor-${engineType}.csv`, engineColumns, engineRows);
-            }}
-          >
-            CSV indir
-          </button>
-          <button
-            type="button"
-            className="universal-btn-aux"
-            disabled={engineRows.length === 0}
-            data-testid="raporlar-engine-print"
-            onClick={() => {
-              printCurrentReportWindow(`Rapor: ${engineType}`, engineColumns, engineRows);
-            }}
-          >
-            Yazdır / PDF
-          </button>
-        </div>
-        {engineRows.length === 0 ? (
-          <p className="raporlar-engine-empty">
-            Bu tür için önbellekte satır yok; ilgili modülü en az bir kez açın.
-          </p>
-        ) : (
-          <div className="raporlar-table-wrap raporlar-engine-table">
-            <table className="raporlar-table">
-              <thead>
-                <tr>
-                  {engineColumns.map((column) => (
-                    <th key={column}>{column}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {engineRows.map((row, index) => (
-                  <tr key={index}>
-                    {engineColumns.map((column) => (
-                      <td key={`${index}-${column}`}>{formatCellValue(column, row[column])}</td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
       </div>
 
-      <div className="module-links">
+      <nav className="raporlar-quick-nav" aria-label="Hızlı bağlantılar">
         <Link to="/finans" data-testid="link-raporlar-finans">
-          Finans modülüne git
+          Finans
         </Link>
+        <span className="raporlar-quick-nav-sep" aria-hidden="true">
+          ·
+        </span>
         <Link to="/" data-testid="link-raporlar-home">
-          Ana ekrana dön
+          Ana ekran
         </Link>
-      </div>
+      </nav>
     </section>
   );
 }

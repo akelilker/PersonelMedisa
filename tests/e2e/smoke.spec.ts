@@ -46,15 +46,10 @@ test.describe("e2e smoke", () => {
     await page.goto("/raporlar");
     await expect(page).toHaveURL(/\/raporlar$/);
     await expect(page.locator(".modal-header h2").first()).toContainText("Raporlar");
-    await page.getByRole("button", { name: /Raporu .*al.*/i }).click();
+    await expect(page.getByTestId("aylik-kapanis-ozeti-section")).toBeVisible();
+    await page.getByTestId("raporlar-submit-run").click();
     await expect(page.getByTestId("raporlar-resmi-sonuc")).toContainText("1");
     await expect(page.getByTestId("raporlar-resmi-sonuc")).toContainText("sgk_prim_gun");
-    await page.locator("[name='engine-turu']").selectOption("finans");
-    await expect(page.locator("[name='engine-turu']")).toHaveValue("finans");
-    const engineCard = page.locator(".raporlar-engine-card");
-    await expect(engineCard).toBeVisible();
-    await expect(engineCard.locator("h3.raporlar-engine-title")).toHaveText("Yardımcı önbellek aracı");
-    await expect(engineCard.locator(".raporlar-engine-table")).toBeVisible();
   });
 
   test("birim amiri gunluk kayit girer ama puantaj ve kapanis tarafinda read-only kalir", async ({ page }) => {

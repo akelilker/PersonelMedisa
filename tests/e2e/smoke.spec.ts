@@ -71,7 +71,7 @@ test.describe("e2e smoke", () => {
 
     await page.getByTestId("menu-gunluk-durum").click();
     await expect(page).toHaveURL(/\/bildirimler$/);
-    await expect(page.locator(".modal-header h2").first()).toContainText("Gunluk Kayit Merkezi");
+    await expect(page.locator(".modal-header h2").first()).toContainText("Günlük Kayıt Merkezi");
 
     const amirBildirimModal = page.locator(".modal-container").last();
     await expect(amirBildirimModal).toBeVisible();
@@ -149,7 +149,7 @@ test.describe("e2e smoke", () => {
 
     await page.goto("/bildirimler");
     await expect(page).toHaveURL(/\/bildirimler$/);
-    await expect(page.locator(".modal-header h2").first()).toContainText("Gunluk Kayit Merkezi");
+    await expect(page.locator(".modal-header h2").first()).toContainText("Günlük Kayıt Merkezi");
 
     await page.getByRole("button", { name: "Yeni Gunluk Kayit" }).click();
     const bildirimCreateModal = page.locator(".modal-container").last();

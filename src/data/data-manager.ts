@@ -23,7 +23,9 @@ import {
   fetchBildirimTuruOptions,
   fetchDepartmanOptions,
   fetchGorevOptions,
+  fetchPrimKuraliOptions,
   fetchPersonelTipiOptions,
+  fetchUcretTipiOptions,
   fetchSurecTuruOptions
 } from "../api/referans.api";
 import { upsertGunlukPuantaj } from "../api/puantaj.api";
@@ -375,7 +377,9 @@ function resolveFallbackForKey(key: string): unknown {
       departmanOptions: [],
       gorevOptions: [],
       personelTipiOptions: [],
-      bagliAmirOptions: []
+      bagliAmirOptions: [],
+      ucretTipiOptions: [],
+      primKuraliOptions: []
     } satisfies PersonelReferenceBundle;
   }
   if (key.startsWith("referans:surec-turu")) {
@@ -687,7 +691,10 @@ export function draftPersonelFromPayload(payload: CreatePersonelPayload, tempId:
     bagli_amir_id: payload.bagli_amir_id,
     dogum_yeri: payload.dogum_yeri,
     kan_grubu: payload.kan_grubu,
-    aktif_durum: payload.aktif_durum
+    aktif_durum: payload.aktif_durum,
+    ucret_tipi_id: payload.ucret_tipi_id,
+    maas_tutari: payload.maas_tutari,
+    prim_kurali_id: payload.prim_kurali_id
   };
 }
 
@@ -1096,7 +1103,9 @@ export async function loadDataFromServer(): Promise<void> {
           departmanOptions: await fetchDepartmanOptions(),
           gorevOptions: await fetchGorevOptions(),
           personelTipiOptions: await fetchPersonelTipiOptions(),
-          bagliAmirOptions: await fetchBagliAmirOptions()
+          bagliAmirOptions: await fetchBagliAmirOptions(),
+          ucretTipiOptions: await fetchUcretTipiOptions(),
+          primKuraliOptions: await fetchPrimKuraliOptions()
         };
         setCacheEntry(key, bundle);
       } catch {

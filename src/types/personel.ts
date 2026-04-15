@@ -35,7 +35,9 @@ export type Personel = {
   sgk_ayin_takvim_gun_sayisi?: number;
   sgk_hesaplama_modu?: string;
   pasiflik_durumu_etiketi?: string | null;
-  ucret_tipi?: string;
+  ucret_tipi_id?: number;
+  ucret_tipi_adi?: string;
   maas_tutari?: number;
   prim_kurali_id?: number;
+  prim_kurali_adi?: string;
 };

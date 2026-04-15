@@ -33,7 +33,7 @@ function resolveBackBar(pathname: string): { to: string; label: string } | null 
     return { to: "/surecler", label: "Süreç listesine dön" };
   }
   if (/^\/bildirimler\/\d+$/.test(pathname)) {
-    return { to: "/bildirimler", label: "Gunluk kayit listesine don" };
+    return { to: "/bildirimler", label: "Günlük kayıt listesine dön" };
   }
   return null;
 }
@@ -58,10 +58,10 @@ function resolveModuleModal(pathname: string): ModuleModalConfig | null {
   }
 
   if (/^\/bildirimler\/\d+$/.test(pathname)) {
-    return { title: "Gunluk Kayit Detayi", closeTo: "/bildirimler" };
+    return { title: "Günlük Kayıt Detayı", closeTo: "/bildirimler" };
   }
   if (pathname === "/bildirimler") {
-    return { title: "Gunluk Kayit Merkezi", closeTo: "/" };
+    return { title: "Günlük Kayıt Merkezi", closeTo: "/" };
   }
 
   if (pathname === "/raporlar") {
@@ -80,9 +80,6 @@ function resolveModuleModal(pathname: string): ModuleModalConfig | null {
       className: "modal-container--yonetim",
       bodyClassName: "modal-body--yonetim"
     };
-  }
-  if (pathname === "/aylik-kapanis-ozeti") {
-    return { title: "Aylık Kapanış Özeti", closeTo: "/" };
   }
 
   return { title: "Modül", closeTo: "/" };

@@ -988,14 +988,7 @@ export function PersonelDetayPage() {
                     selectOptions={idOptionsToSelectOptions(personelRefs.departmanOptions)}
                   />
                 ) : (
-                  <FormField
-                    label="Departman ID"
-                    name="edit-departman-id"
-                    type="number"
-                    min={1}
-                    value={editForm.departmanId}
-                    onChange={(value) => setEditForm((prev) => ({ ...prev, departmanId: value }))}
-                  />
+                  <p className="personel-create-error">Departman listesi yüklenemedi.</p>
                 )}
                 {personelRefs.gorevOptions.length > 0 ? (
                   <FormField
@@ -1008,14 +1001,7 @@ export function PersonelDetayPage() {
                     selectOptions={idOptionsToSelectOptions(personelRefs.gorevOptions)}
                   />
                 ) : (
-                  <FormField
-                    label="Görev ID"
-                    name="edit-gorev-id"
-                    type="number"
-                    min={1}
-                    value={editForm.gorevId}
-                    onChange={(value) => setEditForm((prev) => ({ ...prev, gorevId: value }))}
-                  />
+                  <p className="personel-create-error">Görev listesi yüklenemedi.</p>
                 )}
                 {personelRefs.bagliAmirOptions.length > 0 ? (
                   <FormField
@@ -1028,22 +1014,21 @@ export function PersonelDetayPage() {
                     selectOptions={idOptionsToSelectOptions(personelRefs.bagliAmirOptions)}
                   />
                 ) : (
-                  <FormField
-                    label="Bağlı amir ID"
-                    name="edit-bagli-amir-id"
-                    type="number"
-                    min={1}
-                    value={editForm.bagliAmirId}
-                    onChange={(value) => setEditForm((prev) => ({ ...prev, bagliAmirId: value }))}
-                  />
+                  <p className="personel-create-error">Bağlı amir listesi yüklenemedi.</p>
                 )}
-                <FormField
-                  label="Ücret tipi"
-                  name="edit-ucret-tipi"
-                  value={editForm.ucretTipi}
-                  onChange={(value) => setEditForm((prev) => ({ ...prev, ucretTipi: value }))}
-                  placeholder="Örnek: MAKTU_AYLIK"
-                />
+                {personelRefs.ucretTipiOptions.length > 0 ? (
+                  <FormField
+                    as="select"
+                    label="Ücret tipi"
+                    name="edit-ucret-tipi-id"
+                    value={editForm.ucretTipiId}
+                    onChange={(value) => setEditForm((prev) => ({ ...prev, ucretTipiId: value }))}
+                    placeholderOption={{ value: "", label: "Seçiniz" }}
+                    selectOptions={idOptionsToSelectOptions(personelRefs.ucretTipiOptions)}
+                  />
+                ) : (
+                  <p className="personel-create-error">Ücret tipi listesi yüklenemedi.</p>
+                )}
                 <FormField
                   label="Maaş tutarı"
                   name="edit-maas"
@@ -1053,14 +1038,19 @@ export function PersonelDetayPage() {
                   value={editForm.maasTutari}
                   onChange={(value) => setEditForm((prev) => ({ ...prev, maasTutari: value }))}
                 />
-                <FormField
-                  label="Prim kuralı ID"
-                  name="edit-prim-kurali"
-                  type="number"
-                  min={1}
-                  value={editForm.primKuraliId}
-                  onChange={(value) => setEditForm((prev) => ({ ...prev, primKuraliId: value }))}
-                />
+                {personelRefs.primKuraliOptions.length > 0 ? (
+                  <FormField
+                    as="select"
+                    label="Prim kuralı"
+                    name="edit-prim-kurali-id"
+                    value={editForm.primKuraliId}
+                    onChange={(value) => setEditForm((prev) => ({ ...prev, primKuraliId: value }))}
+                    placeholderOption={{ value: "", label: "Seçiniz" }}
+                    selectOptions={idOptionsToSelectOptions(personelRefs.primKuraliOptions)}
+                  />
+                ) : (
+                  <p className="personel-create-error">Prim kuralı listesi yüklenemedi.</p>
+                )}
                 {hasLifecycleDiff ? (
                   <FormField
                     label="Geçerlilik Tarihi"

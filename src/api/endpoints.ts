@@ -51,7 +51,9 @@ export const endpoints = {
     personelTipleri: "/referans/personel-tipleri",
     bagliAmirler: "/referans/bagli-amirler",
     bildirimTurleri: "/referans/bildirim-turleri",
-    surecTurleri: "/referans/surec-turleri"
+    surecTurleri: "/referans/surec-turleri",
+    ucretTipleri: "/referans/ucret-tipleri",
+    primKurallari: "/referans/prim-kurallari"
   },
   yonetim: {
     kullanicilar: "/yonetim/kullanicilar",

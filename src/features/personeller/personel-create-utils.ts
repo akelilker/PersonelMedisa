@@ -49,6 +49,16 @@ export function buildCreatePersonelPayload(form: CreatePersonelFormState): Creat
   validatePhoneNumber(acilDurumTelefon, "Acil durum telefonu");
 
   const bagliAmirId = parseOptionalPositiveInt(form.bagliAmirId);
+  const ucretTipiId = parseOptionalPositiveInt(form.ucretTipiId);
+  const primKuraliId = parseOptionalPositiveInt(form.primKuraliId);
+  const maasRaw = form.maasTutari.trim();
+  const maasTutari =
+    maasRaw === ""
+      ? undefined
+      : (() => {
+          const parsed = Number.parseFloat(maasRaw.replace(",", "."));
+          return Number.isFinite(parsed) ? parsed : undefined;
+        })();
 
   return {
     tc_kimlik_no: tcKimlikNo,
@@ -60,12 +70,15 @@ export function buildCreatePersonelPayload(form: CreatePersonelFormState): Creat
     acil_durum_telefon: acilDurumTelefon,
     sicil_no: form.sicilNo.trim(),
     ise_giris_tarihi: form.iseGirisTarihi,
-    departman_id: parseRequiredPositiveInt(form.departmanId, "Departman ID"),
-    gorev_id: parseRequiredPositiveInt(form.gorevId, "Görev ID"),
-    personel_tipi_id: parseRequiredPositiveInt(form.personelTipiId, "Personel Tipi ID"),
+    departman_id: parseRequiredPositiveInt(form.departmanId, "Departman"),
+    gorev_id: parseRequiredPositiveInt(form.gorevId, "Görev"),
+    personel_tipi_id: parseRequiredPositiveInt(form.personelTipiId, "Personel Tipi"),
     aktif_durum: "AKTIF",
     ...(form.dogumYeri.trim() ? { dogum_yeri: form.dogumYeri.trim() } : {}),
     ...(form.kanGrubu.trim() ? { kan_grubu: form.kanGrubu.trim() } : {}),
-    ...(bagliAmirId !== undefined ? { bagli_amir_id: bagliAmirId } : {})
+    ...(bagliAmirId !== undefined ? { bagli_amir_id: bagliAmirId } : {}),
+    ...(ucretTipiId !== undefined ? { ucret_tipi_id: ucretTipiId } : {}),
+    ...(primKuraliId !== undefined ? { prim_kurali_id: primKuraliId } : {}),
+    ...(maasTutari !== undefined ? { maas_tutari: maasTutari } : {})
   };
 }

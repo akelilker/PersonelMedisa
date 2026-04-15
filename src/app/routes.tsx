@@ -11,7 +11,6 @@ import { GunlukPuantajPage } from "../features/puantaj/pages/GunlukPuantajPage";
 import { RaporlarPage } from "../features/raporlar/pages/RaporlarPage";
 import { FinansPage } from "../features/finans/pages/FinansPage";
 import { YonetimPaneliPage } from "../features/yonetim/pages/YonetimPaneliPage";
-import { AylikKapanisOzetiPage } from "../features/yonetim/pages/AylikKapanisOzetiPage";
 import { LoginPage } from "../features/auth/pages/LoginPage";
 import { InternalDiagnosticsPage } from "./InternalDiagnosticsPage";
 import {
@@ -144,14 +143,6 @@ export function AppRoutes() {
           element={
             <ProtectedRoute requirePermission={ROUTE_PERMISSION.yonetimPaneliPage}>
               <YonetimPaneliPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="aylik-kapanis-ozeti"
-          element={
-            <ProtectedRoute requirePermission={ROUTE_PERMISSION.aylikOzetPage}>
-              <AylikKapanisOzetiPage />
             </ProtectedRoute>
           }
         />

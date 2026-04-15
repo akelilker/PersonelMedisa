@@ -30,6 +30,8 @@ export type PersonelReferenceBundle = {
   gorevOptions: IdOption[];
   personelTipiOptions: IdOption[];
   bagliAmirOptions: IdOption[];
+  ucretTipiOptions: IdOption[];
+  primKuraliOptions: IdOption[];
 };
 
 export type AppData = {

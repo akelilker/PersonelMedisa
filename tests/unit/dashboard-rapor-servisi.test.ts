@@ -206,7 +206,7 @@ describe("hesaplaAylikSgkPuantajOzeti", () => {
     expect(sonuc.kayit_gun_sayisi).toBe(3);
     expect(sonuc.eksik_gun_sayisi).toBe(1);
     expect(sonuc.sgk_prim_gun).toBe(29);
-    expect(sonuc.eksik_gun_nedeni_kodu).toBe("15 - Devamsizlik");
+    expect(sonuc.eksik_gun_nedeni_kodu).toBe("15 - Devamsızlık");
     expect(sonuc.hesaplama_modu).toBe("TAKVIM_GUNU");
   });
 
@@ -251,7 +251,7 @@ describe("hesaplaAylikSgkPuantajOzeti", () => {
 
     const sonuc = hesaplaAylikSgkPuantajOzeti(kayitlar, 2026, 4);
     expect(sonuc.eksik_gun_sayisi).toBe(2);
-    expect(sonuc.eksik_gun_nedeni_kodu).toBe("01 - Istirahat");
+    expect(sonuc.eksik_gun_nedeni_kodu).toBe("01 - İstirahat");
   });
 
   it("rapor ve devamsizlik ayni ayda birlikte varsa birden fazla kodunu doner", () => {

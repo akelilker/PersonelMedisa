@@ -10,7 +10,9 @@ import {
   fetchDepartmanOptions,
   fetchGorevOptions,
   fetchPersonelTipiOptions,
-  fetchSurecTuruOptions
+  fetchPrimKuraliOptions,
+  fetchSurecTuruOptions,
+  fetchUcretTipiOptions
 } from "../../../api/referans.api";
 import { cancelSurec, createSurec, fetchSureclerList, updateSurec } from "../../../api/surecler.api";
 import { PersonelCreateFields } from "../../../features/personeller/components/PersonelCreateFields";
@@ -43,7 +45,9 @@ const EMPTY_REFS: PersonelReferenceBundle = {
   departmanOptions: [],
   gorevOptions: [],
   personelTipiOptions: [],
-  bagliAmirOptions: []
+  bagliAmirOptions: [],
+  ucretTipiOptions: [],
+  primKuraliOptions: []
 };
 
 const SUREC_TURU_LABELS: Record<string, string> = {
@@ -153,21 +157,33 @@ export function KayitSurecWorkspace({
     setBootstrapError(null);
 
     try {
-      const [departmanOptions, gorevOptions, personelTipiOptions, bagliAmirOptions, surecTurleri, personelList] =
-        await Promise.all([
-          fetchDepartmanOptions(),
-          fetchGorevOptions(),
-          fetchPersonelTipiOptions(),
-          fetchBagliAmirOptions(),
-          fetchSurecTuruOptions(),
-          fetchPersonellerList({ page: 1, limit: 250, aktiflik: "tum" })
-        ]);
+      const [
+        departmanOptions,
+        gorevOptions,
+        personelTipiOptions,
+        bagliAmirOptions,
+        ucretTipiOptions,
+        primKuraliOptions,
+        surecTurleri,
+        personelList
+      ] = await Promise.all([
+        fetchDepartmanOptions(),
+        fetchGorevOptions(),
+        fetchPersonelTipiOptions(),
+        fetchBagliAmirOptions(),
+        fetchUcretTipiOptions(),
+        fetchPrimKuraliOptions(),
+        fetchSurecTuruOptions(),
+        fetchPersonellerList({ page: 1, limit: 250, aktiflik: "tum" })
+      ]);
 
       setRefs({
         departmanOptions,
         gorevOptions,
         personelTipiOptions,
-        bagliAmirOptions
+        bagliAmirOptions,
+        ucretTipiOptions,
+        primKuraliOptions
       });
       setSurecTuruOptions(surecTurleri);
       setPersoneller(personelList.items);

@@ -4,7 +4,7 @@ export type LifecycleSnapshot = {
   departman_id: number | null;
   gorev_id: number | null;
   bagli_amir_id: number | null;
-  ucret_tipi: string | null;
+  ucret_tipi_id: number | null;
   maas_tutari: number | null;
   prim_kurali_id: number | null;
 };
@@ -13,7 +13,7 @@ export type LifecycleFormFields = {
   departmanId: string;
   gorevId: string;
   bagliAmirId: string;
-  ucretTipi: string;
+  ucretTipiId: string;
   maasTutari: string;
   primKuraliId: string;
 };
@@ -80,7 +80,7 @@ export function snapshotFromPersonel(personel: Personel): LifecycleSnapshot {
     departman_id: normalizeOptionalId(personel.departman_id),
     gorev_id: normalizeOptionalId(personel.gorev_id),
     bagli_amir_id: normalizeOptionalId(personel.bagli_amir_id),
-    ucret_tipi: normalizeOptionalString(personel.ucret_tipi),
+    ucret_tipi_id: normalizeOptionalId(personel.ucret_tipi_id),
     maas_tutari: normalizeOptionalMoney(personel.maas_tutari),
     prim_kurali_id: normalizeOptionalId(personel.prim_kurali_id)
   };
@@ -91,7 +91,7 @@ export function snapshotFromLifecycleForm(form: LifecycleFormFields): LifecycleS
     departman_id: normalizeOptionalId(form.departmanId),
     gorev_id: normalizeOptionalId(form.gorevId),
     bagli_amir_id: normalizeOptionalId(form.bagliAmirId),
-    ucret_tipi: normalizeOptionalString(form.ucretTipi),
+    ucret_tipi_id: normalizeOptionalId(form.ucretTipiId),
     maas_tutari: normalizeOptionalMoney(form.maasTutari),
     prim_kurali_id: normalizeOptionalId(form.primKuraliId)
   };
@@ -102,7 +102,7 @@ function snapshotsEqual(left: LifecycleSnapshot, right: LifecycleSnapshot): bool
     left.departman_id === right.departman_id &&
     left.gorev_id === right.gorev_id &&
     left.bagli_amir_id === right.bagli_amir_id &&
-    left.ucret_tipi === right.ucret_tipi &&
+    left.ucret_tipi_id === right.ucret_tipi_id &&
     left.maas_tutari === right.maas_tutari &&
     left.prim_kurali_id === right.prim_kurali_id
   );
@@ -117,7 +117,7 @@ export function lifecycleSnapshotToPersonelPatch(snap: LifecycleSnapshot): Parti
     departman_id: snap.departman_id ?? undefined,
     gorev_id: snap.gorev_id ?? undefined,
     bagli_amir_id: snap.bagli_amir_id ?? undefined,
-    ucret_tipi: snap.ucret_tipi ?? undefined,
+    ucret_tipi_id: snap.ucret_tipi_id ?? undefined,
     maas_tutari: snap.maas_tutari ?? undefined,
     prim_kurali_id: snap.prim_kurali_id ?? undefined
   };

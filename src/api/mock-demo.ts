@@ -1822,6 +1822,20 @@ export function resolveDemoApiResponse(
       return ok([{ id: 1, ad: "Demo Amir" }]);
     }
 
+    if (pathname === "/referans/ucret-tipleri") {
+      return ok([
+        { id: 1, ad: "Maktu Aylik" },
+        { id: 2, ad: "Saatlik" }
+      ]);
+    }
+
+    if (pathname === "/referans/prim-kurallari") {
+      return ok([
+        { id: 7, ad: "Prim Kurali 7" },
+        { id: 8, ad: "Prim Kurali 8" }
+      ]);
+    }
+
     return ok([]);
   }
 

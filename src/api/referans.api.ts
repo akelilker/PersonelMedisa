@@ -115,6 +115,16 @@ export async function fetchBagliAmirOptions(): Promise<IdOption[]> {
   return normalizeIdOptions(response.data);
 }
 
+export async function fetchUcretTipiOptions(): Promise<IdOption[]> {
+  const response = await apiRequest<ApiResponse<unknown>>(endpoints.referans.ucretTipleri);
+  return normalizeIdOptions(response.data);
+}
+
+export async function fetchPrimKuraliOptions(): Promise<IdOption[]> {
+  const response = await apiRequest<ApiResponse<unknown>>(endpoints.referans.primKurallari);
+  return normalizeIdOptions(response.data);
+}
+
 export async function fetchSurecTuruOptions(): Promise<KeyOption[]> {
   const response = await apiRequest<ApiResponse<unknown>>(endpoints.referans.surecTurleri);
   return normalizeKeyOptions(response.data);

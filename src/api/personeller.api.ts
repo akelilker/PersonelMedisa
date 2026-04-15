@@ -33,6 +33,9 @@ export type CreatePersonelPayload = {
   dogum_yeri?: string;
   kan_grubu?: string;
   bagli_amir_id?: number;
+  ucret_tipi_id?: number;
+  maas_tutari?: number;
+  prim_kurali_id?: number;
 };
 
 export type UpdatePersonelPayload = Omit<
@@ -42,7 +45,7 @@ export type UpdatePersonelPayload = Omit<
   departman_id?: number | null;
   gorev_id?: number | null;
   bagli_amir_id?: number | null;
-  ucret_tipi?: string | null;
+  ucret_tipi_id?: number | null;
   maas_tutari?: number | null;
   prim_kurali_id?: number | null;
   effective_date?: string;
@@ -228,9 +231,21 @@ function normalizePersonel(data: unknown): Personel {
       "pasiflik_durumu_etiketi",
       "pasiflikDurumuEtiketi"
     ),
-    ucret_tipi: readString(baseSources, "ucret_tipi", "ucretTipi"),
+    ucret_tipi_id: readNumber(baseSources, "ucret_tipi_id", "ucretTipiId"),
+    ucret_tipi_adi: readString(
+      [...baseSources, ...referenceSources],
+      "ucret_tipi_adi",
+      "ucretTipiAdi",
+      "ucret_tipi"
+    ),
     maas_tutari: readNumber(baseSources, "maas_tutari", "maasTutari"),
-    prim_kurali_id: readNumber(baseSources, "prim_kurali_id", "primKuraliId")
+    prim_kurali_id: readNumber(baseSources, "prim_kurali_id", "primKuraliId"),
+    prim_kurali_adi: readString(
+      [...baseSources, ...referenceSources],
+      "prim_kurali_adi",
+      "primKuraliAdi",
+      "prim_kurali"
+    )
   };
 }
 

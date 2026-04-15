@@ -100,11 +100,11 @@ function hesaplaEksikGunNedeniKodu(kayitlar: GunlukPuantaj[], yil: number, ay: n
   }
 
   if (raporVar) {
-    return "01 - Istirahat";
+    return "01 - İstirahat";
   }
 
   if (devamsizlikVar) {
-    return "15 - Devamsizlik";
+    return "15 - Devamsızlık";
   }
 
   return null;

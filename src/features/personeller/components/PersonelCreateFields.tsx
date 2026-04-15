@@ -28,6 +28,16 @@ const kanGrubuOptions = [
   { value: "0 Rh-", label: "0 Rh-" }
 ];
 
+function refMissingNote(label: string, blocking: boolean) {
+  return (
+    <p className="personel-create-error" role="alert">
+      {blocking
+        ? `${label} listesi yüklenemedi. Bu alan zorunlu; referanslar gelene kadar kayıt oluşturulamaz.`
+        : `${label} referansı yüklenemedi; bu alan şimdilik seçilemez.`}
+    </p>
+  );
+}
+
 export function PersonelCreateFields({
   form,
   setForm,
@@ -139,15 +149,7 @@ export function PersonelCreateFields({
               selectOptions={toSelectOptions(refs.departmanOptions)}
             />
           ) : (
-            <FormField
-              label="Bölüm"
-              name="create-departman-num"
-              type="number"
-              min={1}
-              value={form.departmanId}
-              onChange={(value) => setForm((prev) => ({ ...prev, departmanId: value }))}
-              required
-            />
+            refMissingNote("Bölüm", true)
           )}
           {refs.gorevOptions.length > 0 ? (
             <FormField
@@ -161,15 +163,7 @@ export function PersonelCreateFields({
               selectOptions={toSelectOptions(refs.gorevOptions)}
             />
           ) : (
-            <FormField
-              label="Görev"
-              name="create-gorev-num"
-              type="number"
-              min={1}
-              value={form.gorevId}
-              onChange={(value) => setForm((prev) => ({ ...prev, gorevId: value }))}
-              required
-            />
+            refMissingNote("Görev", true)
           )}
           {refs.bagliAmirOptions.length > 0 ? (
             <FormField
@@ -182,14 +176,7 @@ export function PersonelCreateFields({
               selectOptions={toSelectOptions(refs.bagliAmirOptions)}
             />
           ) : (
-            <FormField
-              label="Bağlı Amir"
-              name="create-bagli-amir-num"
-              type="number"
-              min={1}
-              value={form.bagliAmirId}
-              onChange={(value) => setForm((prev) => ({ ...prev, bagliAmirId: value }))}
-            />
+            refMissingNote("Bağlı amir", false)
           )}
           {refs.personelTipiOptions.length > 0 ? (
             <FormField
@@ -203,15 +190,42 @@ export function PersonelCreateFields({
               selectOptions={toSelectOptions(refs.personelTipiOptions)}
             />
           ) : (
+            refMissingNote("Personel tipi", true)
+          )}
+          {refs.ucretTipiOptions.length > 0 ? (
             <FormField
-              label="Personel Tipi"
-              name="create-personel-tipi-num"
-              type="number"
-              min={1}
-              value={form.personelTipiId}
-              onChange={(value) => setForm((prev) => ({ ...prev, personelTipiId: value }))}
-              required
+              as="select"
+              label="Ücret tipi"
+              name="create-ucret-tipi"
+              value={form.ucretTipiId}
+              onChange={(value) => setForm((prev) => ({ ...prev, ucretTipiId: value }))}
+              placeholderOption={{ value: "", label: "Seçiniz" }}
+              selectOptions={toSelectOptions(refs.ucretTipiOptions)}
             />
+          ) : (
+            refMissingNote("Ücret tipi", false)
+          )}
+          <FormField
+            label="Maaş tutarı"
+            name="create-maas"
+            type="number"
+            min={0}
+            step="0.01"
+            value={form.maasTutari}
+            onChange={(value) => setForm((prev) => ({ ...prev, maasTutari: value }))}
+          />
+          {refs.primKuraliOptions.length > 0 ? (
+            <FormField
+              as="select"
+              label="Prim kuralı"
+              name="create-prim-kurali"
+              value={form.primKuraliId}
+              onChange={(value) => setForm((prev) => ({ ...prev, primKuraliId: value }))}
+              placeholderOption={{ value: "", label: "Seçiniz" }}
+              selectOptions={toSelectOptions(refs.primKuraliOptions)}
+            />
+          ) : (
+            refMissingNote("Prim kuralı", false)
           )}
         </div>
       </div>

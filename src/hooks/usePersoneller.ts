@@ -9,7 +9,15 @@ import {
   type CreatePersonelPayload,
   type UpdatePersonelPayload
 } from "../api/personeller.api";
-import { fetchBagliAmirOptions, fetchDepartmanOptions, fetchGorevOptions, fetchPersonelTipiOptions, fetchSurecTuruOptions } from "../api/referans.api";
+import {
+  fetchBagliAmirOptions,
+  fetchDepartmanOptions,
+  fetchGorevOptions,
+  fetchPersonelTipiOptions,
+  fetchPrimKuraliOptions,
+  fetchSurecTuruOptions,
+  fetchUcretTipiOptions
+} from "../api/referans.api";
 import { createSurec, fetchSureclerList } from "../api/surecler.api";
 import { createZimmet, fetchZimmetlerList } from "../api/zimmetler.api";
 import { emptyPaginated, makeTempId, type PersonelReferenceBundle } from "../data/app-data.types";
@@ -86,6 +94,9 @@ export type CreatePersonelFormState = {
   dogumYeri: string;
   kanGrubu: string;
   bagliAmirId: string;
+  ucretTipiId: string;
+  maasTutari: string;
+  primKuraliId: string;
 };
 
 export const INITIAL_CREATE_PERSONEL_FORM: CreatePersonelFormState = {
@@ -103,7 +114,10 @@ export const INITIAL_CREATE_PERSONEL_FORM: CreatePersonelFormState = {
   personelTipiId: "",
   dogumYeri: "",
   kanGrubu: "",
-  bagliAmirId: ""
+  bagliAmirId: "",
+  ucretTipiId: "",
+  maasTutari: "",
+  primKuraliId: ""
 };
 
 export function usePersoneller() {
@@ -164,7 +178,9 @@ export function usePersoneller() {
         departmanOptions: [],
         gorevOptions: [],
         personelTipiOptions: [],
-        bagliAmirOptions: []
+        bagliAmirOptions: [],
+        ucretTipiOptions: [],
+        primKuraliOptions: []
       }
     );
   }, [revision]);
@@ -244,23 +260,34 @@ export function usePersoneller() {
       try {
         await fetchWithCacheMerge(dataCacheKeys.referansPersonel(), () =>
           runDeduped(dataCacheKeys.referansPersonel(), async () => {
-            const [departmanOptions, gorevOptions, personelTipiOptions, bagliAmirOptions] = await Promise.all([
+            const [
+              departmanOptions,
+              gorevOptions,
+              personelTipiOptions,
+              bagliAmirOptions,
+              ucretTipiOptions,
+              primKuraliOptions
+            ] = await Promise.all([
               fetchDepartmanOptions(),
               fetchGorevOptions(),
               fetchPersonelTipiOptions(),
-              fetchBagliAmirOptions()
+              fetchBagliAmirOptions(),
+              fetchUcretTipiOptions(),
+              fetchPrimKuraliOptions()
             ]);
             return {
               departmanOptions,
               gorevOptions,
               personelTipiOptions,
-              bagliAmirOptions
+              bagliAmirOptions,
+              ucretTipiOptions,
+              primKuraliOptions
             } satisfies PersonelReferenceBundle;
           })
         );
       } catch {
         if (!cancelled) {
-      setReferenceError("Referans veriler şu an güncellenemiyor, manuel giriş kullanılabilir.");
+          setReferenceError("Referans listeleri yüklenemedi. Lütfen sayfayı yenileyin.");
         }
       }
     })();
@@ -425,7 +452,7 @@ type EditPersonelFormState = {
   departmanId: string;
   gorevId: string;
   bagliAmirId: string;
-  ucretTipi: string;
+  ucretTipiId: string;
   maasTutari: string;
   primKuraliId: string;
   effectiveDate: string;
@@ -436,7 +463,7 @@ function pickLifecycleFormFields(form: EditPersonelFormState): LifecycleFormFiel
     departmanId: form.departmanId,
     gorevId: form.gorevId,
     bagliAmirId: form.bagliAmirId,
-    ucretTipi: form.ucretTipi,
+    ucretTipiId: form.ucretTipiId,
     maasTutari: form.maasTutari,
     primKuraliId: form.primKuraliId
   };
@@ -450,7 +477,7 @@ function personelToEditForm(personel: Personel): EditPersonelFormState {
     departmanId: personel.departman_id != null ? String(personel.departman_id) : "",
     gorevId: personel.gorev_id != null ? String(personel.gorev_id) : "",
     bagliAmirId: personel.bagli_amir_id != null ? String(personel.bagli_amir_id) : "",
-    ucretTipi: personel.ucret_tipi ?? "",
+    ucretTipiId: personel.ucret_tipi_id != null ? String(personel.ucret_tipi_id) : "",
     maasTutari: personel.maas_tutari != null ? String(personel.maas_tutari) : "",
     primKuraliId: personel.prim_kurali_id != null ? String(personel.prim_kurali_id) : "",
     effectiveDate: ""
@@ -471,36 +498,36 @@ function buildPersonelUpdatePayload(
     return payload;
   }
 
+  const idPayload = payload as Record<string, number | null | undefined>;
+
   const setOptionalId = (
-    key: "departman_id" | "gorev_id" | "bagli_amir_id" | "prim_kurali_id",
+    key: "departman_id" | "gorev_id" | "bagli_amir_id" | "prim_kurali_id" | "ucret_tipi_id",
     raw: string
   ) => {
     const trimmed = raw.trim();
     if (trimmed === "") {
-      payload[key] = null;
+      idPayload[key] = null;
       return;
     }
 
     const parsed = Number.parseInt(trimmed, 10);
     if (Number.isFinite(parsed) && parsed > 0) {
-      payload[key] = parsed;
+      idPayload[key] = parsed;
     }
   };
 
   setOptionalId("departman_id", editForm.departmanId);
   setOptionalId("gorev_id", editForm.gorevId);
   setOptionalId("bagli_amir_id", editForm.bagliAmirId);
+  setOptionalId("ucret_tipi_id", editForm.ucretTipiId);
   setOptionalId("prim_kurali_id", editForm.primKuraliId);
-
-  const ucret = editForm.ucretTipi.trim();
-  payload.ucret_tipi = ucret === "" ? null : ucret;
 
   const maasRaw = editForm.maasTutari.trim();
   if (maasRaw === "") {
-    payload.maas_tutari = null;
+    idPayload.maas_tutari = null;
   } else {
     const parsed = Number.parseFloat(maasRaw.replace(",", "."));
-    payload.maas_tutari = Number.isFinite(parsed) ? parsed : null;
+    idPayload.maas_tutari = Number.isFinite(parsed) ? parsed : null;
   }
 
   payload.effective_date = editForm.effectiveDate.trim();
@@ -708,7 +735,7 @@ export function usePersonelDetail(
     departmanId: "",
     gorevId: "",
     bagliAmirId: "",
-    ucretTipi: "",
+    ucretTipiId: "",
     maasTutari: "",
     primKuraliId: "",
     effectiveDate: ""
@@ -912,7 +939,9 @@ export function usePersonelDetail(
         departmanOptions: [],
         gorevOptions: [],
         personelTipiOptions: [],
-        bagliAmirOptions: []
+        bagliAmirOptions: [],
+        ucretTipiOptions: [],
+        primKuraliOptions: []
       }
     );
   }, [revision]);
@@ -932,23 +961,34 @@ export function usePersonelDetail(
       try {
         await fetchWithCacheMerge(dataCacheKeys.referansPersonel(), () =>
           runDeduped(dataCacheKeys.referansPersonel(), async () => {
-            const [departmanOptions, gorevOptions, personelTipiOptions, bagliAmirOptions] = await Promise.all([
+            const [
+              departmanOptions,
+              gorevOptions,
+              personelTipiOptions,
+              bagliAmirOptions,
+              ucretTipiOptions,
+              primKuraliOptions
+            ] = await Promise.all([
               fetchDepartmanOptions(),
               fetchGorevOptions(),
               fetchPersonelTipiOptions(),
-              fetchBagliAmirOptions()
+              fetchBagliAmirOptions(),
+              fetchUcretTipiOptions(),
+              fetchPrimKuraliOptions()
             ]);
             return {
               departmanOptions,
               gorevOptions,
               personelTipiOptions,
-              bagliAmirOptions
+              bagliAmirOptions,
+              ucretTipiOptions,
+              primKuraliOptions
             } satisfies PersonelReferenceBundle;
           })
         );
       } catch {
         if (!cancelled) {
-          // Referans yuklenemedi; form manuel ID ile doldurulabilir.
+          /* referans yuklenemedi; select alanlari bos kalir */
         }
       }
     })();

@@ -53,9 +53,11 @@ export async function mockApi(page: Page, role: MockUserRole) {
     gorev_adi?: string;
     personel_tipi_adi?: string;
     bagli_amir_adi?: string;
-    ucret_tipi?: string;
+    ucret_tipi_id?: number;
+    ucret_tipi_adi?: string;
     maas_tutari?: number;
     prim_kurali_id?: number;
+    prim_kurali_adi?: string;
   }> = [
     {
       id: 1,
@@ -81,9 +83,11 @@ export async function mockApi(page: Page, role: MockUserRole) {
       gorev_adi: "Uzman",
       personel_tipi_adi: "Tam Zamanli",
       bagli_amir_adi: "Demo Amir",
-      ucret_tipi: "MAKTU_AYLIK",
+      ucret_tipi_id: 1,
+      ucret_tipi_adi: "Maktu Aylik",
       maas_tutari: 35000,
-      prim_kurali_id: 7
+      prim_kurali_id: 7,
+      prim_kurali_adi: "Prim Kurali 7"
     },
     {
       id: 2,
@@ -109,9 +113,11 @@ export async function mockApi(page: Page, role: MockUserRole) {
       gorev_adi: "Sef",
       personel_tipi_adi: "Yari Zamanli",
       bagli_amir_adi: "Demo Amir",
-      ucret_tipi: "SAATLIK",
+      ucret_tipi_id: 2,
+      ucret_tipi_adi: "Saatlik",
       maas_tutari: 25000,
-      prim_kurali_id: 8
+      prim_kurali_id: 8,
+      prim_kurali_adi: "Prim Kurali 8"
     }
   ];
 
@@ -271,6 +277,16 @@ export async function mockApi(page: Page, role: MockUserRole) {
     { id: 2, ad: "Döşeme" },
     { id: 3, ad: "Atölye" },
     { id: 4, ad: "Finans" }
+  ];
+
+  const ucretTipiReferans: Array<{ id: number; ad: string }> = [
+    { id: 1, ad: "Maktu Aylik" },
+    { id: 2, ad: "Saatlik" }
+  ];
+
+  const primKuraliReferans: Array<{ id: number; ad: string }> = [
+    { id: 7, ad: "Prim Kurali 7" },
+    { id: 8, ad: "Prim Kurali 8" }
   ];
 
   const subeler: Array<{
@@ -553,9 +569,11 @@ let bildirimIdCounter = 800;
         gorev_id: personel.gorev_id,
         personel_tipi_id: personel.personel_tipi_id,
         bagli_amir_id: personel.bagli_amir_id,
-        ucret_tipi: personel.ucret_tipi,
+        ucret_tipi_id: personel.ucret_tipi_id,
+        ucret_tipi_adi: personel.ucret_tipi_adi,
         maas_tutari: personel.maas_tutari,
-        prim_kurali_id: personel.prim_kurali_id
+        prim_kurali_id: personel.prim_kurali_id,
+        prim_kurali_adi: personel.prim_kurali_adi
       },
       sistem_ozeti: {
         hizmet_suresi: personel.id === 1 ? "3 yil 2 ay" : "1 yil 8 ay",
@@ -592,15 +610,13 @@ let bildirimIdCounter = 800;
   function normalizeLifecycleSnapshot(p: (typeof personeller)[number]) {
     const n = (v: number | undefined | null) =>
       v === undefined || v === null || !Number.isFinite(v) ? null : v;
-    const ns = (v: string | undefined | null) =>
-      typeof v === "string" && v.trim() ? v.trim() : null;
     const nm = (v: number | undefined | null) =>
       v === undefined || v === null || !Number.isFinite(v) ? null : v;
     return {
       departman_id: n(p.departman_id),
       gorev_id: n(p.gorev_id),
       bagli_amir_id: n(p.bagli_amir_id),
-      ucret_tipi: ns(p.ucret_tipi),
+      ucret_tipi_id: n(p.ucret_tipi_id),
       maas_tutari: nm(p.maas_tutari),
       prim_kurali_id: n(p.prim_kurali_id)
     };
@@ -614,7 +630,7 @@ let bildirimIdCounter = 800;
       a.departman_id === b.departman_id &&
       a.gorev_id === b.gorev_id &&
       a.bagli_amir_id === b.bagli_amir_id &&
-      a.ucret_tipi === b.ucret_tipi &&
+      a.ucret_tipi_id === b.ucret_tipi_id &&
       a.maas_tutari === b.maas_tutari &&
       a.prim_kurali_id === b.prim_kurali_id
     );
@@ -629,7 +645,7 @@ let bildirimIdCounter = 800;
     if (typeof payload.soyad === "string") next.soyad = payload.soyad.trim();
     if (typeof payload.telefon === "string") next.telefon = payload.telefon.trim();
 
-    const setId = (key: "departman_id" | "gorev_id" | "bagli_amir_id" | "prim_kurali_id") => {
+    const setId = (key: "departman_id" | "gorev_id" | "bagli_amir_id" | "prim_kurali_id" | "ucret_tipi_id") => {
       if (!(key in payload)) return;
       const v = payload[key];
       if (v === null) {
@@ -649,11 +665,7 @@ let bildirimIdCounter = 800;
     setId("gorev_id");
     setId("bagli_amir_id");
     setId("prim_kurali_id");
-
-    if ("ucret_tipi" in payload) {
-      const v = payload.ucret_tipi;
-      next.ucret_tipi = v === null || v === undefined ? undefined : String(v).trim() || undefined;
-    }
+    setId("ucret_tipi_id");
     if ("maas_tutari" in payload) {
       const v = payload.maas_tutari;
       if (v === null || v === undefined) next.maas_tutari = undefined;
@@ -668,6 +680,14 @@ let bildirimIdCounter = 800;
     }
     if (target.gorev_id !== undefined) {
       target.gorev_adi = gorevAdlari.find((g) => g.id === target.gorev_id)?.ad ?? target.gorev_adi;
+    }
+    if (target.ucret_tipi_id !== undefined) {
+      target.ucret_tipi_adi =
+        ucretTipiReferans.find((x) => x.id === target.ucret_tipi_id)?.ad ?? target.ucret_tipi_adi;
+    }
+    if (target.prim_kurali_id !== undefined) {
+      target.prim_kurali_adi =
+        primKuraliReferans.find((x) => x.id === target.prim_kurali_id)?.ad ?? target.prim_kurali_adi;
     }
   }
 
@@ -943,7 +963,7 @@ let bildirimIdCounter = 800;
         "departman_id" in payload ||
         "gorev_id" in payload ||
         "bagli_amir_id" in payload ||
-        "ucret_tipi" in payload ||
+        "ucret_tipi_id" in payload ||
         "maas_tutari" in payload ||
         "prim_kurali_id" in payload;
 
@@ -1445,6 +1465,16 @@ let bildirimIdCounter = 800;
             { key: "RAPORLU", label: "Raporlu" }
           ])
         );
+        return;
+      }
+
+      if (path === "/api/referans/ucret-tipleri") {
+        await fulfillJson(route, 200, okBody(ucretTipiReferans));
+        return;
+      }
+
+      if (path === "/api/referans/prim-kurallari") {
+        await fulfillJson(route, 200, okBody(primKuraliReferans));
         return;
       }
 

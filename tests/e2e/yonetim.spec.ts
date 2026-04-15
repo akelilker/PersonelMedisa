@@ -62,11 +62,13 @@ test.describe("yonetim paneli ve aylik ozet", () => {
 
     await page.getByTestId("menu-raporlar").click();
     await expect(page).toHaveURL(/\/raporlar$/);
-    await page.getByTestId("link-aylik-ozet").click();
 
-    await expect(page).toHaveURL(/\/aylik-kapanis-ozeti$/);
-    await expect(page.locator(".modal-header h2").first()).toContainText("Aylık Kapanış Özeti");
-    await expect(page.locator(".raporlar-table tbody tr")).toHaveCount(2);
+    await expect(page.getByTestId("aylik-kapanis-ozeti-section")).toBeVisible();
+    await expect(page.locator(".modal-header h2").first()).toContainText("Raporlar");
+    await expect(page.getByTestId("aylik-kapanis-ozeti-section").locator("h2")).toContainText("Aylık Kapanış Özeti");
+    await expect(
+      page.getByTestId("aylik-kapanis-ozeti-section").locator(".raporlar-table tbody tr")
+    ).toHaveCount(2);
 
     await page.getByTestId("aylik-ozet-bolum-onay").click();
     await expect(page.getByText("Seçili ay için bölüm onayı verildi.")).toBeVisible();

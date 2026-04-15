@@ -6,7 +6,8 @@ import {
   fetchPersonelDetail,
   fetchPersonellerList,
   updatePersonel,
-  type CreatePersonelPayload
+  type CreatePersonelPayload,
+  type UpdatePersonelPayload
 } from "../api/personeller.api";
 import { fetchBagliAmirOptions, fetchDepartmanOptions, fetchGorevOptions, fetchPersonelTipiOptions, fetchSurecTuruOptions } from "../api/referans.api";
 import { createSurec, fetchSureclerList } from "../api/surecler.api";
@@ -35,6 +36,12 @@ import {
   buildCreatePersonelPayload,
   parseOptionalPositiveInt
 } from "../features/personeller/personel-create-utils";
+import {
+  computeHasLifecycleDiff,
+  lifecycleSnapshotToPersonelPatch,
+  snapshotFromLifecycleForm,
+  type LifecycleFormFields
+} from "../lib/personel-lifecycle-diff";
 import type { PaginatedResult } from "../types/api";
 import { runDeduped } from "../lib/in-flight-dedupe";
 import { useAuth } from "../state/auth.store";
@@ -414,7 +421,89 @@ type EditPersonelFormState = {
   ad: string;
   soyad: string;
   telefon: string;
+  departmanId: string;
+  gorevId: string;
+  bagliAmirId: string;
+  ucretTipi: string;
+  maasTutari: string;
+  primKuraliId: string;
+  effectiveDate: string;
 };
+
+function pickLifecycleFormFields(form: EditPersonelFormState): LifecycleFormFields {
+  return {
+    departmanId: form.departmanId,
+    gorevId: form.gorevId,
+    bagliAmirId: form.bagliAmirId,
+    ucretTipi: form.ucretTipi,
+    maasTutari: form.maasTutari,
+    primKuraliId: form.primKuraliId
+  };
+}
+
+function personelToEditForm(personel: Personel): EditPersonelFormState {
+  return {
+    ad: personel.ad,
+    soyad: personel.soyad,
+    telefon: personel.telefon ?? "",
+    departmanId: personel.departman_id != null ? String(personel.departman_id) : "",
+    gorevId: personel.gorev_id != null ? String(personel.gorev_id) : "",
+    bagliAmirId: personel.bagli_amir_id != null ? String(personel.bagli_amir_id) : "",
+    ucretTipi: personel.ucret_tipi ?? "",
+    maasTutari: personel.maas_tutari != null ? String(personel.maas_tutari) : "",
+    primKuraliId: personel.prim_kurali_id != null ? String(personel.prim_kurali_id) : "",
+    effectiveDate: ""
+  };
+}
+
+function buildPersonelUpdatePayload(
+  editForm: EditPersonelFormState,
+  hasLifecycleDiff: boolean
+): UpdatePersonelPayload {
+  const payload: UpdatePersonelPayload = {
+    ad: editForm.ad.trim(),
+    soyad: editForm.soyad.trim(),
+    telefon: editForm.telefon.trim()
+  };
+
+  const setOptionalId = (
+    key: "departman_id" | "gorev_id" | "bagli_amir_id" | "prim_kurali_id",
+    raw: string
+  ) => {
+    const trimmed = raw.trim();
+    if (trimmed === "") {
+      payload[key] = null;
+      return;
+    }
+
+    const parsed = Number.parseInt(trimmed, 10);
+    if (Number.isFinite(parsed) && parsed > 0) {
+      payload[key] = parsed;
+    }
+  };
+
+  setOptionalId("departman_id", editForm.departmanId);
+  setOptionalId("gorev_id", editForm.gorevId);
+  setOptionalId("bagli_amir_id", editForm.bagliAmirId);
+  setOptionalId("prim_kurali_id", editForm.primKuraliId);
+
+  const ucret = editForm.ucretTipi.trim();
+  payload.ucret_tipi = ucret === "" ? null : ucret;
+
+  const maasRaw = editForm.maasTutari.trim();
+  if (maasRaw === "") {
+    payload.maas_tutari = null;
+  } else {
+    const parsed = Number.parseFloat(maasRaw.replace(",", "."));
+    payload.maas_tutari = Number.isFinite(parsed) ? parsed : null;
+  }
+
+  if (hasLifecycleDiff) {
+    payload.effective_date = editForm.effectiveDate.trim();
+  }
+
+  return payload;
+}
 
 type PersonelSurecFormState = {
   surecTuru: string;
@@ -667,7 +756,14 @@ export function usePersonelDetail(
   const [editForm, setEditForm] = useState<EditPersonelFormState>({
     ad: "",
     soyad: "",
-    telefon: ""
+    telefon: "",
+    departmanId: "",
+    gorevId: "",
+    bagliAmirId: "",
+    ucretTipi: "",
+    maasTutari: "",
+    primKuraliId: "",
+    effectiveDate: ""
   });
   const [isSurecModalOpen, setIsSurecModalOpen] = useState(false);
   const [isSurecSubmitting, setIsSurecSubmitting] = useState(false);
@@ -686,11 +782,7 @@ export function usePersonelDetail(
   useEffect(() => {
     if (cached) {
       setPersonel(cached);
-      setEditForm({
-        ad: cached.ad,
-        soyad: cached.soyad,
-        telefon: cached.telefon ?? ""
-      });
+      setEditForm(personelToEditForm(cached));
     }
   }, [cached]);
 
@@ -713,11 +805,7 @@ export function usePersonelDetail(
         runDeduped(detailKey, () => fetchPersonelDetail(parsedPersonelId))
       );
       setPersonel(data);
-      setEditForm({
-        ad: data.ad,
-        soyad: data.soyad,
-        telefon: data.telefon ?? ""
-      });
+      setEditForm(personelToEditForm(data));
     } catch (error) {
       if (shouldRedirectDetailAfterSubeMismatch(error)) {
         setPersonel(null);
@@ -870,6 +958,58 @@ export function usePersonelDetail(
     [zimmetHistorySnapshot]
   );
 
+  const personelRefs = useMemo((): PersonelReferenceBundle => {
+    return (
+      getCacheEntry<PersonelReferenceBundle>(dataCacheKeys.referansPersonel()) ?? {
+        departmanOptions: [],
+        gorevOptions: [],
+        personelTipiOptions: [],
+        bagliAmirOptions: []
+      }
+    );
+  }, [revision]);
+
+  const hasLifecycleDiff = useMemo(() => {
+    if (!personel) {
+      return false;
+    }
+
+    return computeHasLifecycleDiff(personel, pickLifecycleFormFields(editForm));
+  }, [personel, editForm]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        await fetchWithCacheMerge(dataCacheKeys.referansPersonel(), () =>
+          runDeduped(dataCacheKeys.referansPersonel(), async () => {
+            const [departmanOptions, gorevOptions, personelTipiOptions, bagliAmirOptions] = await Promise.all([
+              fetchDepartmanOptions(),
+              fetchGorevOptions(),
+              fetchPersonelTipiOptions(),
+              fetchBagliAmirOptions()
+            ]);
+            return {
+              departmanOptions,
+              gorevOptions,
+              personelTipiOptions,
+              bagliAmirOptions
+            } satisfies PersonelReferenceBundle;
+          })
+        );
+      } catch {
+        if (!cancelled) {
+          // Referans yuklenemedi; form manuel ID ile doldurulabilir.
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const openSurecModal = useCallback(() => {
     if (!canCreateSurec) {
       setSurecCreateErrorMessage("Bu islem icin yetkin bulunmuyor.");
@@ -906,11 +1046,7 @@ export function usePersonelDetail(
     }
     setIsEditing(false);
     setEditErrorMessage(null);
-    setEditForm({
-      ad: personel.ad,
-      soyad: personel.soyad,
-      telefon: personel.telefon ?? ""
-    });
+    setEditForm(personelToEditForm(personel));
   }, [personel]);
 
   const updatePersonelHandler = useCallback(
@@ -928,13 +1064,23 @@ export function usePersonelDetail(
       setIsSubmitting(true);
 
       const previousPersonel = personel;
-      const body = {
+
+      if (hasLifecycleDiff && !editForm.effectiveDate.trim()) {
+        setEditErrorMessage("Gecerlilik tarihi zorunludur.");
+        setIsSubmitting(false);
+        return;
+      }
+
+      const body = buildPersonelUpdatePayload(editForm, hasLifecycleDiff);
+
+      const lifecycleSnap = snapshotFromLifecycleForm(pickLifecycleFormFields(editForm));
+      const optimistic: Personel = {
+        ...personel,
         ad: editForm.ad.trim(),
         soyad: editForm.soyad.trim(),
-        telefon: editForm.telefon.trim()
+        telefon: editForm.telefon.trim(),
+        ...lifecycleSnapshotToPersonelPatch(lifecycleSnap)
       };
-
-      const optimistic: Personel = { ...personel, ...body };
 
       mergeCacheEntry<Personel>(detailKey, () => optimistic);
       setPersonel(optimistic);
@@ -943,11 +1089,7 @@ export function usePersonelDetail(
         const updated = await updatePersonel(personel.id, body);
         mergeCacheEntry<Personel>(detailKey, () => updated);
         setPersonel(updated);
-        setEditForm({
-          ad: updated.ad,
-          soyad: updated.soyad,
-          telefon: updated.telefon ?? ""
-        });
+        setEditForm(personelToEditForm(updated));
         setIsEditing(false);
       } catch (error) {
         if (shouldRedirectDetailAfterSubeMismatch(error)) {
@@ -977,7 +1119,7 @@ export function usePersonelDetail(
         setIsSubmitting(false);
       }
     },
-    [detailKey, editForm, isSubmitting, navigate, personel]
+    [detailKey, editForm, hasLifecycleDiff, isSubmitting, navigate, personel]
   );
 
   const createSurecHandler = useCallback(
@@ -1104,6 +1246,8 @@ export function usePersonelDetail(
     setEditForm,
     discardEdit,
     updatePersonelHandler,
+    hasLifecycleDiff,
+    personelRefs,
     isSurecModalOpen,
     openSurecModal,
     closeSurecModal,

@@ -35,7 +35,18 @@ export type CreatePersonelPayload = {
   bagli_amir_id?: number;
 };
 
-export type UpdatePersonelPayload = Partial<CreatePersonelPayload>;
+export type UpdatePersonelPayload = Omit<
+  Partial<CreatePersonelPayload>,
+  "departman_id" | "gorev_id" | "bagli_amir_id"
+> & {
+  departman_id?: number | null;
+  gorev_id?: number | null;
+  bagli_amir_id?: number | null;
+  ucret_tipi?: string | null;
+  maas_tutari?: number | null;
+  prim_kurali_id?: number | null;
+  effective_date?: string;
+};
 
 function toRecord(value: unknown): Record<string, unknown> | null {
   if (typeof value !== "object" || value === null) {
@@ -216,7 +227,10 @@ function normalizePersonel(data: unknown): Personel {
       "etiket",
       "pasiflik_durumu_etiketi",
       "pasiflikDurumuEtiketi"
-    )
+    ),
+    ucret_tipi: readString(baseSources, "ucret_tipi", "ucretTipi"),
+    maas_tutari: readNumber(baseSources, "maas_tutari", "maasTutari"),
+    prim_kurali_id: readNumber(baseSources, "prim_kurali_id", "primKuraliId")
   };
 }
 

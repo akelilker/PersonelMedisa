@@ -16,7 +16,7 @@ import {
   formatSurecTuruLabel
 } from "../../../lib/display/enum-display";
 import { hesaplaIzinBakiye } from "../../../services/izin-hesap-motoru";
-import type { KeyOption } from "../../../types/referans";
+import type { IdOption, KeyOption } from "../../../types/referans";
 import type { Personel } from "../../../types/personel";
 import type { Surec } from "../../../types/surec";
 import { ZIMMET_TESLIM_DURUMU_OPTIONS, ZIMMET_URUN_TURU_OPTIONS, type Zimmet } from "../../../types/zimmet";
@@ -83,6 +83,10 @@ function formatSgkHesaplamaModuLabel(value?: string) {
 
 function keyOptionsToSelectOptions(options: KeyOption[]) {
   return options.map((option) => ({ value: option.key, label: option.label }));
+}
+
+function idOptionsToSelectOptions(options: IdOption[]) {
+  return options.map((option) => ({ value: String(option.id), label: option.label }));
 }
 
 function parseTimelineDate(value: string | null | undefined) {
@@ -817,6 +821,8 @@ export function PersonelDetayPage() {
     setEditForm,
     discardEdit,
     updatePersonelHandler,
+    hasLifecycleDiff,
+    personelRefs,
     isSurecModalOpen,
     openSurecModal,
     closeSurecModal,
@@ -943,6 +949,100 @@ export function PersonelDetayPage() {
                   value={editForm.telefon}
                   onChange={(value) => setEditForm((prev) => ({ ...prev, telefon: value }))}
                 />
+                {personelRefs.departmanOptions.length > 0 ? (
+                  <FormField
+                    as="select"
+                    label="Departman"
+                    name="edit-departman"
+                    value={editForm.departmanId}
+                    onChange={(value) => setEditForm((prev) => ({ ...prev, departmanId: value }))}
+                    placeholderOption={{ value: "", label: "Seciniz" }}
+                    selectOptions={idOptionsToSelectOptions(personelRefs.departmanOptions)}
+                  />
+                ) : (
+                  <FormField
+                    label="Departman ID"
+                    name="edit-departman-id"
+                    type="number"
+                    min={1}
+                    value={editForm.departmanId}
+                    onChange={(value) => setEditForm((prev) => ({ ...prev, departmanId: value }))}
+                  />
+                )}
+                {personelRefs.gorevOptions.length > 0 ? (
+                  <FormField
+                    as="select"
+                    label="Gorev"
+                    name="edit-gorev"
+                    value={editForm.gorevId}
+                    onChange={(value) => setEditForm((prev) => ({ ...prev, gorevId: value }))}
+                    placeholderOption={{ value: "", label: "Seciniz" }}
+                    selectOptions={idOptionsToSelectOptions(personelRefs.gorevOptions)}
+                  />
+                ) : (
+                  <FormField
+                    label="Gorev ID"
+                    name="edit-gorev-id"
+                    type="number"
+                    min={1}
+                    value={editForm.gorevId}
+                    onChange={(value) => setEditForm((prev) => ({ ...prev, gorevId: value }))}
+                  />
+                )}
+                {personelRefs.bagliAmirOptions.length > 0 ? (
+                  <FormField
+                    as="select"
+                    label="Bagli amir"
+                    name="edit-bagli-amir"
+                    value={editForm.bagliAmirId}
+                    onChange={(value) => setEditForm((prev) => ({ ...prev, bagliAmirId: value }))}
+                    placeholderOption={{ value: "", label: "Seciniz" }}
+                    selectOptions={idOptionsToSelectOptions(personelRefs.bagliAmirOptions)}
+                  />
+                ) : (
+                  <FormField
+                    label="Bagli amir ID"
+                    name="edit-bagli-amir-id"
+                    type="number"
+                    min={1}
+                    value={editForm.bagliAmirId}
+                    onChange={(value) => setEditForm((prev) => ({ ...prev, bagliAmirId: value }))}
+                  />
+                )}
+                <FormField
+                  label="Ucret tipi"
+                  name="edit-ucret-tipi"
+                  value={editForm.ucretTipi}
+                  onChange={(value) => setEditForm((prev) => ({ ...prev, ucretTipi: value }))}
+                  placeholder="Ornek: MAKTU_AYLIK"
+                />
+                <FormField
+                  label="Maas tutari"
+                  name="edit-maas"
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={editForm.maasTutari}
+                  onChange={(value) => setEditForm((prev) => ({ ...prev, maasTutari: value }))}
+                />
+                <FormField
+                  label="Prim kurali ID"
+                  name="edit-prim-kurali"
+                  type="number"
+                  min={1}
+                  value={editForm.primKuraliId}
+                  onChange={(value) => setEditForm((prev) => ({ ...prev, primKuraliId: value }))}
+                />
+                {hasLifecycleDiff ? (
+                  <FormField
+                    label="Gecerlilik Tarihi"
+                    name="edit-effective-date"
+                    type="date"
+                    value={editForm.effectiveDate}
+                    onChange={(value) => setEditForm((prev) => ({ ...prev, effectiveDate: value }))}
+                    required
+                  />
+                ) : null}
               </div>
 
               {editErrorMessage ? <p className="personel-create-error">{editErrorMessage}</p> : null}

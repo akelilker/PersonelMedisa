@@ -258,7 +258,7 @@ export function PersonellerPage() {
         }`}
       >
         {canViewPuantaj || canViewBildirimler ? (
-          <nav className="personeller-toolbar-top" aria-label="Personel karti iliskili moduller">
+          <nav className="personeller-toolbar-top" aria-label="Personel kartı ilişkili modüller">
             <div className="personeller-toolbar-module-links">
               {canViewPuantaj ? (
                 <Link className="personeller-toolbar-module-link" to="/puantaj">
@@ -267,7 +267,7 @@ export function PersonellerPage() {
               ) : null}
               {canViewBildirimler ? (
                 <Link className="personeller-toolbar-module-link" to="/bildirimler">
-                  Gunluk Kayit
+                  Günlük Kayıt
                 </Link>
               ) : null}
             </div>
@@ -279,7 +279,7 @@ export function PersonellerPage() {
             <Link
               to="/"
               className="personeller-icon-btn personeller-toolbar-back-link"
-              aria-label="Ana panele don"
+              aria-label="Ana panele dön"
             >
               <IconBack />
             </Link>
@@ -288,7 +288,7 @@ export function PersonellerPage() {
               className="personeller-icon-btn"
               aria-expanded={searchExpanded}
               aria-controls="personeller-filter-form"
-              aria-label={searchExpanded ? "Aramayi kapat" : "Arama ac"}
+              aria-label={searchExpanded ? "Aramayı kapat" : "Arama aç"}
               onClick={() => setSearchExpanded((open) => !open)}
             >
               <IconSearch />
@@ -298,7 +298,7 @@ export function PersonellerPage() {
               className="personeller-icon-btn"
               aria-expanded={filterExpanded}
               aria-controls="personeller-filter-form"
-              aria-label={filterExpanded ? "Detayli filtreyi kapat" : "Detayli filtre ac"}
+              aria-label={filterExpanded ? "Detaylı filtreyi kapat" : "Detaylı filtre aç"}
               onClick={() => setFilterExpanded((open) => !open)}
             >
               <IconFilter />
@@ -309,7 +309,7 @@ export function PersonellerPage() {
               type="button"
               className="personeller-icon-btn"
               aria-label={
-                viewMode === "grid" ? "Liste gorunumune gec" : "Kart gorunumune gec"
+                viewMode === "grid" ? "Liste görünümüne geç" : "Kart görünümüne geç"
               }
               onClick={() => setViewMode((mode) => (mode === "grid" ? "list" : "grid"))}
             >
@@ -322,7 +322,7 @@ export function PersonellerPage() {
                 aria-expanded={moduleMenuOpen}
                 aria-controls="personeller-module-menu"
                 aria-haspopup="true"
-                aria-label="Modul menu"
+                aria-label="Modül menü"
                 onClick={() => setModuleMenuOpen((open) => !open)}
               >
                 <IconMenu />
@@ -339,7 +339,7 @@ export function PersonellerPage() {
                     role="menuitem"
                     onClick={() => setModuleMenuOpen(false)}
                   >
-                    Surec takibi
+                    Süreç takibi
                   </Link>
                 </div>
               ) : null}
@@ -384,20 +384,20 @@ export function PersonellerPage() {
                 {departmanFilterOptions.length > 0 ? (
                   <FormField
                     as="select"
-                    label="Bolum"
+                    label="Bölüm"
                     name="personel-filter-departman"
                     value={draft.departmanId}
                     onChange={setDraftDepartmanId}
-                    placeholderOption={{ value: "", label: "Tumu" }}
+                    placeholderOption={{ value: "", label: "Tümü" }}
                     selectOptions={departmanFilterOptions}
                   />
                 ) : (
                   <FormField
-                    label="Bolum"
+                    label="Bölüm"
                     name="personel-filter-departman-num"
                     type="number"
                     min={1}
-                    placeholder="Tumu"
+                    placeholder="Tümü"
                     value={draft.departmanId}
                     onChange={setDraftDepartmanId}
                   />
@@ -412,7 +412,7 @@ export function PersonellerPage() {
                     name="personel-filter-personel-tipi"
                     value={draft.personelTipiId}
                     onChange={setDraftPersonelTipiId}
-                    placeholderOption={{ value: "", label: "Tumu" }}
+                    placeholderOption={{ value: "", label: "Tümü" }}
                     selectOptions={personelTipiFilterOptions}
                   />
                 ) : (
@@ -421,7 +421,7 @@ export function PersonellerPage() {
                     name="personel-filter-personel-tipi-num"
                     type="number"
                     min={1}
-                    placeholder="Tumu"
+                    placeholder="Tümü"
                     value={draft.personelTipiId}
                     onChange={setDraftPersonelTipiId}
                   />
@@ -476,7 +476,7 @@ export function PersonellerPage() {
         </form>
       ) : null}
 
-      {isLoading ? <LoadingState label="Personel verileri yukleniyor..." /> : null}
+      {isLoading ? <LoadingState label="Personel verileri yükleniyor..." /> : null}
 
       {!isLoading && errorMessage ? (
         <ErrorState message={errorMessage} onRetry={() => void refetch()} />
@@ -484,7 +484,7 @@ export function PersonellerPage() {
 
       {!isLoading && !errorMessage && personeller.length === 0 ? (
         <EmptyState
-          title="Personel kaydi bulunamadi"
+          title="Personel kaydı bulunamadı"
           message="Filtre veya kaynak veri durumunu kontrol et."
         />
       ) : null}
@@ -495,12 +495,12 @@ export function PersonellerPage() {
             <thead>
               <tr>
                 <th scope="col">Ad Soyad</th>
-                <th scope="col">Bolum</th>
-                <th scope="col">Gorev</th>
+                <th scope="col">Bölüm</th>
+                <th scope="col">Görev</th>
                 <th scope="col">Durum</th>
                 <th scope="col">Telefon</th>
                 <th scope="col" className="personeller-table-col-actions">
-                  Hizli
+                  Hızlı
                 </th>
               </tr>
             </thead>
@@ -509,7 +509,7 @@ export function PersonellerPage() {
                 const personelCallHref = buildTelHref(personel.telefon);
                 const emergencyCallHref = buildTelHref(personel.acil_durum_telefon);
                 const detailTo = `/personeller/${personel.id}`;
-                const previewLabel = `${personel.ad} ${personel.soyad} kisisi kartini ac`;
+                const previewLabel = `${personel.ad} ${personel.soyad} kişisinin kartını aç`;
 
                 function rowActivate() {
                   if (canOpenDetail) {
@@ -606,7 +606,7 @@ export function PersonellerPage() {
               const emergencyCallHref = buildTelHref(personel.acil_durum_telefon);
               const hasQuickActions = Boolean(personelCallHref || emergencyCallHref);
               const detailTo = `/personeller/${personel.id}`;
-              const previewLabel = `${personel.ad} ${personel.soyad} kisisi kartini ac`;
+              const previewLabel = `${personel.ad} ${personel.soyad} kişisinin kartını aç`;
 
               const previewInner = (
                 <div className="personeller-item-content personeller-item-content--grid">

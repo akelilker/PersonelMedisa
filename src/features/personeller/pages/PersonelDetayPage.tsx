@@ -25,9 +25,9 @@ import { ZIMMET_TESLIM_DURUMU_OPTIONS, ZIMMET_URUN_TURU_OPTIONS, type Zimmet } f
 const PERSONEL_DOSYA_TABS = [
   { id: "genel-bilgiler", label: "Genel Bilgiler" },
   { id: "puantaj", label: "Puantaj" },
-  { id: "izin-devamsizlik", label: "Izin & Devamsizlik" },
+  { id: "izin-devamsizlik", label: "İzin / Devamsızlık" },
   { id: "zimmet-envanter", label: "Zimmet & Envanter" },
-  { id: "surec-gecmisi", label: "Surec Gecmisi" }
+  { id: "surec-gecmisi", label: "Süreç Geçmişi" }
 ] as const;
 
 const PERSONEL_SUREC_FORM_ID = "personel-surec-form";
@@ -73,11 +73,11 @@ function formatReferenceValue(label?: string, id?: number) {
 
 function formatSgkHesaplamaModuLabel(value?: string) {
   if (value === "OTUZ_GUN_STANDART") {
-    return "30 gun standart";
+    return "30 gün standart";
   }
 
   if (value === "TAKVIM_GUNU") {
-    return "Takvim gunu";
+    return "Takvim günü";
   }
 
   return "-";
@@ -175,9 +175,9 @@ function buildPersonelTimeline(
     events.push({
       id: `personel-ise-giris-${personel.id}`,
       tarih: iseGirisTarihi,
-      baslik: "Ise Giris",
+      baslik: "İşe Giriş",
       kaynak: "Personel",
-      ozet: iseGirisOzeti || "Personel kaydi olusturuldu.",
+      ozet: iseGirisOzeti || "Personel kaydı oluşturuldu.",
       sortValue: createTimelineSortValue(iseGirisTarihi),
       sortRank: 4
     });
@@ -231,7 +231,7 @@ function buildPersonelTimeline(
       events.push({
         id: `zimmet-iade-${zimmet.id}`,
         tarih: iadeTarihi,
-        baslik: "Zimmet Iadesi",
+        baslik: "Zimmet İadesi",
         kaynak: "Zimmet",
         ozet: [urun, teslimEden].filter((part): part is string => Boolean(part)).join(" / "),
         aciklama: ortakAciklama,
@@ -329,11 +329,11 @@ function PersonelDosyaHero({
     <section className="personel-dosya-hero">
       <div className="personel-dosya-hero-head">
         <div className="personel-dosya-hero-copy">
-          <p className="personel-dosya-kicker">Personel Dosyasi</p>
+          <p className="personel-dosya-kicker">Personel Dosyası</p>
           <h3>
             {personel.ad} {personel.soyad}
           </h3>
-          <p className="personel-dosya-sub">{heroSummary || "Kurumsal personel kaydi"}</p>
+          <p className="personel-dosya-sub">{heroSummary || "Kurumsal personel kaydı"}</p>
         </div>
       </div>
 
@@ -342,9 +342,9 @@ function PersonelDosyaHero({
         <DossierField label="Soyad" value={personel.soyad} />
         <DossierField label="Sicil No" value={formatDetailValue(personel.sicil_no)} />
         <DossierField label="Departman / Birim" value={formatReferenceValue(personel.departman_adi, personel.departman_id)} />
-        <DossierField label="Gorev / Unvan" value={formatReferenceValue(personel.gorev_adi, personel.gorev_id)} />
+        <DossierField label="Görev / Unvan" value={formatReferenceValue(personel.gorev_adi, personel.gorev_id)} />
         <DossierField
-          label="Calisma Durumu"
+          label="Çalışma Durumu"
           value={durumLabel}
           valueClassName={
             personel.aktif_durum === "PASIF"
@@ -352,7 +352,7 @@ function PersonelDosyaHero({
               : "personel-dosya-field-value"
           }
         />
-        <DossierField label="Ise Giris Tarihi" value={formatDetailValue(personel.ise_giris_tarihi)} />
+        <DossierField label="İşe Giriş Tarihi" value={formatDetailValue(personel.ise_giris_tarihi)} />
       </div>
     </section>
   );
@@ -385,7 +385,7 @@ function PersonelDosyaActionRow({
     if (canCreateSurec) {
       items.push({
         id: "surec-ekle",
-        label: "Surec Ekle",
+        label: "Süreç Ekle",
         onSelect: () => {
           onCloseActionMenu();
           onOpenSurecModal();
@@ -394,7 +394,7 @@ function PersonelDosyaActionRow({
     } else if (canAccessSurecler) {
       items.push({
         id: "surec-gecmisi",
-        label: "Surec Gecmisini Ac",
+        label: "Süreç Geçmişini Aç",
         onSelect: () => {
           onCloseActionMenu();
           onOpenSurecHistory();
@@ -405,7 +405,7 @@ function PersonelDosyaActionRow({
     if (canEditPersonel) {
       items.push({
         id: "duzenle",
-        label: "Karti Duzenle",
+        label: "Kartı Düzenle",
         onSelect: () => {
           onCloseActionMenu();
           onStartEdit();
@@ -448,27 +448,27 @@ function PersonelKartPanelGenelBilgiler({ personel }: { personel: Personel }) {
   return (
     <div className="personel-dosya-sections">
       <DossierSection
-        title="Kimlik ve Iletisim"
-        description="Temel kimlik, iletisim ve lokasyon verileri bu dosyada salt okunur izlenir."
+        title="Kimlik ve İletişim"
+        description="Temel kimlik, iletişim ve lokasyon verileri bu dosyada salt okunur izlenir."
       >
         <DossierRecord label="T.C. Kimlik No" value={formatDetailValue(personel.tc_kimlik_no)} />
         <DossierRecord label="Telefon" value={formatDetailValue(personel.telefon)} />
-        <DossierRecord label="Dogum Tarihi" value={formatDetailValue(personel.dogum_tarihi)} />
-        <DossierRecord label="Dogum Yeri" value={formatDetailValue(personel.dogum_yeri)} />
+        <DossierRecord label="Doğum Tarihi" value={formatDetailValue(personel.dogum_tarihi)} />
+        <DossierRecord label="Doğum Yeri" value={formatDetailValue(personel.dogum_yeri)} />
         <DossierRecord label="Kan Grubu" value={formatDetailValue(personel.kan_grubu)} />
-        <DossierRecord label="Sube" value={formatReferenceValue(personel.sube_adi, personel.sube_id)} />
+        <DossierRecord label="Şube" value={formatReferenceValue(personel.sube_adi, personel.sube_id)} />
       </DossierSection>
 
       <DossierSection
         title="Organizasyon ve Acil Durum"
-        description="Bagli organizasyon, yonetim hatti ve acil durum bilgileri burada tutulur."
+        description="Bağlı organizasyon, yönetim hattı ve acil durum bilgileri burada tutulur."
       >
         <DossierRecord
           label="Personel Tipi"
           value={formatReferenceValue(personel.personel_tipi_adi, personel.personel_tipi_id)}
         />
         <DossierRecord label="Bağlı Amir" value={formatReferenceValue(personel.bagli_amir_adi, personel.bagli_amir_id)} />
-        <DossierRecord label="Acil Durum Kisisi" value={formatDetailValue(personel.acil_durum_kisi)} />
+        <DossierRecord label="Acil Durum Kişisi" value={formatDetailValue(personel.acil_durum_kisi)} />
         <DossierRecord label="Acil Durum Telefonu" value={formatDetailValue(personel.acil_durum_telefon)} />
         <DossierRecord label="Pasiflik Etiketi" value={formatDetailValue(personel.pasiflik_durumu_etiketi)} />
       </DossierSection>
@@ -483,45 +483,45 @@ function PersonelPuantajPanel({
   personel: Personel;
   canViewPuantaj: boolean;
 }) {
-  const sgkPrimGunu = typeof personel.sgk_prim_gun === "number" ? `${personel.sgk_prim_gun} Gun` : "-";
-  const eksikGun = typeof personel.sgk_eksik_gun_sayisi === "number" ? `${personel.sgk_eksik_gun_sayisi} Gun` : "-";
+  const sgkPrimGunu = typeof personel.sgk_prim_gun === "number" ? `${personel.sgk_prim_gun} Gün` : "-";
+  const eksikGun = typeof personel.sgk_eksik_gun_sayisi === "number" ? `${personel.sgk_eksik_gun_sayisi} Gün` : "-";
   const eksikGunNedeni = formatDetailValue(personel.sgk_eksik_gun_nedeni_kodu);
-  const takvimGun = typeof personel.sgk_ayin_takvim_gun_sayisi === "number" ? `${personel.sgk_ayin_takvim_gun_sayisi} Gun` : "-";
+  const takvimGun = typeof personel.sgk_ayin_takvim_gun_sayisi === "number" ? `${personel.sgk_ayin_takvim_gun_sayisi} Gün` : "-";
   const donem = formatDetailValue(personel.sgk_donem);
   const hesaplamaModu = formatSgkHesaplamaModuLabel(personel.sgk_hesaplama_modu);
 
   return (
     <div className="personel-dosya-sections">
       <section className="personel-puantaj-summary-card" data-testid="personel-sgk-prim-gun-card">
-        <span className="personel-puantaj-summary-kicker">SGK Prim Gunu</span>
+        <span className="personel-puantaj-summary-kicker">SGK Prim Günü</span>
         <strong className="personel-puantaj-summary-value" data-testid="personel-sgk-prim-gun">
           {sgkPrimGunu}
         </strong>
         <p className="personel-puantaj-summary-note">
-          Aylik puantajdan turetilen resmi prim gunu ozeti burada read-only izlenir.
+          Aylık puantajdan türetilen resmi prim günü özeti burada salt okunur izlenir.
         </p>
       </section>
 
       <DossierSection
-        title="Aylik Puantaj Ozeti"
-        description="Bu dosya SGK prim gunu, eksik gun ve hesaplama modunu tek bakista gosterir."
+        title="Aylık Puantaj Özeti"
+        description="Bu dosya SGK prim günü, eksik gün ve hesaplama modunu tek bakışta gösterir."
       >
-        <DossierRecord label="Donem" value={donem} />
-        <DossierRecord label="SGK Prim Gunu" value={sgkPrimGunu} />
-        <DossierRecord label="Eksik Gun" value={eksikGun} />
-        <DossierRecord label="Eksik Gun Nedeni" value={eksikGunNedeni} />
-        <DossierRecord label="Takvim Gun Sayisi" value={takvimGun} />
+        <DossierRecord label="Dönem" value={donem} />
+        <DossierRecord label="SGK Prim Günü" value={sgkPrimGunu} />
+        <DossierRecord label="Eksik Gün" value={eksikGun} />
+        <DossierRecord label="Eksik Gün Nedeni" value={eksikGunNedeni} />
+        <DossierRecord label="Takvim Gün Sayısı" value={takvimGun} />
         <DossierRecord label="Hesaplama Modu" value={hesaplamaModu} />
       </DossierSection>
 
       <PlaceholderPanel
-        title="Gunluk Puantaj Dosyasi"
-        description="Gunluk giris-cikis kayitlari ve detayli puantaj duzenleme akisi ayri puantaj ekraninda kalir."
-        actionLabel="Puantaj ekranina git"
+        title="Günlük Puantaj Dosyası"
+        description="Günlük giriş-çıkış kayıtları ve detaylı puantaj düzenleme akışı ayrı puantaj ekranında kalır."
+        actionLabel="Puantaj ekranına git"
         actionTo="/puantaj"
         actionState={{ prefillPersonelId: personel.id }}
         canOpen={canViewPuantaj}
-        noPermissionMessage="Puantaj goruntuleme yetkiniz yok."
+        noPermissionMessage="Puantaj görüntüleme yetkiniz yok."
       />
     </div>
   );
@@ -554,10 +554,10 @@ function PlaceholderPanel({
             {actionLabel}
           </Link>
         ) : (
-          <p className="personel-kart-placeholder-note">{noPermissionMessage ?? "Bu alani goruntuleme yetkiniz yok."}</p>
+          <p className="personel-kart-placeholder-note">{noPermissionMessage ?? "Bu alanı görüntüleme yetkiniz yok."}</p>
         )
       ) : (
-        <p className="personel-kart-placeholder-note">Icerik bir sonraki keside baglanacak.</p>
+        <p className="personel-kart-placeholder-note">İçerik bir sonraki keside bağlanacak.</p>
       )}
     </div>
   );
@@ -598,39 +598,39 @@ function PersonelIzinDevamsizlikPanel({
     >
       <div className="personel-detail-grid">
         <section className="personel-detail-section">
-          <h3>Izin Hakki</h3>
+          <h3>İzin Hakkı</h3>
           {bakiye ? (
             <div className="personel-izin-infobox" data-testid="izin-bakiye-infobox">
               <p>
-                <strong>Kidem:</strong> {bakiye.hak_edis.kidem_yil} yil
+                <strong>Kıdem:</strong> {bakiye.hak_edis.kidem_yil} yıl
               </p>
               {bakiye.hak_edis.yas !== null ? (
                 <p>
-                  <strong>Yas:</strong> {bakiye.hak_edis.yas}
+                  <strong>Yaş:</strong> {bakiye.hak_edis.yas}
                 </p>
               ) : null}
               <p>
-                <strong>Yillik Izin Hakki:</strong> {bakiye.hak_edis.yillik_izin_gun} gun
+                <strong>Yıllık İzin Hakkı:</strong> {bakiye.hak_edis.yillik_izin_gun} gün
                 {bakiye.hak_edis.yas_istisna_uygulandi ? (
-                  <span className="personel-izin-istisna-badge"> (50 yas istisnasi)</span>
+                  <span className="personel-izin-istisna-badge"> (50 yaş istisnası)</span>
                 ) : null}
               </p>
               <p>
-                <strong>Kullanilan:</strong> {bakiye.kullanilan_gun} gun
+                <strong>Kullanılan:</strong> {bakiye.kullanilan_gun} gün
               </p>
               <p className="personel-izin-kalan">
-                <strong>Kalan Izin:</strong> {bakiye.kalan_gun} gun
+                <strong>Kalan İzin:</strong> {bakiye.kalan_gun} gün
               </p>
             </div>
           ) : (
-            <p>Ise giris tarihi bilgisi eksik; izin hakki hesaplanamadi.</p>
+            <p>İşe giriş tarihi bilgisi eksik; izin hakkı hesaplanamadı.</p>
           )}
         </section>
 
         <section className="personel-detail-section">
-          <h3>Izin Hareketleri</h3>
+          <h3>İzin Hareketleri</h3>
           {izinSurecleri.length === 0 ? (
-            <p>Kayitli izin hareketi bulunamadi.</p>
+            <p>Kayıtlı izin hareketi bulunamadı.</p>
           ) : (
             <ul className="personel-surec-list personel-izin-list" data-testid="izin-hareket-listesi">
               {izinSurecleri.map((surec) => (
@@ -641,8 +641,8 @@ function PersonelIzinDevamsizlikPanel({
                   </span>
                   <span className="personel-surec-card-state">{formatSurecStateLabel(surec.state)}</span>
                   <span className="personel-surec-card-dates">
-                    Baslangic: {formatDetailValue(surec.baslangic_tarihi)}
-                    {surec.bitis_tarihi ? ` | Bitis: ${surec.bitis_tarihi}` : ""}
+                    Başlangıç: {formatDetailValue(surec.baslangic_tarihi)}
+                    {surec.bitis_tarihi ? ` | Bitiş: ${surec.bitis_tarihi}` : ""}
                   </span>
                   {surec.aciklama ? (
                     <span className="personel-surec-card-desc">{surec.aciklama}</span>
@@ -684,8 +684,8 @@ function PersonelSurecGecmisiPanel({
   if (!canAccessSurecler) {
     return (
       <div className="personel-kart-placeholder">
-        <h3>Surec Gecmisi</h3>
-        <p>Bu dosya yalnizca surec goruntuleme yetkisi olan kullanicilar icin acilir.</p>
+        <h3>Süreç Geçmişi</h3>
+        <p>Bu dosya yalnızca süreç görüntüleme yetkisi olan kullanıcılar için açılır.</p>
       </div>
     );
   }
@@ -694,22 +694,22 @@ function PersonelSurecGecmisiPanel({
     <div className="personel-surec-history">
       <div className="personel-surec-history-head">
         <div>
-          <h3>Surec Gecmisi</h3>
-          <p>Personelin tum surec hareketleri kronolojik olay gunlugu olarak izlenir.</p>
+          <h3>Süreç Geçmişi</h3>
+          <p>Personelin tüm süreç hareketleri kronolojik olay günlüğü olarak izlenir.</p>
         </div>
         {canCreateSurec ? (
           <button type="button" className="universal-btn-aux" onClick={onOpenCreateModal}>
-            Surec Ekle
+            Süreç Ekle
           </button>
         ) : null}
       </div>
 
-      {isLoading ? <p className="personel-kart-placeholder-note">Surec gecmisi yukleniyor...</p> : null}
+      {isLoading ? <p className="personel-kart-placeholder-note">Süreç geçmişi yükleniyor...</p> : null}
       {!isLoading && errorMessage ? <p className="personel-create-error">{errorMessage}</p> : null}
       {!isLoading && !errorMessage && timeline.length === 0 ? (
         <div className="personel-kart-placeholder">
-          <h3>Kayit Bulunamadi</h3>
-          <p>Bu personel icin henuz kronolojik olay kaydi bulunmuyor.</p>
+          <h3>Kayıt Bulunamadı</h3>
+          <p>Bu personel için henüz kronolojik olay kaydı bulunmuyor.</p>
         </div>
       ) : null}
 
@@ -763,8 +763,8 @@ function PersonelZimmetEnvanterPanel({
     <div className="personel-zimmet-panel">
       <div className="personel-zimmet-head">
         <div>
-          <h3>Zimmet ve Envanter Kayitlari</h3>
-          <p>Kullaniciya teslim edilen ekipmanlar ve geri alinmis kayitlar bu listede izlenir.</p>
+          <h3>Zimmet ve Envanter Kayıtları</h3>
+          <p>Kullanıcıya teslim edilen ekipmanlar ve geri alınmış kayıtlar bu listede izlenir.</p>
         </div>
         {canCreateZimmet ? (
           <button type="button" className="universal-btn-aux" onClick={onOpenCreateModal}>
@@ -773,13 +773,13 @@ function PersonelZimmetEnvanterPanel({
         ) : null}
       </div>
 
-      {isLoading ? <p className="personel-kart-placeholder-note">Zimmet kayitlari yukleniyor...</p> : null}
+      {isLoading ? <p className="personel-kart-placeholder-note">Zimmet kayıtları yükleniyor...</p> : null}
       {!isLoading && errorMessage ? <p className="personel-create-error">{errorMessage}</p> : null}
 
       {!isLoading && !errorMessage && zimmetler.length === 0 ? (
         <div className="personel-kart-placeholder">
-          <h3>Zimmet Kaydi Bulunamadi</h3>
-          <p>Bu personel icin henuz zimmetlenmis urun kaydi bulunmuyor.</p>
+          <h3>Zimmet Kaydı Bulunamadı</h3>
+          <p>Bu personel için henüz zimmetlenmiş ürün kaydı bulunmuyor.</p>
         </div>
       ) : null}
 
@@ -788,12 +788,12 @@ function PersonelZimmetEnvanterPanel({
           <table className="personel-zimmet-table">
             <thead>
               <tr>
-                <th>Urun Turu</th>
+                <th>Ürün Türü</th>
                 <th>Teslim Tarihi</th>
                 <th>Teslim Eden</th>
                 <th>Teslim Durumu</th>
-                <th>Kayit Durumu</th>
-                <th>Seri No / Aciklama</th>
+                <th>Kayıt Durumu</th>
+                <th>Seri No / Açıklama</th>
               </tr>
             </thead>
             <tbody>
@@ -919,20 +919,20 @@ export function PersonelDetayPage() {
   }
 
   const pageHeading =
-    personel != null ? `${personel.ad} ${personel.soyad} personel dosyasi` : "Personel detayi";
+    personel != null ? `${personel.ad} ${personel.soyad} personel dosyası` : "Personel detayı";
 
   return (
     <section className="personel-detay-page personel-dosya-page" aria-label={pageHeading}>
       <h2 className="personeller-sr-only">{pageHeading}</h2>
 
-      {isLoading ? <LoadingState label="Personel dosyasi yukleniyor..." /> : null}
+      {isLoading ? <LoadingState label="Personel dosyası yükleniyor..." /> : null}
 
       {!isLoading && errorMessage ? (
         <ErrorState message={errorMessage} onRetry={() => void refetch()} />
       ) : null}
 
       {!isLoading && !errorMessage && !personel ? (
-        <EmptyState title="Personel bulunamadi" message="Belirtilen ID ile kayit bulunamadi." />
+        <EmptyState title="Personel bulunamadı" message="Belirtilen ID ile kayıt bulunamadı." />
       ) : null}
 
       {!isLoading && !errorMessage && personel ? (
@@ -1070,13 +1070,13 @@ export function PersonelDetayPage() {
                   {isSubmitting ? "Kaydediliyor..." : "Kaydet"}
                 </button>
                 <button type="button" className="universal-btn-cancel" onClick={discardEdit} disabled={isSubmitting}>
-                  Vazgec
+                  Vazgeç
                 </button>
               </div>
             </form>
           ) : (
             <>
-              <div className="personel-kart-tablist" role="tablist" aria-label="Personel dosyasi sekmeleri">
+              <div className="personel-kart-tablist" role="tablist" aria-label="Personel dosyası sekmeleri">
                 {PERSONEL_DOSYA_TABS.map((tab) => (
                   <button
                     key={tab.id}
@@ -1160,7 +1160,7 @@ export function PersonelDetayPage() {
 
       {personel && canCreateSurec && isSurecModalOpen ? (
         <AppModal
-          title="Surec Ekle"
+          title="Süreç Ekle"
           onClose={closeSurecModal}
           footer={
             <div className="universal-btn-group modal-footer-actions">
@@ -1178,7 +1178,7 @@ export function PersonelDetayPage() {
                 onClick={closeSurecModal}
                 disabled={isSurecSubmitting}
               >
-                Vazgec
+                Vazgeç
               </button>
             </div>
           }
@@ -1187,17 +1187,17 @@ export function PersonelDetayPage() {
             {surecTuruOptions.length > 0 ? (
               <FormField
                 as="select"
-                label="Surec Turu"
+                label="Süreç Türü"
                 name="personel-surec-turu"
                 value={surecForm.surecTuru}
                 onChange={(value) => setSurecForm((prev) => ({ ...prev, surecTuru: value }))}
                 required
-                placeholderOption={{ value: "", label: "Seciniz" }}
+                placeholderOption={{ value: "", label: "Seçiniz" }}
                 selectOptions={keyOptionsToSelectOptions(surecTuruOptions)}
               />
             ) : (
               <FormField
-                label="Surec Turu"
+                label="Süreç Türü"
                 name="personel-surec-turu-text"
                 value={surecForm.surecTuru}
                 onChange={(value) => setSurecForm((prev) => ({ ...prev, surecTuru: value }))}
@@ -1206,7 +1206,7 @@ export function PersonelDetayPage() {
               />
             )}
             <FormField
-              label="Baslangic Tarihi"
+              label="Başlangıç Tarihi"
               name="personel-surec-baslangic"
               type="date"
               value={surecForm.baslangicTarihi}
@@ -1214,7 +1214,7 @@ export function PersonelDetayPage() {
               required
             />
             <FormField
-              label="Bitis Tarihi"
+              label="Bitiş Tarihi"
               name="personel-surec-bitis"
               type="date"
               value={surecForm.bitisTarihi}
@@ -1222,7 +1222,7 @@ export function PersonelDetayPage() {
             />
             <FormField
               as="textarea"
-              label="Aciklama"
+              label="Açıklama"
               name="personel-surec-aciklama"
               value={surecForm.aciklama}
               onChange={(value) => setSurecForm((prev) => ({ ...prev, aciklama: value }))}
@@ -1254,7 +1254,7 @@ export function PersonelDetayPage() {
                 onClick={closeZimmetModal}
                 disabled={isZimmetSubmitting}
               >
-                Vazgec
+                Vazgeç
               </button>
             </div>
           }
@@ -1262,12 +1262,12 @@ export function PersonelDetayPage() {
           <form id={PERSONEL_ZIMMET_FORM_ID} className="personel-zimmet-form-grid" onSubmit={handleZimmetCreateSubmit}>
             <FormField
               as="select"
-              label="Urun Turu"
+              label="Ürün Türü"
               name="personel-zimmet-urun-turu"
               value={zimmetForm.urunTuru}
               onChange={(value) => setZimmetForm((prev) => ({ ...prev, urunTuru: value }))}
               required
-              placeholderOption={{ value: "", label: "Seciniz" }}
+              placeholderOption={{ value: "", label: "Seçiniz" }}
               selectOptions={[...ZIMMET_URUN_TURU_OPTIONS]}
             />
             <FormField
@@ -1284,7 +1284,7 @@ export function PersonelDetayPage() {
               value={zimmetForm.teslimEden}
               onChange={(value) => setZimmetForm((prev) => ({ ...prev, teslimEden: value }))}
               required
-              placeholder="Bağlı Amir veya IK gorevlisi"
+              placeholder="Bağlı amir veya İK görevlisi"
             />
             <FormField
               as="select"
@@ -1297,7 +1297,7 @@ export function PersonelDetayPage() {
             />
             <FormField
               as="textarea"
-              label="Seri No / Aciklama"
+              label="Seri No / Açıklama"
               name="personel-zimmet-aciklama"
               value={zimmetForm.aciklama}
               onChange={(value) => setZimmetForm((prev) => ({ ...prev, aciklama: value }))}

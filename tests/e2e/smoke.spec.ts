@@ -19,7 +19,7 @@ test.describe("e2e smoke", () => {
     await expect(page.getByRole("heading", { name: "Personeller" })).toBeVisible();
     await expect(page.getByText("Ayse Yilmaz")).toBeVisible();
 
-    await page.getByRole("link", { name: /Ayse Yilmaz.*kisisi kartini ac/i }).first().click();
+    await page.getByRole("link", { name: /Ayse Yilmaz.*kişisinin kartını aç/i }).first().click();
     await expect(page).toHaveURL(/\/personeller\/1$/);
     await expect(page.locator(".modal-header h2").first()).toContainText("Personel Detayı");
 
@@ -72,8 +72,8 @@ test.describe("e2e smoke", () => {
     await expect(amirBildirimModal).toBeVisible();
     await amirBildirimModal.getByLabel("Tarih").fill("2026-04-11");
     await amirBildirimModal.getByLabel("Personel").selectOption("2");
-    await amirBildirimModal.getByLabel("Kayit Senaryosu").selectOption("IZINSIZ_GELMEDI");
-    await amirBildirimModal.getByLabel("Not / Aciklama").fill("Habersiz devamsizlik");
+    await amirBildirimModal.getByLabel("Kayıt Senaryosu").selectOption("IZINSIZ_GELMEDI");
+    await amirBildirimModal.getByLabel("Not / Açıklama").fill("Habersiz devamsizlik");
     await amirBildirimModal.getByRole("button", { name: "Kaydet" }).click();
 
     await expect(page.locator(".bildirimler-list")).toContainText(/[Iİ]zinsiz Gelmedi/i);
@@ -146,13 +146,13 @@ test.describe("e2e smoke", () => {
     await expect(page).toHaveURL(/\/bildirimler$/);
     await expect(page.locator(".modal-header h2").first()).toContainText("Günlük Kayıt Merkezi");
 
-    await page.getByRole("button", { name: "Yeni Gunluk Kayit" }).click();
+    await page.getByRole("button", { name: "Yeni Günlük Kayıt" }).click();
     const bildirimCreateModal = page.locator(".modal-container").last();
     await expect(bildirimCreateModal).toBeVisible();
     await bildirimCreateModal.getByLabel("Tarih").fill("2026-04-11");
     await bildirimCreateModal.getByLabel("Personel").selectOption("1");
-    await bildirimCreateModal.getByLabel("Kayit Senaryosu").selectOption("DEVAMSIZLIK");
-    await bildirimCreateModal.getByLabel("Not / Aciklama").fill("Yeni gunluk kayit");
+    await bildirimCreateModal.getByLabel("Kayıt Senaryosu").selectOption("DEVAMSIZLIK");
+    await bildirimCreateModal.getByLabel("Not / Açıklama").fill("Yeni gunluk kayit");
     await bildirimCreateModal.getByRole("button", { name: "Kaydet" }).click();
 
     await expect(page.locator(".bildirimler-list")).toContainText(/Devams/i);
@@ -160,14 +160,14 @@ test.describe("e2e smoke", () => {
     await page.getByRole("button", { name: /Düzenle|Duzenle/i }).first().click();
     const bildirimEditModal = page.locator(".modal-container").last();
     await expect(bildirimEditModal).toBeVisible();
-    await bildirimEditModal.getByLabel("Kayit Senaryosu").selectOption("RAPORLU");
+    await bildirimEditModal.getByLabel("Kayıt Senaryosu").selectOption("RAPORLU");
     await bildirimEditModal.getByRole("button", { name: "Kaydet" }).click();
 
     await expect(page.locator(".bildirimler-list")).toContainText("Raporlu");
 
     page.once("dialog", (dialog) => void dialog.accept());
     await page.getByRole("button", { name: /İptal|Iptal/i }).first().click();
-    await expect(page.locator(".bildirimler-list")).toContainText(/Kayit Durumu: .*ptal/i);
+    await expect(page.locator(".bildirimler-list")).toContainText(/Kayıt Durumu: .*ptal/i);
 
     await page.goto("/finans");
     await expect(page).toHaveURL(/\/finans$/);

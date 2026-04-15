@@ -22,22 +22,22 @@ export function BildirimDetayPage() {
 
   return (
     <section className="bildirimler-page bildirim-detay-page">
-      <h2>Gunluk Kayit Detayi</h2>
+      <h2>Günlük Kayıt Detayı</h2>
 
-      {isLoading ? <LoadingState label="Gunluk kayit detayi yukleniyor..." /> : null}
+      {isLoading ? <LoadingState label="Günlük kayıt detayı yükleniyor..." /> : null}
 
       {!isLoading && errorMessage ? (
         <ErrorState message={errorMessage} onRetry={() => void refetch()} />
       ) : null}
 
       {!isLoading && !errorMessage && !bildirim ? (
-        <EmptyState title="Gunluk kayit bulunamadi" message="Belirtilen ID ile kayit bulunamadi." />
+        <EmptyState title="Günlük kayıt bulunamadı" message="Belirtilen ID ile kayıt bulunamadı." />
       ) : null}
 
       {!isLoading && !errorMessage && bildirim ? (
         <div className="bildirim-detail-card">
           <p>
-            <strong>Kayit ID:</strong> {bildirim.id}
+            <strong>Kayıt ID:</strong> {bildirim.id}
           </p>
           <p>
             <strong>Tarih:</strong> {bildirim.tarih ?? "-"}
@@ -49,13 +49,13 @@ export function BildirimDetayPage() {
             <strong>Personel ID:</strong> {bildirim.personel_id ?? "-"}
           </p>
           <p>
-            <strong>Kayit Senaryosu:</strong> {preset.label}
+            <strong>Kayıt Senaryosu:</strong> {preset.label}
           </p>
           <p>
-            <strong>Kayit Durumu:</strong> {formatBildirimStateLabel(bildirim.state)}
+            <strong>Kayıt Durumu:</strong> {formatBildirimStateLabel(bildirim.state)}
           </p>
           <p>
-            <strong>Gun Tipi:</strong> {formatGunlukKayitGunTipi(preset.gunTipi)}
+            <strong>Gün Tipi:</strong> {formatGunlukKayitGunTipi(preset.gunTipi)}
           </p>
           <p>
             <strong>Hareket Durumu:</strong> {formatGunlukKayitHareketDurumu(preset.hareketDurumu)}
@@ -67,14 +67,14 @@ export function BildirimDetayPage() {
             <strong>Hesap Etkisi:</strong> {formatGunlukKayitHesapEtkisi(preset.hesapEtkisi)}
           </p>
           <p>
-            <strong>Aciklama:</strong> {bildirim.aciklama ?? "-"}
+            <strong>Açıklama:</strong> {bildirim.aciklama ?? "-"}
           </p>
         </div>
       ) : null}
 
       <div className="module-links">
-        <Link to="/surecler">Surec takibe git</Link>
-        <Link to="/puantaj">Puantaj ekranina git</Link>
+        <Link to="/surecler">Süreç takibe git</Link>
+        <Link to="/puantaj">Puantaj ekranına git</Link>
       </div>
     </section>
   );

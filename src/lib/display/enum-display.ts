@@ -18,8 +18,8 @@ const UI_PROFILE_LABELS: Record<UiProfile, string> = {
 };
 
 const PERSONEL_DURUM_LABELS: Record<string, string> = {
-  AKTIF: "Calisiyor",
-  PASIF: "Ayrildi"
+  AKTIF: "Çalışıyor",
+  PASIF: "Ayrıldı"
 };
 
 const SUREC_TURU_LABELS: Record<string, string> = {
@@ -93,34 +93,34 @@ const COMPLIANCE_LEVEL_LABELS: Record<string, string> = {
 
 const ISG_MAKINE_DURUM_LABELS: Record<string, string> = {
   AKTIF: "Aktif",
-  ARIZALI: "Arizali",
+  ARIZALI: "Arızalı",
   PASIF: "Pasif"
 };
 
 const ISG_BAKIM_DURUM_LABELS: Record<string, string> = {
-  GUNCEL: "Guncel",
-  GECIKMIS: "Gecikmis",
+  GUNCEL: "Güncel",
+  GECIKMIS: "Gecikmiş",
   EKSIK_VERI: "Eksik Veri"
 };
 
 const ZIMMET_URUN_TURU_LABELS: Record<string, string> = {
-  AYAKKABI: "Ayakkabi",
+  AYAKKABI: "Ayakkabı",
   KASK: "Kask",
-  KULAKLIK: "Kulaklik",
+  KULAKLIK: "Kulaklık",
   MASKE: "Maske",
   TELEFON: "Telefon",
-  DIGER: "Diger"
+  DIGER: "Diğer"
 };
 
 const ZIMMET_TESLIM_DURUMU_LABELS: Record<string, string> = {
   YENI: "Yeni",
-  IKINCI_EL: "Ikinci El",
-  ARIZALI: "Arizali"
+  IKINCI_EL: "İkinci El",
+  ARIZALI: "Arızalı"
 };
 
 const ZIMMET_KAYIT_DURUMU_LABELS: Record<string, string> = {
   AKTIF: "Aktif Zimmet",
-  IADE_EDILDI: "Iade Edildi"
+  IADE_EDILDI: "İade Edildi"
 };
 
 const SPECIAL_TOKEN_LABELS: Record<string, string> = {

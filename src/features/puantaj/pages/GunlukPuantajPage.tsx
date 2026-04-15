@@ -18,7 +18,7 @@ import type {
 } from "../../../types/puantaj";
 
 const GUN_TIPI_OPTIONS: Array<{ value: PuantajGunTipi; label: string }> = [
-  { value: "Normal_Is_Gunu", label: "Normal Is Gunu" },
+  { value: "Normal_Is_Gunu", label: "Normal İş Günü" },
   { value: "Hafta_Tatili_Pazar", label: "Hafta Tatili Pazar" },
   { value: "UBGT_Resmi_Tatil", label: "UBGT Resmi Tatil" }
 ];
@@ -26,17 +26,17 @@ const GUN_TIPI_OPTIONS: Array<{ value: PuantajGunTipi; label: string }> = [
 const HAREKET_DURUMU_OPTIONS: Array<{ value: PuantajHareketDurumu; label: string }> = [
   { value: "Geldi", label: "Geldi" },
   { value: "Gelmedi", label: "Gelmedi" },
-  { value: "Gec_Geldi", label: "Gec Geldi" },
-  { value: "Erken_Cikti", label: "Erken Cikti" }
+  { value: "Gec_Geldi", label: "Geç Geldi" },
+  { value: "Erken_Cikti", label: "Erken Çıktı" }
 ];
 
 const DAYANAK_OPTIONS: Array<{ value: PuantajDayanak; label: string }> = [
-  { value: "Yok_Izinsiz", label: "Yok / Izinsiz" },
-  { value: "Ucretli_Izinli", label: "Ucretli Izinli" },
-  { value: "Raporlu_Hastalik", label: "Raporlu Hastalik" },
-  { value: "Raporlu_Is_Kazasi", label: "Raporlu Is Kazasi" },
-  { value: "Yillik_Izin", label: "Yillik Izin" },
-  { value: "Telafi_Calismasi", label: "Telafi Calismasi" }
+  { value: "Yok_Izinsiz", label: "Yok / İzinsiz" },
+  { value: "Ucretli_Izinli", label: "Ücretli İzinli" },
+  { value: "Raporlu_Hastalik", label: "Raporlu Hastalık" },
+  { value: "Raporlu_Is_Kazasi", label: "Raporlu İş Kazası" },
+  { value: "Yillik_Izin", label: "Yıllık İzin" },
+  { value: "Telafi_Calismasi", label: "Telafi Çalışması" }
 ];
 
 const GUN_TIPI_LABELS: Record<PuantajGunTipi, string> = Object.fromEntries(
@@ -83,11 +83,11 @@ function formatDakikaValue(value: number | null | undefined) {
 
 function formatHakKazanimi(value: boolean | null | undefined) {
   if (value === true) {
-    return "Hak Kazandi";
+    return "Hak Kazandı";
   }
 
   if (value === false) {
-    return "Hak Kazanmadi";
+    return "Hak Kazanmadı";
   }
 
   return "-";
@@ -150,7 +150,7 @@ export function GunlukPuantajPage() {
   const handleMuhurleConfirm = useCallback(async () => {
     const match = /^(\d{4})-(\d{2})$/.exec(muhurDonem);
     if (!match) {
-      setMuhurHata("Gecerli bir donem seciniz (YYYY-AA).");
+      setMuhurHata("Geçerli bir dönem seçiniz (YYYY-AA).");
       return;
     }
 
@@ -163,12 +163,12 @@ export function GunlukPuantajPage() {
         yil: Number.parseInt(match[1], 10),
         ay: Number.parseInt(match[2], 10)
       });
-      setMuhurSonuc(`${result.donem} donemi icin ${result.muhurlenen_kayit_sayisi} kayit muhurlendi.`);
+      setMuhurSonuc(`${result.donem} dönemi için ${result.muhurlenen_kayit_sayisi} kayıt mühürlendi.`);
       if (activeQuery) {
         void refetchActive();
       }
     } catch {
-      setMuhurHata("Muhurleme islemi basarisiz oldu. Lutfen tekrar deneyin.");
+      setMuhurHata("Mühürleme işlemi başarısız oldu. Lütfen tekrar deneyin.");
     } finally {
       setIsMuhurlemeSending(false);
     }
@@ -209,7 +209,7 @@ export function GunlukPuantajPage() {
   return (
     <section className="puantaj-page">
       <div className="puantaj-header-row">
-        <h2>Gunluk Kayit ve Puantaj</h2>
+        <h2>Günlük Kayıt ve Puantaj</h2>
       </div>
 
       <form className="form-filter-panel" onSubmit={handleQuerySubmit}>
@@ -235,7 +235,7 @@ export function GunlukPuantajPage() {
 
         <div className="form-actions-row">
           <button type="submit" className="universal-btn-aux" disabled={isLoading}>
-            Kaydi Getir
+            Kaydı Getir
           </button>
           <button type="button" className="universal-btn-aux" onClick={clearQuery} disabled={isLoading}>
             Temizle
@@ -243,7 +243,7 @@ export function GunlukPuantajPage() {
         </div>
       </form>
 
-      {isLoading ? <LoadingState label="Puantaj verisi yukleniyor..." /> : null}
+      {isLoading ? <LoadingState label="Puantaj verisi yükleniyor..." /> : null}
 
       {!isLoading && errorMessage ? (
         <ErrorState
@@ -254,8 +254,8 @@ export function GunlukPuantajPage() {
 
       {!isLoading && !errorMessage && activeQuery && !puantaj ? (
         <EmptyState
-          title="Kayit bulunamadi"
-          message="Secilen gun icin puantaj kaydi yok. Formu doldurarak gunluk kaydi olusturabilirsin."
+          title="Kayıt bulunamadı"
+          message="Seçilen gün için puantaj kaydı yok. Formu doldurarak günlük kaydı oluşturabilirsin."
         />
       ) : null}
 
@@ -264,8 +264,8 @@ export function GunlukPuantajPage() {
           <div className="form-field-grid">
             <ReadonlyField label="Personel ID" value={String(puantaj.personel_id)} />
             <ReadonlyField label="Tarih" value={puantaj.tarih} />
-            <ReadonlyField label="Kayit Durumu" value={formatPuantajStateLabel(puantaj.state)} />
-            <ReadonlyField label="Gun Tipi" value={formatMappedValue(puantaj.gun_tipi, GUN_TIPI_LABELS)} />
+            <ReadonlyField label="Kayıt Durumu" value={formatPuantajStateLabel(puantaj.state)} />
+            <ReadonlyField label="Gün Tipi" value={formatMappedValue(puantaj.gun_tipi, GUN_TIPI_LABELS)} />
             <ReadonlyField
               label="Hareket Durumu"
               value={formatMappedValue(puantaj.hareket_durumu, HAREKET_DURUMU_LABELS)}
@@ -276,13 +276,13 @@ export function GunlukPuantajPage() {
               value={formatMappedValue(puantaj.hesap_etkisi, HESAP_ETKISI_LABELS)}
             />
             <ReadonlyField
-              label="Hafta Tatili Hakki"
+              label="Hafta Tatili Hakkı"
               value={formatHakKazanimi(puantaj.hafta_tatili_hak_kazandi_mi)}
             />
-            <ReadonlyField label="Giris Saati" value={formatSaatValue(puantaj.giris_saati)} />
-            <ReadonlyField label="Cikis Saati" value={formatSaatValue(puantaj.cikis_saati)} />
+            <ReadonlyField label="Giriş Saati" value={formatSaatValue(puantaj.giris_saati)} />
+            <ReadonlyField label="Çıkış Saati" value={formatSaatValue(puantaj.cikis_saati)} />
             <ReadonlyField
-              label="Gercek Mola (dk)"
+              label="Gerçek Mola (dk)"
               value={formatDakikaValue(puantaj.gercek_mola_dakika)}
             />
             <ReadonlyField
@@ -290,11 +290,11 @@ export function GunlukPuantajPage() {
               value={formatDakikaValue(puantaj.hesaplanan_mola_dakika)}
             />
             <ReadonlyField
-              label="Net Calisma (dk)"
+              label="Net Çalışma (dk)"
               value={formatDakikaValue(puantaj.net_calisma_suresi_dakika)}
             />
             <ReadonlyField
-              label="Gunluk Brut Sure (dk)"
+              label="Günlük Brüt Süre (dk)"
               value={formatDakikaValue(puantaj.gunluk_brut_sure_dakika)}
             />
           </div>
@@ -312,13 +312,13 @@ export function GunlukPuantajPage() {
       ) : null}
 
       <div className="puantaj-edit-card">
-        <h3>Gunluk Kayit Girisi</h3>
+        <h3>Günlük Kayıt Girişi</h3>
 
         <form className="puantaj-form-grid" onSubmit={handlePuantajSubmit}>
           <div className="form-field-grid">
             <FormField
               as="select"
-              label="Gun Tipi"
+              label="Gün Tipi"
               name="puantaj-gun-tipi"
               value={formState.entryGunTipi}
               onChange={(value) => patchFormState({ entryGunTipi: value as PuantajGunTipi })}
@@ -332,7 +332,7 @@ export function GunlukPuantajPage() {
               value={formState.entryHareketDurumu}
               onChange={(value) => patchFormState({ entryHareketDurumu: value as PuantajHareketDurumu | "" })}
               selectOptions={HAREKET_DURUMU_OPTIONS}
-              placeholderOption={{ value: "", label: "Seciniz" }}
+              placeholderOption={{ value: "", label: "Seçiniz" }}
               required
             />
             <FormField
@@ -348,7 +348,7 @@ export function GunlukPuantajPage() {
 
           <div className="form-field-grid">
             <FormField
-              label="Giris Saati"
+              label="Giriş Saati"
               name="puantaj-giris"
               type="time"
               value={formState.entryGirisSaati}
@@ -357,7 +357,7 @@ export function GunlukPuantajPage() {
               disabled={!entryRequiresSaatBilgisi}
             />
             <FormField
-              label="Cikis Saati"
+              label="Çıkış Saati"
               name="puantaj-cikis"
               type="time"
               value={formState.entryCikisSaati}
@@ -366,7 +366,7 @@ export function GunlukPuantajPage() {
               disabled={!entryRequiresSaatBilgisi}
             />
             <FormField
-              label="Gercek Mola (dk)"
+              label="Gerçek Mola (dk)"
               name="puantaj-mola"
               type="number"
               min={0}
@@ -378,17 +378,17 @@ export function GunlukPuantajPage() {
 
           {!entryRequiresSaatBilgisi ? (
             <p className="puantaj-form-readonly">
-              Bu hareket durumu icin saat bilgisi zorunlu degil. Sistem puantaji gun tipi ve dayanakla okur.
+              Bu hareket durumu için saat bilgisi zorunlu değil. Sistem puantajı gün tipi ve dayanakla okur.
             </p>
           ) : null}
 
           {submitErrorMessage ? <p className="puantaj-form-error">{submitErrorMessage}</p> : null}
           {isMuhurlendi ? (
             <p className="puantaj-form-readonly puantaj-muhur-uyari" data-testid="muhur-uyari">
-              Bu kayit muhurlenistir ve duzenlenemez.
+              Bu kayıt mühürlenmiştir ve düzenlenemez.
             </p>
           ) : !canUpdatePuantaj ? (
-            <p className="puantaj-form-readonly">Bu modulu sadece goruntuleme yetkin var.</p>
+            <p className="puantaj-form-readonly">Bu modülü sadece görüntüleme yetkin var.</p>
           ) : null}
 
           <div className="form-actions-row">
@@ -416,7 +416,7 @@ export function GunlukPuantajPage() {
               setMuhurHata(null);
             }}
           >
-            Ayi Kapat / Muhurle
+            Ayı Kapat / Mühürle
           </button>
         </div>
       ) : null}
@@ -424,14 +424,14 @@ export function GunlukPuantajPage() {
       {isMuhurModalOpen ? (
         <AppModal
           onClose={() => setIsMuhurModalOpen(false)}
-          title="Aylik Puantaj Muhurle"
+          title="Aylık Puantaj Mühürle"
         >
           <div className="muhur-modal-content" data-testid="muhur-modal">
           <p className="muhur-modal-uyari">
-            <strong>Dikkat:</strong> Bu islem geri alinamaz. Muhurlenen kayitlar degistirilemez ve silinemez.
+            <strong>Dikkat:</strong> Bu işlem geri alınamaz. Mühürlenmiş kayıtlar değiştirilemez ve silinemez.
           </p>
           <FormField
-            label="Donem (Yil-Ay)"
+            label="Dönem (Yıl-Ay)"
             name="muhur-donem"
             type="month"
             value={muhurDonem}
@@ -448,14 +448,14 @@ export function GunlukPuantajPage() {
               data-testid="muhur-onayla-btn"
               onClick={() => void handleMuhurleConfirm()}
             >
-              {isMuhurlemeSending ? "Muhurleniyor..." : "Onayla ve Muhurle"}
+              {isMuhurlemeSending ? "Mühürleniyor..." : "Onayla ve Mühürle"}
             </button>
             <button
               type="button"
               className="universal-btn-aux"
               onClick={() => setIsMuhurModalOpen(false)}
             >
-              Vazgec
+              Vazgeç
             </button>
           </div>
         </div>
@@ -463,7 +463,7 @@ export function GunlukPuantajPage() {
       ) : null}
 
       <div className="module-links">
-        <Link to="/surecler">Surec takibe don</Link>
+        <Link to="/surecler">Süreç takibe dön</Link>
       </div>
     </section>
   );

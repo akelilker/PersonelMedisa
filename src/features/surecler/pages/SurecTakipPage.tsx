@@ -268,7 +268,7 @@ export function SurecTakipPage() {
 
       <div className="module-links">
         <Link to="/">Ana ekrana dön</Link>
-        <Link to="/bildirimler">Gunluk kayit merkezine git</Link>
+        <Link to="/bildirimler">Günlük kayıt merkezine git</Link>
         <Link to="/puantaj">Puantaja git</Link>
       </div>
 

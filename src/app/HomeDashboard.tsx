@@ -119,7 +119,7 @@ export function HomeDashboard() {
       </div>
 
       <div className="dashboard-section">
-        <h3 className="dashboard-section-title">Personel Ozeti</h3>
+        <h3 className="dashboard-section-title">Personel Özeti</h3>
         <div className="dashboard-kpi-grid" data-testid="dashboard-kpi-grid">
           <KpiCard label="Toplam Personel" value={kpi.toplam_personel} />
           <KpiCard label="Aktif Personel" value={kpi.aktif_personel} variant="success" />
@@ -128,27 +128,27 @@ export function HomeDashboard() {
       </div>
 
       <div className="dashboard-section">
-        <h3 className="dashboard-section-title">Puantaj Ozeti</h3>
+        <h3 className="dashboard-section-title">Puantaj Özeti</h3>
         <div className="dashboard-kpi-grid">
-          <KpiCard label="Muhurlu Puantaj" value={kpi.toplam_muhurlenen_puantaj} variant="success" />
-          <KpiCard label="Acik Puantaj" value={kpi.toplam_acik_puantaj} variant={kpi.toplam_acik_puantaj > 0 ? "warning" : undefined} />
-          <KpiCard label="Izinsiz Devamsizlik" value={kpi.toplam_izinsiz_devamsizlik} variant={kpi.toplam_izinsiz_devamsizlik > 0 ? "danger" : undefined} />
-          <KpiCard label="Hafta Tatili Hak Kaybi" value={kpi.hafta_tatili_hak_kaybi_sayisi} variant={kpi.hafta_tatili_hak_kaybi_sayisi > 0 ? "danger" : undefined} />
+          <KpiCard label="Mühürlü Puantaj" value={kpi.toplam_muhurlenen_puantaj} variant="success" />
+          <KpiCard label="Açık Puantaj" value={kpi.toplam_acik_puantaj} variant={kpi.toplam_acik_puantaj > 0 ? "warning" : undefined} />
+          <KpiCard label="İzinsiz Devamsızlık" value={kpi.toplam_izinsiz_devamsizlik} variant={kpi.toplam_izinsiz_devamsizlik > 0 ? "danger" : undefined} />
+          <KpiCard label="Hafta Tatili Hak Kaybı" value={kpi.hafta_tatili_hak_kaybi_sayisi} variant={kpi.hafta_tatili_hak_kaybi_sayisi > 0 ? "danger" : undefined} />
         </div>
       </div>
 
       <div className="dashboard-section">
-        <h3 className="dashboard-section-title">Calisma ve Izin</h3>
+        <h3 className="dashboard-section-title">Çalışma ve İzin</h3>
         <div className="dashboard-kpi-grid">
-          <KpiCard label="Toplam Net Calisma" value={formatDakikaToSaat(kpi.toplam_net_calisma_dakika)} />
-          <KpiCard label="Ortalama Gunluk Net" value={formatDakikaToSaat(kpi.ortalama_gunluk_net_calisma_dakika)} />
-          <KpiCard label="Ortalama Kalan Izin" value={`${kpi.ortalama_kalan_izin} gun`} />
+          <KpiCard label="Toplam Net Çalışma" value={formatDakikaToSaat(kpi.toplam_net_calisma_dakika)} />
+          <KpiCard label="Ortalama Günlük Net" value={formatDakikaToSaat(kpi.ortalama_gunluk_net_calisma_dakika)} />
+          <KpiCard label="Ortalama Kalan İzin" value={`${kpi.ortalama_kalan_izin} gün`} />
         </div>
       </div>
 
       <div className="module-links">
-        <Link to="/puantaj">Gunluk Kayit Merkezi</Link>
-        <Link to="/surecler">Surec Takip</Link>
+        <Link to="/puantaj">Günlük Kayıt Merkezi</Link>
+        <Link to="/surecler">Süreç Takip</Link>
         <Link to="/personeller">Personel Listesi</Link>
       </div>
     </section>

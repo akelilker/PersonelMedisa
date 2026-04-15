@@ -467,6 +467,10 @@ function buildPersonelUpdatePayload(
     telefon: editForm.telefon.trim()
   };
 
+  if (!hasLifecycleDiff) {
+    return payload;
+  }
+
   const setOptionalId = (
     key: "departman_id" | "gorev_id" | "bagli_amir_id" | "prim_kurali_id",
     raw: string
@@ -499,9 +503,7 @@ function buildPersonelUpdatePayload(
     payload.maas_tutari = Number.isFinite(parsed) ? parsed : null;
   }
 
-  if (hasLifecycleDiff) {
-    payload.effective_date = editForm.effectiveDate.trim();
-  }
+  payload.effective_date = editForm.effectiveDate.trim();
 
   return payload;
 }
@@ -573,14 +575,6 @@ function draftSurecFromPayload(personelId: number, form: PersonelSurecFormState,
     bitis_tarihi: form.bitisTarihi.trim() || undefined,
     aciklama: form.aciklama.trim() || undefined,
     state: "BEKLEMEDE"
-  };
-}
-
-function applyTerminationToPersonel(personel: Personel): Personel {
-  return {
-    ...personel,
-    aktif_durum: "PASIF",
-    pasiflik_durumu_etiketi: "Isten Ayrildi"
   };
 }
 
@@ -1128,9 +1122,15 @@ export function usePersonelDetail(
           });
 
           if (payload.surec_turu === "ISTEN_AYRILMA") {
-            const nextPersonel = applyTerminationToPersonel(personel);
-            mergeCacheEntry<Personel>(detailKey, () => nextPersonel);
-            setPersonel(nextPersonel);
+            try {
+              const refreshed = await fetchWithCacheMerge(detailKey, () =>
+                runDeduped(detailKey, () => fetchPersonelDetail(parsedPersonelId))
+              );
+              setPersonel(refreshed);
+              setEditForm(personelToEditForm(refreshed));
+            } catch {
+              // Personel yenilenemedi; mevcut kart korunur.
+            }
           }
 
           setIsSurecModalOpen(false);
@@ -1155,12 +1155,6 @@ export function usePersonelDetail(
             meta: { listKey: surecHistoryKey, tempId }
           });
 
-          if (payload.surec_turu === "ISTEN_AYRILMA") {
-            const nextPersonel = applyTerminationToPersonel(personel);
-            mergeCacheEntry<Personel>(detailKey, () => nextPersonel);
-            setPersonel(nextPersonel);
-          }
-
           setIsSurecModalOpen(false);
           setSurecForm(INITIAL_PERSONEL_SUREC_FORM);
           void processSyncQueue();
@@ -1171,7 +1165,7 @@ export function usePersonelDetail(
         setIsSurecSubmitting(false);
       }
     },
-    [canCreateSurec, detailKey, isSurecSubmitting, personel, surecForm, surecHistoryKey]
+    [canCreateSurec, detailKey, isSurecSubmitting, parsedPersonelId, personel, surecForm, surecHistoryKey]
   );
 
   const createZimmetHandler = useCallback(

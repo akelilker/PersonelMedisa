@@ -29,6 +29,11 @@ async function fulfillJson(route: Route, status: number, body: string) {
 }
 
 export async function mockApi(page: Page, role: MockUserRole) {
+  const bagliAmirReferanslari: Array<{ id: number; ad: string; sube_id: number; departman_id: number }> = [
+    { id: 9, ad: "Demo Amir", sube_id: 1, departman_id: 3 },
+    { id: 10, ad: "Ikinci Amir", sube_id: 2, departman_id: 6 }
+  ];
+
   const personeller: Array<{
     id: number;
     tc_kimlik_no: string;
@@ -709,6 +714,10 @@ let bildirimIdCounter = 800;
       target.prim_kurali_adi =
         primKuraliReferans.find((x) => x.id === target.prim_kurali_id)?.ad ?? target.prim_kurali_adi;
     }
+    if (target.bagli_amir_id !== undefined) {
+      target.bagli_amir_adi =
+        bagliAmirReferanslari.find((item) => item.id === target.bagli_amir_id)?.ad ?? target.bagli_amir_adi;
+    }
   }
 
   function buildAylikOzetResponse(searchUrl: URL) {
@@ -1042,8 +1051,46 @@ let bildirimIdCounter = 800;
     if (path.match(/^\/api\/personeller\/\d+$/) && method === "GET") {
       const personelId = Number.parseInt(path.split("/")[3] ?? "0", 10);
       const personel = personeller.find((item) => item.id === personelId);
-      if (!personel) {
+      const bagliAmir = bagliAmirReferanslari.find((item) => item.id === personelId);
+
+      if (!personel && !bagliAmir) {
         await fulfillJson(route, 404, errorBody("NOT_FOUND", "Personel bulunamadi."));
+        return;
+      }
+
+      if (!personel && bagliAmir) {
+        await fulfillJson(
+          route,
+          200,
+          okBody({
+            ana_kart: {
+              id: bagliAmir.id,
+              tc_kimlik_no: "00000000000",
+              ad: bagliAmir.ad,
+              soyad: "",
+              aktif_durum: "AKTIF",
+              sube_id: bagliAmir.sube_id,
+              departman_id: bagliAmir.departman_id
+            },
+            sistem_ozeti: {
+              hizmet_suresi: "-",
+              toplam_izin_hakki: 0,
+              kullanilan_izin: 0,
+              kalan_izin: 0
+            },
+            pasiflik_durumu: {
+              aktif_durum: "AKTIF",
+              etiket: null
+            },
+            referans_adlari: {
+              sube: subeler.find((sube) => sube.id === bagliAmir.sube_id)?.ad ?? "-",
+              departman: getDepartmanLabel(bagliAmir.departman_id),
+              gorev: "Birim Amiri",
+              personel_tipi: "-",
+              bagli_amir: null
+            }
+          })
+        );
         return;
       }
 
@@ -1460,7 +1507,7 @@ let bildirimIdCounter = 800;
       }
 
       if (path === "/api/referans/bagli-amirler") {
-        await fulfillJson(route, 200, okBody([{ id: 9, ad: "Demo Amir" }]));
+        await fulfillJson(route, 200, okBody(bagliAmirReferanslari.map(({ id, ad }) => ({ id, ad }))));
         return;
       }
 

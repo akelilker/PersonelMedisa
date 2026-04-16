@@ -56,6 +56,12 @@ const YONETIM_TIMELINE_SUREC_TYPES = new Set([
   "SUBE_YETKISI_DEGISTI"
 ]);
 
+const BAGLI_AMIR_TIMELINE_SUREC_TYPES = new Set([
+  "BAGLI_AMIR_ATANDI",
+  "BAGLI_AMIR_DEGISTI",
+  "BAGLI_AMIR_ATAMASI_KALDIRILDI"
+]);
+
 function formatDetailValue(value: string | null | undefined) {
   if (typeof value !== "string") {
     return "-";
@@ -64,7 +70,6 @@ function formatDetailValue(value: string | null | undefined) {
   const trimmed = value.trim();
   return trimmed ? trimmed : "-";
 }
-
 function formatDetailNumber(value: number | null | undefined) {
   return typeof value === "number" ? String(value) : "-";
 }
@@ -156,6 +161,10 @@ function buildSurecOzet(surec: Surec) {
   const surecTuru = surec.surec_turu.trim().toUpperCase();
   if (YONETIM_TIMELINE_SUREC_TYPES.has(surecTuru)) {
     return "Yönetim panelinden rol ve yetki güncellemesi kaydedildi.";
+  }
+
+  if (BAGLI_AMIR_TIMELINE_SUREC_TYPES.has(surecTuru)) {
+    return "Personelin bagli amir iliskisi guncellendi.";
   }
 
   const parts = [

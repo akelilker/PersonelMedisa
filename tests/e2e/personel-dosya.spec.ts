@@ -116,6 +116,31 @@ test.describe("personel dosyasi surec akisi", () => {
     await expect(timeline.locator("li").first()).toContainText(/Org/i);
   });
 
+  test("yonetici bagli amiri degistirdiginde ozel timeline olayi uretir", async ({ page }) => {
+    await mockApi(page, "GENEL_YONETICI");
+
+    await login(page, { username: "yonetici", password: "secret" });
+
+    await page.getByTestId("menu-personel-karti").click();
+    await expect(page).toHaveURL(/\/personeller$/);
+
+    await page.locator('a[href="/personeller/1"]').first().click();
+    await expect(page).toHaveURL(/\/personeller\/1$/);
+
+    await page.getByRole("button", { name: "Islemler" }).click();
+    await page.locator(".personel-dosya-action-menu button").last().click();
+
+    await page.locator('[name="edit-bagli-amir"]').selectOption("10");
+    await page.locator('[name="edit-effective-date"]').fill("2026-06-15");
+    await page.getByRole("button", { name: "Kaydet" }).click();
+
+    await page.locator("#personel-kart-tab-surec-gecmisi").click();
+    const timeline = page.locator("#personel-kart-panel-surec-gecmisi").locator("[data-testid='personel-surec-timeline']");
+    await expect(timeline).toContainText(/Amir/i);
+    await expect(timeline).toContainText(/Demo Amir/i);
+    await expect(timeline).toContainText(/Ikinci Amir/i);
+  });
+
   test("yonetici izlenen org alanlarina dokunmadan kaydettiginde otomatik surec olusmaz", async ({ page }) => {
     await mockApi(page, "GENEL_YONETICI");
 

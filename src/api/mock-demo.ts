@@ -551,7 +551,8 @@ const DEMO_PERSONEL_TIPI_LABELS: Record<number, string> = {
 };
 
 const DEMO_BAGLI_AMIR_LABELS: Record<number, string> = {
-  1: "Demo Amir"
+  1: "Demo Amir",
+  2: "Ikinci Amir"
 };
 
 function toRecord(value: unknown): Record<string, unknown> | null {
@@ -1800,7 +1801,10 @@ export function resolveDemoApiResponse(
     }
 
     if (pathname === "/referans/bagli-amirler") {
-      return ok([{ id: 1, ad: "Demo Amir" }]);
+      return ok([
+        { id: 1, ad: "Demo Amir" },
+        { id: 2, ad: "Ikinci Amir" }
+      ]);
     }
 
     if (pathname === "/referans/ucret-tipleri") {

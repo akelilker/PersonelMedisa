@@ -18,7 +18,7 @@ import {
   fetchSurecTuruOptions,
   fetchUcretTipiOptions
 } from "../api/referans.api";
-import { createSurec, fetchSureclerList } from "../api/surecler.api";
+import { createSurec, fetchSureclerList, type CreateSurecPayload } from "../api/surecler.api";
 import { createZimmet, fetchZimmetlerList } from "../api/zimmetler.api";
 import { emptyPaginated, makeTempId, type PersonelReferenceBundle } from "../data/app-data.types";
 import {
@@ -35,6 +35,7 @@ import {
   processSyncQueue,
   useAppDataRevision
 } from "../data/data-manager";
+import type { IdOption } from "../types/referans";
 import {
   SUBE_DETAIL_REDIRECT_MESSAGE,
   SUBE_DETAIL_REDIRECT_STATE_KEY,
@@ -132,6 +133,10 @@ type BagliAmirFormGuidance = {
   departmanWarning: string | null;
 };
 
+const BAGLI_AMIR_ATANDI_SUREC_TURU = "BAGLI_AMIR_ATANDI";
+const BAGLI_AMIR_DEGISTI_SUREC_TURU = "BAGLI_AMIR_DEGISTI";
+const BAGLI_AMIR_ATAMASI_KALDIRILDI_SUREC_TURU = "BAGLI_AMIR_ATAMASI_KALDIRILDI";
+
 function buildBagliAmirContext(personel: Personel): BagliAmirContext {
   return {
     personelId: personel.id,
@@ -185,6 +190,75 @@ function buildBagliAmirFormGuidance(
     subeWarning,
     departmanWarning
   };
+}
+
+function resolveBagliAmirLabel(
+  amirId: number | null,
+  options: IdOption[],
+  fallback?: string | null
+): string {
+  if (typeof fallback === "string" && fallback.trim()) {
+    return fallback.trim();
+  }
+
+  if (typeof amirId !== "number") {
+    return "-";
+  }
+
+  const option = options.find((item) => item.id === amirId);
+  return option?.label ?? `#${amirId}`;
+}
+
+function buildBagliAmirSurecPayloads(
+  previousPersonel: Personel,
+  updatedPersonel: Personel,
+  effectiveDate: string,
+  options: IdOption[]
+): CreateSurecPayload[] {
+  const previousAmirId = previousPersonel.bagli_amir_id ?? null;
+  const nextAmirId = updatedPersonel.bagli_amir_id ?? null;
+
+  if (previousAmirId === nextAmirId) {
+    return [];
+  }
+
+  const previousAmirLabel = resolveBagliAmirLabel(
+    previousAmirId,
+    options,
+    previousPersonel.bagli_amir_adi ?? null
+  );
+  const nextAmirLabel = resolveBagliAmirLabel(nextAmirId, options, updatedPersonel.bagli_amir_adi ?? null);
+
+  if (previousAmirId === null && nextAmirId !== null) {
+    return [
+      {
+        personel_id: updatedPersonel.id,
+        surec_turu: BAGLI_AMIR_ATANDI_SUREC_TURU,
+        baslangic_tarihi: effectiveDate,
+        aciklama: `Yeni Amir: ${nextAmirLabel}`
+      }
+    ];
+  }
+
+  if (previousAmirId !== null && nextAmirId === null) {
+    return [
+      {
+        personel_id: updatedPersonel.id,
+        surec_turu: BAGLI_AMIR_ATAMASI_KALDIRILDI_SUREC_TURU,
+        baslangic_tarihi: effectiveDate,
+        aciklama: `Eski Amir: ${previousAmirLabel}`
+      }
+    ];
+  }
+
+  return [
+    {
+      personel_id: updatedPersonel.id,
+      surec_turu: BAGLI_AMIR_DEGISTI_SUREC_TURU,
+      baslangic_tarihi: effectiveDate,
+      aciklama: `Eski Amir: ${previousAmirLabel} / Yeni Amir: ${nextAmirLabel}`
+    }
+  ];
 }
 
 export function usePersoneller() {
@@ -1257,6 +1331,37 @@ export function usePersonelDetail(
         setPersonel(updated);
         setEditForm(personelToEditForm(updated));
         setIsEditing(false);
+
+        if (hasLifecycleDiff && editForm.effectiveDate.trim()) {
+          const bagliAmirSurecPayloads = buildBagliAmirSurecPayloads(
+            previousPersonel,
+            updated,
+            editForm.effectiveDate.trim(),
+            personelRefs.bagliAmirOptions
+          );
+
+          if (bagliAmirSurecPayloads.length > 0) {
+            const settled = await Promise.allSettled(
+              bagliAmirSurecPayloads.map((payload) => createSurec(payload))
+            );
+
+            const createdBagliAmirSurecleri = settled
+              .filter(
+                (result): result is PromiseFulfilledResult<Surec> => result.status === "fulfilled"
+              )
+              .map((result) => result.value);
+
+            if (createdBagliAmirSurecleri.length > 0) {
+              mergeCacheEntry<PaginatedResult<Surec>>(surecHistoryKey, (prev) => {
+                const base = prev ?? emptyPaginated<Surec>();
+                return {
+                  ...base,
+                  items: sortSurecHistoryDescending([...createdBagliAmirSurecleri, ...base.items])
+                };
+              });
+            }
+          }
+        }
 
         if (canAccessSurecler) {
           void fetchWithCacheMerge(surecHistoryKey, () =>

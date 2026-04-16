@@ -8,6 +8,7 @@ import { LoadingState } from "../../../components/states/LoadingState";
 import { fetchPersonellerList } from "../../../api/personeller.api";
 import { createDepartmanOption, fetchDepartmanOptions } from "../../../api/referans.api";
 import {
+  createSurec,
   createYonetimKullanici,
   createYonetimSube,
   fetchYonetimKullanicilari,
@@ -18,6 +19,7 @@ import {
 import type { UserRole } from "../../../types/auth";
 import type { Personel } from "../../../types/personel";
 import type { IdOption } from "../../../types/referans";
+import type { CreateSurecPayload } from "../../../api/surecler.api";
 import type {
   KayitDurumu,
   KullaniciTipi,
@@ -86,6 +88,9 @@ const INITIAL_SUBE_FORM: SubeFormState = {
 
 const YONETIM_KULLANICI_FORM_ID = "yonetim-kullanici-form";
 const YONETIM_SUBE_FORM_ID = "yonetim-sube-form";
+const BIRIM_AMIRI_ATANDI_SUREC_TURU = "BIRIM_AMIRI_ATANDI";
+const BIRIM_AMIRI_ATAMASI_KALDIRILDI_SUREC_TURU = "BIRIM_AMIRI_ATAMASI_KALDIRILDI";
+const SUBE_YETKISI_DEGISTI_SUREC_TURU = "SUBE_YETKISI_DEGISTI";
 
 function roleOptions() {
   return Object.entries(ROLE_LABELS).map(([value, label]) => ({ value, label }));
@@ -181,6 +186,85 @@ function formatSubeScopeLabel(subeIds: number[], subeNameMap: Map<number, string
   }
 
   return subeIds.map((subeId) => subeNameMap.get(subeId) ?? `Şube ${subeId}`).join(", ");
+}
+
+function normalizeNumberArray(values: number[]) {
+  return [...values].sort((left, right) => left - right);
+}
+
+function areSameNumberArrays(left: number[], right: number[]) {
+  const normalizedLeft = normalizeNumberArray(left);
+  const normalizedRight = normalizeNumberArray(right);
+
+  if (normalizedLeft.length !== normalizedRight.length) {
+    return false;
+  }
+
+  return normalizedLeft.every((value, index) => value === normalizedRight[index]);
+}
+
+function formatVarsayilanSubeLabel(value: number | null | undefined, subeNameMap: Map<number, string>) {
+  if (value == null) {
+    return "Tanımsız";
+  }
+
+  return subeNameMap.get(value) ?? `Şube ${value}`;
+}
+
+function buildYonetimSurecLogPayloads(
+  previous: YonetimKullanici | null,
+  payload: UpsertYonetimKullaniciPayload,
+  subeNameMap: Map<number, string>
+): CreateSurecPayload[] {
+  const today = new Date().toISOString().slice(0, 10);
+  const oldPersonelId = previous?.personel_id ?? null;
+  const newPersonelId = payload.personel_id ?? null;
+  const oldIsBirimAmiri = previous?.rol === "BIRIM_AMIRI";
+  const newIsBirimAmiri = payload.rol === "BIRIM_AMIRI";
+  const logs: CreateSurecPayload[] = [];
+
+  if (oldIsBirimAmiri && oldPersonelId != null && (!newIsBirimAmiri || newPersonelId !== oldPersonelId)) {
+    logs.push({
+      personel_id: oldPersonelId,
+      surec_turu: BIRIM_AMIRI_ATAMASI_KALDIRILDI_SUREC_TURU,
+      baslangic_tarihi: today,
+      aciklama: "Birim Amiri Ataması Kaldırıldı."
+    });
+  }
+
+  if (newIsBirimAmiri && newPersonelId != null && (!oldIsBirimAmiri || newPersonelId !== oldPersonelId)) {
+    logs.push({
+      personel_id: newPersonelId,
+      surec_turu: BIRIM_AMIRI_ATANDI_SUREC_TURU,
+      baslangic_tarihi: today,
+      aciklama: "Birim Amiri Olarak Atandı."
+    });
+  }
+
+  const scopeChanged =
+    oldIsBirimAmiri &&
+    newIsBirimAmiri &&
+    oldPersonelId != null &&
+    newPersonelId != null &&
+    oldPersonelId === newPersonelId &&
+    (!areSameNumberArrays(previous?.sube_ids ?? [], payload.sube_ids) ||
+      (previous?.varsayilan_sube_id ?? null) !== (payload.varsayilan_sube_id ?? null));
+
+  if (scopeChanged) {
+    const oldScope = formatSubeScopeLabel(previous?.sube_ids ?? [], subeNameMap);
+    const newScope = formatSubeScopeLabel(payload.sube_ids, subeNameMap);
+    const oldDefault = formatVarsayilanSubeLabel(previous?.varsayilan_sube_id ?? null, subeNameMap);
+    const newDefault = formatVarsayilanSubeLabel(payload.varsayilan_sube_id ?? null, subeNameMap);
+
+    logs.push({
+      personel_id: newPersonelId,
+      surec_turu: SUBE_YETKISI_DEGISTI_SUREC_TURU,
+      baslangic_tarihi: today,
+      aciklama: `Bağlı Bölüm / Şube Yetkisi Değişti. Eski kapsam: ${oldScope}. Yeni kapsam: ${newScope}. Eski varsayılan şube: ${oldDefault}. Yeni varsayılan şube: ${newDefault}.`
+    });
+  }
+
+  return logs;
 }
 
 export function YonetimPaneliPage() {
@@ -347,12 +431,20 @@ export function YonetimPaneliPage() {
 
     try {
       const payload = toKullaniciPayload(kullaniciForm);
+      const existingKullanici =
+        editingKullaniciId != null ? kullanicilar.find((item) => item.id === editingKullaniciId) ?? null : null;
+      const surecLogPayloads = buildYonetimSurecLogPayloads(existingKullanici, payload, subeNameMap);
+
       if (editingKullaniciId != null) {
         await updateYonetimKullanici(editingKullaniciId, payload);
         setSuccessMessage("Kullanıcı yetkileri güncellendi.");
       } else {
         await createYonetimKullanici(payload);
         setSuccessMessage("Kullanıcı kaydı oluşturuldu.");
+      }
+
+      if (surecLogPayloads.length > 0) {
+        await Promise.all(surecLogPayloads.map((entry) => createSurec(entry)));
       }
 
       resetKullaniciEditor();

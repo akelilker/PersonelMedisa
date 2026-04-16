@@ -50,6 +50,12 @@ type PersonelTimelineEvent = {
   sortRank: number;
 };
 
+const YONETIM_TIMELINE_SUREC_TYPES = new Set([
+  "BIRIM_AMIRI_ATANDI",
+  "BIRIM_AMIRI_ATAMASI_KALDIRILDI",
+  "SUBE_YETKISI_DEGISTI"
+]);
+
 function formatDetailValue(value: string | null | undefined) {
   if (typeof value !== "string") {
     return "-";
@@ -147,6 +153,11 @@ function formatSurecKayitZamani(value: string | undefined): string | null {
 }
 
 function buildSurecOzet(surec: Surec) {
+  const surecTuru = surec.surec_turu.trim().toUpperCase();
+  if (YONETIM_TIMELINE_SUREC_TYPES.has(surecTuru)) {
+    return "Yönetim panelinden rol ve yetki güncellemesi kaydedildi.";
+  }
+
   const parts = [
     surec.baslangic_tarihi ? `Başlangıç: ${surec.baslangic_tarihi}` : null,
     surec.bitis_tarihi ? `Bitiş: ${surec.bitis_tarihi}` : null
@@ -195,7 +206,7 @@ function buildPersonelTimeline(
       tarih,
       zamanIkincil: kayit ? `Kayıt: ${kayit}` : undefined,
       baslik: buildSurecTitle(surec),
-      kaynak: "Süreç",
+      kaynak: YONETIM_TIMELINE_SUREC_TYPES.has(surecTuru) ? "Yönetim" : "Süreç",
       ozet: buildSurecOzet(surec),
       aciklama: normalizeTimelineText(surec.aciklama) ?? undefined,
       etiket: normalizeTimelineText(formatSurecStateLabel(surec.state)) ?? undefined,

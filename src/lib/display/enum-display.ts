@@ -31,7 +31,10 @@ const SUREC_TURU_LABELS: Record<string, string> = {
   DOGUM_IZNI: "Doğum İzni",
   EVLILIK_IZNI: "Evlilik İzni",
   GOREVLENDIRME: "Görevlendirme",
-  EGITIM: "Eğitim"
+  EGITIM: "Eğitim",
+  BIRIM_AMIRI_ATANDI: "Birim Amiri Olarak Atandı",
+  BIRIM_AMIRI_ATAMASI_KALDIRILDI: "Birim Amiri Ataması Kaldırıldı",
+  SUBE_YETKISI_DEGISTI: "Bağlı Bölüm / Şube Yetkisi Değişti"
 };
 
 const COMMON_STATE_LABELS: Record<string, string> = {

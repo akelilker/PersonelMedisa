@@ -994,7 +994,7 @@ export function PersonelDetayPage() {
                 {personelRefs.gorevOptions.length > 0 ? (
                   <FormField
                     as="select"
-                    label="Görev"
+                    label="Görev / Unvan"
                     name="edit-gorev"
                     value={editForm.gorevId}
                     onChange={(value) => setEditForm((prev) => ({ ...prev, gorevId: value }))}
@@ -1002,7 +1002,7 @@ export function PersonelDetayPage() {
                     selectOptions={idOptionsToSelectOptions(personelRefs.gorevOptions)}
                   />
                 ) : (
-                  <p className="personel-create-error">Görev listesi yüklenemedi.</p>
+                  <p className="personel-create-error">Görev / Unvan listesi yüklenemedi.</p>
                 )}
                 {personelRefs.bagliAmirOptions.length > 0 ? (
                   <FormField

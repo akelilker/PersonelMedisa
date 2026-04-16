@@ -496,7 +496,7 @@ export function PersonellerPage() {
               <tr>
                 <th scope="col">Ad Soyad</th>
                 <th scope="col">Bölüm</th>
-                <th scope="col">Görev</th>
+                <th scope="col">Görev / Unvan</th>
                 <th scope="col">Durum</th>
                 <th scope="col">Telefon</th>
                 <th scope="col" className="personeller-table-col-actions">

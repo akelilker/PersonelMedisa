@@ -154,7 +154,7 @@ export function PersonelCreateFields({
           {refs.gorevOptions.length > 0 ? (
             <FormField
               as="select"
-              label="Görev"
+              label="Görev / Unvan"
               name="create-gorev"
               value={form.gorevId}
               onChange={(value) => setForm((prev) => ({ ...prev, gorevId: value }))}
@@ -163,7 +163,7 @@ export function PersonelCreateFields({
               selectOptions={toSelectOptions(refs.gorevOptions)}
             />
           ) : (
-            refMissingNote("Görev", true)
+            refMissingNote("Görev / Unvan", true)
           )}
           {refs.bagliAmirOptions.length > 0 ? (
             <FormField

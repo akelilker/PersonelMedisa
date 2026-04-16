@@ -7,8 +7,8 @@ import { ErrorState } from "../../../components/states/ErrorState";
 import { LoadingState } from "../../../components/states/LoadingState";
 import { fetchPersonellerList } from "../../../api/personeller.api";
 import { createDepartmanOption, fetchDepartmanOptions } from "../../../api/referans.api";
+import { createSurec, type CreateSurecPayload } from "../../../api/surecler.api";
 import {
-  createSurec,
   createYonetimKullanici,
   createYonetimSube,
   fetchYonetimKullanicilari,
@@ -19,7 +19,6 @@ import {
 import type { UserRole } from "../../../types/auth";
 import type { Personel } from "../../../types/personel";
 import type { IdOption } from "../../../types/referans";
-import type { CreateSurecPayload } from "../../../api/surecler.api";
 import type {
   KayitDurumu,
   KullaniciTipi,

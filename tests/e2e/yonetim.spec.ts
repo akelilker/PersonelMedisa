@@ -78,4 +78,55 @@ test.describe("yonetim paneli ve aylik ozet", () => {
     await expect(page).toHaveURL(/\/yetkisiz$/);
     await expect(page.getByRole("heading", { name: /Yetkisiz/i })).toBeVisible();
   });
+
+  test("genel yonetici birim amiri rol ve sube degisikliklerini personel timeline'ina dusurur", async ({
+    page
+  }) => {
+    await mockApi(page, "GENEL_YONETICI");
+    await login(page, { username: "genel_yonetici", password: "demo123" });
+
+    await page.getByTestId("header-settings-toggle").click();
+    await page.getByTestId("settings-yonetim-paneli").click();
+    await expect(page).toHaveURL(/\/yonetim-paneli$/);
+
+    await page.locator(".yonetim-entity-card").filter({ hasText: /Ayse Yilmaz/i }).click();
+    const kullaniciModal = page.locator(".modal-container").last();
+    await expect(kullaniciModal).toBeVisible();
+
+    await kullaniciModal.getByRole("button", { name: /Depolama/i }).click();
+    await kullaniciModal.locator('[name="yonetim-kullanici-varsayilan-sube"]').selectOption("2");
+    await kullaniciModal.getByTestId("yonetim-kullanici-kaydet").click();
+
+    await expect(page.getByText("Kullanıcı yetkileri güncellendi.")).toBeVisible();
+
+    await page.locator(".yonetim-entity-card").filter({ hasText: /Ayse Yilmaz/i }).click();
+    await expect(kullaniciModal).toBeVisible();
+    await kullaniciModal.locator('[name="yonetim-kullanici-rol"]').selectOption("MUHASEBE");
+    await kullaniciModal.getByTestId("yonetim-kullanici-kaydet").click();
+
+    await expect(page.getByText("Kullanıcı yetkileri güncellendi.")).toBeVisible();
+
+    await page.locator(".yonetim-entity-card").filter({ hasText: /Adnan/i }).click();
+    await expect(kullaniciModal).toBeVisible();
+    await kullaniciModal.locator('[name="yonetim-kullanici-tipi"]').selectOption("IC_PERSONEL");
+    await kullaniciModal.locator('[name="yonetim-kullanici-personel"]').selectOption("2");
+    await kullaniciModal.locator('[name="yonetim-kullanici-rol"]').selectOption("BIRIM_AMIRI");
+    await kullaniciModal.locator('[name="yonetim-kullanici-varsayilan-sube"]').selectOption("2");
+    await kullaniciModal.getByTestId("yonetim-kullanici-kaydet").click();
+
+    await expect(page.getByText("Kullanıcı yetkileri güncellendi.")).toBeVisible();
+
+    await page.goto("/personeller/1");
+    await expect(page).toHaveURL(/\/personeller\/1$/);
+    await page.getByRole("tab", { name: "Süreç Geçmişi" }).click();
+    const personelBirTimeline = page.locator("#personel-kart-panel-surec-gecmisi").locator("[data-testid='personel-surec-timeline']");
+    await expect(personelBirTimeline).toContainText(/Bağlı Bölüm \/ Şube Yetkisi Değişti/i);
+    await expect(personelBirTimeline).toContainText(/Birim Amiri Ataması Kaldırıldı/i);
+
+    await page.goto("/personeller/2");
+    await expect(page).toHaveURL(/\/personeller\/2$/);
+    await page.getByRole("tab", { name: "Süreç Geçmişi" }).click();
+    const personelIkiTimeline = page.locator("#personel-kart-panel-surec-gecmisi").locator("[data-testid='personel-surec-timeline']");
+    await expect(personelIkiTimeline).toContainText(/Birim Amiri Olarak Atandı/i);
+  });
 });

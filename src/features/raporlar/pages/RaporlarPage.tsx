@@ -36,7 +36,7 @@ const RAPOR_OPTIONS: Array<{ value: RaporTipi; label: string }> = [
   { value: "ceza", label: "Ceza" },
   { value: "ekstra-prim", label: "Ekstra Prim" },
   { value: "is-kazasi", label: "İş Kazası" },
-  { value: "bildirim", label: "Bildirim" }
+  { value: "bildirim", label: "Günlük Kayıt" }
 ];
 
 function parseOptionalPositiveInt(value: string): number | undefined {
@@ -548,13 +548,13 @@ export function RaporlarPage() {
     <section className="raporlar-page raporlar-page--premium">
       <header className="raporlar-page-head">
         <h2>Raporlar</h2>
-        <p className="raporlar-page-lead">Filtreleri kullanarak liste raporları oluşturun.</p>
+        <p className="raporlar-page-lead">Filtreleri kullanarak liste raporlarını ve aylık kapanış özetini görüntüleyin.</p>
       </header>
 
       {canViewAylikOzet ? <AylikKapanisOzetiSection /> : null}
 
       <div className="raporlar-standart-panel">
-        <h3 className="raporlar-panel-title">Liste raporu</h3>
+        <h3 className="raporlar-panel-title">Detaylı Liste</h3>
         <form className="form-filter-panel raporlar-standart-form" onSubmit={handleSubmit}>
         <div className="form-field-grid raporlar-standart-grid">
           <FormField
@@ -566,7 +566,7 @@ export function RaporlarPage() {
             selectOptions={RAPOR_OPTIONS}
           />
           <FormField
-            label="Personel no"
+            label="Personel ID"
             name="rapor-personel"
             type="number"
             min={1}

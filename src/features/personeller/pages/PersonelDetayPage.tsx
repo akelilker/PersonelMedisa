@@ -920,7 +920,7 @@ export function PersonelDetayPage() {
   }
 
   const pageHeading =
-    personel != null ? `${personel.ad} ${personel.soyad} personel dosyası` : "Personel detayı";
+    personel != null ? `${personel.ad} ${personel.soyad} personel dosyası` : "Personel dosyası";
 
   return (
     <section className="personel-detay-page personel-dosya-page" aria-label={pageHeading}>

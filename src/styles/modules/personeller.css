@@ -465,6 +465,20 @@
   color: var(--red);
 }
 
+.personel-form-note {
+  margin: -2px 0 0;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.personel-form-note--info {
+  color: var(--txt-muted);
+}
+
+.personel-form-note--warning {
+  color: #f59e0b;
+}
+
 .personel-detail-card {
   display: grid;
   gap: var(--space-3);

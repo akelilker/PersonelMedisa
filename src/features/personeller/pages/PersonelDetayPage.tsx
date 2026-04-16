@@ -859,6 +859,9 @@ export function PersonelDetayPage() {
     editErrorMessage,
     editForm,
     setEditForm,
+    handleEditDepartmanChange,
+    handleEditBagliAmirChange,
+    editBagliAmirGuidance,
     discardEdit,
     updatePersonelHandler,
     hasLifecycleDiff,
@@ -989,16 +992,48 @@ export function PersonelDetayPage() {
                   value={editForm.telefon}
                   onChange={(value) => setEditForm((prev) => ({ ...prev, telefon: value }))}
                 />
+                {personelRefs.bagliAmirOptions.length > 0 ? (
+                  <>
+                    <FormField
+                      as="select"
+                      label="Bağlı amir"
+                      name="edit-bagli-amir"
+                      value={editForm.bagliAmirId}
+                      onChange={handleEditBagliAmirChange}
+                      placeholderOption={{ value: "", label: "Seçiniz" }}
+                      selectOptions={idOptionsToSelectOptions(personelRefs.bagliAmirOptions)}
+                    />
+                    {editBagliAmirGuidance.infoMessage ? (
+                      <p className="personel-form-note personel-form-note--info">
+                        {editBagliAmirGuidance.infoMessage}
+                      </p>
+                    ) : null}
+                    {editBagliAmirGuidance.subeWarning ? (
+                      <p className="personel-form-note personel-form-note--warning">
+                        {editBagliAmirGuidance.subeWarning}
+                      </p>
+                    ) : null}
+                  </>
+                ) : (
+                  <p className="personel-create-error">Bağlı amir listesi yüklenemedi.</p>
+                )}
                 {personelRefs.departmanOptions.length > 0 ? (
-                  <FormField
-                    as="select"
-                    label="Departman"
-                    name="edit-departman"
-                    value={editForm.departmanId}
-                    onChange={(value) => setEditForm((prev) => ({ ...prev, departmanId: value }))}
-                    placeholderOption={{ value: "", label: "Seçiniz" }}
-                    selectOptions={idOptionsToSelectOptions(personelRefs.departmanOptions)}
-                  />
+                  <>
+                    <FormField
+                      as="select"
+                      label="Departman"
+                      name="edit-departman"
+                      value={editForm.departmanId}
+                      onChange={handleEditDepartmanChange}
+                      placeholderOption={{ value: "", label: "Seçiniz" }}
+                      selectOptions={idOptionsToSelectOptions(personelRefs.departmanOptions)}
+                    />
+                    {editBagliAmirGuidance.departmanWarning ? (
+                      <p className="personel-form-note personel-form-note--warning">
+                        {editBagliAmirGuidance.departmanWarning}
+                      </p>
+                    ) : null}
+                  </>
                 ) : (
                   <p className="personel-create-error">Departman listesi yüklenemedi.</p>
                 )}
@@ -1014,19 +1049,6 @@ export function PersonelDetayPage() {
                   />
                 ) : (
                   <p className="personel-create-error">Görev / Unvan listesi yüklenemedi.</p>
-                )}
-                {personelRefs.bagliAmirOptions.length > 0 ? (
-                  <FormField
-                    as="select"
-                    label="Bağlı amir"
-                    name="edit-bagli-amir"
-                    value={editForm.bagliAmirId}
-                    onChange={(value) => setEditForm((prev) => ({ ...prev, bagliAmirId: value }))}
-                    placeholderOption={{ value: "", label: "Seçiniz" }}
-                    selectOptions={idOptionsToSelectOptions(personelRefs.bagliAmirOptions)}
-                  />
-                ) : (
-                  <p className="personel-create-error">Bağlı amir listesi yüklenemedi.</p>
                 )}
                 {personelRefs.ucretTipiOptions.length > 0 ? (
                   <FormField

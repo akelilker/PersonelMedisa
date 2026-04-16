@@ -120,6 +120,73 @@ export const INITIAL_CREATE_PERSONEL_FORM: CreatePersonelFormState = {
   primKuraliId: ""
 };
 
+type BagliAmirContext = {
+  personelId: number;
+  departmanId: string;
+  subeId: number | null;
+};
+
+type BagliAmirFormGuidance = {
+  infoMessage: string | null;
+  subeWarning: string | null;
+  departmanWarning: string | null;
+};
+
+function buildBagliAmirContext(personel: Personel): BagliAmirContext {
+  return {
+    personelId: personel.id,
+    departmanId: personel.departman_id != null ? String(personel.departman_id) : "",
+    subeId: personel.sube_id ?? null
+  };
+}
+
+async function fetchBagliAmirContext(amirId: number): Promise<BagliAmirContext | null> {
+  try {
+    const personel = await fetchPersonelDetail(amirId);
+    return buildBagliAmirContext(personel);
+  } catch {
+    return null;
+  }
+}
+
+function buildBagliAmirFormGuidance(
+  departmanId: string,
+  context: BagliAmirContext | null,
+  activeSubeId: number | null
+): BagliAmirFormGuidance {
+  if (!context) {
+    return {
+      infoMessage: null,
+      subeWarning: null,
+      departmanWarning: null
+    };
+  }
+
+  const subeWarning =
+    activeSubeId !== null && context.subeId !== null && context.subeId !== activeSubeId
+      ? "Secilen Sube, bagli amirin mevcut yetki kapsami ile uyusmuyor."
+      : null;
+
+  const departmanWarning =
+    context.departmanId && departmanId && context.departmanId !== departmanId
+      ? "Secilen Bolum, bagli amirin mevcut yetki kapsami ile uyusmuyor."
+      : null;
+
+  const infoMessage =
+    context.departmanId &&
+    departmanId === context.departmanId &&
+    !subeWarning &&
+    !departmanWarning
+      ? "Sube ve Bolum bilgileri, secilen Birim Amirine gore otomatik olarak guncellendi."
+      : null;
+
+  return {
+    infoMessage,
+    subeWarning,
+    departmanWarning
+  };
+}
+
 export function usePersoneller() {
   const revision = useAppDataRevision();
   const [listQuery, setListQuery] = useState<PersonelListQueryState>({
@@ -137,6 +204,7 @@ export function usePersoneller() {
   const [isCreateSubmitting, setIsCreateSubmitting] = useState(false);
   const [createErrorMessage, setCreateErrorMessage] = useState<string | null>(null);
   const [createForm, setCreateForm] = useState<CreatePersonelFormState>(INITIAL_CREATE_PERSONEL_FORM);
+  const [createBagliAmirContext, setCreateBagliAmirContext] = useState<BagliAmirContext | null>(null);
 
   const appliedFilters = listQuery.applied;
   const listPage = listQuery.page;
@@ -184,6 +252,11 @@ export function usePersoneller() {
       }
     );
   }, [revision]);
+
+  const createBagliAmirGuidance = useMemo(
+    () => buildBagliAmirFormGuidance(createForm.departmanId, createBagliAmirContext, activeSube),
+    [activeSube, createBagliAmirContext, createForm.departmanId]
+  );
 
   const refetch = useCallback(async () => {
     await fetchWithCacheMerge(listKey, () =>
@@ -339,11 +412,46 @@ export function usePersoneller() {
 
   const openCreateModal = useCallback(() => {
     setCreateErrorMessage(null);
+    const amirId = parseOptionalPositiveInt(createForm.bagliAmirId);
+    if (amirId === undefined) {
+      setCreateBagliAmirContext(null);
+    } else {
+      void (async () => {
+        const context = await fetchBagliAmirContext(amirId);
+        setCreateBagliAmirContext(context);
+      })();
+    }
     setIsCreateModalOpen(true);
-  }, []);
+  }, [createForm.bagliAmirId]);
 
   const closeCreateModal = useCallback(() => {
     setIsCreateModalOpen(false);
+  }, []);
+
+  const handleCreateDepartmanChange = useCallback((departmanId: string) => {
+    setCreateForm((prev) => ({ ...prev, departmanId }));
+  }, []);
+
+  const handleCreateBagliAmirChange = useCallback((bagliAmirId: string) => {
+    setCreateForm((prev) => ({ ...prev, bagliAmirId }));
+
+    const amirId = parseOptionalPositiveInt(bagliAmirId);
+    if (amirId === undefined) {
+      setCreateBagliAmirContext(null);
+      return;
+    }
+
+    void (async () => {
+      const context = await fetchBagliAmirContext(amirId);
+      setCreateBagliAmirContext(context);
+      if (!context?.departmanId) {
+        return;
+      }
+
+      setCreateForm((prev) =>
+        prev.bagliAmirId === bagliAmirId ? { ...prev, departmanId: context.departmanId } : prev
+      );
+    })();
   }, []);
 
   const createPersonelHandler = useCallback(
@@ -376,6 +484,7 @@ export function usePersoneller() {
           await createPersonel(payload);
           setIsCreateModalOpen(false);
           setCreateForm(INITIAL_CREATE_PERSONEL_FORM);
+          setCreateBagliAmirContext(null);
           setListQuery((prev) => ({ ...prev, page: 1 }));
           await fetchWithCacheMerge(pageOneKey, () =>
             runDeduped(pageOneKey, () =>
@@ -405,6 +514,7 @@ export function usePersoneller() {
           });
           setIsCreateModalOpen(false);
           setCreateForm(INITIAL_CREATE_PERSONEL_FORM);
+          setCreateBagliAmirContext(null);
           setListQuery((prev) => ({ ...prev, page: 1 }));
           void processSyncQueue();
         }
@@ -434,6 +544,9 @@ export function usePersoneller() {
     createErrorMessage,
     createForm,
     setCreateForm,
+    handleCreateDepartmanChange,
+    handleCreateBagliAmirChange,
+    createBagliAmirGuidance,
     createPersonelHandler,
     submitFilters,
     clearFilters,
@@ -740,6 +853,7 @@ export function usePersonelDetail(
     primKuraliId: "",
     effectiveDate: ""
   });
+  const [editBagliAmirContext, setEditBagliAmirContext] = useState<BagliAmirContext | null>(null);
   const [isSurecModalOpen, setIsSurecModalOpen] = useState(false);
   const [isSurecSubmitting, setIsSurecSubmitting] = useState(false);
   const [surecCreateErrorMessage, setSurecCreateErrorMessage] = useState<string | null>(null);
@@ -954,6 +1068,11 @@ export function usePersonelDetail(
     return computeHasLifecycleDiff(personel, pickLifecycleFormFields(editForm));
   }, [personel, editForm]);
 
+  const editBagliAmirGuidance = useMemo(
+    () => buildBagliAmirFormGuidance(editForm.departmanId, editBagliAmirContext, activeSubeId),
+    [activeSubeId, editBagliAmirContext, editForm.departmanId]
+  );
+
   useEffect(() => {
     let cancelled = false;
 
@@ -998,6 +1117,29 @@ export function usePersonelDetail(
     };
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    const amirId = personel?.bagli_amir_id;
+    if (typeof amirId !== "number") {
+      setEditBagliAmirContext(null);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    void (async () => {
+      const context = await fetchBagliAmirContext(amirId);
+      if (!cancelled) {
+        setEditBagliAmirContext(context);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [personel?.bagli_amir_id]);
+
   const openSurecModal = useCallback(() => {
     if (!canCreateSurec) {
       setSurecCreateErrorMessage("Bu islem icin yetkin bulunmuyor.");
@@ -1035,7 +1177,43 @@ export function usePersonelDetail(
     setIsEditing(false);
     setEditErrorMessage(null);
     setEditForm(personelToEditForm(personel));
+    const amirId = personel.bagli_amir_id;
+    if (typeof amirId !== "number") {
+      setEditBagliAmirContext(null);
+      return;
+    }
+
+    void (async () => {
+      const context = await fetchBagliAmirContext(amirId);
+      setEditBagliAmirContext(context);
+    })();
   }, [personel]);
+
+  const handleEditDepartmanChange = useCallback((departmanId: string) => {
+    setEditForm((prev) => ({ ...prev, departmanId }));
+  }, []);
+
+  const handleEditBagliAmirChange = useCallback((bagliAmirId: string) => {
+    setEditForm((prev) => ({ ...prev, bagliAmirId }));
+
+    const amirId = parseOptionalPositiveInt(bagliAmirId);
+    if (amirId === undefined) {
+      setEditBagliAmirContext(null);
+      return;
+    }
+
+    void (async () => {
+      const context = await fetchBagliAmirContext(amirId);
+      setEditBagliAmirContext(context);
+      if (!context?.departmanId) {
+        return;
+      }
+
+      setEditForm((prev) =>
+        prev.bagliAmirId === bagliAmirId ? { ...prev, departmanId: context.departmanId } : prev
+      );
+    })();
+  }, []);
 
   const updatePersonelHandler = useCallback(
     async (event: FormEvent<HTMLFormElement>, canEdit: boolean) => {
@@ -1255,6 +1433,9 @@ export function usePersonelDetail(
     editErrorMessage,
     editForm,
     setEditForm,
+    handleEditDepartmanChange,
+    handleEditBagliAmirChange,
+    editBagliAmirGuidance,
     discardEdit,
     updatePersonelHandler,
     hasLifecycleDiff,

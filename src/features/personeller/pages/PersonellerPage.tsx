@@ -196,6 +196,9 @@ export function PersonellerPage() {
     createErrorMessage,
     createForm,
     setCreateForm,
+    handleCreateDepartmanChange,
+    handleCreateBagliAmirChange,
+    createBagliAmirGuidance,
     createPersonelHandler,
     submitFilters,
     clearFilters,
@@ -702,6 +705,11 @@ export function PersonellerPage() {
             <PersonelCreateFields
               form={createForm}
               setForm={setCreateForm}
+              onDepartmanChange={handleCreateDepartmanChange}
+              onBagliAmirChange={handleCreateBagliAmirChange}
+              bagliAmirInfoMessage={createBagliAmirGuidance.infoMessage}
+              bagliAmirSubeWarning={createBagliAmirGuidance.subeWarning}
+              bagliAmirDepartmanWarning={createBagliAmirGuidance.departmanWarning}
               refs={refs}
               createErrorMessage={createErrorMessage}
               referenceError={referenceError}

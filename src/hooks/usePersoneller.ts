@@ -235,7 +235,7 @@ function buildBagliAmirSurecPayloads(
         personel_id: updatedPersonel.id,
         surec_turu: BAGLI_AMIR_ATANDI_SUREC_TURU,
         baslangic_tarihi: effectiveDate,
-        aciklama: `Yeni Amir: ${nextAmirLabel}`
+        aciklama: `${nextAmirLabel} bagli amir olarak atandi.`
       }
     ];
   }
@@ -246,7 +246,7 @@ function buildBagliAmirSurecPayloads(
         personel_id: updatedPersonel.id,
         surec_turu: BAGLI_AMIR_ATAMASI_KALDIRILDI_SUREC_TURU,
         baslangic_tarihi: effectiveDate,
-        aciklama: `Eski Amir: ${previousAmirLabel}`
+        aciklama: `${previousAmirLabel} icin bagli amir atamasi kaldirildi.`
       }
     ];
   }
@@ -256,7 +256,7 @@ function buildBagliAmirSurecPayloads(
       personel_id: updatedPersonel.id,
       surec_turu: BAGLI_AMIR_DEGISTI_SUREC_TURU,
       baslangic_tarihi: effectiveDate,
-      aciklama: `Eski Amir: ${previousAmirLabel} / Yeni Amir: ${nextAmirLabel}`
+      aciklama: `Bagli Amir ${previousAmirLabel} yerine ${nextAmirLabel} olarak guncellendi.`
     }
   ];
 }

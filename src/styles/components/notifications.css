@@ -86,16 +86,14 @@
   transition:
     border-color 0.18s ease,
     background-color 0.18s ease,
-    transform 0.18s ease,
     box-shadow 0.18s ease;
 }
 
 .notifications-dropdown .notification-item:hover {
   border-color: rgba(255, 255, 255, 0.5);
   background: rgba(9, 15, 24, 0.98);
-  transform: scale(1.012);
   box-shadow:
-    0 8px 16px rgba(0, 0, 0, 0.22),
+    0 7px 14px rgba(0, 0, 0, 0.2),
     inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
@@ -124,7 +122,7 @@
   line-height: 1.35;
   margin-bottom: 2px;
   word-break: break-word;
-  transition: transform 0.18s ease;
+  transition: color 0.18s ease;
 }
 
 .notifications-dropdown .notif-line2 {
@@ -133,12 +131,11 @@
   font-size: 11px;
   line-height: 1.2;
   word-break: break-word;
-  transition: transform 0.18s ease, color 0.18s ease;
+  transition: color 0.18s ease;
 }
 
-.notifications-dropdown .notification-item:hover .notif-line1,
-.notifications-dropdown .notification-item:hover .notif-line2 {
-  transform: scale(1.015);
+.notifications-dropdown .notification-item:hover .notif-line1 {
+  color: #ffffff;
 }
 
 .notifications-dropdown .notification-item:hover .notif-line2 {

@@ -1,4 +1,4 @@
-import type { ApiResponse } from "../types/api";
+﻿import type { ApiResponse } from "../types/api";
 import { hesaplaAylikSgkPuantajOzetleri } from "../services/dashboard-rapor-servisi";
 
 type DemoMethod = "GET" | "POST" | "PUT" | "DELETE";
@@ -138,23 +138,23 @@ type DemoDepartman = {
   ad: string;
 };
 
-/** Şirket birim/departman referans listesi (sabit ID sırası). */
+/** Åirket birim/departman referans listesi (sabit ID sÄ±rasÄ±). */
 const DEMO_DEPARTMANLAR: DemoDepartman[] = [
   { id: 1, ad: "Muhasebe" },
   { id: 2, ad: "Finans" },
-  { id: 3, ad: "Döşeme" },
+  { id: 3, ad: "DÃ¶ÅŸeme" },
   { id: 4, ad: "Panel" },
   { id: 5, ad: "Hammadde Depo" },
   { id: 6, ad: "Depo" },
   { id: 7, ad: "E-ticaret Depo" },
-  { id: 8, ad: "Yönetim Personeli" },
-  { id: 9, ad: "Dış Ticaret" },
-  { id: 10, ad: "İdari İşler" },
+  { id: 8, ad: "YÃ¶netim Personeli" },
+  { id: 9, ad: "DÄ±ÅŸ Ticaret" },
+  { id: 10, ad: "Ä°dari Ä°ÅŸler" },
   { id: 11, ad: "Pazarlama" },
   { id: 12, ad: "Ar-Ge" }
 ];
 
-/** Görev/unvan referans listesi (sabit ID sırası). */
+/** GÃ¶rev/unvan referans listesi (sabit ID sÄ±rasÄ±). */
 const DEMO_GOREVLER: Array<{ id: number; ad: string }> = [
   { id: 1, ad: "Genel Müdür" },
   { id: 2, ad: "Üretim Müdürü" },
@@ -286,7 +286,7 @@ const demoState: {
       personel_id: 1,
       urun_turu: "KULAKLIK",
       teslim_tarihi: "2026-01-15",
-      teslim_eden: "Bağlı Amir",
+      teslim_eden: "BaÄŸlÄ± Amir",
       aciklama: "Onceki vardiyadan teslim alindi",
       teslim_durumu: "IKINCI_EL",
       zimmet_durumu: "IADE_EDILDI",
@@ -630,7 +630,7 @@ function resolveDemoRole(username: string) {
   if (normalized.includes("muhasebe")) {
     return "MUHASEBE";
   }
-  if (normalized.includes("bolum") || normalized.includes("bölüm")) {
+  if (normalized.includes("bolum") || normalized.includes("bÃ¶lÃ¼m")) {
     return "BOLUM_YONETICISI";
   }
 
@@ -1106,7 +1106,7 @@ export function resolveDemoApiResponse(
       role === "BIRIM_AMIRI" ? [1] : role === "MUHASEBE" ? [1, 2] : role === "BOLUM_YONETICISI" ? [2] : [];
     const sube_list =
       sube_ids.length > 0
-      ? sube_ids.map((id) => ({ id, ad: id === 1 ? "Merkez" : `Şube ${id}` }))
+      ? sube_ids.map((id) => ({ id, ad: id === 1 ? "Merkez" : `Åube ${id}` }))
         : undefined;
 
     return ok({
@@ -1743,7 +1743,7 @@ export function resolveDemoApiResponse(
         errors: [
           {
             code: "DEPARTMAN_NAME_REQUIRED",
-            message: "Departman adı zorunludur."
+            message: "Departman adÄ± zorunludur."
           }
         ]
       };
@@ -1774,28 +1774,28 @@ export function resolveDemoApiResponse(
 
     if (pathname === "/referans/personel-tipleri") {
       return ok([
-        { id: 1, ad: "Tam Zamanlı" },
-        { id: 2, ad: "Yarı Zamanlı" }
+        { id: 1, ad: "Tam ZamanlÄ±" },
+        { id: 2, ad: "YarÄ± ZamanlÄ±" }
       ]);
     }
 
     if (pathname === "/referans/surec-turleri") {
       return ok([
-        { key: "IZIN", label: "İzin" },
+        { key: "IZIN", label: "Ä°zin" },
         { key: "RAPOR", label: "Rapor" },
-        { key: "IS_KAZASI", label: "İş Kazası" },
-        { key: "DEVAMSIZLIK", label: "Devamsızlık" },
-        { key: "ISTEN_AYRILMA", label: "İşten Ayrılma" }
+        { key: "IS_KAZASI", label: "Ä°ÅŸ KazasÄ±" },
+        { key: "DEVAMSIZLIK", label: "DevamsÄ±zlÄ±k" },
+        { key: "ISTEN_AYRILMA", label: "Ä°ÅŸten AyrÄ±lma" }
       ]);
     }
 
     if (pathname === "/referans/bildirim-turleri") {
       return ok([
-        { key: "GEC_GELDI", label: "Geç Geldi" },
+        { key: "GEC_GELDI", label: "GeÃ§ Geldi" },
         { key: "GELMEDI", label: "Gelmedi" },
-        { key: "IZINLI_GELMEDI", label: "İzinli Gelmedi" },
-        { key: "IZINSIZ_GELMEDI", label: "İzinsiz Gelmedi" },
-        { key: "DEVAMSIZLIK", label: "Devamsızlık" },
+        { key: "IZINLI_GELMEDI", label: "Ä°zinli Gelmedi" },
+        { key: "IZINSIZ_GELMEDI", label: "Ä°zinsiz Gelmedi" },
+        { key: "DEVAMSIZLIK", label: "DevamsÄ±zlÄ±k" },
         { key: "RAPORLU", label: "Raporlu" }
       ]);
     }
@@ -1891,3 +1891,4 @@ export function resolveDemoApiResponse(
 
   return null;
 }
+

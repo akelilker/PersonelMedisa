@@ -15,10 +15,12 @@
   box-sizing: border-box;
   padding-top: 2px;
   padding-bottom: calc(2px + env(safe-area-inset-bottom, 0px));
-  border-top: 0.8px solid rgba(var(--theme-color-rgb), 0.45);
-  border-left: 0.5px solid rgba(255, 255, 255, 0.2);
-  border-right: 0.5px solid rgba(255, 255, 255, 0.2);
-  box-shadow: 0 -10px 20px rgba(var(--theme-color-rgb), 0.46);
+  border-top: 0.9px solid rgba(var(--theme-color-rgb), 0.52);
+  border-left: 0.65px solid rgba(214, 225, 236, 0.28);
+  border-right: 0.65px solid rgba(214, 225, 236, 0.28);
+  box-shadow:
+    0 -1px 0 rgba(240, 246, 252, 0.12),
+    0 -10px 20px rgba(var(--theme-color-rgb), 0.4);
   overflow: visible;
   display: flex;
   align-items: center;
@@ -29,12 +31,10 @@
 #app-footer::before {
   content: "";
   position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 100%;
-  display: block;
-  height: 0;
-  opacity: 0;
+  inset: 0;
+  border-top: 0.7px solid rgba(214, 225, 236, 0.2);
+  border-left: 0.7px solid rgba(214, 225, 236, 0.16);
+  border-right: 0.7px solid rgba(214, 225, 236, 0.16);
   pointer-events: none;
   z-index: 0;
 }

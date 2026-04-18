@@ -91,15 +91,15 @@
   .hero {
     --hero-logo-width: 40px;
     --hero-spacer-width: 20px;
-    min-height: 77px;
-    padding: 12px 12px 16px;
+    min-height: 80px;
+    padding: 13px 12px 16px;
   }
 
   .hero h1 {
     font-size: clamp(14px, 4.6vw, 18px);
     letter-spacing: 1px;
     line-height: 1.1;
-    transform: none;
+    transform: translateY(4px);
   }
 
   .hero-logo {
@@ -111,5 +111,9 @@
   .hero-logo img {
     height: 33px;
     width: auto;
+  }
+
+  .animated-line {
+    bottom: 12px;
   }
 }

@@ -193,12 +193,12 @@ export function PersonelCreateFields({
               ) : null}
             </>
           ) : (
-            refMissingNote("Bolum", true)
+            refMissingNote("Bölüm", true)
           )}
           {refs.gorevOptions.length > 0 ? (
             <FormField
               as="select"
-              label="Gorev / Unvan"
+              label="Görev / Unvan"
               name="create-gorev"
               value={form.gorevId}
               onChange={(value) => setForm((prev) => ({ ...prev, gorevId: value }))}
@@ -207,7 +207,7 @@ export function PersonelCreateFields({
               selectOptions={toSelectOptions(refs.gorevOptions)}
             />
           ) : (
-            refMissingNote("Gorev / Unvan", true)
+            refMissingNote("Görev / Unvan", true)
           )}
           {refs.personelTipiOptions.length > 0 ? (
             <FormField
@@ -221,12 +221,12 @@ export function PersonelCreateFields({
               selectOptions={toSelectOptions(refs.personelTipiOptions)}
             />
           ) : (
-            refMissingNote("Personel tipi", true)
+            refMissingNote("Personel Tipi", true)
           )}
           {refs.ucretTipiOptions.length > 0 ? (
             <FormField
               as="select"
-              label="Ucret tipi"
+              label="Ücret Tipi"
               name="create-ucret-tipi"
               value={form.ucretTipiId}
               onChange={(value) => setForm((prev) => ({ ...prev, ucretTipiId: value }))}
@@ -234,10 +234,10 @@ export function PersonelCreateFields({
               selectOptions={toSelectOptions(refs.ucretTipiOptions)}
             />
           ) : (
-            refMissingNote("Ucret tipi", false)
+            refMissingNote("Ücret Tipi", false)
           )}
           <FormField
-            label="Maas tutari"
+            label="Maaş Tutarı"
             name="create-maas"
             type="number"
             min={0}
@@ -248,7 +248,7 @@ export function PersonelCreateFields({
           {refs.primKuraliOptions.length > 0 ? (
             <FormField
               as="select"
-              label="Prim kurali"
+              label="Prim Kuralı"
               name="create-prim-kurali"
               value={form.primKuraliId}
               onChange={(value) => setForm((prev) => ({ ...prev, primKuraliId: value }))}
@@ -256,7 +256,7 @@ export function PersonelCreateFields({
               selectOptions={toSelectOptions(refs.primKuraliOptions)}
             />
           ) : (
-            refMissingNote("Prim kurali", false)
+            refMissingNote("Prim Kuralı", false)
           )}
         </div>
       </div>

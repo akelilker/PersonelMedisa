@@ -142,14 +142,14 @@ type DemoDepartman = {
 const DEMO_DEPARTMANLAR: DemoDepartman[] = [
   { id: 1, ad: "Muhasebe" },
   { id: 2, ad: "Finans" },
-  { id: 3, ad: "DÃ¶ÅŸeme" },
+  { id: 3, ad: "Döşeme" },
   { id: 4, ad: "Panel" },
   { id: 5, ad: "Hammadde Depo" },
   { id: 6, ad: "Depo" },
   { id: 7, ad: "E-ticaret Depo" },
-  { id: 8, ad: "YÃ¶netim Personeli" },
-  { id: 9, ad: "DÄ±ÅŸ Ticaret" },
-  { id: 10, ad: "Ä°dari Ä°ÅŸler" },
+  { id: 8, ad: "Yönetim Personeli" },
+  { id: 9, ad: "Dış Ticaret" },
+  { id: 10, ad: "İdari İşler" },
   { id: 11, ad: "Pazarlama" },
   { id: 12, ad: "Ar-Ge" }
 ];
@@ -546,8 +546,8 @@ const demoState: {
 };
 
 const DEMO_PERSONEL_TIPI_LABELS: Record<number, string> = {
-  1: "Tam Zamanli",
-  2: "Yari Zamanli"
+  1: "Tam Zamanlı",
+  2: "Yarı Zamanlı"
 };
 
 const DEMO_BAGLI_AMIR_LABELS: Record<number, string> = {
@@ -1774,8 +1774,8 @@ export function resolveDemoApiResponse(
 
     if (pathname === "/referans/personel-tipleri") {
       return ok([
-        { id: 1, ad: "Tam ZamanlÄ±" },
-        { id: 2, ad: "YarÄ± ZamanlÄ±" }
+        { id: 1, ad: "Tam Zamanlı" },
+        { id: 2, ad: "Yarı Zamanlı" }
       ]);
     }
 
@@ -1809,15 +1809,15 @@ export function resolveDemoApiResponse(
 
     if (pathname === "/referans/ucret-tipleri") {
       return ok([
-        { id: 1, ad: "Maktu Aylik" },
+        { id: 1, ad: "Maktu Aylık" },
         { id: 2, ad: "Saatlik" }
       ]);
     }
 
     if (pathname === "/referans/prim-kurallari") {
       return ok([
-        { id: 7, ad: "Prim Kurali 7" },
-        { id: 8, ad: "Prim Kurali 8" }
+        { id: 7, ad: "7 No'lu Prim Kuralı" },
+        { id: 8, ad: "8 No'lu Prim Kuralı" }
       ]);
     }
 

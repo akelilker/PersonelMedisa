@@ -219,6 +219,14 @@
   gap: 12px 14px;
 }
 
+.yonetim-form-stack--sube .form-field-grid {
+  gap: 10px 12px;
+}
+
+.yonetim-form-stack--sube .form-input {
+  min-height: 46px;
+}
+
 .yonetim-checkbox-section {
   display: grid;
   gap: 12px;
@@ -238,6 +246,7 @@
 
 .yonetim-selection-grid--departmanlar {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
 }
 
 .yonetim-selection-trigger {
@@ -249,6 +258,10 @@
   min-height: 52px;
   text-align: left;
   cursor: pointer;
+}
+
+.yonetim-form-stack--sube .yonetim-selection-trigger {
+  min-height: 46px;
 }
 
 .yonetim-selection-trigger.is-open {
@@ -285,6 +298,31 @@
   background: rgba(7, 11, 19, 0.92);
 }
 
+.yonetim-form-stack--sube .yonetim-selection-panel {
+  gap: 10px;
+  padding: 12px;
+}
+
+.yonetim-selection-panel-head {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.yonetim-panel-action {
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: rgba(226, 213, 188, 0.9);
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+}
+
+.yonetim-panel-action:hover {
+  color: #ffffff;
+}
+
 .yonetim-selection-pill {
   min-height: 56px;
   padding: 12px 14px;
@@ -297,6 +335,11 @@
   display: grid;
   gap: 4px;
   transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.yonetim-form-stack--sube .yonetim-selection-pill {
+  min-height: 48px;
+  padding: 10px 12px;
 }
 
 .yonetim-selection-pill strong,
@@ -487,6 +530,10 @@
   align-items: center;
 }
 
+.yonetim-inline-add-row--panel {
+  margin-bottom: 2px;
+}
+
 .yonetim-inline-add-btn {
   min-width: 42px;
   min-height: 42px;
@@ -499,8 +546,25 @@
   cursor: pointer;
 }
 
+.yonetim-inline-add-row--panel .yonetim-inline-add-btn {
+  min-width: 72px;
+  min-height: 42px;
+  padding: 0 14px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 12px;
+  background: rgba(10, 14, 22, 0.86);
+  color: rgba(244, 246, 250, 0.88);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
 .yonetim-inline-add-btn:hover:not(:disabled) {
   color: rgb(var(--theme-color-rgb));
+}
+
+.yonetim-inline-add-row--panel .yonetim-inline-add-btn:hover:not(:disabled) {
+  border-color: rgba(var(--theme-color-rgb), 0.72);
+  background: rgba(12, 17, 26, 0.94);
 }
 
 .yonetim-inline-add-btn:disabled {

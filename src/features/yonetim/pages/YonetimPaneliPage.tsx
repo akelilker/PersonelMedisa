@@ -322,6 +322,7 @@ export function YonetimPaneliPage() {
   const [isKullaniciFormOpen, setIsKullaniciFormOpen] = useState(false);
   const [isSubeFormOpen, setIsSubeFormOpen] = useState(false);
   const [isDepartmanPickerOpen, setIsDepartmanPickerOpen] = useState(false);
+  const [isDepartmanCreateOpen, setIsDepartmanCreateOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isAddingDepartman, setIsAddingDepartman] = useState(false);
@@ -360,7 +361,7 @@ export function YonetimPaneliPage() {
         .map((departman) => departman.label),
     [departmanOptions, subeForm.departmanIds]
   );
-  const selectedDepartmanSummary = selectedDepartmanLabels.length > 0 ? selectedDepartmanLabels.join(", ") : "Departman seç";
+  const selectedDepartmanSummary = selectedDepartmanLabels.length > 0 ? selectedDepartmanLabels.join(", ") : "Departman seçimi";
 
   async function loadPanel() {
     setIsLoading(true);
@@ -417,6 +418,7 @@ export function YonetimPaneliPage() {
     setSubeForm(INITIAL_SUBE_FORM);
     setYeniDepartmanAdi("");
     setIsDepartmanPickerOpen(false);
+    setIsDepartmanCreateOpen(false);
     setIsSubeFormOpen(false);
   }
 
@@ -443,6 +445,7 @@ export function YonetimPaneliPage() {
     setSubeForm(INITIAL_SUBE_FORM);
     setYeniDepartmanAdi("");
     setIsDepartmanPickerOpen(false);
+    setIsDepartmanCreateOpen(false);
     setIsSubeFormOpen(true);
   }
 
@@ -453,6 +456,7 @@ export function YonetimPaneliPage() {
     setSubeForm(subeFormFromItem(item));
     setYeniDepartmanAdi("");
     setIsDepartmanPickerOpen(false);
+    setIsDepartmanCreateOpen(false);
     setIsSubeFormOpen(true);
   }
 
@@ -568,6 +572,7 @@ export function YonetimPaneliPage() {
         departmanIds: prev.departmanIds.includes(created.id) ? prev.departmanIds : [...prev.departmanIds, created.id]
       }));
       setYeniDepartmanAdi("");
+      setIsDepartmanCreateOpen(false);
       setSuccessMessage(`"${created.label}" departmanı seçeneklere eklendi.`);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Departman eklenemedi.");
@@ -821,7 +826,7 @@ export function YonetimPaneliPage() {
 
       {isSubeFormOpen ? (
         <AppModal title={editingSubeId != null ? "Şube Yönetimi" : "Yeni Şube"} onClose={resetSubeEditor}>
-          <form className="yonetim-form-stack" id={YONETIM_SUBE_FORM_ID} onSubmit={handleSubeSubmit}>
+          <form className="yonetim-form-stack yonetim-form-stack--sube" id={YONETIM_SUBE_FORM_ID} onSubmit={handleSubeSubmit}>
             <div className="form-field-grid">
               <FormField
                 label="Şube Kodu"
@@ -848,8 +853,7 @@ export function YonetimPaneliPage() {
             </div>
 
             <div className="yonetim-checkbox-section">
-              <p className="yonetim-checkbox-title">Departmanlar</p>
-              <p className="yonetim-hint">Şube kapsamındaki departmanları seç. Yeni seçenek gerekirse sağdaki artı ile ekle.</p>
+              <p className="yonetim-checkbox-title">Departman Seçimi</p>
               <button
                 type="button"
                 className={`form-input yonetim-selection-trigger${isDepartmanPickerOpen ? " is-open" : ""}`}
@@ -870,6 +874,36 @@ export function YonetimPaneliPage() {
                   id="yonetim-sube-departman-panel"
                   data-testid="yonetim-sube-departman-panel"
                 >
+                  <div className="yonetim-selection-panel-head">
+                    <button
+                      type="button"
+                      className="yonetim-panel-action"
+                      onClick={() => setIsDepartmanCreateOpen((prev) => !prev)}
+                    >
+                      + Yeni Departman
+                    </button>
+                  </div>
+
+                  {isDepartmanCreateOpen ? (
+                    <div className="yonetim-inline-add-row yonetim-inline-add-row--panel">
+                      <input
+                        className="form-input"
+                        type="text"
+                        value={yeniDepartmanAdi}
+                        onChange={(event) => setYeniDepartmanAdi(event.target.value)}
+                        placeholder="Yeni departman adı"
+                      />
+                      <button
+                        type="button"
+                        className="yonetim-inline-add-btn"
+                        onClick={() => void handleDepartmanAdd()}
+                        disabled={isAddingDepartman || yeniDepartmanAdi.trim().length === 0}
+                      >
+                        Ekle
+                      </button>
+                    </div>
+                  ) : null}
+
                   <div className="yonetim-selection-grid yonetim-selection-grid--departmanlar">
                     {departmanOptions.map((departman) => (
                       <button
@@ -885,25 +919,6 @@ export function YonetimPaneliPage() {
                   </div>
                 </div>
               ) : null}
-
-              <div className="yonetim-inline-add-row">
-                <input
-                  className="form-input"
-                  type="text"
-                  value={yeniDepartmanAdi}
-                  onChange={(event) => setYeniDepartmanAdi(event.target.value)}
-                  placeholder="Yeni departman adı"
-                />
-                <button
-                  type="button"
-                  className="yonetim-inline-add-btn"
-                  onClick={() => void handleDepartmanAdd()}
-                  disabled={isAddingDepartman || yeniDepartmanAdi.trim().length === 0}
-                  aria-label="Departman ekle"
-                >
-                  +
-                </button>
-              </div>
             </div>
 
             <div className="form-actions-row">

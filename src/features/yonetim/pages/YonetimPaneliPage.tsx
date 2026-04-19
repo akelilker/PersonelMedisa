@@ -94,7 +94,6 @@ const SUBE_YETKISI_DEGISTI_SUREC_TURU = "SUBE_YETKISI_DEGISTI";
 function roleOptions() {
   return Object.entries(ROLE_LABELS).map(([value, label]) => ({ value, label }));
 }
-}
 
 function formatNameToken(value: string) {
   if (!value) {

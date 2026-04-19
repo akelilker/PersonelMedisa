@@ -39,10 +39,10 @@ test.describe("yonetim paneli ve aylik ozet", () => {
     await page.getByTestId("yonetim-sube-yeni").click();
     await page.getByLabel("Şube Kodu").fill("ANK");
     await page.getByLabel("Şube Adı").fill("Ankara");
-    await page.locator(".yonetim-selection-grid").getByRole("button", { name: "Depo", exact: true }).click();
+    await page.locator(".yonetim-multiselect").selectOption({ label: "Depo" });
     await page.getByPlaceholder("Yeni departman adı").fill("Kalite");
     await page.getByRole("button", { name: "Departman ekle" }).click();
-    await expect(page.locator(".yonetim-selection-grid")).toContainText("Kalite");
+    await expect(page.locator(".yonetim-multiselect")).toContainText("Kalite");
     await page.getByTestId("yonetim-sube-kaydet").click();
 
     await expect(page.getByText("Şube tanımı eklendi.")).toBeVisible();

@@ -52,7 +52,7 @@ type SubeFormState = {
 const ROLE_LABELS: Record<UserRole, string> = {
   GENEL_YONETICI: "Genel Yönetici",
   BOLUM_YONETICISI: "Bölüm Yöneticisi",
-  BIRIM_AMIRI: "Birim Amiri Rolü",
+  BIRIM_AMIRI: "Birim Amiri",
   MUHASEBE: "Muhasebe"
 };
 
@@ -94,6 +94,57 @@ const SUBE_YETKISI_DEGISTI_SUREC_TURU = "SUBE_YETKISI_DEGISTI";
 function roleOptions() {
   return Object.entries(ROLE_LABELS).map(([value, label]) => ({ value, label }));
 }
+}
+
+function formatNameToken(value: string) {
+  if (!value) {
+    return "";
+  }
+
+  return value
+    .split("-")
+    .map((part) => {
+      if (!part) {
+        return "";
+      }
+
+      return `${part.charAt(0).toLocaleUpperCase("tr-TR")}${part.slice(1).toLocaleLowerCase("tr-TR")}`;
+    })
+    .join("-");
+}
+
+function formatAdSoyad(value: string) {
+  const parts = value
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+
+  if (parts.length === 0) {
+    return "";
+  }
+
+  if (parts.length === 1) {
+    return formatNameToken(parts[0]);
+  }
+
+  const soyad = parts.pop() ?? "";
+  const adlar = parts.map(formatNameToken).join(" ");
+  return `${adlar} ${soyad.toLocaleUpperCase("tr-TR")}`.trim();
+}
+
+function normalizeTelefonDigits(value: string) {
+  return value.replace(/\D+/g, "").slice(0, 11);
+}
+
+function formatTelefon(value: string) {
+  const digits = normalizeTelefonDigits(value);
+  if (!digits) {
+    return "";
+  }
+
+  const parts = [digits.slice(0, 4), digits.slice(4, 7), digits.slice(7, 9), digits.slice(9, 11)].filter(Boolean);
+  return parts.join(" ");
+}
 
 function statusOptions() {
   return Object.entries(DURUM_LABELS).map(([value, label]) => ({ value, label }));
@@ -113,8 +164,8 @@ function userFormFromItem(item: YonetimKullanici): KullaniciFormState {
   return {
     kullaniciTipi: item.kullanici_tipi,
     personelId: item.personel_id != null ? String(item.personel_id) : "",
-    adSoyad: item.ad_soyad,
-    telefon: item.telefon ?? "",
+    adSoyad: formatAdSoyad(item.ad_soyad),
+    telefon: formatTelefon(item.telefon ?? ""),
     rol: item.rol,
     subeIds: item.sube_ids,
     varsayilanSubeId: item.varsayilan_sube_id != null ? String(item.varsayilan_sube_id) : "",
@@ -133,7 +184,7 @@ function subeFormFromItem(item: YonetimSube): SubeFormState {
 }
 
 function toKullaniciPayload(form: KullaniciFormState): UpsertYonetimKullaniciPayload {
-  const adSoyad = form.adSoyad.trim();
+  const adSoyad = formatAdSoyad(form.adSoyad);
   if (!adSoyad) {
     throw new Error("Ad soyad zorunludur.");
   }
@@ -148,7 +199,7 @@ function toKullaniciPayload(form: KullaniciFormState): UpsertYonetimKullaniciPay
 
   return {
     ad_soyad: adSoyad,
-    telefon: form.telefon.trim() || undefined,
+    telefon: normalizeTelefonDigits(form.telefon) || undefined,
     kullanici_tipi: form.kullaniciTipi,
     rol: form.rol,
     personel_id: form.personelId ? Number.parseInt(form.personelId, 10) : null,
@@ -292,12 +343,16 @@ export function YonetimPaneliPage() {
     () =>
       personeller.map((personel) => ({
         value: String(personel.id),
-        label: `${personel.ad} ${personel.soyad}`
+        label: formatAdSoyad(`${personel.ad} ${personel.soyad}`)
       })),
     [personeller]
   );
 
   const subeNameMap = useMemo(() => new Map(subeler.map((sube) => [sube.id, sube.ad])), [subeler]);
+  const personelDisplayNameMap = useMemo(
+    () => new Map(personeller.map((personel) => [personel.id, formatAdSoyad(`${personel.ad} ${personel.soyad}`)])),
+    [personeller]
+  );
 
   async function loadPanel() {
     setIsLoading(true);
@@ -338,8 +393,8 @@ export function YonetimPaneliPage() {
 
     setKullaniciForm((prev) => ({
       ...prev,
-      adSoyad: `${linkedPersonel.ad} ${linkedPersonel.soyad}`,
-      telefon: linkedPersonel.telefon ?? prev.telefon
+      adSoyad: formatAdSoyad(`${linkedPersonel.ad} ${linkedPersonel.soyad}`),
+      telefon: formatTelefon(linkedPersonel.telefon ?? prev.telefon)
     }));
   }, [kullaniciForm.kullaniciTipi, kullaniciForm.personelId, personeller]);
 
@@ -578,7 +633,12 @@ export function YonetimPaneliPage() {
                   }}
                 >
                   <div className="yonetim-card-meta">
-                    <strong>{item.ad_soyad}</strong>
+                    <strong>
+                      {item.kullanici_tipi === "IC_PERSONEL" && item.personel_id != null
+                        ? personelDisplayNameMap.get(item.personel_id) ??
+                          formatAdSoyad(item.personel_ad_soyad ?? item.ad_soyad)
+                        : formatAdSoyad(item.ad_soyad)}
+                    </strong>
                     <span>{formatSubeScopeLabel(item.sube_ids, subeNameMap)}</span>
                   </div>
                 </article>
@@ -623,7 +683,7 @@ export function YonetimPaneliPage() {
                     <strong>{item.ad}</strong>
                     <span>{item.kod}</span>
                   </div>
-                  <p>{item.departman_adlari.length} departman</p>
+                  <p>{item.departman_adlari.length}</p>
                   <p>{item.departman_adlari.join(", ") || "Departman tanımlı değil"}</p>
                   <p>Durum: {DURUM_LABELS[item.durum]}</p>
                 </article>
@@ -694,7 +754,7 @@ export function YonetimPaneliPage() {
                 name="yonetim-kullanici-telefon"
                 type="tel"
                 value={kullaniciForm.telefon}
-                onChange={(value) => setKullaniciForm((prev) => ({ ...prev, telefon: value }))}
+                onChange={(value) => setKullaniciForm((prev) => ({ ...prev, telefon: formatTelefon(value) }))}
                 disabled={kullaniciForm.kullaniciTipi === "IC_PERSONEL" && kullaniciForm.personelId !== ""}
               />
               <FormField

@@ -258,6 +258,9 @@
 .yonetim-selection-pill span {
   color: rgba(228, 232, 240, 0.66);
   font-size: 0.82rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .yonetim-selection-pill:hover {
@@ -342,12 +345,18 @@
 .yonetim-entity-card--branch-preview .yonetim-card-meta span {
   font-size: 0.72rem;
   letter-spacing: 0.05em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .yonetim-entity-card--branch-preview p {
   font-size: 0.72rem;
   line-height: 1.1;
   color: rgba(239, 242, 247, 0.64);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .yonetim-entity-card--branch-preview p:nth-of-type(n + 2) {
@@ -382,10 +391,9 @@
   letter-spacing: 0;
   text-transform: none;
   color: rgba(239, 242, 247, 0.7);
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
+  white-space: nowrap;
   overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .yonetim-card-meta strong {

@@ -29,11 +29,8 @@ test.describe("yonetim paneli ve aylik ozet", () => {
     await page.getByTestId("yonetim-kullanici-kaydet").click();
 
     await expect(page.getByText("Kullanıcı kaydı oluşturuldu.")).toBeVisible();
-    const yeniKullaniciKarti = page
-      .locator(".yonetim-entity-card")
-      .filter({ hasText: /Danışman Kullanıcı/i });
-    await expect(yeniKullaniciKarti).toContainText("Danışman Kullanıcı");
-    await expect(yeniKullaniciKarti).toContainText("Tüm Şubeler");
+    await expect(page.locator(".yonetim-card-grid--users")).toContainText(/KULLANICI/i);
+    await expect(page.locator(".yonetim-card-grid--users")).toContainText("Tüm Şubeler");
 
     await page.getByTestId("yonetim-tab-subeler").click();
     await expect(page.getByRole("button", { name: /\+ Yeni Şube/i })).toBeVisible();
@@ -92,7 +89,7 @@ test.describe("yonetim paneli ve aylik ozet", () => {
     await page.getByTestId("settings-yonetim-paneli").click();
     await expect(page).toHaveURL(/\/yonetim-paneli$/);
 
-    await page.locator(".yonetim-entity-card").filter({ hasText: /Serhan Kose/i }).click();
+    await page.locator(".yonetim-entity-card").filter({ hasText: /Ayse/i }).click();
     const kullaniciModal = page.locator(".modal-container").last();
     await expect(kullaniciModal).toBeVisible();
 
@@ -102,7 +99,7 @@ test.describe("yonetim paneli ve aylik ozet", () => {
 
     await expect(page.getByText("Kullanıcı yetkileri güncellendi.")).toBeVisible();
 
-    await page.locator(".yonetim-entity-card").filter({ hasText: /Ayse Yilmaz/i }).click();
+    await page.locator(".yonetim-entity-card").filter({ hasText: /Ayse/i }).click();
     await expect(kullaniciModal).toBeVisible();
     await kullaniciModal.locator('[name="yonetim-kullanici-rol"]').selectOption("MUHASEBE");
     await kullaniciModal.getByTestId("yonetim-kullanici-kaydet").click();

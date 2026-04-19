@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+﻿import { expect, test } from "@playwright/test";
 import { login } from "./helpers/auth";
 import { mockApi } from "./helpers/mock-api";
 
@@ -73,10 +73,10 @@ test.describe("e2e smoke", () => {
     await amirBildirimModal.getByLabel("Tarih").fill("2026-04-11");
     await amirBildirimModal.getByLabel("Personel").selectOption("2");
     await amirBildirimModal.getByLabel("Kayıt Senaryosu").selectOption("IZINSIZ_GELMEDI");
-    await amirBildirimModal.getByLabel("Not / Açıklama").fill("Habersiz devamsizlik");
+    await amirBildirimModal.getByLabel("Not / Açıklama").fill("Habersiz devamsızlık");
     await amirBildirimModal.getByRole("button", { name: "Kaydet" }).click();
 
-    await expect(page.locator(".bildirimler-list")).toContainText(/[Iİ]zinsiz Gelmedi/i);
+    await expect(page.locator(".bildirimler-list")).toContainText(/[İI]zinsiz Gelmedi/i);
     await expect(page.locator(".bildirimler-list")).toContainText("Mehmet Kaya");
 
     await page.goto("/personeller");
@@ -152,7 +152,7 @@ test.describe("e2e smoke", () => {
     await bildirimCreateModal.getByLabel("Tarih").fill("2026-04-11");
     await bildirimCreateModal.getByLabel("Personel").selectOption("1");
     await bildirimCreateModal.getByLabel("Kayıt Senaryosu").selectOption("DEVAMSIZLIK");
-    await bildirimCreateModal.getByLabel("Not / Açıklama").fill("Yeni gunluk kayit");
+    await bildirimCreateModal.getByLabel("Not / Açıklama").fill("Yeni günlük kayıt");
     await bildirimCreateModal.getByRole("button", { name: "Kaydet" }).click();
 
     await expect(page.locator(".bildirimler-list")).toContainText(/Devams/i);

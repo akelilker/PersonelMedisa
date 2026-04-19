@@ -1,4 +1,4 @@
-import type { Page, Route } from "@playwright/test";
+﻿import type { Page, Route } from "@playwright/test";
 import type { GunlukPuantaj } from "../../../src/types/puantaj";
 import { hesaplaAylikSgkPuantajOzetleri } from "../../../src/services/dashboard-rapor-servisi";
 
@@ -31,7 +31,7 @@ async function fulfillJson(route: Route, status: number, body: string) {
 export async function mockApi(page: Page, role: MockUserRole) {
   const bagliAmirReferanslari: Array<{ id: number; ad: string; sube_id: number; departman_id: number }> = [
     { id: 9, ad: "Demo Amir", sube_id: 1, departman_id: 3 },
-    { id: 10, ad: "Ikinci Amir", sube_id: 2, departman_id: 6 }
+    { id: 10, ad: "İkinci Amir", sube_id: 2, departman_id: 6 }
   ];
 
   const personeller: Array<{
@@ -67,17 +67,17 @@ export async function mockApi(page: Page, role: MockUserRole) {
     {
       id: 1,
       tc_kimlik_no: "12345678901",
-      ad: "Ayse",
-      soyad: "Yilmaz",
+      ad: "Ayşe",
+      soyad: "Yılmaz",
       aktif_durum: "AKTIF",
       sube_id: 1,
       telefon: "05550000000",
       dogum_tarihi: "1992-03-14",
-      dogum_yeri: "Istanbul",
+      dogum_yeri: "İstanbul",
       kan_grubu: "A Rh+",
       sicil_no: "P-001",
       ise_giris_tarihi: "2023-02-01",
-      acil_durum_kisi: "Fatma Yilmaz",
+      acil_durum_kisi: "Fatma Yılmaz",
       acil_durum_telefon: "05553334455",
       departman_id: 3,
       gorev_id: 1,
@@ -86,13 +86,13 @@ export async function mockApi(page: Page, role: MockUserRole) {
       sube_adi: "Merkez",
       departman_adi: "Döşeme",
       gorev_adi: "Genel Müdür",
-      personel_tipi_adi: "Tam Zamanli",
+      personel_tipi_adi: "Tam Zamanlı",
       bagli_amir_adi: "Demo Amir",
       ucret_tipi_id: 1,
-      ucret_tipi_adi: "Maktu Aylik",
+      ucret_tipi_adi: "Maktu Aylık",
       maas_tutari: 35000,
       prim_kurali_id: 7,
-      prim_kurali_adi: "Prim Kurali 7"
+      prim_kurali_adi: "7 No'lu Prim Kuralı"
     },
     {
       id: 2,
@@ -116,13 +116,13 @@ export async function mockApi(page: Page, role: MockUserRole) {
       sube_adi: "Depolama",
       departman_adi: "Depo",
       gorev_adi: "Üretim Müdürü",
-      personel_tipi_adi: "Yari Zamanli",
+      personel_tipi_adi: "Yarı Zamanlı",
       bagli_amir_adi: "Demo Amir",
       ucret_tipi_id: 2,
       ucret_tipi_adi: "Saatlik",
       maas_tutari: 25000,
       prim_kurali_id: 8,
-      prim_kurali_adi: "Prim Kurali 8"
+      prim_kurali_adi: "8 No'lu Prim Kuralı"
     }
   ];
 
@@ -181,7 +181,7 @@ export async function mockApi(page: Page, role: MockUserRole) {
       urun_turu: "KULAKLIK",
       teslim_tarihi: "2026-01-15",
       teslim_eden: "Bağlı Amir",
-      aciklama: "Onceki vardiyadan teslim alindi",
+      aciklama: "Önceki vardiyadan teslim alındı",
       teslim_durumu: "IKINCI_EL",
       zimmet_durumu: "IADE_EDILDI",
       iade_tarihi: "2026-02-20"
@@ -293,13 +293,13 @@ export async function mockApi(page: Page, role: MockUserRole) {
   ];
 
   const ucretTipiReferans: Array<{ id: number; ad: string }> = [
-    { id: 1, ad: "Maktu Aylik" },
+    { id: 1, ad: "Maktu Aylık" },
     { id: 2, ad: "Saatlik" }
   ];
 
   const primKuraliReferans: Array<{ id: number; ad: string }> = [
-    { id: 7, ad: "Prim Kurali 7" },
-    { id: 8, ad: "Prim Kurali 8" }
+    { id: 7, ad: "7 No'lu Prim Kuralı" },
+    { id: 8, ad: "8 No'lu Prim Kuralı" }
   ];
 
   const subeler: Array<{
@@ -382,7 +382,7 @@ export async function mockApi(page: Page, role: MockUserRole) {
       makine_id: 1101,
       bakim_tarihi: "2026-03-01",
       yapan: "Bakim Ekibi A",
-      notlar: "Aylik kontrol"
+      notlar: "Aylık kontrol"
     },
     {
       id: 2102,
@@ -428,7 +428,7 @@ export async function mockApi(page: Page, role: MockUserRole) {
   }> = [
     {
       id: 1,
-      ad_soyad: "Ilker Akel",
+      ad_soyad: "İlker Akel",
       telefon: "05550000001",
       kullanici_tipi: "HARICI",
       rol: "GENEL_YONETICI",
@@ -436,7 +436,7 @@ export async function mockApi(page: Page, role: MockUserRole) {
       sube_ids: [],
       varsayilan_sube_id: null,
       durum: "AKTIF",
-      notlar: "Tum yapiyi yonetir"
+      notlar: "Tüm yapıyı yönetir"
     },
     {
       id: 2,
@@ -448,11 +448,11 @@ export async function mockApi(page: Page, role: MockUserRole) {
       sube_ids: [2],
       varsayilan_sube_id: 2,
       durum: "AKTIF",
-      notlar: "Depolama kapsaminda bolum onayi verir"
+      notlar: "Depolama kapsamında bölüm onayı verir"
     },
     {
       id: 3,
-      ad_soyad: "Serhan Kose",
+      ad_soyad: "Serhan Köse",
       telefon: "05550000003",
       kullanici_tipi: "IC_PERSONEL",
       rol: "BIRIM_AMIRI",
@@ -460,7 +460,7 @@ export async function mockApi(page: Page, role: MockUserRole) {
       sube_ids: [1],
       varsayilan_sube_id: 1,
       durum: "AKTIF",
-      notlar: "Gunluk kayitlari girer"
+      notlar: "Günlük kayıtları girer"
     }
   ];
 
@@ -489,13 +489,13 @@ export async function mockApi(page: Page, role: MockUserRole) {
     {
       ay: "2026-04",
       personel_id: 1,
-      ad_soyad: "Ayse Yilmaz",
+      ad_soyad: "Ayşe Yılmaz",
       sicil_no: "P-001",
       sube_id: 1,
       sube: "Merkez",
       departman_id: 3,
       bolum: "Döşeme",
-      bagli_amir_adi: "Serhan Kose",
+      bagli_amir_adi: "Serhan Köse",
       devamsizlik_gun: 0,
       gec_kalma_adet: 1,
       izinli_gelmedi: 0,
@@ -505,7 +505,7 @@ export async function mockApi(page: Page, role: MockUserRole) {
       ceza_kesinti_tutari: 0,
       bolum_onay_durumu: "BOLUM_ONAYINDA",
       revize_var_mi: false,
-      son_islem: "Bagli amir gunluk kayitlari hazirladi",
+      son_islem: "Bağlı amir günlük kayıtları hazırladı",
       kapanis_durumu: "ACIK"
     },
     {
@@ -517,7 +517,7 @@ export async function mockApi(page: Page, role: MockUserRole) {
       sube: "Depolama",
       departman_id: 6,
       bolum: "Depo",
-      bagli_amir_adi: "Serhan Kose",
+      bagli_amir_adi: "Serhan Köse",
       devamsizlik_gun: 1,
       gec_kalma_adet: 0,
       izinli_gelmedi: 1,
@@ -527,7 +527,7 @@ export async function mockApi(page: Page, role: MockUserRole) {
       ceza_kesinti_tutari: 450,
       bolum_onay_durumu: "REVIZE_ISTENDI",
       revize_var_mi: true,
-      son_islem: "Bolum yoneticisi revize istedi",
+      son_islem: "Bölüm yöneticisi revize istedi",
       kapanis_durumu: "ACIK"
     }
   ];
@@ -602,7 +602,7 @@ let bildirimIdCounter = 800;
       },
       pasiflik_durumu: {
         aktif_durum: personel.aktif_durum,
-        etiket: personel.aktif_durum === "PASIF" ? "Isten Ayrildi" : null
+        etiket: personel.aktif_durum === "PASIF" ? "İşten Ayrıldı" : null
       },
       referans_adlari: {
         sube: personel.sube_adi,
@@ -810,10 +810,10 @@ let bildirimIdCounter = 800;
         okBody({
           token: "mock-token",
           ui_profile: role === "BIRIM_AMIRI" ? "birim_amiri" : "yonetim",
-          sube_list: subeIds.map((id) => ({ id, ad: subeler.find((item) => item.id === id)?.ad ?? `Sube ${id}` })),
+          sube_list: subeIds.map((id) => ({ id, ad: subeler.find((item) => item.id === id)?.ad ?? `Şube ${id}` })),
           user: {
             id: 1,
-            ad_soyad: "Mock Kullanici",
+            ad_soyad: "Mock Kullanıcı",
             rol: role,
             sube_ids: subeIds
           }
@@ -1229,17 +1229,17 @@ let bildirimIdCounter = 800;
           ana_kart: {
             id: 1,
             tc_kimlik_no: "12345678901",
-            ad: "Ayse",
-            soyad: "Yilmaz",
+            ad: "Ayşe",
+            soyad: "Yılmaz",
             aktif_durum: "AKTIF",
             sube_id: 1,
             telefon: "05550000000",
             dogum_tarihi: "1992-03-14",
-            dogum_yeri: "Istanbul",
+            dogum_yeri: "İstanbul",
             kan_grubu: "A Rh+",
             sicil_no: "P-001",
             ise_giris_tarihi: "2023-02-01",
-            acil_durum_kisi: "Fatma Yilmaz",
+            acil_durum_kisi: "Fatma Yılmaz",
             acil_durum_telefon: "05553334455",
             departman_id: 3,
             gorev_id: 1,
@@ -1260,7 +1260,7 @@ let bildirimIdCounter = 800;
             sube: "Merkez",
             departman: "Döşeme",
             gorev: "Genel Müdür",
-            personel_tipi: "Tam Zamanli",
+            personel_tipi: "Tam Zamanlı",
             bagli_amir: "Demo Amir"
           }
         })
@@ -1484,8 +1484,8 @@ let bildirimIdCounter = 800;
           route,
           200,
           okBody([
-            { id: 1, ad: "Tam Zamanli" },
-            { id: 2, ad: "Yari Zamanli" }
+            { id: 1, ad: "Tam Zamanlı" },
+            { id: 2, ad: "Yarı Zamanlı" }
           ])
         );
         return;
@@ -1496,11 +1496,11 @@ let bildirimIdCounter = 800;
           route,
           200,
           okBody([
-            { key: "IZIN", label: "Izin" },
+            { key: "IZIN", label: "İzin" },
             { key: "RAPOR", label: "Rapor" },
-            { key: "IS_KAZASI", label: "Is Kazasi" },
-            { key: "DEVAMSIZLIK", label: "Devamsizlik" },
-            { key: "ISTEN_AYRILMA", label: "Isten Ayrilma" }
+            { key: "IS_KAZASI", label: "İş Kazası" },
+            { key: "DEVAMSIZLIK", label: "Devamsızlık" },
+            { key: "ISTEN_AYRILMA", label: "İşten Ayrılma" }
           ])
         );
         return;
@@ -1516,11 +1516,11 @@ let bildirimIdCounter = 800;
           route,
           200,
           okBody([
-            { key: "GEC_GELDI", label: "Gec Geldi" },
+            { key: "GEC_GELDI", label: "Geç Geldi" },
             { key: "GELMEDI", label: "Gelmedi" },
-            { key: "IZINLI_GELMEDI", label: "Izinli Gelmedi" },
-            { key: "IZINSIZ_GELMEDI", label: "Izinsiz Gelmedi" },
-            { key: "DEVAMSIZLIK", label: "Devamsizlik" },
+            { key: "IZINLI_GELMEDI", label: "İzinli Gelmedi" },
+            { key: "IZINSIZ_GELMEDI", label: "İzinsiz Gelmedi" },
+            { key: "DEVAMSIZLIK", label: "Devamsızlık" },
             { key: "RAPORLU", label: "Raporlu" }
           ])
         );
@@ -1897,7 +1897,7 @@ let bildirimIdCounter = 800;
             items: [
               {
                 personel_id: 1,
-                ad_soyad: "Ayse Yilmaz",
+                ad_soyad: "Ayşe Yılmaz",
                 net_calisma_dakika: 510,
                 sgk_donem: sgkOzeti?.donem ?? "2026-04",
                 sgk_prim_gun: sgkOzeti?.sgk_prim_gun ?? 30,
@@ -1974,3 +1974,4 @@ let bildirimIdCounter = 800;
     }
   );
 }
+

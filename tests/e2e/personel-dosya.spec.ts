@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+﻿import { expect, test } from "@playwright/test";
 import { login } from "./helpers/auth";
 import { mockApi } from "./helpers/mock-api";
 
@@ -36,7 +36,7 @@ test.describe("personel dosyasi surec akisi", () => {
     await surecModal.locator("[name='personel-surec-aciklama']").fill("Is akdi sonlandirildi");
     await surecModal.getByRole("button", { name: "Kaydet" }).click();
 
-    await expect(page.locator(".personel-dosya-hero")).toContainText(/Isten Ayrildi|Pasif/i);
+    await expect(page.locator(".personel-dosya-hero")).toContainText(/İşten Ayrıldı|Pasif/i);
     await page.getByRole("tab", { name: "Süreç Geçmişi" }).click();
     const surecPanel = page.locator("#personel-kart-panel-surec-gecmisi");
     const timeline = surecPanel.locator("[data-testid='personel-surec-timeline']");
@@ -88,9 +88,7 @@ test.describe("personel dosyasi surec akisi", () => {
     await expect(telefonRow.locator(".personel-zimmet-note-cell")).toContainText(/TEL-900/);
   });
 
-  test("yonetici departman ve gecerlilik tarihi ile org surecini uretir ve timeline tepesinde gosterir", async ({
-    page
-  }) => {
+  test("yonetici departman ve gecerlilik tarihi ile org surecini uretir ve timeline tepesinde gosterir", async ({ page }) => {
     await mockApi(page, "GENEL_YONETICI");
 
     await login(page, { username: "yonetici", password: "secret" });
@@ -138,7 +136,7 @@ test.describe("personel dosyasi surec akisi", () => {
     const timeline = page.locator("#personel-kart-panel-surec-gecmisi").locator("[data-testid='personel-surec-timeline']");
     await expect(timeline).toContainText(/Amir/i);
     await expect(timeline).toContainText(/Demo Amir/i);
-    await expect(timeline).toContainText(/İkinci Amir/i);
+    await expect(timeline).toContainText(/İkinci Amir|Ikinci Amir/i);
   });
 
   test("yonetici izlenen org alanlarina dokunmadan kaydettiginde otomatik surec olusmaz", async ({ page }) => {

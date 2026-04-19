@@ -1781,21 +1781,21 @@ export function resolveDemoApiResponse(
 
     if (pathname === "/referans/surec-turleri") {
       return ok([
-        { key: "IZIN", label: "Ä°zin" },
+        { key: "IZIN", label: "İzin" },
         { key: "RAPOR", label: "Rapor" },
-        { key: "IS_KAZASI", label: "Ä°ÅŸ KazasÄ±" },
-        { key: "DEVAMSIZLIK", label: "DevamsÄ±zlÄ±k" },
-        { key: "ISTEN_AYRILMA", label: "Ä°ÅŸten AyrÄ±lma" }
+        { key: "IS_KAZASI", label: "İş Kazası" },
+        { key: "DEVAMSIZLIK", label: "Devamsızlık" },
+        { key: "ISTEN_AYRILMA", label: "İşten Ayrılma" }
       ]);
     }
 
     if (pathname === "/referans/bildirim-turleri") {
       return ok([
-        { key: "GEC_GELDI", label: "GeÃ§ Geldi" },
+        { key: "GEC_GELDI", label: "Geç Geldi" },
         { key: "GELMEDI", label: "Gelmedi" },
-        { key: "IZINLI_GELMEDI", label: "Ä°zinli Gelmedi" },
-        { key: "IZINSIZ_GELMEDI", label: "Ä°zinsiz Gelmedi" },
-        { key: "DEVAMSIZLIK", label: "DevamsÄ±zlÄ±k" },
+        { key: "IZINLI_GELMEDI", label: "İzinli Gelmedi" },
+        { key: "IZINSIZ_GELMEDI", label: "İzinsiz Gelmedi" },
+        { key: "DEVAMSIZLIK", label: "Devamsızlık" },
         { key: "RAPORLU", label: "Raporlu" }
       ]);
     }

@@ -17,9 +17,9 @@ test.describe("e2e smoke", () => {
     await page.getByTestId("menu-personel-karti").click();
     await expect(page).toHaveURL(/\/personeller$/);
     await expect(page.getByRole("heading", { name: "Personeller" })).toBeVisible();
-    await expect(page.getByText("Ayse Yilmaz")).toBeVisible();
+    await expect(page.getByText("Ayşe Yılmaz")).toBeVisible();
 
-    await page.getByRole("link", { name: /Ayse Yilmaz.*kişisinin kartını aç/i }).first().click();
+    await page.getByRole("link", { name: /Ayşe Yılmaz.*kişisinin kartını aç/i }).first().click();
     await expect(page).toHaveURL(/\/personeller\/1$/);
     await expect(page.locator(".modal-header h2").first()).toContainText("Personel Detayı");
 

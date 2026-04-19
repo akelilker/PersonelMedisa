@@ -90,7 +90,7 @@ test.describe("yonetim paneli ve aylik ozet", () => {
     await page.getByTestId("settings-yonetim-paneli").click();
     await expect(page).toHaveURL(/\/yonetim-paneli$/);
 
-    await page.locator(".yonetim-entity-card").filter({ hasText: /Ayse/i }).click();
+    await page.locator(".yonetim-entity-card").filter({ hasText: /Ayşe/i }).click();
     const kullaniciModal = page.locator(".modal-container").last();
     await expect(kullaniciModal).toBeVisible();
 
@@ -100,7 +100,7 @@ test.describe("yonetim paneli ve aylik ozet", () => {
 
     await expect(page.getByText("Kullanıcı yetkileri güncellendi.")).toBeVisible();
 
-    await page.locator(".yonetim-entity-card").filter({ hasText: /Ayse/i }).click();
+    await page.locator(".yonetim-entity-card").filter({ hasText: /Ayşe/i }).click();
     await expect(kullaniciModal).toBeVisible();
     await kullaniciModal.locator('[name="yonetim-kullanici-rol"]').selectOption("MUHASEBE");
     await kullaniciModal.getByTestId("yonetim-kullanici-kaydet").click();

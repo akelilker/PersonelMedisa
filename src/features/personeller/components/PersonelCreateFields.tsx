@@ -37,8 +37,8 @@ function refMissingNote(label: string, blocking: boolean) {
   return (
     <p className="personel-create-error" role="alert">
       {blocking
-        ? `${label} listesi yuklenemedi. Bu alan zorunlu; referanslar gelene kadar kayit olusturulamaz.`
-        : `${label} referansi yuklenemedi; bu alan simdilik secilemez.`}
+        ? `${label} listesi yüklenemedi. Bu alan zorunlu; referanslar gelene kadar kayıt oluşturulamaz.`
+        : `${label} referansı yüklenemedi; bu alan şimdilik seçilemez.`}
     </p>
   );
 }
@@ -82,7 +82,7 @@ export function PersonelCreateFields({
             required
           />
           <FormField
-            label="Dogum Tarihi"
+            label="Doğum Tarihi"
             name="create-dogum"
             type="date"
             value={form.dogumTarihi}
@@ -98,7 +98,7 @@ export function PersonelCreateFields({
             required
           />
           <FormField
-            label="Acil Durum Kisisi"
+            label="Acil Durum Kişisi"
             name="create-acil-kisi"
             value={form.acilDurumKisi}
             onChange={(value) => setForm((prev) => ({ ...prev, acilDurumKisi: value }))}
@@ -113,7 +113,7 @@ export function PersonelCreateFields({
             required
           />
           <FormField
-            label="Dogum Yeri"
+            label="Doğum Yeri"
             name="create-dogum-yeri"
             value={form.dogumYeri}
             onChange={(value) => setForm((prev) => ({ ...prev, dogumYeri: value }))}
@@ -124,7 +124,7 @@ export function PersonelCreateFields({
             name="create-kan"
             value={form.kanGrubu}
             onChange={(value) => setForm((prev) => ({ ...prev, kanGrubu: value }))}
-            placeholderOption={{ value: "", label: "Seciniz" }}
+            placeholderOption={{ value: "", label: "Seçiniz" }}
             selectOptions={kanGrubuOptions}
           />
         </div>
@@ -138,7 +138,7 @@ export function PersonelCreateFields({
             required
           />
           <FormField
-            label="Ise Giris Tarihi"
+            label="İşe Giriş Tarihi"
             name="create-ise-giris"
             type="date"
             value={form.iseGirisTarihi}
@@ -149,14 +149,14 @@ export function PersonelCreateFields({
             <>
               <FormField
                 as="select"
-                label="Bagli Amir"
+                label="Bağlı Amir"
                 name="create-bagli-amir"
                 value={form.bagliAmirId}
                 onChange={
                   onBagliAmirChange ??
                   ((value) => setForm((prev) => ({ ...prev, bagliAmirId: value })))
                 }
-                placeholderOption={{ value: "", label: "Seciniz" }}
+                placeholderOption={{ value: "", label: "Seçiniz" }}
                 selectOptions={toSelectOptions(refs.bagliAmirOptions)}
               />
               {bagliAmirInfoMessage ? (
@@ -167,13 +167,13 @@ export function PersonelCreateFields({
               ) : null}
             </>
           ) : (
-            refMissingNote("Bagli amir", false)
+            refMissingNote("Bağlı amir", false)
           )}
           {refs.departmanOptions.length > 0 ? (
             <>
               <FormField
                 as="select"
-                label="Bolum"
+                label="Bölüm"
                 name="create-departman"
                 value={form.departmanId}
                 onChange={
@@ -181,7 +181,7 @@ export function PersonelCreateFields({
                   ((value) => setForm((prev) => ({ ...prev, departmanId: value })))
                 }
                 required
-                placeholderOption={{ value: "", label: "Seciniz" }}
+                placeholderOption={{ value: "", label: "Seçiniz" }}
                 selectOptions={toSelectOptions(refs.departmanOptions)}
               />
               {bagliAmirDepartmanWarning ? (
@@ -201,7 +201,7 @@ export function PersonelCreateFields({
               value={form.gorevId}
               onChange={(value) => setForm((prev) => ({ ...prev, gorevId: value }))}
               required
-              placeholderOption={{ value: "", label: "Seciniz" }}
+              placeholderOption={{ value: "", label: "Seçiniz" }}
               selectOptions={toSelectOptions(refs.gorevOptions)}
             />
           ) : (
@@ -215,7 +215,7 @@ export function PersonelCreateFields({
               value={form.personelTipiId}
               onChange={(value) => setForm((prev) => ({ ...prev, personelTipiId: value }))}
               required
-              placeholderOption={{ value: "", label: "Seciniz" }}
+              placeholderOption={{ value: "", label: "Seçiniz" }}
               selectOptions={toSelectOptions(refs.personelTipiOptions)}
             />
           ) : (
@@ -228,7 +228,7 @@ export function PersonelCreateFields({
               name="create-ucret-tipi"
               value={form.ucretTipiId}
               onChange={(value) => setForm((prev) => ({ ...prev, ucretTipiId: value }))}
-              placeholderOption={{ value: "", label: "Seciniz" }}
+              placeholderOption={{ value: "", label: "Seçiniz" }}
               selectOptions={toSelectOptions(refs.ucretTipiOptions)}
             />
           ) : (
@@ -250,7 +250,7 @@ export function PersonelCreateFields({
               name="create-prim-kurali"
               value={form.primKuraliId}
               onChange={(value) => setForm((prev) => ({ ...prev, primKuraliId: value }))}
-              placeholderOption={{ value: "", label: "Seciniz" }}
+              placeholderOption={{ value: "", label: "Seçiniz" }}
               selectOptions={toSelectOptions(refs.primKuraliOptions)}
             />
           ) : (

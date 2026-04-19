@@ -11,7 +11,7 @@ test.describe("personel dosyasi surec akisi", () => {
     await page.getByTestId("menu-personel-karti").click();
     await expect(page).toHaveURL(/\/personeller$/);
 
-    await page.getByRole("link", { name: /Ayse Yilmaz.*kişisinin kartını aç/i }).first().click();
+    await page.getByRole("link", { name: /Ayşe Yılmaz.*kişisinin kartını aç/i }).first().click();
     await expect(page).toHaveURL(/\/personeller\/1$/);
 
     await page.getByRole("tab", { name: "Puantaj" }).click();
@@ -54,7 +54,7 @@ test.describe("personel dosyasi surec akisi", () => {
     await page.getByTestId("menu-personel-karti").click();
     await expect(page).toHaveURL(/\/personeller$/);
 
-    await page.getByRole("link", { name: /Ayse Yilmaz.*kişisinin kartını aç/i }).first().click();
+    await page.getByRole("link", { name: /Ayşe Yılmaz.*kişisinin kartını aç/i }).first().click();
     await expect(page).toHaveURL(/\/personeller\/1$/);
 
     await page.getByRole("tab", { name: "Zimmet & Envanter" }).click();
@@ -98,7 +98,7 @@ test.describe("personel dosyasi surec akisi", () => {
     await page.getByTestId("menu-personel-karti").click();
     await expect(page).toHaveURL(/\/personeller$/);
 
-    await page.getByRole("link", { name: /Ayse Yilmaz.*kişisinin kartını aç/i }).first().click();
+    await page.getByRole("link", { name: /Ayşe Yılmaz.*kişisinin kartını aç/i }).first().click();
     await expect(page).toHaveURL(/\/personeller\/1$/);
 
     await page.getByRole("button", { name: "Islemler" }).click();
@@ -138,7 +138,7 @@ test.describe("personel dosyasi surec akisi", () => {
     const timeline = page.locator("#personel-kart-panel-surec-gecmisi").locator("[data-testid='personel-surec-timeline']");
     await expect(timeline).toContainText(/Amir/i);
     await expect(timeline).toContainText(/Demo Amir/i);
-    await expect(timeline).toContainText(/Ikinci Amir/i);
+    await expect(timeline).toContainText(/İkinci Amir/i);
   });
 
   test("yonetici izlenen org alanlarina dokunmadan kaydettiginde otomatik surec olusmaz", async ({ page }) => {
@@ -149,7 +149,7 @@ test.describe("personel dosyasi surec akisi", () => {
     await page.getByTestId("menu-personel-karti").click();
     await expect(page).toHaveURL(/\/personeller$/);
 
-    await page.getByRole("link", { name: /Ayse Yilmaz.*kişisinin kartını aç/i }).first().click();
+    await page.getByRole("link", { name: /Ayşe Yılmaz.*kişisinin kartını aç/i }).first().click();
     await expect(page).toHaveURL(/\/personeller\/1$/);
 
     await page.getByRole("tab", { name: "Süreç Geçmişi" }).click();

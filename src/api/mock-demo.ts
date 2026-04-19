@@ -219,17 +219,17 @@ const demoState: {
     {
       id: 1,
       tc_kimlik_no: "12345678901",
-      ad: "Ayse",
-      soyad: "Yilmaz",
+      ad: "Ayşe",
+      soyad: "Yılmaz",
       aktif_durum: "AKTIF",
       sube_id: 1,
       telefon: "05550000000",
       dogum_tarihi: "1992-03-14",
       sicil_no: "P-001",
-      dogum_yeri: "Istanbul",
+      dogum_yeri: "İstanbul",
       kan_grubu: "A Rh+",
       ise_giris_tarihi: "2023-02-01",
-      acil_durum_kisi: "Fatma Yilmaz",
+      acil_durum_kisi: "Fatma Yılmaz",
       acil_durum_telefon: "05553334455",
       departman_id: 3,
       gorev_id: 1,
@@ -462,7 +462,7 @@ const demoState: {
   yonetimKullanicilari: [
     {
       id: 1,
-      ad_soyad: "Ilker Akel",
+      ad_soyad: "İlker Akel",
       telefon: "05550000001",
       kullanici_tipi: "HARICI",
       rol: "GENEL_YONETICI",
@@ -486,7 +486,7 @@ const demoState: {
     },
     {
       id: 3,
-      ad_soyad: "Serhan Kose",
+      ad_soyad: "Serhan Köse",
       telefon: "05550000003",
       kullanici_tipi: "IC_PERSONEL",
       rol: "BIRIM_AMIRI",
@@ -552,7 +552,7 @@ const DEMO_PERSONEL_TIPI_LABELS: Record<number, string> = {
 
 const DEMO_BAGLI_AMIR_LABELS: Record<number, string> = {
   1: "Demo Amir",
-  2: "Ikinci Amir"
+  2: "İkinci Amir"
 };
 
 function toRecord(value: unknown): Record<string, unknown> | null {
@@ -1803,7 +1803,7 @@ export function resolveDemoApiResponse(
     if (pathname === "/referans/bagli-amirler") {
       return ok([
         { id: 1, ad: "Demo Amir" },
-        { id: 2, ad: "Ikinci Amir" }
+        { id: 2, ad: "İkinci Amir" }
       ]);
     }
 
@@ -1834,7 +1834,7 @@ export function resolveDemoApiResponse(
         items: [
           {
             personel_id: personel?.id ?? 1,
-            ad_soyad: personel != null ? `${personel.ad} ${personel.soyad}` : "Ayse Yilmaz",
+            ad_soyad: personel != null ? `${personel.ad} ${personel.soyad}` : "Ayşe Yılmaz",
             rapor_tipi: pathname.replace("/raporlar/", ""),
             net_calisma_dakika: 510,
             sgk_donem: sgkOzeti?.donem ?? "2026-04",
@@ -1891,4 +1891,3 @@ export function resolveDemoApiResponse(
 
   return null;
 }
-

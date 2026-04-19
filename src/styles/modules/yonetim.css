@@ -236,13 +236,53 @@
   gap: 12px;
 }
 
-.yonetim-multiselect {
-  min-height: 180px;
-  padding-block: 8px;
+.yonetim-selection-grid--departmanlar {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.yonetim-multiselect option {
-  padding: 8px 10px;
+.yonetim-selection-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-height: 52px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.yonetim-selection-trigger.is-open {
+  border-color: rgba(var(--theme-color-rgb), 0.82);
+  box-shadow: inset 0 0 0 1px rgba(var(--theme-color-rgb), 0.24);
+}
+
+.yonetim-selection-summary {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: rgba(244, 246, 250, 0.9);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.yonetim-selection-caret {
+  flex: 0 0 auto;
+  color: rgba(228, 232, 240, 0.78);
+  font-size: 0.92rem;
+  transition: transform 0.2s ease;
+}
+
+.yonetim-selection-trigger.is-open .yonetim-selection-caret {
+  transform: rotate(180deg);
+}
+
+.yonetim-selection-panel {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 16px;
+  background: rgba(7, 11, 19, 0.92);
 }
 
 .yonetim-selection-pill {

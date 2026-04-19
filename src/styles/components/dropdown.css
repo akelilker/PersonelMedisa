@@ -36,7 +36,7 @@
 }
 
 .settings-dropdown button:hover {
-  border-color: rgba(var(--theme-color-rgb), 0.85);
+  border-color: rgba(214, 225, 236, 0.5);
   color: #ffffff;
 }
 

@@ -109,6 +109,16 @@
   border-color: rgba(255, 159, 47, 0.94);
 }
 
+.notifications-dropdown .notification-item.date-warning-red-border .notif-line1,
+.notifications-dropdown .notification-item.date-warning-red-border .notif-line2 {
+  color: rgba(255, 118, 118, 0.96);
+}
+
+.notifications-dropdown .notification-item.date-warning-orange-border .notif-line1,
+.notifications-dropdown .notification-item.date-warning-orange-border .notif-line2 {
+  color: rgba(255, 183, 94, 0.96);
+}
+
 .notifications-dropdown .notification-item.notification-empty {
   justify-content: center;
   text-align: center;
@@ -140,6 +150,16 @@
 
 .notifications-dropdown .notification-item:hover .notif-line2 {
   color: rgba(248, 248, 248, 0.88);
+}
+
+.notifications-dropdown .notification-item.date-warning-red-border:hover .notif-line1,
+.notifications-dropdown .notification-item.date-warning-red-border:hover .notif-line2 {
+  color: rgba(255, 138, 138, 0.98);
+}
+
+.notifications-dropdown .notification-item.date-warning-orange-border:hover .notif-line1,
+.notifications-dropdown .notification-item.date-warning-orange-border:hover .notif-line2 {
+  color: rgba(255, 196, 122, 0.98);
 }
 
 .notifications-dropdown .notification-error {

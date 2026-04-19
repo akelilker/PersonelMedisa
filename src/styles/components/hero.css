@@ -7,7 +7,7 @@
   background: linear-gradient(180deg, #060d16 0%, #08090c 100%);
   border: 1px solid var(--line-hero-card);
   border-radius: var(--radius-lg);
-  padding: 14px 16px 18px;
+  padding: 14px 16px 14px;
   box-shadow:
     0 4px 15px rgba(0, 0, 0, 0.5),
     0 4px 22px rgba(var(--theme-color-rgb), 0.08),
@@ -76,7 +76,7 @@
 
 .animated-line {
   position: absolute;
-  bottom: 8px;
+  bottom: 6px;
   left: 50%;
   transform: translateX(-50%);
   width: 74%;
@@ -92,7 +92,7 @@
     --hero-logo-width: 40px;
     --hero-spacer-width: 48px;
     min-height: 80px;
-    padding: 13px 12px 16px;
+    padding: 13px 12px 14px;
   }
 
   .hero h1 {
@@ -117,7 +117,7 @@
   }
 
   .animated-line {
-    bottom: 12px;
+    bottom: 8px;
     width: 88%;
   }
 }

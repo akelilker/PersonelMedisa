@@ -579,20 +579,8 @@ export function YonetimPaneliPage() {
                 >
                   <div className="yonetim-card-meta">
                     <strong>{item.ad_soyad}</strong>
-                    <span>
-                      {KULLANICI_TIPI_LABELS[item.kullanici_tipi]} • {ROLE_LABELS[item.rol]}
-                    </span>
+                    <span>{formatSubeScopeLabel(item.sube_ids, subeNameMap)}</span>
                   </div>
-                  <p>Durum: {DURUM_LABELS[item.durum]}</p>
-                  <p>Telefon: {item.telefon ?? "-"}</p>
-                  <p>Bağlı Personel: {item.personel_ad_soyad ?? "-"}</p>
-                  <p>Yetki Kapsamı: {formatSubeScopeLabel(item.sube_ids, subeNameMap)}</p>
-                  <p>
-                    Varsayılan Şube:{" "}
-                    {item.varsayilan_sube_id != null
-                      ? subeNameMap.get(item.varsayilan_sube_id) ?? `Şube ${item.varsayilan_sube_id}`
-                      : "Tanımsız"}
-                  </p>
                 </article>
               ))}
             </div>

@@ -29,8 +29,11 @@ test.describe("yonetim paneli ve aylik ozet", () => {
     await page.getByTestId("yonetim-kullanici-kaydet").click();
 
     await expect(page.getByText("Kullanıcı kaydı oluşturuldu.")).toBeVisible();
-    await expect(page.locator(".yonetim-card-grid")).toContainText("Danışman Kullanıcı");
-    await expect(page.locator(".yonetim-card-grid")).toContainText("Harici");
+    const yeniKullaniciKarti = page
+      .locator(".yonetim-entity-card")
+      .filter({ hasText: /Danışman Kullanıcı/i });
+    await expect(yeniKullaniciKarti).toContainText("Danışman Kullanıcı");
+    await expect(yeniKullaniciKarti).toContainText("Tüm Şubeler");
 
     await page.getByTestId("yonetim-tab-subeler").click();
     await expect(page.getByRole("button", { name: /\+ Yeni Şube/i })).toBeVisible();
@@ -89,7 +92,7 @@ test.describe("yonetim paneli ve aylik ozet", () => {
     await page.getByTestId("settings-yonetim-paneli").click();
     await expect(page).toHaveURL(/\/yonetim-paneli$/);
 
-    await page.locator(".yonetim-entity-card").filter({ hasText: /Ayse Yilmaz/i }).click();
+    await page.locator(".yonetim-entity-card").filter({ hasText: /Serhan Kose/i }).click();
     const kullaniciModal = page.locator(".modal-container").last();
     await expect(kullaniciModal).toBeVisible();
 
@@ -119,14 +122,18 @@ test.describe("yonetim paneli ve aylik ozet", () => {
     await page.goto("/personeller/1");
     await expect(page).toHaveURL(/\/personeller\/1$/);
     await page.getByRole("tab", { name: "Süreç Geçmişi" }).click();
-    const personelBirTimeline = page.locator("#personel-kart-panel-surec-gecmisi").locator("[data-testid='personel-surec-timeline']");
+    const personelBirTimeline = page
+      .locator("#personel-kart-panel-surec-gecmisi")
+      .locator("[data-testid='personel-surec-timeline']");
     await expect(personelBirTimeline).toContainText(/Bağlı Bölüm \/ Şube Yetkisi Değişti/i);
     await expect(personelBirTimeline).toContainText(/Birim Amiri Ataması Kaldırıldı/i);
 
     await page.goto("/personeller/2");
     await expect(page).toHaveURL(/\/personeller\/2$/);
     await page.getByRole("tab", { name: "Süreç Geçmişi" }).click();
-    const personelIkiTimeline = page.locator("#personel-kart-panel-surec-gecmisi").locator("[data-testid='personel-surec-timeline']");
+    const personelIkiTimeline = page
+      .locator("#personel-kart-panel-surec-gecmisi")
+      .locator("[data-testid='personel-surec-timeline']");
     await expect(personelIkiTimeline).toContainText(/Birim Amiri Olarak Atandı/i);
   });
 });

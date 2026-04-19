@@ -60,7 +60,6 @@ export function PersonelCreateFields({
     <div className={className}>
       <div className="personel-form-columns">
         <div className="personel-form-column">
-          <div className="personel-form-column-heading">Kimlik ve Iletisim</div>
           <FormField
             label="T.C. Kimlik No"
             name="create-tc"
@@ -131,7 +130,6 @@ export function PersonelCreateFields({
         </div>
 
         <div className="personel-form-column">
-          <div className="personel-form-column-heading">Is ve Atama</div>
           <FormField
             label="Sicil No"
             name="create-sicil"

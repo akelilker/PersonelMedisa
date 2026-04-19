@@ -1,4 +1,4 @@
-name: Deploy cPanel (FTP)
+name: Deploy cPanel
 
 on:
   push:
@@ -12,7 +12,7 @@ concurrency:
 
 jobs:
   deploy:
-    name: Build and FTP upload
+    name: Build and upload
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
@@ -51,14 +51,53 @@ jobs:
           test -n "$FTP_PASSWORD" || (echo "FTP_PASSWORD secret is missing." && exit 1)
           test -n "$FTP_PORT" || (echo "FTP_PORT secret is missing." && exit 1)
 
+      - name: Install deploy client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lftp
+
       - name: Upload dist to cPanel public_html/personelmedisa
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
-        with:
-          server: ${{ secrets.FTP_SERVER }}
-          username: ${{ secrets.FTP_USERNAME }}
-          password: ${{ secrets.FTP_PASSWORD }}
-          protocol: ftp
-          port: ${{ secrets.FTP_PORT }}
-          local-dir: ${{ env.LOCAL_DIST_DIR }}
-          server-dir: ${{ env.REMOTE_TARGET_DIR }}
-          dangerous-clean-slate: true
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+          FTP_PORT: ${{ secrets.FTP_PORT }}
+          LOCAL_DIST_DIR: ${{ env.LOCAL_DIST_DIR }}
+          REMOTE_TARGET_DIR: ${{ env.REMOTE_TARGET_DIR }}
+        run: |
+          set -euo pipefail
+
+          deploy_with_protocol() {
+            local protocol="$1"
+            local use_ftps="$2"
+
+            echo "Deploy protokolu deneniyor: ${protocol}"
+
+            lftp -u "${FTP_USERNAME}","${FTP_PASSWORD}" -p "${FTP_PORT}" "${protocol}://${FTP_SERVER}" -e "
+              set cmd:fail-exit true;
+              set net:max-retries 2;
+              set net:timeout 20;
+              set net:reconnect-interval-base 5;
+              set xfer:clobber true;
+              set ssl:verify-certificate no;
+              set ftp:passive-mode true;
+              set ftp:ssl-allow ${use_ftps};
+              set ftp:ssl-force ${use_ftps};
+              set sftp:auto-confirm yes;
+              mkdir -p \"${REMOTE_TARGET_DIR%/}\";
+              mirror -R --delete --verbose \"${LOCAL_DIST_DIR%/}/\" \"${REMOTE_TARGET_DIR%/}/\";
+              bye
+            "
+          }
+
+          if [ "${FTP_PORT}" = "22" ]; then
+            deploy_with_protocol "sftp" "false"
+            exit 0
+          fi
+
+          if deploy_with_protocol "ftps" "true"; then
+            exit 0
+          fi
+
+          echo "FTPS baglantisi basarisiz oldu, FTP fallback deneniyor..."
+          deploy_with_protocol "ftp" "false"

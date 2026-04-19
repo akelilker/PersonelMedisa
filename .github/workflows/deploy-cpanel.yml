@@ -84,8 +84,10 @@ jobs:
               set ftp:ssl-allow ${use_ftps};
               set ftp:ssl-force ${use_ftps};
               set sftp:auto-confirm yes;
-              mkdir -p \"${REMOTE_TARGET_DIR%/}\";
-              mirror -R --delete --verbose \"${LOCAL_DIST_DIR%/}/\" \"${REMOTE_TARGET_DIR%/}/\";
+              lcd ${LOCAL_DIST_DIR%/};
+              mkdir -p ${REMOTE_TARGET_DIR%/};
+              cd ${REMOTE_TARGET_DIR%/};
+              mirror -R --delete --verbose . .;
               bye
             "
           }

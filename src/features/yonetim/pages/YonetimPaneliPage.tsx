@@ -472,6 +472,13 @@ export function YonetimPaneliPage() {
     }));
   }
 
+  function updateDepartmanSelections(values: string[]) {
+    setSubeForm((prev) => ({
+      ...prev,
+      departmanIds: values.map((value) => Number.parseInt(value, 10)).filter(Number.isFinite)
+    }));
+  }
+
   async function handleKullaniciSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (isSubmitting) {
@@ -838,18 +845,20 @@ export function YonetimPaneliPage() {
             <div className="yonetim-checkbox-section">
               <p className="yonetim-checkbox-title">Departmanlar</p>
               <p className="yonetim-hint">Şube kapsamındaki departmanları seç. Yeni seçenek gerekirse sağdaki artı ile ekle.</p>
-              <div className="yonetim-selection-grid">
+              <select
+                className="form-input yonetim-multiselect"
+                multiple
+                value={subeForm.departmanIds.map(String)}
+                onChange={(event) =>
+                  updateDepartmanSelections(Array.from(event.currentTarget.selectedOptions, (option) => option.value))
+                }
+              >
                 {departmanOptions.map((departman) => (
-                  <button
-                    key={departman.id}
-                    type="button"
-                    className={`yonetim-selection-pill${subeForm.departmanIds.includes(departman.id) ? " is-selected" : ""}`}
-                    onClick={() => toggleDepartmanSelection(departman.id)}
-                  >
-                    <strong>{departman.label}</strong>
-                  </button>
+                  <option key={departman.id} value={String(departman.id)}>
+                    {departman.label}
+                  </option>
                 ))}
-              </div>
+              </select>
 
               <div className="yonetim-inline-add-row">
                 <input

@@ -236,6 +236,15 @@
   gap: 12px;
 }
 
+.yonetim-multiselect {
+  min-height: 180px;
+  padding-block: 8px;
+}
+
+.yonetim-multiselect option {
+  padding: 8px 10px;
+}
+
 .yonetim-selection-pill {
   min-height: 56px;
   padding: 12px 14px;

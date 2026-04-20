@@ -9,10 +9,13 @@ test.describe("e2e smoke", () => {
     await login(page, { username: "yonetici", password: "secret" });
 
     await expect(page).toHaveURL("/");
-    await expect(page.locator("#main-menu .menu-btn")).toHaveCount(3);
+    await expect(page.locator("#main-menu .menu-btn")).toHaveCount(6);
     await expect(page.getByTestId("menu-kayit-surec")).toBeVisible();
+    await expect(page.getByTestId("menu-gunluk-durum")).toBeVisible();
     await expect(page.getByTestId("menu-personel-karti")).toBeVisible();
+    await expect(page.getByTestId("menu-puantaj")).toBeVisible();
     await expect(page.getByTestId("menu-raporlar")).toBeVisible();
+    await expect(page.getByTestId("menu-finans")).toBeVisible();
 
     await page.getByTestId("menu-personel-karti").click();
     await expect(page).toHaveURL(/\/personeller$/);
@@ -58,11 +61,13 @@ test.describe("e2e smoke", () => {
     await login(page, { username: "birim", password: "secret" });
 
     await expect(page).toHaveURL("/");
-    await expect(page.locator("#main-menu .menu-btn")).toHaveCount(3);
+    await expect(page.locator("#main-menu .menu-btn")).toHaveCount(4);
     await expect(page.getByTestId("menu-gunluk-durum")).toBeVisible();
     await expect(page.getByTestId("menu-personel-karti")).toBeVisible();
+    await expect(page.getByTestId("menu-puantaj")).toBeVisible();
     await expect(page.getByTestId("menu-raporlar")).toBeVisible();
     await expect(page.getByTestId("menu-kayit-surec")).toHaveCount(0);
+    await expect(page.getByTestId("menu-finans")).toHaveCount(0);
 
     await page.getByTestId("menu-gunluk-durum").click();
     await expect(page).toHaveURL(/\/bildirimler$/);

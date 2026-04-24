@@ -25,7 +25,7 @@ type ModuleModalConfig = {
   bodyClassName?: string;
 };
 
-type KayitModalIntent = "personel-edit-gateway";
+type KayitModalIntent = "personel-edit-gateway" | "personel-zimmet-gateway";
 
 type KayitModalRouteConfig = {
   tab: KayitTab;
@@ -52,7 +52,8 @@ function resolveKayitModalRouteConfig(state: unknown): KayitModalRouteConfig | n
   return {
     tab: rawTab === "surec" ? "surec" : "yeni-kayit",
     personelId: rawPersonelId === undefined || rawPersonelId === null ? null : String(rawPersonelId),
-    intent: rawIntent === "personel-edit-gateway" ? rawIntent : null,
+    intent:
+      rawIntent === "personel-edit-gateway" || rawIntent === "personel-zimmet-gateway" ? rawIntent : null,
     returnTo: typeof rawReturnTo === "string" && rawReturnTo.trim() ? rawReturnTo.trim() : null
   };
 }

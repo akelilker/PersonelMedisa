@@ -380,22 +380,26 @@ function PersonelDosyaHero({
 
 function PersonelDosyaActionRow({
   canEditPersonel,
+  canCreateZimmet,
   canAccessSurecler,
   canCreateSurec,
   isActionMenuOpen,
   onToggleActionMenu,
   onCloseActionMenu,
   onStartEdit,
+  onOpenZimmetCreate,
   onOpenSurecModal,
   onOpenSurecHistory
 }: {
   canEditPersonel: boolean;
+  canCreateZimmet: boolean;
   canAccessSurecler: boolean;
   canCreateSurec: boolean;
   isActionMenuOpen: boolean;
   onToggleActionMenu: () => void;
   onCloseActionMenu: () => void;
   onStartEdit: () => void;
+  onOpenZimmetCreate: () => void;
   onOpenSurecModal: () => void;
   onOpenSurecHistory: () => void;
 }) {
@@ -433,8 +437,29 @@ function PersonelDosyaActionRow({
       });
     }
 
+    if (canCreateZimmet) {
+      items.push({
+        id: "zimmet-ekle",
+        label: "Yeni Zimmet Ekle",
+        onSelect: () => {
+          onCloseActionMenu();
+          onOpenZimmetCreate();
+        }
+      });
+    }
+
     return items;
-  }, [canAccessSurecler, canCreateSurec, canEditPersonel, onCloseActionMenu, onOpenSurecHistory, onOpenSurecModal, onStartEdit]);
+  }, [
+    canAccessSurecler,
+    canCreateSurec,
+    canCreateZimmet,
+    canEditPersonel,
+    onCloseActionMenu,
+    onOpenSurecHistory,
+    onOpenSurecModal,
+    onOpenZimmetCreate,
+    onStartEdit
+  ]);
 
   if (actionItems.length === 0) {
     return null;
@@ -919,7 +944,7 @@ export function PersonelDetayPage() {
   }, [isEditing, isSurecModalOpen, isZimmetModalOpen]);
 
   useEffect(() => {
-    const routeState = location.state as { openPersonelEdit?: boolean } | null;
+    const routeState = location.state as { openPersonelEdit?: boolean; openPersonelZimmet?: boolean } | null;
     if (!routeState?.openPersonelEdit) {
       return;
     }
@@ -932,6 +957,21 @@ export function PersonelDetayPage() {
     setIsEditing(true);
     navigate(location.pathname, { replace: true, state: null });
   }, [canEditPersonel, location.pathname, location.state, navigate, setIsEditing]);
+
+  useEffect(() => {
+    const routeState = location.state as { openPersonelEdit?: boolean; openPersonelZimmet?: boolean } | null;
+    if (!routeState?.openPersonelZimmet) {
+      return;
+    }
+
+    if (!canCreateZimmet) {
+      return;
+    }
+
+    setActiveTab("zimmet-envanter");
+    openZimmetModal();
+    navigate(location.pathname, { replace: true, state: null });
+  }, [canCreateZimmet, location.pathname, location.state, navigate, openZimmetModal]);
 
   function handleEditSubmit(event: FormEvent<HTMLFormElement>) {
     void updatePersonelHandler(event, canEditPersonel);
@@ -973,6 +1013,19 @@ export function PersonelDetayPage() {
     });
   }
 
+  function handleOpenPersonelZimmetGateway() {
+    navigate("/", {
+      state: {
+        kayitModal: {
+          tab: "yeni-kayit",
+          personelId: parsedPersonelId,
+          intent: "personel-zimmet-gateway",
+          returnTo: `/personeller/${parsedPersonelId}`
+        }
+      }
+    });
+  }
+
   function handleOpenZimmetModal() {
     setActiveTab("zimmet-envanter");
     openZimmetModal();
@@ -1002,12 +1055,14 @@ export function PersonelDetayPage() {
           {!isEditing ? (
             <PersonelDosyaActionRow
               canEditPersonel={canEditPersonel}
+              canCreateZimmet={canCreateZimmet}
               canAccessSurecler={canAccessSurecler}
               canCreateSurec={canCreateSurec}
               isActionMenuOpen={isActionMenuOpen}
               onToggleActionMenu={() => setIsActionMenuOpen((prev) => !prev)}
               onCloseActionMenu={() => setIsActionMenuOpen(false)}
               onStartEdit={handleOpenPersonelEditGateway}
+              onOpenZimmetCreate={handleOpenPersonelZimmetGateway}
               onOpenSurecModal={handleOpenSurecModal}
               onOpenSurecHistory={handleOpenSurecHistory}
             />

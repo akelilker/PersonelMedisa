@@ -39,7 +39,7 @@ type KayitSurecWorkspaceProps = {
   onTabChange: (tab: KayitTab) => void;
   onClose: () => void;
   initialSurecPersonelId?: string | null;
-  initialIntent?: "personel-edit-gateway" | null;
+  initialIntent?: "personel-edit-gateway" | "personel-zimmet-gateway" | null;
   initialReturnTo?: string | null;
   primaryActionLabel: string;
   primaryFormId: string;
@@ -352,11 +352,19 @@ export function KayitSurecWorkspace({
     setSurecForm(resetSurecFormKeepingPersonel(surecForm.personelId));
   }
 
-  const showPersonelEditGateway =
+  const showGatewayMessage =
     activeTab === "yeni-kayit" &&
-    initialIntent === "personel-edit-gateway" &&
+    (initialIntent === "personel-edit-gateway" || initialIntent === "personel-zimmet-gateway") &&
     typeof initialReturnTo === "string" &&
     initialReturnTo.length > 0;
+
+  const gatewayActionLabel =
+    initialIntent === "personel-zimmet-gateway" ? "Personel Kartina Don ve Zimmet Ekle" : "Personel Kartina Don ve Duzenle";
+
+  const gatewayInfoMessage =
+    initialIntent === "personel-zimmet-gateway"
+      ? "Zimmet islemi merkez ekrana tasiniyor. Bu gecis turunda zimmet formu Personel Karti icinde calismaya devam ediyor."
+      : "Kart duzenleme islemi merkez ekrana tasiniyor. Bu gecis turunda duzenleme formu Personel Karti icinde calismaya devam ediyor.";
 
   return (
     <div className="kayit-workspace">
@@ -396,11 +404,10 @@ export function KayitSurecWorkspace({
 
             {!bootstrapLoading && !bootstrapError ? (
               <>
-                {showPersonelEditGateway ? (
+                {showGatewayMessage ? (
                   <>
                     <p className="workspace-success">
-                      Kart duzenleme islemi merkez ekrana tasiniyor. Bu gecis turunda duzenleme formu Personel Karti
-                      icinde calismaya devam ediyor.
+                      {gatewayInfoMessage}
                     </p>
                     <div className="universal-btn-group workspace-form-actions">
                       <button
@@ -408,11 +415,14 @@ export function KayitSurecWorkspace({
                         className="universal-btn-save"
                         onClick={() => {
                           navigate(initialReturnTo, {
-                            state: { openPersonelEdit: true }
+                            state:
+                              initialIntent === "personel-zimmet-gateway"
+                                ? { openPersonelZimmet: true }
+                                : { openPersonelEdit: true }
                           });
                         }}
                       >
-                        Personel Kartina Don ve Duzenle
+                        {gatewayActionLabel}
                       </button>
                       <button type="button" className="universal-btn-cancel" onClick={onClose}>
                         Kapat

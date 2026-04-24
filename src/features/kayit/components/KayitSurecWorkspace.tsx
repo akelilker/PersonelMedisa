@@ -37,6 +37,7 @@ type KayitSurecWorkspaceProps = {
   activeTab: KayitTab;
   onTabChange: (tab: KayitTab) => void;
   onClose: () => void;
+  initialSurecPersonelId?: string | null;
   primaryActionLabel: string;
   primaryFormId: string;
 };
@@ -107,6 +108,7 @@ export function KayitSurecWorkspace({
   activeTab,
   onTabChange,
   onClose,
+  initialSurecPersonelId,
   primaryActionLabel,
   primaryFormId
 }: KayitSurecWorkspaceProps) {
@@ -215,6 +217,17 @@ export function KayitSurecWorkspace({
   useEffect(() => {
     void loadBootstrap();
   }, []);
+
+  useEffect(() => {
+    if (!initialSurecPersonelId) {
+      return;
+    }
+
+    setEditingSurec(null);
+    setSurecError(null);
+    setSurecInfo("Seçili personel ile süreç girişine devam edebilirsin.");
+    setSurecForm(resetSurecFormKeepingPersonel(initialSurecPersonelId));
+  }, [initialSurecPersonelId]);
 
   useEffect(() => {
     if (activeTab !== "surec" || bootstrapLoading || bootstrapError) {
@@ -518,5 +531,3 @@ export function KayitSurecWorkspace({
     </div>
   );
 }
-
-

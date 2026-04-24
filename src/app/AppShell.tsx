@@ -25,6 +25,30 @@ type ModuleModalConfig = {
   bodyClassName?: string;
 };
 
+type KayitModalRouteConfig = {
+  tab: KayitTab;
+  personelId: string | null;
+};
+
+function resolveKayitModalRouteConfig(state: unknown): KayitModalRouteConfig | null {
+  if (state === null || typeof state !== "object") {
+    return null;
+  }
+
+  const kayitModal = (state as { kayitModal?: unknown }).kayitModal;
+  if (kayitModal === null || typeof kayitModal !== "object") {
+    return null;
+  }
+
+  const rawTab = (kayitModal as { tab?: unknown }).tab;
+  const rawPersonelId = (kayitModal as { personelId?: unknown }).personelId;
+
+  return {
+    tab: rawTab === "surec" ? "surec" : "yeni-kayit",
+    personelId: rawPersonelId === undefined || rawPersonelId === null ? null : String(rawPersonelId)
+  };
+}
+
 function resolveBackBar(pathname: string): { to: string; label: string } | null {
   if (/^\/personeller\/\d+$/.test(pathname)) {
     return { to: "/personeller", label: "Personel listesine dön" };
@@ -88,7 +112,7 @@ function resolveModuleModal(pathname: string): ModuleModalConfig | null {
 export function AppShell({ children }: AppShellProps) {
   const { session, logout } = useAuth();
   const navigate = useNavigate();
-  const { pathname } = useLocation();
+  const { pathname, state } = useLocation();
 
   const isLoginRoute = pathname === "/login";
   const isHomeRoute = pathname === "/";
@@ -100,6 +124,8 @@ export function AppShell({ children }: AppShellProps) {
 
   const [isKayitModalOpen, setIsKayitModalOpen] = useState(false);
   const [kayitTab, setKayitTab] = useState<KayitTab>("yeni-kayit");
+  const [kayitInitialSurecPersonelId, setKayitInitialSurecPersonelId] = useState<string | null>(null);
+  const kayitRouteConfig = useMemo(() => resolveKayitModalRouteConfig(state), [state]);
 
   useEffect(() => {
     document.body.classList.toggle("dashboard-page", isHomeRoute && !isLoginRoute);
@@ -108,6 +134,17 @@ export function AppShell({ children }: AppShellProps) {
       document.body.classList.remove("dashboard-page");
     };
   }, [isHomeRoute, isLoginRoute]);
+
+  useEffect(() => {
+    if (!kayitRouteConfig) {
+      return;
+    }
+
+    setKayitTab(kayitRouteConfig.tab);
+    setKayitInitialSurecPersonelId(kayitRouteConfig.personelId);
+    setIsKayitModalOpen(true);
+    navigate(pathname, { replace: true, state: null });
+  }, [kayitRouteConfig, navigate, pathname]);
 
   const kayitPrimaryLabel = kayitTab === "yeni-kayit" ? "Personeli Kaydet" : "Süreci Kaydet";
   const kayitPrimaryFormId =
@@ -139,6 +176,7 @@ export function AppShell({ children }: AppShellProps) {
           <MainMenu
             onKayitOpen={(tab) => {
               setKayitTab(tab);
+              setKayitInitialSurecPersonelId(null);
               setIsKayitModalOpen(true);
             }}
           />
@@ -151,12 +189,19 @@ export function AppShell({ children }: AppShellProps) {
       {isKayitModalOpen ? (
         <AppModal
           title="Kayıt ve Süreç İşlemleri"
-          onClose={() => setIsKayitModalOpen(false)}
+          onClose={() => {
+            setIsKayitModalOpen(false);
+            setKayitInitialSurecPersonelId(null);
+          }}
         >
           <KayitSurecWorkspace
             activeTab={kayitTab}
             onTabChange={setKayitTab}
-            onClose={() => setIsKayitModalOpen(false)}
+            onClose={() => {
+              setIsKayitModalOpen(false);
+              setKayitInitialSurecPersonelId(null);
+            }}
+            initialSurecPersonelId={kayitInitialSurecPersonelId}
             primaryActionLabel={kayitPrimaryLabel}
             primaryFormId={kayitPrimaryFormId}
           />

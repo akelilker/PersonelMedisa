@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { FormField } from "../../../components/form/FormField";
 import { AppModal } from "../../../components/modal/AppModal";
 import { EmptyState } from "../../../components/states/EmptyState";
@@ -843,6 +843,7 @@ function PersonelZimmetEnvanterPanel({
 }
 
 export function PersonelDetayPage() {
+  const navigate = useNavigate();
   const { personelId } = useParams();
   const parsedPersonelId = Number.parseInt(personelId ?? "", 10);
   const hasValidId = !Number.isNaN(parsedPersonelId) && parsedPersonelId > 0;
@@ -929,8 +930,14 @@ export function PersonelDetayPage() {
   }
 
   function handleOpenSurecModal() {
-    setActiveTab("surec-gecmisi");
-    openSurecModal();
+    navigate("/", {
+      state: {
+        kayitModal: {
+          tab: "surec",
+          personelId: parsedPersonelId
+        }
+      }
+    });
   }
 
   function handleOpenSurecHistory() {

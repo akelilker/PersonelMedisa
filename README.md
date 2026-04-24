@@ -42,6 +42,7 @@ Bu repo, Medisa Personel ve Puantaj Yonetim Sistemi icin React + Vite + TypeScri
 - `docs/guncel/07-is-akislari-ve-senaryolar.md`
 - `docs/guncel/08-frontend-teknik-mimari.md`
 - `docs/guncel/09-rol-yetki-matrisi.md`
+- `docs/guncel/10-yuzey-gorev-sinirlari.md`
 
 ## Kurulum
 

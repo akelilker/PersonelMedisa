@@ -25,16 +25,27 @@ test.describe("personel dosyasi surec akisi", () => {
 
     const surecModal = page.locator(".modal-container").last();
     await expect(surecModal).toBeVisible();
+    await expect(page).toHaveURL(/\/$/);
+    await expect(surecModal.getByTestId("kayit-tab-surec")).toHaveAttribute("aria-selected", "true");
+    await expect(surecModal.locator("[name='surec-create-personel']")).toHaveValue("1");
 
-    if (await surecModal.locator("[name='personel-surec-turu']").count()) {
-      await surecModal.locator("[name='personel-surec-turu']").selectOption("ISTEN_AYRILMA");
+    if (await surecModal.locator("[name='surec-create-turu']").count()) {
+      await surecModal.locator("[name='surec-create-turu']").selectOption("ISTEN_AYRILMA");
     } else {
-      await surecModal.locator("[name='personel-surec-turu-text']").fill("ISTEN_AYRILMA");
+      await surecModal.locator("[name='surec-create-turu-text']").fill("ISTEN_AYRILMA");
     }
 
-    await surecModal.locator("[name='personel-surec-baslangic']").fill("2026-04-12");
-    await surecModal.locator("[name='personel-surec-aciklama']").fill("Is akdi sonlandirildi");
-    await surecModal.getByRole("button", { name: "Kaydet" }).click();
+    await surecModal.locator("[name='surec-create-bas']").fill("2026-04-12");
+    await surecModal.locator("[name='surec-create-bitis']").fill("2026-04-12");
+    await surecModal.locator("[name='surec-create-aciklama']").fill("Is akdi sonlandirildi");
+    await surecModal.getByRole("button", { name: "Süreci Kaydet" }).click();
+    await expect(surecModal.locator(".workspace-success")).toContainText(/eklendi/i);
+    await surecModal.locator(".universal-btn-cancel").click();
+
+    await page.getByTestId("menu-personel-karti").click();
+    await expect(page).toHaveURL(/\/personeller$/);
+    await page.getByRole("link", { name: /Ayşe Yılmaz.*kişisinin kartını aç/i }).first().click();
+    await expect(page).toHaveURL(/\/personeller\/1$/);
 
     await expect(page.locator(".personel-dosya-hero")).toContainText(/İşten Ayrıldı|Pasif/i);
     await page.getByRole("tab", { name: "Süreç Geçmişi" }).click();

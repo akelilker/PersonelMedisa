@@ -7,13 +7,14 @@ test("Ana akış smoke", async ({ page }) => {
   await login(page, { username: "genel_yonetici", password: "demo123" });
 
   await expect(page).toHaveURL("/");
-  await expect(page.locator("#main-menu .menu-btn")).toHaveCount(6);
+  await expect(page.locator("#main-menu .menu-btn")).toHaveCount(3);
   await expect(page.getByTestId("menu-kayit-surec")).toBeVisible();
-  await expect(page.getByTestId("menu-gunluk-durum")).toBeVisible();
+  await expect(page.getByTestId("menu-kayit-surec")).toBeEnabled();
   await expect(page.getByTestId("menu-personel-karti")).toBeVisible();
-  await expect(page.getByTestId("menu-puantaj")).toBeVisible();
   await expect(page.getByTestId("menu-raporlar")).toBeVisible();
-  await expect(page.getByTestId("menu-finans")).toBeVisible();
+  await expect(page.getByTestId("menu-gunluk-durum")).toHaveCount(0);
+  await expect(page.getByTestId("menu-puantaj")).toHaveCount(0);
+  await expect(page.getByTestId("menu-finans")).toHaveCount(0);
 
   await page.getByTestId("menu-kayit-surec").click();
   const homeFlowModal = page.locator(".modal-container").last();

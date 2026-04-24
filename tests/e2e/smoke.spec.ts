@@ -1,4 +1,4 @@
-﻿import { expect, test } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import { login } from "./helpers/auth";
 import { mockApi } from "./helpers/mock-api";
 
@@ -9,13 +9,14 @@ test.describe("e2e smoke", () => {
     await login(page, { username: "yonetici", password: "secret" });
 
     await expect(page).toHaveURL("/");
-    await expect(page.locator("#main-menu .menu-btn")).toHaveCount(6);
+    await expect(page.locator("#main-menu .menu-btn")).toHaveCount(3);
     await expect(page.getByTestId("menu-kayit-surec")).toBeVisible();
-    await expect(page.getByTestId("menu-gunluk-durum")).toBeVisible();
+    await expect(page.getByTestId("menu-kayit-surec")).toBeEnabled();
     await expect(page.getByTestId("menu-personel-karti")).toBeVisible();
-    await expect(page.getByTestId("menu-puantaj")).toBeVisible();
     await expect(page.getByTestId("menu-raporlar")).toBeVisible();
-    await expect(page.getByTestId("menu-finans")).toBeVisible();
+    await expect(page.getByTestId("menu-gunluk-durum")).toHaveCount(0);
+    await expect(page.getByTestId("menu-puantaj")).toHaveCount(0);
+    await expect(page.getByTestId("menu-finans")).toHaveCount(0);
 
     await page.getByTestId("menu-personel-karti").click();
     await expect(page).toHaveURL(/\/personeller$/);
@@ -61,17 +62,21 @@ test.describe("e2e smoke", () => {
     await login(page, { username: "birim", password: "secret" });
 
     await expect(page).toHaveURL("/");
-    await expect(page.locator("#main-menu .menu-btn")).toHaveCount(4);
-    await expect(page.getByTestId("menu-gunluk-durum")).toBeVisible();
+    await expect(page.locator("#main-menu .menu-btn")).toHaveCount(3);
+    await expect(page.getByTestId("menu-kayit-surec")).toBeVisible();
+    await expect(page.getByTestId("menu-kayit-surec")).toBeDisabled();
     await expect(page.getByTestId("menu-personel-karti")).toBeVisible();
-    await expect(page.getByTestId("menu-puantaj")).toBeVisible();
     await expect(page.getByTestId("menu-raporlar")).toBeVisible();
-    await expect(page.getByTestId("menu-kayit-surec")).toHaveCount(0);
+    await expect(page.getByTestId("menu-gunluk-durum")).toHaveCount(0);
+    await expect(page.getByTestId("menu-puantaj")).toHaveCount(0);
     await expect(page.getByTestId("menu-finans")).toHaveCount(0);
 
-    await page.getByTestId("menu-gunluk-durum").click();
+    await page.getByTestId("menu-personel-karti").click();
+    await expect(page).toHaveURL(/\/personeller$/);
+    await page.getByRole("link", { name: "Günlük Kayıt" }).click();
     await expect(page).toHaveURL(/\/bildirimler$/);
     await expect(page.locator(".modal-header h2").first()).toContainText("Günlük Kayıt Merkezi");
+    await page.getByRole("button", { name: /Günlük Kayıt Gir|Yeni Günlük Kayıt/i }).click();
 
     const amirBildirimModal = page.locator(".modal-container").last();
     await expect(amirBildirimModal).toBeVisible();

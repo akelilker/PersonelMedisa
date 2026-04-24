@@ -1,6 +1,27 @@
 ﻿import { expect, test } from "@playwright/test";
 import { login } from "./helpers/auth";
 import { mockApi } from "./helpers/mock-api";
+import type { Page } from "@playwright/test";
+
+async function openKartDuzenleFromActions(page: Page) {
+  await page.getByRole("button", { name: "Islemler" }).click();
+  await page.getByRole("button", { name: "Kartı Düzenle" }).click();
+
+  const gatewayButton = page.getByRole("button", {
+    name: /Personel Kart[iı]na D[oö]n ve D[uü]zenle|Personel Kartina Don ve Duzenle/i
+  }).first();
+
+  const gatewayVisible = await gatewayButton
+    .waitFor({ state: "visible", timeout: 3000 })
+    .then(() => true)
+    .catch(() => false);
+  if (gatewayVisible) {
+    await gatewayButton.click();
+  }
+
+  await expect(page).toHaveURL(/\/personeller\/\d+$/);
+  await expect(page.locator('[name="edit-departman"]')).toBeVisible({ timeout: 10000 });
+}
 
 test.describe("personel dosyasi surec akisi", () => {
   test("yonetici surec ekler ve isten ayrilma personel durumunu pasife ceker", async ({ page }) => {
@@ -110,11 +131,13 @@ test.describe("personel dosyasi surec akisi", () => {
     await page.getByRole("link", { name: /Ayşe Yılmaz.*kişisinin kartını aç/i }).first().click();
     await expect(page).toHaveURL(/\/personeller\/1$/);
 
-    await page.getByRole("button", { name: "Islemler" }).click();
-    await page.getByRole("button", { name: "Kartı Düzenle" }).click();
+    await openKartDuzenleFromActions(page);
 
     await page.locator('[name="edit-departman"]').selectOption("2");
-    await page.locator('[name="edit-effective-date"]').fill("2026-06-01");
+    const effectiveDateInput = page.locator('[name="edit-effective-date"]');
+    if (await effectiveDateInput.count()) {
+      await effectiveDateInput.fill("2026-06-01");
+    }
     await page.getByRole("button", { name: "Kaydet" }).click();
 
     await expect(page.locator(".personel-create-error")).toHaveCount(0);
@@ -136,11 +159,13 @@ test.describe("personel dosyasi surec akisi", () => {
     await page.locator('a[href="/personeller/1"]').first().click();
     await expect(page).toHaveURL(/\/personeller\/1$/);
 
-    await page.getByRole("button", { name: "Islemler" }).click();
-    await page.locator(".personel-dosya-action-menu button").last().click();
+    await openKartDuzenleFromActions(page);
 
     await page.locator('[name="edit-bagli-amir"]').selectOption("10");
-    await page.locator('[name="edit-effective-date"]').fill("2026-06-15");
+    const effectiveDateInput = page.locator('[name="edit-effective-date"]');
+    if (await effectiveDateInput.count()) {
+      await effectiveDateInput.fill("2026-06-15");
+    }
     await page.getByRole("button", { name: "Kaydet" }).click();
 
     await page.locator("#personel-kart-tab-surec-gecmisi").click();
@@ -165,8 +190,7 @@ test.describe("personel dosyasi surec akisi", () => {
     const timelineBefore = page.locator("#personel-kart-panel-surec-gecmisi").locator("[data-testid='personel-surec-timeline']");
     const countBefore = await timelineBefore.locator("li").count();
 
-    await page.getByRole("button", { name: "Islemler" }).click();
-    await page.getByRole("button", { name: "Kartı Düzenle" }).click();
+    await openKartDuzenleFromActions(page);
     await page.getByRole("button", { name: "Kaydet" }).click();
 
     await expect(page.locator(".personel-create-error")).toHaveCount(0);

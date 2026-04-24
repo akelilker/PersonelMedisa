@@ -924,11 +924,12 @@ export function PersonelDetayPage() {
       return;
     }
 
-    if (canEditPersonel) {
-      setActiveTab("genel-bilgiler");
-      setIsEditing(true);
+    if (!canEditPersonel) {
+      return;
     }
 
+    setActiveTab("genel-bilgiler");
+    setIsEditing(true);
     navigate(location.pathname, { replace: true, state: null });
   }, [canEditPersonel, location.pathname, location.state, navigate, setIsEditing]);
 

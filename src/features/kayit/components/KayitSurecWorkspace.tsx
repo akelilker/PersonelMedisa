@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useNavigate } from "react-router-dom";
 import { EmptyState } from "../../../components/states/EmptyState";
 import { ErrorState } from "../../../components/states/ErrorState";
 import { LoadingState } from "../../../components/states/LoadingState";
@@ -38,6 +39,8 @@ type KayitSurecWorkspaceProps = {
   onTabChange: (tab: KayitTab) => void;
   onClose: () => void;
   initialSurecPersonelId?: string | null;
+  initialIntent?: "personel-edit-gateway" | null;
+  initialReturnTo?: string | null;
   primaryActionLabel: string;
   primaryFormId: string;
 };
@@ -109,9 +112,12 @@ export function KayitSurecWorkspace({
   onTabChange,
   onClose,
   initialSurecPersonelId,
+  initialIntent,
+  initialReturnTo,
   primaryActionLabel,
   primaryFormId
 }: KayitSurecWorkspaceProps) {
+  const navigate = useNavigate();
   const { hasPermission } = useRoleAccess();
   const canCreatePersonel = hasPermission("personeller.create");
   const canCreateSurec = hasPermission("surecler.create");
@@ -346,6 +352,12 @@ export function KayitSurecWorkspace({
     setSurecForm(resetSurecFormKeepingPersonel(surecForm.personelId));
   }
 
+  const showPersonelEditGateway =
+    activeTab === "yeni-kayit" &&
+    initialIntent === "personel-edit-gateway" &&
+    typeof initialReturnTo === "string" &&
+    initialReturnTo.length > 0;
+
   return (
     <div className="kayit-workspace">
       <div className="kayit-workspace-tabs" role="tablist" aria-label="Kayıt ve süreç sekmeleri">
@@ -384,25 +396,52 @@ export function KayitSurecWorkspace({
 
             {!bootstrapLoading && !bootstrapError ? (
               <>
-                <form id={KAYIT_SUREC_PERSONEL_FORM_ID} className="workspace-form" onSubmit={handlePersonelSubmit}>
-                  <PersonelCreateFields
-                    form={personelForm}
-                    setForm={setPersonelForm}
-                    refs={refs}
-                    createErrorMessage={personelError}
-                    referenceError={null}
-                    className="workspace-form-stack"
-                  />
-                </form>
-                {personelInfo ? <p className="workspace-success">{personelInfo}</p> : null}
-                <div className="universal-btn-group workspace-form-actions">
-                  <button type="submit" form={primaryFormId} className="universal-btn-save" disabled={personelSubmitting}>
-                    {primaryActionLabel}
-                  </button>
-                  <button type="button" className="universal-btn-cancel" onClick={onClose}>
-                    Kapat
-                  </button>
-                </div>
+                {showPersonelEditGateway ? (
+                  <>
+                    <p className="workspace-success">
+                      Kart duzenleme islemi merkez ekrana tasiniyor. Bu gecis turunda duzenleme formu Personel Karti
+                      icinde calismaya devam ediyor.
+                    </p>
+                    <div className="universal-btn-group workspace-form-actions">
+                      <button
+                        type="button"
+                        className="universal-btn-save"
+                        onClick={() => {
+                          navigate(initialReturnTo, {
+                            state: { openPersonelEdit: true }
+                          });
+                        }}
+                      >
+                        Personel Kartina Don ve Duzenle
+                      </button>
+                      <button type="button" className="universal-btn-cancel" onClick={onClose}>
+                        Kapat
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <form id={KAYIT_SUREC_PERSONEL_FORM_ID} className="workspace-form" onSubmit={handlePersonelSubmit}>
+                      <PersonelCreateFields
+                        form={personelForm}
+                        setForm={setPersonelForm}
+                        refs={refs}
+                        createErrorMessage={personelError}
+                        referenceError={null}
+                        className="workspace-form-stack"
+                      />
+                    </form>
+                    {personelInfo ? <p className="workspace-success">{personelInfo}</p> : null}
+                    <div className="universal-btn-group workspace-form-actions">
+                      <button type="submit" form={primaryFormId} className="universal-btn-save" disabled={personelSubmitting}>
+                        {primaryActionLabel}
+                      </button>
+                      <button type="button" className="universal-btn-cancel" onClick={onClose}>
+                        Kapat
+                      </button>
+                    </div>
+                  </>
+                )}
               </>
             ) : null}
           </section>

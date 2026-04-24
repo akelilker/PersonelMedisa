@@ -25,9 +25,13 @@ type ModuleModalConfig = {
   bodyClassName?: string;
 };
 
+type KayitModalIntent = "personel-edit-gateway";
+
 type KayitModalRouteConfig = {
   tab: KayitTab;
   personelId: string | null;
+  intent: KayitModalIntent | null;
+  returnTo: string | null;
 };
 
 function resolveKayitModalRouteConfig(state: unknown): KayitModalRouteConfig | null {
@@ -42,10 +46,14 @@ function resolveKayitModalRouteConfig(state: unknown): KayitModalRouteConfig | n
 
   const rawTab = (kayitModal as { tab?: unknown }).tab;
   const rawPersonelId = (kayitModal as { personelId?: unknown }).personelId;
+  const rawIntent = (kayitModal as { intent?: unknown }).intent;
+  const rawReturnTo = (kayitModal as { returnTo?: unknown }).returnTo;
 
   return {
     tab: rawTab === "surec" ? "surec" : "yeni-kayit",
-    personelId: rawPersonelId === undefined || rawPersonelId === null ? null : String(rawPersonelId)
+    personelId: rawPersonelId === undefined || rawPersonelId === null ? null : String(rawPersonelId),
+    intent: rawIntent === "personel-edit-gateway" ? rawIntent : null,
+    returnTo: typeof rawReturnTo === "string" && rawReturnTo.trim() ? rawReturnTo.trim() : null
   };
 }
 
@@ -125,6 +133,8 @@ export function AppShell({ children }: AppShellProps) {
   const [isKayitModalOpen, setIsKayitModalOpen] = useState(false);
   const [kayitTab, setKayitTab] = useState<KayitTab>("yeni-kayit");
   const [kayitInitialSurecPersonelId, setKayitInitialSurecPersonelId] = useState<string | null>(null);
+  const [kayitEntryIntent, setKayitEntryIntent] = useState<KayitModalIntent | null>(null);
+  const [kayitEntryReturnTo, setKayitEntryReturnTo] = useState<string | null>(null);
   const kayitRouteConfig = useMemo(() => resolveKayitModalRouteConfig(state), [state]);
 
   useEffect(() => {
@@ -142,6 +152,8 @@ export function AppShell({ children }: AppShellProps) {
 
     setKayitTab(kayitRouteConfig.tab);
     setKayitInitialSurecPersonelId(kayitRouteConfig.personelId);
+    setKayitEntryIntent(kayitRouteConfig.intent);
+    setKayitEntryReturnTo(kayitRouteConfig.returnTo);
     setIsKayitModalOpen(true);
     navigate(pathname, { replace: true, state: null });
   }, [kayitRouteConfig, navigate, pathname]);
@@ -177,6 +189,8 @@ export function AppShell({ children }: AppShellProps) {
             onKayitOpen={(tab) => {
               setKayitTab(tab);
               setKayitInitialSurecPersonelId(null);
+              setKayitEntryIntent(null);
+              setKayitEntryReturnTo(null);
               setIsKayitModalOpen(true);
             }}
           />
@@ -192,6 +206,8 @@ export function AppShell({ children }: AppShellProps) {
           onClose={() => {
             setIsKayitModalOpen(false);
             setKayitInitialSurecPersonelId(null);
+            setKayitEntryIntent(null);
+            setKayitEntryReturnTo(null);
           }}
         >
           <KayitSurecWorkspace
@@ -200,8 +216,12 @@ export function AppShell({ children }: AppShellProps) {
             onClose={() => {
               setIsKayitModalOpen(false);
               setKayitInitialSurecPersonelId(null);
+              setKayitEntryIntent(null);
+              setKayitEntryReturnTo(null);
             }}
             initialSurecPersonelId={kayitInitialSurecPersonelId}
+            initialIntent={kayitEntryIntent}
+            initialReturnTo={kayitEntryReturnTo}
             primaryActionLabel={kayitPrimaryLabel}
             primaryFormId={kayitPrimaryFormId}
           />

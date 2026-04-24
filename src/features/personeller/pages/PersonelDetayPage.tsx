@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { FormField } from "../../../components/form/FormField";
 import { AppModal } from "../../../components/modal/AppModal";
 import { EmptyState } from "../../../components/states/EmptyState";
@@ -843,6 +843,7 @@ function PersonelZimmetEnvanterPanel({
 }
 
 export function PersonelDetayPage() {
+  const location = useLocation();
   const navigate = useNavigate();
   const { personelId } = useParams();
   const parsedPersonelId = Number.parseInt(personelId ?? "", 10);
@@ -917,6 +918,20 @@ export function PersonelDetayPage() {
     }
   }, [isEditing, isSurecModalOpen, isZimmetModalOpen]);
 
+  useEffect(() => {
+    const routeState = location.state as { openPersonelEdit?: boolean } | null;
+    if (!routeState?.openPersonelEdit) {
+      return;
+    }
+
+    if (canEditPersonel) {
+      setActiveTab("genel-bilgiler");
+      setIsEditing(true);
+    }
+
+    navigate(location.pathname, { replace: true, state: null });
+  }, [canEditPersonel, location.pathname, location.state, navigate, setIsEditing]);
+
   function handleEditSubmit(event: FormEvent<HTMLFormElement>) {
     void updatePersonelHandler(event, canEditPersonel);
   }
@@ -942,6 +957,19 @@ export function PersonelDetayPage() {
 
   function handleOpenSurecHistory() {
     setActiveTab("surec-gecmisi");
+  }
+
+  function handleOpenPersonelEditGateway() {
+    navigate("/", {
+      state: {
+        kayitModal: {
+          tab: "yeni-kayit",
+          personelId: parsedPersonelId,
+          intent: "personel-edit-gateway",
+          returnTo: `/personeller/${parsedPersonelId}`
+        }
+      }
+    });
   }
 
   function handleOpenZimmetModal() {
@@ -978,7 +1006,7 @@ export function PersonelDetayPage() {
               isActionMenuOpen={isActionMenuOpen}
               onToggleActionMenu={() => setIsActionMenuOpen((prev) => !prev)}
               onCloseActionMenu={() => setIsActionMenuOpen(false)}
-              onStartEdit={() => setIsEditing(true)}
+              onStartEdit={handleOpenPersonelEditGateway}
               onOpenSurecModal={handleOpenSurecModal}
               onOpenSurecHistory={handleOpenSurecHistory}
             />

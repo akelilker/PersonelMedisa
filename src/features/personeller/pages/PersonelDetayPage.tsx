@@ -1265,7 +1265,7 @@ export function PersonelDetayPage() {
                   isLoading={isZimmetHistoryLoading}
                   errorMessage={zimmetHistoryErrorMessage}
                   zimmetler={zimmetHistory}
-                  onOpenCreateModal={handleOpenZimmetModal}
+                  onOpenCreateModal={handleOpenPersonelZimmetGateway}
                 />
               </div>
 

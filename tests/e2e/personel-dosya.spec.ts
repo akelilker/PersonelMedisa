@@ -23,6 +23,27 @@ async function openKartDuzenleFromActions(page: Page) {
   await expect(page.locator('[name="edit-departman"]')).toBeVisible({ timeout: 10000 });
 }
 
+async function openZimmetCreateFromPersonelDosya(page: Page) {
+  await page.getByRole("button", { name: "Yeni Zimmet Ekle" }).click();
+
+  const gatewayButton = page.getByRole("button", {
+    name: /Personel Kart[iı]na D[oö]n ve Zimmet Ekle|Personel Kartina Don ve Zimmet Ekle/i
+  }).first();
+
+  const gatewayVisible = await gatewayButton
+    .waitFor({ state: "visible", timeout: 3000 })
+    .then(() => true)
+    .catch(() => false);
+  if (gatewayVisible) {
+    await gatewayButton.click();
+  }
+
+  await expect(page).toHaveURL(/\/personeller\/\d+$/);
+  const zimmetModal = page.locator(".modal-container").last();
+  await expect(zimmetModal).toBeVisible({ timeout: 10000 });
+  return zimmetModal;
+}
+
 test.describe("personel dosyasi surec akisi", () => {
   test("yonetici surec ekler ve isten ayrilma personel durumunu pasife ceker", async ({ page }) => {
     await mockApi(page, "GENEL_YONETICI");
@@ -102,10 +123,7 @@ test.describe("personel dosyasi surec akisi", () => {
     await expect(iadeRow).toHaveCount(1);
     await expect(iadeRow.getByTestId("zimmet-durum")).toContainText(/Edildi/);
 
-    await page.getByRole("button", { name: "Yeni Zimmet Ekle" }).click();
-
-    const zimmetModal = page.locator(".modal-container").last();
-    await expect(zimmetModal).toBeVisible();
+    const zimmetModal = await openZimmetCreateFromPersonelDosya(page);
 
     await zimmetModal.locator("[name='personel-zimmet-urun-turu']").selectOption("TELEFON");
     await zimmetModal.locator("[name='personel-zimmet-teslim-tarihi']").fill("2026-04-12");

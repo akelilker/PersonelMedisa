@@ -13,6 +13,8 @@ type SurecFormFieldsProps = {
   setForm: Dispatch<SetStateAction<SurecFormState>>;
   surecTuruOptions: KeyOption[];
   personelOptions?: PersonelOption[];
+  showPersonelField?: boolean;
+  showSurecTuruField?: boolean;
   errorMessage?: string | null;
   referenceError?: string | null;
   className?: string;
@@ -32,55 +34,65 @@ export function SurecFormFields({
   setForm,
   surecTuruOptions,
   personelOptions = [],
+  showPersonelField = true,
+  showSurecTuruField = true,
   errorMessage,
   referenceError,
   className
 }: SurecFormFieldsProps) {
   return (
     <div className={className}>
-      {personelOptions.length > 0 ? (
-        <FormField
-          as="select"
-          label="Personel"
-          name="surec-create-personel"
-          value={form.personelId}
-          onChange={(value) => setForm((prev) => ({ ...prev, personelId: value }))}
-          required
-          placeholderOption={{ value: "", label: "Seçiniz" }}
-          selectOptions={personelOptions}
-        />
-      ) : (
-        <FormField
-          label="Personel ID"
-          name="surec-create-personel"
-          type="number"
-          min={1}
-          value={form.personelId}
-          onChange={(value) => setForm((prev) => ({ ...prev, personelId: value }))}
-          required
-        />
-      )}
+      {showPersonelField
+        ? personelOptions.length > 0
+          ? (
+              <FormField
+                as="select"
+                label="Personel"
+                name="surec-create-personel"
+                value={form.personelId}
+                onChange={(value) => setForm((prev) => ({ ...prev, personelId: value }))}
+                required
+                placeholderOption={{ value: "", label: "Seçiniz" }}
+                selectOptions={personelOptions}
+              />
+            )
+          : (
+              <FormField
+                label="Personel ID"
+                name="surec-create-personel"
+                type="number"
+                min={1}
+                value={form.personelId}
+                onChange={(value) => setForm((prev) => ({ ...prev, personelId: value }))}
+                required
+              />
+            )
+        : null}
 
-      {surecTuruOptions.length > 0 ? (
-        <FormField
-          as="select"
-          label="Süreç Türü"
-          name="surec-create-turu"
-          value={form.surecTuru}
-          onChange={(value) => setForm((prev) => ({ ...prev, surecTuru: value }))}
-          required
-          placeholderOption={{ value: "", label: "Seçiniz" }}
-          selectOptions={keyOptionsToSelectOptions(surecTuruOptions)}
-        />
-      ) : (
-        <FormField
-          label="Süreç Türü"
-          name="surec-create-turu-text"
-          value={form.surecTuru}
-          onChange={(value) => setForm((prev) => ({ ...prev, surecTuru: value }))}
-          required
-        />
-      )}
+      {showSurecTuruField
+        ? surecTuruOptions.length > 0
+          ? (
+              <FormField
+                as="select"
+                label="Süreç Türü"
+                name="surec-create-turu"
+                value={form.surecTuru}
+                onChange={(value) => setForm((prev) => ({ ...prev, surecTuru: value }))}
+                required
+                placeholderOption={{ value: "", label: "Seçiniz" }}
+                selectOptions={keyOptionsToSelectOptions(surecTuruOptions)}
+              />
+            )
+          : (
+              <FormField
+                label="Süreç Türü"
+                name="surec-create-turu-text"
+                value={form.surecTuru}
+                onChange={(value) => setForm((prev) => ({ ...prev, surecTuru: value }))}
+                required
+              />
+            )
+        : null}
 
       <FormField
         label="Alt Tür"

@@ -1,6 +1,8 @@
 .kayit-workspace {
   display: grid;
-  gap: 14px;
+  grid-auto-rows: max-content;
+  align-content: start;
+  gap: 12px;
   min-height: 0;
 }
 
@@ -8,7 +10,7 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   align-items: flex-end;
-  gap: 18px;
+  gap: 24px;
   margin: 0;
   padding: 0;
   border: none;
@@ -20,13 +22,13 @@
 .kayit-workspace-tab {
   width: 100%;
   margin: 0 0 -1px;
-  padding: 8px 0 10px;
+  padding: 6px 0 9px;
   border: none;
-  border-bottom: 3px solid transparent;
+  border-bottom: 2px solid transparent;
   border-radius: 0;
   background: transparent;
-  color: rgba(245, 247, 255, 0.45);
-  font-size: 18px;
+  color: rgba(245, 247, 255, 0.38);
+  font-size: 20px;
   font-weight: 700;
   letter-spacing: 0;
   text-transform: none;
@@ -44,25 +46,18 @@
 .surec-workspace-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 16px;
+  gap: 12px;
   align-items: start;
+  align-content: start;
 }
 
 /* Süreç sekmesi — Devamsızlık işlem modu: işlem kartı öncelikli dikey alan, tarihçe sabit içerik */
 .surec-workspace-grid.surec-workspace-grid--islem-modu {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 12px;
-  align-items: stretch;
-}
-
-.surec-workspace-grid.surec-workspace-grid--islem-modu > section:first-of-type {
-  flex: 1 1 auto;
-  min-height: min(52vh, 560px);
-}
-
-.surec-workspace-grid.surec-workspace-grid--islem-modu > section.workspace-surface-card--surec-tarihce {
-  flex: 0 0 auto;
+  align-items: start;
+  align-content: start;
 }
 
 .workspace-surface-card {
@@ -187,11 +182,11 @@
 
 .surec-personel-picker {
   display: grid;
-  gap: 12px;
-  padding: 14px 16px;
-  border: 1px solid rgba(var(--theme-color-rgb), 0.22);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.035);
+  gap: 8px;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
 }
 
 .surec-personel-picker-head {
@@ -206,19 +201,19 @@
 
 .surec-personel-picker-head strong {
   color: #ffffff;
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 700;
 }
 
 .surec-personel-picker-head p {
   color: rgba(241, 243, 250, 0.66);
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.4;
 }
 
 .surec-personel-picker-fields {
   display: grid;
-  gap: 10px;
+  gap: 12px;
 }
 
 @media (min-width: 760px) {
@@ -301,7 +296,7 @@
 .personel-form-columns {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 22px;
+  gap: 28px;
   position: relative;
 }
 
@@ -366,8 +361,9 @@
 
 .surec-shell-split {
   display: grid;
-  gap: 16px;
+  gap: 22px;
   align-items: start;
+  align-content: start;
 }
 
 @media (min-width: 900px) {
@@ -392,7 +388,7 @@
 
 .surec-shell-summary {
   display: grid;
-  gap: 10px;
+  gap: 12px;
   padding: 0;
   border-radius: 0;
   background: transparent;
@@ -400,7 +396,7 @@
 
 .surec-shell-summary-kicker {
   margin: 0;
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -449,20 +445,20 @@
 .surec-shell-action-tile {
   display: flex;
   align-items: flex-start;
-  gap: 14px;
+  gap: 12px;
   width: 100%;
-  padding: 14px 16px;
+  padding: 10px 0;
   border: none;
-  border-radius: 14px;
+  border-radius: 0;
   text-align: left;
   cursor: pointer;
   color: rgba(247, 248, 250, 0.94);
-  background: rgba(255, 255, 255, 0.06);
+  background: transparent;
   transition: background 0.18s ease, box-shadow 0.18s ease;
 }
 
 .surec-shell-action-tile:hover {
-  background: rgba(255, 255, 255, 0.09);
+  background: rgba(255, 255, 255, 0.035);
 }
 
 .surec-shell-action-tile:focus-visible {
@@ -472,9 +468,9 @@
 
 .surec-shell-action-icon {
   flex: 0 0 auto;
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
   background: rgba(var(--theme-color-rgb), 0.22);
   box-shadow: inset 0 0 0 1px rgba(var(--theme-color-rgb), 0.35);
 }
@@ -486,13 +482,13 @@
 }
 
 .surec-shell-action-title {
-  font-size: 15px;
+  font-size: 17px;
   font-weight: 700;
-  letter-spacing: 0.02em;
+  letter-spacing: 0;
 }
 
 .surec-shell-action-desc {
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.4;
   color: rgba(240, 242, 248, 0.72);
 }

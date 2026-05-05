@@ -723,7 +723,6 @@ export function KayitSurecWorkspace({
                         <div className="surec-personel-picker">
                           <div className="surec-personel-picker-head">
                             <strong>Personel seçimi</strong>
-                            <p>Ad, T.C. kimlik, telefon, bölüm veya görev bilgisiyle arayıp kişiyi seçin.</p>
                           </div>
 
                           {personelOptions.length > 0 ? (
@@ -757,7 +756,6 @@ export function KayitSurecWorkspace({
                           )}
                         </div>
 
-                        <p className="workspace-empty-hint">Süreç girmek için önce personel seçin.</p>
                       </>
                     ) : (
                       <div className={`surec-shell-split${surecShellPanel === "devamsizlik" ? " surec-shell-split--panel" : ""}`}>

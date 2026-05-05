@@ -106,7 +106,7 @@ export function PersonelCreateFields({
             name="create-acil-kisi"
             value={form.acilDurumKisi}
             onChange={(value) => setForm((prev) => ({ ...prev, acilDurumKisi: value }))}
-            placeholder="Ayşe AKEL"
+            placeholder="Serhan KÖSE"
             required
           />
           <FormField

@@ -28,7 +28,7 @@
   border-radius: 0;
   background: transparent;
   color: rgba(245, 247, 255, 0.38);
-  font-size: 19px;
+  font-size: 18px;
   font-weight: 700;
   letter-spacing: 0;
   text-transform: none;
@@ -361,14 +361,14 @@
 
 .surec-shell-split {
   display: grid;
-  gap: 22px;
+  gap: 18px;
   align-items: start;
   align-content: start;
 }
 
-@media (min-width: 900px) {
+@media (min-width: 720px) {
   .surec-shell-split {
-    grid-template-columns: minmax(210px, 0.35fr) minmax(0, 0.65fr);
+    grid-template-columns: minmax(170px, 35%) minmax(0, 65%);
   }
 }
 
@@ -382,7 +382,7 @@
 
 .surec-shell-operations {
   display: grid;
-  gap: 14px;
+  gap: 10px;
   min-width: 0;
 }
 
@@ -436,61 +436,47 @@
   overflow-wrap: anywhere;
 }
 
-.surec-shell-actions {
-  display: grid;
-  gap: 12px;
-  align-content: start;
+.surec-person-tabs {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+  min-width: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.surec-person-tab {
+  margin: 0 0 -1px;
+  padding: 0 0 8px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  color: rgba(247, 248, 250, 0.94);
+  background: transparent;
+  font-size: 14px;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+  transition: color 0.18s ease, border-color 0.18s ease;
+}
+
+.surec-person-tab.is-active {
+  color: #ffffff;
+  border-bottom-color: rgb(var(--theme-color-rgb));
+}
+
+.surec-person-tab:disabled {
+  cursor: not-allowed;
+  color: rgba(241, 243, 250, 0.34);
 }
 
 .surec-shell-action-tile {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  width: 100%;
-  padding: 10px 0;
-  border: none;
-  border-radius: 0;
-  text-align: left;
-  cursor: pointer;
-  color: rgba(247, 248, 250, 0.94);
-  background: transparent;
-  transition: background 0.18s ease, box-shadow 0.18s ease;
+  width: auto;
 }
 
-.surec-shell-action-tile:hover {
-  background: rgba(255, 255, 255, 0.035);
-}
-
+.surec-person-tab:focus-visible,
 .surec-shell-action-tile:focus-visible {
   outline: 2px solid rgba(var(--theme-color-rgb), 0.85);
   outline-offset: 2px;
-}
-
-.surec-shell-action-icon {
-  flex: 0 0 auto;
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
-  background: rgba(var(--theme-color-rgb), 0.22);
-  box-shadow: inset 0 0 0 1px rgba(var(--theme-color-rgb), 0.35);
-}
-
-.surec-shell-action-text {
-  display: grid;
-  gap: 4px;
-  min-width: 0;
-}
-
-.surec-shell-action-title {
-  font-size: 17px;
-  font-weight: 700;
-  letter-spacing: 0;
-}
-
-.surec-shell-action-desc {
-  font-size: 14px;
-  line-height: 1.4;
-  color: rgba(240, 242, 248, 0.72);
 }
 
 .surec-shell-panel {
@@ -498,47 +484,29 @@
   gap: 14px;
 }
 
-.surec-shell-panel-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px 14px;
-}
-
-.surec-shell-panel-title {
-  margin: 0;
-  font-size: 15px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: #ffffff;
-}
-
-.surec-shell-panel-hint {
-  margin: 0;
-}
-
 .surec-devamsizlik-tiles {
   display: grid;
-  gap: 10px;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 6px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .surec-devamsizlik-tile {
   display: grid;
-  gap: 6px;
-  padding: 12px 14px;
+  gap: 2px;
+  min-height: 34px;
+  padding: 7px 8px;
   border: none;
-  border-radius: 12px;
-  text-align: left;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  text-align: center;
   cursor: pointer;
   color: rgba(247, 248, 250, 0.92);
-  background: rgba(255, 255, 255, 0.05);
-  transition: background 0.18s ease, box-shadow 0.18s ease;
+  background: transparent;
+  transition: color 0.18s ease, border-color 0.18s ease;
 }
 
 .surec-devamsizlik-tile:hover {
-  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
 }
 
 .surec-devamsizlik-tile:focus-visible {
@@ -547,25 +515,21 @@
 }
 
 .surec-devamsizlik-tile.is-active {
-  background: rgba(var(--theme-color-rgb), 0.14);
-  box-shadow: inset 0 -2px 0 0 rgba(var(--theme-color-rgb), 0.85);
+  color: #ffffff;
+  border-bottom-color: rgba(var(--theme-color-rgb), 0.85);
 }
 
 .surec-devamsizlik-tile-title {
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 700;
 }
 
 .surec-devamsizlik-tile-desc {
-  font-size: 12px;
-  line-height: 1.35;
-  color: rgba(240, 242, 248, 0.72);
+  display: none;
 }
 
 .surec-devamsizlik-tile-status {
-  font-size: 11px;
-  line-height: 1.3;
-  color: rgba(230, 232, 240, 0.55);
+  display: none;
 }
 
 .workspace-surface-card--surec-tarihce {

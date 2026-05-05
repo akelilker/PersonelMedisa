@@ -309,26 +309,19 @@ export function KayitSurecWorkspace({
       return;
     }
 
-    setSurecShellPanel(null);
-    setDevamsizlikSubId(null);
+    setSurecShellPanel(surecForm.personelId ? "devamsizlik" : null);
+    setDevamsizlikSubId(surecForm.personelId ? "izin" : null);
     setSurecForm((prev) => resetSurecFormKeepingPersonel(prev.personelId));
     setSurecError(null);
     setSurecInfo(null);
   }, [editingSurec, surecForm.personelId, useShellSurecLayout]);
 
-  function openDevamsizlikShellPanel() {
+  function openDevamsizlikShellPanel(defaultSubId: DevamsizlikSubId | null = "izin") {
     setSurecError(null);
     setSurecInfo(null);
     setSurecShellPanel("devamsizlik");
-    setDevamsizlikSubId(null);
+    setDevamsizlikSubId(defaultSubId);
     setSurecForm((prev) => resetSurecFormKeepingPersonel(prev.personelId));
-  }
-
-  function closeDevamsizlikShellPanel() {
-    setSurecShellPanel(null);
-    setDevamsizlikSubId(null);
-    setSurecForm((prev) => resetSurecFormKeepingPersonel(prev.personelId));
-    setSurecError(null);
   }
 
   function selectDevamsizlikSubCard(id: DevamsizlikSubId) {
@@ -826,36 +819,30 @@ export function KayitSurecWorkspace({
                         </aside>
 
                         <div className="surec-shell-operations">
-                          {surecShellPanel === null ? (
-                            <div className="surec-shell-actions">
-                              <button
-                                type="button"
-                                className="surec-shell-action-tile"
-                                onClick={openDevamsizlikShellPanel}
-                              >
-                                <span className="surec-shell-action-icon" aria-hidden="true" />
-                                <span className="surec-shell-action-text">
-                                  <span className="surec-shell-action-title">Devamsızlık</span>
-                                  <span className="surec-shell-action-desc">
-                                    İzin, rapor, devamsızlık ve günlük yoklukla ilgili kayıtlar
-                                  </span>
-                                </span>
-                              </button>
-                            </div>
-                          ) : (
-                            <div className="surec-shell-panel">
-                              <div className="surec-shell-panel-head">
-                                <button type="button" className="universal-btn-aux" onClick={closeDevamsizlikShellPanel}>
-                                  Geri
-                                </button>
-                                <h4 className="surec-shell-panel-title">Devamsızlık</h4>
-                              </div>
-                              <p className="workspace-empty-hint surec-shell-panel-hint">
-                                Önce personelin yaşadığı olayı seçin. Sistem gerekli resmi etkileri kayıt sırasında arka planda
-                                değerlendirir.
-                              </p>
+                          <div className="surec-person-tabs" role="tablist" aria-label="Personel işlem sekmeleri">
+                            <button
+                              type="button"
+                              role="tab"
+                              aria-selected={surecShellPanel === "devamsizlik"}
+                              className={`surec-person-tab surec-shell-action-tile${surecShellPanel === "devamsizlik" ? " is-active" : ""}`}
+                              onClick={() => openDevamsizlikShellPanel("izin")}
+                            >
+                              İzin
+                            </button>
+                            <button type="button" role="tab" aria-selected="false" className="surec-person-tab" disabled>
+                              Belgeler
+                            </button>
+                            <button type="button" role="tab" aria-selected="false" className="surec-person-tab" disabled>
+                              Cezalar
+                            </button>
+                            <button type="button" role="tab" aria-selected="false" className="surec-person-tab" disabled>
+                              Zimmet
+                            </button>
+                          </div>
 
-                              <div className="surec-devamsizlik-tiles" role="group" aria-label="Devamsızlık alt türleri">
+                          {surecShellPanel === "devamsizlik" ? (
+                            <div className="surec-shell-panel">
+                              <div className="surec-devamsizlik-tiles" role="group" aria-label="İzin ve yokluk işlemleri">
                                 {DEVAMSIZLIK_SUB_CARDS.map((card) => {
                                   const isActive = devamsizlikSubId === card.id;
 
@@ -904,7 +891,7 @@ export function KayitSurecWorkspace({
                                 </>
                               ) : null}
                             </div>
-                          )}
+                          ) : null}
                         </div>
                       </div>
                     )}

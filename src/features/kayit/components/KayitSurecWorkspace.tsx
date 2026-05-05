@@ -718,45 +718,47 @@ export function KayitSurecWorkspace({
                   </>
                 ) : (
                   <>
-                    <div className="surec-personel-picker">
-                      <div className="surec-personel-picker-head">
-                        <strong>Personel seçimi</strong>
-                        <p>Ad, T.C. kimlik, telefon, bölüm veya görev bilgisiyle arayıp kişiyi seçin.</p>
-                      </div>
-
-                      {personelOptions.length > 0 ? (
-                        <div className="surec-personel-picker-fields">
-                          <div className="form-section surec-personel-search-field">
-                            <label className="form-label" htmlFor="surec-personel-search">
-                              Personel ara
-                            </label>
-                            <input
-                              id="surec-personel-search"
-                              className="form-input"
-                              type="search"
-                              value={surecPersonelSearch}
-                              onChange={(event) => setSurecPersonelSearch(event.target.value)}
-                              placeholder="Ad, T.C., telefon veya bölüm"
-                            />
-                          </div>
-                          <FormField
-                            as="select"
-                            label="Personel"
-                            name="surec-create-personel"
-                            value={surecForm.personelId}
-                            onChange={(value) => setSurecForm((prev) => ({ ...prev, personelId: value }))}
-                            required
-                            placeholderOption={{ value: "", label: "Seçiniz" }}
-                            selectOptions={filteredSurecPersonelOptions}
-                          />
-                        </div>
-                      ) : (
-                        <p className="workspace-empty-hint">Personel listesi yüklenemedi veya boş.</p>
-                      )}
-                    </div>
-
                     {!selectedSurecPersonel ? (
-                      <p className="workspace-empty-hint">Süreç girmek için önce personel seçin.</p>
+                      <>
+                        <div className="surec-personel-picker">
+                          <div className="surec-personel-picker-head">
+                            <strong>Personel seçimi</strong>
+                            <p>Ad, T.C. kimlik, telefon, bölüm veya görev bilgisiyle arayıp kişiyi seçin.</p>
+                          </div>
+
+                          {personelOptions.length > 0 ? (
+                            <div className="surec-personel-picker-fields">
+                              <div className="form-section surec-personel-search-field">
+                                <label className="form-label" htmlFor="surec-personel-search">
+                                  Personel ara
+                                </label>
+                                <input
+                                  id="surec-personel-search"
+                                  className="form-input"
+                                  type="search"
+                                  value={surecPersonelSearch}
+                                  onChange={(event) => setSurecPersonelSearch(event.target.value)}
+                                  placeholder="Ad, T.C., telefon veya bölüm"
+                                />
+                              </div>
+                              <FormField
+                                as="select"
+                                label="Personel"
+                                name="surec-create-personel"
+                                value={surecForm.personelId}
+                                onChange={(value) => setSurecForm((prev) => ({ ...prev, personelId: value }))}
+                                required
+                                placeholderOption={{ value: "", label: "Seçiniz" }}
+                                selectOptions={filteredSurecPersonelOptions}
+                              />
+                            </div>
+                          ) : (
+                            <p className="workspace-empty-hint">Personel listesi yüklenemedi veya boş.</p>
+                          )}
+                        </div>
+
+                        <p className="workspace-empty-hint">Süreç girmek için önce personel seçin.</p>
+                      </>
                     ) : (
                       <div className={`surec-shell-split${surecShellPanel === "devamsizlik" ? " surec-shell-split--panel" : ""}`}>
                         <aside className="surec-shell-summary surec-shell-person-card">

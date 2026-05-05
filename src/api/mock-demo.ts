@@ -1809,8 +1809,8 @@ export function resolveDemoApiResponse(
 
     if (pathname === "/referans/ucret-tipleri") {
       return ok([
-        { id: 1, ad: "Maktu Aylık" },
-        { id: 2, ad: "Saatlik" }
+        { id: 1, ad: "Aylık sabit maaş" },
+        { id: 2, ad: "Saatlik çalışan" }
       ]);
     }
 

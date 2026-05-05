@@ -138,7 +138,7 @@ const DEVAMSIZLIK_SUB_CARDS: DevamsizlikSubCard[] = [
   },
   {
     id: "izinsiz",
-    title: "İzinsiz Devamsızlık",
+    title: "İzinsiz Gelmedi",
     description: "Mazeretsiz yokluk (referansta karşılığı varsa tür atanır)",
     candidateKeys: ["DEVAMSIZLIK"]
   },
@@ -219,9 +219,6 @@ export function KayitSurecWorkspace({
   const [sureclerLoading, setSureclerLoading] = useState(false);
   const [sureclerError, setSureclerError] = useState<string | null>(null);
 
-  const directSurecEntry =
-    typeof initialSurecPersonelId === "string" && initialSurecPersonelId.trim().length > 0;
-
   const [surecShellPanel, setSurecShellPanel] = useState<null | "devamsizlik">(null);
   const [devamsizlikSubId, setDevamsizlikSubId] = useState<DevamsizlikSubId | null>(null);
 
@@ -254,7 +251,7 @@ export function KayitSurecWorkspace({
     return resolveSurecTuruKeyFromOptions(card.candidateKeys, surecTuruOptions);
   }, [devamsizlikSubId, surecTuruOptions]);
 
-  const useShellSurecLayout = !directSurecEntry;
+  const useShellSurecLayout = editingSurec === null;
 
   const hideSurecTuruFieldInShell =
     useShellSurecLayout &&
@@ -518,7 +515,14 @@ export function KayitSurecWorkspace({
       ? "Zimmet işlemi merkez ekrana taşınıyor. Bu geçişte zimmet formu personel kartında çalışmaya devam eder."
       : "Kart düzenleme işlemi merkez ekrana taşınıyor. Bu geçişte düzenleme formu personel kartında çalışmaya devam eder.";
 
-  const classicSurecFormLayout = directSurecEntry || editingSurec !== null;
+  const classicSurecFormLayout = editingSurec !== null;
+
+  const surecWorkspaceGridClassName = [
+    "surec-workspace-grid",
+    !classicSurecFormLayout && surecShellPanel === "devamsizlik" ? "surec-workspace-grid--islem-modu" : ""
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   return (
     <div className="kayit-workspace">
@@ -611,7 +615,7 @@ export function KayitSurecWorkspace({
           </section>
         </div>
       ) : (
-        <div className="surec-workspace-grid">
+        <div className={surecWorkspaceGridClassName}>
           <section className="workspace-surface-card">
             <div className="workspace-surface-header">
               <h3>{editingSurec ? `Süreç Düzenle #${editingSurec.id}` : "Süreç İşlemleri"}</h3>
@@ -842,25 +846,25 @@ export function KayitSurecWorkspace({
             ) : null}
           </section>
 
-          <section className="workspace-surface-card">
+          <section className="workspace-surface-card workspace-surface-card--surec-tarihce">
             <div className="workspace-surface-header">
-              <h3>Süreç Kayıtları</h3>
+              <h3>Kayıt tarihçesi</h3>
               <p>
                 {selectedSurecPersonel
-                  ? `${selectedSurecPersonel.ad} ${selectedSurecPersonel.soyad} için kayıtlar`
-                  : "Seçili personel yoksa son süreç kayıtları listelenir."}
+                  ? `${selectedSurecPersonel.ad} ${selectedSurecPersonel.soyad} için geçmiş kayıtlar`
+                  : "Personel seçili değilken liste son süreçlere göre dolar."}
               </p>
             </div>
 
-            {sureclerLoading ? <LoadingState label="Süreç kayıtları yükleniyor..." /> : null}
+            {sureclerLoading ? <LoadingState label="Kayıt tarihçesi yükleniyor..." /> : null}
             {!sureclerLoading && sureclerError ? (
               <ErrorState message={sureclerError} onRetry={() => void loadSurecler(surecForm.personelId)} />
             ) : null}
 
             {!sureclerLoading && !sureclerError && surecler.length === 0 ? (
               <EmptyState
-                title="Süreç kaydı yok"
-                message="Bu seçim için görüntülenecek süreç kaydı bulunamadı."
+                title="Tarihçede kayıt yok"
+                message="Bu seçim için görüntülenecek kayıt bulunamadı."
               />
             ) : null}
 

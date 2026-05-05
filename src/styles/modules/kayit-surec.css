@@ -40,6 +40,23 @@
   align-items: start;
 }
 
+/* Süreç sekmesi — Devamsızlık işlem modu: işlem kartı öncelikli dikey alan, tarihçe sabit içerik */
+.surec-workspace-grid.surec-workspace-grid--islem-modu {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: stretch;
+}
+
+.surec-workspace-grid.surec-workspace-grid--islem-modu > section:first-of-type {
+  flex: 1 1 auto;
+  min-height: min(52vh, 560px);
+}
+
+.surec-workspace-grid.surec-workspace-grid--islem-modu > section.workspace-surface-card--surec-tarihce {
+  flex: 0 0 auto;
+}
+
 .workspace-surface-card {
   display: grid;
   gap: 10px;

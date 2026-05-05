@@ -461,6 +461,46 @@ Contract:
 - Modal altı ile footer arasında sabit nefes alanı korunur
 - Özellikle mobil ve PWA'da modal footer'a yapışık görünmez
 
+### 10.6 Kayıt ve Süreç Modalı - Personel İçi Sekme Contract'ı
+
+`Kayıt ve Süreç` modalında üst seviye iki ana sekme korunur:
+
+- `Kayıt`
+- `Süreç`
+
+`Süreç` sekmesinde kişi seçildikten sonra ikinci bir kart seçme ekranı gösterilmez.
+Ekran, seçili personelin dosyası gibi davranan personel içi sekme düzenine geçer.
+
+Personel içi sekmeler:
+
+1. `Genel`
+2. `İzin + Devamsızlık`
+3. `Belgeler`
+4. `Mali İşlemler`
+5. `Zimmet`
+6. `Ceza`
+7. `Ayrılma`
+8. `Süreç Tarihçesi`
+
+Görsel davranış:
+
+- Personel içi sekmeler buton/kart gibi görünmez; metin sekmesi ve alt çizgi mantığıyla çalışır.
+- Aktif sekme netleşir, pasif sekmeler soluklaşır.
+- Sekme değişiminde ana `Kayıt / Süreç` sekmelerinin konumu zıplamaz.
+- Seçili personel için varsayılan sekme `Genel` olur.
+- `Genel` sekmesi küçük sol özet kartı değildir; kayıt formunda sorulan bütün alanları okunur ve gruplanmış şekilde yayar.
+- `Genel` sekmesinde sağ üstte personel fotoğrafı alanı bulunur. Fotoğraf yoksa boş avatar/placeholder görünür.
+- Fotoğraf yükleme ilk sürümde görsel placeholder olabilir; gerçek dosya upload akışı ayrı teknik pakettir.
+- `Süreç Tarihçesi` okuma sekmesidir; yeni kayıt formu gibi davranmaz.
+- `İzin + Devamsızlık`, `Mali İşlemler`, `Zimmet`, `Ceza` ve `Ayrılma` kayıt girişi aileleridir.
+
+Yasaklar:
+
+- Personel seçildikten sonra sağ tarafta tek büyük `Devamsızlık` kartı bekletilmez.
+- `İşten Ayrılma`, `Devamsızlık` altına gömülmez.
+- Belgeler, yalnızca açıklama alanına yazılan serbest metin gibi ele alınmaz; ayrı sekme ailesidir.
+- Teknik event adları kullanıcıya sekme adı olarak basılmaz.
+
 ## 11. Dropdown ve Floating Panel Contract'ı
 
 ### 11.1 Ortak Kural

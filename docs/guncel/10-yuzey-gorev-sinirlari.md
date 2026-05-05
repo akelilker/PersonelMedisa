@@ -35,12 +35,34 @@ Korunacak ana yapı:
 - `Kayıt` sekmesi
 - `Süreç` sekmesi
 
-İleride `Süreç` sekmesi kişi seçimi merkezli hale getirilir:
+`Süreç` sekmesi kişi seçimi merkezli hale getirilir:
 
 - personel seçimi
-- kısa kişi özeti
-- işlem kolu seçimi
+- personel içi sekme düzeni
 - ilgili forma geçiş
+
+Kişi seçildikten sonra `Süreç` sekmesi içinde aşağıdaki personel içi sekmeler görünür:
+
+1. `Genel`
+2. `İzin + Devamsızlık`
+3. `Belgeler`
+4. `Mali İşlemler`
+5. `Zimmet`
+6. `Ceza`
+7. `Ayrılma`
+8. `Süreç Tarihçesi`
+
+Sekme görevleri:
+
+- `Genel`: Kayıt ekranında sorulan bütün personel bilgilerini okunur şekilde gösterir. Kısa özet değil, yayılmış personel dosyası görünümüdür.
+- `Genel` içinde sağ üstte personel fotoğrafı alanı bulunur. İlk sürümde fotoğraf yükleme alanı placeholder olabilir; gerçek upload entegrasyonu ayrı pakettir.
+- `İzin + Devamsızlık`: izin, rapor, iş kazası, izinsiz gelmedi, geç geldi, erken çıktı gibi yokluk ve devam durumlarını toplar.
+- `Belgeler`: forklift operatör belgesi, ehliyet, sertifika, sağlık belgesi, özel yetkinlik ve personel dosyası evraklarını toplar.
+- `Mali İşlemler`: avans ve ekstra prim gibi para etkili işlemleri toplar.
+- `Zimmet`: ekipman, cihaz, araç, kıyafet ve teslim-tesellüm işlemlerini toplar.
+- `Ceza`: disiplin, uyarı ve ceza kayıtlarını toplar.
+- `Ayrılma`: işten ayrılma lifecycle işlemini toplar; devamsızlık altında gösterilmez.
+- `Süreç Tarihçesi`: okuma alanıdır; yeni kayıt girişi başlatmaz.
 
 ### Personel Kartı
 
@@ -140,4 +162,3 @@ Bir değişiklik bu belgeye uygundur diyebilmek için:
 - çalışan geçici operasyonlar merkezi karşılığı hazır olmadan sökülmemeli
 - Raporlar genel düzenleme ekranı gibi davranmamalı
 - her taşımada ilgili E2E testi yeni davranışa göre güncellenmeli
-

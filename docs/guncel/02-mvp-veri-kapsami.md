@@ -230,6 +230,30 @@ Form davranışı:
 - `isten_ayrilma`
 - `diger`
 
+Bu liste teknik/event kapsamıdır; kullanıcı arayüzünde birebir sekme listesi olarak gösterilmez.
+`Kayıt ve Süreç` ekranında kişi seçildikten sonra süreçler kullanıcı diliyle operasyon ailelerine ayrılır.
+
+UI operasyon aileleri:
+
+- `Genel`
+- `İzin + Devamsızlık`
+- `Belgeler`
+- `Mali İşlemler`
+- `Zimmet`
+- `Ceza`
+- `Ayrılma`
+- `Süreç Tarihçesi`
+
+Gruplama kararı:
+
+- `izin`, `devamsizlik`, `rapor` ve `is_kazasi` kullanıcı arayüzünde `İzin + Devamsızlık` ailesi altında toplanır.
+- `ekstra_prim` ve `avans` kullanıcı arayüzünde `Mali İşlemler` ailesi altında toplanır.
+- `isten_ayrilma` ayrı lifecycle işlemidir; `Devamsızlık` altında gösterilmez.
+- `ceza` ayrı operasyon ailesidir.
+- `belge yükleme`, sertifika, ehliyet, sağlık belgesi ve özel yetkinlik evrakları `Belgeler` ailesinde ele alınır.
+- `zimmet` ayrı merkezi operasyon ailesidir; süreç event listesinden bağımsız olarak `Kayıt ve Süreç` ekranına taşınacaktır.
+- `diger` yalnızca mevcut ailelere girmeyen istisnai süreçler için kullanılır; ilk tercih özel aile açmak değil, doğru aileye yerleştirmektir.
+
 Süreç kaydı için ilk sürüm minimum alanları:
 
 - `personel_id`

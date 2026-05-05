@@ -464,6 +464,9 @@ export async function mockApi(page: Page, role: MockUserRole) {
     }
   ];
 
+  /** Playwright süreci ile tarayıcı aynı makinede; UI ilk yüklemede `new Date()` ayını kullanır. */
+  const aylikOzetFixtureAy = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`;
+
   const aylikOzetRows: Array<{
     ay: string;
     personel_id: number;
@@ -487,7 +490,7 @@ export async function mockApi(page: Page, role: MockUserRole) {
     kapanis_durumu: "ACIK" | "KAPANDI";
   }> = [
     {
-      ay: "2026-04",
+      ay: aylikOzetFixtureAy,
       personel_id: 1,
       ad_soyad: "Ayşe Yılmaz",
       sicil_no: "P-001",
@@ -509,7 +512,7 @@ export async function mockApi(page: Page, role: MockUserRole) {
       kapanis_durumu: "ACIK"
     },
     {
-      ay: "2026-04",
+      ay: aylikOzetFixtureAy,
       personel_id: 2,
       ad_soyad: "Mehmet Kaya",
       sicil_no: "P-002",
@@ -721,7 +724,7 @@ let bildirimIdCounter = 800;
   }
 
   function buildAylikOzetResponse(searchUrl: URL) {
-    const ay = urlValue(searchUrl.searchParams.get("ay")) ?? "2026-04";
+    const ay = urlValue(searchUrl.searchParams.get("ay")) ?? aylikOzetFixtureAy;
     const subeId = numberValue(searchUrl.searchParams.get("sube_id"));
     const departmanId = numberValue(searchUrl.searchParams.get("departman_id"));
     const sadeceRevizeli = searchUrl.searchParams.get("sadece_revizeli") === "true";
@@ -1817,7 +1820,7 @@ let bildirimIdCounter = 800;
       };
 
       aylikOzetRows.forEach((item) => {
-        if (item.ay !== (payload.ay ?? "2026-04")) {
+        if (item.ay !== (payload.ay ?? aylikOzetFixtureAy)) {
           return;
         }
         if (payload.sube_id != null && item.sube_id !== payload.sube_id) {
@@ -1868,7 +1871,7 @@ let bildirimIdCounter = 800;
       }
 
       aylikOzetRows.forEach((item) => {
-        if (item.ay !== (payload.ay ?? "2026-04")) {
+        if (item.ay !== (payload.ay ?? aylikOzetFixtureAy)) {
           return;
         }
         if (payload.sube_id != null && item.sube_id !== payload.sube_id) {

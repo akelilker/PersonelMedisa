@@ -71,6 +71,16 @@ test.describe("personel dosyasi surec akisi", () => {
     await expect(surecModal.getByTestId("kayit-tab-surec")).toHaveAttribute("aria-selected", "true");
     await expect(surecModal.locator("[name='surec-create-personel']")).toHaveValue("1");
 
+    if (
+      (await surecModal.locator("[name='surec-create-turu']").count()) === 0 &&
+      (await surecModal.locator("[name='surec-create-turu-text']").count()) === 0
+    ) {
+      await surecModal.locator(".surec-shell-action-tile").click();
+      await expect(
+        surecModal.locator("[name='surec-create-turu'], [name='surec-create-turu-text']").first()
+      ).toBeVisible({ timeout: 10000 });
+    }
+
     if (await surecModal.locator("[name='surec-create-turu']").count()) {
       await surecModal.locator("[name='surec-create-turu']").selectOption("ISTEN_AYRILMA");
     } else {

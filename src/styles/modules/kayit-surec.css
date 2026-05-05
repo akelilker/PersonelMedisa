@@ -28,7 +28,7 @@
   border-radius: 0;
   background: transparent;
   color: rgba(245, 247, 255, 0.38);
-  font-size: 18px;
+  font-size: 17px;
   font-weight: 700;
   letter-spacing: 0;
   text-transform: none;
@@ -236,10 +236,22 @@
   min-height: 30px;
   padding: 0 9px;
   border-radius: 10px;
+  color-scheme: dark;
 }
 
 .kayit-workspace select.form-input {
   padding: 4px 9px;
+}
+
+.kayit-workspace input[type="date"].form-input {
+  width: min(100%, 340px);
+  padding-right: 8px;
+}
+
+.kayit-workspace input[type="date"].form-input::-webkit-calendar-picker-indicator {
+  margin-left: 8px;
+  opacity: 0.72;
+  filter: invert(1);
 }
 
 .kayit-workspace textarea.form-input {
@@ -359,39 +371,24 @@
   }
 }
 
-.surec-shell-split {
+.surec-person-shell {
   display: grid;
-  gap: 18px;
+  gap: 14px;
   align-items: start;
   align-content: start;
 }
 
-@media (min-width: 720px) {
-  .surec-shell-split {
-    grid-template-columns: minmax(170px, 35%) minmax(0, 65%);
-  }
-}
-
-.surec-shell-person-card {
-  align-content: start;
-}
-
-.surec-shell-person-card .surec-shell-summary-grid {
-  grid-template-columns: 1fr;
-}
-
-.surec-shell-operations {
+.surec-person-general-panel {
   display: grid;
-  gap: 10px;
+  gap: 14px;
   min-width: 0;
 }
 
-.surec-shell-summary {
+.surec-person-general-head {
   display: grid;
-  gap: 12px;
-  padding: 0;
-  border-radius: 0;
-  background: transparent;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: start;
 }
 
 .surec-shell-summary-kicker {
@@ -403,15 +400,81 @@
   color: rgba(245, 247, 255, 0.7);
 }
 
+.surec-person-general-title {
+  margin: 4px 0 0;
+  color: #ffffff;
+  font-size: 18px;
+  line-height: 1.25;
+}
+
+.surec-person-photo-box {
+  display: grid;
+  justify-items: center;
+  gap: 7px;
+  min-width: 96px;
+}
+
+.surec-person-photo-avatar {
+  display: grid;
+  place-items: center;
+  width: 72px;
+  height: 72px;
+  border: 1px solid rgba(var(--theme-color-rgb), 0.38);
+  border-radius: 14px;
+  background: rgba(var(--theme-color-rgb), 0.12);
+  color: #ffffff;
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.surec-person-photo-action {
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: rgba(241, 243, 250, 0.52);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.surec-person-general-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1fr) minmax(0, 1fr);
+  gap: 24px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.surec-person-general-column {
+  min-width: 0;
+}
+
 .surec-shell-summary-grid {
   display: grid;
   gap: 10px 16px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: 1fr;
+}
+
+@media (max-width: 760px) {
+  .surec-person-general-columns {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 560px) {
+  .surec-person-general-columns {
+    grid-template-columns: 1fr;
+  }
+
   .surec-shell-summary-grid {
     grid-template-columns: 1fr;
+  }
+
+  .surec-person-general-head {
+    grid-template-columns: 1fr;
+  }
+
+  .surec-person-photo-box {
+    justify-items: start;
   }
 }
 
@@ -439,20 +502,28 @@
 .surec-person-tabs {
   display: flex;
   align-items: flex-end;
-  gap: 14px;
+  gap: 12px;
   min-width: 0;
+  overflow-x: auto;
   border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.surec-person-tabs::-webkit-scrollbar {
+  display: none;
 }
 
 .surec-person-tab {
+  flex: 0 0 auto;
   margin: 0 0 -1px;
   padding: 0 0 8px;
   border: none;
   border-bottom: 2px solid transparent;
   border-radius: 0;
-  color: rgba(247, 248, 250, 0.94);
+  color: rgba(247, 248, 250, 0.48);
   background: transparent;
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 700;
   text-align: left;
   cursor: pointer;
@@ -462,11 +533,6 @@
 .surec-person-tab.is-active {
   color: #ffffff;
   border-bottom-color: rgb(var(--theme-color-rgb));
-}
-
-.surec-person-tab:disabled {
-  cursor: not-allowed;
-  color: rgba(241, 243, 250, 0.34);
 }
 
 .surec-shell-action-tile {
@@ -482,6 +548,28 @@
 .surec-shell-panel {
   display: grid;
   gap: 14px;
+}
+
+.surec-person-placeholder {
+  display: grid;
+  gap: 6px;
+  padding-top: 6px;
+}
+
+.surec-person-placeholder strong,
+.surec-person-placeholder p {
+  margin: 0;
+}
+
+.surec-person-placeholder strong {
+  color: #ffffff;
+  font-size: 15px;
+}
+
+.surec-person-placeholder p {
+  color: rgba(241, 243, 250, 0.64);
+  font-size: 13px;
+  line-height: 1.4;
 }
 
 .surec-devamsizlik-tiles {
@@ -532,12 +620,13 @@
   display: none;
 }
 
-.workspace-surface-card--surec-tarihce {
-  padding-top: 12px;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+.surec-history-panel {
+  display: grid;
+  gap: 12px;
+  padding-top: 6px;
 }
 
-.workspace-surface-card--surec-tarihce .workspace-surface-header {
+.surec-history-panel .workspace-surface-header {
   display: grid;
   gap: 3px;
 }

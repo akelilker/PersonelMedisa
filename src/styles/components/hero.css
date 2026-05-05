@@ -1,6 +1,5 @@
 .hero {
-  --hero-logo-width: 54px;
-  --hero-spacer-width: 27px;
+  --hero-logo-width: 62px;
   position: relative;
   min-width: 0;
   overflow: hidden;
@@ -14,17 +13,18 @@
     inset 0 1px 0 rgba(255, 255, 255, 0.18),
     inset 0 -1px 0 rgba(92, 102, 114, 0.28);
   min-height: 72px;
-  display: flex;
+  display: grid;
+  grid-template-columns: var(--hero-logo-width) minmax(0, 1fr);
+  column-gap: 14px;
   align-items: center;
 }
 
 .hero-logo {
-  flex: 0 0 var(--hero-logo-width);
   display: flex;
   align-items: center;
   width: var(--hero-logo-width);
-  margin-left: -5px;
-  transform: translateY(-2px);
+  margin-left: 0;
+  transform: translate(-5px, -2px);
   opacity: 1;
   filter: none;
   backdrop-filter: none;
@@ -47,20 +47,19 @@
 }
 
 .hero h1 {
-  flex: 1;
   min-width: 0;
   margin: 0;
   text-align: center;
-  font-size: clamp(14px, 3.8vw, 20px);
+  font-size: clamp(15px, 4.8vw, 24px);
   font-weight: 800;
-  letter-spacing: clamp(0.6px, 0.35vw, 2px);
+  letter-spacing: clamp(0.2px, 0.2vw, 1.2px);
   text-transform: uppercase;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow: visible;
+  text-overflow: clip;
   padding: 0 4px;
   line-height: 1.1;
-  transform: none;
+  transform: translateX(-10px);
   background: linear-gradient(to bottom, #c2d4df 0%, #ffffff 40%, #9aadba 52%, #d6e0e8 100%);
   -webkit-background-clip: text;
   background-clip: text;
@@ -71,7 +70,7 @@
 }
 
 .hero-spacer {
-  flex: 0 0 var(--hero-spacer-width);
+  display: none;
 }
 
 .animated-line {
@@ -89,29 +88,29 @@
 
 @media (max-width: 640px) {
   .hero {
-    --hero-logo-width: 40px;
-    --hero-spacer-width: 48px;
+    --hero-logo-width: 52px;
     min-height: 80px;
     padding: 13px 12px 14px;
+    column-gap: 10px;
   }
 
   .hero h1 {
-    font-size: clamp(14px, 4.6vw, 18px);
-    letter-spacing: 1px;
+    font-size: clamp(15px, 4.8vw, 21px);
+    letter-spacing: 0.2px;
     line-height: 1.1;
-    transform: translateY(4px);
+    transform: translate(-10px, 2px);
   }
 
   .hero-logo {
     margin-left: 0;
     margin-right: 8px;
-    transform: translateX(-1px);
+    transform: translateX(-5px);
     overflow: hidden;
   }
 
   .hero-logo img {
     max-width: 100%;
-    height: 33px;
+    height: 38px;
     width: auto;
     object-fit: contain;
   }
@@ -119,5 +118,16 @@
   .animated-line {
     bottom: 8px;
     width: 88%;
+  }
+}
+
+@media (max-width: 360px) {
+  .hero {
+    --hero-logo-width: 48px;
+    column-gap: 8px;
+  }
+
+  .hero h1 {
+    font-size: 14.5px;
   }
 }

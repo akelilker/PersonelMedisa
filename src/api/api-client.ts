@@ -36,6 +36,17 @@ function readWindowPathname() {
   return typeof maybeLocation?.pathname === "string" ? maybeLocation.pathname : "";
 }
 
+function isLocalDemoHost() {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  const maybeLocation = (window as Window & { location?: Location }).location;
+  const hostname = maybeLocation?.hostname ?? "";
+  const port = maybeLocation?.port ?? "";
+  return (hostname === "localhost" || hostname === "127.0.0.1") && port !== "4173";
+}
+
 function resolveApiMode() {
   const normalized = (ENV_API_MODE ?? "").trim().toLowerCase();
   if (normalized === "real") {
@@ -70,6 +81,10 @@ function shouldPreferDemoApi() {
 
   const pub = getAppPublicPath();
   const path = readWindowPathname();
+  if (isLocalDemoHost()) {
+    return true;
+  }
+
   if (pub && path.startsWith(pub)) {
     return true;
   }

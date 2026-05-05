@@ -26,8 +26,8 @@ test("Ana akış smoke", async ({ page }) => {
   await homeFlowModal.getByRole("button", { name: "Süreç" }).click();
   await expect(homeFlowModal.getByLabel("Personel", { exact: true })).toBeVisible();
   await homeFlowModal.getByLabel("Personel", { exact: true }).selectOption("1");
-  await expect(homeFlowModal.getByRole("tab", { name: "İzin" })).toBeVisible();
-  await homeFlowModal.getByRole("tab", { name: "İzin" }).click();
+  await expect(homeFlowModal.getByRole("tab", { name: "Genel" })).toHaveAttribute("aria-selected", "true");
+  await homeFlowModal.getByRole("tab", { name: "İzin / Devamsızlık" }).click();
   await homeFlowModal.getByRole("button", { name: /Geç Geldi/i }).click();
   await expect(homeFlowModal.locator("[name='surec-create-bas']")).toBeVisible();
   await homeFlowModal.locator(".universal-btn-cancel").click();

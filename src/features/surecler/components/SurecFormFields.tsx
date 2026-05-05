@@ -8,6 +8,11 @@ type PersonelOption = {
   label: string;
 };
 
+type AltTurFieldConfig = {
+  label: string;
+  options: PersonelOption[];
+};
+
 type SurecFormFieldsProps = {
   form: SurecFormState;
   setForm: Dispatch<SetStateAction<SurecFormState>>;
@@ -15,6 +20,7 @@ type SurecFormFieldsProps = {
   personelOptions?: PersonelOption[];
   showPersonelField?: boolean;
   showSurecTuruField?: boolean;
+  altTurField?: AltTurFieldConfig;
   errorMessage?: string | null;
   referenceError?: string | null;
   className?: string;
@@ -36,6 +42,7 @@ export function SurecFormFields({
   personelOptions = [],
   showPersonelField = true,
   showSurecTuruField = true,
+  altTurField,
   errorMessage,
   referenceError,
   className
@@ -94,12 +101,27 @@ export function SurecFormFields({
             )
         : null}
 
-      <FormField
-        label="Alt Tür"
-        name="surec-create-alt"
-        value={form.altTur}
-        onChange={(value) => setForm((prev) => ({ ...prev, altTur: value }))}
-      />
+      {altTurField ? (
+        altTurField.options.length > 1 ? (
+          <FormField
+            as="select"
+            label={altTurField.label}
+            name="surec-create-alt"
+            value={form.altTur}
+            onChange={(value) => setForm((prev) => ({ ...prev, altTur: value }))}
+            required
+            placeholderOption={{ value: "", label: "Seçiniz" }}
+            selectOptions={altTurField.options}
+          />
+        ) : null
+      ) : (
+          <FormField
+            label="İşlem Detayı"
+            name="surec-create-alt"
+            value={form.altTur}
+            onChange={(value) => setForm((prev) => ({ ...prev, altTur: value }))}
+          />
+        )}
       <FormField
         label="Başlangıç Tarihi"
         name="surec-create-bas"

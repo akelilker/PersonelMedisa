@@ -113,12 +113,26 @@ function resetSurecFormKeepingPersonel(personelId: string) {
 }
 
 type DevamsizlikSubId = "izin" | "rapor" | "is_kazasi" | "izinsiz" | "gec" | "erken";
+type PersonelSurecTab =
+  | "genel"
+  | "izin-devamsizlik"
+  | "belgeler"
+  | "mali"
+  | "zimmet"
+  | "ceza"
+  | "ayrilma"
+  | "tarihce";
 
 type DevamsizlikSubCard = {
   id: DevamsizlikSubId;
   title: string;
   description: string;
   candidateKeys: string[];
+};
+
+type DevamsizlikAltTurConfig = {
+  label: string;
+  options: Array<{ value: string; label: string }>;
 };
 
 const DEVAMSIZLIK_SUB_CARDS: DevamsizlikSubCard[] = [
@@ -160,6 +174,57 @@ const DEVAMSIZLIK_SUB_CARDS: DevamsizlikSubCard[] = [
   }
 ];
 
+const PERSONEL_SUREC_TABS: Array<{ id: PersonelSurecTab; label: string }> = [
+  { id: "genel", label: "Genel" },
+  { id: "izin-devamsizlik", label: "İzin / Devamsızlık" },
+  { id: "belgeler", label: "Belgeler" },
+  { id: "mali", label: "Mali İşlemler" },
+  { id: "zimmet", label: "Zimmet" },
+  { id: "ceza", label: "Ceza" },
+  { id: "ayrilma", label: "Ayrılma" },
+  { id: "tarihce", label: "Süreç Tarihçesi" }
+];
+
+const DEVAMSIZLIK_ALT_TUR_CONFIG: Record<DevamsizlikSubId, DevamsizlikAltTurConfig> = {
+  izin: {
+    label: "İzin Türü",
+    options: [
+      { value: "YILLIK_IZIN", label: "Yıllık izin" },
+      { value: "MAZERET_IZNI", label: "Mazeret izni" },
+      { value: "UCRETSIZ_IZIN", label: "Ücretsiz izin" }
+    ]
+  },
+  rapor: {
+    label: "Rapor Türü",
+    options: [{ value: "RAPORLU", label: "Raporlu" }]
+  },
+  is_kazasi: {
+    label: "Kayıt Türü",
+    options: [{ value: "IS_KAZASI_BILDIRIMI", label: "İş kazası bildirimi" }]
+  },
+  izinsiz: {
+    label: "Gelmedi Türü",
+    options: [
+      { value: "IZINSIZ_GELMEDI", label: "İzinsiz gelmedi" },
+      { value: "HABERSIZ_GELMEDI", label: "Habersiz gelmedi" }
+    ]
+  },
+  gec: {
+    label: "Geç Kalma Türü",
+    options: [
+      { value: "MAZERETLI_GEC_GELDI", label: "Mazeretli geç geldi" },
+      { value: "MAZERETSIZ_GEC_GELDI", label: "Mazeretsiz geç geldi" }
+    ]
+  },
+  erken: {
+    label: "Erken Çıkış Türü",
+    options: [
+      { value: "MAZERETLI_ERKEN_CIKTI", label: "Mazeretli erken çıktı" },
+      { value: "MAZERETSIZ_ERKEN_CIKTI", label: "Mazeretsiz erken çıktı" }
+    ]
+  }
+};
+
 function resolveSurecTuruKeyFromOptions(candidateKeys: string[], options: KeyOption[]): string | null {
   if (candidateKeys.length === 0 || options.length === 0) {
     return null;
@@ -177,13 +242,30 @@ function resolveSurecTuruKeyFromOptions(candidateKeys: string[], options: KeyOpt
   return null;
 }
 
-function formatSummaryField(value: string | null | undefined) {
-  if (typeof value !== "string") {
+function formatGeneralField(value: string | number | null | undefined) {
+  if (value === null || value === undefined) {
     return "-";
   }
 
-  const trimmed = value.trim();
+  const trimmed = String(value).trim();
   return trimmed.length > 0 ? trimmed : "-";
+}
+
+function formatMoneyField(value: number | null | undefined) {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return "-";
+  }
+
+  return new Intl.NumberFormat("tr-TR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(value);
+}
+
+function getPersonelInitials(personel: Personel) {
+  const adInitial = personel.ad.trim().charAt(0);
+  const soyadInitial = personel.soyad.trim().charAt(0);
+  return `${adInitial}${soyadInitial}`.toLocaleUpperCase("tr-TR");
 }
 
 export function KayitSurecWorkspace({
@@ -224,7 +306,7 @@ export function KayitSurecWorkspace({
   const [sureclerError, setSureclerError] = useState<string | null>(null);
   const [surecPersonelSearch, setSurecPersonelSearch] = useState("");
 
-  const [surecShellPanel, setSurecShellPanel] = useState<null | "devamsizlik">(null);
+  const [activePersonelTab, setActivePersonelTab] = useState<PersonelSurecTab>("genel");
   const [devamsizlikSubId, setDevamsizlikSubId] = useState<DevamsizlikSubId | null>(null);
 
   const personelOptions = useMemo(
@@ -281,17 +363,49 @@ export function KayitSurecWorkspace({
     return Number.isFinite(personelId) ? personelMap.get(personelId) ?? null : null;
   }, [personelMap, surecForm.personelId]);
 
+  const selectedPersonelGeneralColumns = useMemo(() => {
+    if (!selectedSurecPersonel) {
+      return [];
+    }
+
+    return [
+      {
+        items: [
+          { label: "T.C. Kimlik No", value: formatGeneralField(selectedSurecPersonel.tc_kimlik_no) },
+          { label: "Doğum Tarihi", value: formatGeneralField(selectedSurecPersonel.dogum_tarihi) },
+          { label: "Doğum Yeri", value: formatGeneralField(selectedSurecPersonel.dogum_yeri) },
+          { label: "Telefon", value: formatGeneralField(selectedSurecPersonel.telefon) },
+          { label: "Kan Grubu", value: formatGeneralField(selectedSurecPersonel.kan_grubu) }
+        ]
+      },
+      {
+        items: [
+          { label: "Acil Durum Kişisi", value: formatGeneralField(selectedSurecPersonel.acil_durum_kisi) },
+          { label: "Acil Durum Telefon", value: formatGeneralField(selectedSurecPersonel.acil_durum_telefon) },
+          { label: "Bölüm", value: formatGeneralField(selectedSurecPersonel.departman_adi) },
+          { label: "Görev / Unvan", value: formatGeneralField(selectedSurecPersonel.gorev_adi) },
+          { label: "Bağlı Amir", value: formatGeneralField(selectedSurecPersonel.bagli_amir_adi) }
+        ]
+      },
+      {
+        items: [
+          { label: "Sicil No", value: formatGeneralField(selectedSurecPersonel.sicil_no) },
+          { label: "İşe Giriş Tarihi", value: formatGeneralField(selectedSurecPersonel.ise_giris_tarihi) },
+          { label: "Personel Tipi", value: formatGeneralField(selectedSurecPersonel.personel_tipi_adi) },
+          { label: "Ücret Tipi", value: formatGeneralField(selectedSurecPersonel.ucret_tipi_adi) },
+          { label: "Maaş Tutarı", value: formatMoneyField(selectedSurecPersonel.maas_tutari) },
+          { label: "Prim Kuralı", value: formatGeneralField(selectedSurecPersonel.prim_kurali_adi) }
+        ]
+      }
+    ];
+  }, [selectedSurecPersonel]);
+
   const resolvedDevamsizlikSurecTuruKey = useMemo(() => {
     if (!devamsizlikSubId) {
       return null;
     }
 
-    const card = DEVAMSIZLIK_SUB_CARDS.find((item) => item.id === devamsizlikSubId);
-    if (!card) {
-      return null;
-    }
-
-    return resolveSurecTuruKeyFromOptions(card.candidateKeys, surecTuruOptions);
+    return resolveDevamsizlikSurecTuru(devamsizlikSubId);
   }, [devamsizlikSubId, surecTuruOptions]);
 
   const useShellSurecLayout = editingSurec === null;
@@ -299,44 +413,77 @@ export function KayitSurecWorkspace({
   const hideSurecTuruFieldInShell =
     useShellSurecLayout &&
     !editingSurec &&
-    surecShellPanel === "devamsizlik" &&
+    activePersonelTab === "izin-devamsizlik" &&
     surecTuruOptions.length > 0 &&
     devamsizlikSubId !== null &&
     resolvedDevamsizlikSurecTuruKey !== null;
+  const activeDevamsizlikAltTurField =
+    useShellSurecLayout && devamsizlikSubId ? DEVAMSIZLIK_ALT_TUR_CONFIG[devamsizlikSubId] : undefined;
 
   useEffect(() => {
     if (!useShellSurecLayout || editingSurec) {
       return;
     }
 
-    setSurecShellPanel(surecForm.personelId ? "devamsizlik" : null);
-    setDevamsizlikSubId(surecForm.personelId ? "izin" : null);
+    setActivePersonelTab("genel");
+    setDevamsizlikSubId(null);
     setSurecForm((prev) => resetSurecFormKeepingPersonel(prev.personelId));
     setSurecError(null);
     setSurecInfo(null);
   }, [editingSurec, surecForm.personelId, useShellSurecLayout]);
 
-  function openDevamsizlikShellPanel(defaultSubId: DevamsizlikSubId | null = "izin") {
+  function openDevamsizlikTab(defaultSubId: DevamsizlikSubId | null = "izin") {
+    const altTurConfig = defaultSubId ? DEVAMSIZLIK_ALT_TUR_CONFIG[defaultSubId] : null;
     setSurecError(null);
     setSurecInfo(null);
-    setSurecShellPanel("devamsizlik");
+    setActivePersonelTab("izin-devamsizlik");
     setDevamsizlikSubId(defaultSubId);
-    setSurecForm((prev) => resetSurecFormKeepingPersonel(prev.personelId));
+    setSurecForm((prev) => ({
+      ...resetSurecFormKeepingPersonel(prev.personelId),
+      surecTuru: defaultSubId ? resolveDevamsizlikSurecTuru(defaultSubId) ?? "" : "",
+      altTur: altTurConfig?.options[0]?.value ?? ""
+    }));
+  }
+
+  function selectPersonelTab(tabId: PersonelSurecTab) {
+    setActivePersonelTab(tabId);
+    setSurecError(null);
+    setSurecInfo(null);
+
+    if (tabId === "izin-devamsizlik") {
+      const nextSubId = devamsizlikSubId ?? "izin";
+      const altTurConfig = DEVAMSIZLIK_ALT_TUR_CONFIG[nextSubId];
+      setDevamsizlikSubId(nextSubId);
+      setSurecForm((prev) => ({
+        ...resetSurecFormKeepingPersonel(prev.personelId),
+        surecTuru: resolveDevamsizlikSurecTuru(nextSubId) ?? "",
+        altTur: altTurConfig.options[0]?.value ?? ""
+      }));
+      return;
+    }
+
+    setDevamsizlikSubId(null);
   }
 
   function selectDevamsizlikSubCard(id: DevamsizlikSubId) {
     setDevamsizlikSubId(id);
-    const card = DEVAMSIZLIK_SUB_CARDS.find((item) => item.id === id);
-    const resolvedKey =
-      card && card.candidateKeys.length > 0
-        ? resolveSurecTuruKeyFromOptions(card.candidateKeys, surecTuruOptions)
-        : null;
+    const resolvedKey = resolveDevamsizlikSurecTuru(id);
+    const altTurConfig = DEVAMSIZLIK_ALT_TUR_CONFIG[id];
 
     setSurecForm((prev) => ({
       ...prev,
       surecTuru: resolvedKey ?? "",
-      altTur: ""
+      altTur: altTurConfig.options[0]?.value ?? ""
     }));
+  }
+
+  function resolveDevamsizlikSurecTuru(id: DevamsizlikSubId) {
+    const card = DEVAMSIZLIK_SUB_CARDS.find((item) => item.id === id);
+    if (!card) {
+      return null;
+    }
+
+    return resolveSurecTuruKeyFromOptions(card.candidateKeys, surecTuruOptions);
   }
 
   async function loadBootstrap() {
@@ -520,7 +667,7 @@ export function KayitSurecWorkspace({
 
     setSurecError(null);
     setSurecInfo(null);
-    setSurecShellPanel(null);
+    setActivePersonelTab("genel");
     setDevamsizlikSubId(null);
     setEditingSurec(item);
     setSurecForm(toSurecFormState(item));
@@ -530,7 +677,7 @@ export function KayitSurecWorkspace({
     setEditingSurec(null);
     setSurecError(null);
     setSurecInfo(null);
-    setSurecShellPanel(null);
+    setActivePersonelTab("genel");
     setDevamsizlikSubId(null);
     setSurecForm(resetSurecFormKeepingPersonel(surecForm.personelId));
   }
@@ -556,7 +703,7 @@ export function KayitSurecWorkspace({
 
   const surecWorkspaceGridClassName = [
     "surec-workspace-grid",
-    !classicSurecFormLayout && surecShellPanel === "devamsizlik" ? "surec-workspace-grid--islem-modu" : ""
+    !classicSurecFormLayout && activePersonelTab !== "genel" ? "surec-workspace-grid--islem-modu" : ""
   ]
     .filter(Boolean)
     .join(" ");
@@ -751,148 +898,183 @@ export function KayitSurecWorkspace({
 
                       </>
                     ) : (
-                      <div className={`surec-shell-split${surecShellPanel === "devamsizlik" ? " surec-shell-split--panel" : ""}`}>
-                        <aside className="surec-shell-summary surec-shell-person-card">
-                          <p className="surec-shell-summary-kicker">Genel bilgiler</p>
-                          <div className="surec-shell-summary-grid">
-                            <div className="surec-shell-summary-item">
-                              <span className="surec-shell-summary-label">Ad Soyad</span>
-                              <strong className="surec-shell-summary-value">
-                                {selectedSurecPersonel.ad} {selectedSurecPersonel.soyad}
-                              </strong>
+                      <div className="surec-person-shell">
+                        <div className="surec-person-tabs" role="tablist" aria-label="Personel işlem sekmeleri">
+                          {PERSONEL_SUREC_TABS.map((tab) => {
+                            const isActive = activePersonelTab === tab.id;
+
+                            return (
+                              <button
+                                key={tab.id}
+                                type="button"
+                                role="tab"
+                                aria-selected={isActive}
+                                className={`surec-person-tab${isActive ? " is-active" : ""}${tab.id === "izin-devamsizlik" ? " surec-shell-action-tile" : ""}`}
+                                onClick={() => selectPersonelTab(tab.id)}
+                              >
+                                {tab.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+
+                        {activePersonelTab === "genel" ? (
+                          <div className="surec-person-general-panel">
+                            <div className="surec-person-general-head">
+                              <div>
+                                <p className="surec-shell-summary-kicker">Genel bilgiler</p>
+                                <h4 className="surec-person-general-title">
+                                  {selectedSurecPersonel.ad} {selectedSurecPersonel.soyad}
+                                </h4>
+                              </div>
+                              <div className="surec-person-photo-box" aria-label="Personel fotoğrafı">
+                                <div className="surec-person-photo-avatar" aria-hidden="true">
+                                  {getPersonelInitials(selectedSurecPersonel)}
+                                </div>
+                                <button type="button" className="surec-person-photo-action" disabled>
+                                  Fotoğraf yükle
+                                </button>
+                              </div>
                             </div>
-                            <div className="surec-shell-summary-item">
-                              <span className="surec-shell-summary-label">T.C. Kimlik No</span>
-                              <strong className="surec-shell-summary-value">
-                                {formatSummaryField(selectedSurecPersonel.tc_kimlik_no)}
-                              </strong>
-                            </div>
-                            <div className="surec-shell-summary-item">
-                              <span className="surec-shell-summary-label">Doğum Tarihi</span>
-                              <strong className="surec-shell-summary-value">
-                                {formatSummaryField(selectedSurecPersonel.dogum_tarihi)}
-                              </strong>
-                            </div>
-                            <div className="surec-shell-summary-item">
-                              <span className="surec-shell-summary-label">Bölüm</span>
-                              <strong className="surec-shell-summary-value">
-                                {formatSummaryField(selectedSurecPersonel.departman_adi)}
-                              </strong>
-                            </div>
-                            <div className="surec-shell-summary-item">
-                              <span className="surec-shell-summary-label">Görev / Unvan</span>
-                              <strong className="surec-shell-summary-value">
-                                {formatSummaryField(selectedSurecPersonel.gorev_adi)}
-                              </strong>
-                            </div>
-                            <div className="surec-shell-summary-item">
-                              <span className="surec-shell-summary-label">Bağlı Amir</span>
-                              <strong className="surec-shell-summary-value">
-                                {formatSummaryField(selectedSurecPersonel.bagli_amir_adi)}
-                              </strong>
-                            </div>
-                            <div className="surec-shell-summary-item">
-                              <span className="surec-shell-summary-label">Kan Grubu</span>
-                              <strong className="surec-shell-summary-value">
-                                {formatSummaryField(selectedSurecPersonel.kan_grubu)}
-                              </strong>
-                            </div>
-                            <div className="surec-shell-summary-item">
-                              <span className="surec-shell-summary-label">Telefon</span>
-                              <strong className="surec-shell-summary-value">
-                                {formatSummaryField(selectedSurecPersonel.telefon)}
-                              </strong>
-                            </div>
-                            <div className="surec-shell-summary-item">
-                              <span className="surec-shell-summary-label">İşe Giriş Tarihi</span>
-                              <strong className="surec-shell-summary-value">
-                                {formatSummaryField(selectedSurecPersonel.ise_giris_tarihi)}
-                              </strong>
-                            </div>
-                            <div className="surec-shell-summary-item">
-                              <span className="surec-shell-summary-label">Personel Tipi</span>
-                              <strong className="surec-shell-summary-value">
-                                {formatSummaryField(selectedSurecPersonel.personel_tipi_adi)}
-                              </strong>
+
+                            <div className="surec-person-general-columns">
+                              {selectedPersonelGeneralColumns.map((column, columnIndex) => (
+                                <section key={`personel-general-column-${columnIndex}`} className="surec-person-general-column">
+                                  <div className="surec-shell-summary-grid">
+                                    {column.items.map((item) => (
+                                      <div key={`${columnIndex}-${item.label}`} className="surec-shell-summary-item">
+                                        <span className="surec-shell-summary-label">{item.label}</span>
+                                        <strong className="surec-shell-summary-value">{item.value}</strong>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </section>
+                              ))}
                             </div>
                           </div>
-                        </aside>
+                        ) : null}
 
-                        <div className="surec-shell-operations">
-                          <div className="surec-person-tabs" role="tablist" aria-label="Personel işlem sekmeleri">
-                            <button
-                              type="button"
-                              role="tab"
-                              aria-selected={surecShellPanel === "devamsizlik"}
-                              className={`surec-person-tab surec-shell-action-tile${surecShellPanel === "devamsizlik" ? " is-active" : ""}`}
-                              onClick={() => openDevamsizlikShellPanel("izin")}
-                            >
-                              İzin
-                            </button>
-                            <button type="button" role="tab" aria-selected="false" className="surec-person-tab" disabled>
-                              Belgeler
-                            </button>
-                            <button type="button" role="tab" aria-selected="false" className="surec-person-tab" disabled>
-                              Cezalar
-                            </button>
-                            <button type="button" role="tab" aria-selected="false" className="surec-person-tab" disabled>
-                              Zimmet
-                            </button>
+                        {activePersonelTab === "izin-devamsizlik" ? (
+                          <div className="surec-shell-panel">
+                            <div className="surec-devamsizlik-tiles" role="group" aria-label="İzin ve yokluk işlemleri">
+                              {DEVAMSIZLIK_SUB_CARDS.map((card) => {
+                                const isActive = devamsizlikSubId === card.id;
+
+                                return (
+                                  <button
+                                    key={card.id}
+                                    type="button"
+                                    className={`surec-devamsizlik-tile${isActive ? " is-active" : ""}`}
+                                    onClick={() => selectDevamsizlikSubCard(card.id)}
+                                  >
+                                    <span className="surec-devamsizlik-tile-title">{card.title}</span>
+                                    <span className="surec-devamsizlik-tile-desc">{card.description}</span>
+                                    <span className="surec-devamsizlik-tile-status">{isActive ? "Seçildi" : "Seç"}</span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+
+                            {devamsizlikSubId ? (
+                              <>
+                                <form id={KAYIT_SUREC_SUREC_FORM_ID} className="workspace-form" onSubmit={handleSurecSubmit}>
+                                  <SurecFormFields
+                                    form={surecForm}
+                                    setForm={setSurecForm}
+                                    surecTuruOptions={surecTuruOptions}
+                                    personelOptions={personelOptions}
+                                    showPersonelField={false}
+                                    showSurecTuruField={!hideSurecTuruFieldInShell}
+                                    altTurField={activeDevamsizlikAltTurField}
+                                    errorMessage={surecError}
+                                    referenceError={null}
+                                    className="workspace-form-stack workspace-form-stack--compact"
+                                  />
+                                </form>
+
+                                <div className="workspace-inline-actions">
+                                  {surecInfo ? <p className="workspace-success workspace-success--inline">{surecInfo}</p> : null}
+                                </div>
+                                <div className="universal-btn-group workspace-form-actions">
+                                  <button type="submit" form={primaryFormId} className="universal-btn-save" disabled={surecSubmitting}>
+                                    {primaryActionLabel}
+                                  </button>
+                                  <button type="button" className="universal-btn-cancel" onClick={onClose}>
+                                    Kapat
+                                  </button>
+                                </div>
+                              </>
+                            ) : null}
                           </div>
+                        ) : null}
 
-                          {surecShellPanel === "devamsizlik" ? (
-                            <div className="surec-shell-panel">
-                              <div className="surec-devamsizlik-tiles" role="group" aria-label="İzin ve yokluk işlemleri">
-                                {DEVAMSIZLIK_SUB_CARDS.map((card) => {
-                                  const isActive = devamsizlikSubId === card.id;
+                        {["belgeler", "mali", "zimmet", "ceza", "ayrilma"].includes(activePersonelTab) ? (
+                          <div className="surec-person-placeholder">
+                            <strong>{PERSONEL_SUREC_TABS.find((tab) => tab.id === activePersonelTab)?.label}</strong>
+                            <p>Bu işlem ailesi merkezi akışa taşınacak. Şimdilik yerleşim sabitlendi.</p>
+                          </div>
+                        ) : null}
+
+                        {activePersonelTab === "tarihce" ? (
+                          <div className="surec-history-panel">
+                            <div className="workspace-surface-header">
+                              <h3>Süreç tarihçesi</h3>
+                              <p>{selectedSurecPersonel.ad} {selectedSurecPersonel.soyad} için geçmiş kayıtlar</p>
+                            </div>
+
+                            {sureclerLoading ? <LoadingState label="Süreç tarihçesi yükleniyor..." /> : null}
+                            {!sureclerLoading && sureclerError ? (
+                              <ErrorState message={sureclerError} onRetry={() => void loadSurecler(surecForm.personelId)} />
+                            ) : null}
+
+                            {!sureclerLoading && !sureclerError && surecler.length === 0 ? (
+                              <EmptyState
+                                title="Tarihçede kayıt yok"
+                                message="Bu seçim için görüntülenecek kayıt bulunamadı."
+                              />
+                            ) : null}
+
+                            {!sureclerLoading && !sureclerError && surecler.length > 0 ? (
+                              <ul className="workspace-surec-list">
+                                {surecler.map((item) => {
+                                  const relatedPersonel = personelMap.get(item.personel_id) ?? null;
 
                                   return (
-                                    <button
-                                      key={card.id}
-                                      type="button"
-                                      className={`surec-devamsizlik-tile${isActive ? " is-active" : ""}`}
-                                      onClick={() => selectDevamsizlikSubCard(card.id)}
-                                    >
-                                      <span className="surec-devamsizlik-tile-title">{card.title}</span>
-                                      <span className="surec-devamsizlik-tile-desc">{card.description}</span>
-                                      <span className="surec-devamsizlik-tile-status">{isActive ? "Seçildi" : "Seç"}</span>
-                                    </button>
+                                    <li key={item.id} className="workspace-surec-item">
+                                      <div className="workspace-surec-copy">
+                                        <strong>{formatSurecTuruLabel(item.surec_turu)}</strong>
+                                        <p>Personel: {relatedPersonel ? `${relatedPersonel.ad} ${relatedPersonel.soyad}` : item.personel_id}</p>
+                                        <p>Durum: {formatSurecStateLabel(item.state ?? "BEKLEMEDE")}</p>
+                                        <p>
+                                          Tarih: {item.baslangic_tarihi ?? "-"} / {item.bitis_tarihi ?? "-"}
+                                        </p>
+                                        {item.alt_tur ? <p>İşlem Detayı: {item.alt_tur}</p> : null}
+                                        {item.aciklama ? <p>Açıklama: {item.aciklama}</p> : null}
+                                      </div>
+
+                                      <div className="module-item-actions workspace-surec-actions">
+                                        {canEditSurec ? (
+                                          <button type="button" className="universal-btn-aux" onClick={() => beginSurecEdit(item)}>
+                                            Düzenle
+                                          </button>
+                                        ) : null}
+                                        {canCancelSurec ? (
+                                          <button
+                                            type="button"
+                                            className="universal-btn-aux"
+                                            onClick={() => void handleSurecCancel(item)}
+                                          >
+                                            İptal
+                                          </button>
+                                        ) : null}
+                                      </div>
+                                    </li>
                                   );
                                 })}
-                              </div>
-
-                              {devamsizlikSubId ? (
-                                <>
-                                  <form id={KAYIT_SUREC_SUREC_FORM_ID} className="workspace-form" onSubmit={handleSurecSubmit}>
-                                    <SurecFormFields
-                                      form={surecForm}
-                                      setForm={setSurecForm}
-                                      surecTuruOptions={surecTuruOptions}
-                                      personelOptions={personelOptions}
-                                      showPersonelField={false}
-                                      showSurecTuruField={!hideSurecTuruFieldInShell}
-                                      errorMessage={surecError}
-                                      referenceError={null}
-                                      className="workspace-form-stack workspace-form-stack--compact"
-                                    />
-                                  </form>
-
-                                  <div className="workspace-inline-actions">
-                                    {surecInfo ? <p className="workspace-success workspace-success--inline">{surecInfo}</p> : null}
-                                  </div>
-                                  <div className="universal-btn-group workspace-form-actions">
-                                    <button type="submit" form={primaryFormId} className="universal-btn-save" disabled={surecSubmitting}>
-                                      {primaryActionLabel}
-                                    </button>
-                                    <button type="button" className="universal-btn-cancel" onClick={onClose}>
-                                      Kapat
-                                    </button>
-                                  </div>
-                                </>
-                              ) : null}
-                            </div>
-                          ) : null}
-                        </div>
+                              </ul>
+                            ) : null}
+                          </div>
+                        ) : null}
                       </div>
                     )}
                   </>
@@ -901,66 +1083,6 @@ export function KayitSurecWorkspace({
             ) : null}
           </section>
 
-          {selectedSurecPersonel ? (
-            <section className="workspace-surface-card workspace-surface-card--surec-tarihce">
-              <div className="workspace-surface-header">
-                <h3>Kayıt tarihçesi</h3>
-                <p>{selectedSurecPersonel.ad} {selectedSurecPersonel.soyad} için geçmiş kayıtlar</p>
-              </div>
-
-              {sureclerLoading ? <LoadingState label="Kayıt tarihçesi yükleniyor..." /> : null}
-              {!sureclerLoading && sureclerError ? (
-                <ErrorState message={sureclerError} onRetry={() => void loadSurecler(surecForm.personelId)} />
-              ) : null}
-
-              {!sureclerLoading && !sureclerError && surecler.length === 0 ? (
-                <EmptyState
-                  title="Tarihçede kayıt yok"
-                  message="Bu seçim için görüntülenecek kayıt bulunamadı."
-                />
-              ) : null}
-
-              {!sureclerLoading && !sureclerError && surecler.length > 0 ? (
-                <ul className="workspace-surec-list">
-                  {surecler.map((item) => {
-                    const relatedPersonel = personelMap.get(item.personel_id) ?? null;
-
-                    return (
-                      <li key={item.id} className="workspace-surec-item">
-                        <div className="workspace-surec-copy">
-                          <strong>{formatSurecTuruLabel(item.surec_turu)}</strong>
-                          <p>Personel: {relatedPersonel ? `${relatedPersonel.ad} ${relatedPersonel.soyad}` : item.personel_id}</p>
-                          <p>Durum: {formatSurecStateLabel(item.state ?? "BEKLEMEDE")}</p>
-                          <p>
-                            Tarih: {item.baslangic_tarihi ?? "-"} / {item.bitis_tarihi ?? "-"}
-                          </p>
-                          {item.alt_tur ? <p>Alt Tür: {item.alt_tur}</p> : null}
-                          {item.aciklama ? <p>Açıklama: {item.aciklama}</p> : null}
-                        </div>
-
-                        <div className="module-item-actions workspace-surec-actions">
-                          {canEditSurec ? (
-                            <button type="button" className="universal-btn-aux" onClick={() => beginSurecEdit(item)}>
-                              Düzenle
-                            </button>
-                          ) : null}
-                          {canCancelSurec ? (
-                            <button
-                              type="button"
-                              className="universal-btn-aux"
-                              onClick={() => void handleSurecCancel(item)}
-                            >
-                              İptal
-                            </button>
-                          ) : null}
-                        </div>
-                      </li>
-                    );
-                  })}
-                </ul>
-              ) : null}
-            </section>
-          ) : null}
         </div>
       )}
     </div>

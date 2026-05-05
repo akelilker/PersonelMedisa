@@ -121,37 +121,37 @@ const DEVAMSIZLIK_SUB_CARDS: DevamsizlikSubCard[] = [
   {
     id: "izin",
     title: "İzin",
-    description: "Ücretli veya süreli izin hareketi",
+    description: "Planlı ya da onaylı izin kaydı",
     candidateKeys: ["IZIN"]
   },
   {
     id: "rapor",
     title: "Rapor",
-    description: "Hastalık veya istirahat raporu",
+    description: "Hastalık veya istirahat raporu kaydı",
     candidateKeys: ["RAPOR"]
   },
   {
     id: "is_kazasi",
     title: "İş Kazası",
-    description: "İş kazasına bağlı süreç kaydı",
+    description: "İş kazasına bağlı devamsızlık kaydı",
     candidateKeys: ["IS_KAZASI"]
   },
   {
     id: "izinsiz",
     title: "İzinsiz Gelmedi",
-    description: "Mazeretsiz yokluk (referansta karşılığı varsa tür atanır)",
+    description: "Mazeretsiz işe gelmeme kaydı",
     candidateKeys: ["DEVAMSIZLIK"]
   },
   {
     id: "gec",
     title: "Geç Geldi",
-    description: "Referansta tür yoksa süreç türünü aşağıdan seçin",
+    description: "Mesai başlangıcından sonra giriş kaydı",
     candidateKeys: []
   },
   {
     id: "erken",
     title: "Erken Çıktı",
-    description: "Referansta tür yoksa süreç türünü aşağıdan seçin",
+    description: "Mesai bitiminden önce çıkış kaydı",
     candidateKeys: []
   }
 ];
@@ -784,60 +784,58 @@ export function KayitSurecWorkspace({
                           <h4 className="surec-shell-panel-title">Devamsızlık</h4>
                         </div>
                         <p className="workspace-empty-hint surec-shell-panel-hint">
-                          Hareket türünü seçin. Yalnızca referansta tanımlı süreç türleri forma otomatik yazılır;
-                          liste dışındaki durumlarda süreç türünü elle seçmeniz gerekir.
+                          Önce personelin yaşadığı olayı seçin. Sistem gerekli resmi etkileri kayıt sırasında arka planda
+                          değerlendirir.
                         </p>
 
                         <div className="surec-devamsizlik-tiles" role="group" aria-label="Devamsızlık alt türleri">
                           {DEVAMSIZLIK_SUB_CARDS.map((card) => {
-                            const matched = resolveSurecTuruKeyFromOptions(card.candidateKeys, surecTuruOptions);
-                            const statusLabel =
-                              card.candidateKeys.length === 0
-                                ? "Referansta eşleşme yok; tür elle seçilecek"
-                                : matched
-                                  ? "Referansla eşleşti"
-                                  : "Bu ortamda referans eşleşmedi; tür elle seçilecek";
+                            const isActive = devamsizlikSubId === card.id;
 
                             return (
                               <button
                                 key={card.id}
                                 type="button"
-                                className={`surec-devamsizlik-tile${devamsizlikSubId === card.id ? " is-active" : ""}`}
+                                className={`surec-devamsizlik-tile${isActive ? " is-active" : ""}`}
                                 onClick={() => selectDevamsizlikSubCard(card.id)}
                               >
                                 <span className="surec-devamsizlik-tile-title">{card.title}</span>
                                 <span className="surec-devamsizlik-tile-desc">{card.description}</span>
-                                <span className="surec-devamsizlik-tile-status">{statusLabel}</span>
+                                <span className="surec-devamsizlik-tile-status">{isActive ? "Seçildi" : "Seç"}</span>
                               </button>
                             );
                           })}
                         </div>
 
-                        <form id={KAYIT_SUREC_SUREC_FORM_ID} className="workspace-form" onSubmit={handleSurecSubmit}>
-                          <SurecFormFields
-                            form={surecForm}
-                            setForm={setSurecForm}
-                            surecTuruOptions={surecTuruOptions}
-                            personelOptions={personelOptions}
-                            showPersonelField={false}
-                            showSurecTuruField={!hideSurecTuruFieldInShell}
-                            errorMessage={surecError}
-                            referenceError={null}
-                            className="workspace-form-stack workspace-form-stack--compact"
-                          />
-                        </form>
+                        {devamsizlikSubId ? (
+                          <>
+                            <form id={KAYIT_SUREC_SUREC_FORM_ID} className="workspace-form" onSubmit={handleSurecSubmit}>
+                              <SurecFormFields
+                                form={surecForm}
+                                setForm={setSurecForm}
+                                surecTuruOptions={surecTuruOptions}
+                                personelOptions={personelOptions}
+                                showPersonelField={false}
+                                showSurecTuruField={!hideSurecTuruFieldInShell}
+                                errorMessage={surecError}
+                                referenceError={null}
+                                className="workspace-form-stack workspace-form-stack--compact"
+                              />
+                            </form>
 
-                        <div className="workspace-inline-actions">
-                          {surecInfo ? <p className="workspace-success workspace-success--inline">{surecInfo}</p> : null}
-                        </div>
-                        <div className="universal-btn-group workspace-form-actions">
-                          <button type="submit" form={primaryFormId} className="universal-btn-save" disabled={surecSubmitting}>
-                            {primaryActionLabel}
-                          </button>
-                          <button type="button" className="universal-btn-cancel" onClick={onClose}>
-                            Kapat
-                          </button>
-                        </div>
+                            <div className="workspace-inline-actions">
+                              {surecInfo ? <p className="workspace-success workspace-success--inline">{surecInfo}</p> : null}
+                            </div>
+                            <div className="universal-btn-group workspace-form-actions">
+                              <button type="submit" form={primaryFormId} className="universal-btn-save" disabled={surecSubmitting}>
+                                {primaryActionLabel}
+                              </button>
+                              <button type="button" className="universal-btn-cancel" onClick={onClose}>
+                                Kapat
+                              </button>
+                            </div>
+                          </>
+                        ) : null}
                       </div>
                     )}
                   </>

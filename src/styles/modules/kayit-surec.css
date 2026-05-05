@@ -1,22 +1,29 @@
 .kayit-workspace {
   display: grid;
-  gap: 10px;
+  gap: 14px;
   min-height: 0;
 }
 
 .kayit-workspace-tabs {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
-  align-items: end;
+  gap: 6px;
+  align-items: stretch;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  background: rgba(7, 10, 18, 0.92);
+  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.18);
 }
 
 .kayit-workspace-tab {
-  min-height: 34px;
-  padding: 0 0 8px;
-  border: none;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 0;
+  min-height: 38px;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: 10px;
   background: transparent;
   color: rgba(245, 247, 255, 0.72);
   font-size: 14px;
@@ -28,7 +35,8 @@
 }
 
 .kayit-workspace-tab.is-active {
-  border-bottom-color: rgba(var(--theme-color-rgb), 0.96);
+  border-color: rgba(var(--theme-color-rgb), 0.46);
+  background: rgba(var(--theme-color-rgb), 0.16);
   color: #ffffff;
 }
 
@@ -177,6 +185,49 @@
   margin-top: 2px;
 }
 
+.surec-personel-picker {
+  display: grid;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid rgba(var(--theme-color-rgb), 0.22);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.surec-personel-picker-head {
+  display: grid;
+  gap: 3px;
+}
+
+.surec-personel-picker-head strong,
+.surec-personel-picker-head p {
+  margin: 0;
+}
+
+.surec-personel-picker-head strong {
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.surec-personel-picker-head p {
+  color: rgba(241, 243, 250, 0.66);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.surec-personel-picker-fields {
+  display: grid;
+  gap: 10px;
+}
+
+@media (min-width: 760px) {
+  .surec-personel-picker-fields {
+    grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+    align-items: end;
+  }
+}
+
 .kayit-workspace .form-section {
   gap: 3px;
 }
@@ -298,7 +349,7 @@
   }
 }
 
-/* Süreç sekmesi — kabuk (personel özeti + Devamsızlık girişi) */
+/* Süreç sekmesi — kabuk (personel özeti + operasyon alanı) */
 
 .surec-shell-overview {
   display: grid;
@@ -311,6 +362,32 @@
     grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
     gap: 24px;
   }
+}
+
+.surec-shell-split {
+  display: grid;
+  gap: 16px;
+  align-items: start;
+}
+
+@media (min-width: 900px) {
+  .surec-shell-split {
+    grid-template-columns: minmax(220px, 0.82fr) minmax(0, 1.18fr);
+  }
+}
+
+.surec-shell-person-card {
+  align-content: start;
+}
+
+.surec-shell-person-card .surec-shell-summary-grid {
+  grid-template-columns: 1fr;
+}
+
+.surec-shell-operations {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
 }
 
 .surec-shell-summary {
@@ -495,4 +572,13 @@
   color: rgba(230, 232, 240, 0.55);
 }
 
+.workspace-surface-card--surec-tarihce {
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.workspace-surface-card--surec-tarihce .workspace-surface-header {
+  display: grid;
+  gap: 3px;
+}
 

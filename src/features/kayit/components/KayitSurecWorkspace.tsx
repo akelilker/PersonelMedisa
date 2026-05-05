@@ -101,6 +101,10 @@ function formatPersonelLabel(personel: Personel) {
   return meta ? `${personel.ad} ${personel.soyad} • ${meta}` : `${personel.ad} ${personel.soyad}`;
 }
 
+function normalizePersonelSearchText(value: string | number | null | undefined) {
+  return String(value ?? "").toLocaleLowerCase("tr-TR").trim();
+}
+
 function resetSurecFormKeepingPersonel(personelId: string) {
   return {
     ...INITIAL_SUREC_FORM,
@@ -218,6 +222,7 @@ export function KayitSurecWorkspace({
   const [surecler, setSurecler] = useState<Surec[]>([]);
   const [sureclerLoading, setSureclerLoading] = useState(false);
   const [sureclerError, setSureclerError] = useState<string | null>(null);
+  const [surecPersonelSearch, setSurecPersonelSearch] = useState("");
 
   const [surecShellPanel, setSurecShellPanel] = useState<null | "devamsizlik">(null);
   const [devamsizlikSubId, setDevamsizlikSubId] = useState<DevamsizlikSubId | null>(null);
@@ -230,6 +235,44 @@ export function KayitSurecWorkspace({
       })),
     [personeller]
   );
+
+  const filteredSurecPersonelOptions = useMemo(() => {
+    const query = normalizePersonelSearchText(surecPersonelSearch);
+
+    if (!query) {
+      return personelOptions;
+    }
+
+    const filteredPersoneller = personeller.filter((personel) => {
+      const searchable = [
+        personel.ad,
+        personel.soyad,
+        personel.tc_kimlik_no,
+        personel.telefon,
+        personel.departman_adi,
+        personel.gorev_adi
+      ]
+        .map(normalizePersonelSearchText)
+        .join(" ");
+
+      return searchable.includes(query);
+    });
+
+    const filteredOptions = filteredPersoneller.map((personel) => ({
+      value: String(personel.id),
+      label: formatPersonelLabel(personel)
+    }));
+
+    if (surecForm.personelId && !filteredOptions.some((option) => option.value === surecForm.personelId)) {
+      const selectedPersonel = personeller.find((personel) => String(personel.id) === surecForm.personelId);
+
+      if (selectedPersonel) {
+        return [{ value: String(selectedPersonel.id), label: formatPersonelLabel(selectedPersonel) }, ...filteredOptions];
+      }
+    }
+
+    return filteredOptions;
+  }, [personelOptions, personeller, surecForm.personelId, surecPersonelSearch]);
 
   const personelMap = useMemo(() => new Map(personeller.map((personel) => [personel.id, personel])), [personeller]);
 
@@ -515,7 +558,8 @@ export function KayitSurecWorkspace({
       ? "Zimmet işlemi merkez ekrana taşınıyor. Bu geçişte zimmet formu personel kartında çalışmaya devam eder."
       : "Kart düzenleme işlemi merkez ekrana taşınıyor. Bu geçişte düzenleme formu personel kartında çalışmaya devam eder.";
 
-  const classicSurecFormLayout = editingSurec !== null;
+  const hasInitialSurecPersonel = typeof initialSurecPersonelId === "string" && initialSurecPersonelId.length > 0;
+  const classicSurecFormLayout = editingSurec !== null || hasInitialSurecPersonel;
 
   const surecWorkspaceGridClassName = [
     "surec-workspace-grid",
@@ -674,26 +718,48 @@ export function KayitSurecWorkspace({
                   </>
                 ) : (
                   <>
-                    {personelOptions.length > 0 ? (
-                      <FormField
-                        as="select"
-                        label="Personel"
-                        name="surec-create-personel"
-                        value={surecForm.personelId}
-                        onChange={(value) => setSurecForm((prev) => ({ ...prev, personelId: value }))}
-                        required
-                        placeholderOption={{ value: "", label: "Seçiniz" }}
-                        selectOptions={personelOptions}
-                      />
-                    ) : (
-                      <p className="workspace-empty-hint">Personel listesi yüklenemedi veya boş.</p>
-                    )}
+                    <div className="surec-personel-picker">
+                      <div className="surec-personel-picker-head">
+                        <strong>Personel seçimi</strong>
+                        <p>Ad, T.C. kimlik, telefon, bölüm veya görev bilgisiyle arayıp kişiyi seçin.</p>
+                      </div>
+
+                      {personelOptions.length > 0 ? (
+                        <div className="surec-personel-picker-fields">
+                          <div className="form-section surec-personel-search-field">
+                            <label className="form-label" htmlFor="surec-personel-search">
+                              Personel ara
+                            </label>
+                            <input
+                              id="surec-personel-search"
+                              className="form-input"
+                              type="search"
+                              value={surecPersonelSearch}
+                              onChange={(event) => setSurecPersonelSearch(event.target.value)}
+                              placeholder="Ad, T.C., telefon veya bölüm"
+                            />
+                          </div>
+                          <FormField
+                            as="select"
+                            label="Personel"
+                            name="surec-create-personel"
+                            value={surecForm.personelId}
+                            onChange={(value) => setSurecForm((prev) => ({ ...prev, personelId: value }))}
+                            required
+                            placeholderOption={{ value: "", label: "Seçiniz" }}
+                            selectOptions={filteredSurecPersonelOptions}
+                          />
+                        </div>
+                      ) : (
+                        <p className="workspace-empty-hint">Personel listesi yüklenemedi veya boş.</p>
+                      )}
+                    </div>
 
                     {!selectedSurecPersonel ? (
                       <p className="workspace-empty-hint">Süreç girmek için önce personel seçin.</p>
-                    ) : surecShellPanel === null ? (
-                      <div className="surec-shell-overview">
-                        <div className="surec-shell-summary">
+                    ) : (
+                      <div className={`surec-shell-split${surecShellPanel === "devamsizlik" ? " surec-shell-split--panel" : ""}`}>
+                        <aside className="surec-shell-summary surec-shell-person-card">
                           <p className="surec-shell-summary-kicker">Genel bilgiler</p>
                           <div className="surec-shell-summary-grid">
                             <div className="surec-shell-summary-item">
@@ -757,85 +823,89 @@ export function KayitSurecWorkspace({
                               </strong>
                             </div>
                           </div>
-                        </div>
+                        </aside>
 
-                        <div className="surec-shell-actions">
-                          <button
-                            type="button"
-                            className="surec-shell-action-tile"
-                            onClick={openDevamsizlikShellPanel}
-                          >
-                            <span className="surec-shell-action-icon" aria-hidden="true" />
-                            <span className="surec-shell-action-text">
-                              <span className="surec-shell-action-title">Devamsızlık</span>
-                              <span className="surec-shell-action-desc">
-                                İzin, rapor, devamsızlık ve günlük yoklukla ilgili kayıtlar
-                              </span>
-                            </span>
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="surec-shell-panel">
-                        <div className="surec-shell-panel-head">
-                          <button type="button" className="universal-btn-aux" onClick={closeDevamsizlikShellPanel}>
-                            Geri
-                          </button>
-                          <h4 className="surec-shell-panel-title">Devamsızlık</h4>
-                        </div>
-                        <p className="workspace-empty-hint surec-shell-panel-hint">
-                          Önce personelin yaşadığı olayı seçin. Sistem gerekli resmi etkileri kayıt sırasında arka planda
-                          değerlendirir.
-                        </p>
-
-                        <div className="surec-devamsizlik-tiles" role="group" aria-label="Devamsızlık alt türleri">
-                          {DEVAMSIZLIK_SUB_CARDS.map((card) => {
-                            const isActive = devamsizlikSubId === card.id;
-
-                            return (
+                        <div className="surec-shell-operations">
+                          {surecShellPanel === null ? (
+                            <div className="surec-shell-actions">
                               <button
-                                key={card.id}
                                 type="button"
-                                className={`surec-devamsizlik-tile${isActive ? " is-active" : ""}`}
-                                onClick={() => selectDevamsizlikSubCard(card.id)}
+                                className="surec-shell-action-tile"
+                                onClick={openDevamsizlikShellPanel}
                               >
-                                <span className="surec-devamsizlik-tile-title">{card.title}</span>
-                                <span className="surec-devamsizlik-tile-desc">{card.description}</span>
-                                <span className="surec-devamsizlik-tile-status">{isActive ? "Seçildi" : "Seç"}</span>
+                                <span className="surec-shell-action-icon" aria-hidden="true" />
+                                <span className="surec-shell-action-text">
+                                  <span className="surec-shell-action-title">Devamsızlık</span>
+                                  <span className="surec-shell-action-desc">
+                                    İzin, rapor, devamsızlık ve günlük yoklukla ilgili kayıtlar
+                                  </span>
+                                </span>
                               </button>
-                            );
-                          })}
+                            </div>
+                          ) : (
+                            <div className="surec-shell-panel">
+                              <div className="surec-shell-panel-head">
+                                <button type="button" className="universal-btn-aux" onClick={closeDevamsizlikShellPanel}>
+                                  Geri
+                                </button>
+                                <h4 className="surec-shell-panel-title">Devamsızlık</h4>
+                              </div>
+                              <p className="workspace-empty-hint surec-shell-panel-hint">
+                                Önce personelin yaşadığı olayı seçin. Sistem gerekli resmi etkileri kayıt sırasında arka planda
+                                değerlendirir.
+                              </p>
+
+                              <div className="surec-devamsizlik-tiles" role="group" aria-label="Devamsızlık alt türleri">
+                                {DEVAMSIZLIK_SUB_CARDS.map((card) => {
+                                  const isActive = devamsizlikSubId === card.id;
+
+                                  return (
+                                    <button
+                                      key={card.id}
+                                      type="button"
+                                      className={`surec-devamsizlik-tile${isActive ? " is-active" : ""}`}
+                                      onClick={() => selectDevamsizlikSubCard(card.id)}
+                                    >
+                                      <span className="surec-devamsizlik-tile-title">{card.title}</span>
+                                      <span className="surec-devamsizlik-tile-desc">{card.description}</span>
+                                      <span className="surec-devamsizlik-tile-status">{isActive ? "Seçildi" : "Seç"}</span>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+
+                              {devamsizlikSubId ? (
+                                <>
+                                  <form id={KAYIT_SUREC_SUREC_FORM_ID} className="workspace-form" onSubmit={handleSurecSubmit}>
+                                    <SurecFormFields
+                                      form={surecForm}
+                                      setForm={setSurecForm}
+                                      surecTuruOptions={surecTuruOptions}
+                                      personelOptions={personelOptions}
+                                      showPersonelField={false}
+                                      showSurecTuruField={!hideSurecTuruFieldInShell}
+                                      errorMessage={surecError}
+                                      referenceError={null}
+                                      className="workspace-form-stack workspace-form-stack--compact"
+                                    />
+                                  </form>
+
+                                  <div className="workspace-inline-actions">
+                                    {surecInfo ? <p className="workspace-success workspace-success--inline">{surecInfo}</p> : null}
+                                  </div>
+                                  <div className="universal-btn-group workspace-form-actions">
+                                    <button type="submit" form={primaryFormId} className="universal-btn-save" disabled={surecSubmitting}>
+                                      {primaryActionLabel}
+                                    </button>
+                                    <button type="button" className="universal-btn-cancel" onClick={onClose}>
+                                      Kapat
+                                    </button>
+                                  </div>
+                                </>
+                              ) : null}
+                            </div>
+                          )}
                         </div>
-
-                        {devamsizlikSubId ? (
-                          <>
-                            <form id={KAYIT_SUREC_SUREC_FORM_ID} className="workspace-form" onSubmit={handleSurecSubmit}>
-                              <SurecFormFields
-                                form={surecForm}
-                                setForm={setSurecForm}
-                                surecTuruOptions={surecTuruOptions}
-                                personelOptions={personelOptions}
-                                showPersonelField={false}
-                                showSurecTuruField={!hideSurecTuruFieldInShell}
-                                errorMessage={surecError}
-                                referenceError={null}
-                                className="workspace-form-stack workspace-form-stack--compact"
-                              />
-                            </form>
-
-                            <div className="workspace-inline-actions">
-                              {surecInfo ? <p className="workspace-success workspace-success--inline">{surecInfo}</p> : null}
-                            </div>
-                            <div className="universal-btn-group workspace-form-actions">
-                              <button type="submit" form={primaryFormId} className="universal-btn-save" disabled={surecSubmitting}>
-                                {primaryActionLabel}
-                              </button>
-                              <button type="button" className="universal-btn-cancel" onClick={onClose}>
-                                Kapat
-                              </button>
-                            </div>
-                          </>
-                        ) : null}
                       </div>
                     )}
                   </>
@@ -844,68 +914,66 @@ export function KayitSurecWorkspace({
             ) : null}
           </section>
 
-          <section className="workspace-surface-card workspace-surface-card--surec-tarihce">
-            <div className="workspace-surface-header">
-              <h3>Kayıt tarihçesi</h3>
-              <p>
-                {selectedSurecPersonel
-                  ? `${selectedSurecPersonel.ad} ${selectedSurecPersonel.soyad} için geçmiş kayıtlar`
-                  : "Personel seçili değilken liste son süreçlere göre dolar."}
-              </p>
-            </div>
+          {selectedSurecPersonel ? (
+            <section className="workspace-surface-card workspace-surface-card--surec-tarihce">
+              <div className="workspace-surface-header">
+                <h3>Kayıt tarihçesi</h3>
+                <p>{selectedSurecPersonel.ad} {selectedSurecPersonel.soyad} için geçmiş kayıtlar</p>
+              </div>
 
-            {sureclerLoading ? <LoadingState label="Kayıt tarihçesi yükleniyor..." /> : null}
-            {!sureclerLoading && sureclerError ? (
-              <ErrorState message={sureclerError} onRetry={() => void loadSurecler(surecForm.personelId)} />
-            ) : null}
+              {sureclerLoading ? <LoadingState label="Kayıt tarihçesi yükleniyor..." /> : null}
+              {!sureclerLoading && sureclerError ? (
+                <ErrorState message={sureclerError} onRetry={() => void loadSurecler(surecForm.personelId)} />
+              ) : null}
 
-            {!sureclerLoading && !sureclerError && surecler.length === 0 ? (
-              <EmptyState
-                title="Tarihçede kayıt yok"
-                message="Bu seçim için görüntülenecek kayıt bulunamadı."
-              />
-            ) : null}
+              {!sureclerLoading && !sureclerError && surecler.length === 0 ? (
+                <EmptyState
+                  title="Tarihçede kayıt yok"
+                  message="Bu seçim için görüntülenecek kayıt bulunamadı."
+                />
+              ) : null}
 
-            {!sureclerLoading && !sureclerError && surecler.length > 0 ? (
-              <ul className="workspace-surec-list">
-                {surecler.map((item) => {
-                  const relatedPersonel = personelMap.get(item.personel_id) ?? null;
+              {!sureclerLoading && !sureclerError && surecler.length > 0 ? (
+                <ul className="workspace-surec-list">
+                  {surecler.map((item) => {
+                    const relatedPersonel = personelMap.get(item.personel_id) ?? null;
 
-                  return (
-                    <li key={item.id} className="workspace-surec-item">
-                      <div className="workspace-surec-copy">
-                        <strong>{formatSurecTuruLabel(item.surec_turu)}</strong>
-                        <p>Personel: {relatedPersonel ? `${relatedPersonel.ad} ${relatedPersonel.soyad}` : item.personel_id}</p>
-                        <p>Durum: {formatSurecStateLabel(item.state ?? "BEKLEMEDE")}</p>
-                        <p>
-                          Tarih: {item.baslangic_tarihi ?? "-"} / {item.bitis_tarihi ?? "-"}
-                        </p>
-                        {item.alt_tur ? <p>Alt Tür: {item.alt_tur}</p> : null}
-                        {item.aciklama ? <p>Açıklama: {item.aciklama}</p> : null}
-                      </div>
+                    return (
+                      <li key={item.id} className="workspace-surec-item">
+                        <div className="workspace-surec-copy">
+                          <strong>{formatSurecTuruLabel(item.surec_turu)}</strong>
+                          <p>Personel: {relatedPersonel ? `${relatedPersonel.ad} ${relatedPersonel.soyad}` : item.personel_id}</p>
+                          <p>Durum: {formatSurecStateLabel(item.state ?? "BEKLEMEDE")}</p>
+                          <p>
+                            Tarih: {item.baslangic_tarihi ?? "-"} / {item.bitis_tarihi ?? "-"}
+                          </p>
+                          {item.alt_tur ? <p>Alt Tür: {item.alt_tur}</p> : null}
+                          {item.aciklama ? <p>Açıklama: {item.aciklama}</p> : null}
+                        </div>
 
-                      <div className="module-item-actions workspace-surec-actions">
-                        {canEditSurec ? (
-                          <button type="button" className="universal-btn-aux" onClick={() => beginSurecEdit(item)}>
-                            Düzenle
-                          </button>
-                        ) : null}
-                        {canCancelSurec ? (
-                          <button
-                            type="button"
-                            className="universal-btn-aux"
-                            onClick={() => void handleSurecCancel(item)}
-                          >
-                            İptal
-                          </button>
-                        ) : null}
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            ) : null}
-          </section>
+                        <div className="module-item-actions workspace-surec-actions">
+                          {canEditSurec ? (
+                            <button type="button" className="universal-btn-aux" onClick={() => beginSurecEdit(item)}>
+                              Düzenle
+                            </button>
+                          ) : null}
+                          {canCancelSurec ? (
+                            <button
+                              type="button"
+                              className="universal-btn-aux"
+                              onClick={() => void handleSurecCancel(item)}
+                            >
+                              İptal
+                            </button>
+                          ) : null}
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : null}
+            </section>
+          ) : null}
         </div>
       )}
     </div>

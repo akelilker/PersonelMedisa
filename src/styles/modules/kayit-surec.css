@@ -5,12 +5,12 @@
 }
 
 .kayit-workspace-tabs {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   align-items: flex-end;
-  gap: 0;
+  gap: 18px;
   margin: 0;
-  padding: 0 0 0 2px;
+  padding: 0;
   border: none;
   border-bottom: 1px solid rgba(255, 255, 255, 0.14);
   background: transparent;
@@ -18,17 +18,19 @@
 }
 
 .kayit-workspace-tab {
-  margin: 0 20px -1px 0;
-  padding: 10px 2px 12px;
+  width: 100%;
+  margin: 0 0 -1px;
+  padding: 8px 0 10px;
   border: none;
   border-bottom: 3px solid transparent;
   border-radius: 0;
   background: transparent;
   color: rgba(245, 247, 255, 0.45);
-  font-size: 14px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0;
   text-transform: none;
+  text-align: center;
   cursor: pointer;
   transition: color 0.18s ease, border-color 0.18s ease;
 }
@@ -370,7 +372,7 @@
 
 @media (min-width: 900px) {
   .surec-shell-split {
-    grid-template-columns: minmax(220px, 0.82fr) minmax(0, 1.18fr);
+    grid-template-columns: minmax(210px, 0.35fr) minmax(0, 0.65fr);
   }
 }
 
@@ -391,18 +393,18 @@
 .surec-shell-summary {
   display: grid;
   gap: 10px;
-  padding: 14px 16px;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.04);
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
 }
 
 .surec-shell-summary-kicker {
   margin: 0;
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: rgba(245, 247, 255, 0.55);
+  color: rgba(245, 247, 255, 0.7);
 }
 
 .surec-shell-summary-grid {
@@ -579,4 +581,3 @@
   display: grid;
   gap: 3px;
 }
-

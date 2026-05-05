@@ -89,7 +89,7 @@ export async function mockApi(page: Page, role: MockUserRole) {
       personel_tipi_adi: "Tam Zamanlı",
       bagli_amir_adi: "Demo Amir",
       ucret_tipi_id: 1,
-      ucret_tipi_adi: "Aylık sabit maaş",
+      ucret_tipi_adi: "Aylık",
       maas_tutari: 35000,
       prim_kurali_id: 7,
       prim_kurali_adi: "7 No'lu Prim Kuralı"
@@ -119,7 +119,7 @@ export async function mockApi(page: Page, role: MockUserRole) {
       personel_tipi_adi: "Yarı Zamanlı",
       bagli_amir_adi: "Demo Amir",
       ucret_tipi_id: 2,
-      ucret_tipi_adi: "Saatlik çalışan",
+      ucret_tipi_adi: "Saatlik",
       maas_tutari: 25000,
       prim_kurali_id: 8,
       prim_kurali_adi: "8 No'lu Prim Kuralı"
@@ -293,8 +293,8 @@ export async function mockApi(page: Page, role: MockUserRole) {
   ];
 
   const ucretTipiReferans: Array<{ id: number; ad: string }> = [
-    { id: 1, ad: "Aylık sabit maaş" },
-    { id: 2, ad: "Saatlik çalışan" }
+    { id: 1, ad: "Aylık" },
+    { id: 2, ad: "Saatlik" }
   ];
 
   const primKuraliReferans: Array<{ id: number; ad: string }> = [

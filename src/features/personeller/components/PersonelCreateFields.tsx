@@ -65,6 +65,7 @@ export function PersonelCreateFields({
             name="create-tc"
             value={form.tcKimlikNo}
             onChange={(value) => setForm((prev) => ({ ...prev, tcKimlikNo: value }))}
+            placeholder="12345678122"
             required
           />
           <FormField
@@ -72,6 +73,7 @@ export function PersonelCreateFields({
             name="create-ad"
             value={form.ad}
             onChange={(value) => setForm((prev) => ({ ...prev, ad: value }))}
+            placeholder="İlker"
             required
           />
           <FormField
@@ -79,6 +81,7 @@ export function PersonelCreateFields({
             name="create-soyad"
             value={form.soyad}
             onChange={(value) => setForm((prev) => ({ ...prev, soyad: value }))}
+            placeholder="AKEL"
             required
           />
           <FormField
@@ -95,6 +98,7 @@ export function PersonelCreateFields({
             type="tel"
             value={form.telefon}
             onChange={(value) => setForm((prev) => ({ ...prev, telefon: value }))}
+            placeholder="0532 123 45 67"
             required
           />
           <FormField
@@ -102,6 +106,7 @@ export function PersonelCreateFields({
             name="create-acil-kisi"
             value={form.acilDurumKisi}
             onChange={(value) => setForm((prev) => ({ ...prev, acilDurumKisi: value }))}
+            placeholder="Ayşe AKEL"
             required
           />
           <FormField
@@ -110,6 +115,7 @@ export function PersonelCreateFields({
             type="tel"
             value={form.acilDurumTelefon}
             onChange={(value) => setForm((prev) => ({ ...prev, acilDurumTelefon: value }))}
+            placeholder="0532 123 45 67"
             required
           />
           <FormField
@@ -117,6 +123,7 @@ export function PersonelCreateFields({
             name="create-dogum-yeri"
             value={form.dogumYeri}
             onChange={(value) => setForm((prev) => ({ ...prev, dogumYeri: value }))}
+            placeholder="İstanbul"
           />
           <FormField
             as="select"
@@ -135,6 +142,7 @@ export function PersonelCreateFields({
             name="create-sicil"
             value={form.sicilNo}
             onChange={(value) => setForm((prev) => ({ ...prev, sicilNo: value }))}
+            placeholder="MED-001"
             required
           />
           <FormField
@@ -228,7 +236,6 @@ export function PersonelCreateFields({
               name="create-ucret-tipi"
               value={form.ucretTipiId}
               onChange={(value) => setForm((prev) => ({ ...prev, ucretTipiId: value }))}
-              placeholderOption={{ value: "", label: "Seçiniz" }}
               selectOptions={toSelectOptions(refs.ucretTipiOptions)}
             />
           ) : (
@@ -242,6 +249,7 @@ export function PersonelCreateFields({
             step="0.01"
             value={form.maasTutari}
             onChange={(value) => setForm((prev) => ({ ...prev, maasTutari: value }))}
+            placeholder="35000"
           />
           {refs.primKuraliOptions.length > 0 ? (
             <FormField

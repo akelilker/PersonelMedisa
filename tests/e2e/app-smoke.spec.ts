@@ -24,10 +24,11 @@ test("Ana akış smoke", async ({ page }) => {
   await expect(homeFlowModal.getByLabel("T.C. Kimlik No")).toBeVisible();
 
   await homeFlowModal.getByRole("button", { name: "Süreç" }).click();
-  await expect(homeFlowModal.getByLabel("Personel")).toBeVisible();
-  await homeFlowModal.getByLabel("Personel").selectOption("1");
+  await expect(homeFlowModal.getByLabel("Personel", { exact: true })).toBeVisible();
+  await homeFlowModal.getByLabel("Personel", { exact: true }).selectOption("1");
   await expect(homeFlowModal.getByRole("button", { name: /Devamsızlık/i })).toBeVisible();
   await homeFlowModal.getByRole("button", { name: /Devamsızlık/i }).click();
+  await homeFlowModal.getByRole("button", { name: /Geç Geldi/i }).click();
   await expect(homeFlowModal.getByLabel("Süreç Türü")).toBeVisible();
   await homeFlowModal.locator(".universal-btn-cancel").click();
   await expect(page).toHaveURL("/");

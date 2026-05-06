@@ -6,7 +6,7 @@ import { ErrorState } from "../../../components/states/ErrorState";
 import { LoadingState } from "../../../components/states/LoadingState";
 import type { KayitTab } from "../../../components/main-menu/MainMenu";
 import type { PersonelReferenceBundle } from "../../../data/app-data.types";
-import { createPersonel, fetchPersonellerList } from "../../../api/personeller.api";
+import { createPersonel, fetchPersonellerList, updatePersonel } from "../../../api/personeller.api";
 import {
   fetchBagliAmirOptions,
   fetchDepartmanOptions,
@@ -63,7 +63,8 @@ const SUREC_TURU_LABELS: Record<string, string> = {
   MAZERET_IZNI: "Mazeret İzni",
   UCRETSIZ_IZIN: "Ücretsiz İzin",
   GOREVLENDIRME: "Görevlendirme",
-  EGITIM: "Eğitim"
+  EGITIM: "Eğitim",
+  POZISYON_DEGISTI: "Pozisyon Değişti"
 };
 
 const SUREC_STATE_LABELS: Record<string, string> = {
@@ -116,12 +117,21 @@ type DevamsizlikSubId = "izin" | "rapor" | "is_kazasi" | "izinsiz" | "gec" | "er
 type PersonelSurecTab =
   | "genel"
   | "izin-devamsizlik"
+  | "pozisyon"
   | "belgeler"
   | "mali"
   | "zimmet"
   | "ceza"
-  | "ayrilma"
-  | "tarihce";
+  | "ayrilma";
+
+type PozisyonFormState = {
+  departmanId: string;
+  gorevId: string;
+  bagliAmirId: string;
+  personelTipiId: string;
+  effectiveDate: string;
+  aciklama: string;
+};
 
 type DevamsizlikSubCard = {
   id: DevamsizlikSubId;
@@ -177,12 +187,12 @@ const DEVAMSIZLIK_SUB_CARDS: DevamsizlikSubCard[] = [
 const PERSONEL_SUREC_TABS: Array<{ id: PersonelSurecTab; label: string }> = [
   { id: "genel", label: "Genel" },
   { id: "izin-devamsizlik", label: "İzin / Devamsızlık" },
+  { id: "pozisyon", label: "Pozisyon" },
   { id: "belgeler", label: "Belgeler" },
   { id: "mali", label: "Mali İşlemler" },
   { id: "zimmet", label: "Zimmet" },
   { id: "ceza", label: "Ceza" },
-  { id: "ayrilma", label: "Ayrılma" },
-  { id: "tarihce", label: "Süreç Tarihçesi" }
+  { id: "ayrilma", label: "Ayrılma" }
 ];
 
 const DEVAMSIZLIK_ALT_TUR_CONFIG: Record<DevamsizlikSubId, DevamsizlikAltTurConfig> = {
@@ -265,6 +275,34 @@ function getPersonelInitials(personel: Personel) {
   return `${adInitial}${soyadInitial}`.toLocaleUpperCase("tr-TR");
 }
 
+function toOptionalIdValue(value: number | null | undefined) {
+  return typeof value === "number" ? String(value) : "";
+}
+
+function createPozisyonFormFromPersonel(personel: Personel | null): PozisyonFormState {
+  return {
+    departmanId: toOptionalIdValue(personel?.departman_id),
+    gorevId: toOptionalIdValue(personel?.gorev_id),
+    bagliAmirId: toOptionalIdValue(personel?.bagli_amir_id),
+    personelTipiId: toOptionalIdValue(personel?.personel_tipi_id),
+    effectiveDate: "",
+    aciklama: ""
+  };
+}
+
+function optionLabel(options: Array<{ id: number; label: string }>, value: string, fallback: string) {
+  if (!value) {
+    return "-";
+  }
+
+  const option = options.find((item) => String(item.id) === value);
+  return option?.label ?? fallback;
+}
+
+function parsePozisyonId(value: string) {
+  return value ? Number.parseInt(value, 10) : null;
+}
+
 export function KayitSurecWorkspace({
   activeTab,
   onTabChange,
@@ -306,6 +344,10 @@ export function KayitSurecWorkspace({
 
   const [activePersonelTab, setActivePersonelTab] = useState<PersonelSurecTab>("genel");
   const [devamsizlikSubId, setDevamsizlikSubId] = useState<DevamsizlikSubId | null>(null);
+  const [pozisyonForm, setPozisyonForm] = useState<PozisyonFormState>(createPozisyonFormFromPersonel(null));
+  const [pozisyonSubmitting, setPozisyonSubmitting] = useState(false);
+  const [pozisyonError, setPozisyonError] = useState<string | null>(null);
+  const [pozisyonInfo, setPozisyonInfo] = useState<string | null>(null);
 
   const personelOptions = useMemo(
     () =>
@@ -362,6 +404,14 @@ export function KayitSurecWorkspace({
   }, [personelMap, surecForm.personelId]);
 
   const selectedSurecPersonelLabel = selectedSurecPersonel ? formatPersonelLabel(selectedSurecPersonel) : "Seçiniz";
+
+  const hasPozisyonDiff = Boolean(
+    selectedSurecPersonel &&
+      (pozisyonForm.departmanId !== toOptionalIdValue(selectedSurecPersonel.departman_id) ||
+        pozisyonForm.gorevId !== toOptionalIdValue(selectedSurecPersonel.gorev_id) ||
+        pozisyonForm.bagliAmirId !== toOptionalIdValue(selectedSurecPersonel.bagli_amir_id) ||
+        pozisyonForm.personelTipiId !== toOptionalIdValue(selectedSurecPersonel.personel_tipi_id))
+  );
 
   const selectedPersonelGeneralColumns = useMemo(() => {
     if (!selectedSurecPersonel) {
@@ -433,6 +483,12 @@ export function KayitSurecWorkspace({
     setSurecPersonelPickerOpen(false);
   }, [editingSurec, surecForm.personelId, useShellSurecLayout]);
 
+  useEffect(() => {
+    setPozisyonForm(createPozisyonFormFromPersonel(selectedSurecPersonel));
+    setPozisyonError(null);
+    setPozisyonInfo(null);
+  }, [selectedSurecPersonel]);
+
   function selectSurecPersonel(personelId: string) {
     setSurecForm((prev) => ({ ...prev, personelId }));
     setSurecPersonelPickerOpen(false);
@@ -455,6 +511,8 @@ export function KayitSurecWorkspace({
     setActivePersonelTab(tabId);
     setSurecError(null);
     setSurecInfo(null);
+    setPozisyonError(null);
+    setPozisyonInfo(null);
 
     if (tabId === "izin-devamsizlik") {
       const nextSubId = devamsizlikSubId ?? "izin";
@@ -639,6 +697,85 @@ export function KayitSurecWorkspace({
       setSurecError(error instanceof Error ? error.message : "Süreç kaydı kaydedilemedi.");
     } finally {
       setSurecSubmitting(false);
+    }
+  }
+
+  async function handlePozisyonSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!selectedSurecPersonel || pozisyonSubmitting) {
+      return;
+    }
+
+    if (!hasPozisyonDiff) {
+      setPozisyonError(null);
+      setPozisyonInfo("Pozisyon bilgisi değişmedi.");
+      return;
+    }
+
+    if (!pozisyonForm.effectiveDate) {
+      setPozisyonInfo(null);
+      setPozisyonError("Değişikliğin geçerli olacağı tarihi seç.");
+      return;
+    }
+
+    setPozisyonSubmitting(true);
+    setPozisyonError(null);
+    setPozisyonInfo(null);
+
+    const changes = [
+      {
+        label: "Bölüm",
+        before: formatGeneralField(selectedSurecPersonel.departman_adi),
+        after: optionLabel(refs.departmanOptions, pozisyonForm.departmanId, formatGeneralField(selectedSurecPersonel.departman_adi)),
+        changed: pozisyonForm.departmanId !== toOptionalIdValue(selectedSurecPersonel.departman_id)
+      },
+      {
+        label: "Görev / Unvan",
+        before: formatGeneralField(selectedSurecPersonel.gorev_adi),
+        after: optionLabel(refs.gorevOptions, pozisyonForm.gorevId, formatGeneralField(selectedSurecPersonel.gorev_adi)),
+        changed: pozisyonForm.gorevId !== toOptionalIdValue(selectedSurecPersonel.gorev_id)
+      },
+      {
+        label: "Bağlı Amir",
+        before: formatGeneralField(selectedSurecPersonel.bagli_amir_adi),
+        after: optionLabel(refs.bagliAmirOptions, pozisyonForm.bagliAmirId, formatGeneralField(selectedSurecPersonel.bagli_amir_adi)),
+        changed: pozisyonForm.bagliAmirId !== toOptionalIdValue(selectedSurecPersonel.bagli_amir_id)
+      },
+      {
+        label: "Çalışma Tipi",
+        before: formatGeneralField(selectedSurecPersonel.personel_tipi_adi),
+        after: optionLabel(refs.personelTipiOptions, pozisyonForm.personelTipiId, formatGeneralField(selectedSurecPersonel.personel_tipi_adi)),
+        changed: pozisyonForm.personelTipiId !== toOptionalIdValue(selectedSurecPersonel.personel_tipi_id)
+      }
+    ].filter((item) => item.changed);
+
+    const changeSummary = changes.map((item) => `${item.label}: ${item.before} -> ${item.after}`).join("; ");
+    const aciklama = [changeSummary, pozisyonForm.aciklama.trim()].filter(Boolean).join(" | ");
+
+    try {
+      const updated = await updatePersonel(selectedSurecPersonel.id, {
+        departman_id: parsePozisyonId(pozisyonForm.departmanId),
+        gorev_id: parsePozisyonId(pozisyonForm.gorevId),
+        bagli_amir_id: parsePozisyonId(pozisyonForm.bagliAmirId),
+        personel_tipi_id: parsePozisyonId(pozisyonForm.personelTipiId) ?? undefined,
+        effective_date: pozisyonForm.effectiveDate
+      });
+
+      await createSurec({
+        personel_id: selectedSurecPersonel.id,
+        surec_turu: "POZISYON_DEGISTI",
+        baslangic_tarihi: pozisyonForm.effectiveDate,
+        aciklama
+      });
+
+      setPersoneller((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
+      setPozisyonForm(createPozisyonFormFromPersonel(updated));
+      setPozisyonInfo("Pozisyon güncellendi.");
+    } catch (error) {
+      setPozisyonError(error instanceof Error ? error.message : "Pozisyon güncellenemedi.");
+    } finally {
+      setPozisyonSubmitting(false);
     }
   }
 
@@ -1038,6 +1175,106 @@ export function KayitSurecWorkspace({
                           </div>
                         ) : null}
 
+                        {activePersonelTab === "pozisyon" ? (
+                          <div className="surec-position-panel">
+                            <div className="workspace-surface-header">
+                              <h3>Pozisyon</h3>
+                              <p>Bölüm, amir, unvan ve çalışma tipi değişikliklerini buradan işle.</p>
+                            </div>
+
+                            <form className="workspace-form surec-position-form" onSubmit={handlePozisyonSubmit}>
+                              <div className="surec-position-grid">
+                                <FormField
+                                  label="Bölüm"
+                                  name="pozisyon-departman"
+                                  type="select"
+                                  value={pozisyonForm.departmanId}
+                                  onChange={(value) => setPozisyonForm((prev) => ({ ...prev, departmanId: value }))}
+                                  selectOptions={refs.departmanOptions.map((option) => ({
+                                    value: String(option.id),
+                                    label: option.label
+                                  }))}
+                                  required
+                                />
+                                <FormField
+                                  label="Görev / Unvan"
+                                  name="pozisyon-gorev"
+                                  type="select"
+                                  value={pozisyonForm.gorevId}
+                                  onChange={(value) => setPozisyonForm((prev) => ({ ...prev, gorevId: value }))}
+                                  selectOptions={refs.gorevOptions.map((option) => ({
+                                    value: String(option.id),
+                                    label: option.label
+                                  }))}
+                                  required
+                                />
+                                <FormField
+                                  label="Bağlı Amir"
+                                  name="pozisyon-bagli-amir"
+                                  type="select"
+                                  value={pozisyonForm.bagliAmirId}
+                                  onChange={(value) => setPozisyonForm((prev) => ({ ...prev, bagliAmirId: value }))}
+                                  selectOptions={refs.bagliAmirOptions.map((option) => ({
+                                    value: String(option.id),
+                                    label: option.label
+                                  }))}
+                                />
+                                <FormField
+                                  label="Çalışma Tipi"
+                                  name="pozisyon-personel-tipi"
+                                  type="select"
+                                  value={pozisyonForm.personelTipiId}
+                                  onChange={(value) => setPozisyonForm((prev) => ({ ...prev, personelTipiId: value }))}
+                                  selectOptions={refs.personelTipiOptions.map((option) => ({
+                                    value: String(option.id),
+                                    label: option.label
+                                  }))}
+                                  required
+                                />
+                              </div>
+
+                              <FormField
+                                label="Geçerlilik Tarihi"
+                                name="pozisyon-effective-date"
+                                type="date"
+                                value={pozisyonForm.effectiveDate}
+                                onChange={(value) => setPozisyonForm((prev) => ({ ...prev, effectiveDate: value }))}
+                                required={hasPozisyonDiff}
+                              />
+
+                              <FormField
+                                label="Açıklama"
+                                name="pozisyon-aciklama"
+                                type="textarea"
+                                value={pozisyonForm.aciklama}
+                                onChange={(value) => setPozisyonForm((prev) => ({ ...prev, aciklama: value }))}
+                                placeholder="Değişiklik notu"
+                                rows={2}
+                              />
+
+                              {pozisyonError ? <p className="workspace-error">{pozisyonError}</p> : null}
+                              {pozisyonInfo ? <p className="workspace-success">{pozisyonInfo}</p> : null}
+
+                              <div className="universal-btn-group workspace-form-actions">
+                                <button
+                                  type="submit"
+                                  className="universal-btn-save"
+                                  disabled={pozisyonSubmitting || !hasPozisyonDiff}
+                                >
+                                  Kaydet
+                                </button>
+                                <button
+                                  type="button"
+                                  className="universal-btn-cancel"
+                                  onClick={() => setPozisyonForm(createPozisyonFormFromPersonel(selectedSurecPersonel))}
+                                >
+                                  Vazgeç
+                                </button>
+                              </div>
+                            </form>
+                          </div>
+                        ) : null}
+
                         {["belgeler", "mali", "zimmet", "ceza", "ayrilma"].includes(activePersonelTab) ? (
                           <div className="surec-person-placeholder">
                             <strong>{PERSONEL_SUREC_TABS.find((tab) => tab.id === activePersonelTab)?.label}</strong>
@@ -1045,66 +1282,6 @@ export function KayitSurecWorkspace({
                           </div>
                         ) : null}
 
-                        {activePersonelTab === "tarihce" ? (
-                          <div className="surec-history-panel">
-                            <div className="workspace-surface-header">
-                              <h3>Süreç tarihçesi</h3>
-                              <p>{selectedSurecPersonel.ad} {selectedSurecPersonel.soyad} için geçmiş kayıtlar</p>
-                            </div>
-
-                            {sureclerLoading ? <LoadingState label="Süreç tarihçesi yükleniyor..." /> : null}
-                            {!sureclerLoading && sureclerError ? (
-                              <ErrorState message={sureclerError} onRetry={() => void loadSurecler(surecForm.personelId)} />
-                            ) : null}
-
-                            {!sureclerLoading && !sureclerError && surecler.length === 0 ? (
-                              <EmptyState
-                                title="Tarihçede kayıt yok"
-                                message="Bu seçim için görüntülenecek kayıt bulunamadı."
-                              />
-                            ) : null}
-
-                            {!sureclerLoading && !sureclerError && surecler.length > 0 ? (
-                              <ul className="workspace-surec-list">
-                                {surecler.map((item) => {
-                                  const relatedPersonel = personelMap.get(item.personel_id) ?? null;
-
-                                  return (
-                                    <li key={item.id} className="workspace-surec-item">
-                                      <div className="workspace-surec-copy">
-                                        <strong>{formatSurecTuruLabel(item.surec_turu)}</strong>
-                                        <p>Personel: {relatedPersonel ? `${relatedPersonel.ad} ${relatedPersonel.soyad}` : item.personel_id}</p>
-                                        <p>Durum: {formatSurecStateLabel(item.state ?? "BEKLEMEDE")}</p>
-                                        <p>
-                                          Tarih: {item.baslangic_tarihi ?? "-"} / {item.bitis_tarihi ?? "-"}
-                                        </p>
-                                        {item.alt_tur ? <p>İşlem Detayı: {item.alt_tur}</p> : null}
-                                        {item.aciklama ? <p>Açıklama: {item.aciklama}</p> : null}
-                                      </div>
-
-                                      <div className="module-item-actions workspace-surec-actions">
-                                        {canEditSurec ? (
-                                          <button type="button" className="universal-btn-aux" onClick={() => beginSurecEdit(item)}>
-                                            Düzenle
-                                          </button>
-                                        ) : null}
-                                        {canCancelSurec ? (
-                                          <button
-                                            type="button"
-                                            className="universal-btn-aux"
-                                            onClick={() => void handleSurecCancel(item)}
-                                          >
-                                            İptal
-                                          </button>
-                                        ) : null}
-                                      </div>
-                                    </li>
-                                  );
-                                })}
-                              </ul>
-                            ) : null}
-                          </div>
-                        ) : null}
                       </div>
                     )}
                   </>

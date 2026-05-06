@@ -557,21 +557,16 @@
 
 .surec-person-tabs {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-end;
   gap: 10px;
   min-width: 0;
-  overflow-x: auto;
+  overflow: visible;
   border-bottom: 1px solid rgba(255, 255, 255, 0.12);
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
-
-.surec-person-tabs::-webkit-scrollbar {
-  display: none;
 }
 
 .surec-person-tab {
-  flex: 0 0 auto;
+  flex: 0 1 auto;
   margin: 0 0 -1px;
   padding: 0 0 8px;
   border: none;
@@ -636,7 +631,7 @@
 .surec-devamsizlik-tiles {
   display: grid;
   gap: 6px;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
 }
 
 .surec-devamsizlik-tile {

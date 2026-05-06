@@ -24,8 +24,10 @@ test("Ana akış smoke", async ({ page }) => {
   await expect(homeFlowModal.getByLabel("T.C. Kimlik No")).toBeVisible();
 
   await homeFlowModal.getByRole("button", { name: "Süreç" }).click();
-  await expect(homeFlowModal.getByLabel("Personel", { exact: true })).toBeVisible();
-  await homeFlowModal.getByLabel("Personel", { exact: true }).selectOption("1");
+  await expect(homeFlowModal.getByRole("combobox", { name: "Personel" })).toBeVisible();
+  await homeFlowModal.getByRole("combobox", { name: "Personel" }).click();
+  await homeFlowModal.getByPlaceholder("Personel ara").fill("Ayşe");
+  await homeFlowModal.getByRole("option", { name: /Ayşe Yılmaz/i }).click();
   await expect(homeFlowModal.getByRole("tab", { name: "Genel" })).toHaveAttribute("aria-selected", "true");
   await homeFlowModal.getByRole("tab", { name: "İzin / Devamsızlık" }).click();
   await homeFlowModal.getByRole("button", { name: /Geç Geldi/i }).click();

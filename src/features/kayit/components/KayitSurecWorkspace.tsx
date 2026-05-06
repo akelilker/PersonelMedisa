@@ -164,13 +164,13 @@ const DEVAMSIZLIK_SUB_CARDS: DevamsizlikSubCard[] = [
     id: "gec",
     title: "Geç Geldi",
     description: "Mesai başlangıcından sonra giriş kaydı",
-    candidateKeys: []
+    candidateKeys: ["DEVAMSIZLIK"]
   },
   {
     id: "erken",
     title: "Erken Çıktı",
     description: "Mesai bitiminden önce çıkış kaydı",
-    candidateKeys: []
+    candidateKeys: ["DEVAMSIZLIK"]
   }
 ];
 
@@ -189,9 +189,9 @@ const DEVAMSIZLIK_ALT_TUR_CONFIG: Record<DevamsizlikSubId, DevamsizlikAltTurConf
   izin: {
     label: "İzin Türü",
     options: [
-      { value: "YILLIK_IZIN", label: "Yıllık izin" },
-      { value: "MAZERET_IZNI", label: "Mazeret izni" },
-      { value: "UCRETSIZ_IZIN", label: "Ücretsiz izin" }
+      { value: "YILLIK_IZIN", label: "Yıllık" },
+      { value: "MAZERET_IZNI", label: "Mazeret" },
+      { value: "UCRETSIZ_IZIN", label: "Ücretsiz" }
     ]
   },
   rapor: {
@@ -204,10 +204,7 @@ const DEVAMSIZLIK_ALT_TUR_CONFIG: Record<DevamsizlikSubId, DevamsizlikAltTurConf
   },
   izinsiz: {
     label: "Gelmedi Türü",
-    options: [
-      { value: "IZINSIZ_GELMEDI", label: "İzinsiz gelmedi" },
-      { value: "HABERSIZ_GELMEDI", label: "Habersiz gelmedi" }
-    ]
+    options: [{ value: "IZINSIZ_GELMEDI", label: "İzinsiz gelmedi" }]
   },
   gec: {
     label: "Geç Kalma Türü",
@@ -305,6 +302,7 @@ export function KayitSurecWorkspace({
   const [sureclerLoading, setSureclerLoading] = useState(false);
   const [sureclerError, setSureclerError] = useState<string | null>(null);
   const [surecPersonelSearch, setSurecPersonelSearch] = useState("");
+  const [surecPersonelPickerOpen, setSurecPersonelPickerOpen] = useState(false);
 
   const [activePersonelTab, setActivePersonelTab] = useState<PersonelSurecTab>("genel");
   const [devamsizlikSubId, setDevamsizlikSubId] = useState<DevamsizlikSubId | null>(null);
@@ -362,6 +360,8 @@ export function KayitSurecWorkspace({
     const personelId = Number.parseInt(surecForm.personelId, 10);
     return Number.isFinite(personelId) ? personelMap.get(personelId) ?? null : null;
   }, [personelMap, surecForm.personelId]);
+
+  const selectedSurecPersonelLabel = selectedSurecPersonel ? formatPersonelLabel(selectedSurecPersonel) : "Seçiniz";
 
   const selectedPersonelGeneralColumns = useMemo(() => {
     if (!selectedSurecPersonel) {
@@ -430,7 +430,13 @@ export function KayitSurecWorkspace({
     setSurecForm((prev) => resetSurecFormKeepingPersonel(prev.personelId));
     setSurecError(null);
     setSurecInfo(null);
+    setSurecPersonelPickerOpen(false);
   }, [editingSurec, surecForm.personelId, useShellSurecLayout]);
+
+  function selectSurecPersonel(personelId: string) {
+    setSurecForm((prev) => ({ ...prev, personelId }));
+    setSurecPersonelPickerOpen(false);
+  }
 
   function openDevamsizlikTab(defaultSubId: DevamsizlikSubId | null = "izin") {
     const altTurConfig = defaultSubId ? DEVAMSIZLIK_ALT_TUR_CONFIG[defaultSubId] : null;
@@ -866,30 +872,53 @@ export function KayitSurecWorkspace({
                           </div>
 
                           {personelOptions.length > 0 ? (
-                            <div className="surec-personel-picker-fields">
-                              <div className="form-section surec-personel-search-field">
-                                <label className="form-label" htmlFor="surec-personel-search">
-                                  Personel ara
-                                </label>
-                                <input
-                                  id="surec-personel-search"
-                                  className="form-input"
-                                  type="search"
-                                  value={surecPersonelSearch}
-                                  onChange={(event) => setSurecPersonelSearch(event.target.value)}
-                                  placeholder="Ad, T.C., telefon veya bölüm"
-                                />
-                              </div>
-                              <FormField
-                                as="select"
-                                label="Personel"
-                                name="surec-create-personel"
-                                value={surecForm.personelId}
-                                onChange={(value) => setSurecForm((prev) => ({ ...prev, personelId: value }))}
-                                required
-                                placeholderOption={{ value: "", label: "Seçiniz" }}
-                                selectOptions={filteredSurecPersonelOptions}
-                              />
+                            <div className="surec-personel-combobox form-section">
+                              <label className="form-label" id="surec-personel-combobox-label">
+                                Personel
+                              </label>
+                              <button
+                                type="button"
+                                className="form-input surec-personel-combobox-trigger"
+                                role="combobox"
+                                aria-labelledby="surec-personel-combobox-label"
+                                aria-expanded={surecPersonelPickerOpen}
+                                aria-controls="surec-personel-combobox-list"
+                                onClick={() => setSurecPersonelPickerOpen((isOpen) => !isOpen)}
+                              >
+                                <span>{selectedSurecPersonelLabel}</span>
+                                <span aria-hidden="true">⌄</span>
+                              </button>
+
+                              {surecPersonelPickerOpen ? (
+                                <div className="surec-personel-combobox-panel" id="surec-personel-combobox-list">
+                                  <input
+                                    className="form-input surec-personel-combobox-search"
+                                    type="search"
+                                    value={surecPersonelSearch}
+                                    onChange={(event) => setSurecPersonelSearch(event.target.value)}
+                                    placeholder="Personel ara"
+                                    autoFocus
+                                  />
+                                  <div className="surec-personel-combobox-options" role="listbox" aria-label="Personel listesi">
+                                    {filteredSurecPersonelOptions.length > 0 ? (
+                                      filteredSurecPersonelOptions.map((option) => (
+                                        <button
+                                          key={option.value}
+                                          type="button"
+                                          role="option"
+                                          aria-selected={surecForm.personelId === option.value}
+                                          className={`surec-personel-combobox-option${surecForm.personelId === option.value ? " is-active" : ""}`}
+                                          onClick={() => selectSurecPersonel(option.value)}
+                                        >
+                                          {option.label}
+                                        </button>
+                                      ))
+                                    ) : (
+                                      <p className="workspace-empty-hint">Aramaya uygun personel bulunamadı.</p>
+                                    )}
+                                  </div>
+                                </div>
+                              ) : null}
                             </div>
                           ) : (
                             <p className="workspace-empty-hint">Personel listesi yüklenemedi veya boş.</p>
@@ -986,6 +1015,7 @@ export function KayitSurecWorkspace({
                                     showPersonelField={false}
                                     showSurecTuruField={!hideSurecTuruFieldInShell}
                                     altTurField={activeDevamsizlikAltTurField}
+                                    useOperationControls
                                     errorMessage={surecError}
                                     referenceError={null}
                                     className="workspace-form-stack workspace-form-stack--compact"
@@ -997,10 +1027,10 @@ export function KayitSurecWorkspace({
                                 </div>
                                 <div className="universal-btn-group workspace-form-actions">
                                   <button type="submit" form={primaryFormId} className="universal-btn-save" disabled={surecSubmitting}>
-                                    {primaryActionLabel}
+                                    Kaydet
                                   </button>
                                   <button type="button" className="universal-btn-cancel" onClick={onClose}>
-                                    Kapat
+                                    Vazgeç
                                   </button>
                                 </div>
                               </>

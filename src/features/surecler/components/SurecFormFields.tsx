@@ -21,6 +21,7 @@ type SurecFormFieldsProps = {
   showPersonelField?: boolean;
   showSurecTuruField?: boolean;
   altTurField?: AltTurFieldConfig;
+  useOperationControls?: boolean;
   errorMessage?: string | null;
   referenceError?: string | null;
   className?: string;
@@ -43,10 +44,40 @@ export function SurecFormFields({
   showPersonelField = true,
   showSurecTuruField = true,
   altTurField,
+  useOperationControls = false,
   errorMessage,
   referenceError,
   className
 }: SurecFormFieldsProps) {
+  const renderSegmentedButtons = (
+    label: string,
+    name: string,
+    value: string,
+    options: PersonelOption[],
+    onSelect: (nextValue: string) => void
+  ) => (
+    <div className="form-section surec-choice-field">
+      <span className="form-label">{label}</span>
+      <div className="surec-choice-group" role="group" aria-label={label}>
+        {options.map((option) => {
+          const isActive = option.value === value;
+
+          return (
+            <button
+              key={`${name}-${option.value}`}
+              type="button"
+              className={`surec-choice-btn${isActive ? " is-active" : ""}`}
+              aria-pressed={isActive}
+              onClick={() => onSelect(option.value)}
+            >
+              {option.label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+
   return (
     <div className={className}>
       {showPersonelField
@@ -103,6 +134,15 @@ export function SurecFormFields({
 
       {altTurField ? (
         altTurField.options.length > 1 ? (
+          useOperationControls ? (
+            renderSegmentedButtons(
+              altTurField.label,
+              "surec-create-alt",
+              form.altTur,
+              altTurField.options,
+              (value) => setForm((prev) => ({ ...prev, altTur: value }))
+            )
+          ) : (
           <FormField
             as="select"
             label={altTurField.label}
@@ -113,6 +153,7 @@ export function SurecFormFields({
             placeholderOption={{ value: "", label: "Seçiniz" }}
             selectOptions={altTurField.options}
           />
+          )
         ) : null
       ) : (
           <FormField
@@ -122,37 +163,49 @@ export function SurecFormFields({
             onChange={(value) => setForm((prev) => ({ ...prev, altTur: value }))}
           />
         )}
-      <FormField
-        label="Başlangıç Tarihi"
-        name="surec-create-bas"
-        type="date"
-        value={form.baslangicTarihi}
-        onChange={(value) => setForm((prev) => ({ ...prev, baslangicTarihi: value }))}
-        required
-      />
-      <FormField
-        label="Bitiş Tarihi"
-        name="surec-create-bitis"
-        type="date"
-        value={form.bitisTarihi}
-        onChange={(value) => setForm((prev) => ({ ...prev, bitisTarihi: value }))}
-        required
-      />
-      <FormField
-        as="select"
-        label="Ücretli mi?"
-        name="surec-create-ucret"
-        value={form.ucretliMi ? "evet" : "hayir"}
-        onChange={(value) => setForm((prev) => ({ ...prev, ucretliMi: value === "evet" }))}
-        selectOptions={UCRETLI_SELECT_OPTIONS}
-      />
+      <div className={useOperationControls ? "surec-date-row" : undefined}>
+        <FormField
+          label="Başlangıç Tarihi"
+          name="surec-create-bas"
+          type="date"
+          value={form.baslangicTarihi}
+          onChange={(value) => setForm((prev) => ({ ...prev, baslangicTarihi: value }))}
+          required
+        />
+        <FormField
+          label="Bitiş Tarihi"
+          name="surec-create-bitis"
+          type="date"
+          value={form.bitisTarihi}
+          onChange={(value) => setForm((prev) => ({ ...prev, bitisTarihi: value }))}
+          required
+        />
+      </div>
+      {useOperationControls ? (
+        renderSegmentedButtons(
+          "Ücretli mi?",
+          "surec-create-ucret",
+          form.ucretliMi ? "evet" : "hayir",
+          UCRETLI_SELECT_OPTIONS,
+          (value) => setForm((prev) => ({ ...prev, ucretliMi: value === "evet" }))
+        )
+      ) : (
+        <FormField
+          as="select"
+          label="Ücretli mi?"
+          name="surec-create-ucret"
+          value={form.ucretliMi ? "evet" : "hayir"}
+          onChange={(value) => setForm((prev) => ({ ...prev, ucretliMi: value === "evet" }))}
+          selectOptions={UCRETLI_SELECT_OPTIONS}
+        />
+      )}
       <FormField
         as="textarea"
         label="Açıklama"
         name="surec-create-aciklama"
         value={form.aciklama}
         onChange={(value) => setForm((prev) => ({ ...prev, aciklama: value }))}
-        rows={3}
+        rows={useOperationControls ? 2 : 3}
       />
 
       {errorMessage ? <p className="surec-form-error">{errorMessage}</p> : null}

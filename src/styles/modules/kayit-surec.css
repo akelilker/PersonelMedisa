@@ -297,13 +297,16 @@
 
 .kayit-workspace input[type="date"].form-input {
   width: min(100%, 340px);
-  padding-right: 8px;
+  padding-right: 6px;
 }
 
 .kayit-workspace input[type="date"].form-input::-webkit-calendar-picker-indicator {
-  margin-left: 8px;
-  opacity: 0.58;
-  filter: invert(0.78);
+  width: 16px;
+  height: 16px;
+  margin-left: 4px;
+  opacity: 0.9;
+  filter: invert(0.82) brightness(1.35) contrast(0.85);
+  cursor: pointer;
 }
 
 .kayit-workspace textarea.form-input {
@@ -555,7 +558,7 @@
 .surec-person-tabs {
   display: flex;
   align-items: flex-end;
-  gap: 12px;
+  gap: 10px;
   min-width: 0;
   overflow-x: auto;
   border-bottom: 1px solid rgba(255, 255, 255, 0.12);
@@ -576,7 +579,7 @@
   border-radius: 0;
   color: rgba(247, 248, 250, 0.48);
   background: transparent;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
   text-align: left;
   cursor: pointer;
@@ -632,15 +635,15 @@
 
 .surec-devamsizlik-tiles {
   display: grid;
-  gap: 8px;
+  gap: 6px;
   grid-template-columns: repeat(6, minmax(0, 1fr));
 }
 
 .surec-devamsizlik-tile {
   display: grid;
   gap: 2px;
-  min-height: 34px;
-  padding: 7px 8px;
+  min-height: 26px;
+  padding: 3px 6px;
   border: none;
   border-bottom: 2px solid transparent;
   border-radius: 0;
@@ -686,12 +689,13 @@
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
+  max-width: 462px;
 }
 
 .surec-choice-btn {
-  min-height: 34px;
-  padding: 7px 10px;
-  border: 1px solid rgba(247, 248, 250, 0.34);
+  min-height: 22px;
+  padding: 2px 10px;
+  border: 1px solid rgba(247, 248, 250, 0.46);
   border-radius: 10px;
   background: transparent;
   color: rgba(247, 248, 250, 0.58);
@@ -713,10 +717,15 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
   align-items: end;
+  max-width: 462px;
 }
 
 .surec-date-row .form-section {
   min-width: 0;
+}
+
+.surec-date-row .form-label {
+  text-align: center;
 }
 
 .surec-date-row input[type="date"].form-input {

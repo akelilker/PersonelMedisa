@@ -5,6 +5,49 @@ export function digitsOnly(value: string) {
   return value.replace(/\D+/g, "");
 }
 
+function titleCaseWord(value: string) {
+  const lower = value.toLocaleLowerCase("tr-TR");
+  const firstLetterIndex = lower.search(/\p{L}/u);
+
+  if (firstLetterIndex < 0) {
+    return lower;
+  }
+
+  return `${lower.slice(0, firstLetterIndex)}${lower
+    .charAt(firstLetterIndex)
+    .toLocaleUpperCase("tr-TR")}${lower.slice(firstLetterIndex + 1)}`;
+}
+
+export function normalizePersonelAd(value: string) {
+  return value
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((part) => part.split("-").map(titleCaseWord).join("-"))
+    .join(" ");
+}
+
+export function normalizePersonelSoyad(value: string) {
+  return value.trim().toLocaleUpperCase("tr-TR");
+}
+
+export function normalizeTurkishMobilePhone(value: string, label: string) {
+  const digits = digitsOnly(value);
+  let normalized = digits;
+
+  if (digits.length === 12 && digits.startsWith("90")) {
+    normalized = `0${digits.slice(2)}`;
+  } else if (digits.length === 10 && digits.startsWith("5")) {
+    normalized = `0${digits}`;
+  }
+
+  if (!/^05\d{9}$/.test(normalized)) {
+    throw new Error(`${label} 05xx xxx xx xx formatında olmalıdır.`);
+  }
+
+  return `${normalized.slice(0, 4)} ${normalized.slice(4, 7)} ${normalized.slice(7, 9)} ${normalized.slice(9, 11)}`;
+}
+
 export function parseRequiredPositiveInt(value: string, label: string) {
   const number = Number.parseInt(value, 10);
   if (Number.isNaN(number) || number <= 0) {
@@ -34,19 +77,17 @@ export function validateTcKimlikNo(value: string) {
 }
 
 export function validatePhoneNumber(value: string, label: string) {
-  if (!/^\d{10,11}$/.test(value)) {
-    throw new Error(`${label} yalnızca rakamlardan oluşmalı ve 10-11 hane olmalı.`);
+  if (!/^05\d{9}$/.test(value)) {
+    throw new Error(`${label} 05xx xxx xx xx formatında olmalıdır.`);
   }
 }
 
 export function buildCreatePersonelPayload(form: CreatePersonelFormState): CreatePersonelPayload {
   const tcKimlikNo = digitsOnly(form.tcKimlikNo);
-  const telefon = digitsOnly(form.telefon);
-  const acilDurumTelefon = digitsOnly(form.acilDurumTelefon);
+  const telefon = normalizeTurkishMobilePhone(form.telefon, "Telefon");
+  const acilDurumTelefon = normalizeTurkishMobilePhone(form.acilDurumTelefon, "Acil durum telefonu");
 
   validateTcKimlikNo(tcKimlikNo);
-  validatePhoneNumber(telefon, "Telefon");
-  validatePhoneNumber(acilDurumTelefon, "Acil durum telefonu");
 
   const bagliAmirId = parseOptionalPositiveInt(form.bagliAmirId);
   const ucretTipiId = parseOptionalPositiveInt(form.ucretTipiId);
@@ -62,8 +103,8 @@ export function buildCreatePersonelPayload(form: CreatePersonelFormState): Creat
 
   return {
     tc_kimlik_no: tcKimlikNo,
-    ad: form.ad.trim(),
-    soyad: form.soyad.trim(),
+    ad: normalizePersonelAd(form.ad),
+    soyad: normalizePersonelSoyad(form.soyad),
     dogum_tarihi: form.dogumTarihi,
     telefon,
     acil_durum_kisi: form.acilDurumKisi.trim(),

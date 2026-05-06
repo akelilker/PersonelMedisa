@@ -1102,9 +1102,9 @@ export function usePersonelDetail(
       const lifecycleSnap = snapshotFromLifecycleForm(pickLifecycleFormFields(editForm));
       const optimistic: Personel = {
         ...personel,
-        ad: editForm.ad.trim(),
-        soyad: editForm.soyad.trim(),
-        telefon: editForm.telefon.trim(),
+        ad: body.ad ?? personel.ad,
+        soyad: body.soyad ?? personel.soyad,
+        telefon: body.telefon ?? personel.telefon,
         ...lifecycleSnapshotToPersonelPatch(lifecycleSnap)
       };
 

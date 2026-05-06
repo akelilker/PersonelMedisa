@@ -3,6 +3,11 @@ import type { CreateSurecPayload } from "../../api/surecler.api";
 import type { LifecycleFormFields } from "../../lib/personel-lifecycle-diff";
 import type { Personel } from "../../types/personel";
 import type { IdOption } from "../../types/referans";
+import {
+  normalizePersonelAd,
+  normalizePersonelSoyad,
+  normalizeTurkishMobilePhone
+} from "./personel-create-utils";
 
 export type BagliAmirContext = {
   personelId: number;
@@ -179,9 +184,9 @@ export function buildPersonelUpdatePayload(
   hasLifecycleDiff: boolean
 ): UpdatePersonelPayload {
   const payload: UpdatePersonelPayload = {
-    ad: editForm.ad.trim(),
-    soyad: editForm.soyad.trim(),
-    telefon: editForm.telefon.trim()
+    ad: normalizePersonelAd(editForm.ad),
+    soyad: normalizePersonelSoyad(editForm.soyad),
+    telefon: normalizeTurkishMobilePhone(editForm.telefon, "Telefon")
   };
 
   if (!hasLifecycleDiff) {
@@ -224,4 +229,3 @@ export function buildPersonelUpdatePayload(
 
   return payload;
 }
-

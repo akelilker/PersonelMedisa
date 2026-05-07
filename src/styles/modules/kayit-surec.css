@@ -13,7 +13,7 @@
   gap: 24px;
   margin: 0;
   padding: 0;
-  transform: translateY(-8px);
+  transform: translateY(-16px);
   border: none;
   border-bottom: 1px solid rgba(255, 255, 255, 0.14);
   background: transparent;
@@ -29,7 +29,7 @@
   border-radius: 0;
   background: transparent;
   color: rgba(245, 247, 255, 0.38);
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 700;
   letter-spacing: 0;
   text-transform: none;
@@ -297,15 +297,15 @@
 
 .kayit-workspace input[type="date"].form-input {
   width: min(100%, 340px);
-  padding-right: 6px;
+  padding-right: 10px;
 }
 
 .kayit-workspace input[type="date"].form-input::-webkit-calendar-picker-indicator {
-  width: 16px;
-  height: 16px;
-  margin-left: 4px;
-  opacity: 0.9;
-  filter: invert(0.82) brightness(1.35) contrast(0.85);
+  width: 18px;
+  height: 18px;
+  margin-left: 6px;
+  opacity: 1;
+  filter: grayscale(1) invert(0.72) brightness(0.9) contrast(0.9);
   cursor: pointer;
 }
 
@@ -703,14 +703,17 @@
 }
 
 .surec-devamsizlik-tiles {
-  display: grid;
-  gap: 6px;
-  grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+  align-items: flex-start;
 }
 
 .surec-devamsizlik-tile {
   display: grid;
   gap: 2px;
+  flex: 0 1 auto;
+  min-width: 104px;
   min-height: 26px;
   padding: 3px 6px;
   border: none;
@@ -756,14 +759,15 @@
 
 .surec-choice-group {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
   gap: 8px;
-  max-width: 462px;
+  width: min(100%, 388px);
+  margin-inline: auto;
 }
 
 .surec-choice-btn {
-  min-height: 22px;
-  padding: 2px 10px;
+  min-height: 34px;
+  padding: 6px 10px;
   border: 1px solid rgba(247, 248, 250, 0.46);
   border-radius: 10px;
   background: transparent;
@@ -787,6 +791,7 @@
   gap: 12px;
   align-items: end;
   max-width: 462px;
+  margin-inline: auto;
 }
 
 .surec-date-row .form-section {
@@ -803,7 +808,7 @@
 
 @media (max-width: 560px) {
   .surec-devamsizlik-tiles {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
   }
 
   .surec-date-row,

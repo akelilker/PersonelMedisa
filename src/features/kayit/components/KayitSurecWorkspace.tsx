@@ -1157,11 +1157,6 @@ export function KayitSurecWorkspace({
 
                         {activePersonelTab === "pozisyon" ? (
                           <div className="surec-position-panel">
-                            <div className="workspace-surface-header">
-                              <h3>Pozisyon</h3>
-                              <p>Bölüm, amir, unvan ve çalışma tipi değişikliklerini buradan işle.</p>
-                            </div>
-
                             <form className="workspace-form surec-position-form" onSubmit={handlePozisyonSubmit}>
                               <div className="surec-position-grid">
                                 <PozisyonReferencePicker

@@ -159,7 +159,7 @@ export function AppShell({ children }: AppShellProps) {
     navigate(pathname, { replace: true, state: null });
   }, [kayitRouteConfig, navigate, pathname]);
 
-  const kayitPrimaryLabel = kayitTab === "yeni-kayit" ? "Personeli Kaydet" : "Süreci Kaydet";
+  const kayitPrimaryLabel = kayitTab === "yeni-kayit" ? "Kaydet" : "Süreci Kaydet";
   const kayitPrimaryFormId =
     kayitTab === "yeni-kayit" ? KAYIT_SUREC_PERSONEL_FORM_ID : KAYIT_SUREC_SUREC_FORM_ID;
 

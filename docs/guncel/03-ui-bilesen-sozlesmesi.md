@@ -474,13 +474,13 @@ Ekran, seçili personelin dosyası gibi davranan personel içi sekme düzenine g
 Personel içi sekmeler:
 
 1. `Genel`
-2. `İzin + Devamsızlık`
-3. `Belgeler`
-4. `Mali İşlemler`
-5. `Zimmet`
-6. `Ceza`
-7. `Ayrılma`
-8. `Süreç Tarihçesi`
+2. `İzin / Devamsızlık`
+3. `Pozisyon`
+4. `Belgeler`
+5. `Mali İşlemler`
+6. `Zimmet`
+7. `Ceza`
+8. `Ayrılma`
 
 Görsel davranış:
 
@@ -491,8 +491,9 @@ Görsel davranış:
 - `Genel` sekmesi küçük sol özet kartı değildir; kayıt formunda sorulan bütün alanları okunur ve gruplanmış şekilde yayar.
 - `Genel` sekmesinde sağ üstte personel fotoğrafı alanı bulunur. Fotoğraf yoksa boş avatar/placeholder görünür.
 - Fotoğraf yükleme ilk sürümde görsel placeholder olabilir; gerçek dosya upload akışı ayrı teknik pakettir.
-- `Süreç Tarihçesi` okuma sekmesidir; yeni kayıt formu gibi davranmaz.
-- `İzin + Devamsızlık`, `Mali İşlemler`, `Zimmet`, `Ceza` ve `Ayrılma` kayıt girişi aileleridir.
+- `Pozisyon` sekmesi bölüm, bağlı amir, görev / unvan ve çalışma tipi değişikliklerini işler; personelin güncel kartını ve tarihçeyi sistem otomatik günceller.
+- `Süreç Tarihçesi` kayıt girişi sekmesi değildir; okuma/timeline görünümü Personel Kartı tarafında kalır.
+- `İzin / Devamsızlık`, `Pozisyon`, `Mali İşlemler`, `Zimmet`, `Ceza` ve `Ayrılma` kayıt girişi aileleridir.
 
 Yasaklar:
 

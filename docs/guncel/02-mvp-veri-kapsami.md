@@ -236,22 +236,24 @@ Bu liste teknik/event kapsamıdır; kullanıcı arayüzünde birebir sekme liste
 UI operasyon aileleri:
 
 - `Genel`
-- `İzin + Devamsızlık`
+- `İzin / Devamsızlık`
+- `Pozisyon`
 - `Belgeler`
 - `Mali İşlemler`
 - `Zimmet`
 - `Ceza`
 - `Ayrılma`
-- `Süreç Tarihçesi`
 
 Gruplama kararı:
 
-- `izin`, `devamsizlik`, `rapor` ve `is_kazasi` kullanıcı arayüzünde `İzin + Devamsızlık` ailesi altında toplanır.
+- `izin`, `devamsizlik`, `rapor` ve `is_kazasi` kullanıcı arayüzünde `İzin / Devamsızlık` ailesi altında toplanır.
+- `departman`, `bağlı amir`, `görev / unvan` ve `çalışma tipi` değişiklikleri `Pozisyon` ailesinde ele alınır.
 - `ekstra_prim` ve `avans` kullanıcı arayüzünde `Mali İşlemler` ailesi altında toplanır.
 - `isten_ayrilma` ayrı lifecycle işlemidir; `Devamsızlık` altında gösterilmez.
 - `ceza` ayrı operasyon ailesidir.
 - `belge yükleme`, sertifika, ehliyet, sağlık belgesi ve özel yetkinlik evrakları `Belgeler` ailesinde ele alınır.
 - `zimmet` ayrı merkezi operasyon ailesidir; süreç event listesinden bağımsız olarak `Kayıt ve Süreç` ekranına taşınacaktır.
+- `Süreç Tarihçesi` kayıt girişi ailesi değildir; okuma/timeline görünümü Personel Kartı tarafında kalır.
 - `diger` yalnızca mevcut ailelere girmeyen istisnai süreçler için kullanılır; ilk tercih özel aile açmak değil, doğru aileye yerleştirmektir.
 
 Süreç kaydı için ilk sürüm minimum alanları:

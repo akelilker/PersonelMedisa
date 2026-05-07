@@ -628,6 +628,27 @@
   line-height: 1.4;
 }
 
+.surec-position-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.surec-position-panel .workspace-surface-header {
+  display: grid;
+  gap: 3px;
+}
+
+.surec-position-form {
+  width: min(100%, 620px);
+  margin-inline: auto;
+}
+
+.surec-position-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 14px;
+}
+
 .surec-devamsizlik-tiles {
   display: grid;
   gap: 6px;
@@ -733,7 +754,8 @@
   }
 
   .surec-date-row,
-  .surec-choice-group {
+  .surec-choice-group,
+  .surec-position-grid {
     grid-template-columns: 1fr;
   }
 }

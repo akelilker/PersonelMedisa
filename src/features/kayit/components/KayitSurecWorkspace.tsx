@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { FormField } from "../../../components/form/FormField";
-import { EmptyState } from "../../../components/states/EmptyState";
 import { ErrorState } from "../../../components/states/ErrorState";
 import { LoadingState } from "../../../components/states/LoadingState";
 import type { KayitTab } from "../../../components/main-menu/MainMenu";
@@ -16,14 +15,13 @@ import {
   fetchSurecTuruOptions,
   fetchUcretTipiOptions
 } from "../../../api/referans.api";
-import { cancelSurec, createSurec, fetchSureclerList, updateSurec } from "../../../api/surecler.api";
+import { createSurec, updateSurec } from "../../../api/surecler.api";
 import { PersonelCreateFields } from "../../../features/personeller/components/PersonelCreateFields";
 import { buildCreatePersonelPayload } from "../../../features/personeller/personel-create-utils";
 import { SurecFormFields } from "../../../features/surecler/components/SurecFormFields";
 import {
   buildCreateSurecPayload,
-  buildUpdateSurecPayload,
-  toSurecFormState
+  buildUpdateSurecPayload
 } from "../../../features/surecler/surec-form-utils";
 import { INITIAL_CREATE_PERSONEL_FORM, type CreatePersonelFormState } from "../../../hooks/usePersoneller";
 import { INITIAL_SUREC_FORM, type SurecFormState } from "../../../hooks/useSurecler";
@@ -55,46 +53,8 @@ const EMPTY_REFS: PersonelReferenceBundle = {
   primKuraliOptions: []
 };
 
-const SUREC_TURU_LABELS: Record<string, string> = {
-  IZIN: "İzin",
-  RAPOR: "Rapor",
-  ISTEN_AYRILMA: "İşten Ayrılma",
-  YILLIK_IZIN: "Yıllık İzin",
-  MAZERET_IZNI: "Mazeret İzni",
-  UCRETSIZ_IZIN: "Ücretsiz İzin",
-  GOREVLENDIRME: "Görevlendirme",
-  EGITIM: "Eğitim",
-  POZISYON_DEGISTI: "Pozisyon Değişti"
-};
-
-const SUREC_STATE_LABELS: Record<string, string> = {
-  AKTIF: "Aktif",
-  BEKLEMEDE: "Beklemede",
-  IPTAL: "İptal",
-  IPTAL_EDILDI: "İptal Edildi",
-  TAMAMLANDI: "Tamamlandı"
-};
-
 function normalizeEnumKey(value: string) {
   return value.trim().replace(/-/g, "_").toUpperCase();
-}
-
-function formatSurecTuruLabel(value: string | null | undefined) {
-  if (!value) {
-    return "-";
-  }
-
-  const normalized = normalizeEnumKey(value);
-  return SUREC_TURU_LABELS[normalized] ?? normalized.split("_").join(" ");
-}
-
-function formatSurecStateLabel(value: string | null | undefined) {
-  if (!value) {
-    return "-";
-  }
-
-  const normalized = normalizeEnumKey(value);
-  return SUREC_STATE_LABELS[normalized] ?? normalized.split("_").join(" ");
 }
 
 function formatPersonelLabel(personel: Personel) {
@@ -318,7 +278,6 @@ export function KayitSurecWorkspace({
   const canCreatePersonel = hasPermission("personeller.create");
   const canCreateSurec = hasPermission("surecler.create");
   const canEditSurec = hasPermission("surecler.update");
-  const canCancelSurec = hasPermission("surecler.cancel");
 
   const [refs, setRefs] = useState<PersonelReferenceBundle>(EMPTY_REFS);
   const [surecTuruOptions, setSurecTuruOptions] = useState<KeyOption[]>([]);
@@ -336,9 +295,6 @@ export function KayitSurecWorkspace({
   const [surecError, setSurecError] = useState<string | null>(null);
   const [surecInfo, setSurecInfo] = useState<string | null>(null);
   const [editingSurec, setEditingSurec] = useState<Surec | null>(null);
-  const [surecler, setSurecler] = useState<Surec[]>([]);
-  const [sureclerLoading, setSureclerLoading] = useState(false);
-  const [sureclerError, setSureclerError] = useState<string | null>(null);
   const [surecPersonelSearch, setSurecPersonelSearch] = useState("");
   const [surecPersonelPickerOpen, setSurecPersonelPickerOpen] = useState(false);
 
@@ -592,24 +548,6 @@ export function KayitSurecWorkspace({
     }
   }
 
-  async function loadSurecler(personelId: string) {
-    setSureclerLoading(true);
-    setSureclerError(null);
-
-    try {
-      const result = await fetchSureclerList({
-        page: 1,
-        limit: 25,
-        personel_id: personelId ? Number.parseInt(personelId, 10) : undefined
-      });
-      setSurecler(result.items);
-    } catch (error) {
-      setSureclerError(error instanceof Error ? error.message : "Süreç kayıtları yüklenemedi.");
-    } finally {
-      setSureclerLoading(false);
-    }
-  }
-
   useEffect(() => {
     void loadBootstrap();
   }, []);
@@ -624,14 +562,6 @@ export function KayitSurecWorkspace({
     setSurecInfo("Seçili personel ile süreç girişine devam edebilirsin.");
     setSurecForm(resetSurecFormKeepingPersonel(initialSurecPersonelId));
   }, [initialSurecPersonelId]);
-
-  useEffect(() => {
-    if (activeTab !== "surec" || bootstrapLoading || bootstrapError) {
-      return;
-    }
-
-    void loadSurecler(surecForm.personelId);
-  }, [activeTab, bootstrapError, bootstrapLoading, surecForm.personelId]);
 
   async function handlePersonelSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -692,7 +622,6 @@ export function KayitSurecWorkspace({
       const currentPersonelId = surecForm.personelId;
       setEditingSurec(null);
       setSurecForm(resetSurecFormKeepingPersonel(currentPersonelId));
-      await loadSurecler(currentPersonelId);
     } catch (error) {
       setSurecError(error instanceof Error ? error.message : "Süreç kaydı kaydedilemedi.");
     } finally {
@@ -777,43 +706,6 @@ export function KayitSurecWorkspace({
     } finally {
       setPozisyonSubmitting(false);
     }
-  }
-
-  async function handleSurecCancel(item: Surec) {
-    if (!canCancelSurec) {
-      setSurecError("Bu süreci iptal etmek için yetkin bulunmuyor.");
-      return;
-    }
-
-    const confirmed = window.confirm(`Süreç #${item.id} kaydını iptal etmek istiyor musun?`);
-    if (!confirmed) {
-      return;
-    }
-
-    setSurecError(null);
-    setSurecInfo(null);
-
-    try {
-      await cancelSurec(item.id);
-      setSurecInfo("Süreç kaydı iptal edildi.");
-      await loadSurecler(surecForm.personelId);
-    } catch (error) {
-      setSurecError(error instanceof Error ? error.message : "Süreç kaydı iptal edilemedi.");
-    }
-  }
-
-  function beginSurecEdit(item: Surec) {
-    if (!canEditSurec) {
-      setSurecError("Bu süreci düzenlemek için yetkin bulunmuyor.");
-      return;
-    }
-
-    setSurecError(null);
-    setSurecInfo(null);
-    setActivePersonelTab("genel");
-    setDevamsizlikSubId(null);
-    setEditingSurec(item);
-    setSurecForm(toSurecFormState(item));
   }
 
   function resetSurecEditor() {
@@ -1187,9 +1079,10 @@ export function KayitSurecWorkspace({
                                 <FormField
                                   label="Bölüm"
                                   name="pozisyon-departman"
-                                  type="select"
+                                  as="select"
                                   value={pozisyonForm.departmanId}
                                   onChange={(value) => setPozisyonForm((prev) => ({ ...prev, departmanId: value }))}
+                                  placeholderOption={{ value: "", label: "Seçiniz" }}
                                   selectOptions={refs.departmanOptions.map((option) => ({
                                     value: String(option.id),
                                     label: option.label
@@ -1199,9 +1092,10 @@ export function KayitSurecWorkspace({
                                 <FormField
                                   label="Görev / Unvan"
                                   name="pozisyon-gorev"
-                                  type="select"
+                                  as="select"
                                   value={pozisyonForm.gorevId}
                                   onChange={(value) => setPozisyonForm((prev) => ({ ...prev, gorevId: value }))}
+                                  placeholderOption={{ value: "", label: "Seçiniz" }}
                                   selectOptions={refs.gorevOptions.map((option) => ({
                                     value: String(option.id),
                                     label: option.label
@@ -1211,9 +1105,10 @@ export function KayitSurecWorkspace({
                                 <FormField
                                   label="Bağlı Amir"
                                   name="pozisyon-bagli-amir"
-                                  type="select"
+                                  as="select"
                                   value={pozisyonForm.bagliAmirId}
                                   onChange={(value) => setPozisyonForm((prev) => ({ ...prev, bagliAmirId: value }))}
+                                  placeholderOption={{ value: "", label: "Seçiniz" }}
                                   selectOptions={refs.bagliAmirOptions.map((option) => ({
                                     value: String(option.id),
                                     label: option.label
@@ -1222,9 +1117,10 @@ export function KayitSurecWorkspace({
                                 <FormField
                                   label="Çalışma Tipi"
                                   name="pozisyon-personel-tipi"
-                                  type="select"
+                                  as="select"
                                   value={pozisyonForm.personelTipiId}
                                   onChange={(value) => setPozisyonForm((prev) => ({ ...prev, personelTipiId: value }))}
+                                  placeholderOption={{ value: "", label: "Seçiniz" }}
                                   selectOptions={refs.personelTipiOptions.map((option) => ({
                                     value: String(option.id),
                                     label: option.label
@@ -1245,7 +1141,7 @@ export function KayitSurecWorkspace({
                               <FormField
                                 label="Açıklama"
                                 name="pozisyon-aciklama"
-                                type="textarea"
+                                as="textarea"
                                 value={pozisyonForm.aciklama}
                                 onChange={(value) => setPozisyonForm((prev) => ({ ...prev, aciklama: value }))}
                                 placeholder="Değişiklik notu"

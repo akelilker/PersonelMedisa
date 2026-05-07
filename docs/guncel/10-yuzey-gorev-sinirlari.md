@@ -44,25 +44,26 @@ Korunacak ana yapı:
 Kişi seçildikten sonra `Süreç` sekmesi içinde aşağıdaki personel içi sekmeler görünür:
 
 1. `Genel`
-2. `İzin + Devamsızlık`
-3. `Belgeler`
-4. `Mali İşlemler`
-5. `Zimmet`
-6. `Ceza`
-7. `Ayrılma`
-8. `Süreç Tarihçesi`
+2. `İzin / Devamsızlık`
+3. `Pozisyon`
+4. `Belgeler`
+5. `Mali İşlemler`
+6. `Zimmet`
+7. `Ceza`
+8. `Ayrılma`
 
 Sekme görevleri:
 
 - `Genel`: Kayıt ekranında sorulan bütün personel bilgilerini okunur şekilde gösterir. Kısa özet değil, yayılmış personel dosyası görünümüdür.
 - `Genel` içinde sağ üstte personel fotoğrafı alanı bulunur. İlk sürümde fotoğraf yükleme alanı placeholder olabilir; gerçek upload entegrasyonu ayrı pakettir.
-- `İzin + Devamsızlık`: izin, rapor, iş kazası, izinsiz gelmedi, geç geldi, erken çıktı gibi yokluk ve devam durumlarını toplar.
+- `İzin / Devamsızlık`: izin, rapor, iş kazası, izinsiz gelmedi, geç geldi, erken çıktı gibi yokluk ve devam durumlarını toplar.
+- `Pozisyon`: bölüm, bağlı amir, görev / unvan ve çalışma tipi değişikliklerini toplar; güncel personel bilgisi ve tarihçe sistem tarafından otomatik güncellenir.
 - `Belgeler`: forklift operatör belgesi, ehliyet, sertifika, sağlık belgesi, özel yetkinlik ve personel dosyası evraklarını toplar.
 - `Mali İşlemler`: avans ve ekstra prim gibi para etkili işlemleri toplar.
 - `Zimmet`: ekipman, cihaz, araç, kıyafet ve teslim-tesellüm işlemlerini toplar.
 - `Ceza`: disiplin, uyarı ve ceza kayıtlarını toplar.
 - `Ayrılma`: işten ayrılma lifecycle işlemini toplar; devamsızlık altında gösterilmez.
-- `Süreç Tarihçesi`: okuma alanıdır; yeni kayıt girişi başlatmaz.
+- `Süreç Tarihçesi`: bu ekranda ayrı kayıt sekmesi değildir; okuma/timeline tarafı Personel Kartı içinde kalır.
 
 ### Personel Kartı
 

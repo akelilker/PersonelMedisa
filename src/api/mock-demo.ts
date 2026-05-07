@@ -1233,7 +1233,7 @@ export function resolveDemoApiResponse(
 
     if (method === "PUT") {
       Object.assign(personel, body);
-      return ok(personel);
+      return ok(buildDemoPersonelDetail(personel));
     }
   }
 

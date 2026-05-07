@@ -27,7 +27,7 @@ import { INITIAL_CREATE_PERSONEL_FORM, type CreatePersonelFormState } from "../.
 import { INITIAL_SUREC_FORM, type SurecFormState } from "../../../hooks/useSurecler";
 import { useRoleAccess } from "../../../hooks/use-role-access";
 import type { Personel } from "../../../types/personel";
-import type { KeyOption } from "../../../types/referans";
+import type { IdOption, KeyOption } from "../../../types/referans";
 import type { Surec } from "../../../types/surec";
 
 export const KAYIT_SUREC_PERSONEL_FORM_ID = "kayit-surec-personel-form";
@@ -91,6 +91,17 @@ type PozisyonFormState = {
   personelTipiId: string;
   effectiveDate: string;
   aciklama: string;
+};
+
+type PozisyonReferencePickerProps = {
+  label: string;
+  name: string;
+  value: string;
+  options: IdOption[];
+  isOpen: boolean;
+  required?: boolean;
+  onChange: (value: string) => void;
+  onOpenChange: (isOpen: boolean) => void;
 };
 
 type DevamsizlikSubCard = {
@@ -263,6 +274,74 @@ function parsePozisyonId(value: string) {
   return value ? Number.parseInt(value, 10) : null;
 }
 
+function PozisyonReferencePicker({
+  label,
+  name,
+  value,
+  options,
+  isOpen,
+  required = false,
+  onChange,
+  onOpenChange
+}: PozisyonReferencePickerProps) {
+  const selectedLabel = optionLabel(options, value, "Seçiniz");
+
+  return (
+    <div className="form-section surec-position-picker">
+      <label className="form-label" id={`${name}-label`}>
+        {label}
+      </label>
+      <button
+        type="button"
+        className="form-input surec-position-picker-trigger"
+        role="combobox"
+        aria-labelledby={`${name}-label`}
+        aria-expanded={isOpen}
+        aria-controls={`${name}-panel`}
+        onClick={() => onOpenChange(!isOpen)}
+      >
+        <span>{selectedLabel === "-" ? "Seçiniz" : selectedLabel}</span>
+        <span aria-hidden="true">⌄</span>
+      </button>
+
+      {isOpen ? (
+        <div className="surec-position-picker-panel" id={`${name}-panel`}>
+          {!required ? (
+            <button
+              type="button"
+              className={`surec-position-picker-option${value === "" ? " is-active" : ""}`}
+              onClick={() => {
+                onChange("");
+                onOpenChange(false);
+              }}
+            >
+              Seçiniz
+            </button>
+          ) : null}
+          {options.map((option) => {
+            const optionValue = String(option.id);
+            const isActive = value === optionValue;
+
+            return (
+              <button
+                key={`${name}-${option.id}`}
+                type="button"
+                className={`surec-position-picker-option${isActive ? " is-active" : ""}`}
+                onClick={() => {
+                  onChange(optionValue);
+                  onOpenChange(false);
+                }}
+              >
+                {option.label}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export function KayitSurecWorkspace({
   activeTab,
   onTabChange,
@@ -304,6 +383,7 @@ export function KayitSurecWorkspace({
   const [pozisyonSubmitting, setPozisyonSubmitting] = useState(false);
   const [pozisyonError, setPozisyonError] = useState<string | null>(null);
   const [pozisyonInfo, setPozisyonInfo] = useState<string | null>(null);
+  const [openPozisyonPicker, setOpenPozisyonPicker] = useState<string | null>(null);
 
   const personelOptions = useMemo(
     () =>
@@ -443,6 +523,7 @@ export function KayitSurecWorkspace({
     setPozisyonForm(createPozisyonFormFromPersonel(selectedSurecPersonel));
     setPozisyonError(null);
     setPozisyonInfo(null);
+    setOpenPozisyonPicker(null);
   }, [selectedSurecPersonel]);
 
   function selectSurecPersonel(personelId: string) {
@@ -469,6 +550,7 @@ export function KayitSurecWorkspace({
     setSurecInfo(null);
     setPozisyonError(null);
     setPozisyonInfo(null);
+    setOpenPozisyonPicker(null);
 
     if (tabId === "izin-devamsizlik") {
       const nextSubId = devamsizlikSubId ?? "izin";
@@ -645,6 +727,12 @@ export function KayitSurecWorkspace({
     if (!pozisyonForm.effectiveDate) {
       setPozisyonInfo(null);
       setPozisyonError("Değişikliğin geçerli olacağı tarihi seç.");
+      return;
+    }
+
+    if (!pozisyonForm.departmanId || !pozisyonForm.gorevId || !pozisyonForm.personelTipiId) {
+      setPozisyonInfo(null);
+      setPozisyonError("Bölüm, görev / unvan ve çalışma tipi boş bırakılamaz.");
       return;
     }
 
@@ -1076,55 +1164,43 @@ export function KayitSurecWorkspace({
 
                             <form className="workspace-form surec-position-form" onSubmit={handlePozisyonSubmit}>
                               <div className="surec-position-grid">
-                                <FormField
+                                <PozisyonReferencePicker
                                   label="Bölüm"
                                   name="pozisyon-departman"
-                                  as="select"
                                   value={pozisyonForm.departmanId}
+                                  options={refs.departmanOptions}
+                                  isOpen={openPozisyonPicker === "departman"}
+                                  onOpenChange={(isOpen) => setOpenPozisyonPicker(isOpen ? "departman" : null)}
                                   onChange={(value) => setPozisyonForm((prev) => ({ ...prev, departmanId: value }))}
-                                  placeholderOption={{ value: "", label: "Seçiniz" }}
-                                  selectOptions={refs.departmanOptions.map((option) => ({
-                                    value: String(option.id),
-                                    label: option.label
-                                  }))}
                                   required
                                 />
-                                <FormField
+                                <PozisyonReferencePicker
                                   label="Görev / Unvan"
                                   name="pozisyon-gorev"
-                                  as="select"
                                   value={pozisyonForm.gorevId}
+                                  options={refs.gorevOptions}
+                                  isOpen={openPozisyonPicker === "gorev"}
+                                  onOpenChange={(isOpen) => setOpenPozisyonPicker(isOpen ? "gorev" : null)}
                                   onChange={(value) => setPozisyonForm((prev) => ({ ...prev, gorevId: value }))}
-                                  placeholderOption={{ value: "", label: "Seçiniz" }}
-                                  selectOptions={refs.gorevOptions.map((option) => ({
-                                    value: String(option.id),
-                                    label: option.label
-                                  }))}
                                   required
                                 />
-                                <FormField
+                                <PozisyonReferencePicker
                                   label="Bağlı Amir"
                                   name="pozisyon-bagli-amir"
-                                  as="select"
                                   value={pozisyonForm.bagliAmirId}
+                                  options={refs.bagliAmirOptions}
+                                  isOpen={openPozisyonPicker === "bagli-amir"}
+                                  onOpenChange={(isOpen) => setOpenPozisyonPicker(isOpen ? "bagli-amir" : null)}
                                   onChange={(value) => setPozisyonForm((prev) => ({ ...prev, bagliAmirId: value }))}
-                                  placeholderOption={{ value: "", label: "Seçiniz" }}
-                                  selectOptions={refs.bagliAmirOptions.map((option) => ({
-                                    value: String(option.id),
-                                    label: option.label
-                                  }))}
                                 />
-                                <FormField
+                                <PozisyonReferencePicker
                                   label="Çalışma Tipi"
                                   name="pozisyon-personel-tipi"
-                                  as="select"
                                   value={pozisyonForm.personelTipiId}
+                                  options={refs.personelTipiOptions}
+                                  isOpen={openPozisyonPicker === "personel-tipi"}
+                                  onOpenChange={(isOpen) => setOpenPozisyonPicker(isOpen ? "personel-tipi" : null)}
                                   onChange={(value) => setPozisyonForm((prev) => ({ ...prev, personelTipiId: value }))}
-                                  placeholderOption={{ value: "", label: "Seçiniz" }}
-                                  selectOptions={refs.personelTipiOptions.map((option) => ({
-                                    value: String(option.id),
-                                    label: option.label
-                                  }))}
                                   required
                                 />
                               </div>

@@ -1440,7 +1440,12 @@ export function KayitSurecWorkspace({
                               <p>İşten ayrılma süreci eklemek için önce personel seçin.</p>
                             </div>
                           )
-                        ) : ["belgeler", "ceza"].includes(activePersonelTab) ? (
+                        ) : activePersonelTab === "ceza" ? (
+                          <div className="surec-person-placeholder">
+                            <strong>Ceza</strong>
+                            <p>Personele uygulanacak ceza kesintileri Mali İşlemler sekmesinden yönetilir.</p>
+                          </div>
+                        ) : activePersonelTab === "belgeler" ? (
                           <div className="surec-person-placeholder">
                             <strong>{PERSONEL_SUREC_TABS.find((tab) => tab.id === activePersonelTab)?.label}</strong>
                             <p>Bu işlem ailesi merkezi akışa taşınacak. Şimdilik yerleşim sabitlendi.</p>

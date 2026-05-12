@@ -123,6 +123,36 @@ export async function mockApi(page: Page, role: MockUserRole) {
       maas_tutari: 25000,
       prim_kurali_id: 8,
       prim_kurali_adi: "8 No'lu Prim Kuralı"
+    },
+    {
+      id: 3,
+      tc_kimlik_no: "34567890123",
+      ad: "Pasif",
+      soyad: "Ornek",
+      aktif_durum: "PASIF",
+      sube_id: 1,
+      telefon: "05552222222",
+      dogum_tarihi: "1990-01-01",
+      dogum_yeri: "İzmir",
+      kan_grubu: "B Rh+",
+      sicil_no: "P-003",
+      ise_giris_tarihi: "2022-01-10",
+      acil_durum_kisi: "Yakın Kişi",
+      acil_durum_telefon: "05559998877",
+      departman_id: 3,
+      gorev_id: 1,
+      personel_tipi_id: 1,
+      bagli_amir_id: 9,
+      sube_adi: "Merkez",
+      departman_adi: "Döşeme",
+      gorev_adi: "Genel Müdür",
+      personel_tipi_adi: "Tam Zamanlı",
+      bagli_amir_adi: "Demo Amir",
+      ucret_tipi_id: 1,
+      ucret_tipi_adi: "Aylık",
+      maas_tutari: 30000,
+      prim_kurali_id: 7,
+      prim_kurali_adi: "7 No'lu Prim Kuralı"
     }
   ];
 

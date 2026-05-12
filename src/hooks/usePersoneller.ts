@@ -515,7 +515,7 @@ type PersonelSurecFormState = {
   aciklama: string;
 };
 
-type PersonelZimmetFormState = {
+export type PersonelZimmetFormState = {
   urunTuru: string;
   teslimTarihi: string;
   teslimEden: string;
@@ -615,6 +615,97 @@ function sortZimmetHistory(items: Zimmet[]) {
 
 function mergeZimmetHistoryRow(items: Zimmet[], next: Zimmet) {
   return sortZimmetHistory([next, ...items.filter((item) => item.id !== next.id)]);
+}
+
+type UsePersonelZimmetCreateOptions = {
+  canSubmit: boolean;
+  onCreateSuccess?: () => void;
+};
+
+export function usePersonelZimmetCreate(
+  parsedPersonelId: number,
+  hasValidId: boolean,
+  canCreateZimmet: boolean,
+  options: UsePersonelZimmetCreateOptions
+) {
+  const { session } = useAuth();
+  const activeSubeId = session?.active_sube_id ?? null;
+  const { canSubmit, onCreateSuccess } = options;
+
+  const zimmetHistoryKey = useMemo(
+    () => dataCacheKeys.zimmetlerList(activeSubeId, String(parsedPersonelId), 1),
+    [activeSubeId, parsedPersonelId]
+  );
+
+  const [zimmetForm, setZimmetForm] = useState<PersonelZimmetFormState>(INITIAL_PERSONEL_ZIMMET_FORM);
+  const [isZimmetSubmitting, setIsZimmetSubmitting] = useState(false);
+  const [zimmetCreateErrorMessage, setZimmetCreateErrorMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    setZimmetForm(INITIAL_PERSONEL_ZIMMET_FORM);
+    setZimmetCreateErrorMessage(null);
+    setIsZimmetSubmitting(false);
+  }, [parsedPersonelId]);
+
+  const resetZimmetForm = useCallback(() => {
+    setZimmetForm(INITIAL_PERSONEL_ZIMMET_FORM);
+    setZimmetCreateErrorMessage(null);
+  }, []);
+
+  const createZimmetHandler = useCallback(
+    async (event: FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      if (!hasValidId || !canSubmit || isZimmetSubmitting) {
+        return;
+      }
+
+      if (!canCreateZimmet) {
+        setZimmetCreateErrorMessage("Bu islem icin yetkin bulunmuyor.");
+        return;
+      }
+
+      setZimmetCreateErrorMessage(null);
+      setIsZimmetSubmitting(true);
+
+      try {
+        const payload = buildPersonelZimmetPayload(parsedPersonelId, zimmetForm);
+        const created = await createZimmet(payload);
+        mergeCacheEntry<PaginatedResult<Zimmet>>(zimmetHistoryKey, (prev) => {
+          const base = prev ?? emptyPaginated<Zimmet>();
+          return {
+            ...base,
+            items: mergeZimmetHistoryRow(base.items, created)
+          };
+        });
+        setZimmetForm(INITIAL_PERSONEL_ZIMMET_FORM);
+        onCreateSuccess?.();
+      } catch (error) {
+        setZimmetCreateErrorMessage(getApiErrorMessage(error, "Zimmet kaydi yapilamadi."));
+      } finally {
+        setIsZimmetSubmitting(false);
+      }
+    },
+    [
+      canCreateZimmet,
+      canSubmit,
+      hasValidId,
+      isZimmetSubmitting,
+      onCreateSuccess,
+      parsedPersonelId,
+      zimmetForm,
+      zimmetHistoryKey
+    ]
+  );
+
+  return {
+    zimmetForm,
+    setZimmetForm,
+    createZimmetHandler,
+    isZimmetSubmitting,
+    zimmetCreateErrorMessage,
+    setZimmetCreateErrorMessage,
+    resetZimmetForm
+  };
 }
 
 function buildPersonelZimmetPayload(
@@ -722,11 +813,24 @@ export function usePersonelDetail(
   const [isSurecHistoryLoading, setIsSurecHistoryLoading] = useState(false);
   const [surecForm, setSurecForm] = useState<PersonelSurecFormState>(INITIAL_PERSONEL_SUREC_FORM);
   const [isZimmetModalOpen, setIsZimmetModalOpen] = useState(false);
-  const [isZimmetSubmitting, setIsZimmetSubmitting] = useState(false);
-  const [zimmetCreateErrorMessage, setZimmetCreateErrorMessage] = useState<string | null>(null);
+  const closeZimmetModalAfterCreate = useCallback(() => {
+    setIsZimmetModalOpen(false);
+  }, []);
+
+  const {
+    zimmetForm,
+    setZimmetForm,
+    createZimmetHandler,
+    isZimmetSubmitting,
+    zimmetCreateErrorMessage,
+    setZimmetCreateErrorMessage,
+    resetZimmetForm
+  } = usePersonelZimmetCreate(parsedPersonelId, hasValidId, canCreateZimmet, {
+    canSubmit: Boolean(personel),
+    onCreateSuccess: closeZimmetModalAfterCreate
+  });
   const [zimmetHistoryErrorMessage, setZimmetHistoryErrorMessage] = useState<string | null>(null);
   const [isZimmetHistoryLoading, setIsZimmetHistoryLoading] = useState(false);
-  const [zimmetForm, setZimmetForm] = useState<PersonelZimmetFormState>(INITIAL_PERSONEL_ZIMMET_FORM);
 
   useEffect(() => {
     if (cached) {
@@ -783,9 +887,7 @@ export function usePersonelDetail(
     setSurecReferenceErrorMessage(null);
     setSurecForm(INITIAL_PERSONEL_SUREC_FORM);
     setIsZimmetModalOpen(false);
-    setZimmetCreateErrorMessage(null);
     setZimmetHistoryErrorMessage(null);
-    setZimmetForm(INITIAL_PERSONEL_ZIMMET_FORM);
   }, [parsedPersonelId]);
 
   useEffect(() => {
@@ -1021,10 +1123,9 @@ export function usePersonelDetail(
       return;
     }
 
-    setZimmetCreateErrorMessage(null);
-    setZimmetForm(INITIAL_PERSONEL_ZIMMET_FORM);
+    resetZimmetForm();
     setIsZimmetModalOpen(true);
-  }, [canCreateZimmet]);
+  }, [canCreateZimmet, resetZimmetForm, setZimmetCreateErrorMessage]);
 
   const closeZimmetModal = useCallback(() => {
     setIsZimmetModalOpen(false);
@@ -1275,42 +1376,6 @@ export function usePersonelDetail(
       }
     },
     [canCreateSurec, detailKey, isSurecSubmitting, parsedPersonelId, personel, surecForm, surecHistoryKey]
-  );
-
-  const createZimmetHandler = useCallback(
-    async (event: FormEvent<HTMLFormElement>) => {
-      event.preventDefault();
-      if (!personel || isZimmetSubmitting) {
-        return;
-      }
-
-      if (!canCreateZimmet) {
-        setZimmetCreateErrorMessage("Bu islem icin yetkin bulunmuyor.");
-        return;
-      }
-
-      setZimmetCreateErrorMessage(null);
-      setIsZimmetSubmitting(true);
-
-      try {
-        const payload = buildPersonelZimmetPayload(personel.id, zimmetForm);
-        const created = await createZimmet(payload);
-        mergeCacheEntry<PaginatedResult<Zimmet>>(zimmetHistoryKey, (prev) => {
-          const base = prev ?? emptyPaginated<Zimmet>();
-          return {
-            ...base,
-            items: mergeZimmetHistoryRow(base.items, created)
-          };
-        });
-        setIsZimmetModalOpen(false);
-        setZimmetForm(INITIAL_PERSONEL_ZIMMET_FORM);
-      } catch (error) {
-        setZimmetCreateErrorMessage(getApiErrorMessage(error, "Zimmet kaydi yapilamadi."));
-      } finally {
-        setIsZimmetSubmitting(false);
-      }
-    },
-    [canCreateZimmet, isZimmetSubmitting, personel, zimmetForm, zimmetHistoryKey]
   );
 
   return {

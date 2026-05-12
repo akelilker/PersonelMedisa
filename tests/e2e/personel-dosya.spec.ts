@@ -148,6 +148,56 @@ test.describe("personel dosyasi surec akisi", () => {
     await expect(telefonRow.locator(".personel-zimmet-note-cell")).toContainText(/TEL-900/);
   });
 
+  test("yonetici surec modalinda zimmet sekmesinden zimmet ekler kartta liste ve timeline gorur", async ({ page }) => {
+    await mockApi(page, "GENEL_YONETICI");
+
+    await login(page, { username: "yonetici", password: "secret" });
+
+    await page.getByTestId("menu-kayit-surec").click();
+    const kayitModal = page.locator(".modal-container").last();
+    await expect(kayitModal.getByRole("heading", { name: /Kayıt ve Süreç İşlemleri/i })).toBeVisible();
+
+    await kayitModal.getByRole("button", { name: "Süreç" }).click();
+    await expect(kayitModal.getByRole("combobox", { name: "Personel" })).toBeVisible();
+    await kayitModal.getByRole("combobox", { name: "Personel" }).click();
+    await kayitModal.getByPlaceholder("Personel ara").fill("Ayşe");
+    await kayitModal.getByRole("option", { name: /Ayşe Yılmaz/i }).click();
+    await expect(kayitModal.getByRole("tab", { name: "Genel" })).toHaveAttribute("aria-selected", "true");
+
+    await kayitModal.getByRole("tab", { name: "Zimmet" }).click();
+    await kayitModal.locator("[name='personel-zimmet-urun-turu']").selectOption("MASKE");
+    await kayitModal.locator("[name='personel-zimmet-teslim-tarihi']").fill("2026-05-10");
+    await kayitModal.locator("[name='personel-zimmet-teslim-eden']").fill("IK Surec E2E");
+    await kayitModal.locator("[name='personel-zimmet-teslim-durumu']").selectOption("YENI");
+    await kayitModal.locator("[name='personel-zimmet-aciklama']").fill("SUREC-ZIM-E2E-MASKE");
+
+    await kayitModal.locator('button[type="submit"][form="kayit-surec-zimmet-form"]').click();
+
+    await kayitModal.getByRole("button", { name: "Kapat" }).click();
+    await expect(page).toHaveURL("/");
+
+    await page.getByTestId("menu-personel-karti").click();
+    await expect(page).toHaveURL(/\/personeller$/);
+    await page.getByRole("link", { name: /Ayşe Yılmaz.*kişisinin kartını aç/i }).first().click();
+    await expect(page).toHaveURL(/\/personeller\/1$/);
+
+    await page.getByRole("tab", { name: "Zimmet & Envanter" }).click();
+    const maskeRow = page
+      .locator(".personel-zimmet-table tbody tr")
+      .filter({ has: page.locator("td", { hasText: /Maske/i }) })
+      .filter({ has: page.locator(".personel-zimmet-note-cell", { hasText: /SUREC-ZIM-E2E-MASKE/ }) });
+    await expect(maskeRow).toHaveCount(1);
+    await expect(maskeRow.getByTestId("zimmet-durum")).toContainText(/Aktif/i);
+
+    await page.getByRole("tab", { name: "Süreç Geçmişi" }).click();
+    const timeline = page
+      .locator("#personel-kart-panel-surec-gecmisi")
+      .locator("[data-testid='personel-surec-timeline']");
+    await expect(timeline).toContainText(/Zimmet Teslim/i);
+    await expect(timeline).toContainText(/Maske/i);
+    await expect(timeline).toContainText(/SUREC-ZIM-E2E-MASKE/i);
+  });
+
   test("yonetici departman ve gecerlilik tarihi ile org surecini uretir ve timeline tepesinde gosterir", async ({ page }) => {
     await mockApi(page, "GENEL_YONETICI");
 

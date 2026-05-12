@@ -7,6 +7,7 @@ import { ErrorState } from "../../../components/states/ErrorState";
 import { LoadingState } from "../../../components/states/LoadingState";
 import { useRoleAccess } from "../../../hooks/use-role-access";
 import { usePersonelDetail } from "../../../hooks/usePersoneller";
+import { PersonelZimmetCreateForm } from "../components/PersonelZimmetCreateForm";
 import {
   formatAktifDurumLabel,
   formatZimmetKayitDurumuLabel,
@@ -20,7 +21,7 @@ import { hesaplaIzinBakiye } from "../../../services/izin-hesap-motoru";
 import type { IdOption, KeyOption } from "../../../types/referans";
 import type { Personel } from "../../../types/personel";
 import type { Surec } from "../../../types/surec";
-import { ZIMMET_TESLIM_DURUMU_OPTIONS, ZIMMET_URUN_TURU_OPTIONS, type Zimmet } from "../../../types/zimmet";
+import type { Zimmet } from "../../../types/zimmet";
 
 const PERSONEL_DOSYA_TABS = [
   { id: "genel-bilgiler", label: "Genel Bilgiler" },
@@ -1393,52 +1394,13 @@ export function PersonelDetayPage() {
             </div>
           }
         >
-          <form id={PERSONEL_ZIMMET_FORM_ID} className="personel-zimmet-form-grid" onSubmit={handleZimmetCreateSubmit}>
-            <FormField
-              as="select"
-              label="Ürün Türü"
-              name="personel-zimmet-urun-turu"
-              value={zimmetForm.urunTuru}
-              onChange={(value) => setZimmetForm((prev) => ({ ...prev, urunTuru: value }))}
-              required
-              placeholderOption={{ value: "", label: "Seçiniz" }}
-              selectOptions={[...ZIMMET_URUN_TURU_OPTIONS]}
-            />
-            <FormField
-              label="Teslim Tarihi"
-              name="personel-zimmet-teslim-tarihi"
-              type="date"
-              value={zimmetForm.teslimTarihi}
-              onChange={(value) => setZimmetForm((prev) => ({ ...prev, teslimTarihi: value }))}
-              required
-            />
-            <FormField
-              label="Teslim Eden"
-              name="personel-zimmet-teslim-eden"
-              value={zimmetForm.teslimEden}
-              onChange={(value) => setZimmetForm((prev) => ({ ...prev, teslimEden: value }))}
-              required
-              placeholder="Bağlı amir veya İK görevlisi"
-            />
-            <FormField
-              as="select"
-              label="Teslim Durumu"
-              name="personel-zimmet-teslim-durumu"
-              value={zimmetForm.teslimDurumu}
-              onChange={(value) => setZimmetForm((prev) => ({ ...prev, teslimDurumu: value }))}
-              required
-              selectOptions={[...ZIMMET_TESLIM_DURUMU_OPTIONS]}
-            />
-            <FormField
-              as="textarea"
-              label="Seri No / Açıklama"
-              name="personel-zimmet-aciklama"
-              value={zimmetForm.aciklama}
-              onChange={(value) => setZimmetForm((prev) => ({ ...prev, aciklama: value }))}
-              rows={4}
-            />
-            {zimmetCreateErrorMessage ? <p className="personel-create-error">{zimmetCreateErrorMessage}</p> : null}
-          </form>
+          <PersonelZimmetCreateForm
+            formId={PERSONEL_ZIMMET_FORM_ID}
+            zimmetForm={zimmetForm}
+            setZimmetForm={setZimmetForm}
+            onSubmit={handleZimmetCreateSubmit}
+            zimmetCreateErrorMessage={zimmetCreateErrorMessage}
+          />
         </AppModal>
       ) : null}
     </section>

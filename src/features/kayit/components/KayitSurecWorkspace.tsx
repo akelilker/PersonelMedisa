@@ -17,13 +17,14 @@ import {
 } from "../../../api/referans.api";
 import { createSurec, updateSurec } from "../../../api/surecler.api";
 import { PersonelCreateFields } from "../../../features/personeller/components/PersonelCreateFields";
+import { PersonelZimmetCreateForm } from "../../../features/personeller/components/PersonelZimmetCreateForm";
 import { buildCreatePersonelPayload } from "../../../features/personeller/personel-create-utils";
 import { SurecFormFields } from "../../../features/surecler/components/SurecFormFields";
 import {
   buildCreateSurecPayload,
   buildUpdateSurecPayload
 } from "../../../features/surecler/surec-form-utils";
-import { INITIAL_CREATE_PERSONEL_FORM, type CreatePersonelFormState } from "../../../hooks/usePersoneller";
+import { INITIAL_CREATE_PERSONEL_FORM, usePersonelZimmetCreate, type CreatePersonelFormState } from "../../../hooks/usePersoneller";
 import { INITIAL_SUREC_FORM, type SurecFormState } from "../../../hooks/useSurecler";
 import { useRoleAccess } from "../../../hooks/use-role-access";
 import type { Personel } from "../../../types/personel";
@@ -32,6 +33,7 @@ import type { Surec } from "../../../types/surec";
 
 export const KAYIT_SUREC_PERSONEL_FORM_ID = "kayit-surec-personel-form";
 export const KAYIT_SUREC_SUREC_FORM_ID = "kayit-surec-surec-form";
+export const KAYIT_SUREC_ZIMMET_FORM_ID = "kayit-surec-zimmet-form";
 
 type KayitSurecWorkspaceProps = {
   activeTab: KayitTab;
@@ -356,6 +358,7 @@ export function KayitSurecWorkspace({
   const { hasPermission } = useRoleAccess();
   const canCreatePersonel = hasPermission("personeller.create");
   const canCreateSurec = hasPermission("surecler.create");
+  const canCreateZimmet = hasPermission("personeller.update");
   const canEditSurec = hasPermission("surecler.update");
 
   const [refs, setRefs] = useState<PersonelReferenceBundle>(EMPTY_REFS);
@@ -438,6 +441,18 @@ export function KayitSurecWorkspace({
     const personelId = Number.parseInt(surecForm.personelId, 10);
     return Number.isFinite(personelId) ? personelMap.get(personelId) ?? null : null;
   }, [personelMap, surecForm.personelId]);
+
+  const zimmetPersonelIdForHook = selectedSurecPersonel?.id ?? 0;
+  const zimmetPersonelValid = Boolean(selectedSurecPersonel);
+  const {
+    zimmetForm,
+    setZimmetForm,
+    createZimmetHandler,
+    isZimmetSubmitting,
+    zimmetCreateErrorMessage
+  } = usePersonelZimmetCreate(zimmetPersonelIdForHook, zimmetPersonelValid, canCreateZimmet, {
+    canSubmit: zimmetPersonelValid
+  });
 
   const selectedSurecPersonelLabel = selectedSurecPersonel ? formatPersonelLabel(selectedSurecPersonel) : "Seçiniz";
 
@@ -1242,7 +1257,34 @@ export function KayitSurecWorkspace({
                           </div>
                         ) : null}
 
-                        {["belgeler", "mali", "zimmet", "ceza", "ayrilma"].includes(activePersonelTab) ? (
+                        {activePersonelTab === "zimmet" ? (
+                          selectedSurecPersonel ? (
+                            <div>
+                              <PersonelZimmetCreateForm
+                                formId={KAYIT_SUREC_ZIMMET_FORM_ID}
+                                zimmetForm={zimmetForm}
+                                setZimmetForm={setZimmetForm}
+                                onSubmit={createZimmetHandler}
+                                zimmetCreateErrorMessage={zimmetCreateErrorMessage}
+                              />
+                              <div className="universal-btn-group workspace-form-actions">
+                                <button
+                                  type="submit"
+                                  form={KAYIT_SUREC_ZIMMET_FORM_ID}
+                                  className="universal-btn-save"
+                                  disabled={isZimmetSubmitting || !canCreateZimmet}
+                                >
+                                  {isZimmetSubmitting ? "Kaydediliyor..." : "Kaydet"}
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="surec-person-placeholder">
+                              <strong>Zimmet</strong>
+                              <p>Zimmet eklemek için önce personel seçin.</p>
+                            </div>
+                          )
+                        ) : ["belgeler", "mali", "ceza", "ayrilma"].includes(activePersonelTab) ? (
                           <div className="surec-person-placeholder">
                             <strong>{PERSONEL_SUREC_TABS.find((tab) => tab.id === activePersonelTab)?.label}</strong>
                             <p>Bu işlem ailesi merkezi akışa taşınacak. Şimdilik yerleşim sabitlendi.</p>

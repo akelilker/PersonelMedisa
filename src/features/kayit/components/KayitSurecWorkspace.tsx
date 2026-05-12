@@ -592,6 +592,17 @@ export function KayitSurecWorkspace({
       return;
     }
 
+    if (tabId === "ayrilma") {
+      setDevamsizlikSubId(null);
+      setSurecForm((prev) => ({
+        ...resetSurecFormKeepingPersonel(prev.personelId),
+        surecTuru: "ISTEN_AYRILMA",
+        altTur: "",
+        ucretliMi: false
+      }));
+      return;
+    }
+
     setDevamsizlikSubId(null);
   }
 
@@ -1370,7 +1381,66 @@ export function KayitSurecWorkspace({
                               <p>Zimmet eklemek için önce personel seçin.</p>
                             </div>
                           )
-                        ) : ["belgeler", "ceza", "ayrilma"].includes(activePersonelTab) ? (
+                        ) : activePersonelTab === "ayrilma" ? (
+                          selectedSurecPersonel ? (
+                            selectedSurecPersonel.aktif_durum === "PASIF" ? (
+                              <div className="surec-person-placeholder">
+                                <strong>Ayrılma</strong>
+                                <p>Bu personel pasif. İşten ayrılma süreci eklenemez.</p>
+                              </div>
+                            ) : (
+                              <div className="surec-shell-panel">
+                                <p className="workspace-empty-hint">
+                                  <strong>İşten ayrılma</strong> — {selectedSurecPersonelLabel}
+                                </p>
+                                <form
+                                  id={KAYIT_SUREC_SUREC_FORM_ID}
+                                  className="workspace-form"
+                                  onSubmit={handleSurecSubmit}
+                                >
+                                  <SurecFormFields
+                                    form={surecForm}
+                                    setForm={setSurecForm}
+                                    surecTuruOptions={surecTuruOptions}
+                                    personelOptions={personelOptions}
+                                    showPersonelField={false}
+                                    showSurecTuruField={false}
+                                    showAltTurField={false}
+                                    showUcretliField={false}
+                                    useOperationControls
+                                    errorMessage={surecError}
+                                    referenceError={null}
+                                    className="workspace-form-stack workspace-form-stack--compact"
+                                  />
+                                </form>
+
+                                <div className="workspace-inline-actions">
+                                  {surecInfo ? (
+                                    <p className="workspace-success workspace-success--inline">{surecInfo}</p>
+                                  ) : null}
+                                </div>
+                                <div className="universal-btn-group workspace-form-actions">
+                                  <button
+                                    type="submit"
+                                    form={primaryFormId}
+                                    className="universal-btn-save"
+                                    disabled={surecSubmitting}
+                                  >
+                                    Kaydet
+                                  </button>
+                                  <button type="button" className="universal-btn-cancel" onClick={onClose}>
+                                    Vazgeç
+                                  </button>
+                                </div>
+                              </div>
+                            )
+                          ) : (
+                            <div className="surec-person-placeholder">
+                              <strong>Ayrılma</strong>
+                              <p>İşten ayrılma süreci eklemek için önce personel seçin.</p>
+                            </div>
+                          )
+                        ) : ["belgeler", "ceza"].includes(activePersonelTab) ? (
                           <div className="surec-person-placeholder">
                             <strong>{PERSONEL_SUREC_TABS.find((tab) => tab.id === activePersonelTab)?.label}</strong>
                             <p>Bu işlem ailesi merkezi akışa taşınacak. Şimdilik yerleşim sabitlendi.</p>

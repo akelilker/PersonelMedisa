@@ -22,6 +22,10 @@ type SurecFormFieldsProps = {
   showSurecTuruField?: boolean;
   altTurField?: AltTurFieldConfig;
   useOperationControls?: boolean;
+  /** false: alt tür / işlem detayı satırı hiç gösterilmez (ör. ISTEN_AYRILMA sade yüzü). */
+  showAltTurField?: boolean;
+  /** false: ücretli mi alanı gösterilmez; form state tarafında sabitlenmeli. */
+  showUcretliField?: boolean;
   errorMessage?: string | null;
   referenceError?: string | null;
   className?: string;
@@ -45,6 +49,8 @@ export function SurecFormFields({
   showSurecTuruField = true,
   altTurField,
   useOperationControls = false,
+  showAltTurField = true,
+  showUcretliField = true,
   errorMessage,
   referenceError,
   className
@@ -132,37 +138,39 @@ export function SurecFormFields({
             )
         : null}
 
-      {altTurField ? (
-        altTurField.options.length > 1 ? (
-          useOperationControls ? (
-            renderSegmentedButtons(
-              altTurField.label,
-              "surec-create-alt",
-              form.altTur,
-              altTurField.options,
-              (value) => setForm((prev) => ({ ...prev, altTur: value }))
+      {showAltTurField ? (
+        altTurField ? (
+          altTurField.options.length > 1 ? (
+            useOperationControls ? (
+              renderSegmentedButtons(
+                altTurField.label,
+                "surec-create-alt",
+                form.altTur,
+                altTurField.options,
+                (value) => setForm((prev) => ({ ...prev, altTur: value }))
+              )
+            ) : (
+              <FormField
+                as="select"
+                label={altTurField.label}
+                name="surec-create-alt"
+                value={form.altTur}
+                onChange={(value) => setForm((prev) => ({ ...prev, altTur: value }))}
+                required
+                placeholderOption={{ value: "", label: "Seçiniz" }}
+                selectOptions={altTurField.options}
+              />
             )
-          ) : (
-          <FormField
-            as="select"
-            label={altTurField.label}
-            name="surec-create-alt"
-            value={form.altTur}
-            onChange={(value) => setForm((prev) => ({ ...prev, altTur: value }))}
-            required
-            placeholderOption={{ value: "", label: "Seçiniz" }}
-            selectOptions={altTurField.options}
-          />
-          )
-        ) : null
-      ) : (
+          ) : null
+        ) : (
           <FormField
             label="İşlem Detayı"
             name="surec-create-alt"
             value={form.altTur}
             onChange={(value) => setForm((prev) => ({ ...prev, altTur: value }))}
           />
-        )}
+        )
+      ) : null}
       <div className={useOperationControls ? "surec-date-row" : undefined}>
         <FormField
           label="Başlangıç Tarihi"
@@ -181,24 +189,26 @@ export function SurecFormFields({
           required
         />
       </div>
-      {useOperationControls ? (
-        renderSegmentedButtons(
-          "Ücretli mi?",
-          "surec-create-ucret",
-          form.ucretliMi ? "evet" : "hayir",
-          UCRETLI_SELECT_OPTIONS,
-          (value) => setForm((prev) => ({ ...prev, ucretliMi: value === "evet" }))
+      {showUcretliField ? (
+        useOperationControls ? (
+          renderSegmentedButtons(
+            "Ücretli mi?",
+            "surec-create-ucret",
+            form.ucretliMi ? "evet" : "hayir",
+            UCRETLI_SELECT_OPTIONS,
+            (value) => setForm((prev) => ({ ...prev, ucretliMi: value === "evet" }))
+          )
+        ) : (
+          <FormField
+            as="select"
+            label="Ücretli mi?"
+            name="surec-create-ucret"
+            value={form.ucretliMi ? "evet" : "hayir"}
+            onChange={(value) => setForm((prev) => ({ ...prev, ucretliMi: value === "evet" }))}
+            selectOptions={UCRETLI_SELECT_OPTIONS}
+          />
         )
-      ) : (
-        <FormField
-          as="select"
-          label="Ücretli mi?"
-          name="surec-create-ucret"
-          value={form.ucretliMi ? "evet" : "hayir"}
-          onChange={(value) => setForm((prev) => ({ ...prev, ucretliMi: value === "evet" }))}
-          selectOptions={UCRETLI_SELECT_OPTIONS}
-        />
-      )}
+      ) : null}
       <FormField
         as="textarea"
         label="Açıklama"

@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react
 import { getApiErrorMessage, shouldQueueOfflineMutation } from "../api/api-client";
 import {
   cancelFinansKalem,
-  createFinansKalem,
   fetchFinansKalemList,
   updateFinansKalem
 } from "../api/finans.api";
@@ -15,19 +14,26 @@ import {
   getCacheEntry,
   getSubeIdForApiRequest,
   mergeCacheEntry,
-  optimisticPrependToList,
   processSyncQueue,
   useAppDataRevision
 } from "../data/data-manager";
+import {
+  buildCreateFinansKalemPayload,
+  commitFinansKalemCreate,
+  createEmptyFinansCreateForm,
+  createEmptyFinansMaliFields,
+  parseRequiredPositiveInt,
+  parseRequiredPositiveNumber,
+  validateDonem,
+  type FinansCreateFormInput,
+  type FinansListAppliedFilters,
+  type FinansMaliFieldsState
+} from "../lib/finans/finans-create-commit";
 import { runDeduped } from "../lib/in-flight-dedupe";
 import type { PaginatedResult } from "../types/api";
 import type { CreateFinansKalemPayload, FinansKalem } from "../types/finans";
 
 const PAGE_SIZE = 10;
-
-function toMonthInputValue(date: Date): string {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
-}
 
 export type FinansListQueryState = {
   draft: { personelId: string; donem: string; kalemTuru: string; state: string };
@@ -35,13 +41,7 @@ export type FinansListQueryState = {
   page: number;
 };
 
-export type FinansFormState = {
-  personelId: string;
-  donem: string;
-  kalemTuru: string;
-  tutar: string;
-  aciklama: string;
-};
+export type FinansFormState = FinansCreateFormInput;
 
 function parsePositiveInt(value: string): number | undefined {
   const trimmed = value.trim();
@@ -55,31 +55,6 @@ function parsePositiveInt(value: string): number | undefined {
   return parsed;
 }
 
-function parseRequiredPositiveInt(value: string, label: string): number {
-  const parsed = parsePositiveInt(value);
-  if (!parsed) {
-    throw new Error(`${label} pozitif sayi olmalidir.`);
-  }
-  return parsed;
-}
-
-function parseRequiredPositiveNumber(value: string, label: string): number {
-  const trimmed = value.trim();
-  const parsed = Number.parseFloat(trimmed);
-  if (!trimmed || Number.isNaN(parsed) || parsed <= 0) {
-    throw new Error(`${label} sifirdan buyuk olmali.`);
-  }
-  return parsed;
-}
-
-function validateDonem(donem: string): string {
-  const value = donem.trim();
-  if (!/^\d{4}-\d{2}$/.test(value)) {
-    throw new Error("Dönem YYYY-MM formatında olmalı.");
-  }
-  return value;
-}
-
 function toFormState(item: FinansKalem): FinansFormState {
   return {
     personelId: String(item.personel_id),
@@ -89,26 +64,6 @@ function toFormState(item: FinansKalem): FinansFormState {
     aciklama: item.aciklama ?? ""
   };
 }
-
-function draftFinansFromPayload(payload: CreateFinansKalemPayload, tempId: number): FinansKalem {
-  return {
-    id: tempId,
-    personel_id: payload.personel_id,
-    donem: payload.donem,
-    kalem_turu: payload.kalem_turu,
-    tutar: payload.tutar,
-    aciklama: payload.aciklama,
-    state: "AKTIF"
-  };
-}
-
-const INITIAL_CREATE_FINANS_FORM: FinansFormState = {
-  personelId: "",
-  donem: toMonthInputValue(new Date()),
-  kalemTuru: "AVANS",
-  tutar: "",
-  aciklama: ""
-};
 
 export function useFinans() {
   const revision = useAppDataRevision();
@@ -122,7 +77,7 @@ export function useFinans() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [createForm, setCreateForm] = useState<FinansFormState>({ ...INITIAL_CREATE_FINANS_FORM });
+  const [createForm, setCreateForm] = useState<FinansFormState>(() => createEmptyFinansCreateForm());
   const [createErrorMessage, setCreateErrorMessage] = useState<string | null>(null);
   const [isCreateSubmitting, setIsCreateSubmitting] = useState(false);
 
@@ -204,7 +159,7 @@ export function useFinans() {
         );
       } catch {
         if (!getCacheEntry<PaginatedResult<FinansKalem>>(listKey)) {
-      setErrorMessage("Finans kayıtları şu an güncellenemiyor.");
+          setErrorMessage("Finans kayıtları şu an güncellenemiyor.");
         }
       } finally {
         if (!cancelled) {
@@ -287,7 +242,7 @@ export function useFinans() {
         return;
       }
       if (!canCreate) {
-      setCreateErrorMessage("Bu işlem için yetkin bulunmuyor.");
+        setCreateErrorMessage("Bu işlem için yetkin bulunmuyor.");
         return;
       }
 
@@ -295,53 +250,33 @@ export function useFinans() {
       setIsCreateSubmitting(true);
 
       try {
-        const payload: CreateFinansKalemPayload = {
-          personel_id: parseRequiredPositiveInt(createForm.personelId, "Personel ID"),
-          donem: validateDonem(createForm.donem),
-          kalem_turu: createForm.kalemTuru.trim(),
-          tutar: parseRequiredPositiveNumber(createForm.tutar, "Tutar"),
-          aciklama: createForm.aciklama.trim() || undefined
-        };
-
-        const pageOneKey = dataCacheKeys.finansList(
-          activeSube,
-          listQuery.applied.personelId,
-          listQuery.applied.donem,
-          listQuery.applied.kalemTuru,
-          listQuery.applied.state,
-          1
-        );
-
+        let payload: CreateFinansKalemPayload;
         try {
-          await createFinansKalem(payload);
-          setIsCreateModalOpen(false);
-          setCreateForm({ ...INITIAL_CREATE_FINANS_FORM });
-          setListQuery((prev) => ({ ...prev, page: 1 }));
-          await refreshPageOne();
+          payload = buildCreateFinansKalemPayload(createForm);
         } catch (error) {
-          if (!shouldQueueOfflineMutation(error)) {
-            throw error;
-          }
-
-          const tempId = makeTempId();
-          optimisticPrependToList(pageOneKey, draftFinansFromPayload(payload, tempId));
-          enqueueSyncOperation({
-            op: "finans.create",
-            payload,
-            meta: { listKey: pageOneKey, tempId }
-          });
-          setIsCreateModalOpen(false);
-          setCreateForm({ ...INITIAL_CREATE_FINANS_FORM });
-          setListQuery((prev) => ({ ...prev, page: 1 }));
-          void processSyncQueue();
+          setCreateErrorMessage(getApiErrorMessage(error, "Finans kaydi olusturulamadi."));
+          return;
         }
-      } catch (error) {
-        setCreateErrorMessage(getApiErrorMessage(error, "Finans kaydi olusturulamadi."));
+
+        const result = await commitFinansKalemCreate({
+          payload,
+          activeSube,
+          applied: listQuery.applied
+        });
+
+        if (result.outcome === "error") {
+          setCreateErrorMessage(result.message);
+          return;
+        }
+
+        setIsCreateModalOpen(false);
+        setCreateForm(createEmptyFinansCreateForm());
+        setListQuery((prev) => ({ ...prev, page: 1 }));
       } finally {
         setIsCreateSubmitting(false);
       }
     },
-    [activeSube, createForm, isCreateSubmitting, listQuery.applied, refreshPageOne]
+    [activeSube, createForm, isCreateSubmitting, listQuery.applied]
   );
 
   const openEditModal = useCallback((item: FinansKalem, canEdit: boolean) => {
@@ -385,9 +320,7 @@ export function useFinans() {
         const base = prev ?? emptyPaginated<FinansKalem>();
         return {
           ...base,
-          items: base.items.map((row) =>
-            row.id === editingItem.id ? { ...row, ...body } : row
-          )
+          items: base.items.map((row) => (row.id === editingItem.id ? { ...row, ...body } : row))
         };
       });
 
@@ -441,9 +374,7 @@ export function useFinans() {
         const base = prev ?? emptyPaginated<FinansKalem>();
         return {
           ...base,
-          items: base.items.map((row) =>
-            row.id === item.id ? { ...row, state: "IPTAL" } : row
-          )
+          items: base.items.map((row) => (row.id === item.id ? { ...row, state: "IPTAL" } : row))
         };
       });
 
@@ -507,5 +438,106 @@ export function useFinans() {
     submitFilters,
     clearFilters,
     setPage
+  };
+}
+
+type UsePersonelFinansCreateOptions = {
+  canSubmit: boolean;
+  onCreateSuccess?: () => void;
+};
+
+export function usePersonelFinansCreate(
+  parsedPersonelId: number,
+  hasValidId: boolean,
+  canCreateFinans: boolean,
+  options: UsePersonelFinansCreateOptions
+) {
+  const { canSubmit, onCreateSuccess } = options;
+  const revision = useAppDataRevision();
+  const activeSube = useMemo(() => getActiveSube(), [revision]);
+
+  const [maliFields, setMaliFields] = useState<FinansMaliFieldsState>(() => createEmptyFinansMaliFields());
+  const [maliCreateErrorMessage, setMaliCreateErrorMessage] = useState<string | null>(null);
+  const [isMaliSubmitting, setIsMaliSubmitting] = useState(false);
+
+  const appliedForCommit = useMemo<FinansListAppliedFilters>(
+    () => ({
+      personelId: String(parsedPersonelId),
+      donem: "",
+      kalemTuru: "",
+      state: ""
+    }),
+    [parsedPersonelId]
+  );
+
+  useEffect(() => {
+    setMaliFields(createEmptyFinansMaliFields());
+    setMaliCreateErrorMessage(null);
+    setIsMaliSubmitting(false);
+  }, [parsedPersonelId]);
+
+  const createPersonelFinansHandler = useCallback(
+    async (event: FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      if (!hasValidId || !canSubmit || isMaliSubmitting) {
+        return;
+      }
+      if (!canCreateFinans) {
+        setMaliCreateErrorMessage("Bu islem icin yetkin bulunmuyor.");
+        return;
+      }
+
+      setMaliCreateErrorMessage(null);
+      setIsMaliSubmitting(true);
+
+      try {
+        let payload: CreateFinansKalemPayload;
+        try {
+          payload = buildCreateFinansKalemPayload({
+            personelId: String(parsedPersonelId),
+            ...maliFields
+          });
+        } catch (error) {
+          setMaliCreateErrorMessage(getApiErrorMessage(error, "Finans kaydi olusturulamadi."));
+          return;
+        }
+
+        const result = await commitFinansKalemCreate({
+          payload,
+          activeSube,
+          applied: appliedForCommit
+        });
+
+        if (result.outcome === "error") {
+          setMaliCreateErrorMessage(result.message);
+          return;
+        }
+
+        setMaliFields(createEmptyFinansMaliFields());
+        onCreateSuccess?.();
+      } finally {
+        setIsMaliSubmitting(false);
+      }
+    },
+    [
+      activeSube,
+      appliedForCommit,
+      canCreateFinans,
+      canSubmit,
+      hasValidId,
+      isMaliSubmitting,
+      maliFields,
+      onCreateSuccess,
+      parsedPersonelId
+    ]
+  );
+
+  return {
+    maliFields,
+    setMaliFields,
+    createPersonelFinansHandler,
+    isMaliSubmitting,
+    maliCreateErrorMessage,
+    setMaliCreateErrorMessage
   };
 }

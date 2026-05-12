@@ -24,6 +24,7 @@ import {
   buildCreateSurecPayload,
   buildUpdateSurecPayload
 } from "../../../features/surecler/surec-form-utils";
+import { usePersonelFinansCreate } from "../../../hooks/useFinans";
 import { INITIAL_CREATE_PERSONEL_FORM, usePersonelZimmetCreate, type CreatePersonelFormState } from "../../../hooks/usePersoneller";
 import { INITIAL_SUREC_FORM, type SurecFormState } from "../../../hooks/useSurecler";
 import { useRoleAccess } from "../../../hooks/use-role-access";
@@ -34,6 +35,7 @@ import type { Surec } from "../../../types/surec";
 export const KAYIT_SUREC_PERSONEL_FORM_ID = "kayit-surec-personel-form";
 export const KAYIT_SUREC_SUREC_FORM_ID = "kayit-surec-surec-form";
 export const KAYIT_SUREC_ZIMMET_FORM_ID = "kayit-surec-zimmet-form";
+export const KAYIT_SUREC_MALI_FORM_ID = "kayit-surec-mali-form";
 
 type KayitSurecWorkspaceProps = {
   activeTab: KayitTab;
@@ -359,6 +361,7 @@ export function KayitSurecWorkspace({
   const canCreatePersonel = hasPermission("personeller.create");
   const canCreateSurec = hasPermission("surecler.create");
   const canCreateZimmet = hasPermission("personeller.update");
+  const canCreateFinans = hasPermission("finans.create");
   const canEditSurec = hasPermission("surecler.update");
 
   const [refs, setRefs] = useState<PersonelReferenceBundle>(EMPTY_REFS);
@@ -451,6 +454,16 @@ export function KayitSurecWorkspace({
     isZimmetSubmitting,
     zimmetCreateErrorMessage
   } = usePersonelZimmetCreate(zimmetPersonelIdForHook, zimmetPersonelValid, canCreateZimmet, {
+    canSubmit: zimmetPersonelValid
+  });
+
+  const {
+    maliFields,
+    setMaliFields,
+    createPersonelFinansHandler,
+    isMaliSubmitting,
+    maliCreateErrorMessage
+  } = usePersonelFinansCreate(zimmetPersonelIdForHook, zimmetPersonelValid, canCreateFinans, {
     canSubmit: zimmetPersonelValid
   });
 
@@ -1257,7 +1270,80 @@ export function KayitSurecWorkspace({
                           </div>
                         ) : null}
 
-                        {activePersonelTab === "zimmet" ? (
+                        {activePersonelTab === "mali" ? (
+                          selectedSurecPersonel ? (
+                            canCreateFinans ? (
+                              <div>
+                                <p className="workspace-empty-hint">
+                                  <strong>Mali işlem</strong> — {selectedSurecPersonelLabel}
+                                </p>
+                                <form
+                                  id={KAYIT_SUREC_MALI_FORM_ID}
+                                  className="finans-form-grid"
+                                  onSubmit={createPersonelFinansHandler}
+                                >
+                                  <FormField
+                                    label="Dönem"
+                                    name="kayit-mali-donem"
+                                    type="month"
+                                    value={maliFields.donem}
+                                    onChange={(value) => setMaliFields((prev) => ({ ...prev, donem: value }))}
+                                    required
+                                  />
+                                  <FormField
+                                    label="Kalem Turu"
+                                    name="kayit-mali-kalem"
+                                    value={maliFields.kalemTuru}
+                                    onChange={(value) => setMaliFields((prev) => ({ ...prev, kalemTuru: value }))}
+                                    required
+                                  />
+                                  <FormField
+                                    label="Tutar"
+                                    name="kayit-mali-tutar"
+                                    type="number"
+                                    min={0.01}
+                                    step="0.01"
+                                    value={maliFields.tutar}
+                                    onChange={(value) => setMaliFields((prev) => ({ ...prev, tutar: value }))}
+                                    required
+                                  />
+                                  <FormField
+                                    label="Açıklama"
+                                    name="kayit-mali-aciklama"
+                                    value={maliFields.aciklama}
+                                    onChange={(value) => setMaliFields((prev) => ({ ...prev, aciklama: value }))}
+                                  />
+                                  {maliCreateErrorMessage ? (
+                                    <p className="finans-form-error">{maliCreateErrorMessage}</p>
+                                  ) : null}
+                                </form>
+                                <div className="universal-btn-group workspace-form-actions">
+                                  <button
+                                    type="submit"
+                                    form={KAYIT_SUREC_MALI_FORM_ID}
+                                    className="universal-btn-save"
+                                    disabled={isMaliSubmitting}
+                                  >
+                                    {isMaliSubmitting ? "Kaydediliyor..." : "Kaydet"}
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="surec-person-placeholder">
+                                <strong>Mali İşlemler</strong>
+                                <p>
+                                  Finans kalemi oluşturmak için hesabınızda finans oluşturma yetkisi olmalıdır. Liste ve
+                                  diğer finans işlemleri için Finans modülünü kullanın.
+                                </p>
+                              </div>
+                            )
+                          ) : (
+                            <div className="surec-person-placeholder">
+                              <strong>Mali İşlemler</strong>
+                              <p>Finans kaydı eklemek için önce personel seçin.</p>
+                            </div>
+                          )
+                        ) : activePersonelTab === "zimmet" ? (
                           selectedSurecPersonel ? (
                             <div>
                               <PersonelZimmetCreateForm
@@ -1284,7 +1370,7 @@ export function KayitSurecWorkspace({
                               <p>Zimmet eklemek için önce personel seçin.</p>
                             </div>
                           )
-                        ) : ["belgeler", "mali", "ceza", "ayrilma"].includes(activePersonelTab) ? (
+                        ) : ["belgeler", "ceza", "ayrilma"].includes(activePersonelTab) ? (
                           <div className="surec-person-placeholder">
                             <strong>{PERSONEL_SUREC_TABS.find((tab) => tab.id === activePersonelTab)?.label}</strong>
                             <p>Bu işlem ailesi merkezi akışa taşınacak. Şimdilik yerleşim sabitlendi.</p>

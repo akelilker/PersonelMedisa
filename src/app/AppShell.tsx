@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { BackBar } from "../components/BackBar";
 import { AppFooter } from "../components/footer/AppFooter";
 import { Hero } from "../components/hero/Hero";
-import { MainMenu, type KayitTab } from "../components/main-menu/MainMenu";
+import type { KayitTab } from "../components/main-menu/MainMenu";
 import { AppModal } from "../components/modal/AppModal";
 import { ShellHeaderActions } from "../components/shell/ShellHeaderActions";
 import {
@@ -14,8 +14,10 @@ import {
 import { formatUiProfileLabel, formatUserRoleLabel } from "../lib/display/enum-display";
 import { useAuth } from "../state/auth.store";
 
-type AppShellProps = {
-  children?: ReactNode;
+export type AppShellOutletContext = {
+  onKayitOpen: (tab: KayitTab) => void;
+  /** Ana girişte kayıt modalı açıkken MainMenu gizlenir (önceki AppShell davranışı). */
+  showMainMenu: boolean;
 };
 
 type ModuleModalConfig = {
@@ -118,7 +120,7 @@ function resolveModuleModal(pathname: string): ModuleModalConfig | null {
   return { title: "Modül", closeTo: "/" };
 }
 
-export function AppShell({ children }: AppShellProps) {
+export function AppShell() {
   const { session, logout } = useAuth();
   const navigate = useNavigate();
   const { pathname, state } = useLocation();
@@ -163,6 +165,22 @@ export function AppShell({ children }: AppShellProps) {
   const kayitPrimaryFormId =
     kayitTab === "yeni-kayit" ? KAYIT_SUREC_PERSONEL_FORM_ID : KAYIT_SUREC_SUREC_FORM_ID;
 
+  const handleKayitOpen = useCallback((tab: KayitTab) => {
+    setKayitTab(tab);
+    setKayitInitialSurecPersonelId(null);
+    setKayitEntryIntent(null);
+    setKayitEntryReturnTo(null);
+    setIsKayitModalOpen(true);
+  }, []);
+
+  const outletContext = useMemo<AppShellOutletContext>(
+    () => ({
+      onKayitOpen: handleKayitOpen,
+      showMainMenu: isHomeRoute ? !isKayitModalOpen : true
+    }),
+    [handleKayitOpen, isHomeRoute, isKayitModalOpen]
+  );
+
   return (
     <div className="app-container app-shell">
       <main className="content-wrap">
@@ -185,20 +203,8 @@ export function AppShell({ children }: AppShellProps) {
           </div>
         ) : null}
 
-        {isHomeRoute && !isLoginRoute && !isKayitModalOpen ? (
-          <MainMenu
-            onKayitOpen={(tab) => {
-              setKayitTab(tab);
-              setKayitInitialSurecPersonelId(null);
-              setKayitEntryIntent(null);
-              setKayitEntryReturnTo(null);
-              setIsKayitModalOpen(true);
-            }}
-          />
-        ) : null}
-
         {!isModuleOverlayRoute && backBarTarget ? <BackBar to={backBarTarget.to} label={backBarTarget.label} /> : null}
-        {!isModuleOverlayRoute ? children : null}
+        {!isModuleOverlayRoute ? <Outlet context={outletContext} /> : null}
       </main>
 
       {isKayitModalOpen ? (
@@ -237,7 +243,7 @@ export function AppShell({ children }: AppShellProps) {
           bodyClassName={moduleModal.bodyClassName}
         >
           {backBarTarget ? <BackBar to={backBarTarget.to} label={backBarTarget.label} /> : null}
-          {children}
+          <Outlet context={outletContext} />
         </AppModal>
       ) : null}
 

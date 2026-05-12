@@ -1,5 +1,6 @@
-import { Link, Navigate, Outlet, Route, Routes } from "react-router-dom";
-import { AppShell } from "./AppShell";
+import { Link, Navigate, Route, Routes, useOutletContext } from "react-router-dom";
+import { AppShell, type AppShellOutletContext } from "./AppShell";
+import { MainMenu } from "../components/main-menu/MainMenu";
 import { ProtectedRoute } from "../router/ProtectedRoute";
 import { PersonellerPage } from "../features/personeller/pages/PersonellerPage";
 import { PersonelDetayPage } from "../features/personeller/pages/PersonelDetayPage";
@@ -20,11 +21,15 @@ import {
 } from "../lib/authorization/role-permissions";
 
 function AppLayout() {
-  return (
-    <AppShell>
-      <Outlet />
-    </AppShell>
-  );
+  return <AppShell />;
+}
+
+function HomeIndexMainMenu() {
+  const ctx = useOutletContext<AppShellOutletContext>();
+  if (!ctx.showMainMenu) {
+    return null;
+  }
+  return <MainMenu onKayitOpen={ctx.onKayitOpen} />;
 }
 
 function NotFoundPage() {
@@ -64,7 +69,7 @@ export function AppRoutes() {
           </ProtectedRoute>
         }
       >
-        <Route index element={<></>} />
+        <Route index element={<HomeIndexMainMenu />} />
         <Route
           path="personeller"
           element={

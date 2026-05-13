@@ -36,6 +36,8 @@ const SUREC_TURU_LABELS: Record<string, string> = {
   BAGLI_AMIR_DEGISTI: "Bağlı Amir Değişti",
   BAGLI_AMIR_ATAMASI_KALDIRILDI: "Bağlı Amir Ataması Kaldırıldı",
   POZISYON_DEGISTI: "Pozisyon Değişti",
+  ORG_DEGISIKLIK: "Organizasyon değişikliği",
+  ISTEN_AYRILMA: "İsten ayrılma",
   BIRIM_AMIRI_ATANDI: "Birim Amiri Olarak Atandı",
   BIRIM_AMIRI_ATAMASI_KALDIRILDI: "Birim Amiri Ataması Kaldırıldı",
   SUBE_YETKISI_DEGISTI: "Bağlı Bölüm / Şube Yetkisi Değişti"

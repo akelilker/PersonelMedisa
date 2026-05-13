@@ -44,7 +44,7 @@ test.describe("Kayit Surec Ayrilma sekmesi", () => {
 
     await page.getByRole("tab", { name: "Süreç Geçmişi" }).click();
     const timeline = page.locator("#personel-kart-panel-surec-gecmisi").locator("[data-testid='personel-surec-timeline']");
-    await expect(timeline).toContainText(/Isten Ayr[\u0131i]lma/i);
+    await expect(timeline).toContainText(/İsten ayrılma|Isten ayrilma|Isten Ayrilma/i);
     await expect(timeline).toContainText("E2E Kayit Ayrilma surec");
   });
 

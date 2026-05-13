@@ -834,6 +834,11 @@
   font-weight: 400;
 }
 
+.personel-timeline-meta-dot {
+  opacity: 0.55;
+  user-select: none;
+}
+
 .personel-timeline-summary,
 .personel-timeline-note {
   margin: 0;

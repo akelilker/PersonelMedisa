@@ -158,14 +158,109 @@ function formatSurecKayitZamani(value: string | undefined): string | null {
   return new Intl.DateTimeFormat("tr-TR", { dateStyle: "short", timeStyle: "short" }).format(new Date(parsed));
 }
 
+const IZIN_ANA_TUR_SET = new Set([
+  "IZIN",
+  "YILLIK_IZIN",
+  "MAZERET_IZNI",
+  "UCRETSIZ_IZIN",
+  "DOGUM_IZNI",
+  "EVLILIK_IZNI"
+]);
+
+function joinTimelineOzetParts(parts: Array<string | null | undefined>) {
+  return parts
+    .map((p) => (typeof p === "string" ? p.trim() : ""))
+    .filter(Boolean)
+    .join(" · ");
+}
+
+function buildSurecDateRangeSummary(surec: Surec): string {
+  const bas = normalizeTimelineText(surec.baslangic_tarihi);
+  const bit = normalizeTimelineText(surec.bitis_tarihi);
+  const eff = normalizeTimelineText(surec.effective_date);
+  if (bas && bit && bas !== bit) {
+    return `${bas} – ${bit}`;
+  }
+  if (bas && bit) {
+    return bas;
+  }
+  if (bas) {
+    return bas;
+  }
+  if (bit) {
+    return bit;
+  }
+  if (eff) {
+    return eff;
+  }
+  return "";
+}
+
+function buildSurecTimelinePrimaryDate(surec: Surec): string | null {
+  const eff = normalizeTimelineText(surec.effective_date);
+  const basB = normalizeTimelineText(surec.baslangic_tarihi);
+  const bitB = normalizeTimelineText(surec.bitis_tarihi);
+  if (eff) {
+    return `Geçerlilik: ${eff}`;
+  }
+  if (basB && bitB) {
+    return `Dönem: ${basB} – ${bitB}`;
+  }
+  if (basB) {
+    return `Başlangıç: ${basB}`;
+  }
+  if (bitB) {
+    return `Bitiş: ${bitB}`;
+  }
+  return null;
+}
+
 function buildSurecOzet(surec: Surec) {
   const surecTuru = surec.surec_turu.trim().toUpperCase();
+  const dates = buildSurecDateRangeSummary(surec);
+
   if (YONETIM_TIMELINE_SUREC_TYPES.has(surecTuru)) {
-    return "Yönetim panelinden rol ve yetki güncellemesi kaydedildi.";
+    return "Yönetim panelinden rol ve yetki güncellemesi.";
   }
 
   if (BAGLI_AMIR_TIMELINE_SUREC_TYPES.has(surecTuru)) {
-    return "Personelin bagli amir iliskisi guncellendi.";
+    return "Bağlı amir bilgisi güncellendi.";
+  }
+
+  if (surecTuru === "ISTEN_AYRILMA") {
+    return joinTimelineOzetParts([
+      dates ? `Son çalışma: ${dates}` : null,
+      "İş akdi sonlanır; kart pasife işlenir."
+    ]);
+  }
+
+  if (surecTuru === "ORG_DEGISIKLIK" || surecTuru === "POZISYON_DEGISTI") {
+    return joinTimelineOzetParts([dates ? `Dönem: ${dates}` : null, "Departman veya görev bilgisi güncellendi."]);
+  }
+
+  if (surecTuru === "RAPOR") {
+    return joinTimelineOzetParts([dates ? `Dönem: ${dates}` : null, "Raporlu dönem kaydı."]);
+  }
+
+  if (IZIN_ANA_TUR_SET.has(surecTuru)) {
+    const ucret =
+      surec.ucretli_mi === true ? "Ücretli" : surec.ucretli_mi === false ? "Ücretsiz" : null;
+    const alt = surec.alt_tur ? formatSurecTuruLabel(surec.alt_tur) : null;
+    return joinTimelineOzetParts([
+      alt,
+      ucret,
+      dates ? `Dönem: ${dates}` : null,
+      "İzin kaydı."
+    ]);
+  }
+
+  if (
+    surecTuru.includes("GEC_GELDI") ||
+    surecTuru.includes("ERKEN_CIKTI") ||
+    surecTuru.includes("DEVAMSIZ") ||
+    surecTuru.includes("GELMEDI")
+  ) {
+    return joinTimelineOzetParts([dates ? `Tarih: ${dates}` : null, "Devamsızlık veya puantaj sapması."]);
   }
 
   const parts = [
@@ -173,7 +268,7 @@ function buildSurecOzet(surec: Surec) {
     surec.bitis_tarihi ? `Bitiş: ${surec.bitis_tarihi}` : null
   ].filter((part): part is string => part !== null);
 
-  return parts.length > 0 ? parts.join(" / ") : "Süreç kaydı";
+  return parts.length > 0 ? parts.join(" · ") : "Süreç kaydı.";
 }
 
 function buildPersonelTimeline(
@@ -197,18 +292,15 @@ function buildPersonelTimeline(
       id: `personel-ise-giris-${personel.id}`,
       tarih: iseGirisTarihi,
       baslik: "İşe Giriş",
-      kaynak: "Personel",
-      ozet: iseGirisOzeti || "Personel kaydı oluşturuldu.",
+      kaynak: "Personel kartı",
+      ozet: iseGirisOzeti || "Kuruma giriş kaydı.",
       sortValue: createTimelineSortValue(iseGirisTarihi),
       sortRank: 4
     });
   }
 
   for (const surec of surecler) {
-    const eff = normalizeTimelineText(surec.effective_date);
-    const basB = normalizeTimelineText(surec.baslangic_tarihi);
-    const bitB = normalizeTimelineText(surec.bitis_tarihi);
-    const tarih = eff ? `Geçerlilik: ${eff}` : basB ?? bitB ?? null;
+    const tarih = buildSurecTimelinePrimaryDate(surec);
     const kayit = formatSurecKayitZamani(surec.created_at);
     const surecTuru = surec.surec_turu.trim().toUpperCase();
     events.push({
@@ -234,12 +326,13 @@ function buildPersonelTimeline(
     const ortakAciklama = normalizeTimelineText(zimmet.aciklama) ?? undefined;
 
     if (teslimTarihi) {
+      const teslimOzet = [urun, teslimDurumu, teslimEden].filter((part): part is string => Boolean(part)).join(" · ");
       events.push({
         id: `zimmet-teslim-${zimmet.id}`,
-        tarih: teslimTarihi,
-        baslik: "Zimmet Teslim",
+        tarih: `Teslim: ${teslimTarihi}`,
+        baslik: "Zimmet teslimi",
         kaynak: "Zimmet",
-        ozet: [urun, teslimDurumu, teslimEden].filter((part): part is string => Boolean(part)).join(" / "),
+        ozet: teslimOzet || "Teslim edilen ürün kaydı.",
         aciklama: ortakAciklama,
         etiket: normalizeTimelineText(formatZimmetKayitDurumuLabel(zimmet.zimmet_durumu)) ?? undefined,
         sortValue: createTimelineSortValue(teslimTarihi),
@@ -249,12 +342,13 @@ function buildPersonelTimeline(
 
     const iadeTarihi = normalizeTimelineText(zimmet.iade_tarihi);
     if (iadeTarihi) {
+      const iadeOzet = [urun, teslimEden].filter((part): part is string => Boolean(part)).join(" · ");
       events.push({
         id: `zimmet-iade-${zimmet.id}`,
-        tarih: iadeTarihi,
-        baslik: "Zimmet İadesi",
+        tarih: `İade: ${iadeTarihi}`,
+        baslik: "Zimmet iadesi",
         kaynak: "Zimmet",
-        ozet: [urun, teslimEden].filter((part): part is string => Boolean(part)).join(" / "),
+        ozet: iadeOzet || "Ürün iade kaydı.",
         aciklama: ortakAciklama,
         etiket: formatZimmetKayitDurumuLabel("IADE_EDILDI"),
         sortValue: createTimelineSortValue(iadeTarihi),
@@ -350,7 +444,7 @@ function PersonelDosyaHero({
     <section className="personel-dosya-hero">
       <div className="personel-dosya-hero-head">
         <div className="personel-dosya-hero-copy">
-          <p className="personel-dosya-kicker">Personel Dosyası</p>
+          <p className="personel-dosya-kicker">Personel kartı</p>
           <h3>
             {personel.ad} {personel.soyad}
           </h3>
@@ -683,7 +777,7 @@ function PersonelIzinDevamsizlikPanel({
                 <li key={surec.id} className="personel-surec-card">
                   <span className="personel-surec-card-type">
                     {formatSurecTuruLabel(surec.surec_turu)}
-                    {surec.alt_tur ? ` / ${surec.alt_tur}` : ""}
+                    {surec.alt_tur ? ` · ${formatSurecTuruLabel(surec.alt_tur)}` : ""}
                   </span>
                   <span className="personel-surec-card-state">{formatSurecStateLabel(surec.state)}</span>
                   <span className="personel-surec-card-dates">
@@ -741,7 +835,7 @@ function PersonelSurecGecmisiPanel({
       <div className="personel-surec-history-head">
         <div>
           <h3>Süreç Geçmişi</h3>
-          <p>Personelin tüm süreç hareketleri kronolojik olay günlüğü olarak izlenir.</p>
+          <p>Süreç kayıtları ve zimmet hareketleri tek akışta, en yeniden eskiye sıralanır.</p>
         </div>
         {canCreateSurec ? (
           <button type="button" className="universal-btn-aux" onClick={onOpenCreateModal}>
@@ -755,7 +849,7 @@ function PersonelSurecGecmisiPanel({
       {!isLoading && !errorMessage && timeline.length === 0 ? (
         <div className="personel-kart-placeholder">
           <h3>Kayıt Bulunamadı</h3>
-          <p>Bu personel için henüz kronolojik olay kaydı bulunmuyor.</p>
+          <p>Bu personel için henüz süreç veya zimmet satırı oluşmamış.</p>
         </div>
       ) : null}
 
@@ -773,10 +867,18 @@ function PersonelSurecGecmisiPanel({
                   {event.etiket ? <span className="personel-surec-state">{event.etiket}</span> : null}
                 </div>
                 <div className="personel-timeline-meta">
-                  <span>{event.tarih ?? "-"}</span>
+                  <span>{event.tarih ?? "Tarih belirtilmedi"}</span>
                   {event.zamanIkincil ? (
-                    <span className="personel-timeline-meta-secondary">{event.zamanIkincil}</span>
+                    <>
+                      <span className="personel-timeline-meta-dot" aria-hidden="true">
+                        ·
+                      </span>
+                      <span className="personel-timeline-meta-secondary">{event.zamanIkincil}</span>
+                    </>
                   ) : null}
+                  <span className="personel-timeline-meta-dot" aria-hidden="true">
+                    ·
+                  </span>
                   <span>{event.kaynak}</span>
                 </div>
                 <p className="personel-timeline-summary">{event.ozet}</p>

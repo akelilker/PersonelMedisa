@@ -105,7 +105,7 @@ test.describe("personel dosyasi surec akisi", () => {
     const timeline = surecPanel.locator("[data-testid='personel-surec-timeline']");
     await expect(timeline).toContainText(/İşe Giriş/i);
     await expect(timeline).toContainText(/Kask/i);
-    await expect(timeline).toContainText(/Isten Ayr[\u0131i]lma/i);
+    await expect(timeline).toContainText(/İsten ayrılma|Isten ayrilma|Isten Ayrilma/i);
     await expect(timeline).toContainText("Is akdi sonlandirildi");
   });
 
@@ -193,7 +193,7 @@ test.describe("personel dosyasi surec akisi", () => {
     const timeline = page
       .locator("#personel-kart-panel-surec-gecmisi")
       .locator("[data-testid='personel-surec-timeline']");
-    await expect(timeline).toContainText(/Zimmet Teslim/i);
+    await expect(timeline).toContainText(/Zimmet teslim/i);
     await expect(timeline).toContainText(/Maske/i);
     await expect(timeline).toContainText(/SUREC-ZIM-E2E-MASKE/i);
   });

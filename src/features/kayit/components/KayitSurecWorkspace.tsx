@@ -704,7 +704,7 @@ export function KayitSurecWorkspace({
       setPersonelForm(INITIAL_CREATE_PERSONEL_FORM);
       setSurecForm(resetSurecFormKeepingPersonel(String(created.id)));
       setPersonelInfo("Personel kaydı oluşturuldu. Süreç sekmesine geçiliyor.");
-      setSurecInfo("Yeni personel seçildi. Süreç girişine devam edebilirsin.");
+      setSurecInfo("Personel seçildi. Süreç kaydına devam edebilirsin.");
       onTabChange("surec");
     } catch (error) {
       setPersonelError(error instanceof Error ? error.message : "Personel kaydı oluşturulamadı.");
@@ -965,7 +965,7 @@ export function KayitSurecWorkspace({
           <section className="workspace-surface-card">
             <div className="workspace-surface-header">
               <h3>{editingSurec ? `Süreç Düzenle #${editingSurec.id}` : "Süreç İşlemleri"}</h3>
-              <p>İzin, rapor ve hareket girişlerini doğrudan bu sekmeden yönet.</p>
+              <p>İzin, rapor ve diğer süreç kayıtlarını bu sekmeden yönet.</p>
             </div>
 
             {bootstrapLoading ? <LoadingState label="Süreç alanı yükleniyor..." /> : null}
@@ -1286,7 +1286,7 @@ export function KayitSurecWorkspace({
                             canCreateFinans ? (
                               <div>
                                 <p className="workspace-empty-hint">
-                                  <strong>Mali işlem</strong> — {selectedSurecPersonelLabel}
+                                  <strong>Mali İşlemler</strong> — {selectedSurecPersonelLabel}
                                 </p>
                                 <form
                                   id={KAYIT_SUREC_MALI_FORM_ID}
@@ -1342,16 +1342,13 @@ export function KayitSurecWorkspace({
                             ) : (
                               <div className="surec-person-placeholder">
                                 <strong>Mali İşlemler</strong>
-                                <p>
-                                  Finans kalemi oluşturmak için hesabınızda finans oluşturma yetkisi olmalıdır. Liste ve
-                                  diğer finans işlemleri için Finans modülünü kullanın.
-                                </p>
+                                <p>Bu işlem için yetkin yok. Mali kayıtları Finans ekranından yönet.</p>
                               </div>
                             )
                           ) : (
                             <div className="surec-person-placeholder">
                               <strong>Mali İşlemler</strong>
-                              <p>Finans kaydı eklemek için önce personel seçin.</p>
+                              <p>Mali işlemler için önce personel seç.</p>
                             </div>
                           )
                         ) : activePersonelTab === "zimmet" ? (
@@ -1378,7 +1375,7 @@ export function KayitSurecWorkspace({
                           ) : (
                             <div className="surec-person-placeholder">
                               <strong>Zimmet</strong>
-                              <p>Zimmet eklemek için önce personel seçin.</p>
+                              <p>Zimmet için önce personel seç.</p>
                             </div>
                           )
                         ) : activePersonelTab === "ayrilma" ? (
@@ -1386,12 +1383,12 @@ export function KayitSurecWorkspace({
                             selectedSurecPersonel.aktif_durum === "PASIF" ? (
                               <div className="surec-person-placeholder">
                                 <strong>Ayrılma</strong>
-                                <p>Bu personel pasif. İşten ayrılma süreci eklenemez.</p>
+                                <p>Bu personel pasif; ayrılma kaydı eklenmez.</p>
                               </div>
                             ) : (
                               <div className="surec-shell-panel">
                                 <p className="workspace-empty-hint">
-                                  <strong>İşten ayrılma</strong> — {selectedSurecPersonelLabel}
+                                  <strong>Ayrılma</strong> — {selectedSurecPersonelLabel}
                                 </p>
                                 <form
                                   id={KAYIT_SUREC_SUREC_FORM_ID}
@@ -1437,21 +1434,18 @@ export function KayitSurecWorkspace({
                           ) : (
                             <div className="surec-person-placeholder">
                               <strong>Ayrılma</strong>
-                              <p>İşten ayrılma süreci eklemek için önce personel seçin.</p>
+                              <p>Ayrılma için önce personel seç.</p>
                             </div>
                           )
                         ) : activePersonelTab === "ceza" ? (
                           <div className="surec-person-placeholder">
                             <strong>Ceza</strong>
-                            <p>Personele uygulanacak ceza kesintileri Mali İşlemler sekmesinden yönetilir.</p>
+                            <p>Ceza kesintilerini Mali İşlemler sekmesinde gir.</p>
                           </div>
                         ) : activePersonelTab === "belgeler" ? (
                           <div className="surec-person-placeholder">
                             <strong>Belgeler</strong>
-                            <p>
-                              Forklift belgesi, ehliyet, sertifika ve sağlık belgesi gibi evraklar bu sekmede
-                              yönetilecektir.
-                            </p>
+                            <p>Ehliyet, sertifika ve sağlık belgesi gibi evrakları bu sekmeden yönet.</p>
                           </div>
                         ) : null}
 

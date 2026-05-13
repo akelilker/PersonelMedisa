@@ -5,7 +5,18 @@ import { ErrorState } from "../../../components/states/ErrorState";
 import { LoadingState } from "../../../components/states/LoadingState";
 import type { KayitTab } from "../../../components/main-menu/MainMenu";
 import type { PersonelReferenceBundle } from "../../../data/app-data.types";
-import { createPersonel, fetchPersonellerList, updatePersonel } from "../../../api/personeller.api";
+import {
+  dataCacheKeys,
+  fetchWithCacheMerge,
+  getActiveSube,
+  getSubeIdForApiRequest
+} from "../../../data/data-manager";
+import {
+  createPersonel,
+  fetchPersonelDetail,
+  fetchPersonellerList,
+  updatePersonel
+} from "../../../api/personeller.api";
 import {
   fetchBagliAmirOptions,
   fetchDepartmanOptions,
@@ -15,7 +26,7 @@ import {
   fetchSurecTuruOptions,
   fetchUcretTipiOptions
 } from "../../../api/referans.api";
-import { createSurec, updateSurec } from "../../../api/surecler.api";
+import { createSurec, fetchSureclerList, updateSurec } from "../../../api/surecler.api";
 import { fetchPersonelBelgeDurumu, putPersonelBelgeDurumu } from "../../../api/belgeler.api";
 import { getApiErrorMessage } from "../../../api/api-client";
 import { PersonelCreateFields } from "../../../features/personeller/components/PersonelCreateFields";
@@ -30,6 +41,7 @@ import { usePersonelFinansCreate } from "../../../hooks/useFinans";
 import { INITIAL_CREATE_PERSONEL_FORM, usePersonelZimmetCreate, type CreatePersonelFormState } from "../../../hooks/usePersoneller";
 import { INITIAL_SUREC_FORM, type SurecFormState } from "../../../hooks/useSurecler";
 import { useRoleAccess } from "../../../hooks/use-role-access";
+import { runDeduped } from "../../../lib/in-flight-dedupe";
 import type { FinansMaliFieldsState } from "../../../lib/finans/finans-create-commit";
 import type { Personel } from "../../../types/personel";
 import type { IdOption, KeyOption } from "../../../types/referans";
@@ -49,6 +61,46 @@ export const KAYIT_SUREC_ZIMMET_FORM_ID = "kayit-surec-zimmet-form";
 export const KAYIT_SUREC_MALI_FORM_ID = "kayit-surec-mali-form";
 export const KAYIT_SUREC_CEZA_FORM_ID = "kayit-surec-ceza-form";
 export const KAYIT_SUREC_BELGELER_FORM_ID = "kayit-surec-belgeler-form";
+
+/** Personel kartı süreç geçmişi; `usePersonelDetail` ile aynı sayfa boyutu. */
+const KAYIT_SUREC_PERSONEL_HISTORY_LIMIT = 20;
+/** `useSurecler` liste sayfa boyutu ile uyumlu. */
+const KAYIT_SUREC_LIST_PAGE_SIZE = 10;
+
+async function refetchSurecCachesForPersonel(personelId: number): Promise<void> {
+  const activeSube = getActiveSube();
+  const subeId = getSubeIdForApiRequest();
+  const personelKey = String(personelId);
+
+  const scopedKey = dataCacheKeys.sureclerList(activeSube, personelKey, "", "", "", "", 1);
+  await fetchWithCacheMerge(scopedKey, () =>
+    runDeduped(scopedKey, () =>
+      fetchSureclerList({
+        personel_id: personelId,
+        sube_id: subeId,
+        page: 1,
+        limit: KAYIT_SUREC_PERSONEL_HISTORY_LIMIT
+      })
+    )
+  );
+
+  const globalKey = dataCacheKeys.sureclerList(activeSube, "", "", "", "", "", 1);
+  await fetchWithCacheMerge(globalKey, () =>
+    runDeduped(globalKey, () =>
+      fetchSureclerList({
+        sube_id: subeId,
+        page: 1,
+        limit: KAYIT_SUREC_LIST_PAGE_SIZE
+      })
+    )
+  );
+}
+
+async function refetchPersonelDetailAfterIstenAyrilma(personelId: number): Promise<Personel> {
+  const activeSube = getActiveSube();
+  const detailKey = dataCacheKeys.personelDetail(activeSube, personelId);
+  return fetchWithCacheMerge(detailKey, () => runDeduped(detailKey, () => fetchPersonelDetail(personelId)));
+}
 
 type KayitSurecWorkspaceProps = {
   activeTab: KayitTab;
@@ -943,18 +995,34 @@ export function KayitSurecWorkspace({
     setSurecError(null);
     setSurecInfo(null);
 
+    let nextSurecPersonelId = surecForm.personelId;
+
     try {
       if (editingSurec) {
         await updateSurec(editingSurec.id, buildUpdateSurecPayload(surecForm));
         setSurecInfo("Süreç kaydı güncellendi.");
       } else {
-        await createSurec(buildCreateSurecPayload(surecForm));
+        const payload = buildCreateSurecPayload(surecForm);
+        nextSurecPersonelId = String(payload.personel_id);
+        await createSurec(payload);
         setSurecInfo("Süreç kaydı eklendi.");
+        try {
+          await refetchSurecCachesForPersonel(payload.personel_id);
+        } catch {
+          /* Süreç listesi önbelleği yenilenemedi. */
+        }
+        if (payload.surec_turu === "ISTEN_AYRILMA") {
+          try {
+            const refreshed = await refetchPersonelDetailAfterIstenAyrilma(payload.personel_id);
+            setPersoneller((prev) => prev.map((item) => (item.id === refreshed.id ? refreshed : item)));
+          } catch {
+            /* Personel detay önbelleği / liste satırı güncellenemedi. */
+          }
+        }
       }
 
-      const currentPersonelId = surecForm.personelId;
       setEditingSurec(null);
-      setSurecForm(resetSurecFormKeepingPersonel(currentPersonelId));
+      setSurecForm(resetSurecFormKeepingPersonel(nextSurecPersonelId));
     } catch (error) {
       setSurecError(error instanceof Error ? error.message : "Süreç kaydı kaydedilemedi.");
     } finally {
@@ -1048,6 +1116,12 @@ export function KayitSurecWorkspace({
         baslangic_tarihi: pozisyonForm.effectiveDate,
         aciklama
       });
+
+      try {
+        await refetchSurecCachesForPersonel(selectedSurecPersonel.id);
+      } catch {
+        /* Önbellek yenilemesi başarısız. */
+      }
 
       setPersoneller((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
       setPozisyonForm(createPozisyonFormFromPersonel(updated));
@@ -1595,57 +1669,59 @@ export function KayitSurecWorkspace({
                           )
                         ) : activePersonelTab === "ayrilma" ? (
                           selectedSurecPersonel ? (
-                            selectedSurecPersonel.aktif_durum === "PASIF" ? (
-                              <div className="surec-person-placeholder">
-                                <strong>Ayrılma</strong>
-                                <p>Bu personel pasif; ayrılma kaydı eklenmez.</p>
-                              </div>
-                            ) : (
-                              <div className="surec-shell-panel">
-                                <p className="workspace-empty-hint">
-                                  <strong>Ayrılma</strong> — {selectedSurecPersonelLabel}
-                                </p>
-                                <form
-                                  id={KAYIT_SUREC_SUREC_FORM_ID}
-                                  className="workspace-form"
-                                  onSubmit={handleSurecSubmit}
-                                >
-                                  <SurecFormFields
-                                    form={surecForm}
-                                    setForm={setSurecForm}
-                                    surecTuruOptions={surecTuruOptions}
-                                    personelOptions={personelOptions}
-                                    showPersonelField={false}
-                                    showSurecTuruField={false}
-                                    showAltTurField={false}
-                                    showUcretliField={false}
-                                    useOperationControls
-                                    errorMessage={surecError}
-                                    referenceError={null}
-                                    className="workspace-form-stack workspace-form-stack--compact"
-                                  />
-                                </form>
-
+                            <>
+                              {surecInfo ? (
                                 <div className="workspace-inline-actions">
-                                  {surecInfo ? (
-                                    <p className="workspace-success workspace-success--inline">{surecInfo}</p>
-                                  ) : null}
+                                  <p className="workspace-success workspace-success--inline">{surecInfo}</p>
                                 </div>
-                                <div className="universal-btn-group workspace-form-actions">
-                                  <button
-                                    type="submit"
-                                    form={primaryFormId}
-                                    className="universal-btn-save"
-                                    disabled={surecSubmitting}
+                              ) : null}
+                              {selectedSurecPersonel.aktif_durum === "PASIF" ? (
+                                <div className="surec-person-placeholder">
+                                  <strong>Ayrılma</strong>
+                                  <p>Bu personel pasif; ayrılma kaydı eklenmez.</p>
+                                </div>
+                              ) : (
+                                <div className="surec-shell-panel">
+                                  <p className="workspace-empty-hint">
+                                    <strong>Ayrılma</strong> — {selectedSurecPersonelLabel}
+                                  </p>
+                                  <form
+                                    id={KAYIT_SUREC_SUREC_FORM_ID}
+                                    className="workspace-form"
+                                    onSubmit={handleSurecSubmit}
                                   >
-                                    Kaydet
-                                  </button>
-                                  <button type="button" className="universal-btn-cancel" onClick={onClose}>
-                                    Vazgeç
-                                  </button>
+                                    <SurecFormFields
+                                      form={surecForm}
+                                      setForm={setSurecForm}
+                                      surecTuruOptions={surecTuruOptions}
+                                      personelOptions={personelOptions}
+                                      showPersonelField={false}
+                                      showSurecTuruField={false}
+                                      showAltTurField={false}
+                                      showUcretliField={false}
+                                      useOperationControls
+                                      errorMessage={surecError}
+                                      referenceError={null}
+                                      className="workspace-form-stack workspace-form-stack--compact"
+                                    />
+                                  </form>
+
+                                  <div className="universal-btn-group workspace-form-actions">
+                                    <button
+                                      type="submit"
+                                      form={primaryFormId}
+                                      className="universal-btn-save"
+                                      disabled={surecSubmitting}
+                                    >
+                                      Kaydet
+                                    </button>
+                                    <button type="button" className="universal-btn-cancel" onClick={onClose}>
+                                      Vazgeç
+                                    </button>
+                                  </div>
                                 </div>
-                              </div>
-                            )
+                              )}
+                            </>
                           ) : (
                             <div className="surec-person-placeholder">
                               <strong>Ayrılma</strong>

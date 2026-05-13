@@ -184,6 +184,9 @@ export async function mockApi(page: Page, role: MockUserRole) {
     }
   ];
 
+  const DEMO_BELGE_TURLERI = ["KIMLIK", "ADRES_BEYANI", "IS_GIRIS_EVRAKLARI", "BANKA_IBAN"] as const;
+  const belgeDurumByPersonelId = new Map<number, Record<string, "VAR" | "YOK">>();
+
   const zimmetler: Array<{
     id: number;
     personel_id: number;
@@ -1251,6 +1254,59 @@ let bildirimIdCounter = 800;
       zimmetler.unshift(created);
 
       await fulfillJson(route, 200, okBody(created));
+      return;
+    }
+
+    const belgeDurumMatch = path.match(/^\/api\/personeller\/(\d+)\/belge-durumu$/);
+    if (belgeDurumMatch && method === "GET") {
+      const pid = Number.parseInt(belgeDurumMatch[1] ?? "0", 10);
+      const p = personeller.find((x) => x.id === pid);
+      if (!p) {
+        await fulfillJson(route, 404, errorBody("NOT_FOUND", "Personel bulunamadi."));
+        return;
+      }
+      const stored = belgeDurumByPersonelId.get(pid) ?? {};
+      const items = DEMO_BELGE_TURLERI.map((belge_turu) => ({
+        belge_turu,
+        durum: (stored[belge_turu] as "VAR" | "YOK" | undefined) ?? "YOK"
+      }));
+      await fulfillJson(route, 200, okBody({ items }));
+      return;
+    }
+
+    if (belgeDurumMatch && method === "PUT") {
+      const pid = Number.parseInt(belgeDurumMatch[1] ?? "0", 10);
+      const p = personeller.find((x) => x.id === pid);
+      if (!p) {
+        await fulfillJson(route, 404, errorBody("NOT_FOUND", "Personel bulunamadi."));
+        return;
+      }
+      const payload = (request.postDataJSON() ?? {}) as {
+        items?: Array<{ belge_turu?: string; durum?: string }>;
+      };
+      const stored = belgeDurumByPersonelId.get(pid) ?? {};
+      const incoming: Record<string, "VAR" | "YOK"> = {};
+      for (const row of payload.items ?? []) {
+        const tur = row.belge_turu?.trim();
+        const durum = row.durum;
+        if (!tur || (durum !== "VAR" && durum !== "YOK")) {
+          continue;
+        }
+        if (!(DEMO_BELGE_TURLERI as readonly string[]).includes(tur)) {
+          continue;
+        }
+        incoming[tur] = durum;
+      }
+      const next: Record<string, "VAR" | "YOK"> = { ...stored };
+      for (const belge_turu of DEMO_BELGE_TURLERI) {
+        next[belge_turu] = incoming[belge_turu] ?? stored[belge_turu] ?? "YOK";
+      }
+      belgeDurumByPersonelId.set(pid, next);
+      const items = DEMO_BELGE_TURLERI.map((belge_turu) => ({
+        belge_turu,
+        durum: next[belge_turu] ?? "YOK"
+      }));
+      await fulfillJson(route, 200, okBody({ items }));
       return;
     }
 

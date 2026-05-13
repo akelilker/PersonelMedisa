@@ -4,7 +4,8 @@ export const endpoints = {
   },
   personeller: {
     list: "/personeller",
-    detail: (id: number | string) => `/personeller/${id}`
+    detail: (id: number | string) => `/personeller/${id}`,
+    belgeDurumu: (id: number | string) => `/personeller/${id}/belge-durumu`
   },
   surecler: {
     list: "/surecler",

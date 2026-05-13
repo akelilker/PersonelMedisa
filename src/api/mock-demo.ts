@@ -203,6 +203,10 @@ const demoState: {
   departmanlar: DemoDepartman[];
   subeler: DemoSube[];
   aylikDurumMap: Record<string, DemoAylikDurum>;
+  belgeDurumByPersonelId: Record<
+    number,
+    Partial<Record<"KIMLIK" | "ADRES_BEYANI" | "IS_GIRIS_EVRAKLARI" | "BANKA_IBAN", "VAR" | "YOK">>
+  >;
   nextIds: {
     personel: number;
     surec: number;
@@ -532,6 +536,7 @@ const demoState: {
       kapanis_durumu: "ACIK"
     }
   },
+  belgeDurumByPersonelId: {},
   nextIds: {
     personel: 100,
     surec: 600,
@@ -544,6 +549,50 @@ const demoState: {
     departman: 12
   }
 };
+
+const DEMO_BELGE_TURLERI = ["KIMLIK", "ADRES_BEYANI", "IS_GIRIS_EVRAKLARI", "BANKA_IBAN"] as const;
+
+function buildDemoBelgeDurumResponse(personelId: number) {
+  const stored = demoState.belgeDurumByPersonelId[personelId] ?? {};
+  const items = DEMO_BELGE_TURLERI.map((belge_turu) => ({
+    belge_turu,
+    durum: stored[belge_turu] ?? "YOK"
+  }));
+  return ok({ items });
+}
+
+function applyDemoBelgeDurumPut(personelId: number, body: Record<string, unknown>) {
+  const itemsRaw = body.items;
+  if (!Array.isArray(itemsRaw)) {
+    return buildDemoBelgeDurumResponse(personelId);
+  }
+
+  const incoming: Partial<Record<(typeof DEMO_BELGE_TURLERI)[number], "VAR" | "YOK">> = {};
+  for (const row of itemsRaw) {
+    if (typeof row !== "object" || row === null) {
+      continue;
+    }
+    const r = row as Record<string, unknown>;
+    const tur = toStringValue(r.belge_turu);
+    const durum = toStringValue(r.durum);
+    if (!tur || (durum !== "VAR" && durum !== "YOK")) {
+      continue;
+    }
+    if (!(DEMO_BELGE_TURLERI as readonly string[]).includes(tur)) {
+      continue;
+    }
+    incoming[tur as (typeof DEMO_BELGE_TURLERI)[number]] = durum;
+  }
+
+  const prior = demoState.belgeDurumByPersonelId[personelId] ?? {};
+  const next: (typeof demoState.belgeDurumByPersonelId)[number] = { ...prior };
+  for (const belge_turu of DEMO_BELGE_TURLERI) {
+    next[belge_turu] = incoming[belge_turu] ?? prior[belge_turu] ?? "YOK";
+  }
+
+  demoState.belgeDurumByPersonelId[personelId] = next;
+  return buildDemoBelgeDurumResponse(personelId);
+}
 
 const DEMO_PERSONEL_TIPI_LABELS: Record<number, string> = {
   1: "Tam Zamanlı",
@@ -1845,6 +1894,25 @@ export function resolveDemoApiResponse(
       },
       { total: 1 }
     );
+  }
+
+  const belgeDurumMatch = pathname.match(/^\/personeller\/(\d+)\/belge-durumu$/);
+  if (belgeDurumMatch && method === "GET") {
+    const personelId = Number.parseInt(belgeDurumMatch[1] ?? "0", 10);
+    const exists = demoState.personeller.some((item) => item.id === personelId);
+    if (!exists) {
+      return null;
+    }
+    return buildDemoBelgeDurumResponse(personelId);
+  }
+
+  if (belgeDurumMatch && method === "PUT") {
+    const personelId = Number.parseInt(belgeDurumMatch[1] ?? "0", 10);
+    const exists = demoState.personeller.some((item) => item.id === personelId);
+    if (!exists) {
+      return null;
+    }
+    return applyDemoBelgeDurumPut(personelId, body);
   }
 
   if (pathname === "/ek-odeme-kesinti" && method === "GET") {

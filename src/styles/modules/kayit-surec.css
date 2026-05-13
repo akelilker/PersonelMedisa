@@ -847,3 +847,40 @@
   display: grid;
   gap: 3px;
 }
+
+.belge-durum-form {
+  display: grid;
+  gap: 12px;
+  width: min(100%, 520px);
+  margin-inline: auto;
+}
+
+.belge-durum-row {
+  display: grid;
+  gap: 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.belge-durum-row:last-of-type {
+  border-bottom: none;
+}
+
+.belge-durum-radios {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.belge-durum-radio {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: rgba(241, 243, 250, 0.85);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.belge-durum-radio input {
+  accent-color: rgb(var(--theme-color-rgb));
+}

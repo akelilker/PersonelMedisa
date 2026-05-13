@@ -16,6 +16,8 @@ import {
   fetchUcretTipiOptions
 } from "../../../api/referans.api";
 import { createSurec, updateSurec } from "../../../api/surecler.api";
+import { fetchPersonelBelgeDurumu, putPersonelBelgeDurumu } from "../../../api/belgeler.api";
+import { getApiErrorMessage } from "../../../api/api-client";
 import { PersonelCreateFields } from "../../../features/personeller/components/PersonelCreateFields";
 import { PersonelZimmetCreateForm } from "../../../features/personeller/components/PersonelZimmetCreateForm";
 import { buildCreatePersonelPayload } from "../../../features/personeller/personel-create-utils";
@@ -31,11 +33,20 @@ import { useRoleAccess } from "../../../hooks/use-role-access";
 import type { Personel } from "../../../types/personel";
 import type { IdOption, KeyOption } from "../../../types/referans";
 import type { Surec } from "../../../types/surec";
+import {
+  BELGE_TURU_KEYS,
+  BELGE_TURU_LABELS,
+  createDefaultBelgeDurumDraft,
+  type BelgeDurum,
+  type BelgeDurumuItem,
+  type BelgeTuru
+} from "../../../types/belgeler";
 
 export const KAYIT_SUREC_PERSONEL_FORM_ID = "kayit-surec-personel-form";
 export const KAYIT_SUREC_SUREC_FORM_ID = "kayit-surec-surec-form";
 export const KAYIT_SUREC_ZIMMET_FORM_ID = "kayit-surec-zimmet-form";
 export const KAYIT_SUREC_MALI_FORM_ID = "kayit-surec-mali-form";
+export const KAYIT_SUREC_BELGELER_FORM_ID = "kayit-surec-belgeler-form";
 
 type KayitSurecWorkspaceProps = {
   activeTab: KayitTab;
@@ -391,6 +402,14 @@ export function KayitSurecWorkspace({
   const [pozisyonInfo, setPozisyonInfo] = useState<string | null>(null);
   const [openPozisyonPicker, setOpenPozisyonPicker] = useState<string | null>(null);
 
+  const [belgeDurumDraft, setBelgeDurumDraft] = useState<Record<BelgeTuru, BelgeDurum>>(() =>
+    createDefaultBelgeDurumDraft()
+  );
+  const [belgeDurumLoading, setBelgeDurumLoading] = useState(false);
+  const [belgeDurumError, setBelgeDurumError] = useState<string | null>(null);
+  const [belgeDurumInfo, setBelgeDurumInfo] = useState<string | null>(null);
+  const [belgeDurumSaving, setBelgeDurumSaving] = useState(false);
+
   const personelOptions = useMemo(
     () =>
       personeller.map((personel) => ({
@@ -557,6 +576,10 @@ export function KayitSurecWorkspace({
   function selectSurecPersonel(personelId: string) {
     setSurecForm((prev) => ({ ...prev, personelId }));
     setSurecPersonelPickerOpen(false);
+    if (activePersonelTab === "belgeler") {
+      setBelgeDurumInfo(null);
+      setBelgeDurumError(null);
+    }
   }
 
   function openDevamsizlikTab(defaultSubId: DevamsizlikSubId | null = "izin") {
@@ -579,6 +602,8 @@ export function KayitSurecWorkspace({
     setPozisyonError(null);
     setPozisyonInfo(null);
     setOpenPozisyonPicker(null);
+    setBelgeDurumInfo(null);
+    setBelgeDurumError(null);
 
     if (tabId === "izin-devamsizlik") {
       const nextSubId = devamsizlikSubId ?? "izin";
@@ -600,6 +625,11 @@ export function KayitSurecWorkspace({
         altTur: "",
         ucretliMi: false
       }));
+      return;
+    }
+
+    if (tabId === "belgeler") {
+      setDevamsizlikSubId(null);
       return;
     }
 
@@ -669,9 +699,78 @@ export function KayitSurecWorkspace({
     }
   }
 
+  async function handleBelgeDurumSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!selectedSurecPersonel || selectedSurecPersonel.aktif_durum === "PASIF" || !canCreateSurec) {
+      return;
+    }
+    if (belgeDurumSaving || belgeDurumLoading) {
+      return;
+    }
+
+    setBelgeDurumSaving(true);
+    setBelgeDurumError(null);
+    setBelgeDurumInfo(null);
+    try {
+      const items: BelgeDurumuItem[] = BELGE_TURU_KEYS.map((belge_turu) => ({
+        belge_turu,
+        durum: belgeDurumDraft[belge_turu]
+      }));
+      await putPersonelBelgeDurumu(selectedSurecPersonel.id, items);
+      setBelgeDurumInfo("Belge durumu kaydedildi.");
+    } catch (err) {
+      setBelgeDurumError(getApiErrorMessage(err, "Belge durumu kaydedilemedi."));
+    } finally {
+      setBelgeDurumSaving(false);
+    }
+  }
+
   useEffect(() => {
     void loadBootstrap();
   }, []);
+
+  useEffect(() => {
+    if (activePersonelTab !== "belgeler") {
+      return;
+    }
+
+    if (!selectedSurecPersonel || selectedSurecPersonel.aktif_durum === "PASIF") {
+      setBelgeDurumDraft(createDefaultBelgeDurumDraft());
+      setBelgeDurumLoading(false);
+      setBelgeDurumError(null);
+      return;
+    }
+
+    let cancelled = false;
+    setBelgeDurumLoading(true);
+    setBelgeDurumError(null);
+
+    void (async () => {
+      try {
+        const items = await fetchPersonelBelgeDurumu(selectedSurecPersonel.id);
+        if (cancelled) {
+          return;
+        }
+        const next = createDefaultBelgeDurumDraft();
+        for (const row of items) {
+          next[row.belge_turu] = row.durum;
+        }
+        setBelgeDurumDraft(next);
+      } catch (err) {
+        if (!cancelled) {
+          setBelgeDurumError(getApiErrorMessage(err, "Belge durumu yüklenemedi."));
+        }
+      } finally {
+        if (!cancelled) {
+          setBelgeDurumLoading(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activePersonelTab, selectedSurecPersonel?.id, selectedSurecPersonel?.aktif_durum]);
 
   useEffect(() => {
     if (!initialSurecPersonelId) {
@@ -1093,6 +1192,7 @@ export function KayitSurecWorkspace({
                                 key={tab.id}
                                 type="button"
                                 role="tab"
+                                data-testid={`kayit-surec-subtab-${tab.id}`}
                                 aria-selected={isActive}
                                 className={`surec-person-tab${isActive ? " is-active" : ""}${tab.id === "izin-devamsizlik" ? " surec-shell-action-tile" : ""}`}
                                 onClick={() => selectPersonelTab(tab.id)}
@@ -1443,10 +1543,92 @@ export function KayitSurecWorkspace({
                             <p>Ceza kesintilerini Mali İşlemler sekmesinde gir.</p>
                           </div>
                         ) : activePersonelTab === "belgeler" ? (
-                          <div className="surec-person-placeholder">
-                            <strong>Belgeler</strong>
-                            <p>Ehliyet, sertifika ve sağlık belgesi gibi evrakları bu sekmeden yönet.</p>
-                          </div>
+                          selectedSurecPersonel ? (
+                            selectedSurecPersonel.aktif_durum === "PASIF" ? (
+                              <div className="surec-person-placeholder">
+                                <strong>Belgeler</strong>
+                                <p>Bu personel pasif; belge durumu güncellenmez.</p>
+                              </div>
+                            ) : canCreateSurec ? (
+                              <div>
+                                <p className="workspace-empty-hint">
+                                  <strong>Belgeler</strong> — {selectedSurecPersonelLabel}
+                                </p>
+                                {belgeDurumLoading ? (
+                                  <p className="workspace-empty-hint">Belgeler yükleniyor…</p>
+                                ) : null}
+                                {belgeDurumError ? <p className="workspace-error">{belgeDurumError}</p> : null}
+                                {!belgeDurumLoading ? (
+                                  <form
+                                    id={KAYIT_SUREC_BELGELER_FORM_ID}
+                                    className="workspace-form belge-durum-form"
+                                    onSubmit={handleBelgeDurumSubmit}
+                                  >
+                                    {BELGE_TURU_KEYS.map((tur) => (
+                                      <div key={tur} className="form-section belge-durum-row">
+                                        <div className="form-label" id={`belge-label-${tur}`}>
+                                          {BELGE_TURU_LABELS[tur]}
+                                        </div>
+                                        <div
+                                          className="belge-durum-radios"
+                                          role="radiogroup"
+                                          aria-labelledby={`belge-label-${tur}`}
+                                        >
+                                          <label className="belge-durum-radio">
+                                            <input
+                                              type="radio"
+                                              name={`belge-durum-${tur}`}
+                                              value="VAR"
+                                              checked={belgeDurumDraft[tur] === "VAR"}
+                                              onChange={() =>
+                                                setBelgeDurumDraft((prev) => ({ ...prev, [tur]: "VAR" }))
+                                              }
+                                            />{" "}
+                                            VAR
+                                          </label>
+                                          <label className="belge-durum-radio">
+                                            <input
+                                              type="radio"
+                                              name={`belge-durum-${tur}`}
+                                              value="YOK"
+                                              checked={belgeDurumDraft[tur] === "YOK"}
+                                              onChange={() =>
+                                                setBelgeDurumDraft((prev) => ({ ...prev, [tur]: "YOK" }))
+                                              }
+                                            />{" "}
+                                            YOK
+                                          </label>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </form>
+                                ) : null}
+                                {belgeDurumInfo ? (
+                                  <p className="workspace-success workspace-success--inline">{belgeDurumInfo}</p>
+                                ) : null}
+                                <div className="universal-btn-group workspace-form-actions">
+                                  <button
+                                    type="submit"
+                                    form={KAYIT_SUREC_BELGELER_FORM_ID}
+                                    className="universal-btn-save"
+                                    disabled={belgeDurumSaving || belgeDurumLoading}
+                                  >
+                                    {belgeDurumSaving ? "Kaydediliyor..." : "Kaydet"}
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="surec-person-placeholder">
+                                <strong>Belgeler</strong>
+                                <p>Bu işlem için yetkin yok.</p>
+                              </div>
+                            )
+                          ) : (
+                            <div className="surec-person-placeholder">
+                              <strong>Belgeler</strong>
+                              <p>Belgeler için önce personel seç.</p>
+                            </div>
+                          )
                         ) : null}
 
                       </div>

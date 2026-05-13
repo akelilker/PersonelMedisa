@@ -62,8 +62,9 @@ test.describe("Kayit Surec Ayrilma sekmesi", () => {
 
     await kayitModal.getByRole("tab", { name: "Ayrılma" }).click();
 
-    await expect(kayitModal.locator(".surec-person-placeholder")).toContainText(/pasif/i);
-    await expect(kayitModal.locator(".surec-person-placeholder")).toContainText(/İşten ayrılma süreci eklenemez/i);
+    await expect(kayitModal.locator(".surec-person-placeholder")).toContainText(
+      "Bu personel pasif; ayrılma kaydı eklenmez."
+    );
     await expect(kayitModal.locator("[name='surec-create-bas']")).toHaveCount(0);
   });
 });

@@ -456,9 +456,12 @@ export function KayitSurecWorkspace({
   const { hasPermission } = useRoleAccess();
   const canCreatePersonel = hasPermission("personeller.create");
   const canCreateSurec = hasPermission("surecler.create");
-  const canCreateZimmet = hasPermission("personeller.update");
+  const canUpdatePersonel = hasPermission("personeller.update");
+  const canCreateZimmet = canUpdatePersonel;
   const canCreateFinans = hasPermission("finans.create");
   const canEditSurec = hasPermission("surecler.update");
+  /** Pozisyon: `updatePersonel` + `createSurec(POZISYON_DEGISTI)` — ikisi de zorunlu. */
+  const canSubmitPozisyon = canUpdatePersonel && canCreateSurec;
 
   const [refs, setRefs] = useState<PersonelReferenceBundle>(EMPTY_REFS);
   const [surecTuruOptions, setSurecTuruOptions] = useState<KeyOption[]>([]);
@@ -549,6 +552,9 @@ export function KayitSurecWorkspace({
     return Number.isFinite(personelId) ? personelMap.get(personelId) ?? null : null;
   }, [personelMap, surecForm.personelId]);
 
+  const isSelectedPersonelPasif = selectedSurecPersonel?.aktif_durum === "PASIF";
+  const canSubmitShellFinansZimmet = Boolean(selectedSurecPersonel) && !isSelectedPersonelPasif;
+
   const zimmetPersonelIdForHook = selectedSurecPersonel?.id ?? 0;
   const zimmetPersonelValid = Boolean(selectedSurecPersonel);
   const {
@@ -558,7 +564,7 @@ export function KayitSurecWorkspace({
     isZimmetSubmitting,
     zimmetCreateErrorMessage
   } = usePersonelZimmetCreate(zimmetPersonelIdForHook, zimmetPersonelValid, canCreateZimmet, {
-    canSubmit: zimmetPersonelValid
+    canSubmit: canSubmitShellFinansZimmet
   });
 
   const {
@@ -568,7 +574,7 @@ export function KayitSurecWorkspace({
     isFinansSubmitting: isMaliSubmitting,
     finansCreateErrorMessage: maliCreateErrorMessage
   } = usePersonelFinansCreate(zimmetPersonelIdForHook, zimmetPersonelValid, canCreateFinans, {
-    canSubmit: zimmetPersonelValid,
+    canSubmit: canSubmitShellFinansZimmet,
     initialKalemTuru: "AVANS"
   });
 
@@ -579,7 +585,7 @@ export function KayitSurecWorkspace({
     isFinansSubmitting: isCezaSubmitting,
     finansCreateErrorMessage: cezaCreateErrorMessage
   } = usePersonelFinansCreate(zimmetPersonelIdForHook, zimmetPersonelValid, canCreateFinans, {
-    canSubmit: zimmetPersonelValid,
+    canSubmit: canSubmitShellFinansZimmet,
     initialKalemTuru: "CEZA"
   });
 
@@ -922,6 +928,16 @@ export function KayitSurecWorkspace({
       setSurecError("Bu süreci düzenlemek için yetkin bulunmuyor.");
       return;
     }
+    if (!editingSurec && selectedSurecPersonel?.aktif_durum === "PASIF") {
+      setSurecError(
+        activePersonelTab === "ayrilma"
+          ? "Bu personel pasif; ayrılma kaydı eklenmez."
+          : activePersonelTab === "izin-devamsizlik"
+            ? "Bu personel pasif; izin/devamsızlık kaydı eklenmez."
+            : "Bu personel pasif; süreç kaydı eklenmez."
+      );
+      return;
+    }
 
     setSurecSubmitting(true);
     setSurecError(null);
@@ -950,6 +966,18 @@ export function KayitSurecWorkspace({
     event.preventDefault();
 
     if (!selectedSurecPersonel || pozisyonSubmitting) {
+      return;
+    }
+
+    if (!canSubmitPozisyon) {
+      setPozisyonInfo(null);
+      setPozisyonError("Bu işlem için yetkin bulunmuyor.");
+      return;
+    }
+
+    if (selectedSurecPersonel.aktif_durum === "PASIF") {
+      setPozisyonInfo(null);
+      setPozisyonError("Bu personel pasif; pozisyon değişikliği yapılamaz.");
       return;
     }
 
@@ -1337,150 +1365,177 @@ export function KayitSurecWorkspace({
                         ) : null}
 
                         {activePersonelTab === "izin-devamsizlik" ? (
-                          <div className="surec-shell-panel">
-                            <div className="surec-devamsizlik-tiles" role="group" aria-label="İzin ve yokluk işlemleri">
-                              {DEVAMSIZLIK_SUB_CARDS.map((card) => {
-                                const isActive = devamsizlikSubId === card.id;
-
-                                return (
-                                  <button
-                                    key={card.id}
-                                    type="button"
-                                    className={`surec-devamsizlik-tile${isActive ? " is-active" : ""}`}
-                                    onClick={() => selectDevamsizlikSubCard(card.id)}
-                                  >
-                                    <span className="surec-devamsizlik-tile-title">{card.title}</span>
-                                    <span className="surec-devamsizlik-tile-desc">{card.description}</span>
-                                    <span className="surec-devamsizlik-tile-status">{isActive ? "Seçildi" : "Seç"}</span>
-                                  </button>
-                                );
-                              })}
+                          isSelectedPersonelPasif ? (
+                            <div className="surec-person-placeholder">
+                              <strong>İzin / Devamsızlık</strong>
+                              <p>Bu personel pasif; izin/devamsızlık kaydı eklenmez.</p>
                             </div>
+                          ) : (
+                            <div className="surec-shell-panel">
+                              <div className="surec-devamsizlik-tiles" role="group" aria-label="İzin ve yokluk işlemleri">
+                                {DEVAMSIZLIK_SUB_CARDS.map((card) => {
+                                  const isActive = devamsizlikSubId === card.id;
 
-                            {devamsizlikSubId ? (
-                              <>
-                                <form id={KAYIT_SUREC_SUREC_FORM_ID} className="workspace-form" onSubmit={handleSurecSubmit}>
-                                  <SurecFormFields
-                                    form={surecForm}
-                                    setForm={setSurecForm}
-                                    surecTuruOptions={surecTuruOptions}
-                                    personelOptions={personelOptions}
-                                    showPersonelField={false}
-                                    showSurecTuruField={!hideSurecTuruFieldInShell}
-                                    altTurField={activeDevamsizlikAltTurField}
-                                    useOperationControls
-                                    errorMessage={surecError}
-                                    referenceError={null}
-                                    className="workspace-form-stack workspace-form-stack--compact"
-                                  />
-                                </form>
+                                  return (
+                                    <button
+                                      key={card.id}
+                                      type="button"
+                                      className={`surec-devamsizlik-tile${isActive ? " is-active" : ""}`}
+                                      onClick={() => selectDevamsizlikSubCard(card.id)}
+                                    >
+                                      <span className="surec-devamsizlik-tile-title">{card.title}</span>
+                                      <span className="surec-devamsizlik-tile-desc">{card.description}</span>
+                                      <span className="surec-devamsizlik-tile-status">{isActive ? "Seçildi" : "Seç"}</span>
+                                    </button>
+                                  );
+                                })}
+                              </div>
 
-                                <div className="workspace-inline-actions">
-                                  {surecInfo ? <p className="workspace-success workspace-success--inline">{surecInfo}</p> : null}
-                                </div>
-                                <div className="universal-btn-group workspace-form-actions">
-                                  <button type="submit" form={primaryFormId} className="universal-btn-save" disabled={surecSubmitting}>
-                                    Kaydet
-                                  </button>
-                                  <button type="button" className="universal-btn-cancel" onClick={onClose}>
-                                    Vazgeç
-                                  </button>
-                                </div>
-                              </>
-                            ) : null}
-                          </div>
+                              {devamsizlikSubId ? (
+                                <>
+                                  <form id={KAYIT_SUREC_SUREC_FORM_ID} className="workspace-form" onSubmit={handleSurecSubmit}>
+                                    <SurecFormFields
+                                      form={surecForm}
+                                      setForm={setSurecForm}
+                                      surecTuruOptions={surecTuruOptions}
+                                      personelOptions={personelOptions}
+                                      showPersonelField={false}
+                                      showSurecTuruField={!hideSurecTuruFieldInShell}
+                                      altTurField={activeDevamsizlikAltTurField}
+                                      useOperationControls
+                                      errorMessage={surecError}
+                                      referenceError={null}
+                                      className="workspace-form-stack workspace-form-stack--compact"
+                                    />
+                                  </form>
+
+                                  <div className="workspace-inline-actions">
+                                    {surecInfo ? <p className="workspace-success workspace-success--inline">{surecInfo}</p> : null}
+                                  </div>
+                                  <div className="universal-btn-group workspace-form-actions">
+                                    <button type="submit" form={primaryFormId} className="universal-btn-save" disabled={surecSubmitting}>
+                                      Kaydet
+                                    </button>
+                                    <button type="button" className="universal-btn-cancel" onClick={onClose}>
+                                      Vazgeç
+                                    </button>
+                                  </div>
+                                </>
+                              ) : null}
+                            </div>
+                          )
                         ) : null}
 
                         {activePersonelTab === "pozisyon" ? (
-                          <div className="surec-position-panel">
-                            <form className="workspace-form surec-position-form" onSubmit={handlePozisyonSubmit}>
-                              <div className="surec-position-grid">
-                                <PozisyonReferencePicker
-                                  label="Bölüm"
-                                  name="pozisyon-departman"
-                                  value={pozisyonForm.departmanId}
-                                  options={refs.departmanOptions}
-                                  isOpen={openPozisyonPicker === "departman"}
-                                  onOpenChange={(isOpen) => setOpenPozisyonPicker(isOpen ? "departman" : null)}
-                                  onChange={(value) => setPozisyonForm((prev) => ({ ...prev, departmanId: value }))}
-                                  required
-                                />
-                                <PozisyonReferencePicker
-                                  label="Görev / Unvan"
-                                  name="pozisyon-gorev"
-                                  value={pozisyonForm.gorevId}
-                                  options={refs.gorevOptions}
-                                  isOpen={openPozisyonPicker === "gorev"}
-                                  onOpenChange={(isOpen) => setOpenPozisyonPicker(isOpen ? "gorev" : null)}
-                                  onChange={(value) => setPozisyonForm((prev) => ({ ...prev, gorevId: value }))}
-                                  required
-                                />
-                                <PozisyonReferencePicker
-                                  label="Bağlı Amir"
-                                  name="pozisyon-bagli-amir"
-                                  value={pozisyonForm.bagliAmirId}
-                                  options={refs.bagliAmirOptions}
-                                  isOpen={openPozisyonPicker === "bagli-amir"}
-                                  onOpenChange={(isOpen) => setOpenPozisyonPicker(isOpen ? "bagli-amir" : null)}
-                                  onChange={(value) => setPozisyonForm((prev) => ({ ...prev, bagliAmirId: value }))}
-                                />
-                                <PozisyonReferencePicker
-                                  label="Çalışma Tipi"
-                                  name="pozisyon-personel-tipi"
-                                  value={pozisyonForm.personelTipiId}
-                                  options={refs.personelTipiOptions}
-                                  isOpen={openPozisyonPicker === "personel-tipi"}
-                                  onOpenChange={(isOpen) => setOpenPozisyonPicker(isOpen ? "personel-tipi" : null)}
-                                  onChange={(value) => setPozisyonForm((prev) => ({ ...prev, personelTipiId: value }))}
-                                  required
-                                />
-                              </div>
+                          isSelectedPersonelPasif ? (
+                            <div className="surec-person-placeholder">
+                              <strong>Pozisyon</strong>
+                              <p>Bu personel pasif; pozisyon değişikliği yapılamaz.</p>
+                            </div>
+                          ) : canSubmitPozisyon ? (
+                            <div className="surec-position-panel">
+                              <form className="workspace-form surec-position-form" onSubmit={handlePozisyonSubmit}>
+                                <div className="surec-position-grid">
+                                  <PozisyonReferencePicker
+                                    label="Bölüm"
+                                    name="pozisyon-departman"
+                                    value={pozisyonForm.departmanId}
+                                    options={refs.departmanOptions}
+                                    isOpen={openPozisyonPicker === "departman"}
+                                    onOpenChange={(isOpen) => setOpenPozisyonPicker(isOpen ? "departman" : null)}
+                                    onChange={(value) => setPozisyonForm((prev) => ({ ...prev, departmanId: value }))}
+                                    required
+                                  />
+                                  <PozisyonReferencePicker
+                                    label="Görev / Unvan"
+                                    name="pozisyon-gorev"
+                                    value={pozisyonForm.gorevId}
+                                    options={refs.gorevOptions}
+                                    isOpen={openPozisyonPicker === "gorev"}
+                                    onOpenChange={(isOpen) => setOpenPozisyonPicker(isOpen ? "gorev" : null)}
+                                    onChange={(value) => setPozisyonForm((prev) => ({ ...prev, gorevId: value }))}
+                                    required
+                                  />
+                                  <PozisyonReferencePicker
+                                    label="Bağlı Amir"
+                                    name="pozisyon-bagli-amir"
+                                    value={pozisyonForm.bagliAmirId}
+                                    options={refs.bagliAmirOptions}
+                                    isOpen={openPozisyonPicker === "bagli-amir"}
+                                    onOpenChange={(isOpen) => setOpenPozisyonPicker(isOpen ? "bagli-amir" : null)}
+                                    onChange={(value) => setPozisyonForm((prev) => ({ ...prev, bagliAmirId: value }))}
+                                  />
+                                  <PozisyonReferencePicker
+                                    label="Çalışma Tipi"
+                                    name="pozisyon-personel-tipi"
+                                    value={pozisyonForm.personelTipiId}
+                                    options={refs.personelTipiOptions}
+                                    isOpen={openPozisyonPicker === "personel-tipi"}
+                                    onOpenChange={(isOpen) => setOpenPozisyonPicker(isOpen ? "personel-tipi" : null)}
+                                    onChange={(value) => setPozisyonForm((prev) => ({ ...prev, personelTipiId: value }))}
+                                    required
+                                  />
+                                </div>
 
-                              <FormField
-                                label="Geçerlilik Tarihi"
-                                name="pozisyon-effective-date"
-                                type="date"
-                                value={pozisyonForm.effectiveDate}
-                                onChange={(value) => setPozisyonForm((prev) => ({ ...prev, effectiveDate: value }))}
-                                required={hasPozisyonDiff}
-                              />
+                                <FormField
+                                  label="Geçerlilik Tarihi"
+                                  name="pozisyon-effective-date"
+                                  type="date"
+                                  value={pozisyonForm.effectiveDate}
+                                  onChange={(value) => setPozisyonForm((prev) => ({ ...prev, effectiveDate: value }))}
+                                  required={hasPozisyonDiff}
+                                />
 
-                              <FormField
-                                label="Açıklama"
-                                name="pozisyon-aciklama"
-                                as="textarea"
-                                value={pozisyonForm.aciklama}
-                                onChange={(value) => setPozisyonForm((prev) => ({ ...prev, aciklama: value }))}
-                                placeholder="Değişiklik notu"
-                                rows={2}
-                              />
+                                <FormField
+                                  label="Açıklama"
+                                  name="pozisyon-aciklama"
+                                  as="textarea"
+                                  value={pozisyonForm.aciklama}
+                                  onChange={(value) => setPozisyonForm((prev) => ({ ...prev, aciklama: value }))}
+                                  placeholder="Değişiklik notu"
+                                  rows={2}
+                                />
 
-                              {pozisyonError ? <p className="workspace-error">{pozisyonError}</p> : null}
-                              {pozisyonInfo ? <p className="workspace-success">{pozisyonInfo}</p> : null}
+                                {pozisyonError ? <p className="workspace-error">{pozisyonError}</p> : null}
+                                {pozisyonInfo ? <p className="workspace-success">{pozisyonInfo}</p> : null}
 
-                              <div className="universal-btn-group workspace-form-actions">
-                                <button
-                                  type="submit"
-                                  className="universal-btn-save"
-                                  disabled={pozisyonSubmitting || !hasPozisyonDiff}
-                                >
-                                  Kaydet
-                                </button>
-                                <button
-                                  type="button"
-                                  className="universal-btn-cancel"
-                                  onClick={() => setPozisyonForm(createPozisyonFormFromPersonel(selectedSurecPersonel))}
-                                >
-                                  Vazgeç
-                                </button>
-                              </div>
-                            </form>
-                          </div>
+                                <div className="universal-btn-group workspace-form-actions">
+                                  <button
+                                    type="submit"
+                                    className="universal-btn-save"
+                                    disabled={pozisyonSubmitting || !hasPozisyonDiff}
+                                  >
+                                    Kaydet
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="universal-btn-cancel"
+                                    onClick={() => setPozisyonForm(createPozisyonFormFromPersonel(selectedSurecPersonel))}
+                                  >
+                                    Vazgeç
+                                  </button>
+                                </div>
+                              </form>
+                            </div>
+                          ) : (
+                            <div className="surec-person-placeholder">
+                              <strong>Pozisyon</strong>
+                              <p>
+                                Bu işlem için yetkin yok. Pozisyon değişikliği personel kartını günceller ve süreç kaydı
+                                oluşturur.
+                              </p>
+                            </div>
+                          )
                         ) : null}
 
                         {activePersonelTab === "mali" ? (
                           selectedSurecPersonel ? (
-                            canCreateFinans ? (
+                            isSelectedPersonelPasif ? (
+                              <div className="surec-person-placeholder">
+                                <strong>Mali İşlemler</strong>
+                                <p>Bu personel pasif; mali kayıt eklenmez.</p>
+                              </div>
+                            ) : canCreateFinans ? (
                               <PersonelFinansCreatePanel
                                 title="Mali İşlemler"
                                 personelLabel={selectedSurecPersonelLabel}
@@ -1506,6 +1561,12 @@ export function KayitSurecWorkspace({
                           )
                         ) : activePersonelTab === "zimmet" ? (
                           selectedSurecPersonel ? (
+                            isSelectedPersonelPasif ? (
+                              <div className="surec-person-placeholder">
+                                <strong>Zimmet</strong>
+                                <p>Bu personel pasif; zimmet kaydı eklenmez.</p>
+                              </div>
+                            ) : (
                             <div>
                               <PersonelZimmetCreateForm
                                 formId={KAYIT_SUREC_ZIMMET_FORM_ID}
@@ -1525,6 +1586,7 @@ export function KayitSurecWorkspace({
                                 </button>
                               </div>
                             </div>
+                            )
                           ) : (
                             <div className="surec-person-placeholder">
                               <strong>Zimmet</strong>
@@ -1592,7 +1654,12 @@ export function KayitSurecWorkspace({
                           )
                         ) : activePersonelTab === "ceza" ? (
                           selectedSurecPersonel ? (
-                            canCreateFinans ? (
+                            isSelectedPersonelPasif ? (
+                              <div className="surec-person-placeholder">
+                                <strong>Ceza</strong>
+                                <p>Bu personel pasif; ceza kaydı eklenmez.</p>
+                              </div>
+                            ) : canCreateFinans ? (
                               <PersonelFinansCreatePanel
                                 title="Ceza"
                                 personelLabel={selectedSurecPersonelLabel}

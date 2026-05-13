@@ -1447,8 +1447,11 @@ export function KayitSurecWorkspace({
                           </div>
                         ) : activePersonelTab === "belgeler" ? (
                           <div className="surec-person-placeholder">
-                            <strong>{PERSONEL_SUREC_TABS.find((tab) => tab.id === activePersonelTab)?.label}</strong>
-                            <p>Bu işlem ailesi merkezi akışa taşınacak. Şimdilik yerleşim sabitlendi.</p>
+                            <strong>Belgeler</strong>
+                            <p>
+                              Forklift belgesi, ehliyet, sertifika ve sağlık belgesi gibi evraklar bu sekmede
+                              yönetilecektir.
+                            </p>
                           </div>
                         ) : null}
 

@@ -6,6 +6,11 @@
   min-height: 0;
 }
 
+/* Kayıt sekmesi: sekme satırı ile içerik ızgarası arası (varsayılan 12px yerine sıkı ritim) */
+.kayit-workspace--personel-kayit {
+  gap: 6px;
+}
+
 .kayit-workspace-tabs {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
@@ -53,6 +58,50 @@
   gap: 12px;
   align-items: start;
   align-content: start;
+}
+
+/* Kayıt sekmesi personel formu — sıkı ritim; üst boşluk .kayit-workspace--personel-kayit gap ile */
+.kayit-workspace-grid--personel-form > .workspace-surface-card {
+  gap: 6px;
+}
+
+.kayit-workspace-grid--personel-form .workspace-form,
+.kayit-workspace-grid--personel-form .workspace-form-stack {
+  gap: 5px;
+}
+
+.kayit-workspace-grid--personel-form .personel-form-columns {
+  gap: 16px;
+}
+
+.kayit-workspace-grid--personel-form .personel-form-column {
+  gap: 5px;
+}
+
+.kayit-workspace-grid--personel-form .form-section {
+  gap: 2px;
+}
+
+.kayit-workspace-grid--personel-form .workspace-form-actions {
+  margin-top: 0;
+}
+
+.kayit-workspace-grid--personel-form .form-input::placeholder {
+  color: rgba(230, 234, 245, 0.34);
+}
+
+.kayit-workspace-grid--personel-form .form-input::-moz-placeholder {
+  color: rgba(230, 234, 245, 0.34);
+  opacity: 1;
+}
+
+.kayit-workspace-grid--personel-form input[type="date"].form-input::-webkit-calendar-picker-indicator {
+  width: 20px;
+  height: 20px;
+  margin-left: 4px;
+  opacity: 1;
+  filter: grayscale(1) invert(0.88) brightness(1.12) contrast(1.08);
+  cursor: pointer;
 }
 
 /* Süreç sekmesi — Devamsızlık işlem modu: işlem kartı öncelikli dikey alan, tarihçe sabit içerik */

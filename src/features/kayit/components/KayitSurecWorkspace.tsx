@@ -1183,7 +1183,7 @@ export function KayitSurecWorkspace({
     .join(" ");
 
   return (
-    <div className="kayit-workspace">
+    <div className={`kayit-workspace${activeTab === "yeni-kayit" ? " kayit-workspace--personel-kayit" : ""}`}>
       <div className="kayit-workspace-tabs" role="tablist" aria-label="Kayıt ve süreç sekmeleri">
         <button
           type="button"
@@ -1206,7 +1206,7 @@ export function KayitSurecWorkspace({
       </div>
 
       {activeTab === "yeni-kayit" ? (
-        <div className="kayit-workspace-grid">
+        <div className="kayit-workspace-grid kayit-workspace-grid--personel-form">
           <section className="workspace-surface-card">
             <div className="workspace-surface-header">
               <h3>Kayıt İşlemleri</h3>
@@ -1263,7 +1263,7 @@ export function KayitSurecWorkspace({
                         {primaryActionLabel}
                       </button>
                       <button type="button" className="universal-btn-cancel" onClick={onClose}>
-                        Kapat
+                        Vazgeç
                       </button>
                     </div>
                   </>

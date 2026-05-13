@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type Dispatch, type FormEvent, type SetStateAction } from "react";
+import { useEffect, useMemo, useRef, useState, type Dispatch, type FormEvent, type SetStateAction } from "react";
 import { useNavigate } from "react-router-dom";
 import { FormField } from "../../../components/form/FormField";
 import { ErrorState } from "../../../components/states/ErrorState";
@@ -7,6 +7,7 @@ import type { KayitTab } from "../../../components/main-menu/MainMenu";
 import type { PersonelReferenceBundle } from "../../../data/app-data.types";
 import {
   dataCacheKeys,
+  deleteCacheEntry,
   fetchWithCacheMerge,
   getActiveSube,
   getSubeIdForApiRequest
@@ -698,6 +699,8 @@ export function KayitSurecWorkspace({
 
   const useShellSurecLayout = editingSurec === null;
 
+  const prevShellPersonelIdRef = useRef<string | null>(null);
+
   const hideSurecTuruFieldInShell =
     useShellSurecLayout &&
     !editingSurec &&
@@ -713,11 +716,17 @@ export function KayitSurecWorkspace({
       return;
     }
 
+    const pid = surecForm.personelId;
+    const prevPid = prevShellPersonelIdRef.current;
+    if (prevPid !== null && prevPid !== "" && prevPid !== pid) {
+      setSurecInfo(null);
+    }
+    prevShellPersonelIdRef.current = pid;
+
     setActivePersonelTab("genel");
     setDevamsizlikSubId(null);
     setSurecForm((prev) => resetSurecFormKeepingPersonel(prev.personelId));
     setSurecError(null);
-    setSurecInfo(null);
     setSurecPersonelPickerOpen(false);
   }, [editingSurec, surecForm.personelId, useShellSurecLayout]);
 
@@ -999,8 +1008,16 @@ export function KayitSurecWorkspace({
 
     try {
       if (editingSurec) {
+        const updatedPersonelId = editingSurec.personel_id;
+        const updatedSurecId = editingSurec.id;
         await updateSurec(editingSurec.id, buildUpdateSurecPayload(surecForm));
         setSurecInfo("Süreç kaydı güncellendi.");
+        deleteCacheEntry(dataCacheKeys.surecDetail(getActiveSube(), updatedSurecId));
+        try {
+          await refetchSurecCachesForPersonel(updatedPersonelId);
+        } catch {
+          /* Süreç listesi önbelleği yenilenemedi. */
+        }
       } else {
         const payload = buildCreateSurecPayload(surecForm);
         nextSurecPersonelId = String(payload.personel_id);

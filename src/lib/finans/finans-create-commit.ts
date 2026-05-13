@@ -82,11 +82,11 @@ export function createEmptyFinansCreateForm(personelId = ""): FinansCreateFormIn
   };
 }
 
-export function createEmptyFinansMaliFields(): FinansMaliFieldsState {
+export function createEmptyFinansMaliFields(defaultKalemTuru = "AVANS"): FinansMaliFieldsState {
   const base = createEmptyFinansCreateForm("");
   return {
     donem: base.donem,
-    kalemTuru: base.kalemTuru,
+    kalemTuru: defaultKalemTuru,
     tutar: base.tutar,
     aciklama: base.aciklama
   };

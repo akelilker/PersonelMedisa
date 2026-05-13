@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type Dispatch, type FormEvent, type SetStateAction } from "react";
 import { useNavigate } from "react-router-dom";
 import { FormField } from "../../../components/form/FormField";
 import { ErrorState } from "../../../components/states/ErrorState";
@@ -30,6 +30,7 @@ import { usePersonelFinansCreate } from "../../../hooks/useFinans";
 import { INITIAL_CREATE_PERSONEL_FORM, usePersonelZimmetCreate, type CreatePersonelFormState } from "../../../hooks/usePersoneller";
 import { INITIAL_SUREC_FORM, type SurecFormState } from "../../../hooks/useSurecler";
 import { useRoleAccess } from "../../../hooks/use-role-access";
+import type { FinansMaliFieldsState } from "../../../lib/finans/finans-create-commit";
 import type { Personel } from "../../../types/personel";
 import type { IdOption, KeyOption } from "../../../types/referans";
 import type { Surec } from "../../../types/surec";
@@ -46,6 +47,7 @@ export const KAYIT_SUREC_PERSONEL_FORM_ID = "kayit-surec-personel-form";
 export const KAYIT_SUREC_SUREC_FORM_ID = "kayit-surec-surec-form";
 export const KAYIT_SUREC_ZIMMET_FORM_ID = "kayit-surec-zimmet-form";
 export const KAYIT_SUREC_MALI_FORM_ID = "kayit-surec-mali-form";
+export const KAYIT_SUREC_CEZA_FORM_ID = "kayit-surec-ceza-form";
 export const KAYIT_SUREC_BELGELER_FORM_ID = "kayit-surec-belgeler-form";
 
 type KayitSurecWorkspaceProps = {
@@ -129,6 +131,19 @@ type DevamsizlikSubCard = {
 type DevamsizlikAltTurConfig = {
   label: string;
   options: Array<{ value: string; label: string }>;
+};
+
+type PersonelFinansCreatePanelProps = {
+  title: string;
+  personelLabel: string;
+  formId: string;
+  fieldNamePrefix: string;
+  fields: FinansMaliFieldsState;
+  setFields: Dispatch<SetStateAction<FinansMaliFieldsState>>;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  errorMessage: string | null;
+  isSubmitting: boolean;
+  isKalemLocked?: boolean;
 };
 
 const DEVAMSIZLIK_SUB_CARDS: DevamsizlikSubCard[] = [
@@ -357,6 +372,76 @@ function PozisyonReferencePicker({
   );
 }
 
+function PersonelFinansCreatePanel({
+  title,
+  personelLabel,
+  formId,
+  fieldNamePrefix,
+  fields,
+  setFields,
+  onSubmit,
+  errorMessage,
+  isSubmitting,
+  isKalemLocked = false
+}: PersonelFinansCreatePanelProps) {
+  return (
+    <div>
+      <p className="workspace-empty-hint">
+        <strong>{title}</strong> — {personelLabel}
+      </p>
+      <form id={formId} className="finans-form-grid" onSubmit={onSubmit}>
+        <FormField
+          label="Dönem"
+          name={`${fieldNamePrefix}-donem`}
+          type="month"
+          value={fields.donem}
+          onChange={(value) => setFields((prev) => ({ ...prev, donem: value }))}
+          required
+        />
+        {isKalemLocked ? (
+          <FormField
+            label="Kalem Turu"
+            name={`${fieldNamePrefix}-kalem-display`}
+            value="CEZA"
+            onChange={() => undefined}
+            disabled
+          />
+        ) : (
+          <FormField
+            label="Kalem Turu"
+            name={`${fieldNamePrefix}-kalem`}
+            value={fields.kalemTuru}
+            onChange={(value) => setFields((prev) => ({ ...prev, kalemTuru: value }))}
+            required
+          />
+        )}
+        <FormField
+          label="Tutar"
+          name={`${fieldNamePrefix}-tutar`}
+          type="number"
+          min={0.01}
+          step="0.01"
+          value={fields.tutar}
+          onChange={(value) => setFields((prev) => ({ ...prev, tutar: value }))}
+          required
+        />
+        <FormField
+          label="Açıklama"
+          name={`${fieldNamePrefix}-aciklama`}
+          value={fields.aciklama}
+          onChange={(value) => setFields((prev) => ({ ...prev, aciklama: value }))}
+        />
+        {errorMessage ? <p className="finans-form-error">{errorMessage}</p> : null}
+      </form>
+      <div className="universal-btn-group workspace-form-actions">
+        <button type="submit" form={formId} className="universal-btn-save" disabled={isSubmitting}>
+          {isSubmitting ? "Kaydediliyor..." : "Kaydet"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function KayitSurecWorkspace({
   activeTab,
   onTabChange,
@@ -477,13 +562,25 @@ export function KayitSurecWorkspace({
   });
 
   const {
-    maliFields,
-    setMaliFields,
+    finansFields: maliFields,
+    setFinansFields: setMaliFields,
     createPersonelFinansHandler,
-    isMaliSubmitting,
-    maliCreateErrorMessage
+    isFinansSubmitting: isMaliSubmitting,
+    finansCreateErrorMessage: maliCreateErrorMessage
   } = usePersonelFinansCreate(zimmetPersonelIdForHook, zimmetPersonelValid, canCreateFinans, {
-    canSubmit: zimmetPersonelValid
+    canSubmit: zimmetPersonelValid,
+    initialKalemTuru: "AVANS"
+  });
+
+  const {
+    finansFields: cezaFields,
+    setFinansFields: setCezaFields,
+    createPersonelFinansHandler: createPersonelCezaHandler,
+    isFinansSubmitting: isCezaSubmitting,
+    finansCreateErrorMessage: cezaCreateErrorMessage
+  } = usePersonelFinansCreate(zimmetPersonelIdForHook, zimmetPersonelValid, canCreateFinans, {
+    canSubmit: zimmetPersonelValid,
+    initialKalemTuru: "CEZA"
   });
 
   const selectedSurecPersonelLabel = selectedSurecPersonel ? formatPersonelLabel(selectedSurecPersonel) : "Seçiniz";
@@ -1384,61 +1481,17 @@ export function KayitSurecWorkspace({
                         {activePersonelTab === "mali" ? (
                           selectedSurecPersonel ? (
                             canCreateFinans ? (
-                              <div>
-                                <p className="workspace-empty-hint">
-                                  <strong>Mali İşlemler</strong> — {selectedSurecPersonelLabel}
-                                </p>
-                                <form
-                                  id={KAYIT_SUREC_MALI_FORM_ID}
-                                  className="finans-form-grid"
-                                  onSubmit={createPersonelFinansHandler}
-                                >
-                                  <FormField
-                                    label="Dönem"
-                                    name="kayit-mali-donem"
-                                    type="month"
-                                    value={maliFields.donem}
-                                    onChange={(value) => setMaliFields((prev) => ({ ...prev, donem: value }))}
-                                    required
-                                  />
-                                  <FormField
-                                    label="Kalem Turu"
-                                    name="kayit-mali-kalem"
-                                    value={maliFields.kalemTuru}
-                                    onChange={(value) => setMaliFields((prev) => ({ ...prev, kalemTuru: value }))}
-                                    required
-                                  />
-                                  <FormField
-                                    label="Tutar"
-                                    name="kayit-mali-tutar"
-                                    type="number"
-                                    min={0.01}
-                                    step="0.01"
-                                    value={maliFields.tutar}
-                                    onChange={(value) => setMaliFields((prev) => ({ ...prev, tutar: value }))}
-                                    required
-                                  />
-                                  <FormField
-                                    label="Açıklama"
-                                    name="kayit-mali-aciklama"
-                                    value={maliFields.aciklama}
-                                    onChange={(value) => setMaliFields((prev) => ({ ...prev, aciklama: value }))}
-                                  />
-                                  {maliCreateErrorMessage ? (
-                                    <p className="finans-form-error">{maliCreateErrorMessage}</p>
-                                  ) : null}
-                                </form>
-                                <div className="universal-btn-group workspace-form-actions">
-                                  <button
-                                    type="submit"
-                                    form={KAYIT_SUREC_MALI_FORM_ID}
-                                    className="universal-btn-save"
-                                    disabled={isMaliSubmitting}
-                                  >
-                                    {isMaliSubmitting ? "Kaydediliyor..." : "Kaydet"}
-                                  </button>
-                                </div>
-                              </div>
+                              <PersonelFinansCreatePanel
+                                title="Mali İşlemler"
+                                personelLabel={selectedSurecPersonelLabel}
+                                formId={KAYIT_SUREC_MALI_FORM_ID}
+                                fieldNamePrefix="kayit-mali"
+                                fields={maliFields}
+                                setFields={setMaliFields}
+                                onSubmit={createPersonelFinansHandler}
+                                errorMessage={maliCreateErrorMessage}
+                                isSubmitting={isMaliSubmitting}
+                              />
                             ) : (
                               <div className="surec-person-placeholder">
                                 <strong>Mali İşlemler</strong>
@@ -1538,10 +1591,32 @@ export function KayitSurecWorkspace({
                             </div>
                           )
                         ) : activePersonelTab === "ceza" ? (
-                          <div className="surec-person-placeholder">
-                            <strong>Ceza</strong>
-                            <p>Ceza kesintilerini Mali İşlemler sekmesinde gir.</p>
-                          </div>
+                          selectedSurecPersonel ? (
+                            canCreateFinans ? (
+                              <PersonelFinansCreatePanel
+                                title="Ceza"
+                                personelLabel={selectedSurecPersonelLabel}
+                                formId={KAYIT_SUREC_CEZA_FORM_ID}
+                                fieldNamePrefix="kayit-ceza"
+                                fields={cezaFields}
+                                setFields={setCezaFields}
+                                onSubmit={createPersonelCezaHandler}
+                                errorMessage={cezaCreateErrorMessage}
+                                isSubmitting={isCezaSubmitting}
+                                isKalemLocked
+                              />
+                            ) : (
+                              <div className="surec-person-placeholder">
+                                <strong>Ceza</strong>
+                                <p>Bu işlem için yetkin yok. Ceza kayıtlarını Finans ekranından yönet.</p>
+                              </div>
+                            )
+                          ) : (
+                            <div className="surec-person-placeholder">
+                              <strong>Ceza</strong>
+                              <p>Ceza için önce personel seç.</p>
+                            </div>
+                          )
                         ) : activePersonelTab === "belgeler" ? (
                           selectedSurecPersonel ? (
                             selectedSurecPersonel.aktif_durum === "PASIF" ? (

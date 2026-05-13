@@ -444,6 +444,7 @@ export function useFinans() {
 type UsePersonelFinansCreateOptions = {
   canSubmit: boolean;
   onCreateSuccess?: () => void;
+  initialKalemTuru?: string;
 };
 
 export function usePersonelFinansCreate(
@@ -452,13 +453,16 @@ export function usePersonelFinansCreate(
   canCreateFinans: boolean,
   options: UsePersonelFinansCreateOptions
 ) {
-  const { canSubmit, onCreateSuccess } = options;
+  const { canSubmit, onCreateSuccess, initialKalemTuru = "AVANS" } = options;
   const revision = useAppDataRevision();
   const activeSube = useMemo(() => getActiveSube(), [revision]);
+  const defaultKalemTuru = useMemo(() => initialKalemTuru.trim() || "AVANS", [initialKalemTuru]);
 
-  const [maliFields, setMaliFields] = useState<FinansMaliFieldsState>(() => createEmptyFinansMaliFields());
-  const [maliCreateErrorMessage, setMaliCreateErrorMessage] = useState<string | null>(null);
-  const [isMaliSubmitting, setIsMaliSubmitting] = useState(false);
+  const [finansFields, setFinansFields] = useState<FinansMaliFieldsState>(() =>
+    createEmptyFinansMaliFields(defaultKalemTuru)
+  );
+  const [finansCreateErrorMessage, setFinansCreateErrorMessage] = useState<string | null>(null);
+  const [isFinansSubmitting, setIsFinansSubmitting] = useState(false);
 
   const appliedForCommit = useMemo<FinansListAppliedFilters>(
     () => ({
@@ -471,34 +475,34 @@ export function usePersonelFinansCreate(
   );
 
   useEffect(() => {
-    setMaliFields(createEmptyFinansMaliFields());
-    setMaliCreateErrorMessage(null);
-    setIsMaliSubmitting(false);
-  }, [parsedPersonelId]);
+    setFinansFields(createEmptyFinansMaliFields(defaultKalemTuru));
+    setFinansCreateErrorMessage(null);
+    setIsFinansSubmitting(false);
+  }, [defaultKalemTuru, parsedPersonelId]);
 
   const createPersonelFinansHandler = useCallback(
     async (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault();
-      if (!hasValidId || !canSubmit || isMaliSubmitting) {
+      if (!hasValidId || !canSubmit || isFinansSubmitting) {
         return;
       }
       if (!canCreateFinans) {
-        setMaliCreateErrorMessage("Bu islem icin yetkin bulunmuyor.");
+        setFinansCreateErrorMessage("Bu islem icin yetkin bulunmuyor.");
         return;
       }
 
-      setMaliCreateErrorMessage(null);
-      setIsMaliSubmitting(true);
+      setFinansCreateErrorMessage(null);
+      setIsFinansSubmitting(true);
 
       try {
         let payload: CreateFinansKalemPayload;
         try {
           payload = buildCreateFinansKalemPayload({
             personelId: String(parsedPersonelId),
-            ...maliFields
+            ...finansFields
           });
         } catch (error) {
-          setMaliCreateErrorMessage(getApiErrorMessage(error, "Finans kaydi olusturulamadi."));
+          setFinansCreateErrorMessage(getApiErrorMessage(error, "Finans kaydi olusturulamadi."));
           return;
         }
 
@@ -509,14 +513,14 @@ export function usePersonelFinansCreate(
         });
 
         if (result.outcome === "error") {
-          setMaliCreateErrorMessage(result.message);
+          setFinansCreateErrorMessage(result.message);
           return;
         }
 
-        setMaliFields(createEmptyFinansMaliFields());
+        setFinansFields(createEmptyFinansMaliFields(defaultKalemTuru));
         onCreateSuccess?.();
       } finally {
-        setIsMaliSubmitting(false);
+        setIsFinansSubmitting(false);
       }
     },
     [
@@ -524,20 +528,21 @@ export function usePersonelFinansCreate(
       appliedForCommit,
       canCreateFinans,
       canSubmit,
+      defaultKalemTuru,
       hasValidId,
-      isMaliSubmitting,
-      maliFields,
+      isFinansSubmitting,
+      finansFields,
       onCreateSuccess,
       parsedPersonelId
     ]
   );
 
   return {
-    maliFields,
-    setMaliFields,
+    finansFields,
+    setFinansFields,
     createPersonelFinansHandler,
-    isMaliSubmitting,
-    maliCreateErrorMessage,
-    setMaliCreateErrorMessage
+    isFinansSubmitting,
+    finansCreateErrorMessage,
+    setFinansCreateErrorMessage
   };
 }

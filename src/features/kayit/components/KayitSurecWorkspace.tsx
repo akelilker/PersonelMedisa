@@ -23,7 +23,6 @@ import {
   fetchDepartmanOptions,
   fetchGorevOptions,
   fetchPersonelTipiOptions,
-  fetchPrimKuraliOptions,
   fetchSurecTuruOptions,
   fetchUcretTipiOptions
 } from "../../../api/referans.api";
@@ -832,7 +831,6 @@ export function KayitSurecWorkspace({
         personelTipiOptions,
         bagliAmirOptions,
         ucretTipiOptions,
-        primKuraliOptions,
         surecTurleri,
         personelList
       ] = await Promise.all([
@@ -841,7 +839,6 @@ export function KayitSurecWorkspace({
         fetchPersonelTipiOptions(),
         fetchBagliAmirOptions(),
         fetchUcretTipiOptions(),
-        fetchPrimKuraliOptions(),
         fetchSurecTuruOptions(),
         fetchPersonellerList({ page: 1, limit: 250, aktiflik: "tum" })
       ]);
@@ -852,7 +849,7 @@ export function KayitSurecWorkspace({
         personelTipiOptions,
         bagliAmirOptions,
         ucretTipiOptions,
-        primKuraliOptions
+        primKuraliOptions: []
       });
       setSurecTuruOptions(surecTurleri);
       setPersoneller(personelList.items);

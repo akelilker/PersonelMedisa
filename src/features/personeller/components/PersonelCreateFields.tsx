@@ -251,19 +251,6 @@ export function PersonelCreateFields({
             onChange={(value) => setForm((prev) => ({ ...prev, maasTutari: value }))}
             placeholder="35000"
           />
-          {refs.primKuraliOptions.length > 0 ? (
-            <FormField
-              as="select"
-              label="Prim Kuralı"
-              name="create-prim-kurali"
-              value={form.primKuraliId}
-              onChange={(value) => setForm((prev) => ({ ...prev, primKuraliId: value }))}
-              placeholderOption={{ value: "", label: "Seçiniz" }}
-              selectOptions={toSelectOptions(refs.primKuraliOptions)}
-            />
-          ) : (
-            refMissingNote("Prim Kuralı", false)
-          )}
         </div>
       </div>
 

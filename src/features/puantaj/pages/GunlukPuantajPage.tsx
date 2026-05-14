@@ -173,7 +173,10 @@ export function GunlukPuantajPage() {
     entryRequiresSaatBilgisi,
     haftalikOzet,
     haftalikOzetDurumu,
-    haftalikOzetEksikVeriNotu
+    haftalikOzetEksikVeriNotu,
+    devamsizlikKesintiOzet,
+    gecErkenKesintiNotu,
+    kesintiOzetNotu
   } = usePuantaj();
 
   const isMuhurlendi = puantaj?.state === "MUHURLENDI";
@@ -392,6 +395,35 @@ export function GunlukPuantajPage() {
               value={formatTurkcePara(haftalikOzet.fazla_calisma_tutari)}
             />
           </div>
+        </div>
+      ) : null}
+
+      {activeQuery && puantaj && (devamsizlikKesintiOzet || gecErkenKesintiNotu) ? (
+        <div className="puantaj-detail-card">
+          <h3>Kesinti Ön İzleme</h3>
+          {kesintiOzetNotu ? <p className="puantaj-form-readonly">{kesintiOzetNotu}</p> : null}
+          {devamsizlikKesintiOzet ? (
+            <div className="form-field-grid">
+              <ReadonlyField label="Günlük Ücret" value={formatTurkcePara(devamsizlikKesintiOzet.gunluk_ucret)} />
+              <ReadonlyField
+                label="Devamsızlık Gün Sayısı"
+                value={String(devamsizlikKesintiOzet.devamsizlik_gun_sayisi)}
+              />
+              <ReadonlyField
+                label="Hafta Tatili Kaybı Gün Sayısı"
+                value={String(devamsizlikKesintiOzet.hafta_tatili_kaybi_gun_sayisi)}
+              />
+              <ReadonlyField
+                label="Toplam Gün Eşdeğeri"
+                value={formatOndalikSaat(devamsizlikKesintiOzet.toplam_kesinti_gun_esdegeri)}
+              />
+              <ReadonlyField
+                label="Toplam Kesinti Tutarı"
+                value={formatTurkcePara(devamsizlikKesintiOzet.toplam_kesinti_tutari)}
+              />
+            </div>
+          ) : null}
+          {gecErkenKesintiNotu ? <p className="puantaj-form-readonly">{gecErkenKesintiNotu}</p> : null}
         </div>
       ) : null}
 

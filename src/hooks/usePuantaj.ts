@@ -14,10 +14,12 @@ import {
 import { runDeduped } from "../lib/in-flight-dedupe";
 import {
   hesapla,
+  hesaplaDevamsizlikKesintiOzeti,
   hesaplaHaftaAraligi,
   hesaplaHaftalikPuantajUcretOzeti,
   hesaplaYasKuraliBlokMesaji,
   hesapSonucuToGunlukPuantaj,
+  type DevamsizlikKesintiOzeti,
   type HaftalikPuantajUcretOzeti
 } from "../services/puantaj-hesap-motoru";
 import { useAuth } from "../state/auth.store";
@@ -366,6 +368,47 @@ export function usePuantaj() {
     };
   }, [activeQuery, activeSube, puantaj, personelMaasTutari, appDataRevision]);
 
+  const { devamsizlikKesintiOzet, gecErkenKesintiNotu, kesintiOzetNotu } = useMemo(() => {
+    if (!activeQuery || !puantaj) {
+      return {
+        devamsizlikKesintiOzet: null as DevamsizlikKesintiOzeti | null,
+        gecErkenKesintiNotu: null as string | null,
+        kesintiOzetNotu: null as string | null
+      };
+    }
+
+    const maas = personelMaasTutari ?? 0;
+
+    let devamsizlikKesintiOzet: DevamsizlikKesintiOzeti | null = null;
+    if (puantaj.hareket_durumu === "Gelmedi" && puantaj.dayanak === "Yok_Izinsiz") {
+      const haftaKayipGun =
+        puantaj.hafta_tatili_hak_kazandi_mi === false
+          ? 1
+          : 0;
+      devamsizlikKesintiOzet = hesaplaDevamsizlikKesintiOzeti(maas, {
+        devamsizlik_gun_sayisi: 1,
+        hafta_tatili_kaybi_gun_sayisi: haftaKayipGun
+      });
+    }
+
+    let gecErkenKesintiNotu: string | null = null;
+    if (puantaj.hareket_durumu === "Gec_Geldi" || puantaj.hareket_durumu === "Erken_Cikti") {
+      gecErkenKesintiNotu =
+        "Geç kalma veya erken çıkma kesintisi için eksik süre, kayıtta beklenen mesai süresi olmadan güvenle hesaplanamıyor; bu nedenle saatlik kesinti ön izlemesi gösterilmiyor.";
+    }
+
+    const notlar: string[] = [];
+    if (personelMaasTutari === undefined && (devamsizlikKesintiOzet || gecErkenKesintiNotu)) {
+      notlar.push("Personel maaşı yükleniyor; kesinti tutarları geçici olarak sıfır görünebilir.");
+    }
+
+    return {
+      devamsizlikKesintiOzet,
+      gecErkenKesintiNotu,
+      kesintiOzetNotu: notlar.length > 0 ? notlar.join(" ") : null
+    };
+  }, [activeQuery, puantaj, personelMaasTutari, appDataRevision]);
+
   const clearQuery = useCallback(() => {
     setFormState({ ...INITIAL_FORM });
     setActiveQuery(null);
@@ -580,6 +623,9 @@ export function usePuantaj() {
     entryRequiresSaatBilgisi,
     haftalikOzet,
     haftalikOzetDurumu,
-    haftalikOzetEksikVeriNotu
+    haftalikOzetEksikVeriNotu,
+    devamsizlikKesintiOzet,
+    gecErkenKesintiNotu,
+    kesintiOzetNotu
   };
 }

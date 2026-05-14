@@ -193,6 +193,33 @@ function toplaHaftalikPuantajGunleri(
 
 export type HaftalikPuantajOzetDurumu = "yok" | "gecersiz_tarih" | "hazir";
 
+/** Readonly “Parasal Etki Ön İzleme” — mevcut özetlerin birleşimi; bordro kesinliği taşımaz. */
+export type ParasalEtkiOzeti = {
+  haftalik_fazla_calisma_tutari: number;
+  tatil_ek_odeme_tutari: number;
+  devamsizlik_kesinti_tutari: number;
+  net_etki_tutari: number | null;
+  net_etki_hesaplanabilir_mi: boolean;
+  manuel_inceleme_gerekli_mi: boolean;
+  notlar: string[];
+};
+
+function onIzlemeParsalGuvenlikNotu(not: string | null | undefined): boolean {
+  if (!not?.trim()) {
+    return false;
+  }
+  const t = not.toLowerCase();
+  return (
+    t.includes("yükleniyor") ||
+    t.includes("geçici") ||
+    t.includes("sıfır görünebilir") ||
+    t.includes("sıfır görünür") ||
+    t.includes("tanımlı değil") ||
+    t.includes("net değil") ||
+    t.includes("gösterilmiyor")
+  );
+}
+
 export function usePuantaj() {
   const { session } = useAuth();
   const activeSube = session?.active_sube_id ?? null;
@@ -420,7 +447,13 @@ export function usePuantaj() {
     }
 
     const maas = personelMaasTutari ?? 0;
-    const ozet = hesaplaTatilEkOdemeOzeti(maas, puantaj);
+    const ozet = hesaplaTatilEkOdemeOzeti(maas, {
+      gun_tipi: puantaj.gun_tipi,
+      hesap_etkisi: puantaj.hesap_etkisi,
+      giris_saati: puantaj.giris_saati,
+      cikis_saati: puantaj.cikis_saati,
+      hafta_tatili_hak_kazandi_mi: puantaj.hafta_tatili_hak_kazandi_mi
+    });
 
     if (!ozet) {
       return { tatilEkOdemeOzeti: null, tatilEkOdemeNotu: null };
@@ -433,11 +466,102 @@ export function usePuantaj() {
       notlar.push("Personel maaşı tanımlı değil veya sıfır; ek ödeme tutarı sıfır görünür.");
     }
 
+    if (ozet.tur === "HAFTA_TATILI") {
+      const karar = ozet.hafta_tatili_pazar_karar;
+      if (karar) {
+        if (karar.manuel_inceleme_gerekli_mi) {
+          notlar.push("Bu kayıt için manuel inceleme gerekli.");
+        }
+        if (karar.aciklama?.trim()) {
+          notlar.push(karar.aciklama.trim());
+        }
+      } else {
+        notlar.push(
+          "Pazar hafta tatili hakkı bilgisi net değil; otomatik ek ödeme gösterilmiyor."
+        );
+      }
+    }
+
     return {
       tatilEkOdemeOzeti: ozet,
       tatilEkOdemeNotu: notlar.length > 0 ? notlar.join(" ") : null
     };
   }, [activeQuery, puantaj, personelMaasTutari]);
+
+  const parasalEtkiOzeti = useMemo((): ParasalEtkiOzeti | null => {
+    if (!activeQuery || !puantaj) {
+      return null;
+    }
+
+    const haftalik_fazla_calisma_tutari =
+      haftalikOzetDurumu === "hazir" && haftalikOzet
+        ? haftalikOzet.fazla_calisma_tutari
+        : 0;
+
+    const tatil_ek_odeme_tutari = tatilEkOdemeOzeti?.ek_odeme_tutari ?? 0;
+
+    const devamsizlik_kesinti_tutari = devamsizlikKesintiOzet?.toplam_kesinti_tutari ?? 0;
+
+    const manuel_inceleme_gerekli_mi =
+      tatilEkOdemeOzeti?.hafta_tatili_pazar_karar?.manuel_inceleme_gerekli_mi === true;
+
+    const haftalikEksikVeyaGuvenilmezNot = Boolean(haftalikOzetEksikVeriNotu?.trim());
+    const tatilNotuGuvenliDegil = onIzlemeParsalGuvenlikNotu(tatilEkOdemeNotu);
+    const kesintiOzetNotuGuvenliDegil = onIzlemeParsalGuvenlikNotu(kesintiOzetNotu);
+    const gecErkenNotuVar = Boolean(gecErkenKesintiNotu?.trim());
+
+    const net_etki_hesaplanabilir_mi = !(
+      manuel_inceleme_gerekli_mi ||
+      haftalikEksikVeyaGuvenilmezNot ||
+      tatilNotuGuvenliDegil ||
+      kesintiOzetNotuGuvenliDegil ||
+      gecErkenNotuVar
+    );
+
+    const netHam =
+      haftalik_fazla_calisma_tutari + tatil_ek_odeme_tutari - devamsizlik_kesinti_tutari;
+    const net_etki_tutari = net_etki_hesaplanabilir_mi
+      ? Math.round(netHam * 100) / 100
+      : null;
+
+    const notlar: string[] = [];
+    notlar.push("Bu özet bordro/muhasebe kesin hesabı değildir.");
+    if (gecErkenNotuVar) {
+      notlar.push("Geç kalma / erken çıkma kesintileri bu özete dahil edilmedi.");
+    }
+    if (manuel_inceleme_gerekli_mi) {
+      notlar.push("Pazar kaydı manuel inceleme gerektirdiği için net etki kesinleştirilemedi.");
+    }
+    if (haftalikEksikVeyaGuvenilmezNot) {
+      notlar.push("Haftalık özet eksik kayıtlarla hesaplandı; toplam etki kesinleştirilemedi.");
+    }
+    if (tatilNotuGuvenliDegil || kesintiOzetNotuGuvenliDegil) {
+      notlar.push(
+        "Maaş veya tatil ek ödeme bilgisi güvenli olmadığı için net etki kesinleştirilemedi."
+      );
+    }
+
+    return {
+      haftalik_fazla_calisma_tutari,
+      tatil_ek_odeme_tutari,
+      devamsizlik_kesinti_tutari,
+      net_etki_tutari,
+      net_etki_hesaplanabilir_mi,
+      manuel_inceleme_gerekli_mi,
+      notlar
+    };
+  }, [
+    activeQuery,
+    puantaj,
+    haftalikOzet,
+    haftalikOzetDurumu,
+    haftalikOzetEksikVeriNotu,
+    devamsizlikKesintiOzet,
+    gecErkenKesintiNotu,
+    kesintiOzetNotu,
+    tatilEkOdemeOzeti,
+    tatilEkOdemeNotu
+  ]);
 
   const clearQuery = useCallback(() => {
     setFormState({ ...INITIAL_FORM });
@@ -658,6 +782,7 @@ export function usePuantaj() {
     gecErkenKesintiNotu,
     kesintiOzetNotu,
     tatilEkOdemeOzeti,
-    tatilEkOdemeNotu
+    tatilEkOdemeNotu,
+    parasalEtkiOzeti
   };
 }

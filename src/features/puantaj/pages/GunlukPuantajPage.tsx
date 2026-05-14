@@ -48,6 +48,14 @@ const HAREKET_DURUMU_LABELS: Record<PuantajHareketDurumu, string> = Object.fromE
   HAREKET_DURUMU_OPTIONS.map((option) => [option.value, option.label])
 ) as Record<PuantajHareketDurumu, string>;
 
+function formatTatilEkOdemeCarpani(carpani: number): string {
+  if (carpani === 1) return "1";
+  if (carpani === 1.5) return "1,5";
+  if (carpani === 0) return "0";
+  if (Number.isFinite(carpani)) return String(carpani).replace(".", ",");
+  return String(carpani);
+}
+
 const DAYANAK_LABELS: Record<PuantajDayanak, string> = Object.fromEntries(
   DAYANAK_OPTIONS.map((option) => [option.value, option.label])
 ) as Record<PuantajDayanak, string>;
@@ -178,7 +186,8 @@ export function GunlukPuantajPage() {
     gecErkenKesintiNotu,
     kesintiOzetNotu,
     tatilEkOdemeOzeti,
-    tatilEkOdemeNotu
+    tatilEkOdemeNotu,
+    parasalEtkiOzeti
   } = usePuantaj();
 
   const isMuhurlendi = puantaj?.state === "MUHURLENDI";
@@ -439,13 +448,71 @@ export function GunlukPuantajPage() {
               value={formatMappedValue(puantaj.gun_tipi, GUN_TIPI_LABELS)}
             />
             <ReadonlyField label="Günlük Ücret" value={formatTurkcePara(tatilEkOdemeOzeti.gunluk_ucret)} />
-            <ReadonlyField
-              label="Çarpan"
-              value={tatilEkOdemeOzeti.carpani === 1 ? "1" : "1,5"}
-            />
+            <ReadonlyField label="Çarpan" value={formatTatilEkOdemeCarpani(tatilEkOdemeOzeti.carpani)} />
             <ReadonlyField
               label="Ek Ödeme Tutarı"
               value={formatTurkcePara(tatilEkOdemeOzeti.ek_odeme_tutari)}
+            />
+            {tatilEkOdemeOzeti.hafta_tatili_pazar_karar ? (
+              <>
+                <ReadonlyField
+                  label="Hafta Tatili Hakkı"
+                  value={
+                    tatilEkOdemeOzeti.hafta_tatili_pazar_karar.hafta_tatili_hak_kazandi_mi
+                      ? "Hak Kazandı"
+                      : "Hak Kazanmadı"
+                  }
+                />
+                <ReadonlyField
+                  label="Manuel İnceleme"
+                  value={
+                    tatilEkOdemeOzeti.hafta_tatili_pazar_karar.manuel_inceleme_gerekli_mi
+                      ? "Gerekli"
+                      : "Gerekli Değil"
+                  }
+                />
+                <ReadonlyField
+                  label="Açıklama"
+                  value={tatilEkOdemeOzeti.hafta_tatili_pazar_karar.aciklama}
+                />
+              </>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+
+      {activeQuery && puantaj && parasalEtkiOzeti ? (
+        <div className="puantaj-detail-card">
+          <h3>Parasal Etki Ön İzleme</h3>
+          {parasalEtkiOzeti.notlar.map((satir, i) => (
+            <p key={`parasal-not-${i}`} className="puantaj-form-readonly">
+              {satir}
+            </p>
+          ))}
+          <div className="form-field-grid">
+            <ReadonlyField
+              label="Haftalık Fazla Çalışma Tutarı"
+              value={formatTurkcePara(parasalEtkiOzeti.haftalik_fazla_calisma_tutari)}
+            />
+            <ReadonlyField
+              label="Tatil Ek Ödeme Tutarı"
+              value={formatTurkcePara(parasalEtkiOzeti.tatil_ek_odeme_tutari)}
+            />
+            <ReadonlyField
+              label="Devamsızlık Kesinti Tutarı"
+              value={formatTurkcePara(parasalEtkiOzeti.devamsizlik_kesinti_tutari)}
+            />
+            <ReadonlyField
+              label="Manuel İnceleme (Pazar / tatil)"
+              value={parasalEtkiOzeti.manuel_inceleme_gerekli_mi ? "Gerekli" : "Gerekli değil"}
+            />
+            <ReadonlyField
+              label="Net Etki"
+              value={
+                parasalEtkiOzeti.net_etki_hesaplanabilir_mi && parasalEtkiOzeti.net_etki_tutari !== null
+                  ? formatTurkcePara(parasalEtkiOzeti.net_etki_tutari)
+                  : "Kesinleştirilemedi"
+              }
             />
           </div>
         </div>

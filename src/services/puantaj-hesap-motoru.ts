@@ -396,6 +396,87 @@ export function hesaplaDevamsizlikKesintiOzeti(
   };
 }
 
+// ---------------------------------------------------------------------------
+// Hafta tatili (Pazar) — hak → etki karar motoru (salt karar, UI bağımsız)
+// ---------------------------------------------------------------------------
+
+/** `hesaplaHaftaTatiliPazarEtkisi` çıktısı: Pazar / hafta tatili hak durumuna göre özet. */
+export type HaftaTatiliPazarEtkisiSonucu = {
+  hafta_tatili_hak_kazandi_mi: boolean;
+  pazar_calisildi_mi: boolean;
+  hafta_tatili_kaybi_var_mi: boolean;
+  ek_odeme_gun_carpani: number;
+  ek_odeme_tutari: number;
+  manuel_inceleme_gerekli_mi: boolean;
+  aciklama: string;
+};
+
+/**
+ * Hafta tatili hakkı ve Pazar çalışması için saf karar ağacı (devamsızlık / tatil ek ödeme motorlarından ayrı).
+ * `gunlukUcret` yok veya geçerli pozitif sayı değilse `ek_odeme_tutari` 0; hak + Pazar çalıştı ise çarpan yine 1.5 kalabilir.
+ */
+export function hesaplaHaftaTatiliPazarEtkisi(
+  haftaTatiliHakKazandiMi: boolean,
+  pazarCalisildiMi: boolean,
+  gunlukUcret?: number
+): HaftaTatiliPazarEtkisiSonucu {
+  const hafta_tatili_hak_kazandi_mi = haftaTatiliHakKazandiMi;
+  const pazar_calisildi_mi = pazarCalisildiMi;
+
+  const guvenliGunluk = ucretIcinGuvenliPozitifMaas(gunlukUcret ?? Number.NaN);
+
+  if (haftaTatiliHakKazandiMi && !pazarCalisildiMi) {
+    return {
+      hafta_tatili_hak_kazandi_mi,
+      pazar_calisildi_mi,
+      hafta_tatili_kaybi_var_mi: false,
+      ek_odeme_gun_carpani: 0,
+      ek_odeme_tutari: 0,
+      manuel_inceleme_gerekli_mi: false,
+      aciklama: "normal ücretli hafta tatili, ek ödeme yok"
+    };
+  }
+
+  if (haftaTatiliHakKazandiMi && pazarCalisildiMi) {
+    const ek_odeme_gun_carpani = 1.5;
+    const ek_odeme_tutari =
+      guvenliGunluk > 0 ? yuvarlaParaIkiliOndalik(guvenliGunluk * ek_odeme_gun_carpani) : 0;
+    return {
+      hafta_tatili_hak_kazandi_mi,
+      pazar_calisildi_mi,
+      hafta_tatili_kaybi_var_mi: false,
+      ek_odeme_gun_carpani,
+      ek_odeme_tutari,
+      manuel_inceleme_gerekli_mi: false,
+      aciklama:
+        "hafta tatiline hak kazanmış personelin Pazar çalışması için +1.5 günlük ek ödeme"
+    };
+  }
+
+  if (!haftaTatiliHakKazandiMi && !pazarCalisildiMi) {
+    return {
+      hafta_tatili_hak_kazandi_mi,
+      pazar_calisildi_mi,
+      hafta_tatili_kaybi_var_mi: true,
+      ek_odeme_gun_carpani: 0,
+      ek_odeme_tutari: 0,
+      manuel_inceleme_gerekli_mi: false,
+      aciklama: "hafta tatili hakkı kaybedilmiş, ek ödeme yok"
+    };
+  }
+
+  return {
+    hafta_tatili_hak_kazandi_mi,
+    pazar_calisildi_mi,
+    hafta_tatili_kaybi_var_mi: true,
+    ek_odeme_gun_carpani: 0,
+    ek_odeme_tutari: 0,
+    manuel_inceleme_gerekli_mi: true,
+    aciklama:
+      "hafta tatili hakkı kaybedilmişken Pazar çalışması var; otomatik ödeme üretilmez, manuel inceleme gerekir"
+  };
+}
+
 export type TatilEkOdemeTuru = "UBGT" | "HAFTA_TATILI";
 
 /** Günlük kayıt + maaştan türetilen tatil mesai ek ödeme ön izlemesi (tek gün, salt okunur). */
@@ -404,17 +485,22 @@ export type TatilEkOdemeOzeti = {
   gunluk_ucret: number;
   carpani: number;
   ek_odeme_tutari: number;
+  /** Pazar günü: `hesaplaHaftaTatiliPazarEtkisi` tam çıktısı (hak bilgisi güvenli olduğunda). */
+  hafta_tatili_pazar_karar?: HaftaTatiliPazarEtkisiSonucu;
 };
 
 /**
  * UBGT / hafta tatili mesaisi için ek ödeme ön izlemesi.
- * Koşullar: `hesap_etkisi === "Mesai_Yaz"`, gün tipi resmi tatil veya pazar,
- * en az bir saat alanı dolu (`deriveHesapEtkisi` ile uyumlu).
+ * Koşullar: `hesap_etkisi === "Mesai_Yaz"`, gün tipi resmi tatil veya pazar.
+ * UBGT için en az bir saat alanı dolu olmalı. Pazar için saat yoksa yalnızca `hafta_tatili_hak_kazandi_mi` boolean ise özet üretilir (hak → etki).
+ * Hak bilgisi güvenli değilken Pazar + mesai saati varken otomatik +1,5 ücret üretilmez.
  * Diğer durumlarda `null` (kart gösterilmez).
  */
 export function hesaplaTatilEkOdemeOzeti(
   maasTutari: number,
-  kayit: Pick<GunlukPuantaj, "gun_tipi" | "hesap_etkisi" | "giris_saati" | "cikis_saati">
+  kayit: Pick<GunlukPuantaj, "gun_tipi" | "hesap_etkisi" | "giris_saati" | "cikis_saati"> & {
+    hafta_tatili_hak_kazandi_mi?: boolean;
+  }
 ): TatilEkOdemeOzeti | null {
   if (kayit.hesap_etkisi !== "Mesai_Yaz") {
     return null;
@@ -422,26 +508,49 @@ export function hesaplaTatilEkOdemeOzeti(
 
   const hasSaat =
     Boolean(kayit.giris_saati?.trim()) || Boolean(kayit.cikis_saati?.trim());
-  if (!hasSaat) {
+  const isPazar = kayit.gun_tipi === "Hafta_Tatili_Pazar";
+
+  if (!hasSaat && !isPazar) {
     return null;
   }
-
-  let tur: TatilEkOdemeTuru;
-  let carpani: number;
-  if (kayit.gun_tipi === "UBGT_Resmi_Tatil") {
-    tur = "UBGT";
-    carpani = 1;
-  } else if (kayit.gun_tipi === "Hafta_Tatili_Pazar") {
-    tur = "HAFTA_TATILI";
-    carpani = 1.5;
-  } else {
+  if (kayit.gun_tipi === "UBGT_Resmi_Tatil" && !hasSaat) {
     return null;
   }
 
   const gunluk_ucret = hesaplaGunlukUcret(maasTutari);
-  const ek_odeme_tutari = yuvarlaParaIkiliOndalik(gunluk_ucret * carpani);
 
-  return { tur, gunluk_ucret, carpani, ek_odeme_tutari };
+  if (kayit.gun_tipi === "UBGT_Resmi_Tatil") {
+    const carpani = 1;
+    const ek_odeme_tutari = yuvarlaParaIkiliOndalik(gunluk_ucret * carpani);
+    return { tur: "UBGT", gunluk_ucret, carpani, ek_odeme_tutari };
+  }
+
+  if (kayit.gun_tipi === "Hafta_Tatili_Pazar") {
+    const hak = kayit.hafta_tatili_hak_kazandi_mi;
+    if (typeof hak !== "boolean") {
+      if (!hasSaat) {
+        return null;
+      }
+      return {
+        tur: "HAFTA_TATILI",
+        gunluk_ucret,
+        carpani: 0,
+        ek_odeme_tutari: 0
+      };
+    }
+
+    const pazarKarar = hesaplaHaftaTatiliPazarEtkisi(hak, hasSaat, gunluk_ucret);
+
+    return {
+      tur: "HAFTA_TATILI",
+      gunluk_ucret,
+      carpani: pazarKarar.ek_odeme_gun_carpani,
+      ek_odeme_tutari: pazarKarar.ek_odeme_tutari,
+      hafta_tatili_pazar_karar: pazarKarar
+    };
+  }
+
+  return null;
 }
 
 // ---------------------------------------------------------------------------

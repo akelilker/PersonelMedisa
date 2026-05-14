@@ -26,6 +26,7 @@ import {
   hesaplaGecKalmaErkenCikmaKesintiOzeti,
   hesaplaDevamsizlikKesintiOzeti,
   hesaplaTatilEkOdemeOzeti,
+  hesaplaHaftaTatiliPazarEtkisi,
   gunlukPuantajToGirdi,
   hesapSonucuToGunlukPuantaj,
   type HesapGirdisi
@@ -203,8 +204,89 @@ describe("deriveHesapEtkisi", () => {
 });
 
 // =========================================================================
-// 8. Hafta tatili hakkı (İş Kanunu md.46) – KRİTİK
+// 8. Hafta tatili — Pazar hak → etki kararı + hakkı (İş Kanunu md.46)
 // =========================================================================
+
+describe("hesaplaHaftaTatiliPazarEtkisi", () => {
+  it("hak kazandı + Pazar çalışmadı → kayıp yok, ek ödeme yok", () => {
+    const o = hesaplaHaftaTatiliPazarEtkisi(true, false, 1000);
+    expect(o).toEqual(
+      expect.objectContaining({
+        hafta_tatili_hak_kazandi_mi: true,
+        pazar_calisildi_mi: false,
+        hafta_tatili_kaybi_var_mi: false,
+        ek_odeme_gun_carpani: 0,
+        ek_odeme_tutari: 0,
+        manuel_inceleme_gerekli_mi: false,
+        aciklama: "normal ücretli hafta tatili, ek ödeme yok"
+      })
+    );
+  });
+
+  it("hak kazandı + Pazar çalıştı → çarpan 1,5 ve tutar günlük × 1,5", () => {
+    const o = hesaplaHaftaTatiliPazarEtkisi(true, true, 1000);
+    expect(o.hafta_tatili_hak_kazandi_mi).toBe(true);
+    expect(o.pazar_calisildi_mi).toBe(true);
+    expect(o.hafta_tatili_kaybi_var_mi).toBe(false);
+    expect(o.ek_odeme_gun_carpani).toBe(1.5);
+    expect(o.ek_odeme_tutari).toBe(1500);
+    expect(o.manuel_inceleme_gerekli_mi).toBe(false);
+    expect(o.aciklama).toBe(
+      "hafta tatiline hak kazanmış personelin Pazar çalışması için +1.5 günlük ek ödeme"
+    );
+  });
+
+  it("hak kazanmadı + Pazar çalışmadı → tatil kaybı, ek ödeme yok", () => {
+    const o = hesaplaHaftaTatiliPazarEtkisi(false, false, 1000);
+    expect(o).toEqual(
+      expect.objectContaining({
+        hafta_tatili_hak_kazandi_mi: false,
+        pazar_calisildi_mi: false,
+        hafta_tatili_kaybi_var_mi: true,
+        ek_odeme_gun_carpani: 0,
+        ek_odeme_tutari: 0,
+        manuel_inceleme_gerekli_mi: false,
+        aciklama: "hafta tatili hakkı kaybedilmiş, ek ödeme yok"
+      })
+    );
+  });
+
+  it("hak kazanmadı + Pazar çalıştı → manuel inceleme, otomatik tutar yok", () => {
+    const o = hesaplaHaftaTatiliPazarEtkisi(false, true, 1000);
+    expect(o.hafta_tatili_hak_kazandi_mi).toBe(false);
+    expect(o.pazar_calisildi_mi).toBe(true);
+    expect(o.hafta_tatili_kaybi_var_mi).toBe(true);
+    expect(o.ek_odeme_gun_carpani).toBe(0);
+    expect(o.ek_odeme_tutari).toBe(0);
+    expect(o.manuel_inceleme_gerekli_mi).toBe(true);
+    expect(o.aciklama).toBe(
+      "hafta tatili hakkı kaybedilmişken Pazar çalışması var; otomatik ödeme üretilmez, manuel inceleme gerekir"
+    );
+  });
+
+  it("günlük ücret yok veya geçersizse tutar 0; hak + Pazar’da çarpan 1,5 kalır", () => {
+    expect(hesaplaHaftaTatiliPazarEtkisi(true, true)).toMatchObject({
+      ek_odeme_gun_carpani: 1.5,
+      ek_odeme_tutari: 0
+    });
+    expect(hesaplaHaftaTatiliPazarEtkisi(true, true, undefined)).toMatchObject({
+      ek_odeme_gun_carpani: 1.5,
+      ek_odeme_tutari: 0
+    });
+    expect(hesaplaHaftaTatiliPazarEtkisi(true, true, 0)).toMatchObject({
+      ek_odeme_gun_carpani: 1.5,
+      ek_odeme_tutari: 0
+    });
+    expect(hesaplaHaftaTatiliPazarEtkisi(true, true, -100)).toMatchObject({
+      ek_odeme_gun_carpani: 1.5,
+      ek_odeme_tutari: 0
+    });
+    expect(hesaplaHaftaTatiliPazarEtkisi(true, true, Number.NaN)).toMatchObject({
+      ek_odeme_gun_carpani: 1.5,
+      ek_odeme_tutari: 0
+    });
+  });
+});
 
 describe("hesaplaHaftaTatiliHakki", () => {
   it("Gelmedi + Yok_Izinsiz → hak KAYBI (false)", () => {
@@ -733,7 +815,29 @@ describe("hesaplaTatilEkOdemeOzeti", () => {
     expect(o!.ek_odeme_tutari).toBe(1000);
   });
 
-  it("Hafta tatili + Mesai_Yaz + saat → çarpan 1,5", () => {
+  it("Hafta tatili + Mesai_Yaz + saat + hak var → çarpan 1,5 ve pazar kararı", () => {
+    const o = hesaplaTatilEkOdemeOzeti(maas, {
+      gun_tipi: "Hafta_Tatili_Pazar",
+      hesap_etkisi: "Mesai_Yaz",
+      giris_saati: "10:00",
+      cikis_saati: "14:00",
+      hafta_tatili_hak_kazandi_mi: true
+    });
+    expect(o).not.toBeNull();
+    expect(o!.tur).toBe("HAFTA_TATILI");
+    expect(o!.carpani).toBe(1.5);
+    expect(o!.gunluk_ucret).toBe(1000);
+    expect(o!.ek_odeme_tutari).toBe(1500);
+    expect(o!.hafta_tatili_pazar_karar).toMatchObject({
+      hafta_tatili_hak_kazandi_mi: true,
+      pazar_calisildi_mi: true,
+      ek_odeme_gun_carpani: 1.5,
+      ek_odeme_tutari: 1500,
+      manuel_inceleme_gerekli_mi: false
+    });
+  });
+
+  it("Pazar + Mesai_Yaz + saat ama hak bilgisi yoksa otomatik 1,5 üretilmez", () => {
     const o = hesaplaTatilEkOdemeOzeti(maas, {
       gun_tipi: "Hafta_Tatili_Pazar",
       hesap_etkisi: "Mesai_Yaz",
@@ -742,9 +846,9 @@ describe("hesaplaTatilEkOdemeOzeti", () => {
     });
     expect(o).not.toBeNull();
     expect(o!.tur).toBe("HAFTA_TATILI");
-    expect(o!.carpani).toBe(1.5);
-    expect(o!.gunluk_ucret).toBe(1000);
-    expect(o!.ek_odeme_tutari).toBe(1500);
+    expect(o!.carpani).toBe(0);
+    expect(o!.ek_odeme_tutari).toBe(0);
+    expect(o!.hafta_tatili_pazar_karar).toBeUndefined();
   });
 
   it("giriş ve çıkış boşsa null (tatil mesaisi doğrulanamaz)", () => {
@@ -767,6 +871,90 @@ describe("hesaplaTatilEkOdemeOzeti", () => {
     });
     expect(o!.gunluk_ucret).toBe(0);
     expect(o!.ek_odeme_tutari).toBe(0);
+  });
+});
+
+describe("hesaplaTatilEkOdemeOzeti — Pazar / hafta tatili hak entegrasyonu", () => {
+  const maas = 30000;
+
+  it("Pazar + hak var + çalıştı → 1,5 çarpan ve tutar üretir", () => {
+    const o = hesaplaTatilEkOdemeOzeti(maas, {
+      gun_tipi: "Hafta_Tatili_Pazar",
+      hesap_etkisi: "Mesai_Yaz",
+      giris_saati: "09:00",
+      cikis_saati: "17:00",
+      hafta_tatili_hak_kazandi_mi: true
+    });
+    expect(o!.carpani).toBe(1.5);
+    expect(o!.ek_odeme_tutari).toBe(1500);
+    expect(o!.hafta_tatili_pazar_karar?.manuel_inceleme_gerekli_mi).toBe(false);
+  });
+
+  it("Pazar + hak yok + çalıştı → otomatik tutar üretmez, manuel inceleme", () => {
+    const o = hesaplaTatilEkOdemeOzeti(maas, {
+      gun_tipi: "Hafta_Tatili_Pazar",
+      hesap_etkisi: "Mesai_Yaz",
+      giris_saati: "09:00",
+      cikis_saati: "17:00",
+      hafta_tatili_hak_kazandi_mi: false
+    });
+    expect(o!.carpani).toBe(0);
+    expect(o!.ek_odeme_tutari).toBe(0);
+    expect(o!.hafta_tatili_pazar_karar?.manuel_inceleme_gerekli_mi).toBe(true);
+    expect(o!.hafta_tatili_pazar_karar?.hafta_tatili_kaybi_var_mi).toBe(true);
+  });
+
+  it("Pazar + hak var + çalışmadı → ek ödeme üretmez", () => {
+    const o = hesaplaTatilEkOdemeOzeti(maas, {
+      gun_tipi: "Hafta_Tatili_Pazar",
+      hesap_etkisi: "Mesai_Yaz",
+      giris_saati: "",
+      cikis_saati: "",
+      hafta_tatili_hak_kazandi_mi: true
+    });
+    expect(o!.carpani).toBe(0);
+    expect(o!.ek_odeme_tutari).toBe(0);
+    expect(o!.hafta_tatili_pazar_karar?.pazar_calisildi_mi).toBe(false);
+    expect(o!.hafta_tatili_pazar_karar?.hafta_tatili_kaybi_var_mi).toBe(false);
+  });
+
+  it("Pazar + hak yok + çalışmadı → hafta tatili kaybı, ek ödeme yok", () => {
+    const o = hesaplaTatilEkOdemeOzeti(maas, {
+      gun_tipi: "Hafta_Tatili_Pazar",
+      hesap_etkisi: "Mesai_Yaz",
+      giris_saati: "",
+      cikis_saati: "",
+      hafta_tatili_hak_kazandi_mi: false
+    });
+    expect(o!.carpani).toBe(0);
+    expect(o!.ek_odeme_tutari).toBe(0);
+    expect(o!.hafta_tatili_pazar_karar?.hafta_tatili_kaybi_var_mi).toBe(true);
+    expect(o!.hafta_tatili_pazar_karar?.pazar_calisildi_mi).toBe(false);
+  });
+
+  it("hak bilgisi güvensiz (yok) iken Pazar + çalıştı → otomatik +1,5 yok", () => {
+    const o = hesaplaTatilEkOdemeOzeti(maas, {
+      gun_tipi: "Hafta_Tatili_Pazar",
+      hesap_etkisi: "Mesai_Yaz",
+      giris_saati: "08:00",
+      cikis_saati: "12:00"
+    });
+    expect(o!.carpani).toBe(0);
+    expect(o!.ek_odeme_tutari).toBe(0);
+    expect(o!.hafta_tatili_pazar_karar).toBeUndefined();
+  });
+
+  it("UBGT branch eski davranış: çarpan 1 ve tutar, pazar kararı yok", () => {
+    const o = hesaplaTatilEkOdemeOzeti(maas, {
+      gun_tipi: "UBGT_Resmi_Tatil",
+      hesap_etkisi: "Mesai_Yaz",
+      giris_saati: "08:00",
+      cikis_saati: "12:00"
+    });
+    expect(o!.tur).toBe("UBGT");
+    expect(o!.carpani).toBe(1);
+    expect(o!.ek_odeme_tutari).toBe(1000);
+    expect(o!.hafta_tatili_pazar_karar).toBeUndefined();
   });
 });
 

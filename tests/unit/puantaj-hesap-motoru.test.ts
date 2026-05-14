@@ -12,6 +12,15 @@ import {
   hesaplaYasKuraliBlokMesaji,
   uretComplianceUyarilari,
   hesapla,
+  hesaplaHaftalikCalismaOzeti,
+  hesaplaHaftaAraligi,
+  filtreleHaftalikPuantajSatirlari,
+  hesaplaTarihtenHaftalikCalismaOzeti,
+  hesaplaSaatlikUcret,
+  hesaplaFazlaCalismaTutari,
+  hesaplaHaftalikFazlaCalismaUcreti,
+  hesaplaHaftalikPuantajUcretOzeti,
+  HAFTALIK_NORMAL_CALISMA_ESIK_DAKIKA,
   gunlukPuantajToGirdi,
   hesapSonucuToGunlukPuantaj,
   type HesapGirdisi
@@ -491,7 +500,355 @@ describe("hesapla – entegre senaryolar", () => {
 });
 
 // =========================================================================
-// 11. Adaptör fonksiyonları
+// 11. Haftalık net çalışma özeti (45 saat eşiği)
+// =========================================================================
+
+describe("hesaplaHaftalikCalismaOzeti", () => {
+  it("boş hafta → toplam ve fazla 0, eşik sabit", () => {
+    const o = hesaplaHaftalikCalismaOzeti([]);
+    expect(o.toplam_net_dakika).toBe(0);
+    expect(o.normal_calisma_dakika).toBe(0);
+    expect(o.fazla_calisma_dakika).toBe(0);
+    expect(o.haftalik_esik_dakika).toBe(HAFTALIK_NORMAL_CALISMA_ESIK_DAKIKA);
+    expect(o.haftalik_esik_dakika).toBe(2700);
+  });
+
+  it("5 gün x 8 saat net (480 dk) = 2400 dk → fazla yok", () => {
+    const gunler = Array.from({ length: 5 }, () => ({ net_calisma_suresi_dakika: 480 }));
+    const o = hesaplaHaftalikCalismaOzeti(gunler);
+    expect(o.toplam_net_dakika).toBe(2400);
+    expect(o.normal_calisma_dakika).toBe(2400);
+    expect(o.fazla_calisma_dakika).toBe(0);
+  });
+
+  it("tam 45 saat (2700 dk) → fazla yok, normal = toplam", () => {
+    const o = hesaplaHaftalikCalismaOzeti([{ net_calisma_suresi_dakika: 2700 }]);
+    expect(o.toplam_net_dakika).toBe(2700);
+    expect(o.normal_calisma_dakika).toBe(2700);
+    expect(o.fazla_calisma_dakika).toBe(0);
+  });
+
+  it("46 saat (2760 dk) → 60 dk fazla", () => {
+    const o = hesaplaHaftalikCalismaOzeti([{ net_calisma_suresi_dakika: 2760 }]);
+    expect(o.toplam_net_dakika).toBe(2760);
+    expect(o.normal_calisma_dakika).toBe(2700);
+    expect(o.fazla_calisma_dakika).toBe(60);
+  });
+
+  it("karışık günler → toplam ve normal/fazla doğru", () => {
+    const o = hesaplaHaftalikCalismaOzeti([
+      { net_calisma_suresi_dakika: 400 },
+      { net_calisma_suresi_dakika: 500 },
+      { net_calisma_suresi_dakika: 600 },
+      { net_calisma_suresi_dakika: 200 },
+      { net_calisma_suresi_dakika: 300 }
+    ]);
+    expect(o.toplam_net_dakika).toBe(2000);
+    expect(o.normal_calisma_dakika).toBe(2000);
+    expect(o.fazla_calisma_dakika).toBe(0);
+  });
+
+  it("Pazar günü net dakika varsa haftalık toplama dahil (sadece süre toplamı)", () => {
+    const haftaIci = Array.from({ length: 5 }, () => ({ net_calisma_suresi_dakika: 480 }));
+    const pazar = { net_calisma_suresi_dakika: 360 };
+    const o = hesaplaHaftalikCalismaOzeti([...haftaIci, pazar]);
+    expect(o.toplam_net_dakika).toBe(5 * 480 + 360);
+    expect(o.fazla_calisma_dakika).toBe(5 * 480 + 360 - 2700);
+  });
+
+  it("bazı satırlarda net süre undefined → 0 sayılır", () => {
+    const o = hesaplaHaftalikCalismaOzeti([
+      { net_calisma_suresi_dakika: 1000 },
+      {},
+      { net_calisma_suresi_dakika: 500 }
+    ]);
+    expect(o.toplam_net_dakika).toBe(1500);
+    expect(o.fazla_calisma_dakika).toBe(0);
+  });
+});
+
+// =========================================================================
+// 11a. Haftalık fazla çalışma ücreti (maaş / 225, FM × 1.5)
+// =========================================================================
+
+describe("hesaplaSaatlikUcret", () => {
+  it("45000 / 225 → 200", () => {
+    expect(hesaplaSaatlikUcret(45000)).toBe(200);
+  });
+
+  it("maaş 0 → saatlik 0", () => {
+    expect(hesaplaSaatlikUcret(0)).toBe(0);
+  });
+
+  it("negatif veya NaN maaş → 0", () => {
+    expect(hesaplaSaatlikUcret(-100)).toBe(0);
+    expect(hesaplaSaatlikUcret(Number.NaN)).toBe(0);
+  });
+});
+
+describe("hesaplaFazlaCalismaTutari", () => {
+  const saatlik = 200;
+
+  it("60 dk fazla → 1 saat × 1.5 × 200 = 300", () => {
+    expect(hesaplaFazlaCalismaTutari(60, saatlik)).toBe(300);
+  });
+
+  it("120 dk fazla → 2 saat × 1.5 × 200 = 600", () => {
+    expect(hesaplaFazlaCalismaTutari(120, saatlik)).toBe(600);
+  });
+
+  it("fazla dakika 0 → tutar 0", () => {
+    expect(hesaplaFazlaCalismaTutari(0, saatlik)).toBe(0);
+  });
+
+  it("90 dk → 1.5 saat × 1.5 × 200 = 450", () => {
+    expect(hesaplaFazlaCalismaTutari(90, saatlik)).toBe(450);
+  });
+});
+
+describe("hesaplaHaftalikFazlaCalismaUcreti", () => {
+  it("özet 2760 dk (60 dk fazla) + 45000 maaş → tutar 300", () => {
+    const ozet = hesaplaHaftalikCalismaOzeti([{ net_calisma_suresi_dakika: 2760 }]);
+    const u = hesaplaHaftalikFazlaCalismaUcreti(ozet, 45000);
+    expect(u.fazla_calisma_dakika).toBe(60);
+    expect(u.saatlik_ucret).toBe(200);
+    expect(u.fazla_calisma_saat).toBe(1);
+    expect(u.fazla_calisma_tutari).toBe(300);
+  });
+
+  it("fazla çalışma 0 → tutar 0", () => {
+    const ozet = hesaplaHaftalikCalismaOzeti([{ net_calisma_suresi_dakika: 1000 }]);
+    const u = hesaplaHaftalikFazlaCalismaUcreti(ozet, 45000);
+    expect(u.fazla_calisma_tutari).toBe(0);
+    expect(u.fazla_calisma_saat).toBe(0);
+  });
+
+  it("geçersiz maaş ile güvenli sıfır saatlik ve tutar", () => {
+    const ozet = hesaplaHaftalikCalismaOzeti([{ net_calisma_suresi_dakika: 2760 }]);
+    const u = hesaplaHaftalikFazlaCalismaUcreti(ozet, -1);
+    expect(u.saatlik_ucret).toBe(0);
+    expect(u.fazla_calisma_tutari).toBe(0);
+  });
+});
+
+// =========================================================================
+// 11a2. Günlük puantaj → haftalık FM ücret adapter
+// =========================================================================
+
+function gunlukSatir(
+  personel_id: number,
+  tarih: string,
+  net?: number
+): GunlukPuantaj {
+  return {
+    personel_id,
+    tarih,
+    compliance_uyarilari: [],
+    ...(net !== undefined ? { net_calisma_suresi_dakika: net } : {})
+  };
+}
+
+describe("hesaplaHaftalikPuantajUcretOzeti", () => {
+  const ref = "2026-04-15";
+  const maas = 45000;
+
+  it("aynı haftadaki 5 günlük kayıt + maaş → özet ve hafta aralığı doğru", () => {
+    const gunler = [
+      gunlukSatir(1, "2026-04-13", 480),
+      gunlukSatir(1, "2026-04-14", 480),
+      gunlukSatir(1, "2026-04-15", 480),
+      gunlukSatir(1, "2026-04-16", 480),
+      gunlukSatir(1, "2026-04-17", 480)
+    ];
+    const o = hesaplaHaftalikPuantajUcretOzeti(gunler, ref, maas);
+    expect(o.hafta_baslangic).toBe("2026-04-13");
+    expect(o.hafta_bitis).toBe("2026-04-19");
+    expect(o.toplam_net_dakika).toBe(2400);
+    expect(o.fazla_calisma_dakika).toBe(0);
+    expect(o.fazla_calisma_tutari).toBe(0);
+    expect(o.saatlik_ucret).toBe(200);
+  });
+
+  it("45 saat altı → fazla çalışma tutarı 0", () => {
+    const gunler = [gunlukSatir(1, "2026-04-14", 400), gunlukSatir(1, "2026-04-15", 400)];
+    const o = hesaplaHaftalikPuantajUcretOzeti(gunler, ref, maas);
+    expect(o.toplam_net_dakika).toBe(800);
+    expect(o.fazla_calisma_tutari).toBe(0);
+  });
+
+  it("46 saat (2760 dk) → 60 dk fazla + tutar 300", () => {
+    const gunler = [gunlukSatir(1, "2026-04-14", 2760)];
+    const o = hesaplaHaftalikPuantajUcretOzeti(gunler, ref, maas);
+    expect(o.fazla_calisma_dakika).toBe(60);
+    expect(o.fazla_calisma_tutari).toBe(300);
+  });
+
+  it("karışık haftalardaki kayıtlar → yalnız referans haftası", () => {
+    const gunler = [
+      gunlukSatir(1, "2026-04-13", 100),
+      gunlukSatir(1, "2026-04-20", 9999),
+      gunlukSatir(1, "2026-04-18", 200)
+    ];
+    const o = hesaplaHaftalikPuantajUcretOzeti(gunler, ref, maas);
+    expect(o.toplam_net_dakika).toBe(300);
+  });
+
+  it("Pazar satırı haftaya dahil", () => {
+    const gunler = [
+      gunlukSatir(1, "2026-04-13", 480),
+      gunlukSatir(1, "2026-04-14", 480),
+      gunlukSatir(1, "2026-04-15", 480),
+      gunlukSatir(1, "2026-04-16", 480),
+      gunlukSatir(1, "2026-04-17", 480),
+      gunlukSatir(1, "2026-04-19", 120)
+    ];
+    const o = hesaplaHaftalikPuantajUcretOzeti(gunler, ref, maas);
+    expect(o.toplam_net_dakika).toBe(2520);
+    expect(o.fazla_calisma_dakika).toBe(0);
+  });
+
+  it("geçersiz referans tarih → sıfır özet, hafta aralığı null", () => {
+    const o = hesaplaHaftalikPuantajUcretOzeti(
+      [gunlukSatir(1, "2026-04-14", 480)],
+      "gecersiz-tarih",
+      maas
+    );
+    expect(o.hafta_baslangic).toBeNull();
+    expect(o.hafta_bitis).toBeNull();
+    expect(o.toplam_net_dakika).toBe(0);
+    expect(o.fazla_calisma_tutari).toBe(0);
+    expect(o.haftalik_esik_dakika).toBe(HAFTALIK_NORMAL_CALISMA_ESIK_DAKIKA);
+  });
+
+  it("geçersiz maaş → süre özeti korunur, ücret alanları 0", () => {
+    const gunler = [
+      gunlukSatir(1, "2026-04-13", 480),
+      gunlukSatir(1, "2026-04-14", 480),
+      gunlukSatir(1, "2026-04-15", 480),
+      gunlukSatir(1, "2026-04-16", 480),
+      gunlukSatir(1, "2026-04-17", 480)
+    ];
+    const o = hesaplaHaftalikPuantajUcretOzeti(gunler, ref, -50);
+    expect(o.toplam_net_dakika).toBe(2400);
+    expect(o.saatlik_ucret).toBe(0);
+    expect(o.fazla_calisma_tutari).toBe(0);
+  });
+
+  it("boş kayıt listesi → sıfır sonuç, geçerli referansta hafta aralığı dolu", () => {
+    const o = hesaplaHaftalikPuantajUcretOzeti([], ref, maas);
+    expect(o.toplam_net_dakika).toBe(0);
+    expect(o.hafta_baslangic).toBe("2026-04-13");
+    expect(o.hafta_bitis).toBe("2026-04-19");
+  });
+});
+
+// =========================================================================
+// 11b. Hafta aralığı ve tarihten haftalık özet (Pzt–Pz)
+// =========================================================================
+
+describe("hesaplaHaftaAraligi", () => {
+  it("hafta içi tarih → Pazartesi başlangıç, Pazar bitiş", () => {
+    const a = hesaplaHaftaAraligi("2026-04-15");
+    expect(a).toEqual({
+      hafta_baslangic: "2026-04-13",
+      hafta_bitis: "2026-04-19"
+    });
+  });
+
+  it("referans Pazar → aynı haftanın son günü bitişte, başlangıç önceki Pazartesi", () => {
+    const a = hesaplaHaftaAraligi("2026-04-12");
+    expect(a).toEqual({
+      hafta_baslangic: "2026-04-06",
+      hafta_bitis: "2026-04-12"
+    });
+  });
+
+  it("geçersiz tarih formatı → null (throw yok)", () => {
+    expect(hesaplaHaftaAraligi("15-04-2026")).toBeNull();
+    expect(hesaplaHaftaAraligi("")).toBeNull();
+  });
+
+  it("takvim taşması (var olmayan gün) → null", () => {
+    expect(hesaplaHaftaAraligi("2026-02-31")).toBeNull();
+  });
+});
+
+describe("filtreleHaftalikPuantajSatirlari", () => {
+  it("karışık listede yalnızca referans haftasındaki satırlar kalır", () => {
+    const tum = [
+      { tarih: "2026-04-13", net_calisma_suresi_dakika: 100 },
+      { tarih: "2026-04-20", net_calisma_suresi_dakika: 999 },
+      { tarih: "2026-04-18", net_calisma_suresi_dakika: 200 }
+    ];
+    const f = filtreleHaftalikPuantajSatirlari(tum, "2026-04-15");
+    expect(f.map((x) => x.tarih).sort()).toEqual(["2026-04-13", "2026-04-18"]);
+  });
+
+  it("geçersiz referans tarih → boş dizi", () => {
+    expect(filtreleHaftalikPuantajSatirlari([{ tarih: "2026-04-13" }], "gecersiz")).toEqual([]);
+  });
+
+  it("geçersiz satır tarihi haftaya dahil edilmez", () => {
+    const f = filtreleHaftalikPuantajSatirlari(
+      [
+        { tarih: "2026-04-14", net_calisma_suresi_dakika: 50 },
+        { tarih: "2026-13-40", net_calisma_suresi_dakika: 999 }
+      ],
+      "2026-04-15"
+    );
+    expect(f).toHaveLength(1);
+    expect(f[0].tarih).toBe("2026-04-14");
+  });
+});
+
+describe("hesaplaTarihtenHaftalikCalismaOzeti", () => {
+  it("aynı haftadaki kayıtların toplamı doğru", () => {
+    const gunler = [
+      { tarih: "2026-04-13", net_calisma_suresi_dakika: 480 },
+      { tarih: "2026-04-14", net_calisma_suresi_dakika: 480 },
+      { tarih: "2026-04-15", net_calisma_suresi_dakika: 480 },
+      { tarih: "2026-04-16", net_calisma_suresi_dakika: 480 },
+      { tarih: "2026-04-17", net_calisma_suresi_dakika: 480 }
+    ];
+    const o = hesaplaTarihtenHaftalikCalismaOzeti(gunler, "2026-04-15");
+    expect(o.toplam_net_dakika).toBe(2400);
+    expect(o.fazla_calisma_dakika).toBe(0);
+  });
+
+  it("Pazar günü kaydı haftaya dahil ve toplama girer", () => {
+    const gunler = [
+      { tarih: "2026-04-13", net_calisma_suresi_dakika: 480 },
+      { tarih: "2026-04-14", net_calisma_suresi_dakika: 480 },
+      { tarih: "2026-04-15", net_calisma_suresi_dakika: 480 },
+      { tarih: "2026-04-16", net_calisma_suresi_dakika: 480 },
+      { tarih: "2026-04-17", net_calisma_suresi_dakika: 480 },
+      { tarih: "2026-04-19", net_calisma_suresi_dakika: 120 }
+    ];
+    const o = hesaplaTarihtenHaftalikCalismaOzeti(gunler, "2026-04-15");
+    expect(o.toplam_net_dakika).toBe(2520);
+    expect(o.normal_calisma_dakika).toBe(2520);
+  });
+
+  it("geçersiz referans tarih → süzüm boş, özet sıfır toplamlı", () => {
+    const o = hesaplaTarihtenHaftalikCalismaOzeti(
+      [{ tarih: "2026-04-14", net_calisma_suresi_dakika: 480 }],
+      "not-a-date"
+    );
+    expect(o.toplam_net_dakika).toBe(0);
+    expect(o.normal_calisma_dakika).toBe(0);
+    expect(o.fazla_calisma_dakika).toBe(0);
+    expect(o.haftalik_esik_dakika).toBe(HAFTALIK_NORMAL_CALISMA_ESIK_DAKIKA);
+  });
+
+  it("boş dizi + geçerli referans → sıfır toplamlı özet", () => {
+    const o = hesaplaTarihtenHaftalikCalismaOzeti([], "2026-04-15");
+    expect(o.toplam_net_dakika).toBe(0);
+    expect(o.fazla_calisma_dakika).toBe(0);
+  });
+});
+
+// =========================================================================
+// 12. Adaptör fonksiyonları
 // =========================================================================
 
 describe("adaptör fonksiyonları", () => {

@@ -46,6 +46,262 @@ export type HesapSonucu = {
 };
 
 // ---------------------------------------------------------------------------
+// Haftalık net çalışma özeti (45 saat / 2700 dk eşiği)
+// ---------------------------------------------------------------------------
+
+/** Aylık tam zamanlı model: haftalık normal çalışma üst sınırı (45 saat). */
+export const HAFTALIK_NORMAL_CALISMA_ESIK_DAKIKA = 45 * 60; // 2700
+
+/** Haftalık toplamda kullanılacak günlük net süre girdisi (diğer alanlar yok sayılır). */
+export type HaftalikGunNetCalisma = {
+  net_calisma_suresi_dakika?: number;
+};
+
+export type HaftalikCalismaOzeti = {
+  toplam_net_dakika: number;
+  normal_calisma_dakika: number;
+  fazla_calisma_dakika: number;
+  haftalik_esik_dakika: number;
+};
+
+function haftalikNetDakikaSatir(value: number | undefined): number {
+  if (value === undefined || value === null || Number.isNaN(value)) {
+    return 0;
+  }
+  return value < 0 ? 0 : value;
+}
+
+/**
+ * Bir haftaya ait günlük net çalışma dakikalarından haftalık özeti üretir.
+ * - toplam: satırların net dakikalarının toplamı (güvenli satır birleştirme)
+ * - normal: min(toplam, haftalık eşik)
+ * - fazla: max(toplam − eşik, 0)
+ */
+export function hesaplaHaftalikCalismaOzeti(
+  gunler: readonly HaftalikGunNetCalisma[]
+): HaftalikCalismaOzeti {
+  const haftalik_esik_dakika = HAFTALIK_NORMAL_CALISMA_ESIK_DAKIKA;
+  const toplam_net_dakika = gunler.reduce(
+    (acc, g) => acc + haftalikNetDakikaSatir(g.net_calisma_suresi_dakika),
+    0
+  );
+  const normal_calisma_dakika = Math.min(toplam_net_dakika, haftalik_esik_dakika);
+  const fazla_calisma_dakika = Math.max(toplam_net_dakika - haftalik_esik_dakika, 0);
+
+  return {
+    toplam_net_dakika,
+    normal_calisma_dakika,
+    fazla_calisma_dakika,
+    haftalik_esik_dakika
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Hafta aralığı (Pazartesi – Pazar) ve tarihten haftalık özet
+// ---------------------------------------------------------------------------
+
+/** Haftalık filtre / özet için günlük satırda gerekli alanlar. */
+export type HaftalikPuantajSatirGirdi = {
+  tarih: string;
+  net_calisma_suresi_dakika?: number;
+};
+
+export type HaftaAraligi = {
+  hafta_baslangic: string;
+  hafta_bitis: string;
+};
+
+/** YYYY-MM-DD; takvim taşması / geçersiz gün → null (throw yok). */
+function parseGGAATarihStrict(value: string): Date | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
+  if (!match) return null;
+  const y = Number.parseInt(match[1], 10);
+  const m = Number.parseInt(match[2], 10);
+  const day = Number.parseInt(match[3], 10);
+  if (m < 1 || m > 12 || day < 1 || day > 31) return null;
+  const d = new Date(y, m - 1, day);
+  if (Number.isNaN(d.getTime())) return null;
+  if (d.getFullYear() !== y || d.getMonth() !== m - 1 || d.getDate() !== day) {
+    return null;
+  }
+  return d;
+}
+
+function formatGGAATarih(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+/** Yerel takvimde Pazartesi 00:00 günü (aynı haftanın ilk iş günü başlangıcı). */
+function haftaninPazartesiBaslangici(d: Date): Date {
+  const lokal = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const gun = lokal.getDay();
+  const pazartesidenItibaren = (gun + 6) % 7;
+  lokal.setDate(lokal.getDate() - pazartesidenItibaren);
+  return lokal;
+}
+
+function haftaninPazarSonu(pazartesi: Date): Date {
+  const son = new Date(pazartesi.getFullYear(), pazartesi.getMonth(), pazartesi.getDate());
+  son.setDate(son.getDate() + 6);
+  return son;
+}
+
+/**
+ * Verilen tarihin düştüğü haftanın Pazartesi–Pazar aralığı (yerel tarih).
+ * Geçersiz `tarih` → `null`.
+ */
+export function hesaplaHaftaAraligi(tarih: string): HaftaAraligi | null {
+  const d = parseGGAATarihStrict(tarih);
+  if (!d) return null;
+  const bas = haftaninPazartesiBaslangici(d);
+  const bit = haftaninPazarSonu(bas);
+  return {
+    hafta_baslangic: formatGGAATarih(bas),
+    hafta_bitis: formatGGAATarih(bit)
+  };
+}
+
+/**
+ * `referansTarih` ile aynı Pazartesi–Pazar haftasındaki satırlar.
+ * Geçersiz referans veya satır `tarih` → o satır seçilmez; referans geçersizse `[]`.
+ */
+export function filtreleHaftalikPuantajSatirlari<T extends { tarih: string }>(
+  gunler: readonly T[],
+  referansTarih: string
+): T[] {
+  const aralik = hesaplaHaftaAraligi(referansTarih);
+  if (!aralik) return [];
+  const { hafta_baslangic, hafta_bitis } = aralik;
+  return gunler.filter((g) => {
+    const parsed = parseGGAATarihStrict(g.tarih);
+    if (!parsed) return false;
+    const ymd = formatGGAATarih(parsed);
+    return ymd >= hafta_baslangic && ymd <= hafta_bitis;
+  });
+}
+
+/** Aynı haftayı süzer ve `hesaplaHaftalikCalismaOzeti` sonucunu döner. */
+export function hesaplaTarihtenHaftalikCalismaOzeti(
+  gunler: readonly HaftalikPuantajSatirGirdi[],
+  referansTarih: string
+): HaftalikCalismaOzeti {
+  const hafta = filtreleHaftalikPuantajSatirlari(gunler, referansTarih);
+  return hesaplaHaftalikCalismaOzeti(hafta);
+}
+
+// ---------------------------------------------------------------------------
+// Haftalık fazla çalışma ücreti (aylık: saatlik = maaş / 225, FM × 1.5)
+// ---------------------------------------------------------------------------
+
+/** Aylık modele göre brüt aylık maaşın bölündüğü ay içi “mesai saati” paydası. */
+export const AYLIK_MAAS_SAAT_PAYDASI = 225;
+
+export const FAZLA_CALISMA_UCRET_CARPANI = 1.5;
+
+function ucretIcinGuvenliPozitifMaas(n: number): number {
+  if (typeof n !== "number" || Number.isNaN(n) || !Number.isFinite(n) || n <= 0) {
+    return 0;
+  }
+  return n;
+}
+
+function ucretIcinGuvenliNegatifOlmayanSayi(n: number): number {
+  if (typeof n !== "number" || Number.isNaN(n) || !Number.isFinite(n) || n < 0) {
+    return 0;
+  }
+  return n;
+}
+
+/** Para alanları için 2 ondalık (yarım yukarı yuvarlama). */
+function yuvarlaParaIkiliOndalik(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.round(value * 100) / 100;
+}
+
+/**
+ * Aylık brüt maaştan saatlik ücret: maaş / 225.
+ * Maaş 0, negatif, NaN, ±Infinity → 0 (throw yok).
+ */
+export function hesaplaSaatlikUcret(maasTutari: number): number {
+  const maas = ucretIcinGuvenliPozitifMaas(maasTutari);
+  if (maas === 0) return 0;
+  return maas / AYLIK_MAAS_SAAT_PAYDASI;
+}
+
+/**
+ * Fazla mesai tutarı: saatlik × 1.5 × (fazla dakika / 60).
+ * Negatif / NaN dakika veya saatlik → 0 kabul; tutar 2 ondalığa yuvarlanır.
+ */
+export function hesaplaFazlaCalismaTutari(fazlaCalismaDakika: number, saatlikUcret: number): number {
+  const dk = ucretIcinGuvenliNegatifOlmayanSayi(fazlaCalismaDakika);
+  const su = ucretIcinGuvenliNegatifOlmayanSayi(saatlikUcret);
+  const fazlaSaat = dk / 60;
+  const ham = su * FAZLA_CALISMA_UCRET_CARPANI * fazlaSaat;
+  return yuvarlaParaIkiliOndalik(ham);
+}
+
+/** Haftalık süre özeti + saatlik ücret ve FM tutarı. */
+export type HaftalikCalismaVeFazlaUcretOzeti = HaftalikCalismaOzeti & {
+  saatlik_ucret: number;
+  fazla_calisma_saat: number;
+  fazla_calisma_tutari: number;
+};
+
+/**
+ * `HaftalikCalismaOzeti` üzerinden saatlik ücret ve haftalık fazla çalışma parasını ekler.
+ */
+export function hesaplaHaftalikFazlaCalismaUcreti(
+  ozet: HaftalikCalismaOzeti,
+  maasTutari: number
+): HaftalikCalismaVeFazlaUcretOzeti {
+  const hamSaatlik = hesaplaSaatlikUcret(maasTutari);
+  const fazla_dk = ucretIcinGuvenliNegatifOlmayanSayi(ozet.fazla_calisma_dakika);
+  const fazla_calisma_saat = fazla_dk / 60;
+  const fazla_calisma_tutari = hesaplaFazlaCalismaTutari(ozet.fazla_calisma_dakika, hamSaatlik);
+
+  return {
+    ...ozet,
+    saatlik_ucret: yuvarlaParaIkiliOndalik(hamSaatlik),
+    fazla_calisma_saat,
+    fazla_calisma_tutari
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Günlük puantaj → haftalık fazla mesai ücret özeti (servis adapter)
+// ---------------------------------------------------------------------------
+
+/** Haftalık süre + ücret + hafta aralığı (geçersiz referansta aralık `null`). */
+export type HaftalikPuantajUcretOzeti = HaftalikCalismaVeFazlaUcretOzeti & {
+  hafta_baslangic: string | null;
+  hafta_bitis: string | null;
+};
+
+/**
+ * `GunlukPuantaj` satırları (çağıranın tek personel listesi vermesi beklenir),
+ * referans tarih ve maaş ile haftalık fazla mesai ücret özetini üretir.
+ * Motorları birleştirir; veri çekmez, throw etmez.
+ */
+export function hesaplaHaftalikPuantajUcretOzeti(
+  gunler: readonly GunlukPuantaj[],
+  referansTarih: string,
+  maasTutari: number
+): HaftalikPuantajUcretOzeti {
+  const aralik = hesaplaHaftaAraligi(referansTarih);
+  const ozet = hesaplaTarihtenHaftalikCalismaOzeti(gunler, referansTarih);
+  const ucret = hesaplaHaftalikFazlaCalismaUcreti(ozet, maasTutari);
+
+  return {
+    ...ucret,
+    hafta_baslangic: aralik?.hafta_baslangic ?? null,
+    hafta_bitis: aralik?.hafta_bitis ?? null
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Saat ayrıştırma
 // ---------------------------------------------------------------------------
 

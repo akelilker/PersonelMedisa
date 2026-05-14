@@ -303,6 +303,100 @@ export function hesaplaHaftalikPuantajUcretOzeti(
 }
 
 // ---------------------------------------------------------------------------
+// Günlük kesinti (geç kalma / erken çıkma / devamsızlık — aylık model)
+// ---------------------------------------------------------------------------
+
+/** Aylık brüt maaşın bölündüğü takvim ayı gün paydası (günlük ücret). */
+export const AYLIK_MAAS_GUN_PAYDASI = 30;
+
+/**
+ * Günlük ücret: maaş / 30.
+ * Geçersiz maaş → 0; tutar `yuvarlaParaIkiliOndalik` ile 2 ondalık.
+ */
+export function hesaplaGunlukUcret(maasTutari: number): number {
+  const maas = ucretIcinGuvenliPozitifMaas(maasTutari);
+  if (maas === 0) return 0;
+  return yuvarlaParaIkiliOndalik(maas / AYLIK_MAAS_GUN_PAYDASI);
+}
+
+/**
+ * Eksik çalışılan süre için saatlik ücret kadar kesinti (FM çarpanı yok).
+ * Negatif / NaN dakika → 0; kesinti 2 ondalık.
+ */
+export function hesaplaSaatlikKesintiTutari(eksikDakika: number, maasTutari: number): number {
+  const dk = ucretIcinGuvenliNegatifOlmayanSayi(eksikDakika);
+  const su = hesaplaSaatlikUcret(maasTutari);
+  const eksikSaat = dk / 60;
+  return yuvarlaParaIkiliOndalik(su * eksikSaat);
+}
+
+export type GecKalmaErkenCikmaKesintiOzeti = {
+  eksik_dakika: number;
+  eksik_saat: number;
+  saatlik_ucret: number;
+  kesinti_tutari: number;
+};
+
+/**
+ * Geç kalma veya erken çıkma için eksik süre × saatlik ücret özeti.
+ */
+export function hesaplaGecKalmaErkenCikmaKesintiOzeti(
+  eksikDakika: number,
+  maasTutari: number
+): GecKalmaErkenCikmaKesintiOzeti {
+  const eksik_dakika = ucretIcinGuvenliNegatifOlmayanSayi(eksikDakika);
+  const eksik_saat = eksik_dakika / 60;
+  const hamSaatlik = hesaplaSaatlikUcret(maasTutari);
+  const kesinti_tutari = hesaplaSaatlikKesintiTutari(eksikDakika, maasTutari);
+
+  return {
+    eksik_dakika,
+    eksik_saat,
+    saatlik_ucret: yuvarlaParaIkiliOndalik(hamSaatlik),
+    kesinti_tutari
+  };
+}
+
+export type DevamsizlikKesintiGirdi = {
+  devamsizlik_gun_sayisi: number;
+  /** Hafta tatili hakkı kaybı vb. için ek kesinti gün eşdeğeri (varsayılan 0). */
+  hafta_tatili_kaybi_gun_sayisi?: number;
+};
+
+export type DevamsizlikKesintiOzeti = {
+  gunluk_ucret: number;
+  devamsizlik_gun_sayisi: number;
+  hafta_tatili_kaybi_gun_sayisi: number;
+  toplam_kesinti_gun_esdegeri: number;
+  toplam_kesinti_tutari: number;
+};
+
+/**
+ * Devamsızlık: günlük ücret × (devamsızlık günü + hafta tatili kaybı gün eşdeğeri).
+ * Gün sayıları negatif/NaN ise 0; toplam kesinti 2 ondalık. Maaş geçersizse tutar 0, gün eşdeğeri yine hesaplanır.
+ */
+export function hesaplaDevamsizlikKesintiOzeti(
+  maasTutari: number,
+  girdi: DevamsizlikKesintiGirdi
+): DevamsizlikKesintiOzeti {
+  const devamsizlik_gun_sayisi = ucretIcinGuvenliNegatifOlmayanSayi(girdi.devamsizlik_gun_sayisi);
+  const hafta_tatili_kaybi_gun_sayisi = ucretIcinGuvenliNegatifOlmayanSayi(
+    girdi.hafta_tatili_kaybi_gun_sayisi ?? 0
+  );
+  const toplam_kesinti_gun_esdegeri = devamsizlik_gun_sayisi + hafta_tatili_kaybi_gun_sayisi;
+  const gunluk_ucret = hesaplaGunlukUcret(maasTutari);
+  const toplam_kesinti_tutari = yuvarlaParaIkiliOndalik(gunluk_ucret * toplam_kesinti_gun_esdegeri);
+
+  return {
+    gunluk_ucret,
+    devamsizlik_gun_sayisi,
+    hafta_tatili_kaybi_gun_sayisi,
+    toplam_kesinti_gun_esdegeri,
+    toplam_kesinti_tutari
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Saat ayrıştırma
 // ---------------------------------------------------------------------------
 

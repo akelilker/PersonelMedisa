@@ -21,6 +21,10 @@ import {
   hesaplaHaftalikFazlaCalismaUcreti,
   hesaplaHaftalikPuantajUcretOzeti,
   HAFTALIK_NORMAL_CALISMA_ESIK_DAKIKA,
+  hesaplaGunlukUcret,
+  hesaplaSaatlikKesintiTutari,
+  hesaplaGecKalmaErkenCikmaKesintiOzeti,
+  hesaplaDevamsizlikKesintiOzeti,
   gunlukPuantajToGirdi,
   hesapSonucuToGunlukPuantaj,
   type HesapGirdisi
@@ -603,6 +607,92 @@ describe("hesaplaFazlaCalismaTutari", () => {
 
   it("90 dk → 1.5 saat × 1.5 × 200 = 450", () => {
     expect(hesaplaFazlaCalismaTutari(90, saatlik)).toBe(450);
+  });
+});
+
+// =========================================================================
+// 11a1. Günlük kesinti (geç kalma / erken çıkma / devamsızlık)
+// =========================================================================
+
+describe("hesaplaGunlukUcret", () => {
+  it("30000 / 30 → 1000", () => {
+    expect(hesaplaGunlukUcret(30000)).toBe(1000);
+  });
+
+  it("maaş 0 → günlük ücret 0", () => {
+    expect(hesaplaGunlukUcret(0)).toBe(0);
+  });
+});
+
+describe("hesaplaSaatlikKesintiTutari ve gecKalmaErkenCikma özeti", () => {
+  const maas = 30000;
+
+  it("60 dk eksik → 1 saatlik kesinti doğru", () => {
+    expect(hesaplaSaatlikKesintiTutari(60, maas)).toBeCloseTo(133.33, 2);
+    const o = hesaplaGecKalmaErkenCikmaKesintiOzeti(60, maas);
+    expect(o.eksik_dakika).toBe(60);
+    expect(o.eksik_saat).toBe(1);
+    expect(o.kesinti_tutari).toBe(hesaplaSaatlikKesintiTutari(60, maas));
+    expect(o.saatlik_ucret).toBeCloseTo(133.33, 2);
+  });
+
+  it("90 dk eksik → 1.5 saatlik kesinti doğru", () => {
+    expect(hesaplaSaatlikKesintiTutari(90, maas)).toBeCloseTo(200, 2);
+    const o = hesaplaGecKalmaErkenCikmaKesintiOzeti(90, maas);
+    expect(o.kesinti_tutari).toBeCloseTo(200, 2);
+  });
+
+  it("negatif eksik dakika → 0 kesinti", () => {
+    expect(hesaplaSaatlikKesintiTutari(-30, maas)).toBe(0);
+    const o = hesaplaGecKalmaErkenCikmaKesintiOzeti(-5, maas);
+    expect(o.eksik_dakika).toBe(0);
+    expect(o.kesinti_tutari).toBe(0);
+  });
+
+  it("ondalıklı para: günlük ücret ve kesinti 2 hane", () => {
+    expect(hesaplaGunlukUcret(10001)).toBe(333.37);
+    const o = hesaplaGecKalmaErkenCikmaKesintiOzeti(45, 30000);
+    expect(o.kesinti_tutari).toBe(100);
+  });
+});
+
+describe("hesaplaDevamsizlikKesintiOzeti", () => {
+  const maas = 30000;
+
+  it("1 gün devamsızlık, hafta tatili kaybı yok → 1 günlük kesinti", () => {
+    const o = hesaplaDevamsizlikKesintiOzeti(maas, { devamsizlik_gun_sayisi: 1 });
+    expect(o.gunluk_ucret).toBe(1000);
+    expect(o.hafta_tatili_kaybi_gun_sayisi).toBe(0);
+    expect(o.toplam_kesinti_gun_esdegeri).toBe(1);
+    expect(o.toplam_kesinti_tutari).toBe(1000);
+  });
+
+  it("1 gün devamsızlık + 1 gün tatil kaybı → 2 günlük eşdeğer kesinti", () => {
+    const o = hesaplaDevamsizlikKesintiOzeti(maas, {
+      devamsizlik_gun_sayisi: 1,
+      hafta_tatili_kaybi_gun_sayisi: 1
+    });
+    expect(o.toplam_kesinti_gun_esdegeri).toBe(2);
+    expect(o.toplam_kesinti_tutari).toBe(2000);
+  });
+
+  it("2 gün devamsızlık + 1 gün tatil kaybı → 3 günlük eşdeğer kesinti", () => {
+    const o = hesaplaDevamsizlikKesintiOzeti(maas, {
+      devamsizlik_gun_sayisi: 2,
+      hafta_tatili_kaybi_gun_sayisi: 1
+    });
+    expect(o.toplam_kesinti_gun_esdegeri).toBe(3);
+    expect(o.toplam_kesinti_tutari).toBe(3000);
+  });
+
+  it("geçersiz maaşta tutar 0, gün eşdeğeri korunur", () => {
+    const o = hesaplaDevamsizlikKesintiOzeti(-50, {
+      devamsizlik_gun_sayisi: 1,
+      hafta_tatili_kaybi_gun_sayisi: 1
+    });
+    expect(o.gunluk_ucret).toBe(0);
+    expect(o.toplam_kesinti_gun_esdegeri).toBe(2);
+    expect(o.toplam_kesinti_tutari).toBe(0);
   });
 });
 

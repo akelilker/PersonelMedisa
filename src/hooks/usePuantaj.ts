@@ -204,7 +204,7 @@ export type ParasalEtkiOzeti = {
   notlar: string[];
 };
 
-function onIzlemeParsalGuvenlikNotu(not: string | null | undefined): boolean {
+function onIzlemeParasalGuvenlikNotu(not: string | null | undefined): boolean {
   if (!not?.trim()) {
     return false;
   }
@@ -506,8 +506,8 @@ export function usePuantaj() {
       tatilEkOdemeOzeti?.hafta_tatili_pazar_karar?.manuel_inceleme_gerekli_mi === true;
 
     const haftalikEksikVeyaGuvenilmezNot = Boolean(haftalikOzetEksikVeriNotu?.trim());
-    const tatilNotuGuvenliDegil = onIzlemeParsalGuvenlikNotu(tatilEkOdemeNotu);
-    const kesintiOzetNotuGuvenliDegil = onIzlemeParsalGuvenlikNotu(kesintiOzetNotu);
+    const tatilNotuGuvenliDegil = onIzlemeParasalGuvenlikNotu(tatilEkOdemeNotu);
+    const kesintiOzetNotuGuvenliDegil = onIzlemeParasalGuvenlikNotu(kesintiOzetNotu);
     const gecErkenNotuVar = Boolean(gecErkenKesintiNotu?.trim());
 
     const net_etki_hesaplanabilir_mi = !(

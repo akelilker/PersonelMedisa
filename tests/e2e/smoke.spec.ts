@@ -2,6 +2,17 @@ import { expect, test } from "@playwright/test";
 import { login } from "./helpers/auth";
 import { mockApi } from "./helpers/mock-api";
 
+function readonlyFieldByLabel(page: Parameters<typeof test>[0]["page"], label: string) {
+  return page.locator(".form-section").filter({ hasText: label });
+}
+
+function readonlyFieldInCardByLabel(
+  container: ReturnType<Parameters<typeof test>[0]["page"]["locator"]>,
+  label: string
+) {
+  return container.locator(".form-section").filter({ hasText: label });
+}
+
 test.describe("e2e smoke", () => {
   test("management user completes login to kapanis flow", async ({ page }) => {
     await mockApi(page, "GENEL_YONETICI");
@@ -35,14 +46,15 @@ test.describe("e2e smoke", () => {
     await page.getByLabel("Tarih").fill("2026-04-12");
     await page.getByRole("button", { name: /Kayd.*Getir/i }).click();
 
-    await expect(page.getByText(/Hesaplandı/i)).toBeVisible();
-    await expect(page.getByText(/510/)).toBeVisible();
+    const gunlukDetayKarti = page.locator(".puantaj-detail-card").first();
+    await expect(readonlyFieldInCardByLabel(gunlukDetayKarti, "Kayıt Durumu")).toContainText(/Hesapland/i);
+    await expect(readonlyFieldInCardByLabel(gunlukDetayKarti, "Net Çalışma (dk)").getByText(/^510$/)).toBeVisible();
 
     await page.locator("[name='puantaj-giris']").fill("08:30");
     await page.locator("[name='puantaj-cikis']").fill("18:00");
     await page.locator("[name='puantaj-mola']").fill("60");
     await page.getByRole("button", { name: "Kaydet" }).click();
-    await expect(page.getByText(/570/)).toBeVisible();
+    await expect(readonlyFieldInCardByLabel(gunlukDetayKarti, "Günlük Brüt Süre (dk)").getByText(/^570$/)).toBeVisible();
 
     await page.goto("/haftalik-kapanis");
     await expect(page).toHaveURL(/\/$/);

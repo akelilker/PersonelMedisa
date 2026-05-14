@@ -50,6 +50,7 @@ Bu doküman iki katmanlı kaynağa dayanır:
 - `beyin-olmazsa-olmaz.docx`
 - `01-urun-anayasasi.md`
 - `02-mvp-veri-kapsami.md`
+- `11-puantaj-kural-matrisi.md` (yoklama / süreç / puantaj ürün karar özeti; bu belge ile çelişmemeli)
 
 ### Resmî dayanaklar
 

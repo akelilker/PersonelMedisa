@@ -1,5 +1,6 @@
 import type { Dispatch, SetStateAction } from "react";
 import { FormField } from "../../../components/form/FormField";
+import { mapUcretTipiSelectOptions } from "../../../lib/display/ucret-tipi-display";
 import type { PersonelReferenceBundle } from "../../../data/app-data.types";
 import type { CreatePersonelFormState } from "../../../hooks/usePersoneller";
 import type { IdOption } from "../../../types/referans";
@@ -229,14 +230,14 @@ export function PersonelCreateFields({
           ) : (
             refMissingNote("Personel Tipi", true)
           )}
-          {refs.ucretTipiOptions.length > 0 ? (
+            {refs.ucretTipiOptions.length > 0 ? (
             <FormField
               as="select"
               label="Ücret Tipi"
               name="create-ucret-tipi"
               value={form.ucretTipiId}
               onChange={(value) => setForm((prev) => ({ ...prev, ucretTipiId: value }))}
-              selectOptions={toSelectOptions(refs.ucretTipiOptions)}
+              selectOptions={mapUcretTipiSelectOptions(refs.ucretTipiOptions)}
             />
           ) : (
             refMissingNote("Ücret Tipi", false)

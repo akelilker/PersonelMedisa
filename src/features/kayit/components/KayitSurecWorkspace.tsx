@@ -52,6 +52,7 @@ import { usePersonelFinansCreate } from "../../../hooks/useFinans";
 import { INITIAL_CREATE_PERSONEL_FORM, usePersonelZimmetCreate, type CreatePersonelFormState } from "../../../hooks/usePersoneller";
 import { INITIAL_SUREC_FORM, type SurecFormState } from "../../../hooks/useSurecler";
 import { useRoleAccess } from "../../../hooks/use-role-access";
+import { displayUcretTipiLabel } from "../../../lib/display/ucret-tipi-display";
 import { runDeduped } from "../../../lib/in-flight-dedupe";
 import type { FinansMaliFieldsState } from "../../../lib/finans/finans-create-commit";
 import type { Personel } from "../../../types/personel";
@@ -760,7 +761,15 @@ export function KayitSurecWorkspace({
           { label: "Sicil No", value: formatGeneralField(selectedSurecPersonel.sicil_no) },
           { label: "İşe Giriş Tarihi", value: formatGeneralField(selectedSurecPersonel.ise_giris_tarihi) },
           { label: "Personel Tipi", value: formatGeneralField(selectedSurecPersonel.personel_tipi_adi) },
-          { label: "Ücret Tipi", value: formatGeneralField(selectedSurecPersonel.ucret_tipi_adi) },
+          {
+            label: "Ücret Tipi",
+            value: formatGeneralField(
+              displayUcretTipiLabel(
+                selectedSurecPersonel.ucret_tipi_adi,
+                selectedSurecPersonel.ucret_tipi_id
+              )
+            )
+          },
           { label: "Maaş Tutarı", value: formatMoneyField(selectedSurecPersonel.maas_tutari) },
           { label: "Prim Kuralı", value: formatGeneralField(selectedSurecPersonel.prim_kurali_adi) }
         ]

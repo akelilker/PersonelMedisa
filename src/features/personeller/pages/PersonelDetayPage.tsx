@@ -16,6 +16,7 @@ import {
   formatSurecStateLabel,
   formatSurecTuruLabel
 } from "../../../lib/display/enum-display";
+import { mapUcretTipiSelectOptions } from "../../../lib/display/ucret-tipi-display";
 import { getSurecTimelineSortWeight } from "../../../lib/surec-history-sort";
 import { hesaplaIzinBakiye } from "../../../services/izin-hesap-motoru";
 import type { IdOption, KeyOption } from "../../../types/referans";
@@ -1261,7 +1262,7 @@ export function PersonelDetayPage() {
                     value={editForm.ucretTipiId}
                     onChange={(value) => setEditForm((prev) => ({ ...prev, ucretTipiId: value }))}
                     placeholderOption={{ value: "", label: "Seçiniz" }}
-                    selectOptions={idOptionsToSelectOptions(personelRefs.ucretTipiOptions)}
+                    selectOptions={mapUcretTipiSelectOptions(personelRefs.ucretTipiOptions)}
                   />
                 ) : (
                   <p className="personel-create-error">Ücret tipi listesi yüklenemedi.</p>

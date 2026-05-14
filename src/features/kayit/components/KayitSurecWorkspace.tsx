@@ -1,4 +1,15 @@
-import { useEffect, useMemo, useRef, useState, type Dispatch, type FormEvent, type SetStateAction } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type Dispatch,
+  type FormEvent,
+  type KeyboardEvent,
+  type SetStateAction
+} from "react";
 import { useNavigate } from "react-router-dom";
 import { FormField } from "../../../components/form/FormField";
 import { ErrorState } from "../../../components/states/ErrorState";
@@ -533,6 +544,7 @@ export function KayitSurecWorkspace({
   const [editingSurec, setEditingSurec] = useState<Surec | null>(null);
   const [surecPersonelSearch, setSurecPersonelSearch] = useState("");
   const [surecPersonelPickerOpen, setSurecPersonelPickerOpen] = useState(false);
+  const surecPersonelSearchInputRef = useRef<HTMLInputElement>(null);
 
   const [activePersonelTab, setActivePersonelTab] = useState<PersonelSurecTab>("genel");
   const [devamsizlikSubId, setDevamsizlikSubId] = useState<DevamsizlikSubId | null>(null);
@@ -596,6 +608,74 @@ export function KayitSurecWorkspace({
 
     return filteredOptions;
   }, [personelOptions, personeller, surecForm.personelId, surecPersonelSearch]);
+
+  const handleSurecPersonelComboboxKeyDownCapture = useCallback(
+    (event: KeyboardEvent<HTMLDivElement>) => {
+      if (!surecPersonelPickerOpen) {
+        return;
+      }
+      const searchEl = surecPersonelSearchInputRef.current;
+      if (!searchEl) {
+        return;
+      }
+      const active = document.activeElement;
+      if (active === searchEl || searchEl.contains(active)) {
+        return;
+      }
+      if (event.nativeEvent.isComposing) {
+        return;
+      }
+
+      const { key } = event;
+
+      if (key === "Escape") {
+        return;
+      }
+      if (key === "Tab") {
+        return;
+      }
+      if (key.startsWith("Arrow")) {
+        return;
+      }
+      if (key === "Enter" || key === "Home" || key === "End" || key === "PageDown" || key === "PageUp") {
+        return;
+      }
+
+      if (key === "Backspace") {
+        event.preventDefault();
+        searchEl.focus({ preventScroll: true });
+        setSurecPersonelSearch((prev) => prev.slice(0, -1));
+        return;
+      }
+
+      if (key === "Delete") {
+        event.preventDefault();
+        searchEl.focus({ preventScroll: true });
+        return;
+      }
+
+      if (key === " ") {
+        return;
+      }
+
+      if (key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey) {
+        event.preventDefault();
+        searchEl.focus({ preventScroll: true });
+        setSurecPersonelSearch((prev) => prev + key);
+      }
+    },
+    [surecPersonelPickerOpen]
+  );
+
+  useLayoutEffect(() => {
+    if (!surecPersonelPickerOpen) {
+      return;
+    }
+    const id = window.requestAnimationFrame(() => {
+      surecPersonelSearchInputRef.current?.focus({ preventScroll: true });
+    });
+    return () => window.cancelAnimationFrame(id);
+  }, [surecPersonelPickerOpen]);
 
   const personelMap = useMemo(() => new Map(personeller.map((personel) => [personel.id, personel])), [personeller]);
 
@@ -1335,12 +1415,11 @@ export function KayitSurecWorkspace({
                     {!selectedSurecPersonel ? (
                       <>
                         <div className="surec-personel-picker">
-                          <div className="surec-personel-picker-head">
-                            <strong>Personel seçimi</strong>
-                          </div>
-
                           {personelOptions.length > 0 ? (
-                            <div className="surec-personel-combobox form-section">
+                            <div
+                              className="surec-personel-combobox form-section"
+                              onKeyDownCapture={handleSurecPersonelComboboxKeyDownCapture}
+                            >
                               <label className="form-label" id="surec-personel-combobox-label">
                                 Personel
                               </label>
@@ -1360,12 +1439,12 @@ export function KayitSurecWorkspace({
                               {surecPersonelPickerOpen ? (
                                 <div className="surec-personel-combobox-panel" id="surec-personel-combobox-list">
                                   <input
+                                    ref={surecPersonelSearchInputRef}
                                     className="form-input surec-personel-combobox-search"
                                     type="search"
                                     value={surecPersonelSearch}
                                     onChange={(event) => setSurecPersonelSearch(event.target.value)}
                                     placeholder="Personel ara"
-                                    autoFocus
                                   />
                                   <div className="surec-personel-combobox-options" role="listbox" aria-label="Personel listesi">
                                     {filteredSurecPersonelOptions.length > 0 ? (

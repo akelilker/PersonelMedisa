@@ -235,33 +235,16 @@
 
 .surec-personel-picker {
   display: grid;
-  gap: 8px;
+  gap: 0;
+  margin-top: 12px;
   padding: 0;
   border: none;
   border-radius: 0;
   background: transparent;
 }
 
-.surec-personel-picker-head {
-  display: grid;
+.surec-personel-picker .surec-personel-combobox.form-section {
   gap: 3px;
-}
-
-.surec-personel-picker-head strong,
-.surec-personel-picker-head p {
-  margin: 0;
-}
-
-.surec-personel-picker-head strong {
-  color: #ffffff;
-  font-size: 16px;
-  font-weight: 700;
-}
-
-.surec-personel-picker-head p {
-  color: rgba(241, 243, 250, 0.66);
-  font-size: 13px;
-  line-height: 1.4;
 }
 
 .surec-personel-combobox {

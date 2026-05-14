@@ -17,10 +17,12 @@ import {
   hesaplaDevamsizlikKesintiOzeti,
   hesaplaHaftaAraligi,
   hesaplaHaftalikPuantajUcretOzeti,
+  hesaplaTatilEkOdemeOzeti,
   hesaplaYasKuraliBlokMesaji,
   hesapSonucuToGunlukPuantaj,
   type DevamsizlikKesintiOzeti,
-  type HaftalikPuantajUcretOzeti
+  type HaftalikPuantajUcretOzeti,
+  type TatilEkOdemeOzeti
 } from "../services/puantaj-hesap-motoru";
 import { useAuth } from "../state/auth.store";
 import type { Personel } from "../types/personel";
@@ -409,6 +411,34 @@ export function usePuantaj() {
     };
   }, [activeQuery, puantaj, personelMaasTutari, appDataRevision]);
 
+  const { tatilEkOdemeOzeti, tatilEkOdemeNotu } = useMemo(() => {
+    if (!activeQuery || !puantaj) {
+      return {
+        tatilEkOdemeOzeti: null as TatilEkOdemeOzeti | null,
+        tatilEkOdemeNotu: null as string | null
+      };
+    }
+
+    const maas = personelMaasTutari ?? 0;
+    const ozet = hesaplaTatilEkOdemeOzeti(maas, puantaj);
+
+    if (!ozet) {
+      return { tatilEkOdemeOzeti: null, tatilEkOdemeNotu: null };
+    }
+
+    const notlar: string[] = [];
+    if (personelMaasTutari === undefined) {
+      notlar.push("Personel maaşı yükleniyor; ek ödeme tutarı geçici olarak sıfır görünebilir.");
+    } else if (!Number.isFinite(personelMaasTutari) || personelMaasTutari <= 0) {
+      notlar.push("Personel maaşı tanımlı değil veya sıfır; ek ödeme tutarı sıfır görünür.");
+    }
+
+    return {
+      tatilEkOdemeOzeti: ozet,
+      tatilEkOdemeNotu: notlar.length > 0 ? notlar.join(" ") : null
+    };
+  }, [activeQuery, puantaj, personelMaasTutari]);
+
   const clearQuery = useCallback(() => {
     setFormState({ ...INITIAL_FORM });
     setActiveQuery(null);
@@ -626,6 +656,8 @@ export function usePuantaj() {
     haftalikOzetEksikVeriNotu,
     devamsizlikKesintiOzet,
     gecErkenKesintiNotu,
-    kesintiOzetNotu
+    kesintiOzetNotu,
+    tatilEkOdemeOzeti,
+    tatilEkOdemeNotu
   };
 }

@@ -176,7 +176,9 @@ export function GunlukPuantajPage() {
     haftalikOzetEksikVeriNotu,
     devamsizlikKesintiOzet,
     gecErkenKesintiNotu,
-    kesintiOzetNotu
+    kesintiOzetNotu,
+    tatilEkOdemeOzeti,
+    tatilEkOdemeNotu
   } = usePuantaj();
 
   const isMuhurlendi = puantaj?.state === "MUHURLENDI";
@@ -424,6 +426,28 @@ export function GunlukPuantajPage() {
             </div>
           ) : null}
           {gecErkenKesintiNotu ? <p className="puantaj-form-readonly">{gecErkenKesintiNotu}</p> : null}
+        </div>
+      ) : null}
+
+      {activeQuery && puantaj && tatilEkOdemeOzeti ? (
+        <div className="puantaj-detail-card">
+          <h3>Tatil Ek Ödeme Ön İzleme</h3>
+          {tatilEkOdemeNotu ? <p className="puantaj-form-readonly">{tatilEkOdemeNotu}</p> : null}
+          <div className="form-field-grid">
+            <ReadonlyField
+              label="Gün Türü"
+              value={formatMappedValue(puantaj.gun_tipi, GUN_TIPI_LABELS)}
+            />
+            <ReadonlyField label="Günlük Ücret" value={formatTurkcePara(tatilEkOdemeOzeti.gunluk_ucret)} />
+            <ReadonlyField
+              label="Çarpan"
+              value={tatilEkOdemeOzeti.carpani === 1 ? "1" : "1,5"}
+            />
+            <ReadonlyField
+              label="Ek Ödeme Tutarı"
+              value={formatTurkcePara(tatilEkOdemeOzeti.ek_odeme_tutari)}
+            />
+          </div>
         </div>
       ) : null}
 

@@ -396,6 +396,54 @@ export function hesaplaDevamsizlikKesintiOzeti(
   };
 }
 
+export type TatilEkOdemeTuru = "UBGT" | "HAFTA_TATILI";
+
+/** Günlük kayıt + maaştan türetilen tatil mesai ek ödeme ön izlemesi (tek gün, salt okunur). */
+export type TatilEkOdemeOzeti = {
+  tur: TatilEkOdemeTuru;
+  gunluk_ucret: number;
+  carpani: number;
+  ek_odeme_tutari: number;
+};
+
+/**
+ * UBGT / hafta tatili mesaisi için ek ödeme ön izlemesi.
+ * Koşullar: `hesap_etkisi === "Mesai_Yaz"`, gün tipi resmi tatil veya pazar,
+ * en az bir saat alanı dolu (`deriveHesapEtkisi` ile uyumlu).
+ * Diğer durumlarda `null` (kart gösterilmez).
+ */
+export function hesaplaTatilEkOdemeOzeti(
+  maasTutari: number,
+  kayit: Pick<GunlukPuantaj, "gun_tipi" | "hesap_etkisi" | "giris_saati" | "cikis_saati">
+): TatilEkOdemeOzeti | null {
+  if (kayit.hesap_etkisi !== "Mesai_Yaz") {
+    return null;
+  }
+
+  const hasSaat =
+    Boolean(kayit.giris_saati?.trim()) || Boolean(kayit.cikis_saati?.trim());
+  if (!hasSaat) {
+    return null;
+  }
+
+  let tur: TatilEkOdemeTuru;
+  let carpani: number;
+  if (kayit.gun_tipi === "UBGT_Resmi_Tatil") {
+    tur = "UBGT";
+    carpani = 1;
+  } else if (kayit.gun_tipi === "Hafta_Tatili_Pazar") {
+    tur = "HAFTA_TATILI";
+    carpani = 1.5;
+  } else {
+    return null;
+  }
+
+  const gunluk_ucret = hesaplaGunlukUcret(maasTutari);
+  const ek_odeme_tutari = yuvarlaParaIkiliOndalik(gunluk_ucret * carpani);
+
+  return { tur, gunluk_ucret, carpani, ek_odeme_tutari };
+}
+
 // ---------------------------------------------------------------------------
 // Saat ayrıştırma
 // ---------------------------------------------------------------------------

@@ -25,6 +25,7 @@ import {
   hesaplaSaatlikKesintiTutari,
   hesaplaGecKalmaErkenCikmaKesintiOzeti,
   hesaplaDevamsizlikKesintiOzeti,
+  hesaplaTatilEkOdemeOzeti,
   gunlukPuantajToGirdi,
   hesapSonucuToGunlukPuantaj,
   type HesapGirdisi
@@ -693,6 +694,79 @@ describe("hesaplaDevamsizlikKesintiOzeti", () => {
     expect(o.gunluk_ucret).toBe(0);
     expect(o.toplam_kesinti_gun_esdegeri).toBe(2);
     expect(o.toplam_kesinti_tutari).toBe(0);
+  });
+});
+
+describe("hesaplaTatilEkOdemeOzeti", () => {
+  const maas = 30000;
+
+  it("normal iş günü veya Mesai_Yaz değilse null", () => {
+    expect(
+      hesaplaTatilEkOdemeOzeti(maas, {
+        gun_tipi: "Normal_Is_Gunu",
+        hesap_etkisi: "Mesai_Yaz",
+        giris_saati: "09:00",
+        cikis_saati: "18:00"
+      })
+    ).toBeNull();
+    expect(
+      hesaplaTatilEkOdemeOzeti(maas, {
+        gun_tipi: "UBGT_Resmi_Tatil",
+        hesap_etkisi: "Tam_Yevmiye_Ver",
+        giris_saati: "09:00",
+        cikis_saati: "18:00"
+      })
+    ).toBeNull();
+  });
+
+  it("UBGT + Mesai_Yaz + saat → çarpan 1 ve günlük ücret kadar ek ödeme", () => {
+    const o = hesaplaTatilEkOdemeOzeti(maas, {
+      gun_tipi: "UBGT_Resmi_Tatil",
+      hesap_etkisi: "Mesai_Yaz",
+      giris_saati: "08:00",
+      cikis_saati: "12:00"
+    });
+    expect(o).not.toBeNull();
+    expect(o!.tur).toBe("UBGT");
+    expect(o!.carpani).toBe(1);
+    expect(o!.gunluk_ucret).toBe(1000);
+    expect(o!.ek_odeme_tutari).toBe(1000);
+  });
+
+  it("Hafta tatili + Mesai_Yaz + saat → çarpan 1,5", () => {
+    const o = hesaplaTatilEkOdemeOzeti(maas, {
+      gun_tipi: "Hafta_Tatili_Pazar",
+      hesap_etkisi: "Mesai_Yaz",
+      giris_saati: "10:00",
+      cikis_saati: "14:00"
+    });
+    expect(o).not.toBeNull();
+    expect(o!.tur).toBe("HAFTA_TATILI");
+    expect(o!.carpani).toBe(1.5);
+    expect(o!.gunluk_ucret).toBe(1000);
+    expect(o!.ek_odeme_tutari).toBe(1500);
+  });
+
+  it("giriş ve çıkış boşsa null (tatil mesaisi doğrulanamaz)", () => {
+    expect(
+      hesaplaTatilEkOdemeOzeti(maas, {
+        gun_tipi: "UBGT_Resmi_Tatil",
+        hesap_etkisi: "Mesai_Yaz",
+        giris_saati: "",
+        cikis_saati: "   "
+      })
+    ).toBeNull();
+  });
+
+  it("maaş geçersizse tutar 0, özet yine üretilir", () => {
+    const o = hesaplaTatilEkOdemeOzeti(-1, {
+      gun_tipi: "UBGT_Resmi_Tatil",
+      hesap_etkisi: "Mesai_Yaz",
+      giris_saati: "08:00",
+      cikis_saati: "12:00"
+    });
+    expect(o!.gunluk_ucret).toBe(0);
+    expect(o!.ek_odeme_tutari).toBe(0);
   });
 });
 

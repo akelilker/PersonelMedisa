@@ -8,15 +8,20 @@ import {
   fetchWithCacheMerge,
   getCacheEntry,
   mergePuantajCache,
-  processSyncQueue
+  processSyncQueue,
+  useAppDataRevision
 } from "../data/data-manager";
 import { runDeduped } from "../lib/in-flight-dedupe";
 import {
   hesapla,
+  hesaplaHaftaAraligi,
+  hesaplaHaftalikPuantajUcretOzeti,
   hesaplaYasKuraliBlokMesaji,
-  hesapSonucuToGunlukPuantaj
+  hesapSonucuToGunlukPuantaj,
+  type HaftalikPuantajUcretOzeti
 } from "../services/puantaj-hesap-motoru";
 import { useAuth } from "../state/auth.store";
+import type { Personel } from "../types/personel";
 import type {
   GunlukPuantaj,
   PuantajDayanak,
@@ -144,17 +149,60 @@ const INITIAL_FORM: GunlukPuantajFormState = {
   entryGercekMolaDakika: ""
 };
 
+/** Pazartesi başlangıcından itibaren 7 gün YYYY-MM-DD. */
+function listHaftaGGaatarihleri(haftaBaslangic: string): string[] {
+  const m1 = /^(\d{4})-(\d{2})-(\d{2})$/.exec(haftaBaslangic);
+  if (!m1) return [];
+  const d0 = new Date(Number(m1[1]), Number(m1[2]) - 1, Number(m1[3]));
+  const out: string[] = [];
+  for (let i = 0; i < 7; i++) {
+    const cur = new Date(d0.getFullYear(), d0.getMonth(), d0.getDate() + i);
+    const y = cur.getFullYear();
+    const mo = String(cur.getMonth() + 1).padStart(2, "0");
+    const day = String(cur.getDate()).padStart(2, "0");
+    out.push(`${y}-${mo}-${day}`);
+  }
+  return out;
+}
+
+function toplaHaftalikPuantajGunleri(
+  activeSube: number | null,
+  personelId: number,
+  aralik: { hafta_baslangic: string; hafta_bitis: string },
+  aktifKayit: GunlukPuantaj | null
+): GunlukPuantaj[] {
+  const tarihler = listHaftaGGaatarihleri(aralik.hafta_baslangic);
+  const gunler: GunlukPuantaj[] = [];
+  for (const tarih of tarihler) {
+    if (aktifKayit && aktifKayit.personel_id === personelId && aktifKayit.tarih === tarih) {
+      gunler.push(aktifKayit);
+      continue;
+    }
+    const key = dataCacheKeys.puantajDetail(activeSube, personelId, tarih);
+    const cached = getCacheEntry<GunlukPuantaj | null>(key);
+    if (cached != null) {
+      gunler.push(cached);
+    }
+  }
+  return gunler;
+}
+
+export type HaftalikPuantajOzetDurumu = "yok" | "gecersiz_tarih" | "hazir";
+
 export function usePuantaj() {
   const { session } = useAuth();
   const activeSube = session?.active_sube_id ?? null;
+  const appDataRevision = useAppDataRevision();
 
   const [formState, setFormState] = useState<GunlukPuantajFormState>({ ...INITIAL_FORM });
   const [activeQuery, setActiveQuery] = useState<ActiveQuery | null>(null);
   const [puantaj, setPuantaj] = useState<GunlukPuantaj | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isKontrolSubmitting, setIsKontrolSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [submitErrorMessage, setSubmitErrorMessage] = useState<string | null>(null);
+  const [personelMaasTutari, setPersonelMaasTutari] = useState<number | undefined>(undefined);
 
   const patchFormState = useCallback((partial: Partial<GunlukPuantajFormState>) => {
     setFormState((prev) => {
@@ -232,12 +280,99 @@ export function usePuantaj() {
     [formState.queryPersonelId, formState.queryTarih, loadPuantaj]
   );
 
+  useEffect(() => {
+    if (!activeQuery) {
+      setPersonelMaasTutari(undefined);
+      return;
+    }
+
+    let cancelled = false;
+    setPersonelMaasTutari(undefined);
+
+    void (async () => {
+      const detailKey = dataCacheKeys.personelDetail(activeSube, activeQuery.personelId);
+      const cached = getCacheEntry<Personel>(detailKey);
+      if (cached) {
+        const m = cached.maas_tutari;
+        if (!cancelled) {
+          setPersonelMaasTutari(m != null && Number.isFinite(m) ? m : 0);
+        }
+        return;
+      }
+
+      try {
+        const p = await fetchWithCacheMerge(detailKey, () =>
+          runDeduped(detailKey, () => fetchPersonelDetail(activeQuery.personelId))
+        );
+        if (cancelled) {
+          return;
+        }
+        const m = p?.maas_tutari;
+        setPersonelMaasTutari(m != null && Number.isFinite(m) ? m : 0);
+      } catch {
+        if (!cancelled) {
+          setPersonelMaasTutari(0);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeSube, activeQuery]);
+
+  const { haftalikOzet, haftalikOzetDurumu, haftalikOzetEksikVeriNotu } = useMemo(() => {
+    if (!activeQuery) {
+      return {
+        haftalikOzet: null as HaftalikPuantajUcretOzeti | null,
+        haftalikOzetDurumu: "yok" as HaftalikPuantajOzetDurumu,
+        haftalikOzetEksikVeriNotu: null as string | null
+      };
+    }
+
+    const aralik = hesaplaHaftaAraligi(activeQuery.tarih);
+    if (!aralik) {
+      return {
+        haftalikOzet: null,
+        haftalikOzetDurumu: "gecersiz_tarih" as const,
+        haftalikOzetEksikVeriNotu: "Sorgu tarihi geçersiz; haftalık özet hesaplanamadı."
+      };
+    }
+
+    const gunler = toplaHaftalikPuantajGunleri(
+      activeSube,
+      activeQuery.personelId,
+      aralik,
+      puantaj
+    );
+    const maas = personelMaasTutari ?? 0;
+    const ozet = hesaplaHaftalikPuantajUcretOzeti(gunler, activeQuery.tarih, maas);
+
+    const tumGunler = listHaftaGGaatarihleri(aralik.hafta_baslangic);
+    const parcalar: string[] = [];
+    if (gunler.length < tumGunler.length) {
+      parcalar.push(
+        `Özet, bu personel için önbellekte bulunan ${gunler.length} günlük kayıtla hesaplandı (tam hafta ${tumGunler.length} gün). Diğer günler getirilmediyse toplamlar eksik olabilir.`
+      );
+    }
+    if (personelMaasTutari === undefined) {
+      parcalar.push("Personel maaşı yükleniyor; saatlik ücret ve tutar geçici olarak sıfır görünebilir.");
+    }
+
+    return {
+      haftalikOzet: ozet,
+      haftalikOzetDurumu: "hazir" as const,
+      haftalikOzetEksikVeriNotu: parcalar.length > 0 ? parcalar.join(" ") : null
+    };
+  }, [activeQuery, activeSube, puantaj, personelMaasTutari, appDataRevision]);
+
   const clearQuery = useCallback(() => {
     setFormState({ ...INITIAL_FORM });
     setActiveQuery(null);
     setPuantaj(null);
     setErrorMessage(null);
     setSubmitErrorMessage(null);
+    setPersonelMaasTutari(undefined);
   }, []);
 
   const refetchActive = useCallback(async () => {
@@ -328,7 +463,9 @@ export function usePuantaj() {
           cikis_saati: body.cikis_saati,
           gercek_mola_dakika: body.gercek_mola_dakika
         });
-        const optimistic = hesapSonucuToGunlukPuantaj(hesapSonucu, puantaj?.state ?? "ACIK");
+        const optimistic = hesapSonucuToGunlukPuantaj(hesapSonucu, puantaj?.state ?? "ACIK", {
+          kontrol_durumu: puantaj?.kontrol_durumu ?? "BEKLIYOR"
+        });
 
         const previousPuantaj = puantaj;
         mergePuantajCache(activeQuery.personelId, activeQuery.tarih, optimistic);
@@ -381,6 +518,50 @@ export function usePuantaj() {
     ]
   );
 
+  const markAmirKontrolEtti = useCallback(async () => {
+    if (!activeQuery || !puantaj || isKontrolSubmitting || isSubmitting) {
+      return;
+    }
+    if (puantaj.kontrol_durumu === "AMIR_KONTROL_ETTI") {
+      return;
+    }
+
+    setSubmitErrorMessage(null);
+    setIsKontrolSubmitting(true);
+    const previousPuantaj = puantaj;
+    const optimistic: GunlukPuantaj = { ...puantaj, kontrol_durumu: "AMIR_KONTROL_ETTI" };
+
+    try {
+      mergePuantajCache(activeQuery.personelId, activeQuery.tarih, optimistic);
+      setPuantaj(optimistic);
+
+      const updated = await upsertGunlukPuantaj(activeQuery.personelId, activeQuery.tarih, {
+        kontrol_durumu: "AMIR_KONTROL_ETTI"
+      });
+      mergePuantajCache(activeQuery.personelId, activeQuery.tarih, updated);
+      setPuantaj(updated);
+    } catch (error) {
+      if (shouldQueueOfflineMutation(error)) {
+        enqueueSyncOperation({
+          op: "puantaj.upsert",
+          payload: {
+            personelId: activeQuery.personelId,
+            tarih: activeQuery.tarih,
+            body: { kontrol_durumu: "AMIR_KONTROL_ETTI" }
+          }
+        });
+        void processSyncQueue();
+        return;
+      }
+
+      mergePuantajCache(activeQuery.personelId, activeQuery.tarih, previousPuantaj);
+      setPuantaj(previousPuantaj);
+      setSubmitErrorMessage(getApiErrorMessage(error, "Kontrol durumu guncellenemedi."));
+    } finally {
+      setIsKontrolSubmitting(false);
+    }
+  }, [activeQuery, puantaj, isKontrolSubmitting, isSubmitting]);
+
   return {
     formState,
     patchFormState,
@@ -388,12 +569,17 @@ export function usePuantaj() {
     puantaj,
     isLoading,
     isSubmitting,
+    isKontrolSubmitting,
     errorMessage,
     submitErrorMessage,
     submitQuery,
     clearQuery,
     refetchActive,
     submitPuantaj,
-    entryRequiresSaatBilgisi
+    markAmirKontrolEtti,
+    entryRequiresSaatBilgisi,
+    haftalikOzet,
+    haftalikOzetDurumu,
+    haftalikOzetEksikVeriNotu
   };
 }

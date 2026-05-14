@@ -1,6 +1,7 @@
 import type {
   ComplianceUyari,
   GunlukPuantaj,
+  PuantajAmirKontrolDurumu,
   PuantajDayanak,
   PuantajGunTipi,
   PuantajHareketDurumu,
@@ -656,7 +657,8 @@ export function gunlukPuantajToGirdi(p: GunlukPuantaj): HesapGirdisi {
 
 export function hesapSonucuToGunlukPuantaj(
   sonuc: HesapSonucu,
-  state?: string
+  state?: string,
+  options?: { kontrol_durumu?: PuantajAmirKontrolDurumu }
 ): GunlukPuantaj {
   return {
     personel_id: sonuc.personel_id,
@@ -673,6 +675,7 @@ export function hesapSonucuToGunlukPuantaj(
     gunluk_brut_sure_dakika: sonuc.gunluk_brut_sure_dakika,
     hafta_tatili_hak_kazandi_mi: sonuc.hafta_tatili_hak_kazandi_mi,
     state: state ?? "HESAPLANDI",
+    kontrol_durumu: options?.kontrol_durumu ?? "BEKLIYOR",
     compliance_uyarilari: sonuc.compliance_uyarilari
   };
 }

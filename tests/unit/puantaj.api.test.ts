@@ -72,6 +72,7 @@ describe("puantaj.api", () => {
       gunluk_brut_sure_dakika: undefined,
       hafta_tatili_hak_kazandi_mi: true,
       state: "HESAPLANDI",
+      kontrol_durumu: "BEKLIYOR",
       compliance_uyarilari: [
         {
           code: "MAX_DAILY_LIMIT",
@@ -82,18 +83,43 @@ describe("puantaj.api", () => {
     });
   });
 
+  it("normalizes kontrol_durumu from snake_case or camelCase", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        createJsonResponse(
+          {
+            data: {
+              personel_id: 3,
+              tarih: "2026-05-01",
+              kontrolDurumu: "AMIR_KONTROL_ETTI",
+              compliance_uyarilari: []
+            },
+            meta: {},
+            errors: []
+          },
+          200
+        )
+      )
+    );
+
+    const result = await fetchGunlukPuantaj(3, "2026-05-01");
+    expect(result?.kontrol_durumu).toBe("AMIR_KONTROL_ETTI");
+  });
+
   it("sends PUT request to upsert endpoint and returns normalized payload", async () => {
     const fetchMock = vi.fn(async () =>
       createJsonResponse(
         {
-          data: {
-            personel_id: 12,
-            tarih: "2026-04-20",
-            giris_saati: "09:00",
-            cikis_saati: "18:00",
-            gercek_mola_dakika: 45,
-            compliance_uyarilari: []
-          },
+            data: {
+              personel_id: 12,
+              tarih: "2026-04-20",
+              giris_saati: "09:00",
+              cikis_saati: "18:00",
+              gercek_mola_dakika: 45,
+              kontrol_durumu: "AMIR_KONTROL_ETTI",
+              compliance_uyarilari: []
+            },
           meta: {},
           errors: []
         },
@@ -106,7 +132,8 @@ describe("puantaj.api", () => {
     const result = await upsertGunlukPuantaj(12, "2026-04-20", {
       giris_saati: "09:00",
       cikis_saati: "18:00",
-      gercek_mola_dakika: 45
+      gercek_mola_dakika: 45,
+      kontrol_durumu: "AMIR_KONTROL_ETTI"
     });
 
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
@@ -116,10 +143,12 @@ describe("puantaj.api", () => {
       JSON.stringify({
         giris_saati: "09:00",
         cikis_saati: "18:00",
-        gercek_mola_dakika: 45
+        gercek_mola_dakika: 45,
+        kontrol_durumu: "AMIR_KONTROL_ETTI"
       })
     );
     expect(result.personel_id).toBe(12);
     expect(result.tarih).toBe("2026-04-20");
+    expect(result.kontrol_durumu).toBe("AMIR_KONTROL_ETTI");
   });
 });

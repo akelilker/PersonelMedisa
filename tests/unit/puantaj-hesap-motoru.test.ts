@@ -882,6 +882,7 @@ describe("adaptör fonksiyonları", () => {
     expect(puantaj.state).toBe("HESAPLANDI");
     expect(puantaj.personel_id).toBe(1);
     expect(puantaj.net_calisma_suresi_dakika).toBe(480);
+    expect(puantaj.kontrol_durumu).toBe("BEKLIYOR");
     expect(puantaj.compliance_uyarilari).toBeDefined();
   });
 
@@ -889,5 +890,19 @@ describe("adaptör fonksiyonları", () => {
     const sonuc = hesapla({ personel_id: 1, tarih: "2026-04-13" });
     const puantaj = hesapSonucuToGunlukPuantaj(sonuc, "ACIK");
     expect(puantaj.state).toBe("ACIK");
+    expect(puantaj.kontrol_durumu).toBe("BEKLIYOR");
+  });
+
+  it("hesapSonucuToGunlukPuantaj: onceki kontrol durumunu koruyabilir", () => {
+    const sonuc = hesapla({
+      personel_id: 1,
+      tarih: "2026-04-13",
+      giris_saati: "08:00",
+      cikis_saati: "17:00"
+    });
+    const puantaj = hesapSonucuToGunlukPuantaj(sonuc, "HESAPLANDI", {
+      kontrol_durumu: "AMIR_KONTROL_ETTI"
+    });
+    expect(puantaj.kontrol_durumu).toBe("AMIR_KONTROL_ETTI");
   });
 });

@@ -32,6 +32,9 @@ export type PuantajHesapEtkisi =
   | "Tam_Yevmiye_Ver"
   | "Mesai_Yaz";
 
+/** Birim amirinin günlük kayda baktığına dair görünürlük (zorunlu onay kapısı değil). */
+export type PuantajAmirKontrolDurumu = "BEKLIYOR" | "AMIR_KONTROL_ETTI";
+
 export type GunlukPuantaj = {
   personel_id: number;
   tarih: string;
@@ -47,6 +50,7 @@ export type GunlukPuantaj = {
   gunluk_brut_sure_dakika?: number;
   hafta_tatili_hak_kazandi_mi?: boolean;
   state?: GunlukPuantajState;
+  kontrol_durumu?: PuantajAmirKontrolDurumu;
   compliance_uyarilari: ComplianceUyari[];
 };
 
@@ -57,4 +61,5 @@ export type UpsertGunlukPuantajPayload = {
   giris_saati?: string;
   cikis_saati?: string;
   gercek_mola_dakika?: number;
+  kontrol_durumu?: PuantajAmirKontrolDurumu;
 };

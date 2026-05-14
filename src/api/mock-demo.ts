@@ -72,6 +72,7 @@ type DemoFinansKalem = {
 type DemoPuantaj = {
   personel_id: number;
   tarih: string;
+  kontrol_durumu?: "BEKLIYOR" | "AMIR_KONTROL_ETTI";
   gun_tipi?: "Normal_Is_Gunu" | "Hafta_Tatili_Pazar" | "UBGT_Resmi_Tatil";
   hareket_durumu?: "Geldi" | "Gelmedi" | "Gec_Geldi" | "Erken_Cikti";
   dayanak?:
@@ -91,6 +92,12 @@ type DemoPuantaj = {
   hafta_tatili_hak_kazandi_mi?: boolean;
   state?: string;
   compliance_uyarilari: Array<{ code: string; message: string; level?: string }>;
+};
+
+const DEMO_PUANTAJ_KONTROL_DURUMU_MAP: Record<string, NonNullable<DemoPuantaj["kontrol_durumu"]>> = {
+  BEKLIYOR: "BEKLIYOR",
+  AMIR_KONTROL_ETTI: "AMIR_KONTROL_ETTI",
+  AMIR_KONTROL_EDILDI: "AMIR_KONTROL_ETTI"
 };
 
 type DemoMakine = {
@@ -353,7 +360,8 @@ const demoState: {
       hesaplananMolaDakika: 60,
       netCalismaSuresiDakika: 510,
       gunlukBrutSureDakika: 570,
-      haftaTatiliHakKazandiMi: true
+      haftaTatiliHakKazandiMi: true,
+      kontrolDurumu: "AMIR_KONTROL_ETTI"
     }),
     "2|2026-04-09": buildDemoPuantaj({
       personelId: 2,
@@ -702,6 +710,7 @@ type DemoPuantajBuildParams = {
   haftaTatiliHakKazandiMi?: boolean;
   state?: string;
   complianceUyarilari?: DemoPuantaj["compliance_uyarilari"];
+  kontrolDurumu?: DemoPuantaj["kontrol_durumu"];
 };
 
 const DEMO_PUANTAJ_GUN_TIPI_MAP: Record<string, NonNullable<DemoPuantaj["gun_tipi"]>> = {
@@ -761,6 +770,11 @@ function readDemoPuantajHesapEtkisi(value: unknown): DemoPuantaj["hesap_etkisi"]
   return token ? DEMO_PUANTAJ_HESAP_ETKISI_MAP[token] : undefined;
 }
 
+function readDemoPuantajKontrolDurumu(value: unknown): DemoPuantaj["kontrol_durumu"] | undefined {
+  const token = normalizeDemoLiteralToken(value);
+  return token ? DEMO_PUANTAJ_KONTROL_DURUMU_MAP[token] : undefined;
+}
+
 function buildDemoPuantaj(params: DemoPuantajBuildParams): DemoPuantaj {
   return {
     personel_id: params.personelId,
@@ -777,6 +791,7 @@ function buildDemoPuantaj(params: DemoPuantajBuildParams): DemoPuantaj {
     gunluk_brut_sure_dakika: params.gunlukBrutSureDakika,
     hafta_tatili_hak_kazandi_mi: params.haftaTatiliHakKazandiMi,
     state: params.state ?? "HESAPLANDI",
+    kontrol_durumu: params.kontrolDurumu ?? "BEKLIYOR",
     compliance_uyarilari: params.complianceUyarilari ?? []
   };
 }
@@ -1542,7 +1557,8 @@ export function resolveDemoApiResponse(
         hesap_etkisi: readDemoPuantajHesapEtkisi(body.hesap_etkisi) ?? existing.hesap_etkisi,
         giris_saati: toStringValue(body.giris_saati) ?? existing.giris_saati,
         cikis_saati: toStringValue(body.cikis_saati) ?? existing.cikis_saati,
-        gercek_mola_dakika: toNumber(body.gercek_mola_dakika) ?? existing.gercek_mola_dakika
+        gercek_mola_dakika: toNumber(body.gercek_mola_dakika) ?? existing.gercek_mola_dakika,
+        kontrol_durumu: readDemoPuantajKontrolDurumu(body.kontrol_durumu) ?? existing.kontrol_durumu ?? "BEKLIYOR"
       };
       demoState.puantajMap[key] = updated;
       return ok(updated);

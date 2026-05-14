@@ -36,6 +36,7 @@ describe("role permissions", () => {
     expect(hasRolePermission("BIRIM_AMIRI", "personeller.create")).toBe(false);
     expect(hasRolePermission("BIRIM_AMIRI", "surecler.update")).toBe(false);
     expect(hasRolePermission("BIRIM_AMIRI", "puantaj.update")).toBe(false);
+    expect(hasRolePermission("BIRIM_AMIRI", "puantaj.amir_kontrol")).toBe(true);
     expect(hasRolePermission("BIRIM_AMIRI", "finans.view")).toBe(false);
     expect(hasRolePermission("BIRIM_AMIRI", "finans.create")).toBe(false);
   });

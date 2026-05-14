@@ -2,6 +2,7 @@ import type { ApiResponse } from "../types/api";
 import type {
   ComplianceUyari,
   GunlukPuantaj,
+  PuantajAmirKontrolDurumu,
   PuantajDayanak,
   PuantajGunTipi,
   PuantajHareketDurumu,
@@ -38,6 +39,12 @@ const PUANTAJ_HESAP_ETKISI_MAP: Record<string, PuantajHesapEtkisi> = {
   KESINTI_YAP: "Kesinti_Yap",
   TAM_YEVMIYE_VER: "Tam_Yevmiye_Ver",
   MESAI_YAZ: "Mesai_Yaz"
+};
+
+const PUANTAJ_KONTROL_DURUMU_MAP: Record<string, PuantajAmirKontrolDurumu> = {
+  BEKLIYOR: "BEKLIYOR",
+  AMIR_KONTROL_ETTI: "AMIR_KONTROL_ETTI",
+  AMIR_KONTROL_EDILDI: "AMIR_KONTROL_ETTI"
 };
 
 function toRecord(value: unknown): Record<string, unknown> | null {
@@ -386,6 +393,13 @@ function normalizeGunlukPuantaj(
     ? complianceUyarilari
     : normalizeComplianceUyarilari(record.uyarilar);
 
+  const kontrolDurumu =
+    pickLiteral(
+      record,
+      ["kontrol_durumu", "kontrolDurumu", "amir_kontrol_durumu", "amirKontrolDurumu"],
+      PUANTAJ_KONTROL_DURUMU_MAP
+    ) ?? "BEKLIYOR";
+
   return {
     personel_id: normalizedPersonelId,
     tarih: normalizedTarih,
@@ -421,6 +435,7 @@ function normalizeGunlukPuantaj(
       dayanak
     }),
     state: pickString(record, ["state", "durum"]),
+    kontrol_durumu: kontrolDurumu,
     compliance_uyarilari: fallbackUyarilar
   };
 }

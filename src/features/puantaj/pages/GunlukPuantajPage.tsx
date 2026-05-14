@@ -11,6 +11,7 @@ import { usePuantaj } from "../../../hooks/usePuantaj";
 import { formatComplianceLevelLabel, formatPuantajStateLabel } from "../../../lib/display/enum-display";
 import type {
   GunlukPuantaj,
+  PuantajAmirKontrolDurumu,
   PuantajDayanak,
   PuantajGunTipi,
   PuantajHareketDurumu,
@@ -57,6 +58,11 @@ const HESAP_ETKISI_LABELS: Record<PuantajHesapEtkisi, string> = {
   Mesai_Yaz: "Mesai Yaz"
 };
 
+const KONTROL_DURUMU_LABELS: Record<PuantajAmirKontrolDurumu, string> = {
+  BEKLIYOR: "Bekliyor",
+  AMIR_KONTROL_ETTI: "Amir kontrol etti"
+};
+
 function humanizeFallback(value: string) {
   return value
     .split("_")
@@ -93,12 +99,38 @@ function formatHakKazanimi(value: boolean | null | undefined) {
   return "-";
 }
 
+function formatHaftaAraligiOzet(bas: string | null, bit: string | null) {
+  if (bas && bit) {
+    return `${bas} – ${bit}`;
+  }
+  return "-";
+}
+
+function formatTurkcePara(value: number) {
+  if (!Number.isFinite(value)) {
+    return "-";
+  }
+  return `${value.toFixed(2)} TL`;
+}
+
+function formatOndalikSaat(value: number) {
+  if (!Number.isFinite(value)) {
+    return "-";
+  }
+  return value.toFixed(2);
+}
+
 function formatDayanakValue(value: GunlukPuantaj["dayanak"]) {
   if (!value) {
     return "Yok";
   }
 
   return formatMappedValue(value, DAYANAK_LABELS);
+}
+
+function formatKontrolDurumu(value: GunlukPuantaj["kontrol_durumu"]) {
+  const key = value ?? "BEKLIYOR";
+  return KONTROL_DURUMU_LABELS[key] ?? key;
 }
 
 function ReadonlyField({ label, value }: { label: string; value: string }) {
@@ -118,6 +150,7 @@ function currentMonthValue() {
 export function GunlukPuantajPage() {
   const { hasPermission } = useRoleAccess();
   const canUpdatePuantaj = hasPermission("puantaj.update");
+  const canAmirKontrol = hasPermission("puantaj.amir_kontrol");
   const canMuhurle = hasPermission("puantaj.muhurle");
   const location = useLocation();
   const navigate = useNavigate();
@@ -129,17 +162,24 @@ export function GunlukPuantajPage() {
     puantaj,
     isLoading,
     isSubmitting,
+    isKontrolSubmitting,
     errorMessage,
     submitErrorMessage,
     submitQuery,
     clearQuery,
     refetchActive,
     submitPuantaj,
-    entryRequiresSaatBilgisi
+    markAmirKontrolEtti,
+    entryRequiresSaatBilgisi,
+    haftalikOzet,
+    haftalikOzetDurumu,
+    haftalikOzetEksikVeriNotu
   } = usePuantaj();
 
   const isMuhurlendi = puantaj?.state === "MUHURLENDI";
-  const canEdit = canUpdatePuantaj && !isMuhurlendi;
+  const canEditForm = canUpdatePuantaj && !isMuhurlendi;
+  const canMarkAmirKontrol =
+    !isMuhurlendi && (canUpdatePuantaj || canAmirKontrol) && Boolean(puantaj);
 
   const [isMuhurModalOpen, setIsMuhurModalOpen] = useState(false);
   const [muhurDonem, setMuhurDonem] = useState(currentMonthValue());
@@ -203,7 +243,7 @@ export function GunlukPuantajPage() {
   }
 
   function handlePuantajSubmit(event: FormEvent<HTMLFormElement>) {
-    void submitPuantaj(event, canEdit);
+    void submitPuantaj(event, canEditForm);
   }
 
   return (
@@ -265,6 +305,7 @@ export function GunlukPuantajPage() {
             <ReadonlyField label="Personel ID" value={String(puantaj.personel_id)} />
             <ReadonlyField label="Tarih" value={puantaj.tarih} />
             <ReadonlyField label="Kayıt Durumu" value={formatPuantajStateLabel(puantaj.state)} />
+            <ReadonlyField label="Kontrol Durumu" value={formatKontrolDurumu(puantaj.kontrol_durumu)} />
             <ReadonlyField label="Gün Tipi" value={formatMappedValue(puantaj.gun_tipi, GUN_TIPI_LABELS)} />
             <ReadonlyField
               label="Hareket Durumu"
@@ -311,8 +352,64 @@ export function GunlukPuantajPage() {
         </div>
       ) : null}
 
+      {activeQuery && haftalikOzetDurumu === "gecersiz_tarih" ? (
+        <div className="puantaj-detail-card">
+          <h3>Haftalık Fazla Çalışma Özeti</h3>
+          <p className="puantaj-form-readonly">{haftalikOzetEksikVeriNotu}</p>
+        </div>
+      ) : null}
+
+      {activeQuery && haftalikOzetDurumu === "hazir" && haftalikOzet ? (
+        <div className="puantaj-detail-card">
+          <h3>Haftalık Fazla Çalışma Özeti</h3>
+          {haftalikOzetEksikVeriNotu ? (
+            <p className="puantaj-form-readonly">{haftalikOzetEksikVeriNotu}</p>
+          ) : null}
+          <div className="form-field-grid">
+            <ReadonlyField
+              label="Hafta Aralığı"
+              value={formatHaftaAraligiOzet(haftalikOzet.hafta_baslangic, haftalikOzet.hafta_bitis)}
+            />
+            <ReadonlyField
+              label="Toplam Net Çalışma (dk)"
+              value={String(haftalikOzet.toplam_net_dakika)}
+            />
+            <ReadonlyField
+              label="Normal Çalışma (dk)"
+              value={String(haftalikOzet.normal_calisma_dakika)}
+            />
+            <ReadonlyField
+              label="Fazla Çalışma (dk)"
+              value={String(haftalikOzet.fazla_calisma_dakika)}
+            />
+            <ReadonlyField
+              label="Fazla Çalışma (saat)"
+              value={formatOndalikSaat(haftalikOzet.fazla_calisma_saat)}
+            />
+            <ReadonlyField label="Saatlik Ücret" value={formatTurkcePara(haftalikOzet.saatlik_ucret)} />
+            <ReadonlyField
+              label="Fazla Çalışma Tutarı"
+              value={formatTurkcePara(haftalikOzet.fazla_calisma_tutari)}
+            />
+          </div>
+        </div>
+      ) : null}
+
       <div className="puantaj-edit-card">
         <h3>Günlük Kayıt Girişi</h3>
+
+        {activeQuery && puantaj && canMarkAmirKontrol && puantaj.kontrol_durumu !== "AMIR_KONTROL_ETTI" ? (
+          <div className="form-actions-row">
+            <button
+              type="button"
+              className="universal-btn-aux"
+              disabled={isSubmitting || isKontrolSubmitting}
+              onClick={() => void markAmirKontrolEtti()}
+            >
+              {isKontrolSubmitting ? "Kaydediliyor..." : "Amir Kontrol Etti"}
+            </button>
+          </div>
+        ) : null}
 
         <form className="puantaj-form-grid" onSubmit={handlePuantajSubmit}>
           <div className="form-field-grid">
@@ -395,7 +492,7 @@ export function GunlukPuantajPage() {
             <button
               type="submit"
               className="universal-btn-aux"
-              disabled={!activeQuery || !canEdit || isSubmitting}
+              disabled={!activeQuery || !canEditForm || isSubmitting || isKontrolSubmitting}
               data-testid="puantaj-kaydet"
             >
               {isSubmitting ? "Kaydediliyor..." : "Kaydet"}

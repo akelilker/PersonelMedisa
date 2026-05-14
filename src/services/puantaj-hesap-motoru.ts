@@ -6,6 +6,7 @@ import type {
   PuantajHareketDurumu,
   PuantajHesapEtkisi
 } from "../types/puantaj";
+import { hesaplaYas } from "./izin-hesap-motoru";
 
 // ---------------------------------------------------------------------------
 // Giriş tipi: hesapla() fonksiyonuna verilen ham günlük kayıt
@@ -55,6 +56,21 @@ function parseTimeToMinutes(value: string): number | null {
   const minutes = Number.parseInt(match[2], 10);
   if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return null;
   return hours * 60 + minutes;
+}
+
+export function geceBandinaGiriyor(giris?: string, cikis?: string): boolean {
+  const girisMin = giris ? parseTimeToMinutes(giris) : null;
+  const cikisMin = cikis ? parseTimeToMinutes(cikis) : null;
+
+  if (girisMin !== null && girisMin < 6 * 60) {
+    return true;
+  }
+
+  if (cikisMin !== null && cikisMin >= 20 * 60) {
+    return true;
+  }
+
+  return false;
 }
 
 // ---------------------------------------------------------------------------
@@ -250,6 +266,56 @@ export function uretComplianceUyarilari(
   }
 
   return uyarilar;
+}
+
+export function hesaplaYasKuraliBlokMesaji(
+  girdi: Pick<
+    HesapGirdisi,
+    "tarih" | "gun_tipi" | "hareket_durumu" | "dayanak" | "hesap_etkisi" | "giris_saati" | "cikis_saati"
+  > & {
+    dogum_tarihi?: string;
+  }
+): string | null {
+  if (!girdi.dogum_tarihi) {
+    return null;
+  }
+
+  const yas = hesaplaYas(girdi.dogum_tarihi, girdi.tarih);
+  if (yas === null || yas > 18) {
+    return null;
+  }
+
+  const gunTipi = deriveGunTipi(girdi.tarih, girdi.gun_tipi);
+  const hareketDurumu = deriveHareketDurumu(
+    girdi.hareket_durumu,
+    girdi.giris_saati,
+    girdi.cikis_saati,
+    girdi.dayanak
+  );
+  const dayanak = deriveDayanak(
+    girdi.dayanak,
+    hareketDurumu,
+    girdi.giris_saati,
+    girdi.cikis_saati
+  );
+  const hesapEtkisi = deriveHesapEtkisi(
+    gunTipi,
+    hareketDurumu,
+    dayanak,
+    girdi.giris_saati,
+    girdi.cikis_saati,
+    girdi.hesap_etkisi
+  );
+
+  if (geceBandinaGiriyor(girdi.giris_saati, girdi.cikis_saati)) {
+    return "Yasal Uyari: 18 yas alti personele gece calismasi girilemez.";
+  }
+
+  if (hesapEtkisi === "Mesai_Yaz") {
+    return "Yasal Uyari: 18 yas alti personele fazla mesai girilemez.";
+  }
+
+  return null;
 }
 
 // ---------------------------------------------------------------------------

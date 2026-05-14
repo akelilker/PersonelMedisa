@@ -4,10 +4,12 @@ import {
   deriveHareketDurumu,
   deriveDayanak,
   deriveHesapEtkisi,
+  geceBandinaGiriyor,
   hesaplaBrutSure,
   hesaplaYasalMolaDakika,
   hesaplaNetSure,
   hesaplaHaftaTatiliHakki,
+  hesaplaYasKuraliBlokMesaji,
   uretComplianceUyarilari,
   hesapla,
   gunlukPuantajToGirdi,
@@ -260,6 +262,49 @@ describe("uretComplianceUyarilari", () => {
     expect(uyarilar).toContainEqual(
       expect.objectContaining({ code: "GECE_MESAI", level: "BILGI" })
     );
+  });
+});
+
+describe("18 yas alti blok kurallari", () => {
+  it("20:00 sonrasi cikis gece bandina girer", () => {
+    expect(geceBandinaGiriyor("08:00", "20:00")).toBe(true);
+  });
+
+  it("06:00 oncesi giris gece bandina girer", () => {
+    expect(geceBandinaGiriyor("05:30", "14:00")).toBe(true);
+  });
+
+  it("yetiskin personelde blok mesaji uretmez", () => {
+    expect(
+      hesaplaYasKuraliBlokMesaji({
+        tarih: "2026-04-13",
+        dogum_tarihi: "1990-01-01",
+        giris_saati: "08:00",
+        cikis_saati: "17:00"
+      })
+    ).toBeNull();
+  });
+
+  it("18 yas alti gece calismasini bloklar", () => {
+    expect(
+      hesaplaYasKuraliBlokMesaji({
+        tarih: "2026-04-13",
+        dogum_tarihi: "2008-01-01",
+        giris_saati: "12:00",
+        cikis_saati: "20:30"
+      })
+    ).toBe("Yasal Uyari: 18 yas alti personele gece calismasi girilemez.");
+  });
+
+  it("18 yas alti pazar mesaisini bloklar", () => {
+    expect(
+      hesaplaYasKuraliBlokMesaji({
+        tarih: "2026-04-12",
+        dogum_tarihi: "2008-01-01",
+        giris_saati: "09:00",
+        cikis_saati: "17:00"
+      })
+    ).toBe("Yasal Uyari: 18 yas alti personele fazla mesai girilemez.");
   });
 });
 

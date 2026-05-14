@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { getApiErrorMessage, shouldQueueOfflineMutation } from "../api/api-client";
+import { fetchPersonelDetail } from "../api/personeller.api";
 import { fetchGunlukPuantaj, upsertGunlukPuantaj } from "../api/puantaj.api";
 import {
   dataCacheKeys,
@@ -10,7 +11,11 @@ import {
   processSyncQueue
 } from "../data/data-manager";
 import { runDeduped } from "../lib/in-flight-dedupe";
-import { hesapla, hesapSonucuToGunlukPuantaj } from "../services/puantaj-hesap-motoru";
+import {
+  hesapla,
+  hesaplaYasKuraliBlokMesaji,
+  hesapSonucuToGunlukPuantaj
+} from "../services/puantaj-hesap-motoru";
 import { useAuth } from "../state/auth.store";
 import type {
   GunlukPuantaj,
@@ -94,6 +99,22 @@ function parseRequiredPositiveInt(value: string, label: string) {
     throw new Error(`${label} pozitif sayi olmalidir.`);
   }
   return number;
+}
+
+async function loadPersonelDogumTarihi(
+  activeSube: number | null,
+  personelId: number
+): Promise<string | undefined> {
+  const detailKey = dataCacheKeys.personelDetail(activeSube, personelId);
+  const cached = getCacheEntry<{ dogum_tarihi?: string }>(detailKey);
+  if (cached?.dogum_tarihi) {
+    return cached.dogum_tarihi;
+  }
+
+  const personel = await fetchWithCacheMerge(detailKey, () =>
+    runDeduped(detailKey, () => fetchPersonelDetail(personelId))
+  );
+  return personel?.dogum_tarihi;
 }
 
 function parseOptionalNonNegativeInt(value: string) {
@@ -278,6 +299,25 @@ export function usePuantaj() {
             : undefined
         };
 
+        const dogumTarihi = await loadPersonelDogumTarihi(activeSube, activeQuery.personelId);
+        if (!dogumTarihi) {
+          throw new Error("Personelin dogum tarihi olmadan yas kurallari dogrulanamadi.");
+        }
+
+        const yasBlokMesaji = hesaplaYasKuraliBlokMesaji({
+          tarih: activeQuery.tarih,
+          dogum_tarihi: dogumTarihi,
+          gun_tipi: body.gun_tipi,
+          hareket_durumu: body.hareket_durumu,
+          dayanak: body.dayanak,
+          giris_saati: body.giris_saati,
+          cikis_saati: body.cikis_saati
+        });
+
+        if (yasBlokMesaji) {
+          throw new Error(yasBlokMesaji);
+        }
+
         const hesapSonucu = hesapla({
           personel_id: activeQuery.personelId,
           tarih: activeQuery.tarih,
@@ -327,6 +367,7 @@ export function usePuantaj() {
     },
     [
       activeQuery,
+      activeSube,
       entryRequiresSaatBilgisi,
       formState.entryCikisSaati,
       formState.entryDayanak,

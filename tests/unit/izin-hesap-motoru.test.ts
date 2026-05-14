@@ -102,6 +102,14 @@ describe("hesaplaYillikIzinGun", () => {
     expect(hesaplaYillikIzinGun(2, 50)).toEqual({ gun: 20, yas_istisna_uygulandi: true });
   });
 
+  it("18 yaş istisnası: 2 yıl kıdem + 18 yaş → 14 yerine 20 gün", () => {
+    expect(hesaplaYillikIzinGun(2, 18)).toEqual({ gun: 20, yas_istisna_uygulandi: true });
+  });
+
+  it("18 yaş istisnası: 3 yıl kıdem + 17 yaş → 14 yerine 20 gün", () => {
+    expect(hesaplaYillikIzinGun(3, 17)).toEqual({ gun: 20, yas_istisna_uygulandi: true });
+  });
+
   it("50 yaş istisnası: 3 yıl kıdem + 52 yaş → 14 yerine 20 gün", () => {
     expect(hesaplaYillikIzinGun(3, 52)).toEqual({ gun: 20, yas_istisna_uygulandi: true });
   });
@@ -166,6 +174,19 @@ describe("hesaplaIzinHakEdis", () => {
 
     expect(sonuc.kidem_yil).toBe(2);
     expect(sonuc.yas).toBe(50);
+    expect(sonuc.yillik_izin_gun).toBe(20);
+    expect(sonuc.yas_istisna_uygulandi).toBe(true);
+  });
+
+  it("KRİTİK: 2 yıl kıdem + 18 yaş → istisna ile 20 gün", () => {
+    const sonuc = hesaplaIzinHakEdis({
+      ise_giris_tarihi: "2024-01-01",
+      dogum_tarihi: "2008-04-13",
+      referans_tarih: "2026-04-13"
+    });
+
+    expect(sonuc.kidem_yil).toBe(2);
+    expect(sonuc.yas).toBe(18);
     expect(sonuc.yillik_izin_gun).toBe(20);
     expect(sonuc.yas_istisna_uygulandi).toBe(true);
   });

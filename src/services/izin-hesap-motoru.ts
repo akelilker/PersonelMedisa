@@ -120,7 +120,7 @@ export function hesaplaYillikIzinGun(kidemYil: number, yas: number | null): {
 
   let yasIstisna = false;
 
-  if (yas !== null && yas >= 50 && gun < 20) {
+  if (yas !== null && (yas <= 18 || yas >= 50) && gun < 20) {
     gun = 20;
     yasIstisna = true;
   }

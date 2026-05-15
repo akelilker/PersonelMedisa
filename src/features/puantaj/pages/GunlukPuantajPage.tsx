@@ -8,14 +8,11 @@ import { ErrorState } from "../../../components/states/ErrorState";
 import { LoadingState } from "../../../components/states/LoadingState";
 import { useRoleAccess } from "../../../hooks/use-role-access";
 import { usePuantaj } from "../../../hooks/usePuantaj";
-import { formatComplianceLevelLabel, formatPuantajStateLabel } from "../../../lib/display/enum-display";
+import { formatComplianceLevelLabel } from "../../../lib/display/enum-display";
 import type {
-  GunlukPuantaj,
-  PuantajAmirKontrolDurumu,
-  PuantajDayanak,
   PuantajGunTipi,
   PuantajHareketDurumu,
-  PuantajHesapEtkisi
+  PuantajDayanak
 } from "../../../types/puantaj";
 
 const GUN_TIPI_OPTIONS: Array<{ value: PuantajGunTipi; label: string }> = [
@@ -56,21 +53,6 @@ function formatTatilEkOdemeCarpani(carpani: number): string {
   return String(carpani);
 }
 
-const DAYANAK_LABELS: Record<PuantajDayanak, string> = Object.fromEntries(
-  DAYANAK_OPTIONS.map((option) => [option.value, option.label])
-) as Record<PuantajDayanak, string>;
-
-const HESAP_ETKISI_LABELS: Record<PuantajHesapEtkisi, string> = {
-  Kesinti_Yap: "Kesinti Yap",
-  Tam_Yevmiye_Ver: "Tam Yevmiye Ver",
-  Mesai_Yaz: "Mesai Yaz"
-};
-
-const KONTROL_DURUMU_LABELS: Record<PuantajAmirKontrolDurumu, string> = {
-  BEKLIYOR: "Bekliyor",
-  AMIR_KONTROL_ETTI: "Amir kontrol etti"
-};
-
 function humanizeFallback(value: string) {
   return value
     .split("_")
@@ -85,26 +67,6 @@ function formatMappedValue<T extends string>(value: T | "" | null | undefined, l
   }
 
   return labels[value] ?? humanizeFallback(value);
-}
-
-function formatSaatValue(value: string | null | undefined) {
-  return value && value.trim() ? value : "-";
-}
-
-function formatDakikaValue(value: number | null | undefined) {
-  return value !== undefined && value !== null ? String(value) : "-";
-}
-
-function formatHakKazanimi(value: boolean | null | undefined) {
-  if (value === true) {
-    return "Hak Kazandı";
-  }
-
-  if (value === false) {
-    return "Hak Kazanmadı";
-  }
-
-  return "-";
 }
 
 function formatHaftaAraligiOzet(bas: string | null, bit: string | null) {
@@ -130,19 +92,6 @@ function formatOndalikSaat(value: number) {
     return "-";
   }
   return value.toFixed(2);
-}
-
-function formatDayanakValue(value: GunlukPuantaj["dayanak"]) {
-  if (!value) {
-    return "Yok";
-  }
-
-  return formatMappedValue(value, DAYANAK_LABELS);
-}
-
-function formatKontrolDurumu(value: GunlukPuantaj["kontrol_durumu"]) {
-  const key = value ?? "BEKLIYOR";
-  return KONTROL_DURUMU_LABELS[key] ?? key;
 }
 
 function ReadonlyField({ label, value }: { label: string; value: string }) {
@@ -192,7 +141,8 @@ export function GunlukPuantajPage() {
     kesintiOzetNotu,
     tatilEkOdemeOzeti,
     tatilEkOdemeNotu,
-    parasalEtkiOzeti
+    parasalEtkiOzeti,
+    anaDetay
   } = usePuantaj();
 
   const isMuhurlendi = puantaj?.state === "MUHURLENDI";
@@ -324,42 +274,9 @@ export function GunlukPuantajPage() {
       {!isLoading && !errorMessage && puantaj ? (
         <div className="puantaj-detail-card" data-testid="puantaj-ana-detay">
           <div className="form-field-grid">
-            <ReadonlyField label="Personel ID" value={String(puantaj.personel_id)} />
-            <ReadonlyField label="Tarih" value={puantaj.tarih} />
-            <ReadonlyField label="Kayıt Durumu" value={formatPuantajStateLabel(puantaj.state)} />
-            <ReadonlyField label="Kontrol Durumu" value={formatKontrolDurumu(puantaj.kontrol_durumu)} />
-            <ReadonlyField label="Gün Tipi" value={formatMappedValue(puantaj.gun_tipi, GUN_TIPI_LABELS)} />
-            <ReadonlyField
-              label="Hareket Durumu"
-              value={formatMappedValue(puantaj.hareket_durumu, HAREKET_DURUMU_LABELS)}
-            />
-            <ReadonlyField label="Dayanak" value={formatDayanakValue(puantaj.dayanak)} />
-            <ReadonlyField
-              label="Hesap Etkisi"
-              value={formatMappedValue(puantaj.hesap_etkisi, HESAP_ETKISI_LABELS)}
-            />
-            <ReadonlyField
-              label="Hafta Tatili Hakkı"
-              value={formatHakKazanimi(puantaj.hafta_tatili_hak_kazandi_mi)}
-            />
-            <ReadonlyField label="Giriş Saati" value={formatSaatValue(puantaj.giris_saati)} />
-            <ReadonlyField label="Çıkış Saati" value={formatSaatValue(puantaj.cikis_saati)} />
-            <ReadonlyField
-              label="Gerçek Mola (dk)"
-              value={formatDakikaValue(puantaj.gercek_mola_dakika)}
-            />
-            <ReadonlyField
-              label="Hesaplanan Mola (dk)"
-              value={formatDakikaValue(puantaj.hesaplanan_mola_dakika)}
-            />
-            <ReadonlyField
-              label="Net Çalışma (dk)"
-              value={formatDakikaValue(puantaj.net_calisma_suresi_dakika)}
-            />
-            <ReadonlyField
-              label="Günlük Brüt Süre (dk)"
-              value={formatDakikaValue(puantaj.gunluk_brut_sure_dakika)}
-            />
+            {anaDetay?.fields.map((field) => (
+              <ReadonlyField key={field.label} label={field.label} value={field.value} />
+            ))}
           </div>
 
           {puantaj.compliance_uyarilari.length > 0 ? (

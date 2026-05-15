@@ -1667,6 +1667,11 @@ let bildirimIdCounter = 800;
       const personelId = Number.parseInt(segments[3] ?? "0", 10);
       const tarih = decodeURIComponent(segments[4] ?? "");
       const payload = request.postDataJSON() as {
+        gun_tipi?: GunlukPuantaj["gun_tipi"];
+        hareket_durumu?: GunlukPuantaj["hareket_durumu"];
+        dayanak?: GunlukPuantaj["dayanak"];
+        beklenen_giris_saati?: string;
+        beklenen_cikis_saati?: string;
         giris_saati?: string;
         cikis_saati?: string;
         gercek_mola_dakika?: number;
@@ -1687,6 +1692,11 @@ let bildirimIdCounter = 800;
             };
       const updated = {
         ...oncekiKayit,
+        gun_tipi: payload.gun_tipi ?? oncekiKayit.gun_tipi ?? "Normal_Is_Gunu",
+        hareket_durumu: payload.hareket_durumu ?? oncekiKayit.hareket_durumu ?? "Geldi",
+        dayanak: payload.dayanak ?? oncekiKayit.dayanak,
+        beklenen_giris_saati: payload.beklenen_giris_saati ?? oncekiKayit.beklenen_giris_saati,
+        beklenen_cikis_saati: payload.beklenen_cikis_saati ?? oncekiKayit.beklenen_cikis_saati,
         giris_saati: payload.giris_saati ?? oncekiKayit.giris_saati ?? "08:30",
         cikis_saati: payload.cikis_saati ?? oncekiKayit.cikis_saati ?? "18:00",
         gercek_mola_dakika: payload.gercek_mola_dakika ?? oncekiKayit.gercek_mola_dakika ?? 60,

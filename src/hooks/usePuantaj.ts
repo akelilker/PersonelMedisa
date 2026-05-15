@@ -12,6 +12,7 @@ import {
   useAppDataRevision
 } from "../data/data-manager";
 import { runDeduped } from "../lib/in-flight-dedupe";
+import { formatPuantajStateLabel } from "../lib/display/enum-display";
 import {
   hesapla,
   hesaplaDevamsizlikKesintiOzeti,
@@ -225,6 +226,137 @@ export type GecErkenKesintiOzeti = {
   eksik_dakika: number;
   kesinti_tutari: number;
 };
+
+export type PuantajReadonlyFieldView = {
+  label: string;
+  value: string;
+};
+
+export type PuantajAnaDetayView = {
+  fields: PuantajReadonlyFieldView[];
+};
+
+const GUN_TIPI_LABELS: Record<PuantajGunTipi, string> = {
+  Normal_Is_Gunu: "Normal İş Günü",
+  Hafta_Tatili_Pazar: "Hafta Tatili Pazar",
+  UBGT_Resmi_Tatil: "UBGT Resmi Tatil"
+};
+
+const HAREKET_DURUMU_LABELS: Record<PuantajHareketDurumu, string> = {
+  Geldi: "Geldi",
+  Gelmedi: "Gelmedi",
+  Gec_Geldi: "Geç Geldi",
+  Erken_Cikti: "Erken Çıktı"
+};
+
+const DAYANAK_LABELS: Record<PuantajDayanak, string> = {
+  Yok_Izinsiz: "Yok / İzinsiz",
+  Ucretli_Izinli: "Ücretli İzinli",
+  Raporlu_Hastalik: "Raporlu Hastalık",
+  Raporlu_Is_Kazasi: "Raporlu İş Kazası",
+  Yillik_Izin: "Yıllık İzin",
+  Telafi_Calismasi: "Telafi Çalışması"
+};
+
+const HESAP_ETKISI_LABELS = {
+  Kesinti_Yap: "Kesinti Yap",
+  Tam_Yevmiye_Ver: "Tam Yevmiye Ver",
+  Mesai_Yaz: "Mesai Yaz"
+} as const;
+
+const KONTROL_DURUMU_LABELS = {
+  BEKLIYOR: "Bekliyor",
+  AMIR_KONTROL_ETTI: "Amir kontrol etti"
+} as const;
+
+function humanizeFallback(value: string) {
+  return value
+    .split("_")
+    .filter(Boolean)
+    .map((token) => token.charAt(0).toUpperCase() + token.slice(1).toLowerCase())
+    .join(" ");
+}
+
+function formatMappedValue<T extends string>(
+  value: T | "" | null | undefined,
+  labels: Record<string, string>
+) {
+  if (!value) {
+    return "-";
+  }
+
+  return labels[value] ?? humanizeFallback(value);
+}
+
+function formatSaatValue(value: string | null | undefined) {
+  return value && value.trim() ? value : "-";
+}
+
+function formatDakikaValue(value: number | null | undefined) {
+  return value !== undefined && value !== null ? String(value) : "-";
+}
+
+function formatHakKazanimi(value: boolean | null | undefined) {
+  if (value === true) {
+    return "Hak Kazandı";
+  }
+
+  if (value === false) {
+    return "Hak Kazanmadı";
+  }
+
+  return "-";
+}
+
+function formatDayanakValue(value: GunlukPuantaj["dayanak"]) {
+  if (!value) {
+    return "Yok";
+  }
+
+  return formatMappedValue(value, DAYANAK_LABELS);
+}
+
+function formatKontrolDurumu(value: GunlukPuantaj["kontrol_durumu"]) {
+  const key = value ?? "BEKLIYOR";
+  return KONTROL_DURUMU_LABELS[key] ?? key;
+}
+
+function toPuantajAnaDetayView(puantaj: GunlukPuantaj | null): PuantajAnaDetayView | null {
+  if (!puantaj) {
+    return null;
+  }
+
+  return {
+    fields: [
+      { label: "Personel ID", value: String(puantaj.personel_id) },
+      { label: "Tarih", value: puantaj.tarih },
+      { label: "Kayıt Durumu", value: formatPuantajStateLabel(puantaj.state) },
+      { label: "Kontrol Durumu", value: formatKontrolDurumu(puantaj.kontrol_durumu) },
+      { label: "Gün Tipi", value: formatMappedValue(puantaj.gun_tipi, GUN_TIPI_LABELS) },
+      {
+        label: "Hareket Durumu",
+        value: formatMappedValue(puantaj.hareket_durumu, HAREKET_DURUMU_LABELS)
+      },
+      { label: "Dayanak", value: formatDayanakValue(puantaj.dayanak) },
+      {
+        label: "Hesap Etkisi",
+        value: formatMappedValue(puantaj.hesap_etkisi, HESAP_ETKISI_LABELS)
+      },
+      {
+        label: "Hafta Tatili Hakkı",
+        value: formatHakKazanimi(puantaj.hafta_tatili_hak_kazandi_mi)
+      },
+      { label: "Beklenen Giriş", value: formatSaatValue(puantaj.beklenen_giris_saati) },
+      { label: "Beklenen Çıkış", value: formatSaatValue(puantaj.beklenen_cikis_saati) },
+      { label: "Giriş Saati", value: formatSaatValue(puantaj.giris_saati) },
+      { label: "Çıkış Saati", value: formatSaatValue(puantaj.cikis_saati) },
+      { label: "Gerçek Mola (dk)", value: formatDakikaValue(puantaj.gercek_mola_dakika) },
+      { label: "Hesaplanan Mola (dk)", value: formatDakikaValue(puantaj.hesaplanan_mola_dakika) },
+      { label: "Net Çalışma (dk)", value: formatDakikaValue(puantaj.net_calisma_suresi_dakika) },
+      { label: "Günlük Brüt Süre (dk)", value: formatDakikaValue(puantaj.gunluk_brut_sure_dakika) }
+    ]
+  };
+}
 
 function onIzlemeParasalGuvenlikNotu(not: string | null | undefined): boolean {
   if (!not?.trim()) {
@@ -639,6 +771,8 @@ export function usePuantaj() {
     tatilEkOdemeNotu
   ]);
 
+  const anaDetay = useMemo(() => toPuantajAnaDetayView(puantaj), [puantaj]);
+
   const clearQuery = useCallback(() => {
     setFormState({ ...INITIAL_FORM });
     setActiveQuery(null);
@@ -868,6 +1002,7 @@ export function usePuantaj() {
     kesintiOzetNotu,
     tatilEkOdemeOzeti,
     tatilEkOdemeNotu,
-    parasalEtkiOzeti
+    parasalEtkiOzeti,
+    anaDetay
   };
 }

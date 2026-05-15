@@ -14,6 +14,31 @@ function readonlyFieldInCardByLabel(
 }
 
 test.describe("e2e smoke", () => {
+  test("puantaj ana detay karti beklenen giris ve cikis snapshot saatlerini gosterir", async ({ page }) => {
+    await mockApi(page, "GENEL_YONETICI");
+
+    await login(page, { username: "yonetici", password: "secret" });
+
+    await page.goto("/puantaj");
+    await expect(page).toHaveURL(/\/puantaj$/);
+
+    await page.getByLabel("Personel ID").fill("1");
+    await page.getByLabel("Tarih").fill("2026-04-14");
+    await page.getByRole("button", { name: /Kayd.*Getir/i }).click();
+
+    await page.locator("[name='puantaj-hareket-durumu']").selectOption("Gec_Geldi");
+    await page.locator("[name='puantaj-beklenen-giris']").fill("08:00");
+    await page.locator("[name='puantaj-beklenen-cikis']").fill("18:00");
+    await page.locator("[name='puantaj-giris']").fill("08:20");
+    await page.locator("[name='puantaj-cikis']").fill("18:00");
+    await page.locator("[name='puantaj-mola']").fill("60");
+    await page.getByRole("button", { name: "Kaydet" }).click();
+
+    const gunlukDetayKarti = page.getByTestId("puantaj-ana-detay");
+    await expect(readonlyFieldInCardByLabel(gunlukDetayKarti, "Beklenen Giriş")).toContainText("08:00");
+    await expect(readonlyFieldInCardByLabel(gunlukDetayKarti, "Beklenen Çıkış")).toContainText("18:00");
+  });
+
   test("management user completes login to kapanis flow", async ({ page }) => {
     await mockApi(page, "GENEL_YONETICI");
 

@@ -206,6 +206,12 @@ export type ParasalEtkiOzeti = {
   notlar: string[];
 };
 
+export type GecErkenKesintiOzeti = {
+  tip: "GEC_KALMA" | "ERKEN_CIKMA";
+  eksik_dakika: number;
+  kesinti_tutari: number;
+};
+
 function onIzlemeParasalGuvenlikNotu(not: string | null | undefined): boolean {
   if (!not?.trim()) {
     return false;
@@ -399,10 +405,18 @@ export function usePuantaj() {
     };
   }, [activeQuery, activeSube, puantaj, personelMaasTutari, appDataRevision]);
 
-  const { devamsizlikKesintiOzet, gecErkenKesintiTutari, gecErkenKesintiNotu, gecErkenKesintiHesaplanamadiMi, kesintiOzetNotu } = useMemo(() => {
+  const {
+    devamsizlikKesintiOzet,
+    gecErkenKesintiOzeti,
+    gecErkenKesintiTutari,
+    gecErkenKesintiNotu,
+    gecErkenKesintiHesaplanamadiMi,
+    kesintiOzetNotu
+  } = useMemo(() => {
     if (!activeQuery || !puantaj) {
       return {
         devamsizlikKesintiOzet: null as DevamsizlikKesintiOzeti | null,
+        gecErkenKesintiOzeti: null as GecErkenKesintiOzeti | null,
         gecErkenKesintiTutari: 0,
         gecErkenKesintiNotu: null as string | null,
         gecErkenKesintiHesaplanamadiMi: false,
@@ -425,6 +439,7 @@ export function usePuantaj() {
     }
 
     let gecErkenKesintiTutari = 0;
+    let gecErkenKesintiOzeti: GecErkenKesintiOzeti | null = null;
     let gecErkenKesintiNotu: string | null = null;
     let gecErkenKesintiHesaplanamadiMi = false;
     if (puantaj.hareket_durumu === "Gec_Geldi" || puantaj.hareket_durumu === "Erken_Cikti") {
@@ -440,13 +455,13 @@ export function usePuantaj() {
         if (eksikSureSonucu.eksik_dakika > 0) {
           const ozet = hesaplaGecKalmaErkenCikmaKesintiOzeti(eksikSureSonucu.eksik_dakika, maas);
           gecErkenKesintiTutari = ozet.kesinti_tutari;
-          const tipMetni =
-            eksikSureSonucu.tip === "ERKEN_CIKMA"
-              ? "Erken çıkma"
-              : "Geç kalma";
-          gecErkenKesintiNotu =
-            `${tipMetni} kesintisi ön izlemesi: ${ozet.eksik_dakika} dk eksik süre, ` +
-            `${ozet.kesinti_tutari.toFixed(2)} TL saatlik kesinti hesaplandı.`;
+          gecErkenKesintiOzeti = {
+            tip:
+              eksikSureSonucu.tip ??
+              (puantaj.hareket_durumu === "Erken_Cikti" ? "ERKEN_CIKMA" : "GEC_KALMA"),
+            eksik_dakika: ozet.eksik_dakika,
+            kesinti_tutari: ozet.kesinti_tutari
+          };
         }
       } else if (eksikSureSonucu.neden === "BEKLENEN_SAAT_YOK") {
         gecErkenKesintiHesaplanamadiMi = true;
@@ -473,6 +488,7 @@ export function usePuantaj() {
 
     return {
       devamsizlikKesintiOzet,
+      gecErkenKesintiOzeti,
       gecErkenKesintiTutari,
       gecErkenKesintiNotu,
       gecErkenKesintiHesaplanamadiMi,
@@ -601,8 +617,8 @@ export function usePuantaj() {
     haftalikOzetDurumu,
     haftalikOzetEksikVeriNotu,
     devamsizlikKesintiOzet,
+    gecErkenKesintiOzeti,
     gecErkenKesintiTutari,
-    gecErkenKesintiNotu,
     gecErkenKesintiHesaplanamadiMi,
     kesintiOzetNotu,
     tatilEkOdemeOzeti,
@@ -825,6 +841,7 @@ export function usePuantaj() {
     haftalikOzetDurumu,
     haftalikOzetEksikVeriNotu,
     devamsizlikKesintiOzet,
+    gecErkenKesintiOzeti,
     gecErkenKesintiNotu,
     kesintiOzetNotu,
     tatilEkOdemeOzeti,

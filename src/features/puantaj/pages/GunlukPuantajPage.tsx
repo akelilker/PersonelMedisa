@@ -121,6 +121,10 @@ function formatTurkcePara(value: number) {
   return `${value.toFixed(2)} TL`;
 }
 
+function formatGecErkenKesintiTuru(value: "GEC_KALMA" | "ERKEN_CIKMA") {
+  return value === "ERKEN_CIKMA" ? "Erken Çıkma" : "Geç Kalma";
+}
+
 function formatOndalikSaat(value: number) {
   if (!Number.isFinite(value)) {
     return "-";
@@ -183,6 +187,7 @@ export function GunlukPuantajPage() {
     haftalikOzetDurumu,
     haftalikOzetEksikVeriNotu,
     devamsizlikKesintiOzet,
+    gecErkenKesintiOzeti,
     gecErkenKesintiNotu,
     kesintiOzetNotu,
     tatilEkOdemeOzeti,
@@ -409,7 +414,7 @@ export function GunlukPuantajPage() {
         </div>
       ) : null}
 
-      {activeQuery && puantaj && (devamsizlikKesintiOzet || gecErkenKesintiNotu) ? (
+      {activeQuery && puantaj && (devamsizlikKesintiOzet || gecErkenKesintiOzeti || gecErkenKesintiNotu) ? (
         <div className="puantaj-detail-card">
           <h3>Kesinti Ön İzleme</h3>
           {kesintiOzetNotu ? <p className="puantaj-form-readonly">{kesintiOzetNotu}</p> : null}
@@ -431,6 +436,22 @@ export function GunlukPuantajPage() {
               <ReadonlyField
                 label="Toplam Kesinti Tutarı"
                 value={formatTurkcePara(devamsizlikKesintiOzet.toplam_kesinti_tutari)}
+              />
+            </div>
+          ) : null}
+          {gecErkenKesintiOzeti ? (
+            <div className="form-field-grid">
+              <ReadonlyField
+                label="Kesinti Türü"
+                value={formatGecErkenKesintiTuru(gecErkenKesintiOzeti.tip)}
+              />
+              <ReadonlyField
+                label="Eksik Süre (dk)"
+                value={String(gecErkenKesintiOzeti.eksik_dakika)}
+              />
+              <ReadonlyField
+                label="Geç / Erken Kesinti Tutarı"
+                value={formatTurkcePara(gecErkenKesintiOzeti.kesinti_tutari)}
               />
             </div>
           ) : null}

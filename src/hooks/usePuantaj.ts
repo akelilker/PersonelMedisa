@@ -68,12 +68,20 @@ function hareketDurumuSaatGerekliMi(
   return hareketDurumu === "Geldi" || hareketDurumu === "Gec_Geldi" || hareketDurumu === "Erken_Cikti";
 }
 
+function hareketDurumuBeklenenSaatBilgisiGosterilmeliMi(
+  hareketDurumu: PuantajHareketDurumu | "" | undefined
+): boolean {
+  return hareketDurumu === "Gec_Geldi" || hareketDurumu === "Erken_Cikti";
+}
+
 export type GunlukPuantajFormState = {
   queryPersonelId: string;
   queryTarih: string;
   entryGunTipi: PuantajGunTipi | "";
   entryHareketDurumu: PuantajHareketDurumu | "";
   entryDayanak: PuantajDayanak | "";
+  entryBeklenenGirisSaati: string;
+  entryBeklenenCikisSaati: string;
   entryGirisSaati: string;
   entryCikisSaati: string;
   entryGercekMolaDakika: string;
@@ -87,6 +95,8 @@ function toPuantajFormState(
   | "entryGunTipi"
   | "entryHareketDurumu"
   | "entryDayanak"
+  | "entryBeklenenGirisSaati"
+  | "entryBeklenenCikisSaati"
   | "entryGirisSaati"
   | "entryCikisSaati"
   | "entryGercekMolaDakika"
@@ -97,6 +107,8 @@ function toPuantajFormState(
     entryGunTipi: puantaj?.gun_tipi ?? deriveGunTipiFromDateInput(effectiveTarih),
     entryHareketDurumu: puantaj?.hareket_durumu ?? "",
     entryDayanak: puantaj?.dayanak ?? "",
+    entryBeklenenGirisSaati: puantaj?.beklenen_giris_saati ?? "",
+    entryBeklenenCikisSaati: puantaj?.beklenen_cikis_saati ?? "",
     entryGirisSaati: puantaj?.giris_saati ?? "",
     entryCikisSaati: puantaj?.cikis_saati ?? "",
     entryGercekMolaDakika:
@@ -150,6 +162,8 @@ const INITIAL_FORM: GunlukPuantajFormState = {
   entryGunTipi: deriveGunTipiFromDateInput(TODAY_INPUT),
   entryHareketDurumu: "",
   entryDayanak: "",
+  entryBeklenenGirisSaati: "",
+  entryBeklenenCikisSaati: "",
   entryGirisSaati: "",
   entryCikisSaati: "",
   entryGercekMolaDakika: ""
@@ -675,6 +689,10 @@ export function usePuantaj() {
           throw new Error("Hareket durumu zorunludur.");
         }
 
+        const beklenenSaatBilgisiGosterilmeliMi =
+          hareketDurumuBeklenenSaatBilgisiGosterilmeliMi(hareketDurumu);
+        const beklenenGirisSaati = formState.entryBeklenenGirisSaati.trim();
+        const beklenenCikisSaati = formState.entryBeklenenCikisSaati.trim();
         const girisSaati = formState.entryGirisSaati.trim();
         const cikisSaati = formState.entryCikisSaati.trim();
 
@@ -686,6 +704,8 @@ export function usePuantaj() {
           gun_tipi: gunTipi,
           hareket_durumu: hareketDurumu,
           dayanak,
+          beklenen_giris_saati: beklenenSaatBilgisiGosterilmeliMi ? (beklenenGirisSaati || undefined) : undefined,
+          beklenen_cikis_saati: beklenenSaatBilgisiGosterilmeliMi ? (beklenenCikisSaati || undefined) : undefined,
           giris_saati: hareketDurumuSaatGerekliMi(hareketDurumu) ? girisSaati : undefined,
           cikis_saati: hareketDurumuSaatGerekliMi(hareketDurumu) ? cikisSaati : undefined,
           gercek_mola_dakika: hareketDurumuSaatGerekliMi(hareketDurumu)
@@ -765,6 +785,8 @@ export function usePuantaj() {
       activeQuery,
       activeSube,
       entryRequiresSaatBilgisi,
+      formState.entryBeklenenCikisSaati,
+      formState.entryBeklenenGirisSaati,
       formState.entryCikisSaati,
       formState.entryDayanak,
       formState.entryGercekMolaDakika,

@@ -265,6 +265,9 @@ export function GunlukPuantajPage() {
     void submitPuantaj(event, canEditForm);
   }
 
+  const beklenenSaatBilgisiGosterilmeliMi =
+    formState.entryHareketDurumu === "Gec_Geldi" || formState.entryHareketDurumu === "Erken_Cikti";
+
   return (
     <section className="puantaj-page">
       <div className="puantaj-header-row">
@@ -616,6 +619,25 @@ export function GunlukPuantajPage() {
               disabled={!entryRequiresSaatBilgisi}
             />
           </div>
+
+          {beklenenSaatBilgisiGosterilmeliMi ? (
+            <div className="form-field-grid">
+              <FormField
+                label="Beklenen Giriş Saati"
+                name="puantaj-beklenen-giris"
+                type="time"
+                value={formState.entryBeklenenGirisSaati}
+                onChange={(value) => patchFormState({ entryBeklenenGirisSaati: value })}
+              />
+              <FormField
+                label="Beklenen Çıkış Saati"
+                name="puantaj-beklenen-cikis"
+                type="time"
+                value={formState.entryBeklenenCikisSaati}
+                onChange={(value) => patchFormState({ entryBeklenenCikisSaati: value })}
+              />
+            </div>
+          ) : null}
 
           {!entryRequiresSaatBilgisi ? (
             <p className="puantaj-form-readonly">

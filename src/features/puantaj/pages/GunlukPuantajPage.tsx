@@ -507,7 +507,7 @@ export function GunlukPuantajPage() {
               value={parasalEtkiOzeti.manuel_inceleme_gerekli_mi ? "Gerekli" : "Gerekli değil"}
             />
             <ReadonlyField
-              label="Net Etki"
+              label="Ön İzleme Net Etki"
               value={
                 parasalEtkiOzeti.net_etki_hesaplanabilir_mi && parasalEtkiOzeti.net_etki_tutari !== null
                   ? formatTurkcePara(parasalEtkiOzeti.net_etki_tutari)

@@ -83,6 +83,8 @@ type DemoPuantaj = {
     | "Yillik_Izin"
     | "Telafi_Calismasi";
   hesap_etkisi?: "Kesinti_Yap" | "Tam_Yevmiye_Ver" | "Mesai_Yaz";
+  beklenen_giris_saati?: string;
+  beklenen_cikis_saati?: string;
   giris_saati?: string;
   cikis_saati?: string;
   gercek_mola_dakika?: number;
@@ -386,6 +388,8 @@ const demoState: {
       hareketDurumu: "Gec_Geldi",
       dayanak: "Ucretli_Izinli",
       hesapEtkisi: "Tam_Yevmiye_Ver",
+      beklenenGirisSaati: "08:00",
+      beklenenCikisSaati: "18:00",
       girisSaati: "09:15",
       cikisSaati: "18:00",
       gercekMolaDakika: 60,
@@ -701,6 +705,8 @@ type DemoPuantajBuildParams = {
   hareketDurumu: NonNullable<DemoPuantaj["hareket_durumu"]>;
   dayanak?: DemoPuantaj["dayanak"];
   hesapEtkisi?: DemoPuantaj["hesap_etkisi"];
+  beklenenGirisSaati?: string;
+  beklenenCikisSaati?: string;
   girisSaati?: string;
   cikisSaati?: string;
   gercekMolaDakika?: number;
@@ -783,6 +789,8 @@ function buildDemoPuantaj(params: DemoPuantajBuildParams): DemoPuantaj {
     hareket_durumu: params.hareketDurumu,
     dayanak: params.dayanak,
     hesap_etkisi: params.hesapEtkisi,
+    beklenen_giris_saati: params.beklenenGirisSaati,
+    beklenen_cikis_saati: params.beklenenCikisSaati,
     giris_saati: params.girisSaati,
     cikis_saati: params.cikisSaati,
     gercek_mola_dakika: params.gercekMolaDakika,
@@ -1555,6 +1563,8 @@ export function resolveDemoApiResponse(
         hareket_durumu: readDemoPuantajHareketDurumu(body.hareket_durumu) ?? existing.hareket_durumu,
         dayanak: readDemoPuantajDayanak(body.dayanak) ?? existing.dayanak,
         hesap_etkisi: readDemoPuantajHesapEtkisi(body.hesap_etkisi) ?? existing.hesap_etkisi,
+        beklenen_giris_saati: toStringValue(body.beklenen_giris_saati) ?? existing.beklenen_giris_saati,
+        beklenen_cikis_saati: toStringValue(body.beklenen_cikis_saati) ?? existing.beklenen_cikis_saati,
         giris_saati: toStringValue(body.giris_saati) ?? existing.giris_saati,
         cikis_saati: toStringValue(body.cikis_saati) ?? existing.cikis_saati,
         gercek_mola_dakika: toNumber(body.gercek_mola_dakika) ?? existing.gercek_mola_dakika,

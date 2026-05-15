@@ -499,7 +499,7 @@ export function GunlukPuantajPage() {
               value={formatTurkcePara(parasalEtkiOzeti.tatil_ek_odeme_tutari)}
             />
             <ReadonlyField
-              label="Devamsızlık Kesinti Tutarı"
+              label="Toplam Kesinti Tutarı"
               value={formatTurkcePara(parasalEtkiOzeti.devamsizlik_kesinti_tutari)}
             />
             <ReadonlyField

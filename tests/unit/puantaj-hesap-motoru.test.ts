@@ -23,6 +23,8 @@ import {
   HAFTALIK_NORMAL_CALISMA_ESIK_DAKIKA,
   hesaplaGunlukUcret,
   hesaplaSaatlikKesintiTutari,
+  GEC_ERKEN_TOLERANS_DAKIKA,
+  hesaplaGecErkenEksikSure,
   hesaplaGecKalmaErkenCikmaKesintiOzeti,
   hesaplaDevamsizlikKesintiOzeti,
   hesaplaTatilEkOdemeOzeti,
@@ -736,6 +738,207 @@ describe("hesaplaSaatlikKesintiTutari ve gecKalmaErkenCikma özeti", () => {
     expect(hesaplaGunlukUcret(10001)).toBe(333.37);
     const o = hesaplaGecKalmaErkenCikmaKesintiOzeti(45, 30000);
     expect(o.kesinti_tutari).toBe(100);
+  });
+});
+
+describe("hesaplaGecErkenEksikSure", () => {
+  it("Gec_Geldi + beklenen 08:00 + gercek 08:15 => 15 dakika", () => {
+    const sonuc = hesaplaGecErkenEksikSure({
+      hareket_durumu: "Gec_Geldi",
+      beklenen_giris_saati: "08:00",
+      giris_saati: "08:15"
+    });
+
+    expect(sonuc).toEqual({
+      hesaplanabilir_mi: true,
+      eksik_dakika: 15,
+      tip: "GEC_KALMA"
+    });
+  });
+
+  it("Erken_Cikti + beklenen 17:00 + gercek 16:40 => 20 dakika", () => {
+    const sonuc = hesaplaGecErkenEksikSure({
+      hareket_durumu: "Erken_Cikti",
+      beklenen_cikis_saati: "17:00",
+      cikis_saati: "16:40"
+    });
+
+    expect(sonuc).toEqual({
+      hesaplanabilir_mi: true,
+      eksik_dakika: 20,
+      tip: "ERKEN_CIKMA"
+    });
+  });
+
+  it("Gec_Geldi + gercek giris beklenenden once/esit => 0 dakika ve hesaplanabilir", () => {
+    expect(
+      hesaplaGecErkenEksikSure({
+        hareket_durumu: "Gec_Geldi",
+        beklenen_giris_saati: "08:00",
+        giris_saati: "08:00"
+      })
+    ).toEqual({
+      hesaplanabilir_mi: true,
+      eksik_dakika: 0,
+      tip: "GEC_KALMA"
+    });
+
+    expect(
+      hesaplaGecErkenEksikSure({
+        hareket_durumu: "Gec_Geldi",
+        beklenen_giris_saati: "08:00",
+        giris_saati: "07:55"
+      })
+    ).toEqual({
+      hesaplanabilir_mi: true,
+      eksik_dakika: 0,
+      tip: "GEC_KALMA"
+    });
+  });
+
+  it("Erken_Cikti + gercek cikis beklenenden sonra/esit => 0 dakika ve hesaplanabilir", () => {
+    expect(
+      hesaplaGecErkenEksikSure({
+        hareket_durumu: "Erken_Cikti",
+        beklenen_cikis_saati: "17:00",
+        cikis_saati: "17:00"
+      })
+    ).toEqual({
+      hesaplanabilir_mi: true,
+      eksik_dakika: 0,
+      tip: "ERKEN_CIKMA"
+    });
+
+    expect(
+      hesaplaGecErkenEksikSure({
+        hareket_durumu: "Erken_Cikti",
+        beklenen_cikis_saati: "17:00",
+        cikis_saati: "17:10"
+      })
+    ).toEqual({
+      hesaplanabilir_mi: true,
+      eksik_dakika: 0,
+      tip: "ERKEN_CIKMA"
+    });
+  });
+
+  it("beklenen giris yok => hesaplanamaz, BEKLENEN_SAAT_YOK", () => {
+    expect(
+      hesaplaGecErkenEksikSure({
+        hareket_durumu: "Gec_Geldi",
+        giris_saati: "08:15"
+      })
+    ).toEqual({
+      hesaplanabilir_mi: false,
+      eksik_dakika: 0,
+      neden: "BEKLENEN_SAAT_YOK"
+    });
+  });
+
+  it("beklenen cikis yok => hesaplanamaz, BEKLENEN_SAAT_YOK", () => {
+    expect(
+      hesaplaGecErkenEksikSure({
+        hareket_durumu: "Erken_Cikti",
+        cikis_saati: "16:40"
+      })
+    ).toEqual({
+      hesaplanabilir_mi: false,
+      eksik_dakika: 0,
+      neden: "BEKLENEN_SAAT_YOK"
+    });
+  });
+
+  it("gercek giris yok => hesaplanamaz, GERCEK_SAAT_YOK", () => {
+    expect(
+      hesaplaGecErkenEksikSure({
+        hareket_durumu: "Gec_Geldi",
+        beklenen_giris_saati: "08:00"
+      })
+    ).toEqual({
+      hesaplanabilir_mi: false,
+      eksik_dakika: 0,
+      neden: "GERCEK_SAAT_YOK"
+    });
+  });
+
+  it("gercek cikis yok => hesaplanamaz, GERCEK_SAAT_YOK", () => {
+    expect(
+      hesaplaGecErkenEksikSure({
+        hareket_durumu: "Erken_Cikti",
+        beklenen_cikis_saati: "17:00"
+      })
+    ).toEqual({
+      hesaplanabilir_mi: false,
+      eksik_dakika: 0,
+      neden: "GERCEK_SAAT_YOK"
+    });
+  });
+
+  it("gecersiz saat formati => hesaplanamaz, GECERSIZ_SAAT", () => {
+    expect(
+      hesaplaGecErkenEksikSure({
+        hareket_durumu: "Gec_Geldi",
+        beklenen_giris_saati: "08:00",
+        giris_saati: "08:6x"
+      })
+    ).toEqual({
+      hesaplanabilir_mi: false,
+      eksik_dakika: 0,
+      neden: "GECERSIZ_SAAT"
+    });
+
+    expect(
+      hesaplaGecErkenEksikSure({
+        hareket_durumu: "Erken_Cikti",
+        beklenen_cikis_saati: "17:0x",
+        cikis_saati: "16:40"
+      })
+    ).toEqual({
+      hesaplanabilir_mi: false,
+      eksik_dakika: 0,
+      neden: "GECERSIZ_SAAT"
+    });
+  });
+
+  it("hareket durumu Geldi => hesaplanamaz, HAREKET_DURUMU_UYGUN_DEGIL", () => {
+    expect(
+      hesaplaGecErkenEksikSure({
+        hareket_durumu: "Geldi",
+        beklenen_giris_saati: "08:00",
+        giris_saati: "08:15"
+      })
+    ).toEqual({
+      hesaplanabilir_mi: false,
+      eksik_dakika: 0,
+      neden: "HAREKET_DURUMU_UYGUN_DEGIL"
+    });
+  });
+
+  it("hesaplanan eksik dakika mevcut kesinti ozetine beslenebilir", () => {
+    const sure = hesaplaGecErkenEksikSure({
+      hareket_durumu: "Gec_Geldi",
+      beklenen_giris_saati: "08:00",
+      giris_saati: "09:30"
+    });
+
+    expect(sure.hesaplanabilir_mi).toBe(true);
+    expect(sure.eksik_dakika).toBe(90);
+
+    const kesinti = hesaplaGecKalmaErkenCikmaKesintiOzeti(sure.eksik_dakika, 30000);
+    expect(kesinti.kesinti_tutari).toBeCloseTo(200, 2);
+  });
+
+  it("tolerans sabiti 0 iken 15 dk fark 15 dk doner", () => {
+    expect(GEC_ERKEN_TOLERANS_DAKIKA).toBe(0);
+
+    const sonuc = hesaplaGecErkenEksikSure({
+      hareket_durumu: "Gec_Geldi",
+      beklenen_giris_saati: "08:00",
+      giris_saati: "08:15"
+    });
+
+    expect(sonuc.hesaplanabilir_mi).toBe(true);
+    expect(sonuc.eksik_dakika).toBe(15);
   });
 });
 

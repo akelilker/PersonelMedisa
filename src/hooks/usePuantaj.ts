@@ -15,6 +15,8 @@ import { runDeduped } from "../lib/in-flight-dedupe";
 import {
   hesapla,
   hesaplaDevamsizlikKesintiOzeti,
+  hesaplaGecErkenEksikSure,
+  hesaplaGecKalmaErkenCikmaKesintiOzeti,
   hesaplaHaftaAraligi,
   hesaplaHaftalikPuantajUcretOzeti,
   hesaplaTatilEkOdemeOzeti,
@@ -397,11 +399,13 @@ export function usePuantaj() {
     };
   }, [activeQuery, activeSube, puantaj, personelMaasTutari, appDataRevision]);
 
-  const { devamsizlikKesintiOzet, gecErkenKesintiNotu, kesintiOzetNotu } = useMemo(() => {
+  const { devamsizlikKesintiOzet, gecErkenKesintiTutari, gecErkenKesintiNotu, gecErkenKesintiHesaplanamadiMi, kesintiOzetNotu } = useMemo(() => {
     if (!activeQuery || !puantaj) {
       return {
         devamsizlikKesintiOzet: null as DevamsizlikKesintiOzeti | null,
+        gecErkenKesintiTutari: 0,
         gecErkenKesintiNotu: null as string | null,
+        gecErkenKesintiHesaplanamadiMi: false,
         kesintiOzetNotu: null as string | null
       };
     }
@@ -420,20 +424,58 @@ export function usePuantaj() {
       });
     }
 
+    let gecErkenKesintiTutari = 0;
     let gecErkenKesintiNotu: string | null = null;
+    let gecErkenKesintiHesaplanamadiMi = false;
     if (puantaj.hareket_durumu === "Gec_Geldi" || puantaj.hareket_durumu === "Erken_Cikti") {
-      gecErkenKesintiNotu =
-        "Geç kalma veya erken çıkma kesintisi için eksik süre, kayıtta beklenen mesai süresi olmadan güvenle hesaplanamıyor; bu nedenle saatlik kesinti ön izlemesi gösterilmiyor.";
+      const eksikSureSonucu = hesaplaGecErkenEksikSure({
+        hareket_durumu: puantaj.hareket_durumu,
+        giris_saati: puantaj.giris_saati,
+        cikis_saati: puantaj.cikis_saati,
+        beklenen_giris_saati: puantaj.beklenen_giris_saati,
+        beklenen_cikis_saati: puantaj.beklenen_cikis_saati
+      });
+
+      if (eksikSureSonucu.hesaplanabilir_mi) {
+        if (eksikSureSonucu.eksik_dakika > 0) {
+          const ozet = hesaplaGecKalmaErkenCikmaKesintiOzeti(eksikSureSonucu.eksik_dakika, maas);
+          gecErkenKesintiTutari = ozet.kesinti_tutari;
+          const tipMetni =
+            eksikSureSonucu.tip === "ERKEN_CIKMA"
+              ? "Erken çıkma"
+              : "Geç kalma";
+          gecErkenKesintiNotu =
+            `${tipMetni} kesintisi ön izlemesi: ${ozet.eksik_dakika} dk eksik süre, ` +
+            `${ozet.kesinti_tutari.toFixed(2)} TL saatlik kesinti hesaplandı.`;
+        }
+      } else if (eksikSureSonucu.neden === "BEKLENEN_SAAT_YOK") {
+        gecErkenKesintiHesaplanamadiMi = true;
+        gecErkenKesintiNotu =
+          "Geç kalma veya erken çıkma kesintisi için beklenen mesai saati bulunmadığından saatlik kesinti ön izlemesi gösterilmiyor.";
+      } else if (eksikSureSonucu.neden === "GERCEK_SAAT_YOK") {
+        gecErkenKesintiHesaplanamadiMi = true;
+        gecErkenKesintiNotu =
+          "Geç kalma veya erken çıkma kesintisi için gerçek saat bilgisi eksik olduğundan saatlik kesinti ön izlemesi gösterilmiyor.";
+      } else if (eksikSureSonucu.neden === "GECERSIZ_SAAT") {
+        gecErkenKesintiHesaplanamadiMi = true;
+        gecErkenKesintiNotu =
+          "Geç kalma veya erken çıkma kesintisi için saat formatı geçersiz olduğundan saatlik kesinti ön izlemesi gösterilmiyor.";
+      }
     }
 
     const notlar: string[] = [];
-    if (personelMaasTutari === undefined && (devamsizlikKesintiOzet || gecErkenKesintiNotu)) {
+    if (
+      personelMaasTutari === undefined &&
+      (devamsizlikKesintiOzet || gecErkenKesintiNotu || gecErkenKesintiTutari > 0)
+    ) {
       notlar.push("Personel maaşı yükleniyor; kesinti tutarları geçici olarak sıfır görünebilir.");
     }
 
     return {
       devamsizlikKesintiOzet,
+      gecErkenKesintiTutari,
       gecErkenKesintiNotu,
+      gecErkenKesintiHesaplanamadiMi,
       kesintiOzetNotu: notlar.length > 0 ? notlar.join(" ") : null
     };
   }, [activeQuery, puantaj, personelMaasTutari, appDataRevision]);
@@ -500,7 +542,8 @@ export function usePuantaj() {
 
     const tatil_ek_odeme_tutari = tatilEkOdemeOzeti?.ek_odeme_tutari ?? 0;
 
-    const devamsizlik_kesinti_tutari = devamsizlikKesintiOzet?.toplam_kesinti_tutari ?? 0;
+    const devamsizlik_kesinti_tutari =
+      (devamsizlikKesintiOzet?.toplam_kesinti_tutari ?? 0) + gecErkenKesintiTutari;
 
     const manuel_inceleme_gerekli_mi =
       tatilEkOdemeOzeti?.hafta_tatili_pazar_karar?.manuel_inceleme_gerekli_mi === true;
@@ -508,14 +551,14 @@ export function usePuantaj() {
     const haftalikEksikVeyaGuvenilmezNot = Boolean(haftalikOzetEksikVeriNotu?.trim());
     const tatilNotuGuvenliDegil = onIzlemeParasalGuvenlikNotu(tatilEkOdemeNotu);
     const kesintiOzetNotuGuvenliDegil = onIzlemeParasalGuvenlikNotu(kesintiOzetNotu);
-    const gecErkenNotuVar = Boolean(gecErkenKesintiNotu?.trim());
+    const gecErkenHesaplanamadi = gecErkenKesintiHesaplanamadiMi;
 
     const net_etki_hesaplanabilir_mi = !(
       manuel_inceleme_gerekli_mi ||
       haftalikEksikVeyaGuvenilmezNot ||
       tatilNotuGuvenliDegil ||
       kesintiOzetNotuGuvenliDegil ||
-      gecErkenNotuVar
+      gecErkenHesaplanamadi
     );
 
     const netHam =
@@ -527,7 +570,7 @@ export function usePuantaj() {
     const notlar: string[] = [];
     notlar.push("Bu özet bordro/muhasebe kesin hesabı değildir.");
     notlar.push("Bu kart günlük kesinti/ek ödeme ile haftalık fazla çalışma tutarını birlikte gösterir.");
-    if (gecErkenNotuVar) {
+    if (gecErkenHesaplanamadi) {
       notlar.push("Geç kalma / erken çıkma kesintileri bu özete dahil edilmedi.");
     }
     if (manuel_inceleme_gerekli_mi) {
@@ -558,7 +601,9 @@ export function usePuantaj() {
     haftalikOzetDurumu,
     haftalikOzetEksikVeriNotu,
     devamsizlikKesintiOzet,
+    gecErkenKesintiTutari,
     gecErkenKesintiNotu,
+    gecErkenKesintiHesaplanamadiMi,
     kesintiOzetNotu,
     tatilEkOdemeOzeti,
     tatilEkOdemeNotu

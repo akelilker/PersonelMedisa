@@ -346,6 +346,16 @@ function normalizeGunlukPuantaj(
     pickNumber(record, ["personel_id", "personelId", "id"]) ?? personelId;
   const normalizedTarih = pickString(record, ["tarih", "date"]) ?? tarih;
 
+  const beklenenGirisSaati = pickString(record, [
+    "beklenen_giris_saati",
+    "beklenen_giris",
+    "expected_check_in"
+  ]);
+  const beklenenCikisSaati = pickString(record, [
+    "beklenen_cikis_saati",
+    "beklenen_cikis",
+    "expected_check_out"
+  ]);
   const girisSaati = pickString(record, ["giris_saati", "giris", "check_in"]);
   const cikisSaati = pickString(record, ["cikis_saati", "cikis", "check_out"]);
 
@@ -407,6 +417,8 @@ function normalizeGunlukPuantaj(
     hareket_durumu: hareketDurumu,
     dayanak,
     hesap_etkisi: hesapEtkisi,
+    beklenen_giris_saati: beklenenGirisSaati,
+    beklenen_cikis_saati: beklenenCikisSaati,
     giris_saati: girisSaati,
     cikis_saati: cikisSaati,
     gercek_mola_dakika: pickNumber(record, ["gercek_mola_dakika", "gercek_mola", "break_minutes"]),
@@ -457,9 +469,14 @@ export async function upsertGunlukPuantaj(
   tarih: string,
   payload: UpsertGunlukPuantajPayload
 ): Promise<GunlukPuantaj> {
+  const requestBody: UpsertGunlukPuantajPayload = {
+    ...payload,
+    beklenen_giris_saati: payload.beklenen_giris_saati,
+    beklenen_cikis_saati: payload.beklenen_cikis_saati
+  };
   const response = await apiRequest<ApiResponse<unknown>>(endpoints.puantaj.detail(personelId, tarih), {
     method: "PUT",
-    body: JSON.stringify(payload)
+    body: JSON.stringify(requestBody)
   });
 
   const row = normalizeGunlukPuantaj(response.data, personelId, tarih);

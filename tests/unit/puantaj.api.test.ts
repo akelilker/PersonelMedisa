@@ -64,6 +64,8 @@ describe("puantaj.api", () => {
       hareket_durumu: "Geldi",
       dayanak: undefined,
       hesap_etkisi: "Tam_Yevmiye_Ver",
+      beklenen_giris_saati: undefined,
+      beklenen_cikis_saati: undefined,
       giris_saati: "08:10",
       cikis_saati: "18:05",
       gercek_mola_dakika: undefined,
@@ -81,6 +83,32 @@ describe("puantaj.api", () => {
         }
       ]
     });
+  });
+
+  it("normalizes beklenen_giris_saati and beklenen_cikis_saati when present", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        createJsonResponse(
+          {
+            data: {
+              personel_id: 8,
+              tarih: "2026-04-16",
+              beklenen_giris_saati: "08:00",
+              beklenen_cikis_saati: "17:00",
+              compliance_uyarilari: []
+            },
+            meta: {},
+            errors: []
+          },
+          200
+        )
+      )
+    );
+
+    const result = await fetchGunlukPuantaj(8, "2026-04-16");
+    expect(result?.beklenen_giris_saati).toBe("08:00");
+    expect(result?.beklenen_cikis_saati).toBe("17:00");
   });
 
   it("normalizes kontrol_durumu from snake_case or camelCase", async () => {
@@ -114,6 +142,8 @@ describe("puantaj.api", () => {
             data: {
               personel_id: 12,
               tarih: "2026-04-20",
+              beklenen_giris_saati: "08:00",
+              beklenen_cikis_saati: "17:30",
               giris_saati: "09:00",
               cikis_saati: "18:00",
               gercek_mola_dakika: 45,
@@ -130,6 +160,8 @@ describe("puantaj.api", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     const result = await upsertGunlukPuantaj(12, "2026-04-20", {
+      beklenen_giris_saati: "08:00",
+      beklenen_cikis_saati: "17:30",
       giris_saati: "09:00",
       cikis_saati: "18:00",
       gercek_mola_dakika: 45,
@@ -141,6 +173,8 @@ describe("puantaj.api", () => {
     expect(init.method).toBe("PUT");
     expect(init.body).toBe(
       JSON.stringify({
+        beklenen_giris_saati: "08:00",
+        beklenen_cikis_saati: "17:30",
         giris_saati: "09:00",
         cikis_saati: "18:00",
         gercek_mola_dakika: 45,
@@ -149,6 +183,45 @@ describe("puantaj.api", () => {
     );
     expect(result.personel_id).toBe(12);
     expect(result.tarih).toBe("2026-04-20");
+    expect(result.beklenen_giris_saati).toBe("08:00");
+    expect(result.beklenen_cikis_saati).toBe("17:30");
     expect(result.kontrol_durumu).toBe("AMIR_KONTROL_ETTI");
+  });
+
+  it("keeps existing behavior when beklenen saat fields are absent", async () => {
+    const fetchMock = vi.fn(async () =>
+      createJsonResponse(
+        {
+          data: {
+            personel_id: 13,
+            tarih: "2026-04-21",
+            giris_saati: "08:45",
+            cikis_saati: "18:15",
+            compliance_uyarilari: []
+          },
+          meta: {},
+          errors: []
+        },
+        200
+      )
+    );
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await upsertGunlukPuantaj(13, "2026-04-21", {
+      giris_saati: "08:45",
+      cikis_saati: "18:15"
+    });
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("/api/gunluk-puantaj/13/2026-04-21");
+    expect(init.body).toBe(
+      JSON.stringify({
+        giris_saati: "08:45",
+        cikis_saati: "18:15"
+      })
+    );
+    expect(result.beklenen_giris_saati).toBeUndefined();
+    expect(result.beklenen_cikis_saati).toBeUndefined();
   });
 });

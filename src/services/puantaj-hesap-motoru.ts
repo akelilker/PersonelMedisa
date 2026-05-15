@@ -337,6 +337,107 @@ export type GecKalmaErkenCikmaKesintiOzeti = {
   kesinti_tutari: number;
 };
 
+export const GEC_ERKEN_TOLERANS_DAKIKA = 0;
+
+export type GecErkenEksikSureGirdisi = {
+  hareket_durumu?: PuantajHareketDurumu;
+  giris_saati?: string;
+  cikis_saati?: string;
+  beklenen_giris_saati?: string;
+  beklenen_cikis_saati?: string;
+};
+
+export type GecErkenEksikSureSonucu = {
+  hesaplanabilir_mi: boolean;
+  eksik_dakika: number;
+  neden?:
+    | "BEKLENEN_SAAT_YOK"
+    | "GERCEK_SAAT_YOK"
+    | "GECERSIZ_SAAT"
+    | "HAREKET_DURUMU_UYGUN_DEGIL";
+  tip?: "GEC_KALMA" | "ERKEN_CIKMA";
+};
+
+/**
+ * Geç kalma / erken çıkma için beklenen ve gerçek saatlerden güvenli eksik süre üretir.
+ * Hesap yapılamayan durumlarda throw etmez; neden kodu ile 0 dakika döner.
+ */
+export function hesaplaGecErkenEksikSure(
+  girdi: GecErkenEksikSureGirdisi
+): GecErkenEksikSureSonucu {
+  if (girdi.hareket_durumu !== "Gec_Geldi" && girdi.hareket_durumu !== "Erken_Cikti") {
+    return {
+      hesaplanabilir_mi: false,
+      eksik_dakika: 0,
+      neden: "HAREKET_DURUMU_UYGUN_DEGIL"
+    };
+  }
+
+  if (girdi.hareket_durumu === "Gec_Geldi") {
+    if (!girdi.beklenen_giris_saati?.trim()) {
+      return {
+        hesaplanabilir_mi: false,
+        eksik_dakika: 0,
+        neden: "BEKLENEN_SAAT_YOK"
+      };
+    }
+    if (!girdi.giris_saati?.trim()) {
+      return {
+        hesaplanabilir_mi: false,
+        eksik_dakika: 0,
+        neden: "GERCEK_SAAT_YOK"
+      };
+    }
+
+    const beklenen = parseTimeToMinutes(girdi.beklenen_giris_saati);
+    const gercek = parseTimeToMinutes(girdi.giris_saati);
+    if (beklenen === null || gercek === null) {
+      return {
+        hesaplanabilir_mi: false,
+        eksik_dakika: 0,
+        neden: "GECERSIZ_SAAT"
+      };
+    }
+
+    return {
+      hesaplanabilir_mi: true,
+      eksik_dakika: Math.max(gercek - beklenen - GEC_ERKEN_TOLERANS_DAKIKA, 0),
+      tip: "GEC_KALMA"
+    };
+  }
+
+  if (!girdi.beklenen_cikis_saati?.trim()) {
+    return {
+      hesaplanabilir_mi: false,
+      eksik_dakika: 0,
+      neden: "BEKLENEN_SAAT_YOK"
+    };
+  }
+  if (!girdi.cikis_saati?.trim()) {
+    return {
+      hesaplanabilir_mi: false,
+      eksik_dakika: 0,
+      neden: "GERCEK_SAAT_YOK"
+    };
+  }
+
+  const beklenen = parseTimeToMinutes(girdi.beklenen_cikis_saati);
+  const gercek = parseTimeToMinutes(girdi.cikis_saati);
+  if (beklenen === null || gercek === null) {
+    return {
+      hesaplanabilir_mi: false,
+      eksik_dakika: 0,
+      neden: "GECERSIZ_SAAT"
+    };
+  }
+
+  return {
+    hesaplanabilir_mi: true,
+    eksik_dakika: Math.max(beklenen - gercek - GEC_ERKEN_TOLERANS_DAKIKA, 0),
+    tip: "ERKEN_CIKMA"
+  };
+}
+
 /**
  * Geç kalma veya erken çıkma için eksik süre × saatlik ücret özeti.
  */

@@ -223,7 +223,8 @@ export type ParasalEtkiOzeti = {
 
 export type GecErkenKesintiOzeti = {
   tip: "GEC_KALMA" | "ERKEN_CIKMA";
-  eksik_dakika: number;
+  gercek_eksik_dakika: number;
+  kesintiye_esas_dakika: number;
   kesinti_tutari: number;
 };
 
@@ -605,7 +606,8 @@ export function usePuantaj() {
             tip:
               eksikSureSonucu.tip ??
               (puantaj.hareket_durumu === "Erken_Cikti" ? "ERKEN_CIKMA" : "GEC_KALMA"),
-            eksik_dakika: ozet.eksik_dakika,
+            gercek_eksik_dakika: ozet.gercek_eksik_dakika,
+            kesintiye_esas_dakika: ozet.kesintiye_esas_dakika,
             kesinti_tutari: ozet.kesinti_tutari
           };
         }

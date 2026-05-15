@@ -148,6 +148,23 @@ Tüm fazla çalışma ve kesinti hesapları **brüt ücret** üzerinden.
 
 | | |
 |---|---|
+| **Kural** | Gerçek eksik süre korunur; parasal kesinti doğrudan gerçek dakika üzerinden değil, **kesintiye_esas_dakika** üzerinden hesaplanır. |
+| **Sistem etkisi** | Geç / erken kayıtlarında iki alan ayrışır: **gercek_eksik_dakika** fiili farkı taşır, **kesintiye_esas_dakika** parasal hesapta kullanılır. |
+| **Not** | Yuvarlama kuralı: `kesintiye_esas_dakika = Math.ceil(gercek_eksik_dakika / 30) * 30`. `gercek_eksik_dakika = 0` ise kesinti yoktur. |
+
+### 8.1 Kesintiye Esas Süre Tablosu
+
+| Gerçek eksik süre | Kesintiye esas süre |
+|---|---|
+| `0 dk` | `0 dk` |
+| `1-30 dk` | `30 dk` |
+| `31-60 dk` | `60 dk` |
+| `61-90 dk` | `90 dk` |
+
+**Uygulama notu:** Bu kural tolerans değildir. Geç / erken durum hesaplanamazsa parasal kesinti gösterilmez; yanlış kesin tutar üretilmez.
+
+| | |
+|---|---|
 | **Kural** | Tolerans: firma politikası; netleşmemişse **varsayılan sıfır tolerans** düşünülür. |
 | **Sistem etkisi** | V1’de sıfır veya parametre; ürün kararı netleşince parametreleştirilir. |
 | **Not** | **Politika alanı** (Bölüm 17). |
@@ -319,3 +336,4 @@ Aşağıdakiler **kesin firma politikası** veya **ileride parametreleştirilebi
 | Tarih | Not |
 |-------|-----|
 | V1 | İlk konsolidasyon; kod değişikliği yok. |
+| 2026-05-15 | Geç kalma / erken çıkma için 30 dakikalık yukarı yuvarlama ve `kesintiye_esas_dakika` kuralı eklendi. |

@@ -366,8 +366,12 @@ export function GunlukPuantajPage() {
                 value={formatGecErkenKesintiTuru(gecErkenKesintiOzeti.tip)}
               />
               <ReadonlyField
-                label="Eksik Süre (dk)"
-                value={String(gecErkenKesintiOzeti.eksik_dakika)}
+                label="Gerçek Eksik Süre (dk)"
+                value={String(gecErkenKesintiOzeti.gercek_eksik_dakika)}
+              />
+              <ReadonlyField
+                label="Kesintiye Esas Süre (dk)"
+                value={String(gecErkenKesintiOzeti.kesintiye_esas_dakika)}
               />
               <ReadonlyField
                 label="Geç / Erken Kesinti Tutarı"

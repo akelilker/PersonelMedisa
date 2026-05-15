@@ -397,6 +397,27 @@ Sistem davranışı:
 
 Bu karar, sistemin aylar arası keyfi eksi saat borcu taşımasını engeller.
 
+## 9.1 Geç Kalma / Erken Çıkma Kesinti Notu
+
+V1 ürün kuralı:
+
+- `gercek_eksik_dakika` beklenen ve fiili saat farkından üretilir; gerçek fark korunur
+- parasal kesinti doğrudan bu gerçek dakika üzerinden değil, `kesintiye_esas_dakika` üzerinden hesaplanır
+- `kesintiye_esas_dakika = Math.ceil(gercek_eksik_dakika / 30) * 30`
+- `gercek_eksik_dakika = 0` ise kesinti yoktur
+- geç / erken fark hesaplanamazsa parasal kesinti gösterilmez
+
+Sınır örnekleri:
+
+| Gerçek eksik süre | Kesintiye esas süre |
+|---|---|
+| `0 dk` | `0 dk` |
+| `1-30 dk` | `30 dk` |
+| `31-60 dk` | `60 dk` |
+| `61-90 dk` | `90 dk` |
+
+Bu başlık, ürün karar özeti olan `docs/guncel/11-puantaj-kural-matrisi.md` Bölüm 8 ile uyumlu tutulmalıdır.
+
 ## 10. Yıllık İzin Algoritması
 
 ### 10.1 Hak Ediş
@@ -632,3 +653,9 @@ Bu belge sonrası sıradaki doğru doküman:
 - `State Flow + API Contract`
 
 çünkü artık ürün mantığı, veri kapsamı, UI contract'ı ve hesap motoru netleştiğine göre, uygulamanın veri yaşam döngüsünü ve ekran-endpoint ilişkisini çivileme zamanı gelmiştir.
+
+## Belge Geçmişi
+
+| Tarih | Not |
+|-------|-----|
+| 2026-05-15 | Geç kalma / erken çıkma için 30 dakikalık yukarı yuvarlama ve `kesintiye_esas_dakika` notu eklendi. |

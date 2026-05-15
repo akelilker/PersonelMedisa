@@ -715,8 +715,9 @@ describe("hesaplaSaatlikKesintiTutari ve gecKalmaErkenCikma özeti", () => {
   it("60 dk eksik → 1 saatlik kesinti doğru", () => {
     expect(hesaplaSaatlikKesintiTutari(60, maas)).toBeCloseTo(133.33, 2);
     const o = hesaplaGecKalmaErkenCikmaKesintiOzeti(60, maas);
-    expect(o.eksik_dakika).toBe(60);
-    expect(o.eksik_saat).toBe(1);
+    expect(o.gercek_eksik_dakika).toBe(60);
+    expect(o.kesintiye_esas_dakika).toBe(60);
+    expect(o.kesintiye_esas_saat).toBe(1);
     expect(o.kesinti_tutari).toBe(hesaplaSaatlikKesintiTutari(60, maas));
     expect(o.saatlik_ucret).toBeCloseTo(133.33, 2);
   });
@@ -730,14 +731,51 @@ describe("hesaplaSaatlikKesintiTutari ve gecKalmaErkenCikma özeti", () => {
   it("negatif eksik dakika → 0 kesinti", () => {
     expect(hesaplaSaatlikKesintiTutari(-30, maas)).toBe(0);
     const o = hesaplaGecKalmaErkenCikmaKesintiOzeti(-5, maas);
-    expect(o.eksik_dakika).toBe(0);
+    expect(o.gercek_eksik_dakika).toBe(0);
+    expect(o.kesintiye_esas_dakika).toBe(0);
     expect(o.kesinti_tutari).toBe(0);
   });
 
-  it("ondalıklı para: günlük ücret ve kesinti 2 hane", () => {
+  it("ondalıklı para: günlük ücret ve 30 dk yuvarlanmis kesinti 2 hane", () => {
     expect(hesaplaGunlukUcret(10001)).toBe(333.37);
     const o = hesaplaGecKalmaErkenCikmaKesintiOzeti(45, 30000);
-    expect(o.kesinti_tutari).toBe(100);
+    expect(o.gercek_eksik_dakika).toBe(45);
+    expect(o.kesintiye_esas_dakika).toBe(60);
+    expect(o.kesinti_tutari).toBeCloseTo(133.33, 2);
+  });
+
+  it("0 dk eksik → kesintiye esas 0 ve kesinti 0", () => {
+    const o = hesaplaGecKalmaErkenCikmaKesintiOzeti(0, maas);
+    expect(o.gercek_eksik_dakika).toBe(0);
+    expect(o.kesintiye_esas_dakika).toBe(0);
+    expect(o.kesinti_tutari).toBe(0);
+  });
+
+  it("1 dk eksik → 30 dk kesintiye esas sure", () => {
+    const o = hesaplaGecKalmaErkenCikmaKesintiOzeti(1, maas);
+    expect(o.gercek_eksik_dakika).toBe(1);
+    expect(o.kesintiye_esas_dakika).toBe(30);
+    expect(o.kesinti_tutari).toBeCloseTo(66.67, 2);
+  });
+
+  it("30 dk eksik → 30 dk kesintiye esas sure", () => {
+    const o = hesaplaGecKalmaErkenCikmaKesintiOzeti(30, maas);
+    expect(o.kesintiye_esas_dakika).toBe(30);
+    expect(o.kesinti_tutari).toBeCloseTo(66.67, 2);
+  });
+
+  it("31 dk eksik → 60 dk kesintiye esas sure", () => {
+    const o = hesaplaGecKalmaErkenCikmaKesintiOzeti(31, maas);
+    expect(o.gercek_eksik_dakika).toBe(31);
+    expect(o.kesintiye_esas_dakika).toBe(60);
+    expect(o.kesinti_tutari).toBeCloseTo(133.33, 2);
+  });
+
+  it("61 dk eksik → 90 dk kesintiye esas sure", () => {
+    const o = hesaplaGecKalmaErkenCikmaKesintiOzeti(61, maas);
+    expect(o.gercek_eksik_dakika).toBe(61);
+    expect(o.kesintiye_esas_dakika).toBe(90);
+    expect(o.kesinti_tutari).toBeCloseTo(200, 2);
   });
 });
 
@@ -925,6 +963,8 @@ describe("hesaplaGecErkenEksikSure", () => {
     expect(sure.eksik_dakika).toBe(90);
 
     const kesinti = hesaplaGecKalmaErkenCikmaKesintiOzeti(sure.eksik_dakika, 30000);
+    expect(kesinti.gercek_eksik_dakika).toBe(90);
+    expect(kesinti.kesintiye_esas_dakika).toBe(90);
     expect(kesinti.kesinti_tutari).toBeCloseTo(200, 2);
   });
 

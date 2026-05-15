@@ -331,8 +331,9 @@ export function hesaplaSaatlikKesintiTutari(eksikDakika: number, maasTutari: num
 }
 
 export type GecKalmaErkenCikmaKesintiOzeti = {
-  eksik_dakika: number;
-  eksik_saat: number;
+  gercek_eksik_dakika: number;
+  kesintiye_esas_dakika: number;
+  kesintiye_esas_saat: number;
   saatlik_ucret: number;
   kesinti_tutari: number;
 };
@@ -357,6 +358,15 @@ export type GecErkenEksikSureSonucu = {
     | "HAREKET_DURUMU_UYGUN_DEGIL";
   tip?: "GEC_KALMA" | "ERKEN_CIKMA";
 };
+
+function hesaplaKesintiyeEsasDakika(gercekEksikDakika: number): number {
+  const dk = ucretIcinGuvenliNegatifOlmayanSayi(gercekEksikDakika);
+  if (dk === 0) {
+    return 0;
+  }
+
+  return Math.ceil(dk / 30) * 30;
+}
 
 /**
  * Geç kalma / erken çıkma için beklenen ve gerçek saatlerden güvenli eksik süre üretir.
@@ -445,14 +455,16 @@ export function hesaplaGecKalmaErkenCikmaKesintiOzeti(
   eksikDakika: number,
   maasTutari: number
 ): GecKalmaErkenCikmaKesintiOzeti {
-  const eksik_dakika = ucretIcinGuvenliNegatifOlmayanSayi(eksikDakika);
-  const eksik_saat = eksik_dakika / 60;
+  const gercek_eksik_dakika = ucretIcinGuvenliNegatifOlmayanSayi(eksikDakika);
+  const kesintiye_esas_dakika = hesaplaKesintiyeEsasDakika(gercek_eksik_dakika);
+  const kesintiye_esas_saat = kesintiye_esas_dakika / 60;
   const hamSaatlik = hesaplaSaatlikUcret(maasTutari);
-  const kesinti_tutari = hesaplaSaatlikKesintiTutari(eksikDakika, maasTutari);
+  const kesinti_tutari = hesaplaSaatlikKesintiTutari(kesintiye_esas_dakika, maasTutari);
 
   return {
-    eksik_dakika,
-    eksik_saat,
+    gercek_eksik_dakika,
+    kesintiye_esas_dakika,
+    kesintiye_esas_saat,
     saatlik_ucret: yuvarlaParaIkiliOndalik(hamSaatlik),
     kesinti_tutari
   };

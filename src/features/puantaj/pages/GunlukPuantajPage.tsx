@@ -314,7 +314,7 @@ export function GunlukPuantajPage() {
       ) : null}
 
       {!isLoading && !errorMessage && puantaj ? (
-        <div className="puantaj-detail-card">
+        <div className="puantaj-detail-card" data-testid="puantaj-ana-detay">
           <div className="form-field-grid">
             <ReadonlyField label="Personel ID" value={String(puantaj.personel_id)} />
             <ReadonlyField label="Tarih" value={puantaj.tarih} />

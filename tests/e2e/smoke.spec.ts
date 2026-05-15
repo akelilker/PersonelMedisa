@@ -46,7 +46,7 @@ test.describe("e2e smoke", () => {
     await page.getByLabel("Tarih").fill("2026-04-12");
     await page.getByRole("button", { name: /Kayd.*Getir/i }).click();
 
-    const gunlukDetayKarti = page.locator(".puantaj-detail-card").first();
+    const gunlukDetayKarti = page.getByTestId("puantaj-ana-detay");
     await expect(readonlyFieldInCardByLabel(gunlukDetayKarti, "Kayıt Durumu")).toContainText(/Hesapland/i);
     await expect(readonlyFieldInCardByLabel(gunlukDetayKarti, "Net Çalışma (dk)").getByText(/^510$/)).toBeVisible();
 

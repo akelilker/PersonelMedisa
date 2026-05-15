@@ -526,6 +526,7 @@ export function usePuantaj() {
 
     const notlar: string[] = [];
     notlar.push("Bu özet bordro/muhasebe kesin hesabı değildir.");
+    notlar.push("Bu kart günlük kesinti/ek ödeme ile haftalık fazla çalışma tutarını birlikte gösterir.");
     if (gecErkenNotuVar) {
       notlar.push("Geç kalma / erken çıkma kesintileri bu özete dahil edilmedi.");
     }

@@ -1,0 +1,139 @@
+# Puantaj V2 Eksik Gün ve SGK Prim Günü Kural Matrisi
+
+Sürüm: `V2 karar matrisi`
+
+## Belgenin Amacı
+
+Bu doküman, tam gün devamsızlık, rapor, ücretsiz izin, yıllık izin, resmi tatil ve ücret hak edilmeyen günlerin ücret, SGK prim günü, prim / ek ödeme ve manuel inceleme etkilerini kod yazmadan önce sabitler.
+
+Bu belge uygulama kodu değildir. `04-hesap-motoru-kurallari.md` motor owner'ı olarak kalır; bu dosya tam gün eksik gün ve SGK prim günü kararlarının detay matrisidir.
+
+İlişkili belgeler:
+
+- Ürün ve operasyon ana özeti: `11-puantaj-kural-matrisi.md`
+- Hesap motoru teknik owner'ı: `04-hesap-motoru-kurallari.md`
+- Kullanıcı akışları: `07-is-akislari-ve-senaryolar.md`
+- Puantaj geliştirici devir notu: `12-puantaj-gelistirici-devir-notu.md`
+
+## Karar Etiketleri
+
+Bu dokümanda her önemli karar aşağıdaki etiketlerden biriyle işaretlenir.
+
+| Etiket | Anlam |
+|---|---|
+| `Kesinleşmiş kural` | Ürün içinde uygulanacak davranış nettir. |
+| `Mevzuat dayanaklı yorum` | Mevzuat ve SGK pratiğine göre teknik yorum yapılmıştır; uygulamada resmi danışmanlık veya bordro kontrolü gerekebilir. |
+| `Firma / ürün kararı bekliyor` | Ücret, prim, ek ödeme, onay veya kod eşlemesi için firma politikası ya da ürün kararı eksiktir. |
+
+## Geç / Erken Kesinti ile Tam Gün Eksik Gün Ayrımı
+
+**Durum etiketi:** `Kesinleşmiş kural`
+
+Geç / erken kesinti ile tam gün devamsızlık / eksik gün hesabı aynı alan değildir.
+
+- Geç / erken kesinti dakika bazlıdır.
+- Geç / erken kesintide `gercek_eksik_dakika` korunur, parasal tutar `kesintiye_esas_dakika` üzerinden hesaplanır.
+- 30 dakikalık yukarı yuvarlama kuralı yalnızca geç / erken dakika kesintisi içindir.
+- Tam gün devamsızlık / eksik gün hesabı gün bazlıdır.
+- SGK prim günü hesabı tam gün eksik gün üzerinden yürür.
+- `sgk_gunu = min(30, takvim_gunu - eksik_gun)` formülü geç / erken dakika kesintisi için kullanılmaz.
+
+## Senaryo Karar Matrisi
+
+| Senaryo | Eksik gün oluşur mu? | Ücret kesilir mi? | SGK prim günü etkilenir mi? | Prim / ek ödeme etkilenir mi? | Manuel inceleme gerekir mi? | Durum etiketi | Not / mevzuat açıklaması |
+|---|---|---|---|---|---|---|---|
+| Haber vermeden işe gelmedi | Evet, tam gün çalışılmadıysa eksik gün oluşur. | Evet, ücret hak edilmez. | Evet, tam gün eksik gün sayısına göre prim günü düşer. | Firma kuralına bağlı; varsayılan karar henüz net değil. | Evet. Devamsızlık, hafta tatili hakkı ve disiplin etkisi birlikte kontrol edilir. | `Kesinleşmiş kural` | SGK eksik gün nedeni için `15 Devamsızlık` adaydır; kesin kod eşlemesi ayrıca netleşecektir. |
+| Haber vererek işe gelmedi | Duruma bağlı. Onaylı ücretli mazeret ise oluşmaz; ücretsiz izin / ücretsiz mazeret ise oluşur. | Duruma bağlı. | Duruma bağlı. Ücret hak edilmeyen tam gün varsa etkilenir. | Firma kuralına bağlı. | Evet. Haber vermek tek başına ücretli gün anlamına gelmez. | `Firma / ürün kararı bekliyor` | Haberli yokluk, süreçte mazeret, izin veya ücretsiz izin olarak sınıflandırılmadan kesin ücret / SGK etkisi üretilmemelidir. |
+| Yıllık izin | Hayır. Ücretli izin olduğu için eksik gün sayılmaz. | Hayır. Ücret korunur. | Hayır. Prim günü korunur. | Prim / ek ödeme politikası firma kararına bağlıdır. | Genelde hayır; izin bölünme kuralı veya bakiye çelişkisi varsa evet. | `Mevzuat dayanaklı yorum` | Yıllık izin ücretli izin türüdür; yıllık izin bakiyesi ayrıca izin motorunda takip edilir. |
+| Rapor | Evet, raporlu tam günler SGK eksik gün adayıdır. | V1 ürün özetinde işveren ödemez; hastalık / iş kazası / tamamlayıcı ödeme ayrımı V2 ürün kararı ister. | Evet, raporlu gün prim gününü düşürebilir. | Firma kuralına bağlı; prim / ek ödeme devam edip etmeyeceği netleşmelidir. | Evet. Belge, rapor türü, tarih aralığı ve SGK karşılığı kontrol edilir. | `Firma / ürün kararı bekliyor` | SGK `01 İstirahat` kodu adaydır. İş kazası ve hastalık raporu ayrı tutulur; işveren ödeme politikası senaryoya göre ayrıştırılmalıdır. |
+| Ücretsiz izin | Evet. Ücret hak edilmeyen tam gün olarak eksik gün oluşur. | Evet. | Evet. Prim günü tam gün eksik sayısına göre düşer. | Firma kuralına bağlı; çoğunlukla prim / ek ödeme hak edişi kesinti adayıdır. | Onay veya belge eksikse evet. | `Mevzuat dayanaklı yorum` | Ücretsiz izin, onaylı ve belgeli süreç kaydı olmalıdır; SGK eksik gün nedeni eşlemesi ayrıca netleşecektir. |
+| Resmi tatil | Hayır. Çalışılmasa da normal ücret korunur. | Hayır. | Hayır. | Çalışılırsa `11-puantaj-kural-matrisi.md` uyarınca ek yevmiye doğar; çalışılmazsa ek ödeme yoktur. | Genelde hayır; çalışma / çalışmama kaydı çelişkiliyse evet. | `Kesinleşmiş kural` | UBGT / resmi tatil çalışmazsa normal ücret korunur, çalışırsa ürün kuralı olarak `+1 günlük` ek yevmiye üretilir. |
+| Mazeretli devamsızlık | Duruma bağlı. Ücretli mazeret ise oluşmaz; ücretsiz mazeret ise oluşur. | Duruma bağlı. | Duruma bağlı. Ücret hak edilmeyen tam gün varsa etkilenir. | Firma kuralına bağlı. | Evet. Mazeretin ücretli / ücretsiz sınıfı netleşmelidir. | `Firma / ürün kararı bekliyor` | Düğün, cenaze, doğum gibi ücretli mazeret izinleri ayrı ele alınır; hangi hallerin ücretli sayılacağı firma politikasıyla netleşmelidir. |
+| Disiplin cezası / ücret hak edilmeyen gün | Evet, tam gün ücret hak edilmiyorsa eksik gün oluşur. | Evet. | Evet, ücret hak edilmeyen tam gün prim gününü düşürür. | Firma kuralına bağlı; prim / ek ödeme kesintisi ayrıca belirlenmelidir. | Evet. Süreç, onay, belge ve mevzuata uygunluk kontrolü gerekir. | `Firma / ürün kararı bekliyor` | Disiplin kaydı otomatik bordro kesintisi değildir; ücret hak edilmeyen gün olarak işlenmesi için süreç ve onay matrisi net olmalıdır. |
+
+## Ay Sonu SGK Prim Günü Hesabı
+
+### Tam çalışma
+
+**Durum etiketi:** `Mevzuat dayanaklı yorum`
+
+Tam çalışma halinde ay 28, 29, 30 veya 31 çekse de SGK prim günü `30` kabul edilir.
+
+### Eksik gün oluştuğunda güvenli formül
+
+**Durum etiketi:** `Mevzuat dayanaklı yorum`
+
+Ücret hak edilmeyen tam gün eksik gün oluştuğunda prim günü hesabı `30` sabitinden değil, fiili takvim gününden türetilir.
+
+```text
+sgk_gunu = min(30, takvim_gunu - eksik_gun)
+```
+
+Bu formül yalnızca tam gün eksik gün / SGK prim günü hesabı içindir. Geç / erken dakika kesintisi için kullanılmaz.
+
+### Örnekler
+
+| Ay takvim günü | Eksik gün | Hesap | SGK prim günü |
+|---|---:|---|---:|
+| `31` | `1` | `min(30, 31 - 1)` | `30` |
+| `31` | `2` | `min(30, 31 - 2)` | `29` |
+| `30` | `1` | `min(30, 30 - 1)` | `29` |
+| `28` | `1` | `min(30, 28 - 1)` | `27` |
+| `28` | `2` | `min(30, 28 - 2)` | `26` |
+| `29` | `1` | `min(30, 29 - 1)` | `28` |
+
+> **Şubat / 28 gün uyarısı:** 28 çeken Şubat'ta 1 eksik gün `29` prim günü üretmez; `27` prim günü üretir. Çünkü eksik gün oluştuğunda hesap `30` sabitinden değil, fiili takvim gününden yürür.
+
+> **31 gün çeken ay uyarısı:** 31 gün çeken ayda 1 eksik gün prim gününü `30` altına düşürmez. 2 eksik gün olduğunda `29` prim günü oluşur.
+
+## Karar Sınıflandırması Özeti
+
+### Kesinleşmiş kural
+
+- Geç / erken dakika kesintisi ile tam gün devamsızlık / eksik gün hesabı ayrı tutulur.
+- Haber vermeden işe gelmeme tam gün çalışılmadıysa eksik gün ve ücret kesintisi üretir.
+- Resmi tatilde çalışılmasa da normal ücret korunur; çalışılırsa ürün kuralı olarak ek yevmiye doğar.
+
+### Mevzuat dayanaklı yorum
+
+- Tam çalışma halinde ay kaç gün çekerse çeksin SGK prim günü `30` kabul edilir.
+- Eksik gün oluştuğunda SGK prim günü fiili takvim günü üzerinden `min(30, takvim_gunu - eksik_gun)` formülüyle hesaplanır.
+- Yıllık izin ücretli izin olduğu için eksik gün sayılmaz ve prim günü korunur.
+- Ücretsiz izin, onaylı süreç kaydıyla ücret hak edilmeyen eksik gün etkisi üretir.
+
+### Firma / ürün kararı bekliyor
+
+- Haber vererek işe gelmeme ücretli mazeret mi, ücretsiz izin mi, mazeretsiz devamsızlık mı sayılacak?
+- Rapor durumunda işveren ödeme politikası hastalık, iş kazası, ilk günler ve tamamlayıcı ödeme senaryolarında nasıl ayrışacak?
+- Prim / ek ödeme hangi senaryoda kesilecek veya korunacak?
+- SGK eksik gün nedeni eşleme tablosu hangi kodlarla kesinleşecek?
+- Firma uygulaması ile mevzuat yorumu ayrımı UI ve raporda nasıl işaretlenecek?
+- Mazeretli devamsızlık hangi hallerde ücretli, hangi hallerde ücretsiz sayılacak?
+- Disiplin cezası / ücret hak edilmeyen gün süreçte hangi onayla kesinleşecek?
+
+## Açık Ürün Kararları
+
+- Haber vererek işe gelmeme ücrette nasıl ele alınacak?
+- Rapor durumunda işveren ödeme politikası hangi senaryoda nasıl ayrışacak?
+- Prim / ek ödeme hangi senaryoda kesilecek?
+- SGK eksik gün nedeni eşleme tablosu nasıl netleşecek?
+- Firma uygulaması ile mevzuat yorumu ayrımı nasıl işaretlenecek?
+- Mazeretli devamsızlık hangi hallerde ücretli, hangi hallerde ücretsiz sayılacak?
+- Disiplin cezası / ücret hak edilmeyen gün süreçte nasıl onaylanacak?
+
+## Uygulama Sınırı
+
+Bu faz yalnızca karar dokümanı fazıdır.
+
+- Kod yazılmaz.
+- Hook / page davranışı değiştirilmez.
+- Geç / erken 30 dakika yukarı yuvarlama kuralı değiştirilmez.
+- Vardiya / çalışma planı modeli açılmaz.
+- Muhasebe motoru implementasyonu yapılmaz.
+- Test yazılmaz.
+
+## Belge Geçmişi
+
+| Tarih | Not |
+|---|---|
+| 2026-05-15 | Puantaj V2 için eksik gün, SGK prim günü ve senaryo karar matrisi eklendi. |

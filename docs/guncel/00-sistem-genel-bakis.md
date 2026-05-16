@@ -77,6 +77,7 @@ Operasyon ve yönetim görünürlüğünü sağlayan çıktı katmanı.
 - Kod ve klasör yapısı: `06-proje-scaffold.md`
 - Kullanıcı akışları: `07-is-akislari-ve-senaryolar.md`
 - Frontend disiplin kuralları: `08-frontend-teknik-mimari.md`
+- Eksik gün ve SGK prim günü karar matrisi: `13-eksik-gun-sgk-prim-gunu-kural-matrisi.md`
 - Güncel puantaj geliştirme devri ve doğrulama özeti: `12-puantaj-gelistirici-devir-notu.md`
 
 ## 6. Altın Kurallar

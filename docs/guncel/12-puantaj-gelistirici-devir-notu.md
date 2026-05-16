@@ -179,6 +179,9 @@ Detay owner belgeleri `11-puantaj-kural-matrisi.md` ve `04-hesap-motoru-kurallar
 - `beklenen_cikis_saati`
 - eksik dakika serviste türetiliyor
 - tolerans sabiti `0`
+- gerçek eksik süre korunuyor
+- parasal kesinti `kesintiye_esas_dakika` üzerinden hesaplanıyor
+- 30 dakikalık yukarı yuvarlama uygulanıyor
 - güvenli veri varsa sayısal kesinti
 - güvenli veri yoksa not / fren
 - readonly görünür özet alanları var
@@ -190,6 +193,8 @@ Bu fazın bilinçli sınırları:
 
 - ayrı vardiya / çalışma planı modeli yok
 - beklenen saatler günlük puantaj kaydında opsiyonel snapshot alanları olarak tutuluyor
+- beklenen giriş ve beklenen çıkış ana detay kartında readonly görünür
+- bu kural tolerans politikası değildir
 
 Eklenen tip alanları:
 
@@ -202,6 +207,18 @@ Servis davranışı:
 - `hesaplaGecErkenEksikSure(...)`
 - hesaplanamıyorsa neden kodu döner
 - `throw` ile akışı kırmaz
+- `gercek_eksik_dakika` fiili farkı korur
+- `kesintiye_esas_dakika = Math.ceil(gercek_eksik_dakika / 30) * 30`
+- `gercek_eksik_dakika = 0` ise kesinti yoktur
+
+30 dk sınırları:
+
+| Gerçek eksik süre | Kesintiye esas süre |
+|---|---|
+| `0 dk` | `0 dk` |
+| `1-30 dk` | `30 dk` |
+| `31-60 dk` | `60 dk` |
+| `61-90 dk` | `90 dk` |
 
 Hook davranışı:
 
@@ -209,14 +226,31 @@ Hook davranışı:
 - hesaplanamıyorsa `gecErkenKesintiOzeti = null`
 - bu durumda `gecErkenKesintiNotu` güvenlik notu üretir
 - `eksik_dakika === 0` ise özet yok, not yok, kart şişmez
+- beklenen giriş yoksa parasal özet üretilmez
+- beklenen çıkış yoksa parasal özet üretilmez
+- gerçek giriş yoksa parasal özet üretilmez
+- gerçek çıkış yoksa parasal özet üretilmez
+- geçersiz saat formatında parasal tutar üretilmez
 
 UI davranışı:
 
 - Kesinti Ön İzleme kartında readonly alanlar:
 - `Kesinti Türü`
-- `Eksik Süre (dk)`
+- `Gerçek Eksik Süre (dk)`
+- `Kesintiye Esas Süre (dk)`
 - `Geç / Erken Kesinti Tutarı`
 - hesaplanamayan durumda not korunur
+
+Katman prensibi:
+
+- iş kuralı servis katmanında kalır
+- hook servis sonucunu view model'e taşır
+- page / UI hesap yapmaz, sadece hook'tan gelen readonly veriyi render eder
+
+Doğrulama kapsamı:
+
+- `tests/unit/puantaj-hesap-motoru.test.ts` içinde güvenli durumlar ve 30 dk sınır değerleri kilitlendi
+- `tests/e2e/smoke.spec.ts` içinde 1 dk geç gelme senaryosunda UI seviyesinde `Gerçek Eksik Süre (dk) = 1` ve `Kesintiye Esas Süre (dk) = 30` assert edildi
 
 ## Ekranın Şu Anki Görünür Hattı
 
@@ -335,11 +369,6 @@ Bu başlıklar mevcut V1 hattında bug olarak ele alınmamalı; ürün veya sonr
 - geri açma
 - snapshot
 - kim neyi değiştirdi
-
-### 7. Beklenen saatlerin ana detay readonly görünürlüğü
-
-- şu an form + kesinti kartı hattında var
-- ana detay kartına ekleme ayrı mini UI fazı olarak ele alınmalı
 
 ## Yeni Oturum İçin Öncelikli İş Akışı
 

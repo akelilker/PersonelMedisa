@@ -28,15 +28,26 @@ test.describe("e2e smoke", () => {
 
     await page.locator("[name='puantaj-hareket-durumu']").selectOption("Gec_Geldi");
     await page.locator("[name='puantaj-beklenen-giris']").fill("08:00");
-    await page.locator("[name='puantaj-beklenen-cikis']").fill("18:00");
-    await page.locator("[name='puantaj-giris']").fill("08:20");
-    await page.locator("[name='puantaj-cikis']").fill("18:00");
+    await page.locator("[name='puantaj-beklenen-cikis']").fill("17:00");
+    await page.locator("[name='puantaj-giris']").fill("08:01");
+    await page.locator("[name='puantaj-cikis']").fill("17:00");
     await page.locator("[name='puantaj-mola']").fill("60");
     await page.getByRole("button", { name: "Kaydet" }).click();
 
     const gunlukDetayKarti = page.getByTestId("puantaj-ana-detay");
     await expect(readonlyFieldInCardByLabel(gunlukDetayKarti, "Beklenen Giriş")).toContainText("08:00");
-    await expect(readonlyFieldInCardByLabel(gunlukDetayKarti, "Beklenen Çıkış")).toContainText("18:00");
+    await expect(readonlyFieldInCardByLabel(gunlukDetayKarti, "Beklenen Çıkış")).toContainText("17:00");
+
+    const kesintiOnIzlemeKarti = page
+      .locator(".puantaj-detail-card")
+      .filter({ has: page.getByRole("heading", { name: "Kesinti Ön İzleme" }) });
+    await expect(kesintiOnIzlemeKarti).toBeVisible();
+    await expect(
+      readonlyFieldInCardByLabel(kesintiOnIzlemeKarti, "Gerçek Eksik Süre (dk)").getByText(/^1$/)
+    ).toBeVisible();
+    await expect(
+      readonlyFieldInCardByLabel(kesintiOnIzlemeKarti, "Kesintiye Esas Süre (dk)").getByText(/^30$/)
+    ).toBeVisible();
   });
 
   test("management user completes login to kapanis flow", async ({ page }) => {

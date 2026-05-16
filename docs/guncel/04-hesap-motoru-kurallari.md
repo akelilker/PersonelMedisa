@@ -401,11 +401,15 @@ Bu karar, sistemin aylar arası keyfi eksi saat borcu taşımasını engeller.
 
 V1 ürün kuralı:
 
+- `beklenen_giris_saati` ve `beklenen_cikis_saati` günlük puantaj kaydındaki opsiyonel snapshot alanlarıdır
+- bu alanlar ana detay kartında readonly görünür; hesap girdisi olarak UI'da yeniden türetilmez
 - `gercek_eksik_dakika` beklenen ve fiili saat farkından üretilir; gerçek fark korunur
 - parasal kesinti doğrudan bu gerçek dakika üzerinden değil, `kesintiye_esas_dakika` üzerinden hesaplanır
 - `kesintiye_esas_dakika = Math.ceil(gercek_eksik_dakika / 30) * 30`
 - `gercek_eksik_dakika = 0` ise kesinti yoktur
 - geç / erken fark hesaplanamazsa parasal kesinti gösterilmez
+
+Bu yuvarlama tolerans değildir. Gerçek eksik süre `0` ise kesinti yoktur; `1-30 dk` arası parasal hesapta `30 dk`, `31-60 dk` arası `60 dk`, `61-90 dk` arası `90 dk` kabul edilir.
 
 Sınır örnekleri:
 
@@ -415,6 +419,26 @@ Sınır örnekleri:
 | `1-30 dk` | `30 dk` |
 | `31-60 dk` | `60 dk` |
 | `61-90 dk` | `90 dk` |
+
+Güvenli hesap prensibi:
+
+- beklenen giriş yoksa parasal özet üretilmez
+- beklenen çıkış yoksa parasal özet üretilmez
+- gerçek giriş yoksa parasal özet üretilmez
+- gerçek çıkış yoksa parasal özet üretilmez
+- geçersiz saat formatında parasal tutar üretilmez
+- eksik dakika `0` ise kart şişirilmez
+
+Katman prensibi:
+
+- iş kuralı servis katmanında kalır
+- hook servis sonucunu view model'e taşır
+- page / UI hesap yapmaz, sadece hook'tan gelen readonly veriyi render eder
+
+Doğrulama kapsamı:
+
+- `tests/unit/puantaj-hesap-motoru.test.ts` içinde güvenli durumlar ve 30 dk sınır değerleri kilitlendi
+- `tests/e2e/smoke.spec.ts` içinde 1 dk geç gelme senaryosunda UI seviyesinde `Gerçek Eksik Süre (dk) = 1` ve `Kesintiye Esas Süre (dk) = 30` assert edildi
 
 Bu başlık, ürün karar özeti olan `docs/guncel/11-puantaj-kural-matrisi.md` Bölüm 8 ile uyumlu tutulmalıdır.
 
@@ -659,3 +683,4 @@ Bu belge sonrası sıradaki doğru doküman:
 | Tarih | Not |
 |-------|-----|
 | 2026-05-15 | Geç kalma / erken çıkma için 30 dakikalık yukarı yuvarlama ve `kesintiye_esas_dakika` notu eklendi. |
+| 2026-05-15 | Geç / Erken Kesinti V1 kapanış davranışı, güvenli hesap prensibi, katman sınırı ve test kapsamı sabitlendi. |

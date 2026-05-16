@@ -1,7 +1,7 @@
 # Yoklama, Süreç ve Puantaj Kural Matrisi
 
 **Sürüm:** V1 (ürün karar özeti)  
-**İlişkili belge:** Teknik hesap motoru ayrıntıları için `docs/guncel/04-hesap-motoru-kurallari.md` ile uyum korunmalıdır. Bu belge (11), puantaj ve çalışma ücreti tarafında **ürün + operasyon kararlarının** özet tek kaynağıdır.
+**İlişkili belgeler:** Teknik hesap motoru ayrıntıları için `docs/guncel/04-hesap-motoru-kurallari.md` ile uyum korunmalıdır. Tam gün eksik gün ve SGK prim günü detay matrisi için `docs/guncel/13-eksik-gun-sgk-prim-gunu-kural-matrisi.md` referans alınmalıdır. Bu belge (11), puantaj ve çalışma ücreti tarafında **ürün + operasyon kararlarının** özet tek kaynağıdır.
 
 ---
 
@@ -152,6 +152,12 @@ Tüm fazla çalışma ve kesinti hesapları **brüt ücret** üzerinden.
 | **Sistem etkisi** | Geç / erken kayıtlarında iki alan ayrışır: **gercek_eksik_dakika** fiili farkı taşır, **kesintiye_esas_dakika** parasal hesapta kullanılır. |
 | **Not** | Yuvarlama kuralı: `kesintiye_esas_dakika = Math.ceil(gercek_eksik_dakika / 30) * 30`. `gercek_eksik_dakika = 0` ise kesinti yoktur. |
 
+| | |
+|---|---|
+| **Kural** | `beklenen_giris_saati` ve `beklenen_cikis_saati`, günlük puantaj kaydındaki opsiyonel snapshot alanlarıdır. |
+| **Sistem etkisi** | Beklenen giriş ve beklenen çıkış ana detay kartında readonly görünür; kullanıcıya hesap girdisi olarak değil, kayıt snapshot'ı olarak sunulur. |
+| **Not** | V1 bu alanlar üzerinden vardiya / çalışma planı modeli açmaz. |
+
 ### 8.1 Kesintiye Esas Süre Tablosu
 
 | Gerçek eksik süre | Kesintiye esas süre |
@@ -162,6 +168,30 @@ Tüm fazla çalışma ve kesinti hesapları **brüt ücret** üzerinden.
 | `61-90 dk` | `90 dk` |
 
 **Uygulama notu:** Bu kural tolerans değildir. Geç / erken durum hesaplanamazsa parasal kesinti gösterilmez; yanlış kesin tutar üretilmez.
+
+### 8.2 Güvenli hesap ve katman prensibi
+
+Parasal özet yalnızca beklenen ve fiili saatler birlikte güvenli okunabiliyorsa üretilir.
+
+- Beklenen giriş yoksa parasal özet üretilmez.
+- Beklenen çıkış yoksa parasal özet üretilmez.
+- Gerçek giriş yoksa parasal özet üretilmez.
+- Gerçek çıkış yoksa parasal özet üretilmez.
+- Geçersiz saat formatında parasal tutar üretilmez.
+- Eksik dakika `0` ise kart şişirilmez.
+
+Katman prensibi:
+
+- İş kuralı servis katmanında kalır.
+- Hook servis sonucunu view model'e taşır.
+- Page / UI hesap yapmaz; sadece hook'tan gelen readonly veriyi render eder.
+
+### 8.3 V1 doğrulama kapsamı
+
+- `tests/unit/puantaj-hesap-motoru.test.ts` içinde güvenli durumlar ve 30 dk sınır değerleri kilitlendi.
+- `tests/e2e/smoke.spec.ts` içinde 1 dk geç gelme senaryosunda UI seviyesinde şu değerler assert edildi:
+  - `Gerçek Eksik Süre (dk) = 1`
+  - `Kesintiye Esas Süre (dk) = 30`
 
 | | |
 |---|---|
@@ -177,7 +207,13 @@ Tüm fazla çalışma ve kesinti hesapları **brüt ücret** üzerinden.
 |---|---|
 | **Kural** | Mazeretsiz devamsızlık: çalışılmayan gün etkisi üretir; hafta tatili hakkını düşürebilir. |
 | **Sistem etkisi** | Bölüm 6 ile birleşik değerlendirme; düz sabit “X gün kes” modeli kullanılmaz. |
-| **Not** | SGK bildirim tarafında **15 Devamsızlık** kodu ürün sözlüğünde eşlenebilir (uygulama fazına bırakıldı). |
+| **Not** | SGK bildirim tarafında **15 Devamsızlık** kodu ürün sözlüğünde eşlenebilir (uygulama fazına bırakıldı). Tam gün eksik gün, rapor, ücretsiz izin, yıllık izin, resmi tatil ve SGK prim günü senaryo matrisi `docs/guncel/13-eksik-gun-sgk-prim-gunu-kural-matrisi.md` dosyasındadır. |
+
+| | |
+|---|---|
+| **Kural** | Geç / erken dakika kesintisi ile tam gün devamsızlık / eksik gün hesabı ayrı tutulur. |
+| **Sistem etkisi** | 30 dakikalık yukarı yuvarlama yalnızca geç / erken dakika kesintisi içindir; SGK prim günü hesabı tam gün eksik gün üzerinden yürür. |
+| **Not** | Ay sonu prim günü formülü ve Şubat / 31 gün uyarıları detay belgede sabitlenmiştir. |
 
 ---
 
@@ -337,3 +373,5 @@ Aşağıdakiler **kesin firma politikası** veya **ileride parametreleştirilebi
 |-------|-----|
 | V1 | İlk konsolidasyon; kod değişikliği yok. |
 | 2026-05-15 | Geç kalma / erken çıkma için 30 dakikalık yukarı yuvarlama ve `kesintiye_esas_dakika` kuralı eklendi. |
+| 2026-05-15 | Geç / Erken Kesinti V1 kapanış davranışı, güvenli hesap prensibi, katman sınırı ve doğrulama kapsamı sabitlendi. |
+| 2026-05-15 | Puantaj V2 eksik gün ve SGK prim günü detay matrisi için `13-eksik-gun-sgk-prim-gunu-kural-matrisi.md` referansı eklendi. |

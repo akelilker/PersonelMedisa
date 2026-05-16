@@ -33,6 +33,7 @@ import {
   hesapSonucuToGunlukPuantaj,
   type HesapGirdisi
 } from "../../src/services/puantaj-hesap-motoru";
+import { deriveGecErkenKesintiPreview } from "../../src/hooks/usePuantaj";
 import type { GunlukPuantaj } from "../../src/types/puantaj";
 
 // =========================================================================
@@ -979,6 +980,115 @@ describe("hesaplaGecErkenEksikSure", () => {
 
     expect(sonuc.hesaplanabilir_mi).toBe(true);
     expect(sonuc.eksik_dakika).toBe(15);
+  });
+});
+
+describe("deriveGecErkenKesintiPreview (hook güvenli davranış)", () => {
+  const maas = 30000;
+
+  function basePuantaj(partial: Partial<GunlukPuantaj>): GunlukPuantaj {
+    return {
+      personel_id: 1,
+      tarih: "2026-04-10",
+      compliance_uyarilari: [],
+      ...partial
+    };
+  }
+
+  it("beklenen_giris_saati yoksa parasal kesinti özeti üretmez, not verir", () => {
+    const p = basePuantaj({
+      hareket_durumu: "Gec_Geldi",
+      giris_saati: "08:15"
+    });
+    const out = deriveGecErkenKesintiPreview(p, maas);
+    expect(out.gecErkenKesintiOzeti).toBeNull();
+    expect(out.gecErkenKesintiTutari).toBe(0);
+    expect(out.gecErkenKesintiHesaplanamadiMi).toBe(true);
+    expect(out.gecErkenKesintiNotu).toBe(
+      "Geç kalma veya erken çıkma kesintisi için beklenen mesai saati bulunmadığından saatlik kesinti ön izlemesi gösterilmiyor."
+    );
+  });
+
+  it("beklenen_cikis_saati yoksa parasal kesinti özeti üretmez, not verir", () => {
+    const p = basePuantaj({
+      hareket_durumu: "Erken_Cikti",
+      cikis_saati: "16:40"
+    });
+    const out = deriveGecErkenKesintiPreview(p, maas);
+    expect(out.gecErkenKesintiOzeti).toBeNull();
+    expect(out.gecErkenKesintiTutari).toBe(0);
+    expect(out.gecErkenKesintiHesaplanamadiMi).toBe(true);
+    expect(out.gecErkenKesintiNotu).toBe(
+      "Geç kalma veya erken çıkma kesintisi için beklenen mesai saati bulunmadığından saatlik kesinti ön izlemesi gösterilmiyor."
+    );
+  });
+
+  it("gerçek giriş saati yoksa parasal kesinti özeti üretmez, not verir", () => {
+    const p = basePuantaj({
+      hareket_durumu: "Gec_Geldi",
+      beklenen_giris_saati: "08:00"
+    });
+    const out = deriveGecErkenKesintiPreview(p, maas);
+    expect(out.gecErkenKesintiOzeti).toBeNull();
+    expect(out.gecErkenKesintiTutari).toBe(0);
+    expect(out.gecErkenKesintiHesaplanamadiMi).toBe(true);
+    expect(out.gecErkenKesintiNotu).toBe(
+      "Geç kalma veya erken çıkma kesintisi için gerçek saat bilgisi eksik olduğundan saatlik kesinti ön izlemesi gösterilmiyor."
+    );
+  });
+
+  it("gerçek çıkış saati yoksa parasal kesinti özeti üretmez, not verir", () => {
+    const p = basePuantaj({
+      hareket_durumu: "Erken_Cikti",
+      beklenen_cikis_saati: "17:00"
+    });
+    const out = deriveGecErkenKesintiPreview(p, maas);
+    expect(out.gecErkenKesintiOzeti).toBeNull();
+    expect(out.gecErkenKesintiTutari).toBe(0);
+    expect(out.gecErkenKesintiHesaplanamadiMi).toBe(true);
+    expect(out.gecErkenKesintiNotu).toBe(
+      "Geç kalma veya erken çıkma kesintisi için gerçek saat bilgisi eksik olduğundan saatlik kesinti ön izlemesi gösterilmiyor."
+    );
+  });
+
+  it("geçersiz saat formatında parasal kesinti özeti üretmez, not verir", () => {
+    const p = basePuantaj({
+      hareket_durumu: "Gec_Geldi",
+      beklenen_giris_saati: "08:0x",
+      giris_saati: "08:15"
+    });
+    const out = deriveGecErkenKesintiPreview(p, maas);
+    expect(out.gecErkenKesintiOzeti).toBeNull();
+    expect(out.gecErkenKesintiTutari).toBe(0);
+    expect(out.gecErkenKesintiHesaplanamadiMi).toBe(true);
+    expect(out.gecErkenKesintiNotu).toBe(
+      "Geç kalma veya erken çıkma kesintisi için saat formatı geçersiz olduğundan saatlik kesinti ön izlemesi gösterilmiyor."
+    );
+  });
+
+  it("eksik_dakika = 0 ise özet üretmez (kart şişmez), not üretmez", () => {
+    const p = basePuantaj({
+      hareket_durumu: "Gec_Geldi",
+      beklenen_giris_saati: "08:00",
+      giris_saati: "08:00"
+    });
+    const out = deriveGecErkenKesintiPreview(p, maas);
+    expect(out.gecErkenKesintiOzeti).toBeNull();
+    expect(out.gecErkenKesintiTutari).toBe(0);
+    expect(out.gecErkenKesintiNotu).toBeNull();
+    expect(out.gecErkenKesintiHesaplanamadiMi).toBe(false);
+  });
+
+  it("eksik_dakika = 1 ise kesintiye_esas_dakika = 30 (yuvarlama bozulmaz)", () => {
+    const p = basePuantaj({
+      hareket_durumu: "Gec_Geldi",
+      beklenen_giris_saati: "08:00",
+      giris_saati: "08:01"
+    });
+    const out = deriveGecErkenKesintiPreview(p, maas);
+    expect(out.gecErkenKesintiOzeti).not.toBeNull();
+    expect(out.gecErkenKesintiOzeti!.gercek_eksik_dakika).toBe(1);
+    expect(out.gecErkenKesintiOzeti!.kesintiye_esas_dakika).toBe(30);
   });
 });
 

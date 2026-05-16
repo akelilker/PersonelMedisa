@@ -228,6 +228,67 @@ export type GecErkenKesintiOzeti = {
   kesinti_tutari: number;
 };
 
+export type GecErkenKesintiPreview = {
+  gecErkenKesintiOzeti: GecErkenKesintiOzeti | null;
+  gecErkenKesintiTutari: number;
+  gecErkenKesintiNotu: string | null;
+  gecErkenKesintiHesaplanamadiMi: boolean;
+};
+
+export function deriveGecErkenKesintiPreview(
+  puantaj: GunlukPuantaj,
+  maasTutari: number
+): GecErkenKesintiPreview {
+  let gecErkenKesintiTutari = 0;
+  let gecErkenKesintiOzeti: GecErkenKesintiOzeti | null = null;
+  let gecErkenKesintiNotu: string | null = null;
+  let gecErkenKesintiHesaplanamadiMi = false;
+
+  if (puantaj.hareket_durumu === "Gec_Geldi" || puantaj.hareket_durumu === "Erken_Cikti") {
+    const eksikSureSonucu = hesaplaGecErkenEksikSure({
+      hareket_durumu: puantaj.hareket_durumu,
+      giris_saati: puantaj.giris_saati,
+      cikis_saati: puantaj.cikis_saati,
+      beklenen_giris_saati: puantaj.beklenen_giris_saati,
+      beklenen_cikis_saati: puantaj.beklenen_cikis_saati
+    });
+
+    if (eksikSureSonucu.hesaplanabilir_mi) {
+      if (eksikSureSonucu.eksik_dakika > 0) {
+        const ozet = hesaplaGecKalmaErkenCikmaKesintiOzeti(eksikSureSonucu.eksik_dakika, maasTutari);
+        gecErkenKesintiTutari = ozet.kesinti_tutari;
+        gecErkenKesintiOzeti = {
+          tip:
+            eksikSureSonucu.tip ??
+            (puantaj.hareket_durumu === "Erken_Cikti" ? "ERKEN_CIKMA" : "GEC_KALMA"),
+          gercek_eksik_dakika: ozet.gercek_eksik_dakika,
+          kesintiye_esas_dakika: ozet.kesintiye_esas_dakika,
+          kesinti_tutari: ozet.kesinti_tutari
+        };
+      }
+    } else if (eksikSureSonucu.neden === "BEKLENEN_SAAT_YOK") {
+      gecErkenKesintiHesaplanamadiMi = true;
+      gecErkenKesintiNotu =
+        "Geç kalma veya erken çıkma kesintisi için beklenen mesai saati bulunmadığından saatlik kesinti ön izlemesi gösterilmiyor.";
+    } else if (eksikSureSonucu.neden === "GERCEK_SAAT_YOK") {
+      gecErkenKesintiHesaplanamadiMi = true;
+      gecErkenKesintiNotu =
+        "Geç kalma veya erken çıkma kesintisi için gerçek saat bilgisi eksik olduğundan saatlik kesinti ön izlemesi gösterilmiyor.";
+    } else if (eksikSureSonucu.neden === "GECERSIZ_SAAT") {
+      gecErkenKesintiHesaplanamadiMi = true;
+      gecErkenKesintiNotu =
+        "Geç kalma veya erken çıkma kesintisi için saat formatı geçersiz olduğundan saatlik kesinti ön izlemesi gösterilmiyor.";
+    }
+  }
+
+  return {
+    gecErkenKesintiOzeti,
+    gecErkenKesintiTutari,
+    gecErkenKesintiNotu,
+    gecErkenKesintiHesaplanamadiMi
+  };
+}
+
 export type PuantajReadonlyFieldView = {
   label: string;
   value: string;
@@ -590,40 +651,11 @@ export function usePuantaj() {
     let gecErkenKesintiNotu: string | null = null;
     let gecErkenKesintiHesaplanamadiMi = false;
     if (puantaj.hareket_durumu === "Gec_Geldi" || puantaj.hareket_durumu === "Erken_Cikti") {
-      const eksikSureSonucu = hesaplaGecErkenEksikSure({
-        hareket_durumu: puantaj.hareket_durumu,
-        giris_saati: puantaj.giris_saati,
-        cikis_saati: puantaj.cikis_saati,
-        beklenen_giris_saati: puantaj.beklenen_giris_saati,
-        beklenen_cikis_saati: puantaj.beklenen_cikis_saati
-      });
-
-      if (eksikSureSonucu.hesaplanabilir_mi) {
-        if (eksikSureSonucu.eksik_dakika > 0) {
-          const ozet = hesaplaGecKalmaErkenCikmaKesintiOzeti(eksikSureSonucu.eksik_dakika, maas);
-          gecErkenKesintiTutari = ozet.kesinti_tutari;
-          gecErkenKesintiOzeti = {
-            tip:
-              eksikSureSonucu.tip ??
-              (puantaj.hareket_durumu === "Erken_Cikti" ? "ERKEN_CIKMA" : "GEC_KALMA"),
-            gercek_eksik_dakika: ozet.gercek_eksik_dakika,
-            kesintiye_esas_dakika: ozet.kesintiye_esas_dakika,
-            kesinti_tutari: ozet.kesinti_tutari
-          };
-        }
-      } else if (eksikSureSonucu.neden === "BEKLENEN_SAAT_YOK") {
-        gecErkenKesintiHesaplanamadiMi = true;
-        gecErkenKesintiNotu =
-          "Geç kalma veya erken çıkma kesintisi için beklenen mesai saati bulunmadığından saatlik kesinti ön izlemesi gösterilmiyor.";
-      } else if (eksikSureSonucu.neden === "GERCEK_SAAT_YOK") {
-        gecErkenKesintiHesaplanamadiMi = true;
-        gecErkenKesintiNotu =
-          "Geç kalma veya erken çıkma kesintisi için gerçek saat bilgisi eksik olduğundan saatlik kesinti ön izlemesi gösterilmiyor.";
-      } else if (eksikSureSonucu.neden === "GECERSIZ_SAAT") {
-        gecErkenKesintiHesaplanamadiMi = true;
-        gecErkenKesintiNotu =
-          "Geç kalma veya erken çıkma kesintisi için saat formatı geçersiz olduğundan saatlik kesinti ön izlemesi gösterilmiyor.";
-      }
+      const preview = deriveGecErkenKesintiPreview(puantaj, maas);
+      gecErkenKesintiTutari = preview.gecErkenKesintiTutari;
+      gecErkenKesintiOzeti = preview.gecErkenKesintiOzeti;
+      gecErkenKesintiNotu = preview.gecErkenKesintiNotu;
+      gecErkenKesintiHesaplanamadiMi = preview.gecErkenKesintiHesaplanamadiMi;
     }
 
     const notlar: string[] = [];

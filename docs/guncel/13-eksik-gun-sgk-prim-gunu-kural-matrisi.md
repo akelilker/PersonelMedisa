@@ -14,6 +14,7 @@ Bu belge uygulama kodu değildir. `04-hesap-motoru-kurallari.md` motor owner'ı 
 - Hesap motoru teknik owner'ı: `04-hesap-motoru-kurallari.md`
 - Kullanıcı akışları: `07-is-akislari-ve-senaryolar.md`
 - Puantaj geliştirici devir notu: `12-puantaj-gelistirici-devir-notu.md`
+- SGK eksik gün nedeni eşleme uzantısı: `14-sgk-eksik-gun-nedeni-esleme-tablosu.md`
 
 ## Karar Etiketleri
 
@@ -126,7 +127,7 @@ Formül negatif sonuç üretmemelidir. `eksik_gun` bozuk, aşırı veya takvim g
 - Prim / ek ödeme hangi senaryoda kesilecek veya korunacak?
 - Haber vermeden işe gelmeme için disiplin süreci, yaptırım sonucu ve hafta tatili bağlantısı nasıl değerlendirilecek?
 - Resmi tatilde çalışma, UBGT ve ek ödeme etkisi hangi puantaj / ürün kararına göre ele alınacak?
-- SGK eksik gün nedeni eşleme tablosu hangi kodlarla kesinleşecek?
+- SGK eksik gün nedeni eşleme tablosu `14-sgk-eksik-gun-nedeni-esleme-tablosu.md` üzerinden hangi ad ve kodlarla kesinleşecek?
 - Firma uygulaması ile mevzuat yorumu ayrımı UI ve raporda nasıl işaretlenecek?
 - Mazeretli devamsızlık hangi hallerde ücretli, hangi hallerde ücretsiz sayılacak?
 - Disiplin cezası / ücret hak edilmeyen gün süreçte hangi onayla kesinleşecek?
@@ -137,7 +138,7 @@ Formül negatif sonuç üretmemelidir. `eksik_gun` bozuk, aşırı veya takvim g
 - Haber vererek işe gelmeme ücrette nasıl ele alınacak?
 - Rapor durumunda işveren ödeme politikası hangi senaryoda nasıl ayrışacak?
 - Prim / ek ödeme hangi senaryoda kesilecek?
-- SGK eksik gün nedeni eşleme tablosu nasıl netleşecek?
+- SGK eksik gün nedeni eşleme tablosu `14-sgk-eksik-gun-nedeni-esleme-tablosu.md` üzerinden nasıl netleşecek?
 - Firma uygulaması ile mevzuat yorumu ayrımı nasıl işaretlenecek?
 - Mazeretli devamsızlık hangi hallerde ücretli, hangi hallerde ücretsiz sayılacak?
 - Disiplin cezası / ücret hak edilmeyen gün süreçte nasıl onaylanacak?

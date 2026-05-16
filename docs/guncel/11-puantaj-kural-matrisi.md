@@ -1,7 +1,7 @@
 # Yoklama, Süreç ve Puantaj Kural Matrisi
 
 **Sürüm:** V1 (ürün karar özeti)  
-**İlişkili belgeler:** Teknik hesap motoru ayrıntıları için `docs/guncel/04-hesap-motoru-kurallari.md` ile uyum korunmalıdır. Tam gün eksik gün ve SGK prim günü detay matrisi için `docs/guncel/13-eksik-gun-sgk-prim-gunu-kural-matrisi.md` referans alınmalıdır. Bu belge (11), puantaj ve çalışma ücreti tarafında **ürün + operasyon kararlarının** özet tek kaynağıdır.
+**İlişkili belgeler:** Teknik hesap motoru ayrıntıları için `docs/guncel/04-hesap-motoru-kurallari.md` ile uyum korunmalıdır. Tam gün eksik gün ve SGK prim günü detay matrisi için `docs/guncel/13-eksik-gun-sgk-prim-gunu-kural-matrisi.md`, SGK eksik gün nedeni eşleme kararları için `docs/guncel/14-sgk-eksik-gun-nedeni-esleme-tablosu.md` referans alınmalıdır. Bu belge (11), puantaj ve çalışma ücreti tarafında **ürün + operasyon kararlarının** özet tek kaynağıdır.
 
 ---
 
@@ -207,7 +207,7 @@ Katman prensibi:
 |---|---|
 | **Kural** | Mazeretsiz devamsızlık: çalışılmayan gün etkisi üretir; hafta tatili hakkını düşürebilir. |
 | **Sistem etkisi** | Bölüm 6 ile birleşik değerlendirme; düz sabit “X gün kes” modeli kullanılmaz. |
-| **Not** | SGK eksik gün nedeni kodu bu belgede kesinleştirilmez; kod eşleme tablosu ayrı ürün / bordro kararıyla netleşecektir. Tam gün eksik gün, rapor, ücretsiz izin, yıllık izin, resmi tatil ve SGK prim günü senaryo matrisi `docs/guncel/13-eksik-gun-sgk-prim-gunu-kural-matrisi.md` dosyasındadır. |
+| **Not** | SGK eksik gün nedeni kodu bu belgede kesinleştirilmez; neden adı ve kod eşleme kararları `docs/guncel/14-sgk-eksik-gun-nedeni-esleme-tablosu.md` uzantısında ayrıca netleşecektir. Tam gün eksik gün, rapor, ücretsiz izin, yıllık izin, resmi tatil ve SGK prim günü senaryo matrisi `docs/guncel/13-eksik-gun-sgk-prim-gunu-kural-matrisi.md` dosyasındadır. |
 
 | | |
 |---|---|

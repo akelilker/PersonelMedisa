@@ -78,6 +78,7 @@ Operasyon ve yönetim görünürlüğünü sağlayan çıktı katmanı.
 - Kullanıcı akışları: `07-is-akislari-ve-senaryolar.md`
 - Frontend disiplin kuralları: `08-frontend-teknik-mimari.md`
 - Eksik gün ve SGK prim günü karar matrisi: `13-eksik-gun-sgk-prim-gunu-kural-matrisi.md`
+- SGK eksik gün nedeni eşleme tablosu: `14-sgk-eksik-gun-nedeni-esleme-tablosu.md`
 - Güncel puantaj geliştirme devri ve doğrulama özeti: `12-puantaj-gelistirici-devir-notu.md`
 
 ## 6. Altın Kurallar

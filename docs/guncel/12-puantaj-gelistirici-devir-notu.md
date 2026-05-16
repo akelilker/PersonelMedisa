@@ -244,6 +244,49 @@ Personel detay görünüm review sonucu:
 - hook / page tarafı hesap yapmıyor; API'den gelen readonly veriyi render ediyor
 - kod değişikliği gerekmedi
 
+### 17. Rapor / istirahat politika doküman hattı checkpoint'i
+
+Oluşturulan karar dokümanları:
+
+- `15-rapor-istirahat-isveren-odeme-politikasi.md`: Rapor / İstirahat İşveren Ödeme Politikası
+- `16-rapor-turleri-isveren-odeme-karar-matrisi.md`: Rapor Türleri ve İşveren Ödeme Politikası Dar Karar Matrisi
+- `17-rapor-istirahat-bordro-cevap-formu.md`: Rapor / İstirahat Bordro Cevap Formu
+- `18-rapor-istirahat-kesin-politika-tablosu.md`: Rapor / İstirahat Kesin Politika Tablosu Taslak Şablonu
+
+Net durum:
+
+- `15/16/17/18` hattı kod fazı değil, karar dokümanı fazıdır.
+- `17` numaralı form gerçek muhasebe / bordro / firma cevapları beklemektedir.
+- `18` numaralı tablo bu yüzden kesin politika değil, taslak şablondur.
+- `18` numaralı tablodaki karar alanları `Cevap bekliyor`, `Firma/bordro kararı bekler` ve `Kod fazına hazır değil` statüsündedir.
+- Kod fazına hazır alan yoktur.
+
+Korunan mevcut kararlar:
+
+- SGK prim günü formülü değişmedi: `sgk_gunu = max(0, min(30, takvim_gunu - eksik_gun))`
+- Dashboard SGK özet güvenliği değişmedi.
+- Kodsuz eksik gün nedeni yaklaşımı korundu.
+- Resmi SGK kod numarası üretilmedi.
+- Rapor / istirahat SGK etkisi ile işveren ödeme politikası ayrı tutuldu.
+- UI / hook / service / hesap motoru davranışı değiştirilmedi.
+
+Kod fazına geçiş kriteri:
+
+- `17` numaralı bordro cevap formu gerçek muhasebe / bordro / firma cevaplarıyla doldurulmalıdır.
+- Bu cevaplar `18` numaralı tabloya kesin politika olarak işlenmelidir.
+- Ancak bundan sonra hesap motoru / dashboard / UI için ayrı teşhis ve ayrı talimat hazırlanmalıdır.
+
+Bilinçli kapsam dışı:
+
+- kod implementasyonu
+- `src` değişikliği
+- test değişikliği
+- dashboard servis değişikliği
+- hesap motoru değişikliği
+- UI / hook / service değişikliği
+- SGK resmi kod sözlüğü
+- net bordro / maaş hesabı
+
 Son görülen doğrulama durumu:
 
 - `npm run typecheck` geçti

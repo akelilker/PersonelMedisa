@@ -27,6 +27,7 @@ import {
   hesaplaGecErkenEksikSure,
   hesaplaGecKalmaErkenCikmaKesintiOzeti,
   hesaplaDevamsizlikKesintiOzeti,
+  hesaplaSgkPrimGunu,
   hesaplaTatilEkOdemeOzeti,
   hesaplaHaftaTatiliPazarEtkisi,
   gunlukPuantajToGirdi,
@@ -1129,6 +1130,91 @@ describe("hesaplaDevamsizlikKesintiOzeti", () => {
     expect(o.gunluk_ucret).toBe(0);
     expect(o.toplam_kesinti_gun_esdegeri).toBe(2);
     expect(o.toplam_kesinti_tutari).toBe(0);
+  });
+});
+
+describe("hesaplaSgkPrimGunu", () => {
+  it.each([
+    [28, 0],
+    [29, 0],
+    [30, 0],
+    [31, 0]
+  ])("%i gün, 0 eksik ve prim günü düşüren eksik yoksa 30 döner", (takvimGunu, eksikGun) => {
+    const o = hesaplaSgkPrimGunu({
+      takvim_gunu: takvimGunu,
+      eksik_gun: eksikGun,
+      sgk_prim_gununu_dusurur_mu: false
+    });
+
+    expect(o.hesaplanabilir_mi).toBe(true);
+    expect(o.sgk_gunu).toBe(30);
+  });
+
+  it.each([
+    [28, 1, 27],
+    [28, 2, 26],
+    [29, 1, 28],
+    [30, 1, 29],
+    [31, 1, 30],
+    [31, 2, 29]
+  ])(
+    "%i gün, %i ücret hak edilmeyen eksik gün için SGK prim günü %i olur",
+    (takvimGunu, eksikGun, beklenenSgkGunu) => {
+      const o = hesaplaSgkPrimGunu({
+        takvim_gunu: takvimGunu,
+        eksik_gun: eksikGun,
+        sgk_prim_gununu_dusurur_mu: true
+      });
+
+      expect(o.hesaplanabilir_mi).toBe(true);
+      expect(o.sgk_gunu).toBe(beklenenSgkGunu);
+    }
+  );
+
+  it("eksik_gun takvim_gunu degerinden buyukse sonucu 0 altina dusurmez", () => {
+    const o = hesaplaSgkPrimGunu({
+      takvim_gunu: 28,
+      eksik_gun: 40,
+      sgk_prim_gununu_dusurur_mu: true
+    });
+
+    expect(o.hesaplanabilir_mi).toBe(true);
+    expect(o.sgk_gunu).toBe(0);
+  });
+
+  it("sgk_prim_gununu_dusurur_mu false ise eksik_gun verilse bile 30 kalir", () => {
+    const o = hesaplaSgkPrimGunu({
+      takvim_gunu: 28,
+      eksik_gun: 5,
+      sgk_prim_gununu_dusurur_mu: false
+    });
+
+    expect(o.hesaplanabilir_mi).toBe(true);
+    expect(o.sgk_gunu).toBe(30);
+  });
+
+  it("negatif eksik_gun guvenli sekilde reddedilir", () => {
+    const o = hesaplaSgkPrimGunu({
+      takvim_gunu: 30,
+      eksik_gun: -1,
+      sgk_prim_gununu_dusurur_mu: true
+    });
+
+    expect(o.hesaplanabilir_mi).toBe(false);
+    expect(o.sgk_gunu).toBe(0);
+    expect(o.neden).toBe("GECERSIZ_EKSIK_GUN");
+  });
+
+  it("gecersiz takvim_gunu guvenli sekilde reddedilir", () => {
+    const o = hesaplaSgkPrimGunu({
+      takvim_gunu: 0,
+      eksik_gun: 1,
+      sgk_prim_gununu_dusurur_mu: true
+    });
+
+    expect(o.hesaplanabilir_mi).toBe(false);
+    expect(o.sgk_gunu).toBe(0);
+    expect(o.neden).toBe("GECERSIZ_TAKVIM_GUNU");
   });
 });
 

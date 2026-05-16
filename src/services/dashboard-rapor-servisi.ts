@@ -6,7 +6,7 @@ import {
   hesaplaSgkPrimGunu,
   type SgkPrimGunuHesaplamaModu,
   type SgkUcretTipi
-} from "./sgk-prim-gunu-hesap";
+} from "./puantaj-hesap-motoru";
 
 // ---------------------------------------------------------------------------
 // Dashboard KPI çıktı tipleri

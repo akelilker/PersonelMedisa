@@ -25,12 +25,8 @@ Bu belge uygulama kodu değildir. `13-eksik-gun-sgk-prim-gunu-kural-matrisi.md` 
 
 ## Kapsam Sınırı
 
-**Durum etiketi:** `Kesinleşmiş kural`
-
 Bu doküman yalnızca SGK eksik gün nedeni eşleme karar çerçevesini tarif eder.
 
-- SGK eksik gün nedeni kod numarası kesinleştirilmez.
-- Kod numarası bilinse bile bordro / mevzuat kontrolü yapılmadan ürün kuralı kabul edilmez.
 - Ay sonu prim günü formülü değiştirilmez: `sgk_gunu = max(0, min(30, takvim_gunu - eksik_gun))`.
 - Bu formül yalnızca ücret hak edilmeyen ve SGK prim gününü düşüren tam gün eksiklikler için geçerlidir.
 - Geç / erken dakika kesintisi bu tablonun kapsamı değildir.

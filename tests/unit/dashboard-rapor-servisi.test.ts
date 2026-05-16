@@ -206,8 +206,40 @@ describe("hesaplaAylikSgkPuantajOzeti", () => {
     expect(sonuc.kayit_gun_sayisi).toBe(3);
     expect(sonuc.eksik_gun_sayisi).toBe(1);
     expect(sonuc.sgk_prim_gun).toBe(29);
-    expect(sonuc.eksik_gun_nedeni_kodu).toBe("15 - Devamsızlık");
+    expect(sonuc.eksik_gun_nedeni_kodu).toBe("Devamsızlık");
     expect(sonuc.hesaplama_modu).toBe("TAKVIM_GUNU");
+  });
+
+  it("Gelmedi + dayanak undefined kaydini SGK eksik gune saymaz", () => {
+    const kayitlar = [
+      makePuantaj({
+        personel_id: 1,
+        tarih: "2026-04-10",
+        hareket_durumu: "Gelmedi"
+      })
+    ];
+
+    const sonuc = hesaplaAylikSgkPuantajOzeti(kayitlar, 2026, 4);
+    expect(sonuc.eksik_gun_sayisi).toBe(0);
+    expect(sonuc.sgk_prim_gun).toBe(30);
+    expect(sonuc.eksik_gun_nedeni_kodu).toBeNull();
+  });
+
+  it("UBGT resmi tatil Gelmedi kaydini SGK eksik gune saymaz", () => {
+    const kayitlar = [
+      makePuantaj({
+        personel_id: 1,
+        tarih: "2026-04-23",
+        gun_tipi: "UBGT_Resmi_Tatil",
+        hareket_durumu: "Gelmedi",
+        dayanak: "Yok_Izinsiz"
+      })
+    ];
+
+    const sonuc = hesaplaAylikSgkPuantajOzeti(kayitlar, 2026, 4);
+    expect(sonuc.eksik_gun_sayisi).toBe(0);
+    expect(sonuc.sgk_prim_gun).toBe(30);
+    expect(sonuc.eksik_gun_nedeni_kodu).toBeNull();
   });
 
   it("ucretli izin ve yillik izin gunlerini eksik gune saymaz", () => {
@@ -233,7 +265,7 @@ describe("hesaplaAylikSgkPuantajOzeti", () => {
     expect(sonuc.hesaplama_modu).toBe("OTUZ_GUN_STANDART");
   });
 
-  it("sadece raporlu eksik gunlerde istirahat kodunu doner", () => {
+  it("sadece raporlu eksik gunlerde kod numarasi olmadan istirahat nedeni doner", () => {
     const kayitlar = [
       makePuantaj({
         personel_id: 1,
@@ -251,10 +283,27 @@ describe("hesaplaAylikSgkPuantajOzeti", () => {
 
     const sonuc = hesaplaAylikSgkPuantajOzeti(kayitlar, 2026, 4);
     expect(sonuc.eksik_gun_sayisi).toBe(2);
-    expect(sonuc.eksik_gun_nedeni_kodu).toBe("01 - İstirahat");
+    expect(sonuc.eksik_gun_nedeni_kodu).toBe("Rapor / istirahat");
+    expect(sonuc.eksik_gun_nedeni_kodu).not.toBe("01 - İstirahat");
   });
 
-  it("rapor ve devamsizlik ayni ayda birlikte varsa birden fazla kodunu doner", () => {
+  it("habersiz devamsizlik icin kod numarasi olmadan devamsizlik nedeni doner", () => {
+    const kayitlar = [
+      makePuantaj({
+        personel_id: 1,
+        tarih: "2026-04-10",
+        hareket_durumu: "Gelmedi",
+        dayanak: "Yok_Izinsiz"
+      })
+    ];
+
+    const sonuc = hesaplaAylikSgkPuantajOzeti(kayitlar, 2026, 4);
+    expect(sonuc.eksik_gun_sayisi).toBe(1);
+    expect(sonuc.eksik_gun_nedeni_kodu).toBe("Devamsızlık");
+    expect(sonuc.eksik_gun_nedeni_kodu).not.toBe("15 - Devamsızlık");
+  });
+
+  it("rapor ve devamsizlik ayni ayda birlikte varsa kodsuz bordro kontrolu nedeni doner", () => {
     const kayitlar = [
       makePuantaj({
         personel_id: 1,
@@ -272,7 +321,8 @@ describe("hesaplaAylikSgkPuantajOzeti", () => {
 
     const sonuc = hesaplaAylikSgkPuantajOzeti(kayitlar, 2026, 4);
     expect(sonuc.eksik_gun_sayisi).toBe(2);
-    expect(sonuc.eksik_gun_nedeni_kodu).toBe("12 - Birden Fazla");
+    expect(sonuc.eksik_gun_nedeni_kodu).toBe("Birden fazla neden / bordro kontrolü gerekir");
+    expect(sonuc.eksik_gun_nedeni_kodu).not.toBe("12 - Birden Fazla");
   });
 });
 

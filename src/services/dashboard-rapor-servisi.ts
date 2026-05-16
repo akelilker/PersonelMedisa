@@ -67,8 +67,11 @@ function shouldCountAsEksikGun(kayit: GunlukPuantaj) {
     return false;
   }
 
+  if (kayit.gun_tipi === "UBGT_Resmi_Tatil") {
+    return false;
+  }
+
   return (
-    kayit.dayanak === undefined ||
     kayit.dayanak === "Yok_Izinsiz" ||
     kayit.dayanak === "Raporlu_Hastalik" ||
     kayit.dayanak === "Raporlu_Is_Kazasi"
@@ -90,21 +93,21 @@ function hesaplaEksikGunNedeniKodu(kayitlar: GunlukPuantaj[], yil: number, ay: n
       continue;
     }
 
-    if (kayit.dayanak === "Yok_Izinsiz" || kayit.dayanak === undefined) {
+    if (kayit.dayanak === "Yok_Izinsiz") {
       devamsizlikVar = true;
     }
   }
 
   if (raporVar && devamsizlikVar) {
-    return "12 - Birden Fazla";
+    return "Birden fazla neden / bordro kontrolü gerekir";
   }
 
   if (raporVar) {
-    return "01 - İstirahat";
+    return "Rapor / istirahat";
   }
 
   if (devamsizlikVar) {
-    return "15 - Devamsızlık";
+    return "Devamsızlık";
   }
 
   return null;

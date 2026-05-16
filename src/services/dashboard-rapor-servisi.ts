@@ -78,6 +78,24 @@ function shouldCountAsEksikGun(kayit: GunlukPuantaj) {
   );
 }
 
+function assertTekPersonelSgkPuantajKayitlari(
+  kayitlar: GunlukPuantaj[],
+  shouldInclude: (kayit: GunlukPuantaj) => boolean
+) {
+  const personelIdleri = new Set<number>();
+
+  for (const kayit of kayitlar) {
+    if (!shouldInclude(kayit)) {
+      continue;
+    }
+
+    personelIdleri.add(kayit.personel_id);
+    if (personelIdleri.size > 1) {
+      throw new Error("Dashboard SGK aylık özeti tek personel kayıtlarıyla hesaplanmalıdır.");
+    }
+  }
+}
+
 function hesaplaEksikGunNedeniKodu(kayitlar: GunlukPuantaj[], yil: number, ay: number) {
   let raporVar = false;
   let devamsizlikVar = false;
@@ -122,6 +140,10 @@ export function hesaplaAylikSgkPuantajOzeti(
   const donem = `${yil}-${String(ay).padStart(2, "0")}`;
   const gunAnahtarlari = new Set<string>();
   const eksikGunAnahtarlari = new Set<string>();
+  assertTekPersonelSgkPuantajKayitlari(kayitlar, (kayit) => {
+    const parsed = parsePuantajYearMonth(kayit.tarih);
+    return parsed != null && parsed.yil === yil && parsed.ay === ay;
+  });
 
   for (const kayit of kayitlar) {
     const parsed = parsePuantajYearMonth(kayit.tarih);
@@ -163,6 +185,10 @@ export function hesaplaAylikSgkPuantajOzetleri(
   ucretTipi: SgkUcretTipi = "MAKTU_AYLIK"
 ): AylikSgkPuantajOzeti[] {
   const donemler = new Map<string, { yil: number; ay: number }>();
+  assertTekPersonelSgkPuantajKayitlari(
+    kayitlar,
+    (kayit) => parsePuantajYearMonth(kayit.tarih) != null
+  );
 
   for (const kayit of kayitlar) {
     const parsed = parsePuantajYearMonth(kayit.tarih);

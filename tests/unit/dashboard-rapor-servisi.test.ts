@@ -4,7 +4,8 @@ import {
   hesaplaPuantajIstatistikleri,
   hesaplaOrtalamaKalanIzin,
   hesaplaDashboardKpi,
-  hesaplaAylikSgkPuantajOzeti
+  hesaplaAylikSgkPuantajOzeti,
+  hesaplaAylikSgkPuantajOzetleri
 } from "../../src/services/dashboard-rapor-servisi";
 import type { GunlukPuantaj } from "../../src/types/puantaj";
 import type { Personel } from "../../src/types/personel";
@@ -185,6 +186,73 @@ describe("hesaplaDashboardKpi", () => {
 // =========================================================================
 
 describe("hesaplaAylikSgkPuantajOzeti", () => {
+  it("bos kayit listesi icin mevcut davranisi korur", () => {
+    const sonuc = hesaplaAylikSgkPuantajOzeti([], 2026, 4);
+    expect(sonuc.kayit_gun_sayisi).toBe(0);
+    expect(sonuc.eksik_gun_sayisi).toBe(0);
+    expect(sonuc.sgk_prim_gun).toBe(30);
+    expect(sonuc.eksik_gun_nedeni_kodu).toBeNull();
+  });
+
+  it("ayni personelin farkli gunlerdeki kayitlarini normal hesaplar", () => {
+    const kayitlar = [
+      makePuantaj({ personel_id: 1, tarih: "2026-04-09", hareket_durumu: "Geldi" }),
+      makePuantaj({
+        personel_id: 1,
+        tarih: "2026-04-10",
+        hareket_durumu: "Gelmedi",
+        dayanak: "Yok_Izinsiz"
+      })
+    ];
+
+    const sonuc = hesaplaAylikSgkPuantajOzeti(kayitlar, 2026, 4);
+    expect(sonuc.kayit_gun_sayisi).toBe(2);
+    expect(sonuc.eksik_gun_sayisi).toBe(1);
+    expect(sonuc.sgk_prim_gun).toBe(29);
+  });
+
+  it("cok personelli ayni ay input verilirse hata firlatir", () => {
+    const kayitlar = [
+      makePuantaj({
+        personel_id: 1,
+        tarih: "2026-04-10",
+        hareket_durumu: "Gelmedi",
+        dayanak: "Yok_Izinsiz"
+      }),
+      makePuantaj({
+        personel_id: 2,
+        tarih: "2026-04-11",
+        hareket_durumu: "Gelmedi",
+        dayanak: "Raporlu_Hastalik"
+      })
+    ];
+
+    expect(() => hesaplaAylikSgkPuantajOzeti(kayitlar, 2026, 4)).toThrow(
+      "Dashboard SGK aylık özeti tek personel kayıtlarıyla hesaplanmalıdır."
+    );
+  });
+
+  it("farkli personel_id ayni tarih senaryosunu guard ile reddeder", () => {
+    const kayitlar = [
+      makePuantaj({
+        personel_id: 1,
+        tarih: "2026-04-10",
+        hareket_durumu: "Gelmedi",
+        dayanak: "Yok_Izinsiz"
+      }),
+      makePuantaj({
+        personel_id: 2,
+        tarih: "2026-04-10",
+        hareket_durumu: "Gelmedi",
+        dayanak: "Raporlu_Hastalik"
+      })
+    ];
+
+    expect(() => hesaplaAylikSgkPuantajOzeti(kayitlar, 2026, 4)).toThrow(
+      "Dashboard SGK aylık özeti tek personel kayıtlarıyla hesaplanmalıdır."
+    );
+  });
+
   it("aylik kayitlardan eksik gun ve SGK prim gununu hesaplar", () => {
     const kayitlar = [
       makePuantaj({ personel_id: 1, tarih: "2026-04-09", hareket_durumu: "Geldi" }),
@@ -323,6 +391,50 @@ describe("hesaplaAylikSgkPuantajOzeti", () => {
     expect(sonuc.eksik_gun_sayisi).toBe(2);
     expect(sonuc.eksik_gun_nedeni_kodu).toBe("Birden fazla neden / bordro kontrolü gerekir");
     expect(sonuc.eksik_gun_nedeni_kodu).not.toBe("12 - Birden Fazla");
+  });
+});
+
+describe("hesaplaAylikSgkPuantajOzetleri", () => {
+  it("bos kayit listesi icin bos ozet listesi doner", () => {
+    expect(hesaplaAylikSgkPuantajOzetleri([])).toEqual([]);
+  });
+
+  it("ayni personelin farkli gun ve ay kayitlarini normal ozetler", () => {
+    const kayitlar = [
+      makePuantaj({
+        personel_id: 1,
+        tarih: "2026-04-10",
+        hareket_durumu: "Gelmedi",
+        dayanak: "Yok_Izinsiz"
+      }),
+      makePuantaj({ personel_id: 1, tarih: "2026-05-01", hareket_durumu: "Geldi" })
+    ];
+
+    const sonuc = hesaplaAylikSgkPuantajOzetleri(kayitlar);
+    expect(sonuc).toHaveLength(2);
+    expect(sonuc.map((item) => item.donem)).toEqual(["2026-05", "2026-04"]);
+    expect(sonuc.find((item) => item.donem === "2026-04")?.eksik_gun_sayisi).toBe(1);
+  });
+
+  it("cok personelli input verilirse hata firlatir", () => {
+    const kayitlar = [
+      makePuantaj({
+        personel_id: 1,
+        tarih: "2026-04-10",
+        hareket_durumu: "Gelmedi",
+        dayanak: "Yok_Izinsiz"
+      }),
+      makePuantaj({
+        personel_id: 2,
+        tarih: "2026-04-10",
+        hareket_durumu: "Gelmedi",
+        dayanak: "Raporlu_Hastalik"
+      })
+    ];
+
+    expect(() => hesaplaAylikSgkPuantajOzetleri(kayitlar)).toThrow(
+      "Dashboard SGK aylık özeti tek personel kayıtlarıyla hesaplanmalıdır."
+    );
   });
 });
 

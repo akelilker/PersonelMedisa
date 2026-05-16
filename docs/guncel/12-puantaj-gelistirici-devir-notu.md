@@ -187,6 +187,81 @@ Detay owner belgeleri `11-puantaj-kural-matrisi.md` ve `04-hesap-motoru-kurallar
 - readonly görünür özet alanları var
 - form inputları submit body'ye taşındı
 
+### 16. SGK prim günü ve eksik gün checkpoint'i tamamlandı
+
+Normatif karar kaynakları:
+
+- `13-eksik-gun-sgk-prim-gunu-kural-matrisi.md`
+- `14-sgk-eksik-gun-nedeni-esleme-tablosu.md`
+
+SGK prim günü hesap çekirdeği:
+
+- owner: `src/services/puantaj-hesap-motoru.ts`
+- test: `tests/unit/puantaj-hesap-motoru.test.ts`
+- `hesaplaSgkPrimGunu` artık puantaj hesap motoru owner dosyasındadır
+- formül: `sgk_gunu = max(0, min(30, takvim_gunu - eksik_gun))`
+- formül yalnız ücret hak edilmeyen ve SGK prim gününü düşüren tam gün eksiklikler için geçerlidir
+- SGK kod nedeni üretmez
+- süreç tipinden otomatik karar türetmez
+- `07-Puantaj Kayıtları` özel motorunu uygulamaz
+- geç / erken dakika kesintisine dokunmaz
+
+Kaldırılan yanlış owner dosyaları:
+
+- `src/services/sgk-prim-gunu-hesap.ts` silindi
+- `tests/unit/sgk-prim-gunu-hesap.test.ts` silindi
+- SGK prim günü çekirdeği ayrı helper dosyasında değil, puantaj hesap motoru owner dosyasında tutulur
+
+Dashboard SGK eksik gün güvenlik düzeltmesi:
+
+- owner: `src/services/dashboard-rapor-servisi.ts`
+- test: `tests/unit/dashboard-rapor-servisi.test.ts`
+- `dayanak === undefined` artık SGK eksik gün sayılmaz
+- yalnız açık sınıflandırılmış adaylar değerlendirilir: `Yok_Izinsiz`, `Raporlu_Hastalik`, `Raporlu_Is_Kazasi`
+- `UBGT_Resmi_Tatil` eksik gün hesabından dışlanır
+- kesin SGK kod numaraları üretilmez
+- `01 - İstirahat`, `15 - Devamsızlık`, `12 - Birden Fazla` kaldırıldı
+- kodsuz açıklayıcı neden metinleri kullanılır: `Rapor / istirahat`, `Devamsızlık`, `Birden fazla neden / bordro kontrolü gerekir`
+
+`eksik_gun_nedeni_kodu` alanı:
+
+- alan adı geriye uyumluluk için korunmuştur
+- içerik artık resmi SGK kod numarası değil, kodsuz açıklayıcı neden metnidir
+- UI veya yeni geliştirme bu alanı resmi kod gibi yorumlamamalıdır
+
+Dashboard SGK tek personel kontratı:
+
+- `hesaplaAylikSgkPuantajOzeti` ve `hesaplaAylikSgkPuantajOzetleri` tek personel kayıt listesi bekler
+- çok personelli input guard ile reddedilir
+- hata mesajı: `Dashboard SGK aylık özeti tek personel kayıtlarıyla hesaplanmalıdır.`
+- kişi bazlı çok personelli SGK özet modeli bu fazda açılmadı
+- `personel_id + tarih` anahtar modeline geçilmedi
+
+Personel detay görünüm review sonucu:
+
+- personel detay UI'da SGK nedeni `Eksik Gün Nedeni` label'ı ile gösteriliyor
+- kullanıcıya `kod` olarak sunulmuyor
+- hook / page tarafı hesap yapmıyor; API'den gelen readonly veriyi render ediyor
+- kod değişikliği gerekmedi
+
+Son görülen doğrulama durumu:
+
+- `npm run typecheck` geçti
+- `npx vitest run "tests/unit/puantaj-hesap-motoru.test.ts"` geçti
+- `npx vitest run "tests/unit/dashboard-rapor-servisi.test.ts"` geçti
+- CI yeşil
+- cPanel deploy yeşil
+
+Bilinçli kapsam dışı / sonraki işler:
+
+- gerçek kişi bazlı çok personelli SGK özet modeli
+- SGK eksik gün nedeni resmi kod sözlüğü
+- rapor / istirahat işveren ödeme politikası
+- `07-Puantaj Kayıtları` özel motoru
+- resmi tatilde çalışma / UBGT ödeme motoru
+- UI'da yeni SGK rapor kartı veya bordro ekranı
+- E2E / smoke kapsamının genişletilmesi
+
 ## Geç / Erken Kesinti V1 Sınırı
 
 Bu fazın bilinçli sınırları:

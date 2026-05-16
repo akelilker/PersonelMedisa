@@ -207,7 +207,7 @@ Katman prensibi:
 |---|---|
 | **Kural** | Mazeretsiz devamsızlık: çalışılmayan gün etkisi üretir; hafta tatili hakkını düşürebilir. |
 | **Sistem etkisi** | Bölüm 6 ile birleşik değerlendirme; düz sabit “X gün kes” modeli kullanılmaz. |
-| **Not** | SGK bildirim tarafında **15 Devamsızlık** kodu ürün sözlüğünde eşlenebilir (uygulama fazına bırakıldı). Tam gün eksik gün, rapor, ücretsiz izin, yıllık izin, resmi tatil ve SGK prim günü senaryo matrisi `docs/guncel/13-eksik-gun-sgk-prim-gunu-kural-matrisi.md` dosyasındadır. |
+| **Not** | SGK eksik gün nedeni kodu bu belgede kesinleştirilmez; kod eşleme tablosu ayrı ürün / bordro kararıyla netleşecektir. Tam gün eksik gün, rapor, ücretsiz izin, yıllık izin, resmi tatil ve SGK prim günü senaryo matrisi `docs/guncel/13-eksik-gun-sgk-prim-gunu-kural-matrisi.md` dosyasındadır. |
 
 | | |
 |---|---|
@@ -221,15 +221,15 @@ Katman prensibi:
 
 | | |
 |---|---|
-| **Kural** | Hastalık raporu ve iş kazası raporunda **işveren ücret ödemez** (ürün kararı özeti). |
-| **Sistem etkisi** | Türler sistemde **ayrı** tutulur; hesap ve raporlama ayrışır. |
-| **Not** | SGK **01 İstirahat** kodu sözlükte kullanılabilir. |
+| **Kural** | Rapor / istirahat SGK etkisi ile işveren ödeme politikası ayrı değerlendirilir. |
+| **Sistem etkisi** | Türler sistemde **ayrı** tutulur; rapor tipi, süre, SGK etkisi ve işveren uygulaması `13-eksik-gun-sgk-prim-gunu-kural-matrisi.md` uyarınca alt karara ayrılır. |
+| **Not** | İşveren ödeme politikası ve SGK eksik gün nedeni kodu bu belgede kesinleştirilmez; firma / ürün kararı ve bordro kontrolü gerekir. |
 
 | | |
 |---|---|
-| **Kural** | Raporun **ilk 2 günü**: firma ödeme yapmaz. |
-| **Sistem etkisi** | Takvim bazlı kural; parametre yapılabilir. |
-| **Not** | **Politika alanı:** gün sayısı ve istisnalar (Bölüm 17). |
+| **Kural** | Raporun ilk günleri, tamamlayıcı ödeme ve istisnalar firma / bordro politikasıdır. |
+| **Sistem etkisi** | Kesin ödeme sonucu bu V2 karar fazında üretilmez; rapor tipi ve süreye göre manuel / ürün kararı bekler. |
+| **Not** | **Politika alanı:** gün sayısı, ödeme tercihi ve istisnalar (Bölüm 17 ve `13-eksik-gun-sgk-prim-gunu-kural-matrisi.md`). |
 
 ---
 

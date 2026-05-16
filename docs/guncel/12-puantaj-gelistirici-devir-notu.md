@@ -76,7 +76,7 @@ Detay owner belgeleri `11-puantaj-kural-matrisi.md` ve `04-hesap-motoru-kurallar
 - UBGT çalışılırsa `+1 günlük` ek yevmiye
 - Pazar / hafta tatili çalışmasında hak varsa `+1.5 günlük` ek ödeme
 - hak yokken Pazar çalışması otomatik kesin ödeme değil, manuel inceleme adayıdır
-- raporda işveren ödemez
+- raporda SGK etkisi ile işveren ödeme politikası ayrı değerlendirilir; kesin ayrım için `13-eksik-gun-sgk-prim-gunu-kural-matrisi.md` referans alınır
 - 18 yaş altı için fazla mesai ve gece çalışması bloktur
 - 18 yaş altı yıllık izin alt sınırı `20 gün`
 - serbest zaman yalnızca çalışan talep ederse

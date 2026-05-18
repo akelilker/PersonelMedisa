@@ -186,12 +186,24 @@ describe("deriveHesapEtkisi", () => {
     expect(deriveHesapEtkisi("UBGT_Resmi_Tatil", "Geldi", undefined, "08:00")).toBe("Mesai_Yaz");
   });
 
-  it("Raporlu hastalık → Tam_Yevmiye_Ver", () => {
-    expect(deriveHesapEtkisi("Normal_Is_Gunu", "Gelmedi", "Raporlu_Hastalik")).toBe("Tam_Yevmiye_Ver");
+  it("Raporlu hastalık → otomatik hesap etkisi üretmez", () => {
+    expect(deriveHesapEtkisi("Normal_Is_Gunu", "Gelmedi", "Raporlu_Hastalik")).toBeUndefined();
   });
 
-  it("İş kazası → Tam_Yevmiye_Ver", () => {
-    expect(deriveHesapEtkisi("Normal_Is_Gunu", "Gelmedi", "Raporlu_Is_Kazasi")).toBe("Tam_Yevmiye_Ver");
+  it("İş kazası → otomatik hesap etkisi üretmez", () => {
+    expect(deriveHesapEtkisi("Normal_Is_Gunu", "Gelmedi", "Raporlu_Is_Kazasi")).toBeUndefined();
+  });
+
+  it("Pazar + rapor + giriş var → Mesai_Yaz üretmez", () => {
+    expect(
+      deriveHesapEtkisi("Hafta_Tatili_Pazar", "Geldi", "Raporlu_Hastalik", "08:00", "17:00")
+    ).toBeUndefined();
+  });
+
+  it("UBGT + rapor + giriş var → Mesai_Yaz üretmez", () => {
+    expect(
+      deriveHesapEtkisi("UBGT_Resmi_Tatil", "Geldi", "Raporlu_Hastalik", "08:00", "17:00")
+    ).toBeUndefined();
   });
 
   it("Ücretli izin → Tam_Yevmiye_Ver", () => {
@@ -471,7 +483,7 @@ describe("hesapla – entegre senaryolar", () => {
     expect(sonuc.net_calisma_suresi_dakika).toBe(0);
   });
 
-  it("hastalık raporu: gelmedi ama raporlu → tam yevmiye + hafta tatili korunur", () => {
+  it("hastalık raporu: gelmedi ama raporlu → otomatik hesap etkisi yok + hafta tatili korunur", () => {
     const sonuc = hesapla({
       personel_id: 5,
       tarih: "2026-04-16",
@@ -479,11 +491,11 @@ describe("hesapla – entegre senaryolar", () => {
       dayanak: "Raporlu_Hastalik"
     });
 
-    expect(sonuc.hesap_etkisi).toBe("Tam_Yevmiye_Ver");
+    expect(sonuc.hesap_etkisi).toBeUndefined();
     expect(sonuc.hafta_tatili_hak_kazandi_mi).toBe(true);
   });
 
-  it("iş kazası: gelmedi ama raporlu → tam yevmiye + hafta tatili korunur", () => {
+  it("iş kazası: gelmedi ama raporlu → otomatik hesap etkisi yok + hafta tatili korunur", () => {
     const sonuc = hesapla({
       personel_id: 6,
       tarih: "2026-04-16",
@@ -491,8 +503,92 @@ describe("hesapla – entegre senaryolar", () => {
       dayanak: "Raporlu_Is_Kazasi"
     });
 
-    expect(sonuc.hesap_etkisi).toBe("Tam_Yevmiye_Ver");
+    expect(sonuc.hesap_etkisi).toBeUndefined();
     expect(sonuc.hafta_tatili_hak_kazandi_mi).toBe(true);
+  });
+
+  it("hastalık raporu + çalışma saati → normal çalışma veya mesai sayılmaz, kritik uyarı üretir", () => {
+    const sonuc = hesapla({
+      personel_id: 14,
+      tarih: "2026-04-16",
+      hareket_durumu: "Gelmedi",
+      dayanak: "Raporlu_Hastalik",
+      giris_saati: "08:00",
+      cikis_saati: "17:00"
+    });
+
+    expect(sonuc.hesap_etkisi).toBeUndefined();
+    expect(sonuc.hesap_etkisi).not.toBe("Tam_Yevmiye_Ver");
+    expect(sonuc.hesap_etkisi).not.toBe("Mesai_Yaz");
+    expect(sonuc.compliance_uyarilari).toContainEqual(
+      expect.objectContaining({
+        code: "RAPOR_CALISMA_CAKISMASI",
+        level: "KRITIK"
+      })
+    );
+  });
+
+  it("iş kazası raporu + çalışma saati → normal çalışma veya mesai sayılmaz, kritik uyarı üretir", () => {
+    const sonuc = hesapla({
+      personel_id: 15,
+      tarih: "2026-04-16",
+      hareket_durumu: "Gelmedi",
+      dayanak: "Raporlu_Is_Kazasi",
+      giris_saati: "08:00",
+      cikis_saati: "17:00"
+    });
+
+    expect(sonuc.hesap_etkisi).toBeUndefined();
+    expect(sonuc.hesap_etkisi).not.toBe("Tam_Yevmiye_Ver");
+    expect(sonuc.hesap_etkisi).not.toBe("Mesai_Yaz");
+    expect(sonuc.compliance_uyarilari).toContainEqual(
+      expect.objectContaining({
+        code: "RAPOR_CALISMA_CAKISMASI",
+        level: "KRITIK"
+      })
+    );
+  });
+
+  it("Pazar + hastalık raporu + çalışma saati → Mesai_Yaz üretmez, kritik uyarı üretir", () => {
+    const sonuc = hesapla({
+      personel_id: 16,
+      tarih: "2026-04-19",
+      gun_tipi: "Hafta_Tatili_Pazar",
+      hareket_durumu: "Gelmedi",
+      dayanak: "Raporlu_Hastalik",
+      giris_saati: "09:00",
+      cikis_saati: "12:00"
+    });
+
+    expect(sonuc.hesap_etkisi).toBeUndefined();
+    expect(sonuc.hesap_etkisi).not.toBe("Mesai_Yaz");
+    expect(sonuc.compliance_uyarilari).toContainEqual(
+      expect.objectContaining({
+        code: "RAPOR_CALISMA_CAKISMASI",
+        level: "KRITIK"
+      })
+    );
+  });
+
+  it("UBGT + hastalık raporu + çalışma saati → Mesai_Yaz üretmez, kritik uyarı üretir", () => {
+    const sonuc = hesapla({
+      personel_id: 17,
+      tarih: "2026-04-23",
+      gun_tipi: "UBGT_Resmi_Tatil",
+      hareket_durumu: "Gelmedi",
+      dayanak: "Raporlu_Hastalik",
+      giris_saati: "09:00",
+      cikis_saati: "12:00"
+    });
+
+    expect(sonuc.hesap_etkisi).toBeUndefined();
+    expect(sonuc.hesap_etkisi).not.toBe("Mesai_Yaz");
+    expect(sonuc.compliance_uyarilari).toContainEqual(
+      expect.objectContaining({
+        code: "RAPOR_CALISMA_CAKISMASI",
+        level: "KRITIK"
+      })
+    );
   });
 
   it("ücretli izin: gelmedi ama izinli → tam yevmiye + hafta tatili korunur", () => {

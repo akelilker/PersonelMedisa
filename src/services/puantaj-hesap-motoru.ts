@@ -937,6 +937,14 @@ export function deriveDayanak(
   return undefined;
 }
 
+function isRaporDayanak(dayanak?: PuantajDayanak): boolean {
+  return dayanak === "Raporlu_Hastalik" || dayanak === "Raporlu_Is_Kazasi";
+}
+
+function hasPuantajSaati(giris?: string, cikis?: string): boolean {
+  return Boolean(giris?.trim()) || Boolean(cikis?.trim());
+}
+
 // ---------------------------------------------------------------------------
 // Hesap etkisi türetme
 // ---------------------------------------------------------------------------
@@ -949,6 +957,10 @@ export function deriveHesapEtkisi(
   cikis?: string,
   explicit?: PuantajHesapEtkisi
 ): PuantajHesapEtkisi | undefined {
+  if (isRaporDayanak(dayanak)) {
+    return undefined;
+  }
+
   if (explicit) return explicit;
 
   if (hareketDurumu === "Gelmedi" && dayanak === "Yok_Izinsiz") {
@@ -1128,6 +1140,15 @@ export function hesapla(girdi: HesapGirdisi): HesapSonucu {
     girdi.giris_saati,
     girdi.cikis_saati
   );
+
+  if (isRaporDayanak(dayanak) && hasPuantajSaati(girdi.giris_saati, girdi.cikis_saati)) {
+    uyarilar.push({
+      code: "RAPOR_CALISMA_CAKISMASI",
+      message:
+        "Raporlu personel için çalışma saati girilmiş; kayıt normal çalışma veya mesai sayılmamalıdır.",
+      level: "KRITIK"
+    });
+  }
 
   return {
     personel_id: girdi.personel_id,

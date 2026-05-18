@@ -67,7 +67,7 @@ function shouldCountAsEksikGun(kayit: GunlukPuantaj) {
     return false;
   }
 
-  if (kayit.gun_tipi === "UBGT_Resmi_Tatil") {
+  if (kayit.gun_tipi === "UBGT_Resmi_Tatil" || kayit.gun_tipi === "Hafta_Tatili_Pazar") {
     return false;
   }
 

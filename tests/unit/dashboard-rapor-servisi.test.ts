@@ -310,6 +310,74 @@ describe("hesaplaAylikSgkPuantajOzeti", () => {
     expect(sonuc.eksik_gun_nedeni_kodu).toBeNull();
   });
 
+  it("UBGT resmi tatil raporlu hastalik kaydini SGK eksik gune saymaz", () => {
+    const kayitlar = [
+      makePuantaj({
+        personel_id: 1,
+        tarih: "2026-04-23",
+        gun_tipi: "UBGT_Resmi_Tatil",
+        hareket_durumu: "Gelmedi",
+        dayanak: "Raporlu_Hastalik"
+      })
+    ];
+
+    const sonuc = hesaplaAylikSgkPuantajOzeti(kayitlar, 2026, 4);
+    expect(sonuc.eksik_gun_sayisi).toBe(0);
+    expect(sonuc.sgk_prim_gun).toBe(30);
+    expect(sonuc.eksik_gun_nedeni_kodu).toBeNull();
+  });
+
+  it("UBGT resmi tatil raporlu is kazasi kaydini SGK eksik gune saymaz", () => {
+    const kayitlar = [
+      makePuantaj({
+        personel_id: 1,
+        tarih: "2026-04-23",
+        gun_tipi: "UBGT_Resmi_Tatil",
+        hareket_durumu: "Gelmedi",
+        dayanak: "Raporlu_Is_Kazasi"
+      })
+    ];
+
+    const sonuc = hesaplaAylikSgkPuantajOzeti(kayitlar, 2026, 4);
+    expect(sonuc.eksik_gun_sayisi).toBe(0);
+    expect(sonuc.sgk_prim_gun).toBe(30);
+    expect(sonuc.eksik_gun_nedeni_kodu).toBeNull();
+  });
+
+  it("hafta tatili pazar raporlu hastalik kaydini SGK eksik gune saymaz", () => {
+    const kayitlar = [
+      makePuantaj({
+        personel_id: 1,
+        tarih: "2026-04-12",
+        gun_tipi: "Hafta_Tatili_Pazar",
+        hareket_durumu: "Gelmedi",
+        dayanak: "Raporlu_Hastalik"
+      })
+    ];
+
+    const sonuc = hesaplaAylikSgkPuantajOzeti(kayitlar, 2026, 4);
+    expect(sonuc.eksik_gun_sayisi).toBe(0);
+    expect(sonuc.sgk_prim_gun).toBe(30);
+    expect(sonuc.eksik_gun_nedeni_kodu).toBeNull();
+  });
+
+  it("hafta tatili pazar raporlu is kazasi kaydini SGK eksik gune saymaz", () => {
+    const kayitlar = [
+      makePuantaj({
+        personel_id: 1,
+        tarih: "2026-04-12",
+        gun_tipi: "Hafta_Tatili_Pazar",
+        hareket_durumu: "Gelmedi",
+        dayanak: "Raporlu_Is_Kazasi"
+      })
+    ];
+
+    const sonuc = hesaplaAylikSgkPuantajOzeti(kayitlar, 2026, 4);
+    expect(sonuc.eksik_gun_sayisi).toBe(0);
+    expect(sonuc.sgk_prim_gun).toBe(30);
+    expect(sonuc.eksik_gun_nedeni_kodu).toBeNull();
+  });
+
   it("ucretli izin ve yillik izin gunlerini eksik gune saymaz", () => {
     const kayitlar = [
       makePuantaj({
@@ -333,24 +401,36 @@ describe("hesaplaAylikSgkPuantajOzeti", () => {
     expect(sonuc.hesaplama_modu).toBe("OTUZ_GUN_STANDART");
   });
 
-  it("sadece raporlu eksik gunlerde kod numarasi olmadan istirahat nedeni doner", () => {
+  it("raporlu hastalik normal is gununde SGK eksik gun ve kodsuz istirahat nedeni uretir", () => {
     const kayitlar = [
       makePuantaj({
         personel_id: 1,
         tarih: "2026-04-10",
+        gun_tipi: "Normal_Is_Gunu",
         hareket_durumu: "Gelmedi",
         dayanak: "Raporlu_Hastalik"
-      }),
+      })
+    ];
+
+    const sonuc = hesaplaAylikSgkPuantajOzeti(kayitlar, 2026, 4);
+    expect(sonuc.eksik_gun_sayisi).toBe(1);
+    expect(sonuc.eksik_gun_nedeni_kodu).toBe("Rapor / istirahat");
+    expect(sonuc.eksik_gun_nedeni_kodu).not.toBe("01 - İstirahat");
+  });
+
+  it("raporlu is kazasi normal is gununde SGK eksik gun ve kodsuz istirahat nedeni uretir", () => {
+    const kayitlar = [
       makePuantaj({
         personel_id: 1,
         tarih: "2026-04-11",
+        gun_tipi: "Normal_Is_Gunu",
         hareket_durumu: "Gelmedi",
         dayanak: "Raporlu_Is_Kazasi"
       })
     ];
 
     const sonuc = hesaplaAylikSgkPuantajOzeti(kayitlar, 2026, 4);
-    expect(sonuc.eksik_gun_sayisi).toBe(2);
+    expect(sonuc.eksik_gun_sayisi).toBe(1);
     expect(sonuc.eksik_gun_nedeni_kodu).toBe("Rapor / istirahat");
     expect(sonuc.eksik_gun_nedeni_kodu).not.toBe("01 - İstirahat");
   });

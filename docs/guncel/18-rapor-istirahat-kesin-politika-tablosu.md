@@ -29,9 +29,9 @@ Bu dokuman yalnizca karar dokumani ve politika tablosudur.
 
 Bu fazda resmi SGK kod numarasi uretilmez.
 
-## 3. Kullanilan kaynak cevaplar
+## 3. Kullanilan kaynak kararlar
 
-Kaynak karar girdisi:
+Kaynak karar girdileri:
 
 - Firma / urun tarafindan iletilen minimum rapor / istirahat uygulama kararlari
 - `17-rapor-istirahat-bordro-cevap-formu.md`
@@ -87,7 +87,7 @@ Netlesmeyen prim turleri, yan haklar, yarim gun rapor prim etkisi, analik / dogu
 
 Genel rapor / istirahat hatti tamamen kod fazina hazir degildir. Sadece netlesen minimum politika alanlari icin `Kod fazina kismen hazir` ifadesi kullanilir.
 
-## 6. Rapor turu bazli kesin/taslak politika tablosu
+## 6. Rapor turu bazli politika tablosu
 
 | Rapor turu | SGK prim gunu etkisi | Ucret hak edisi etkisi | Isveren odeme politikasi | Ilk gunler ozel uygulamasi | SGK odenegi mahsup / raporlama yaklasimi | Hafta tatili hakki etkisi | Hafta tatili ucreti etkisi | Devam primi etkisi | Performans primi etkisi | Yan hak etkisi | Aciklayici eksik gun nedeni | Resmi SGK kodu durumu | Karar durumu | Kod fazina hazir mi? |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -181,7 +181,7 @@ Kismen netlesen minimum politika alanlari:
 
 - Hastalik raporunda isveren odeme yapmaz.
 - Ilk 1-2 gun odeme yoktur.
-- 3. gun ve sonrasi SGK odenegi surecidir; firma ayrica odeme yapmaz.
+- 3. gun ve sonrasi SGK gecici is goremezlik odenegi surecidir; firma ayrica odeme yapmaz.
 - SGK rapor parasi isciye odenir; firma otomatik mahsup / tamamlama hesabi yapmaz.
 - Raporlu isci calisamaz.
 - Rapor + calisma cakismasi normal calisma sayilmaz.
@@ -234,5 +234,5 @@ Sonraki onerilen faz:
 
 | Tarih | Not |
 |---|---|
-| 2026-05-17 | Gercek bordro cevaplari olmadigi icin taslak politika tablo sablonu eklendi. |
-| 2026-05-18 | Minimum sistem politikasi ve manuel yonetim karari ayrimi islendi. |
+| 2026-05-17 | Rapor / istirahat politika tablosu ilk taslagi eklendi. |
+| 2026-05-18 | Minimum sistem politikasi, acik kalan kararlar ve manuel yonetim karari ayrimi islendi. |

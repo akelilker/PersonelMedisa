@@ -1,44 +1,52 @@
 # Puantaj V2 Rapor / Istirahat Kesin Politika Tablosu
 
-Surum: `V2 taslak politika tablo sablonu`
+Surum: `V2 minimum sistem politikasi`
 
 ## 1. Amac
 
-Bu dokuman, `17-rapor-istirahat-bordro-cevap-formu.md` muhasebe / bordro / firma tarafindan cevaplandiktan sonra, bu cevaplari teknik implementasyona girmeden once sade, denetlenebilir ve kesinlesmis politika tablosuna donusturmek icin hazirlanmistir.
+Bu dokuman, rapor / istirahat hattinda firma tarafindan netlesen minimum uygulama kararlarini teknik implementasyona girmeden once sade, denetlenebilir ve politika tablosu halinde sabitlemek icin hazirlanmistir.
 
-Bu dokumanin mevcut hali kesin politika tablosu degildir. 17 numarali formda gercek firma / bordro cevaplari bulunmadigi icin bu dosya taslak politika tablo sablonu olarak olusturulmustur.
+Bu dokuman kod fazi degildir. Buradaki kararlar hesap motoruna otomatik tasinmis sayilmaz. Netlesen minimum sistem politikasi alanlari ileride ayri teshis ve ayri implementasyon talimatiyla ele alinabilir.
 
-Gercek cevap yokken kesin karar yazilmaz. Kesinlesmeden hesap motoruna tasinmaz.
+Genel rapor / istirahat hatti tamamen kod fazina hazir degildir.
 
 ## 2. Bu dokumanin siniri
 
-Bu dokuman yalnizca rapor / istirahat bordro cevaplarini politika tablosuna donusturme sablonudur.
+Bu dokuman yalnizca karar dokumani ve politika tablosudur.
 
 - Kod yazilmaz.
 - Test yazilmaz.
 - `src` altinda dosya degistirilmez.
 - Hesap motoru kurali eklenmez.
 - Dashboard servisi degistirilmez.
-- UI / hook / service onerisi eklenmez.
+- UI / hook / service degisikligi yapilmaz.
 - SGK resmi kod sozlugu olusturulmaz.
 - Resmi SGK kod numarasi kesinlestirilmez.
 - Net bordro / maas hesabi yazilmaz.
-- Mevzuat kesin hukmu verilmez.
-- Firma cevabi yokken kesin politika uretilmez.
+- SGK odeme tutari hesaplanmaz.
+- Analik / dogum veya is kazasi icin detayli mevzuat algoritmasi yazilmaz.
+- Yonetimsel destek odemeleri otomatik bordro kuralina donusturulmez.
 
 Bu fazda resmi SGK kod numarasi uretilmez.
 
 ## 3. Kullanilan kaynak cevaplar
 
-Kaynak cevap formu:
+Kaynak karar girdisi:
 
+- Firma / urun tarafindan iletilen minimum rapor / istirahat uygulama kararlari
 - `17-rapor-istirahat-bordro-cevap-formu.md`
+- `15-rapor-istirahat-isveren-odeme-politikasi.md`
+- `16-rapor-turleri-isveren-odeme-karar-matrisi.md`
 
 Mevcut durum:
 
-- 17 numarali form henuz gercek muhasebe / bordro / firma cevaplariyla doldurulmamistir.
-- Bu nedenle bu dokumanda kesin rapor politikasi uretilmemistir.
-- Tum rapor turu bazli politika alanlari `Cevap bekliyor`, `Firma/bordro karari bekler` ve `Kod fazina hazir degil` olarak isaretlenmistir.
+- Hastalik raporu icin minimum sistem politikasi netlesmistir.
+- Raporlu personelin calisamayacagi ve rapor + calisma cakismasinin normal calisma sayilmayacagi netlesmistir.
+- Saatlik rapor modeli acilmayacagi, kismi ihtiyacin yarim gun mantigiyla ele alinacagi netlesmistir.
+- Resmi tatil / hafta tatili / yillik izin cakismasinda ek rapor etkisi uygulanmayacagi netlesmistir.
+- 1 gun raporun devam primini tam kesecegi netlesmistir.
+- Analik / dogum ve is kazasi icin resmi prosedur + bordro kontrolu yaklasimi korunmustur.
+- Yonetimsel destek / yardim / maas tamamlama / ozel odeme kararlari otomatik hesap motoru disinda tutulmustur.
 
 Varsayilan guvenli davranis: aciklayici metin + manuel/bordro kontrolu.
 
@@ -53,151 +61,178 @@ Bu dokuman asagidaki kesin kararlarla uyumlu okunmalidir:
 - `Rapor / istirahat` SGK eksik gun nedeni adayidir.
 - `eksik_gun_nedeni_kodu` alani resmi SGK kodu gibi yorumlanmaz.
 - Bu fazda resmi SGK kod numarasi uretilmez.
-- Belgeli rapor otomatik mazeretsiz devamsizlik gibi siniflandirilmaz.
-- Belgeli rapor otomatik ucretli veya ucretsiz diye kesinlestirilmez.
+- Rapor otomatik mazeretsiz devamsizlik gibi siniflandirilmaz.
+- Belgeli rapor calisma gibi sayilmaz.
 - UI hesap yapmaz.
 - Hook agir mevzuat hesabi yapmaz.
 - Servis / motor is kuralinin sahibidir.
 
-Bu dokuman `13`, `14`, `15`, `16` ve `17` numarali dokumanlarin uzerine kesinlesmis cevap gelmeden yeni bordro kuralı eklemez.
+Bu dokuman minimum sistem politikasini netlestirir; UI / hook / service / hesap motoru davranisini bu gorevde degistirmez.
 
 ## 5. Politika tablosu kullanim mantigi
 
-Bu tablo, 17 numarali form cevaplandiktan sonra su amaclarla kullanilir:
+Bu tablo uc ayri alan olusturur:
 
-1. Hangi rapor turunde hangi karar kesinlesti?
-2. Hangi alan hala bordro kontrolu gerektiriyor?
-3. Hangi alan kod fazina hazir?
-4. Hangi alan kapsam disi veya sonraki faz?
-5. Hangi kararlar hesap motoruna tasinabilir?
+1. Minimum sistem politikasi
 
-Mevcut taslak durumda hicbir rapor turu kod fazina hazir degildir. Cevap bekliyor.
+Sistemin otomatik ve guvenli sekilde esas alacagi minimum davranistir. Bu alanlar sadece ileride ayri teshisle implementasyona konu olabilir.
 
-Bir alan ancak su kosullarda `Kod fazina hazir` kabul edilebilir:
+2. Yonetimsel inisiyatif / manuel bordro karari
 
-- 17 numarali formda cevap vardir.
-- Karar sahibi bellidir.
-- Karar `Evet / Hayir / net politika` seviyesinde yazilidir.
-- `Duruma gore` cevabinin kosullari aciktir.
-- `Bordro kontrolu gerekir` cevabi varsa alan kod fazina hazir sayilmaz.
-- Karar 13 / 14 / 15 / 16 numarali dokumanlarla celismez.
+Ozel destek, yardim, maas tamamlama, tekil odeme veya yonetim insiyatifi otomatik hesap motoruna gomulmez. Bu kararlar manuel bordro / yonetim karari olarak ayrica takip edilir.
+
+3. Hala cevap bekleyen alanlar
+
+Netlesmeyen prim turleri, yan haklar, yarim gun rapor prim etkisi, analik / dogum detaylari, is kazasi detaylari ve belirsiz raporlar firma / bordro karari bekler.
+
+Genel rapor / istirahat hatti tamamen kod fazina hazir degildir. Sadece netlesen minimum politika alanlari icin `Kod fazina kismen hazir` ifadesi kullanilir.
 
 ## 6. Rapor turu bazli kesin/taslak politika tablosu
 
-Mevcut durumda bu tablo taslaktir. Gercek bordro cevaplari olmadigi icin tum rapor turleri cevap bekliyor olarak isaretlenmistir.
-
 | Rapor turu | SGK prim gunu etkisi | Ucret hak edisi etkisi | Isveren odeme politikasi | Ilk gunler ozel uygulamasi | SGK odenegi mahsup / raporlama yaklasimi | Hafta tatili hakki etkisi | Hafta tatili ucreti etkisi | Devam primi etkisi | Performans primi etkisi | Yan hak etkisi | Aciklayici eksik gun nedeni | Resmi SGK kodu durumu | Karar durumu | Kod fazina hazir mi? |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| Hastalik raporu | Cevap bekliyor. Firma/bordro karari bekler. | Cevap bekliyor. Firma/bordro karari bekler. | Cevap bekliyor. Firma/bordro karari bekler. | Cevap bekliyor. Ilk gunler icin politika net degil. | Cevap bekliyor. Mahsup / raporlama yaklasimi net degil. | Belgeli rapor otomatik mazeretsiz devamsizlik sayilmaz; bordro cevabi bekler. | Cevap bekliyor. Firma/bordro karari bekler. | Cevap bekliyor. Firma/bordro karari bekler. | Cevap bekliyor. Firma/bordro karari bekler. | Cevap bekliyor. Firma/bordro karari bekler. | Taslak aciklayici metin: `Rapor / istirahat`; kesinlesme bekler. | Bu fazda resmi SGK kod numarasi uretilmez. | Cevap bekliyor. | Hayir. Kod fazina hazir degil. |
-| Is kazasi raporu | Cevap bekliyor. Hastalik raporundan ayri karar gerekir. | Cevap bekliyor. Firma/bordro karari bekler. | Cevap bekliyor. Firma/bordro karari bekler. | Cevap bekliyor. Hastalik raporundan farkli olabilir. | Cevap bekliyor. Mahsup / raporlama yaklasimi net degil. | Belgeli rapor otomatik mazeretsiz devamsizlik sayilmaz; bordro cevabi bekler. | Cevap bekliyor. Firma/bordro karari bekler. | Cevap bekliyor. Firma/bordro karari bekler. | Cevap bekliyor. Firma/bordro karari bekler. | Cevap bekliyor. Firma/bordro karari bekler. | Taslak aciklayici metin: `Rapor / istirahat`; kesinlesme bekler. | Bu fazda resmi SGK kod numarasi uretilmez. | Cevap bekliyor. | Hayir. Kod fazina hazir degil. |
-| Analik / dogum raporu | Cevap bekliyor. Firma/bordro karari ve mevzuat kontrolu bekler. | Cevap bekliyor. Firma/bordro karari bekler. | Cevap bekliyor. Firma/bordro karari bekler. | Cevap bekliyor. Firma/bordro karari bekler. | Cevap bekliyor. Mahsup / raporlama yaklasimi net degil. | Cevap bekliyor. Firma/bordro karari ve mevzuat kontrolu bekler. | Cevap bekliyor. Firma/bordro karari bekler. | Cevap bekliyor. Firma/bordro karari bekler. | Cevap bekliyor. Firma/bordro karari bekler. | Cevap bekliyor. Firma/bordro karari bekler. | Taslak aciklayici metin: `Rapor / istirahat`; ayri metin icin bordro cevabi bekler. | Bu fazda resmi SGK kod numarasi uretilmez. | Cevap bekliyor. | Hayir. Kod fazina hazir degil. |
-| Refakat / diger istirahat turleri | Cevap bekliyor. Firma/bordro karari bekler. | Cevap bekliyor. Firma/bordro karari bekler. | Cevap bekliyor. Firma/bordro karari bekler. | Cevap bekliyor. Firma/bordro karari bekler. | Cevap bekliyor. Mahsup / raporlama yaklasimi net degil. | Cevap bekliyor. Firma/bordro karari bekler. | Cevap bekliyor. Firma/bordro karari bekler. | Cevap bekliyor. Firma/bordro karari bekler. | Cevap bekliyor. Firma/bordro karari bekler. | Cevap bekliyor. Firma/bordro karari bekler. | Taslak aciklayici metin: `Rapor / istirahat` veya `Diger / bordro kontrolu gerekir`; kesinlesme bekler. | Bu fazda resmi SGK kod numarasi uretilmez. | Cevap bekliyor. | Hayir. Kod fazina hazir degil. |
-| Belirsiz / bordro kontrolu gereken raporlar | Kesinlestirilmez. Bordro kontrolu gerekir. | Kesinlestirilmez. Bordro kontrolu gerekir. | Kesinlestirilmez. Bordro kontrolu gerekir. | Kesinlestirilmez. Bordro kontrolu gerekir. | Kesinlestirilmez. Bordro kontrolu gerekir. | Kesinlestirilmez. Bordro kontrolu gerekir. | Kesinlestirilmez. Bordro kontrolu gerekir. | Kesinlestirilmez. Bordro kontrolu gerekir. | Kesinlestirilmez. Bordro kontrolu gerekir. | Kesinlestirilmez. Bordro kontrolu gerekir. | Taslak aciklayici metin: `Diger / bordro kontrolu gerekir`; kesinlesme bekler. | Bu fazda resmi SGK kod numarasi uretilmez. | Bordro kontrolu gerekir. | Hayir. Kod fazina hazir degil. |
+| Hastalik raporu | Minimum sistem politikasi: raporlu tam gun SGK eksik gun adayi olarak ele alinabilir; formulle celismeden bordro kontrolu korunur. | Minimum sistem politikasi: hastalik raporunda isveren ayrica ucret odemez. | Kesinlesti: isveren hastalik raporu icin otomatik ucret, maas tamamlama veya fark odemesi yapmaz. | Kesinlesti: ilk 1-2 gun icin isveren odeme yapmaz. 3. gun ve sonrasi SGK gecici is goremezlik odenegi surecidir. | Kesinlesti: SGK rapor parasi isciye odenir; firma bordro motoru otomatik mahsup / tamamlama hesabi yapmaz. | Minimum sistem politikasi: rapor hafta tatiline denk gelirse ek rapor etkisi uygulanmaz; tek baskin statu kullanilir. | Minimum sistem politikasi: rapor hafta tatiline denk gelirse ayrica rapor kaynakli ek ucret etkisi uretilmez. | Kesinlesti: 1 gun rapor devam primini tam keser. Yarım gun rapor prim etkisi firma/bordro karari bekler. | Firma/bordro karari bekler. | Firma/bordro karari bekler. | `Rapor / istirahat` kodsuz aciklayici neden yaklasimi korunur. | Bu fazda resmi SGK kod numarasi uretilmez. | Kesinlesti / Minimum sistem politikasi. | Kismen. Sadece netlesen minimum alanlar ayri teshisle ele alinabilir. |
+| Is kazasi raporu | Resmi prosedur + bordro kontrolu. Hastalik raporundan ayri statudur. | Resmi prosedur + bordro kontrolu. | Kesinlesti: firma otomatik maas tamamlama / destek odeme zorunlulugu tanimlamaz. Ozel destek olursa manuel yonetim karari olur. | Resmi prosedur + bordro kontrolu. | Resmi prosedur + bordro kontrolu. Otomatik mahsup / tamamlama kurali tanimlanmaz. | Resmi prosedur + bordro kontrolu; tek baskin statu prensibi korunur. | Resmi prosedur + bordro kontrolu. | Firma/bordro karari bekler. | Firma/bordro karari bekler. | Firma/bordro karari bekler. | `Rapor / istirahat` veya bordro kontrolu sonrasi kodsuz aciklayici metin. | Bu fazda resmi SGK kod numarasi uretilmez. | Resmi prosedur + bordro kontrolu / Yonetimsel manuel karar ayrimi. | Kod fazina hazir degil. Detay uygulama bordro kontrolu bekler. |
+| Analik / dogum raporu | Resmi prosedur + bordro kontrolu. Detay algoritma bu fazda yazilmaz. | Resmi prosedur + bordro kontrolu. | Ek firma politikasi tanimlanmadiysa resmi prosedur + bordro kontrolu. | Resmi prosedur + bordro kontrolu. | Resmi prosedur + bordro kontrolu. | Resmi prosedur + bordro kontrolu; tek baskin statu prensibi korunur. | Resmi prosedur + bordro kontrolu. | Firma/bordro karari bekler. | Firma/bordro karari bekler. | Firma/bordro karari bekler. | `Rapor / istirahat` veya bordro kontrolu sonrasi kodsuz aciklayici metin. | Bu fazda resmi SGK kod numarasi uretilmez. | Resmi prosedur + bordro kontrolu. | Kod fazina hazir degil. Detay uygulama bordro kontrolu bekler. |
+| Refakat / diger istirahat turleri | Firma/bordro karari bekler. | Firma/bordro karari bekler. | Firma/bordro karari bekler. | Firma/bordro karari bekler. | Firma/bordro karari bekler. | Tek baskin statu prensibi korunur; detay firma/bordro karari bekler. | Firma/bordro karari bekler. | Firma/bordro karari bekler. | Firma/bordro karari bekler. | Firma/bordro karari bekler. | `Rapor / istirahat` veya `Diger / bordro kontrolu gerekir`. | Bu fazda resmi SGK kod numarasi uretilmez. | Firma/bordro karari bekler. | Kod fazina hazir degil. |
+| Belirsiz / bordro kontrolu gereken raporlar | Firma/bordro karari bekler. | Firma/bordro karari bekler. | Firma/bordro karari bekler. | Firma/bordro karari bekler. | Firma/bordro karari bekler. | Tek baskin statu prensibi korunur; detay firma/bordro karari bekler. | Firma/bordro karari bekler. | Firma/bordro karari bekler. | Firma/bordro karari bekler. | Firma/bordro karari bekler. | `Diger / bordro kontrolu gerekir`. | Bu fazda resmi SGK kod numarasi uretilmez. | Firma/bordro karari bekler. | Kod fazina hazir degil. |
 
-## 7. Kolon aciklamalari
+## 7. Minimum sistem politikasi
 
-Tablodaki kolonlar 16 numarali karar matrisi ve 17 numarali cevap formu ile uyumludur.
+Netlesen minimum sistem politikasi:
 
-- `Rapor turu`: Politikanin uygulanacagi rapor sinifi.
-- `SGK prim gunu etkisi`: Raporun SGK prim gununu dusurup dusurmedigi.
-- `Ucret hak edisi etkisi`: Raporlu gun icin ucret hak edilip edilmedigi.
-- `Isveren odeme politikasi`: Isverenin tam ucret, fark odemesi veya odeme yapmama yaklasimi.
-- `Ilk gunler ozel uygulamasi`: Ozellikle hastalik raporunda ilk gunler icin farkli uygulama olup olmadigi.
-- `SGK odenegi mahsup / raporlama yaklasimi`: SGK gecici is goremezlik odeneginin bordroda nasil ele alinacagi.
-- `Hafta tatili hakki etkisi`: Raporun hafta tatili hakkini etkileyip etkilemedigi.
-- `Hafta tatili ucreti etkisi`: Raporun hafta tatili ucretine etkisi.
-- `Devam primi etkisi`: Devam priminin raporlu gunlerden etkilenip etkilenmedigi.
-- `Performans primi etkisi`: Performans priminin raporlu gunlerden etkilenip etkilenmedigi.
-- `Yan hak etkisi`: Yemek, yol, vardiya, gece veya benzeri yan hak etkisi.
-- `Aciklayici eksik gun nedeni`: Kodsuz neden metni.
-- `Resmi SGK kodu durumu`: Bu fazda resmi kod numarasi uretilmez.
-- `Karar durumu`: Kesin, cevap bekliyor veya bordro kontrolu gerekir.
-- `Kod fazina hazir mi?`: Kod fazina gecilip gecilemeyecegi.
+- Hastalik raporunda isveren odeme yapmaz.
+- Ilk 1-2 gun isveren odeme yapmaz.
+- 3. gun ve sonrasi SGK gecici is goremezlik odenegi surecidir; firma ayrica odeme yapmaz.
+- SGK rapor parasi isciye odenir; firma otomatik mahsup / tamamlama hesabi yapmaz.
+- Raporlu isci calisamaz.
+- Rapor + calisma kaydi cakismasi normal calisma sayilmaz; kontrol gerektiren cakismadir.
+- Saatlik rapor modeli acilmaz; kismi durumlar yarim gun mantigiyla dusunulur.
+- Rapor resmi tatil, hafta tatili veya yillik izinle cakisirsa ek rapor etkisi uygulanmaz.
+- Ayni gun icin tek baskin statu kullanilir; cift bordro etkisi uretilmez.
+- 1 gun rapor devam primini tam keser.
+- Resmi SGK kod numarasi bu fazda uretilmez.
+- Kodsuz aciklayici neden yaklasimi korunur.
 
-## 8. Kesinlesen kararlar
+Bu minimum politika alanlari ileride ayri teshisle implementasyona konu olabilir. Bu dokuman tek basina kod talimati degildir.
 
-17 numarali form henuz gercek cevaplarla doldurulmadigi icin bu dokumanla yeni bir bordro / firma politikasi kesinlesmemistir.
+## 8. Yonetimsel manuel kararlar
 
-Korunan mevcut kesin cerceve:
+Asagidaki alanlar otomatik hesap motoruna gomulmez:
 
-- SGK prim gunu formulu degismez.
-- Formul yalniz ucret hak edilmeyen ve SGK prim gununu dusuren tam gun eksiklikler icindir.
-- Rapor / istirahat icin SGK etkisi ile isveren odeme politikasi ayri degerlendirilir.
-- Rapor / istirahat icin kodsuz aciklayici neden yaklasimi korunur.
-- Bu fazda resmi SGK kod numarasi uretilmez.
-- Belgeli rapor otomatik mazeretsiz devamsizlik gibi siniflandirilmaz.
-- Belgeli rapor otomatik ucretli veya ucretsiz diye kesinlestirilmez.
+- Ozel destek odemesi.
+- Yardim odemesi.
+- Maas tamamlama.
+- SGK odenegi ustune fark odeme.
+- Tekil personel veya olay bazli yonetim insiyatifi.
+- Is kazasi icin firma tarafindan yapilabilecek ozel destek.
+- Hastalik raporu icin istisnai destek veya yardim.
 
-## 9. Cevap bekleyen kararlar
+Bu alanlar olursa manuel bordro / yonetim karari olarak ayrica takip edilir. Sessiz bordro varsayimi uretilmez.
 
-Asagidaki kararlar cevap bekliyor:
+## 9. Cakisma ve statu onceligi
 
-- Hastalik raporunda ilk gunler icin isveren odemesi.
-- Hastalik raporunda ucuncu gun ve sonrasi icin isveren odemesi.
-- Hastalik raporunda SGK prim gunu etkisi.
-- Is kazasi raporunun hastalik raporundan farkli uygulanip uygulanmayacagi.
-- Is kazasi raporunda isveren odemesi.
-- Is kazasi raporunda SGK prim gunu etkisi.
-- Analik / dogum raporunun bu faza dahil edilip edilmeyecegi.
-- Analik / dogum raporunda ucret, SGK prim gunu ve aciklayici neden yaklasimi.
+Netlesen cakisma politikasi:
+
+- Raporlu isci calisamaz.
+- Rapor + calisma kaydi cakismasi normal calisma sayilmaz.
+- Rapor + calisma cakismasi kontrol / hata / bordro kontrolu gerektiren cakismadir.
+- Rapor resmi tatil gunune denk gelirse ayrica rapor etkisi uygulanmaz.
+- Rapor hafta tatiline denk gelirse ayrica rapor etkisi uygulanmaz.
+- Rapor yillik izne denk gelirse ayrica rapor etkisi uygulanmaz.
+- Ayni gun icin tek baskin statu kullanilir.
+- Cift bordro etkisi uretilmez.
+
+Bu fazda kod yazilmaz; bu yalniz politika notudur.
+
+## 10. Kismi rapor yaklasimi
+
+Netlesen kismi rapor politikasi:
+
+- Mikro saatlik rapor modeli acilmaz.
+- Saatlik rapor modeli sistemin ana omurgasina uygun gorulmemistir.
+- Kismi rapor ihtiyaci olursa yarim gun mantigiyla ele alinir.
+- Ornek: sabah yarim gun / ogleden sonra yarim gun.
+- Yarım gun raporun devam primi ve diger primlere etkisi ayrıca netlesmemistir; firma/bordro karari bekler.
+
+## 11. Hala cevap bekleyen kararlar
+
+Asagidaki alanlar hala firma/bordro karari bekler:
+
+- Yarım gun raporun devam primi etkisi.
+- Performans primi etkisi.
+- Uretim primi etkisi.
+- Yemek yardimi etkisi.
+- Yol yardimi etkisi.
+- Vardiya / gece / diger ek odeme etkileri.
 - Refakat / diger istirahat turlerinde ucret ve SGK etkisi.
-- SGK gecici is goremezlik odeneginin mahsup mu, raporlama mi olacagi.
-- Hafta tatili hakki ve hafta tatili ucreti etkisi.
-- Devam primi, performans primi ve yan hak etkileri.
-- Belirsiz raporlar icin aciklayici metin.
-- Resmi SGK kod sozlugunun hangi onay sureciyle ele alinacagi.
+- Belirsiz rapor turlerinde nihai aciklayici metin.
+- Analik / dogum raporu detay uygulamasi.
+- Is kazasi resmi prosedur detay uygulamasi.
+- Resmi SGK kod sozlugu onay sureci.
 
-## 10. Kod fazina hazir olmayan alanlar
+Bu alanlar kesinlesmeden hesap motoruna tasinmaz.
 
-Gercek bordro cevaplari olmadigi icin asagidaki alanlar kod fazina hazir degildir:
+## 12. Kod fazina hazirlik durumu
 
-- Hastalik raporu politikasi.
-- Is kazasi raporu politikasi.
-- Analik / dogum raporu politikasi.
-- Refakat / diger istirahat turleri politikasi.
-- Belirsiz raporlarin kontrol mesaji ve davranisi.
-- SGK odenegi mahsup / raporlama yaklasimi.
-- Hafta tatili ucreti etkisi.
-- Prim / devam primi / performans primi etkisi.
-- Yemek, yol, vardiya, gece ve benzeri yan hak etkisi.
+Genel rapor / istirahat hatti tamamen kod fazina hazir degildir.
+
+Kismen netlesen minimum politika alanlari:
+
+- Hastalik raporunda isveren odeme yapmaz.
+- Ilk 1-2 gun odeme yoktur.
+- 3. gun ve sonrasi SGK odenegi surecidir; firma ayrica odeme yapmaz.
+- SGK rapor parasi isciye odenir; firma otomatik mahsup / tamamlama hesabi yapmaz.
+- Raporlu isci calisamaz.
+- Rapor + calisma cakismasi normal calisma sayilmaz.
+- Saatlik rapor modeli acilmaz.
+- Tek baskin statu prensibi uygulanir.
+- 1 gun rapor devam primini tam keser.
+
+Bu alanlar dahi dogrudan kodlanmaz; once ayri teshis, owner belirleme, dar kapsamli talimat ve review gerekir.
+
+Kod fazina hazir olmayan alanlar:
+
+- Analik / dogum detaylari.
+- Is kazasi detaylari.
+- Refakat / diger istirahat turleri.
+- Yarım gun rapor prim etkisi.
+- Performans primi, uretim primi, yan haklar ve diger ek odemeler.
 - Resmi SGK kod sozlugu.
 - Net bordro / maas etkisi.
 
-Mevcut durumda kod fazina hazir alan yoktur.
-
-## 11. Kod fazina gecis kriterleri
+## 13. Kod fazina gecis kriterleri
 
 Kod fazina gecmek icin asagidaki kriterler saglanmalidir:
 
-1. 17 numarali form gercek muhasebe / bordro / firma cevaplariyla doldurulmus olmalidir.
-2. Her rapor turu icin SGK prim gunu etkisi netlesmelidir.
-3. Her rapor turu icin ucret hak edisi etkisi netlesmelidir.
-4. Isveren odeme politikasi netlesmelidir.
-5. Ilk gunler icin ozel uygulama olup olmadigi yazilmalidir.
-6. SGK gecici is goremezlik odenegi icin mahsup / raporlama yaklasimi belirlenmelidir.
-7. Hafta tatili hakki ve hafta tatili ucreti etkisi netlesmelidir.
-8. Devam primi, performans primi ve yan hak etkileri netlesmelidir.
-9. Aciklayici eksik gun nedeni metinleri kesinlesmelidir.
-10. Resmi SGK kodu bu fazda uretilmeyecekse bu karar korunmalidir; kod sozlugu ayrica onay surecine birakilmalidir.
-11. `Duruma gore` cevaplari varsa kosullari yazilmalidir.
-12. `Bordro kontrolu gerekir` kalan alanlar kod fazi disinda tutulmalidir.
+1. Netlesen minimum politika alanlari icin ayri teshis yapilmalidir.
+2. Hesap motoru / dashboard / UI etkisi ayrilmalidir.
+3. Owner dosya ve katman netlestirilmelidir.
+4. Acik kalan firma/bordro kararlari kod kapsamindan dislanmalidir.
+5. Yonetimsel manuel kararlar otomatik hesap motoruna sokulmamalidir.
+6. Resmi SGK kod numarasi sozlugu ayri onay surecine birakilmalidir.
+7. 13 / 14 / 15 / 16 / 17 / 18 numarali dokumanlarla uyum review'u yapilmalidir.
 
 Bu kriterler saglanmadan hesap motoru kurali, dashboard davranisi, UI gosterimi veya net bordro etkisi uretilmemelidir.
 
-## 12. Sonuc ve onerilen sonraki faz
+## 14. Sonuc ve onerilen sonraki faz
 
-Bu dokuman, 17 numarali form cevaplandiktan sonra kullanilacak kesin politika tablosu sablonudur. Mevcut durumda gercek firma / bordro cevaplari bulunmadigi icin tum rapor turleri cevap bekliyor ve kod fazina hazir degil olarak isaretlenmistir.
+Rapor / istirahat hattinda minimum sistem politikasi kismen netlesmistir. Hastalik raporunda isveren odemesi yapilmamasi, SGK rapor parasinin isciye odenmesi, otomatik mahsup / tamamlama hesabi yapilmamasi, raporlu iscinin calisamamasi, saatlik rapor modelinin acilmamasi, tek baskin statu prensibi ve 1 gun raporun devam primini tam kesmesi karar olarak islenmistir.
+
+Yonetimsel destek, ozel odeme, yardim, maas tamamlama ve insiyatif odemeleri manuel bordro / yonetim karari olarak ayrilmistir.
+
+Genel rapor / istirahat hatti tamamen kod fazina hazir degildir. Sadece netlesen minimum politika alanlari ileride ayri teshisle implementasyona konu olabilir.
 
 Sonraki onerilen faz:
 
-1. `17-rapor-istirahat-bordro-cevap-formu.md` dosyasinin muhasebe / bordro / firma yetkilileri tarafindan doldurulmasi
-2. Doldurulan cevaplarin bu tabloya islenmesi
-3. `Cevap bekliyor` ve `Bordro kontrolu gerekir` alanlarin ayrilmasi
-4. Sadece kesinlesen alanlar icin dar kapsamli Cursor / Codex implementasyon talimati hazirlanmasi
-5. Kod fazi oncesi `13`, `14`, `15`, `16` ve `17` numarali dokumanlarla uyum review'u yapilmasi
+1. Netlesen minimum politika alanlari icin ayri implementasyon teshisi hazirlamak
+2. Acik kalan prim / yan hak / yarim gun / is kazasi / analik alanlarini firma-bordro karar listesinde tutmak
+3. Teshis sonrasi dar kapsamli Cursor / Codex talimati yazmak
+4. Kod fazi oncesi 13 / 14 / 15 / 16 / 17 / 18 dokumanlariyla uyum review'u yapmak
 
 ## Belge Gecmisi
 
 | Tarih | Not |
 |---|---|
 | 2026-05-17 | Gercek bordro cevaplari olmadigi icin taslak politika tablo sablonu eklendi. |
+| 2026-05-18 | Minimum sistem politikasi ve manuel yonetim karari ayrimi islendi. |

@@ -261,6 +261,13 @@ Net durum:
 - `18` numaralı tablodaki karar alanları `Cevap bekliyor`, `Firma/bordro kararı bekler` ve `Kod fazına hazır değil` statüsündedir.
 - Kod fazına hazır alan yoktur.
 
+Güncel not:
+
+- `18` numaralı tabloya sonradan rapor / istirahat minimum sistem politikası işlenmiştir.
+- Hastalık raporunda işveren ödemesi yapılmaması, SGK rapor parasının işçiye ödenmesi, otomatik mahsup / tamamlama yapılmaması, raporlu işçinin çalışamaması, saatlik rapor modelinin açılmaması, tek baskın statü prensibi ve 1 gün raporun devam primini tam kesmesi kararları minimum sistem politikası olarak ayrılmıştır.
+- Yönetimsel destek / özel ödeme / maaş tamamlama / yardım kararları manuel bordro / yönetim kararı olarak hesap motoru dışında tutulmuştur.
+- Genel rapor / istirahat hattı tamamen kod fazına hazır değildir; yalnız netleşen minimum politika alanları ileride ayrı teşhisle ele alınabilir.
+
 Korunan mevcut kararlar:
 
 - SGK prim günü formülü değişmedi: `sgk_gunu = max(0, min(30, takvim_gunu - eksik_gun))`

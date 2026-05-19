@@ -312,6 +312,58 @@ Bilinçli kapsam dışı / sonraki işler:
 - UI'da yeni SGK rapor kartı veya bordro ekranı
 - E2E / smoke kapsamının genişletilmesi
 
+### 18. Rapor / istirahat minimum politika ilk implementasyon checkpoint'i
+
+Kapanan teknik fazlar:
+
+- Hesap motoru rapor / çalışma çakışması güvenlik freni.
+- Dashboard SGK rapor / hafta tatili çakışması güvenlik düzeltmesi.
+
+Hesap motorunda netleşen davranış:
+
+- `Raporlu_Hastalik` / `Raporlu_Is_Kazasi` otomatik `Tam_Yevmiye_Ver` üretmez.
+- `Raporlu_Hastalik` / `Raporlu_Is_Kazasi` otomatik `Mesai_Yaz` üretmez.
+- Rapor + çalışma saati çakışması `RAPOR_CALISMA_CAKISMASI` kodlu `KRITIK` compliance uyarısı üretir.
+- `deriveHareketDurumu` ve `deriveDayanak` semantiği değiştirilmedi.
+- Yeni `PuantajHesapEtkisi` enum değeri eklenmedi.
+
+Dashboard SGK hattında netleşen davranış:
+
+- `UBGT_Resmi_Tatil` eksik gün dışında kalır.
+- `Hafta_Tatili_Pazar` eksik gün dışında kalır.
+- Rapor + hafta tatili çakışması ek SGK eksik günü üretmez.
+- Normal iş günü + `Gelmedi` + `Raporlu_Hastalik` / `Raporlu_Is_Kazasi` SGK eksik gün adayı olmaya devam eder.
+- Eksik gün nedeni kodsuz `Rapor / istirahat` olarak korunur.
+- Resmi SGK kod numarası üretilmez.
+
+Korunan kapsam dışı alanlar:
+
+- UI değişmedi.
+- Hook değişmedi.
+- `PersonelDetayPage` değişmedi.
+- SGK resmi kod sözlüğü oluşturulmadı.
+- Net bordro / maaş hesabı yazılmadı.
+- Devam primi motoru eklenmedi.
+- Yarım gün rapor modeli implementasyonu yapılmadı.
+- Analık / doğum / refakat detayına girilmedi.
+- Yönetimsel destek ödemeleri otomatik kurala dönüştürülmedi.
+
+Kod fazında hâlâ açık kalan alanlar:
+
+- 1 gün rapor devam primini tam keser kararı için henüz devam primi motoru yok.
+- Yarım gün raporun prim etkisi açık.
+- Performans primi, üretim primi ve yan hak etkileri açık.
+- İş kazası detay uygulaması resmi prosedür + bordro kontrolü olarak bekliyor.
+- Analık / doğum detay uygulaması resmi prosedür + bordro kontrolü olarak bekliyor.
+- Refakat / diğer istirahat türleri hâlâ firma / bordro kararı bekliyor.
+- Resmi SGK kod sözlüğü ayrı onay sürecine bırakıldı.
+
+Sonraki önerilen faz:
+
+- Önce bu checkpoint review edilmeli.
+- Sonra ya devam primi motoru var / yok teşhisi yapılmalı ya da açık kalan bordro kararları ayrı listede tutulmalı.
+- Yeni implementasyon için yine ayrı teşhis ve dar Cursor talimatı hazırlanmalı.
+
 ## Geç / Erken Kesinti V1 Sınırı
 
 Bu fazın bilinçli sınırları:

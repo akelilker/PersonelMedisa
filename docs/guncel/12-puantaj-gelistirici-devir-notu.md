@@ -364,6 +364,58 @@ Sonraki önerilen faz:
 - Sonra ya devam primi motoru var / yok teşhisi yapılmalı ya da açık kalan bordro kararları ayrı listede tutulmalı.
 - Yeni implementasyon için yine ayrı teşhis ve dar Cursor talimatı hazırlanmalı.
 
+### 19. Devam primi motoru var/yok teşhisi checkpoint'i
+
+Teşhis sonucu:
+
+- Repo'da otomatik çalışan devam primi motoru yoktur.
+- Devam primi için dedicated owner servis/helper/type/test bulunmamıştır.
+- `prim_kurali_id` / `prim_kurali_adi` şu an hesap motoru kuralı değil, personel veri/reference alanıdır.
+- Finans tarafındaki `PRIM` / `BONUS` / `EKSTRA_PRIM` manuel finans kalemidir; otomatik devam primi kararı değildir.
+
+İş kuralı durumu:
+
+- `1 gün rapor devam primini tam keser` kararı `18` numaralı dokümanda minimum sistem politikası olarak yer almaktadır.
+- Ancak mevcut kodda bu kararı çalıştıracak devam primi owner hattı yoktur.
+- Bu nedenle karar şimdilik iş kuralı olarak dokümanda kalır; otomatik implementasyon yapılmaz.
+
+Neden kod yazılmadı?
+
+- Owner servis yok.
+- `prim_kurali_id` semantiği net değil.
+- Devam primi aylık binary hakediş mi, gün bazlı hakediş mi net değil.
+- Tutar kaynağı net değil.
+- Rapor dışındaki diğer eksik günlerin devam primine etkisi net değil.
+- Manuel override / yönetim inisiyatifi kararı net değil.
+- Kod yazmak sessiz bordro varsayımı üretir.
+
+Sonraki faza bırakılan kararlar:
+
+- `prim_kurali_id` gerçekten neyi temsil ediyor?
+- Devam primi aylık mı, dönemsel mi, gün bazlı mı?
+- `1 gün rapor` tüm ay primini mi keser?
+- Kural `Raporlu_Hastalik` ve `Raporlu_Is_Kazasi` için aynı mı?
+- Yarım gün rapor devam primini nasıl etkiler?
+- Analık / doğum / refakat / diğer istirahat türleri nasıl ele alınır?
+- Ücretsiz izin, devamsızlık, disiplin günü gibi diğer eksik günler devam primini nasıl etkiler?
+- Performans primi, üretim primi ve yan haklar devam priminden ayrı mı?
+- Tutar kaynağı neresi olacak?
+- Sonuç finans kalemine mi, readonly rapora mı, aylık kapanış snapshot'ına mı yazılacak?
+- Manuel override olacak mı?
+
+Sonraki önerilen faz:
+
+- Devam primi owner ve dar tasarım karar dokümanı hazırlanmalı.
+- Bu doküman oluşturulmadan devam primi implementasyonuna geçilmemeli.
+
+### 20. Devam primi owner ve dar tasarım karar dokümanı checkpoint'i
+
+- `docs/guncel/20-devam-primi-owner-ve-dar-tasarim-karari.md` oluşturuldu.
+- Devam primi için mevcut repo'da otomatik motor olmadığı teyit edildi.
+- `1 gün rapor devam primini tam keser` kararı iş kuralı olarak korunur.
+- Kod fazına geçiş için `prim_kurali_id` semantiği, dönem tipi, kesinti olayları, çıktı hedefi ve manuel override kararları beklenir.
+- Kod değişikliği yapılmadı.
+
 ## Geç / Erken Kesinti V1 Sınırı
 
 Bu fazın bilinçli sınırları:

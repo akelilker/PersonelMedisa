@@ -137,6 +137,47 @@ describe("hesaplaDevamPrimiEligibility", () => {
     expect(sonuc.hak_kazandi_mi).toBe(true);
   });
 
+  it("baska personelin hastalik kaydi → personel 1 icin kesinti uretmez", () => {
+    const sonuc = hesaplaDevamPrimiEligibility({
+      ...baseGirdi,
+      gunluk_kayitlar: [
+        makeKayit({
+          personel_id: 2,
+          tarih: "2026-04-10",
+          hareket_durumu: "Gelmedi",
+          dayanak: "Raporlu_Hastalik"
+        })
+      ]
+    });
+
+    expect(sonuc.kesildi_mi).toBe(false);
+    expect(sonuc.hak_kazandi_mi).toBe(true);
+    expect(sonuc.kesinti_nedeni).toBeUndefined();
+  });
+
+  it("personel 1 icin ayni ay hastalik kaydi → kesildi_mi true kalir", () => {
+    const sonuc = hesaplaDevamPrimiEligibility({
+      ...baseGirdi,
+      gunluk_kayitlar: [
+        makeKayit({
+          personel_id: 2,
+          tarih: "2026-04-09",
+          hareket_durumu: "Gelmedi",
+          dayanak: "Raporlu_Hastalik"
+        }),
+        makeKayit({
+          personel_id: 1,
+          tarih: "2026-04-10",
+          hareket_durumu: "Gelmedi",
+          dayanak: "Raporlu_Hastalik"
+        })
+      ]
+    });
+
+    expect(sonuc.kesildi_mi).toBe(true);
+    expect(sonuc.hak_kazandi_mi).toBe(false);
+  });
+
   it("farkli ay kayitlari → sadece hedef ay degerlendirilir", () => {
     const sonuc = hesaplaDevamPrimiEligibility({
       ...baseGirdi,

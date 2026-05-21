@@ -58,6 +58,15 @@ function filterKayitlarByDonem(
   });
 }
 
+function filterKayitlarByPersonelVeDonem(
+  kayitlar: GunlukPuantaj[],
+  personelId: number,
+  yil: number,
+  ay: number
+): GunlukPuantaj[] {
+  return filterKayitlarByDonem(kayitlar, yil, ay).filter((kayit) => kayit.personel_id === personelId);
+}
+
 function isTamGunHastalikRaporu(kayit: GunlukPuantaj): boolean {
   return kayit.hareket_durumu === "Gelmedi" && kayit.dayanak === "Raporlu_Hastalik";
 }
@@ -70,7 +79,12 @@ export function hesaplaDevamPrimiEligibility(
   girdi: DevamPrimiEligibilityGirdi
 ): DevamPrimiEligibilitySonuc {
   const donem = `${girdi.yil}-${String(girdi.ay).padStart(2, "0")}`;
-  const donemKayitlari = filterKayitlarByDonem(girdi.gunluk_kayitlar, girdi.yil, girdi.ay);
+  const donemKayitlari = filterKayitlarByPersonelVeDonem(
+    girdi.gunluk_kayitlar,
+    girdi.personel_id,
+    girdi.yil,
+    girdi.ay
+  );
 
   const primKuraliEksik = girdi.prim_kurali_id == null;
   const isKazasiVar = hasIsKazasiKaydi(donemKayitlari);

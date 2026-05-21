@@ -519,6 +519,36 @@ Sonraki önerilen faz:
 - İş kazası, yarım gün, devamsızlık ve override için netleşmeden yeni otomatik kural eklenmemeli.
 - Aylık puantaj verisinin tam kapsamla yüklenmesi ayrı veri fazı olarak ele alınabilir; bu checkpoint yalnızca eksik veriyle kesin hak kazanımı gösterme riskini kapatır.
 
+### 23. Devam primi personel_id izolasyonu güvenlik düzeltmesi checkpoint'i
+
+Tamamlanan teknik düzeltme:
+
+- `src/services/devam-primi-hesap-motoru.ts` içinde eligibility hesabı artık yalnızca `girdi.personel_id` kayıtlarını dikkate alır.
+- `filterKayitlarByPersonelVeDonem` eklendi; önce dönem filtresi (`filterKayitlarByDonem`), ardından `kayit.personel_id === girdi.personel_id` uygulanır.
+
+Güvenlik etkisi:
+
+- Karışık `gunluk_kayitlar` içinde başka personele ait `Raporlu_Hastalik` + `Gelmedi` kaydı olsa bile ilgili personelin devam primi kesilmez.
+- Dönem filtresi korunmuştur; personel + dönem izolasyonu birlikte çalışır.
+
+Korunan sınırlar:
+
+- Dış API değişmemiştir (`DevamPrimiEligibilityGirdi` / `DevamPrimiEligibilitySonuc`).
+- Yeni iş kuralı eklenmemiştir; yalnızca mevcut eligibility hesabının personel izolasyonu güvenceye alınmıştır.
+- Hook, UI, API, dashboard, finans, bordro ve SGK değiştirilmedi.
+
+Test güvencesi:
+
+- `tests/unit/devam-primi-hesap-motoru.test.ts` içine iki regression testi eklendi:
+  - başka personelin hastalık kaydı → hedef personel için kesinti üretmez
+  - karışık listede hedef personelin kendi hastalık kaydı → `kesildi_mi` korunur
+- Motor test sayısı: `10`
+
+Son görülen doğrulama durumu:
+
+- `npm run test` → `329` passed
+- `npm run typecheck` geçti
+
 ## Geç / Erken Kesinti V1 Sınırı
 
 Bu fazın bilinçli sınırları:

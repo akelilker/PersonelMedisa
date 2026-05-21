@@ -94,6 +94,12 @@ Eligibility hatti personel bazinda izole calisir:
 
 **Hook:** `toplaDonemPuantajKayitlari` onbellek anahtarlarinda `personelId` filtresi uygular; baska personelin puantaj kaydi girdiye karismaz.
 
+**Cache / gecis stabilizasyonu:**
+
+- Fallback onbellek taramasi aktif sube + hedef personel prefix'i ile sinirlandirildi; farkli subeye ait puantaj cache kaydi devam primi sonucuna karismaz.
+- `usePersonelDetail` icinde request-sequence guard eklendi; personel gecisinde gec gelen eski detay cevabi guncel `personel` / `editForm` state'ini ezmez.
+- Personel 1 -> Personel 2 gecisinde readonly devam primi kartinin eski `Kesildi` sonucunu tasimadigi E2E ile kilitlendi.
+
 **Test regression kapsami** (`tests/unit/devam-primi-hesap-motoru.test.ts`):
 
 - Baska personelin hastalik kaydi → hedef personel icin kesinti uretmez
@@ -118,6 +124,16 @@ Ilgili test dosyalari (referans; bu belge test degistirmez):
 
 - `tests/unit/devam-primi-hesap-motoru.test.ts`
 - `tests/unit/useDevamPrimiEligibilityOzeti.test.ts`
+- `tests/unit/usePersonelDetail.test.ts`
+- `tests/e2e/personel-dosya.spec.ts`
+
+Stabilizasyon sonrasi guncel dogrulama:
+
+```text
+npm run test -> 331 passed
+npm run typecheck -> OK
+npx playwright test tests/e2e/personel-dosya.spec.ts -> 7 passed
+```
 
 ## 8. Bilincli Kapsam Disi (Sonraki Fazlar)
 
@@ -140,7 +156,7 @@ Devam Primi V2 eligibility fazı su durumda kapatilir:
 
 - Dedicated owner (`devam-primi-hesap-motoru.ts`) ile tutar disi karar omurgasi calisir durumda
 - Personel detayinda salt okunur eligibility ozeti gosterilir
-- Eksik veri ve personel izolasyonu regression testleri ile korunur
+- Eksik veri, personel izolasyonu, aktif sube cache izolasyonu ve personel gecis guvenligi regression testleri ile korunur
 - Finans, bordro ve SGK hatlari bu fazda **dokunulmadan** birakilir
 
 Sonraki faz, bu belgedeki kapsam disi maddelerden **ayri bir urun/teknik karar** ile acilmalidir.
@@ -149,4 +165,5 @@ Sonraki faz, bu belgedeki kapsam disi maddelerden **ayri bir urun/teknik karar**
 
 | Tarih | Not |
 |---|---|
+| 2026-05-22 | Cache / gecis stabilizasyonu eklendi; aktif sube fallback izolasyonu, `usePersonelDetail` request guard'i ve personel gecisi E2E kilidi sabitlendi. Guncel dogrulama: `331 passed`, `personel-dosya.spec.ts` `7 passed`. |
 | 2026-05-21 | Devam Primi V2 eligibility faz kapanis checkpoint; mimari ayrim, cikti sinirlari, eksik veri ve personel izolasyonu, test durumu sabitlendi. |

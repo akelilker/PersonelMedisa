@@ -549,6 +549,33 @@ Son görülen doğrulama durumu:
 - `npm run test` → `329` passed
 - `npm run typecheck` geçti
 
+### 24. Devam primi cache / gecis stabilizasyonu checkpoint'i
+
+Tamamlanan teknik guvenlik duzeltmeleri:
+
+- `src/hooks/useDevamPrimiEligibilityOzeti.ts` icinde fallback puantaj cache taramasi aktif sube + hedef personel prefix'i ile sinirlandirildi.
+- Farkli subeye ait puantaj cache kaydi devam primi eligibility sonucuna karismaz.
+- `src/hooks/usePersoneller.ts` icinde `usePersonelDetail` refetch akisi request-sequence guard ile korundu.
+- Personel gecisinde gec gelen eski detay cevabi guncel `personel` ve `editForm` state'ini ezemez.
+
+Test / E2E guvencesi:
+
+- `tests/unit/useDevamPrimiEligibilityOzeti.test.ts` icinde farkli sube cache karisimi regression testi eklendi.
+- `tests/unit/usePersonelDetail.test.ts` icinde hizli personel gecisi ve gec gelen eski cevap regression testi eklendi.
+- `tests/e2e/personel-dosya.spec.ts` icinde readonly devam primi kartinin Personel 1 -> Personel 2 gecisinde eski `Kesildi` sonucunu tasimadigi kilitlendi.
+
+Korunan sinirlar:
+
+- Yeni devam primi is kurali eklenmedi.
+- Finans, bordro, SGK, dashboard, API ve UI tasarim katmanlari degistirilmedi.
+- Page icinde hesap yapilmadi; readonly yuzey hook sonucunu render etmeye devam eder.
+
+Son gorulen dogrulama durumu:
+
+- `npm run test` -> `331` passed
+- `npm run typecheck` -> OK
+- `npx playwright test tests/e2e/personel-dosya.spec.ts` -> `7` passed
+
 ## Geç / Erken Kesinti V1 Sınırı
 
 Bu fazın bilinçli sınırları:

@@ -188,6 +188,141 @@ describe("puantaj.api", () => {
     expect(result.kontrol_durumu).toBe("AMIR_KONTROL_ETTI");
   });
 
+  it("normalizes Raporlu_Hastalik + Gelmedi without hesap_etkisi", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        createJsonResponse(
+          {
+            data: {
+              personel_id: 21,
+              tarih: "2026-04-22",
+              hareket_durumu: "Gelmedi",
+              dayanak: "Raporlu_Hastalik",
+              compliance_uyarilari: []
+            },
+            meta: {},
+            errors: []
+          },
+          200
+        )
+      )
+    );
+
+    const result = await fetchGunlukPuantaj(21, "2026-04-22");
+    expect(result?.dayanak).toBe("Raporlu_Hastalik");
+    expect(result?.hesap_etkisi).toBeUndefined();
+  });
+
+  it("normalizes Raporlu_Is_Kazasi + Gelmedi without hesap_etkisi", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        createJsonResponse(
+          {
+            data: {
+              personel_id: 22,
+              tarih: "2026-04-23",
+              hareket_durumu: "Gelmedi",
+              dayanak: "Raporlu_Is_Kazasi",
+              compliance_uyarilari: []
+            },
+            meta: {},
+            errors: []
+          },
+          200
+        )
+      )
+    );
+
+    const result = await fetchGunlukPuantaj(22, "2026-04-23");
+    expect(result?.dayanak).toBe("Raporlu_Is_Kazasi");
+    expect(result?.hesap_etkisi).toBeUndefined();
+  });
+
+  it("normalizes Pazar rapor + saat without Mesai_Yaz hesap_etkisi", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        createJsonResponse(
+          {
+            data: {
+              personel_id: 23,
+              tarih: "2026-04-12",
+              gun_tipi: "Hafta_Tatili_Pazar",
+              hareket_durumu: "Geldi",
+              dayanak: "Raporlu_Hastalik",
+              giris_saati: "08:00",
+              cikis_saati: "17:00",
+              compliance_uyarilari: []
+            },
+            meta: {},
+            errors: []
+          },
+          200
+        )
+      )
+    );
+
+    const result = await fetchGunlukPuantaj(23, "2026-04-12");
+    expect(result?.hesap_etkisi).toBeUndefined();
+    expect(result?.hesap_etkisi).not.toBe("Mesai_Yaz");
+  });
+
+  it("normalizes UBGT rapor + saat without Mesai_Yaz hesap_etkisi", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        createJsonResponse(
+          {
+            data: {
+              personel_id: 24,
+              tarih: "2026-04-23",
+              gun_tipi: "UBGT_Resmi_Tatil",
+              hareket_durumu: "Geldi",
+              dayanak: "Raporlu_Hastalik",
+              giris_saati: "08:00",
+              compliance_uyarilari: []
+            },
+            meta: {},
+            errors: []
+          },
+          200
+        )
+      )
+    );
+
+    const result = await fetchGunlukPuantaj(24, "2026-04-23");
+    expect(result?.hesap_etkisi).toBeUndefined();
+    expect(result?.hesap_etkisi).not.toBe("Mesai_Yaz");
+  });
+
+  it("ignores explicit Tam_Yevmiye_Ver when rapor dayanak is present", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        createJsonResponse(
+          {
+            data: {
+              personel_id: 25,
+              tarih: "2026-04-24",
+              hareket_durumu: "Gelmedi",
+              dayanak: "Raporlu_Hastalik",
+              hesap_etkisi: "Tam_Yevmiye_Ver",
+              compliance_uyarilari: []
+            },
+            meta: {},
+            errors: []
+          },
+          200
+        )
+      )
+    );
+
+    const result = await fetchGunlukPuantaj(25, "2026-04-24");
+    expect(result?.hesap_etkisi).toBeUndefined();
+  });
+
   it("keeps existing behavior when beklenen saat fields are absent", async () => {
     const fetchMock = vi.fn(async () =>
       createJsonResponse(

@@ -10,6 +10,7 @@ import type {
   UpsertGunlukPuantajPayload
 } from "../types/puantaj";
 import { logAction } from "../audit/audit-service";
+import { deriveHesapEtkisi } from "../services/puantaj-hesap-motoru";
 import { apiRequest } from "./api-client";
 import { endpoints } from "./endpoints";
 
@@ -236,44 +237,6 @@ function deriveDayanak(params: {
   return undefined;
 }
 
-function deriveHesapEtkisi(params: {
-  explicit?: PuantajHesapEtkisi;
-  gunTipi: PuantajGunTipi;
-  hareketDurumu: PuantajHareketDurumu;
-  dayanak?: PuantajDayanak;
-  girisSaati?: string;
-  cikisSaati?: string;
-}): PuantajHesapEtkisi | undefined {
-  if (params.explicit) {
-    return params.explicit;
-  }
-
-  if (params.hareketDurumu === "Gelmedi" && params.dayanak === "Yok_Izinsiz") {
-    return "Kesinti_Yap";
-  }
-
-  if (
-    (params.gunTipi === "Hafta_Tatili_Pazar" || params.gunTipi === "UBGT_Resmi_Tatil") &&
-    (params.girisSaati || params.cikisSaati)
-  ) {
-    return "Mesai_Yaz";
-  }
-
-  if (params.dayanak && params.dayanak !== "Yok_Izinsiz") {
-    return "Tam_Yevmiye_Ver";
-  }
-
-  if (
-    params.hareketDurumu === "Geldi" ||
-    params.hareketDurumu === "Gec_Geldi" ||
-    params.hareketDurumu === "Erken_Cikti"
-  ) {
-    return "Tam_Yevmiye_Ver";
-  }
-
-  return undefined;
-}
-
 function deriveHaftaTatiliHakKazandiMi(params: {
   explicit?: boolean;
   hareketDurumu: PuantajHareketDurumu;
@@ -382,18 +345,19 @@ function normalizeGunlukPuantaj(
     cikisSaati
   });
   const gunTipi = deriveGunTipi(normalizedTarih, explicitGunTipi);
-  const hesapEtkisi = deriveHesapEtkisi({
-    explicit: pickLiteral(
-      record,
-      ["hesap_etkisi", "hesapEtkisi", "payroll_effect"],
-      PUANTAJ_HESAP_ETKISI_MAP
-    ),
+  const explicitHesapEtkisi = pickLiteral(
+    record,
+    ["hesap_etkisi", "hesapEtkisi", "payroll_effect"],
+    PUANTAJ_HESAP_ETKISI_MAP
+  );
+  const hesapEtkisi = deriveHesapEtkisi(
     gunTipi,
     hareketDurumu,
     dayanak,
     girisSaati,
-    cikisSaati
-  });
+    cikisSaati,
+    explicitHesapEtkisi
+  );
 
   const complianceUyarilari =
     normalizeComplianceUyarilari(record.compliance_uyarilari) ||

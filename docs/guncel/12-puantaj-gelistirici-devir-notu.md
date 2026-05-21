@@ -416,6 +416,48 @@ Sonraki önerilen faz:
 - Kod fazına geçiş için `prim_kurali_id` semantiği, dönem tipi, kesinti olayları, çıktı hedefi ve manuel override kararları beklenir.
 - Kod değişikliği yapılmadı.
 
+### 21. Devam primi ultra dar pilot eligibility motoru checkpoint'i
+
+Tamamlanan teknik faz:
+
+- `src/services/devam-primi-hesap-motoru.ts` oluşturuldu.
+- `tests/unit/devam-primi-hesap-motoru.test.ts` oluşturuldu.
+
+Motor sınırı:
+
+- Motor yalnızca tutar dışı eligibility kararı üretir.
+- Bordro motoru değildir.
+- Finans motoru değildir.
+- SGK motoru değildir.
+
+Tek otomatik kural:
+
+- Aylık dönemde en az 1 tam gün `Raporlu_Hastalik` + `Gelmedi` varsa devam primi eligibility kesilir (`hak_kazandi_mi = false`, `kesildi_mi = true`).
+
+Bilinçli davranış sınırları:
+
+- `Raporlu_Is_Kazasi` otomatik kesinti üretmez; `manuel_inceleme_gerekli_mi = true` işaretler.
+- `Yok_Izinsiz`, `Gec_Geldi`, `Erken_Cikti`, yarım gün, UBGT, hafta tatili otomatik devam primi etkisi üretmez.
+- `prim_kurali_id` yalnızca bağlam alanıdır; kural parametresi olarak okunmaz. Tanımlı değilse `manuel_inceleme_gerekli_mi = true` üretilir.
+
+Korunan kapsam dışı alanlar:
+
+- Finans kalemi üretilmez.
+- Bordro / net maaş / SGK hesabı yapılmaz.
+- UI, hook, API, dashboard entegrasyonu yapılmadı.
+- Yeni devam primi kuralı eklenmedi.
+- Parametre motoru / çoklu kural sistemi açılmadı.
+
+Son görülen doğrulama durumu:
+
+- `npm run test` → `322/322` geçti
+- `npm run typecheck` geçti
+
+Sonraki önerilen faz:
+
+- Eligibility sonucunun readonly yüzeyde (personel detay / puantaj özet / rapor) gösterilmesi ayrı UI fazı olarak ele alınmalı.
+- İş kazası, yarım gün, devamsızlık, geç gelme ve override için ayrı ürün kararı netleşmeden yeni otomatik kural eklenmemeli.
+
 ## Geç / Erken Kesinti V1 Sınırı
 
 Bu fazın bilinçli sınırları:
@@ -501,6 +543,7 @@ Günlük puantaj ekranı şu başlıkları gösterebiliyor:
 
 - `src/services/izin-hesap-motoru.ts`
 - `src/services/puantaj-hesap-motoru.ts`
+- `src/services/devam-primi-hesap-motoru.ts`
 - `src/services/dashboard-rapor-servisi.ts`
 
 ### Hook
@@ -530,6 +573,7 @@ Günlük puantaj ekranı şu başlıkları gösterebiliyor:
 
 - `tests/unit/izin-hesap-motoru.test.ts`
 - `tests/unit/puantaj-hesap-motoru.test.ts`
+- `tests/unit/devam-primi-hesap-motoru.test.ts`
 - `tests/unit/puantaj.api.test.ts`
 - `tests/unit/role-permissions.test.ts`
 - `tests/e2e/smoke.spec.ts`

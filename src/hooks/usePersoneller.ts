@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { getApiErrorMessage, shouldQueueOfflineMutation } from "../api/api-client";
 import {
@@ -812,6 +812,7 @@ export function usePersonelDetail(
   const [surecReferenceErrorMessage, setSurecReferenceErrorMessage] = useState<string | null>(null);
   const [isSurecHistoryLoading, setIsSurecHistoryLoading] = useState(false);
   const [surecForm, setSurecForm] = useState<PersonelSurecFormState>(INITIAL_PERSONEL_SUREC_FORM);
+  const detailRequestSeq = useRef(0);
   const [isZimmetModalOpen, setIsZimmetModalOpen] = useState(false);
   const closeZimmetModalAfterCreate = useCallback(() => {
     setIsZimmetModalOpen(false);
@@ -844,6 +845,10 @@ export function usePersonelDetail(
   }, [detailKey, activeSubeId]);
 
   const refetch = useCallback(async () => {
+    const requestSeq = detailRequestSeq.current + 1;
+    detailRequestSeq.current = requestSeq;
+    const isCurrentRequest = () => detailRequestSeq.current === requestSeq;
+
     if (!hasValidId) {
       setIsLoading(false);
       setErrorMessage("Geçerli bir personel ID verilmedi.");
@@ -857,9 +862,15 @@ export function usePersonelDetail(
       const data = await fetchWithCacheMerge(detailKey, () =>
         runDeduped(detailKey, () => fetchPersonelDetail(parsedPersonelId))
       );
+      if (!isCurrentRequest()) {
+        return;
+      }
       setPersonel(data);
       setEditForm(personelToEditForm(data));
     } catch (error) {
+      if (!isCurrentRequest()) {
+        return;
+      }
       if (shouldRedirectDetailAfterSubeMismatch(error)) {
         setPersonel(null);
         navigate("/personeller", {
@@ -872,7 +883,9 @@ export function usePersonelDetail(
         setErrorMessage("Personel detayi su an guncellenemiyor.");
       }
     } finally {
-      setIsLoading(false);
+      if (isCurrentRequest()) {
+        setIsLoading(false);
+      }
     }
   }, [activeSubeId, detailKey, hasValidId, navigate, parsedPersonelId]);
 

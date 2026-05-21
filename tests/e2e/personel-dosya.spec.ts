@@ -44,7 +44,61 @@ async function openZimmetCreateFromPersonelDosya(page: Page) {
   return zimmetModal;
 }
 
+async function seedDevamPrimiHastalikCacheForPersonelOne(page: Page) {
+  await page.evaluate(() => {
+    const fetchedAt = new Date().toISOString();
+    const appData = {
+      schemaVersion: 4,
+      revision: 1,
+      updatedAt: fetchedAt,
+      cache: {
+        "puantaj:sall:1|2026-04-10": {
+          fetchedAt,
+          data: {
+            personel_id: 1,
+            tarih: "2026-04-10",
+            gun_tipi: "Normal_Is_Gunu",
+            hareket_durumu: "Gelmedi",
+            dayanak: "Raporlu_Hastalik",
+            hesap_etkisi: "Kesinti_Yap",
+            hafta_tatili_hak_kazandi_mi: true,
+            state: "HESAPLANDI",
+            compliance_uyarilari: []
+          }
+        }
+      }
+    };
+    window.appData = appData;
+    window.localStorage.setItem("medisa_app_data", JSON.stringify(appData));
+  });
+}
+
 test.describe("personel dosyasi surec akisi", () => {
+  test("devam primi readonly karti personel gecisinde eski kesinti sonucunu tasimaz", async ({ page }) => {
+    await mockApi(page, "GENEL_YONETICI");
+
+    await login(page, { username: "yonetici", password: "secret" });
+    await seedDevamPrimiHastalikCacheForPersonelOne(page);
+
+    await page.goto("/personeller");
+    await expect(page).toHaveURL(/\/personeller$/);
+
+    await page.getByRole("link", { name: /Ayşe Yılmaz.*kişisinin kartını aç/i }).first().click();
+    await expect(page).toHaveURL(/\/personeller\/1$/);
+    await page.getByRole("tab", { name: "Puantaj" }).click();
+    await expect(page.getByTestId("personel-devam-primi-card")).toBeVisible();
+    await expect(page.getByTestId("personel-devam-primi-durum")).toContainText("Kesildi");
+
+    await page.goto("/personeller");
+    await expect(page).toHaveURL(/\/personeller$/);
+
+    await page.getByRole("link", { name: /Mehmet Kaya.*kişisinin kartını aç/i }).first().click();
+    await expect(page).toHaveURL(/\/personeller\/2$/);
+    await page.getByRole("tab", { name: "Puantaj" }).click();
+    await expect(page.getByTestId("personel-devam-primi-card")).toBeVisible();
+    await expect(page.getByTestId("personel-devam-primi-durum")).not.toContainText("Kesildi");
+  });
+
   test("yonetici surec ekler ve isten ayrilma personel durumunu pasife ceker", async ({ page }) => {
     await mockApi(page, "GENEL_YONETICI");
 

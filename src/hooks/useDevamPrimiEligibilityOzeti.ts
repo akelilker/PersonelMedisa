@@ -78,10 +78,10 @@ function toplaDonemPuantajKayitlari(
     }
   }
 
-  const prefix = "puantaj:s";
+  const activeSubePersonelPrefix = dataCacheKeys.puantajDetail(activeSube, personelId, "");
   const donemPrefix = `${yil}-${String(ay).padStart(2, "0")}-`;
   for (const key of Object.keys(ensureAppData().cache)) {
-    if (!key.startsWith(prefix)) {
+    if (!key.startsWith(activeSubePersonelPrefix)) {
       continue;
     }
 

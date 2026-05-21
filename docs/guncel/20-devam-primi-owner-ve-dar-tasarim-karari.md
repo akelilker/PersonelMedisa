@@ -2,6 +2,13 @@
 
 Surum: `V2 karar dokumani`
 
+Guncellik notu:
+
+- Bu belge, Devam Primi V2 eligibility implementasyonundan once hazirlanan owner / dar tasarim karar zeminidir.
+- Belgedeki "otomatik devam primi motoru yoktur" tespiti, 2026-05-20 tarihli implementasyon oncesi repo durumunu ifade eder.
+- Guncel V2 eligibility faz kapanisi, owner dosyalar ve test durumu icin bkz. `docs/guncel/21-devam-primi-v2-kapanis-checkpoint.md`.
+- Bu belge halen acik urun sorulari, kapsam disi alanlar ve finans / bordro / SGK sinirlari icin referans olarak korunur.
+
 ## 1. Amac
 
 Bu dokuman, `1 gun rapor devam primini tam keser` is kararini dogrudan koda tasimadan once devam primi alaninin is modeli, teknik owner siniri ve dar V1 tasarim cercevesini netlestirmek icin hazirlanmistir.

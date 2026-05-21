@@ -6,6 +6,10 @@ import { EmptyState } from "../../../components/states/EmptyState";
 import { ErrorState } from "../../../components/states/ErrorState";
 import { LoadingState } from "../../../components/states/LoadingState";
 import { useRoleAccess } from "../../../hooks/use-role-access";
+import {
+  useDevamPrimiEligibilityOzeti,
+  type DevamPrimiEligibilityDurum
+} from "../../../hooks/useDevamPrimiEligibilityOzeti";
 import { usePersonelDetail } from "../../../hooks/usePersoneller";
 import { PersonelZimmetCreateForm } from "../components/PersonelZimmetCreateForm";
 import {
@@ -617,6 +621,41 @@ function PersonelKartPanelGenelBilgiler({ personel }: { personel: Personel }) {
   );
 }
 
+function formatDevamPrimiDonemLabel(donem: string) {
+  const match = donem.match(/^(\d{4})-(\d{2})$/);
+  if (!match) {
+    return donem;
+  }
+
+  const ayAdlari = [
+    "Ocak",
+    "Şubat",
+    "Mart",
+    "Nisan",
+    "Mayıs",
+    "Haziran",
+    "Temmuz",
+    "Ağustos",
+    "Eylül",
+    "Ekim",
+    "Kasım",
+    "Aralık"
+  ];
+  const ay = Number.parseInt(match[2], 10);
+  const ayAdi = ayAdlari[ay - 1];
+  return ayAdi ? `${ayAdi} ${match[1]}` : donem;
+}
+
+function devamPrimiDurumToneClass(durum: DevamPrimiEligibilityDurum) {
+  if (durum === "kesildi") {
+    return "is-kesildi";
+  }
+  if (durum === "manuel_inceleme") {
+    return "is-manuel";
+  }
+  return "is-hak";
+}
+
 function PersonelPuantajPanel({
   personel,
   canViewPuantaj
@@ -624,6 +663,7 @@ function PersonelPuantajPanel({
   personel: Personel;
   canViewPuantaj: boolean;
 }) {
+  const devamPrimiOzeti = useDevamPrimiEligibilityOzeti(personel);
   const sgkPrimGunu = typeof personel.sgk_prim_gun === "number" ? `${personel.sgk_prim_gun} Gün` : "-";
   const eksikGun = typeof personel.sgk_eksik_gun_sayisi === "number" ? `${personel.sgk_eksik_gun_sayisi} Gün` : "-";
   const eksikGunNedeni = formatDetailValue(personel.sgk_eksik_gun_nedeni_kodu);
@@ -642,6 +682,38 @@ function PersonelPuantajPanel({
           Aylık puantajdan türetilen resmi prim günü özeti burada salt okunur izlenir.
         </p>
       </section>
+
+      {devamPrimiOzeti ? (
+        <section
+          className="personel-puantaj-summary-card personel-devam-primi-card"
+          data-testid="personel-devam-primi-card"
+        >
+          <span className="personel-puantaj-summary-kicker">Devam Primi</span>
+          <div className="personel-devam-primi-meta">
+            <div className="personel-devam-primi-row">
+              <span className="personel-devam-primi-label">Dönem</span>
+              <span className="personel-devam-primi-value" data-testid="personel-devam-primi-donem">
+                {formatDevamPrimiDonemLabel(devamPrimiOzeti.donem)}
+              </span>
+            </div>
+            <div className="personel-devam-primi-row">
+              <span className="personel-devam-primi-label">Durum</span>
+              <span
+                className={`personel-devam-primi-durum ${devamPrimiDurumToneClass(devamPrimiOzeti.durum)}`}
+                data-testid="personel-devam-primi-durum"
+              >
+                {devamPrimiOzeti.durumLabel}
+              </span>
+            </div>
+          </div>
+          <p className="personel-puantaj-summary-note" data-testid="personel-devam-primi-aciklama">
+            {devamPrimiOzeti.aciklama}
+          </p>
+          {devamPrimiOzeti.kayitKapsamiNotu ? (
+            <p className="personel-devam-primi-scope-note">{devamPrimiOzeti.kayitKapsamiNotu}</p>
+          ) : null}
+        </section>
+      ) : null}
 
       <DossierSection
         title="Aylık Puantaj Özeti"

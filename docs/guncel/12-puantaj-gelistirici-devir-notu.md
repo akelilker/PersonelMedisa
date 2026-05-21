@@ -458,6 +458,67 @@ Sonraki önerilen faz:
 - Eligibility sonucunun readonly yüzeyde (personel detay / puantaj özet / rapor) gösterilmesi ayrı UI fazı olarak ele alınmalı.
 - İş kazası, yarım gün, devamsızlık, geç gelme ve override için ayrı ürün kararı netleşmeden yeni otomatik kural eklenmemeli.
 
+### 22. Devam primi readonly surface checkpoint'i
+
+Tamamlanan teknik faz:
+
+- Devam primi eligibility sonucu ilk kez readonly olarak görünür hale getirildi.
+- Yüzey: `PersonelDetayPage` → Puantaj sekmesi → `PersonelPuantajPanel`
+- Hook: `src/hooks/useDevamPrimiEligibilityOzeti.ts`
+- Test: `tests/unit/useDevamPrimiEligibilityOzeti.test.ts`
+
+Motor owner değişmedi:
+
+- `src/services/devam-primi-hesap-motoru.ts` yalnızca tüketilir; hesap owner bu dosyada kalır.
+
+Katman prensibi:
+
+- UI hesap yapmaz.
+- Hook servis sonucunu view model'e çevirir (`dönem`, `durum`, `kısa açıklama`, gerekirse veri kapsamı notu).
+
+Gösterilenler:
+
+- dönem
+- durum (`Hak Kazandı`, `Kesildi`, `Manuel İnceleme Gerekli`)
+- kısa açıklama
+- gerekirse veri kapsamı notu (`kayitKapsamiNotu`)
+
+Gösterilmeyenler:
+
+- tutar
+- oran
+- net maaş
+- SGK kodu
+- finans kalemi
+
+Veri kapsamı güvenliği:
+
+- Hedef ay günlük puantaj kapsamı eksikse (`kayitSayisi < donemGunSayisi`) kesin **Hak Kazandı** gösterilmez.
+- Kapsam eksik ve motor kesinti üretmiyorsa durum **Manuel İnceleme Gerekli** olur; ana açıklama: *Bu dönem için tüm günlük puantaj kayıtları yüklenmeden devam primi kesin değerlendirilemez.*
+- Kapsam eksik olsa bile motor `kesildi_mi` döndürüyorsa **Kesildi** korunur; kapsam notu ayrıca gösterilir.
+- Günlük kayıtlar yalnızca mevcut puantaj önbelleğinden okunur; yeni veri kaynağı veya API açılmadı.
+
+Korunan kapsam dışı alanlar:
+
+- Dashboard entegrasyonu yapılmadı.
+- Finans kalemi / bordro / net maaş hesabı yapılmadı.
+- SGK entegrasyonu yapılmadı.
+- Günlük puantaj ekranı (`GunlukPuantajPage`) değiştirilmedi.
+- API endpoint açılmadı.
+- Yeni iş kuralı eklenmedi.
+- Motor dosyası değiştirilmedi.
+
+Son görülen doğrulama durumu:
+
+- `npm run test` → `327` passed
+- `npm run typecheck` geçti
+
+Sonraki önerilen faz:
+
+- Devam primi tutar / finans kalemi / bordro entegrasyonu için ayrı ürün kararı ve owner fazı gerekir.
+- İş kazası, yarım gün, devamsızlık ve override için netleşmeden yeni otomatik kural eklenmemeli.
+- Aylık puantaj verisinin tam kapsamla yüklenmesi ayrı veri fazı olarak ele alınabilir; bu checkpoint yalnızca eksik veriyle kesin hak kazanımı gösterme riskini kapatır.
+
 ## Geç / Erken Kesinti V1 Sınırı
 
 Bu fazın bilinçli sınırları:
@@ -549,10 +610,12 @@ Günlük puantaj ekranı şu başlıkları gösterebiliyor:
 ### Hook
 
 - `src/hooks/usePuantaj.ts`
+- `src/hooks/useDevamPrimiEligibilityOzeti.ts`
 
 ### Sayfa
 
 - `src/features/puantaj/pages/GunlukPuantajPage.tsx`
+- `src/features/personeller/pages/PersonelDetayPage.tsx` (Puantaj sekmesi / devam primi readonly kartı)
 
 ### Tipler
 
@@ -574,6 +637,7 @@ Günlük puantaj ekranı şu başlıkları gösterebiliyor:
 - `tests/unit/izin-hesap-motoru.test.ts`
 - `tests/unit/puantaj-hesap-motoru.test.ts`
 - `tests/unit/devam-primi-hesap-motoru.test.ts`
+- `tests/unit/useDevamPrimiEligibilityOzeti.test.ts`
 - `tests/unit/puantaj.api.test.ts`
 - `tests/unit/role-permissions.test.ts`
 - `tests/e2e/smoke.spec.ts`

@@ -736,6 +736,58 @@
   color: var(--txt-muted);
 }
 
+.personel-devam-primi-card .personel-puantaj-summary-value {
+  font-size: 1.1rem;
+}
+
+.personel-devam-primi-meta {
+  display: grid;
+  gap: 8px;
+}
+
+.personel-devam-primi-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.personel-devam-primi-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--txt-muted);
+}
+
+.personel-devam-primi-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--txt-primary);
+}
+
+.personel-devam-primi-durum {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.personel-devam-primi-durum.is-hak {
+  color: #6ee7a8;
+}
+
+.personel-devam-primi-durum.is-kesildi {
+  color: #f87171;
+}
+
+.personel-devam-primi-durum.is-manuel {
+  color: #fbbf24;
+}
+
+.personel-devam-primi-scope-note {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--txt-muted);
+}
+
 .personel-surec-history {
   display: grid;
   gap: var(--space-2);

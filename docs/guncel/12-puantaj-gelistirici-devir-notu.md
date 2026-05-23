@@ -576,6 +576,31 @@ Son gorulen dogrulama durumu:
 - `npm run typecheck` -> OK
 - `npx playwright test tests/e2e/personel-dosya.spec.ts` -> `7` passed
 
+### 25. Personel detail cached effect lifecycle hardening checkpoint'i
+
+Tamamlanan teknik guvenlik duzeltmeleri:
+
+- `src/hooks/usePersoneller.ts` icinde `usePersonelDetail` route/detailKey degisiminde eski `personel` state'i ve `editForm` temizlenir.
+- Cached detail effect'i yalnizca `cached.id === parsedPersonelId` ise `setPersonel` / `setEditForm` uygular.
+- Mevcut request-sequence guard korunmustur; gec gelen eski fetch cevabinin state'i ezmesi halen engellenir.
+
+Test guvencesi:
+
+- `tests/unit/usePersonelDetail.test.ts` icinde P1 -> P2 gecisinde P2 fetch beklerken eski P1 state'inin kalmadigi sabitlendi.
+- Detail cache icinde id mismatch varsa state'e yazilmadigi sabitlendi.
+- Gec gelen eski fetch regression testi korunmustur.
+
+Korunan sinirlar:
+
+- `data-manager`, `PersonelDetayPage`, devam primi motoru / hook'u, E2E, finans, bordro, SGK ve dashboard degistirilmedi.
+- Bu checkpoint is kurali degil, personel detail lifecycle hardening'idir.
+
+Son gorulen dogrulama durumu:
+
+- `npx vitest run "tests/unit/usePersonelDetail.test.ts"` -> `3/3` passed
+- `npm run typecheck` -> OK
+- `npm run test` -> `333` passed
+
 ## Geç / Erken Kesinti V1 Sınırı
 
 Bu fazın bilinçli sınırları:

@@ -130,7 +130,7 @@ Ilgili test dosyalari (referans; bu belge test degistirmez):
 Stabilizasyon sonrasi guncel dogrulama:
 
 ```text
-npm run test -> 331 passed
+npm run test -> 333 passed
 npm run typecheck -> OK
 npx playwright test tests/e2e/personel-dosya.spec.ts -> 7 passed
 ```
@@ -165,5 +165,6 @@ Sonraki faz, bu belgedeki kapsam disi maddelerden **ayri bir urun/teknik karar**
 
 | Tarih | Not |
 |---|---|
+| 2026-05-23 | Personel detail cached effect lifecycle hardening sonrasi guncel dogrulama `333 passed` olarak yenilendi. |
 | 2026-05-22 | Cache / gecis stabilizasyonu eklendi; aktif sube fallback izolasyonu, `usePersonelDetail` request guard'i ve personel gecisi E2E kilidi sabitlendi. Guncel dogrulama: `331 passed`, `personel-dosya.spec.ts` `7 passed`. |
 | 2026-05-21 | Devam Primi V2 eligibility faz kapanis checkpoint; mimari ayrim, cikti sinirlari, eksik veri ve personel izolasyonu, test durumu sabitlendi. |

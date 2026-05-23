@@ -4,6 +4,7 @@ import { createElement, type ReactNode } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { APP_DATA_SCHEMA_VERSION } from "../../src/data/app-data.types";
+import { dataCacheKeys, setCacheEntry } from "../../src/data/data-manager";
 import { usePersonelDetail } from "../../src/hooks/usePersoneller";
 import type { Personel } from "../../src/types/personel";
 
@@ -111,5 +112,78 @@ describe("usePersonelDetail", () => {
 
     expect(result.current.personel?.id).toBe(2);
     expect(result.current.editForm.ad).toBe("Guncel");
+  });
+
+  it("P1 den P2 ye geciste P2 fetch beklerken eski P1 personel state te kalmaz", async () => {
+    const firstPersonelRequest = createDeferred<Personel>();
+    const secondPersonelRequest = createDeferred<Personel>();
+
+    personellerApiMock.fetchPersonelDetail.mockImplementation((personelId: number) => {
+      if (personelId === 10) {
+        return firstPersonelRequest.promise;
+      }
+      if (personelId === 11) {
+        return secondPersonelRequest.promise;
+      }
+      throw new Error(`Beklenmeyen personel id: ${personelId}`);
+    });
+
+    const { result, rerender } = renderHook(
+      ({ personelId }) => usePersonelDetail(personelId, true),
+      {
+        initialProps: { personelId: 10 },
+        wrapper
+      }
+    );
+
+    await act(async () => {
+      firstPersonelRequest.resolve(makePersonel(10, "Birinci"));
+      await firstPersonelRequest.promise;
+    });
+
+    await waitFor(() => {
+      expect(result.current.personel?.id).toBe(10);
+    });
+
+    rerender({ personelId: 11 });
+
+    await waitFor(() => {
+      expect(personellerApiMock.fetchPersonelDetail).toHaveBeenCalledWith(11);
+    });
+
+    expect(result.current.personel).toBeNull();
+    expect(result.current.editForm.ad).toBe("");
+
+    await act(async () => {
+      secondPersonelRequest.resolve(makePersonel(11, "Ikinci"));
+      await secondPersonelRequest.promise;
+    });
+  });
+
+  it("detailKey cache id parsedPersonelId ile uyusmuyorsa state e yazmaz", async () => {
+    const personelTwentyRequest = createDeferred<Personel>();
+
+    setCacheEntry(dataCacheKeys.personelDetail(1, 20), makePersonel(1, "YanlisId"));
+
+    personellerApiMock.fetchPersonelDetail.mockImplementation((personelId: number) => {
+      if (personelId === 20) {
+        return personelTwentyRequest.promise;
+      }
+      throw new Error(`Beklenmeyen personel id: ${personelId}`);
+    });
+
+    const { result } = renderHook(() => usePersonelDetail(20, true), { wrapper });
+
+    await waitFor(() => {
+      expect(personellerApiMock.fetchPersonelDetail).toHaveBeenCalledWith(20);
+    });
+
+    expect(result.current.personel).toBeNull();
+    expect(result.current.editForm.ad).toBe("");
+
+    await act(async () => {
+      personelTwentyRequest.resolve(makePersonel(20, "Dogru"));
+      await personelTwentyRequest.promise;
+    });
   });
 });

@@ -743,6 +743,19 @@ function buildPersonelZimmetPayload(
   };
 }
 
+const INITIAL_EDIT_PERSONEL_FORM: EditPersonelFormState = {
+  ad: "",
+  soyad: "",
+  telefon: "",
+  departmanId: "",
+  gorevId: "",
+  bagliAmirId: "",
+  ucretTipiId: "",
+  maasTutari: "",
+  primKuraliId: "",
+  effectiveDate: ""
+};
+
 export function usePersonelDetail(
   parsedPersonelId: number,
   hasValidId: boolean,
@@ -792,18 +805,7 @@ export function usePersonelDetail(
   const [isEditing, setIsEditing] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editErrorMessage, setEditErrorMessage] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState<EditPersonelFormState>({
-    ad: "",
-    soyad: "",
-    telefon: "",
-    departmanId: "",
-    gorevId: "",
-    bagliAmirId: "",
-    ucretTipiId: "",
-    maasTutari: "",
-    primKuraliId: "",
-    effectiveDate: ""
-  });
+  const [editForm, setEditForm] = useState<EditPersonelFormState>(INITIAL_EDIT_PERSONEL_FORM);
   const [editBagliAmirContext, setEditBagliAmirContext] = useState<BagliAmirContext | null>(null);
   const [isSurecModalOpen, setIsSurecModalOpen] = useState(false);
   const [isSurecSubmitting, setIsSurecSubmitting] = useState(false);
@@ -834,11 +836,17 @@ export function usePersonelDetail(
   const [isZimmetHistoryLoading, setIsZimmetHistoryLoading] = useState(false);
 
   useEffect(() => {
-    if (cached) {
+    setPersonel(null);
+    setEditForm(INITIAL_EDIT_PERSONEL_FORM);
+    setEditErrorMessage(null);
+  }, [detailKey, parsedPersonelId]);
+
+  useEffect(() => {
+    if (cached && cached.id === parsedPersonelId) {
       setPersonel(cached);
       setEditForm(personelToEditForm(cached));
     }
-  }, [cached]);
+  }, [cached, parsedPersonelId]);
 
   useEffect(() => {
     deleteCacheEntry(detailKey);

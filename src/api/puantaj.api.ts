@@ -102,7 +102,7 @@ function toBooleanValue(value: unknown): boolean | undefined {
     if (normalized === "true" || normalized === "1" || normalized === "evet") {
       return true;
     }
-    if (normalized === "false" || normalized === "0" || normalized === "hayir") {
+    if (normalized === "false" || normalized === "0" || normalized === "hayir" || normalized === "hayır") {
       return false;
     }
   }
@@ -380,6 +380,17 @@ function normalizeGunlukPuantaj(
     gun_tipi: gunTipi,
     hareket_durumu: hareketDurumu,
     dayanak,
+    durumu_bildirdi_mi: pickBoolean(record, [
+      "durumu_bildirdi_mi",
+      "durumuBildirdiMi",
+      "absence_reported"
+    ]),
+    durum_bildirim_aciklamasi: pickString(record, [
+      "durum_bildirim_aciklamasi",
+      "durumBildirimAciklamasi",
+      "bildirim_aciklamasi",
+      "absence_report_note"
+    ]),
     hesap_etkisi: hesapEtkisi,
     beklenen_giris_saati: beklenenGirisSaati,
     beklenen_cikis_saati: beklenenCikisSaati,

@@ -1670,6 +1670,8 @@ let bildirimIdCounter = 800;
         gun_tipi?: GunlukPuantaj["gun_tipi"];
         hareket_durumu?: GunlukPuantaj["hareket_durumu"];
         dayanak?: GunlukPuantaj["dayanak"];
+        durumu_bildirdi_mi?: boolean | null;
+        durum_bildirim_aciklamasi?: string | null;
         beklenen_giris_saati?: string;
         beklenen_cikis_saati?: string;
         giris_saati?: string;
@@ -1695,6 +1697,16 @@ let bildirimIdCounter = 800;
         gun_tipi: payload.gun_tipi ?? oncekiKayit.gun_tipi ?? "Normal_Is_Gunu",
         hareket_durumu: payload.hareket_durumu ?? oncekiKayit.hareket_durumu ?? "Geldi",
         dayanak: payload.dayanak ?? oncekiKayit.dayanak,
+        durumu_bildirdi_mi:
+          "durumu_bildirdi_mi" in payload
+            ? payload.durumu_bildirdi_mi ?? undefined
+            : oncekiKayit.durumu_bildirdi_mi,
+        durum_bildirim_aciklamasi:
+          payload.durumu_bildirdi_mi === true
+            ? payload.durum_bildirim_aciklamasi ?? undefined
+            : "durumu_bildirdi_mi" in payload
+              ? undefined
+              : oncekiKayit.durum_bildirim_aciklamasi,
         beklenen_giris_saati: payload.beklenen_giris_saati ?? oncekiKayit.beklenen_giris_saati,
         beklenen_cikis_saati: payload.beklenen_cikis_saati ?? oncekiKayit.beklenen_cikis_saati,
         giris_saati: payload.giris_saati ?? oncekiKayit.giris_saati ?? "08:30",

@@ -82,6 +82,8 @@ type DemoPuantaj = {
     | "Raporlu_Is_Kazasi"
     | "Yillik_Izin"
     | "Telafi_Calismasi";
+  durumu_bildirdi_mi?: boolean;
+  durum_bildirim_aciklamasi?: string;
   hesap_etkisi?: "Kesinti_Yap" | "Tam_Yevmiye_Ver" | "Mesai_Yaz";
   beklenen_giris_saati?: string;
   beklenen_cikis_saati?: string;
@@ -648,6 +650,25 @@ function toStringValue(value: unknown): string | null {
   return trimmed || null;
 }
 
+function toBooleanValue(value: unknown): boolean | null {
+  if (typeof value === "boolean") {
+    return value;
+  }
+
+  if (typeof value === "number") {
+    if (value === 1) return true;
+    if (value === 0) return false;
+  }
+
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === "true" || normalized === "1" || normalized === "evet") return true;
+    if (normalized === "false" || normalized === "0" || normalized === "hayir" || normalized === "hayır") return false;
+  }
+
+  return null;
+}
+
 function readBody(init?: RequestInit): Record<string, unknown> {
   if (!init?.body || typeof init.body !== "string") {
     return {};
@@ -704,6 +725,8 @@ type DemoPuantajBuildParams = {
   gunTipi: NonNullable<DemoPuantaj["gun_tipi"]>;
   hareketDurumu: NonNullable<DemoPuantaj["hareket_durumu"]>;
   dayanak?: DemoPuantaj["dayanak"];
+  durumuBildirdiMi?: boolean;
+  durumBildirimAciklamasi?: string;
   hesapEtkisi?: DemoPuantaj["hesap_etkisi"];
   beklenenGirisSaati?: string;
   beklenenCikisSaati?: string;
@@ -788,6 +811,8 @@ function buildDemoPuantaj(params: DemoPuantajBuildParams): DemoPuantaj {
     gun_tipi: params.gunTipi,
     hareket_durumu: params.hareketDurumu,
     dayanak: params.dayanak,
+    durumu_bildirdi_mi: params.durumuBildirdiMi,
+    durum_bildirim_aciklamasi: params.durumBildirimAciklamasi,
     hesap_etkisi: params.hesapEtkisi,
     beklenen_giris_saati: params.beklenenGirisSaati,
     beklenen_cikis_saati: params.beklenenCikisSaati,
@@ -1557,11 +1582,29 @@ export function resolveDemoApiResponse(
     }
 
     if (method === "PUT") {
+      const hasDurumuBildirdiMi = Object.prototype.hasOwnProperty.call(body, "durumu_bildirdi_mi");
+      const hasDurumBildirimAciklamasi = Object.prototype.hasOwnProperty.call(
+        body,
+        "durum_bildirim_aciklamasi"
+      );
+      const nextDurumuBildirdiMi = toBooleanValue(body.durumu_bildirdi_mi);
+      const nextDurumBildirimAciklamasi =
+        nextDurumuBildirdiMi === true
+          ? hasDurumBildirimAciklamasi
+            ? toStringValue(body.durum_bildirim_aciklamasi) ?? undefined
+            : existing.durum_bildirim_aciklamasi
+          : hasDurumuBildirdiMi
+            ? undefined
+            : existing.durum_bildirim_aciklamasi;
       const updated: DemoPuantaj = {
         ...existing,
         gun_tipi: readDemoPuantajGunTipi(body.gun_tipi) ?? existing.gun_tipi,
         hareket_durumu: readDemoPuantajHareketDurumu(body.hareket_durumu) ?? existing.hareket_durumu,
         dayanak: readDemoPuantajDayanak(body.dayanak) ?? existing.dayanak,
+        durumu_bildirdi_mi: hasDurumuBildirdiMi
+          ? nextDurumuBildirdiMi ?? undefined
+          : existing.durumu_bildirdi_mi,
+        durum_bildirim_aciklamasi: nextDurumBildirimAciklamasi,
         hesap_etkisi: readDemoPuantajHesapEtkisi(body.hesap_etkisi) ?? existing.hesap_etkisi,
         beklenen_giris_saati: toStringValue(body.beklenen_giris_saati) ?? existing.beklenen_giris_saati,
         beklenen_cikis_saati: toStringValue(body.beklenen_cikis_saati) ?? existing.beklenen_cikis_saati,

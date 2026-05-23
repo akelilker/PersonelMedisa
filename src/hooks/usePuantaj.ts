@@ -81,6 +81,8 @@ export type GunlukPuantajFormState = {
   entryGunTipi: PuantajGunTipi | "";
   entryHareketDurumu: PuantajHareketDurumu | "";
   entryDayanak: PuantajDayanak | "";
+  entryDurumuBildirdiMi: "" | "evet" | "hayir";
+  entryDurumBildirimAciklamasi: string;
   entryBeklenenGirisSaati: string;
   entryBeklenenCikisSaati: string;
   entryGirisSaati: string;
@@ -96,6 +98,8 @@ function toPuantajFormState(
   | "entryGunTipi"
   | "entryHareketDurumu"
   | "entryDayanak"
+  | "entryDurumuBildirdiMi"
+  | "entryDurumBildirimAciklamasi"
   | "entryBeklenenGirisSaati"
   | "entryBeklenenCikisSaati"
   | "entryGirisSaati"
@@ -108,6 +112,13 @@ function toPuantajFormState(
     entryGunTipi: puantaj?.gun_tipi ?? deriveGunTipiFromDateInput(effectiveTarih),
     entryHareketDurumu: puantaj?.hareket_durumu ?? "",
     entryDayanak: puantaj?.dayanak ?? "",
+    entryDurumuBildirdiMi:
+      puantaj?.durumu_bildirdi_mi === true
+        ? "evet"
+        : puantaj?.durumu_bildirdi_mi === false
+          ? "hayir"
+          : "",
+    entryDurumBildirimAciklamasi: puantaj?.durum_bildirim_aciklamasi ?? "",
     entryBeklenenGirisSaati: puantaj?.beklenen_giris_saati ?? "",
     entryBeklenenCikisSaati: puantaj?.beklenen_cikis_saati ?? "",
     entryGirisSaati: puantaj?.giris_saati ?? "",
@@ -163,6 +174,8 @@ const INITIAL_FORM: GunlukPuantajFormState = {
   entryGunTipi: deriveGunTipiFromDateInput(TODAY_INPUT),
   entryHareketDurumu: "",
   entryDayanak: "",
+  entryDurumuBildirdiMi: "",
+  entryDurumBildirimAciklamasi: "",
   entryBeklenenGirisSaati: "",
   entryBeklenenCikisSaati: "",
   entryGirisSaati: "",
@@ -852,9 +865,25 @@ export function usePuantaj() {
         const gunTipi = formState.entryGunTipi || deriveGunTipiFromDateInput(activeQuery.tarih);
         const hareketDurumu = formState.entryHareketDurumu;
         const dayanak = formState.entryDayanak || undefined;
+        const durumuBildirdiMi =
+          hareketDurumu === "Gelmedi"
+            ? formState.entryDurumuBildirdiMi === "evet"
+              ? true
+              : formState.entryDurumuBildirdiMi === "hayir"
+                ? false
+                : undefined
+            : undefined;
+        const durumBildirimAciklamasi =
+          durumuBildirdiMi === true
+            ? formState.entryDurumBildirimAciklamasi.trim() || undefined
+            : undefined;
 
         if (!hareketDurumu) {
           throw new Error("Hareket durumu zorunludur.");
+        }
+
+        if (hareketDurumu === "Gelmedi" && durumuBildirdiMi === undefined) {
+          throw new Error("Durumu bildirdi mi alanı zorunludur.");
         }
 
         const beklenenSaatBilgisiGosterilmeliMi =
@@ -872,6 +901,9 @@ export function usePuantaj() {
           gun_tipi: gunTipi,
           hareket_durumu: hareketDurumu,
           dayanak,
+          durumu_bildirdi_mi: hareketDurumu === "Gelmedi" ? durumuBildirdiMi : null,
+          durum_bildirim_aciklamasi:
+            durumuBildirdiMi === true ? durumBildirimAciklamasi ?? null : null,
           beklenen_giris_saati: beklenenSaatBilgisiGosterilmeliMi ? (beklenenGirisSaati || undefined) : undefined,
           beklenen_cikis_saati: beklenenSaatBilgisiGosterilmeliMi ? (beklenenCikisSaati || undefined) : undefined,
           giris_saati: hareketDurumuSaatGerekliMi(hareketDurumu) ? girisSaati : undefined,
@@ -910,9 +942,13 @@ export function usePuantaj() {
           cikis_saati: body.cikis_saati,
           gercek_mola_dakika: body.gercek_mola_dakika
         });
-        const optimistic = hesapSonucuToGunlukPuantaj(hesapSonucu, puantaj?.state ?? "ACIK", {
-          kontrol_durumu: puantaj?.kontrol_durumu ?? "BEKLIYOR"
-        });
+        const optimistic: GunlukPuantaj = {
+          ...hesapSonucuToGunlukPuantaj(hesapSonucu, puantaj?.state ?? "ACIK", {
+            kontrol_durumu: puantaj?.kontrol_durumu ?? "BEKLIYOR"
+          }),
+          durumu_bildirdi_mi: body.durumu_bildirdi_mi ?? undefined,
+          durum_bildirim_aciklamasi: body.durum_bildirim_aciklamasi ?? undefined
+        };
 
         const previousPuantaj = puantaj;
         mergePuantajCache(activeQuery.personelId, activeQuery.tarih, optimistic);
@@ -957,6 +993,8 @@ export function usePuantaj() {
       formState.entryBeklenenGirisSaati,
       formState.entryCikisSaati,
       formState.entryDayanak,
+      formState.entryDurumBildirimAciklamasi,
+      formState.entryDurumuBildirdiMi,
       formState.entryGercekMolaDakika,
       formState.entryGirisSaati,
       formState.entryGunTipi,

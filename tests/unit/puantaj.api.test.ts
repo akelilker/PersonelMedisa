@@ -63,6 +63,8 @@ describe("puantaj.api", () => {
       gun_tipi: "Normal_Is_Gunu",
       hareket_durumu: "Geldi",
       dayanak: undefined,
+      durumu_bildirdi_mi: undefined,
+      durum_bildirim_aciklamasi: undefined,
       hesap_etkisi: "Tam_Yevmiye_Ver",
       beklenen_giris_saati: undefined,
       beklenen_cikis_saati: undefined,
@@ -144,6 +146,8 @@ describe("puantaj.api", () => {
               tarih: "2026-04-20",
               beklenen_giris_saati: "08:00",
               beklenen_cikis_saati: "17:30",
+              durumu_bildirdi_mi: true,
+              durum_bildirim_aciklamasi: "Telefonla haber verdi.",
               giris_saati: "09:00",
               cikis_saati: "18:00",
               gercek_mola_dakika: 45,
@@ -162,6 +166,8 @@ describe("puantaj.api", () => {
     const result = await upsertGunlukPuantaj(12, "2026-04-20", {
       beklenen_giris_saati: "08:00",
       beklenen_cikis_saati: "17:30",
+      durumu_bildirdi_mi: true,
+      durum_bildirim_aciklamasi: "Telefonla haber verdi.",
       giris_saati: "09:00",
       cikis_saati: "18:00",
       gercek_mola_dakika: 45,
@@ -175,6 +181,8 @@ describe("puantaj.api", () => {
       JSON.stringify({
         beklenen_giris_saati: "08:00",
         beklenen_cikis_saati: "17:30",
+        durumu_bildirdi_mi: true,
+        durum_bildirim_aciklamasi: "Telefonla haber verdi.",
         giris_saati: "09:00",
         cikis_saati: "18:00",
         gercek_mola_dakika: 45,
@@ -185,6 +193,8 @@ describe("puantaj.api", () => {
     expect(result.tarih).toBe("2026-04-20");
     expect(result.beklenen_giris_saati).toBe("08:00");
     expect(result.beklenen_cikis_saati).toBe("17:30");
+    expect(result.durumu_bildirdi_mi).toBe(true);
+    expect(result.durum_bildirim_aciklamasi).toBe("Telefonla haber verdi.");
     expect(result.kontrol_durumu).toBe("AMIR_KONTROL_ETTI");
   });
 

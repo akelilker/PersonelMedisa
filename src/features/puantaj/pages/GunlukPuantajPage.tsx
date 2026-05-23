@@ -37,6 +37,11 @@ const DAYANAK_OPTIONS: Array<{ value: PuantajDayanak; label: string }> = [
   { value: "Telafi_Calismasi", label: "Telafi Çalışması" }
 ];
 
+const DURUMU_BILDIRDI_OPTIONS = [
+  { value: "evet", label: "Evet" },
+  { value: "hayir", label: "Hayır" }
+];
+
 const GUN_TIPI_LABELS: Record<PuantajGunTipi, string> = Object.fromEntries(
   GUN_TIPI_OPTIONS.map((option) => [option.value, option.label])
 ) as Record<PuantajGunTipi, string>;
@@ -495,7 +500,18 @@ export function GunlukPuantajPage() {
               label="Hareket Durumu"
               name="puantaj-hareket-durumu"
               value={formState.entryHareketDurumu}
-              onChange={(value) => patchFormState({ entryHareketDurumu: value as PuantajHareketDurumu | "" })}
+              onChange={(value) => {
+                const hareketDurumu = value as PuantajHareketDurumu | "";
+                patchFormState({
+                  entryHareketDurumu: hareketDurumu,
+                  ...(hareketDurumu === "Gelmedi"
+                    ? {}
+                    : {
+                        entryDurumuBildirdiMi: "",
+                        entryDurumBildirimAciklamasi: ""
+                      })
+                });
+              }}
               selectOptions={HAREKET_DURUMU_OPTIONS}
               placeholderOption={{ value: "", label: "Seçiniz" }}
               required
@@ -510,6 +526,36 @@ export function GunlukPuantajPage() {
               placeholderOption={{ value: "", label: "Yok / Belirtilmedi" }}
             />
           </div>
+
+          {formState.entryHareketDurumu === "Gelmedi" ? (
+            <div className="form-field-grid">
+              <FormField
+                as="select"
+                label="Durumu Bildirdi mi?"
+                name="puantaj-durumu-bildirdi-mi"
+                value={formState.entryDurumuBildirdiMi}
+                onChange={(value) =>
+                  patchFormState({
+                    entryDurumuBildirdiMi: value as "" | "evet" | "hayir",
+                    ...(value === "evet" ? {} : { entryDurumBildirimAciklamasi: "" })
+                  })
+                }
+                selectOptions={DURUMU_BILDIRDI_OPTIONS}
+                placeholderOption={{ value: "", label: "Seçiniz" }}
+                required
+              />
+              {formState.entryDurumuBildirdiMi === "evet" ? (
+                <FormField
+                  as="textarea"
+                  label="Açıklama"
+                  name="puantaj-durum-bildirim-aciklamasi"
+                  value={formState.entryDurumBildirimAciklamasi}
+                  onChange={(value) => patchFormState({ entryDurumBildirimAciklamasi: value })}
+                  rows={3}
+                />
+              ) : null}
+            </div>
+          ) : null}
 
           <div className="form-field-grid">
             <FormField

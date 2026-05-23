@@ -41,6 +41,8 @@ export type GunlukPuantaj = {
   gun_tipi?: PuantajGunTipi;
   hareket_durumu?: PuantajHareketDurumu;
   dayanak?: PuantajDayanak;
+  durumu_bildirdi_mi?: boolean | null;
+  durum_bildirim_aciklamasi?: string;
   hesap_etkisi?: PuantajHesapEtkisi;
   beklenen_giris_saati?: string;
   beklenen_cikis_saati?: string;
@@ -60,6 +62,8 @@ export type UpsertGunlukPuantajPayload = {
   gun_tipi?: PuantajGunTipi;
   hareket_durumu?: PuantajHareketDurumu;
   dayanak?: PuantajDayanak;
+  durumu_bildirdi_mi?: boolean | null;
+  durum_bildirim_aciklamasi?: string | null;
   beklenen_giris_saati?: string;
   beklenen_cikis_saati?: string;
   giris_saati?: string;

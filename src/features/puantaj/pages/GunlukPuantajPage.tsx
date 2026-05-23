@@ -493,6 +493,7 @@ export function GunlukPuantajPage() {
               value={formState.entryGunTipi}
               onChange={(value) => patchFormState({ entryGunTipi: value as PuantajGunTipi })}
               selectOptions={GUN_TIPI_OPTIONS}
+              disabled={isLoading}
               required
             />
             <FormField
@@ -514,6 +515,7 @@ export function GunlukPuantajPage() {
               }}
               selectOptions={HAREKET_DURUMU_OPTIONS}
               placeholderOption={{ value: "", label: "Seçiniz" }}
+              disabled={isLoading}
               required
             />
             <FormField
@@ -524,6 +526,7 @@ export function GunlukPuantajPage() {
               onChange={(value) => patchFormState({ entryDayanak: value as PuantajDayanak | "" })}
               selectOptions={DAYANAK_OPTIONS}
               placeholderOption={{ value: "", label: "Yok / Belirtilmedi" }}
+              disabled={isLoading}
             />
           </div>
 
@@ -542,6 +545,7 @@ export function GunlukPuantajPage() {
                 }
                 selectOptions={DURUMU_BILDIRDI_OPTIONS}
                 placeholderOption={{ value: "", label: "Seçiniz" }}
+                disabled={isLoading}
                 required
               />
               {formState.entryDurumuBildirdiMi === "evet" ? (
@@ -552,6 +556,7 @@ export function GunlukPuantajPage() {
                   value={formState.entryDurumBildirimAciklamasi}
                   onChange={(value) => patchFormState({ entryDurumBildirimAciklamasi: value })}
                   rows={3}
+                  disabled={isLoading}
                 />
               ) : null}
             </div>
@@ -565,7 +570,7 @@ export function GunlukPuantajPage() {
               value={formState.entryGirisSaati}
               onChange={(value) => patchFormState({ entryGirisSaati: value })}
               required={entryRequiresSaatBilgisi}
-              disabled={!entryRequiresSaatBilgisi}
+              disabled={isLoading || !entryRequiresSaatBilgisi}
             />
             <FormField
               label="Çıkış Saati"
@@ -574,7 +579,7 @@ export function GunlukPuantajPage() {
               value={formState.entryCikisSaati}
               onChange={(value) => patchFormState({ entryCikisSaati: value })}
               required={entryRequiresSaatBilgisi}
-              disabled={!entryRequiresSaatBilgisi}
+              disabled={isLoading || !entryRequiresSaatBilgisi}
             />
             <FormField
               label="Gerçek Mola (dk)"
@@ -583,7 +588,7 @@ export function GunlukPuantajPage() {
               min={0}
               value={formState.entryGercekMolaDakika}
               onChange={(value) => patchFormState({ entryGercekMolaDakika: value })}
-              disabled={!entryRequiresSaatBilgisi}
+              disabled={isLoading || !entryRequiresSaatBilgisi}
             />
           </div>
 
@@ -595,6 +600,7 @@ export function GunlukPuantajPage() {
                 type="time"
                 value={formState.entryBeklenenGirisSaati}
                 onChange={(value) => patchFormState({ entryBeklenenGirisSaati: value })}
+                disabled={isLoading}
               />
               <FormField
                 label="Beklenen Çıkış Saati"
@@ -602,6 +608,7 @@ export function GunlukPuantajPage() {
                 type="time"
                 value={formState.entryBeklenenCikisSaati}
                 onChange={(value) => patchFormState({ entryBeklenenCikisSaati: value })}
+                disabled={isLoading}
               />
             </div>
           ) : null}
@@ -625,7 +632,7 @@ export function GunlukPuantajPage() {
             <button
               type="submit"
               className="universal-btn-aux"
-              disabled={!activeQuery || !canEditForm || isSubmitting || isKontrolSubmitting}
+              disabled={!activeQuery || !canEditForm || isLoading || isSubmitting || isKontrolSubmitting}
               data-testid="puantaj-kaydet"
             >
               {isSubmitting ? "Kaydediliyor..." : "Kaydet"}

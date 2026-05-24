@@ -641,6 +641,66 @@ export function siniflandirPuantajEksikGunEtkisi(
   };
 }
 
+export type AylikPuantajEksikGunOzetiGirdisi = {
+  kayitlar: readonly PuantajEksikGunSiniflandirmaGirdisi[];
+};
+
+export type AylikPuantajEksikGunOzetiSonucu = {
+  toplam_kayit_sayisi: number;
+  eksik_gun_adayi_kayit_sayisi: number;
+  sgk_prim_gununu_dusuren_eksik_gun_sayisi: number;
+  manuel_inceleme_kayit_sayisi: number;
+  dakika_bazli_ucret_etkisi_adayi_sayisi: number;
+  gunluk_kesinti_adayi_sayisi: number;
+  ucret_korunan_kayit_sayisi: number;
+  haberli_yokluk_sinyali_sayisi: number;
+  habersiz_yokluk_sinyali_sayisi: number;
+  kesin_sgk_prim_gunu_hesaplanabilir_mi: boolean;
+  siniflandirmalar: PuantajEksikGunSiniflandirmaSonucu[];
+  aciklama: string;
+};
+
+export function hesaplaAylikPuantajEksikGunOzeti(
+  girdi: AylikPuantajEksikGunOzetiGirdisi
+): AylikPuantajEksikGunOzetiSonucu {
+  const siniflandirmalar = girdi.kayitlar.map((kayit) => siniflandirPuantajEksikGunEtkisi(kayit));
+
+  const toplam_kayit_sayisi = siniflandirmalar.length;
+  const eksik_gun_adayi_kayit_sayisi = siniflandirmalar.filter((s) => s.eksik_gun_adayi_mi).length;
+  const sgk_prim_gununu_dusuren_eksik_gun_sayisi = siniflandirmalar.reduce(
+    (toplam, s) => toplam + (s.sgk_prim_gununu_dusurur_mu ? s.eksik_gun_sayisi : 0),
+    0
+  );
+  const manuel_inceleme_kayit_sayisi = siniflandirmalar.filter((s) => s.manuel_inceleme_gerekli_mi).length;
+  const dakika_bazli_ucret_etkisi_adayi_sayisi = siniflandirmalar.filter(
+    (s) => s.ucret_etkisi_turu === "DAKIKA_BAZLI_KESINTI_ADAYI"
+  ).length;
+  const gunluk_kesinti_adayi_sayisi = siniflandirmalar.filter(
+    (s) => s.ucret_etkisi_turu === "GUNLUK_KESINTI_ADAYI"
+  ).length;
+  const ucret_korunan_kayit_sayisi = siniflandirmalar.filter((s) => s.ucret_etkisi_turu === "UCRET_KORUNUR").length;
+  const haberli_yokluk_sinyali_sayisi = siniflandirmalar.filter((s) => s.haberli_yokluk_sinyali_mi).length;
+  const habersiz_yokluk_sinyali_sayisi = siniflandirmalar.filter((s) => s.habersiz_yokluk_sinyali_mi).length;
+  const kesin_sgk_prim_gunu_hesaplanabilir_mi = manuel_inceleme_kayit_sayisi === 0;
+
+  return {
+    toplam_kayit_sayisi,
+    eksik_gun_adayi_kayit_sayisi,
+    sgk_prim_gununu_dusuren_eksik_gun_sayisi,
+    manuel_inceleme_kayit_sayisi,
+    dakika_bazli_ucret_etkisi_adayi_sayisi,
+    gunluk_kesinti_adayi_sayisi,
+    ucret_korunan_kayit_sayisi,
+    haberli_yokluk_sinyali_sayisi,
+    habersiz_yokluk_sinyali_sayisi,
+    kesin_sgk_prim_gunu_hesaplanabilir_mi,
+    siniflandirmalar,
+    aciklama: kesin_sgk_prim_gunu_hesaplanabilir_mi
+      ? "Aylik eksik gun ozeti manuel inceleme gerektiren kayit olmadan hesaplandi."
+      : "Aylik eksik gun ozeti manuel inceleme gerektiren kayitlar icerir; kesin SGK prim gunu karari verilmemelidir."
+  };
+}
+
 export type SgkPrimGunuHesapGirdisi = {
   takvim_gunu: number;
   eksik_gun: number;

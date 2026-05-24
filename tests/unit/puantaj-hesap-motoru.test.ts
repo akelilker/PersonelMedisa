@@ -28,6 +28,7 @@ import {
   hesaplaGecKalmaErkenCikmaKesintiOzeti,
   hesaplaDevamsizlikKesintiOzeti,
   siniflandirPuantajEksikGunEtkisi,
+  hesaplaAylikPuantajEksikGunOzeti,
   hesaplaSgkPrimGunu,
   hesaplaTatilEkOdemeOzeti,
   hesaplaHaftaTatiliPazarEtkisi,
@@ -1353,6 +1354,67 @@ describe("siniflandirPuantajEksikGunEtkisi", () => {
       });
     }
   );
+});
+
+describe("hesaplaAylikPuantajEksikGunOzeti", () => {
+  it("gunluk siniflandirmalardan aylik eksik gun ve ucret etkisi toplamlarini uretir", () => {
+    const o = hesaplaAylikPuantajEksikGunOzeti({
+      kayitlar: [
+        { hareket_durumu: "Geldi" },
+        { hareket_durumu: "Gec_Geldi" },
+        { hareket_durumu: "Erken_Cikti" },
+        { hareket_durumu: "Gelmedi", dayanak: "Yok_Izinsiz", durumu_bildirdi_mi: false },
+        { hareket_durumu: "Gelmedi", dayanak: "Ucretli_Izinli", durumu_bildirdi_mi: true },
+        { hareket_durumu: "Gelmedi", dayanak: "Yillik_Izin" }
+      ]
+    });
+
+    expect(o).toMatchObject({
+      toplam_kayit_sayisi: 6,
+      eksik_gun_adayi_kayit_sayisi: 1,
+      sgk_prim_gununu_dusuren_eksik_gun_sayisi: 1,
+      manuel_inceleme_kayit_sayisi: 0,
+      dakika_bazli_ucret_etkisi_adayi_sayisi: 2,
+      gunluk_kesinti_adayi_sayisi: 1,
+      ucret_korunan_kayit_sayisi: 2,
+      haberli_yokluk_sinyali_sayisi: 1,
+      habersiz_yokluk_sinyali_sayisi: 1,
+      kesin_sgk_prim_gunu_hesaplanabilir_mi: true
+    });
+    expect(o.siniflandirmalar).toHaveLength(6);
+  });
+
+  it("raporlu gunleri otomatik SGK dusumune eklemez ve aylik ozeti manuel incelemeye alir", () => {
+    const o = hesaplaAylikPuantajEksikGunOzeti({
+      kayitlar: [
+        { hareket_durumu: "Gelmedi", dayanak: "Yok_Izinsiz" },
+        { hareket_durumu: "Gelmedi", dayanak: "Raporlu_Hastalik" },
+        { hareket_durumu: "Gelmedi", dayanak: "Raporlu_Is_Kazasi" }
+      ]
+    });
+
+    expect(o.sgk_prim_gununu_dusuren_eksik_gun_sayisi).toBe(1);
+    expect(o.manuel_inceleme_kayit_sayisi).toBe(2);
+    expect(o.kesin_sgk_prim_gunu_hesaplanabilir_mi).toBe(false);
+  });
+
+  it("bos kayit listesi icin sifirli ve hesaplanabilir ozet dondurur", () => {
+    const o = hesaplaAylikPuantajEksikGunOzeti({ kayitlar: [] });
+
+    expect(o).toMatchObject({
+      toplam_kayit_sayisi: 0,
+      eksik_gun_adayi_kayit_sayisi: 0,
+      sgk_prim_gununu_dusuren_eksik_gun_sayisi: 0,
+      manuel_inceleme_kayit_sayisi: 0,
+      dakika_bazli_ucret_etkisi_adayi_sayisi: 0,
+      gunluk_kesinti_adayi_sayisi: 0,
+      ucret_korunan_kayit_sayisi: 0,
+      haberli_yokluk_sinyali_sayisi: 0,
+      habersiz_yokluk_sinyali_sayisi: 0,
+      kesin_sgk_prim_gunu_hesaplanabilir_mi: true
+    });
+    expect(o.siniflandirmalar).toEqual([]);
+  });
 });
 
 describe("hesaplaSgkPrimGunu", () => {

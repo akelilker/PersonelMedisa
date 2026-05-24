@@ -826,13 +826,7 @@ function PersonelIzinDevamsizlikPanel({
   );
 
   return (
-    <div
-      id="personel-kart-panel-izin-devamsizlik"
-      role="tabpanel"
-      className="personel-kart-panel"
-      aria-labelledby="personel-kart-tab-izin-devamsizlik"
-    >
-      <div className="personel-detail-grid">
+    <div className="personel-detail-grid">
         <section className="personel-detail-section">
           <h3>İzin Hakkı</h3>
           {bakiye ? (
@@ -889,7 +883,6 @@ function PersonelIzinDevamsizlikPanel({
           )}
         </section>
       </div>
-    </div>
   );
 }
 
@@ -1447,10 +1440,18 @@ export function PersonelDetayPage() {
                 <PersonelPuantajPanel personel={personel} canViewPuantaj={canViewPuantaj} />
               </div>
 
-              <PersonelIzinDevamsizlikPanel
-                personel={personel}
-                surecler={surecHistory}
-              />
+              <div
+                id="personel-kart-panel-izin-devamsizlik"
+                role="tabpanel"
+                className="personel-kart-panel"
+                aria-labelledby="personel-kart-tab-izin-devamsizlik"
+                hidden={activeTab !== "izin-devamsizlik"}
+              >
+                <PersonelIzinDevamsizlikPanel
+                  personel={personel}
+                  surecler={surecHistory}
+                />
+              </div>
 
               <div
                 id="personel-kart-panel-zimmet-envanter"

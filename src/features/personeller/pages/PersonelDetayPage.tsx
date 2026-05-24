@@ -10,6 +10,7 @@ import {
   useDevamPrimiEligibilityOzeti,
   type DevamPrimiEligibilityDurum
 } from "../../../hooks/useDevamPrimiEligibilityOzeti";
+import { usePuantajEksikGunOzeti } from "../../../hooks/usePuantajEksikGunOzeti";
 import { usePersonelDetail } from "../../../hooks/usePersoneller";
 import { PersonelZimmetCreateForm } from "../components/PersonelZimmetCreateForm";
 import {
@@ -664,6 +665,7 @@ function PersonelPuantajPanel({
   canViewPuantaj: boolean;
 }) {
   const devamPrimiOzeti = useDevamPrimiEligibilityOzeti(personel);
+  const puantajEksikGunOzeti = usePuantajEksikGunOzeti(personel);
   const sgkPrimGunu = typeof personel.sgk_prim_gun === "number" ? `${personel.sgk_prim_gun} Gün` : "-";
   const eksikGun = typeof personel.sgk_eksik_gun_sayisi === "number" ? `${personel.sgk_eksik_gun_sayisi} Gün` : "-";
   const eksikGunNedeni = formatDetailValue(personel.sgk_eksik_gun_nedeni_kodu);
@@ -725,6 +727,27 @@ function PersonelPuantajPanel({
         <DossierRecord label="Eksik Gün Nedeni" value={eksikGunNedeni} />
         <DossierRecord label="Takvim Gün Sayısı" value={takvimGun} />
         <DossierRecord label="Hesaplama Modu" value={hesaplamaModu} />
+        {puantajEksikGunOzeti ? (
+          <>
+            <DossierRecord label="Çekirdek Durum" value={puantajEksikGunOzeti.durumLabel} />
+            <DossierRecord
+              label="Önbellek Kapsamı"
+              value={`${puantajEksikGunOzeti.toplamKayitSayisi}/${puantajEksikGunOzeti.donemGunSayisi} Gün`}
+            />
+            <DossierRecord
+              label="SGK Düşüren Eksik Gün Adayı"
+              value={`${puantajEksikGunOzeti.sgkPrimGununuDusurenEksikGunSayisi} Gün`}
+            />
+            <DossierRecord
+              label="Manuel İnceleme Kaydı"
+              value={String(puantajEksikGunOzeti.manuelIncelemeKayitSayisi)}
+            />
+            <DossierRecord
+              label="Haberli / Habersiz Yokluk"
+              value={`${puantajEksikGunOzeti.haberliYoklukSinyaliSayisi} / ${puantajEksikGunOzeti.habersizYoklukSinyaliSayisi}`}
+            />
+          </>
+        ) : null}
       </DossierSection>
 
       <PlaceholderPanel

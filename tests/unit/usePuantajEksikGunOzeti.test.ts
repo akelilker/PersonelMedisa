@@ -1,8 +1,8 @@
 /** @vitest-environment jsdom */
-import { renderHook } from "@testing-library/react";
+import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { APP_DATA_SCHEMA_VERSION } from "../../src/data/app-data.types";
-import { dataCacheKeys, setCacheEntry } from "../../src/data/data-manager";
+import { dataCacheKeys, getCacheEntry, setCacheEntry } from "../../src/data/data-manager";
 import { hesaplaAylikPuantajEksikGunOzeti } from "../../src/services/puantaj-hesap-motoru";
 import {
   PUANTAJ_EKSIK_GUN_VERI_KAPSAMI_EKSIK_ACIKLAMA,
@@ -14,6 +14,11 @@ import type { GunlukPuantaj } from "../../src/types/puantaj";
 
 const NISAN_2026_GUN_SAYISI = 30;
 let activeSubeId: number | null = 2;
+const fetchGunlukPuantajMock = vi.hoisted(() => vi.fn());
+
+vi.mock("../../src/api/puantaj.api", () => ({
+  fetchGunlukPuantaj: fetchGunlukPuantajMock
+}));
 
 vi.mock("../../src/state/auth.store", () => ({
   useAuth: () => ({
@@ -54,6 +59,7 @@ function makePuantaj(overrides: Partial<GunlukPuantaj> & Pick<GunlukPuantaj, "ta
 
 beforeEach(() => {
   activeSubeId = 2;
+  fetchGunlukPuantajMock.mockReset();
   resetAppDataCache();
 });
 
@@ -191,6 +197,26 @@ describe("usePuantajEksikGunOzeti", () => {
     expect(result.current?.kayitKapsamiNotu).toContain("0/30");
   });
 
+  it("cache'te null olan tarihi eksik saymaz ama hesap kayitlarina katmaz", () => {
+    setCacheEntry(dataCacheKeys.puantajDetail(2, 1, "2026-04-01"), null);
+    setCacheEntry(
+      dataCacheKeys.puantajDetail(2, 1, "2026-04-02"),
+      makePuantaj({
+        tarih: "2026-04-02",
+        hareket_durumu: "Gelmedi",
+        dayanak: "Yok_Izinsiz"
+      })
+    );
+
+    const { result } = renderHook(() => usePuantajEksikGunOzeti(makePersonel()));
+
+    expect(result.current?.toplamKayitSayisi).toBe(1);
+    expect(result.current?.eksikTarihSayisi).toBe(28);
+    expect(result.current?.eksikTarihListesi).not.toContain("2026-04-01");
+    expect(result.current?.eksikTarihListesi).not.toContain("2026-04-02");
+    expect(result.current?.sgkPrimGununuDusurenEksikGunSayisi).toBe(1);
+  });
+
   it("tam ay cache doluysa veri kapsamini tam gosterir", () => {
     for (let day = 1; day <= NISAN_2026_GUN_SAYISI; day++) {
       const tarih = `2026-04-${String(day).padStart(2, "0")}`;
@@ -210,5 +236,67 @@ describe("usePuantajEksikGunOzeti", () => {
     expect(result.current?.eksikTarihSayisi).toBe(0);
     expect(result.current?.eksikTarihListesi).toEqual([]);
     expect(result.current?.kesinSgkPrimGunuHesaplanabilirMi).toBe(true);
+  });
+
+  it("hydrateEksikPuantajTarihleri sadece ilk 7 eksik tarihi fetch eder", async () => {
+    fetchGunlukPuantajMock.mockImplementation(async (personelId: number, tarih: string) =>
+      makePuantaj({
+        personel_id: personelId,
+        tarih,
+        hareket_durumu: "Geldi"
+      })
+    );
+
+    const { result } = renderHook(() => usePuantajEksikGunOzeti(makePersonel()));
+
+    await act(async () => {
+      await result.current?.hydrateEksikPuantajTarihleri();
+    });
+
+    expect(fetchGunlukPuantajMock).toHaveBeenCalledTimes(7);
+    expect(fetchGunlukPuantajMock.mock.calls.map((call) => call[1])).toEqual([
+      "2026-04-01",
+      "2026-04-02",
+      "2026-04-03",
+      "2026-04-04",
+      "2026-04-05",
+      "2026-04-06",
+      "2026-04-07"
+    ]);
+    expect(result.current?.hydrateDurumu).toBe("success");
+    expect(result.current?.hydrateEdilenTarihSayisi).toBe(7);
+    expect(result.current?.hydrateHataMesaji).toBeNull();
+    expect(getCacheEntry(dataCacheKeys.puantajDetail(2, 1, "2026-04-07"))).not.toBeUndefined();
+    expect(getCacheEntry(dataCacheKeys.puantajDetail(2, 1, "2026-04-08"))).toBeUndefined();
+  });
+
+  it("hydrate basarili olunca null sonuclari cache'e yazar ve kapsamdan duser", async () => {
+    fetchGunlukPuantajMock.mockResolvedValue(null);
+
+    const { result } = renderHook(() => usePuantajEksikGunOzeti(makePersonel()));
+
+    await act(async () => {
+      await result.current?.hydrateEksikPuantajTarihleri();
+    });
+
+    expect(result.current?.hydrateDurumu).toBe("success");
+    expect(result.current?.hydrateEdilenTarihSayisi).toBe(7);
+    expect(getCacheEntry(dataCacheKeys.puantajDetail(2, 1, "2026-04-01"))).toBeNull();
+    expect(result.current?.toplamKayitSayisi).toBe(0);
+    expect(result.current?.eksikTarihListesi).not.toContain("2026-04-01");
+  });
+
+  it("hydrate hata verirse hata durumunu ve mesajini dondurur", async () => {
+    fetchGunlukPuantajMock.mockRejectedValue(new Error("Puantaj getirilemedi"));
+
+    const { result } = renderHook(() => usePuantajEksikGunOzeti(makePersonel()));
+
+    await act(async () => {
+      await result.current?.hydrateEksikPuantajTarihleri();
+    });
+
+    expect(result.current?.hydrateDurumu).toBe("error");
+    expect(result.current?.hydrateEdilenTarihSayisi).toBe(0);
+    expect(result.current?.hydrateHataMesaji).toBe("Puantaj getirilemedi");
   });
 });

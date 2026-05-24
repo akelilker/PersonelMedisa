@@ -65,13 +65,20 @@ describe("mapAylikPuantajEksikGunOzetiToView", () => {
       sonuc,
       "2026-04",
       0,
-      NISAN_2026_GUN_SAYISI
+      NISAN_2026_GUN_SAYISI,
+      Array.from({ length: NISAN_2026_GUN_SAYISI }, (_, index) =>
+        `2026-04-${String(index + 1).padStart(2, "0")}`
+      )
     );
 
     expect(view.durum).toBe("veri_kapsami_eksik");
     expect(view.durumLabel).toBe("Veri Kapsamı Eksik");
     expect(view.aciklama).toBe(PUANTAJ_EKSIK_GUN_VERI_KAPSAMI_EKSIK_ACIKLAMA);
     expect(view.kesinSgkPrimGunuHesaplanabilirMi).toBe(false);
+    expect(view.veriKapsamiTamMi).toBe(false);
+    expect(view.eksikTarihSayisi).toBe(NISAN_2026_GUN_SAYISI);
+    expect(view.eksikTarihListesi[0]).toBe("2026-04-01");
+    expect(view.eksikTarihListesi.at(-1)).toBe("2026-04-30");
     expect(view.kayitKapsamiNotu).toContain("0/30");
   });
 
@@ -88,12 +95,16 @@ describe("mapAylikPuantajEksikGunOzetiToView", () => {
       sonuc,
       "2026-04",
       NISAN_2026_GUN_SAYISI,
-      NISAN_2026_GUN_SAYISI
+      NISAN_2026_GUN_SAYISI,
+      []
     );
 
     expect(view.durum).toBe("hazir");
     expect(view.durumLabel).toBe("Hesaplanabilir");
     expect(view.kesinSgkPrimGunuHesaplanabilirMi).toBe(true);
+    expect(view.veriKapsamiTamMi).toBe(true);
+    expect(view.eksikTarihSayisi).toBe(0);
+    expect(view.eksikTarihListesi).toEqual([]);
     expect(view.kayitKapsamiNotu).toBeNull();
   });
 });
@@ -142,6 +153,12 @@ describe("usePuantajEksikGunOzeti", () => {
     expect(result.current?.habersizYoklukSinyaliSayisi).toBe(1);
     expect(result.current?.durum).toBe("veri_kapsami_eksik");
     expect(result.current?.kesinSgkPrimGunuHesaplanabilirMi).toBe(false);
+    expect(result.current?.veriKapsamiTamMi).toBe(false);
+    expect(result.current?.eksikTarihSayisi).toBe(27);
+    expect(result.current?.eksikTarihListesi).not.toContain("2026-04-03");
+    expect(result.current?.eksikTarihListesi).not.toContain("2026-04-04");
+    expect(result.current?.eksikTarihListesi).not.toContain("2026-04-05");
+    expect(result.current?.eksikTarihListesi.slice(0, 2)).toEqual(["2026-04-01", "2026-04-02"]);
   });
 
   it("farkli sube ve farkli personel cache kayitlarini karistirmaz", () => {
@@ -167,6 +184,31 @@ describe("usePuantajEksikGunOzeti", () => {
 
     expect(result.current?.toplamKayitSayisi).toBe(0);
     expect(result.current?.sgkPrimGununuDusurenEksikGunSayisi).toBe(0);
+    expect(result.current?.veriKapsamiTamMi).toBe(false);
+    expect(result.current?.eksikTarihSayisi).toBe(NISAN_2026_GUN_SAYISI);
+    expect(result.current?.eksikTarihListesi).toContain("2026-04-03");
+    expect(result.current?.eksikTarihListesi).toContain("2026-04-04");
     expect(result.current?.kayitKapsamiNotu).toContain("0/30");
+  });
+
+  it("tam ay cache doluysa veri kapsamini tam gosterir", () => {
+    for (let day = 1; day <= NISAN_2026_GUN_SAYISI; day++) {
+      const tarih = `2026-04-${String(day).padStart(2, "0")}`;
+      setCacheEntry(
+        dataCacheKeys.puantajDetail(2, 1, tarih),
+        makePuantaj({
+          tarih,
+          hareket_durumu: "Geldi"
+        })
+      );
+    }
+
+    const { result } = renderHook(() => usePuantajEksikGunOzeti(makePersonel()));
+
+    expect(result.current?.toplamKayitSayisi).toBe(NISAN_2026_GUN_SAYISI);
+    expect(result.current?.veriKapsamiTamMi).toBe(true);
+    expect(result.current?.eksikTarihSayisi).toBe(0);
+    expect(result.current?.eksikTarihListesi).toEqual([]);
+    expect(result.current?.kesinSgkPrimGunuHesaplanabilirMi).toBe(true);
   });
 });

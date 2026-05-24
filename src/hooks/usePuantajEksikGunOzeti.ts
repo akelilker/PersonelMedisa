@@ -30,6 +30,9 @@ export type PuantajEksikGunOzetiView = {
   haberliYoklukSinyaliSayisi: number;
   habersizYoklukSinyaliSayisi: number;
   kesinSgkPrimGunuHesaplanabilirMi: boolean;
+  eksikTarihSayisi: number;
+  eksikTarihListesi: string[];
+  veriKapsamiTamMi: boolean;
   aciklama: string;
   kayitKapsamiNotu: string | null;
 };
@@ -71,12 +74,12 @@ function buildKayitKapsamiNotu(kayitSayisi: number, donemGunSayisi: number): str
   return `Bu dönem için önbellekte ${kayitSayisi}/${donemGunSayisi} günlük kayıt bulundu.`;
 }
 
-function toplaDonemPuantajKayitlari(
+function toplaDonemPuantajKapsami(
   activeSube: number | null,
   personelId: number,
   yil: number,
   ay: number
-): GunlukPuantaj[] {
+): { kayitlar: GunlukPuantaj[]; tumTarihler: string[]; eksikTarihListesi: string[] } {
   const tarihler = listDonemTarihleri(yil, ay);
   const byTarih = new Map<string, GunlukPuantaj>();
 
@@ -112,16 +115,23 @@ function toplaDonemPuantajKayitlari(
     }
   }
 
-  return [...byTarih.values()];
+  return {
+    kayitlar: [...byTarih.values()],
+    tumTarihler: tarihler,
+    eksikTarihListesi: tarihler.filter((tarih) => !byTarih.has(tarih))
+  };
 }
 
 export function mapAylikPuantajEksikGunOzetiToView(
   sonuc: ReturnType<typeof hesaplaAylikPuantajEksikGunOzeti>,
   donem: string,
   kayitSayisi: number,
-  donemGunSayisi: number
+  donemGunSayisi: number,
+  eksikTarihListesi: string[]
 ): PuantajEksikGunOzetiView {
-  const kapsamEksik = kayitSayisi < donemGunSayisi;
+  const eksikTarihSayisi = eksikTarihListesi.length;
+  const veriKapsamiTamMi = eksikTarihSayisi === 0 && kayitSayisi >= donemGunSayisi;
+  const kapsamEksik = !veriKapsamiTamMi;
   const kesinSgkPrimGunuHesaplanabilirMi =
     sonuc.kesin_sgk_prim_gunu_hesaplanabilir_mi && !kapsamEksik;
 
@@ -153,6 +163,9 @@ export function mapAylikPuantajEksikGunOzetiToView(
     haberliYoklukSinyaliSayisi: sonuc.haberli_yokluk_sinyali_sayisi,
     habersizYoklukSinyaliSayisi: sonuc.habersiz_yokluk_sinyali_sayisi,
     kesinSgkPrimGunuHesaplanabilirMi,
+    eksikTarihSayisi,
+    eksikTarihListesi,
+    veriKapsamiTamMi,
     aciklama,
     kayitKapsamiNotu: kapsamEksik ? buildKayitKapsamiNotu(kayitSayisi, donemGunSayisi) : null
   };
@@ -171,21 +184,22 @@ export function usePuantajEksikGunOzeti(personel: Personel): PuantajEksikGunOzet
       return null;
     }
 
-    const gunlukKayitlar = toplaDonemPuantajKayitlari(
+    const puantajKapsami = toplaDonemPuantajKapsami(
       activeSube,
       personel.id,
       parsedDonem.yil,
       parsedDonem.ay
     );
-    const donemGunSayisi = listDonemTarihleri(parsedDonem.yil, parsedDonem.ay).length;
+    const donemGunSayisi = puantajKapsami.tumTarihler.length;
 
-    const sonuc = hesaplaAylikPuantajEksikGunOzeti({ kayitlar: gunlukKayitlar });
+    const sonuc = hesaplaAylikPuantajEksikGunOzeti({ kayitlar: puantajKapsami.kayitlar });
 
     return mapAylikPuantajEksikGunOzetiToView(
       sonuc,
       parsedDonem.donem,
-      gunlukKayitlar.length,
-      donemGunSayisi
+      puantajKapsami.kayitlar.length,
+      donemGunSayisi,
+      puantajKapsami.eksikTarihListesi
     );
   }, [activeSube, appDataRevision, personel.id, personel.sgk_donem]);
 }

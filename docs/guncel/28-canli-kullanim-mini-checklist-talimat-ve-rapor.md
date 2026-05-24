@@ -23,7 +23,7 @@ Son dogrulanan commitler:
 - 5f1156b Connect puantaj eksik gun hydrate action
 - 453a5b2 Add puantaj controlled hydrate checkpoint
 
-CI ve Deploy cPanel son ekranda yesil gorundu.
+CI ve Deploy cPanel son gorulen durumda yesil gorundu.
 
 ## 2. Yapilan Islerin Ozeti
 
@@ -176,7 +176,7 @@ PersonelMedisa icin canli kullanim oncesi mini kontrol checklist'i hazirla.
 
 Yeni dosya olustur:
 
-docs/guncel/28-canli-kullanim-mini-checklist.md
+docs/guncel/29-canli-kullanim-mini-checklist.md
 
 ### Dosya Icerigi
 
@@ -242,7 +242,7 @@ UI degistirme.
 API degistirme.
 Hook degistirme.
 Service degistirme.
-Sadece docs/guncel/28-canli-kullanim-mini-checklist.md dosyasini olustur.
+Sadece docs/guncel/29-canli-kullanim-mini-checklist.md dosyasini olustur.
 
 ### Son Cikti
 

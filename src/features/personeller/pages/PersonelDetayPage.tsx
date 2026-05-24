@@ -672,6 +672,14 @@ function PersonelPuantajPanel({
   const takvimGun = typeof personel.sgk_ayin_takvim_gun_sayisi === "number" ? `${personel.sgk_ayin_takvim_gun_sayisi} Gün` : "-";
   const donem = formatDetailValue(personel.sgk_donem);
   const hesaplamaModu = formatSgkHesaplamaModuLabel(personel.sgk_hesaplama_modu);
+  const puantajHydrateDurumMetni =
+    puantajEksikGunOzeti?.hydrateDurumu === "loading"
+      ? "Eksik puantaj tarihleri yükleniyor..."
+      : puantajEksikGunOzeti?.hydrateDurumu === "success"
+        ? `${puantajEksikGunOzeti.hydrateEdilenTarihSayisi} tarih kontrol edildi.`
+        : puantajEksikGunOzeti?.hydrateDurumu === "error"
+          ? puantajEksikGunOzeti.hydrateHataMesaji
+          : null;
 
   return (
     <div className="personel-dosya-sections">
@@ -746,6 +754,22 @@ function PersonelPuantajPanel({
               label="Haberli / Habersiz Yokluk"
               value={`${puantajEksikGunOzeti.haberliYoklukSinyaliSayisi} / ${puantajEksikGunOzeti.habersizYoklukSinyaliSayisi}`}
             />
+            {puantajEksikGunOzeti.hydrateMumkunMu && !puantajEksikGunOzeti.veriKapsamiTamMi ? (
+              <div className="personel-dosya-record">
+                <span className="personel-dosya-record-label">Kapsam Kontrolü</span>
+                <span className="personel-dosya-record-value">
+                  <button
+                    type="button"
+                    className="universal-btn-aux"
+                    disabled={puantajEksikGunOzeti.hydrateDurumu === "loading"}
+                    onClick={() => void puantajEksikGunOzeti.hydrateEksikPuantajTarihleri()}
+                  >
+                    Kapsamı Tamamla
+                  </button>
+                  {puantajHydrateDurumMetni ? <span>{puantajHydrateDurumMetni}</span> : null}
+                </span>
+              </div>
+            ) : null}
           </>
         ) : null}
       </DossierSection>

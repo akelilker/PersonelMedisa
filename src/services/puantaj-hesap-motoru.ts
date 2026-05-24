@@ -513,6 +513,134 @@ export function hesaplaDevamsizlikKesintiOzeti(
 // Ay sonu SGK prim günü hesabı (tam gün eksik gün çekirdeği)
 // ---------------------------------------------------------------------------
 
+export type PuantajEksikGunUcretEtkisiTuru =
+  | "YOK"
+  | "DAKIKA_BAZLI_KESINTI_ADAYI"
+  | "GUNLUK_KESINTI_ADAYI"
+  | "UCRET_KORUNUR"
+  | "POLITIKA_INCELEMESI";
+
+export type PuantajEksikGunSiniflandirmaGirdisi = {
+  hareket_durumu?: PuantajHareketDurumu;
+  dayanak?: PuantajDayanak;
+  durumu_bildirdi_mi?: boolean | null;
+};
+
+export type PuantajEksikGunSiniflandirmaSonucu = {
+  eksik_gun_adayi_mi: boolean;
+  eksik_gun_sayisi: number;
+  sgk_prim_gununu_dusurur_mu: boolean;
+  ucret_etkisi_turu: PuantajEksikGunUcretEtkisiTuru;
+  manuel_inceleme_gerekli_mi: boolean;
+  haberli_yokluk_sinyali_mi: boolean;
+  habersiz_yokluk_sinyali_mi: boolean;
+  aciklama: string;
+};
+
+function bildirimSinyali(
+  hareketDurumu: PuantajHareketDurumu | undefined,
+  durumuBildirdiMi: boolean | null | undefined
+) {
+  return {
+    haberli_yokluk_sinyali_mi: hareketDurumu === "Gelmedi" && durumuBildirdiMi === true,
+    habersiz_yokluk_sinyali_mi: hareketDurumu === "Gelmedi" && durumuBildirdiMi === false
+  };
+}
+
+/**
+ * Gunluk puantaj satirini eksik gun / SGK prim gunu / ucret etkisi acisindan
+ * siniflandirir. Resmi SGK kodu, bordro tutari veya finans kalemi uretmez.
+ */
+export function siniflandirPuantajEksikGunEtkisi(
+  girdi: PuantajEksikGunSiniflandirmaGirdisi
+): PuantajEksikGunSiniflandirmaSonucu {
+  const hareketDurumu = girdi.hareket_durumu;
+  const dayanak = girdi.dayanak;
+  const bildirim = bildirimSinyali(hareketDurumu, girdi.durumu_bildirdi_mi);
+
+  if (hareketDurumu === "Gec_Geldi" || hareketDurumu === "Erken_Cikti") {
+    return {
+      eksik_gun_adayi_mi: false,
+      eksik_gun_sayisi: 0,
+      sgk_prim_gununu_dusurur_mu: false,
+      ucret_etkisi_turu: "DAKIKA_BAZLI_KESINTI_ADAYI",
+      manuel_inceleme_gerekli_mi: false,
+      ...bildirim,
+      aciklama: "Gec kalma / erken cikma dakika bazli ucret etkisidir; SGK prim gununu dusuren tam gun eksiklik degildir."
+    };
+  }
+
+  if (hareketDurumu === "Geldi") {
+    return {
+      eksik_gun_adayi_mi: false,
+      eksik_gun_sayisi: 0,
+      sgk_prim_gununu_dusurur_mu: false,
+      ucret_etkisi_turu: "YOK",
+      manuel_inceleme_gerekli_mi: false,
+      ...bildirim,
+      aciklama: "Geldi kaydi eksik gun veya SGK prim gunu dusumu uretmez."
+    };
+  }
+
+  if (hareketDurumu !== "Gelmedi") {
+    return {
+      eksik_gun_adayi_mi: false,
+      eksik_gun_sayisi: 0,
+      sgk_prim_gununu_dusurur_mu: false,
+      ucret_etkisi_turu: "POLITIKA_INCELEMESI",
+      manuel_inceleme_gerekli_mi: true,
+      ...bildirim,
+      aciklama: "Hareket durumu net olmadigi icin eksik gun karari manuel inceleme gerektirir."
+    };
+  }
+
+  if (dayanak === "Yok_Izinsiz") {
+    return {
+      eksik_gun_adayi_mi: true,
+      eksik_gun_sayisi: 1,
+      sgk_prim_gununu_dusurur_mu: true,
+      ucret_etkisi_turu: "GUNLUK_KESINTI_ADAYI",
+      manuel_inceleme_gerekli_mi: false,
+      ...bildirim,
+      aciklama: "Gelmedi + Yok_Izinsiz, ucret hak edilmeyen tam gun eksiklik adayidir."
+    };
+  }
+
+  if (dayanak === "Ucretli_Izinli" || dayanak === "Yillik_Izin" || dayanak === "Telafi_Calismasi") {
+    return {
+      eksik_gun_adayi_mi: false,
+      eksik_gun_sayisi: 0,
+      sgk_prim_gununu_dusurur_mu: false,
+      ucret_etkisi_turu: "UCRET_KORUNUR",
+      manuel_inceleme_gerekli_mi: false,
+      ...bildirim,
+      aciklama: "Ucretli izin / yillik izin / telafi calismasi SGK prim gununu dusuren eksik gun olarak siniflandirilmaz."
+    };
+  }
+
+  if (dayanak === "Raporlu_Hastalik" || dayanak === "Raporlu_Is_Kazasi") {
+    return {
+      eksik_gun_adayi_mi: true,
+      eksik_gun_sayisi: 0,
+      sgk_prim_gununu_dusurur_mu: false,
+      ucret_etkisi_turu: "POLITIKA_INCELEMESI",
+      manuel_inceleme_gerekli_mi: true,
+      ...bildirim,
+      aciklama: "Raporlu gun SGK prim gunu dusumu icin otomatik karar uretmez; rapor turu ve bordro politikasi manuel inceleme gerektirir."
+    };
+  }
+
+  return {
+    eksik_gun_adayi_mi: true,
+    eksik_gun_sayisi: 0,
+    sgk_prim_gununu_dusurur_mu: false,
+    ucret_etkisi_turu: "POLITIKA_INCELEMESI",
+    manuel_inceleme_gerekli_mi: true,
+    ...bildirim,
+    aciklama: "Gelmedi kaydinda dayanak netlesmeden ucretli/ucretsiz veya SGK prim gunu karari uretilemez."
+  };
+}
+
 export type SgkPrimGunuHesapGirdisi = {
   takvim_gunu: number;
   eksik_gun: number;

@@ -27,6 +27,7 @@ import {
   hesaplaGecErkenEksikSure,
   hesaplaGecKalmaErkenCikmaKesintiOzeti,
   hesaplaDevamsizlikKesintiOzeti,
+  siniflandirPuantajEksikGunEtkisi,
   hesaplaSgkPrimGunu,
   hesaplaTatilEkOdemeOzeti,
   hesaplaHaftaTatiliPazarEtkisi,
@@ -1227,6 +1228,131 @@ describe("hesaplaDevamsizlikKesintiOzeti", () => {
     expect(o.toplam_kesinti_gun_esdegeri).toBe(2);
     expect(o.toplam_kesinti_tutari).toBe(0);
   });
+});
+
+describe("siniflandirPuantajEksikGunEtkisi", () => {
+  it("Geldi eksik gun, SGK dusumu veya ucret kesintisi uretmez", () => {
+    const o = siniflandirPuantajEksikGunEtkisi({
+      hareket_durumu: "Geldi"
+    });
+
+    expect(o).toMatchObject({
+      eksik_gun_adayi_mi: false,
+      eksik_gun_sayisi: 0,
+      sgk_prim_gununu_dusurur_mu: false,
+      ucret_etkisi_turu: "YOK",
+      manuel_inceleme_gerekli_mi: false
+    });
+  });
+
+  it.each([
+    ["Gec_Geldi", "DAKIKA_BAZLI_KESINTI_ADAYI"],
+    ["Erken_Cikti", "DAKIKA_BAZLI_KESINTI_ADAYI"]
+  ] as const)("%s SGK eksik gün sayılmaz, yalnız dakika bazlı ücret etkisi adayıdır", (hareketDurumu, ucretEtkisiTuru) => {
+    const o = siniflandirPuantajEksikGunEtkisi({
+      hareket_durumu: hareketDurumu
+    });
+
+    expect(o).toMatchObject({
+      eksik_gun_adayi_mi: false,
+      eksik_gun_sayisi: 0,
+      sgk_prim_gununu_dusurur_mu: false,
+      ucret_etkisi_turu: ucretEtkisiTuru,
+      manuel_inceleme_gerekli_mi: false
+    });
+  });
+
+  it.each([
+    ["Ucretli_Izinli"],
+    ["Yillik_Izin"],
+    ["Telafi_Calismasi"]
+  ] as const)("Gelmedi + %s SGK prim gününü düşürmez ve ücreti korur", (dayanak) => {
+    const o = siniflandirPuantajEksikGunEtkisi({
+      hareket_durumu: "Gelmedi",
+      dayanak
+    });
+
+    expect(o).toMatchObject({
+      eksik_gun_adayi_mi: false,
+      eksik_gun_sayisi: 0,
+      sgk_prim_gununu_dusurur_mu: false,
+      ucret_etkisi_turu: "UCRET_KORUNUR",
+      manuel_inceleme_gerekli_mi: false
+    });
+  });
+
+  it("Gelmedi + Yok_Izinsiz tam gün eksik gün ve SGK düşümü adayıdır", () => {
+    const o = siniflandirPuantajEksikGunEtkisi({
+      hareket_durumu: "Gelmedi",
+      dayanak: "Yok_Izinsiz"
+    });
+
+    expect(o).toMatchObject({
+      eksik_gun_adayi_mi: true,
+      eksik_gun_sayisi: 1,
+      sgk_prim_gununu_dusurur_mu: true,
+      ucret_etkisi_turu: "GUNLUK_KESINTI_ADAYI",
+      manuel_inceleme_gerekli_mi: false
+    });
+  });
+
+  it.each([
+    ["Raporlu_Hastalik"],
+    ["Raporlu_Is_Kazasi"]
+  ] as const)("Gelmedi + %s otomatik SGK düşümü üretmez, manuel inceleme sinyali verir", (dayanak) => {
+    const o = siniflandirPuantajEksikGunEtkisi({
+      hareket_durumu: "Gelmedi",
+      dayanak
+    });
+
+    expect(o).toMatchObject({
+      eksik_gun_adayi_mi: true,
+      eksik_gun_sayisi: 0,
+      sgk_prim_gununu_dusurur_mu: false,
+      ucret_etkisi_turu: "POLITIKA_INCELEMESI",
+      manuel_inceleme_gerekli_mi: true
+    });
+  });
+
+  it.each([
+    ["Raporlu_Hastalik", true],
+    ["Raporlu_Hastalik", false],
+    ["Raporlu_Is_Kazasi", true],
+    ["Raporlu_Is_Kazasi", false]
+  ] as const)("%s + durumu_bildirdi_mi=%s ile kesin SGK düşümü vermez", (dayanak, durumuBildirdiMi) => {
+    const o = siniflandirPuantajEksikGunEtkisi({
+      hareket_durumu: "Gelmedi",
+      dayanak,
+      durumu_bildirdi_mi: durumuBildirdiMi
+    });
+
+    expect(o.sgk_prim_gununu_dusurur_mu).toBe(false);
+    expect(o.eksik_gun_sayisi).toBe(0);
+    expect(o.manuel_inceleme_gerekli_mi).toBe(true);
+  });
+
+  it.each([
+    [true, true, false],
+    [false, false, true]
+  ] as const)(
+    "durumu_bildirdi_mi=%s tek başına ücretli/ücretsiz veya SGK kararı üretmez",
+    (durumuBildirdiMi, haberliSinyal, habersizSinyal) => {
+      const o = siniflandirPuantajEksikGunEtkisi({
+        hareket_durumu: "Gelmedi",
+        durumu_bildirdi_mi: durumuBildirdiMi
+      });
+
+      expect(o).toMatchObject({
+        eksik_gun_adayi_mi: true,
+        eksik_gun_sayisi: 0,
+        sgk_prim_gununu_dusurur_mu: false,
+        ucret_etkisi_turu: "POLITIKA_INCELEMESI",
+        manuel_inceleme_gerekli_mi: true,
+        haberli_yokluk_sinyali_mi: haberliSinyal,
+        habersiz_yokluk_sinyali_mi: habersizSinyal
+      });
+    }
+  );
 });
 
 describe("hesaplaSgkPrimGunu", () => {

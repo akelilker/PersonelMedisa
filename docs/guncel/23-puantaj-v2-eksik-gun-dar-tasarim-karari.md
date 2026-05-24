@@ -109,9 +109,9 @@ Bu formul yalniz tam gun eksik gun / SGK prim gunu hesabinda kullanilir. Geç / 
 | `Gelmedi + Yok_Izinsiz` | Evet, tam gun calisilmadiysa | Ucret hak edilmeyen tam gun ise dusurebilir | Gunluk kesinti adayi | Haber verip vermeme disiplin / surec siniflandirmasini etkileyebilir. |
 | `Gelmedi + Ucretli_Izinli` | Hayir | Dusurmez | Ucret korunur | Ucretli mazeret / izin olarak ayrica surec owner'i netlestirmelidir. |
 | `Gelmedi + Yillik_Izin` | Hayir | Dusurmez | Ucret korunur | Yillik izin bakiyesi izin motorunun konusudur. |
-| `Gelmedi + Raporlu_Hastalik` | Evet, SGK eksik gun adayi | Rapor tipi, sure ve bordro politikasina gore degerlendirilir | Isveren odeme politikasi ayridir | Hastalik raporu icin minimum politika kismen netlesmistir; resmi SGK kodu uretilmez. |
-| `Gelmedi + Raporlu_Is_Kazasi` | Evet, SGK eksik gun adayi | Resmi prosedur / bordro kontrolu gerekir | Isveren odeme politikasi ayridir | Hastalik raporundan ayri ele alinmalidir. |
-| Ucretsiz izin | Evet | Ucret hak edilmeyen tam gun ise dusurur | Gunluk ucret etkisi adayi | Mevcut `PuantajDayanak` enum'unda dogrudan temsil yoktur; model karari gerekir. |
+| `Gelmedi + Raporlu_Hastalik` | SGK prim gunu inceleme adayi | Otomatik dusum anlamina gelmez; rapor tipi, sure ve isletme / bordro politikasi gerekir | Isveren odeme politikasi ayridir | Hastalik raporu icin minimum politika kismen netlesmistir; resmi SGK kodu uretilmez. |
+| `Gelmedi + Raporlu_Is_Kazasi` | SGK prim gunu inceleme adayi | Otomatik dusum anlamina gelmez; resmi prosedur, manuel kontrol ve bordro degerlendirmesi gerekir | Isveren odeme politikasi ayridir | Hastalik raporundan ayri ele alinmalidir. |
+| Ucretsiz izin | Gelecek karar / model alani | Mevcut aktif model davranisi degildir; temsil karari olmadan otomatik dusum uretilmez | Gelecek politika karari | Mevcut `PuantajDayanak` enum'unda dogrudan temsil yoktur; bugunku modelde aktif davranis degil, ileride karar/model alani olarak ele alinmalidir. |
 | Mazeretli devamsizlik | Duruma bagli | Ucretli ise dusurmez, ucretsiz ise dusurebilir | Duruma bagli | Hangi mazeretin ucretli oldugu firma / urun karari bekler. |
 | Disiplin / ucret hak edilmeyen gun | Evet | Tam gun ucret hak edilmiyorsa dusurebilir | Gunluk ucret etkisi adayi | Surec, onay ve belge matrisi netlesmeden otomatik kural olmamalidir. |
 | `UBGT_Resmi_Tatil` calisilmadi | Hayir | Dusurmez | Normal ucret korunur | UBGT calisma ek odeme konusu bu matrisin disindadir. |
@@ -178,6 +178,8 @@ Onerilen cikti semantigi:
 - `ucret_etkisi_turu`
 - `manuel_inceleme_gerekli_mi`
 - `aciklama`
+
+`sgk_prim_gununu_dusurur_mu` semantigi her durumda otomatik boolean karar gibi yorumlanmamalidir. Rapor, is kazasi, haberli yokluk veya mevcut modelde temsil edilmeyen durumlar manuel inceleme ya da isletme / bordro politikasi gerektirebilir.
 
 Bu alan adlari kod talimati degil, karar semantigi onerileridir.
 

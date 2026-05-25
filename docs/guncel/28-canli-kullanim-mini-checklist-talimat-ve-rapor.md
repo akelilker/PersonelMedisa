@@ -23,7 +23,7 @@ Son dogrulanan commitler:
 - 5f1156b Connect puantaj eksik gun hydrate action
 - 453a5b2 Add puantaj controlled hydrate checkpoint
 
-CI ve Deploy cPanel son gorulen durumda yesil gorundu.
+CI ve Deploy cPanel son görülen durumda yeşil göründü.
 
 ## 2. Yapilan Islerin Ozeti
 

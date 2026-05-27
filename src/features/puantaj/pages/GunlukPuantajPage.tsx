@@ -37,7 +37,7 @@ const DAYANAK_OPTIONS: Array<{ value: PuantajDayanak; label: string }> = [
   { value: "Telafi_Calismasi", label: "Telafi Çalışması" }
 ];
 
-const DURUMU_BILDIRDI_OPTIONS = [
+const DURUMU_BILDIRDI_OPTIONS: Array<{ value: "evet" | "hayir"; label: string }> = [
   { value: "evet", label: "Evet" },
   { value: "hayir", label: "Hayır" }
 ];
@@ -49,6 +49,51 @@ const GUN_TIPI_LABELS: Record<PuantajGunTipi, string> = Object.fromEntries(
 const HAREKET_DURUMU_LABELS: Record<PuantajHareketDurumu, string> = Object.fromEntries(
   HAREKET_DURUMU_OPTIONS.map((option) => [option.value, option.label])
 ) as Record<PuantajHareketDurumu, string>;
+
+type ChoiceOption<T extends string> = {
+  value: T;
+  label: string;
+};
+
+function PuantajChoiceGroup<T extends string>({
+  label,
+  name,
+  value,
+  options,
+  onSelect,
+  disabled = false
+}: {
+  label: string;
+  name: string;
+  value: T;
+  options: Array<ChoiceOption<T>>;
+  onSelect: (nextValue: T) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <div className="form-section puantaj-choice-field">
+      <span className="form-label">{label}</span>
+      <div className="puantaj-choice-group" role="group" aria-label={label}>
+        {options.map((option) => {
+          const isActive = option.value === value;
+
+          return (
+            <button
+              key={`${name}-${option.value || "empty"}`}
+              type="button"
+              className={`puantaj-choice-btn${isActive ? " is-active" : ""}`}
+              aria-pressed={isActive}
+              disabled={disabled}
+              onClick={() => onSelect(option.value)}
+            >
+              {option.label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 function formatTatilEkOdemeCarpani(carpani: number): string {
   if (carpani === 1) return "1";
@@ -486,23 +531,19 @@ export function GunlukPuantajPage() {
 
         <form className="puantaj-form-grid" onSubmit={handlePuantajSubmit}>
           <div className="form-field-grid">
-            <FormField
-              as="select"
+            <PuantajChoiceGroup
               label="Gün Tipi"
               name="puantaj-gun-tipi"
               value={formState.entryGunTipi}
-              onChange={(value) => patchFormState({ entryGunTipi: value as PuantajGunTipi })}
-              selectOptions={GUN_TIPI_OPTIONS}
+              onSelect={(value) => patchFormState({ entryGunTipi: value })}
+              options={GUN_TIPI_OPTIONS}
               disabled={isLoading}
-              required
             />
-            <FormField
-              as="select"
+            <PuantajChoiceGroup
               label="Hareket Durumu"
               name="puantaj-hareket-durumu"
               value={formState.entryHareketDurumu}
-              onChange={(value) => {
-                const hareketDurumu = value as PuantajHareketDurumu | "";
+              onSelect={(hareketDurumu) => {
                 patchFormState({
                   entryHareketDurumu: hareketDurumu,
                   ...(hareketDurumu === "Gelmedi"
@@ -513,40 +554,33 @@ export function GunlukPuantajPage() {
                       })
                 });
               }}
-              selectOptions={HAREKET_DURUMU_OPTIONS}
-              placeholderOption={{ value: "", label: "Seçiniz" }}
+              options={HAREKET_DURUMU_OPTIONS}
               disabled={isLoading}
-              required
             />
-            <FormField
-              as="select"
+            <PuantajChoiceGroup
               label="Dayanak"
               name="puantaj-dayanak"
               value={formState.entryDayanak}
-              onChange={(value) => patchFormState({ entryDayanak: value as PuantajDayanak | "" })}
-              selectOptions={DAYANAK_OPTIONS}
-              placeholderOption={{ value: "", label: "Yok / Belirtilmedi" }}
+              onSelect={(value) => patchFormState({ entryDayanak: value })}
+              options={[{ value: "", label: "Yok / Belirtilmedi" }, ...DAYANAK_OPTIONS]}
               disabled={isLoading}
             />
           </div>
 
           {formState.entryHareketDurumu === "Gelmedi" ? (
             <div className="form-field-grid">
-              <FormField
-                as="select"
+              <PuantajChoiceGroup
                 label="Durumu Bildirdi mi?"
                 name="puantaj-durumu-bildirdi-mi"
                 value={formState.entryDurumuBildirdiMi}
-                onChange={(value) =>
+                onSelect={(value) =>
                   patchFormState({
-                    entryDurumuBildirdiMi: value as "" | "evet" | "hayir",
+                    entryDurumuBildirdiMi: value,
                     ...(value === "evet" ? {} : { entryDurumBildirimAciklamasi: "" })
                   })
                 }
-                selectOptions={DURUMU_BILDIRDI_OPTIONS}
-                placeholderOption={{ value: "", label: "Seçiniz" }}
+                options={DURUMU_BILDIRDI_OPTIONS}
                 disabled={isLoading}
-                required
               />
               {formState.entryDurumuBildirdiMi === "evet" ? (
                 <FormField

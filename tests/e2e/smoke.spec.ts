@@ -26,7 +26,7 @@ test.describe("e2e smoke", () => {
     await page.getByLabel("Tarih").fill("2026-04-14");
     await page.getByRole("button", { name: /Kayd.*Getir/i }).click();
 
-    await page.locator("[name='puantaj-hareket-durumu']").selectOption("Gec_Geldi");
+    await page.getByRole("group", { name: "Hareket Durumu" }).getByRole("button", { name: "Geç Geldi" }).click();
     await page.locator("[name='puantaj-beklenen-giris']").fill("08:00");
     await page.locator("[name='puantaj-beklenen-cikis']").fill("17:00");
     await page.locator("[name='puantaj-giris']").fill("08:01");

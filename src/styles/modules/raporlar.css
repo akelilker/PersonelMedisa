@@ -5,7 +5,14 @@
 .raporlar-page--premium {
   display: grid;
   gap: var(--space-4);
-  max-width: 1200px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.raporlar-page--premium > * {
+  min-width: 0;
 }
 
 .raporlar-page-head {
@@ -44,6 +51,11 @@
 
 .raporlar-aylik-filters {
   padding-top: var(--space-1);
+  max-width: 100%;
+}
+
+.raporlar-page--premium .aylik-ozet-page {
+  max-width: 100%;
 }
 
 .raporlar-aylik-hint {
@@ -118,7 +130,16 @@
 }
 
 .raporlar-table-wrap {
+  min-width: 0;
+  max-width: 100%;
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* yonetim.css loads after raporlar.css; restore horizontal scroll inside rapor tables */
+.raporlar-table-wrap.yonetim-table-wrap {
+  overflow-x: auto;
+  overflow-y: visible;
 }
 
 .raporlar-table {

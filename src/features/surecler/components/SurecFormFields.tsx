@@ -29,10 +29,55 @@ type SurecFormFieldsProps = {
   className?: string;
 };
 
-const UCRETLI_SELECT_OPTIONS = [
+export const UCRETLI_SELECT_OPTIONS: Array<{ value: "evet" | "hayir"; label: string }> = [
   { value: "evet", label: "Evet" },
   { value: "hayir", label: "Hayır" }
 ];
+
+type SurecChoiceOption = {
+  value: string;
+  label: string;
+};
+
+export function SurecChoiceGroup({
+  label,
+  name,
+  value,
+  options,
+  onSelect,
+  disabled = false
+}: {
+  label: string;
+  name: string;
+  value: string;
+  options: SurecChoiceOption[];
+  onSelect: (nextValue: string) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <div className="form-section surec-choice-field">
+      <span className="form-label">{label}</span>
+      <div className="surec-choice-group" role="group" aria-label={label}>
+        {options.map((option) => {
+          const isActive = option.value === value;
+
+          return (
+            <button
+              key={`${name}-${option.value}`}
+              type="button"
+              className={`surec-choice-btn${isActive ? " is-active" : ""}`}
+              aria-pressed={isActive}
+              disabled={disabled}
+              onClick={() => onSelect(option.value)}
+            >
+              {option.label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 function keyOptionsToSelectOptions(options: KeyOption[]) {
   return options.map((option) => ({ value: option.key, label: option.label }));
@@ -60,26 +105,13 @@ export function SurecFormFields({
     options: PersonelOption[],
     onSelect: (nextValue: string) => void
   ) => (
-    <div className="form-section surec-choice-field">
-      <span className="form-label">{label}</span>
-      <div className="surec-choice-group" role="group" aria-label={label}>
-        {options.map((option) => {
-          const isActive = option.value === value;
-
-          return (
-            <button
-              key={`${name}-${option.value}`}
-              type="button"
-              className={`surec-choice-btn${isActive ? " is-active" : ""}`}
-              aria-pressed={isActive}
-              onClick={() => onSelect(option.value)}
-            >
-              {option.label}
-            </button>
-          );
-        })}
-      </div>
-    </div>
+    <SurecChoiceGroup
+      label={label}
+      name={name}
+      value={value}
+      options={options}
+      onSelect={onSelect}
+    />
   );
 
   const personelField = showPersonelField

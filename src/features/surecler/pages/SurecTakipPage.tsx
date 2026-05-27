@@ -11,18 +11,18 @@ import { useSurecler } from "../../../hooks/useSurecler";
 import { formatSurecStateLabel, formatSurecTuruLabel } from "../../../lib/display/enum-display";
 import type { KeyOption } from "../../../types/referans";
 import type { Surec } from "../../../types/surec";
+import { SurecChoiceGroup, UCRETLI_SELECT_OPTIONS } from "../components/SurecFormFields";
 
 const SUREC_CREATE_FORM_ID = "surec-create-form";
 const SUREC_EDIT_FORM_ID = "surec-edit-form";
 
-function keyOptionsToSelectOptions(options: KeyOption[]) {
+function keyOptionsToChoiceOptions(options: KeyOption[]) {
   return options.map((option) => ({ value: option.key, label: option.label }));
 }
 
-const UCRETLI_SELECT_OPTIONS = [
-  { value: "evet", label: "Evet" },
-  { value: "hayir", label: "Hayır" }
-];
+function keyOptionsToSelectOptions(options: KeyOption[]) {
+  return keyOptionsToChoiceOptions(options);
+}
 
 export function SurecTakipPage() {
   const {
@@ -308,15 +308,12 @@ export function SurecTakipPage() {
               required
             />
             {surecTuruOptions.length > 0 ? (
-              <FormField
-                as="select"
+              <SurecChoiceGroup
                 label="Süreç Türü"
                 name="surec-create-turu"
                 value={createForm.surecTuru}
-                onChange={(value) => setCreateForm((prev) => ({ ...prev, surecTuru: value }))}
-                required
-                placeholderOption={{ value: "", label: "Seçiniz" }}
-                selectOptions={keyOptionsToSelectOptions(surecTuruOptions)}
+                options={keyOptionsToChoiceOptions(surecTuruOptions)}
+                onSelect={(value) => setCreateForm((prev) => ({ ...prev, surecTuru: value }))}
               />
             ) : (
               <FormField
@@ -349,15 +346,14 @@ export function SurecTakipPage() {
               onChange={(value) => setCreateForm((prev) => ({ ...prev, bitisTarihi: value }))}
               required
             />
-            <FormField
-              as="select"
-              label="Ücretli Mi"
+            <SurecChoiceGroup
+              label="Ücretli mi?"
               name="surec-create-ucret"
               value={createForm.ucretliMi ? "evet" : "hayir"}
-              onChange={(value) =>
+              options={UCRETLI_SELECT_OPTIONS}
+              onSelect={(value) =>
                 setCreateForm((prev) => ({ ...prev, ucretliMi: value === "evet" }))
               }
-              selectOptions={UCRETLI_SELECT_OPTIONS}
             />
             <FormField
               label="Açıklama"
@@ -407,15 +403,12 @@ export function SurecTakipPage() {
               required
             />
             {surecTuruOptions.length > 0 ? (
-              <FormField
-                as="select"
+              <SurecChoiceGroup
                 label="Süreç Türü"
                 name="surec-edit-turu"
                 value={editForm.surecTuru}
-                onChange={(value) => setEditForm((prev) => ({ ...prev, surecTuru: value }))}
-                required
-                placeholderOption={{ value: "", label: "Seçiniz" }}
-                selectOptions={keyOptionsToSelectOptions(surecTuruOptions)}
+                options={keyOptionsToChoiceOptions(surecTuruOptions)}
+                onSelect={(value) => setEditForm((prev) => ({ ...prev, surecTuru: value }))}
               />
             ) : (
               <FormField
@@ -448,15 +441,14 @@ export function SurecTakipPage() {
               onChange={(value) => setEditForm((prev) => ({ ...prev, bitisTarihi: value }))}
               required
             />
-            <FormField
-              as="select"
-              label="Ücretli Mi"
+            <SurecChoiceGroup
+              label="Ücretli mi?"
               name="surec-edit-ucret"
               value={editForm.ucretliMi ? "evet" : "hayir"}
-              onChange={(value) =>
+              options={UCRETLI_SELECT_OPTIONS}
+              onSelect={(value) =>
                 setEditForm((prev) => ({ ...prev, ucretliMi: value === "evet" }))
               }
-              selectOptions={UCRETLI_SELECT_OPTIONS}
             />
             <FormField
               label="Açıklama"

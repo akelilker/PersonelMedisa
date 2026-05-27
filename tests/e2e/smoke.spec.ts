@@ -172,8 +172,8 @@ test.describe("e2e smoke", () => {
     const surecCreateModal = page.locator(".modal-container").last();
     await expect(surecCreateModal).toBeVisible();
     await surecCreateModal.locator("[name='surec-create-personel']").fill("1");
-    if (await surecCreateModal.locator("[name='surec-create-turu']").count()) {
-      await surecCreateModal.locator("[name='surec-create-turu']").selectOption("RAPOR");
+    if (await surecCreateModal.getByRole("group", { name: "Süreç Türü" }).count()) {
+      await surecCreateModal.getByRole("group", { name: "Süreç Türü" }).getByRole("button", { name: "Rapor" }).click();
     } else {
       await surecCreateModal.locator("[name='surec-create-turu-text']").fill("RAPOR");
     }
@@ -187,8 +187,8 @@ test.describe("e2e smoke", () => {
     await page.locator(".surecler-list .module-item-actions button").first().click();
     const surecEditModal = page.locator(".modal-container").last();
     await expect(surecEditModal).toBeVisible();
-    if (await surecEditModal.locator("[name='surec-edit-turu']").count()) {
-      await surecEditModal.locator("[name='surec-edit-turu']").selectOption("RAPOR");
+    if (await surecEditModal.getByRole("group", { name: "Süreç Türü" }).count()) {
+      await surecEditModal.getByRole("group", { name: "Süreç Türü" }).getByRole("button", { name: "Rapor" }).click();
     } else {
       await surecEditModal.locator("[name='surec-edit-turu-text']").fill("RAPOR_GUNCEL");
     }

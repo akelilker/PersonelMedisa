@@ -18,6 +18,14 @@ export function parseRequiredPositiveInt(value: string, label: string) {
   return number;
 }
 
+function parseRequiredSurecTuru(value: string) {
+  const surecTuru = value.trim();
+  if (!surecTuru) {
+    throw new Error("Surec turu zorunludur.");
+  }
+  return surecTuru;
+}
+
 export function toSurecFormState(surec: Surec): SurecFormState {
   return {
     personelId: String(surec.personel_id),
@@ -33,7 +41,7 @@ export function toSurecFormState(surec: Surec): SurecFormState {
 export function buildCreateSurecPayload(form: SurecFormState): CreateSurecPayload {
   return {
     personel_id: parseRequiredPositiveInt(form.personelId, "Personel ID"),
-    surec_turu: form.surecTuru.trim(),
+    surec_turu: parseRequiredSurecTuru(form.surecTuru),
     alt_tur: form.altTur.trim() || undefined,
     baslangic_tarihi: form.baslangicTarihi,
     bitis_tarihi: form.bitisTarihi.trim() || undefined,
@@ -45,7 +53,7 @@ export function buildCreateSurecPayload(form: SurecFormState): CreateSurecPayloa
 export function buildUpdateSurecPayload(form: SurecFormState): UpdateSurecPayload {
   return {
     personel_id: parseRequiredPositiveInt(form.personelId, "Personel ID"),
-    surec_turu: form.surecTuru.trim(),
+    surec_turu: parseRequiredSurecTuru(form.surecTuru),
     alt_tur: form.altTur.trim() || undefined,
     baslangic_tarihi: form.baslangicTarihi,
     bitis_tarihi: form.bitisTarihi.trim() || undefined,

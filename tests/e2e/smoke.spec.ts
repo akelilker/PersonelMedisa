@@ -130,7 +130,10 @@ test.describe("e2e smoke", () => {
     await expect(amirBildirimModal).toBeVisible();
     await amirBildirimModal.getByLabel("Tarih").fill("2026-04-11");
     await amirBildirimModal.getByLabel("Personel").selectOption("2");
-    await amirBildirimModal.getByLabel("Kayıt Senaryosu").selectOption("IZINSIZ_GELMEDI");
+    await amirBildirimModal
+      .getByRole("group", { name: "Kayıt Senaryosu" })
+      .getByRole("button", { name: /[İI]zinsiz Gelmedi/i })
+      .click();
     await amirBildirimModal.getByLabel("Not / Açıklama").fill("Habersiz devamsızlık");
     await amirBildirimModal.getByRole("button", { name: "Kaydet" }).click();
 
@@ -209,7 +212,10 @@ test.describe("e2e smoke", () => {
     await expect(bildirimCreateModal).toBeVisible();
     await bildirimCreateModal.getByLabel("Tarih").fill("2026-04-11");
     await bildirimCreateModal.getByLabel("Personel").selectOption("1");
-    await bildirimCreateModal.getByLabel("Kayıt Senaryosu").selectOption("DEVAMSIZLIK");
+    await bildirimCreateModal
+      .getByRole("group", { name: "Kayıt Senaryosu" })
+      .getByRole("button", { name: /Devams/i })
+      .click();
     await bildirimCreateModal.getByLabel("Not / Açıklama").fill("Yeni günlük kayıt");
     await bildirimCreateModal.getByRole("button", { name: "Kaydet" }).click();
 
@@ -218,7 +224,10 @@ test.describe("e2e smoke", () => {
     await page.getByRole("button", { name: /Düzenle|Duzenle/i }).first().click();
     const bildirimEditModal = page.locator(".modal-container").last();
     await expect(bildirimEditModal).toBeVisible();
-    await bildirimEditModal.getByLabel("Kayıt Senaryosu").selectOption("RAPORLU");
+    await bildirimEditModal
+      .getByRole("group", { name: "Kayıt Senaryosu" })
+      .getByRole("button", { name: "Raporlu" })
+      .click();
     await bildirimEditModal.getByRole("button", { name: "Kaydet" }).click();
 
     await expect(page.locator(".bildirimler-list")).toContainText("Raporlu");

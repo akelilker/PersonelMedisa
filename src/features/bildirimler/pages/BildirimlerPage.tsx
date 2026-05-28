@@ -26,14 +26,7 @@ import {
 
 const GUNLUK_KAYIT_CREATE_FORM_ID = "gunluk-kayit-create-form";
 const GUNLUK_KAYIT_EDIT_FORM_ID = "gunluk-kayit-edit-form";
-
-const QUICK_KAYIT_KEYS = [
-  "GEC_GELDI",
-  "GELMEDI",
-  "IZINLI_GELMEDI",
-  "IZINSIZ_GELMEDI",
-  "RAPORLU"
-] as const;
+const KAYIT_SENARYOSU_LABEL = "Kayıt Senaryosu";
 
 function digitsOnly(value: string | null | undefined) {
   return (value ?? "").replace(/\D+/g, "");
@@ -154,6 +147,38 @@ function toSelectOptions(options: GunlukKayitOption[]) {
   return options.map((option) => ({ value: option.key, label: option.label }));
 }
 
+type KayitSenaryosuChoiceGroupProps = {
+  name: string;
+  value: string;
+  options: GunlukKayitOption[];
+  onSelect: (value: string) => void;
+};
+
+function KayitSenaryosuChoiceGroup({ name, value, options, onSelect }: KayitSenaryosuChoiceGroupProps) {
+  return (
+    <div className="form-section bildirim-kayit-senaryosu-field">
+      <span className="form-label">{KAYIT_SENARYOSU_LABEL}</span>
+      <div className="bildirim-kayit-senaryosu-group" role="group" aria-label={KAYIT_SENARYOSU_LABEL}>
+        {options.map((option) => {
+          const isActive = option.key === value;
+
+          return (
+            <button
+              key={`${name}-${option.key}`}
+              type="button"
+              className={`bildirim-kayit-senaryosu-btn${isActive ? " is-active" : ""}`}
+              aria-pressed={isActive}
+              onClick={() => onSelect(option.key)}
+            >
+              {option.label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export function BildirimlerPage() {
   const {
     listQuery,
@@ -217,20 +242,6 @@ export function BildirimlerPage() {
         label: formatPersonelOptionLabel(personel)
       })),
     [personelOptions]
-  );
-
-  const quickKayitOptions = useMemo(
-    () =>
-      QUICK_KAYIT_KEYS.map((key) => {
-        const option = gunlukKayitOptions.find((item) => item.key === key);
-        if (option) {
-          return option;
-        }
-
-        const preset = resolveGunlukKayitPreset(key);
-        return { key, label: preset.label, preset };
-      }),
-    [gunlukKayitOptions]
   );
 
   const selectedCreatePersonel = useMemo(() => {
@@ -326,14 +337,6 @@ export function BildirimlerPage() {
             ? prev.departmanId
             : ""
     }));
-  }
-
-  function applyCreateQuickType(value: string) {
-    setCreateForm((prev) => ({ ...prev, bildirimTuru: value }));
-  }
-
-  function applyEditQuickType(value: string) {
-    setEditForm((prev) => ({ ...prev, bildirimTuru: value }));
   }
 
   const createTitle = isBirimAmiri ? "Günlük Kayıt Gir" : "Yeni Günlük Kayıt";
@@ -619,36 +622,16 @@ export function BildirimlerPage() {
 
             <PersonelContextCard personel={selectedCreatePersonel} />
 
-            <div className="bildirim-quick-types">
-              <span className="bildirim-quick-types-label">Hazır Günlük Kayıt Seç</span>
-              <div className="bildirim-quick-types-row">
-                {quickKayitOptions.map((option) => (
-                  <button
-                    key={option.key}
-                    type="button"
-                    className={`universal-btn-aux${createForm.bildirimTuru === option.key ? " is-active" : ""}`}
-                    onClick={() => applyCreateQuickType(option.key)}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
             {gunlukKayitOptions.length > 0 ? (
-              <FormField
-                as="select"
-                label="Kayıt Senaryosu"
+              <KayitSenaryosuChoiceGroup
                 name="bildirim-create-turu"
                 value={createForm.bildirimTuru}
-                onChange={(value) => setCreateForm((prev) => ({ ...prev, bildirimTuru: value }))}
-                required
-                placeholderOption={{ value: "", label: "Seçiniz" }}
-                selectOptions={toSelectOptions(gunlukKayitOptions)}
+                options={gunlukKayitOptions}
+                onSelect={(nextValue) => setCreateForm((prev) => ({ ...prev, bildirimTuru: nextValue }))}
               />
             ) : (
               <FormField
-                label="Kayıt Senaryosu"
+                label={KAYIT_SENARYOSU_LABEL}
                 name="bildirim-create-turu-text"
                 value={createForm.bildirimTuru}
                 onChange={(value) => setCreateForm((prev) => ({ ...prev, bildirimTuru: value }))}
@@ -756,36 +739,16 @@ export function BildirimlerPage() {
 
             <PersonelContextCard personel={selectedEditPersonel} />
 
-            <div className="bildirim-quick-types">
-              <span className="bildirim-quick-types-label">Hazır Günlük Kayıt Seç</span>
-              <div className="bildirim-quick-types-row">
-                {quickKayitOptions.map((option) => (
-                  <button
-                    key={option.key}
-                    type="button"
-                    className={`universal-btn-aux${editForm.bildirimTuru === option.key ? " is-active" : ""}`}
-                    onClick={() => applyEditQuickType(option.key)}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
             {gunlukKayitOptions.length > 0 ? (
-              <FormField
-                as="select"
-                label="Kayıt Senaryosu"
+              <KayitSenaryosuChoiceGroup
                 name="bildirim-edit-turu"
                 value={editForm.bildirimTuru}
-                onChange={(value) => setEditForm((prev) => ({ ...prev, bildirimTuru: value }))}
-                required
-                placeholderOption={{ value: "", label: "Seçiniz" }}
-                selectOptions={toSelectOptions(gunlukKayitOptions)}
+                options={gunlukKayitOptions}
+                onSelect={(nextValue) => setEditForm((prev) => ({ ...prev, bildirimTuru: nextValue }))}
               />
             ) : (
               <FormField
-                label="Kayıt Senaryosu"
+                label={KAYIT_SENARYOSU_LABEL}
                 name="bildirim-edit-turu-text"
                 value={editForm.bildirimTuru}
                 onChange={(value) => setEditForm((prev) => ({ ...prev, bildirimTuru: value }))}

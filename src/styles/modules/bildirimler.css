@@ -103,22 +103,37 @@
   margin: 0;
 }
 
-.bildirim-quick-types {
-  display: grid;
+.bildirim-kayit-senaryosu-field {
   gap: var(--space-2);
-  padding: var(--space-2);
-  border: 1px solid var(--line-soft);
-  border-radius: var(--radius-sm);
 }
 
-.bildirim-quick-types-label {
-  font-weight: 600;
-}
-
-.bildirim-quick-types-row {
+.bildirim-kayit-senaryosu-group {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
+  width: 100%;
+}
+
+.bildirim-kayit-senaryosu-btn {
+  width: auto;
+  min-width: 92px;
+  min-height: 30px;
+  padding: 6px 12px;
+  border: 1px solid rgba(247, 248, 250, 0.24);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: rgba(247, 248, 250, 0.68);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease;
+}
+
+.bildirim-kayit-senaryosu-btn:hover,
+.bildirim-kayit-senaryosu-btn.is-active {
+  border-color: rgba(255, 255, 255, 0.86);
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
 }
 
 .bildirim-detay-page {

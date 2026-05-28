@@ -49,8 +49,8 @@
 }
 
 .auth-field input:focus {
-  outline: 1px solid var(--theme-color);
-  outline-offset: 0;
+  outline: none;
+  border-color: rgba(var(--theme-color-rgb), 0.42);
 }
 
 .auth-field input:-webkit-autofill,

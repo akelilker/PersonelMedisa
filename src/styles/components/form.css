@@ -41,8 +41,8 @@ select.form-input {
 }
 
 .form-input:focus {
-  outline: 1px solid rgba(var(--theme-color-rgb), 0.9);
-  outline-offset: 0;
+  outline: none;
+  border-color: rgba(var(--theme-color-rgb), 0.42);
 }
 
 .form-filter-panel {

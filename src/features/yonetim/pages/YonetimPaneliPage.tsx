@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent, type KeyboardEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { FormField } from "../../../components/form/FormField";
 import { AppModal } from "../../../components/modal/AppModal";
@@ -29,6 +29,7 @@ import type {
 } from "../../../types/yonetim";
 
 type ActiveTab = "kullanicilar" | "subeler";
+type YonetimViewMode = "card" | "list";
 
 type KullaniciFormState = {
   kullaniciTipi: KullaniciTipi;
@@ -90,6 +91,80 @@ const YONETIM_SUBE_FORM_ID = "yonetim-sube-form";
 const BIRIM_AMIRI_ATANDI_SUREC_TURU = "BIRIM_AMIRI_ATANDI";
 const BIRIM_AMIRI_ATAMASI_KALDIRILDI_SUREC_TURU = "BIRIM_AMIRI_ATAMASI_KALDIRILDI";
 const SUBE_YETKISI_DEGISTI_SUREC_TURU = "SUBE_YETKISI_DEGISTI";
+
+function IconList(props: { className?: string }) {
+  return (
+    <svg
+      className={props.className}
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M4 7h16M4 12h16M4 17h16" />
+    </svg>
+  );
+}
+
+function IconGrid(props: { className?: string }) {
+  return (
+    <svg
+      className={props.className}
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <rect x="3" y="3" width="7" height="7" rx="1" />
+      <rect x="14" y="3" width="7" height="7" rx="1" />
+      <rect x="3" y="14" width="7" height="7" rx="1" />
+      <rect x="14" y="14" width="7" height="7" rx="1" />
+    </svg>
+  );
+}
+
+function YonetimViewToggle(props: {
+  label: string;
+  value: YonetimViewMode;
+  onChange: (mode: YonetimViewMode) => void;
+}) {
+  return (
+    <div className="yonetim-view-toggle" role="group" aria-label={props.label}>
+      <button
+        type="button"
+        className={`yonetim-icon-btn${props.value === "card" ? " is-active" : ""}`}
+        aria-label="Kart görünümü"
+        aria-pressed={props.value === "card"}
+        onClick={() => props.onChange("card")}
+      >
+        <IconGrid />
+      </button>
+      <button
+        type="button"
+        className={`yonetim-icon-btn${props.value === "list" ? " is-active" : ""}`}
+        aria-label="Liste görünümü"
+        aria-pressed={props.value === "list"}
+        onClick={() => props.onChange("list")}
+      >
+        <IconList />
+      </button>
+    </div>
+  );
+}
+
+function isActivationKey(event: KeyboardEvent<HTMLElement>) {
+  return event.key === "Enter" || event.key === " ";
+}
 
 function roleOptions() {
   return Object.entries(ROLE_LABELS).map(([value, label]) => ({ value, label }));
@@ -319,6 +394,8 @@ function buildYonetimSurecLogPayloads(
 export function YonetimPaneliPage() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<ActiveTab>("kullanicilar");
+  const [kullaniciViewMode, setKullaniciViewMode] = useState<YonetimViewMode>("card");
+  const [subeViewMode, setSubeViewMode] = useState<YonetimViewMode>("card");
   const [isKullaniciFormOpen, setIsKullaniciFormOpen] = useState(false);
   const [isSubeFormOpen, setIsSubeFormOpen] = useState(false);
   const [isDepartmanPickerOpen, setIsDepartmanPickerOpen] = useState(false);
@@ -362,6 +439,14 @@ export function YonetimPaneliPage() {
     [departmanOptions, subeForm.departmanIds]
   );
   const selectedDepartmanSummary = selectedDepartmanLabels.length > 0 ? selectedDepartmanLabels.join(", ") : "Departman seçimi";
+
+  function formatKullaniciDisplayName(item: YonetimKullanici) {
+    if (item.kullanici_tipi === "IC_PERSONEL" && item.personel_id != null) {
+      return personelDisplayNameMap.get(item.personel_id) ?? formatAdSoyad(item.personel_ad_soyad ?? item.ad_soyad);
+    }
+
+    return formatAdSoyad(item.ad_soyad);
+  }
 
   async function loadPanel() {
     setIsLoading(true);
@@ -620,19 +705,26 @@ export function YonetimPaneliPage() {
       {!isLoading && !errorMessage && activeTab === "kullanicilar" ? (
         <section className="yonetim-list-surface">
           <div className="yonetim-list-header">
-            <button
-              type="button"
-              className="yonetim-create-link"
-              data-testid="yonetim-kullanici-yeni"
-              onClick={openYeniKullaniciForm}
-            >
-              + Yeni Kullanıcı
-            </button>
+            <div className="yonetim-list-actions">
+              <YonetimViewToggle
+                label="Kullanıcılar görünümü"
+                value={kullaniciViewMode}
+                onChange={setKullaniciViewMode}
+              />
+              <button
+                type="button"
+                className="yonetim-create-link"
+                data-testid="yonetim-kullanici-yeni"
+                onClick={openYeniKullaniciForm}
+              >
+                + Yeni Kullanıcı
+              </button>
+            </div>
           </div>
 
           {kullanicilar.length === 0 ? (
             <EmptyState title="Kullanıcı kaydı yok" message="İlk kullanıcı atamasını buradan oluşturabilirsin." />
-          ) : (
+          ) : kullaniciViewMode === "card" ? (
             <div className="yonetim-card-grid yonetim-card-grid--users">
               {kullanicilar.map((item) => (
                 <article
@@ -642,23 +734,59 @@ export function YonetimPaneliPage() {
                   tabIndex={0}
                   onClick={() => openKullaniciEditor(item)}
                   onKeyDown={(event) => {
-                    if (event.key === "Enter" || event.key === " ") {
+                    if (isActivationKey(event)) {
                       event.preventDefault();
                       openKullaniciEditor(item);
                     }
                   }}
                 >
                   <div className="yonetim-card-meta">
-                    <strong>
-                      {item.kullanici_tipi === "IC_PERSONEL" && item.personel_id != null
-                        ? personelDisplayNameMap.get(item.personel_id) ??
-                          formatAdSoyad(item.personel_ad_soyad ?? item.ad_soyad)
-                        : formatAdSoyad(item.ad_soyad)}
-                    </strong>
+                    <strong>{formatKullaniciDisplayName(item)}</strong>
                     <span>{formatSubeScopeLabel(item.sube_ids, subeNameMap)}</span>
                   </div>
                 </article>
               ))}
+            </div>
+          ) : (
+            <div className="yonetim-list-table-wrap">
+              <table className="yonetim-list-table">
+                <thead>
+                  <tr>
+                    <th>Ad Soyad</th>
+                    <th>Kullanıcı Tipi</th>
+                    <th>Rol</th>
+                    <th>Şube Yetkisi</th>
+                    <th>Varsayılan Şube</th>
+                    <th>Durum</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {kullanicilar.map((item) => (
+                    <tr
+                      key={item.id}
+                      className="yonetim-list-table-row"
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => openKullaniciEditor(item)}
+                      onKeyDown={(event) => {
+                        if (isActivationKey(event)) {
+                          event.preventDefault();
+                          openKullaniciEditor(item);
+                        }
+                      }}
+                    >
+                      <td className="yonetim-list-table-cell-strong">{formatKullaniciDisplayName(item)}</td>
+                      <td>{KULLANICI_TIPI_LABELS[item.kullanici_tipi]}</td>
+                      <td>{ROLE_LABELS[item.rol]}</td>
+                      <td title={formatSubeScopeLabel(item.sube_ids, subeNameMap)}>
+                        {formatSubeScopeLabel(item.sube_ids, subeNameMap)}
+                      </td>
+                      <td>{formatVarsayilanSubeLabel(item.varsayilan_sube_id, subeNameMap)}</td>
+                      <td>{DURUM_LABELS[item.durum]}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </section>
@@ -667,19 +795,22 @@ export function YonetimPaneliPage() {
       {!isLoading && !errorMessage && activeTab === "subeler" ? (
         <section className="yonetim-list-surface">
           <div className="yonetim-list-header">
-            <button
-              type="button"
-              className="yonetim-create-link"
-              data-testid="yonetim-sube-yeni"
-              onClick={openYeniSubeForm}
-            >
-              + Yeni Şube
-            </button>
+            <div className="yonetim-list-actions">
+              <YonetimViewToggle label="Şubeler görünümü" value={subeViewMode} onChange={setSubeViewMode} />
+              <button
+                type="button"
+                className="yonetim-create-link"
+                data-testid="yonetim-sube-yeni"
+                onClick={openYeniSubeForm}
+              >
+                + Yeni Şube
+              </button>
+            </div>
           </div>
 
           {subeler.length === 0 ? (
             <EmptyState title="Şube tanımı yok" message="İlk şube kaydını buradan oluşturmaya başlayabilirsin." />
-          ) : (
+          ) : subeViewMode === "card" ? (
             <div className="yonetim-card-grid yonetim-card-grid--branches">
               {subeler.map((item) => (
                 <article
@@ -689,7 +820,7 @@ export function YonetimPaneliPage() {
                   tabIndex={0}
                   onClick={() => openSubeEditor(item)}
                   onKeyDown={(event) => {
-                    if (event.key === "Enter" || event.key === " ") {
+                    if (isActivationKey(event)) {
                       event.preventDefault();
                       openSubeEditor(item);
                     }
@@ -704,6 +835,45 @@ export function YonetimPaneliPage() {
                   <p>Durum: {DURUM_LABELS[item.durum]}</p>
                 </article>
               ))}
+            </div>
+          ) : (
+            <div className="yonetim-list-table-wrap">
+              <table className="yonetim-list-table">
+                <thead>
+                  <tr>
+                    <th>Şube Adı</th>
+                    <th>Kod</th>
+                    <th>Departman Sayısı</th>
+                    <th>Departmanlar</th>
+                    <th>Durum</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {subeler.map((item) => (
+                    <tr
+                      key={item.id}
+                      className="yonetim-list-table-row"
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => openSubeEditor(item)}
+                      onKeyDown={(event) => {
+                        if (isActivationKey(event)) {
+                          event.preventDefault();
+                          openSubeEditor(item);
+                        }
+                      }}
+                    >
+                      <td className="yonetim-list-table-cell-strong">{item.ad}</td>
+                      <td>{item.kod}</td>
+                      <td>{item.departman_adlari.length}</td>
+                      <td title={item.departman_adlari.join(", ") || "Departman tanımlı değil"}>
+                        {item.departman_adlari.join(", ") || "Departman tanımlı değil"}
+                      </td>
+                      <td>{DURUM_LABELS[item.durum]}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </section>

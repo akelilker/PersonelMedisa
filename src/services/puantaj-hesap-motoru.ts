@@ -1239,6 +1239,65 @@ export function uretComplianceUyarilari(
   return uyarilar;
 }
 
+/** UBGT mesai günü + haftalık fazla mesai çakışması (Faz A — yalnız uyarı, tutar değiştirmez). */
+export const UBGT_FAZLA_MESAI_CAKISMASI_CODE = "UBGT_FAZLA_MESAI_CAKISMASI";
+
+export const UBGT_FAZLA_MESAI_CAKISMASI_MESSAGE =
+  "UBGT çalışması ile haftalık fazla mesai aynı haftada çakışıyor. Bordro etkisi manuel incelenmelidir.";
+
+export type UbgtFazlaMesaiCakismaGunGirdi = {
+  gun_tipi?: PuantajGunTipi;
+  hesap_etkisi?: PuantajHesapEtkisi;
+  net_calisma_suresi_dakika?: number;
+};
+
+export function isUbgtMesaiCalismaGunu(gun: UbgtFazlaMesaiCakismaGunGirdi): boolean {
+  const net = ucretIcinGuvenliNegatifOlmayanSayi(gun.net_calisma_suresi_dakika ?? 0);
+  return (
+    gun.gun_tipi === "UBGT_Resmi_Tatil" &&
+    gun.hesap_etkisi === "Mesai_Yaz" &&
+    net > 0
+  );
+}
+
+export function uretUbgtFazlaMesaiCakismaUyari(): ComplianceUyari {
+  return {
+    code: UBGT_FAZLA_MESAI_CAKISMASI_CODE,
+    message: UBGT_FAZLA_MESAI_CAKISMASI_MESSAGE,
+    level: "UYARI"
+  };
+}
+
+function complianceUyariKoduVar(mevcut: readonly ComplianceUyari[], code: string): boolean {
+  return mevcut.some((uyari) => uyari.code === code);
+}
+
+/**
+ * Tam haftalık puantaj verisi varken, UBGT mesai gününe haftalık fazla mesai çakışma uyarısını ekler.
+ * Eksik hafta veya çakışma yoksa listeyi olduğu gibi döner.
+ */
+export function birlestirUbgtFazlaMesaiCakismaUyari(
+  mevcut: readonly ComplianceUyari[],
+  gun: UbgtFazlaMesaiCakismaGunGirdi,
+  haftaGunleri: readonly HaftalikGunNetCalisma[],
+  tamHaftaVerisi: boolean
+): ComplianceUyari[] {
+  if (!tamHaftaVerisi) {
+    return [...mevcut];
+  }
+  if (!isUbgtMesaiCalismaGunu(gun)) {
+    return [...mevcut];
+  }
+  const fazlaDk = hesaplaHaftalikCalismaOzeti(haftaGunleri).fazla_calisma_dakika;
+  if (fazlaDk <= 0) {
+    return [...mevcut];
+  }
+  if (complianceUyariKoduVar(mevcut, UBGT_FAZLA_MESAI_CAKISMASI_CODE)) {
+    return [...mevcut];
+  }
+  return [...mevcut, uretUbgtFazlaMesaiCakismaUyari()];
+}
+
 export function hesaplaYasKuraliBlokMesaji(
   girdi: Pick<
     HesapGirdisi,

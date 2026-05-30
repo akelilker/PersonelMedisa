@@ -34,6 +34,9 @@ import {
   hesaplaHaftaTatiliPazarEtkisi,
   gunlukPuantajToGirdi,
   hesapSonucuToGunlukPuantaj,
+  birlestirUbgtFazlaMesaiCakismaUyari,
+  UBGT_FAZLA_MESAI_CAKISMASI_CODE,
+  UBGT_FAZLA_MESAI_CAKISMASI_MESSAGE,
   type HesapGirdisi
 } from "../../src/services/puantaj-hesap-motoru";
 import { deriveGecErkenKesintiPreview } from "../../src/hooks/usePuantaj";
@@ -1979,5 +1982,111 @@ describe("adaptör fonksiyonları", () => {
       kontrol_durumu: "AMIR_KONTROL_ETTI"
     });
     expect(puantaj.kontrol_durumu).toBe("AMIR_KONTROL_ETTI");
+  });
+});
+
+// =========================================================================
+// UBGT + haftalık fazla mesai çakışması (Faz A)
+// =========================================================================
+
+describe("birlestirUbgtFazlaMesaiCakismaUyari", () => {
+  const ref = "2026-04-15";
+  const maas = 30000;
+
+  const normalHaftaGunleri = (): GunlukPuantaj[] => [
+    gunlukSatir(1, "2026-04-13", 480),
+    gunlukSatir(1, "2026-04-14", 480),
+    gunlukSatir(1, "2026-04-15", 480),
+    gunlukSatir(1, "2026-04-16", 480),
+    gunlukSatir(1, "2026-04-17", 480)
+  ];
+
+  const ubgtMesaiGunu = (net = 480): GunlukPuantaj => ({
+    ...gunlukSatir(1, "2026-04-18", net),
+    gun_tipi: "UBGT_Resmi_Tatil",
+    hesap_etkisi: "Mesai_Yaz",
+    giris_saati: "08:00",
+    cikis_saati: "16:00"
+  });
+
+  it("pozitif: tam hafta, FM > 0 ve UBGT mesai günü → UBGT_FAZLA_MESAI_CAKISMASI", () => {
+    const tamHafta = [...normalHaftaGunleri(), ubgtMesaiGunu(), gunlukSatir(1, "2026-04-19", 0)];
+    const ubgt = ubgtMesaiGunu();
+    const merged = birlestirUbgtFazlaMesaiCakismaUyari([], ubgt, tamHafta, true);
+
+    expect(merged).toContainEqual({
+      code: UBGT_FAZLA_MESAI_CAKISMASI_CODE,
+      message: UBGT_FAZLA_MESAI_CAKISMASI_MESSAGE,
+      level: "UYARI"
+    });
+
+    const haftalik = hesaplaHaftalikPuantajUcretOzeti(tamHafta, ref, 45000);
+    expect(haftalik.fazla_calisma_dakika).toBeGreaterThan(0);
+    expect(haftalik.fazla_calisma_tutari).toBeGreaterThan(0);
+
+    const tatil = hesaplaTatilEkOdemeOzeti(maas, ubgt);
+    expect(tatil!.ek_odeme_tutari).toBe(1000);
+  });
+
+  it("negatif A: UBGT mesai var ama haftalık toplam <= 45 saat → uyarı yok", () => {
+    const tamHafta = [
+      gunlukSatir(1, "2026-04-13", 385),
+      gunlukSatir(1, "2026-04-14", 385),
+      gunlukSatir(1, "2026-04-15", 385),
+      gunlukSatir(1, "2026-04-16", 385),
+      gunlukSatir(1, "2026-04-17", 385),
+      ubgtMesaiGunu(385),
+      gunlukSatir(1, "2026-04-19", 385)
+    ];
+    const ubgt = ubgtMesaiGunu(385);
+    expect(hesaplaHaftalikPuantajUcretOzeti(tamHafta, ref, 45000).fazla_calisma_dakika).toBe(0);
+
+    const merged = birlestirUbgtFazlaMesaiCakismaUyari([], ubgt, tamHafta, true);
+    expect(merged).toHaveLength(0);
+  });
+
+  it("negatif B: haftalık FM > 0 ama UBGT mesai yok → uyarı yok", () => {
+    const tamHafta = [gunlukSatir(1, "2026-04-14", 2760), gunlukSatir(1, "2026-04-15", 0)];
+    const normal = gunlukSatir(1, "2026-04-14", 2760);
+    const merged = birlestirUbgtFazlaMesaiCakismaUyari([], normal, tamHafta, true);
+    expect(merged).toHaveLength(0);
+  });
+
+  it("negatif C: UBGT günü Mesai_Yaz değil veya net 0 → uyarı yok", () => {
+    const tamHafta = [...normalHaftaGunleri(), ubgtMesaiGunu(), gunlukSatir(1, "2026-04-19", 0)];
+    const ubgtTamYevmiye: GunlukPuantaj = {
+      ...gunlukSatir(1, "2026-04-18", 480),
+      gun_tipi: "UBGT_Resmi_Tatil",
+      hesap_etkisi: "Tam_Yevmiye_Ver"
+    };
+    const ubgtNetSifir: GunlukPuantaj = {
+      ...gunlukSatir(1, "2026-04-18", 0),
+      gun_tipi: "UBGT_Resmi_Tatil",
+      hesap_etkisi: "Mesai_Yaz"
+    };
+
+    expect(birlestirUbgtFazlaMesaiCakismaUyari([], ubgtTamYevmiye, tamHafta, true)).toHaveLength(0);
+    expect(birlestirUbgtFazlaMesaiCakismaUyari([], ubgtNetSifir, tamHafta, true)).toHaveLength(0);
+  });
+
+  it("eksik hafta verisi (tamHaftaVerisi false) → uyarı yok", () => {
+    const tamHafta = [...normalHaftaGunleri(), ubgtMesaiGunu()];
+    const ubgt = ubgtMesaiGunu();
+    const merged = birlestirUbgtFazlaMesaiCakismaUyari([], ubgt, tamHafta, false);
+    expect(merged).toHaveLength(0);
+  });
+
+  it("duplicate uyarı kodu eklenmez", () => {
+    const tamHafta = [...normalHaftaGunleri(), ubgtMesaiGunu(), gunlukSatir(1, "2026-04-19", 0)];
+    const ubgt = ubgtMesaiGunu();
+    const mevcut = [
+      {
+        code: UBGT_FAZLA_MESAI_CAKISMASI_CODE,
+        message: UBGT_FAZLA_MESAI_CAKISMASI_MESSAGE,
+        level: "UYARI" as const
+      }
+    ];
+    const merged = birlestirUbgtFazlaMesaiCakismaUyari(mevcut, ubgt, tamHafta, true);
+    expect(merged).toHaveLength(1);
   });
 });

@@ -23,6 +23,7 @@ import {
   hesaplaTatilEkOdemeOzeti,
   hesaplaYasKuraliBlokMesaji,
   hesapSonucuToGunlukPuantaj,
+  birlestirUbgtFazlaMesaiCakismaUyari,
   type DevamsizlikKesintiOzeti,
   type HaftalikPuantajUcretOzeti,
   type TatilEkOdemeOzeti
@@ -219,6 +220,24 @@ function toplaHaftalikPuantajGunleri(
     }
   }
   return gunler;
+}
+
+function hesaplaHaftalikPuantajBaglam(
+  activeSube: number | null,
+  personelId: number,
+  referansTarih: string,
+  aktifKayit: GunlukPuantaj | null
+): { gunler: GunlukPuantaj[]; tamHaftaVerisi: boolean } | null {
+  const aralik = hesaplaHaftaAraligi(referansTarih);
+  if (!aralik) {
+    return null;
+  }
+  const gunler = toplaHaftalikPuantajGunleri(activeSube, personelId, aralik, aktifKayit);
+  const tumGunler = listHaftaGGaatarihleri(aralik.hafta_baslangic);
+  return {
+    gunler,
+    tamHaftaVerisi: gunler.length >= tumGunler.length
+  };
 }
 
 export type HaftalikPuantajOzetDurumu = "yok" | "gecersiz_tarih" | "hazir";
@@ -581,12 +600,20 @@ export function usePuantaj() {
     };
   }, [activeSube, activeQuery]);
 
-  const { haftalikOzet, haftalikOzetDurumu, haftalikOzetEksikVeriNotu } = useMemo(() => {
+  const {
+    haftalikOzet,
+    haftalikOzetDurumu,
+    haftalikOzetEksikVeriNotu,
+    haftaPuantajGunleri,
+    tamHaftaVerisi
+  } = useMemo(() => {
     if (!activeQuery) {
       return {
         haftalikOzet: null as HaftalikPuantajUcretOzeti | null,
         haftalikOzetDurumu: "yok" as HaftalikPuantajOzetDurumu,
-        haftalikOzetEksikVeriNotu: null as string | null
+        haftalikOzetEksikVeriNotu: null as string | null,
+        haftaPuantajGunleri: [] as GunlukPuantaj[],
+        tamHaftaVerisi: false
       };
     }
 
@@ -595,7 +622,9 @@ export function usePuantaj() {
       return {
         haftalikOzet: null,
         haftalikOzetDurumu: "gecersiz_tarih" as const,
-        haftalikOzetEksikVeriNotu: "Sorgu tarihi geçersiz; haftalık özet hesaplanamadı."
+        haftalikOzetEksikVeriNotu: "Sorgu tarihi geçersiz; haftalık özet hesaplanamadı.",
+        haftaPuantajGunleri: [] as GunlukPuantaj[],
+        tamHaftaVerisi: false
       };
     }
 
@@ -609,8 +638,9 @@ export function usePuantaj() {
     const ozet = hesaplaHaftalikPuantajUcretOzeti(gunler, activeQuery.tarih, maas);
 
     const tumGunler = listHaftaGGaatarihleri(aralik.hafta_baslangic);
+    const tamHaftaVerisi = gunler.length >= tumGunler.length;
     const parcalar: string[] = [];
-    if (gunler.length < tumGunler.length) {
+    if (!tamHaftaVerisi) {
       parcalar.push(
         `Özet, bu personel için önbellekte bulunan ${gunler.length} günlük kayıtla hesaplandı (tam hafta ${tumGunler.length} gün). Diğer günler getirilmediyse toplamlar eksik olabilir.`
       );
@@ -622,9 +652,26 @@ export function usePuantaj() {
     return {
       haftalikOzet: ozet,
       haftalikOzetDurumu: "hazir" as const,
-      haftalikOzetEksikVeriNotu: parcalar.length > 0 ? parcalar.join(" ") : null
+      haftalikOzetEksikVeriNotu: parcalar.length > 0 ? parcalar.join(" ") : null,
+      haftaPuantajGunleri: gunler,
+      tamHaftaVerisi
     };
   }, [activeQuery, activeSube, puantaj, personelMaasTutari, appDataRevision]);
+
+  const puantajGoruntuleme = useMemo(() => {
+    if (!puantaj || haftalikOzetDurumu !== "hazir") {
+      return puantaj;
+    }
+    return {
+      ...puantaj,
+      compliance_uyarilari: birlestirUbgtFazlaMesaiCakismaUyari(
+        puantaj.compliance_uyarilari,
+        puantaj,
+        haftaPuantajGunleri,
+        tamHaftaVerisi
+      )
+    };
+  }, [puantaj, haftalikOzetDurumu, haftaPuantajGunleri, tamHaftaVerisi]);
 
   const {
     devamsizlikKesintiOzet,
@@ -818,7 +865,7 @@ export function usePuantaj() {
     tatilEkOdemeNotu
   ]);
 
-  const anaDetay = useMemo(() => toPuantajAnaDetayView(puantaj), [puantaj]);
+  const anaDetay = useMemo(() => toPuantajAnaDetayView(puantajGoruntuleme), [puantajGoruntuleme]);
 
   const clearQuery = useCallback(() => {
     setFormState({ ...INITIAL_FORM });
@@ -942,12 +989,27 @@ export function usePuantaj() {
           cikis_saati: body.cikis_saati,
           gercek_mola_dakika: body.gercek_mola_dakika
         });
+        const mapped = hesapSonucuToGunlukPuantaj(hesapSonucu, puantaj?.state ?? "ACIK", {
+          kontrol_durumu: puantaj?.kontrol_durumu ?? "BEKLIYOR"
+        });
+        const haftalikBaglam = hesaplaHaftalikPuantajBaglam(
+          activeSube,
+          activeQuery.personelId,
+          activeQuery.tarih,
+          mapped
+        );
         const optimistic: GunlukPuantaj = {
-          ...hesapSonucuToGunlukPuantaj(hesapSonucu, puantaj?.state ?? "ACIK", {
-            kontrol_durumu: puantaj?.kontrol_durumu ?? "BEKLIYOR"
-          }),
+          ...mapped,
           durumu_bildirdi_mi: body.durumu_bildirdi_mi ?? undefined,
-          durum_bildirim_aciklamasi: body.durum_bildirim_aciklamasi ?? undefined
+          durum_bildirim_aciklamasi: body.durum_bildirim_aciklamasi ?? undefined,
+          compliance_uyarilari: haftalikBaglam
+            ? birlestirUbgtFazlaMesaiCakismaUyari(
+                mapped.compliance_uyarilari,
+                mapped,
+                haftalikBaglam.gunler,
+                haftalikBaglam.tamHaftaVerisi
+              )
+            : mapped.compliance_uyarilari
         };
 
         const previousPuantaj = puantaj;
@@ -1053,7 +1115,7 @@ export function usePuantaj() {
     formState,
     patchFormState,
     activeQuery,
-    puantaj,
+    puantaj: puantajGoruntuleme,
     isLoading,
     isSubmitting,
     isKontrolSubmitting,

@@ -1,5 +1,6 @@
 ﻿import type { ApiResponse } from "../types/api";
 import { hesaplaAylikSgkPuantajOzetleri } from "../services/dashboard-rapor-servisi";
+import { buildHaftalikKapanisSnapshot } from "../services/haftalik-kapanis-snapshot";
 
 type DemoMethod = "GET" | "POST" | "PUT" | "DELETE";
 
@@ -1636,37 +1637,28 @@ export function resolveDemoApiResponse(
     const kapanisId = ++demoState.nextIds.kapanis;
     const hafta_baslangic = toStringValue(body.hafta_baslangic) ?? "2026-04-06";
     const hafta_bitis = toStringValue(body.hafta_bitis) ?? "2026-04-12";
-    const departman_id = toNumber(body.departman_id) ?? 3;
-    const yilMatch = /^(\d{4})-/.exec(hafta_baslangic);
-    const yil = yilMatch ? Number.parseInt(yilMatch[1], 10) : undefined;
-    const hesaplama_zamani = new Date().toISOString();
-    const kapsamPersoneller = demoState.personeller.filter(
-      (personel) => personel.departman_id === departman_id || personel.departman_id == null
-    );
+    const departmanIdFromBody = toNumber(body.departman_id);
+    const departman_id = departmanIdFromBody ?? 3;
+    const kapsamPersoneller =
+      departmanIdFromBody != null
+        ? demoState.personeller.filter((personel) => personel.departman_id === departman_id)
+        : demoState.personeller;
 
-    const snapshot_satirlari = kapsamPersoneller.map((personel, index) => ({
-      snapshot_id: kapanisId * 1000 + index + 1,
+    const snapshot = buildHaftalikKapanisSnapshot({
       kapanis_id: kapanisId,
-      personel_id: personel.id,
-      departman_id,
       hafta_baslangic,
       hafta_bitis,
-      yil,
-      hafta_no: 1,
-      state: "KAPANDI" as const,
-      kaynak_versiyon: "A1_CONTRACT_STUB",
-      toplam_net_dakika: 0,
-      normal_calisma_dakika: 0,
-      fazla_calisma_dakika: 0,
-      fazla_surelerle_calisma_dakika: 0,
-      tam_hafta_verisi: false,
-      compliance_uyarilari: [],
-      compliance_uyari_sayisi: 0,
-      kritik_uyari_var_mi: false,
-      hesaplama_zamani,
-      kaynak_gun_sayisi: 0,
-      notlar: ["A1 contract stub; gerçek hesap A2 fazında bağlanacak."]
-    }));
+      departman_id,
+      personeller: kapsamPersoneller.map((personel) => ({
+        id: personel.id,
+        departman_id: personel.departman_id,
+        dogum_tarihi: personel.dogum_tarihi ?? null
+      })),
+      resolvePuantaj: (personelId, tarih) => {
+        const kayit = demoState.puantajMap[`${personelId}|${tarih}`];
+        return kayit ?? null;
+      }
+    });
 
     return ok({
       id: kapanisId,
@@ -1675,9 +1667,9 @@ export function resolveDemoApiResponse(
       hafta_bitis,
       departman_id,
       state: "KAPANDI",
-      personel_sayisi: demoState.personeller.length,
-      snapshot_satir_sayisi: snapshot_satirlari.length,
-      snapshot_satirlari
+      personel_sayisi: snapshot.personel_sayisi,
+      snapshot_satir_sayisi: snapshot.snapshot_satir_sayisi,
+      snapshot_satirlari: snapshot.snapshot_satirlari
     });
   }
 

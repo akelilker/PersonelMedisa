@@ -18,13 +18,20 @@ Bu belge yeni kod fazı açmaz. Enum rename, UI metinleri, SGK/dashboard, API pe
 
 ## 2. Kapanış özeti
 
-**Faz C kod tarafı kapanmıştır** (CI yeşil onayı ile).
-
-Faz C'de hafta tatili günü **davranışı değiştirilmeden** Pazar varsayımı tek domain helper'a alındı. Default değer **Pazar (`0`)** olarak korundu; UI, enum, SGK/dashboard ve Faz A/B davranışları değiştirilmedi.
+**Faz C kapanmıştır.** Hafta tatili günü **davranışı değiştirilmeden** Pazar varsayımı tek domain helper'a alındı. Default değer **Pazar (`0`)** olarak korundu; UI, enum, SGK/dashboard ve Faz A/B davranışları değiştirilmedi. `main` → `origin/main` push tamamlandı.
 
 ---
 
-## 3. Teknik özet
+## 3. Commit zinciri
+
+| Sıra | Commit | Açıklama |
+|------|--------|----------|
+| 1 | `630b8df` | Faz C implementasyonu (domain helper, hook/API hizalama, +8 unit test) |
+| 2 | `4b51e13` | Faz C kapanış checkpoint (`34-puantaj-mevzuat-faz-c-kapanis-checkpoint.md`) |
+
+---
+
+## 4. Teknik özet
 
 | Öğe | Değer / not |
 |-----|-------------|
@@ -38,7 +45,7 @@ Kaldırılan dağınık kopyalar: `puantaj-hesap-motoru.ts` (iç), `usePuantaj.t
 
 ---
 
-## 4. Değişen dosyalar
+## 5. Değişen dosyalar
 
 | Dosya | Rol |
 |-------|-----|
@@ -51,7 +58,7 @@ Kaldırılan dağınık kopyalar: `puantaj-hesap-motoru.ts` (iç), `usePuantaj.t
 
 ---
 
-## 5. Davranış — ne değişti / ne korundu
+## 6. Davranış — ne değişti / ne korundu
 
 ### Değişen (yalnızca yapı)
 
@@ -66,18 +73,18 @@ Kaldırılan dağınık kopyalar: `puantaj-hesap-motoru.ts` (iç), `usePuantaj.t
 
 ---
 
-## 6. Doğrulama (implementasyon anı)
+## 7. Doğrulama
 
 | Komut | Sonuç |
 |-------|--------|
 | `npm run typecheck` | Yeşil |
 | `npm run test` | 386 passed |
 | `npx playwright test tests/e2e/smoke.spec.ts` | 4 passed |
-| CI / Deploy | Commit push sonrası güncellenecek |
+| Git push | `main` → `origin/main` (`630b8df`, `4b51e13`) |
 
 ---
 
-## 7. Kapsam dışı (bilinçli)
+## 8. Kapsam dışı (bilinçli)
 
 - `Hafta_Tatili_Pazar` enum/string rename
 - UI label / `GunlukPuantajPage` metin değişikliği
@@ -89,10 +96,10 @@ Kaldırılan dağınık kopyalar: `puantaj-hesap-motoru.ts` (iç), `usePuantaj.t
 
 ---
 
-## 8. Sonraki adım
+## 9. Sonraki adım
 
 Yeni teknik faz **kullanıcı onayı** ile açılır. Açık adaylar: **Faz D**, **Faz E** (`32-puantaj-mevzuat-uyum-review.md` Bölüm 7).
 
 İsteğe bağlı ileri adımlar (Faz C+): şube/personel `hafta_tatili_gun_kodu` persist, dashboard SGK istisnası, enum/generic isim refactor — ayrı karar.
 
-**Belge durumu:** Faz C kapalı — CI onayı commit hash ile tamamlanacak.
+**Belge durumu:** Faz C kapalı — push tamamlandı (`630b8df`, `4b51e13`).

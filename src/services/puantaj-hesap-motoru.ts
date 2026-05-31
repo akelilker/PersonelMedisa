@@ -1458,6 +1458,58 @@ export function birlestirUbgtFazlaMesaiCakismaUyari(
   return [...mevcut, uretUbgtFazlaMesaiCakismaUyari()];
 }
 
+/** 18 yaş altı personelde haftalık fazla çalışma (Faz D2 — yalnız uyarı, tutar/blok değiştirmez). */
+export const ONSEKIZ_YAS_ALTI_FAZLA_CALISMA_CODE = "ONSEKIZ_YAS_ALTI_FAZLA_CALISMA";
+
+export const ONSEKIZ_YAS_ALTI_FAZLA_CALISMA_MESSAGE =
+  "18 yaş altı personel için haftalık fazla çalışma tespit edildi; mevzuat uyumu manuel doğrulanmalıdır.";
+
+export function isOnsekizYasAltiPersonel(dogumTarihi: string, referansTarih: string): boolean {
+  const yas = hesaplaYas(dogumTarihi, referansTarih);
+  return yas !== null && yas <= 18;
+}
+
+export function uretOnsekizYasAltiFazlaCalismaUyari(): ComplianceUyari {
+  return {
+    code: ONSEKIZ_YAS_ALTI_FAZLA_CALISMA_CODE,
+    message: ONSEKIZ_YAS_ALTI_FAZLA_CALISMA_MESSAGE,
+    level: "UYARI"
+  };
+}
+
+export type OnsekizYasAltiFazlaCalismaUyariGirdi = {
+  dogum_tarihi?: string;
+  referans_tarih: string;
+  fazla_calisma_dakika: number;
+  tam_hafta_verisi: boolean;
+};
+
+/**
+ * Tam haftalık puantaj verisi varken, 18 yaş altı personel için haftalık fazla çalışma uyarısını ekler.
+ * Doğum tarihi yok/geçersiz, FM yok veya tam hafta eksikse listeyi olduğu gibi döner.
+ */
+export function birlestirOnsekizYasAltiFazlaCalismaUyari(
+  mevcut: readonly ComplianceUyari[],
+  girdi: OnsekizYasAltiFazlaCalismaUyariGirdi
+): ComplianceUyari[] {
+  if (!girdi.tam_hafta_verisi) {
+    return [...mevcut];
+  }
+  if (!girdi.dogum_tarihi?.trim()) {
+    return [...mevcut];
+  }
+  if (girdi.fazla_calisma_dakika <= 0) {
+    return [...mevcut];
+  }
+  if (!isOnsekizYasAltiPersonel(girdi.dogum_tarihi, girdi.referans_tarih)) {
+    return [...mevcut];
+  }
+  if (complianceUyariKoduVar(mevcut, ONSEKIZ_YAS_ALTI_FAZLA_CALISMA_CODE)) {
+    return [...mevcut];
+  }
+  return [...mevcut, uretOnsekizYasAltiFazlaCalismaUyari()];
+}
+
 export function hesaplaYasKuraliBlokMesaji(
   girdi: Pick<
     HesapGirdisi,

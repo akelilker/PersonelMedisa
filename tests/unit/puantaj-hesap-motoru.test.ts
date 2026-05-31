@@ -40,9 +40,14 @@ import {
   gunlukPuantajToGirdi,
   hesapSonucuToGunlukPuantaj,
   birlestirUbgtFazlaMesaiCakismaUyari,
+  birlestirOnsekizYasAltiFazlaCalismaUyari,
+  isOnsekizYasAltiPersonel,
   birlestirMazeretsizDevamsizlikAdayUyariari,
   UBGT_FAZLA_MESAI_CAKISMASI_CODE,
   UBGT_FAZLA_MESAI_CAKISMASI_MESSAGE,
+  ONSEKIZ_YAS_ALTI_FAZLA_CALISMA_CODE,
+  ONSEKIZ_YAS_ALTI_FAZLA_CALISMA_MESSAGE,
+  GECE_CALISMASI_7_5_SAAT_ASIMI_CODE,
   DEVAMSIZLIK_UCRET_ETKISI_ADAYI_CODE,
   DEVAMSIZLIK_UCRET_ETKISI_ADAYI_MESSAGE,
   HAFTA_TATILI_HAK_KAYBI_ADAYI_CODE,
@@ -2234,6 +2239,104 @@ describe("birlestirUbgtFazlaMesaiCakismaUyari", () => {
     ];
     const merged = birlestirUbgtFazlaMesaiCakismaUyari(mevcut, ubgt, tamHafta, true);
     expect(merged).toHaveLength(1);
+  });
+});
+
+// =========================================================================
+// 18 yaş altı haftalık fazla çalışma (Faz D2)
+// =========================================================================
+
+describe("isOnsekizYasAltiPersonel", () => {
+  it("18 yaş tam sınırda true", () => {
+    expect(isOnsekizYasAltiPersonel("2008-04-13", "2026-04-13")).toBe(true);
+  });
+
+  it("yetişkin false", () => {
+    expect(isOnsekizYasAltiPersonel("1990-01-01", "2026-04-13")).toBe(false);
+  });
+
+  it("geçersiz doğum tarihi false", () => {
+    expect(isOnsekizYasAltiPersonel("invalid", "2026-04-13")).toBe(false);
+  });
+});
+
+describe("birlestirOnsekizYasAltiFazlaCalismaUyari", () => {
+  const referans = "2026-04-15";
+  const gencDogum = "2008-01-01";
+  const yetiskinDogum = "1990-01-01";
+
+  const girdi = (
+    dogum_tarihi: string | undefined,
+    fazla_calisma_dakika: number,
+    tam_hafta_verisi = true
+  ) => ({
+    dogum_tarihi,
+    referans_tarih: referans,
+    fazla_calisma_dakika,
+    tam_hafta_verisi
+  });
+
+  it("yetişkin + fazla_calisma_dakika > 0 → uyarı yok", () => {
+    const merged = birlestirOnsekizYasAltiFazlaCalismaUyari([], girdi(yetiskinDogum, 60));
+    expect(merged).toHaveLength(0);
+  });
+
+  it("18 yaş altı + fazla_calisma_dakika > 0 → ONSEKIZ_YAS_ALTI_FAZLA_CALISMA", () => {
+    const merged = birlestirOnsekizYasAltiFazlaCalismaUyari([], girdi(gencDogum, 60));
+    expect(merged).toContainEqual({
+      code: ONSEKIZ_YAS_ALTI_FAZLA_CALISMA_CODE,
+      message: ONSEKIZ_YAS_ALTI_FAZLA_CALISMA_MESSAGE,
+      level: "UYARI"
+    });
+  });
+
+  it("18 yaş altı + fazla_calisma_dakika = 0 → uyarı yok", () => {
+    const merged = birlestirOnsekizYasAltiFazlaCalismaUyari([], girdi(gencDogum, 0));
+    expect(merged).toHaveLength(0);
+  });
+
+  it("dogum_tarihi eksik → uyarı yok", () => {
+    const merged = birlestirOnsekizYasAltiFazlaCalismaUyari([], girdi(undefined, 60));
+    expect(merged).toHaveLength(0);
+  });
+
+  it("geçersiz dogum_tarihi → uyarı yok", () => {
+    const merged = birlestirOnsekizYasAltiFazlaCalismaUyari([], girdi("invalid", 60));
+    expect(merged).toHaveLength(0);
+  });
+
+  it("tam hafta verisi yok → uyarı yok", () => {
+    const merged = birlestirOnsekizYasAltiFazlaCalismaUyari(
+      [],
+      girdi(gencDogum, 60, false)
+    );
+    expect(merged).toHaveLength(0);
+  });
+
+  it("mevcut listede aynı kod varsa duplicate yok", () => {
+    const mevcut = [
+      {
+        code: ONSEKIZ_YAS_ALTI_FAZLA_CALISMA_CODE,
+        message: ONSEKIZ_YAS_ALTI_FAZLA_CALISMA_MESSAGE,
+        level: "UYARI" as const
+      }
+    ];
+    const merged = birlestirOnsekizYasAltiFazlaCalismaUyari(mevcut, girdi(gencDogum, 60));
+    expect(merged).toHaveLength(1);
+  });
+
+  it("mevcut başka compliance uyarıları korunur", () => {
+    const mevcut = [
+      {
+        code: GECE_CALISMASI_7_5_SAAT_ASIMI_CODE,
+        message: "Gece çalışma süresi günlük 7,5 saat sınırını aşıyor.",
+        level: "UYARI" as const
+      }
+    ];
+    const merged = birlestirOnsekizYasAltiFazlaCalismaUyari(mevcut, girdi(gencDogum, 60));
+    expect(merged).toHaveLength(2);
+    expect(merged[0].code).toBe(GECE_CALISMASI_7_5_SAAT_ASIMI_CODE);
+    expect(merged[1].code).toBe(ONSEKIZ_YAS_ALTI_FAZLA_CALISMA_CODE);
   });
 });
 

@@ -20,11 +20,13 @@ import {
   hesaplaGecErkenEksikSure,
   hesaplaGecKalmaErkenCikmaKesintiOzeti,
   hesaplaHaftaAraligi,
+  hesaplaHaftalikCalismaOzeti,
   hesaplaHaftalikPuantajUcretOzeti,
   hesaplaTatilEkOdemeOzeti,
   hesaplaYasKuraliBlokMesaji,
   hesapSonucuToGunlukPuantaj,
   birlestirUbgtFazlaMesaiCakismaUyari,
+  birlestirOnsekizYasAltiFazlaCalismaUyari,
   birlestirMazeretsizDevamsizlikAdayUyariari,
   BORDRO_ETKISI_KESINLESME_NOTU,
   mazeretsizDevamsizlikParasalNetKilitliMi,
@@ -472,6 +474,7 @@ export function usePuantaj() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [submitErrorMessage, setSubmitErrorMessage] = useState<string | null>(null);
   const [personelMaasTutari, setPersonelMaasTutari] = useState<number | undefined>(undefined);
+  const [personelDogumTarihi, setPersonelDogumTarihi] = useState<string | undefined>(undefined);
 
   const patchFormState = useCallback((partial: Partial<GunlukPuantajFormState>) => {
     setFormState((prev) => {
@@ -590,6 +593,42 @@ export function usePuantaj() {
     };
   }, [activeSube, activeQuery]);
 
+  useEffect(() => {
+    if (!activeQuery) {
+      setPersonelDogumTarihi(undefined);
+      return;
+    }
+
+    let cancelled = false;
+    setPersonelDogumTarihi(undefined);
+
+    void (async () => {
+      const detailKey = dataCacheKeys.personelDetail(activeSube, activeQuery.personelId);
+      const cached = getCacheEntry<Personel>(detailKey);
+      if (cached?.dogum_tarihi) {
+        if (!cancelled) {
+          setPersonelDogumTarihi(cached.dogum_tarihi);
+        }
+        return;
+      }
+
+      try {
+        const dogumTarihi = await loadPersonelDogumTarihi(activeSube, activeQuery.personelId);
+        if (!cancelled) {
+          setPersonelDogumTarihi(dogumTarihi);
+        }
+      } catch {
+        if (!cancelled) {
+          setPersonelDogumTarihi(undefined);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeSube, activeQuery]);
+
   const {
     haftalikOzet,
     haftalikOzetDurumu,
@@ -656,19 +695,33 @@ export function usePuantaj() {
       puantaj.compliance_uyarilari,
       puantaj
     );
-    if (haftalikOzetDurumu === "hazir") {
+    if (haftalikOzetDurumu === "hazir" && haftalikOzet && activeQuery) {
       compliance = birlestirUbgtFazlaMesaiCakismaUyari(
         compliance,
         puantaj,
         haftaPuantajGunleri,
         tamHaftaVerisi
       );
+      compliance = birlestirOnsekizYasAltiFazlaCalismaUyari(compliance, {
+        dogum_tarihi: personelDogumTarihi,
+        referans_tarih: activeQuery.tarih,
+        fazla_calisma_dakika: haftalikOzet.fazla_calisma_dakika,
+        tam_hafta_verisi: tamHaftaVerisi
+      });
     }
     return {
       ...puantaj,
       compliance_uyarilari: compliance
     };
-  }, [puantaj, haftalikOzetDurumu, haftaPuantajGunleri, tamHaftaVerisi]);
+  }, [
+    puantaj,
+    activeQuery,
+    haftalikOzet,
+    haftalikOzetDurumu,
+    haftaPuantajGunleri,
+    tamHaftaVerisi,
+    personelDogumTarihi
+  ]);
 
   const {
     devamsizlikKesintiOzet,
@@ -879,6 +932,7 @@ export function usePuantaj() {
     setErrorMessage(null);
     setSubmitErrorMessage(null);
     setPersonelMaasTutari(undefined);
+    setPersonelDogumTarihi(undefined);
   }, []);
 
   const refetchActive = useCallback(async () => {
@@ -1019,6 +1073,13 @@ export function usePuantaj() {
                 haftalikBaglam.gunler,
                 haftalikBaglam.tamHaftaVerisi
               );
+              compliance = birlestirOnsekizYasAltiFazlaCalismaUyari(compliance, {
+                dogum_tarihi: dogumTarihi,
+                referans_tarih: activeQuery.tarih,
+                fazla_calisma_dakika: hesaplaHaftalikCalismaOzeti(haftalikBaglam.gunler)
+                  .fazla_calisma_dakika,
+                tam_hafta_verisi: haftalikBaglam.tamHaftaVerisi
+              });
             }
             return compliance;
           })()

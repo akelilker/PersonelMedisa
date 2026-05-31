@@ -1747,16 +1747,50 @@ let bildirimIdCounter = 800;
         departman_id?: number;
       };
 
+      const kapanisId = 99;
+      const hafta_baslangic = payload.hafta_baslangic ?? "2026-04-06";
+      const hafta_bitis = payload.hafta_bitis ?? "2026-04-12";
+      const departman_id = payload.departman_id ?? 3;
+      const yilMatch = /^(\d{4})-/.exec(hafta_baslangic);
+      const yil = yilMatch ? Number.parseInt(yilMatch[1], 10) : undefined;
+      const hesaplama_zamani = new Date().toISOString();
+      const snapshot_satirlari = personeller.map((personel, index) => ({
+        snapshot_id: kapanisId * 1000 + index + 1,
+        kapanis_id: kapanisId,
+        personel_id: personel.id,
+        departman_id,
+        hafta_baslangic,
+        hafta_bitis,
+        yil,
+        hafta_no: 1,
+        state: "KAPANDI",
+        kaynak_versiyon: "A1_CONTRACT_STUB",
+        toplam_net_dakika: 0,
+        normal_calisma_dakika: 0,
+        fazla_calisma_dakika: 0,
+        fazla_surelerle_calisma_dakika: 0,
+        tam_hafta_verisi: false,
+        compliance_uyarilari: [],
+        compliance_uyari_sayisi: 0,
+        kritik_uyari_var_mi: false,
+        hesaplama_zamani,
+        kaynak_gun_sayisi: 0,
+        notlar: ["A1 contract stub; gerçek hesap A2 fazında bağlanacak."]
+      }));
+
       await fulfillJson(
         route,
         200,
         okBody({
-          id: 99,
-          hafta_baslangic: payload.hafta_baslangic ?? "2026-04-06",
-          hafta_bitis: payload.hafta_bitis ?? "2026-04-12",
-          departman_id: payload.departman_id ?? 3,
+          id: kapanisId,
+          kapanis_id: kapanisId,
+          hafta_baslangic,
+          hafta_bitis,
+          departman_id,
           state: "KAPANDI",
-          personel_sayisi: 24
+          personel_sayisi: 24,
+          snapshot_satir_sayisi: snapshot_satirlari.length,
+          snapshot_satirlari
         })
       );
       return;

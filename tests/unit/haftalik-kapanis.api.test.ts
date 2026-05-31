@@ -47,9 +47,183 @@ describe("haftalik-kapanis.api", () => {
     expect(url).toBe("/api/haftalik-kapanis");
     expect(init.method).toBe("POST");
     expect(result.id).toBe(99);
+    expect(result.kapanis_id).toBe(99);
     expect(result.hafta_baslangic).toBe("2026-04-06");
     expect(result.hafta_bitis).toBe("2026-04-12");
     expect(result.state).toBe("KAPANDI");
     expect(result.personel_sayisi).toBe(24);
+    expect(result.snapshot_satirlari).toEqual([]);
+    expect(result.snapshot_satir_sayisi).toBe(0);
+  });
+
+  it("normalizes snapshot_satirlari and snapshot_satir_sayisi from response", async () => {
+    const fetchMock = vi.fn(async () =>
+      createJsonResponse(
+        {
+          data: {
+            id: 10,
+            hafta_baslangic: "2026-04-06",
+            hafta_bitis: "2026-04-12",
+            departman_id: 3,
+            state: "KAPANDI",
+            personel_sayisi: 2,
+            snapshot_satir_sayisi: 2,
+            snapshot_satirlari: [
+              {
+                snapshot_id: 1001,
+                personel_id: 1,
+                hafta_baslangic: "2026-04-06",
+                hafta_bitis: "2026-04-12",
+                state: "KAPANDI",
+                kaynak_versiyon: "A1_CONTRACT_STUB"
+              },
+              {
+                snapshot_id: 1002,
+                personel_id: 2,
+                departman_id: 3,
+                hafta_baslangic: "2026-04-06",
+                hafta_bitis: "2026-04-12"
+              }
+            ]
+          },
+          meta: {},
+          errors: []
+        },
+        200
+      )
+    );
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await createHaftalikKapanis({
+      hafta_baslangic: "2026-04-06",
+      hafta_bitis: "2026-04-12",
+      departman_id: 3
+    });
+
+    expect(result.kapanis_id).toBe(10);
+    expect(result.snapshot_satirlari).toHaveLength(2);
+    expect(result.snapshot_satir_sayisi).toBe(2);
+    expect(result.snapshot_satirlari[0].personel_id).toBe(1);
+    expect(result.snapshot_satirlari[0].fazla_surelerle_calisma_dakika).toBe(0);
+    expect(result.snapshot_satirlari[0].toplam_net_dakika).toBe(0);
+    expect(result.snapshot_satirlari[0].compliance_uyarilari).toEqual([]);
+    expect(result.snapshot_satirlari[0].compliance_uyari_sayisi).toBe(0);
+    expect(result.snapshot_satirlari[0].tam_hafta_verisi).toBe(false);
+    expect(result.snapshot_satirlari[0].state).toBe("KAPANDI");
+    expect(result.snapshot_satirlari[0].kaynak_versiyon).toBe("A1_CONTRACT_STUB");
+    expect(result.snapshot_satirlari[1].kapanis_id).toBe(10);
+  });
+
+  it("derives kapanis_id from id when kapanis_id is absent", async () => {
+    const fetchMock = vi.fn(async () =>
+      createJsonResponse(
+        {
+          data: {
+            id: 77,
+            hafta_baslangic: "2026-04-06",
+            hafta_bitis: "2026-04-12",
+            snapshot_satirlari: [
+              {
+                personel_id: 5,
+                hafta_baslangic: "2026-04-06",
+                hafta_bitis: "2026-04-12"
+              }
+            ]
+          },
+          meta: {},
+          errors: []
+        },
+        200
+      )
+    );
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await createHaftalikKapanis({
+      hafta_baslangic: "2026-04-06",
+      hafta_bitis: "2026-04-12"
+    });
+
+    expect(result.kapanis_id).toBe(77);
+    expect(result.snapshot_satirlari[0].kapanis_id).toBe(77);
+  });
+
+  it("defaults snapshot row fields when omitted in payload", async () => {
+    const fetchMock = vi.fn(async () =>
+      createJsonResponse(
+        {
+          data: {
+            id: 1,
+            hafta_baslangic: "2026-04-06",
+            hafta_bitis: "2026-04-12",
+            snapshot_satirlari: [
+              {
+                personel_id: 3,
+                hafta_baslangic: "2026-04-06",
+                hafta_bitis: "2026-04-12",
+                compliance_uyarilari: [
+                  { code: "MAX_DAILY_LIMIT", message: "Uyarı", level: "KRITIK" }
+                ]
+              }
+            ]
+          },
+          meta: {},
+          errors: []
+        },
+        200
+      )
+    );
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await createHaftalikKapanis({
+      hafta_baslangic: "2026-04-06",
+      hafta_bitis: "2026-04-12"
+    });
+
+    const row = result.snapshot_satirlari[0];
+    expect(row.fazla_surelerle_calisma_dakika).toBe(0);
+    expect(row.normal_calisma_dakika).toBe(0);
+    expect(row.fazla_calisma_dakika).toBe(0);
+    expect(row.tam_hafta_verisi).toBe(false);
+    expect(row.state).toBe("KAPANDI");
+    expect(row.compliance_uyarilari).toHaveLength(1);
+    expect(row.compliance_uyari_sayisi).toBe(1);
+    expect(row.kritik_uyari_var_mi).toBe(true);
+  });
+
+  it("uses compliance_uyari_sayisi from payload when provided", async () => {
+    const fetchMock = vi.fn(async () =>
+      createJsonResponse(
+        {
+          data: {
+            id: 1,
+            snapshot_satirlari: [
+              {
+                personel_id: 1,
+                hafta_baslangic: "2026-04-06",
+                hafta_bitis: "2026-04-12",
+                compliance_uyarilari: [],
+                compliance_uyari_sayisi: 5
+              }
+            ]
+          },
+          meta: {},
+          errors: []
+        },
+        200
+      )
+    );
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await createHaftalikKapanis({
+      hafta_baslangic: "2026-04-06",
+      hafta_bitis: "2026-04-12"
+    });
+
+    expect(result.snapshot_satirlari[0].compliance_uyari_sayisi).toBe(5);
+    expect(result.snapshot_satirlari[0].kritik_uyari_var_mi).toBe(false);
   });
 });

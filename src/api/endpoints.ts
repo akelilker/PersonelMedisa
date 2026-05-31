@@ -33,6 +33,11 @@ export const endpoints = {
   fazlaCalismaOdemeTercihi: {
     resource: "/fazla-calisma-odeme-tercihi"
   },
+  serbestZaman: {
+    events: "/serbest-zaman/events",
+    bakiye: "/serbest-zaman/bakiye",
+    olusum: "/serbest-zaman/olusum"
+  },
   raporlar: {
     personelOzet: "/raporlar/personel-ozet",
     izin: "/raporlar/izin",

@@ -5,8 +5,13 @@ import type {
   OdemeTipi
 } from "../types/fazla-calisma-odeme-tercihi";
 import { DEFAULT_ODEME_TIPI } from "../types/fazla-calisma-odeme-tercihi";
+import type { SerbestZamanEvent } from "../types/serbest-zaman";
 import { hesaplaAylikSgkPuantajOzetleri } from "../services/dashboard-rapor-servisi";
 import { buildHaftalikKapanisSnapshot } from "../services/haftalik-kapanis-snapshot";
+import {
+  hesaplaSerbestZamanBakiye,
+  olusturOlusumEvent
+} from "../services/serbest-zaman-event-motoru";
 import { aggregateYillikFazlaCalisma } from "../services/yillik-fazla-calisma-aggregate";
 
 type DemoMethod = "GET" | "POST" | "PUT" | "DELETE";
@@ -228,6 +233,7 @@ const demoState: {
   >;
   kapanisById: Record<number, HaftalikKapanisSonuc>;
   odemeTercihiBySnapshotId: Record<number, FazlaCalismaOdemeTercihi>;
+  serbestZamanEventsById: Record<number, SerbestZamanEvent>;
   nextIds: {
     personel: number;
     surec: number;
@@ -236,6 +242,7 @@ const demoState: {
     finans: number;
     kapanis: number;
     odemeTercihi: number;
+    serbestZamanEvent: number;
     kullanici: number;
     sube: number;
     departman: number;
@@ -564,6 +571,7 @@ const demoState: {
   belgeDurumByPersonelId: {},
   kapanisById: {},
   odemeTercihiBySnapshotId: {},
+  serbestZamanEventsById: {},
   nextIds: {
     personel: 100,
     surec: 600,
@@ -572,6 +580,7 @@ const demoState: {
     finans: 950,
     kapanis: 1000,
     odemeTercihi: 1,
+    serbestZamanEvent: 1,
     kullanici: 3,
     sube: 2,
     departman: 12
@@ -757,6 +766,46 @@ function demoOdemeTercihiNotFound(snapshotId: number): ApiResponse<unknown> {
         message: `snapshot_id ${snapshotId} icin odeme tercihi veya kapanis satiri bulunamadi.`
       }
     ]
+  };
+}
+
+function listDemoSerbestZamanEvents(): SerbestZamanEvent[] {
+  return Object.values(demoState.serbestZamanEventsById);
+}
+
+function findDemoOdemeTercihiById(odemeTercihiId: number): FazlaCalismaOdemeTercihi | null {
+  for (const tercih of Object.values(demoState.odemeTercihiBySnapshotId)) {
+    if (tercih.id === odemeTercihiId) {
+      return tercih;
+    }
+  }
+
+  return null;
+}
+
+function resolvePersistedOdemeTercihi(params: {
+  odeme_tercihi_id?: number;
+  snapshot_id?: number;
+}): FazlaCalismaOdemeTercihi | null {
+  if (params.odeme_tercihi_id !== undefined) {
+    return findDemoOdemeTercihiById(params.odeme_tercihi_id);
+  }
+
+  if (params.snapshot_id !== undefined) {
+    return demoState.odemeTercihiBySnapshotId[params.snapshot_id] ?? null;
+  }
+
+  return null;
+}
+
+function demoSerbestZamanOlusumError(
+  code: string,
+  message: string
+): ApiResponse<unknown> {
+  return {
+    data: null,
+    meta: {},
+    errors: [{ code, message }]
   };
 }
 
@@ -1869,6 +1918,108 @@ export function resolveDemoApiResponse(
 
     demoState.odemeTercihiBySnapshotId[snapshotId] = next;
     return ok(next);
+  }
+
+  if (pathname === "/serbest-zaman/events" && method === "GET") {
+    const personelId = toNumber(requestUrl.searchParams.get("personel_id"));
+    if (personelId === null || personelId < 1) {
+      return {
+        data: null,
+        meta: {},
+        errors: [
+          {
+            code: "INVALID_QUERY",
+            message: "personel_id zorunludur ve pozitif tam sayi olmalidir."
+          }
+        ]
+      };
+    }
+
+    const items = listDemoSerbestZamanEvents().filter((event) => event.personel_id === personelId);
+    return ok({ items });
+  }
+
+  if (pathname === "/serbest-zaman/bakiye" && method === "GET") {
+    const personelId = toNumber(requestUrl.searchParams.get("personel_id"));
+    if (personelId === null || personelId < 1) {
+      return {
+        data: null,
+        meta: {},
+        errors: [
+          {
+            code: "INVALID_QUERY",
+            message: "personel_id zorunludur ve pozitif tam sayi olmalidir."
+          }
+        ]
+      };
+    }
+
+    const referans_tarih = toStringValue(requestUrl.searchParams.get("referans_tarih"));
+    const bakiye = hesaplaSerbestZamanBakiye({
+      personel_id: personelId,
+      events: listDemoSerbestZamanEvents(),
+      referans_tarih: referans_tarih ?? undefined
+    });
+
+    return ok(bakiye);
+  }
+
+  if (pathname === "/serbest-zaman/olusum" && method === "POST") {
+    const odemeTercihiId = toNumber(body.odeme_tercihi_id);
+    const snapshotId = toNumber(body.snapshot_id);
+
+    if (
+      (odemeTercihiId === null || odemeTercihiId < 1) &&
+      (snapshotId === null || snapshotId < 1)
+    ) {
+      return {
+        data: null,
+        meta: {},
+        errors: [
+          {
+            code: "INVALID_BODY",
+            message: "odeme_tercihi_id veya snapshot_id zorunludur."
+          }
+        ]
+      };
+    }
+
+    const tercih = resolvePersistedOdemeTercihi({
+      odeme_tercihi_id: odemeTercihiId !== null && odemeTercihiId >= 1 ? odemeTercihiId : undefined,
+      snapshot_id: snapshotId !== null && snapshotId >= 1 ? snapshotId : undefined
+    });
+
+    if (!tercih) {
+      return demoSerbestZamanOlusumError(
+        "NOT_FOUND",
+        "Persist edilmis odeme tercihi bulunamadi."
+      );
+    }
+
+    const sonuc = olusturOlusumEvent({
+      tercih,
+      mevcutEvents: listDemoSerbestZamanEvents()
+    });
+
+    if (!sonuc.ok) {
+      const messages: Record<string, string> = {
+        ALREADY_EXISTS: "Bu odeme tercihi icin serbest zaman olusum eventi zaten mevcut.",
+        NOT_ELIGIBLE: "Odeme tercihi SERBEST_ZAMAN degil; olusum eventi uretilemez.",
+        ZERO_DAKIKA: "Fazla calisma dakikasi sifir; olusum eventi uretilemez.",
+        NOT_PERSISTED: "Odeme tercihi persist edilmemis; olusum eventi uretilemez."
+      };
+
+      return demoSerbestZamanOlusumError(sonuc.code, messages[sonuc.code] ?? sonuc.code);
+    }
+
+    const eventId = ++demoState.nextIds.serbestZamanEvent;
+    const persisted: SerbestZamanEvent = {
+      ...sonuc.event,
+      id: eventId
+    };
+    demoState.serbestZamanEventsById[eventId] = persisted;
+
+    return ok(persisted);
   }
 
   if (pathname === "/yonetim/kullanicilar" && method === "GET") {

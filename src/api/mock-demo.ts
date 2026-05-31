@@ -1,4 +1,5 @@
 ﻿import type { ApiResponse } from "../types/api";
+import type { HaftalikKapanisSonuc } from "../types/haftalik-kapanis";
 import { hesaplaAylikSgkPuantajOzetleri } from "../services/dashboard-rapor-servisi";
 import { buildHaftalikKapanisSnapshot } from "../services/haftalik-kapanis-snapshot";
 
@@ -219,6 +220,7 @@ const demoState: {
     number,
     Partial<Record<"KIMLIK" | "ADRES_BEYANI" | "IS_GIRIS_EVRAKLARI" | "BANKA_IBAN", "VAR" | "YOK">>
   >;
+  kapanisById: Record<number, HaftalikKapanisSonuc>;
   nextIds: {
     personel: number;
     surec: number;
@@ -552,6 +554,7 @@ const demoState: {
     }
   },
   belgeDurumByPersonelId: {},
+  kapanisById: {},
   nextIds: {
     personel: 100,
     surec: 600,
@@ -1633,6 +1636,17 @@ export function resolveDemoApiResponse(
     return ok({ muhurlenen_kayit_sayisi: count, donem: donemPrefix });
   }
 
+  const haftalikKapanisDetailMatch = pathname.match(/^\/haftalik-kapanis\/(\d+)$/);
+  if (haftalikKapanisDetailMatch && method === "GET") {
+    const kapanisId = Number.parseInt(haftalikKapanisDetailMatch[1], 10);
+    const kayit = demoState.kapanisById[kapanisId];
+    if (!kayit) {
+      return null;
+    }
+
+    return ok(kayit);
+  }
+
   if (pathname === "/haftalik-kapanis" && method === "POST") {
     const kapanisId = ++demoState.nextIds.kapanis;
     const hafta_baslangic = toStringValue(body.hafta_baslangic) ?? "2026-04-06";
@@ -1660,7 +1674,7 @@ export function resolveDemoApiResponse(
       }
     });
 
-    return ok({
+    const response: HaftalikKapanisSonuc = {
       id: kapanisId,
       kapanis_id: kapanisId,
       hafta_baslangic,
@@ -1670,7 +1684,10 @@ export function resolveDemoApiResponse(
       personel_sayisi: snapshot.personel_sayisi,
       snapshot_satir_sayisi: snapshot.snapshot_satir_sayisi,
       snapshot_satirlari: snapshot.snapshot_satirlari
-    });
+    };
+    demoState.kapanisById[kapanisId] = response;
+
+    return ok(response);
   }
 
   if (pathname === "/yonetim/kullanicilar" && method === "GET") {

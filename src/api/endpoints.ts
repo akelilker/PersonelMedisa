@@ -25,7 +25,8 @@ export const endpoints = {
     muhurle: "/puantaj/muhurle"
   },
   haftalikKapanis: {
-    close: "/haftalik-kapanis"
+    close: "/haftalik-kapanis",
+    detail: (id: number | string) => `/haftalik-kapanis/${id}`
   },
   raporlar: {
     personelOzet: "/raporlar/personel-ozet",

@@ -299,3 +299,12 @@ export async function createHaftalikKapanis(
   });
   return sonuc;
 }
+
+export async function fetchHaftalikKapanisDetail(
+  kapanisId: number | string
+): Promise<HaftalikKapanisSonuc> {
+  const response = await apiRequest<ApiResponse<unknown>>(
+    endpoints.haftalikKapanis.detail(kapanisId)
+  );
+  return normalizeHaftalikKapanisSonuc(response.data);
+}

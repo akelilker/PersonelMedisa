@@ -1017,15 +1017,59 @@ function parseTimeToMinutes(value: string): number | null {
   return hours * 60 + minutes;
 }
 
+const GECE_BAND_SABAH_BITIS_DK = 6 * 60; // 06:00 (band [00:00, 06:00))
+const GECE_BAND_AKSAM_BASLANGIC_DK = 20 * 60; // 20:00 (band [20:00, 24:00))
+const GUN_TOPLAM_DK = 24 * 60;
+
+function zamanAraligiKesisimDakika(
+  aralikBas: number,
+  aralikBit: number,
+  bandBas: number,
+  bandBit: number
+): number {
+  return Math.max(0, Math.min(aralikBit, bandBit) - Math.max(aralikBas, bandBas));
+}
+
+/**
+ * Aynı gün giriş–çıkış kaydında gece bandına (20:00–06:00) düşen brüt çalışma dakikası.
+ * Mola gece bandına dağıtılmaz (Faz D3 minimum).
+ * Gece yarısı geçişi (çıkış ≤ giriş) veya saat eksikliği → null.
+ */
+export function hesaplaGeceCalismaDakika(giris?: string, cikis?: string): number | null {
+  if (!giris?.trim() || !cikis?.trim()) {
+    return null;
+  }
+
+  const girisMin = parseTimeToMinutes(giris);
+  const cikisMin = parseTimeToMinutes(cikis);
+  if (girisMin === null || cikisMin === null) {
+    return null;
+  }
+
+  if (cikisMin <= girisMin) {
+    return null;
+  }
+
+  const sabahBandi = zamanAraligiKesisimDakika(girisMin, cikisMin, 0, GECE_BAND_SABAH_BITIS_DK);
+  const aksamBandi = zamanAraligiKesisimDakika(
+    girisMin,
+    cikisMin,
+    GECE_BAND_AKSAM_BASLANGIC_DK,
+    GUN_TOPLAM_DK
+  );
+
+  return sabahBandi + aksamBandi;
+}
+
 export function geceBandinaGiriyor(giris?: string, cikis?: string): boolean {
   const girisMin = giris ? parseTimeToMinutes(giris) : null;
   const cikisMin = cikis ? parseTimeToMinutes(cikis) : null;
 
-  if (girisMin !== null && girisMin < 6 * 60) {
+  if (girisMin !== null && girisMin < GECE_BAND_SABAH_BITIS_DK) {
     return true;
   }
 
-  if (cikisMin !== null && cikisMin >= 20 * 60) {
+  if (cikisMin !== null && cikisMin >= GECE_BAND_AKSAM_BASLANGIC_DK) {
     return true;
   }
 
@@ -1223,6 +1267,14 @@ export function hesaplaHaftaTatiliHakki(
 const MAX_GUNLUK_CALISMA_DAKIKA = 660; // 11 saat
 const GECE_MESAI_BASLANGIC = 20 * 60; // 20:00
 
+/** Gece bandı (20:00–06:00) brüt çalışma süresi günlük üst sınırı — Faz D3. */
+export const GECE_CALISMA_GUNLUK_ESIK_DAKIKA = 450;
+
+export const GECE_CALISMASI_7_5_SAAT_ASIMI_CODE = "GECE_CALISMASI_7_5_SAAT_ASIMI";
+
+export const GECE_CALISMASI_7_5_SAAT_ASIMI_MESSAGE =
+  "Gece çalışma süresi günlük 7,5 saat sınırını aşıyor.";
+
 export function uretComplianceUyarilari(
   brutDakika: number,
   netDakika: number,
@@ -1254,6 +1306,18 @@ export function uretComplianceUyarilari(
         level: "BILGI"
       });
     }
+  }
+
+  const geceBandiBrutDakika = hesaplaGeceCalismaDakika(giris, cikis);
+  if (
+    geceBandiBrutDakika !== null &&
+    geceBandiBrutDakika > GECE_CALISMA_GUNLUK_ESIK_DAKIKA
+  ) {
+    uyarilar.push({
+      code: GECE_CALISMASI_7_5_SAAT_ASIMI_CODE,
+      message: GECE_CALISMASI_7_5_SAAT_ASIMI_MESSAGE,
+      level: "UYARI"
+    });
   }
 
   return uyarilar;

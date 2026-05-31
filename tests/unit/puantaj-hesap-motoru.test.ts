@@ -7,6 +7,9 @@ import {
   deriveDayanak,
   deriveHesapEtkisi,
   geceBandinaGiriyor,
+  hesaplaGeceCalismaDakika,
+  GECE_CALISMASI_7_5_SAAT_ASIMI_CODE,
+  GECE_CALISMASI_7_5_SAAT_ASIMI_MESSAGE,
   hesaplaBrutSure,
   hesaplaYasalMolaDakika,
   hesaplaNetSure,
@@ -421,6 +424,106 @@ describe("uretComplianceUyarilari", () => {
     const uyarilar = uretComplianceUyarilari(720, 660, "08:00", "20:00");
     expect(uyarilar).toContainEqual(
       expect.objectContaining({ code: "GECE_MESAI", level: "BILGI" })
+    );
+  });
+});
+
+describe("hesaplaGeceCalismaDakika", () => {
+  it("gece bandı dışı kayıt → 0", () => {
+    expect(hesaplaGeceCalismaDakika("08:00", "17:00")).toBe(0);
+  });
+
+  it("20:00 sonrası kısım gece bandı sayılır", () => {
+    expect(hesaplaGeceCalismaDakika("08:00", "22:00")).toBe(120);
+  });
+
+  it("06:00 öncesi kısım gece bandı sayılır", () => {
+    expect(hesaplaGeceCalismaDakika("04:00", "10:00")).toBe(120);
+  });
+
+  it("sabah + akşam gece bandı parçaları toplanır", () => {
+    // 00:00–06:00 = 360 dk + 20:00–21:31 = 91 dk → 451 dk gece bandı
+    expect(hesaplaGeceCalismaDakika("00:00", "21:31")).toBe(451);
+  });
+
+  it("450 dk tam sınır", () => {
+    expect(hesaplaGeceCalismaDakika("00:00", "21:30")).toBe(450);
+  });
+
+  it("saat eksik → null", () => {
+    expect(hesaplaGeceCalismaDakika("08:00", undefined)).toBeNull();
+    expect(hesaplaGeceCalismaDakika(undefined, "17:00")).toBeNull();
+  });
+
+  it("gece yarısı geçişli kayıt → null", () => {
+    expect(hesaplaGeceCalismaDakika("22:00", "02:00")).toBeNull();
+  });
+});
+
+describe("GECE_CALISMASI_7_5_SAAT_ASIMI compliance", () => {
+  it("451 dk gece bandı brüt süre → GECE_CALISMASI_7_5_SAAT_ASIMI üretir", () => {
+    const uyarilar = uretComplianceUyarilari(1291, 1200, "00:00", "21:31");
+    expect(uyarilar).toContainEqual({
+      code: GECE_CALISMASI_7_5_SAAT_ASIMI_CODE,
+      message: GECE_CALISMASI_7_5_SAAT_ASIMI_MESSAGE,
+      level: "UYARI"
+    });
+  });
+
+  it("450 dk tam sınır → GECE_CALISMASI_7_5_SAAT_ASIMI üretmez", () => {
+    const uyarilar = uretComplianceUyarilari(1290, 1200, "00:00", "21:30");
+    expect(
+      uyarilar.some((u) => u.code === GECE_CALISMASI_7_5_SAAT_ASIMI_CODE)
+    ).toBe(false);
+  });
+
+  it("gece bandı dışı kayıt → GECE_CALISMASI_7_5_SAAT_ASIMI üretmez", () => {
+    const uyarilar = uretComplianceUyarilari(540, 480, "08:00", "17:00");
+    expect(
+      uyarilar.some((u) => u.code === GECE_CALISMASI_7_5_SAAT_ASIMI_CODE)
+    ).toBe(false);
+  });
+
+  it("saat eksik → GECE_CALISMASI_7_5_SAAT_ASIMI üretmez", () => {
+    const uyarilar = uretComplianceUyarilari(480, 420, "08:00", undefined);
+    expect(
+      uyarilar.some((u) => u.code === GECE_CALISMASI_7_5_SAAT_ASIMI_CODE)
+    ).toBe(false);
+  });
+
+  it("gece yarısı geçişli kayıt → GECE_CALISMASI_7_5_SAAT_ASIMI üretmez", () => {
+    const uyarilar = uretComplianceUyarilari(240, 180, "22:00", "02:00");
+    expect(
+      uyarilar.some((u) => u.code === GECE_CALISMASI_7_5_SAAT_ASIMI_CODE)
+    ).toBe(false);
+  });
+
+  it("GECE_MESAI bilgisi bozulmaz", () => {
+    const uyarilar = uretComplianceUyarilari(1291, 1200, "00:00", "21:31");
+    expect(uyarilar).toContainEqual(
+      expect.objectContaining({ code: "GECE_MESAI", level: "BILGI" })
+    );
+  });
+
+  it("mevcut MAX_DAILY_LIMIT uyarıları bozulmaz", () => {
+    const uyarilar = uretComplianceUyarilari(780, 720, "00:00", "21:31");
+    expect(uyarilar).toContainEqual(
+      expect.objectContaining({ code: "MAX_DAILY_LIMIT", level: "KRITIK" })
+    );
+    expect(uyarilar).toContainEqual(
+      expect.objectContaining({ code: GECE_CALISMASI_7_5_SAAT_ASIMI_CODE, level: "UYARI" })
+    );
+  });
+
+  it("hesapla() entegrasyon: gece bandı aşımı compliance'a yansır", () => {
+    const sonuc = hesapla({
+      personel_id: 1,
+      tarih: "2026-04-13",
+      giris_saati: "00:00",
+      cikis_saati: "21:31"
+    });
+    expect(sonuc.compliance_uyarilari).toContainEqual(
+      expect.objectContaining({ code: GECE_CALISMASI_7_5_SAAT_ASIMI_CODE, level: "UYARI" })
     );
   });
 });

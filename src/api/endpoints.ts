@@ -36,7 +36,8 @@ export const endpoints = {
   serbestZaman: {
     events: "/serbest-zaman/events",
     bakiye: "/serbest-zaman/bakiye",
-    olusum: "/serbest-zaman/olusum"
+    olusum: "/serbest-zaman/olusum",
+    kullanim: "/serbest-zaman/kullanim"
   },
   raporlar: {
     personelOzet: "/raporlar/personel-ozet",

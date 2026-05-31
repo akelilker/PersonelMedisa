@@ -23,7 +23,16 @@ export type SerbestZamanOlusumEvent = {
   aciklama?: string;
 };
 
-export type SerbestZamanEvent = SerbestZamanOlusumEvent;
+export type SerbestZamanKullanimEvent = {
+  id?: number;
+  personel_id: number;
+  event_tipi: "SERBEST_ZAMAN_KULLANIM";
+  dakika: number;
+  event_tarihi: string;
+  aciklama?: string;
+};
+
+export type SerbestZamanEvent = SerbestZamanOlusumEvent | SerbestZamanKullanimEvent;
 
 export type SerbestZamanBakiye = {
   personel_id: number;
@@ -37,4 +46,11 @@ export type SerbestZamanBakiye = {
 export type PostSerbestZamanOlusumPayload = {
   odeme_tercihi_id?: number;
   snapshot_id?: number;
+};
+
+export type PostSerbestZamanKullanimPayload = {
+  personel_id: number | string;
+  dakika: number;
+  event_tarihi: string;
+  aciklama?: string;
 };

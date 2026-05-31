@@ -10,6 +10,7 @@ import { hesaplaAylikSgkPuantajOzetleri } from "../services/dashboard-rapor-serv
 import { buildHaftalikKapanisSnapshot } from "../services/haftalik-kapanis-snapshot";
 import {
   hesaplaSerbestZamanBakiye,
+  olusturKullanimEvent,
   olusturOlusumEvent
 } from "../services/serbest-zaman-event-motoru";
 import { aggregateYillikFazlaCalisma } from "../services/yillik-fazla-calisma-aggregate";
@@ -2007,6 +2008,72 @@ export function resolveDemoApiResponse(
         NOT_ELIGIBLE: "Odeme tercihi SERBEST_ZAMAN degil; olusum eventi uretilemez.",
         ZERO_DAKIKA: "Fazla calisma dakikasi sifir; olusum eventi uretilemez.",
         NOT_PERSISTED: "Odeme tercihi persist edilmemis; olusum eventi uretilemez."
+      };
+
+      return demoSerbestZamanOlusumError(sonuc.code, messages[sonuc.code] ?? sonuc.code);
+    }
+
+    const eventId = ++demoState.nextIds.serbestZamanEvent;
+    const persisted: SerbestZamanEvent = {
+      ...sonuc.event,
+      id: eventId
+    };
+    demoState.serbestZamanEventsById[eventId] = persisted;
+
+    return ok(persisted);
+  }
+
+  if (pathname === "/serbest-zaman/kullanim" && method === "POST") {
+    const personelId = toNumber(body.personel_id);
+    const dakika = toNumber(body.dakika);
+    const eventTarihi = toStringValue(body.event_tarihi);
+
+    if (personelId === null || personelId < 1) {
+      return {
+        data: null,
+        meta: {},
+        errors: [
+          {
+            code: "INVALID_BODY",
+            message: "personel_id zorunludur ve pozitif tam sayi olmalidir."
+          }
+        ]
+      };
+    }
+
+    if (dakika === null || dakika <= 0) {
+      return demoSerbestZamanOlusumError(
+        "ZERO_DAKIKA",
+        "Kullanim dakikasi pozitif olmalidir."
+      );
+    }
+
+    if (!eventTarihi || !/^\d{4}-\d{2}-\d{2}$/.test(eventTarihi.trim())) {
+      return {
+        data: null,
+        meta: {},
+        errors: [
+          {
+            code: "INVALID_BODY",
+            message: "event_tarihi YYYY-MM-DD formatinda olmalidir."
+          }
+        ]
+      };
+    }
+
+    const sonuc = olusturKullanimEvent({
+      personel_id: personelId,
+      dakika,
+      event_tarihi: eventTarihi.trim().slice(0, 10),
+      mevcutEvents: listDemoSerbestZamanEvents(),
+      aciklama: toStringValue(body.aciklama) ?? undefined
+    });
+
+    if (!sonuc.ok) {
+      const messages: Record<string, string> = {
+        ZERO_DAKIKA: "Kullanim dakikasi pozitif olmalidir.",
+        NO_ELIGIBLE_BALANCE: "Kullanilabilir serbest zaman bakiyesi yok.",
+        INSUFFICIENT_BALANCE: "Kullanim miktarı mevcut bakiyeyi asiyor."
       };
 
       return demoSerbestZamanOlusumError(sonuc.code, messages[sonuc.code] ?? sonuc.code);

@@ -1,5 +1,10 @@
 import type { FazlaCalismaOdemeTercihi } from "../types/fazla-calisma-odeme-tercihi";
-import type { SerbestZamanBakiye, SerbestZamanEvent, SerbestZamanOlusumEvent } from "../types/serbest-zaman";
+import type {
+  SerbestZamanBakiye,
+  SerbestZamanEvent,
+  SerbestZamanKullanimEvent,
+  SerbestZamanOlusumEvent
+} from "../types/serbest-zaman";
 import { hesaplaSerbestZamanDakika } from "./serbest-zaman-donusum";
 
 export const SERBEST_ZAMAN_KULLANIM_SURE_AY = 6;
@@ -13,6 +18,12 @@ export type OlusumEventHataKodu =
 export type OlusturOlusumEventSonuc =
   | { ok: true; event: SerbestZamanOlusumEvent }
   | { ok: false; code: OlusumEventHataKodu };
+
+export type KullanimEventHataKodu = "ZERO_DAKIKA" | "NO_ELIGIBLE_BALANCE" | "INSUFFICIENT_BALANCE";
+
+export type OlusturKullanimEventSonuc =
+  | { ok: true; event: SerbestZamanKullanimEvent }
+  | { ok: false; code: KullanimEventHataKodu };
 
 function parseIsoDate(value: string): Date | null {
   const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value.trim());
@@ -36,6 +47,10 @@ function formatIsoDate(date: Date): string {
 
 function bugunIsoDate(): string {
   return formatIsoDate(new Date());
+}
+
+function isValidEventTarihi(value: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value.trim());
 }
 
 export function extractEventTarihi(secimZamani?: string, referansZamani?: string): string {
@@ -148,6 +163,54 @@ export function olusturOlusumEvent(params: {
   };
 }
 
+export function olusturKullanimEvent(params: {
+  personel_id: number;
+  dakika: number;
+  event_tarihi: string;
+  mevcutEvents: readonly SerbestZamanEvent[];
+  referans_tarih?: string;
+  aciklama?: string;
+}): OlusturKullanimEventSonuc {
+  const { personel_id, dakika, event_tarihi, mevcutEvents, aciklama, referans_tarih } = params;
+
+  if (!Number.isFinite(personel_id) || personel_id < 1) {
+    return { ok: false, code: "NO_ELIGIBLE_BALANCE" };
+  }
+
+  if (!Number.isFinite(dakika) || dakika <= 0) {
+    return { ok: false, code: "ZERO_DAKIKA" };
+  }
+
+  if (!isValidEventTarihi(event_tarihi)) {
+    return { ok: false, code: "ZERO_DAKIKA" };
+  }
+
+  const bakiye = hesaplaSerbestZamanBakiye({
+    personel_id,
+    events: mevcutEvents,
+    referans_tarih
+  });
+
+  if (bakiye.kalan_dakika <= 0) {
+    return { ok: false, code: "NO_ELIGIBLE_BALANCE" };
+  }
+
+  if (dakika > bakiye.kalan_dakika) {
+    return { ok: false, code: "INSUFFICIENT_BALANCE" };
+  }
+
+  return {
+    ok: true,
+    event: {
+      personel_id,
+      event_tipi: "SERBEST_ZAMAN_KULLANIM",
+      dakika,
+      event_tarihi: event_tarihi.trim().slice(0, 10),
+      aciklama
+    }
+  };
+}
+
 export function hesaplaSerbestZamanBakiye(params: {
   personel_id: number;
   events: readonly SerbestZamanEvent[];
@@ -171,7 +234,14 @@ export function hesaplaSerbestZamanBakiye(params: {
     }
   }
 
-  const kullanilan_dakika = 0;
+  let kullanilan_dakika = 0;
+
+  for (const event of events) {
+    if (event.event_tipi === "SERBEST_ZAMAN_KULLANIM" && event.personel_id === personel_id) {
+      kullanilan_dakika += event.dakika;
+    }
+  }
+
   const kalan_dakika = Math.max(toplam_hak_dakika - suresi_dolan_dakika - kullanilan_dakika, 0);
 
   return {

@@ -4,6 +4,7 @@ import type { SerbestZamanEvent } from "../../src/types/serbest-zaman";
 import {
   hesaplaSerbestZamanBakiye,
   hesaplaSonKullanimTarihi,
+  olusturKullanimEvent,
   olusturOlusumEvent
 } from "../../src/services/serbest-zaman-event-motoru";
 
@@ -22,7 +23,7 @@ function tercih(
 }
 
 function olusumEvent(
-  overrides: Partial<SerbestZamanEvent> & Pick<SerbestZamanEvent, "id">
+  overrides: Partial<SerbestZamanEvent> & { id: number }
 ): SerbestZamanEvent {
   return {
     personel_id: 1,
@@ -33,7 +34,19 @@ function olusumEvent(
     event_tarihi: "2026-05-31",
     son_kullanim_tarihi: "2026-11-30",
     ...overrides
-  };
+  } as SerbestZamanEvent;
+}
+
+function kullanimEvent(
+  overrides: Partial<SerbestZamanEvent> & { id: number; dakika?: number }
+): SerbestZamanEvent {
+  return {
+    personel_id: 1,
+    event_tipi: "SERBEST_ZAMAN_KULLANIM",
+    dakika: 30,
+    event_tarihi: "2026-06-15",
+    ...overrides
+  } as SerbestZamanEvent;
 }
 
 describe("serbest-zaman-event-motoru", () => {
@@ -177,5 +190,135 @@ describe("serbest-zaman-event-motoru", () => {
     expect(bakiye.suresi_dolan_dakika).toBe(90);
     expect(bakiye.kalan_dakika).toBe(60);
     expect(bakiye.kullanilan_dakika).toBe(0);
+  });
+
+  it("gecerli kullanim eventi olusur", () => {
+    const sonuc = olusturKullanimEvent({
+      personel_id: 1,
+      dakika: 30,
+      event_tarihi: "2026-06-15",
+      mevcutEvents: [olusumEvent({ id: 1, dakika: 90, son_kullanim_tarihi: "2026-12-31" })],
+      referans_tarih: "2026-06-01"
+    });
+
+    expect(sonuc.ok).toBe(true);
+    if (!sonuc.ok) {
+      return;
+    }
+
+    expect(sonuc.event.event_tipi).toBe("SERBEST_ZAMAN_KULLANIM");
+    expect(sonuc.event.dakika).toBe(30);
+    expect(sonuc.event.event_tarihi).toBe("2026-06-15");
+  });
+
+  it("kullanim sonrasi kullanilan_dakika artar ve kalan_dakika duser", () => {
+    const events: SerbestZamanEvent[] = [
+      olusumEvent({ id: 1, dakika: 90, son_kullanim_tarihi: "2026-12-31" })
+    ];
+
+    const kullanimSonuc = olusturKullanimEvent({
+      personel_id: 1,
+      dakika: 30,
+      event_tarihi: "2026-06-15",
+      mevcutEvents: events,
+      referans_tarih: "2026-06-01"
+    });
+
+    expect(kullanimSonuc.ok).toBe(true);
+    if (!kullanimSonuc.ok) {
+      return;
+    }
+
+    events.push({ ...kullanimSonuc.event, id: 2 });
+
+    const bakiye = hesaplaSerbestZamanBakiye({
+      personel_id: 1,
+      events,
+      referans_tarih: "2026-06-01"
+    });
+
+    expect(bakiye.kullanilan_dakika).toBe(30);
+    expect(bakiye.kalan_dakika).toBe(60);
+    expect(bakiye.toplam_hak_dakika).toBe(90);
+  });
+
+  it("kullanim kalan bakiyeyi asarsa INSUFFICIENT_BALANCE doner", () => {
+    const sonuc = olusturKullanimEvent({
+      personel_id: 1,
+      dakika: 100,
+      event_tarihi: "2026-06-15",
+      mevcutEvents: [olusumEvent({ id: 1, dakika: 90, son_kullanim_tarihi: "2026-12-31" })],
+      referans_tarih: "2026-06-01"
+    });
+
+    expect(sonuc).toEqual({ ok: false, code: "INSUFFICIENT_BALANCE" });
+  });
+
+  it("hic bakiye yoksa NO_ELIGIBLE_BALANCE doner", () => {
+    const sonuc = olusturKullanimEvent({
+      personel_id: 1,
+      dakika: 10,
+      event_tarihi: "2026-06-15",
+      mevcutEvents: [],
+      referans_tarih: "2026-06-01"
+    });
+
+    expect(sonuc).toEqual({ ok: false, code: "NO_ELIGIBLE_BALANCE" });
+  });
+
+  it("dakika sifir veya negatifse ZERO_DAKIKA doner", () => {
+    const sonucSifir = olusturKullanimEvent({
+      personel_id: 1,
+      dakika: 0,
+      event_tarihi: "2026-06-15",
+      mevcutEvents: [olusumEvent({ id: 1 })],
+      referans_tarih: "2026-06-01"
+    });
+
+    expect(sonucSifir).toEqual({ ok: false, code: "ZERO_DAKIKA" });
+
+    const sonucNegatif = olusturKullanimEvent({
+      personel_id: 1,
+      dakika: -5,
+      event_tarihi: "2026-06-15",
+      mevcutEvents: [olusumEvent({ id: 1 })],
+      referans_tarih: "2026-06-01"
+    });
+
+    expect(sonucNegatif).toEqual({ ok: false, code: "ZERO_DAKIKA" });
+  });
+
+  it("suresi dolmus hak kullanilabilir bakiyeye dahil edilmez", () => {
+    const sonuc = olusturKullanimEvent({
+      personel_id: 1,
+      dakika: 10,
+      event_tarihi: "2026-06-15",
+      mevcutEvents: [
+        olusumEvent({
+          id: 1,
+          dakika: 90,
+          son_kullanim_tarihi: "2026-05-01"
+        })
+      ],
+      referans_tarih: "2026-06-01"
+    });
+
+    expect(sonuc).toEqual({ ok: false, code: "NO_ELIGIBLE_BALANCE" });
+  });
+
+  it("kalan_dakika asla negatif olmaz", () => {
+    const events: SerbestZamanEvent[] = [
+      olusumEvent({ id: 1, dakika: 50, son_kullanim_tarihi: "2026-12-31" }),
+      kullanimEvent({ id: 2, dakika: 80 })
+    ];
+
+    const bakiye = hesaplaSerbestZamanBakiye({
+      personel_id: 1,
+      events,
+      referans_tarih: "2026-06-01"
+    });
+
+    expect(bakiye.kalan_dakika).toBe(0);
+    expect(bakiye.kalan_dakika).toBeGreaterThanOrEqual(0);
   });
 });

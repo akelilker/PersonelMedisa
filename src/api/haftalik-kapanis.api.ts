@@ -3,11 +3,16 @@ import type {
   HaftalikKapanisPayload,
   HaftalikKapanisSnapshotSatir,
   HaftalikKapanisSonuc,
-  HaftalikKapanisState
+  HaftalikKapanisState,
+  YillikFazlaCalismaOzeti
 } from "../types/haftalik-kapanis";
+import {
+  YILLIK_FAZLA_CALISMA_LIMIT_DAKIKA,
+  YILLIK_FAZLA_CALISMA_YAKLASMA_ESIK_DAKIKA
+} from "../services/yillik-fazla-calisma-aggregate";
 import type { ComplianceUyari } from "../types/puantaj";
 import { logAction } from "../audit/audit-service";
-import { apiRequest } from "./api-client";
+import { ApiRequestError, apiRequest } from "./api-client";
 import { endpoints } from "./endpoints";
 
 const DEFAULT_STATE: HaftalikKapanisState = "KAPANDI";
@@ -307,4 +312,94 @@ export async function fetchHaftalikKapanisDetail(
     endpoints.haftalikKapanis.detail(kapanisId)
   );
   return normalizeHaftalikKapanisSonuc(response.data);
+}
+
+function toBooleanStrict(value: unknown, fallback = false): boolean {
+  if (typeof value === "boolean") {
+    return value;
+  }
+
+  return fallback;
+}
+
+function normalizeYillikFazlaCalismaOzeti(
+  data: unknown,
+  context: { personelId: number; yil: number }
+): YillikFazlaCalismaOzeti {
+  const record = toRecord(data) ?? {};
+  const limitParsed = toOptionalNumber(record.yillik_limit_dakika);
+  const yillik_limit_dakika =
+    limitParsed !== undefined && limitParsed >= 0
+      ? limitParsed
+      : YILLIK_FAZLA_CALISMA_LIMIT_DAKIKA;
+  const yaklasmaParsed = toOptionalNumber(record.yaklasma_esik_dakika);
+  const yaklasma_esik_dakika =
+    yaklasmaParsed !== undefined && yaklasmaParsed >= 0
+      ? yaklasmaParsed
+      : YILLIK_FAZLA_CALISMA_YAKLASMA_ESIK_DAKIKA;
+  const kullanilan_dakika = toNonNegativeNumber(record.kullanilan_dakika, 0);
+  const kalanFromPayload = toOptionalNumber(record.kalan_dakika);
+  const kalan_dakika =
+    kalanFromPayload !== undefined && kalanFromPayload >= 0
+      ? kalanFromPayload
+      : Math.max(0, yillik_limit_dakika - kullanilan_dakika);
+
+  const personel_id = toOptionalNumber(record.personel_id) ?? context.personelId;
+  const yil = toOptionalNumber(record.yil) ?? context.yil;
+
+  return {
+    personel_id,
+    yil,
+    yillik_limit_dakika,
+    yaklasma_esik_dakika,
+    kullanilan_dakika,
+    kalan_dakika,
+    limit_asildi_mi: toBooleanStrict(record.limit_asildi_mi, kullanilan_dakika > yillik_limit_dakika),
+    limit_yaklasiyor_mu: toBooleanStrict(
+      record.limit_yaklasiyor_mu,
+      kullanilan_dakika >= yaklasma_esik_dakika
+    ),
+    kapanan_hafta_sayisi: toNonNegativeNumber(record.kapanan_hafta_sayisi, 0),
+    atlanan_duplicate_hafta_sayisi: toNonNegativeNumber(record.atlanan_duplicate_hafta_sayisi, 0),
+    atlanan_eksik_hafta_sayisi: toNonNegativeNumber(record.atlanan_eksik_hafta_sayisi, 0)
+  };
+}
+
+function parsePositiveIntParam(value: number | string, field: string): number {
+  const parsed =
+    typeof value === "number"
+      ? value
+      : Number.parseInt(String(value).trim(), 10);
+
+  if (!Number.isFinite(parsed) || parsed < 1) {
+    throw new ApiRequestError(`${field} gecersiz.`, 400, { code: "INVALID_QUERY", field });
+  }
+
+  return parsed;
+}
+
+export async function fetchYillikFazlaCalismaOzeti(
+  personelId: number | string,
+  yil: number | string
+): Promise<YillikFazlaCalismaOzeti> {
+  const personel_id = parsePositiveIntParam(personelId, "personel_id");
+  const yilNum = parsePositiveIntParam(yil, "yil");
+
+  const response = await apiRequest<ApiResponse<unknown>>(
+    endpoints.haftalikKapanis.yillikFazlaCalisma(personel_id, yilNum)
+  );
+
+  if (Array.isArray(response.errors) && response.errors.length > 0) {
+    const first = response.errors[0];
+    throw new ApiRequestError(
+      typeof first?.message === "string" ? first.message : "Yillik fazla calisma ozeti alinamadi.",
+      400,
+      { code: typeof first?.code === "string" ? first.code : "INVALID_QUERY" }
+    );
+  }
+
+  return normalizeYillikFazlaCalismaOzeti(response.data, {
+    personelId: personel_id,
+    yil: yilNum
+  });
 }

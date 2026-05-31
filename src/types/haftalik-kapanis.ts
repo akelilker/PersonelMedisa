@@ -47,3 +47,17 @@ export type HaftalikKapanisSonuc = {
   snapshot_satir_sayisi?: number;
   snapshot_satirlari: HaftalikKapanisSnapshotSatir[];
 };
+
+export type YillikFazlaCalismaOzeti = {
+  personel_id: number;
+  yil: number;
+  yillik_limit_dakika: number;
+  yaklasma_esik_dakika: number;
+  kullanilan_dakika: number;
+  kalan_dakika: number;
+  limit_asildi_mi: boolean;
+  limit_yaklasiyor_mu: boolean;
+  kapanan_hafta_sayisi: number;
+  atlanan_duplicate_hafta_sayisi: number;
+  atlanan_eksik_hafta_sayisi: number;
+};

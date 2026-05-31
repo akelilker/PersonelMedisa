@@ -26,7 +26,9 @@ export const endpoints = {
   },
   haftalikKapanis: {
     close: "/haftalik-kapanis",
-    detail: (id: number | string) => `/haftalik-kapanis/${id}`
+    detail: (id: number | string) => `/haftalik-kapanis/${id}`,
+    yillikFazlaCalisma: (personelId: number | string, yil: number | string) =>
+      `/haftalik-kapanis/yillik-fazla-calisma?personel_id=${personelId}&yil=${yil}`
   },
   raporlar: {
     personelOzet: "/raporlar/personel-ozet",

@@ -1,8 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   createHaftalikKapanis,
-  fetchHaftalikKapanisDetail
+  fetchHaftalikKapanisDetail,
+  fetchYillikFazlaCalismaOzeti
 } from "../../src/api/haftalik-kapanis.api";
+import { ApiRequestError } from "../../src/api/api-client";
 
 function createJsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -365,6 +367,142 @@ describe("haftalik-kapanis.api", () => {
 
     expect(result.snapshot_satirlari).toEqual([]);
     expect(result.snapshot_satir_sayisi).toBe(0);
+  });
+
+  it("fetchYillikFazlaCalismaOzeti sends GET to yillik-fazla-calisma endpoint", async () => {
+    const fetchMock = vi.fn(async () =>
+      createJsonResponse(
+        {
+          data: {
+            personel_id: 1,
+            yil: 2026,
+            yillik_limit_dakika: 16200,
+            yaklasma_esik_dakika: 15600,
+            kullanilan_dakika: 500,
+            kalan_dakika: 15700,
+            limit_asildi_mi: false,
+            limit_yaklasiyor_mu: false,
+            kapanan_hafta_sayisi: 2,
+            atlanan_duplicate_hafta_sayisi: 0,
+            atlanan_eksik_hafta_sayisi: 0
+          },
+          meta: {},
+          errors: []
+        },
+        200
+      )
+    );
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    await fetchYillikFazlaCalismaOzeti(1, 2026);
+
+    const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("/api/haftalik-kapanis/yillik-fazla-calisma?personel_id=1&yil=2026");
+  });
+
+  it("fetchYillikFazlaCalismaOzeti normalizes response fields", async () => {
+    const fetchMock = vi.fn(async () =>
+      createJsonResponse(
+        {
+          data: {
+            personel_id: "3",
+            yil: "2026",
+            kullanilan_dakika: "900",
+            limit_asildi_mi: true,
+            limit_yaklasiyor_mu: true,
+            kapanan_hafta_sayisi: 4
+          },
+          meta: {},
+          errors: []
+        },
+        200
+      )
+    );
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await fetchYillikFazlaCalismaOzeti("3", "2026");
+
+    expect(result.personel_id).toBe(3);
+    expect(result.yil).toBe(2026);
+    expect(result.yillik_limit_dakika).toBe(16200);
+    expect(result.yaklasma_esik_dakika).toBe(15600);
+    expect(result.kullanilan_dakika).toBe(900);
+    expect(result.kalan_dakika).toBe(15300);
+    expect(result.limit_asildi_mi).toBe(true);
+    expect(result.limit_yaklasiyor_mu).toBe(true);
+    expect(result.kapanan_hafta_sayisi).toBe(4);
+    expect(result.atlanan_duplicate_hafta_sayisi).toBe(0);
+    expect(result.atlanan_eksik_hafta_sayisi).toBe(0);
+  });
+
+  it("fetchYillikFazlaCalismaOzeti applies defaults for omitted numeric fields", async () => {
+    const fetchMock = vi.fn(async () =>
+      createJsonResponse(
+        {
+          data: {
+            personel_id: 1,
+            yil: 2026
+          },
+          meta: {},
+          errors: []
+        },
+        200
+      )
+    );
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await fetchYillikFazlaCalismaOzeti(1, 2026);
+
+    expect(result.kullanilan_dakika).toBe(0);
+    expect(result.kalan_dakika).toBe(16200);
+    expect(result.limit_asildi_mi).toBe(false);
+    expect(result.limit_yaklasiyor_mu).toBe(false);
+    expect(result.kapanan_hafta_sayisi).toBe(0);
+    expect(result.atlanan_duplicate_hafta_sayisi).toBe(0);
+    expect(result.atlanan_eksik_hafta_sayisi).toBe(0);
+  });
+
+  it("fetchYillikFazlaCalismaOzeti derives kalan from limit when kalan omitted", async () => {
+    const fetchMock = vi.fn(async () =>
+      createJsonResponse(
+        {
+          data: {
+            personel_id: 1,
+            yil: 2026,
+            kullanilan_dakika: 1000
+          },
+          meta: {},
+          errors: []
+        },
+        200
+      )
+    );
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await fetchYillikFazlaCalismaOzeti(1, 2026);
+
+    expect(result.kalan_dakika).toBe(15200);
+  });
+
+  it("fetchYillikFazlaCalismaOzeti throws ApiRequestError when mock returns errors", async () => {
+    const fetchMock = vi.fn(async () =>
+      createJsonResponse(
+        {
+          data: null,
+          meta: {},
+          errors: [{ code: "INVALID_QUERY", message: "personel_id ve yil zorunludur." }]
+        },
+        200
+      )
+    );
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(fetchYillikFazlaCalismaOzeti(1, 2026)).rejects.toBeInstanceOf(ApiRequestError);
   });
 
   it("fetchHaftalikKapanisDetail rejects with ApiRequestError on 404 response", async () => {

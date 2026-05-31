@@ -2,6 +2,7 @@
 import type { HaftalikKapanisSonuc } from "../types/haftalik-kapanis";
 import { hesaplaAylikSgkPuantajOzetleri } from "../services/dashboard-rapor-servisi";
 import { buildHaftalikKapanisSnapshot } from "../services/haftalik-kapanis-snapshot";
+import { aggregateYillikFazlaCalisma } from "../services/yillik-fazla-calisma-aggregate";
 
 type DemoMethod = "GET" | "POST" | "PUT" | "DELETE";
 
@@ -1634,6 +1635,32 @@ export function resolveDemoApiResponse(
       }
     }
     return ok({ muhurlenen_kayit_sayisi: count, donem: donemPrefix });
+  }
+
+  if (pathname === "/haftalik-kapanis/yillik-fazla-calisma" && method === "GET") {
+    const personelId = toNumber(requestUrl.searchParams.get("personel_id"));
+    const yil = toNumber(requestUrl.searchParams.get("yil"));
+
+    if (personelId === null || personelId < 1 || yil === null || yil < 1) {
+      return {
+        data: null,
+        meta: {},
+        errors: [
+          {
+            code: "INVALID_QUERY",
+            message: "personel_id ve yil zorunludur ve pozitif tam sayi olmalidir."
+          }
+        ]
+      };
+    }
+
+    const ozet = aggregateYillikFazlaCalisma({
+      kapanislar: Object.values(demoState.kapanisById),
+      personel_id: personelId,
+      yil
+    });
+
+    return ok(ozet);
   }
 
   const haftalikKapanisDetailMatch = pathname.match(/^\/haftalik-kapanis\/(\d+)$/);

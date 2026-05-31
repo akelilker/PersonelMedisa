@@ -40,7 +40,7 @@ test.describe("e2e smoke", () => {
 
     const kesintiOnIzlemeKarti = page
       .locator(".puantaj-detail-card")
-      .filter({ has: page.getByRole("heading", { name: "Kesinti Ön İzleme" }) });
+      .filter({ has: page.getByRole("heading", { name: "Kesinti Adayı Ön İzleme" }) });
     await expect(kesintiOnIzlemeKarti).toBeVisible();
     await expect(
       readonlyFieldInCardByLabel(kesintiOnIzlemeKarti, "Gerçek Eksik Süre (dk)").getByText(/^1$/)

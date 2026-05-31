@@ -1075,8 +1075,12 @@ export function hesaplaNetSure(
 }
 
 // ---------------------------------------------------------------------------
-// Gün tipi türetme (tarihten)
+// Hafta tatili günü (V1 varsayılan: Pazar) — tek domain kaynağı
 // ---------------------------------------------------------------------------
+
+export type HaftaTatiliGunKodu = 0 | 1 | 2 | 3 | 4 | 5 | 6;
+
+export const VARSAYILAN_HAFTA_TATILI_GUN_KODU: HaftaTatiliGunKodu = 0;
 
 function parseDateOnly(value: string): Date | null {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
@@ -1088,10 +1092,26 @@ function parseDateOnly(value: string): Date | null {
   );
 }
 
-export function deriveGunTipi(tarih: string, explicit?: PuantajGunTipi): PuantajGunTipi {
-  if (explicit) return explicit;
+export function isHaftaTatiliGunu(
+  tarih: string,
+  haftaTatiliGunKodu: HaftaTatiliGunKodu = VARSAYILAN_HAFTA_TATILI_GUN_KODU
+): boolean {
   const d = parseDateOnly(tarih);
-  if (d?.getDay() === 0) return "Hafta_Tatili_Pazar";
+  if (!d) return false;
+  return d.getDay() === haftaTatiliGunKodu;
+}
+
+// ---------------------------------------------------------------------------
+// Gün tipi türetme (tarihten)
+// ---------------------------------------------------------------------------
+
+export function deriveGunTipi(
+  tarih: string,
+  explicit?: PuantajGunTipi,
+  haftaTatiliGunKodu: HaftaTatiliGunKodu = VARSAYILAN_HAFTA_TATILI_GUN_KODU
+): PuantajGunTipi {
+  if (explicit) return explicit;
+  if (isHaftaTatiliGunu(tarih, haftaTatiliGunKodu)) return "Hafta_Tatili_Pazar";
   return "Normal_Is_Gunu";
 }
 

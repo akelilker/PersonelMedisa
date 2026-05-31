@@ -14,6 +14,7 @@ import {
 import { runDeduped } from "../lib/in-flight-dedupe";
 import { formatPuantajStateLabel } from "../lib/display/enum-display";
 import {
+  deriveGunTipi,
   hesapla,
   hesaplaDevamsizlikKesintiOzeti,
   hesaplaGecErkenEksikSure,
@@ -51,21 +52,6 @@ function toDateInputValue(date: Date) {
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
-}
-
-function deriveGunTipiFromDateInput(value: string): PuantajGunTipi {
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
-  if (!match) {
-    return "Normal_Is_Gunu";
-  }
-
-  const date = new Date(
-    Number.parseInt(match[1], 10),
-    Number.parseInt(match[2], 10) - 1,
-    Number.parseInt(match[3], 10)
-  );
-
-  return date.getDay() === 0 ? "Hafta_Tatili_Pazar" : "Normal_Is_Gunu";
 }
 
 function hareketDurumuSaatGerekliMi(
@@ -114,7 +100,7 @@ function toPuantajFormState(
   const effectiveTarih = puantaj?.tarih ?? fallbackTarih;
 
   return {
-    entryGunTipi: puantaj?.gun_tipi ?? deriveGunTipiFromDateInput(effectiveTarih),
+    entryGunTipi: puantaj?.gun_tipi ?? deriveGunTipi(effectiveTarih),
     entryHareketDurumu: puantaj?.hareket_durumu ?? "",
     entryDayanak: puantaj?.dayanak ?? "",
     entryDurumuBildirdiMi:
@@ -176,7 +162,7 @@ const TODAY_INPUT = toDateInputValue(new Date());
 const INITIAL_FORM: GunlukPuantajFormState = {
   queryPersonelId: "",
   queryTarih: TODAY_INPUT,
-  entryGunTipi: deriveGunTipiFromDateInput(TODAY_INPUT),
+  entryGunTipi: deriveGunTipi(TODAY_INPUT),
   entryHareketDurumu: "",
   entryDayanak: "",
   entryDurumuBildirdiMi: "",
@@ -491,7 +477,7 @@ export function usePuantaj() {
     setFormState((prev) => {
       const next = { ...prev, ...partial };
       if (partial.queryTarih !== undefined && partial.entryGunTipi === undefined && !activeQuery) {
-        next.entryGunTipi = deriveGunTipiFromDateInput(partial.queryTarih);
+        next.entryGunTipi = deriveGunTipi(partial.queryTarih);
       }
       return next;
     });
@@ -928,7 +914,7 @@ export function usePuantaj() {
       setIsSubmitting(true);
 
       try {
-        const gunTipi = formState.entryGunTipi || deriveGunTipiFromDateInput(activeQuery.tarih);
+        const gunTipi = formState.entryGunTipi || deriveGunTipi(activeQuery.tarih);
         const hareketDurumu = formState.entryHareketDurumu;
         const dayanak = formState.entryDayanak || undefined;
         const durumuBildirdiMi =

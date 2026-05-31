@@ -10,7 +10,7 @@ import type {
   UpsertGunlukPuantajPayload
 } from "../types/puantaj";
 import { logAction } from "../audit/audit-service";
-import { deriveHesapEtkisi } from "../services/puantaj-hesap-motoru";
+import { deriveGunTipi, deriveHesapEtkisi } from "../services/puantaj-hesap-motoru";
 import { apiRequest } from "./api-client";
 import { endpoints } from "./endpoints";
 
@@ -165,38 +165,6 @@ function pickLiteral<T extends string>(
   }
 
   return undefined;
-}
-
-function parsePuantajDate(value: string): Date | null {
-  const trimmed = value.trim();
-  const dateOnlyMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(trimmed);
-  if (dateOnlyMatch) {
-    return new Date(
-      Number.parseInt(dateOnlyMatch[1], 10),
-      Number.parseInt(dateOnlyMatch[2], 10) - 1,
-      Number.parseInt(dateOnlyMatch[3], 10)
-    );
-  }
-
-  const parsed = Date.parse(trimmed);
-  if (Number.isNaN(parsed)) {
-    return null;
-  }
-
-  return new Date(parsed);
-}
-
-function deriveGunTipi(tarih: string, explicit?: PuantajGunTipi): PuantajGunTipi {
-  if (explicit) {
-    return explicit;
-  }
-
-  const parsedDate = parsePuantajDate(tarih);
-  if (parsedDate?.getDay() === 0) {
-    return "Hafta_Tatili_Pazar";
-  }
-
-  return "Normal_Is_Gunu";
 }
 
 function deriveHareketDurumu(params: {

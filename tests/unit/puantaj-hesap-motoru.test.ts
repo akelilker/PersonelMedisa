@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   deriveGunTipi,
+  isHaftaTatiliGunu,
+  VARSAYILAN_HAFTA_TATILI_GUN_KODU,
   deriveHareketDurumu,
   deriveDayanak,
   deriveHesapEtkisi,
@@ -130,6 +132,28 @@ describe("hesaplaNetSure", () => {
 // 4. Gün tipi türetme
 // =========================================================================
 
+describe("isHaftaTatiliGunu", () => {
+  it("varsayılan Pazar kodu 0'dır", () => {
+    expect(VARSAYILAN_HAFTA_TATILI_GUN_KODU).toBe(0);
+  });
+
+  it("default Pazar için Pazar tarihi true döner", () => {
+    expect(isHaftaTatiliGunu("2026-04-12")).toBe(true);
+  });
+
+  it("default Pazar için hafta içi false döner", () => {
+    expect(isHaftaTatiliGunu("2026-04-13")).toBe(false);
+  });
+
+  it("Cumartesi parametresiyle Cumartesi için true döner", () => {
+    expect(isHaftaTatiliGunu("2026-04-11", 6)).toBe(true);
+  });
+
+  it("Cumartesi parametresiyle Pazar için false döner", () => {
+    expect(isHaftaTatiliGunu("2026-04-12", 6)).toBe(false);
+  });
+});
+
 describe("deriveGunTipi", () => {
   it("pazar günü → Hafta_Tatili_Pazar", () => {
     expect(deriveGunTipi("2026-04-12")).toBe("Hafta_Tatili_Pazar");
@@ -142,6 +166,18 @@ describe("deriveGunTipi", () => {
   it("explicit verilmişse tarih görmezden gelinir", () => {
     expect(deriveGunTipi("2026-04-12", "Normal_Is_Gunu")).toBe("Normal_Is_Gunu");
     expect(deriveGunTipi("2026-04-13", "UBGT_Resmi_Tatil")).toBe("UBGT_Resmi_Tatil");
+  });
+
+  it("parametre verilmeden Pazar tarihi Hafta_Tatili_Pazar kalır", () => {
+    expect(deriveGunTipi("2026-04-12")).toBe("Hafta_Tatili_Pazar");
+  });
+
+  it("Cumartesi parametresiyle Cumartesi Hafta_Tatili_Pazar döner", () => {
+    expect(deriveGunTipi("2026-04-11", undefined, 6)).toBe("Hafta_Tatili_Pazar");
+  });
+
+  it("explicit gun_tipi override hafta tatili günü parametresinden önce gelir", () => {
+    expect(deriveGunTipi("2026-04-11", "Normal_Is_Gunu", 6)).toBe("Normal_Is_Gunu");
   });
 });
 

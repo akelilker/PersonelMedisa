@@ -30,6 +30,9 @@ export const endpoints = {
     yillikFazlaCalisma: (personelId: number | string, yil: number | string) =>
       `/haftalik-kapanis/yillik-fazla-calisma?personel_id=${personelId}&yil=${yil}`
   },
+  fazlaCalismaOdemeTercihi: {
+    resource: "/fazla-calisma-odeme-tercihi"
+  },
   raporlar: {
     personelOzet: "/raporlar/personel-ozet",
     izin: "/raporlar/izin",

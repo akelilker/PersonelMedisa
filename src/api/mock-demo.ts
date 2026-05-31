@@ -1,5 +1,10 @@
 ﻿import type { ApiResponse } from "../types/api";
-import type { HaftalikKapanisSonuc } from "../types/haftalik-kapanis";
+import type { HaftalikKapanisSnapshotSatir, HaftalikKapanisSonuc } from "../types/haftalik-kapanis";
+import type {
+  FazlaCalismaOdemeTercihi,
+  OdemeTipi
+} from "../types/fazla-calisma-odeme-tercihi";
+import { DEFAULT_ODEME_TIPI } from "../types/fazla-calisma-odeme-tercihi";
 import { hesaplaAylikSgkPuantajOzetleri } from "../services/dashboard-rapor-servisi";
 import { buildHaftalikKapanisSnapshot } from "../services/haftalik-kapanis-snapshot";
 import { aggregateYillikFazlaCalisma } from "../services/yillik-fazla-calisma-aggregate";
@@ -222,6 +227,7 @@ const demoState: {
     Partial<Record<"KIMLIK" | "ADRES_BEYANI" | "IS_GIRIS_EVRAKLARI" | "BANKA_IBAN", "VAR" | "YOK">>
   >;
   kapanisById: Record<number, HaftalikKapanisSonuc>;
+  odemeTercihiBySnapshotId: Record<number, FazlaCalismaOdemeTercihi>;
   nextIds: {
     personel: number;
     surec: number;
@@ -229,6 +235,7 @@ const demoState: {
     bildirim: number;
     finans: number;
     kapanis: number;
+    odemeTercihi: number;
     kullanici: number;
     sube: number;
     departman: number;
@@ -556,6 +563,7 @@ const demoState: {
   },
   belgeDurumByPersonelId: {},
   kapanisById: {},
+  odemeTercihiBySnapshotId: {},
   nextIds: {
     personel: 100,
     surec: 600,
@@ -563,6 +571,7 @@ const demoState: {
     bildirim: 800,
     finans: 950,
     kapanis: 1000,
+    odemeTercihi: 1,
     kullanici: 3,
     sube: 2,
     departman: 12
@@ -692,6 +701,62 @@ function ok<T>(data: T, meta: Record<string, unknown> = {}): ApiResponse<T> {
     data,
     meta,
     errors: []
+  };
+}
+
+function isDemoOdemeTipi(value: unknown): value is OdemeTipi {
+  return value === "KARAR_BEKLIYOR" || value === "UCRET" || value === "SERBEST_ZAMAN";
+}
+
+function guvenliFazlaCalismaDakika(value: number | undefined): number {
+  if (value === undefined || !Number.isFinite(value) || value < 0) {
+    return 0;
+  }
+
+  return value;
+}
+
+function findDemoSnapshotSatir(snapshotId: number): HaftalikKapanisSnapshotSatir | null {
+  for (const kapanis of Object.values(demoState.kapanisById)) {
+    for (const satir of kapanis.snapshot_satirlari ?? []) {
+      if (satir.snapshot_id === snapshotId) {
+        return satir;
+      }
+    }
+  }
+
+  return null;
+}
+
+function buildSyntheticOdemeTercihi(satir: HaftalikKapanisSnapshotSatir): FazlaCalismaOdemeTercihi {
+  const snapshot_id = satir.snapshot_id;
+  const kapanis_id = satir.kapanis_id;
+
+  if (snapshot_id === undefined || kapanis_id === undefined) {
+    throw new Error("Snapshot satiri snapshot_id veya kapanis_id icermiyor.");
+  }
+
+  return {
+    snapshot_id,
+    kapanis_id,
+    personel_id: satir.personel_id,
+    hafta_baslangic: satir.hafta_baslangic,
+    hafta_bitis: satir.hafta_bitis,
+    fazla_calisma_dakika: guvenliFazlaCalismaDakika(satir.fazla_calisma_dakika),
+    odeme_tipi: DEFAULT_ODEME_TIPI
+  };
+}
+
+function demoOdemeTercihiNotFound(snapshotId: number): ApiResponse<unknown> {
+  return {
+    data: null,
+    meta: {},
+    errors: [
+      {
+        code: "NOT_FOUND",
+        message: `snapshot_id ${snapshotId} icin odeme tercihi veya kapanis satiri bulunamadi.`
+      }
+    ]
   };
 }
 
@@ -1715,6 +1780,95 @@ export function resolveDemoApiResponse(
     demoState.kapanisById[kapanisId] = response;
 
     return ok(response);
+  }
+
+  if (pathname === "/fazla-calisma-odeme-tercihi" && method === "GET") {
+    const snapshotId = toNumber(requestUrl.searchParams.get("snapshot_id"));
+    if (snapshotId === null || snapshotId < 1) {
+      return {
+        data: null,
+        meta: {},
+        errors: [
+          {
+            code: "INVALID_QUERY",
+            message: "snapshot_id zorunludur ve pozitif tam sayi olmalidir."
+          }
+        ]
+      };
+    }
+
+    const stored = demoState.odemeTercihiBySnapshotId[snapshotId];
+    if (stored) {
+      return ok(stored);
+    }
+
+    const satir = findDemoSnapshotSatir(snapshotId);
+    if (!satir) {
+      return demoOdemeTercihiNotFound(snapshotId);
+    }
+
+    return ok(buildSyntheticOdemeTercihi(satir));
+  }
+
+  if (pathname === "/fazla-calisma-odeme-tercihi" && method === "PUT") {
+    const snapshotId = toNumber(body.snapshot_id);
+    if (snapshotId === null || snapshotId < 1) {
+      return {
+        data: null,
+        meta: {},
+        errors: [
+          {
+            code: "INVALID_BODY",
+            message: "snapshot_id zorunludur ve pozitif tam sayi olmalidir."
+          }
+        ]
+      };
+    }
+
+    const odemeTipi = body.odeme_tipi;
+    if (!isDemoOdemeTipi(odemeTipi)) {
+      return {
+        data: null,
+        meta: {},
+        errors: [
+          {
+            code: "INVALID_BODY",
+            message: "odeme_tipi gecersiz."
+          }
+        ]
+      };
+    }
+
+    const satir = findDemoSnapshotSatir(snapshotId);
+    if (!satir) {
+      return demoOdemeTercihiNotFound(snapshotId);
+    }
+
+    const existing = demoState.odemeTercihiBySnapshotId[snapshotId];
+    const onceki_odeme_tipi = existing?.odeme_tipi ?? DEFAULT_ODEME_TIPI;
+    const kapanis_id = satir.kapanis_id;
+
+    if (kapanis_id === undefined) {
+      return demoOdemeTercihiNotFound(snapshotId);
+    }
+
+    const next: FazlaCalismaOdemeTercihi = {
+      id: existing?.id ?? ++demoState.nextIds.odemeTercihi,
+      snapshot_id: snapshotId,
+      kapanis_id,
+      personel_id: satir.personel_id,
+      hafta_baslangic: satir.hafta_baslangic,
+      hafta_bitis: satir.hafta_bitis,
+      fazla_calisma_dakika: guvenliFazlaCalismaDakika(satir.fazla_calisma_dakika),
+      odeme_tipi: odemeTipi,
+      secim_zamani: new Date().toISOString(),
+      secen_kullanici_id: toNumber(body.secen_kullanici_id) ?? undefined,
+      onceki_odeme_tipi,
+      gerekce: toStringValue(body.gerekce) ?? undefined
+    };
+
+    demoState.odemeTercihiBySnapshotId[snapshotId] = next;
+    return ok(next);
   }
 
   if (pathname === "/yonetim/kullanicilar" && method === "GET") {

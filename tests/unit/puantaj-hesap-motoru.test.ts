@@ -35,8 +35,15 @@ import {
   gunlukPuantajToGirdi,
   hesapSonucuToGunlukPuantaj,
   birlestirUbgtFazlaMesaiCakismaUyari,
+  birlestirMazeretsizDevamsizlikAdayUyariari,
   UBGT_FAZLA_MESAI_CAKISMASI_CODE,
   UBGT_FAZLA_MESAI_CAKISMASI_MESSAGE,
+  DEVAMSIZLIK_UCRET_ETKISI_ADAYI_CODE,
+  DEVAMSIZLIK_UCRET_ETKISI_ADAYI_MESSAGE,
+  HAFTA_TATILI_HAK_KAYBI_ADAYI_CODE,
+  HAFTA_TATILI_HAK_KAYBI_ADAYI_MESSAGE,
+  mazeretsizDevamsizlikParasalNetKilitliMi,
+  parasalNetEtkidenDusulecekKesintiTutari,
   type HesapGirdisi
 } from "../../src/services/puantaj-hesap-motoru";
 import { deriveGecErkenKesintiPreview } from "../../src/hooks/usePuantaj";
@@ -2088,5 +2095,118 @@ describe("birlestirUbgtFazlaMesaiCakismaUyari", () => {
     ];
     const merged = birlestirUbgtFazlaMesaiCakismaUyari(mevcut, ubgt, tamHafta, true);
     expect(merged).toHaveLength(1);
+  });
+});
+
+// =========================================================================
+// Mazeretsiz devamsızlık / hafta tatili kaybı aday (Faz B)
+// =========================================================================
+
+describe("birlestirMazeretsizDevamsizlikAdayUyariari", () => {
+  const mazeretsizKayit = (): GunlukPuantaj => ({
+    personel_id: 1,
+    tarih: "2026-04-14",
+    hareket_durumu: "Gelmedi",
+    dayanak: "Yok_Izinsiz",
+    hafta_tatili_hak_kazandi_mi: false,
+    compliance_uyarilari: []
+  });
+
+  it("Gelmedi + Yok_Izinsiz → DEVAMSIZLIK_UCRET_ETKISI_ADAYI", () => {
+    const merged = birlestirMazeretsizDevamsizlikAdayUyariari([], mazeretsizKayit());
+    expect(merged).toContainEqual({
+      code: DEVAMSIZLIK_UCRET_ETKISI_ADAYI_CODE,
+      message: DEVAMSIZLIK_UCRET_ETKISI_ADAYI_MESSAGE,
+      level: "UYARI"
+    });
+  });
+
+  it("hafta_tatili_hak_kazandi_mi false → HAFTA_TATILI_HAK_KAYBI_ADAYI", () => {
+    const merged = birlestirMazeretsizDevamsizlikAdayUyariari([], mazeretsizKayit());
+    expect(merged).toContainEqual({
+      code: HAFTA_TATILI_HAK_KAYBI_ADAYI_CODE,
+      message: HAFTA_TATILI_HAK_KAYBI_ADAYI_MESSAGE,
+      level: "UYARI"
+    });
+    expect(merged).toHaveLength(2);
+  });
+
+  it("hafta tatili hakkı korunmuşsa yalnız devamsızlık aday uyarısı", () => {
+    const kayit: GunlukPuantaj = {
+      ...mazeretsizKayit(),
+      hafta_tatili_hak_kazandi_mi: true
+    };
+    const merged = birlestirMazeretsizDevamsizlikAdayUyariari([], kayit);
+    expect(merged).toHaveLength(1);
+    expect(merged[0].code).toBe(DEVAMSIZLIK_UCRET_ETKISI_ADAYI_CODE);
+  });
+
+  it("Gelmedi + Yok_Izinsiz değilse uyarı üretmez", () => {
+    const kayit: GunlukPuantaj = {
+      personel_id: 1,
+      tarih: "2026-04-14",
+      hareket_durumu: "Geldi",
+      compliance_uyarilari: []
+    };
+    expect(birlestirMazeretsizDevamsizlikAdayUyariari([], kayit)).toHaveLength(0);
+  });
+
+  it("duplicate uyarı kodu eklenmez", () => {
+    const mevcut = [
+      {
+        code: DEVAMSIZLIK_UCRET_ETKISI_ADAYI_CODE,
+        message: DEVAMSIZLIK_UCRET_ETKISI_ADAYI_MESSAGE,
+        level: "UYARI" as const
+      },
+      {
+        code: HAFTA_TATILI_HAK_KAYBI_ADAYI_CODE,
+        message: HAFTA_TATILI_HAK_KAYBI_ADAYI_MESSAGE,
+        level: "UYARI" as const
+      }
+    ];
+    const merged = birlestirMazeretsizDevamsizlikAdayUyariari(mevcut, mazeretsizKayit());
+    expect(merged).toHaveLength(2);
+  });
+});
+
+describe("Faz B — devamsızlık matematiği ve parasal net kilidi", () => {
+  const maas = 30000;
+
+  it("hesaplaDevamsizlikKesintiOzeti 1+1 gün eşdeğeri matematiği değişmez", () => {
+    const o = hesaplaDevamsizlikKesintiOzeti(maas, {
+      devamsizlik_gun_sayisi: 1,
+      hafta_tatili_kaybi_gun_sayisi: 1
+    });
+    expect(o.toplam_kesinti_gun_esdegeri).toBe(2);
+    expect(o.toplam_kesinti_tutari).toBe(2000);
+  });
+
+  it("mazeretsiz devamsızlık parasal net kilitli", () => {
+    expect(
+      mazeretsizDevamsizlikParasalNetKilitliMi({
+        hareket_durumu: "Gelmedi",
+        dayanak: "Yok_Izinsiz"
+      })
+    ).toBe(true);
+    expect(
+      mazeretsizDevamsizlikParasalNetKilitliMi({
+        hareket_durumu: "Geldi",
+        dayanak: "Yok_Izinsiz"
+      })
+    ).toBe(false);
+  });
+
+  it("parasal netHam mazeretsiz adayda devamsızlık kesintisini düşmez", () => {
+    const kesintiToplam = 2000;
+    const netHam =
+      300 +
+      1000 -
+      parasalNetEtkidenDusulecekKesintiTutari(kesintiToplam, true);
+    expect(netHam).toBe(1300);
+    const netKesin =
+      300 +
+      1000 -
+      parasalNetEtkidenDusulecekKesintiTutari(kesintiToplam, false);
+    expect(netKesin).toBe(-700);
   });
 });

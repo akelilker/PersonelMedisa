@@ -386,7 +386,7 @@ export function GunlukPuantajPage() {
 
       {activeQuery && puantaj && (devamsizlikKesintiOzet || gecErkenKesintiOzeti || gecErkenKesintiNotu) ? (
         <div className="puantaj-detail-card">
-          <h3>Kesinti Ön İzleme</h3>
+          <h3>Kesinti Adayı Ön İzleme</h3>
           {kesintiOzetNotu ? <p className="puantaj-form-readonly">{kesintiOzetNotu}</p> : null}
           {devamsizlikKesintiOzet ? (
             <div className="form-field-grid">
@@ -404,7 +404,7 @@ export function GunlukPuantajPage() {
                 value={formatOndalikSaat(devamsizlikKesintiOzet.toplam_kesinti_gun_esdegeri)}
               />
               <ReadonlyField
-                label="Toplam Kesinti Tutarı"
+                label="Referans Kesinti Adayı"
                 value={formatTurkcePara(devamsizlikKesintiOzet.toplam_kesinti_tutari)}
               />
             </div>

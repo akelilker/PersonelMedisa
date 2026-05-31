@@ -24,6 +24,10 @@ import {
   hesaplaYasKuraliBlokMesaji,
   hesapSonucuToGunlukPuantaj,
   birlestirUbgtFazlaMesaiCakismaUyari,
+  birlestirMazeretsizDevamsizlikAdayUyariari,
+  BORDRO_ETKISI_KESINLESME_NOTU,
+  mazeretsizDevamsizlikParasalNetKilitliMi,
+  parasalNetEtkidenDusulecekKesintiTutari,
   type DevamsizlikKesintiOzeti,
   type HaftalikPuantajUcretOzeti,
   type TatilEkOdemeOzeti
@@ -659,17 +663,24 @@ export function usePuantaj() {
   }, [activeQuery, activeSube, puantaj, personelMaasTutari, appDataRevision]);
 
   const puantajGoruntuleme = useMemo(() => {
-    if (!puantaj || haftalikOzetDurumu !== "hazir") {
+    if (!puantaj) {
       return puantaj;
     }
-    return {
-      ...puantaj,
-      compliance_uyarilari: birlestirUbgtFazlaMesaiCakismaUyari(
-        puantaj.compliance_uyarilari,
+    let compliance = birlestirMazeretsizDevamsizlikAdayUyariari(
+      puantaj.compliance_uyarilari,
+      puantaj
+    );
+    if (haftalikOzetDurumu === "hazir") {
+      compliance = birlestirUbgtFazlaMesaiCakismaUyari(
+        compliance,
         puantaj,
         haftaPuantajGunleri,
         tamHaftaVerisi
-      )
+      );
+    }
+    return {
+      ...puantaj,
+      compliance_uyarilari: compliance
     };
   }, [puantaj, haftalikOzetDurumu, haftaPuantajGunleri, tamHaftaVerisi]);
 
@@ -801,6 +812,8 @@ export function usePuantaj() {
     const devamsizlik_kesinti_tutari =
       (devamsizlikKesintiOzet?.toplam_kesinti_tutari ?? 0) + gecErkenKesintiTutari;
 
+    const mazeretsizDevamsizlikAdayi = mazeretsizDevamsizlikParasalNetKilitliMi(puantaj);
+
     const manuel_inceleme_gerekli_mi =
       tatilEkOdemeOzeti?.hafta_tatili_pazar_karar?.manuel_inceleme_gerekli_mi === true;
 
@@ -810,6 +823,7 @@ export function usePuantaj() {
     const gecErkenHesaplanamadi = gecErkenKesintiHesaplanamadiMi;
 
     const net_etki_hesaplanabilir_mi = !(
+      mazeretsizDevamsizlikAdayi ||
       manuel_inceleme_gerekli_mi ||
       haftalikEksikVeyaGuvenilmezNot ||
       tatilNotuGuvenliDegil ||
@@ -818,7 +832,9 @@ export function usePuantaj() {
     );
 
     const netHam =
-      haftalik_fazla_calisma_tutari + tatil_ek_odeme_tutari - devamsizlik_kesinti_tutari;
+      haftalik_fazla_calisma_tutari +
+      tatil_ek_odeme_tutari -
+      parasalNetEtkidenDusulecekKesintiTutari(devamsizlik_kesinti_tutari, mazeretsizDevamsizlikAdayi);
     const net_etki_tutari = net_etki_hesaplanabilir_mi
       ? Math.round(netHam * 100) / 100
       : null;
@@ -828,6 +844,9 @@ export function usePuantaj() {
     notlar.push("Bu kart günlük kesinti/ek ödeme ile haftalık fazla çalışma tutarını birlikte gösterir.");
     if (gecErkenHesaplanamadi) {
       notlar.push("Geç kalma / erken çıkma kesintileri bu özete dahil edilmedi.");
+    }
+    if (mazeretsizDevamsizlikAdayi) {
+      notlar.push(BORDRO_ETKISI_KESINLESME_NOTU);
     }
     if (manuel_inceleme_gerekli_mi) {
       notlar.push("Pazar kaydı manuel inceleme gerektirdiği için net etki kesinleştirilemedi.");
@@ -1002,14 +1021,21 @@ export function usePuantaj() {
           ...mapped,
           durumu_bildirdi_mi: body.durumu_bildirdi_mi ?? undefined,
           durum_bildirim_aciklamasi: body.durum_bildirim_aciklamasi ?? undefined,
-          compliance_uyarilari: haftalikBaglam
-            ? birlestirUbgtFazlaMesaiCakismaUyari(
-                mapped.compliance_uyarilari,
+          compliance_uyarilari: (() => {
+            let compliance = birlestirMazeretsizDevamsizlikAdayUyariari(
+              mapped.compliance_uyarilari,
+              mapped
+            );
+            if (haftalikBaglam) {
+              compliance = birlestirUbgtFazlaMesaiCakismaUyari(
+                compliance,
                 mapped,
                 haftalikBaglam.gunler,
                 haftalikBaglam.tamHaftaVerisi
-              )
-            : mapped.compliance_uyarilari
+              );
+            }
+            return compliance;
+          })()
         };
 
         const previousPuantaj = puantaj;

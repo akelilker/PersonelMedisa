@@ -1239,6 +1239,86 @@ export function uretComplianceUyarilari(
   return uyarilar;
 }
 
+function complianceUyariKoduVar(mevcut: readonly ComplianceUyari[], code: string): boolean {
+  return mevcut.some((uyari) => uyari.code === code);
+}
+
+/** Mazeretsiz devamsızlık — ücret etkisi / hafta tatili kaybı aday uyarıları (Faz B). */
+export const DEVAMSIZLIK_UCRET_ETKISI_ADAYI_CODE = "DEVAMSIZLIK_UCRET_ETKISI_ADAYI";
+
+export const DEVAMSIZLIK_UCRET_ETKISI_ADAYI_MESSAGE =
+  "Mazeretsiz devamsızlık için ücret etkisi bordro adayıdır; kesin kesinti değildir.";
+
+export const HAFTA_TATILI_HAK_KAYBI_ADAYI_CODE = "HAFTA_TATILI_HAK_KAYBI_ADAYI";
+
+export const HAFTA_TATILI_HAK_KAYBI_ADAYI_MESSAGE =
+  "Hafta tatili hakkı kaybı adayı oluştu; ek etki hafta/ay kapanışında kesinleşir.";
+
+export const BORDRO_ETKISI_KESINLESME_NOTU =
+  "Bordro etkisi hafta/ay kapanışında kesinleşir.";
+
+export type MazeretsizDevamsizlikKayitGirdi = {
+  hareket_durumu?: PuantajHareketDurumu;
+  dayanak?: PuantajDayanak;
+  hafta_tatili_hak_kazandi_mi?: boolean;
+};
+
+export function isMazeretsizDevamsizlikKaydi(kayit: MazeretsizDevamsizlikKayitGirdi): boolean {
+  return kayit.hareket_durumu === "Gelmedi" && kayit.dayanak === "Yok_Izinsiz";
+}
+
+export function mazeretsizDevamsizlikParasalNetKilitliMi(kayit: MazeretsizDevamsizlikKayitGirdi): boolean {
+  return isMazeretsizDevamsizlikKaydi(kayit);
+}
+
+/** Parasal ön izlemede mazeretsiz devamsızlık kesintisi net etkiden düşülmez (referans alanı ayrı). */
+export function parasalNetEtkidenDusulecekKesintiTutari(
+  toplamKesintiTutari: number,
+  mazeretsizDevamsizlikAdayi: boolean
+): number {
+  return mazeretsizDevamsizlikAdayi ? 0 : toplamKesintiTutari;
+}
+
+export function uretDevamsizlikUcretEtkisiAdayiUyari(): ComplianceUyari {
+  return {
+    code: DEVAMSIZLIK_UCRET_ETKISI_ADAYI_CODE,
+    message: DEVAMSIZLIK_UCRET_ETKISI_ADAYI_MESSAGE,
+    level: "UYARI"
+  };
+}
+
+export function uretHaftaTatiliHakKaybiAdayiUyari(): ComplianceUyari {
+  return {
+    code: HAFTA_TATILI_HAK_KAYBI_ADAYI_CODE,
+    message: HAFTA_TATILI_HAK_KAYBI_ADAYI_MESSAGE,
+    level: "UYARI"
+  };
+}
+
+/**
+ * Gelmedi + Yok_Izinsiz kaydına devamsızlık / hafta tatili kaybı aday compliance uyarılarını ekler.
+ */
+export function birlestirMazeretsizDevamsizlikAdayUyariari(
+  mevcut: readonly ComplianceUyari[],
+  kayit: MazeretsizDevamsizlikKayitGirdi
+): ComplianceUyari[] {
+  if (!isMazeretsizDevamsizlikKaydi(kayit)) {
+    return [...mevcut];
+  }
+
+  let result = [...mevcut];
+  if (!complianceUyariKoduVar(result, DEVAMSIZLIK_UCRET_ETKISI_ADAYI_CODE)) {
+    result = [...result, uretDevamsizlikUcretEtkisiAdayiUyari()];
+  }
+  if (
+    kayit.hafta_tatili_hak_kazandi_mi === false &&
+    !complianceUyariKoduVar(result, HAFTA_TATILI_HAK_KAYBI_ADAYI_CODE)
+  ) {
+    result = [...result, uretHaftaTatiliHakKaybiAdayiUyari()];
+  }
+  return result;
+}
+
 /** UBGT mesai günü + haftalık fazla mesai çakışması (Faz A — yalnız uyarı, tutar değiştirmez). */
 export const UBGT_FAZLA_MESAI_CAKISMASI_CODE = "UBGT_FAZLA_MESAI_CAKISMASI";
 
@@ -1266,10 +1346,6 @@ export function uretUbgtFazlaMesaiCakismaUyari(): ComplianceUyari {
     message: UBGT_FAZLA_MESAI_CAKISMASI_MESSAGE,
     level: "UYARI"
   };
-}
-
-function complianceUyariKoduVar(mevcut: readonly ComplianceUyari[], code: string): boolean {
-  return mevcut.some((uyari) => uyari.code === code);
 }
 
 /**

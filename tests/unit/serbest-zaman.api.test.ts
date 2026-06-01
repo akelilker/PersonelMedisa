@@ -4,6 +4,8 @@ import {
   fetchSerbestZamanBakiye,
   fetchSerbestZamanEvents,
   normalizeSerbestZamanEvent,
+  postSerbestZamanDuzeltme,
+  postSerbestZamanIptal,
   postSerbestZamanKullanim,
   postSerbestZamanOlusum
 } from "../../src/api/serbest-zaman.api";
@@ -280,6 +282,154 @@ describe("serbest-zaman.api", () => {
         personel_id: 1,
         dakika: 100,
         event_tarihi: "2026-06-15"
+      })
+    ).rejects.toMatchObject({
+      status: 409
+    } satisfies Partial<ApiRequestError>);
+  });
+
+  it("normalizeSerbestZamanEvent IPTAL alanlarini normalize eder", () => {
+    const result = normalizeSerbestZamanEvent({
+      id: 4,
+      personel_id: 1,
+      event_tipi: "SERBEST_ZAMAN_IPTAL",
+      hedef_event_id: 2,
+      hedef_event_tipi: "SERBEST_ZAMAN_KULLANIM",
+      event_tarihi: "2026-06-20"
+    });
+
+    expect(result.event_tipi).toBe("SERBEST_ZAMAN_IPTAL");
+    if (result.event_tipi === "SERBEST_ZAMAN_IPTAL") {
+      expect(result.hedef_event_id).toBe(2);
+    }
+  });
+
+  it("normalizeSerbestZamanEvent DUZELTME alanlarini normalize eder", () => {
+    const result = normalizeSerbestZamanEvent({
+      id: 5,
+      personel_id: 1,
+      event_tipi: "SERBEST_ZAMAN_DUZELTME",
+      hedef_event_id: 1,
+      hedef_event_tipi: "SERBEST_ZAMAN_OLUSUM",
+      yeni_dakika: 60,
+      event_tarihi: "2026-06-20"
+    });
+
+    expect(result.event_tipi).toBe("SERBEST_ZAMAN_DUZELTME");
+    if (result.event_tipi === "SERBEST_ZAMAN_DUZELTME") {
+      expect(result.yeni_dakika).toBe(60);
+    }
+  });
+
+  it("POST iptal basarili response normalize eder", async () => {
+    const fetchMock = vi.fn(async () =>
+      createJsonResponse({
+        data: {
+          id: 4,
+          personel_id: 1,
+          event_tipi: "SERBEST_ZAMAN_IPTAL",
+          hedef_event_id: 2,
+          hedef_event_tipi: "SERBEST_ZAMAN_KULLANIM",
+          event_tarihi: "2026-06-20"
+        },
+        meta: {},
+        errors: []
+      })
+    );
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await postSerbestZamanIptal({
+      personel_id: 1,
+      hedef_event_id: 2,
+      hedef_event_tipi: "SERBEST_ZAMAN_KULLANIM",
+      event_tarihi: "2026-06-20"
+    });
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(String(init.body))).toMatchObject({
+      hedef_event_id: 2,
+      hedef_event_tipi: "SERBEST_ZAMAN_KULLANIM"
+    });
+    expect(result.event_tipi).toBe("SERBEST_ZAMAN_IPTAL");
+  });
+
+  it("POST duzeltme basarili response normalize eder", async () => {
+    const fetchMock = vi.fn(async () =>
+      createJsonResponse({
+        data: {
+          id: 5,
+          personel_id: 1,
+          event_tipi: "SERBEST_ZAMAN_DUZELTME",
+          hedef_event_id: 1,
+          hedef_event_tipi: "SERBEST_ZAMAN_OLUSUM",
+          yeni_dakika: 60,
+          event_tarihi: "2026-06-20"
+        },
+        meta: {},
+        errors: []
+      })
+    );
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await postSerbestZamanDuzeltme({
+      personel_id: 1,
+      hedef_event_id: 1,
+      hedef_event_tipi: "SERBEST_ZAMAN_OLUSUM",
+      yeni_dakika: 60,
+      event_tarihi: "2026-06-20"
+    });
+
+    const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("/api/serbest-zaman/duzeltme");
+    expect(result.event_tipi).toBe("SERBEST_ZAMAN_DUZELTME");
+    if (result.event_tipi === "SERBEST_ZAMAN_DUZELTME") {
+      expect(result.yeni_dakika).toBe(60);
+    }
+  });
+
+  it("TARGET_NOT_FOUND hatasini 404 olarak firlatir", async () => {
+    const fetchMock = vi.fn(async () =>
+      createJsonResponse({
+        data: null,
+        meta: {},
+        errors: [{ code: "TARGET_NOT_FOUND", message: "Hedef yok" }]
+      })
+    );
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      postSerbestZamanIptal({
+        personel_id: 1,
+        hedef_event_id: 999,
+        hedef_event_tipi: "SERBEST_ZAMAN_KULLANIM",
+        event_tarihi: "2026-06-20"
+      })
+    ).rejects.toMatchObject({
+      status: 404
+    } satisfies Partial<ApiRequestError>);
+  });
+
+  it("ALREADY_CANCELLED hatasini 409 olarak firlatir", async () => {
+    const fetchMock = vi.fn(async () =>
+      createJsonResponse({
+        data: null,
+        meta: {},
+        errors: [{ code: "ALREADY_CANCELLED", message: "Zaten iptal" }]
+      })
+    );
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      postSerbestZamanIptal({
+        personel_id: 1,
+        hedef_event_id: 1,
+        hedef_event_tipi: "SERBEST_ZAMAN_KULLANIM",
+        event_tarihi: "2026-06-20"
       })
     ).rejects.toMatchObject({
       status: 409

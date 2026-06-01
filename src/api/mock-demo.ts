@@ -11,7 +11,9 @@ import { buildHaftalikKapanisSnapshot } from "../services/haftalik-kapanis-snaps
 import {
   hesaplaSerbestZamanBakiye,
   olusturKullanimEvent,
-  olusturOlusumEvent
+  olusturOlusumEvent,
+  olusturDuzeltmeEvent,
+  olusturIptalEvent
 } from "../services/serbest-zaman-event-motoru";
 import { aggregateYillikFazlaCalisma } from "../services/yillik-fazla-calisma-aggregate";
 
@@ -2081,6 +2083,173 @@ export function resolveDemoApiResponse(
 
     const eventId = ++demoState.nextIds.serbestZamanEvent;
     const persisted: SerbestZamanEvent = {
+      ...sonuc.event,
+      id: eventId
+    };
+    demoState.serbestZamanEventsById[eventId] = persisted;
+
+    return ok(persisted);
+  }
+
+  if (pathname === "/serbest-zaman/iptal" && method === "POST") {
+    const personelId = toNumber(body.personel_id);
+    const hedefEventId = toNumber(body.hedef_event_id);
+    const hedefEventTipi = toStringValue(body.hedef_event_tipi);
+    const eventTarihi = toStringValue(body.event_tarihi);
+
+    if (personelId === null || personelId < 1) {
+      return {
+        data: null,
+        meta: {},
+        errors: [
+          {
+            code: "INVALID_BODY",
+            message: "personel_id zorunludur ve pozitif tam sayi olmalidir."
+          }
+        ]
+      };
+    }
+
+    if (hedefEventId === null || hedefEventId < 1) {
+      return demoSerbestZamanOlusumError(
+        "TARGET_NOT_FOUND",
+        "hedef_event_id gecerli bir event id olmalidir."
+      );
+    }
+
+    if (
+      hedefEventTipi !== "SERBEST_ZAMAN_OLUSUM" &&
+      hedefEventTipi !== "SERBEST_ZAMAN_KULLANIM"
+    ) {
+      return demoSerbestZamanOlusumError(
+        "UNSUPPORTED_TARGET_EVENT",
+        "hedef_event_tipi OLUSUM veya KULLANIM olmalidir."
+      );
+    }
+
+    if (!eventTarihi || !/^\d{4}-\d{2}-\d{2}$/.test(eventTarihi.trim())) {
+      return {
+        data: null,
+        meta: {},
+        errors: [
+          {
+            code: "INVALID_BODY",
+            message: "event_tarihi YYYY-MM-DD formatinda olmalidir."
+          }
+        ]
+      };
+    }
+
+    const sonuc = olusturIptalEvent({
+      personel_id: personelId,
+      hedef_event_id: hedefEventId,
+      hedef_event_tipi: hedefEventTipi,
+      event_tarihi: eventTarihi.trim().slice(0, 10),
+      mevcutEvents: listDemoSerbestZamanEvents(),
+      aciklama: toStringValue(body.aciklama) ?? undefined
+    });
+
+    if (!sonuc.ok) {
+      const messages: Record<string, string> = {
+        TARGET_NOT_FOUND: "Hedef event bulunamadi.",
+        TARGET_PERSONEL_MISMATCH: "Hedef event bu personele ait degil.",
+        TARGET_ALREADY_CANCELLED: "Hedef event zaten iptal edilmis.",
+        ALREADY_CANCELLED: "Bu hedef event icin iptal zaten mevcut.",
+        UNSUPPORTED_TARGET_EVENT: "Hedef event tipi desteklenmiyor."
+      };
+
+      return demoSerbestZamanOlusumError(sonuc.code, messages[sonuc.code] ?? sonuc.code);
+    }
+
+    const eventId = ++demoState.nextIds.serbestZamanEvent;
+    const persisted = {
+      ...sonuc.event,
+      id: eventId
+    };
+    demoState.serbestZamanEventsById[eventId] = persisted;
+
+    return ok(persisted);
+  }
+
+  if (pathname === "/serbest-zaman/duzeltme" && method === "POST") {
+    const personelId = toNumber(body.personel_id);
+    const hedefEventId = toNumber(body.hedef_event_id);
+    const hedefEventTipi = toStringValue(body.hedef_event_tipi);
+    const yeniDakika = toNumber(body.yeni_dakika);
+    const eventTarihi = toStringValue(body.event_tarihi);
+
+    if (personelId === null || personelId < 1) {
+      return {
+        data: null,
+        meta: {},
+        errors: [
+          {
+            code: "INVALID_BODY",
+            message: "personel_id zorunludur ve pozitif tam sayi olmalidir."
+          }
+        ]
+      };
+    }
+
+    if (hedefEventId === null || hedefEventId < 1) {
+      return demoSerbestZamanOlusumError(
+        "TARGET_NOT_FOUND",
+        "hedef_event_id gecerli bir event id olmalidir."
+      );
+    }
+
+    if (
+      hedefEventTipi !== "SERBEST_ZAMAN_OLUSUM" &&
+      hedefEventTipi !== "SERBEST_ZAMAN_KULLANIM"
+    ) {
+      return demoSerbestZamanOlusumError(
+        "UNSUPPORTED_TARGET_EVENT",
+        "hedef_event_tipi OLUSUM veya KULLANIM olmalidir."
+      );
+    }
+
+    if (yeniDakika === null || yeniDakika <= 0) {
+      return demoSerbestZamanOlusumError("ZERO_DAKIKA", "yeni_dakika pozitif olmalidir.");
+    }
+
+    if (!eventTarihi || !/^\d{4}-\d{2}-\d{2}$/.test(eventTarihi.trim())) {
+      return {
+        data: null,
+        meta: {},
+        errors: [
+          {
+            code: "INVALID_BODY",
+            message: "event_tarihi YYYY-MM-DD formatinda olmalidir."
+          }
+        ]
+      };
+    }
+
+    const sonuc = olusturDuzeltmeEvent({
+      personel_id: personelId,
+      hedef_event_id: hedefEventId,
+      hedef_event_tipi: hedefEventTipi,
+      yeni_dakika: yeniDakika,
+      event_tarihi: eventTarihi.trim().slice(0, 10),
+      mevcutEvents: listDemoSerbestZamanEvents(),
+      aciklama: toStringValue(body.aciklama) ?? undefined
+    });
+
+    if (!sonuc.ok) {
+      const messages: Record<string, string> = {
+        TARGET_NOT_FOUND: "Hedef event bulunamadi.",
+        TARGET_PERSONEL_MISMATCH: "Hedef event bu personele ait degil.",
+        TARGET_ALREADY_CANCELLED: "Hedef event iptal edilmis; duzeltme yapilamaz.",
+        ZERO_DAKIKA: "yeni_dakika pozitif olmalidir.",
+        INSUFFICIENT_BALANCE: "Duzeltme sonrasi kullanim bakiyeyi asiyor.",
+        UNSUPPORTED_TARGET_EVENT: "Hedef event tipi desteklenmiyor."
+      };
+
+      return demoSerbestZamanOlusumError(sonuc.code, messages[sonuc.code] ?? sonuc.code);
+    }
+
+    const eventId = ++demoState.nextIds.serbestZamanEvent;
+    const persisted = {
       ...sonuc.event,
       id: eventId
     };

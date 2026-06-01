@@ -1,7 +1,11 @@
 import type { FazlaCalismaOdemeTercihi } from "../types/fazla-calisma-odeme-tercihi";
 import type {
   SerbestZamanBakiye,
+  SerbestZamanDuzeltmeEvent,
   SerbestZamanEvent,
+  SerbestZamanHedefEvent,
+  SerbestZamanHedefEventTipi,
+  SerbestZamanIptalEvent,
   SerbestZamanKullanimEvent,
   SerbestZamanOlusumEvent
 } from "../types/serbest-zaman";
@@ -24,6 +28,23 @@ export type KullanimEventHataKodu = "ZERO_DAKIKA" | "NO_ELIGIBLE_BALANCE" | "INS
 export type OlusturKullanimEventSonuc =
   | { ok: true; event: SerbestZamanKullanimEvent }
   | { ok: false; code: KullanimEventHataKodu };
+
+export type HedefEventHataKodu =
+  | "TARGET_NOT_FOUND"
+  | "TARGET_PERSONEL_MISMATCH"
+  | "TARGET_ALREADY_CANCELLED"
+  | "ALREADY_CANCELLED"
+  | "ZERO_DAKIKA"
+  | "INSUFFICIENT_BALANCE"
+  | "UNSUPPORTED_TARGET_EVENT";
+
+export type OlusturIptalEventSonuc =
+  | { ok: true; event: SerbestZamanIptalEvent }
+  | { ok: false; code: HedefEventHataKodu };
+
+export type OlusturDuzeltmeEventSonuc =
+  | { ok: true; event: SerbestZamanDuzeltmeEvent }
+  | { ok: false; code: HedefEventHataKodu };
 
 function parseIsoDate(value: string): Date | null {
   const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value.trim());
@@ -51,6 +72,10 @@ function bugunIsoDate(): string {
 
 function isValidEventTarihi(value: string): boolean {
   return /^\d{4}-\d{2}-\d{2}$/.test(value.trim());
+}
+
+function isHedefEventTipi(value: string): value is SerbestZamanHedefEventTipi {
+  return value === "SERBEST_ZAMAN_OLUSUM" || value === "SERBEST_ZAMAN_KULLANIM";
 }
 
 export function extractEventTarihi(secimZamani?: string, referansZamani?: string): string {
@@ -84,6 +109,125 @@ export function hesaplaSonKullanimTarihi(eventTarihi: string): string {
   const day = Math.min(parsed.getDate(), lastDayOfTargetMonth);
 
   return formatIsoDate(new Date(targetYear, normalizedMonth, day));
+}
+
+export function findHedefEventById(
+  events: readonly SerbestZamanEvent[],
+  hedefEventId: number
+): SerbestZamanHedefEvent | null {
+  for (const event of events) {
+    if (
+      (event.event_tipi === "SERBEST_ZAMAN_OLUSUM" ||
+        event.event_tipi === "SERBEST_ZAMAN_KULLANIM") &&
+      event.id === hedefEventId
+    ) {
+      return event;
+    }
+  }
+
+  return null;
+}
+
+function buildIptalHedefIds(events: readonly SerbestZamanEvent[], personel_id: number): Set<number> {
+  const ids = new Set<number>();
+
+  for (const event of events) {
+    if (event.event_tipi === "SERBEST_ZAMAN_IPTAL" && event.personel_id === personel_id) {
+      ids.add(event.hedef_event_id);
+    }
+  }
+
+  return ids;
+}
+
+function buildDuzeltmeOverrides(
+  events: readonly SerbestZamanEvent[],
+  personel_id: number,
+  iptalHedefIds: ReadonlySet<number>
+): Map<number, number> {
+  const overrides = new Map<number, number>();
+
+  const duzeltmeler = events
+    .filter(
+      (event): event is SerbestZamanDuzeltmeEvent =>
+        event.event_tipi === "SERBEST_ZAMAN_DUZELTME" && event.personel_id === personel_id
+    )
+    .sort((a, b) => (a.id ?? 0) - (b.id ?? 0));
+
+  for (const event of duzeltmeler) {
+    if (!iptalHedefIds.has(event.hedef_event_id)) {
+      overrides.set(event.hedef_event_id, event.yeni_dakika);
+    }
+  }
+
+  return overrides;
+}
+
+function etkinDakika(
+  hamDakika: number,
+  eventId: number | undefined,
+  iptalHedefIds: ReadonlySet<number>,
+  overrides: ReadonlyMap<number, number>
+): number | null {
+  if (eventId !== undefined && iptalHedefIds.has(eventId)) {
+    return null;
+  }
+
+  if (eventId !== undefined && overrides.has(eventId)) {
+    return overrides.get(eventId)!;
+  }
+
+  return hamDakika;
+}
+
+function validateHedefForMutation(params: {
+  mevcutEvents: readonly SerbestZamanEvent[];
+  personel_id: number;
+  hedef_event_id: number;
+  hedef_event_tipi: string;
+  forIptal: boolean;
+}): { ok: true; hedef: SerbestZamanHedefEvent } | { ok: false; code: HedefEventHataKodu } {
+  const { mevcutEvents, personel_id, hedef_event_id, hedef_event_tipi, forIptal } = params;
+
+  if (!isHedefEventTipi(hedef_event_tipi)) {
+    return { ok: false, code: "UNSUPPORTED_TARGET_EVENT" };
+  }
+
+  const hedef = findHedefEventById(mevcutEvents, hedef_event_id);
+  if (!hedef) {
+    return { ok: false, code: "TARGET_NOT_FOUND" };
+  }
+
+  if (hedef.event_tipi !== hedef_event_tipi) {
+    return { ok: false, code: "UNSUPPORTED_TARGET_EVENT" };
+  }
+
+  if (hedef.personel_id !== personel_id) {
+    return { ok: false, code: "TARGET_PERSONEL_MISMATCH" };
+  }
+
+  const iptalHedefIds = buildIptalHedefIds(mevcutEvents, personel_id);
+
+  if (iptalHedefIds.has(hedef_event_id)) {
+    return {
+      ok: false,
+      code: forIptal ? "ALREADY_CANCELLED" : "TARGET_ALREADY_CANCELLED"
+    };
+  }
+
+  if (forIptal) {
+    for (const event of mevcutEvents) {
+      if (
+        event.event_tipi === "SERBEST_ZAMAN_IPTAL" &&
+        event.personel_id === personel_id &&
+        event.hedef_event_id === hedef_event_id
+      ) {
+        return { ok: false, code: "ALREADY_CANCELLED" };
+      }
+    }
+  }
+
+  return { ok: true, hedef };
 }
 
 export function findOlusumByOdemeTercihiId(
@@ -211,6 +355,139 @@ export function olusturKullanimEvent(params: {
   };
 }
 
+export function olusturIptalEvent(params: {
+  personel_id: number;
+  hedef_event_id: number;
+  hedef_event_tipi: SerbestZamanHedefEventTipi;
+  event_tarihi: string;
+  mevcutEvents: readonly SerbestZamanEvent[];
+  aciklama?: string;
+}): OlusturIptalEventSonuc {
+  const { personel_id, hedef_event_id, hedef_event_tipi, event_tarihi, mevcutEvents, aciklama } =
+    params;
+
+  if (!Number.isFinite(personel_id) || personel_id < 1) {
+    return { ok: false, code: "TARGET_PERSONEL_MISMATCH" };
+  }
+
+  if (!Number.isFinite(hedef_event_id) || hedef_event_id < 1) {
+    return { ok: false, code: "TARGET_NOT_FOUND" };
+  }
+
+  if (!isValidEventTarihi(event_tarihi)) {
+    return { ok: false, code: "UNSUPPORTED_TARGET_EVENT" };
+  }
+
+  const hedefSonuc = validateHedefForMutation({
+    mevcutEvents,
+    personel_id,
+    hedef_event_id,
+    hedef_event_tipi,
+    forIptal: true
+  });
+
+  if (!hedefSonuc.ok) {
+    return hedefSonuc;
+  }
+
+  return {
+    ok: true,
+    event: {
+      personel_id,
+      event_tipi: "SERBEST_ZAMAN_IPTAL",
+      hedef_event_id,
+      hedef_event_tipi,
+      event_tarihi: event_tarihi.trim().slice(0, 10),
+      aciklama
+    }
+  };
+}
+
+export function olusturDuzeltmeEvent(params: {
+  personel_id: number;
+  hedef_event_id: number;
+  hedef_event_tipi: SerbestZamanHedefEventTipi;
+  yeni_dakika: number;
+  event_tarihi: string;
+  mevcutEvents: readonly SerbestZamanEvent[];
+  referans_tarih?: string;
+  aciklama?: string;
+}): OlusturDuzeltmeEventSonuc {
+  const {
+    personel_id,
+    hedef_event_id,
+    hedef_event_tipi,
+    yeni_dakika,
+    event_tarihi,
+    mevcutEvents,
+    referans_tarih,
+    aciklama
+  } = params;
+
+  if (!Number.isFinite(personel_id) || personel_id < 1) {
+    return { ok: false, code: "TARGET_PERSONEL_MISMATCH" };
+  }
+
+  if (!Number.isFinite(hedef_event_id) || hedef_event_id < 1) {
+    return { ok: false, code: "TARGET_NOT_FOUND" };
+  }
+
+  if (!Number.isFinite(yeni_dakika) || yeni_dakika <= 0) {
+    return { ok: false, code: "ZERO_DAKIKA" };
+  }
+
+  if (!isValidEventTarihi(event_tarihi)) {
+    return { ok: false, code: "ZERO_DAKIKA" };
+  }
+
+  const hedefSonuc = validateHedefForMutation({
+    mevcutEvents,
+    personel_id,
+    hedef_event_id,
+    hedef_event_tipi,
+    forIptal: false
+  });
+
+  if (!hedefSonuc.ok) {
+    return hedefSonuc;
+  }
+
+  if (hedef_event_tipi === "SERBEST_ZAMAN_KULLANIM") {
+    const simulated: SerbestZamanDuzeltmeEvent = {
+      personel_id,
+      event_tipi: "SERBEST_ZAMAN_DUZELTME",
+      hedef_event_id,
+      hedef_event_tipi,
+      yeni_dakika,
+      event_tarihi: event_tarihi.trim().slice(0, 10)
+    };
+
+    const bakiye = hesaplaSerbestZamanBakiye({
+      personel_id,
+      events: [...mevcutEvents, simulated],
+      referans_tarih
+    });
+
+    const kullanilabilir = bakiye.toplam_hak_dakika - bakiye.suresi_dolan_dakika;
+    if (bakiye.kullanilan_dakika > kullanilabilir) {
+      return { ok: false, code: "INSUFFICIENT_BALANCE" };
+    }
+  }
+
+  return {
+    ok: true,
+    event: {
+      personel_id,
+      event_tipi: "SERBEST_ZAMAN_DUZELTME",
+      hedef_event_id,
+      hedef_event_tipi,
+      yeni_dakika,
+      event_tarihi: event_tarihi.trim().slice(0, 10),
+      aciklama
+    }
+  };
+}
+
 export function hesaplaSerbestZamanBakiye(params: {
   personel_id: number;
   events: readonly SerbestZamanEvent[];
@@ -224,13 +501,21 @@ export function hesaplaSerbestZamanBakiye(params: {
       event.event_tipi === "SERBEST_ZAMAN_OLUSUM" && event.personel_id === personel_id
   );
 
+  const iptalHedefIds = buildIptalHedefIds(events, personel_id);
+  const duzeltmeOverrides = buildDuzeltmeOverrides(events, personel_id, iptalHedefIds);
+
   let toplam_hak_dakika = 0;
   let suresi_dolan_dakika = 0;
 
   for (const event of olusumEvents) {
-    toplam_hak_dakika += event.dakika;
+    const dakika = etkinDakika(event.dakika, event.id, iptalHedefIds, duzeltmeOverrides);
+    if (dakika === null) {
+      continue;
+    }
+
+    toplam_hak_dakika += dakika;
     if (referans > event.son_kullanim_tarihi) {
-      suresi_dolan_dakika += event.dakika;
+      suresi_dolan_dakika += dakika;
     }
   }
 
@@ -238,7 +523,10 @@ export function hesaplaSerbestZamanBakiye(params: {
 
   for (const event of events) {
     if (event.event_tipi === "SERBEST_ZAMAN_KULLANIM" && event.personel_id === personel_id) {
-      kullanilan_dakika += event.dakika;
+      const dakika = etkinDakika(event.dakika, event.id, iptalHedefIds, duzeltmeOverrides);
+      if (dakika !== null) {
+        kullanilan_dakika += dakika;
+      }
     }
   }
 

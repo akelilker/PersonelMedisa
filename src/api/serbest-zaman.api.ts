@@ -1,10 +1,15 @@
 import type { ApiResponse } from "../types/api";
 import type {
+  PostSerbestZamanDuzeltmePayload,
+  PostSerbestZamanIptalPayload,
   PostSerbestZamanKullanimPayload,
   PostSerbestZamanOlusumPayload,
   SerbestZamanBakiye,
+  SerbestZamanDuzeltmeEvent,
   SerbestZamanEvent,
   SerbestZamanEventTipi,
+  SerbestZamanHedefEventTipi,
+  SerbestZamanIptalEvent,
   SerbestZamanKullanimEvent
 } from "../types/serbest-zaman";
 import { SERBEST_ZAMAN_EVENT_TIPI_VALUES } from "../types/serbest-zaman";
@@ -63,6 +68,10 @@ function isSerbestZamanEventTipi(value: unknown): value is SerbestZamanEventTipi
   );
 }
 
+function isHedefEventTipi(value: unknown): value is SerbestZamanHedefEventTipi {
+  return value === "SERBEST_ZAMAN_OLUSUM" || value === "SERBEST_ZAMAN_KULLANIM";
+}
+
 function isValidEventTarihi(value: string): boolean {
   return /^\d{4}-\d{2}-\d{2}$/.test(value.trim());
 }
@@ -99,6 +108,69 @@ function normalizeSerbestZamanOlusumEvent(
     dakika: toNonNegativeNumber(record.dakika),
     event_tarihi,
     son_kullanim_tarihi,
+    aciklama: toOptionalString(record.aciklama)
+  };
+}
+
+function normalizeSerbestZamanIptalEvent(record: Record<string, unknown>): SerbestZamanIptalEvent {
+  const personel_id = toOptionalNumber(record.personel_id);
+  const hedef_event_id = toOptionalNumber(record.hedef_event_id);
+  const event_tarihi = toOptionalString(record.event_tarihi);
+  const hedef_event_tipi = record.hedef_event_tipi;
+
+  if (
+    personel_id === undefined ||
+    hedef_event_id === undefined ||
+    !event_tarihi ||
+    !isHedefEventTipi(hedef_event_tipi)
+  ) {
+    throw new ApiRequestError("Serbest zaman event yaniti eksik alan iceriyor.", 400, {
+      code: "INVALID_RESPONSE"
+    });
+  }
+
+  const id = toOptionalNumber(record.id);
+
+  return {
+    id,
+    personel_id,
+    event_tipi: "SERBEST_ZAMAN_IPTAL",
+    hedef_event_id,
+    hedef_event_tipi,
+    event_tarihi,
+    aciklama: toOptionalString(record.aciklama)
+  };
+}
+
+function normalizeSerbestZamanDuzeltmeEvent(
+  record: Record<string, unknown>
+): SerbestZamanDuzeltmeEvent {
+  const personel_id = toOptionalNumber(record.personel_id);
+  const hedef_event_id = toOptionalNumber(record.hedef_event_id);
+  const event_tarihi = toOptionalString(record.event_tarihi);
+  const hedef_event_tipi = record.hedef_event_tipi;
+
+  if (
+    personel_id === undefined ||
+    hedef_event_id === undefined ||
+    !event_tarihi ||
+    !isHedefEventTipi(hedef_event_tipi)
+  ) {
+    throw new ApiRequestError("Serbest zaman event yaniti eksik alan iceriyor.", 400, {
+      code: "INVALID_RESPONSE"
+    });
+  }
+
+  const id = toOptionalNumber(record.id);
+
+  return {
+    id,
+    personel_id,
+    event_tipi: "SERBEST_ZAMAN_DUZELTME",
+    hedef_event_id,
+    hedef_event_tipi,
+    yeni_dakika: toNonNegativeNumber(record.yeni_dakika),
+    event_tarihi,
     aciklama: toOptionalString(record.aciklama)
   };
 }
@@ -151,6 +223,14 @@ export function normalizeSerbestZamanEvent(data: unknown): SerbestZamanEvent {
     return normalizeSerbestZamanKullanimEvent(record);
   }
 
+  if (event_tipi === "SERBEST_ZAMAN_IPTAL") {
+    return normalizeSerbestZamanIptalEvent(record);
+  }
+
+  if (event_tipi === "SERBEST_ZAMAN_DUZELTME") {
+    return normalizeSerbestZamanDuzeltmeEvent(record);
+  }
+
   throw new ApiRequestError("Serbest zaman event yaniti desteklenmeyen event tipi iceriyor.", 400, {
     code: "INVALID_RESPONSE"
   });
@@ -195,11 +275,13 @@ function throwFirstApiError(
   const first = errors?.[0];
   const code = typeof first?.code === "string" ? first.code : "INVALID_REQUEST";
   const status =
-    code === "NOT_FOUND"
+    code === "NOT_FOUND" || code === "TARGET_NOT_FOUND"
       ? 404
       : code === "ALREADY_EXISTS" ||
           code === "INSUFFICIENT_BALANCE" ||
-          code === "NO_ELIGIBLE_BALANCE"
+          code === "NO_ELIGIBLE_BALANCE" ||
+          code === "ALREADY_CANCELLED" ||
+          code === "TARGET_ALREADY_CANCELLED"
         ? 409
         : fallbackStatus;
 
@@ -317,6 +399,96 @@ export async function postSerbestZamanKullanim(
 
   const event = normalizeSerbestZamanEvent(response.data);
   if (event.event_tipi !== "SERBEST_ZAMAN_KULLANIM") {
+    throw new ApiRequestError("Serbest zaman event yaniti beklenen formatta degil.", 400, {
+      code: "INVALID_RESPONSE"
+    });
+  }
+
+  return event;
+}
+
+export async function postSerbestZamanIptal(
+  payload: PostSerbestZamanIptalPayload
+): Promise<SerbestZamanIptalEvent> {
+  const personel_id = parsePositiveIntParam(payload.personel_id, "personel_id");
+  const hedef_event_id = parsePositiveIntParam(payload.hedef_event_id, "hedef_event_id");
+
+  if (!isHedefEventTipi(payload.hedef_event_tipi)) {
+    throw new ApiRequestError("hedef_event_tipi gecersiz.", 400, { code: "INVALID_BODY" });
+  }
+
+  const event_tarihi = toOptionalString(payload.event_tarihi);
+  if (!event_tarihi || !isValidEventTarihi(event_tarihi)) {
+    throw new ApiRequestError("event_tarihi YYYY-MM-DD formatinda olmalidir.", 400, {
+      code: "INVALID_BODY"
+    });
+  }
+
+  const response = await apiRequest<ApiResponse<unknown>>(endpoints.serbestZaman.iptal, {
+    method: "POST",
+    body: JSON.stringify({
+      personel_id,
+      hedef_event_id,
+      hedef_event_tipi: payload.hedef_event_tipi,
+      event_tarihi: event_tarihi.trim().slice(0, 10),
+      aciklama: toOptionalString(payload.aciklama)
+    })
+  });
+
+  if (Array.isArray(response.errors) && response.errors.length > 0) {
+    throwFirstApiError(response.errors, "Serbest zaman iptal eventi olusturulamadi.");
+  }
+
+  const event = normalizeSerbestZamanEvent(response.data);
+  if (event.event_tipi !== "SERBEST_ZAMAN_IPTAL") {
+    throw new ApiRequestError("Serbest zaman event yaniti beklenen formatta degil.", 400, {
+      code: "INVALID_RESPONSE"
+    });
+  }
+
+  return event;
+}
+
+export async function postSerbestZamanDuzeltme(
+  payload: PostSerbestZamanDuzeltmePayload
+): Promise<SerbestZamanDuzeltmeEvent> {
+  const personel_id = parsePositiveIntParam(payload.personel_id, "personel_id");
+  const hedef_event_id = parsePositiveIntParam(payload.hedef_event_id, "hedef_event_id");
+  const yeni_dakika = toOptionalNumber(payload.yeni_dakika);
+
+  if (!isHedefEventTipi(payload.hedef_event_tipi)) {
+    throw new ApiRequestError("hedef_event_tipi gecersiz.", 400, { code: "INVALID_BODY" });
+  }
+
+  if (yeni_dakika === undefined || yeni_dakika <= 0) {
+    throw new ApiRequestError("yeni_dakika pozitif olmalidir.", 400, { code: "INVALID_BODY" });
+  }
+
+  const event_tarihi = toOptionalString(payload.event_tarihi);
+  if (!event_tarihi || !isValidEventTarihi(event_tarihi)) {
+    throw new ApiRequestError("event_tarihi YYYY-MM-DD formatinda olmalidir.", 400, {
+      code: "INVALID_BODY"
+    });
+  }
+
+  const response = await apiRequest<ApiResponse<unknown>>(endpoints.serbestZaman.duzeltme, {
+    method: "POST",
+    body: JSON.stringify({
+      personel_id,
+      hedef_event_id,
+      hedef_event_tipi: payload.hedef_event_tipi,
+      yeni_dakika,
+      event_tarihi: event_tarihi.trim().slice(0, 10),
+      aciklama: toOptionalString(payload.aciklama)
+    })
+  });
+
+  if (Array.isArray(response.errors) && response.errors.length > 0) {
+    throwFirstApiError(response.errors, "Serbest zaman duzeltme eventi olusturulamadi.");
+  }
+
+  const event = normalizeSerbestZamanEvent(response.data);
+  if (event.event_tipi !== "SERBEST_ZAMAN_DUZELTME") {
     throw new ApiRequestError("Serbest zaman event yaniti beklenen formatta degil.", 400, {
       code: "INVALID_RESPONSE"
     });

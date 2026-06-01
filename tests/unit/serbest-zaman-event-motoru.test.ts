@@ -4,6 +4,8 @@ import type { SerbestZamanEvent } from "../../src/types/serbest-zaman";
 import {
   hesaplaSerbestZamanBakiye,
   hesaplaSonKullanimTarihi,
+  olusturDuzeltmeEvent,
+  olusturIptalEvent,
   olusturKullanimEvent,
   olusturOlusumEvent
 } from "../../src/services/serbest-zaman-event-motoru";
@@ -320,5 +322,230 @@ describe("serbest-zaman-event-motoru", () => {
 
     expect(bakiye.kalan_dakika).toBe(0);
     expect(bakiye.kalan_dakika).toBeGreaterThanOrEqual(0);
+  });
+
+  it("OLUSUM iptali toplam_hak_dakika azaltir", () => {
+    const events: SerbestZamanEvent[] = [
+      olusumEvent({ id: 1, dakika: 90, son_kullanim_tarihi: "2026-12-31" })
+    ];
+
+    const iptalSonuc = olusturIptalEvent({
+      personel_id: 1,
+      hedef_event_id: 1,
+      hedef_event_tipi: "SERBEST_ZAMAN_OLUSUM",
+      event_tarihi: "2026-06-20",
+      mevcutEvents: events
+    });
+
+    expect(iptalSonuc.ok).toBe(true);
+    if (!iptalSonuc.ok) {
+      return;
+    }
+
+    events.push({ ...iptalSonuc.event, id: 2 });
+
+    const bakiye = hesaplaSerbestZamanBakiye({
+      personel_id: 1,
+      events,
+      referans_tarih: "2026-06-01"
+    });
+
+    expect(bakiye.toplam_hak_dakika).toBe(0);
+    expect(bakiye.kalan_dakika).toBe(0);
+  });
+
+  it("KULLANIM iptali kullanilan_dakika azaltir ve bakiye iade eder", () => {
+    const events: SerbestZamanEvent[] = [
+      olusumEvent({ id: 1, dakika: 90, son_kullanim_tarihi: "2026-12-31" }),
+      kullanimEvent({ id: 2, dakika: 30 })
+    ];
+
+    const iptalSonuc = olusturIptalEvent({
+      personel_id: 1,
+      hedef_event_id: 2,
+      hedef_event_tipi: "SERBEST_ZAMAN_KULLANIM",
+      event_tarihi: "2026-06-20",
+      mevcutEvents: events
+    });
+
+    expect(iptalSonuc.ok).toBe(true);
+    if (!iptalSonuc.ok) {
+      return;
+    }
+
+    events.push({ ...iptalSonuc.event, id: 3 });
+
+    const bakiye = hesaplaSerbestZamanBakiye({
+      personel_id: 1,
+      events,
+      referans_tarih: "2026-06-01"
+    });
+
+    expect(bakiye.kullanilan_dakika).toBe(0);
+    expect(bakiye.kalan_dakika).toBe(90);
+  });
+
+  it("OLUSUM duzeltmesi toplam_hak_dakika degistirir", () => {
+    const events: SerbestZamanEvent[] = [
+      olusumEvent({ id: 1, dakika: 90, son_kullanim_tarihi: "2026-12-31" })
+    ];
+
+    const duzeltmeSonuc = olusturDuzeltmeEvent({
+      personel_id: 1,
+      hedef_event_id: 1,
+      hedef_event_tipi: "SERBEST_ZAMAN_OLUSUM",
+      yeni_dakika: 60,
+      event_tarihi: "2026-06-20",
+      mevcutEvents: events
+    });
+
+    expect(duzeltmeSonuc.ok).toBe(true);
+    if (!duzeltmeSonuc.ok) {
+      return;
+    }
+
+    events.push({ ...duzeltmeSonuc.event, id: 2 });
+
+    const bakiye = hesaplaSerbestZamanBakiye({
+      personel_id: 1,
+      events,
+      referans_tarih: "2026-06-01"
+    });
+
+    expect(bakiye.toplam_hak_dakika).toBe(60);
+    expect(bakiye.kalan_dakika).toBe(60);
+  });
+
+  it("KULLANIM duzeltmesi kullanilan_dakika degistirir", () => {
+    const events: SerbestZamanEvent[] = [
+      olusumEvent({ id: 1, dakika: 90, son_kullanim_tarihi: "2026-12-31" }),
+      kullanimEvent({ id: 2, dakika: 30 })
+    ];
+
+    const duzeltmeSonuc = olusturDuzeltmeEvent({
+      personel_id: 1,
+      hedef_event_id: 2,
+      hedef_event_tipi: "SERBEST_ZAMAN_KULLANIM",
+      yeni_dakika: 20,
+      event_tarihi: "2026-06-20",
+      mevcutEvents: events,
+      referans_tarih: "2026-06-01"
+    });
+
+    expect(duzeltmeSonuc.ok).toBe(true);
+    if (!duzeltmeSonuc.ok) {
+      return;
+    }
+
+    events.push({ ...duzeltmeSonuc.event, id: 3 });
+
+    const bakiye = hesaplaSerbestZamanBakiye({
+      personel_id: 1,
+      events,
+      referans_tarih: "2026-06-01"
+    });
+
+    expect(bakiye.kullanilan_dakika).toBe(20);
+    expect(bakiye.kalan_dakika).toBe(70);
+  });
+
+  it("iptal edilmis hedefe duzeltme TARGET_ALREADY_CANCELLED doner", () => {
+    const events: SerbestZamanEvent[] = [
+      olusumEvent({ id: 1, dakika: 90, son_kullanim_tarihi: "2026-12-31" }),
+      {
+        id: 2,
+        personel_id: 1,
+        event_tipi: "SERBEST_ZAMAN_IPTAL",
+        hedef_event_id: 1,
+        hedef_event_tipi: "SERBEST_ZAMAN_OLUSUM",
+        event_tarihi: "2026-06-20"
+      }
+    ];
+
+    const sonuc = olusturDuzeltmeEvent({
+      personel_id: 1,
+      hedef_event_id: 1,
+      hedef_event_tipi: "SERBEST_ZAMAN_OLUSUM",
+      yeni_dakika: 60,
+      event_tarihi: "2026-06-21",
+      mevcutEvents: events
+    });
+
+    expect(sonuc).toEqual({ ok: false, code: "TARGET_ALREADY_CANCELLED" });
+  });
+
+  it("aynı hedef ikinci kez iptal edilemez", () => {
+    const events: SerbestZamanEvent[] = [
+      kullanimEvent({ id: 1, dakika: 30 }),
+      {
+        id: 2,
+        personel_id: 1,
+        event_tipi: "SERBEST_ZAMAN_IPTAL",
+        hedef_event_id: 1,
+        hedef_event_tipi: "SERBEST_ZAMAN_KULLANIM",
+        event_tarihi: "2026-06-20"
+      }
+    ];
+
+    const sonuc = olusturIptalEvent({
+      personel_id: 1,
+      hedef_event_id: 1,
+      hedef_event_tipi: "SERBEST_ZAMAN_KULLANIM",
+      event_tarihi: "2026-06-21",
+      mevcutEvents: events
+    });
+
+    expect(sonuc).toEqual({ ok: false, code: "ALREADY_CANCELLED" });
+  });
+
+  it("kullanim duzeltmesi bakiyeyi asarsa INSUFFICIENT_BALANCE doner", () => {
+    const events: SerbestZamanEvent[] = [
+      olusumEvent({ id: 1, dakika: 90, son_kullanim_tarihi: "2026-12-31" }),
+      kullanimEvent({ id: 2, dakika: 30 })
+    ];
+
+    const sonuc = olusturDuzeltmeEvent({
+      personel_id: 1,
+      hedef_event_id: 2,
+      hedef_event_tipi: "SERBEST_ZAMAN_KULLANIM",
+      yeni_dakika: 100,
+      event_tarihi: "2026-06-20",
+      mevcutEvents: events,
+      referans_tarih: "2026-06-01"
+    });
+
+    expect(sonuc).toEqual({ ok: false, code: "INSUFFICIENT_BALANCE" });
+  });
+
+  it("son duzeltme gecerli kalir", () => {
+    const events: SerbestZamanEvent[] = [
+      olusumEvent({ id: 1, dakika: 90, son_kullanim_tarihi: "2026-12-31" }),
+      {
+        id: 2,
+        personel_id: 1,
+        event_tipi: "SERBEST_ZAMAN_DUZELTME",
+        hedef_event_id: 1,
+        hedef_event_tipi: "SERBEST_ZAMAN_OLUSUM",
+        yeni_dakika: 70,
+        event_tarihi: "2026-06-20"
+      },
+      {
+        id: 3,
+        personel_id: 1,
+        event_tipi: "SERBEST_ZAMAN_DUZELTME",
+        hedef_event_id: 1,
+        hedef_event_tipi: "SERBEST_ZAMAN_OLUSUM",
+        yeni_dakika: 50,
+        event_tarihi: "2026-06-21"
+      }
+    ];
+
+    const bakiye = hesaplaSerbestZamanBakiye({
+      personel_id: 1,
+      events,
+      referans_tarih: "2026-06-01"
+    });
+
+    expect(bakiye.toplam_hak_dakika).toBe(50);
   });
 });

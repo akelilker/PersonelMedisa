@@ -37,7 +37,9 @@ export const endpoints = {
     events: "/serbest-zaman/events",
     bakiye: "/serbest-zaman/bakiye",
     olusum: "/serbest-zaman/olusum",
-    kullanim: "/serbest-zaman/kullanim"
+    kullanim: "/serbest-zaman/kullanim",
+    iptal: "/serbest-zaman/iptal",
+    duzeltme: "/serbest-zaman/duzeltme"
   },
   raporlar: {
     personelOzet: "/raporlar/personel-ozet",

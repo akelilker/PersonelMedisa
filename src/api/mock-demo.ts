@@ -6,9 +6,20 @@ import type {
 } from "../types/fazla-calisma-odeme-tercihi";
 import { DEFAULT_ODEME_TIPI } from "../types/fazla-calisma-odeme-tercihi";
 import type { SerbestZamanEvent } from "../types/serbest-zaman";
+import type { UserRole } from "../types/auth";
+import { hasRolePermission, type AppPermission } from "../lib/authorization/role-permissions";
+import { assertRevizyonTransition } from "../lib/revizyon-talebi/revizyon-state";
+import {
+  canApproveOrRejectRevizyon,
+  canCancelRevizyon,
+  canCreateRevizyonForPersonel,
+  canSubmitRevizyon,
+  canViewRevizyonTalep,
+  maskRevizyonFinanceFields,
+  type RevizyonActorContext
+} from "../lib/revizyon-talebi/revizyon-scope";
 import type { RevizyonTalebi, RevizyonTipi } from "../types/revizyon-talebi";
 import { REVIZYON_TIPLERI } from "../types/revizyon-talebi";
-import { assertRevizyonTransition } from "../lib/revizyon-talebi/revizyon-state";
 import { hesaplaAylikSgkPuantajOzetleri } from "../services/dashboard-rapor-servisi";
 import { buildHaftalikKapanisSnapshot } from "../services/haftalik-kapanis-snapshot";
 import {
@@ -731,6 +742,83 @@ function demoRevizyonError(code: string, message: string): ApiResponse<unknown> 
   };
 }
 
+const DEMO_USER_ROLES: readonly UserRole[] = [
+  "GENEL_YONETICI",
+  "BOLUM_YONETICISI",
+  "MUHASEBE",
+  "BIRIM_AMIRI"
+];
+
+function isDemoUserRole(value: string): value is UserRole {
+  return (DEMO_USER_ROLES as readonly string[]).includes(value);
+}
+
+function readDemoRequestHeader(init: RequestInit | undefined, name: string): string | undefined {
+  const headers = new Headers(init?.headers ?? {});
+  const direct = headers.get(name);
+  if (direct) {
+    return direct.trim() || undefined;
+  }
+
+  return headers.get(name.toLowerCase())?.trim() || undefined;
+}
+
+function resolveDemoDepartmanIdsForSubeler(subeIds: readonly number[]): number[] {
+  const departmanIds = new Set<number>();
+  for (const subeId of subeIds) {
+    const sube = demoState.subeler.find((item) => item.id === subeId);
+    for (const departmanId of sube?.departman_ids ?? []) {
+      departmanIds.add(departmanId);
+    }
+  }
+
+  return [...departmanIds];
+}
+
+function readDemoRevizyonActor(init?: RequestInit): RevizyonActorContext {
+  const roleHeader = readDemoRequestHeader(init, "X-Demo-Role");
+  const userIdRaw = readDemoRequestHeader(init, "X-Demo-User-Id");
+  const parsedUserId = userIdRaw ? Number.parseInt(userIdRaw, 10) : Number.NaN;
+  const userId = Number.isFinite(parsedUserId) && parsedUserId > 0 ? parsedUserId : 1;
+  const user = demoState.yonetimKullanicilari.find((item) => item.id === userId);
+  const roleFromUser = user?.rol ?? "GENEL_YONETICI";
+  const role = roleHeader && isDemoUserRole(roleHeader) ? roleHeader : roleFromUser;
+  const subeIds =
+    user?.sube_ids ??
+    (role === "BIRIM_AMIRI" ? [1] : role === "MUHASEBE" ? [1, 2] : role === "BOLUM_YONETICISI" ? [2] : []);
+  const linkedPersonelId = user?.personel_id ?? (role === "BIRIM_AMIRI" ? 1 : null);
+
+  return {
+    userId: user?.id ?? userId,
+    role,
+    subeIds,
+    departmanIds: resolveDemoDepartmanIdsForSubeler(subeIds),
+    linkedPersonelId
+  };
+}
+
+function enforceDemoRevizyonPermission(
+  actor: RevizyonActorContext,
+  permission: AppPermission,
+  errorCode: string,
+  message: string
+): ApiResponse<unknown> | null {
+  if (!hasRolePermission(actor.role, permission)) {
+    return demoRevizyonError(errorCode, message);
+  }
+
+  return null;
+}
+
+function findDemoPersonelDepartmanId(personelId: number): number | null {
+  const personel = demoState.personeller.find((item) => item.id === personelId);
+  return personel?.departman_id ?? null;
+}
+
+function presentDemoRevizyonTalep(actor: RevizyonActorContext, talep: RevizyonTalebi): RevizyonTalebi {
+  return maskRevizyonFinanceFields(actor, talep);
+}
+
 function isDemoRevizyonTipi(value: unknown): value is RevizyonTipi {
   return typeof value === "string" && (REVIZYON_TIPLERI as readonly string[]).includes(value);
 }
@@ -764,6 +852,7 @@ function findDemoRevizyonTalebi(id: number): RevizyonTalebi | null {
 }
 
 function applyDemoRevizyonTransition(
+  actor: RevizyonActorContext,
   talep: RevizyonTalebi,
   nextDurum: RevizyonTalebi["durum"],
   karar?: { karar_veren_kullanici_id?: number; karar_notu?: string | null }
@@ -776,7 +865,7 @@ function applyDemoRevizyonTransition(
   talep.durum = nextDurum;
 
   if (karar !== undefined) {
-    talep.karar_veren_kullanici_id = karar.karar_veren_kullanici_id ?? 1;
+    talep.karar_veren_kullanici_id = karar.karar_veren_kullanici_id ?? actor.userId;
     talep.karar_zamani = new Date().toISOString();
     talep.karar_notu = karar.karar_notu ?? null;
   }
@@ -786,35 +875,93 @@ function applyDemoRevizyonTransition(
   }
 
   demoState.revizyonTalebiById[talep.id] = talep;
-  return ok(talep);
+  return ok(presentDemoRevizyonTalep(actor, talep));
 }
 
-function buildDemoRevizyonTalebiListResponse(searchUrl: URL): ApiResponse<unknown> {
+function buildDemoRevizyonTalebiListResponse(
+  searchUrl: URL,
+  actor: RevizyonActorContext
+): ApiResponse<unknown> {
+  const permissionError = enforceDemoRevizyonPermission(
+    actor,
+    "revizyon.view",
+    "UNAUTHORIZED_REVISION_REQUEST",
+    "Revizyon taleplerini goruntuleme yetkisi yok."
+  );
+  if (permissionError) {
+    return permissionError;
+  }
+
   const personelId = toNumber(searchUrl.searchParams.get("personel_id"));
   const durum = toStringValue(searchUrl.searchParams.get("durum"));
   const haftaBaslangic = toStringValue(searchUrl.searchParams.get("hafta_baslangic"));
   const haftaBitis = toStringValue(searchUrl.searchParams.get("hafta_bitis"));
 
-  const items = Object.values(demoState.revizyonTalebiById).filter((talep) => {
-    if (personelId !== null && talep.personel_id !== personelId) {
-      return false;
-    }
-    if (durum && talep.durum !== durum) {
-      return false;
-    }
-    if (haftaBaslangic && talep.hafta_baslangic !== haftaBaslangic) {
-      return false;
-    }
-    if (haftaBitis && talep.hafta_bitis !== haftaBitis) {
-      return false;
-    }
-    return true;
-  });
+  const items = Object.values(demoState.revizyonTalebiById)
+    .filter((talep) => {
+      if (personelId !== null && talep.personel_id !== personelId) {
+        return false;
+      }
+      if (durum && talep.durum !== durum) {
+        return false;
+      }
+      if (haftaBaslangic && talep.hafta_baslangic !== haftaBaslangic) {
+        return false;
+      }
+      if (haftaBitis && talep.hafta_bitis !== haftaBitis) {
+        return false;
+      }
+      return true;
+    })
+    .filter((talep) =>
+      canViewRevizyonTalep(actor, talep, findDemoPersonelDepartmanId(talep.personel_id))
+    )
+    .map((talep) => presentDemoRevizyonTalep(actor, talep));
 
   return ok({ items });
 }
 
-function createDemoRevizyonTalebi(body: Record<string, unknown>): ApiResponse<unknown> {
+function buildDemoRevizyonTalebiDetailResponse(
+  talepId: number,
+  actor: RevizyonActorContext
+): ApiResponse<unknown> {
+  const permissionError = enforceDemoRevizyonPermission(
+    actor,
+    "revizyon.view",
+    "UNAUTHORIZED_REVISION_REQUEST",
+    "Revizyon talebi goruntuleme yetkisi yok."
+  );
+  if (permissionError) {
+    return permissionError;
+  }
+
+  const talep = findDemoRevizyonTalebi(talepId);
+  if (!talep) {
+    return demoRevizyonError("NOT_FOUND", "Revizyon talebi bulunamadi.");
+  }
+
+  const personelDepartmanId = findDemoPersonelDepartmanId(talep.personel_id);
+  if (!canViewRevizyonTalep(actor, talep, personelDepartmanId)) {
+    return demoRevizyonError("REVISION_SCOPE_DENIED", "Revizyon talebi kapsam disi.");
+  }
+
+  return ok(presentDemoRevizyonTalep(actor, talep));
+}
+
+function createDemoRevizyonTalebi(
+  body: Record<string, unknown>,
+  actor: RevizyonActorContext
+): ApiResponse<unknown> {
+  const permissionError = enforceDemoRevizyonPermission(
+    actor,
+    "revizyon.create",
+    "UNAUTHORIZED_REVISION_REQUEST",
+    "Revizyon talebi olusturma yetkisi yok."
+  );
+  if (permissionError) {
+    return permissionError;
+  }
+
   const personel_id = toNumber(body.personel_id);
   const kaynak_id = toNumber(body.kaynak_id);
   const hafta_baslangic = toStringValue(body.hafta_baslangic);
@@ -837,6 +984,15 @@ function createDemoRevizyonTalebi(body: Record<string, unknown>): ApiResponse<un
     !gerekce
   ) {
     return demoRevizyonError("INVALID_BODY", "Revizyon talebi payload gecersiz.");
+  }
+
+  const personelDepartmanId = findDemoPersonelDepartmanId(personel_id);
+  const scopeDecision = canCreateRevizyonForPersonel(actor, personel_id, personelDepartmanId, {
+    bordro_etki_var_mi: body.bordro_etki_var_mi === true,
+    bordro_etki_notu: toStringValue(body.bordro_etki_notu) ?? null
+  });
+  if (!scopeDecision.ok) {
+    return demoRevizyonError(scopeDecision.code, "Revizyon talebi kapsam disi.");
   }
 
   if (!findDemoClosedKapanis(hafta_baslangic, hafta_bitis)) {
@@ -883,7 +1039,7 @@ function createDemoRevizyonTalebi(body: Record<string, unknown>): ApiResponse<un
           ? null
           : null,
     gerekce,
-    talep_eden_kullanici_id: 1,
+    talep_eden_kullanici_id: actor.userId,
     talep_zamani: new Date().toISOString(),
     durum: "TASLAK",
     karar_veren_kullanici_id: null,
@@ -895,7 +1051,89 @@ function createDemoRevizyonTalebi(body: Record<string, unknown>): ApiResponse<un
   };
 
   demoState.revizyonTalebiById[id] = talep;
-  return ok(talep);
+  return ok(presentDemoRevizyonTalep(actor, talep));
+}
+
+function handleDemoRevizyonAction(
+  talepId: number,
+  action: "gonder" | "onay" | "red" | "iptal",
+  body: Record<string, unknown>,
+  actor: RevizyonActorContext
+): ApiResponse<unknown> {
+  const talep = findDemoRevizyonTalebi(talepId);
+  if (!talep) {
+    return demoRevizyonError("NOT_FOUND", "Revizyon talebi bulunamadi.");
+  }
+
+  const personelDepartmanId = findDemoPersonelDepartmanId(talep.personel_id);
+  const kararNotu = toStringValue(body.karar_notu) ?? null;
+
+  if (action === "gonder") {
+    const permissionError = enforceDemoRevizyonPermission(
+      actor,
+      "revizyon.submit",
+      "UNAUTHORIZED_REVISION_REQUEST",
+      "Revizyon talebi gonderme yetkisi yok."
+    );
+    if (permissionError) {
+      return permissionError;
+    }
+
+    if (!canSubmitRevizyon(actor, talep, personelDepartmanId)) {
+      return demoRevizyonError("REVISION_SCOPE_DENIED", "Revizyon talebi gonderilemez.");
+    }
+
+    return applyDemoRevizyonTransition(actor, talep, "ONAY_BEKLIYOR");
+  }
+
+  if (action === "onay" || action === "red") {
+    const permission = action === "onay" ? "revizyon.approve" : "revizyon.reject";
+    const permissionError = enforceDemoRevizyonPermission(
+      actor,
+      permission,
+      "UNAUTHORIZED_REVISION_APPROVAL",
+      "Revizyon talebi onay/red yetkisi yok."
+    );
+    if (permissionError) {
+      return permissionError;
+    }
+
+    if (!canApproveOrRejectRevizyon(actor)) {
+      return demoRevizyonError(
+        "UNAUTHORIZED_REVISION_APPROVAL",
+        "Revizyon talebi onay/red yetkisi yok."
+      );
+    }
+
+    return applyDemoRevizyonTransition(
+      actor,
+      talep,
+      action === "onay" ? "ONAYLANDI" : "REDDEDILDI",
+      {
+        karar_veren_kullanici_id: actor.userId,
+        karar_notu: kararNotu
+      }
+    );
+  }
+
+  const permissionError = enforceDemoRevizyonPermission(
+    actor,
+    "revizyon.cancel",
+    "UNAUTHORIZED_REVISION_REQUEST",
+    "Revizyon talebi iptal yetkisi yok."
+  );
+  if (permissionError) {
+    return permissionError;
+  }
+
+  if (!canCancelRevizyon(actor, talep, personelDepartmanId)) {
+    return demoRevizyonError("REVISION_SCOPE_DENIED", "Revizyon talebi iptal edilemez.");
+  }
+
+  return applyDemoRevizyonTransition(actor, talep, "IPTAL", {
+    karar_veren_kullanici_id: actor.userId,
+    karar_notu: kararNotu
+  });
 }
 
 function isDemoOdemeTipi(value: unknown): value is OdemeTipi {
@@ -1937,11 +2175,11 @@ export function resolveDemoApiResponse(
   }
 
   if (pathname === "/haftalik-kapanis/revizyon-talepleri" && method === "GET") {
-    return buildDemoRevizyonTalebiListResponse(requestUrl);
+    return buildDemoRevizyonTalebiListResponse(requestUrl, readDemoRevizyonActor(init));
   }
 
   if (pathname === "/haftalik-kapanis/revizyon-talepleri" && method === "POST") {
-    return createDemoRevizyonTalebi(body);
+    return createDemoRevizyonTalebi(body, readDemoRevizyonActor(init));
   }
 
   const revizyonTalebiActionMatch = pathname.match(
@@ -1949,47 +2187,14 @@ export function resolveDemoApiResponse(
   );
   if (revizyonTalebiActionMatch && method === "POST") {
     const talepId = Number.parseInt(revizyonTalebiActionMatch[1], 10);
-    const action = revizyonTalebiActionMatch[2];
-    const talep = findDemoRevizyonTalebi(talepId);
-    if (!talep) {
-      return demoRevizyonError("NOT_FOUND", "Revizyon talebi bulunamadi.");
-    }
-
-    const kararNotu = toStringValue(body.karar_notu) ?? null;
-
-    if (action === "gonder") {
-      return applyDemoRevizyonTransition(talep, "ONAY_BEKLIYOR");
-    }
-
-    if (action === "onay") {
-      return applyDemoRevizyonTransition(talep, "ONAYLANDI", {
-        karar_veren_kullanici_id: 1,
-        karar_notu: kararNotu
-      });
-    }
-
-    if (action === "red") {
-      return applyDemoRevizyonTransition(talep, "REDDEDILDI", {
-        karar_veren_kullanici_id: 1,
-        karar_notu: kararNotu
-      });
-    }
-
-    return applyDemoRevizyonTransition(talep, "IPTAL", {
-      karar_veren_kullanici_id: 1,
-      karar_notu: kararNotu
-    });
+    const action = revizyonTalebiActionMatch[2] as "gonder" | "onay" | "red" | "iptal";
+    return handleDemoRevizyonAction(talepId, action, body, readDemoRevizyonActor(init));
   }
 
   const revizyonTalebiDetailMatch = pathname.match(/^\/haftalik-kapanis\/revizyon-talepleri\/(\d+)$/);
   if (revizyonTalebiDetailMatch && method === "GET") {
     const talepId = Number.parseInt(revizyonTalebiDetailMatch[1], 10);
-    const talep = findDemoRevizyonTalebi(talepId);
-    if (!talep) {
-      return demoRevizyonError("NOT_FOUND", "Revizyon talebi bulunamadi.");
-    }
-
-    return ok(talep);
+    return buildDemoRevizyonTalebiDetailResponse(talepId, readDemoRevizyonActor(init));
   }
 
   if (pathname === "/haftalik-kapanis/yillik-fazla-calisma" && method === "GET") {

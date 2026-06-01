@@ -242,6 +242,17 @@ describe("revizyon-talebi.api", () => {
 });
 
 describe("revizyon-talebi mock integration", () => {
+  function demoHeaders(userId?: number, role?: string): HeadersInit {
+    const headers = new Headers();
+    if (userId !== undefined) {
+      headers.set("X-Demo-User-Id", String(userId));
+    }
+    if (role) {
+      headers.set("X-Demo-Role", role);
+    }
+    return headers;
+  }
+
   function getCreatedTalepId(response: ReturnType<typeof resolveDemoApiResponse>): number {
     const data = response?.data as { id?: number } | null | undefined;
     if (typeof data?.id !== "number") {
@@ -357,5 +368,309 @@ describe("revizyon-talebi mock integration", () => {
     });
 
     expect(invalid?.errors?.[0]?.code).toBe("INVALID_STATE_TRANSITION");
+  });
+
+  it("BOLUM_YONETICISI list yalniz kendi bolumundeki talepleri doner", () => {
+    resolveDemoApiResponse("/haftalik-kapanis", {
+      method: "POST",
+      body: JSON.stringify({
+        hafta_baslangic: "2026-06-01",
+        hafta_bitis: "2026-06-07",
+        departman_id: 3
+      })
+    });
+    resolveDemoApiResponse("/haftalik-kapanis", {
+      method: "POST",
+      body: JSON.stringify({
+        hafta_baslangic: "2026-06-08",
+        hafta_bitis: "2026-06-14",
+        departman_id: 6
+      })
+    });
+
+    resolveDemoApiResponse("/haftalik-kapanis/revizyon-talepleri", {
+      method: "POST",
+      headers: demoHeaders(1),
+      body: JSON.stringify({
+        personel_id: 1,
+        hafta_baslangic: "2026-06-01",
+        hafta_bitis: "2026-06-07",
+        etkilenen_tarih: "2026-06-02",
+        kaynak_tipi: "PUANTAJ",
+        kaynak_id: 9301,
+        revizyon_tipi: "PUANTAJ_GIRIS_CIKIS_DUZELTME",
+        onceki_deger: "08:00",
+        talep_edilen_deger: "08:15",
+        gerekce: "Dept 3"
+      })
+    });
+
+    resolveDemoApiResponse("/haftalik-kapanis/revizyon-talepleri", {
+      method: "POST",
+      headers: demoHeaders(1),
+      body: JSON.stringify({
+        personel_id: 2,
+        hafta_baslangic: "2026-06-08",
+        hafta_bitis: "2026-06-14",
+        etkilenen_tarih: "2026-06-10",
+        kaynak_tipi: "PUANTAJ",
+        kaynak_id: 9302,
+        revizyon_tipi: "PUANTAJ_GIRIS_CIKIS_DUZELTME",
+        onceki_deger: "08:00",
+        talep_edilen_deger: "08:15",
+        gerekce: "Dept 6"
+      })
+    });
+
+    const list = resolveDemoApiResponse("/haftalik-kapanis/revizyon-talepleri", {
+      headers: demoHeaders(2)
+    });
+    const items = (list?.data as { items?: Array<{ personel_id: number }> })?.items ?? [];
+
+    expect(items).toHaveLength(1);
+    expect(items[0]?.personel_id).toBe(2);
+  });
+
+  it("BOLUM_YONETICISI scope disi detail REVISION_SCOPE_DENIED doner", () => {
+    resolveDemoApiResponse("/haftalik-kapanis", {
+      method: "POST",
+      body: JSON.stringify({
+        hafta_baslangic: "2026-06-15",
+        hafta_bitis: "2026-06-21",
+        departman_id: 3
+      })
+    });
+
+    const created = resolveDemoApiResponse("/haftalik-kapanis/revizyon-talepleri", {
+      method: "POST",
+      headers: demoHeaders(1),
+      body: JSON.stringify({
+        personel_id: 1,
+        hafta_baslangic: "2026-06-15",
+        hafta_bitis: "2026-06-21",
+        etkilenen_tarih: "2026-06-16",
+        kaynak_tipi: "PUANTAJ",
+        kaynak_id: 9401,
+        revizyon_tipi: "PUANTAJ_GIRIS_CIKIS_DUZELTME",
+        onceki_deger: "08:00",
+        talep_edilen_deger: "08:15",
+        gerekce: "Scope test"
+      })
+    });
+    const talepId = getCreatedTalepId(created);
+
+    const detail = resolveDemoApiResponse(`/haftalik-kapanis/revizyon-talepleri/${talepId}`, {
+      headers: demoHeaders(2)
+    });
+
+    expect(detail?.errors?.[0]?.code).toBe("REVISION_SCOPE_DENIED");
+  });
+
+  it("MUHASEBE approve UNAUTHORIZED_REVISION_APPROVAL doner", () => {
+    resolveDemoApiResponse("/haftalik-kapanis", {
+      method: "POST",
+      body: JSON.stringify({
+        hafta_baslangic: "2026-06-22",
+        hafta_bitis: "2026-06-28",
+        departman_id: 3
+      })
+    });
+
+    const created = resolveDemoApiResponse("/haftalik-kapanis/revizyon-talepleri", {
+      method: "POST",
+      headers: demoHeaders(1),
+      body: JSON.stringify({
+        personel_id: 1,
+        hafta_baslangic: "2026-06-22",
+        hafta_bitis: "2026-06-28",
+        etkilenen_tarih: "2026-06-23",
+        kaynak_tipi: "PUANTAJ",
+        kaynak_id: 9501,
+        revizyon_tipi: "PUANTAJ_GIRIS_CIKIS_DUZELTME",
+        onceki_deger: "08:00",
+        talep_edilen_deger: "08:15",
+        gerekce: "Approve test",
+        bordro_etki_var_mi: true
+      })
+    });
+    const talepId = getCreatedTalepId(created);
+
+    resolveDemoApiResponse(`/haftalik-kapanis/revizyon-talepleri/${talepId}/gonder`, {
+      method: "POST",
+      headers: demoHeaders(1),
+      body: JSON.stringify({})
+    });
+
+    const approve = resolveDemoApiResponse(`/haftalik-kapanis/revizyon-talepleri/${talepId}/onay`, {
+      method: "POST",
+      headers: demoHeaders(undefined, "MUHASEBE"),
+      body: JSON.stringify({ karar_notu: "Yetkisiz" })
+    });
+
+    expect(approve?.errors?.[0]?.code).toBe("UNAUTHORIZED_REVISION_APPROVAL");
+  });
+
+  it("BIRIM_AMIRI detail finance alanini maskeler", () => {
+    resolveDemoApiResponse("/haftalik-kapanis", {
+      method: "POST",
+      body: JSON.stringify({
+        hafta_baslangic: "2026-07-01",
+        hafta_bitis: "2026-07-07",
+        departman_id: 3
+      })
+    });
+
+    const created = resolveDemoApiResponse("/haftalik-kapanis/revizyon-talepleri", {
+      method: "POST",
+      headers: demoHeaders(1),
+      body: JSON.stringify({
+        personel_id: 1,
+        hafta_baslangic: "2026-07-01",
+        hafta_bitis: "2026-07-07",
+        etkilenen_tarih: "2026-07-02",
+        kaynak_tipi: "PUANTAJ",
+        kaynak_id: 9601,
+        revizyon_tipi: "PUANTAJ_GIRIS_CIKIS_DUZELTME",
+        onceki_deger: "08:00",
+        talep_edilen_deger: "08:15",
+        gerekce: "Finance mask",
+        bordro_etki_var_mi: true,
+        bordro_etki_notu: "Gizli not"
+      })
+    });
+    const talepId = getCreatedTalepId(created);
+
+    const detail = resolveDemoApiResponse(`/haftalik-kapanis/revizyon-talepleri/${talepId}`, {
+      headers: demoHeaders(3)
+    });
+    const talep = detail?.data as { bordro_etki_notu?: string | null; bordro_etki_var_mi?: boolean };
+
+    expect(talep.bordro_etki_var_mi).toBe(true);
+    expect(talep.bordro_etki_notu).toBeNull();
+  });
+
+  it("create client talep_eden_kullanici_id gonderse ignore eder", () => {
+    resolveDemoApiResponse("/haftalik-kapanis", {
+      method: "POST",
+      body: JSON.stringify({
+        hafta_baslangic: "2026-07-08",
+        hafta_bitis: "2026-07-14",
+        departman_id: 3
+      })
+    });
+
+    const created = resolveDemoApiResponse("/haftalik-kapanis/revizyon-talepleri", {
+      method: "POST",
+      headers: demoHeaders(3),
+      body: JSON.stringify({
+        personel_id: 1,
+        hafta_baslangic: "2026-07-08",
+        hafta_bitis: "2026-07-14",
+        etkilenen_tarih: "2026-07-09",
+        kaynak_tipi: "PUANTAJ",
+        kaynak_id: 9701,
+        revizyon_tipi: "PUANTAJ_GIRIS_CIKIS_DUZELTME",
+        onceki_deger: "08:00",
+        talep_edilen_deger: "08:15",
+        gerekce: "Owner test",
+        talep_eden_kullanici_id: 999
+      })
+    });
+    const talep = created?.data as { talep_eden_kullanici_id?: number };
+
+    expect(talep.talep_eden_kullanici_id).toBe(3);
+  });
+
+  it("GENEL_YONETICI ONAY_BEKLIYOR talebi onaylayabilir", () => {
+    resolveDemoApiResponse("/haftalik-kapanis", {
+      method: "POST",
+      body: JSON.stringify({
+        hafta_baslangic: "2026-07-15",
+        hafta_bitis: "2026-07-21",
+        departman_id: 3
+      })
+    });
+
+    const created = resolveDemoApiResponse("/haftalik-kapanis/revizyon-talepleri", {
+      method: "POST",
+      headers: demoHeaders(1),
+      body: JSON.stringify({
+        personel_id: 1,
+        hafta_baslangic: "2026-07-15",
+        hafta_bitis: "2026-07-21",
+        etkilenen_tarih: "2026-07-16",
+        kaynak_tipi: "PUANTAJ",
+        kaynak_id: 9801,
+        revizyon_tipi: "PUANTAJ_GIRIS_CIKIS_DUZELTME",
+        onceki_deger: "08:00",
+        talep_edilen_deger: "08:15",
+        gerekce: "Onay test"
+      })
+    });
+    const talepId = getCreatedTalepId(created);
+
+    resolveDemoApiResponse(`/haftalik-kapanis/revizyon-talepleri/${talepId}/gonder`, {
+      method: "POST",
+      headers: demoHeaders(1),
+      body: JSON.stringify({})
+    });
+
+    const approved = resolveDemoApiResponse(`/haftalik-kapanis/revizyon-talepleri/${talepId}/onay`, {
+      method: "POST",
+      headers: demoHeaders(1),
+      body: JSON.stringify({ karar_notu: "Onaylandi" })
+    });
+    const talep = approved?.data as { durum?: string; karar_veren_kullanici_id?: number };
+
+    expect(talep.durum).toBe("ONAYLANDI");
+    expect(talep.karar_veren_kullanici_id).toBe(1);
+  });
+
+  it("ONAYLANDI talep cancel INVALID_STATE_TRANSITION doner", () => {
+    resolveDemoApiResponse("/haftalik-kapanis", {
+      method: "POST",
+      body: JSON.stringify({
+        hafta_baslangic: "2026-07-22",
+        hafta_bitis: "2026-07-28",
+        departman_id: 3
+      })
+    });
+
+    const created = resolveDemoApiResponse("/haftalik-kapanis/revizyon-talepleri", {
+      method: "POST",
+      headers: demoHeaders(1),
+      body: JSON.stringify({
+        personel_id: 1,
+        hafta_baslangic: "2026-07-22",
+        hafta_bitis: "2026-07-28",
+        etkilenen_tarih: "2026-07-23",
+        kaynak_tipi: "PUANTAJ",
+        kaynak_id: 9901,
+        revizyon_tipi: "PUANTAJ_GIRIS_CIKIS_DUZELTME",
+        onceki_deger: "08:00",
+        talep_edilen_deger: "08:15",
+        gerekce: "Cancel test"
+      })
+    });
+    const talepId = getCreatedTalepId(created);
+
+    resolveDemoApiResponse(`/haftalik-kapanis/revizyon-talepleri/${talepId}/gonder`, {
+      method: "POST",
+      headers: demoHeaders(1),
+      body: JSON.stringify({})
+    });
+    resolveDemoApiResponse(`/haftalik-kapanis/revizyon-talepleri/${talepId}/onay`, {
+      method: "POST",
+      headers: demoHeaders(1),
+      body: JSON.stringify({ karar_notu: "Onay" })
+    });
+
+    const cancel = resolveDemoApiResponse(`/haftalik-kapanis/revizyon-talepleri/${talepId}/iptal`, {
+      method: "POST",
+      headers: demoHeaders(1),
+      body: JSON.stringify({})
+    });
+
+    expect(cancel?.errors?.[0]?.code).toBe("INVALID_STATE_TRANSITION");
   });
 });

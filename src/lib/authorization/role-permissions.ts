@@ -31,7 +31,15 @@ export type AppPermission =
   | "yonetim-paneli.manage"
   | "aylik-ozet.view"
   | "aylik-ozet.review"
-  | "aylik-ozet.executive_ack";
+  | "aylik-ozet.executive_ack"
+  | "revizyon.view"
+  | "revizyon.create"
+  | "revizyon.submit"
+  | "revizyon.cancel"
+  | "revizyon.approve"
+  | "revizyon.reject"
+  | "revizyon.view_finance_effect"
+  | "revizyon.view_audit_history";
 
 const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
   GENEL_YONETICI: [
@@ -63,7 +71,15 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "yonetim-paneli.view",
     "yonetim-paneli.manage",
     "aylik-ozet.view",
-    "aylik-ozet.executive_ack"
+    "aylik-ozet.executive_ack",
+    "revizyon.view",
+    "revizyon.create",
+    "revizyon.submit",
+    "revizyon.cancel",
+    "revizyon.approve",
+    "revizyon.reject",
+    "revizyon.view_finance_effect",
+    "revizyon.view_audit_history"
   ],
   BOLUM_YONETICISI: [
     "personeller.view",
@@ -92,7 +108,13 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "finans.cancel",
     "isg.view",
     "aylik-ozet.view",
-    "aylik-ozet.review"
+    "aylik-ozet.review",
+    "revizyon.view",
+    "revizyon.create",
+    "revizyon.submit",
+    "revizyon.cancel",
+    "revizyon.view_finance_effect",
+    "revizyon.view_audit_history"
   ],
   MUHASEBE: [
     "personeller.view",
@@ -117,7 +139,13 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "finans.view",
     "finans.create",
     "finans.update",
-    "finans.cancel"
+    "finans.cancel",
+    "revizyon.view",
+    "revizyon.create",
+    "revizyon.submit",
+    "revizyon.cancel",
+    "revizyon.view_finance_effect",
+    "revizyon.view_audit_history"
   ],
   BIRIM_AMIRI: [
     "personeller.view.sube",
@@ -132,7 +160,12 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "puantaj.view",
     "puantaj.amir_kontrol",
     "raporlar.view",
-    "isg.view"
+    "isg.view",
+    "revizyon.view",
+    "revizyon.create",
+    "revizyon.submit",
+    "revizyon.cancel",
+    "revizyon.view_audit_history"
   ]
 };
 

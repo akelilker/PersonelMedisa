@@ -30,6 +30,15 @@ export const endpoints = {
     yillikFazlaCalisma: (personelId: number | string, yil: number | string) =>
       `/haftalik-kapanis/yillik-fazla-calisma?personel_id=${personelId}&yil=${yil}`
   },
+  revizyonTalepleri: {
+    list: "/haftalik-kapanis/revizyon-talepleri",
+    detail: (id: number | string) => `/haftalik-kapanis/revizyon-talepleri/${id}`,
+    create: "/haftalik-kapanis/revizyon-talepleri",
+    submit: (id: number | string) => `/haftalik-kapanis/revizyon-talepleri/${id}/gonder`,
+    approve: (id: number | string) => `/haftalik-kapanis/revizyon-talepleri/${id}/onay`,
+    reject: (id: number | string) => `/haftalik-kapanis/revizyon-talepleri/${id}/red`,
+    cancel: (id: number | string) => `/haftalik-kapanis/revizyon-talepleri/${id}/iptal`
+  },
   fazlaCalismaOdemeTercihi: {
     resource: "/fazla-calisma-odeme-tercihi"
   },

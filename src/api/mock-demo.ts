@@ -6,6 +6,9 @@ import type {
 } from "../types/fazla-calisma-odeme-tercihi";
 import { DEFAULT_ODEME_TIPI } from "../types/fazla-calisma-odeme-tercihi";
 import type { SerbestZamanEvent } from "../types/serbest-zaman";
+import type { RevizyonTalebi, RevizyonTipi } from "../types/revizyon-talebi";
+import { REVIZYON_TIPLERI } from "../types/revizyon-talebi";
+import { assertRevizyonTransition } from "../lib/revizyon-talebi/revizyon-state";
 import { hesaplaAylikSgkPuantajOzetleri } from "../services/dashboard-rapor-servisi";
 import { buildHaftalikKapanisSnapshot } from "../services/haftalik-kapanis-snapshot";
 import {
@@ -237,6 +240,7 @@ const demoState: {
   kapanisById: Record<number, HaftalikKapanisSonuc>;
   odemeTercihiBySnapshotId: Record<number, FazlaCalismaOdemeTercihi>;
   serbestZamanEventsById: Record<number, SerbestZamanEvent>;
+  revizyonTalebiById: Record<number, RevizyonTalebi>;
   nextIds: {
     personel: number;
     surec: number;
@@ -246,6 +250,7 @@ const demoState: {
     kapanis: number;
     odemeTercihi: number;
     serbestZamanEvent: number;
+    revizyonTalebi: number;
     kullanici: number;
     sube: number;
     departman: number;
@@ -575,6 +580,7 @@ const demoState: {
   kapanisById: {},
   odemeTercihiBySnapshotId: {},
   serbestZamanEventsById: {},
+  revizyonTalebiById: {},
   nextIds: {
     personel: 100,
     surec: 600,
@@ -584,6 +590,7 @@ const demoState: {
     kapanis: 1000,
     odemeTercihi: 1,
     serbestZamanEvent: 1,
+    revizyonTalebi: 1,
     kullanici: 3,
     sube: 2,
     departman: 12
@@ -714,6 +721,181 @@ function ok<T>(data: T, meta: Record<string, unknown> = {}): ApiResponse<T> {
     meta,
     errors: []
   };
+}
+
+function demoRevizyonError(code: string, message: string): ApiResponse<unknown> {
+  return {
+    data: null,
+    meta: {},
+    errors: [{ code, message }]
+  };
+}
+
+function isDemoRevizyonTipi(value: unknown): value is RevizyonTipi {
+  return typeof value === "string" && (REVIZYON_TIPLERI as readonly string[]).includes(value);
+}
+
+function findDemoClosedKapanis(haftaBaslangic: string, haftaBitis: string): HaftalikKapanisSonuc | null {
+  for (const kapanis of Object.values(demoState.kapanisById)) {
+    if (kapanis.hafta_baslangic === haftaBaslangic && kapanis.hafta_bitis === haftaBitis) {
+      return kapanis;
+    }
+  }
+
+  return null;
+}
+
+function hasDemoOpenRevizyonTalebi(params: {
+  kaynak_tipi: string;
+  kaynak_id: number;
+  etkilenen_tarih: string;
+}): boolean {
+  return Object.values(demoState.revizyonTalebiById).some(
+    (talep) =>
+      talep.durum === "ONAY_BEKLIYOR" &&
+      talep.kaynak_tipi === params.kaynak_tipi &&
+      talep.kaynak_id === params.kaynak_id &&
+      talep.etkilenen_tarih === params.etkilenen_tarih
+  );
+}
+
+function findDemoRevizyonTalebi(id: number): RevizyonTalebi | null {
+  return demoState.revizyonTalebiById[id] ?? null;
+}
+
+function applyDemoRevizyonTransition(
+  talep: RevizyonTalebi,
+  nextDurum: RevizyonTalebi["durum"],
+  karar?: { karar_veren_kullanici_id?: number; karar_notu?: string | null }
+): ApiResponse<unknown> {
+  const transition = assertRevizyonTransition(talep.durum, nextDurum);
+  if (!transition.ok) {
+    return demoRevizyonError(transition.code, "Gecersiz revizyon durum gecisi.");
+  }
+
+  talep.durum = nextDurum;
+
+  if (karar !== undefined) {
+    talep.karar_veren_kullanici_id = karar.karar_veren_kullanici_id ?? 1;
+    talep.karar_zamani = new Date().toISOString();
+    talep.karar_notu = karar.karar_notu ?? null;
+  }
+
+  if (nextDurum === "ONAYLANDI") {
+    talep.correction_event_id = null;
+  }
+
+  demoState.revizyonTalebiById[talep.id] = talep;
+  return ok(talep);
+}
+
+function buildDemoRevizyonTalebiListResponse(searchUrl: URL): ApiResponse<unknown> {
+  const personelId = toNumber(searchUrl.searchParams.get("personel_id"));
+  const durum = toStringValue(searchUrl.searchParams.get("durum"));
+  const haftaBaslangic = toStringValue(searchUrl.searchParams.get("hafta_baslangic"));
+  const haftaBitis = toStringValue(searchUrl.searchParams.get("hafta_bitis"));
+
+  const items = Object.values(demoState.revizyonTalebiById).filter((talep) => {
+    if (personelId !== null && talep.personel_id !== personelId) {
+      return false;
+    }
+    if (durum && talep.durum !== durum) {
+      return false;
+    }
+    if (haftaBaslangic && talep.hafta_baslangic !== haftaBaslangic) {
+      return false;
+    }
+    if (haftaBitis && talep.hafta_bitis !== haftaBitis) {
+      return false;
+    }
+    return true;
+  });
+
+  return ok({ items });
+}
+
+function createDemoRevizyonTalebi(body: Record<string, unknown>): ApiResponse<unknown> {
+  const personel_id = toNumber(body.personel_id);
+  const kaynak_id = toNumber(body.kaynak_id);
+  const hafta_baslangic = toStringValue(body.hafta_baslangic);
+  const hafta_bitis = toStringValue(body.hafta_bitis);
+  const etkilenen_tarih = toStringValue(body.etkilenen_tarih);
+  const kaynak_tipi = toStringValue(body.kaynak_tipi);
+  const revizyon_tipi = body.revizyon_tipi;
+  const gerekce = toStringValue(body.gerekce);
+
+  if (
+    personel_id === null ||
+    personel_id < 1 ||
+    kaynak_id === null ||
+    kaynak_id < 1 ||
+    !hafta_baslangic ||
+    !hafta_bitis ||
+    !etkilenen_tarih ||
+    !kaynak_tipi ||
+    !isDemoRevizyonTipi(revizyon_tipi) ||
+    !gerekce
+  ) {
+    return demoRevizyonError("INVALID_BODY", "Revizyon talebi payload gecersiz.");
+  }
+
+  if (!findDemoClosedKapanis(hafta_baslangic, hafta_bitis)) {
+    return demoRevizyonError("PERIOD_NOT_CLOSED", "Revizyon talebi yalniz kapali donem icin acilabilir.");
+  }
+
+  if (
+    hasDemoOpenRevizyonTalebi({
+      kaynak_tipi,
+      kaynak_id,
+      etkilenen_tarih
+    })
+  ) {
+    return demoRevizyonError(
+      "REVISION_ALREADY_EXISTS",
+      "Ayni kaynak icin acik revizyon talebi zaten mevcut."
+    );
+  }
+
+  const id = ++demoState.nextIds.revizyonTalebi;
+  const talep: RevizyonTalebi = {
+    id,
+    personel_id,
+    hafta_baslangic,
+    hafta_bitis,
+    etkilenen_tarih,
+    kaynak_tipi,
+    kaynak_id,
+    revizyon_tipi,
+    onceki_deger:
+      typeof body.onceki_deger === "string" ||
+      typeof body.onceki_deger === "number" ||
+      typeof body.onceki_deger === "boolean"
+        ? body.onceki_deger
+        : body.onceki_deger === null
+          ? null
+          : null,
+    talep_edilen_deger:
+      typeof body.talep_edilen_deger === "string" ||
+      typeof body.talep_edilen_deger === "number" ||
+      typeof body.talep_edilen_deger === "boolean"
+        ? body.talep_edilen_deger
+        : body.talep_edilen_deger === null
+          ? null
+          : null,
+    gerekce,
+    talep_eden_kullanici_id: 1,
+    talep_zamani: new Date().toISOString(),
+    durum: "TASLAK",
+    karar_veren_kullanici_id: null,
+    karar_zamani: null,
+    karar_notu: null,
+    bordro_etki_var_mi: body.bordro_etki_var_mi === true,
+    bordro_etki_notu: toStringValue(body.bordro_etki_notu) ?? null,
+    correction_event_id: null
+  };
+
+  demoState.revizyonTalebiById[id] = talep;
+  return ok(talep);
 }
 
 function isDemoOdemeTipi(value: unknown): value is OdemeTipi {
@@ -1752,6 +1934,62 @@ export function resolveDemoApiResponse(
       }
     }
     return ok({ muhurlenen_kayit_sayisi: count, donem: donemPrefix });
+  }
+
+  if (pathname === "/haftalik-kapanis/revizyon-talepleri" && method === "GET") {
+    return buildDemoRevizyonTalebiListResponse(requestUrl);
+  }
+
+  if (pathname === "/haftalik-kapanis/revizyon-talepleri" && method === "POST") {
+    return createDemoRevizyonTalebi(body);
+  }
+
+  const revizyonTalebiActionMatch = pathname.match(
+    /^\/haftalik-kapanis\/revizyon-talepleri\/(\d+)\/(gonder|onay|red|iptal)$/
+  );
+  if (revizyonTalebiActionMatch && method === "POST") {
+    const talepId = Number.parseInt(revizyonTalebiActionMatch[1], 10);
+    const action = revizyonTalebiActionMatch[2];
+    const talep = findDemoRevizyonTalebi(talepId);
+    if (!talep) {
+      return demoRevizyonError("NOT_FOUND", "Revizyon talebi bulunamadi.");
+    }
+
+    const kararNotu = toStringValue(body.karar_notu) ?? null;
+
+    if (action === "gonder") {
+      return applyDemoRevizyonTransition(talep, "ONAY_BEKLIYOR");
+    }
+
+    if (action === "onay") {
+      return applyDemoRevizyonTransition(talep, "ONAYLANDI", {
+        karar_veren_kullanici_id: 1,
+        karar_notu: kararNotu
+      });
+    }
+
+    if (action === "red") {
+      return applyDemoRevizyonTransition(talep, "REDDEDILDI", {
+        karar_veren_kullanici_id: 1,
+        karar_notu: kararNotu
+      });
+    }
+
+    return applyDemoRevizyonTransition(talep, "IPTAL", {
+      karar_veren_kullanici_id: 1,
+      karar_notu: kararNotu
+    });
+  }
+
+  const revizyonTalebiDetailMatch = pathname.match(/^\/haftalik-kapanis\/revizyon-talepleri\/(\d+)$/);
+  if (revizyonTalebiDetailMatch && method === "GET") {
+    const talepId = Number.parseInt(revizyonTalebiDetailMatch[1], 10);
+    const talep = findDemoRevizyonTalebi(talepId);
+    if (!talep) {
+      return demoRevizyonError("NOT_FOUND", "Revizyon talebi bulunamadi.");
+    }
+
+    return ok(talep);
   }
 
   if (pathname === "/haftalik-kapanis/yillik-fazla-calisma" && method === "GET") {

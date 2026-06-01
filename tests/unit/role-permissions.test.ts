@@ -87,4 +87,40 @@ describe("role permissions", () => {
     expect(sessionAllowsSubeAccess(session, 1)).toBe(true);
     expect(sessionAllowsSubeAccess(session, 3)).toBe(false);
   });
+
+  it("grants GENEL_YONETICI all revizyon permissions", () => {
+    expect(hasRolePermission("GENEL_YONETICI", "revizyon.view")).toBe(true);
+    expect(hasRolePermission("GENEL_YONETICI", "revizyon.create")).toBe(true);
+    expect(hasRolePermission("GENEL_YONETICI", "revizyon.submit")).toBe(true);
+    expect(hasRolePermission("GENEL_YONETICI", "revizyon.cancel")).toBe(true);
+    expect(hasRolePermission("GENEL_YONETICI", "revizyon.approve")).toBe(true);
+    expect(hasRolePermission("GENEL_YONETICI", "revizyon.reject")).toBe(true);
+    expect(hasRolePermission("GENEL_YONETICI", "revizyon.view_finance_effect")).toBe(true);
+    expect(hasRolePermission("GENEL_YONETICI", "revizyon.view_audit_history")).toBe(true);
+  });
+
+  it("keeps BOLUM_YONETICISI and MUHASEBE without approve/reject", () => {
+    expect(hasRolePermission("BOLUM_YONETICISI", "revizyon.view")).toBe(true);
+    expect(hasRolePermission("BOLUM_YONETICISI", "revizyon.create")).toBe(true);
+    expect(hasRolePermission("BOLUM_YONETICISI", "revizyon.approve")).toBe(false);
+    expect(hasRolePermission("BOLUM_YONETICISI", "revizyon.reject")).toBe(false);
+    expect(hasRolePermission("BOLUM_YONETICISI", "revizyon.view_finance_effect")).toBe(true);
+
+    expect(hasRolePermission("MUHASEBE", "revizyon.view")).toBe(true);
+    expect(hasRolePermission("MUHASEBE", "revizyon.create")).toBe(true);
+    expect(hasRolePermission("MUHASEBE", "revizyon.approve")).toBe(false);
+    expect(hasRolePermission("MUHASEBE", "revizyon.reject")).toBe(false);
+    expect(hasRolePermission("MUHASEBE", "revizyon.view_finance_effect")).toBe(true);
+  });
+
+  it("keeps BIRIM_AMIRI revizyon scope limited without finance effect and approval", () => {
+    expect(hasRolePermission("BIRIM_AMIRI", "revizyon.view")).toBe(true);
+    expect(hasRolePermission("BIRIM_AMIRI", "revizyon.create")).toBe(true);
+    expect(hasRolePermission("BIRIM_AMIRI", "revizyon.submit")).toBe(true);
+    expect(hasRolePermission("BIRIM_AMIRI", "revizyon.cancel")).toBe(true);
+    expect(hasRolePermission("BIRIM_AMIRI", "revizyon.view_audit_history")).toBe(true);
+    expect(hasRolePermission("BIRIM_AMIRI", "revizyon.approve")).toBe(false);
+    expect(hasRolePermission("BIRIM_AMIRI", "revizyon.reject")).toBe(false);
+    expect(hasRolePermission("BIRIM_AMIRI", "revizyon.view_finance_effect")).toBe(false);
+  });
 });

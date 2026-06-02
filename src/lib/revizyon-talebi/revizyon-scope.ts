@@ -1,4 +1,5 @@
 import type { UserRole } from "../../types/auth";
+import type { RevizyonCorrectionEvent } from "../../types/revizyon-correction";
 import type { RevizyonHataKodu, RevizyonTalebi } from "../../types/revizyon-talebi";
 
 export type RevizyonActorContext = {
@@ -114,4 +115,41 @@ export function maskRevizyonFinanceFields(
   }
 
   return talep;
+}
+
+export function canViewRevizyonCorrection(
+  actor: RevizyonActorContext,
+  talep: RevizyonTalebi,
+  personelDepartmanId: number | null | undefined
+): boolean {
+  return canViewRevizyonTalep(actor, talep, personelDepartmanId);
+}
+
+export function canViewRevizyonFinanceEffect(
+  actor: RevizyonActorContext,
+  talep: RevizyonTalebi,
+  personelDepartmanId: number | null | undefined
+): boolean {
+  if (actor.role === "BIRIM_AMIRI") {
+    return false;
+  }
+
+  return canViewRevizyonTalep(actor, talep, personelDepartmanId);
+}
+
+export function maskCorrectionFinanceFields(
+  actor: RevizyonActorContext,
+  correction: RevizyonCorrectionEvent,
+  talep: RevizyonTalebi,
+  personelDepartmanId: number | null | undefined
+): RevizyonCorrectionEvent {
+  if (canViewRevizyonFinanceEffect(actor, talep, personelDepartmanId)) {
+    return correction;
+  }
+
+  return {
+    ...correction,
+    bordro_etki_tipi: null,
+    aciklama: correction.bordro_etki_var_mi ? null : correction.aciklama
+  };
 }

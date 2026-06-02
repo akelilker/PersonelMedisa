@@ -39,6 +39,13 @@ export const endpoints = {
     reject: (id: number | string) => `/haftalik-kapanis/revizyon-talepleri/${id}/red`,
     cancel: (id: number | string) => `/haftalik-kapanis/revizyon-talepleri/${id}/iptal`
   },
+  revizyonCorrections: {
+    list: "/haftalik-kapanis/revizyon-corrections",
+    detail: (id: number | string) => `/haftalik-kapanis/revizyon-corrections/${id}`,
+    produce: (talepId: number | string) =>
+      `/haftalik-kapanis/revizyon-talepleri/${talepId}/correction-uret`,
+    cancel: (id: number | string) => `/haftalik-kapanis/revizyon-corrections/${id}/iptal`
+  },
   fazlaCalismaOdemeTercihi: {
     resource: "/fazla-calisma-odeme-tercihi"
   },

@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+import { fetchRevizyonCorrections } from "../../../api/revizyon-correction.api";
+import { fetchRevizyonTalepleri } from "../../../api/revizyon-talebi.api";
 import { FormField } from "../../../components/form/FormField";
 import { AppModal } from "../../../components/modal/AppModal";
 import { EmptyState } from "../../../components/states/EmptyState";
@@ -26,6 +28,15 @@ import { getSurecTimelineSortWeight } from "../../../lib/surec-history-sort";
 import { hesaplaIzinBakiye } from "../../../services/izin-hesap-motoru";
 import type { IdOption, KeyOption } from "../../../types/referans";
 import type { Personel } from "../../../types/personel";
+import type {
+  RevizyonCorrectionEvent,
+  RevizyonCorrectionTipi
+} from "../../../types/revizyon-correction";
+import type {
+  RevizyonTalebi,
+  RevizyonTalebiDurumu,
+  RevizyonTipi
+} from "../../../types/revizyon-talebi";
 import type { Surec } from "../../../types/surec";
 import type { Zimmet } from "../../../types/zimmet";
 
@@ -39,6 +50,33 @@ const PERSONEL_DOSYA_TABS = [
 
 const PERSONEL_SUREC_FORM_ID = "personel-surec-form";
 const PERSONEL_ZIMMET_FORM_ID = "personel-zimmet-form";
+
+const REVIZYON_DURUM_LABELS: Record<RevizyonTalebiDurumu, string> = {
+  TASLAK: "Taslak",
+  ONAY_BEKLIYOR: "Onay bekliyor",
+  ONAYLANDI: "Onaylandı",
+  REDDEDILDI: "Reddedildi",
+  IPTAL: "İptal"
+};
+
+const REVIZYON_TIPI_LABELS: Record<RevizyonTipi, string> = {
+  PUANTAJ_GIRIS_CIKIS_DUZELTME: "Giriş / çıkış düzeltme",
+  MOLA_DUZELTME: "Mola düzeltme",
+  DEVAMSIZLIK_DUZELTME: "Devamsızlık düzeltme",
+  SUREC_GEC_GIRIS: "Süreç geç giriş",
+  SERBEST_ZAMAN_ETKI_DUZELTME: "Serbest zaman etki düzeltme",
+  KAPANIS_HESAP_REVIZYONU: "Kapanış hesap revizyonu",
+  BORDRO_ETKI_NOTU: "Bordro etki notu"
+};
+
+const REVIZYON_CORRECTION_TIPI_LABELS: Record<RevizyonCorrectionTipi, string> = {
+  GIRIS_CIKIS_DUZELTME: "Giriş / çıkış düzeltme",
+  MOLA_DUZELTME: "Mola düzeltme",
+  DEVAMSIZLIK_DUZELTME: "Devamsızlık düzeltme",
+  SERBEST_ZAMAN_ETKI_DUZELTME: "Serbest zaman etki düzeltme",
+  KAPANIS_HESAP_REVIZYONU: "Kapanış hesap revizyonu",
+  BORDRO_ETKI_NOTU: "Bordro etki notu"
+};
 
 type PersonelDosyaTabId = (typeof PERSONEL_DOSYA_TABS)[number]["id"];
 type PersonelTimelineEventTone = "default" | "danger";
@@ -79,6 +117,57 @@ function formatDetailValue(value: string | null | undefined) {
 }
 function formatDetailNumber(value: number | null | undefined) {
   return typeof value === "number" ? String(value) : "-";
+}
+
+function formatNullableScalar(value: string | number | boolean | null | undefined) {
+  if (typeof value === "boolean") {
+    return value ? "Evet" : "Hayır";
+  }
+  if (typeof value === "number") {
+    return String(value);
+  }
+  if (typeof value === "string") {
+    return formatDetailValue(value);
+  }
+  return "-";
+}
+
+function formatDateTimeDetail(value: string | null | undefined) {
+  const fallback = formatDetailValue(value ?? undefined);
+  if (fallback === "-") {
+    return fallback;
+  }
+
+  const parsed = Date.parse(fallback);
+  if (!Number.isFinite(parsed)) {
+    return fallback;
+  }
+
+  return new Intl.DateTimeFormat("tr-TR", {
+    dateStyle: "short",
+    timeStyle: "short"
+  }).format(new Date(parsed));
+}
+
+function timestampValue(value: string | null | undefined) {
+  if (!value) {
+    return 0;
+  }
+
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function sortRevizyonTalepleriByLatest(items: RevizyonTalebi[]) {
+  return [...items].sort(
+    (left, right) => timestampValue(right.talep_zamani) - timestampValue(left.talep_zamani)
+  );
+}
+
+function sortCorrectionsByLatest(items: RevizyonCorrectionEvent[]) {
+  return [...items].sort(
+    (left, right) => timestampValue(right.olusturma_zamani) - timestampValue(left.olusturma_zamani)
+  );
 }
 
 function formatReferenceValue(label?: string, id?: number) {
@@ -659,13 +748,21 @@ function devamPrimiDurumToneClass(durum: DevamPrimiEligibilityDurum) {
 
 function PersonelPuantajPanel({
   personel,
-  canViewPuantaj
+  canViewPuantaj,
+  canViewRevizyon,
+  isActive
 }: {
   personel: Personel;
   canViewPuantaj: boolean;
+  canViewRevizyon: boolean;
+  isActive: boolean;
 }) {
   const devamPrimiOzeti = useDevamPrimiEligibilityOzeti(personel);
   const puantajEksikGunOzeti = usePuantajEksikGunOzeti(personel);
+  const [revizyonTalepleri, setRevizyonTalepleri] = useState<RevizyonTalebi[]>([]);
+  const [revizyonCorrections, setRevizyonCorrections] = useState<RevizyonCorrectionEvent[]>([]);
+  const [isRevizyonLoading, setIsRevizyonLoading] = useState(false);
+  const [revizyonErrorMessage, setRevizyonErrorMessage] = useState<string | null>(null);
   const sgkPrimGunu = typeof personel.sgk_prim_gun === "number" ? `${personel.sgk_prim_gun} Gün` : "-";
   const eksikGun = typeof personel.sgk_eksik_gun_sayisi === "number" ? `${personel.sgk_eksik_gun_sayisi} Gün` : "-";
   const eksikGunNedeni = formatDetailValue(personel.sgk_eksik_gun_nedeni_kodu);
@@ -680,6 +777,52 @@ function PersonelPuantajPanel({
         : puantajEksikGunOzeti?.hydrateDurumu === "error"
           ? puantajEksikGunOzeti.hydrateHataMesaji
           : null;
+
+  useEffect(() => {
+    let isCancelled = false;
+
+    if (!canViewRevizyon || !isActive) {
+      setRevizyonTalepleri([]);
+      setRevizyonCorrections([]);
+      setIsRevizyonLoading(false);
+      setRevizyonErrorMessage(null);
+      return;
+    }
+
+    setIsRevizyonLoading(true);
+    setRevizyonErrorMessage(null);
+
+    Promise.all([
+      fetchRevizyonTalepleri({ personel_id: personel.id }),
+      fetchRevizyonCorrections({ personel_id: personel.id })
+    ])
+      .then(([talepler, corrections]) => {
+        if (isCancelled) {
+          return;
+        }
+
+        setRevizyonTalepleri(sortRevizyonTalepleriByLatest(talepler));
+        setRevizyonCorrections(sortCorrectionsByLatest(corrections));
+      })
+      .catch(() => {
+        if (isCancelled) {
+          return;
+        }
+
+        setRevizyonTalepleri([]);
+        setRevizyonCorrections([]);
+        setRevizyonErrorMessage("Revizyon ve correction kayıtları yüklenemedi.");
+      })
+      .finally(() => {
+        if (!isCancelled) {
+          setIsRevizyonLoading(false);
+        }
+      });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [canViewRevizyon, isActive, personel.id]);
 
   return (
     <div className="personel-dosya-sections">
@@ -774,6 +917,14 @@ function PersonelPuantajPanel({
         ) : null}
       </DossierSection>
 
+      <PersonelRevizyonCorrectionPanel
+        canViewRevizyon={canViewRevizyon}
+        isLoading={isRevizyonLoading}
+        errorMessage={revizyonErrorMessage}
+        talepler={revizyonTalepleri}
+        corrections={revizyonCorrections}
+      />
+
       <PlaceholderPanel
         title="Günlük Puantaj Dosyası"
         description="Günlük giriş-çıkış kayıtları ve detaylı puantaj düzenleme akışı ayrı puantaj ekranında kalır."
@@ -784,6 +935,99 @@ function PersonelPuantajPanel({
         noPermissionMessage="Puantaj görüntüleme yetkiniz yok."
       />
     </div>
+  );
+}
+
+function formatRevizyonTalebiSummary(talep: RevizyonTalebi) {
+  const durum = REVIZYON_DURUM_LABELS[talep.durum] ?? talep.durum;
+  const tip = REVIZYON_TIPI_LABELS[talep.revizyon_tipi] ?? talep.revizyon_tipi;
+  const eskiDeger = formatNullableScalar(talep.onceki_deger);
+  const yeniDeger = formatNullableScalar(talep.talep_edilen_deger);
+  const correction = talep.correction_event_id != null ? `Correction #${talep.correction_event_id}` : "Correction yok";
+  const talepZamani = formatDateTimeDetail(talep.talep_zamani);
+
+  return `${durum} / ${tip} / ${talep.etkilenen_tarih} / ${eskiDeger} -> ${yeniDeger} / ${correction} / ${talepZamani}`;
+}
+
+function formatRevizyonCorrectionSummary(correction: RevizyonCorrectionEvent) {
+  const tip = REVIZYON_CORRECTION_TIPI_LABELS[correction.correction_tipi] ?? correction.correction_tipi;
+  const eskiDeger = formatNullableScalar(correction.onceki_deger);
+  const yeniDeger = formatNullableScalar(correction.yeni_deger);
+  const durum = correction.iptal_edildi_mi ? "İptal" : "Aktif";
+  const deltaParts = [
+    correction.delta_dakika !== 0 ? `${correction.delta_dakika} dk` : null,
+    correction.delta_gun !== 0 ? `${correction.delta_gun} gün` : null
+  ].filter((part): part is string => part !== null);
+  const delta = deltaParts.length > 0 ? deltaParts.join(", ") : "Delta yok";
+  const olusturmaZamani = formatDateTimeDetail(correction.olusturma_zamani);
+
+  return `${durum} / ${tip} / ${correction.etkilenen_tarih} / ${eskiDeger} -> ${yeniDeger} / ${delta} / ${olusturmaZamani}`;
+}
+
+function PersonelRevizyonCorrectionPanel({
+  canViewRevizyon,
+  isLoading,
+  errorMessage,
+  talepler,
+  corrections
+}: {
+  canViewRevizyon: boolean;
+  isLoading: boolean;
+  errorMessage: string | null;
+  talepler: RevizyonTalebi[];
+  corrections: RevizyonCorrectionEvent[];
+}) {
+  const acikTalepSayisi = talepler.filter(
+    (talep) => talep.durum === "TASLAK" || talep.durum === "ONAY_BEKLIYOR"
+  ).length;
+  const onayliTalepSayisi = talepler.filter((talep) => talep.durum === "ONAYLANDI").length;
+  const aktifCorrectionSayisi = corrections.filter((correction) => !correction.iptal_edildi_mi).length;
+  const sonTalepler = talepler.slice(0, 3);
+  const sonCorrections = corrections.slice(0, 3);
+
+  return (
+    <DossierSection
+      title="Revizyon / Correction İzleri"
+      description="Kapalı dönem düzeltme talepleri ve üretilen correction etkileri burada salt okunur izlenir."
+    >
+      {!canViewRevizyon ? (
+        <DossierRecord label="Yetki" value="Revizyon kayıtlarını görüntüleme yetkiniz yok." />
+      ) : null}
+
+      {canViewRevizyon && isLoading ? <DossierRecord label="Durum" value="Yükleniyor..." /> : null}
+      {canViewRevizyon && !isLoading && errorMessage ? (
+        <DossierRecord label="Durum" value={errorMessage} />
+      ) : null}
+
+      {canViewRevizyon && !isLoading && !errorMessage ? (
+        <>
+          <DossierRecord label="Toplam Talep" value={String(talepler.length)} />
+          <DossierRecord label="Açık Talep" value={String(acikTalepSayisi)} />
+          <DossierRecord label="Onaylanan Talep" value={String(onayliTalepSayisi)} />
+          <DossierRecord label="Aktif Correction" value={String(aktifCorrectionSayisi)} />
+
+          {talepler.length === 0 && corrections.length === 0 ? (
+            <DossierRecord label="Kayıt" value="Bu personel için revizyon veya correction kaydı yok." />
+          ) : null}
+
+          {sonTalepler.map((talep) => (
+            <DossierRecord
+              key={`revizyon-talebi-${talep.id}`}
+              label={`Talep #${talep.id}`}
+              value={formatRevizyonTalebiSummary(talep)}
+            />
+          ))}
+
+          {sonCorrections.map((correction) => (
+            <DossierRecord
+              key={`revizyon-correction-${correction.id}`}
+              label={`Correction #${correction.id}`}
+              value={formatRevizyonCorrectionSummary(correction)}
+            />
+          ))}
+        </>
+      ) : null}
+    </DossierSection>
   );
 }
 
@@ -1095,6 +1339,7 @@ export function PersonelDetayPage() {
   const canViewSurecler = hasPermission("surecler.view") || hasPermission("surecler.view.sube");
   const canAccessSurecler = canCreateSurec || canViewSurecler;
   const canViewPuantaj = hasPermission("puantaj.view");
+  const canViewRevizyon = hasPermission("revizyon.view");
   const canCreateZimmet = canEditPersonel;
 
   const [activeTab, setActiveTab] = useState<PersonelDosyaTabId>("genel-bilgiler");
@@ -1461,7 +1706,12 @@ export function PersonelDetayPage() {
                 aria-labelledby="personel-kart-tab-puantaj"
                 hidden={activeTab !== "puantaj"}
               >
-                <PersonelPuantajPanel personel={personel} canViewPuantaj={canViewPuantaj} />
+                <PersonelPuantajPanel
+                  personel={personel}
+                  canViewPuantaj={canViewPuantaj}
+                  canViewRevizyon={canViewRevizyon}
+                  isActive={activeTab === "puantaj"}
+                />
               </div>
 
               <div

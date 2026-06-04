@@ -1,5 +1,5 @@
-import type { Dispatch, SetStateAction } from "react";
-import { FormField } from "../../../components/form/FormField";
+import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import { FormField, type FormFieldOption } from "../../../components/form/FormField";
 import { mapUcretTipiSelectOptions } from "../../../lib/display/ucret-tipi-display";
 import type { PersonelReferenceBundle } from "../../../data/app-data.types";
 import type { CreatePersonelFormState } from "../../../hooks/usePersoneller";
@@ -17,6 +17,19 @@ type PersonelCreateFieldsProps = {
   createErrorMessage?: string | null;
   referenceError?: string | null;
   className?: string;
+};
+
+type PersonelCreateSelectProps = {
+  label: string;
+  name: string;
+  value: string;
+  options: FormFieldOption[];
+  onChange: (value: string) => void;
+  isOpen: boolean;
+  onOpenChange: (isOpen: boolean) => void;
+  placeholderOption?: FormFieldOption;
+  required?: boolean;
+  disabled?: boolean;
 };
 
 function toSelectOptions(options: IdOption[]) {
@@ -44,6 +57,108 @@ function refMissingNote(label: string, blocking: boolean) {
   );
 }
 
+function PersonelCreateSelect({
+  label,
+  name,
+  value,
+  options,
+  onChange,
+  isOpen,
+  onOpenChange,
+  placeholderOption,
+  required = false,
+  disabled = false
+}: PersonelCreateSelectProps) {
+  const rootRef = useRef<HTMLDivElement>(null);
+  const labelId = `${name}-label`;
+  const panelId = `${name}-panel`;
+  const allOptions = useMemo(
+    () => (placeholderOption ? [placeholderOption, ...options] : options),
+    [options, placeholderOption]
+  );
+  const selectedOption = allOptions.find((option) => option.value === value) ?? placeholderOption ?? null;
+  const isPlaceholderSelected = placeholderOption ? value === placeholderOption.value : false;
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    function handleMouseDown(event: MouseEvent) {
+      if (!rootRef.current?.contains(event.target as Node)) {
+        onOpenChange(false);
+      }
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        onOpenChange(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleMouseDown);
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("mousedown", handleMouseDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isOpen, onOpenChange]);
+
+  return (
+    <div className="form-section personel-create-select" ref={rootRef}>
+      <label className="form-label" id={labelId}>
+        {label}
+      </label>
+      <button
+        type="button"
+        className={`form-input personel-create-select-trigger${isOpen ? " is-open" : ""}${
+          isPlaceholderSelected ? " is-placeholder" : ""
+        }`}
+        role="combobox"
+        aria-labelledby={labelId}
+        aria-expanded={isOpen}
+        aria-controls={panelId}
+        aria-required={required}
+        disabled={disabled}
+        onClick={() => onOpenChange(!isOpen)}
+      >
+        <span>{selectedOption?.label ?? "Seçiniz"}</span>
+        <span className="personel-create-select-caret" aria-hidden="true">
+          v
+        </span>
+      </button>
+
+      {isOpen ? (
+        <div className="personel-create-select-panel" id={panelId} role="listbox" aria-labelledby={labelId}>
+          {allOptions.map((option) => {
+            const isSelected = value === option.value;
+            const isPlaceholder = placeholderOption ? option.value === placeholderOption.value : false;
+
+            return (
+              <button
+                key={`${name}-${option.value || "empty"}`}
+                type="button"
+                role="option"
+                aria-selected={isSelected}
+                className={`personel-create-select-option${isSelected ? " is-active" : ""}${
+                  isPlaceholder ? " is-placeholder" : ""
+                }`}
+                onClick={() => {
+                  onChange(option.value);
+                  onOpenChange(false);
+                }}
+              >
+                {option.label}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export function PersonelCreateFields({
   form,
   setForm,
@@ -57,6 +172,12 @@ export function PersonelCreateFields({
   referenceError,
   className
 }: PersonelCreateFieldsProps) {
+  const [openSelectName, setOpenSelectName] = useState<string | null>(null);
+
+  function setSelectOpen(name: string, isOpen: boolean) {
+    setOpenSelectName(isOpen ? name : null);
+  }
+
   return (
     <div className={className}>
       <div className="personel-form-columns">
@@ -126,14 +247,15 @@ export function PersonelCreateFields({
             onChange={(value) => setForm((prev) => ({ ...prev, dogumYeri: value }))}
             placeholder="Örn. İstanbul"
           />
-          <FormField
-            as="select"
+          <PersonelCreateSelect
             label="Kan Grubu"
             name="create-kan"
             value={form.kanGrubu}
             onChange={(value) => setForm((prev) => ({ ...prev, kanGrubu: value }))}
             placeholderOption={{ value: "", label: "Seçiniz" }}
-            selectOptions={kanGrubuOptions}
+            options={kanGrubuOptions}
+            isOpen={openSelectName === "create-kan"}
+            onOpenChange={(isOpen) => setSelectOpen("create-kan", isOpen)}
           />
         </div>
 
@@ -156,8 +278,7 @@ export function PersonelCreateFields({
           />
           {refs.bagliAmirOptions.length > 0 ? (
             <>
-              <FormField
-                as="select"
+              <PersonelCreateSelect
                 label="Bağlı Amir"
                 name="create-bagli-amir"
                 value={form.bagliAmirId}
@@ -166,7 +287,9 @@ export function PersonelCreateFields({
                   ((value) => setForm((prev) => ({ ...prev, bagliAmirId: value })))
                 }
                 placeholderOption={{ value: "", label: "Seçiniz" }}
-                selectOptions={toSelectOptions(refs.bagliAmirOptions)}
+                options={toSelectOptions(refs.bagliAmirOptions)}
+                isOpen={openSelectName === "create-bagli-amir"}
+                onOpenChange={(isOpen) => setSelectOpen("create-bagli-amir", isOpen)}
               />
               {bagliAmirInfoMessage ? (
                 <p className="personel-form-note personel-form-note--info">{bagliAmirInfoMessage}</p>
@@ -180,8 +303,7 @@ export function PersonelCreateFields({
           )}
           {refs.departmanOptions.length > 0 ? (
             <>
-              <FormField
-                as="select"
+              <PersonelCreateSelect
                 label="Bölüm"
                 name="create-departman"
                 value={form.departmanId}
@@ -191,7 +313,9 @@ export function PersonelCreateFields({
                 }
                 required
                 placeholderOption={{ value: "", label: "Seçiniz" }}
-                selectOptions={toSelectOptions(refs.departmanOptions)}
+                options={toSelectOptions(refs.departmanOptions)}
+                isOpen={openSelectName === "create-departman"}
+                onOpenChange={(isOpen) => setSelectOpen("create-departman", isOpen)}
               />
               {bagliAmirDepartmanWarning ? (
                 <p className="personel-form-note personel-form-note--warning">
@@ -203,41 +327,44 @@ export function PersonelCreateFields({
             refMissingNote("Bölüm", true)
           )}
           {refs.gorevOptions.length > 0 ? (
-            <FormField
-              as="select"
+            <PersonelCreateSelect
               label="Görev / Unvan"
               name="create-gorev"
               value={form.gorevId}
               onChange={(value) => setForm((prev) => ({ ...prev, gorevId: value }))}
               required
               placeholderOption={{ value: "", label: "Seçiniz" }}
-              selectOptions={toSelectOptions(refs.gorevOptions)}
+              options={toSelectOptions(refs.gorevOptions)}
+              isOpen={openSelectName === "create-gorev"}
+              onOpenChange={(isOpen) => setSelectOpen("create-gorev", isOpen)}
             />
           ) : (
             refMissingNote("Görev / Unvan", true)
           )}
           {refs.personelTipiOptions.length > 0 ? (
-            <FormField
-              as="select"
+            <PersonelCreateSelect
               label="Personel Tipi"
               name="create-personel-tipi"
               value={form.personelTipiId}
               onChange={(value) => setForm((prev) => ({ ...prev, personelTipiId: value }))}
               required
               placeholderOption={{ value: "", label: "Seçiniz" }}
-              selectOptions={toSelectOptions(refs.personelTipiOptions)}
+              options={toSelectOptions(refs.personelTipiOptions)}
+              isOpen={openSelectName === "create-personel-tipi"}
+              onOpenChange={(isOpen) => setSelectOpen("create-personel-tipi", isOpen)}
             />
           ) : (
             refMissingNote("Personel Tipi", true)
           )}
-            {refs.ucretTipiOptions.length > 0 ? (
-            <FormField
-              as="select"
+          {refs.ucretTipiOptions.length > 0 ? (
+            <PersonelCreateSelect
               label="Ücret Tipi"
               name="create-ucret-tipi"
               value={form.ucretTipiId}
               onChange={(value) => setForm((prev) => ({ ...prev, ucretTipiId: value }))}
-              selectOptions={mapUcretTipiSelectOptions(refs.ucretTipiOptions)}
+              options={mapUcretTipiSelectOptions(refs.ucretTipiOptions)}
+              isOpen={openSelectName === "create-ucret-tipi"}
+              onOpenChange={(isOpen) => setSelectOpen("create-ucret-tipi", isOpen)}
             />
           ) : (
             refMissingNote("Ücret Tipi", false)

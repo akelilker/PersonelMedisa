@@ -95,6 +95,20 @@
   opacity: 1;
 }
 
+.kayit-workspace-grid--personel-form select.form-input:has(option[value=""]:checked),
+.kayit-workspace-grid--personel-form input[type="date"].form-input:invalid {
+  color: rgba(230, 234, 245, 0.5);
+}
+
+.kayit-workspace-grid--personel-form select.form-input option {
+  background-color: #0f141f;
+  color: rgba(240, 244, 252, 0.86);
+}
+
+.kayit-workspace-grid--personel-form select.form-input option[value=""] {
+  color: rgba(230, 234, 245, 0.56);
+}
+
 .kayit-workspace-grid--personel-form input[type="date"].form-input::-webkit-calendar-picker-indicator {
   width: 20px;
   height: 20px;

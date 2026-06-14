@@ -567,6 +567,8 @@ export function KayitSurecWorkspace({
   const [surecPersonelPickerOpen, setSurecPersonelPickerOpen] = useState(false);
   const [surecSearchExpanded, setSurecSearchExpanded] = useState(false);
   const surecPersonelSearchInputRef = useRef<HTMLInputElement>(null);
+  const surecSearchToolbarRef = useRef<HTMLDivElement>(null);
+  const surecPersonelPickerRef = useRef<HTMLDivElement>(null);
 
   const [activePersonelTab, setActivePersonelTab] = useState<PersonelSurecTab>("genel");
   const [devamsizlikSubId, setDevamsizlikSubId] = useState<DevamsizlikSubId | null>(null);
@@ -701,6 +703,34 @@ export function KayitSurecWorkspace({
     });
     return () => window.cancelAnimationFrame(id);
   }, [surecSearchExpanded]);
+
+  useEffect(() => {
+    if (!surecSearchExpanded && !surecPersonelPickerOpen) {
+      return;
+    }
+
+    function handlePointerDown(event: MouseEvent) {
+      const target = event.target;
+
+      if (!(target instanceof Node)) {
+        return;
+      }
+
+      if (surecSearchToolbarRef.current?.contains(target)) {
+        return;
+      }
+
+      if (surecPersonelPickerRef.current?.contains(target)) {
+        return;
+      }
+
+      setSurecSearchExpanded(false);
+      setSurecPersonelPickerOpen(false);
+    }
+
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => document.removeEventListener("mousedown", handlePointerDown);
+  }, [surecPersonelPickerOpen, surecSearchExpanded]);
 
   const personelMap = useMemo(() => new Map(personeller.map((personel) => [personel.id, personel])), [personeller]);
 
@@ -1310,7 +1340,11 @@ export function KayitSurecWorkspace({
     .join(" ");
 
   return (
-    <div className={`kayit-workspace${activeTab === "yeni-kayit" ? " kayit-workspace--personel-kayit" : ""}`}>
+    <div
+      className={`kayit-workspace${activeTab === "yeni-kayit" ? " kayit-workspace--personel-kayit" : ""}${
+        activeTab === "surec" && !classicSurecFormLayout && !selectedSurecPersonel ? " kayit-workspace--surec-search" : ""
+      }`}
+    >
       <div className="kayit-workspace-tabs" role="tablist" aria-label="Kayıt ve süreç sekmeleri">
         <button
           type="button"
@@ -1333,47 +1367,45 @@ export function KayitSurecWorkspace({
       </div>
 
       {activeTab === "surec" && !classicSurecFormLayout && !selectedSurecPersonel ? (
-        <div className="surec-workspace-toolbar">
-          <div className={`surec-workspace-search${surecSearchExpanded ? " is-expanded" : ""}`}>
-            <div className={`surec-workspace-search-field${surecSearchExpanded ? " is-expanded" : ""}`}>
-              <input
-                ref={surecPersonelSearchInputRef}
-                id="kayit-surec-personel-search-input"
-                data-testid="kayit-surec-personel-search-input"
-                className="form-input surec-workspace-search-input"
-                type="search"
-                value={surecPersonelSearch}
-                onChange={(event) => {
-                  const nextValue = event.target.value;
-                  setSurecPersonelSearch(nextValue);
+        <div className="surec-workspace-toolbar" ref={surecSearchToolbarRef}>
+          <div className={`surec-workspace-search-field${surecSearchExpanded ? " is-expanded" : ""}`}>
+            <input
+              ref={surecPersonelSearchInputRef}
+              id="kayit-surec-personel-search-input"
+              data-testid="kayit-surec-personel-search-input"
+              className="form-input surec-workspace-search-input"
+              type="search"
+              value={surecPersonelSearch}
+              onChange={(event) => {
+                const nextValue = event.target.value;
+                setSurecPersonelSearch(nextValue);
 
-                  if (nextValue.trim() && !selectedSurecPersonel) {
-                    setSurecPersonelPickerOpen(true);
-                  }
-                }}
-                onKeyDown={(event) => {
-                  if (event.key === "Escape") {
-                    setSurecSearchExpanded(false);
-                    setSurecPersonelPickerOpen(false);
-                  }
-                }}
-                placeholder="Personel ara"
-                aria-label="Personel ara"
-                tabIndex={surecSearchExpanded ? 0 : -1}
-              />
-            </div>
-            <button
-              type="button"
-              data-testid="kayit-surec-personel-search-toggle"
-              className="surec-workspace-search-toggle"
-              aria-expanded={surecSearchExpanded}
-              aria-controls="kayit-surec-personel-search-input"
-              aria-label={surecSearchExpanded ? "Aramayı kapat" : "Personel ara"}
-              onClick={toggleSurecSearchExpanded}
-            >
-              <IconSearch />
-            </button>
+                if (nextValue.trim() && !selectedSurecPersonel) {
+                  setSurecPersonelPickerOpen(true);
+                }
+              }}
+              onKeyDown={(event) => {
+                if (event.key === "Escape") {
+                  setSurecSearchExpanded(false);
+                  setSurecPersonelPickerOpen(false);
+                }
+              }}
+              placeholder="Personel ara"
+              aria-label="Personel ara"
+              tabIndex={surecSearchExpanded ? 0 : -1}
+            />
           </div>
+          <button
+            type="button"
+            data-testid="kayit-surec-personel-search-toggle"
+            className="surec-workspace-search-toggle"
+            aria-expanded={surecSearchExpanded}
+            aria-controls="kayit-surec-personel-search-input"
+            aria-label={surecSearchExpanded ? "Aramayı kapat" : "Personel ara"}
+            onClick={toggleSurecSearchExpanded}
+          >
+            <IconSearch />
+          </button>
         </div>
       ) : null}
 
@@ -1506,7 +1538,7 @@ export function KayitSurecWorkspace({
                   <>
                     {!selectedSurecPersonel ? (
                       <>
-                        <div className="surec-personel-picker">
+                        <div className="surec-personel-picker" ref={surecPersonelPickerRef}>
                           {personelOptions.length > 0 ? (
                             <div
                               className="surec-personel-combobox form-section"

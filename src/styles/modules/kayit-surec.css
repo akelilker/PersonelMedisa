@@ -11,6 +11,10 @@
   gap: 6px;
 }
 
+.kayit-workspace--surec-search {
+  gap: 4px;
+}
+
 .kayit-workspace-tabs {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
@@ -52,30 +56,20 @@
 }
 
 .surec-workspace-toolbar {
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
+  position: relative;
+  display: block;
   width: 100%;
-  min-height: 0;
+  min-height: 32px;
   margin-top: -4px;
-}
-
-.surec-workspace-search {
-  display: flex;
-  flex-direction: row-reverse;
-  align-items: center;
-  gap: 6px;
-  max-width: 40%;
-  margin-left: auto;
-}
-
-.surec-workspace-search.is-expanded {
-  width: 40%;
+  margin-bottom: -2px;
 }
 
 .surec-workspace-search-toggle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 2;
   display: inline-flex;
-  flex: 0 0 auto;
   align-items: center;
   justify-content: center;
   width: 32px;
@@ -96,21 +90,21 @@
 }
 
 .surec-workspace-search-field {
-  flex: 0 0 0;
+  position: absolute;
+  top: 0;
+  right: 38px;
   width: 0;
-  min-width: 0;
+  max-width: calc(40% - 38px);
   overflow: hidden;
   opacity: 0;
   pointer-events: none;
   transition:
-    flex-basis 0.22s ease,
     width 0.22s ease,
     opacity 0.18s ease;
 }
 
 .surec-workspace-search-field.is-expanded {
-  flex: 1 1 auto;
-  width: auto;
+  width: calc(40% - 38px);
   opacity: 1;
   pointer-events: auto;
 }
@@ -399,7 +393,7 @@
 .surec-personel-picker {
   display: grid;
   gap: 0;
-  margin-top: 12px;
+  margin-top: 0;
   padding: 0;
   border: none;
   border-radius: 0;

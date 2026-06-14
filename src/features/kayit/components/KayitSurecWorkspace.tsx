@@ -74,6 +74,26 @@ export const KAYIT_SUREC_MALI_FORM_ID = "kayit-surec-mali-form";
 export const KAYIT_SUREC_CEZA_FORM_ID = "kayit-surec-ceza-form";
 export const KAYIT_SUREC_BELGELER_FORM_ID = "kayit-surec-belgeler-form";
 
+function IconSearch(props: { className?: string }) {
+  return (
+    <svg
+      className={props.className}
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <circle cx="11" cy="11" r="8" />
+      <path d="m21 21-4.3-4.3" />
+    </svg>
+  );
+}
+
 /** Personel kartı süreç geçmişi; `usePersonelDetail` ile aynı sayfa boyutu. */
 const KAYIT_SUREC_PERSONEL_HISTORY_LIMIT = 20;
 /** `useSurecler` liste sayfa boyutu ile uyumlu. */
@@ -545,6 +565,7 @@ export function KayitSurecWorkspace({
   const [editingSurec, setEditingSurec] = useState<Surec | null>(null);
   const [surecPersonelSearch, setSurecPersonelSearch] = useState("");
   const [surecPersonelPickerOpen, setSurecPersonelPickerOpen] = useState(false);
+  const [surecSearchExpanded, setSurecSearchExpanded] = useState(false);
   const surecPersonelSearchInputRef = useRef<HTMLInputElement>(null);
 
   const [activePersonelTab, setActivePersonelTab] = useState<PersonelSurecTab>("genel");
@@ -644,6 +665,7 @@ export function KayitSurecWorkspace({
 
       if (key === "Backspace") {
         event.preventDefault();
+        setSurecSearchExpanded(true);
         searchEl.focus({ preventScroll: true });
         setSurecPersonelSearch((prev) => prev.slice(0, -1));
         return;
@@ -651,6 +673,7 @@ export function KayitSurecWorkspace({
 
       if (key === "Delete") {
         event.preventDefault();
+        setSurecSearchExpanded(true);
         searchEl.focus({ preventScroll: true });
         return;
       }
@@ -661,6 +684,7 @@ export function KayitSurecWorkspace({
 
       if (key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey) {
         event.preventDefault();
+        setSurecSearchExpanded(true);
         searchEl.focus({ preventScroll: true });
         setSurecPersonelSearch((prev) => prev + key);
       }
@@ -669,14 +693,14 @@ export function KayitSurecWorkspace({
   );
 
   useLayoutEffect(() => {
-    if (!surecPersonelPickerOpen) {
+    if (!surecSearchExpanded) {
       return;
     }
     const id = window.requestAnimationFrame(() => {
       surecPersonelSearchInputRef.current?.focus({ preventScroll: true });
     });
     return () => window.cancelAnimationFrame(id);
-  }, [surecPersonelPickerOpen]);
+  }, [surecSearchExpanded]);
 
   const personelMap = useMemo(() => new Map(personeller.map((personel) => [personel.id, personel])), [personeller]);
 
@@ -684,6 +708,18 @@ export function KayitSurecWorkspace({
     const personelId = Number.parseInt(surecForm.personelId, 10);
     return Number.isFinite(personelId) ? personelMap.get(personelId) ?? null : null;
   }, [personelMap, surecForm.personelId]);
+
+  const toggleSurecSearchExpanded = useCallback(() => {
+    setSurecSearchExpanded((open) => {
+      const next = !open;
+
+      if (next && !selectedSurecPersonel) {
+        setSurecPersonelPickerOpen(true);
+      }
+
+      return next;
+    });
+  }, [selectedSurecPersonel]);
 
   const isSelectedPersonelPasif = selectedSurecPersonel?.aktif_durum === "PASIF";
   const canSubmitShellFinansZimmet = Boolean(selectedSurecPersonel) && !isSelectedPersonelPasif;
@@ -828,6 +864,8 @@ export function KayitSurecWorkspace({
   function selectSurecPersonel(personelId: string) {
     setSurecForm((prev) => ({ ...prev, personelId }));
     setSurecPersonelPickerOpen(false);
+    setSurecPersonelSearch("");
+    setSurecSearchExpanded(false);
     if (activePersonelTab === "belgeler") {
       setBelgeDurumInfo(null);
       setBelgeDurumError(null);
@@ -1294,6 +1332,51 @@ export function KayitSurecWorkspace({
         </button>
       </div>
 
+      {activeTab === "surec" && !classicSurecFormLayout && !selectedSurecPersonel ? (
+        <div className="surec-workspace-toolbar">
+          <div className={`surec-workspace-search${surecSearchExpanded ? " is-expanded" : ""}`}>
+            <div className={`surec-workspace-search-field${surecSearchExpanded ? " is-expanded" : ""}`}>
+              <input
+                ref={surecPersonelSearchInputRef}
+                id="kayit-surec-personel-search-input"
+                data-testid="kayit-surec-personel-search-input"
+                className="form-input surec-workspace-search-input"
+                type="search"
+                value={surecPersonelSearch}
+                onChange={(event) => {
+                  const nextValue = event.target.value;
+                  setSurecPersonelSearch(nextValue);
+
+                  if (nextValue.trim() && !selectedSurecPersonel) {
+                    setSurecPersonelPickerOpen(true);
+                  }
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === "Escape") {
+                    setSurecSearchExpanded(false);
+                    setSurecPersonelPickerOpen(false);
+                  }
+                }}
+                placeholder="Personel ara"
+                aria-label="Personel ara"
+                tabIndex={surecSearchExpanded ? 0 : -1}
+              />
+            </div>
+            <button
+              type="button"
+              data-testid="kayit-surec-personel-search-toggle"
+              className="surec-workspace-search-toggle"
+              aria-expanded={surecSearchExpanded}
+              aria-controls="kayit-surec-personel-search-input"
+              aria-label={surecSearchExpanded ? "Aramayı kapat" : "Personel ara"}
+              onClick={toggleSurecSearchExpanded}
+            >
+              <IconSearch />
+            </button>
+          </div>
+        </div>
+      ) : null}
+
       {activeTab === "yeni-kayit" ? (
         <div className="kayit-workspace-grid kayit-workspace-grid--personel-form">
           <section className="workspace-surface-card">
@@ -1439,7 +1522,17 @@ export function KayitSurecWorkspace({
                                 aria-labelledby="surec-personel-combobox-label"
                                 aria-expanded={surecPersonelPickerOpen}
                                 aria-controls="surec-personel-combobox-list"
-                                onClick={() => setSurecPersonelPickerOpen((isOpen) => !isOpen)}
+                                onClick={() => {
+                                  setSurecPersonelPickerOpen((isOpen) => {
+                                    const next = !isOpen;
+
+                                    if (next) {
+                                      setSurecSearchExpanded(true);
+                                    }
+
+                                    return next;
+                                  });
+                                }}
                               >
                                 <span>{selectedSurecPersonelLabel}</span>
                                 <span aria-hidden="true">⌄</span>
@@ -1447,14 +1540,6 @@ export function KayitSurecWorkspace({
 
                               {surecPersonelPickerOpen ? (
                                 <div className="surec-personel-combobox-panel" id="surec-personel-combobox-list">
-                                  <input
-                                    ref={surecPersonelSearchInputRef}
-                                    className="form-input surec-personel-combobox-search"
-                                    type="search"
-                                    value={surecPersonelSearch}
-                                    onChange={(event) => setSurecPersonelSearch(event.target.value)}
-                                    placeholder="Personel ara"
-                                  />
                                   <div className="surec-personel-combobox-options" role="listbox" aria-label="Personel listesi">
                                     {filteredSurecPersonelOptions.length > 0 ? (
                                       filteredSurecPersonelOptions.map((option) => (

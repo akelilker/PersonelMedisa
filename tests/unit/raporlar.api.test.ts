@@ -29,7 +29,7 @@ describe("raporlar.api", () => {
               }
             ]
           },
-          meta: { total: 1 },
+          meta: { page: 2, limit: 10, total: 24, total_pages: 3, has_next_page: true },
           errors: []
         },
         200
@@ -42,7 +42,9 @@ describe("raporlar.api", () => {
       departman_id: 3,
       baslangic_tarihi: "2026-04-01",
       bitis_tarihi: "2026-04-30",
-      aktiflik: "aktif"
+      aktiflik: "aktif",
+      page: 2,
+      limit: 10
     });
 
     const [url] = fetchMock.mock.calls[0] as [string];
@@ -50,8 +52,18 @@ describe("raporlar.api", () => {
     expect(url).toContain("personel_id=1");
     expect(url).toContain("departman_id=3");
     expect(url).toContain("aktiflik=aktif");
-    expect(result.total).toBe(1);
+    expect(url).toContain("page=2");
+    expect(url).toContain("limit=10");
+    expect(result.total).toBe(24);
     expect(result.rows).toHaveLength(1);
+    expect(result.pagination).toEqual({
+      page: 2,
+      limit: 10,
+      total: 24,
+      totalPages: 3,
+      hasNextPage: true,
+      hasPreviousPage: true
+    });
   });
 
   it("wraps object payload into single row for summary-style endpoints", async () => {
@@ -80,5 +92,29 @@ describe("raporlar.api", () => {
       }
     ]);
     expect(result.total).toBe(1);
+  });
+
+  it("keeps empty list payloads empty instead of wrapping the response object", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        createJsonResponse(
+          {
+            data: {
+              items: []
+            },
+            meta: { page: 1, limit: 10, total: 0, total_pages: 1, has_next_page: false },
+            errors: []
+          },
+          200
+        )
+      )
+    );
+
+    const result = await fetchRapor("bildirim", { page: 1, limit: 10 });
+
+    expect(result.rows).toEqual([]);
+    expect(result.total).toBe(0);
+    expect(result.pagination.hasNextPage).toBe(false);
   });
 });

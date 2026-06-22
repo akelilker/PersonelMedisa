@@ -101,7 +101,7 @@ test.describe("e2e smoke", () => {
     await expect(page.getByTestId("aylik-kapanis-ozeti-section")).toBeVisible();
     await page.getByTestId("raporlar-submit-run").click();
     await expect(page.getByTestId("raporlar-resmi-sonuc")).toContainText("1");
-    await expect(page.getByTestId("raporlar-resmi-sonuc")).toContainText("sgk_prim_gun");
+    await expect(page.getByTestId("raporlar-resmi-sonuc")).toContainText("SGK Prim Gün");
   });
 
   test("birim amiri gunluk kayit girer ama puantaj ve kapanis tarafinda read-only kalir", async ({ page }) => {

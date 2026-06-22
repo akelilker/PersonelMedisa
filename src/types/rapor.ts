@@ -1,3 +1,5 @@
+import type { PaginationMeta } from "./api";
+
 export type RaporTipi =
   | "personel-ozet"
   | "izin"
@@ -16,11 +18,19 @@ export type RaporFiltreleri = {
   baslangic_tarihi?: string;
   bitis_tarihi?: string;
   aktiflik?: RaporAktiflik;
+  page?: number;
+  limit?: number;
 };
 
 export type RaporSatiri = Record<string, unknown>;
 
+export type RaporKolonu = {
+  key: string;
+  label: string;
+};
+
 export type RaporSonuc = {
   rows: RaporSatiri[];
   total: number | null;
+  pagination: PaginationMeta;
 };

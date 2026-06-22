@@ -3,7 +3,7 @@ import type { RaporFiltreleri, RaporSatiri, RaporSonuc, RaporTipi } from "../typ
 import { appendQueryParams } from "../utils/append-query-params";
 import { apiRequest } from "./api-client";
 import { endpoints } from "./endpoints";
-import { extractListItems } from "./response-normalizers";
+import { extractListItems, normalizePaginatedList } from "./response-normalizers";
 
 const RAPOR_ENDPOINTS: Record<RaporTipi, string> = {
   "personel-ozet": endpoints.raporlar.personelOzet,
@@ -45,7 +45,7 @@ function normalizeRows(data: unknown): RaporSatiri[] {
   }
 
   const listItems = extractListItems<unknown>(data);
-  if (listItems.length > 0) {
+  if (listItems.length > 0 || hasListContainer(data)) {
     return listItems.map((item) => toRecord(item) ?? { value: item });
   }
 
@@ -55,6 +55,17 @@ function normalizeRows(data: unknown): RaporSatiri[] {
   }
 
   return [];
+}
+
+function hasListContainer(data: unknown): boolean {
+  const record = toRecord(data);
+  if (!record) {
+    return false;
+  }
+
+  return ["items", "records", "results", "list", "rows", "data"].some((key) =>
+    Array.isArray(record[key])
+  );
 }
 
 function readTotal(meta: ApiMeta, data: unknown, rows: RaporSatiri[]): number | null {
@@ -79,13 +90,24 @@ export async function fetchRapor(
     departman_id: filters?.departman_id,
     baslangic_tarihi: filters?.baslangic_tarihi,
     bitis_tarihi: filters?.bitis_tarihi,
-    aktiflik: filters?.aktiflik
+    aktiflik: filters?.aktiflik,
+    page: filters?.page,
+    limit: filters?.limit
   });
   const response = await apiRequest<ApiResponse<unknown>>(path);
+  const normalized = normalizePaginatedList<unknown>(response, {
+    requestedPage: filters?.page,
+    requestedLimit: filters?.limit
+  });
   const rows = normalizeRows(response.data);
+  const total = normalized.pagination.total ?? readTotal(response.meta, response.data, rows);
 
   return {
     rows,
-    total: readTotal(response.meta, response.data, rows)
+    total,
+    pagination: {
+      ...normalized.pagination,
+      total
+    }
   };
 }

@@ -16,8 +16,9 @@ import { useRoleAccess } from "../../../hooks/use-role-access";
 import { formatReportCellValue } from "../../../lib/display/enum-display";
 import { downloadReportCsv } from "../../../reports/export-report";
 import type { IdOption } from "../../../types/referans";
-import type { RaporAktiflik, RaporFiltreleri, RaporSatiri, RaporTipi } from "../../../types/rapor";
+import type { RaporAktiflik, RaporFiltreleri, RaporKolonu, RaporSatiri, RaporTipi } from "../../../types/rapor";
 import type { AylikBolumOnayDurumu, AylikOzetAggregateState, AylikOzetResponse } from "../../../types/yonetim";
+import { getRaporColumns } from "../rapor-column-contract";
 
 type RaporFormState = {
   raporTipi: RaporTipi;
@@ -27,6 +28,8 @@ type RaporFormState = {
   bitisTarihi: string;
   aktiflik: RaporAktiflik;
 };
+
+const PAGE_SIZE = 10;
 
 const RAPOR_OPTIONS: Array<{ value: RaporTipi; label: string }> = [
   { value: "personel-ozet", label: "Personel Özeti" },
@@ -53,8 +56,8 @@ function parseOptionalPositiveInt(value: string): number | undefined {
   return parsed;
 }
 
-function formatCellValue(column: string, value: unknown): string {
-  const displayValue = formatReportCellValue(column, value);
+function formatCellValue(column: RaporKolonu, value: unknown): string {
+  const displayValue = formatReportCellValue(column.key, value);
   if (displayValue !== null) {
     return displayValue;
   }
@@ -76,21 +79,6 @@ function formatCellValue(column: string, value: unknown): string {
   } catch {
     return String(value);
   }
-}
-
-function collectColumns(rows: RaporSatiri[]): string[] {
-  const keys = new Set<string>();
-
-  for (const row of rows) {
-    for (const key of Object.keys(row)) {
-      keys.add(key);
-      if (keys.size >= 8) {
-        return Array.from(keys);
-      }
-    }
-  }
-
-  return Array.from(keys);
 }
 
 type AylikFilterState = {
@@ -493,40 +481,57 @@ export function RaporlarPage() {
   });
   const [rows, setRows] = useState<RaporSatiri[]>([]);
   const [total, setTotal] = useState<number | null>(null);
+  const [page, setPage] = useState(1);
+  const [hasNextPage, setHasNextPage] = useState(false);
+  const [totalPages, setTotalPages] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
 
-  const columns = useMemo(() => collectColumns(rows), [rows]);
+  const columns = useMemo(() => getRaporColumns(form.raporTipi), [form.raporTipi]);
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  function buildRaporFilters(nextPage: number): RaporFiltreleri {
+    if (form.baslangicTarihi && form.bitisTarihi && form.baslangicTarihi > form.bitisTarihi) {
+      throw new Error("Başlangıç tarihi bitiş tarihinden büyük olamaz.");
+    }
+
+    return {
+      personel_id: parseOptionalPositiveInt(form.personelId),
+      departman_id: parseOptionalPositiveInt(form.departmanId),
+      baslangic_tarihi: form.baslangicTarihi || undefined,
+      bitis_tarihi: form.bitisTarihi || undefined,
+      aktiflik: form.aktiflik,
+      page: nextPage,
+      limit: PAGE_SIZE
+    };
+  }
+
+  async function loadRapor(nextPage: number) {
     setIsLoading(true);
     setErrorMessage(null);
 
     try {
-      if (form.baslangicTarihi && form.bitisTarihi && form.baslangicTarihi > form.bitisTarihi) {
-        throw new Error("Başlangıç tarihi bitiş tarihinden büyük olamaz.");
-      }
-
-      const filters: RaporFiltreleri = {
-        personel_id: parseOptionalPositiveInt(form.personelId),
-        departman_id: parseOptionalPositiveInt(form.departmanId),
-        baslangic_tarihi: form.baslangicTarihi || undefined,
-        bitis_tarihi: form.bitisTarihi || undefined,
-        aktiflik: form.aktiflik
-      };
-      const result = await fetchRapor(form.raporTipi, filters);
+      const result = await fetchRapor(form.raporTipi, buildRaporFilters(nextPage));
       setRows(result.rows);
       setTotal(result.total);
+      setPage(result.pagination.page ?? nextPage);
+      setHasNextPage(result.pagination.hasNextPage ?? result.rows.length >= PAGE_SIZE);
+      setTotalPages(result.pagination.totalPages);
       setHasSearched(true);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Rapor verisi alınamadı.");
       setRows([]);
       setTotal(null);
+      setHasNextPage(false);
+      setTotalPages(null);
     } finally {
       setIsLoading(false);
     }
+  }
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    await loadRapor(1);
   }
 
   function handleClear() {
@@ -540,6 +545,9 @@ export function RaporlarPage() {
     });
     setRows([]);
     setTotal(null);
+    setPage(1);
+    setHasNextPage(false);
+    setTotalPages(null);
     setErrorMessage(null);
     setHasSearched(false);
   }
@@ -643,7 +651,7 @@ export function RaporlarPage() {
               <thead>
                 <tr>
                   {columns.map((column) => (
-                    <th key={column}>{column}</th>
+                    <th key={column.key}>{column.label}</th>
                   ))}
                 </tr>
               </thead>
@@ -651,12 +659,34 @@ export function RaporlarPage() {
                 {rows.map((row, index) => (
                   <tr key={index}>
                     {columns.map((column) => (
-                      <td key={`${index}-${column}`}>{formatCellValue(column, row[column])}</td>
+                      <td key={`${index}-${column.key}`}>{formatCellValue(column, row[column.key])}</td>
                     ))}
                   </tr>
                 ))}
               </tbody>
             </table>
+          </div>
+          <div className="module-pagination">
+            <button
+              type="button"
+              className="state-action-btn"
+              onClick={() => void loadRapor(Math.max(1, page - 1))}
+              disabled={isLoading || page <= 1}
+            >
+              Onceki
+            </button>
+            <span className="module-page-info">
+              Sayfa {page}
+              {totalPages ? ` / ${totalPages}` : ""}
+            </span>
+            <button
+              type="button"
+              className="state-action-btn"
+              onClick={() => void loadRapor(page + 1)}
+              disabled={isLoading || !hasNextPage}
+            >
+              Sonraki
+            </button>
           </div>
         </div>
       ) : null}

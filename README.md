@@ -21,7 +21,7 @@ Bu repo, Medisa Personel ve Puantaj Yonetim Sistemi icin React + Vite + TypeScri
 - surec ve bildirim detay sayfalari route seviyesinde aktif (`/surecler/:surecId`, `/bildirimler/:bildirimId`)
 - gunluk puantaj modulu aktif (`GET/PUT /api/gunluk-puantaj/{personelId}/{tarih}`)
 - haftalik kapanis modulu aktif (`POST /api/haftalik-kapanis`)
-- raporlar modulu aktif (`GET /api/raporlar/*`)
+- raporlar modulu aktif (`GET /api/raporlar/*`); her rapor tipi icin deterministik kolon sozlesmesi ve page/limit sayfalama akisi bagli
 - finans modulu aktif (`GET/POST/PUT /api/ek-odeme-kesinti`, `POST /api/ek-odeme-kesinti/{id}/iptal`)
 - rol bazli permission matrisi aktif; `BIRIM_AMIRI` (Birim Amiri Rolü) create/update/cancel aksiyonlarinda read-only
 - referans veri endpointleri form dropdownlarina baglandi (departman/gorev/personel tipi/surec turu/bildirim turu)
@@ -84,6 +84,5 @@ npm run e2e
 
 ## Sonraki Adimlar
 
-1. raporlar ekraninda her rapor tipi icin ozel kolon map ve sayfalama stratejisi eklemek
-2. haftalik kapanis sonucu ile raporlar endpointlerini ayni snapshot ID uzerinden iliskilendirmek
-3. finans modulunde kalem turu ve donem secimlerini referans endpointleri ile zenginlestirmek
+1. haftalik kapanis sonucu ile raporlar endpointlerini ayni snapshot ID uzerinden iliskilendirmek
+2. finans modulunde kalem turu ve donem secimlerini referans endpointleri ile zenginlestirmek

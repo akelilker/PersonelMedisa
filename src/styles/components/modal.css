@@ -113,6 +113,33 @@
   padding-top: 0;
 }
 
+/* Module overlay: pass modal-body height to page roots without changing global .modal-body. */
+.modal-body:has(> .personeller-page),
+.modal-body:has(> .yonetim-page) {
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-body > .personeller-page,
+.modal-body > .yonetim-page {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-body > .personeller-page {
+  gap: var(--space-3);
+}
+
+.modal-body > .yonetim-page {
+  gap: 14px;
+}
+
+.modal-body > .yonetim-page > * + * {
+  margin-top: 0;
+}
+
 .modal-close-btn {
   grid-column: 3;
   justify-self: end;

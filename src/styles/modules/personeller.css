@@ -225,6 +225,20 @@
   max-height: min(56vh, 560px);
 }
 
+.modal-body > .personeller-page .personeller-list-wrap,
+.modal-body > .personeller-page .personeller-table-wrap {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+  overflow-y: auto;
+}
+
+.modal-body > .personeller-page .personeller-toolbar,
+.modal-body > .personeller-page .personeller-filter-panel,
+.modal-body > .personeller-page .module-pagination {
+  flex-shrink: 0;
+}
+
 .personeller-list {
   list-style: none;
   margin: 0;

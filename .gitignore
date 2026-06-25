@@ -3,6 +3,9 @@ dist/
 build/
 .env.local
 .env.*.local
+.env.production
+modem_*
+huawei_login.*
 .DS_Store
 Thumbs.db
 *.log

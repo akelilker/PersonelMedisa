@@ -650,6 +650,59 @@ Rapor endpoint'leri en az şu filtreleri taşımalıdır:
 - `baslangic_tarihi`
 - `bitis_tarihi`
 - `aktiflik`
+- `page`
+- `limit`
+
+Haftalık kapanış snapshot ilişkisi için ek sorgu parametreleri §13.2.1–§13.2.3 altında tanımlanır. Bu alt maddeler **[KARAR BEKLIYOR]** statüsündedir; owner/backend onayı olmadan uygulama kontratı sayılmaz.
+
+#### 13.2.1 Haftalık kapanış batch filtresi — `kapanis_id`
+
+**[KARAR BEKLIYOR — 1]** Liste raporları, haftalık kapanış batch'i için `kapanis_id` query param ile filtrelenecek mi?
+
+Önerilen yön (onay bekliyor):
+
+- `kapanis_id`, `POST /api/haftalik-kapanis` yanıtındaki kapanış işlemi kimliğini temsil eder.
+- Yanıtta yalnızca `id` dönerse, istemci tarafında `kapanis_id` ile eş anlamlı kabul edilebilir (bkz. `docs/guncel/39-haftalik-kapanis-snapshot-sozlesmesi-karar.md`).
+- Bir `kapanis_id`, ilgili hafta ve kapsam için N adet personel snapshot satırını (`snapshot_id`) kapsar.
+
+| Alan | Tip | Zorunluluk (önerilen) | Açıklama |
+|------|-----|----------------------|----------|
+| `kapanis_id` | positive integer | opsiyonel | Haftalık kapanış batch kimliği |
+
+**Not:** Mevcut frontend bu param'ı henüz göndermemektedir.
+
+#### 13.2.2 Satır referansı — `snapshot_id`
+
+**[KARAR BEKLIYOR — 2]** `snapshot_id` genel liste raporu filtresi mi olacak, yoksa yalnızca satır/detay referansı mı kalacak?
+
+Önerilen yön (onay bekliyor):
+
+| Kullanım | `snapshot_id` rolü (önerilen) |
+|----------|------------------------------|
+| Liste raporu (`GET /api/raporlar/*`) | Genel liste filtresi değildir |
+| Tek personel daraltma | `kapanis_id` + `personel_id` yeterli olabilir |
+| Satır/detay referansı | FM ödeme tercihi, serbest zaman, audit gibi diğer domain endpoint'lerinde |
+
+Owner alternatif olarak belirli rapor endpoint'lerinde opsiyonel `snapshot_id` filtresi tanımlayabilir. Bu durumda whitelist §13.4'te açıkça listelenmelidir.
+
+#### 13.2.3 `kapanis_id` ile tarih filtrelerinin birlikte kullanımı
+
+**[KARAR BEKLIYOR — 4]** `kapanis_id` ile `baslangic_tarihi` / `bitis_tarihi` birlikte gelirse davranış ne olacak?
+
+Önerilen yön (onay bekliyor):
+
+1. `kapanis_id` gönderildiğinde backend, kapanış kaydındaki `hafta_baslangic` ve `hafta_bitis` değerlerini authoritative kabul edebilir.
+2. İstemci tarih filtrelerini bilgilendirme amaçlı gönderebilir; backend bunları kapanış haftası ile hizalayabilir veya yok sayabilir.
+3. İstemci tarafından gönderilen tarih aralığı kapanış haftası ile çakışmıyorsa backend `400 INVALID_QUERY` dönebilir.
+
+| Senaryo | Önerilen backend davranışı (onay bekliyor) |
+|---------|---------------------------------------------|
+| Yalnız `kapanis_id` | Kapanış haftası kapsamında rapor döner |
+| `kapanis_id` + uyumlu tarih | Kapanış haftası uygulanır; tarih redundant kabul edilir |
+| `kapanis_id` + uyumsuz tarih | `400 INVALID_QUERY` |
+| Tarih var, `kapanis_id` yok | Mevcut canlı/read-model filtre davranışı (§13.3) |
+
+Owner alternatifleri: tarih + kapanis kesişimi (AND) veya farklı hata kodu.
 
 ### 13.3 Veri Kaynağı
 
@@ -663,6 +716,106 @@ Backend gerektiğinde:
 - ek odeme kesinti
 
 katmanlarını birleştirerek rapor DTO'su döner.
+
+#### 13.3.1 `kapanis_id` varken veri kaynağı
+
+**[KARAR BEKLIYOR — 5]** `kapanis_id` filtresi aktifken rapor mühürlü snapshot mı, canlı read-model mi dönecek?
+
+Önerilen yön (onay bekliyor):
+
+| Koşul | Veri kaynağı (önerilen) | Açıklama |
+|-------|-------------------------|----------|
+| `kapanis_id` var | Mühürlü snapshot | Kapanış anında üretilen personel × hafta satırları |
+| `kapanis_id` yok | Canlı read-model | Mevcut puantaj/süreç/finans birleşimi; geriye dönük uyumluluk |
+
+Önerilen `meta` izi (onay bekliyor):
+
+```json
+{
+  "meta": {
+    "kaynak": "SNAPSHOT",
+    "kapanis_id": 99,
+    "hafta_baslangic": "2026-04-06",
+    "hafta_bitis": "2026-04-12"
+  }
+}
+```
+
+`kapanis_id` yokken önerilen değer: `"kaynak": "LIVE"`.
+
+#### 13.3.2 Correction overlay
+
+**[KARAR BEKLIYOR — 6]** Correction overlay bu fazda kapsam dışı mı?
+
+Önerilen yön (onay bekliyor):
+
+- Bu fazda `kapanis_id` ile dönen raporlar ham mühürlü snapshot verisini yansıtır.
+- ONAYLANDI revizyon correction overlay'i (`docs/guncel/60-revizyon-talebi-correction-layer-karar.md` §7–8) sonraki fazda ele alınır.
+- Düzeltilmiş operasyon görünümü için ileride aday endpoint: `GET /api/raporlar/haftalik-kapanis-duzeltilmis` (`docs/guncel/50-kapali-donem-audit-workflow-karar.md` §14). Bu kontrat fazında implementasyon hedefi değildir.
+
+### 13.4 Endpoint whitelist karar tablosu
+
+**[KARAR BEKLIYOR — 3]** Hangi `/api/raporlar/*` endpoint'leri `kapanis_id` destekleyecek?
+
+Aşağıdaki tablo önerilen/onay bekleyen yöndür; kod tarafında varsayım üretilmez.
+
+| Endpoint | `kapanis_id` (önerilen / onay bekliyor) | Gerekçe (önerilen) |
+|----------|----------------------------------------|---------------------|
+| `GET /api/raporlar/personel-ozet` | Evet | Haftalık puantaj özeti |
+| `GET /api/raporlar/devamsizlik` | Evet | Kapanış snapshot devamsızlık türevi |
+| `GET /api/raporlar/izin` | Evet | Süreç + kapanış birleşimi |
+| `GET /api/raporlar/bildirim` | Evet | Günlük kayıt türevi |
+| `GET /api/raporlar/is-kazasi` | Opsiyonel | Owner kararı |
+| `GET /api/raporlar/tesvik` | Hayır (önerilen) | Dönemsel finans katmanı |
+| `GET /api/raporlar/ceza` | Hayır (önerilen) | Dönemsel finans katmanı |
+| `GET /api/raporlar/ekstra-prim` | Hayır (önerilen) | Dönemsel finans katmanı |
+
+**[KARAR BEKLIYOR — 7]** Whitelist dışı endpoint'e `kapanis_id` gönderilirse backend ne yapacak?
+
+| Tercih (önerilen / onay bekliyor) | Davranış |
+|-----------------------------------|----------|
+| Strict | `400 INVALID_QUERY` veya `UNSUPPORTED_FILTER` |
+| Permissive | Param yok sayılır; canlı read-model döner |
+
+Önerilen hata kodları (onay bekliyor):
+
+| Kod | HTTP | Koşul (önerilen) |
+|-----|------|-----------------|
+| `INVALID_QUERY` | 400 | `kapanis_id` geçersiz format |
+| `KAPANIS_NOT_FOUND` | 404 | `kapanis_id` bulunamadı |
+| `KAPANIS_OUT_OF_SCOPE` | 400 | `personel_id` veya `departman_id` kapanış kapsamı dışında |
+| `UNSUPPORTED_FILTER` | 400 | Endpoint whitelist dışında `kapanis_id` (strict mod) |
+
+### 13.5 Owner karar matrisi
+
+Aşağıdaki maddeler onaylanmadan frontend implementasyonu yapılmaz.
+
+| # | Karar sorusu | Önerilen yön (onay bekliyor) | Onay |
+|---|--------------|------------------------------|------|
+| 1 | Batch filtresi `kapanis_id`? | Evet; liste raporları için birincil batch filtresi | ☐ |
+| 2 | `snapshot_id` liste filtresi? | Hayır; satır/detay referansı | ☐ |
+| 3 | Destekleyen endpoint'ler? | §13.4 whitelist (puantaj-türevi alt küme) | ☐ |
+| 4 | `kapanis_id` + tarih çakışması? | Kapanış authoritative; uyumsuz tarih → 400 | ☐ |
+| 5 | `kapanis_id` varken veri kaynağı? | Mühürlü snapshot; `meta.kaynak = SNAPSHOT` | ☐ |
+| 6 | Correction overlay bu fazda? | Kapsam dışı; ham snapshot yeterli | ☐ |
+| 7 | Whitelist dışı `kapanis_id`? | Strict → 400 (alternatif: yok say) | ☐ |
+| 8 | Query param vs dedicated endpoint? | Faz 1: query param; dedicated endpoint sonraki faz | ☐ |
+
+İlişkili dokümanlar:
+
+- `docs/guncel/39-haftalik-kapanis-snapshot-sozlesmesi-karar.md` — ID modeli, snapshot alanları
+- `docs/guncel/50-kapali-donem-audit-workflow-karar.md` — düzeltilmiş görünüm adayı endpoint
+- `docs/guncel/60-revizyon-talebi-correction-layer-karar.md` — overlay modeli (sonraki faz)
+
+### 13.6 Kapsam dışı
+
+Bu kontrat fazında hedeflenmeyenler:
+
+- Correction overlay uygulanmış rapor görünümü
+- `GET /api/raporlar/haftalik-kapanis-duzeltilmis` implementasyonu
+- Haftalık kapanış UI ekranı ve kapanış → rapor navigasyon akışı (ayrı frontend fazı)
+- `snapshot_id` genel liste filtresi (owner aksini onaylamadıkça)
+- Frontend, mock veya type katmanında `kapanis_id` / `snapshot_id` alanı ekleme (§13.5 onayı sonrası)
 
 ## 14. Ekran -> Endpoint Haritası
 

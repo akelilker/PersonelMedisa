@@ -56,6 +56,8 @@ test.describe("e2e smoke", () => {
     await login(page, { username: "yonetici", password: "secret" });
 
     await expect(page).toHaveURL("/");
+    await expect(page.getByTestId("dashboard-page")).toBeVisible();
+    await expect(page.getByTestId("dashboard-kpi-grid")).toBeVisible();
     await expect(page.locator("#main-menu .menu-btn")).toHaveCount(3);
     await expect(page.getByTestId("menu-kayit-surec")).toBeVisible();
     await expect(page.getByTestId("menu-kayit-surec")).toBeEnabled();
@@ -110,6 +112,8 @@ test.describe("e2e smoke", () => {
     await login(page, { username: "birim", password: "secret" });
 
     await expect(page).toHaveURL("/");
+    await expect(page.getByTestId("dashboard-page")).toBeVisible();
+    await expect(page.getByTestId("dashboard-kpi-grid")).toBeVisible();
     await expect(page.locator("#main-menu .menu-btn")).toHaveCount(3);
     await expect(page.getByTestId("menu-kayit-surec")).toBeVisible();
     await expect(page.getByTestId("menu-kayit-surec")).toBeDisabled();

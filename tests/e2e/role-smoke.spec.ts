@@ -10,6 +10,8 @@ const users = {
 };
 
 async function expectThreeButtonHome(page: Page, canWrite: boolean) {
+  await expect(page.getByTestId("dashboard-page")).toBeVisible();
+  await expect(page.getByTestId("dashboard-kpi-grid")).toBeVisible();
   await expect(page.locator("#main-menu .menu-btn")).toHaveCount(3);
   await expect(page.getByTestId("menu-kayit-surec")).toBeVisible();
   if (canWrite) {

@@ -1,0 +1,422 @@
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import { fetchRevizyonCorrections } from "../../../../api/revizyon-correction.api";
+import { fetchRevizyonTalepleri } from "../../../../api/revizyon-talebi.api";
+import {
+  useDevamPrimiEligibilityOzeti,
+  type DevamPrimiEligibilityDurum
+} from "../../../../hooks/useDevamPrimiEligibilityOzeti";
+import { usePuantajEksikGunOzeti } from "../../../../hooks/usePuantajEksikGunOzeti";
+import type { Personel } from "../../../../types/personel";
+import type {
+  RevizyonCorrectionEvent,
+  RevizyonCorrectionTipi
+} from "../../../../types/revizyon-correction";
+import type {
+  RevizyonTalebi,
+  RevizyonTalebiDurumu,
+  RevizyonTipi
+} from "../../../../types/revizyon-talebi";
+import { DossierRecord, DossierSection } from "./personel-dosya-dossier";
+import {
+  formatDateTimeDetail,
+  formatDetailValue,
+  formatNullableScalar,
+  formatSgkHesaplamaModuLabel,
+  timestampValue
+} from "./personel-dosya-format-utils";
+
+const REVIZYON_DURUM_LABELS: Record<RevizyonTalebiDurumu, string> = {
+  TASLAK: "Taslak",
+  ONAY_BEKLIYOR: "Onay bekliyor",
+  ONAYLANDI: "Onaylandı",
+  REDDEDILDI: "Reddedildi",
+  IPTAL: "İptal"
+};
+
+const REVIZYON_TIPI_LABELS: Record<RevizyonTipi, string> = {
+  PUANTAJ_GIRIS_CIKIS_DUZELTME: "Giriş / çıkış düzeltme",
+  MOLA_DUZELTME: "Mola düzeltme",
+  DEVAMSIZLIK_DUZELTME: "Devamsızlık düzeltme",
+  SUREC_GEC_GIRIS: "Süreç geç giriş",
+  SERBEST_ZAMAN_ETKI_DUZELTME: "Serbest zaman etki düzeltme",
+  KAPANIS_HESAP_REVIZYONU: "Kapanış hesap revizyonu",
+  BORDRO_ETKI_NOTU: "Bordro etki notu"
+};
+
+const REVIZYON_CORRECTION_TIPI_LABELS: Record<RevizyonCorrectionTipi, string> = {
+  GIRIS_CIKIS_DUZELTME: "Giriş / çıkış düzeltme",
+  MOLA_DUZELTME: "Mola düzeltme",
+  DEVAMSIZLIK_DUZELTME: "Devamsızlık düzeltme",
+  SERBEST_ZAMAN_ETKI_DUZELTME: "Serbest zaman etki düzeltme",
+  KAPANIS_HESAP_REVIZYONU: "Kapanış hesap revizyonu",
+  BORDRO_ETKI_NOTU: "Bordro etki notu"
+};
+
+function sortRevizyonTalepleriByLatest(items: RevizyonTalebi[]) {
+  return [...items].sort(
+    (left, right) => timestampValue(right.talep_zamani) - timestampValue(left.talep_zamani)
+  );
+}
+
+function sortCorrectionsByLatest(items: RevizyonCorrectionEvent[]) {
+  return [...items].sort(
+    (left, right) => timestampValue(right.olusturma_zamani) - timestampValue(left.olusturma_zamani)
+  );
+}
+
+function formatDevamPrimiDonemLabel(donem: string) {
+  const match = donem.match(/^(\d{4})-(\d{2})$/);
+  if (!match) {
+    return donem;
+  }
+
+  const ayAdlari = [
+    "Ocak",
+    "Şubat",
+    "Mart",
+    "Nisan",
+    "Mayıs",
+    "Haziran",
+    "Temmuz",
+    "Ağustos",
+    "Eylül",
+    "Ekim",
+    "Kasım",
+    "Aralık"
+  ];
+  const ay = Number.parseInt(match[2], 10);
+  const ayAdi = ayAdlari[ay - 1];
+  return ayAdi ? `${ayAdi} ${match[1]}` : donem;
+}
+
+function devamPrimiDurumToneClass(durum: DevamPrimiEligibilityDurum) {
+  if (durum === "kesildi") {
+    return "is-kesildi";
+  }
+  if (durum === "manuel_inceleme") {
+    return "is-manuel";
+  }
+  return "is-hak";
+}
+
+function formatRevizyonTalebiSummary(talep: RevizyonTalebi) {
+  const durum = REVIZYON_DURUM_LABELS[talep.durum] ?? talep.durum;
+  const tip = REVIZYON_TIPI_LABELS[talep.revizyon_tipi] ?? talep.revizyon_tipi;
+  const eskiDeger = formatNullableScalar(talep.onceki_deger);
+  const yeniDeger = formatNullableScalar(talep.talep_edilen_deger);
+  const correction = talep.correction_event_id != null ? `Correction #${talep.correction_event_id}` : "Correction yok";
+  const talepZamani = formatDateTimeDetail(talep.talep_zamani);
+
+  return `${durum} / ${tip} / ${talep.etkilenen_tarih} / ${eskiDeger} -> ${yeniDeger} / ${correction} / ${talepZamani}`;
+}
+
+function formatRevizyonCorrectionSummary(correction: RevizyonCorrectionEvent) {
+  const tip = REVIZYON_CORRECTION_TIPI_LABELS[correction.correction_tipi] ?? correction.correction_tipi;
+  const eskiDeger = formatNullableScalar(correction.onceki_deger);
+  const yeniDeger = formatNullableScalar(correction.yeni_deger);
+  const durum = correction.iptal_edildi_mi ? "İptal" : "Aktif";
+  const deltaParts = [
+    correction.delta_dakika !== 0 ? `${correction.delta_dakika} dk` : null,
+    correction.delta_gun !== 0 ? `${correction.delta_gun} gün` : null
+  ].filter((part): part is string => part !== null);
+  const delta = deltaParts.length > 0 ? deltaParts.join(", ") : "Delta yok";
+  const olusturmaZamani = formatDateTimeDetail(correction.olusturma_zamani);
+
+  return `${durum} / ${tip} / ${correction.etkilenen_tarih} / ${eskiDeger} -> ${yeniDeger} / ${delta} / ${olusturmaZamani}`;
+}
+
+function PersonelRevizyonCorrectionPanel({
+  canViewRevizyon,
+  isLoading,
+  errorMessage,
+  talepler,
+  corrections
+}: {
+  canViewRevizyon: boolean;
+  isLoading: boolean;
+  errorMessage: string | null;
+  talepler: RevizyonTalebi[];
+  corrections: RevizyonCorrectionEvent[];
+}) {
+  const acikTalepSayisi = talepler.filter(
+    (talep) => talep.durum === "TASLAK" || talep.durum === "ONAY_BEKLIYOR"
+  ).length;
+  const onayliTalepSayisi = talepler.filter((talep) => talep.durum === "ONAYLANDI").length;
+  const aktifCorrectionSayisi = corrections.filter((correction) => !correction.iptal_edildi_mi).length;
+  const sonTalepler = talepler.slice(0, 3);
+  const sonCorrections = corrections.slice(0, 3);
+
+  return (
+    <DossierSection
+      title="Revizyon / Correction İzleri"
+      description="Kapalı dönem düzeltme talepleri ve üretilen correction etkileri burada salt okunur izlenir."
+    >
+      {!canViewRevizyon ? (
+        <DossierRecord label="Yetki" value="Revizyon kayıtlarını görüntüleme yetkiniz yok." />
+      ) : null}
+
+      {canViewRevizyon && isLoading ? <DossierRecord label="Durum" value="Yükleniyor..." /> : null}
+      {canViewRevizyon && !isLoading && errorMessage ? (
+        <DossierRecord label="Durum" value={errorMessage} />
+      ) : null}
+
+      {canViewRevizyon && !isLoading && !errorMessage ? (
+        <>
+          <DossierRecord label="Toplam Talep" value={String(talepler.length)} />
+          <DossierRecord label="Açık Talep" value={String(acikTalepSayisi)} />
+          <DossierRecord label="Onaylanan Talep" value={String(onayliTalepSayisi)} />
+          <DossierRecord label="Aktif Correction" value={String(aktifCorrectionSayisi)} />
+
+          {talepler.length === 0 && corrections.length === 0 ? (
+            <DossierRecord label="Kayıt" value="Bu personel için revizyon veya correction kaydı yok." />
+          ) : null}
+
+          {sonTalepler.map((talep) => (
+            <DossierRecord
+              key={`revizyon-talebi-${talep.id}`}
+              label={`Talep #${talep.id}`}
+              value={formatRevizyonTalebiSummary(talep)}
+            />
+          ))}
+
+          {sonCorrections.map((correction) => (
+            <DossierRecord
+              key={`revizyon-correction-${correction.id}`}
+              label={`Correction #${correction.id}`}
+              value={formatRevizyonCorrectionSummary(correction)}
+            />
+          ))}
+        </>
+      ) : null}
+    </DossierSection>
+  );
+}
+
+function PlaceholderPanel({
+  title,
+  description,
+  actionLabel,
+  actionTo,
+  actionState,
+  canOpen,
+  noPermissionMessage
+}: {
+  title: string;
+  description: string;
+  actionLabel?: string;
+  actionTo?: string;
+  actionState?: Record<string, unknown>;
+  canOpen?: boolean;
+  noPermissionMessage?: string;
+}) {
+  return (
+    <div className="personel-kart-placeholder">
+      <h3>{title}</h3>
+      <p>{description}</p>
+      {actionLabel && actionTo ? (
+        canOpen ? (
+          <Link to={actionTo} state={actionState} className="universal-btn-aux">
+            {actionLabel}
+          </Link>
+        ) : (
+          <p className="personel-kart-placeholder-note">{noPermissionMessage ?? "Bu alanı görüntüleme yetkiniz yok."}</p>
+        )
+      ) : (
+        <p className="personel-kart-placeholder-note">İçerik bir sonraki keside bağlanacak.</p>
+      )}
+    </div>
+  );
+}
+
+export function PersonelPuantajPanel({
+  personel,
+  canViewPuantaj,
+  canViewRevizyon,
+  isActive
+}: {
+  personel: Personel;
+  canViewPuantaj: boolean;
+  canViewRevizyon: boolean;
+  isActive: boolean;
+}) {
+  const devamPrimiOzeti = useDevamPrimiEligibilityOzeti(personel);
+  const puantajEksikGunOzeti = usePuantajEksikGunOzeti(personel);
+  const [revizyonTalepleri, setRevizyonTalepleri] = useState<RevizyonTalebi[]>([]);
+  const [revizyonCorrections, setRevizyonCorrections] = useState<RevizyonCorrectionEvent[]>([]);
+  const [isRevizyonLoading, setIsRevizyonLoading] = useState(false);
+  const [revizyonErrorMessage, setRevizyonErrorMessage] = useState<string | null>(null);
+  const sgkPrimGunu = typeof personel.sgk_prim_gun === "number" ? `${personel.sgk_prim_gun} Gün` : "-";
+  const eksikGun = typeof personel.sgk_eksik_gun_sayisi === "number" ? `${personel.sgk_eksik_gun_sayisi} Gün` : "-";
+  const eksikGunNedeni = formatDetailValue(personel.sgk_eksik_gun_nedeni_kodu);
+  const takvimGun = typeof personel.sgk_ayin_takvim_gun_sayisi === "number" ? `${personel.sgk_ayin_takvim_gun_sayisi} Gün` : "-";
+  const donem = formatDetailValue(personel.sgk_donem);
+  const hesaplamaModu = formatSgkHesaplamaModuLabel(personel.sgk_hesaplama_modu);
+  const puantajHydrateDurumMetni =
+    puantajEksikGunOzeti?.hydrateDurumu === "loading"
+      ? "Eksik puantaj tarihleri yükleniyor..."
+      : puantajEksikGunOzeti?.hydrateDurumu === "success"
+        ? `${puantajEksikGunOzeti.hydrateEdilenTarihSayisi} tarih kontrol edildi.`
+        : puantajEksikGunOzeti?.hydrateDurumu === "error"
+          ? puantajEksikGunOzeti.hydrateHataMesaji
+          : null;
+
+  useEffect(() => {
+    let isCancelled = false;
+
+    if (!canViewRevizyon || !isActive) {
+      setRevizyonTalepleri([]);
+      setRevizyonCorrections([]);
+      setIsRevizyonLoading(false);
+      setRevizyonErrorMessage(null);
+      return;
+    }
+
+    setIsRevizyonLoading(true);
+    setRevizyonErrorMessage(null);
+
+    Promise.all([
+      fetchRevizyonTalepleri({ personel_id: personel.id }),
+      fetchRevizyonCorrections({ personel_id: personel.id })
+    ])
+      .then(([talepler, corrections]) => {
+        if (isCancelled) {
+          return;
+        }
+
+        setRevizyonTalepleri(sortRevizyonTalepleriByLatest(talepler));
+        setRevizyonCorrections(sortCorrectionsByLatest(corrections));
+      })
+      .catch(() => {
+        if (isCancelled) {
+          return;
+        }
+
+        setRevizyonTalepleri([]);
+        setRevizyonCorrections([]);
+        setRevizyonErrorMessage("Revizyon ve correction kayıtları yüklenemedi.");
+      })
+      .finally(() => {
+        if (!isCancelled) {
+          setIsRevizyonLoading(false);
+        }
+      });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [canViewRevizyon, isActive, personel.id]);
+
+  return (
+    <div className="personel-dosya-sections">
+      <section className="personel-puantaj-summary-card" data-testid="personel-sgk-prim-gun-card">
+        <span className="personel-puantaj-summary-kicker">SGK Prim Günü</span>
+        <strong className="personel-puantaj-summary-value" data-testid="personel-sgk-prim-gun">
+          {sgkPrimGunu}
+        </strong>
+        <p className="personel-puantaj-summary-note">
+          Aylık puantajdan türetilen resmi prim günü özeti burada salt okunur izlenir.
+        </p>
+      </section>
+
+      {devamPrimiOzeti ? (
+        <section
+          className="personel-puantaj-summary-card personel-devam-primi-card"
+          data-testid="personel-devam-primi-card"
+        >
+          <span className="personel-puantaj-summary-kicker">Devam Primi</span>
+          <div className="personel-devam-primi-meta">
+            <div className="personel-devam-primi-row">
+              <span className="personel-devam-primi-label">Dönem</span>
+              <span className="personel-devam-primi-value" data-testid="personel-devam-primi-donem">
+                {formatDevamPrimiDonemLabel(devamPrimiOzeti.donem)}
+              </span>
+            </div>
+            <div className="personel-devam-primi-row">
+              <span className="personel-devam-primi-label">Durum</span>
+              <span
+                className={`personel-devam-primi-durum ${devamPrimiDurumToneClass(devamPrimiOzeti.durum)}`}
+                data-testid="personel-devam-primi-durum"
+              >
+                {devamPrimiOzeti.durumLabel}
+              </span>
+            </div>
+          </div>
+          <p className="personel-puantaj-summary-note" data-testid="personel-devam-primi-aciklama">
+            {devamPrimiOzeti.aciklama}
+          </p>
+          {devamPrimiOzeti.kayitKapsamiNotu ? (
+            <p className="personel-devam-primi-scope-note">{devamPrimiOzeti.kayitKapsamiNotu}</p>
+          ) : null}
+        </section>
+      ) : null}
+
+      <DossierSection
+        title="Aylık Puantaj Özeti"
+        description="Bu dosya SGK prim günü, eksik gün ve hesaplama modunu tek bakışta gösterir."
+      >
+        <DossierRecord label="Dönem" value={donem} />
+        <DossierRecord label="SGK Prim Günü" value={sgkPrimGunu} />
+        <DossierRecord label="Eksik Gün" value={eksikGun} />
+        <DossierRecord label="Eksik Gün Nedeni" value={eksikGunNedeni} />
+        <DossierRecord label="Takvim Gün Sayısı" value={takvimGun} />
+        <DossierRecord label="Hesaplama Modu" value={hesaplamaModu} />
+        {puantajEksikGunOzeti ? (
+          <>
+            <DossierRecord label="Çekirdek Durum" value={puantajEksikGunOzeti.durumLabel} />
+            <DossierRecord
+              label="Önbellek Kapsamı"
+              value={`${puantajEksikGunOzeti.toplamKayitSayisi}/${puantajEksikGunOzeti.donemGunSayisi} Gün`}
+            />
+            <DossierRecord
+              label="SGK Düşüren Eksik Gün Adayı"
+              value={`${puantajEksikGunOzeti.sgkPrimGununuDusurenEksikGunSayisi} Gün`}
+            />
+            <DossierRecord
+              label="Manuel İnceleme Kaydı"
+              value={String(puantajEksikGunOzeti.manuelIncelemeKayitSayisi)}
+            />
+            <DossierRecord
+              label="Haberli / Habersiz Yokluk"
+              value={`${puantajEksikGunOzeti.haberliYoklukSinyaliSayisi} / ${puantajEksikGunOzeti.habersizYoklukSinyaliSayisi}`}
+            />
+            {puantajEksikGunOzeti.hydrateMumkunMu && !puantajEksikGunOzeti.veriKapsamiTamMi ? (
+              <div className="personel-dosya-record">
+                <span className="personel-dosya-record-label">Kapsam Kontrolü</span>
+                <span className="personel-dosya-record-value">
+                  <button
+                    type="button"
+                    className="universal-btn-aux"
+                    disabled={puantajEksikGunOzeti.hydrateDurumu === "loading"}
+                    onClick={() => void puantajEksikGunOzeti.hydrateEksikPuantajTarihleri()}
+                  >
+                    Kapsamı Tamamla
+                  </button>
+                  {puantajHydrateDurumMetni ? <span>{puantajHydrateDurumMetni}</span> : null}
+                </span>
+              </div>
+            ) : null}
+          </>
+        ) : null}
+      </DossierSection>
+
+      <PersonelRevizyonCorrectionPanel
+        canViewRevizyon={canViewRevizyon}
+        isLoading={isRevizyonLoading}
+        errorMessage={revizyonErrorMessage}
+        talepler={revizyonTalepleri}
+        corrections={revizyonCorrections}
+      />
+
+      <PlaceholderPanel
+        title="Günlük Puantaj Dosyası"
+        description="Günlük giriş-çıkış kayıtları ve detaylı puantaj düzenleme akışı ayrı puantaj ekranında kalır."
+        actionLabel="Puantaj ekranına git"
+        actionTo="/puantaj"
+        actionState={{ prefillPersonelId: personel.id }}
+        canOpen={canViewPuantaj}
+        noPermissionMessage="Puantaj görüntüleme yetkiniz yok."
+      />
+    </div>
+  );
+}

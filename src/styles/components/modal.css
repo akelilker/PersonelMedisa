@@ -16,14 +16,15 @@
   padding: 0;
   box-sizing: border-box;
   overflow: hidden;
-  background: rgba(3, 8, 16, 0.54);
-  backdrop-filter: blur(3px);
-  -webkit-backdrop-filter: blur(3px);
+  background: var(--bg);
 }
 
 .modal-overlay.open,
 .modal-overlay.active {
   display: flex;
+  background: var(--bg);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 .modal-container {
@@ -37,15 +38,11 @@
   flex-direction: column;
   overflow: hidden;
   box-sizing: border-box;
-  border: 1px solid rgba(255, 255, 255, 0.34);
-  border-radius: 18px 18px 0 0;
-  background:
-    radial-gradient(circle at bottom center, rgba(var(--theme-color-rgb), 0.08) 0%, rgba(8, 11, 19, 0) 28%),
-    linear-gradient(180deg, rgba(7, 10, 19, 0.98) 0%, rgba(6, 9, 17, 0.98) 100%);
-  box-shadow:
-    0 28px 48px rgba(0, 0, 0, 0.46),
-    0 0 0 1px rgba(var(--theme-color-rgb), 0.16),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  border: 0.5px solid var(--modal-border);
+  border-radius: var(--modal-radius) var(--modal-radius) 0 0;
+  background: var(--modal-bg);
+  background-clip: padding-box;
+  box-shadow: none;
 }
 
 .modal-header {
@@ -55,17 +52,14 @@
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
   column-gap: 12px;
-  background: linear-gradient(
-    180deg,
-    rgba(255, 0, 0, 0.36) 0%,
-    rgba(255, 0, 0, 0.27) 25%,
-    rgba(255, 0, 0, 0.2) 50%,
-    rgba(255, 0, 0, 0.14) 75%,
-    rgba(10, 13, 22, 0.96) 100%
-  );
+  background: var(--modal-header-red-gradient);
   border-top-left-radius: inherit;
   border-top-right-radius: inherit;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   background-clip: padding-box;
+  box-shadow:
+    inset 0 1px 0 rgba(236, 242, 250, 0.34),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.05);
   overflow: hidden;
 }
 
@@ -78,13 +72,13 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  color: #f0f0f0;
+  color: var(--modal-title-color);
   font-size: clamp(16px, 1.7vw, 20px);
   line-height: 1;
-  font-weight: 800;
+  font-weight: var(--modal-title-weight);
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  text-shadow: none;
+  text-shadow: var(--modal-title-shadow);
 }
 
 .modal-body {
@@ -166,4 +160,13 @@
 
 body.modal-open {
   overflow: hidden;
+}
+
+body.modal-open .modal-container {
+  box-shadow: none;
+  outline: 1px solid rgba(214, 222, 232, 0.34);
+  outline-offset: -1px;
+  border-color: rgba(184, 192, 201, 0.42);
+  border-top-color: rgba(200, 208, 216, 0.48);
+  border-bottom-color: rgba(168, 176, 186, 0.4);
 }

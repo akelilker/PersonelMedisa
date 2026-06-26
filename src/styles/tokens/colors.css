@@ -11,6 +11,12 @@
   --border-red-side: rgba(var(--theme-color-rgb), 0.6);
   --red-glow-subtle: rgba(var(--theme-color-rgb), 0.12);
   --bg: #080d16;
+  --modal-bg: #080d16;
+  --modal-header-red-gradient: linear-gradient(180deg, #820018 0%, #650013 30%, #38000c 58%, var(--modal-bg) 100%);
+  --modal-title-color: #d1dbe4;
+  --modal-title-shadow: 0 1px 0 rgba(0, 0, 0, 0.55), 0 0 5px rgba(214, 224, 232, 0.12);
+  --modal-title-weight: 700;
+  --modal-border: rgba(255, 255, 255, 0.35);
   --bg-content: #0d131f;
   --txt: #f0f0f0;
   --txt-muted: #999;

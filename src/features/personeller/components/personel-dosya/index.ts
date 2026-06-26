@@ -6,5 +6,7 @@ export { PersonelInlineEditForm, type PersonelInlineEditFormProps } from "./Pers
 export { PersonelIzinDevamsizlikPanel } from "./PersonelIzinDevamsizlikPanel";
 export { PersonelKartPanelGenelBilgiler } from "./PersonelKartPanelGenelBilgiler";
 export { PersonelPuantajPanel } from "./PersonelPuantajPanel";
+export { PersonelSurecCreateModal, type PersonelSurecCreateModalProps } from "./PersonelSurecCreateModal";
 export { PersonelSurecGecmisiPanel } from "./PersonelSurecGecmisiPanel";
+export { PersonelZimmetCreateModal, type PersonelZimmetCreateModalProps } from "./PersonelZimmetCreateModal";
 export { PersonelZimmetEnvanterPanel } from "./PersonelZimmetEnvanterPanel";

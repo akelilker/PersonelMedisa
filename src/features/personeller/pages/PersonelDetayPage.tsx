@@ -1,28 +1,19 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { FormField } from "../../../components/form/FormField";
-import { AppModal } from "../../../components/modal/AppModal";
 import { EmptyState } from "../../../components/states/EmptyState";
 import { ErrorState } from "../../../components/states/ErrorState";
 import { LoadingState } from "../../../components/states/LoadingState";
 import { useRoleAccess } from "../../../hooks/use-role-access";
 import { usePersonelDetail } from "../../../hooks/usePersoneller";
-import type { KeyOption } from "../../../types/referans";
-import { PersonelZimmetCreateForm } from "../components/PersonelZimmetCreateForm";
 import {
   PersonelDosyaActionRow,
   PersonelDosyaHero,
   PersonelDosyaTabPanels,
   PersonelInlineEditForm,
+  PersonelSurecCreateModal,
+  PersonelZimmetCreateModal,
   type PersonelDosyaTabId
 } from "../components/personel-dosya";
-
-const PERSONEL_SUREC_FORM_ID = "personel-surec-form";
-const PERSONEL_ZIMMET_FORM_ID = "personel-zimmet-form";
-
-function keyOptionsToSelectOptions(options: KeyOption[]) {
-  return options.map((option) => ({ value: option.key, label: option.label }));
-}
 
 export function PersonelDetayPage() {
   const location = useLocation();
@@ -257,115 +248,30 @@ export function PersonelDetayPage() {
         </div>
       ) : null}
 
-      {personel && canCreateSurec && isSurecModalOpen ? (
-        <AppModal
-          title="Süreç Ekle"
+      {personel && canCreateSurec ? (
+        <PersonelSurecCreateModal
+          isOpen={isSurecModalOpen}
           onClose={closeSurecModal}
-          footer={
-            <div className="universal-btn-group modal-footer-actions">
-              <button
-                type="submit"
-                form={PERSONEL_SUREC_FORM_ID}
-                className="universal-btn-save"
-                disabled={isSurecSubmitting}
-              >
-                {isSurecSubmitting ? "Kaydediliyor..." : "Kaydet"}
-              </button>
-              <button
-                type="button"
-                className="universal-btn-cancel"
-                onClick={closeSurecModal}
-                disabled={isSurecSubmitting}
-              >
-                Vazgeç
-              </button>
-            </div>
-          }
-        >
-          <form id={PERSONEL_SUREC_FORM_ID} className="personel-surec-form-grid" onSubmit={handleSurecCreateSubmit}>
-            {surecTuruOptions.length > 0 ? (
-              <FormField
-                as="select"
-                label="Süreç Türü"
-                name="personel-surec-turu"
-                value={surecForm.surecTuru}
-                onChange={(value) => setSurecForm((prev) => ({ ...prev, surecTuru: value }))}
-                required
-                placeholderOption={{ value: "", label: "Seçiniz" }}
-                selectOptions={keyOptionsToSelectOptions(surecTuruOptions)}
-              />
-            ) : (
-              <FormField
-                label="Süreç Türü"
-                name="personel-surec-turu-text"
-                value={surecForm.surecTuru}
-                onChange={(value) => setSurecForm((prev) => ({ ...prev, surecTuru: value }))}
-                required
-                placeholder="IZIN, RAPOR, ISTEN_AYRILMA"
-              />
-            )}
-            <FormField
-              label="Başlangıç Tarihi"
-              name="personel-surec-baslangic"
-              type="date"
-              value={surecForm.baslangicTarihi}
-              onChange={(value) => setSurecForm((prev) => ({ ...prev, baslangicTarihi: value }))}
-              required
-            />
-            <FormField
-              label="Bitiş Tarihi"
-              name="personel-surec-bitis"
-              type="date"
-              value={surecForm.bitisTarihi}
-              onChange={(value) => setSurecForm((prev) => ({ ...prev, bitisTarihi: value }))}
-            />
-            <FormField
-              as="textarea"
-              label="Açıklama"
-              name="personel-surec-aciklama"
-              value={surecForm.aciklama}
-              onChange={(value) => setSurecForm((prev) => ({ ...prev, aciklama: value }))}
-              rows={4}
-            />
-            {surecCreateErrorMessage ? <p className="personel-create-error">{surecCreateErrorMessage}</p> : null}
-            {surecReferenceErrorMessage ? <p className="personel-create-error">{surecReferenceErrorMessage}</p> : null}
-          </form>
-        </AppModal>
+          onSubmit={handleSurecCreateSubmit}
+          surecForm={surecForm}
+          setSurecForm={setSurecForm}
+          surecTuruOptions={surecTuruOptions}
+          isSubmitting={isSurecSubmitting}
+          surecCreateErrorMessage={surecCreateErrorMessage}
+          surecReferenceErrorMessage={surecReferenceErrorMessage}
+        />
       ) : null}
 
-      {personel && canCreateZimmet && isZimmetModalOpen ? (
-        <AppModal
-          title="Yeni Zimmet Ekle"
+      {personel && canCreateZimmet ? (
+        <PersonelZimmetCreateModal
+          isOpen={isZimmetModalOpen}
           onClose={closeZimmetModal}
-          footer={
-            <div className="universal-btn-group modal-footer-actions">
-              <button
-                type="submit"
-                form={PERSONEL_ZIMMET_FORM_ID}
-                className="universal-btn-save"
-                disabled={isZimmetSubmitting}
-              >
-                {isZimmetSubmitting ? "Kaydediliyor..." : "Kaydet"}
-              </button>
-              <button
-                type="button"
-                className="universal-btn-cancel"
-                onClick={closeZimmetModal}
-                disabled={isZimmetSubmitting}
-              >
-                Vazgeç
-              </button>
-            </div>
-          }
-        >
-          <PersonelZimmetCreateForm
-            formId={PERSONEL_ZIMMET_FORM_ID}
-            zimmetForm={zimmetForm}
-            setZimmetForm={setZimmetForm}
-            onSubmit={handleZimmetCreateSubmit}
-            zimmetCreateErrorMessage={zimmetCreateErrorMessage}
-          />
-        </AppModal>
+          onSubmit={handleZimmetCreateSubmit}
+          zimmetForm={zimmetForm}
+          setZimmetForm={setZimmetForm}
+          isSubmitting={isZimmetSubmitting}
+          zimmetCreateErrorMessage={zimmetCreateErrorMessage}
+        />
       ) : null}
     </section>
   );

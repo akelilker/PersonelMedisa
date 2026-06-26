@@ -23,6 +23,7 @@ export type PersonelDosyaTabPanelsProps = {
   canCreateZimmet: boolean;
   canAccessSurecler: boolean;
   canCreateSurec: boolean;
+  canViewFinans: boolean;
   onOpenZimmetCreate: () => void;
   onOpenCreateSurecModal: () => void;
 };
@@ -42,6 +43,7 @@ export function PersonelDosyaTabPanels({
   canCreateZimmet,
   canAccessSurecler,
   canCreateSurec,
+  canViewFinans,
   onOpenZimmetCreate,
   onOpenCreateSurecModal
 }: PersonelDosyaTabPanelsProps) {
@@ -87,7 +89,16 @@ export function PersonelDosyaTabPanels({
         aria-labelledby="personel-kart-tab-disiplin"
         hidden={activeTab !== "disiplin"}
       >
-        <PersonelDisiplinPanel />
+        <PersonelDisiplinPanel
+          personel={personel}
+          surecler={surecler}
+          isActive={activeTab === "disiplin"}
+          isSurecHistoryLoading={isSurecHistoryLoading}
+          surecHistoryErrorMessage={surecHistoryErrorMessage}
+          canViewFinans={canViewFinans}
+          canAccessSurecler={canAccessSurecler}
+          onOpenSurecHistory={handleOpenSurecHistory}
+        />
       </div>
 
       <div

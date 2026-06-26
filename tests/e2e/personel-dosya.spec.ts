@@ -355,10 +355,32 @@ test.describe("personel dosyasi surec akisi", () => {
     await expect(belgelerPanel.getByRole("button", { name: "Kaydet" })).toHaveCount(0);
   });
 
-  test("yonetici disiplin sekmesinde placeholder metnini gorur", async ({ page }) => {
+  test("yonetici disiplin sekmesinde read-only ceza ve surec sinyallerini gorur", async ({ page }) => {
     await mockApi(page, "GENEL_YONETICI");
 
     await login(page, { username: "yonetici", password: "secret" });
+
+    await page.getByTestId("menu-kayit-surec").click();
+    const kayitModal = page.locator(".modal-container").last();
+    await expect(kayitModal.getByRole("heading", { name: /Kayıt ve Süreç İşlemleri/i })).toBeVisible();
+
+    await kayitModal.getByRole("button", { name: "Süreç" }).click();
+    await kayitModal.getByRole("combobox", { name: "Personel" }).click();
+    await kayitModal.getByPlaceholder("Personel ara").fill("Ayşe");
+    await kayitModal.getByRole("option", { name: /Ayşe Yılmaz/i }).click();
+
+    await kayitModal.getByRole("tab", { name: "Ceza" }).click();
+
+    const uniqueDonem = "2031-09";
+    const uniqueTutar = "4200.50";
+    const uniqueAciklama = "E2E Disiplin kart ceza";
+
+    await kayitModal.locator('[name="kayit-ceza-donem"]').fill(uniqueDonem);
+    await kayitModal.locator('[name="kayit-ceza-tutar"]').fill(uniqueTutar);
+    await kayitModal.locator('[name="kayit-ceza-aciklama"]').fill(uniqueAciklama);
+    await kayitModal.locator('button[type="submit"][form="kayit-surec-ceza-form"]').click();
+    await expect(kayitModal.locator('[name="kayit-ceza-tutar"]')).toHaveValue("", { timeout: 15_000 });
+    await kayitModal.getByRole("button", { name: "Kapat" }).click();
 
     await page.getByTestId("menu-personel-karti").click();
     await expect(page).toHaveURL(/\/personeller$/);
@@ -370,7 +392,17 @@ test.describe("personel dosyasi surec akisi", () => {
     const disiplinPanel = page.locator("#personel-kart-panel-disiplin");
     await expect(disiplinPanel).toBeVisible();
     await expect(disiplinPanel.getByTestId("personel-disiplin-panel")).toBeVisible();
-    await expect(disiplinPanel).toContainText(/Ceza ve disiplin kayıtları sonraki sprintte/i);
-    await expect(disiplinPanel.getByRole("button")).toHaveCount(0);
+    await expect(disiplinPanel.getByTestId("personel-disiplin-ceza-section")).toBeVisible();
+    await expect(disiplinPanel.getByTestId("personel-disiplin-ceza-list")).toContainText(uniqueDonem);
+    await expect(disiplinPanel.getByTestId("personel-disiplin-ceza-list")).toContainText(/4\.200,50/);
+    await expect(disiplinPanel.getByTestId("personel-disiplin-ceza-list")).toContainText(uniqueAciklama);
+    await expect(disiplinPanel.getByTestId("personel-disiplin-surec-signals")).toContainText(/Devamsızlık/i);
+    await expect(disiplinPanel.getByTestId("personel-disiplin-surec-list")).toContainText(/Demo devamsizlik sinyali/i);
+    await expect(disiplinPanel.getByRole("button", { name: "Kaydet" })).toHaveCount(0);
+    await expect(disiplinPanel.getByRole("button", { name: "Süreç Ekle" })).toHaveCount(0);
+
+    await disiplinPanel.getByRole("button", { name: "Süreç Geçmişi'nde gör" }).click();
+    await expect(page.locator("#personel-kart-panel-surec-gecmisi")).toBeVisible();
+    await expect(page.locator("#personel-kart-tab-surec-gecmisi")).toHaveAttribute("aria-selected", "true");
   });
 });

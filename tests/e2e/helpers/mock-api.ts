@@ -212,6 +212,14 @@ export async function mockApi(page: Page, role: MockUserRole) {
       ucretli_mi: true,
       aciklama: "Mevcut surec",
       state: "AKTIF"
+    },
+    {
+      id: 502,
+      personel_id: 1,
+      surec_turu: "DEVAMSIZLIK",
+      baslangic_tarihi: "2026-03-08",
+      aciklama: "Demo devamsizlik sinyali",
+      state: "AKTIF"
     }
   ];
 
@@ -2217,7 +2225,19 @@ let bildirimIdCounter = 800;
     }
 
     if (path === "/api/ek-odeme-kesinti" && method === "GET") {
-      await fulfillJson(route, 200, okBody({ items: finansKalemleri }));
+      const url = new URL(route.request().url());
+      const personelId = Number.parseInt(url.searchParams.get("personel_id") ?? "", 10);
+      const kalemTuru = url.searchParams.get("kalem_turu");
+      const filtered = finansKalemleri.filter((item) => {
+        if (Number.isFinite(personelId) && item.personel_id !== personelId) {
+          return false;
+        }
+        if (kalemTuru && item.kalem_turu !== kalemTuru) {
+          return false;
+        }
+        return true;
+      });
+      await fulfillJson(route, 200, okBody({ items: filtered }));
       return;
     }
 

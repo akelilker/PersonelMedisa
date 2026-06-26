@@ -28,6 +28,7 @@ export function PersonelDetayPage() {
   const canAccessSurecler = canCreateSurec || canViewSurecler;
   const canViewPuantaj = hasPermission("puantaj.view");
   const canViewRevizyon = hasPermission("revizyon.view");
+  const canViewFinans = hasPermission("finans.view");
   const canCreateZimmet = canEditPersonel;
 
   const [activeTab, setActiveTab] = useState<PersonelDosyaTabId>("genel-bilgiler");
@@ -241,6 +242,7 @@ export function PersonelDetayPage() {
               canCreateZimmet={canCreateZimmet}
               canAccessSurecler={canAccessSurecler}
               canCreateSurec={canCreateSurec}
+              canViewFinans={canViewFinans}
               onOpenZimmetCreate={handleOpenPersonelZimmetGateway}
               onOpenCreateSurecModal={handleOpenSurecModal}
             />

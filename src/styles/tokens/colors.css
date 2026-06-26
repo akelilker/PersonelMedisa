@@ -16,6 +16,13 @@
   --txt-muted: #999;
   --line-soft: rgba(240, 240, 240, 0.2);
   --line-hero-card: rgba(184, 192, 201, 0.72);
+  --border-subtle: rgba(255, 255, 255, 0.3);
+  --hero-gradient-start: #060d16;
+  --hero-gradient-end: #08090c;
+  --premium-title-gradient: linear-gradient(to bottom, #ccd7e1 0%, #f4f8fb 38%, #adbdca 56%, #e2ebf2 100%);
+  --premium-title-shadow: 0 1px 1px rgba(0, 0, 0, 0.26), 0 0 7px rgba(214, 224, 232, 0.22);
+  --premium-title-weight: 700;
+  --premium-title-letter-spacing: 0.085em;
   --green: #4ade80;
   --red: #ef4444;
 }

@@ -110,7 +110,7 @@ export function HomeDashboard() {
   return (
     <section className="dashboard-page" data-testid="dashboard-page">
       <div className="dashboard-header">
-        <h2>Yönetim Paneli</h2>
+        <h2>Genel Özet</h2>
         {canViewRaporlar ? (
           <Link to="/raporlar" className="universal-btn-aux">
             Detaylı Raporlar

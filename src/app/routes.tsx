@@ -29,8 +29,8 @@ function HomeIndexMainMenu() {
   const ctx = useOutletContext<AppShellOutletContext>();
   return (
     <>
-      <HomeDashboard />
       {ctx.showMainMenu ? <MainMenu onKayitOpen={ctx.onKayitOpen} /> : null}
+      <HomeDashboard />
     </>
   );
 }

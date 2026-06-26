@@ -14,6 +14,8 @@
   --modal-footer-reserve: calc(var(--app-footer-height) + var(--modal-footer-gap));
   --modal-gap-above-footer: 8px;
   --modal-footer-optical-reserve: 8px;
+  --shell-top-stack-gap: 8px;
+  --shell-top-stack-bottom-gap: 0px;
 }
 
 @media (max-width: 640px) {

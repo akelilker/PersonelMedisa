@@ -1,20 +1,22 @@
 .hero {
-  --hero-logo-width: 62px;
+  --hero-logo-width: 69px;
+  --hero-spacer-width: 30px;
   position: relative;
   min-width: 0;
   overflow: hidden;
   background: linear-gradient(180deg, #060d16 0%, #08090c 100%);
   border: 1px solid var(--line-hero-card);
   border-radius: var(--radius-lg);
-  padding: 14px 16px 14px;
+  padding: 12px 16px;
+  margin-bottom: 8px;
   box-shadow:
     0 4px 15px rgba(0, 0, 0, 0.5),
     0 4px 22px rgba(var(--theme-color-rgb), 0.08),
     inset 0 1px 0 rgba(255, 255, 255, 0.18),
     inset 0 -1px 0 rgba(92, 102, 114, 0.28);
-  min-height: 72px;
+  min-height: 60px;
   display: grid;
-  grid-template-columns: var(--hero-logo-width) minmax(0, 1fr);
+  grid-template-columns: var(--hero-logo-width) minmax(0, 1fr) var(--hero-spacer-width);
   column-gap: 14px;
   align-items: center;
 }
@@ -23,8 +25,8 @@
   display: flex;
   align-items: center;
   width: var(--hero-logo-width);
-  margin-left: 0;
-  transform: translate(-5px, -2px);
+  margin-left: -5px;
+  transform: translateY(-1px);
   opacity: 1;
   filter: none;
   backdrop-filter: none;
@@ -50,17 +52,17 @@
   min-width: 0;
   margin: 0;
   text-align: center;
-  font-size: clamp(15px, 4.8vw, 24px);
+  font-size: clamp(16px, 4.5vw, 24px);
   font-weight: 800;
-  letter-spacing: clamp(0.2px, 0.2vw, 1.2px);
+  letter-spacing: clamp(1px, 0.5vw, 4px);
   text-transform: uppercase;
   white-space: nowrap;
-  overflow: visible;
-  text-overflow: clip;
+  overflow: hidden;
+  text-overflow: ellipsis;
   padding: 0 4px;
   line-height: 1.1;
-  transform: translateX(-10px);
-  background: linear-gradient(to bottom, #c2d4df 0%, #ffffff 40%, #9aadba 52%, #d6e0e8 100%);
+  transform: translateY(-2px);
+  background: linear-gradient(to bottom, #c6d2dc 0%, #f4f8fb 36%, #aab8c5 56%, #dce5ec 100%);
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -70,7 +72,8 @@
 }
 
 .hero-spacer {
-  display: none;
+  display: block;
+  min-width: 0;
 }
 
 .animated-line {
@@ -88,46 +91,55 @@
 
 @media (max-width: 640px) {
   .hero {
-    --hero-logo-width: 52px;
-    min-height: 80px;
-    padding: 13px 12px 14px;
-    column-gap: 10px;
+    --hero-logo-width: 43px;
+    --hero-spacer-width: 1px;
+    min-height: 65px;
+    padding: 12px 12px 12px 3px;
+    column-gap: 8px;
   }
 
   .hero h1 {
-    font-size: clamp(15px, 4.8vw, 21px);
-    letter-spacing: 0.2px;
-    line-height: 1.1;
-    transform: translate(-10px, 2px);
+    font-size: clamp(18.5px, 5.15vw, 23px);
+    letter-spacing: 1.8px;
+    line-height: 1.2;
+    padding: 0 2px 0 0;
+    transform: translateY(-2px);
   }
 
   .hero-logo {
     margin-left: 0;
     margin-right: 8px;
-    transform: translateX(-5px);
+    transform: translate(-1px, 1px);
     overflow: hidden;
   }
 
   .hero-logo img {
     max-width: 100%;
-    height: 38px;
+    height: 33px;
     width: auto;
     object-fit: contain;
+    transform: translateY(0);
   }
 
   .animated-line {
     bottom: 8px;
     width: 88%;
   }
+
+  body:not(.login-page) .hero {
+    min-height: 71px;
+  }
+
+  body:not(.login-page) .hero .animated-line {
+    bottom: 19px;
+    height: 2.5px;
+    opacity: 0.72;
+  }
 }
 
 @media (max-width: 360px) {
-  .hero {
-    --hero-logo-width: 48px;
-    column-gap: 8px;
-  }
-
   .hero h1 {
-    font-size: 14.5px;
+    font-size: clamp(17px, 4.9vw, 21px);
+    letter-spacing: 1.5px;
   }
 }

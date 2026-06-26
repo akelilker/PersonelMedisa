@@ -1,8 +1,8 @@
 export const PERSONEL_DOSYA_TABS = [
-  { id: "genel-bilgiler", label: "Genel Bilgiler" },
-  { id: "puantaj", label: "Puantaj" },
-  { id: "izin-devamsizlik", label: "İzin / Devamsızlık" },
-  { id: "zimmet-envanter", label: "Zimmet & Envanter" },
+  { id: "genel-bilgiler", label: "Genel" },
+  { id: "egitim-belgeler", label: "Eğitim / Belgeler" },
+  { id: "disiplin", label: "Disiplin" },
+  { id: "zimmet-envanter", label: "Zimmet" },
   { id: "surec-gecmisi", label: "Süreç Geçmişi" }
 ] as const;
 

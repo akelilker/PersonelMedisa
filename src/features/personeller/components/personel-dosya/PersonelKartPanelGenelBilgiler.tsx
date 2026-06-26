@@ -1,8 +1,25 @@
 import type { Personel } from "../../../../types/personel";
+import type { Surec } from "../../../../types/surec";
 import { DossierRecord, DossierSection } from "./personel-dosya-dossier";
 import { formatDetailValue, formatReferenceValue } from "./personel-dosya-format-utils";
+import { PersonelIzinOzetSection } from "./PersonelIzinOzetSection";
+import { PersonelPuantajOzetSection } from "./PersonelPuantajOzetSection";
 
-export function PersonelKartPanelGenelBilgiler({ personel }: { personel: Personel }) {
+export function PersonelKartPanelGenelBilgiler({
+  personel,
+  surecler,
+  canViewPuantaj,
+  canViewRevizyon,
+  isActive,
+  onOpenSurecHistory
+}: {
+  personel: Personel;
+  surecler: Surec[];
+  canViewPuantaj: boolean;
+  canViewRevizyon: boolean;
+  isActive: boolean;
+  onOpenSurecHistory?: () => void;
+}) {
   return (
     <div className="personel-dosya-sections">
       <DossierSection
@@ -30,6 +47,19 @@ export function PersonelKartPanelGenelBilgiler({ personel }: { personel: Persone
         <DossierRecord label="Acil Durum Telefonu" value={formatDetailValue(personel.acil_durum_telefon)} />
         <DossierRecord label="Pasiflik Etiketi" value={formatDetailValue(personel.pasiflik_durumu_etiketi)} />
       </DossierSection>
+
+      <PersonelPuantajOzetSection
+        personel={personel}
+        canViewPuantaj={canViewPuantaj}
+        canViewRevizyon={canViewRevizyon}
+        isActive={isActive}
+      />
+
+      <PersonelIzinOzetSection
+        personel={personel}
+        surecler={surecler}
+        onOpenSurecHistory={onOpenSurecHistory}
+      />
     </div>
   );
 }

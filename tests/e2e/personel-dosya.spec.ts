@@ -85,7 +85,6 @@ test.describe("personel dosyasi surec akisi", () => {
 
     await page.getByRole("link", { name: /Ayşe Yılmaz.*kişisinin kartını aç/i }).first().click();
     await expect(page).toHaveURL(/\/personeller\/1$/);
-    await page.getByRole("tab", { name: "Puantaj" }).click();
     await expect(page.getByTestId("personel-devam-primi-card")).toBeVisible();
     await expect(page.getByTestId("personel-devam-primi-durum")).toContainText("Kesildi");
 
@@ -94,7 +93,6 @@ test.describe("personel dosyasi surec akisi", () => {
 
     await page.getByRole("link", { name: /Mehmet Kaya.*kişisinin kartını aç/i }).first().click();
     await expect(page).toHaveURL(/\/personeller\/2$/);
-    await page.getByRole("tab", { name: "Puantaj" }).click();
     await expect(page.getByTestId("personel-devam-primi-card")).toBeVisible();
     await expect(page.getByTestId("personel-devam-primi-durum")).not.toContainText("Kesildi");
   });
@@ -110,11 +108,11 @@ test.describe("personel dosyasi surec akisi", () => {
     await page.getByRole("link", { name: /Ayşe Yılmaz.*kişisinin kartını aç/i }).first().click();
     await expect(page).toHaveURL(/\/personeller\/1$/);
 
-    await page.getByRole("tab", { name: "Puantaj" }).click();
     await expect(page.getByTestId("personel-sgk-prim-gun-card")).toContainText(/30 Gün/i);
     await expect(page.getByText(/30 gün standart/i)).toBeVisible();
-    await expect(page.locator("#personel-kart-panel-puantaj")).toContainText(/Eksik Gün Nedeni/i);
-    await expect(page.locator("#personel-kart-panel-puantaj")).toContainText("-");
+    await expect(page.locator("#personel-kart-panel-genel-bilgiler")).toContainText(/Eksik Gün Nedeni/i);
+    await expect(page.locator("#personel-kart-panel-genel-bilgiler")).toContainText("-");
+    await expect(page.getByTestId("izin-bakiye-infobox")).toBeVisible();
 
     await page.getByRole("button", { name: "Islemler" }).click();
     await page.getByRole("button", { name: "Süreç Ekle" }).click();
@@ -174,7 +172,7 @@ test.describe("personel dosyasi surec akisi", () => {
     await page.getByRole("link", { name: /Ayşe Yılmaz.*kişisinin kartını aç/i }).first().click();
     await expect(page).toHaveURL(/\/personeller\/1$/);
 
-    await page.getByRole("tab", { name: "Zimmet & Envanter" }).click();
+    await page.getByRole("tab", { name: "Zimmet" }).click();
 
     const zimmetRow = (product: RegExp) =>
       page.locator(".personel-zimmet-table tbody tr").filter({ has: page.locator("td", { hasText: product }) });
@@ -235,7 +233,7 @@ test.describe("personel dosyasi surec akisi", () => {
     await page.getByRole("link", { name: /Ayşe Yılmaz.*kişisinin kartını aç/i }).first().click();
     await expect(page).toHaveURL(/\/personeller\/1$/);
 
-    await page.getByRole("tab", { name: "Zimmet & Envanter" }).click();
+    await page.getByRole("tab", { name: "Zimmet" }).click();
     const maskeRow = page
       .locator(".personel-zimmet-table tbody tr")
       .filter({ has: page.locator("td", { hasText: /Maske/i }) })
@@ -331,5 +329,48 @@ test.describe("personel dosyasi surec akisi", () => {
     const timelineAfter = page.locator("#personel-kart-panel-surec-gecmisi").locator("[data-testid='personel-surec-timeline']");
     await expect(timelineAfter.locator("li")).toHaveCount(countBefore);
     await expect(timelineAfter).not.toContainText("Mock otomatik org gecmis kaydi");
+  });
+
+  test("yonetici egitim belgeler sekmesinde read-only belge durumunu gorur", async ({ page }) => {
+    await mockApi(page, "GENEL_YONETICI");
+
+    await login(page, { username: "yonetici", password: "secret" });
+
+    await page.getByTestId("menu-personel-karti").click();
+    await expect(page).toHaveURL(/\/personeller$/);
+
+    await page.getByRole("link", { name: /Ayşe Yılmaz.*kişisinin kartını aç/i }).first().click();
+    await expect(page).toHaveURL(/\/personeller\/1$/);
+
+    await page.getByRole("tab", { name: "Eğitim / Belgeler" }).click();
+    const belgelerPanel = page.locator("#personel-kart-panel-egitim-belgeler");
+    await expect(belgelerPanel).toBeVisible();
+    await expect(belgelerPanel.getByTestId("personel-belgeler-panel")).toBeVisible();
+    await expect(belgelerPanel).toContainText(/Belge Durumu/i);
+    await expect(belgelerPanel).toContainText(/Kimlik/i);
+    await expect(belgelerPanel).toContainText(/Yok/i);
+    await expect(belgelerPanel).toContainText(/Eğitim & Sertifikalar/i);
+    await expect(belgelerPanel).toContainText(/sonraki fazda ayrı veri modeliyle eklenecektir/i);
+    await expect(belgelerPanel.locator('input[type="radio"]')).toHaveCount(0);
+    await expect(belgelerPanel.getByRole("button", { name: "Kaydet" })).toHaveCount(0);
+  });
+
+  test("yonetici disiplin sekmesinde placeholder metnini gorur", async ({ page }) => {
+    await mockApi(page, "GENEL_YONETICI");
+
+    await login(page, { username: "yonetici", password: "secret" });
+
+    await page.getByTestId("menu-personel-karti").click();
+    await expect(page).toHaveURL(/\/personeller$/);
+
+    await page.getByRole("link", { name: /Ayşe Yılmaz.*kişisinin kartını aç/i }).first().click();
+    await expect(page).toHaveURL(/\/personeller\/1$/);
+
+    await page.getByRole("tab", { name: "Disiplin" }).click();
+    const disiplinPanel = page.locator("#personel-kart-panel-disiplin");
+    await expect(disiplinPanel).toBeVisible();
+    await expect(disiplinPanel.getByTestId("personel-disiplin-panel")).toBeVisible();
+    await expect(disiplinPanel).toContainText(/Ceza ve disiplin kayıtları sonraki sprintte/i);
+    await expect(disiplinPanel.getByRole("button")).toHaveCount(0);
   });
 });

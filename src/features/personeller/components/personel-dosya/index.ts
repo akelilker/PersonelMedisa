@@ -1,10 +1,14 @@
+export { PersonelBelgelerPanel } from "./PersonelBelgelerPanel";
+export { PersonelDisiplinPanel } from "./PersonelDisiplinPanel";
 export { PersonelDosyaActionRow } from "./PersonelDosyaActionRow";
 export { PersonelDosyaHero } from "./PersonelDosyaHero";
 export { PersonelDosyaTabPanels, type PersonelDosyaTabPanelsProps } from "./PersonelDosyaTabPanels";
 export { PERSONEL_DOSYA_TABS, PersonelDosyaTabList, type PersonelDosyaTabId } from "./PersonelDosyaTabs";
 export { PersonelInlineEditForm, type PersonelInlineEditFormProps } from "./PersonelInlineEditForm";
 export { PersonelIzinDevamsizlikPanel } from "./PersonelIzinDevamsizlikPanel";
+export { PersonelIzinOzetSection } from "./PersonelIzinOzetSection";
 export { PersonelKartPanelGenelBilgiler } from "./PersonelKartPanelGenelBilgiler";
+export { PersonelPuantajOzetSection } from "./PersonelPuantajOzetSection";
 export { PersonelPuantajPanel } from "./PersonelPuantajPanel";
 export { PersonelSurecCreateModal, type PersonelSurecCreateModalProps } from "./PersonelSurecCreateModal";
 export { PersonelSurecGecmisiPanel } from "./PersonelSurecGecmisiPanel";

@@ -1,10 +1,10 @@
 import type { Personel } from "../../../../types/personel";
 import type { Surec } from "../../../../types/surec";
 import type { Zimmet } from "../../../../types/zimmet";
+import { PersonelBelgelerPanel } from "./PersonelBelgelerPanel";
+import { PersonelDisiplinPanel } from "./PersonelDisiplinPanel";
 import { PersonelDosyaTabList, type PersonelDosyaTabId } from "./PersonelDosyaTabs";
-import { PersonelIzinDevamsizlikPanel } from "./PersonelIzinDevamsizlikPanel";
 import { PersonelKartPanelGenelBilgiler } from "./PersonelKartPanelGenelBilgiler";
-import { PersonelPuantajPanel } from "./PersonelPuantajPanel";
 import { PersonelSurecGecmisiPanel } from "./PersonelSurecGecmisiPanel";
 import { PersonelZimmetEnvanterPanel } from "./PersonelZimmetEnvanterPanel";
 
@@ -45,6 +45,10 @@ export function PersonelDosyaTabPanels({
   onOpenZimmetCreate,
   onOpenCreateSurecModal
 }: PersonelDosyaTabPanelsProps) {
+  function handleOpenSurecHistory() {
+    onTabChange("surec-gecmisi");
+  }
+
   return (
     <>
       <PersonelDosyaTabList activeTab={activeTab} onTabChange={onTabChange} />
@@ -56,32 +60,34 @@ export function PersonelDosyaTabPanels({
         aria-labelledby="personel-kart-tab-genel-bilgiler"
         hidden={activeTab !== "genel-bilgiler"}
       >
-        <PersonelKartPanelGenelBilgiler personel={personel} />
-      </div>
-
-      <div
-        id="personel-kart-panel-puantaj"
-        role="tabpanel"
-        className="personel-kart-panel"
-        aria-labelledby="personel-kart-tab-puantaj"
-        hidden={activeTab !== "puantaj"}
-      >
-        <PersonelPuantajPanel
+        <PersonelKartPanelGenelBilgiler
           personel={personel}
+          surecler={surecler}
           canViewPuantaj={canViewPuantaj}
           canViewRevizyon={canViewRevizyon}
-          isActive={activeTab === "puantaj"}
+          isActive={activeTab === "genel-bilgiler"}
+          onOpenSurecHistory={handleOpenSurecHistory}
         />
       </div>
 
       <div
-        id="personel-kart-panel-izin-devamsizlik"
+        id="personel-kart-panel-egitim-belgeler"
         role="tabpanel"
         className="personel-kart-panel"
-        aria-labelledby="personel-kart-tab-izin-devamsizlik"
-        hidden={activeTab !== "izin-devamsizlik"}
+        aria-labelledby="personel-kart-tab-egitim-belgeler"
+        hidden={activeTab !== "egitim-belgeler"}
       >
-        <PersonelIzinDevamsizlikPanel personel={personel} surecler={surecler} />
+        <PersonelBelgelerPanel personel={personel} isActive={activeTab === "egitim-belgeler"} />
+      </div>
+
+      <div
+        id="personel-kart-panel-disiplin"
+        role="tabpanel"
+        className="personel-kart-panel"
+        aria-labelledby="personel-kart-tab-disiplin"
+        hidden={activeTab !== "disiplin"}
+      >
+        <PersonelDisiplinPanel />
       </div>
 
       <div

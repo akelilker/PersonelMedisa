@@ -1,6 +1,5 @@
-import { useEffect, useState, type FormEvent } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
-import { AppModal } from "../../../components/modal/AppModal";
+import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { FormField } from "../../../components/form/FormField";
 import { EmptyState } from "../../../components/states/EmptyState";
 import { ErrorState } from "../../../components/states/ErrorState";
@@ -11,9 +10,6 @@ import { usePersoneller } from "../../../hooks/usePersoneller";
 import { formatAktifDurumLabel } from "../../../lib/display/enum-display";
 import type { Personel } from "../../../types/personel";
 import type { IdOption } from "../../../types/referans";
-import { PersonelCreateFields } from "../components/PersonelCreateFields";
-
-const PERSONEL_CREATE_FORM_ID = "personel-create-form";
 
 function IconSearch(props: { className?: string }) {
   return (
@@ -189,17 +185,6 @@ export function PersonellerPage() {
     refetch,
     refs,
     referenceError,
-    isCreateModalOpen,
-    openCreateModal,
-    closeCreateModal,
-    isCreateSubmitting,
-    createErrorMessage,
-    createForm,
-    setCreateForm,
-    handleCreateDepartmanChange,
-    handleCreateBagliAmirChange,
-    createBagliAmirGuidance,
-    createPersonelHandler,
     submitFilters,
     clearFilters,
     setDraftSearch,
@@ -210,39 +195,14 @@ export function PersonellerPage() {
   } = usePersoneller();
 
   const { hasPermission } = useRoleAccess();
-  const canCreatePersonel = hasPermission("personeller.create");
   const canOpenDetail = hasPermission("personeller.detail.view");
   const canViewPuantaj = hasPermission("puantaj.view");
   const canViewBildirimler = hasPermission("bildirimler.view");
-  const location = useLocation();
   const navigate = useNavigate();
   const [searchExpanded, setSearchExpanded] = useState(false);
   const [filterExpanded, setFilterExpanded] = useState(false);
   const [moduleMenuOpen, setModuleMenuOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"list" | "grid">("grid");
-
-  useEffect(() => {
-    const currentState = (location.state ?? null) as Record<string, unknown> | null;
-    if (!currentState?.openCreateModal) {
-      return;
-    }
-
-    if (canCreatePersonel) {
-      openCreateModal();
-    }
-
-    const nextState = { ...currentState };
-    delete nextState.openCreateModal;
-
-    navigate(location.pathname, {
-      replace: true,
-      state: Object.keys(nextState).length > 0 ? nextState : null
-    });
-  }, [canCreatePersonel, location.pathname, location.state, navigate, openCreateModal]);
-
-  function handleCreateSubmit(event: FormEvent<HTMLFormElement>) {
-    void createPersonelHandler(event, canCreatePersonel);
-  }
 
   const { draft } = listQuery;
   const page = listQuery.page;
@@ -347,16 +307,6 @@ export function PersonellerPage() {
                 </div>
               ) : null}
             </div>
-            {canCreatePersonel ? (
-              <button
-                type="button"
-                className="personeller-add-icon-btn"
-                onClick={openCreateModal}
-                aria-label="Yeni personel ekle"
-              >
-                +
-              </button>
-            ) : null}
           </div>
         </div>
       </div>
@@ -671,53 +621,6 @@ export function PersonellerPage() {
           Sonraki
         </button>
       </div>
-
-      {canCreatePersonel && isCreateModalOpen ? (
-        <AppModal
-          title="Yeni Personel Ekle"
-          onClose={closeCreateModal}
-          footer={
-            <div className="universal-btn-group modal-footer-actions">
-              <button
-                type="submit"
-                form={PERSONEL_CREATE_FORM_ID}
-                className="universal-btn-save"
-                disabled={isCreateSubmitting}
-              >
-                {isCreateSubmitting ? "Kaydediliyor..." : "Kaydet"}
-              </button>
-              <button
-                type="button"
-                className="universal-btn-cancel"
-                onClick={closeCreateModal}
-                disabled={isCreateSubmitting}
-              >
-                Vazgec
-              </button>
-            </div>
-          }
-        >
-          <form
-            id={PERSONEL_CREATE_FORM_ID}
-            className="personel-create-form"
-            onSubmit={handleCreateSubmit}
-          >
-            <PersonelCreateFields
-              form={createForm}
-              setForm={setCreateForm}
-              onDepartmanChange={handleCreateDepartmanChange}
-              onBagliAmirChange={handleCreateBagliAmirChange}
-              bagliAmirInfoMessage={createBagliAmirGuidance.infoMessage}
-              bagliAmirSubeWarning={createBagliAmirGuidance.subeWarning}
-              bagliAmirDepartmanWarning={createBagliAmirGuidance.departmanWarning}
-              refs={refs}
-              createErrorMessage={createErrorMessage}
-              referenceError={referenceError}
-              className="workspace-form-stack"
-            />
-          </form>
-        </AppModal>
-      ) : null}
     </section>
   );
 }

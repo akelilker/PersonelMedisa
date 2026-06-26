@@ -29,6 +29,7 @@ import {
   fetchPersonellerList,
   updatePersonel
 } from "../../../api/personeller.api";
+import { fetchYonetimSubeleri } from "../../../api/yonetim.api";
 import {
   fetchBagliAmirOptions,
   fetchDepartmanOptions,
@@ -548,6 +549,8 @@ export function KayitSurecWorkspace({
   const canSubmitPozisyon = canUpdatePersonel && canCreateSurec;
 
   const [refs, setRefs] = useState<PersonelReferenceBundle>(EMPTY_REFS);
+  const [subeOptions, setSubeOptions] = useState<IdOption[]>([]);
+  const [subeLoadError, setSubeLoadError] = useState<string | null>(null);
   const [surecTuruOptions, setSurecTuruOptions] = useState<KeyOption[]>([]);
   const [personeller, setPersoneller] = useState<Personel[]>([]);
   const [bootstrapLoading, setBootstrapLoading] = useState(true);
@@ -989,7 +992,8 @@ export function KayitSurecWorkspace({
         bagliAmirOptions,
         ucretTipiOptions,
         surecTurleri,
-        personelList
+        personelList,
+        subeler
       ] = await Promise.all([
         fetchDepartmanOptions(),
         fetchGorevOptions(),
@@ -997,8 +1001,16 @@ export function KayitSurecWorkspace({
         fetchBagliAmirOptions(),
         fetchUcretTipiOptions(),
         fetchSurecTuruOptions(),
-        fetchPersonellerList({ page: 1, limit: 250, aktiflik: "tum" })
+        fetchPersonellerList({ page: 1, limit: 250, aktiflik: "tum" }),
+        fetchYonetimSubeleri()
       ]);
+
+      setSubeOptions(
+        subeler
+          .filter((sube) => sube.durum === "AKTIF")
+          .map((sube) => ({ id: sube.id, label: sube.ad }))
+      );
+      setSubeLoadError(null);
 
       setRefs({
         departmanOptions,
@@ -1012,6 +1024,7 @@ export function KayitSurecWorkspace({
       setPersoneller(personelList.items);
     } catch (error) {
       setBootstrapError(error instanceof Error ? error.message : "Kayıt alanı yüklenemedi.");
+      setSubeLoadError(error instanceof Error ? error.message : "Şube listesi yüklenemedi.");
     } finally {
       setBootstrapLoading(false);
     }
@@ -1456,6 +1469,8 @@ export function KayitSurecWorkspace({
                         form={personelForm}
                         setForm={setPersonelForm}
                         refs={refs}
+                        subeOptions={subeOptions}
+                        subeLoadError={subeLoadError}
                         createErrorMessage={personelError}
                         referenceError={null}
                         className="workspace-form-stack"

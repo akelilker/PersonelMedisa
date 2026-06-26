@@ -157,6 +157,33 @@ export async function mockApi(page: Page, role: MockUserRole) {
       maas_tutari: 30000,
       prim_kurali_id: 7,
       prim_kurali_adi: "7 No'lu Prim Kuralı"
+    },
+    {
+      id: 4,
+      tc_kimlik_no: "45678901234",
+      ad: "Maas",
+      soyad: "Eksik",
+      aktif_durum: "AKTIF",
+      sube_id: 1,
+      telefon: "05323334444",
+      dogum_tarihi: "1988-08-08",
+      dogum_yeri: "Bursa",
+      kan_grubu: "AB Rh+",
+      sicil_no: "P-004",
+      ise_giris_tarihi: "2025-01-01",
+      acil_durum_kisi: "Acil Kisi",
+      acil_durum_telefon: "05325556677",
+      departman_id: 3,
+      gorev_id: 1,
+      personel_tipi_id: 1,
+      bagli_amir_id: 9,
+      sube_adi: "Merkez",
+      departman_adi: "Döşeme",
+      gorev_adi: "Genel Müdür",
+      personel_tipi_adi: "Tam Zamanlı",
+      bagli_amir_adi: "Demo Amir",
+      ucret_tipi_id: 1,
+      ucret_tipi_adi: "Aylık"
     }
   ];
 
@@ -362,6 +389,14 @@ export async function mockApi(page: Page, role: MockUserRole) {
       departman_ids: [1],
       departman_adlari: ["Depo"],
       durum: "AKTIF"
+    },
+    {
+      id: 99,
+      kod: "PSF",
+      ad: "Pasif Şube",
+      departman_ids: [1],
+      departman_adlari: ["Muhasebe"],
+      durum: "PASIF"
     }
   ];
 
@@ -579,9 +614,18 @@ let bildirimIdCounter = 800;
   let kullaniciIdCounter = 3;
   let subeIdCounter = 2;
   let departmanIdCounter = 12;
+  let personelIdCounter = 4;
 
   function getDepartmanLabel(id: number) {
     return departmanOptions.find((item) => item.id === id)?.ad ?? `Departman ${id}`;
+  }
+
+  function getSubeLabel(id: number | undefined) {
+    return subeler.find((item) => item.id === id)?.ad;
+  }
+
+  function getGorevLabel(id: number | undefined) {
+    return gorevAdlari.find((item) => item.id === id)?.ad;
   }
 
   function normalizeSubePayload(payload: { kod: string; ad: string; departman_ids?: number[]; durum: "AKTIF" | "PASIF" }) {
@@ -908,6 +952,86 @@ let bildirimIdCounter = 800;
           errors: []
         })
       );
+      return;
+    }
+
+    if (path === "/api/personeller" && method === "POST") {
+      const payload = request.postDataJSON() as Record<string, unknown>;
+      const subeId =
+        typeof payload.sube_id === "number"
+          ? payload.sube_id
+          : Number.parseInt(String(payload.sube_id ?? ""), 10);
+
+      if (!Number.isFinite(subeId) || subeId <= 0) {
+        await fulfillJson(route, 400, errorBody("VALIDATION_ERROR", "Şube seçilmelidir."));
+        return;
+      }
+
+      const parseId = (value: unknown) => {
+        if (typeof value === "number" && Number.isFinite(value)) {
+          return value;
+        }
+        if (typeof value === "string" && value.trim()) {
+          const parsed = Number.parseInt(value, 10);
+          if (Number.isFinite(parsed)) {
+            return parsed;
+          }
+        }
+        return undefined;
+      };
+
+      const parseMaas = (value: unknown) => {
+        if (value === undefined || value === null || value === "") {
+          return undefined;
+        }
+        if (typeof value === "number" && Number.isFinite(value)) {
+          return value;
+        }
+        if (typeof value === "string" && value.trim()) {
+          const parsed = Number.parseFloat(value.replace(",", "."));
+          return Number.isFinite(parsed) ? parsed : undefined;
+        }
+        return undefined;
+      };
+
+      const departmanId = parseId(payload.departman_id);
+      const gorevId = parseId(payload.gorev_id);
+      const personelTipiId = parseId(payload.personel_tipi_id);
+      const ucretTipiId = parseId(payload.ucret_tipi_id);
+      const nextId = ++personelIdCounter;
+
+      const created = {
+        id: nextId,
+        tc_kimlik_no: String(payload.tc_kimlik_no ?? ""),
+        ad: String(payload.ad ?? "Yeni"),
+        soyad: String(payload.soyad ?? "Personel"),
+        aktif_durum: (payload.aktif_durum === "PASIF" ? "PASIF" : "AKTIF") as "AKTIF" | "PASIF",
+        sube_id: subeId,
+        telefon: typeof payload.telefon === "string" ? payload.telefon : undefined,
+        dogum_tarihi: typeof payload.dogum_tarihi === "string" ? payload.dogum_tarihi : undefined,
+        dogum_yeri: typeof payload.dogum_yeri === "string" ? payload.dogum_yeri : undefined,
+        kan_grubu: typeof payload.kan_grubu === "string" ? payload.kan_grubu : undefined,
+        sicil_no: typeof payload.sicil_no === "string" ? payload.sicil_no : undefined,
+        ise_giris_tarihi: typeof payload.ise_giris_tarihi === "string" ? payload.ise_giris_tarihi : undefined,
+        acil_durum_kisi: typeof payload.acil_durum_kisi === "string" ? payload.acil_durum_kisi : undefined,
+        acil_durum_telefon:
+          typeof payload.acil_durum_telefon === "string" ? payload.acil_durum_telefon : undefined,
+        departman_id: departmanId,
+        gorev_id: gorevId,
+        personel_tipi_id: personelTipiId,
+        bagli_amir_id: parseId(payload.bagli_amir_id),
+        ucret_tipi_id: ucretTipiId,
+        ucret_tipi_adi: ucretTipiId === 1 ? "Aylık" : ucretTipiId === 2 ? "Saatlik" : undefined,
+        maas_tutari: parseMaas(payload.maas_tutari),
+        sube_adi: getSubeLabel(subeId),
+        departman_adi: departmanId ? getDepartmanLabel(departmanId) : undefined,
+        gorev_adi: gorevId ? getGorevLabel(gorevId) : undefined,
+        personel_tipi_adi:
+          personelTipiId === 1 ? "Tam Zamanlı" : personelTipiId === 2 ? "Yarı Zamanlı" : undefined
+      };
+
+      personeller.unshift(created);
+      await fulfillJson(route, 200, okBody(created));
       return;
     }
 

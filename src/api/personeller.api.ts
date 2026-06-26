@@ -26,6 +26,7 @@ export type CreatePersonelPayload = {
   acil_durum_telefon: string;
   sicil_no: string;
   ise_giris_tarihi: string;
+  sube_id: number;
   departman_id: number;
   gorev_id: number;
   personel_tipi_id: number;

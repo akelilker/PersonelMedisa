@@ -14,6 +14,8 @@ type PersonelCreateFieldsProps = {
   bagliAmirSubeWarning?: string | null;
   bagliAmirDepartmanWarning?: string | null;
   refs: PersonelReferenceBundle;
+  subeOptions?: IdOption[];
+  subeLoadError?: string | null;
   createErrorMessage?: string | null;
   referenceError?: string | null;
   className?: string;
@@ -168,6 +170,8 @@ export function PersonelCreateFields({
   bagliAmirSubeWarning,
   bagliAmirDepartmanWarning,
   refs,
+  subeOptions = [],
+  subeLoadError,
   createErrorMessage,
   referenceError,
   className
@@ -276,6 +280,25 @@ export function PersonelCreateFields({
             onChange={(value) => setForm((prev) => ({ ...prev, iseGirisTarihi: value }))}
             required
           />
+          {subeLoadError ? (
+            <p className="personel-create-error" role="alert">
+              {subeLoadError}
+            </p>
+          ) : subeOptions.length > 0 ? (
+            <PersonelCreateSelect
+              label="Şube"
+              name="create-sube"
+              value={form.subeId}
+              onChange={(value) => setForm((prev) => ({ ...prev, subeId: value }))}
+              required
+              placeholderOption={{ value: "", label: "Seçiniz" }}
+              options={toSelectOptions(subeOptions)}
+              isOpen={openSelectName === "create-sube"}
+              onOpenChange={(isOpen) => setSelectOpen("create-sube", isOpen)}
+            />
+          ) : (
+            refMissingNote("Şube", true)
+          )}
           {refs.bagliAmirOptions.length > 0 ? (
             <>
               <PersonelCreateSelect

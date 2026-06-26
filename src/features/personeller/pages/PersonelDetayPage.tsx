@@ -23,6 +23,7 @@ import {
   formatSurecStateLabel,
   formatSurecTuruLabel
 } from "../../../lib/display/enum-display";
+import { isPersonelMaasMissing } from "../personel-create-utils";
 import { mapUcretTipiSelectOptions } from "../../../lib/display/ucret-tipi-display";
 import { getSurecTimelineSortWeight } from "../../../lib/surec-history-sort";
 import { hesaplaIzinBakiye } from "../../../services/izin-hesap-motoru";
@@ -564,6 +565,12 @@ function PersonelDosyaHero({
         />
         <DossierField label="İşe Giriş Tarihi" value={formatDetailValue(personel.ise_giris_tarihi)} />
       </div>
+
+      {isPersonelMaasMissing(personel.maas_tutari) ? (
+        <p className="personel-dosya-maas-alert" data-testid="personel-maas-eksik-uyari">
+          Maaş bilgisi eksik.
+        </p>
+      ) : null}
     </section>
   );
 }

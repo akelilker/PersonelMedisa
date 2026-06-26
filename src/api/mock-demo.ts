@@ -64,6 +64,8 @@ type DemoPersonel = {
   gorev_id?: number;
   personel_tipi_id?: number;
   bagli_amir_id?: number;
+  ucret_tipi_id?: number;
+  maas_tutari?: number;
 };
 
 type DemoSurec = {
@@ -2156,13 +2158,18 @@ export function resolveDemoApiResponse(
   }
 
   if (pathname === "/personeller" && method === "POST") {
+    const subeId = toNumber(body.sube_id);
+    if (subeId === null) {
+      return demoRevizyonError("VALIDATION_ERROR", "Şube seçilmelidir.");
+    }
+
     const next: DemoPersonel = {
       id: ++demoState.nextIds.personel,
       tc_kimlik_no: toStringValue(body.tc_kimlik_no) ?? "00000000000",
       ad: toStringValue(body.ad) ?? "Yeni",
       soyad: toStringValue(body.soyad) ?? "Personel",
       aktif_durum: (toStringValue(body.aktif_durum) as "AKTIF" | "PASIF") ?? "AKTIF",
-      sube_id: toNumber(body.sube_id) ?? (toNumber(body.departman_id) === 2 ? 2 : 1),
+      sube_id: subeId,
       telefon: toStringValue(body.telefon) ?? undefined,
       dogum_tarihi: toStringValue(body.dogum_tarihi) ?? undefined,
       sicil_no: toStringValue(body.sicil_no) ?? undefined,
@@ -2174,10 +2181,19 @@ export function resolveDemoApiResponse(
       departman_id: toNumber(body.departman_id) ?? undefined,
       gorev_id: toNumber(body.gorev_id) ?? undefined,
       personel_tipi_id: toNumber(body.personel_tipi_id) ?? undefined,
-      bagli_amir_id: toNumber(body.bagli_amir_id) ?? undefined
+      bagli_amir_id: toNumber(body.bagli_amir_id) ?? undefined,
+      ucret_tipi_id: toNumber(body.ucret_tipi_id) ?? undefined,
+      maas_tutari: toNumber(body.maas_tutari) ?? undefined
     };
     demoState.personeller.unshift(next);
-    return ok(next);
+    return ok({
+      ...next,
+      sube_adi: getSubeLabel(next.sube_id),
+      departman_adi: getDepartmanLabel(next.departman_id),
+      gorev_adi: getLabel(DEMO_GOREV_LABELS, next.gorev_id),
+      personel_tipi_adi: getLabel(DEMO_PERSONEL_TIPI_LABELS, next.personel_tipi_id),
+      bagli_amir_adi: getLabel(DEMO_BAGLI_AMIR_LABELS, next.bagli_amir_id)
+    });
   }
 
   const personelDetailMatch = pathname.match(/^\/personeller\/(\d+)$/);

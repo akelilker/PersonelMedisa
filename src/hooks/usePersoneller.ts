@@ -96,6 +96,7 @@ export type CreatePersonelFormState = {
   acilDurumTelefon: string;
   sicilNo: string;
   iseGirisTarihi: string;
+  subeId: string;
   departmanId: string;
   gorevId: string;
   personelTipiId: string;
@@ -117,6 +118,7 @@ export const INITIAL_CREATE_PERSONEL_FORM: CreatePersonelFormState = {
   acilDurumTelefon: "",
   sicilNo: "",
   iseGirisTarihi: "",
+  subeId: "",
   departmanId: "",
   gorevId: "",
   personelTipiId: "",

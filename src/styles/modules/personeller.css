@@ -591,6 +591,13 @@
   color: var(--red);
 }
 
+.personel-dosya-maas-alert {
+  margin: 0;
+  color: var(--red);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
 .personel-detail-card p {
   margin: 0;
 }

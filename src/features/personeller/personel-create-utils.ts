@@ -82,6 +82,10 @@ export function validatePhoneNumber(value: string, label: string) {
   }
 }
 
+export function isPersonelMaasMissing(maasTutari: number | null | undefined) {
+  return maasTutari === null || maasTutari === undefined;
+}
+
 export function buildCreatePersonelPayload(form: CreatePersonelFormState): CreatePersonelPayload {
   const tcKimlikNo = digitsOnly(form.tcKimlikNo);
   const telefon = normalizeTurkishMobilePhone(form.telefon, "Telefon");
@@ -89,6 +93,11 @@ export function buildCreatePersonelPayload(form: CreatePersonelFormState): Creat
 
   validateTcKimlikNo(tcKimlikNo);
 
+  if (!form.subeId.trim()) {
+    throw new Error("Şube seçilmelidir.");
+  }
+
+  const subeId = parseRequiredPositiveInt(form.subeId, "Şube");
   const bagliAmirId = parseOptionalPositiveInt(form.bagliAmirId);
   const ucretTipiId = parseOptionalPositiveInt(form.ucretTipiId);
   const primKuraliId = parseOptionalPositiveInt(form.primKuraliId);
@@ -111,6 +120,7 @@ export function buildCreatePersonelPayload(form: CreatePersonelFormState): Creat
     acil_durum_telefon: acilDurumTelefon,
     sicil_no: form.sicilNo.trim(),
     ise_giris_tarihi: form.iseGirisTarihi,
+    sube_id: subeId,
     departman_id: parseRequiredPositiveInt(form.departmanId, "Departman"),
     gorev_id: parseRequiredPositiveInt(form.gorevId, "Görev"),
     personel_tipi_id: parseRequiredPositiveInt(form.personelTipiId, "Personel Tipi"),

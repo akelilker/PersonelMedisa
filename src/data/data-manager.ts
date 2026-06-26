@@ -681,7 +681,7 @@ export function draftPersonelFromPayload(payload: CreatePersonelPayload, tempId:
     ad: payload.ad,
     soyad: payload.soyad,
     dogum_tarihi: payload.dogum_tarihi,
-    sube_id: undefined,
+    sube_id: payload.sube_id,
     telefon: payload.telefon,
     sicil_no: payload.sicil_no,
     ise_giris_tarihi: payload.ise_giris_tarihi,

@@ -10,7 +10,7 @@
   max-width: var(--app-shell-max-width);
   margin: 0 auto;
   background: var(--bg);
-  border-top: 0.5px solid rgba(var(--theme-color-rgb), 0.4);
+  border-top: 0.5px solid var(--border-red-tech);
   border-top-left-radius: 20px;
   border-top-right-radius: 20px;
   overflow: hidden;
@@ -32,10 +32,10 @@
 .app-shell::before {
   content: "";
   position: absolute;
-  inset: 0 0 calc(var(--app-footer-real-height) + env(safe-area-inset-bottom, 0px)) 0;
-  border-top: 0.5px solid rgba(var(--theme-color-rgb), 0.4);
-  border-left: 0.5px solid rgba(var(--theme-color-rgb), 0.4);
-  border-right: 0.5px solid rgba(var(--theme-color-rgb), 0.4);
+  inset: 0 0 calc(var(--app-footer-real-height) + var(--app-footer-gap) + env(safe-area-inset-bottom, 0px)) 0;
+  border-top: 0.5px solid var(--border-red-tech);
+  border-left: 0.5px solid var(--border-red-tech);
+  border-right: 0.5px solid var(--border-red-tech);
   border-top-left-radius: 20px;
   border-top-right-radius: 20px;
   pointer-events: none;
@@ -46,7 +46,7 @@
   content: "";
   position: absolute;
   inset: 0;
-  box-shadow: inset 0 0 10px rgba(var(--theme-color-rgb), 0.05);
+  box-shadow: inset 0 0 25px var(--red-glow-subtle);
   pointer-events: none;
   z-index: 0;
 }
@@ -251,6 +251,19 @@ body.modal-open .app-shell::before {
   color: rgba(240, 240, 240, 0.86);
   font-size: 13px;
   line-height: 1.3;
+}
+
+@media (min-width: 769px) {
+  body:not(.dashboard-page):not(.login-page):not(.admin-report-page) .app-shell::before {
+    border-left-width: 0.7px;
+    border-right-width: 0.7px;
+    border-top-color: rgba(var(--theme-color-rgb), 0.78);
+    border-left-color: rgba(var(--theme-color-rgb), 0.78);
+    border-right-color: rgba(var(--theme-color-rgb), 0.78);
+    box-shadow:
+      0 0 16px rgba(var(--theme-color-rgb), 0.24),
+      inset 0 0 18px rgba(var(--theme-color-rgb), 0.1);
+  }
 }
 
 @media (max-width: 640px) {

@@ -1,6 +1,15 @@
 :root {
-  --theme-color: #d40000;
-  --theme-color-rgb: 212, 0, 0;
+  --theme-color: #e00000;
+  --theme-color-rgb: 224, 0, 0;
+  --footer-glow-rgb: 224, 0, 0;
+  --footer-glow-opacity: 0.5;
+  --footer-top-border: rgba(190, 198, 208, 0.58);
+  --footer-side-border: rgba(255, 255, 255, 0.5);
+  --footer-top-highlight: rgba(255, 255, 255, 0.16);
+  --footer-red-glow: 0 -18px 34px rgba(var(--footer-glow-rgb), var(--footer-glow-opacity));
+  --border-red-tech: rgba(var(--theme-color-rgb), 0.4);
+  --border-red-side: rgba(var(--theme-color-rgb), 0.6);
+  --red-glow-subtle: rgba(var(--theme-color-rgb), 0.12);
   --bg: #080d16;
   --bg-content: #0d131f;
   --txt: #f0f0f0;
@@ -9,4 +18,12 @@
   --line-hero-card: rgba(184, 192, 201, 0.72);
   --green: #4ade80;
   --red: #ef4444;
+}
+
+@media (max-width: 640px) {
+  :root {
+    --border-red-tech: rgba(var(--theme-color-rgb), 0.78);
+    --border-red-side: rgba(var(--theme-color-rgb), 0.78);
+    --red-glow-subtle: rgba(var(--theme-color-rgb), 0.18);
+  }
 }

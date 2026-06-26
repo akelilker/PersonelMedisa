@@ -14,7 +14,8 @@
     "test:watch": "vitest",
     "e2e": "playwright test",
     "e2e:headed": "playwright test --headed",
-    "e2e:ui": "playwright test --ui"
+    "e2e:ui": "playwright test --ui",
+    "icons:generate": "node scripts/generate-icons.mjs"
   },
   "dependencies": {
     "react": "^18.2.0",
@@ -30,6 +31,8 @@
     "@types/react-dom": "^18.2.22",
     "@vitejs/plugin-react": "^4.2.1",
     "archiver": "^7.0.1",
+    "sharp": "^0.34.5",
+    "to-ico": "^1.1.5",
     "jsdom": "^29.0.1",
     "typescript": "^5.4.5",
     "vite": "^5.2.8",

@@ -1,6 +1,8 @@
 export { PersonelDosyaActionRow } from "./PersonelDosyaActionRow";
 export { PersonelDosyaHero } from "./PersonelDosyaHero";
+export { PersonelDosyaTabPanels, type PersonelDosyaTabPanelsProps } from "./PersonelDosyaTabPanels";
 export { PERSONEL_DOSYA_TABS, PersonelDosyaTabList, type PersonelDosyaTabId } from "./PersonelDosyaTabs";
+export { PersonelInlineEditForm, type PersonelInlineEditFormProps } from "./PersonelInlineEditForm";
 export { PersonelIzinDevamsizlikPanel } from "./PersonelIzinDevamsizlikPanel";
 export { PersonelKartPanelGenelBilgiler } from "./PersonelKartPanelGenelBilgiler";
 export { PersonelPuantajPanel } from "./PersonelPuantajPanel";

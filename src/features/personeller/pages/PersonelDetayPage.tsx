@@ -7,18 +7,13 @@ import { ErrorState } from "../../../components/states/ErrorState";
 import { LoadingState } from "../../../components/states/LoadingState";
 import { useRoleAccess } from "../../../hooks/use-role-access";
 import { usePersonelDetail } from "../../../hooks/usePersoneller";
-import { mapUcretTipiSelectOptions } from "../../../lib/display/ucret-tipi-display";
-import type { IdOption, KeyOption } from "../../../types/referans";
+import type { KeyOption } from "../../../types/referans";
 import { PersonelZimmetCreateForm } from "../components/PersonelZimmetCreateForm";
 import {
   PersonelDosyaActionRow,
   PersonelDosyaHero,
-  PersonelDosyaTabList,
-  PersonelIzinDevamsizlikPanel,
-  PersonelKartPanelGenelBilgiler,
-  PersonelPuantajPanel,
-  PersonelSurecGecmisiPanel,
-  PersonelZimmetEnvanterPanel,
+  PersonelDosyaTabPanels,
+  PersonelInlineEditForm,
   type PersonelDosyaTabId
 } from "../components/personel-dosya";
 
@@ -27,10 +22,6 @@ const PERSONEL_ZIMMET_FORM_ID = "personel-zimmet-form";
 
 function keyOptionsToSelectOptions(options: KeyOption[]) {
   return options.map((option) => ({ value: option.key, label: option.label }));
-}
-
-function idOptionsToSelectOptions(options: IdOption[]) {
-  return options.map((option) => ({ value: String(option.id), label: option.label }));
 }
 
 export function PersonelDetayPage() {
@@ -230,222 +221,38 @@ export function PersonelDetayPage() {
           ) : null}
 
           {isEditing ? (
-            <form className="personel-edit-form" onSubmit={handleEditSubmit}>
-              <div className="form-field-grid">
-                <FormField
-                  label="Ad"
-                  name="edit-ad"
-                  value={editForm.ad}
-                  onChange={(value) => setEditForm((prev) => ({ ...prev, ad: value }))}
-                  required
-                />
-                <FormField
-                  label="Soyad"
-                  name="edit-soyad"
-                  value={editForm.soyad}
-                  onChange={(value) => setEditForm((prev) => ({ ...prev, soyad: value }))}
-                  required
-                />
-                <FormField
-                  label="Telefon"
-                  name="edit-telefon"
-                  type="tel"
-                  value={editForm.telefon}
-                  onChange={(value) => setEditForm((prev) => ({ ...prev, telefon: value }))}
-                />
-                {personelRefs.bagliAmirOptions.length > 0 ? (
-                  <>
-                    <FormField
-                      as="select"
-                      label="Bağlı amir"
-                      name="edit-bagli-amir"
-                      value={editForm.bagliAmirId}
-                      onChange={handleEditBagliAmirChange}
-                      placeholderOption={{ value: "", label: "Seçiniz" }}
-                      selectOptions={idOptionsToSelectOptions(personelRefs.bagliAmirOptions)}
-                    />
-                    {editBagliAmirGuidance.infoMessage ? (
-                      <p className="personel-form-note personel-form-note--info">
-                        {editBagliAmirGuidance.infoMessage}
-                      </p>
-                    ) : null}
-                    {editBagliAmirGuidance.subeWarning ? (
-                      <p className="personel-form-note personel-form-note--warning">
-                        {editBagliAmirGuidance.subeWarning}
-                      </p>
-                    ) : null}
-                  </>
-                ) : (
-                  <p className="personel-create-error">Bağlı amir listesi yüklenemedi.</p>
-                )}
-                {personelRefs.departmanOptions.length > 0 ? (
-                  <>
-                    <FormField
-                      as="select"
-                      label="Departman"
-                      name="edit-departman"
-                      value={editForm.departmanId}
-                      onChange={handleEditDepartmanChange}
-                      placeholderOption={{ value: "", label: "Seçiniz" }}
-                      selectOptions={idOptionsToSelectOptions(personelRefs.departmanOptions)}
-                    />
-                    {editBagliAmirGuidance.departmanWarning ? (
-                      <p className="personel-form-note personel-form-note--warning">
-                        {editBagliAmirGuidance.departmanWarning}
-                      </p>
-                    ) : null}
-                  </>
-                ) : (
-                  <p className="personel-create-error">Departman listesi yüklenemedi.</p>
-                )}
-                {personelRefs.gorevOptions.length > 0 ? (
-                  <FormField
-                    as="select"
-                    label="Görev / Unvan"
-                    name="edit-gorev"
-                    value={editForm.gorevId}
-                    onChange={(value) => setEditForm((prev) => ({ ...prev, gorevId: value }))}
-                    placeholderOption={{ value: "", label: "Seçiniz" }}
-                    selectOptions={idOptionsToSelectOptions(personelRefs.gorevOptions)}
-                  />
-                ) : (
-                  <p className="personel-create-error">Görev / Unvan listesi yüklenemedi.</p>
-                )}
-                {personelRefs.ucretTipiOptions.length > 0 ? (
-                  <FormField
-                    as="select"
-                    label="Ücret tipi"
-                    name="edit-ucret-tipi-id"
-                    value={editForm.ucretTipiId}
-                    onChange={(value) => setEditForm((prev) => ({ ...prev, ucretTipiId: value }))}
-                    placeholderOption={{ value: "", label: "Seçiniz" }}
-                    selectOptions={mapUcretTipiSelectOptions(personelRefs.ucretTipiOptions)}
-                  />
-                ) : (
-                  <p className="personel-create-error">Ücret tipi listesi yüklenemedi.</p>
-                )}
-                <FormField
-                  label="Maaş tutarı"
-                  name="edit-maas"
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  value={editForm.maasTutari}
-                  onChange={(value) => setEditForm((prev) => ({ ...prev, maasTutari: value }))}
-                />
-                {personelRefs.primKuraliOptions.length > 0 ? (
-                  <FormField
-                    as="select"
-                    label="Prim kuralı"
-                    name="edit-prim-kurali-id"
-                    value={editForm.primKuraliId}
-                    onChange={(value) => setEditForm((prev) => ({ ...prev, primKuraliId: value }))}
-                    placeholderOption={{ value: "", label: "Seçiniz" }}
-                    selectOptions={idOptionsToSelectOptions(personelRefs.primKuraliOptions)}
-                  />
-                ) : (
-                  <p className="personel-create-error">Prim kuralı listesi yüklenemedi.</p>
-                )}
-                {hasLifecycleDiff ? (
-                  <FormField
-                    label="Geçerlilik Tarihi"
-                    name="edit-effective-date"
-                    type="date"
-                    value={editForm.effectiveDate}
-                    onChange={(value) => setEditForm((prev) => ({ ...prev, effectiveDate: value }))}
-                    required
-                  />
-                ) : null}
-              </div>
-
-              {editErrorMessage ? <p className="personel-create-error">{editErrorMessage}</p> : null}
-
-              <div className="universal-btn-group">
-                <button type="submit" className="universal-btn-save" disabled={isSubmitting}>
-                  {isSubmitting ? "Kaydediliyor..." : "Kaydet"}
-                </button>
-                <button type="button" className="universal-btn-cancel" onClick={discardEdit} disabled={isSubmitting}>
-                  Vazgeç
-                </button>
-              </div>
-            </form>
+            <PersonelInlineEditForm
+              editForm={editForm}
+              setEditForm={setEditForm}
+              handleEditDepartmanChange={handleEditDepartmanChange}
+              handleEditBagliAmirChange={handleEditBagliAmirChange}
+              editBagliAmirGuidance={editBagliAmirGuidance}
+              personelRefs={personelRefs}
+              hasLifecycleDiff={hasLifecycleDiff}
+              editErrorMessage={editErrorMessage}
+              isSubmitting={isSubmitting}
+              onSubmit={handleEditSubmit}
+              onDiscard={discardEdit}
+            />
           ) : (
-            <>
-              <PersonelDosyaTabList activeTab={activeTab} onTabChange={setActiveTab} />
-
-              <div
-                id="personel-kart-panel-genel-bilgiler"
-                role="tabpanel"
-                className="personel-kart-panel"
-                aria-labelledby="personel-kart-tab-genel-bilgiler"
-                hidden={activeTab !== "genel-bilgiler"}
-              >
-                <PersonelKartPanelGenelBilgiler personel={personel} />
-              </div>
-
-              <div
-                id="personel-kart-panel-puantaj"
-                role="tabpanel"
-                className="personel-kart-panel"
-                aria-labelledby="personel-kart-tab-puantaj"
-                hidden={activeTab !== "puantaj"}
-              >
-                <PersonelPuantajPanel
-                  personel={personel}
-                  canViewPuantaj={canViewPuantaj}
-                  canViewRevizyon={canViewRevizyon}
-                  isActive={activeTab === "puantaj"}
-                />
-              </div>
-
-              <div
-                id="personel-kart-panel-izin-devamsizlik"
-                role="tabpanel"
-                className="personel-kart-panel"
-                aria-labelledby="personel-kart-tab-izin-devamsizlik"
-                hidden={activeTab !== "izin-devamsizlik"}
-              >
-                <PersonelIzinDevamsizlikPanel
-                  personel={personel}
-                  surecler={surecHistory}
-                />
-              </div>
-
-              <div
-                id="personel-kart-panel-zimmet-envanter"
-                role="tabpanel"
-                className="personel-kart-panel"
-                aria-labelledby="personel-kart-tab-zimmet-envanter"
-                hidden={activeTab !== "zimmet-envanter"}
-              >
-                <PersonelZimmetEnvanterPanel
-                  canCreateZimmet={canCreateZimmet}
-                  isLoading={isZimmetHistoryLoading}
-                  errorMessage={zimmetHistoryErrorMessage}
-                  zimmetler={zimmetHistory}
-                  onOpenCreateModal={handleOpenPersonelZimmetGateway}
-                />
-              </div>
-
-              <div
-                id="personel-kart-panel-surec-gecmisi"
-                role="tabpanel"
-                className="personel-kart-panel"
-                aria-labelledby="personel-kart-tab-surec-gecmisi"
-                hidden={activeTab !== "surec-gecmisi"}
-              >
-                <PersonelSurecGecmisiPanel
-                  personel={personel}
-                  canAccessSurecler={canAccessSurecler}
-                  canCreateSurec={canCreateSurec}
-                  isLoading={isSurecHistoryLoading}
-                  errorMessage={surecHistoryErrorMessage}
-                  surecler={surecHistory}
-                  zimmetler={zimmetHistory}
-                  onOpenCreateModal={handleOpenSurecModal}
-                />
-              </div>
-            </>
+            <PersonelDosyaTabPanels
+              activeTab={activeTab}
+              onTabChange={setActiveTab}
+              personel={personel}
+              surecler={surecHistory}
+              zimmetler={zimmetHistory}
+              isSurecHistoryLoading={isSurecHistoryLoading}
+              surecHistoryErrorMessage={surecHistoryErrorMessage}
+              isZimmetHistoryLoading={isZimmetHistoryLoading}
+              zimmetHistoryErrorMessage={zimmetHistoryErrorMessage}
+              canViewPuantaj={canViewPuantaj}
+              canViewRevizyon={canViewRevizyon}
+              canCreateZimmet={canCreateZimmet}
+              canAccessSurecler={canAccessSurecler}
+              canCreateSurec={canCreateSurec}
+              onOpenZimmetCreate={handleOpenPersonelZimmetGateway}
+              onOpenCreateSurecModal={handleOpenSurecModal}
+            />
           )}
         </div>
       ) : null}

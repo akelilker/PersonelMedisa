@@ -14,8 +14,9 @@ import type {
   YonetimSube
 } from "../types/yonetim";
 import type { UserRole } from "../types/auth";
+import { SUBE_DELETE_BLOCKED_ERROR_CODE } from "../lib/yonetim/sube-delete";
 import { appendQueryParams } from "../utils/append-query-params";
-import { apiRequest } from "./api-client";
+import { ApiRequestError, apiRequest } from "./api-client";
 import { endpoints } from "./endpoints";
 import { extractListItems } from "./response-normalizers";
 
@@ -292,6 +293,25 @@ export async function updateYonetimSube(
     body: JSON.stringify(payload)
   });
   return normalizeYonetimSube(response.data);
+}
+
+function throwYonetimApiError(response: ApiResponse<unknown>, fallbackMessage: string): never {
+  const first = Array.isArray(response.errors) ? response.errors[0] : null;
+  const message = typeof first?.message === "string" && first.message.trim() ? first.message : fallbackMessage;
+  const code = typeof first?.code === "string" ? first.code : undefined;
+  const status = code === SUBE_DELETE_BLOCKED_ERROR_CODE ? 409 : 400;
+
+  throw new ApiRequestError(message, status, code ? { code } : undefined);
+}
+
+export async function deleteYonetimSube(subeId: number | string): Promise<void> {
+  const response = await apiRequest<ApiResponse<unknown>>(endpoints.yonetim.subeDetail(subeId), {
+    method: "DELETE"
+  });
+
+  if (Array.isArray(response.errors) && response.errors.length > 0) {
+    throwYonetimApiError(response, "Şube silinemedi.");
+  }
 }
 
 export async function fetchAylikKapanisOzeti(filters: AylikOzetFilters): Promise<AylikOzetResponse> {

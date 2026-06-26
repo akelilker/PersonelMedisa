@@ -139,6 +139,7 @@ export function ShellHeaderActions({ contextLabel, minimal = false }: ShellHeade
   const canViewRaporlar = hasPermission("raporlar.view");
   const canViewFinans = hasPermission("finans.view");
   const canViewYonetimPanel = hasPermission("yonetim-paneli.view");
+  const canManageYonetimPanel = hasPermission("yonetim-paneli.manage");
 
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -541,6 +542,17 @@ export function ShellHeaderActions({ contextLabel, minimal = false }: ShellHeade
               }}
             >
               Yönetim Paneli
+            </button>
+          ) : null}
+          {canManageYonetimPanel ? (
+            <button
+              type="button"
+              data-testid="settings-sube-yonetimi"
+              onClick={() => {
+                navigateTo("/yonetim-paneli?tab=subeler");
+              }}
+            >
+              Şube Yönetimi
             </button>
           ) : null}
           <button

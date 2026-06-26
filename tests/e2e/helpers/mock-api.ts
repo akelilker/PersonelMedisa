@@ -1,6 +1,10 @@
 ﻿import type { Page, Route } from "@playwright/test";
 import type { GunlukPuantaj } from "../../../src/types/puantaj";
 import { hesaplaAylikSgkPuantajOzetleri } from "../../../src/services/dashboard-rapor-servisi";
+import {
+  SUBE_DELETE_BLOCKED_ERROR_CODE,
+  SUBE_DELETE_BLOCKED_MESSAGE
+} from "../../../src/lib/yonetim/sube-delete";
 
 export type MockUserRole = "GENEL_YONETICI" | "BOLUM_YONETICISI" | "MUHASEBE" | "BIRIM_AMIRI";
 
@@ -1946,6 +1950,36 @@ let bildirimIdCounter = 800;
         ...(payload.durum ? { durum: payload.durum } : {})
       });
       await fulfillJson(route, 200, okBody(target));
+      return;
+    }
+
+    if (path.match(/^\/api\/yonetim\/subeler\/\d+$/) && method === "DELETE") {
+      const subeId = Number.parseInt(path.split("/")[4] ?? "0", 10);
+      const targetIndex = subeler.findIndex((item) => item.id === subeId);
+      if (targetIndex === -1) {
+        await fulfillJson(route, 404, errorBody("NOT_FOUND", "Sube bulunamadi."));
+        return;
+      }
+
+      const hasLinkedPersonel = personeller.some((personel) => personel.sube_id === subeId);
+      if (hasLinkedPersonel) {
+        await fulfillJson(route, 409, errorBody(SUBE_DELETE_BLOCKED_ERROR_CODE, SUBE_DELETE_BLOCKED_MESSAGE));
+        return;
+      }
+
+      subeler.splice(targetIndex, 1);
+      yonetimKullanicilari.forEach((kullanici) => {
+        if (!kullanici.sube_ids.includes(subeId)) {
+          return;
+        }
+
+        kullanici.sube_ids = kullanici.sube_ids.filter((id) => id !== subeId);
+        if (kullanici.varsayilan_sube_id === subeId) {
+          kullanici.varsayilan_sube_id = kullanici.sube_ids[0] ?? null;
+        }
+      });
+
+      await fulfillJson(route, 200, okBody({ id: subeId, deleted: true }));
       return;
     }
 

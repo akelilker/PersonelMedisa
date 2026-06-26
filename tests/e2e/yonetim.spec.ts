@@ -1,6 +1,7 @@
 ﻿import { expect, test } from "@playwright/test";
 import { login } from "./helpers/auth";
 import { mockApi } from "./helpers/mock-api";
+import { SUBE_DELETE_BLOCKED_MESSAGE } from "../../src/lib/yonetim/sube-delete";
 
 test.describe("yonetim paneli ve aylik ozet", () => {
   test("genel yonetici ayarlar menusunden yonetim paneline gider, kullanici ekler ve sube tanimlar", async ({
@@ -11,6 +12,7 @@ test.describe("yonetim paneli ve aylik ozet", () => {
 
     await page.getByTestId("header-settings-toggle").click();
     await expect(page.getByTestId("settings-yonetim-paneli")).toBeVisible();
+    await expect(page.getByTestId("settings-sube-yonetimi")).toBeVisible();
     await expect(page.getByTestId("settings-aylik-ozet")).toHaveCount(0);
 
     await page.getByTestId("settings-yonetim-paneli").click();
@@ -60,6 +62,7 @@ test.describe("yonetim paneli ve aylik ozet", () => {
 
     await page.getByTestId("header-settings-toggle").click();
     await expect(page.getByTestId("settings-yonetim-paneli")).toHaveCount(0);
+    await expect(page.getByTestId("settings-sube-yonetimi")).toHaveCount(0);
     await page.keyboard.press("Escape");
 
     await page.getByTestId("menu-raporlar").click();
@@ -134,5 +137,54 @@ test.describe("yonetim paneli ve aylik ozet", () => {
       .locator("#personel-kart-panel-surec-gecmisi")
       .locator("[data-testid='personel-surec-timeline']");
     await expect(personelIkiTimeline).toContainText(/Birim Amiri Olarak Atandı/i);
+  });
+
+  test("genel yonetici ayarlar menusunden sube yonetimine gider, bos subeyi siler ve personelli subeyi silemez", async ({
+    page
+  }) => {
+    await mockApi(page, "GENEL_YONETICI");
+    await login(page, { username: "genel_yonetici", password: "demo123" });
+
+    await page.getByTestId("header-settings-toggle").click();
+    await page.getByTestId("settings-sube-yonetimi").click();
+    await expect(page).toHaveURL(/\/yonetim-paneli\?tab=subeler$/);
+    await expect(page.getByTestId("yonetim-tab-subeler")).toHaveClass(/is-active/);
+
+    await page.getByTestId("yonetim-sube-yeni").click();
+    await page.getByLabel("Şube Kodu").fill("BOS");
+    await page.getByLabel("Şube Adı").fill("Bos Sube");
+    await page.getByTestId("yonetim-sube-departman-toggle").click();
+    await page.getByTestId("yonetim-sube-departman-panel").getByRole("button", { name: /^Depo$/i }).click();
+    await page.getByTestId("yonetim-sube-kaydet").click();
+    await expect(page.getByText("Şube tanımı eklendi.")).toBeVisible();
+    await expect(page.locator(".yonetim-card-grid--branches")).toContainText("Bos Sube");
+
+    const bosSubeCard = page.locator(".yonetim-entity-card--branch-preview").filter({ hasText: "Bos Sube" });
+    await bosSubeCard.click();
+    const subeModal = page.locator(".modal-container").last();
+    await expect(subeModal).toBeVisible();
+    await expect(subeModal.getByTestId("yonetim-sube-sil")).toBeVisible();
+
+    page.once("dialog", (dialog) => {
+      expect(dialog.message()).toContain("Bu şubeyi silmek istediğinize emin misiniz?");
+      void dialog.accept();
+    });
+    await subeModal.getByTestId("yonetim-sube-sil").click();
+
+    await expect(page.getByText("Şube tanımı silindi.")).toBeVisible();
+    await expect(page.locator(".yonetim-card-grid--branches")).not.toContainText("Bos Sube");
+
+    const merkezCard = page.locator(".yonetim-entity-card--branch-preview").filter({ hasText: "Merkez" });
+    await merkezCard.click();
+    const merkezModal = page.locator(".modal-container").last();
+    await expect(merkezModal).toBeVisible();
+
+    page.once("dialog", (dialog) => {
+      void dialog.accept();
+    });
+    await merkezModal.getByTestId("yonetim-sube-sil").click();
+
+    await expect(merkezModal.getByRole("alert")).toContainText(SUBE_DELETE_BLOCKED_MESSAGE);
+    await expect(page.locator(".yonetim-card-grid--branches")).toContainText("Merkez");
   });
 });

@@ -712,6 +712,19 @@
   color: #dbffea;
 }
 
+.yonetim-inline-error {
+  margin: 0;
+  padding: 11px 14px;
+  border: 1px solid rgba(239, 68, 68, 0.45);
+  border-radius: 12px;
+  background: rgba(127, 29, 29, 0.28);
+  color: #ffe4e6;
+}
+
+.form-actions-row--sube-delete {
+  margin-top: 4px;
+}
+
 .yonetim-summary-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));

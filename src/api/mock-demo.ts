@@ -8,6 +8,10 @@ import { DEFAULT_ODEME_TIPI } from "../types/fazla-calisma-odeme-tercihi";
 import type { SerbestZamanEvent } from "../types/serbest-zaman";
 import type { UserRole } from "../types/auth";
 import { hasRolePermission, type AppPermission } from "../lib/authorization/role-permissions";
+import {
+  SUBE_DELETE_BLOCKED_ERROR_CODE,
+  SUBE_DELETE_BLOCKED_MESSAGE
+} from "../lib/yonetim/sube-delete";
 import { assertRevizyonTransition } from "../lib/revizyon-talebi/revizyon-state";
 import {
   canApproveOrRejectRevizyon,
@@ -3199,6 +3203,33 @@ export function resolveDemoApiResponse(
         .map((departmanId) => getDepartmanLabel(departmanId))
         .filter((label): label is string => typeof label === "string")
     });
+  }
+
+  if (yonetimSubeMatch && method === "DELETE") {
+    const id = Number.parseInt(yonetimSubeMatch[1], 10);
+    const targetIndex = demoState.subeler.findIndex((item) => item.id === id);
+    if (targetIndex === -1) {
+      return demoRevizyonError("NOT_FOUND", "Sube bulunamadi.");
+    }
+
+    const hasLinkedPersonel = demoState.personeller.some((personel) => personel.sube_id === id);
+    if (hasLinkedPersonel) {
+      return demoRevizyonError(SUBE_DELETE_BLOCKED_ERROR_CODE, SUBE_DELETE_BLOCKED_MESSAGE);
+    }
+
+    demoState.subeler.splice(targetIndex, 1);
+    demoState.yonetimKullanicilari.forEach((kullanici) => {
+      if (!kullanici.sube_ids.includes(id)) {
+        return;
+      }
+
+      kullanici.sube_ids = kullanici.sube_ids.filter((subeId) => subeId !== id);
+      if (kullanici.varsayilan_sube_id === id) {
+        kullanici.varsayilan_sube_id = kullanici.sube_ids[0] ?? null;
+      }
+    });
+
+    return ok({ id, deleted: true });
   }
 
   if (pathname === "/yonetim/aylik-ozet" && method === "GET") {

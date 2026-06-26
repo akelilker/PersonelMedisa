@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent, type KeyboardEvent } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { FormField } from "../../../components/form/FormField";
 import { AppModal } from "../../../components/modal/AppModal";
 import { EmptyState } from "../../../components/states/EmptyState";
@@ -11,11 +11,13 @@ import { createSurec, type CreateSurecPayload } from "../../../api/surecler.api"
 import {
   createYonetimKullanici,
   createYonetimSube,
+  deleteYonetimSube,
   fetchYonetimKullanicilari,
   fetchYonetimSubeleri,
   updateYonetimKullanici,
   updateYonetimSube
 } from "../../../api/yonetim.api";
+import { useRoleAccess } from "../../../hooks/use-role-access";
 import type { UserRole } from "../../../types/auth";
 import type { Personel } from "../../../types/personel";
 import type { IdOption } from "../../../types/referans";
@@ -393,6 +395,9 @@ function buildYonetimSurecLogPayloads(
 
 export function YonetimPaneliPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const { hasPermission } = useRoleAccess();
+  const canManageYonetimPanel = hasPermission("yonetim-paneli.manage");
   const [activeTab, setActiveTab] = useState<ActiveTab>("kullanicilar");
   const [kullaniciViewMode, setKullaniciViewMode] = useState<YonetimViewMode>("card");
   const [subeViewMode, setSubeViewMode] = useState<YonetimViewMode>("card");
@@ -405,6 +410,7 @@ export function YonetimPaneliPage() {
   const [isAddingDepartman, setIsAddingDepartman] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [subeDeleteError, setSubeDeleteError] = useState<string | null>(null);
 
   const [kullanicilar, setKullanicilar] = useState<YonetimKullanici[]>([]);
   const [subeler, setSubeler] = useState<YonetimSube[]>([]);
@@ -476,6 +482,12 @@ export function YonetimPaneliPage() {
   }, []);
 
   useEffect(() => {
+    if (searchParams.get("tab") === "subeler") {
+      setActiveTab("subeler");
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
     if (kullaniciForm.kullaniciTipi !== "IC_PERSONEL" || !kullaniciForm.personelId) {
       return;
     }
@@ -505,6 +517,7 @@ export function YonetimPaneliPage() {
     setIsDepartmanPickerOpen(false);
     setIsDepartmanCreateOpen(false);
     setIsSubeFormOpen(false);
+    setSubeDeleteError(null);
   }
 
   function openYeniKullaniciForm() {
@@ -526,6 +539,7 @@ export function YonetimPaneliPage() {
   function openYeniSubeForm() {
     setSuccessMessage(null);
     setErrorMessage(null);
+    setSubeDeleteError(null);
     setEditingSubeId(null);
     setSubeForm(INITIAL_SUBE_FORM);
     setYeniDepartmanAdi("");
@@ -537,6 +551,7 @@ export function YonetimPaneliPage() {
   function openSubeEditor(item: YonetimSube) {
     setSuccessMessage(null);
     setErrorMessage(null);
+    setSubeDeleteError(null);
     setEditingSubeId(item.id);
     setSubeForm(subeFormFromItem(item));
     setYeniDepartmanAdi("");
@@ -634,6 +649,31 @@ export function YonetimPaneliPage() {
       await loadPanel();
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Şube tanımı kaydedilemedi.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function handleSubeDelete() {
+    if (editingSubeId == null || isSubmitting || !canManageYonetimPanel) {
+      return;
+    }
+
+    if (!window.confirm("Bu şubeyi silmek istediğinize emin misiniz?")) {
+      return;
+    }
+
+    setIsSubmitting(true);
+    setSubeDeleteError(null);
+    setSuccessMessage(null);
+
+    try {
+      await deleteYonetimSube(editingSubeId);
+      resetSubeEditor();
+      setSuccessMessage("Şube tanımı silindi.");
+      await loadPanel();
+    } catch (error) {
+      setSubeDeleteError(error instanceof Error ? error.message : "Şube silinemedi.");
     } finally {
       setIsSubmitting(false);
     }
@@ -1091,6 +1131,12 @@ export function YonetimPaneliPage() {
               ) : null}
             </div>
 
+            {subeDeleteError ? (
+              <p className="yonetim-inline-error" role="alert">
+                {subeDeleteError}
+              </p>
+            ) : null}
+
             <div className="form-actions-row">
               <button type="submit" className="universal-btn-save" data-testid="yonetim-sube-kaydet">
                 {editingSubeId != null ? "Şubeyi Güncelle" : "Şubeyi Kaydet"}
@@ -1099,6 +1145,20 @@ export function YonetimPaneliPage() {
                 Vazgeç
               </button>
             </div>
+
+            {editingSubeId != null && canManageYonetimPanel ? (
+              <div className="form-actions-row form-actions-row--sube-delete">
+                <button
+                  type="button"
+                  className="universal-btn-cancel"
+                  data-testid="yonetim-sube-sil"
+                  onClick={() => void handleSubeDelete()}
+                  disabled={isSubmitting}
+                >
+                  Şubeyi Sil
+                </button>
+              </div>
+            ) : null}
           </form>
         </AppModal>
       ) : null}

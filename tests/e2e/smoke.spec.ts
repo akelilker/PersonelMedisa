@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { login } from "./helpers/auth";
-import { expectMainMenuForRole } from "./helpers/main-menu";
+import { expectThreeButtonMainMenu } from "./helpers/main-menu";
 import { mockApi } from "./helpers/mock-api";
 
 function readonlyFieldByLabel(page: Parameters<typeof test>[0]["page"], label: string) {
@@ -57,7 +57,7 @@ test.describe("e2e smoke", () => {
     await login(page, { username: "yonetici", password: "secret" });
 
     await expect(page).toHaveURL("/");
-    await expectMainMenuForRole(page, "GENEL_YONETICI");
+    await expectThreeButtonMainMenu(page, true);
 
     await page.getByTestId("menu-personel-karti").click();
     await expect(page).toHaveURL(/\/personeller$/);
@@ -104,7 +104,7 @@ test.describe("e2e smoke", () => {
     await login(page, { username: "birim", password: "secret" });
 
     await expect(page).toHaveURL("/");
-    await expectMainMenuForRole(page, "BIRIM_AMIRI");
+    await expectThreeButtonMainMenu(page, false);
 
     await page.getByTestId("menu-personel-karti").click();
     await expect(page).toHaveURL(/\/personeller$/);

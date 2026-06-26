@@ -6,78 +6,29 @@ export type MainMenuRole =
   | "MUHASEBE"
   | "BIRIM_AMIRI";
 
-const ROLE_MENU_EXPECTATIONS: Record<
-  MainMenuRole,
-  { visible: string[]; hidden: string[]; kayitEnabled: boolean }
-> = {
-  GENEL_YONETICI: {
-    visible: [
-      "menu-kayit-surec",
-      "menu-personel-karti",
-      "menu-raporlar",
-      "menu-puantaj",
-      "menu-finans",
-      "menu-gunluk-kayit",
-      "menu-yonetim-paneli"
-    ],
-    hidden: [],
-    kayitEnabled: true
-  },
-  BOLUM_YONETICISI: {
-    visible: [
-      "menu-kayit-surec",
-      "menu-personel-karti",
-      "menu-raporlar",
-      "menu-puantaj",
-      "menu-finans",
-      "menu-gunluk-kayit"
-    ],
-    hidden: ["menu-yonetim-paneli"],
-    kayitEnabled: true
-  },
-  MUHASEBE: {
-    visible: [
-      "menu-kayit-surec",
-      "menu-personel-karti",
-      "menu-raporlar",
-      "menu-puantaj",
-      "menu-finans",
-      "menu-gunluk-kayit"
-    ],
-    hidden: ["menu-yonetim-paneli"],
-    kayitEnabled: true
-  },
-  BIRIM_AMIRI: {
-    visible: [
-      "menu-kayit-surec",
-      "menu-personel-karti",
-      "menu-raporlar",
-      "menu-puantaj",
-      "menu-gunluk-kayit"
-    ],
-    hidden: ["menu-finans", "menu-yonetim-paneli"],
-    kayitEnabled: false
-  }
+const ROLE_KAYIT_ENABLED: Record<MainMenuRole, boolean> = {
+  GENEL_YONETICI: true,
+  BOLUM_YONETICISI: true,
+  MUHASEBE: true,
+  BIRIM_AMIRI: false
 };
 
-export async function expectMainMenuForRole(page: Page, role: MainMenuRole) {
-  const expectations = ROLE_MENU_EXPECTATIONS[role];
-
-  await expect(page.getByTestId("dashboard-page")).toBeVisible();
-  await expect(page.getByTestId("dashboard-kpi-grid")).toBeVisible();
-  await expect(page.locator("#main-menu .menu-btn")).toHaveCount(expectations.visible.length);
-
-  for (const testId of expectations.visible) {
-    await expect(page.getByTestId(testId)).toBeVisible();
-  }
-
-  for (const testId of expectations.hidden) {
-    await expect(page.getByTestId(testId)).toHaveCount(0);
-  }
-
-  if (expectations.kayitEnabled) {
+export async function expectThreeButtonMainMenu(page: Page, kayitEnabled: boolean) {
+  await expect(page.locator("#main-menu .menu-btn")).toHaveCount(3);
+  await expect(page.getByTestId("menu-kayit-surec")).toBeVisible();
+  if (kayitEnabled) {
     await expect(page.getByTestId("menu-kayit-surec")).toBeEnabled();
   } else {
     await expect(page.getByTestId("menu-kayit-surec")).toBeDisabled();
   }
+  await expect(page.getByTestId("menu-personel-karti")).toBeVisible();
+  await expect(page.getByTestId("menu-raporlar")).toBeVisible();
+  await expect(page.getByTestId("menu-puantaj")).toHaveCount(0);
+  await expect(page.getByTestId("menu-finans")).toHaveCount(0);
+  await expect(page.getByTestId("menu-gunluk-kayit")).toHaveCount(0);
+  await expect(page.getByTestId("menu-yonetim-paneli")).toHaveCount(0);
+}
+
+export async function expectMainMenuForRole(page: Page, role: MainMenuRole) {
+  await expectThreeButtonMainMenu(page, ROLE_KAYIT_ENABLED[role]);
 }

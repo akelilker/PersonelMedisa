@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { login } from "./helpers/auth";
-import { expectMainMenuForRole } from "./helpers/main-menu";
+import { expectThreeButtonMainMenu } from "./helpers/main-menu";
 import { mockApi } from "./helpers/mock-api";
 
 test("Ana akış smoke", async ({ page }) => {
@@ -8,7 +8,8 @@ test("Ana akış smoke", async ({ page }) => {
   await login(page, { username: "genel_yonetici", password: "demo123" });
 
   await expect(page).toHaveURL("/");
-  await expectMainMenuForRole(page, "GENEL_YONETICI");
+  await expectThreeButtonMainMenu(page, true);
+  await expect(page.getByTestId("dashboard-page")).toHaveCount(0);
 
   await page.getByTestId("menu-kayit-surec").click();
   await expect(page.locator("#main-menu")).toHaveCount(0);
@@ -43,27 +44,19 @@ test("Ana akış smoke", async ({ page }) => {
   await page.locator(".modal-container").first().locator(".modal-close-btn").click();
   await expect(page).toHaveURL("/");
 
-  await page.getByTestId("menu-puantaj").click();
+  await page.goto("/puantaj");
   await expect(page).toHaveURL(/\/puantaj$/);
   await expect(page.locator(".modal-header h2").first()).toContainText("Günlük Puantaj");
-  await page.locator(".modal-container").first().locator(".modal-close-btn").click();
-  await expect(page).toHaveURL("/");
 
-  await page.getByTestId("menu-finans").click();
+  await page.goto("/finans");
   await expect(page).toHaveURL(/\/finans$/);
   await expect(page.locator(".modal-header h2").first()).toContainText("Finans");
-  await page.locator(".modal-container").first().locator(".modal-close-btn").click();
-  await expect(page).toHaveURL("/");
 
-  await page.getByTestId("menu-gunluk-kayit").click();
+  await page.goto("/bildirimler");
   await expect(page).toHaveURL(/\/bildirimler$/);
   await expect(page.locator(".modal-header h2").first()).toContainText("Günlük Kayıt Merkezi");
-  await page.locator(".modal-container").first().locator(".modal-close-btn").click();
-  await expect(page).toHaveURL("/");
 
-  await page.getByTestId("menu-yonetim-paneli").click();
+  await page.goto("/yonetim-paneli");
   await expect(page).toHaveURL(/\/yonetim-paneli$/);
   await expect(page.locator(".modal-header h2").first()).toContainText("Yönetim Paneli");
-  await page.locator(".modal-container").first().locator(".modal-close-btn").click();
-  await expect(page).toHaveURL("/");
 });

@@ -1,6 +1,5 @@
 import { Link, Navigate, Route, Routes, useOutletContext } from "react-router-dom";
 import { AppShell, type AppShellOutletContext } from "./AppShell";
-import { HomeDashboard } from "./HomeDashboard";
 import { MainMenu } from "../components/main-menu/MainMenu";
 import { ProtectedRoute } from "../router/ProtectedRoute";
 import { PersonellerPage } from "../features/personeller/pages/PersonellerPage";
@@ -27,12 +26,7 @@ function AppLayout() {
 
 function HomeIndexMainMenu() {
   const ctx = useOutletContext<AppShellOutletContext>();
-  return (
-    <>
-      {ctx.showMainMenu ? <MainMenu onKayitOpen={ctx.onKayitOpen} /> : null}
-      <HomeDashboard />
-    </>
-  );
+  return ctx.showMainMenu ? <MainMenu onKayitOpen={ctx.onKayitOpen} /> : null;
 }
 
 function NotFoundPage() {

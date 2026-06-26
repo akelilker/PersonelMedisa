@@ -1,7 +1,9 @@
 import { useLocation, useNavigate } from "react-router-dom";
 import { useRoleAccess } from "../../hooks/use-role-access";
-import type { AppPermission } from "../../lib/authorization/role-permissions";
-import { MAIN_MENU_ITEMS, type MainMenuConfigItem } from "./main-menu-config";
+import {
+  PERSONELLER_LIST_ANY,
+  ROUTE_PERMISSION
+} from "../../lib/authorization/role-permissions";
 
 export type KayitTab = "yeni-kayit" | "surec";
 
@@ -9,73 +11,61 @@ type MainMenuProps = {
   onKayitOpen: (tab: KayitTab) => void;
 };
 
-function itemIsAllowed(
-  item: MainMenuConfigItem,
-  hasPermission: (permission: AppPermission) => boolean,
-  hasAnyPermission: (permissions: AppPermission[]) => boolean
-): boolean {
-  if (item.requiredAnyPermissions && item.requiredAnyPermissions.length > 0) {
-    return hasAnyPermission(item.requiredAnyPermissions);
-  }
-
-  if ("requiredPermission" in item && item.requiredPermission) {
-    return hasPermission(item.requiredPermission);
-  }
-
-  return true;
-}
-
-function itemIsActive(item: MainMenuConfigItem, pathname: string): boolean {
-  if (item.kind === "modal") {
-    return pathname.startsWith(item.activePathPrefix);
-  }
-
-  return pathname === item.route || pathname.startsWith(`${item.route}/`);
-}
-
 export function MainMenu({ onKayitOpen }: MainMenuProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const { hasAnyPermission, hasPermission } = useRoleAccess();
+
+  const canKayitSection = hasPermission("personeller.create") || hasPermission("surecler.create");
+  const canViewPersoneller = hasAnyPermission(PERSONELLER_LIST_ANY);
+  const canViewRaporlar = hasPermission(ROUTE_PERMISSION.raporlarPage);
+
   const { pathname } = location;
-
-  const menuItems = MAIN_MENU_ITEMS.filter((item) => {
-    const allowed = itemIsAllowed(item, hasPermission, hasAnyPermission);
-    if (item.visibilityMode === "hide") {
-      return allowed;
-    }
-
-    return true;
-  });
+  const isKayitSurecActive = pathname.startsWith("/surecler");
+  const isPersonelActive = pathname.startsWith("/personeller");
+  const isRaporlarActive = pathname.startsWith("/raporlar");
 
   return (
     <nav id="main-menu" className="menu-container" aria-label="Ana omurga modulleri">
-      {menuItems.map((item) => {
-        const allowed = itemIsAllowed(item, hasPermission, hasAnyPermission);
-        const isActive = itemIsActive(item, pathname);
+      <button
+        type="button"
+        className={`menu-btn${isKayitSurecActive ? " is-active" : ""}`}
+        aria-current={isKayitSurecActive ? "page" : undefined}
+        data-testid="menu-kayit-surec"
+        onClick={() => {
+          const tab: KayitTab = pathname.startsWith("/surecler") ? "surec" : "yeni-kayit";
+          onKayitOpen(tab);
+        }}
+        disabled={!canKayitSection}
+      >
+        <div className="ttl">Kayıt ve Süreç</div>
+      </button>
 
-        return (
-          <button
-            key={item.testId}
-            type="button"
-            className={`menu-btn${isActive ? " is-active" : ""}`}
-            aria-current={isActive ? "page" : undefined}
-            data-testid={item.testId}
-            onClick={() => {
-              if (item.kind === "modal") {
-                const tab: KayitTab = pathname.startsWith("/surecler") ? "surec" : "yeni-kayit";
-                onKayitOpen(tab);
-                return;
-              }
+      <button
+        type="button"
+        className={`menu-btn${isPersonelActive ? " is-active" : ""}`}
+        aria-current={isPersonelActive ? "page" : undefined}
+        data-testid="menu-personel-karti"
+        onClick={() => {
+          navigate("/personeller");
+        }}
+        disabled={!canViewPersoneller}
+      >
+        <div className="ttl">Personel Kartı</div>
+      </button>
 
-              navigate(item.route);
-            }}
-            disabled={!allowed}
-          >
-            <div className="ttl">{item.label}</div>
-          </button>
-        );
-      })}
+      <button
+        type="button"
+        className={`menu-btn${isRaporlarActive ? " is-active" : ""}`}
+        aria-current={isRaporlarActive ? "page" : undefined}
+        data-testid="menu-raporlar"
+        onClick={() => {
+          navigate("/raporlar");
+        }}
+        disabled={!canViewRaporlar}
+      >
+        <div className="ttl">Raporlar</div>
+      </button>
     </nav>
   );
 }

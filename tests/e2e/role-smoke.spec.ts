@@ -11,12 +11,13 @@ const users = {
 };
 
 test.describe("Rol bazli smoke", () => {
-  test("Genel yonetici home'da tum modul butonlarini gorur ve ana modullere erisebilir", async ({ page }) => {
+  test("Genel yonetici home'da 3 ana omurga butonunu gorur ve ana modullere erisebilir", async ({ page }) => {
     await mockApi(page, "GENEL_YONETICI");
     await login(page, users.genelYonetici);
     await expect(page).toHaveURL("/");
 
     await expectMainMenuForRole(page, "GENEL_YONETICI");
+    await expect(page.getByTestId("dashboard-page")).toHaveCount(0);
 
     await page.goto("/personeller");
     await expect(page.getByRole("heading", { name: "Personeller" })).toBeVisible();
@@ -34,7 +35,7 @@ test.describe("Rol bazli smoke", () => {
     await expect(page.locator(".modal-header h2").first()).toContainText("Yönetim Paneli");
   });
 
-  test("Bolum yoneticisi home'da yonetim paneli haric modul butonlarini gorur", async ({ page }) => {
+  test("Bolum yoneticisi home'da 3 ana omurga butonunu gorur ve yetkili modullere erisebilir", async ({ page }) => {
     await mockApi(page, "BOLUM_YONETICISI");
     await login(page, users.bolumYonetici);
     await expect(page).toHaveURL("/");
@@ -54,7 +55,7 @@ test.describe("Rol bazli smoke", () => {
     await expect(page).toHaveURL(/\/yetkisiz$/);
   });
 
-  test("Muhasebe home'da yonetim paneli haric modul butonlarini gorur", async ({ page }) => {
+  test("Muhasebe home'da 3 ana omurga butonunu gorur; finans ve raporlara ikincil akistan erisebilir", async ({ page }) => {
     await mockApi(page, "MUHASEBE");
     await login(page, users.muhasebe);
     await expect(page).toHaveURL("/");
@@ -71,7 +72,9 @@ test.describe("Rol bazli smoke", () => {
     await expect(page).toHaveURL(/\/yetkisiz$/);
   });
 
-  test("Birim amiri finans ve yonetim paneli haric modul butonlarini gorur", async ({ page }) => {
+  test("Birim amiri 3 ana omurga butonunu gorur, yazma owner'ina giremez; ikincil akislarla gunluk kayda iner", async ({
+    page
+  }) => {
     await mockApi(page, "BIRIM_AMIRI");
     await login(page, users.birimAmiri);
     await expect(page).toHaveURL("/");

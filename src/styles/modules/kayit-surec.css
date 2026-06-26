@@ -1095,3 +1095,38 @@
 .belge-durum-radio input {
   accent-color: rgb(var(--theme-color-rgb));
 }
+
+.belge-kayit-section-divider {
+  margin: 20px 0 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.belge-kayit-section {
+  display: grid;
+  gap: 12px;
+}
+
+.belge-kayit-form {
+  display: grid;
+  gap: 10px;
+  width: min(100%, 520px);
+  margin-inline: auto;
+}
+
+.belge-kayit-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+}
+
+.belge-kayit-table th,
+.belge-kayit-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  text-align: left;
+  vertical-align: top;
+}
+
+.belge-kayit-cancel-btn {
+  white-space: nowrap;
+}

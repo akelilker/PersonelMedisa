@@ -43,6 +43,7 @@ import { fetchPersonelBelgeDurumu, putPersonelBelgeDurumu } from "../../../api/b
 import { getApiErrorMessage } from "../../../api/api-client";
 import { PersonelCreateFields } from "../../../features/personeller/components/PersonelCreateFields";
 import { PersonelZimmetCreateForm } from "../../../features/personeller/components/PersonelZimmetCreateForm";
+import { KayitBelgeKayitlariSection } from "./KayitBelgeKayitlariSection";
 import { buildCreatePersonelPayload } from "../../../features/personeller/personel-create-utils";
 import { SurecFormFields } from "../../../features/surecler/components/SurecFormFields";
 import {
@@ -2004,7 +2005,7 @@ export function KayitSurecWorkspace({
                             ) : canCreateSurec ? (
                               <div>
                                 <p className="workspace-empty-hint">
-                                  <strong>Belgeler</strong> — {selectedSurecPersonelLabel}
+                                  <strong>Dosya Evrak Durumu</strong> — {selectedSurecPersonelLabel}
                                 </p>
                                 {belgeDurumLoading ? (
                                   <p className="workspace-empty-hint">Belgeler yükleniyor…</p>
@@ -2068,6 +2069,16 @@ export function KayitSurecWorkspace({
                                     {belgeDurumSaving ? "Kaydediliyor..." : "Kaydet"}
                                   </button>
                                 </div>
+
+                                <div className="belge-kayit-section-divider" aria-hidden="true" />
+
+                                <KayitBelgeKayitlariSection
+                                  personelId={selectedSurecPersonel.id}
+                                  personelLabel={selectedSurecPersonelLabel}
+                                  isPersonelPasif={false}
+                                  canWrite={canCreateSurec}
+                                  isActive={activePersonelTab === "belgeler"}
+                                />
                               </div>
                             ) : (
                               <div className="surec-person-placeholder">

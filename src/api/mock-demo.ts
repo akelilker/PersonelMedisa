@@ -42,6 +42,12 @@ import {
   olusturIptalEvent
 } from "../services/serbest-zaman-event-motoru";
 import { aggregateYillikFazlaCalisma } from "../services/yillik-fazla-calisma-aggregate";
+import {
+  computeGecerlilikDurumu,
+  PERSONEL_BELGE_KAYIT_TIPI_KEYS,
+  type PersonelBelgeKayitDurum,
+  type PersonelBelgeKayitTipi
+} from "../types/personel-belge-kaydi";
 
 type DemoMethod = "GET" | "POST" | "PUT" | "DELETE";
 
@@ -90,6 +96,22 @@ type DemoZimmet = {
   teslim_durumu: string;
   zimmet_durumu: string;
   iade_tarihi?: string;
+};
+
+type DemoPersonelBelgeKaydi = {
+  id: number;
+  personel_id: number;
+  kayit_tipi: PersonelBelgeKayitTipi;
+  ad: string;
+  veren_kurum?: string | null;
+  belge_no?: string | null;
+  baslangic_tarihi?: string | null;
+  bitis_tarihi?: string | null;
+  durum: PersonelBelgeKayitDurum;
+  ek_ref?: string | null;
+  aciklama?: string | null;
+  created_at?: string;
+  updated_at?: string;
 };
 
 type DemoBildirim = {
@@ -249,6 +271,7 @@ const demoState: {
   personeller: DemoPersonel[];
   surecler: DemoSurec[];
   zimmetler: DemoZimmet[];
+  personelBelgeKayitlari: DemoPersonelBelgeKaydi[];
   bildirimler: DemoBildirim[];
   finansKalemleri: DemoFinansKalem[];
   puantajMap: Record<string, DemoPuantaj>;
@@ -271,6 +294,7 @@ const demoState: {
     personel: number;
     surec: number;
     zimmet: number;
+    personelBelgeKaydi: number;
     bildirim: number;
     finans: number;
     kapanis: number;
@@ -370,6 +394,32 @@ const demoState: {
       aciklama: "Seri No: AYK-204",
       teslim_durumu: "YENI",
       zimmet_durumu: "AKTIF"
+    }
+  ],
+  personelBelgeKayitlari: [
+    {
+      id: 701,
+      personel_id: 1,
+      kayit_tipi: "SERTIFIKA",
+      ad: "Forklift Operatör Belgesi",
+      veren_kurum: "Medisa Eğitim Merkezi",
+      belge_no: "FRK-2024-001",
+      baslangic_tarihi: "2024-03-01",
+      bitis_tarihi: "2027-03-01",
+      durum: "AKTIF",
+      created_at: "2024-03-01T10:00:00.000Z"
+    },
+    {
+      id: 702,
+      personel_id: 1,
+      kayit_tipi: "EHLIYET",
+      ad: "B Sınıfı Ehliyet",
+      veren_kurum: "İstanbul İl Emniyet",
+      belge_no: "TR-987654",
+      baslangic_tarihi: "2018-05-10",
+      bitis_tarihi: "2026-07-15",
+      durum: "AKTIF",
+      created_at: "2018-05-10T10:00:00.000Z"
     }
   ],
   bildirimler: [
@@ -614,6 +664,7 @@ const demoState: {
     personel: 100,
     surec: 600,
     zimmet: 560,
+    personelBelgeKaydi: 703,
     bildirim: 800,
     finans: 950,
     kapanis: 1000,
@@ -636,6 +687,30 @@ function buildDemoBelgeDurumResponse(personelId: number) {
     durum: stored[belge_turu] ?? "YOK"
   }));
   return ok({ items });
+}
+
+function serializeDemoPersonelBelgeKaydi(record: DemoPersonelBelgeKaydi) {
+  const bitisTarihi = record.bitis_tarihi ?? null;
+  return {
+    id: record.id,
+    personel_id: record.personel_id,
+    kayit_tipi: record.kayit_tipi,
+    ad: record.ad,
+    veren_kurum: record.veren_kurum ?? null,
+    belge_no: record.belge_no ?? null,
+    baslangic_tarihi: record.baslangic_tarihi ?? null,
+    bitis_tarihi: bitisTarihi,
+    durum: record.durum,
+    gecerlilik_durumu: computeGecerlilikDurumu(bitisTarihi),
+    ek_ref: record.ek_ref ?? null,
+    aciklama: record.aciklama ?? null,
+    created_at: record.created_at ?? null,
+    updated_at: record.updated_at ?? null
+  };
+}
+
+function isPersonelBelgeKayitTipi(value: unknown): value is PersonelBelgeKayitTipi {
+  return typeof value === "string" && (PERSONEL_BELGE_KAYIT_TIPI_KEYS as readonly string[]).includes(value);
 }
 
 function applyDemoBelgeDurumPut(personelId: number, body: Record<string, unknown>) {
@@ -3422,6 +3497,123 @@ export function resolveDemoApiResponse(
       },
       { total: 1 }
     );
+  }
+
+  const belgeKayitlariListMatch = pathname.match(/^\/personeller\/(\d+)\/belge-kayitlari$/);
+  if (belgeKayitlariListMatch && method === "GET") {
+    const personelId = Number.parseInt(belgeKayitlariListMatch[1] ?? "0", 10);
+    const exists = demoState.personeller.some((item) => item.id === personelId);
+    if (!exists) {
+      return null;
+    }
+
+    const stateFilter = toStringValue(requestUrl.searchParams.get("state"));
+    const page = toNumber(requestUrl.searchParams.get("page")) ?? 1;
+    const limit = toNumber(requestUrl.searchParams.get("limit")) ?? 50;
+
+    const filtered = demoState.personelBelgeKayitlari.filter((item) => {
+      if (item.personel_id !== personelId) {
+        return false;
+      }
+      if (stateFilter && stateFilter !== "tum" && item.durum !== stateFilter) {
+        return false;
+      }
+      return true;
+    });
+
+    const start = (page - 1) * limit;
+    const items = filtered.slice(start, start + limit).map(serializeDemoPersonelBelgeKaydi);
+    const total = filtered.length;
+    const totalPages = Math.max(1, Math.ceil(total / limit));
+
+    return ok({ items }, { page, limit, total, total_pages: totalPages });
+  }
+
+  if (belgeKayitlariListMatch && method === "POST") {
+    const personelId = Number.parseInt(belgeKayitlariListMatch[1] ?? "0", 10);
+    const exists = demoState.personeller.some((item) => item.id === personelId);
+    if (!exists) {
+      return null;
+    }
+
+    const kayitTipi = body.kayit_tipi;
+    const ad = toStringValue(body.ad);
+    if (!isPersonelBelgeKayitTipi(kayitTipi) || !ad) {
+      return demoRevizyonError("VALIDATION_ERROR", "kayit_tipi ve ad zorunludur.");
+    }
+
+    const now = new Date().toISOString();
+    const next: DemoPersonelBelgeKaydi = {
+      id: ++demoState.nextIds.personelBelgeKaydi,
+      personel_id: personelId,
+      kayit_tipi: kayitTipi,
+      ad,
+      veren_kurum: toStringValue(body.veren_kurum) ?? null,
+      belge_no: toStringValue(body.belge_no) ?? null,
+      baslangic_tarihi: toStringValue(body.baslangic_tarihi) ?? null,
+      bitis_tarihi: toStringValue(body.bitis_tarihi) ?? null,
+      durum: "AKTIF",
+      ek_ref: toStringValue(body.ek_ref) ?? null,
+      aciklama: toStringValue(body.aciklama) ?? null,
+      created_at: now,
+      updated_at: now
+    };
+    demoState.personelBelgeKayitlari.unshift(next);
+    return ok(serializeDemoPersonelBelgeKaydi(next));
+  }
+
+  const belgeKayitDetailMatch = pathname.match(/^\/belge-kayitlari\/(\d+)$/);
+  if (belgeKayitDetailMatch && method === "PUT") {
+    const id = Number.parseInt(belgeKayitDetailMatch[1], 10);
+    const kayit = demoState.personelBelgeKayitlari.find((item) => item.id === id);
+    if (!kayit) {
+      return null;
+    }
+    if (kayit.durum === "IPTAL") {
+      return demoRevizyonError("INVALID_STATE", "Iptal edilmis kayit guncellenemez.");
+    }
+
+    const kayitTipi = body.kayit_tipi;
+    if (kayitTipi !== undefined && isPersonelBelgeKayitTipi(kayitTipi)) {
+      kayit.kayit_tipi = kayitTipi;
+    }
+    const ad = toStringValue(body.ad);
+    if (ad) {
+      kayit.ad = ad;
+    }
+    if ("veren_kurum" in body) {
+      kayit.veren_kurum = toStringValue(body.veren_kurum) ?? null;
+    }
+    if ("belge_no" in body) {
+      kayit.belge_no = toStringValue(body.belge_no) ?? null;
+    }
+    if ("baslangic_tarihi" in body) {
+      kayit.baslangic_tarihi = toStringValue(body.baslangic_tarihi) ?? null;
+    }
+    if ("bitis_tarihi" in body) {
+      kayit.bitis_tarihi = toStringValue(body.bitis_tarihi) ?? null;
+    }
+    if ("ek_ref" in body) {
+      kayit.ek_ref = toStringValue(body.ek_ref) ?? null;
+    }
+    if ("aciklama" in body) {
+      kayit.aciklama = toStringValue(body.aciklama) ?? null;
+    }
+    kayit.updated_at = new Date().toISOString();
+    return ok(serializeDemoPersonelBelgeKaydi(kayit));
+  }
+
+  const belgeKayitCancelMatch = pathname.match(/^\/belge-kayitlari\/(\d+)\/iptal$/);
+  if (belgeKayitCancelMatch && method === "POST") {
+    const id = Number.parseInt(belgeKayitCancelMatch[1], 10);
+    const kayit = demoState.personelBelgeKayitlari.find((item) => item.id === id);
+    if (!kayit) {
+      return null;
+    }
+
+    kayit.durum = "IPTAL";
+    kayit.updated_at = new Date().toISOString();
+    return ok(serializeDemoPersonelBelgeKaydi(kayit));
   }
 
   const belgeDurumMatch = pathname.match(/^\/personeller\/(\d+)\/belge-durumu$/);

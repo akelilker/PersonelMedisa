@@ -350,7 +350,10 @@ test.describe("personel dosyasi surec akisi", () => {
     await expect(belgelerPanel).toContainText(/Kimlik/i);
     await expect(belgelerPanel).toContainText(/Yok/i);
     await expect(belgelerPanel).toContainText(/Eğitim & Sertifikalar/i);
-    await expect(belgelerPanel).toContainText(/sonraki fazda ayrı veri modeliyle eklenecektir/i);
+    await expect(belgelerPanel.getByTestId("personel-belge-kayit-list")).toBeVisible();
+    await expect(belgelerPanel.getByTestId("personel-belge-kayit-list")).toContainText(/Forklift Operatör Belgesi/i);
+    await expect(belgelerPanel.getByTestId("personel-belge-kayit-list")).toContainText(/B Sınıfı Ehliyet/i);
+    await expect(belgelerPanel.getByTestId("personel-belge-kayit-list")).toContainText(/Yakında doluyor/i);
     await expect(belgelerPanel.locator('input[type="radio"]')).toHaveCount(0);
     await expect(belgelerPanel.getByRole("button", { name: "Kaydet" })).toHaveCount(0);
   });

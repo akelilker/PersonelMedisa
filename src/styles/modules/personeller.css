@@ -1142,3 +1142,30 @@
     align-items: stretch;
   }
 }
+
+.personel-belge-kayit-table-wrap {
+  overflow-x: auto;
+}
+
+.personel-belge-kayit-table {
+  width: 100%;
+  min-width: 720px;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+}
+
+.personel-belge-kayit-table th,
+.personel-belge-kayit-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  text-align: left;
+  vertical-align: top;
+}
+
+.personel-belge-kayit-state.is-expired {
+  color: #f87171;
+}
+
+.personel-belge-kayit-state.is-expiring {
+  color: #fbbf24;
+}

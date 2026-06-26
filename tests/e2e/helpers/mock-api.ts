@@ -5,6 +5,12 @@ import {
   SUBE_DELETE_BLOCKED_ERROR_CODE,
   SUBE_DELETE_BLOCKED_MESSAGE
 } from "../../../src/lib/yonetim/sube-delete";
+import {
+  computeGecerlilikDurumu,
+  PERSONEL_BELGE_KAYIT_TIPI_KEYS,
+  type PersonelBelgeKayitDurum,
+  type PersonelBelgeKayitTipi
+} from "../../../src/types/personel-belge-kaydi";
 
 export type MockUserRole = "GENEL_YONETICI" | "BOLUM_YONETICISI" | "MUHASEBE" | "BIRIM_AMIRI";
 
@@ -257,6 +263,47 @@ export async function mockApi(page: Page, role: MockUserRole) {
       teslim_durumu: "IKINCI_EL",
       zimmet_durumu: "IADE_EDILDI",
       iade_tarihi: "2026-02-20"
+    }
+  ];
+
+  const personelBelgeKayitlari: Array<{
+    id: number;
+    personel_id: number;
+    kayit_tipi: PersonelBelgeKayitTipi;
+    ad: string;
+    veren_kurum?: string | null;
+    belge_no?: string | null;
+    baslangic_tarihi?: string | null;
+    bitis_tarihi?: string | null;
+    durum: PersonelBelgeKayitDurum;
+    ek_ref?: string | null;
+    aciklama?: string | null;
+    created_at?: string;
+    updated_at?: string;
+  }> = [
+    {
+      id: 901,
+      personel_id: 1,
+      kayit_tipi: "SERTIFIKA",
+      ad: "Forklift Operatör Belgesi",
+      veren_kurum: "Medisa Eğitim Merkezi",
+      belge_no: "FRK-2024-001",
+      baslangic_tarihi: "2024-03-01",
+      bitis_tarihi: "2027-03-01",
+      durum: "AKTIF",
+      created_at: "2024-03-01T10:00:00.000Z"
+    },
+    {
+      id: 902,
+      personel_id: 1,
+      kayit_tipi: "EHLIYET",
+      ad: "B Sınıfı Ehliyet",
+      veren_kurum: "İstanbul İl Emniyet",
+      belge_no: "TR-987654",
+      baslangic_tarihi: "2018-05-10",
+      bitis_tarihi: "2026-07-15",
+      durum: "AKTIF",
+      created_at: "2018-05-10T10:00:00.000Z"
     }
   ];
 
@@ -617,12 +664,33 @@ export async function mockApi(page: Page, role: MockUserRole) {
 
 let surecIdCounter = 600;
 let zimmetIdCounter = 560;
+let personelBelgeKaydiIdCounter = 903;
 let bildirimIdCounter = 800;
   let finansIdCounter = 950;
   let kullaniciIdCounter = 3;
   let subeIdCounter = 2;
   let departmanIdCounter = 12;
   let personelIdCounter = 4;
+
+  function serializePersonelBelgeKaydi(record: (typeof personelBelgeKayitlari)[number]) {
+    const bitisTarihi = record.bitis_tarihi ?? null;
+    return {
+      id: record.id,
+      personel_id: record.personel_id,
+      kayit_tipi: record.kayit_tipi,
+      ad: record.ad,
+      veren_kurum: record.veren_kurum ?? null,
+      belge_no: record.belge_no ?? null,
+      baslangic_tarihi: record.baslangic_tarihi ?? null,
+      bitis_tarihi: bitisTarihi,
+      durum: record.durum,
+      gecerlilik_durumu: computeGecerlilikDurumu(bitisTarihi),
+      ek_ref: record.ek_ref ?? null,
+      aciklama: record.aciklama ?? null,
+      created_at: record.created_at ?? null,
+      updated_at: record.updated_at ?? null
+    };
+  }
 
   function getDepartmanLabel(id: number) {
     return departmanOptions.find((item) => item.id === id)?.ad ?? `Departman ${id}`;
@@ -1390,6 +1458,99 @@ let bildirimIdCounter = 800;
       zimmetler.unshift(created);
 
       await fulfillJson(route, 200, okBody(created));
+      return;
+    }
+
+    const belgeKayitlariListMatch = path.match(/^\/api\/personeller\/(\d+)\/belge-kayitlari$/);
+    if (belgeKayitlariListMatch && method === "GET") {
+      const pid = Number.parseInt(belgeKayitlariListMatch[1] ?? "0", 10);
+      const p = personeller.find((x) => x.id === pid);
+      if (!p) {
+        await fulfillJson(route, 404, errorBody("NOT_FOUND", "Personel bulunamadi."));
+        return;
+      }
+
+      const stateFilter = url.searchParams.get("state");
+      const filtered = personelBelgeKayitlari.filter((item) => {
+        if (item.personel_id !== pid) {
+          return false;
+        }
+        if (stateFilter && stateFilter !== "tum" && item.durum !== stateFilter) {
+          return false;
+        }
+        return true;
+      });
+
+      await fulfillJson(
+        route,
+        200,
+        JSON.stringify({
+          data: { items: filtered.map(serializePersonelBelgeKaydi) },
+          meta: { page: 1, limit: 50, total: filtered.length, total_pages: 1 },
+          errors: []
+        })
+      );
+      return;
+    }
+
+    if (belgeKayitlariListMatch && method === "POST") {
+      const pid = Number.parseInt(belgeKayitlariListMatch[1] ?? "0", 10);
+      const p = personeller.find((x) => x.id === pid);
+      if (!p) {
+        await fulfillJson(route, 404, errorBody("NOT_FOUND", "Personel bulunamadi."));
+        return;
+      }
+
+      const payload = request.postDataJSON() as {
+        kayit_tipi?: string;
+        ad?: string;
+        veren_kurum?: string | null;
+        belge_no?: string | null;
+        baslangic_tarihi?: string | null;
+        bitis_tarihi?: string | null;
+        ek_ref?: string | null;
+        aciklama?: string | null;
+      };
+
+      const kayitTipi = payload.kayit_tipi?.trim();
+      const ad = payload.ad?.trim();
+      if (!kayitTipi || !(PERSONEL_BELGE_KAYIT_TIPI_KEYS as readonly string[]).includes(kayitTipi) || !ad) {
+        await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "kayit_tipi ve ad zorunludur."));
+        return;
+      }
+
+      const now = new Date().toISOString();
+      const created = {
+        id: ++personelBelgeKaydiIdCounter,
+        personel_id: pid,
+        kayit_tipi: kayitTipi as PersonelBelgeKayitTipi,
+        ad,
+        veren_kurum: payload.veren_kurum?.trim() || null,
+        belge_no: payload.belge_no?.trim() || null,
+        baslangic_tarihi: payload.baslangic_tarihi?.trim() || null,
+        bitis_tarihi: payload.bitis_tarihi?.trim() || null,
+        durum: "AKTIF" as const,
+        ek_ref: payload.ek_ref?.trim() || null,
+        aciklama: payload.aciklama?.trim() || null,
+        created_at: now,
+        updated_at: now
+      };
+      personelBelgeKayitlari.unshift(created);
+      await fulfillJson(route, 200, okBody(serializePersonelBelgeKaydi(created)));
+      return;
+    }
+
+    const belgeKayitCancelMatch = path.match(/^\/api\/belge-kayitlari\/(\d+)\/iptal$/);
+    if (belgeKayitCancelMatch && method === "POST") {
+      const id = Number.parseInt(belgeKayitCancelMatch[1] ?? "0", 10);
+      const kayit = personelBelgeKayitlari.find((item) => item.id === id);
+      if (!kayit) {
+        await fulfillJson(route, 404, errorBody("NOT_FOUND", "Belge kaydi bulunamadi."));
+        return;
+      }
+      kayit.durum = "IPTAL";
+      kayit.updated_at = new Date().toISOString();
+      await fulfillJson(route, 200, okBody(serializePersonelBelgeKaydi(kayit)));
       return;
     }
 

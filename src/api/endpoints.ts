@@ -7,6 +7,12 @@ export const endpoints = {
     detail: (id: number | string) => `/personeller/${id}`,
     belgeDurumu: (id: number | string) => `/personeller/${id}/belge-durumu`
   },
+  personelBelgeKayitlari: {
+    listByPersonel: (personelId: number | string) => `/personeller/${personelId}/belge-kayitlari`,
+    create: (personelId: number | string) => `/personeller/${personelId}/belge-kayitlari`,
+    detail: (id: number | string) => `/belge-kayitlari/${id}`,
+    cancel: (id: number | string) => `/belge-kayitlari/${id}/iptal`
+  },
   surecler: {
     list: "/surecler",
     detail: (id: number | string) => `/surecler/${id}`

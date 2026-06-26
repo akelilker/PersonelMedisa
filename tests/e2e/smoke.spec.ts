@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { login } from "./helpers/auth";
+import { expectMainMenuForRole } from "./helpers/main-menu";
 import { mockApi } from "./helpers/mock-api";
 
 function readonlyFieldByLabel(page: Parameters<typeof test>[0]["page"], label: string) {
@@ -56,16 +57,7 @@ test.describe("e2e smoke", () => {
     await login(page, { username: "yonetici", password: "secret" });
 
     await expect(page).toHaveURL("/");
-    await expect(page.getByTestId("dashboard-page")).toBeVisible();
-    await expect(page.getByTestId("dashboard-kpi-grid")).toBeVisible();
-    await expect(page.locator("#main-menu .menu-btn")).toHaveCount(3);
-    await expect(page.getByTestId("menu-kayit-surec")).toBeVisible();
-    await expect(page.getByTestId("menu-kayit-surec")).toBeEnabled();
-    await expect(page.getByTestId("menu-personel-karti")).toBeVisible();
-    await expect(page.getByTestId("menu-raporlar")).toBeVisible();
-    await expect(page.getByTestId("menu-gunluk-durum")).toHaveCount(0);
-    await expect(page.getByTestId("menu-puantaj")).toHaveCount(0);
-    await expect(page.getByTestId("menu-finans")).toHaveCount(0);
+    await expectMainMenuForRole(page, "GENEL_YONETICI");
 
     await page.getByTestId("menu-personel-karti").click();
     await expect(page).toHaveURL(/\/personeller$/);
@@ -112,16 +104,7 @@ test.describe("e2e smoke", () => {
     await login(page, { username: "birim", password: "secret" });
 
     await expect(page).toHaveURL("/");
-    await expect(page.getByTestId("dashboard-page")).toBeVisible();
-    await expect(page.getByTestId("dashboard-kpi-grid")).toBeVisible();
-    await expect(page.locator("#main-menu .menu-btn")).toHaveCount(3);
-    await expect(page.getByTestId("menu-kayit-surec")).toBeVisible();
-    await expect(page.getByTestId("menu-kayit-surec")).toBeDisabled();
-    await expect(page.getByTestId("menu-personel-karti")).toBeVisible();
-    await expect(page.getByTestId("menu-raporlar")).toBeVisible();
-    await expect(page.getByTestId("menu-gunluk-durum")).toHaveCount(0);
-    await expect(page.getByTestId("menu-puantaj")).toHaveCount(0);
-    await expect(page.getByTestId("menu-finans")).toHaveCount(0);
+    await expectMainMenuForRole(page, "BIRIM_AMIRI");
 
     await page.getByTestId("menu-personel-karti").click();
     await expect(page).toHaveURL(/\/personeller$/);

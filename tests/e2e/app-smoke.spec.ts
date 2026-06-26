@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { login } from "./helpers/auth";
+import { expectMainMenuForRole } from "./helpers/main-menu";
 import { mockApi } from "./helpers/mock-api";
 
 test("Ana akış smoke", async ({ page }) => {
@@ -7,18 +8,10 @@ test("Ana akış smoke", async ({ page }) => {
   await login(page, { username: "genel_yonetici", password: "demo123" });
 
   await expect(page).toHaveURL("/");
-  await expect(page.getByTestId("dashboard-page")).toBeVisible();
-  await expect(page.getByTestId("dashboard-kpi-grid")).toBeVisible();
-  await expect(page.locator("#main-menu .menu-btn")).toHaveCount(3);
-  await expect(page.getByTestId("menu-kayit-surec")).toBeVisible();
-  await expect(page.getByTestId("menu-kayit-surec")).toBeEnabled();
-  await expect(page.getByTestId("menu-personel-karti")).toBeVisible();
-  await expect(page.getByTestId("menu-raporlar")).toBeVisible();
-  await expect(page.getByTestId("menu-gunluk-durum")).toHaveCount(0);
-  await expect(page.getByTestId("menu-puantaj")).toHaveCount(0);
-  await expect(page.getByTestId("menu-finans")).toHaveCount(0);
+  await expectMainMenuForRole(page, "GENEL_YONETICI");
 
   await page.getByTestId("menu-kayit-surec").click();
+  await expect(page.locator("#main-menu")).toHaveCount(0);
   const homeFlowModal = page.locator(".modal-container").last();
   await expect(homeFlowModal.getByRole("heading", { name: /Kayıt ve Süreç İşlemleri/i })).toBeVisible();
   await expect(homeFlowModal.getByRole("button", { name: "Kayıt" })).toBeVisible();
@@ -36,16 +29,41 @@ test("Ana akış smoke", async ({ page }) => {
   await expect(homeFlowModal.locator("[name='surec-create-bas']")).toBeVisible();
   await homeFlowModal.locator(".universal-btn-cancel").click();
   await expect(page).toHaveURL("/");
+  await expect(page.locator("#main-menu")).toBeVisible();
 
   await page.getByTestId("menu-personel-karti").click();
   await expect(page).toHaveURL(/\/personeller$/);
   await expect(page.getByRole("heading", { name: "Personeller" })).toBeVisible();
-  await page.locator(".modal-container").first().getByRole("button", { name: "Kapat" }).click();
+  await page.locator(".modal-container").first().locator(".modal-close-btn").click();
   await expect(page).toHaveURL("/");
 
   await page.getByTestId("menu-raporlar").click();
   await expect(page).toHaveURL(/\/raporlar$/);
   await expect(page.locator(".modal-header h2").first()).toContainText("Raporlar");
-  await page.locator(".modal-container").first().getByRole("button", { name: "Kapat" }).click();
+  await page.locator(".modal-container").first().locator(".modal-close-btn").click();
+  await expect(page).toHaveURL("/");
+
+  await page.getByTestId("menu-puantaj").click();
+  await expect(page).toHaveURL(/\/puantaj$/);
+  await expect(page.locator(".modal-header h2").first()).toContainText("Günlük Puantaj");
+  await page.locator(".modal-container").first().locator(".modal-close-btn").click();
+  await expect(page).toHaveURL("/");
+
+  await page.getByTestId("menu-finans").click();
+  await expect(page).toHaveURL(/\/finans$/);
+  await expect(page.locator(".modal-header h2").first()).toContainText("Finans");
+  await page.locator(".modal-container").first().locator(".modal-close-btn").click();
+  await expect(page).toHaveURL("/");
+
+  await page.getByTestId("menu-gunluk-kayit").click();
+  await expect(page).toHaveURL(/\/bildirimler$/);
+  await expect(page.locator(".modal-header h2").first()).toContainText("Günlük Kayıt Merkezi");
+  await page.locator(".modal-container").first().locator(".modal-close-btn").click();
+  await expect(page).toHaveURL("/");
+
+  await page.getByTestId("menu-yonetim-paneli").click();
+  await expect(page).toHaveURL(/\/yonetim-paneli$/);
+  await expect(page.locator(".modal-header h2").first()).toContainText("Yönetim Paneli");
+  await page.locator(".modal-container").first().locator(".modal-close-btn").click();
   await expect(page).toHaveURL("/");
 });

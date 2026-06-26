@@ -72,6 +72,15 @@ test.describe("Kayit yeni personel", () => {
     await expect(page.getByTestId("personel-maas-eksik-uyari")).toHaveText("Maaş bilgisi eksik.");
   });
 
+  test("maaşı dolu personelde maaş eksik uyarısı göstermez", async ({ page }) => {
+    await mockApi(page, "GENEL_YONETICI");
+    await login(page, { username: "yonetici", password: "secret" });
+
+    await page.getByTestId("menu-personel-karti").click();
+    await page.getByRole("link", { name: /Ayşe Yılmaz.*kişisinin kartını aç/i }).first().click();
+    await expect(page.getByTestId("personel-maas-eksik-uyari")).toHaveCount(0);
+  });
+
   test("MUHASEBE rolü maaş eksik uyarısını görür", async ({ page }) => {
     await mockApi(page, "MUHASEBE");
     await login(page, { username: "muhasebe", password: "demo123" });

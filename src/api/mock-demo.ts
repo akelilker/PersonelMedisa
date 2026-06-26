@@ -302,7 +302,8 @@ const demoState: {
       departman_id: 3,
       gorev_id: 1,
       personel_tipi_id: 1,
-      bagli_amir_id: 1
+      bagli_amir_id: 1,
+      maas_tutari: 35000
     },
     {
       id: 2,

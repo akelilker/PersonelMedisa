@@ -104,7 +104,7 @@
 
 .modal-body--yonetim {
   gap: 14px;
-  padding-top: 0;
+  padding-top: 16px;
 }
 
 /* Module overlay: pass modal-body height to page roots without changing global .modal-body. */
@@ -132,6 +132,51 @@
 
 .modal-body > .yonetim-page > * + * {
   margin-top: 0;
+}
+
+.modal-header-spacer {
+  grid-column: 1;
+  width: 34px;
+  height: 34px;
+}
+
+.modal-header-spacer:last-child {
+  grid-column: 3;
+  justify-self: end;
+}
+
+.modal-back-btn {
+  grid-column: 1;
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.modal-back-btn:hover {
+  color: #ffffff;
+}
+
+.modal-back-btn-icon {
+  flex: 0 0 auto;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.modal-back-btn-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .modal-close-btn {

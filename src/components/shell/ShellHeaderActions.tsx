@@ -538,7 +538,7 @@ export function ShellHeaderActions({ contextLabel, minimal = false }: ShellHeade
               type="button"
               data-testid="settings-yonetim-paneli"
               onClick={() => {
-                navigateTo("/yonetim-paneli");
+                navigateTo("/yonetim-paneli?tab=kullanicilar");
               }}
             >
               Yönetim Paneli

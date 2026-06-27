@@ -220,6 +220,10 @@
   min-height: 40px;
 }
 
+.yonetim-list-header .yonetim-toolbar-pill {
+  margin-right: auto;
+}
+
 .yonetim-list-actions {
   display: inline-flex;
   align-items: center;

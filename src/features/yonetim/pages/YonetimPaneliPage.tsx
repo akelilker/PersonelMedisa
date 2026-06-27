@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent, type KeyboardEvent } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { FormField } from "../../../components/form/FormField";
 import { AppModal } from "../../../components/modal/AppModal";
 import { EmptyState } from "../../../components/states/EmptyState";
@@ -402,8 +402,7 @@ function buildYonetimSurecLogPayloads(
 }
 
 export function YonetimPaneliPage() {
-  const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const { hasPermission } = useRoleAccess();
   const canManageYonetimPanel = hasPermission("yonetim-paneli.manage");
   const activeTab = resolveYonetimActiveTab(searchParams.get("tab"));
@@ -488,10 +487,6 @@ export function YonetimPaneliPage() {
   useEffect(() => {
     void loadPanel();
   }, []);
-
-  function selectActiveTab(tab: ActiveTab) {
-    setSearchParams(tab === "subeler" ? { tab: "subeler" } : { tab: "kullanicilar" }, { replace: true });
-  }
 
   useEffect(() => {
     if (kullaniciForm.kullaniciTipi !== "IC_PERSONEL" || !kullaniciForm.personelId) {
@@ -714,44 +709,15 @@ export function YonetimPaneliPage() {
 
   return (
     <section className="yonetim-page">
-      <div className="yonetim-toolbar">
-        <button type="button" className="yonetim-toolbar-back" onClick={() => navigate("/")}>
-          <span aria-hidden="true">←</span>
-          <span>Ayarlar</span>
-        </button>
-
-        <div className="yonetim-toolbar-meta" aria-label="Yönetim özeti">
-          <span className="yonetim-toolbar-pill">{kullanicilar.length} Kullanıcı</span>
-          <span className="yonetim-toolbar-pill">{subeler.length} Şube</span>
-        </div>
-      </div>
-      <div className="yonetim-tabs" role="tablist" aria-label="Yönetim sekmeleri">
-        <button
-          type="button"
-          data-testid="yonetim-tab-kullanicilar"
-          className={`yonetim-tab-btn${activeTab === "kullanicilar" ? " is-active" : ""}`}
-          onClick={() => selectActiveTab("kullanicilar")}
-        >
-          Sistem Kullanıcıları
-        </button>
-        <button
-          type="button"
-          data-testid="yonetim-tab-subeler"
-          className={`yonetim-tab-btn${activeTab === "subeler" ? " is-active" : ""}`}
-          onClick={() => selectActiveTab("subeler")}
-        >
-          Şubeler
-        </button>
-      </div>
-
       {isLoading ? <LoadingState label="Yönetim paneli yükleniyor..." /> : null}
       {!isLoading && errorMessage ? <ErrorState message={errorMessage} onRetry={() => void loadPanel()} /> : null}
       {!isLoading && successMessage ? <p className="yonetim-success">{successMessage}</p> : null}
 
       {!isLoading && !errorMessage && activeTab === "kullanicilar" ? (
-        <section className="yonetim-list-surface">
+        <section className="yonetim-list-surface" aria-label="Kullanıcı yönetimi" data-testid="yonetim-section-kullanicilar">
           <div className="yonetim-list-header">
             <div className="yonetim-list-actions">
+              <span className="yonetim-toolbar-pill">{kullanicilar.length} Kullanıcı</span>
               <YonetimViewToggle
                 label="Kullanıcılar görünümü"
                 value={kullaniciViewMode}
@@ -839,9 +805,10 @@ export function YonetimPaneliPage() {
       ) : null}
 
       {!isLoading && !errorMessage && activeTab === "subeler" ? (
-        <section className="yonetim-list-surface">
+        <section className="yonetim-list-surface" aria-label="Şube yönetimi" data-testid="yonetim-section-subeler">
           <div className="yonetim-list-header">
             <div className="yonetim-list-actions">
+              <span className="yonetim-toolbar-pill">{subeler.length} Şube</span>
               <YonetimViewToggle label="Şubeler görünümü" value={subeViewMode} onChange={setSubeViewMode} />
               <button
                 type="button"
@@ -926,7 +893,12 @@ export function YonetimPaneliPage() {
       ) : null}
 
       {isKullaniciFormOpen ? (
-        <AppModal title={editingKullaniciId != null ? "Kullanıcı Yönetimi" : "Yeni Kullanıcı"} onClose={resetKullaniciEditor}>
+        <AppModal
+          title={editingKullaniciId != null ? "Kullanıcı Düzenle" : "Yeni Kullanıcı"}
+          backLabel="Kullanıcı Yönetimi"
+          onBack={resetKullaniciEditor}
+          onClose={resetKullaniciEditor}
+        >
           <form className="yonetim-form-stack" id={YONETIM_KULLANICI_FORM_ID} onSubmit={handleKullaniciSubmit}>
             <div className="form-field-grid">
               <FormField
@@ -1041,7 +1013,12 @@ export function YonetimPaneliPage() {
       ) : null}
 
       {isSubeFormOpen ? (
-        <AppModal title={editingSubeId != null ? "Şube Yönetimi" : "Yeni Şube"} onClose={resetSubeEditor}>
+        <AppModal
+          title={editingSubeId != null ? "Şube Düzenle" : "Yeni Şube"}
+          backLabel="Şube Yönetimi"
+          onBack={resetSubeEditor}
+          onClose={resetSubeEditor}
+        >
           <form className="yonetim-form-stack yonetim-form-stack--sube" id={YONETIM_SUBE_FORM_ID} onSubmit={handleSubeSubmit}>
             <div className="form-field-grid">
               <FormField

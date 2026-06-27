@@ -58,5 +58,5 @@ test("Ana akış smoke", async ({ page }) => {
 
   await page.goto("/yonetim-paneli");
   await expect(page).toHaveURL(/\/yonetim-paneli$/);
-  await expect(page.locator(".modal-header h2").first()).toContainText("Yönetim Paneli");
+  await expect(page.locator(".modal-header h2").first()).toContainText("KULLANICI YÖNETİMİ");
 });

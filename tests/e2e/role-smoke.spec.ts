@@ -32,7 +32,7 @@ test.describe("Rol bazli smoke", () => {
     await expect(page.locator(".modal-header h2").first()).toContainText("Raporlar");
 
     await page.goto("/yonetim-paneli");
-    await expect(page.locator(".modal-header h2").first()).toContainText("Yönetim Paneli");
+    await expect(page.locator(".modal-header h2").first()).toContainText("KULLANICI YÖNETİMİ");
   });
 
   test("Bolum yoneticisi home'da 3 ana omurga butonunu gorur ve yetkili modullere erisebilir", async ({ page }) => {

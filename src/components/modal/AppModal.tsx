@@ -6,6 +6,8 @@ type AppModalProps = {
   children?: ReactNode;
   footer?: ReactNode;
   onClose?: () => void;
+  backLabel?: string;
+  onBack?: () => void;
   className?: string;
   bodyClassName?: string;
 };
@@ -18,7 +20,16 @@ function getModalPortalRoot(): HTMLElement | null {
   return document.body;
 }
 
-export function AppModal({ title, children, footer, onClose, className, bodyClassName }: AppModalProps) {
+export function AppModal({
+  title,
+  children,
+  footer,
+  onClose,
+  backLabel,
+  onBack,
+  className,
+  bodyClassName
+}: AppModalProps) {
   const overlayRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -86,12 +97,24 @@ export function AppModal({ title, children, footer, onClose, className, bodyClas
     >
       <div className={["modal-container", className].filter(Boolean).join(" ")}>
         <div className="modal-header">
+          {onBack && backLabel ? (
+            <button type="button" className="modal-back-btn" onClick={onBack}>
+              <span className="modal-back-btn-icon" aria-hidden="true">
+                ←
+              </span>
+              <span className="modal-back-btn-label">{backLabel}</span>
+            </button>
+          ) : (
+            <span className="modal-header-spacer" aria-hidden="true" />
+          )}
           <h2>{title}</h2>
           {onClose ? (
             <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Kapat">
               ×
             </button>
-          ) : null}
+          ) : (
+            <span className="modal-header-spacer" aria-hidden="true" />
+          )}
         </div>
         <div className={["modal-body", bodyClassName].filter(Boolean).join(" ")}>{children}</div>
         {footer ? <div className="modal-footer">{footer}</div> : null}

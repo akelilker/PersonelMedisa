@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Outlet, useLocation, useNavigate } from "react-router-dom";
+import { Outlet, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { BackBar } from "../components/BackBar";
 import { AppFooter } from "../components/footer/AppFooter";
 import { Hero } from "../components/hero/Hero";
@@ -23,6 +23,7 @@ export type AppShellOutletContext = {
 type ModuleModalConfig = {
   title: string;
   closeTo: string;
+  backLabel?: string;
   className?: string;
   bodyClassName?: string;
 };
@@ -73,7 +74,15 @@ function resolveBackBar(pathname: string): { to: string; label: string } | null 
   return null;
 }
 
-function resolveModuleModal(pathname: string): ModuleModalConfig | null {
+function resolveYonetimModalTitle(tabParam: string | null): string {
+  const normalized = tabParam?.trim().toLowerCase() ?? "";
+  if (normalized === "subeler" || normalized === "sube") {
+    return "ŞUBE YÖNETİMİ";
+  }
+  return "KULLANICI YÖNETİMİ";
+}
+
+function resolveModuleModal(pathname: string, tabParam: string | null): ModuleModalConfig | null {
   if (pathname === "/") {
     return null;
   }
@@ -110,8 +119,9 @@ function resolveModuleModal(pathname: string): ModuleModalConfig | null {
   }
   if (pathname === "/yonetim-paneli") {
     return {
-      title: "Yönetim Paneli",
+      title: resolveYonetimModalTitle(tabParam),
       closeTo: "/",
+      backLabel: "Ayarlar",
       className: "modal-container--yonetim",
       bodyClassName: "modal-body--yonetim"
     };
@@ -124,10 +134,14 @@ export function AppShell() {
   const { session, logout } = useAuth();
   const navigate = useNavigate();
   const { pathname, state } = useLocation();
+  const [searchParams] = useSearchParams();
 
   const isLoginRoute = pathname === "/login";
   const isHomeRoute = pathname === "/";
-  const moduleModal = useMemo(() => (isLoginRoute ? null : resolveModuleModal(pathname)), [isLoginRoute, pathname]);
+  const moduleModal = useMemo(
+    () => (isLoginRoute ? null : resolveModuleModal(pathname, searchParams.get("tab"))),
+    [isLoginRoute, pathname, searchParams]
+  );
   const isModuleOverlayRoute = moduleModal !== null;
   const showShellHeaderActions = !isModuleOverlayRoute && !isLoginRoute;
   const showUserBar = !isLoginRoute && !isModuleOverlayRoute && !isHomeRoute;
@@ -239,6 +253,8 @@ export function AppShell() {
         <AppModal
           title={moduleModal.title}
           onClose={() => navigate(moduleModal.closeTo)}
+          backLabel={moduleModal.backLabel}
+          onBack={moduleModal.backLabel ? () => navigate(moduleModal.closeTo) : undefined}
           className={moduleModal.className}
           bodyClassName={moduleModal.bodyClassName}
         >

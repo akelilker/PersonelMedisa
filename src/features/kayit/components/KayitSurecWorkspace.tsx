@@ -925,7 +925,7 @@ export function KayitSurecWorkspace({
     gatewayActionLabel,
     gatewayInfoMessage,
     handleGatewayReturn
-  } = useKayitGatewayIntent({ activeTab, initialIntent, initialReturnTo });
+  } = useKayitGatewayIntent({ activeTab, initialIntent, initialReturnTo, onClose });
 
   const hasInitialSurecPersonel = typeof initialSurecPersonelId === "string" && initialSurecPersonelId.length > 0;
   const classicSurecFormLayout = editingSurec !== null || hasInitialSurecPersonel;

@@ -86,6 +86,16 @@ export function PersonelDetayPage() {
     });
 
   useEffect(() => {
+    const routeState = location.state as {
+      openPersonelEdit?: boolean;
+      openPersonelZimmet?: boolean;
+    } | null;
+
+    if (routeState?.openPersonelEdit || routeState?.openPersonelZimmet) {
+      setIsActionMenuOpen(false);
+      return;
+    }
+
     setActiveTab("genel-bilgiler");
     setIsActionMenuOpen(false);
   }, [parsedPersonelId]);

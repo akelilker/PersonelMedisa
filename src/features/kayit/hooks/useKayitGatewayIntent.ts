@@ -6,9 +6,15 @@ type UseKayitGatewayIntentArgs = {
   activeTab: "yeni-kayit" | "surec";
   initialIntent?: KayitModalIntent | null;
   initialReturnTo?: string | null;
+  onClose: () => void;
 };
 
-export function useKayitGatewayIntent({ activeTab, initialIntent, initialReturnTo }: UseKayitGatewayIntentArgs) {
+export function useKayitGatewayIntent({
+  activeTab,
+  initialIntent,
+  initialReturnTo,
+  onClose
+}: UseKayitGatewayIntentArgs) {
   const navigate = useNavigate();
 
   const showGatewayMessage = useMemo(
@@ -34,6 +40,8 @@ export function useKayitGatewayIntent({ activeTab, initialIntent, initialReturnT
     if (!initialReturnTo) {
       return;
     }
+
+    onClose();
 
     navigate(initialReturnTo, {
       state:

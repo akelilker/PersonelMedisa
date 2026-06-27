@@ -66,7 +66,7 @@ test.describe("e2e smoke", () => {
 
     await page.getByRole("link", { name: /Ayşe Yılmaz.*kişisinin kartını aç/i }).first().click();
     await expect(page).toHaveURL(/\/personeller\/1$/);
-    await expect(page.locator(".modal-header h2").first()).toContainText("Personel Detayı");
+    await expect(page.locator(".modal-header h2").first()).toContainText("Personel Kartı");
 
     await page.goto("/puantaj");
     await expect(page).toHaveURL(/\/puantaj$/);

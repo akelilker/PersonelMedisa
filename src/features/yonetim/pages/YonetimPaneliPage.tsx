@@ -410,7 +410,6 @@ export function YonetimPaneliPage() {
   const [subeViewMode, setSubeViewMode] = useState<YonetimViewMode>("card");
   const [isKullaniciFormOpen, setIsKullaniciFormOpen] = useState(false);
   const [isSubeFormOpen, setIsSubeFormOpen] = useState(false);
-  const [isDepartmanPickerOpen, setIsDepartmanPickerOpen] = useState(false);
   const [isDepartmanCreateOpen, setIsDepartmanCreateOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -515,7 +514,6 @@ export function YonetimPaneliPage() {
     setEditingSubeId(null);
     setSubeForm(INITIAL_SUBE_FORM);
     setYeniDepartmanAdi("");
-    setIsDepartmanPickerOpen(false);
     setIsDepartmanCreateOpen(false);
     setIsSubeFormOpen(false);
     setSubeDeleteError(null);
@@ -544,7 +542,6 @@ export function YonetimPaneliPage() {
     setEditingSubeId(null);
     setSubeForm(INITIAL_SUBE_FORM);
     setYeniDepartmanAdi("");
-    setIsDepartmanPickerOpen(false);
     setIsDepartmanCreateOpen(false);
     setIsSubeFormOpen(true);
   }
@@ -556,7 +553,6 @@ export function YonetimPaneliPage() {
     setEditingSubeId(item.id);
     setSubeForm(subeFormFromItem(item));
     setYeniDepartmanAdi("");
-    setIsDepartmanPickerOpen(false);
     setIsDepartmanCreateOpen(false);
     setIsSubeFormOpen(true);
   }
@@ -1035,83 +1031,88 @@ export function YonetimPaneliPage() {
                 onChange={(value) => setSubeForm((prev) => ({ ...prev, ad: value }))}
                 required
               />
-              <FormField
-                as="select"
-                label="Durum"
-                name="yonetim-sube-durum"
-                value={subeForm.durum}
-                onChange={(value) => setSubeForm((prev) => ({ ...prev, durum: value as KayitDurumu }))}
-                selectOptions={statusOptions()}
-              />
+              <div className="yonetim-durum-row">
+                <span className="yonetim-durum-label">Durum</span>
+                <div className="yonetim-durum-toggle" role="group" aria-label="Durum">
+                  <button
+                    type="button"
+                    className={`yonetim-durum-btn${subeForm.durum === "AKTIF" ? " is-active" : ""}`}
+                    aria-pressed={subeForm.durum === "AKTIF"}
+                    onClick={() => setSubeForm((prev) => ({ ...prev, durum: "AKTIF" }))}
+                  >
+                    {DURUM_LABELS.AKTIF}
+                  </button>
+                  <button
+                    type="button"
+                    className={`yonetim-durum-btn${subeForm.durum === "PASIF" ? " is-active" : ""}`}
+                    aria-pressed={subeForm.durum === "PASIF"}
+                    onClick={() => setSubeForm((prev) => ({ ...prev, durum: "PASIF" }))}
+                  >
+                    {DURUM_LABELS.PASIF}
+                  </button>
+                </div>
+              </div>
             </div>
 
             <div className="yonetim-checkbox-section">
-              <p className="yonetim-checkbox-title">Departman Seçimi</p>
-              <button
-                type="button"
-                className={`form-input yonetim-selection-trigger${isDepartmanPickerOpen ? " is-open" : ""}`}
-                data-testid="yonetim-sube-departman-toggle"
-                aria-expanded={isDepartmanPickerOpen}
-                aria-controls="yonetim-sube-departman-panel"
-                onClick={() => setIsDepartmanPickerOpen((prev) => !prev)}
-              >
-                <span className="yonetim-selection-summary">{selectedDepartmanSummary}</span>
-                <span className="yonetim-selection-caret" aria-hidden="true">
-                  ▾
-                </span>
-              </button>
+              <div className="yonetim-departman-section-head">
+                <p className="yonetim-checkbox-title">Departman Seçimi</p>
+                <p className="yonetim-hint">
+                  {selectedDepartmanLabels.length > 0
+                    ? `Seçili: ${selectedDepartmanSummary}`
+                    : "Departmanları aşağıdan seçin."}
+                </p>
+              </div>
 
-              {isDepartmanPickerOpen ? (
-                <div
-                  className="yonetim-selection-panel"
-                  id="yonetim-sube-departman-panel"
-                  data-testid="yonetim-sube-departman-panel"
-                >
-                  <div className="yonetim-selection-panel-head">
+              <div
+                className="yonetim-selection-panel"
+                id="yonetim-sube-departman-panel"
+                data-testid="yonetim-sube-departman-panel"
+              >
+                <div className="yonetim-selection-panel-head">
+                  <button
+                    type="button"
+                    className="yonetim-panel-action"
+                    onClick={() => setIsDepartmanCreateOpen((prev) => !prev)}
+                  >
+                    + Yeni Departman
+                  </button>
+                </div>
+
+                {isDepartmanCreateOpen ? (
+                  <div className="yonetim-inline-add-row yonetim-inline-add-row--panel">
+                    <input
+                      className="form-input"
+                      type="text"
+                      value={yeniDepartmanAdi}
+                      onChange={(event) => setYeniDepartmanAdi(event.target.value)}
+                      placeholder="Yeni departman adı"
+                    />
                     <button
                       type="button"
-                      className="yonetim-panel-action"
-                      onClick={() => setIsDepartmanCreateOpen((prev) => !prev)}
+                      className="yonetim-inline-add-btn"
+                      onClick={() => void handleDepartmanAdd()}
+                      disabled={isAddingDepartman || yeniDepartmanAdi.trim().length === 0}
                     >
-                      + Yeni Departman
+                      Ekle
                     </button>
                   </div>
+                ) : null}
 
-                  {isDepartmanCreateOpen ? (
-                    <div className="yonetim-inline-add-row yonetim-inline-add-row--panel">
-                      <input
-                        className="form-input"
-                        type="text"
-                        value={yeniDepartmanAdi}
-                        onChange={(event) => setYeniDepartmanAdi(event.target.value)}
-                        placeholder="Yeni departman adı"
-                      />
-                      <button
-                        type="button"
-                        className="yonetim-inline-add-btn"
-                        onClick={() => void handleDepartmanAdd()}
-                        disabled={isAddingDepartman || yeniDepartmanAdi.trim().length === 0}
-                      >
-                        Ekle
-                      </button>
-                    </div>
-                  ) : null}
-
-                  <div className="yonetim-selection-grid yonetim-selection-grid--departmanlar">
-                    {departmanOptions.map((departman) => (
-                      <button
-                        key={departman.id}
-                        type="button"
-                        className={`yonetim-selection-pill${subeForm.departmanIds.includes(departman.id) ? " is-selected" : ""}`}
-                        data-testid={`yonetim-sube-departman-option-${departman.id}`}
-                        onClick={() => toggleDepartmanSelection(departman.id)}
-                      >
-                        <strong>{departman.label}</strong>
-                      </button>
-                    ))}
-                  </div>
+                <div className="yonetim-selection-grid yonetim-selection-grid--departmanlar">
+                  {departmanOptions.map((departman) => (
+                    <button
+                      key={departman.id}
+                      type="button"
+                      className={`yonetim-selection-pill${subeForm.departmanIds.includes(departman.id) ? " is-selected" : ""}`}
+                      data-testid={`yonetim-sube-departman-option-${departman.id}`}
+                      onClick={() => toggleDepartmanSelection(departman.id)}
+                    >
+                      <strong>{departman.label}</strong>
+                    </button>
+                  ))}
                 </div>
-              ) : null}
+              </div>
             </div>
 
             {subeDeleteError ? (

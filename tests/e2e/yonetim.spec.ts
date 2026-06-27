@@ -44,12 +44,11 @@ test.describe("yonetim paneli ve aylik ozet", () => {
     await page.getByTestId("yonetim-sube-yeni").click();
     await page.getByLabel("Şube Kodu").fill("ANK");
     await page.getByLabel("Şube Adı").fill("Ankara");
-    await page.getByTestId("yonetim-sube-departman-toggle").click();
-    await page.getByRole("button", { name: /\+ Yeni Departman/i }).click();
+    await page.getByTestId("yonetim-sube-departman-panel").getByRole("button", { name: /\+ Yeni Departman/i }).click();
     await page.getByTestId("yonetim-sube-departman-panel").getByRole("button", { name: /^Depo$/i }).click();
     await page.getByPlaceholder("Yeni departman adı").fill("Kalite");
     await page.getByRole("button", { name: "Ekle" }).click();
-    await expect(page.getByTestId("yonetim-sube-departman-toggle")).toContainText("Kalite");
+    await expect(page.getByTestId("yonetim-sube-departman-panel")).toContainText("Kalite");
     await page.getByTestId("yonetim-sube-kaydet").click();
 
     await expect(page.getByText("Şube tanımı eklendi.")).toBeVisible();
@@ -158,7 +157,6 @@ test.describe("yonetim paneli ve aylik ozet", () => {
     await page.getByTestId("yonetim-sube-yeni").click();
     await page.getByLabel("Şube Kodu").fill("BOS");
     await page.getByLabel("Şube Adı").fill("Bos Sube");
-    await page.getByTestId("yonetim-sube-departman-toggle").click();
     await page.getByTestId("yonetim-sube-departman-panel").getByRole("button", { name: /^Depo$/i }).click();
     await page.getByTestId("yonetim-sube-kaydet").click();
     await expect(page.getByText("Şube tanımı eklendi.")).toBeVisible();

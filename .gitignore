@@ -1,47 +1,47 @@
+# Dependencies
 node_modules/
+node_modules.zip
+
+# Build outputs
 dist/
 build/
-.env.local
-.env.*.local
-.env.production
-modem_*
-huawei_login.*
-.DS_Store
-Thumbs.db
-*.log
 coverage/
 playwright-report/
 test-results/
-personelmedisa-cpanel-upload.zip
-dist.zip
-tests.zip
+
+# Environment files
+.env.local
+.env.*.local
+
+# Logs and temporary files
+*.log
+*.tmp
+*.bak
+*.orig
+*.rej
+.tmp/
+tmp/
+.codex-*.log
+
+# Editor / OS state
+.DS_Store
+Thumbs.db
+.vscode/launch.json
+.idea/
+
+# Generated archives and local transfer packages
+*.zip
+!vite.config.zip
+
+# Local device / modem leftovers
+modem_*
+huawei_login.*
+
+# Project note/archive leftovers
 Birimler.docx
 birimler2.docx
-index.zip
-archive.zip
-calısmaozet/chatgpt1404.docx
-calısmaozet/chatgpt1404teknik.docx
-calısmaozet/chatgpt1504.docx
-calısmaozet/chatgpt1504teknik.docx
-src.zip
-calısmaozet/chatgpt.1514-1.docx
-calısmaozet.zip
+calısmaozet/
 ydk.zip
 package.zip
-calısmaozet/arsiv/codex gelistirici raporu.docx
-calısmaozet/arsiv/codexpersonel.docx
-calısmaozet/codex dosya acılıs metnı.docx
-calısmaozet/codex gelistirici raporu.docx
-calısmaozet/codexpersonel.docx
-calısmaozet/arsiv/codex dosya acılıs metnı.docx
-calısmaozet/codex dosya acılıs metnı.docx
-calısmaozet/codex gelistirici raporu.docx
-calısmaozet/codexpersonel.docx
-vite.config.zip
-.env.zip
-.vscode/launch.json
-node_modules.zip
 1705.zip
 tsconfig.zip
-vitest.config.zip
-calısmaozet/personelmedisagelistirici0805.docx

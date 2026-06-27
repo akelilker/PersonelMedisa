@@ -1,79 +1,108 @@
 # Deploy Checklist (cPanel)
 
-Canli klasor: `public_html/personelmedisa`  
-Repo klasoru: `public_html` disinda ayri bir dizin
+Canlı klasör: `public_html/personelmedisa`  
+Repo klasörü: `public_html` dışında ayrı bir dizin
 
 ## GitHub Actions ile otomatik deploy
 
-Ana deploy yolu GitHub Actions uzerindendir. cPanel uzerinde `npm build` calistirilmaz; yalnizca GitHub Actions build ciktisi olan `dist/` icerigi yayinlanir.
+Ana deploy yolu GitHub Actions üzerindendir. cPanel üzerinde `npm build` çalıştırılmaz; yalnızca GitHub Actions build çıktısı olan `dist/` içeriği yayınlanır.
 
-1. GitHub repo -> `Settings` -> `Secrets and variables` -> `Actions`:
-   - `FTP_SERVER` (or. `ftp.domain.com`)
+1. GitHub repo → `Settings` → `Secrets and variables` → `Actions`:
+   - `FTP_SERVER` (ör. `ftp.domain.com`)
    - `FTP_USERNAME`
    - `FTP_PASSWORD`
-   - `FTP_PORT` (genelde `21`; SFTP icin `22`)
-2. Workflow dosyasi: `.github/workflows/deploy-cpanel.yml`
-3. `main` branch'e push sonrasi deploy **dogrudan baslamaz**. Once `CI` workflow'u (unit + typecheck + build + E2E) basariyla tamamlanir; ardindan `Deploy cPanel` workflow'u `workflow_run` ile tetiklenir.
-4. CI veya E2E fail olursa deploy calismaz.
-5. Istersen `Actions` -> `Deploy cPanel` -> `Run workflow` ile manuel deploy yapabilirsin (`workflow_dispatch`).
+   - `FTP_PORT` (genelde `21`; SFTP için `22`)
+2. Workflow dosyası: `.github/workflows/deploy-cpanel.yml`
+3. `main` branch'e push sonrası deploy doğrudan başlamaz. Önce `CI` workflow'u (`unit + typecheck + build + E2E`) başarıyla tamamlanır; ardından `Deploy cPanel` workflow'u `workflow_run` ile tetiklenir.
+4. CI veya E2E fail olursa deploy çalışmaz.
+5. İstersen `Actions` → `Deploy cPanel` → `Run workflow` ile manuel deploy yapabilirsin (`workflow_dispatch`).
 
-Otomatik deploy sirasi:
-1. `main` push -> `CI` workflow calisir.
-2. `CI` success -> `Deploy cPanel` workflow baslar.
+## Üretim environment kontrolü
+
+Build öncesi üretim değerleri net doğrulanmalıdır:
+
+```env
+VITE_APP_BASE_PATH=/personelmedisa/
+VITE_API_MODE=real
+VITE_DEMO_API_FALLBACK=false
+VITE_APP_ENV=production
+VITE_ENABLE_DIAGNOSTICS=false
+```
+
+Kontrol notları:
+
+- `VITE_APP_BASE_PATH` canlı alt klasörle birebir uyumlu olmalı ve `/` ile bitmeli.
+- Üretimde demo/mock fallback açık bırakılmamalı; API hatalarını maskeleyebilir.
+- Diagnostics canlıda varsayılan olarak kapalı kalmalı.
+- Gerçek secret/token `.env*` dosyalarına commit edilmemeli; GitHub Actions secret veya sunucu ortam değişkeni kullanılmalı.
+
+## Otomatik deploy sırası
+
+1. `main` push → `CI` workflow çalışır.
+2. `CI` success → `Deploy cPanel` workflow başlar.
 3. Deploy, CI'da test edilen commit SHA ile checkout yapar (`github.event.workflow_run.head_sha`).
-4. Deploy icinde: `npm ci` -> `npm run typecheck` -> `npm run test` -> `npm run build` -> yalnizca `dist/` icerigini `public_html/personelmedisa/` hedefine yukler.
+4. Deploy içinde: `npm ci` → `npm run typecheck` → `npm run test` → `npm run build` → yalnızca `dist/` içeriğini `public_html/personelmedisa/` hedefine yükler.
 
-Manuel deploy (`workflow_dispatch`) korunur; checkout secilen branch/ref uzerinden yapilir.
+Manuel deploy (`workflow_dispatch`) korunur; checkout seçilen branch/ref üzerinden yapılır.
 
-### cPanel Git Deployment (yedek / manual)
+## cPanel Git Deployment (yedek / manuel)
 
-- Ana deploy GitHub Actions uzerinden yapilir.
-- cPanel Git Version Control / `.cpanel.yml` ana deploy yolu degildir.
-- Yedek veya acil durumda cPanel Git Deployment kullanilacaksa wildcard ile tum repo deploy edilmemelidir; yalnizca `dist/` icerigi hedef klasore kopyalanmalidir.
+- Ana deploy GitHub Actions üzerinden yapılır.
+- cPanel Git Version Control / `.cpanel.yml` ana deploy yolu değildir.
+- Yedek veya acil durumda cPanel Git Deployment kullanılacaksa wildcard ile tüm repo deploy edilmemelidir; yalnızca `dist/` içeriği hedef klasöre kopyalanmalıdır.
 
 ## 1) Build
 
-Repo klasorunde:
+Repo klasöründe:
 
 ```bash
 npm ci
+npm run typecheck
+npm run test
 npm run build
 ```
 
 Kontrol:
+
 - `dist/index.html` var
 - `dist/assets/` var
 - `dist/.htaccess` var
+- Build çıktısı içinde `src`, `tests`, `.git`, `node_modules` yok
 
 ## 2) Sunucuyu temizle
 
-`public_html/personelmedisa` icindeki eski dosyalari sil:
+`public_html/personelmedisa` içindeki eski dosyaları sil:
+
 - eski `assets/`
 - eski `index.html`
-- test/kaynak dosyalari
-- deploy zip dosyalari
+- test/kaynak dosyaları
+- deploy zip dosyaları
 
-> Not: Canli klasorde `src`, `.git`, `tests`, `node_modules` olmamali.
+> Not: Canlı klasörde `src`, `.git`, `tests`, `node_modules` olmamalı.
 
-## 3) Dist icerigini kopyala
+## 3) Dist içeriğini kopyala
 
-`dist` klasorunun **kendisi degil**, sadece **icerigi** kopyalanir:
+`dist` klasörünün kendisi değil, sadece içeriği kopyalanır:
+
 - `index.html`
 - `assets/`
 - `.htaccess`
-- diger statik dosyalar (`favicon.svg` vb.)
+- diğer statik dosyalar (`favicon.svg` vb.)
 
 Hedef: `public_html/personelmedisa/`
 
 ## 4) Son kontrol
 
-- Siteyi `/personelmedisa/` ile ac
+- Siteyi `/personelmedisa/` ile aç
 - Hard refresh yap: `Ctrl + F5`
-- DevTools Network'te `index-*.js` ve `index-*.css` 200 donuyor mu kontrol et
+- DevTools Network'te `index-*.js` ve `index-*.css` 200 dönüyor mu kontrol et
+- Login, ana menü, Kayıt/Süreç, Personel Kartı ve Raporlar ekranlarında kısa smoke yap
+- Raporlar/Aylık Kapanış export akışı varsa canlıda indirme davranışını doğrula
 
-## Sorun olursa hizli kontrol
+## Sorun olursa hızlı kontrol
 
-- Beyaz ekran + JS 404: Yanlis klasore kopyalanmis olabilir
-- Route 404: `.htaccess` eksik veya yanlis yerde olabilir
-- Eski ekran: Tarayici cache temizlenmemis olabilir
-- Deploy hatasi: GitHub `Actions` logunda `FTP_SERVER/USERNAME/PASSWORD/PORT` secret adlarini kontrol et
+- Beyaz ekran + JS 404: `VITE_APP_BASE_PATH` veya kopyalama hedefi yanlış olabilir
+- Route 404: `dist/.htaccess` eksik veya yanlış yerde olabilir
+- Demo veri görünüyorsa: `VITE_API_MODE` / `VITE_DEMO_API_FALLBACK` değerlerini kontrol et
+- Eski ekran: Tarayıcı/PWA cache temizlenmemiş olabilir
+- Deploy hatası: GitHub `Actions` logunda `FTP_SERVER/USERNAME/PASSWORD/PORT` secret adlarını kontrol et

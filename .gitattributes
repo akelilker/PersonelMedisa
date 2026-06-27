@@ -1,4 +1,13 @@
-.gitattributes text eol=lf
-src/features/personeller/pages/PersonelDetayPage.tsx text eol=lf
-src/features/personeller/components/PersonelCreateFields.tsx text eol=lf
-src/styles/modules/kayit-surec.css text eol=lf
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.svg text eol=lf
+*.pdf binary
+*.docx binary
+*.xlsx binary
+*.zip binary

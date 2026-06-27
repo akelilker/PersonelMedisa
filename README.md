@@ -1,58 +1,59 @@
-# Medisa Personel ve Puantaj Yonetim Sistemi
+# Medisa Personel ve Puantaj Yönetim Sistemi
 
-Bu repo, Medisa Personel ve Puantaj Yonetim Sistemi icin React + Vite + TypeScript tabanli calisan baslangic scaffold'idir.
+React + Vite + TypeScript tabanlı PersonelMedisa uygulaması. Ana kapsam personel kayıtları, süreç yönetimi, personel kartı, puantaj, finans kalemleri ve raporlar/aylık kapanış akışlarıdır.
 
 ## Durum
 
-- urun ve teknik anayasa belgeleri `docs/` altinda hazir
-- sorumluluk bazli klasor iskeleti olusturuldu
-- React + Vite + TypeScript arac zinciri calisir durumda
-- route katmani ve modul sayfa gecisleri bagli
-- login + auth guard + rol bazli gorunurluk aktif
-- API katmaninda token enjeksiyonu ve 401/403 davranis yonetimi var
-- personeller / surecler / bildirimler sayfalari gercek liste endpoint cagrilariyla calisir
-- liste ekranlarinda filtre ve sayfalama (page/limit) akisi bagli
-- liste yanitlari icin merkezi normalize katmani eklendi (`items + pagination`)
-- personeller modulunde `Yeni Personel` modali ile create (`POST /api/personeller`) akisi bagli
-- personel detay ekraninda gercek detay fetch + temel update (`PUT /api/personeller/{id}`) akisi bagli
-- surec modulunde create/update (`POST/PUT /api/surecler`) modal akislar bagli
-- bildirim modulunde create/update (`POST/PUT /api/bildirimler`) modal akislar bagli
-- surec ve bildirim listelerinde `iptal` aksiyonlari (`POST /.../{id}/iptal`) bagli
-- surec ve bildirim detay sayfalari route seviyesinde aktif (`/surecler/:surecId`, `/bildirimler/:bildirimId`)
-- gunluk puantaj modulu aktif (`GET/PUT /api/gunluk-puantaj/{personelId}/{tarih}`)
-- haftalik kapanis modulu aktif (`POST /api/haftalik-kapanis`)
-- raporlar modulu aktif (`GET /api/raporlar/*`); her rapor tipi icin deterministik kolon sozlesmesi ve page/limit sayfalama akisi bagli
-- finans modulu aktif (`GET/POST/PUT /api/ek-odeme-kesinti`, `POST /api/ek-odeme-kesinti/{id}/iptal`)
-- rol bazli permission matrisi aktif; `BIRIM_AMIRI` (Birim Amiri Rolü) create/update/cancel aksiyonlarinda read-only
-- referans veri endpointleri form dropdownlarina baglandi (departman/gorev/personel tipi/surec turu/bildirim turu)
-- ortak loading / error / empty state bilesenleri bagli
-- Vitest test altyapisi aktif; query util + normalize + api client + permission + auth integration + puantaj/kapanis + rapor/finans API testleri yazildi
-- Playwright e2e smoke hatti aktif; login -> personeller -> detay -> puantaj -> haftalik kapanis -> raporlar ve CRUD + iptal senaryolari yazildi
-- GitHub Actions CI hatti aktif (`unit + typecheck + build` ve `e2e` paralel)
+- React + Vite + TypeScript araç zinciri çalışır durumda.
+- Login, auth guard ve rol bazlı görünürlük aktif.
+- Şube/rol farkındalığı uygulama akışında korunur.
+- Kayıt ve Süreç alanı personel oluşturma, süreç kayıtları ve ilgili modalları yönetir.
+- Personel Kartı personel detay, güncelleme ve geçmiş/kayıt görüntüleme akışlarının merkezidir.
+- Günlük puantaj ve kapanış akışları API seviyesinde bağlıdır.
+- Raporlar modülü aktif; rapor tipleri için kolon sözleşmesi, page/limit sayfalama ve export akışları bulunur.
+- Finans modülü ek ödeme/kesinti kayıtlarını ve iptal akışlarını yönetir.
+- Referans veri endpointleri form dropdownlarına bağlıdır.
+- Ortak loading, error ve empty state bileşenleri kullanılır.
+- Vitest test altyapısı aktif.
+- Playwright E2E smoke hattı aktif.
+- GitHub Actions CI hattı `unit + typecheck + build + E2E` doğrulaması yapar.
 
-## Dokumanlar
+## Ana modüller
 
-- `docs/guncel/00-sistem-genel-bakis.md`
-- `docs/guncel/01-urun-anayasasi.md`
-- `docs/guncel/02-mvp-veri-kapsami.md`
-- `docs/guncel/03-ui-bilesen-sozlesmesi.md`
-- `docs/guncel/04-hesap-motoru-kurallari.md`
-- `docs/guncel/05-state-flow-api-kontrati.md`
-- `docs/guncel/06-proje-scaffold.md`
-- `docs/guncel/07-is-akislari-ve-senaryolar.md`
-- `docs/guncel/08-frontend-teknik-mimari.md`
-- `docs/guncel/09-rol-yetki-matrisi.md`
-- `docs/guncel/10-yuzey-gorev-sinirlari.md`
+| Alan | Amaç |
+|---|---|
+| Login/Auth | Oturum, token ve yetki kontrolü |
+| Kayıt ve Süreç | Personel kaydı, süreç girişi, belge/bildirim/aksiyon akışları |
+| Personel Kartı | Personel detay, güncelleme ve geçmiş görünümü |
+| Puantaj | Günlük puantaj ve kapanışa hazırlık |
+| Raporlar | Aylık kapanış, rapor listeleri, kolon kontratları ve export |
+| Finans | Ek ödeme/kesinti ve iptal akışları |
+
+## Dokümanlar
+
+Güncel ürün ve teknik dokümanlar `docs/guncel/` altında tutulur:
+
+- `00-sistem-genel-bakis.md`
+- `01-urun-anayasasi.md`
+- `02-mvp-veri-kapsami.md`
+- `03-ui-bilesen-sozlesmesi.md`
+- `04-hesap-motoru-kurallari.md`
+- `05-state-flow-api-kontrati.md`
+- `06-proje-scaffold.md`
+- `07-is-akislari-ve-senaryolar.md`
+- `08-frontend-teknik-mimari.md`
+- `09-rol-yetki-matrisi.md`
+- `10-yuzey-gorev-sinirlari.md`
 
 ## Kurulum
 
-On kosul: `Node.js 20+`
+Ön koşul: Node.js 20+
 
 ```bash
 npm install
 ```
 
-## Calistirma
+## Geliştirme
 
 ```bash
 npm run dev
@@ -64,25 +65,42 @@ npm run dev
 npm run build
 ```
 
-## Type Check
+## Type check
 
 ```bash
 npm run typecheck
 ```
 
-## Test
+## Unit test
 
 ```bash
 npm run test
 ```
 
-## E2E Smoke
+## E2E smoke
 
 ```bash
 npm run e2e
 ```
 
-## Sonraki Adimlar
+## Production environment
 
-1. haftalik kapanis sonucu ile raporlar endpointlerini ayni snapshot ID uzerinden iliskilendirmek
-2. finans modulunde kalem turu ve donem secimlerini referans endpointleri ile zenginlestirmek
+Canlı build için temel değerler:
+
+```env
+VITE_APP_BASE_PATH=/personelmedisa/
+VITE_API_MODE=real
+VITE_DEMO_API_FALLBACK=false
+VITE_APP_ENV=production
+VITE_ENABLE_DIAGNOSTICS=false
+```
+
+Demo/mock fallback üretimde açık bırakılmamalıdır.
+
+## Deploy
+
+Canlı yayın için `DEPLOY_CHECKLIST.md` izlenir. Ana deploy yolu GitHub Actions üzerinden `dist/` içeriğinin cPanel hedef klasörüne aktarılmasıdır.
+
+## Çalışma kuralı
+
+Kod değişikliklerinde mevcut owner yapı korunur. Yeni paralel akış, gereksiz CSS override, toplu format/refactor ve kapsam dışı dosya değişikliği yapılmaz. Kalıcı iş davranışı demo/local fallback ile maskelenmez; üretim ayarları gerçek API davranışına göre doğrulanır.

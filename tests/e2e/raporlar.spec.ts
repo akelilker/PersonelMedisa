@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { expect, test } from "@playwright/test";
 import { getRaporColumns } from "../../src/features/raporlar/rapor-column-contract";
 import type { RaporTipi } from "../../src/types/rapor";
@@ -81,6 +82,39 @@ test.describe("raporlar detayli liste smoke", () => {
     await expect(oncekiButton).toBeDisabled();
     await expect(sonrakiButton).toBeEnabled();
     await expect(pageInfo).toContainText("Sayfa 1 / 2");
+    expect(runtimeErrors).toEqual([]);
+  });
+
+  test("aylik kapanis ozeti csv export dosyasini indirir", async ({ page }) => {
+    const runtimeErrors: string[] = [];
+    page.on("pageerror", (error) => {
+      runtimeErrors.push(error.message);
+    });
+
+    const aylikSection = page.getByTestId("aylik-kapanis-ozeti-section");
+    await expect(aylikSection).toBeVisible();
+    await expect(aylikSection.locator("h2")).toContainText("Aylık Kapanış Özeti");
+    await expect(aylikSection.locator(".raporlar-table tbody tr")).toHaveCount(2);
+
+    const exportButton = aylikSection.getByRole("button", { name: "Excel'e Aktar" });
+    await expect(exportButton).toBeVisible();
+
+    const downloadPromise = page.waitForEvent("download");
+    await exportButton.click();
+    const download = await downloadPromise;
+
+    const filename = download.suggestedFilename();
+    expect(filename).toContain("aylik-kapanis-ozeti");
+    expect(filename.endsWith(".csv")).toBe(true);
+
+    const downloadPath = await download.path();
+    expect(downloadPath).not.toBeNull();
+
+    const csvContent = readFileSync(downloadPath!, "utf-8");
+    expect(csvContent.trim().length).toBeGreaterThan(0);
+    expect(csvContent).toContain("Ad Soyad");
+    expect(csvContent).toContain("Ayşe Yılmaz");
+    expect(csvContent).toContain("Mehmet Kaya");
     expect(runtimeErrors).toEqual([]);
   });
 });

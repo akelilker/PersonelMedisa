@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 import { Outlet, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { BackBar } from "../components/BackBar";
 import { AppFooter } from "../components/footer/AppFooter";
@@ -6,11 +6,8 @@ import { Hero } from "../components/hero/Hero";
 import type { KayitTab } from "../components/main-menu/MainMenu";
 import { AppModal } from "../components/modal/AppModal";
 import { ShellHeaderActions } from "../components/shell/ShellHeaderActions";
-import {
-  KAYIT_SUREC_PERSONEL_FORM_ID,
-  KAYIT_SUREC_SUREC_FORM_ID,
-  KayitSurecWorkspace
-} from "../features/kayit/components/KayitSurecWorkspace";
+import { KayitSurecWorkspace } from "../features/kayit/components/KayitSurecWorkspace";
+import { useKayitModalController } from "../features/kayit/hooks/useKayitModalController";
 import { formatUiProfileLabel, formatUserRoleLabel } from "../lib/display/enum-display";
 import { useAuth } from "../state/auth.store";
 
@@ -27,39 +24,6 @@ type ModuleModalConfig = {
   className?: string;
   bodyClassName?: string;
 };
-
-type KayitModalIntent = "personel-edit-gateway" | "personel-zimmet-gateway";
-
-type KayitModalRouteConfig = {
-  tab: KayitTab;
-  personelId: string | null;
-  intent: KayitModalIntent | null;
-  returnTo: string | null;
-};
-
-function resolveKayitModalRouteConfig(state: unknown): KayitModalRouteConfig | null {
-  if (state === null || typeof state !== "object") {
-    return null;
-  }
-
-  const kayitModal = (state as { kayitModal?: unknown }).kayitModal;
-  if (kayitModal === null || typeof kayitModal !== "object") {
-    return null;
-  }
-
-  const rawTab = (kayitModal as { tab?: unknown }).tab;
-  const rawPersonelId = (kayitModal as { personelId?: unknown }).personelId;
-  const rawIntent = (kayitModal as { intent?: unknown }).intent;
-  const rawReturnTo = (kayitModal as { returnTo?: unknown }).returnTo;
-
-  return {
-    tab: rawTab === "surec" ? "surec" : "yeni-kayit",
-    personelId: rawPersonelId === undefined || rawPersonelId === null ? null : String(rawPersonelId),
-    intent:
-      rawIntent === "personel-edit-gateway" || rawIntent === "personel-zimmet-gateway" ? rawIntent : null,
-    returnTo: typeof rawReturnTo === "string" && rawReturnTo.trim() ? rawReturnTo.trim() : null
-  };
-}
 
 function resolveBackBar(pathname: string): { to: string; label: string } | null {
   if (/^\/personeller\/\d+$/.test(pathname)) {
@@ -146,12 +110,18 @@ export function AppShell() {
   const showUserBar = !isLoginRoute && !isModuleOverlayRoute && !isHomeRoute;
   const backBarTarget = resolveBackBar(pathname);
 
-  const [isKayitModalOpen, setIsKayitModalOpen] = useState(false);
-  const [kayitTab, setKayitTab] = useState<KayitTab>("yeni-kayit");
-  const [kayitInitialSurecPersonelId, setKayitInitialSurecPersonelId] = useState<string | null>(null);
-  const [kayitEntryIntent, setKayitEntryIntent] = useState<KayitModalIntent | null>(null);
-  const [kayitEntryReturnTo, setKayitEntryReturnTo] = useState<string | null>(null);
-  const kayitRouteConfig = useMemo(() => resolveKayitModalRouteConfig(state), [state]);
+  const {
+    isKayitModalOpen,
+    kayitTab,
+    setKayitTab,
+    kayitInitialSurecPersonelId,
+    kayitEntryIntent,
+    kayitEntryReturnTo,
+    kayitPrimaryLabel,
+    kayitPrimaryFormId,
+    openKayitModal,
+    closeKayitModal
+  } = useKayitModalController(pathname, state);
 
   useEffect(() => {
     document.body.classList.toggle("dashboard-page", isHomeRoute && !isLoginRoute);
@@ -161,37 +131,12 @@ export function AppShell() {
     };
   }, [isHomeRoute, isLoginRoute]);
 
-  useEffect(() => {
-    if (!kayitRouteConfig) {
-      return;
-    }
-
-    setKayitTab(kayitRouteConfig.tab);
-    setKayitInitialSurecPersonelId(kayitRouteConfig.personelId);
-    setKayitEntryIntent(kayitRouteConfig.intent);
-    setKayitEntryReturnTo(kayitRouteConfig.returnTo);
-    setIsKayitModalOpen(true);
-    navigate(pathname, { replace: true, state: null });
-  }, [kayitRouteConfig, navigate, pathname]);
-
-  const kayitPrimaryLabel = kayitTab === "yeni-kayit" ? "Kaydet" : "Süreci Kaydet";
-  const kayitPrimaryFormId =
-    kayitTab === "yeni-kayit" ? KAYIT_SUREC_PERSONEL_FORM_ID : KAYIT_SUREC_SUREC_FORM_ID;
-
-  const handleKayitOpen = useCallback((tab: KayitTab) => {
-    setKayitTab(tab);
-    setKayitInitialSurecPersonelId(null);
-    setKayitEntryIntent(null);
-    setKayitEntryReturnTo(null);
-    setIsKayitModalOpen(true);
-  }, []);
-
   const outletContext = useMemo<AppShellOutletContext>(
     () => ({
-      onKayitOpen: handleKayitOpen,
+      onKayitOpen: openKayitModal,
       showMainMenu: isHomeRoute ? !isKayitModalOpen : true
     }),
-    [handleKayitOpen, isHomeRoute, isKayitModalOpen]
+    [openKayitModal, isHomeRoute, isKayitModalOpen]
   );
 
   return (
@@ -223,22 +168,14 @@ export function AppShell() {
       {isKayitModalOpen ? (
         <AppModal
           title="Kayıt ve Süreç İşlemleri"
-          onClose={() => {
-            setIsKayitModalOpen(false);
-            setKayitInitialSurecPersonelId(null);
-            setKayitEntryIntent(null);
-            setKayitEntryReturnTo(null);
-          }}
+          onClose={closeKayitModal}
+          className="modal-container--kayit-surec"
+          bodyClassName="modal-body--kayit-surec"
         >
           <KayitSurecWorkspace
             activeTab={kayitTab}
             onTabChange={setKayitTab}
-            onClose={() => {
-              setIsKayitModalOpen(false);
-              setKayitInitialSurecPersonelId(null);
-              setKayitEntryIntent(null);
-              setKayitEntryReturnTo(null);
-            }}
+            onClose={closeKayitModal}
             initialSurecPersonelId={kayitInitialSurecPersonelId}
             initialIntent={kayitEntryIntent}
             initialReturnTo={kayitEntryReturnTo}

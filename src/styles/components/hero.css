@@ -89,6 +89,19 @@
   box-shadow: 0 2px 10px rgba(var(--theme-color-rgb), 0.3);
 }
 
+@media (min-width: 641px) {
+  .hero {
+    --hero-spacer-width: 14px;
+    column-gap: 10px;
+    padding-inline: 12px;
+  }
+
+  .hero h1 {
+    font-size: 21px;
+    letter-spacing: 0.05em;
+  }
+}
+
 @media (max-width: 640px) {
   .hero {
     --hero-logo-width: 43px;

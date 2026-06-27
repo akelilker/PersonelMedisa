@@ -1,7 +1,11 @@
 name: Deploy cPanel
 
 on:
-  push:
+  workflow_run:
+    workflows:
+      - CI
+    types:
+      - completed
     branches:
       - main
   workflow_dispatch:
@@ -13,6 +17,13 @@ concurrency:
 jobs:
   deploy:
     name: Build and upload
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (
+        github.event_name == 'workflow_run' &&
+        github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.head_branch == 'main'
+      )
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
@@ -20,8 +31,17 @@ jobs:
       LOCAL_DIST_DIR: ./dist/
       REMOTE_TARGET_DIR: ./public_html/personelmedisa/
     steps:
-      - name: Checkout
+      - name: Checkout tested commit
+        if: github.event_name == 'workflow_run'
         uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Checkout manual dispatch ref
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
 
       - name: Setup Node
         uses: actions/setup-node@v6

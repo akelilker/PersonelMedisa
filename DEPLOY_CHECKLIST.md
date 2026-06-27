@@ -13,10 +13,17 @@ Ana deploy yolu GitHub Actions uzerindendir. cPanel uzerinde `npm build` calisti
    - `FTP_PASSWORD`
    - `FTP_PORT` (genelde `21`; SFTP icin `22`)
 2. Workflow dosyasi: `.github/workflows/deploy-cpanel.yml`
-3. `main` branch'e push atinca otomatik deploy olur.
-4. Istersen `Actions` sekmesinden `Run workflow` ile manuel tetikleyebilirsin.
+3. `main` branch'e push sonrasi deploy **dogrudan baslamaz**. Once `CI` workflow'u (unit + typecheck + build + E2E) basariyla tamamlanir; ardindan `Deploy cPanel` workflow'u `workflow_run` ile tetiklenir.
+4. CI veya E2E fail olursa deploy calismaz.
+5. Istersen `Actions` -> `Deploy cPanel` -> `Run workflow` ile manuel deploy yapabilirsin (`workflow_dispatch`).
 
-Workflow sirasi: `npm ci` -> `npm run typecheck` -> `npm run test` -> `npm run build` -> yalnizca `dist/` icerigini `public_html/personelmedisa/` hedefine yukler.
+Otomatik deploy sirasi:
+1. `main` push -> `CI` workflow calisir.
+2. `CI` success -> `Deploy cPanel` workflow baslar.
+3. Deploy, CI'da test edilen commit SHA ile checkout yapar (`github.event.workflow_run.head_sha`).
+4. Deploy icinde: `npm ci` -> `npm run typecheck` -> `npm run test` -> `npm run build` -> yalnizca `dist/` icerigini `public_html/personelmedisa/` hedefine yukler.
+
+Manuel deploy (`workflow_dispatch`) korunur; checkout secilen branch/ref uzerinden yapilir.
 
 ### cPanel Git Deployment (yedek / manual)
 

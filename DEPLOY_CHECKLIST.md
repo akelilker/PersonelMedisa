@@ -5,14 +5,24 @@ Repo klasoru: `public_html` disinda ayri bir dizin
 
 ## GitHub Actions ile otomatik deploy
 
+Ana deploy yolu GitHub Actions uzerindendir. cPanel uzerinde `npm build` calistirilmaz; yalnizca GitHub Actions build ciktisi olan `dist/` icerigi yayinlanir.
+
 1. GitHub repo -> `Settings` -> `Secrets and variables` -> `Actions`:
    - `FTP_SERVER` (or. `ftp.domain.com`)
    - `FTP_USERNAME`
    - `FTP_PASSWORD`
-   - `FTP_PORT` (genelde `21`)
+   - `FTP_PORT` (genelde `21`; SFTP icin `22`)
 2. Workflow dosyasi: `.github/workflows/deploy-cpanel.yml`
 3. `main` branch'e push atinca otomatik deploy olur.
 4. Istersen `Actions` sekmesinden `Run workflow` ile manuel tetikleyebilirsin.
+
+Workflow sirasi: `npm ci` -> `npm run typecheck` -> `npm run test` -> `npm run build` -> yalnizca `dist/` icerigini `public_html/personelmedisa/` hedefine yukler.
+
+### cPanel Git Deployment (yedek / manual)
+
+- Ana deploy GitHub Actions uzerinden yapilir.
+- cPanel Git Version Control / `.cpanel.yml` ana deploy yolu degildir.
+- Yedek veya acil durumda cPanel Git Deployment kullanilacaksa wildcard ile tum repo deploy edilmemelidir; yalnizca `dist/` icerigi hedef klasore kopyalanmalidir.
 
 ## 1) Build
 

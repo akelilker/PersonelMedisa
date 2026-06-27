@@ -213,15 +213,35 @@
   overflow-y: auto;
 }
 
+.yonetim-content-back {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  justify-self: start;
+  min-height: 34px;
+  margin: 0 0 6px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: rgba(242, 246, 252, 0.92);
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.yonetim-content-back:hover {
+  color: #ffffff;
+}
+
+.modal-body > .yonetim-page .yonetim-content-back {
+  flex-shrink: 0;
+}
+
 .yonetim-list-header {
   display: flex;
   justify-content: flex-end;
   align-items: center;
   min-height: 40px;
-}
-
-.yonetim-list-header .yonetim-toolbar-pill {
-  margin-right: auto;
 }
 
 .yonetim-list-actions {
@@ -234,52 +254,52 @@
 .yonetim-view-toggle {
   display: inline-flex;
   align-items: center;
-  gap: 2px;
-}
-
-.yonetim-icon-btn {
-  display: inline-flex;
-  align-items: center;
   justify-content: center;
-  min-width: 40px;
-  min-height: 40px;
+  min-width: 44px;
+  min-height: 44px;
   padding: 0;
-  border: none;
-  border-radius: 10px;
-  background: transparent;
-  color: rgba(244, 246, 250, 0.76);
+  border: 1px solid rgba(var(--theme-color-rgb), 0.5);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(244, 246, 250, 0.88);
   cursor: pointer;
-  transition: color 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: inset 0 0 0 1px rgba(var(--theme-color-rgb), 0.16);
+  transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
-.yonetim-icon-btn:hover,
-.yonetim-icon-btn.is-active {
-  background: rgba(255, 255, 255, 0.06);
+.yonetim-view-toggle:hover {
+  border-color: rgba(var(--theme-color-rgb), 0.78);
+  background: rgba(255, 255, 255, 0.07);
   color: #ffffff;
 }
 
-.yonetim-icon-btn.is-active {
-  box-shadow: inset 0 0 0 1px rgba(var(--theme-color-rgb), 0.36);
+.yonetim-create-row {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 0 0 12px;
 }
 
 .yonetim-create-link {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 40px;
-  padding: 0 10px;
-  border: none;
-  border-radius: 10px;
-  background: transparent;
-  color: rgba(226, 213, 188, 0.86);
-  font-size: 0.92rem;
-  font-weight: 700;
+  min-height: 44px;
+  padding: 0 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(244, 246, 250, 0.96);
+  font-size: 0.98rem;
+  font-weight: 800;
   letter-spacing: 0.02em;
   cursor: pointer;
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.16);
 }
 
 .yonetim-create-link:hover {
-  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(var(--theme-color-rgb), 0.5);
+  background: rgba(255, 255, 255, 0.1);
   color: #ffffff;
 }
 
@@ -847,7 +867,7 @@
   }
 
   .yonetim-list-actions {
-    flex-wrap: wrap;
+    justify-content: center;
   }
 
   .yonetim-list-surface .yonetim-list-table {

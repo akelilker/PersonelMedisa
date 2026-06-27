@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent, type KeyboardEvent } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { FormField } from "../../../components/form/FormField";
 import { AppModal } from "../../../components/modal/AppModal";
 import { EmptyState } from "../../../components/states/EmptyState";
@@ -148,27 +148,19 @@ function YonetimViewToggle(props: {
   value: YonetimViewMode;
   onChange: (mode: YonetimViewMode) => void;
 }) {
+  const nextMode: YonetimViewMode = props.value === "card" ? "list" : "card";
+  const nextLabel = props.value === "card" ? "Liste görünümüne geç" : "Kart görünümüne geç";
+
   return (
-    <div className="yonetim-view-toggle" role="group" aria-label={props.label}>
-      <button
-        type="button"
-        className={`yonetim-icon-btn${props.value === "card" ? " is-active" : ""}`}
-        aria-label="Kart görünümü"
-        aria-pressed={props.value === "card"}
-        onClick={() => props.onChange("card")}
-      >
-        <IconGrid />
-      </button>
-      <button
-        type="button"
-        className={`yonetim-icon-btn${props.value === "list" ? " is-active" : ""}`}
-        aria-label="Liste görünümü"
-        aria-pressed={props.value === "list"}
-        onClick={() => props.onChange("list")}
-      >
-        <IconList />
-      </button>
-    </div>
+    <button
+      type="button"
+      className="yonetim-view-toggle"
+      aria-label={`${props.label}: ${nextLabel}`}
+      title={nextLabel}
+      onClick={() => props.onChange(nextMode)}
+    >
+      {props.value === "card" ? <IconList /> : <IconGrid />}
+    </button>
   );
 }
 
@@ -402,10 +394,16 @@ function buildYonetimSurecLogPayloads(
 }
 
 export function YonetimPaneliPage() {
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { hasPermission } = useRoleAccess();
   const canManageYonetimPanel = hasPermission("yonetim-paneli.manage");
   const activeTab = resolveYonetimActiveTab(searchParams.get("tab"));
+
+  function handleBackToAyarlar() {
+    navigate("/");
+  }
+
   const [kullaniciViewMode, setKullaniciViewMode] = useState<YonetimViewMode>("card");
   const [subeViewMode, setSubeViewMode] = useState<YonetimViewMode>("card");
   const [isKullaniciFormOpen, setIsKullaniciFormOpen] = useState(false);
@@ -711,23 +709,34 @@ export function YonetimPaneliPage() {
 
       {!isLoading && !errorMessage && activeTab === "kullanicilar" ? (
         <section className="yonetim-list-surface" aria-label="Kullanıcı yönetimi" data-testid="yonetim-section-kullanicilar">
+          <button
+            type="button"
+            className="yonetim-content-back"
+            data-testid="yonetim-back-ayarlar"
+            onClick={handleBackToAyarlar}
+          >
+            ← Ayarlar
+          </button>
+
           <div className="yonetim-list-header">
             <div className="yonetim-list-actions">
-              <span className="yonetim-toolbar-pill">{kullanicilar.length} Kullanıcı</span>
               <YonetimViewToggle
                 label="Kullanıcılar görünümü"
                 value={kullaniciViewMode}
                 onChange={setKullaniciViewMode}
               />
-              <button
-                type="button"
-                className="yonetim-create-link"
-                data-testid="yonetim-kullanici-yeni"
-                onClick={openYeniKullaniciForm}
-              >
-                + Yeni Kullanıcı
-              </button>
             </div>
+          </div>
+
+          <div className="yonetim-create-row">
+            <button
+              type="button"
+              className="yonetim-create-link"
+              data-testid="yonetim-kullanici-yeni"
+              onClick={openYeniKullaniciForm}
+            >
+              + Yeni Kullanıcı
+            </button>
           </div>
 
           {kullanicilar.length === 0 ? (
@@ -802,19 +811,30 @@ export function YonetimPaneliPage() {
 
       {!isLoading && !errorMessage && activeTab === "subeler" ? (
         <section className="yonetim-list-surface" aria-label="Şube yönetimi" data-testid="yonetim-section-subeler">
+          <button
+            type="button"
+            className="yonetim-content-back"
+            data-testid="yonetim-back-ayarlar"
+            onClick={handleBackToAyarlar}
+          >
+            ← Ayarlar
+          </button>
+
           <div className="yonetim-list-header">
             <div className="yonetim-list-actions">
-              <span className="yonetim-toolbar-pill">{subeler.length} Şube</span>
               <YonetimViewToggle label="Şubeler görünümü" value={subeViewMode} onChange={setSubeViewMode} />
-              <button
-                type="button"
-                className="yonetim-create-link"
-                data-testid="yonetim-sube-yeni"
-                onClick={openYeniSubeForm}
-              >
-                + Yeni Şube
-              </button>
             </div>
+          </div>
+
+          <div className="yonetim-create-row">
+            <button
+              type="button"
+              className="yonetim-create-link"
+              data-testid="yonetim-sube-yeni"
+              onClick={openYeniSubeForm}
+            >
+              + Yeni Şube
+            </button>
           </div>
 
           {subeler.length === 0 ? (

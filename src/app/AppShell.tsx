@@ -121,7 +121,6 @@ function resolveModuleModal(pathname: string, tabParam: string | null): ModuleMo
     return {
       title: resolveYonetimModalTitle(tabParam),
       closeTo: "/",
-      backLabel: "Ayarlar",
       className: "modal-container--yonetim",
       bodyClassName: "modal-body--yonetim"
     };

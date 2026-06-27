@@ -688,6 +688,9 @@
   padding-bottom: 0;
   border-bottom: 1px solid var(--line-soft);
   overflow-x: auto;
+  max-width: 100%;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
 }
 
 .personel-kart-tab {
@@ -1102,6 +1105,21 @@
 }
 
 @media (max-width: 720px) {
+  .personel-kart-tablist {
+    margin-inline: calc(-1 * var(--space-1));
+    padding-inline: var(--space-1);
+  }
+
+  .personel-kart-tab {
+    padding: 10px 12px;
+    font-size: 12px;
+  }
+
+  .personel-belge-kayit-table,
+  .personel-zimmet-table {
+    min-width: 640px;
+  }
+
   .personel-dosya-hero-head {
     flex-direction: column;
     align-items: stretch;

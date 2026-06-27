@@ -5,7 +5,7 @@ import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { APP_DATA_SCHEMA_VERSION } from "../../src/data/app-data.types";
 import { dataCacheKeys, setCacheEntry } from "../../src/data/data-manager";
-import { usePersonelDetail } from "../../src/hooks/usePersoneller";
+import { usePersonelDetail } from "../../src/hooks/usePersonelDetail";
 import type { Personel } from "../../src/types/personel";
 
 const personellerApiMock = vi.hoisted(() => ({
@@ -185,5 +185,25 @@ describe("usePersonelDetail", () => {
       personelTwentyRequest.resolve(makePersonel(20, "Dogru"));
       await personelTwentyRequest.promise;
     });
+  });
+
+  it("ayrilmis hook yuzeyinde veri, duzenleme ve zimmet modal alanlarini bir arada doner", async () => {
+    personellerApiMock.fetchPersonelDetail.mockResolvedValue(makePersonel(5, "Test"));
+
+    const { result } = renderHook(() => usePersonelDetail(5, true), { wrapper });
+
+    await waitFor(() => {
+      expect(result.current.personel?.id).toBe(5);
+    });
+
+    expect(result.current).toMatchObject({
+      isLoading: false,
+      isEditing: false,
+      isZimmetModalOpen: false,
+      surecHistory: [],
+      zimmetHistory: []
+    });
+    expect(result.current).not.toHaveProperty("isSurecModalOpen");
+    expect(result.current).not.toHaveProperty("openSurecModal");
   });
 });

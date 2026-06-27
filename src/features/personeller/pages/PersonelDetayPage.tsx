@@ -4,16 +4,16 @@ import { EmptyState } from "../../../components/states/EmptyState";
 import { ErrorState } from "../../../components/states/ErrorState";
 import { LoadingState } from "../../../components/states/LoadingState";
 import { useRoleAccess } from "../../../hooks/use-role-access";
-import { usePersonelDetail } from "../../../hooks/usePersoneller";
+import { usePersonelDetail } from "../../../hooks/usePersonelDetail";
 import {
   PersonelDosyaActionRow,
   PersonelDosyaHero,
   PersonelDosyaTabPanels,
   PersonelInlineEditForm,
-  PersonelSurecCreateModal,
   PersonelZimmetCreateModal,
   type PersonelDosyaTabId
 } from "../components/personel-dosya";
+import { usePersonelKartGatewayReturn } from "../hooks/usePersonelKartGatewayReturn";
 
 export function PersonelDetayPage() {
   const location = useLocation();
@@ -34,13 +34,18 @@ export function PersonelDetayPage() {
   const [activeTab, setActiveTab] = useState<PersonelDosyaTabId>("genel-bilgiler");
   const [isActionMenuOpen, setIsActionMenuOpen] = useState(false);
 
+  const detail = usePersonelDetail(parsedPersonelId, hasValidId, {
+    canViewSurecler,
+    canCreateSurec,
+    canCreateZimmet
+  });
+
   const {
     personel,
     isLoading,
     errorMessage,
     refetch,
     isEditing,
-    setIsEditing,
     isSubmitting,
     editErrorMessage,
     editForm,
@@ -52,18 +57,6 @@ export function PersonelDetayPage() {
     updatePersonelHandler,
     hasLifecycleDiff,
     personelRefs,
-    isSurecModalOpen,
-    closeSurecModal,
-    surecForm,
-    setSurecForm,
-    createSurecHandler,
-    isSurecSubmitting,
-    surecCreateErrorMessage,
-    surecHistory,
-    isSurecHistoryLoading,
-    surecHistoryErrorMessage,
-    surecTuruOptions,
-    surecReferenceErrorMessage,
     isZimmetModalOpen,
     openZimmetModal,
     closeZimmetModal,
@@ -72,14 +65,25 @@ export function PersonelDetayPage() {
     createZimmetHandler,
     isZimmetSubmitting,
     zimmetCreateErrorMessage,
+    surecHistory,
+    isSurecHistoryLoading,
+    surecHistoryErrorMessage,
     zimmetHistory,
     isZimmetHistoryLoading,
     zimmetHistoryErrorMessage
-  } = usePersonelDetail(parsedPersonelId, hasValidId, {
-    canViewSurecler,
-    canCreateSurec,
-    canCreateZimmet
-  });
+  } = detail;
+
+  const { handleOpenSurecModal, handleOpenPersonelEditGateway, handleOpenPersonelZimmetGateway } =
+    usePersonelKartGatewayReturn({
+      location,
+      navigate,
+      parsedPersonelId,
+      canEditPersonel,
+      canCreateZimmet,
+      setActiveTab,
+      setIsEditing: detail.setIsEditing,
+      openZimmetModal
+    });
 
   useEffect(() => {
     setActiveTab("genel-bilgiler");
@@ -87,102 +91,33 @@ export function PersonelDetayPage() {
   }, [parsedPersonelId]);
 
   useEffect(() => {
-    if (isEditing || isSurecModalOpen || isZimmetModalOpen) {
+    if (isEditing || isZimmetModalOpen) {
       setIsActionMenuOpen(false);
     }
-  }, [isEditing, isSurecModalOpen, isZimmetModalOpen]);
-
-  useEffect(() => {
-    const routeState = location.state as { openPersonelEdit?: boolean; openPersonelZimmet?: boolean } | null;
-    if (!routeState?.openPersonelEdit) {
-      return;
-    }
-
-    if (!canEditPersonel) {
-      return;
-    }
-
-    setActiveTab("genel-bilgiler");
-    setIsEditing(true);
-    navigate(location.pathname, { replace: true, state: null });
-  }, [canEditPersonel, location.pathname, location.state, navigate, setIsEditing]);
-
-  useEffect(() => {
-    const routeState = location.state as { openPersonelEdit?: boolean; openPersonelZimmet?: boolean } | null;
-    if (!routeState?.openPersonelZimmet) {
-      return;
-    }
-
-    if (!canCreateZimmet) {
-      return;
-    }
-
-    setActiveTab("zimmet-envanter");
-    openZimmetModal();
-    navigate(location.pathname, { replace: true, state: null });
-  }, [canCreateZimmet, location.pathname, location.state, navigate, openZimmetModal]);
+  }, [isEditing, isZimmetModalOpen]);
 
   function handleEditSubmit(event: FormEvent<HTMLFormElement>) {
     void updatePersonelHandler(event, canEditPersonel);
-  }
-
-  function handleSurecCreateSubmit(event: FormEvent<HTMLFormElement>) {
-    void createSurecHandler(event);
   }
 
   function handleZimmetCreateSubmit(event: FormEvent<HTMLFormElement>) {
     void createZimmetHandler(event);
   }
 
-  function handleOpenSurecModal() {
-    navigate("/", {
-      state: {
-        kayitModal: {
-          tab: "surec",
-          personelId: parsedPersonelId
-        }
-      }
-    });
-  }
-
   function handleOpenSurecHistory() {
     setActiveTab("surec-gecmisi");
   }
 
-  function handleOpenPersonelEditGateway() {
-    navigate("/", {
-      state: {
-        kayitModal: {
-          tab: "yeni-kayit",
-          personelId: parsedPersonelId,
-          intent: "personel-edit-gateway",
-          returnTo: `/personeller/${parsedPersonelId}`
-        }
-      }
-    });
-  }
-
-  function handleOpenPersonelZimmetGateway() {
-    navigate("/", {
-      state: {
-        kayitModal: {
-          tab: "yeni-kayit",
-          personelId: parsedPersonelId,
-          intent: "personel-zimmet-gateway",
-          returnTo: `/personeller/${parsedPersonelId}`
-        }
-      }
-    });
-  }
-
   const pageHeading =
-    personel != null ? `${personel.ad} ${personel.soyad} personel dosyası` : "Personel dosyası";
+    personel != null
+      ? `${personel.ad} ${personel.soyad} — Personel kartı detay alanı`
+      : "Personel kartı detay alanı";
 
   return (
     <section className="personel-detay-page personel-dosya-page" aria-label={pageHeading}>
       <h2 className="personeller-sr-only">{pageHeading}</h2>
 
-      {isLoading ? <LoadingState label="Personel dosyası yükleniyor..." /> : null}
+      {isLoading ? <LoadingState label="Personel kartı yükleniyor..." /> : null}
 
       {!isLoading && errorMessage ? (
         <ErrorState message={errorMessage} onRetry={() => void refetch()} />
@@ -248,20 +183,6 @@ export function PersonelDetayPage() {
             />
           )}
         </div>
-      ) : null}
-
-      {personel && canCreateSurec ? (
-        <PersonelSurecCreateModal
-          isOpen={isSurecModalOpen}
-          onClose={closeSurecModal}
-          onSubmit={handleSurecCreateSubmit}
-          surecForm={surecForm}
-          setSurecForm={setSurecForm}
-          surecTuruOptions={surecTuruOptions}
-          isSubmitting={isSurecSubmitting}
-          surecCreateErrorMessage={surecCreateErrorMessage}
-          surecReferenceErrorMessage={surecReferenceErrorMessage}
-        />
       ) : null}
 
       {personel && canCreateZimmet ? (

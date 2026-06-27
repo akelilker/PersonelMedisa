@@ -16,7 +16,7 @@ export function PersonelDosyaTabList({
   onTabChange: (tabId: PersonelDosyaTabId) => void;
 }) {
   return (
-    <div className="personel-kart-tablist" role="tablist" aria-label="Personel dosyası sekmeleri">
+    <div className="personel-kart-tablist" role="tablist" aria-label="Personel kartı sekmeleri">
       {PERSONEL_DOSYA_TABS.map((tab) => (
         <button
           key={tab.id}

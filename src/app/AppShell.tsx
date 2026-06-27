@@ -88,7 +88,7 @@ function resolveModuleModal(pathname: string, tabParam: string | null): ModuleMo
   }
 
   if (/^\/personeller\/\d+$/.test(pathname)) {
-    return { title: "Personel Detayı", closeTo: "/personeller" };
+    return { title: "Personel Kartı", closeTo: "/personeller" };
   }
   if (pathname === "/personeller") {
     return { title: "Personel Kartı", closeTo: "/" };

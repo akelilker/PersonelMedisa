@@ -41,4 +41,46 @@ test.describe("raporlar detayli liste smoke", () => {
       expect(headerTexts.map((text) => text.trim())).toEqual(columns.map((column) => column.label));
     });
   }
+
+  test("personel ozet raporunda sayfalama ile ikinci sayfaya gecer ve geri doner", async ({ page }) => {
+    const runtimeErrors: string[] = [];
+    page.on("pageerror", (error) => {
+      runtimeErrors.push(error.message);
+    });
+
+    await page.locator('[name="rapor-turu"]').selectOption("personel-ozet");
+    await page.getByTestId("raporlar-submit-run").click();
+
+    const resultCard = page.getByTestId("raporlar-resmi-sonuc");
+    await expect(resultCard).toBeVisible();
+    await expect(resultCard.locator("tbody")).toContainText("Ayşe Yılmaz");
+    await expect(resultCard.locator("tbody tr")).toHaveCount(1);
+
+    const oncekiButton = page.getByRole("button", { name: "Onceki" });
+    const sonrakiButton = page.getByRole("button", { name: "Sonraki" });
+    const pageInfo = page.locator(".module-page-info");
+
+    await expect(sonrakiButton).toBeEnabled();
+    await expect(oncekiButton).toBeDisabled();
+    await expect(pageInfo).toContainText("Sayfa 1 / 2");
+
+    await sonrakiButton.click();
+
+    await expect(resultCard.locator("tbody")).toContainText("Mehmet Kaya");
+    await expect(resultCard.locator("tbody")).not.toContainText("Ayşe Yılmaz");
+    await expect(resultCard.locator("tbody tr")).toHaveCount(1);
+    await expect(oncekiButton).toBeEnabled();
+    await expect(sonrakiButton).toBeDisabled();
+    await expect(pageInfo).toContainText("Sayfa 2 / 2");
+
+    await oncekiButton.click();
+
+    await expect(resultCard.locator("tbody")).toContainText("Ayşe Yılmaz");
+    await expect(resultCard.locator("tbody")).not.toContainText("Mehmet Kaya");
+    await expect(resultCard.locator("tbody tr")).toHaveCount(1);
+    await expect(oncekiButton).toBeDisabled();
+    await expect(sonrakiButton).toBeEnabled();
+    await expect(pageInfo).toContainText("Sayfa 1 / 2");
+    expect(runtimeErrors).toEqual([]);
+  });
 });

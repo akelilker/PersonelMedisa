@@ -22,17 +22,71 @@ function okBody(data: unknown) {
   });
 }
 
-function raporListOkBody(items: Record<string, unknown>[]) {
+type RaporListMeta = {
+  page?: number;
+  limit?: number;
+  total?: number;
+  total_pages?: number;
+  has_next_page?: boolean;
+  has_prev_page?: boolean;
+};
+
+function raporListOkBody(items: Record<string, unknown>[], metaOverrides?: RaporListMeta) {
+  const page = metaOverrides?.page ?? 1;
+  const limit = metaOverrides?.limit ?? 10;
+  const total = metaOverrides?.total ?? items.length;
+  const totalPages = metaOverrides?.total_pages ?? Math.max(1, Math.ceil(total / limit));
+
   return JSON.stringify({
     data: { items },
     meta: {
-      page: 1,
-      limit: 10,
-      total: items.length,
-      total_pages: 1,
-      has_next_page: false
+      page,
+      limit,
+      total,
+      total_pages: totalPages,
+      has_next_page: metaOverrides?.has_next_page ?? false,
+      ...(metaOverrides?.has_prev_page !== undefined ? { has_prev_page: metaOverrides.has_prev_page } : {})
     },
     errors: []
+  });
+}
+
+const PERSONEL_OZET_PAGINATED_ITEMS: Record<string, unknown>[] = [
+  {
+    personel_id: 1,
+    ad_soyad: "Ayşe Yılmaz",
+    sicil_no: "S-001",
+    aktif_durum: "AKTIF",
+    net_calisma_dakika: 510,
+    sgk_prim_gun: 30
+  },
+  {
+    personel_id: 2,
+    ad_soyad: "Mehmet Kaya",
+    sicil_no: "S-002",
+    aktif_durum: "AKTIF",
+    net_calisma_dakika: 480,
+    sgk_prim_gun: 28
+  }
+];
+
+function personelOzetPaginatedBody(pageNumber: number, pageLimit: number) {
+  const total = PERSONEL_OZET_PAGINATED_ITEMS.length;
+  const totalPages = 2;
+  const items =
+    pageNumber === 2
+      ? [PERSONEL_OZET_PAGINATED_ITEMS[1]]
+      : pageNumber === 1
+        ? [PERSONEL_OZET_PAGINATED_ITEMS[0]]
+        : [];
+
+  return raporListOkBody(items, {
+    page: pageNumber,
+    limit: pageLimit,
+    total,
+    total_pages: totalPages,
+    has_next_page: pageNumber < totalPages,
+    has_prev_page: pageNumber > 1
   });
 }
 
@@ -2458,6 +2512,14 @@ let bildirimIdCounter = 800;
     }
 
     if (path.startsWith("/api/raporlar/") && method === "GET") {
+      if (path === "/api/raporlar/personel-ozet") {
+        const url = new URL(route.request().url());
+        const pageNumber = Number.parseInt(url.searchParams.get("page") ?? "1", 10) || 1;
+        const pageLimit = Number.parseInt(url.searchParams.get("limit") ?? "10", 10) || 10;
+        await fulfillJson(route, 200, personelOzetPaginatedBody(pageNumber, pageLimit));
+        return;
+      }
+
       const mockItems = RAPOR_MOCK_ITEMS[path];
       if (mockItems) {
         await fulfillJson(route, 200, raporListOkBody(mockItems));

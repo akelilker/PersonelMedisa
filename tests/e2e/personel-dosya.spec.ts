@@ -97,6 +97,57 @@ async function seedDevamPrimiHastalikCacheForPersonelOne(page: Page) {
 }
 
 test.describe("personel dosyasi surec akisi", () => {
+  test("personel karti bes sekme modelini ve temel panelleri gosterir", async ({ page }) => {
+    await mockApi(page, "GENEL_YONETICI");
+
+    await login(page, { username: "yonetici", password: "secret" });
+
+    await page.getByTestId("menu-personel-karti").click();
+    await expect(page).toHaveURL(/\/personeller$/);
+
+    await page.getByRole("link", { name: /Ayşe Yılmaz.*kişisinin kartını aç/i }).first().click();
+    await expect(page).toHaveURL(/\/personeller\/1$/);
+
+    for (const tabName of ["Genel", "Eğitim / Belgeler", "Disiplin", "Zimmet", "Süreç Geçmişi"] as const) {
+      await expect(page.getByRole("tab", { name: tabName })).toBeVisible();
+    }
+
+    await expect(page.getByRole("tab", { name: "Genel" })).toHaveAttribute("aria-selected", "true");
+    const genelPanel = page.locator("#personel-kart-panel-genel-bilgiler");
+    await expect(genelPanel).toBeVisible();
+    await expect(genelPanel.getByText("Aylık Puantaj Özeti")).toBeVisible();
+    await expect(genelPanel.getByText("İzin Özeti")).toBeVisible();
+    await expect(page.getByTestId("personel-maas-eksik-uyari")).toHaveCount(0);
+
+    await page.getByRole("tab", { name: "Eğitim / Belgeler" }).click();
+    await expect(page.getByRole("tab", { name: "Eğitim / Belgeler" })).toHaveAttribute("aria-selected", "true");
+    const belgelerPanel = page.locator("#personel-kart-panel-egitim-belgeler");
+    await expect(belgelerPanel).toBeVisible();
+    await expect(belgelerPanel.getByTestId("personel-belgeler-panel")).toBeVisible();
+    await expect(belgelerPanel).toContainText(/Belge Durumu|Eğitim/i);
+
+    await page.getByRole("tab", { name: "Disiplin" }).click();
+    await expect(page.getByRole("tab", { name: "Disiplin" })).toHaveAttribute("aria-selected", "true");
+    const disiplinPanel = page.locator("#personel-kart-panel-disiplin");
+    await expect(disiplinPanel).toBeVisible();
+    await expect(disiplinPanel.getByTestId("personel-disiplin-panel")).toBeVisible();
+    await expect(disiplinPanel.getByTestId("personel-disiplin-ceza-section")).toBeVisible();
+
+    await page.getByRole("tab", { name: "Zimmet" }).click();
+    await expect(page.getByRole("tab", { name: "Zimmet" })).toHaveAttribute("aria-selected", "true");
+    const zimmetPanel = page.locator("#personel-kart-panel-zimmet-envanter");
+    await expect(zimmetPanel).toBeVisible();
+    await expect(zimmetPanel.locator(".personel-zimmet-panel")).toBeVisible();
+
+    await page.getByRole("tab", { name: "Süreç Geçmişi" }).click();
+    await expect(page.getByRole("tab", { name: "Süreç Geçmişi" })).toHaveAttribute("aria-selected", "true");
+    const surecPanel = page.locator("#personel-kart-panel-surec-gecmisi");
+    await expect(surecPanel).toBeVisible();
+    await expect(surecPanel.getByTestId("personel-surec-timeline")).toBeVisible();
+
+    await assertGatewayStateCleared(page);
+  });
+
   test("devam primi readonly karti personel gecisinde eski kesinti sonucunu tasimaz", async ({ page }) => {
     await mockApi(page, "GENEL_YONETICI");
 

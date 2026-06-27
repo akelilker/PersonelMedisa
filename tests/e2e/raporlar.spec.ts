@@ -106,6 +106,32 @@ test.describe("raporlar detayli liste smoke", () => {
     expect(runtimeErrors).toEqual([]);
   });
 
+  test("personel ozet raporunda departman filtresi sonucu daraltir", async ({ page }) => {
+    const runtimeErrors: string[] = [];
+    page.on("pageerror", (error) => {
+      runtimeErrors.push(error.message);
+    });
+
+    await page.locator('[name="rapor-turu"]').selectOption("personel-ozet");
+    await page.locator('[name="rapor-departman"]').fill("3");
+    await page.getByTestId("raporlar-submit-run").click();
+
+    const resultCard = page.getByTestId("raporlar-resmi-sonuc");
+    await expect(resultCard).toBeVisible();
+    await expect(resultCard.locator("tbody")).toContainText("Ayşe Yılmaz");
+    await expect(resultCard.locator("tbody")).not.toContainText("Mehmet Kaya");
+    await expect(resultCard.locator("tbody tr")).toHaveCount(1);
+
+    const oncekiButton = page.getByRole("button", { name: "Onceki" });
+    const sonrakiButton = page.getByRole("button", { name: "Sonraki" });
+    const pageInfo = page.locator(".module-page-info");
+
+    await expect(pageInfo).toContainText("Sayfa 1 / 1");
+    await expect(oncekiButton).toBeDisabled();
+    await expect(sonrakiButton).toBeDisabled();
+    expect(runtimeErrors).toEqual([]);
+  });
+
   test("aylik kapanis ozeti csv export dosyasini indirir", async ({ page }) => {
     const runtimeErrors: string[] = [];
     page.on("pageerror", (error) => {

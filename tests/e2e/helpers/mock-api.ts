@@ -57,6 +57,7 @@ const PERSONEL_OZET_PAGINATED_ITEMS: Record<string, unknown>[] = [
     ad_soyad: "Ayşe Yılmaz",
     sicil_no: "S-001",
     aktif_durum: "AKTIF",
+    departman_id: 3,
     net_calisma_dakika: 510,
     sgk_prim_gun: 30
   },
@@ -65,20 +66,38 @@ const PERSONEL_OZET_PAGINATED_ITEMS: Record<string, unknown>[] = [
     ad_soyad: "Mehmet Kaya",
     sicil_no: "S-002",
     aktif_durum: "AKTIF",
+    departman_id: 6,
     net_calisma_dakika: 480,
     sgk_prim_gun: 28
   }
 ];
 
-function personelOzetPaginatedBody(pageNumber: number, pageLimit: number) {
-  const total = PERSONEL_OZET_PAGINATED_ITEMS.length;
-  const totalPages = 2;
-  const items =
-    pageNumber === 2
-      ? [PERSONEL_OZET_PAGINATED_ITEMS[1]]
-      : pageNumber === 1
-        ? [PERSONEL_OZET_PAGINATED_ITEMS[0]]
-        : [];
+function personelOzetPaginatedBody(pageNumber: number, pageLimit: number, departmanId?: number) {
+  if (departmanId === undefined) {
+    const total = PERSONEL_OZET_PAGINATED_ITEMS.length;
+    const totalPages = 2;
+    const items =
+      pageNumber === 2
+        ? [PERSONEL_OZET_PAGINATED_ITEMS[1]]
+        : pageNumber === 1
+          ? [PERSONEL_OZET_PAGINATED_ITEMS[0]]
+          : [];
+
+    return raporListOkBody(items, {
+      page: pageNumber,
+      limit: pageLimit,
+      total,
+      total_pages: totalPages,
+      has_next_page: pageNumber < totalPages,
+      has_prev_page: pageNumber > 1
+    });
+  }
+
+  const filtered = PERSONEL_OZET_PAGINATED_ITEMS.filter((item) => item.departman_id === departmanId);
+  const total = filtered.length;
+  const totalPages = Math.max(1, Math.ceil(total / pageLimit));
+  const start = (pageNumber - 1) * pageLimit;
+  const items = filtered.slice(start, start + pageLimit);
 
   return raporListOkBody(items, {
     page: pageNumber,
@@ -2516,7 +2535,16 @@ let bildirimIdCounter = 800;
         const url = new URL(route.request().url());
         const pageNumber = Number.parseInt(url.searchParams.get("page") ?? "1", 10) || 1;
         const pageLimit = Number.parseInt(url.searchParams.get("limit") ?? "10", 10) || 10;
-        await fulfillJson(route, 200, personelOzetPaginatedBody(pageNumber, pageLimit));
+        const departmanId = Number.parseInt(url.searchParams.get("departman_id") ?? "", 10);
+        await fulfillJson(
+          route,
+          200,
+          personelOzetPaginatedBody(
+            pageNumber,
+            pageLimit,
+            Number.isFinite(departmanId) ? departmanId : undefined
+          )
+        );
         return;
       }
 

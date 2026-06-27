@@ -33,6 +33,14 @@ import type {
 type ActiveTab = "kullanicilar" | "subeler";
 type YonetimViewMode = "card" | "list";
 
+function resolveYonetimActiveTab(tabParam: string | null): ActiveTab {
+  const normalized = tabParam?.trim().toLowerCase() ?? "";
+  if (normalized === "subeler" || normalized === "sube") {
+    return "subeler";
+  }
+  return "kullanicilar";
+}
+
 type KullaniciFormState = {
   kullaniciTipi: KullaniciTipi;
   personelId: string;
@@ -395,10 +403,10 @@ function buildYonetimSurecLogPayloads(
 
 export function YonetimPaneliPage() {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { hasPermission } = useRoleAccess();
   const canManageYonetimPanel = hasPermission("yonetim-paneli.manage");
-  const [activeTab, setActiveTab] = useState<ActiveTab>("kullanicilar");
+  const activeTab = resolveYonetimActiveTab(searchParams.get("tab"));
   const [kullaniciViewMode, setKullaniciViewMode] = useState<YonetimViewMode>("card");
   const [subeViewMode, setSubeViewMode] = useState<YonetimViewMode>("card");
   const [isKullaniciFormOpen, setIsKullaniciFormOpen] = useState(false);
@@ -481,11 +489,9 @@ export function YonetimPaneliPage() {
     void loadPanel();
   }, []);
 
-  useEffect(() => {
-    if (searchParams.get("tab") === "subeler") {
-      setActiveTab("subeler");
-    }
-  }, [searchParams]);
+  function selectActiveTab(tab: ActiveTab) {
+    setSearchParams(tab === "subeler" ? { tab: "subeler" } : { tab: "kullanicilar" }, { replace: true });
+  }
 
   useEffect(() => {
     if (kullaniciForm.kullaniciTipi !== "IC_PERSONEL" || !kullaniciForm.personelId) {
@@ -724,15 +730,15 @@ export function YonetimPaneliPage() {
           type="button"
           data-testid="yonetim-tab-kullanicilar"
           className={`yonetim-tab-btn${activeTab === "kullanicilar" ? " is-active" : ""}`}
-          onClick={() => setActiveTab("kullanicilar")}
+          onClick={() => selectActiveTab("kullanicilar")}
         >
-          Kullanıcılar
+          Sistem Kullanıcıları
         </button>
         <button
           type="button"
           data-testid="yonetim-tab-subeler"
           className={`yonetim-tab-btn${activeTab === "subeler" ? " is-active" : ""}`}
-          onClick={() => setActiveTab("subeler")}
+          onClick={() => selectActiveTab("subeler")}
         >
           Şubeler
         </button>

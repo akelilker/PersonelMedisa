@@ -19,7 +19,7 @@ test.describe("yonetim paneli ve aylik ozet", () => {
     await expect(page).toHaveURL(/\/yonetim-paneli$/);
     await expect(page.locator(".modal-header h2").first()).toContainText("Yönetim Paneli");
     await expect(page.locator(".yonetim-toolbar-back")).toContainText("Ayarlar");
-    await expect(page.locator(".yonetim-tabs")).toContainText("Kullanıcılar");
+    await expect(page.locator(".yonetim-tabs")).toContainText("Sistem Kullanıcıları");
 
     await page.getByTestId("yonetim-kullanici-yeni").click();
     await expect(page.locator(".modal-header h2").last()).toContainText("Yeni Kullanıcı");
@@ -186,5 +186,30 @@ test.describe("yonetim paneli ve aylik ozet", () => {
 
     await expect(merkezModal.getByRole("alert")).toContainText(SUBE_DELETE_BLOCKED_MESSAGE);
     await expect(page.locator(".yonetim-card-grid--branches")).toContainText("Merkez");
+  });
+
+  test("yonetim paneli tab query param ile dogru sekme acilir ve url senkron kalir", async ({ page }) => {
+    await mockApi(page, "GENEL_YONETICI");
+    await login(page, { username: "genel_yonetici", password: "demo123" });
+
+    await page.goto("/yonetim-paneli?tab=subeler");
+    await expect(page).toHaveURL(/\/yonetim-paneli\?tab=subeler$/);
+    await expect(page.getByTestId("yonetim-tab-subeler")).toHaveClass(/is-active/);
+    await expect(page.getByTestId("yonetim-tab-kullanicilar")).not.toHaveClass(/is-active/);
+    await expect(page.getByTestId("yonetim-tab-kullanicilar")).toHaveText("Sistem Kullanıcıları");
+    await expect(page.locator(".yonetim-card-grid--branches")).toBeVisible();
+    await expect(page.locator(".yonetim-card-grid--users")).toHaveCount(0);
+
+    await page.getByTestId("yonetim-tab-kullanicilar").click();
+    await expect(page).toHaveURL(/\/yonetim-paneli\?tab=kullanicilar$/);
+    await expect(page.getByTestId("yonetim-tab-kullanicilar")).toHaveClass(/is-active/);
+    await expect(page.locator(".yonetim-card-grid--users")).toBeVisible();
+    await expect(page.locator(".yonetim-card-grid--branches")).toHaveCount(0);
+
+    await page.getByTestId("yonetim-tab-subeler").click();
+    await expect(page).toHaveURL(/\/yonetim-paneli\?tab=subeler$/);
+    await expect(page.getByTestId("yonetim-tab-subeler")).toHaveClass(/is-active/);
+    await expect(page.locator(".yonetim-card-grid--branches")).toBeVisible();
+    await expect(page.locator(".yonetim-card-grid--users")).toHaveCount(0);
   });
 });

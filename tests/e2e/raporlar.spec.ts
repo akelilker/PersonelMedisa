@@ -3,7 +3,28 @@ import { expect, test } from "@playwright/test";
 import { getRaporColumns } from "../../src/features/raporlar/rapor-column-contract";
 import type { RaporTipi } from "../../src/types/rapor";
 import { login } from "./helpers/auth";
-import { mockApi } from "./helpers/mock-api";
+import { mockApi, type MockUserRole } from "./helpers/mock-api";
+
+const ROLE_LOGIN: Record<MockUserRole, { username: string; password: string }> = {
+  GENEL_YONETICI: { username: "yonetici", password: "secret" },
+  BOLUM_YONETICISI: { username: "bolum_yonetici", password: "demo123" },
+  MUHASEBE: { username: "muhasebe", password: "demo123" },
+  BIRIM_AMIRI: { username: "birim_amiri", password: "demo123" }
+};
+
+const ROLE_AYLIK_SECTION_VISIBLE: Record<MockUserRole, boolean> = {
+  GENEL_YONETICI: true,
+  BOLUM_YONETICISI: true,
+  MUHASEBE: false,
+  BIRIM_AMIRI: false
+};
+
+const RAPOR_ROLE_CASES: MockUserRole[] = [
+  "GENEL_YONETICI",
+  "BOLUM_YONETICISI",
+  "MUHASEBE",
+  "BIRIM_AMIRI"
+];
 
 const RAPOR_SMOKE_CASES: Array<{ type: RaporTipi; rowMarker: string }> = [
   { type: "personel-ozet", rowMarker: "Ayşe Yılmaz" },
@@ -115,6 +136,69 @@ test.describe("raporlar detayli liste smoke", () => {
     expect(csvContent).toContain("Ad Soyad");
     expect(csvContent).toContain("Ayşe Yılmaz");
     expect(csvContent).toContain("Mehmet Kaya");
+    expect(runtimeErrors).toEqual([]);
+  });
+});
+
+test.describe("raporlar rol ve aylik filtre smoke", () => {
+  for (const role of RAPOR_ROLE_CASES) {
+    test(`raporlar section gorunurlugunu role gore kilitler - ${role}`, async ({ page }) => {
+      const runtimeErrors: string[] = [];
+      page.on("pageerror", (error) => {
+        runtimeErrors.push(error.message);
+      });
+
+      await mockApi(page, role);
+      await login(page, ROLE_LOGIN[role]);
+      await page.goto("/raporlar");
+      await expect(page).toHaveURL(/\/raporlar$/);
+      await expect(page.locator(".modal-header h2").first()).toContainText("Raporlar");
+
+      await expect(page.locator('[name="rapor-turu"]')).toBeVisible();
+      await expect(page.getByTestId("raporlar-submit-run")).toBeVisible();
+
+      const aylikSection = page.getByTestId("aylik-kapanis-ozeti-section");
+      if (ROLE_AYLIK_SECTION_VISIBLE[role]) {
+        await expect(aylikSection).toBeVisible();
+      } else {
+        await expect(aylikSection).toHaveCount(0);
+      }
+
+      expect(runtimeErrors).toEqual([]);
+    });
+  }
+
+  test("genel yonetici aylik ozet sube filtresi ile satirlari daraltir", async ({ page }) => {
+    const runtimeErrors: string[] = [];
+    page.on("pageerror", (error) => {
+      runtimeErrors.push(error.message);
+    });
+
+    await mockApi(page, "GENEL_YONETICI");
+    await login(page, ROLE_LOGIN.GENEL_YONETICI);
+    await page.goto("/raporlar");
+    await expect(page).toHaveURL(/\/raporlar$/);
+
+    const aylikSection = page.getByTestId("aylik-kapanis-ozeti-section");
+    await expect(aylikSection).toBeVisible();
+
+    const tableBody = aylikSection.locator(".raporlar-table tbody");
+    await expect(tableBody).toHaveCount(1);
+    await expect(tableBody.locator("tr")).toHaveCount(2);
+    await expect(tableBody).toContainText("Ayşe Yılmaz");
+    await expect(tableBody).toContainText("Mehmet Kaya");
+
+    const subeSelect = aylikSection.locator('[name="aylik-ozet-sube"]');
+    const merkezOption = subeSelect.locator('option').filter({ hasText: "Merkez" }).first();
+    const merkezValue = await merkezOption.getAttribute("value");
+    expect(merkezValue).toBeTruthy();
+    await subeSelect.selectOption(merkezValue!);
+    await aylikSection.getByRole("button", { name: "Özeti Getir" }).click();
+
+    await expect(tableBody.locator("tr")).toHaveCount(1);
+    await expect(tableBody).toContainText("Ayşe Yılmaz");
+    await expect(tableBody).not.toContainText("Mehmet Kaya");
+    await expect(aylikSection.getByRole("button", { name: "Excel'e Aktar" })).toBeVisible();
     expect(runtimeErrors).toEqual([]);
   });
 });

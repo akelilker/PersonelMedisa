@@ -3,13 +3,23 @@ import { login } from "./helpers/auth";
 import { mockApi } from "./helpers/mock-api";
 import type { Page } from "@playwright/test";
 
+function kayitSurecModal(page: Page) {
+  return page.locator(".modal-container--kayit-surec, .modal-container").filter({
+    has: page.getByRole("heading", { name: /Kayıt ve Süreç İşlemleri/i })
+  });
+}
+
+async function assertGatewayStateCleared(page: Page) {
+  await expect(kayitSurecModal(page)).toHaveCount(0);
+  await expect(page.getByText(/Kart düzenleme işlemi merkez ekrana taşınıyor/i)).toHaveCount(0);
+  await expect(page.getByText(/Zimmet işlemi merkez ekrana taşınıyor/i)).toHaveCount(0);
+}
+
 async function openKartDuzenleFromActions(page: Page) {
   await page.getByRole("button", { name: "Islemler" }).click();
   await page.getByRole("button", { name: "Kartı Düzenle" }).click();
 
-  const kayitModal = page.locator(".modal-container--kayit-surec, .modal-container").filter({
-    has: page.getByRole("heading", { name: /Kayıt ve Süreç İşlemleri/i })
-  });
+  const kayitModal = kayitSurecModal(page);
   await expect(kayitModal.getByText(/Kart düzenleme işlemi merkez ekrana taşınıyor/i)).toBeVisible({
     timeout: 5000
   });
@@ -21,7 +31,7 @@ async function openKartDuzenleFromActions(page: Page) {
   await gatewayButton.click();
 
   await expect(page).toHaveURL(/\/personeller\/\d+$/);
-  await expect(kayitModal).toHaveCount(0);
+  await assertGatewayStateCleared(page);
   await expect(page.locator('[name="edit-departman"]')).toBeVisible({ timeout: 10000 });
 }
 
@@ -32,9 +42,7 @@ async function openZimmetCreateFromPersonelDosya(page: Page) {
     .getByRole("button", { name: "Yeni Zimmet Ekle" })
     .click();
 
-  const kayitModal = page.locator(".modal-container--kayit-surec, .modal-container").filter({
-    has: page.getByRole("heading", { name: /Kayıt ve Süreç İşlemleri/i })
-  });
+  const kayitModal = kayitSurecModal(page);
   await expect(kayitModal.getByText(/Zimmet işlemi merkez ekrana taşınıyor/i)).toBeVisible({
     timeout: 5000
   });
@@ -46,14 +54,16 @@ async function openZimmetCreateFromPersonelDosya(page: Page) {
   await gatewayButton.click();
 
   await expect(page).toHaveURL(/\/personeller\/\d+$/);
-  await expect(kayitModal).toHaveCount(0);
+  await assertGatewayStateCleared(page);
   await expect(page.getByRole("tab", { name: "Zimmet" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("tab", { name: "Genel" })).not.toHaveAttribute("aria-selected", "true");
 
   const zimmetModal = page
     .locator(".modal-container")
     .filter({ has: page.getByRole("heading", { name: /Yeni Zimmet Ekle/i }) })
     .last();
   await expect(zimmetModal).toBeVisible({ timeout: 10000 });
+  await expect(zimmetModal.locator("[name='personel-zimmet-urun-turu']")).toBeVisible();
   return zimmetModal;
 }
 
@@ -226,15 +236,14 @@ test.describe("personel dosyasi surec akisi", () => {
     await page.getByRole("link", { name: /Mehmet Kaya.*kişisinin kartını aç/i }).first().click();
     await expect(page).toHaveURL(/\/personeller\/2$/);
 
-    const zimmetModal = await openZimmetCreateFromPersonelDosya(page);
-    await expect(zimmetModal.locator("[name='personel-zimmet-urun-turu']")).toBeVisible();
+    await openZimmetCreateFromPersonelDosya(page);
 
     await page.reload({ waitUntil: "domcontentloaded" });
     await expect(page).toHaveURL(/\/personeller\/2$/);
+    await assertGatewayStateCleared(page);
     await expect(
       page.locator(".modal-container").filter({ has: page.getByRole("heading", { name: /Yeni Zimmet Ekle/i }) })
     ).toHaveCount(0);
-    await expect(page.getByText(/Zimmet işlemi merkez ekrana taşınıyor/i)).toHaveCount(0);
   });
 
   test("kart duzenle gateway donusu kayit modalini kapatir ve genel duzenleme modunu acar", async ({ page }) => {
@@ -247,6 +256,38 @@ test.describe("personel dosyasi surec akisi", () => {
     await expect(page).toHaveURL(/\/personeller\/1$/);
 
     await openKartDuzenleFromActions(page);
+  });
+
+  test("kart duzenle gateway reload sonrasi kayit modalini ve gateway state tekrar acmaz", async ({ page }) => {
+    await mockApi(page, "GENEL_YONETICI");
+
+    await login(page, { username: "yonetici", password: "secret" });
+
+    await page.getByTestId("menu-personel-karti").click();
+    await page.getByRole("link", { name: /Ayşe Yılmaz.*kişisinin kartını aç/i }).first().click();
+    await expect(page).toHaveURL(/\/personeller\/1$/);
+
+    await openKartDuzenleFromActions(page);
+
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await expect(page).toHaveURL(/\/personeller\/1$/);
+    await assertGatewayStateCleared(page);
+    await expect(page.locator('[name="edit-departman"]')).toHaveCount(0);
+  });
+
+  test("birim amiri personel kartinda gateway baslatan aksiyonlari goremez", async ({ page }) => {
+    await mockApi(page, "BIRIM_AMIRI");
+
+    await login(page, { username: "birim_amiri", password: "demo123" });
+
+    await page.goto("/personeller/1");
+    await expect(page).toHaveURL(/\/personeller\/1$/);
+
+    await expect(page.getByRole("button", { name: "Kartı Düzenle" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Yeni Zimmet Ekle" })).toHaveCount(0);
+    await expect(page.getByText(/Kart düzenleme işlemi merkez ekrana taşınıyor/i)).toHaveCount(0);
+    await expect(page.getByText(/Zimmet işlemi merkez ekrana taşınıyor/i)).toHaveCount(0);
+    await expect(kayitSurecModal(page)).toHaveCount(0);
   });
 
   test("yonetici surec modalinda zimmet sekmesinden zimmet ekler kartta liste ve timeline gorur", async ({ page }) => {

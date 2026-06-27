@@ -22,6 +22,105 @@ function okBody(data: unknown) {
   });
 }
 
+function raporListOkBody(items: Record<string, unknown>[]) {
+  return JSON.stringify({
+    data: { items },
+    meta: {
+      page: 1,
+      limit: 10,
+      total: items.length,
+      total_pages: 1,
+      has_next_page: false
+    },
+    errors: []
+  });
+}
+
+const RAPOR_MOCK_ITEMS: Record<string, Record<string, unknown>[]> = {
+  "/api/raporlar/personel-ozet": [
+    {
+      personel_id: 1,
+      ad_soyad: "Ayşe Yılmaz",
+      sicil_no: "S-001",
+      aktif_durum: "AKTIF",
+      net_calisma_dakika: 510,
+      sgk_prim_gun: 30
+    }
+  ],
+  "/api/raporlar/izin": [
+    {
+      personel_id: 1,
+      ad_soyad: "Ayşe Yılmaz",
+      baslangic_tarihi: "2026-04-01",
+      bitis_tarihi: "2026-04-05",
+      alt_tur: "YILLIK_IZIN",
+      ucretli_mi: true,
+      state: "AKTIF"
+    }
+  ],
+  "/api/raporlar/devamsizlik": [
+    {
+      personel_id: 1,
+      ad_soyad: "Ayşe Yılmaz",
+      baslangic_tarihi: "2026-04-10",
+      bitis_tarihi: "2026-04-10",
+      alt_tur: "IZINSIZ",
+      state: "AKTIF"
+    }
+  ],
+  "/api/raporlar/tesvik": [
+    {
+      personel_id: 1,
+      ad_soyad: "Ayşe Yılmaz",
+      donem: "2026-04",
+      gun_sayisi: 22,
+      toplam_tutar: 1500,
+      state: "AKTIF"
+    }
+  ],
+  "/api/raporlar/ceza": [
+    {
+      personel_id: 1,
+      ad_soyad: "Ayşe Yılmaz",
+      donem: "2026-04",
+      tutar: 500,
+      aciklama: "Gec kalma",
+      state: "AKTIF"
+    }
+  ],
+  "/api/raporlar/ekstra-prim": [
+    {
+      personel_id: 1,
+      ad_soyad: "Ayşe Yılmaz",
+      donem: "2026-04",
+      tutar: 800,
+      aciklama: "Performans primi",
+      state: "AKTIF"
+    }
+  ],
+  "/api/raporlar/is-kazasi": [
+    {
+      personel_id: 1,
+      ad_soyad: "Ayşe Yılmaz",
+      baslangic_tarihi: "2026-03-15",
+      bitis_tarihi: "2026-03-20",
+      aciklama: "Hafif yaralanma",
+      state: "AKTIF"
+    }
+  ],
+  "/api/raporlar/bildirim": [
+    {
+      tarih: "2026-04-11",
+      departman_id: 3,
+      personel_id: 2,
+      ad_soyad: "Mehmet Kaya",
+      bildirim_turu: "IZINSIZ_GELMEDI",
+      aciklama: "Habersiz devamsizlik",
+      state: "AKTIF"
+    }
+  ]
+};
+
 function errorBody(code: string, message: string) {
   return JSON.stringify({
     data: null,
@@ -2359,29 +2458,13 @@ let bildirimIdCounter = 800;
     }
 
     if (path.startsWith("/api/raporlar/") && method === "GET") {
-      if (path === "/api/raporlar/personel-ozet") {
-        const sgkOzeti = hesaplaAylikSgkPuantajOzetleri(getPuantajRowsForPersonel(1))[0] ?? null;
-
-        await fulfillJson(
-          route,
-          200,
-          okBody({
-            items: [
-              {
-                personel_id: 1,
-                ad_soyad: "Ayşe Yılmaz",
-                net_calisma_dakika: 510,
-                sgk_donem: sgkOzeti?.donem ?? "2026-04",
-                sgk_prim_gun: sgkOzeti?.sgk_prim_gun ?? 30,
-                eksik_gun_nedeni_kodu: sgkOzeti?.eksik_gun_nedeni_kodu ?? "-"
-              }
-            ]
-          })
-        );
+      const mockItems = RAPOR_MOCK_ITEMS[path];
+      if (mockItems) {
+        await fulfillJson(route, 200, raporListOkBody(mockItems));
         return;
       }
 
-      await fulfillJson(route, 200, okBody({ items: [] }));
+      await fulfillJson(route, 200, raporListOkBody([]));
       return;
     }
 

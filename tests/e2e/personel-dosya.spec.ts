@@ -67,6 +67,22 @@ async function openZimmetCreateFromPersonelDosya(page: Page) {
   return zimmetModal;
 }
 
+const PERSONEL_KART_TAB_NAMES = ["Genel", "Eğitim / Belgeler", "Disiplin", "Zimmet", "Süreç Geçmişi"] as const;
+
+function trackPageErrors(page: Page) {
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => {
+    pageErrors.push(error.message);
+  });
+  return pageErrors;
+}
+
+async function assertPersonelKartTabsVisible(page: Page) {
+  for (const tabName of PERSONEL_KART_TAB_NAMES) {
+    await expect(page.getByRole("tab", { name: tabName })).toBeVisible();
+  }
+}
+
 async function seedDevamPrimiHastalikCacheForPersonelOne(page: Page) {
   await page.evaluate(() => {
     const fetchedAt = new Date().toISOString();
@@ -108,9 +124,7 @@ test.describe("personel dosyasi surec akisi", () => {
     await page.getByRole("link", { name: /Ayşe Yılmaz.*kişisinin kartını aç/i }).first().click();
     await expect(page).toHaveURL(/\/personeller\/1$/);
 
-    for (const tabName of ["Genel", "Eğitim / Belgeler", "Disiplin", "Zimmet", "Süreç Geçmişi"] as const) {
-      await expect(page.getByRole("tab", { name: tabName })).toBeVisible();
-    }
+    await assertPersonelKartTabsVisible(page);
 
     await expect(page.getByRole("tab", { name: "Genel" })).toHaveAttribute("aria-selected", "true");
     const genelPanel = page.locator("#personel-kart-panel-genel-bilgiler");
@@ -324,6 +338,84 @@ test.describe("personel dosyasi surec akisi", () => {
     await expect(page).toHaveURL(/\/personeller\/1$/);
     await assertGatewayStateCleared(page);
     await expect(page.locator('[name="edit-departman"]')).toHaveCount(0);
+  });
+
+  test("personel karti maas eksik uyarisini gosterir", async ({ page }) => {
+    const pageErrors = trackPageErrors(page);
+    await mockApi(page, "GENEL_YONETICI");
+
+    await login(page, { username: "yonetici", password: "secret" });
+
+    await page.goto("/personeller/4");
+    await expect(page).toHaveURL(/\/personeller\/4$/);
+    await expect(page.locator(".personel-dosya-hero")).toContainText(/Maas Eksik/i);
+
+    await expect(page.getByTestId("personel-maas-eksik-uyari")).toBeVisible();
+    await expect(page.getByTestId("personel-maas-eksik-uyari")).toHaveText("Maaş bilgisi eksik.");
+
+    await assertPersonelKartTabsVisible(page);
+    expect(pageErrors).toEqual([]);
+  });
+
+  test("birim amiri personel kartinda yetkisiz aksiyonlari gormez", async ({ page }) => {
+    const pageErrors = trackPageErrors(page);
+    await mockApi(page, "BIRIM_AMIRI");
+
+    await login(page, { username: "birim_amiri", password: "demo123" });
+
+    await page.goto("/personeller/1");
+    await expect(page).toHaveURL(/\/personeller\/1$/);
+    await expect(page.locator(".personel-dosya-hero")).toContainText(/Ayşe Yılmaz/i);
+
+    await assertPersonelKartTabsVisible(page);
+
+    await expect(page.getByRole("button", { name: "Kartı Düzenle" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Yeni Zimmet Ekle" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Süreç Ekle" })).toHaveCount(0);
+
+    await page.getByRole("tab", { name: "Disiplin" }).click();
+    const disiplinPanel = page.locator("#personel-kart-panel-disiplin");
+    await expect(disiplinPanel.getByTestId("personel-disiplin-panel")).toBeVisible();
+    await expect(disiplinPanel.getByTestId("personel-disiplin-ceza-section")).toContainText(
+      "Finans ceza kayıtlarını görüntüleme yetkiniz yok."
+    );
+    await expect(disiplinPanel.getByTestId("personel-disiplin-ceza-list")).toHaveCount(0);
+    await expect(disiplinPanel.getByRole("button", { name: "Kaydet" })).toHaveCount(0);
+
+    await page.getByRole("tab", { name: "Zimmet" }).click();
+    const zimmetPanel = page.locator("#personel-kart-panel-zimmet-envanter");
+    await expect(zimmetPanel.locator(".personel-zimmet-panel")).toBeVisible();
+    await expect(zimmetPanel.getByRole("button", { name: "Yeni Zimmet Ekle" })).toHaveCount(0);
+    await expect(zimmetPanel.locator(".personel-zimmet-table tbody tr")).not.toHaveCount(0);
+
+    expect(pageErrors).toEqual([]);
+  });
+
+  test("personel karti surec gecmisi mevcut eventleri sirali gosterir", async ({ page }) => {
+    const pageErrors = trackPageErrors(page);
+    await mockApi(page, "GENEL_YONETICI");
+
+    await login(page, { username: "yonetici", password: "secret" });
+
+    await page.goto("/personeller/1");
+    await expect(page).toHaveURL(/\/personeller\/1$/);
+
+    await page.getByRole("tab", { name: "Süreç Geçmişi" }).click();
+    const surecPanel = page.locator("#personel-kart-panel-surec-gecmisi");
+    const timeline = surecPanel.locator("[data-testid='personel-surec-timeline']");
+    await expect(timeline).toBeVisible();
+
+    await expect(timeline).toContainText(/İşe Giriş/i);
+    await expect(timeline).toContainText(/İzin|Izin/i);
+    await expect(timeline).toContainText(/Devamsızlık|Devamsizlik/i);
+    await expect(timeline).toContainText(/Zimmet teslim/i);
+    await expect(timeline).toContainText(/Kask/i);
+
+    const firstItem = timeline.locator("li").first();
+    await expect(firstItem).toContainText(/İzin|Izin/i);
+    await expect(firstItem).toContainText(/2026-04-10/);
+
+    expect(pageErrors).toEqual([]);
   });
 
   test("birim amiri personel kartinda gateway baslatan aksiyonlari goremez", async ({ page }) => {

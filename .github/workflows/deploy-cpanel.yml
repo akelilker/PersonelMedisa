@@ -103,19 +103,24 @@ jobs:
 
             lftp -u "${FTP_USERNAME}","${FTP_PASSWORD}" -p "${FTP_PORT}" "${protocol}://${FTP_SERVER}" -e "
               set cmd:fail-exit true;
-              set net:max-retries 2;
-              set net:timeout 20;
-              set net:reconnect-interval-base 5;
+              set cmd:verbose on;
+              set net:max-retries 5;
+              set net:timeout 30;
+              set net:reconnect-interval-base 10;
+              set net:reconnect-interval-max 30;
               set xfer:clobber true;
               set ssl:verify-certificate no;
-              set ftp:passive-mode true;
+              set ftp:passive-mode on;
               set ftp:ssl-allow ${use_ftps};
               set ftp:ssl-force ${use_ftps};
               set sftp:auto-confirm yes;
               lcd ${LOCAL_DIST_DIR%/};
+              !echo 'mkdir -p basliyor: ${REMOTE_TARGET_DIR%/}';
               mkdir -p ${REMOTE_TARGET_DIR%/};
               cd ${REMOTE_TARGET_DIR%/};
+              !echo 'mirror -R basliyor';
               mirror -R --delete --verbose . .;
+              !echo 'upload tamamlandi';
               bye
             "
           }
@@ -125,9 +130,10 @@ jobs:
             exit 0
           fi
 
+          echo "FTPS deneniyor..."
           if deploy_with_protocol "ftps" "true"; then
             exit 0
           fi
 
-          echo "FTPS baglantisi basarisiz oldu, FTP fallback deneniyor..."
+          echo "FTPS basarisiz oldu, FTP fallback deneniyor..."
           deploy_with_protocol "ftp" "false"

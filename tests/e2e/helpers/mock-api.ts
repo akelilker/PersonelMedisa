@@ -2201,10 +2201,31 @@ let bildirimIdCounter = 800;
     }
 
     if (path === "/api/puantaj/muhurle" && method === "POST") {
+      const payload = request.postDataJSON() as { yil?: number; ay?: number };
+      const yil = Number.isFinite(payload.yil) ? Number(payload.yil) : new Date().getFullYear();
+      const ay = Number.isFinite(payload.ay) ? Number(payload.ay) : new Date().getMonth() + 1;
+      const donem = `${yil}-${String(ay).padStart(2, "0")}`;
+      let muhurlenenKayitSayisi = 0;
+
+      for (let index = 0; index < puantajKayitlari.length; index += 1) {
+        const item = puantajKayitlari[index];
+        if (!item.tarih.startsWith(`${donem}-`) && !item.tarih.startsWith(`${donem}`)) {
+          continue;
+        }
+        if (item.tarih.slice(0, 7) !== donem) {
+          continue;
+        }
+        if (item.state === "MUHURLENDI") {
+          continue;
+        }
+        puantajKayitlari[index] = { ...item, state: "MUHURLENDI" };
+        muhurlenenKayitSayisi += 1;
+      }
+
       await fulfillJson(
         route,
         200,
-        okBody({ muhurlenen_kayit_sayisi: 5, donem: "2026-04" })
+        okBody({ muhurlenen_kayit_sayisi: muhurlenenKayitSayisi, donem })
       );
       return;
     }

@@ -2146,6 +2146,7 @@ let bildirimIdCounter = 800;
         giris_saati?: string;
         cikis_saati?: string;
         gercek_mola_dakika?: number;
+        kontrol_durumu?: GunlukPuantaj["kontrol_durumu"];
       };
       const mevcutIndex = puantajKayitlari.findIndex((item) => item.personel_id === personelId && item.tarih === tarih);
       const oncekiKayit =
@@ -2159,6 +2160,7 @@ let bildirimIdCounter = 800;
               hesap_etkisi: "Tam_Yevmiye_Ver" as const,
               hafta_tatili_hak_kazandi_mi: true,
               state: "HESAPLANDI",
+              kontrol_durumu: "BEKLIYOR" as const,
               compliance_uyarilari: []
             };
       const updated = {
@@ -2183,7 +2185,8 @@ let bildirimIdCounter = 800;
         gercek_mola_dakika: payload.gercek_mola_dakika ?? oncekiKayit.gercek_mola_dakika ?? 60,
         hesaplanan_mola_dakika: payload.gercek_mola_dakika ?? oncekiKayit.hesaplanan_mola_dakika ?? 60,
         net_calisma_suresi_dakika: oncekiKayit.net_calisma_suresi_dakika ?? 510,
-        gunluk_brut_sure_dakika: oncekiKayit.gunluk_brut_sure_dakika ?? 570
+        gunluk_brut_sure_dakika: oncekiKayit.gunluk_brut_sure_dakika ?? 570,
+        kontrol_durumu: payload.kontrol_durumu ?? oncekiKayit.kontrol_durumu ?? "BEKLIYOR"
       };
 
       if (mevcutIndex >= 0) {

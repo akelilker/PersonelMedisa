@@ -34,6 +34,13 @@ async function openPuantajRecord(page: Parameters<typeof test>[0]["page"]) {
   await expect(page.getByTestId("puantaj-ana-detay")).toBeVisible();
 }
 
+function readonlyFieldInCardByLabel(
+  container: ReturnType<Parameters<typeof test>[0]["page"]["getByTestId"]>,
+  label: string
+) {
+  return container.locator(".form-section").filter({ hasText: label });
+}
+
 test.describe("puantaj muhurleme", () => {
   for (const role of MUHUR_ROLE_CASES) {
     test(`puantaj muhur aksiyonunu role gore gosterir - ${role}`, async ({ page }) => {
@@ -95,6 +102,58 @@ test.describe("puantaj muhurleme", () => {
 
     await expect(page.getByTestId("muhur-uyari")).toBeVisible();
     await expect(kaydetButton).toBeDisabled();
+
+    expect(runtimeErrors).toEqual([]);
+  });
+});
+
+test.describe("puantaj birim amiri", () => {
+  test("birim amiri kayit yuklendikten sonra puantaji read only gorur", async ({ page }) => {
+    const runtimeErrors: string[] = [];
+    page.on("pageerror", (error) => {
+      runtimeErrors.push(error.message);
+    });
+
+    await mockApi(page, "BIRIM_AMIRI");
+    await login(page, ROLE_LOGIN.BIRIM_AMIRI);
+    await page.goto("/puantaj");
+    await expect(page).toHaveURL(/\/puantaj$/);
+
+    await openPuantajRecord(page);
+
+    await expect(page.getByTestId("puantaj-kaydet")).toBeDisabled();
+    await expect(page.getByTestId("muhur-ay-kapat-btn")).toHaveCount(0);
+    await expect(page.getByText("Bu modülü sadece görüntüleme yetkin var.")).toBeVisible();
+    await expect(page.locator("[name='puantaj-giris']")).toBeEnabled();
+
+    expect(runtimeErrors).toEqual([]);
+  });
+
+  test("birim amiri amir kontrol aksiyonunu tamamlar", async ({ page }) => {
+    const runtimeErrors: string[] = [];
+    page.on("pageerror", (error) => {
+      runtimeErrors.push(error.message);
+    });
+
+    await mockApi(page, "BIRIM_AMIRI");
+    await login(page, ROLE_LOGIN.BIRIM_AMIRI);
+    await page.goto("/puantaj");
+    await expect(page).toHaveURL(/\/puantaj$/);
+
+    await openPuantajRecord(page);
+
+    const gunlukDetayKarti = page.getByTestId("puantaj-ana-detay");
+    await expect(readonlyFieldInCardByLabel(gunlukDetayKarti, "Kontrol Durumu")).toContainText("Bekliyor");
+
+    const amirKontrolButton = page.getByRole("button", { name: "Amir Kontrol Etti" });
+    await expect(amirKontrolButton).toBeVisible();
+    await amirKontrolButton.click();
+
+    await expect(amirKontrolButton).toHaveCount(0);
+    await expect(readonlyFieldInCardByLabel(gunlukDetayKarti, "Kontrol Durumu")).toContainText("Amir kontrol etti");
+    await expect(page.getByTestId("puantaj-kaydet")).toBeDisabled();
+    await expect(page.getByTestId("muhur-ay-kapat-btn")).toHaveCount(0);
+    await expect(page.getByText("Bu modülü sadece görüntüleme yetkin var.")).toBeVisible();
 
     expect(runtimeErrors).toEqual([]);
   });

@@ -26,6 +26,19 @@ const RAPOR_ROLE_CASES: MockUserRole[] = [
   "BIRIM_AMIRI"
 ];
 
+const AYLIK_ONAY_ROLE_CASES: Array<"GENEL_YONETICI" | "BOLUM_YONETICISI"> = [
+  "GENEL_YONETICI",
+  "BOLUM_YONETICISI"
+];
+
+const ROLE_AYLIK_ONAY_VISIBILITY: Record<
+  (typeof AYLIK_ONAY_ROLE_CASES)[number],
+  { bolumOnay: boolean; ustOnay: boolean }
+> = {
+  GENEL_YONETICI: { bolumOnay: false, ustOnay: true },
+  BOLUM_YONETICISI: { bolumOnay: true, ustOnay: false }
+};
+
 const RAPOR_SMOKE_CASES: Array<{ type: RaporTipi; rowMarker: string }> = [
   { type: "personel-ozet", rowMarker: "Ayşe Yılmaz" },
   { type: "izin", rowMarker: "Ayşe Yılmaz" },
@@ -227,4 +240,70 @@ test.describe("raporlar rol ve aylik filtre smoke", () => {
     await expect(aylikSection.getByRole("button", { name: "Excel'e Aktar" })).toBeVisible();
     expect(runtimeErrors).toEqual([]);
   });
+
+  test("genel yonetici aylik ozet sadece revizeli filtresi ile satirlari daraltir", async ({ page }) => {
+    const runtimeErrors: string[] = [];
+    page.on("pageerror", (error) => {
+      runtimeErrors.push(error.message);
+    });
+
+    await mockApi(page, "GENEL_YONETICI");
+    await login(page, ROLE_LOGIN.GENEL_YONETICI);
+    await page.goto("/raporlar");
+    await expect(page).toHaveURL(/\/raporlar$/);
+
+    const aylikSection = page.getByTestId("aylik-kapanis-ozeti-section");
+    await expect(aylikSection).toBeVisible();
+
+    const tableBody = aylikSection.locator(".raporlar-table tbody");
+    await expect(tableBody.locator("tr")).toHaveCount(2);
+    await expect(tableBody).toContainText("Ayşe Yılmaz");
+    await expect(tableBody).toContainText("Mehmet Kaya");
+
+    const revizeliCheckbox = aylikSection.getByLabel("Sadece revizeli kayıtlar");
+    await expect(revizeliCheckbox).toBeVisible();
+    await revizeliCheckbox.check();
+    await aylikSection.getByRole("button", { name: "Özeti Getir" }).click();
+
+    await expect(tableBody.locator("tr")).toHaveCount(1);
+    await expect(tableBody).toContainText("Mehmet Kaya");
+    await expect(tableBody).not.toContainText("Ayşe Yılmaz");
+    await expect(aylikSection.getByRole("button", { name: "Excel'e Aktar" })).toBeVisible();
+    expect(runtimeErrors).toEqual([]);
+  });
+
+  for (const role of AYLIK_ONAY_ROLE_CASES) {
+    test(`aylik ozet onay aksiyonlarini role gore gosterir - ${role}`, async ({ page }) => {
+      const runtimeErrors: string[] = [];
+      page.on("pageerror", (error) => {
+        runtimeErrors.push(error.message);
+      });
+
+      await mockApi(page, role);
+      await login(page, ROLE_LOGIN[role]);
+      await page.goto("/raporlar");
+      await expect(page).toHaveURL(/\/raporlar$/);
+
+      const aylikSection = page.getByTestId("aylik-kapanis-ozeti-section");
+      await expect(aylikSection).toBeVisible();
+
+      const bolumOnayButton = aylikSection.getByTestId("aylik-ozet-bolum-onay");
+      const ustOnayButton = aylikSection.getByTestId("aylik-ozet-ust-onay");
+      const expected = ROLE_AYLIK_ONAY_VISIBILITY[role];
+
+      if (expected.bolumOnay) {
+        await expect(bolumOnayButton).toBeVisible();
+      } else {
+        await expect(bolumOnayButton).toHaveCount(0);
+      }
+
+      if (expected.ustOnay) {
+        await expect(ustOnayButton).toBeVisible();
+      } else {
+        await expect(ustOnayButton).toHaveCount(0);
+      }
+
+      expect(runtimeErrors).toEqual([]);
+    });
+  }
 });

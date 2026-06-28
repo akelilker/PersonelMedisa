@@ -1,0 +1,181 @@
+-- PersonelMedisa API — initial schema
+-- Target database: karmotor_medisa (CREATE DATABASE kullanilmaz)
+-- Charset: utf8mb4
+
+SET NAMES utf8mb4;
+SET time_zone = '+00:00';
+
+CREATE TABLE IF NOT EXISTS subeler (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  kod VARCHAR(32) NOT NULL,
+  ad VARCHAR(120) NOT NULL,
+  durum ENUM('AKTIF', 'PASIF') NOT NULL DEFAULT 'AKTIF',
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_subeler_kod (kod)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS departmanlar (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  ad VARCHAR(120) NOT NULL,
+  durum ENUM('AKTIF', 'PASIF') NOT NULL DEFAULT 'AKTIF',
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS gorevler (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  ad VARCHAR(120) NOT NULL,
+  durum ENUM('AKTIF', 'PASIF') NOT NULL DEFAULT 'AKTIF',
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS personel_tipleri (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  ad VARCHAR(120) NOT NULL,
+  durum ENUM('AKTIF', 'PASIF') NOT NULL DEFAULT 'AKTIF',
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS sube_departmanlar (
+  sube_id INT UNSIGNED NOT NULL,
+  departman_id INT UNSIGNED NOT NULL,
+  PRIMARY KEY (sube_id, departman_id),
+  CONSTRAINT fk_sube_departman_sube FOREIGN KEY (sube_id) REFERENCES subeler (id),
+  CONSTRAINT fk_sube_departman_departman FOREIGN KEY (departman_id) REFERENCES departmanlar (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS users (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  username VARCHAR(64) NOT NULL,
+  password_hash VARCHAR(255) NOT NULL,
+  ad_soyad VARCHAR(160) NOT NULL,
+  rol ENUM('GENEL_YONETICI', 'MUHASEBE', 'BIRIM_AMIRI', 'BOLUM_YONETICISI') NOT NULL,
+  durum ENUM('AKTIF', 'PASIF') NOT NULL DEFAULT 'AKTIF',
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_users_username (username)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS user_subeler (
+  user_id INT UNSIGNED NOT NULL,
+  sube_id INT UNSIGNED NOT NULL,
+  PRIMARY KEY (user_id, sube_id),
+  CONSTRAINT fk_user_subeler_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+  CONSTRAINT fk_user_subeler_sube FOREIGN KEY (sube_id) REFERENCES subeler (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS personeller (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  tc_kimlik_no CHAR(11) NOT NULL,
+  ad VARCHAR(80) NOT NULL,
+  soyad VARCHAR(80) NOT NULL,
+  dogum_tarihi DATE NOT NULL,
+  telefon VARCHAR(32) NOT NULL,
+  acil_durum_kisi VARCHAR(120) NOT NULL,
+  acil_durum_telefon VARCHAR(32) NOT NULL,
+  sicil_no VARCHAR(32) NOT NULL,
+  ise_giris_tarihi DATE NOT NULL,
+  sube_id INT UNSIGNED NOT NULL,
+  departman_id INT UNSIGNED NULL,
+  gorev_id INT UNSIGNED NULL,
+  personel_tipi_id INT UNSIGNED NULL,
+  bagli_amir_id INT UNSIGNED NULL,
+  aktif_durum ENUM('AKTIF', 'PASIF') NOT NULL DEFAULT 'AKTIF',
+  dogum_yeri VARCHAR(80) NULL,
+  kan_grubu VARCHAR(8) NULL,
+  ucret_tipi_id INT UNSIGNED NULL,
+  maas_tutari DECIMAL(12,2) NULL,
+  prim_kurali_id INT UNSIGNED NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_personeller_tc (tc_kimlik_no),
+  KEY idx_personeller_sube (sube_id),
+  CONSTRAINT fk_personeller_sube FOREIGN KEY (sube_id) REFERENCES subeler (id),
+  CONSTRAINT fk_personeller_departman FOREIGN KEY (departman_id) REFERENCES departmanlar (id),
+  CONSTRAINT fk_personeller_gorev FOREIGN KEY (gorev_id) REFERENCES gorevler (id),
+  CONSTRAINT fk_personeller_personel_tipi FOREIGN KEY (personel_tipi_id) REFERENCES personel_tipleri (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS gunluk_puantaj (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  personel_id INT UNSIGNED NOT NULL,
+  tarih DATE NOT NULL,
+  gun_tipi VARCHAR(40) NULL,
+  hareket_durumu VARCHAR(40) NULL,
+  dayanak VARCHAR(40) NULL,
+  hesap_etkisi VARCHAR(40) NULL,
+  giris_saati VARCHAR(8) NULL,
+  cikis_saati VARCHAR(8) NULL,
+  kontrol_durumu VARCHAR(32) NOT NULL DEFAULT 'BEKLIYOR',
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_gunluk_puantaj_personel_tarih (personel_id, tarih),
+  CONSTRAINT fk_gunluk_puantaj_personel FOREIGN KEY (personel_id) REFERENCES personeller (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS surecler (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  personel_id INT UNSIGNED NOT NULL,
+  surec_turu VARCHAR(64) NOT NULL,
+  alt_tur VARCHAR(64) NULL,
+  baslangic_tarihi DATE NOT NULL,
+  bitis_tarihi DATE NULL,
+  ucretli_mi TINYINT(1) NOT NULL DEFAULT 0,
+  aciklama TEXT NULL,
+  state VARCHAR(32) NOT NULL DEFAULT 'AKTIF',
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_surecler_personel (personel_id),
+  CONSTRAINT fk_surecler_personel FOREIGN KEY (personel_id) REFERENCES personeller (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS aylik_kapanis_state (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  ay CHAR(7) NOT NULL,
+  state ENUM('BOLUM_ONAYINDA', 'BOLUM_ONAYLANDI', 'REVIZE_ISTENDI', 'KAPANDI') NOT NULL DEFAULT 'BOLUM_ONAYINDA',
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_aylik_kapanis_state_ay (ay)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS aylik_ozet_satirlari (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  ay CHAR(7) NOT NULL,
+  personel_id INT UNSIGNED NOT NULL,
+  ad_soyad VARCHAR(160) NOT NULL,
+  sicil_no VARCHAR(32) NULL,
+  sube_id INT UNSIGNED NULL,
+  sube VARCHAR(120) NOT NULL,
+  departman_id INT UNSIGNED NULL,
+  bolum VARCHAR(120) NOT NULL,
+  bagli_amir_adi VARCHAR(120) NULL,
+  devamsizlik_gun INT NOT NULL DEFAULT 0,
+  gec_kalma_adet INT NOT NULL DEFAULT 0,
+  izinli_gelmedi INT NOT NULL DEFAULT 0,
+  izinsiz_gelmedi INT NOT NULL DEFAULT 0,
+  raporlu INT NOT NULL DEFAULT 0,
+  tesvik_tutari DECIMAL(12,2) NOT NULL DEFAULT 0,
+  ceza_kesinti_tutari DECIMAL(12,2) NOT NULL DEFAULT 0,
+  bolum_onay_durumu ENUM('BOLUM_ONAYINDA', 'BOLUM_ONAYLANDI', 'REVIZE_ISTENDI') NOT NULL DEFAULT 'BOLUM_ONAYINDA',
+  revize_var_mi TINYINT(1) NOT NULL DEFAULT 0,
+  son_islem VARCHAR(255) NULL,
+  kapanis_durumu ENUM('ACIK', 'KAPANDI') NOT NULL DEFAULT 'ACIK',
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_aylik_ozet_ay (ay),
+  KEY idx_aylik_ozet_sube (sube_id),
+  CONSTRAINT fk_aylik_ozet_personel FOREIGN KEY (personel_id) REFERENCES personeller (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

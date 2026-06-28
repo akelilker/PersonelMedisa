@@ -1,0 +1,10 @@
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /personelmedisa/api/
+
+  RewriteRule ^(src|migrations|seeds)/ - [F,L]
+
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule ^ public/index.php [L,QSA]
+</IfModule>

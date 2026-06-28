@@ -13,6 +13,13 @@ test-results/
 .env.local
 .env.*.local
 
+# Backend API local config (never commit secrets)
+api/config.local.php
+api/**/config.local.php
+api/.env
+api/.env.*
+!api/.env.example
+
 # Logs and temporary files
 *.log
 *.tmp

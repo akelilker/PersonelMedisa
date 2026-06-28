@@ -207,6 +207,75 @@ test.describe("raporlar rol ve aylik filtre smoke", () => {
     });
   }
 
+  test("genel yonetici aylik ozet sube filtresi csv export icerigini scopea gore kilitler", async ({
+    page
+  }) => {
+    const runtimeErrors: string[] = [];
+    page.on("pageerror", (error) => {
+      runtimeErrors.push(error.message);
+    });
+
+    await mockApi(page, "GENEL_YONETICI");
+    await login(page, ROLE_LOGIN.GENEL_YONETICI);
+    await page.goto("/raporlar");
+    await expect(page).toHaveURL(/\/raporlar$/);
+
+    const aylikSection = page.getByTestId("aylik-kapanis-ozeti-section");
+    await expect(aylikSection).toBeVisible();
+
+    const tableBody = aylikSection.locator(".raporlar-table tbody");
+    const subeSelect = aylikSection.locator('[name="aylik-ozet-sube"]');
+    const exportButton = aylikSection.getByRole("button", { name: "Excel'e Aktar" });
+
+    async function exportCsvContent() {
+      const downloadPromise = page.waitForEvent("download");
+      await exportButton.click();
+      const download = await downloadPromise;
+
+      const filename = download.suggestedFilename();
+      expect(filename).toContain("aylik-kapanis-ozeti");
+      expect(filename.endsWith(".csv")).toBe(true);
+
+      const downloadPath = await download.path();
+      expect(downloadPath).not.toBeNull();
+
+      const csvContent = readFileSync(downloadPath!, "utf-8");
+      expect(csvContent.trim().length).toBeGreaterThan(0);
+      expect(csvContent).toContain("Ad Soyad");
+      return csvContent;
+    }
+
+    const merkezOption = subeSelect.locator("option").filter({ hasText: "Merkez" }).first();
+    const merkezValue = await merkezOption.getAttribute("value");
+    expect(merkezValue).toBeTruthy();
+    await subeSelect.selectOption(merkezValue!);
+    await aylikSection.getByRole("button", { name: "Özeti Getir" }).click();
+
+    await expect(tableBody.locator("tr")).toHaveCount(1);
+    await expect(tableBody).toContainText("Ayşe Yılmaz");
+    await expect(tableBody).not.toContainText("Mehmet Kaya");
+
+    const merkezCsv = await exportCsvContent();
+    expect(merkezCsv).toContain("Ayşe Yılmaz");
+    expect(merkezCsv).not.toContain("Mehmet Kaya");
+
+    const depolamaOption = subeSelect.locator("option").filter({ hasText: "Depolama" }).first();
+    const depolamaValue = await depolamaOption.getAttribute("value");
+    expect(depolamaValue).toBeTruthy();
+    await subeSelect.selectOption(depolamaValue!);
+    await aylikSection.getByRole("button", { name: "Özeti Getir" }).click();
+
+    await expect(tableBody.locator("tr")).toHaveCount(1);
+    await expect(tableBody).toContainText("Mehmet Kaya");
+    await expect(tableBody).not.toContainText("Ayşe Yılmaz");
+
+    const depolamaCsv = await exportCsvContent();
+    expect(depolamaCsv).toContain("Mehmet Kaya");
+    expect(depolamaCsv).not.toContain("Ayşe Yılmaz");
+
+    expect(runtimeErrors).toEqual([]);
+  });
+
   test("genel yonetici aylik ozet sube filtresi ile satirlari daraltir", async ({ page }) => {
     const runtimeErrors: string[] = [];
     page.on("pageerror", (error) => {

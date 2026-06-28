@@ -51,6 +51,11 @@ function raporListOkBody(items: Record<string, unknown>[], metaOverrides?: Rapor
   });
 }
 
+const PERSONEL_SUBE_BY_ID: Record<number, number> = {
+  1: 1,
+  2: 2
+};
+
 const PERSONEL_OZET_PAGINATED_ITEMS: Record<string, unknown>[] = [
   {
     personel_id: 1,
@@ -72,8 +77,38 @@ const PERSONEL_OZET_PAGINATED_ITEMS: Record<string, unknown>[] = [
   }
 ];
 
-function personelOzetPaginatedBody(pageNumber: number, pageLimit: number, departmanId?: number) {
-  if (departmanId === undefined) {
+function filterRaporItemsBySubeScope(
+  items: Record<string, unknown>[],
+  subeScope: number | null
+): Record<string, unknown>[] {
+  if (subeScope === null) {
+    return items;
+  }
+
+  return items.filter((item) => {
+    const personelId = item.personel_id;
+    if (typeof personelId !== "number") {
+      return false;
+    }
+    return PERSONEL_SUBE_BY_ID[personelId] === subeScope;
+  });
+}
+
+function personelOzetPaginatedBody(
+  pageNumber: number,
+  pageLimit: number,
+  departmanId?: number,
+  subeScope: number | null = null
+) {
+  let scopedItems = PERSONEL_OZET_PAGINATED_ITEMS;
+  if (subeScope !== null) {
+    scopedItems = scopedItems.filter((item) => {
+      const personelId = item.personel_id;
+      return typeof personelId === "number" && PERSONEL_SUBE_BY_ID[personelId] === subeScope;
+    });
+  }
+
+  if (departmanId === undefined && subeScope === null) {
     const total = PERSONEL_OZET_PAGINATED_ITEMS.length;
     const totalPages = 2;
     const items =
@@ -93,7 +128,10 @@ function personelOzetPaginatedBody(pageNumber: number, pageLimit: number, depart
     });
   }
 
-  const filtered = PERSONEL_OZET_PAGINATED_ITEMS.filter((item) => item.departman_id === departmanId);
+  const filtered =
+    departmanId === undefined
+      ? scopedItems
+      : scopedItems.filter((item) => item.departman_id === departmanId);
   const total = filtered.length;
   const totalPages = Math.max(1, Math.ceil(total / pageLimit));
   const start = (pageNumber - 1) * pageLimit;
@@ -2134,6 +2172,14 @@ let bildirimIdCounter = 800;
       const segments = path.split("/");
       const personelId = Number.parseInt(segments[3] ?? "0", 10);
       const tarih = decodeURIComponent(segments[4] ?? "");
+      const subeScope = getRequestSubeScope(request, url);
+      const personel = personeller.find((item) => item.id === personelId);
+
+      if (personel && subeScope !== null && personel.sube_id !== subeScope) {
+        await fulfillJson(route, 403, errorBody("FORBIDDEN", SUBE_SCOPE_MISMATCH_MESSAGE));
+        return;
+      }
+
       const mevcutKayit =
         puantajKayitlari.find((item) => item.personel_id === personelId && item.tarih === tarih) ?? null;
 
@@ -2166,6 +2212,14 @@ let bildirimIdCounter = 800;
       const segments = path.split("/");
       const personelId = Number.parseInt(segments[3] ?? "0", 10);
       const tarih = decodeURIComponent(segments[4] ?? "");
+      const subeScope = getRequestSubeScope(request, url);
+      const personel = personeller.find((item) => item.id === personelId);
+
+      if (personel && subeScope !== null && personel.sube_id !== subeScope) {
+        await fulfillJson(route, 403, errorBody("FORBIDDEN", SUBE_SCOPE_MISMATCH_MESSAGE));
+        return;
+      }
+
       const payload = request.postDataJSON() as {
         gun_tipi?: GunlukPuantaj["gun_tipi"];
         hareket_durumu?: GunlukPuantaj["hareket_durumu"];
@@ -2236,6 +2290,7 @@ let bildirimIdCounter = 800;
 
     if (path === "/api/puantaj/muhurle" && method === "POST") {
       const payload = request.postDataJSON() as { yil?: number; ay?: number };
+      const subeScope = getRequestSubeScope(request, url);
       const yil = Number.isFinite(payload.yil) ? Number(payload.yil) : new Date().getFullYear();
       const ay = Number.isFinite(payload.ay) ? Number(payload.ay) : new Date().getMonth() + 1;
       const donem = `${yil}-${String(ay).padStart(2, "0")}`;
@@ -2248,6 +2303,12 @@ let bildirimIdCounter = 800;
         }
         if (item.tarih.slice(0, 7) !== donem) {
           continue;
+        }
+        if (subeScope !== null) {
+          const personel = personeller.find((entry) => entry.id === item.personel_id);
+          if (personel && personel.sube_id !== subeScope) {
+            continue;
+          }
         }
         if (item.state === "MUHURLENDI") {
           continue;
@@ -2586,18 +2647,21 @@ let bildirimIdCounter = 800;
     }
 
     if (path.startsWith("/api/raporlar/") && method === "GET") {
+      const subeScope = getRequestSubeScope(request, url);
+
       if (path === "/api/raporlar/personel-ozet") {
-        const url = new URL(route.request().url());
-        const pageNumber = Number.parseInt(url.searchParams.get("page") ?? "1", 10) || 1;
-        const pageLimit = Number.parseInt(url.searchParams.get("limit") ?? "10", 10) || 10;
-        const departmanId = Number.parseInt(url.searchParams.get("departman_id") ?? "", 10);
+        const raporUrl = new URL(route.request().url());
+        const pageNumber = Number.parseInt(raporUrl.searchParams.get("page") ?? "1", 10) || 1;
+        const pageLimit = Number.parseInt(raporUrl.searchParams.get("limit") ?? "10", 10) || 10;
+        const departmanId = Number.parseInt(raporUrl.searchParams.get("departman_id") ?? "", 10);
         await fulfillJson(
           route,
           200,
           personelOzetPaginatedBody(
             pageNumber,
             pageLimit,
-            Number.isFinite(departmanId) ? departmanId : undefined
+            Number.isFinite(departmanId) ? departmanId : undefined,
+            subeScope
           )
         );
         return;
@@ -2605,7 +2669,8 @@ let bildirimIdCounter = 800;
 
       const mockItems = RAPOR_MOCK_ITEMS[path];
       if (mockItems) {
-        await fulfillJson(route, 200, raporListOkBody(mockItems));
+        const scopedItems = filterRaporItemsBySubeScope(mockItems, subeScope);
+        await fulfillJson(route, 200, raporListOkBody(scopedItems));
         return;
       }
 

@@ -210,6 +210,22 @@ async function fulfillJson(route: Route, status: number, body: string) {
   });
 }
 
+const SUBE_SCOPE_MISMATCH_MESSAGE = "Bu kayıt aktif şube bağlamında görüntülenemiyor.";
+
+function getRequestSubeScope(request: { headers(): { [key: string]: string } }, url: URL): number | null {
+  const querySubeId = url.searchParams.get("sube_id");
+  const headers = request.headers();
+  const headerSubeId = headers["x-active-sube-id"] ?? headers["X-Active-Sube-Id"];
+  const raw = querySubeId || headerSubeId;
+
+  if (raw === null || raw === undefined || raw.trim() === "") {
+    return null;
+  }
+
+  const parsed = Number.parseInt(raw, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
 export async function mockApi(page: Page, role: MockUserRole) {
   const bagliAmirReferanslari: Array<{ id: number; ad: string; sube_id: number; departman_id: number }> = [
     { id: 9, ad: "Demo Amir", sube_id: 1, departman_id: 3 },
@@ -1161,8 +1177,13 @@ let bildirimIdCounter = 800;
       const departmanId = Number.parseInt(url.searchParams.get("departman_id") ?? "", 10);
       const personelTipiId = Number.parseInt(url.searchParams.get("personel_tipi_id") ?? "", 10);
       const aktiflik = url.searchParams.get("aktiflik") ?? "tum";
+      const subeScope = getRequestSubeScope(request, url);
+      const applyListSubeScope = subeScope !== null && pageLimit <= 10;
 
       const filtered = personeller.filter((item) => {
+        if (applyListSubeScope && item.sube_id !== subeScope) {
+          return false;
+        }
         if (aktiflik === "aktif" && item.aktif_durum !== "AKTIF") {
           return false;
         }
@@ -1464,13 +1485,23 @@ let bildirimIdCounter = 800;
       const personelId = Number.parseInt(path.split("/")[3] ?? "0", 10);
       const personel = personeller.find((item) => item.id === personelId);
       const bagliAmir = bagliAmirReferanslari.find((item) => item.id === personelId);
+      const subeScope = getRequestSubeScope(request, url);
 
       if (!personel && !bagliAmir) {
         await fulfillJson(route, 404, errorBody("NOT_FOUND", "Personel bulunamadi."));
         return;
       }
 
+      if (personel && subeScope !== null && personel.sube_id !== subeScope) {
+        await fulfillJson(route, 403, errorBody("FORBIDDEN", SUBE_SCOPE_MISMATCH_MESSAGE));
+        return;
+      }
+
       if (!personel && bagliAmir) {
+        if (subeScope !== null && bagliAmir.sube_id !== subeScope) {
+          await fulfillJson(route, 403, errorBody("FORBIDDEN", SUBE_SCOPE_MISMATCH_MESSAGE));
+          return;
+        }
         await fulfillJson(
           route,
           200,

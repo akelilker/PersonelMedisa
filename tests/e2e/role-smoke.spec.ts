@@ -72,6 +72,32 @@ test.describe("Rol bazli smoke", () => {
     await expect(page).toHaveURL(/\/yetkisiz$/);
   });
 
+  test("birim amiri kayit ve surec merkezini acamaz", async ({ page }) => {
+    const pageErrors: string[] = [];
+    page.on("pageerror", (error) => {
+      pageErrors.push(error.message);
+    });
+
+    await mockApi(page, "BIRIM_AMIRI");
+    await login(page, users.birimAmiri);
+    await expect(page).toHaveURL("/");
+
+    await expectMainMenuForRole(page, "BIRIM_AMIRI");
+    const kayitMenu = page.getByTestId("menu-kayit-surec");
+    await expect(kayitMenu).toBeDisabled();
+    await kayitMenu.click({ force: true });
+    await expect(page.getByRole("heading", { name: /Kayıt ve Süreç İşlemleri/i })).toHaveCount(0);
+
+    await page.goto("/personeller/1");
+    await expect(page).toHaveURL(/\/personeller\/1$/);
+    await expect(page.locator(".personel-dosya-hero")).toContainText(/Ayşe Yılmaz/i);
+    await expect(page.getByRole("button", { name: "Süreç Ekle" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Kartı Düzenle" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Yeni Zimmet Ekle" })).toHaveCount(0);
+
+    expect(pageErrors).toEqual([]);
+  });
+
   test("Birim amiri 3 ana omurga butonunu gorur, yazma owner'ina giremez; ikincil akislarla gunluk kayda iner", async ({
     page
   }) => {

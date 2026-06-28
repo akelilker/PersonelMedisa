@@ -185,6 +185,81 @@ test.describe("personel dosyasi surec akisi", () => {
     await expect(page.getByTestId("personel-devam-primi-durum")).not.toContainText("Kesildi");
   });
 
+  test("personel kartindan surec ekle izin kaydini timelinea yansitir", async ({ page }) => {
+    const pageErrors = trackPageErrors(page);
+    await mockApi(page, "GENEL_YONETICI");
+
+    await login(page, { username: "yonetici", password: "secret" });
+
+    await page.goto("/personeller/1");
+    await expect(page).toHaveURL(/\/personeller\/1$/);
+    await expect(page.locator(".personel-dosya-hero")).toContainText(/Ayşe Yılmaz/i);
+
+    await page.getByRole("button", { name: "Islemler" }).click();
+    await page.getByRole("button", { name: "Süreç Ekle" }).click();
+
+    const surecModal = kayitSurecModal(page);
+    await expect(surecModal).toBeVisible();
+    await expect(page).toHaveURL(/\/$/);
+    await expect(surecModal.getByTestId("kayit-tab-surec")).toHaveAttribute("aria-selected", "true");
+    await expect(surecModal.locator("[name='surec-create-personel']")).toHaveValue("1");
+    await expect(surecModal.locator(".workspace-personel-preview--compact strong")).toContainText(/Ayşe Yılmaz/i, {
+      timeout: 15_000
+    });
+
+    if (
+      (await surecModal.locator("[name='surec-create-turu']").count()) === 0 &&
+      (await surecModal.locator("[name='surec-create-turu-text']").count()) === 0
+    ) {
+      await surecModal.locator(".surec-shell-action-tile").click();
+      await expect(
+        surecModal.locator("[name='surec-create-turu'], [name='surec-create-turu-text']").first()
+      ).toBeVisible({ timeout: 10_000 });
+    }
+
+    const izinBaslangic = "2026-04-15";
+    const izinAciklama = "E2E gateway izin sureci";
+
+    if (await surecModal.locator("[name='surec-create-turu']").count()) {
+      await surecModal.locator("[name='surec-create-turu']").selectOption("IZIN");
+    } else {
+      await surecModal.locator("[name='surec-create-turu-text']").fill("IZIN");
+    }
+
+    if (await surecModal.locator("[name='surec-create-alt']").count()) {
+      const altField = surecModal.locator("[name='surec-create-alt']");
+      if ((await altField.evaluate((el) => el.tagName)) === "SELECT") {
+        await altField.selectOption("YILLIK_IZIN");
+      } else {
+        await altField.fill("YILLIK_IZIN");
+      }
+    }
+
+    await surecModal.locator("[name='surec-create-bas']").fill(izinBaslangic);
+    await surecModal.locator("[name='surec-create-bitis']").fill(izinBaslangic);
+    await surecModal.locator("[name='surec-create-aciklama']").fill(izinAciklama);
+
+    await surecModal.getByRole("button", { name: "Süreci Kaydet" }).click();
+    await expect(surecModal.locator(".workspace-success")).toContainText(/eklendi/i, { timeout: 15_000 });
+    await surecModal.locator(".universal-btn-cancel").click();
+    await expect(surecModal).toHaveCount(0);
+
+    await page.goto("/personeller/1");
+    await expect(page).toHaveURL(/\/personeller\/1$/);
+
+    await page.getByRole("tab", { name: "Süreç Geçmişi" }).click();
+    const timeline = page
+      .locator("#personel-kart-panel-surec-gecmisi")
+      .locator("[data-testid='personel-surec-timeline']");
+    await expect(timeline).toBeVisible();
+    await expect(timeline).toContainText(/İzin/i);
+    await expect(timeline).toContainText(/Yıllık|YILLIK/i);
+    await expect(timeline).toContainText(izinBaslangic);
+    await expect(timeline).toContainText(izinAciklama);
+
+    expect(pageErrors).toEqual([]);
+  });
+
   test("yonetici surec ekler ve isten ayrilma personel durumunu pasife ceker", async ({ page }) => {
     await mockApi(page, "GENEL_YONETICI");
 

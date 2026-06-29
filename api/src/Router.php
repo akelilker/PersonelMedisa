@@ -85,6 +85,18 @@ class Router
         if ($path === '/referans/personel-tipleri' && $method === 'GET') {
             ReferansController::personelTipleri($this->request);
         }
+        if ($path === '/referans/bagli-amirler' && $method === 'GET') {
+            ReferansController::bagliAmirler($this->request);
+        }
+        if ($path === '/referans/surec-turleri' && $method === 'GET') {
+            ReferansController::surecTurleri($this->request);
+        }
+        if ($path === '/referans/ucret-tipleri' && $method === 'GET') {
+            ReferansController::ucretTipleri($this->request);
+        }
+        if ($path === '/referans/prim-kurallari' && $method === 'GET') {
+            ReferansController::primKurallari($this->request);
+        }
 
         if ($path === '/yonetim/subeler' && $method === 'GET') {
             YonetimController::subeler($this->request);

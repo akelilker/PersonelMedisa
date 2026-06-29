@@ -119,7 +119,7 @@ jobs:
               mkdir -p ${REMOTE_TARGET_DIR%/};
               cd ${REMOTE_TARGET_DIR%/};
               !echo 'mirror -R basliyor';
-              mirror -R --delete --verbose . .;
+              mirror -R --delete --verbose --exclude api/ . .;
               !echo 'upload tamamlandi';
               bye
             "

@@ -61,8 +61,11 @@ class PersonellerController
         }
 
         if ($search !== '') {
-            $where[] = '(LOWER(p.ad) LIKE :search OR LOWER(p.soyad) LIKE :search OR p.tc_kimlik_no LIKE :search)';
-            $params['search'] = '%' . $search . '%';
+            $where[] = '(LOWER(p.ad) LIKE :search_ad OR LOWER(p.soyad) LIKE :search_soyad OR p.tc_kimlik_no LIKE :search_tc)';
+            $searchLike = '%' . $search . '%';
+            $params['search_ad'] = $searchLike;
+            $params['search_soyad'] = $searchLike;
+            $params['search_tc'] = $searchLike;
         }
 
         $whereSql = implode(' AND ', $where);

@@ -6,11 +6,15 @@ namespace Medisa\Api;
 
 use Medisa\Api\Auth\AuthMiddleware;
 use Medisa\Api\Auth\LoginController;
+use Medisa\Api\Controllers\BildirimlerController;
 use Medisa\Api\Controllers\PersonellerController;
 use Medisa\Api\Controllers\PuantajController;
 use Medisa\Api\Controllers\RaporlarController;
 use Medisa\Api\Controllers\ReferansController;
+use Medisa\Api\Controllers\RevizyonController;
+use Medisa\Api\Controllers\SureclerController;
 use Medisa\Api\Controllers\YonetimController;
+use Medisa\Api\Controllers\ZimmetlerController;
 use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
 
@@ -96,6 +100,25 @@ class Router
         }
         if ($path === '/referans/prim-kurallari' && $method === 'GET') {
             ReferansController::primKurallari($this->request);
+        }
+        if ($path === '/referans/bildirim-turleri' && $method === 'GET') {
+            ReferansController::bildirimTurleri($this->request);
+        }
+
+        if ($path === '/bildirimler' && $method === 'GET') {
+            BildirimlerController::list($this->request);
+        }
+        if ($path === '/surecler' && $method === 'GET') {
+            SureclerController::list($this->request);
+        }
+        if ($path === '/zimmetler' && $method === 'GET') {
+            ZimmetlerController::list($this->request);
+        }
+        if ($path === '/haftalik-kapanis/revizyon-talepleri' && $method === 'GET') {
+            RevizyonController::talepleri($this->request);
+        }
+        if ($path === '/haftalik-kapanis/revizyon-corrections' && $method === 'GET') {
+            RevizyonController::corrections($this->request);
         }
 
         if ($path === '/yonetim/subeler' && $method === 'GET') {

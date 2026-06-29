@@ -99,6 +99,19 @@ class ReferansController
         ]);
     }
 
+    public static function bildirimTurleri(Request $request)
+    {
+        AuthMiddleware::authenticate($request, true);
+
+        JsonResponse::success([
+            'items' => [
+                ['key' => 'SISTEM', 'label' => 'Sistem'],
+                ['key' => 'SUREC', 'label' => 'Süreç'],
+                ['key' => 'UYARI', 'label' => 'Uyarı'],
+            ],
+        ]);
+    }
+
     private static function listByTable(Request $request, $table)
     {
         AuthMiddleware::authenticate($request, true);

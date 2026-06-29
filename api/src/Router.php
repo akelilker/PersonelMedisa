@@ -48,9 +48,6 @@ class Router
             LoginController::login($this->request);
         }
 
-        if ($method === 'POST' && $path === '/personeller') {
-            JsonResponse::methodNotAllowed();
-        }
         if ($method === 'PUT' && preg_match('#^/personeller/(\d+)$#', $path)) {
             JsonResponse::methodNotAllowed();
         }
@@ -75,6 +72,9 @@ class Router
 
         if ($path === '/personeller' && $method === 'GET') {
             PersonellerController::list($this->request);
+        }
+        if ($path === '/personeller' && $method === 'POST') {
+            PersonellerController::create($this->request);
         }
         if ($method === 'GET' && preg_match('#^/personeller/(\d+)$#', $path, $matches)) {
             PersonellerController::detail($this->request, $matches[1]);

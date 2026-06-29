@@ -149,9 +149,439 @@ class PersonellerController
         JsonResponse::success(self::mapPersonelRow($row));
     }
 
+    public static function create(Request $request)
+    {
+        $user = AuthMiddleware::authenticate($request, true);
+        self::assertCreateRole($user);
+
+        $body = $request->getJsonBody();
+        $payload = self::normalizeAndValidateCreatePayload($body);
+
+        try {
+            $pdo = Connection::get();
+        } catch (\Throwable $e) {
+            JsonResponse::serverError('Veritabani baglantisi kurulamadi.');
+        }
+
+        self::assertCreateSubeScope($user, $request, $payload['sube_id']);
+        self::validateCreateReferences($pdo, $payload);
+        self::assertTcAvailable($pdo, $payload['tc_kimlik_no']);
+
+        $pdo->beginTransaction();
+        try {
+            $insertId = self::insertPersonel($pdo, $payload);
+            $row = self::fetchPersonelRowById($pdo, $insertId);
+            if (!$row) {
+                $pdo->rollBack();
+                JsonResponse::serverError('Kayit olusturulamadi.');
+            }
+
+            $pdo->commit();
+            JsonResponse::success(self::mapPersonelRow($row), [], 201);
+        } catch (\PDOException $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+
+            if (self::isDuplicateTcException($e)) {
+                self::duplicateTcResponse();
+            }
+
+            JsonResponse::serverError('Kayit olusturulamadi.');
+        }
+    }
+
+    /** @param array<string, mixed> $body @return array<string, mixed> */
+    private static function normalizeAndValidateCreatePayload(array $body)
+    {
+        if (!array_key_exists('tc_kimlik_no', $body) || trim((string) $body['tc_kimlik_no']) === '') {
+            self::validationError('tc_kimlik_no', 'T.C. Kimlik No zorunludur.');
+        }
+
+        $tcKimlikNo = trim((string) $body['tc_kimlik_no']);
+        if (!preg_match('/^\d{11}$/', $tcKimlikNo)) {
+            self::validationError('tc_kimlik_no', 'T.C. Kimlik No 11 hane olmalidir.');
+        }
+
+        $ad = self::requireTrimmedString($body, 'ad', 'Ad zorunludur.');
+        $soyad = self::requireTrimmedString($body, 'soyad', 'Soyad zorunludur.');
+
+        $dogumTarihi = self::requireValidDate($body, 'dogum_tarihi', 'Dogum tarihi zorunludur.');
+        $telefon = self::requireTrimmedString($body, 'telefon', 'Telefon zorunludur.');
+        $acilDurumKisi = self::requireTrimmedString($body, 'acil_durum_kisi', 'Acil durum kisi zorunludur.');
+        $acilDurumTelefon = self::requireTrimmedString($body, 'acil_durum_telefon', 'Acil durum telefonu zorunludur.');
+        $sicilNo = self::requireTrimmedString($body, 'sicil_no', 'Sicil no zorunludur.');
+        $iseGirisTarihi = self::requireValidDate($body, 'ise_giris_tarihi', 'Ise giris tarihi zorunludur.');
+
+        $subeId = self::requirePositiveInt($body, 'sube_id', 'Sube secilmelidir.');
+        $departmanId = self::requirePositiveInt($body, 'departman_id', 'Departman secilmelidir.');
+        $gorevId = self::requirePositiveInt($body, 'gorev_id', 'Gorev secilmelidir.');
+        $personelTipiId = self::requirePositiveInt($body, 'personel_tipi_id', 'Personel tipi secilmelidir.');
+
+        if (!array_key_exists('aktif_durum', $body)) {
+            self::validationError('aktif_durum', 'Aktif durum zorunludur.');
+        }
+        $aktifDurum = strtoupper(trim((string) $body['aktif_durum']));
+        if (!in_array($aktifDurum, ['AKTIF', 'PASIF'], true)) {
+            self::validationError('aktif_durum', 'Aktif durum AKTIF veya PASIF olmalidir.');
+        }
+
+        $dogumYeri = self::optionalTrimmedString($body, 'dogum_yeri');
+        $kanGrubu = self::optionalTrimmedString($body, 'kan_grubu');
+        if ($kanGrubu !== null && !in_array($kanGrubu, self::validKanGruplari(), true)) {
+            self::validationError('kan_grubu', 'Gecersiz kan grubu.');
+        }
+
+        $bagliAmirId = self::optionalPositiveInt($body, 'bagli_amir_id');
+        $ucretTipiId = self::optionalPositiveInt($body, 'ucret_tipi_id');
+        if ($ucretTipiId !== null && !in_array($ucretTipiId, [1, 2, 3], true)) {
+            self::validationError('ucret_tipi_id', 'Gecersiz ucret tipi.');
+        }
+
+        $primKuraliId = self::optionalPositiveInt($body, 'prim_kurali_id');
+        if ($primKuraliId !== null && !in_array($primKuraliId, [1, 2, 3], true)) {
+            self::validationError('prim_kurali_id', 'Gecersiz prim kurali.');
+        }
+
+        $maasTutari = self::optionalNonNegativeNumber($body, 'maas_tutari');
+
+        return [
+            'tc_kimlik_no' => $tcKimlikNo,
+            'ad' => $ad,
+            'soyad' => $soyad,
+            'dogum_tarihi' => $dogumTarihi,
+            'telefon' => $telefon,
+            'acil_durum_kisi' => $acilDurumKisi,
+            'acil_durum_telefon' => $acilDurumTelefon,
+            'sicil_no' => $sicilNo,
+            'ise_giris_tarihi' => $iseGirisTarihi,
+            'sube_id' => $subeId,
+            'departman_id' => $departmanId,
+            'gorev_id' => $gorevId,
+            'personel_tipi_id' => $personelTipiId,
+            'aktif_durum' => $aktifDurum,
+            'dogum_yeri' => $dogumYeri,
+            'kan_grubu' => $kanGrubu,
+            'bagli_amir_id' => $bagliAmirId,
+            'ucret_tipi_id' => $ucretTipiId,
+            'maas_tutari' => $maasTutari,
+            'prim_kurali_id' => $primKuraliId,
+        ];
+    }
+
+    /** @param array<string, mixed> $user */
+    private static function assertCreateRole(array $user)
+    {
+        $allowedRoles = ['GENEL_YONETICI', 'BOLUM_YONETICISI', 'MUHASEBE'];
+        if (!in_array((string) ($user['rol'] ?? ''), $allowedRoles, true)) {
+            JsonResponse::forbidden();
+        }
+    }
+
+    /** @param array<string, mixed> $user */
+    private static function assertCreateSubeScope(array $user, Request $request, $subeId)
+    {
+        $subeId = (int) $subeId;
+        $headerSube = self::parseHeaderPositiveInt($request->getHeader('x-active-sube-id'));
+        if ($headerSube !== null && $headerSube !== $subeId) {
+            JsonResponse::forbidden();
+        }
+
+        $allowed = SubeScope::allowedSubeIds($user);
+        if (count($allowed) === 0) {
+            return;
+        }
+
+        if (!in_array($subeId, $allowed, true)) {
+            JsonResponse::forbidden('Secili sube icin yetkiniz yok.');
+        }
+    }
+
+    /** @param array<string, mixed> $payload */
+    private static function validateCreateReferences(PDO $pdo, array $payload)
+    {
+        if (!self::existsActiveRecord($pdo, 'subeler', (int) $payload['sube_id'])) {
+            self::validationError('sube_id', 'Gecersiz sube.');
+        }
+        if (!self::existsActiveRecord($pdo, 'departmanlar', (int) $payload['departman_id'])) {
+            self::validationError('departman_id', 'Gecersiz departman.');
+        }
+        if (!self::existsActiveRecord($pdo, 'gorevler', (int) $payload['gorev_id'])) {
+            self::validationError('gorev_id', 'Gecersiz gorev.');
+        }
+        if (!self::existsActiveRecord($pdo, 'personel_tipleri', (int) $payload['personel_tipi_id'])) {
+            self::validationError('personel_tipi_id', 'Gecersiz personel tipi.');
+        }
+
+        $bagliAmirId = $payload['bagli_amir_id'];
+        if ($bagliAmirId !== null) {
+            $stmt = $pdo->prepare("SELECT id FROM users WHERE id = :id AND durum = 'AKTIF' LIMIT 1");
+            $stmt->execute(['id' => (int) $bagliAmirId]);
+            if (!$stmt->fetch(PDO::FETCH_ASSOC)) {
+                self::validationError('bagli_amir_id', 'Gecersiz bagli amir.');
+            }
+        }
+    }
+
+    private static function assertTcAvailable(PDO $pdo, $tcKimlikNo)
+    {
+        $stmt = $pdo->prepare('SELECT id FROM personeller WHERE tc_kimlik_no = :tc_kimlik_no LIMIT 1');
+        $stmt->execute(['tc_kimlik_no' => (string) $tcKimlikNo]);
+        if ($stmt->fetch(PDO::FETCH_ASSOC)) {
+            self::duplicateTcResponse();
+        }
+    }
+
+    /** @param array<string, mixed> $payload */
+    private static function insertPersonel(PDO $pdo, array $payload)
+    {
+        $sql = '
+            INSERT INTO personeller (
+                tc_kimlik_no, ad, soyad, dogum_tarihi, telefon, acil_durum_kisi, acil_durum_telefon,
+                sicil_no, ise_giris_tarihi, sube_id, departman_id, gorev_id, personel_tipi_id,
+                bagli_amir_id, aktif_durum, dogum_yeri, kan_grubu, ucret_tipi_id, maas_tutari, prim_kurali_id
+            ) VALUES (
+                :tc_kimlik_no, :ad, :soyad, :dogum_tarihi, :telefon, :acil_durum_kisi, :acil_durum_telefon,
+                :sicil_no, :ise_giris_tarihi, :sube_id, :departman_id, :gorev_id, :personel_tipi_id,
+                :bagli_amir_id, :aktif_durum, :dogum_yeri, :kan_grubu, :ucret_tipi_id, :maas_tutari, :prim_kurali_id
+            )
+        ';
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute([
+            'tc_kimlik_no' => $payload['tc_kimlik_no'],
+            'ad' => $payload['ad'],
+            'soyad' => $payload['soyad'],
+            'dogum_tarihi' => $payload['dogum_tarihi'],
+            'telefon' => $payload['telefon'],
+            'acil_durum_kisi' => $payload['acil_durum_kisi'],
+            'acil_durum_telefon' => $payload['acil_durum_telefon'],
+            'sicil_no' => $payload['sicil_no'],
+            'ise_giris_tarihi' => $payload['ise_giris_tarihi'],
+            'sube_id' => $payload['sube_id'],
+            'departman_id' => $payload['departman_id'],
+            'gorev_id' => $payload['gorev_id'],
+            'personel_tipi_id' => $payload['personel_tipi_id'],
+            'bagli_amir_id' => $payload['bagli_amir_id'],
+            'aktif_durum' => $payload['aktif_durum'],
+            'dogum_yeri' => $payload['dogum_yeri'],
+            'kan_grubu' => $payload['kan_grubu'],
+            'ucret_tipi_id' => $payload['ucret_tipi_id'],
+            'maas_tutari' => $payload['maas_tutari'],
+            'prim_kurali_id' => $payload['prim_kurali_id'],
+        ]);
+
+        return (int) $pdo->lastInsertId();
+    }
+
+    /** @return array<string, mixed>|null */
+    private static function fetchPersonelRowById(PDO $pdo, $personelId)
+    {
+        $sql = "
+            SELECT p.*, s.ad AS sube_adi, d.ad AS departman_adi, g.ad AS gorev_adi, pt.ad AS personel_tipi_adi
+            FROM personeller p
+            LEFT JOIN subeler s ON s.id = p.sube_id
+            LEFT JOIN departmanlar d ON d.id = p.departman_id
+            LEFT JOIN gorevler g ON g.id = p.gorev_id
+            LEFT JOIN personel_tipleri pt ON pt.id = p.personel_tipi_id
+            WHERE p.id = :id
+            LIMIT 1
+        ";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute(['id' => (int) $personelId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        return is_array($row) ? $row : null;
+    }
+
+    private static function existsActiveRecord(PDO $pdo, $table, $id)
+    {
+        $allowedTables = ['subeler', 'departmanlar', 'gorevler', 'personel_tipleri'];
+        if (!in_array($table, $allowedTables, true)) {
+            return false;
+        }
+
+        $stmt = $pdo->prepare("SELECT id FROM $table WHERE id = :id AND durum = 'AKTIF' LIMIT 1");
+        $stmt->execute(['id' => (int) $id]);
+
+        return (bool) $stmt->fetch(PDO::FETCH_ASSOC);
+    }
+
+    private static function duplicateTcResponse()
+    {
+        JsonResponse::error(409, 'DUPLICATE_TC_KIMLIK_NO', 'Bu T.C. Kimlik No ile kayıt açılamaz.', 'tc_kimlik_no');
+    }
+
+    private static function isDuplicateTcException(\PDOException $e)
+    {
+        if ($e->getCode() !== '23000') {
+            return false;
+        }
+
+        $errorInfo = $e->errorInfo;
+        if (!is_array($errorInfo) || !isset($errorInfo[1]) || (int) $errorInfo[1] !== 1062) {
+            return false;
+        }
+
+        $message = strtolower($e->getMessage());
+
+        return strpos($message, 'uq_personeller_tc') !== false || strpos($message, 'tc_kimlik_no') !== false;
+    }
+
+    /** @param array<string, mixed> $body */
+    private static function requireTrimmedString(array $body, $field, $message)
+    {
+        if (!array_key_exists($field, $body)) {
+            self::validationError((string) $field, $message);
+        }
+
+        $value = trim((string) $body[$field]);
+        if ($value === '') {
+            self::validationError((string) $field, $message);
+        }
+
+        return $value;
+    }
+
+    /** @param array<string, mixed> $body */
+    private static function requireValidDate(array $body, $field, $missingMessage)
+    {
+        if (!array_key_exists($field, $body) || trim((string) $body[$field]) === '') {
+            self::validationError((string) $field, $missingMessage);
+        }
+
+        $value = trim((string) $body[$field]);
+        if (!self::isValidDateString($value)) {
+            self::validationError((string) $field, 'Gecerli bir tarih olmalidir.');
+        }
+
+        return $value;
+    }
+
+    /** @param array<string, mixed> $body */
+    private static function requirePositiveInt(array $body, $field, $message)
+    {
+        if (!array_key_exists($field, $body)) {
+            self::validationError((string) $field, $message);
+        }
+
+        $value = self::parsePositiveInt($body[$field]);
+        if ($value === null) {
+            self::validationError((string) $field, $message);
+        }
+
+        return $value;
+    }
+
+    /** @param array<string, mixed> $body */
+    private static function optionalTrimmedString(array $body, $field)
+    {
+        if (!array_key_exists($field, $body) || $body[$field] === null) {
+            return null;
+        }
+
+        $value = trim((string) $body[$field]);
+
+        return $value === '' ? null : $value;
+    }
+
+    /** @param array<string, mixed> $body */
+    private static function optionalPositiveInt(array $body, $field)
+    {
+        if (!array_key_exists($field, $body) || $body[$field] === null || $body[$field] === '') {
+            return null;
+        }
+
+        $value = self::parsePositiveInt($body[$field]);
+        if ($value === null) {
+            self::validationError((string) $field, 'Gecersiz deger.');
+        }
+
+        return $value;
+    }
+
+    /** @param array<string, mixed> $body */
+    private static function optionalNonNegativeNumber(array $body, $field)
+    {
+        if (!array_key_exists($field, $body) || $body[$field] === null || $body[$field] === '') {
+            return null;
+        }
+
+        if (!is_numeric($body[$field])) {
+            self::validationError((string) $field, 'Maas tutari sayisal olmalidir.');
+        }
+
+        $value = (float) $body[$field];
+        if ($value < 0) {
+            self::validationError((string) $field, 'Maas tutari sifirdan kucuk olamaz.');
+        }
+
+        return $value;
+    }
+
+    /** @param mixed $value */
+    private static function parsePositiveInt($value)
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        if (is_string($value) && trim($value) !== $value) {
+            return null;
+        }
+
+        if (!is_numeric($value)) {
+            return null;
+        }
+
+        $parsed = (int) $value;
+        if ($parsed <= 0 || (string) $parsed !== trim((string) $value)) {
+            return null;
+        }
+
+        return $parsed;
+    }
+
+    private static function isValidDateString($value)
+    {
+        if (!is_string($value) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $value)) {
+            return false;
+        }
+
+        [$year, $month, $day] = array_map('intval', explode('-', $value));
+
+        return checkdate($month, $day, $year);
+    }
+
+    /** @return array<int, string> */
+    private static function validKanGruplari()
+    {
+        return ['A Rh+', 'A Rh-', 'B Rh+', 'B Rh-', 'AB Rh+', 'AB Rh-', '0 Rh+', '0 Rh-'];
+    }
+
+    private static function validationError($field, $message)
+    {
+        JsonResponse::error(422, 'VALIDATION_ERROR', $message, $field);
+    }
+
+    /** @param mixed $value */
+    private static function parseHeaderPositiveInt($value)
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        $parsed = (int) $value;
+        return $parsed > 0 ? $parsed : null;
+    }
+
     /** @param array<string, mixed> $row @return array<string, mixed> */
     private static function mapPersonelRow(array $row)
     {
+        $ucretTipiId = $row['ucret_tipi_id'] !== null ? (int) $row['ucret_tipi_id'] : null;
+        $primKuraliId = $row['prim_kurali_id'] !== null ? (int) $row['prim_kurali_id'] : null;
+        $ucretTipiAdlari = [1 => 'Aylik', 2 => 'Gunluk', 3 => 'Saatlik'];
+        $primKuraliAdlari = [1 => 'Devamsizlik Primi Yok', 2 => 'Tam Prim', 3 => 'Kismi Prim'];
+
         return [
             'id' => (int) $row['id'],
             'tc_kimlik_no' => (string) $row['tc_kimlik_no'],
@@ -181,6 +611,15 @@ class PersonellerController
                 'gorev' => $row['gorev_adi'],
                 'personel_tipi' => $row['personel_tipi_adi'],
             ],
+            'ucret_tipi_id' => $ucretTipiId,
+            'maas_tutari' => $row['maas_tutari'] !== null ? (float) $row['maas_tutari'] : null,
+            'prim_kurali_id' => $primKuraliId,
+            'ucret_tipi_adi' => $ucretTipiId !== null && isset($ucretTipiAdlari[$ucretTipiId])
+                ? $ucretTipiAdlari[$ucretTipiId]
+                : null,
+            'prim_kurali_adi' => $primKuraliId !== null && isset($primKuraliAdlari[$primKuraliId])
+                ? $primKuraliAdlari[$primKuraliId]
+                : null,
         ];
     }
 }

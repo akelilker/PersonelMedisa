@@ -24,7 +24,11 @@ const PERSONEL_DURUM_LABELS: Record<string, string> = {
 
 const SUREC_TURU_LABELS: Record<string, string> = {
   IZIN: "İzin",
+  DEVAMSIZLIK: "Devamsızlık",
+  TESVIK: "Teşvik",
   RAPOR: "Rapor",
+  IS_KAZASI: "İş Kazası",
+  BELGE: "Belge / Sertifika",
   YILLIK_IZIN: "Yıllık İzin",
   MAZERET_IZNI: "Mazeret İzni",
   UCRETSIZ_IZIN: "Ücretsiz İzin",

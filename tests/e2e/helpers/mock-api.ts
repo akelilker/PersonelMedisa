@@ -240,6 +240,24 @@ function errorBody(code: string, message: string, field?: string) {
   });
 }
 
+function surecListOkBody(items: unknown[], metaOverrides?: RaporListMeta) {
+  const page = metaOverrides?.page ?? 1;
+  const limit = metaOverrides?.limit ?? 10;
+  const total = metaOverrides?.total ?? items.length;
+  const totalPages = metaOverrides?.total_pages ?? Math.max(1, Math.ceil(total / limit));
+
+  return JSON.stringify({
+    data: { items },
+    meta: {
+      page,
+      limit,
+      total,
+      total_pages: totalPages
+    },
+    errors: []
+  });
+}
+
 async function fulfillJson(route: Route, status: number, body: string) {
   await route.fulfill({
     status,
@@ -252,6 +270,26 @@ const SUBE_SCOPE_MISMATCH_MESSAGE = "Bu kayıt aktif şube bağlamında görünt
 const PERSONEL_CREATE_SUBE_SCOPE_MISMATCH_MESSAGE = "Bu kayit aktif sube baglaminda goruntulenemiyor.";
 const PERSONEL_CREATE_SUBE_UNAUTHORIZED_MESSAGE = "Secili sube icin yetkiniz yok.";
 const DUPLICATE_TC_KIMLIK_NO_MESSAGE = "Bu T.C. Kimlik No ile kayıt açılamaz.";
+const SUPPORTED_SUREC_TURLERI = new Set([
+  "IZIN",
+  "DEVAMSIZLIK",
+  "TESVIK",
+  "RAPOR",
+  "IS_KAZASI",
+  "DISIPLIN",
+  "BELGE",
+  "POZISYON_DEGISTI",
+  "ISTEN_AYRILMA",
+  "GOREV_DEGISIKLIGI",
+  "UCRET_DEGISIKLIGI",
+  "ORG_DEGISIKLIK",
+  "BAGLI_AMIR_ATANDI",
+  "BAGLI_AMIR_DEGISTI",
+  "BAGLI_AMIR_ATAMASI_KALDIRILDI",
+  "BIRIM_AMIRI_ATANDI",
+  "BIRIM_AMIRI_ATAMASI_KALDIRILDI",
+  "SUBE_YETKISI_DEGISTI"
+]);
 
 function getRequestSubeScope(request: { headers(): { [key: string]: string } }, url: URL): number | null {
   const querySubeId = url.searchParams.get("sube_id");
@@ -275,6 +313,27 @@ function parseStrictPositiveIntParam(value: string | null): number | null {
   const trimmed = value.trim();
   const parsed = Number.parseInt(trimmed, 10);
   return Number.isInteger(parsed) && parsed > 0 && String(parsed) === trimmed ? parsed : null;
+}
+
+function parsePayloadPositiveInt(value: unknown): number | null {
+  if (typeof value === "number" && Number.isInteger(value) && value > 0) {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    return parseStrictPositiveIntParam(value);
+  }
+
+  return null;
+}
+
+function isValidDateString(value: unknown): value is string {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return false;
+  }
+
+  const parsed = Date.parse(`${value}T00:00:00`);
+  return Number.isFinite(parsed);
 }
 
 export async function mockApi(page: Page, role: MockUserRole) {
@@ -1788,27 +1847,105 @@ let bildirimIdCounter = 800;
         return true;
       });
 
-      await fulfillJson(route, 200, okBody({ items: filtered }));
+      const pageNumber = Number.parseInt(url.searchParams.get("page") ?? "1", 10) || 1;
+      const pageLimit = Number.parseInt(url.searchParams.get("limit") ?? "20", 10) || 20;
+      const start = (pageNumber - 1) * pageLimit;
+      const items = filtered.slice(start, start + pageLimit);
+
+      await fulfillJson(
+        route,
+        200,
+        surecListOkBody(items, {
+          page: pageNumber,
+          limit: pageLimit,
+          total: filtered.length
+        })
+      );
       return;
     }
 
     if (path === "/api/surecler" && method === "POST") {
-      const payload = request.postDataJSON() as {
-        personel_id: number;
-        surec_turu: string;
-        alt_tur?: string;
-        baslangic_tarihi: string;
-        bitis_tarihi?: string;
-        ucretli_mi?: boolean;
-        aciklama?: string;
-      };
+      const payload = request.postDataJSON() as Record<string, unknown>;
+      const personelId = parsePayloadPositiveInt(payload.personel_id);
+      const surecTuru =
+        typeof payload.surec_turu === "string" ? payload.surec_turu.trim().toUpperCase() : "";
+      const baslangicTarihi = typeof payload.baslangic_tarihi === "string" ? payload.baslangic_tarihi : "";
+      const bitisTarihi =
+        typeof payload.bitis_tarihi === "string" && payload.bitis_tarihi.trim() !== ""
+          ? payload.bitis_tarihi
+          : undefined;
+      const subeScope = getRequestSubeScope(request, url);
 
-      if (payload.surec_turu === "POZISYON_DEGISTI") {
+      if (personelId === null) {
+        await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "Personel seçilmelidir.", "personel_id"));
+        return;
+      }
+
+      if (!surecTuru) {
+        await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "Süreç türü seçilmelidir.", "surec_turu"));
+        return;
+      }
+
+      if (!SUPPORTED_SUREC_TURLERI.has(surecTuru)) {
+        await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "Süreç türü geçerli değil.", "surec_turu"));
+        return;
+      }
+
+      if (!isValidDateString(baslangicTarihi)) {
+        await fulfillJson(
+          route,
+          422,
+          errorBody("VALIDATION_ERROR", "Başlangıç tarihi geçerli olmalıdır.", "baslangic_tarihi")
+        );
+        return;
+      }
+
+      if (bitisTarihi !== undefined && !isValidDateString(bitisTarihi)) {
+        await fulfillJson(
+          route,
+          422,
+          errorBody("VALIDATION_ERROR", "Bitiş tarihi geçerli olmalıdır.", "bitis_tarihi")
+        );
+        return;
+      }
+
+      if (subeScope !== null && mockUserSubeIds.length > 0 && !mockUserSubeIds.includes(subeScope)) {
+        await fulfillJson(route, 403, errorBody("FORBIDDEN", PERSONEL_CREATE_SUBE_UNAUTHORIZED_MESSAGE));
+        return;
+      }
+
+      const linkedPersonel = personeller.find((personel) => personel.id === personelId);
+      if (!linkedPersonel) {
+        await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "Personel bulunamadı.", "personel_id"));
+        return;
+      }
+
+      if (linkedPersonel.sube_id !== undefined) {
+        if (subeScope !== null && linkedPersonel.sube_id !== subeScope) {
+          await fulfillJson(route, 403, errorBody("FORBIDDEN", SUBE_SCOPE_MISMATCH_MESSAGE));
+          return;
+        }
+        if (mockUserSubeIds.length > 0 && !mockUserSubeIds.includes(linkedPersonel.sube_id)) {
+          await fulfillJson(route, 403, errorBody("FORBIDDEN", PERSONEL_CREATE_SUBE_UNAUTHORIZED_MESSAGE));
+          return;
+        }
+      }
+
+      if (linkedPersonel.aktif_durum === "PASIF") {
+        await fulfillJson(
+          route,
+          422,
+          errorBody("VALIDATION_ERROR", "Pasif personele süreç kaydı eklenemez.", "personel_id")
+        );
+        return;
+      }
+
+      if (surecTuru === "POZISYON_DEGISTI") {
         const mockOrgIndex = surecler.findIndex(
           (item) =>
-            item.personel_id === payload.personel_id &&
+            item.personel_id === personelId &&
             item.surec_turu === "ORG_DEGISIKLIK" &&
-            item.baslangic_tarihi === payload.baslangic_tarihi &&
+            item.baslangic_tarihi === baslangicTarihi &&
             item.aciklama === "Mock otomatik org gecmis kaydi"
         );
         if (mockOrgIndex >= 0) {
@@ -1818,13 +1955,15 @@ let bildirimIdCounter = 800;
 
       const created = {
         id: ++surecIdCounter,
-        personel_id: payload.personel_id,
-        surec_turu: payload.surec_turu,
-        alt_tur: payload.alt_tur,
-        baslangic_tarihi: payload.baslangic_tarihi,
-        bitis_tarihi: payload.bitis_tarihi,
-        ucretli_mi: payload.ucretli_mi,
-        aciklama: payload.aciklama,
+        personel_id: personelId,
+        surec_turu: surecTuru,
+        alt_tur: typeof payload.alt_tur === "string" && payload.alt_tur.trim() ? payload.alt_tur.trim() : undefined,
+        baslangic_tarihi: baslangicTarihi,
+        bitis_tarihi: bitisTarihi,
+        ucretli_mi: Boolean(payload.ucretli_mi),
+        aciklama:
+          typeof payload.aciklama === "string" && payload.aciklama.trim() ? payload.aciklama.trim() : undefined,
+        created_at: new Date().toISOString(),
         state: "AKTIF"
       };
       surecler.unshift(created);
@@ -1836,7 +1975,7 @@ let bildirimIdCounter = 800;
         }
       }
 
-      await fulfillJson(route, 200, okBody(created));
+      await fulfillJson(route, 201, okBody(created));
       return;
     }
 
@@ -2316,6 +2455,8 @@ let bildirimIdCounter = 800;
             { key: "RAPOR", label: "Rapor" },
             { key: "IS_KAZASI", label: "İş Kazası" },
             { key: "DEVAMSIZLIK", label: "Devamsızlık" },
+            { key: "TESVIK", label: "Teşvik" },
+            { key: "BELGE", label: "Belge / Sertifika" },
             { key: "ISTEN_AYRILMA", label: "İşten Ayrılma" }
           ])
         );

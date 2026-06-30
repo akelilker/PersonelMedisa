@@ -364,6 +364,7 @@ class SureclerController
         return [
             'IZIN',
             'DEVAMSIZLIK',
+            'TESVIK',
             'RAPOR',
             'IS_KAZASI',
             'DISIPLIN',
@@ -373,6 +374,12 @@ class SureclerController
             'GOREV_DEGISIKLIGI',
             'UCRET_DEGISIKLIGI',
             'ORG_DEGISIKLIK',
+            'BAGLI_AMIR_ATANDI',
+            'BAGLI_AMIR_DEGISTI',
+            'BAGLI_AMIR_ATAMASI_KALDIRILDI',
+            'BIRIM_AMIRI_ATANDI',
+            'BIRIM_AMIRI_ATAMASI_KALDIRILDI',
+            'SUBE_YETKISI_DEGISTI',
         ];
     }
 

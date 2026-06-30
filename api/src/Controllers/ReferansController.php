@@ -66,6 +66,8 @@ class ReferansController
                 ['key' => 'RAPOR', 'label' => 'Rapor'],
                 ['key' => 'IS_KAZASI', 'label' => 'İş Kazası'],
                 ['key' => 'DEVAMSIZLIK', 'label' => 'Devamsızlık'],
+                ['key' => 'TESVIK', 'label' => 'Teşvik'],
+                ['key' => 'BELGE', 'label' => 'Belge / Sertifika'],
                 ['key' => 'ISTEN_AYRILMA', 'label' => 'İşten Ayrılma'],
                 ['key' => 'GOREV_DEGISIKLIGI', 'label' => 'Görev Değişikliği'],
                 ['key' => 'UCRET_DEGISIKLIGI', 'label' => 'Ücret Değişikliği'],

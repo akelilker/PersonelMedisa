@@ -283,6 +283,74 @@ describe("apiRequest", () => {
     });
   });
 
+  it("emits forbidden event and throws ApiRequestError for 403 PUT /gunluk-puantaj/:id/:date", async () => {
+    const fetchMock = vi.fn(async () =>
+      createJsonResponse(
+        {
+          data: null,
+          meta: {},
+          errors: [{ code: "FORBIDDEN", message: "Bu islem icin yetkin yok." }]
+        },
+        403
+      )
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const forbiddenListener = vi.fn();
+    window.addEventListener(AUTH_FORBIDDEN_EVENT, (event) => {
+      forbiddenListener((event as CustomEvent<{ status: number; path: string }>).detail);
+    });
+
+    await expect(
+      apiRequest("/gunluk-puantaj/2/2026-01-01", {
+        method: "PUT",
+        body: JSON.stringify({ kontrol_durumu: "AMIR_KONTROL_ETTI" })
+      })
+    ).rejects.toMatchObject({
+      status: 403,
+      code: "FORBIDDEN"
+    });
+
+    expect(forbiddenListener).toHaveBeenCalledWith({
+      status: 403,
+      path: "/gunluk-puantaj/2/2026-01-01"
+    });
+  });
+
+  it("emits forbidden event and throws ApiRequestError for 403 POST /puantaj/muhurle", async () => {
+    const fetchMock = vi.fn(async () =>
+      createJsonResponse(
+        {
+          data: null,
+          meta: {},
+          errors: [{ code: "FORBIDDEN", message: "Bu islem icin yetkin yok." }]
+        },
+        403
+      )
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const forbiddenListener = vi.fn();
+    window.addEventListener(AUTH_FORBIDDEN_EVENT, (event) => {
+      forbiddenListener((event as CustomEvent<{ status: number; path: string }>).detail);
+    });
+
+    await expect(
+      apiRequest("/puantaj/muhurle", {
+        method: "POST",
+        body: JSON.stringify({ yil: 2026, ay: 4 })
+      })
+    ).rejects.toMatchObject({
+      status: 403,
+      code: "FORBIDDEN"
+    });
+
+    expect(forbiddenListener).toHaveBeenCalledWith({
+      status: 403,
+      path: "/puantaj/muhurle"
+    });
+  });
+
   it("emits forbidden event and throws ApiRequestError for 403 GET /personeller list", async () => {
     const fetchMock = vi.fn(async () =>
       createJsonResponse(

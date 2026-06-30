@@ -52,11 +52,11 @@ class Router
         if ($method === 'PUT' && preg_match('#^/personeller/(\d+)$#', $path, $matches)) {
             PersonellerController::update($this->request, $matches[1]);
         }
-        if ($method === 'PUT' && preg_match('#^/gunluk-puantaj/(\d+)/([^/]+)$#', $path)) {
-            JsonResponse::methodNotAllowed();
+        if ($method === 'PUT' && preg_match('#^/gunluk-puantaj/(\d+)/([^/]+)$#', $path, $matches)) {
+            PuantajController::upsert($this->request, $matches[1], $matches[2]);
         }
         if ($method === 'POST' && $path === '/puantaj/muhurle') {
-            JsonResponse::methodNotAllowed();
+            PuantajController::muhurleAylik($this->request);
         }
         if ($method === 'POST' && $path === '/yonetim/aylik-ozet/bolum-onay') {
             JsonResponse::methodNotAllowed();

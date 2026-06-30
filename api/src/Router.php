@@ -48,8 +48,8 @@ class Router
             LoginController::login($this->request);
         }
 
-        if ($method === 'PUT' && preg_match('#^/personeller/(\d+)$#', $path)) {
-            JsonResponse::methodNotAllowed();
+        if ($method === 'PUT' && preg_match('#^/personeller/(\d+)$#', $path, $matches)) {
+            PersonellerController::update($this->request, $matches[1]);
         }
         if ($method === 'PUT' && preg_match('#^/gunluk-puantaj/(\d+)/([^/]+)$#', $path)) {
             JsonResponse::methodNotAllowed();

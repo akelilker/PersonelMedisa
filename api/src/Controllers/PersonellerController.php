@@ -155,7 +155,7 @@ class PersonellerController
     public static function create(Request $request)
     {
         $user = AuthMiddleware::authenticate($request, true);
-        self::assertCreateRole($user);
+        self::assertWriteRole($user);
 
         $body = $request->getJsonBody();
         $payload = self::normalizeAndValidateCreatePayload($body);
@@ -192,6 +192,132 @@ class PersonellerController
 
             JsonResponse::serverError('Kayit olusturulamadi.');
         }
+    }
+
+    public static function update(Request $request, $personelId)
+    {
+        $user = AuthMiddleware::authenticate($request, true);
+        self::assertWriteRole($user);
+
+        $personelId = (int) $personelId;
+        if ($personelId <= 0) {
+            JsonResponse::notFound();
+        }
+
+        $body = $request->getJsonBody();
+        $payload = self::normalizeAndValidateUpdatePayload($body);
+
+        try {
+            $pdo = Connection::get();
+        } catch (\Throwable $e) {
+            JsonResponse::serverError('Veritabani baglantisi kurulamadi.');
+        }
+
+        $current = self::fetchPersonelRowById($pdo, $personelId);
+        if (!$current) {
+            JsonResponse::notFound();
+        }
+
+        self::assertUpdateSubeScope($user, $request, (int) $current['sube_id'], $payload);
+        self::assertAktifDurumNotChanged($current, $payload);
+        self::validateUpdateReferences($pdo, $payload);
+
+        if (array_key_exists('tc_kimlik_no', $payload)) {
+            self::assertTcAvailableForUpdate($pdo, $payload['tc_kimlik_no'], $personelId);
+        }
+
+        try {
+            self::updatePersonelRow($pdo, $personelId, $payload);
+            $row = self::fetchPersonelRowById($pdo, $personelId);
+            if (!$row) {
+                JsonResponse::serverError('Kayit guncellenemedi.');
+            }
+
+            JsonResponse::success(self::mapPersonelRow($row));
+        } catch (\PDOException $e) {
+            if (self::isDuplicateTcException($e)) {
+                self::duplicateTcResponse();
+            }
+
+            JsonResponse::serverError('Kayit guncellenemedi.');
+        }
+    }
+
+    /** @param array<string, mixed> $body @return array<string, mixed> */
+    private static function normalizeAndValidateUpdatePayload(array $body)
+    {
+        $payload = [];
+
+        if (array_key_exists('effective_date', $body) && $body['effective_date'] !== null && trim((string) $body['effective_date']) !== '') {
+            $effectiveDate = trim((string) $body['effective_date']);
+            if (!self::isValidDateString($effectiveDate)) {
+                self::validationError('effective_date', 'Gecerli bir tarih olmalidir.');
+            }
+        }
+
+        if (array_key_exists('tc_kimlik_no', $body)) {
+            $tcKimlikNo = trim((string) $body['tc_kimlik_no']);
+            if (!preg_match('/^\d{11}$/', $tcKimlikNo)) {
+                self::validationError('tc_kimlik_no', 'T.C. Kimlik No 11 hane olmalidir.');
+            }
+            $payload['tc_kimlik_no'] = $tcKimlikNo;
+        }
+
+        foreach (['ad', 'soyad', 'telefon', 'acil_durum_kisi', 'acil_durum_telefon', 'sicil_no'] as $field) {
+            if (array_key_exists($field, $body)) {
+                $payload[$field] = self::requireTrimmedString($body, $field, 'Gecersiz deger.');
+            }
+        }
+
+        foreach (['dogum_tarihi', 'ise_giris_tarihi'] as $field) {
+            if (array_key_exists($field, $body)) {
+                $payload[$field] = self::requireValidDate($body, $field, 'Gecerli bir tarih olmalidir.');
+            }
+        }
+
+        foreach (['dogum_yeri', 'kan_grubu'] as $field) {
+            if (array_key_exists($field, $body)) {
+                $payload[$field] = self::optionalTrimmedString($body, $field);
+            }
+        }
+
+        if (array_key_exists('kan_grubu', $payload) && $payload['kan_grubu'] !== null && !in_array($payload['kan_grubu'], self::validKanGruplari(), true)) {
+            self::validationError('kan_grubu', 'Gecersiz kan grubu.');
+        }
+
+        if (array_key_exists('sube_id', $body)) {
+            $payload['sube_id'] = self::requirePositiveInt($body, 'sube_id', 'Sube secilmelidir.');
+        }
+
+        foreach (['departman_id', 'gorev_id', 'bagli_amir_id', 'personel_tipi_id'] as $field) {
+            if (array_key_exists($field, $body)) {
+                $payload[$field] = self::optionalPositiveInt($body, $field);
+            }
+        }
+
+        foreach (['ucret_tipi_id', 'prim_kurali_id'] as $field) {
+            if (array_key_exists($field, $body)) {
+                $value = self::optionalPositiveInt($body, $field);
+                if ($value !== null && !in_array($value, [1, 2, 3], true)) {
+                    self::validationError($field, 'Gecersiz deger.');
+                }
+                $payload[$field] = $value;
+            }
+        }
+
+        if (array_key_exists('maas_tutari', $body)) {
+            $payload['maas_tutari'] = self::optionalNonNegativeNumber($body, 'maas_tutari');
+        }
+
+        if (array_key_exists('aktif_durum', $body)) {
+            $aktifDurum = strtoupper(trim((string) $body['aktif_durum']));
+            if (!in_array($aktifDurum, ['AKTIF', 'PASIF'], true)) {
+                self::validationError('aktif_durum', 'Aktif durum AKTIF veya PASIF olmalidir.');
+            }
+            $payload['aktif_durum'] = $aktifDurum;
+        }
+
+        return $payload;
     }
 
     /** @param array<string, mixed> $body @return array<string, mixed> */
@@ -273,7 +399,7 @@ class PersonellerController
     }
 
     /** @param array<string, mixed> $user */
-    private static function assertCreateRole(array $user)
+    private static function assertWriteRole(array $user)
     {
         $allowedRoles = ['GENEL_YONETICI', 'BOLUM_YONETICISI', 'MUHASEBE'];
         if (!in_array((string) ($user['rol'] ?? ''), $allowedRoles, true)) {
@@ -297,6 +423,39 @@ class PersonellerController
 
         if (!in_array($subeId, $allowed, true)) {
             JsonResponse::forbidden('Secili sube icin yetkiniz yok.');
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $user
+     * @param array<string, mixed> $payload
+     */
+    private static function assertUpdateSubeScope(array $user, Request $request, $currentSubeId, array $payload)
+    {
+        $currentSubeId = (int) $currentSubeId;
+        SubeScope::assertPersonelAccess($user, $request, $currentSubeId);
+
+        if (!array_key_exists('sube_id', $payload)) {
+            return;
+        }
+
+        $targetSubeId = (int) $payload['sube_id'];
+        self::assertCreateSubeScope($user, $request, $targetSubeId);
+
+        if ($targetSubeId !== $currentSubeId) {
+            JsonResponse::forbidden();
+        }
+    }
+
+    /** @param array<string, mixed> $current @param array<string, mixed> $payload */
+    private static function assertAktifDurumNotChanged(array $current, array $payload)
+    {
+        if (!array_key_exists('aktif_durum', $payload)) {
+            return;
+        }
+
+        if ((string) $payload['aktif_durum'] !== (string) $current['aktif_durum']) {
+            self::validationError('aktif_durum', 'Aktif durum bu endpoint ile degistirilemez.');
         }
     }
 
@@ -326,10 +485,47 @@ class PersonellerController
         }
     }
 
+    /** @param array<string, mixed> $payload */
+    private static function validateUpdateReferences(PDO $pdo, array $payload)
+    {
+        if (array_key_exists('sube_id', $payload) && !self::existsActiveRecord($pdo, 'subeler', (int) $payload['sube_id'])) {
+            self::validationError('sube_id', 'Gecersiz sube.');
+        }
+        if (array_key_exists('departman_id', $payload) && $payload['departman_id'] !== null && !self::existsActiveRecord($pdo, 'departmanlar', (int) $payload['departman_id'])) {
+            self::validationError('departman_id', 'Gecersiz departman.');
+        }
+        if (array_key_exists('gorev_id', $payload) && $payload['gorev_id'] !== null && !self::existsActiveRecord($pdo, 'gorevler', (int) $payload['gorev_id'])) {
+            self::validationError('gorev_id', 'Gecersiz gorev.');
+        }
+        if (array_key_exists('personel_tipi_id', $payload) && $payload['personel_tipi_id'] !== null && !self::existsActiveRecord($pdo, 'personel_tipleri', (int) $payload['personel_tipi_id'])) {
+            self::validationError('personel_tipi_id', 'Gecersiz personel tipi.');
+        }
+
+        if (array_key_exists('bagli_amir_id', $payload) && $payload['bagli_amir_id'] !== null) {
+            $stmt = $pdo->prepare("SELECT id FROM users WHERE id = :id AND durum = 'AKTIF' LIMIT 1");
+            $stmt->execute(['id' => (int) $payload['bagli_amir_id']]);
+            if (!$stmt->fetch(PDO::FETCH_ASSOC)) {
+                self::validationError('bagli_amir_id', 'Gecersiz bagli amir.');
+            }
+        }
+    }
+
     private static function assertTcAvailable(PDO $pdo, $tcKimlikNo)
     {
         $stmt = $pdo->prepare('SELECT id FROM personeller WHERE tc_kimlik_no = :tc_kimlik_no LIMIT 1');
         $stmt->execute(['tc_kimlik_no' => (string) $tcKimlikNo]);
+        if ($stmt->fetch(PDO::FETCH_ASSOC)) {
+            self::duplicateTcResponse();
+        }
+    }
+
+    private static function assertTcAvailableForUpdate(PDO $pdo, $tcKimlikNo, $personelId)
+    {
+        $stmt = $pdo->prepare('SELECT id FROM personeller WHERE tc_kimlik_no = :tc_kimlik_no AND id <> :id LIMIT 1');
+        $stmt->execute([
+            'tc_kimlik_no' => (string) $tcKimlikNo,
+            'id' => (int) $personelId,
+        ]);
         if ($stmt->fetch(PDO::FETCH_ASSOC)) {
             self::duplicateTcResponse();
         }
@@ -374,6 +570,55 @@ class PersonellerController
         ]);
 
         return (int) $pdo->lastInsertId();
+    }
+
+    /** @param array<string, mixed> $payload */
+    private static function updatePersonelRow(PDO $pdo, $personelId, array $payload)
+    {
+        if (count($payload) === 0) {
+            return;
+        }
+
+        $allowedColumns = [
+            'tc_kimlik_no',
+            'ad',
+            'soyad',
+            'dogum_tarihi',
+            'telefon',
+            'acil_durum_kisi',
+            'acil_durum_telefon',
+            'sicil_no',
+            'ise_giris_tarihi',
+            'sube_id',
+            'departman_id',
+            'gorev_id',
+            'personel_tipi_id',
+            'bagli_amir_id',
+            'aktif_durum',
+            'dogum_yeri',
+            'kan_grubu',
+            'ucret_tipi_id',
+            'maas_tutari',
+            'prim_kurali_id',
+        ];
+
+        $set = [];
+        $params = ['id' => (int) $personelId];
+        foreach ($allowedColumns as $column) {
+            if (!array_key_exists($column, $payload)) {
+                continue;
+            }
+
+            $set[] = $column . ' = :' . $column;
+            $params[$column] = $payload[$column];
+        }
+
+        if (count($set) === 0) {
+            return;
+        }
+
+        $stmt = $pdo->prepare('UPDATE personeller SET ' . implode(', ', $set) . ' WHERE id = :id');
+        $stmt->execute($params);
     }
 
     /** @return array<string, mixed>|null */

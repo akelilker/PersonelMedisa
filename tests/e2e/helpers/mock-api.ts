@@ -1021,35 +1021,6 @@ let bildirimIdCounter = 800;
     { id: 15, ad: "Aşçı" }
   ];
 
-  function normalizeLifecycleSnapshot(p: (typeof personeller)[number]) {
-    const n = (v: number | undefined | null) =>
-      v === undefined || v === null || !Number.isFinite(v) ? null : v;
-    const nm = (v: number | undefined | null) =>
-      v === undefined || v === null || !Number.isFinite(v) ? null : v;
-    return {
-      departman_id: n(p.departman_id),
-      gorev_id: n(p.gorev_id),
-      bagli_amir_id: n(p.bagli_amir_id),
-      ucret_tipi_id: n(p.ucret_tipi_id),
-      maas_tutari: nm(p.maas_tutari),
-      prim_kurali_id: n(p.prim_kurali_id)
-    };
-  }
-
-  function lifecycleSnapshotsEqual(
-    a: ReturnType<typeof normalizeLifecycleSnapshot>,
-    b: ReturnType<typeof normalizeLifecycleSnapshot>
-  ) {
-    return (
-      a.departman_id === b.departman_id &&
-      a.gorev_id === b.gorev_id &&
-      a.bagli_amir_id === b.bagli_amir_id &&
-      a.ucret_tipi_id === b.ucret_tipi_id &&
-      a.maas_tutari === b.maas_tutari &&
-      a.prim_kurali_id === b.prim_kurali_id
-    );
-  }
-
   function mergePersonelFromPutPayload(
     base: (typeof personeller)[number],
     payload: Record<string, unknown>
@@ -1059,7 +1030,16 @@ let bildirimIdCounter = 800;
     if (typeof payload.soyad === "string") next.soyad = payload.soyad.trim();
     if (typeof payload.telefon === "string") next.telefon = payload.telefon.trim();
 
-    const setId = (key: "departman_id" | "gorev_id" | "bagli_amir_id" | "prim_kurali_id" | "ucret_tipi_id") => {
+    const setId = (
+      key:
+        | "sube_id"
+        | "departman_id"
+        | "gorev_id"
+        | "bagli_amir_id"
+        | "personel_tipi_id"
+        | "prim_kurali_id"
+        | "ucret_tipi_id"
+    ) => {
       if (!(key in payload)) return;
       const v = payload[key];
       if (v === null) {
@@ -1075,9 +1055,11 @@ let bildirimIdCounter = 800;
         if (Number.isFinite(parsed)) next[key] = parsed;
       }
     };
+    setId("sube_id");
     setId("departman_id");
     setId("gorev_id");
     setId("bagli_amir_id");
+    setId("personel_tipi_id");
     setId("prim_kurali_id");
     setId("ucret_tipi_id");
     if ("maas_tutari" in payload) {
@@ -1091,21 +1073,41 @@ let bildirimIdCounter = 800;
   function syncPersonelReferansAdlari(target: (typeof personeller)[number]) {
     if (target.departman_id !== undefined) {
       target.departman_adi = getDepartmanLabel(target.departman_id);
+    } else {
+      target.departman_adi = undefined;
     }
     if (target.gorev_id !== undefined) {
       target.gorev_adi = gorevAdlari.find((g) => g.id === target.gorev_id)?.ad ?? target.gorev_adi;
+    } else {
+      target.gorev_adi = undefined;
+    }
+    if (target.personel_tipi_id !== undefined) {
+      target.personel_tipi_adi =
+        target.personel_tipi_id === 1
+          ? "Tam Zamanlı"
+          : target.personel_tipi_id === 2
+            ? "Yarı Zamanlı"
+            : target.personel_tipi_adi;
+    } else {
+      target.personel_tipi_adi = undefined;
     }
     if (target.ucret_tipi_id !== undefined) {
       target.ucret_tipi_adi =
         ucretTipiReferans.find((x) => x.id === target.ucret_tipi_id)?.ad ?? target.ucret_tipi_adi;
+    } else {
+      target.ucret_tipi_adi = undefined;
     }
     if (target.prim_kurali_id !== undefined) {
       target.prim_kurali_adi =
         primKuraliReferans.find((x) => x.id === target.prim_kurali_id)?.ad ?? target.prim_kurali_adi;
+    } else {
+      target.prim_kurali_adi = undefined;
     }
     if (target.bagli_amir_id !== undefined) {
       target.bagli_amir_adi =
         bagliAmirReferanslari.find((item) => item.id === target.bagli_amir_id)?.ad ?? target.bagli_amir_adi;
+    } else {
+      target.bagli_amir_adi = undefined;
     }
   }
 
@@ -1483,63 +1485,71 @@ let bildirimIdCounter = 800;
         return;
       }
 
-      const payload = request.postDataJSON() as Record<string, unknown>;
-
-      const hasLifecycleKeys =
-        "departman_id" in payload ||
-        "gorev_id" in payload ||
-        "bagli_amir_id" in payload ||
-        "ucret_tipi_id" in payload ||
-        "maas_tutari" in payload ||
-        "prim_kurali_id" in payload;
-
-      if (!hasLifecycleKeys) {
-        if (typeof payload.ad === "string") personel.ad = payload.ad.trim();
-        if (typeof payload.soyad === "string") personel.soyad = payload.soyad.trim();
-        if (typeof payload.telefon === "string") personel.telefon = payload.telefon.trim();
-        await fulfillJson(route, 200, okBody(buildPersonelDetail(personel)));
+      if (role === "BIRIM_AMIRI") {
+        await fulfillJson(route, 403, errorBody("FORBIDDEN", "Bu kayit aktif sube baglaminda goruntulenemiyor."));
         return;
       }
 
-      const merged = mergePersonelFromPutPayload(personel, payload);
-      const beforeSnap = normalizeLifecycleSnapshot(personel);
-      const afterSnap = normalizeLifecycleSnapshot(merged);
-      const hasLifecycleDiff = !lifecycleSnapshotsEqual(beforeSnap, afterSnap);
-
-      if (!hasLifecycleDiff) {
-        personel.ad = merged.ad;
-        personel.soyad = merged.soyad;
-        personel.telefon = merged.telefon;
-        await fulfillJson(route, 200, okBody(buildPersonelDetail(personel)));
+      const subeScope = getRequestSubeScope(request, url);
+      if (personel.sube_id !== undefined && subeScope !== null && personel.sube_id !== subeScope) {
+        await fulfillJson(route, 403, errorBody("FORBIDDEN", SUBE_SCOPE_MISMATCH_MESSAGE));
+        return;
+      }
+      if (personel.sube_id !== undefined && mockUserSubeIds.length > 0 && !mockUserSubeIds.includes(personel.sube_id)) {
+        await fulfillJson(route, 403, errorBody("FORBIDDEN", PERSONEL_CREATE_SUBE_UNAUTHORIZED_MESSAGE));
         return;
       }
 
-      const effectiveRaw = payload.effective_date;
-      const effective =
-        typeof effectiveRaw === "string" && effectiveRaw.trim() ? effectiveRaw.trim() : "";
-      if (!effective) {
+      const payload = (request.postDataJSON() ?? {}) as Record<string, unknown>;
+      const readNullablePositiveInt = (field: string) => {
+        if (!(field in payload)) return undefined;
+        const value = payload[field];
+        if (value === null || value === "") return null;
+        const parsed =
+          typeof value === "number"
+            ? value
+            : typeof value === "string" && value.trim()
+              ? Number.parseInt(value.trim(), 10)
+              : NaN;
+        return Number.isInteger(parsed) && parsed > 0 ? parsed : NaN;
+      };
+
+      for (const field of ["departman_id", "gorev_id", "bagli_amir_id", "personel_tipi_id", "ucret_tipi_id", "prim_kurali_id"]) {
+        const parsed = readNullablePositiveInt(field);
+        if (typeof parsed === "number" && Number.isNaN(parsed)) {
+          await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "Gecersiz deger.", field));
+          return;
+        }
+      }
+
+      if ("sube_id" in payload) {
+        const parsedSubeId = readNullablePositiveInt("sube_id");
+        if (parsedSubeId === null || (typeof parsedSubeId === "number" && Number.isNaN(parsedSubeId))) {
+          await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "Sube secilmelidir.", "sube_id"));
+          return;
+        }
+        if (parsedSubeId !== personel.sube_id) {
+          await fulfillJson(route, 403, errorBody("FORBIDDEN", SUBE_SCOPE_MISMATCH_MESSAGE));
+          return;
+        }
+      }
+
+      if ("aktif_durum" in payload && payload.aktif_durum !== personel.aktif_durum) {
         await fulfillJson(
           route,
-          400,
-          errorBody("VALIDATION_ERROR", "Gecerlilik tarihi zorunludur.")
+          422,
+          errorBody("VALIDATION_ERROR", "Aktif durum bu endpoint ile degistirilemez.", "aktif_durum")
         );
         return;
       }
 
+      const merged = mergePersonelFromPutPayload(personel, payload);
+      if (typeof payload.ad === "string") merged.ad = payload.ad.trim();
+      if (typeof payload.soyad === "string") merged.soyad = payload.soyad.trim();
+      if (typeof payload.telefon === "string") merged.telefon = payload.telefon.trim();
+
       Object.assign(personel, merged);
       syncPersonelReferansAdlari(personel);
-
-      const createdAt = new Date().toISOString();
-      surecler.unshift({
-        id: ++surecIdCounter,
-        personel_id: personelId,
-        surec_turu: "ORG_DEGISIKLIK",
-        baslangic_tarihi: effective,
-        effective_date: effective,
-        created_at: createdAt,
-        state: "TAMAMLANDI",
-        aciklama: "Mock otomatik org gecmis kaydi"
-      });
 
       await fulfillJson(route, 200, okBody(buildPersonelDetail(personel)));
       return;

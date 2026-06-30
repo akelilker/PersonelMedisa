@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AUTH_FORBIDDEN_EVENT, AUTH_UNAUTHORIZED_EVENT } from "../../src/lib/storage/auth-events";
+import { shouldEmitGlobalAuthForbidden } from "../../src/lib/api-forbidden-policy";
 import { apiRequest } from "../../src/api/api-client";
 import { getAuthTokenForApi } from "../../src/auth/auth-token-provider";
 
@@ -159,5 +160,143 @@ describe("apiRequest", () => {
       status: 403,
       path: "/surecler"
     });
+  });
+
+  it("throws ApiRequestError without forbidden event for 403 POST /personeller", async () => {
+    const fetchMock = vi.fn(async () =>
+      createJsonResponse(
+        {
+          data: null,
+          meta: {},
+          errors: [{ code: "FORBIDDEN", message: "Secili sube icin yetkiniz yok." }]
+        },
+        403
+      )
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const forbiddenListener = vi.fn();
+    window.addEventListener(AUTH_FORBIDDEN_EVENT, (event) => {
+      forbiddenListener((event as CustomEvent<{ status: number; path: string }>).detail);
+    });
+
+    await expect(
+      apiRequest("/personeller", {
+        method: "POST",
+        body: JSON.stringify({ sube_id: 2 })
+      })
+    ).rejects.toMatchObject({
+      status: 403,
+      message: "Secili sube icin yetkiniz yok.",
+      code: "FORBIDDEN"
+    });
+
+    expect(forbiddenListener).not.toHaveBeenCalled();
+  });
+
+  it("throws ApiRequestError without forbidden event for 403 GET /personeller/:id", async () => {
+    const fetchMock = vi.fn(async () =>
+      createJsonResponse(
+        {
+          data: null,
+          meta: {},
+          errors: [{ code: "FORBIDDEN", message: "Bu kayit aktif sube baglaminda goruntulenemiyor." }]
+        },
+        403
+      )
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const forbiddenListener = vi.fn();
+    window.addEventListener(AUTH_FORBIDDEN_EVENT, (event) => {
+      forbiddenListener((event as CustomEvent<{ status: number; path: string }>).detail);
+    });
+
+    await expect(apiRequest("/personeller/2")).rejects.toMatchObject({
+      status: 403,
+      message: "Bu kayit aktif sube baglaminda goruntulenemiyor.",
+      code: "FORBIDDEN"
+    });
+
+    expect(forbiddenListener).not.toHaveBeenCalled();
+  });
+
+  it("emits forbidden event and throws ApiRequestError for 403 GET /gunluk-puantaj/:id/:date", async () => {
+    const fetchMock = vi.fn(async () =>
+      createJsonResponse(
+        {
+          data: null,
+          meta: {},
+          errors: [{ code: "FORBIDDEN", message: "Bu kayit aktif sube baglaminda goruntulenemiyor." }]
+        },
+        403
+      )
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const forbiddenListener = vi.fn();
+    window.addEventListener(AUTH_FORBIDDEN_EVENT, (event) => {
+      forbiddenListener((event as CustomEvent<{ status: number; path: string }>).detail);
+    });
+
+    await expect(apiRequest("/gunluk-puantaj/2/2026-01-01")).rejects.toMatchObject({
+      status: 403,
+      code: "FORBIDDEN"
+    });
+
+    expect(forbiddenListener).toHaveBeenCalledWith({
+      status: 403,
+      path: "/gunluk-puantaj/2/2026-01-01"
+    });
+  });
+
+  it("emits forbidden event and throws ApiRequestError for 403 GET /personeller list", async () => {
+    const fetchMock = vi.fn(async () =>
+      createJsonResponse(
+        {
+          data: null,
+          meta: {},
+          errors: [{ code: "FORBIDDEN", message: "Secili sube icin yetkiniz yok." }]
+        },
+        403
+      )
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const forbiddenListener = vi.fn();
+    window.addEventListener(AUTH_FORBIDDEN_EVENT, (event) => {
+      forbiddenListener((event as CustomEvent<{ status: number; path: string }>).detail);
+    });
+
+    await expect(apiRequest("/personeller?page=1&limit=10")).rejects.toMatchObject({
+      status: 403,
+      code: "FORBIDDEN"
+    });
+
+    expect(forbiddenListener).toHaveBeenCalledWith({
+      status: 403,
+      path: "/personeller?page=1&limit=10"
+    });
+  });
+});
+
+describe("shouldEmitGlobalAuthForbidden", () => {
+  it("suppresses global forbidden for scoped personel write/detail paths", () => {
+    expect(shouldEmitGlobalAuthForbidden("/personeller", "POST")).toBe(false);
+    expect(shouldEmitGlobalAuthForbidden("/personeller/2", "GET")).toBe(false);
+    expect(shouldEmitGlobalAuthForbidden("/personeller/2", "PUT")).toBe(false);
+    expect(shouldEmitGlobalAuthForbidden("/surecler/9", "GET")).toBe(false);
+    expect(shouldEmitGlobalAuthForbidden("/bildirimler/4", "GET")).toBe(false);
+  });
+
+  it("keeps global forbidden for list, sub-resources, puantaj and unknown paths", () => {
+    expect(shouldEmitGlobalAuthForbidden("/personeller", "GET")).toBe(true);
+    expect(shouldEmitGlobalAuthForbidden("/personeller?page=1", "GET")).toBe(true);
+    expect(shouldEmitGlobalAuthForbidden("/personeller/2/belge-durumu", "GET")).toBe(true);
+    expect(shouldEmitGlobalAuthForbidden("/personeller/3/belge-kayitlari", "GET")).toBe(true);
+    expect(shouldEmitGlobalAuthForbidden("/gunluk-puantaj/2/2026-01-01", "GET")).toBe(true);
+    expect(shouldEmitGlobalAuthForbidden("/yonetim/kullanicilar", "GET")).toBe(true);
+    expect(shouldEmitGlobalAuthForbidden("/api/personeller/2/belge-durumu", "GET")).toBe(true);
+    expect(shouldEmitGlobalAuthForbidden("/unknown-endpoint", "GET")).toBe(true);
   });
 });

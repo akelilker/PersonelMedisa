@@ -331,7 +331,11 @@ export async function fetchWithCacheMerge<T>(key: string, fetcher: () => Promise
     const data = await fetcher();
     setCacheEntry(key, data);
     return data;
-  } catch {
+  } catch (error) {
+    if (error instanceof ApiRequestError && (error.status === 403 || error.status === 404)) {
+      throw error;
+    }
+
     const cached = getCacheEntry<T>(key);
     if (cached !== undefined) {
       return cached;

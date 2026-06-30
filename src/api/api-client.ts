@@ -1,3 +1,4 @@
+import { shouldEmitGlobalAuthForbidden } from "../lib/api-forbidden-policy";
 import { getActiveSubeIdForApiHeader } from "../auth/auth-manager";
 import { getAuthTokenForApi } from "../auth/auth-token-provider";
 import { emitAuthForbidden, emitAuthUnauthorized } from "../lib/storage/auth-events";
@@ -258,12 +259,16 @@ export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T
       return payload as T;
     }
 
+    const requestMethod = (init?.method ?? "GET").toUpperCase();
+
     if (isUnauthorizedStatus(response.status)) {
       emitAuthUnauthorized({ status: response.status, path });
     } else if (isForbiddenStatus(response.status)) {
-      emitAuthForbidden({ status: response.status, path });
+      if (shouldEmitGlobalAuthForbidden(path, requestMethod)) {
+        emitAuthForbidden({ status: response.status, path });
+      }
     } else if (response.status >= 500) {
-      const method = (init?.method ?? "GET").toUpperCase();
+      const method = requestMethod;
       logApiFailure5xx({
         endpoint: path,
         status: response.status,

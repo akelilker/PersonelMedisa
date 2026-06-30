@@ -70,13 +70,10 @@ test.describe("sube scope", () => {
     await expect(page.locator(".personel-dosya-hero")).toContainText(/Ayşe Yılmaz/i);
 
     await page.goto("/personeller/2");
-    await expect(page).toHaveURL(/\/(personeller|yetkisiz)$/);
+    await expect(page).toHaveURL(/\/personeller$/);
     await expect(page.locator(".personel-dosya-hero")).toHaveCount(0);
     await expect(page.getByRole("link", { name: /Mehmet Kaya.*kişisinin kartını aç/i })).toHaveCount(0);
-
-    if (page.url().endsWith("/personeller")) {
-      await expect(page.getByText(SUBE_DETAIL_REDIRECT_MESSAGE)).toBeVisible();
-    }
+    await expect(page.getByText(SUBE_DETAIL_REDIRECT_MESSAGE)).toBeVisible();
 
     expect(pageErrors).toEqual([]);
   });

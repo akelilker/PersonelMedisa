@@ -37,6 +37,10 @@ export function shouldEmitGlobalAuthForbidden(path: string, method?: string): bo
     return false;
   }
 
+  if (normalizedMethod === "GET" && normalizedPath === "/surecler") {
+    return false;
+  }
+
   if (normalizedMethod === "GET" && /^\/surecler\/\d+$/.test(normalizedPath)) {
     return false;
   }

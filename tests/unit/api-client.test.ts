@@ -138,7 +138,7 @@ describe("apiRequest", () => {
     });
   });
 
-  it("emits forbidden event and throws ApiRequestError for 403 response", async () => {
+  it("emits forbidden event and throws ApiRequestError for global 403 response", async () => {
     const fetchMock = vi.fn(async () =>
       createJsonResponse(
         {
@@ -156,7 +156,7 @@ describe("apiRequest", () => {
       forbiddenListener((event as CustomEvent<{ status: number; path: string }>).detail);
     });
 
-    await expect(apiRequest("/surecler")).rejects.toMatchObject({
+    await expect(apiRequest("/yonetim/kullanicilar")).rejects.toMatchObject({
       status: 403,
       message: "Bu kaynak icin yetkin yok.",
       code: "FORBIDDEN"
@@ -164,7 +164,7 @@ describe("apiRequest", () => {
 
     expect(forbiddenListener).toHaveBeenCalledWith({
       status: 403,
-      path: "/surecler"
+      path: "/yonetim/kullanicilar"
     });
   });
 
@@ -219,6 +219,33 @@ describe("apiRequest", () => {
     });
 
     await expect(apiRequest("/personeller/2")).rejects.toMatchObject({
+      status: 403,
+      message: "Bu kayit aktif sube baglaminda goruntulenemiyor.",
+      code: "FORBIDDEN"
+    });
+
+    expect(forbiddenListener).not.toHaveBeenCalled();
+  });
+
+  it("throws ApiRequestError without forbidden event for 403 GET /surecler list", async () => {
+    const fetchMock = vi.fn(async () =>
+      createJsonResponse(
+        {
+          data: null,
+          meta: {},
+          errors: [{ code: "FORBIDDEN", message: "Bu kayit aktif sube baglaminda goruntulenemiyor." }]
+        },
+        403
+      )
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const forbiddenListener = vi.fn();
+    window.addEventListener(AUTH_FORBIDDEN_EVENT, (event) => {
+      forbiddenListener((event as CustomEvent<{ status: number; path: string }>).detail);
+    });
+
+    await expect(apiRequest("/surecler?personel_id=2&sube_id=1")).rejects.toMatchObject({
       status: 403,
       message: "Bu kayit aktif sube baglaminda goruntulenemiyor.",
       code: "FORBIDDEN"
@@ -389,10 +416,13 @@ describe("api error helpers", () => {
 });
 
 describe("shouldEmitGlobalAuthForbidden", () => {
-  it("suppresses global forbidden for scoped personel write/detail paths", () => {
+  it("suppresses global forbidden for scoped personel write/detail and surecler read paths", () => {
     expect(shouldEmitGlobalAuthForbidden("/personeller", "POST")).toBe(false);
     expect(shouldEmitGlobalAuthForbidden("/personeller/2", "GET")).toBe(false);
     expect(shouldEmitGlobalAuthForbidden("/personeller/2", "PUT")).toBe(false);
+    expect(shouldEmitGlobalAuthForbidden("/surecler", "GET")).toBe(false);
+    expect(shouldEmitGlobalAuthForbidden("/surecler?personel_id=2&sube_id=1", "GET")).toBe(false);
+    expect(shouldEmitGlobalAuthForbidden("/api/surecler?personel_id=2", "GET")).toBe(false);
     expect(shouldEmitGlobalAuthForbidden("/surecler/9", "GET")).toBe(false);
     expect(shouldEmitGlobalAuthForbidden("/bildirimler/4", "GET")).toBe(false);
   });

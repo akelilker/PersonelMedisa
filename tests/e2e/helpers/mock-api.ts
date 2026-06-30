@@ -267,6 +267,16 @@ function getRequestSubeScope(request: { headers(): { [key: string]: string } }, 
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 }
 
+function parseStrictPositiveIntParam(value: string | null): number | null {
+  if (value === null || value.trim() === "") {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  const parsed = Number.parseInt(trimmed, 10);
+  return Number.isInteger(parsed) && parsed > 0 && String(parsed) === trimmed ? parsed : null;
+}
+
 export async function mockApi(page: Page, role: MockUserRole) {
   const bagliAmirReferanslari: Array<{ id: number; ad: string; sube_id: number; departman_id: number }> = [
     { id: 9, ad: "Demo Amir", sube_id: 1, departman_id: 3 },
@@ -454,6 +464,19 @@ export async function mockApi(page: Page, role: MockUserRole) {
       surec_turu: "DEVAMSIZLIK",
       baslangic_tarihi: "2026-03-08",
       aciklama: "Demo devamsizlik sinyali",
+      state: "AKTIF"
+    },
+    {
+      id: 503,
+      personel_id: 2,
+      surec_turu: "IZIN",
+      alt_tur: "UCRETSIZ_IZIN",
+      baslangic_tarihi: "2026-04-15",
+      bitis_tarihi: "2026-04-15",
+      effective_date: "2026-04-15",
+      created_at: "2026-04-15T10:00:00.000Z",
+      ucretli_mi: false,
+      aciklama: "Sube 2 scope kontrol sureci",
       state: "AKTIF"
     }
   ];
@@ -1700,15 +1723,51 @@ let bildirimIdCounter = 800;
     }
 
     if (path === "/api/surecler" && method === "GET") {
-      const personelId = Number.parseInt(url.searchParams.get("personel_id") ?? "", 10);
+      const hasPersonelId = url.searchParams.has("personel_id");
+      const personelId = hasPersonelId ? parseStrictPositiveIntParam(url.searchParams.get("personel_id")) : null;
       const surecTuru = url.searchParams.get("surec_turu");
       const state = url.searchParams.get("state");
       const baslangicTarihi = url.searchParams.get("baslangic_tarihi");
       const bitisTarihi = url.searchParams.get("bitis_tarihi");
-      const subeId = Number.parseInt(url.searchParams.get("sube_id") ?? "", 10);
+      const subeScope = getRequestSubeScope(request, url);
+
+      if (hasPersonelId && personelId === null) {
+        await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "Personel secimi gecersiz.", "personel_id"));
+        return;
+      }
+
+      if (subeScope !== null && mockUserSubeIds.length > 0 && !mockUserSubeIds.includes(subeScope)) {
+        await fulfillJson(route, 403, errorBody("FORBIDDEN", PERSONEL_CREATE_SUBE_UNAUTHORIZED_MESSAGE));
+        return;
+      }
+
+      const personelInScope = (personel: (typeof personeller)[number] | undefined) => {
+        if (!personel || typeof personel.sube_id !== "number") {
+          return false;
+        }
+
+        if (subeScope !== null) {
+          return personel.sube_id === subeScope;
+        }
+
+        return mockUserSubeIds.length === 0 || mockUserSubeIds.includes(personel.sube_id);
+      };
+
+      if (personelId !== null) {
+        const linkedPersonel = personeller.find((personel) => personel.id === personelId);
+        if (!linkedPersonel) {
+          await fulfillJson(route, 404, errorBody("NOT_FOUND", "Personel bulunamadi."));
+          return;
+        }
+
+        if (!personelInScope(linkedPersonel)) {
+          await fulfillJson(route, 403, errorBody("FORBIDDEN", SUBE_SCOPE_MISMATCH_MESSAGE));
+          return;
+        }
+      }
 
       const filtered = surecler.filter((item) => {
-        if (Number.isFinite(personelId) && item.personel_id !== personelId) {
+        if (personelId !== null && item.personel_id !== personelId) {
           return false;
         }
         if (surecTuru && item.surec_turu !== surecTuru) {
@@ -1723,11 +1782,8 @@ let bildirimIdCounter = 800;
         if (bitisTarihi && item.bitis_tarihi !== bitisTarihi) {
           return false;
         }
-        if (Number.isFinite(subeId)) {
-          const linkedPersonel = personeller.find((personel) => personel.id === item.personel_id);
-          if (!linkedPersonel || linkedPersonel.sube_id !== subeId) {
-            return false;
-          }
+        if (!personelInScope(personeller.find((personel) => personel.id === item.personel_id))) {
+          return false;
         }
         return true;
       });

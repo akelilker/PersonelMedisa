@@ -15,11 +15,20 @@ class SureclerController
 {
     public static function list(Request $request)
     {
-        AuthMiddleware::authenticate($request, true);
+        $user = AuthMiddleware::authenticate($request, true);
+        $scope = SubeScope::resolveScope($user, $request);
+        $allowedSubeIds = SubeScope::allowedSubeIds($user);
 
         $page = max(1, (int) ($request->getQuery('page', 1) ?: 1));
         $limit = max(1, min(250, (int) ($request->getQuery('limit', 20) ?: 20)));
-        $personelId = (int) ($request->getQuery('personel_id', 0) ?: 0);
+        $rawPersonelId = $request->getQuery('personel_id', null);
+        $personelId = null;
+        if ($rawPersonelId !== null) {
+            $personelId = self::parsePositiveInt($rawPersonelId);
+            if ($personelId === null) {
+                self::validationError('personel_id', 'Personel secimi gecersiz.');
+            }
+        }
 
         try {
             $pdo = Connection::get();
@@ -30,32 +39,59 @@ class SureclerController
         $where = ['1=1'];
         $params = [];
 
-        if ($personelId > 0) {
-            $where[] = 'personel_id = :personel_id';
+        if ($personelId !== null) {
+            $personel = self::fetchPersonelForScope($pdo, $personelId);
+            if (!$personel) {
+                JsonResponse::notFound('Personel bulunamadi.');
+            }
+
+            SubeScope::assertPersonelAccess($user, $request, (int) $personel['sube_id']);
+            $where[] = 'sc.personel_id = :personel_id';
             $params['personel_id'] = $personelId;
+        } elseif ($scope !== null) {
+            $where[] = 'p.sube_id = :scope_sube_id';
+            $params['scope_sube_id'] = $scope;
+        } elseif (count($allowedSubeIds) > 0) {
+            $placeholders = [];
+            foreach ($allowedSubeIds as $index => $subeId) {
+                $key = 'allowed_sube_id_' . $index;
+                $placeholders[] = ':' . $key;
+                $params[$key] = $subeId;
+            }
+            $where[] = 'p.sube_id IN (' . implode(', ', $placeholders) . ')';
         }
 
         $whereSql = implode(' AND ', $where);
-        $countStmt = $pdo->prepare("SELECT COUNT(*) AS total FROM surecler WHERE $whereSql");
-        $countStmt->execute($params);
-        $total = (int) ($countStmt->fetch(PDO::FETCH_ASSOC)['total'] ?? 0);
+        try {
+            $countStmt = $pdo->prepare("
+                SELECT COUNT(*) AS total
+                FROM surecler sc
+                INNER JOIN personeller p ON p.id = sc.personel_id
+                WHERE $whereSql
+            ");
+            $countStmt->execute($params);
+            $total = (int) ($countStmt->fetch(PDO::FETCH_ASSOC)['total'] ?? 0);
 
-        $offset = ($page - 1) * $limit;
-        $sql = "
-            SELECT id, personel_id, surec_turu, alt_tur, baslangic_tarihi, bitis_tarihi,
-                   ucretli_mi, aciklama, state
-            FROM surecler
-            WHERE $whereSql
-            ORDER BY id DESC
-            LIMIT :limit OFFSET :offset
-        ";
-        $stmt = $pdo->prepare($sql);
-        foreach ($params as $key => $value) {
-            $stmt->bindValue(':' . $key, $value);
+            $offset = ($page - 1) * $limit;
+            $sql = "
+                SELECT sc.id, sc.personel_id, sc.surec_turu, sc.alt_tur, sc.baslangic_tarihi, sc.bitis_tarihi,
+                       sc.ucretli_mi, sc.aciklama, sc.state
+                FROM surecler sc
+                INNER JOIN personeller p ON p.id = sc.personel_id
+                WHERE $whereSql
+                ORDER BY sc.id DESC
+                LIMIT :limit OFFSET :offset
+            ";
+            $stmt = $pdo->prepare($sql);
+            foreach ($params as $key => $value) {
+                $stmt->bindValue(':' . $key, $value, is_int($value) ? PDO::PARAM_INT : PDO::PARAM_STR);
+            }
+            $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+            $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+            $stmt->execute();
+        } catch (\PDOException $e) {
+            JsonResponse::serverError('Surecler listelenemedi.');
         }
-        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
-        $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
-        $stmt->execute();
 
         $items = [];
         foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
@@ -87,7 +123,7 @@ class SureclerController
             JsonResponse::serverError('Veritabani baglantisi kurulamadi.');
         }
 
-        $personel = self::fetchPersonelForCreate($pdo, $payload['personel_id']);
+        $personel = self::fetchPersonelForScope($pdo, $payload['personel_id']);
         if (!$personel) {
             self::validationError('personel_id', 'Personel bulunamadı.');
         }
@@ -179,7 +215,7 @@ class SureclerController
     }
 
     /** @return array<string, mixed>|null */
-    private static function fetchPersonelForCreate(PDO $pdo, $personelId)
+    private static function fetchPersonelForScope(PDO $pdo, $personelId)
     {
         $stmt = $pdo->prepare('SELECT id, sube_id, aktif_durum FROM personeller WHERE id = :id LIMIT 1');
         $stmt->execute(['id' => (int) $personelId]);

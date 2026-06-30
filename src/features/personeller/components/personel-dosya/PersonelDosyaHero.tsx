@@ -2,7 +2,7 @@ import { formatAktifDurumLabel } from "../../../../lib/display/enum-display";
 import type { Personel } from "../../../../types/personel";
 import { isPersonelMaasMissing } from "../../personel-create-utils";
 import { DossierField } from "./personel-dosya-dossier";
-import { formatDetailValue, formatReferenceValue } from "./personel-dosya-format-utils";
+import { formatDetailValue, formatIsoDateDetail, formatReferenceValue } from "./personel-dosya-format-utils";
 
 export function PersonelDosyaHero({ personel }: { personel: Personel }) {
   const durumLabel =
@@ -45,7 +45,7 @@ export function PersonelDosyaHero({ personel }: { personel: Personel }) {
               : "personel-dosya-field-value"
           }
         />
-        <DossierField label="İşe Giriş Tarihi" value={formatDetailValue(personel.ise_giris_tarihi)} />
+        <DossierField label="İşe Giriş Tarihi" value={formatIsoDateDetail(personel.ise_giris_tarihi)} />
       </div>
 
       {isPersonelMaasMissing(personel.maas_tutari) ? (

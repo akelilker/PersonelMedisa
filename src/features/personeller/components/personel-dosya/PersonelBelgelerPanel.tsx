@@ -6,13 +6,13 @@ import type { Personel } from "../../../../types/personel";
 import { BELGE_TURU_KEYS, BELGE_TURU_LABELS, type BelgeDurumuItem } from "../../../../types/belgeler";
 import {
   formatPersonelBelgeDisplayText,
-  formatPersonelBelgeIsoDate,
   formatPersonelBelgeKayitTipiLabel,
   PERSONEL_BELGE_GECERLILIK_LABELS,
   PERSONEL_BELGE_KAYIT_EMPTY_MESSAGE,
   type PersonelBelgeKaydi
 } from "../../../../types/personel-belge-kaydi";
 import { DossierRecord, DossierSection } from "./personel-dosya-dossier";
+import { formatIsoDateDetail } from "./personel-dosya-format-utils";
 
 function formatBelgeDurumLabel(durum: BelgeDurumuItem["durum"]) {
   return durum === "VAR" ? "Var" : "Yok";
@@ -203,8 +203,8 @@ export function PersonelBelgelerPanel({
                     <td>{formatPersonelBelgeDisplayText(kayit.ad)}</td>
                     <td>{formatPersonelBelgeDisplayText(kayit.veren_kurum)}</td>
                     <td>{formatPersonelBelgeDisplayText(kayit.belge_no)}</td>
-                    <td>{formatPersonelBelgeIsoDate(kayit.baslangic_tarihi)}</td>
-                    <td>{formatPersonelBelgeIsoDate(kayit.bitis_tarihi)}</td>
+                    <td>{formatIsoDateDetail(kayit.baslangic_tarihi)}</td>
+                    <td>{formatIsoDateDetail(kayit.bitis_tarihi)}</td>
                     <td>
                       <span className={gecerlilikClassName(kayit.gecerlilik_durumu)}>
                         {PERSONEL_BELGE_GECERLILIK_LABELS[kayit.gecerlilik_durumu]}

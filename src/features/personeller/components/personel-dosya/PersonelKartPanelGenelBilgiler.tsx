@@ -1,7 +1,7 @@
 import type { Personel } from "../../../../types/personel";
 import type { Surec } from "../../../../types/surec";
 import { DossierRecord, DossierSection } from "./personel-dosya-dossier";
-import { formatDetailValue, formatReferenceValue } from "./personel-dosya-format-utils";
+import { formatDetailValue, formatIsoDateDetail, formatReferenceValue } from "./personel-dosya-format-utils";
 import { PersonelIzinOzetSection } from "./PersonelIzinOzetSection";
 import { PersonelPuantajOzetSection } from "./PersonelPuantajOzetSection";
 
@@ -28,7 +28,7 @@ export function PersonelKartPanelGenelBilgiler({
       >
         <DossierRecord label="T.C. Kimlik No" value={formatDetailValue(personel.tc_kimlik_no)} />
         <DossierRecord label="Telefon" value={formatDetailValue(personel.telefon)} />
-        <DossierRecord label="Doğum Tarihi" value={formatDetailValue(personel.dogum_tarihi)} />
+        <DossierRecord label="Doğum Tarihi" value={formatIsoDateDetail(personel.dogum_tarihi)} />
         <DossierRecord label="Doğum Yeri" value={formatDetailValue(personel.dogum_yeri)} />
         <DossierRecord label="Kan Grubu" value={formatDetailValue(personel.kan_grubu)} />
         <DossierRecord label="Şube" value={formatReferenceValue(personel.sube_adi, personel.sube_id)} />

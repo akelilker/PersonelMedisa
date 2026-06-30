@@ -15,12 +15,9 @@ import {
   type PersonelBelgeKaydi,
   type PersonelBelgeKayitTipi
 } from "../../../types/personel-belge-kaydi";
+import { formatIsoDateDetail } from "../../personeller/components/personel-dosya/personel-dosya-format-utils";
 
 export const KAYIT_SUREC_BELGE_KAYITLARI_FORM_ID = "kayit-surec-belge-kayitlari-form";
-
-function formatOptionalField(value: string | null | undefined) {
-  return value && value.trim() ? value : "-";
-}
 
 function needsBitisTarihiWarning(tip: PersonelBelgeKayitTipi, bitisTarihi: string | null | undefined) {
   return (tip === "SERTIFIKA" || tip === "EHLIYET") && !bitisTarihi?.trim();
@@ -175,7 +172,7 @@ export function KayitBelgeKayitlariSection({
                   <tr key={item.id} data-testid={`kayit-belge-kayit-row-${item.id}`}>
                     <td>{formatPersonelBelgeKayitTipiLabel(item.kayit_tipi)}</td>
                     <td>{item.ad}</td>
-                    <td>{formatOptionalField(item.bitis_tarihi)}</td>
+                    <td>{formatIsoDateDetail(item.bitis_tarihi)}</td>
                     <td>{PERSONEL_BELGE_GECERLILIK_LABELS[item.gecerlilik_durumu]}</td>
                     <td>
                       <button

@@ -4,7 +4,7 @@ import {
   formatZimmetUrunTuruLabel
 } from "../../../../lib/display/enum-display";
 import type { Zimmet } from "../../../../types/zimmet";
-import { formatDetailValue } from "./personel-dosya-format-utils";
+import { formatDetailValue, formatIsoDateDetail } from "./personel-dosya-format-utils";
 
 export function PersonelZimmetEnvanterPanel({
   canCreateZimmet,
@@ -60,7 +60,7 @@ export function PersonelZimmetEnvanterPanel({
               {zimmetler.map((zimmet) => (
                 <tr key={zimmet.id}>
                   <td className="personel-zimmet-cell-strong">{formatZimmetUrunTuruLabel(zimmet.urun_turu)}</td>
-                  <td>{formatDetailValue(zimmet.teslim_tarihi)}</td>
+                  <td>{formatIsoDateDetail(zimmet.teslim_tarihi)}</td>
                   <td>{formatDetailValue(zimmet.teslim_eden)}</td>
                   <td>{formatZimmetTeslimDurumuLabel(zimmet.teslim_durumu)}</td>
                   <td>

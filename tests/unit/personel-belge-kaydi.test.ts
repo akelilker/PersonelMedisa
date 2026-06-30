@@ -4,7 +4,6 @@ import { normalizePersonelBelgeKaydi } from "../../src/api/personel-belge-kayitl
 import {
   computeGecerlilikDurumu,
   formatPersonelBelgeDisplayText,
-  formatPersonelBelgeIsoDate,
   formatPersonelBelgeKayitDurumLabel,
   formatPersonelBelgeKayitTipiLabel,
   normalizePersonelBelgeKayitTipi,
@@ -58,12 +57,6 @@ describe("personel-belge-kaydi helpers", () => {
     expect(formatPersonelBelgeDisplayText("[object Object]")).toBe("-");
     expect(formatPersonelBelgeDisplayText("  ISO 9001 sertifikası  ")).toBe("ISO 9001 sertifikası");
     expect(formatPersonelBelgeDisplayText(null)).toBe("-");
-  });
-
-  it("belge iso tarihlerini okunur formatta gosterir", () => {
-    expect(formatPersonelBelgeIsoDate("2024-03-01")).toMatch(/2024/);
-    expect(formatPersonelBelgeIsoDate("")).toBe("-");
-    expect(formatPersonelBelgeIsoDate('{"tarih":"2024-03-01"}')).toBe("-");
   });
 
   it("timeline ve belge sekmesi Sertifika label mantigi celismez", () => {

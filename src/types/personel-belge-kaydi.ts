@@ -137,21 +137,6 @@ export function formatPersonelBelgeDisplayText(value: string | null | undefined)
   return trimmed;
 }
 
-export function formatPersonelBelgeIsoDate(value: string | null | undefined): string {
-  if (typeof value !== "string" || !value.trim()) {
-    return "-";
-  }
-
-  const parts = parseIsoDate(value);
-  if (!parts) {
-    return formatPersonelBelgeDisplayText(value);
-  }
-
-  return new Intl.DateTimeFormat("tr-TR", { dateStyle: "short" }).format(
-    new Date(Date.UTC(parts.y, parts.m - 1, parts.d))
-  );
-}
-
 export const PERSONEL_BELGE_GECERLILIK_LABELS: Record<PersonelBelgeGecerlilikDurumu, string> = {
   GECERLI: "Geçerli",
   YAKINDA_DOLUYOR: "Yakında doluyor",

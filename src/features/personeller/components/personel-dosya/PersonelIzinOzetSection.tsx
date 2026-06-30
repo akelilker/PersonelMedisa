@@ -4,7 +4,7 @@ import { hesaplaIzinBakiye } from "../../../../services/izin-hesap-motoru";
 import type { Personel } from "../../../../types/personel";
 import type { Surec } from "../../../../types/surec";
 import { DossierSection } from "./personel-dosya-dossier";
-import { formatDetailValue } from "./personel-dosya-format-utils";
+import { formatIsoDateDetail } from "./personel-dosya-format-utils";
 
 export function PersonelIzinOzetSection({
   personel,
@@ -81,8 +81,8 @@ export function PersonelIzinOzetSection({
                 </span>
                 <span className="personel-surec-card-state">{formatSurecStateLabel(surec.state)}</span>
                 <span className="personel-surec-card-dates">
-                  Başlangıç: {formatDetailValue(surec.baslangic_tarihi)}
-                  {surec.bitis_tarihi ? ` | Bitiş: ${surec.bitis_tarihi}` : ""}
+                  Başlangıç: {formatIsoDateDetail(surec.baslangic_tarihi)}
+                  {surec.bitis_tarihi ? ` | Bitiş: ${formatIsoDateDetail(surec.bitis_tarihi)}` : ""}
                 </span>
                 {surec.aciklama ? (
                   <span className="personel-surec-card-desc">{surec.aciklama}</span>

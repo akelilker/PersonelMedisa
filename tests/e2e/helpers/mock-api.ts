@@ -232,11 +232,11 @@ const RAPOR_MOCK_ITEMS: Record<string, Record<string, unknown>[]> = {
   ]
 };
 
-function errorBody(code: string, message: string) {
+function errorBody(code: string, message: string, field?: string) {
   return JSON.stringify({
     data: null,
     meta: {},
-    errors: [{ code, message }]
+    errors: [{ code, ...(field ? { field } : {}), message }]
   });
 }
 
@@ -249,6 +249,9 @@ async function fulfillJson(route: Route, status: number, body: string) {
 }
 
 const SUBE_SCOPE_MISMATCH_MESSAGE = "Bu kayıt aktif şube bağlamında görüntülenemiyor.";
+const PERSONEL_CREATE_SUBE_SCOPE_MISMATCH_MESSAGE = "Bu kayit aktif sube baglaminda goruntulenemiyor.";
+const PERSONEL_CREATE_SUBE_UNAUTHORIZED_MESSAGE = "Secili sube icin yetkiniz yok.";
+const DUPLICATE_TC_KIMLIK_NO_MESSAGE = "Bu T.C. Kimlik No ile kayıt açılamaz.";
 
 function getRequestSubeScope(request: { headers(): { [key: string]: string } }, url: URL): number | null {
   const querySubeId = url.searchParams.get("sube_id");
@@ -1173,6 +1176,9 @@ let bildirimIdCounter = 800;
     return Number.isFinite(parsed) ? parsed : null;
   }
 
+  const mockUserSubeIds =
+    role === "BIRIM_AMIRI" ? [1] : role === "MUHASEBE" ? [1, 2] : role === "BOLUM_YONETICISI" ? [2] : [];
+
   await page.route(
     (testUrl) => {
       try {
@@ -1188,20 +1194,18 @@ let bildirimIdCounter = 800;
     const method = request.method();
 
     if (path === "/api/auth/login" && method === "POST") {
-      const subeIds =
-        role === "BIRIM_AMIRI" ? [1] : role === "MUHASEBE" ? [1, 2] : role === "BOLUM_YONETICISI" ? [2] : [];
       await fulfillJson(
         route,
         200,
         okBody({
           token: "mock-token",
           ui_profile: role === "BIRIM_AMIRI" ? "birim_amiri" : "yonetim",
-          sube_list: subeIds.map((id) => ({ id, ad: subeler.find((item) => item.id === id)?.ad ?? `Şube ${id}` })),
+          sube_list: mockUserSubeIds.map((id) => ({ id, ad: subeler.find((item) => item.id === id)?.ad ?? `Şube ${id}` })),
           user: {
             id: 1,
             ad_soyad: "Mock Kullanıcı",
             rol: role,
-            sube_ids: subeIds
+            sube_ids: mockUserSubeIds
           }
         })
       );
@@ -1264,13 +1268,35 @@ let bildirimIdCounter = 800;
 
     if (path === "/api/personeller" && method === "POST") {
       const payload = request.postDataJSON() as Record<string, unknown>;
+      const tcKimlikNo = String(payload.tc_kimlik_no ?? "").trim();
       const subeId =
         typeof payload.sube_id === "number"
           ? payload.sube_id
           : Number.parseInt(String(payload.sube_id ?? ""), 10);
+      const subeScope = getRequestSubeScope(request, url);
+
+      const duplicateTc = personeller.some((personel) => String(personel.tc_kimlik_no).trim() === tcKimlikNo);
+      if (duplicateTc) {
+        await fulfillJson(
+          route,
+          409,
+          errorBody("DUPLICATE_TC_KIMLIK_NO", DUPLICATE_TC_KIMLIK_NO_MESSAGE, "tc_kimlik_no")
+        );
+        return;
+      }
+
+      if (Number.isFinite(subeId) && subeId > 0 && subeScope !== null && subeId !== subeScope) {
+        await fulfillJson(route, 403, errorBody("FORBIDDEN", PERSONEL_CREATE_SUBE_SCOPE_MISMATCH_MESSAGE));
+        return;
+      }
 
       if (!Number.isFinite(subeId) || subeId <= 0) {
         await fulfillJson(route, 400, errorBody("VALIDATION_ERROR", "Şube seçilmelidir."));
+        return;
+      }
+
+      if (mockUserSubeIds.length > 0 && !mockUserSubeIds.includes(subeId)) {
+        await fulfillJson(route, 403, errorBody("FORBIDDEN", PERSONEL_CREATE_SUBE_UNAUTHORIZED_MESSAGE));
         return;
       }
 
@@ -1309,7 +1335,7 @@ let bildirimIdCounter = 800;
 
       const created = {
         id: nextId,
-        tc_kimlik_no: String(payload.tc_kimlik_no ?? ""),
+        tc_kimlik_no: tcKimlikNo,
         ad: String(payload.ad ?? "Yeni"),
         soyad: String(payload.soyad ?? "Personel"),
         aktif_durum: (payload.aktif_durum === "PASIF" ? "PASIF" : "AKTIF") as "AKTIF" | "PASIF",
@@ -2751,4 +2777,3 @@ let bildirimIdCounter = 800;
     }
   );
 }
-

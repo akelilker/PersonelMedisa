@@ -7,6 +7,7 @@ import {
 import { getApiErrorMessage } from "../../../api/api-client";
 import {
   createEmptyBelgeKaydiDraft,
+  formatPersonelBelgeKayitTipiLabel,
   PERSONEL_BELGE_GECERLILIK_LABELS,
   PERSONEL_BELGE_KAYIT_TIPI_KEYS,
   PERSONEL_BELGE_KAYIT_TIPI_LABELS,
@@ -172,7 +173,7 @@ export function KayitBelgeKayitlariSection({
               <tbody>
                 {items.map((item) => (
                   <tr key={item.id} data-testid={`kayit-belge-kayit-row-${item.id}`}>
-                    <td>{PERSONEL_BELGE_KAYIT_TIPI_LABELS[item.kayit_tipi]}</td>
+                    <td>{formatPersonelBelgeKayitTipiLabel(item.kayit_tipi)}</td>
                     <td>{item.ad}</td>
                     <td>{formatOptionalField(item.bitis_tarihi)}</td>
                     <td>{PERSONEL_BELGE_GECERLILIK_LABELS[item.gecerlilik_durumu]}</td>

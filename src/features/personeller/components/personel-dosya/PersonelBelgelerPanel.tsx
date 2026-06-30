@@ -5,19 +5,17 @@ import { getApiErrorMessage } from "../../../../api/api-client";
 import type { Personel } from "../../../../types/personel";
 import { BELGE_TURU_KEYS, BELGE_TURU_LABELS, type BelgeDurumuItem } from "../../../../types/belgeler";
 import {
+  formatPersonelBelgeDisplayText,
+  formatPersonelBelgeIsoDate,
+  formatPersonelBelgeKayitTipiLabel,
   PERSONEL_BELGE_GECERLILIK_LABELS,
-  PERSONEL_BELGE_KAYIT_TIPI_LABELS,
+  PERSONEL_BELGE_KAYIT_EMPTY_MESSAGE,
   type PersonelBelgeKaydi
 } from "../../../../types/personel-belge-kaydi";
 import { DossierRecord, DossierSection } from "./personel-dosya-dossier";
-import { formatDetailValue } from "./personel-dosya-format-utils";
 
 function formatBelgeDurumLabel(durum: BelgeDurumuItem["durum"]) {
   return durum === "VAR" ? "Var" : "Yok";
-}
-
-function formatOptionalDetail(value: string | null | undefined) {
-  return value && value.trim() ? formatDetailValue(value) : "-";
 }
 
 function gecerlilikClassName(durum: PersonelBelgeKaydi["gecerlilik_durumu"]) {
@@ -179,7 +177,7 @@ export function PersonelBelgelerPanel({
           <DossierRecord label="Durum" value={belgeKayitlariErrorMessage} />
         ) : null}
         {!isBelgeKayitlariLoading && !belgeKayitlariErrorMessage && sortedBelgeKayitlari.length === 0 ? (
-          <DossierRecord label="Kayıt" value="Henüz aktif eğitim veya sertifika kaydı yok." />
+          <DossierRecord label="Kayıt" value={PERSONEL_BELGE_KAYIT_EMPTY_MESSAGE} />
         ) : null}
 
         {!isBelgeKayitlariLoading && !belgeKayitlariErrorMessage && sortedBelgeKayitlari.length > 0 ? (
@@ -201,19 +199,19 @@ export function PersonelBelgelerPanel({
               <tbody>
                 {sortedBelgeKayitlari.map((kayit) => (
                   <tr key={kayit.id} data-testid={`personel-belge-kayit-row-${kayit.id}`}>
-                    <td>{PERSONEL_BELGE_KAYIT_TIPI_LABELS[kayit.kayit_tipi]}</td>
-                    <td>{kayit.ad}</td>
-                    <td>{formatOptionalDetail(kayit.veren_kurum)}</td>
-                    <td>{formatOptionalDetail(kayit.belge_no)}</td>
-                    <td>{formatOptionalDetail(kayit.baslangic_tarihi)}</td>
-                    <td>{formatOptionalDetail(kayit.bitis_tarihi)}</td>
+                    <td>{formatPersonelBelgeKayitTipiLabel(kayit.kayit_tipi)}</td>
+                    <td>{formatPersonelBelgeDisplayText(kayit.ad)}</td>
+                    <td>{formatPersonelBelgeDisplayText(kayit.veren_kurum)}</td>
+                    <td>{formatPersonelBelgeDisplayText(kayit.belge_no)}</td>
+                    <td>{formatPersonelBelgeIsoDate(kayit.baslangic_tarihi)}</td>
+                    <td>{formatPersonelBelgeIsoDate(kayit.bitis_tarihi)}</td>
                     <td>
                       <span className={gecerlilikClassName(kayit.gecerlilik_durumu)}>
                         {PERSONEL_BELGE_GECERLILIK_LABELS[kayit.gecerlilik_durumu]}
                       </span>
                     </td>
-                    <td>{formatOptionalDetail(kayit.ek_ref)}</td>
-                    <td>{formatOptionalDetail(kayit.aciklama)}</td>
+                    <td>{formatPersonelBelgeDisplayText(kayit.ek_ref)}</td>
+                    <td>{formatPersonelBelgeDisplayText(kayit.aciklama)}</td>
                   </tr>
                 ))}
               </tbody>

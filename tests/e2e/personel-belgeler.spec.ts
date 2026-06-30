@@ -39,6 +39,56 @@ test.describe("personel belgeler API contract", () => {
     expect(response.pathname).not.toBe("/yetkisiz");
   });
 
+  test("egitim belgeler sekmesi label kalitesi ve bos durumu kilitler", async ({ page }) => {
+    await mockApi(page, "GENEL_YONETICI");
+    await login(page, users.genelYonetici);
+
+    const apiFailures: Array<{ status: number; url: string }> = [];
+    page.on("response", (response) => {
+      if (!response.url().includes("/api/personeller/") || !response.url().includes("/belge")) {
+        return;
+      }
+      if ([401, 403, 404, 500].includes(response.status())) {
+        apiFailures.push({ status: response.status(), url: response.url() });
+      }
+    });
+
+    await page.getByTestId("menu-personel-karti").click();
+    await page.getByRole("link", { name: /Maas Eksik.*kişisinin kartını aç/i }).first().click();
+    await page.getByRole("tab", { name: "Eğitim / Belgeler" }).click();
+
+    const belgelerPanel = page.locator("#personel-kart-panel-egitim-belgeler");
+    await expect(belgelerPanel.getByText("Belge kaydı bulunmuyor.")).toBeVisible();
+    await expect(belgelerPanel).not.toContainText("SERTIFIKA");
+    await expect(belgelerPanel).not.toContainText("IPTAL");
+    await expect(belgelerPanel).not.toContainText("[object Object]");
+    await expect(belgelerPanel).not.toContainText(/Sertf/i);
+    await expect(page).not.toHaveURL(/\/yetkisiz$/);
+    expect(apiFailures).toEqual([]);
+
+    await page.goto("/personeller");
+    await expect(page).toHaveURL(/\/personeller$/);
+    await page.getByRole("link", { name: /Ayşe Yılmaz.*kişisinin kartını aç/i }).first().click();
+    await page.getByRole("tab", { name: "Eğitim / Belgeler" }).click();
+
+    const aysePanel = page.locator("#personel-kart-panel-egitim-belgeler");
+    const kayitList = aysePanel.getByTestId("personel-belge-kayit-list");
+    await expect(kayitList).toBeVisible();
+    await expect(kayitList).toContainText("Sertifika");
+    await expect(kayitList).toContainText("Forklift Operatör Belgesi");
+    await expect(kayitList).toContainText("Medisa Eğitim Merkezi");
+    await expect(kayitList).not.toContainText("SERTIFIKA");
+    await expect(kayitList).not.toContainText(/Sertf/i);
+    await expect(kayitList).not.toContainText("[object Object]");
+    await expect(kayitList).not.toContainText('{"tip"');
+
+    await page.getByRole("tab", { name: "Süreç Geçmişi" }).click();
+    const timeline = page.locator("#personel-kart-panel-surec-gecmisi [data-testid='personel-surec-timeline']");
+    await expect(timeline).toContainText("Belge / Sertifika");
+    await expect(timeline).not.toContainText(/Sertf/i);
+    expect(apiFailures).toEqual([]);
+  });
+
   test("belge kaydi create sonrasi personel kartinda read-only gorunur", async ({ page }) => {
     await mockApi(page, "GENEL_YONETICI");
     await login(page, users.genelYonetici);

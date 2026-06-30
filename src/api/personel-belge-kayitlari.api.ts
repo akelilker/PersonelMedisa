@@ -1,11 +1,10 @@
 import type { ApiResponse, PaginatedResult } from "../types/api";
 import {
   computeGecerlilikDurumu,
-  PERSONEL_BELGE_KAYIT_TIPI_KEYS,
+  normalizePersonelBelgeKayitTipi,
   type CreatePersonelBelgeKaydiPayload,
   type PersonelBelgeKaydi,
   type PersonelBelgeKayitDurum,
-  type PersonelBelgeKayitTipi,
   type UpdatePersonelBelgeKaydiPayload
 } from "../types/personel-belge-kaydi";
 import { logAction } from "../audit/audit-service";
@@ -41,10 +40,6 @@ function toNullableString(value: unknown): string | null {
   return trimmed || null;
 }
 
-function isPersonelBelgeKayitTipi(value: unknown): value is PersonelBelgeKayitTipi {
-  return typeof value === "string" && (PERSONEL_BELGE_KAYIT_TIPI_KEYS as readonly string[]).includes(value);
-}
-
 function isPersonelBelgeKayitDurum(value: unknown): value is PersonelBelgeKayitDurum {
   return value === "AKTIF" || value === "IPTAL";
 }
@@ -58,9 +53,10 @@ export function normalizePersonelBelgeKaydi(data: unknown): PersonelBelgeKaydi {
   const id = toNumber(record.id);
   const personelId = toNumber(record.personel_id ?? record.personelId);
   const kayitTipiRaw = record.kayit_tipi ?? record.kayitTipi;
+  const kayitTipi = normalizePersonelBelgeKayitTipi(kayitTipiRaw);
   const ad = toNullableString(record.ad);
 
-  if (!id || !personelId || !isPersonelBelgeKayitTipi(kayitTipiRaw) || !ad) {
+  if (!id || !personelId || !kayitTipi || !ad) {
     throw new Error("Belge kaydi yaniti eksik alan iceriyor.");
   }
 
@@ -72,7 +68,7 @@ export function normalizePersonelBelgeKaydi(data: unknown): PersonelBelgeKaydi {
   return {
     id,
     personel_id: personelId,
-    kayit_tipi: kayitTipiRaw,
+    kayit_tipi: kayitTipi,
     ad,
     veren_kurum: toNullableString(record.veren_kurum ?? record.verenKurum),
     belge_no: toNullableString(record.belge_no ?? record.belgeNo),

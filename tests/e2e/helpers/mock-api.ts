@@ -526,6 +526,15 @@ export async function mockApi(page: Page, role: MockUserRole) {
       state: "AKTIF"
     },
     {
+      id: 504,
+      personel_id: 1,
+      surec_turu: "BELGE",
+      alt_tur: "SERTIFIKA",
+      baslangic_tarihi: "2024-03-01",
+      aciklama: "Forklift Operatör Belgesi",
+      state: "AKTIF"
+    },
+    {
       id: 503,
       personel_id: 2,
       surec_turu: "IZIN",

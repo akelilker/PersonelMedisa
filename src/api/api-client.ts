@@ -141,16 +141,100 @@ export function shouldQueueOfflineMutation(error: unknown): boolean {
   return error instanceof ApiRequestError && error.status === 0;
 }
 
-export function getApiErrorMessage(error: unknown, fallbackMessage: string): string {
-  if (error instanceof ApiRequestError && error.message.trim()) {
-    return error.message;
+export type ApiErrorDetail = {
+  message: string;
+  status?: number;
+  code?: string;
+  field?: string;
+};
+
+export type GetApiErrorMessageOptions = {
+  context?: "personel-create";
+};
+
+export function isApiRequestError(error: unknown): error is ApiRequestError {
+  return error instanceof ApiRequestError;
+}
+
+const DUPLICATE_TC_MESSAGE = "Bu T.C. Kimlik No ile kayıt açılamaz.";
+const PERSONEL_CREATE_FORBIDDEN_SUBE_YETKI_MESSAGE = "Seçili şube için yetkiniz yok.";
+const PERSONEL_CREATE_FORBIDDEN_SUBE_SCOPE_MESSAGE =
+  "Seçilen şube aktif şube filtresiyle uyuşmuyor.";
+
+function resolvePersonelCreateForbiddenMessage(backendMessage: string, fallbackMessage: string): string {
+  const normalized = backendMessage.trim().toLowerCase();
+  if (!normalized) {
+    return fallbackMessage;
+  }
+
+  if (normalized.includes("secili sube") && normalized.includes("yetkiniz")) {
+    return PERSONEL_CREATE_FORBIDDEN_SUBE_YETKI_MESSAGE;
+  }
+
+  if (
+    normalized.includes("aktif sube") ||
+    normalized.includes("baglaminda") ||
+    normalized.includes("goruntulenemiyor")
+  ) {
+    return PERSONEL_CREATE_FORBIDDEN_SUBE_SCOPE_MESSAGE;
+  }
+
+  return backendMessage.trim();
+}
+
+function resolveApiErrorDetail(
+  error: unknown,
+  fallbackMessage: string,
+  options?: GetApiErrorMessageOptions
+): ApiErrorDetail {
+  if (error instanceof ApiRequestError) {
+    const rawMessage = error.message.trim();
+    const baseDetail: ApiErrorDetail = {
+      message: rawMessage || fallbackMessage,
+      status: error.status,
+      code: error.code,
+      field: error.field
+    };
+
+    if (error.code === "DUPLICATE_TC_KIMLIK_NO") {
+      return {
+        ...baseDetail,
+        message: rawMessage || DUPLICATE_TC_MESSAGE,
+        field: error.field ?? "tc_kimlik_no"
+      };
+    }
+
+    if (error.code === "FORBIDDEN" && options?.context === "personel-create") {
+      return {
+        ...baseDetail,
+        message: resolvePersonelCreateForbiddenMessage(rawMessage, fallbackMessage)
+      };
+    }
+
+    return baseDetail;
   }
 
   if (error instanceof Error && error.message.trim()) {
-    return error.message;
+    return { message: error.message.trim() };
   }
 
-  return fallbackMessage;
+  return { message: fallbackMessage };
+}
+
+export function getApiErrorDetail(
+  error: unknown,
+  fallbackMessage: string,
+  options?: GetApiErrorMessageOptions
+): ApiErrorDetail {
+  return resolveApiErrorDetail(error, fallbackMessage, options);
+}
+
+export function getApiErrorMessage(
+  error: unknown,
+  fallbackMessage: string,
+  options?: GetApiErrorMessageOptions
+): string {
+  return getApiErrorDetail(error, fallbackMessage, options).message;
 }
 
 function extractFirstApiError(payload: unknown): ApiError | null {

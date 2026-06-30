@@ -618,8 +618,8 @@ export function KayitSurecWorkspace({
       setSurecTuruOptions(surecTurleri);
       setPersoneller(personelList.items);
     } catch (error) {
-      setBootstrapError(error instanceof Error ? error.message : "Kayıt alanı yüklenemedi.");
-      setSubeLoadError(error instanceof Error ? error.message : "Şube listesi yüklenemedi.");
+      setBootstrapError(getApiErrorMessage(error, "Kayıt alanı yüklenemedi."));
+      setSubeLoadError(getApiErrorMessage(error, "Şube listesi yüklenemedi."));
     } finally {
       setBootstrapLoading(false);
     }
@@ -733,7 +733,9 @@ export function KayitSurecWorkspace({
       setSurecInfo("Personel seçildi. Süreç kaydına devam edebilirsin.");
       onTabChange("surec");
     } catch (error) {
-      setPersonelError(error instanceof Error ? error.message : "Personel kaydı oluşturulamadı.");
+      setPersonelError(
+        getApiErrorMessage(error, "Personel kaydı oluşturulamadı.", { context: "personel-create" })
+      );
     } finally {
       setPersonelSubmitting(false);
     }
@@ -804,7 +806,7 @@ export function KayitSurecWorkspace({
       setEditingSurec(null);
       setSurecForm(resetSurecFormKeepingPersonel(nextSurecPersonelId));
     } catch (error) {
-      setSurecError(error instanceof Error ? error.message : "Süreç kaydı kaydedilemedi.");
+      setSurecError(getApiErrorMessage(error, "Süreç kaydı kaydedilemedi."));
     } finally {
       setSurecSubmitting(false);
     }
@@ -907,7 +909,7 @@ export function KayitSurecWorkspace({
       setPozisyonForm(createPozisyonFormFromPersonel(updated));
       setPozisyonInfo("Pozisyon güncellendi.");
     } catch (error) {
-      setPozisyonError(error instanceof Error ? error.message : "Pozisyon güncellenemedi.");
+      setPozisyonError(getApiErrorMessage(error, "Pozisyon güncellenemedi."));
     } finally {
       setPozisyonSubmitting(false);
     }

@@ -1,7 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AUTH_FORBIDDEN_EVENT, AUTH_UNAUTHORIZED_EVENT } from "../../src/lib/storage/auth-events";
 import { shouldEmitGlobalAuthForbidden } from "../../src/lib/api-forbidden-policy";
-import { apiRequest } from "../../src/api/api-client";
+import {
+  ApiRequestError,
+  apiRequest,
+  getApiErrorDetail,
+  getApiErrorMessage,
+  isApiRequestError
+} from "../../src/api/api-client";
 import { getAuthTokenForApi } from "../../src/auth/auth-token-provider";
 
 const { mockActiveSubeHeader } = vi.hoisted(() => ({
@@ -277,6 +283,108 @@ describe("apiRequest", () => {
       status: 403,
       path: "/personeller?page=1&limit=10"
     });
+  });
+});
+
+describe("api error helpers", () => {
+  it("isApiRequestError distinguishes ApiRequestError from generic Error", () => {
+    expect(isApiRequestError(new ApiRequestError("Forbidden", 403, { code: "FORBIDDEN" }))).toBe(true);
+    expect(isApiRequestError(new Error("Generic"))).toBe(false);
+    expect(isApiRequestError(null)).toBe(false);
+  });
+
+  it("getApiErrorDetail preserves DUPLICATE_TC_KIMLIK_NO metadata", () => {
+    const error = new ApiRequestError("Bu T.C. Kimlik No ile kayıt açılamaz.", 409, {
+      code: "DUPLICATE_TC_KIMLIK_NO",
+      field: "tc_kimlik_no"
+    });
+
+    expect(getApiErrorDetail(error, "Personel kaydı oluşturulamadı.")).toEqual({
+      message: "Bu T.C. Kimlik No ile kayıt açılamaz.",
+      status: 409,
+      code: "DUPLICATE_TC_KIMLIK_NO",
+      field: "tc_kimlik_no"
+    });
+  });
+
+  it("maps personel-create FORBIDDEN yetkisiz sube message", () => {
+    const error = new ApiRequestError("Secili sube icin yetkiniz yok.", 403, { code: "FORBIDDEN" });
+
+    expect(
+      getApiErrorDetail(error, "Personel kaydı oluşturulamadı.", { context: "personel-create" })
+    ).toEqual({
+      message: "Seçili şube için yetkiniz yok.",
+      status: 403,
+      code: "FORBIDDEN",
+      field: undefined
+    });
+  });
+
+  it("maps personel-create FORBIDDEN aktif sube mismatch message", () => {
+    const error = new ApiRequestError("Bu kayit aktif sube baglaminda goruntulenemiyor.", 403, {
+      code: "FORBIDDEN"
+    });
+
+    expect(
+      getApiErrorDetail(error, "Personel kaydı oluşturulamadı.", { context: "personel-create" })
+    ).toEqual({
+      message: "Seçilen şube aktif şube filtresiyle uyuşmuyor.",
+      status: 403,
+      code: "FORBIDDEN",
+      field: undefined
+    });
+  });
+
+  it("passes through FORBIDDEN without personel-create context", () => {
+    const error = new ApiRequestError("Bu kaynak icin yetkin yok.", 403, { code: "FORBIDDEN" });
+
+    expect(getApiErrorDetail(error, "Islem basarisiz.")).toEqual({
+      message: "Bu kaynak icin yetkin yok.",
+      status: 403,
+      code: "FORBIDDEN",
+      field: undefined
+    });
+  });
+
+  it("passes through VALIDATION_ERROR with field metadata", () => {
+    const error = new ApiRequestError("Sube secilmelidir.", 422, {
+      code: "VALIDATION_ERROR",
+      field: "sube_id"
+    });
+
+    expect(getApiErrorDetail(error, "Personel kaydı oluşturulamadı.")).toEqual({
+      message: "Sube secilmelidir.",
+      status: 422,
+      code: "VALIDATION_ERROR",
+      field: "sube_id"
+    });
+  });
+
+  it("returns generic Error message and fallback for unknown values", () => {
+    expect(getApiErrorDetail(new Error("Client validation failed"), "Fallback")).toEqual({
+      message: "Client validation failed"
+    });
+    expect(getApiErrorDetail(null, "Fallback")).toEqual({ message: "Fallback" });
+  });
+
+  it("uses fallback for empty ApiRequestError message", () => {
+    const error = new ApiRequestError("   ", 500, { code: "INTERNAL_ERROR" });
+
+    expect(getApiErrorDetail(error, "Sunucu hatasi.")).toEqual({
+      message: "Sunucu hatasi.",
+      status: 500,
+      code: "INTERNAL_ERROR",
+      field: undefined
+    });
+  });
+
+  it("getApiErrorMessage returns detail message", () => {
+    const error = new ApiRequestError("Secili sube icin yetkiniz yok.", 403, { code: "FORBIDDEN" });
+
+    expect(getApiErrorMessage(error, "Personel kaydı oluşturulamadı.", { context: "personel-create" })).toBe(
+      "Seçili şube için yetkiniz yok."
+    );
+    expect(getApiErrorMessage(error, "Personel kaydı oluşturulamadı.")).toBe("Secili sube icin yetkiniz yok.");
   });
 });
 

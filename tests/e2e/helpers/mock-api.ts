@@ -1021,6 +1021,37 @@ let bildirimIdCounter = 800;
     { id: 15, ad: "Aşçı" }
   ];
 
+  function normalizeLifecycleSnapshot(p: (typeof personeller)[number]) {
+    const n = (v: number | undefined | null) =>
+      v === undefined || v === null || !Number.isFinite(v) ? null : v;
+    const nm = (v: number | undefined | null) =>
+      v === undefined || v === null || !Number.isFinite(v) ? null : v;
+    return {
+      departman_id: n(p.departman_id),
+      gorev_id: n(p.gorev_id),
+      bagli_amir_id: n(p.bagli_amir_id),
+      personel_tipi_id: n(p.personel_tipi_id),
+      ucret_tipi_id: n(p.ucret_tipi_id),
+      maas_tutari: nm(p.maas_tutari),
+      prim_kurali_id: n(p.prim_kurali_id)
+    };
+  }
+
+  function lifecycleSnapshotsEqual(
+    a: ReturnType<typeof normalizeLifecycleSnapshot>,
+    b: ReturnType<typeof normalizeLifecycleSnapshot>
+  ) {
+    return (
+      a.departman_id === b.departman_id &&
+      a.gorev_id === b.gorev_id &&
+      a.bagli_amir_id === b.bagli_amir_id &&
+      a.personel_tipi_id === b.personel_tipi_id &&
+      a.ucret_tipi_id === b.ucret_tipi_id &&
+      a.maas_tutari === b.maas_tutari &&
+      a.prim_kurali_id === b.prim_kurali_id
+    );
+  }
+
   function mergePersonelFromPutPayload(
     base: (typeof personeller)[number],
     payload: Record<string, unknown>
@@ -1543,13 +1574,66 @@ let bildirimIdCounter = 800;
         return;
       }
 
+      const hasLifecycleKeys =
+        "departman_id" in payload ||
+        "gorev_id" in payload ||
+        "bagli_amir_id" in payload ||
+        "personel_tipi_id" in payload ||
+        "ucret_tipi_id" in payload ||
+        "maas_tutari" in payload ||
+        "prim_kurali_id" in payload;
+
+      if (!hasLifecycleKeys) {
+        if (typeof payload.ad === "string") personel.ad = payload.ad.trim();
+        if (typeof payload.soyad === "string") personel.soyad = payload.soyad.trim();
+        if (typeof payload.telefon === "string") personel.telefon = payload.telefon.trim();
+        await fulfillJson(route, 200, okBody(buildPersonelDetail(personel)));
+        return;
+      }
+
       const merged = mergePersonelFromPutPayload(personel, payload);
       if (typeof payload.ad === "string") merged.ad = payload.ad.trim();
       if (typeof payload.soyad === "string") merged.soyad = payload.soyad.trim();
       if (typeof payload.telefon === "string") merged.telefon = payload.telefon.trim();
 
+      const beforeSnap = normalizeLifecycleSnapshot(personel);
+      const afterSnap = normalizeLifecycleSnapshot(merged);
+      const hasLifecycleDiff = !lifecycleSnapshotsEqual(beforeSnap, afterSnap);
+
+      if (!hasLifecycleDiff) {
+        personel.ad = merged.ad;
+        personel.soyad = merged.soyad;
+        personel.telefon = merged.telefon;
+        await fulfillJson(route, 200, okBody(buildPersonelDetail(personel)));
+        return;
+      }
+
+      const effectiveRaw = payload.effective_date;
+      const effective =
+        typeof effectiveRaw === "string" && effectiveRaw.trim() ? effectiveRaw.trim() : "";
+      if (!effective) {
+        await fulfillJson(
+          route,
+          400,
+          errorBody("VALIDATION_ERROR", "Gecerlilik tarihi zorunludur.")
+        );
+        return;
+      }
+
       Object.assign(personel, merged);
       syncPersonelReferansAdlari(personel);
+
+      const createdAt = new Date().toISOString();
+      surecler.unshift({
+        id: ++surecIdCounter,
+        personel_id: personelId,
+        surec_turu: "ORG_DEGISIKLIK",
+        baslangic_tarihi: effective,
+        effective_date: effective,
+        created_at: createdAt,
+        state: "TAMAMLANDI",
+        aciklama: "Mock otomatik org gecmis kaydi"
+      });
 
       await fulfillJson(route, 200, okBody(buildPersonelDetail(personel)));
       return;
@@ -1662,6 +1746,19 @@ let bildirimIdCounter = 800;
         ucretli_mi?: boolean;
         aciklama?: string;
       };
+
+      if (payload.surec_turu === "POZISYON_DEGISTI") {
+        const mockOrgIndex = surecler.findIndex(
+          (item) =>
+            item.personel_id === payload.personel_id &&
+            item.surec_turu === "ORG_DEGISIKLIK" &&
+            item.baslangic_tarihi === payload.baslangic_tarihi &&
+            item.aciklama === "Mock otomatik org gecmis kaydi"
+        );
+        if (mockOrgIndex >= 0) {
+          surecler.splice(mockOrgIndex, 1);
+        }
+      }
 
       const created = {
         id: ++surecIdCounter,

@@ -100,4 +100,56 @@ test.describe("Kayit yeni personel", () => {
     await page.goto("/");
     await expectThreeButtonMainMenu(page, true);
   });
+
+  test("Personel Karti acikken kayit sonrasi liste cache guncellenir", async ({ page }) => {
+    await mockApi(page, "GENEL_YONETICI");
+    await login(page, { username: "yonetici", password: "secret" });
+
+    await page.getByTestId("menu-personel-karti").click();
+    await expect(page).toHaveURL(/\/personeller$/);
+    await expect(page.getByRole("link", { name: /Ayşe Yılmaz.*kişisinin kartını aç/i }).first()).toBeVisible({
+      timeout: 15_000
+    });
+
+    await page.goto("/");
+    await expectThreeButtonMainMenu(page, true);
+
+    const kayitModal = await openKayitModal(page);
+    await kayitModal.locator('[name="create-tc"]').fill("17654321987");
+    await kayitModal.locator('[name="create-ad"]').fill("CacheSync");
+    await kayitModal.locator('[name="create-soyad"]').fill("E2E");
+    await kayitModal.locator('[name="create-dogum"]').fill("1992-08-20");
+    await kayitModal.locator('[name="create-telefon"]').fill("05321112233");
+    await kayitModal.locator('[name="create-acil-kisi"]').fill("Acil Kisi");
+    await kayitModal.locator('[name="create-acil-tel"]').fill("05324443322");
+    await kayitModal.locator('[name="create-sicil"]').fill("E2E-CACHE-SYNC-01");
+    await kayitModal.locator('[name="create-ise-giris"]').fill("2026-06-20");
+    await selectCreateOption(kayitModal, "Şube", "Merkez");
+    await selectCreateOption(kayitModal, "Bölüm", "Döşeme");
+    await selectCreateOption(kayitModal, "Görev / Unvan", "Genel Müdür");
+    await selectCreateOption(kayitModal, "Personel Tipi", "Tam Zamanlı");
+    await kayitModal.getByRole("button", { name: "Kaydet" }).click();
+
+    await expect(kayitModal.getByRole("heading", { name: /CacheSync E2E/i })).toBeVisible({
+      timeout: 15_000
+    });
+    await kayitModal.getByRole("button", { name: "Kapat" }).click();
+    await expect(kayitModal).toHaveCount(0);
+
+    let delayPersonelList = true;
+    await page.route("**/api/personeller**", async (route) => {
+      const request = route.request();
+      if (request.method() === "GET" && delayPersonelList) {
+        await new Promise((resolve) => setTimeout(resolve, 4_000));
+      }
+      await route.continue();
+    });
+
+    await page.getByTestId("menu-personel-karti").click();
+    await expect(page).toHaveURL(/\/personeller$/);
+
+    await expect(
+      page.getByRole("link", { name: /CacheSync E2E.*kişisinin kartını aç/i }).first()
+    ).toBeVisible({ timeout: 2_000 });
+  });
 });

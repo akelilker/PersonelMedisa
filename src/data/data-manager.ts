@@ -650,6 +650,121 @@ export function optimisticPrependPersonel(listKey: string, row: Personel): numbe
   return optimisticPrependToList(listKey, row);
 }
 
+type PersonellerListCacheFilters = {
+  search: string;
+  aktiflik: string;
+  departmanId: string;
+  personelTipiId: string;
+  page: number;
+};
+
+function parsePersonellerListCacheKeySuffix(suffix: string): PersonellerListCacheFilters | null {
+  const parts = suffix.split("|");
+  if (parts.length !== 5) {
+    return null;
+  }
+
+  const page = Number.parseInt(parts[4], 10);
+  if (!Number.isFinite(page)) {
+    return null;
+  }
+
+  return {
+    search: parts[0],
+    aktiflik: parts[1],
+    departmanId: parts[2],
+    personelTipiId: parts[3],
+    page
+  };
+}
+
+function personelMatchesAktiflikFilter(created: Personel, aktiflik: string): boolean {
+  if (aktiflik === "tum") {
+    return true;
+  }
+  if (aktiflik === "aktif") {
+    return created.aktif_durum === "AKTIF";
+  }
+  if (aktiflik === "pasif") {
+    return created.aktif_durum === "PASIF";
+  }
+  return false;
+}
+
+function personelMatchesSearchFilter(created: Personel, search: string): boolean {
+  const query = search.trim().toLowerCase();
+  if (!query) {
+    return true;
+  }
+
+  const fields = [created.ad, created.soyad, created.tc_kimlik_no]
+    .filter((value): value is string => typeof value === "string" && value.length > 0)
+    .map((value) => value.toLowerCase());
+
+  return fields.some((field) => field.includes(query));
+}
+
+function personelMatchesOptionalIdFilter(
+  createdValue: number | undefined,
+  filterValue: string
+): boolean {
+  const trimmed = filterValue.trim();
+  if (!trimmed) {
+    return true;
+  }
+
+  const parsed = Number.parseInt(trimmed, 10);
+  if (!Number.isFinite(parsed)) {
+    return false;
+  }
+
+  return createdValue === parsed;
+}
+
+function personelMatchesListCacheFilters(created: Personel, filters: PersonellerListCacheFilters): boolean {
+  if (filters.page !== 1) {
+    return false;
+  }
+
+  if (!personelMatchesAktiflikFilter(created, filters.aktiflik)) {
+    return false;
+  }
+
+  if (!personelMatchesSearchFilter(created, filters.search)) {
+    return false;
+  }
+
+  if (!personelMatchesOptionalIdFilter(created.departman_id, filters.departmanId)) {
+    return false;
+  }
+
+  if (!personelMatchesOptionalIdFilter(created.personel_tipi_id, filters.personelTipiId)) {
+    return false;
+  }
+
+  return true;
+}
+
+/** Kayit modalindan yeni personel olusturulunca global list/detail onbellegini gunceller. */
+export function commitPersonelCreateToCaches(created: Personel): void {
+  const activeSube = getActiveSube();
+  setCacheEntry(dataCacheKeys.personelDetail(activeSube, created.id), created);
+
+  const prefix = `personeller:list:s${subeSeg(activeSube)}:`;
+  for (const key of Object.keys(ensureAppData().cache)) {
+    if (!key.startsWith(prefix)) {
+      continue;
+    }
+
+    const filters = parsePersonellerListCacheKeySuffix(key.slice(prefix.length));
+    if (!filters || !personelMatchesListCacheFilters(created, filters)) {
+      continue;
+    }
+
+    optimisticPrependPersonel(key, created);
+  }
+}
+
 export function replacePersonelInListCache(listKey: string, tempId: number, created: Personel): void {
   mergeCacheEntry<PaginatedResult<Personel>>(listKey, (prev) => {
     if (!prev) {

@@ -14,6 +14,7 @@ import { LoadingState } from "../../../components/states/LoadingState";
 import type { KayitTab } from "../../../components/main-menu/MainMenu";
 import type { PersonelReferenceBundle } from "../../../data/app-data.types";
 import {
+  commitPersonelCreateToCaches,
   dataCacheKeys,
   deleteCacheEntry,
   getActiveSube,
@@ -724,6 +725,7 @@ export function KayitSurecWorkspace({
 
     try {
       const created = await createPersonel(buildCreatePersonelPayload(personelForm));
+      commitPersonelCreateToCaches(created);
       setPersoneller((prev) => [created, ...prev.filter((item) => item.id !== created.id)]);
       setPersonelForm(INITIAL_CREATE_PERSONEL_FORM);
       setSurecForm(resetSurecFormKeepingPersonel(String(created.id)));

@@ -25,8 +25,8 @@ type PersonelCreateFieldsProps = {
   subeOptions?: IdOption[];
   subeLoadError?: string | null;
   createErrorMessage?: string | null;
-  fieldErrors?: Partial<Record<"tcKimlikNo", string>>;
-  onFieldErrorClear?: (field: "tcKimlikNo") => void;
+  fieldErrors?: Partial<Record<"tcKimlikNo" | "subeId", string>>;
+  onFieldErrorClear?: (field: "tcKimlikNo" | "subeId") => void;
   referenceError?: string | null;
   className?: string;
 };
@@ -124,6 +124,7 @@ function PersonelCreateSelect({
       </label>
       <button
         type="button"
+        id={name}
         className={`form-input personel-create-select-trigger${isOpen ? " is-open" : ""}${
           isPlaceholderSelected ? " is-placeholder" : ""
         }`}
@@ -190,28 +191,44 @@ export function PersonelCreateFields({
 }: PersonelCreateFieldsProps) {
   const [openSelectName, setOpenSelectName] = useState<string | null>(null);
   const tcKimlikNoFieldError = fieldErrors?.tcKimlikNo;
+  const subeIdFieldError = fieldErrors?.subeId;
 
   function setSelectOpen(name: string, isOpen: boolean) {
     setOpenSelectName(isOpen ? name : null);
   }
 
   useLayoutEffect(() => {
-    if (!tcKimlikNoFieldError) {
+    if (tcKimlikNoFieldError) {
+      const input = document.getElementById("create-tc");
+      if (!(input instanceof HTMLInputElement)) {
+        return;
+      }
+
+      try {
+        input.focus({ preventScroll: true });
+        input.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      } catch {
+        /* Focus/scroll desteklenmiyorsa sessizce devam et. */
+      }
       return;
     }
 
-    const input = document.getElementById("create-tc");
-    if (!(input instanceof HTMLInputElement)) {
+    if (!subeIdFieldError) {
+      return;
+    }
+
+    const trigger = document.getElementById("create-sube");
+    if (!(trigger instanceof HTMLElement)) {
       return;
     }
 
     try {
-      input.focus({ preventScroll: true });
-      input.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      trigger.focus({ preventScroll: true });
+      trigger.scrollIntoView({ block: "nearest", behavior: "smooth" });
     } catch {
       /* Focus/scroll desteklenmiyorsa sessizce devam et. */
     }
-  }, [tcKimlikNoFieldError]);
+  }, [tcKimlikNoFieldError, subeIdFieldError]);
 
   return (
     <div className={className}>
@@ -324,17 +341,27 @@ export function PersonelCreateFields({
               {subeLoadError}
             </p>
           ) : subeOptions.length > 0 ? (
-            <PersonelCreateSelect
-              label="Şube"
-              name="create-sube"
-              value={form.subeId}
-              onChange={(value) => setForm((prev) => ({ ...prev, subeId: value }))}
-              required
-              placeholderOption={{ value: "", label: "Seçiniz" }}
-              options={toSelectOptions(subeOptions)}
-              isOpen={openSelectName === "create-sube"}
-              onOpenChange={(isOpen) => setSelectOpen("create-sube", isOpen)}
-            />
+            <>
+              <PersonelCreateSelect
+                label="Şube"
+                name="create-sube"
+                value={form.subeId}
+                onChange={(value) => {
+                  setForm((prev) => ({ ...prev, subeId: value }));
+                  onFieldErrorClear?.("subeId");
+                }}
+                required
+                placeholderOption={{ value: "", label: "Seçiniz" }}
+                options={toSelectOptions(subeOptions)}
+                isOpen={openSelectName === "create-sube"}
+                onOpenChange={(isOpen) => setSelectOpen("create-sube", isOpen)}
+              />
+              {subeIdFieldError ? (
+                <p className="personel-create-error" role="alert">
+                  {subeIdFieldError}
+                </p>
+              ) : null}
+            </>
           ) : (
             refMissingNote("Şube", true)
           )}

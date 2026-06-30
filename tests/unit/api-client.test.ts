@@ -416,10 +416,16 @@ describe("api error helpers", () => {
 });
 
 describe("shouldEmitGlobalAuthForbidden", () => {
-  it("suppresses global forbidden for scoped personel write/detail and surecler read paths", () => {
+  it("suppresses global forbidden for scoped personel write/detail, belge and surecler paths", () => {
     expect(shouldEmitGlobalAuthForbidden("/personeller", "POST")).toBe(false);
     expect(shouldEmitGlobalAuthForbidden("/personeller/2", "GET")).toBe(false);
     expect(shouldEmitGlobalAuthForbidden("/personeller/2", "PUT")).toBe(false);
+    expect(shouldEmitGlobalAuthForbidden("/personeller/2/belge-durumu", "GET")).toBe(false);
+    expect(shouldEmitGlobalAuthForbidden("/personeller/2/belge-durumu", "PUT")).toBe(false);
+    expect(shouldEmitGlobalAuthForbidden("/personeller/3/belge-kayitlari", "GET")).toBe(false);
+    expect(shouldEmitGlobalAuthForbidden("/personeller/3/belge-kayitlari", "POST")).toBe(false);
+    expect(shouldEmitGlobalAuthForbidden("/api/personeller/2/belge-durumu", "GET")).toBe(false);
+    expect(shouldEmitGlobalAuthForbidden("/belge-kayitlari/9/iptal", "POST")).toBe(false);
     expect(shouldEmitGlobalAuthForbidden("/surecler", "GET")).toBe(false);
     expect(shouldEmitGlobalAuthForbidden("/surecler?personel_id=2&sube_id=1", "GET")).toBe(false);
     expect(shouldEmitGlobalAuthForbidden("/api/surecler?personel_id=2", "GET")).toBe(false);
@@ -430,11 +436,9 @@ describe("shouldEmitGlobalAuthForbidden", () => {
   it("keeps global forbidden for list, sub-resources, puantaj and unknown paths", () => {
     expect(shouldEmitGlobalAuthForbidden("/personeller", "GET")).toBe(true);
     expect(shouldEmitGlobalAuthForbidden("/personeller?page=1", "GET")).toBe(true);
-    expect(shouldEmitGlobalAuthForbidden("/personeller/2/belge-durumu", "GET")).toBe(true);
-    expect(shouldEmitGlobalAuthForbidden("/personeller/3/belge-kayitlari", "GET")).toBe(true);
     expect(shouldEmitGlobalAuthForbidden("/gunluk-puantaj/2/2026-01-01", "GET")).toBe(true);
     expect(shouldEmitGlobalAuthForbidden("/yonetim/kullanicilar", "GET")).toBe(true);
-    expect(shouldEmitGlobalAuthForbidden("/api/personeller/2/belge-durumu", "GET")).toBe(true);
+    expect(shouldEmitGlobalAuthForbidden("/belge-kayitlari/9", "PUT")).toBe(true);
     expect(shouldEmitGlobalAuthForbidden("/unknown-endpoint", "GET")).toBe(true);
   });
 });

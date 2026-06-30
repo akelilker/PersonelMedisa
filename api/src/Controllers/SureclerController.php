@@ -38,6 +38,7 @@ class SureclerController
 
         $where = ['1=1'];
         $params = [];
+        $where[] = "(sc.surec_turu <> 'BELGE' OR sc.alt_tur IS NULL OR sc.alt_tur <> 'BELGE_DURUMU')";
 
         if ($personelId !== null) {
             $personel = self::fetchPersonelForScope($pdo, $personelId);
@@ -399,8 +400,34 @@ class SureclerController
             'baslangic_tarihi' => (string) $row['baslangic_tarihi'],
             'bitis_tarihi' => $row['bitis_tarihi'] !== null ? (string) $row['bitis_tarihi'] : null,
             'ucretli_mi' => (bool) ((int) ($row['ucretli_mi'] ?? 0)),
-            'aciklama' => $row['aciklama'] !== null ? (string) $row['aciklama'] : null,
+            'aciklama' => self::mapSurecAciklama($row),
             'state' => (string) $row['state'],
         ];
+    }
+
+    /** @param array<string, mixed> $row */
+    private static function mapSurecAciklama(array $row)
+    {
+        if ($row['aciklama'] === null) {
+            return null;
+        }
+
+        $aciklama = (string) $row['aciklama'];
+        if ((string) ($row['surec_turu'] ?? '') !== 'BELGE') {
+            return $aciklama;
+        }
+
+        $decoded = json_decode($aciklama, true);
+        if (!is_array($decoded) || empty($decoded['_personel_belge_kaydi'])) {
+            return $aciklama;
+        }
+
+        if (!array_key_exists('aciklama', $decoded) || $decoded['aciklama'] === null) {
+            return null;
+        }
+
+        $value = trim((string) $decoded['aciklama']);
+
+        return $value === '' ? null : $value;
     }
 }

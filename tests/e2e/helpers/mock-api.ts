@@ -1003,6 +1003,29 @@ let bildirimIdCounter = 800;
     };
   }
 
+  function assertBelgePersonelScope(request: { headers(): { [key: string]: string } }, url: URL, personelId: number) {
+    const personel = personeller.find((item) => item.id === personelId);
+    if (!personel) {
+      return { ok: false as const, personel: undefined };
+    }
+
+    const subeScope = getRequestSubeScope(request, url);
+    if (personel.sube_id !== undefined && subeScope !== null && personel.sube_id !== subeScope) {
+      return { ok: false as const, personel, status: 403, body: errorBody("FORBIDDEN", SUBE_SCOPE_MISMATCH_MESSAGE) };
+    }
+
+    if (personel.sube_id !== undefined && mockUserSubeIds.length > 0 && !mockUserSubeIds.includes(personel.sube_id)) {
+      return {
+        ok: false as const,
+        personel,
+        status: 403,
+        body: errorBody("FORBIDDEN", PERSONEL_CREATE_SUBE_UNAUTHORIZED_MESSAGE)
+      };
+    }
+
+    return { ok: true as const, personel };
+  }
+
   function getDepartmanLabel(id: number) {
     return departmanOptions.find((item) => item.id === id)?.ad ?? `Departman ${id}`;
   }
@@ -2033,9 +2056,13 @@ let bildirimIdCounter = 800;
     const belgeKayitlariListMatch = path.match(/^\/api\/personeller\/(\d+)\/belge-kayitlari$/);
     if (belgeKayitlariListMatch && method === "GET") {
       const pid = Number.parseInt(belgeKayitlariListMatch[1] ?? "0", 10);
-      const p = personeller.find((x) => x.id === pid);
-      if (!p) {
+      const scopeResult = assertBelgePersonelScope(request, url, pid);
+      if (!scopeResult.personel) {
         await fulfillJson(route, 404, errorBody("NOT_FOUND", "Personel bulunamadi."));
+        return;
+      }
+      if (!scopeResult.ok) {
+        await fulfillJson(route, scopeResult.status, scopeResult.body);
         return;
       }
 
@@ -2064,9 +2091,17 @@ let bildirimIdCounter = 800;
 
     if (belgeKayitlariListMatch && method === "POST") {
       const pid = Number.parseInt(belgeKayitlariListMatch[1] ?? "0", 10);
-      const p = personeller.find((x) => x.id === pid);
-      if (!p) {
+      const scopeResult = assertBelgePersonelScope(request, url, pid);
+      if (!scopeResult.personel) {
         await fulfillJson(route, 404, errorBody("NOT_FOUND", "Personel bulunamadi."));
+        return;
+      }
+      if (!scopeResult.ok) {
+        await fulfillJson(route, scopeResult.status, scopeResult.body);
+        return;
+      }
+      if (scopeResult.personel.aktif_durum === "PASIF") {
+        await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "Pasif personele belge kaydı eklenemez.", "personel_id"));
         return;
       }
 
@@ -2087,6 +2122,14 @@ let bildirimIdCounter = 800;
         await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "kayit_tipi ve ad zorunludur."));
         return;
       }
+      if (payload.baslangic_tarihi && !isValidDateString(payload.baslangic_tarihi)) {
+        await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "Gecerli bir tarih olmalidir.", "baslangic_tarihi"));
+        return;
+      }
+      if (payload.bitis_tarihi && !isValidDateString(payload.bitis_tarihi)) {
+        await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "Gecerli bir tarih olmalidir.", "bitis_tarihi"));
+        return;
+      }
 
       const now = new Date().toISOString();
       const created = {
@@ -2105,7 +2148,7 @@ let bildirimIdCounter = 800;
         updated_at: now
       };
       personelBelgeKayitlari.unshift(created);
-      await fulfillJson(route, 200, okBody(serializePersonelBelgeKaydi(created)));
+      await fulfillJson(route, 201, okBody(serializePersonelBelgeKaydi(created)));
       return;
     }
 
@@ -2117,6 +2160,11 @@ let bildirimIdCounter = 800;
         await fulfillJson(route, 404, errorBody("NOT_FOUND", "Belge kaydi bulunamadi."));
         return;
       }
+      const scopeResult = assertBelgePersonelScope(request, url, kayit.personel_id);
+      if (!scopeResult.ok) {
+        await fulfillJson(route, scopeResult.status, scopeResult.body);
+        return;
+      }
       kayit.durum = "IPTAL";
       kayit.updated_at = new Date().toISOString();
       await fulfillJson(route, 200, okBody(serializePersonelBelgeKaydi(kayit)));
@@ -2126,9 +2174,13 @@ let bildirimIdCounter = 800;
     const belgeDurumMatch = path.match(/^\/api\/personeller\/(\d+)\/belge-durumu$/);
     if (belgeDurumMatch && method === "GET") {
       const pid = Number.parseInt(belgeDurumMatch[1] ?? "0", 10);
-      const p = personeller.find((x) => x.id === pid);
-      if (!p) {
+      const scopeResult = assertBelgePersonelScope(request, url, pid);
+      if (!scopeResult.personel) {
         await fulfillJson(route, 404, errorBody("NOT_FOUND", "Personel bulunamadi."));
+        return;
+      }
+      if (!scopeResult.ok) {
+        await fulfillJson(route, scopeResult.status, scopeResult.body);
         return;
       }
       const stored = belgeDurumByPersonelId.get(pid) ?? {};
@@ -2142,9 +2194,17 @@ let bildirimIdCounter = 800;
 
     if (belgeDurumMatch && method === "PUT") {
       const pid = Number.parseInt(belgeDurumMatch[1] ?? "0", 10);
-      const p = personeller.find((x) => x.id === pid);
-      if (!p) {
+      const scopeResult = assertBelgePersonelScope(request, url, pid);
+      if (!scopeResult.personel) {
         await fulfillJson(route, 404, errorBody("NOT_FOUND", "Personel bulunamadi."));
+        return;
+      }
+      if (!scopeResult.ok) {
+        await fulfillJson(route, scopeResult.status, scopeResult.body);
+        return;
+      }
+      if (scopeResult.personel.aktif_durum === "PASIF") {
+        await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "Pasif personelin belge durumu güncellenemez.", "personel_id"));
         return;
       }
       const payload = (request.postDataJSON() ?? {}) as {

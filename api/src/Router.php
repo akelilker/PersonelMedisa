@@ -51,9 +51,6 @@ class Router
         if ($method === 'PUT' && preg_match('#^/personeller/(\d+)$#', $path)) {
             JsonResponse::methodNotAllowed();
         }
-        if ($method === 'POST' && $path === '/surecler') {
-            JsonResponse::methodNotAllowed();
-        }
         if ($method === 'PUT' && preg_match('#^/gunluk-puantaj/(\d+)/([^/]+)$#', $path)) {
             JsonResponse::methodNotAllowed();
         }
@@ -110,6 +107,9 @@ class Router
         }
         if ($path === '/surecler' && $method === 'GET') {
             SureclerController::list($this->request);
+        }
+        if ($path === '/surecler' && $method === 'POST') {
+            SureclerController::create($this->request);
         }
         if ($path === '/zimmetler' && $method === 'GET') {
             ZimmetlerController::list($this->request);

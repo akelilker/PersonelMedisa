@@ -97,6 +97,61 @@ function sanitizeTimelineDisplayText(value: unknown): string | null {
   return trimmed;
 }
 
+type PersonelBelgeKaydiSurecMetadata = {
+  ad: string;
+  userAciklama: string | null;
+};
+
+function parsePersonelBelgeKaydiSurecMetadata(
+  value: string | null | undefined
+): PersonelBelgeKaydiSurecMetadata | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed.startsWith("{")) {
+    return null;
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(trimmed);
+  } catch {
+    return null;
+  }
+
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    return null;
+  }
+
+  const record = parsed as Record<string, unknown>;
+  if (record._personel_belge_kaydi !== true) {
+    return null;
+  }
+
+  const ad = typeof record.ad === "string" ? record.ad.trim() : "";
+  if (!ad || looksLikeRawJsonLeak(ad)) {
+    return null;
+  }
+
+  const userAciklama =
+    typeof record.aciklama === "string" ? sanitizeTimelineDisplayText(record.aciklama) : null;
+
+  return { ad, userAciklama };
+}
+
+function resolveSurecTimelineAciklama(surec: Surec): string | null {
+  if (surec.surec_turu.trim().toUpperCase() === "BELGE") {
+    const metadata = parsePersonelBelgeKaydiSurecMetadata(surec.aciklama);
+    if (metadata) {
+      return metadata.userAciklama;
+    }
+  }
+
+  return normalizeTimelineText(surec.aciklama);
+}
+
 function normalizeTimelineText(value: string | null | undefined) {
   const sanitized = sanitizeTimelineDisplayText(value);
   if (!sanitized) {
@@ -208,6 +263,11 @@ function buildSurecOzet(surec: Surec) {
   }
 
   if (surecTuru === "BELGE") {
+    const metadata = parsePersonelBelgeKaydiSurecMetadata(surec.aciklama);
+    if (metadata?.ad) {
+      return metadata.ad;
+    }
+
     return "Belge kaydı.";
   }
 
@@ -276,7 +336,7 @@ export function buildPersonelTimeline(
       baslik: buildSurecTitle(surec),
       kaynak: YONETIM_TIMELINE_SUREC_TYPES.has(surecTuru) ? "Yönetim" : "Süreç",
       ozet: buildSurecOzet(surec),
-      aciklama: normalizeTimelineText(surec.aciklama) ?? undefined,
+      aciklama: resolveSurecTimelineAciklama(surec) ?? undefined,
       etiket: normalizeTimelineText(formatSurecStateLabel(surec.state)) ?? undefined,
       tone: surecTuru === "ISTEN_AYRILMA" ? "danger" : "default",
       sortValue: getSurecTimelineSortWeight(surec),

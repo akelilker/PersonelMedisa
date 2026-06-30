@@ -531,7 +531,28 @@ export async function mockApi(page: Page, role: MockUserRole) {
       surec_turu: "BELGE",
       alt_tur: "SERTIFIKA",
       baslangic_tarihi: "2024-03-01",
-      aciklama: "Forklift Operatör Belgesi",
+      aciklama: JSON.stringify({
+        _personel_belge_kaydi: true,
+        kayit_tipi: "SERTIFIKA",
+        ad: "Forklift Operatör Belgesi",
+        baslangic_tarihi: "2024-03-01",
+        bitis_tarihi: "2027-03-01"
+      }),
+      state: "AKTIF"
+    },
+    {
+      id: 505,
+      personel_id: 1,
+      surec_turu: "BELGE",
+      alt_tur: "SERTIFIKA",
+      baslangic_tarihi: "2026-06-28",
+      aciklama: JSON.stringify({
+        _personel_belge_kaydi: true,
+        kayit_tipi: "SERTIFIKA",
+        ad: "S32 Forklift Belgesi",
+        baslangic_tarihi: "2026-06-28"
+      }),
+      created_at: "2026-06-28T10:00:00.000Z",
       state: "AKTIF"
     },
     {
@@ -991,6 +1012,22 @@ let bildirimIdCounter = 800;
   let subeIdCounter = 2;
   let departmanIdCounter = 12;
   let personelIdCounter = 4;
+
+  function encodePersonelBelgeKaydiSurecMetadata(payload: {
+    kayit_tipi: string;
+    ad: string;
+    veren_kurum?: string | null;
+    belge_no?: string | null;
+    baslangic_tarihi?: string | null;
+    bitis_tarihi?: string | null;
+    ek_ref?: string | null;
+    aciklama?: string | null;
+  }) {
+    return JSON.stringify({
+      _personel_belge_kaydi: true,
+      ...payload
+    });
+  }
 
   function serializePersonelBelgeKaydi(record: (typeof personelBelgeKayitlari)[number]) {
     const bitisTarihi = record.bitis_tarihi ?? null;
@@ -2157,6 +2194,26 @@ let bildirimIdCounter = 800;
         updated_at: now
       };
       personelBelgeKayitlari.unshift(created);
+      surecler.unshift({
+        id: created.id,
+        personel_id: pid,
+        surec_turu: "BELGE",
+        alt_tur: kayitTipi,
+        baslangic_tarihi: created.baslangic_tarihi ?? now.slice(0, 10),
+        bitis_tarihi: created.bitis_tarihi ?? undefined,
+        aciklama: encodePersonelBelgeKaydiSurecMetadata({
+          kayit_tipi: kayitTipi,
+          ad,
+          veren_kurum: created.veren_kurum,
+          belge_no: created.belge_no,
+          baslangic_tarihi: created.baslangic_tarihi,
+          bitis_tarihi: created.bitis_tarihi,
+          ek_ref: created.ek_ref,
+          aciklama: created.aciklama
+        }),
+        created_at: now,
+        state: "AKTIF"
+      });
       await fulfillJson(route, 201, okBody(serializePersonelBelgeKaydi(created)));
       return;
     }

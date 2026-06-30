@@ -52,4 +52,24 @@ test.describe("timeline quality", () => {
     await expect(page.getByTestId("personel-belgeler-panel")).toBeVisible();
     await expect(page).not.toHaveURL(/\/yetkisiz$/);
   });
+
+  test("belge metadata adini timeline ozetinde gosterir", async ({ page }) => {
+    await mockApi(page, "GENEL_YONETICI");
+    await login(page, users.genelYonetici);
+
+    await page.goto("/personeller/1");
+    await page.getByRole("tab", { name: "Süreç Geçmişi" }).click();
+
+    const timeline = page
+      .locator("#personel-kart-panel-surec-gecmisi")
+      .locator("[data-testid='personel-surec-timeline']");
+    await expect(timeline).toBeVisible();
+    await expect(timeline).toContainText("Belge / Sertifika");
+    await expect(timeline).toContainText("S32 Forklift Belgesi");
+    await expect(timeline).not.toContainText("Belge / Sertifika / Sertifika");
+    await expect(timeline).not.toContainText('"tip"');
+    await expect(timeline).not.toContainText("_personel_belge_kaydi");
+    await expect(timeline).not.toContainText("[object Object]");
+    await expect(page).not.toHaveURL(/\/yetkisiz$/);
+  });
 });

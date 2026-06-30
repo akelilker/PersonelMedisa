@@ -103,8 +103,83 @@ describe("personel-timeline-utils", () => {
 
     const text = renderTimelineItem(timeline[0]!);
     expect(timeline[0]?.aciklama).toBeUndefined();
+    expect(timeline[0]?.ozet).toBe("Belge kaydı.");
     expect(text).not.toContain('"tip"');
     expect(text).not.toContain("{");
+    expect(text).not.toContain("ISO 9001");
+  });
+
+  it("belge metadata json icindeki ad degerini ozet satirinda gosterir", () => {
+    const timeline = buildPersonelTimeline(makePersonel(), [
+      makeSurec({
+        id: 16,
+        surec_turu: "BELGE",
+        alt_tur: "SERTIFIKA",
+        baslangic_tarihi: "2026-06-28",
+        aciklama: JSON.stringify({
+          _personel_belge_kaydi: true,
+          kayit_tipi: "SERTIFIKA",
+          ad: "Forklift Operatör Belgesi"
+        })
+      })
+    ], []);
+
+    expect(timeline[0]?.baslik).toBe("Belge / Sertifika");
+    expect(timeline[0]?.ozet).toBe("Forklift Operatör Belgesi");
+    expect(renderTimelineItem(timeline[0]!)).not.toMatch(/Belge \/ Sertifika \/ Sertifika/);
+    expect(renderTimelineItem(timeline[0]!)).not.toContain("{");
+    expect(renderTimelineItem(timeline[0]!)).not.toContain("[object Object]");
+  });
+
+  it("belge metadata json ad bos ise guvenli fallback kullanir", () => {
+    const timeline = buildPersonelTimeline(makePersonel(), [
+      makeSurec({
+        id: 17,
+        surec_turu: "BELGE",
+        alt_tur: "SERTIFIKA",
+        aciklama: JSON.stringify({
+          _personel_belge_kaydi: true,
+          kayit_tipi: "SERTIFIKA",
+          ad: ""
+        })
+      })
+    ], []);
+
+    expect(timeline[0]?.ozet).toBe("Belge kaydı.");
+    expect(timeline[0]?.aciklama).toBeUndefined();
+  });
+
+  it("belge metadata json icindeki kullanici aciklamasini ayri not satirinda gosterir", () => {
+    const timeline = buildPersonelTimeline(makePersonel(), [
+      makeSurec({
+        id: 18,
+        surec_turu: "BELGE",
+        alt_tur: "SERTIFIKA",
+        aciklama: JSON.stringify({
+          _personel_belge_kaydi: true,
+          kayit_tipi: "SERTIFIKA",
+          ad: "Forklift Operatör Belgesi",
+          aciklama: "Yenileme notu"
+        })
+      })
+    ], []);
+
+    expect(timeline[0]?.ozet).toBe("Forklift Operatör Belgesi");
+    expect(timeline[0]?.aciklama).toBe("Yenileme notu");
+  });
+
+  it("plain text belge aciklamasini metadata gibi yorumlamaz", () => {
+    const timeline = buildPersonelTimeline(makePersonel(), [
+      makeSurec({
+        id: 19,
+        surec_turu: "BELGE",
+        alt_tur: "SERTIFIKA",
+        aciklama: "S29 timeline kalite belge"
+      })
+    ], []);
+
+    expect(timeline[0]?.ozet).toBe("Belge kaydı.");
+    expect(timeline[0]?.aciklama).toBe("S29 timeline kalite belge");
   });
 
   it("ornek surec turu basliklarini uretir", () => {

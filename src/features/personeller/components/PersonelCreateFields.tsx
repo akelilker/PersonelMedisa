@@ -1,4 +1,12 @@
-import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type Dispatch,
+  type SetStateAction
+} from "react";
 import { FormField, type FormFieldOption } from "../../../components/form/FormField";
 import { mapUcretTipiSelectOptions } from "../../../lib/display/ucret-tipi-display";
 import type { PersonelReferenceBundle } from "../../../data/app-data.types";
@@ -17,6 +25,8 @@ type PersonelCreateFieldsProps = {
   subeOptions?: IdOption[];
   subeLoadError?: string | null;
   createErrorMessage?: string | null;
+  fieldErrors?: Partial<Record<"tcKimlikNo", string>>;
+  onFieldErrorClear?: (field: "tcKimlikNo") => void;
   referenceError?: string | null;
   className?: string;
 };
@@ -173,14 +183,35 @@ export function PersonelCreateFields({
   subeOptions = [],
   subeLoadError,
   createErrorMessage,
+  fieldErrors,
+  onFieldErrorClear,
   referenceError,
   className
 }: PersonelCreateFieldsProps) {
   const [openSelectName, setOpenSelectName] = useState<string | null>(null);
+  const tcKimlikNoFieldError = fieldErrors?.tcKimlikNo;
 
   function setSelectOpen(name: string, isOpen: boolean) {
     setOpenSelectName(isOpen ? name : null);
   }
+
+  useLayoutEffect(() => {
+    if (!tcKimlikNoFieldError) {
+      return;
+    }
+
+    const input = document.getElementById("create-tc");
+    if (!(input instanceof HTMLInputElement)) {
+      return;
+    }
+
+    try {
+      input.focus({ preventScroll: true });
+      input.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    } catch {
+      /* Focus/scroll desteklenmiyorsa sessizce devam et. */
+    }
+  }, [tcKimlikNoFieldError]);
 
   return (
     <div className={className}>
@@ -190,10 +221,18 @@ export function PersonelCreateFields({
             label="T.C. Kimlik No"
             name="create-tc"
             value={form.tcKimlikNo}
-            onChange={(value) => setForm((prev) => ({ ...prev, tcKimlikNo: value }))}
+            onChange={(value) => {
+              setForm((prev) => ({ ...prev, tcKimlikNo: value }));
+              onFieldErrorClear?.("tcKimlikNo");
+            }}
             placeholder="Örn. 12345678122"
             required
           />
+          {tcKimlikNoFieldError ? (
+            <p className="personel-create-error" role="alert">
+              {tcKimlikNoFieldError}
+            </p>
+          ) : null}
           <FormField
             label="Ad"
             name="create-ad"

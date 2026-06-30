@@ -36,7 +36,7 @@ import {
 } from "../../../api/referans.api";
 import { createSurec, updateSurec } from "../../../api/surecler.api";
 import { fetchPersonelBelgeDurumu, putPersonelBelgeDurumu } from "../../../api/belgeler.api";
-import { getApiErrorMessage } from "../../../api/api-client";
+import { getApiErrorDetail, getApiErrorMessage } from "../../../api/api-client";
 import { PersonelCreateFields } from "../../../features/personeller/components/PersonelCreateFields";
 import { PersonelZimmetCreateForm } from "../../../features/personeller/components/PersonelZimmetCreateForm";
 import { KayitBelgeKayitlariSection } from "./KayitBelgeKayitlariSection";
@@ -176,6 +176,9 @@ export function KayitSurecWorkspace({
   const [personelForm, setPersonelForm] = useState<CreatePersonelFormState>(INITIAL_CREATE_PERSONEL_FORM);
   const [personelSubmitting, setPersonelSubmitting] = useState(false);
   const [personelError, setPersonelError] = useState<string | null>(null);
+  const [personelFieldErrors, setPersonelFieldErrors] = useState<
+    Partial<Record<"tcKimlikNo", string>>
+  >({});
   const [personelInfo, setPersonelInfo] = useState<string | null>(null);
 
   const [surecForm, setSurecForm] = useState<SurecFormState>(INITIAL_SUREC_FORM);
@@ -721,6 +724,7 @@ export function KayitSurecWorkspace({
 
     setPersonelSubmitting(true);
     setPersonelError(null);
+    setPersonelFieldErrors({});
     setPersonelInfo(null);
 
     try {
@@ -728,14 +732,19 @@ export function KayitSurecWorkspace({
       commitPersonelCreateToCaches(created);
       setPersoneller((prev) => [created, ...prev.filter((item) => item.id !== created.id)]);
       setPersonelForm(INITIAL_CREATE_PERSONEL_FORM);
+      setPersonelFieldErrors({});
       setSurecForm(resetSurecFormKeepingPersonel(String(created.id)));
       setPersonelInfo("Personel kaydı oluşturuldu. Süreç sekmesine geçiliyor.");
       setSurecInfo("Personel seçildi. Süreç kaydına devam edebilirsin.");
       onTabChange("surec");
     } catch (error) {
-      setPersonelError(
-        getApiErrorMessage(error, "Personel kaydı oluşturulamadı.", { context: "personel-create" })
-      );
+      const detail = getApiErrorDetail(error, "Personel kaydı oluşturulamadı.", {
+        context: "personel-create"
+      });
+      setPersonelError(detail.message);
+      if (detail.code === "DUPLICATE_TC_KIMLIK_NO") {
+        setPersonelFieldErrors({ tcKimlikNo: detail.message });
+      }
     } finally {
       setPersonelSubmitting(false);
     }
@@ -1024,6 +1033,19 @@ export function KayitSurecWorkspace({
                         subeOptions={subeOptions}
                         subeLoadError={subeLoadError}
                         createErrorMessage={personelError}
+                        fieldErrors={personelFieldErrors}
+                        onFieldErrorClear={(field) => {
+                          if (field === "tcKimlikNo") {
+                            setPersonelFieldErrors((prev) => {
+                              if (!prev.tcKimlikNo) {
+                                return prev;
+                              }
+                              const next = { ...prev };
+                              delete next.tcKimlikNo;
+                              return next;
+                            });
+                          }
+                        }}
                         referenceError={null}
                         className="workspace-form-stack"
                       />

@@ -645,6 +645,20 @@ export async function mockApi(page: Page, role: MockUserRole) {
       bitis_tarihi: "2026-07-15",
       durum: "AKTIF",
       created_at: "2018-05-10T10:00:00.000Z"
+    },
+    {
+      id: 903,
+      personel_id: 1,
+      kayit_tipi: "SERTFIKA",
+      ad: "S34 İptal Sertifika",
+      veren_kurum: "Medisa Eğitim Merkezi",
+      belge_no: "S34-001",
+      baslangic_tarihi: "2023-01-01",
+      bitis_tarihi: "2025-01-01",
+      durum: "IPTAL",
+      aciklama: "Eski kayıt iptal edildi",
+      created_at: "2023-01-01T10:00:00.000Z",
+      updated_at: "2024-06-15T10:00:00.000Z"
     }
   ];
 

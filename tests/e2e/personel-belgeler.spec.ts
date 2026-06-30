@@ -144,6 +144,47 @@ test.describe("personel belgeler API contract", () => {
     expect(apiFailures).toEqual([]);
   });
 
+  test("iptal edilen belge kayitlari ayri salt okunur gecmis bolumunde gorunur", async ({ page }) => {
+    await mockApi(page, "GENEL_YONETICI");
+    await login(page, users.genelYonetici);
+
+    const apiFailures: Array<{ status: number; url: string }> = [];
+    page.on("response", (response) => {
+      if (!response.url().includes("/api/personeller/1/belge")) {
+        return;
+      }
+      if ([401, 403, 404, 500].includes(response.status())) {
+        apiFailures.push({ status: response.status(), url: response.url() });
+      }
+    });
+
+    await page.getByTestId("menu-personel-karti").click();
+    await page.getByRole("link", { name: /Ayşe Yılmaz.*kişisinin kartını aç/i }).first().click();
+    await page.getByRole("tab", { name: "Eğitim / Belgeler" }).click();
+
+    const belgelerPanel = page.locator("#personel-kart-panel-egitim-belgeler");
+    const aktifListe = belgelerPanel.getByTestId("personel-belge-kayit-list");
+    const iptalListe = belgelerPanel.getByTestId("personel-belge-kayit-iptal-list");
+
+    await expect(aktifListe).toBeVisible();
+    await expect(aktifListe).toContainText("Forklift Operatör Belgesi");
+    await expect(aktifListe).not.toContainText("S34 İptal Sertifika");
+
+    await expect(belgelerPanel.getByRole("heading", { name: "İptal edilen belge kayıtları" })).toBeVisible();
+    await expect(iptalListe).toBeVisible();
+    await expect(iptalListe).toContainText("S34 İptal Sertifika");
+    await expect(iptalListe).toContainText("Sertifika");
+    await expect(iptalListe).toContainText("İptal");
+    await expect(iptalListe).not.toContainText("IPTAL");
+    await expect(iptalListe).not.toContainText("SERTFIKA");
+    await expect(iptalListe).not.toContainText("SERTIFIKA");
+    await expect(iptalListe).not.toContainText("[object Object]");
+    await expect(iptalListe).not.toContainText('{"tip"');
+    await expect(belgelerPanel).not.toContainText('{"tip"');
+    await expect(page).not.toHaveURL(/\/yetkisiz$/);
+    expect(apiFailures).toEqual([]);
+  });
+
   test("scope disi belge endpointleri 403 doner ve yetkisiz redirect tetiklemez", async ({ page }) => {
     await mockApi(page, "MUHASEBE");
     await login(page, users.muhasebe);

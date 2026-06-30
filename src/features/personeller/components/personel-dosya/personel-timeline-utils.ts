@@ -6,6 +6,7 @@ import {
   formatZimmetTeslimDurumuLabel,
   formatZimmetUrunTuruLabel
 } from "../../../../lib/display/enum-display";
+import { looksLikeRawDisplayLeak } from "../../../../lib/display/sanitize-display-text";
 import { getSurecTimelineSortWeight } from "../../../../lib/surec-history-sort";
 import type { Personel } from "../../../../types/personel";
 import type { Surec } from "../../../../types/surec";
@@ -63,34 +64,13 @@ function parseTimelineDate(value: string | null | undefined) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-function looksLikeRawJsonLeak(value: string): boolean {
-  const trimmed = value.trim();
-  if (!trimmed) {
-    return true;
-  }
-
-  if (trimmed.includes("[object Object]")) {
-    return true;
-  }
-
-  if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
-    return true;
-  }
-
-  if (/"tip"\s*:/.test(trimmed)) {
-    return true;
-  }
-
-  return false;
-}
-
 function sanitizeTimelineDisplayText(value: unknown): string | null {
   if (typeof value !== "string") {
     return null;
   }
 
   const trimmed = value.trim();
-  if (!trimmed || looksLikeRawJsonLeak(trimmed)) {
+  if (!trimmed || looksLikeRawDisplayLeak(trimmed)) {
     return null;
   }
 
@@ -131,7 +111,7 @@ function parsePersonelBelgeKaydiSurecMetadata(
   }
 
   const ad = typeof record.ad === "string" ? record.ad.trim() : "";
-  if (!ad || looksLikeRawJsonLeak(ad)) {
+  if (!ad || looksLikeRawDisplayLeak(ad)) {
     return null;
   }
 

@@ -1,3 +1,5 @@
+import { sanitizeDisplayText } from "../lib/display/sanitize-display-text";
+
 export const PERSONEL_BELGE_KAYIT_TIPI_KEYS = ["EGITIM", "SERTIFIKA", "EHLIYET", "YETKINLIK"] as const;
 
 export type PersonelBelgeKayitTipi = (typeof PERSONEL_BELGE_KAYIT_TIPI_KEYS)[number];
@@ -103,38 +105,8 @@ export function formatPersonelBelgeKayitDurumLabel(value: unknown): string {
   return PERSONEL_BELGE_KAYIT_DURUM_LABELS[key] ?? "-";
 }
 
-function looksLikeBelgeDisplayLeak(value: string): boolean {
-  const trimmed = value.trim();
-  if (!trimmed) {
-    return true;
-  }
-
-  if (trimmed.includes("[object Object]")) {
-    return true;
-  }
-
-  if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
-    return true;
-  }
-
-  if (/"tip"\s*:/.test(trimmed)) {
-    return true;
-  }
-
-  return false;
-}
-
 export function formatPersonelBelgeDisplayText(value: string | null | undefined): string {
-  if (typeof value !== "string") {
-    return "-";
-  }
-
-  const trimmed = value.trim();
-  if (!trimmed || looksLikeBelgeDisplayLeak(trimmed)) {
-    return "-";
-  }
-
-  return trimmed;
+  return sanitizeDisplayText(value);
 }
 
 export const PERSONEL_BELGE_GECERLILIK_LABELS: Record<PersonelBelgeGecerlilikDurumu, string> = {

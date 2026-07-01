@@ -47,7 +47,7 @@ const RAPOR_SMOKE_CASES: Array<{ type: RaporTipi; rowMarker: string }> = [
   { type: "ceza", rowMarker: "Ayşe Yılmaz" },
   { type: "ekstra-prim", rowMarker: "Ayşe Yılmaz" },
   { type: "is-kazasi", rowMarker: "Ayşe Yılmaz" },
-  { type: "bildirim", rowMarker: "Mehmet Kaya" }
+  { type: "bildirim", rowMarker: "Ayşe Yılmaz" }
 ];
 
 test.describe("raporlar detayli liste smoke", () => {
@@ -116,6 +116,110 @@ test.describe("raporlar detayli liste smoke", () => {
     await expect(oncekiButton).toBeDisabled();
     await expect(sonrakiButton).toBeEnabled();
     await expect(pageInfo).toContainText("Sayfa 1 / 2");
+    expect(runtimeErrors).toEqual([]);
+  });
+
+  test("personel ozet raporunda ayni ay tarih araliginda snapshot degerlerini gosterir", async ({ page }) => {
+    const runtimeErrors: string[] = [];
+    page.on("pageerror", (error) => {
+      runtimeErrors.push(error.message);
+    });
+
+    await page.locator('[name="rapor-turu"]').selectOption("personel-ozet");
+    await page.locator('[name="rapor-bas"]').fill("2026-04-01");
+    await page.locator('[name="rapor-bitis"]').fill("2026-04-30");
+    await page.getByTestId("raporlar-submit-run").click();
+
+    const resultCard = page.getByTestId("raporlar-resmi-sonuc");
+    await expect(resultCard).toBeVisible();
+    await expect(resultCard.locator("tbody")).toContainText("Ayşe Yılmaz");
+    await expect(resultCard.locator("tbody")).toContainText("510");
+    await expect(resultCard.locator("tbody")).toContainText("30");
+    expect(runtimeErrors).toEqual([]);
+  });
+
+  test("devamsizlik raporunda ayni ay tarih araliginda snapshot kaynakli satirlari gosterir", async ({ page }) => {
+    const runtimeErrors: string[] = [];
+    page.on("pageerror", (error) => {
+      runtimeErrors.push(error.message);
+    });
+
+    await page.locator('[name="rapor-turu"]').selectOption("devamsizlik");
+    await page.locator('[name="rapor-bas"]').fill("2026-04-01");
+    await page.locator('[name="rapor-bitis"]').fill("2026-04-30");
+    await page.getByTestId("raporlar-submit-run").click();
+
+    const resultCard = page.getByTestId("raporlar-resmi-sonuc");
+    await expect(resultCard).toBeVisible();
+    await expect(resultCard.locator("tbody")).toContainText("Ayşe Yılmaz");
+    await expect(resultCard.locator("tbody")).toContainText("IZINSIZ");
+    await expect(resultCard.locator("tbody")).toContainText("2026-04-10");
+    await expect(resultCard).not.toContainText("UNSUPPORTED_REPORT");
+    expect(runtimeErrors).toEqual([]);
+  });
+
+  test("izin raporunda ayni ay tarih araliginda snapshot kaynakli gunluk satirlari gosterir", async ({ page }) => {
+    const runtimeErrors: string[] = [];
+    page.on("pageerror", (error) => {
+      runtimeErrors.push(error.message);
+    });
+
+    await page.locator('[name="rapor-turu"]').selectOption("izin");
+    await page.locator('[name="rapor-bas"]').fill("2026-04-01");
+    await page.locator('[name="rapor-bitis"]').fill("2026-04-30");
+    await page.getByTestId("raporlar-submit-run").click();
+
+    const resultCard = page.getByTestId("raporlar-resmi-sonuc");
+    await expect(resultCard).toBeVisible();
+    await expect(resultCard.locator("tbody")).toContainText("Ayşe Yılmaz");
+    await expect(resultCard.locator("tbody")).toContainText("YILLIK_IZIN");
+    await expect(resultCard.locator("tbody")).toContainText("2026-04-03");
+    await expect(resultCard.locator("tbody")).toContainText("Evet");
+    await expect(resultCard).not.toContainText("UNSUPPORTED_REPORT");
+    expect(runtimeErrors).toEqual([]);
+  });
+
+  test("is-kazasi raporunda tarih araliginda surec kaynakli satirlari gosterir", async ({ page }) => {
+    const runtimeErrors: string[] = [];
+    page.on("pageerror", (error) => {
+      runtimeErrors.push(error.message);
+    });
+
+    await page.locator('[name="rapor-turu"]').selectOption("is-kazasi");
+    await page.locator('[name="rapor-bas"]').fill("2026-04-01");
+    await page.locator('[name="rapor-bitis"]').fill("2026-04-30");
+    await page.getByTestId("raporlar-submit-run").click();
+
+    const resultCard = page.getByTestId("raporlar-resmi-sonuc");
+    await expect(resultCard).toBeVisible();
+    await expect(resultCard.locator("tbody")).toContainText("Ayşe Yılmaz");
+    await expect(resultCard.locator("tbody")).toContainText("2026-04-12");
+    await expect(resultCard.locator("tbody")).toContainText("2026-04-14");
+    await expect(resultCard.locator("tbody")).toContainText("Hafif yaralanma");
+    await expect(resultCard.locator("tbody")).toContainText("Aktif");
+    await expect(resultCard).not.toContainText("UNSUPPORTED_REPORT");
+    expect(runtimeErrors).toEqual([]);
+  });
+
+  test("bildirim raporunda ayni ay tarih araliginda snapshot kaynakli gunluk satirlari gosterir", async ({ page }) => {
+    const runtimeErrors: string[] = [];
+    page.on("pageerror", (error) => {
+      runtimeErrors.push(error.message);
+    });
+
+    await page.locator('[name="rapor-turu"]').selectOption("bildirim");
+    await page.locator('[name="rapor-bas"]').fill("2026-04-01");
+    await page.locator('[name="rapor-bitis"]').fill("2026-04-30");
+    await page.getByTestId("raporlar-submit-run").click();
+
+    const resultCard = page.getByTestId("raporlar-resmi-sonuc");
+    await expect(resultCard).toBeVisible();
+    await expect(resultCard.locator("tbody")).toContainText("Ayşe Yılmaz");
+    await expect(resultCard.locator("tbody")).toContainText("2026-04-11");
+    await expect(resultCard.locator("tbody")).toContainText("İzinsiz Gelmedi");
+    await expect(resultCard.locator("tbody")).toContainText("Habersiz devamsizlik");
+    await expect(resultCard.locator("tbody")).toContainText("Mühürlendi");
+    await expect(resultCard).not.toContainText("UNSUPPORTED_REPORT");
     expect(runtimeErrors).toEqual([]);
   });
 

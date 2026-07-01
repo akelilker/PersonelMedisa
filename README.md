@@ -99,7 +99,7 @@ Demo/mock fallback üretimde açık bırakılmamalıdır.
 
 ## Deploy
 
-Canlı yayın için `DEPLOY_CHECKLIST.md` izlenir. Ana deploy yolu GitHub Actions üzerinden `dist/` içeriğinin cPanel hedef klasörüne aktarılmasıdır.
+Canlı yayın için `DEPLOY_CHECKLIST.md` izlenir. Ana deploy yolu GitHub Actions üzerinden `dist/` içeriğinin ve PHP API runtime dosyalarının cPanel hedef klasörüne aktarılmasıdır.
 
 ## Çalışma kuralı
 

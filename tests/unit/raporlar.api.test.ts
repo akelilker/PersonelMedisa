@@ -117,4 +117,279 @@ describe("raporlar.api", () => {
     expect(result.total).toBe(0);
     expect(result.pagination.hasNextPage).toBe(false);
   });
+
+  it("preserves report source meta from response", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        createJsonResponse(
+          {
+            data: {
+              items: [
+                {
+                  personel_id: 1,
+                  ad_soyad: "Ayse Yilmaz",
+                  net_calisma_dakika: 960,
+                  sgk_prim_gun: 20
+                }
+              ]
+            },
+            meta: {
+              page: 1,
+              limit: 10,
+              total: 1,
+              total_pages: 1,
+              has_next_page: false,
+              kaynak: "SNAPSHOT",
+              muhur_id: 42,
+              donem: "2026-04",
+              effective_sube_id: 1
+            },
+            errors: []
+          },
+          200
+        )
+      )
+    );
+
+    const result = await fetchRapor("personel-ozet", {
+      baslangic_tarihi: "2026-04-01",
+      bitis_tarihi: "2026-04-30",
+      page: 1,
+      limit: 10
+    });
+
+    expect(result.reportMeta).toEqual({
+      kaynak: "SNAPSHOT",
+      muhur_id: 42,
+      donem: "2026-04",
+      effective_sube_id: 1
+    });
+    expect(result.rows[0]?.net_calisma_dakika).toBe(960);
+  });
+
+  it("preserves devamsizlik report source meta from response", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        createJsonResponse(
+          {
+            data: {
+              items: [
+                {
+                  personel_id: 1,
+                  ad_soyad: "Ayse Yilmaz",
+                  baslangic_tarihi: "2026-04-10",
+                  bitis_tarihi: "2026-04-10",
+                  alt_tur: "IZINSIZ",
+                  state: "MUHURLENDI"
+                }
+              ]
+            },
+            meta: {
+              page: 1,
+              limit: 10,
+              total: 1,
+              total_pages: 1,
+              has_next_page: false,
+              kaynak: "SNAPSHOT",
+              muhur_id: 101,
+              donem: "2026-04",
+              effective_sube_id: 1
+            },
+            errors: []
+          },
+          200
+        )
+      )
+    );
+
+    const result = await fetchRapor("devamsizlik", {
+      baslangic_tarihi: "2026-04-01",
+      bitis_tarihi: "2026-04-30",
+      page: 1,
+      limit: 10
+    });
+
+    const [url] = (vi.mocked(fetch) as ReturnType<typeof vi.fn>).mock.calls[0] as [string];
+    expect(url).toContain("/api/raporlar/devamsizlik");
+    expect(url).toContain("baslangic_tarihi=2026-04-01");
+    expect(url).toContain("bitis_tarihi=2026-04-30");
+    expect(url).toContain("page=1");
+    expect(url).toContain("limit=10");
+    expect(result.reportMeta).toEqual({
+      kaynak: "SNAPSHOT",
+      muhur_id: 101,
+      donem: "2026-04",
+      effective_sube_id: 1
+    });
+    expect(result.rows[0]?.alt_tur).toBe("IZINSIZ");
+  });
+
+  it("preserves izin report source meta from response", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        createJsonResponse(
+          {
+            data: {
+              items: [
+                {
+                  personel_id: 1,
+                  ad_soyad: "Ayse Yilmaz",
+                  baslangic_tarihi: "2026-04-03",
+                  bitis_tarihi: "2026-04-03",
+                  alt_tur: "YILLIK_IZIN",
+                  ucretli_mi: true,
+                  state: "MUHURLENDI"
+                }
+              ]
+            },
+            meta: {
+              page: 1,
+              limit: 10,
+              total: 1,
+              total_pages: 1,
+              has_next_page: false,
+              kaynak: "SNAPSHOT",
+              muhur_id: 101,
+              donem: "2026-04",
+              effective_sube_id: 1
+            },
+            errors: []
+          },
+          200
+        )
+      )
+    );
+
+    const result = await fetchRapor("izin", {
+      baslangic_tarihi: "2026-04-01",
+      bitis_tarihi: "2026-04-30",
+      page: 1,
+      limit: 10
+    });
+
+    const [url] = (vi.mocked(fetch) as ReturnType<typeof vi.fn>).mock.calls[0] as [string];
+    expect(url).toContain("/api/raporlar/izin");
+    expect(url).toContain("baslangic_tarihi=2026-04-01");
+    expect(url).toContain("bitis_tarihi=2026-04-30");
+    expect(result.reportMeta).toEqual({
+      kaynak: "SNAPSHOT",
+      muhur_id: 101,
+      donem: "2026-04",
+      effective_sube_id: 1
+    });
+    expect(result.rows[0]?.alt_tur).toBe("YILLIK_IZIN");
+    expect(result.rows[0]?.ucretli_mi).toBe(true);
+  });
+
+  it("preserves is-kazasi report source meta from response", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        createJsonResponse(
+          {
+            data: {
+              items: [
+                {
+                  personel_id: 1,
+                  ad_soyad: "Ayse Yilmaz",
+                  baslangic_tarihi: "2026-04-12",
+                  bitis_tarihi: "2026-04-14",
+                  aciklama: "Hafif yaralanma",
+                  state: "AKTIF"
+                }
+              ]
+            },
+            meta: {
+              page: 1,
+              limit: 10,
+              total: 1,
+              total_pages: 1,
+              has_next_page: false,
+              kaynak: "SUREC",
+              muhur_id: null,
+              donem: "2026-04",
+              effective_sube_id: 1
+            },
+            errors: []
+          },
+          200
+        )
+      )
+    );
+
+    const result = await fetchRapor("is-kazasi", {
+      baslangic_tarihi: "2026-04-01",
+      bitis_tarihi: "2026-04-30",
+      page: 1,
+      limit: 10
+    });
+
+    const [url] = (vi.mocked(fetch) as ReturnType<typeof vi.fn>).mock.calls[0] as [string];
+    expect(url).toContain("/api/raporlar/is-kazasi");
+    expect(result.reportMeta).toEqual({
+      kaynak: "SUREC",
+      muhur_id: null,
+      donem: "2026-04",
+      effective_sube_id: 1
+    });
+    expect(result.rows[0]?.aciklama).toBe("Hafif yaralanma");
+  });
+
+  it("preserves bildirim report source meta from response", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        createJsonResponse(
+          {
+            data: {
+              items: [
+                {
+                  tarih: "2026-04-11",
+                  departman_id: 3,
+                  personel_id: 1,
+                  ad_soyad: "Ayse Yilmaz",
+                  bildirim_turu: "IZINSIZ_GELMEDI",
+                  aciklama: "Habersiz devamsizlik",
+                  state: "MUHURLENDI"
+                }
+              ]
+            },
+            meta: {
+              page: 1,
+              limit: 10,
+              total: 1,
+              total_pages: 1,
+              has_next_page: false,
+              kaynak: "SNAPSHOT",
+              muhur_id: 101,
+              donem: "2026-04",
+              effective_sube_id: 1
+            },
+            errors: []
+          },
+          200
+        )
+      )
+    );
+
+    const result = await fetchRapor("bildirim", {
+      baslangic_tarihi: "2026-04-01",
+      bitis_tarihi: "2026-04-30",
+      page: 1,
+      limit: 10
+    });
+
+    const [url] = (vi.mocked(fetch) as ReturnType<typeof vi.fn>).mock.calls[0] as [string];
+    expect(url).toContain("/api/raporlar/bildirim");
+    expect(result.reportMeta).toEqual({
+      kaynak: "SNAPSHOT",
+      muhur_id: 101,
+      donem: "2026-04",
+      effective_sube_id: 1
+    });
+    expect(result.rows[0]?.bildirim_turu).toBe("IZINSIZ_GELMEDI");
+  });
 });

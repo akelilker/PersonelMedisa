@@ -1,10 +1,12 @@
 import {
   formatSurecStateLabel,
   formatSurecTuruLabel,
+  normalizeEnumKey,
   formatZimmetKayitDurumuLabel,
   formatZimmetTeslimDurumuLabel,
   formatZimmetUrunTuruLabel
 } from "../../../../lib/display/enum-display";
+import { looksLikeRawDisplayLeak } from "../../../../lib/display/sanitize-display-text";
 import { getSurecTimelineSortWeight } from "../../../../lib/surec-history-sort";
 import type { Personel } from "../../../../types/personel";
 import type { Surec } from "../../../../types/surec";
@@ -62,8 +64,81 @@ function parseTimelineDate(value: string | null | undefined) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function sanitizeTimelineDisplayText(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed || looksLikeRawDisplayLeak(trimmed)) {
+    return null;
+  }
+
+  return trimmed;
+}
+
+type PersonelBelgeKaydiSurecMetadata = {
+  ad: string;
+  userAciklama: string | null;
+};
+
+function parsePersonelBelgeKaydiSurecMetadata(
+  value: string | null | undefined
+): PersonelBelgeKaydiSurecMetadata | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed.startsWith("{")) {
+    return null;
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(trimmed);
+  } catch {
+    return null;
+  }
+
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    return null;
+  }
+
+  const record = parsed as Record<string, unknown>;
+  if (record._personel_belge_kaydi !== true) {
+    return null;
+  }
+
+  const ad = typeof record.ad === "string" ? record.ad.trim() : "";
+  if (!ad || looksLikeRawDisplayLeak(ad)) {
+    return null;
+  }
+
+  const userAciklama =
+    typeof record.aciklama === "string" ? sanitizeTimelineDisplayText(record.aciklama) : null;
+
+  return { ad, userAciklama };
+}
+
+function resolveSurecTimelineAciklama(surec: Surec): string | null {
+  if (surec.surec_turu.trim().toUpperCase() === "BELGE") {
+    const metadata = parsePersonelBelgeKaydiSurecMetadata(surec.aciklama);
+    if (metadata) {
+      return metadata.userAciklama;
+    }
+  }
+
+  return normalizeTimelineText(surec.aciklama);
+}
+
 function normalizeTimelineText(value: string | null | undefined) {
-  const formatted = formatDetailValue(value);
+  const sanitized = sanitizeTimelineDisplayText(value);
+  if (!sanitized) {
+    return null;
+  }
+
+  const formatted = formatDetailValue(sanitized);
   return formatted === "-" ? null : formatted;
 }
 
@@ -78,11 +153,17 @@ function buildSurecTitle(surec: Surec) {
     surec.alt_tur ? formatSurecTuruLabel(surec.alt_tur) : null
   );
 
-  if (altBaslik && altBaslik !== anaBaslik) {
-    return `${anaBaslik} / ${altBaslik}`;
+  if (!altBaslik || altBaslik === anaBaslik) {
+    return anaBaslik;
   }
 
-  return anaBaslik;
+  const anaKey = normalizeEnumKey(surec.surec_turu);
+  const altKey = normalizeEnumKey(surec.alt_tur ?? "");
+  if (altKey && altKey === anaKey) {
+    return anaBaslik;
+  }
+
+  return `${anaBaslik} / ${altBaslik}`;
 }
 
 function formatSurecKayitZamani(value: string | undefined): string | null {
@@ -110,50 +191,36 @@ function joinTimelineOzetParts(parts: Array<string | null | undefined>) {
     .join(" · ");
 }
 
-function buildSurecDateRangeSummary(surec: Surec): string {
-  const bas = normalizeTimelineText(surec.baslangic_tarihi);
-  const bit = normalizeTimelineText(surec.bitis_tarihi);
-  const eff = normalizeTimelineText(surec.effective_date);
-  if (bas && bit && bas !== bit) {
-    return `${bas} – ${bit}`;
-  }
-  if (bas && bit) {
-    return bas;
-  }
-  if (bas) {
-    return bas;
-  }
-  if (bit) {
-    return bit;
-  }
-  if (eff) {
-    return eff;
-  }
-  return "";
-}
-
 function buildSurecTimelinePrimaryDate(surec: Surec): string | null {
   const eff = normalizeTimelineText(surec.effective_date);
-  const basB = normalizeTimelineText(surec.baslangic_tarihi);
-  const bitB = normalizeTimelineText(surec.bitis_tarihi);
+  const bas = normalizeTimelineText(surec.baslangic_tarihi);
+  const bit = normalizeTimelineText(surec.bitis_tarihi);
+
   if (eff) {
     return `Geçerlilik: ${eff}`;
   }
-  if (basB && bitB) {
-    return `Dönem: ${basB} – ${bitB}`;
+
+  if (bas && bit) {
+    if (bas === bit) {
+      return `Tarih: ${bas}`;
+    }
+
+    return `Başlangıç: ${bas} · Bitiş: ${bit}`;
   }
-  if (basB) {
-    return `Başlangıç: ${basB}`;
+
+  if (bas) {
+    return `Tarih: ${bas}`;
   }
-  if (bitB) {
-    return `Bitiş: ${bitB}`;
+
+  if (bit) {
+    return `Tarih: ${bit}`;
   }
+
   return null;
 }
 
 function buildSurecOzet(surec: Surec) {
   const surecTuru = surec.surec_turu.trim().toUpperCase();
-  const dates = buildSurecDateRangeSummary(surec);
 
   if (YONETIM_TIMELINE_SUREC_TYPES.has(surecTuru)) {
     return "Yönetim panelinden rol ve yetki güncellemesi.";
@@ -164,30 +231,38 @@ function buildSurecOzet(surec: Surec) {
   }
 
   if (surecTuru === "ISTEN_AYRILMA") {
-    return joinTimelineOzetParts([
-      dates ? `Son çalışma: ${dates}` : null,
-      "İş akdi sonlanır; kart pasife işlenir."
-    ]);
+    return "İş akdi sonlanır; kart pasife işlenir.";
   }
 
   if (surecTuru === "ORG_DEGISIKLIK" || surecTuru === "POZISYON_DEGISTI") {
-    return joinTimelineOzetParts([dates ? `Dönem: ${dates}` : null, "Departman veya görev bilgisi güncellendi."]);
+    return "Departman veya görev bilgisi güncellendi.";
   }
 
   if (surecTuru === "RAPOR") {
-    return joinTimelineOzetParts([dates ? `Dönem: ${dates}` : null, "Raporlu dönem kaydı."]);
+    return "Raporlu dönem kaydı.";
+  }
+
+  if (surecTuru === "BELGE") {
+    const metadata = parsePersonelBelgeKaydiSurecMetadata(surec.aciklama);
+    if (metadata?.ad) {
+      return metadata.ad;
+    }
+
+    return "Belge kaydı.";
+  }
+
+  if (surecTuru === "TESVIK") {
+    return "Teşvik kaydı.";
+  }
+
+  if (surecTuru === "IS_KAZASI") {
+    return "İş kazası kaydı.";
   }
 
   if (IZIN_ANA_TUR_SET.has(surecTuru)) {
     const ucret =
       surec.ucretli_mi === true ? "Ücretli" : surec.ucretli_mi === false ? "Ücretsiz" : null;
-    const alt = surec.alt_tur ? formatSurecTuruLabel(surec.alt_tur) : null;
-    return joinTimelineOzetParts([
-      alt,
-      ucret,
-      dates ? `Dönem: ${dates}` : null,
-      "İzin kaydı."
-    ]);
+    return joinTimelineOzetParts([ucret, "İzin kaydı."]);
   }
 
   if (
@@ -196,15 +271,10 @@ function buildSurecOzet(surec: Surec) {
     surecTuru.includes("DEVAMSIZ") ||
     surecTuru.includes("GELMEDI")
   ) {
-    return joinTimelineOzetParts([dates ? `Tarih: ${dates}` : null, "Devamsızlık veya puantaj sapması."]);
+    return "Devamsızlık veya puantaj sapması.";
   }
 
-  const parts = [
-    surec.baslangic_tarihi ? `Başlangıç: ${surec.baslangic_tarihi}` : null,
-    surec.bitis_tarihi ? `Bitiş: ${surec.bitis_tarihi}` : null
-  ].filter((part): part is string => part !== null);
-
-  return parts.length > 0 ? parts.join(" · ") : "Süreç kaydı.";
+  return "Süreç kaydı.";
 }
 
 export function buildPersonelTimeline(
@@ -246,7 +316,7 @@ export function buildPersonelTimeline(
       baslik: buildSurecTitle(surec),
       kaynak: YONETIM_TIMELINE_SUREC_TYPES.has(surecTuru) ? "Yönetim" : "Süreç",
       ozet: buildSurecOzet(surec),
-      aciklama: normalizeTimelineText(surec.aciklama) ?? undefined,
+      aciklama: resolveSurecTimelineAciklama(surec) ?? undefined,
       etiket: normalizeTimelineText(formatSurecStateLabel(surec.state)) ?? undefined,
       tone: surecTuru === "ISTEN_AYRILMA" ? "danger" : "default",
       sortValue: getSurecTimelineSortWeight(surec),

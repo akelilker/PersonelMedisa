@@ -138,7 +138,7 @@ describe("apiRequest", () => {
     });
   });
 
-  it("emits forbidden event and throws ApiRequestError for 403 response", async () => {
+  it("emits forbidden event and throws ApiRequestError for global 403 response", async () => {
     const fetchMock = vi.fn(async () =>
       createJsonResponse(
         {
@@ -156,7 +156,7 @@ describe("apiRequest", () => {
       forbiddenListener((event as CustomEvent<{ status: number; path: string }>).detail);
     });
 
-    await expect(apiRequest("/surecler")).rejects.toMatchObject({
+    await expect(apiRequest("/yonetim/kullanicilar")).rejects.toMatchObject({
       status: 403,
       message: "Bu kaynak icin yetkin yok.",
       code: "FORBIDDEN"
@@ -164,7 +164,7 @@ describe("apiRequest", () => {
 
     expect(forbiddenListener).toHaveBeenCalledWith({
       status: 403,
-      path: "/surecler"
+      path: "/yonetim/kullanicilar"
     });
   });
 
@@ -227,6 +227,33 @@ describe("apiRequest", () => {
     expect(forbiddenListener).not.toHaveBeenCalled();
   });
 
+  it("throws ApiRequestError without forbidden event for 403 GET /surecler list", async () => {
+    const fetchMock = vi.fn(async () =>
+      createJsonResponse(
+        {
+          data: null,
+          meta: {},
+          errors: [{ code: "FORBIDDEN", message: "Bu kayit aktif sube baglaminda goruntulenemiyor." }]
+        },
+        403
+      )
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const forbiddenListener = vi.fn();
+    window.addEventListener(AUTH_FORBIDDEN_EVENT, (event) => {
+      forbiddenListener((event as CustomEvent<{ status: number; path: string }>).detail);
+    });
+
+    await expect(apiRequest("/surecler?personel_id=2&sube_id=1")).rejects.toMatchObject({
+      status: 403,
+      message: "Bu kayit aktif sube baglaminda goruntulenemiyor.",
+      code: "FORBIDDEN"
+    });
+
+    expect(forbiddenListener).not.toHaveBeenCalled();
+  });
+
   it("emits forbidden event and throws ApiRequestError for 403 GET /gunluk-puantaj/:id/:date", async () => {
     const fetchMock = vi.fn(async () =>
       createJsonResponse(
@@ -253,6 +280,74 @@ describe("apiRequest", () => {
     expect(forbiddenListener).toHaveBeenCalledWith({
       status: 403,
       path: "/gunluk-puantaj/2/2026-01-01"
+    });
+  });
+
+  it("emits forbidden event and throws ApiRequestError for 403 PUT /gunluk-puantaj/:id/:date", async () => {
+    const fetchMock = vi.fn(async () =>
+      createJsonResponse(
+        {
+          data: null,
+          meta: {},
+          errors: [{ code: "FORBIDDEN", message: "Bu islem icin yetkin yok." }]
+        },
+        403
+      )
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const forbiddenListener = vi.fn();
+    window.addEventListener(AUTH_FORBIDDEN_EVENT, (event) => {
+      forbiddenListener((event as CustomEvent<{ status: number; path: string }>).detail);
+    });
+
+    await expect(
+      apiRequest("/gunluk-puantaj/2/2026-01-01", {
+        method: "PUT",
+        body: JSON.stringify({ kontrol_durumu: "AMIR_KONTROL_ETTI" })
+      })
+    ).rejects.toMatchObject({
+      status: 403,
+      code: "FORBIDDEN"
+    });
+
+    expect(forbiddenListener).toHaveBeenCalledWith({
+      status: 403,
+      path: "/gunluk-puantaj/2/2026-01-01"
+    });
+  });
+
+  it("emits forbidden event and throws ApiRequestError for 403 POST /puantaj/muhurle", async () => {
+    const fetchMock = vi.fn(async () =>
+      createJsonResponse(
+        {
+          data: null,
+          meta: {},
+          errors: [{ code: "FORBIDDEN", message: "Bu islem icin yetkin yok." }]
+        },
+        403
+      )
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const forbiddenListener = vi.fn();
+    window.addEventListener(AUTH_FORBIDDEN_EVENT, (event) => {
+      forbiddenListener((event as CustomEvent<{ status: number; path: string }>).detail);
+    });
+
+    await expect(
+      apiRequest("/puantaj/muhurle", {
+        method: "POST",
+        body: JSON.stringify({ yil: 2026, ay: 4 })
+      })
+    ).rejects.toMatchObject({
+      status: 403,
+      code: "FORBIDDEN"
+    });
+
+    expect(forbiddenListener).toHaveBeenCalledWith({
+      status: 403,
+      path: "/puantaj/muhurle"
     });
   });
 
@@ -389,10 +484,19 @@ describe("api error helpers", () => {
 });
 
 describe("shouldEmitGlobalAuthForbidden", () => {
-  it("suppresses global forbidden for scoped personel write/detail paths", () => {
+  it("suppresses global forbidden for scoped personel write/detail, belge and surecler paths", () => {
     expect(shouldEmitGlobalAuthForbidden("/personeller", "POST")).toBe(false);
     expect(shouldEmitGlobalAuthForbidden("/personeller/2", "GET")).toBe(false);
     expect(shouldEmitGlobalAuthForbidden("/personeller/2", "PUT")).toBe(false);
+    expect(shouldEmitGlobalAuthForbidden("/personeller/2/belge-durumu", "GET")).toBe(false);
+    expect(shouldEmitGlobalAuthForbidden("/personeller/2/belge-durumu", "PUT")).toBe(false);
+    expect(shouldEmitGlobalAuthForbidden("/personeller/3/belge-kayitlari", "GET")).toBe(false);
+    expect(shouldEmitGlobalAuthForbidden("/personeller/3/belge-kayitlari", "POST")).toBe(false);
+    expect(shouldEmitGlobalAuthForbidden("/api/personeller/2/belge-durumu", "GET")).toBe(false);
+    expect(shouldEmitGlobalAuthForbidden("/belge-kayitlari/9/iptal", "POST")).toBe(false);
+    expect(shouldEmitGlobalAuthForbidden("/surecler", "GET")).toBe(false);
+    expect(shouldEmitGlobalAuthForbidden("/surecler?personel_id=2&sube_id=1", "GET")).toBe(false);
+    expect(shouldEmitGlobalAuthForbidden("/api/surecler?personel_id=2", "GET")).toBe(false);
     expect(shouldEmitGlobalAuthForbidden("/surecler/9", "GET")).toBe(false);
     expect(shouldEmitGlobalAuthForbidden("/bildirimler/4", "GET")).toBe(false);
   });
@@ -400,11 +504,9 @@ describe("shouldEmitGlobalAuthForbidden", () => {
   it("keeps global forbidden for list, sub-resources, puantaj and unknown paths", () => {
     expect(shouldEmitGlobalAuthForbidden("/personeller", "GET")).toBe(true);
     expect(shouldEmitGlobalAuthForbidden("/personeller?page=1", "GET")).toBe(true);
-    expect(shouldEmitGlobalAuthForbidden("/personeller/2/belge-durumu", "GET")).toBe(true);
-    expect(shouldEmitGlobalAuthForbidden("/personeller/3/belge-kayitlari", "GET")).toBe(true);
     expect(shouldEmitGlobalAuthForbidden("/gunluk-puantaj/2/2026-01-01", "GET")).toBe(true);
     expect(shouldEmitGlobalAuthForbidden("/yonetim/kullanicilar", "GET")).toBe(true);
-    expect(shouldEmitGlobalAuthForbidden("/api/personeller/2/belge-durumu", "GET")).toBe(true);
+    expect(shouldEmitGlobalAuthForbidden("/belge-kayitlari/9", "PUT")).toBe(true);
     expect(shouldEmitGlobalAuthForbidden("/unknown-endpoint", "GET")).toBe(true);
   });
 });

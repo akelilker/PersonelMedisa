@@ -5,19 +5,35 @@ import { getApiErrorMessage } from "../../../../api/api-client";
 import type { Personel } from "../../../../types/personel";
 import { BELGE_TURU_KEYS, BELGE_TURU_LABELS, type BelgeDurumuItem } from "../../../../types/belgeler";
 import {
+  formatPersonelBelgeDisplayText,
+  formatPersonelBelgeKayitDurumLabel,
+  formatPersonelBelgeKayitTipiLabel,
   PERSONEL_BELGE_GECERLILIK_LABELS,
-  PERSONEL_BELGE_KAYIT_TIPI_LABELS,
+  PERSONEL_BELGE_KAYIT_EMPTY_MESSAGE,
   type PersonelBelgeKaydi
 } from "../../../../types/personel-belge-kaydi";
 import { DossierRecord, DossierSection } from "./personel-dosya-dossier";
-import { formatDetailValue } from "./personel-dosya-format-utils";
+import { formatIsoDateDetail } from "./personel-dosya-format-utils";
 
 function formatBelgeDurumLabel(durum: BelgeDurumuItem["durum"]) {
   return durum === "VAR" ? "Var" : "Yok";
 }
 
-function formatOptionalDetail(value: string | null | undefined) {
-  return value && value.trim() ? formatDetailValue(value) : "-";
+function sortBelgeKayitlari(items: PersonelBelgeKaydi[]): PersonelBelgeKaydi[] {
+  return [...items].sort((left, right) => {
+    const leftDate = left.bitis_tarihi ?? "";
+    const rightDate = right.bitis_tarihi ?? "";
+    if (!leftDate && !rightDate) {
+      return left.ad.localeCompare(right.ad, "tr");
+    }
+    if (!leftDate) {
+      return 1;
+    }
+    if (!rightDate) {
+      return -1;
+    }
+    return leftDate.localeCompare(rightDate);
+  });
 }
 
 function gecerlilikClassName(durum: PersonelBelgeKaydi["gecerlilik_durumu"]) {
@@ -39,10 +55,13 @@ export function PersonelBelgelerPanel({
 }) {
   const [items, setItems] = useState<BelgeDurumuItem[]>([]);
   const [belgeKayitlari, setBelgeKayitlari] = useState<PersonelBelgeKaydi[]>([]);
+  const [iptalBelgeKayitlari, setIptalBelgeKayitlari] = useState<PersonelBelgeKaydi[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isBelgeKayitlariLoading, setIsBelgeKayitlariLoading] = useState(false);
+  const [isIptalBelgeKayitlariLoading, setIsIptalBelgeKayitlariLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [belgeKayitlariErrorMessage, setBelgeKayitlariErrorMessage] = useState<string | null>(null);
+  const [iptalBelgeKayitlariErrorMessage, setIptalBelgeKayitlariErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
     let isCancelled = false;
@@ -114,26 +133,54 @@ export function PersonelBelgelerPanel({
     };
   }, [isActive, personel.id]);
 
+  useEffect(() => {
+    let isCancelled = false;
+
+    if (!isActive) {
+      return;
+    }
+
+    setIsIptalBelgeKayitlariLoading(true);
+    setIptalBelgeKayitlariErrorMessage(null);
+
+    fetchPersonelBelgeKayitlari(personel.id, { state: "IPTAL", limit: 50 })
+      .then((result) => {
+        if (isCancelled) {
+          return;
+        }
+        setIptalBelgeKayitlari(result.items);
+      })
+      .catch((err) => {
+        if (isCancelled) {
+          return;
+        }
+        setIptalBelgeKayitlari([]);
+        setIptalBelgeKayitlariErrorMessage(
+          getApiErrorMessage(err, "İptal edilen belge kayıtları yüklenemedi.")
+        );
+      })
+      .finally(() => {
+        if (!isCancelled) {
+          setIsIptalBelgeKayitlariLoading(false);
+        }
+      });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [isActive, personel.id]);
+
   const isPasif = personel.aktif_durum === "PASIF";
   const hasAnyBelge = items.some((item) => item.durum === "VAR");
-  const sortedBelgeKayitlari = useMemo(
-    () =>
-      [...belgeKayitlari].sort((left, right) => {
-        const leftDate = left.bitis_tarihi ?? "";
-        const rightDate = right.bitis_tarihi ?? "";
-        if (!leftDate && !rightDate) {
-          return left.ad.localeCompare(right.ad, "tr");
-        }
-        if (!leftDate) {
-          return 1;
-        }
-        if (!rightDate) {
-          return -1;
-        }
-        return leftDate.localeCompare(rightDate);
-      }),
-    [belgeKayitlari]
+  const sortedBelgeKayitlari = useMemo(() => sortBelgeKayitlari(belgeKayitlari), [belgeKayitlari]);
+  const sortedIptalBelgeKayitlari = useMemo(
+    () => sortBelgeKayitlari(iptalBelgeKayitlari),
+    [iptalBelgeKayitlari]
   );
+  const showIptalBelgeKayitlariSection =
+    !isIptalBelgeKayitlariLoading &&
+    !iptalBelgeKayitlariErrorMessage &&
+    sortedIptalBelgeKayitlari.length > 0;
 
   return (
     <div className="personel-dosya-sections" data-testid="personel-belgeler-panel">
@@ -179,7 +226,7 @@ export function PersonelBelgelerPanel({
           <DossierRecord label="Durum" value={belgeKayitlariErrorMessage} />
         ) : null}
         {!isBelgeKayitlariLoading && !belgeKayitlariErrorMessage && sortedBelgeKayitlari.length === 0 ? (
-          <DossierRecord label="Kayıt" value="Henüz aktif eğitim veya sertifika kaydı yok." />
+          <DossierRecord label="Kayıt" value={PERSONEL_BELGE_KAYIT_EMPTY_MESSAGE} />
         ) : null}
 
         {!isBelgeKayitlariLoading && !belgeKayitlariErrorMessage && sortedBelgeKayitlari.length > 0 ? (
@@ -201,19 +248,19 @@ export function PersonelBelgelerPanel({
               <tbody>
                 {sortedBelgeKayitlari.map((kayit) => (
                   <tr key={kayit.id} data-testid={`personel-belge-kayit-row-${kayit.id}`}>
-                    <td>{PERSONEL_BELGE_KAYIT_TIPI_LABELS[kayit.kayit_tipi]}</td>
-                    <td>{kayit.ad}</td>
-                    <td>{formatOptionalDetail(kayit.veren_kurum)}</td>
-                    <td>{formatOptionalDetail(kayit.belge_no)}</td>
-                    <td>{formatOptionalDetail(kayit.baslangic_tarihi)}</td>
-                    <td>{formatOptionalDetail(kayit.bitis_tarihi)}</td>
+                    <td>{formatPersonelBelgeKayitTipiLabel(kayit.kayit_tipi)}</td>
+                    <td>{formatPersonelBelgeDisplayText(kayit.ad)}</td>
+                    <td>{formatPersonelBelgeDisplayText(kayit.veren_kurum)}</td>
+                    <td>{formatPersonelBelgeDisplayText(kayit.belge_no)}</td>
+                    <td>{formatIsoDateDetail(kayit.baslangic_tarihi)}</td>
+                    <td>{formatIsoDateDetail(kayit.bitis_tarihi)}</td>
                     <td>
                       <span className={gecerlilikClassName(kayit.gecerlilik_durumu)}>
                         {PERSONEL_BELGE_GECERLILIK_LABELS[kayit.gecerlilik_durumu]}
                       </span>
                     </td>
-                    <td>{formatOptionalDetail(kayit.ek_ref)}</td>
-                    <td>{formatOptionalDetail(kayit.aciklama)}</td>
+                    <td>{formatPersonelBelgeDisplayText(kayit.ek_ref)}</td>
+                    <td>{formatPersonelBelgeDisplayText(kayit.aciklama)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -221,6 +268,48 @@ export function PersonelBelgelerPanel({
           </div>
         ) : null}
       </DossierSection>
+
+      {showIptalBelgeKayitlariSection ? (
+        <DossierSection
+          title="İptal edilen belge kayıtları"
+          description="İptal edilmiş eğitim ve belge kayıtları salt okunur geçmiş olarak gösterilir."
+        >
+          <div className="personel-belge-kayit-table-wrap" data-testid="personel-belge-kayit-iptal-list">
+            <table className="personel-belge-kayit-table">
+              <thead>
+                <tr>
+                  <th>Tip</th>
+                  <th>Ad</th>
+                  <th>Veren kurum</th>
+                  <th>Belge no</th>
+                  <th>Başlangıç</th>
+                  <th>Bitiş</th>
+                  <th>Durum</th>
+                  <th>Açıklama</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sortedIptalBelgeKayitlari.map((kayit) => (
+                  <tr key={kayit.id} data-testid={`personel-belge-kayit-iptal-row-${kayit.id}`}>
+                    <td>{formatPersonelBelgeKayitTipiLabel(kayit.kayit_tipi)}</td>
+                    <td>{formatPersonelBelgeDisplayText(kayit.ad)}</td>
+                    <td>{formatPersonelBelgeDisplayText(kayit.veren_kurum)}</td>
+                    <td>{formatPersonelBelgeDisplayText(kayit.belge_no)}</td>
+                    <td>{formatIsoDateDetail(kayit.baslangic_tarihi)}</td>
+                    <td>{formatIsoDateDetail(kayit.bitis_tarihi)}</td>
+                    <td>
+                      <span className="personel-surec-state is-cancelled">
+                        {formatPersonelBelgeKayitDurumLabel(kayit.durum)}
+                      </span>
+                    </td>
+                    <td>{formatPersonelBelgeDisplayText(kayit.aciklama)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </DossierSection>
+      ) : null}
     </div>
   );
 }

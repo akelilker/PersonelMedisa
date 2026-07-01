@@ -120,6 +120,7 @@ jobs:
               set net:reconnect-interval-max 30;
               set xfer:clobber true;
               set ssl:verify-certificate no;
+              set ssl:check-hostname no;
               set ftp:passive-mode on;
               set ftp:ssl-allow ${use_ftps};
               set ftp:ssl-force ${use_ftps};

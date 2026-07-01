@@ -29,6 +29,10 @@ type RaporListMeta = {
   total_pages?: number;
   has_next_page?: boolean;
   has_prev_page?: boolean;
+  kaynak?: "SNAPSHOT" | "LIVE";
+  muhur_id?: number | null;
+  donem?: string | null;
+  effective_sube_id?: number | null;
 };
 
 function raporListOkBody(items: Record<string, unknown>[], metaOverrides?: RaporListMeta) {
@@ -45,10 +49,47 @@ function raporListOkBody(items: Record<string, unknown>[], metaOverrides?: Rapor
       total,
       total_pages: totalPages,
       has_next_page: metaOverrides?.has_next_page ?? false,
-      ...(metaOverrides?.has_prev_page !== undefined ? { has_prev_page: metaOverrides.has_prev_page } : {})
+      ...(metaOverrides?.has_prev_page !== undefined ? { has_prev_page: metaOverrides.has_prev_page } : {}),
+      ...(metaOverrides?.kaynak ? { kaynak: metaOverrides.kaynak } : {}),
+      ...(metaOverrides?.muhur_id !== undefined ? { muhur_id: metaOverrides.muhur_id } : {}),
+      ...(metaOverrides?.donem !== undefined ? { donem: metaOverrides.donem } : {}),
+      ...(metaOverrides?.effective_sube_id !== undefined
+        ? { effective_sube_id: metaOverrides.effective_sube_id }
+        : {})
     },
     errors: []
   });
+}
+
+function deriveRaporDonem(baslangic?: string | null, bitis?: string | null): string | null {
+  if (!baslangic || !bitis) {
+    return null;
+  }
+
+  const baslangicAy = baslangic.slice(0, 7);
+  const bitisAy = bitis.slice(0, 7);
+  if (baslangicAy !== bitisAy) {
+    return null;
+  }
+
+  return baslangicAy;
+}
+
+function resolveReportKaynak(
+  baslangic?: string | null,
+  bitis?: string | null,
+  muhurId?: number | null
+): { kaynak: "SNAPSHOT" | "LIVE"; donem: string | null; muhur_id: number | null } {
+  if (muhurId !== undefined && muhurId !== null && muhurId > 0) {
+    return { kaynak: "SNAPSHOT", donem: null, muhur_id: muhurId };
+  }
+
+  const donem = deriveRaporDonem(baslangic, bitis);
+  if (donem) {
+    return { kaynak: "SNAPSHOT", donem, muhur_id: 101 };
+  }
+
+  return { kaynak: "LIVE", donem, muhur_id: null };
 }
 
 const PERSONEL_SUBE_BY_ID: Record<number, number> = {
@@ -98,7 +139,13 @@ function personelOzetPaginatedBody(
   pageNumber: number,
   pageLimit: number,
   departmanId?: number,
-  subeScope: number | null = null
+  subeScope: number | null = null,
+  options?: {
+    personelId?: number;
+    baslangicTarihi?: string | null;
+    bitisTarihi?: string | null;
+    muhurId?: number | null;
+  }
 ) {
   let scopedItems = PERSONEL_OZET_PAGINATED_ITEMS;
   if (subeScope !== null) {
@@ -108,7 +155,22 @@ function personelOzetPaginatedBody(
     });
   }
 
-  if (departmanId === undefined && subeScope === null) {
+  let filtered =
+    departmanId === undefined
+      ? scopedItems
+      : scopedItems.filter((item) => item.departman_id === departmanId);
+
+  if (options?.personelId !== undefined) {
+    filtered = filtered.filter((item) => item.personel_id === options.personelId);
+  }
+
+  const sourceMeta = resolveReportKaynak(
+    options?.baslangicTarihi,
+    options?.bitisTarihi,
+    options?.muhurId
+  );
+
+  if (departmanId === undefined && subeScope === null && options?.personelId === undefined) {
     const total = PERSONEL_OZET_PAGINATED_ITEMS.length;
     const totalPages = 2;
     const items =
@@ -124,14 +186,14 @@ function personelOzetPaginatedBody(
       total,
       total_pages: totalPages,
       has_next_page: pageNumber < totalPages,
-      has_prev_page: pageNumber > 1
+      has_prev_page: pageNumber > 1,
+      kaynak: sourceMeta.kaynak,
+      muhur_id: sourceMeta.muhur_id,
+      donem: sourceMeta.donem,
+      effective_sube_id: subeScope
     });
   }
 
-  const filtered =
-    departmanId === undefined
-      ? scopedItems
-      : scopedItems.filter((item) => item.departman_id === departmanId);
   const total = filtered.length;
   const totalPages = Math.max(1, Math.ceil(total / pageLimit));
   const start = (pageNumber - 1) * pageLimit;
@@ -143,7 +205,399 @@ function personelOzetPaginatedBody(
     total,
     total_pages: totalPages,
     has_next_page: pageNumber < totalPages,
-    has_prev_page: pageNumber > 1
+    has_prev_page: pageNumber > 1,
+    kaynak: sourceMeta.kaynak,
+    muhur_id: sourceMeta.muhur_id,
+    donem: sourceMeta.donem,
+    effective_sube_id: subeScope
+  });
+}
+
+const DEVAMSIZLIK_PAGINATED_ITEMS: Record<string, unknown>[] = [
+  {
+    personel_id: 1,
+    ad_soyad: "Ayşe Yılmaz",
+    departman_id: 3,
+    baslangic_tarihi: "2026-04-10",
+    bitis_tarihi: "2026-04-10",
+    alt_tur: "IZINSIZ",
+    state: "MUHURLENDI"
+  },
+  {
+    personel_id: 2,
+    ad_soyad: "Mehmet Kaya",
+    departman_id: 4,
+    baslangic_tarihi: "2026-04-12",
+    bitis_tarihi: "2026-04-12",
+    alt_tur: "IZINSIZ",
+    state: "MUHURLENDI"
+  }
+];
+
+function devamsizlikPaginatedBody(
+  pageNumber: number,
+  pageLimit: number,
+  departmanId?: number,
+  subeScope: number | null = null,
+  options?: {
+    personelId?: number;
+    baslangicTarihi?: string | null;
+    bitisTarihi?: string | null;
+    muhurId?: number | null;
+  }
+) {
+  let scopedItems = DEVAMSIZLIK_PAGINATED_ITEMS;
+  if (subeScope !== null) {
+    scopedItems = scopedItems.filter((item) => {
+      const personelId = item.personel_id;
+      return typeof personelId === "number" && PERSONEL_SUBE_BY_ID[personelId] === subeScope;
+    });
+  }
+
+  let filtered =
+    departmanId === undefined
+      ? scopedItems
+      : scopedItems.filter((item) => item.departman_id === departmanId);
+
+  if (options?.personelId !== undefined) {
+    filtered = filtered.filter((item) => item.personel_id === options.personelId);
+  }
+
+  const sourceMeta = resolveReportKaynak(
+    options?.baslangicTarihi,
+    options?.bitisTarihi,
+    options?.muhurId
+  );
+
+  if (
+    departmanId === undefined &&
+    subeScope === null &&
+    options?.personelId === undefined &&
+    !options?.baslangicTarihi &&
+    !options?.bitisTarihi
+  ) {
+    const items = [DEVAMSIZLIK_PAGINATED_ITEMS[0]];
+    return raporListOkBody(items, {
+      page: 1,
+      limit: pageLimit,
+      total: 1,
+      total_pages: 1,
+      has_next_page: false,
+      has_prev_page: false,
+      kaynak: "LIVE",
+      muhur_id: null,
+      donem: null,
+      effective_sube_id: subeScope
+    });
+  }
+
+  const total = filtered.length;
+  const totalPages = Math.max(1, Math.ceil(total / pageLimit));
+  const start = (pageNumber - 1) * pageLimit;
+  const items = filtered.slice(start, start + pageLimit);
+
+  return raporListOkBody(items, {
+    page: pageNumber,
+    limit: pageLimit,
+    total,
+    total_pages: totalPages,
+    has_next_page: pageNumber < totalPages,
+    has_prev_page: pageNumber > 1,
+    kaynak: sourceMeta.kaynak,
+    muhur_id: sourceMeta.muhur_id,
+    donem: sourceMeta.donem,
+    effective_sube_id: subeScope
+  });
+}
+
+const IZIN_PAGINATED_ITEMS: Record<string, unknown>[] = [
+  {
+    personel_id: 1,
+    ad_soyad: "Ayşe Yılmaz",
+    departman_id: 3,
+    baslangic_tarihi: "2026-04-03",
+    bitis_tarihi: "2026-04-03",
+    alt_tur: "YILLIK_IZIN",
+    ucretli_mi: true,
+    state: "MUHURLENDI"
+  },
+  {
+    personel_id: 2,
+    ad_soyad: "Mehmet Kaya",
+    departman_id: 4,
+    baslangic_tarihi: "2026-04-08",
+    bitis_tarihi: "2026-04-08",
+    alt_tur: "UCRETLI_IZIN",
+    ucretli_mi: true,
+    state: "MUHURLENDI"
+  }
+];
+
+function izinPaginatedBody(
+  pageNumber: number,
+  pageLimit: number,
+  departmanId?: number,
+  subeScope: number | null = null,
+  options?: {
+    personelId?: number;
+    baslangicTarihi?: string | null;
+    bitisTarihi?: string | null;
+    muhurId?: number | null;
+  }
+) {
+  let scopedItems = IZIN_PAGINATED_ITEMS;
+  if (subeScope !== null) {
+    scopedItems = scopedItems.filter((item) => {
+      const personelId = item.personel_id;
+      return typeof personelId === "number" && PERSONEL_SUBE_BY_ID[personelId] === subeScope;
+    });
+  }
+
+  let filtered =
+    departmanId === undefined
+      ? scopedItems
+      : scopedItems.filter((item) => item.departman_id === departmanId);
+
+  if (options?.personelId !== undefined) {
+    filtered = filtered.filter((item) => item.personel_id === options.personelId);
+  }
+
+  const sourceMeta = resolveReportKaynak(
+    options?.baslangicTarihi,
+    options?.bitisTarihi,
+    options?.muhurId
+  );
+
+  if (
+    departmanId === undefined &&
+    subeScope === null &&
+    options?.personelId === undefined &&
+    !options?.baslangicTarihi &&
+    !options?.bitisTarihi
+  ) {
+    const items = [IZIN_PAGINATED_ITEMS[0]];
+    return raporListOkBody(items, {
+      page: 1,
+      limit: pageLimit,
+      total: 1,
+      total_pages: 1,
+      has_next_page: false,
+      has_prev_page: false,
+      kaynak: "LIVE",
+      muhur_id: null,
+      donem: null,
+      effective_sube_id: subeScope
+    });
+  }
+
+  const total = filtered.length;
+  const totalPages = Math.max(1, Math.ceil(total / pageLimit));
+  const start = (pageNumber - 1) * pageLimit;
+  const items = filtered.slice(start, start + pageLimit);
+
+  return raporListOkBody(items, {
+    page: pageNumber,
+    limit: pageLimit,
+    total,
+    total_pages: totalPages,
+    has_next_page: pageNumber < totalPages,
+    has_prev_page: pageNumber > 1,
+    kaynak: sourceMeta.kaynak,
+    muhur_id: sourceMeta.muhur_id,
+    donem: sourceMeta.donem,
+    effective_sube_id: subeScope
+  });
+}
+
+const IS_KAZASI_PAGINATED_ITEMS: Record<string, unknown>[] = [
+  {
+    personel_id: 1,
+    ad_soyad: "Ayşe Yılmaz",
+    departman_id: 3,
+    baslangic_tarihi: "2026-04-12",
+    bitis_tarihi: "2026-04-14",
+    aciklama: "Hafif yaralanma",
+    state: "AKTIF"
+  },
+  {
+    personel_id: 2,
+    ad_soyad: "Mehmet Kaya",
+    departman_id: 4,
+    baslangic_tarihi: "2026-04-18",
+    bitis_tarihi: "2026-04-20",
+    aciklama: "Is kazasi kaydi",
+    state: "AKTIF"
+  }
+];
+
+function isKazasiPaginatedBody(
+  pageNumber: number,
+  pageLimit: number,
+  departmanId?: number,
+  subeScope: number | null = null,
+  options?: {
+    personelId?: number;
+    baslangicTarihi?: string | null;
+    bitisTarihi?: string | null;
+  }
+) {
+  let scopedItems = IS_KAZASI_PAGINATED_ITEMS;
+  if (subeScope !== null) {
+    scopedItems = scopedItems.filter((item) => {
+      const personelId = item.personel_id;
+      return typeof personelId === "number" && PERSONEL_SUBE_BY_ID[personelId] === subeScope;
+    });
+  }
+
+  let filtered =
+    departmanId === undefined
+      ? scopedItems
+      : scopedItems.filter((item) => item.departman_id === departmanId);
+
+  if (options?.personelId !== undefined) {
+    filtered = filtered.filter((item) => item.personel_id === options.personelId);
+  }
+
+  if (
+    departmanId === undefined &&
+    subeScope === null &&
+    options?.personelId === undefined &&
+    !options?.baslangicTarihi &&
+    !options?.bitisTarihi
+  ) {
+    const items = [IS_KAZASI_PAGINATED_ITEMS[0]];
+    return raporListOkBody(items, {
+      page: 1,
+      limit: pageLimit,
+      total: 1,
+      total_pages: 1,
+      has_next_page: false,
+      has_prev_page: false,
+      kaynak: "SUREC",
+      muhur_id: null,
+      donem: null,
+      effective_sube_id: subeScope
+    });
+  }
+
+  const donem =
+    options?.baslangicTarihi && /^\d{4}-\d{2}/.test(options.baslangicTarihi)
+      ? options.baslangicTarihi.slice(0, 7)
+      : null;
+
+  const total = filtered.length;
+  const totalPages = Math.max(1, Math.ceil(total / pageLimit));
+  const start = (pageNumber - 1) * pageLimit;
+  const items = filtered.slice(start, start + pageLimit);
+
+  return raporListOkBody(items, {
+    page: pageNumber,
+    limit: pageLimit,
+    total,
+    total_pages: totalPages,
+    has_next_page: pageNumber < totalPages,
+    has_prev_page: pageNumber > 1,
+    kaynak: "SUREC",
+    muhur_id: null,
+    donem,
+    effective_sube_id: subeScope
+  });
+}
+
+const BILDIRIM_PAGINATED_ITEMS: Record<string, unknown>[] = [
+  {
+    tarih: "2026-04-11",
+    departman_id: 3,
+    personel_id: 1,
+    ad_soyad: "Ayşe Yılmaz",
+    bildirim_turu: "IZINSIZ_GELMEDI",
+    aciklama: "Habersiz devamsizlik",
+    state: "MUHURLENDI"
+  },
+  {
+    tarih: "2026-04-16",
+    departman_id: 4,
+    personel_id: 2,
+    ad_soyad: "Mehmet Kaya",
+    bildirim_turu: "GEC_GELDI",
+    aciklama: "Gec geldi bildirimi",
+    state: "MUHURLENDI"
+  }
+];
+
+function bildirimPaginatedBody(
+  pageNumber: number,
+  pageLimit: number,
+  departmanId?: number,
+  subeScope: number | null = null,
+  options?: {
+    personelId?: number;
+    baslangicTarihi?: string | null;
+    bitisTarihi?: string | null;
+    muhurId?: number | null;
+  }
+) {
+  let scopedItems = BILDIRIM_PAGINATED_ITEMS;
+  if (subeScope !== null) {
+    scopedItems = scopedItems.filter((item) => {
+      const personelId = item.personel_id;
+      return typeof personelId === "number" && PERSONEL_SUBE_BY_ID[personelId] === subeScope;
+    });
+  }
+
+  let filtered =
+    departmanId === undefined
+      ? scopedItems
+      : scopedItems.filter((item) => item.departman_id === departmanId);
+
+  if (options?.personelId !== undefined) {
+    filtered = filtered.filter((item) => item.personel_id === options.personelId);
+  }
+
+  const sourceMeta = resolveReportKaynak(
+    options?.baslangicTarihi,
+    options?.bitisTarihi,
+    options?.muhurId
+  );
+
+  if (
+    departmanId === undefined &&
+    subeScope === null &&
+    options?.personelId === undefined &&
+    !options?.baslangicTarihi &&
+    !options?.bitisTarihi
+  ) {
+    const items = [BILDIRIM_PAGINATED_ITEMS[0]];
+    return raporListOkBody(items, {
+      page: 1,
+      limit: pageLimit,
+      total: 1,
+      total_pages: 1,
+      has_next_page: false,
+      has_prev_page: false,
+      kaynak: "LIVE",
+      muhur_id: null,
+      donem: null,
+      effective_sube_id: subeScope
+    });
+  }
+
+  const total = filtered.length;
+  const totalPages = Math.max(1, Math.ceil(total / pageLimit));
+  const start = (pageNumber - 1) * pageLimit;
+  const items = filtered.slice(start, start + pageLimit);
+
+  return raporListOkBody(items, {
+    page: pageNumber,
+    limit: pageLimit,
+    total,
+    total_pages: totalPages,
+    has_next_page: pageNumber < totalPages,
+    has_prev_page: pageNumber > 1,
+    kaynak: sourceMeta.kaynak,
+    muhur_id: sourceMeta.muhur_id,
+    donem: sourceMeta.donem,
+    effective_sube_id: subeScope
   });
 }
 
@@ -232,11 +686,29 @@ const RAPOR_MOCK_ITEMS: Record<string, Record<string, unknown>[]> = {
   ]
 };
 
-function errorBody(code: string, message: string) {
+function errorBody(code: string, message: string, field?: string) {
   return JSON.stringify({
     data: null,
     meta: {},
-    errors: [{ code, message }]
+    errors: [{ code, ...(field ? { field } : {}), message }]
+  });
+}
+
+function surecListOkBody(items: unknown[], metaOverrides?: RaporListMeta) {
+  const page = metaOverrides?.page ?? 1;
+  const limit = metaOverrides?.limit ?? 10;
+  const total = metaOverrides?.total ?? items.length;
+  const totalPages = metaOverrides?.total_pages ?? Math.max(1, Math.ceil(total / limit));
+
+  return JSON.stringify({
+    data: { items },
+    meta: {
+      page,
+      limit,
+      total,
+      total_pages: totalPages
+    },
+    errors: []
   });
 }
 
@@ -249,6 +721,29 @@ async function fulfillJson(route: Route, status: number, body: string) {
 }
 
 const SUBE_SCOPE_MISMATCH_MESSAGE = "Bu kayıt aktif şube bağlamında görüntülenemiyor.";
+const PERSONEL_CREATE_SUBE_SCOPE_MISMATCH_MESSAGE = "Bu kayit aktif sube baglaminda goruntulenemiyor.";
+const PERSONEL_CREATE_SUBE_UNAUTHORIZED_MESSAGE = "Secili sube icin yetkiniz yok.";
+const DUPLICATE_TC_KIMLIK_NO_MESSAGE = "Bu T.C. Kimlik No ile kayıt açılamaz.";
+const SUPPORTED_SUREC_TURLERI = new Set([
+  "IZIN",
+  "DEVAMSIZLIK",
+  "TESVIK",
+  "RAPOR",
+  "IS_KAZASI",
+  "DISIPLIN",
+  "BELGE",
+  "POZISYON_DEGISTI",
+  "ISTEN_AYRILMA",
+  "GOREV_DEGISIKLIGI",
+  "UCRET_DEGISIKLIGI",
+  "ORG_DEGISIKLIK",
+  "BAGLI_AMIR_ATANDI",
+  "BAGLI_AMIR_DEGISTI",
+  "BAGLI_AMIR_ATAMASI_KALDIRILDI",
+  "BIRIM_AMIRI_ATANDI",
+  "BIRIM_AMIRI_ATAMASI_KALDIRILDI",
+  "SUBE_YETKISI_DEGISTI"
+]);
 
 function getRequestSubeScope(request: { headers(): { [key: string]: string } }, url: URL): number | null {
   const querySubeId = url.searchParams.get("sube_id");
@@ -262,6 +757,37 @@ function getRequestSubeScope(request: { headers(): { [key: string]: string } }, 
 
   const parsed = Number.parseInt(raw, 10);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+function parseStrictPositiveIntParam(value: string | null): number | null {
+  if (value === null || value.trim() === "") {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  const parsed = Number.parseInt(trimmed, 10);
+  return Number.isInteger(parsed) && parsed > 0 && String(parsed) === trimmed ? parsed : null;
+}
+
+function parsePayloadPositiveInt(value: unknown): number | null {
+  if (typeof value === "number" && Number.isInteger(value) && value > 0) {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    return parseStrictPositiveIntParam(value);
+  }
+
+  return null;
+}
+
+function isValidDateString(value: unknown): value is string {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return false;
+  }
+
+  const parsed = Date.parse(`${value}T00:00:00`);
+  return Number.isFinite(parsed);
 }
 
 export async function mockApi(page: Page, role: MockUserRole) {
@@ -452,6 +978,49 @@ export async function mockApi(page: Page, role: MockUserRole) {
       baslangic_tarihi: "2026-03-08",
       aciklama: "Demo devamsizlik sinyali",
       state: "AKTIF"
+    },
+    {
+      id: 504,
+      personel_id: 1,
+      surec_turu: "BELGE",
+      alt_tur: "SERTIFIKA",
+      baslangic_tarihi: "2024-03-01",
+      aciklama: JSON.stringify({
+        _personel_belge_kaydi: true,
+        kayit_tipi: "SERTIFIKA",
+        ad: "Forklift Operatör Belgesi",
+        baslangic_tarihi: "2024-03-01",
+        bitis_tarihi: "2027-03-01"
+      }),
+      state: "AKTIF"
+    },
+    {
+      id: 505,
+      personel_id: 1,
+      surec_turu: "BELGE",
+      alt_tur: "SERTIFIKA",
+      baslangic_tarihi: "2026-06-28",
+      aciklama: JSON.stringify({
+        _personel_belge_kaydi: true,
+        kayit_tipi: "SERTIFIKA",
+        ad: "S32 Forklift Belgesi",
+        baslangic_tarihi: "2026-06-28"
+      }),
+      created_at: "2026-06-28T10:00:00.000Z",
+      state: "AKTIF"
+    },
+    {
+      id: 503,
+      personel_id: 2,
+      surec_turu: "IZIN",
+      alt_tur: "UCRETSIZ_IZIN",
+      baslangic_tarihi: "2026-04-15",
+      bitis_tarihi: "2026-04-15",
+      effective_date: "2026-04-15",
+      created_at: "2026-04-15T10:00:00.000Z",
+      ucretli_mi: false,
+      aciklama: "Sube 2 scope kontrol sureci",
+      state: "AKTIF"
     }
   ];
 
@@ -530,6 +1099,20 @@ export async function mockApi(page: Page, role: MockUserRole) {
       bitis_tarihi: "2026-07-15",
       durum: "AKTIF",
       created_at: "2018-05-10T10:00:00.000Z"
+    },
+    {
+      id: 903,
+      personel_id: 1,
+      kayit_tipi: "SERTFIKA",
+      ad: "S34 İptal Sertifika",
+      veren_kurum: "Medisa Eğitim Merkezi",
+      belge_no: "S34-001",
+      baslangic_tarihi: "2023-01-01",
+      bitis_tarihi: "2025-01-01",
+      durum: "IPTAL",
+      aciklama: "Eski kayıt iptal edildi",
+      created_at: "2023-01-01T10:00:00.000Z",
+      updated_at: "2024-06-15T10:00:00.000Z"
     }
   ];
 
@@ -898,6 +1481,22 @@ let bildirimIdCounter = 800;
   let departmanIdCounter = 12;
   let personelIdCounter = 4;
 
+  function encodePersonelBelgeKaydiSurecMetadata(payload: {
+    kayit_tipi: string;
+    ad: string;
+    veren_kurum?: string | null;
+    belge_no?: string | null;
+    baslangic_tarihi?: string | null;
+    bitis_tarihi?: string | null;
+    ek_ref?: string | null;
+    aciklama?: string | null;
+  }) {
+    return JSON.stringify({
+      _personel_belge_kaydi: true,
+      ...payload
+    });
+  }
+
   function serializePersonelBelgeKaydi(record: (typeof personelBelgeKayitlari)[number]) {
     const bitisTarihi = record.bitis_tarihi ?? null;
     return {
@@ -916,6 +1515,29 @@ let bildirimIdCounter = 800;
       created_at: record.created_at ?? null,
       updated_at: record.updated_at ?? null
     };
+  }
+
+  function assertBelgePersonelScope(request: { headers(): { [key: string]: string } }, url: URL, personelId: number) {
+    const personel = personeller.find((item) => item.id === personelId);
+    if (!personel) {
+      return { ok: false as const, personel: undefined };
+    }
+
+    const subeScope = getRequestSubeScope(request, url);
+    if (personel.sube_id !== undefined && subeScope !== null && personel.sube_id !== subeScope) {
+      return { ok: false as const, personel, status: 403, body: errorBody("FORBIDDEN", SUBE_SCOPE_MISMATCH_MESSAGE) };
+    }
+
+    if (personel.sube_id !== undefined && mockUserSubeIds.length > 0 && !mockUserSubeIds.includes(personel.sube_id)) {
+      return {
+        ok: false as const,
+        personel,
+        status: 403,
+        body: errorBody("FORBIDDEN", PERSONEL_CREATE_SUBE_UNAUTHORIZED_MESSAGE)
+      };
+    }
+
+    return { ok: true as const, personel };
   }
 
   function getDepartmanLabel(id: number) {
@@ -1027,6 +1649,7 @@ let bildirimIdCounter = 800;
       departman_id: n(p.departman_id),
       gorev_id: n(p.gorev_id),
       bagli_amir_id: n(p.bagli_amir_id),
+      personel_tipi_id: n(p.personel_tipi_id),
       ucret_tipi_id: n(p.ucret_tipi_id),
       maas_tutari: nm(p.maas_tutari),
       prim_kurali_id: n(p.prim_kurali_id)
@@ -1041,6 +1664,7 @@ let bildirimIdCounter = 800;
       a.departman_id === b.departman_id &&
       a.gorev_id === b.gorev_id &&
       a.bagli_amir_id === b.bagli_amir_id &&
+      a.personel_tipi_id === b.personel_tipi_id &&
       a.ucret_tipi_id === b.ucret_tipi_id &&
       a.maas_tutari === b.maas_tutari &&
       a.prim_kurali_id === b.prim_kurali_id
@@ -1056,7 +1680,16 @@ let bildirimIdCounter = 800;
     if (typeof payload.soyad === "string") next.soyad = payload.soyad.trim();
     if (typeof payload.telefon === "string") next.telefon = payload.telefon.trim();
 
-    const setId = (key: "departman_id" | "gorev_id" | "bagli_amir_id" | "prim_kurali_id" | "ucret_tipi_id") => {
+    const setId = (
+      key:
+        | "sube_id"
+        | "departman_id"
+        | "gorev_id"
+        | "bagli_amir_id"
+        | "personel_tipi_id"
+        | "prim_kurali_id"
+        | "ucret_tipi_id"
+    ) => {
       if (!(key in payload)) return;
       const v = payload[key];
       if (v === null) {
@@ -1072,9 +1705,11 @@ let bildirimIdCounter = 800;
         if (Number.isFinite(parsed)) next[key] = parsed;
       }
     };
+    setId("sube_id");
     setId("departman_id");
     setId("gorev_id");
     setId("bagli_amir_id");
+    setId("personel_tipi_id");
     setId("prim_kurali_id");
     setId("ucret_tipi_id");
     if ("maas_tutari" in payload) {
@@ -1088,21 +1723,41 @@ let bildirimIdCounter = 800;
   function syncPersonelReferansAdlari(target: (typeof personeller)[number]) {
     if (target.departman_id !== undefined) {
       target.departman_adi = getDepartmanLabel(target.departman_id);
+    } else {
+      target.departman_adi = undefined;
     }
     if (target.gorev_id !== undefined) {
       target.gorev_adi = gorevAdlari.find((g) => g.id === target.gorev_id)?.ad ?? target.gorev_adi;
+    } else {
+      target.gorev_adi = undefined;
+    }
+    if (target.personel_tipi_id !== undefined) {
+      target.personel_tipi_adi =
+        target.personel_tipi_id === 1
+          ? "Tam Zamanlı"
+          : target.personel_tipi_id === 2
+            ? "Yarı Zamanlı"
+            : target.personel_tipi_adi;
+    } else {
+      target.personel_tipi_adi = undefined;
     }
     if (target.ucret_tipi_id !== undefined) {
       target.ucret_tipi_adi =
         ucretTipiReferans.find((x) => x.id === target.ucret_tipi_id)?.ad ?? target.ucret_tipi_adi;
+    } else {
+      target.ucret_tipi_adi = undefined;
     }
     if (target.prim_kurali_id !== undefined) {
       target.prim_kurali_adi =
         primKuraliReferans.find((x) => x.id === target.prim_kurali_id)?.ad ?? target.prim_kurali_adi;
+    } else {
+      target.prim_kurali_adi = undefined;
     }
     if (target.bagli_amir_id !== undefined) {
       target.bagli_amir_adi =
         bagliAmirReferanslari.find((item) => item.id === target.bagli_amir_id)?.ad ?? target.bagli_amir_adi;
+    } else {
+      target.bagli_amir_adi = undefined;
     }
   }
 
@@ -1173,6 +1828,9 @@ let bildirimIdCounter = 800;
     return Number.isFinite(parsed) ? parsed : null;
   }
 
+  const mockUserSubeIds =
+    role === "BIRIM_AMIRI" ? [1] : role === "MUHASEBE" ? [1, 2] : role === "BOLUM_YONETICISI" ? [2] : [];
+
   await page.route(
     (testUrl) => {
       try {
@@ -1188,20 +1846,18 @@ let bildirimIdCounter = 800;
     const method = request.method();
 
     if (path === "/api/auth/login" && method === "POST") {
-      const subeIds =
-        role === "BIRIM_AMIRI" ? [1] : role === "MUHASEBE" ? [1, 2] : role === "BOLUM_YONETICISI" ? [2] : [];
       await fulfillJson(
         route,
         200,
         okBody({
           token: "mock-token",
           ui_profile: role === "BIRIM_AMIRI" ? "birim_amiri" : "yonetim",
-          sube_list: subeIds.map((id) => ({ id, ad: subeler.find((item) => item.id === id)?.ad ?? `Şube ${id}` })),
+          sube_list: mockUserSubeIds.map((id) => ({ id, ad: subeler.find((item) => item.id === id)?.ad ?? `Şube ${id}` })),
           user: {
             id: 1,
             ad_soyad: "Mock Kullanıcı",
             rol: role,
-            sube_ids: subeIds
+            sube_ids: mockUserSubeIds
           }
         })
       );
@@ -1264,13 +1920,35 @@ let bildirimIdCounter = 800;
 
     if (path === "/api/personeller" && method === "POST") {
       const payload = request.postDataJSON() as Record<string, unknown>;
+      const tcKimlikNo = String(payload.tc_kimlik_no ?? "").trim();
       const subeId =
         typeof payload.sube_id === "number"
           ? payload.sube_id
           : Number.parseInt(String(payload.sube_id ?? ""), 10);
+      const subeScope = getRequestSubeScope(request, url);
+
+      const duplicateTc = personeller.some((personel) => String(personel.tc_kimlik_no).trim() === tcKimlikNo);
+      if (duplicateTc) {
+        await fulfillJson(
+          route,
+          409,
+          errorBody("DUPLICATE_TC_KIMLIK_NO", DUPLICATE_TC_KIMLIK_NO_MESSAGE, "tc_kimlik_no")
+        );
+        return;
+      }
+
+      if (Number.isFinite(subeId) && subeId > 0 && subeScope !== null && subeId !== subeScope) {
+        await fulfillJson(route, 403, errorBody("FORBIDDEN", PERSONEL_CREATE_SUBE_SCOPE_MISMATCH_MESSAGE));
+        return;
+      }
 
       if (!Number.isFinite(subeId) || subeId <= 0) {
         await fulfillJson(route, 400, errorBody("VALIDATION_ERROR", "Şube seçilmelidir."));
+        return;
+      }
+
+      if (mockUserSubeIds.length > 0 && !mockUserSubeIds.includes(subeId)) {
+        await fulfillJson(route, 403, errorBody("FORBIDDEN", PERSONEL_CREATE_SUBE_UNAUTHORIZED_MESSAGE));
         return;
       }
 
@@ -1309,7 +1987,7 @@ let bildirimIdCounter = 800;
 
       const created = {
         id: nextId,
-        tc_kimlik_no: String(payload.tc_kimlik_no ?? ""),
+        tc_kimlik_no: tcKimlikNo,
         ad: String(payload.ad ?? "Yeni"),
         soyad: String(payload.soyad ?? "Personel"),
         aktif_durum: (payload.aktif_durum === "PASIF" ? "PASIF" : "AKTIF") as "AKTIF" | "PASIF",
@@ -1457,12 +2135,69 @@ let bildirimIdCounter = 800;
         return;
       }
 
-      const payload = request.postDataJSON() as Record<string, unknown>;
+      if (role === "BIRIM_AMIRI") {
+        await fulfillJson(route, 403, errorBody("FORBIDDEN", "Bu kayit aktif sube baglaminda goruntulenemiyor."));
+        return;
+      }
+
+      const subeScope = getRequestSubeScope(request, url);
+      if (personel.sube_id !== undefined && subeScope !== null && personel.sube_id !== subeScope) {
+        await fulfillJson(route, 403, errorBody("FORBIDDEN", SUBE_SCOPE_MISMATCH_MESSAGE));
+        return;
+      }
+      if (personel.sube_id !== undefined && mockUserSubeIds.length > 0 && !mockUserSubeIds.includes(personel.sube_id)) {
+        await fulfillJson(route, 403, errorBody("FORBIDDEN", PERSONEL_CREATE_SUBE_UNAUTHORIZED_MESSAGE));
+        return;
+      }
+
+      const payload = (request.postDataJSON() ?? {}) as Record<string, unknown>;
+      const readNullablePositiveInt = (field: string) => {
+        if (!(field in payload)) return undefined;
+        const value = payload[field];
+        if (value === null || value === "") return null;
+        const parsed =
+          typeof value === "number"
+            ? value
+            : typeof value === "string" && value.trim()
+              ? Number.parseInt(value.trim(), 10)
+              : NaN;
+        return Number.isInteger(parsed) && parsed > 0 ? parsed : NaN;
+      };
+
+      for (const field of ["departman_id", "gorev_id", "bagli_amir_id", "personel_tipi_id", "ucret_tipi_id", "prim_kurali_id"]) {
+        const parsed = readNullablePositiveInt(field);
+        if (typeof parsed === "number" && Number.isNaN(parsed)) {
+          await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "Gecersiz deger.", field));
+          return;
+        }
+      }
+
+      if ("sube_id" in payload) {
+        const parsedSubeId = readNullablePositiveInt("sube_id");
+        if (parsedSubeId === null || (typeof parsedSubeId === "number" && Number.isNaN(parsedSubeId))) {
+          await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "Sube secilmelidir.", "sube_id"));
+          return;
+        }
+        if (parsedSubeId !== personel.sube_id) {
+          await fulfillJson(route, 403, errorBody("FORBIDDEN", SUBE_SCOPE_MISMATCH_MESSAGE));
+          return;
+        }
+      }
+
+      if ("aktif_durum" in payload && payload.aktif_durum !== personel.aktif_durum) {
+        await fulfillJson(
+          route,
+          422,
+          errorBody("VALIDATION_ERROR", "Aktif durum bu endpoint ile degistirilemez.", "aktif_durum")
+        );
+        return;
+      }
 
       const hasLifecycleKeys =
         "departman_id" in payload ||
         "gorev_id" in payload ||
         "bagli_amir_id" in payload ||
+        "personel_tipi_id" in payload ||
         "ucret_tipi_id" in payload ||
         "maas_tutari" in payload ||
         "prim_kurali_id" in payload;
@@ -1476,6 +2211,10 @@ let bildirimIdCounter = 800;
       }
 
       const merged = mergePersonelFromPutPayload(personel, payload);
+      if (typeof payload.ad === "string") merged.ad = payload.ad.trim();
+      if (typeof payload.soyad === "string") merged.soyad = payload.soyad.trim();
+      if (typeof payload.telefon === "string") merged.telefon = payload.telefon.trim();
+
       const beforeSnap = normalizeLifecycleSnapshot(personel);
       const afterSnap = normalizeLifecycleSnapshot(merged);
       const hasLifecycleDiff = !lifecycleSnapshotsEqual(beforeSnap, afterSnap);
@@ -1580,15 +2319,51 @@ let bildirimIdCounter = 800;
     }
 
     if (path === "/api/surecler" && method === "GET") {
-      const personelId = Number.parseInt(url.searchParams.get("personel_id") ?? "", 10);
+      const hasPersonelId = url.searchParams.has("personel_id");
+      const personelId = hasPersonelId ? parseStrictPositiveIntParam(url.searchParams.get("personel_id")) : null;
       const surecTuru = url.searchParams.get("surec_turu");
       const state = url.searchParams.get("state");
       const baslangicTarihi = url.searchParams.get("baslangic_tarihi");
       const bitisTarihi = url.searchParams.get("bitis_tarihi");
-      const subeId = Number.parseInt(url.searchParams.get("sube_id") ?? "", 10);
+      const subeScope = getRequestSubeScope(request, url);
+
+      if (hasPersonelId && personelId === null) {
+        await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "Personel secimi gecersiz.", "personel_id"));
+        return;
+      }
+
+      if (subeScope !== null && mockUserSubeIds.length > 0 && !mockUserSubeIds.includes(subeScope)) {
+        await fulfillJson(route, 403, errorBody("FORBIDDEN", PERSONEL_CREATE_SUBE_UNAUTHORIZED_MESSAGE));
+        return;
+      }
+
+      const personelInScope = (personel: (typeof personeller)[number] | undefined) => {
+        if (!personel || typeof personel.sube_id !== "number") {
+          return false;
+        }
+
+        if (subeScope !== null) {
+          return personel.sube_id === subeScope;
+        }
+
+        return mockUserSubeIds.length === 0 || mockUserSubeIds.includes(personel.sube_id);
+      };
+
+      if (personelId !== null) {
+        const linkedPersonel = personeller.find((personel) => personel.id === personelId);
+        if (!linkedPersonel) {
+          await fulfillJson(route, 404, errorBody("NOT_FOUND", "Personel bulunamadi."));
+          return;
+        }
+
+        if (!personelInScope(linkedPersonel)) {
+          await fulfillJson(route, 403, errorBody("FORBIDDEN", SUBE_SCOPE_MISMATCH_MESSAGE));
+          return;
+        }
+      }
 
       const filtered = surecler.filter((item) => {
-        if (Number.isFinite(personelId) && item.personel_id !== personelId) {
+        if (personelId !== null && item.personel_id !== personelId) {
           return false;
         }
         if (surecTuru && item.surec_turu !== surecTuru) {
@@ -1603,39 +2378,129 @@ let bildirimIdCounter = 800;
         if (bitisTarihi && item.bitis_tarihi !== bitisTarihi) {
           return false;
         }
-        if (Number.isFinite(subeId)) {
-          const linkedPersonel = personeller.find((personel) => personel.id === item.personel_id);
-          if (!linkedPersonel || linkedPersonel.sube_id !== subeId) {
-            return false;
-          }
+        if (!personelInScope(personeller.find((personel) => personel.id === item.personel_id))) {
+          return false;
         }
         return true;
       });
 
-      await fulfillJson(route, 200, okBody({ items: filtered }));
+      const pageNumber = Number.parseInt(url.searchParams.get("page") ?? "1", 10) || 1;
+      const pageLimit = Number.parseInt(url.searchParams.get("limit") ?? "20", 10) || 20;
+      const start = (pageNumber - 1) * pageLimit;
+      const items = filtered.slice(start, start + pageLimit);
+
+      await fulfillJson(
+        route,
+        200,
+        surecListOkBody(items, {
+          page: pageNumber,
+          limit: pageLimit,
+          total: filtered.length
+        })
+      );
       return;
     }
 
     if (path === "/api/surecler" && method === "POST") {
-      const payload = request.postDataJSON() as {
-        personel_id: number;
-        surec_turu: string;
-        alt_tur?: string;
-        baslangic_tarihi: string;
-        bitis_tarihi?: string;
-        ucretli_mi?: boolean;
-        aciklama?: string;
-      };
+      const payload = request.postDataJSON() as Record<string, unknown>;
+      const personelId = parsePayloadPositiveInt(payload.personel_id);
+      const surecTuru =
+        typeof payload.surec_turu === "string" ? payload.surec_turu.trim().toUpperCase() : "";
+      const baslangicTarihi = typeof payload.baslangic_tarihi === "string" ? payload.baslangic_tarihi : "";
+      const bitisTarihi =
+        typeof payload.bitis_tarihi === "string" && payload.bitis_tarihi.trim() !== ""
+          ? payload.bitis_tarihi
+          : undefined;
+      const subeScope = getRequestSubeScope(request, url);
+
+      if (personelId === null) {
+        await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "Personel seçilmelidir.", "personel_id"));
+        return;
+      }
+
+      if (!surecTuru) {
+        await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "Süreç türü seçilmelidir.", "surec_turu"));
+        return;
+      }
+
+      if (!SUPPORTED_SUREC_TURLERI.has(surecTuru)) {
+        await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "Süreç türü geçerli değil.", "surec_turu"));
+        return;
+      }
+
+      if (!isValidDateString(baslangicTarihi)) {
+        await fulfillJson(
+          route,
+          422,
+          errorBody("VALIDATION_ERROR", "Başlangıç tarihi geçerli olmalıdır.", "baslangic_tarihi")
+        );
+        return;
+      }
+
+      if (bitisTarihi !== undefined && !isValidDateString(bitisTarihi)) {
+        await fulfillJson(
+          route,
+          422,
+          errorBody("VALIDATION_ERROR", "Bitiş tarihi geçerli olmalıdır.", "bitis_tarihi")
+        );
+        return;
+      }
+
+      if (subeScope !== null && mockUserSubeIds.length > 0 && !mockUserSubeIds.includes(subeScope)) {
+        await fulfillJson(route, 403, errorBody("FORBIDDEN", PERSONEL_CREATE_SUBE_UNAUTHORIZED_MESSAGE));
+        return;
+      }
+
+      const linkedPersonel = personeller.find((personel) => personel.id === personelId);
+      if (!linkedPersonel) {
+        await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "Personel bulunamadı.", "personel_id"));
+        return;
+      }
+
+      if (linkedPersonel.sube_id !== undefined) {
+        if (subeScope !== null && linkedPersonel.sube_id !== subeScope) {
+          await fulfillJson(route, 403, errorBody("FORBIDDEN", SUBE_SCOPE_MISMATCH_MESSAGE));
+          return;
+        }
+        if (mockUserSubeIds.length > 0 && !mockUserSubeIds.includes(linkedPersonel.sube_id)) {
+          await fulfillJson(route, 403, errorBody("FORBIDDEN", PERSONEL_CREATE_SUBE_UNAUTHORIZED_MESSAGE));
+          return;
+        }
+      }
+
+      if (linkedPersonel.aktif_durum === "PASIF") {
+        await fulfillJson(
+          route,
+          422,
+          errorBody("VALIDATION_ERROR", "Pasif personele süreç kaydı eklenemez.", "personel_id")
+        );
+        return;
+      }
+
+      if (surecTuru === "POZISYON_DEGISTI") {
+        const mockOrgIndex = surecler.findIndex(
+          (item) =>
+            item.personel_id === personelId &&
+            item.surec_turu === "ORG_DEGISIKLIK" &&
+            item.baslangic_tarihi === baslangicTarihi &&
+            item.aciklama === "Mock otomatik org gecmis kaydi"
+        );
+        if (mockOrgIndex >= 0) {
+          surecler.splice(mockOrgIndex, 1);
+        }
+      }
 
       const created = {
         id: ++surecIdCounter,
-        personel_id: payload.personel_id,
-        surec_turu: payload.surec_turu,
-        alt_tur: payload.alt_tur,
-        baslangic_tarihi: payload.baslangic_tarihi,
-        bitis_tarihi: payload.bitis_tarihi,
-        ucretli_mi: payload.ucretli_mi,
-        aciklama: payload.aciklama,
+        personel_id: personelId,
+        surec_turu: surecTuru,
+        alt_tur: typeof payload.alt_tur === "string" && payload.alt_tur.trim() ? payload.alt_tur.trim() : undefined,
+        baslangic_tarihi: baslangicTarihi,
+        bitis_tarihi: bitisTarihi,
+        ucretli_mi: Boolean(payload.ucretli_mi),
+        aciklama:
+          typeof payload.aciklama === "string" && payload.aciklama.trim() ? payload.aciklama.trim() : undefined,
+        created_at: new Date().toISOString(),
         state: "AKTIF"
       };
       surecler.unshift(created);
@@ -1647,7 +2512,7 @@ let bildirimIdCounter = 800;
         }
       }
 
-      await fulfillJson(route, 200, okBody(created));
+      await fulfillJson(route, 201, okBody(created));
       return;
     }
 
@@ -1705,9 +2570,13 @@ let bildirimIdCounter = 800;
     const belgeKayitlariListMatch = path.match(/^\/api\/personeller\/(\d+)\/belge-kayitlari$/);
     if (belgeKayitlariListMatch && method === "GET") {
       const pid = Number.parseInt(belgeKayitlariListMatch[1] ?? "0", 10);
-      const p = personeller.find((x) => x.id === pid);
-      if (!p) {
+      const scopeResult = assertBelgePersonelScope(request, url, pid);
+      if (!scopeResult.personel) {
         await fulfillJson(route, 404, errorBody("NOT_FOUND", "Personel bulunamadi."));
+        return;
+      }
+      if (!scopeResult.ok) {
+        await fulfillJson(route, scopeResult.status, scopeResult.body);
         return;
       }
 
@@ -1736,9 +2605,17 @@ let bildirimIdCounter = 800;
 
     if (belgeKayitlariListMatch && method === "POST") {
       const pid = Number.parseInt(belgeKayitlariListMatch[1] ?? "0", 10);
-      const p = personeller.find((x) => x.id === pid);
-      if (!p) {
+      const scopeResult = assertBelgePersonelScope(request, url, pid);
+      if (!scopeResult.personel) {
         await fulfillJson(route, 404, errorBody("NOT_FOUND", "Personel bulunamadi."));
+        return;
+      }
+      if (!scopeResult.ok) {
+        await fulfillJson(route, scopeResult.status, scopeResult.body);
+        return;
+      }
+      if (scopeResult.personel.aktif_durum === "PASIF") {
+        await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "Pasif personele belge kaydı eklenemez.", "personel_id"));
         return;
       }
 
@@ -1759,6 +2636,14 @@ let bildirimIdCounter = 800;
         await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "kayit_tipi ve ad zorunludur."));
         return;
       }
+      if (payload.baslangic_tarihi && !isValidDateString(payload.baslangic_tarihi)) {
+        await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "Gecerli bir tarih olmalidir.", "baslangic_tarihi"));
+        return;
+      }
+      if (payload.bitis_tarihi && !isValidDateString(payload.bitis_tarihi)) {
+        await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "Gecerli bir tarih olmalidir.", "bitis_tarihi"));
+        return;
+      }
 
       const now = new Date().toISOString();
       const created = {
@@ -1777,7 +2662,27 @@ let bildirimIdCounter = 800;
         updated_at: now
       };
       personelBelgeKayitlari.unshift(created);
-      await fulfillJson(route, 200, okBody(serializePersonelBelgeKaydi(created)));
+      surecler.unshift({
+        id: created.id,
+        personel_id: pid,
+        surec_turu: "BELGE",
+        alt_tur: kayitTipi,
+        baslangic_tarihi: created.baslangic_tarihi ?? now.slice(0, 10),
+        bitis_tarihi: created.bitis_tarihi ?? undefined,
+        aciklama: encodePersonelBelgeKaydiSurecMetadata({
+          kayit_tipi: kayitTipi,
+          ad,
+          veren_kurum: created.veren_kurum,
+          belge_no: created.belge_no,
+          baslangic_tarihi: created.baslangic_tarihi,
+          bitis_tarihi: created.bitis_tarihi,
+          ek_ref: created.ek_ref,
+          aciklama: created.aciklama
+        }),
+        created_at: now,
+        state: "AKTIF"
+      });
+      await fulfillJson(route, 201, okBody(serializePersonelBelgeKaydi(created)));
       return;
     }
 
@@ -1789,6 +2694,11 @@ let bildirimIdCounter = 800;
         await fulfillJson(route, 404, errorBody("NOT_FOUND", "Belge kaydi bulunamadi."));
         return;
       }
+      const scopeResult = assertBelgePersonelScope(request, url, kayit.personel_id);
+      if (!scopeResult.ok) {
+        await fulfillJson(route, scopeResult.status, scopeResult.body);
+        return;
+      }
       kayit.durum = "IPTAL";
       kayit.updated_at = new Date().toISOString();
       await fulfillJson(route, 200, okBody(serializePersonelBelgeKaydi(kayit)));
@@ -1798,9 +2708,13 @@ let bildirimIdCounter = 800;
     const belgeDurumMatch = path.match(/^\/api\/personeller\/(\d+)\/belge-durumu$/);
     if (belgeDurumMatch && method === "GET") {
       const pid = Number.parseInt(belgeDurumMatch[1] ?? "0", 10);
-      const p = personeller.find((x) => x.id === pid);
-      if (!p) {
+      const scopeResult = assertBelgePersonelScope(request, url, pid);
+      if (!scopeResult.personel) {
         await fulfillJson(route, 404, errorBody("NOT_FOUND", "Personel bulunamadi."));
+        return;
+      }
+      if (!scopeResult.ok) {
+        await fulfillJson(route, scopeResult.status, scopeResult.body);
         return;
       }
       const stored = belgeDurumByPersonelId.get(pid) ?? {};
@@ -1814,9 +2728,17 @@ let bildirimIdCounter = 800;
 
     if (belgeDurumMatch && method === "PUT") {
       const pid = Number.parseInt(belgeDurumMatch[1] ?? "0", 10);
-      const p = personeller.find((x) => x.id === pid);
-      if (!p) {
+      const scopeResult = assertBelgePersonelScope(request, url, pid);
+      if (!scopeResult.personel) {
         await fulfillJson(route, 404, errorBody("NOT_FOUND", "Personel bulunamadi."));
+        return;
+      }
+      if (!scopeResult.ok) {
+        await fulfillJson(route, scopeResult.status, scopeResult.body);
+        return;
+      }
+      if (scopeResult.personel.aktif_durum === "PASIF") {
+        await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "Pasif personelin belge durumu güncellenemez.", "personel_id"));
         return;
       }
       const payload = (request.postDataJSON() ?? {}) as {
@@ -2127,6 +3049,8 @@ let bildirimIdCounter = 800;
             { key: "RAPOR", label: "Rapor" },
             { key: "IS_KAZASI", label: "İş Kazası" },
             { key: "DEVAMSIZLIK", label: "Devamsızlık" },
+            { key: "TESVIK", label: "Teşvik" },
+            { key: "BELGE", label: "Belge / Sertifika" },
             { key: "ISTEN_AYRILMA", label: "İşten Ayrılma" }
           ])
         );
@@ -2654,6 +3578,29 @@ let bildirimIdCounter = 800;
         const pageNumber = Number.parseInt(raporUrl.searchParams.get("page") ?? "1", 10) || 1;
         const pageLimit = Number.parseInt(raporUrl.searchParams.get("limit") ?? "10", 10) || 10;
         const departmanId = Number.parseInt(raporUrl.searchParams.get("departman_id") ?? "", 10);
+        const personelId = Number.parseInt(raporUrl.searchParams.get("personel_id") ?? "", 10);
+        const muhurId = Number.parseInt(raporUrl.searchParams.get("muhur_id") ?? "", 10);
+        const baslangicTarihi = raporUrl.searchParams.get("baslangic_tarihi");
+        const bitisTarihi = raporUrl.searchParams.get("bitis_tarihi");
+
+        if (Number.isFinite(muhurId) && muhurId > 0 && subeScope !== null && subeScope !== 2) {
+          await fulfillJson(
+            route,
+            403,
+            errorBody("FORBIDDEN", "Bu kayit aktif sube baglaminda goruntulenemiyor.")
+          );
+          return;
+        }
+
+        if (baslangicTarihi === "2026-13-01") {
+          await fulfillJson(
+            route,
+            400,
+            errorBody("VALIDATION_ERROR", "Gecersiz baslangic tarihi.", "baslangic_tarihi")
+          );
+          return;
+        }
+
         await fulfillJson(
           route,
           200,
@@ -2661,7 +3608,181 @@ let bildirimIdCounter = 800;
             pageNumber,
             pageLimit,
             Number.isFinite(departmanId) ? departmanId : undefined,
-            subeScope
+            subeScope,
+            {
+              personelId: Number.isFinite(personelId) ? personelId : undefined,
+              baslangicTarihi,
+              bitisTarihi,
+              muhurId: Number.isFinite(muhurId) ? muhurId : null
+            }
+          )
+        );
+        return;
+      }
+
+      if (path === "/api/raporlar/izin") {
+        const raporUrl = new URL(route.request().url());
+        const pageNumber = Number.parseInt(raporUrl.searchParams.get("page") ?? "1", 10) || 1;
+        const pageLimit = Number.parseInt(raporUrl.searchParams.get("limit") ?? "10", 10) || 10;
+        const departmanId = Number.parseInt(raporUrl.searchParams.get("departman_id") ?? "", 10);
+        const personelId = Number.parseInt(raporUrl.searchParams.get("personel_id") ?? "", 10);
+        const muhurId = Number.parseInt(raporUrl.searchParams.get("muhur_id") ?? "", 10);
+        const baslangicTarihi = raporUrl.searchParams.get("baslangic_tarihi");
+        const bitisTarihi = raporUrl.searchParams.get("bitis_tarihi");
+
+        if (Number.isFinite(muhurId) && muhurId > 0 && subeScope !== null && subeScope !== 2) {
+          await fulfillJson(
+            route,
+            403,
+            errorBody("FORBIDDEN", "Bu kayit aktif sube baglaminda goruntulenemiyor.")
+          );
+          return;
+        }
+
+        if (baslangicTarihi === "2026-13-01") {
+          await fulfillJson(
+            route,
+            400,
+            errorBody("VALIDATION_ERROR", "Gecersiz baslangic tarihi.", "baslangic_tarihi")
+          );
+          return;
+        }
+
+        await fulfillJson(
+          route,
+          200,
+          izinPaginatedBody(
+            pageNumber,
+            pageLimit,
+            Number.isFinite(departmanId) ? departmanId : undefined,
+            subeScope,
+            {
+              personelId: Number.isFinite(personelId) ? personelId : undefined,
+              baslangicTarihi,
+              bitisTarihi,
+              muhurId: Number.isFinite(muhurId) ? muhurId : null
+            }
+          )
+        );
+        return;
+      }
+
+      if (path === "/api/raporlar/devamsizlik") {
+        const raporUrl = new URL(route.request().url());
+        const pageNumber = Number.parseInt(raporUrl.searchParams.get("page") ?? "1", 10) || 1;
+        const pageLimit = Number.parseInt(raporUrl.searchParams.get("limit") ?? "10", 10) || 10;
+        const departmanId = Number.parseInt(raporUrl.searchParams.get("departman_id") ?? "", 10);
+        const personelId = Number.parseInt(raporUrl.searchParams.get("personel_id") ?? "", 10);
+        const muhurId = Number.parseInt(raporUrl.searchParams.get("muhur_id") ?? "", 10);
+        const baslangicTarihi = raporUrl.searchParams.get("baslangic_tarihi");
+        const bitisTarihi = raporUrl.searchParams.get("bitis_tarihi");
+
+        if (Number.isFinite(muhurId) && muhurId > 0 && subeScope !== null && subeScope !== 2) {
+          await fulfillJson(
+            route,
+            403,
+            errorBody("FORBIDDEN", "Bu kayit aktif sube baglaminda goruntulenemiyor.")
+          );
+          return;
+        }
+
+        if (baslangicTarihi === "2026-13-01") {
+          await fulfillJson(
+            route,
+            400,
+            errorBody("VALIDATION_ERROR", "Gecersiz baslangic tarihi.", "baslangic_tarihi")
+          );
+          return;
+        }
+
+        await fulfillJson(
+          route,
+          200,
+          devamsizlikPaginatedBody(
+            pageNumber,
+            pageLimit,
+            Number.isFinite(departmanId) ? departmanId : undefined,
+            subeScope,
+            {
+              personelId: Number.isFinite(personelId) ? personelId : undefined,
+              baslangicTarihi,
+              bitisTarihi,
+              muhurId: Number.isFinite(muhurId) ? muhurId : null
+            }
+          )
+        );
+        return;
+      }
+
+      if (path === "/api/raporlar/is-kazasi") {
+        const raporUrl = new URL(route.request().url());
+        const pageNumber = Number.parseInt(raporUrl.searchParams.get("page") ?? "1", 10) || 1;
+        const pageLimit = Number.parseInt(raporUrl.searchParams.get("limit") ?? "10", 10) || 10;
+        const departmanId = Number.parseInt(raporUrl.searchParams.get("departman_id") ?? "", 10);
+        const personelId = Number.parseInt(raporUrl.searchParams.get("personel_id") ?? "", 10);
+        const baslangicTarihi = raporUrl.searchParams.get("baslangic_tarihi");
+        const bitisTarihi = raporUrl.searchParams.get("bitis_tarihi");
+
+        await fulfillJson(
+          route,
+          200,
+          isKazasiPaginatedBody(
+            pageNumber,
+            pageLimit,
+            Number.isFinite(departmanId) ? departmanId : undefined,
+            subeScope,
+            {
+              personelId: Number.isFinite(personelId) ? personelId : undefined,
+              baslangicTarihi,
+              bitisTarihi
+            }
+          )
+        );
+        return;
+      }
+
+      if (path === "/api/raporlar/bildirim") {
+        const raporUrl = new URL(route.request().url());
+        const pageNumber = Number.parseInt(raporUrl.searchParams.get("page") ?? "1", 10) || 1;
+        const pageLimit = Number.parseInt(raporUrl.searchParams.get("limit") ?? "10", 10) || 10;
+        const departmanId = Number.parseInt(raporUrl.searchParams.get("departman_id") ?? "", 10);
+        const personelId = Number.parseInt(raporUrl.searchParams.get("personel_id") ?? "", 10);
+        const muhurId = Number.parseInt(raporUrl.searchParams.get("muhur_id") ?? "", 10);
+        const baslangicTarihi = raporUrl.searchParams.get("baslangic_tarihi");
+        const bitisTarihi = raporUrl.searchParams.get("bitis_tarihi");
+
+        if (Number.isFinite(muhurId) && muhurId > 0 && subeScope !== null && subeScope !== 2) {
+          await fulfillJson(
+            route,
+            403,
+            errorBody("FORBIDDEN", "Bu kayit aktif sube baglaminda goruntulenemiyor.")
+          );
+          return;
+        }
+
+        if (baslangicTarihi === "2026-13-01") {
+          await fulfillJson(
+            route,
+            400,
+            errorBody("VALIDATION_ERROR", "Gecersiz baslangic tarihi.", "baslangic_tarihi")
+          );
+          return;
+        }
+
+        await fulfillJson(
+          route,
+          200,
+          bildirimPaginatedBody(
+            pageNumber,
+            pageLimit,
+            Number.isFinite(departmanId) ? departmanId : undefined,
+            subeScope,
+            {
+              personelId: Number.isFinite(personelId) ? personelId : undefined,
+              baslangicTarihi,
+              bitisTarihi,
+              muhurId: Number.isFinite(muhurId) ? muhurId : null
+            }
           )
         );
         return;
@@ -2751,4 +3872,3 @@ let bildirimIdCounter = 800;
     }
   );
 }
-

@@ -177,7 +177,7 @@ export function KayitSurecWorkspace({
   const [personelSubmitting, setPersonelSubmitting] = useState(false);
   const [personelError, setPersonelError] = useState<string | null>(null);
   const [personelFieldErrors, setPersonelFieldErrors] = useState<
-    Partial<Record<"tcKimlikNo", string>>
+    Partial<Record<"tcKimlikNo" | "subeId", string>>
   >({});
   const [personelInfo, setPersonelInfo] = useState<string | null>(null);
 
@@ -744,6 +744,13 @@ export function KayitSurecWorkspace({
       setPersonelError(detail.message);
       if (detail.code === "DUPLICATE_TC_KIMLIK_NO") {
         setPersonelFieldErrors({ tcKimlikNo: detail.message });
+      } else if (
+        detail.status === 403 &&
+        detail.code === "FORBIDDEN" &&
+        (detail.message === "Seçilen şube aktif şube filtresiyle uyuşmuyor." ||
+          detail.message === "Seçili şube için yetkiniz yok.")
+      ) {
+        setPersonelFieldErrors({ subeId: detail.message });
       }
     } finally {
       setPersonelSubmitting(false);
@@ -1035,16 +1042,14 @@ export function KayitSurecWorkspace({
                         createErrorMessage={personelError}
                         fieldErrors={personelFieldErrors}
                         onFieldErrorClear={(field) => {
-                          if (field === "tcKimlikNo") {
-                            setPersonelFieldErrors((prev) => {
-                              if (!prev.tcKimlikNo) {
-                                return prev;
-                              }
-                              const next = { ...prev };
-                              delete next.tcKimlikNo;
-                              return next;
-                            });
-                          }
+                          setPersonelFieldErrors((prev) => {
+                            if (!prev[field]) {
+                              return prev;
+                            }
+                            const next = { ...prev };
+                            delete next[field];
+                            return next;
+                          });
                         }}
                         referenceError={null}
                         className="workspace-form-stack"

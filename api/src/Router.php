@@ -7,6 +7,7 @@ namespace Medisa\Api;
 use Medisa\Api\Auth\AuthMiddleware;
 use Medisa\Api\Auth\LoginController;
 use Medisa\Api\Controllers\BildirimlerController;
+use Medisa\Api\Controllers\PersonelBelgelerController;
 use Medisa\Api\Controllers\PersonellerController;
 use Medisa\Api\Controllers\PuantajController;
 use Medisa\Api\Controllers\RaporlarController;
@@ -48,17 +49,14 @@ class Router
             LoginController::login($this->request);
         }
 
-        if ($method === 'PUT' && preg_match('#^/personeller/(\d+)$#', $path)) {
-            JsonResponse::methodNotAllowed();
+        if ($method === 'PUT' && preg_match('#^/personeller/(\d+)$#', $path, $matches)) {
+            PersonellerController::update($this->request, $matches[1]);
         }
-        if ($method === 'POST' && $path === '/surecler') {
-            JsonResponse::methodNotAllowed();
-        }
-        if ($method === 'PUT' && preg_match('#^/gunluk-puantaj/(\d+)/([^/]+)$#', $path)) {
-            JsonResponse::methodNotAllowed();
+        if ($method === 'PUT' && preg_match('#^/gunluk-puantaj/(\d+)/([^/]+)$#', $path, $matches)) {
+            PuantajController::upsert($this->request, $matches[1], $matches[2]);
         }
         if ($method === 'POST' && $path === '/puantaj/muhurle') {
-            JsonResponse::methodNotAllowed();
+            PuantajController::muhurleAylik($this->request);
         }
         if ($method === 'POST' && $path === '/yonetim/aylik-ozet/bolum-onay') {
             JsonResponse::methodNotAllowed();
@@ -78,6 +76,21 @@ class Router
         }
         if ($method === 'GET' && preg_match('#^/personeller/(\d+)$#', $path, $matches)) {
             PersonellerController::detail($this->request, $matches[1]);
+        }
+        if ($method === 'GET' && preg_match('#^/personeller/(\d+)/belge-durumu$#', $path, $matches)) {
+            PersonelBelgelerController::belgeDurumu($this->request, $matches[1]);
+        }
+        if ($method === 'PUT' && preg_match('#^/personeller/(\d+)/belge-durumu$#', $path, $matches)) {
+            PersonelBelgelerController::updateBelgeDurumu($this->request, $matches[1]);
+        }
+        if ($method === 'GET' && preg_match('#^/personeller/(\d+)/belge-kayitlari$#', $path, $matches)) {
+            PersonelBelgelerController::listKayitlari($this->request, $matches[1]);
+        }
+        if ($method === 'POST' && preg_match('#^/personeller/(\d+)/belge-kayitlari$#', $path, $matches)) {
+            PersonelBelgelerController::createKaydi($this->request, $matches[1]);
+        }
+        if ($method === 'POST' && preg_match('#^/belge-kayitlari/(\d+)/iptal$#', $path, $matches)) {
+            PersonelBelgelerController::cancelKaydi($this->request, $matches[1]);
         }
 
         if ($path === '/referans/departmanlar' && $method === 'GET') {
@@ -110,6 +123,9 @@ class Router
         }
         if ($path === '/surecler' && $method === 'GET') {
             SureclerController::list($this->request);
+        }
+        if ($path === '/surecler' && $method === 'POST') {
+            SureclerController::create($this->request);
         }
         if ($path === '/zimmetler' && $method === 'GET') {
             ZimmetlerController::list($this->request);

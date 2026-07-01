@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { fetchGunlukPuantaj, upsertGunlukPuantaj } from "../../src/api/puantaj.api";
+import { fetchGunlukPuantaj, muhurleAylikPuantaj, upsertGunlukPuantaj } from "../../src/api/puantaj.api";
 
 function createJsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -368,5 +368,39 @@ describe("puantaj.api", () => {
     );
     expect(result.beklenen_giris_saati).toBeUndefined();
     expect(result.beklenen_cikis_saati).toBeUndefined();
+  });
+
+  it("sends POST request to aylik puantaj muhurle endpoint", async () => {
+    const fetchMock = vi.fn(async () =>
+      createJsonResponse(
+        {
+          data: {
+            muhur_id: 4,
+            sube_id: 2,
+            yil: 2026,
+            ay: 4,
+            donem: "2026-04",
+            durum: "MUHURLENDI",
+            muhurlenen_kayit_sayisi: 18
+          },
+          meta: {},
+          errors: []
+        },
+        200
+      )
+    );
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await muhurleAylikPuantaj({ yil: 2026, ay: 4 });
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("/api/puantaj/muhurle");
+    expect(init.method).toBe("POST");
+    expect(init.body).toBe(JSON.stringify({ yil: 2026, ay: 4 }));
+    expect(result).toMatchObject({
+      donem: "2026-04",
+      muhurlenen_kayit_sayisi: 18
+    });
   });
 });

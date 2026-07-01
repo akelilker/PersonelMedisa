@@ -1,3 +1,5 @@
+import { sanitizeDisplayText } from "../lib/display/sanitize-display-text";
+
 export const PERSONEL_BELGE_KAYIT_TIPI_KEYS = ["EGITIM", "SERTIFIKA", "EHLIYET", "YETKINLIK"] as const;
 
 export type PersonelBelgeKayitTipi = (typeof PERSONEL_BELGE_KAYIT_TIPI_KEYS)[number];
@@ -42,6 +44,70 @@ export const PERSONEL_BELGE_KAYIT_TIPI_LABELS: Record<PersonelBelgeKayitTipi, st
   EHLIYET: "Ehliyet",
   YETKINLIK: "Yetkinlik"
 };
+
+export const PERSONEL_BELGE_KAYIT_EMPTY_MESSAGE = "Belge kaydı bulunmuyor.";
+
+const PERSONEL_BELGE_KAYIT_TIPI_ALIASES: Record<string, PersonelBelgeKayitTipi> = {
+  SERTFIKA: "SERTIFIKA"
+};
+
+const PERSONEL_BELGE_KAYIT_DURUM_LABELS: Record<PersonelBelgeKayitDurum, string> = {
+  AKTIF: "Aktif",
+  IPTAL: "İptal"
+};
+
+function normalizeBelgeEnumKey(value: string): string {
+  return value.trim().replace(/-/g, "_").toUpperCase();
+}
+
+export function normalizePersonelBelgeKayitTipi(value: unknown): PersonelBelgeKayitTipi | null {
+  if (typeof value !== "string" || !value.trim()) {
+    return null;
+  }
+
+  const key = normalizeBelgeEnumKey(value);
+  if ((PERSONEL_BELGE_KAYIT_TIPI_KEYS as readonly string[]).includes(key)) {
+    return key as PersonelBelgeKayitTipi;
+  }
+
+  return PERSONEL_BELGE_KAYIT_TIPI_ALIASES[key] ?? null;
+}
+
+export function formatPersonelBelgeKayitTipiLabel(value: unknown): string {
+  const normalized = normalizePersonelBelgeKayitTipi(value);
+  if (normalized) {
+    return PERSONEL_BELGE_KAYIT_TIPI_LABELS[normalized];
+  }
+
+  if (typeof value !== "string" || !value.trim()) {
+    return "-";
+  }
+
+  const key = normalizeBelgeEnumKey(value);
+  const alias = PERSONEL_BELGE_KAYIT_TIPI_ALIASES[key];
+  if (alias) {
+    return PERSONEL_BELGE_KAYIT_TIPI_LABELS[alias];
+  }
+
+  return key
+    .split("_")
+    .filter(Boolean)
+    .map((token) => token.charAt(0) + token.slice(1).toLocaleLowerCase("tr-TR"))
+    .join(" ");
+}
+
+export function formatPersonelBelgeKayitDurumLabel(value: unknown): string {
+  if (typeof value !== "string" || !value.trim()) {
+    return "-";
+  }
+
+  const key = normalizeBelgeEnumKey(value) as PersonelBelgeKayitDurum;
+  return PERSONEL_BELGE_KAYIT_DURUM_LABELS[key] ?? "-";
+}
+
+export function formatPersonelBelgeDisplayText(value: string | null | undefined): string {
+  return sanitizeDisplayText(value);
+}
 
 export const PERSONEL_BELGE_GECERLILIK_LABELS: Record<PersonelBelgeGecerlilikDurumu, string> = {
   GECERLI: "Geçerli",

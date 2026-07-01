@@ -5,7 +5,7 @@ Repo klasörü: `public_html` dışında ayrı bir dizin
 
 ## GitHub Actions ile otomatik deploy
 
-Ana deploy yolu GitHub Actions üzerindendir. cPanel üzerinde `npm build` çalıştırılmaz; yalnızca GitHub Actions build çıktısı olan `dist/` içeriği yayınlanır.
+Ana deploy yolu GitHub Actions üzerindendir. cPanel üzerinde `npm build` çalıştırılmaz; GitHub Actions build çıktısı olan `dist/` içeriği yayınlanır ve PHP API runtime dosyaları ayrıca senkronlanır.
 
 1. GitHub repo → `Settings` → `Secrets and variables` → `Actions`:
    - `FTP_SERVER` (ör. `ftp.domain.com`)
@@ -41,7 +41,9 @@ Kontrol notları:
 1. `main` push → `CI` workflow çalışır.
 2. `CI` success → `Deploy cPanel` workflow başlar.
 3. Deploy, CI'da test edilen commit SHA ile checkout yapar (`github.event.workflow_run.head_sha`).
-4. Deploy içinde: `npm ci` → `npm run typecheck` → `npm run test` → `npm run build` → yalnızca `dist/` içeriğini `public_html/personelmedisa/` hedefine yükler.
+4. Deploy içinde: `npm ci` → `npm run typecheck` → `npm run test` → `npm run build` → `dist/` içeriğini `public_html/personelmedisa/` hedefine yükler.
+5. Aynı workflow ayrıca `api/.htaccess`, `api/public/` ve `api/src/` dosyalarını `public_html/personelmedisa/api/` altına gönderir.
+6. `api/config.local.php`, `api/migrations/` ve `api/seeds/` deploy kapsamı dışındadır; migration otomatik çalıştırılmaz.
 
 Manuel deploy (`workflow_dispatch`) korunur; checkout seçilen branch/ref üzerinden yapılır.
 
@@ -68,17 +70,19 @@ Kontrol:
 - `dist/assets/` var
 - `dist/.htaccess` var
 - Build çıktısı içinde `src`, `tests`, `.git`, `node_modules` yok
+- PHP API deploy kapsamı yalnızca `api/.htaccess`, `api/public/`, `api/src/`
+- `api/config.local.php`, `api/migrations/`, `api/seeds/` otomatik deploy edilmez
 
 ## 2) Sunucuyu temizle
 
-`public_html/personelmedisa` içindeki eski dosyaları sil:
+`public_html/personelmedisa` içindeki eski frontend dosyalarını sil:
 
 - eski `assets/`
 - eski `index.html`
 - test/kaynak dosyaları
 - deploy zip dosyaları
 
-> Not: Canlı klasörde `src`, `.git`, `tests`, `node_modules` olmamalı.
+> Not: Canlı frontend kökünde `.git`, `tests`, `node_modules` olmamalı. `public_html/personelmedisa/api/src/` PHP runtime klasörüdür ve korunmalıdır.
 
 ## 3) Dist içeriğini kopyala
 
@@ -90,6 +94,22 @@ Kontrol:
 - diğer statik dosyalar (`favicon.svg` vb.)
 
 Hedef: `public_html/personelmedisa/`
+
+## 3.1) PHP API dosyalarını kopyala
+
+GitHub Actions deploy workflow'u şu dosyaları ayrıca gönderir:
+
+- `api/.htaccess` → `public_html/personelmedisa/api/.htaccess`
+- `api/public/` → `public_html/personelmedisa/api/public/`
+- `api/src/` → `public_html/personelmedisa/api/src/`
+
+Şunlar workflow tarafından gönderilmez ve otomatik çalıştırılmaz:
+
+- `api/config.local.php`
+- `api/migrations/`
+- `api/seeds/`
+
+Canlı `config.local.php` sunucuda kalmalı; gerçek DB secret bilgileri repodan gelmemelidir.
 
 ## 4) Son kontrol
 

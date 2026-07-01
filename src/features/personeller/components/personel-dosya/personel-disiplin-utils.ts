@@ -7,7 +7,7 @@ import {
 import { getSurecTimelineSortWeight } from "../../../../lib/surec-history-sort";
 import type { FinansKalem } from "../../../../types/finans";
 import type { Surec } from "../../../../types/surec";
-import { formatDetailValue } from "./personel-dosya-format-utils";
+import { formatDetailValue, formatIsoDateDetail } from "./personel-dosya-format-utils";
 
 function normalizeSurecTypeToken(value: string | null | undefined) {
   return typeof value === "string" ? value.trim().toUpperCase() : "";
@@ -37,8 +37,8 @@ export function sortDisiplinSurecSignals(surecler: Surec[]) {
 }
 
 function buildDisiplinSurecDateSummary(surec: Surec) {
-  const bas = formatDetailValue(surec.baslangic_tarihi);
-  const bit = formatDetailValue(surec.bitis_tarihi);
+  const bas = formatIsoDateDetail(surec.baslangic_tarihi);
+  const bit = formatIsoDateDetail(surec.bitis_tarihi);
   if (bas !== "-" && bit !== "-" && bas !== bit) {
     return `${bas} – ${bit}`;
   }
@@ -48,7 +48,7 @@ function buildDisiplinSurecDateSummary(surec: Surec) {
   if (bit !== "-") {
     return bit;
   }
-  return formatDetailValue(surec.effective_date);
+  return formatIsoDateDetail(surec.effective_date);
 }
 
 export function formatDisiplinSurecSignalSummary(surec: Surec) {

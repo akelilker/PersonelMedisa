@@ -37,6 +37,28 @@ export function shouldEmitGlobalAuthForbidden(path: string, method?: string): bo
     return false;
   }
 
+  if (normalizedMethod === "GET" && normalizedPath === "/surecler") {
+    return false;
+  }
+
+  if (
+    ["GET", "PUT"].includes(normalizedMethod) &&
+    /^\/personeller\/\d+\/belge-durumu$/.test(normalizedPath)
+  ) {
+    return false;
+  }
+
+  if (
+    ["GET", "POST"].includes(normalizedMethod) &&
+    /^\/personeller\/\d+\/belge-kayitlari$/.test(normalizedPath)
+  ) {
+    return false;
+  }
+
+  if (normalizedMethod === "POST" && /^\/belge-kayitlari\/\d+\/iptal$/.test(normalizedPath)) {
+    return false;
+  }
+
   if (normalizedMethod === "GET" && /^\/surecler\/\d+$/.test(normalizedPath)) {
     return false;
   }

@@ -85,6 +85,46 @@ function trackRaporDetailRequests(page: Page): RequestCapture[] {
   return captures;
 }
 
+async function runIzinReport(page: Page) {
+  await page.locator('[name="rapor-turu"]').selectOption("izin");
+  await page.locator('[name="rapor-bas"]').fill("2026-04-01");
+  await page.locator('[name="rapor-bitis"]').fill("2026-04-30");
+  await page.getByTestId("raporlar-submit-run").click();
+  const resultCard = page.getByTestId("raporlar-resmi-sonuc");
+  await expect(resultCard).toBeVisible();
+  return resultCard;
+}
+
+async function runBildirimReport(page: Page) {
+  await page.locator('[name="rapor-turu"]').selectOption("bildirim");
+  await page.locator('[name="rapor-bas"]').fill("2026-04-01");
+  await page.locator('[name="rapor-bitis"]').fill("2026-04-30");
+  await page.getByTestId("raporlar-submit-run").click();
+  const resultCard = page.getByTestId("raporlar-resmi-sonuc");
+  await expect(resultCard).toBeVisible();
+  return resultCard;
+}
+
+async function runIsKazasiReport(page: Page) {
+  await page.locator('[name="rapor-turu"]').selectOption("is-kazasi");
+  await page.locator('[name="rapor-bas"]').fill("2026-04-01");
+  await page.locator('[name="rapor-bitis"]').fill("2026-04-30");
+  await page.getByTestId("raporlar-submit-run").click();
+  const resultCard = page.getByTestId("raporlar-resmi-sonuc");
+  await expect(resultCard).toBeVisible();
+  return resultCard;
+}
+
+async function runDevamsizlikReport(page: Page) {
+  await page.locator('[name="rapor-turu"]').selectOption("devamsizlik");
+  await page.locator('[name="rapor-bas"]').fill("2026-04-01");
+  await page.locator('[name="rapor-bitis"]').fill("2026-04-30");
+  await page.getByTestId("raporlar-submit-run").click();
+  const resultCard = page.getByTestId("raporlar-resmi-sonuc");
+  await expect(resultCard).toBeVisible();
+  return resultCard;
+}
+
 async function runPersonelOzetReport(page: Page) {
   await page.locator('[name="rapor-turu"]').selectOption("personel-ozet");
   await page.getByTestId("raporlar-submit-run").click();
@@ -177,6 +217,98 @@ test.describe("puantaj rapor sube scope", () => {
       return headerScope === "2" || scopedUrl.searchParams.get("sube_id") === "2";
     });
     expect(switchedScopedRequest).toBeTruthy();
+
+    expect(pageErrors).toEqual([]);
+  });
+
+  test("devamsizlik raporu active sube scope ile satirlari daraltir", async ({ page }) => {
+    const pageErrors = trackPageErrors(page);
+
+    await mockApi(page, "MUHASEBE");
+    await login(page, ROLE_LOGIN.MUHASEBE);
+    await page.goto("/raporlar");
+    await expect(page).toHaveURL(/\/raporlar$/);
+
+    const initialResult = await runDevamsizlikReport(page);
+    await expect(initialResult.locator("tbody")).toContainText("Ayşe Yılmaz");
+    await expect(initialResult.locator("tbody")).not.toContainText("Mehmet Kaya");
+
+    await switchActiveSubeViaSession(page, 2);
+    await page.goto("/raporlar");
+    await expect(page).toHaveURL(/\/raporlar$/);
+
+    const switchedResult = await runDevamsizlikReport(page);
+    await expect(switchedResult.locator("tbody")).toContainText("Mehmet Kaya");
+    await expect(switchedResult.locator("tbody")).not.toContainText("Ayşe Yılmaz");
+
+    expect(pageErrors).toEqual([]);
+  });
+
+  test("izin raporu active sube scope ile satirlari daraltir", async ({ page }) => {
+    const pageErrors = trackPageErrors(page);
+
+    await mockApi(page, "MUHASEBE");
+    await login(page, ROLE_LOGIN.MUHASEBE);
+    await page.goto("/raporlar");
+    await expect(page).toHaveURL(/\/raporlar$/);
+
+    const initialResult = await runIzinReport(page);
+    await expect(initialResult.locator("tbody")).toContainText("Ayşe Yılmaz");
+    await expect(initialResult.locator("tbody")).not.toContainText("Mehmet Kaya");
+
+    await switchActiveSubeViaSession(page, 2);
+    await page.goto("/raporlar");
+    await expect(page).toHaveURL(/\/raporlar$/);
+
+    const switchedResult = await runIzinReport(page);
+    await expect(switchedResult.locator("tbody")).toContainText("Mehmet Kaya");
+    await expect(switchedResult.locator("tbody")).not.toContainText("Ayşe Yılmaz");
+
+    expect(pageErrors).toEqual([]);
+  });
+
+  test("bildirim raporu active sube scope ile satirlari daraltir", async ({ page }) => {
+    const pageErrors = trackPageErrors(page);
+
+    await mockApi(page, "MUHASEBE");
+    await login(page, ROLE_LOGIN.MUHASEBE);
+    await page.goto("/raporlar");
+    await expect(page).toHaveURL(/\/raporlar$/);
+
+    const initialResult = await runBildirimReport(page);
+    await expect(initialResult.locator("tbody")).toContainText("Ayşe Yılmaz");
+    await expect(initialResult.locator("tbody")).not.toContainText("Mehmet Kaya");
+
+    await switchActiveSubeViaSession(page, 2);
+    await page.goto("/raporlar");
+    await expect(page).toHaveURL(/\/raporlar$/);
+
+    const switchedResult = await runBildirimReport(page);
+    await expect(switchedResult.locator("tbody")).toContainText("Mehmet Kaya");
+    await expect(switchedResult.locator("tbody")).not.toContainText("Ayşe Yılmaz");
+
+    expect(pageErrors).toEqual([]);
+  });
+
+  test("is-kazasi raporu active sube scope ile satirlari daraltir", async ({ page }) => {
+    const pageErrors = trackPageErrors(page);
+
+    await mockApi(page, "MUHASEBE");
+    await login(page, ROLE_LOGIN.MUHASEBE);
+    await page.goto("/raporlar");
+    await expect(page).toHaveURL(/\/raporlar$/);
+
+    const initialResult = await runIsKazasiReport(page);
+    await expect(initialResult.locator("tbody")).toContainText("Ayşe Yılmaz");
+    await expect(initialResult.locator("tbody")).not.toContainText("Mehmet Kaya");
+
+    await switchActiveSubeViaSession(page, 2);
+    await page.goto("/raporlar");
+    await expect(page).toHaveURL(/\/raporlar$/);
+
+    const switchedResult = await runIsKazasiReport(page);
+    await expect(switchedResult.locator("tbody")).toContainText("Mehmet Kaya");
+    await expect(switchedResult.locator("tbody")).not.toContainText("Ayşe Yılmaz");
 
     expect(pageErrors).toEqual([]);
   });

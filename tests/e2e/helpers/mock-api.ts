@@ -409,6 +409,198 @@ function izinPaginatedBody(
   });
 }
 
+const IS_KAZASI_PAGINATED_ITEMS: Record<string, unknown>[] = [
+  {
+    personel_id: 1,
+    ad_soyad: "Ayşe Yılmaz",
+    departman_id: 3,
+    baslangic_tarihi: "2026-04-12",
+    bitis_tarihi: "2026-04-14",
+    aciklama: "Hafif yaralanma",
+    state: "AKTIF"
+  },
+  {
+    personel_id: 2,
+    ad_soyad: "Mehmet Kaya",
+    departman_id: 4,
+    baslangic_tarihi: "2026-04-18",
+    bitis_tarihi: "2026-04-20",
+    aciklama: "Is kazasi kaydi",
+    state: "AKTIF"
+  }
+];
+
+function isKazasiPaginatedBody(
+  pageNumber: number,
+  pageLimit: number,
+  departmanId?: number,
+  subeScope: number | null = null,
+  options?: {
+    personelId?: number;
+    baslangicTarihi?: string | null;
+    bitisTarihi?: string | null;
+  }
+) {
+  let scopedItems = IS_KAZASI_PAGINATED_ITEMS;
+  if (subeScope !== null) {
+    scopedItems = scopedItems.filter((item) => {
+      const personelId = item.personel_id;
+      return typeof personelId === "number" && PERSONEL_SUBE_BY_ID[personelId] === subeScope;
+    });
+  }
+
+  let filtered =
+    departmanId === undefined
+      ? scopedItems
+      : scopedItems.filter((item) => item.departman_id === departmanId);
+
+  if (options?.personelId !== undefined) {
+    filtered = filtered.filter((item) => item.personel_id === options.personelId);
+  }
+
+  if (
+    departmanId === undefined &&
+    subeScope === null &&
+    options?.personelId === undefined &&
+    !options?.baslangicTarihi &&
+    !options?.bitisTarihi
+  ) {
+    const items = [IS_KAZASI_PAGINATED_ITEMS[0]];
+    return raporListOkBody(items, {
+      page: 1,
+      limit: pageLimit,
+      total: 1,
+      total_pages: 1,
+      has_next_page: false,
+      has_prev_page: false,
+      kaynak: "SUREC",
+      muhur_id: null,
+      donem: null,
+      effective_sube_id: subeScope
+    });
+  }
+
+  const donem =
+    options?.baslangicTarihi && /^\d{4}-\d{2}/.test(options.baslangicTarihi)
+      ? options.baslangicTarihi.slice(0, 7)
+      : null;
+
+  const total = filtered.length;
+  const totalPages = Math.max(1, Math.ceil(total / pageLimit));
+  const start = (pageNumber - 1) * pageLimit;
+  const items = filtered.slice(start, start + pageLimit);
+
+  return raporListOkBody(items, {
+    page: pageNumber,
+    limit: pageLimit,
+    total,
+    total_pages: totalPages,
+    has_next_page: pageNumber < totalPages,
+    has_prev_page: pageNumber > 1,
+    kaynak: "SUREC",
+    muhur_id: null,
+    donem,
+    effective_sube_id: subeScope
+  });
+}
+
+const BILDIRIM_PAGINATED_ITEMS: Record<string, unknown>[] = [
+  {
+    tarih: "2026-04-11",
+    departman_id: 3,
+    personel_id: 1,
+    ad_soyad: "Ayşe Yılmaz",
+    bildirim_turu: "IZINSIZ_GELMEDI",
+    aciklama: "Habersiz devamsizlik",
+    state: "MUHURLENDI"
+  },
+  {
+    tarih: "2026-04-16",
+    departman_id: 4,
+    personel_id: 2,
+    ad_soyad: "Mehmet Kaya",
+    bildirim_turu: "GEC_GELDI",
+    aciklama: "Gec geldi bildirimi",
+    state: "MUHURLENDI"
+  }
+];
+
+function bildirimPaginatedBody(
+  pageNumber: number,
+  pageLimit: number,
+  departmanId?: number,
+  subeScope: number | null = null,
+  options?: {
+    personelId?: number;
+    baslangicTarihi?: string | null;
+    bitisTarihi?: string | null;
+    muhurId?: number | null;
+  }
+) {
+  let scopedItems = BILDIRIM_PAGINATED_ITEMS;
+  if (subeScope !== null) {
+    scopedItems = scopedItems.filter((item) => {
+      const personelId = item.personel_id;
+      return typeof personelId === "number" && PERSONEL_SUBE_BY_ID[personelId] === subeScope;
+    });
+  }
+
+  let filtered =
+    departmanId === undefined
+      ? scopedItems
+      : scopedItems.filter((item) => item.departman_id === departmanId);
+
+  if (options?.personelId !== undefined) {
+    filtered = filtered.filter((item) => item.personel_id === options.personelId);
+  }
+
+  const sourceMeta = resolveReportKaynak(
+    options?.baslangicTarihi,
+    options?.bitisTarihi,
+    options?.muhurId
+  );
+
+  if (
+    departmanId === undefined &&
+    subeScope === null &&
+    options?.personelId === undefined &&
+    !options?.baslangicTarihi &&
+    !options?.bitisTarihi
+  ) {
+    const items = [BILDIRIM_PAGINATED_ITEMS[0]];
+    return raporListOkBody(items, {
+      page: 1,
+      limit: pageLimit,
+      total: 1,
+      total_pages: 1,
+      has_next_page: false,
+      has_prev_page: false,
+      kaynak: "LIVE",
+      muhur_id: null,
+      donem: null,
+      effective_sube_id: subeScope
+    });
+  }
+
+  const total = filtered.length;
+  const totalPages = Math.max(1, Math.ceil(total / pageLimit));
+  const start = (pageNumber - 1) * pageLimit;
+  const items = filtered.slice(start, start + pageLimit);
+
+  return raporListOkBody(items, {
+    page: pageNumber,
+    limit: pageLimit,
+    total,
+    total_pages: totalPages,
+    has_next_page: pageNumber < totalPages,
+    has_prev_page: pageNumber > 1,
+    kaynak: sourceMeta.kaynak,
+    muhur_id: sourceMeta.muhur_id,
+    donem: sourceMeta.donem,
+    effective_sube_id: subeScope
+  });
+}
+
 const RAPOR_MOCK_ITEMS: Record<string, Record<string, unknown>[]> = {
   "/api/raporlar/personel-ozet": [
     {
@@ -3507,6 +3699,80 @@ let bildirimIdCounter = 800;
           route,
           200,
           devamsizlikPaginatedBody(
+            pageNumber,
+            pageLimit,
+            Number.isFinite(departmanId) ? departmanId : undefined,
+            subeScope,
+            {
+              personelId: Number.isFinite(personelId) ? personelId : undefined,
+              baslangicTarihi,
+              bitisTarihi,
+              muhurId: Number.isFinite(muhurId) ? muhurId : null
+            }
+          )
+        );
+        return;
+      }
+
+      if (path === "/api/raporlar/is-kazasi") {
+        const raporUrl = new URL(route.request().url());
+        const pageNumber = Number.parseInt(raporUrl.searchParams.get("page") ?? "1", 10) || 1;
+        const pageLimit = Number.parseInt(raporUrl.searchParams.get("limit") ?? "10", 10) || 10;
+        const departmanId = Number.parseInt(raporUrl.searchParams.get("departman_id") ?? "", 10);
+        const personelId = Number.parseInt(raporUrl.searchParams.get("personel_id") ?? "", 10);
+        const baslangicTarihi = raporUrl.searchParams.get("baslangic_tarihi");
+        const bitisTarihi = raporUrl.searchParams.get("bitis_tarihi");
+
+        await fulfillJson(
+          route,
+          200,
+          isKazasiPaginatedBody(
+            pageNumber,
+            pageLimit,
+            Number.isFinite(departmanId) ? departmanId : undefined,
+            subeScope,
+            {
+              personelId: Number.isFinite(personelId) ? personelId : undefined,
+              baslangicTarihi,
+              bitisTarihi
+            }
+          )
+        );
+        return;
+      }
+
+      if (path === "/api/raporlar/bildirim") {
+        const raporUrl = new URL(route.request().url());
+        const pageNumber = Number.parseInt(raporUrl.searchParams.get("page") ?? "1", 10) || 1;
+        const pageLimit = Number.parseInt(raporUrl.searchParams.get("limit") ?? "10", 10) || 10;
+        const departmanId = Number.parseInt(raporUrl.searchParams.get("departman_id") ?? "", 10);
+        const personelId = Number.parseInt(raporUrl.searchParams.get("personel_id") ?? "", 10);
+        const muhurId = Number.parseInt(raporUrl.searchParams.get("muhur_id") ?? "", 10);
+        const baslangicTarihi = raporUrl.searchParams.get("baslangic_tarihi");
+        const bitisTarihi = raporUrl.searchParams.get("bitis_tarihi");
+
+        if (Number.isFinite(muhurId) && muhurId > 0 && subeScope !== null && subeScope !== 2) {
+          await fulfillJson(
+            route,
+            403,
+            errorBody("FORBIDDEN", "Bu kayit aktif sube baglaminda goruntulenemiyor.")
+          );
+          return;
+        }
+
+        if (baslangicTarihi === "2026-13-01") {
+          await fulfillJson(
+            route,
+            400,
+            errorBody("VALIDATION_ERROR", "Gecersiz baslangic tarihi.", "baslangic_tarihi")
+          );
+          return;
+        }
+
+        await fulfillJson(
+          route,
+          200,
+          bildirimPaginatedBody(
             pageNumber,
             pageLimit,
             Number.isFinite(departmanId) ? departmanId : undefined,

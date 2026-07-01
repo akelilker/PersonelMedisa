@@ -3945,11 +3945,29 @@ let bildirimIdCounter = 800;
     }
 
     if (path === "/api/yonetim/aylik-ozet/bolum-onay" && method === "POST") {
+      if (
+        !hasRolePermission(role, "aylik-ozet.review") &&
+        !hasRolePermission(role, "aylik-ozet.executive_ack")
+      ) {
+        await fulfillJson(route, 403, errorBody("FORBIDDEN", "Bu islem icin yetkiniz yok."));
+        return;
+      }
+
       const payload = request.postDataJSON() as {
         ay?: string;
         sube_id?: number;
         departman_id?: number;
       };
+
+      if (payload.sube_id != null && mockUserSubeIds.length > 0 && !mockUserSubeIds.includes(payload.sube_id)) {
+        await fulfillJson(route, 403, errorBody("FORBIDDEN", "Bu islem icin yetkiniz yok."));
+        return;
+      }
+
+      if (!payload.ay || !/^\d{4}-\d{2}$/.test(payload.ay)) {
+        await fulfillJson(route, 400, errorBody("VALIDATION_ERROR", "Gecersiz ay parametresi.", "ay"));
+        return;
+      }
 
       aylikOzetRows.forEach((item) => {
         if (item.ay !== (payload.ay ?? aylikOzetFixtureAy)) {
@@ -3985,11 +4003,25 @@ let bildirimIdCounter = 800;
     }
 
     if (path === "/api/yonetim/aylik-ozet/ay-kapat" && method === "POST") {
+      if (await denyUnlessRolePermission(route, "aylik-ozet.executive_ack")) {
+        return;
+      }
+
       const payload = request.postDataJSON() as {
         ay?: string;
         sube_id?: number;
         departman_id?: number;
       };
+
+      if (payload.sube_id != null && mockUserSubeIds.length > 0 && !mockUserSubeIds.includes(payload.sube_id)) {
+        await fulfillJson(route, 403, errorBody("FORBIDDEN", "Bu islem icin yetkiniz yok."));
+        return;
+      }
+
+      if (!payload.ay || !/^\d{4}-\d{2}$/.test(payload.ay)) {
+        await fulfillJson(route, 400, errorBody("VALIDATION_ERROR", "Gecersiz ay parametresi.", "ay"));
+        return;
+      }
 
       const responseUrl = new URL(url.toString());
       if (payload.ay) {

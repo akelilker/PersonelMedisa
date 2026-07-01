@@ -409,14 +409,7 @@ class YonetimController
         $user = AuthMiddleware::authenticate($request, true);
         RolePermissions::assert($user, 'aylik-ozet.view');
 
-        $ay = trim((string) $request->getQuery('ay', date('Y-m')));
-        if (!preg_match('/^\d{4}-\d{2}$/', $ay)) {
-            JsonResponse::badRequest('Gecersiz ay parametresi.', 'VALIDATION_ERROR', 'ay');
-        }
-
-        $subeId = (int) ($request->getQuery('sube_id', 0) ?: 0);
-        $departmanId = (int) ($request->getQuery('departman_id', 0) ?: 0);
-        $sadeceRevizeli = filter_var($request->getQuery('sadece_revizeli', false), FILTER_VALIDATE_BOOLEAN);
+        $filters = self::parseAylikOzetFilters($request, false);
 
         try {
             $pdo = Connection::get();
@@ -424,23 +417,166 @@ class YonetimController
             JsonResponse::serverError('Veritabani baglantisi kurulamadi.');
         }
 
+        JsonResponse::success(self::buildAylikOzetPayload($pdo, $filters));
+    }
+
+    public static function aylikOzetBolumOnay(Request $request)
+    {
+        $user = AuthMiddleware::authenticate($request, true);
+        RolePermissions::assertAny($user, ['aylik-ozet.review', 'aylik-ozet.executive_ack']);
+
+        $filters = self::parseAylikOzetFilters($request, true);
+        self::assertAylikSubeAccess($user, $filters['sube_id']);
+
+        try {
+            $pdo = Connection::get();
+        } catch (\Throwable $e) {
+            JsonResponse::serverError('Veritabani baglantisi kurulamadi.');
+        }
+
+        $where = self::buildAylikOzetWhereClause($filters);
+        $params = $where['params'];
+        $params['son_islem'] = 'Bolum yoneticisi toplu onay verdi';
+
+        $pdo->beginTransaction();
+        try {
+            $updateSql = 'UPDATE aylik_ozet_satirlari
+                SET bolum_onay_durumu = \'BOLUM_ONAYLANDI\',
+                    revize_var_mi = 0,
+                    son_islem = :son_islem
+                WHERE ' . $where['sql'] . ' AND kapanis_durumu <> \'KAPANDI\'';
+            $stmt = $pdo->prepare($updateSql);
+            $stmt->execute($params);
+
+            self::syncAylikKapanisState($pdo, $filters['ay']);
+            $pdo->commit();
+        } catch (\Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            JsonResponse::serverError('Aylik ozet onay islemi tamamlanamadi.');
+        }
+
+        JsonResponse::success(self::buildAylikOzetPayload($pdo, $filters));
+    }
+
+    public static function aylikOzetAyKapat(Request $request)
+    {
+        $user = AuthMiddleware::authenticate($request, true);
+        RolePermissions::assert($user, 'aylik-ozet.executive_ack');
+
+        $filters = self::parseAylikOzetFilters($request, true);
+        self::assertAylikSubeAccess($user, $filters['sube_id']);
+
+        try {
+            $pdo = Connection::get();
+        } catch (\Throwable $e) {
+            JsonResponse::serverError('Veritabani baglantisi kurulamadi.');
+        }
+
+        $where = self::buildAylikOzetWhereClause($filters);
+        $params = $where['params'];
+        $params['son_islem'] = 'Genel yonetici ust onay verdi';
+
+        $pdo->beginTransaction();
+        try {
+            $updateSql = 'UPDATE aylik_ozet_satirlari
+                SET kapanis_durumu = \'KAPANDI\',
+                    son_islem = :son_islem
+                WHERE ' . $where['sql'];
+            $stmt = $pdo->prepare($updateSql);
+            $stmt->execute($params);
+
+            self::syncAylikKapanisState($pdo, $filters['ay']);
+            $pdo->commit();
+        } catch (\Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            JsonResponse::serverError('Aylik ozet kapanis islemi tamamlanamadi.');
+        }
+
+        JsonResponse::success(self::buildAylikOzetPayload($pdo, $filters));
+    }
+
+    /**
+     * @return array{ay: string, sube_id: int, departman_id: int, sadece_revizeli: bool}
+     */
+    private static function parseAylikOzetFilters(Request $request, $fromBody)
+    {
+        if ($fromBody) {
+            $body = $request->getJsonBody();
+            $ay = trim((string) (isset($body['ay']) ? $body['ay'] : ''));
+            $subeId = (int) (isset($body['sube_id']) ? $body['sube_id'] : 0);
+            $departmanId = (int) (isset($body['departman_id']) ? $body['departman_id'] : 0);
+            $sadeceRevizeli = filter_var(isset($body['sadece_revizeli']) ? $body['sadece_revizeli'] : false, FILTER_VALIDATE_BOOLEAN);
+        } else {
+            $ay = trim((string) $request->getQuery('ay', date('Y-m')));
+            $subeId = (int) ($request->getQuery('sube_id', 0) ?: 0);
+            $departmanId = (int) ($request->getQuery('departman_id', 0) ?: 0);
+            $sadeceRevizeli = filter_var($request->getQuery('sadece_revizeli', false), FILTER_VALIDATE_BOOLEAN);
+        }
+
+        if (!preg_match('/^\d{4}-\d{2}$/', $ay)) {
+            JsonResponse::badRequest('Gecersiz ay parametresi.', 'VALIDATION_ERROR', 'ay');
+        }
+
+        return [
+            'ay' => $ay,
+            'sube_id' => $subeId > 0 ? $subeId : 0,
+            'departman_id' => $departmanId > 0 ? $departmanId : 0,
+            'sadece_revizeli' => $sadeceRevizeli,
+        ];
+    }
+
+    /** @param array<string, mixed> $user */
+    private static function assertAylikSubeAccess(array $user, $subeId)
+    {
+        $subeId = (int) $subeId;
+        if ($subeId <= 0) {
+            return;
+        }
+
+        $allowed = SubeScope::allowedSubeIds($user);
+        if (count($allowed) > 0 && !in_array($subeId, $allowed, true)) {
+            JsonResponse::forbidden('Secili sube icin yetkiniz yok.');
+        }
+    }
+
+    /**
+     * @param array{ay: string, sube_id: int, departman_id: int, sadece_revizeli: bool} $filters
+     * @return array{sql: string, params: array<string, mixed>}
+     */
+    private static function buildAylikOzetWhereClause(array $filters)
+    {
         $where = ['ay = :ay'];
-        $params = ['ay' => $ay];
-        if ($subeId > 0) {
+        $params = ['ay' => $filters['ay']];
+        if ($filters['sube_id'] > 0) {
             $where[] = 'sube_id = :sube_id';
-            $params['sube_id'] = $subeId;
+            $params['sube_id'] = $filters['sube_id'];
         }
-        if ($departmanId > 0) {
+        if ($filters['departman_id'] > 0) {
             $where[] = 'departman_id = :departman_id';
-            $params['departman_id'] = $departmanId;
+            $params['departman_id'] = $filters['departman_id'];
         }
-        if ($sadeceRevizeli) {
+        if ($filters['sadece_revizeli']) {
             $where[] = 'revize_var_mi = 1';
         }
 
-        $whereSql = implode(' AND ', $where);
-        $stmt = $pdo->prepare("SELECT * FROM aylik_ozet_satirlari WHERE $whereSql ORDER BY personel_id ASC");
-        $stmt->execute($params);
+        return [
+            'sql' => implode(' AND ', $where),
+            'params' => $params,
+        ];
+    }
+
+    /** @param array{ay: string, sube_id: int, departman_id: int, sadece_revizeli: bool} $filters */
+    private static function buildAylikOzetPayload(PDO $pdo, array $filters)
+    {
+        $where = self::buildAylikOzetWhereClause($filters);
+        $stmt = $pdo->prepare(
+            'SELECT * FROM aylik_ozet_satirlari WHERE ' . $where['sql'] . ' ORDER BY personel_id ASC'
+        );
+        $stmt->execute($where['params']);
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         $items = [];
@@ -493,17 +629,66 @@ class YonetimController
         }
 
         $stateStmt = $pdo->prepare('SELECT state FROM aylik_kapanis_state WHERE ay = :ay LIMIT 1');
-        $stateStmt->execute(['ay' => $ay]);
+        $stateStmt->execute(['ay' => $filters['ay']]);
         $stateRow = $stateStmt->fetch(PDO::FETCH_ASSOC);
         $state = $stateRow ? (string) $stateRow['state'] : 'BOLUM_ONAYINDA';
 
-        JsonResponse::success([
-            'ay' => $ay,
+        return [
+            'ay' => $filters['ay'],
             'state' => $state,
             'summary' => $summary,
             'items' => $items,
             'pending_bolum_onayi' => $pending,
-        ]);
+        ];
+    }
+
+    private static function syncAylikKapanisState(PDO $pdo, $ay)
+    {
+        $stmt = $pdo->prepare(
+            'SELECT bolum_onay_durumu, kapanis_durumu FROM aylik_ozet_satirlari WHERE ay = :ay'
+        );
+        $stmt->execute(['ay' => $ay]);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        if (count($rows) === 0) {
+            return;
+        }
+
+        $allClosed = true;
+        $hasRevize = false;
+        $hasPending = false;
+
+        foreach ($rows as $row) {
+            if ((string) $row['kapanis_durumu'] !== 'KAPANDI') {
+                $allClosed = false;
+            }
+            if ((string) $row['bolum_onay_durumu'] === 'REVIZE_ISTENDI') {
+                $hasRevize = true;
+            }
+            if ((string) $row['bolum_onay_durumu'] === 'BOLUM_ONAYINDA') {
+                $hasPending = true;
+            }
+        }
+
+        $state = 'BOLUM_ONAYINDA';
+        if ($allClosed) {
+            $state = 'KAPANDI';
+        } elseif ($hasRevize) {
+            $state = 'REVIZE_ISTENDI';
+        } elseif (!$hasPending) {
+            $state = 'BOLUM_ONAYLANDI';
+        }
+
+        $existing = $pdo->prepare('SELECT id FROM aylik_kapanis_state WHERE ay = :ay LIMIT 1');
+        $existing->execute(['ay' => $ay]);
+        $existingRow = $existing->fetch(PDO::FETCH_ASSOC);
+        if ($existingRow) {
+            $update = $pdo->prepare('UPDATE aylik_kapanis_state SET state = :state WHERE ay = :ay');
+            $update->execute(['state' => $state, 'ay' => $ay]);
+            return;
+        }
+
+        $insert = $pdo->prepare('INSERT INTO aylik_kapanis_state (ay, state) VALUES (:ay, :state)');
+        $insert->execute(['ay' => $ay, 'state' => $state]);
     }
 
     /** @var array<int, string> */

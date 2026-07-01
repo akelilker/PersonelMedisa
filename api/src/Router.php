@@ -60,10 +60,10 @@ class Router
             PuantajController::muhurleAylik($this->request);
         }
         if ($method === 'POST' && $path === '/yonetim/aylik-ozet/bolum-onay') {
-            JsonResponse::methodNotAllowed();
+            YonetimController::aylikOzetBolumOnay($this->request);
         }
         if ($method === 'POST' && $path === '/yonetim/aylik-ozet/ay-kapat') {
-            JsonResponse::methodNotAllowed();
+            YonetimController::aylikOzetAyKapat($this->request);
         }
         if ($path === '/personeller' && $method === 'GET') {
             PersonellerController::list($this->request);

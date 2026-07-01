@@ -135,6 +135,29 @@ test.describe("raporlar detayli liste smoke", () => {
     await expect(resultCard.locator("tbody")).toContainText("Ayşe Yılmaz");
     await expect(resultCard.locator("tbody")).toContainText("510");
     await expect(resultCard.locator("tbody")).toContainText("30");
+
+    const kaynakMeta = page.getByTestId("raporlar-kaynak-meta");
+    await expect(kaynakMeta).toBeVisible();
+    await expect(kaynakMeta).toContainText("Mühürlü snapshot");
+    await expect(kaynakMeta).toContainText("Dönem: 2026-04");
+    await expect(kaynakMeta).toContainText("Mühür ID: 101");
+    expect(runtimeErrors).toEqual([]);
+  });
+
+  test("personel ozet raporunda tarihsiz calistirmada canli veri meta bandini gosterir", async ({ page }) => {
+    const runtimeErrors: string[] = [];
+    page.on("pageerror", (error) => {
+      runtimeErrors.push(error.message);
+    });
+
+    await page.locator('[name="rapor-turu"]').selectOption("personel-ozet");
+    await page.getByTestId("raporlar-submit-run").click();
+
+    const kaynakMeta = page.getByTestId("raporlar-kaynak-meta");
+    await expect(kaynakMeta).toBeVisible();
+    await expect(kaynakMeta).toContainText("Canlı veri");
+    await expect(page.getByText("Bu rapor canlı veriden oluşturuldu; veriler değişebilir.")).toBeVisible();
+    await expect(page.getByTestId("raporlar-resmi-sonuc")).toBeVisible();
     expect(runtimeErrors).toEqual([]);
   });
 
@@ -198,6 +221,10 @@ test.describe("raporlar detayli liste smoke", () => {
     await expect(resultCard.locator("tbody")).toContainText("Hafif yaralanma");
     await expect(resultCard.locator("tbody")).toContainText("Aktif");
     await expect(resultCard).not.toContainText("UNSUPPORTED_REPORT");
+
+    const kaynakMeta = page.getByTestId("raporlar-kaynak-meta");
+    await expect(kaynakMeta).toBeVisible();
+    await expect(kaynakMeta).toContainText("Süreç kaydı");
     expect(runtimeErrors).toEqual([]);
   });
 
@@ -220,6 +247,10 @@ test.describe("raporlar detayli liste smoke", () => {
     await expect(resultCard.locator("tbody")).toContainText("1500");
     await expect(resultCard.locator("tbody")).toContainText("Aktif");
     await expect(resultCard).not.toContainText("UNSUPPORTED_REPORT");
+
+    const kaynakMeta = page.getByTestId("raporlar-kaynak-meta");
+    await expect(kaynakMeta).toBeVisible();
+    await expect(kaynakMeta).toContainText("Finans kaydı");
     expect(runtimeErrors).toEqual([]);
   });
 
@@ -312,6 +343,54 @@ test.describe("raporlar detayli liste smoke", () => {
     await expect(pageInfo).toContainText("Sayfa 1 / 1");
     await expect(oncekiButton).toBeDisabled();
     await expect(sonrakiButton).toBeDisabled();
+    expect(runtimeErrors).toEqual([]);
+  });
+
+  test("rapor meta kaynagi eksik oldugunda tablo yine render olur", async ({ page }) => {
+    const runtimeErrors: string[] = [];
+    page.on("pageerror", (error) => {
+      runtimeErrors.push(error.message);
+    });
+
+    await page.route("**/api/raporlar/personel-ozet**", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          data: {
+            items: [
+              {
+                personel_id: 1,
+                ad_soyad: "Ayşe Yılmaz",
+                sicil_no: "S-001",
+                aktif_durum: "AKTIF",
+                net_calisma_dakika: 510,
+                sgk_prim_gun: 30,
+                toplam_calisma_gunu: 22
+              }
+            ]
+          },
+          meta: {
+            page: 1,
+            limit: 10,
+            total: 1,
+            total_pages: 1,
+            has_next_page: false,
+            has_prev_page: false
+          },
+          errors: []
+        })
+      });
+    });
+
+    await page.locator('[name="rapor-turu"]').selectOption("personel-ozet");
+    await page.getByTestId("raporlar-submit-run").click();
+
+    const resultCard = page.getByTestId("raporlar-resmi-sonuc");
+    await expect(resultCard).toBeVisible();
+    await expect(page.getByTestId("raporlar-kaynak-meta")).toHaveCount(0);
+    await expect(resultCard).toContainText("kayıt listeleniyor");
+    await expect(resultCard.locator("tbody tr")).toHaveCount(1);
     expect(runtimeErrors).toEqual([]);
   });
 

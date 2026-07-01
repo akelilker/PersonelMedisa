@@ -14,9 +14,21 @@ import { ErrorState } from "../../../components/states/ErrorState";
 import { LoadingState } from "../../../components/states/LoadingState";
 import { useRoleAccess } from "../../../hooks/use-role-access";
 import { formatReportCellValue } from "../../../lib/display/enum-display";
+import {
+  RAPOR_LIVE_KAYNAK_UYARI,
+  buildRaporKaynakMetaLine,
+  isRaporLiveKaynak
+} from "../../../lib/display/rapor-kaynak-labels";
 import { downloadReportCsv } from "../../../reports/export-report";
 import type { IdOption } from "../../../types/referans";
-import type { RaporAktiflik, RaporFiltreleri, RaporKolonu, RaporSatiri, RaporTipi } from "../../../types/rapor";
+import type {
+  RaporAktiflik,
+  RaporFiltreleri,
+  RaporKolonu,
+  RaporSatiri,
+  RaporSonuc,
+  RaporTipi
+} from "../../../types/rapor";
 import type { AylikBolumOnayDurumu, AylikOzetAggregateState, AylikOzetResponse } from "../../../types/yonetim";
 import { getRaporColumns } from "../rapor-column-contract";
 
@@ -54,6 +66,39 @@ function parseOptionalPositiveInt(value: string): number | undefined {
   }
 
   return parsed;
+}
+
+type RaporReportMeta = NonNullable<RaporSonuc["reportMeta"]>;
+
+function RaporKaynakMetaBand({
+  reportMeta,
+  kayitSayisi
+}: {
+  reportMeta: RaporReportMeta | null;
+  kayitSayisi: number;
+}) {
+  const metaLine = buildRaporKaynakMetaLine({
+    kaynak: reportMeta?.kaynak,
+    donem: reportMeta?.donem,
+    muhur_id: reportMeta?.muhur_id,
+    kayitSayisi
+  });
+
+  return (
+    <>
+      {metaLine ? (
+        <p className="raporlar-result-meta" data-testid="raporlar-kaynak-meta">
+          {metaLine}
+        </p>
+      ) : null}
+      {isRaporLiveKaynak(reportMeta?.kaynak) ? (
+        <p className="yonetim-hint raporlar-kaynak-live-hint">{RAPOR_LIVE_KAYNAK_UYARI}</p>
+      ) : null}
+      <p className="raporlar-result-meta">
+        <span className="raporlar-result-count">{kayitSayisi}</span> kayıt listeleniyor
+      </p>
+    </>
+  );
 }
 
 function formatCellValue(column: RaporKolonu, value: unknown): string {
@@ -487,6 +532,7 @@ export function RaporlarPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
+  const [reportMeta, setReportMeta] = useState<RaporReportMeta | null>(null);
 
   const columns = useMemo(() => getRaporColumns(form.raporTipi), [form.raporTipi]);
 
@@ -517,11 +563,13 @@ export function RaporlarPage() {
       setPage(result.pagination.page ?? nextPage);
       setHasNextPage(result.pagination.hasNextPage ?? result.rows.length >= PAGE_SIZE);
       setTotalPages(result.pagination.totalPages);
+      setReportMeta(result.reportMeta ?? null);
       setHasSearched(true);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Rapor verisi alınamadı.");
       setRows([]);
       setTotal(null);
+      setReportMeta(null);
       setHasNextPage(false);
       setTotalPages(null);
     } finally {
@@ -550,6 +598,7 @@ export function RaporlarPage() {
     setTotalPages(null);
     setErrorMessage(null);
     setHasSearched(false);
+    setReportMeta(null);
   }
 
   return (
@@ -643,9 +692,7 @@ export function RaporlarPage() {
 
       {!isLoading && !errorMessage && rows.length > 0 ? (
         <div className="raporlar-result-card" data-testid="raporlar-resmi-sonuc">
-          <p className="raporlar-result-meta">
-            <span className="raporlar-result-count">{total ?? rows.length}</span> kayıt listeleniyor
-          </p>
+          <RaporKaynakMetaBand reportMeta={reportMeta} kayitSayisi={total ?? rows.length} />
           <div className="raporlar-table-wrap raporlar-table-wrap--premium">
             <table className="raporlar-table raporlar-table--premium">
               <thead>

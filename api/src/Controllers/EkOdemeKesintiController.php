@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Medisa\Api\Controllers;
 
 use Medisa\Api\Auth\AuthMiddleware;
+use Medisa\Api\Auth\RolePermissions;
 use Medisa\Api\Database\Connection;
 use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
@@ -33,6 +34,7 @@ class EkOdemeKesintiController
     public static function list(Request $request)
     {
         $user = AuthMiddleware::authenticate($request, true);
+        RolePermissions::assert($user, 'finans.view');
         $scope = SubeScope::resolveScope($user, $request);
 
         $page = max(1, (int) ($request->getQuery('page', 1) ?: 1));
@@ -101,6 +103,7 @@ class EkOdemeKesintiController
     public static function detail(Request $request, $id)
     {
         $user = AuthMiddleware::authenticate($request, true);
+        RolePermissions::assert($user, 'finans.view');
         $kalemId = self::parsePositiveInt($id);
         if ($kalemId === null) {
             JsonResponse::notFound('Kayit bulunamadi.');
@@ -126,6 +129,7 @@ class EkOdemeKesintiController
     public static function create(Request $request)
     {
         $user = AuthMiddleware::authenticate($request, true);
+        RolePermissions::assert($user, 'finans.create');
         $body = $request->getJsonBody();
         $payload = self::normalizeCreatePayload($body);
 
@@ -178,6 +182,7 @@ class EkOdemeKesintiController
     public static function update(Request $request, $id)
     {
         $user = AuthMiddleware::authenticate($request, true);
+        RolePermissions::assert($user, 'finans.update');
         $kalemId = self::parsePositiveInt($id);
         if ($kalemId === null) {
             JsonResponse::notFound('Kayit bulunamadi.');
@@ -266,6 +271,7 @@ class EkOdemeKesintiController
     public static function cancel(Request $request, $id)
     {
         $user = AuthMiddleware::authenticate($request, true);
+        RolePermissions::assert($user, 'finans.cancel');
         $kalemId = self::parsePositiveInt($id);
         if ($kalemId === null) {
             JsonResponse::notFound('Kayit bulunamadi.');

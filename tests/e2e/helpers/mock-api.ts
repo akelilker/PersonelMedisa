@@ -11,6 +11,7 @@ import {
   type PersonelBelgeKayitDurum,
   type PersonelBelgeKayitTipi
 } from "../../../src/types/personel-belge-kaydi";
+import { hasRolePermission, type AppPermission } from "../../../src/lib/authorization/role-permissions";
 
 export type MockUserRole = "GENEL_YONETICI" | "BOLUM_YONETICISI" | "MUHASEBE" | "BIRIM_AMIRI";
 
@@ -2116,6 +2117,22 @@ let bildirimIdCounter = 800;
   const mockUserSubeIds =
     role === "BIRIM_AMIRI" ? [1] : role === "MUHASEBE" ? [1, 2] : role === "BOLUM_YONETICISI" ? [2] : [];
 
+  async function denyUnlessRolePermission(route: Route, permission: AppPermission) {
+    if (!hasRolePermission(role, permission)) {
+      await fulfillJson(route, 403, errorBody("FORBIDDEN", "Bu islem icin yetkiniz yok."));
+      return true;
+    }
+    return false;
+  }
+
+  async function denyUnlessAnyRolePermission(route: Route, permissions: AppPermission[]) {
+    if (!permissions.some((permission) => hasRolePermission(role, permission))) {
+      await fulfillJson(route, 403, errorBody("FORBIDDEN", "Bu islem icin yetkiniz yok."));
+      return true;
+    }
+    return false;
+  }
+
   await page.route(
     (testUrl) => {
       try {
@@ -3699,6 +3716,16 @@ let bildirimIdCounter = 800;
     }
 
     if (path === "/api/yonetim/subeler" && method === "GET") {
+      if (
+        await denyUnlessAnyRolePermission(route, [
+          "yonetim-paneli.view",
+          "aylik-ozet.view",
+          "personeller.create",
+          "personeller.update"
+        ])
+      ) {
+        return;
+      }
       await fulfillJson(route, 200, okBody({ items: subeler }));
       return;
     }
@@ -3774,6 +3801,9 @@ let bildirimIdCounter = 800;
     }
 
     if (path === "/api/yonetim/aylik-ozet" && method === "GET") {
+      if (await denyUnlessRolePermission(route, "aylik-ozet.view")) {
+        return;
+      }
       await fulfillJson(route, 200, okBody(buildAylikOzetResponse(url)));
       return;
     }
@@ -3856,6 +3886,17 @@ let bildirimIdCounter = 800;
     }
 
     if (path.startsWith("/api/raporlar/") && method === "GET") {
+      if (await denyUnlessRolePermission(route, "raporlar.view")) {
+        return;
+      }
+
+      const finansRaporPaths = ["/api/raporlar/tesvik", "/api/raporlar/ceza", "/api/raporlar/ekstra-prim"];
+      if (finansRaporPaths.includes(path)) {
+        if (await denyUnlessRolePermission(route, "finans.view")) {
+          return;
+        }
+      }
+
       const subeScope = getRequestSubeScope(request, url);
 
       if (path === "/api/raporlar/personel-ozet") {
@@ -4166,6 +4207,9 @@ let bildirimIdCounter = 800;
     }
 
     if (path === "/api/ek-odeme-kesinti" && method === "GET") {
+      if (await denyUnlessRolePermission(route, "finans.view")) {
+        return;
+      }
       const url = new URL(route.request().url());
       const personelId = Number.parseInt(url.searchParams.get("personel_id") ?? "", 10);
       const kalemTuru = url.searchParams.get("kalem_turu");
@@ -4183,6 +4227,9 @@ let bildirimIdCounter = 800;
     }
 
     if (path === "/api/ek-odeme-kesinti" && method === "POST") {
+      if (await denyUnlessRolePermission(route, "finans.create")) {
+        return;
+      }
       const payload = request.postDataJSON() as {
         personel_id: number;
         donem: string;
@@ -4207,6 +4254,9 @@ let bildirimIdCounter = 800;
     }
 
     if (path.match(/^\/api\/ek-odeme-kesinti\/\d+$/) && method === "PUT") {
+      if (await denyUnlessRolePermission(route, "finans.update")) {
+        return;
+      }
       const kalemId = Number.parseInt(path.split("/")[3] ?? "0", 10);
       const kalem = finansKalemleri.find((item) => item.id === kalemId);
       if (!kalem) {
@@ -4222,6 +4272,9 @@ let bildirimIdCounter = 800;
     }
 
     if (path.match(/^\/api\/ek-odeme-kesinti\/\d+\/iptal$/) && method === "POST") {
+      if (await denyUnlessRolePermission(route, "finans.cancel")) {
+        return;
+      }
       const kalemId = Number.parseInt(path.split("/")[3] ?? "0", 10);
       const kalem = finansKalemleri.find((item) => item.id === kalemId);
       if (!kalem) {

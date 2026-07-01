@@ -39,6 +39,28 @@ describe("role permissions", () => {
     expect(hasRolePermission("BIRIM_AMIRI", "puantaj.amir_kontrol")).toBe(true);
     expect(hasRolePermission("BIRIM_AMIRI", "finans.view")).toBe(false);
     expect(hasRolePermission("BIRIM_AMIRI", "finans.create")).toBe(false);
+    expect(hasRolePermission("BIRIM_AMIRI", "finans.update")).toBe(false);
+    expect(hasRolePermission("BIRIM_AMIRI", "finans.cancel")).toBe(false);
+    expect(hasRolePermission("BIRIM_AMIRI", "yonetim-paneli.view")).toBe(false);
+    expect(hasRolePermission("BIRIM_AMIRI", "aylik-ozet.view")).toBe(false);
+  });
+
+  it("grants management roles full finans permissions (S43B matrix)", () => {
+    for (const role of ["GENEL_YONETICI", "BOLUM_YONETICISI", "MUHASEBE"] as const) {
+      expect(hasRolePermission(role, "finans.view")).toBe(true);
+      expect(hasRolePermission(role, "finans.create")).toBe(true);
+      expect(hasRolePermission(role, "finans.update")).toBe(true);
+      expect(hasRolePermission(role, "finans.cancel")).toBe(true);
+    }
+  });
+
+  it("restricts yonetim read endpoints to frontend matrix (S43B)", () => {
+    expect(hasRolePermission("GENEL_YONETICI", "yonetim-paneli.view")).toBe(true);
+    expect(hasRolePermission("GENEL_YONETICI", "aylik-ozet.view")).toBe(true);
+    expect(hasRolePermission("BOLUM_YONETICISI", "yonetim-paneli.view")).toBe(false);
+    expect(hasRolePermission("BOLUM_YONETICISI", "aylik-ozet.view")).toBe(true);
+    expect(hasRolePermission("MUHASEBE", "yonetim-paneli.view")).toBe(false);
+    expect(hasRolePermission("MUHASEBE", "aylik-ozet.view")).toBe(false);
   });
 
   it("resolves allowed role lists for detail routes from permission matrix", () => {

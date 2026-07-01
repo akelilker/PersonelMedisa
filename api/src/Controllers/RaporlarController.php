@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Medisa\Api\Controllers;
 
 use Medisa\Api\Auth\AuthMiddleware;
+use Medisa\Api\Auth\RolePermissions;
 use Medisa\Api\Database\Connection;
 use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
@@ -34,6 +35,11 @@ class RaporlarController
 
     if (!isset(self::$allowedTips[$tip])) {
       JsonResponse::badRequest('Desteklenmeyen rapor tipi.', 'UNSUPPORTED_REPORT');
+    }
+
+    RolePermissions::assert($user, 'raporlar.view');
+    if ($tip === 'tesvik' || $tip === 'ceza' || $tip === 'ekstra-prim') {
+      RolePermissions::assert($user, 'finans.view');
     }
 
     $scope = SubeScope::resolveScope($user, $request);

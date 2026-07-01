@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Medisa\Api\Controllers;
 
 use Medisa\Api\Auth\AuthMiddleware;
+use Medisa\Api\Auth\RolePermissions;
 use Medisa\Api\Database\Connection;
 use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
@@ -15,7 +16,13 @@ class YonetimController
 {
     public static function subeler(Request $request)
     {
-        AuthMiddleware::authenticate($request, true);
+        $user = AuthMiddleware::authenticate($request, true);
+        RolePermissions::assertAny($user, [
+            'yonetim-paneli.view',
+            'aylik-ozet.view',
+            'personeller.create',
+            'personeller.update',
+        ]);
 
         try {
             $pdo = Connection::get();
@@ -54,7 +61,8 @@ class YonetimController
 
     public static function aylikOzet(Request $request)
     {
-        AuthMiddleware::authenticate($request, true);
+        $user = AuthMiddleware::authenticate($request, true);
+        RolePermissions::assert($user, 'aylik-ozet.view');
 
         $ay = trim((string) $request->getQuery('ay', date('Y-m')));
         if (!preg_match('/^\d{4}-\d{2}$/', $ay)) {

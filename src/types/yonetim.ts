@@ -5,6 +5,7 @@ export type KayitDurumu = "AKTIF" | "PASIF";
 
 export type YonetimKullanici = {
   id: number;
+  username?: string;
   ad_soyad: string;
   telefon?: string;
   kullanici_tipi: KullaniciTipi;
@@ -18,6 +19,8 @@ export type YonetimKullanici = {
 };
 
 export type UpsertYonetimKullaniciPayload = {
+  username?: string;
+  password?: string;
   ad_soyad: string;
   telefon?: string;
   kullanici_tipi: KullaniciTipi;

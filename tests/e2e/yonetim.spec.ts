@@ -26,6 +26,8 @@ test.describe("yonetim paneli ve aylik ozet", () => {
     await expect(page.locator(".modal-header h2").last()).toContainText("Yeni Kullanıcı");
     await page.getByLabel("Kullanıcı Tipi").selectOption("HARICI");
     await page.getByLabel("Rol").selectOption("GENEL_YONETICI");
+    await page.getByLabel("Kullanıcı Adı").fill("danisman_kullanici");
+    await page.getByLabel("Geçici Şifre").fill("GeciciSifre2026");
     await page.getByLabel("Ad Soyad").fill("Danışman Kullanıcı");
     await page.getByLabel("Telefon").fill("05559998877");
     await page.getByLabel("Notlar").fill("Dışarıdan danışman erişimi");

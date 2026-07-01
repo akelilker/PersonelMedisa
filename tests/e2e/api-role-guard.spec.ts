@@ -114,6 +114,7 @@ test.describe("S43B API role guards (mock-api)", () => {
 
     await expect(apiFetch(page, "/api/yonetim/subeler")).resolves.toMatchObject({ status: 403 });
     await expect(apiFetch(page, "/api/yonetim/aylik-ozet?ay=2026-04")).resolves.toMatchObject({ status: 403 });
+    await expect(apiFetch(page, "/api/yonetim/kullanicilar")).resolves.toMatchObject({ status: 403 });
   });
 
   test("BOLUM_YONETICISI can read subeler for aylik ozet filters", async ({ page }) => {
@@ -135,5 +136,6 @@ test.describe("S43B API role guards (mock-api)", () => {
 
     await expect(apiFetch(page, "/api/yonetim/subeler")).resolves.toMatchObject({ status: 200 });
     await expect(apiFetch(page, "/api/yonetim/aylik-ozet?ay=2026-04")).resolves.toMatchObject({ status: 200 });
+    await expect(apiFetch(page, "/api/yonetim/kullanicilar")).resolves.toMatchObject({ status: 200 });
   });
 });

@@ -42,6 +42,8 @@ function resolveYonetimActiveTab(tabParam: string | null): ActiveTab {
 }
 
 type KullaniciFormState = {
+  username: string;
+  password: string;
   kullaniciTipi: KullaniciTipi;
   personelId: string;
   adSoyad: string;
@@ -78,6 +80,8 @@ const DURUM_LABELS: Record<KayitDurumu, string> = {
 };
 
 const INITIAL_KULLANICI_FORM: KullaniciFormState = {
+  username: "",
+  password: "",
   kullaniciTipi: "IC_PERSONEL",
   personelId: "",
   adSoyad: "",
@@ -238,6 +242,8 @@ function mergeIdOptions(current: IdOption[], incoming: IdOption[]) {
 
 function userFormFromItem(item: YonetimKullanici): KullaniciFormState {
   return {
+    username: item.username ?? "",
+    password: "",
     kullaniciTipi: item.kullanici_tipi,
     personelId: item.personel_id != null ? String(item.personel_id) : "",
     adSoyad: formatAdSoyad(item.ad_soyad),
@@ -259,10 +265,19 @@ function subeFormFromItem(item: YonetimSube): SubeFormState {
   };
 }
 
-function toKullaniciPayload(form: KullaniciFormState): UpsertYonetimKullaniciPayload {
+function toKullaniciPayload(form: KullaniciFormState, isEdit: boolean): UpsertYonetimKullaniciPayload {
   const adSoyad = formatAdSoyad(form.adSoyad);
   if (!adSoyad) {
     throw new Error("Ad soyad zorunludur.");
+  }
+
+  const username = form.username.trim();
+  if (!username) {
+    throw new Error("Kullanıcı adı zorunludur.");
+  }
+
+  if (!isEdit && !form.password.trim()) {
+    throw new Error("Geçici şifre zorunludur.");
   }
 
   if (form.kullaniciTipi === "IC_PERSONEL" && !form.personelId) {
@@ -273,7 +288,8 @@ function toKullaniciPayload(form: KullaniciFormState): UpsertYonetimKullaniciPay
     throw new Error("Varsayılan şube, yetki verilen şubeler içinde olmalıdır.");
   }
 
-  return {
+  const payload: UpsertYonetimKullaniciPayload = {
+    username,
     ad_soyad: adSoyad,
     telefon: normalizeTelefonDigits(form.telefon) || undefined,
     kullanici_tipi: form.kullaniciTipi,
@@ -284,6 +300,12 @@ function toKullaniciPayload(form: KullaniciFormState): UpsertYonetimKullaniciPay
     durum: form.durum,
     notlar: form.notlar.trim() || undefined
   };
+
+  if (form.password.trim()) {
+    payload.password = form.password;
+  }
+
+  return payload;
 }
 
 function toSubePayload(form: SubeFormState): UpsertYonetimSubePayload {
@@ -594,7 +616,7 @@ export function YonetimPaneliPage() {
     setSuccessMessage(null);
 
     try {
-      const payload = toKullaniciPayload(kullaniciForm);
+      const payload = toKullaniciPayload(kullaniciForm, editingKullaniciId != null);
       const existingKullanici =
         editingKullaniciId != null ? kullanicilar.find((item) => item.id === editingKullaniciId) ?? null : null;
       const surecLogPayloads = buildYonetimSurecLogPayloads(existingKullanici, payload, subeNameMap);
@@ -917,6 +939,21 @@ export function YonetimPaneliPage() {
         >
           <form className="yonetim-form-stack" id={YONETIM_KULLANICI_FORM_ID} onSubmit={handleKullaniciSubmit}>
             <div className="form-field-grid">
+              <FormField
+                label="Kullanıcı Adı"
+                name="yonetim-kullanici-username"
+                value={kullaniciForm.username}
+                onChange={(value) => setKullaniciForm((prev) => ({ ...prev, username: value }))}
+                required
+              />
+              <FormField
+                label={editingKullaniciId != null ? "Geçici Şifre (boş bırakılırsa değişmez)" : "Geçici Şifre"}
+                name="yonetim-kullanici-password"
+                type="password"
+                value={kullaniciForm.password}
+                onChange={(value) => setKullaniciForm((prev) => ({ ...prev, password: value }))}
+                required={editingKullaniciId == null}
+              />
               <FormField
                 as="select"
                 label="Kullanıcı Tipi"

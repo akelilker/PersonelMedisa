@@ -14,7 +14,7 @@ type FormFieldBase = {
 
 type FormFieldAsInput = FormFieldBase & {
   as?: "input";
-  type?: "text" | "date" | "tel" | "number" | "month" | "time";
+  type?: "text" | "date" | "tel" | "number" | "month" | "time" | "password";
   min?: number | string;
   step?: string;
   rows?: never;

@@ -141,6 +141,15 @@ class Router
         if ($path === '/yonetim/subeler' && $method === 'GET') {
             YonetimController::subeler($this->request);
         }
+        if ($path === '/yonetim/kullanicilar' && $method === 'GET') {
+            YonetimController::kullanicilar($this->request);
+        }
+        if ($path === '/yonetim/kullanicilar' && $method === 'POST') {
+            YonetimController::kullaniciOlustur($this->request);
+        }
+        if ($method === 'PUT' && preg_match('#^/yonetim/kullanicilar/(\d+)$#', $path, $matches)) {
+            YonetimController::kullaniciGuncelle($this->request, $matches[1]);
+        }
         if ($path === '/yonetim/aylik-ozet' && $method === 'GET') {
             YonetimController::aylikOzet($this->request);
         }

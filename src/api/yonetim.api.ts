@@ -118,6 +118,7 @@ function normalizeYonetimKullanici(data: unknown): YonetimKullanici {
 
   return {
     id,
+    username: readString(record.username),
     ad_soyad: adSoyad,
     telefon: readString(record.telefon),
     kullanici_tipi: normalizeKullaniciTipi(record.kullanici_tipi),

@@ -1668,6 +1668,7 @@ export async function mockApi(page: Page, role: MockUserRole) {
 
   const yonetimKullanicilari: Array<{
     id: number;
+    username: string;
     ad_soyad: string;
     telefon?: string;
     kullanici_tipi: "IC_PERSONEL" | "HARICI";
@@ -1680,6 +1681,7 @@ export async function mockApi(page: Page, role: MockUserRole) {
   }> = [
     {
       id: 1,
+      username: "genel_yonetici",
       ad_soyad: "İlker Akel",
       telefon: "05550000001",
       kullanici_tipi: "HARICI",
@@ -1692,6 +1694,7 @@ export async function mockApi(page: Page, role: MockUserRole) {
     },
     {
       id: 2,
+      username: "bolum_yonetici",
       ad_soyad: "Adnan Bulut",
       telefon: "05550000002",
       kullanici_tipi: "HARICI",
@@ -1704,6 +1707,7 @@ export async function mockApi(page: Page, role: MockUserRole) {
     },
     {
       id: 3,
+      username: "birim_amiri",
       ad_soyad: "Serhan Köse",
       telefon: "05550000003",
       kullanici_tipi: "IC_PERSONEL",
@@ -3658,28 +3662,43 @@ let bildirimIdCounter = 800;
     }
 
     if (path === "/api/yonetim/kullanicilar" && method === "GET") {
+      if (await denyUnlessRolePermission(route, "yonetim-paneli.manage")) {
+        return;
+      }
       await fulfillJson(
         route,
         200,
         okBody({
-          items: yonetimKullanicilari.map((item) => ({
-            ...item,
-            personel_ad_soyad:
-              item.personel_id != null
-                ? personeller.find((personel) => personel.id === item.personel_id)
-                  ? `${personeller.find((personel) => personel.id === item.personel_id)?.ad} ${
-                      personeller.find((personel) => personel.id === item.personel_id)?.soyad
-                    }`
+          items: yonetimKullanicilari.map((item) => {
+            const { password: _password, password_hash: _hash, ...safe } = item as typeof item & {
+              password?: string;
+              password_hash?: string;
+            };
+            return {
+              ...safe,
+              personel_ad_soyad:
+                item.personel_id != null
+                  ? personeller.find((personel) => personel.id === item.personel_id)
+                    ? `${personeller.find((personel) => personel.id === item.personel_id)?.ad} ${
+                        personeller.find((personel) => personel.id === item.personel_id)?.soyad
+                      }`
+                    : null
                   : null
-                : null
-          }))
+            };
+          })
         })
       );
       return;
     }
 
     if (path === "/api/yonetim/kullanicilar" && method === "POST") {
+      if (await denyUnlessRolePermission(route, "yonetim-paneli.manage")) {
+        return;
+      }
+
       const payload = request.postDataJSON() as {
+        username?: string;
+        password?: string;
         ad_soyad: string;
         telefon?: string;
         kullanici_tipi: "IC_PERSONEL" | "HARICI";
@@ -3691,11 +3710,27 @@ let bildirimIdCounter = 800;
         notlar?: string;
       };
 
+      const username = String(payload.username ?? "").trim();
+      const password = String(payload.password ?? "");
+      if (!username) {
+        await fulfillJson(route, 400, errorBody("VALIDATION_ERROR", "Kullanici adi zorunludur.", "username"));
+        return;
+      }
+      if (!password) {
+        await fulfillJson(route, 400, errorBody("VALIDATION_ERROR", "Sifre zorunludur.", "password"));
+        return;
+      }
+      if (yonetimKullanicilari.some((item) => item.username === username)) {
+        await fulfillJson(route, 409, errorBody("DUPLICATE_USERNAME", "Bu kullanici adi zaten kayitli.", "username"));
+        return;
+      }
+
       const linkedPersonel =
         payload.personel_id != null ? personeller.find((item) => item.id === payload.personel_id) ?? null : null;
 
       const created = {
         id: ++kullaniciIdCounter,
+        username,
         ad_soyad: payload.ad_soyad,
         telefon: payload.telefon,
         kullanici_tipi: payload.kullanici_tipi,
@@ -3721,6 +3756,10 @@ let bildirimIdCounter = 800;
     }
 
     if (path.match(/^\/api\/yonetim\/kullanicilar\/\d+$/) && method === "PUT") {
+      if (await denyUnlessRolePermission(route, "yonetim-paneli.manage")) {
+        return;
+      }
+
       const kullaniciId = Number.parseInt(path.split("/")[4] ?? "0", 10);
       const target = yonetimKullanicilari.find((item) => item.id === kullaniciId);
       if (!target) {
@@ -3729,6 +3768,8 @@ let bildirimIdCounter = 800;
       }
 
       const payload = request.postDataJSON() as {
+        username?: string;
+        password?: string;
         ad_soyad?: string;
         telefon?: string;
         kullanici_tipi?: "IC_PERSONEL" | "HARICI";
@@ -3739,10 +3780,21 @@ let bildirimIdCounter = 800;
         durum?: "AKTIF" | "PASIF";
         notlar?: string;
       };
+
+      const nextUsername = payload.username != null ? String(payload.username).trim() : target.username;
+      if (
+        nextUsername !== target.username &&
+        yonetimKullanicilari.some((item) => item.username === nextUsername && item.id !== target.id)
+      ) {
+        await fulfillJson(route, 409, errorBody("DUPLICATE_USERNAME", "Bu kullanici adi zaten kayitli.", "username"));
+        return;
+      }
+
       const linkedPersonel =
         payload.personel_id != null ? personeller.find((item) => item.id === payload.personel_id) ?? null : null;
 
       Object.assign(target, {
+        username: nextUsername,
         ad_soyad: payload.ad_soyad ?? target.ad_soyad,
         telefon: payload.telefon ?? target.telefon,
         kullanici_tipi: payload.kullanici_tipi ?? target.kullanici_tipi,

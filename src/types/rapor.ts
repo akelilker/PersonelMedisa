@@ -33,4 +33,10 @@ export type RaporSonuc = {
   rows: RaporSatiri[];
   total: number | null;
   pagination: PaginationMeta;
+  reportMeta?: {
+    kaynak?: "SNAPSHOT" | "LIVE" | string;
+    muhur_id?: number | null;
+    donem?: string | null;
+    effective_sube_id?: number | null;
+  };
 };

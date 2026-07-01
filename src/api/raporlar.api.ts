@@ -101,6 +101,7 @@ export async function fetchRapor(
   });
   const rows = normalizeRows(response.data);
   const total = normalized.pagination.total ?? readTotal(response.meta, response.data, rows);
+  const metaRecord = toRecord(response.meta);
 
   return {
     rows,
@@ -108,6 +109,12 @@ export async function fetchRapor(
     pagination: {
       ...normalized.pagination,
       total
+    },
+    reportMeta: {
+      kaynak: typeof metaRecord?.kaynak === "string" ? metaRecord.kaynak : undefined,
+      muhur_id: toNumber(metaRecord?.muhur_id),
+      donem: typeof metaRecord?.donem === "string" ? metaRecord.donem : null,
+      effective_sube_id: toNumber(metaRecord?.effective_sube_id)
     }
   };
 }

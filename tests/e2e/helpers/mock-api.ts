@@ -29,6 +29,10 @@ type RaporListMeta = {
   total_pages?: number;
   has_next_page?: boolean;
   has_prev_page?: boolean;
+  kaynak?: "SNAPSHOT" | "LIVE";
+  muhur_id?: number | null;
+  donem?: string | null;
+  effective_sube_id?: number | null;
 };
 
 function raporListOkBody(items: Record<string, unknown>[], metaOverrides?: RaporListMeta) {
@@ -45,10 +49,47 @@ function raporListOkBody(items: Record<string, unknown>[], metaOverrides?: Rapor
       total,
       total_pages: totalPages,
       has_next_page: metaOverrides?.has_next_page ?? false,
-      ...(metaOverrides?.has_prev_page !== undefined ? { has_prev_page: metaOverrides.has_prev_page } : {})
+      ...(metaOverrides?.has_prev_page !== undefined ? { has_prev_page: metaOverrides.has_prev_page } : {}),
+      ...(metaOverrides?.kaynak ? { kaynak: metaOverrides.kaynak } : {}),
+      ...(metaOverrides?.muhur_id !== undefined ? { muhur_id: metaOverrides.muhur_id } : {}),
+      ...(metaOverrides?.donem !== undefined ? { donem: metaOverrides.donem } : {}),
+      ...(metaOverrides?.effective_sube_id !== undefined
+        ? { effective_sube_id: metaOverrides.effective_sube_id }
+        : {})
     },
     errors: []
   });
+}
+
+function deriveRaporDonem(baslangic?: string | null, bitis?: string | null): string | null {
+  if (!baslangic || !bitis) {
+    return null;
+  }
+
+  const baslangicAy = baslangic.slice(0, 7);
+  const bitisAy = bitis.slice(0, 7);
+  if (baslangicAy !== bitisAy) {
+    return null;
+  }
+
+  return baslangicAy;
+}
+
+function resolvePersonelOzetKaynak(
+  baslangic?: string | null,
+  bitis?: string | null,
+  muhurId?: number | null
+): { kaynak: "SNAPSHOT" | "LIVE"; donem: string | null; muhur_id: number | null } {
+  if (muhurId !== undefined && muhurId !== null && muhurId > 0) {
+    return { kaynak: "SNAPSHOT", donem: null, muhur_id: muhurId };
+  }
+
+  const donem = deriveRaporDonem(baslangic, bitis);
+  if (donem) {
+    return { kaynak: "SNAPSHOT", donem, muhur_id: 101 };
+  }
+
+  return { kaynak: "LIVE", donem, muhur_id: null };
 }
 
 const PERSONEL_SUBE_BY_ID: Record<number, number> = {
@@ -98,7 +139,13 @@ function personelOzetPaginatedBody(
   pageNumber: number,
   pageLimit: number,
   departmanId?: number,
-  subeScope: number | null = null
+  subeScope: number | null = null,
+  options?: {
+    personelId?: number;
+    baslangicTarihi?: string | null;
+    bitisTarihi?: string | null;
+    muhurId?: number | null;
+  }
 ) {
   let scopedItems = PERSONEL_OZET_PAGINATED_ITEMS;
   if (subeScope !== null) {
@@ -108,7 +155,22 @@ function personelOzetPaginatedBody(
     });
   }
 
-  if (departmanId === undefined && subeScope === null) {
+  let filtered =
+    departmanId === undefined
+      ? scopedItems
+      : scopedItems.filter((item) => item.departman_id === departmanId);
+
+  if (options?.personelId !== undefined) {
+    filtered = filtered.filter((item) => item.personel_id === options.personelId);
+  }
+
+  const sourceMeta = resolvePersonelOzetKaynak(
+    options?.baslangicTarihi,
+    options?.bitisTarihi,
+    options?.muhurId
+  );
+
+  if (departmanId === undefined && subeScope === null && options?.personelId === undefined) {
     const total = PERSONEL_OZET_PAGINATED_ITEMS.length;
     const totalPages = 2;
     const items =
@@ -124,14 +186,14 @@ function personelOzetPaginatedBody(
       total,
       total_pages: totalPages,
       has_next_page: pageNumber < totalPages,
-      has_prev_page: pageNumber > 1
+      has_prev_page: pageNumber > 1,
+      kaynak: sourceMeta.kaynak,
+      muhur_id: sourceMeta.muhur_id,
+      donem: sourceMeta.donem,
+      effective_sube_id: subeScope
     });
   }
 
-  const filtered =
-    departmanId === undefined
-      ? scopedItems
-      : scopedItems.filter((item) => item.departman_id === departmanId);
   const total = filtered.length;
   const totalPages = Math.max(1, Math.ceil(total / pageLimit));
   const start = (pageNumber - 1) * pageLimit;
@@ -143,7 +205,11 @@ function personelOzetPaginatedBody(
     total,
     total_pages: totalPages,
     has_next_page: pageNumber < totalPages,
-    has_prev_page: pageNumber > 1
+    has_prev_page: pageNumber > 1,
+    kaynak: sourceMeta.kaynak,
+    muhur_id: sourceMeta.muhur_id,
+    donem: sourceMeta.donem,
+    effective_sube_id: subeScope
   });
 }
 
@@ -3124,6 +3190,29 @@ let bildirimIdCounter = 800;
         const pageNumber = Number.parseInt(raporUrl.searchParams.get("page") ?? "1", 10) || 1;
         const pageLimit = Number.parseInt(raporUrl.searchParams.get("limit") ?? "10", 10) || 10;
         const departmanId = Number.parseInt(raporUrl.searchParams.get("departman_id") ?? "", 10);
+        const personelId = Number.parseInt(raporUrl.searchParams.get("personel_id") ?? "", 10);
+        const muhurId = Number.parseInt(raporUrl.searchParams.get("muhur_id") ?? "", 10);
+        const baslangicTarihi = raporUrl.searchParams.get("baslangic_tarihi");
+        const bitisTarihi = raporUrl.searchParams.get("bitis_tarihi");
+
+        if (Number.isFinite(muhurId) && muhurId > 0 && subeScope !== null && subeScope !== 2) {
+          await fulfillJson(
+            route,
+            403,
+            errorBody("FORBIDDEN", "Bu kayit aktif sube baglaminda goruntulenemiyor.")
+          );
+          return;
+        }
+
+        if (baslangicTarihi === "2026-13-01") {
+          await fulfillJson(
+            route,
+            400,
+            errorBody("VALIDATION_ERROR", "Gecersiz baslangic tarihi.", "baslangic_tarihi")
+          );
+          return;
+        }
+
         await fulfillJson(
           route,
           200,
@@ -3131,7 +3220,13 @@ let bildirimIdCounter = 800;
             pageNumber,
             pageLimit,
             Number.isFinite(departmanId) ? departmanId : undefined,
-            subeScope
+            subeScope,
+            {
+              personelId: Number.isFinite(personelId) ? personelId : undefined,
+              baslangicTarihi,
+              bitisTarihi,
+              muhurId: Number.isFinite(muhurId) ? muhurId : null
+            }
           )
         );
         return;

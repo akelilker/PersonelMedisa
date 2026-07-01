@@ -95,4 +95,103 @@ test.describe("yonetim kullanicilar API (S44)", () => {
 
     await expect(apiFetch(page, "/api/yonetim/kullanicilar")).resolves.toMatchObject({ status: 403 });
   });
+
+  test("create user with varsayilan_sube_id returns consistent sube_ids order", async ({ page }) => {
+    await mockApi(page, "GENEL_YONETICI");
+    await login(page, { username: "yonetici", password: "secret" });
+
+    const result = await apiFetch(page, "/api/yonetim/kullanicilar", {
+      method: "POST",
+      body: {
+        username: "sube_sira_test",
+        password: "GeciciSifre2026",
+        ad_soyad: "Sube Sira Test",
+        kullanici_tipi: "HARICI",
+        rol: "MUHASEBE",
+        sube_ids: [1, 2],
+        varsayilan_sube_id: 2,
+        durum: "AKTIF"
+      }
+    });
+
+    expect(result.status).toBe(200);
+    const data = result.json.data as Record<string, unknown>;
+    expect(data.varsayilan_sube_id).toBe(2);
+    expect(data.sube_ids).toEqual([2, 1]);
+    expect(JSON.stringify(result.json)).not.toContain("password_hash");
+  });
+
+  test("update user with varsayilan_sube_id returns consistent response", async ({ page }) => {
+    await mockApi(page, "GENEL_YONETICI");
+    await login(page, { username: "yonetici", password: "secret" });
+
+    const result = await apiFetch(page, "/api/yonetim/kullanicilar/3", {
+      method: "PUT",
+      body: {
+        username: "birim_amiri",
+        ad_soyad: "Ayşe Yılmaz",
+        kullanici_tipi: "IC_PERSONEL",
+        rol: "BIRIM_AMIRI",
+        personel_id: 1,
+        sube_ids: [1, 2],
+        varsayilan_sube_id: 2,
+        durum: "AKTIF"
+      }
+    });
+
+    expect(result.status).toBe(200);
+    const data = result.json.data as Record<string, unknown>;
+    expect(data.varsayilan_sube_id).toBe(2);
+    expect(data.sube_ids).toEqual([2, 1]);
+  });
+
+  test("invalid varsayilan_sube_id returns validation error", async ({ page }) => {
+    await mockApi(page, "GENEL_YONETICI");
+    await login(page, { username: "yonetici", password: "secret" });
+
+    const result = await apiFetch(page, "/api/yonetim/kullanicilar", {
+      method: "POST",
+      body: {
+        username: "invalid_varsayilan",
+        password: "GeciciSifre2026",
+        ad_soyad: "Invalid Varsayilan",
+        kullanici_tipi: "HARICI",
+        rol: "MUHASEBE",
+        sube_ids: [1],
+        varsayilan_sube_id: 2,
+        durum: "AKTIF"
+      }
+    });
+
+    expect(result.status).toBe(400);
+    const errors = (result.json.errors as Array<{ field?: string; code?: string }>) ?? [];
+    expect(errors[0]?.field).toBe("varsayilan_sube_id");
+    expect(errors[0]?.code).toBe("VALIDATION_ERROR");
+  });
+
+  test("unsupported fields are accepted in mock but real payload contract strips them in unit layer", async ({ page }) => {
+    await mockApi(page, "GENEL_YONETICI");
+    await login(page, { username: "yonetici", password: "secret" });
+
+    const result = await apiFetch(page, "/api/yonetim/kullanicilar", {
+      method: "POST",
+      body: {
+        username: "extended_fields_mock",
+        password: "GeciciSifre2026",
+        ad_soyad: "Extended Fields Mock",
+        telefon: "05551234567",
+        notlar: "mock not",
+        kullanici_tipi: "HARICI",
+        rol: "MUHASEBE",
+        sube_ids: [1],
+        durum: "AKTIF"
+      }
+    });
+
+    expect(result.status).toBe(200);
+    const data = result.json.data as Record<string, unknown>;
+    expect(data.telefon).toBe("05551234567");
+    expect(data.notlar).toBe("mock not");
+    expect(JSON.stringify(result.json)).not.toMatch(/"password"\s*:/);
+  });
 });

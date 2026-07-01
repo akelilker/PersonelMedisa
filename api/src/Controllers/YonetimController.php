@@ -773,6 +773,9 @@ class YonetimController
 
         self::assertSubeIdsExist($pdo, $subeIds);
         self::assertVarsayilanSubeInScope($varsayilanSubeId, $subeIds);
+        if ($varsayilanSubeId !== null) {
+            $subeIds = self::normalizeSubeIdsWithVarsayilan($subeIds, $varsayilanSubeId);
+        }
 
         $pdo->beginTransaction();
         try {
@@ -795,7 +798,7 @@ class YonetimController
             JsonResponse::serverError('Kullanici kaydi olusturulamadi.');
         }
 
-        $created = self::findKullaniciById($pdo, $userId);
+        $created = self::findKullaniciById($pdo, $userId, $varsayilanSubeId);
         if ($created === null) {
             JsonResponse::serverError('Kullanici kaydi olusturulamadi.');
         }
@@ -864,9 +867,18 @@ class YonetimController
         if ($subeIds !== null) {
             self::assertSubeIdsExist($pdo, $subeIds);
             self::assertVarsayilanSubeInScope($varsayilanSubeId, $subeIds);
-        } elseif ($varsayilanSubeId !== null) {
+            if ($varsayilanSubeId !== null) {
+                $subeIds = self::normalizeSubeIdsWithVarsayilan($subeIds, $varsayilanSubeId);
+            }
+        } elseif (array_key_exists('varsayilan_sube_id', $body) && $varsayilanSubeId !== null) {
             $currentSubeIds = self::loadSubeIdsByUserIds($pdo, [$kullaniciId])[$kullaniciId] ?? [];
             self::assertVarsayilanSubeInScope($varsayilanSubeId, $currentSubeIds);
+            $subeIds = self::normalizeSubeIdsWithVarsayilan($currentSubeIds, $varsayilanSubeId);
+        }
+
+        $responseVarsayilanSubeId = $varsayilanSubeId;
+        if ($responseVarsayilanSubeId === null && $subeIds !== null && count($subeIds) > 0) {
+            $responseVarsayilanSubeId = $subeIds[0];
         }
 
         $pdo->beginTransaction();
@@ -897,7 +909,7 @@ class YonetimController
             JsonResponse::serverError('Kullanici kaydi guncellenemedi.');
         }
 
-        $updated = self::findKullaniciById($pdo, $kullaniciId);
+        $updated = self::findKullaniciById($pdo, $kullaniciId, $responseVarsayilanSubeId);
         if ($updated === null) {
             JsonResponse::serverError('Kullanici kaydi guncellenemedi.');
         }
@@ -912,9 +924,19 @@ class YonetimController
     }
 
   /** @param array<string, mixed> $row @param array<int, int> $subeIds @return array<string, mixed> */
-    private static function mapKullaniciRow(array $row, array $subeIds)
+    private static function mapKullaniciRow(array $row, array $subeIds, $varsayilanSubeId = null)
     {
-        $varsayilanSubeId = count($subeIds) > 0 ? $subeIds[0] : null;
+        $resolvedVarsayilan = null;
+        $orderedSubeIds = $subeIds;
+
+        if ($varsayilanSubeId !== null && in_array($varsayilanSubeId, $subeIds, true)) {
+            $resolvedVarsayilan = $varsayilanSubeId;
+            $orderedSubeIds = self::normalizeSubeIdsWithVarsayilan($subeIds, $varsayilanSubeId);
+        } elseif (count($subeIds) > 0) {
+            $resolvedVarsayilan = $subeIds[0];
+            $orderedSubeIds = $subeIds;
+        }
+
         $rol = (string) $row['rol'];
 
         return [
@@ -923,8 +945,8 @@ class YonetimController
             'ad_soyad' => (string) $row['ad_soyad'],
             'rol' => $rol,
             'durum' => (string) $row['durum'],
-            'sube_ids' => $subeIds,
-            'varsayilan_sube_id' => $varsayilanSubeId,
+            'sube_ids' => $orderedSubeIds,
+            'varsayilan_sube_id' => $resolvedVarsayilan,
             'telefon' => null,
             'personel_id' => null,
             'personel_ad_soyad' => null,
@@ -970,7 +992,7 @@ class YonetimController
     }
 
     /** @return array<string, mixed>|null */
-    private static function findKullaniciById(PDO $pdo, $userId)
+    private static function findKullaniciById(PDO $pdo, $userId, $varsayilanSubeId = null)
     {
         $row = self::findKullaniciRowById($pdo, $userId);
         if ($row === null) {
@@ -979,7 +1001,7 @@ class YonetimController
 
         $subeIds = self::loadSubeIdsByUserIds($pdo, [(int) $userId])[(int) $userId] ?? [];
 
-        return self::mapKullaniciRow($row, $subeIds);
+        return self::mapKullaniciRow($row, $subeIds, $varsayilanSubeId);
     }
 
     private static function usernameExists(PDO $pdo, $username, $excludeUserId = null)
@@ -1058,6 +1080,23 @@ class YonetimController
         if (!in_array($varsayilanSubeId, $subeIds, true)) {
             JsonResponse::badRequest('Varsayilan sube yetki verilen subeler icinde olmalidir.', 'VALIDATION_ERROR', 'varsayilan_sube_id');
         }
+    }
+
+    /** @param array<int, int> $subeIds @param int|null $varsayilanSubeId @return array<int, int> */
+    private static function normalizeSubeIdsWithVarsayilan(array $subeIds, $varsayilanSubeId)
+    {
+        if ($varsayilanSubeId === null || count($subeIds) === 0) {
+            return $subeIds;
+        }
+
+        $others = [];
+        foreach ($subeIds as $subeId) {
+            if ((int) $subeId !== (int) $varsayilanSubeId) {
+                $others[] = (int) $subeId;
+            }
+        }
+
+        return array_merge([(int) $varsayilanSubeId], $others);
     }
 
     /** @param array<int, int> $subeIds */

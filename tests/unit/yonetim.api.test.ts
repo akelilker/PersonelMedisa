@@ -4,6 +4,11 @@ import {
   fetchYonetimKullanicilari,
   updateYonetimKullanici
 } from "../../src/api/yonetim.api";
+import {
+  isRealYonetimKullaniciApi,
+  normalizeSubeIdsWithVarsayilan,
+  sanitizeYonetimKullaniciPayloadForApi
+} from "../../src/lib/yonetim/kullanici-api-contract";
 
 function createJsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -126,5 +131,62 @@ describe("yonetim.api kullanicilar", () => {
     });
 
     expect(fetchMock).toHaveBeenCalledOnce();
+  });
+});
+
+describe("kullanici-api-contract", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("normalizeSubeIdsWithVarsayilan puts default branch first", () => {
+    expect(normalizeSubeIdsWithVarsayilan([1, 2], 2)).toEqual([2, 1]);
+    expect(normalizeSubeIdsWithVarsayilan([1, 2], null)).toEqual([1, 2]);
+  });
+
+  it("sanitizeYonetimKullaniciPayloadForApi strips unsupported fields in real mode", () => {
+    vi.stubEnv("VITE_API_MODE", "real");
+
+    const sanitized = sanitizeYonetimKullaniciPayloadForApi({
+      username: "muhasebe",
+      password: "GeciciSifre2026",
+      ad_soyad: "Test Muhasebe",
+      telefon: "05551112233",
+      kullanici_tipi: "HARICI",
+      rol: "MUHASEBE",
+      personel_id: 1,
+      sube_ids: [1, 2],
+      varsayilan_sube_id: 2,
+      durum: "AKTIF",
+      notlar: "not"
+    });
+
+    expect(sanitized).toEqual({
+      username: "muhasebe",
+      password: "GeciciSifre2026",
+      ad_soyad: "Test Muhasebe",
+      rol: "MUHASEBE",
+      sube_ids: [1, 2],
+      varsayilan_sube_id: 2,
+      durum: "AKTIF"
+    });
+    expect(isRealYonetimKullaniciApi()).toBe(true);
+  });
+
+  it("sanitizeYonetimKullaniciPayloadForApi keeps extended fields in demo mode", () => {
+    vi.stubEnv("VITE_API_MODE", "demo");
+
+    const payload = {
+      username: "muhasebe",
+      ad_soyad: "Test Muhasebe",
+      telefon: "05551112233",
+      kullanici_tipi: "HARICI" as const,
+      rol: "MUHASEBE" as const,
+      sube_ids: [1],
+      durum: "AKTIF" as const
+    };
+
+    expect(sanitizeYonetimKullaniciPayloadForApi(payload)).toEqual(payload);
+    expect(isRealYonetimKullaniciApi()).toBe(false);
   });
 });

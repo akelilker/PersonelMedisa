@@ -980,6 +980,31 @@ function errorBody(code: string, message: string, field?: string) {
   });
 }
 
+function normalizeMockSubeIdsWithVarsayilan(subeIds: number[], varsayilanSubeId: number | null | undefined) {
+  if (varsayilanSubeId == null || subeIds.length === 0) {
+    return subeIds;
+  }
+
+  const others = subeIds.filter((id) => id !== varsayilanSubeId);
+  return [varsayilanSubeId, ...others];
+}
+
+function assertMockVarsayilanSubeInScope(
+  varsayilanSubeId: number | null | undefined,
+  subeIds: number[] | undefined
+) {
+  if (varsayilanSubeId == null) {
+    return null;
+  }
+
+  const scope = subeIds ?? [];
+  if (!scope.includes(varsayilanSubeId)) {
+    return "Varsayilan sube yetki verilen subeler icinde olmalidir.";
+  }
+
+  return null;
+}
+
 function surecListOkBody(items: unknown[], metaOverrides?: RaporListMeta) {
   const page = metaOverrides?.page ?? 1;
   const limit = metaOverrides?.limit ?? 10;
@@ -3676,6 +3701,7 @@ let bildirimIdCounter = 800;
             };
             return {
               ...safe,
+              sube_ids: normalizeMockSubeIdsWithVarsayilan(item.sube_ids, item.varsayilan_sube_id),
               personel_ad_soyad:
                 item.personel_id != null
                   ? personeller.find((personel) => personel.id === item.personel_id)
@@ -3720,6 +3746,11 @@ let bildirimIdCounter = 800;
         await fulfillJson(route, 400, errorBody("VALIDATION_ERROR", "Sifre zorunludur.", "password"));
         return;
       }
+      const scopeError = assertMockVarsayilanSubeInScope(payload.varsayilan_sube_id, payload.sube_ids ?? []);
+      if (scopeError) {
+        await fulfillJson(route, 400, errorBody("VALIDATION_ERROR", scopeError, "varsayilan_sube_id"));
+        return;
+      }
       if (yonetimKullanicilari.some((item) => item.username === username)) {
         await fulfillJson(route, 409, errorBody("DUPLICATE_USERNAME", "Bu kullanici adi zaten kayitli.", "username"));
         return;
@@ -3727,6 +3758,13 @@ let bildirimIdCounter = 800;
 
       const linkedPersonel =
         payload.personel_id != null ? personeller.find((item) => item.id === payload.personel_id) ?? null : null;
+
+      const normalizedSubeIds = normalizeMockSubeIdsWithVarsayilan(
+        payload.sube_ids ?? [],
+        payload.varsayilan_sube_id ?? null
+      );
+      const resolvedVarsayilan =
+        payload.varsayilan_sube_id ?? (normalizedSubeIds.length > 0 ? normalizedSubeIds[0] : null);
 
       const created = {
         id: ++kullaniciIdCounter,
@@ -3736,8 +3774,8 @@ let bildirimIdCounter = 800;
         kullanici_tipi: payload.kullanici_tipi,
         rol: payload.rol,
         personel_id: payload.personel_id ?? null,
-        sube_ids: payload.sube_ids ?? [],
-        varsayilan_sube_id: payload.varsayilan_sube_id ?? null,
+        sube_ids: normalizedSubeIds,
+        varsayilan_sube_id: resolvedVarsayilan,
         durum: payload.durum,
         notlar: payload.notlar
       };
@@ -3790,8 +3828,20 @@ let bildirimIdCounter = 800;
         return;
       }
 
+      const nextSubeIds = payload.sube_ids ?? target.sube_ids;
+      const nextVarsayilan =
+        payload.varsayilan_sube_id !== undefined ? payload.varsayilan_sube_id : target.varsayilan_sube_id;
+      const scopeError = assertMockVarsayilanSubeInScope(nextVarsayilan, nextSubeIds);
+      if (scopeError) {
+        await fulfillJson(route, 400, errorBody("VALIDATION_ERROR", scopeError, "varsayilan_sube_id"));
+        return;
+      }
+
       const linkedPersonel =
         payload.personel_id != null ? personeller.find((item) => item.id === payload.personel_id) ?? null : null;
+
+      const normalizedSubeIds = normalizeMockSubeIdsWithVarsayilan(nextSubeIds, nextVarsayilan);
+      const resolvedVarsayilan = nextVarsayilan ?? (normalizedSubeIds.length > 0 ? normalizedSubeIds[0] : null);
 
       Object.assign(target, {
         username: nextUsername,
@@ -3800,8 +3850,8 @@ let bildirimIdCounter = 800;
         kullanici_tipi: payload.kullanici_tipi ?? target.kullanici_tipi,
         rol: payload.rol ?? target.rol,
         personel_id: payload.personel_id ?? null,
-        sube_ids: payload.sube_ids ?? target.sube_ids,
-        varsayilan_sube_id: payload.varsayilan_sube_id ?? target.varsayilan_sube_id,
+        sube_ids: normalizedSubeIds,
+        varsayilan_sube_id: resolvedVarsayilan,
         durum: payload.durum ?? target.durum,
         notlar: payload.notlar ?? target.notlar
       });

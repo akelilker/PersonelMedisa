@@ -15,6 +15,7 @@ import type {
 } from "../types/yonetim";
 import type { UserRole } from "../types/auth";
 import { SUBE_DELETE_BLOCKED_ERROR_CODE } from "../lib/yonetim/sube-delete";
+import { sanitizeYonetimKullaniciPayloadForApi } from "../lib/yonetim/kullanici-api-contract";
 import { appendQueryParams } from "../utils/append-query-params";
 import { ApiRequestError, apiRequest } from "./api-client";
 import { endpoints } from "./endpoints";
@@ -256,7 +257,7 @@ export async function createYonetimKullanici(
 ): Promise<YonetimKullanici> {
   const response = await apiRequest<ApiResponse<unknown>>(endpoints.yonetim.kullanicilar, {
     method: "POST",
-    body: JSON.stringify(payload)
+    body: JSON.stringify(sanitizeYonetimKullaniciPayloadForApi(payload))
   });
   return normalizeYonetimKullanici(response.data);
 }
@@ -267,7 +268,7 @@ export async function updateYonetimKullanici(
 ): Promise<YonetimKullanici> {
   const response = await apiRequest<ApiResponse<unknown>>(endpoints.yonetim.kullaniciDetail(kullaniciId), {
     method: "PUT",
-    body: JSON.stringify(payload)
+    body: JSON.stringify(sanitizeYonetimKullaniciPayloadForApi(payload))
   });
   return normalizeYonetimKullanici(response.data);
 }

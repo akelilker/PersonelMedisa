@@ -18,6 +18,7 @@ import {
   updateYonetimSube
 } from "../../../api/yonetim.api";
 import { useRoleAccess } from "../../../hooks/use-role-access";
+import { isRealYonetimKullaniciApi } from "../../../lib/yonetim/kullanici-api-contract";
 import type { UserRole } from "../../../types/auth";
 import type { Personel } from "../../../types/personel";
 import type { IdOption } from "../../../types/referans";
@@ -102,6 +103,7 @@ const INITIAL_SUBE_FORM: SubeFormState = {
 
 const YONETIM_KULLANICI_FORM_ID = "yonetim-kullanici-form";
 const YONETIM_SUBE_FORM_ID = "yonetim-sube-form";
+const REAL_KULLANICI_API_UNSUPPORTED_HINT = "Bu alan V1 canlı API'de desteklenmiyor.";
 const BIRIM_AMIRI_ATANDI_SUREC_TURU = "BIRIM_AMIRI_ATANDI";
 const BIRIM_AMIRI_ATAMASI_KALDIRILDI_SUREC_TURU = "BIRIM_AMIRI_ATAMASI_KALDIRILDI";
 const SUBE_YETKISI_DEGISTI_SUREC_TURU = "SUBE_YETKISI_DEGISTI";
@@ -266,6 +268,7 @@ function subeFormFromItem(item: YonetimSube): SubeFormState {
 }
 
 function toKullaniciPayload(form: KullaniciFormState, isEdit: boolean): UpsertYonetimKullaniciPayload {
+  const realKullaniciApi = isRealYonetimKullaniciApi();
   const adSoyad = formatAdSoyad(form.adSoyad);
   if (!adSoyad) {
     throw new Error("Ad soyad zorunludur.");
@@ -280,7 +283,7 @@ function toKullaniciPayload(form: KullaniciFormState, isEdit: boolean): UpsertYo
     throw new Error("Geçici şifre zorunludur.");
   }
 
-  if (form.kullaniciTipi === "IC_PERSONEL" && !form.personelId) {
+  if (!realKullaniciApi && form.kullaniciTipi === "IC_PERSONEL" && !form.personelId) {
     throw new Error("İç personel kullanıcıları için personel seçimi zorunludur.");
   }
 
@@ -291,15 +294,18 @@ function toKullaniciPayload(form: KullaniciFormState, isEdit: boolean): UpsertYo
   const payload: UpsertYonetimKullaniciPayload = {
     username,
     ad_soyad: adSoyad,
-    telefon: normalizeTelefonDigits(form.telefon) || undefined,
-    kullanici_tipi: form.kullaniciTipi,
+    kullanici_tipi: realKullaniciApi ? "HARICI" : form.kullaniciTipi,
     rol: form.rol,
-    personel_id: form.personelId ? Number.parseInt(form.personelId, 10) : null,
     sube_ids: form.subeIds,
     varsayilan_sube_id: form.varsayilanSubeId ? Number.parseInt(form.varsayilanSubeId, 10) : null,
-    durum: form.durum,
-    notlar: form.notlar.trim() || undefined
+    durum: form.durum
   };
+
+  if (!realKullaniciApi) {
+    payload.telefon = normalizeTelefonDigits(form.telefon) || undefined;
+    payload.personel_id = form.personelId ? Number.parseInt(form.personelId, 10) : null;
+    payload.notlar = form.notlar.trim() || undefined;
+  }
 
   if (form.password.trim()) {
     payload.password = form.password;
@@ -420,6 +426,7 @@ export function YonetimPaneliPage() {
   const [searchParams] = useSearchParams();
   const { hasPermission } = useRoleAccess();
   const canManageYonetimPanel = hasPermission("yonetim-paneli.manage");
+  const realKullaniciApi = isRealYonetimKullaniciApi();
   const activeTab = resolveYonetimActiveTab(searchParams.get("tab"));
 
   function handleBackToAyarlar() {
@@ -954,23 +961,25 @@ export function YonetimPaneliPage() {
                 onChange={(value) => setKullaniciForm((prev) => ({ ...prev, password: value }))}
                 required={editingKullaniciId == null}
               />
-              <FormField
-                as="select"
-                label="Kullanıcı Tipi"
-                name="yonetim-kullanici-tipi"
-                value={kullaniciForm.kullaniciTipi}
-                onChange={(value) =>
-                  setKullaniciForm((prev) => ({
-                    ...prev,
-                    kullaniciTipi: value as KullaniciTipi,
-                    personelId: value === "HARICI" ? "" : prev.personelId
-                  }))
-                }
-                selectOptions={[
-                  { value: "IC_PERSONEL", label: "İç Personel" },
-                  { value: "HARICI", label: "Harici" }
-                ]}
-              />
+              {!realKullaniciApi ? (
+                <FormField
+                  as="select"
+                  label="Kullanıcı Tipi"
+                  name="yonetim-kullanici-tipi"
+                  value={kullaniciForm.kullaniciTipi}
+                  onChange={(value) =>
+                    setKullaniciForm((prev) => ({
+                      ...prev,
+                      kullaniciTipi: value as KullaniciTipi,
+                      personelId: value === "HARICI" ? "" : prev.personelId
+                    }))
+                  }
+                  selectOptions={[
+                    { value: "IC_PERSONEL", label: "İç Personel" },
+                    { value: "HARICI", label: "Harici" }
+                  ]}
+                />
+              ) : null}
               <FormField
                 as="select"
                 label="Rol"
@@ -987,7 +996,12 @@ export function YonetimPaneliPage() {
                 onChange={(value) => setKullaniciForm((prev) => ({ ...prev, durum: value as KayitDurumu }))}
                 selectOptions={statusOptions()}
               />
-              {kullaniciForm.kullaniciTipi === "IC_PERSONEL" ? (
+              {realKullaniciApi ? (
+                <p className="yonetim-hint" data-testid="yonetim-kullanici-real-api-hint">
+                  {REAL_KULLANICI_API_UNSUPPORTED_HINT}
+                </p>
+              ) : null}
+              {!realKullaniciApi && kullaniciForm.kullaniciTipi === "IC_PERSONEL" ? (
                 <FormField
                   as="select"
                   label="Bağlı Personel"
@@ -1003,17 +1017,19 @@ export function YonetimPaneliPage() {
                 name="yonetim-kullanici-ad"
                 value={kullaniciForm.adSoyad}
                 onChange={(value) => setKullaniciForm((prev) => ({ ...prev, adSoyad: value }))}
-                disabled={kullaniciForm.kullaniciTipi === "IC_PERSONEL" && kullaniciForm.personelId !== ""}
+                disabled={!realKullaniciApi && kullaniciForm.kullaniciTipi === "IC_PERSONEL" && kullaniciForm.personelId !== ""}
                 required
               />
-              <FormField
-                label="Telefon"
-                name="yonetim-kullanici-telefon"
-                type="tel"
-                value={kullaniciForm.telefon}
-                onChange={(value) => setKullaniciForm((prev) => ({ ...prev, telefon: formatTelefon(value) }))}
-                disabled={kullaniciForm.kullaniciTipi === "IC_PERSONEL" && kullaniciForm.personelId !== ""}
-              />
+              {!realKullaniciApi ? (
+                <FormField
+                  label="Telefon"
+                  name="yonetim-kullanici-telefon"
+                  type="tel"
+                  value={kullaniciForm.telefon}
+                  onChange={(value) => setKullaniciForm((prev) => ({ ...prev, telefon: formatTelefon(value) }))}
+                  disabled={kullaniciForm.kullaniciTipi === "IC_PERSONEL" && kullaniciForm.personelId !== ""}
+                />
+              ) : null}
               <FormField
                 as="select"
                 label="Varsayılan Şube"
@@ -1025,14 +1041,16 @@ export function YonetimPaneliPage() {
                   .filter((sube) => kullaniciForm.subeIds.includes(sube.id))
                   .map((sube) => ({ value: String(sube.id), label: sube.ad }))}
               />
-              <FormField
-                as="textarea"
-                label="Notlar"
-                name="yonetim-kullanici-notlar"
-                value={kullaniciForm.notlar}
-                onChange={(value) => setKullaniciForm((prev) => ({ ...prev, notlar: value }))}
-                placeholder="Opsiyonel açıklama"
-              />
+              {!realKullaniciApi ? (
+                <FormField
+                  as="textarea"
+                  label="Notlar"
+                  name="yonetim-kullanici-notlar"
+                  value={kullaniciForm.notlar}
+                  onChange={(value) => setKullaniciForm((prev) => ({ ...prev, notlar: value }))}
+                  placeholder="Opsiyonel açıklama"
+                />
+              ) : null}
             </div>
 
             <div className="yonetim-checkbox-section">

@@ -3833,12 +3833,27 @@ let bildirimIdCounter = 800;
     }
 
     if (path === "/api/yonetim/subeler" && method === "POST") {
+      if (await denyUnlessRolePermission(route, "yonetim-paneli.manage")) {
+        return;
+      }
+
       const payload = request.postDataJSON() as {
         kod: string;
         ad: string;
         departman_ids?: number[];
         durum: "AKTIF" | "PASIF";
       };
+
+      const normalizedKod = payload.kod?.trim() ?? "";
+      const normalizedAd = payload.ad?.trim() ?? "";
+      if (subeler.some((item) => item.kod === normalizedKod)) {
+        await fulfillJson(route, 409, errorBody("DUPLICATE_SUBE_KOD", "Bu sube kodu zaten kayitli.", "kod"));
+        return;
+      }
+      if (subeler.some((item) => item.ad === normalizedAd)) {
+        await fulfillJson(route, 409, errorBody("DUPLICATE_SUBE_AD", "Bu sube adi zaten kayitli.", "ad"));
+        return;
+      }
 
       const created = {
         id: ++subeIdCounter,
@@ -3851,6 +3866,10 @@ let bildirimIdCounter = 800;
     }
 
     if (path.match(/^\/api\/yonetim\/subeler\/\d+$/) && method === "PUT") {
+      if (await denyUnlessRolePermission(route, "yonetim-paneli.manage")) {
+        return;
+      }
+
       const subeId = Number.parseInt(path.split("/")[4] ?? "0", 10);
       const target = subeler.find((item) => item.id === subeId);
       if (!target) {
@@ -3859,6 +3878,17 @@ let bildirimIdCounter = 800;
       }
 
       const payload = request.postDataJSON() as Partial<(typeof subeler)[number]>;
+      const nextKod = payload.kod?.trim() ?? target.kod;
+      const nextAd = payload.ad?.trim() ?? target.ad;
+      if (subeler.some((item) => item.id !== subeId && item.kod === nextKod)) {
+        await fulfillJson(route, 409, errorBody("DUPLICATE_SUBE_KOD", "Bu sube kodu zaten kayitli.", "kod"));
+        return;
+      }
+      if (subeler.some((item) => item.id !== subeId && item.ad === nextAd)) {
+        await fulfillJson(route, 409, errorBody("DUPLICATE_SUBE_AD", "Bu sube adi zaten kayitli.", "ad"));
+        return;
+      }
+
       Object.assign(target, {
         ...(payload.kod ? { kod: payload.kod } : {}),
         ...(payload.ad ? { ad: payload.ad } : {}),
@@ -3873,6 +3903,10 @@ let bildirimIdCounter = 800;
     }
 
     if (path.match(/^\/api\/yonetim\/subeler\/\d+$/) && method === "DELETE") {
+      if (await denyUnlessRolePermission(route, "yonetim-paneli.manage")) {
+        return;
+      }
+
       const subeId = Number.parseInt(path.split("/")[4] ?? "0", 10);
       const targetIndex = subeler.findIndex((item) => item.id === subeId);
       if (targetIndex === -1) {

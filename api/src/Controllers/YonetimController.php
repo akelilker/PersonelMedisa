@@ -14,15 +14,12 @@ use PDO;
 
 class YonetimController
 {
+    private const SUBE_DELETE_BLOCKED_MESSAGE = 'Şubede Kayıtlı Personel Gözükmektedir. Kayıtlı Personel Varken Silme İşlemi Yapılamaz.';
+
     public static function subeler(Request $request)
     {
         $user = AuthMiddleware::authenticate($request, true);
-        RolePermissions::assertAny($user, [
-            'yonetim-paneli.view',
-            'aylik-ozet.view',
-            'personeller.create',
-            'personeller.update',
-        ]);
+        self::assertSubeListeleme($user);
 
         try {
             $pdo = Connection::get();
@@ -30,33 +27,381 @@ class YonetimController
             JsonResponse::serverError('Veritabani baglantisi kurulamadi.');
         }
 
+        $items = self::loadSubeItems($pdo);
+
+        JsonResponse::success(['items' => $items]);
+    }
+
+    public static function subeOlustur(Request $request)
+    {
+        $user = AuthMiddleware::authenticate($request, true);
+        self::assertSubeYonetimi($user);
+
+        $body = $request->getJsonBody();
+        $kod = trim((string) ($body['kod'] ?? ''));
+        $ad = trim((string) ($body['ad'] ?? ''));
+        $durum = strtoupper(trim((string) ($body['durum'] ?? 'AKTIF')));
+        $departmanIds = self::parseDepartmanIds(isset($body['departman_ids']) ? $body['departman_ids'] : []);
+
+        if ($kod === '') {
+            JsonResponse::badRequest('Sube kodu zorunludur.', 'VALIDATION_ERROR', 'kod');
+        }
+        if ($ad === '') {
+            JsonResponse::badRequest('Sube adi zorunludur.', 'VALIDATION_ERROR', 'ad');
+        }
+        if ($durum !== 'AKTIF' && $durum !== 'PASIF') {
+            JsonResponse::badRequest('Gecersiz durum.', 'VALIDATION_ERROR', 'durum');
+        }
+
+        try {
+            $pdo = Connection::get();
+        } catch (\Throwable $e) {
+            JsonResponse::serverError('Veritabani baglantisi kurulamadi.');
+        }
+
+        self::assertDepartmanIdsExist($pdo, $departmanIds);
+        self::assertSubeKodUnique($pdo, $kod);
+        self::assertSubeAdUnique($pdo, $ad);
+
+        $pdo->beginTransaction();
+        try {
+            $stmt = $pdo->prepare(
+                'INSERT INTO subeler (kod, ad, durum) VALUES (:kod, :ad, :durum)'
+            );
+            $stmt->execute([
+                'kod' => $kod,
+                'ad' => $ad,
+                'durum' => $durum,
+            ]);
+            $subeId = (int) $pdo->lastInsertId();
+            self::replaceSubeDepartmanlar($pdo, $subeId, $departmanIds);
+            $pdo->commit();
+        } catch (\Throwable $e) {
+            $pdo->rollBack();
+            JsonResponse::serverError('Sube kaydi olusturulamadi.');
+        }
+
+        $created = self::findSubeItemById($pdo, $subeId);
+        if ($created === null) {
+            JsonResponse::serverError('Sube kaydi olusturulamadi.');
+        }
+
+        JsonResponse::success($created);
+    }
+
+    public static function subeGuncelle(Request $request, $subeId)
+    {
+        $user = AuthMiddleware::authenticate($request, true);
+        self::assertSubeYonetimi($user);
+
+        $subeId = (int) $subeId;
+        if ($subeId <= 0) {
+            JsonResponse::badRequest('Gecersiz sube id.', 'VALIDATION_ERROR', 'id');
+        }
+
+        try {
+            $pdo = Connection::get();
+        } catch (\Throwable $e) {
+            JsonResponse::serverError('Veritabani baglantisi kurulamadi.');
+        }
+
+        $existing = self::findSubeRowById($pdo, $subeId);
+        if ($existing === null) {
+            JsonResponse::notFound('Sube bulunamadi.');
+        }
+
+        $body = $request->getJsonBody();
+        $kod = array_key_exists('kod', $body)
+            ? trim((string) $body['kod'])
+            : (string) $existing['kod'];
+        $ad = array_key_exists('ad', $body)
+            ? trim((string) $body['ad'])
+            : (string) $existing['ad'];
+        $durum = array_key_exists('durum', $body)
+            ? strtoupper(trim((string) $body['durum']))
+            : (string) $existing['durum'];
+        $departmanIds = array_key_exists('departman_ids', $body)
+            ? self::parseDepartmanIds($body['departman_ids'])
+            : null;
+
+        if ($kod === '') {
+            JsonResponse::badRequest('Sube kodu zorunludur.', 'VALIDATION_ERROR', 'kod');
+        }
+        if ($ad === '') {
+            JsonResponse::badRequest('Sube adi zorunludur.', 'VALIDATION_ERROR', 'ad');
+        }
+        if ($durum !== 'AKTIF' && $durum !== 'PASIF') {
+            JsonResponse::badRequest('Gecersiz durum.', 'VALIDATION_ERROR', 'durum');
+        }
+
+        if ($departmanIds !== null) {
+            self::assertDepartmanIdsExist($pdo, $departmanIds);
+        }
+        if ($kod !== (string) $existing['kod']) {
+            self::assertSubeKodUnique($pdo, $kod, $subeId);
+        }
+        if ($ad !== (string) $existing['ad']) {
+            self::assertSubeAdUnique($pdo, $ad, $subeId);
+        }
+
+        $pdo->beginTransaction();
+        try {
+            $stmt = $pdo->prepare(
+                'UPDATE subeler SET kod = :kod, ad = :ad, durum = :durum WHERE id = :id'
+            );
+            $stmt->execute([
+                'id' => $subeId,
+                'kod' => $kod,
+                'ad' => $ad,
+                'durum' => $durum,
+            ]);
+
+            if ($departmanIds !== null) {
+                self::replaceSubeDepartmanlar($pdo, $subeId, $departmanIds);
+            }
+
+            $pdo->commit();
+        } catch (\Throwable $e) {
+            $pdo->rollBack();
+            JsonResponse::serverError('Sube kaydi guncellenemedi.');
+        }
+
+        $updated = self::findSubeItemById($pdo, $subeId);
+        if ($updated === null) {
+            JsonResponse::serverError('Sube kaydi guncellenemedi.');
+        }
+
+        JsonResponse::success($updated);
+    }
+
+    public static function subeSil(Request $request, $subeId)
+    {
+        $user = AuthMiddleware::authenticate($request, true);
+        self::assertSubeYonetimi($user);
+
+        $subeId = (int) $subeId;
+        if ($subeId <= 0) {
+            JsonResponse::badRequest('Gecersiz sube id.', 'VALIDATION_ERROR', 'id');
+        }
+
+        try {
+            $pdo = Connection::get();
+        } catch (\Throwable $e) {
+            JsonResponse::serverError('Veritabani baglantisi kurulamadi.');
+        }
+
+        $existing = self::findSubeRowById($pdo, $subeId);
+        if ($existing === null) {
+            JsonResponse::notFound('Sube bulunamadi.');
+        }
+
+        $personelStmt = $pdo->prepare('SELECT COUNT(*) AS total FROM personeller WHERE sube_id = :sube_id');
+        $personelStmt->execute(['sube_id' => $subeId]);
+        $personelCount = (int) ($personelStmt->fetch(PDO::FETCH_ASSOC)['total'] ?? 0);
+        if ($personelCount > 0) {
+            JsonResponse::error(409, 'SUBE_HAS_PERSONEL', self::SUBE_DELETE_BLOCKED_MESSAGE);
+        }
+
+        $pdo->beginTransaction();
+        try {
+            $deleteDepartmanlar = $pdo->prepare('DELETE FROM sube_departmanlar WHERE sube_id = :sube_id');
+            $deleteDepartmanlar->execute(['sube_id' => $subeId]);
+
+            $deleteSube = $pdo->prepare('DELETE FROM subeler WHERE id = :id');
+            $deleteSube->execute(['id' => $subeId]);
+
+            $pdo->commit();
+        } catch (\Throwable $e) {
+            $pdo->rollBack();
+            JsonResponse::serverError('Sube kaydi silinemedi.');
+        }
+
+        JsonResponse::success(['id' => $subeId, 'deleted' => true]);
+    }
+
+    /** @param array<string, mixed> $user */
+    private static function assertSubeListeleme(array $user)
+    {
+        RolePermissions::assertAny($user, [
+            'yonetim-paneli.view',
+            'aylik-ozet.view',
+            'personeller.create',
+            'personeller.update',
+        ]);
+    }
+
+    /** @param array<string, mixed> $user */
+    private static function assertSubeYonetimi(array $user)
+    {
+        RolePermissions::assert($user, 'yonetim-paneli.manage');
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    private static function loadSubeItems(PDO $pdo)
+    {
         $stmt = $pdo->query(
-            'SELECT s.id, s.kod, s.ad, s.durum, GROUP_CONCAT(sd.departman_id) AS departman_ids
+            'SELECT s.id, s.kod, s.ad, s.durum,
+                    GROUP_CONCAT(sd.departman_id ORDER BY sd.departman_id ASC) AS departman_ids,
+                    GROUP_CONCAT(d.ad ORDER BY sd.departman_id ASC) AS departman_adlari
              FROM subeler s
              LEFT JOIN sube_departmanlar sd ON sd.sube_id = s.id
+             LEFT JOIN departmanlar d ON d.id = sd.departman_id
              GROUP BY s.id, s.kod, s.ad, s.durum
              ORDER BY s.id ASC'
         );
         $rows = $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
         $items = [];
         foreach ($rows as $row) {
-            $departmanIds = [];
-            if (!empty($row['departman_ids'])) {
-                foreach (explode(',', (string) $row['departman_ids']) as $id) {
-                    $departmanIds[] = (int) $id;
-                }
-            }
-            $items[] = [
-                'id' => (int) $row['id'],
-                'kod' => (string) $row['kod'],
-                'ad' => (string) $row['ad'],
-                'durum' => (string) $row['durum'],
-                'departman_ids' => $departmanIds,
-                'departman_adlari' => [],
-            ];
+            $items[] = self::mapSubeRow($row);
         }
 
-        JsonResponse::success(['items' => $items]);
+        return $items;
+    }
+
+    /** @param array<string, mixed> $row @return array<string, mixed> */
+    private static function mapSubeRow(array $row)
+    {
+        $departmanIds = [];
+        $departmanAdlari = [];
+        if (!empty($row['departman_ids'])) {
+            foreach (explode(',', (string) $row['departman_ids']) as $id) {
+                $departmanIds[] = (int) $id;
+            }
+        }
+        if (!empty($row['departman_adlari'])) {
+            foreach (explode(',', (string) $row['departman_adlari']) as $ad) {
+                $departmanAdlari[] = (string) $ad;
+            }
+        }
+
+        return [
+            'id' => (int) $row['id'],
+            'kod' => (string) $row['kod'],
+            'ad' => (string) $row['ad'],
+            'durum' => (string) $row['durum'],
+            'departman_ids' => $departmanIds,
+            'departman_adlari' => $departmanAdlari,
+        ];
+    }
+
+    /** @return array<string, mixed>|null */
+    private static function findSubeRowById(PDO $pdo, $subeId)
+    {
+        $stmt = $pdo->prepare('SELECT id, kod, ad, durum FROM subeler WHERE id = :id LIMIT 1');
+        $stmt->execute(['id' => $subeId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        return $row ?: null;
+    }
+
+    /** @return array<string, mixed>|null */
+    private static function findSubeItemById(PDO $pdo, $subeId)
+    {
+        $stmt = $pdo->prepare(
+            'SELECT s.id, s.kod, s.ad, s.durum,
+                    GROUP_CONCAT(sd.departman_id ORDER BY sd.departman_id ASC) AS departman_ids,
+                    GROUP_CONCAT(d.ad ORDER BY sd.departman_id ASC) AS departman_adlari
+             FROM subeler s
+             LEFT JOIN sube_departmanlar sd ON sd.sube_id = s.id
+             LEFT JOIN departmanlar d ON d.id = sd.departman_id
+             WHERE s.id = :id
+             GROUP BY s.id, s.kod, s.ad, s.durum
+             LIMIT 1'
+        );
+        $stmt->execute(['id' => $subeId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$row) {
+            return null;
+        }
+
+        return self::mapSubeRow($row);
+    }
+
+    /** @param mixed $value @return array<int, int> */
+    private static function parseDepartmanIds($value)
+    {
+        if (!is_array($value)) {
+            return [];
+        }
+
+        $ids = [];
+        foreach ($value as $item) {
+            $parsed = (int) $item;
+            if ($parsed > 0) {
+                $ids[] = $parsed;
+            }
+        }
+
+        return array_values(array_unique($ids));
+    }
+
+    /** @param array<int, int> $departmanIds */
+    private static function assertDepartmanIdsExist(PDO $pdo, array $departmanIds)
+    {
+        if (count($departmanIds) === 0) {
+            return;
+        }
+
+        $placeholders = implode(', ', array_fill(0, count($departmanIds), '?'));
+        $stmt = $pdo->prepare("SELECT COUNT(*) AS total FROM departmanlar WHERE id IN ($placeholders)");
+        $stmt->execute($departmanIds);
+        $total = (int) ($stmt->fetch(PDO::FETCH_ASSOC)['total'] ?? 0);
+        if ($total !== count($departmanIds)) {
+            JsonResponse::badRequest('Gecersiz departman secimi.', 'VALIDATION_ERROR', 'departman_ids');
+        }
+    }
+
+    private static function assertSubeKodUnique(PDO $pdo, $kod, $excludeSubeId = null)
+    {
+        $sql = 'SELECT id FROM subeler WHERE kod = :kod';
+        $params = ['kod' => $kod];
+        if ($excludeSubeId !== null) {
+            $sql .= ' AND id <> :exclude_id';
+            $params['exclude_id'] = (int) $excludeSubeId;
+        }
+        $sql .= ' LIMIT 1';
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+        if ($stmt->fetch(PDO::FETCH_ASSOC)) {
+            JsonResponse::error(409, 'DUPLICATE_SUBE_KOD', 'Bu sube kodu zaten kayitli.', 'kod');
+        }
+    }
+
+    private static function assertSubeAdUnique(PDO $pdo, $ad, $excludeSubeId = null)
+    {
+        $sql = 'SELECT id FROM subeler WHERE ad = :ad';
+        $params = ['ad' => $ad];
+        if ($excludeSubeId !== null) {
+            $sql .= ' AND id <> :exclude_id';
+            $params['exclude_id'] = (int) $excludeSubeId;
+        }
+        $sql .= ' LIMIT 1';
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+        if ($stmt->fetch(PDO::FETCH_ASSOC)) {
+            JsonResponse::error(409, 'DUPLICATE_SUBE_AD', 'Bu sube adi zaten kayitli.', 'ad');
+        }
+    }
+
+    /** @param array<int, int> $departmanIds */
+    private static function replaceSubeDepartmanlar(PDO $pdo, $subeId, array $departmanIds)
+    {
+        $delete = $pdo->prepare('DELETE FROM sube_departmanlar WHERE sube_id = :sube_id');
+        $delete->execute(['sube_id' => $subeId]);
+
+        if (count($departmanIds) === 0) {
+            return;
+        }
+
+        $insert = $pdo->prepare(
+            'INSERT INTO sube_departmanlar (sube_id, departman_id) VALUES (:sube_id, :departman_id)'
+        );
+        foreach ($departmanIds as $departmanId) {
+            $insert->execute([
+                'sube_id' => $subeId,
+                'departman_id' => $departmanId,
+            ]);
+        }
     }
 
     public static function aylikOzet(Request $request)

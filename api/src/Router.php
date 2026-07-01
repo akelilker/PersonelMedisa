@@ -65,10 +65,6 @@ class Router
         if ($method === 'POST' && $path === '/yonetim/aylik-ozet/ay-kapat') {
             JsonResponse::methodNotAllowed();
         }
-        if (in_array($method, ['POST', 'PUT', 'DELETE'], true) && preg_match('#^/yonetim/subeler(/(\d+))?$#', $path)) {
-            JsonResponse::methodNotAllowed();
-        }
-
         if ($path === '/personeller' && $method === 'GET') {
             PersonellerController::list($this->request);
         }
@@ -140,6 +136,15 @@ class Router
 
         if ($path === '/yonetim/subeler' && $method === 'GET') {
             YonetimController::subeler($this->request);
+        }
+        if ($path === '/yonetim/subeler' && $method === 'POST') {
+            YonetimController::subeOlustur($this->request);
+        }
+        if ($method === 'PUT' && preg_match('#^/yonetim/subeler/(\d+)$#', $path, $matches)) {
+            YonetimController::subeGuncelle($this->request, $matches[1]);
+        }
+        if ($method === 'DELETE' && preg_match('#^/yonetim/subeler/(\d+)$#', $path, $matches)) {
+            YonetimController::subeSil($this->request, $matches[1]);
         }
         if ($path === '/yonetim/kullanicilar' && $method === 'GET') {
             YonetimController::kullanicilar($this->request);

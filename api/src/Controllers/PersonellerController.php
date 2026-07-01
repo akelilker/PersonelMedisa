@@ -17,6 +17,7 @@ class PersonellerController
     {
         $user = AuthMiddleware::authenticate($request, true);
         $scope = SubeScope::resolveScope($user, $request);
+        $allowedSubeIds = SubeScope::allowedSubeIds($user);
 
         $page = max(1, (int) ($request->getQuery('page', 1) ?: 1));
         $limit = max(1, min(250, (int) ($request->getQuery('limit', 10) ?: 10)));
@@ -24,8 +25,6 @@ class PersonellerController
         $aktiflik = (string) $request->getQuery('aktiflik', 'tum');
         $departmanId = (int) ($request->getQuery('departman_id', 0) ?: 0);
         $personelTipiId = (int) ($request->getQuery('personel_tipi_id', 0) ?: 0);
-
-        $applyScope = $scope !== null && $limit <= 10;
 
         try {
             $pdo = Connection::get();
@@ -36,12 +35,17 @@ class PersonellerController
         $where = ['1=1'];
         $params = [];
 
-        if ($applyScope) {
+        if ($scope !== null) {
             $where[] = 'p.sube_id = :scope_sube_id';
             $params['scope_sube_id'] = $scope;
-        } elseif ($scope !== null) {
-            $where[] = 'p.sube_id = :scope_sube_id';
-            $params['scope_sube_id'] = $scope;
+        } elseif (count($allowedSubeIds) > 0) {
+            $placeholders = [];
+            foreach ($allowedSubeIds as $index => $subeId) {
+                $key = 'allowed_sube_id_' . $index;
+                $placeholders[] = ':' . $key;
+                $params[$key] = $subeId;
+            }
+            $where[] = 'p.sube_id IN (' . implode(', ', $placeholders) . ')';
         }
 
         if ($aktiflik === 'aktif') {

@@ -116,7 +116,7 @@ test.describe("e2e smoke", () => {
     const amirBildirimModal = page.locator(".modal-container").last();
     await expect(amirBildirimModal).toBeVisible();
     await amirBildirimModal.getByLabel("Tarih").fill("2026-04-11");
-    await amirBildirimModal.getByLabel("Personel").selectOption("2");
+    await amirBildirimModal.getByLabel("Personel").selectOption("1");
     await amirBildirimModal
       .getByRole("group", { name: "Kayıt Senaryosu" })
       .getByRole("button", { name: /[İI]zinsiz Gelmedi/i })
@@ -125,7 +125,7 @@ test.describe("e2e smoke", () => {
     await amirBildirimModal.getByRole("button", { name: "Kaydet" }).click();
 
     await expect(page.locator(".bildirimler-list")).toContainText(/[İI]zinsiz Gelmedi/i);
-    await expect(page.locator(".bildirimler-list")).toContainText("Mehmet Kaya");
+    await expect(page.locator(".bildirimler-list")).toContainText("Ayşe Yılmaz");
 
     await page.goto("/personeller");
     await expect(page).toHaveURL(/\/personeller$/);

@@ -1228,6 +1228,36 @@ export async function mockApi(page: Page, role: MockUserRole) {
       bagli_amir_adi: "Demo Amir",
       ucret_tipi_id: 1,
       ucret_tipi_adi: "Aylık"
+    },
+    {
+      id: 5,
+      tc_kimlik_no: "56789012345",
+      ad: "Ucuncu",
+      soyad: "Sube",
+      aktif_durum: "AKTIF",
+      sube_id: 99,
+      telefon: "05328889900",
+      dogum_tarihi: "1993-05-20",
+      dogum_yeri: "Antalya",
+      kan_grubu: "A Rh-",
+      sicil_no: "P-005",
+      ise_giris_tarihi: "2025-06-01",
+      acil_durum_kisi: "Acil Kisi",
+      acil_durum_telefon: "05321112233",
+      departman_id: 6,
+      gorev_id: 2,
+      personel_tipi_id: 1,
+      bagli_amir_id: 10,
+      sube_adi: "Pasif Şube",
+      departman_adi: "Depo",
+      gorev_adi: "Uretim Müdürü",
+      personel_tipi_adi: "Tam Zamanlı",
+      bagli_amir_adi: "İkinci Amir",
+      ucret_tipi_id: 1,
+      ucret_tipi_adi: "Aylık",
+      maas_tutari: 22000,
+      prim_kurali_id: 8,
+      prim_kurali_adi: "8 No'lu Prim Kuralı"
     }
   ];
 
@@ -1765,7 +1795,7 @@ let bildirimIdCounter = 800;
   let kullaniciIdCounter = 3;
   let subeIdCounter = 2;
   let departmanIdCounter = 12;
-  let personelIdCounter = 4;
+  let personelIdCounter = 5;
 
   function encodePersonelBelgeKaydiSurecMetadata(payload: {
     kayit_tipi: string;
@@ -2174,10 +2204,30 @@ let bildirimIdCounter = 800;
       const personelTipiId = Number.parseInt(url.searchParams.get("personel_tipi_id") ?? "", 10);
       const aktiflik = url.searchParams.get("aktiflik") ?? "tum";
       const subeScope = getRequestSubeScope(request, url);
-      const applyListSubeScope = subeScope !== null && pageLimit <= 10;
+
+      if (subeScope !== null && mockUserSubeIds.length > 0 && !mockUserSubeIds.includes(subeScope)) {
+        await fulfillJson(route, 403, errorBody("FORBIDDEN", PERSONEL_CREATE_SUBE_UNAUTHORIZED_MESSAGE));
+        return;
+      }
+
+      const personelMatchesListScope = (item: (typeof personeller)[number]) => {
+        if (typeof item.sube_id !== "number") {
+          return false;
+        }
+
+        if (subeScope !== null) {
+          return item.sube_id === subeScope;
+        }
+
+        if (mockUserSubeIds.length > 0) {
+          return mockUserSubeIds.includes(item.sube_id);
+        }
+
+        return true;
+      };
 
       const filtered = personeller.filter((item) => {
-        if (applyListSubeScope && item.sube_id !== subeScope) {
+        if (!personelMatchesListScope(item)) {
           return false;
         }
         if (aktiflik === "aktif" && item.aktif_durum !== "AKTIF") {

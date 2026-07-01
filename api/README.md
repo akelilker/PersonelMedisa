@@ -26,7 +26,15 @@ Canli deploy hedefi:
 public_html/personelmedisa/api/
 ```
 
-Frontend `dist/` deploy'undan ayri yuklenmelidir. Mevcut GitHub Actions workflow yalnizca frontend `dist/` gonderir.
+GitHub Actions deploy workflow'u frontend `dist/` ile birlikte PHP API icin yalnizca
+asagidaki runtime yuzeyini gonderir:
+
+- `api/.htaccess`
+- `api/public/`
+- `api/src/`
+
+`config.local.php`, `migrations/` ve `seeds/` workflow tarafindan gonderilmez.
+Migration dosyalari canlida otomatik calistirilmaz.
 
 ## Yapilandirma
 

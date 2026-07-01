@@ -29,6 +29,7 @@ jobs:
     env:
       NODE_VERSION: 24
       LOCAL_DIST_DIR: ./dist/
+      LOCAL_REPO_DIR: ${{ github.workspace }}
       REMOTE_TARGET_DIR: ./public_html/personelmedisa/
     steps:
       - name: Checkout tested commit
@@ -67,6 +68,13 @@ jobs:
         run: |
           test -f dist/.htaccess || (echo "dist/.htaccess missing. SPA routes will 404." && exit 1)
 
+      - name: Validate PHP API deploy files
+        run: |
+          test -f api/.htaccess || (echo "api/.htaccess missing." && exit 1)
+          test -f api/public/index.php || (echo "api/public/index.php missing." && exit 1)
+          test -f api/src/Router.php || (echo "api/src/Router.php missing." && exit 1)
+          test ! -f api/config.local.php || (echo "api/config.local.php must not be committed or deployed from repo." && exit 1)
+
       - name: Validate deploy secrets
         env:
           FTP_SERVER: ${{ secrets.FTP_SERVER }}
@@ -84,13 +92,14 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y lftp
 
-      - name: Upload dist to cPanel public_html/personelmedisa
+      - name: Upload dist and PHP API to cPanel public_html/personelmedisa
         env:
           FTP_SERVER: ${{ secrets.FTP_SERVER }}
           FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
           FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
           FTP_PORT: ${{ secrets.FTP_PORT }}
           LOCAL_DIST_DIR: ${{ env.LOCAL_DIST_DIR }}
+          LOCAL_REPO_DIR: ${{ env.LOCAL_REPO_DIR }}
           REMOTE_TARGET_DIR: ${{ env.REMOTE_TARGET_DIR }}
         run: |
           set -euo pipefail
@@ -120,6 +129,12 @@ jobs:
               cd ${REMOTE_TARGET_DIR%/};
               !echo 'mirror -R basliyor';
               mirror -R --delete --verbose --exclude api/ . .;
+              !echo 'PHP API upload basliyor';
+              lcd ${LOCAL_REPO_DIR};
+              mkdir -p api;
+              put -O api api/.htaccess;
+              mirror -R --verbose api/public api/public;
+              mirror -R --verbose api/src api/src;
               !echo 'upload tamamlandi';
               bye
             "

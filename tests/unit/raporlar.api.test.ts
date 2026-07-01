@@ -225,4 +225,62 @@ describe("raporlar.api", () => {
     });
     expect(result.rows[0]?.alt_tur).toBe("IZINSIZ");
   });
+
+  it("preserves izin report source meta from response", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        createJsonResponse(
+          {
+            data: {
+              items: [
+                {
+                  personel_id: 1,
+                  ad_soyad: "Ayse Yilmaz",
+                  baslangic_tarihi: "2026-04-03",
+                  bitis_tarihi: "2026-04-03",
+                  alt_tur: "YILLIK_IZIN",
+                  ucretli_mi: true,
+                  state: "MUHURLENDI"
+                }
+              ]
+            },
+            meta: {
+              page: 1,
+              limit: 10,
+              total: 1,
+              total_pages: 1,
+              has_next_page: false,
+              kaynak: "SNAPSHOT",
+              muhur_id: 101,
+              donem: "2026-04",
+              effective_sube_id: 1
+            },
+            errors: []
+          },
+          200
+        )
+      )
+    );
+
+    const result = await fetchRapor("izin", {
+      baslangic_tarihi: "2026-04-01",
+      bitis_tarihi: "2026-04-30",
+      page: 1,
+      limit: 10
+    });
+
+    const [url] = (vi.mocked(fetch) as ReturnType<typeof vi.fn>).mock.calls[0] as [string];
+    expect(url).toContain("/api/raporlar/izin");
+    expect(url).toContain("baslangic_tarihi=2026-04-01");
+    expect(url).toContain("bitis_tarihi=2026-04-30");
+    expect(result.reportMeta).toEqual({
+      kaynak: "SNAPSHOT",
+      muhur_id: 101,
+      donem: "2026-04",
+      effective_sube_id: 1
+    });
+    expect(result.rows[0]?.alt_tur).toBe("YILLIK_IZIN");
+    expect(result.rows[0]?.ucretli_mi).toBe(true);
+  });
 });

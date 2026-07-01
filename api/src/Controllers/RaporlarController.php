@@ -50,6 +50,11 @@ class RaporlarController
       return;
     }
 
+    if ($tip === 'izin') {
+      self::showIzin($request, $pdo, $scope);
+      return;
+    }
+
     self::showLegacyReport($pdo, $tip, $scope);
   }
 
@@ -76,6 +81,20 @@ class RaporlarController
       $result = self::fetchDevamsizlikSnapshot($pdo, $resolved, $filters, $scope);
     } else {
       $result = self::fetchDevamsizlikLive($pdo, $filters, $scope, $resolved['donem']);
+    }
+
+    self::sendReportResponse($result['items'], $result['total'], $filters, $resolved, $scope);
+  }
+
+  private static function showIzin(Request $request, PDO $pdo, $scope)
+  {
+    $filters = self::parseReportFilters($request);
+    $resolved = self::resolveReportSource($pdo, $scope, $filters);
+
+    if ($resolved['kaynak'] === 'SNAPSHOT') {
+      $result = self::fetchIzinSnapshot($pdo, $resolved, $filters, $scope);
+    } else {
+      $result = self::fetchIzinLive($pdo, $filters, $scope, $resolved['donem']);
     }
 
     self::sendReportResponse($result['items'], $result['total'], $filters, $resolved, $scope);
@@ -440,6 +459,135 @@ class RaporlarController
     return ['items' => $items, 'total' => $total];
   }
 
+  /**
+   * @param array<string, mixed> $resolved
+   * @param array<string, mixed> $filters
+   * @return array{items: array<int, array<string, mixed>>, total: int}
+   */
+  private static function fetchIzinSnapshot(PDO $pdo, array $resolved, array $filters, $scope)
+  {
+    $where = ['1=1'];
+    $params = [];
+
+    if ($filters['muhur_id'] !== null) {
+      $where[] = 'snap.muhur_id = :muhur_id';
+      $params['muhur_id'] = (int) $filters['muhur_id'];
+    } else {
+      $where[] = 'm.donem = :donem';
+      $params['donem'] = (string) $resolved['donem'];
+      if ($scope !== null) {
+        $where[] = 'm.sube_id = :scope_sube_id';
+        $params['scope_sube_id'] = $scope;
+      }
+    }
+
+    self::appendPersonelFilters($where, $params, $filters, 'p');
+    self::appendSnapshotDateFilters($where, $params, $filters);
+    self::appendIzinFilter($where, 'snap');
+
+    $whereSql = implode(' AND ', $where);
+    $fromSql = '
+      FROM puantaj_aylik_muhur_satirlari snap
+      INNER JOIN puantaj_aylik_muhurleri m ON m.id = snap.muhur_id
+      INNER JOIN personeller p ON p.id = snap.personel_id
+      LEFT JOIN subeler s ON s.id = p.sube_id
+      LEFT JOIN departmanlar d ON d.id = p.departman_id
+      WHERE ' . $whereSql;
+
+    $total = self::countDevamsizlikRows($pdo, $fromSql, $params);
+    $offset = ($filters['page'] - 1) * $filters['limit'];
+
+    $sql = '
+      SELECT
+        p.id AS personel_id,
+        CONCAT(p.ad, \' \', p.soyad) AS ad_soyad,
+        snap.tarih AS baslangic_tarihi,
+        snap.tarih AS bitis_tarihi,
+        CASE snap.dayanak
+          WHEN \'Yillik_Izin\' THEN \'YILLIK_IZIN\'
+          WHEN \'Ucretli_Izinli\' THEN \'UCRETLI_IZIN\'
+        END AS alt_tur,
+        1 AS ucretli_mi,
+        \'MUHURLENDI\' AS state
+      ' . $fromSql . '
+      ORDER BY snap.tarih ASC, p.id ASC
+      LIMIT :limit OFFSET :offset
+    ';
+
+    $stmt = $pdo->prepare($sql);
+    self::bindParams($stmt, $params);
+    $stmt->bindValue(':limit', $filters['limit'], PDO::PARAM_INT);
+    $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+    $stmt->execute();
+
+    $items = [];
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+      $items[] = self::mapIzinRow($row);
+    }
+
+    return ['items' => $items, 'total' => $total];
+  }
+
+  /**
+   * @param array<string, mixed> $filters
+   * @return array{items: array<int, array<string, mixed>>, total: int}
+   */
+  private static function fetchIzinLive(PDO $pdo, array $filters, $scope, $donem)
+  {
+    $where = ['1=1'];
+    $params = [];
+
+    if ($scope !== null) {
+      $where[] = 'p.sube_id = :scope_sube_id';
+      $params['scope_sube_id'] = $scope;
+    }
+
+    self::appendPersonelFilters($where, $params, $filters, 'p');
+    self::appendLiveDateFilters($where, $params, $filters, $donem, 'gp.tarih');
+    self::appendIzinFilter($where, 'gp');
+
+    $whereSql = implode(' AND ', $where);
+    $fromSql = '
+      FROM gunluk_puantaj gp
+      INNER JOIN personeller p ON p.id = gp.personel_id
+      LEFT JOIN subeler s ON s.id = p.sube_id
+      LEFT JOIN departmanlar d ON d.id = p.departman_id
+      WHERE ' . $whereSql;
+
+    $total = self::countDevamsizlikRows($pdo, $fromSql, $params);
+    $offset = ($filters['page'] - 1) * $filters['limit'];
+
+    $sql = '
+      SELECT
+        p.id AS personel_id,
+        CONCAT(p.ad, \' \', p.soyad) AS ad_soyad,
+        gp.tarih AS baslangic_tarihi,
+        gp.tarih AS bitis_tarihi,
+        CASE gp.dayanak
+          WHEN \'Yillik_Izin\' THEN \'YILLIK_IZIN\'
+          WHEN \'Ucretli_Izinli\' THEN \'UCRETLI_IZIN\'
+        END AS alt_tur,
+        1 AS ucretli_mi,
+        COALESCE(gp.state, \'ACIK\') AS state
+      ' . $fromSql . '
+      ORDER BY gp.tarih ASC, p.id ASC
+      LIMIT :limit OFFSET :offset
+    ';
+
+    $stmt = $pdo->prepare($sql);
+    self::bindParams($stmt, $params);
+    $stmt->bindValue(':limit', $filters['limit'], PDO::PARAM_INT);
+    $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+    $stmt->execute();
+
+    $items = [];
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+      $items[] = self::mapIzinRow($row);
+    }
+
+    return ['items' => $items, 'total' => $total];
+  }
+
   private static function showLegacyReport(PDO $pdo, $tip, $scope)
   {
     $where = ['1=1'];
@@ -533,6 +681,13 @@ class RaporlarController
     }
 
     return '';
+  }
+
+  /** @param array<int, string> $where */
+  private static function appendIzinFilter(array &$where, $alias)
+  {
+    $where[] = $alias . ".hareket_durumu = 'Gelmedi'";
+    $where[] = $alias . ".dayanak IN ('Yillik_Izin', 'Ucretli_Izinli')";
   }
 
   /** @param array<int, string> $where */
@@ -676,6 +831,20 @@ class RaporlarController
       'net_calisma_dakika' => (int) $row['net_calisma_dakika'],
       'sgk_prim_gun' => min(30, (int) $row['sgk_prim_gun']),
       'toplam_calisma_gunu' => (int) $row['toplam_calisma_gunu'],
+    ];
+  }
+
+  /** @param array<string, mixed> $row @return array<string, mixed> */
+  private static function mapIzinRow(array $row)
+  {
+    return [
+      'personel_id' => (int) $row['personel_id'],
+      'ad_soyad' => (string) $row['ad_soyad'],
+      'baslangic_tarihi' => (string) $row['baslangic_tarihi'],
+      'bitis_tarihi' => (string) $row['bitis_tarihi'],
+      'alt_tur' => (string) $row['alt_tur'],
+      'ucretli_mi' => (bool) ((int) ($row['ucretli_mi'] ?? 0)),
+      'state' => (string) $row['state'],
     ];
   }
 

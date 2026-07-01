@@ -22,6 +22,9 @@ class RaporlarController
     'izin' => 'izin',
     'bildirim' => 'bildirim',
     'is-kazasi' => 'is-kazasi',
+    'tesvik' => 'tesvik',
+    'ceza' => 'ceza',
+    'ekstra-prim' => 'ekstra-prim',
   ];
 
   public static function show(Request $request, $tip)
@@ -63,6 +66,11 @@ class RaporlarController
 
     if ($tip === 'bildirim') {
       self::showBildirim($request, $pdo, $scope);
+      return;
+    }
+
+    if ($tip === 'tesvik' || $tip === 'ceza' || $tip === 'ekstra-prim') {
+      self::showFinansRapor($request, $pdo, $scope, $tip);
       return;
     }
 
@@ -134,6 +142,16 @@ class RaporlarController
     } else {
       $result = self::fetchBildirimLive($pdo, $filters, $scope, $resolved['donem']);
     }
+
+    self::sendReportResponse($result['items'], $result['total'], $filters, $resolved, $scope);
+  }
+
+  private static function showFinansRapor(Request $request, PDO $pdo, $scope, $tip)
+  {
+    EkOdemeKesintiController::assertFinansTableReady($pdo);
+    $filters = self::parseFinansReportFilters($request);
+    $result = self::fetchFinansKalemReport($pdo, $tip, $filters, $scope);
+    $resolved = self::buildFinansResolvedMeta($filters);
 
     self::sendReportResponse($result['items'], $result['total'], $filters, $resolved, $scope);
   }
@@ -808,6 +826,244 @@ class RaporlarController
     }
 
     return ['items' => $items, 'total' => $total];
+  }
+
+  /** @return array<string, mixed> */
+  private static function parseFinansReportFilters(Request $request)
+  {
+    $filters = self::parseReportFilters($request);
+    $donemQuery = trim((string) $request->getQuery('donem', ''));
+    if ($donemQuery !== '') {
+      if (!preg_match('/^\d{4}-\d{2}$/', $donemQuery)) {
+        JsonResponse::badRequest('Gecersiz donem.', 'VALIDATION_ERROR', 'donem');
+      }
+      $filters['donem_query'] = $donemQuery;
+    } else {
+      $filters['donem_query'] = null;
+    }
+
+    return $filters;
+  }
+
+  /** @param array<string, mixed> $filters @return array{kaynak: string, muhur_id: null, donem: string|null} */
+  private static function buildFinansResolvedMeta(array $filters)
+  {
+    $donem = null;
+    if ($filters['donem_query'] !== null) {
+      $donem = (string) $filters['donem_query'];
+    } elseif ($filters['baslangic_tarihi'] !== null && $filters['bitis_tarihi'] !== null) {
+      $startMonth = substr((string) $filters['baslangic_tarihi'], 0, 7);
+      $endMonth = substr((string) $filters['bitis_tarihi'], 0, 7);
+      if ($startMonth === $endMonth) {
+        $donem = $startMonth;
+      }
+    }
+
+    return [
+      'kaynak' => 'FINANS',
+      'muhur_id' => null,
+      'donem' => $donem,
+    ];
+  }
+
+  /** @return array<int, string> */
+  private static function getFinansKalemSet($tip)
+  {
+    if ($tip === 'tesvik') {
+      return ['PRIM', 'BONUS', 'IKRAMIYE', 'TESVIK'];
+    }
+
+    if ($tip === 'ceza') {
+      return ['CEZA'];
+    }
+
+    if ($tip === 'ekstra-prim') {
+      return ['EKSTRA_PRIM'];
+    }
+
+    JsonResponse::badRequest('Desteklenmeyen finans rapor tipi.', 'UNSUPPORTED_REPORT');
+  }
+
+  /**
+   * @param array<string, mixed> $filters
+   * @return array{items: array<int, array<string, mixed>>, total: int}
+   */
+  private static function fetchFinansKalemReport(PDO $pdo, $tip, array $filters, $scope)
+  {
+    $kalemSet = self::getFinansKalemSet($tip);
+    $where = ["fk.state = 'AKTIF'"];
+    $params = [];
+
+    if ($scope !== null) {
+      $where[] = 'p.sube_id = :scope_sube_id';
+      $params['scope_sube_id'] = $scope;
+    }
+
+    self::appendPersonelFilters($where, $params, $filters, 'p');
+    self::appendFinansDonemFilters($where, $params, $filters, 'fk');
+    self::appendFinansKalemFilter($where, $params, $kalemSet);
+
+    $whereSql = implode(' AND ', $where);
+    $fromSql = '
+      FROM ek_odeme_kesinti fk
+      INNER JOIN personeller p ON p.id = fk.personel_id
+      WHERE ' . $whereSql;
+
+    if ($tip === 'tesvik') {
+      return self::fetchTesvikFinansReport($pdo, $fromSql, $params, $filters);
+    }
+
+    return self::fetchLineFinansReport($pdo, $fromSql, $params, $filters, $tip);
+  }
+
+  /**
+   * @param array<string, mixed> $params
+   * @param array<string, mixed> $filters
+   * @return array{items: array<int, array<string, mixed>>, total: int}
+   */
+  private static function fetchTesvikFinansReport(PDO $pdo, $fromSql, array $params, array $filters)
+  {
+    $countSql = 'SELECT COUNT(*) AS total FROM (SELECT fk.personel_id, fk.donem ' . $fromSql . ' GROUP BY fk.personel_id, fk.donem) grouped';
+    $countStmt = $pdo->prepare($countSql);
+    self::bindParams($countStmt, $params);
+    $countStmt->execute();
+    $total = (int) ($countStmt->fetch(PDO::FETCH_ASSOC)['total'] ?? 0);
+
+    $offset = ($filters['page'] - 1) * $filters['limit'];
+    $sql = '
+      SELECT
+        p.id AS personel_id,
+        CONCAT(p.ad, \' \', p.soyad) AS ad_soyad,
+        fk.donem,
+        COALESCE(MAX(fk.gun_sayisi), 0) AS gun_sayisi,
+        SUM(fk.tutar) AS toplam_tutar,
+        \'AKTIF\' AS state
+      ' . $fromSql . '
+      GROUP BY p.id, p.ad, p.soyad, fk.donem
+      ORDER BY fk.donem ASC, p.id ASC
+      LIMIT :limit OFFSET :offset
+    ';
+    $stmt = $pdo->prepare($sql);
+    self::bindParams($stmt, $params);
+    $stmt->bindValue(':limit', $filters['limit'], PDO::PARAM_INT);
+    $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+    $stmt->execute();
+
+    $items = [];
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+      $items[] = self::mapTesvikFinansRow($row);
+    }
+
+    return ['items' => $items, 'total' => $total];
+  }
+
+  /**
+   * @param array<string, mixed> $params
+   * @param array<string, mixed> $filters
+   * @return array{items: array<int, array<string, mixed>>, total: int}
+   */
+  private static function fetchLineFinansReport(PDO $pdo, $fromSql, array $params, array $filters, $tip)
+  {
+    $total = self::countDevamsizlikRows($pdo, $fromSql, $params);
+    $offset = ($filters['page'] - 1) * $filters['limit'];
+
+    $sql = '
+      SELECT
+        p.id AS personel_id,
+        CONCAT(p.ad, \' \', p.soyad) AS ad_soyad,
+        fk.donem,
+        fk.tutar,
+        fk.aciklama,
+        fk.state
+      ' . $fromSql . '
+      ORDER BY fk.donem ASC, p.id ASC, fk.id ASC
+      LIMIT :limit OFFSET :offset
+    ';
+    $stmt = $pdo->prepare($sql);
+    self::bindParams($stmt, $params);
+    $stmt->bindValue(':limit', $filters['limit'], PDO::PARAM_INT);
+    $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+    $stmt->execute();
+
+    $items = [];
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+      if ($tip === 'ceza') {
+        $items[] = self::mapCezaFinansRow($row);
+      } else {
+        $items[] = self::mapEkstraPrimFinansRow($row);
+      }
+    }
+
+    return ['items' => $items, 'total' => $total];
+  }
+
+  /** @param array<int, string> $where @param array<string, mixed> $params @param array<int, string> $kalemSet */
+  private static function appendFinansKalemFilter(array &$where, array &$params, array $kalemSet)
+  {
+    $parts = [];
+    foreach ($kalemSet as $index => $kalem) {
+      $key = 'finans_kalem_' . $index;
+      $parts[] = ':' . $key;
+      $params[$key] = $kalem;
+    }
+
+    $where[] = 'fk.kalem_turu IN (' . implode(', ', $parts) . ')';
+  }
+
+  /** @param array<int, string> $where @param array<string, mixed> $params @param array<string, mixed> $filters */
+  private static function appendFinansDonemFilters(array &$where, array &$params, array $filters, $alias)
+  {
+    if ($filters['donem_query'] !== null) {
+      $where[] = $alias . '.donem = :finans_donem';
+      $params['finans_donem'] = $filters['donem_query'];
+
+      return;
+    }
+
+    if ($filters['baslangic_tarihi'] !== null && $filters['bitis_tarihi'] !== null) {
+      $startMonth = substr((string) $filters['baslangic_tarihi'], 0, 7);
+      $endMonth = substr((string) $filters['bitis_tarihi'], 0, 7);
+      if ($startMonth === $endMonth) {
+        $where[] = $alias . '.donem = :finans_donem';
+        $params['finans_donem'] = $startMonth;
+      } else {
+        $where[] = $alias . '.donem BETWEEN :finans_donem_bas AND :finans_donem_bit';
+        $params['finans_donem_bas'] = $startMonth;
+        $params['finans_donem_bit'] = $endMonth;
+      }
+    }
+  }
+
+  /** @param array<string, mixed> $row @return array<string, mixed> */
+  private static function mapTesvikFinansRow(array $row)
+  {
+    return [
+      'personel_id' => (int) $row['personel_id'],
+      'ad_soyad' => (string) $row['ad_soyad'],
+      'donem' => (string) $row['donem'],
+      'gun_sayisi' => (int) $row['gun_sayisi'],
+      'toplam_tutar' => (float) $row['toplam_tutar'],
+      'state' => (string) $row['state'],
+    ];
+  }
+
+  /** @param array<string, mixed> $row @return array<string, mixed> */
+  private static function mapCezaFinansRow(array $row)
+  {
+    return [
+      'personel_id' => (int) $row['personel_id'],
+      'ad_soyad' => (string) $row['ad_soyad'],
+      'donem' => (string) $row['donem'],
+      'tutar' => (float) $row['tutar'],
+      'aciklama' => $row['aciklama'] !== null ? (string) $row['aciklama'] : '',
+      'state' => (string) $row['state'],
+    ];
+  }
+
+  /** @param array<string, mixed> $row @return array<string, mixed> */
+  private static function mapEkstraPrimFinansRow(array $row)
+  {
+    return self::mapCezaFinansRow($row);
   }
 
   private static function showLegacyReport(PDO $pdo, $tip, $scope)

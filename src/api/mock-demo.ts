@@ -1846,7 +1846,7 @@ function formatAylikIslemTimestamp() {
 }
 
 function isTesvikKalemi(kalemTuru: string | undefined) {
-  return ["PRIM", "BONUS", "IKRAMIYE", "EKSTRA_PRIM"].includes((kalemTuru ?? "").toUpperCase());
+  return ["PRIM", "BONUS", "IKRAMIYE", "TESVIK"].includes((kalemTuru ?? "").toUpperCase());
 }
 
 function isCezaKalemi(kalemTuru: string | undefined) {

@@ -115,6 +115,36 @@ async function runIsKazasiReport(page: Page) {
   return resultCard;
 }
 
+async function runTesvikReport(page: Page) {
+  await page.locator('[name="rapor-turu"]').selectOption("tesvik");
+  await page.locator('[name="rapor-bas"]').fill("2026-04-01");
+  await page.locator('[name="rapor-bitis"]').fill("2026-04-30");
+  await page.getByTestId("raporlar-submit-run").click();
+  const resultCard = page.getByTestId("raporlar-resmi-sonuc");
+  await expect(resultCard).toBeVisible();
+  return resultCard;
+}
+
+async function runCezaReport(page: Page) {
+  await page.locator('[name="rapor-turu"]').selectOption("ceza");
+  await page.locator('[name="rapor-bas"]').fill("2026-04-01");
+  await page.locator('[name="rapor-bitis"]').fill("2026-04-30");
+  await page.getByTestId("raporlar-submit-run").click();
+  const resultCard = page.getByTestId("raporlar-resmi-sonuc");
+  await expect(resultCard).toBeVisible();
+  return resultCard;
+}
+
+async function runEkstraPrimReport(page: Page) {
+  await page.locator('[name="rapor-turu"]').selectOption("ekstra-prim");
+  await page.locator('[name="rapor-bas"]').fill("2026-04-01");
+  await page.locator('[name="rapor-bitis"]').fill("2026-04-30");
+  await page.getByTestId("raporlar-submit-run").click();
+  const resultCard = page.getByTestId("raporlar-resmi-sonuc");
+  await expect(resultCard).toBeVisible();
+  return resultCard;
+}
+
 async function runDevamsizlikReport(page: Page) {
   await page.locator('[name="rapor-turu"]').selectOption("devamsizlik");
   await page.locator('[name="rapor-bas"]').fill("2026-04-01");
@@ -307,6 +337,75 @@ test.describe("puantaj rapor sube scope", () => {
     await expect(page).toHaveURL(/\/raporlar$/);
 
     const switchedResult = await runIsKazasiReport(page);
+    await expect(switchedResult.locator("tbody")).toContainText("Mehmet Kaya");
+    await expect(switchedResult.locator("tbody")).not.toContainText("Ayşe Yılmaz");
+
+    expect(pageErrors).toEqual([]);
+  });
+
+  test("tesvik raporu active sube scope ile satirlari daraltir", async ({ page }) => {
+    const pageErrors = trackPageErrors(page);
+
+    await mockApi(page, "MUHASEBE");
+    await login(page, ROLE_LOGIN.MUHASEBE);
+    await page.goto("/raporlar");
+    await expect(page).toHaveURL(/\/raporlar$/);
+
+    const initialResult = await runTesvikReport(page);
+    await expect(initialResult.locator("tbody")).toContainText("Ayşe Yılmaz");
+    await expect(initialResult.locator("tbody")).not.toContainText("Mehmet Kaya");
+
+    await switchActiveSubeViaSession(page, 2);
+    await page.goto("/raporlar");
+    await expect(page).toHaveURL(/\/raporlar$/);
+
+    const switchedResult = await runTesvikReport(page);
+    await expect(switchedResult.locator("tbody")).toContainText("Mehmet Kaya");
+    await expect(switchedResult.locator("tbody")).not.toContainText("Ayşe Yılmaz");
+
+    expect(pageErrors).toEqual([]);
+  });
+
+  test("ceza raporu active sube scope ile satirlari daraltir", async ({ page }) => {
+    const pageErrors = trackPageErrors(page);
+
+    await mockApi(page, "MUHASEBE");
+    await login(page, ROLE_LOGIN.MUHASEBE);
+    await page.goto("/raporlar");
+    await expect(page).toHaveURL(/\/raporlar$/);
+
+    const initialResult = await runCezaReport(page);
+    await expect(initialResult.locator("tbody")).toContainText("Ayşe Yılmaz");
+    await expect(initialResult.locator("tbody")).not.toContainText("Mehmet Kaya");
+
+    await switchActiveSubeViaSession(page, 2);
+    await page.goto("/raporlar");
+    await expect(page).toHaveURL(/\/raporlar$/);
+
+    const switchedResult = await runCezaReport(page);
+    await expect(switchedResult.locator("tbody")).toContainText("Mehmet Kaya");
+    await expect(switchedResult.locator("tbody")).not.toContainText("Ayşe Yılmaz");
+
+    expect(pageErrors).toEqual([]);
+  });
+
+  test("ekstra-prim raporu active sube scope ile satirlari daraltir", async ({ page }) => {
+    const pageErrors = trackPageErrors(page);
+
+    await mockApi(page, "MUHASEBE");
+    await login(page, ROLE_LOGIN.MUHASEBE);
+    await page.goto("/raporlar");
+    await expect(page).toHaveURL(/\/raporlar$/);
+
+    const initialResult = await runEkstraPrimReport(page);
+    await expect(initialResult.locator("tbody")).toContainText("Ayşe Yılmaz");
+    await expect(initialResult.locator("tbody")).not.toContainText("Mehmet Kaya");
+
+    await switchActiveSubeViaSession(page, 2);
+    await page.goto("/raporlar");
+    await expect(page).toHaveURL(/\/raporlar$/);
+
+    const switchedResult = await runEkstraPrimReport(page);
     await expect(switchedResult.locator("tbody")).toContainText("Mehmet Kaya");
     await expect(switchedResult.locator("tbody")).not.toContainText("Ayşe Yılmaz");
 

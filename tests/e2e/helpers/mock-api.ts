@@ -601,6 +601,291 @@ function bildirimPaginatedBody(
   });
 }
 
+const TESVIK_PAGINATED_ITEMS: Record<string, unknown>[] = [
+  {
+    personel_id: 1,
+    ad_soyad: "Ayşe Yılmaz",
+    departman_id: 3,
+    donem: "2026-04",
+    gun_sayisi: 22,
+    toplam_tutar: 1500,
+    state: "AKTIF"
+  },
+  {
+    personel_id: 2,
+    ad_soyad: "Mehmet Kaya",
+    departman_id: 4,
+    donem: "2026-04",
+    gun_sayisi: 20,
+    toplam_tutar: 900,
+    state: "AKTIF"
+  }
+];
+
+function tesvikPaginatedBody(
+  pageNumber: number,
+  pageLimit: number,
+  departmanId?: number,
+  subeScope: number | null = null,
+  options?: {
+    personelId?: number;
+    baslangicTarihi?: string | null;
+    bitisTarihi?: string | null;
+  }
+) {
+  let scopedItems = TESVIK_PAGINATED_ITEMS;
+  if (subeScope !== null) {
+    scopedItems = scopedItems.filter((item) => {
+      const personelId = item.personel_id;
+      return typeof personelId === "number" && PERSONEL_SUBE_BY_ID[personelId] === subeScope;
+    });
+  }
+
+  let filtered =
+    departmanId === undefined
+      ? scopedItems
+      : scopedItems.filter((item) => item.departman_id === departmanId);
+
+  if (options?.personelId !== undefined) {
+    filtered = filtered.filter((item) => item.personel_id === options.personelId);
+  }
+
+  if (
+    departmanId === undefined &&
+    subeScope === null &&
+    options?.personelId === undefined &&
+    !options?.baslangicTarihi &&
+    !options?.bitisTarihi
+  ) {
+    const items = [TESVIK_PAGINATED_ITEMS[0]];
+    return raporListOkBody(items, {
+      page: 1,
+      limit: pageLimit,
+      total: 1,
+      total_pages: 1,
+      has_next_page: false,
+      has_prev_page: false,
+      kaynak: "FINANS",
+      muhur_id: null,
+      donem: null,
+      effective_sube_id: subeScope
+    });
+  }
+
+  const donem =
+    options?.baslangicTarihi && /^\d{4}-\d{2}/.test(options.baslangicTarihi)
+      ? options.baslangicTarihi.slice(0, 7)
+      : null;
+
+  const total = filtered.length;
+  const totalPages = Math.max(1, Math.ceil(total / pageLimit));
+  const start = (pageNumber - 1) * pageLimit;
+  const items = filtered.slice(start, start + pageLimit);
+
+  return raporListOkBody(items, {
+    page: pageNumber,
+    limit: pageLimit,
+    total,
+    total_pages: totalPages,
+    has_next_page: pageNumber < totalPages,
+    has_prev_page: pageNumber > 1,
+    kaynak: "FINANS",
+    muhur_id: null,
+    donem,
+    effective_sube_id: subeScope
+  });
+}
+
+const CEZA_PAGINATED_ITEMS: Record<string, unknown>[] = [
+  {
+    personel_id: 1,
+    ad_soyad: "Ayşe Yılmaz",
+    departman_id: 3,
+    donem: "2026-04",
+    tutar: 500,
+    aciklama: "Gec kalma",
+    state: "AKTIF"
+  },
+  {
+    personel_id: 2,
+    ad_soyad: "Mehmet Kaya",
+    departman_id: 4,
+    donem: "2026-04",
+    tutar: 350,
+    aciklama: "Devamsizlik cezasi",
+    state: "AKTIF"
+  }
+];
+
+function cezaPaginatedBody(
+  pageNumber: number,
+  pageLimit: number,
+  departmanId?: number,
+  subeScope: number | null = null,
+  options?: {
+    personelId?: number;
+    baslangicTarihi?: string | null;
+    bitisTarihi?: string | null;
+  }
+) {
+  let scopedItems = CEZA_PAGINATED_ITEMS;
+  if (subeScope !== null) {
+    scopedItems = scopedItems.filter((item) => {
+      const personelId = item.personel_id;
+      return typeof personelId === "number" && PERSONEL_SUBE_BY_ID[personelId] === subeScope;
+    });
+  }
+
+  let filtered =
+    departmanId === undefined
+      ? scopedItems
+      : scopedItems.filter((item) => item.departman_id === departmanId);
+
+  if (options?.personelId !== undefined) {
+    filtered = filtered.filter((item) => item.personel_id === options.personelId);
+  }
+
+  if (
+    departmanId === undefined &&
+    subeScope === null &&
+    options?.personelId === undefined &&
+    !options?.baslangicTarihi &&
+    !options?.bitisTarihi
+  ) {
+    const items = [CEZA_PAGINATED_ITEMS[0]];
+    return raporListOkBody(items, {
+      page: 1,
+      limit: pageLimit,
+      total: 1,
+      total_pages: 1,
+      has_next_page: false,
+      has_prev_page: false,
+      kaynak: "FINANS",
+      muhur_id: null,
+      donem: null,
+      effective_sube_id: subeScope
+    });
+  }
+
+  const donem =
+    options?.baslangicTarihi && /^\d{4}-\d{2}/.test(options.baslangicTarihi)
+      ? options.baslangicTarihi.slice(0, 7)
+      : null;
+
+  const total = filtered.length;
+  const totalPages = Math.max(1, Math.ceil(total / pageLimit));
+  const start = (pageNumber - 1) * pageLimit;
+  const items = filtered.slice(start, start + pageLimit);
+
+  return raporListOkBody(items, {
+    page: pageNumber,
+    limit: pageLimit,
+    total,
+    total_pages: totalPages,
+    has_next_page: pageNumber < totalPages,
+    has_prev_page: pageNumber > 1,
+    kaynak: "FINANS",
+    muhur_id: null,
+    donem,
+    effective_sube_id: subeScope
+  });
+}
+
+const EKSTRA_PRIM_PAGINATED_ITEMS: Record<string, unknown>[] = [
+  {
+    personel_id: 1,
+    ad_soyad: "Ayşe Yılmaz",
+    departman_id: 3,
+    donem: "2026-04",
+    tutar: 800,
+    aciklama: "Performans primi",
+    state: "AKTIF"
+  },
+  {
+    personel_id: 2,
+    ad_soyad: "Mehmet Kaya",
+    departman_id: 4,
+    donem: "2026-04",
+    tutar: 600,
+    aciklama: "Ekstra prim odeme",
+    state: "AKTIF"
+  }
+];
+
+function ekstraPrimPaginatedBody(
+  pageNumber: number,
+  pageLimit: number,
+  departmanId?: number,
+  subeScope: number | null = null,
+  options?: {
+    personelId?: number;
+    baslangicTarihi?: string | null;
+    bitisTarihi?: string | null;
+  }
+) {
+  let scopedItems = EKSTRA_PRIM_PAGINATED_ITEMS;
+  if (subeScope !== null) {
+    scopedItems = scopedItems.filter((item) => {
+      const personelId = item.personel_id;
+      return typeof personelId === "number" && PERSONEL_SUBE_BY_ID[personelId] === subeScope;
+    });
+  }
+
+  let filtered =
+    departmanId === undefined
+      ? scopedItems
+      : scopedItems.filter((item) => item.departman_id === departmanId);
+
+  if (options?.personelId !== undefined) {
+    filtered = filtered.filter((item) => item.personel_id === options.personelId);
+  }
+
+  if (
+    departmanId === undefined &&
+    subeScope === null &&
+    options?.personelId === undefined &&
+    !options?.baslangicTarihi &&
+    !options?.bitisTarihi
+  ) {
+    const items = [EKSTRA_PRIM_PAGINATED_ITEMS[0]];
+    return raporListOkBody(items, {
+      page: 1,
+      limit: pageLimit,
+      total: 1,
+      total_pages: 1,
+      has_next_page: false,
+      has_prev_page: false,
+      kaynak: "FINANS",
+      muhur_id: null,
+      donem: null,
+      effective_sube_id: subeScope
+    });
+  }
+
+  const donem =
+    options?.baslangicTarihi && /^\d{4}-\d{2}/.test(options.baslangicTarihi)
+      ? options.baslangicTarihi.slice(0, 7)
+      : null;
+
+  const total = filtered.length;
+  const totalPages = Math.max(1, Math.ceil(total / pageLimit));
+  const start = (pageNumber - 1) * pageLimit;
+  const items = filtered.slice(start, start + pageLimit);
+
+  return raporListOkBody(items, {
+    page: pageNumber,
+    limit: pageLimit,
+    total,
+    total_pages: totalPages,
+    has_next_page: pageNumber < totalPages,
+    has_prev_page: pageNumber > 1,
+    kaynak: "FINANS",
+    muhur_id: null,
+    donem,
+    effective_sube_id: subeScope
+  });
+}
+
 const RAPOR_MOCK_ITEMS: Record<string, Record<string, unknown>[]> = {
   "/api/raporlar/personel-ozet": [
     {
@@ -3708,6 +3993,87 @@ let bildirimIdCounter = 800;
               baslangicTarihi,
               bitisTarihi,
               muhurId: Number.isFinite(muhurId) ? muhurId : null
+            }
+          )
+        );
+        return;
+      }
+
+      if (path === "/api/raporlar/tesvik") {
+        const raporUrl = new URL(route.request().url());
+        const pageNumber = Number.parseInt(raporUrl.searchParams.get("page") ?? "1", 10) || 1;
+        const pageLimit = Number.parseInt(raporUrl.searchParams.get("limit") ?? "10", 10) || 10;
+        const departmanId = Number.parseInt(raporUrl.searchParams.get("departman_id") ?? "", 10);
+        const personelId = Number.parseInt(raporUrl.searchParams.get("personel_id") ?? "", 10);
+        const baslangicTarihi = raporUrl.searchParams.get("baslangic_tarihi");
+        const bitisTarihi = raporUrl.searchParams.get("bitis_tarihi");
+
+        await fulfillJson(
+          route,
+          200,
+          tesvikPaginatedBody(
+            pageNumber,
+            pageLimit,
+            Number.isFinite(departmanId) ? departmanId : undefined,
+            subeScope,
+            {
+              personelId: Number.isFinite(personelId) ? personelId : undefined,
+              baslangicTarihi,
+              bitisTarihi
+            }
+          )
+        );
+        return;
+      }
+
+      if (path === "/api/raporlar/ceza") {
+        const raporUrl = new URL(route.request().url());
+        const pageNumber = Number.parseInt(raporUrl.searchParams.get("page") ?? "1", 10) || 1;
+        const pageLimit = Number.parseInt(raporUrl.searchParams.get("limit") ?? "10", 10) || 10;
+        const departmanId = Number.parseInt(raporUrl.searchParams.get("departman_id") ?? "", 10);
+        const personelId = Number.parseInt(raporUrl.searchParams.get("personel_id") ?? "", 10);
+        const baslangicTarihi = raporUrl.searchParams.get("baslangic_tarihi");
+        const bitisTarihi = raporUrl.searchParams.get("bitis_tarihi");
+
+        await fulfillJson(
+          route,
+          200,
+          cezaPaginatedBody(
+            pageNumber,
+            pageLimit,
+            Number.isFinite(departmanId) ? departmanId : undefined,
+            subeScope,
+            {
+              personelId: Number.isFinite(personelId) ? personelId : undefined,
+              baslangicTarihi,
+              bitisTarihi
+            }
+          )
+        );
+        return;
+      }
+
+      if (path === "/api/raporlar/ekstra-prim") {
+        const raporUrl = new URL(route.request().url());
+        const pageNumber = Number.parseInt(raporUrl.searchParams.get("page") ?? "1", 10) || 1;
+        const pageLimit = Number.parseInt(raporUrl.searchParams.get("limit") ?? "10", 10) || 10;
+        const departmanId = Number.parseInt(raporUrl.searchParams.get("departman_id") ?? "", 10);
+        const personelId = Number.parseInt(raporUrl.searchParams.get("personel_id") ?? "", 10);
+        const baslangicTarihi = raporUrl.searchParams.get("baslangic_tarihi");
+        const bitisTarihi = raporUrl.searchParams.get("bitis_tarihi");
+
+        await fulfillJson(
+          route,
+          200,
+          ekstraPrimPaginatedBody(
+            pageNumber,
+            pageLimit,
+            Number.isFinite(departmanId) ? departmanId : undefined,
+            subeScope,
+            {
+              personelId: Number.isFinite(personelId) ? personelId : undefined,
+              baslangicTarihi,
+              bitisTarihi
             }
           )
         );

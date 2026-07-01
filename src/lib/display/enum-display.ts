@@ -104,7 +104,8 @@ const FINANS_KALEM_TURU_LABELS: Record<string, string> = {
   IKRAMIYE: "İkramiye",
   MAAS: "Maaş",
   MESAI: "Mesai",
-  PRIM: "Prim"
+  PRIM: "Prim",
+  TESVIK: "Teşvik"
 };
 
 const COMPLIANCE_LEVEL_LABELS: Record<string, string> = {

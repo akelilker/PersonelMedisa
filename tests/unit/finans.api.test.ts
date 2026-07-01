@@ -93,6 +93,39 @@ describe("finans.api", () => {
     expect(result.id).toBe(90);
   });
 
+  it("fetches finans detail endpoint contract", async () => {
+    const fetchMock = vi.fn(async () =>
+      createJsonResponse(
+        {
+          data: {
+            id: 55,
+            personel_id: 1,
+            donem: "2026-04",
+            kalem_turu: "CEZA",
+            tutar: 500,
+            aciklama: "Gec kalma",
+            state: "AKTIF"
+          },
+          meta: {},
+          errors: []
+        },
+        200
+      )
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await fetch("/api/ek-odeme-kesinti/55");
+    const body = (await response.json()) as {
+      data: { id: number; kalem_turu: string };
+    };
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit | undefined];
+    expect(url).toBe("/api/ek-odeme-kesinti/55");
+    expect(init?.method ?? "GET").toBe("GET");
+    expect(body.data.id).toBe(55);
+    expect(body.data.kalem_turu).toBe("CEZA");
+  });
+
   it("sends update and cancel calls to detail endpoints", async () => {
     const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
       if (url.endsWith("/iptal")) {

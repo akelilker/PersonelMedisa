@@ -7,6 +7,7 @@ namespace Medisa\Api;
 use Medisa\Api\Auth\AuthMiddleware;
 use Medisa\Api\Auth\LoginController;
 use Medisa\Api\Controllers\BildirimlerController;
+use Medisa\Api\Controllers\EkOdemeKesintiController;
 use Medisa\Api\Controllers\PersonelBelgelerController;
 use Medisa\Api\Controllers\PersonellerController;
 use Medisa\Api\Controllers\PuantajController;
@@ -146,6 +147,22 @@ class Router
 
         if ($method === 'GET' && preg_match('#^/gunluk-puantaj/(\d+)/([^/]+)$#', $path, $matches)) {
             PuantajController::detail($this->request, $matches[1], $matches[2]);
+        }
+
+        if ($path === '/ek-odeme-kesinti' && $method === 'GET') {
+            EkOdemeKesintiController::list($this->request);
+        }
+        if ($path === '/ek-odeme-kesinti' && $method === 'POST') {
+            EkOdemeKesintiController::create($this->request);
+        }
+        if ($method === 'GET' && preg_match('#^/ek-odeme-kesinti/(\d+)$#', $path, $matches)) {
+            EkOdemeKesintiController::detail($this->request, $matches[1]);
+        }
+        if ($method === 'PUT' && preg_match('#^/ek-odeme-kesinti/(\d+)$#', $path, $matches)) {
+            EkOdemeKesintiController::update($this->request, $matches[1]);
+        }
+        if ($method === 'POST' && preg_match('#^/ek-odeme-kesinti/(\d+)/iptal$#', $path, $matches)) {
+            EkOdemeKesintiController::cancel($this->request, $matches[1]);
         }
 
         if ($method === 'GET' && preg_match('#^/raporlar/([^/]+)$#', $path, $matches)) {

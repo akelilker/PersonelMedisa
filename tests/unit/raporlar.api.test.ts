@@ -66,17 +66,35 @@ describe("raporlar.api", () => {
     });
   });
 
-  it("wraps object payload into single row for summary-style endpoints", async () => {
+  it("preserves tesvik report FINANS source meta from response", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async () =>
         createJsonResponse(
           {
             data: {
-              toplam_tutar: 12500,
-              donem: "2026-04"
+              items: [
+                {
+                  personel_id: 1,
+                  ad_soyad: "Ayse Yilmaz",
+                  donem: "2026-04",
+                  gun_sayisi: 22,
+                  toplam_tutar: 1500,
+                  state: "AKTIF"
+                }
+              ]
             },
-            meta: {},
+            meta: {
+              page: 1,
+              limit: 10,
+              total: 1,
+              total_pages: 1,
+              has_next_page: false,
+              kaynak: "FINANS",
+              muhur_id: null,
+              donem: "2026-04",
+              effective_sube_id: 1
+            },
             errors: []
           },
           200
@@ -84,14 +102,121 @@ describe("raporlar.api", () => {
       )
     );
 
-    const result = await fetchRapor("tesvik");
-    expect(result.rows).toEqual([
-      {
-        toplam_tutar: 12500,
-        donem: "2026-04"
-      }
-    ]);
-    expect(result.total).toBe(1);
+    const result = await fetchRapor("tesvik", {
+      baslangic_tarihi: "2026-04-01",
+      bitis_tarihi: "2026-04-30",
+      page: 1,
+      limit: 10
+    });
+
+    const [url] = (vi.mocked(fetch) as ReturnType).mock.calls[0] as [string];
+    expect(url).toContain("/api/raporlar/tesvik");
+    expect(result.reportMeta).toEqual({
+      kaynak: "FINANS",
+      muhur_id: null,
+      donem: "2026-04",
+      effective_sube_id: 1
+    });
+    expect(result.rows[0]?.toplam_tutar).toBe(1500);
+  });
+
+  it("preserves ceza report FINANS source meta from response", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        createJsonResponse(
+          {
+            data: {
+              items: [
+                {
+                  personel_id: 1,
+                  ad_soyad: "Ayse Yilmaz",
+                  donem: "2026-04",
+                  tutar: 500,
+                  aciklama: "Gec kalma",
+                  state: "AKTIF"
+                }
+              ]
+            },
+            meta: {
+              page: 1,
+              limit: 10,
+              total: 1,
+              total_pages: 1,
+              has_next_page: false,
+              kaynak: "FINANS",
+              muhur_id: null,
+              donem: "2026-04",
+              effective_sube_id: 1
+            },
+            errors: []
+          },
+          200
+        )
+      )
+    );
+
+    const result = await fetchRapor("ceza", {
+      baslangic_tarihi: "2026-04-01",
+      bitis_tarihi: "2026-04-30",
+      page: 1,
+      limit: 10
+    });
+
+    const [url] = (vi.mocked(fetch) as ReturnType).mock.calls[0] as [string];
+    expect(url).toContain("/api/raporlar/ceza");
+    expect(result.reportMeta?.kaynak).toBe("FINANS");
+    expect(result.reportMeta?.muhur_id).toBeNull();
+    expect(result.rows[0]?.aciklama).toBe("Gec kalma");
+  });
+
+  it("preserves ekstra-prim report FINANS source meta from response", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        createJsonResponse(
+          {
+            data: {
+              items: [
+                {
+                  personel_id: 1,
+                  ad_soyad: "Ayse Yilmaz",
+                  donem: "2026-04",
+                  tutar: 800,
+                  aciklama: "Performans primi",
+                  state: "AKTIF"
+                }
+              ]
+            },
+            meta: {
+              page: 1,
+              limit: 10,
+              total: 1,
+              total_pages: 1,
+              has_next_page: false,
+              kaynak: "FINANS",
+              muhur_id: null,
+              donem: "2026-04",
+              effective_sube_id: 1
+            },
+            errors: []
+          },
+          200
+        )
+      )
+    );
+
+    const result = await fetchRapor("ekstra-prim", {
+      baslangic_tarihi: "2026-04-01",
+      bitis_tarihi: "2026-04-30",
+      page: 1,
+      limit: 10
+    });
+
+    const [url] = (vi.mocked(fetch) as ReturnType).mock.calls[0] as [string];
+    expect(url).toContain("/api/raporlar/ekstra-prim");
+    expect(result.reportMeta?.kaynak).toBe("FINANS");
+    expect(result.rows[0]?.tutar).toBe(800);
   });
 
   it("keeps empty list payloads empty instead of wrapping the response object", async () => {

@@ -138,6 +138,26 @@ test.describe("raporlar detayli liste smoke", () => {
     expect(runtimeErrors).toEqual([]);
   });
 
+  test("devamsizlik raporunda ayni ay tarih araliginda snapshot kaynakli satirlari gosterir", async ({ page }) => {
+    const runtimeErrors: string[] = [];
+    page.on("pageerror", (error) => {
+      runtimeErrors.push(error.message);
+    });
+
+    await page.locator('[name="rapor-turu"]').selectOption("devamsizlik");
+    await page.locator('[name="rapor-bas"]').fill("2026-04-01");
+    await page.locator('[name="rapor-bitis"]').fill("2026-04-30");
+    await page.getByTestId("raporlar-submit-run").click();
+
+    const resultCard = page.getByTestId("raporlar-resmi-sonuc");
+    await expect(resultCard).toBeVisible();
+    await expect(resultCard.locator("tbody")).toContainText("Ayşe Yılmaz");
+    await expect(resultCard.locator("tbody")).toContainText("IZINSIZ");
+    await expect(resultCard.locator("tbody")).toContainText("2026-04-10");
+    await expect(resultCard).not.toContainText("UNSUPPORTED_REPORT");
+    expect(runtimeErrors).toEqual([]);
+  });
+
   test("personel ozet raporunda departman filtresi sonucu daraltir", async ({ page }) => {
     const runtimeErrors: string[] = [];
     page.on("pageerror", (error) => {

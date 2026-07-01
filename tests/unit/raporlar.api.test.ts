@@ -167,4 +167,62 @@ describe("raporlar.api", () => {
     });
     expect(result.rows[0]?.net_calisma_dakika).toBe(960);
   });
+
+  it("preserves devamsizlik report source meta from response", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        createJsonResponse(
+          {
+            data: {
+              items: [
+                {
+                  personel_id: 1,
+                  ad_soyad: "Ayse Yilmaz",
+                  baslangic_tarihi: "2026-04-10",
+                  bitis_tarihi: "2026-04-10",
+                  alt_tur: "IZINSIZ",
+                  state: "MUHURLENDI"
+                }
+              ]
+            },
+            meta: {
+              page: 1,
+              limit: 10,
+              total: 1,
+              total_pages: 1,
+              has_next_page: false,
+              kaynak: "SNAPSHOT",
+              muhur_id: 101,
+              donem: "2026-04",
+              effective_sube_id: 1
+            },
+            errors: []
+          },
+          200
+        )
+      )
+    );
+
+    const result = await fetchRapor("devamsizlik", {
+      baslangic_tarihi: "2026-04-01",
+      bitis_tarihi: "2026-04-30",
+      page: 1,
+      limit: 10
+    });
+
+    const [url] = (vi.mocked(fetch) as ReturnType<typeof vi.fn>).mock.calls[0] as [string];
+    expect(url).toContain("/api/raporlar/devamsizlik");
+    expect(url).toContain("baslangic_tarihi=2026-04-01");
+    expect(url).toContain("bitis_tarihi=2026-04-30");
+    expect(url).toContain("page=1");
+    expect(url).toContain("limit=10");
+    expect(result.reportMeta).toEqual({
+      kaynak: "SNAPSHOT",
+      muhur_id: 101,
+      donem: "2026-04",
+      effective_sube_id: 1
+    });
+    expect(result.rows[0]?.alt_tur).toBe("IZINSIZ");
+  });
 });

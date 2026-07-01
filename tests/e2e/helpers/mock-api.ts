@@ -75,7 +75,7 @@ function deriveRaporDonem(baslangic?: string | null, bitis?: string | null): str
   return baslangicAy;
 }
 
-function resolvePersonelOzetKaynak(
+function resolveReportKaynak(
   baslangic?: string | null,
   bitis?: string | null,
   muhurId?: number | null
@@ -164,7 +164,7 @@ function personelOzetPaginatedBody(
     filtered = filtered.filter((item) => item.personel_id === options.personelId);
   }
 
-  const sourceMeta = resolvePersonelOzetKaynak(
+  const sourceMeta = resolveReportKaynak(
     options?.baslangicTarihi,
     options?.bitisTarihi,
     options?.muhurId
@@ -190,6 +190,103 @@ function personelOzetPaginatedBody(
       kaynak: sourceMeta.kaynak,
       muhur_id: sourceMeta.muhur_id,
       donem: sourceMeta.donem,
+      effective_sube_id: subeScope
+    });
+  }
+
+  const total = filtered.length;
+  const totalPages = Math.max(1, Math.ceil(total / pageLimit));
+  const start = (pageNumber - 1) * pageLimit;
+  const items = filtered.slice(start, start + pageLimit);
+
+  return raporListOkBody(items, {
+    page: pageNumber,
+    limit: pageLimit,
+    total,
+    total_pages: totalPages,
+    has_next_page: pageNumber < totalPages,
+    has_prev_page: pageNumber > 1,
+    kaynak: sourceMeta.kaynak,
+    muhur_id: sourceMeta.muhur_id,
+    donem: sourceMeta.donem,
+    effective_sube_id: subeScope
+  });
+}
+
+const DEVAMSIZLIK_PAGINATED_ITEMS: Record<string, unknown>[] = [
+  {
+    personel_id: 1,
+    ad_soyad: "Ayşe Yılmaz",
+    departman_id: 3,
+    baslangic_tarihi: "2026-04-10",
+    bitis_tarihi: "2026-04-10",
+    alt_tur: "IZINSIZ",
+    state: "MUHURLENDI"
+  },
+  {
+    personel_id: 2,
+    ad_soyad: "Mehmet Kaya",
+    departman_id: 4,
+    baslangic_tarihi: "2026-04-12",
+    bitis_tarihi: "2026-04-12",
+    alt_tur: "IZINSIZ",
+    state: "MUHURLENDI"
+  }
+];
+
+function devamsizlikPaginatedBody(
+  pageNumber: number,
+  pageLimit: number,
+  departmanId?: number,
+  subeScope: number | null = null,
+  options?: {
+    personelId?: number;
+    baslangicTarihi?: string | null;
+    bitisTarihi?: string | null;
+    muhurId?: number | null;
+  }
+) {
+  let scopedItems = DEVAMSIZLIK_PAGINATED_ITEMS;
+  if (subeScope !== null) {
+    scopedItems = scopedItems.filter((item) => {
+      const personelId = item.personel_id;
+      return typeof personelId === "number" && PERSONEL_SUBE_BY_ID[personelId] === subeScope;
+    });
+  }
+
+  let filtered =
+    departmanId === undefined
+      ? scopedItems
+      : scopedItems.filter((item) => item.departman_id === departmanId);
+
+  if (options?.personelId !== undefined) {
+    filtered = filtered.filter((item) => item.personel_id === options.personelId);
+  }
+
+  const sourceMeta = resolveReportKaynak(
+    options?.baslangicTarihi,
+    options?.bitisTarihi,
+    options?.muhurId
+  );
+
+  if (
+    departmanId === undefined &&
+    subeScope === null &&
+    options?.personelId === undefined &&
+    !options?.baslangicTarihi &&
+    !options?.bitisTarihi
+  ) {
+    const items = [DEVAMSIZLIK_PAGINATED_ITEMS[0]];
+    return raporListOkBody(items, {
+      page: 1,
+      limit: pageLimit,
+      total: 1,
+      total_pages: 1,
+      has_next_page: false,
+      has_prev_page: false,
+      kaynak: "LIVE",
+      muhur_id: null,
+      donem: null,
       effective_sube_id: subeScope
     });
   }
@@ -3217,6 +3314,53 @@ let bildirimIdCounter = 800;
           route,
           200,
           personelOzetPaginatedBody(
+            pageNumber,
+            pageLimit,
+            Number.isFinite(departmanId) ? departmanId : undefined,
+            subeScope,
+            {
+              personelId: Number.isFinite(personelId) ? personelId : undefined,
+              baslangicTarihi,
+              bitisTarihi,
+              muhurId: Number.isFinite(muhurId) ? muhurId : null
+            }
+          )
+        );
+        return;
+      }
+
+      if (path === "/api/raporlar/devamsizlik") {
+        const raporUrl = new URL(route.request().url());
+        const pageNumber = Number.parseInt(raporUrl.searchParams.get("page") ?? "1", 10) || 1;
+        const pageLimit = Number.parseInt(raporUrl.searchParams.get("limit") ?? "10", 10) || 10;
+        const departmanId = Number.parseInt(raporUrl.searchParams.get("departman_id") ?? "", 10);
+        const personelId = Number.parseInt(raporUrl.searchParams.get("personel_id") ?? "", 10);
+        const muhurId = Number.parseInt(raporUrl.searchParams.get("muhur_id") ?? "", 10);
+        const baslangicTarihi = raporUrl.searchParams.get("baslangic_tarihi");
+        const bitisTarihi = raporUrl.searchParams.get("bitis_tarihi");
+
+        if (Number.isFinite(muhurId) && muhurId > 0 && subeScope !== null && subeScope !== 2) {
+          await fulfillJson(
+            route,
+            403,
+            errorBody("FORBIDDEN", "Bu kayit aktif sube baglaminda goruntulenemiyor.")
+          );
+          return;
+        }
+
+        if (baslangicTarihi === "2026-13-01") {
+          await fulfillJson(
+            route,
+            400,
+            errorBody("VALIDATION_ERROR", "Gecersiz baslangic tarihi.", "baslangic_tarihi")
+          );
+          return;
+        }
+
+        await fulfillJson(
+          route,
+          200,
+          devamsizlikPaginatedBody(
             pageNumber,
             pageLimit,
             Number.isFinite(departmanId) ? departmanId : undefined,

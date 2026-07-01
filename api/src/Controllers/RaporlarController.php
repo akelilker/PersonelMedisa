@@ -42,6 +42,12 @@ class RaporlarController
 
     if ($tip === 'personel-ozet') {
       self::showPersonelOzet($request, $pdo, $scope);
+      return;
+    }
+
+    if ($tip === 'devamsizlik') {
+      self::showDevamsizlik($request, $pdo, $scope);
+      return;
     }
 
     self::showLegacyReport($pdo, $tip, $scope);
@@ -49,8 +55,8 @@ class RaporlarController
 
   private static function showPersonelOzet(Request $request, PDO $pdo, $scope)
   {
-    $filters = self::parsePersonelOzetFilters($request);
-    $resolved = self::resolvePersonelOzetSource($pdo, $request, $scope, $filters);
+    $filters = self::parseReportFilters($request);
+    $resolved = self::resolveReportSource($pdo, $scope, $filters);
 
     if ($resolved['kaynak'] === 'SNAPSHOT') {
       $result = self::fetchPersonelOzetSnapshot($pdo, $resolved, $filters, $scope);
@@ -58,14 +64,38 @@ class RaporlarController
       $result = self::fetchPersonelOzetLive($pdo, $filters, $scope, $resolved['donem']);
     }
 
-    $totalPages = max(1, (int) ceil($result['total'] / $filters['limit']));
+    self::sendReportResponse($result['items'], $result['total'], $filters, $resolved, $scope);
+  }
+
+  private static function showDevamsizlik(Request $request, PDO $pdo, $scope)
+  {
+    $filters = self::parseReportFilters($request);
+    $resolved = self::resolveReportSource($pdo, $scope, $filters);
+
+    if ($resolved['kaynak'] === 'SNAPSHOT') {
+      $result = self::fetchDevamsizlikSnapshot($pdo, $resolved, $filters, $scope);
+    } else {
+      $result = self::fetchDevamsizlikLive($pdo, $filters, $scope, $resolved['donem']);
+    }
+
+    self::sendReportResponse($result['items'], $result['total'], $filters, $resolved, $scope);
+  }
+
+  /**
+   * @param array<int, array<string, mixed>> $items
+   * @param array<string, mixed> $filters
+   * @param array<string, mixed> $resolved
+   */
+  private static function sendReportResponse(array $items, $total, array $filters, array $resolved, $scope)
+  {
+    $totalPages = max(1, (int) ceil($total / $filters['limit']));
 
     JsonResponse::success(
-      ['items' => $result['items']],
+      ['items' => $items],
       [
         'page' => $filters['page'],
         'limit' => $filters['limit'],
-        'total' => $result['total'],
+        'total' => $total,
         'total_pages' => $totalPages,
         'has_next_page' => $filters['page'] < $totalPages,
         'has_prev_page' => $filters['page'] > 1,
@@ -78,7 +108,7 @@ class RaporlarController
   }
 
   /** @return array<string, mixed> */
-  private static function parsePersonelOzetFilters(Request $request)
+  private static function parseReportFilters(Request $request)
   {
     $page = max(1, (int) ($request->getQuery('page', 1) ?: 1));
     $limit = max(1, min(self::MAX_LIMIT, (int) ($request->getQuery('limit', 10) ?: 10)));
@@ -122,7 +152,7 @@ class RaporlarController
    * @param array<string, mixed> $filters
    * @return array{kaynak: string, muhur_id: int|null, donem: string|null}
    */
-  private static function resolvePersonelOzetSource(PDO $pdo, Request $request, $scope, array $filters)
+  private static function resolveReportSource(PDO $pdo, $scope, array $filters)
   {
     if ($filters['muhur_id'] !== null) {
       $seal = self::findSealById($pdo, (int) $filters['muhur_id']);
@@ -289,6 +319,127 @@ class RaporlarController
     return ['items' => $items, 'total' => $total];
   }
 
+  /**
+   * @param array<string, mixed> $resolved
+   * @param array<string, mixed> $filters
+   * @return array{items: array<int, array<string, mixed>>, total: int}
+   */
+  private static function fetchDevamsizlikSnapshot(PDO $pdo, array $resolved, array $filters, $scope)
+  {
+    $where = ['1=1'];
+    $params = [];
+
+    if ($filters['muhur_id'] !== null) {
+      $where[] = 'snap.muhur_id = :muhur_id';
+      $params['muhur_id'] = (int) $filters['muhur_id'];
+    } else {
+      $where[] = 'm.donem = :donem';
+      $params['donem'] = (string) $resolved['donem'];
+      if ($scope !== null) {
+        $where[] = 'm.sube_id = :scope_sube_id';
+        $params['scope_sube_id'] = $scope;
+      }
+    }
+
+    self::appendPersonelFilters($where, $params, $filters, 'p');
+    self::appendSnapshotDateFilters($where, $params, $filters);
+    self::appendDevamsizlikAbsenceFilter($where, 'snap');
+
+    $whereSql = implode(' AND ', $where);
+    $fromSql = '
+      FROM puantaj_aylik_muhur_satirlari snap
+      INNER JOIN puantaj_aylik_muhurleri m ON m.id = snap.muhur_id
+      INNER JOIN personeller p ON p.id = snap.personel_id
+      LEFT JOIN subeler s ON s.id = p.sube_id
+      LEFT JOIN departmanlar d ON d.id = p.departman_id
+      WHERE ' . $whereSql;
+
+    $total = self::countDevamsizlikRows($pdo, $fromSql, $params);
+    $offset = ($filters['page'] - 1) * $filters['limit'];
+
+    $sql = '
+      SELECT
+        p.id AS personel_id,
+        CONCAT(p.ad, \' \', p.soyad) AS ad_soyad,
+        snap.tarih AS baslangic_tarihi,
+        snap.tarih AS bitis_tarihi,
+        \'IZINSIZ\' AS alt_tur,
+        \'MUHURLENDI\' AS state
+      ' . $fromSql . '
+      ORDER BY snap.tarih ASC, p.id ASC
+      LIMIT :limit OFFSET :offset
+    ';
+
+    $stmt = $pdo->prepare($sql);
+    self::bindParams($stmt, $params);
+    $stmt->bindValue(':limit', $filters['limit'], PDO::PARAM_INT);
+    $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+    $stmt->execute();
+
+    $items = [];
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+      $items[] = self::mapDevamsizlikRow($row);
+    }
+
+    return ['items' => $items, 'total' => $total];
+  }
+
+  /**
+   * @param array<string, mixed> $filters
+   * @return array{items: array<int, array<string, mixed>>, total: int}
+   */
+  private static function fetchDevamsizlikLive(PDO $pdo, array $filters, $scope, $donem)
+  {
+    $where = ['1=1'];
+    $params = [];
+
+    if ($scope !== null) {
+      $where[] = 'p.sube_id = :scope_sube_id';
+      $params['scope_sube_id'] = $scope;
+    }
+
+    self::appendPersonelFilters($where, $params, $filters, 'p');
+    self::appendLiveDateFilters($where, $params, $filters, $donem, 'gp.tarih');
+    self::appendDevamsizlikAbsenceFilter($where, 'gp');
+
+    $whereSql = implode(' AND ', $where);
+    $fromSql = '
+      FROM gunluk_puantaj gp
+      INNER JOIN personeller p ON p.id = gp.personel_id
+      LEFT JOIN subeler s ON s.id = p.sube_id
+      LEFT JOIN departmanlar d ON d.id = p.departman_id
+      WHERE ' . $whereSql;
+
+    $total = self::countDevamsizlikRows($pdo, $fromSql, $params);
+    $offset = ($filters['page'] - 1) * $filters['limit'];
+
+    $sql = '
+      SELECT
+        p.id AS personel_id,
+        CONCAT(p.ad, \' \', p.soyad) AS ad_soyad,
+        gp.tarih AS baslangic_tarihi,
+        gp.tarih AS bitis_tarihi,
+        \'IZINSIZ\' AS alt_tur,
+        COALESCE(gp.state, \'ACIK\') AS state
+      ' . $fromSql . '
+      ORDER BY gp.tarih ASC, p.id ASC
+      LIMIT :limit OFFSET :offset
+    ';
+
+    $stmt = $pdo->prepare($sql);
+    self::bindParams($stmt, $params);
+    $stmt->bindValue(':limit', $filters['limit'], PDO::PARAM_INT);
+    $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+    $stmt->execute();
+
+    $items = [];
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+      $items[] = self::mapDevamsizlikRow($row);
+    }
+
+    return ['items' => $items, 'total' => $total];
+  }
+
   private static function showLegacyReport(PDO $pdo, $tip, $scope)
   {
     $where = ['1=1'];
@@ -382,6 +533,45 @@ class RaporlarController
     }
 
     return '';
+  }
+
+  /** @param array<int, string> $where */
+  private static function appendDevamsizlikAbsenceFilter(array &$where, $alias)
+  {
+    $where[] = $alias . ".hareket_durumu = 'Gelmedi'";
+    $where[] = $alias . ".dayanak = 'Yok_Izinsiz'";
+  }
+
+  /** @param array<int, string> $where @param array<string, mixed> $params */
+  private static function appendLiveDateFilters(array &$where, array &$params, array $filters, $donem, $tarihAlias)
+  {
+    if ($filters['baslangic_tarihi'] !== null && $filters['bitis_tarihi'] !== null) {
+      $where[] = $tarihAlias . ' BETWEEN :live_baslangic AND :live_bitis';
+      $params['live_baslangic'] = $filters['baslangic_tarihi'];
+      $params['live_bitis'] = $filters['bitis_tarihi'];
+
+      return;
+    }
+
+    if ($donem !== null && preg_match('/^(\d{4})-(\d{2})$/', (string) $donem, $matches)) {
+      $firstDay = sprintf('%04d-%02d-01', (int) $matches[1], (int) $matches[2]);
+      $lastDay = date('Y-m-t', strtotime($firstDay));
+      $where[] = $tarihAlias . ' BETWEEN :live_baslangic AND :live_bitis';
+      $params['live_baslangic'] = $firstDay;
+      $params['live_bitis'] = $lastDay;
+    }
+  }
+
+  /** @param array<string, mixed> $params */
+  private static function countDevamsizlikRows(PDO $pdo, $fromSql, array $params)
+  {
+    $sql = 'SELECT COUNT(*) AS total ' . $fromSql;
+    $stmt = $pdo->prepare($sql);
+    self::bindParams($stmt, $params);
+    $stmt->execute();
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    return (int) ($row['total'] ?? 0);
   }
 
   /** @param array<string, mixed> $params */
@@ -490,6 +680,19 @@ class RaporlarController
   }
 
   /** @param array<string, mixed> $row @return array<string, mixed> */
+  private static function mapDevamsizlikRow(array $row)
+  {
+    return [
+      'personel_id' => (int) $row['personel_id'],
+      'ad_soyad' => (string) $row['ad_soyad'],
+      'baslangic_tarihi' => (string) $row['baslangic_tarihi'],
+      'bitis_tarihi' => (string) $row['bitis_tarihi'],
+      'alt_tur' => (string) $row['alt_tur'],
+      'state' => (string) $row['state'],
+    ];
+  }
+
+  /** @param array<string, mixed> $row @return array<string, mixed> */
   private static function mapLegacyReportRow($tip, array $row)
   {
     $base = [
@@ -499,10 +702,6 @@ class RaporlarController
       'sube' => $row['sube'],
       'bolum' => $row['bolum'],
     ];
-
-    if ($tip === 'devamsizlik') {
-      $base['devamsizlik_gun'] = 0;
-    }
 
     return $base;
   }

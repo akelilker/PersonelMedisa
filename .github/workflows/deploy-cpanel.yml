@@ -105,13 +105,13 @@ jobs:
         run: |
           set -euo pipefail
 
-          deploy_with_protocol() {
-            local protocol="$1"
+          deploy_with_ftp_mode() {
+            local mode_name="$1"
             local use_ftps="$2"
 
-            echo "Deploy protokolu deneniyor: ${protocol}"
+            echo "Deploy modu deneniyor: ${mode_name}"
 
-            lftp -u "${FTP_USERNAME}","${FTP_PASSWORD}" -p "${FTP_PORT}" "${protocol}://${FTP_SERVER}" -e "
+            lftp -u "${FTP_USERNAME}","${FTP_PASSWORD}" -p "${FTP_PORT}" "ftp://${FTP_SERVER}" -e "
               set cmd:fail-exit true;
               set cmd:verbose on;
               set net:max-retries 5;
@@ -123,6 +123,7 @@ jobs:
               set ftp:passive-mode on;
               set ftp:ssl-allow ${use_ftps};
               set ftp:ssl-force ${use_ftps};
+              set ftp:ssl-protect-data ${use_ftps};
               lcd ${LOCAL_DIST_DIR%/};
               !echo 'FTP root hedefleniyor';
               cd ${REMOTE_TARGET_DIR};
@@ -139,10 +140,10 @@ jobs:
             "
           }
 
-          echo "FTPS deneniyor..."
-          if deploy_with_protocol "ftps" "true"; then
+          echo "Explicit FTPS port 21 deneniyor..."
+          if deploy_with_ftp_mode "explicit-ftps" "true"; then
             exit 0
           fi
 
-          echo "FTPS basarisiz oldu, FTP fallback deneniyor..."
-          deploy_with_protocol "ftp" "false"
+          echo "Explicit FTPS basarisiz oldu, plain FTP fallback deneniyor..."
+          deploy_with_ftp_mode "plain-ftp" "false"

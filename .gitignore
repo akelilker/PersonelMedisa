@@ -13,6 +13,10 @@ test-results/
 .env.local
 .env.*.local
 
+# Local smoke credentials
+api/scripts/*.local
+api/scripts/.*.local
+
 # Backend API local config (never commit secrets)
 api/config.local.php
 api/**/config.local.php

@@ -1,5 +1,5 @@
 .settings-dropdown.notifications-dropdown {
-  top: calc(100% + 5px);
+  top: calc(100% + 2px);
   right: 0;
 }
 
@@ -178,18 +178,18 @@
   background: rgba(var(--theme-color-rgb), 0.08);
 }
 
-body:not(.modal-open):has(.notifications-dropdown.open) .app-shell {
+body:not(.modal-open):has(.icons-row .settings-dropdown.open) .app-shell {
   overflow: visible;
   isolation: auto;
 }
 
-body:not(.modal-open):has(.notifications-dropdown.open) .content-wrap {
+body:not(.modal-open):has(.icons-row .settings-dropdown.open) .content-wrap {
   overflow-y: visible;
   position: relative;
   z-index: calc(var(--z-footer) + 15);
 }
 
-body:not(.modal-open):has(.notifications-dropdown.open) .content-wrap::after {
+body:not(.modal-open):has(.icons-row .settings-dropdown.open) .content-wrap::after {
   content: "";
   position: absolute;
   inset: 0 0 calc(var(--app-footer-real-height) + var(--app-footer-gap) + 8px + env(safe-area-inset-bottom, 0px))
@@ -197,10 +197,10 @@ body:not(.modal-open):has(.notifications-dropdown.open) .content-wrap::after {
   background: linear-gradient(180deg, rgba(5, 9, 15, 0.18) 0%, rgba(5, 9, 15, 0.42) 100%);
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
-  pointer-events: none;
+  pointer-events: auto;
   z-index: 1;
 }
 
-body:not(.modal-open):has(.notifications-dropdown.open) .icons-row {
+body:not(.modal-open):has(.icons-row .settings-dropdown.open) .icons-row {
   z-index: 3;
 }

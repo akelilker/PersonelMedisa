@@ -65,14 +65,11 @@
 
 .notification-wrap > .icon-btn {
   overflow: visible;
+  padding-bottom: 2px;
 }
 
 .notification-wrap > .icon-btn svg {
   overflow: visible;
-}
-
-.icons-row--minimal .notification-wrap > .icon-btn {
-  padding: 2px 2px 4px;
 }
 
 .notification-wrap > .icon-btn.notification-pulse {

@@ -423,84 +423,86 @@ export function ShellHeaderActions({ contextLabel, minimal = false }: ShellHeade
           </div>
         ) : null}
 
-        <button
-          id="notifications-toggle-btn"
-          type="button"
-          className={notificationButtonClassName}
-          onClick={() => {
-            setIsNotificationsOpen((prev) => !prev);
-            setIsSettingsOpen(false);
-            setIsSubeOpen(false);
-          }}
-          aria-label="Bildirimleri aç"
-          aria-expanded={isNotificationsOpen}
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="22"
-            height="20"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
+        <div className="notification-wrap">
+          <button
+            id="notifications-toggle-btn"
+            type="button"
+            className={notificationButtonClassName}
+            onClick={() => {
+              setIsNotificationsOpen((prev) => !prev);
+              setIsSettingsOpen(false);
+              setIsSubeOpen(false);
+            }}
+            aria-label="Bildirimleri aç"
+            aria-expanded={isNotificationsOpen}
           >
-            <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
-            <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-          </svg>
-        </button>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="22"
+              height="22"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
+              <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+            </svg>
+          </button>
 
-        <div
-          id="notifications-dropdown"
-          className={`settings-dropdown notifications-dropdown${isNotificationsOpen ? " open" : ""}`}
-        >
-          {isNotificationsLoading ? (
-            <button type="button" className="notification-item notification-empty" disabled>
-              Bildirimler yükleniyor...
-            </button>
-          ) : null}
-
-          {!isNotificationsLoading && unreadCount > 0 ? (
-            <div className="notifications-toolbar">
-              <button
-                type="button"
-                className="notifications-mark-all-read-btn"
-                onClick={markAllNotificationsAsRead}
-              >
-                Tümünü okundu işaretle
+          <div
+            id="notifications-dropdown"
+            className={`settings-dropdown notifications-dropdown${isNotificationsOpen ? " open" : ""}`}
+          >
+            {isNotificationsLoading ? (
+              <button type="button" className="notification-item notification-empty" disabled>
+                Bildirimler yükleniyor...
               </button>
-            </div>
-          ) : null}
+            ) : null}
 
-          {!isNotificationsLoading &&
-            visibleNotifications.map((notification) => (
-              <button
-                key={notification.id}
-                type="button"
-                className={[
-                  "notification-item",
-                  notification.level === "critical" ? "date-warning-red-border" : "",
-                  notification.level === "warning" ? "date-warning-orange-border" : "",
-                  notification.unread ? "notification-unread" : ""
-                ]
-                  .filter(Boolean)
-                  .join(" ")}
-                onClick={() => handleNotificationClick(notification)}
-              >
-                <div className="notif-line1">{notification.title}</div>
-                <div className="notif-line2">{notification.subtitle}</div>
+            {!isNotificationsLoading && unreadCount > 0 ? (
+              <div className="notifications-toolbar">
+                <button
+                  type="button"
+                  className="notifications-mark-all-read-btn"
+                  onClick={markAllNotificationsAsRead}
+                >
+                  Tümünü okundu işaretle
+                </button>
+              </div>
+            ) : null}
+
+            {!isNotificationsLoading &&
+              visibleNotifications.map((notification) => (
+                <button
+                  key={notification.id}
+                  type="button"
+                  className={[
+                    "notification-item",
+                    notification.level === "critical" ? "date-warning-red-border" : "",
+                    notification.level === "warning" ? "date-warning-orange-border" : "",
+                    notification.unread ? "notification-unread" : ""
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                  onClick={() => handleNotificationClick(notification)}
+                >
+                  <div className="notif-line1">{notification.title}</div>
+                  <div className="notif-line2">{notification.subtitle}</div>
+                </button>
+              ))}
+
+            {!isNotificationsLoading && visibleNotifications.length === 0 ? (
+              <button type="button" className="notification-item notification-empty" disabled>
+                Bildirim yok
               </button>
-            ))}
+            ) : null}
 
-          {!isNotificationsLoading && visibleNotifications.length === 0 ? (
-            <button type="button" className="notification-item notification-empty" disabled>
-              Bildirim yok
-            </button>
-          ) : null}
-
-          {notificationError ? <p className="notification-error">{notificationError}</p> : null}
+            {notificationError ? <p className="notification-error">{notificationError}</p> : null}
+          </div>
         </div>
 
         <button

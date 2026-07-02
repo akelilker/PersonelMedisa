@@ -1,3 +1,8 @@
+.settings-dropdown.notifications-dropdown {
+  top: calc(100% + 5px);
+  right: 0;
+}
+
 .notifications-dropdown {
   width: min(360px, calc(100vw - 24px));
   overflow-y: auto;

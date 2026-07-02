@@ -58,8 +58,25 @@
   gap: 14px;
 }
 
-.sube-selector-wrap {
+.sube-selector-wrap,
+.notification-wrap {
   position: relative;
+}
+
+.notification-wrap > .icon-btn {
+  overflow: visible;
+}
+
+.notification-wrap > .icon-btn svg {
+  overflow: visible;
+}
+
+.icons-row--minimal .notification-wrap > .icon-btn {
+  padding: 2px 2px 4px;
+}
+
+.notification-wrap > .icon-btn.notification-pulse {
+  transform-origin: 50% 40%;
 }
 
 .sube-header-badge {
@@ -140,7 +157,7 @@
   }
 
   50% {
-    transform: scale(1.08);
+    transform: scale(1.05);
   }
 }
 

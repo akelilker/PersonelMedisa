@@ -89,6 +89,39 @@
   box-shadow: 0 2px 10px rgba(var(--theme-color-rgb), 0.3);
 }
 
+body.login-page .hero {
+  grid-template-rows: auto auto;
+  row-gap: 4px;
+  align-items: center;
+}
+
+body.login-page .hero-logo {
+  grid-column: 1;
+  grid-row: 1 / 3;
+  align-self: center;
+}
+
+body.login-page .hero h1 {
+  grid-column: 2;
+  grid-row: 1;
+  align-self: end;
+}
+
+body.login-page .hero-spacer {
+  grid-column: 3;
+  grid-row: 1 / 3;
+}
+
+body.login-page .hero .animated-line {
+  grid-column: 2;
+  grid-row: 2;
+  position: static;
+  left: auto;
+  bottom: auto;
+  transform: none;
+  justify-self: center;
+}
+
 @media (min-width: 641px) {
   .hero {
     --hero-spacer-width: 14px;
@@ -136,6 +169,10 @@
 
   .animated-line {
     bottom: 8px;
+    width: 88%;
+  }
+
+  body.login-page .hero .animated-line {
     width: 88%;
   }
 

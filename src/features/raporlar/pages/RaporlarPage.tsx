@@ -65,7 +65,8 @@ function createInitialRaporFormState(searchParams: URLSearchParams): RaporFormSt
     ...DEFAULT_RAPOR_FORM,
     ...(prefill.raporTipi ? { raporTipi: prefill.raporTipi } : {}),
     ...(prefill.baslangicTarihi ? { baslangicTarihi: prefill.baslangicTarihi } : {}),
-    ...(prefill.bitisTarihi ? { bitisTarihi: prefill.bitisTarihi } : {})
+    ...(prefill.bitisTarihi ? { bitisTarihi: prefill.bitisTarihi } : {}),
+    ...(prefill.personelId ? { personelId: String(prefill.personelId) } : {})
   };
 }
 

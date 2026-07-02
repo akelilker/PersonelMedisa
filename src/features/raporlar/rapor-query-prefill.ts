@@ -20,6 +20,7 @@ export type RaporQueryPrefillResult = {
   raporTipi?: RaporTipi;
   baslangicTarihi?: string;
   bitisTarihi?: string;
+  personelId?: number;
   extraFilters: RaporQueryExtraFilters;
   shouldAutoRun: boolean;
 };
@@ -70,6 +71,7 @@ export type RaporlarPrefillUrlParams = {
   bitis: string;
   donem?: string;
   muhur_id?: number;
+  personel_id?: number;
 };
 
 export function donemToAyTarihAraligi(donem: string): { baslangic: string; bitis: string } | undefined {
@@ -106,6 +108,10 @@ export function buildRaporlarPrefillUrl(params: RaporlarPrefillUrlParams): strin
     searchParams.set("muhur_id", String(params.muhur_id));
   }
 
+  if (params.personel_id !== undefined && params.personel_id > 0) {
+    searchParams.set("personel_id", String(params.personel_id));
+  }
+
   return `/raporlar?${searchParams.toString()}`;
 }
 
@@ -128,10 +134,13 @@ export function parseRaporlarQueryPrefill(searchParams: URLSearchParams): RaporQ
     extraFilters.donem = donem;
   }
 
+  const personelId = parsePositiveIntQueryParam(searchParams.get("personel_id"));
+
   return {
     raporTipi,
     baslangicTarihi,
     bitisTarihi,
+    ...(personelId !== undefined ? { personelId } : {}),
     extraFilters,
     shouldAutoRun: Boolean(raporTipi && baslangicTarihi && bitisTarihi)
   };

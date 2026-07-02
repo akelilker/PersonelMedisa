@@ -29,10 +29,11 @@ describe("rapor-query-prefill", () => {
         baslangic: "2026-04-01",
         bitis: "2026-04-30",
         donem: "2026-04",
-        muhur_id: 123
+        muhur_id: 123,
+        personel_id: 42
       })
     ).toBe(
-      "/raporlar?rapor=personel-ozet&baslangic=2026-04-01&bitis=2026-04-30&donem=2026-04&muhur_id=123"
+      "/raporlar?rapor=personel-ozet&baslangic=2026-04-01&bitis=2026-04-30&donem=2026-04&muhur_id=123&personel_id=42"
     );
   });
 
@@ -43,9 +44,32 @@ describe("rapor-query-prefill", () => {
         baslangic: "2026-04-01",
         bitis: "2026-04-30",
         donem: "2026-ab",
-        muhur_id: 0
+        muhur_id: 0,
+        personel_id: 0
       })
     ).toBe("/raporlar?rapor=personel-ozet&baslangic=2026-04-01&bitis=2026-04-30");
+  });
+
+  it("parses personel_id from query and ignores invalid values", () => {
+    expect(
+      parseRaporlarQueryPrefill(
+        new URLSearchParams(
+          "rapor=personel-ozet&baslangic=2026-04-01&bitis=2026-04-30&personel_id=42"
+        )
+      ).personelId
+    ).toBe(42);
+
+    expect(
+      parseRaporlarQueryPrefill(
+        new URLSearchParams("rapor=personel-ozet&baslangic=2026-04-01&bitis=2026-04-30&personel_id=0")
+      ).personelId
+    ).toBeUndefined();
+
+    expect(
+      parseRaporlarQueryPrefill(
+        new URLSearchParams("rapor=personel-ozet&baslangic=2026-04-01&bitis=2026-04-30&personel_id=abc")
+      ).personelId
+    ).toBeUndefined();
   });
 
   it("round-trips builder output through parser", () => {
@@ -54,7 +78,8 @@ describe("rapor-query-prefill", () => {
       baslangic: "2026-04-01",
       bitis: "2026-04-30",
       donem: "2026-04",
-      muhur_id: 123
+      muhur_id: 123,
+      personel_id: 42
     });
     const searchParams = new URLSearchParams(url.split("?")[1] ?? "");
     const parsed = parseRaporlarQueryPrefill(searchParams);
@@ -62,6 +87,7 @@ describe("rapor-query-prefill", () => {
     expect(parsed.raporTipi).toBe("personel-ozet");
     expect(parsed.baslangicTarihi).toBe("2026-04-01");
     expect(parsed.bitisTarihi).toBe("2026-04-30");
+    expect(parsed.personelId).toBe(42);
     expect(parsed.extraFilters).toEqual({ donem: "2026-04", muhur_id: 123 });
     expect(parsed.shouldAutoRun).toBe(true);
   });

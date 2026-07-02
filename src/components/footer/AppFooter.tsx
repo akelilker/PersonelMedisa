@@ -48,7 +48,7 @@ export function AppFooter() {
   return (
     <footer id="app-footer" className={footerStateClasses || undefined}>
       <div className="footer-content">
-        <span className="version">v0.1</span>
+        <span className="version">v78.3</span>
         <span className="brand">
           <img src={footerLogo} alt="MEDISA" />
         </span>

@@ -82,6 +82,55 @@ test.describe("raporlar query prefill", () => {
     expect(runtimeErrors).toEqual([]);
   });
 
+  test("personel_id deep link ile formu doldurur, auto-run calistirir ve filtreyi api'ye iletir", async ({
+    page
+  }) => {
+    const runtimeErrors: string[] = [];
+    const raporRequests: string[] = [];
+    page.on("pageerror", (error) => {
+      runtimeErrors.push(error.message);
+    });
+    page.on("request", (request) => {
+      if (request.url().includes("/api/raporlar/personel-ozet")) {
+        raporRequests.push(request.url());
+      }
+    });
+
+    await page.goto(
+      "/raporlar?rapor=personel-ozet&baslangic=2026-04-01&bitis=2026-04-30&personel_id=2"
+    );
+    await expect(page.locator(".modal-header h2").first()).toContainText("Raporlar");
+
+    await expect(page.locator('[name="rapor-turu"]')).toHaveValue("personel-ozet");
+    await expect(page.locator('[name="rapor-bas"]')).toHaveValue("2026-04-01");
+    await expect(page.locator('[name="rapor-bitis"]')).toHaveValue("2026-04-30");
+    await expect(page.locator('[name="rapor-personel"]')).toHaveValue("2");
+
+    const resultCard = page.getByTestId("raporlar-resmi-sonuc");
+    await expect(resultCard).toBeVisible();
+    await expect(resultCard.locator("tbody")).toContainText("Mehmet Kaya");
+    await expect(resultCard.locator("tbody")).not.toContainText("Ayşe Yılmaz");
+
+    expect(raporRequests.some((url) => url.includes("personel_id=2"))).toBe(true);
+    expect(runtimeErrors).toEqual([]);
+  });
+
+  test("gecersiz personel_id parametresini ignore eder", async ({ page }) => {
+    const runtimeErrors: string[] = [];
+    page.on("pageerror", (error) => {
+      runtimeErrors.push(error.message);
+    });
+
+    await page.goto(
+      "/raporlar?rapor=personel-ozet&baslangic=2026-04-01&bitis=2026-04-30&personel_id=0"
+    );
+    await expect(page.locator(".modal-header h2").first()).toContainText("Raporlar");
+
+    await expect(page.locator('[name="rapor-personel"]')).toHaveValue("");
+    await expect(page.getByTestId("raporlar-resmi-sonuc")).toBeVisible();
+    expect(runtimeErrors).toEqual([]);
+  });
+
   test("gecersiz rapor parametresinde sayfa kirmaz ve default rapor tipini korur", async ({ page }) => {
     const runtimeErrors: string[] = [];
     page.on("pageerror", (error) => {

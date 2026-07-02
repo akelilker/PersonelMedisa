@@ -399,6 +399,7 @@ describe("puantaj.api", () => {
     expect(init.method).toBe("POST");
     expect(init.body).toBe(JSON.stringify({ yil: 2026, ay: 4 }));
     expect(result).toMatchObject({
+      muhur_id: 4,
       donem: "2026-04",
       muhurlenen_kayit_sayisi: 18
     });

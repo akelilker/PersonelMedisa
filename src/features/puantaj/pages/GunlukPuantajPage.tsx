@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { muhurleAylikPuantaj } from "../../../api/puantaj.api";
+import {
+  buildRaporlarPrefillUrl,
+  donemToAyTarihAraligi
+} from "../../raporlar/rapor-query-prefill";
 import { FormField } from "../../../components/form/FormField";
 import { AppModal } from "../../../components/modal/AppModal";
 import { EmptyState } from "../../../components/states/EmptyState";
@@ -163,6 +167,7 @@ export function GunlukPuantajPage() {
   const canUpdatePuantaj = hasPermission("puantaj.update");
   const canAmirKontrol = hasPermission("puantaj.amir_kontrol");
   const canMuhurle = hasPermission("puantaj.muhurle");
+  const canViewRaporlar = hasPermission("raporlar.view");
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -203,7 +208,11 @@ export function GunlukPuantajPage() {
   const [isMuhurModalOpen, setIsMuhurModalOpen] = useState(false);
   const [muhurDonem, setMuhurDonem] = useState(currentMonthValue());
   const [isMuhurlemeSending, setIsMuhurlemeSending] = useState(false);
-  const [muhurSonuc, setMuhurSonuc] = useState<string | null>(null);
+  const [muhurSonuc, setMuhurSonuc] = useState<{
+    message: string;
+    donem: string;
+    muhur_id?: number;
+  } | null>(null);
   const [muhurHata, setMuhurHata] = useState<string | null>(null);
 
   const handleMuhurleConfirm = useCallback(async () => {
@@ -222,7 +231,11 @@ export function GunlukPuantajPage() {
         yil: Number.parseInt(match[1], 10),
         ay: Number.parseInt(match[2], 10)
       });
-      setMuhurSonuc(`${result.donem} dönemi için ${result.muhurlenen_kayit_sayisi} kayıt mühürlendi.`);
+      setMuhurSonuc({
+        message: `${result.donem} dönemi için ${result.muhurlenen_kayit_sayisi} kayıt mühürlendi.`,
+        donem: result.donem,
+        muhur_id: result.muhur_id
+      });
       if (activeQuery) {
         void refetchActive();
       }
@@ -267,6 +280,20 @@ export function GunlukPuantajPage() {
 
   const beklenenSaatBilgisiGosterilmeliMi =
     formState.entryHareketDurumu === "Gec_Geldi" || formState.entryHareketDurumu === "Erken_Cikti";
+
+  let muhurRaporlarLink: string | null = null;
+  if (muhurSonuc && canViewRaporlar) {
+    const tarihAraligi = donemToAyTarihAraligi(muhurSonuc.donem);
+    if (tarihAraligi) {
+      muhurRaporlarLink = buildRaporlarPrefillUrl({
+        rapor: "personel-ozet",
+        baslangic: tarihAraligi.baslangic,
+        bitis: tarihAraligi.bitis,
+        donem: muhurSonuc.donem,
+        muhur_id: muhurSonuc.muhur_id
+      });
+    }
+  }
 
   return (
     <section className="puantaj-page">
@@ -710,7 +737,18 @@ export function GunlukPuantajPage() {
             required
           />
           {muhurHata ? <p className="puantaj-form-error">{muhurHata}</p> : null}
-          {muhurSonuc ? <p className="puantaj-form-success" data-testid="muhur-sonuc">{muhurSonuc}</p> : null}
+          {muhurSonuc ? (
+            <>
+              <p className="puantaj-form-success" data-testid="muhur-sonuc">
+                {muhurSonuc.message}
+              </p>
+              {muhurRaporlarLink ? (
+                <Link to={muhurRaporlarLink} data-testid="puantaj-raporlarda-goruntule">
+                  Raporlarda Görüntüle
+                </Link>
+              ) : null}
+            </>
+          ) : null}
           <div className="form-actions-row">
             <button
               type="button"

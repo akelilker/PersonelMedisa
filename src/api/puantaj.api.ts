@@ -433,6 +433,7 @@ export type MuhurlePayload = {
 };
 
 export type MuhurleResponse = {
+  muhur_id?: number;
   muhurlenen_kayit_sayisi: number;
   donem: string;
 };

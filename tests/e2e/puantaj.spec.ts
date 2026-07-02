@@ -97,9 +97,29 @@ test.describe("puantaj muhurleme", () => {
     await expect(muhurSonuc).toContainText("kayıt mühürlendi");
     await expect(muhurModal).toBeVisible();
 
-    await page.getByRole("button", { name: "Vazgeç" }).click();
-    await expect(muhurModal).toHaveCount(0);
+    const raporlardaGoruntule = page.getByTestId("puantaj-raporlarda-goruntule");
+    await expect(raporlardaGoruntule).toBeVisible();
+    await raporlardaGoruntule.click();
 
+    await expect(page).toHaveURL(
+      /\/raporlar\?rapor=personel-ozet&baslangic=2026-04-01&bitis=2026-04-30&donem=2026-04&muhur_id=123/
+    );
+    await expect(page.locator(".modal-header h2").first()).toContainText("Raporlar");
+    await expect(page.locator('[name="rapor-turu"]')).toHaveValue("personel-ozet");
+    await expect(page.locator('[name="rapor-bas"]')).toHaveValue("2026-04-01");
+    await expect(page.locator('[name="rapor-bitis"]')).toHaveValue("2026-04-30");
+
+    const resultCard = page.getByTestId("raporlar-resmi-sonuc");
+    await expect(resultCard).toBeVisible();
+    await expect(resultCard.locator("tbody")).toContainText("Ayşe Yılmaz");
+
+    const kaynakMeta = page.getByTestId("raporlar-kaynak-meta");
+    await expect(kaynakMeta).toBeVisible();
+    await expect(kaynakMeta).toContainText("Mühürlü snapshot");
+    await expect(kaynakMeta).toContainText("Mühür ID: 123");
+
+    await page.goto("/puantaj");
+    await openPuantajRecord(page);
     await expect(page.getByTestId("muhur-uyari")).toBeVisible();
     await expect(kaydetButton).toBeDisabled();
 

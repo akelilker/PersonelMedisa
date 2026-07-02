@@ -64,6 +64,51 @@ export function parseDonemQueryParam(value: string | null): string | undefined {
   return /^\d{4}-\d{2}$/.test(value) ? value : undefined;
 }
 
+export type RaporlarPrefillUrlParams = {
+  rapor: RaporTipi;
+  baslangic: string;
+  bitis: string;
+  donem?: string;
+  muhur_id?: number;
+};
+
+export function donemToAyTarihAraligi(donem: string): { baslangic: string; bitis: string } | undefined {
+  const match = /^(\d{4})-(\d{2})$/.exec(donem);
+  if (!match) {
+    return undefined;
+  }
+
+  const year = Number.parseInt(match[1], 10);
+  const month = Number.parseInt(match[2], 10);
+  if (month < 1 || month > 12) {
+    return undefined;
+  }
+
+  const baslangic = `${match[1]}-${match[2]}-01`;
+  const lastDay = new Date(year, month, 0).getDate();
+  const bitis = `${match[1]}-${match[2]}-${String(lastDay).padStart(2, "0")}`;
+
+  return { baslangic, bitis };
+}
+
+export function buildRaporlarPrefillUrl(params: RaporlarPrefillUrlParams): string {
+  const searchParams = new URLSearchParams();
+  searchParams.set("rapor", params.rapor);
+  searchParams.set("baslangic", params.baslangic);
+  searchParams.set("bitis", params.bitis);
+
+  const donem = params.donem ? parseDonemQueryParam(params.donem) : undefined;
+  if (donem) {
+    searchParams.set("donem", donem);
+  }
+
+  if (params.muhur_id !== undefined && params.muhur_id > 0) {
+    searchParams.set("muhur_id", String(params.muhur_id));
+  }
+
+  return `/raporlar?${searchParams.toString()}`;
+}
+
 export function parseRaporlarQueryPrefill(searchParams: URLSearchParams): RaporQueryPrefillResult {
   const raporTipi = parseRaporTipiParam(searchParams.get("rapor"));
   const baslangicRaw = searchParams.get("baslangic");

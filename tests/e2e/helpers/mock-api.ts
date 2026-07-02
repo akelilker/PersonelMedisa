@@ -3625,7 +3625,7 @@ let bildirimIdCounter = 800;
       await fulfillJson(
         route,
         200,
-        okBody({ muhurlenen_kayit_sayisi: muhurlenenKayitSayisi, donem })
+        okBody({ muhurlenen_kayit_sayisi: muhurlenenKayitSayisi, donem, muhur_id: 123 })
       );
       return;
     }

@@ -117,6 +117,55 @@ test.describe("raporlar query prefill", () => {
   });
 });
 
+test.describe("raporlar aylik ozet koprusu", () => {
+  test.beforeEach(async ({ page }) => {
+    await mockApi(page, "GENEL_YONETICI");
+    await login(page, { username: "yonetici", password: "secret" });
+  });
+
+  test("aylik kapanis ozetinden raporlarda goruntule koprusu detayli listeyi calistirir", async ({ page }) => {
+    const runtimeErrors: string[] = [];
+    page.on("pageerror", (error) => {
+      runtimeErrors.push(error.message);
+    });
+
+    await page.goto("/raporlar");
+    await expect(page).toHaveURL(/\/raporlar(?:\?.*)?$/);
+    await expect(page.locator(".modal-header h2").first()).toContainText("Raporlar");
+
+    const aylikSection = page.getByTestId("aylik-kapanis-ozeti-section");
+    await expect(aylikSection).toBeVisible();
+    await expect(aylikSection.locator(".raporlar-table tbody tr")).toHaveCount(2);
+
+    const selectedAy = await aylikSection.locator("[name='aylik-ozet-ay']").inputValue();
+    const raporlardaGoruntule = aylikSection.getByTestId("aylik-ozet-raporlarda-goruntule");
+    await expect(raporlardaGoruntule).toBeVisible();
+    await raporlardaGoruntule.click();
+
+    const url = new URL(page.url());
+    expect(url.pathname.endsWith("/raporlar")).toBe(true);
+    expect(url.searchParams.get("rapor")).toBe("personel-ozet");
+    expect(url.searchParams.get("donem")).toBe(selectedAy);
+    expect(url.searchParams.get("baslangic")).toBe(`${selectedAy}-01`);
+    expect(url.searchParams.get("bitis")).toMatch(new RegExp(`^${selectedAy}-\\d{2}$`));
+
+    await expect(page.locator('[name="rapor-turu"]')).toHaveValue("personel-ozet");
+    await expect(page.locator('[name="rapor-bas"]')).toHaveValue(url.searchParams.get("baslangic"));
+    await expect(page.locator('[name="rapor-bitis"]')).toHaveValue(url.searchParams.get("bitis"));
+
+    const resultCard = page.getByTestId("raporlar-resmi-sonuc");
+    await expect(resultCard).toBeVisible();
+    await expect(resultCard.locator("tbody")).toContainText("Ayşe Yılmaz");
+
+    const kaynakMeta = page.getByTestId("raporlar-kaynak-meta");
+    await expect(kaynakMeta).toBeVisible();
+    await expect(kaynakMeta).toContainText("Mühürlü snapshot");
+    await expect(kaynakMeta).toContainText(`Dönem: ${selectedAy}`);
+
+    expect(runtimeErrors).toEqual([]);
+  });
+});
+
 test.describe("raporlar detayli liste smoke", () => {
   test.beforeEach(async ({ page }) => {
     await mockApi(page, "GENEL_YONETICI");

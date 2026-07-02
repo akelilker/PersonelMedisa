@@ -32,6 +32,8 @@ import type {
 import type { AylikBolumOnayDurumu, AylikOzetAggregateState, AylikOzetResponse } from "../../../types/yonetim";
 import { getRaporColumns } from "../rapor-column-contract";
 import {
+  buildRaporlarPrefillUrl,
+  donemToAyTarihAraligi,
   parseRaporlarQueryPrefill,
   type RaporQueryExtraFilters
 } from "../rapor-query-prefill";
@@ -69,10 +71,6 @@ function createInitialRaporFormState(searchParams: URLSearchParams): RaporFormSt
 
 function createInitialQueryExtraFilters(searchParams: URLSearchParams): RaporQueryExtraFilters {
   return parseRaporlarQueryPrefill(searchParams).extraFilters;
-}
-
-function shouldAutoRunFromQuery(searchParams: URLSearchParams): boolean {
-  return parseRaporlarQueryPrefill(searchParams).shouldAutoRun;
 }
 
 const RAPOR_OPTIONS: Array<{ value: RaporTipi; label: string }> = [
@@ -206,6 +204,7 @@ function AylikKapanisOzetiSection() {
   const { hasPermission } = useRoleAccess();
   const canReview = hasPermission("aylik-ozet.review");
   const canExecutiveAck = hasPermission("aylik-ozet.executive_ack");
+  const canViewRaporlar = hasPermission("raporlar.view");
 
   const [filters, setFilters] = useState<AylikFilterState>({
     ay: aylikCurrentMonthValue(),
@@ -340,6 +339,19 @@ function AylikKapanisOzetiSection() {
     [result?.items]
   );
 
+  let aylikRaporlarLink: string | null = null;
+  if (result && canViewRaporlar) {
+    const tarihAraligi = donemToAyTarihAraligi(filters.ay);
+    if (tarihAraligi) {
+      aylikRaporlarLink = buildRaporlarPrefillUrl({
+        rapor: "personel-ozet",
+        baslangic: tarihAraligi.baslangic,
+        bitis: tarihAraligi.bitis,
+        donem: filters.ay
+      });
+    }
+  }
+
   return (
     <section
       className="yonetim-page aylik-ozet-page"
@@ -414,6 +426,11 @@ function AylikKapanisOzetiSection() {
           >
             Excel&apos;e Aktar
           </button>
+          {aylikRaporlarLink ? (
+            <Link to={aylikRaporlarLink} data-testid="aylik-ozet-raporlarda-goruntule">
+              Raporlarda Görüntüle
+            </Link>
+          ) : null}
           {canReview ? (
             <button
               type="button"
@@ -548,9 +565,8 @@ export function RaporlarPage() {
   const { hasPermission } = useRoleAccess();
   const canViewAylikOzet = hasPermission("aylik-ozet.view");
   const [searchParams] = useSearchParams();
-  const queryPrefillAppliedRef = useRef(false);
-  const queryAutoRunDoneRef = useRef(false);
-  const shouldAutoRunRef = useRef(shouldAutoRunFromQuery(searchParams));
+  const lastAppliedQueryKeyRef = useRef<string | null>(null);
+  const searchQueryKey = searchParams.toString();
 
   const [form, setForm] = useState<RaporFormState>(() => createInitialRaporFormState(searchParams));
   const [queryExtraFilters, setQueryExtraFilters] = useState<RaporQueryExtraFilters>(() =>
@@ -568,30 +584,46 @@ export function RaporlarPage() {
 
   const columns = useMemo(() => getRaporColumns(form.raporTipi), [form.raporTipi]);
 
-  function buildRaporFilters(nextPage: number): RaporFiltreleri {
-    if (form.baslangicTarihi && form.bitisTarihi && form.baslangicTarihi > form.bitisTarihi) {
+  function buildRaporFilters(
+    nextPage: number,
+    activeForm: RaporFormState,
+    activeExtraFilters: RaporQueryExtraFilters
+  ): RaporFiltreleri {
+    if (
+      activeForm.baslangicTarihi &&
+      activeForm.bitisTarihi &&
+      activeForm.baslangicTarihi > activeForm.bitisTarihi
+    ) {
       throw new Error("Başlangıç tarihi bitiş tarihinden büyük olamaz.");
     }
 
     return {
-      personel_id: parseOptionalPositiveInt(form.personelId),
-      departman_id: parseOptionalPositiveInt(form.departmanId),
-      baslangic_tarihi: form.baslangicTarihi || undefined,
-      bitis_tarihi: form.bitisTarihi || undefined,
-      aktiflik: form.aktiflik,
-      muhur_id: queryExtraFilters.muhur_id,
-      donem: queryExtraFilters.donem,
+      personel_id: parseOptionalPositiveInt(activeForm.personelId),
+      departman_id: parseOptionalPositiveInt(activeForm.departmanId),
+      baslangic_tarihi: activeForm.baslangicTarihi || undefined,
+      bitis_tarihi: activeForm.bitisTarihi || undefined,
+      aktiflik: activeForm.aktiflik,
+      muhur_id: activeExtraFilters.muhur_id,
+      donem: activeExtraFilters.donem,
       page: nextPage,
       limit: PAGE_SIZE
     };
   }
 
-  async function loadRapor(nextPage: number) {
+  async function loadRapor(
+    nextPage: number,
+    stateOverride?: { form: RaporFormState; extraFilters: RaporQueryExtraFilters }
+  ) {
+    const activeForm = stateOverride?.form ?? form;
+    const activeExtraFilters = stateOverride?.extraFilters ?? queryExtraFilters;
     setIsLoading(true);
     setErrorMessage(null);
 
     try {
-      const result = await fetchRapor(form.raporTipi, buildRaporFilters(nextPage));
+      const result = await fetchRapor(
+        activeForm.raporTipi,
+        buildRaporFilters(nextPage, activeForm, activeExtraFilters)
+      );
       setRows(result.rows);
       setTotal(result.total);
       setPage(result.pagination.page ?? nextPage);
@@ -612,19 +644,23 @@ export function RaporlarPage() {
   }
 
   useEffect(() => {
-    if (queryPrefillAppliedRef.current) {
+    if (lastAppliedQueryKeyRef.current === searchQueryKey) {
       return;
     }
 
-    queryPrefillAppliedRef.current = true;
+    lastAppliedQueryKeyRef.current = searchQueryKey;
 
-    if (!shouldAutoRunRef.current || queryAutoRunDoneRef.current) {
-      return;
+    const prefill = parseRaporlarQueryPrefill(searchParams);
+    const nextForm = createInitialRaporFormState(searchParams);
+    const nextExtraFilters = prefill.extraFilters;
+
+    setForm(nextForm);
+    setQueryExtraFilters(nextExtraFilters);
+
+    if (prefill.shouldAutoRun) {
+      void loadRapor(1, { form: nextForm, extraFilters: nextExtraFilters });
     }
-
-    queryAutoRunDoneRef.current = true;
-    void loadRapor(1);
-  }, []);
+  }, [searchQueryKey]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

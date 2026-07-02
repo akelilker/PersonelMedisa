@@ -50,6 +50,73 @@ const RAPOR_SMOKE_CASES: Array<{ type: RaporTipi; rowMarker: string }> = [
   { type: "bildirim", rowMarker: "Ayşe Yılmaz" }
 ];
 
+test.describe("raporlar query prefill", () => {
+  test.beforeEach(async ({ page }) => {
+    await mockApi(page, "GENEL_YONETICI");
+    await login(page, { username: "yonetici", password: "secret" });
+  });
+
+  test("gecerli deep link ile formu doldurur ve raporu otomatik calistirir", async ({ page }) => {
+    const runtimeErrors: string[] = [];
+    page.on("pageerror", (error) => {
+      runtimeErrors.push(error.message);
+    });
+
+    await page.goto(
+      "/raporlar?rapor=personel-ozet&baslangic=2026-04-01&bitis=2026-04-30&muhur_id=123"
+    );
+    await expect(page.locator(".modal-header h2").first()).toContainText("Raporlar");
+
+    await expect(page.locator('[name="rapor-turu"]')).toHaveValue("personel-ozet");
+    await expect(page.locator('[name="rapor-bas"]')).toHaveValue("2026-04-01");
+    await expect(page.locator('[name="rapor-bitis"]')).toHaveValue("2026-04-30");
+
+    const resultCard = page.getByTestId("raporlar-resmi-sonuc");
+    await expect(resultCard).toBeVisible();
+    await expect(resultCard.locator("tbody")).toContainText("Ayşe Yılmaz");
+
+    const kaynakMeta = page.getByTestId("raporlar-kaynak-meta");
+    await expect(kaynakMeta).toBeVisible();
+    await expect(kaynakMeta).toContainText("Mühürlü snapshot");
+    await expect(kaynakMeta).toContainText("Mühür ID: 123");
+    expect(runtimeErrors).toEqual([]);
+  });
+
+  test("gecersiz rapor parametresinde sayfa kirmaz ve default rapor tipini korur", async ({ page }) => {
+    const runtimeErrors: string[] = [];
+    page.on("pageerror", (error) => {
+      runtimeErrors.push(error.message);
+    });
+
+    await page.goto("/raporlar?rapor=yanlis-tip&baslangic=2026-04-01&bitis=2026-04-30");
+    await expect(page.locator(".modal-header h2").first()).toContainText("Raporlar");
+
+    await expect(page.locator('[name="rapor-turu"]')).toHaveValue("personel-ozet");
+    await expect(page.locator('[name="rapor-bas"]')).toHaveValue("2026-04-01");
+    await expect(page.locator('[name="rapor-bitis"]')).toHaveValue("2026-04-30");
+    await expect(page.getByTestId("raporlar-resmi-sonuc")).toHaveCount(0);
+    expect(runtimeErrors).toEqual([]);
+  });
+
+  test("gecersiz baslangic tarihini ignore eder ve manuel filtrelemeye izin verir", async ({ page }) => {
+    const runtimeErrors: string[] = [];
+    page.on("pageerror", (error) => {
+      runtimeErrors.push(error.message);
+    });
+
+    await page.goto("/raporlar?rapor=personel-ozet&baslangic=abc&bitis=2026-04-30");
+    await expect(page.locator(".modal-header h2").first()).toContainText("Raporlar");
+
+    await expect(page.locator('[name="rapor-bas"]')).toHaveValue("");
+    await expect(page.locator('[name="rapor-bitis"]')).toHaveValue("2026-04-30");
+    await expect(page.getByTestId("raporlar-resmi-sonuc")).toHaveCount(0);
+
+    await page.getByTestId("raporlar-submit-run").click();
+    await expect(page.getByTestId("raporlar-resmi-sonuc")).toBeVisible();
+    expect(runtimeErrors).toEqual([]);
+  });
+});
+
 test.describe("raporlar detayli liste smoke", () => {
   test.beforeEach(async ({ page }) => {
     await mockApi(page, "GENEL_YONETICI");

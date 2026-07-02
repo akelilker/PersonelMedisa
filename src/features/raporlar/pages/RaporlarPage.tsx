@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { fetchDepartmanOptions } from "../../../api/referans.api";
 import { fetchRapor } from "../../../api/raporlar.api";
 import {
@@ -31,6 +31,10 @@ import type {
 } from "../../../types/rapor";
 import type { AylikBolumOnayDurumu, AylikOzetAggregateState, AylikOzetResponse } from "../../../types/yonetim";
 import { getRaporColumns } from "../rapor-column-contract";
+import {
+  parseRaporlarQueryPrefill,
+  type RaporQueryExtraFilters
+} from "../rapor-query-prefill";
 
 type RaporFormState = {
   raporTipi: RaporTipi;
@@ -42,6 +46,34 @@ type RaporFormState = {
 };
 
 const PAGE_SIZE = 10;
+
+const DEFAULT_RAPOR_FORM: RaporFormState = {
+  raporTipi: "personel-ozet",
+  personelId: "",
+  departmanId: "",
+  baslangicTarihi: "",
+  bitisTarihi: "",
+  aktiflik: "tum"
+};
+
+function createInitialRaporFormState(searchParams: URLSearchParams): RaporFormState {
+  const prefill = parseRaporlarQueryPrefill(searchParams);
+
+  return {
+    ...DEFAULT_RAPOR_FORM,
+    ...(prefill.raporTipi ? { raporTipi: prefill.raporTipi } : {}),
+    ...(prefill.baslangicTarihi ? { baslangicTarihi: prefill.baslangicTarihi } : {}),
+    ...(prefill.bitisTarihi ? { bitisTarihi: prefill.bitisTarihi } : {})
+  };
+}
+
+function createInitialQueryExtraFilters(searchParams: URLSearchParams): RaporQueryExtraFilters {
+  return parseRaporlarQueryPrefill(searchParams).extraFilters;
+}
+
+function shouldAutoRunFromQuery(searchParams: URLSearchParams): boolean {
+  return parseRaporlarQueryPrefill(searchParams).shouldAutoRun;
+}
 
 const RAPOR_OPTIONS: Array<{ value: RaporTipi; label: string }> = [
   { value: "personel-ozet", label: "Personel Özeti" },
@@ -515,15 +547,15 @@ function AylikKapanisOzetiSection() {
 export function RaporlarPage() {
   const { hasPermission } = useRoleAccess();
   const canViewAylikOzet = hasPermission("aylik-ozet.view");
+  const [searchParams] = useSearchParams();
+  const queryPrefillAppliedRef = useRef(false);
+  const queryAutoRunDoneRef = useRef(false);
+  const shouldAutoRunRef = useRef(shouldAutoRunFromQuery(searchParams));
 
-  const [form, setForm] = useState<RaporFormState>({
-    raporTipi: "personel-ozet",
-    personelId: "",
-    departmanId: "",
-    baslangicTarihi: "",
-    bitisTarihi: "",
-    aktiflik: "tum"
-  });
+  const [form, setForm] = useState<RaporFormState>(() => createInitialRaporFormState(searchParams));
+  const [queryExtraFilters, setQueryExtraFilters] = useState<RaporQueryExtraFilters>(() =>
+    createInitialQueryExtraFilters(searchParams)
+  );
   const [rows, setRows] = useState<RaporSatiri[]>([]);
   const [total, setTotal] = useState<number | null>(null);
   const [page, setPage] = useState(1);
@@ -547,6 +579,8 @@ export function RaporlarPage() {
       baslangic_tarihi: form.baslangicTarihi || undefined,
       bitis_tarihi: form.bitisTarihi || undefined,
       aktiflik: form.aktiflik,
+      muhur_id: queryExtraFilters.muhur_id,
+      donem: queryExtraFilters.donem,
       page: nextPage,
       limit: PAGE_SIZE
     };
@@ -577,20 +611,29 @@ export function RaporlarPage() {
     }
   }
 
+  useEffect(() => {
+    if (queryPrefillAppliedRef.current) {
+      return;
+    }
+
+    queryPrefillAppliedRef.current = true;
+
+    if (!shouldAutoRunRef.current || queryAutoRunDoneRef.current) {
+      return;
+    }
+
+    queryAutoRunDoneRef.current = true;
+    void loadRapor(1);
+  }, []);
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     await loadRapor(1);
   }
 
   function handleClear() {
-    setForm({
-      raporTipi: "personel-ozet",
-      personelId: "",
-      departmanId: "",
-      baslangicTarihi: "",
-      bitisTarihi: "",
-      aktiflik: "tum"
-    });
+    setForm(DEFAULT_RAPOR_FORM);
+    setQueryExtraFilters({});
     setRows([]);
     setTotal(null);
     setPage(1);

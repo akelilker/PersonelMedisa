@@ -91,6 +91,8 @@ export async function fetchRapor(
     baslangic_tarihi: filters?.baslangic_tarihi,
     bitis_tarihi: filters?.bitis_tarihi,
     aktiflik: filters?.aktiflik,
+    muhur_id: filters?.muhur_id,
+    donem: filters?.donem,
     page: filters?.page,
     limit: filters?.limit
   });

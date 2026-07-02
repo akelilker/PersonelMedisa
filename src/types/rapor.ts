@@ -18,6 +18,8 @@ export type RaporFiltreleri = {
   baslangic_tarihi?: string;
   bitis_tarihi?: string;
   aktiflik?: RaporAktiflik;
+  muhur_id?: number;
+  donem?: string;
   page?: number;
   limit?: number;
 };

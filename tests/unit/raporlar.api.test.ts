@@ -517,4 +517,58 @@ describe("raporlar.api", () => {
     });
     expect(result.rows[0]?.bildirim_turu).toBe("IZINSIZ_GELMEDI");
   });
+
+  it("appends muhur_id and donem to query string when provided", async () => {
+    const fetchMock = vi.fn(async () =>
+      createJsonResponse(
+        {
+          data: { items: [] },
+          meta: { page: 1, limit: 10, total: 0, total_pages: 1, has_next_page: false },
+          errors: []
+        },
+        200
+      )
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await fetchRapor("personel-ozet", {
+      baslangic_tarihi: "2026-04-01",
+      bitis_tarihi: "2026-04-30",
+      muhur_id: 123,
+      donem: "2026-04",
+      page: 1,
+      limit: 10
+    });
+
+    const [url] = fetchMock.mock.calls[0] as [string];
+    expect(url).toContain("muhur_id=123");
+    expect(url).toContain("donem=2026-04");
+    expect(url).toContain("baslangic_tarihi=2026-04-01");
+    expect(url).toContain("bitis_tarihi=2026-04-30");
+  });
+
+  it("omits empty muhur_id and donem from query string", async () => {
+    const fetchMock = vi.fn(async () =>
+      createJsonResponse(
+        {
+          data: { items: [] },
+          meta: { page: 1, limit: 10, total: 0, total_pages: 1, has_next_page: false },
+          errors: []
+        },
+        200
+      )
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await fetchRapor("personel-ozet", {
+      baslangic_tarihi: "2026-04-01",
+      bitis_tarihi: "2026-04-30",
+      page: 1,
+      limit: 10
+    });
+
+    const [url] = fetchMock.mock.calls[0] as [string];
+    expect(url).not.toContain("muhur_id=");
+    expect(url).not.toContain("donem=");
+  });
 });

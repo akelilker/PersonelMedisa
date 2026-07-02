@@ -487,6 +487,19 @@ export function YonetimPaneliPage() {
     return formatAdSoyad(item.ad_soyad);
   }
 
+  function formatKullaniciCardLabel(item: YonetimKullanici) {
+    if (item.kullanici_tipi === "IC_PERSONEL" && item.personel_id != null) {
+      const linkedPersonel = personeller.find((personel) => personel.id === item.personel_id);
+      if (linkedPersonel) {
+        return `${linkedPersonel.ad} ${linkedPersonel.soyad}`.trim();
+      }
+
+      return (item.personel_ad_soyad ?? item.ad_soyad ?? "").trim();
+    }
+
+    return (item.ad_soyad ?? "").trim();
+  }
+
   async function loadPanel() {
     setIsLoading(true);
     setErrorMessage(null);
@@ -787,7 +800,7 @@ export function YonetimPaneliPage() {
                   }}
                 >
                   <div className="yonetim-card-meta">
-                    <strong>{formatKullaniciDisplayName(item)}</strong>
+                    <strong>{formatKullaniciCardLabel(item)}</strong>
                     <span>{formatSubeScopeLabel(item.sube_ids, subeNameMap)}</span>
                   </div>
                 </article>

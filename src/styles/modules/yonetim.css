@@ -190,34 +190,19 @@
 .yonetim-list-surface > .yonetim-content-back {
   grid-column: 1;
   grid-row: 1;
-  margin-top: -16px;
+  align-self: center;
 }
 
 .yonetim-list-surface > .yonetim-list-header {
   grid-column: 2;
   grid-row: 1;
-  position: relative;
-  align-self: start;
-  min-height: 28px;
-  margin-top: -16px;
-  overflow: visible;
-}
-
-.yonetim-list-surface .yonetim-list-actions {
-  position: relative;
-  min-height: 28px;
-}
-
-.yonetim-list-surface .yonetim-view-toggle {
-  position: absolute;
-  top: -8px;
-  right: 0;
+  align-self: center;
 }
 
 .yonetim-list-surface > .yonetim-create-row {
   grid-column: 1 / -1;
   grid-row: 2;
-  margin-top: 8px;
+  margin-top: 12px;
   margin-bottom: 12px;
 }
 
@@ -752,10 +737,12 @@
   max-width: 100%;
   font-size: 0.84rem;
   line-height: 1.2;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
   word-break: break-word;
-  display: block;
-  overflow: visible;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .yonetim-card-grid--users .yonetim-card-meta span {
@@ -767,8 +754,11 @@
   text-transform: none;
   color: rgba(239, 242, 247, 0.7);
   white-space: normal;
-  overflow: visible;
-  overflow-wrap: anywhere;
+  overflow: hidden;
+  overflow-wrap: break-word;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
 }
 
 .yonetim-card-meta strong {

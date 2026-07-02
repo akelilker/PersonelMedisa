@@ -48,11 +48,10 @@
 .modal-container--yonetim .modal-header {
   border-bottom: none;
   box-shadow: none;
-  padding-bottom: 0;
 }
 
 .modal-container--yonetim .modal-body--yonetim {
-  padding-top: 0;
+  padding-top: 8px;
 }
 
 .modal-header {

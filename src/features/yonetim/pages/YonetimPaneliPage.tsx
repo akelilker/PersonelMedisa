@@ -421,6 +421,10 @@ function buildYonetimSurecLogPayloads(
   return logs;
 }
 
+function isCorruptedDisplayText(value: string) {
+  return /(?:\?\?|\uFFFD)/u.test(value);
+}
+
 export function YonetimPaneliPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -491,13 +495,26 @@ export function YonetimPaneliPage() {
     if (item.kullanici_tipi === "IC_PERSONEL" && item.personel_id != null) {
       const linkedPersonel = personeller.find((personel) => personel.id === item.personel_id);
       if (linkedPersonel) {
-        return `${linkedPersonel.ad} ${linkedPersonel.soyad}`.trim();
+        const personelLabel = `${linkedPersonel.ad} ${linkedPersonel.soyad}`.trim();
+        if (personelLabel && !isCorruptedDisplayText(personelLabel)) {
+          return personelLabel;
+        }
       }
 
-      return (item.personel_ad_soyad ?? item.ad_soyad ?? "").trim();
+      const fallback = (item.personel_ad_soyad ?? item.ad_soyad ?? "").trim();
+      if (fallback && !isCorruptedDisplayText(fallback)) {
+        return fallback;
+      }
+
+      return ROLE_LABELS[item.rol];
     }
 
-    return (item.ad_soyad ?? "").trim();
+    const adSoyad = (item.ad_soyad ?? "").trim();
+    if (adSoyad && !isCorruptedDisplayText(adSoyad)) {
+      return adSoyad;
+    }
+
+    return ROLE_LABELS[item.rol];
   }
 
   async function loadPanel() {

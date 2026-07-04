@@ -482,7 +482,8 @@ async function dispatchSyncItem(item: SyncQueueItem): Promise<void> {
       return;
     }
     case "personeller.update": {
-      await updatePersonel(item.payload.personelId, item.payload.body);
+      const updated = await updatePersonel(item.payload.personelId, item.payload.body);
+      commitPersonelUpdateToCaches(updated);
       return;
     }
     case "surecler.create": {
@@ -766,6 +767,69 @@ export function commitPersonelCreateToCaches(created: Personel): void {
     }
 
     optimisticPrependPersonel(key, created);
+  }
+}
+
+function personelMatchesListFiltersForUpdate(
+  personel: Personel,
+  filters: PersonellerListCacheFilters
+): boolean {
+  if (!personelMatchesAktiflikFilter(personel, filters.aktiflik)) {
+    return false;
+  }
+
+  if (!personelMatchesSearchFilter(personel, filters.search)) {
+    return false;
+  }
+
+  if (!personelMatchesOptionalIdFilter(personel.departman_id, filters.departmanId)) {
+    return false;
+  }
+
+  if (!personelMatchesOptionalIdFilter(personel.personel_tipi_id, filters.personelTipiId)) {
+    return false;
+  }
+
+  return true;
+}
+
+/** Personel guncelleme sonrasi aktif sube detail/list onbellegini senkronlar. */
+export function commitPersonelUpdateToCaches(updated: Personel): void {
+  const activeSube = getActiveSube();
+  setCacheEntry(dataCacheKeys.personelDetail(activeSube, updated.id), updated);
+
+  const prefix = `personeller:list:s${subeSeg(activeSube)}:`;
+  for (const key of Object.keys(ensureAppData().cache)) {
+    if (!key.startsWith(prefix)) {
+      continue;
+    }
+
+    const filters = parsePersonellerListCacheKeySuffix(key.slice(prefix.length));
+    if (!filters) {
+      continue;
+    }
+
+    mergeCacheEntry<PaginatedResult<Personel>>(key, (prev) => {
+      if (!prev) {
+        return emptyPaginated<Personel>();
+      }
+
+      const index = prev.items.findIndex((item) => item.id === updated.id);
+      if (index === -1) {
+        return prev;
+      }
+
+      if (personelMatchesListFiltersForUpdate(updated, filters)) {
+        const items = [...prev.items];
+        items[index] = updated;
+        return { ...prev, items };
+      }
+
+      return {
+        ...prev,
+        items: prev.items.filter((item) => item.id !== updated.id)
+      };
+    });
   }
 }
 

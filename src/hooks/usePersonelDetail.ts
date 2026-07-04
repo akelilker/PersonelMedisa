@@ -14,6 +14,7 @@ import { createSurec, fetchSureclerList } from "../api/surecler.api";
 import { fetchZimmetlerList } from "../api/zimmetler.api";
 import { emptyPaginated, type PersonelReferenceBundle } from "../data/app-data.types";
 import {
+  commitPersonelUpdateToCaches,
   dataCacheKeys,
   deleteCacheEntry,
   enqueueSyncOperation,
@@ -584,12 +585,12 @@ function usePersonelDetailEdit(
         ...lifecycleSnapshotToPersonelPatch(lifecycleSnap)
       };
 
-      mergeCacheEntry<Personel>(detailKey, () => optimistic);
+      commitPersonelUpdateToCaches(optimistic);
       setPersonel(optimistic);
 
       try {
         const updated = await updatePersonel(personel.id, body);
-        mergeCacheEntry<Personel>(detailKey, () => updated);
+        commitPersonelUpdateToCaches(updated);
         setPersonel(updated);
         setEditForm(personelToEditForm(updated));
         setIsEditing(false);
@@ -658,7 +659,7 @@ function usePersonelDetailEdit(
           return;
         }
 
-        mergeCacheEntry<Personel>(detailKey, () => previousPersonel);
+        commitPersonelUpdateToCaches(previousPersonel);
         setPersonel(previousPersonel);
         setEditErrorMessage(getApiErrorMessage(error, "Personel kaydi guncellenemedi."));
       } finally {

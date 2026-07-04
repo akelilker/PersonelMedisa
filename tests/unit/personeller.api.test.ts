@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { fetchPersonelDetail } from "../../src/api/personeller.api";
+import { fetchPersonelDetail, updatePersonel } from "../../src/api/personeller.api";
 
 function createJsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -130,6 +130,66 @@ describe("personeller.api", () => {
       soyad: "Kaya",
       aktif_durum: "PASIF",
       telefon: "05551111111"
+    });
+  });
+
+  it("updates personel with PUT and normalizes response", async () => {
+    const fetchMock = vi.fn(async () =>
+      createJsonResponse(
+        {
+          data: {
+            ana_kart: {
+              id: 12,
+              tc_kimlik_no: "12345678901",
+              ad: "Yeni",
+              soyad: "Personel",
+              aktif_durum: "AKTIF",
+              telefon: "05550001122"
+            },
+            sistem_ozeti: {
+              hizmet_suresi: "3 yil 2 ay",
+              toplam_izin_hakki: 14,
+              kullanilan_izin: 4,
+              kalan_izin: 10
+            },
+            pasiflik_durumu: {
+              aktif_durum: "AKTIF",
+              etiket: null
+            },
+            referans_adlari: {
+              departman: "Döşeme",
+              gorev: "Genel Müdür"
+            }
+          },
+          meta: {},
+          errors: []
+        },
+        200
+      )
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await updatePersonel(12, {
+      ad: "Yeni",
+      soyad: "Personel",
+      telefon: "05550001122"
+    });
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("/api/personeller/12");
+    expect(init.method).toBe("PUT");
+    expect(JSON.parse(String(init.body))).toMatchObject({
+      ad: "Yeni",
+      soyad: "Personel",
+      telefon: "05550001122"
+    });
+    expect(result).toMatchObject({
+      id: 12,
+      ad: "Yeni",
+      soyad: "Personel",
+      telefon: "05550001122",
+      aktif_durum: "AKTIF",
+      tc_kimlik_no: "12345678901"
     });
   });
 });

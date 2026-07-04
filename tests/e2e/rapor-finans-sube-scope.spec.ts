@@ -10,6 +10,7 @@ const ROLE_LOGIN: Record<MockUserRole, { username: string; password: string }> =
 };
 
 const RAPOR_QUERY = "baslangic_tarihi=2026-04-01&bitis_tarihi=2026-04-30";
+const FINANS_RAPOR_TIPS = ["tesvik", "ceza", "ekstra-prim"] as const;
 
 type ApiFetchResult = {
   status: number;
@@ -124,11 +125,37 @@ test.describe("rapor finans sube scope fallback (S43D)", () => {
     expect(personelOzet.status).toBe(200);
     expect(personelOzet.personelIds).toEqual(expect.arrayContaining([1, 2]));
     expect(personelOzet.total).toBe(2);
+  });
 
-    const tesvik = await fetchRaporApi(page, "tesvik", { clearActiveSube: true });
-    expect(tesvik.status).toBe(200);
-    expect(tesvik.personelIds).toEqual(expect.arrayContaining([1, 2]));
-    expect(tesvik.total).toBe(2);
+  test("MUHASEBE without active scope returns only allowed sube rows for all finans reports", async ({
+    page
+  }) => {
+    await loginAs(page, "MUHASEBE");
+
+    for (const tip of FINANS_RAPOR_TIPS) {
+      const result = await fetchRaporApi(page, tip, { clearActiveSube: true });
+      expect(result.status, `${tip} status`).toBe(200);
+      expect(result.personelIds, `${tip} personelIds`).toEqual(expect.arrayContaining([1, 2]));
+      expect(result.total, `${tip} total`).toBe(2);
+    }
+  });
+
+  test("MUHASEBE sube_id query takes precedence over X-Active-Sube-Id header", async ({ page }) => {
+    await loginAs(page, "MUHASEBE");
+
+    const unauthorizedQuery = await fetchRaporApi(page, "personel-ozet", {
+      activeSubeId: 1,
+      extraQuery: "sube_id=99"
+    });
+    expect(unauthorizedQuery.status).toBe(403);
+
+    const authorizedQuery = await fetchRaporApi(page, "personel-ozet", {
+      activeSubeId: 99,
+      extraQuery: "sube_id=1"
+    });
+    expect(authorizedQuery.status).toBe(200);
+    expect(authorizedQuery.personelIds).toEqual([1]);
+    expect(authorizedQuery.total).toBe(1);
   });
 
   test("MUHASEBE finans list without active scope returns only allowed sube records", async ({ page }) => {

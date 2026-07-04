@@ -76,4 +76,55 @@ test.describe("Kayit Surec Pozisyon", () => {
     expect(pageErrors).toEqual([]);
     expect(console500).toEqual([]);
   });
+
+  test("Personel Karti acikken pozisyon update sonrasi liste cache guncellenir", async ({ page }) => {
+    await mockApi(page, "GENEL_YONETICI");
+    await login(page, { username: "yonetici", password: "secret" });
+
+    await page.getByTestId("menu-personel-karti").click();
+    await expect(page).toHaveURL(/\/personeller$/);
+    await expect(page.getByRole("link", { name: /Ayşe Yılmaz.*kişisinin kartını aç/i }).first()).toBeVisible({
+      timeout: 15_000
+    });
+
+    await page.goto("/");
+
+    await page.getByTestId("menu-kayit-surec").click();
+    const kayitModal = page.locator(".modal-container").last();
+    await expect(kayitModal.getByRole("heading", { name: /Kayıt ve Süreç İşlemleri/i })).toBeVisible();
+
+    await kayitModal.getByTestId("kayit-tab-surec").click();
+    await kayitModal.getByRole("combobox", { name: "Personel" }).click();
+    await kayitModal.getByPlaceholder("Personel ara").fill("Ayşe");
+    await kayitModal.getByRole("option", { name: /Ayşe Yılmaz/i }).click();
+
+    await kayitModal.getByRole("tab", { name: "Pozisyon" }).click();
+    await kayitModal.getByRole("combobox", { name: "Görev / Unvan" }).click();
+    await kayitModal.locator("#pozisyon-gorev-panel").getByRole("button", { name: "Üretim Müdürü" }).click();
+    await kayitModal.getByLabel("Geçerlilik Tarihi").fill("2026-08-01");
+
+    const pozisyonKaydet = kayitModal.locator("form.surec-position-form").getByRole("button", { name: "Kaydet" });
+    await expect(pozisyonKaydet).toBeEnabled({ timeout: 5000 });
+    await pozisyonKaydet.click();
+
+    await expect(kayitModal.getByRole("combobox", { name: "Görev / Unvan" })).toContainText("Üretim Müdürü");
+    await kayitModal.getByRole("button", { name: "Kapat" }).click();
+    await expect(kayitModal).toHaveCount(0);
+
+    let delayPersonelList = true;
+    await page.route("**/api/personeller**", async (route) => {
+      const request = route.request();
+      if (request.method() === "GET" && delayPersonelList) {
+        await new Promise((resolve) => setTimeout(resolve, 4_000));
+      }
+      await route.continue();
+    });
+
+    await page.getByTestId("menu-personel-karti").click();
+    await expect(page).toHaveURL(/\/personeller$/);
+
+    const ayseListLink = page.getByRole("link", { name: /Ayşe Yılmaz.*kişisinin kartını aç/i }).first();
+    await expect(ayseListLink).toBeVisible({ timeout: 2_000 });
+    await expect(ayseListLink).toContainText(/Üretim Müdürü|Uretim Müdürü|Uretim Muduru/i, { timeout: 2_000 });
+  });
 });

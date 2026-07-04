@@ -15,6 +15,7 @@ import type { KayitTab } from "../../../components/main-menu/MainMenu";
 import type { PersonelReferenceBundle } from "../../../data/app-data.types";
 import {
   commitPersonelCreateToCaches,
+  commitPersonelUpdateToCaches,
   dataCacheKeys,
   deleteCacheEntry,
   getActiveSube,
@@ -921,6 +922,7 @@ export function KayitSurecWorkspace({
         /* Önbellek yenilemesi başarısız. */
       }
 
+      commitPersonelUpdateToCaches(updated);
       setPersoneller((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
       setPozisyonForm(createPozisyonFormFromPersonel(updated));
       setPozisyonInfo("Pozisyon güncellendi.");

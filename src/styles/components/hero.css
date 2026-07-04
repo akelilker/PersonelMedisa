@@ -78,7 +78,7 @@
 
 .animated-line {
   position: absolute;
-  bottom: 6px;
+  bottom: 12px;
   left: 50%;
   transform: translateX(-50%);
   width: 74%;

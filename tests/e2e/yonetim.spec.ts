@@ -18,8 +18,10 @@ test.describe("yonetim paneli ve aylik ozet", () => {
     await page.getByTestId("settings-yonetim-paneli").click();
     await expect(page).toHaveURL(/\/yonetim-paneli\?tab=kullanicilar$/);
     await expect(page.locator(".modal-header h2").first()).toContainText("KULLANICI YÖNETİMİ");
-    await expect(page.getByTestId("yonetim-back-ayarlar")).toContainText("Ayarlar");
-    await expect(page.locator(".modal-header .modal-back-btn")).toHaveCount(0);
+    await expect(page.locator(".modal-header").getByTestId("yonetim-back-ayarlar")).toBeVisible();
+    await expect(page.locator(".modal-header").getByTestId("yonetim-back-ayarlar")).toContainText("Ayarlar");
+    await expect(page.locator(".modal-header .modal-back-btn")).toHaveCount(1);
+    await expect(page.locator(".modal-body .yonetim-content-back")).toHaveCount(0);
     await expect(page.getByTestId("yonetim-section-kullanicilar")).toBeVisible();
 
     await page.getByTestId("yonetim-kullanici-yeni").click();

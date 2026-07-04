@@ -8,6 +8,7 @@ type AppModalProps = {
   onClose?: () => void;
   backLabel?: string;
   onBack?: () => void;
+  backTestId?: string;
   className?: string;
   bodyClassName?: string;
 };
@@ -27,6 +28,7 @@ export function AppModal({
   onClose,
   backLabel,
   onBack,
+  backTestId,
   className,
   bodyClassName
 }: AppModalProps) {
@@ -98,7 +100,7 @@ export function AppModal({
       <div className={["modal-container", className].filter(Boolean).join(" ")}>
         <div className="modal-header">
           {onBack && backLabel ? (
-            <button type="button" className="modal-back-btn" onClick={onBack}>
+            <button type="button" className="modal-back-btn" onClick={onBack} data-testid={backTestId}>
               <span className="modal-back-btn-icon" aria-hidden="true">
                 ←
               </span>

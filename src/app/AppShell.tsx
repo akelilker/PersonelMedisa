@@ -21,6 +21,7 @@ type ModuleModalConfig = {
   title: string;
   closeTo: string;
   backLabel?: string;
+  backTestId?: string;
   className?: string;
   bodyClassName?: string;
 };
@@ -85,6 +86,8 @@ function resolveModuleModal(pathname: string, tabParam: string | null): ModuleMo
     return {
       title: resolveYonetimModalTitle(tabParam),
       closeTo: "/",
+      backLabel: "Ayarlar",
+      backTestId: "yonetim-back-ayarlar",
       className: "modal-container--yonetim",
       bodyClassName: "modal-body--yonetim"
     };
@@ -191,6 +194,7 @@ export function AppShell() {
           onClose={() => navigate(moduleModal.closeTo)}
           backLabel={moduleModal.backLabel}
           onBack={moduleModal.backLabel ? () => navigate(moduleModal.closeTo) : undefined}
+          backTestId={moduleModal.backTestId}
           className={moduleModal.className}
           bodyClassName={moduleModal.bodyClassName}
         >

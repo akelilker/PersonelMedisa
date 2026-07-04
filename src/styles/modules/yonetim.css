@@ -187,14 +187,8 @@
   padding: 0;
 }
 
-.yonetim-list-surface > .yonetim-content-back {
-  grid-column: 1;
-  grid-row: 1;
-  align-self: center;
-}
-
 .yonetim-list-surface > .yonetim-list-header {
-  grid-column: 2;
+  grid-column: 1 / -1;
   grid-row: 1;
   align-self: center;
 }
@@ -239,32 +233,6 @@
 .modal-body > .yonetim-page .yonetim-list-surface > .yonetim-list-table-wrap {
   min-height: 0;
   overflow-y: auto;
-}
-
-.yonetim-content-back {
-  display: inline-flex;
-  align-items: center;
-  justify-content: flex-start;
-  justify-self: start;
-  min-height: 28px;
-  margin: 0;
-  padding: 0;
-  border: none;
-  background: transparent;
-  color: rgba(242, 246, 252, 0.92);
-  font-size: 1rem;
-  font-weight: 500;
-  line-height: 1;
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.yonetim-content-back:hover {
-  color: #ffffff;
-}
-
-.modal-body > .yonetim-page .yonetim-content-back {
-  flex-shrink: 0;
 }
 
 .yonetim-list-header {
@@ -335,6 +303,7 @@
   letter-spacing: normal;
   cursor: pointer;
   box-shadow: none;
+  transition: color 0.2s ease, transform 0.2s ease;
 }
 
 .yonetim-create-link:hover {
@@ -342,7 +311,7 @@
   background: transparent;
   color: #ffffff;
   box-shadow: none;
-  text-decoration: underline;
+  transform: scale(1.06);
 }
 
 .yonetim-section-copy--row {
@@ -718,15 +687,16 @@
 
 .yonetim-card-grid--users .yonetim-entity-card {
   align-content: center;
-  justify-items: center;
+  justify-items: start;
   min-height: 88px;
   gap: 6px;
-  padding: 6px 2px;
-  text-align: center;
+  padding: 6px 10px;
+  text-align: left;
+  border: 1.5px solid rgba(255, 255, 255, 0.3);
 }
 
 .yonetim-card-grid--users .yonetim-card-meta {
-  justify-items: center;
+  justify-items: start;
   align-content: center;
   width: 100%;
   gap: 6px;

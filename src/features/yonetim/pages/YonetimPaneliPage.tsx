@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent, type KeyboardEvent } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { FormField } from "../../../components/form/FormField";
 import { AppModal } from "../../../components/modal/AppModal";
 import { EmptyState } from "../../../components/states/EmptyState";
@@ -426,16 +426,11 @@ function isCorruptedDisplayText(value: string) {
 }
 
 export function YonetimPaneliPage() {
-  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { hasPermission } = useRoleAccess();
   const canManageYonetimPanel = hasPermission("yonetim-paneli.manage");
   const realKullaniciApi = isRealYonetimKullaniciApi();
   const activeTab = resolveYonetimActiveTab(searchParams.get("tab"));
-
-  function handleBackToAyarlar() {
-    navigate("/");
-  }
 
   const [kullaniciViewMode, setKullaniciViewMode] = useState<YonetimViewMode>("card");
   const [subeViewMode, setSubeViewMode] = useState<YonetimViewMode>("card");
@@ -768,15 +763,6 @@ export function YonetimPaneliPage() {
 
       {!isLoading && !errorMessage && activeTab === "kullanicilar" ? (
         <section className="yonetim-list-surface" aria-label="Kullanıcı yönetimi" data-testid="yonetim-section-kullanicilar">
-          <button
-            type="button"
-            className="yonetim-content-back"
-            data-testid="yonetim-back-ayarlar"
-            onClick={handleBackToAyarlar}
-          >
-            ← Ayarlar
-          </button>
-
           <div className="yonetim-list-header">
             <div className="yonetim-list-actions">
               <YonetimViewToggle
@@ -870,15 +856,6 @@ export function YonetimPaneliPage() {
 
       {!isLoading && !errorMessage && activeTab === "subeler" ? (
         <section className="yonetim-list-surface" aria-label="Şube yönetimi" data-testid="yonetim-section-subeler">
-          <button
-            type="button"
-            className="yonetim-content-back"
-            data-testid="yonetim-back-ayarlar"
-            onClick={handleBackToAyarlar}
-          >
-            ← Ayarlar
-          </button>
-
           <div className="yonetim-list-header">
             <div className="yonetim-list-actions">
               <YonetimViewToggle label="Şubeler görünümü" value={subeViewMode} onChange={setSubeViewMode} />

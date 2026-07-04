@@ -2119,6 +2119,9 @@ let bildirimIdCounter = 800;
       if (Number.isFinite(subeId) && item.sube_id !== subeId) {
         return false;
       }
+      if (!Number.isFinite(subeId) && mockUserSubeIds.length > 0 && !mockUserSubeIds.includes(item.sube_id)) {
+        return false;
+      }
       if (Number.isFinite(departmanId) && item.departman_id !== departmanId) {
         return false;
       }
@@ -4014,6 +4017,14 @@ let bildirimIdCounter = 800;
         return;
       }
 
+      if (
+        mockUserSubeIds.length > 0 &&
+        (payload.sube_id == null || payload.sube_id <= 0)
+      ) {
+        await fulfillJson(route, 400, errorBody("VALIDATION_ERROR", "Sube secimi zorunludur.", "sube_id"));
+        return;
+      }
+
       if (!payload.ay || !/^\d{4}-\d{2}$/.test(payload.ay)) {
         await fulfillJson(route, 400, errorBody("VALIDATION_ERROR", "Gecersiz ay parametresi.", "ay"));
         return;
@@ -4065,6 +4076,14 @@ let bildirimIdCounter = 800;
 
       if (payload.sube_id != null && mockUserSubeIds.length > 0 && !mockUserSubeIds.includes(payload.sube_id)) {
         await fulfillJson(route, 403, errorBody("FORBIDDEN", "Bu islem icin yetkiniz yok."));
+        return;
+      }
+
+      if (
+        mockUserSubeIds.length > 0 &&
+        (payload.sube_id == null || payload.sube_id <= 0)
+      ) {
+        await fulfillJson(route, 400, errorBody("VALIDATION_ERROR", "Sube secimi zorunludur.", "sube_id"));
         return;
       }
 

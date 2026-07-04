@@ -72,6 +72,43 @@ function ayKapatBody(overrides?: Record<string, unknown>) {
   };
 }
 
+test.describe("S45A-2 aylik ozet sube scope security", () => {
+  test("BOLUM_YONETICISI GET without sube_id returns only allowed sube rows", async ({ page }) => {
+    await loginAs(page, "BOLUM_YONETICISI");
+
+    const response = await apiFetch(page, `/api/yonetim/aylik-ozet?ay=${FIXTURE_AY}`);
+
+    expect(response.status).toBe(200);
+    expect(response.body.data?.items?.length).toBe(1);
+    expect(response.body.data?.items?.every((item) => item.sube === "Depolama")).toBe(true);
+    expect(response.body.data?.items?.some((item) => item.sube === "Merkez")).toBe(false);
+  });
+
+  test("BOLUM_YONETICISI POST bolum-onay without sube_id returns 400", async ({ page }) => {
+    await loginAs(page, "BOLUM_YONETICISI");
+
+    const response = await apiFetch(page, "/api/yonetim/aylik-ozet/bolum-onay", {
+      method: "POST",
+      body: { ay: FIXTURE_AY }
+    });
+
+    expect(response.status).toBe(400);
+    expect(response.body.errors?.[0]?.field).toBe("sube_id");
+    expect(response.body.errors?.[0]?.message).toContain("Sube secimi zorunludur");
+  });
+
+  test("GENEL_YONETICI GET without sube_id returns all sube rows", async ({ page }) => {
+    await loginAs(page, "GENEL_YONETICI");
+
+    const response = await apiFetch(page, `/api/yonetim/aylik-ozet?ay=${FIXTURE_AY}`);
+
+    expect(response.status).toBe(200);
+    expect(response.body.data?.items?.length).toBeGreaterThanOrEqual(2);
+    expect(response.body.data?.items?.some((item) => item.sube === "Merkez")).toBe(true);
+    expect(response.body.data?.items?.some((item) => item.sube === "Depolama")).toBe(true);
+  });
+});
+
 test.describe("S45A-2 aylik ozet onay POST (mock-api contract)", () => {
   test("BOLUM_YONETICISI can approve department summary for scoped sube", async ({ page }) => {
     await loginAs(page, "BOLUM_YONETICISI");

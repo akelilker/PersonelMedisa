@@ -417,7 +417,7 @@ class YonetimController
             JsonResponse::serverError('Veritabani baglantisi kurulamadi.');
         }
 
-        JsonResponse::success(self::buildAylikOzetPayload($pdo, $filters));
+        JsonResponse::success(self::buildAylikOzetPayload($pdo, $filters, $user));
     }
 
     public static function aylikOzetBolumOnay(Request $request)
@@ -426,6 +426,7 @@ class YonetimController
         RolePermissions::assertAny($user, ['aylik-ozet.review', 'aylik-ozet.executive_ack']);
 
         $filters = self::parseAylikOzetFilters($request, true);
+        self::assertAylikWriteSubeScope($user, $filters['sube_id']);
         self::assertAylikSubeAccess($user, $filters['sube_id']);
 
         try {
@@ -434,7 +435,7 @@ class YonetimController
             JsonResponse::serverError('Veritabani baglantisi kurulamadi.');
         }
 
-        $where = self::buildAylikOzetWhereClause($filters);
+        $where = self::buildAylikOzetWhereClause($filters, $user);
         $params = $where['params'];
         $params['son_islem'] = 'Bolum yoneticisi toplu onay verdi';
 
@@ -457,7 +458,7 @@ class YonetimController
             JsonResponse::serverError('Aylik ozet onay islemi tamamlanamadi.');
         }
 
-        JsonResponse::success(self::buildAylikOzetPayload($pdo, $filters));
+        JsonResponse::success(self::buildAylikOzetPayload($pdo, $filters, $user));
     }
 
     public static function aylikOzetAyKapat(Request $request)
@@ -466,6 +467,7 @@ class YonetimController
         RolePermissions::assert($user, 'aylik-ozet.executive_ack');
 
         $filters = self::parseAylikOzetFilters($request, true);
+        self::assertAylikWriteSubeScope($user, $filters['sube_id']);
         self::assertAylikSubeAccess($user, $filters['sube_id']);
 
         try {
@@ -474,7 +476,7 @@ class YonetimController
             JsonResponse::serverError('Veritabani baglantisi kurulamadi.');
         }
 
-        $where = self::buildAylikOzetWhereClause($filters);
+        $where = self::buildAylikOzetWhereClause($filters, $user);
         $params = $where['params'];
         $params['son_islem'] = 'Genel yonetici ust onay verdi';
 
@@ -496,7 +498,7 @@ class YonetimController
             JsonResponse::serverError('Aylik ozet kapanis islemi tamamlanamadi.');
         }
 
-        JsonResponse::success(self::buildAylikOzetPayload($pdo, $filters));
+        JsonResponse::success(self::buildAylikOzetPayload($pdo, $filters, $user));
     }
 
     /**
@@ -543,17 +545,39 @@ class YonetimController
         }
     }
 
+    /** @param array<string, mixed> $user */
+    private static function assertAylikWriteSubeScope(array $user, $subeId)
+    {
+        $subeId = (int) $subeId;
+        $allowed = SubeScope::allowedSubeIds($user);
+        if (count($allowed) > 0 && $subeId <= 0) {
+            JsonResponse::badRequest('Sube secimi zorunludur.', 'VALIDATION_ERROR', 'sube_id');
+        }
+    }
+
     /**
      * @param array{ay: string, sube_id: int, departman_id: int, sadece_revizeli: bool} $filters
+     * @param array<string, mixed> $user
      * @return array{sql: string, params: array<string, mixed>}
      */
-    private static function buildAylikOzetWhereClause(array $filters)
+    private static function buildAylikOzetWhereClause(array $filters, array $user)
     {
         $where = ['ay = :ay'];
         $params = ['ay' => $filters['ay']];
         if ($filters['sube_id'] > 0) {
             $where[] = 'sube_id = :sube_id';
             $params['sube_id'] = $filters['sube_id'];
+        } else {
+            $allowedSubeIds = SubeScope::allowedSubeIds($user);
+            if (count($allowedSubeIds) > 0) {
+                $placeholders = [];
+                foreach ($allowedSubeIds as $index => $subeId) {
+                    $key = 'allowed_sube_id_' . $index;
+                    $placeholders[] = ':' . $key;
+                    $params[$key] = $subeId;
+                }
+                $where[] = 'sube_id IN (' . implode(', ', $placeholders) . ')';
+            }
         }
         if ($filters['departman_id'] > 0) {
             $where[] = 'departman_id = :departman_id';
@@ -569,10 +593,13 @@ class YonetimController
         ];
     }
 
-    /** @param array{ay: string, sube_id: int, departman_id: int, sadece_revizeli: bool} $filters */
-    private static function buildAylikOzetPayload(PDO $pdo, array $filters)
+    /**
+     * @param array{ay: string, sube_id: int, departman_id: int, sadece_revizeli: bool} $filters
+     * @param array<string, mixed> $user
+     */
+    private static function buildAylikOzetPayload(PDO $pdo, array $filters, array $user)
     {
-        $where = self::buildAylikOzetWhereClause($filters);
+        $where = self::buildAylikOzetWhereClause($filters, $user);
         $stmt = $pdo->prepare(
             'SELECT * FROM aylik_ozet_satirlari WHERE ' . $where['sql'] . ' ORDER BY personel_id ASC'
         );

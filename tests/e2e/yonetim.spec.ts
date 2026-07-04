@@ -76,9 +76,22 @@ test.describe("yonetim paneli ve aylik ozet", () => {
     await expect(page.getByTestId("aylik-kapanis-ozeti-section")).toBeVisible();
     await expect(page.locator(".modal-header h2").first()).toContainText("Raporlar");
     await expect(page.getByTestId("aylik-kapanis-ozeti-section").locator("h2")).toContainText("Aylık Kapanış Özeti");
-    await expect(
-      page.getByTestId("aylik-kapanis-ozeti-section").locator(".raporlar-table tbody tr")
-    ).toHaveCount(2);
+    const aylikSection = page.getByTestId("aylik-kapanis-ozeti-section");
+    const aylikOzetTable = aylikSection.locator(".raporlar-table tbody");
+    await expect(aylikOzetTable.locator("tr")).toHaveCount(1);
+    await expect(aylikOzetTable).toContainText("Mehmet Kaya");
+    await expect(aylikOzetTable).toContainText("Depolama");
+    await expect(aylikOzetTable).not.toContainText("Ayşe Yılmaz");
+    await expect(aylikOzetTable).not.toContainText("Merkez");
+
+    const subeSelect = aylikSection.locator('[name="aylik-ozet-sube"]');
+    const depolamaOption = subeSelect.locator("option").filter({ hasText: "Depolama" }).first();
+    const depolamaValue = await depolamaOption.getAttribute("value");
+    await subeSelect.selectOption(depolamaValue!);
+    await aylikSection.getByRole("button", { name: "Özeti Getir" }).click();
+    await expect(aylikOzetTable.locator("tr")).toHaveCount(1);
+    await expect(aylikOzetTable).toContainText("Mehmet Kaya");
+    await expect(aylikOzetTable).toContainText("Depolama");
 
     await page.getByTestId("aylik-ozet-bolum-onay").click();
     await expect(page.getByText("Seçili ay için bölüm onayı verildi.")).toBeVisible();

@@ -192,4 +192,40 @@ describe("personeller.api", () => {
       tc_kimlik_no: "12345678901"
     });
   });
+
+  it("keeps empty PUT payload as an explicit empty object", async () => {
+    const fetchMock = vi.fn(async () =>
+      createJsonResponse(
+        {
+          data: {
+            ana_kart: {
+              id: 12,
+              tc_kimlik_no: "12345678901",
+              ad: "Ayse",
+              soyad: "Yilmaz",
+              aktif_durum: "AKTIF"
+            }
+          },
+          meta: {},
+          errors: []
+        },
+        200
+      )
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await updatePersonel(12, {});
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("/api/personeller/12");
+    expect(init.method).toBe("PUT");
+    expect(init.body).toBe("{}");
+    expect(result).toMatchObject({
+      id: 12,
+      ad: "Ayse",
+      soyad: "Yilmaz",
+      aktif_durum: "AKTIF",
+      tc_kimlik_no: "12345678901"
+    });
+  });
 });

@@ -813,6 +813,7 @@ export function KayitSurecWorkspace({
         if (payload.surec_turu === "ISTEN_AYRILMA") {
           try {
             const refreshed = await refetchPersonelDetailAfterIstenAyrilma(payload.personel_id);
+            commitPersonelUpdateToCaches(refreshed);
             setPersoneller((prev) => prev.map((item) => (item.id === refreshed.id ? refreshed : item)));
           } catch {
             /* Personel detay önbelleği / liste satırı güncellenemedi. */

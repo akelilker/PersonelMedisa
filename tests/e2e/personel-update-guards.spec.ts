@@ -77,6 +77,20 @@ test.describe("personel update guards (S51-A)", () => {
     expect(result.status).toBe(403);
   });
 
+  test("MUHASEBE empty personel update is accepted as no-op", async ({ page }) => {
+    await loginAs(page, "MUHASEBE");
+
+    const result = await putPersonelApi(page, 1, {});
+
+    expect(result.status).toBe(200);
+    const anaKart = result.body.data?.ana_kart as Record<string, unknown> | undefined;
+    expect(anaKart?.id).toBe(1);
+    expect(anaKart?.ad).toBe("Ayşe");
+    expect(anaKart?.soyad).toBe("Yılmaz");
+    expect(anaKart?.tc_kimlik_no).toBe("12345678901");
+    expect(anaKart?.aktif_durum).toBe("AKTIF");
+  });
+
   test("MUHASEBE cannot change sube_id via PUT", async ({ page }) => {
     await loginAs(page, "MUHASEBE");
 

@@ -197,6 +197,7 @@ test.describe("raporlar aylik ozet koprusu", () => {
     expect(url.searchParams.get("donem")).toBe(selectedAy);
     expect(url.searchParams.get("baslangic")).toBe(`${selectedAy}-01`);
     expect(url.searchParams.get("bitis")).toMatch(new RegExp(`^${selectedAy}-\\d{2}$`));
+    expect(url.searchParams.get("sube_id")).toBeNull();
 
     await expect(page.locator('[name="rapor-turu"]')).toHaveValue("personel-ozet");
     await expect(page.locator('[name="rapor-bas"]')).toHaveValue(url.searchParams.get("baslangic"));
@@ -211,6 +212,57 @@ test.describe("raporlar aylik ozet koprusu", () => {
     await expect(kaynakMeta).toContainText("Mühürlü snapshot");
     await expect(kaynakMeta).toContainText(`Dönem: ${selectedAy}`);
 
+    expect(runtimeErrors).toEqual([]);
+  });
+
+  test("aylik kapanis ozetinde secili sube koprusu sube_id query ve api istegini tasir", async ({ page }) => {
+    const runtimeErrors: string[] = [];
+    const raporRequests: string[] = [];
+    page.on("pageerror", (error) => {
+      runtimeErrors.push(error.message);
+    });
+    page.on("request", (request) => {
+      if (request.method() === "GET" && request.url().includes("/api/raporlar/personel-ozet")) {
+        raporRequests.push(request.url());
+      }
+    });
+
+    await page.goto("/raporlar");
+    await expect(page).toHaveURL(/\/raporlar(?:\?.*)?$/);
+
+    const aylikSection = page.getByTestId("aylik-kapanis-ozeti-section");
+    await expect(aylikSection).toBeVisible();
+
+    const subeSelect = aylikSection.locator('[name="aylik-ozet-sube"]');
+    const merkezOption = subeSelect.locator("option").filter({ hasText: "Merkez" }).first();
+    const merkezValue = await merkezOption.getAttribute("value");
+    expect(merkezValue).toBeTruthy();
+    await subeSelect.selectOption(merkezValue!);
+    await aylikSection.getByRole("button", { name: "Özeti Getir" }).click();
+
+    await expect(aylikSection.locator(".raporlar-table tbody tr")).toHaveCount(1);
+    await expect(aylikSection.locator(".raporlar-table tbody")).toContainText("Ayşe Yılmaz");
+    await expect(aylikSection.locator(".raporlar-table tbody")).not.toContainText("Mehmet Kaya");
+
+    const selectedAy = await aylikSection.locator("[name='aylik-ozet-ay']").inputValue();
+    const raporlardaGoruntule = aylikSection.getByTestId("aylik-ozet-raporlarda-goruntule");
+    await expect(raporlardaGoruntule).toBeVisible();
+    await raporlardaGoruntule.click();
+
+    const url = new URL(page.url());
+    expect(url.pathname.endsWith("/raporlar")).toBe(true);
+    expect(url.searchParams.get("rapor")).toBe("personel-ozet");
+    expect(url.searchParams.get("donem")).toBe(selectedAy);
+    expect(url.searchParams.get("sube_id")).toBe(merkezValue);
+
+    const resultCard = page.getByTestId("raporlar-resmi-sonuc");
+    await expect(resultCard).toBeVisible();
+    await expect(resultCard.locator("tbody")).toContainText("Ayşe Yılmaz");
+    await expect(resultCard.locator("tbody")).not.toContainText("Mehmet Kaya");
+
+    expect(raporRequests.some((requestUrl) => requestUrl.includes(`sube_id=${merkezValue}`))).toBe(
+      true
+    );
     expect(runtimeErrors).toEqual([]);
   });
 });

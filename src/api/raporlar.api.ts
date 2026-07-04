@@ -88,6 +88,7 @@ export async function fetchRapor(
   const path = appendQueryParams(RAPOR_ENDPOINTS[raporTipi], {
     personel_id: filters?.personel_id,
     departman_id: filters?.departman_id,
+    sube_id: filters?.sube_id,
     baslangic_tarihi: filters?.baslangic_tarihi,
     bitis_tarihi: filters?.bitis_tarihi,
     aktiflik: filters?.aktiflik,

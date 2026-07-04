@@ -15,6 +15,7 @@ export type RaporAktiflik = "aktif" | "pasif" | "tum";
 export type RaporFiltreleri = {
   personel_id?: number;
   departman_id?: number;
+  sube_id?: number;
   baslangic_tarihi?: string;
   bitis_tarihi?: string;
   aktiflik?: RaporAktiflik;

@@ -14,6 +14,7 @@ const RAPOR_TIPI_SET = new Set<RaporTipi>([
 export type RaporQueryExtraFilters = {
   muhur_id?: number;
   donem?: string;
+  sube_id?: number;
 };
 
 export type RaporQueryPrefillResult = {
@@ -72,6 +73,7 @@ export type RaporlarPrefillUrlParams = {
   donem?: string;
   muhur_id?: number;
   personel_id?: number;
+  sube_id?: number;
 };
 
 export function donemToAyTarihAraligi(donem: string): { baslangic: string; bitis: string } | undefined {
@@ -112,6 +114,10 @@ export function buildRaporlarPrefillUrl(params: RaporlarPrefillUrlParams): strin
     searchParams.set("personel_id", String(params.personel_id));
   }
 
+  if (params.sube_id !== undefined && params.sube_id > 0) {
+    searchParams.set("sube_id", String(params.sube_id));
+  }
+
   return `/raporlar?${searchParams.toString()}`;
 }
 
@@ -132,6 +138,11 @@ export function parseRaporlarQueryPrefill(searchParams: URLSearchParams): RaporQ
   const donem = parseDonemQueryParam(searchParams.get("donem"));
   if (donem !== undefined) {
     extraFilters.donem = donem;
+  }
+
+  const subeId = parsePositiveIntQueryParam(searchParams.get("sube_id"));
+  if (subeId !== undefined) {
+    extraFilters.sube_id = subeId;
   }
 
   const personelId = parsePositiveIntQueryParam(searchParams.get("personel_id"));

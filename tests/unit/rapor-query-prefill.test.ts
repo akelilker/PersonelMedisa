@@ -30,14 +30,15 @@ describe("rapor-query-prefill", () => {
         bitis: "2026-04-30",
         donem: "2026-04",
         muhur_id: 123,
-        personel_id: 42
+        personel_id: 42,
+        sube_id: 1
       })
     ).toBe(
-      "/raporlar?rapor=personel-ozet&baslangic=2026-04-01&bitis=2026-04-30&donem=2026-04&muhur_id=123&personel_id=42"
+      "/raporlar?rapor=personel-ozet&baslangic=2026-04-01&bitis=2026-04-30&donem=2026-04&muhur_id=123&personel_id=42&sube_id=1"
     );
   });
 
-  it("omits invalid donem and non-positive muhur_id from url", () => {
+  it("omits invalid donem and non-positive optional ids from url", () => {
     expect(
       buildRaporlarPrefillUrl({
         rapor: "personel-ozet",
@@ -45,7 +46,8 @@ describe("rapor-query-prefill", () => {
         bitis: "2026-04-30",
         donem: "2026-ab",
         muhur_id: 0,
-        personel_id: 0
+        personel_id: 0,
+        sube_id: 0
       })
     ).toBe("/raporlar?rapor=personel-ozet&baslangic=2026-04-01&bitis=2026-04-30");
   });
@@ -72,6 +74,28 @@ describe("rapor-query-prefill", () => {
     ).toBeUndefined();
   });
 
+  it("parses sube_id from query and ignores invalid values", () => {
+    expect(
+      parseRaporlarQueryPrefill(
+        new URLSearchParams(
+          "rapor=personel-ozet&baslangic=2026-04-01&bitis=2026-04-30&sube_id=1"
+        )
+      ).extraFilters.sube_id
+    ).toBe(1);
+
+    expect(
+      parseRaporlarQueryPrefill(
+        new URLSearchParams("rapor=personel-ozet&baslangic=2026-04-01&bitis=2026-04-30&sube_id=0")
+      ).extraFilters.sube_id
+    ).toBeUndefined();
+
+    expect(
+      parseRaporlarQueryPrefill(
+        new URLSearchParams("rapor=personel-ozet&baslangic=2026-04-01&bitis=2026-04-30&sube_id=abc")
+      ).extraFilters.sube_id
+    ).toBeUndefined();
+  });
+
   it("round-trips builder output through parser", () => {
     const url = buildRaporlarPrefillUrl({
       rapor: "personel-ozet",
@@ -79,7 +103,8 @@ describe("rapor-query-prefill", () => {
       bitis: "2026-04-30",
       donem: "2026-04",
       muhur_id: 123,
-      personel_id: 42
+      personel_id: 42,
+      sube_id: 1
     });
     const searchParams = new URLSearchParams(url.split("?")[1] ?? "");
     const parsed = parseRaporlarQueryPrefill(searchParams);
@@ -88,7 +113,7 @@ describe("rapor-query-prefill", () => {
     expect(parsed.baslangicTarihi).toBe("2026-04-01");
     expect(parsed.bitisTarihi).toBe("2026-04-30");
     expect(parsed.personelId).toBe(42);
-    expect(parsed.extraFilters).toEqual({ donem: "2026-04", muhur_id: 123 });
+    expect(parsed.extraFilters).toEqual({ donem: "2026-04", muhur_id: 123, sube_id: 1 });
     expect(parsed.shouldAutoRun).toBe(true);
   });
 });

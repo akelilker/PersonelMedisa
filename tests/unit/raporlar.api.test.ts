@@ -571,4 +571,55 @@ describe("raporlar.api", () => {
     expect(url).not.toContain("muhur_id=");
     expect(url).not.toContain("donem=");
   });
+
+  it("appends sube_id to query string when provided", async () => {
+    const fetchMock = vi.fn(async () =>
+      createJsonResponse(
+        {
+          data: { items: [] },
+          meta: { page: 1, limit: 10, total: 0, total_pages: 1, has_next_page: false },
+          errors: []
+        },
+        200
+      )
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await fetchRapor("personel-ozet", {
+      baslangic_tarihi: "2026-04-01",
+      bitis_tarihi: "2026-04-30",
+      donem: "2026-04",
+      sube_id: 1,
+      page: 1,
+      limit: 10
+    });
+
+    const [url] = fetchMock.mock.calls[0] as [string];
+    expect(url).toContain("sube_id=1");
+    expect(url).not.toContain("sube_id=undefined");
+  });
+
+  it("omits empty sube_id from query string", async () => {
+    const fetchMock = vi.fn(async () =>
+      createJsonResponse(
+        {
+          data: { items: [] },
+          meta: { page: 1, limit: 10, total: 0, total_pages: 1, has_next_page: false },
+          errors: []
+        },
+        200
+      )
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await fetchRapor("personel-ozet", {
+      baslangic_tarihi: "2026-04-01",
+      bitis_tarihi: "2026-04-30",
+      page: 1,
+      limit: 10
+    });
+
+    const [url] = fetchMock.mock.calls[0] as [string];
+    expect(url).not.toContain("sube_id=");
+  });
 });

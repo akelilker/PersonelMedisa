@@ -344,11 +344,13 @@ function AylikKapanisOzetiSection() {
   if (result && canViewRaporlar) {
     const tarihAraligi = donemToAyTarihAraligi(filters.ay);
     if (tarihAraligi) {
+      const parsedSubeId = filters.subeId ? Number.parseInt(filters.subeId, 10) : Number.NaN;
       aylikRaporlarLink = buildRaporlarPrefillUrl({
         rapor: "personel-ozet",
         baslangic: tarihAraligi.baslangic,
         bitis: tarihAraligi.bitis,
-        donem: filters.ay
+        donem: filters.ay,
+        ...(Number.isFinite(parsedSubeId) && parsedSubeId > 0 ? { sube_id: parsedSubeId } : {})
       });
     }
   }
@@ -601,6 +603,7 @@ export function RaporlarPage() {
     return {
       personel_id: parseOptionalPositiveInt(activeForm.personelId),
       departman_id: parseOptionalPositiveInt(activeForm.departmanId),
+      sube_id: activeExtraFilters.sube_id,
       baslangic_tarihi: activeForm.baslangicTarihi || undefined,
       bitis_tarihi: activeForm.bitisTarihi || undefined,
       aktiflik: activeForm.aktiflik,

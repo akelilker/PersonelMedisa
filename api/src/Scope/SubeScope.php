@@ -84,6 +84,50 @@ class SubeScope
     }
 
     /**
+     * @param array<int, string> $where
+     * @param array<string, mixed> $params
+     * @param int|null $scope
+     * @param array<int, int> $allowedSubeIds
+     */
+    public static function appendSubeFilter(array &$where, array &$params, $scope, array $allowedSubeIds, $column, $paramPrefix = 'scope')
+    {
+        if ($scope !== null) {
+            $key = $paramPrefix . '_sube_id';
+            $where[] = $column . ' = :' . $key;
+            $params[$key] = (int) $scope;
+
+            return;
+        }
+
+        if (count($allowedSubeIds) === 0) {
+            return;
+        }
+
+        $placeholders = [];
+        foreach ($allowedSubeIds as $index => $subeId) {
+            $key = $paramPrefix . '_allowed_sube_id_' . $index;
+            $placeholders[] = ':' . $key;
+            $params[$key] = (int) $subeId;
+        }
+
+        $where[] = $column . ' IN (' . implode(', ', $placeholders) . ')';
+    }
+
+    /** @param array<int, int> $allowedSubeIds */
+    public static function assertSealAccess($sealSubeId, $scope, array $allowedSubeIds)
+    {
+        $sealSubeId = (int) $sealSubeId;
+
+        if (count($allowedSubeIds) > 0 && !in_array($sealSubeId, $allowedSubeIds, true)) {
+            JsonResponse::forbidden('Bu kayit aktif sube baglaminda goruntulenemiyor.');
+        }
+
+        if ($scope !== null && $sealSubeId !== (int) $scope) {
+            JsonResponse::forbidden('Bu kayit aktif sube baglaminda goruntulenemiyor.');
+        }
+    }
+
+    /**
      * @param array<string, mixed> $user
      * @return array<int, int>
      */

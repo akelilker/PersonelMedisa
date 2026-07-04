@@ -36,6 +36,7 @@ class EkOdemeKesintiController
         $user = AuthMiddleware::authenticate($request, true);
         RolePermissions::assert($user, 'finans.view');
         $scope = SubeScope::resolveScope($user, $request);
+        $allowedSubeIds = SubeScope::allowedSubeIds($user);
 
         $page = max(1, (int) ($request->getQuery('page', 1) ?: 1));
         $limit = max(1, min(self::MAX_LIMIT, (int) ($request->getQuery('limit', 20) ?: 20)));
@@ -51,10 +52,7 @@ class EkOdemeKesintiController
         $where = ['1=1'];
         $params = [];
 
-        if ($scope !== null) {
-            $where[] = 'p.sube_id = :scope_sube_id';
-            $params['scope_sube_id'] = $scope;
-        }
+        SubeScope::appendSubeFilter($where, $params, $scope, $allowedSubeIds, 'p.sube_id');
 
         self::appendListFilters($request, $where, $params);
 

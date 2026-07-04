@@ -98,6 +98,73 @@ const PERSONEL_SUBE_BY_ID: Record<number, number> = {
   2: 2
 };
 
+const MUHUR_SEAL_SUBE_BY_ID: Record<number, number> = {
+  2: 2,
+  101: 1,
+  123: 1
+};
+
+function personelMatchesRaporScope(personelId: number, subeScope: number | null, allowedSubeIds: number[]): boolean {
+  const personelSube = PERSONEL_SUBE_BY_ID[personelId];
+  if (personelSube === undefined) {
+    return false;
+  }
+
+  if (subeScope !== null) {
+    return personelSube === subeScope;
+  }
+
+  if (allowedSubeIds.length > 0) {
+    return allowedSubeIds.includes(personelSube);
+  }
+
+  return true;
+}
+
+function scopeRaporItems<T extends { personel_id?: unknown }>(
+  items: T[],
+  subeScope: number | null,
+  allowedSubeIds: number[] = []
+): T[] {
+  return items.filter((item) => {
+    const personelId = item.personel_id;
+    if (typeof personelId !== "number") {
+      return false;
+    }
+    return personelMatchesRaporScope(personelId, subeScope, allowedSubeIds);
+  });
+}
+
+function isMuhurSealAccessDenied(muhurId: number, subeScope: number | null, allowedSubeIds: number[]): boolean {
+  const sealSubeId = MUHUR_SEAL_SUBE_BY_ID[muhurId];
+  if (sealSubeId === undefined) {
+    return false;
+  }
+
+  if (allowedSubeIds.length > 0 && !allowedSubeIds.includes(sealSubeId)) {
+    return true;
+  }
+
+  if (subeScope !== null && subeScope !== sealSubeId) {
+    return true;
+  }
+
+  return false;
+}
+
+function finansItemMatchesScope(
+  personelId: number,
+  subeScope: number | null,
+  allowedSubeIds: number[]
+): boolean {
+  const personelSube = PERSONEL_SUBE_BY_ID[personelId];
+  if (personelSube === undefined) {
+    return allowedSubeIds.length === 0 && subeScope === null;
+  }
+
+  return personelMatchesRaporScope(personelId, subeScope, allowedSubeIds);
+}
+
 const PERSONEL_OZET_PAGINATED_ITEMS: Record<string, unknown>[] = [
   {
     personel_id: 1,
@@ -121,19 +188,10 @@ const PERSONEL_OZET_PAGINATED_ITEMS: Record<string, unknown>[] = [
 
 function filterRaporItemsBySubeScope(
   items: Record<string, unknown>[],
-  subeScope: number | null
+  subeScope: number | null,
+  allowedSubeIds: number[] = []
 ): Record<string, unknown>[] {
-  if (subeScope === null) {
-    return items;
-  }
-
-  return items.filter((item) => {
-    const personelId = item.personel_id;
-    if (typeof personelId !== "number") {
-      return false;
-    }
-    return PERSONEL_SUBE_BY_ID[personelId] === subeScope;
-  });
+  return scopeRaporItems(items, subeScope, allowedSubeIds);
 }
 
 function personelOzetPaginatedBody(
@@ -141,6 +199,7 @@ function personelOzetPaginatedBody(
   pageLimit: number,
   departmanId?: number,
   subeScope: number | null = null,
+  allowedSubeIds: number[] = [],
   options?: {
     personelId?: number;
     baslangicTarihi?: string | null;
@@ -148,13 +207,7 @@ function personelOzetPaginatedBody(
     muhurId?: number | null;
   }
 ) {
-  let scopedItems = PERSONEL_OZET_PAGINATED_ITEMS;
-  if (subeScope !== null) {
-    scopedItems = scopedItems.filter((item) => {
-      const personelId = item.personel_id;
-      return typeof personelId === "number" && PERSONEL_SUBE_BY_ID[personelId] === subeScope;
-    });
-  }
+  let scopedItems = scopeRaporItems(PERSONEL_OZET_PAGINATED_ITEMS, subeScope, allowedSubeIds);
 
   let filtered =
     departmanId === undefined
@@ -171,7 +224,7 @@ function personelOzetPaginatedBody(
     options?.muhurId
   );
 
-  if (departmanId === undefined && subeScope === null && options?.personelId === undefined) {
+  if (departmanId === undefined && subeScope === null && allowedSubeIds.length === 0 && options?.personelId === undefined) {
     const total = PERSONEL_OZET_PAGINATED_ITEMS.length;
     const totalPages = 2;
     const items =
@@ -240,6 +293,7 @@ function devamsizlikPaginatedBody(
   pageLimit: number,
   departmanId?: number,
   subeScope: number | null = null,
+  allowedSubeIds: number[] = [],
   options?: {
     personelId?: number;
     baslangicTarihi?: string | null;
@@ -247,13 +301,7 @@ function devamsizlikPaginatedBody(
     muhurId?: number | null;
   }
 ) {
-  let scopedItems = DEVAMSIZLIK_PAGINATED_ITEMS;
-  if (subeScope !== null) {
-    scopedItems = scopedItems.filter((item) => {
-      const personelId = item.personel_id;
-      return typeof personelId === "number" && PERSONEL_SUBE_BY_ID[personelId] === subeScope;
-    });
-  }
+  let scopedItems = scopeRaporItems(DEVAMSIZLIK_PAGINATED_ITEMS, subeScope, allowedSubeIds);
 
   let filtered =
     departmanId === undefined
@@ -273,6 +321,7 @@ function devamsizlikPaginatedBody(
   if (
     departmanId === undefined &&
     subeScope === null &&
+    allowedSubeIds.length === 0 &&
     options?.personelId === undefined &&
     !options?.baslangicTarihi &&
     !options?.bitisTarihi
@@ -339,6 +388,7 @@ function izinPaginatedBody(
   pageLimit: number,
   departmanId?: number,
   subeScope: number | null = null,
+  allowedSubeIds: number[] = [],
   options?: {
     personelId?: number;
     baslangicTarihi?: string | null;
@@ -346,13 +396,7 @@ function izinPaginatedBody(
     muhurId?: number | null;
   }
 ) {
-  let scopedItems = IZIN_PAGINATED_ITEMS;
-  if (subeScope !== null) {
-    scopedItems = scopedItems.filter((item) => {
-      const personelId = item.personel_id;
-      return typeof personelId === "number" && PERSONEL_SUBE_BY_ID[personelId] === subeScope;
-    });
-  }
+  let scopedItems = scopeRaporItems(IZIN_PAGINATED_ITEMS, subeScope, allowedSubeIds);
 
   let filtered =
     departmanId === undefined
@@ -372,6 +416,7 @@ function izinPaginatedBody(
   if (
     departmanId === undefined &&
     subeScope === null &&
+    allowedSubeIds.length === 0 &&
     options?.personelId === undefined &&
     !options?.baslangicTarihi &&
     !options?.bitisTarihi
@@ -436,19 +481,14 @@ function isKazasiPaginatedBody(
   pageLimit: number,
   departmanId?: number,
   subeScope: number | null = null,
+  allowedSubeIds: number[] = [],
   options?: {
     personelId?: number;
     baslangicTarihi?: string | null;
     bitisTarihi?: string | null;
   }
 ) {
-  let scopedItems = IS_KAZASI_PAGINATED_ITEMS;
-  if (subeScope !== null) {
-    scopedItems = scopedItems.filter((item) => {
-      const personelId = item.personel_id;
-      return typeof personelId === "number" && PERSONEL_SUBE_BY_ID[personelId] === subeScope;
-    });
-  }
+  let scopedItems = scopeRaporItems(IS_KAZASI_PAGINATED_ITEMS, subeScope, allowedSubeIds);
 
   let filtered =
     departmanId === undefined
@@ -462,6 +502,7 @@ function isKazasiPaginatedBody(
   if (
     departmanId === undefined &&
     subeScope === null &&
+    allowedSubeIds.length === 0 &&
     options?.personelId === undefined &&
     !options?.baslangicTarihi &&
     !options?.bitisTarihi
@@ -531,6 +572,7 @@ function bildirimPaginatedBody(
   pageLimit: number,
   departmanId?: number,
   subeScope: number | null = null,
+  allowedSubeIds: number[] = [],
   options?: {
     personelId?: number;
     baslangicTarihi?: string | null;
@@ -538,13 +580,7 @@ function bildirimPaginatedBody(
     muhurId?: number | null;
   }
 ) {
-  let scopedItems = BILDIRIM_PAGINATED_ITEMS;
-  if (subeScope !== null) {
-    scopedItems = scopedItems.filter((item) => {
-      const personelId = item.personel_id;
-      return typeof personelId === "number" && PERSONEL_SUBE_BY_ID[personelId] === subeScope;
-    });
-  }
+  let scopedItems = scopeRaporItems(BILDIRIM_PAGINATED_ITEMS, subeScope, allowedSubeIds);
 
   let filtered =
     departmanId === undefined
@@ -564,6 +600,7 @@ function bildirimPaginatedBody(
   if (
     departmanId === undefined &&
     subeScope === null &&
+    allowedSubeIds.length === 0 &&
     options?.personelId === undefined &&
     !options?.baslangicTarihi &&
     !options?.bitisTarihi
@@ -628,19 +665,14 @@ function tesvikPaginatedBody(
   pageLimit: number,
   departmanId?: number,
   subeScope: number | null = null,
+  allowedSubeIds: number[] = [],
   options?: {
     personelId?: number;
     baslangicTarihi?: string | null;
     bitisTarihi?: string | null;
   }
 ) {
-  let scopedItems = TESVIK_PAGINATED_ITEMS;
-  if (subeScope !== null) {
-    scopedItems = scopedItems.filter((item) => {
-      const personelId = item.personel_id;
-      return typeof personelId === "number" && PERSONEL_SUBE_BY_ID[personelId] === subeScope;
-    });
-  }
+  let scopedItems = scopeRaporItems(TESVIK_PAGINATED_ITEMS, subeScope, allowedSubeIds);
 
   let filtered =
     departmanId === undefined
@@ -654,6 +686,7 @@ function tesvikPaginatedBody(
   if (
     departmanId === undefined &&
     subeScope === null &&
+    allowedSubeIds.length === 0 &&
     options?.personelId === undefined &&
     !options?.baslangicTarihi &&
     !options?.bitisTarihi
@@ -723,19 +756,14 @@ function cezaPaginatedBody(
   pageLimit: number,
   departmanId?: number,
   subeScope: number | null = null,
+  allowedSubeIds: number[] = [],
   options?: {
     personelId?: number;
     baslangicTarihi?: string | null;
     bitisTarihi?: string | null;
   }
 ) {
-  let scopedItems = CEZA_PAGINATED_ITEMS;
-  if (subeScope !== null) {
-    scopedItems = scopedItems.filter((item) => {
-      const personelId = item.personel_id;
-      return typeof personelId === "number" && PERSONEL_SUBE_BY_ID[personelId] === subeScope;
-    });
-  }
+  let scopedItems = scopeRaporItems(CEZA_PAGINATED_ITEMS, subeScope, allowedSubeIds);
 
   let filtered =
     departmanId === undefined
@@ -749,6 +777,7 @@ function cezaPaginatedBody(
   if (
     departmanId === undefined &&
     subeScope === null &&
+    allowedSubeIds.length === 0 &&
     options?.personelId === undefined &&
     !options?.baslangicTarihi &&
     !options?.bitisTarihi
@@ -818,19 +847,14 @@ function ekstraPrimPaginatedBody(
   pageLimit: number,
   departmanId?: number,
   subeScope: number | null = null,
+  allowedSubeIds: number[] = [],
   options?: {
     personelId?: number;
     baslangicTarihi?: string | null;
     bitisTarihi?: string | null;
   }
 ) {
-  let scopedItems = EKSTRA_PRIM_PAGINATED_ITEMS;
-  if (subeScope !== null) {
-    scopedItems = scopedItems.filter((item) => {
-      const personelId = item.personel_id;
-      return typeof personelId === "number" && PERSONEL_SUBE_BY_ID[personelId] === subeScope;
-    });
-  }
+  let scopedItems = scopeRaporItems(EKSTRA_PRIM_PAGINATED_ITEMS, subeScope, allowedSubeIds);
 
   let filtered =
     departmanId === undefined
@@ -844,6 +868,7 @@ function ekstraPrimPaginatedBody(
   if (
     departmanId === undefined &&
     subeScope === null &&
+    allowedSubeIds.length === 0 &&
     options?.personelId === undefined &&
     !options?.baslangicTarihi &&
     !options?.bitisTarihi
@@ -1495,6 +1520,15 @@ export async function mockApi(page: Page, role: MockUserRole) {
       kalem_turu: "AVANS",
       tutar: 2500,
       aciklama: "Mevcut finans kalemi",
+      state: "AKTIF"
+    },
+    {
+      id: 902,
+      personel_id: 2,
+      donem: "2026-04",
+      kalem_turu: "PRIM",
+      tutar: 1200,
+      aciklama: "Sube 2 finans kalemi",
       state: "AKTIF"
     }
   ];
@@ -4136,6 +4170,11 @@ let bildirimIdCounter = 800;
 
       const subeScope = getRequestSubeScope(request, url);
 
+      if (subeScope !== null && mockUserSubeIds.length > 0 && !mockUserSubeIds.includes(subeScope)) {
+        await fulfillJson(route, 403, errorBody("FORBIDDEN", "Secili sube icin yetkiniz yok."));
+        return;
+      }
+
       if (path === "/api/raporlar/personel-ozet") {
         const raporUrl = new URL(route.request().url());
         const pageNumber = Number.parseInt(raporUrl.searchParams.get("page") ?? "1", 10) || 1;
@@ -4146,7 +4185,7 @@ let bildirimIdCounter = 800;
         const baslangicTarihi = raporUrl.searchParams.get("baslangic_tarihi");
         const bitisTarihi = raporUrl.searchParams.get("bitis_tarihi");
 
-        if (Number.isFinite(muhurId) && muhurId > 0 && subeScope !== null && subeScope !== 2) {
+        if (Number.isFinite(muhurId) && muhurId > 0 && isMuhurSealAccessDenied(muhurId, subeScope, mockUserSubeIds)) {
           await fulfillJson(
             route,
             403,
@@ -4172,6 +4211,7 @@ let bildirimIdCounter = 800;
             pageLimit,
             Number.isFinite(departmanId) ? departmanId : undefined,
             subeScope,
+            mockUserSubeIds,
             {
               personelId: Number.isFinite(personelId) ? personelId : undefined,
               baslangicTarihi,
@@ -4193,7 +4233,7 @@ let bildirimIdCounter = 800;
         const baslangicTarihi = raporUrl.searchParams.get("baslangic_tarihi");
         const bitisTarihi = raporUrl.searchParams.get("bitis_tarihi");
 
-        if (Number.isFinite(muhurId) && muhurId > 0 && subeScope !== null && subeScope !== 2) {
+        if (Number.isFinite(muhurId) && muhurId > 0 && isMuhurSealAccessDenied(muhurId, subeScope, mockUserSubeIds)) {
           await fulfillJson(
             route,
             403,
@@ -4219,6 +4259,7 @@ let bildirimIdCounter = 800;
             pageLimit,
             Number.isFinite(departmanId) ? departmanId : undefined,
             subeScope,
+            mockUserSubeIds,
             {
               personelId: Number.isFinite(personelId) ? personelId : undefined,
               baslangicTarihi,
@@ -4240,7 +4281,7 @@ let bildirimIdCounter = 800;
         const baslangicTarihi = raporUrl.searchParams.get("baslangic_tarihi");
         const bitisTarihi = raporUrl.searchParams.get("bitis_tarihi");
 
-        if (Number.isFinite(muhurId) && muhurId > 0 && subeScope !== null && subeScope !== 2) {
+        if (Number.isFinite(muhurId) && muhurId > 0 && isMuhurSealAccessDenied(muhurId, subeScope, mockUserSubeIds)) {
           await fulfillJson(
             route,
             403,
@@ -4266,6 +4307,7 @@ let bildirimIdCounter = 800;
             pageLimit,
             Number.isFinite(departmanId) ? departmanId : undefined,
             subeScope,
+            mockUserSubeIds,
             {
               personelId: Number.isFinite(personelId) ? personelId : undefined,
               baslangicTarihi,
@@ -4294,6 +4336,7 @@ let bildirimIdCounter = 800;
             pageLimit,
             Number.isFinite(departmanId) ? departmanId : undefined,
             subeScope,
+            mockUserSubeIds,
             {
               personelId: Number.isFinite(personelId) ? personelId : undefined,
               baslangicTarihi,
@@ -4321,6 +4364,7 @@ let bildirimIdCounter = 800;
             pageLimit,
             Number.isFinite(departmanId) ? departmanId : undefined,
             subeScope,
+            mockUserSubeIds,
             {
               personelId: Number.isFinite(personelId) ? personelId : undefined,
               baslangicTarihi,
@@ -4348,6 +4392,7 @@ let bildirimIdCounter = 800;
             pageLimit,
             Number.isFinite(departmanId) ? departmanId : undefined,
             subeScope,
+            mockUserSubeIds,
             {
               personelId: Number.isFinite(personelId) ? personelId : undefined,
               baslangicTarihi,
@@ -4375,6 +4420,7 @@ let bildirimIdCounter = 800;
             pageLimit,
             Number.isFinite(departmanId) ? departmanId : undefined,
             subeScope,
+            mockUserSubeIds,
             {
               personelId: Number.isFinite(personelId) ? personelId : undefined,
               baslangicTarihi,
@@ -4395,7 +4441,7 @@ let bildirimIdCounter = 800;
         const baslangicTarihi = raporUrl.searchParams.get("baslangic_tarihi");
         const bitisTarihi = raporUrl.searchParams.get("bitis_tarihi");
 
-        if (Number.isFinite(muhurId) && muhurId > 0 && subeScope !== null && subeScope !== 2) {
+        if (Number.isFinite(muhurId) && muhurId > 0 && isMuhurSealAccessDenied(muhurId, subeScope, mockUserSubeIds)) {
           await fulfillJson(
             route,
             403,
@@ -4421,6 +4467,7 @@ let bildirimIdCounter = 800;
             pageLimit,
             Number.isFinite(departmanId) ? departmanId : undefined,
             subeScope,
+            mockUserSubeIds,
             {
               personelId: Number.isFinite(personelId) ? personelId : undefined,
               baslangicTarihi,
@@ -4434,7 +4481,7 @@ let bildirimIdCounter = 800;
 
       const mockItems = RAPOR_MOCK_ITEMS[path];
       if (mockItems) {
-        const scopedItems = filterRaporItemsBySubeScope(mockItems, subeScope);
+        const scopedItems = filterRaporItemsBySubeScope(mockItems, subeScope, mockUserSubeIds);
         await fulfillJson(route, 200, raporListOkBody(scopedItems));
         return;
       }
@@ -4447,10 +4494,20 @@ let bildirimIdCounter = 800;
       if (await denyUnlessRolePermission(route, "finans.view")) {
         return;
       }
-      const url = new URL(route.request().url());
-      const personelId = Number.parseInt(url.searchParams.get("personel_id") ?? "", 10);
-      const kalemTuru = url.searchParams.get("kalem_turu");
+      const finansUrl = new URL(route.request().url());
+      const subeScope = getRequestSubeScope(request, finansUrl);
+
+      if (subeScope !== null && mockUserSubeIds.length > 0 && !mockUserSubeIds.includes(subeScope)) {
+        await fulfillJson(route, 403, errorBody("FORBIDDEN", "Secili sube icin yetkiniz yok."));
+        return;
+      }
+
+      const personelId = Number.parseInt(finansUrl.searchParams.get("personel_id") ?? "", 10);
+      const kalemTuru = finansUrl.searchParams.get("kalem_turu");
       const filtered = finansKalemleri.filter((item) => {
+        if (!finansItemMatchesScope(item.personel_id, subeScope, mockUserSubeIds)) {
+          return false;
+        }
         if (Number.isFinite(personelId) && item.personel_id !== personelId) {
           return false;
         }

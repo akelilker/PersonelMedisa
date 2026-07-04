@@ -43,6 +43,7 @@ class RaporlarController
     }
 
     $scope = SubeScope::resolveScope($user, $request);
+    $allowedSubeIds = SubeScope::allowedSubeIds($user);
 
     try {
       $pdo = Connection::get();
@@ -51,84 +52,88 @@ class RaporlarController
     }
 
     if ($tip === 'personel-ozet') {
-      self::showPersonelOzet($request, $pdo, $scope);
+      self::showPersonelOzet($request, $pdo, $scope, $allowedSubeIds);
       return;
     }
 
     if ($tip === 'devamsizlik') {
-      self::showDevamsizlik($request, $pdo, $scope);
+      self::showDevamsizlik($request, $pdo, $scope, $allowedSubeIds);
       return;
     }
 
     if ($tip === 'izin') {
-      self::showIzin($request, $pdo, $scope);
+      self::showIzin($request, $pdo, $scope, $allowedSubeIds);
       return;
     }
 
     if ($tip === 'is-kazasi') {
-      self::showIsKazasi($request, $pdo, $scope);
+      self::showIsKazasi($request, $pdo, $scope, $allowedSubeIds);
       return;
     }
 
     if ($tip === 'bildirim') {
-      self::showBildirim($request, $pdo, $scope);
+      self::showBildirim($request, $pdo, $scope, $allowedSubeIds);
       return;
     }
 
     if ($tip === 'tesvik' || $tip === 'ceza' || $tip === 'ekstra-prim') {
-      self::showFinansRapor($request, $pdo, $scope, $tip);
+      self::showFinansRapor($request, $pdo, $scope, $allowedSubeIds, $tip);
       return;
     }
 
-    self::showLegacyReport($pdo, $tip, $scope);
+    self::showLegacyReport($pdo, $tip, $scope, $allowedSubeIds);
   }
 
-  private static function showPersonelOzet(Request $request, PDO $pdo, $scope)
+  /** @param array<int, int> $allowedSubeIds */
+  private static function showPersonelOzet(Request $request, PDO $pdo, $scope, array $allowedSubeIds)
   {
     $filters = self::parseReportFilters($request);
-    $resolved = self::resolveReportSource($pdo, $scope, $filters);
+    $resolved = self::resolveReportSource($pdo, $scope, $filters, $allowedSubeIds);
 
     if ($resolved['kaynak'] === 'SNAPSHOT') {
-      $result = self::fetchPersonelOzetSnapshot($pdo, $resolved, $filters, $scope);
+      $result = self::fetchPersonelOzetSnapshot($pdo, $resolved, $filters, $scope, $allowedSubeIds);
     } else {
-      $result = self::fetchPersonelOzetLive($pdo, $filters, $scope, $resolved['donem']);
+      $result = self::fetchPersonelOzetLive($pdo, $filters, $scope, $resolved['donem'], $allowedSubeIds);
     }
 
     self::sendReportResponse($result['items'], $result['total'], $filters, $resolved, $scope);
   }
 
-  private static function showDevamsizlik(Request $request, PDO $pdo, $scope)
+  /** @param array<int, int> $allowedSubeIds */
+  private static function showDevamsizlik(Request $request, PDO $pdo, $scope, array $allowedSubeIds)
   {
     $filters = self::parseReportFilters($request);
-    $resolved = self::resolveReportSource($pdo, $scope, $filters);
+    $resolved = self::resolveReportSource($pdo, $scope, $filters, $allowedSubeIds);
 
     if ($resolved['kaynak'] === 'SNAPSHOT') {
-      $result = self::fetchDevamsizlikSnapshot($pdo, $resolved, $filters, $scope);
+      $result = self::fetchDevamsizlikSnapshot($pdo, $resolved, $filters, $scope, $allowedSubeIds);
     } else {
-      $result = self::fetchDevamsizlikLive($pdo, $filters, $scope, $resolved['donem']);
+      $result = self::fetchDevamsizlikLive($pdo, $filters, $scope, $resolved['donem'], $allowedSubeIds);
     }
 
     self::sendReportResponse($result['items'], $result['total'], $filters, $resolved, $scope);
   }
 
-  private static function showIzin(Request $request, PDO $pdo, $scope)
+  /** @param array<int, int> $allowedSubeIds */
+  private static function showIzin(Request $request, PDO $pdo, $scope, array $allowedSubeIds)
   {
     $filters = self::parseReportFilters($request);
-    $resolved = self::resolveReportSource($pdo, $scope, $filters);
+    $resolved = self::resolveReportSource($pdo, $scope, $filters, $allowedSubeIds);
 
     if ($resolved['kaynak'] === 'SNAPSHOT') {
-      $result = self::fetchIzinSnapshot($pdo, $resolved, $filters, $scope);
+      $result = self::fetchIzinSnapshot($pdo, $resolved, $filters, $scope, $allowedSubeIds);
     } else {
-      $result = self::fetchIzinLive($pdo, $filters, $scope, $resolved['donem']);
+      $result = self::fetchIzinLive($pdo, $filters, $scope, $resolved['donem'], $allowedSubeIds);
     }
 
     self::sendReportResponse($result['items'], $result['total'], $filters, $resolved, $scope);
   }
 
-  private static function showIsKazasi(Request $request, PDO $pdo, $scope)
+  /** @param array<int, int> $allowedSubeIds */
+  private static function showIsKazasi(Request $request, PDO $pdo, $scope, array $allowedSubeIds)
   {
     $filters = self::parseReportFilters($request);
-    $result = self::fetchIsKazasiFromSurec($pdo, $filters, $scope);
+    $result = self::fetchIsKazasiFromSurec($pdo, $filters, $scope, $allowedSubeIds);
     $resolved = [
       'kaynak' => 'SUREC',
       'muhur_id' => null,
@@ -138,25 +143,27 @@ class RaporlarController
     self::sendReportResponse($result['items'], $result['total'], $filters, $resolved, $scope);
   }
 
-  private static function showBildirim(Request $request, PDO $pdo, $scope)
+  /** @param array<int, int> $allowedSubeIds */
+  private static function showBildirim(Request $request, PDO $pdo, $scope, array $allowedSubeIds)
   {
     $filters = self::parseReportFilters($request);
-    $resolved = self::resolveReportSource($pdo, $scope, $filters);
+    $resolved = self::resolveReportSource($pdo, $scope, $filters, $allowedSubeIds);
 
     if ($resolved['kaynak'] === 'SNAPSHOT') {
-      $result = self::fetchBildirimSnapshot($pdo, $resolved, $filters, $scope);
+      $result = self::fetchBildirimSnapshot($pdo, $resolved, $filters, $scope, $allowedSubeIds);
     } else {
-      $result = self::fetchBildirimLive($pdo, $filters, $scope, $resolved['donem']);
+      $result = self::fetchBildirimLive($pdo, $filters, $scope, $resolved['donem'], $allowedSubeIds);
     }
 
     self::sendReportResponse($result['items'], $result['total'], $filters, $resolved, $scope);
   }
 
-  private static function showFinansRapor(Request $request, PDO $pdo, $scope, $tip)
+  /** @param array<int, int> $allowedSubeIds */
+  private static function showFinansRapor(Request $request, PDO $pdo, $scope, array $allowedSubeIds, $tip)
   {
     EkOdemeKesintiController::assertFinansTableReady($pdo);
     $filters = self::parseFinansReportFilters($request);
-    $result = self::fetchFinansKalemReport($pdo, $tip, $filters, $scope);
+    $result = self::fetchFinansKalemReport($pdo, $tip, $filters, $scope, $allowedSubeIds);
     $resolved = self::buildFinansResolvedMeta($filters);
 
     self::sendReportResponse($result['items'], $result['total'], $filters, $resolved, $scope);
@@ -233,7 +240,7 @@ class RaporlarController
    * @param array<string, mixed> $filters
    * @return array{kaynak: string, muhur_id: int|null, donem: string|null}
    */
-  private static function resolveReportSource(PDO $pdo, $scope, array $filters)
+  private static function resolveReportSource(PDO $pdo, $scope, array $filters, array $allowedSubeIds)
   {
     if ($filters['muhur_id'] !== null) {
       $seal = self::findSealById($pdo, (int) $filters['muhur_id']);
@@ -241,7 +248,7 @@ class RaporlarController
         JsonResponse::notFound('Aylik muhur kaydi bulunamadi.');
       }
 
-      self::assertSealScope((int) $seal['sube_id'], $scope);
+      SubeScope::assertSealAccess((int) $seal['sube_id'], $scope, $allowedSubeIds);
 
       return [
         'kaynak' => 'SNAPSHOT',
@@ -253,7 +260,7 @@ class RaporlarController
 
     $donem = $filters['donem'];
     if ($donem !== null) {
-      $seal = self::findSealForDonem($pdo, $donem, $scope);
+      $seal = self::findSealForDonem($pdo, $donem, $scope, $allowedSubeIds);
       if ($seal) {
         return [
           'kaynak' => 'SNAPSHOT',
@@ -277,7 +284,7 @@ class RaporlarController
    * @param array<string, mixed> $filters
    * @return array{items: array<int, array<string, mixed>>, total: int}
    */
-  private static function fetchPersonelOzetSnapshot(PDO $pdo, array $resolved, array $filters, $scope)
+  private static function fetchPersonelOzetSnapshot(PDO $pdo, array $resolved, array $filters, $scope, array $allowedSubeIds)
   {
     $where = ['1=1'];
     $params = [];
@@ -288,10 +295,7 @@ class RaporlarController
     } else {
       $where[] = 'm.donem = :donem';
       $params['donem'] = (string) $resolved['donem'];
-      if ($scope !== null) {
-        $where[] = 'm.sube_id = :scope_sube_id';
-        $params['scope_sube_id'] = $scope;
-      }
+      SubeScope::appendSubeFilter($where, $params, $scope, $allowedSubeIds, 'm.sube_id', 'muhur');
     }
 
     self::appendPersonelFilters($where, $params, $filters, 'p');
@@ -344,15 +348,12 @@ class RaporlarController
    * @param array<string, mixed> $filters
    * @return array{items: array<int, array<string, mixed>>, total: int}
    */
-  private static function fetchPersonelOzetLive(PDO $pdo, array $filters, $scope, $donem)
+  private static function fetchPersonelOzetLive(PDO $pdo, array $filters, $scope, $donem, array $allowedSubeIds)
   {
     $where = ['1=1'];
     $params = [];
 
-    if ($scope !== null) {
-      $where[] = 'p.sube_id = :scope_sube_id';
-      $params['scope_sube_id'] = $scope;
-    }
+    SubeScope::appendSubeFilter($where, $params, $scope, $allowedSubeIds, 'p.sube_id');
 
     self::appendPersonelFilters($where, $params, $filters, 'p');
 
@@ -405,7 +406,7 @@ class RaporlarController
    * @param array<string, mixed> $filters
    * @return array{items: array<int, array<string, mixed>>, total: int}
    */
-  private static function fetchDevamsizlikSnapshot(PDO $pdo, array $resolved, array $filters, $scope)
+  private static function fetchDevamsizlikSnapshot(PDO $pdo, array $resolved, array $filters, $scope, array $allowedSubeIds)
   {
     $where = ['1=1'];
     $params = [];
@@ -416,10 +417,7 @@ class RaporlarController
     } else {
       $where[] = 'm.donem = :donem';
       $params['donem'] = (string) $resolved['donem'];
-      if ($scope !== null) {
-        $where[] = 'm.sube_id = :scope_sube_id';
-        $params['scope_sube_id'] = $scope;
-      }
+      SubeScope::appendSubeFilter($where, $params, $scope, $allowedSubeIds, 'm.sube_id', 'muhur');
     }
 
     self::appendPersonelFilters($where, $params, $filters, 'p');
@@ -469,15 +467,12 @@ class RaporlarController
    * @param array<string, mixed> $filters
    * @return array{items: array<int, array<string, mixed>>, total: int}
    */
-  private static function fetchDevamsizlikLive(PDO $pdo, array $filters, $scope, $donem)
+  private static function fetchDevamsizlikLive(PDO $pdo, array $filters, $scope, $donem, array $allowedSubeIds)
   {
     $where = ['1=1'];
     $params = [];
 
-    if ($scope !== null) {
-      $where[] = 'p.sube_id = :scope_sube_id';
-      $params['scope_sube_id'] = $scope;
-    }
+    SubeScope::appendSubeFilter($where, $params, $scope, $allowedSubeIds, 'p.sube_id');
 
     self::appendPersonelFilters($where, $params, $filters, 'p');
     self::appendLiveDateFilters($where, $params, $filters, $donem, 'gp.tarih');
@@ -526,7 +521,7 @@ class RaporlarController
    * @param array<string, mixed> $filters
    * @return array{items: array<int, array<string, mixed>>, total: int}
    */
-  private static function fetchIzinSnapshot(PDO $pdo, array $resolved, array $filters, $scope)
+  private static function fetchIzinSnapshot(PDO $pdo, array $resolved, array $filters, $scope, array $allowedSubeIds)
   {
     $where = ['1=1'];
     $params = [];
@@ -537,10 +532,7 @@ class RaporlarController
     } else {
       $where[] = 'm.donem = :donem';
       $params['donem'] = (string) $resolved['donem'];
-      if ($scope !== null) {
-        $where[] = 'm.sube_id = :scope_sube_id';
-        $params['scope_sube_id'] = $scope;
-      }
+      SubeScope::appendSubeFilter($where, $params, $scope, $allowedSubeIds, 'm.sube_id', 'muhur');
     }
 
     self::appendPersonelFilters($where, $params, $filters, 'p');
@@ -594,15 +586,12 @@ class RaporlarController
    * @param array<string, mixed> $filters
    * @return array{items: array<int, array<string, mixed>>, total: int}
    */
-  private static function fetchIzinLive(PDO $pdo, array $filters, $scope, $donem)
+  private static function fetchIzinLive(PDO $pdo, array $filters, $scope, $donem, array $allowedSubeIds)
   {
     $where = ['1=1'];
     $params = [];
 
-    if ($scope !== null) {
-      $where[] = 'p.sube_id = :scope_sube_id';
-      $params['scope_sube_id'] = $scope;
-    }
+    SubeScope::appendSubeFilter($where, $params, $scope, $allowedSubeIds, 'p.sube_id');
 
     self::appendPersonelFilters($where, $params, $filters, 'p');
     self::appendLiveDateFilters($where, $params, $filters, $donem, 'gp.tarih');
@@ -654,15 +643,12 @@ class RaporlarController
    * @param array<string, mixed> $filters
    * @return array{items: array<int, array<string, mixed>>, total: int}
    */
-  private static function fetchIsKazasiFromSurec(PDO $pdo, array $filters, $scope)
+  private static function fetchIsKazasiFromSurec(PDO $pdo, array $filters, $scope, array $allowedSubeIds)
   {
     $where = ["sc.surec_turu = 'IS_KAZASI'"];
     $params = [];
 
-    if ($scope !== null) {
-      $where[] = 'p.sube_id = :scope_sube_id';
-      $params['scope_sube_id'] = $scope;
-    }
+    SubeScope::appendSubeFilter($where, $params, $scope, $allowedSubeIds, 'p.sube_id');
 
     self::appendPersonelFilters($where, $params, $filters, 'p');
     self::appendSurecDateFilters($where, $params, $filters);
@@ -710,7 +696,7 @@ class RaporlarController
    * @param array<string, mixed> $filters
    * @return array{items: array<int, array<string, mixed>>, total: int}
    */
-  private static function fetchBildirimSnapshot(PDO $pdo, array $resolved, array $filters, $scope)
+  private static function fetchBildirimSnapshot(PDO $pdo, array $resolved, array $filters, $scope, array $allowedSubeIds)
   {
     $where = ['1=1'];
     $params = [];
@@ -721,10 +707,7 @@ class RaporlarController
     } else {
       $where[] = 'm.donem = :donem';
       $params['donem'] = (string) $resolved['donem'];
-      if ($scope !== null) {
-        $where[] = 'm.sube_id = :scope_sube_id';
-        $params['scope_sube_id'] = $scope;
-      }
+      SubeScope::appendSubeFilter($where, $params, $scope, $allowedSubeIds, 'm.sube_id', 'muhur');
     }
 
     self::appendPersonelFilters($where, $params, $filters, 'p');
@@ -778,15 +761,12 @@ class RaporlarController
    * @param array<string, mixed> $filters
    * @return array{items: array<int, array<string, mixed>>, total: int}
    */
-  private static function fetchBildirimLive(PDO $pdo, array $filters, $scope, $donem)
+  private static function fetchBildirimLive(PDO $pdo, array $filters, $scope, $donem, array $allowedSubeIds)
   {
     $where = ['1=1'];
     $params = [];
 
-    if ($scope !== null) {
-      $where[] = 'p.sube_id = :scope_sube_id';
-      $params['scope_sube_id'] = $scope;
-    }
+    SubeScope::appendSubeFilter($where, $params, $scope, $allowedSubeIds, 'p.sube_id');
 
     self::appendPersonelFilters($where, $params, $filters, 'p');
     self::appendLiveDateFilters($where, $params, $filters, $donem, 'gp.tarih');
@@ -894,16 +874,13 @@ class RaporlarController
    * @param array<string, mixed> $filters
    * @return array{items: array<int, array<string, mixed>>, total: int}
    */
-  private static function fetchFinansKalemReport(PDO $pdo, $tip, array $filters, $scope)
+  private static function fetchFinansKalemReport(PDO $pdo, $tip, array $filters, $scope, array $allowedSubeIds)
   {
     $kalemSet = self::getFinansKalemSet($tip);
     $where = ["fk.state = 'AKTIF'"];
     $params = [];
 
-    if ($scope !== null) {
-      $where[] = 'p.sube_id = :scope_sube_id';
-      $params['scope_sube_id'] = $scope;
-    }
+    SubeScope::appendSubeFilter($where, $params, $scope, $allowedSubeIds, 'p.sube_id');
 
     self::appendPersonelFilters($where, $params, $filters, 'p');
     self::appendFinansDonemFilters($where, $params, $filters, 'fk');
@@ -1072,14 +1049,11 @@ class RaporlarController
     return self::mapCezaFinansRow($row);
   }
 
-  private static function showLegacyReport(PDO $pdo, $tip, $scope)
+  private static function showLegacyReport(PDO $pdo, $tip, $scope, array $allowedSubeIds)
   {
     $where = ['1=1'];
     $params = [];
-    if ($scope !== null) {
-      $where[] = 'p.sube_id = :scope_sube_id';
-      $params['scope_sube_id'] = $scope;
-    }
+    SubeScope::appendSubeFilter($where, $params, $scope, $allowedSubeIds, 'p.sube_id');
 
     $whereSql = implode(' AND ', $where);
     $sql = "
@@ -1265,7 +1239,7 @@ class RaporlarController
   }
 
   /** @return array<string, mixed>|false */
-  private static function findSealForDonem(PDO $pdo, $donem, $scope)
+  private static function findSealForDonem(PDO $pdo, $donem, $scope, array $allowedSubeIds)
   {
     if ($scope !== null) {
       $stmt = $pdo->prepare(
@@ -1282,6 +1256,26 @@ class RaporlarController
       return $stmt->fetch(PDO::FETCH_ASSOC);
     }
 
+    if (count($allowedSubeIds) > 0) {
+      $placeholders = [];
+      $params = ['donem' => $donem];
+      foreach ($allowedSubeIds as $index => $subeId) {
+        $key = 'allowed_sube_id_' . $index;
+        $placeholders[] = ':' . $key;
+        $params[$key] = (int) $subeId;
+      }
+
+      $stmt = $pdo->prepare(
+        'SELECT * FROM puantaj_aylik_muhurleri
+         WHERE donem = :donem AND sube_id IN (' . implode(', ', $placeholders) . ')
+         ORDER BY id DESC
+         LIMIT 1'
+      );
+      $stmt->execute($params);
+
+      return $stmt->fetch(PDO::FETCH_ASSOC);
+    }
+
     $stmt = $pdo->prepare(
       'SELECT * FROM puantaj_aylik_muhurleri
        WHERE donem = :donem
@@ -1291,13 +1285,6 @@ class RaporlarController
     $stmt->execute(['donem' => $donem]);
 
     return $stmt->fetch(PDO::FETCH_ASSOC);
-  }
-
-  private static function assertSealScope($sealSubeId, $scope)
-  {
-    if ($scope !== null && (int) $sealSubeId !== (int) $scope) {
-      JsonResponse::forbidden('Bu kayit aktif sube baglaminda goruntulenemiyor.');
-    }
   }
 
   private static function isValidDate($value)

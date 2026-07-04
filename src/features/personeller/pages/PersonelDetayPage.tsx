@@ -66,9 +66,11 @@ export function PersonelDetayPage() {
     isZimmetSubmitting,
     zimmetCreateErrorMessage,
     surecHistory,
+    surecHistoryHasMore,
     isSurecHistoryLoading,
     surecHistoryErrorMessage,
     zimmetHistory,
+    zimmetHistoryHasMore,
     isZimmetHistoryLoading,
     zimmetHistoryErrorMessage
   } = detail;
@@ -177,7 +179,9 @@ export function PersonelDetayPage() {
               onTabChange={setActiveTab}
               personel={personel}
               surecler={surecHistory}
+              surecHistoryHasMore={surecHistoryHasMore}
               zimmetler={zimmetHistory}
+              zimmetHistoryHasMore={zimmetHistoryHasMore}
               isSurecHistoryLoading={isSurecHistoryLoading}
               surecHistoryErrorMessage={surecHistoryErrorMessage}
               isZimmetHistoryLoading={isZimmetHistoryLoading}

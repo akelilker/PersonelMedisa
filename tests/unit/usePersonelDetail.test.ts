@@ -5,7 +5,7 @@ import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { APP_DATA_SCHEMA_VERSION } from "../../src/data/app-data.types";
 import { dataCacheKeys, setCacheEntry } from "../../src/data/data-manager";
-import { usePersonelDetail } from "../../src/hooks/usePersonelDetail";
+import { usePersonelDetail, resolveHistoryHasMore } from "../../src/hooks/usePersonelDetail";
 import type { Personel } from "../../src/types/personel";
 
 const personellerApiMock = vi.hoisted(() => ({
@@ -57,6 +57,56 @@ function createDeferred<T>() {
 function wrapper({ children }: { children: ReactNode }) {
   return createElement(MemoryRouter, null, children);
 }
+
+describe("resolveHistoryHasMore", () => {
+  it("hasNextPage true ise daha fazla kayit oldugunu doner", () => {
+    expect(
+      resolveHistoryHasMore(
+        {
+          page: 1,
+          limit: 20,
+          total: 25,
+          totalPages: 2,
+          hasNextPage: true,
+          hasPreviousPage: false
+        },
+        20
+      )
+    ).toBe(true);
+  });
+
+  it("hasNextPage false ve total tamamlandiysa daha fazla kayit yok der", () => {
+    expect(
+      resolveHistoryHasMore(
+        {
+          page: 1,
+          limit: 20,
+          total: 15,
+          totalPages: 1,
+          hasNextPage: false,
+          hasPreviousPage: false
+        },
+        15
+      )
+    ).toBe(false);
+  });
+
+  it("hasNextPage null ama total item sayisindan buyukse daha fazla kayit oldugunu doner", () => {
+    expect(
+      resolveHistoryHasMore(
+        {
+          page: 1,
+          limit: 20,
+          total: 25,
+          totalPages: null,
+          hasNextPage: null,
+          hasPreviousPage: null
+        },
+        20
+      )
+    ).toBe(true);
+  });
+});
 
 describe("usePersonelDetail", () => {
   beforeEach(() => {
@@ -201,7 +251,9 @@ describe("usePersonelDetail", () => {
       isEditing: false,
       isZimmetModalOpen: false,
       surecHistory: [],
-      zimmetHistory: []
+      surecHistoryHasMore: false,
+      zimmetHistory: [],
+      zimmetHistoryHasMore: false
     });
     expect(result.current).not.toHaveProperty("isSurecModalOpen");
     expect(result.current).not.toHaveProperty("openSurecModal");

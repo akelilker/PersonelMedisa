@@ -11,12 +11,14 @@ export function PersonelZimmetEnvanterPanel({
   isLoading,
   errorMessage,
   zimmetler,
+  zimmetHistoryHasMore,
   onOpenCreateModal
 }: {
   canCreateZimmet: boolean;
   isLoading: boolean;
   errorMessage: string | null;
   zimmetler: Zimmet[];
+  zimmetHistoryHasMore: boolean;
   onOpenCreateModal: () => void;
 }) {
   return (
@@ -32,6 +34,13 @@ export function PersonelZimmetEnvanterPanel({
           </button>
         ) : null}
       </div>
+
+      {!isLoading && !errorMessage && zimmetHistoryHasMore ? (
+        <p className="personel-form-note personel-form-note--info" data-testid="personel-zimmet-scope-notice">
+          Bu listede yalnızca en güncel 20 zimmet kaydı gösterilir. Tüm kayıtlar için ilgili modül veya rapor
+          ekranını kullanın.
+        </p>
+      ) : null}
 
       {isLoading ? <p className="personel-kart-placeholder-note">Zimmet kayıtları yükleniyor...</p> : null}
       {!isLoading && errorMessage ? <p className="personel-create-error">{errorMessage}</p> : null}

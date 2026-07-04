@@ -13,7 +13,9 @@ export type PersonelDosyaTabPanelsProps = {
   onTabChange: (tabId: PersonelDosyaTabId) => void;
   personel: Personel;
   surecler: Surec[];
+  surecHistoryHasMore: boolean;
   zimmetler: Zimmet[];
+  zimmetHistoryHasMore: boolean;
   isSurecHistoryLoading: boolean;
   surecHistoryErrorMessage: string | null;
   isZimmetHistoryLoading: boolean;
@@ -33,7 +35,9 @@ export function PersonelDosyaTabPanels({
   onTabChange,
   personel,
   surecler,
+  surecHistoryHasMore,
   zimmetler,
+  zimmetHistoryHasMore,
   isSurecHistoryLoading,
   surecHistoryErrorMessage,
   isZimmetHistoryLoading,
@@ -113,6 +117,7 @@ export function PersonelDosyaTabPanels({
           isLoading={isZimmetHistoryLoading}
           errorMessage={zimmetHistoryErrorMessage}
           zimmetler={zimmetler}
+          zimmetHistoryHasMore={zimmetHistoryHasMore}
           onOpenCreateModal={onOpenZimmetCreate}
         />
       </div>
@@ -131,6 +136,7 @@ export function PersonelDosyaTabPanels({
           isLoading={isSurecHistoryLoading}
           errorMessage={surecHistoryErrorMessage}
           surecler={surecler}
+          surecHistoryHasMore={surecHistoryHasMore}
           zimmetler={zimmetler}
           onOpenCreateModal={onOpenCreateSurecModal}
         />

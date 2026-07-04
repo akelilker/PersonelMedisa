@@ -36,7 +36,7 @@ import {
   snapshotFromLifecycleForm
 } from "../lib/personel-lifecycle-diff";
 import { sortSurecHistoryDescending } from "../lib/surec-history-sort";
-import type { PaginatedResult } from "../types/api";
+import type { PaginatedResult, PaginationMeta } from "../types/api";
 import { runDeduped } from "../lib/in-flight-dedupe";
 import { useAuth } from "../state/auth.store";
 import type { Personel } from "../types/personel";
@@ -56,6 +56,21 @@ import { usePersonelZimmetCreate } from "./usePersonelZimmetCreate";
 
 const PERSONEL_DETAIL_SUREC_PAGE_SIZE = 20;
 const PERSONEL_DETAIL_ZIMMET_PAGE_SIZE = 20;
+
+export function resolveHistoryHasMore(
+  pagination: PaginationMeta | undefined,
+  itemCount: number
+): boolean {
+  if (!pagination) {
+    return false;
+  }
+
+  if (pagination.hasNextPage === true) {
+    return true;
+  }
+
+  return pagination.total != null && itemCount < pagination.total;
+}
 
 const INITIAL_EDIT_PERSONEL_FORM: EditPersonelFormState = {
   ad: "",
@@ -336,6 +351,20 @@ function usePersonelDetailData(
     [zimmetHistorySnapshot]
   );
 
+  const surecHistoryHasMore = useMemo(() => {
+    if (!canAccessSurecler) {
+      return false;
+    }
+
+    const items = surecHistorySnapshot?.items ?? [];
+    return resolveHistoryHasMore(surecHistorySnapshot?.pagination, items.length);
+  }, [canAccessSurecler, surecHistorySnapshot]);
+
+  const zimmetHistoryHasMore = useMemo(() => {
+    const items = zimmetHistorySnapshot?.items ?? [];
+    return resolveHistoryHasMore(zimmetHistorySnapshot?.pagination, items.length);
+  }, [zimmetHistorySnapshot]);
+
   return {
     personel,
     setPersonel,
@@ -343,9 +372,11 @@ function usePersonelDetailData(
     errorMessage,
     refetch,
     surecHistory,
+    surecHistoryHasMore,
     isSurecHistoryLoading,
     surecHistoryErrorMessage,
     zimmetHistory,
+    zimmetHistoryHasMore,
     isZimmetHistoryLoading,
     zimmetHistoryErrorMessage
   };

@@ -2569,6 +2569,32 @@ let bildirimIdCounter = 800;
       }
 
       const payload = (request.postDataJSON() ?? {}) as Record<string, unknown>;
+
+      let validatedTcKimlikNo: string | undefined;
+      if ("tc_kimlik_no" in payload) {
+        const tcKimlikNo = String(payload.tc_kimlik_no ?? "").trim();
+        if (!/^\d{11}$/.test(tcKimlikNo)) {
+          await fulfillJson(
+            route,
+            422,
+            errorBody("VALIDATION_ERROR", "T.C. Kimlik No 11 hane olmalidir.", "tc_kimlik_no")
+          );
+          return;
+        }
+        const duplicateTc = personeller.some(
+          (item) => item.id !== personelId && String(item.tc_kimlik_no).trim() === tcKimlikNo
+        );
+        if (duplicateTc) {
+          await fulfillJson(
+            route,
+            409,
+            errorBody("DUPLICATE_TC_KIMLIK_NO", DUPLICATE_TC_KIMLIK_NO_MESSAGE, "tc_kimlik_no")
+          );
+          return;
+        }
+        validatedTcKimlikNo = tcKimlikNo;
+      }
+
       const readNullablePositiveInt = (field: string) => {
         if (!(field in payload)) return undefined;
         const value = payload[field];
@@ -2624,6 +2650,7 @@ let bildirimIdCounter = 800;
         if (typeof payload.ad === "string") personel.ad = payload.ad.trim();
         if (typeof payload.soyad === "string") personel.soyad = payload.soyad.trim();
         if (typeof payload.telefon === "string") personel.telefon = payload.telefon.trim();
+        if (validatedTcKimlikNo !== undefined) personel.tc_kimlik_no = validatedTcKimlikNo;
         await fulfillJson(route, 200, okBody(buildPersonelDetail(personel)));
         return;
       }

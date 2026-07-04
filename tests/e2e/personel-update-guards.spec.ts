@@ -108,6 +108,17 @@ test.describe("personel update guards (S51-A)", () => {
     );
   });
 
+  test("MUHASEBE cannot update tc_kimlik_no to an existing personel tc", async ({ page }) => {
+    await loginAs(page, "MUHASEBE");
+
+    const result = await putPersonelApi(page, 1, { tc_kimlik_no: "23456789012" });
+
+    expect(result.status).toBe(409);
+    const tcError = result.body.errors?.find((error) => error.code === "DUPLICATE_TC_KIMLIK_NO");
+    expect(tcError).toBeDefined();
+    expect(tcError?.field).toBe("tc_kimlik_no");
+  });
+
   test("MUHASEBE can update simple contact fields", async ({ page }) => {
     await loginAs(page, "MUHASEBE");
 

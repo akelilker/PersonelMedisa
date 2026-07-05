@@ -10,6 +10,17 @@ import { KayitSurecWorkspace } from "../features/kayit/components/KayitSurecWork
 import { useKayitModalController } from "../features/kayit/hooks/useKayitModalController";
 import { formatUiProfileLabel, formatUserRoleLabel } from "../lib/display/enum-display";
 import { useAuth } from "../state/auth.store";
+import type { AuthSession } from "../types/auth";
+
+function resolveHeroSubeLabel(session: AuthSession): string {
+  if (session.user.sube_ids.length === 0 || session.active_sube_id == null) {
+    return "Tüm Şubeler";
+  }
+
+  const activeId = session.active_sube_id;
+  const subeName = session.sube_list?.find((sube) => sube.id === activeId)?.ad;
+  return subeName ?? `Şube ${activeId}`;
+}
 
 export type AppShellOutletContext = {
   onKayitOpen: (tab: KayitTab) => void;

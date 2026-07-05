@@ -1,5 +1,5 @@
 .settings-dropdown.notifications-dropdown {
-  top: calc(100% + 2px);
+  top: 100%;
   right: 0;
 }
 
@@ -8,7 +8,7 @@
   overflow-y: auto;
   overflow-x: hidden;
   max-height: min(60vh, 440px);
-  padding: 8px;
+  padding: 4px 8px 8px;
   border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: 18px;
   background: linear-gradient(180deg, rgba(4, 8, 14, 0.98) 0%, rgba(8, 13, 22, 0.97) 100%);
@@ -35,8 +35,8 @@
   position: sticky;
   top: 0;
   z-index: 2;
-  margin: -8px -8px 0;
-  padding: 8px 8px 6px;
+  margin: -4px -8px 0;
+  padding: 6px 8px 4px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   border-top-left-radius: 18px;
   border-top-right-radius: 18px;

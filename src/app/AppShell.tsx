@@ -153,11 +153,31 @@ export function AppShell() {
     [openKayitModal, isHomeRoute, isKayitModalOpen]
   );
 
+  const heroSessionMeta = useMemo(() => {
+    if (!session) {
+      return null;
+    }
+
+    const userName = session.user.ad_soyad.trim();
+    if (!userName) {
+      return null;
+    }
+
+    return {
+      userName,
+      subeLabel: resolveHeroSubeLabel(session)
+    };
+  }, [session]);
+
   return (
     <div className="app-container app-shell">
       <main className="content-wrap">
         <div className="shell-top-stack">
-          <Hero title="Personel Yönetim Sistemi" />
+          <Hero
+            title="Personel Yönetim Sistemi"
+            userName={heroSessionMeta?.userName}
+            subeLabel={heroSessionMeta?.subeLabel}
+          />
           {showShellHeaderActions ? <ShellHeaderActions contextLabel="Ana panel" minimal={isHomeRoute} /> : null}
         </div>
 

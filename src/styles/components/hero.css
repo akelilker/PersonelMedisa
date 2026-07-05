@@ -32,6 +32,50 @@
   backdrop-filter: none;
 }
 
+.hero-with-session .hero-logo {
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 4px;
+}
+
+.hero-session-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  gap: 1px;
+  overflow: hidden;
+}
+
+.hero-session-user,
+.hero-session-sube {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: center;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: 0.01em;
+  color: rgba(238, 246, 255, 0.96);
+  -webkit-font-smoothing: antialiased;
+}
+
+.hero-session-sube {
+  font-size: clamp(7px, 1.35vw, 9px);
+  font-weight: 600;
+  color: rgba(238, 246, 255, 0.78);
+}
+
+.hero-session-user {
+  font-size: clamp(8px, 1.55vw, 10px);
+}
+
 .hero-logo picture {
   display: flex;
   align-items: center;
@@ -129,6 +173,41 @@ body.login-page .hero .animated-line {
     padding-inline: 12px;
   }
 
+  .hero-with-session {
+    align-items: stretch;
+  }
+
+  .hero-with-session .hero-logo {
+    display: grid;
+    grid-template-rows: auto auto;
+    align-items: start;
+    align-self: stretch;
+    justify-items: center;
+    gap: 0;
+    margin-left: 0;
+    margin-right: 8px;
+    transform: translateY(3px);
+    padding: 2px 0 4px;
+  }
+
+  .hero-with-session .hero-session-meta {
+    align-self: stretch;
+    padding: 0 2px 1px;
+    transform: translateY(4px);
+  }
+
+  .hero-with-session .hero-session-user,
+  .hero-with-session .hero-session-sube {
+    white-space: normal;
+    word-break: break-word;
+    overflow-wrap: normal;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    text-overflow: clip;
+  }
+
   .hero h1 {
     font-size: 21px;
     letter-spacing: 0.05em;
@@ -157,6 +236,37 @@ body.login-page .hero .animated-line {
     margin-right: 8px;
     transform: translate(-1px, 1px);
     overflow: hidden;
+  }
+
+  .hero-with-session .hero-logo {
+    flex: 0 0 var(--hero-logo-width);
+    gap: 4px;
+    align-self: center;
+    transform: translate(-1px, 1px);
+  }
+
+  .hero-with-session .hero-session-meta {
+    width: 82px;
+    max-width: 82px;
+    transform: translate(13px, 5px);
+  }
+
+  .hero-with-session .hero-session-user,
+  .hero-with-session .hero-session-sube {
+    font-size: 9.5px;
+    line-height: 1.06;
+    max-height: 1.06em;
+    white-space: nowrap;
+    word-break: normal;
+    overflow-wrap: normal;
+    display: block;
+    -webkit-line-clamp: unset;
+    line-clamp: unset;
+  }
+
+  .hero-with-session .hero-session-sube {
+    font-size: 8.5px;
+    color: rgba(238, 246, 255, 0.82);
   }
 
   .hero-logo img {

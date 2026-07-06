@@ -876,7 +876,8 @@ export function draftPersonelFromPayload(payload: CreatePersonelPayload, tempId:
     kan_grubu: payload.kan_grubu,
     aktif_durum: payload.aktif_durum,
     ucret_tipi_id: payload.ucret_tipi_id,
-    maas_tutari: payload.maas_tutari,
+    net_maas_tutari: payload.net_maas_tutari ?? payload.maas_tutari,
+    maas_tutari: payload.maas_tutari ?? payload.net_maas_tutari,
     prim_kurali_id: payload.prim_kurali_id
   };
 }

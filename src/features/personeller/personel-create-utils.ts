@@ -82,8 +82,39 @@ export function validatePhoneNumber(value: string, label: string) {
   }
 }
 
-export function isPersonelMaasMissing(maasTutari: number | null | undefined) {
-  return maasTutari === null || maasTutari === undefined;
+export function resolvePersonelMaasTutari(personel: {
+  net_maas_tutari?: number | null;
+  maas_tutari?: number | null;
+}): number | undefined {
+  const net = personel.net_maas_tutari;
+  const maas = personel.maas_tutari;
+  if (net !== null && net !== undefined) {
+    return net;
+  }
+  if (maas !== null && maas !== undefined) {
+    return maas;
+  }
+  return undefined;
+}
+
+export function isPersonelMaasMissing(
+  maasTutari?: number | null,
+  netMaasTutari?: number | null
+) {
+  const resolved = netMaasTutari ?? maasTutari;
+  return resolved === null || resolved === undefined;
+}
+
+export function buildMaasPayloadFields(
+  value: number | null | undefined
+): { net_maas_tutari?: number | null; maas_tutari?: number | null } {
+  if (value === undefined) {
+    return {};
+  }
+  return {
+    net_maas_tutari: value,
+    maas_tutari: value
+  };
 }
 
 export function buildCreatePersonelPayload(form: CreatePersonelFormState): CreatePersonelPayload {
@@ -130,6 +161,6 @@ export function buildCreatePersonelPayload(form: CreatePersonelFormState): Creat
     ...(bagliAmirId !== undefined ? { bagli_amir_id: bagliAmirId } : {}),
     ...(ucretTipiId !== undefined ? { ucret_tipi_id: ucretTipiId } : {}),
     ...(primKuraliId !== undefined ? { prim_kurali_id: primKuraliId } : {}),
-    ...(maasTutari !== undefined ? { maas_tutari: maasTutari } : {})
+    ...(maasTutari !== undefined ? { net_maas_tutari: maasTutari, maas_tutari: maasTutari } : {}),
   };
 }

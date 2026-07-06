@@ -48,7 +48,7 @@ export function PersonelDosyaHero({ personel }: { personel: Personel }) {
         <DossierField label="İşe Giriş Tarihi" value={formatIsoDateDetail(personel.ise_giris_tarihi)} />
       </div>
 
-      {isPersonelMaasMissing(personel.maas_tutari) ? (
+      {isPersonelMaasMissing(personel.maas_tutari, personel.net_maas_tutari) ? (
         <p className="personel-dosya-maas-alert" data-testid="personel-maas-eksik-uyari">
           Maaş bilgisi eksik.
         </p>

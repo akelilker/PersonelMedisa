@@ -72,6 +72,7 @@ type DemoPersonel = {
   bagli_amir_id?: number;
   ucret_tipi_id?: number;
   maas_tutari?: number;
+  net_maas_tutari?: number;
 };
 
 type DemoSurec = {
@@ -2259,7 +2260,8 @@ export function resolveDemoApiResponse(
       personel_tipi_id: toNumber(body.personel_tipi_id) ?? undefined,
       bagli_amir_id: toNumber(body.bagli_amir_id) ?? undefined,
       ucret_tipi_id: toNumber(body.ucret_tipi_id) ?? undefined,
-      maas_tutari: toNumber(body.maas_tutari) ?? undefined
+      net_maas_tutari: toNumber(body.net_maas_tutari) ?? toNumber(body.maas_tutari) ?? undefined,
+      maas_tutari: toNumber(body.maas_tutari) ?? toNumber(body.net_maas_tutari) ?? undefined
     };
     demoState.personeller.unshift(next);
     return ok({

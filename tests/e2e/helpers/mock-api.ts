@@ -1159,6 +1159,7 @@ export async function mockApi(page: Page, role: MockUserRole) {
     ucret_tipi_id?: number;
     ucret_tipi_adi?: string;
     maas_tutari?: number;
+    net_maas_tutari?: number;
     prim_kurali_id?: number;
     prim_kurali_adi?: string;
   }> = [
@@ -1972,6 +1973,7 @@ let bildirimIdCounter = 800;
         ucret_tipi_id: personel.ucret_tipi_id,
         ucret_tipi_adi: personel.ucret_tipi_adi,
         maas_tutari: personel.maas_tutari,
+        net_maas_tutari: personel.net_maas_tutari ?? personel.maas_tutari,
         prim_kurali_id: personel.prim_kurali_id,
         prim_kurali_adi: personel.prim_kurali_adi
       },
@@ -2030,7 +2032,7 @@ let bildirimIdCounter = 800;
       bagli_amir_id: n(p.bagli_amir_id),
       personel_tipi_id: n(p.personel_tipi_id),
       ucret_tipi_id: n(p.ucret_tipi_id),
-      maas_tutari: nm(p.maas_tutari),
+      maas_tutari: nm(p.net_maas_tutari ?? p.maas_tutari),
       prim_kurali_id: n(p.prim_kurali_id)
     };
   }
@@ -2091,10 +2093,26 @@ let bildirimIdCounter = 800;
     setId("personel_tipi_id");
     setId("prim_kurali_id");
     setId("ucret_tipi_id");
-    if ("maas_tutari" in payload) {
-      const v = payload.maas_tutari;
-      if (v === null || v === undefined) next.maas_tutari = undefined;
-      else next.maas_tutari = typeof v === "number" ? v : Number.parseFloat(String(v));
+    if ("net_maas_tutari" in payload || "maas_tutari" in payload) {
+      const rawNet = payload.net_maas_tutari;
+      const rawMaas = payload.maas_tutari;
+      const resolved =
+        rawNet === null || rawNet === undefined
+          ? rawMaas === null || rawMaas === undefined
+            ? undefined
+            : typeof rawMaas === "number"
+              ? rawMaas
+              : Number.parseFloat(String(rawMaas))
+          : typeof rawNet === "number"
+            ? rawNet
+            : Number.parseFloat(String(rawNet));
+      if (resolved === null || resolved === undefined || !Number.isFinite(resolved)) {
+        next.maas_tutari = undefined;
+        next.net_maas_tutari = undefined;
+      } else {
+        next.maas_tutari = resolved;
+        next.net_maas_tutari = resolved;
+      }
     }
     return next;
   }
@@ -2425,7 +2443,8 @@ let bildirimIdCounter = 800;
         bagli_amir_id: parseId(payload.bagli_amir_id),
         ucret_tipi_id: ucretTipiId,
         ucret_tipi_adi: ucretTipiId === 1 ? "Aylık" : ucretTipiId === 2 ? "Saatlik" : undefined,
-        maas_tutari: parseMaas(payload.maas_tutari),
+        maas_tutari: parseMaas(payload.net_maas_tutari) ?? parseMaas(payload.maas_tutari),
+        net_maas_tutari: parseMaas(payload.net_maas_tutari) ?? parseMaas(payload.maas_tutari),
         sube_adi: getSubeLabel(subeId),
         departman_adi: departmanId ? getDepartmanLabel(departmanId) : undefined,
         gorev_adi: gorevId ? getGorevLabel(gorevId) : undefined,
@@ -2643,6 +2662,7 @@ let bildirimIdCounter = 800;
         "bagli_amir_id" in payload ||
         "personel_tipi_id" in payload ||
         "ucret_tipi_id" in payload ||
+        "net_maas_tutari" in payload ||
         "maas_tutari" in payload ||
         "prim_kurali_id" in payload;
 

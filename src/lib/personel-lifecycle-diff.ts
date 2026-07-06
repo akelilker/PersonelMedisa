@@ -1,4 +1,5 @@
 import type { Personel } from "../types/personel";
+import { resolvePersonelMaasTutari } from "../features/personeller/personel-create-utils";
 
 export type LifecycleSnapshot = {
   departman_id: number | null;
@@ -81,7 +82,7 @@ export function snapshotFromPersonel(personel: Personel): LifecycleSnapshot {
     gorev_id: normalizeOptionalId(personel.gorev_id),
     bagli_amir_id: normalizeOptionalId(personel.bagli_amir_id),
     ucret_tipi_id: normalizeOptionalId(personel.ucret_tipi_id),
-    maas_tutari: normalizeOptionalMoney(personel.maas_tutari),
+    maas_tutari: normalizeOptionalMoney(resolvePersonelMaasTutari(personel)),
     prim_kurali_id: normalizeOptionalId(personel.prim_kurali_id)
   };
 }
@@ -119,6 +120,7 @@ export function lifecycleSnapshotToPersonelPatch(snap: LifecycleSnapshot): Parti
     bagli_amir_id: snap.bagli_amir_id ?? undefined,
     ucret_tipi_id: snap.ucret_tipi_id ?? undefined,
     maas_tutari: snap.maas_tutari ?? undefined,
+    net_maas_tutari: snap.maas_tutari ?? undefined,
     prim_kurali_id: snap.prim_kurali_id ?? undefined
   };
 }

@@ -35,6 +35,7 @@ export type CreatePersonelPayload = {
   kan_grubu?: string;
   bagli_amir_id?: number;
   ucret_tipi_id?: number;
+  net_maas_tutari?: number;
   maas_tutari?: number;
   prim_kurali_id?: number;
 };
@@ -47,6 +48,7 @@ export type UpdatePersonelPayload = Omit<
   gorev_id?: number | null;
   bagli_amir_id?: number | null;
   ucret_tipi_id?: number | null;
+  net_maas_tutari?: number | null;
   maas_tutari?: number | null;
   prim_kurali_id?: number | null;
   effective_date?: string;
@@ -158,6 +160,36 @@ function normalizeAktifDurum(value: unknown): PersonelAktifDurum | null {
   return null;
 }
 
+function readNullableNumberValue(value: unknown): number | null | undefined {
+  if (value === null) {
+    return null;
+  }
+
+  return readNumberValue(value);
+}
+
+function readNullableNumber(
+  sources: Array<Record<string, unknown> | null>,
+  ...keys: string[]
+): number | null | undefined {
+  return readNullableNumberValue(pickValue(sources, keys));
+}
+
+function resolveMaasFields(sources: Array<Record<string, unknown> | null>): {
+  net_maas_tutari?: number;
+  maas_tutari?: number;
+} {
+  const rawNet = readNumber(sources, "net_maas_tutari", "netMaasTutari");
+  const rawMaas = readNumber(sources, "maas_tutari", "maasTutari");
+  const net_maas_tutari = rawNet ?? rawMaas;
+  const maas_tutari = rawMaas ?? rawNet;
+
+  return {
+    ...(net_maas_tutari !== undefined ? { net_maas_tutari } : {}),
+    ...(maas_tutari !== undefined ? { maas_tutari } : {})
+  };
+}
+
 function normalizePersonel(data: unknown): Personel {
   const root = toRecord(data);
   if (!root) {
@@ -179,6 +211,20 @@ function normalizePersonel(data: unknown): Personel {
   if (!aktifDurum) {
     throw new Error("Personel yaniti aktif_durum alanini icermiyor.");
   }
+
+  const maasFields = resolveMaasFields(baseSources);
+  const brut_maas_tutari = readNullableNumber(baseSources, "brut_maas_tutari", "brutMaasTutari");
+  const brut_hesaplama_modeli = readNullableString(
+    baseSources,
+    "brut_hesaplama_modeli",
+    "brutHesaplamaModeli"
+  );
+  const brut_hesaplama_donemi = readNullableString(
+    baseSources,
+    "brut_hesaplama_donemi",
+    "brutHesaplamaDonemi"
+  );
+  const model_versiyonu = readNullableString(baseSources, "model_versiyonu", "modelVersiyonu");
 
   return {
     id: readRequiredNumber(baseSources, "id", "id"),
@@ -239,7 +285,11 @@ function normalizePersonel(data: unknown): Personel {
       "ucretTipiAdi",
       "ucret_tipi"
     ),
-    maas_tutari: readNumber(baseSources, "maas_tutari", "maasTutari"),
+    ...maasFields,
+    ...(brut_maas_tutari !== undefined ? { brut_maas_tutari } : {}),
+    ...(brut_hesaplama_modeli !== undefined ? { brut_hesaplama_modeli } : {}),
+    ...(brut_hesaplama_donemi !== undefined ? { brut_hesaplama_donemi } : {}),
+    ...(model_versiyonu !== undefined ? { model_versiyonu } : {}),
     prim_kurali_id: readNumber(baseSources, "prim_kurali_id", "primKuraliId"),
     prim_kurali_adi: readString(
       [...baseSources, ...referenceSources],

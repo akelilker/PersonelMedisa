@@ -37,7 +37,15 @@ export type Personel = {
   pasiflik_durumu_etiketi?: string | null;
   ucret_tipi_id?: number;
   ucret_tipi_adi?: string;
+  /** Canonical net maaş (kullanıcı girdisi). */
+  net_maas_tutari?: number;
+  /** Legacy read-compat; yeni kayıtlarda net ile aynı değer olabilir. */
   maas_tutari?: number;
+  /** Sistem hesaplı brüt; bu sprintte değer üretilmez. */
+  brut_maas_tutari?: number | null;
+  brut_hesaplama_modeli?: string | null;
+  brut_hesaplama_donemi?: string | null;
+  model_versiyonu?: string | null;
   prim_kurali_id?: number;
   prim_kurali_adi?: string;
 };

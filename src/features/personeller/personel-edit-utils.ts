@@ -6,7 +6,9 @@ import type { IdOption } from "../../types/referans";
 import {
   normalizePersonelAd,
   normalizePersonelSoyad,
-  normalizeTurkishMobilePhone
+  normalizeTurkishMobilePhone,
+  resolvePersonelMaasTutari,
+  buildMaasPayloadFields
 } from "./personel-create-utils";
 
 export type BagliAmirContext = {
@@ -165,6 +167,7 @@ export function pickLifecycleFormFields(form: EditPersonelFormState): LifecycleF
 }
 
 export function personelToEditForm(personel: Personel): EditPersonelFormState {
+  const resolvedMaas = resolvePersonelMaasTutari(personel);
   return {
     ad: personel.ad,
     soyad: personel.soyad,
@@ -173,7 +176,7 @@ export function personelToEditForm(personel: Personel): EditPersonelFormState {
     gorevId: personel.gorev_id != null ? String(personel.gorev_id) : "",
     bagliAmirId: personel.bagli_amir_id != null ? String(personel.bagli_amir_id) : "",
     ucretTipiId: personel.ucret_tipi_id != null ? String(personel.ucret_tipi_id) : "",
-    maasTutari: personel.maas_tutari != null ? String(personel.maas_tutari) : "",
+    maasTutari: resolvedMaas != null ? String(resolvedMaas) : "",
     primKuraliId: personel.prim_kurali_id != null ? String(personel.prim_kurali_id) : "",
     effectiveDate: ""
   };
@@ -219,10 +222,10 @@ export function buildPersonelUpdatePayload(
 
   const maasRaw = editForm.maasTutari.trim();
   if (maasRaw === "") {
-    idPayload.maas_tutari = null;
+    Object.assign(idPayload, buildMaasPayloadFields(null));
   } else {
     const parsed = Number.parseFloat(maasRaw.replace(",", "."));
-    idPayload.maas_tutari = Number.isFinite(parsed) ? parsed : null;
+    Object.assign(idPayload, buildMaasPayloadFields(Number.isFinite(parsed) ? parsed : null));
   }
 
   payload.effective_date = editForm.effectiveDate.trim();

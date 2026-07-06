@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   buildCreatePersonelPayload,
-  isPersonelMaasMissing
+  isPersonelMaasMissing,
+  buildMaasPayloadFields
 } from "../../src/features/personeller/personel-create-utils";
 import { INITIAL_CREATE_PERSONEL_FORM } from "../../src/hooks/usePersoneller";
 
@@ -40,11 +41,36 @@ describe("personel-create-utils", () => {
 
     expect(payload.sube_id).toBe(1);
     expect(payload.maas_tutari).toBeUndefined();
+    expect(payload.net_maas_tutari).toBeUndefined();
+  });
+
+  it("buildCreatePersonelPayload maaş girildiğinde net ve legacy alanları yazar", () => {
+    const payload = buildCreatePersonelPayload({
+      ...validForm,
+      maasTutari: "35000"
+    });
+
+    expect(payload.net_maas_tutari).toBe(35000);
+    expect(payload.maas_tutari).toBe(35000);
+  });
+
+  it("buildMaasPayloadFields null ve undefined ayrımını korur", () => {
+    expect(buildMaasPayloadFields(undefined)).toEqual({});
+    expect(buildMaasPayloadFields(null)).toEqual({
+      net_maas_tutari: null,
+      maas_tutari: null
+    });
+    expect(buildMaasPayloadFields(0)).toEqual({
+      net_maas_tutari: 0,
+      maas_tutari: 0
+    });
   });
 
   it("maas_tutari === 0 eksik sayılmaz", () => {
     expect(isPersonelMaasMissing(0)).toBe(false);
+    expect(isPersonelMaasMissing(undefined, 0)).toBe(false);
     expect(isPersonelMaasMissing(undefined)).toBe(true);
     expect(isPersonelMaasMissing(null)).toBe(true);
+    expect(isPersonelMaasMissing(undefined, undefined)).toBe(true);
   });
 });

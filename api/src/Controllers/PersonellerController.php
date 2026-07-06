@@ -309,8 +309,8 @@ class PersonellerController
             }
         }
 
-        if (array_key_exists('maas_tutari', $body)) {
-            $payload['maas_tutari'] = self::optionalNonNegativeNumber($body, 'maas_tutari');
+        if (array_key_exists('net_maas_tutari', $body) || array_key_exists('maas_tutari', $body)) {
+            $payload['maas_tutari'] = self::resolveMaasTutariFromBody($body);
         }
 
         if (array_key_exists('aktif_durum', $body)) {
@@ -376,7 +376,7 @@ class PersonellerController
             self::validationError('prim_kurali_id', 'Gecersiz prim kurali.');
         }
 
-        $maasTutari = self::optionalNonNegativeNumber($body, 'maas_tutari');
+        $maasTutari = self::resolveMaasTutariFromBody($body);
 
         return [
             'tc_kimlik_no' => $tcKimlikNo,
@@ -815,6 +815,20 @@ class PersonellerController
         JsonResponse::error(422, 'VALIDATION_ERROR', $message, $field);
     }
 
+    /** @param array<string, mixed> $body */
+    private static function resolveMaasTutariFromBody(array $body)
+    {
+        if (array_key_exists('net_maas_tutari', $body)) {
+            return self::optionalNonNegativeNumber($body, 'net_maas_tutari');
+        }
+
+        if (array_key_exists('maas_tutari', $body)) {
+            return self::optionalNonNegativeNumber($body, 'maas_tutari');
+        }
+
+        return null;
+    }
+
     /** @param mixed $value */
     private static function parseHeaderPositiveInt($value)
     {
@@ -833,6 +847,7 @@ class PersonellerController
         $primKuraliId = $row['prim_kurali_id'] !== null ? (int) $row['prim_kurali_id'] : null;
         $ucretTipiAdlari = [1 => 'Aylik', 2 => 'Gunluk', 3 => 'Saatlik'];
         $primKuraliAdlari = [1 => 'Devamsizlik Primi Yok', 2 => 'Tam Prim', 3 => 'Kismi Prim'];
+        $maasTutari = $row['maas_tutari'] !== null ? (float) $row['maas_tutari'] : null;
 
         return [
             'id' => (int) $row['id'],
@@ -864,7 +879,8 @@ class PersonellerController
                 'personel_tipi' => $row['personel_tipi_adi'],
             ],
             'ucret_tipi_id' => $ucretTipiId,
-            'maas_tutari' => $row['maas_tutari'] !== null ? (float) $row['maas_tutari'] : null,
+            'maas_tutari' => $maasTutari,
+            'net_maas_tutari' => $maasTutari,
             'prim_kurali_id' => $primKuraliId,
             'ucret_tipi_adi' => $ucretTipiId !== null && isset($ucretTipiAdlari[$ucretTipiId])
                 ? $ucretTipiAdlari[$ucretTipiId]

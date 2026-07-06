@@ -228,4 +228,122 @@ describe("personeller.api", () => {
       tc_kimlik_no: "12345678901"
     });
   });
+
+  it("dual-reads legacy maas_tutari into net_maas_tutari", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        createJsonResponse(
+          {
+            data: {
+              id: 3,
+              tc_kimlik_no: "12345678901",
+              ad: "Test",
+              soyad: "User",
+              aktif_durum: "AKTIF",
+              maas_tutari: 35000
+            },
+            meta: {},
+            errors: []
+          },
+          200
+        )
+      )
+    );
+
+    const result = await fetchPersonelDetail(3);
+
+    expect(result.net_maas_tutari).toBe(35000);
+    expect(result.maas_tutari).toBe(35000);
+    expect(result.brut_maas_tutari).toBeUndefined();
+  });
+
+  it("dual-reads net_maas_tutari into legacy maas_tutari", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        createJsonResponse(
+          {
+            data: {
+              id: 5,
+              tc_kimlik_no: "12345678901",
+              ad: "Test",
+              soyad: "User",
+              aktif_durum: "AKTIF",
+              net_maas_tutari: 28000
+            },
+            meta: {},
+            errors: []
+          },
+          200
+        )
+      )
+    );
+
+    const result = await fetchPersonelDetail(5);
+
+    expect(result.net_maas_tutari).toBe(28000);
+    expect(result.maas_tutari).toBe(28000);
+  });
+
+  it("keeps distinct values when both maas fields are present", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        createJsonResponse(
+          {
+            data: {
+              id: 6,
+              tc_kimlik_no: "12345678901",
+              ad: "Test",
+              soyad: "User",
+              aktif_durum: "AKTIF",
+              net_maas_tutari: 30000,
+              maas_tutari: 32000
+            },
+            meta: {},
+            errors: []
+          },
+          200
+        )
+      )
+    );
+
+    const result = await fetchPersonelDetail(6);
+
+    expect(result.net_maas_tutari).toBe(30000);
+    expect(result.maas_tutari).toBe(32000);
+  });
+
+  it("passes through optional brut fields when present in response", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        createJsonResponse(
+          {
+            data: {
+              id: 8,
+              tc_kimlik_no: "12345678901",
+              ad: "Test",
+              soyad: "User",
+              aktif_durum: "AKTIF",
+              net_maas_tutari: 40000,
+              brut_maas_tutari: null,
+              brut_hesaplama_modeli: null
+            },
+            meta: {},
+            errors: []
+          },
+          200
+        )
+      )
+    );
+
+    const result = await fetchPersonelDetail(8);
+
+    expect(result.net_maas_tutari).toBe(40000);
+    expect(result.maas_tutari).toBe(40000);
+    expect(result.brut_maas_tutari).toBeNull();
+    expect(result.brut_hesaplama_modeli).toBeNull();
+  });
 });

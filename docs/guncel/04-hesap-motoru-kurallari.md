@@ -85,9 +85,25 @@ Hesap motorunun doğru çalışması için minimum girdiler şunlardır:
 - `ise_giris_tarihi`
 - `aktif_durum`
 - `personel_tipi`
-- `sozlesme_saati` varsa
-- `baz_maas` varsa
+- `sozlesme_saati` varsa (sonraki faz; mevcut işletmede 45 saat altı sözleşmeli personel yok)
+- `net_maas_tutari` varsa
+- `brut_maas_tutari` varsa (sistem hesaplı; kullanıcı girdisi değildir)
 - `bes_kesintisi_var_mi` varsa
+
+### 1.5 Maaş alan semantiği (S62A kilit)
+
+İşletmede işçiye sabit **net** maaş ödenir.
+
+| Alan | Rol |
+|------|-----|
+| `net_maas_tutari` | Kullanıcı girdisi / canonical alan |
+| `brut_maas_tutari` | Sistem hesaplı / salt okunur |
+| `brut_hesaplama_modeli` | Brüt üretim yöntemi izi |
+| `brut_hesaplama_donemi` veya `model_versiyonu` | Dönem / model izlenebilirliği |
+
+- Mevcut `maas_tutari` semantik olarak belirsizdir; yeni bordro altyapısında tek başına ana alan olmamalıdır.
+- Fazla mesai, saatlik ücret ve parasal kesinti hesapları **brüt** kaynak üzerinden yürür.
+- Netten brüte gerçek hesap motoru ve bordro/vergi parametreleri **bu sprintte yazılmaz**; sonraki fazdır.
 
 ### 1.2 Günlük puantaj verisi
 
@@ -267,6 +283,15 @@ Tanım ayrımı:
 4. Eğer normal süre `45 saatten düşük` ise:
    - normal süre ile `45 saat` arası = `fazla sürelerle çalışma`
    - `45 saat` üstü = `fazla çalışma`
+
+### 6.3.1 V1 FSC kararı (S62A kilit)
+
+Mevcut işletmede haftalık 45 saatin altında sözleşmeli personel **yoktur**.
+
+- Fazla Sürelerle Çalışma (FSC, x1.25) mevzuat dokümanında yer alır; mimaride ve backlog'da açık kalabilir.
+- V1 mevzuat kapatma sprintlerinde FSC **aktif öncelik değildir**.
+- `sozlesme_saati` ve FSC hesap zinciri **sonraki fazdır**.
+- V1 motor varsayımı: tam süreli personel; yalnızca 45 saat eşiği üzerinden fazla çalışma ayrımı yapılır; `fazla_surelerle_calisma` çıktısı **0** olabilir.
 
 ### 6.4 Yuvarlama
 
@@ -517,6 +542,18 @@ SGK'ya göre hastalık halinde geçici iş göremezlik ödeneği:
 - `rapor_turu = hastalik` seçildiğinde sistem prim gün şartı için kontrol alanı veya uyarı üretir
 - ücret etkisi ve SGK ödenek ayrımı sonraki bordro katmanında ayrıca işlenir
 
+#### 11.1.1 İlk 2 gün firma ödemesi (S62A kilit)
+
+Yalnızca `Raporlu_Hastalik` için geçerlidir; `Raporlu_Is_Kazasi` ayrı değerlendirilir.
+
+| Alan | Varsayılan | Açıklama |
+|------|------------|----------|
+| `ilk_iki_gun_firma_oder_mi` | `false` | İşletme varsayılan politikası: ilk 2 gün firma ödemez |
+
+- Kullanıcı rapor girişinde bu değeri değiştirebilmelidir.
+- UI karşılığı (ileride): checkbox — “İlk 2 gün firma tarafından ödenecek mi?”
+- “İlk 2 gün” hesabı günlük puantaj satırı yerine **rapor event / periyot kaydı** üzerinden düşünülmelidir; yalnızca günlük satıra boolean koymak güvenilir periyot takibi için yetersizdir.
+
 ### 11.2 İş Kazası
 
 SGK'ya göre iş kazası halinde geçici iş göremezlik ödeneği:
@@ -649,7 +686,7 @@ Bu dokümanın `V1` sınırında şunlar kesin vardır:
 - günlük net süre hesabı
 - mola düşümü
 - hafta tatili kararı
-- fazla çalışma / fazla sürelerle çalışma ayrımı
+- fazla çalışma ayrımı (45 saat eşiği; tam süreli varsayım)
 - serbest zaman üretimi
 - yıllık izin hak edişi
 - rapor / iş kazası ayrımı
@@ -657,7 +694,9 @@ Bu dokümanın `V1` sınırında şunlar kesin vardır:
 
 Bu dokümanın `V1` sınırında şunlar sonraki detay dokümana bırakılmıştır:
 
-- net bordro formülü
+- net bordro formülü ve netten brüte hesap motoru
+- `brut_maas_tutari` üretim motoru ve bordro/vergi parametreleri
+- `sozlesme_saati` ve FSC (x1.25) aktif hesap zinciri
 - vergi ve SGK matrah akışı
 - banka ödeme dosyası kolon formatı
 - dönem kapatma ve geri açma workflow'u
@@ -682,5 +721,6 @@ Bu belge sonrası sıradaki doğru doküman:
 
 | Tarih | Not |
 |-------|-----|
+| 2026-07-07 | S62A: net maaş canonical alan, brüt salt okunur, FSC V1 backlog, hastalık ilk 2 gün rapor event politikası kilitlendi. |
 | 2026-05-15 | Geç kalma / erken çıkma için 30 dakikalık yukarı yuvarlama ve `kesintiye_esas_dakika` notu eklendi. |
 | 2026-05-15 | Geç / Erken Kesinti V1 kapanış davranışı, güvenli hesap prensibi, katman sınırı ve test kapsamı sabitlendi. |

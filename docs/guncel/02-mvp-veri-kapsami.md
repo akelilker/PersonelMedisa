@@ -113,12 +113,16 @@ Veri modelinde şimdiden düşünülür, fakat ilk sprintlerde formu şişirmeme
 - `kart_no`
 - `iban`
 - `sozlesme_saati`
-- `baz_maas`
+- `net_maas_tutari`
+- `brut_maas_tutari`
+- `brut_hesaplama_modeli`
+- `brut_hesaplama_donemi` veya `model_versiyonu`
 - `bes_kesintisi_var_mi`
 
 Gerekçe:
 
-- `iban`, `baz_maas`, `sozlesme_saati` bordro ve banka çıktısı için değerlidir ama MVP'nin ilk ekranlarını açmak için şart değildir
+- `iban`, `net_maas_tutari`, `sozlesme_saati` bordro ve banka çıktısı için değerlidir ama MVP'nin ilk ekranlarını açmak için şart değildir
+- Mevcut `maas_tutari` alanı semantik olarak belirsizdir; yeni bordro altyapısında tek başına canonical alan olmayacaktır
 - `bes_kesintisi_var_mi` finans motoru genişlerken zorunlu hale gelecektir
 - `kart_no` fiziksel kart altyapısına bağlıdır
 - `cinsiyet` ve `ogrenim_durumu` raporlama için faydalı olabilir ama çekirdek süreç motorunun ilk sürümü için şart değildir
@@ -136,6 +140,7 @@ Sistem tarafından üretilecek veya diğer verilerden türetilecektir.
 - `net_calisma_suresi`
 - `fazla_mesai_suresi`
 - `fazla_surelerle_calisma_suresi`
+- `brut_maas_tutari`
 - `pasiflik_durumu_etiketi`
 
 Bu alanların görünme yerleri:
@@ -295,9 +300,27 @@ Bildirim türü örnekleri:
 Bu alanlar ilk sürümde ekranda tam açılmasa bile veri modelinde düşünülmelidir:
 
 - `iban`
-- `baz_maas`
+- `net_maas_tutari`
+- `brut_maas_tutari`
+- `brut_hesaplama_modeli`
+- `brut_hesaplama_donemi` veya `model_versiyonu`
 - `sozlesme_saati`
 - `bes_kesintisi_var_mi`
+
+### 10.1 Maaş alan semantiği (S62A kilit)
+
+İşletmede işçiye sabit **net** maaş ödenir. Ürün kararı:
+
+| Alan | Rol | Kaynak |
+|------|-----|--------|
+| `net_maas_tutari` | Canonical kullanıcı girdisi | Personel kartı / kayıt formu |
+| `brut_maas_tutari` | Sistem hesaplı, salt okunur | Netten brüte dönüşüm motoru (sonraki faz) |
+| `brut_hesaplama_modeli` | Hangi yöntemle brüt üretildiğini izler | Sistem |
+| `brut_hesaplama_donemi` veya `model_versiyonu` | Dönem / model izlenebilirliği | Sistem |
+
+- Mevcut `maas_tutari` semantik olarak belirsizdir; yeni bordro altyapısında tek başına ana alan olmamalıdır.
+- Fazla mesai, saatlik ücret ve kesinti hesapları **brüt** kaynak üzerinden yürür (`brut_maas_tutari`).
+- Netten brüte gerçek hesap motoru ve bordro/vergi parametreleri **bu sprintte yazılmaz**; sonraki fazdır.
 
 Sebep:
 
@@ -329,7 +352,9 @@ Bu belge ile aşağıdaki kararlar sabitlenmiştir:
 - `Bölüm`, `Görev` ve `Personel Tipi` zorunludur
 - `Kan Grubu` ilk sürümde opsiyoneldir
 - `Bağlı Amir` ilk sürümde opsiyoneldir
-- `IBAN`, `Baz Maaş`, `Sözleşme Saati`, `BES` ilk sürümde sonraki faz alanlarıdır
+- `IBAN`, `Net Maaş`, `Sözleşme Saati`, `BES` ilk sürümde sonraki faz alanlarıdır
+- kullanıcı maaşı **net** olarak girer; `brut_maas_tutari` salt okunur sistem alanıdır
+- mevcut `maas_tutari` canonical alan değildir; `net_maas_tutari` hedef semantiktir
 - hesaplanan alanlar kayıt formuna girmeyecektir
 - işten ayrılma süreç kaydı olarak çalışacaktır
 

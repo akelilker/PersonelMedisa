@@ -32,7 +32,7 @@ Aşağıdaki maddeler, mevzuatın asgari çerçevesi ve ürün omurgasıyla uyum
 |------|--------|
 | Haftalık genel çalışma eşiği | **45 saat** |
 | Fazla çalışma | Haftalık 45 saat üstü çalışma; **%50 zamlı** hesaplanır |
-| Fazla sürelerle çalışma | Sözleşme haftalık süresi 45 saatin altındaysa, sözleşme süresi ile 45 saat arasındaki çalışma **%25 zamlı** değerlendirilir. **Mevcut V1 işletme varsayımı tam süreli personeldir;** bu katmanın teknik implementasyonu **ayrı faz** olarak ele alınacaktır |
+| Fazla sürelerle çalışma | Sözleşme haftalık süresi 45 saatin altındaysa, sözleşme süresi ile 45 saat arasındaki çalışma **%25 zamlı** değerlendirilir. **Mevcut işletmede 45 saat altı sözleşmeli personel yoktur;** FSC (x1.25) V1 mevzuat kapatma sprintlerinde **aktif öncelik değildir**. Mimaride/backlog'da açık kalabilir; `sozlesme_saati` ve FSC hesap zinciri **sonraki fazdır** |
 | Günlük çalışma süresi | **11 saat** üzeri **compliance alert** üretir |
 | Ara dinlenmesi | Minimum süreler hesap motoru kuralı olarak **korunur** |
 | UBGT / resmi tatil | Çalışmazsa **tam ücret korunur**; çalışırsa **+1 günlük ek ödeme** kuralı geçerlidir |
@@ -53,7 +53,7 @@ Aşağıdaki konular mevzuat motorunun otomatik kesin kuralı değildir; firma, 
 | Konu | Karar |
 |------|--------|
 | Geç kalma toleransı | Tolerans **dakikaları firma politikasıdır** |
-| Hastalık raporu — ilk 2 gün | İlk 2 günün işveren tarafından ödenip ödenmeyeceği **firma politikasıdır** |
+| Hastalık raporu — ilk 2 gün | Varsayılan `ilk_iki_gun_firma_oder_mi = false`. Yalnızca `Raporlu_Hastalik` için; kullanıcı rapor girişinde değiştirebilir. Alan rapor event/periyot kaydında tutulur; `Raporlu_Is_Kazasi` ayrı değerlendirilir |
 | Hafta tatili çalışması | **+1,5 ek ödeme / toplam 2,5 yevmiye** anlatımı otomatik kesin motor kuralı değildir; **bordro / firma politikasıyla** kesinleşecek **ek ödeme adayı** olarak ele alınır |
 | Prim, ceza, disiplin | Ayrı **politika ve süreç** kararı gerektirir |
 | Fazla çalışma yazılı onayı | Nasıl toplanacağı ve hangi **workflow** ile izleneceği **ayrıca kararlaştırılacaktır** |
@@ -83,13 +83,16 @@ Bu başlıklarda sistem **sessiz kesin bordro sonucu** üretmemeli; teyit, manue
 
 **Kısmi süreli çalışma modeli V1 kapsam dışıdır.**
 
+**FSC (Fazla Sürelerle Çalışma, x1.25) V1 aktif öncelik değildir.**
+
 Gerekçe ve sınırlar:
 
 - İşletmede kısmi süreli personel **bulunmadığı** için bu modele özel **UI alanı**, **hesap motoru kuralı**, **compliance guard**, **test** ve **bordro / SGK etkisi** geliştirilmeyecektir.
+- Mevcut işletmede haftalık **45 saatin altında** sözleşmeli personel **yoktur**.
 - **“V1 kapsam dışı; guard eklenmeli”** yaklaşımı bu proje için **uygulanmayacaktır** (`COMPLIANCE_KISMI_SURELI_FM` veya benzeri uyarı üretimi dahil).
 - İleride kısmi süreli personel çalıştırılması gündeme gelirse: **ayrı karar dokümanı**, **ayrı mevzuat değerlendirmesi** ve **ayrı teknik faz** açılacaktır.
 
-Fazla sürelerle çalışma (%25 katmanı) mevzuat dokümanında yer alır; V1 tam süreli varsayımı nedeniyle implementasyon **bu belgede açılmaz**.
+Fazla sürelerle çalışma (%25 katmanı) mevzuat dokümanında yer alır; mimaride/backlog'da açık kalabilir. V1 tam süreli varsayımı nedeniyle aktif implementasyon **sonraki fazdır**; `sozlesme_saati` ve FSC hesap zinciri backlog'da tutulur.
 
 ---
 
@@ -129,9 +132,10 @@ Kod yazılmadan yalnızca faz önerisi; öncelik sırası ürün ihtiyacına gö
 
 ```text
 [Mevzuat motoru]     → 45s, FM %50, ara dinlenme, UBGT, serbest zaman oranları, 18↓ FM blok, yıllık izin yaş/kıdem
-[Firma / bordro]     → tolerans, rapor 2 gün, HT +1.5, prim/ceza, FM onay workflow, SGK kod eşlemesi
+[Firma / bordro]     → tolerans, HT +1.5, prim/ceza, FM onay workflow, SGK kod eşlemesi
+[S62A kilit]         → net maaş girişi, brüt salt okunur; hastalık ilk 2 gün varsayılan firma ödemez (rapor event)
 [Hukuk / teyit]      → UBGT çift ödeme yok, çakışma manuel, devamsızlık aday, HT günü parametre, dijital onay
-[V1 kapsam dışı]     → kısmi süreli (guard yok)
+[V1 kapsam dışı]     → kısmi süreli (guard yok), FSC x1.25 aktif öncelik değil (backlog / sonraki faz)
 ```
 
 **Belge durumu:** Karar zemini — implementasyon bekliyor.

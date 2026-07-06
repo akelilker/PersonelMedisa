@@ -38,7 +38,7 @@ Bu belge implementasyon dokümanı değildir. Kod, test, UI ve API değişikliğ
 | Haftalık fazla çalışma | `puantaj-hesap-motoru` + `usePuantaj` + `GunlukPuantajPage` hattında **canlı ön izleme** olarak var |
 | FM persist | Haftalık `fazla_calisma_dakika` kapanış snapshot’ına **yazılmıyor** |
 | Compliance | Motor/hook tarafında üretiliyor; API upsert’e persist edilmiyor; kapanışa **taşınmıyor** |
-| Fazla sürelerle çalışma | Kapanış snapshot’ında **yok**; motor V1 tam süreli varsayımıyla yalnızca 45 saat eşiği kullanıyor |
+| Fazla sürelerle çalışma | Kapanış snapshot’ında **yok**; motor V1 tam süreli varsayımıyla yalnızca 45 saat eşiği kullanıyor. **S62A:** Mevcut işletmede 45 saat altı sözleşmeli personel yok; FSC x1.25 V1 aktif öncelik değil, sonraki faz/backlog |
 | Personel × hafta mühürlü veri | **Yok** — 270 saat ve serbest zaman için gerekli temel kaynak eksik |
 | Tip sözleşmesi | `HaftalikKapanisSonuc` gevşek (`[key: string]: unknown`); snapshot alanları tanımlı değil |
 

@@ -185,7 +185,7 @@ Bu dokumanla kesinlesen kararlar sunlardir:
 
 Asagidaki alanlar kod fazina gecmeden once firma / bordro karari bekler:
 
-- Hastalik raporunda isveren ilk gunler icin ucret odeyecek mi?
+- Hastalik raporunda ilk iki gun: varsayilan `ilk_iki_gun_firma_oder_mi = false`; kullanici rapor girisinde degistirebilir (S62A, yalnizca `Raporlu_Hastalik`).
 - Hastalik raporunda isveren tam ucret mi, fark odemesi mi, hic odeme mi uygulayacak?
 - Is kazasi raporunda hastalik raporundan farkli odeme politikasi olacak mi?
 - Analik / dogum raporu icin ucret ve tamamlayici odeme politikasi ne olacak?
@@ -200,7 +200,7 @@ Asagidaki alanlar kod fazina gecmeden once firma / bordro karari bekler:
 Kod implementasyonu oncesi asagidaki sorular yanitlanmalidir:
 
 1. Rapor turleri sistemde hangi sabit alt turlerle tutulacak?
-2. Hastalik raporunda ilk iki gun icin firma odeme politikasi nedir?
+2. Hastalik raporunda ilk iki gun icin firma odeme politikasi: varsayilan `ilk_iki_gun_firma_oder_mi = false`; kullanici rapor girisinde degistirebilir (yalnizca `Raporlu_Hastalik`, rapor event kaydinda).
 3. Hastalik raporunda ucuncu gun ve sonrasi icin isveren odemesi nasil davranir?
 4. Is kazasi raporunda firma tam ucret, fark odemesi veya odeme yapmama seceneklerinden hangisini uygular?
 5. Analik / dogum raporu bu fazda kapsama alinacak mi, yoksa sonraki bordro fazina mi birakilacak?

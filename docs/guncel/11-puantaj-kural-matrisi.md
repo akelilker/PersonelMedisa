@@ -76,7 +76,13 @@
 |---|---|
 | **Kural** | Ücret tipi kullanıcı yüzünde yalnızca **Aylık** ve **Günlük**; varsayılan **Aylık**. |
 | **Sistem etkisi** | Form ve listelerde sade ürün dili; teknik id’ler ayrı tutulabilir. |
-| **Not** | **Kısmi süreli çalışma:** şimdilik yok (V1). |
+| **Not** | **Kısmi süreli çalışma:** mevcut işletmede yok; FSC (x1.25) V1 aktif öncelik değil, sonraki faz/backlog. |
+
+| | |
+|---|---|
+| **Kural** | Kullanıcı maaşı **net** olarak girer (`net_maas_tutari` canonical). |
+| **Sistem etkisi** | `brut_maas_tutari` sistem hesaplı / salt okunur; FM ve kesinti hesapları brüt kaynak üzerinden yürür. |
+| **Not** | Mevcut `maas_tutari` belirsiz semantik; netten brüte motor sonraki faz. |
 
 | | |
 |---|---|
@@ -88,12 +94,12 @@
 
 ## 5. Temel ücret formülleri
 
-Tüm fazla çalışma ve kesinti hesapları **brüt ücret** üzerinden.
+Tüm fazla çalışma ve kesinti hesapları **brüt ücret** (`brut_maas_tutari`) üzerinden.
 
 | Alan | Formül | Sistem etkisi |
 |------|--------|----------------|
-| Aylık personel günlük ücret | Maaş ÷ **30** | Günlük yevmiye, UBGT ek yevmiye vb. |
-| Aylık personel saatlik ücret | Maaş ÷ **225** | FM, geç kalma, erken çıkma kesintisi |
+| Aylık personel günlük ücret | Brüt maaş ÷ **30** | Günlük yevmiye, UBGT ek yevmiye vb. |
+| Aylık personel saatlik ücret | Brüt maaş ÷ **225** | FM, geç kalma, erken çıkma kesintisi |
 | FM çarpanı | Saatlik ücret × **1,5** | Haftalık 45 saat üstü |
 
 **Not:** Günlük ücretli personelde yuvarlama veya özel anlaşma farkları **firma politikası / ileride parametre** alanıdır (Bölüm 17).

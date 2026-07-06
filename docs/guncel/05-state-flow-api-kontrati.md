@@ -201,9 +201,17 @@ Endpoint:
   "aktif_durum": "AKTIF",
   "dogum_yeri": "İstanbul",
   "kan_grubu": "A Rh+",
-  "bagli_amir_id": 44
+  "bagli_amir_id": 44,
+  "net_maas_tutari": 35000
 }
 ```
+
+Notlar (S62A maaş kontratı):
+
+- Kullanıcı maaşı **net** olarak girer; `net_maas_tutari` canonical alandır.
+- `brut_maas_tutari`, `brut_hesaplama_modeli`, `brut_hesaplama_donemi` (veya `model_versiyonu`) yanıtta salt okunur döner; create/update isteğinde gönderilmez.
+- Mevcut `maas_tutari` semantik olarak belirsizdir; yeni bordro altyapısında tek başına ana alan olmamalıdır.
+- Netten brüte hesap motoru bu sprintte implemente edilmez.
 
 Başarılı sonuç:
 
@@ -237,6 +245,7 @@ Kural:
 
 - personel ana kartı düzenlenebilir
 - ancak hesaplanan alanlar bu endpoint ile güncellenemez
+- `brut_maas_tutari` ve türev iz alanları backend tarafından üretilir; istemci yazamaz
 - `aktif_durum` doğrudan elle değiştirilebilir olsa bile, işten ayrılma senaryosunda ana yol `süreç` tarafıdır
 
 ### 4.5 Listeleme
@@ -331,6 +340,24 @@ Endpoint:
   "aciklama": "Yıllık izin"
 }
 ```
+
+Hastalık raporu örneği (S62A):
+
+```json
+{
+  "personel_id": 120,
+  "surec_turu": "RAPOR",
+  "alt_tur": "Raporlu_Hastalik",
+  "baslangic_tarihi": "2026-04-10",
+  "bitis_tarihi": "2026-04-14",
+  "ilk_iki_gun_firma_oder_mi": false,
+  "aciklama": "Hastalık raporu"
+}
+```
+
+- `ilk_iki_gun_firma_oder_mi` yalnızca `Raporlu_Hastalik` için geçerlidir; varsayılan `false`.
+- `Raporlu_Is_Kazasi` bu alanı taşımaz; ayrı değerlendirilir.
+- Alan rapor event / periyot kaydında tutulur; günlük puantaj satırına boolean olarak dağıtılmaz.
 
 Backend davranışı:
 

@@ -164,6 +164,7 @@ Mevzuat ve hesap motoru hedefi (`docs/guncel/04-hesap-motoru-kurallari.md` §7.2
 ### 7.1 V1 daraltması
 
 - V1'de `fazla_surelerle_calisma_dakika` snapshot builder tarafından **0** yazılır; motor sözleşme bazlı FSC ayrımı yapmaz.
+- **S62A:** Mevcut işletmede 45 saat altı sözleşmeli personel yok; FSC x1.25 V1 aktif öncelik değil, sonraki faz/backlog.
 - **E2 dar kod fazında** yalnız `fazla_calisma_dakika` → serbest zaman dakika **dönüşüm helper'ı** ele alınabilir (saf motor fonksiyonu; test amaçlı).
 - FSC dönüşüm kuralı bu belgede **hedef olarak tanımlı** kalır; FSC aktif hesaplanmadığı sürece kodda uygulanmaz.
 

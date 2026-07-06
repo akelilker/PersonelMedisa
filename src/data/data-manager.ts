@@ -1072,6 +1072,12 @@ function parseSurecRealtimePayload(p: unknown): Surec | null {
     baslangic_tarihi: typeof p.baslangic_tarihi === "string" ? p.baslangic_tarihi : undefined,
     bitis_tarihi: typeof p.bitis_tarihi === "string" ? p.bitis_tarihi : undefined,
     ucretli_mi: typeof p.ucretli_mi === "boolean" ? p.ucretli_mi : undefined,
+    ilk_iki_gun_firma_oder_mi:
+      p.ilk_iki_gun_firma_oder_mi === null
+        ? null
+        : typeof p.ilk_iki_gun_firma_oder_mi === "boolean"
+          ? p.ilk_iki_gun_firma_oder_mi
+          : undefined,
     aciklama: typeof p.aciklama === "string" ? p.aciklama : undefined,
     state: typeof p.state === "string" ? p.state : undefined
   };

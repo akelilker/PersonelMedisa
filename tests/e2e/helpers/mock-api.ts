@@ -1126,6 +1126,21 @@ function isValidDateString(value: unknown): value is string {
   return Number.isFinite(parsed);
 }
 
+function resolveMockIlkIkiGunFirmaOderMi(
+  surecTuru: string,
+  altTur: string | undefined,
+  payload: Record<string, unknown>
+): boolean | null {
+  if (surecTuru === "RAPOR" && altTur === "Raporlu_Hastalik") {
+    if (payload.ilk_iki_gun_firma_oder_mi !== undefined && payload.ilk_iki_gun_firma_oder_mi !== null) {
+      return Boolean(payload.ilk_iki_gun_firma_oder_mi);
+    }
+    return false;
+  }
+
+  return null;
+}
+
 export async function mockApi(page: Page, role: MockUserRole) {
   const bagliAmirReferanslari: Array<{ id: number; ad: string; sube_id: number; departman_id: number }> = [
     { id: 9, ad: "Demo Amir", sube_id: 1, departman_id: 3 },
@@ -1322,6 +1337,7 @@ export async function mockApi(page: Page, role: MockUserRole) {
     effective_date?: string;
     created_at?: string;
     ucretli_mi?: boolean;
+    ilk_iki_gun_firma_oder_mi?: boolean | null;
     aciklama?: string;
     state: string;
   }> = [
@@ -2963,6 +2979,11 @@ let bildirimIdCounter = 800;
         baslangic_tarihi: baslangicTarihi,
         bitis_tarihi: bitisTarihi,
         ucretli_mi: Boolean(payload.ucretli_mi),
+        ilk_iki_gun_firma_oder_mi: resolveMockIlkIkiGunFirmaOderMi(
+          surecTuru,
+          typeof payload.alt_tur === "string" && payload.alt_tur.trim() ? payload.alt_tur.trim() : undefined,
+          payload
+        ),
         aciklama:
           typeof payload.aciklama === "string" && payload.aciklama.trim() ? payload.aciklama.trim() : undefined,
         created_at: new Date().toISOString(),
@@ -3295,17 +3316,21 @@ let bildirimIdCounter = 800;
         baslangic_tarihi: string;
         bitis_tarihi: string;
         ucretli_mi?: boolean;
+        ilk_iki_gun_firma_oder_mi?: boolean;
         aciklama?: string;
       };
 
+      const surecTuru = payload.surec_turu.trim().toUpperCase();
+      const altTur = payload.alt_tur?.trim() || undefined;
       const created = {
         id: ++surecIdCounter,
         personel_id: payload.personel_id,
-        surec_turu: payload.surec_turu,
-        alt_tur: payload.alt_tur,
+        surec_turu: surecTuru,
+        alt_tur: altTur,
         baslangic_tarihi: payload.baslangic_tarihi,
         bitis_tarihi: payload.bitis_tarihi,
         ucretli_mi: payload.ucretli_mi,
+        ilk_iki_gun_firma_oder_mi: resolveMockIlkIkiGunFirmaOderMi(surecTuru, altTur, payload),
         aciklama: payload.aciklama,
         state: "AKTIF"
       };

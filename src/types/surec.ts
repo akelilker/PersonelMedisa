@@ -8,6 +8,7 @@ export type Surec = {
   bitis_tarihi?: string;
   created_at?: string;
   ucretli_mi?: boolean;
+  ilk_iki_gun_firma_oder_mi?: boolean | null;
   aciklama?: string;
   state?: string;
 };

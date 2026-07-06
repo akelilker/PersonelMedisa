@@ -83,6 +83,7 @@ type DemoSurec = {
   baslangic_tarihi?: string;
   bitis_tarihi?: string;
   ucretli_mi?: boolean;
+  ilk_iki_gun_firma_oder_mi?: boolean | null;
   aciklama?: string;
   state?: string;
 };
@@ -2335,14 +2336,22 @@ export function resolveDemoApiResponse(
   }
 
   if (pathname === "/surecler" && method === "POST") {
+    const surecTuru = toStringValue(body.surec_turu) ?? "IZIN";
+    const altTur = toStringValue(body.alt_tur) ?? undefined;
     const next: DemoSurec = {
       id: ++demoState.nextIds.surec,
       personel_id: toNumber(body.personel_id) ?? 1,
-      surec_turu: toStringValue(body.surec_turu) ?? "IZIN",
-      alt_tur: toStringValue(body.alt_tur) ?? undefined,
+      surec_turu: surecTuru,
+      alt_tur: altTur,
       baslangic_tarihi: toStringValue(body.baslangic_tarihi) ?? undefined,
       bitis_tarihi: toStringValue(body.bitis_tarihi) ?? undefined,
       ucretli_mi: body.ucretli_mi === undefined ? true : Boolean(body.ucretli_mi),
+      ilk_iki_gun_firma_oder_mi:
+        surecTuru === "RAPOR" && altTur === "Raporlu_Hastalik"
+          ? body.ilk_iki_gun_firma_oder_mi !== undefined && body.ilk_iki_gun_firma_oder_mi !== null
+            ? Boolean(body.ilk_iki_gun_firma_oder_mi)
+            : false
+          : null,
       aciklama: toStringValue(body.aciklama) ?? undefined,
       state: "AKTIF"
     };

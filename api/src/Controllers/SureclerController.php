@@ -76,7 +76,7 @@ class SureclerController
             $offset = ($page - 1) * $limit;
             $sql = "
                 SELECT sc.id, sc.personel_id, sc.surec_turu, sc.alt_tur, sc.baslangic_tarihi, sc.bitis_tarihi,
-                       sc.ucretli_mi, sc.aciklama, sc.state
+                       sc.ucretli_mi, sc.ilk_iki_gun_firma_oder_mi, sc.aciklama, sc.state
                 FROM surecler sc
                 INNER JOIN personeller p ON p.id = sc.personel_id
                 WHERE $whereSql
@@ -195,13 +195,16 @@ class SureclerController
             $ucretliMi = self::normalizeBoolean($body['ucretli_mi']);
         }
 
+        $altTur = self::optionalTrimmedString($body, 'alt_tur');
+
         return [
             'personel_id' => $personelId,
             'surec_turu' => $surecTuru,
-            'alt_tur' => self::optionalTrimmedString($body, 'alt_tur'),
+            'alt_tur' => $altTur,
             'baslangic_tarihi' => $baslangicTarihi,
             'bitis_tarihi' => $bitisTarihi,
             'ucretli_mi' => $ucretliMi,
+            'ilk_iki_gun_firma_oder_mi' => self::resolveIlkIkiGunFirmaOderMi($surecTuru, $altTur, $body),
             'aciklama' => self::optionalTrimmedString($body, 'aciklama'),
         ];
     }
@@ -231,10 +234,10 @@ class SureclerController
         $sql = '
             INSERT INTO surecler (
                 personel_id, surec_turu, alt_tur, baslangic_tarihi, bitis_tarihi,
-                ucretli_mi, aciklama, state
+                ucretli_mi, ilk_iki_gun_firma_oder_mi, aciklama, state
             ) VALUES (
                 :personel_id, :surec_turu, :alt_tur, :baslangic_tarihi, :bitis_tarihi,
-                :ucretli_mi, :aciklama, :state
+                :ucretli_mi, :ilk_iki_gun_firma_oder_mi, :aciklama, :state
             )
         ';
         $stmt = $pdo->prepare($sql);
@@ -245,6 +248,9 @@ class SureclerController
             'baslangic_tarihi' => $payload['baslangic_tarihi'],
             'bitis_tarihi' => $payload['bitis_tarihi'],
             'ucretli_mi' => $payload['ucretli_mi'] ? 1 : 0,
+            'ilk_iki_gun_firma_oder_mi' => $payload['ilk_iki_gun_firma_oder_mi'] === null
+                ? null
+                : ($payload['ilk_iki_gun_firma_oder_mi'] ? 1 : 0),
             'aciklama' => $payload['aciklama'],
             'state' => 'AKTIF',
         ]);
@@ -263,7 +269,7 @@ class SureclerController
     {
         $stmt = $pdo->prepare('
             SELECT id, personel_id, surec_turu, alt_tur, baslangic_tarihi, bitis_tarihi,
-                   ucretli_mi, aciklama, state
+                   ucretli_mi, ilk_iki_gun_firma_oder_mi, aciklama, state
             FROM surecler
             WHERE id = :id
             LIMIT 1
@@ -384,6 +390,36 @@ class SureclerController
         ];
     }
 
+    /** @param array<string, mixed> $body */
+    private static function resolveIlkIkiGunFirmaOderMi($surecTuru, $altTur, array $body)
+    {
+        if (!self::isHastalikRaporSureci($surecTuru, $altTur)) {
+            return null;
+        }
+
+        if (array_key_exists('ilk_iki_gun_firma_oder_mi', $body) && $body['ilk_iki_gun_firma_oder_mi'] !== null) {
+            return self::normalizeBoolean($body['ilk_iki_gun_firma_oder_mi']);
+        }
+
+        return false;
+    }
+
+    /** @param mixed $surecTuru @param mixed $altTur */
+    private static function isHastalikRaporSureci($surecTuru, $altTur)
+    {
+        return (string) $surecTuru === 'RAPOR' && (string) $altTur === 'Raporlu_Hastalik';
+    }
+
+    /** @param mixed $value */
+    private static function mapNullableBoolean($value)
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        return (bool) ((int) $value);
+    }
+
     private static function validationError($field, $message)
     {
         JsonResponse::error(422, 'VALIDATION_ERROR', $message, $field);
@@ -400,6 +436,7 @@ class SureclerController
             'baslangic_tarihi' => (string) $row['baslangic_tarihi'],
             'bitis_tarihi' => $row['bitis_tarihi'] !== null ? (string) $row['bitis_tarihi'] : null,
             'ucretli_mi' => (bool) ((int) ($row['ucretli_mi'] ?? 0)),
+            'ilk_iki_gun_firma_oder_mi' => self::mapNullableBoolean($row['ilk_iki_gun_firma_oder_mi'] ?? null),
             'aciklama' => self::mapSurecAciklama($row),
             'state' => (string) $row['state'],
         ];

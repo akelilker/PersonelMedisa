@@ -132,7 +132,7 @@ export function PersonelInlineEditForm({
           <p className="personel-create-error">Ücret tipi listesi yüklenemedi.</p>
         )}
         <FormField
-          label="Maaş tutarı"
+          label="Net Maaş"
           name="edit-maas"
           type="number"
           min={0}

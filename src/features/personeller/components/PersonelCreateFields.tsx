@@ -459,7 +459,7 @@ export function PersonelCreateFields({
             refMissingNote("Ücret Tipi", false)
           )}
           <FormField
-            label="Maaş Tutarı"
+            label="Net Maaş"
             name="create-maas"
             type="number"
             min={0}

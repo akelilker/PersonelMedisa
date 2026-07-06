@@ -460,7 +460,7 @@ export function KayitSurecWorkspace({
               )
             )
           },
-          { label: "Maaş Tutarı", value: formatMoneyField(selectedSurecPersonel.maas_tutari) },
+          { label: "Net Maaş", value: formatMoneyField(selectedSurecPersonel.maas_tutari) },
           { label: "Prim Kuralı", value: formatGeneralField(selectedSurecPersonel.prim_kurali_adi) }
         ]
       }

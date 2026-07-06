@@ -155,6 +155,7 @@ body.login-page .hero .animated-line {
 
 @media (min-width: 641px) {
   .hero {
+    --hero-logo-width: 92px;
     --hero-spacer-width: 14px;
     column-gap: 10px;
     padding-inline: 12px;
@@ -162,6 +163,7 @@ body.login-page .hero .animated-line {
 
   .hero-with-session .hero-logo {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto auto;
     align-items: start;
     align-self: center;
@@ -174,7 +176,13 @@ body.login-page .hero .animated-line {
   }
 
   .hero-with-session .hero-session-meta {
+    box-sizing: border-box;
+    justify-self: stretch;
     padding: 0 2px;
+  }
+
+  .hero-with-session .hero-logo picture {
+    width: 69px;
   }
 
   .hero h1 {

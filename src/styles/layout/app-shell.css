@@ -25,6 +25,7 @@
    * - alt bosluk footer ustunde sabit 8px olarak korunur
    */
   --shell-content-top-padding: max(12px, env(safe-area-inset-top, 0px));
+  --shell-frame-bottom-clearance: 18px;
   --shell-modal-top-inset: 0px;
   --shell-modal-top: var(--shell-modal-top-inset);
 }
@@ -32,7 +33,12 @@
 .app-shell::before {
   content: "";
   position: absolute;
-  inset: 0 0 calc(var(--app-footer-real-height) + var(--app-footer-gap) + env(safe-area-inset-bottom, 0px)) 0;
+  inset: 0 0
+    calc(
+      var(--app-footer-real-height) + var(--app-footer-gap) + var(--shell-frame-bottom-clearance) +
+        env(safe-area-inset-bottom, 0px)
+    )
+    0;
   border-top: 0.5px solid var(--border-red-tech);
   border-left: 0.5px solid var(--border-red-side);
   border-right: 0.5px solid var(--border-red-side);

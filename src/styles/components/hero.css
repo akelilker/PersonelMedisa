@@ -36,22 +36,18 @@
   flex-direction: column;
   align-items: center;
   justify-content: flex-start;
-  gap: 4px;
+  gap: 3px;
 }
 
 .hero-session-meta {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+  display: block;
   width: 100%;
   max-width: 100%;
   min-width: 0;
-  gap: 1px;
   overflow: hidden;
 }
 
-.hero-session-user,
-.hero-session-sube {
+.hero-session-user {
   display: block;
   width: 100%;
   max-width: 100%;
@@ -64,15 +60,6 @@
   letter-spacing: 0.01em;
   color: rgba(238, 246, 255, 0.96);
   -webkit-font-smoothing: antialiased;
-}
-
-.hero-session-sube {
-  font-size: clamp(7px, 1.35vw, 9px);
-  font-weight: 600;
-  color: rgba(238, 246, 255, 0.78);
-}
-
-.hero-session-user {
   font-size: clamp(8px, 1.55vw, 10px);
 }
 
@@ -173,39 +160,21 @@ body.login-page .hero .animated-line {
     padding-inline: 12px;
   }
 
-  .hero-with-session {
-    align-items: stretch;
-  }
-
   .hero-with-session .hero-logo {
     display: grid;
     grid-template-rows: auto auto;
     align-items: start;
-    align-self: stretch;
+    align-self: center;
     justify-items: center;
-    gap: 0;
+    gap: 2px;
     margin-left: 0;
     margin-right: 8px;
-    transform: translateY(3px);
-    padding: 2px 0 4px;
+    transform: translateY(0);
+    padding: 0;
   }
 
   .hero-with-session .hero-session-meta {
-    align-self: stretch;
-    padding: 0 2px 1px;
-    transform: translateY(4px);
-  }
-
-  .hero-with-session .hero-session-user,
-  .hero-with-session .hero-session-sube {
-    white-space: normal;
-    word-break: break-word;
-    overflow-wrap: normal;
-    display: -webkit-box;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
-    text-overflow: clip;
+    padding: 0 2px;
   }
 
   .hero h1 {
@@ -240,7 +209,7 @@ body.login-page .hero .animated-line {
 
   .hero-with-session .hero-logo {
     flex: 0 0 var(--hero-logo-width);
-    gap: 4px;
+    gap: 3px;
     align-self: center;
     transform: translate(-1px, 1px);
   }
@@ -248,25 +217,13 @@ body.login-page .hero .animated-line {
   .hero-with-session .hero-session-meta {
     width: 82px;
     max-width: 82px;
-    transform: translate(13px, 5px);
+    transform: translate(13px, 2px);
   }
 
-  .hero-with-session .hero-session-user,
-  .hero-with-session .hero-session-sube {
+  .hero-with-session .hero-session-user {
     font-size: 9.5px;
     line-height: 1.06;
     max-height: 1.06em;
-    white-space: nowrap;
-    word-break: normal;
-    overflow-wrap: normal;
-    display: block;
-    -webkit-line-clamp: unset;
-    line-clamp: unset;
-  }
-
-  .hero-with-session .hero-session-sube {
-    font-size: 8.5px;
-    color: rgba(238, 246, 255, 0.82);
   }
 
   .hero-logo img {
@@ -287,11 +244,11 @@ body.login-page .hero .animated-line {
   }
 
   body:not(.login-page) .hero {
-    min-height: 71px;
+    min-height: 65px;
   }
 
   body:not(.login-page) .hero .animated-line {
-    bottom: 19px;
+    bottom: 12px;
     height: 2.5px;
     opacity: 0.72;
   }

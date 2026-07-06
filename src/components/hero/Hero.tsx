@@ -3,26 +3,23 @@ import logoMobile from "../../assets/brand/logo-header2-mobile-header.svg";
 
 type HeroProps = {
   title: string;
-  userName?: string | null;
-  subeLabel?: string | null;
+  userLabel?: string | null;
 };
 
-export function Hero({ title, userName, subeLabel }: HeroProps) {
-  const trimmedUserName = userName?.trim() ?? "";
-  const trimmedSubeLabel = subeLabel?.trim() ?? "";
-  const showSessionMeta = trimmedUserName.length > 0;
+export function Hero({ title, userLabel }: HeroProps) {
+  const trimmedUserLabel = userLabel?.trim() ?? "";
+  const showUserLabel = trimmedUserLabel.length > 0;
 
   return (
-    <section className={`hero${showSessionMeta ? " hero-with-session" : ""}`}>
+    <section className={`hero${showUserLabel ? " hero-with-session" : ""}`}>
       <div className="hero-logo">
         <picture>
           <source media="(max-width: 640px)" srcSet={logoMobile} />
           <img src={logoDesktop} alt="MEDISA" />
         </picture>
-        {showSessionMeta ? (
+        {showUserLabel ? (
           <div className="hero-session-meta" aria-live="polite">
-            <span className="hero-session-user">{trimmedUserName}</span>
-            {trimmedSubeLabel ? <span className="hero-session-sube">{trimmedSubeLabel}</span> : null}
+            <span className="hero-session-user">{trimmedUserLabel}</span>
           </div>
         ) : null}
       </div>

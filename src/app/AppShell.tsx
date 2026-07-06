@@ -10,17 +10,6 @@ import { KayitSurecWorkspace } from "../features/kayit/components/KayitSurecWork
 import { useKayitModalController } from "../features/kayit/hooks/useKayitModalController";
 import { formatUiProfileLabel, formatUserRoleLabel } from "../lib/display/enum-display";
 import { useAuth } from "../state/auth.store";
-import type { AuthSession } from "../types/auth";
-
-function resolveHeroSubeLabel(session: AuthSession): string {
-  if (session.user.sube_ids.length === 0 || session.active_sube_id == null) {
-    return "Tüm Şubeler";
-  }
-
-  const activeId = session.active_sube_id;
-  const subeName = session.sube_list?.find((sube) => sube.id === activeId)?.ad;
-  return subeName ?? `Şube ${activeId}`;
-}
 
 export type AppShellOutletContext = {
   onKayitOpen: (tab: KayitTab) => void;
@@ -153,31 +142,11 @@ export function AppShell() {
     [openKayitModal, isHomeRoute, isKayitModalOpen]
   );
 
-  const heroSessionMeta = useMemo(() => {
-    if (!session) {
-      return null;
-    }
-
-    const userName = session.user.ad_soyad.trim();
-    if (!userName) {
-      return null;
-    }
-
-    return {
-      userName,
-      subeLabel: resolveHeroSubeLabel(session)
-    };
-  }, [session]);
-
   return (
     <div className="app-container app-shell">
       <main className="content-wrap">
         <div className="shell-top-stack">
-          <Hero
-            title="Personel Yönetim Sistemi"
-            userName={heroSessionMeta?.userName}
-            subeLabel={heroSessionMeta?.subeLabel}
-          />
+          <Hero title="Personel Yönetim Sistemi" userLabel={session?.user.ad_soyad} />
           {showShellHeaderActions ? <ShellHeaderActions contextLabel="Ana panel" minimal={isHomeRoute} /> : null}
         </div>
 

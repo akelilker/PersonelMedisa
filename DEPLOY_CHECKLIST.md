@@ -120,6 +120,31 @@ Canlı `config.local.php` sunucuda kalmalı; gerçek DB secret bilgileri repodan
 
 Deploy cPanel workflow **success** sonrası aşağıdaki adımları sırayla uygula. `<BASE_URL>` yerine canlı host adresini kullan.
 
+### Otomatik HTTP smoke (local script)
+
+Adımlar 2–5 (API health, auth guard, frontend kök, bundle/asset tutarlılığı) repo kökünde local script ile otomatik çalıştırılabilir. Gerçek domain bu dosyaya veya koda yazılmaz; operasyon sırasında env ile verilir.
+
+```bash
+SMOKE_BASE_URL=https://<canlı-host> npm run smoke:live
+```
+
+Opsiyonel alt klasör override:
+
+```bash
+SMOKE_BASE_URL=https://<canlı-host> SMOKE_APP_PREFIX=/personelmedisa npm run smoke:live
+```
+
+- **Script:** `scripts/post-deploy-smoke.mjs`
+- **npm script:** `smoke:live`
+- **Zorunlu env:** `SMOKE_BASE_URL` (protokol + host; sondaki `/` temizlenir)
+- **Opsiyonel env:** `SMOKE_APP_PREFIX` (varsayılan: `/personelmedisa`)
+- **Otomatik kapsam:** API health, API auth guard 401, frontend kök HTML, `index.html` asset 200
+- **Manuel kalır:** GitHub Actions doğrulama (1), cache bypass (6), login smoke (7), read smoke (8), sonuç kaydı (9)
+- **Çıkış kodu:** tüm otomatik kontroller OK → `0`; herhangi fail veya eksik env → `1`
+- **Credential yok:** login/read veya token bu scriptte desteklenmez
+
+`SMOKE_BASE_URL` verilmeden çalıştırılırsa usage gösterilir ve script `exit 1` döner.
+
 ### 1. GitHub Actions doğrulama
 
 - **Amaç:** Doğru commit deploy edildi mi?

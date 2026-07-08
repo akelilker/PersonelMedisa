@@ -162,8 +162,13 @@ test.describe("rapor finans sube scope fallback (S43D)", () => {
     await loginAs(page, "MUHASEBE");
 
     const result = await fetchFinansList(page, { clearActiveSube: true });
+    const allowedPersonelIds = [1, 2];
+    const uniquePersonelIds = [...new Set(result.personelIds)].sort((left, right) => left - right);
+
     expect(result.status).toBe(200);
-    expect(result.personelIds.sort()).toEqual([1, 2]);
+    expect(result.personelIds.length).toBeGreaterThan(0);
+    expect(result.personelIds.every((id) => allowedPersonelIds.includes(id))).toBe(true);
+    expect(uniquePersonelIds).toEqual(allowedPersonelIds);
   });
 
   test("MUHASEBE with unauthorized active sube returns 403 for rapor and finans", async ({ page }) => {

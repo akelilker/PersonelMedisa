@@ -57,11 +57,16 @@ describe("personel-finans-adaylari-utils", () => {
   });
 
   it("CEZA ve DIGER_KESINTI kayitlarinda kesinti adayi dilini kullanir", () => {
-    expect(formatFinansKayitAdayRolu("CEZA")).toBe("Bordroda dikkate alınacak kesinti adayı");
-    expect(formatFinansKayitAdayRolu("DIGER_KESINTI")).toBe("Bordroda dikkate alınacak kesinti adayı");
-    expect(formatFinansKayitSatirOzeti(makeFinansKalem({ kalem_turu: "CEZA" }))).toContain(
-      "Bordroda dikkate alınacak kesinti adayı"
-    );
+    expect(formatFinansKayitAdayRolu("CEZA")).toBe("Kesinti adayı");
+    expect(formatFinansKayitAdayRolu("DIGER_KESINTI")).toBe("Kesinti adayı");
+    expect(formatFinansKayitAdayRolu("BES")).toBe("Kesinti adayı");
+    expect(formatFinansKayitSatirOzeti(makeFinansKalem({ kalem_turu: "CEZA" }))).toContain("Kesinti adayı");
+  });
+
+  it("MAAS rolunu toplam disi finans kaydi olarak gosterir", () => {
+    const rol = formatFinansKayitAdayRolu("MAAS");
+    expect(rol).toBe("Toplam dışı finans kaydı");
+    expect(formatFinansKayitSatirOzeti(makeFinansKalem({ kalem_turu: "MAAS", tutar: 5000 }))).toContain(rol);
   });
 
   it("yasakli kesin bordro dilini kullanmaz", () => {
@@ -69,6 +74,7 @@ describe("personel-finans-adaylari-utils", () => {
       formatFinansKayitAdayRolu("AVANS"),
       formatFinansKayitAdayRolu("PRIM"),
       formatFinansKayitAdayRolu("CEZA"),
+      formatFinansKayitAdayRolu("MAAS"),
       formatFinansKayitSatirOzeti(makeFinansKalem({ kalem_turu: "BES", tutar: 250 }))
     ];
 
@@ -118,6 +124,7 @@ describe("personel-finans-adaylari-utils", () => {
 
   it("MAAS toplam disinda kalir", () => {
     expect(getFinansAdayGrubu("MAAS")).toBeNull();
+    expect(formatFinansKayitAdayRolu("MAAS")).toBe("Toplam dışı finans kaydı");
     const toplamlar = computeFinansAdayToplamlari([
       makeFinansKalem({ id: 1, kalem_turu: "MAAS", tutar: 5000 }),
       makeFinansKalem({ id: 2, kalem_turu: "PRIM", tutar: 1000 })

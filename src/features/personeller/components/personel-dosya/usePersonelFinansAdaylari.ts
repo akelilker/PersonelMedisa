@@ -17,9 +17,11 @@ export function usePersonelFinansAdaylari({
   const [finansKayitlari, setFinansKayitlari] = useState<FinansKalem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [fetchResolved, setFetchResolved] = useState(false);
   const donem = typeof personel.sgk_donem === "string" ? personel.sgk_donem.trim() : "";
   const hasDonem = donem.length > 0;
   const canFetch = isActive && canViewFinans && Boolean(personel.id) && hasDonem;
+  const isFinansLoading = canFetch && (isLoading || !fetchResolved);
 
   useEffect(() => {
     let isCancelled = false;
@@ -28,11 +30,13 @@ export function usePersonelFinansAdaylari({
       setFinansKayitlari([]);
       setIsLoading(false);
       setErrorMessage(null);
+      setFetchResolved(false);
       return;
     }
 
     setIsLoading(true);
     setErrorMessage(null);
+    setFetchResolved(false);
 
     fetchFinansKalemList({
       personel_id: personel.id,
@@ -60,6 +64,7 @@ export function usePersonelFinansAdaylari({
       .finally(() => {
         if (!isCancelled) {
           setIsLoading(false);
+          setFetchResolved(true);
         }
       });
 
@@ -70,9 +75,11 @@ export function usePersonelFinansAdaylari({
 
   return {
     finansKayitlari,
-    isLoading,
+    isLoading: isFinansLoading,
     errorMessage,
     hasDonem,
-    donem
+    donem,
+    canFetch,
+    fetchResolved
   };
 }

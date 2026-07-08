@@ -14,14 +14,25 @@ export function PersonelFinansAdaylariSection({
   isLoading,
   errorMessage,
   canViewFinans,
-  hasDonem
+  hasDonem,
+  canFetch,
+  fetchResolved
 }: {
   finansKayitlari: FinansKalem[];
   isLoading: boolean;
   errorMessage: string | null;
   canViewFinans: boolean;
   hasDonem: boolean;
+  canFetch: boolean;
+  fetchResolved: boolean;
 }) {
+  const showLoading = canViewFinans && hasDonem && canFetch && isLoading;
+  const showEmpty =
+    canViewFinans && hasDonem && canFetch && fetchResolved && !isLoading && !errorMessage && finansKayitlari.length === 0;
+  const showList =
+    canViewFinans && hasDonem && canFetch && fetchResolved && !isLoading && !errorMessage && finansKayitlari.length > 0;
+  const showError = canViewFinans && hasDonem && canFetch && fetchResolved && !isLoading && Boolean(errorMessage);
+
   return (
     <section
       className="personel-puantaj-summary-card personel-devam-primi-card"
@@ -44,25 +55,25 @@ export function PersonelFinansAdaylariSection({
         </p>
       ) : null}
 
-      {canViewFinans && hasDonem && isLoading ? (
+      {showLoading ? (
         <p className="personel-puantaj-summary-note" data-testid="personel-finans-adaylari-yukleniyor">
           Finans kayıtları yükleniyor...
         </p>
       ) : null}
 
-      {canViewFinans && hasDonem && !isLoading && errorMessage ? (
+      {showError ? (
         <p className="personel-puantaj-summary-note" data-testid="personel-finans-adaylari-hata">
           {errorMessage}
         </p>
       ) : null}
 
-      {canViewFinans && hasDonem && !isLoading && !errorMessage && finansKayitlari.length === 0 ? (
+      {showEmpty ? (
         <p className="personel-puantaj-summary-note" data-testid="personel-finans-adaylari-bos">
           {FINANS_ADAY_KAYIT_YOK_MESAJI}
         </p>
       ) : null}
 
-      {canViewFinans && hasDonem && !isLoading && !errorMessage && finansKayitlari.length > 0 ? (
+      {showList ? (
         <ul className="personel-surec-list personel-izin-list" data-testid="personel-finans-adaylari-list">
           {finansKayitlari.map((item) => (
             <li key={item.id} className="personel-surec-card" data-testid={`personel-finans-kayit-${item.id}`}>

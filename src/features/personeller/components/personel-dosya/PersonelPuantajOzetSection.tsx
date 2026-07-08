@@ -244,7 +244,9 @@ export function PersonelPuantajOzetSection({
     finansKayitlari,
     isLoading: isFinansLoading,
     errorMessage: finansErrorMessage,
-    hasDonem: hasFinansDonem
+    hasDonem: hasFinansDonem,
+    canFetch: canFetchFinans,
+    fetchResolved: finansFetchResolved
   } = usePersonelFinansAdaylari({ personel, canViewFinans, isActive });
   const finansAdayToplamlari = useMemo(
     () => computeFinansAdayToplamlari(finansKayitlari),
@@ -487,6 +489,8 @@ export function PersonelPuantajOzetSection({
         errorMessage={finansErrorMessage}
         canViewFinans={canViewFinans}
         hasDonem={hasFinansDonem}
+        canFetch={canFetchFinans}
+        fetchResolved={finansFetchResolved}
       />
 
       <DossierSection

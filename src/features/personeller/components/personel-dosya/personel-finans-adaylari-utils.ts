@@ -13,8 +13,7 @@ const EK_ODEME_KALEM_TURLERI = new Set([
   "BONUS",
   "IKRAMIYE",
   "TESVIK",
-  "MESAI",
-  "MAAS"
+  "MESAI"
 ]);
 
 const EK_ODEME_TOPLAM_KALEM_TURLERI = new Set([
@@ -137,12 +136,16 @@ export function formatFinansKayitAdayRolu(kalemTuru: string): string {
     return "Maaştan mahsup edilecek aday";
   }
 
+  if (normalized === "MAAS") {
+    return "Toplam dışı finans kaydı";
+  }
+
   if (EK_ODEME_KALEM_TURLERI.has(normalized)) {
     return "Ek ödeme adayı";
   }
 
   if (KESINTI_KALEM_TURLERI.has(normalized)) {
-    return "Bordroda dikkate alınacak kesinti adayı";
+    return "Kesinti adayı";
   }
 
   return "Bordroda dikkate alınacak finans kaydı";

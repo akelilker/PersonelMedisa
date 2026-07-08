@@ -34,18 +34,17 @@ import {
   siniflandirPuantajEksikGunEtkisi,
   type DevamsizlikKesintiOzeti,
   type HaftalikPuantajUcretOzeti,
-  type PuantajEksikGunSiniflandirmaGirdisi,
   type PuantajEksikGunSiniflandirmaSonucu,
   type TatilEkOdemeOzeti
 } from "../services/puantaj-hesap-motoru";
 import {
-  cozumleHastalikRaporGunu,
-  type HastalikRaporSureci
-} from "../services/hastalik-rapor-politikasi";
+  buildGunlukPuantajEksikGunSiniflandirmaGirdisi,
+  readHastalikRaporSurecleriFromCache,
+  type GunlukPuantajEksikGunSiniflandirmaKaynagi
+} from "../services/puantaj-hastalik-rapor-cozumu";
+import type { HastalikRaporSureci } from "../services/hastalik-rapor-politikasi";
 import { useAuth } from "../state/auth.store";
-import type { PaginatedResult } from "../types/api";
 import type { Personel } from "../types/personel";
-import type { Surec } from "../types/surec";
 import type {
   GunlukPuantaj,
   PuantajDayanak,
@@ -170,54 +169,7 @@ function parseOptionalNonNegativeInt(value: string) {
 
 const TODAY_INPUT = toDateInputValue(new Date());
 
-export type GunlukPuantajEksikGunSiniflandirmaKaynagi = Pick<
-  GunlukPuantaj,
-  "personel_id" | "tarih" | "hareket_durumu" | "dayanak" | "durumu_bildirdi_mi"
->;
-
-export function mapSurecToHastalikRaporSureci(surec: Surec): HastalikRaporSureci | null {
-  const baslangicTarihi = surec.baslangic_tarihi?.trim();
-  if (!baslangicTarihi) {
-    return null;
-  }
-
-  return {
-    id: surec.id,
-    personel_id: surec.personel_id,
-    surec_turu: surec.surec_turu,
-    alt_tur: surec.alt_tur ?? null,
-    baslangic_tarihi: baslangicTarihi,
-    bitis_tarihi: surec.bitis_tarihi ?? null,
-    state: surec.state ?? null,
-    ilk_iki_gun_firma_oder_mi: surec.ilk_iki_gun_firma_oder_mi ?? null
-  };
-}
-
-export function buildHastalikRaporSurecList(surecler: Surec[]): HastalikRaporSureci[] {
-  return surecler
-    .map(mapSurecToHastalikRaporSureci)
-    .filter((surec): surec is HastalikRaporSureci => surec !== null);
-}
-
-export function buildGunlukPuantajEksikGunSiniflandirmaGirdisi(
-  puantaj: GunlukPuantajEksikGunSiniflandirmaKaynagi,
-  hastalikRaporSurecleri: HastalikRaporSureci[] | null
-): PuantajEksikGunSiniflandirmaGirdisi {
-  const girdi: PuantajEksikGunSiniflandirmaGirdisi = {
-    hareket_durumu: puantaj.hareket_durumu,
-    dayanak: puantaj.dayanak,
-    durumu_bildirdi_mi: puantaj.durumu_bildirdi_mi
-  };
-
-  if (puantaj.dayanak === "Raporlu_Hastalik" && hastalikRaporSurecleri !== null) {
-    girdi.hastalik_rapor_cozumu = cozumleHastalikRaporGunu(hastalikRaporSurecleri, {
-      personelId: puantaj.personel_id,
-      tarih: puantaj.tarih
-    });
-  }
-
-  return girdi;
-}
+export type { GunlukPuantajEksikGunSiniflandirmaKaynagi } from "../services/puantaj-hastalik-rapor-cozumu";
 
 export function siniflandirGunlukPuantajEksikGunEtkisi(
   puantaj: GunlukPuantajEksikGunSiniflandirmaKaynagi,
@@ -226,26 +178,6 @@ export function siniflandirGunlukPuantajEksikGunEtkisi(
   return siniflandirPuantajEksikGunEtkisi(
     buildGunlukPuantajEksikGunSiniflandirmaGirdisi(puantaj, hastalikRaporSurecleri)
   );
-}
-
-function readPersonelSurecCache(
-  activeSube: number | null,
-  personelId: number
-): PaginatedResult<Surec> | undefined {
-  const key = dataCacheKeys.sureclerList(activeSube, String(personelId), "", "", "", "", 1);
-  return getCacheEntry<PaginatedResult<Surec>>(key);
-}
-
-function readHastalikRaporSurecleriFromCache(
-  activeSube: number | null,
-  personelId: number
-): HastalikRaporSureci[] | null {
-  const cached = readPersonelSurecCache(activeSube, personelId);
-  if (cached === undefined) {
-    return null;
-  }
-
-  return buildHastalikRaporSurecList(cached.items ?? []);
 }
 
 const INITIAL_FORM: GunlukPuantajFormState = {

@@ -12,6 +12,10 @@ import { hesaplaAylikPuantajEksikGunOzeti } from "../services/puantaj-hesap-moto
 import { useAuth } from "../state/auth.store";
 import type { Personel } from "../types/personel";
 import type { GunlukPuantaj } from "../types/puantaj";
+import {
+  buildGunlukPuantajEksikGunSiniflandirmaGirdisi,
+  readHastalikRaporSurecleriFromCache
+} from "../services/puantaj-hastalik-rapor-cozumu";
 
 const PUANTAJ_EKSIK_GUN_HYDRATE_LIMIT = 7;
 
@@ -236,7 +240,11 @@ export function usePuantajEksikGunOzeti(personel: Personel): PuantajEksikGunOzet
     );
     const donemGunSayisi = puantajKapsami.tumTarihler.length;
 
-    const sonuc = hesaplaAylikPuantajEksikGunOzeti({ kayitlar: puantajKapsami.kayitlar });
+    const hastalikRaporSurecleri = readHastalikRaporSurecleriFromCache(activeSube, personel.id);
+    const siniflandirmaGirdileri = puantajKapsami.kayitlar.map((kayit) =>
+      buildGunlukPuantajEksikGunSiniflandirmaGirdisi(kayit, hastalikRaporSurecleri)
+    );
+    const sonuc = hesaplaAylikPuantajEksikGunOzeti({ kayitlar: siniflandirmaGirdileri });
 
     return mapAylikPuantajEksikGunOzetiToView(
       sonuc,

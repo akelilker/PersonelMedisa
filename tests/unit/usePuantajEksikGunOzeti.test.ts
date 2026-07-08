@@ -11,6 +11,8 @@ import {
 } from "../../src/hooks/usePuantajEksikGunOzeti";
 import type { Personel } from "../../src/types/personel";
 import type { GunlukPuantaj } from "../../src/types/puantaj";
+import type { PaginatedResult } from "../../src/types/api";
+import type { Surec } from "../../src/types/surec";
 
 const NISAN_2026_GUN_SAYISI = 30;
 let activeSubeId: number | null = 2;
@@ -55,6 +57,33 @@ function makePuantaj(overrides: Partial<GunlukPuantaj> & Pick<GunlukPuantaj, "ta
     compliance_uyarilari: [],
     ...overrides
   };
+}
+
+function makeHastalikSurec(overrides: Partial<Surec> = {}): Surec {
+  return {
+    id: 10,
+    personel_id: 1,
+    surec_turu: "RAPOR",
+    alt_tur: "Raporlu_Hastalik",
+    baslangic_tarihi: "2026-04-10",
+    bitis_tarihi: "2026-04-14",
+    ilk_iki_gun_firma_oder_mi: false,
+    state: "AKTIF",
+    ...overrides
+  };
+}
+
+function seedSurecCache(personelId: number, items: Surec[]): void {
+  const key = dataCacheKeys.sureclerList(activeSubeId, String(personelId), "", "", "", "", 1);
+  setCacheEntry<PaginatedResult<Surec>>(key, {
+    items,
+    pagination: {
+      page: 1,
+      limit: 20,
+      total: items.length,
+      total_pages: 1
+    }
+  });
 }
 
 beforeEach(() => {
@@ -165,6 +194,65 @@ describe("usePuantajEksikGunOzeti", () => {
     expect(result.current?.eksikTarihListesi).not.toContain("2026-04-04");
     expect(result.current?.eksikTarihListesi).not.toContain("2026-04-05");
     expect(result.current?.eksikTarihListesi.slice(0, 2)).toEqual(["2026-04-01", "2026-04-02"]);
+  });
+
+  it("surec cache varken Raporlu_Hastalik ilk 2 gun firma odemez → gunluk kesinti adayi sayar (S63-6)", () => {
+    seedSurecCache(1, [makeHastalikSurec({ id: 30, ilk_iki_gun_firma_oder_mi: false })]);
+    setCacheEntry(
+      dataCacheKeys.puantajDetail(2, 1, "2026-04-10"),
+      makePuantaj({
+        tarih: "2026-04-10",
+        hareket_durumu: "Gelmedi",
+        dayanak: "Raporlu_Hastalik",
+        durumu_bildirdi_mi: true
+      })
+    );
+
+    const { result } = renderHook(() => usePuantajEksikGunOzeti(makePersonel()));
+
+    expect(result.current?.gunlukKesintiAdayiSayisi).toBe(1);
+    expect(result.current?.ucretKorunanKayitSayisi).toBe(0);
+    expect(result.current?.manuelIncelemeKayitSayisi).toBe(0);
+    expect(result.current?.eksikGunAdayiKayitSayisi).toBe(1);
+  });
+
+  it("surec cache varken Raporlu_Hastalik ilk 2 gun firma oder → ucret korunan kayit sayar (S63-6)", () => {
+    seedSurecCache(1, [makeHastalikSurec({ id: 31, ilk_iki_gun_firma_oder_mi: true })]);
+    setCacheEntry(
+      dataCacheKeys.puantajDetail(2, 1, "2026-04-10"),
+      makePuantaj({
+        tarih: "2026-04-10",
+        hareket_durumu: "Gelmedi",
+        dayanak: "Raporlu_Hastalik",
+        durumu_bildirdi_mi: true
+      })
+    );
+
+    const { result } = renderHook(() => usePuantajEksikGunOzeti(makePersonel()));
+
+    expect(result.current?.ucretKorunanKayitSayisi).toBe(1);
+    expect(result.current?.gunlukKesintiAdayiSayisi).toBe(0);
+    expect(result.current?.manuelIncelemeKayitSayisi).toBe(0);
+    expect(result.current?.eksikGunAdayiKayitSayisi).toBe(0);
+  });
+
+  it("surec cache yokken Raporlu_Hastalik eski POLITIKA_INCELEMESI davranisini korur (S63-6)", () => {
+    setCacheEntry(
+      dataCacheKeys.puantajDetail(2, 1, "2026-04-10"),
+      makePuantaj({
+        tarih: "2026-04-10",
+        hareket_durumu: "Gelmedi",
+        dayanak: "Raporlu_Hastalik",
+        durumu_bildirdi_mi: true
+      })
+    );
+
+    const { result } = renderHook(() => usePuantajEksikGunOzeti(makePersonel()));
+
+    expect(result.current?.manuelIncelemeKayitSayisi).toBe(1);
+    expect(result.current?.gunlukKesintiAdayiSayisi).toBe(0);
+    expect(result.current?.ucretKorunanKayitSayisi).toBe(0);
+    expect(result.current?.eksikGunAdayiKayitSayisi).toBe(1);
   });
 
   it("farkli sube ve farkli personel cache kayitlarini karistirmaz", () => {

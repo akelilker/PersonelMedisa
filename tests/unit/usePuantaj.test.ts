@@ -7,10 +7,9 @@ import { dataCacheKeys, setCacheEntry } from "../../src/data/data-manager";
 import {
   buildGunlukPuantajEksikGunSiniflandirmaGirdisi,
   buildHastalikRaporSurecList,
-  mapSurecToHastalikRaporSureci,
-  siniflandirGunlukPuantajEksikGunEtkisi,
-  usePuantaj
-} from "../../src/hooks/usePuantaj";
+  mapSurecToHastalikRaporSureci
+} from "../../src/services/puantaj-hastalik-rapor-cozumu";
+import { siniflandirGunlukPuantajEksikGunEtkisi, usePuantaj } from "../../src/hooks/usePuantaj";
 import type { HastalikRaporSureci } from "../../src/services/hastalik-rapor-politikasi";
 import type { PaginatedResult } from "../../src/types/api";
 import type { Surec } from "../../src/types/surec";

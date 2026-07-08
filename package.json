@@ -15,7 +15,8 @@
     "e2e": "playwright test",
     "e2e:headed": "playwright test --headed",
     "e2e:ui": "playwright test --ui",
-    "icons:generate": "node scripts/generate-icons.mjs"
+    "icons:generate": "node scripts/generate-icons.mjs",
+    "smoke:live": "node scripts/post-deploy-smoke.mjs"
   },
   "dependencies": {
     "react": "^18.2.0",

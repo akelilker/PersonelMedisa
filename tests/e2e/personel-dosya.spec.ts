@@ -162,6 +162,41 @@ test.describe("personel dosyasi surec akisi", () => {
     await assertGatewayStateCleared(page);
   });
 
+  test("birim amiri personel kartinda finans aday yetki fallback gosterir", async ({ page }) => {
+    await mockApi(page, "BIRIM_AMIRI");
+
+    await login(page, { username: "birim_amiri", password: "demo123" });
+
+    await page.goto("/personeller/1");
+    await expect(page).toHaveURL(/\/personeller\/1$/);
+    await expect(page.locator(".personel-dosya-hero")).toContainText(/Ayşe Yılmaz/i);
+
+    const finansCard = page.getByTestId("personel-finans-adaylari-card");
+    await expect(finansCard).toBeVisible();
+    await expect(page.getByTestId("personel-finans-adaylari-yetki-yok")).toBeVisible();
+    await expect(page.getByTestId("personel-finans-kayit-901")).toHaveCount(0);
+    await expect(page.getByTestId("personel-finans-kayit-903")).toHaveCount(0);
+    await expect(page.getByTestId("personel-finans-kayit-904")).toHaveCount(0);
+    await expect(page.getByTestId("personel-bordro-aday-finans-toplamlari")).toHaveCount(0);
+    await expect(page.getByTestId("personel-finans-adaylari-yukleniyor")).toHaveCount(0, { timeout: 10_000 });
+  });
+
+  test("personel karti donem bilgisi yoksa finans aday fallback gosterir", async ({ page }) => {
+    await mockApi(page, "GENEL_YONETICI");
+
+    await login(page, { username: "yonetici", password: "secret" });
+
+    await page.goto("/personeller/4");
+    await expect(page).toHaveURL(/\/personeller\/4$/);
+
+    const finansCard = page.getByTestId("personel-finans-adaylari-card");
+    await expect(finansCard).toBeVisible();
+    await expect(page.getByTestId("personel-finans-adaylari-donem-yok")).toBeVisible();
+    await expect(page.getByTestId("personel-finans-adaylari-bos")).toHaveCount(0);
+    await expect(page.getByTestId("personel-finans-adaylari-list")).toHaveCount(0);
+    await expect(page.getByTestId("personel-finans-kayit-901")).toHaveCount(0);
+  });
+
   test("personel karti finans adaylarini donem ve state filtresine gore gosterir", async ({ page }) => {
     await mockApi(page, "GENEL_YONETICI");
 

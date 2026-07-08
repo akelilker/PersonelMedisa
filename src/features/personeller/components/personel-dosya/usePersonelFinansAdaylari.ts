@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { getApiErrorMessage } from "../../../../api/api-client";
 import { fetchFinansKalemList } from "../../../../api/finans.api";
+import { getSubeIdForApiRequest } from "../../../../data/data-manager";
 import type { FinansKalem } from "../../../../types/finans";
 import type { Personel } from "../../../../types/personel";
 import { isAktifFinansKaydi, sortFinansKayitlari } from "./personel-finans-adaylari-utils";
@@ -42,6 +43,7 @@ export function usePersonelFinansAdaylari({
       personel_id: personel.id,
       donem,
       state: "AKTIF",
+      sube_id: getSubeIdForApiRequest(),
       limit: 100
     })
       .then((result) => {

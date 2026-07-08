@@ -889,6 +889,76 @@ function resolveDemoDepartmanIdsForSubeler(subeIds: readonly number[]): number[]
   return [...departmanIds];
 }
 
+function resolveDemoRequestSubeScope(init: RequestInit | undefined, requestUrl: URL): number | null {
+  const querySubeId = toNumber(requestUrl.searchParams.get("sube_id"));
+  const headerSubeId = toNumber(readDemoRequestHeader(init, "X-Active-Sube-Id"));
+  return querySubeId ?? headerSubeId;
+}
+
+function demoFinansItemMatchesScope(
+  personelId: number,
+  subeScope: number | null,
+  allowedSubeIds: readonly number[]
+): boolean {
+  const linkedPersonel = demoState.personeller.find((personel) => personel.id === personelId);
+  if (!linkedPersonel) {
+    return allowedSubeIds.length === 0 && subeScope === null;
+  }
+
+  if (subeScope !== null) {
+    return linkedPersonel.sube_id === subeScope;
+  }
+
+  if (allowedSubeIds.length > 0) {
+    return typeof linkedPersonel.sube_id === "number" && allowedSubeIds.includes(linkedPersonel.sube_id);
+  }
+
+  return true;
+}
+
+function readDemoApiActor(init?: RequestInit): RevizyonActorContext {
+  const roleHeader = readDemoRequestHeader(init, "X-Demo-Role");
+  if (roleHeader && isDemoUserRole(roleHeader)) {
+    return readDemoRevizyonActor(init);
+  }
+
+  if (typeof window !== "undefined") {
+    try {
+      const raw =
+        window.sessionStorage.getItem("medisa_auth_session") ??
+        window.localStorage.getItem("medisa_auth_session");
+      if (raw) {
+        const session = JSON.parse(raw) as {
+          user?: { id?: number; rol?: string; sube_ids?: number[]; personel_id?: number | null };
+        };
+        const role = session.user?.rol;
+        if (role && isDemoUserRole(role)) {
+          const subeIds = Array.isArray(session.user?.sube_ids)
+            ? session.user.sube_ids.filter((id): id is number => typeof id === "number" && id > 0)
+            : role === "BIRIM_AMIRI"
+              ? [1]
+              : role === "MUHASEBE"
+                ? [1, 2]
+                : role === "BOLUM_YONETICISI"
+                  ? [2]
+                  : [];
+          return {
+            userId: session.user?.id ?? 1,
+            role,
+            subeIds,
+            departmanIds: resolveDemoDepartmanIdsForSubeler(subeIds),
+            linkedPersonelId: session.user?.personel_id ?? (role === "BIRIM_AMIRI" ? 1 : null)
+          };
+        }
+      }
+    } catch {
+      // ignore invalid demo session payloads
+    }
+  }
+
+  return readDemoRevizyonActor(init);
+}
+
 function readDemoRevizyonActor(init?: RequestInit): RevizyonActorContext {
   const roleHeader = readDemoRequestHeader(init, "X-Demo-Role");
   const userIdRaw = readDemoRequestHeader(init, "X-Demo-User-Id");
@@ -3665,13 +3735,26 @@ export function resolveDemoApiResponse(
   }
 
   if (pathname === "/ek-odeme-kesinti" && method === "GET") {
+    const actor = readDemoApiActor(init);
+    if (!hasRolePermission(actor.role, "finans.view")) {
+      return demoRevizyonError("FORBIDDEN", "Bu islem icin yetkiniz yok.");
+    }
+
+    const subeScope = resolveDemoRequestSubeScope(init, requestUrl);
+    if (subeScope !== null && actor.subeIds.length > 0 && !actor.subeIds.includes(subeScope)) {
+      return demoRevizyonError("FORBIDDEN", "Secili sube icin yetkiniz yok.");
+    }
+
     const personelId = toNumber(requestUrl.searchParams.get("personel_id"));
     const donem = toStringValue(requestUrl.searchParams.get("donem"));
     const state = toStringValue(requestUrl.searchParams.get("state"));
     const kalemTuru = toStringValue(requestUrl.searchParams.get("kalem_turu"));
-    const subeId = toNumber(requestUrl.searchParams.get("sube_id"));
 
     const filtered = demoState.finansKalemleri.filter((item) => {
+      if (!demoFinansItemMatchesScope(item.personel_id, subeScope, actor.subeIds)) {
+        return false;
+      }
+
       if (personelId !== null && item.personel_id !== personelId) {
         return false;
       }
@@ -3686,13 +3769,6 @@ export function resolveDemoApiResponse(
 
       if (kalemTuru && item.kalem_turu !== kalemTuru) {
         return false;
-      }
-
-      if (subeId !== null) {
-        const linkedPersonel = demoState.personeller.find((personel) => personel.id === item.personel_id);
-        if (!linkedPersonel || linkedPersonel.sube_id !== subeId) {
-          return false;
-        }
       }
 
       return true;

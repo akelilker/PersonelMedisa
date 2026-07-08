@@ -6,7 +6,10 @@ import {
   useDevamPrimiEligibilityOzeti,
   type DevamPrimiEligibilityDurum
 } from "../../../../hooks/useDevamPrimiEligibilityOzeti";
-import { usePuantajEksikGunOzeti } from "../../../../hooks/usePuantajEksikGunOzeti";
+import {
+  usePuantajEksikGunOzeti,
+  type PuantajEksikGunOzetiView
+} from "../../../../hooks/usePuantajEksikGunOzeti";
 import type { Personel } from "../../../../types/personel";
 import type {
   RevizyonCorrectionEvent,
@@ -25,6 +28,19 @@ import {
   formatSgkHesaplamaModuLabel,
   timestampValue
 } from "./personel-dosya-format-utils";
+
+const BORDRO_ADAY_OZETI_HENUZ_OLUSMADI =
+  "Bu ay için puantaj özeti henüz oluşmadı. Aday kalemler oluştuğunda burada gösterilir.";
+const BORDRO_ADAY_KALEM_GORMUNUYOR = "Bu ay bordroya yansıyacak aday kalem görünmüyor.";
+
+function hasBordroAdaySayaci(ozet: PuantajEksikGunOzetiView): boolean {
+  return (
+    ozet.eksikGunAdayiKayitSayisi > 0 ||
+    ozet.gunlukKesintiAdayiSayisi > 0 ||
+    ozet.dakikaBazliUcretEtkisiAdayiSayisi > 0 ||
+    ozet.ucretKorunanKayitSayisi > 0
+  );
+}
 
 const REVIZYON_DURUM_LABELS: Record<RevizyonTalebiDurumu, string> = {
   TASLAK: "Taslak",
@@ -315,59 +331,72 @@ export function PersonelPuantajOzetSection({
         </section>
       ) : null}
 
-      {puantajEksikGunOzeti ? (
-        <section
-          className="personel-puantaj-summary-card personel-devam-primi-card"
-          data-testid="personel-bordro-aday-ozet-card"
-        >
-          <span className="personel-puantaj-summary-kicker">Bu Ay Bordroya Yansıyacak Adaylar</span>
-          <div className="personel-devam-primi-meta">
-            <div className="personel-devam-primi-row">
-              <span className="personel-devam-primi-label">Eksik Gün Adayı</span>
-              <span
-                className="personel-devam-primi-value"
-                data-testid="personel-bordro-aday-eksik-gun"
-              >
-                {puantajEksikGunOzeti.eksikGunAdayiKayitSayisi}
-              </span>
-            </div>
-            <div className="personel-devam-primi-row">
-              <span className="personel-devam-primi-label">Günlük Kesinti Adayı</span>
-              <span
-                className="personel-devam-primi-value"
-                data-testid="personel-bordro-aday-gunluk-kesinti"
-              >
-                {puantajEksikGunOzeti.gunlukKesintiAdayiSayisi}
-              </span>
-            </div>
-            <div className="personel-devam-primi-row">
-              <span className="personel-devam-primi-label">Dakika Bazlı Ücret Etkisi Adayı</span>
-              <span
-                className="personel-devam-primi-value"
-                data-testid="personel-bordro-aday-dakika-kesinti"
-              >
-                {puantajEksikGunOzeti.dakikaBazliUcretEtkisiAdayiSayisi}
-              </span>
-            </div>
-            <div className="personel-devam-primi-row">
-              <span className="personel-devam-primi-label">Ücret Korunan Kayıt</span>
-              <span
-                className="personel-devam-primi-value"
-                data-testid="personel-bordro-aday-ucret-korunan"
-              >
-                {puantajEksikGunOzeti.ucretKorunanKayitSayisi}
-              </span>
-            </div>
-          </div>
-          <p className="personel-puantaj-summary-note">
-            Salt okunur aday sayaçlarıdır; tutar veya bordro kesinliği taşımaz. Kaynak: dönem
-            puantaj önbelleği.
+      <section
+        className="personel-puantaj-summary-card personel-devam-primi-card"
+        data-testid="personel-bordro-aday-ozet-card"
+      >
+        <span className="personel-puantaj-summary-kicker">Bu Ay Bordroya Yansıyacak Adaylar</span>
+        {!puantajEksikGunOzeti ? (
+          <p
+            className="personel-puantaj-summary-note"
+            data-testid="personel-bordro-aday-ozet-beklemede"
+          >
+            {BORDRO_ADAY_OZETI_HENUZ_OLUSMADI}
           </p>
-          {puantajEksikGunOzeti.kayitKapsamiNotu ? (
-            <p className="personel-devam-primi-scope-note">{puantajEksikGunOzeti.kayitKapsamiNotu}</p>
-          ) : null}
-        </section>
-      ) : null}
+        ) : hasBordroAdaySayaci(puantajEksikGunOzeti) ? (
+          <>
+            <div className="personel-devam-primi-meta">
+              <div className="personel-devam-primi-row">
+                <span className="personel-devam-primi-label">Eksik Gün Adayı</span>
+                <span
+                  className="personel-devam-primi-value"
+                  data-testid="personel-bordro-aday-eksik-gun"
+                >
+                  {puantajEksikGunOzeti.eksikGunAdayiKayitSayisi}
+                </span>
+              </div>
+              <div className="personel-devam-primi-row">
+                <span className="personel-devam-primi-label">Günlük Kesinti Adayı</span>
+                <span
+                  className="personel-devam-primi-value"
+                  data-testid="personel-bordro-aday-gunluk-kesinti"
+                >
+                  {puantajEksikGunOzeti.gunlukKesintiAdayiSayisi}
+                </span>
+              </div>
+              <div className="personel-devam-primi-row">
+                <span className="personel-devam-primi-label">Dakika Bazlı Ücret Etkisi Adayı</span>
+                <span
+                  className="personel-devam-primi-value"
+                  data-testid="personel-bordro-aday-dakika-kesinti"
+                >
+                  {puantajEksikGunOzeti.dakikaBazliUcretEtkisiAdayiSayisi}
+                </span>
+              </div>
+              <div className="personel-devam-primi-row">
+                <span className="personel-devam-primi-label">Ücret Korunan Kayıt</span>
+                <span
+                  className="personel-devam-primi-value"
+                  data-testid="personel-bordro-aday-ucret-korunan"
+                >
+                  {puantajEksikGunOzeti.ucretKorunanKayitSayisi}
+                </span>
+              </div>
+            </div>
+            <p className="personel-puantaj-summary-note">
+              Salt okunur aday sayaçlarıdır; tutar veya bordro kesinliği taşımaz. Kaynak: dönem
+              puantaj önbelleği.
+            </p>
+            {puantajEksikGunOzeti.kayitKapsamiNotu ? (
+              <p className="personel-devam-primi-scope-note">{puantajEksikGunOzeti.kayitKapsamiNotu}</p>
+            ) : null}
+          </>
+        ) : (
+          <p className="personel-puantaj-summary-note" data-testid="personel-bordro-aday-ozet-bos">
+            {BORDRO_ADAY_KALEM_GORMUNUYOR}
+          </p>
+        )}
+      </section>
 
       <DossierSection
         title="Aylık Puantaj Özeti"

@@ -162,6 +162,26 @@ test.describe("personel dosyasi surec akisi", () => {
     await assertGatewayStateCleared(page);
   });
 
+  test("personel karti finans adaylarini donem ve state filtresine gore gosterir", async ({ page }) => {
+    await mockApi(page, "GENEL_YONETICI");
+
+    await login(page, { username: "yonetici", password: "secret" });
+
+    await page.goto("/personeller/1");
+    await expect(page).toHaveURL(/\/personeller\/1$/);
+
+    const finansCard = page.getByTestId("personel-finans-adaylari-card");
+    await expect(finansCard).toBeVisible();
+    await expect(page.getByTestId("personel-finans-adaylari-yukleniyor")).toHaveCount(0, { timeout: 10_000 });
+
+    await expect(page.getByTestId("personel-finans-kayit-901")).toBeVisible();
+    await expect(finansCard).toContainText("Mevcut finans kalemi");
+    await expect(finansCard).not.toContainText("Farkli donem finans kaydi");
+    await expect(finansCard).not.toContainText("Iptal finans kaydi");
+    await expect(page.getByTestId("personel-finans-kayit-903")).toHaveCount(0);
+    await expect(page.getByTestId("personel-finans-kayit-904")).toHaveCount(0);
+  });
+
   test("devam primi readonly karti personel gecisinde eski kesinti sonucunu tasimaz", async ({ page }) => {
     await mockApi(page, "GENEL_YONETICI");
 

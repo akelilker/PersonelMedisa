@@ -455,6 +455,24 @@ const demoState: {
       tutar: 2500,
       aciklama: "Demo avans",
       state: "AKTIF"
+    },
+    {
+      id: 903,
+      personel_id: 1,
+      donem: "2026-03",
+      kalem_turu: "PRIM",
+      tutar: 1800,
+      aciklama: "Farkli donem finans kaydi",
+      state: "AKTIF"
+    },
+    {
+      id: 904,
+      personel_id: 1,
+      donem: "2026-04",
+      kalem_turu: "PRIM",
+      tutar: 900,
+      aciklama: "Iptal finans kaydi",
+      state: "IPTAL"
     }
   ],
   puantajMap: {
@@ -3647,7 +3665,40 @@ export function resolveDemoApiResponse(
   }
 
   if (pathname === "/ek-odeme-kesinti" && method === "GET") {
-    return ok({ items: demoState.finansKalemleri });
+    const personelId = toNumber(requestUrl.searchParams.get("personel_id"));
+    const donem = toStringValue(requestUrl.searchParams.get("donem"));
+    const state = toStringValue(requestUrl.searchParams.get("state"));
+    const kalemTuru = toStringValue(requestUrl.searchParams.get("kalem_turu"));
+    const subeId = toNumber(requestUrl.searchParams.get("sube_id"));
+
+    const filtered = demoState.finansKalemleri.filter((item) => {
+      if (personelId !== null && item.personel_id !== personelId) {
+        return false;
+      }
+
+      if (donem && item.donem !== donem) {
+        return false;
+      }
+
+      if (state && item.state !== state) {
+        return false;
+      }
+
+      if (kalemTuru && item.kalem_turu !== kalemTuru) {
+        return false;
+      }
+
+      if (subeId !== null) {
+        const linkedPersonel = demoState.personeller.find((personel) => personel.id === item.personel_id);
+        if (!linkedPersonel || linkedPersonel.sube_id !== subeId) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+
+    return ok({ items: filtered });
   }
 
   if (pathname === "/ek-odeme-kesinti" && method === "POST") {

@@ -258,6 +258,13 @@ export function PersonelPuantajOzetSection({
     !isFinansLoading &&
     !finansErrorMessage &&
     hasFinansAdayToplami(finansAdayToplamlari);
+  const showBordroAdayFinansLoading = canFetchFinans && !finansFetchResolved;
+  const showBordroAdayBos =
+    puantajEksikGunOzeti !== null &&
+    !hasBordroAdaySayaci(puantajEksikGunOzeti) &&
+    !showFinansAdayToplamlari &&
+    !showBordroAdayFinansLoading &&
+    (!canFetchFinans || finansFetchResolved);
   const showMesaiFinansNotu = showFinansAdayToplamlari && hasMesaiFinansKaydi(finansKayitlari);
   const [revizyonTalepleri, setRevizyonTalepleri] = useState<RevizyonTalebi[]>([]);
   const [revizyonCorrections, setRevizyonCorrections] = useState<RevizyonCorrectionEvent[]>([]);
@@ -428,7 +435,14 @@ export function PersonelPuantajOzetSection({
               <p className="personel-devam-primi-scope-note">{puantajEksikGunOzeti.kayitKapsamiNotu}</p>
             ) : null}
           </>
-        ) : !showFinansAdayToplamlari ? (
+        ) : showBordroAdayFinansLoading ? (
+          <p
+            className="personel-puantaj-summary-note"
+            data-testid="personel-bordro-aday-ozet-yukleniyor"
+          >
+            Finans aday tutarları yükleniyor...
+          </p>
+        ) : showBordroAdayBos ? (
           <p className="personel-puantaj-summary-note" data-testid="personel-bordro-aday-ozet-bos">
             {BORDRO_ADAY_KALEM_GORMUNUYOR}
           </p>

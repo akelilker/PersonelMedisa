@@ -2,6 +2,7 @@ import type { Dispatch, ReactNode, SetStateAction } from "react";
 import { FormField } from "../../../components/form/FormField";
 import type { SurecFormState } from "../../../hooks/useSurecler";
 import type { KeyOption } from "../../../types/referans";
+import { isHastalikRaporSureci } from "../surec-form-utils";
 
 type PersonelOption = {
   value: string;
@@ -149,7 +150,13 @@ export function SurecFormFields({
             label="Süreç Türü"
             name="surec-create-turu"
             value={form.surecTuru}
-            onChange={(value) => setForm((prev) => ({ ...prev, surecTuru: value }))}
+            onChange={(value) =>
+              setForm((prev) => ({
+                ...prev,
+                surecTuru: value,
+                ilkIkiGunFirmaOderMi: isHastalikRaporSureci(value, prev.altTur) ? prev.ilkIkiGunFirmaOderMi : false
+              }))
+            }
             required
             placeholderOption={{ value: "", label: "Seçiniz" }}
             selectOptions={keyOptionsToSelectOptions(surecTuruOptions)}
@@ -160,7 +167,13 @@ export function SurecFormFields({
             label="Süreç Türü"
             name="surec-create-turu-text"
             value={form.surecTuru}
-            onChange={(value) => setForm((prev) => ({ ...prev, surecTuru: value }))}
+            onChange={(value) =>
+              setForm((prev) => ({
+                ...prev,
+                surecTuru: value,
+                ilkIkiGunFirmaOderMi: isHastalikRaporSureci(value, prev.altTur) ? prev.ilkIkiGunFirmaOderMi : false
+              }))
+            }
             required
           />
         )
@@ -176,7 +189,14 @@ export function SurecFormFields({
               "surec-create-alt",
               form.altTur,
               altTurField.options,
-              (value) => setForm((prev) => ({ ...prev, altTur: value }))
+              (value) =>
+                setForm((prev) => ({
+                  ...prev,
+                  altTur: value,
+                  ilkIkiGunFirmaOderMi: isHastalikRaporSureci(prev.surecTuru, value)
+                    ? prev.ilkIkiGunFirmaOderMi
+                    : false
+                }))
             )
           : (
               <FormField
@@ -184,7 +204,15 @@ export function SurecFormFields({
                 label={altTurField.label}
                 name="surec-create-alt"
                 value={form.altTur}
-                onChange={(value) => setForm((prev) => ({ ...prev, altTur: value }))}
+                onChange={(value) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    altTur: value,
+                    ilkIkiGunFirmaOderMi: isHastalikRaporSureci(prev.surecTuru, value)
+                      ? prev.ilkIkiGunFirmaOderMi
+                      : false
+                  }))
+                }
                 required
                 placeholderOption={{ value: "", label: "Seçiniz" }}
                 selectOptions={altTurField.options}
@@ -197,11 +225,38 @@ export function SurecFormFields({
           label="İşlem Detayı"
           name="surec-create-alt"
           value={form.altTur}
-          onChange={(value) => setForm((prev) => ({ ...prev, altTur: value }))}
+          onChange={(value) =>
+            setForm((prev) => ({
+              ...prev,
+              altTur: value,
+              ilkIkiGunFirmaOderMi: isHastalikRaporSureci(prev.surecTuru, value)
+                ? prev.ilkIkiGunFirmaOderMi
+                : false
+            }))
+          }
         />
       );
     }
   }
+
+  const showIlkIkiGunFirmaOderMi = isHastalikRaporSureci(form.surecTuru, form.altTur);
+
+  const ilkIkiGunFirmaOderMiFieldNode = showIlkIkiGunFirmaOderMi ? (
+    <div className="form-section">
+      <label>
+        <input
+          type="checkbox"
+          name="surec-ilk-iki-gun-firma-oder-mi"
+          data-testid="surec-ilk-iki-gun-firma-oder-mi"
+          checked={form.ilkIkiGunFirmaOderMi}
+          onChange={(event) =>
+            setForm((prev) => ({ ...prev, ilkIkiGunFirmaOderMi: event.target.checked }))
+          }
+        />
+        <span> İlk 2 gün firma tarafından ödenecek mi?</span>
+      </label>
+    </div>
+  ) : null;
 
   const dateFields = (
     <div className={useOperationControls ? "surec-date-row" : undefined}>
@@ -266,6 +321,11 @@ export function SurecFormFields({
           {altTurFieldNode ? (
             <div className="surec-form-layout-section surec-form-layout-section--operation">{altTurFieldNode}</div>
           ) : null}
+          {ilkIkiGunFirmaOderMiFieldNode ? (
+            <div className="surec-form-layout-section surec-form-layout-section--operation">
+              {ilkIkiGunFirmaOderMiFieldNode}
+            </div>
+          ) : null}
           {ucretliFieldNode ? (
             <div className="surec-form-layout-section surec-form-layout-section--ucret">{ucretliFieldNode}</div>
           ) : null}
@@ -277,6 +337,7 @@ export function SurecFormFields({
       ) : (
         <>
           {altTurFieldNode}
+          {ilkIkiGunFirmaOderMiFieldNode}
           {dateFields}
           {ucretliFieldNode}
           {aciklamaField}

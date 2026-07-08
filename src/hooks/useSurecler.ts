@@ -69,6 +69,7 @@ export type SurecFormState = {
   baslangicTarihi: string;
   bitisTarihi: string;
   ucretliMi: boolean;
+  ilkIkiGunFirmaOderMi: boolean;
   aciklama: string;
 };
 
@@ -79,6 +80,7 @@ export const INITIAL_SUREC_FORM: SurecFormState = {
   baslangicTarihi: "",
   bitisTarihi: "",
   ucretliMi: true,
+  ilkIkiGunFirmaOderMi: false,
   aciklama: ""
 };
 
@@ -91,6 +93,7 @@ function draftSurecFromCreatePayload(payload: CreateSurecPayload, tempId: number
     baslangic_tarihi: payload.baslangic_tarihi,
     bitis_tarihi: payload.bitis_tarihi,
     ucretli_mi: payload.ucretli_mi,
+    ilk_iki_gun_firma_oder_mi: payload.ilk_iki_gun_firma_oder_mi,
     aciklama: payload.aciklama,
     state: "BEKLEMEDE"
   };

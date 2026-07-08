@@ -182,6 +182,37 @@ test.describe("personel dosyasi surec akisi", () => {
     await expect(page.getByTestId("personel-finans-kayit-904")).toHaveCount(0);
   });
 
+  test("bordro aday ozet karti finans yuklenirken bos mesaj gostermez", async ({ page }) => {
+    await mockApi(page, "GENEL_YONETICI");
+
+    let releaseFinansFetch!: () => void;
+    const finansFetchGate = new Promise<void>((resolve) => {
+      releaseFinansFetch = resolve;
+    });
+
+    await page.route("**/api/ek-odeme-kesinti**", async (route) => {
+      if (route.request().method() === "GET") {
+        await finansFetchGate;
+      }
+      await route.fallback();
+    });
+
+    await login(page, { username: "yonetici", password: "secret" });
+
+    await page.goto("/personeller/1");
+    await expect(page).toHaveURL(/\/personeller\/1$/);
+
+    const bordroCard = page.getByTestId("personel-bordro-aday-ozet-card");
+    await expect(bordroCard).toBeVisible();
+    await expect(page.getByTestId("personel-bordro-aday-ozet-yukleniyor")).toBeVisible();
+    await expect(page.getByTestId("personel-bordro-aday-ozet-bos")).toHaveCount(0);
+
+    releaseFinansFetch();
+
+    await expect(page.getByTestId("personel-bordro-aday-ozet-yukleniyor")).toHaveCount(0, { timeout: 10_000 });
+    await expect(page.getByTestId("personel-bordro-aday-finans-toplamlari")).toBeVisible();
+  });
+
   test("devam primi readonly karti personel gecisinde eski kesinti sonucunu tasimaz", async ({ page }) => {
     await mockApi(page, "GENEL_YONETICI");
 

@@ -24,6 +24,7 @@ type ModuleModalConfig = {
   backTestId?: string;
   className?: string;
   bodyClassName?: string;
+  titleVariant?: "default" | "premium";
 };
 
 function resolveBackBar(pathname: string): { to: string; label: string } | null {
@@ -53,34 +54,34 @@ function resolveModuleModal(pathname: string, tabParam: string | null): ModuleMo
   }
 
   if (/^\/personeller\/\d+$/.test(pathname)) {
-    return { title: "Personel Kartı", closeTo: "/personeller" };
+    return { title: "Personel Kartı", closeTo: "/personeller", titleVariant: "premium" };
   }
   if (pathname === "/personeller") {
-    return { title: "Personel Kartı", closeTo: "/" };
+    return { title: "Personel Kartı", closeTo: "/", titleVariant: "premium" };
   }
 
   if (/^\/surecler\/\d+$/.test(pathname)) {
-    return { title: "Süreç Detayı", closeTo: "/surecler" };
+    return { title: "Süreç Detayı", closeTo: "/surecler", titleVariant: "premium" };
   }
   if (pathname === "/surecler") {
-    return { title: "Süreç Takibi", closeTo: "/" };
+    return { title: "Süreç Takibi", closeTo: "/", titleVariant: "premium" };
   }
 
   if (/^\/bildirimler\/\d+$/.test(pathname)) {
-    return { title: "Günlük Kayıt Detayı", closeTo: "/bildirimler" };
+    return { title: "Günlük Kayıt Detayı", closeTo: "/bildirimler", titleVariant: "premium" };
   }
   if (pathname === "/bildirimler") {
-    return { title: "Günlük Kayıt Merkezi", closeTo: "/" };
+    return { title: "Günlük Kayıt Merkezi", closeTo: "/", titleVariant: "premium" };
   }
 
   if (pathname === "/raporlar") {
-    return { title: "Raporlar", closeTo: "/" };
+    return { title: "Raporlar", closeTo: "/", titleVariant: "premium" };
   }
   if (pathname === "/puantaj") {
-    return { title: "Günlük Puantaj", closeTo: "/" };
+    return { title: "Günlük Puantaj", closeTo: "/", titleVariant: "premium" };
   }
   if (pathname === "/finans") {
-    return { title: "Finans", closeTo: "/" };
+    return { title: "Finans", closeTo: "/", titleVariant: "premium" };
   }
   if (pathname === "/yonetim-paneli") {
     return {
@@ -174,6 +175,7 @@ export function AppShell() {
           onClose={closeKayitModal}
           className="modal-container--kayit-surec"
           bodyClassName="modal-body--kayit-surec"
+          titleVariant="premium"
         >
           <KayitSurecWorkspace
             activeTab={kayitTab}
@@ -197,6 +199,7 @@ export function AppShell() {
           backTestId={moduleModal.backTestId}
           className={moduleModal.className}
           bodyClassName={moduleModal.bodyClassName}
+          titleVariant={moduleModal.titleVariant}
         >
           {backBarTarget ? <BackBar to={backBarTarget.to} label={backBarTarget.label} /> : null}
           <Outlet context={outletContext} />

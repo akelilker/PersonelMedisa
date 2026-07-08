@@ -90,6 +90,20 @@
   text-shadow: var(--modal-title-shadow);
 }
 
+.modal-header h2.premium-title {
+  color: transparent;
+  background: var(--premium-title-gradient);
+  background-size: 100% 180%;
+  background-position: 50% 54%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  font-weight: var(--premium-title-weight);
+  letter-spacing: var(--premium-title-letter-spacing);
+  filter: brightness(1.01);
+  text-shadow: var(--premium-title-shadow);
+}
+
 .modal-body {
   flex: 1;
   min-height: 0;

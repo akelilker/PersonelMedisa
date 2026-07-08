@@ -11,6 +11,7 @@ type AppModalProps = {
   backTestId?: string;
   className?: string;
   bodyClassName?: string;
+  titleVariant?: "default" | "premium";
 };
 
 function getModalPortalRoot(): HTMLElement | null {
@@ -30,7 +31,8 @@ export function AppModal({
   onBack,
   backTestId,
   className,
-  bodyClassName
+  bodyClassName,
+  titleVariant = "default"
 }: AppModalProps) {
   const overlayRef = useRef<HTMLDivElement | null>(null);
 
@@ -109,7 +111,7 @@ export function AppModal({
           ) : (
             <span className="modal-header-spacer" aria-hidden="true" />
           )}
-          <h2>{title}</h2>
+          <h2 className={titleVariant === "premium" ? "premium-title" : undefined}>{title}</h2>
           {onClose ? (
             <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Kapat">
               ×

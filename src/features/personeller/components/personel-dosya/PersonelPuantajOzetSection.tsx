@@ -315,6 +315,60 @@ export function PersonelPuantajOzetSection({
         </section>
       ) : null}
 
+      {puantajEksikGunOzeti ? (
+        <section
+          className="personel-puantaj-summary-card personel-devam-primi-card"
+          data-testid="personel-bordro-aday-ozet-card"
+        >
+          <span className="personel-puantaj-summary-kicker">Bu Ay Bordroya Yansıyacak Adaylar</span>
+          <div className="personel-devam-primi-meta">
+            <div className="personel-devam-primi-row">
+              <span className="personel-devam-primi-label">Eksik Gün Adayı</span>
+              <span
+                className="personel-devam-primi-value"
+                data-testid="personel-bordro-aday-eksik-gun"
+              >
+                {puantajEksikGunOzeti.eksikGunAdayiKayitSayisi}
+              </span>
+            </div>
+            <div className="personel-devam-primi-row">
+              <span className="personel-devam-primi-label">Günlük Kesinti Adayı</span>
+              <span
+                className="personel-devam-primi-value"
+                data-testid="personel-bordro-aday-gunluk-kesinti"
+              >
+                {puantajEksikGunOzeti.gunlukKesintiAdayiSayisi}
+              </span>
+            </div>
+            <div className="personel-devam-primi-row">
+              <span className="personel-devam-primi-label">Dakika Bazlı Ücret Etkisi Adayı</span>
+              <span
+                className="personel-devam-primi-value"
+                data-testid="personel-bordro-aday-dakika-kesinti"
+              >
+                {puantajEksikGunOzeti.dakikaBazliUcretEtkisiAdayiSayisi}
+              </span>
+            </div>
+            <div className="personel-devam-primi-row">
+              <span className="personel-devam-primi-label">Ücret Korunan Kayıt</span>
+              <span
+                className="personel-devam-primi-value"
+                data-testid="personel-bordro-aday-ucret-korunan"
+              >
+                {puantajEksikGunOzeti.ucretKorunanKayitSayisi}
+              </span>
+            </div>
+          </div>
+          <p className="personel-puantaj-summary-note">
+            Salt okunur aday sayaçlarıdır; tutar veya bordro kesinliği taşımaz. Kaynak: dönem
+            puantaj önbelleği.
+          </p>
+          {puantajEksikGunOzeti.kayitKapsamiNotu ? (
+            <p className="personel-devam-primi-scope-note">{puantajEksikGunOzeti.kayitKapsamiNotu}</p>
+          ) : null}
+        </section>
+      ) : null}
+
       <DossierSection
         title="Aylık Puantaj Özeti"
         description="Bu dosya SGK prim günü, eksik gün ve hesaplama modunu tek bakışta gösterir."

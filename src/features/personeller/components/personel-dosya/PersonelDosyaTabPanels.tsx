@@ -71,6 +71,7 @@ export function PersonelDosyaTabPanels({
           surecler={surecler}
           canViewPuantaj={canViewPuantaj}
           canViewRevizyon={canViewRevizyon}
+          canViewFinans={canViewFinans}
           isActive={activeTab === "genel-bilgiler"}
           onOpenSurecHistory={handleOpenSurecHistory}
         />

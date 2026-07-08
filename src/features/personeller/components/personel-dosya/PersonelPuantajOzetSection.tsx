@@ -21,6 +21,7 @@ import type {
   RevizyonTipi
 } from "../../../../types/revizyon-talebi";
 import { DossierRecord, DossierSection } from "./personel-dosya-dossier";
+import { PersonelFinansAdaylariSection } from "./PersonelFinansAdaylariSection";
 import {
   formatDateTimeDetail,
   formatDetailValue,
@@ -213,11 +214,13 @@ export function PersonelPuantajOzetSection({
   personel,
   canViewPuantaj,
   canViewRevizyon,
+  canViewFinans,
   isActive
 }: {
   personel: Personel;
   canViewPuantaj: boolean;
   canViewRevizyon: boolean;
+  canViewFinans: boolean;
   isActive: boolean;
 }) {
   const devamPrimiOzeti = useDevamPrimiEligibilityOzeti(personel);
@@ -397,6 +400,12 @@ export function PersonelPuantajOzetSection({
           </p>
         )}
       </section>
+
+      <PersonelFinansAdaylariSection
+        personel={personel}
+        canViewFinans={canViewFinans}
+        isActive={isActive}
+      />
 
       <DossierSection
         title="Aylık Puantaj Özeti"

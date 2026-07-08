@@ -6,6 +6,7 @@ export type FinansKalem = {
   donem: string;
   kalem_turu: string;
   tutar: number;
+  gun_sayisi?: number;
   aciklama?: string;
   state?: FinansDurum;
 };

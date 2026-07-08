@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { fetchRevizyonCorrections } from "../../../../api/revizyon-correction.api";
 import { fetchRevizyonTalepleri } from "../../../../api/revizyon-talebi.api";
@@ -23,6 +23,12 @@ import type {
 import { DossierRecord, DossierSection } from "./personel-dosya-dossier";
 import { PersonelFinansAdaylariSection } from "./PersonelFinansAdaylariSection";
 import {
+  computeFinansAdayToplamlari,
+  formatFinansKayitTutar,
+  hasFinansAdayToplami
+} from "./personel-finans-adaylari-utils";
+import { usePersonelFinansAdaylari } from "./usePersonelFinansAdaylari";
+import {
   formatDateTimeDetail,
   formatDetailValue,
   formatNullableScalar,
@@ -40,6 +46,15 @@ function hasBordroAdaySayaci(ozet: PuantajEksikGunOzetiView): boolean {
     ozet.gunlukKesintiAdayiSayisi > 0 ||
     ozet.dakikaBazliUcretEtkisiAdayiSayisi > 0 ||
     ozet.ucretKorunanKayitSayisi > 0
+  );
+}
+
+function hasMesaiFinansKaydi(kayitlar: { kalem_turu: string; tutar: number; state?: string }[]): boolean {
+  return kayitlar.some(
+    (item) =>
+      item.kalem_turu.trim().toUpperCase() === "MESAI" &&
+      item.tutar > 0 &&
+      (!item.state?.trim() || item.state.trim().toUpperCase() === "AKTIF")
   );
 }
 
@@ -225,6 +240,23 @@ export function PersonelPuantajOzetSection({
 }) {
   const devamPrimiOzeti = useDevamPrimiEligibilityOzeti(personel);
   const puantajEksikGunOzeti = usePuantajEksikGunOzeti(personel);
+  const {
+    finansKayitlari,
+    isLoading: isFinansLoading,
+    errorMessage: finansErrorMessage,
+    hasDonem: hasFinansDonem
+  } = usePersonelFinansAdaylari({ personel, canViewFinans, isActive });
+  const finansAdayToplamlari = useMemo(
+    () => computeFinansAdayToplamlari(finansKayitlari),
+    [finansKayitlari]
+  );
+  const showFinansAdayToplamlari =
+    canViewFinans &&
+    hasFinansDonem &&
+    !isFinansLoading &&
+    !finansErrorMessage &&
+    hasFinansAdayToplami(finansAdayToplamlari);
+  const showMesaiFinansNotu = showFinansAdayToplamlari && hasMesaiFinansKaydi(finansKayitlari);
   const [revizyonTalepleri, setRevizyonTalepleri] = useState<RevizyonTalebi[]>([]);
   const [revizyonCorrections, setRevizyonCorrections] = useState<RevizyonCorrectionEvent[]>([]);
   const [isRevizyonLoading, setIsRevizyonLoading] = useState(false);
@@ -394,17 +426,67 @@ export function PersonelPuantajOzetSection({
               <p className="personel-devam-primi-scope-note">{puantajEksikGunOzeti.kayitKapsamiNotu}</p>
             ) : null}
           </>
-        ) : (
+        ) : !showFinansAdayToplamlari ? (
           <p className="personel-puantaj-summary-note" data-testid="personel-bordro-aday-ozet-bos">
             {BORDRO_ADAY_KALEM_GORMUNUYOR}
           </p>
-        )}
+        ) : null}
+
+        {showFinansAdayToplamlari ? (
+          <div className="personel-devam-primi-meta" data-testid="personel-bordro-aday-finans-toplamlari">
+            <span className="personel-devam-primi-label">Finans aday tutarları</span>
+            {finansAdayToplamlari.mahsupAdayTutari > 0 ? (
+              <div className="personel-devam-primi-row">
+                <span className="personel-devam-primi-label">Maaştan mahsup edilecek aday</span>
+                <span
+                  className="personel-devam-primi-value"
+                  data-testid="personel-bordro-aday-finans-mahsup"
+                >
+                  {formatFinansKayitTutar(finansAdayToplamlari.mahsupAdayTutari)}
+                </span>
+              </div>
+            ) : null}
+            {finansAdayToplamlari.kesintiAdayTutari > 0 ? (
+              <div className="personel-devam-primi-row">
+                <span className="personel-devam-primi-label">Kesinti adayı</span>
+                <span
+                  className="personel-devam-primi-value"
+                  data-testid="personel-bordro-aday-finans-kesinti"
+                >
+                  {formatFinansKayitTutar(finansAdayToplamlari.kesintiAdayTutari)}
+                </span>
+              </div>
+            ) : null}
+            {finansAdayToplamlari.ekOdemeAdayTutari > 0 ? (
+              <div className="personel-devam-primi-row">
+                <span className="personel-devam-primi-label">Ek ödeme adayı</span>
+                <span
+                  className="personel-devam-primi-value"
+                  data-testid="personel-bordro-aday-finans-ek-odeme"
+                >
+                  {formatFinansKayitTutar(finansAdayToplamlari.ekOdemeAdayTutari)}
+                </span>
+              </div>
+            ) : null}
+            <p className="personel-puantaj-summary-note">
+              Finans aday tutarları kayıtlı tutarların toplamıdır; bordro hesabı veya kesin ödeme
+              sonucu değildir. Detaylar aşağıdaki finans kayıtlarında listelenir.
+            </p>
+            {showMesaiFinansNotu ? (
+              <p className="personel-devam-primi-scope-note">
+                Mesai kalemi manuel finans kaydıdır; puantaj fazla mesai hesabı değildir.
+              </p>
+            ) : null}
+          </div>
+        ) : null}
       </section>
 
       <PersonelFinansAdaylariSection
-        personel={personel}
+        finansKayitlari={finansKayitlari}
+        isLoading={isFinansLoading}
+        errorMessage={finansErrorMessage}
         canViewFinans={canViewFinans}
-        isActive={isActive}
+        hasDonem={hasFinansDonem}
       />
 
       <DossierSection

@@ -1,82 +1,27 @@
-import { useEffect, useState } from "react";
-import { getApiErrorMessage } from "../../../../api/api-client";
-import { fetchFinansKalemList } from "../../../../api/finans.api";
 import { formatFinansKalemTuruLabel } from "../../../../lib/display/enum-display";
 import type { FinansKalem } from "../../../../types/finans";
-import type { Personel } from "../../../../types/personel";
 import { formatDetailValue } from "./personel-dosya-format-utils";
 import {
   FINANS_ADAY_DONEM_YOK_MESAJI,
   FINANS_ADAY_KAYIT_YOK_MESAJI,
   FINANS_ADAY_YETKI_YOK_MESAJI,
   formatFinansKayitAdayRolu,
-  formatFinansKayitTutar,
-  isAktifFinansKaydi,
-  sortFinansKayitlari
+  formatFinansKayitTutar
 } from "./personel-finans-adaylari-utils";
 
 export function PersonelFinansAdaylariSection({
-  personel,
+  finansKayitlari,
+  isLoading,
+  errorMessage,
   canViewFinans,
-  isActive
+  hasDonem
 }: {
-  personel: Personel;
+  finansKayitlari: FinansKalem[];
+  isLoading: boolean;
+  errorMessage: string | null;
   canViewFinans: boolean;
-  isActive: boolean;
+  hasDonem: boolean;
 }) {
-  const [finansKayitlari, setFinansKayitlari] = useState<FinansKalem[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const donem = typeof personel.sgk_donem === "string" ? personel.sgk_donem.trim() : "";
-  const hasDonem = donem.length > 0;
-
-  useEffect(() => {
-    let isCancelled = false;
-
-    if (!isActive || !canViewFinans || !personel.id || !hasDonem) {
-      setFinansKayitlari([]);
-      setIsLoading(false);
-      setErrorMessage(null);
-      return;
-    }
-
-    setIsLoading(true);
-    setErrorMessage(null);
-
-    fetchFinansKalemList({
-      personel_id: personel.id,
-      donem,
-      state: "AKTIF",
-      limit: 100
-    })
-      .then((result) => {
-        if (isCancelled) {
-          return;
-        }
-
-        const aktifKayitlar = sortFinansKayitlari(
-          result.items.filter((item) => item.personel_id === personel.id && isAktifFinansKaydi(item))
-        );
-        setFinansKayitlari(aktifKayitlar);
-      })
-      .catch((err) => {
-        if (isCancelled) {
-          return;
-        }
-        setFinansKayitlari([]);
-        setErrorMessage(getApiErrorMessage(err, "Finans kayıtları yüklenemedi."));
-      })
-      .finally(() => {
-        if (!isCancelled) {
-          setIsLoading(false);
-        }
-      });
-
-    return () => {
-      isCancelled = true;
-    };
-  }, [canViewFinans, donem, hasDonem, isActive, personel.id]);
-
   return (
     <section
       className="personel-puantaj-summary-card personel-devam-primi-card"

@@ -17,7 +17,25 @@ const EK_ODEME_KALEM_TURLERI = new Set([
   "MAAS"
 ]);
 
+const EK_ODEME_TOPLAM_KALEM_TURLERI = new Set([
+  "PRIM",
+  "EKSTRA_PRIM",
+  "BONUS",
+  "IKRAMIYE",
+  "TESVIK",
+  "MESAI"
+]);
+
 const KESINTI_KALEM_TURLERI = new Set(["CEZA", "DIGER_KESINTI", "BES"]);
+
+export type FinansAdayGrubu = "mahsup" | "kesinti" | "ek_odeme";
+
+export type FinansAdayToplamlari = {
+  mahsupAdayTutari: number;
+  kesintiAdayTutari: number;
+  ekOdemeAdayTutari: number;
+  dahilEdilmeyenKayitSayisi: number;
+};
 
 function normalizeKalemTuru(value: string) {
   return value.trim().toUpperCase();
@@ -26,6 +44,73 @@ function normalizeKalemTuru(value: string) {
 export function isAktifFinansKaydi(item: FinansKalem) {
   const state = item.state?.trim().toUpperCase();
   return !state || state === "AKTIF";
+}
+
+export function getFinansAdayGrubu(kalemTuru: string): FinansAdayGrubu | null {
+  const normalized = normalizeKalemTuru(kalemTuru);
+
+  if (normalized === "AVANS") {
+    return "mahsup";
+  }
+
+  if (normalized === "MAAS") {
+    return null;
+  }
+
+  if (KESINTI_KALEM_TURLERI.has(normalized)) {
+    return "kesinti";
+  }
+
+  if (EK_ODEME_TOPLAM_KALEM_TURLERI.has(normalized)) {
+    return "ek_odeme";
+  }
+
+  return null;
+}
+
+export function computeFinansAdayToplamlari(kayitlar: FinansKalem[]): FinansAdayToplamlari {
+  let mahsupAdayTutari = 0;
+  let kesintiAdayTutari = 0;
+  let ekOdemeAdayTutari = 0;
+  let dahilEdilmeyenKayitSayisi = 0;
+
+  for (const item of kayitlar) {
+    if (!isAktifFinansKaydi(item) || item.tutar <= 0) {
+      dahilEdilmeyenKayitSayisi += 1;
+      continue;
+    }
+
+    const grup = getFinansAdayGrubu(item.kalem_turu);
+    if (grup === "mahsup") {
+      mahsupAdayTutari += item.tutar;
+      continue;
+    }
+    if (grup === "kesinti") {
+      kesintiAdayTutari += item.tutar;
+      continue;
+    }
+    if (grup === "ek_odeme") {
+      ekOdemeAdayTutari += item.tutar;
+      continue;
+    }
+
+    dahilEdilmeyenKayitSayisi += 1;
+  }
+
+  return {
+    mahsupAdayTutari,
+    kesintiAdayTutari,
+    ekOdemeAdayTutari,
+    dahilEdilmeyenKayitSayisi
+  };
+}
+
+export function hasFinansAdayToplami(toplamlar: FinansAdayToplamlari): boolean {
+  return (
+    toplamlar.mahsupAdayTutari > 0 ||
+    toplamlar.kesintiAdayTutari > 0 ||
+    toplamlar.ekOdemeAdayTutari > 0
+  );
 }
 
 export function sortFinansKayitlari(items: FinansKalem[]) {

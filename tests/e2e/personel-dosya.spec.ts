@@ -1,7 +1,10 @@
 ﻿import { expect, test } from "@playwright/test";
+import { SUBE_DETAIL_REDIRECT_MESSAGE } from "../../src/lib/detail-sube-context";
 import { login } from "./helpers/auth";
 import { mockApi } from "./helpers/mock-api";
 import type { Page } from "@playwright/test";
+
+const muhasebeUser = { username: "muhasebe", password: "demo123" };
 
 function kayitSurecModal(page: Page) {
   return page.locator(".modal-container--kayit-surec, .modal-container").filter({
@@ -81,6 +84,23 @@ async function assertPersonelKartTabsVisible(page: Page) {
   for (const tabName of PERSONEL_KART_TAB_NAMES) {
     await expect(page.getByRole("tab", { name: tabName })).toBeVisible();
   }
+}
+
+async function switchActiveSubeViaSession(page: Page, subeId: number) {
+  await page.evaluate((nextSubeId) => {
+    const key = "medisa_auth_session";
+    const fromSession = sessionStorage.getItem(key);
+    const storage = fromSession ? sessionStorage : localStorage;
+    const raw = fromSession ?? localStorage.getItem(key);
+    if (!raw) {
+      throw new Error("auth session missing");
+    }
+
+    const session = JSON.parse(raw) as { active_sube_id?: number | null };
+    session.active_sube_id = nextSubeId;
+    storage.setItem(key, JSON.stringify(session));
+  }, subeId);
+  await page.reload({ waitUntil: "domcontentloaded" });
 }
 
 async function seedDevamPrimiHastalikCacheForPersonelOne(page: Page) {
@@ -215,6 +235,38 @@ test.describe("personel dosyasi surec akisi", () => {
     await expect(finansCard).not.toContainText("Iptal finans kaydi");
     await expect(page.getByTestId("personel-finans-kayit-903")).toHaveCount(0);
     await expect(page.getByTestId("personel-finans-kayit-904")).toHaveCount(0);
+  });
+
+  test("MUHASEBE aktif sube 2 personel kartinda yalniz kendi sube finans adayini gorur", async ({ page }) => {
+    await mockApi(page, "MUHASEBE");
+
+    await login(page, muhasebeUser);
+    await switchActiveSubeViaSession(page, 2);
+
+    await page.goto("/personeller/2");
+    await expect(page).toHaveURL(/\/personeller\/2$/);
+    await expect(page.locator(".personel-dosya-hero")).toContainText(/Mehmet Kaya/i);
+
+    const finansCard = page.getByTestId("personel-finans-adaylari-card");
+    await expect(finansCard).toBeVisible();
+    await expect(page.getByTestId("personel-finans-adaylari-yukleniyor")).toHaveCount(0, { timeout: 10_000 });
+
+    await expect(page.getByTestId("personel-finans-kayit-902")).toBeVisible();
+    await expect(page.getByTestId("personel-finans-kayit-901")).toHaveCount(0);
+    await expect(finansCard).not.toContainText("Mevcut finans kalemi");
+  });
+
+  test("MUHASEBE farkli sube personel karti direct URL denemesinde finans adayi sizdirmaz", async ({ page }) => {
+    await mockApi(page, "MUHASEBE");
+
+    await login(page, muhasebeUser);
+
+    await page.goto("/personeller/2");
+    await expect(page).toHaveURL(/\/personeller$/);
+    await expect(page.locator(".personel-dosya-hero")).toHaveCount(0);
+    await expect(page.getByText(SUBE_DETAIL_REDIRECT_MESSAGE)).toBeVisible();
+    await expect(page.getByTestId("personel-finans-adaylari-card")).toHaveCount(0);
+    await expect(page.getByTestId("personel-finans-kayit-902")).toHaveCount(0);
   });
 
   test("bordro aday ozet karti finans yuklenirken bos mesaj gostermez", async ({ page }) => {

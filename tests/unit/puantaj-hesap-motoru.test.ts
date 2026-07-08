@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  cozumleHastalikRaporGunu,
+  type HastalikRaporSureci
+} from "../../src/services/hastalik-rapor-politikasi";
+import {
   deriveGunTipi,
   isHaftaTatiliGunu,
   VARSAYILAN_HAFTA_TATILI_GUN_KODU,
@@ -33,6 +37,7 @@ import {
   hesaplaGecKalmaErkenCikmaKesintiOzeti,
   hesaplaDevamsizlikKesintiOzeti,
   siniflandirPuantajEksikGunEtkisi,
+  siniflandirHastalikRaporGunUcretEtkisi,
   hesaplaAylikPuantajEksikGunOzeti,
   hesaplaSgkPrimGunu,
   hesaplaTatilEkOdemeOzeti,
@@ -1508,6 +1513,138 @@ describe("siniflandirPuantajEksikGunEtkisi", () => {
       });
     }
   );
+});
+
+function makeHastalikSurec(
+  overrides: Partial<HastalikRaporSureci> & { id?: number | string }
+): HastalikRaporSureci {
+  return {
+    id: 1,
+    personel_id: 1,
+    surec_turu: "RAPOR",
+    alt_tur: "Raporlu_Hastalik",
+    baslangic_tarihi: "2026-04-10",
+    bitis_tarihi: "2026-04-14",
+    ilk_iki_gun_firma_oder_mi: false,
+    state: "AKTIF",
+    ...overrides
+  };
+}
+
+describe("siniflandirHastalikRaporGunUcretEtkisi (S63-2)", () => {
+  it("ilk 2 gun + firma odemez → GUNLUK_KESINTI_ADAYI", () => {
+    const cozum = cozumleHastalikRaporGunu([makeHastalikSurec({ id: 10, ilk_iki_gun_firma_oder_mi: false })], {
+      personelId: 1,
+      tarih: "2026-04-10"
+    });
+
+    expect(siniflandirHastalikRaporGunUcretEtkisi(cozum)).toMatchObject({
+      eksik_gun_adayi_mi: true,
+      eksik_gun_sayisi: 0,
+      sgk_prim_gununu_dusurur_mu: false,
+      ucret_etkisi_turu: "GUNLUK_KESINTI_ADAYI",
+      manuel_inceleme_gerekli_mi: false
+    });
+  });
+
+  it("ilk 2 gun + firma oder → UCRET_KORUNUR", () => {
+    const cozum = cozumleHastalikRaporGunu([makeHastalikSurec({ id: 11, ilk_iki_gun_firma_oder_mi: true })], {
+      personelId: 1,
+      tarih: "2026-04-11"
+    });
+
+    expect(siniflandirHastalikRaporGunUcretEtkisi(cozum)).toMatchObject({
+      eksik_gun_adayi_mi: false,
+      eksik_gun_sayisi: 0,
+      sgk_prim_gununu_dusurur_mu: false,
+      ucret_etkisi_turu: "UCRET_KORUNUR",
+      manuel_inceleme_gerekli_mi: false
+    });
+  });
+
+  it("3. gun+ → POLITIKA_INCELEMESI ve manuel inceleme", () => {
+    const cozum = cozumleHastalikRaporGunu([makeHastalikSurec({ id: 12, ilk_iki_gun_firma_oder_mi: false })], {
+      personelId: 1,
+      tarih: "2026-04-12"
+    });
+
+    expect(siniflandirHastalikRaporGunUcretEtkisi(cozum)).toMatchObject({
+      eksik_gun_adayi_mi: true,
+      eksik_gun_sayisi: 0,
+      sgk_prim_gununu_dusurur_mu: false,
+      ucret_etkisi_turu: "POLITIKA_INCELEMESI",
+      manuel_inceleme_gerekli_mi: true
+    });
+  });
+});
+
+describe("siniflandirPuantajEksikGunEtkisi + hastalik_rapor_cozumu (S63-2)", () => {
+  it("Raporlu_Hastalik + policy cozumu ile gunluk kesinti adayi uretir", () => {
+    const cozum = cozumleHastalikRaporGunu([makeHastalikSurec({ id: 20, ilk_iki_gun_firma_oder_mi: false })], {
+      personelId: 1,
+      tarih: "2026-04-10"
+    });
+
+    const o = siniflandirPuantajEksikGunEtkisi({
+      hareket_durumu: "Gelmedi",
+      dayanak: "Raporlu_Hastalik",
+      hastalik_rapor_cozumu: cozum
+    });
+
+    expect(o).toMatchObject({
+      eksik_gun_adayi_mi: true,
+      eksik_gun_sayisi: 0,
+      sgk_prim_gununu_dusurur_mu: false,
+      ucret_etkisi_turu: "GUNLUK_KESINTI_ADAYI",
+      manuel_inceleme_gerekli_mi: false
+    });
+  });
+
+  it("Raporlu_Hastalik + firma oder policy ile ucret korunur", () => {
+    const cozum = cozumleHastalikRaporGunu([makeHastalikSurec({ id: 21, ilk_iki_gun_firma_oder_mi: true })], {
+      personelId: 1,
+      tarih: "2026-04-10"
+    });
+
+    const o = siniflandirPuantajEksikGunEtkisi({
+      hareket_durumu: "Gelmedi",
+      dayanak: "Raporlu_Hastalik",
+      hastalik_rapor_cozumu: cozum
+    });
+
+    expect(o.ucret_etkisi_turu).toBe("UCRET_KORUNUR");
+    expect(o.manuel_inceleme_gerekli_mi).toBe(false);
+  });
+
+  it("Raporlu_Is_Kazasi policy cozumunu yok sayar", () => {
+    const cozum = cozumleHastalikRaporGunu([makeHastalikSurec({ id: 22, ilk_iki_gun_firma_oder_mi: false })], {
+      personelId: 1,
+      tarih: "2026-04-10"
+    });
+
+    const o = siniflandirPuantajEksikGunEtkisi({
+      hareket_durumu: "Gelmedi",
+      dayanak: "Raporlu_Is_Kazasi",
+      hastalik_rapor_cozumu: cozum
+    });
+
+    expect(o).toMatchObject({
+      ucret_etkisi_turu: "POLITIKA_INCELEMESI",
+      manuel_inceleme_gerekli_mi: true
+    });
+  });
+
+  it("Raporlu_Hastalik policy cozumu olmadan geriye uyumlu POLITIKA_INCELEMESI dondurur", () => {
+    const o = siniflandirPuantajEksikGunEtkisi({
+      hareket_durumu: "Gelmedi",
+      dayanak: "Raporlu_Hastalik"
+    });
+
+    expect(o).toMatchObject({
+      ucret_etkisi_turu: "POLITIKA_INCELEMESI",
+      manuel_inceleme_gerekli_mi: true
+    });
+  });
 });
 
 describe("hesaplaAylikPuantajEksikGunOzeti", () => {

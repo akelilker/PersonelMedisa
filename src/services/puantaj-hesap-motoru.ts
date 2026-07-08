@@ -7,6 +7,7 @@ import type {
   PuantajHareketDurumu,
   PuantajHesapEtkisi
 } from "../types/puantaj";
+import type { HastalikRaporGunuCozumu } from "./hastalik-rapor-politikasi";
 import { hesaplaYas } from "./izin-hesap-motoru";
 
 // ---------------------------------------------------------------------------
@@ -524,6 +525,8 @@ export type PuantajEksikGunSiniflandirmaGirdisi = {
   hareket_durumu?: PuantajHareketDurumu;
   dayanak?: PuantajDayanak;
   durumu_bildirdi_mi?: boolean | null;
+  /** S63-2: cozumleHastalikRaporGunu ciktisi; yalnizca Raporlu_Hastalik icin kullanilir. */
+  hastalik_rapor_cozumu?: HastalikRaporGunuCozumu;
 };
 
 export type PuantajEksikGunSiniflandirmaSonucu = {
@@ -545,6 +548,67 @@ function bildirimSinyali(
     haberli_yokluk_sinyali_mi: hareketDurumu === "Gelmedi" && durumuBildirdiMi === true,
     habersiz_yokluk_sinyali_mi: hareketDurumu === "Gelmedi" && durumuBildirdiMi === false
   };
+}
+
+const RAPORLU_HASTALIK_SGK_KORUMA = {
+  eksik_gun_sayisi: 0,
+  sgk_prim_gununu_dusurur_mu: false
+} as const;
+
+/**
+ * Hastalik raporu policy resolver ciktisini puantaj eksik gun ucret etkisi siniflandirmasina cevirir.
+ * Is kazasi raporu bu fonksiyonla yonetilmez.
+ */
+export function siniflandirHastalikRaporGunUcretEtkisi(
+  cozum: HastalikRaporGunuCozumu
+): Pick<
+  PuantajEksikGunSiniflandirmaSonucu,
+  | "eksik_gun_adayi_mi"
+  | "eksik_gun_sayisi"
+  | "sgk_prim_gununu_dusurur_mu"
+  | "ucret_etkisi_turu"
+  | "manuel_inceleme_gerekli_mi"
+  | "aciklama"
+> {
+  switch (cozum.ucret_policy) {
+    case "KESINTI_ADAYI":
+      return {
+        eksik_gun_adayi_mi: true,
+        ...RAPORLU_HASTALIK_SGK_KORUMA,
+        ucret_etkisi_turu: "GUNLUK_KESINTI_ADAYI",
+        manuel_inceleme_gerekli_mi: false,
+        aciklama:
+          "Hastalik raporu ilk iki gun ve firma odemez: gunluk ucret kesintisi adayi; SGK prim gunu otomatik dusumu uretilmez."
+      };
+    case "UCRET_KORUNUR":
+      return {
+        eksik_gun_adayi_mi: false,
+        ...RAPORLU_HASTALIK_SGK_KORUMA,
+        ucret_etkisi_turu: "UCRET_KORUNUR",
+        manuel_inceleme_gerekli_mi: false,
+        aciklama:
+          "Hastalik raporu ilk iki gun ve firma oder: ucret korunur; SGK prim gunu otomatik dusumu uretilmez."
+      };
+    case "POLITIKA_INCELEMESI":
+      return {
+        eksik_gun_adayi_mi: true,
+        ...RAPORLU_HASTALIK_SGK_KORUMA,
+        ucret_etkisi_turu: "POLITIKA_INCELEMESI",
+        manuel_inceleme_gerekli_mi: cozum.manuel_inceleme_gerekli_mi,
+        aciklama:
+          "Hastalik raporu gunu icin ucret/SGK politikasi manuel inceleme gerektirir; otomatik kesinti veya koruma karari uretilmez."
+      };
+    case "YOK":
+    default:
+      return {
+        eksik_gun_adayi_mi: true,
+        ...RAPORLU_HASTALIK_SGK_KORUMA,
+        ucret_etkisi_turu: "POLITIKA_INCELEMESI",
+        manuel_inceleme_gerekli_mi: true,
+        aciklama:
+          "Raporlu hastalik gunu icin eslesen surec bulunamadi; ucret ve SGK prim gunu karari manuel inceleme gerektirir."
+      };
+  }
 }
 
 /**
@@ -615,6 +679,13 @@ export function siniflandirPuantajEksikGunEtkisi(
       manuel_inceleme_gerekli_mi: false,
       ...bildirim,
       aciklama: "Ucretli izin / yillik izin / telafi calismasi SGK prim gununu dusuren eksik gun olarak siniflandirilmaz."
+    };
+  }
+
+  if (dayanak === "Raporlu_Hastalik" && girdi.hastalik_rapor_cozumu) {
+    return {
+      ...siniflandirHastalikRaporGunUcretEtkisi(girdi.hastalik_rapor_cozumu),
+      ...bildirim
     };
   }
 

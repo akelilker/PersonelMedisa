@@ -1547,6 +1547,24 @@ export async function mockApi(page: Page, role: MockUserRole) {
       tutar: 1200,
       aciklama: "Sube 2 finans kalemi",
       state: "AKTIF"
+    },
+    {
+      id: 903,
+      personel_id: 1,
+      donem: "2026-03",
+      kalem_turu: "PRIM",
+      tutar: 1800,
+      aciklama: "Farkli donem finans kaydi",
+      state: "AKTIF"
+    },
+    {
+      id: 904,
+      personel_id: 1,
+      donem: "2026-04",
+      kalem_turu: "PRIM",
+      tutar: 900,
+      aciklama: "Iptal finans kaydi",
+      state: "IPTAL"
     }
   ];
 
@@ -4576,6 +4594,8 @@ let bildirimIdCounter = 800;
 
       const personelId = Number.parseInt(finansUrl.searchParams.get("personel_id") ?? "", 10);
       const kalemTuru = finansUrl.searchParams.get("kalem_turu");
+      const donem = finansUrl.searchParams.get("donem");
+      const state = finansUrl.searchParams.get("state");
       const filtered = finansKalemleri.filter((item) => {
         if (!finansItemMatchesScope(item.personel_id, subeScope, mockUserSubeIds)) {
           return false;
@@ -4584,6 +4604,12 @@ let bildirimIdCounter = 800;
           return false;
         }
         if (kalemTuru && item.kalem_turu !== kalemTuru) {
+          return false;
+        }
+        if (donem && item.donem !== donem) {
+          return false;
+        }
+        if (state && item.state !== state) {
           return false;
         }
         return true;

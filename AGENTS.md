@@ -52,3 +52,15 @@ UI davranışı değiştiyse ilgili Playwright/E2E veya manuel smoke yapılır. 
 ## Deploy notu
 
 Deploy için `DEPLOY_CHECKLIST.md` esas alınır. Canlı build öncesi production env değerleri doğrulanır; canlıya `src`, `tests`, `.git`, `node_modules` veya lokal zip/log dosyaları gönderilmez.
+
+## Cursor Cloud specific instructions
+
+Bu bölüm gelecek cloud agent'lar içindir (bağımlılıklar update script ile kurulmuş varsayılır).
+
+- Ana ürün frontend'tir (React + Vite). PHP `api/` yalnızca cPanel deploy hedefidir; lokal geliştirme/test için gerekli değildir.
+- Dev'de API katmanı `auto` moddadır (`.env.development`: `VITE_API_MODE=auto`, `VITE_DEMO_API_FALLBACK=true`), bu yüzden uygulama gerçek backend/DB olmadan demo/mock veriyle tek başına çalışır.
+- Demo login: herhangi bir kullanıcı adı/şifre kabul edilir (varsayılan rol `GENEL_YONETICI`; `birim`/`muhasebe`/`bolum` içeren kullanıcı adları farklı rol verir). Gerçek credential gerekmez.
+- Demo modda beklenen davranış: personel liste endpoint'i boş döner ve "Kayıt ve Süreç" formunda bazı referans-veri hataları (ör. "Şube listesi yüklenemedi") görülebilir — bu bir ortam sorunu değil, backend olmadığı içindir.
+- Standart komutlar `package.json` scripts ve `README.md`'de: `npm run dev` (Vite, varsayılan port 5173), `npm run typecheck`, `npm run test` (vitest), `npm run build`, `npm run e2e`.
+- Ayrı bir `lint` scripti yoktur; statik kontrol için `npm run typecheck` kullanılır.
+- Playwright E2E (`npm run e2e`) çalıştırmadan önce bir kereye mahsus `npx playwright install --with-deps` gerekir; e2e config dev sunucusunu 127.0.0.1:4173'te otomatik başlatır.

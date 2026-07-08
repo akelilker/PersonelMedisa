@@ -10,6 +10,7 @@ export function PersonelKartPanelGenelBilgiler({
   surecler,
   canViewPuantaj,
   canViewRevizyon,
+  canViewFinans,
   isActive,
   onOpenSurecHistory
 }: {
@@ -17,6 +18,7 @@ export function PersonelKartPanelGenelBilgiler({
   surecler: Surec[];
   canViewPuantaj: boolean;
   canViewRevizyon: boolean;
+  canViewFinans: boolean;
   isActive: boolean;
   onOpenSurecHistory?: () => void;
 }) {
@@ -52,6 +54,7 @@ export function PersonelKartPanelGenelBilgiler({
         personel={personel}
         canViewPuantaj={canViewPuantaj}
         canViewRevizyon={canViewRevizyon}
+        canViewFinans={canViewFinans}
         isActive={isActive}
       />
 

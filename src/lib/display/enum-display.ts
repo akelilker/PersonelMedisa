@@ -98,8 +98,10 @@ const BILDIRIM_TURU_LABELS: Record<string, string> = {
 
 const FINANS_KALEM_TURU_LABELS: Record<string, string> = {
   AVANS: "Avans",
+  BES: "BES",
   BONUS: "Bonus",
   CEZA: "Ceza",
+  DIGER_KESINTI: "Diğer Kesinti",
   EKSTRA_PRIM: "Ekstra Prim",
   IKRAMIYE: "İkramiye",
   MAAS: "Maaş",

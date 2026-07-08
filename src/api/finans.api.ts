@@ -66,6 +66,7 @@ function normalizeFinansKalem(data: unknown): FinansKalem {
     donem,
     kalem_turu: kalemTuru,
     tutar,
+    gun_sayisi: toNumber(record.gun_sayisi ?? record.gunSayisi),
     aciklama: toStringValue(record.aciklama),
     state: toStringValue(record.state ?? record.durum)
   };

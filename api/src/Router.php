@@ -118,6 +118,21 @@ class Router
         if ($path === '/bildirimler' && $method === 'GET') {
             BildirimlerController::list($this->request);
         }
+        if ($path === '/bildirimler' && $method === 'POST') {
+            BildirimlerController::create($this->request);
+        }
+        if ($method === 'POST' && preg_match('#^/bildirimler/(\d+)/submit$#', $path, $matches)) {
+            BildirimlerController::submit($this->request, $matches[1]);
+        }
+        if ($method === 'POST' && preg_match('#^/bildirimler/(\d+)/request-correction$#', $path, $matches)) {
+            BildirimlerController::requestCorrection($this->request, $matches[1]);
+        }
+        if ($method === 'POST' && preg_match('#^/bildirimler/(\d+)/iptal$#', $path, $matches)) {
+            BildirimlerController::cancel($this->request, $matches[1]);
+        }
+        if ($method === 'PUT' && preg_match('#^/bildirimler/(\d+)$#', $path, $matches)) {
+            BildirimlerController::update($this->request, $matches[1]);
+        }
         if ($path === '/surecler' && $method === 'GET') {
             SureclerController::list($this->request);
         }

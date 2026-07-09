@@ -2313,6 +2313,19 @@ let bildirimIdCounter = 800;
     return false;
   }
 
+  function isAmirKontrolOnlyPayload(payload: Record<string, unknown>): boolean {
+    const keys = Object.keys(payload);
+    return keys.length === 1 && keys[0] === "kontrol_durumu" && payload.kontrol_durumu === "AMIR_KONTROL_ETTI";
+  }
+
+  async function denyUnlessPuantajUpsertPermission(route: Route, payload: Record<string, unknown>) {
+    if (isAmirKontrolOnlyPayload(payload)) {
+      return denyUnlessAnyRolePermission(route, ["puantaj.amir_kontrol", "puantaj.update"]);
+    }
+
+    return denyUnlessRolePermission(route, "puantaj.update");
+  }
+
   await page.route(
     (testUrl) => {
       try {
@@ -3633,6 +3646,10 @@ let bildirimIdCounter = 800;
     }
 
     if (path.startsWith("/api/gunluk-puantaj/") && method === "GET") {
+      if (await denyUnlessRolePermission(route, "puantaj.view")) {
+        return;
+      }
+
       const segments = path.split("/");
       const personelId = Number.parseInt(segments[3] ?? "0", 10);
       const tarih = decodeURIComponent(segments[4] ?? "");
@@ -3697,6 +3714,11 @@ let bildirimIdCounter = 800;
         gercek_mola_dakika?: number;
         kontrol_durumu?: GunlukPuantaj["kontrol_durumu"];
       };
+
+      if (await denyUnlessPuantajUpsertPermission(route, payload)) {
+        return;
+      }
+
       const mevcutIndex = puantajKayitlari.findIndex((item) => item.personel_id === personelId && item.tarih === tarih);
       const oncekiKayit =
         mevcutIndex >= 0
@@ -3753,6 +3775,10 @@ let bildirimIdCounter = 800;
     }
 
     if (path === "/api/puantaj/muhurle" && method === "POST") {
+      if (await denyUnlessRolePermission(route, "puantaj.muhurle")) {
+        return;
+      }
+
       const payload = request.postDataJSON() as { yil?: number; ay?: number };
       const subeScope = getRequestSubeScope(request, url);
       const yil = Number.isFinite(payload.yil) ? Number(payload.yil) : new Date().getFullYear();

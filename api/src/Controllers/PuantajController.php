@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Medisa\Api\Controllers;
 
 use Medisa\Api\Auth\AuthMiddleware;
+use Medisa\Api\Auth\RolePermissions;
 use Medisa\Api\Database\Connection;
 use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
@@ -13,12 +14,6 @@ use PDO;
 
 class PuantajController
 {
-    /** @var string[] */
-    private static $writeRoles = ['GENEL_YONETICI', 'BOLUM_YONETICISI', 'MUHASEBE'];
-
-    /** @var string[] */
-    private static $muhurRoles = ['GENEL_YONETICI', 'BOLUM_YONETICISI'];
-
     /** @var string[] */
     private static $gunTipleri = ['Normal_Is_Gunu', 'Hafta_Tatili_Pazar', 'UBGT_Resmi_Tatil'];
 
@@ -51,6 +46,7 @@ class PuantajController
     public static function detail(Request $request, $personelId, $tarih)
     {
         $user = AuthMiddleware::authenticate($request, true);
+        RolePermissions::assert($user, 'puantaj.view');
         $personelId = (int) $personelId;
         $tarih = self::normalizeDate($tarih);
 
@@ -73,7 +69,8 @@ class PuantajController
     public static function upsert(Request $request, $personelId, $tarih)
     {
         $user = AuthMiddleware::authenticate($request, true);
-        self::requireRole($user, self::$writeRoles);
+        $payload = $request->getJsonBody();
+        self::assertUpsertPermission($user, $payload);
 
         $personelId = (int) $personelId;
         $tarih = self::normalizeDate($tarih);
@@ -91,7 +88,6 @@ class PuantajController
             JsonResponse::error(409, 'PERIOD_LOCKED', 'Bu donem muhurlenmis, puantaj kaydi guncellenemez.');
         }
 
-        $payload = $request->getJsonBody();
         $values = self::buildUpsertValues($payload, $existing ?: [], $personelId, $tarih);
 
         if ($existing) {
@@ -107,7 +103,7 @@ class PuantajController
     public static function muhurleAylik(Request $request)
     {
         $user = AuthMiddleware::authenticate($request, true);
-        self::requireRole($user, self::$muhurRoles);
+        RolePermissions::assert($user, 'puantaj.muhurle');
 
         $payload = $request->getJsonBody();
         $yil = self::readRequiredInt($payload, 'yil', 2000, 2100);
@@ -204,13 +200,23 @@ class PuantajController
         }
     }
 
-    /** @param array<string, mixed> $user @param string[] $roles */
-    private static function requireRole(array $user, array $roles)
+    /** @param array<string, mixed> $payload */
+    private static function isAmirKontrolOnlyPayload(array $payload)
     {
-        $role = (string) ($user['rol'] ?? '');
-        if (!in_array($role, $roles, true)) {
-            JsonResponse::forbidden('Bu islem icin yetkin yok.');
+        return count($payload) === 1
+            && array_key_exists('kontrol_durumu', $payload)
+            && (string) $payload['kontrol_durumu'] === 'AMIR_KONTROL_ETTI';
+    }
+
+    /** @param array<string, mixed> $user @param array<string, mixed> $payload */
+    private static function assertUpsertPermission(array $user, array $payload)
+    {
+        if (self::isAmirKontrolOnlyPayload($payload)) {
+            RolePermissions::assertAny($user, ['puantaj.amir_kontrol', 'puantaj.update']);
+            return;
         }
+
+        RolePermissions::assert($user, 'puantaj.update');
     }
 
     private static function normalizeDate($value)

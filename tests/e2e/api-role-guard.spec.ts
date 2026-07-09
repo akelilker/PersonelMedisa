@@ -139,3 +139,94 @@ test.describe("S43B API role guards (mock-api)", () => {
     await expect(apiFetch(page, "/api/yonetim/kullanicilar")).resolves.toMatchObject({ status: 200 });
   });
 });
+
+const PUANTAJ_DETAIL = "/api/gunluk-puantaj/1/2026-04-09";
+const AMIR_KONTROL_BODY = { kontrol_durumu: "AMIR_KONTROL_ETTI" } as const;
+const FULL_UPDATE_BODY = { giris_saati: "09:00", cikis_saati: "18:00" } as const;
+const MUHURLE_BODY = { yil: 2026, ay: 4 } as const;
+
+test.describe("S70B-2C puantaj API role guards (mock-api)", () => {
+  test("authorized roles can read gunluk puantaj detail", async ({ page }) => {
+    for (const role of ["GENEL_YONETICI", "BOLUM_YONETICISI", "MUHASEBE", "BIRIM_AMIRI"] as const) {
+      await loginAs(page, role);
+      await expect(apiFetch(page, PUANTAJ_DETAIL)).resolves.toMatchObject({ status: 200 });
+    }
+  });
+
+  test("BIRIM_AMIRI can mark amir kontrol with kontrol-only payload", async ({ page }) => {
+    await loginAs(page, "BIRIM_AMIRI");
+    await expect(
+      apiFetch(page, PUANTAJ_DETAIL, {
+        method: "PUT",
+        body: AMIR_KONTROL_BODY
+      })
+    ).resolves.toMatchObject({ status: 200 });
+  });
+
+  test("BIRIM_AMIRI is denied full puantaj update", async ({ page }) => {
+    await loginAs(page, "BIRIM_AMIRI");
+    await expect(
+      apiFetch(page, PUANTAJ_DETAIL, {
+        method: "PUT",
+        body: FULL_UPDATE_BODY
+      })
+    ).resolves.toMatchObject({ status: 403 });
+  });
+
+  test("BIRIM_AMIRI is denied mixed amir kontrol payload with extra fields", async ({ page }) => {
+    await loginAs(page, "BIRIM_AMIRI");
+    await expect(
+      apiFetch(page, PUANTAJ_DETAIL, {
+        method: "PUT",
+        body: {
+          kontrol_durumu: "AMIR_KONTROL_ETTI",
+          giris_saati: "09:00"
+        }
+      })
+    ).resolves.toMatchObject({ status: 403 });
+  });
+
+  test("management roles can perform full puantaj update", async ({ page }) => {
+    for (const role of ["GENEL_YONETICI", "MUHASEBE"] as const) {
+      await loginAs(page, role);
+      await expect(
+        apiFetch(page, PUANTAJ_DETAIL, {
+          method: "PUT",
+          body: FULL_UPDATE_BODY
+        })
+      ).resolves.toMatchObject({ status: 200 });
+    }
+  });
+
+  test("GENEL_YONETICI can mark amir kontrol with kontrol-only payload", async ({ page }) => {
+    await loginAs(page, "GENEL_YONETICI");
+    await expect(
+      apiFetch(page, PUANTAJ_DETAIL, {
+        method: "PUT",
+        body: AMIR_KONTROL_BODY
+      })
+    ).resolves.toMatchObject({ status: 200 });
+  });
+
+  test("only muhurle-authorized roles can seal monthly puantaj", async ({ page }) => {
+    for (const role of ["GENEL_YONETICI", "BOLUM_YONETICISI"] as const) {
+      await loginAs(page, role);
+      await expect(
+        apiFetch(page, "/api/puantaj/muhurle", {
+          method: "POST",
+          body: MUHURLE_BODY
+        })
+      ).resolves.toMatchObject({ status: 200 });
+    }
+
+    for (const role of ["MUHASEBE", "BIRIM_AMIRI"] as const) {
+      await loginAs(page, role);
+      await expect(
+        apiFetch(page, "/api/puantaj/muhurle", {
+          method: "POST",
+          body: MUHURLE_BODY
+        })
+      ).resolves.toMatchObject({ status: 403 });
+    }
+  });
+});

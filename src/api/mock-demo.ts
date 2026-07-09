@@ -994,6 +994,90 @@ function enforceDemoRevizyonPermission(
   return null;
 }
 
+function enforceDemoPermission(
+  actor: RevizyonActorContext,
+  permission: AppPermission,
+  message = "Bu islem icin yetkiniz yok."
+): ApiResponse<unknown> | null {
+  return enforceDemoRevizyonPermission(actor, permission, "FORBIDDEN", message);
+}
+
+function enforceDemoAnyPermission(
+  actor: RevizyonActorContext,
+  permissions: readonly AppPermission[],
+  message = "Bu islem icin yetkiniz yok."
+): ApiResponse<unknown> | null {
+  if (permissions.some((permission) => hasRolePermission(actor.role, permission))) {
+    return null;
+  }
+
+  return demoRevizyonError("FORBIDDEN", message);
+}
+
+function assertDemoAylikWriteSubeScope(
+  actor: RevizyonActorContext,
+  subeId: number | null
+): ApiResponse<unknown> | null {
+  if (actor.subeIds.length > 0 && (subeId === null || subeId <= 0)) {
+    return demoRevizyonError("VALIDATION_ERROR", "Sube secimi zorunludur.");
+  }
+
+  return null;
+}
+
+function assertDemoAylikSubeAccess(
+  actor: RevizyonActorContext,
+  subeId: number | null
+): ApiResponse<unknown> | null {
+  if (
+    subeId !== null &&
+    subeId > 0 &&
+    actor.subeIds.length > 0 &&
+    !actor.subeIds.includes(subeId)
+  ) {
+    return demoRevizyonError("FORBIDDEN", "Bu islem icin yetkiniz yok.");
+  }
+
+  return null;
+}
+
+function hasDemoPendingBolumOnay(
+  ay: string,
+  subeId: number | null,
+  departmanId: number | null
+): boolean {
+  return demoState.personeller.some((personel) => {
+    if (personel.aktif_durum !== "AKTIF") {
+      return false;
+    }
+    if (subeId !== null && personel.sube_id !== subeId) {
+      return false;
+    }
+    if (departmanId !== null && personel.departman_id !== departmanId) {
+      return false;
+    }
+
+    const durum = ensureAylikDurum(ay, personel.id);
+    return durum.kapanis_durumu !== "KAPANDI" && durum.bolum_onay_durumu === "BOLUM_ONAYINDA";
+  });
+}
+
+function isDemoAmirKontrolOnlyPayload(body: Record<string, unknown>): boolean {
+  const keys = Object.keys(body);
+  return keys.length === 1 && keys[0] === "kontrol_durumu" && body.kontrol_durumu === "AMIR_KONTROL_ETTI";
+}
+
+function enforceDemoPuantajUpsertPermission(
+  actor: RevizyonActorContext,
+  body: Record<string, unknown>
+): ApiResponse<unknown> | null {
+  if (isDemoAmirKontrolOnlyPayload(body)) {
+    return enforceDemoAnyPermission(actor, ["puantaj.amir_kontrol", "puantaj.update"]);
+  }
+
+  return enforceDemoPermission(actor, "puantaj.update");
+}
+
 function findDemoPersonelDepartmanId(personelId: number): number | null {
   const personel = demoState.personeller.find((item) => item.id === personelId);
   return personel?.departman_id ?? null;
@@ -2626,17 +2710,28 @@ export function resolveDemoApiResponse(
 
   const puantajMatch = pathname.match(/^\/gunluk-puantaj\/(\d+)\/([^/]+)$/);
   if (puantajMatch) {
+    const actor = readDemoApiActor(init);
     const personelId = Number.parseInt(puantajMatch[1], 10);
     const tarih = decodeURIComponent(puantajMatch[2]);
     const key = `${personelId}|${tarih}`;
     const existing = demoState.puantajMap[key] ?? defaultPuantaj(personelId, tarih);
 
     if (method === "GET") {
+      const permissionError = enforceDemoPermission(actor, "puantaj.view");
+      if (permissionError) {
+        return permissionError;
+      }
+
       demoState.puantajMap[key] = existing;
       return ok(existing);
     }
 
     if (method === "PUT") {
+      const permissionError = enforceDemoPuantajUpsertPermission(actor, body);
+      if (permissionError) {
+        return permissionError;
+      }
+
       const hasDurumuBildirdiMi = Object.prototype.hasOwnProperty.call(body, "durumu_bildirdi_mi");
       const hasDurumBildirimAciklamasi = Object.prototype.hasOwnProperty.call(
         body,
@@ -2674,6 +2769,12 @@ export function resolveDemoApiResponse(
   }
 
   if (pathname === "/puantaj/muhurle" && method === "POST") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(actor, "puantaj.muhurle");
+    if (permissionError) {
+      return permissionError;
+    }
+
     const yil = toNumber(body.yil) ?? new Date().getFullYear();
     const ay = toNumber(body.ay) ?? new Date().getMonth() + 1;
     const donemPrefix = `${yil}-${String(ay).padStart(2, "0")}`;
@@ -3424,6 +3525,12 @@ export function resolveDemoApiResponse(
   }
 
   if (pathname === "/yonetim/aylik-ozet" && method === "GET") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(actor, "aylik-ozet.view");
+    if (permissionError) {
+      return permissionError;
+    }
+
     const ay = toStringValue(requestUrl.searchParams.get("ay")) ?? "2026-04";
     const subeId = toNumber(requestUrl.searchParams.get("sube_id"));
     const departmanId = toNumber(requestUrl.searchParams.get("departman_id"));
@@ -3432,10 +3539,25 @@ export function resolveDemoApiResponse(
   }
 
   if (pathname === "/yonetim/aylik-ozet/bolum-onay" && method === "POST") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoAnyPermission(actor, [
+      "aylik_bolum_onayi.approve",
+      "aylik-ozet.review"
+    ]);
+    if (permissionError) {
+      return permissionError;
+    }
+
     const ay = toStringValue(body.ay) ?? "2026-04";
     const subeId = toNumber(body.sube_id);
     const departmanId = toNumber(body.departman_id);
     const sadeceRevizeli = Boolean(body.sadece_revizeli);
+
+    const subeScopeError =
+      assertDemoAylikWriteSubeScope(actor, subeId) ?? assertDemoAylikSubeAccess(actor, subeId);
+    if (subeScopeError) {
+      return subeScopeError;
+    }
 
     demoState.personeller.forEach((personel) => {
       if (personel.aktif_durum !== "AKTIF") {
@@ -3461,10 +3583,32 @@ export function resolveDemoApiResponse(
   }
 
   if (pathname === "/yonetim/aylik-ozet/ay-kapat" && method === "POST") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoAnyPermission(actor, [
+      "genel_yonetici_onayi.approve",
+      "aylik-ozet.executive_ack"
+    ]);
+    if (permissionError) {
+      return permissionError;
+    }
+
     const ay = toStringValue(body.ay) ?? "2026-04";
     const subeId = toNumber(body.sube_id);
     const departmanId = toNumber(body.departman_id);
     const sadeceRevizeli = Boolean(body.sadece_revizeli);
+
+    const subeScopeError =
+      assertDemoAylikWriteSubeScope(actor, subeId) ?? assertDemoAylikSubeAccess(actor, subeId);
+    if (subeScopeError) {
+      return subeScopeError;
+    }
+
+    if (hasDemoPendingBolumOnay(ay, subeId, departmanId)) {
+      return demoRevizyonError(
+        "PENDING_BOLUM_ONAY",
+        "Bekleyen bölüm onayları tamamlanmadan genel yönetici onayı verilemez."
+      );
+    }
 
     demoState.personeller.forEach((personel) => {
       if (personel.aktif_durum !== "AKTIF") {

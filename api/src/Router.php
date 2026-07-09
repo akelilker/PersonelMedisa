@@ -130,6 +130,9 @@ class Router
         if ($method === 'POST' && preg_match('#^/bildirimler/(\d+)/iptal$#', $path, $matches)) {
             BildirimlerController::cancel($this->request, $matches[1]);
         }
+        if ($method === 'GET' && preg_match('#^/bildirimler/(\d+)$#', $path, $matches)) {
+            BildirimlerController::detail($this->request, $matches[1]);
+        }
         if ($method === 'PUT' && preg_match('#^/bildirimler/(\d+)$#', $path, $matches)) {
             BildirimlerController::update($this->request, $matches[1]);
         }

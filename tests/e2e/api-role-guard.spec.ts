@@ -279,6 +279,25 @@ test.describe("S70C-2 gunluk bildirim API role guards (mock-api)", () => {
     expect(bildirimRecord(created.data).state).toBe("TASLAK");
   });
 
+  test("BIRIM_AMIRI can fetch bildirim detail by id", async ({ page }) => {
+    await loginAs(page, "BIRIM_AMIRI");
+
+    const created = await apiFetchJson(page, "/api/bildirimler", {
+      method: "POST",
+      body: { ...BILDIRIM_CREATE_BODY, tarih: "2026-04-18" }
+    });
+    expect(created.status).toBe(201);
+    const bildirimId = bildirimRecord(created.data).id;
+    expect(bildirimId).toBeGreaterThan(0);
+
+    const detail = await apiFetchJson(page, `/api/bildirimler/${bildirimId}`, {
+      method: "GET"
+    });
+    expect(detail.status).toBe(200);
+    expect(bildirimRecord(detail.data).id).toBe(bildirimId);
+    expect(bildirimRecord(detail.data).state).toBe("TASLAK");
+  });
+
   test("MUHASEBE and BOLUM_YONETICISI cannot create bildirim", async ({ page }) => {
     for (const role of ["MUHASEBE", "BOLUM_YONETICISI"] as const) {
       await loginAs(page, role);

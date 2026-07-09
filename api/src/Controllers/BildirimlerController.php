@@ -110,6 +110,34 @@ class BildirimlerController
         );
     }
 
+    public static function detail(Request $request, $id)
+    {
+        $user = AuthMiddleware::authenticate($request, true);
+        RolePermissions::assert($user, 'bildirimler.detail.view');
+        $bildirimId = self::parsePositiveInt($id);
+        if ($bildirimId === null) {
+            JsonResponse::notFound('Kayit bulunamadi.');
+        }
+
+        try {
+            $pdo = Connection::get();
+        } catch (\Throwable $e) {
+            JsonResponse::serverError('Veritabani baglantisi kurulamadi.');
+        }
+
+        if (!self::isTableReady($pdo)) {
+            JsonResponse::notFound('Bildirim bulunamadi.');
+        }
+
+        $row = self::fetchRowById($pdo, $bildirimId);
+        if (!$row) {
+            JsonResponse::notFound('Bildirim bulunamadi.');
+        }
+
+        SubeScope::assertPersonelAccess($user, $request, (int) $row['sube_id']);
+        JsonResponse::success(self::mapRow($row));
+    }
+
     public static function create(Request $request)
     {
         $user = AuthMiddleware::authenticate($request, true);

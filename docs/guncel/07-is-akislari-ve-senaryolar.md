@@ -2,7 +2,7 @@
 
 ## Is Akislari ve Senaryolar
 
-Sürüm: `V1`
+Sürüm: `V2` (Ürün Reset — S70A)
 
 ## Belgenin Amaci
 
@@ -13,8 +13,10 @@ Bu belge şu sorulara cevap verir:
 
 - bir personel eklenince ne olur?
 - süreç girişi hangi etkiyi üretir?
-- bildirim nasıl ele alınır?
-- hafta kapanınca hangi kayıtlar kilitlenir?
+- günlük amir bildirimi nasıl işlenir?
+- haftalık mutabakat ve teknik kapanış nasıl ilerler?
+- aylık onay zinciri nasıl tamamlanır?
+- bordro ön izleme ne zaman oluşur?
 - kullanıcı ekranlarda hangi sırayla ilerler?
 
 ## Dokumanin Siniri
@@ -31,13 +33,13 @@ Bu dosya:
 - hesap algoritmasının sahibi değildir
 - component piksel sözleşmesinin sahibi değildir
 
-Detay gerektiğinde sırasıyla `05-state-flow-api-kontrati.md`, `04-hesap-motoru-kurallari.md` ve `03-ui-bilesen-sozlesmesi.md` açılır.
+Detay gerektiğinde sırasıyla `05-state-flow-api-kontrati.md`, `04-hesap-motoru-kurallari.md`, `09-rol-yetki-matrisi.md` ve `03-ui-bilesen-sozlesmesi.md` açılır.
 
 ## 1. Yeni Personel Ekleme Senaryosu
 
 ### 1.1 Tetikleyici
 
-Yetkili kullanıcı `Yeni Personel` aksiyonunu açar.
+Yetkili kullanıcı (`GENEL_YONETICI`, `BOLUM_YONETICISI`, `MUHASEBE`) `Yeni Personel` aksiyonunu açar.
 
 ### 1.2 Akış
 
@@ -84,6 +86,7 @@ Yetkili kullanıcı devamsızlık, hastalık raporu veya benzeri yokluk sürecin
 
 - Süreç tipi seçilir.
 - Tarih aralığı ve gerekli açıklamalar girilir.
+- Hastalık raporunda şirket varsayılanı ve süreç bazlı override (`ilk_iki_gun_firma_oder_mi`) uygulanır.
 - Backend, süreç tipine göre puantaj ve hak ediş etkisini belirler.
 - Kayıt sonrası ilgili günler puantaj ekranında yokluk etkisiyle görünür.
 
@@ -93,108 +96,235 @@ Yetkili kullanıcı devamsızlık, hastalık raporu veya benzeri yokluk sürecin
 - İlgili hesap başlıkları `04-hesap-motoru-kurallari.md` kurallarına göre üretilir.
 - Manuel kullanıcı yorumu ile sistem hesabı birbirine karışmaz.
 
-## 4. Gunluk Durum Bildirimi ve Bildirim Degerlendirme Senaryosu
+## 4. Gunluk BIRIM_AMIRI Bildirimi Senaryosu
 
 ### 4.1 Tetikleyici
 
-Birim Amiri Rolü (`BIRIM_AMIRI`) ile oturum acmis bir kullanici gunluk durum girmek ister ya da kullanici header sag ustteki bildirim ikonundan paneli acar.
+`BIRIM_AMIRI` oturum açmış kullanıcı günlük durum girmek ister.
 
 ### 4.2 Akış
 
-- Bu roldeki kullanici `Bildirimler` ekranindan personel secer.
-- Sistem secilen personelin bolumunu ve hizli iletisim bilgilerini ayni ekranda gosterir.
-- Amir `GEC_GELDI`, `GELMEDI`, `IZINLI_GELMEDI`, `IZINSIZ_GELMEDI` veya `RAPORLU` tiplerinden birini secerek kayit girer.
-- Gunluk durum bildirimi bildirim kaydi olarak yazilir; surece otomatik donusmez.
-- Sistem okunmamis bildirimleri listeler.
-- Kullanici bildirimi okur, gerekirse ilgili ekrana gider.
-- Bildirim ilk surumde otomatik surece donusmez.
-- Operasyon gerekiyorsa kullanici ilgili surec veya kayit ekraninda ayri islem yapar.
+- Kullanıcı `Günlük Kayıt Merkezi` ekranından kendi kapsamındaki personeli seçer.
+- Sistem seçilen personelin bölümünü ve hızlı iletişim bilgilerini gösterir.
+- Amir `GEC_GELDI`, `GELMEDI`, `IZINLI_GELMEDI`, `IZINSIZ_GELMEDI`, `RAPORLU` veya görevde/erken çıktı gibi tiplerden birini seçerek kayıt girer.
+- Kayıt önce `TASLAK`, gönderimde `GONDERILDI` state'ine geçer.
+- Cut-off sonrası gönderim `GEC_GONDERILDI` olarak işaretlenir.
+- Kayıt sürece otomatik dönüşmez; operasyonel ham veri olarak kalır.
+- Onaylı kayıtlar puantaj/bordro hesap zincirinin girdisi olabilir.
 
 ### 4.3 Sistem Etkisi
 
-- Bu rol personel kartindaki telefon, acil durum kisisi, acil telefon ve kan grubu gibi bilgilere hizli ulasir.
-- Bildirimin okunma durumu guncellenir (`okundu_mi`, `PUT /api/bildirimler/{bildirimId}`; ayrinti `05-state-flow-api-kontrati.md`).
-- Takvim hatirlatmalari (or. maas / SGK) kayit tabanli bildirim degildir; okundu bilgisi yalnizca istemci oturumunda tutulur.
-- Bildirim ile surec kaydi birbirine otomatik baglanmaz.
-- Uyari katmani ile islem katmani bilincli olarak ayrilir.
+- Operasyonel günlük kayıt oluşur.
+- `BOLUM_YONETICISI` haftalık mutabakat öncesi kayıtları denetler.
+- Header bildirim paneli bu kayıt tipinden ayrıdır; panel yalnızca sistem uyarıları ve okunma durumu için kullanılır.
 
-## 5. Isten Ayrilma Senaryosu
+### 4.4 Bildirim Katmanlarının Ayrımı
+
+| Katman | Örnek | Operasyonel veri mi? |
+|--------|-------|----------------------|
+| Günlük amir bildirimi | “Ayşe bugün geç geldi” | Evet |
+| Sistem notification paneli | Okunmamış kayıt, hatırlatma | Hayır |
+| Takvim hatırlatması (maaş/SGK) | İstemci oturum uyarısı | Hayır |
+
+## 5. Gec Bildirim ve Duzeltme Istendi Senaryosu
 
 ### 5.1 Tetikleyici
 
-Yetkili kullanıcı personel için `İşten Ayrılma` süreci başlatır.
+`BIRIM_AMIRI` cut-off sonrası kayıt gönderir veya `BOLUM_YONETICISI` hatalı kayıt tespit eder.
 
 ### 5.2 Akış
+
+- Geç gönderim `GEC_GONDERILDI` state'i ile audit izi bırakır.
+- `BOLUM_YONETICISI` düzeltme isterse kayıt `DUZELTME_ISTENDI` olur.
+- `BIRIM_AMIRI` kaydı düzeltir ve yeniden gönderir.
+- Haftalık mutabakata alınmış kayıt doğrudan düzenlenemez; revizyon akışı gerekir.
+
+### 5.3 Sistem Etkisi
+
+- Audit trail korunur.
+- Haftalık mutabakat paketi güncellenene kadar bordro etkisi üretilmez.
+
+## 6. Haftalik A4/Imza Mutabakat Senaryosu
+
+### 6.1 Tetikleyici
+
+Hafta sonunda `BOLUM_YONETICISI` haftalık özeti kontrol eder.
+
+### 6.2 Akış
+
+- Sistem haftanın günlük amir bildirimlerini, süreç ve puantaj verisiyle çapraz kontrol eder.
+- Eksik veya çelişkili kayıt varsa `CELISKI_VAR` veya `MANUEL_INCELEME` üretilir.
+- Sorun yoksa A4 mutabakat çıktısı üretilir; amir imza/onay metadata'sı kaydedilir.
+- Onay sonrası state `MUTABAKAT_TAMAMLANDI` olur.
+- Ardından sistem teknik kapanış/snapshot üretir (`TEKNIK_KAPANIS_YAPILDI`).
+
+### 6.3 Sistem Etkisi
+
+- Hafta operasyonel olarak onaylanmış sayılır.
+- Aylık bölüm onayı için önkoşul sağlanır.
+- Teknik kapanış sonrası hafta düzenlemeye kapanır.
+
+## 7. Celiskili Kayit Manuel Inceleme Senaryosu
+
+### 7.1 Tetikleyici
+
+Günlük bildirim, süreç ve puantaj verisi çelişir veya mevzuat/şirket parametresi belirsizdir.
+
+### 7.2 Akış
+
+- Sistem satırı `MANUEL_INCELEME` olarak işaretler.
+- `GENEL_YONETICI` veya yetkili kullanıcı kaynağı düzeltir, süreç ekler veya kaydı bordro dışı bırakır.
+- Çözüm audit'e yazılır.
+- Açık manuel inceleme varken bordro kesinleşmez.
+
+### 7.3 Sistem Etkisi
+
+- Yanlış otomatik bordro üretimi engellenir.
+- Denetim izi korunur.
+
+## 8. Aylik BOLUM_YONETICISI Onay Senaryosu
+
+### 8.1 Tetikleyici
+
+Ay sonunda `BOLUM_YONETICISI` aylık özeti açar.
+
+### 8.2 Akış
+
+- Sistem ilgili ay için haftalık mutabakatların tamamlanıp tamamlanmadığını kontrol eder.
+- Eksik hafta varsa onay butonu devre dışı kalır veya `409` döner.
+- Amir tüm haftaları ve personel satırlarını kontrol eder.
+- Onay verildiğinde satırlar `BOLUM_ONAYLANDI` olur.
+
+### 8.3 Sistem Etkisi
+
+- Genel yönetici onayı için önkoşul sağlanır.
+- Bordro ön izleme henüz üretilmez.
+
+## 9. GENEL_YONETICI Bordro Oncesi Onay Senaryosu
+
+### 9.1 Tetikleyici
+
+Tüm bölümler `BOLUM_ONAYLANDI` durumuna geçtikten sonra `GENEL_YONETICI` ay kapanışını değerlendirir.
+
+### 9.2 Akış
+
+- Sistem açık manuel inceleme ve eksik şirket parametresi kontrolü yapar.
+- Genel yönetici özet raporu inceler.
+- Onay verildiğinde state `GENEL_YONETICI_ONAYLANDI` olur.
+- Bordro ön izleme üretilebilir hale gelir.
+
+### 9.3 Sistem Etkisi
+
+- Nihai bordro üretimi için operasyonel kapı açılır.
+- Patron ack henüz zorunlu değildir ve bordroyu bloklamaz.
+
+## 10. PATRON Gordu / Not Ekledi Senaryosu
+
+### 10.1 Tetikleyici
+
+`PATRON` aylık genel durum özetini görüntüler.
+
+### 10.2 Akış
+
+- Patron özet raporu ve bordro ön izlemeyi salt okunur görür.
+- “Gördüm” işaretler (`GORULDU`) veya not ekler (`NOT_EKLENDI`).
+- Operasyonel düzeltme veya onay vermez.
+
+### 10.3 Sistem Etkisi
+
+- Sembolik üst yönetim görünürlüğü sağlanır.
+- Bordro state'i değişmez; üretim bloklanmaz.
+
+## 11. Bordro On Izleme Olusma Senaryosu
+
+### 11.1 Tetikleyici
+
+`GENEL_YONETICI_ONAYLANDI` state'i sağlandıktan sonra `MUHASEBE` veya `GENEL_YONETICI` bordro ön izlemeyi açar.
+
+### 11.2 Akış
+
+- Backend hesap motoru puantaj, süreç, onaylı bildirim ve finans adaylarını birleştirir.
+- Her satır mevzuat / şirket parametresi / manuel inceleme sınıfı taşır.
+- Ceza/kesinti kalemleri otomatik nihai bordroya bağlanmaz; ayrı işaretlenir.
+- Ön izleme raporu ve kontrol listesi üretilir.
+
+### 11.3 Sistem Etkisi
+
+- `BORDRO_ON_IZLEME_HAZIR` state'i oluşur.
+- Muhasebe kontrolü yapılır; kesinleştirme ayrı adımdır.
+
+## 12. Parametre Eksikligi Nedeniyle Hesap Kesinlesmeme Senaryosu
+
+### 12.1 Tetikleyici
+
+Hesap motoru zorunlu şirket parametresini bulamaz (ör. hastalık ilk 2 gün firma öder mi varsayılanı tanımsız).
+
+### 12.2 Akış
+
+- Motor satırı `MANUEL_INCELEME` veya `PARAMETRE_EKSIK` olarak işaretler.
+- Bordro kesinleştirme engellenir (`409 COMPANY_PARAM_MISSING`).
+- `GENEL_YONETICI` şirket parametrelerini tanımlar veya günceller.
+- Hesap yeniden çalıştırılır.
+
+### 12.3 Sistem Etkisi
+
+- Parametresiz kesin bordro üretilmez.
+- Denetlenebilirlik korunur.
+
+## 13. Isten Ayrilma Senaryosu
+
+### 13.1 Tetikleyici
+
+Yetkili kullanıcı personel için `İşten Ayrılma` süreci başlatır.
+
+### 13.2 Akış
 
 - Ayrılış tarihi ve gerekli açıklama girilir.
 - Backend süreç kaydını oluşturur.
 - Aynı işlem içinde personel kartının durumu `PASIF` olur.
 - Personel aktif listelerde görünmez, ancak geçmiş ve rapor tarafında erişilebilir kalır.
 
-### 5.3 Sistem Etkisi
+### 13.3 Sistem Etkisi
 
 - Süreç kaydı tarihsel olarak tutulur.
-- Kart alanına doğrudan yazılan bir ayrılış flag'i kullanılmaz.
-- Sonraki puantaj ve kapanış işlemleri pasif durum dikkate alınarak yürür.
+- Sonraki puantaj, mutabakat ve bordro işlemleri pasif durum dikkate alınarak yürür.
 
-## 6. Gunluk Puantaj Isleme Senaryosu
+## 14. Gunluk Puantaj Isleme Senaryosu
 
-### 6.1 Tetikleyici
+### 14.1 Tetikleyici
 
-Yetkili kullanıcı günlük puantaj ekranını açar ya da sistem süreç etkileri sonrası günleri yeniden hesaplar.
+Yetkili kullanıcı (`BOLUM_YONETICISI`, `GENEL_YONETICI`, `MUHASEBE`) günlük puantaj ekranını açar veya sistem süreç/bildirim etkileri sonrası günleri yeniden hesaplar.
 
-### 6.2 Akış
+### 14.2 Akış
 
-- Gün bazlı çalışma, yokluk ve özel durum verileri okunur.
+- Gün bazlı çalışma, yokluk ve onaylı bildirim verileri okunur.
 - Backend günlük süre, mola, fazla çalışma, hafta tatili etkisi gibi hesapları üretir.
 - Şüpheli veya manuel inceleme gereken satırlar işaretlenir.
-- Kullanıcı gerekli ise düzeltme kaydı ya da süreç girişi ile veri kaynağını düzeltir.
+- `BIRIM_AMIRI` puantaj güncellemez; yalnızca görüntüleme ve amir kontrol işaretleri kullanabilir.
 
-### 6.3 Sistem Etkisi
+### 14.3 Sistem Etkisi
 
-- Günlük puantaj satırları canlı çalışma katmanı olarak davranır.
-- Hesap motoru sonuçları kullanıcıya okunur alanlar olarak sunulur.
+- Günlük puantaj satırları hesap motoru girdisi olarak davranır.
 - Hatalı veri formül yamasıyla değil, veri kaynağı düzeltilerek çözülür.
 
-## 7. Haftalik Kapanis Senaryosu
+## 15. Rapor Alma Senaryosu
 
-### 7.1 Tetikleyici
-
-Yetkili kullanıcı belirli bir hafta için kapanış alır.
-
-### 7.2 Akış
-
-- Sistem ilgili hafta verisini toplar.
-- Eksik veya problemli kayıtlar varsa kullanıcı uyarılır.
-- Kapanış onayı verildiğinde backend haftayı mühürler.
-- Haftaya ait puantaj ve özet alanlar kilitlenir.
-- Rapor ve çıktı katmanı kapanış verisini temel alır.
-
-### 7.3 Sistem Etkisi
-
-- `haftalik_kapanis` kaydı oluşur.
-- Haftaya ait kritik kayıtlar düzenlemeye kapanır.
-- Sonradan değişiklik ihtiyacı varsa kontrollü yeniden açma akışı gerekir.
-
-## 8. Rapor Alma Senaryosu
-
-### 8.1 Tetikleyici
+### 15.1 Tetikleyici
 
 Yetkili kullanıcı rapor ekranını filtrelerle çalıştırır.
 
-### 8.2 Akış
+### 15.2 Akış
 
 - Kullanıcı tarih, departman, personel veya durum filtresi seçer.
-- Sistem ilgili kaynak tablolardan veriyi toplar.
+- Sistem onaylı veri katmanlarından (mutabakat snapshot, aylık özet, bordro ön izleme) veriyi toplar.
 - Liste, özet veya çıktı görünümü oluşturulur.
-- Gerekirse kapanış verisi öncelikli kaynak olarak kullanılır.
+- Rol bazlı yoğunluk farkı uygulanır (`PATRON` özet, `MUHASEBE` detay).
 
-### 8.3 Sistem Etkisi
+### 15.3 Sistem Etkisi
 
 - Rapor ekranı ham form girişini değil, doğrulanmış veri katmanını sunar.
-- Aynı rapor farklı roller için farklı yoğunlukta gösterilebilir.
 
 ## Sonuc
 
 Bu belge ürünün operasyonel akış beynidir.
-Bir işin kullanıcı adımıyla başlayıp hangi kayıt ve etkiye dönüştüğünü tek bakışta anlamak için önce buraya bakılır.
+Bir işin kullanıcı adımıyla başlayıp hangi kayıt, onay ve bordro etkisine dönüştüğünü tek bakışta anlamak için önce buraya bakılır.

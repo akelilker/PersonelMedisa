@@ -2,7 +2,7 @@
 
 ## State Flow + API Contract
 
-Sürüm: `V1`
+Sürüm: `V2` (Ürün Reset — S70A)
 
 ## Belgenin Amacı
 
@@ -28,18 +28,38 @@ Kural:
 - frontend hiçbir kaydı “gerçekten aktif oldu” varsayımıyla kendi kendine karar vermez
 - state'in tek sahibi backend'dir
 
-## V1 Kararı
+## Ürün Reset Kararı (S70A)
 
-İlk sürümde varsayılan veri yaşam döngüsü sade tutulur:
+Ürün reset sonrası veri yaşam döngüsü çok aşamalı onay zinciri taşır. Personel ve süreç gibi temel kayıtlar hızlı yazılır; puantaj, mutabakat, aylık onay ve bordro katmanları sıralı state guard ile ilerler.
 
-- `taslak` katmanı yok
-- `çok aşamalı onay` akışı yok
-- kayıt başarıyla validasyondan geçtiği anda aktif veri olarak sisteme yazılır
+### Eski V1 kararı (tarihsel — arşiv)
 
-İstisnalar:
+Önceki V1 kararında “taslak katmanı yok”, “çok aşamalı onay akışı yok” ve “kayıt validasyondan geçince anında aktif” ifadeleri kullanılmıştı. Ürün reset ile bu yaklaşım **personel/süreç temel kayıtları** için korunur; **günlük bildirim, haftalık mutabakat, aylık onay ve bordro** katmanları için geçerli değildir.
 
-- `haftalik_kapanis` mühür mantığı taşır
-- gelecekte eklenecek bordro kapanışı daha sert kilit mantığı taşıyabilir
+### Kritik state guard kuralları
+
+Backend aşağıdaki geçişleri zorunlu kılar:
+
+| Kural | Davranış |
+|-------|----------|
+| Haftalık mutabakat | `MUTABAKAT_TAMAMLANDI` olmadan aylık bölüm onayı verilemez → `409 APPROVAL_CHAIN_BLOCKED` |
+| Bölüm onayı | Tüm ilgili satırlar `BOLUM_ONAYLANDI` olmadan genel yönetici onayı verilemez → `409 APPROVAL_CHAIN_BLOCKED` |
+| Genel yönetici onayı | `GENEL_YONETICI_ONAYLANDI` olmadan nihai bordro oluşmaz → `409 PAYROLL_NOT_APPROVED` |
+| Patron ack | `GORULDU` / `NOT_EKLENDI` bordro üretimini bloklamaz |
+| Manuel inceleme | Açık `MANUEL_INCELEME` kayıtları çözülmeden bordro kesinleşmez → `409 MANUAL_REVIEW_PENDING` |
+| Şirket parametresi | Zorunlu parametre eksikse hesap/bordro kesinleşmez → `409 COMPANY_PARAM_MISSING` |
+
+### Onay zinciri özeti
+
+```text
+Günlük Bildirim (BIRIM_AMIRI)
+  -> Haftalık Mutabakat (BOLUM_YONETICISI)
+  -> Teknik Kapanış (sistem)
+  -> Aylık Bölüm Onayı (BOLUM_YONETICISI)
+  -> Genel Yönetici Onayı (GENEL_YONETICI)
+  -> Bordro Ön İzleme / Kesinleştirme
+  -> Patron Ack (sembolik, paralel veya sonrası — bloklamaz)
+```
 
 ## 1. Ortak API Sözleşmesi
 
@@ -446,25 +466,64 @@ Yanıt içinde şu bilgi açıkça dönmelidir:
 }
 ```
 
-## 8. Bildirim Kaydı State Flow
+## 8. Günlük Amir Bildirimi State Flow
 
-### 8.1 V1 Kararı
+### 8.1 Ürün Kararı
 
-Bildirim modülü, süreç modülünden ayrıdır.
+Günlük amir bildirimi modülü, süreç modülünden ve sistem notification katmanından ayrıdır.
 
-İlk sürüm kararı:
+Kararlar:
 
-- `bildirim` kaydı otomatik olarak `süreç` kaydına dönüşmez
-- bildirim günlük veri toplama alanı olarak çalışır
+- operasyonel günlük kayıt, `BIRIM_AMIRI` tarafından girilir
+- kayıt otomatik olarak `süreç` kaydına dönüşmek zorunda değildir
+- onaylı günlük bildirim, puantaj/bordro hesap zincirinin ham verisi olabilir
+- header bildirim paneli ve takvim hatırlatmaları bu kayıt tipinden ayrıdır
 
-İleride manuel dönüştürme veya otomatik eşleme eklenebilir.
+### 8.2 State Modeli — Günlük Bildirim
 
-### 8.2 State Modeli
+| State | Açıklama |
+|-------|----------|
+| `TASLAK` | Amir kaydı oluşturdu; henüz gönderilmedi |
+| `GONDERILDI` | Normal sürede gönderildi |
+| `GEC_GONDERILDI` | Cut-off sonrası gönderildi; audit izi bırakır |
+| `DUZELTME_ISTENDI` | `BOLUM_YONETICISI` düzeltme talep etti |
+| `HAFTALIK_MUTABAKATA_ALINDI` | Haftalık mutabakat paketine dahil edildi; doğrudan düzenleme kısıtlanır |
 
-V1 bildirim state'leri:
+İptal edilen kayıtlar fiziksel silinmez; `IPTAL` state veya eşdeğer audit kaydı tutulur (geriye uyumluluk).
 
-- `AKTIF`
-- `IPTAL`
+### 8.2.1 State Modeli — Haftalık Mutabakat
+
+| State | Açıklama |
+|-------|----------|
+| `HAFTA_ACIK` | Hafta henüz toplanmadı |
+| `BILDIRIMLER_TOPLANIYOR` | Günlük bildirimler haftaya bağlanıyor |
+| `A4_MUTABAKAT_BEKLIYOR` | A4 çıktı/imza mutabakatı bekleniyor |
+| `CELISKI_VAR` | Bildirim, süreç veya puantaj çelişkisi tespit edildi |
+| `MANUEL_INCELEME` | Çelişki veya eksik veri manuel incelemeye alındı |
+| `MUTABAKAT_TAMAMLANDI` | Amir mutabakatı tamamlandı; aylık onay önkoşulu sağlandı |
+| `TEKNIK_KAPANIS_YAPILDI` | Snapshot/mühür üretildi; hafta teknik olarak kilitlendi |
+
+### 8.2.2 State Modeli — Aylık Onay
+
+| State | Açıklama |
+|-------|----------|
+| `AY_ACIK` | Ay operasyonel olarak açık |
+| `BOLUM_ONAYI_BEKLIYOR` | Haftalık mutabakatlar tamamlanmadı veya bölüm onayı bekleniyor |
+| `BOLUM_ONAYLANDI` | `BOLUM_YONETICISI` bölüm onayını verdi |
+| `GENEL_YONETICI_ONAYI_BEKLIYOR` | Bölüm onayı tamam; üst onay bekleniyor |
+| `GENEL_YONETICI_ONAYLANDI` | `GENEL_YONETICI` bordro öncesi onayı verdi |
+| `BORDRO_ON_IZLEME_HAZIR` | Hesap motoru ön izleme üretebilir |
+| `BORDRO_KESINLESTI` | Nihai bordro kesinleşti |
+
+### 8.2.3 State Modeli — Patron Ack
+
+| State | Açıklama |
+|-------|----------|
+| `GORULMEDI` | Patron henüz görmedi |
+| `GORULDU` | Patron gördü olarak işaretledi |
+| `NOT_EKLENDI` | Patron not ekledi |
+
+Patron ack state'i bordro üretimini teknik olarak engellemez.
 
 ### 8.3 Oluşturma
 
@@ -570,18 +629,30 @@ Yanıt:
 - mühürlü güne doğrudan yazılamaz
 - backend `409 PERIOD_LOCKED` döner
 
-## 10. Haftalık Kapanış State Flow
+## 10. Haftalık Mutabakat ve Teknik Kapanış State Flow
 
 ### 10.1 Amaç
 
-Haftalık kapanış, haftanın özetini mühürleyen işlemdir.
-Bu işlem sadece rapor üretmek için değil, veri bütünlüğü için vardır.
+Haftalık süreç iki katmandan oluşur:
 
-### 10.2 Endpoint
+1. **Haftalık mutabakat (operasyonel):** `BOLUM_YONETICISI`, `BIRIM_AMIRI` günlük bildirimlerini ve haftalık özeti A4/imza mutabakatı ile onaylar.
+2. **Teknik kapanış (sistem):** Onaylı hafta için snapshot üretilir ve hafta mühürlenir.
+
+Teknik kapanış, operasyonel mutabakatın yerine geçmez. Mutabakat tamamlanmadan teknik kapanış tetiklenemez.
+
+### 10.2 Endpoint'ler (hedef kontrat)
+
+Operasyonel mutabakat (kod fazında eklenecek):
+
+- `GET /api/haftalik-mutabakat` — hafta özeti listesi
+- `POST /api/haftalik-mutabakat/{haftaId}/onay` — `BOLUM_YONETICISI` mutabakat onayı
+- `POST /api/haftalik-mutabakat/{haftaId}/duzeltme-iste` — düzeltme talebi
+
+Teknik kapanış (mevcut):
 
 - `POST /api/haftalik-kapanis`
 
-İstek:
+İstek örneği:
 
 ```json
 {
@@ -591,30 +662,84 @@ Bu işlem sadece rapor üretmek için değil, veri bütünlüğü için vardır.
 }
 ```
 
-### 10.3 Backend Akışı
+Önkoşul: ilgili hafta `MUTABAKAT_TAMAMLANDI` state'inde olmalıdır.
 
-Backend bu işlemde:
+### 10.3 Backend Akışı — Mutabakat
 
-1. ilgili haftanın günlük puantajlarını toplar
-2. süreç kayıtlarını bindirir
-3. hafta tatili hakkını hesaplar
-4. fazla çalışma / fazla sürelerle çalışma değerlerini çıkarır
-5. snapshot üretir
-6. haftayı `KAPANDI` olarak işaretler
+1. ilgili haftanın günlük amir bildirimlerini toplar
+2. süreç ve puantaj kayıtlarıyla çapraz kontrol yapar
+3. çelişki varsa `CELISKI_VAR` veya `MANUEL_INCELEME` üretir
+4. `BOLUM_YONETICISI` onayı ile `MUTABAKAT_TAMAMLANDI` yazar
+5. A4 çıktı ve imza metadata'sını audit'e bağlar
 
-### 10.4 State Modeli
+### 10.4 Backend Akışı — Teknik Kapanış
 
-Önerilen state'ler:
+1. mutabakat state doğrulanır
+2. ilgili haftanın puantaj ve süreç verisini toplar
+3. hesap motorunu tetikler
+4. personel × hafta snapshot üretir
+5. haftayı `TEKNIK_KAPANIS_YAPILDI` olarak işaretler
 
-- `ACIK`
-- `KAPANDI`
+### 10.5 Kilit Kuralları
 
-V1 kararı:
+- `MUTABAKAT_TAMAMLANDI` olmadan teknik kapanış yapılamaz
+- teknik kapanış sonrası hafta normal kullanıcı için yeniden açılmaz
+- değişiklik ihtiyacı revizyon talebi akışı ile yürür (`51-haftalik-kapanis-revizyon-talebi-karar.md`)
 
-- kapanan hafta normal kullanıcı için yeniden açılmaz
-- yeniden açma gerekiyorsa sonraki fazda admin akışı tasarlanır
+## 11. Aylık Onay, Bordro ve Patron Ack State Flow
 
-## 11. Ek Ödeme / Kesinti Contract'ı
+### 11.1 Aylık Bölüm Onayı
+
+Endpoint (mevcut — revize edilecek):
+
+- `GET /api/yonetim/aylik-ozet`
+- `POST /api/yonetim/aylik-ozet/bolum-onay`
+
+Yetki: `BOLUM_YONETICISI` (`aylik_bolum_onayi.approve`)
+
+Önkoşul: ilgili ay için tüm haftalar `MUTABAKAT_TAMAMLANDI` (ve tercihen `TEKNIK_KAPANIS_YAPILDI`) olmalıdır.
+
+Başarı sonucu: satırlar `BOLUM_ONAYLANDI` state'ine geçer.
+
+### 11.2 Genel Yönetici Bordro Öncesi Onayı
+
+Endpoint (mevcut — revize edilecek):
+
+- `POST /api/yonetim/aylik-ozet/ay-kapat`
+
+Yetki: `GENEL_YONETICI` (`genel_yonetici_onayi.approve`)
+
+Önkoşul: ilgili kapsamda tüm satırlar `BOLUM_ONAYLANDI` olmalıdır; aksi halde `409 APPROVAL_CHAIN_BLOCKED`.
+
+Başarı sonucu: `GENEL_YONETICI_ONAYLANDI`; bordro ön izleme üretilebilir.
+
+### 11.3 Bordro Ön İzleme ve Kesinleştirme
+
+Hedef endpoint'ler (kod fazında):
+
+- `GET /api/bordro/on-izleme` — `MUHASEBE`, `GENEL_YONETICI`
+- `POST /api/bordro/kesinlestir` — yalnız `GENEL_YONETICI`; açık manuel inceleme ve eksik parametre yok
+
+Önkoşullar:
+
+- `GENEL_YONETICI_ONAYLANDI`
+- zorunlu şirket parametreleri tanımlı
+- açık `MANUEL_INCELEME` kaydı yok
+
+### 11.4 Patron Ack
+
+Hedef endpoint'ler (kod fazında):
+
+- `GET /api/patron-ozet` — `PATRON`, `GENEL_YONETICI`
+- `POST /api/patron-ozet/ack` — `PATRON` (`patron_ack.mark_seen`)
+
+Davranış:
+
+- `GORULDU` veya `NOT_EKLENDI` yazar
+- bordro state'ini değiştirmez; üretimi bloklamaz
+- audit izi bırakır
+
+## 12. Ek Ödeme / Kesinti Contract'ı
 
 ### 11.1 Kaynak
 
@@ -639,7 +764,7 @@ Prim, ceza, avans ve benzeri kalemler ana kartın değil dönemsel finans katman
 }
 ```
 
-## 12. Referans Veri Contract'ı
+## 13. Referans Veri Contract'ı
 
 İlk sürümde aşağıdaki referans veriler ayrı endpoint ile okunmalıdır:
 
@@ -655,7 +780,7 @@ Kural:
 - form açıldığında dropdown'lar hardcode ile doldurulmaz
 - referans veri API'den gelir
 
-## 13. Rapor Ekranı Contract'ı
+## 14. Rapor Ekranı Contract'ı
 
 ### 13.1 Temel Endpoint'ler
 
@@ -828,7 +953,7 @@ Bu kontrat fazında hedeflenmeyenler:
 
 **Not:** `kapanis_id` query param desteği mock/type/API kod fazında §13.5 kararlarına göre eklenebilir; bu maddeler kapsam dışı değildir.
 
-## 14. Ekran -> Endpoint Haritası
+## 15. Ekran -> Endpoint Haritası
 
 ### 14.1 Yeni Personel Ekle
 
@@ -871,16 +996,23 @@ Bu kontrat fazında hedeflenmeyenler:
 
 - ilgili `GET /api/raporlar/*` endpoint'leri
 
-## 15. Kilit ve Düzenleme Kuralları
+## 16. Kilit ve Düzenleme Kuralları
 
-V1 kilit kuralları:
+Onay zinciri ve kilit kuralları:
 
-- kapanmış hafta içindeki puantaj düzenlenemez
+- haftalık mutabakat tamamlanmadan aylık bölüm onayı verilemez
+- bölüm onayı tamamlanmadan genel yönetici onayı verilemez
+- genel yönetici onayı tamamlanmadan nihai bordro oluşmaz
+- patron ack bordroyu bloklamaz
+- açık manuel inceleme varken bordro kesinleşmez
+- zorunlu şirket parametresi eksikse hesap kesinleşmez
+- mutabakat tamamlanmadan teknik haftalık kapanış yapılamaz
+- teknik kapanış sonrası kapanmış hafta içindeki puantaj düzenlenemez
 - kapanmış haftayı etkileyen süreç düzenlemesi `409` döner
 - iptal işlemi fiziksel silme yerine state değişimi ile yapılır
 - işten ayrılma sonrası personel aktif listeden düşer
 
-## 16. Backend'in Zorunlu Olarak Yaptığı Şeyler
+## 17. Backend'in Zorunlu Olarak Yaptığı Şeyler
 
 Backend sadece veriyi kaydetmez; ayrıca:
 
@@ -891,7 +1023,7 @@ Backend sadece veriyi kaydetmez; ayrıca:
 - read model veya snapshot üretir
 - audit izi bırakır
 
-## 17. Frontend'in Yapmaması Gereken Şeyler
+## 18. Frontend'in Yapmaması Gereken Şeyler
 
 Frontend aşağıdakileri kendi başına yapmaz:
 
@@ -901,27 +1033,39 @@ Frontend aşağıdakileri kendi başına yapmaz:
 - referans verileri hardcode etmek
 - state geçişini yalnızca buton rengine bakarak tahmin etmek
 
-## 18. V1'de Özellikle Netleştirilen Kararlar
+## 19. Ürün Reset Sonrası Netleştirilen Kararlar
 
 Bu belge ile aşağıdaki kritik kararlar sabitlenmiştir:
 
-- V1'de `taslak/onay` akışı yoktur
-- `bildirim`, `süreç`e otomatik dönüşmez
+- günlük amir bildirimi operasyonel veri katmanıdır; sürece otomatik dönüşmek zorunda değildir
+- haftalık mutabakat, teknik kapanıştan önce gelir
+- aylık onay zinciri zorunludur; atlama backend tarafından reddedilir
+- patron ack semboliktir; bordroyu bloklamaz
+- manuel inceleme ve eksik şirket parametresi bordro kesinleşmesini engeller
 - `işten ayrılma` kaydı personeli anında `PASIF` yapar
 - `iptal` fiziksel silme değildir
-- `haftalik_kapanis` haftayı mühürler
 - referans veriler API üzerinden gelir
+- frontend nihai hesap yapmaz
 
-## 19. V1 Dışı Ama Sonraki Faz İçin Açık Bırakılan Konular
+### 19.1 Tarihsel V1 kararları (arşiv)
 
-- süreç onay akışı
-- bildirimden süreç üretme
-- haftalık kapanışı geri açma
-- bordro dönemi kapanışı
-- detaylı audit ekranı
-- webhook / event bus yapısı
+Aşağıdaki ifadeler ürün reset öncesi V1 için geçerliydi; artık **onay/bordro katmanları** için geçerli değildir:
 
-## 20. Sonuç
+- “V1'de taslak/onay akışı yoktur”
+- “kayıt validasyondan geçince anında aktif” (yalnızca personel/süreç temel kayıtları için korunur)
+
+## 20. Kod Fazlarında Açılacak Konular
+
+- haftalık mutabakat API ve UI
+- patron rolü ve ack endpoint'leri
+- şirket parametreleri API
+- bordro ön izleme ve kesinleştirme endpoint'leri
+- günlük bildirim → puantaj ham veri bağlantısı
+- mevcut `ay-kapat` endpoint'inin onay zinciri guard revizyonu
+- detaylı sunucu tarafı audit ekranı
+- webhook / event bus yapısı (opsiyonel)
+
+## 21. Sonuç
 
 Bu belge, sistemin veri damar haritasıdır.
 

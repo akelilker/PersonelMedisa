@@ -2,7 +2,7 @@
 
 ## Hesap Motoru Kural Dokümanı
 
-Sürüm: `V1`
+Sürüm: `V2` (Ürün Reset — S70A)
 
 ## Belgenin Amacı
 
@@ -31,15 +31,13 @@ Bu doküman:
 
 tanımlar.
 
-Bu doküman şunları tam çözmez:
+Bu doküman şunları tam çözmez (ayrı belgelerde):
 
 - ekran yerleşimi
-- API endpoint listesi
-- state machine / onay akışı
-- tam net maaş bordro matematiği
+- API endpoint listesi (state machine / onay akışı → `05-state-flow-api-kontrati.md`)
 - banka TXT/Excel formatının kolon bazlı şeması
 
-Bu başlıklar sonraki belgelerde detaylandırılacaktır.
+Bordro matematiği bu belgenin kapsamındadır; kodlama fazlara bölünür (`01-urun-anayasasi.md` §4).
 
 ## Kaynaklar
 
@@ -73,6 +71,57 @@ Kural çatışması olduğunda:
 - mevzuata aykırı kural uygulanmaz
 - mevzuatın izin verdiği alanlarda ürün kararı uygulanır
 - belirsiz alanlar `manuel inceleme` veya `parametre gerektirir` olarak işaretlenir
+
+## Ürün Reset Hesap Motoru İlkeleri (S70A)
+
+Aşağıdaki ilkeler ürün reset sonrası bağlayıcıdır:
+
+### Yetki ve sahiplik
+
+- **Frontend nihai maaş/puantaj hesabı yapamaz.** İstemci yalnızca backend'in döndürdüğü hesap sonuçlarını gösterir; ön izleme bile backend kaynaklı olmalıdır.
+- **Hesap motoru nihai hedefte backend tek yetkilidir.** Geçiş döneminde frontend'te çalışan motorlar kaldırılana kadar backend sonucu esas alınır.
+
+### Sınıflandırma
+
+Her hesap satırı aşağıdaki sınıflardan birine bağlanmalıdır:
+
+| Sınıf | Açıklama |
+|-------|----------|
+| `MEVZUAT_DAYANAKLI` | Resmî mevzuat gereği zorunlu kural |
+| `SIRKET_PARAMETRESI` | İşletme parametresi ile belirlenen alan |
+| `MANUEL_INCELEME` | Eksik/çelişkili veri; otomatik kesinleşmez |
+
+### Kesinleşmeme kuralları
+
+- **Şirket parametresi eksikse sonuç kesinleşmez.** Zorunlu parametre listesi `sirket_parametreleri` katmanında tanımlanır.
+- **Eksik veya çelişkili kayıt `manuel_inceleme` statüsüne düşer.** Açık manuel inceleme varken bordro kesinleşmez.
+- **Ceza/kesinti otomatik nihai bordroya bağlanmaz.** Yüksek riskli kalemler ayrı onay veya manuel işaretleme gerektirir.
+
+### Şirket parametresi — hastalık raporu ilk 2 gün
+
+- `ilk_iki_gun_firma_oder_mi` kararı **şirket parametresi** olarak tanımlanmalıdır (varsayılan değer).
+- Süreç bazlı `ilk_iki_gun_firma_oder_mi` alanı **override** olarak kalır; şirket varsayılanından farklıysa audit izi bırakır.
+- Parametre tanımsızsa hastalık raporu günleri `MANUEL_INCELEME` veya `PARAMETRE_EKSIK` olarak işaretlenir; bordro kesinleşmez.
+
+### Veri girdileri — günlük amir bildirimi
+
+Hesap motoru, onaylı günlük amir bildirimlerini puantaj/süreç verisiyle birlikte değerlendirir:
+
+- `GONDERILDI` / `HAFTALIK_MUTABAKATA_ALINDI` state'indeki bildirimler ham veri adayıdır
+- `TASLAK`, `DUZELTME_ISTENDI`, `IPTAL` kayıtları hesaba dahil edilmez
+- Haftalık mutabakat tamamlanmamış haftanın bildirimleri bordro girdisi olamaz
+
+### Onay zinciri önkoşulu
+
+Hesap motoru bordro çıktısı üretmeden önce backend şu state'leri doğrular:
+
+1. İlgili haftalar `MUTABAKAT_TAMAMLANDI`
+2. Aylık satırlar `BOLUM_ONAYLANDI`
+3. Ay `GENEL_YONETICI_ONAYLANDI`
+4. Açık `MANUEL_INCELEME` yok
+5. Zorunlu şirket parametreleri tanımlı
+
+Patron ack (`GORULDU` / `NOT_EKLENDI`) bu önkoşul listesinde yer almaz.
 
 ## 1. Hesap Motorunun Veri Girdileri
 
@@ -542,17 +591,27 @@ SGK'ya göre hastalık halinde geçici iş göremezlik ödeneği:
 - `rapor_turu = hastalik` seçildiğinde sistem prim gün şartı için kontrol alanı veya uyarı üretir
 - ücret etkisi ve SGK ödenek ayrımı sonraki bordro katmanında ayrıca işlenir
 
-#### 11.1.1 İlk 2 gün firma ödemesi (S62A kilit)
+#### 11.1.1 İlk 2 gün firma ödemesi (S62A + S70A)
 
 Yalnızca `Raporlu_Hastalik` için geçerlidir; `Raporlu_Is_Kazasi` ayrı değerlendirilir.
 
-| Alan | Varsayılan | Açıklama |
-|------|------------|----------|
-| `ilk_iki_gun_firma_oder_mi` | `false` | İşletme varsayılan politikası: ilk 2 gün firma ödemez |
+**Şirket parametresi (canonical varsayılan):**
 
-- Kullanıcı rapor girişinde bu değeri değiştirebilmelidir.
-- UI karşılığı (ileride): checkbox — “İlk 2 gün firma tarafından ödenecek mi?”
-- “İlk 2 gün” hesabı günlük puantaj satırı yerine **rapor event / periyot kaydı** üzerinden düşünülmelidir; yalnızca günlük satıra boolean koymak güvenilir periyot takibi için yetersizdir.
+| Parametre | Varsayılan | Açıklama |
+|-----------|------------|----------|
+| `hastalik_ilk_iki_gun_firma_oder_mi` | `false` | İşletme varsayılan politikası |
+
+**Süreç bazlı override:**
+
+| Alan | Rol |
+|------|-----|
+| `ilk_iki_gun_firma_oder_mi` | Tek rapor/süreç için şirket varsayılanından sapma |
+
+Kurallar:
+
+- Şirket parametresi tanımsızsa ilgili günler `MANUEL_INCELEME` veya `PARAMETRE_EKSIK` olarak işaretlenir.
+- Kullanıcı rapor girişinde override değiştirebilir; audit izi zorunludur.
+- “İlk 2 gün” hesabı rapor event / periyot kaydı üzerinden düşünülür.
 
 ### 11.2 İş Kazası
 

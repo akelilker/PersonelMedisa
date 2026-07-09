@@ -123,7 +123,7 @@ test.describe("S45A-2 aylik ozet onay POST (mock-api contract)", () => {
     expect(response.body.data?.items?.some((item) => item.sube === "Depolama")).toBe(true);
   });
 
-  test("GENEL_YONETICI can approve department summary", async ({ page }) => {
+  test("GENEL_YONETICI cannot approve department summary", async ({ page }) => {
     await loginAs(page, "GENEL_YONETICI");
 
     const response = await apiFetch(page, "/api/yonetim/aylik-ozet/bolum-onay", {
@@ -131,8 +131,7 @@ test.describe("S45A-2 aylik ozet onay POST (mock-api contract)", () => {
       body: bolumOnayBody({ sube_id: 1 })
     });
 
-    expect(response.status).toBe(200);
-    expect(response.body.data?.items?.length).toBeGreaterThan(0);
+    expect(response.status).toBe(403);
   });
 
   test("MUHASEBE and BIRIM_AMIRI are denied bolum-onay write", async ({ page }) => {
@@ -169,9 +168,30 @@ test.describe("S45A-2 aylik ozet onay POST (mock-api contract)", () => {
     expect(response.body.errors?.[0]?.field).toBe("ay");
   });
 
-  test("GENEL_YONETICI can close month via ay-kapat", async ({ page }) => {
+  test("GENEL_YONETICI cannot close month via ay-kapat while bolum onaylari are pending", async ({ page }) => {
     await loginAs(page, "GENEL_YONETICI");
 
+    const response = await apiFetch(page, "/api/yonetim/aylik-ozet/ay-kapat", {
+      method: "POST",
+      body: ayKapatBody()
+    });
+
+    expect(response.status).toBe(409);
+    const errorMessage = response.body.errors?.map((item) => item.message ?? "").join(" ") ?? "";
+    expect(errorMessage).toContain(
+      "Bekleyen bölüm onayları tamamlanmadan genel yönetici onayı verilemez."
+    );
+  });
+
+  test("GENEL_YONETICI can close month via ay-kapat after bolum onaylari complete", async ({ page }) => {
+    await loginAs(page, "BOLUM_YONETICISI");
+    const bolumOnayResponse = await apiFetch(page, "/api/yonetim/aylik-ozet/bolum-onay", {
+      method: "POST",
+      body: bolumOnayBody()
+    });
+    expect(bolumOnayResponse.status).toBe(200);
+
+    await loginAs(page, "GENEL_YONETICI");
     const response = await apiFetch(page, "/api/yonetim/aylik-ozet/ay-kapat", {
       method: "POST",
       body: ayKapatBody()

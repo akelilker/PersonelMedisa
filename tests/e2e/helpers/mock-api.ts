@@ -15,6 +15,104 @@ import { hasRolePermission, type AppPermission } from "../../../src/lib/authoriz
 
 export type MockUserRole = "GENEL_YONETICI" | "BOLUM_YONETICISI" | "MUHASEBE" | "BIRIM_AMIRI";
 
+type MockAylikOzetRow = {
+  ay: string;
+  personel_id: number;
+  ad_soyad: string;
+  sicil_no?: string;
+  sube_id: number;
+  sube: string;
+  departman_id: number;
+  bolum: string;
+  bagli_amir_adi: string;
+  devamsizlik_gun: number;
+  gec_kalma_adet: number;
+  izinli_gelmedi: number;
+  izinsiz_gelmedi: number;
+  raporlu: number;
+  tesvik_tutari: number;
+  ceza_kesinti_tutari: number;
+  bolum_onay_durumu: "BOLUM_ONAYINDA" | "BOLUM_ONAYLANDI" | "REVIZE_ISTENDI";
+  revize_var_mi: boolean;
+  son_islem: string;
+  kapanis_durumu: "ACIK" | "KAPANDI";
+};
+
+type MockAylikOzetPageState = {
+  fixtureAy: string;
+  rows: MockAylikOzetRow[];
+};
+
+const aylikOzetStateByPage = new WeakMap<Page, MockAylikOzetPageState>();
+
+function currentAylikOzetFixtureAy() {
+  return `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`;
+}
+
+function createInitialAylikOzetRows(fixtureAy: string): MockAylikOzetRow[] {
+  return [
+    {
+      ay: fixtureAy,
+      personel_id: 1,
+      ad_soyad: "Ayşe Yılmaz",
+      sicil_no: "P-001",
+      sube_id: 1,
+      sube: "Merkez",
+      departman_id: 3,
+      bolum: "Döşeme",
+      bagli_amir_adi: "Serhan Köse",
+      devamsizlik_gun: 0,
+      gec_kalma_adet: 1,
+      izinli_gelmedi: 0,
+      izinsiz_gelmedi: 0,
+      raporlu: 0,
+      tesvik_tutari: 1200,
+      ceza_kesinti_tutari: 0,
+      bolum_onay_durumu: "BOLUM_ONAYINDA",
+      revize_var_mi: false,
+      son_islem: "Bağlı amir günlük kayıtları hazırladı",
+      kapanis_durumu: "ACIK"
+    },
+    {
+      ay: fixtureAy,
+      personel_id: 2,
+      ad_soyad: "Mehmet Kaya",
+      sicil_no: "P-002",
+      sube_id: 2,
+      sube: "Depolama",
+      departman_id: 6,
+      bolum: "Depo",
+      bagli_amir_adi: "Serhan Köse",
+      devamsizlik_gun: 1,
+      gec_kalma_adet: 0,
+      izinli_gelmedi: 1,
+      izinsiz_gelmedi: 1,
+      raporlu: 0,
+      tesvik_tutari: 0,
+      ceza_kesinti_tutari: 450,
+      bolum_onay_durumu: "BOLUM_ONAYINDA",
+      revize_var_mi: true,
+      son_islem: "Bölüm yöneticisi revize istedi",
+      kapanis_durumu: "ACIK"
+    }
+  ];
+}
+
+function getAylikOzetPageState(page: Page): MockAylikOzetPageState {
+  const existing = aylikOzetStateByPage.get(page);
+  if (existing) {
+    return existing;
+  }
+
+  const fixtureAy = currentAylikOzetFixtureAy();
+  const created: MockAylikOzetPageState = {
+    fixtureAy,
+    rows: createInitialAylikOzetRows(fixtureAy)
+  };
+  aylikOzetStateByPage.set(page, created);
+  return created;
+}
+
 function okBody(data: unknown) {
   return JSON.stringify({
     data,
@@ -1815,77 +1913,11 @@ export async function mockApi(page: Page, role: MockUserRole) {
   ];
 
   /** Playwright süreci ile tarayıcı aynı makinede; UI ilk yüklemede `new Date()` ayını kullanır. */
-  const aylikOzetFixtureAy = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`;
+  const aylikOzetPageState = getAylikOzetPageState(page);
+  const aylikOzetFixtureAy = aylikOzetPageState.fixtureAy;
+  const aylikOzetRows = aylikOzetPageState.rows;
 
-  const aylikOzetRows: Array<{
-    ay: string;
-    personel_id: number;
-    ad_soyad: string;
-    sicil_no?: string;
-    sube_id: number;
-    sube: string;
-    departman_id: number;
-    bolum: string;
-    bagli_amir_adi: string;
-    devamsizlik_gun: number;
-    gec_kalma_adet: number;
-    izinli_gelmedi: number;
-    izinsiz_gelmedi: number;
-    raporlu: number;
-    tesvik_tutari: number;
-    ceza_kesinti_tutari: number;
-    bolum_onay_durumu: "BOLUM_ONAYINDA" | "BOLUM_ONAYLANDI" | "REVIZE_ISTENDI";
-    revize_var_mi: boolean;
-    son_islem: string;
-    kapanis_durumu: "ACIK" | "KAPANDI";
-  }> = [
-    {
-      ay: aylikOzetFixtureAy,
-      personel_id: 1,
-      ad_soyad: "Ayşe Yılmaz",
-      sicil_no: "P-001",
-      sube_id: 1,
-      sube: "Merkez",
-      departman_id: 3,
-      bolum: "Döşeme",
-      bagli_amir_adi: "Serhan Köse",
-      devamsizlik_gun: 0,
-      gec_kalma_adet: 1,
-      izinli_gelmedi: 0,
-      izinsiz_gelmedi: 0,
-      raporlu: 0,
-      tesvik_tutari: 1200,
-      ceza_kesinti_tutari: 0,
-      bolum_onay_durumu: "BOLUM_ONAYINDA",
-      revize_var_mi: false,
-      son_islem: "Bağlı amir günlük kayıtları hazırladı",
-      kapanis_durumu: "ACIK"
-    },
-    {
-      ay: aylikOzetFixtureAy,
-      personel_id: 2,
-      ad_soyad: "Mehmet Kaya",
-      sicil_no: "P-002",
-      sube_id: 2,
-      sube: "Depolama",
-      departman_id: 6,
-      bolum: "Depo",
-      bagli_amir_adi: "Serhan Köse",
-      devamsizlik_gun: 1,
-      gec_kalma_adet: 0,
-      izinli_gelmedi: 1,
-      izinsiz_gelmedi: 1,
-      raporlu: 0,
-      tesvik_tutari: 0,
-      ceza_kesinti_tutari: 450,
-      bolum_onay_durumu: "REVIZE_ISTENDI",
-      revize_var_mi: true,
-      son_islem: "Bölüm yöneticisi revize istedi",
-      kapanis_durumu: "ACIK"
-    }
-  ];
-
-let surecIdCounter = 600;
+  let surecIdCounter = 600;
 let zimmetIdCounter = 560;
 let personelBelgeKaydiIdCounter = 903;
 let bildirimIdCounter = 800;
@@ -4123,10 +4155,8 @@ let bildirimIdCounter = 800;
 
     if (path === "/api/yonetim/aylik-ozet/bolum-onay" && method === "POST") {
       if (
-        !hasRolePermission(role, "aylik-ozet.review") &&
-        !hasRolePermission(role, "aylik-ozet.executive_ack")
+        await denyUnlessAnyRolePermission(route, ["aylik_bolum_onayi.approve", "aylik-ozet.review"])
       ) {
-        await fulfillJson(route, 403, errorBody("FORBIDDEN", "Bu islem icin yetkiniz yok."));
         return;
       }
 
@@ -4188,7 +4218,12 @@ let bildirimIdCounter = 800;
     }
 
     if (path === "/api/yonetim/aylik-ozet/ay-kapat" && method === "POST") {
-      if (await denyUnlessRolePermission(route, "aylik-ozet.executive_ack")) {
+      if (
+        await denyUnlessAnyRolePermission(route, [
+          "genel_yonetici_onayi.approve",
+          "aylik-ozet.executive_ack"
+        ])
+      ) {
         return;
       }
 
@@ -4213,6 +4248,32 @@ let bildirimIdCounter = 800;
 
       if (!payload.ay || !/^\d{4}-\d{2}$/.test(payload.ay)) {
         await fulfillJson(route, 400, errorBody("VALIDATION_ERROR", "Gecersiz ay parametresi.", "ay"));
+        return;
+      }
+
+      const hasPendingBolumOnay = aylikOzetRows.some((item) => {
+        if (item.ay !== (payload.ay ?? aylikOzetFixtureAy)) {
+          return false;
+        }
+        if (payload.sube_id != null && item.sube_id !== payload.sube_id) {
+          return false;
+        }
+        if (payload.departman_id != null && item.departman_id !== payload.departman_id) {
+          return false;
+        }
+
+        return item.kapanis_durumu !== "KAPANDI" && item.bolum_onay_durumu === "BOLUM_ONAYINDA";
+      });
+
+      if (hasPendingBolumOnay) {
+        await fulfillJson(
+          route,
+          409,
+          errorBody(
+            "PENDING_BOLUM_ONAY",
+            "Bekleyen bölüm onayları tamamlanmadan genel yönetici onayı verilemez."
+          )
+        );
         return;
       }
 

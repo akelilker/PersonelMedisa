@@ -423,7 +423,7 @@ class YonetimController
     public static function aylikOzetBolumOnay(Request $request)
     {
         $user = AuthMiddleware::authenticate($request, true);
-        RolePermissions::assertAny($user, ['aylik-ozet.review', 'aylik-ozet.executive_ack']);
+        self::assertBolumOnayPermission($user);
 
         $filters = self::parseAylikOzetFilters($request, true);
         self::assertAylikWriteSubeScope($user, $filters['sube_id']);
@@ -464,7 +464,7 @@ class YonetimController
     public static function aylikOzetAyKapat(Request $request)
     {
         $user = AuthMiddleware::authenticate($request, true);
-        RolePermissions::assert($user, 'aylik-ozet.executive_ack');
+        self::assertGenelYoneticiOnayPermission($user);
 
         $filters = self::parseAylikOzetFilters($request, true);
         self::assertAylikWriteSubeScope($user, $filters['sube_id']);
@@ -475,6 +475,8 @@ class YonetimController
         } catch (\Throwable $e) {
             JsonResponse::serverError('Veritabani baglantisi kurulamadi.');
         }
+
+        self::assertNoPendingBolumOnay($pdo, $filters, $user);
 
         $where = self::buildAylikOzetWhereClause($filters, $user);
         $params = $where['params'];
@@ -552,6 +554,48 @@ class YonetimController
         $allowed = SubeScope::allowedSubeIds($user);
         if (count($allowed) > 0 && $subeId <= 0) {
             JsonResponse::badRequest('Sube secimi zorunludur.', 'VALIDATION_ERROR', 'sube_id');
+        }
+    }
+
+    /** @param array<string, mixed> $user */
+    private static function assertBolumOnayPermission(array $user)
+    {
+        RolePermissions::assertAny($user, [
+            'aylik_bolum_onayi.approve',
+            'aylik-ozet.review',
+        ]);
+    }
+
+    /** @param array<string, mixed> $user */
+    private static function assertGenelYoneticiOnayPermission(array $user)
+    {
+        RolePermissions::assertAny($user, [
+            'genel_yonetici_onayi.approve',
+            'aylik-ozet.executive_ack',
+        ]);
+    }
+
+    /**
+     * @param array{ay: string, sube_id: int, departman_id: int, sadece_revizeli: bool} $filters
+     * @param array<string, mixed> $user
+     */
+    private static function assertNoPendingBolumOnay(PDO $pdo, array $filters, array $user)
+    {
+        $where = self::buildAylikOzetWhereClause($filters, $user);
+        $stmt = $pdo->prepare(
+            'SELECT COUNT(*) AS total FROM aylik_ozet_satirlari
+             WHERE ' . $where['sql'] . '
+               AND kapanis_durumu <> \'KAPANDI\'
+               AND bolum_onay_durumu = \'BOLUM_ONAYINDA\''
+        );
+        $stmt->execute($where['params']);
+        $total = (int) ($stmt->fetch(PDO::FETCH_ASSOC)['total'] ?? 0);
+        if ($total > 0) {
+            JsonResponse::error(
+                409,
+                'PENDING_BOLUM_ONAY',
+                'Bekleyen bölüm onayları tamamlanmadan genel yönetici onayı verilemez.'
+            );
         }
     }
 

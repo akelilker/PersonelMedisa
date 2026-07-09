@@ -2,7 +2,8 @@ export type UserRole =
   | "GENEL_YONETICI"
   | "BOLUM_YONETICISI"
   | "MUHASEBE"
-  | "BIRIM_AMIRI";
+  | "BIRIM_AMIRI"
+  | "PATRON";
 
 export type UiProfile = "yonetim" | "birim_amiri";
 
@@ -45,4 +46,4 @@ export const MANAGEMENT_ROLES: UserRole[] = [
   "MUHASEBE"
 ];
 
-export const ALL_ROLES: UserRole[] = [...MANAGEMENT_ROLES, "BIRIM_AMIRI"];
+export const ALL_ROLES: UserRole[] = [...MANAGEMENT_ROLES, "BIRIM_AMIRI", "PATRON"];

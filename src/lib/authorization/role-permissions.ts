@@ -32,6 +32,23 @@ export type AppPermission =
   | "aylik-ozet.view"
   | "aylik-ozet.review"
   | "aylik-ozet.executive_ack"
+  | "gunluk_bildirim.create"
+  | "gunluk_bildirim.update_own_open"
+  | "gunluk_bildirim.submit"
+  | "gunluk_bildirim.request_correction"
+  | "haftalik_mutabakat.view"
+  | "haftalik_mutabakat.approve"
+  | "haftalik_mutabakat.reopen_request"
+  | "aylik_bolum_onayi.view"
+  | "aylik_bolum_onayi.approve"
+  | "genel_yonetici_onayi.view"
+  | "genel_yonetici_onayi.approve"
+  | "patron_ack.view"
+  | "patron_ack.mark_seen"
+  | "sirket_parametreleri.view"
+  | "sirket_parametreleri.manage"
+  | "bordro_on_izleme.view"
+  | "bordro_kesinlestirme.approve"
   | "revizyon.view"
   | "revizyon.create"
   | "revizyon.submit"
@@ -72,6 +89,17 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "yonetim-paneli.manage",
     "aylik-ozet.view",
     "aylik-ozet.executive_ack",
+    "gunluk_bildirim.request_correction",
+    "haftalik_mutabakat.view",
+    "haftalik_mutabakat.reopen_request",
+    "aylik_bolum_onayi.view",
+    "genel_yonetici_onayi.view",
+    "genel_yonetici_onayi.approve",
+    "patron_ack.view",
+    "sirket_parametreleri.view",
+    "sirket_parametreleri.manage",
+    "bordro_on_izleme.view",
+    "bordro_kesinlestirme.approve",
     "revizyon.view",
     "revizyon.create",
     "revizyon.submit",
@@ -109,6 +137,12 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "isg.view",
     "aylik-ozet.view",
     "aylik-ozet.review",
+    "gunluk_bildirim.request_correction",
+    "haftalik_mutabakat.view",
+    "haftalik_mutabakat.approve",
+    "haftalik_mutabakat.reopen_request",
+    "aylik_bolum_onayi.view",
+    "aylik_bolum_onayi.approve",
     "revizyon.view",
     "revizyon.create",
     "revizyon.submit",
@@ -140,6 +174,8 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "finans.create",
     "finans.update",
     "finans.cancel",
+    "bordro_on_izleme.view",
+    "sirket_parametreleri.view",
     "revizyon.view",
     "revizyon.create",
     "revizyon.submit",
@@ -165,7 +201,16 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "revizyon.create",
     "revizyon.submit",
     "revizyon.cancel",
-    "revizyon.view_audit_history"
+    "revizyon.view_audit_history",
+    "gunluk_bildirim.create",
+    "gunluk_bildirim.update_own_open",
+    "gunluk_bildirim.submit",
+    "haftalik_mutabakat.view"
+  ],
+  PATRON: [
+    "raporlar.view",
+    "patron_ack.view",
+    "patron_ack.mark_seen"
   ]
 };
 

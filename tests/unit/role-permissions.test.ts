@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import {
   BILDIRIM_DETAIL_ALLOWED_ROLES,
   FINANS_ALLOWED_ROLES,
@@ -10,7 +12,44 @@ import {
   hasRolePermission,
   sessionAllowsSubeAccess
 } from "../../src/lib/authorization/role-permissions";
-import type { AuthSession } from "../../src/types/auth";
+import { ALL_ROLES, type AuthSession } from "../../src/types/auth";
+
+const PHP_ROLE_PERMISSIONS_PATH = resolve(
+  process.cwd(),
+  "api/src/Auth/RolePermissions.php"
+);
+
+function extractPhpRolePermissions(role: string): string[] {
+  const php = readFileSync(PHP_ROLE_PERMISSIONS_PATH, "utf8");
+  const marker = `'${role}' => [`;
+  const start = php.indexOf(marker);
+  if (start < 0) {
+    return [];
+  }
+
+  let index = start + marker.length;
+  let depth = 1;
+  const permissions: string[] = [];
+
+  while (index < php.length && depth > 0) {
+    const char = php[index];
+    if (char === "[") {
+      depth += 1;
+    } else if (char === "]") {
+      depth -= 1;
+    } else if (depth === 1 && char === "'") {
+      let end = index + 1;
+      while (end < php.length && php[end] !== "'") {
+        end += 1;
+      }
+      permissions.push(php.slice(index + 1, end));
+      index = end;
+    }
+    index += 1;
+  }
+
+  return permissions.sort();
+}
 
 describe("role permissions", () => {
   it("grants management roles full personel and process actions", () => {
@@ -77,7 +116,7 @@ describe("role permissions", () => {
       expect.arrayContaining(["GENEL_YONETICI", "BOLUM_YONETICISI", "MUHASEBE", "BIRIM_AMIRI"])
     );
     expect(RAPORLAR_ALLOWED_ROLES).toEqual(
-      expect.arrayContaining(["GENEL_YONETICI", "BOLUM_YONETICISI", "MUHASEBE", "BIRIM_AMIRI"])
+      expect.arrayContaining(["GENEL_YONETICI", "BOLUM_YONETICISI", "MUHASEBE", "BIRIM_AMIRI", "PATRON"])
     );
     expect(FINANS_ALLOWED_ROLES).toEqual(
       expect.arrayContaining(["GENEL_YONETICI", "BOLUM_YONETICISI", "MUHASEBE"])
@@ -144,5 +183,71 @@ describe("role permissions", () => {
     expect(hasRolePermission("BIRIM_AMIRI", "revizyon.approve")).toBe(false);
     expect(hasRolePermission("BIRIM_AMIRI", "revizyon.reject")).toBe(false);
     expect(hasRolePermission("BIRIM_AMIRI", "revizyon.view_finance_effect")).toBe(false);
+  });
+
+  it("includes PATRON in all roles list (S70B-1)", () => {
+    expect(ALL_ROLES).toContain("PATRON");
+  });
+
+  it("locks PATRON to patron ack and rapor view only (S70B-1)", () => {
+    expect(hasRolePermission("PATRON", "patron_ack.view")).toBe(true);
+    expect(hasRolePermission("PATRON", "patron_ack.mark_seen")).toBe(true);
+    expect(hasRolePermission("PATRON", "raporlar.view")).toBe(true);
+    expect(hasRolePermission("PATRON", "bordro_kesinlestirme.approve")).toBe(false);
+    expect(hasRolePermission("PATRON", "sirket_parametreleri.manage")).toBe(false);
+    expect(hasRolePermission("PATRON", "genel_yonetici_onayi.approve")).toBe(false);
+    expect(hasRolePermission("PATRON", "aylik_bolum_onayi.approve")).toBe(false);
+    expect(hasRolePermission("PATRON", "gunluk_bildirim.create")).toBe(false);
+  });
+
+  it("locks BIRIM_AMIRI target gunluk bildirim and haftalik view permissions (S70B-1)", () => {
+    expect(hasRolePermission("BIRIM_AMIRI", "gunluk_bildirim.create")).toBe(true);
+    expect(hasRolePermission("BIRIM_AMIRI", "gunluk_bildirim.update_own_open")).toBe(true);
+    expect(hasRolePermission("BIRIM_AMIRI", "gunluk_bildirim.submit")).toBe(true);
+    expect(hasRolePermission("BIRIM_AMIRI", "haftalik_mutabakat.view")).toBe(true);
+    expect(hasRolePermission("BIRIM_AMIRI", "haftalik_mutabakat.approve")).toBe(false);
+    expect(hasRolePermission("BIRIM_AMIRI", "aylik_bolum_onayi.approve")).toBe(false);
+    expect(hasRolePermission("BIRIM_AMIRI", "genel_yonetici_onayi.approve")).toBe(false);
+    expect(hasRolePermission("BIRIM_AMIRI", "bordro_kesinlestirme.approve")).toBe(false);
+  });
+
+  it("locks BOLUM_YONETICISI haftalik and aylik bolum onay permissions (S70B-1)", () => {
+    expect(hasRolePermission("BOLUM_YONETICISI", "gunluk_bildirim.create")).toBe(false);
+    expect(hasRolePermission("BOLUM_YONETICISI", "gunluk_bildirim.request_correction")).toBe(true);
+    expect(hasRolePermission("BOLUM_YONETICISI", "haftalik_mutabakat.approve")).toBe(true);
+    expect(hasRolePermission("BOLUM_YONETICISI", "aylik_bolum_onayi.approve")).toBe(true);
+    expect(hasRolePermission("BOLUM_YONETICISI", "genel_yonetici_onayi.approve")).toBe(false);
+    expect(hasRolePermission("BOLUM_YONETICISI", "bordro_kesinlestirme.approve")).toBe(false);
+  });
+
+  it("locks GENEL_YONETICI genel onay and bordro permissions without bolum onay (S70B-1)", () => {
+    expect(hasRolePermission("GENEL_YONETICI", "genel_yonetici_onayi.approve")).toBe(true);
+    expect(hasRolePermission("GENEL_YONETICI", "sirket_parametreleri.manage")).toBe(true);
+    expect(hasRolePermission("GENEL_YONETICI", "bordro_on_izleme.view")).toBe(true);
+    expect(hasRolePermission("GENEL_YONETICI", "bordro_kesinlestirme.approve")).toBe(true);
+    expect(hasRolePermission("GENEL_YONETICI", "aylik_bolum_onayi.view")).toBe(true);
+    expect(hasRolePermission("GENEL_YONETICI", "aylik_bolum_onayi.approve")).toBe(false);
+    expect(hasRolePermission("GENEL_YONETICI", "patron_ack.view")).toBe(true);
+    expect(hasRolePermission("GENEL_YONETICI", "patron_ack.mark_seen")).toBe(false);
+  });
+
+  it("locks MUHASEBE to bordro preview and read-only parametre view (S70B-1)", () => {
+    expect(hasRolePermission("MUHASEBE", "bordro_on_izleme.view")).toBe(true);
+    expect(hasRolePermission("MUHASEBE", "sirket_parametreleri.view")).toBe(true);
+    expect(hasRolePermission("MUHASEBE", "sirket_parametreleri.manage")).toBe(false);
+    expect(hasRolePermission("MUHASEBE", "gunluk_bildirim.create")).toBe(false);
+    expect(hasRolePermission("MUHASEBE", "haftalik_mutabakat.approve")).toBe(false);
+    expect(hasRolePermission("MUHASEBE", "aylik_bolum_onayi.approve")).toBe(false);
+    expect(hasRolePermission("MUHASEBE", "genel_yonetici_onayi.approve")).toBe(false);
+    expect(hasRolePermission("MUHASEBE", "bordro_kesinlestirme.approve")).toBe(false);
+    expect(hasRolePermission("MUHASEBE", "patron_ack.mark_seen")).toBe(false);
+  });
+
+  it("keeps TS and PHP role permission matrices in parity (S70B-1)", () => {
+    for (const role of ALL_ROLES) {
+      const tsPermissions = [...getRolePermissions(role)].sort();
+      const phpPermissions = extractPhpRolePermissions(role);
+      expect(phpPermissions).toEqual(tsPermissions);
+    }
   });
 });

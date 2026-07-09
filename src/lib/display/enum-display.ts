@@ -9,7 +9,8 @@ const USER_ROLE_LABELS: Record<UserRole, string> = {
   GENEL_YONETICI: "Genel Yönetici",
   BOLUM_YONETICISI: "Bölüm Yöneticisi",
   MUHASEBE: "Muhasebe",
-  BIRIM_AMIRI: "Birim Amiri Rolü"
+  BIRIM_AMIRI: "Birim Amiri Rolü",
+  PATRON: "Patron"
 };
 
 const UI_PROFILE_LABELS: Record<UiProfile, string> = {

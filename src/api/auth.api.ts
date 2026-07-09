@@ -48,7 +48,8 @@ function normalizeRole(value: unknown): AuthSession["user"]["rol"] | null {
     normalized === "GENEL_YONETICI" ||
     normalized === "BOLUM_YONETICISI" ||
     normalized === "MUHASEBE" ||
-    normalized === "BIRIM_AMIRI"
+    normalized === "BIRIM_AMIRI" ||
+    normalized === "PATRON"
   ) {
     return normalized;
   }

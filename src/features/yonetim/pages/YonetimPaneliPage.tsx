@@ -67,7 +67,8 @@ const ROLE_LABELS: Record<UserRole, string> = {
   GENEL_YONETICI: "Genel Yönetici",
   BOLUM_YONETICISI: "Bölüm Yöneticisi",
   BIRIM_AMIRI: "Birim Amiri",
-  MUHASEBE: "Muhasebe"
+  MUHASEBE: "Muhasebe",
+  PATRON: "Patron"
 };
 
 const KULLANICI_TIPI_LABELS: Record<KullaniciTipi, string> = {

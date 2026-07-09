@@ -25,11 +25,25 @@ const RAPOR_QUERY = "baslangic_tarihi=2026-04-01&bitis_tarihi=2026-04-30";
 
 type ApiFetchResult = { status: number };
 
+type ApiFetchJsonResult = {
+  status: number;
+  data: unknown;
+};
+
 async function apiFetch(
   page: Page,
   path: string,
   options?: { method?: string; body?: Record<string, unknown> }
 ): Promise<ApiFetchResult> {
+  const result = await apiFetchJson(page, path, options);
+  return { status: result.status };
+}
+
+async function apiFetchJson(
+  page: Page,
+  path: string,
+  options?: { method?: string; body?: Record<string, unknown> }
+): Promise<ApiFetchJsonResult> {
   return page.evaluate(
     async ({ fetchPath, method, body }) => {
       const storageKey = "medisa_auth_session";
@@ -46,7 +60,12 @@ async function apiFetch(
         ...(body ? { body: JSON.stringify(body) } : {})
       });
 
-      return { status: response.status };
+      const payload = (await response.json().catch(() => null)) as { data?: unknown } | null;
+
+      return {
+        status: response.status,
+        data: payload?.data ?? null
+      };
     },
     { fetchPath: path, method: options?.method, body: options?.body }
   );
@@ -228,5 +247,119 @@ test.describe("S70B-2C puantaj API role guards (mock-api)", () => {
         })
       ).resolves.toMatchObject({ status: 403 });
     }
+  });
+});
+
+const BILDIRIM_CREATE_BODY = {
+  personel_id: 1,
+  tarih: "2026-04-15",
+  departman_id: 3,
+  bildirim_turu: "GEC_GELDI",
+  aciklama: "E2E test bildirimi"
+} as const;
+
+function bildirimRecord(data: unknown): { id: number; state: string } {
+  const record = data as { id?: number; state?: string };
+  return {
+    id: record.id ?? 0,
+    state: record.state ?? ""
+  };
+}
+
+test.describe("S70C-2 gunluk bildirim API role guards (mock-api)", () => {
+  test("BIRIM_AMIRI can create bildirim as TASLAK", async ({ page }) => {
+    await loginAs(page, "BIRIM_AMIRI");
+
+    const created = await apiFetchJson(page, "/api/bildirimler", {
+      method: "POST",
+      body: { ...BILDIRIM_CREATE_BODY }
+    });
+
+    expect(created.status).toBe(201);
+    expect(bildirimRecord(created.data).state).toBe("TASLAK");
+  });
+
+  test("MUHASEBE and BOLUM_YONETICISI cannot create bildirim", async ({ page }) => {
+    for (const role of ["MUHASEBE", "BOLUM_YONETICISI"] as const) {
+      await loginAs(page, role);
+      await expect(
+        apiFetch(page, "/api/bildirimler", {
+          method: "POST",
+          body: { ...BILDIRIM_CREATE_BODY }
+        })
+      ).resolves.toMatchObject({ status: 403 });
+    }
+  });
+
+  test("BIRIM_AMIRI workflow: update, submit, block update, correction, reopen update, cancel", async ({ page }) => {
+    await loginAs(page, "BIRIM_AMIRI");
+
+    const created = await apiFetchJson(page, "/api/bildirimler", {
+      method: "POST",
+      body: { ...BILDIRIM_CREATE_BODY, tarih: "2026-04-16" }
+    });
+    expect(created.status).toBe(201);
+    const bildirimId = bildirimRecord(created.data).id;
+    expect(bildirimId).toBeGreaterThan(0);
+
+    const updated = await apiFetchJson(page, `/api/bildirimler/${bildirimId}`, {
+      method: "PUT",
+      body: { aciklama: "Guncellenmis aciklama" }
+    });
+    expect(updated.status).toBe(200);
+
+    const submitted = await apiFetchJson(page, `/api/bildirimler/${bildirimId}/submit`, {
+      method: "POST"
+    });
+    expect(submitted.status).toBe(200);
+    expect(bildirimRecord(submitted.data).state).toBe("GONDERILDI");
+
+    await expect(
+      apiFetch(page, `/api/bildirimler/${bildirimId}`, {
+        method: "PUT",
+        body: { aciklama: "Gonderildikten sonra" }
+      })
+    ).resolves.toMatchObject({ status: 409 });
+
+    await loginAs(page, "BOLUM_YONETICISI");
+    const correction = await apiFetchJson(page, `/api/bildirimler/${bildirimId}/request-correction`, {
+      method: "POST",
+      body: { correction_reason: "Saat bilgisi hatali" }
+    });
+    expect(correction.status).toBe(200);
+    expect(bildirimRecord(correction.data).state).toBe("DUZELTME_ISTENDI");
+
+    await loginAs(page, "BIRIM_AMIRI");
+    const reopened = await apiFetchJson(page, `/api/bildirimler/${bildirimId}`, {
+      method: "PUT",
+      body: { aciklama: "Duzeltme sonrasi" }
+    });
+    expect(reopened.status).toBe(200);
+
+    const cancelDraft = await apiFetchJson(page, "/api/bildirimler", {
+      method: "POST",
+      body: { ...BILDIRIM_CREATE_BODY, tarih: "2026-04-17" }
+    });
+    const cancelId = bildirimRecord(cancelDraft.data).id;
+
+    const cancelled = await apiFetchJson(page, `/api/bildirimler/${cancelId}/iptal`, {
+      method: "POST"
+    });
+    expect(cancelled.status).toBe(200);
+    expect(bildirimRecord(cancelled.data).state).toBe("IPTAL");
+  });
+
+  test("MUHASEBE cannot cancel bildirim", async ({ page }) => {
+    await loginAs(page, "BIRIM_AMIRI");
+    const created = await apiFetchJson(page, "/api/bildirimler", {
+      method: "POST",
+      body: { ...BILDIRIM_CREATE_BODY, tarih: "2026-04-18" }
+    });
+    const bildirimId = bildirimRecord(created.data).id;
+
+    await loginAs(page, "MUHASEBE");
+    await expect(apiFetch(page, `/api/bildirimler/${bildirimId}/iptal`, { method: "POST" })).resolves.toMatchObject({
+      status: 403
+    });
   });
 });

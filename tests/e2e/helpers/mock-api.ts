@@ -1103,6 +1103,97 @@ function errorBody(code: string, message: string, field?: string) {
   });
 }
 
+const MOCK_BILDIRIM_ALLOWED_TURLER = [
+  "GELMEDI",
+  "GEC_GELDI",
+  "ERKEN_CIKTI",
+  "IZINLI",
+  "RAPORLU",
+  "GOREVDE",
+  "DIGER"
+] as const;
+
+const MOCK_BILDIRIM_EDITABLE_STATES = ["TASLAK", "DUZELTME_ISTENDI"] as const;
+
+const MOCK_BILDIRIM_LEGACY_TUR_MAP: Record<string, string> = {
+  DEVAMSIZLIK: "GELMEDI",
+  IZINLI_GELMEDI: "IZINLI",
+  IZINSIZ_GELMEDI: "GELMEDI",
+  GEC_CIKTI: "ERKEN_CIKTI"
+};
+
+type MockBildirimRecord = {
+  id: number;
+  tarih: string;
+  departman_id: number;
+  personel_id: number;
+  sube_id?: number;
+  bildirim_turu: string;
+  aciklama?: string;
+  state: string;
+  okundu_mi?: boolean;
+  created_by?: number;
+  updated_by?: number;
+  submitted_at?: string | null;
+  correction_requested_by?: number | null;
+  correction_reason?: string | null;
+};
+
+function normalizeMockBildirimTuru(value: string | null | undefined): string | null {
+  if (!value) {
+    return null;
+  }
+
+  const upper = value.toUpperCase();
+  const mapped = MOCK_BILDIRIM_LEGACY_TUR_MAP[upper] ?? upper;
+  return MOCK_BILDIRIM_ALLOWED_TURLER.includes(mapped as (typeof MOCK_BILDIRIM_ALLOWED_TURLER)[number])
+    ? mapped
+    : null;
+}
+
+function isMockBildirimEditableState(state: string): boolean {
+  return (MOCK_BILDIRIM_EDITABLE_STATES as readonly string[]).includes(state.toUpperCase());
+}
+
+type MockBildirimPageState = {
+  items: MockBildirimRecord[];
+  nextId: number;
+};
+
+const bildirimStateByPage = new WeakMap<Page, MockBildirimPageState>();
+
+function createInitialBildirimler(): MockBildirimRecord[] {
+  return [
+    {
+      id: 701,
+      tarih: "2026-04-09",
+      departman_id: 3,
+      personel_id: 1,
+      sube_id: 1,
+      bildirim_turu: "GEC_GELDI",
+      aciklama: "Mevcut bildirim",
+      state: "GONDERILDI",
+      okundu_mi: false,
+      created_by: 1,
+      updated_by: 1
+    }
+  ];
+}
+
+function getBildirimPageState(page: Page): MockBildirimPageState {
+  const existing = bildirimStateByPage.get(page);
+  if (existing) {
+    return existing;
+  }
+
+  const created: MockBildirimPageState = {
+    items: createInitialBildirimler(),
+    nextId: 800
+  };
+  bildirimStateByPage.set(page, created);
+  return created;
+}
+
 function normalizeMockSubeIdsWithVarsayilan(subeIds: number[], varsayilanSubeId: number | null | undefined) {
   if (varsayilanSubeId == null || subeIds.length === 0) {
     return subeIds;
@@ -1240,6 +1331,8 @@ function resolveMockIlkIkiGunFirmaOderMi(
 }
 
 export async function mockApi(page: Page, role: MockUserRole) {
+  const bildirimPageState = getBildirimPageState(page);
+  const bildirimler = bildirimPageState.items;
   const bagliAmirReferanslari: Array<{ id: number; ad: string; sube_id: number; departman_id: number }> = [
     { id: 9, ad: "Demo Amir", sube_id: 1, departman_id: 3 },
     { id: 10, ad: "İkinci Amir", sube_id: 2, departman_id: 6 }
@@ -1597,27 +1690,6 @@ export async function mockApi(page: Page, role: MockUserRole) {
     }
   ];
 
-  const bildirimler: Array<{
-    id: number;
-    tarih: string;
-    departman_id: number;
-    personel_id: number;
-    bildirim_turu: string;
-    aciklama?: string;
-    state: string;
-    okundu_mi?: boolean;
-  }> = [
-    {
-      id: 701,
-      tarih: "2026-04-09",
-      departman_id: 3,
-      personel_id: 1,
-      bildirim_turu: "GEC_GELDI",
-      aciklama: "Mevcut bildirim",
-      state: "AKTIF",
-      okundu_mi: false
-    }
-  ];
 
   const finansKalemleri: Array<{
     id: number;
@@ -1920,7 +1992,6 @@ export async function mockApi(page: Page, role: MockUserRole) {
   let surecIdCounter = 600;
 let zimmetIdCounter = 560;
 let personelBelgeKaydiIdCounter = 903;
-let bildirimIdCounter = 800;
   let finansIdCounter = 950;
   let kullaniciIdCounter = 3;
   let subeIdCounter = 2;
@@ -2296,6 +2367,16 @@ let bildirimIdCounter = 800;
 
   const mockUserSubeIds =
     role === "BIRIM_AMIRI" ? [1] : role === "MUHASEBE" ? [1, 2] : role === "BOLUM_YONETICISI" ? [2] : [];
+  const mockUserId = 1;
+
+  function resolveMockBildirimSubeId(personelId: number): number | undefined {
+    const personel = personeller.find((item) => item.id === personelId);
+    return typeof personel?.sube_id === "number" ? personel.sube_id : undefined;
+  }
+
+  function assertMockBildirimOwnership(bildirim: MockBildirimRecord): boolean {
+    return (bildirim.created_by ?? 0) === mockUserId;
+  }
 
   async function denyUnlessRolePermission(route: Route, permission: AppPermission) {
     if (!hasRolePermission(role, permission)) {
@@ -3444,11 +3525,16 @@ let bildirimIdCounter = 800;
     }
 
     if (path === "/api/bildirimler" && method === "GET") {
+      if (await denyUnlessRolePermission(route, "bildirimler.view")) {
+        return;
+      }
+
       const pageNumber = Number.parseInt(url.searchParams.get("page") ?? "1", 10) || 1;
       const pageLimit = Number.parseInt(url.searchParams.get("limit") ?? "10", 10) || 10;
       const tarih = url.searchParams.get("tarih");
       const personelId = Number.parseInt(url.searchParams.get("personel_id") ?? "", 10);
-      const bildirimTuru = url.searchParams.get("bildirim_turu");
+      const bildirimTuru = normalizeMockBildirimTuru(url.searchParams.get("bildirim_turu"));
+      const stateFilter = url.searchParams.get("state")?.toUpperCase() ?? null;
 
       const filtered = bildirimler.filter((item) => {
         if (tarih && item.tarih !== tarih) {
@@ -3458,6 +3544,9 @@ let bildirimIdCounter = 800;
           return false;
         }
         if (bildirimTuru && item.bildirim_turu !== bildirimTuru) {
+          return false;
+        }
+        if (stateFilter && item.state.toUpperCase() !== stateFilter) {
           return false;
         }
         return true;
@@ -3484,6 +3573,10 @@ let bildirimIdCounter = 800;
     }
 
     if (path === "/api/bildirimler" && method === "POST") {
+      if (await denyUnlessRolePermission(route, "gunluk_bildirim.create")) {
+        return;
+      }
+
       const payload = request.postDataJSON() as {
         tarih: string;
         departman_id: number;
@@ -3492,22 +3585,40 @@ let bildirimIdCounter = 800;
         aciklama?: string;
       };
 
-      const created = {
-        id: ++bildirimIdCounter,
+      const bildirimTuru = normalizeMockBildirimTuru(payload.bildirim_turu);
+      if (!bildirimTuru) {
+        await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "Bildirim turu gecerli degil.", "bildirim_turu"));
+        return;
+      }
+
+      if (bildirimTuru === "DIGER" && !(payload.aciklama ?? "").trim()) {
+        await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "DIGER turu icin aciklama zorunludur.", "aciklama"));
+        return;
+      }
+
+      const created: MockBildirimRecord = {
+        id: ++bildirimPageState.nextId,
         tarih: payload.tarih,
         departman_id: payload.departman_id,
         personel_id: payload.personel_id,
-        bildirim_turu: payload.bildirim_turu,
+        sube_id: resolveMockBildirimSubeId(payload.personel_id),
+        bildirim_turu: bildirimTuru,
         aciklama: payload.aciklama,
-        state: "AKTIF"
+        state: "TASLAK",
+        created_by: mockUserId,
+        updated_by: mockUserId
       };
       bildirimler.unshift(created);
 
-      await fulfillJson(route, 200, okBody(created));
+      await fulfillJson(route, 201, okBody(created));
       return;
     }
 
     if (path.match(/^\/api\/bildirimler\/\d+$/) && method === "GET") {
+      if (await denyUnlessRolePermission(route, "bildirimler.view")) {
+        return;
+      }
+
       const bildirimId = Number.parseInt(path.split("/")[3] ?? "0", 10);
       const bildirim = bildirimler.find((item) => item.id === bildirimId);
       if (!bildirim) {
@@ -3520,6 +3631,10 @@ let bildirimIdCounter = 800;
     }
 
     if (path.match(/^\/api\/bildirimler\/\d+$/) && method === "PUT") {
+      if (await denyUnlessRolePermission(route, "gunluk_bildirim.update_own_open")) {
+        return;
+      }
+
       const bildirimId = Number.parseInt(path.split("/")[3] ?? "0", 10);
       const bildirim = bildirimler.find((item) => item.id === bildirimId);
       if (!bildirim) {
@@ -3527,14 +3642,116 @@ let bildirimIdCounter = 800;
         return;
       }
 
-      const payload = request.postDataJSON() as Partial<typeof bildirim>;
-      Object.assign(bildirim, payload);
+      if (!assertMockBildirimOwnership(bildirim)) {
+        await fulfillJson(route, 403, errorBody("FORBIDDEN", "Bu islem icin yetkiniz yok."));
+        return;
+      }
 
+      const state = bildirim.state.toUpperCase();
+      if (["GONDERILDI", "HAFTALIK_MUTABAKATA_ALINDI", "IPTAL"].includes(state) || !isMockBildirimEditableState(state)) {
+        await fulfillJson(route, 409, errorBody("CONFLICT", "Bu durumdaki bildirim guncellenemez."));
+        return;
+      }
+
+      const payload = request.postDataJSON() as Partial<MockBildirimRecord>;
+      if (payload.bildirim_turu !== undefined) {
+        const nextTur = normalizeMockBildirimTuru(payload.bildirim_turu);
+        if (!nextTur) {
+          await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "Bildirim turu gecerli degil.", "bildirim_turu"));
+          return;
+        }
+        bildirim.bildirim_turu = nextTur;
+      }
+
+      if (payload.aciklama !== undefined) {
+        bildirim.aciklama = payload.aciklama;
+      }
+
+      if (bildirim.bildirim_turu === "DIGER" && !(bildirim.aciklama ?? "").trim()) {
+        await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "DIGER turu icin aciklama zorunludur.", "aciklama"));
+        return;
+      }
+
+      bildirim.updated_by = mockUserId;
+      await fulfillJson(route, 200, okBody(bildirim));
+      return;
+    }
+
+    if (path.match(/^\/api\/bildirimler\/\d+\/submit$/) && method === "POST") {
+      if (await denyUnlessRolePermission(route, "gunluk_bildirim.submit")) {
+        return;
+      }
+
+      const bildirimId = Number.parseInt(path.split("/")[3] ?? "0", 10);
+      const bildirim = bildirimler.find((item) => item.id === bildirimId);
+      if (!bildirim) {
+        await fulfillJson(route, 404, errorBody("NOT_FOUND", "Bildirim bulunamadi."));
+        return;
+      }
+
+      if (!assertMockBildirimOwnership(bildirim)) {
+        await fulfillJson(route, 403, errorBody("FORBIDDEN", "Bu islem icin yetkiniz yok."));
+        return;
+      }
+
+      const state = bildirim.state.toUpperCase();
+      if (state === "GONDERILDI") {
+        await fulfillJson(route, 200, okBody(bildirim));
+        return;
+      }
+      if (state === "IPTAL") {
+        await fulfillJson(route, 409, errorBody("CONFLICT", "Iptal edilmis bildirim gonderilemez."));
+        return;
+      }
+      if (!isMockBildirimEditableState(state)) {
+        await fulfillJson(route, 409, errorBody("CONFLICT", "Bu durumdaki bildirim gonderilemez."));
+        return;
+      }
+
+      bildirim.state = "GONDERILDI";
+      bildirim.submitted_at = new Date().toISOString();
+      bildirim.updated_by = mockUserId;
+      await fulfillJson(route, 200, okBody(bildirim));
+      return;
+    }
+
+    if (path.match(/^\/api\/bildirimler\/\d+\/request-correction$/) && method === "POST") {
+      if (await denyUnlessRolePermission(route, "gunluk_bildirim.request_correction")) {
+        return;
+      }
+
+      const bildirimId = Number.parseInt(path.split("/")[3] ?? "0", 10);
+      const bildirim = bildirimler.find((item) => item.id === bildirimId);
+      if (!bildirim) {
+        await fulfillJson(route, 404, errorBody("NOT_FOUND", "Bildirim bulunamadi."));
+        return;
+      }
+
+      const payload = request.postDataJSON() as { correction_reason?: string };
+      const reason = (payload.correction_reason ?? "").trim();
+      if (!reason) {
+        await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "Duzeltme nedeni zorunludur.", "correction_reason"));
+        return;
+      }
+
+      if (bildirim.state.toUpperCase() !== "GONDERILDI") {
+        await fulfillJson(route, 409, errorBody("CONFLICT", "Yalnizca gonderilmis bildirimler icin duzeltme istenebilir."));
+        return;
+      }
+
+      bildirim.state = "DUZELTME_ISTENDI";
+      bildirim.correction_requested_by = mockUserId;
+      bildirim.correction_reason = reason;
+      bildirim.updated_by = mockUserId;
       await fulfillJson(route, 200, okBody(bildirim));
       return;
     }
 
     if (path.match(/^\/api\/bildirimler\/\d+\/iptal$/) && method === "POST") {
+      if (await denyUnlessRolePermission(route, "gunluk_bildirim.update_own_open")) {
+        return;
+      }
+
       const bildirimId = Number.parseInt(path.split("/")[3] ?? "0", 10);
       const bildirim = bildirimler.find((item) => item.id === bildirimId);
       if (!bildirim) {
@@ -3542,8 +3759,24 @@ let bildirimIdCounter = 800;
         return;
       }
 
+      if (!assertMockBildirimOwnership(bildirim)) {
+        await fulfillJson(route, 403, errorBody("FORBIDDEN", "Bu islem icin yetkiniz yok."));
+        return;
+      }
+
+      const state = bildirim.state.toUpperCase();
+      if (state === "IPTAL") {
+        await fulfillJson(route, 200, okBody(bildirim));
+        return;
+      }
+      if (!isMockBildirimEditableState(state)) {
+        await fulfillJson(route, 409, errorBody("CONFLICT", "Bu durumdaki bildirim iptal edilemez."));
+        return;
+      }
+
       bildirim.state = "IPTAL";
-      await fulfillJson(route, 200, okBody({ id: bildirim.id, state: bildirim.state }));
+      bildirim.updated_by = mockUserId;
+      await fulfillJson(route, 200, okBody(bildirim));
       return;
     }
 

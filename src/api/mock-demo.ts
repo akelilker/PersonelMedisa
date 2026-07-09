@@ -121,10 +121,16 @@ type DemoBildirim = {
   tarih?: string;
   departman_id?: number;
   personel_id?: number;
+  sube_id?: number;
   bildirim_turu: string;
   aciklama?: string;
   state?: string;
   okundu_mi?: boolean;
+  created_by?: number;
+  updated_by?: number;
+  submitted_at?: string | null;
+  correction_requested_by?: number | null;
+  correction_reason?: string | null;
 };
 
 type DemoFinansKalem = {
@@ -430,20 +436,26 @@ const demoState: {
       tarih: "2026-04-09",
       departman_id: 3,
       personel_id: 1,
+      sube_id: 1,
       bildirim_turu: "GEC_GELDI",
       aciklama: "Demo bildirim",
-      state: "AKTIF",
-      okundu_mi: false
+      state: "GONDERILDI",
+      okundu_mi: false,
+      created_by: 3,
+      updated_by: 3
     },
     {
       id: 702,
       tarih: "2026-04-10",
       departman_id: 6,
       personel_id: 2,
-      bildirim_turu: "IZINLI_GELMEDI",
+      sube_id: 2,
+      bildirim_turu: "IZINLI",
       aciklama: "Onayli izin nedeniyle bugun yok.",
-      state: "AKTIF",
-      okundu_mi: false
+      state: "GONDERILDI",
+      okundu_mi: false,
+      created_by: 3,
+      updated_by: 3
     }
   ],
   finansKalemleri: [
@@ -1012,6 +1024,74 @@ function enforceDemoAnyPermission(
   }
 
   return demoRevizyonError("FORBIDDEN", message);
+}
+
+const DEMO_BILDIRIM_ALLOWED_TURLER = [
+  "GELMEDI",
+  "GEC_GELDI",
+  "ERKEN_CIKTI",
+  "IZINLI",
+  "RAPORLU",
+  "GOREVDE",
+  "DIGER"
+] as const;
+
+const DEMO_BILDIRIM_EDITABLE_STATES = ["TASLAK", "DUZELTME_ISTENDI"] as const;
+
+const DEMO_BILDIRIM_LEGACY_TUR_MAP: Record<string, string> = {
+  DEVAMSIZLIK: "GELMEDI",
+  IZINLI_GELMEDI: "IZINLI",
+  IZINSIZ_GELMEDI: "GELMEDI",
+  GEC_CIKTI: "ERKEN_CIKTI"
+};
+
+function normalizeDemoBildirimTuru(value: string | null | undefined): string | null {
+  if (!value) {
+    return null;
+  }
+
+  const upper = value.toUpperCase();
+  const mapped = DEMO_BILDIRIM_LEGACY_TUR_MAP[upper] ?? upper;
+  return DEMO_BILDIRIM_ALLOWED_TURLER.includes(mapped as (typeof DEMO_BILDIRIM_ALLOWED_TURLER)[number])
+    ? mapped
+    : null;
+}
+
+function demoBildirimConflict(message: string): ApiResponse<unknown> {
+  return demoRevizyonError("CONFLICT", message);
+}
+
+function assertDemoBildirimOwnership(
+  actor: RevizyonActorContext,
+  bildirim: DemoBildirim
+): ApiResponse<unknown> | null {
+  const createdBy = bildirim.created_by ?? 0;
+  if (createdBy <= 0 || createdBy !== actor.userId) {
+    return demoRevizyonError("FORBIDDEN", "Bu islem icin yetkiniz yok.");
+  }
+
+  return null;
+}
+
+function assertDemoBildirimEditableState(bildirim: DemoBildirim): ApiResponse<unknown> | null {
+  const state = (bildirim.state ?? "").toUpperCase();
+  if (["GONDERILDI", "HAFTALIK_MUTABAKATA_ALINDI", "IPTAL"].includes(state)) {
+    return demoBildirimConflict("Bu durumdaki bildirim guncellenemez.");
+  }
+  if (!(DEMO_BILDIRIM_EDITABLE_STATES as readonly string[]).includes(state)) {
+    return demoBildirimConflict("Bu durumdaki bildirim guncellenemez.");
+  }
+
+  return null;
+}
+
+function resolveDemoBildirimSubeId(personelId: number | null | undefined): number | undefined {
+  if (personelId === null || personelId === undefined) {
+    return undefined;
+  }
+
+  const personel = demoState.personeller.find((item) => item.id === personelId);
+  return typeof personel?.sube_id === "number" ? personel.sube_id : undefined;
 }
 
 function assertDemoAylikWriteSubeScope(
@@ -2043,6 +2123,7 @@ function summarizeBildirimForPersonel(ay: string, personelId: number) {
       case "GEC_GELDI":
         gecKalmaAdet += 1;
         break;
+      case "IZINLI":
       case "IZINLI_GELMEDI":
         izinliGelmedi += 1;
         break;
@@ -2624,12 +2705,19 @@ export function resolveDemoApiResponse(
   }
 
   if (pathname === "/bildirimler" && method === "GET") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(actor, "bildirimler.view");
+    if (permissionError) {
+      return permissionError;
+    }
+
     const page = toNumber(requestUrl.searchParams.get("page")) ?? 1;
     const limit = toNumber(requestUrl.searchParams.get("limit")) ?? 10;
     const tarih = toStringValue(requestUrl.searchParams.get("tarih"));
     const departmanId = toNumber(requestUrl.searchParams.get("departman_id"));
     const personelId = toNumber(requestUrl.searchParams.get("personel_id"));
-    const bildirimTuru = toStringValue(requestUrl.searchParams.get("bildirim_turu"));
+    const bildirimTuru = normalizeDemoBildirimTuru(requestUrl.searchParams.get("bildirim_turu"));
+    const stateFilter = toStringValue(requestUrl.searchParams.get("state"))?.toUpperCase();
 
     const filtered = demoState.bildirimler.filter((item) => {
       if (tarih && item.tarih !== tarih) {
@@ -2642,6 +2730,9 @@ export function resolveDemoApiResponse(
         return false;
       }
       if (bildirimTuru && item.bildirim_turu !== bildirimTuru) {
+        return false;
+      }
+      if (stateFilter && (item.state ?? "").toUpperCase() !== stateFilter) {
         return false;
       }
       return true;
@@ -2664,15 +2755,35 @@ export function resolveDemoApiResponse(
   }
 
   if (pathname === "/bildirimler" && method === "POST") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(actor, "gunluk_bildirim.create");
+    if (permissionError) {
+      return permissionError;
+    }
+
+    const bildirimTuru = normalizeDemoBildirimTuru(toStringValue(body.bildirim_turu));
+    if (!bildirimTuru) {
+      return demoRevizyonError("VALIDATION_ERROR", "Bildirim turu gecerli degil.");
+    }
+
+    const aciklama = toStringValue(body.aciklama) ?? undefined;
+    if (bildirimTuru === "DIGER" && !aciklama) {
+      return demoRevizyonError("VALIDATION_ERROR", "DIGER turu icin aciklama zorunludur.");
+    }
+
+    const personelId = toNumber(body.personel_id) ?? undefined;
     const next: DemoBildirim = {
       id: ++demoState.nextIds.bildirim,
       tarih: toStringValue(body.tarih) ?? undefined,
       departman_id: toNumber(body.departman_id) ?? undefined,
-      personel_id: toNumber(body.personel_id) ?? undefined,
-      bildirim_turu: toStringValue(body.bildirim_turu) ?? "GEC_GELDI",
-      aciklama: toStringValue(body.aciklama) ?? undefined,
-      state: "AKTIF",
-      okundu_mi: false
+      personel_id: personelId,
+      sube_id: resolveDemoBildirimSubeId(personelId),
+      bildirim_turu: bildirimTuru,
+      aciklama,
+      state: "TASLAK",
+      okundu_mi: false,
+      created_by: actor.userId,
+      updated_by: actor.userId
     };
     demoState.bildirimler.unshift(next);
     return ok(next);
@@ -2680,6 +2791,7 @@ export function resolveDemoApiResponse(
 
   const bildirimDetailMatch = pathname.match(/^\/bildirimler\/(\d+)$/);
   if (bildirimDetailMatch) {
+    const actor = readDemoApiActor(init);
     const id = Number.parseInt(bildirimDetailMatch[1], 10);
     const bildirim = demoState.bildirimler.find((item) => item.id === id);
     if (!bildirim) {
@@ -2687,25 +2799,149 @@ export function resolveDemoApiResponse(
     }
 
     if (method === "GET") {
+      const permissionError = enforceDemoPermission(actor, "bildirimler.view");
+      if (permissionError) {
+        return permissionError;
+      }
+
       return ok(bildirim);
     }
 
     if (method === "PUT") {
-      Object.assign(bildirim, body);
+      const permissionError = enforceDemoPermission(actor, "gunluk_bildirim.update_own_open");
+      if (permissionError) {
+        return permissionError;
+      }
+
+      const ownershipError = assertDemoBildirimOwnership(actor, bildirim);
+      if (ownershipError) {
+        return ownershipError;
+      }
+
+      const stateError = assertDemoBildirimEditableState(bildirim);
+      if (stateError) {
+        return stateError;
+      }
+
+      if (body.bildirim_turu !== undefined) {
+        const nextTur = normalizeDemoBildirimTuru(toStringValue(body.bildirim_turu));
+        if (!nextTur) {
+          return demoRevizyonError("VALIDATION_ERROR", "Bildirim turu gecerli degil.");
+        }
+        bildirim.bildirim_turu = nextTur;
+      }
+
+      if (body.aciklama !== undefined) {
+        bildirim.aciklama = toStringValue(body.aciklama) ?? undefined;
+      }
+
+      const nextTur = bildirim.bildirim_turu;
+      if (nextTur === "DIGER" && !bildirim.aciklama) {
+        return demoRevizyonError("VALIDATION_ERROR", "DIGER turu icin aciklama zorunludur.");
+      }
+
+      bildirim.updated_by = actor.userId;
       return ok(bildirim);
     }
   }
 
+  const bildirimSubmitMatch = pathname.match(/^\/bildirimler\/(\d+)\/submit$/);
+  if (bildirimSubmitMatch && method === "POST") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(actor, "gunluk_bildirim.submit");
+    if (permissionError) {
+      return permissionError;
+    }
+
+    const id = Number.parseInt(bildirimSubmitMatch[1], 10);
+    const bildirim = demoState.bildirimler.find((item) => item.id === id);
+    if (!bildirim) {
+      return null;
+    }
+
+    const ownershipError = assertDemoBildirimOwnership(actor, bildirim);
+    if (ownershipError) {
+      return ownershipError;
+    }
+
+    const state = (bildirim.state ?? "").toUpperCase();
+    if (state === "GONDERILDI") {
+      return ok(bildirim);
+    }
+    if (state === "IPTAL") {
+      return demoBildirimConflict("Iptal edilmis bildirim gonderilemez.");
+    }
+    if (!(DEMO_BILDIRIM_EDITABLE_STATES as readonly string[]).includes(state)) {
+      return demoBildirimConflict("Bu durumdaki bildirim gonderilemez.");
+    }
+
+    bildirim.state = "GONDERILDI";
+    bildirim.submitted_at = new Date().toISOString();
+    bildirim.updated_by = actor.userId;
+    return ok(bildirim);
+  }
+
+  const bildirimCorrectionMatch = pathname.match(/^\/bildirimler\/(\d+)\/request-correction$/);
+  if (bildirimCorrectionMatch && method === "POST") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(actor, "gunluk_bildirim.request_correction");
+    if (permissionError) {
+      return permissionError;
+    }
+
+    const id = Number.parseInt(bildirimCorrectionMatch[1], 10);
+    const bildirim = demoState.bildirimler.find((item) => item.id === id);
+    if (!bildirim) {
+      return null;
+    }
+
+    const reason = toStringValue(body.correction_reason)?.trim() ?? "";
+    if (!reason) {
+      return demoRevizyonError("VALIDATION_ERROR", "Duzeltme nedeni zorunludur.");
+    }
+
+    const state = (bildirim.state ?? "").toUpperCase();
+    if (state !== "GONDERILDI") {
+      return demoBildirimConflict("Yalnizca gonderilmis bildirimler icin duzeltme istenebilir.");
+    }
+
+    bildirim.state = "DUZELTME_ISTENDI";
+    bildirim.correction_requested_by = actor.userId;
+    bildirim.correction_reason = reason;
+    bildirim.updated_by = actor.userId;
+    return ok(bildirim);
+  }
+
   const bildirimCancelMatch = pathname.match(/^\/bildirimler\/(\d+)\/iptal$/);
   if (bildirimCancelMatch && method === "POST") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(actor, "gunluk_bildirim.update_own_open");
+    if (permissionError) {
+      return permissionError;
+    }
+
     const id = Number.parseInt(bildirimCancelMatch[1], 10);
     const bildirim = demoState.bildirimler.find((item) => item.id === id);
     if (!bildirim) {
       return null;
     }
 
+    const ownershipError = assertDemoBildirimOwnership(actor, bildirim);
+    if (ownershipError) {
+      return ownershipError;
+    }
+
+    const state = (bildirim.state ?? "").toUpperCase();
+    if (state === "IPTAL") {
+      return ok(bildirim);
+    }
+    if (!(DEMO_BILDIRIM_EDITABLE_STATES as readonly string[]).includes(state)) {
+      return demoBildirimConflict("Bu durumdaki bildirim iptal edilemez.");
+    }
+
     bildirim.state = "IPTAL";
-    return ok({ id: bildirim.id, state: bildirim.state });
+    bildirim.updated_by = actor.userId;
+    return ok(bildirim);
   }
 
   const puantajMatch = pathname.match(/^\/gunluk-puantaj\/(\d+)\/([^/]+)$/);

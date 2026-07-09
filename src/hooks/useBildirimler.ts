@@ -7,6 +7,8 @@ import {
   fetchBildirimDetail,
   fetchBildirimlerList,
   markBildirimOkundu,
+  requestBildirimCorrection,
+  submitBildirim,
   updateBildirim,
   type CreateBildirimPayload
 } from "../api/bildirimler.api";
@@ -108,7 +110,7 @@ function draftBildirimFromPayload(payload: CreateBildirimPayload, tempId: number
     personel_id: payload.personel_id,
     bildirim_turu: payload.bildirim_turu,
     aciklama: payload.aciklama,
-    state: "AKTIF",
+    state: "TASLAK",
     okundu_mi: false
   };
 }
@@ -145,6 +147,8 @@ function resolveDepartmanIdForBildirim(
 
 export function useBildirimler() {
   const revision = useAppDataRevision();
+  const { session } = useAuth();
+  const currentUserId = session?.user.id ?? null;
   const [listQuery, setListQuery] = useState<BildirimListQueryState>({
     draft: { personelId: "", bildirimTuru: "", tarih: "" },
     applied: { personelId: "", bildirimTuru: "", tarih: "" },
@@ -165,6 +169,11 @@ export function useBildirimler() {
   const [editErrorMessage, setEditErrorMessage] = useState<string | null>(null);
   const [isEditSubmitting, setIsEditSubmitting] = useState(false);
   const [cancelingBildirimId, setCancelingBildirimId] = useState<number | null>(null);
+  const [submittingBildirimId, setSubmittingBildirimId] = useState<number | null>(null);
+  const [correctingBildirim, setCorrectingBildirim] = useState<Bildirim | null>(null);
+  const [correctionReason, setCorrectionReason] = useState("");
+  const [correctionErrorMessage, setCorrectionErrorMessage] = useState<string | null>(null);
+  const [isCorrectionSubmitting, setIsCorrectionSubmitting] = useState(false);
 
   const applied = listQuery.applied;
   const listPage = listQuery.page;
@@ -452,13 +461,6 @@ export function useBildirimler() {
 
       const previousBildirim = editingBildirim;
       const body = {
-        tarih: editForm.tarih,
-        departman_id: resolveDepartmanIdForBildirim(
-          editForm.personelId,
-          editForm.departmanId,
-          personelOptions
-        ),
-        personel_id: parseRequiredPositiveInt(editForm.personelId, "Personel"),
         bildirim_turu: resolveBildirimTuru(editForm.bildirimTuru),
         aciklama: editForm.aciklama.trim() || undefined
       };
@@ -467,7 +469,9 @@ export function useBildirimler() {
         const base = prev ?? emptyPaginated<Bildirim>();
         return {
           ...base,
-          items: base.items.map((row) => (row.id === editingBildirim.id ? { ...row, ...body } : row))
+          items: base.items.map((row) =>
+            row.id === editingBildirim.id ? { ...row, ...body, bildirim_turu: body.bildirim_turu } : row
+          )
         };
       });
 
@@ -555,6 +559,114 @@ export function useBildirimler() {
     [listKey, refreshPageOne]
   );
 
+  const submitBildirimHandler = useCallback(
+    async (bildirim: Bildirim) => {
+      if (submittingBildirimId !== null) {
+        return;
+      }
+
+      setSubmittingBildirimId(bildirim.id);
+
+      mergeCacheEntry<PaginatedResult<Bildirim>>(listKey, (prev) => {
+        const base = prev ?? emptyPaginated<Bildirim>();
+        return {
+          ...base,
+          items: base.items.map((row) =>
+            row.id === bildirim.id ? { ...row, state: "GONDERILDI" } : row
+          )
+        };
+      });
+
+      try {
+        await submitBildirim(bildirim.id);
+        setListQuery((prev) => ({ ...prev, page: 1 }));
+        await refreshPageOne();
+      } catch (error) {
+        mergeCacheEntry<PaginatedResult<Bildirim>>(listKey, (prev) => {
+          const base = prev ?? emptyPaginated<Bildirim>();
+          return {
+            ...base,
+            items: base.items.map((row) => (row.id === bildirim.id ? bildirim : row))
+          };
+        });
+        setErrorMessage(getApiErrorMessage(error, "Gunluk kayit gonderilemedi."));
+      } finally {
+        setSubmittingBildirimId(null);
+      }
+    },
+    [listKey, refreshPageOne, submittingBildirimId]
+  );
+
+  const openCorrectionModal = useCallback((bildirim: Bildirim) => {
+    setCorrectionErrorMessage(null);
+    setCorrectionReason("");
+    setCorrectingBildirim(bildirim);
+  }, []);
+
+  const closeCorrectionModal = useCallback(() => {
+    setCorrectionErrorMessage(null);
+    setCorrectionReason("");
+    setCorrectingBildirim(null);
+  }, []);
+
+  const requestCorrectionHandler = useCallback(
+    async (event: FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      if (!correctingBildirim || isCorrectionSubmitting) {
+        return;
+      }
+
+      const reason = correctionReason.trim();
+      if (!reason) {
+        setCorrectionErrorMessage("Duzeltme nedeni zorunludur.");
+        return;
+      }
+
+      setCorrectionErrorMessage(null);
+      setIsCorrectionSubmitting(true);
+
+      const previousBildirim = correctingBildirim;
+
+      mergeCacheEntry<PaginatedResult<Bildirim>>(listKey, (prev) => {
+        const base = prev ?? emptyPaginated<Bildirim>();
+        return {
+          ...base,
+          items: base.items.map((row) =>
+            row.id === correctingBildirim.id
+              ? { ...row, state: "DUZELTME_ISTENDI", correction_reason: reason }
+              : row
+          )
+        };
+      });
+
+      try {
+        await requestBildirimCorrection(correctingBildirim.id, { correction_reason: reason });
+        closeCorrectionModal();
+        setListQuery((prev) => ({ ...prev, page: 1 }));
+        await refreshPageOne();
+      } catch (error) {
+        mergeCacheEntry<PaginatedResult<Bildirim>>(listKey, (prev) => {
+          const base = prev ?? emptyPaginated<Bildirim>();
+          return {
+            ...base,
+            items: base.items.map((row) => (row.id === previousBildirim.id ? previousBildirim : row))
+          };
+        });
+        setCorrectionErrorMessage(getApiErrorMessage(error, "Duzeltme talebi gonderilemedi."));
+      } finally {
+        setIsCorrectionSubmitting(false);
+      }
+    },
+    [
+      closeCorrectionModal,
+      correctionReason,
+      correctingBildirim,
+      isCorrectionSubmitting,
+      listKey,
+      refreshPageOne
+    ]
+  );
+
   const gunlukKayitOptions = useMemo(
     () => buildGunlukKayitOptions(bildirimTuruOptions),
     [bildirimTuruOptions]
@@ -605,6 +717,17 @@ export function useBildirimler() {
     updateBildirimHandler,
     cancelingBildirimId,
     cancelBildirimHandler,
+    submittingBildirimId,
+    submitBildirimHandler,
+    correctingBildirim,
+    openCorrectionModal,
+    closeCorrectionModal,
+    correctionReason,
+    setCorrectionReason,
+    correctionErrorMessage,
+    isCorrectionSubmitting,
+    requestCorrectionHandler,
+    currentUserId,
     submitFilters,
     clearFilters,
     setPage

@@ -74,6 +74,10 @@ const COMMON_STATE_LABELS: Record<string, string> = {
   REVIZE_ISTENDI: "Revize İstendi",
   TAMAMLANDI: "Tamamlandı",
   TASLAK: "Taslak",
+  GONDERILDI: "Gönderildi",
+  GEC_GONDERILDI: "Geç Gönderildi",
+  DUZELTME_ISTENDI: "Düzeltme İstendi",
+  HAFTALIK_MUTABAKATA_ALINDI: "Haftalık Mutabakata Alındı",
   YENI: "Yeni"
 };
 

@@ -24,8 +24,18 @@ export type CreateBildirimPayload = {
   aciklama?: string;
 };
 
-export type UpdateBildirimPayload = Partial<CreateBildirimPayload> & {
+export type UpdateBildirimPayload = {
+  bildirim_turu?: string;
+  alt_tur?: string | null;
+  baslangic_saati?: string | null;
+  bitis_saati?: string | null;
+  dakika?: number | null;
+  aciklama?: string | null;
   okundu_mi?: boolean;
+};
+
+export type RequestBildirimCorrectionPayload = {
+  correction_reason: string;
 };
 
 function normalizeBildirim(data: unknown): Bildirim {
@@ -93,10 +103,38 @@ export async function updateBildirim(
 }
 
 export async function cancelBildirim(bildirimId: number | string): Promise<void> {
-  await apiRequest<ApiResponse<unknown>>(`${endpoints.bildirimler.detail(bildirimId)}/iptal`, {
+  await apiRequest<ApiResponse<unknown>>(endpoints.bildirimler.detail(bildirimId) + "/iptal", {
     method: "POST"
   });
   logAction({ action: "BILDIRIM_CANCEL", payload: { bildirim_id: bildirimId } });
+}
+
+export async function submitBildirim(bildirimId: number | string): Promise<Bildirim> {
+  const response = await apiRequest<ApiResponse<unknown>>(endpoints.bildirimler.submit(bildirimId), {
+    method: "POST"
+  });
+  const submitted = normalizeBildirim(response.data);
+  logAction({ action: "BILDIRIM_SUBMIT", payload: { bildirim_id: submitted.id } });
+  return submitted;
+}
+
+export async function requestBildirimCorrection(
+  bildirimId: number | string,
+  payload: RequestBildirimCorrectionPayload
+): Promise<Bildirim> {
+  const response = await apiRequest<ApiResponse<unknown>>(
+    endpoints.bildirimler.requestCorrection(bildirimId),
+    {
+      method: "POST",
+      body: JSON.stringify(payload)
+    }
+  );
+  const corrected = normalizeBildirim(response.data);
+  logAction({
+    action: "BILDIRIM_REQUEST_CORRECTION",
+    payload: { bildirim_id: corrected.id }
+  });
+  return corrected;
 }
 
 export async function markBildirimOkundu(bildirimId: number | string): Promise<Bildirim> {

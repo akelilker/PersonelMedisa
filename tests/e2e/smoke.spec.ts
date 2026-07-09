@@ -119,13 +119,23 @@ test.describe("e2e smoke", () => {
     await amirBildirimModal.getByLabel("Personel").selectOption("1");
     await amirBildirimModal
       .getByRole("group", { name: "Kayıt Senaryosu" })
-      .getByRole("button", { name: /[İI]zinsiz Gelmedi/i })
+      .getByRole("button", { name: "İzinsiz Gelmedi", exact: true })
       .click();
     await amirBildirimModal.getByLabel("Not / Açıklama").fill("Habersiz devamsızlık");
     await amirBildirimModal.getByRole("button", { name: "Kaydet" }).click();
 
-    await expect(page.locator(".bildirimler-list")).toContainText(/[İI]zinsiz Gelmedi/i);
+    await expect(page.locator(".bildirimler-list")).toContainText(/Gelmedi/i);
     await expect(page.locator(".bildirimler-list")).toContainText("Ayşe Yılmaz");
+    await expect(page.locator(".bildirimler-list")).toContainText(/Kayıt Durumu: .*Taslak/i);
+
+    const createdRow = page.locator(".bildirimler-item").first();
+    await expect(createdRow.getByRole("button", { name: "Gönder" })).toBeVisible();
+    await expect(createdRow.getByRole("button", { name: /Düzenle|Duzenle/i })).toBeVisible();
+    await createdRow.getByRole("button", { name: "Gönder" }).click();
+    await expect(createdRow).toContainText(/Kayıt Durumu: .*Gönderildi/i);
+    await expect(createdRow.getByRole("button", { name: "Gönder" })).toHaveCount(0);
+    await expect(createdRow.getByRole("button", { name: /Düzenle|Duzenle/i })).toHaveCount(0);
+    await expect(createdRow.getByRole("button", { name: /İptal|Iptal/i })).toHaveCount(0);
 
     await page.goto("/personeller");
     await expect(page).toHaveURL(/\/personeller$/);
@@ -193,35 +203,9 @@ test.describe("e2e smoke", () => {
     await page.goto("/bildirimler");
     await expect(page).toHaveURL(/\/bildirimler$/);
     await expect(page.locator(".modal-header h2").first()).toContainText("Günlük Kayıt Merkezi");
-
-    await page.getByRole("button", { name: "Yeni Günlük Kayıt" }).click();
-    const bildirimCreateModal = page.locator(".modal-container").last();
-    await expect(bildirimCreateModal).toBeVisible();
-    await bildirimCreateModal.getByLabel("Tarih").fill("2026-04-11");
-    await bildirimCreateModal.getByLabel("Personel").selectOption("1");
-    await bildirimCreateModal
-      .getByRole("group", { name: "Kayıt Senaryosu" })
-      .getByRole("button", { name: /Devams/i })
-      .click();
-    await bildirimCreateModal.getByLabel("Not / Açıklama").fill("Yeni günlük kayıt");
-    await bildirimCreateModal.getByRole("button", { name: "Kaydet" }).click();
-
-    await expect(page.locator(".bildirimler-list")).toContainText(/Devams/i);
-
-    await page.getByRole("button", { name: /Düzenle|Duzenle/i }).first().click();
-    const bildirimEditModal = page.locator(".modal-container").last();
-    await expect(bildirimEditModal).toBeVisible();
-    await bildirimEditModal
-      .getByRole("group", { name: "Kayıt Senaryosu" })
-      .getByRole("button", { name: "Raporlu" })
-      .click();
-    await bildirimEditModal.getByRole("button", { name: "Kaydet" }).click();
-
-    await expect(page.locator(".bildirimler-list")).toContainText("Raporlu");
-
-    page.once("dialog", (dialog) => void dialog.accept());
-    await page.getByRole("button", { name: /İptal|Iptal/i }).first().click();
-    await expect(page.locator(".bildirimler-list")).toContainText(/Kayıt Durumu: .*ptal/i);
+    await expect(
+      page.getByRole("button", { name: /Yeni Günlük Kayıt|Günlük Kayıt Gir/i })
+    ).toHaveCount(0);
 
     await page.goto("/finans");
     await expect(page).toHaveURL(/\/finans$/);
@@ -250,5 +234,56 @@ test.describe("e2e smoke", () => {
     page.once("dialog", (dialog) => void dialog.accept());
     await page.locator(".finans-list .module-item-actions button").nth(1).click();
     await expect(page.locator(".finans-list")).toContainText(/İptal|Iptal/i);
+  });
+
+  test("bolum yoneticisi gonderilmis gunluk kayitta duzeltme isteyebilir", async ({ page }) => {
+    await mockApi(page, "BOLUM_YONETICISI");
+    await login(page, { username: "bolum_yonetici", password: "demo123" });
+
+    await page.goto("/bildirimler");
+    await expect(page).toHaveURL(/\/bildirimler$/);
+    await expect(
+      page.getByRole("button", { name: /Yeni Günlük Kayıt|Günlük Kayıt Gir/i })
+    ).toHaveCount(0);
+
+    const sentRow = page.locator(".bildirimler-item").first();
+    await expect(sentRow).toContainText(/Kayıt Durumu: .*Gönderildi/i);
+    await expect(sentRow.getByRole("button", { name: /Düzenle|Duzenle/i })).toHaveCount(0);
+    await expect(sentRow.getByRole("button", { name: /İptal|Iptal/i })).toHaveCount(0);
+    await sentRow.getByRole("button", { name: /Düzeltme iste/i }).click();
+
+    const correctionModal = page.locator(".modal-container").last();
+    await expect(correctionModal).toBeVisible();
+    await correctionModal.getByLabel("Düzeltme Nedeni").fill("Saat bilgisi hatali");
+    await correctionModal.getByRole("button", { name: "Gönder" }).click();
+
+    await expect(sentRow).toContainText(/Kayıt Durumu: .*Düzeltme İstendi/i);
+    await expect(sentRow.getByRole("button", { name: /Düzeltme iste/i })).toHaveCount(0);
+  });
+
+  test("birim amiri iptal edilen gunluk kayitta write aksiyonlarini gormez", async ({ page }) => {
+    await mockApi(page, "BIRIM_AMIRI");
+    await login(page, { username: "birim", password: "secret" });
+
+    await page.goto("/bildirimler");
+    await page.getByRole("button", { name: /Günlük Kayıt Gir|Yeni Günlük Kayıt/i }).click();
+
+    const createModal = page.locator(".modal-container").last();
+    await createModal.getByLabel("Tarih").fill("2026-04-20");
+    await createModal.getByLabel("Personel").selectOption("1");
+    await createModal
+      .getByRole("group", { name: "Kayıt Senaryosu" })
+      .getByRole("button", { name: /Geç Geldi/i })
+      .click();
+    await createModal.getByRole("button", { name: "Kaydet" }).click();
+
+    const createdRow = page.locator(".bildirimler-item").first();
+    page.once("dialog", (dialog) => void dialog.accept());
+    await createdRow.getByRole("button", { name: /İptal|Iptal/i }).click();
+
+    await expect(createdRow).toContainText(/Kayıt Durumu: .*ptal/i);
+    await expect(createdRow.getByRole("button", { name: /Düzenle|Duzenle/i })).toHaveCount(0);
+    await expect(createdRow.getByRole("button", { name: "Gönder" })).toHaveCount(0);
+    await expect(createdRow.getByRole("button", { name: /İptal|Iptal/i })).toHaveCount(0);
   });
 });

@@ -9,6 +9,12 @@ import { SubeDetailListNotice } from "../../../components/states/SubeDetailListN
 import { useRoleAccess } from "../../../hooks/use-role-access";
 import { useBildirimler } from "../../../hooks/useBildirimler";
 import {
+  canCancelGunlukBildirim,
+  canEditGunlukBildirim,
+  canRequestCorrectionGunlukBildirim,
+  canSubmitGunlukBildirim
+} from "../../../lib/bildirim/gunluk-bildirim-actions";
+import {
   formatBildirimStateLabel
 } from "../../../lib/display/enum-display";
 import type { Bildirim } from "../../../types/bildirim";
@@ -26,6 +32,7 @@ import {
 
 const GUNLUK_KAYIT_CREATE_FORM_ID = "gunluk-kayit-create-form";
 const GUNLUK_KAYIT_EDIT_FORM_ID = "gunluk-kayit-edit-form";
+const GUNLUK_KAYIT_CORRECTION_FORM_ID = "gunluk-kayit-correction-form";
 const KAYIT_SENARYOSU_LABEL = "Kayıt Senaryosu";
 
 function digitsOnly(value: string | null | undefined) {
@@ -213,15 +220,24 @@ export function BildirimlerPage() {
     updateBildirimHandler,
     cancelingBildirimId,
     cancelBildirimHandler,
+    submittingBildirimId,
+    submitBildirimHandler,
+    correctingBildirim,
+    openCorrectionModal,
+    closeCorrectionModal,
+    correctionReason,
+    setCorrectionReason,
+    correctionErrorMessage,
+    isCorrectionSubmitting,
+    requestCorrectionHandler,
+    currentUserId,
     submitFilters,
     clearFilters,
     setPage
   } = useBildirimler();
 
   const { hasPermission, uiProfile } = useRoleAccess();
-  const canCreateBildirim = hasPermission("bildirimler.create");
-  const canEditBildirim = hasPermission("bildirimler.update");
-  const canCancelBildirim = hasPermission("bildirimler.cancel");
+  const canCreateBildirim = hasPermission("gunluk_bildirim.create");
   const canOpenBildirimDetail = hasPermission("bildirimler.detail.view");
   const isBirimAmiri = uiProfile === "birim_amiri";
   const location = useLocation();
@@ -308,26 +324,18 @@ export function BildirimlerPage() {
   }
 
   function handleEditSubmit(event: FormEvent<HTMLFormElement>) {
-    void updateBildirimHandler(event, canEditBildirim);
+    if (!editingBildirim) {
+      return;
+    }
+    void updateBildirimHandler(
+      event,
+      canEditGunlukBildirim(editingBildirim, hasPermission, currentUserId)
+    );
   }
 
   function handleCreatePersonelChange(value: string) {
     const selected = personelOptions.find((option) => String(option.id) === value);
     setCreateForm((prev) => ({
-      ...prev,
-      personelId: value,
-      departmanId:
-        typeof selected?.departman_id === "number"
-          ? String(selected.departman_id)
-          : value
-            ? prev.departmanId
-            : ""
-    }));
-  }
-
-  function handleEditPersonelChange(value: string) {
-    const selected = personelOptions.find((option) => String(option.id) === value);
-    setEditForm((prev) => ({
       ...prev,
       personelId: value,
       departmanId:
@@ -445,6 +453,12 @@ export function BildirimlerPage() {
             const personelCallHref = buildTelHref(personel?.telefon);
             const emergencyCallHref = buildTelHref(personel?.acil_durum_telefon);
             const preset = resolveGunlukKayitPreset(bildirim.bildirim_turu);
+            const canEditRow = canEditGunlukBildirim(bildirim, hasPermission, currentUserId);
+            const canCancelRow = canCancelGunlukBildirim(bildirim, hasPermission, currentUserId);
+            const canSubmitRow = canSubmitGunlukBildirim(bildirim, hasPermission, currentUserId);
+            const canRequestCorrectionRow = canRequestCorrectionGunlukBildirim(bildirim, hasPermission);
+            const rowBusy =
+              cancelingBildirimId === bildirim.id || submittingBildirimId === bildirim.id;
 
             return (
               <li key={bildirim.id} className="bildirimler-item">
@@ -482,22 +496,42 @@ export function BildirimlerPage() {
                       Detay
                     </Link>
                   ) : null}
-                  {canEditBildirim ? (
+                  {canEditRow ? (
                     <button
                       type="button"
                       className="universal-btn-aux"
-                      onClick={() => openEditModal(bildirim, canEditBildirim)}
-                      disabled={cancelingBildirimId === bildirim.id}
+                      onClick={() => openEditModal(bildirim, true)}
+                      disabled={rowBusy}
                     >
                       Düzenle
                     </button>
                   ) : null}
-                  {canCancelBildirim ? (
+                  {canSubmitRow ? (
                     <button
                       type="button"
                       className="universal-btn-aux"
-                      onClick={() => void cancelBildirimHandler(bildirim, canCancelBildirim)}
-                      disabled={cancelingBildirimId === bildirim.id}
+                      onClick={() => void submitBildirimHandler(bildirim)}
+                      disabled={rowBusy}
+                    >
+                      {submittingBildirimId === bildirim.id ? "Gönderiliyor..." : "Gönder"}
+                    </button>
+                  ) : null}
+                  {canRequestCorrectionRow ? (
+                    <button
+                      type="button"
+                      className="universal-btn-aux"
+                      onClick={() => openCorrectionModal(bildirim)}
+                      disabled={rowBusy}
+                    >
+                      Düzeltme iste
+                    </button>
+                  ) : null}
+                  {canCancelRow ? (
+                    <button
+                      type="button"
+                      className="universal-btn-aux"
+                      onClick={() => void cancelBildirimHandler(bildirim, true)}
+                      disabled={rowBusy}
                     >
                       {cancelingBildirimId === bildirim.id ? "İptal Ediliyor..." : "İptal"}
                     </button>
@@ -655,7 +689,8 @@ export function BildirimlerPage() {
         </AppModal>
       ) : null}
 
-      {canEditBildirim && editingBildirim ? (
+      {editingBildirim &&
+      canEditGunlukBildirim(editingBildirim, hasPermission, currentUserId) ? (
         <AppModal
           title={`Günlük Kaydı Düzenle #${editingBildirim.id}`}
           onClose={closeEditModal}
@@ -686,8 +721,8 @@ export function BildirimlerPage() {
               name="bildirim-edit-tarih"
               type="date"
               value={editForm.tarih}
-              onChange={(value) => setEditForm((prev) => ({ ...prev, tarih: value }))}
-              required
+              onChange={() => undefined}
+              disabled
             />
 
             {personelSelectOptions.length > 0 ? (
@@ -696,8 +731,8 @@ export function BildirimlerPage() {
                 label="Personel"
                 name="bildirim-edit-personel"
                 value={editForm.personelId}
-                onChange={handleEditPersonelChange}
-                required
+                onChange={() => undefined}
+                disabled
                 placeholderOption={{ value: "", label: "Seçiniz" }}
                 selectOptions={personelSelectOptions}
               />
@@ -708,8 +743,8 @@ export function BildirimlerPage() {
                 type="number"
                 min={1}
                 value={editForm.personelId}
-                onChange={(value) => setEditForm((prev) => ({ ...prev, personelId: value }))}
-                required
+                onChange={() => undefined}
+                disabled
               />
             )}
 
@@ -732,8 +767,8 @@ export function BildirimlerPage() {
                 type="number"
                 min={1}
                 value={editForm.departmanId}
-                onChange={(value) => setEditForm((prev) => ({ ...prev, departmanId: value }))}
-                required
+                onChange={() => undefined}
+                disabled
               />
             )}
 
@@ -768,6 +803,52 @@ export function BildirimlerPage() {
             />
             {editErrorMessage ? <p className="bildirim-form-error">{editErrorMessage}</p> : null}
             {referenceError ? <p className="bildirim-form-error">{referenceError}</p> : null}
+          </form>
+        </AppModal>
+      ) : null}
+
+      {correctingBildirim ? (
+        <AppModal
+          title={`Düzeltme İste #${correctingBildirim.id}`}
+          onClose={closeCorrectionModal}
+          footer={
+            <div className="universal-btn-group modal-footer-actions">
+              <button
+                type="submit"
+                form={GUNLUK_KAYIT_CORRECTION_FORM_ID}
+                className="universal-btn-save"
+                disabled={isCorrectionSubmitting}
+              >
+                {isCorrectionSubmitting ? "Gönderiliyor..." : "Gönder"}
+              </button>
+              <button
+                type="button"
+                className="universal-btn-cancel"
+                onClick={closeCorrectionModal}
+                disabled={isCorrectionSubmitting}
+              >
+                Vazgeç
+              </button>
+            </div>
+          }
+        >
+          <form
+            id={GUNLUK_KAYIT_CORRECTION_FORM_ID}
+            className="bildirim-form-grid"
+            onSubmit={(event) => void requestCorrectionHandler(event)}
+          >
+            <FormField
+              as="textarea"
+              label="Düzeltme Nedeni"
+              name="bildirim-correction-reason"
+              value={correctionReason}
+              onChange={(value) => setCorrectionReason(value)}
+              rows={4}
+              required
+            />
+            {correctionErrorMessage ? (
+              <p className="bildirim-form-error">{correctionErrorMessage}</p>
+            ) : null}
           </form>
         </AppModal>
       ) : null}

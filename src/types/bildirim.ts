@@ -7,4 +7,9 @@ export type Bildirim = {
   aciklama?: string;
   state?: string;
   okundu_mi?: boolean;
+  created_by?: number | null;
+  updated_by?: number | null;
+  submitted_at?: string | null;
+  correction_requested_by?: number | null;
+  correction_reason?: string | null;
 };

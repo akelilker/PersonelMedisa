@@ -23,7 +23,9 @@ export const endpoints = {
   },
   bildirimler: {
     list: "/bildirimler",
-    detail: (id: number | string) => `/bildirimler/${id}`
+    detail: (id: number | string) => `/bildirimler/${id}`,
+    submit: (id: number | string) => `/bildirimler/${id}/submit`,
+    requestCorrection: (id: number | string) => `/bildirimler/${id}/request-correction`
   },
   puantaj: {
     detail: (personelId: number | string, tarih: string) =>

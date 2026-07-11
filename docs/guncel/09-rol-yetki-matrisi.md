@@ -9,13 +9,15 @@ Surum: `V3` (Ürün Reset — S70A)
 Bu dokuman, rol bazli gorunurluk ve aksiyon yetkilerini tek yerde sabitler.
 Ürün reset sonrasi hedef permission matrisidir.
 
-**Onemli:** Bu S70A dokuman revizyonudur. Asagidaki yeni permission anahtarlari henuz `src/lib/authorization/role-permissions.ts` icinde uygulanmamis olabilir. Kod fazina gecilmeden once bu belge karar sozlesmesi olarak okunmalidir.
+**Onemli:** S70C-S72 bildirim permission'lari 11.07.2026 itibarıyla çalışan kod gerçekliğine göre aşağıda güncellenmiştir. Genel Yönetici, patron, şirket parametreleri ve bordro permission'ları ise farklı legacy/hedef domain'leri de içerir; bir permission adının tanımlı olması ilgili uçtan uca ürün akışının tamamlandığı anlamına gelmez.
 
 Mevcut kod referansi (gecis donemi):
 
 - `src/lib/authorization/role-permissions.ts`
 
-## Roller
+## Hedef Ürün Rolleri
+
+Aşağıdaki kısa tanımlar hedef ürün sorumluluklarını anlatır. Güncel S70C-S72 bildirim owner'ları, devamındaki permission matrisinde çalışan kod gerçekliğine göre ayrıca gösterilir.
 
 | Rol | Kisa tanim |
 |-----|------------|
@@ -25,7 +27,7 @@ Mevcut kod referansi (gecis donemi):
 | `PATRON` | Sembolik gordu/not; bordroyu bloklamaz |
 | `MUHASEBE` | Bordro on izleme ve rapor kontrolu; operasyonel onay sahibi degil |
 
-## Yeni Permission Anahtarlari (S70A Hedef)
+## Permission Anahtarları — Güncel Bildirim Zinciri ve Hedef Domain'ler
 
 ### Gunluk bildirim
 
@@ -44,7 +46,18 @@ Mevcut kod referansi (gecis donemi):
 | `haftalik_mutabakat.approve` | A4/imza mutabakat onayi |
 | `haftalik_mutabakat.reopen_request` | Kapali hafta icin revizyon talebi acma |
 
-### Aylik onay
+`haftalik_mutabakat.reopen_request` permission adı tanımlıdır; S71 haftalık bildirim mutabakatında çalışan reopen endpoint/UI akışı yoktur.
+
+### Aylık bildirim onayı — S72 güncel
+
+| Permission | Açıklama |
+|---|---|
+| `aylik_bildirim_onayi.view` | Aylık bildirim özeti ve onayını görüntüleme |
+| `aylik_bildirim_onayi.approve` | BIRIM_AMIRI aylık bildirim onayı oluşturma |
+
+### Legacy/hedef aylık bölüm ve Genel Yönetici onayı
+
+Bu permission'lar yeni S72 `aylik_bildirim_onayi.*` domain'i değildir. Legacy `aylik-ozet` ve hedef üst onay zincirinde ayrı tutulur.
 
 | Permission | Aciklama |
 |------------|----------|
@@ -83,7 +96,9 @@ Mevcut kod referansi (gecis donemi):
 - `gunluk_bildirim.submit` — evet
 - `gunluk_bildirim.request_correction` — hayir
 - `haftalik_mutabakat.view` — sinirli (kendi birimi ozeti)
-- `haftalik_mutabakat.approve` — hayir
+- `haftalik_mutabakat.approve` — evet (kendi haftası / şube kapsamı)
+- `aylik_bildirim_onayi.view` — evet (kendi ayı / şube kapsamı)
+- `aylik_bildirim_onayi.approve` — evet
 - `aylik_bolum_onayi.*` — hayir
 - `genel_yonetici_onayi.*` — hayir
 - `patron_ack.*` — hayir
@@ -103,8 +118,10 @@ Ek (mevcut kod — gecis):
 - `gunluk_bildirim.create` — hayir (denetler, girmez)
 - `gunluk_bildirim.request_correction` — evet (kendi bolumu)
 - `haftalik_mutabakat.view` — evet (kendi bolumu)
-- `haftalik_mutabakat.approve` — evet (kendi bolumu)
-- `haftalik_mutabakat.reopen_request` — evet (revizyon talebi ile)
+- `haftalik_mutabakat.approve` — hayir; güncel S71 approve sahibi `BIRIM_AMIRI`
+- `haftalik_mutabakat.reopen_request` — permission tanımlı, çalışan S71 reopen akışı yok
+- `aylik_bildirim_onayi.view` — evet (read-only)
+- `aylik_bildirim_onayi.approve` — hayir
 - `aylik_bolum_onayi.view` — evet
 - `aylik_bolum_onayi.approve` — evet (kendi bolumu)
 - `genel_yonetici_onayi.*` — hayir
@@ -117,6 +134,9 @@ Ek (mevcut kod — gecis):
 ### GENEL_YONETICI
 
 - Tum kapsamda `haftalik_mutabakat.view`
+- `haftalik_mutabakat.approve` — hayir
+- `aylik_bildirim_onayi.view` — evet (read-only)
+- `aylik_bildirim_onayi.approve` — hayir
 - `genel_yonetici_onayi.view` — evet
 - `genel_yonetici_onayi.approve` — evet
 - `sirket_parametreleri.view` — evet
@@ -136,6 +156,10 @@ Ek (mevcut kod — gecis):
 
 ### MUHASEBE
 
+- `haftalik_mutabakat.view` — evet (read-only)
+- `haftalik_mutabakat.approve` — hayir
+- `aylik_bildirim_onayi.view` — evet (read-only)
+- `aylik_bildirim_onayi.approve` — hayir
 - `bordro_on_izleme.view` — evet
 - Finans / bordro rapor `view` — evet
 - Operasyonel onay (`haftalik_mutabakat.approve`, `aylik_bolum_onayi.approve`, `genel_yonetici_onayi.approve`) — hayir
@@ -171,7 +195,9 @@ Asagidaki anahtarlar kodda halen kullanilmaktadir. S70B kod fazinda yeni anahtar
 - `puantaj.update`: yonetim rolleri
 - `puantaj.amir_kontrol`: `BIRIM_AMIRI`
 
-### Aylik kapanis ozeti (gecis — aylik_bolum_onayi.* / genel_yonetici_onayi.* ile birlestirilecek)
+### Legacy aylık kapanış özeti
+
+`aylik-ozet.*`, `aylik_bolum_onayi.*` ve `genel_yonetici_onayi.*` permission'ları yeni S72 `aylik_bildirim_onayi.*` ile aynı domain değildir ve otomatik bağlı değildir.
 
 - `aylik-ozet.view`: `GENEL_YONETICI`, `BOLUM_YONETICISI`
 - `aylik-ozet.review`: `BOLUM_YONETICISI` — bolum onayi
@@ -189,7 +215,9 @@ Asagidaki anahtarlar kodda halen kullanilmaktadir. S70B kod fazinda yeni anahtar
 
 - `finans.view/create/update/cancel`: yonetim rolleri (`BIRIM_AMIRI` ve `PATRON` haric)
 
-## Rota Korumalari (Hedef)
+## Rota Korumaları — Güncel ve Hedef Ayrımı
+
+Güncel S71/S72 haftalık ve aylık bildirim panelleri `/bildirimler` sayfasına gömülüdür. Aşağıdaki `/haftalik-mutabakat`, `/aylik-kapanis-ozeti`, patron ve bordro rotaları tarihsel/hedef ürün yüzeyleridir; çalışan S71/S72 endpoint adları değildir.
 
 | Rota | Permission |
 |------|------------|
@@ -200,15 +228,15 @@ Asagidaki anahtarlar kodda halen kullanilmaktadir. S70B kod fazinda yeni anahtar
 | `/bordro-on-izleme` | `bordro_on_izleme.view` |
 | `/yonetim-paneli/sirket-parametreleri` | `sirket_parametreleri.manage` |
 
-Gecis donemi: `/haftalik-kapanis` rotasi halen `/` yonlendirmesi yapabilir; S70D'de `/haftalik-mutabakat` ile degistirilecektir.
+Tarihsel hedef notu: `/haftalik-kapanis` rotası `/` yönlendirmesi yapabilir. Güncel S71 paneli `/bildirimler` içinde ve `/haftalik-bildirim-mutabakatlari` API ailesiyle çalışır.
 
 ## UI Davranis Kurallari
 
 - Yetkisiz aksiyon butonlari kullaniciya gosterilmez.
 - Yetkisiz route denemelerinde kullanici `yetkisiz` ekranina yonlendirilir.
-- `BIRIM_AMIRI` sade yuzunde yalnizca gunluk bildirim ve sinirli goruntuleme vardir.
-- `BOLUM_YONETICISI` haftalik mutabakat ve aylik bolum onayi verir; gunluk kayit girmez.
-- `GENEL_YONETICI` bolum onayi tamamlanmadan ust onay veremez (UI ve backend).
+- `BIRIM_AMIRI` sade yüzünde günlük bildirim write, haftalık bildirim mutabakatı approve ve aylık bildirim onayı approve sahibidir.
+- `BOLUM_YONETICISI` günlük kayıt girmez; uygun kayıtta düzeltme isteyebilir ve haftalık/aylık bildirim panellerini salt okunur görür.
+- Legacy `aylik-ozet` hattında `GENEL_YONETICI` bölüm onayı tamamlanmadan üst onay veremez; bu guard yeni S72 aylık bildirim onayına henüz bağlı değildir.
 - `PATRON` yalnizca gordu/not birakir; bordro butonlari gorunmez.
 - `MUHASEBE` bordro on izleme ve rapor gorur; operasyonel onay butonlari gorunmez.
 - Yetkisiz API denemeleri backend permission kontrolunden gecmelidir.

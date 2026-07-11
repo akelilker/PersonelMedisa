@@ -97,6 +97,24 @@ Sistemde “bildirim” iki ayrı katman olarak düşünülür:
 - Şirket parametresi eksikse hesap kesinleşmez.
 - Frontend nihai maaş/puantaj hesabı yapmaz.
 
+## Güncel Bildirim Onay Zinciri
+
+11.07.2026 itibarıyla uygulanmış operasyon zinciri şöyledir:
+
+```text
+Günlük bölüm amiri bildirimi
+  -> haftalık bildirim mutabakatı
+  -> aylık bildirim onayı
+```
+
+- Günlük bildirimin, haftalık bildirimin ve aylık bildirim onayının create/read/approve akışları çalışır.
+- Bu zincirin write ve approve sahibi `BIRIM_AMIRI` rolüdür; yönetim rolleri haftalık ve aylık panelleri salt okunur görür.
+- Bildirim onay zinciri henüz puantaj hesap motoruna gerçek backend girdisi olarak bağlı değildir.
+- Legacy aylık özet üzerindeki Genel Yönetici onayı, yeni aylık bildirim onayı domain'ine henüz bağlı değildir.
+- Bordro ön izleme ve bordro kesinleştirme ayrı sonraki ürün fazlarıdır.
+
+Yukarıdaki zincir güncel uygulanmış operasyon zinciridir. Ana operasyon zincirindeki bölüm onayı, Genel Yönetici onayı, patron görünürlüğü ve bordro hedefleri ürünün hedef zincirini anlatmaya devam eder.
+
 ## 5. Doküman Haritası
 
 - Ürün yönü ve kapsam: `01-urun-anayasasi.md`

@@ -134,9 +134,21 @@ Her fazın çıkış kriteri `05-state-flow-api-kontrati.md` ve `09-rol-yetki-ma
 
 Önceki V1 kararında “tam bordro motoru kurmak hedef değil; doğru veri, doğru state ve doğru UI omurgasını ayağa kaldırmak” ifadesi kullanılmıştı. Ürün reset (RAPOR-01/02/03/04) ile bu karar **aktif ana karar olmaktan çıkarılmıştır**. Omurga kodu korunur; ürün ekseni bordro yönetim sistemine çekilir.
 
+## Uygulanmış Faz Durumu — 11.07.2026
+
+- S70C günlük bildirim fazı tamamlandı.
+- S71 haftalık bildirim mutabakatı fazı tamamlandı.
+- S72 aylık bildirim onayı fazı tamamlandı.
+- Bu üç fazın güncel write/approve sahibi `BIRIM_AMIRI` rolüdür.
+- `BOLUM_YONETICISI`, `GENEL_YONETICI` ve `MUHASEBE` haftalık ve aylık bildirim panellerini salt okunur görür.
+- Yeni aylık bildirim onayı domain'ine bağlı Genel Yönetici üst onayı ve patron katmanı henüz yoktur.
+- Bildirim zincirinin puantaj hesap motoru ve bordro girdisiyle gerçek backend köprüsü henüz yoktur.
+
+Bu bölüm çalışan mevcut zinciri kaydeder. Bölüm onayı, Genel Yönetici onayı, patron görünürlüğü, hesap motoru ve nihai bordrodan oluşan daha geniş akış ise **hedef ürün zinciridir**; S70C-S72'nin tamamlanması ürünün tamamlandığı anlamına gelmez.
+
 ## 5. Roller ve Yüz Ayrımı
 
-Temel roller:
+Hedef ürün zincirindeki temel roller:
 
 | Rol | Kısa sorumluluk |
 |-----|-----------------|
@@ -145,6 +157,8 @@ Temel roller:
 | `GENEL_YONETICI` | Bordro öncesi operasyonel onay; şirket parametreleri; manuel inceleme çözümü |
 | `PATRON` | Sembolik gördü/not; bordroyu bloklamaz |
 | `MUHASEBE` | Bordro ön izleme ve rapor kontrolü; operasyonel onay sahibi değil |
+
+Bu tablo hedef ürün sorumluluklarını gösterir. S70C-S72 kapsamında uygulanmış haftalık ve aylık bildirim approve sahibi yukarıdaki faz durumu bölümünde belirtildiği üzere `BIRIM_AMIRI` rolüdür.
 
 Ana ilke:
 

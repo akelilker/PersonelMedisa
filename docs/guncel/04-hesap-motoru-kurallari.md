@@ -123,6 +123,18 @@ Hesap motoru bordro çıktısı üretmeden önce backend şu state'leri doğrula
 
 Patron ack (`GORULDU` / `NOT_EKLENDI`) bu önkoşul listesinde yer almaz.
 
+## Uygulama Durumu Notu — Bildirim Zinciri
+
+11.07.2026 itibarıyla günlük bildirim, haftalık bildirim mutabakatı ve aylık bildirim onayı domain'leri kendi operasyon kapsamlarında çalışır.
+
+- Bu kayıtlar henüz hesap motorunun gerçek backend girdisi değildir.
+- Bir bildirimde görünen “kesinti adayı”, “fazla çalışma adayı” veya benzeri hesap etkisi otomatik olarak kesinleşmez.
+- Bildirim onayının tamamlanmış olması kaydın bordroya esas olduğu anlamına gelmez.
+- Bildirim zinciri ile hesap motoru arasındaki köprü ayrı geliştirme fazıdır.
+- Aylık bildirim onayı ile bordro girdisi ve bordro kesinleştirme arasında otomatik bağlantı yoktur.
+
+Bu uygulama durumu notu aşağıdaki mevzuat kararlarını veya hesap formüllerini değiştirmez; yalnızca çalışan kod ile hedef hesap zinciri arasındaki sınırı kaydeder.
+
 ## 1. Hesap Motorunun Veri Girdileri
 
 Hesap motorunun doğru çalışması için minimum girdiler şunlardır:

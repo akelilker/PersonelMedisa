@@ -61,6 +61,69 @@ Günlük Bildirim (BIRIM_AMIRI)
   -> Patron Ack (sembolik, paralel veya sonrası — bloklamaz)
 ```
 
+Bu özet hedef ürün zinciridir. Güncel uygulanmış S70C-S72 bildirim zincirinin owner ve endpoint kontratı aşağıda ayrıca tanımlanmıştır.
+
+## Güncel Bildirim State Flow — S70C-S72
+
+Bu bölüm 11.07.2026 tarihindeki çalışan kod kontratını kaydeder. Bildirim onay zinciri; puantaj teknik kapanışı, legacy aylık özet ve bordro kesinleştirme domain'lerinden ayrıdır.
+
+### Günlük bildirim
+
+DB sahibi: `gunluk_bildirimler`; write sahibi: `BIRIM_AMIRI`.
+
+Çalışan state'ler: `TASLAK`, `GONDERILDI`, `DUZELTME_ISTENDI`, `HAFTALIK_MUTABAKATA_ALINDI`, `IPTAL`.
+
+| İşlem | Endpoint | Permission |
+|---|---|---|
+| Liste | `GET /bildirimler` | `bildirimler.view` ve scope guard |
+| Detay | `GET /bildirimler/{id}` | `bildirimler.detail.view` |
+| Oluştur | `POST /bildirimler` | `gunluk_bildirim.create` |
+| Güncelle | `PUT /bildirimler/{id}` | `gunluk_bildirim.update_own_open` |
+| Gönder | `POST /bildirimler/{id}/submit` | `gunluk_bildirim.submit` |
+| Düzeltme iste | `POST /bildirimler/{id}/request-correction` | `gunluk_bildirim.request_correction` |
+| İptal | `POST /bildirimler/{id}/iptal` | `gunluk_bildirim.update_own_open` |
+
+`BIRIM_AMIRI` yalnız kendi açık kaydını güncelleyebilir. Yönetim rolü uygun `GONDERILDI` kaydı için düzeltme isteyebilir. Geçersiz state geçişleri `409` döner.
+
+### Haftalık bildirim mutabakatı
+
+DB sahibi: `haftalik_bildirim_mutabakatlari`; approve sahibi: `BIRIM_AMIRI`.
+
+| İşlem | Endpoint | Permission |
+|---|---|---|
+| Özet | `GET /haftalik-bildirim-mutabakatlari/ozet` | `haftalik_mutabakat.view` |
+| Approve | `POST /haftalik-bildirim-mutabakatlari` | `haftalik_mutabakat.approve` |
+| Detay | `GET /haftalik-bildirim-mutabakatlari/{id}` | `haftalik_mutabakat.view` |
+
+- Başarılı mutabakat kaydı `TAMAMLANDI` state'i taşır.
+- Bağlanan günlük kayıtlar `HAFTALIK_MUTABAKATA_ALINDI` state'ine geçer.
+- Aynı şube, Birim Amiri ve hafta için tekrar approve `409` döner.
+- `BOLUM_YONETICISI`, `GENEL_YONETICI` ve `MUHASEBE` paneli permission üzerinden salt okunur görür; approve sahibi değildir.
+
+### Aylık bildirim onayı
+
+DB sahibi: `aylik_bildirim_onaylari`; approve sahibi: `BIRIM_AMIRI`.
+
+| İşlem | Endpoint | Permission |
+|---|---|---|
+| Özet | `GET /aylik-bildirim-onaylari/ozet` | `aylik_bildirim_onayi.view` |
+| Approve | `POST /aylik-bildirim-onaylari` | `aylik_bildirim_onayi.approve` |
+| Detay | `GET /aylik-bildirim-onaylari/{id}` | `aylik_bildirim_onayi.view` |
+
+- Ay formatı `YYYY-MM` biçimindedir.
+- Ay tarih aralığı gerçek takvim ayının ilk ve son günüdür. Örnek: `2026-07` için `2026-07-01 / 2026-07-31`.
+- Başarılı aylık bildirim onayı `TAMAMLANDI` state'i taşır.
+- Eksik veya mutabakata alınmamış bildirim/hafta onayı bloklar.
+- Aynı şube, Birim Amiri ve ay için tekrar approve `409` döner.
+- Yönetim rolleri paneli salt okunur görür; yeni S72 approve sahibi değildir.
+
+### Domain sınırı
+
+- `aylik_bildirim_onaylari`, legacy `aylik_ozet_satirlari` / `aylik-ozet` domain'i değildir.
+- Legacy aylık özet üzerindeki Genel Yönetici onayı yeni aylık bildirim onayına henüz bağlı değildir.
+- Günlük puantaj, haftalık kapanış/snapshot ve puantaj aylık mühürleri ayrı teknik state flow'dur.
+- Bildirim onayının tamamlanması bordro girdisinin veya bordro kesinliğinin oluştuğu anlamına gelmez.
+
 ## 1. Ortak API Sözleşmesi
 
 ### 1.1 Format
@@ -491,7 +554,9 @@ Kararlar:
 
 İptal edilen kayıtlar fiziksel silinmez; `IPTAL` state veya eşdeğer audit kaydı tutulur (geriye uyumluluk).
 
-### 8.2.1 State Modeli — Haftalık Mutabakat
+### 8.2.1 Tarihsel Başlangıç Kontratı — Haftalık Mutabakat
+
+Bu state seti S70A hedef modelidir. Güncel çalışan S71 kontratı üstteki “Güncel Bildirim State Flow — S70C-S72” bölümündedir; çalışan kaydın state'i `TAMAMLANDI`, approve sahibi `BIRIM_AMIRI` rolüdür.
 
 | State | Açıklama |
 |-------|----------|
@@ -503,7 +568,9 @@ Kararlar:
 | `MUTABAKAT_TAMAMLANDI` | Amir mutabakatı tamamlandı; aylık onay önkoşulu sağlandı |
 | `TEKNIK_KAPANIS_YAPILDI` | Snapshot/mühür üretildi; hafta teknik olarak kilitlendi |
 
-### 8.2.2 State Modeli — Aylık Onay
+### 8.2.2 Hedef Ürün Kontratı — Aylık Bölüm/Genel Yönetici Onayı
+
+Bu hedef state seti yeni S72 `aylik_bildirim_onaylari` domain'i değildir. Yeni aylık bildirim onayının çalışan kontratı üst bölümde ayrıca tanımlanmıştır.
 
 | State | Açıklama |
 |-------|----------|
@@ -629,20 +696,20 @@ Yanıt:
 - mühürlü güne doğrudan yazılamaz
 - backend `409 PERIOD_LOCKED` döner
 
-## 10. Haftalık Mutabakat ve Teknik Kapanış State Flow
+## 10. Tarihsel Hedef — Haftalık Mutabakat ve Teknik Kapanış State Flow
 
 ### 10.1 Amaç
 
 Haftalık süreç iki katmandan oluşur:
 
-1. **Haftalık mutabakat (operasyonel):** `BOLUM_YONETICISI`, `BIRIM_AMIRI` günlük bildirimlerini ve haftalık özeti A4/imza mutabakatı ile onaylar.
+1. **Haftalık mutabakat (tarihsel S70A hedefi):** Bu alt bölümde `BOLUM_YONETICISI` sahibiyle tasarlanan model uygulanmış S71 değildir. Güncel S71'de approve sahibi `BIRIM_AMIRI` rolüdür.
 2. **Teknik kapanış (sistem):** Onaylı hafta için snapshot üretilir ve hafta mühürlenir.
 
 Teknik kapanış, operasyonel mutabakatın yerine geçmez. Mutabakat tamamlanmadan teknik kapanış tetiklenemez.
 
-### 10.2 Endpoint'ler (hedef kontrat)
+### 10.2 Endpoint'ler (uygulanmamış eski hedef)
 
-Operasyonel mutabakat (kod fazında eklenecek):
+Operasyonel mutabakat için aşağıdaki adlar uygulanmamış eski hedef kontrattır; güncel çalışan endpointler üst bölümdeki `/haftalik-bildirim-mutabakatlari` ailesidir:
 
 - `GET /api/haftalik-mutabakat` — hafta özeti listesi
 - `POST /api/haftalik-mutabakat/{haftaId}/onay` — `BOLUM_YONETICISI` mutabakat onayı
@@ -686,7 +753,9 @@ Teknik kapanış (mevcut):
 - teknik kapanış sonrası hafta normal kullanıcı için yeniden açılmaz
 - değişiklik ihtiyacı revizyon talebi akışı ile yürür (`51-haftalik-kapanis-revizyon-talebi-karar.md`)
 
-## 11. Aylık Onay, Bordro ve Patron Ack State Flow
+## 11. Legacy/Hedef Aylık Özet, Bordro ve Patron Ack State Flow
+
+Bu bölüm legacy `aylik_ozet_satirlari` / `aylik-ozet` ve hedef bordro zincirini anlatır. Yeni S72 `aylik_bildirim_onaylari` domain'iyle otomatik bağlantısı yoktur.
 
 ### 11.1 Aylık Bölüm Onayı
 

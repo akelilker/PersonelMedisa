@@ -108,7 +108,7 @@ Yetkili kullanıcı devamsızlık, hastalık raporu veya benzeri yokluk sürecin
 - Sistem seçilen personelin bölümünü ve hızlı iletişim bilgilerini gösterir.
 - Amir `GEC_GELDI`, `GELMEDI`, `IZINLI_GELMEDI`, `IZINSIZ_GELMEDI`, `RAPORLU` veya görevde/erken çıktı gibi tiplerden birini seçerek kayıt girer.
 - Kayıt önce `TASLAK`, gönderimde `GONDERILDI` state'ine geçer.
-- Cut-off sonrası gönderim `GEC_GONDERILDI` olarak işaretlenir.
+- Güncel S70C çalışan state seti `TASLAK`, `GONDERILDI`, `DUZELTME_ISTENDI`, `HAFTALIK_MUTABAKATA_ALINDI` ve `IPTAL` değerlerinden oluşur.
 - Kayıt sürece otomatik dönüşmez; operasyonel ham veri olarak kalır.
 - Onaylı kayıtlar puantaj/bordro hesap zincirinin girdisi olabilir.
 
@@ -134,7 +134,6 @@ Yetkili kullanıcı devamsızlık, hastalık raporu veya benzeri yokluk sürecin
 
 ### 5.2 Akış
 
-- Geç gönderim `GEC_GONDERILDI` state'i ile audit izi bırakır.
 - `BOLUM_YONETICISI` düzeltme isterse kayıt `DUZELTME_ISTENDI` olur.
 - `BIRIM_AMIRI` kaydı düzeltir ve yeniden gönderir.
 - Haftalık mutabakata alınmış kayıt doğrudan düzenlenemez; revizyon akışı gerekir.
@@ -144,25 +143,27 @@ Yetkili kullanıcı devamsızlık, hastalık raporu veya benzeri yokluk sürecin
 - Audit trail korunur.
 - Haftalık mutabakat paketi güncellenene kadar bordro etkisi üretilmez.
 
-## 6. Haftalik A4/Imza Mutabakat Senaryosu
+## 6. Haftalık Bildirim Mutabakatı Senaryosu
 
 ### 6.1 Tetikleyici
 
-Hafta sonunda `BOLUM_YONETICISI` haftalık özeti kontrol eder.
+Hafta sonunda `BIRIM_AMIRI` Bildirimler sayfasındaki haftalık özeti kontrol eder.
 
 ### 6.2 Akış
 
-- Sistem haftanın günlük amir bildirimlerini, süreç ve puantaj verisiyle çapraz kontrol eder.
-- Eksik veya çelişkili kayıt varsa `CELISKI_VAR` veya `MANUEL_INCELEME` üretilir.
-- Sorun yoksa A4 mutabakat çıktısı üretilir; amir imza/onay metadata'sı kaydedilir.
-- Onay sonrası state `MUTABAKAT_TAMAMLANDI` olur.
-- Ardından sistem teknik kapanış/snapshot üretir (`TEKNIK_KAPANIS_YAPILDI`).
+- `BIRIM_AMIRI` hafta başlangıcını seçer ve gönderilmiş günlük bildirimleri kontrol eder.
+- Eksik, taslak veya düzeltme bekleyen kayıt varsa haftalık approve yapılamaz.
+- Koşullar uygunsa `POST /haftalik-bildirim-mutabakatlari` ile mutabakat oluşturulur.
+- Mutabakat kaydı `TAMAMLANDI` olur.
+- Bağlanan günlük kayıtlar `HAFTALIK_MUTABAKATA_ALINDI` state'ine geçer.
+- Aynı hafta için tekrar approve `409` döner.
+- Yönetim rolleri haftalık paneli salt okunur görür; approve sahibi değildir.
 
 ### 6.3 Sistem Etkisi
 
-- Hafta operasyonel olarak onaylanmış sayılır.
-- Aylık bölüm onayı için önkoşul sağlanır.
-- Teknik kapanış sonrası hafta düzenlemeye kapanır.
+- Hafta bildirim zinciri kapsamında mutabakata alınmış sayılır.
+- Aylık bildirim onayı için ilgili haftanın koşulu sağlanır.
+- Bu işlem puantaj teknik kapanışını veya snapshot'ı otomatik oluşturmaz; teknik kapanış ayrı domain'dir.
 
 ## 7. Celiskili Kayit Manuel Inceleme Senaryosu
 
@@ -182,25 +183,29 @@ Günlük bildirim, süreç ve puantaj verisi çelişir veya mevzuat/şirket para
 - Yanlış otomatik bordro üretimi engellenir.
 - Denetim izi korunur.
 
-## 8. Aylik BOLUM_YONETICISI Onay Senaryosu
+## 8. Aylık Bildirim Onayı Senaryosu
 
 ### 8.1 Tetikleyici
 
-Ay sonunda `BOLUM_YONETICISI` aylık özeti açar.
+`BIRIM_AMIRI` Bildirimler sayfasındaki Aylık Bildirim Onayı panelinden ayı seçer.
 
 ### 8.2 Akış
 
-- Sistem ilgili ay için haftalık mutabakatların tamamlanıp tamamlanmadığını kontrol eder.
-- Eksik hafta varsa onay butonu devre dışı kalır veya `409` döner.
-- Amir tüm haftaları ve personel satırlarını kontrol eder.
-- Onay verildiğinde satırlar `BOLUM_ONAYLANDI` olur.
+- Sistem gerçek takvim ayının ilk/son gününü ve ayla kesişen haftaları hesaplar.
+- Eksik veya mutabakata alınmamış bildirim/hafta varsa onay butonu devre dışı kalır veya API `409` döner.
+- Koşullar uygunsa `POST /aylik-bildirim-onaylari` ile aylık bildirim onayı oluşturulur.
+- Aylık bildirim onayı `TAMAMLANDI` state'ine geçer.
+- Aynı ay için tekrar approve `409` döner.
+- `BOLUM_YONETICISI`, `GENEL_YONETICI` ve `MUHASEBE` paneli salt okunur görür.
 
 ### 8.3 Sistem Etkisi
 
-- Genel yönetici onayı için önkoşul sağlanır.
-- Bordro ön izleme henüz üretilmez.
+- S70C-S72 bildirim onay zinciri kendi kapsamında tamamlanır.
+- Yeni aylık bildirim onayı henüz Genel Yönetici onayına, puantaj hesap motoruna veya bordro girdisine bağlanmaz.
 
-## 9. GENEL_YONETICI Bordro Oncesi Onay Senaryosu
+## 9. Legacy/Hedef GENEL_YONETICI Bordro Öncesi Onay Senaryosu
+
+Bu ve sonraki patron/bordro senaryoları hedef ürün zincirini ve legacy `aylik-ozet` hattını anlatır. Yeni S72 `aylik_bildirim_onaylari` domain'iyle otomatik bağlantı henüz yoktur.
 
 ### 9.1 Tetikleyici
 

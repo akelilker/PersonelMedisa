@@ -107,9 +107,13 @@ class ReferansController
 
         JsonResponse::success([
             'items' => [
-                ['key' => 'SISTEM', 'label' => 'Sistem'],
-                ['key' => 'SUREC', 'label' => 'Süreç'],
-                ['key' => 'UYARI', 'label' => 'Uyarı'],
+                ['key' => 'GELMEDI', 'label' => 'Gelmedi'],
+                ['key' => 'GEC_GELDI', 'label' => 'Geç Geldi'],
+                ['key' => 'ERKEN_CIKTI', 'label' => 'Erken Çıktı'],
+                ['key' => 'IZINLI', 'label' => 'İzinli'],
+                ['key' => 'RAPORLU', 'label' => 'Raporlu'],
+                ['key' => 'GOREVDE', 'label' => 'Görevde'],
+                ['key' => 'DIGER', 'label' => 'Diğer'],
             ],
         ]);
     }

@@ -106,4 +106,43 @@ describe("mock-demo API guards", () => {
     expect(response?.errors ?? []).toHaveLength(0);
     expect(response?.data).not.toBeNull();
   });
+
+  it("BIRIM_AMIRI demo bildirimini haftalik mutabakata alir ve ikinci onayi bloklar", () => {
+    const headers = demoHeaders("BIRIM_AMIRI", 99);
+    const created = resolveDemoApiResponse("/bildirimler", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        personel_id: 1,
+        tarih: "2099-01-05",
+        departman_id: 3,
+        bildirim_turu: "GEC_GELDI",
+        aciklama: "Demo mutabakat testi"
+      })
+    });
+    const bildirimId = (created?.data as { id?: number } | null)?.id;
+    expect(bildirimId).toBeGreaterThan(0);
+
+    const submitted = resolveDemoApiResponse(`/bildirimler/${bildirimId}/submit`, {
+      method: "POST",
+      headers
+    });
+    expect((submitted?.data as { state?: string } | null)?.state).toBe("GONDERILDI");
+
+    const approved = resolveDemoApiResponse("/haftalik-bildirim-mutabakatlari", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ hafta_baslangic: "2099-01-05" })
+    });
+    const linked = (approved?.data as { gunluk_bildirimler?: Array<{ state?: string }> } | null)
+      ?.gunluk_bildirimler;
+    expect(linked?.[0]?.state).toBe("HAFTALIK_MUTABAKATA_ALINDI");
+
+    const duplicate = resolveDemoApiResponse("/haftalik-bildirim-mutabakatlari", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ hafta_baslangic: "2099-01-05" })
+    });
+    expect(duplicate?.errors?.[0]?.code).toBe("CONFLICT");
+  });
 });

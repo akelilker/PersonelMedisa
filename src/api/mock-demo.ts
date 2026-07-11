@@ -7,7 +7,9 @@ import type {
 import { DEFAULT_ODEME_TIPI } from "../types/fazla-calisma-odeme-tercihi";
 import type { SerbestZamanEvent } from "../types/serbest-zaman";
 import type { UserRole } from "../types/auth";
+import type { HaftalikBildirimMutabakat } from "../types/haftalik-bildirim-mutabakat";
 import { hasRolePermission, type AppPermission } from "../lib/authorization/role-permissions";
+import { isMondayIsoDate, resolveHaftalikMutabakatApproval } from "../lib/bildirim/haftalik-mutabakat";
 import {
   SUBE_DELETE_BLOCKED_ERROR_CODE,
   SUBE_DELETE_BLOCKED_MESSAGE
@@ -131,6 +133,7 @@ type DemoBildirim = {
   submitted_at?: string | null;
   correction_requested_by?: number | null;
   correction_reason?: string | null;
+  haftalik_mutabakat_id?: number | null;
 };
 
 type DemoFinansKalem = {
@@ -281,6 +284,7 @@ const demoState: {
   zimmetler: DemoZimmet[];
   personelBelgeKayitlari: DemoPersonelBelgeKaydi[];
   bildirimler: DemoBildirim[];
+  haftalikBildirimMutabakatlari: HaftalikBildirimMutabakat[];
   finansKalemleri: DemoFinansKalem[];
   puantajMap: Record<string, DemoPuantaj>;
   makineler: DemoMakine[];
@@ -304,6 +308,7 @@ const demoState: {
     zimmet: number;
     personelBelgeKaydi: number;
     bildirim: number;
+    haftalikBildirimMutabakat: number;
     finans: number;
     kapanis: number;
     odemeTercihi: number;
@@ -458,6 +463,7 @@ const demoState: {
       updated_by: 3
     }
   ],
+  haftalikBildirimMutabakatlari: [],
   finansKalemleri: [
     {
       id: 901,
@@ -698,6 +704,7 @@ const demoState: {
     zimmet: 560,
     personelBelgeKaydi: 703,
     bildirim: 800,
+    haftalikBildirimMutabakat: 0,
     finans: 950,
     kapanis: 1000,
     odemeTercihi: 1,
@@ -2392,6 +2399,32 @@ export function resolveDemoApiResponse(
   const method = getMethod(init);
   const body = readBody(init);
 
+  const mutabakatWeek = (value: unknown) => {
+    if (typeof value !== "string" || !isMondayIsoDate(value)) return null;
+    const end = new Date(`${value}T00:00:00Z`);
+    end.setUTCDate(end.getUTCDate() + 6);
+    return { start: value, end: end.toISOString().slice(0, 10) };
+  };
+
+  const mutabakatScope = (actor: RevizyonActorContext) => {
+    const query = toNumber(requestUrl.searchParams.get("sube_id"));
+    if (query !== null) return actor.subeIds.length === 0 || actor.subeIds.includes(query) ? query : null;
+    return actor.subeIds.length === 1 ? actor.subeIds[0] : null;
+  };
+
+  const mutabakatCounts = (subeId: number, userId: number, start: string, end: string) => {
+    const rows = demoState.bildirimler.filter(
+      (item) => item.sube_id === subeId && item.created_by === userId &&
+        (item.tarih ?? "") >= start && (item.tarih ?? "") <= end
+    );
+    const count = (state: string) => rows.filter((item) => (item.state ?? "").toUpperCase() === state).length;
+    return {
+      toplam: rows.length, taslak: count("TASLAK"), gonderildi: count("GONDERILDI"),
+      duzeltme_istendi: count("DUZELTME_ISTENDI"),
+      haftalik_mutabakata_alindi: count("HAFTALIK_MUTABAKATA_ALINDI"), iptal: count("IPTAL")
+    };
+  };
+
   if (pathname === "/auth/login" && method === "POST") {
     const username = toStringValue(body.username) ?? "demo";
     const role = resolveDemoRole(username);
@@ -2414,6 +2447,77 @@ export function resolveDemoApiResponse(
         sube_ids
       }
     });
+  }
+
+  if (pathname === "/haftalik-bildirim-mutabakatlari/ozet" && method === "GET") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(actor, "haftalik_mutabakat.view");
+    if (permissionError) return permissionError;
+    const week = mutabakatWeek(requestUrl.searchParams.get("hafta_baslangic"));
+    if (!week) return demoRevizyonError("VALIDATION_ERROR", "Hafta baslangici Pazartesi olmalidir.");
+    const subeId = mutabakatScope(actor);
+    if (!subeId) return demoRevizyonError("VALIDATION_ERROR", "Haftalik mutabakat icin aktif sube secilmelidir.");
+    const existing = demoState.haftalikBildirimMutabakatlari.find(
+      (item) => item.sube_id === subeId && item.birim_amiri_user_id === actor.userId && item.hafta_baslangic === week.start
+    );
+    const counts = mutabakatCounts(subeId, actor.userId, week.start, week.end);
+    const approval = resolveHaftalikMutabakatApproval(counts, existing?.id ?? null);
+    return ok({
+      hafta_baslangic: week.start, hafta_bitis: week.end, sube_id: subeId,
+      birim_amiri_user_id: actor.userId, counts, ...approval,
+      mevcut_mutabakat_id: existing?.id ?? null
+    });
+  }
+
+  if (pathname === "/haftalik-bildirim-mutabakatlari" && method === "POST") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(actor, "haftalik_mutabakat.approve");
+    if (permissionError) return permissionError;
+    if (actor.role !== "BIRIM_AMIRI") return demoRevizyonError("FORBIDDEN", "Yalnizca birim amiri kendi haftasini onaylayabilir.");
+    const week = mutabakatWeek(body.hafta_baslangic);
+    if (!week) return demoRevizyonError("VALIDATION_ERROR", "Hafta baslangici Pazartesi olmalidir.");
+    const subeId = mutabakatScope(actor);
+    if (!subeId) return demoRevizyonError("FORBIDDEN", "Haftalik mutabakat icin aktif sube secilmelidir.");
+    const existing = demoState.haftalikBildirimMutabakatlari.find(
+      (item) => item.sube_id === subeId && item.birim_amiri_user_id === actor.userId && item.hafta_baslangic === week.start
+    );
+    const counts = mutabakatCounts(subeId, actor.userId, week.start, week.end);
+    const approval = resolveHaftalikMutabakatApproval(counts, existing?.id ?? null);
+    if (!approval.onaylanabilir_mi) return demoBildirimConflict(approval.blok_nedeni ?? "Hafta onaylanamaz.");
+    const now = new Date().toISOString();
+    const mutabakat: HaftalikBildirimMutabakat = {
+      id: ++demoState.nextIds.haftalikBildirimMutabakat, sube_id: subeId,
+      birim_amiri_user_id: actor.userId, hafta_baslangic: week.start, hafta_bitis: week.end,
+      state: "TAMAMLANDI", onaylayan_user_id: actor.userId,
+      onaylandi_at: now, created_at: now, updated_at: now
+    };
+    demoState.haftalikBildirimMutabakatlari.push(mutabakat);
+    const linked = demoState.bildirimler.filter(
+      (item) => item.sube_id === subeId && item.created_by === actor.userId &&
+        (item.tarih ?? "") >= week.start && (item.tarih ?? "") <= week.end && item.state === "GONDERILDI"
+    );
+    linked.forEach((item) => {
+      item.state = "HAFTALIK_MUTABAKATA_ALINDI";
+      item.haftalik_mutabakat_id = mutabakat.id;
+      item.updated_by = actor.userId;
+    });
+    return ok({ mutabakat, gunluk_bildirimler: linked, counts: { toplam: linked.length, baglanan: linked.length }, baglanan_kayit_sayisi: linked.length });
+  }
+
+  const mutabakatDetailMatch = pathname.match(/^\/haftalik-bildirim-mutabakatlari\/(\d+)$/);
+  if (mutabakatDetailMatch && method === "GET") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(actor, "haftalik_mutabakat.view");
+    if (permissionError) return permissionError;
+    const id = Number.parseInt(mutabakatDetailMatch[1], 10);
+    const mutabakat = demoState.haftalikBildirimMutabakatlari.find((item) => item.id === id);
+    if (!mutabakat) return demoRevizyonError("NOT_FOUND", "Haftalik mutabakat bulunamadi.");
+    const scopeAllowed = actor.subeIds.length === 0 || actor.subeIds.includes(mutabakat.sube_id);
+    if (!scopeAllowed || (actor.role === "BIRIM_AMIRI" && mutabakat.birim_amiri_user_id !== actor.userId)) {
+      return demoRevizyonError("FORBIDDEN", "Bu kayit aktif sube baglaminda goruntulenemiyor.");
+    }
+    const linked = demoState.bildirimler.filter((item) => item.haftalik_mutabakat_id === id);
+    return ok({ mutabakat, gunluk_bildirimler: linked, counts: { toplam: linked.length, baglanan: linked.length } });
   }
 
   if (pathname === "/isg/makineler" && method === "GET") {

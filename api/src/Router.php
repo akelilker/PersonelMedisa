@@ -7,6 +7,7 @@ namespace Medisa\Api;
 use Medisa\Api\Auth\AuthMiddleware;
 use Medisa\Api\Auth\LoginController;
 use Medisa\Api\Controllers\BildirimlerController;
+use Medisa\Api\Controllers\HaftalikBildirimMutabakatlariController;
 use Medisa\Api\Controllers\EkOdemeKesintiController;
 use Medisa\Api\Controllers\PersonelBelgelerController;
 use Medisa\Api\Controllers\PersonellerController;
@@ -135,6 +136,15 @@ class Router
         }
         if ($method === 'PUT' && preg_match('#^/bildirimler/(\d+)$#', $path, $matches)) {
             BildirimlerController::update($this->request, $matches[1]);
+        }
+        if ($path === '/haftalik-bildirim-mutabakatlari/ozet' && $method === 'GET') {
+            HaftalikBildirimMutabakatlariController::summary($this->request);
+        }
+        if ($path === '/haftalik-bildirim-mutabakatlari' && $method === 'POST') {
+            HaftalikBildirimMutabakatlariController::approve($this->request);
+        }
+        if ($method === 'GET' && preg_match('#^/haftalik-bildirim-mutabakatlari/(\d+)$#', $path, $matches)) {
+            HaftalikBildirimMutabakatlariController::detail($this->request, $matches[1]);
         }
         if ($path === '/surecler' && $method === 'GET') {
             SureclerController::list($this->request);

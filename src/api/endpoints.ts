@@ -27,6 +27,11 @@ export const endpoints = {
     submit: (id: number | string) => `/bildirimler/${id}/submit`,
     requestCorrection: (id: number | string) => `/bildirimler/${id}/request-correction`
   },
+  haftalikBildirimMutabakatlari: {
+    summary: "/haftalik-bildirim-mutabakatlari/ozet",
+    approve: "/haftalik-bildirim-mutabakatlari",
+    detail: (id: number | string) => `/haftalik-bildirim-mutabakatlari/${id}`
+  },
   puantaj: {
     detail: (personelId: number | string, tarih: string) =>
       `/gunluk-puantaj/${personelId}/${encodeURIComponent(tarih)}`,

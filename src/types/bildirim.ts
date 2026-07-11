@@ -12,4 +12,5 @@ export type Bildirim = {
   submitted_at?: string | null;
   correction_requested_by?: number | null;
   correction_reason?: string | null;
+  haftalik_mutabakat_id?: number | null;
 };

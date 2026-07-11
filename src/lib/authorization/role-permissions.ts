@@ -139,7 +139,6 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "aylik-ozet.review",
     "gunluk_bildirim.request_correction",
     "haftalik_mutabakat.view",
-    "haftalik_mutabakat.approve",
     "haftalik_mutabakat.reopen_request",
     "aylik_bolum_onayi.view",
     "aylik_bolum_onayi.approve",
@@ -174,6 +173,7 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "finans.create",
     "finans.update",
     "finans.cancel",
+    "haftalik_mutabakat.view",
     "bordro_on_izleme.view",
     "sirket_parametreleri.view",
     "revizyon.view",
@@ -205,7 +205,8 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "gunluk_bildirim.create",
     "gunluk_bildirim.update_own_open",
     "gunluk_bildirim.submit",
-    "haftalik_mutabakat.view"
+    "haftalik_mutabakat.view",
+    "haftalik_mutabakat.approve"
   ],
   PATRON: [
     "raporlar.view",

@@ -1137,6 +1137,20 @@ type MockBildirimRecord = {
   submitted_at?: string | null;
   correction_requested_by?: number | null;
   correction_reason?: string | null;
+  haftalik_mutabakat_id?: number | null;
+};
+
+type MockHaftalikMutabakat = {
+  id: number;
+  sube_id: number;
+  birim_amiri_user_id: number;
+  hafta_baslangic: string;
+  hafta_bitis: string;
+  state: "TAMAMLANDI";
+  onaylayan_user_id: number;
+  onaylandi_at: string;
+  created_at: string;
+  updated_at: string;
 };
 
 function normalizeMockBildirimTuru(value: string | null | undefined): string | null {
@@ -1158,6 +1172,8 @@ function isMockBildirimEditableState(state: string): boolean {
 type MockBildirimPageState = {
   items: MockBildirimRecord[];
   nextId: number;
+  mutabakatlar: MockHaftalikMutabakat[];
+  nextMutabakatId: number;
 };
 
 const bildirimStateByPage = new WeakMap<Page, MockBildirimPageState>();
@@ -1188,7 +1204,9 @@ function getBildirimPageState(page: Page): MockBildirimPageState {
 
   const created: MockBildirimPageState = {
     items: createInitialBildirimler(),
-    nextId: 800
+    nextId: 800,
+    mutabakatlar: [],
+    nextMutabakatId: 0
   };
   bildirimStateByPage.set(page, created);
   return created;
@@ -2378,6 +2396,38 @@ let personelBelgeKaydiIdCounter = 903;
     return (bildirim.created_by ?? 0) === mockUserId;
   }
 
+  function resolveMockMutabakatWeek(value: unknown): { start: string; end: string } | null {
+    if (typeof value !== "string" || !isValidDateString(value)) return null;
+    const date = new Date(`${value}T00:00:00Z`);
+    if (date.getUTCDay() !== 1) return null;
+    date.setUTCDate(date.getUTCDate() + 6);
+    return { start: value, end: date.toISOString().slice(0, 10) };
+  }
+
+  function mockMutabakatCounts(subeId: number, userId: number, start: string, end: string) {
+    const rows = bildirimler.filter(
+      (item) => item.sube_id === subeId && item.created_by === userId && item.tarih >= start && item.tarih <= end
+    );
+    const count = (state: string) => rows.filter((item) => item.state.toUpperCase() === state).length;
+    return {
+      toplam: rows.length,
+      taslak: count("TASLAK"),
+      gonderildi: count("GONDERILDI"),
+      duzeltme_istendi: count("DUZELTME_ISTENDI"),
+      haftalik_mutabakata_alindi: count("HAFTALIK_MUTABAKATA_ALINDI"),
+      iptal: count("IPTAL")
+    };
+  }
+
+  function mockMutabakatBlockReason(counts: ReturnType<typeof mockMutabakatCounts>, existing?: MockHaftalikMutabakat) {
+    if (existing) return "Bu hafta icin mutabakat zaten mevcut.";
+    if (counts.taslak > 0) return "Haftada taslak bildirim bulunuyor.";
+    if (counts.duzeltme_istendi > 0) return "Haftada duzeltme bekleyen bildirim bulunuyor.";
+    if (counts.haftalik_mutabakata_alindi > 0) return "Haftadaki bildirimler daha once mutabakata alinmis.";
+    if (counts.gonderildi < 1) return "Mutabakata alinacak gonderilmis bildirim bulunamadi.";
+    return null;
+  }
+
   async function denyUnlessRolePermission(route: Route, permission: AppPermission) {
     if (!hasRolePermission(role, permission)) {
       await fulfillJson(route, 403, errorBody("FORBIDDEN", "Bu islem icin yetkiniz yok."));
@@ -3521,6 +3571,99 @@ let personelBelgeKaydiIdCounter = 903;
 
       surec.state = "IPTAL";
       await fulfillJson(route, 200, okBody({ id: surec.id, state: surec.state }));
+      return;
+    }
+
+    if (path === "/api/haftalik-bildirim-mutabakatlari/ozet" && method === "GET") {
+      if (await denyUnlessRolePermission(route, "haftalik_mutabakat.view")) return;
+      const week = resolveMockMutabakatWeek(url.searchParams.get("hafta_baslangic"));
+      if (!week) {
+        await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "Hafta baslangici Pazartesi olmalidir.", "hafta_baslangic"));
+        return;
+      }
+      const subeId = getRequestSubeScope(request, url) ?? mockUserSubeIds[0] ?? null;
+      if (!subeId || (mockUserSubeIds.length > 0 && !mockUserSubeIds.includes(subeId))) {
+        await fulfillJson(route, subeId ? 403 : 422, errorBody(subeId ? "FORBIDDEN" : "VALIDATION_ERROR", "Haftalik mutabakat icin aktif sube secilmelidir."));
+        return;
+      }
+      const existing = bildirimPageState.mutabakatlar.find(
+        (item) => item.sube_id === subeId && item.birim_amiri_user_id === mockUserId && item.hafta_baslangic === week.start
+      );
+      const counts = mockMutabakatCounts(subeId, mockUserId, week.start, week.end);
+      const reason = mockMutabakatBlockReason(counts, existing);
+      await fulfillJson(route, 200, okBody({
+        hafta_baslangic: week.start, hafta_bitis: week.end, sube_id: subeId,
+        birim_amiri_user_id: mockUserId, counts, onaylanabilir_mi: reason === null,
+        blok_nedeni: reason, mevcut_mutabakat_id: existing?.id ?? null
+      }));
+      return;
+    }
+
+    if (path === "/api/haftalik-bildirim-mutabakatlari" && method === "POST") {
+      if (await denyUnlessRolePermission(route, "haftalik_mutabakat.approve")) return;
+      if (role !== "BIRIM_AMIRI") {
+        await fulfillJson(route, 403, errorBody("FORBIDDEN", "Yalnizca birim amiri kendi haftasini onaylayabilir."));
+        return;
+      }
+      const payload = request.postDataJSON() as { hafta_baslangic?: string };
+      const week = resolveMockMutabakatWeek(payload.hafta_baslangic);
+      if (!week) {
+        await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "Hafta baslangici Pazartesi olmalidir.", "hafta_baslangic"));
+        return;
+      }
+      const subeId = getRequestSubeScope(request, url) ?? mockUserSubeIds[0] ?? null;
+      if (!subeId || !mockUserSubeIds.includes(subeId)) {
+        await fulfillJson(route, subeId ? 403 : 422, errorBody(subeId ? "FORBIDDEN" : "VALIDATION_ERROR", "Haftalik mutabakat icin aktif sube secilmelidir."));
+        return;
+      }
+      const existing = bildirimPageState.mutabakatlar.find(
+        (item) => item.sube_id === subeId && item.birim_amiri_user_id === mockUserId && item.hafta_baslangic === week.start
+      );
+      const counts = mockMutabakatCounts(subeId, mockUserId, week.start, week.end);
+      const reason = mockMutabakatBlockReason(counts, existing);
+      if (reason) {
+        await fulfillJson(route, 409, errorBody("CONFLICT", reason));
+        return;
+      }
+      const now = new Date().toISOString();
+      const mutabakat: MockHaftalikMutabakat = {
+        id: ++bildirimPageState.nextMutabakatId, sube_id: subeId, birim_amiri_user_id: mockUserId,
+        hafta_baslangic: week.start, hafta_bitis: week.end, state: "TAMAMLANDI",
+        onaylayan_user_id: mockUserId, onaylandi_at: now, created_at: now, updated_at: now
+      };
+      bildirimPageState.mutabakatlar.push(mutabakat);
+      const linked = bildirimler.filter(
+        (item) => item.sube_id === subeId && item.created_by === mockUserId &&
+          item.tarih >= week.start && item.tarih <= week.end && item.state === "GONDERILDI"
+      );
+      linked.forEach((item) => {
+        item.state = "HAFTALIK_MUTABAKATA_ALINDI";
+        item.haftalik_mutabakat_id = mutabakat.id;
+        item.updated_by = mockUserId;
+      });
+      await fulfillJson(route, 201, okBody({
+        mutabakat, gunluk_bildirimler: linked,
+        counts: { toplam: linked.length, baglanan: linked.length }, baglanan_kayit_sayisi: linked.length
+      }));
+      return;
+    }
+
+    if (path.match(/^\/api\/haftalik-bildirim-mutabakatlari\/\d+$/) && method === "GET") {
+      if (await denyUnlessRolePermission(route, "haftalik_mutabakat.view")) return;
+      const id = Number.parseInt(path.split("/")[3] ?? "0", 10);
+      const mutabakat = bildirimPageState.mutabakatlar.find((item) => item.id === id);
+      if (!mutabakat) {
+        await fulfillJson(route, 404, errorBody("NOT_FOUND", "Haftalik mutabakat bulunamadi."));
+        return;
+      }
+      const scope = getRequestSubeScope(request, url);
+      if ((mockUserSubeIds.length > 0 && !mockUserSubeIds.includes(mutabakat.sube_id)) || (scope && scope !== mutabakat.sube_id)
+        || (role === "BIRIM_AMIRI" && mutabakat.birim_amiri_user_id !== mockUserId)) {
+        await fulfillJson(route, 403, errorBody("FORBIDDEN", "Bu kayit aktif sube baglaminda goruntulenemiyor."));
+        return;
+      }
+      const linked = bildirimler.filter((item) => item.haftalik_mutabakat_id === id);
+      await fulfillJson(route, 200, okBody({ mutabakat, gunluk_bildirimler: linked, counts: { toplam: linked.length, baglanan: linked.length } }));
       return;
     }
 

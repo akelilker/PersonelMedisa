@@ -382,3 +382,71 @@ test.describe("S70C-2 gunluk bildirim API role guards (mock-api)", () => {
     });
   });
 });
+
+test.describe("S71-B haftalik bildirim mutabakati API guards (mock-api)", () => {
+  const weekStart = "2026-04-06";
+
+  test("BIRIM_AMIRI ozet gorur, kendi kaydini onaylar ve ikinci onay 409 olur", async ({ page }) => {
+    await loginAs(page, "BIRIM_AMIRI");
+
+    const summary = await apiFetchJson(page, `/api/haftalik-bildirim-mutabakatlari/ozet?hafta_baslangic=${weekStart}`);
+    expect(summary.status).toBe(200);
+    expect((summary.data as { onaylanabilir_mi?: boolean }).onaylanabilir_mi).toBe(true);
+
+    const approved = await apiFetchJson(page, "/api/haftalik-bildirim-mutabakatlari", {
+      method: "POST",
+      body: { hafta_baslangic: weekStart }
+    });
+    expect(approved.status).toBe(201);
+    const detail = approved.data as {
+      mutabakat?: { id?: number };
+      gunluk_bildirimler?: Array<{ state?: string; haftalik_mutabakat_id?: number }>;
+    };
+    expect(detail.gunluk_bildirimler).toHaveLength(1);
+    expect(detail.gunluk_bildirimler?.[0]?.state).toBe("HAFTALIK_MUTABAKATA_ALINDI");
+    expect(detail.gunluk_bildirimler?.[0]?.haftalik_mutabakat_id).toBe(detail.mutabakat?.id);
+
+    await expect(apiFetch(page, "/api/haftalik-bildirim-mutabakatlari", {
+      method: "POST", body: { hafta_baslangic: weekStart }
+    })).resolves.toMatchObject({ status: 409 });
+  });
+
+  test("TASLAK ve DUZELTME_ISTENDI acik kayitlari onayi bloklar", async ({ page }) => {
+    await loginAs(page, "BIRIM_AMIRI");
+    const draft = await apiFetchJson(page, "/api/bildirimler", {
+      method: "POST", body: { ...BILDIRIM_CREATE_BODY, tarih: "2026-04-13" }
+    });
+    await expect(apiFetch(page, "/api/haftalik-bildirim-mutabakatlari", {
+      method: "POST", body: { hafta_baslangic: "2026-04-13" }
+    })).resolves.toMatchObject({ status: 409 });
+
+    const id = bildirimRecord(draft.data).id;
+    await apiFetchJson(page, `/api/bildirimler/${id}/submit`, { method: "POST" });
+    await loginAs(page, "BOLUM_YONETICISI");
+    await apiFetchJson(page, `/api/bildirimler/${id}/request-correction`, {
+      method: "POST", body: { correction_reason: "Eksik bilgi" }
+    });
+    await loginAs(page, "BIRIM_AMIRI");
+    await expect(apiFetch(page, "/api/haftalik-bildirim-mutabakatlari", {
+      method: "POST", body: { hafta_baslangic: "2026-04-13" }
+    })).resolves.toMatchObject({ status: 409 });
+  });
+
+  test("yonetim rolleri approve yapamaz ve scope disi detayi goremez", async ({ page }) => {
+    await loginAs(page, "BIRIM_AMIRI");
+    const approved = await apiFetchJson(page, "/api/haftalik-bildirim-mutabakatlari", {
+      method: "POST", body: { hafta_baslangic: weekStart }
+    });
+    const id = (approved.data as { mutabakat?: { id?: number } }).mutabakat?.id;
+
+    for (const role of ["GENEL_YONETICI", "BOLUM_YONETICISI", "MUHASEBE"] as const) {
+      await loginAs(page, role);
+      await expect(apiFetch(page, "/api/haftalik-bildirim-mutabakatlari", {
+        method: "POST", body: { hafta_baslangic: "2026-04-20" }
+      })).resolves.toMatchObject({ status: 403 });
+    }
+
+    await loginAs(page, "BOLUM_YONETICISI");
+    await expect(apiFetch(page, `/api/haftalik-bildirim-mutabakatlari/${id}`)).resolves.toMatchObject({ status: 403 });
+  });
+});

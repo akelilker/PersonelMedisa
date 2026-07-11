@@ -113,6 +113,14 @@ export function AppShell() {
   const showShellHeaderActions = !isModuleOverlayRoute && !isLoginRoute;
   const showUserBar = !isLoginRoute && !isModuleOverlayRoute && !isHomeRoute;
   const backBarTarget = resolveBackBar(pathname);
+  const activeSubeLabel = useMemo(() => {
+    const activeSubeId = session?.active_sube_id;
+    if (activeSubeId === null || activeSubeId === undefined) {
+      return null;
+    }
+
+    return session?.sube_list?.find((sube) => sube.id === activeSubeId)?.ad ?? null;
+  }, [session?.active_sube_id, session?.sube_list]);
 
   const {
     isKayitModalOpen,
@@ -147,7 +155,11 @@ export function AppShell() {
     <div className="app-container app-shell">
       <main className="content-wrap">
         <div className="shell-top-stack">
-          <Hero title="Personel Yönetim Sistemi" userLabel={session?.user.ad_soyad} />
+          <Hero
+            title="Personel Yönetim Sistemi"
+            userLabel={session?.user.ad_soyad}
+            subeLabel={activeSubeLabel}
+          />
           {showShellHeaderActions ? <ShellHeaderActions contextLabel="Ana panel" minimal={isHomeRoute} /> : null}
         </div>
 

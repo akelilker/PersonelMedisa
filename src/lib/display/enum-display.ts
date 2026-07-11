@@ -88,11 +88,14 @@ const KULLANICI_TIPI_LABELS: Record<KullaniciTipi, string> = {
 
 const BILDIRIM_TURU_LABELS: Record<string, string> = {
   DEVAMSIZLIK: "Devamsızlık",
+  DIGER: "Diğer",
   GEC_GELDI: "Geç Geldi",
   GEC_CIKTI: "Geç Çıktı",
   GELMEDI: "Gelmedi",
+  GOREVDE: "Görevde",
   IPTAL: "İptal",
   IPTAL_EDILDI: "İptal Edildi",
+  IZINLI: "İzinli",
   IZINLI_GELMEDI: "İzinli Gelmedi",
   IZINSIZ: "İzinsiz",
   IZINSIZ_GELMEDI: "İzinsiz Gelmedi",

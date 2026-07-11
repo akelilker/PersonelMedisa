@@ -468,7 +468,16 @@ test.describe("S72-B aylik bildirim onayi API guards (mock-api)", () => {
 
     const summary = await apiFetchJson(page, `/api/aylik-bildirim-onaylari/ozet?ay=${ay}`);
     expect(summary.status).toBe(200);
-    expect((summary.data as { onaylanabilir_mi?: boolean }).onaylanabilir_mi).toBe(true);
+    const summaryData = summary.data as {
+      ay?: string;
+      ay_baslangic?: string;
+      ay_bitis?: string;
+      onaylanabilir_mi?: boolean;
+    };
+    expect(summaryData.ay).toBe(ay);
+    expect(summaryData.ay_baslangic).toBe(`${ay}-01`);
+    expect(summaryData.ay_bitis).toBe("2026-04-30");
+    expect(summaryData.onaylanabilir_mi).toBe(true);
 
     const approved = await apiFetchJson(page, "/api/aylik-bildirim-onaylari", {
       method: "POST",

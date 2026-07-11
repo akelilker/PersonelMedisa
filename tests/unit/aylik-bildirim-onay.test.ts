@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  isDateWithinMonthRange,
   isValidAyValue,
   listWeeksIntersectingMonth,
   resolveAylikBildirimOnayApproval,
@@ -27,6 +28,10 @@ describe("aylik bildirim onayi helper", () => {
   });
 
   it("ay baslangic ve bitis tarihlerini hesaplar", () => {
+    expect(resolveAyBounds("2026-07")).toEqual({
+      ay_baslangic: "2026-07-01",
+      ay_bitis: "2026-07-31"
+    });
     expect(resolveAyBounds("2026-04")).toEqual({
       ay_baslangic: "2026-04-01",
       ay_bitis: "2026-04-30"
@@ -36,6 +41,24 @@ describe("aylik bildirim onayi helper", () => {
       ay_bitis: "2026-02-28"
     });
     expect(resolveAyBounds("bad")).toBeNull();
+  });
+
+  it("2026-07 icin ayla kesisen 5 hafta listeler", () => {
+    const weeks = listWeeksIntersectingMonth("2026-07-01", "2026-07-31");
+    expect(weeks).toHaveLength(5);
+    expect(weeks).toEqual([
+      { hafta_baslangic: "2026-06-29", hafta_bitis: "2026-07-05" },
+      { hafta_baslangic: "2026-07-06", hafta_bitis: "2026-07-12" },
+      { hafta_baslangic: "2026-07-13", hafta_bitis: "2026-07-19" },
+      { hafta_baslangic: "2026-07-20", hafta_bitis: "2026-07-26" },
+      { hafta_baslangic: "2026-07-27", hafta_bitis: "2026-08-02" }
+    ]);
+  });
+
+  it("2026-07-11 tarihini ay araligina dahil sayar", () => {
+    const bounds = resolveAyBounds("2026-07");
+    expect(bounds).not.toBeNull();
+    expect(isDateWithinMonthRange("2026-07-11", bounds!.ay_baslangic, bounds!.ay_bitis)).toBe(true);
   });
 
   it("ay ile kesisen haftalari listeler", () => {

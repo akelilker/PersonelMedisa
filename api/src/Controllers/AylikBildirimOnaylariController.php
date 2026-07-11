@@ -19,8 +19,7 @@ class AylikBildirimOnaylariController
         $user = AuthMiddleware::authenticate($request, true);
         RolePermissions::assert($user, 'aylik_bildirim_onayi.view');
 
-        $ay = trim((string) $request->getQuery('ay', ''));
-        [$ayBaslangic, $ayBitis] = self::resolveMonth($ay);
+        [$ay, $ayBaslangic, $ayBitis] = self::resolveMonth(trim((string) $request->getQuery('ay', '')));
         $subeId = self::requireScope($user, $request);
         $amirId = self::resolveAmirId($user, $request);
 
@@ -40,8 +39,7 @@ class AylikBildirimOnaylariController
         }
 
         $body = $request->getJsonBody();
-        $ay = trim((string) ($body['ay'] ?? ''));
-        [$ayBaslangic, $ayBitis] = self::resolveMonth($ay);
+        [$ay, $ayBaslangic, $ayBitis] = self::resolveMonth(trim((string) ($body['ay'] ?? '')));
         $subeId = self::requireScope($user, $request);
         $amirId = self::userId($user);
         $aciklama = isset($body['aciklama']) ? trim((string) $body['aciklama']) : null;

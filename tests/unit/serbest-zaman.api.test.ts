@@ -1,4 +1,21 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("../../src/auth/auth-token-provider", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../src/auth/auth-token-provider")>();
+  return {
+    ...actual,
+    getAuthTokenForApi: vi.fn(() => null)
+  };
+});
+
+vi.mock("../../src/auth/auth-manager", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../src/auth/auth-manager")>();
+  return {
+    ...actual,
+    getActiveSubeIdForApiHeader: vi.fn(() => null)
+  };
+});
+
 import { ApiRequestError } from "../../src/api/api-client";
 import {
   fetchSerbestZamanBakiye,

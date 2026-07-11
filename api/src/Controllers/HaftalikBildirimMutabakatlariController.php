@@ -23,7 +23,7 @@ class HaftalikBildirimMutabakatlariController
         $currentUserId = self::userId($user);
         $amirId = strtoupper(trim((string) ($user['rol'] ?? ''))) === 'BIRIM_AMIRI'
             ? $currentUserId
-            : self::parsePositiveInt($request->getQuery('birim_amiri_user_id'));
+            : self::positiveInt($request->getQuery('birim_amiri_user_id'));
 
         $pdo = self::connection();
         self::assertTablesReady($pdo);

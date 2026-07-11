@@ -5,7 +5,7 @@ import { mockApi } from "./helpers/mock-api";
 
 const users = {
   genelYonetici: { username: "genel_yonetici", password: "demo123" },
-  bolumYonetici: { username: "bolum_yonetici", password: "demo123" },
+  bolumYonetici: { username: "bolum_yoneticisi", password: "demo123" },
   muhasebe: { username: "muhasebe", password: "demo123" },
   birimAmiri: { username: "birim_amiri", password: "demo123" }
 };
@@ -83,6 +83,8 @@ test.describe("Rol bazli smoke", () => {
     await expect(page).toHaveURL("/");
 
     await expectMainMenuForRole(page, "BIRIM_AMIRI");
+    await expect(page.getByTestId("hero-session-user")).toHaveText("Mock Kullanıcı");
+    await expect(page.getByTestId("hero-session-sube")).toHaveText("Merkez");
     const kayitMenu = page.getByTestId("menu-kayit-surec");
     await expect(kayitMenu).toBeDisabled();
     await kayitMenu.click({ force: true });

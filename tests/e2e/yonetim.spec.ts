@@ -65,7 +65,7 @@ test.describe("yonetim paneli ve aylik ozet", () => {
     page
   }) => {
     await mockApi(page, "BOLUM_YONETICISI");
-    await login(page, { username: "bolum_yonetici", password: "demo123" });
+    await login(page, { username: "bolum_yoneticisi", password: "demo123" });
 
     await page.getByTestId("header-settings-toggle").click();
     await expect(page.getByTestId("settings-yonetim-paneli")).toHaveCount(0);

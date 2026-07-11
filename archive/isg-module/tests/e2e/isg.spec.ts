@@ -20,7 +20,7 @@ test.describe("ISG makine listesi", () => {
 
   test("Bolum yoneticisi kendi sube kapsamindaki makineleri gorur", async ({ page }) => {
     await mockApi(page, "BOLUM_YONETICISI");
-    await login(page, { username: "bolum_yonetici", password: "demo123" });
+    await login(page, { username: "bolum_yoneticisi", password: "demo123" });
 
     await page.goto("/isg");
     await expect(page.getByRole("heading", { name: /Makine Envanteri/i })).toBeVisible();
@@ -78,7 +78,7 @@ test.describe("ISG makine listesi", () => {
 
   test("Bolum yoneticisi scope disi makineyi dogrudan URL ile goremez", async ({ page }) => {
     await mockApi(page, "BOLUM_YONETICISI");
-    await login(page, { username: "bolum_yonetici", password: "demo123" });
+    await login(page, { username: "bolum_yoneticisi", password: "demo123" });
 
     await page.goto("/isg/1101");
     await expect(page.getByText(/Makine bulunamadi/i)).toBeVisible();

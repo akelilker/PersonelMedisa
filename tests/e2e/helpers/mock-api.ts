@@ -2052,7 +2052,7 @@ export async function mockApi(page: Page, role: MockUserRole) {
     },
     {
       id: 2,
-      username: "bolum_yonetici",
+      username: "bolum_yoneticisi",
       ad_soyad: "Adnan Bulut",
       telefon: "05550000002",
       kullanici_tipi: "HARICI",

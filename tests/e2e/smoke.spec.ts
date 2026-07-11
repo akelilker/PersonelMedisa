@@ -238,7 +238,7 @@ test.describe("e2e smoke", () => {
 
   test("bolum yoneticisi gonderilmis gunluk kayitta duzeltme isteyebilir", async ({ page }) => {
     await mockApi(page, "BOLUM_YONETICISI");
-    await login(page, { username: "bolum_yonetici", password: "demo123" });
+    await login(page, { username: "bolum_yoneticisi", password: "demo123" });
 
     await page.goto("/bildirimler");
     await expect(page).toHaveURL(/\/bildirimler$/);

@@ -39,6 +39,8 @@ export type AppPermission =
   | "haftalik_mutabakat.view"
   | "haftalik_mutabakat.approve"
   | "haftalik_mutabakat.reopen_request"
+  | "aylik_bildirim_onayi.view"
+  | "aylik_bildirim_onayi.approve"
   | "aylik_bolum_onayi.view"
   | "aylik_bolum_onayi.approve"
   | "genel_yonetici_onayi.view"
@@ -93,6 +95,7 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "haftalik_mutabakat.view",
     "haftalik_mutabakat.reopen_request",
     "aylik_bolum_onayi.view",
+    "aylik_bildirim_onayi.view",
     "genel_yonetici_onayi.view",
     "genel_yonetici_onayi.approve",
     "patron_ack.view",
@@ -142,6 +145,7 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "haftalik_mutabakat.reopen_request",
     "aylik_bolum_onayi.view",
     "aylik_bolum_onayi.approve",
+    "aylik_bildirim_onayi.view",
     "revizyon.view",
     "revizyon.create",
     "revizyon.submit",
@@ -174,6 +178,7 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "finans.update",
     "finans.cancel",
     "haftalik_mutabakat.view",
+    "aylik_bildirim_onayi.view",
     "bordro_on_izleme.view",
     "sirket_parametreleri.view",
     "revizyon.view",
@@ -206,7 +211,9 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "gunluk_bildirim.update_own_open",
     "gunluk_bildirim.submit",
     "haftalik_mutabakat.view",
-    "haftalik_mutabakat.approve"
+    "haftalik_mutabakat.approve",
+    "aylik_bildirim_onayi.view",
+    "aylik_bildirim_onayi.approve"
   ],
   PATRON: [
     "raporlar.view",

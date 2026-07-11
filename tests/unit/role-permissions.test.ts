@@ -206,6 +206,8 @@ describe("role permissions", () => {
     expect(hasRolePermission("BIRIM_AMIRI", "gunluk_bildirim.submit")).toBe(true);
     expect(hasRolePermission("BIRIM_AMIRI", "haftalik_mutabakat.view")).toBe(true);
     expect(hasRolePermission("BIRIM_AMIRI", "haftalik_mutabakat.approve")).toBe(true);
+    expect(hasRolePermission("BIRIM_AMIRI", "aylik_bildirim_onayi.view")).toBe(true);
+    expect(hasRolePermission("BIRIM_AMIRI", "aylik_bildirim_onayi.approve")).toBe(true);
     expect(hasRolePermission("BIRIM_AMIRI", "aylik_bolum_onayi.approve")).toBe(false);
     expect(hasRolePermission("BIRIM_AMIRI", "genel_yonetici_onayi.approve")).toBe(false);
     expect(hasRolePermission("BIRIM_AMIRI", "bordro_kesinlestirme.approve")).toBe(false);
@@ -215,6 +217,8 @@ describe("role permissions", () => {
     expect(hasRolePermission("BOLUM_YONETICISI", "gunluk_bildirim.create")).toBe(false);
     expect(hasRolePermission("BOLUM_YONETICISI", "gunluk_bildirim.request_correction")).toBe(true);
     expect(hasRolePermission("BOLUM_YONETICISI", "haftalik_mutabakat.approve")).toBe(false);
+    expect(hasRolePermission("BOLUM_YONETICISI", "aylik_bildirim_onayi.view")).toBe(true);
+    expect(hasRolePermission("BOLUM_YONETICISI", "aylik_bildirim_onayi.approve")).toBe(false);
     expect(hasRolePermission("BOLUM_YONETICISI", "aylik_bolum_onayi.approve")).toBe(true);
     expect(hasRolePermission("BOLUM_YONETICISI", "genel_yonetici_onayi.approve")).toBe(false);
     expect(hasRolePermission("BOLUM_YONETICISI", "bordro_kesinlestirme.approve")).toBe(false);
@@ -226,6 +230,8 @@ describe("role permissions", () => {
     expect(hasRolePermission("GENEL_YONETICI", "bordro_on_izleme.view")).toBe(true);
     expect(hasRolePermission("GENEL_YONETICI", "bordro_kesinlestirme.approve")).toBe(true);
     expect(hasRolePermission("GENEL_YONETICI", "aylik_bolum_onayi.view")).toBe(true);
+    expect(hasRolePermission("GENEL_YONETICI", "aylik_bildirim_onayi.view")).toBe(true);
+    expect(hasRolePermission("GENEL_YONETICI", "aylik_bildirim_onayi.approve")).toBe(false);
     expect(hasRolePermission("GENEL_YONETICI", "aylik_bolum_onayi.approve")).toBe(false);
     expect(hasRolePermission("GENEL_YONETICI", "patron_ack.view")).toBe(true);
     expect(hasRolePermission("GENEL_YONETICI", "patron_ack.mark_seen")).toBe(false);
@@ -237,6 +243,8 @@ describe("role permissions", () => {
     expect(hasRolePermission("MUHASEBE", "sirket_parametreleri.manage")).toBe(false);
     expect(hasRolePermission("MUHASEBE", "gunluk_bildirim.create")).toBe(false);
     expect(hasRolePermission("MUHASEBE", "haftalik_mutabakat.approve")).toBe(false);
+    expect(hasRolePermission("MUHASEBE", "aylik_bildirim_onayi.view")).toBe(true);
+    expect(hasRolePermission("MUHASEBE", "aylik_bildirim_onayi.approve")).toBe(false);
     expect(hasRolePermission("MUHASEBE", "aylik_bolum_onayi.approve")).toBe(false);
     expect(hasRolePermission("MUHASEBE", "genel_yonetici_onayi.approve")).toBe(false);
     expect(hasRolePermission("MUHASEBE", "bordro_kesinlestirme.approve")).toBe(false);

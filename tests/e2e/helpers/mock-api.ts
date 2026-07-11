@@ -12,6 +12,11 @@ import {
   type PersonelBelgeKayitTipi
 } from "../../../src/types/personel-belge-kaydi";
 import { hasRolePermission, type AppPermission } from "../../../src/lib/authorization/role-permissions";
+import {
+  listWeeksIntersectingMonth,
+  resolveAylikBildirimOnayApproval,
+  resolveAyBounds
+} from "../../../src/lib/bildirim/aylik-bildirim-onay";
 
 export type MockUserRole = "GENEL_YONETICI" | "BOLUM_YONETICISI" | "MUHASEBE" | "BIRIM_AMIRI";
 
@@ -1169,11 +1174,28 @@ function isMockBildirimEditableState(state: string): boolean {
   return (MOCK_BILDIRIM_EDITABLE_STATES as readonly string[]).includes(state.toUpperCase());
 }
 
+type MockAylikBildirimOnay = {
+  id: number;
+  sube_id: number;
+  birim_amiri_user_id: number;
+  ay: string;
+  ay_baslangic: string;
+  ay_bitis: string;
+  state: "TAMAMLANDI";
+  onaylayan_user_id: number;
+  onaylandi_at: string;
+  aciklama: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 type MockBildirimPageState = {
   items: MockBildirimRecord[];
   nextId: number;
   mutabakatlar: MockHaftalikMutabakat[];
   nextMutabakatId: number;
+  aylikOnaylar: MockAylikBildirimOnay[];
+  nextAylikOnayId: number;
 };
 
 const bildirimStateByPage = new WeakMap<Page, MockBildirimPageState>();
@@ -1206,7 +1228,9 @@ function getBildirimPageState(page: Page): MockBildirimPageState {
     items: createInitialBildirimler(),
     nextId: 800,
     mutabakatlar: [],
-    nextMutabakatId: 0
+    nextMutabakatId: 0,
+    aylikOnaylar: [],
+    nextAylikOnayId: 0
   };
   bildirimStateByPage.set(page, created);
   return created;
@@ -2426,6 +2450,85 @@ let personelBelgeKaydiIdCounter = 903;
     if (counts.haftalik_mutabakata_alindi > 0) return "Haftadaki bildirimler daha once mutabakata alinmis.";
     if (counts.gonderildi < 1) return "Mutabakata alinacak gonderilmis bildirim bulunamadi.";
     return null;
+  }
+
+  function buildMockAylikOnayContext(subeId: number, amirId: number, ay: string) {
+    const bounds = resolveAyBounds(ay);
+    if (!bounds) {
+      return null;
+    }
+    const { ay_baslangic: ayBaslangic, ay_bitis: ayBitis } = bounds;
+    const rows = bildirimler.filter(
+      (item) =>
+        item.sube_id === subeId &&
+        item.created_by === amirId &&
+        item.tarih >= ayBaslangic &&
+        item.tarih <= ayBitis
+    );
+    const weeks = listWeeksIntersectingMonth(ayBaslangic, ayBitis);
+    const counts = {
+      toplam_bildirim: 0,
+      mutabakata_alinan: 0,
+      mutabakatli_hafta: 0,
+      eksik_hafta: 0,
+      taslak: 0,
+      duzeltme_istendi: 0,
+      gonderildi: 0
+    };
+    const stateMap: Record<string, keyof typeof counts> = {
+      TASLAK: "taslak",
+      GONDERILDI: "gonderildi",
+      DUZELTME_ISTENDI: "duzeltme_istendi",
+      HAFTALIK_MUTABAKATA_ALINDI: "mutabakata_alinan"
+    };
+    rows.forEach((row) => {
+      const state = row.state.toUpperCase();
+      if (state === "IPTAL") {
+        return;
+      }
+      counts.toplam_bildirim += 1;
+      const key = stateMap[state];
+      if (key) {
+        counts[key] += 1;
+      }
+    });
+
+    const haftalar = weeks.map((week) => {
+      const weekRows = rows.filter(
+        (row) =>
+          row.tarih >= week.hafta_baslangic &&
+          row.tarih <= week.hafta_bitis &&
+          row.state.toUpperCase() !== "IPTAL"
+      );
+      const mutabakat = bildirimPageState.mutabakatlar.find(
+        (item) =>
+          item.sube_id === subeId &&
+          item.birim_amiri_user_id === amirId &&
+          item.hafta_baslangic === week.hafta_baslangic
+      );
+      const bildirimSayisi = weekRows.length;
+      const mutabakataAlinan = weekRows.filter(
+        (row) => row.state.toUpperCase() === "HAFTALIK_MUTABAKATA_ALINDI"
+      ).length;
+      const eksikMi = bildirimSayisi > 0 && !mutabakat;
+      if (eksikMi) {
+        counts.eksik_hafta += 1;
+      } else if (mutabakat) {
+        counts.mutabakatli_hafta += 1;
+      }
+      return {
+        hafta_baslangic: week.hafta_baslangic,
+        hafta_bitis: week.hafta_bitis,
+        mutabakat_id: mutabakat?.id ?? null,
+        state: mutabakat?.state ?? null,
+        bildirim_sayisi: bildirimSayisi,
+        mutabakata_alinan_sayisi: mutabakataAlinan,
+        eksik_mi: eksikMi,
+        blok_nedeni: eksikMi ? "Haftalik mutabakat eksik." : null
+      };
+    });
+
+    return { ayBaslangic, ayBitis, counts, haftalar };
   }
 
   async function denyUnlessRolePermission(route: Route, permission: AppPermission) {
@@ -3664,6 +3767,152 @@ let personelBelgeKaydiIdCounter = 903;
       }
       const linked = bildirimler.filter((item) => item.haftalik_mutabakat_id === id);
       await fulfillJson(route, 200, okBody({ mutabakat, gunluk_bildirimler: linked, counts: { toplam: linked.length, baglanan: linked.length } }));
+      return;
+    }
+
+    if (path === "/api/aylik-bildirim-onaylari/ozet" && method === "GET") {
+      if (await denyUnlessRolePermission(route, "aylik_bildirim_onayi.view")) return;
+      const ay = url.searchParams.get("ay") ?? "";
+      if (!resolveAyBounds(ay)) {
+        await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "Ay parametresi YYYY-MM formatinda olmalidir.", "ay"));
+        return;
+      }
+      const subeId = getRequestSubeScope(request, url) ?? mockUserSubeIds[0] ?? 1;
+      if (mockUserSubeIds.length > 0 && !mockUserSubeIds.includes(subeId)) {
+        await fulfillJson(route, 403, errorBody("FORBIDDEN", "Aylik bildirim onayi icin aktif sube secilmelidir."));
+        return;
+      }
+      const amirId = role === "BIRIM_AMIRI" ? mockUserId : Number.parseInt(url.searchParams.get("birim_amiri_user_id") ?? "", 10) || null;
+      const existing = amirId
+        ? bildirimPageState.aylikOnaylar.find(
+            (item) => item.sube_id === subeId && item.birim_amiri_user_id === amirId && item.ay === ay
+          )
+        : undefined;
+      const context = amirId ? buildMockAylikOnayContext(subeId, amirId, ay) : null;
+      const approval = context
+        ? resolveAylikBildirimOnayApproval({
+            counts: context.counts,
+            mevcutOnayId: existing?.id ?? null,
+            eksikHaftaSayisi: context.counts.eksik_hafta
+          })
+        : { onaylanabilir_mi: false, blok_nedeni: "Birim amiri secimi zorunludur." };
+      const bounds = resolveAyBounds(ay);
+      await fulfillJson(route, 200, okBody({
+        ay,
+        ay_baslangic: context?.ayBaslangic ?? bounds?.ay_baslangic,
+        ay_bitis: context?.ayBitis ?? bounds?.ay_bitis,
+        sube_id: subeId,
+        birim_amiri_user_id: amirId,
+        haftalar: context?.haftalar ?? [],
+        counts: context?.counts ?? {
+          toplam_bildirim: 0, mutabakata_alinan: 0, mutabakatli_hafta: 0, eksik_hafta: 0,
+          taslak: 0, duzeltme_istendi: 0, gonderildi: 0
+        },
+        onaylanabilir_mi: approval.onaylanabilir_mi,
+        blok_nedeni: approval.blok_nedeni,
+        mevcut_onay_id: existing?.id ?? null
+      }));
+      return;
+    }
+
+    if (path === "/api/aylik-bildirim-onaylari" && method === "POST") {
+      if (await denyUnlessRolePermission(route, "aylik_bildirim_onayi.approve")) return;
+      if (role !== "BIRIM_AMIRI") {
+        await fulfillJson(route, 403, errorBody("FORBIDDEN", "Yalnizca birim amiri kendi ayini onaylayabilir."));
+        return;
+      }
+      const payload = request.postDataJSON() as { ay?: string; aciklama?: string };
+      const ay = payload.ay ?? "";
+      if (!resolveAyBounds(ay)) {
+        await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "Ay parametresi YYYY-MM formatinda olmalidir.", "ay"));
+        return;
+      }
+      const subeId = getRequestSubeScope(request, url) ?? mockUserSubeIds[0] ?? null;
+      if (!subeId || !mockUserSubeIds.includes(subeId)) {
+        await fulfillJson(route, subeId ? 403 : 422, errorBody(subeId ? "FORBIDDEN" : "VALIDATION_ERROR", "Aylik bildirim onayi icin aktif sube secilmelidir."));
+        return;
+      }
+      const existing = bildirimPageState.aylikOnaylar.find(
+        (item) => item.sube_id === subeId && item.birim_amiri_user_id === mockUserId && item.ay === ay
+      );
+      const context = buildMockAylikOnayContext(subeId, mockUserId, ay);
+      if (!context) {
+        await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "Ay parametresi YYYY-MM formatinda olmalidir.", "ay"));
+        return;
+      }
+      const approval = resolveAylikBildirimOnayApproval({
+        counts: context.counts,
+        mevcutOnayId: existing?.id ?? null,
+        eksikHaftaSayisi: context.counts.eksik_hafta
+      });
+      if (!approval.onaylanabilir_mi) {
+        await fulfillJson(route, 409, errorBody("CONFLICT", approval.blok_nedeni ?? "Aylik bildirim onayi olusturulamadi."));
+        return;
+      }
+      const now = new Date().toISOString();
+      const onay: MockAylikBildirimOnay = {
+        id: ++bildirimPageState.nextAylikOnayId,
+        sube_id: subeId,
+        birim_amiri_user_id: mockUserId,
+        ay,
+        ay_baslangic: context.ayBaslangic,
+        ay_bitis: context.ayBitis,
+        state: "TAMAMLANDI",
+        onaylayan_user_id: mockUserId,
+        onaylandi_at: now,
+        aciklama: payload.aciklama?.trim() ? payload.aciklama.trim() : null,
+        created_at: now,
+        updated_at: now
+      };
+      bildirimPageState.aylikOnaylar.push(onay);
+      const mutabakatlar = context.haftalar
+        .map((week) =>
+          bildirimPageState.mutabakatlar.find(
+            (item) =>
+              item.sube_id === subeId &&
+              item.birim_amiri_user_id === mockUserId &&
+              item.hafta_baslangic === week.hafta_baslangic
+          )
+        )
+        .filter((item): item is MockHaftalikMutabakat => item !== undefined);
+      await fulfillJson(route, 201, okBody({ onay, haftalar: context.haftalar, haftalik_mutabakatlar: mutabakatlar, counts: context.counts }));
+      return;
+    }
+
+    if (path.match(/^\/api\/aylik-bildirim-onaylari\/\d+$/) && method === "GET") {
+      if (await denyUnlessRolePermission(route, "aylik_bildirim_onayi.view")) return;
+      const id = Number.parseInt(path.split("/")[3] ?? "0", 10);
+      const onay = bildirimPageState.aylikOnaylar.find((item) => item.id === id);
+      if (!onay) {
+        await fulfillJson(route, 404, errorBody("NOT_FOUND", "Aylik bildirim onayi bulunamadi."));
+        return;
+      }
+      const scope = getRequestSubeScope(request, url);
+      if ((mockUserSubeIds.length > 0 && !mockUserSubeIds.includes(onay.sube_id)) || (scope && scope !== onay.sube_id)
+        || (role === "BIRIM_AMIRI" && onay.birim_amiri_user_id !== mockUserId)) {
+        await fulfillJson(route, 403, errorBody("FORBIDDEN", "Bu kayit aktif sube baglaminda goruntulenemiyor."));
+        return;
+      }
+      const context = buildMockAylikOnayContext(onay.sube_id, onay.birim_amiri_user_id, onay.ay);
+      const mutabakatlar = (context?.haftalar ?? [])
+        .map((week) =>
+          bildirimPageState.mutabakatlar.find(
+            (item) =>
+              item.sube_id === onay.sube_id &&
+              item.birim_amiri_user_id === onay.birim_amiri_user_id &&
+              item.hafta_baslangic === week.hafta_baslangic
+          )
+        )
+        .filter((item): item is MockHaftalikMutabakat => item !== undefined);
+      await fulfillJson(route, 200, okBody({
+        onay,
+        haftalar: context?.haftalar ?? [],
+        haftalik_mutabakatlar: mutabakatlar,
+        counts: context?.counts ?? {
+          toplam_bildirim: 0, mutabakata_alinan: 0, mutabakatli_hafta: 0, eksik_hafta: 0,
+          taslak: 0, duzeltme_istendi: 0, gonderildi: 0
+        }
+      }));
       return;
     }
 

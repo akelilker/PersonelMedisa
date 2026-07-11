@@ -450,3 +450,101 @@ test.describe("S71-B haftalik bildirim mutabakati API guards (mock-api)", () => 
     await expect(apiFetch(page, `/api/haftalik-bildirim-mutabakatlari/${id}`)).resolves.toMatchObject({ status: 403 });
   });
 });
+
+test.describe("S72-B aylik bildirim onayi API guards (mock-api)", () => {
+  const weekStart = "2026-04-06";
+  const ay = "2026-04";
+
+  async function approveWeek(page: Page) {
+    await apiFetchJson(page, "/api/haftalik-bildirim-mutabakatlari", {
+      method: "POST",
+      body: { hafta_baslangic: weekStart }
+    });
+  }
+
+  test("BIRIM_AMIRI ozet gorur, haftalik mutabakat sonrasi ayi onaylar ve ikinci onay 409 olur", async ({ page }) => {
+    await loginAs(page, "BIRIM_AMIRI");
+    await approveWeek(page);
+
+    const summary = await apiFetchJson(page, `/api/aylik-bildirim-onaylari/ozet?ay=${ay}`);
+    expect(summary.status).toBe(200);
+    expect((summary.data as { onaylanabilir_mi?: boolean }).onaylanabilir_mi).toBe(true);
+
+    const approved = await apiFetchJson(page, "/api/aylik-bildirim-onaylari", {
+      method: "POST",
+      body: { ay }
+    });
+    expect(approved.status).toBe(201);
+    const detail = approved.data as { onay?: { id?: number } };
+    const onayId = detail.onay?.id;
+    expect(onayId).toBeTruthy();
+
+    const detailResponse = await apiFetchJson(page, `/api/aylik-bildirim-onaylari/${onayId}`);
+    expect(detailResponse.status).toBe(200);
+
+    await expect(apiFetch(page, "/api/aylik-bildirim-onaylari", {
+      method: "POST",
+      body: { ay }
+    })).resolves.toMatchObject({ status: 409 });
+  });
+
+  test("TASLAK, DUZELTME_ISTENDI ve GONDERILDI acik kayitlari aylik onayi bloklar", async ({ page }) => {
+    await loginAs(page, "BIRIM_AMIRI");
+
+    const draft = await apiFetchJson(page, "/api/bildirimler", {
+      method: "POST",
+      body: { personel_id: 1, tarih: "2026-04-15", bildirim_turu: "GEC_GELDI", aciklama: "Taslak" }
+    });
+    await expect(apiFetch(page, "/api/aylik-bildirim-onaylari", {
+      method: "POST",
+      body: { ay }
+    })).resolves.toMatchObject({ status: 409 });
+
+    const draftId = (draft.data as { id?: number }).id;
+    await apiFetchJson(page, `/api/bildirimler/${draftId}/submit`, { method: "POST" });
+    await expect(apiFetch(page, "/api/aylik-bildirim-onaylari", {
+      method: "POST",
+      body: { ay }
+    })).resolves.toMatchObject({ status: 409 });
+
+    await loginAs(page, "BOLUM_YONETICISI");
+    await apiFetchJson(page, `/api/bildirimler/${draftId}/request-correction`, {
+      method: "POST",
+      body: { correction_reason: "Eksik bilgi" }
+    });
+    await loginAs(page, "BIRIM_AMIRI");
+    await expect(apiFetch(page, "/api/aylik-bildirim-onaylari", {
+      method: "POST",
+      body: { ay }
+    })).resolves.toMatchObject({ status: 409 });
+  });
+
+  test("haftalik mutabakat olmadan aylik onay 409 olur", async ({ page }) => {
+    await loginAs(page, "BIRIM_AMIRI");
+    await expect(apiFetch(page, "/api/aylik-bildirim-onaylari", {
+      method: "POST",
+      body: { ay }
+    })).resolves.toMatchObject({ status: 409 });
+  });
+
+  test("yonetim rolleri approve yapamaz ve scope disi detayi goremez", async ({ page }) => {
+    await loginAs(page, "BIRIM_AMIRI");
+    await approveWeek(page);
+    const approved = await apiFetchJson(page, "/api/aylik-bildirim-onaylari", {
+      method: "POST",
+      body: { ay }
+    });
+    const onayId = (approved.data as { onay?: { id?: number } }).onay?.id;
+
+    for (const role of ["GENEL_YONETICI", "BOLUM_YONETICISI", "MUHASEBE"] as const) {
+      await loginAs(page, role);
+      await expect(apiFetch(page, "/api/aylik-bildirim-onaylari", {
+        method: "POST",
+        body: { ay: "2026-05" }
+      })).resolves.toMatchObject({ status: 403 });
+    }
+
+    await loginAs(page, "BOLUM_YONETICISI");
+    await expect(apiFetch(page, `/api/aylik-bildirim-onaylari/${onayId}`)).resolves.toMatchObject({ status: 403 });
+  });
+});

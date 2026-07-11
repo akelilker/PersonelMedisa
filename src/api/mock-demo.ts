@@ -8,8 +8,14 @@ import { DEFAULT_ODEME_TIPI } from "../types/fazla-calisma-odeme-tercihi";
 import type { SerbestZamanEvent } from "../types/serbest-zaman";
 import type { UserRole } from "../types/auth";
 import type { HaftalikBildirimMutabakat } from "../types/haftalik-bildirim-mutabakat";
+import type { AylikBildirimOnay } from "../types/aylik-bildirim-onay";
 import { hasRolePermission, type AppPermission } from "../lib/authorization/role-permissions";
 import { isMondayIsoDate, resolveHaftalikMutabakatApproval } from "../lib/bildirim/haftalik-mutabakat";
+import {
+  listWeeksIntersectingMonth,
+  resolveAylikBildirimOnayApproval,
+  resolveAyBounds
+} from "../lib/bildirim/aylik-bildirim-onay";
 import {
   SUBE_DELETE_BLOCKED_ERROR_CODE,
   SUBE_DELETE_BLOCKED_MESSAGE
@@ -285,6 +291,7 @@ const demoState: {
   personelBelgeKayitlari: DemoPersonelBelgeKaydi[];
   bildirimler: DemoBildirim[];
   haftalikBildirimMutabakatlari: HaftalikBildirimMutabakat[];
+  aylikBildirimOnaylari: AylikBildirimOnay[];
   finansKalemleri: DemoFinansKalem[];
   puantajMap: Record<string, DemoPuantaj>;
   makineler: DemoMakine[];
@@ -309,6 +316,7 @@ const demoState: {
     personelBelgeKaydi: number;
     bildirim: number;
     haftalikBildirimMutabakat: number;
+    aylikBildirimOnay: number;
     finans: number;
     kapanis: number;
     odemeTercihi: number;
@@ -464,6 +472,7 @@ const demoState: {
     }
   ],
   haftalikBildirimMutabakatlari: [],
+  aylikBildirimOnaylari: [],
   finansKalemleri: [
     {
       id: 901,
@@ -705,6 +714,7 @@ const demoState: {
     personelBelgeKaydi: 703,
     bildirim: 800,
     haftalikBildirimMutabakat: 0,
+    aylikBildirimOnay: 0,
     finans: 950,
     kapanis: 1000,
     odemeTercihi: 1,
@@ -2518,6 +2528,237 @@ export function resolveDemoApiResponse(
     }
     const linked = demoState.bildirimler.filter((item) => item.haftalik_mutabakat_id === id);
     return ok({ mutabakat, gunluk_bildirimler: linked, counts: { toplam: linked.length, baglanan: linked.length } });
+  }
+
+  const buildAylikOnayContext = (subeId: number, amirId: number, ay: string) => {
+    const bounds = resolveAyBounds(ay);
+    if (!bounds) {
+      return null;
+    }
+    const { ay_baslangic: ayBaslangic, ay_bitis: ayBitis } = bounds;
+    const rows = demoState.bildirimler.filter(
+      (item) =>
+        item.sube_id === subeId &&
+        item.created_by === amirId &&
+        (item.tarih ?? "") >= ayBaslangic &&
+        (item.tarih ?? "") <= ayBitis
+    );
+    const weeks = listWeeksIntersectingMonth(ayBaslangic, ayBitis);
+    const counts = {
+      toplam_bildirim: 0,
+      mutabakata_alinan: 0,
+      mutabakatli_hafta: 0,
+      eksik_hafta: 0,
+      taslak: 0,
+      duzeltme_istendi: 0,
+      gonderildi: 0
+    };
+    const stateMap: Record<string, keyof typeof counts> = {
+      TASLAK: "taslak",
+      GONDERILDI: "gonderildi",
+      DUZELTME_ISTENDI: "duzeltme_istendi",
+      HAFTALIK_MUTABAKATA_ALINDI: "mutabakata_alinan"
+    };
+    rows.forEach((row) => {
+      const state = (row.state ?? "").toUpperCase();
+      if (state === "IPTAL") {
+        return;
+      }
+      counts.toplam_bildirim += 1;
+      const key = stateMap[state];
+      if (key) {
+        counts[key] += 1;
+      }
+    });
+
+    const haftalar = weeks.map((week) => {
+      const weekRows = rows.filter(
+        (row) =>
+          (row.tarih ?? "") >= week.hafta_baslangic &&
+          (row.tarih ?? "") <= week.hafta_bitis &&
+          (row.state ?? "").toUpperCase() !== "IPTAL"
+      );
+      const mutabakat = demoState.haftalikBildirimMutabakatlari.find(
+        (item) =>
+          item.sube_id === subeId &&
+          item.birim_amiri_user_id === amirId &&
+          item.hafta_baslangic === week.hafta_baslangic
+      );
+      const bildirimSayisi = weekRows.length;
+      const mutabakataAlinan = weekRows.filter(
+        (row) => (row.state ?? "").toUpperCase() === "HAFTALIK_MUTABAKATA_ALINDI"
+      ).length;
+      const eksikMi = bildirimSayisi > 0 && !mutabakat;
+      if (eksikMi) {
+        counts.eksik_hafta += 1;
+      } else if (mutabakat) {
+        counts.mutabakatli_hafta += 1;
+      }
+      return {
+        hafta_baslangic: week.hafta_baslangic,
+        hafta_bitis: week.hafta_bitis,
+        mutabakat_id: mutabakat?.id ?? null,
+        state: mutabakat?.state ?? null,
+        bildirim_sayisi: bildirimSayisi,
+        mutabakata_alinan_sayisi: mutabakataAlinan,
+        eksik_mi: eksikMi,
+        blok_nedeni: eksikMi ? "Haftalik mutabakat eksik." : null
+      };
+    });
+
+    return { ayBaslangic, ayBitis, counts, haftalar };
+  };
+
+  if (pathname === "/aylik-bildirim-onaylari/ozet" && method === "GET") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(actor, "aylik_bildirim_onayi.view");
+    if (permissionError) return permissionError;
+    const ay = toStringValue(requestUrl.searchParams.get("ay")) ?? "";
+    if (!resolveAyBounds(ay)) {
+      return demoRevizyonError("VALIDATION_ERROR", "Ay parametresi YYYY-MM formatinda olmalidir.");
+    }
+    const subeId = mutabakatScope(actor);
+    if (!subeId) {
+      return demoRevizyonError("VALIDATION_ERROR", "Aylik bildirim onayi icin aktif sube secilmelidir.");
+    }
+    const amirId =
+      actor.role === "BIRIM_AMIRI"
+        ? actor.userId
+        : toNumber(requestUrl.searchParams.get("birim_amiri_user_id"));
+    const existing =
+      amirId !== null
+        ? demoState.aylikBildirimOnaylari.find(
+            (item) => item.sube_id === subeId && item.birim_amiri_user_id === amirId && item.ay === ay
+          )
+        : undefined;
+    const context = amirId !== null ? buildAylikOnayContext(subeId, amirId, ay) : null;
+    const approval =
+      context !== null
+        ? resolveAylikBildirimOnayApproval({
+            counts: context.counts,
+            mevcutOnayId: existing?.id ?? null,
+            eksikHaftaSayisi: context.counts.eksik_hafta
+          })
+        : { onaylanabilir_mi: false, blok_nedeni: "Birim amiri secimi zorunludur." };
+    return ok({
+      ay,
+      ay_baslangic: context?.ayBaslangic ?? resolveAyBounds(ay)?.ay_baslangic,
+      ay_bitis: context?.ayBitis ?? resolveAyBounds(ay)?.ay_bitis,
+      sube_id: subeId,
+      birim_amiri_user_id: amirId,
+      haftalar: context?.haftalar ?? [],
+      counts: context?.counts ?? {
+        toplam_bildirim: 0,
+        mutabakata_alinan: 0,
+        mutabakatli_hafta: 0,
+        eksik_hafta: 0,
+        taslak: 0,
+        duzeltme_istendi: 0,
+        gonderildi: 0
+      },
+      ...approval,
+      mevcut_onay_id: existing?.id ?? null
+    });
+  }
+
+  if (pathname === "/aylik-bildirim-onaylari" && method === "POST") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(actor, "aylik_bildirim_onayi.approve");
+    if (permissionError) return permissionError;
+    if (actor.role !== "BIRIM_AMIRI") {
+      return demoRevizyonError("FORBIDDEN", "Yalnizca birim amiri kendi ayini onaylayabilir.");
+    }
+    const ay = toStringValue(body.ay) ?? "";
+    if (!resolveAyBounds(ay)) {
+      return demoRevizyonError("VALIDATION_ERROR", "Ay parametresi YYYY-MM formatinda olmalidir.");
+    }
+    const subeId = mutabakatScope(actor);
+    if (!subeId) {
+      return demoRevizyonError("VALIDATION_ERROR", "Aylik bildirim onayi icin aktif sube secilmelidir.");
+    }
+    const existing = demoState.aylikBildirimOnaylari.find(
+      (item) => item.sube_id === subeId && item.birim_amiri_user_id === actor.userId && item.ay === ay
+    );
+    const context = buildAylikOnayContext(subeId, actor.userId, ay);
+    if (!context) {
+      return demoRevizyonError("VALIDATION_ERROR", "Ay parametresi YYYY-MM formatinda olmalidir.");
+    }
+    const approval = resolveAylikBildirimOnayApproval({
+      counts: context.counts,
+      mevcutOnayId: existing?.id ?? null,
+      eksikHaftaSayisi: context.counts.eksik_hafta
+    });
+    if (!approval.onaylanabilir_mi) {
+      return demoRevizyonError("CONFLICT", approval.blok_nedeni ?? "Aylik bildirim onayi olusturulamadi.");
+    }
+    const now = new Date().toISOString();
+    const onay: AylikBildirimOnay = {
+      id: ++demoState.nextIds.aylikBildirimOnay,
+      sube_id: subeId,
+      birim_amiri_user_id: actor.userId,
+      ay,
+      ay_baslangic: context.ayBaslangic,
+      ay_bitis: context.ayBitis,
+      state: "TAMAMLANDI",
+      onaylayan_user_id: actor.userId,
+      onaylandi_at: now,
+      aciklama: toStringValue(body.aciklama) ?? null,
+      created_at: now,
+      updated_at: now
+    };
+    demoState.aylikBildirimOnaylari.push(onay);
+    const mutabakatlar = context.haftalar
+      .map((week) =>
+        demoState.haftalikBildirimMutabakatlari.find(
+          (item) =>
+            item.sube_id === subeId &&
+            item.birim_amiri_user_id === actor.userId &&
+            item.hafta_baslangic === week.hafta_baslangic
+        )
+      )
+      .filter((item): item is HaftalikBildirimMutabakat => item !== undefined);
+    return ok({ onay, haftalar: context.haftalar, haftalik_mutabakatlar: mutabakatlar, counts: context.counts });
+  }
+
+  const aylikOnayDetailMatch = pathname.match(/^\/aylik-bildirim-onaylari\/(\d+)$/);
+  if (aylikOnayDetailMatch && method === "GET") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(actor, "aylik_bildirim_onayi.view");
+    if (permissionError) return permissionError;
+    const id = Number.parseInt(aylikOnayDetailMatch[1], 10);
+    const onay = demoState.aylikBildirimOnaylari.find((item) => item.id === id);
+    if (!onay) {
+      return demoRevizyonError("NOT_FOUND", "Aylik bildirim onayi bulunamadi.");
+    }
+    const scopeAllowed = actor.subeIds.length === 0 || actor.subeIds.includes(onay.sube_id);
+    if (!scopeAllowed || (actor.role === "BIRIM_AMIRI" && onay.birim_amiri_user_id !== actor.userId)) {
+      return demoRevizyonError("FORBIDDEN", "Bu kayit aktif sube baglaminda goruntulenemiyor.");
+    }
+    const context = buildAylikOnayContext(onay.sube_id, onay.birim_amiri_user_id, onay.ay);
+    const mutabakatlar = (context?.haftalar ?? [])
+      .map((week) =>
+        demoState.haftalikBildirimMutabakatlari.find(
+          (item) =>
+            item.sube_id === onay.sube_id &&
+            item.birim_amiri_user_id === onay.birim_amiri_user_id &&
+            item.hafta_baslangic === week.hafta_baslangic
+        )
+      )
+      .filter((item): item is HaftalikBildirimMutabakat => item !== undefined);
+    return ok({
+      onay,
+      haftalar: context?.haftalar ?? [],
+      haftalik_mutabakatlar: mutabakatlar,
+      counts: context?.counts ?? {
+        toplam_bildirim: 0,
+        mutabakata_alinan: 0,
+        mutabakatli_hafta: 0,
+        eksik_hafta: 0,
+        taslak: 0,
+        duzeltme_istendi: 0,
+        gonderildi: 0
+      }
+    });
   }
 
   if (pathname === "/isg/makineler" && method === "GET") {

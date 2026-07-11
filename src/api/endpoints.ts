@@ -32,6 +32,11 @@ export const endpoints = {
     approve: "/haftalik-bildirim-mutabakatlari",
     detail: (id: number | string) => `/haftalik-bildirim-mutabakatlari/${id}`
   },
+  aylikBildirimOnaylari: {
+    summary: "/aylik-bildirim-onaylari/ozet",
+    approve: "/aylik-bildirim-onaylari",
+    detail: (id: number | string) => `/aylik-bildirim-onaylari/${id}`
+  },
   puantaj: {
     detail: (personelId: number | string, tarih: string) =>
       `/gunluk-puantaj/${personelId}/${encodeURIComponent(tarih)}`,

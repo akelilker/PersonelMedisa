@@ -286,4 +286,37 @@ test.describe("e2e smoke", () => {
     await expect(createdRow.getByRole("button", { name: "Gönder" })).toHaveCount(0);
     await expect(createdRow.getByRole("button", { name: /İptal|Iptal/i })).toHaveCount(0);
   });
+
+  test("birim amiri haftalik mutabakat panelinde haftayi onaylar", async ({ page }) => {
+    await mockApi(page, "BIRIM_AMIRI");
+    await login(page, { username: "birim", password: "secret" });
+
+    await page.goto("/bildirimler");
+    await expect(page.getByTestId("haftalik-mutabakat-panel")).toBeVisible();
+
+    await page.locator("[name='haftalik-mutabakat-hafta-baslangic']").fill("2026-04-06");
+    await expect(page.getByTestId("haftalik-mutabakat-count-toplam")).toContainText("1");
+    await expect(page.getByTestId("haftalik-mutabakat-count-gonderildi")).toContainText("1");
+    await expect(page.getByTestId("haftalik-mutabakat-status")).toContainText(/onaylanabilir/i);
+
+    const approveButton = page.getByTestId("haftalik-mutabakat-approve");
+    await expect(approveButton).toBeEnabled();
+    await approveButton.click();
+
+    await expect(page.getByTestId("haftalik-mutabakat-count-haftalik_mutabakata_alindi")).toContainText("1");
+    await expect(page.getByTestId("haftalik-mutabakat-status")).toContainText(/mutabakata alinmis/i);
+    await expect(page.getByTestId("haftalik-mutabakat-id")).toContainText("Mutabakat ID: 1");
+    await expect(approveButton).toBeDisabled();
+  });
+
+  test("genel yonetici haftalik mutabakat panelini read-only gorur", async ({ page }) => {
+    await mockApi(page, "GENEL_YONETICI");
+    await login(page, { username: "yonetici", password: "secret" });
+
+    await page.goto("/bildirimler");
+    await expect(page.getByTestId("haftalik-mutabakat-panel")).toBeVisible();
+    await page.locator("[name='haftalik-mutabakat-hafta-baslangic']").fill("2026-04-06");
+    await expect(page.getByTestId("haftalik-mutabakat-count-toplam")).toBeVisible();
+    await expect(page.getByTestId("haftalik-mutabakat-approve")).toHaveCount(0);
+  });
 });

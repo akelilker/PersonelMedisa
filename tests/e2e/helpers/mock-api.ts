@@ -3581,9 +3581,9 @@ let personelBelgeKaydiIdCounter = 903;
         await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "Hafta baslangici Pazartesi olmalidir.", "hafta_baslangic"));
         return;
       }
-      const subeId = getRequestSubeScope(request, url) ?? mockUserSubeIds[0] ?? null;
-      if (!subeId || (mockUserSubeIds.length > 0 && !mockUserSubeIds.includes(subeId))) {
-        await fulfillJson(route, subeId ? 403 : 422, errorBody(subeId ? "FORBIDDEN" : "VALIDATION_ERROR", "Haftalik mutabakat icin aktif sube secilmelidir."));
+      const subeId = getRequestSubeScope(request, url) ?? mockUserSubeIds[0] ?? 1;
+      if (mockUserSubeIds.length > 0 && !mockUserSubeIds.includes(subeId)) {
+        await fulfillJson(route, 403, errorBody("FORBIDDEN", "Haftalik mutabakat icin aktif sube secilmelidir."));
         return;
       }
       const existing = bildirimPageState.mutabakatlar.find(
@@ -3675,6 +3675,8 @@ let personelBelgeKaydiIdCounter = 903;
       const pageNumber = Number.parseInt(url.searchParams.get("page") ?? "1", 10) || 1;
       const pageLimit = Number.parseInt(url.searchParams.get("limit") ?? "10", 10) || 10;
       const tarih = url.searchParams.get("tarih");
+      const baslangicTarihi = url.searchParams.get("baslangic_tarihi");
+      const bitisTarihi = url.searchParams.get("bitis_tarihi");
       const personelId = Number.parseInt(url.searchParams.get("personel_id") ?? "", 10);
       const bildirimTuru = normalizeMockBildirimTuru(url.searchParams.get("bildirim_turu"));
       const stateFilter = url.searchParams.get("state")?.toUpperCase() ?? null;
@@ -3682,6 +3684,11 @@ let personelBelgeKaydiIdCounter = 903;
       const filtered = bildirimler.filter((item) => {
         if (tarih && item.tarih !== tarih) {
           return false;
+        }
+        if (!tarih && baslangicTarihi && bitisTarihi) {
+          if (!item.tarih || item.tarih < baslangicTarihi || item.tarih > bitisTarihi) {
+            return false;
+          }
         }
         if (Number.isFinite(personelId) && item.personel_id !== personelId) {
           return false;

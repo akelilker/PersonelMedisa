@@ -1,6 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { isMondayIsoDate, resolveHaftalikMutabakatApproval } from "../../src/lib/bildirim/haftalik-mutabakat";
-import type { HaftalikBildirimMutabakatCounts } from "../../src/types/haftalik-bildirim-mutabakat";
+import {
+  computeHaftaBitisFromMonday,
+  getCurrentMondayIsoDate,
+  isHaftalikMutabakatApproveEnabled,
+  isMondayIsoDate,
+  resolveHaftalikMutabakatApproval,
+  resolveHaftalikMutabakatStatusMessage
+} from "../../src/lib/bildirim/haftalik-mutabakat";
+import type {
+  HaftalikBildirimMutabakatCounts,
+  HaftalikBildirimMutabakatOzet
+} from "../../src/types/haftalik-bildirim-mutabakat";
 
 const counts = (extra: Partial<HaftalikBildirimMutabakatCounts> = {}): HaftalikBildirimMutabakatCounts => ({
   toplam: 1, taslak: 0, gonderildi: 1, duzeltme_istendi: 0,
@@ -12,6 +22,48 @@ describe("haftalik bildirim mutabakati", () => {
     expect(isMondayIsoDate("2026-04-13")).toBe(true);
     expect(isMondayIsoDate("2026-04-14")).toBe(false);
     expect(isMondayIsoDate("2026-02-30")).toBe(false);
+  });
+
+  it("Pazartesi haftasi icin bitis tarihini hesaplar", () => {
+    expect(computeHaftaBitisFromMonday("2026-04-06")).toBe("2026-04-12");
+    expect(computeHaftaBitisFromMonday("2026-04-07")).toBeNull();
+  });
+
+  it("varsayilan hafta baslangicini icinde bulunulan haftanin Pazartesi gunu olarak verir", () => {
+    expect(getCurrentMondayIsoDate(new Date("2026-04-09T12:00:00"))).toBe("2026-04-06");
+    expect(getCurrentMondayIsoDate(new Date("2026-04-12T12:00:00"))).toBe("2026-04-06");
+  });
+
+  it("onaylanabilir ozette approve butonunu acar", () => {
+    const ozet = {
+      onaylanabilir_mi: true,
+      blok_nedeni: null,
+      mevcut_mutabakat_id: null
+    } as HaftalikBildirimMutabakatOzet;
+
+    expect(isHaftalikMutabakatApproveEnabled(true, ozet)).toBe(true);
+    expect(isHaftalikMutabakatApproveEnabled(false, ozet)).toBe(false);
+  });
+
+  it("blok nedeni veya mevcut mutabakatta approve butonunu kapatir", () => {
+    const blocked = {
+      onaylanabilir_mi: false,
+      blok_nedeni: "Haftada taslak bildirim bulunuyor.",
+      mevcut_mutabakat_id: null
+    } as HaftalikBildirimMutabakatOzet;
+
+    expect(isHaftalikMutabakatApproveEnabled(true, blocked)).toBe(false);
+    expect(resolveHaftalikMutabakatStatusMessage(blocked)).toBe(
+      "Haftada taslak bildirim bulunuyor."
+    );
+    expect(
+      resolveHaftalikMutabakatStatusMessage({
+        ...blocked,
+        onaylanabilir_mi: false,
+        blok_nedeni: null,
+        mevcut_mutabakat_id: 12
+      } as HaftalikBildirimMutabakatOzet)
+    ).toBe("Bu hafta mutabakata alinmis.");
   });
 
   it("gonderilmis kayit varsa onaya izin verir", () => {

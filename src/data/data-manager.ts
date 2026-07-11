@@ -276,8 +276,15 @@ export const dataCacheKeys = {
   surecTuruRef: () => `referans:surec-turu`,
   zimmetlerList: (subeId: number | null, personelId: string, page: number) =>
     `zimmetler:list:s${subeSeg(subeId)}:${personelId}|${page}`,
-  bildirimlerList: (subeId: number | null, personelId: string, tur: string, tarih: string, page: number) =>
-    `bildirimler:list:s${subeSeg(subeId)}:${personelId}|${tur}|${tarih}|${page}`,
+  bildirimlerList: (
+    subeId: number | null,
+    personelId: string,
+    tur: string,
+    tarih: string,
+    baslangic: string,
+    bitis: string,
+    page: number
+  ) => `bildirimler:list:s${subeSeg(subeId)}:${personelId}|${tur}|${tarih}|${baslangic}|${bitis}|${page}`,
   bildirimlerHeader: (subeId: number | null) => `bildirimler:header:8:s${subeSeg(subeId)}`,
   bildirimDetail: (subeId: number | null, id: number) => `bildirimler:detail:s${subeSeg(subeId)}:${id}`,
   bildirimRef: () => `referans:bildirim-meta`,

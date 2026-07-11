@@ -55,8 +55,20 @@ type BildirimReferenceMeta = {
 };
 
 export type BildirimListQueryState = {
-  draft: { personelId: string; bildirimTuru: string; tarih: string };
-  applied: { personelId: string; bildirimTuru: string; tarih: string };
+  draft: {
+    personelId: string;
+    bildirimTuru: string;
+    tarih: string;
+    baslangicTarihi: string;
+    bitisTarihi: string;
+  };
+  applied: {
+    personelId: string;
+    bildirimTuru: string;
+    tarih: string;
+    baslangicTarihi: string;
+    bitisTarihi: string;
+  };
   page: number;
 };
 
@@ -145,13 +157,38 @@ function resolveDepartmanIdForBildirim(
   return parseRequiredPositiveInt(departmanIdValue, "Bolum");
 }
 
+function resolveBildirimListDateParams(applied: BildirimListQueryState["applied"]) {
+  if (applied.tarih) {
+    return { tarih: applied.tarih };
+  }
+
+  if (applied.baslangicTarihi && applied.bitisTarihi) {
+    return {
+      baslangic_tarihi: applied.baslangicTarihi,
+      bitis_tarihi: applied.bitisTarihi
+    };
+  }
+
+  return {};
+}
+
+function emptyBildirimFilters() {
+  return {
+    personelId: "",
+    bildirimTuru: "",
+    tarih: "",
+    baslangicTarihi: "",
+    bitisTarihi: ""
+  };
+}
+
 export function useBildirimler() {
   const revision = useAppDataRevision();
   const { session } = useAuth();
   const currentUserId = session?.user.id ?? null;
   const [listQuery, setListQuery] = useState<BildirimListQueryState>({
-    draft: { personelId: "", bildirimTuru: "", tarih: "" },
-    applied: { personelId: "", bildirimTuru: "", tarih: "" },
+    draft: emptyBildirimFilters(),
+    applied: emptyBildirimFilters(),
     page: 1
   });
 
@@ -187,9 +224,19 @@ export function useBildirimler() {
         applied.personelId,
         applied.bildirimTuru,
         applied.tarih,
+        applied.baslangicTarihi,
+        applied.bitisTarihi,
         listPage
       ),
-    [activeSube, applied.bildirimTuru, applied.personelId, applied.tarih, listPage]
+    [
+      activeSube,
+      applied.bildirimTuru,
+      applied.baslangicTarihi,
+      applied.bitisTarihi,
+      applied.personelId,
+      applied.tarih,
+      listPage
+    ]
   );
 
   const listSnapshot = useMemo(
@@ -220,7 +267,7 @@ export function useBildirimler() {
         fetchBildirimlerList({
           personel_id: parsePositiveInt(applied.personelId),
           bildirim_turu: applied.bildirimTuru || undefined,
-          tarih: applied.tarih || undefined,
+          ...resolveBildirimListDateParams(applied),
           sube_id: getSubeIdForApiRequest(),
           page: listPage,
           limit: PAGE_SIZE
@@ -242,7 +289,7 @@ export function useBildirimler() {
             fetchBildirimlerList({
               personel_id: parsePositiveInt(applied.personelId),
               bildirim_turu: applied.bildirimTuru || undefined,
-              tarih: applied.tarih || undefined,
+              ...resolveBildirimListDateParams(applied),
               sube_id: getSubeIdForApiRequest(),
               page: listPage,
               limit: PAGE_SIZE
@@ -300,19 +347,42 @@ export function useBildirimler() {
 
   const submitFilters = useCallback((event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setListQuery((prev) => ({
-      ...prev,
-      applied: { ...prev.draft },
-      page: 1
-    }));
+    setListQuery((prev) => {
+      const nextApplied = { ...prev.draft };
+      if (nextApplied.tarih) {
+        nextApplied.baslangicTarihi = "";
+        nextApplied.bitisTarihi = "";
+      }
+      return {
+        ...prev,
+        applied: nextApplied,
+        page: 1
+      };
+    });
   }, []);
 
   const clearFilters = useCallback(() => {
-    const empty = { personelId: "", bildirimTuru: "", tarih: "" };
+    const empty = emptyBildirimFilters();
     setListQuery({
       draft: { ...empty },
       applied: { ...empty },
       page: 1
+    });
+  }, []);
+
+  const applyWeekRange = useCallback((baslangicTarihi: string, bitisTarihi: string) => {
+    setListQuery((prev) => {
+      const nextFilters = {
+        ...prev.applied,
+        tarih: "",
+        baslangicTarihi,
+        bitisTarihi
+      };
+      return {
+        draft: { ...prev.draft, ...nextFilters },
+        applied: nextFilters,
+        page: 1
+      };
     });
   }, []);
 
@@ -345,6 +415,8 @@ export function useBildirimler() {
       listQuery.applied.personelId,
       listQuery.applied.bildirimTuru,
       listQuery.applied.tarih,
+      listQuery.applied.baslangicTarihi,
+      listQuery.applied.bitisTarihi,
       1
     );
     await fetchWithCacheMerge(pageOneKey, () =>
@@ -352,7 +424,7 @@ export function useBildirimler() {
         fetchBildirimlerList({
           personel_id: parsePositiveInt(listQuery.applied.personelId),
           bildirim_turu: listQuery.applied.bildirimTuru || undefined,
-          tarih: listQuery.applied.tarih || undefined,
+          ...resolveBildirimListDateParams(listQuery.applied),
           sube_id: getSubeIdForApiRequest(),
           page: 1,
           limit: PAGE_SIZE
@@ -394,6 +466,8 @@ export function useBildirimler() {
           listQuery.applied.personelId,
           listQuery.applied.bildirimTuru,
           listQuery.applied.tarih,
+          listQuery.applied.baslangicTarihi,
+          listQuery.applied.bitisTarihi,
           1
         );
 
@@ -730,6 +804,7 @@ export function useBildirimler() {
     currentUserId,
     submitFilters,
     clearFilters,
+    applyWeekRange,
     setPage
   };
 }

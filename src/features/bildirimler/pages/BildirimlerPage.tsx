@@ -1,4 +1,4 @@
-import { useEffect, useMemo, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, type FormEvent } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { FormField } from "../../../components/form/FormField";
 import { AppModal } from "../../../components/modal/AppModal";
@@ -8,6 +8,7 @@ import { LoadingState } from "../../../components/states/LoadingState";
 import { SubeDetailListNotice } from "../../../components/states/SubeDetailListNotice";
 import { useRoleAccess } from "../../../hooks/use-role-access";
 import { useBildirimler } from "../../../hooks/useBildirimler";
+import { useHaftalikBildirimMutabakat } from "../../../hooks/useHaftalikBildirimMutabakat";
 import {
   canCancelGunlukBildirim,
   canEditGunlukBildirim,
@@ -15,9 +16,16 @@ import {
   canSubmitGunlukBildirim
 } from "../../../lib/bildirim/gunluk-bildirim-actions";
 import {
+  computeHaftaBitisFromMonday,
+  isHaftalikMutabakatApproveEnabled,
+  isMondayIsoDate,
+  resolveHaftalikMutabakatStatusMessage
+} from "../../../lib/bildirim/haftalik-mutabakat";
+import {
   formatBildirimStateLabel
 } from "../../../lib/display/enum-display";
 import type { Bildirim } from "../../../types/bildirim";
+import type { HaftalikBildirimMutabakatCounts } from "../../../types/haftalik-bildirim-mutabakat";
 import type { Personel } from "../../../types/personel";
 import type { IdOption } from "../../../types/referans";
 import {
@@ -186,6 +194,119 @@ function KayitSenaryosuChoiceGroup({ name, value, options, onSelect }: KayitSena
   );
 }
 
+const HAFTALIK_MUTABAKAT_COUNT_LABELS: Array<{
+  key: keyof HaftalikBildirimMutabakatCounts;
+  label: string;
+}> = [
+  { key: "toplam", label: "Toplam" },
+  { key: "taslak", label: "Taslak" },
+  { key: "gonderildi", label: "Gönderildi" },
+  { key: "duzeltme_istendi", label: "Düzeltme İstendi" },
+  { key: "haftalik_mutabakata_alindi", label: "Mutabakata Alındı" },
+  { key: "iptal", label: "İptal" }
+];
+
+type HaftalikMutabakatPanelProps = {
+  canApprove: boolean;
+  onWeekApplied: (baslangic: string, bitis: string) => void;
+  onApproved: () => void | Promise<void>;
+};
+
+function HaftalikMutabakatPanel({ canApprove, onWeekApplied, onApproved }: HaftalikMutabakatPanelProps) {
+  const userSelectedWeekRef = useRef(false);
+  const {
+    haftaBaslangic,
+    setHaftaBaslangic,
+    haftaBitis,
+    ozet,
+    isLoading,
+    error,
+    weekWarning,
+    approveWeek,
+    isApproving
+  } = useHaftalikBildirimMutabakat({ onApproved });
+
+  useEffect(() => {
+    if (!userSelectedWeekRef.current || !ozet || !isMondayIsoDate(haftaBaslangic)) {
+      return;
+    }
+
+    onWeekApplied(ozet.hafta_baslangic, ozet.hafta_bitis);
+  }, [haftaBaslangic, onWeekApplied, ozet]);
+
+  const handleWeekChange = (value: string) => {
+    userSelectedWeekRef.current = true;
+    setHaftaBaslangic(value);
+  };
+
+  const statusMessage = resolveHaftalikMutabakatStatusMessage(ozet);
+  const approveEnabled = isHaftalikMutabakatApproveEnabled(canApprove, ozet);
+  const displayedWeekEnd =
+    haftaBitis ?? (isMondayIsoDate(haftaBaslangic) ? computeHaftaBitisFromMonday(haftaBaslangic) : null);
+
+  return (
+    <div className="state-card bildirim-mutabakat-panel" data-testid="haftalik-mutabakat-panel">
+      <div className="bildirim-mutabakat-panel-head">
+        <h3>Haftalık Mutabakat</h3>
+        {displayedWeekEnd ? (
+          <p className="bildirim-mutabakat-meta">Hafta bitişi: {displayedWeekEnd}</p>
+        ) : null}
+      </div>
+
+      <FormField
+        label="Hafta Başlangıcı"
+        name="haftalik-mutabakat-hafta-baslangic"
+        type="date"
+        value={haftaBaslangic}
+        onChange={handleWeekChange}
+      />
+
+      {weekWarning ? <p className="bildirim-form-error">{weekWarning}</p> : null}
+      {isLoading ? <LoadingState label="Haftalık mutabakat özeti yükleniyor..." /> : null}
+      {!isLoading && error ? <p className="bildirim-form-error">{error}</p> : null}
+
+      {!isLoading && ozet ? (
+        <>
+          <div className="bildirim-model-grid" data-testid="haftalik-mutabakat-counts">
+            {HAFTALIK_MUTABAKAT_COUNT_LABELS.map(({ key, label }) => (
+              <div key={key} className="bildirim-model-card" data-testid={`haftalik-mutabakat-count-${key}`}>
+                <span className="bildirim-model-label">{label}</span>
+                <strong>{ozet.counts[key]}</strong>
+              </div>
+            ))}
+          </div>
+
+          {statusMessage ? (
+            <p className="bildirim-mutabakat-status" data-testid="haftalik-mutabakat-status">
+              {statusMessage}
+            </p>
+          ) : null}
+
+          {typeof ozet.mevcut_mutabakat_id === "number" ? (
+            <p className="bildirim-mutabakat-meta" data-testid="haftalik-mutabakat-id">
+              Mutabakat ID: {ozet.mevcut_mutabakat_id}
+            </p>
+          ) : null}
+
+          {canApprove ? (
+            <div className="bildirim-mutabakat-actions">
+              <button
+                type="button"
+                className="universal-btn-aux"
+                data-testid="haftalik-mutabakat-approve"
+                onClick={() => void approveWeek()}
+                disabled={!approveEnabled || isApproving || Boolean(weekWarning)}
+              >
+                {isApproving ? "Onaylanıyor..." : "Haftayı Onayla"}
+              </button>
+            </div>
+          ) : null}
+        </>
+      ) : null}
+    </div>
+  );
+}
+
 export function BildirimlerPage() {
   const {
     listQuery,
@@ -233,12 +354,15 @@ export function BildirimlerPage() {
     currentUserId,
     submitFilters,
     clearFilters,
+    applyWeekRange,
     setPage
   } = useBildirimler();
 
   const { hasPermission, uiProfile } = useRoleAccess();
   const canCreateBildirim = hasPermission("gunluk_bildirim.create");
   const canOpenBildirimDetail = hasPermission("bildirimler.detail.view");
+  const canViewHaftalikMutabakat = hasPermission("haftalik_mutabakat.view");
+  const canApproveHaftalikMutabakat = hasPermission("haftalik_mutabakat.approve");
   const isBirimAmiri = uiProfile === "birim_amiri";
   const location = useLocation();
   const navigate = useNavigate();
@@ -371,6 +495,14 @@ export function BildirimlerPage() {
       </div>
 
       <SubeDetailListNotice />
+
+      {canViewHaftalikMutabakat ? (
+        <HaftalikMutabakatPanel
+          canApprove={canApproveHaftalikMutabakat}
+          onWeekApplied={applyWeekRange}
+          onApproved={refetch}
+        />
+      ) : null}
 
       <form className="form-filter-panel" onSubmit={submitFilters}>
         <div className="form-field-grid">

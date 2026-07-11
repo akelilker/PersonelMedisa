@@ -132,6 +132,28 @@
   align-items: center;
 }
 
+.bildirim-aylik-hafta-list {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.bildirim-aylik-hafta-item {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  border: 1px solid rgba(247, 248, 250, 0.12);
+  border-radius: var(--radius-sm);
+}
+
+.bildirim-aylik-hafta-item p {
+  margin: 0;
+  color: var(--text-muted, #666);
+  font-size: 12px;
+}
+
 .bildirim-kayit-senaryosu-field {
   gap: var(--space-2);
 }

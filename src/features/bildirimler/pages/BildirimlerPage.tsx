@@ -7,6 +7,7 @@ import { ErrorState } from "../../../components/states/ErrorState";
 import { LoadingState } from "../../../components/states/LoadingState";
 import { SubeDetailListNotice } from "../../../components/states/SubeDetailListNotice";
 import { useRoleAccess } from "../../../hooks/use-role-access";
+import { useAylikBildirimOnay } from "../../../hooks/useAylikBildirimOnay";
 import { useBildirimler } from "../../../hooks/useBildirimler";
 import { useHaftalikBildirimMutabakat } from "../../../hooks/useHaftalikBildirimMutabakat";
 import {
@@ -16,6 +17,10 @@ import {
   canSubmitGunlukBildirim
 } from "../../../lib/bildirim/gunluk-bildirim-actions";
 import {
+  isAylikBildirimOnayApproveEnabled,
+  resolveAylikBildirimOnayStatusMessage
+} from "../../../lib/bildirim/aylik-bildirim-onay";
+import {
   computeHaftaBitisFromMonday,
   isHaftalikMutabakatApproveEnabled,
   isMondayIsoDate,
@@ -24,6 +29,7 @@ import {
 import {
   formatBildirimStateLabel
 } from "../../../lib/display/enum-display";
+import type { AylikBildirimOnayCounts } from "../../../types/aylik-bildirim-onay";
 import type { Bildirim } from "../../../types/bildirim";
 import type { HaftalikBildirimMutabakatCounts } from "../../../types/haftalik-bildirim-mutabakat";
 import type { Personel } from "../../../types/personel";
@@ -206,6 +212,19 @@ const HAFTALIK_MUTABAKAT_COUNT_LABELS: Array<{
   { key: "iptal", label: "İptal" }
 ];
 
+const AYLIK_BILDIRIM_ONAY_COUNT_LABELS: Array<{
+  key: keyof AylikBildirimOnayCounts;
+  label: string;
+}> = [
+  { key: "toplam_bildirim", label: "Toplam Bildirim" },
+  { key: "mutabakata_alinan", label: "Mutabakata Alınan" },
+  { key: "mutabakatli_hafta", label: "Mutabakatlı Hafta" },
+  { key: "eksik_hafta", label: "Eksik Hafta" },
+  { key: "taslak", label: "Taslak" },
+  { key: "duzeltme_istendi", label: "Düzeltme İstendi" },
+  { key: "gonderildi", label: "Gönderildi" }
+];
+
 type HaftalikMutabakatPanelProps = {
   canApprove: boolean;
   onWeekApplied: (baslangic: string, bitis: string) => void;
@@ -307,6 +326,104 @@ function HaftalikMutabakatPanel({ canApprove, onWeekApplied, onApproved }: Hafta
   );
 }
 
+type AylikBildirimOnayPanelProps = {
+  canApprove: boolean;
+};
+
+function AylikBildirimOnayPanel({ canApprove }: AylikBildirimOnayPanelProps) {
+  const { ay, setAy, ozet, isLoading, error, ayWarning, approveMonth, isApproving } =
+    useAylikBildirimOnay();
+
+  const statusMessage = resolveAylikBildirimOnayStatusMessage(ozet);
+  const approveEnabled = isAylikBildirimOnayApproveEnabled(canApprove, ozet);
+
+  return (
+    <div className="state-card bildirim-mutabakat-panel" data-testid="aylik-bildirim-onay-panel">
+      <div className="bildirim-mutabakat-panel-head">
+        <h3>Aylık Bildirim Onayı</h3>
+        {ozet ? (
+          <p className="bildirim-mutabakat-meta">
+            Ay aralığı: {ozet.ay_baslangic} – {ozet.ay_bitis}
+          </p>
+        ) : null}
+      </div>
+
+      <FormField
+        label="Ay"
+        name="aylik-bildirim-onay-ay"
+        type="month"
+        value={ay}
+        onChange={setAy}
+      />
+
+      {ayWarning ? <p className="bildirim-form-error">{ayWarning}</p> : null}
+      {isLoading ? <LoadingState label="Aylık bildirim onayı özeti yükleniyor..." /> : null}
+      {!isLoading && error ? <p className="bildirim-form-error">{error}</p> : null}
+
+      {!isLoading && ozet ? (
+        <>
+          <div className="bildirim-model-grid" data-testid="aylik-bildirim-onay-counts">
+            {AYLIK_BILDIRIM_ONAY_COUNT_LABELS.map(({ key, label }) => (
+              <div key={key} className="bildirim-model-card" data-testid={`aylik-bildirim-onay-count-${key}`}>
+                <span className="bildirim-model-label">{label}</span>
+                <strong>{ozet.counts[key]}</strong>
+              </div>
+            ))}
+          </div>
+
+          {ozet.haftalar.length > 0 ? (
+            <ul className="bildirim-aylik-hafta-list" data-testid="aylik-bildirim-onay-haftalar">
+              {ozet.haftalar.map((hafta) => (
+                <li
+                  key={`${hafta.hafta_baslangic}-${hafta.hafta_bitis}`}
+                  className="bildirim-aylik-hafta-item"
+                  data-testid={`aylik-bildirim-onay-hafta-${hafta.hafta_baslangic}`}
+                >
+                  <strong>
+                    {hafta.hafta_baslangic} – {hafta.hafta_bitis}
+                  </strong>
+                  <p>
+                    Bildirim: {hafta.bildirim_sayisi} | Mutabakata alınan: {hafta.mutabakata_alinan_sayisi}
+                    {typeof hafta.mutabakat_id === "number" ? ` | Mutabakat ID: ${hafta.mutabakat_id}` : ""}
+                    {hafta.eksik_mi ? " | Eksik hafta" : ""}
+                  </p>
+                  {hafta.blok_nedeni ? <p>{hafta.blok_nedeni}</p> : null}
+                </li>
+              ))}
+            </ul>
+          ) : null}
+
+          {statusMessage ? (
+            <p className="bildirim-mutabakat-status" data-testid="aylik-bildirim-onay-status">
+              {statusMessage}
+            </p>
+          ) : null}
+
+          {typeof ozet.mevcut_onay_id === "number" ? (
+            <p className="bildirim-mutabakat-meta" data-testid="aylik-bildirim-onay-id">
+              Aylık Onay ID: {ozet.mevcut_onay_id}
+            </p>
+          ) : null}
+
+          {canApprove ? (
+            <div className="bildirim-mutabakat-actions">
+              <button
+                type="button"
+                className="universal-btn-aux"
+                data-testid="aylik-bildirim-onay-approve"
+                onClick={() => void approveMonth()}
+                disabled={!approveEnabled || isApproving || Boolean(ayWarning)}
+              >
+                {isApproving ? "Onaya gönderiliyor..." : "Ayı Onaya Gönder"}
+              </button>
+            </div>
+          ) : null}
+        </>
+      ) : null}
+    </div>
+  );
+}
+
 export function BildirimlerPage() {
   const {
     listQuery,
@@ -363,6 +480,8 @@ export function BildirimlerPage() {
   const canOpenBildirimDetail = hasPermission("bildirimler.detail.view");
   const canViewHaftalikMutabakat = hasPermission("haftalik_mutabakat.view");
   const canApproveHaftalikMutabakat = hasPermission("haftalik_mutabakat.approve");
+  const canViewAylikBildirimOnay = hasPermission("aylik_bildirim_onayi.view");
+  const canApproveAylikBildirimOnay = hasPermission("aylik_bildirim_onayi.approve");
   const isBirimAmiri = uiProfile === "birim_amiri";
   const location = useLocation();
   const navigate = useNavigate();
@@ -502,6 +621,10 @@ export function BildirimlerPage() {
           onWeekApplied={applyWeekRange}
           onApproved={refetch}
         />
+      ) : null}
+
+      {canViewAylikBildirimOnay ? (
+        <AylikBildirimOnayPanel canApprove={canApproveAylikBildirimOnay} />
       ) : null}
 
       <form className="form-filter-panel" onSubmit={submitFilters}>

@@ -319,4 +319,44 @@ test.describe("e2e smoke", () => {
     await expect(page.getByTestId("haftalik-mutabakat-count-toplam")).toBeVisible();
     await expect(page.getByTestId("haftalik-mutabakat-approve")).toHaveCount(0);
   });
+
+  test("birim amiri aylik bildirim onay panelinde mevcut onayi gorur", async ({ page }) => {
+    await mockApi(page, "BIRIM_AMIRI");
+    await login(page, { username: "birim", password: "secret" });
+
+    await page.goto("/bildirimler");
+    await expect(page.getByTestId("aylik-bildirim-onay-panel")).toBeVisible();
+    await expect(page.locator("[name='aylik-bildirim-onay-ay']")).toBeVisible();
+
+    await page.locator("[name='aylik-bildirim-onay-ay']").fill("2026-07");
+    await expect(page.getByTestId("aylik-bildirim-onay-status")).toContainText(/aylık bildirim onayına gönderilmiş/i);
+    await expect(page.getByTestId("aylik-bildirim-onay-id")).toContainText("Aylık Onay ID: 1");
+
+    const approveButton = page.getByTestId("aylik-bildirim-onay-approve");
+    await expect(approveButton).toBeDisabled();
+    await expect(page.getByTestId("haftalik-mutabakat-panel")).toBeVisible();
+  });
+
+  test("genel yonetici aylik bildirim onay panelini read-only gorur", async ({ page }) => {
+    await mockApi(page, "GENEL_YONETICI");
+    await login(page, { username: "yonetici", password: "secret" });
+
+    await page.goto("/bildirimler");
+    await expect(page.getByTestId("aylik-bildirim-onay-panel")).toBeVisible();
+    await page.locator("[name='aylik-bildirim-onay-ay']").fill("2026-07");
+    await expect(page.getByTestId("aylik-bildirim-onay-counts")).toBeVisible();
+    await expect(page.getByTestId("aylik-bildirim-onay-approve")).toHaveCount(0);
+    await expect(page.getByTestId("haftalik-mutabakat-panel")).toBeVisible();
+  });
+
+  test("muhasebe aylik bildirim onay panelini read-only gorur", async ({ page }) => {
+    await mockApi(page, "MUHASEBE");
+    await login(page, { username: "muhasebe", password: "secret" });
+
+    await page.goto("/bildirimler");
+    await expect(page.getByTestId("aylik-bildirim-onay-panel")).toBeVisible();
+    await page.locator("[name='aylik-bildirim-onay-ay']").fill("2026-07");
+    await expect(page.getByTestId("aylik-bildirim-onay-count-toplam_bildirim")).toBeVisible();
+    await expect(page.getByTestId("aylik-bildirim-onay-approve")).toHaveCount(0);
+  });
 });

@@ -1214,8 +1214,63 @@ function createInitialBildirimler(): MockBildirimRecord[] {
       okundu_mi: false,
       created_by: 1,
       updated_by: 1
+    },
+    {
+      id: 1,
+      tarih: "2026-07-09",
+      departman_id: 3,
+      personel_id: 1,
+      sube_id: 1,
+      bildirim_turu: "GEC_GELDI",
+      aciklama: "Temmuz bildirimi",
+      state: "HAFTALIK_MUTABAKATA_ALINDI",
+      okundu_mi: false,
+      created_by: 1,
+      updated_by: 1,
+      haftalik_mutabakat_id: 100
     }
   ];
+}
+
+function createSeededJulyAylikOnayState(): Pick<
+  MockBildirimPageState,
+  "mutabakatlar" | "nextMutabakatId" | "aylikOnaylar" | "nextAylikOnayId"
+> {
+  const seededAt = "2026-07-11T10:00:00.000Z";
+  return {
+    mutabakatlar: [
+      {
+        id: 100,
+        sube_id: 1,
+        birim_amiri_user_id: 1,
+        hafta_baslangic: "2026-07-06",
+        hafta_bitis: "2026-07-12",
+        state: "TAMAMLANDI",
+        onaylayan_user_id: 1,
+        onaylandi_at: seededAt,
+        created_at: seededAt,
+        updated_at: seededAt
+      }
+    ],
+    nextMutabakatId: 0,
+    aylikOnaylar: [
+      {
+        id: 1,
+        sube_id: 1,
+        birim_amiri_user_id: 1,
+        ay: "2026-07",
+        ay_baslangic: "2026-07-01",
+        ay_bitis: "2026-07-31",
+        state: "TAMAMLANDI",
+        onaylayan_user_id: 1,
+        onaylandi_at: seededAt,
+        aciklama: null,
+        created_at: seededAt,
+        updated_at: seededAt
+      }
+    ],
+    nextAylikOnayId: 1
+  };
 }
 
 function getBildirimPageState(page: Page): MockBildirimPageState {
@@ -1227,10 +1282,7 @@ function getBildirimPageState(page: Page): MockBildirimPageState {
   const created: MockBildirimPageState = {
     items: createInitialBildirimler(),
     nextId: 800,
-    mutabakatlar: [],
-    nextMutabakatId: 0,
-    aylikOnaylar: [],
-    nextAylikOnayId: 0
+    ...createSeededJulyAylikOnayState()
   };
   bildirimStateByPage.set(page, created);
   return created;

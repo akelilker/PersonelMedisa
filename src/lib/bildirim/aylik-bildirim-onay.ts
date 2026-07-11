@@ -1,3 +1,5 @@
+import type { AylikBildirimOnayOzet } from "../../types/aylik-bildirim-onay";
+
 export type AylikBildirimOnayCounts = {
   toplam_bildirim: number;
   mutabakata_alinan: number;
@@ -18,6 +20,35 @@ export type AylikBildirimOnayHafta = {
   eksik_mi: boolean;
   blok_nedeni: string | null;
 };
+
+export function getCurrentMonthValue(reference = new Date()): string {
+  return `${reference.getFullYear()}-${String(reference.getMonth() + 1).padStart(2, "0")}`;
+}
+
+export function isAylikBildirimOnayApproveEnabled(
+  canApprove: boolean,
+  ozet: AylikBildirimOnayOzet | null
+): boolean {
+  return canApprove && ozet?.onaylanabilir_mi === true && !ozet?.mevcut_onay_id;
+}
+
+export function resolveAylikBildirimOnayStatusMessage(
+  ozet: AylikBildirimOnayOzet | null
+): string | null {
+  if (!ozet) {
+    return null;
+  }
+
+  if (ozet.mevcut_onay_id) {
+    return "Bu ay aylık bildirim onayına gönderilmiş.";
+  }
+
+  if (ozet.onaylanabilir_mi) {
+    return "Bu ay aylık onaya gönderilebilir.";
+  }
+
+  return ozet.blok_nedeni;
+}
 
 export function isValidAyValue(value: string): boolean {
   if (!/^\d{4}-\d{2}$/.test(value)) {

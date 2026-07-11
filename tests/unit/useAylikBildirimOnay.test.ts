@@ -44,6 +44,22 @@ describe("useAylikBildirimOnay", () => {
     approveMock.mockResolvedValue({ onay: { id: 1 } });
   });
 
+  it("baglam tamamlanmadan ozet istegi gondermez", () => {
+    const { result } = renderHook(() =>
+      useAylikBildirimOnay({ enabled: false, subeId: null, birimAmiriUserId: null })
+    );
+
+    expect(fetchOzetMock).not.toHaveBeenCalled();
+    expect(result.current.ozet).toBeNull();
+  });
+
+  it("secilen panel baglamini ozet istegine tasir", async () => {
+    renderHook(() => useAylikBildirimOnay({ enabled: true, subeId: 1, birimAmiriUserId: 3 }));
+
+    await waitFor(() => expect(fetchOzetMock).toHaveBeenCalled());
+    expect(fetchOzetMock.mock.calls[0]?.[1]).toEqual({ subeId: 1, birimAmiriUserId: 3 });
+  });
+
   it("gecerli ay seciminde ozet yukler", async () => {
     const { result } = renderHook(() => useAylikBildirimOnay());
 

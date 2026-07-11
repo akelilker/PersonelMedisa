@@ -23,10 +23,14 @@ class HaftalikBildirimMutabakatlariController
         $currentUserId = self::userId($user);
         $amirId = strtoupper(trim((string) ($user['rol'] ?? ''))) === 'BIRIM_AMIRI'
             ? $currentUserId
-            : null;
+            : self::parsePositiveInt($request->getQuery('birim_amiri_user_id'));
 
         $pdo = self::connection();
         self::assertTablesReady($pdo);
+        if ($amirId === null) {
+            self::validationError('birim_amiri_user_id', 'Birim amiri secimi zorunludur.');
+        }
+        self::assertAmirScope($pdo, $subeId, $amirId);
         $counts = self::fetchCounts($pdo, $subeId, $amirId, $haftaBaslangic, $haftaBitis);
         $existing = self::fetchExisting($pdo, $subeId, $amirId, $haftaBaslangic);
         [$canApprove, $blockReason] = self::approvalState($counts, $existing);
@@ -183,6 +187,29 @@ class HaftalikBildirimMutabakatlariController
             self::validationError('sube_id', 'Haftalik mutabakat icin aktif sube secilmelidir.');
         }
         return (int) $scope;
+    }
+
+    private static function assertAmirScope(PDO $pdo, $subeId, $amirId)
+    {
+        $stmt = $pdo->prepare('
+            SELECT 1
+            FROM users u
+            INNER JOIN user_subeler us ON us.user_id = u.id
+            WHERE u.id = :user_id
+              AND u.rol = :rol
+              AND u.durum = :durum
+              AND us.sube_id = :sube_id
+            LIMIT 1
+        ');
+        $stmt->execute([
+            'user_id' => (int) $amirId,
+            'rol' => 'BIRIM_AMIRI',
+            'durum' => 'AKTIF',
+            'sube_id' => (int) $subeId,
+        ]);
+        if (!$stmt->fetchColumn()) {
+            JsonResponse::forbidden('Secili birim amiri bu sube icin yetkili degil.');
+        }
     }
 
     private static function resolveWeek($value)

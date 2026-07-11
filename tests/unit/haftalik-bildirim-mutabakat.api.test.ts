@@ -27,6 +27,18 @@ describe("haftalik-bildirim-mutabakatlari.api", () => {
     );
   });
 
+  it("read-only panel baglamini query parametreleriyle gonderir", async () => {
+    const fetchMock = vi.fn(async () => response({ hafta_baslangic: "2026-04-06" }));
+    vi.stubGlobal("fetch", fetchMock);
+    await fetchHaftalikBildirimMutabakatOzet("2026-04-06", {
+      subeId: 2,
+      birimAmiriUserId: 7
+    });
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
+      "/api/haftalik-bildirim-mutabakatlari/ozet?hafta_baslangic=2026-04-06&sube_id=2&birim_amiri_user_id=7"
+    );
+  });
+
   it("onay endpointine POST body gonderir", async () => {
     const fetchMock = vi.fn(async () => response({ mutabakat: { id: 5 }, gunluk_bildirimler: [], counts: {} }, 201));
     vi.stubGlobal("fetch", fetchMock);

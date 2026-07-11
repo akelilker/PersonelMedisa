@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { FormField } from "../../../components/form/FormField";
 import { AppModal } from "../../../components/modal/AppModal";
@@ -6,10 +6,13 @@ import { EmptyState } from "../../../components/states/EmptyState";
 import { ErrorState } from "../../../components/states/ErrorState";
 import { LoadingState } from "../../../components/states/LoadingState";
 import { SubeDetailListNotice } from "../../../components/states/SubeDetailListNotice";
+import { getApiErrorMessage } from "../../../api/api-client";
+import { fetchBirimAmiriSecenekleri } from "../../../api/bildirimler.api";
 import { useRoleAccess } from "../../../hooks/use-role-access";
 import { useAylikBildirimOnay } from "../../../hooks/useAylikBildirimOnay";
 import { useBildirimler } from "../../../hooks/useBildirimler";
 import { useHaftalikBildirimMutabakat } from "../../../hooks/useHaftalikBildirimMutabakat";
+import { useAuth } from "../../../state/auth.store";
 import {
   canCancelGunlukBildirim,
   canEditGunlukBildirim,
@@ -30,7 +33,7 @@ import {
   formatBildirimStateLabel
 } from "../../../lib/display/enum-display";
 import type { AylikBildirimOnayCounts } from "../../../types/aylik-bildirim-onay";
-import type { Bildirim } from "../../../types/bildirim";
+import type { Bildirim, BirimAmiriSecenegi } from "../../../types/bildirim";
 import type { HaftalikBildirimMutabakatCounts } from "../../../types/haftalik-bildirim-mutabakat";
 import type { Personel } from "../../../types/personel";
 import type { IdOption } from "../../../types/referans";
@@ -227,11 +230,23 @@ const AYLIK_BILDIRIM_ONAY_COUNT_LABELS: Array<{
 
 type HaftalikMutabakatPanelProps = {
   canApprove: boolean;
+  enabled: boolean;
+  subeId: number | null;
+  birimAmiriUserId: number | null;
+  contextMessage: string | null;
   onWeekApplied: (baslangic: string, bitis: string) => void;
   onApproved: () => void | Promise<void>;
 };
 
-function HaftalikMutabakatPanel({ canApprove, onWeekApplied, onApproved }: HaftalikMutabakatPanelProps) {
+function HaftalikMutabakatPanel({
+  canApprove,
+  enabled,
+  subeId,
+  birimAmiriUserId,
+  contextMessage,
+  onWeekApplied,
+  onApproved
+}: HaftalikMutabakatPanelProps) {
   const userSelectedWeekRef = useRef(false);
   const {
     haftaBaslangic,
@@ -243,7 +258,7 @@ function HaftalikMutabakatPanel({ canApprove, onWeekApplied, onApproved }: Hafta
     weekWarning,
     approveWeek,
     isApproving
-  } = useHaftalikBildirimMutabakat({ onApproved });
+  } = useHaftalikBildirimMutabakat({ enabled, subeId, birimAmiriUserId, onApproved });
 
   useEffect(() => {
     if (!userSelectedWeekRef.current || !ozet || !isMondayIsoDate(haftaBaslangic)) {
@@ -280,6 +295,7 @@ function HaftalikMutabakatPanel({ canApprove, onWeekApplied, onApproved }: Hafta
         onChange={handleWeekChange}
       />
 
+      {!enabled && contextMessage ? <p className="bildirim-mutabakat-status">{contextMessage}</p> : null}
       {weekWarning ? <p className="bildirim-form-error">{weekWarning}</p> : null}
       {isLoading ? <LoadingState label="Haftalık mutabakat özeti yükleniyor..." /> : null}
       {!isLoading && error ? <p className="bildirim-form-error">{error}</p> : null}
@@ -328,11 +344,21 @@ function HaftalikMutabakatPanel({ canApprove, onWeekApplied, onApproved }: Hafta
 
 type AylikBildirimOnayPanelProps = {
   canApprove: boolean;
+  enabled: boolean;
+  subeId: number | null;
+  birimAmiriUserId: number | null;
+  contextMessage: string | null;
 };
 
-function AylikBildirimOnayPanel({ canApprove }: AylikBildirimOnayPanelProps) {
+function AylikBildirimOnayPanel({
+  canApprove,
+  enabled,
+  subeId,
+  birimAmiriUserId,
+  contextMessage
+}: AylikBildirimOnayPanelProps) {
   const { ay, setAy, ozet, isLoading, error, ayWarning, approveMonth, isApproving } =
-    useAylikBildirimOnay();
+    useAylikBildirimOnay({ enabled, subeId, birimAmiriUserId });
 
   const statusMessage = resolveAylikBildirimOnayStatusMessage(ozet);
   const approveEnabled = isAylikBildirimOnayApproveEnabled(canApprove, ozet);
@@ -356,6 +382,7 @@ function AylikBildirimOnayPanel({ canApprove }: AylikBildirimOnayPanelProps) {
         onChange={setAy}
       />
 
+      {!enabled && contextMessage ? <p className="bildirim-mutabakat-status">{contextMessage}</p> : null}
       {ayWarning ? <p className="bildirim-form-error">{ayWarning}</p> : null}
       {isLoading ? <LoadingState label="Aylık bildirim onayı özeti yükleniyor..." /> : null}
       {!isLoading && error ? <p className="bildirim-form-error">{error}</p> : null}
@@ -475,6 +502,7 @@ export function BildirimlerPage() {
     setPage
   } = useBildirimler();
 
+  const { session } = useAuth();
   const { hasPermission, uiProfile } = useRoleAccess();
   const canCreateBildirim = hasPermission("gunluk_bildirim.create");
   const canOpenBildirimDetail = hasPermission("bildirimler.detail.view");
@@ -483,8 +511,80 @@ export function BildirimlerPage() {
   const canViewAylikBildirimOnay = hasPermission("aylik_bildirim_onayi.view");
   const canApproveAylikBildirimOnay = hasPermission("aylik_bildirim_onayi.approve");
   const isBirimAmiri = uiProfile === "birim_amiri";
+  const availableSubeler = useMemo(() => {
+    const subeList = session?.sube_list ?? [];
+    const allowedIds = session?.user.sube_ids ?? [];
+    return allowedIds.length === 0
+      ? subeList
+      : subeList.filter((sube) => allowedIds.includes(sube.id));
+  }, [session?.sube_list, session?.user.sube_ids]);
+  const [selectedSubeId, setSelectedSubeId] = useState<number | null>(() =>
+    session?.active_sube_id ?? null
+  );
+  const [selectedBirimAmiriUserId, setSelectedBirimAmiriUserId] = useState<number | null>(() =>
+    isBirimAmiri ? session?.user.id ?? null : null
+  );
+  const [birimAmiriSecenekleri, setBirimAmiriSecenekleri] = useState<BirimAmiriSecenegi[]>([]);
+  const [isBirimAmiriSecenekleriLoading, setIsBirimAmiriSecenekleriLoading] = useState(false);
+  const [birimAmiriSecenekleriError, setBirimAmiriSecenekleriError] = useState<string | null>(null);
   const location = useLocation();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    setSelectedSubeId(session?.active_sube_id ?? null);
+    setSelectedBirimAmiriUserId(isBirimAmiri ? session?.user.id ?? null : null);
+  }, [isBirimAmiri, session?.active_sube_id, session?.user.id]);
+
+  useEffect(() => {
+    if (isBirimAmiri) {
+      setBirimAmiriSecenekleri([]);
+      setBirimAmiriSecenekleriError(null);
+      setIsBirimAmiriSecenekleriLoading(false);
+      return;
+    }
+
+    setSelectedBirimAmiriUserId(null);
+    setBirimAmiriSecenekleri([]);
+    setBirimAmiriSecenekleriError(null);
+    if (selectedSubeId === null) {
+      setIsBirimAmiriSecenekleriLoading(false);
+      return;
+    }
+
+    let current = true;
+    setIsBirimAmiriSecenekleriLoading(true);
+    void fetchBirimAmiriSecenekleri(selectedSubeId)
+      .then((items) => {
+        if (!current) return;
+        setBirimAmiriSecenekleri(items);
+        setSelectedBirimAmiriUserId(items.length === 1 ? items[0]!.user_id : null);
+      })
+      .catch((caught) => {
+        if (!current) return;
+        setBirimAmiriSecenekleriError(
+          getApiErrorMessage(caught, "Birim amiri seçenekleri yüklenemedi.")
+        );
+      })
+      .finally(() => {
+        if (current) setIsBirimAmiriSecenekleriLoading(false);
+      });
+
+    return () => {
+      current = false;
+    };
+  }, [isBirimAmiri, selectedSubeId]);
+
+  const panelContextReady =
+    selectedSubeId !== null && selectedBirimAmiriUserId !== null;
+  const panelContextMessage = selectedSubeId === null
+    ? "Verileri görüntülemek için şube seçin."
+    : isBirimAmiriSecenekleriLoading
+      ? "Birim amiri seçenekleri yükleniyor..."
+      : birimAmiriSecenekleri.length === 0 && !isBirimAmiri
+        ? "Seçilen şubede aktif birim amiri bulunamadı."
+        : selectedBirimAmiriUserId === null
+          ? "Verileri görüntülemek için birim amiri seçin."
+          : null;
 
   const { draft } = listQuery;
   const page = listQuery.page;
@@ -615,16 +715,73 @@ export function BildirimlerPage() {
 
       <SubeDetailListNotice />
 
+      {!isBirimAmiri && (canViewHaftalikMutabakat || canViewAylikBildirimOnay) ? (
+        <div className="state-card" data-testid="bildirim-panel-context">
+          <h3>Panel Bağlamı</h3>
+          <div className="form-field-grid">
+            <FormField
+              as="select"
+              label="Şube"
+              name="bildirim-panel-sube"
+              value={selectedSubeId === null ? "" : String(selectedSubeId)}
+              onChange={(value) => {
+                setSelectedSubeId(value ? Number.parseInt(value, 10) : null);
+                setSelectedBirimAmiriUserId(null);
+              }}
+              placeholderOption={{ value: "", label: "Şube seçin" }}
+              selectOptions={availableSubeler.map((sube) => ({
+                value: String(sube.id),
+                label: sube.ad
+              }))}
+            />
+            <FormField
+              as="select"
+              label="Birim Amiri"
+              name="bildirim-panel-birim-amiri"
+              value={selectedBirimAmiriUserId === null ? "" : String(selectedBirimAmiriUserId)}
+              onChange={(value) =>
+                setSelectedBirimAmiriUserId(value ? Number.parseInt(value, 10) : null)
+              }
+              disabled={selectedSubeId === null || isBirimAmiriSecenekleriLoading}
+              placeholderOption={{
+                value: "",
+                label: isBirimAmiriSecenekleriLoading ? "Yükleniyor..." : "Birim amiri seçin"
+              }}
+              selectOptions={birimAmiriSecenekleri.map((option) => ({
+                value: String(option.user_id),
+                label: option.ad_soyad
+              }))}
+            />
+          </div>
+          {birimAmiriSecenekleriError ? (
+            <p className="bildirim-form-error">{birimAmiriSecenekleriError}</p>
+          ) : null}
+          {!birimAmiriSecenekleriError && panelContextMessage ? (
+            <p className="bildirim-mutabakat-status">{panelContextMessage}</p>
+          ) : null}
+        </div>
+      ) : null}
+
       {canViewHaftalikMutabakat ? (
         <HaftalikMutabakatPanel
           canApprove={canApproveHaftalikMutabakat}
+          enabled={panelContextReady}
+          subeId={selectedSubeId}
+          birimAmiriUserId={selectedBirimAmiriUserId}
+          contextMessage={panelContextMessage}
           onWeekApplied={applyWeekRange}
           onApproved={refetch}
         />
       ) : null}
 
       {canViewAylikBildirimOnay ? (
-        <AylikBildirimOnayPanel canApprove={canApproveAylikBildirimOnay} />
+        <AylikBildirimOnayPanel
+          canApprove={canApproveAylikBildirimOnay}
+          enabled={panelContextReady}
+          subeId={selectedSubeId}
+          birimAmiriUserId={selectedBirimAmiriUserId}
+          contextMessage={panelContextMessage}
+        />
       ) : null}
 
       <form className="form-filter-panel" onSubmit={submitFilters}>

@@ -23,6 +23,7 @@ export const endpoints = {
   },
   bildirimler: {
     list: "/bildirimler",
+    birimAmiriSecenekleri: "/bildirimler/birim-amiri-secenekleri",
     detail: (id: number | string) => `/bildirimler/${id}`,
     submit: (id: number | string) => `/bildirimler/${id}/submit`,
     requestCorrection: (id: number | string) => `/bildirimler/${id}/request-correction`

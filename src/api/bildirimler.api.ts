@@ -1,5 +1,5 @@
 import type { ApiResponse, PaginatedResult } from "../types/api";
-import type { Bildirim } from "../types/bildirim";
+import type { Bildirim, BirimAmiriSecenegi } from "../types/bildirim";
 import { appendQueryParams } from "../utils/append-query-params";
 import { logAction } from "../audit/audit-service";
 import { apiRequest } from "./api-client";
@@ -39,6 +39,12 @@ export type UpdateBildirimPayload = {
 export type RequestBildirimCorrectionPayload = {
   correction_reason: string;
 };
+
+export async function fetchBirimAmiriSecenekleri(subeId: number): Promise<BirimAmiriSecenegi[]> {
+  const path = appendQueryParams(endpoints.bildirimler.birimAmiriSecenekleri, { sube_id: subeId });
+  const response = await apiRequest<ApiResponse<{ items: BirimAmiriSecenegi[] }>>(path);
+  return Array.isArray(response.data.items) ? response.data.items : [];
+}
 
 function normalizeBildirim(data: unknown): Bildirim {
   if (typeof data !== "object" || data === null) {

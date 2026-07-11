@@ -2633,7 +2633,9 @@ let personelBelgeKaydiIdCounter = 903;
         okBody({
           token: "mock-token",
           ui_profile: role === "BIRIM_AMIRI" ? "birim_amiri" : "yonetim",
-          sube_list: mockUserSubeIds.map((id) => ({ id, ad: subeler.find((item) => item.id === id)?.ad ?? `Şube ${id}` })),
+          sube_list: subeler
+            .filter((item) => item.durum === "AKTIF" && (mockUserSubeIds.length === 0 || mockUserSubeIds.includes(item.id)))
+            .map((item) => ({ id: item.id, ad: item.ad })),
           user: {
             id: 1,
             ad_soyad: "Mock Kullanıcı",
@@ -3729,6 +3731,25 @@ let personelBelgeKaydiIdCounter = 903;
       return;
     }
 
+    if (path === "/api/bildirimler/birim-amiri-secenekleri" && method === "GET") {
+      if (await denyUnlessRolePermission(route, "bildirimler.view")) return;
+      const subeId = getRequestSubeScope(request, url);
+      if (!subeId) {
+        await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "Aktif sube secimi zorunludur.", "sube_id"));
+        return;
+      }
+      if (mockUserSubeIds.length > 0 && !mockUserSubeIds.includes(subeId)) {
+        await fulfillJson(route, 403, errorBody("FORBIDDEN", "Bu sube icin yetkiniz bulunmuyor."));
+        return;
+      }
+      const candidates = [
+        { user_id: 1, ad_soyad: "Merkez Birim Amiri", sube_id: 1 },
+        { user_id: 4, ad_soyad: "Depolama Birim Amiri", sube_id: 2 }
+      ].filter((item) => item.sube_id === subeId);
+      await fulfillJson(route, 200, okBody({ items: candidates }));
+      return;
+    }
+
     if (path === "/api/haftalik-bildirim-mutabakatlari/ozet" && method === "GET") {
       if (await denyUnlessRolePermission(route, "haftalik_mutabakat.view")) return;
       const week = resolveMockMutabakatWeek(url.searchParams.get("hafta_baslangic"));
@@ -3741,14 +3762,24 @@ let personelBelgeKaydiIdCounter = 903;
         await fulfillJson(route, 403, errorBody("FORBIDDEN", "Haftalik mutabakat icin aktif sube secilmelidir."));
         return;
       }
+      const amirId = role === "BIRIM_AMIRI" ? mockUserId : Number.parseInt(url.searchParams.get("birim_amiri_user_id") ?? "", 10) || null;
+      const expectedAmirId = subeId === 1 ? 1 : subeId === 2 ? 4 : null;
+      if (!amirId) {
+        await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "Birim amiri secimi zorunludur.", "birim_amiri_user_id"));
+        return;
+      }
+      if (amirId !== expectedAmirId) {
+        await fulfillJson(route, 403, errorBody("FORBIDDEN", "Secilen birim amiri aktif sube ile eslesmiyor."));
+        return;
+      }
       const existing = bildirimPageState.mutabakatlar.find(
-        (item) => item.sube_id === subeId && item.birim_amiri_user_id === mockUserId && item.hafta_baslangic === week.start
+        (item) => item.sube_id === subeId && item.birim_amiri_user_id === amirId && item.hafta_baslangic === week.start
       );
-      const counts = mockMutabakatCounts(subeId, mockUserId, week.start, week.end);
+      const counts = mockMutabakatCounts(subeId, amirId, week.start, week.end);
       const reason = mockMutabakatBlockReason(counts, existing);
       await fulfillJson(route, 200, okBody({
         hafta_baslangic: week.start, hafta_bitis: week.end, sube_id: subeId,
-        birim_amiri_user_id: mockUserId, counts, onaylanabilir_mi: reason === null,
+        birim_amiri_user_id: amirId, counts, onaylanabilir_mi: reason === null,
         blok_nedeni: reason, mevcut_mutabakat_id: existing?.id ?? null
       }));
       return;
@@ -3835,6 +3866,11 @@ let personelBelgeKaydiIdCounter = 903;
         return;
       }
       const amirId = role === "BIRIM_AMIRI" ? mockUserId : Number.parseInt(url.searchParams.get("birim_amiri_user_id") ?? "", 10) || null;
+      const expectedAmirId = subeId === 1 ? 1 : subeId === 2 ? 4 : null;
+      if (amirId !== null && amirId !== expectedAmirId) {
+        await fulfillJson(route, 403, errorBody("FORBIDDEN", "Secilen birim amiri aktif sube ile eslesmiyor."));
+        return;
+      }
       const existing = amirId
         ? bildirimPageState.aylikOnaylar.find(
             (item) => item.sube_id === subeId && item.birim_amiri_user_id === amirId && item.ay === ay

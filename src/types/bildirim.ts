@@ -14,3 +14,9 @@ export type Bildirim = {
   correction_reason?: string | null;
   haftalik_mutabakat_id?: number | null;
 };
+
+export type BirimAmiriSecenegi = {
+  user_id: number;
+  ad_soyad: string;
+  sube_id: number;
+};

@@ -315,6 +315,8 @@ test.describe("e2e smoke", () => {
 
     await page.goto("/bildirimler");
     await expect(page.getByTestId("haftalik-mutabakat-panel")).toBeVisible();
+    await page.getByLabel("Şube").selectOption("1");
+    await expect(page.getByLabel("Birim Amiri")).toHaveValue("1");
     await page.locator("[name='haftalik-mutabakat-hafta-baslangic']").fill("2026-04-06");
     await expect(page.getByTestId("haftalik-mutabakat-count-toplam")).toBeVisible();
     await expect(page.getByTestId("haftalik-mutabakat-approve")).toHaveCount(0);
@@ -343,6 +345,8 @@ test.describe("e2e smoke", () => {
 
     await page.goto("/bildirimler");
     await expect(page.getByTestId("aylik-bildirim-onay-panel")).toBeVisible();
+    await page.getByLabel("Şube").selectOption("1");
+    await expect(page.getByLabel("Birim Amiri")).toHaveValue("1");
     await page.locator("[name='aylik-bildirim-onay-ay']").fill("2026-07");
     await expect(page.getByTestId("aylik-bildirim-onay-counts")).toBeVisible();
     await expect(page.getByTestId("aylik-bildirim-onay-approve")).toHaveCount(0);

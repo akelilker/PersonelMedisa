@@ -8,10 +8,13 @@ import { apiRequest } from "./api-client";
 import { endpoints } from "./endpoints";
 
 export async function fetchHaftalikBildirimMutabakatOzet(
-  haftaBaslangic: string
+  haftaBaslangic: string,
+  context?: { subeId?: number | null; birimAmiriUserId?: number | null }
 ): Promise<HaftalikBildirimMutabakatOzet> {
   const path = appendQueryParams(endpoints.haftalikBildirimMutabakatlari.summary, {
-    hafta_baslangic: haftaBaslangic
+    hafta_baslangic: haftaBaslangic,
+    sube_id: context?.subeId,
+    birim_amiri_user_id: context?.birimAmiriUserId
   });
   const response = await apiRequest<ApiResponse<HaftalikBildirimMutabakatOzet>>(path);
   return response.data;

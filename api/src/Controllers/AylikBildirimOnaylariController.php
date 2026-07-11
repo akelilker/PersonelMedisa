@@ -25,6 +25,9 @@ class AylikBildirimOnaylariController
 
         $pdo = self::connection();
         self::assertTablesReady($pdo);
+        if ($amirId !== null) {
+            self::assertAmirScope($pdo, $subeId, $amirId);
+        }
 
         $payload = self::buildSummaryPayload($pdo, $subeId, $amirId, $ay, $ayBaslangic, $ayBitis);
         JsonResponse::success($payload);
@@ -161,6 +164,29 @@ class AylikBildirimOnaylariController
 
         $requested = self::parsePositiveInt($request->getQuery('birim_amiri_user_id'));
         return $requested;
+    }
+
+    private static function assertAmirScope(PDO $pdo, $subeId, $amirId)
+    {
+        $stmt = $pdo->prepare('
+            SELECT 1
+            FROM users u
+            INNER JOIN user_subeler us ON us.user_id = u.id
+            WHERE u.id = :user_id
+              AND u.rol = :rol
+              AND u.durum = :durum
+              AND us.sube_id = :sube_id
+            LIMIT 1
+        ');
+        $stmt->execute([
+            'user_id' => (int) $amirId,
+            'rol' => 'BIRIM_AMIRI',
+            'durum' => 'AKTIF',
+            'sube_id' => (int) $subeId,
+        ]);
+        if (!$stmt->fetchColumn()) {
+            JsonResponse::forbidden('Secili birim amiri bu sube icin yetkili degil.');
+        }
     }
 
     private static function resolveMonth($value)

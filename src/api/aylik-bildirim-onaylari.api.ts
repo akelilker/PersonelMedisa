@@ -8,8 +8,15 @@ import { appendQueryParams } from "../utils/append-query-params";
 import { apiRequest } from "./api-client";
 import { endpoints } from "./endpoints";
 
-export async function fetchAylikBildirimOnayiOzet(ay: string): Promise<AylikBildirimOnayOzet> {
-  const path = appendQueryParams(endpoints.aylikBildirimOnaylari.summary, { ay });
+export async function fetchAylikBildirimOnayiOzet(
+  ay: string,
+  context?: { subeId?: number | null; birimAmiriUserId?: number | null }
+): Promise<AylikBildirimOnayOzet> {
+  const path = appendQueryParams(endpoints.aylikBildirimOnaylari.summary, {
+    ay,
+    sube_id: context?.subeId,
+    birim_amiri_user_id: context?.birimAmiriUserId
+  });
   const response = await apiRequest<ApiResponse<AylikBildirimOnayOzet>>(path);
   return response.data;
 }

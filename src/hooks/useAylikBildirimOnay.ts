@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { getApiErrorMessage } from "../api/api-client";
 import {
   approveAylikBildirimOnayi,
@@ -12,17 +12,20 @@ import type { AylikBildirimOnayOzet } from "../types/aylik-bildirim-onay";
 
 type UseAylikBildirimOnayOptions = {
   enabled?: boolean;
+  subeId?: number | null;
+  birimAmiriUserId?: number | null;
   onApproved?: () => void | Promise<void>;
 };
 
 export function useAylikBildirimOnay(options: UseAylikBildirimOnayOptions = {}) {
-  const { enabled = true, onApproved } = options;
+  const { enabled = true, subeId = null, birimAmiriUserId = null, onApproved } = options;
   const [ay, setAyState] = useState(getCurrentMonthValue);
   const [ozet, setOzet] = useState<AylikBildirimOnayOzet | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ayWarning, setAyWarning] = useState<string | null>(null);
   const [isApproving, setIsApproving] = useState(false);
+  const requestIdRef = useRef(0);
 
   const refreshOzet = useCallback(async () => {
     if (!enabled || !isValidAyValue(ay)) {
@@ -31,20 +34,31 @@ export function useAylikBildirimOnay(options: UseAylikBildirimOnayOptions = {}) 
 
     setIsLoading(true);
     setError(null);
+    const requestId = ++requestIdRef.current;
 
     try {
-      const data = await fetchAylikBildirimOnayiOzet(ay);
-      setOzet(data);
+      const data = await fetchAylikBildirimOnayiOzet(ay, { subeId, birimAmiriUserId });
+      if (requestId === requestIdRef.current) {
+        setOzet(data);
+      }
     } catch (caught) {
-      setOzet(null);
-      setError(getApiErrorMessage(caught, "Aylik bildirim onayi ozeti yuklenemedi."));
+      if (requestId === requestIdRef.current) {
+        setOzet(null);
+        setError(getApiErrorMessage(caught, "Aylik bildirim onayi ozeti yuklenemedi."));
+      }
     } finally {
-      setIsLoading(false);
+      if (requestId === requestIdRef.current) {
+        setIsLoading(false);
+      }
     }
-  }, [ay, enabled]);
+  }, [ay, birimAmiriUserId, enabled, subeId]);
 
   useEffect(() => {
     if (!enabled) {
+      requestIdRef.current += 1;
+      setOzet(null);
+      setError(null);
+      setIsLoading(false);
       return;
     }
 

@@ -25,6 +25,15 @@ describe("aylik-bildirim-onaylari.api", () => {
     expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/aylik-bildirim-onaylari/ozet?ay=2026-04");
   });
 
+  it("read-only panel baglamini query parametreleriyle gonderir", async () => {
+    const fetchMock = vi.fn(async () => response({ ay: "2026-04" }));
+    vi.stubGlobal("fetch", fetchMock);
+    await fetchAylikBildirimOnayiOzet("2026-04", { subeId: 1, birimAmiriUserId: 3 });
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
+      "/api/aylik-bildirim-onaylari/ozet?ay=2026-04&sube_id=1&birim_amiri_user_id=3"
+    );
+  });
+
   it("onay endpointine POST body gonderir", async () => {
     const fetchMock = vi.fn(async () => response({ onay: { id: 3 } }, 201));
     vi.stubGlobal("fetch", fetchMock);

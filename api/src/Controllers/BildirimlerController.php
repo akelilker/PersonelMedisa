@@ -110,6 +110,47 @@ class BildirimlerController
         );
     }
 
+    public static function birimAmiriSecenekleri(Request $request)
+    {
+        $user = AuthMiddleware::authenticate($request, true);
+        RolePermissions::assert($user, 'bildirimler.view');
+        $subeId = SubeScope::resolveScope($user, $request);
+        if ($subeId === null) {
+            JsonResponse::badRequest('Birim amiri secenekleri icin sube secilmelidir.', 'VALIDATION_ERROR', 'sube_id');
+        }
+
+        try {
+            $pdo = Connection::get();
+            $stmt = $pdo->prepare('
+                SELECT u.id AS user_id, u.ad_soyad, us.sube_id
+                FROM users u
+                INNER JOIN user_subeler us ON us.user_id = u.id
+                WHERE u.rol = :rol
+                  AND u.durum = :durum
+                  AND us.sube_id = :sube_id
+                ORDER BY u.ad_soyad ASC, u.id ASC
+            ');
+            $stmt->execute([
+                'rol' => 'BIRIM_AMIRI',
+                'durum' => 'AKTIF',
+                'sube_id' => (int) $subeId,
+            ]);
+        } catch (\Throwable $e) {
+            JsonResponse::serverError('Birim amiri secenekleri yuklenemedi.');
+        }
+
+        $items = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $items[] = [
+                'user_id' => (int) $row['user_id'],
+                'ad_soyad' => (string) $row['ad_soyad'],
+                'sube_id' => (int) $row['sube_id'],
+            ];
+        }
+
+        JsonResponse::success(['items' => $items]);
+    }
+
     public static function detail(Request $request, $id)
     {
         $user = AuthMiddleware::authenticate($request, true);

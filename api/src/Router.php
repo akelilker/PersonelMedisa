@@ -123,6 +123,9 @@ class Router
         if ($path === '/bildirimler' && $method === 'POST') {
             BildirimlerController::create($this->request);
         }
+        if ($path === '/bildirimler/birim-amiri-secenekleri' && $method === 'GET') {
+            BildirimlerController::birimAmiriSecenekleri($this->request);
+        }
         if ($method === 'POST' && preg_match('#^/bildirimler/(\d+)/submit$#', $path, $matches)) {
             BildirimlerController::submit($this->request, $matches[1]);
         }

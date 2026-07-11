@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getApiErrorMessage } from "../api/api-client";
 import {
   approveHaftalikBildirimMutabakat,
@@ -13,17 +13,20 @@ import type { HaftalikBildirimMutabakatOzet } from "../types/haftalik-bildirim-m
 
 type UseHaftalikBildirimMutabakatOptions = {
   enabled?: boolean;
+  subeId?: number | null;
+  birimAmiriUserId?: number | null;
   onApproved?: () => void | Promise<void>;
 };
 
 export function useHaftalikBildirimMutabakat(options: UseHaftalikBildirimMutabakatOptions = {}) {
-  const { enabled = true, onApproved } = options;
+  const { enabled = true, subeId = null, birimAmiriUserId = null, onApproved } = options;
   const [haftaBaslangic, setHaftaBaslangicState] = useState(getCurrentMondayIsoDate);
   const [ozet, setOzet] = useState<HaftalikBildirimMutabakatOzet | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [weekWarning, setWeekWarning] = useState<string | null>(null);
   const [isApproving, setIsApproving] = useState(false);
+  const requestIdRef = useRef(0);
 
   const haftaBitis = useMemo(() => {
     if (ozet?.hafta_bitis) {
@@ -39,20 +42,34 @@ export function useHaftalikBildirimMutabakat(options: UseHaftalikBildirimMutabak
 
     setIsLoading(true);
     setError(null);
+    const requestId = ++requestIdRef.current;
 
     try {
-      const data = await fetchHaftalikBildirimMutabakatOzet(haftaBaslangic);
-      setOzet(data);
+      const data = await fetchHaftalikBildirimMutabakatOzet(haftaBaslangic, {
+        subeId,
+        birimAmiriUserId
+      });
+      if (requestId === requestIdRef.current) {
+        setOzet(data);
+      }
     } catch (caught) {
-      setOzet(null);
-      setError(getApiErrorMessage(caught, "Haftalik mutabakat ozeti yuklenemedi."));
+      if (requestId === requestIdRef.current) {
+        setOzet(null);
+        setError(getApiErrorMessage(caught, "Haftalik mutabakat ozeti yuklenemedi."));
+      }
     } finally {
-      setIsLoading(false);
+      if (requestId === requestIdRef.current) {
+        setIsLoading(false);
+      }
     }
-  }, [enabled, haftaBaslangic]);
+  }, [birimAmiriUserId, enabled, haftaBaslangic, subeId]);
 
   useEffect(() => {
     if (!enabled) {
+      requestIdRef.current += 1;
+      setOzet(null);
+      setError(null);
+      setIsLoading(false);
       return;
     }
 

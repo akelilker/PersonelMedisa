@@ -177,11 +177,35 @@ export function BildirimPuantajEtkiAdaylariSection() {
   const canDismiss = hasPermission("puantaj.bildirim_etki.dismiss");
   const canResolveGyViaOnayApi = hasPermission("genel_yonetici_bildirim_onayi.view");
   const activeSubeId = session?.active_sube_id ?? null;
+  const subeIds = session?.user.sube_ids ?? [];
+  const subeList = session?.sube_list ?? [];
 
+  const needsLocalSubeSelection =
+    canView && activeSubeId === null && subeIds.length === 0 && subeList.length > 0;
+  const hasNoAvailableSube = canView && activeSubeId === null && subeIds.length === 0 && subeList.length === 0;
+
+  const availablePanelSubeler = useMemo(() => {
+    if (subeIds.length === 0) {
+      return subeList;
+    }
+    return subeList.filter((sube) => subeIds.includes(sube.id));
+  }, [subeIds, subeList]);
+
+  const [selectedLocalSubeId, setSelectedLocalSubeId] = useState<number | null>(null);
   const [birimAmiriSecenekleri, setBirimAmiriSecenekleri] = useState<BirimAmiriSecenegi[]>([]);
   const [selectedBirimAmiriUserId, setSelectedBirimAmiriUserId] = useState<number | null>(null);
   const [isBirimAmiriLoading, setIsBirimAmiriLoading] = useState(false);
   const [birimAmiriError, setBirimAmiriError] = useState<string | null>(null);
+
+  const effectiveSubeId = useMemo(() => {
+    if (typeof activeSubeId === "number" && activeSubeId > 0) {
+      return activeSubeId;
+    }
+    if (needsLocalSubeSelection) {
+      return selectedLocalSubeId;
+    }
+    return null;
+  }, [activeSubeId, needsLocalSubeSelection, selectedLocalSubeId]);
 
   const {
     ay,
@@ -221,22 +245,31 @@ export function BildirimPuantajEtkiAdaylariSection() {
     enabled: canView,
     canDismiss,
     canResolveGyViaOnayApi,
-    subeId: activeSubeId,
+    subeId: effectiveSubeId,
     birimAmiriUserId: selectedBirimAmiriUserId
   });
 
   useEffect(() => {
+    if (!canView) {
+      setSelectedLocalSubeId(null);
+      setSelectedBirimAmiriUserId(null);
+      setBirimAmiriSecenekleri([]);
+      setIsBirimAmiriLoading(false);
+      setBirimAmiriError(null);
+      return;
+    }
+
     setSelectedBirimAmiriUserId(null);
     setBirimAmiriSecenekleri([]);
     setBirimAmiriError(null);
-    if (activeSubeId === null) {
+    if (effectiveSubeId === null) {
       setIsBirimAmiriLoading(false);
       return;
     }
 
     let current = true;
     setIsBirimAmiriLoading(true);
-    void fetchBirimAmiriSecenekleri(activeSubeId)
+    void fetchBirimAmiriSecenekleri(effectiveSubeId)
       .then((options) => {
         if (!current) return;
         setBirimAmiriSecenekleri(options);
@@ -253,10 +286,13 @@ export function BildirimPuantajEtkiAdaylariSection() {
     return () => {
       current = false;
     };
-  }, [activeSubeId]);
+  }, [canView, effectiveSubeId]);
 
   const contextMessage = useMemo(() => {
-    if (activeSubeId === null) {
+    if (hasNoAvailableSube) {
+      return "Görüntülenecek şube bulunamadı.";
+    }
+    if (effectiveSubeId === null) {
       return "Verileri görüntülemek için şube seçin.";
     }
     if (isBirimAmiriLoading) {
@@ -273,9 +309,10 @@ export function BildirimPuantajEtkiAdaylariSection() {
     }
     return null;
   }, [
-    activeSubeId,
     birimAmiriError,
     birimAmiriSecenekleri.length,
+    effectiveSubeId,
+    hasNoAvailableSube,
     isBirimAmiriLoading,
     selectedBirimAmiriUserId
   ]);
@@ -308,6 +345,19 @@ export function BildirimPuantajEtkiAdaylariSection() {
       </div>
 
       <div className="form-field-grid">
+        {needsLocalSubeSelection ? (
+          <FormField
+            label="Şube"
+            name="puantaj-etki-aday-sube"
+            as="select"
+            value={selectedLocalSubeId != null ? String(selectedLocalSubeId) : ""}
+            onChange={(value) => setSelectedLocalSubeId(value ? Number.parseInt(value, 10) : null)}
+            selectOptions={availablePanelSubeler.map((sube) => ({
+              value: String(sube.id),
+              label: sube.ad
+            }))}
+          />
+        ) : null}
         <FormField
           label="Ay"
           name="puantaj-etki-aday-ay"

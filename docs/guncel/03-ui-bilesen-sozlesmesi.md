@@ -570,6 +570,10 @@ Görünürlük:
 - Panel `puantaj.bildirim_etki.view` yetkisine sahip kullanıcıya render edilir (Genel Yönetici, Bölüm Yöneticisi read-only; Muhasebe karar aksiyonlu).
 - `puantaj.bildirim_etki.dismiss` olmadan Yok Say aksiyonu gösterilmez.
 - Liste sayfalama: backend default `limit=20`; `module-pagination` ile sonraki/önceki sayfa.
+- `puantaj.bildirim_etki.view` yetkisi olmayan rolde panel yardımcı request'leri (ör. birim amiri seçenekleri) de çalışmaz.
+- `sube_ids=[]` (tüm şubeler) kullanıcıları panel içinden yerel `Şube` seçer; bu seçim global auth session'ı değiştirmez.
+- Yerel şube seçilmeden birim amiri ve aday liste/özet/detail request'i atılmaz.
+- Canlı kontrollü smoke dönemi `2026-06`; `2026-07` boş-state beklenen sonuçtur.
 
 Veri ve filtreler:
 

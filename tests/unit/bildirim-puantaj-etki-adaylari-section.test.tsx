@@ -1,5 +1,5 @@
 /** @vitest-environment jsdom */
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BildirimPuantajEtkiAdaylariSection } from "../../src/features/puantaj/components/BildirimPuantajEtkiAdaylariSection";
 
@@ -46,6 +46,12 @@ const listItem = {
   uygulanan_puantaj_id: null
 };
 
+const incelemeItem = {
+  ...listItem,
+  id: 3,
+  state: "INCELEME_GEREKLI" as const
+};
+
 function makeHookState(overrides: Record<string, unknown> = {}) {
   return {
     ay: "2026-06",
@@ -67,7 +73,16 @@ function makeHookState(overrides: Record<string, unknown> = {}) {
     },
     items: [listItem],
     ozet: {
-      context: { genel_yonetici_bildirim_onayi_id: 10, ay: "2026-06", ay_baslangic: null, ay_bitis: null, sube_id: 1, birim_amiri_user_id: 1, aylik_bildirim_onayi_id: 2, onaylandi_at: null },
+      context: {
+        genel_yonetici_bildirim_onayi_id: 10,
+        ay: "2026-06",
+        ay_baslangic: null,
+        ay_bitis: null,
+        sube_id: 1,
+        birim_amiri_user_id: 1,
+        aylik_bildirim_onayi_id: 2,
+        onaylandi_at: null
+      },
       genel_yonetici_bildirim_onayi: null,
       kaynak_bildirim_sayisi: 1,
       aday_sayilari: { toplam: 1, hazir: 1, inceleme_gerekli: 0, uygulandi: 0, yok_sayildi: 0 },
@@ -104,27 +119,69 @@ function makeHookState(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function mockPermissions(permissions: string[]) {
+  useRoleAccessMock.mockReturnValue({
+    hasPermission: (permission: string) => permissions.includes(permission)
+  });
+}
+
+function mockSession(overrides: Record<string, unknown> = {}) {
+  useAuthMock.mockReturnValue({
+    session: {
+      active_sube_id: 1,
+      user: { sube_ids: [1] },
+      sube_list: [{ id: 1, ad: "Merkez" }],
+      ...overrides
+    }
+  });
+}
+
+function mockAllSubeSession() {
+  mockSession({
+    active_sube_id: null,
+    user: { sube_ids: [] },
+    sube_list: [
+      { id: 1, ad: "Merkez" },
+      { id: 2, ad: "Depolama" }
+    ]
+  });
+}
+
 describe("BildirimPuantajEtkiAdaylariSection", () => {
   afterEach(() => {
     cleanup();
   });
 
   beforeEach(() => {
-    useRoleAccessMock.mockReturnValue({
-      hasPermission: (permission: string) =>
-        permission === "puantaj.bildirim_etki.view" || permission === "puantaj.bildirim_etki.dismiss"
-    });
-    useAuthMock.mockReturnValue({
-      session: { active_sube_id: 1, user: { sube_ids: [1] }, sube_list: [{ id: 1, ad: "Merkez" }] }
-    });
+    vi.clearAllMocks();
+    mockPermissions(["puantaj.bildirim_etki.view", "puantaj.bildirim_etki.dismiss"]);
+    mockSession();
     fetchBirimAmiriMock.mockResolvedValue([{ user_id: 1, ad_soyad: "Merkez Birim Amiri", sube_id: 1 }]);
     useHookMock.mockReturnValue(makeHookState());
   });
 
-  it("permission yoksa panel render edilmez", () => {
-    useRoleAccessMock.mockReturnValue({ hasPermission: () => false });
+  it("permission yoksa panel render edilmez ve birim amiri secenekleri cagrilmaz", async () => {
+    mockPermissions([]);
+    mockSession({ active_sube_id: 1, user: { sube_ids: [1] } });
     const { container } = render(<BildirimPuantajEtkiAdaylariSection />);
     expect(container.innerHTML).toBe("");
+    await waitFor(() => expect(fetchBirimAmiriMock).not.toHaveBeenCalled());
+  });
+
+  it("BIRIM_AMIRI paneli render etmez ve birim amiri secenekleri cagrilmaz", async () => {
+    mockPermissions([]);
+    mockSession({ active_sube_id: 1, user: { rol: "BIRIM_AMIRI", sube_ids: [1] } });
+    const { container } = render(<BildirimPuantajEtkiAdaylariSection />);
+    expect(container.innerHTML).toBe("");
+    await waitFor(() => expect(fetchBirimAmiriMock).not.toHaveBeenCalled());
+  });
+
+  it("PATRON paneli render etmez ve birim amiri secenekleri cagrilmaz", async () => {
+    mockPermissions([]);
+    mockSession({ active_sube_id: null, user: { rol: "PATRON", sube_ids: [] } });
+    const { container } = render(<BildirimPuantajEtkiAdaylariSection />);
+    expect(container.innerHTML).toBe("");
+    await waitFor(() => expect(fetchBirimAmiriMock).not.toHaveBeenCalled());
   });
 
   it("MUHASEBE gorunurluk yetkisinde panel ve Yok Say aksiyonunu gosterir", async () => {
@@ -133,6 +190,88 @@ describe("BildirimPuantajEtkiAdaylariSection", () => {
     expect(screen.getByText("Onaylı Bildirim Puantaj Etki Adayları")).not.toBeNull();
     expect(screen.getAllByTestId("puantaj-etki-aday-dismiss-1").length).toBeGreaterThan(0);
     expect(screen.queryByText("Uygula")).toBeNull();
+    expect(screen.queryByLabelText("Şube")).toBeNull();
+  });
+
+  it("GENEL_YONETICI tum sube oturumunda yerel sube secimi olmadan request atmaz", async () => {
+    mockPermissions(["puantaj.bildirim_etki.view"]);
+    mockAllSubeSession();
+    useHookMock.mockReturnValue(makeHookState({ contextReady: false, items: [], ozet: null }));
+
+    render(<BildirimPuantajEtkiAdaylariSection />);
+
+    expect(screen.getByLabelText("Şube")).not.toBeNull();
+    expect(screen.getByTestId("puantaj-etki-aday-context").textContent).toContain(
+      "Verileri görüntülemek için şube seçin."
+    );
+    expect(fetchBirimAmiriMock).not.toHaveBeenCalled();
+    expect(useHookMock).toHaveBeenCalledWith(
+      expect.objectContaining({ subeId: null, enabled: true, canDismiss: false })
+    );
+    expect(screen.queryByRole("button", { name: "Yok Say" })).toBeNull();
+  });
+
+  it("GENEL_YONETICI yerel sube secince birim amiri secenekleri ve hook baglami guncellenir", async () => {
+    mockPermissions(["puantaj.bildirim_etki.view"]);
+    mockAllSubeSession();
+    fetchBirimAmiriMock.mockResolvedValue([
+      { user_id: 1, ad_soyad: "Merkez Birim Amiri", sube_id: 1 },
+      { user_id: 4, ad_soyad: "Depolama Birim Amiri", sube_id: 2 }
+    ]);
+    useHookMock.mockReturnValue(makeHookState({ contextReady: false, items: [], ozet: null }));
+
+    render(<BildirimPuantajEtkiAdaylariSection />);
+
+    fireEvent.change(screen.getByLabelText("Şube"), { target: { value: "2" } });
+
+    await waitFor(() => expect(fetchBirimAmiriMock).toHaveBeenCalledWith(2));
+    expect(useHookMock).toHaveBeenCalledWith(expect.objectContaining({ subeId: 2 }));
+  });
+
+  it("BOLUM_YONETICISI tum sube oturumunda read-only panel ve yerel sube secimi gosterir", async () => {
+    mockPermissions(["puantaj.bildirim_etki.view"]);
+    mockAllSubeSession();
+    useHookMock.mockReturnValue(makeHookState({ contextReady: false, items: [], ozet: null }));
+
+    render(<BildirimPuantajEtkiAdaylariSection />);
+
+    expect(screen.getByLabelText("Şube")).not.toBeNull();
+    expect(screen.queryByRole("button", { name: "Yok Say" })).toBeNull();
+  });
+
+  it("MUHASEBE tum sube oturumunda yerel sube secimi sonrasi Yok Say aksiyonunu gosterir", async () => {
+    mockAllSubeSession();
+    useHookMock.mockReturnValue(makeHookState({ items: [incelemeItem] }));
+
+    render(<BildirimPuantajEtkiAdaylariSection />);
+
+    fireEvent.change(screen.getByLabelText("Şube"), { target: { value: "1" } });
+    await waitFor(() => expect(fetchBirimAmiriMock).toHaveBeenCalledWith(1));
+    await waitFor(() => expect(screen.getAllByTestId("puantaj-etki-aday-dismiss-3").length).toBeGreaterThan(0));
+  });
+
+  it("aktif subeli kullanicida ekstra yerel sube select gosterilmez", async () => {
+    render(<BildirimPuantajEtkiAdaylariSection />);
+    expect(screen.queryByLabelText("Şube")).toBeNull();
+    await waitFor(() => expect(fetchBirimAmiriMock).toHaveBeenCalledWith(1));
+  });
+
+  it("yerel sube degisince birim amiri secenekleri yeniden yuklenir", async () => {
+    mockAllSubeSession();
+    fetchBirimAmiriMock
+      .mockResolvedValueOnce([{ user_id: 1, ad_soyad: "Merkez Birim Amiri", sube_id: 1 }])
+      .mockResolvedValueOnce([{ user_id: 4, ad_soyad: "Depolama Birim Amiri", sube_id: 2 }]);
+    useHookMock.mockReturnValue(makeHookState({ contextReady: false, items: [], ozet: null }));
+
+    render(<BildirimPuantajEtkiAdaylariSection />);
+
+    fireEvent.change(screen.getByLabelText("Şube"), { target: { value: "1" } });
+    await waitFor(() => expect(fetchBirimAmiriMock).toHaveBeenCalledWith(1));
+
+    fetchBirimAmiriMock.mockClear();
+
+    fireEvent.change(screen.getByLabelText("Şube"), { target: { value: "2" } });
+    await waitFor(() => expect(fetchBirimAmiriMock).toHaveBeenCalledWith(2));
   });
 
   it("terminal state satirinda aksiyon gostermez", () => {

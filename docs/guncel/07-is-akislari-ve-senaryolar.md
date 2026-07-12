@@ -399,6 +399,9 @@ S73 tamamlanmış Genel Yönetici bildirim üst onayı sonrası `puantaj.bildiri
 - Panel `puantaj.bildirim_etki.view` yetkisinde görünür; Genel Yönetici ve Bölüm Yöneticisi read-only kalır.
 - Yok Say yalnız `puantaj.bildirim_etki.dismiss` (Muhasebe) ile açılır.
 - Ay + birim amiri + aktif şube bağlamı hazır olmadan liste/özet isteği yapılmaz; şube değişince stale veri temizlenir.
+- `sube_ids=[]` (tüm şubeler) kullanıcıları panel içinden yerel şube seçer; global auth session değişmez.
+- View yetkisi olmayan rolde panel yardımcı request'leri (birim amiri seçenekleri dahil) çalışmaz.
+- Canlı kontrollü smoke dönemi `2026-06`; `2026-07` boş-state beklenen sonuçtur.
 - Özet için `genel_yonetici_bildirim_onayi_id` gerekir: Muhasebe/Bölüm için liste satırından veya bağlam içi cache; Genel Yönetici için ayrıca `genel_yonetici_bildirim_onayi` özet API'si kullanılabilir.
 - `HAZIR` ve `INCELEME_GEREKLI` için Yok Say modalı açılır; gerekçe 5–500 karakter doğrulanır.
 - `INCELEME_GEREKLI` satırında “otomatik uygulanamaz” uyarısı gösterilir.

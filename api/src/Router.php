@@ -72,6 +72,9 @@ class Router
         if ($path === '/puantaj/bildirim-etki-adaylari' && $method === 'GET') {
             BildirimPuantajEtkiAdaylariController::list($this->request);
         }
+        if ($method === 'POST' && preg_match('#^/puantaj/bildirim-etki-adaylari/(\d+)/yok-say$#', $path, $matches)) {
+            BildirimPuantajEtkiAdaylariController::dismiss($this->request, $matches[1]);
+        }
         if ($method === 'GET' && preg_match('#^/puantaj/bildirim-etki-adaylari/(\d+)$#', $path, $matches)) {
             BildirimPuantajEtkiAdaylariController::detail($this->request, $matches[1]);
         }

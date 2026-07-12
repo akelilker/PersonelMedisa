@@ -181,6 +181,7 @@ DB sahibi: `onayli_bildirim_puantaj_etki_adaylari`; generate sahibi: `MUHASEBE`.
 | Liste | `GET /puantaj/bildirim-etki-adaylari` | `puantaj.bildirim_etki.view` |
 | Detay | `GET /puantaj/bildirim-etki-adaylari/{id}` | `puantaj.bildirim_etki.view` |
 | Generate | `POST /puantaj/bildirim-etki-adaylari/hazirla` | `puantaj.bildirim_etki.generate` |
+| Yok Say | `POST /puantaj/bildirim-etki-adaylari/{id}/yok-say` | `puantaj.bildirim_etki.dismiss` |
 
 **Migration:** `009_onayli_bildirim_puantaj_etki_adaylari.sql`, `010_bildirim_puantaj_etki_snapshot_zamanlarini_duzelt.sql`.
 
@@ -214,7 +215,46 @@ Policy sahibi: `BildirimPuantajEtkiDecisionPolicy` — yalnız state/action kara
 
 **Ürün kararları:** Mevcut puantaj otomatik overwrite edilmez. YOK_SAY gerekçesi zorunludur; minimum karakter sayısı henüz kararlaştırılmamıştır (doğrulama endpoint fazında). Migration canlıya otomatik uygulanmaz.
 
-**Sınır:** S74-C1 endpoint, puantaj mutation, finans/bordro ve canlı migration içermez. Uygula/yok-say POST'ları S74-C2+ fazındadır.
+**Sınır:** S74-C1 endpoint, puantaj mutation, finans/bordro ve canlı migration içermez. Uygula POST'u S74-C2B fazındadır; yok-say S74-C2A ile gelmiştir.
+
+### Puantaj etki adayı Yok Say — S74-C2A
+
+Endpoint: `POST /puantaj/bildirim-etki-adaylari/{id}/yok-say` — yalnız `puantaj.bildirim_etki.dismiss` (MUHASEBE).
+
+**Kapsam:** S74-C2A yalnız Yok Say endpointidir. Uygula endpointi henüz yoktur. Frontend karar ekranı henüz yoktur.
+
+**Request body:**
+
+```json
+{
+  "expected_state": "INCELEME_GEREKLI",
+  "gerekce": "Mevcut puantaj kaydıyla çakıştığı için yok sayıldı."
+}
+```
+
+| Alan | Kural |
+|------|-------|
+| `expected_state` | Zorunlu; `HAZIR` veya `INCELEME_GEREKLI`; ilk kararda DB state ile aynı olmalı |
+| `gerekce` | Zorunlu; trim sonrası 5–500 karakter; yalnız boşluk kabul edilmez |
+
+**State matrisi:**
+
+| Mevcut state | YOK_SAY |
+|--------------|:-------:|
+| HAZIR | İzinli |
+| INCELEME_GEREKLI | İzinli |
+| UYGULANDI | Yasak (409 `STATE_CONFLICT`) |
+| YOK_SAYILDI | Terminal; exact tekrar idempotent 200, farklı gerekçe 409 |
+
+**Stale:** `expected_state` DB state ile uyuşmazsa → HTTP 409 `STATE_STALE`.
+
+**Idempotency:** Aday zaten `YOK_SAYILDI` ve trim edilmiş gerekçe DB'deki `karar_gerekcesi` ile aynıysa → HTTP 200, `idempotent: true`, yeni UPDATE yok.
+
+**Yazılan alanlar:** `state=YOK_SAYILDI`, `karar_veren_user_id`, `karar_zamani` (backend UTC), `karar_gerekcesi` (trim edilmiş).
+
+**Yazılmayan alanlar:** `uygulanan_puantaj_id`, `onceki_puantaj_snapshot`, `sonraki_puantaj_snapshot`, `uygulama_hash` (NULL kalır).
+
+**Mutation sınırı:** `gunluk_puantaj`, finans/bordro, süreç ve bildirim zinciri tablolarına yazım yoktur.
 
 ## 1. Ortak API Sözleşmesi
 

@@ -15,16 +15,18 @@ const rolePermissionsSource = readFileSync(rolePermissionsPath, "utf8");
 const policySource = readFileSync(policyPath, "utf8");
 
 describe("BildirimPuantajEtkiAdaylariController source contract", () => {
-  it("exposes summary, list, detail and generate operations", () => {
+  it("exposes summary, list, detail, generate and dismiss operations", () => {
     expect(controllerSource).toMatch(/public static function summary\(/);
     expect(controllerSource).toMatch(/public static function list\(/);
     expect(controllerSource).toMatch(/public static function detail\(/);
     expect(controllerSource).toMatch(/public static function generate\(/);
+    expect(controllerSource).toMatch(/public static function dismiss\(/);
   });
 
   it("uses permission guards without hard-coded role checks", () => {
     expect(controllerSource).toContain("puantaj.bildirim_etki.view");
     expect(controllerSource).toContain("puantaj.bildirim_etki.generate");
+    expect(controllerSource).toContain("BildirimPuantajEtkiDecisionPolicy::PERMISSION_DISMISS");
     expect(controllerSource).not.toMatch(/\$user\['rol'\]/);
     expect(controllerSource).not.toMatch(/===\s*'MUHASEBE'/);
   });
@@ -71,11 +73,11 @@ describe("BildirimPuantajEtkiAdaylariController source contract", () => {
     }
   });
 
-  it("does not implement apply or resolve transitions", () => {
+  it("implements dismiss transition on aday table only", () => {
+    expect(controllerSource).toMatch(/public static function dismiss\(/);
     expect(controllerSource).not.toMatch(/public static function apply\(/);
-    expect(controllerSource).not.toMatch(/public static function resolve\(/);
-    expect(controllerSource).not.toMatch(/public static function dismiss\(/);
-    expect(controllerSource).not.toContain("UPDATE onayli_bildirim_puantaj_etki_adaylari");
+    expect(controllerSource).toContain("UPDATE ' . self::TABLE");
+    expect(controllerSource).toContain("BildirimPuantajEtkiDecisionPolicy");
   });
 
   it("maps locked karar audit fields in list/detail", () => {
@@ -114,20 +116,23 @@ describe("BildirimPuantajEtkiAdaylariController source contract", () => {
       expect(listMapper).not.toContain(forbidden);
       expect(detailMapper).not.toContain(forbidden);
     }
-    expect(controllerSource).not.toContain("BildirimPuantajEtkiDecisionPolicy");
+    expect(controllerSource).toContain("BildirimPuantajEtkiDecisionPolicy");
   });
 });
 
 describe("Router source contract for puantaj bildirim etki adaylari", () => {
-  it("registers ozet and hazirla before dynamic id route", () => {
+  it("registers ozet, hazirla and yok-say before dynamic id route", () => {
     const ozetIndex = routerSource.indexOf("'/puantaj/bildirim-etki-adaylari/ozet'");
     const hazirlaIndex = routerSource.indexOf("'/puantaj/bildirim-etki-adaylari/hazirla'");
     const listIndex = routerSource.indexOf("'/puantaj/bildirim-etki-adaylari' && $method === 'GET'");
+    const yokSayIndex = routerSource.indexOf("#^/puantaj/bildirim-etki-adaylari/(\\d+)/yok-say$#");
     const detailIndex = routerSource.indexOf("#^/puantaj/bildirim-etki-adaylari/(\\d+)$#");
     expect(ozetIndex).toBeGreaterThan(-1);
     expect(hazirlaIndex).toBeGreaterThan(ozetIndex);
     expect(listIndex).toBeGreaterThan(hazirlaIndex);
-    expect(detailIndex).toBeGreaterThan(listIndex);
+    expect(yokSayIndex).toBeGreaterThan(listIndex);
+    expect(detailIndex).toBeGreaterThan(yokSayIndex);
+    expect(routerSource).not.toContain("/uygula");
   });
 });
 

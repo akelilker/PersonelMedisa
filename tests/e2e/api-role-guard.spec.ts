@@ -677,3 +677,81 @@ test.describe("S73-B genel yonetici bildirim onayi API guards (mock-api)", () =>
     ).resolves.toMatchObject({ status: 403 });
   });
 });
+
+const DISMISS_BODY = {
+  expected_state: "INCELEME_GEREKLI",
+  gerekce: "Mevcut puantaj kaydiyla cakisti."
+} as const;
+
+const YOK_SAY_ENDPOINT = "/api/puantaj/bildirim-etki-adaylari/1/yok-say";
+
+test.describe("S74-C2A puantaj etki adayi yok-say API guards (mock-api)", () => {
+  test("unauthenticated request returns 401", async ({ page }) => {
+    await mockApi(page, "MUHASEBE");
+    await page.goto("/login");
+    const result = await page.evaluate(async () => {
+      const response = await fetch("/api/puantaj/bildirim-etki-adaylari/1/yok-say", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          expected_state: "INCELEME_GEREKLI",
+          gerekce: "Mevcut puantaj kaydiyla cakisti."
+        })
+      });
+      return { status: response.status };
+    });
+    expect(result.status).toBe(401);
+  });
+
+  test("MUHASEBE can dismiss puantaj etki adayi", async ({ page }) => {
+    await loginAs(page, "MUHASEBE");
+    const result = await apiFetchJson(page, YOK_SAY_ENDPOINT, {
+      method: "POST",
+      body: { ...DISMISS_BODY }
+    });
+    expect(result.status).toBe(200);
+    expect(result.data).toMatchObject({
+      id: 1,
+      state: "YOK_SAYILDI",
+      idempotent: false
+    });
+  });
+
+  test("non-MUHASEBE roles are denied dismiss", async ({ page }) => {
+    for (const role of ["GENEL_YONETICI", "BOLUM_YONETICISI", "BIRIM_AMIRI"] as const) {
+      await loginAs(page, role);
+      await expect(
+        apiFetch(page, YOK_SAY_ENDPOINT, {
+          method: "POST",
+          body: { ...DISMISS_BODY }
+        })
+      ).resolves.toMatchObject({ status: 403 });
+    }
+  });
+
+  test("cross-sube dismiss returns 403", async ({ page }) => {
+    await loginAs(page, "MUHASEBE");
+    const result = await page.evaluate(async () => {
+      const storageKey = "medisa_auth_session";
+      const raw = sessionStorage.getItem(storageKey) ?? localStorage.getItem(storageKey);
+      const session = raw ? (JSON.parse(raw) as { token?: string }) : null;
+      const token = session?.token ?? "mock-token";
+
+      const response = await fetch("/api/puantaj/bildirim-etki-adaylari/2/yok-say", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+          "X-Active-Sube-Id": "1"
+        },
+        body: JSON.stringify({
+          expected_state: "INCELEME_GEREKLI",
+          gerekce: "Mevcut puantaj kaydiyla cakisti."
+        })
+      });
+
+      return { status: response.status };
+    });
+    expect(result.status).toBe(403);
+  });
+});

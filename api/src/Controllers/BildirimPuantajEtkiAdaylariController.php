@@ -10,6 +10,7 @@ use Medisa\Api\Database\Connection;
 use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
 use Medisa\Api\Scope\SubeScope;
+use Medisa\Api\Services\BildirimPuantajEtkiDecisionPolicy;
 use Medisa\Api\Services\BildirimPuantajEtkiProjectionService;
 use PDO;
 
@@ -113,6 +114,102 @@ class BildirimPuantajEtkiAdaylariController
                 'has_prev_page' => $page > 1,
             ]
         );
+    }
+
+    public static function dismiss(Request $request, $id)
+    {
+        $user = AuthMiddleware::authenticate($request, true);
+        RolePermissions::assert($user, BildirimPuantajEtkiDecisionPolicy::PERMISSION_DISMISS);
+
+        $adayId = self::positiveInt($id);
+        if ($adayId === null) {
+            JsonResponse::notFound('Puantaj etki adayi bulunamadi.');
+        }
+
+        $body = $request->getJsonBody();
+        $expectedState = self::validateDismissExpectedState($body['expected_state'] ?? null);
+        $gerekce = self::validateDismissGerekce($body['gerekce'] ?? null);
+
+        $pdo = self::connection();
+        self::assertTablesReady($pdo);
+
+        $scopeRow = self::fetchAdayById($pdo, $adayId);
+        if (!$scopeRow) {
+            JsonResponse::notFound('Puantaj etki adayi bulunamadi.');
+        }
+
+        SubeScope::assertPersonelAccess($user, $request, (int) $scopeRow['sube_id']);
+
+        try {
+            $pdo->beginTransaction();
+
+            $row = self::fetchAdayById($pdo, $adayId, true);
+            if (!$row) {
+                if ($pdo->inTransaction()) {
+                    $pdo->rollBack();
+                }
+                JsonResponse::notFound('Puantaj etki adayi bulunamadi.');
+            }
+
+            $currentState = BildirimPuantajEtkiDecisionPolicy::normalizeState((string) $row['state']);
+            if ($currentState === 'YOK_SAYILDI') {
+                $existingGerekce = trim((string) ($row['karar_gerekcesi'] ?? ''));
+                if ($existingGerekce === $gerekce) {
+                    if ($pdo->inTransaction()) {
+                        $pdo->rollBack();
+                    }
+                    JsonResponse::success(self::mapDismissResponse($row, true));
+                }
+                self::rollbackConflict($pdo, 'STATE_CONFLICT', 'Puantaj etki adayi daha once farkli bir gerekceyle yok sayilmis.');
+            }
+
+            if ($currentState === 'UYGULANDI') {
+                self::rollbackConflict($pdo, 'STATE_CONFLICT', 'Uygulanmis puantaj etki adayi yok sayilamaz.');
+            }
+
+            if (!BildirimPuantajEtkiDecisionPolicy::isDismissAllowed($currentState)) {
+                self::rollbackConflict($pdo, 'STATE_CONFLICT', 'Puantaj etki adayi yok sayilamaz.');
+            }
+
+            if (!BildirimPuantajEtkiDecisionPolicy::validateExpectedState($currentState, $expectedState)['valid']) {
+                self::rollbackConflict($pdo, 'STATE_STALE', 'Puantaj etki adayi durumu degismis. Listeyi yenileyip tekrar deneyin.');
+            }
+
+            $kararZamani = gmdate('Y-m-d H:i:s');
+            $kararVerenUserId = self::userId($user);
+
+            $update = $pdo->prepare('
+                UPDATE ' . self::TABLE . '
+                SET state = :state,
+                    karar_veren_user_id = :karar_veren_user_id,
+                    karar_zamani = :karar_zamani,
+                    karar_gerekcesi = :karar_gerekcesi
+                WHERE id = :id
+            ');
+            $update->execute([
+                'state' => BildirimPuantajEtkiDecisionPolicy::targetStateForAction(BildirimPuantajEtkiDecisionPolicy::ACTION_DISMISS),
+                'karar_veren_user_id' => $kararVerenUserId,
+                'karar_zamani' => $kararZamani,
+                'karar_gerekcesi' => $gerekce,
+                'id' => $adayId,
+            ]);
+
+            $updated = self::fetchAdayById($pdo, $adayId);
+            if (!$updated) {
+                if ($pdo->inTransaction()) {
+                    $pdo->rollBack();
+                }
+                JsonResponse::serverError('Puantaj etki adayi yok sayilamadi.');
+            }
+
+            $pdo->commit();
+            JsonResponse::success(self::mapDismissResponse($updated, false));
+        } catch (\PDOException $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            JsonResponse::serverError('Puantaj etki adayi yok sayilamadi.');
+        }
     }
 
     public static function detail(Request $request, $id)
@@ -811,9 +908,11 @@ class BildirimPuantajEtkiAdaylariController
     }
 
     /** @return array<string, mixed>|false */
-    private static function fetchAdayById(PDO $pdo, $id)
+    private static function fetchAdayById(PDO $pdo, $id, $forUpdate = false)
     {
-        $stmt = $pdo->prepare('SELECT * FROM ' . self::TABLE . ' WHERE id = :id LIMIT 1');
+        $stmt = $pdo->prepare(
+            'SELECT * FROM ' . self::TABLE . ' WHERE id = :id LIMIT 1' . ($forUpdate ? ' FOR UPDATE' : '')
+        );
         $stmt->execute(['id' => (int) $id]);
 
         return $stmt->fetch(PDO::FETCH_ASSOC);
@@ -973,6 +1072,51 @@ class BildirimPuantajEtkiAdaylariController
         $id = (int) $value;
 
         return $id > 0 && (string) $id === trim((string) $value) ? $id : null;
+    }
+
+    /** @param array<string, mixed> $row @return array<string, mixed> */
+    private static function mapDismissResponse(array $row, $idempotent)
+    {
+        return [
+            'id' => (int) $row['id'],
+            'state' => (string) $row['state'],
+            'karar_veren_user_id' => $row['karar_veren_user_id'] !== null ? (int) $row['karar_veren_user_id'] : null,
+            'karar_zamani' => $row['karar_zamani'] !== null ? (string) $row['karar_zamani'] : null,
+            'karar_gerekcesi' => $row['karar_gerekcesi'] !== null ? (string) $row['karar_gerekcesi'] : null,
+            'uygulanan_puantaj_id' => $row['uygulanan_puantaj_id'] !== null ? (int) $row['uygulanan_puantaj_id'] : null,
+            'idempotent' => (bool) $idempotent,
+        ];
+    }
+
+    private static function validateDismissExpectedState($value)
+    {
+        if ($value === null || $value === '') {
+            self::validationError('expected_state', 'Beklenen durum secilmelidir.');
+        }
+
+        $state = BildirimPuantajEtkiDecisionPolicy::normalizeState($value);
+        if ($state !== 'HAZIR' && $state !== 'INCELEME_GEREKLI') {
+            self::validationError('expected_state', 'Beklenen durum HAZIR veya INCELEME_GEREKLI olmalidir.');
+        }
+
+        return $state;
+    }
+
+    private static function validateDismissGerekce($value)
+    {
+        if ($value === null || $value === '') {
+            self::validationError('gerekce', 'Yok sayma gerekcesi en az 5 karakter olmalidir.');
+        }
+
+        $gerekce = trim((string) $value);
+        if ($gerekce === '' || mb_strlen($gerekce) < 5) {
+            self::validationError('gerekce', 'Yok sayma gerekcesi en az 5 karakter olmalidir.');
+        }
+        if (mb_strlen($gerekce) > 500) {
+            self::validationError('gerekce', 'Yok sayma gerekcesi en fazla 500 karakter olabilir.');
+        }
+
+        return $gerekce;
     }
 
     private static function validationError($field, $message)

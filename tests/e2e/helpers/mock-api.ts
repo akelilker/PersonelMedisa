@@ -4722,6 +4722,56 @@ let personelBelgeKaydiIdCounter = 903;
       return;
     }
 
+    if (path.match(/^\/api\/puantaj\/bildirim-etki-adaylari\/\d+\/yok-say$/) && method === "POST") {
+      const authHeader = request.headers()["authorization"] ?? request.headers()["Authorization"] ?? "";
+      if (!authHeader.startsWith("Bearer ")) {
+        await fulfillJson(route, 401, errorBody("UNAUTHORIZED", "Oturum gerekli."));
+        return;
+      }
+      if (await denyUnlessRolePermission(route, "puantaj.bildirim_etki.dismiss")) {
+        return;
+      }
+
+      const adayId = Number.parseInt(path.split("/")[4] ?? "", 10);
+      if (!adayId) {
+        await fulfillJson(route, 404, errorBody("NOT_FOUND", "Puantaj etki adayi bulunamadi."));
+        return;
+      }
+
+      const adaySubeId = adayId === 2 ? 2 : 1;
+      const subeScope = getRequestSubeScope(request, url);
+      if (subeScope !== null && subeScope !== adaySubeId) {
+        await fulfillJson(route, 403, errorBody("FORBIDDEN", "Bu kayit aktif sube baglaminda goruntulenemiyor."));
+        return;
+      }
+      if (mockUserSubeIds.length > 0 && !mockUserSubeIds.includes(adaySubeId)) {
+        await fulfillJson(route, 403, errorBody("FORBIDDEN", "Bu kayit aktif sube baglaminda goruntulenemiyor."));
+        return;
+      }
+
+      const payload = request.postDataJSON() as { expected_state?: string; gerekce?: string };
+      const gerekce = typeof payload.gerekce === "string" ? payload.gerekce.trim() : "";
+      if (!payload.expected_state || gerekce.length < 5) {
+        await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "Yok sayma gerekcesi en az 5 karakter olmalidir.", "gerekce"));
+        return;
+      }
+
+      await fulfillJson(
+        route,
+        200,
+        okBody({
+          id: adayId,
+          state: "YOK_SAYILDI",
+          karar_veren_user_id: 1,
+          karar_zamani: "2026-07-12 15:30:00",
+          karar_gerekcesi: gerekce,
+          uygulanan_puantaj_id: null,
+          idempotent: false
+        })
+      );
+      return;
+    }
+
     if (path === "/api/puantaj/muhurle" && method === "POST") {
       if (await denyUnlessRolePermission(route, "puantaj.muhurle")) {
         return;

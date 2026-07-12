@@ -357,12 +357,34 @@ S73 tamamlanmış Genel Yönetici bildirim üst onayı sonrası `MUHASEBE`, S74-
 - `MUHASEBE` aday listesinde karar audit özet alanlarını (`karar_veren_user_id`, `karar_zamani`, `uygulanan_puantaj_id`) görür.
 - Detayda karar audit alanları (`karar_gerekcesi`, puantaj snapshot'ları, `uygulama_hash`) okunur.
 - `BildirimPuantajEtkiDecisionPolicy` hangi state'ten hangi kararın mümkün olduğunu belirler: `HAZIR` → UYGULA/YOK_SAY; `INCELEME_GEREKLI` → yalnız YOK_SAY; `UYGULANDI`/`YOK_SAYILDI` terminal.
-- Bu fazda uygula/yok-say endpoint'i yoktur; karar yalnız altyapı olarak hazırlanır. YOK_SAY gerekçesi zorunludur; minimum karakter sayısı henüz kararlaştırılmamıştır.
+- S74-C1 yalnız altyapıdır; yok-say endpoint'i S74-C2A ile gelmiştir. Uygula endpoint'i ve frontend karar ekranı henüz yoktur.
 
 ### Sistem Etkisi
 
 - `onayli_bildirim_puantaj_etki_adaylari` tablosuna karar audit kolonları eklenir.
 - `gunluk_puantaj`, finans ve bordro tabloları değişmez.
+
+## 15.5 Puantaj Etki Adayı Yok Say — S74-C2A
+
+### Tetikleyici
+
+`MUHASEBE`, S74-B ile üretilmiş ve `HAZIR` veya `INCELEME_GEREKLI` durumundaki puantaj etki adayını yok sayar.
+
+### Akış
+
+- `POST /puantaj/bildirim-etki-adaylari/{id}/yok-say` çağrılır.
+- `expected_state` ile optimistic lock uygulanır; stale ise 409 `STATE_STALE`.
+- Gerekçe trim edilir ve 5–500 karakter aralığında doğrulanır.
+- Transaction içinde `SELECT ... FOR UPDATE` ile aday alınır; şube erişimi `SubeScope` ile doğrulanır.
+- `BildirimPuantajEtkiDecisionPolicy` ile YOK_SAY izni kontrol edilir.
+- Başarılı kararda yalnız `state`, `karar_veren_user_id`, `karar_zamani`, `karar_gerekcesi` güncellenir.
+- Terminal `YOK_SAYILDI` + aynı gerekçe → idempotent 200; farklı gerekçe → 409 `STATE_CONFLICT`.
+
+### Sistem Etkisi
+
+- `onayli_bildirim_puantaj_etki_adaylari` tablosunda karar alanları güncellenir.
+- `gunluk_puantaj`, finans, bordro, süreç ve bildirim zinciri tabloları değişmez.
+- Uygula endpointi ve frontend karar ekranı bu fazda yoktur.
 
 ## 16. Rapor Alma Senaryosu
 

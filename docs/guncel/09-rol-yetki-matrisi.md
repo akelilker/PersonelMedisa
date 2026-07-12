@@ -221,7 +221,7 @@ Asagidaki anahtarlar kodda halen kullanilmaktadir. S70B kod fazinda yeni anahtar
 - `puantaj.update`: yonetim rolleri
 - `puantaj.amir_kontrol`: `BIRIM_AMIRI`
 - `puantaj.bildirim_etki.view`, `puantaj.bildirim_etki.generate`: `MUHASEBE` (S74-B)
-- `puantaj.bildirim_etki.apply`, `puantaj.bildirim_etki.dismiss`: yalniz `MUHASEBE` (S74-C1 altyapisi; endpoint henuz yok)
+- `puantaj.bildirim_etki.apply`, `puantaj.bildirim_etki.dismiss`: yalniz `MUHASEBE` (`dismiss` S74-C2A endpoint; `apply` henuz yok)
 
 ### Legacy aylık kapanış özeti
 

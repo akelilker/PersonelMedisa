@@ -12,6 +12,7 @@ import { ErrorState } from "../../../components/states/ErrorState";
 import { LoadingState } from "../../../components/states/LoadingState";
 import { useRoleAccess } from "../../../hooks/use-role-access";
 import { usePuantaj } from "../../../hooks/usePuantaj";
+import { BildirimPuantajEtkiAdaylariSection } from "../components/BildirimPuantajEtkiAdaylariSection";
 import { formatComplianceLevelLabel } from "../../../lib/display/enum-display";
 import type {
   PuantajGunTipi,
@@ -770,6 +771,8 @@ export function GunlukPuantajPage() {
         </div>
         </AppModal>
       ) : null}
+
+      <BildirimPuantajEtkiAdaylariSection />
 
       <div className="module-links">
         <Link to="/surecler">Süreç takibe dön</Link>

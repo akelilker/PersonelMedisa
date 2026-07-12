@@ -1897,6 +1897,329 @@ export async function mockApi(page: Page, role: MockUserRole) {
     }
   ];
 
+  type MockPuantajEtkiAday = {
+    id: number;
+    genel_yonetici_bildirim_onayi_id: number;
+    aylik_bildirim_onayi_id: number;
+    gunluk_bildirim_id: number;
+    personel_id: number;
+    sube_id: number;
+    birim_amiri_user_id: number;
+    ay: string;
+    tarih: string;
+    bildirim_turu: string;
+    bildirim_alt_tur: string | null;
+    bildirim_dakika: number | null;
+    bildirim_aciklama: string | null;
+    bildirim_created_at: string;
+    bildirim_updated_at: string;
+    etki_turu: string;
+    etki_miktari: number | null;
+    etki_birimi: string | null;
+    state: "HAZIR" | "INCELEME_GEREKLI" | "UYGULANDI" | "YOK_SAYILDI";
+    conflict_code: string | null;
+    conflict_detail: Record<string, unknown> | null;
+    resmi_surec_id: number | null;
+    resmi_surec_turu: string | null;
+    resmi_surec_alt_tur: string | null;
+    ucretli_mi_snapshot: boolean | null;
+    mevcut_puantaj_id: number | null;
+    source_priority: string;
+    created_by: number;
+    source_snapshot: Record<string, unknown> | null;
+    source_hash: string | null;
+    projection_version: string | null;
+    created_at: string;
+    updated_at: string;
+    karar_veren_user_id: number | null;
+    karar_zamani: string | null;
+    karar_gerekcesi: string | null;
+    uygulanan_puantaj_id: number | null;
+    onceki_puantaj_snapshot: Record<string, unknown> | null;
+    sonraki_puantaj_snapshot: Record<string, unknown> | null;
+    uygulama_hash: string | null;
+  };
+
+  const puantajEtkiAdaylari: MockPuantajEtkiAday[] = [
+    {
+      id: 1,
+      genel_yonetici_bildirim_onayi_id: 10,
+      aylik_bildirim_onayi_id: 2,
+      gunluk_bildirim_id: 101,
+      personel_id: 1,
+      sube_id: 1,
+      birim_amiri_user_id: 1,
+      ay: "2026-06",
+      tarih: "2026-06-03",
+      bildirim_turu: "GEC_KALMA",
+      bildirim_alt_tur: null,
+      bildirim_dakika: 15,
+      bildirim_aciklama: "Sabah gecikme bildirimi",
+      bildirim_created_at: "2026-06-03 08:45:00",
+      bildirim_updated_at: "2026-06-03 08:45:00",
+      etki_turu: "GEC_KALMA_DK",
+      etki_miktari: 15,
+      etki_birimi: "DK",
+      state: "HAZIR",
+      conflict_code: null,
+      conflict_detail: null,
+      resmi_surec_id: null,
+      resmi_surec_turu: null,
+      resmi_surec_alt_tur: null,
+      ucretli_mi_snapshot: null,
+      mevcut_puantaj_id: null,
+      source_priority: "BILDIRIM",
+      created_by: 1,
+      source_snapshot: { aciklama: "Sabah gecikme bildirimi" },
+      source_hash: "hash-1",
+      projection_version: "v1",
+      created_at: "2026-06-10 10:00:00",
+      updated_at: "2026-06-10 10:00:00",
+      karar_veren_user_id: null,
+      karar_zamani: null,
+      karar_gerekcesi: null,
+      uygulanan_puantaj_id: null,
+      onceki_puantaj_snapshot: null,
+      sonraki_puantaj_snapshot: null,
+      uygulama_hash: null
+    },
+    {
+      id: 2,
+      genel_yonetici_bildirim_onayi_id: 11,
+      aylik_bildirim_onayi_id: 3,
+      gunluk_bildirim_id: 202,
+      personel_id: 2,
+      sube_id: 2,
+      birim_amiri_user_id: 4,
+      ay: "2026-06",
+      tarih: "2026-06-04",
+      bildirim_turu: "GELMEDI",
+      bildirim_alt_tur: null,
+      bildirim_dakika: null,
+      bildirim_aciklama: "Sube 2 gelmedi bildirimi",
+      bildirim_created_at: "2026-06-04 09:00:00",
+      bildirim_updated_at: "2026-06-04 09:00:00",
+      etki_turu: "DEVAMSIZLIK",
+      etki_miktari: null,
+      etki_birimi: null,
+      state: "INCELEME_GEREKLI",
+      conflict_code: "MEVCUT_PUANTAJ_VAR",
+      conflict_detail: { message: "Sube 2 mevcut puantaj cakismasi." },
+      resmi_surec_id: null,
+      resmi_surec_turu: null,
+      resmi_surec_alt_tur: null,
+      ucretli_mi_snapshot: null,
+      mevcut_puantaj_id: 55,
+      source_priority: "BILDIRIM",
+      created_by: 1,
+      source_snapshot: { aciklama: "Sube 2 gelmedi bildirimi" },
+      source_hash: "hash-2",
+      projection_version: "v1",
+      created_at: "2026-06-10 10:05:00",
+      updated_at: "2026-06-10 10:05:00",
+      karar_veren_user_id: null,
+      karar_zamani: null,
+      karar_gerekcesi: null,
+      uygulanan_puantaj_id: null,
+      onceki_puantaj_snapshot: null,
+      sonraki_puantaj_snapshot: null,
+      uygulama_hash: null
+    },
+    {
+      id: 3,
+      genel_yonetici_bildirim_onayi_id: 10,
+      aylik_bildirim_onayi_id: 2,
+      gunluk_bildirim_id: 103,
+      personel_id: 1,
+      sube_id: 1,
+      birim_amiri_user_id: 1,
+      ay: "2026-06",
+      tarih: "2026-06-04",
+      bildirim_turu: "GELMEDI",
+      bildirim_alt_tur: null,
+      bildirim_dakika: null,
+      bildirim_aciklama: "Gelmedi bildirimi",
+      bildirim_created_at: "2026-06-04 09:00:00",
+      bildirim_updated_at: "2026-06-04 09:00:00",
+      etki_turu: "DEVAMSIZLIK",
+      etki_miktari: null,
+      etki_birimi: null,
+      state: "INCELEME_GEREKLI",
+      conflict_code: "MEVCUT_PUANTAJ_VAR",
+      conflict_detail: { message: "İlgili gün için mevcut puantaj kaydı bulunuyor." },
+      resmi_surec_id: null,
+      resmi_surec_turu: null,
+      resmi_surec_alt_tur: null,
+      ucretli_mi_snapshot: null,
+      mevcut_puantaj_id: 55,
+      source_priority: "BILDIRIM",
+      created_by: 1,
+      source_snapshot: { aciklama: "Gelmedi bildirimi" },
+      source_hash: "hash-2",
+      projection_version: "v1",
+      created_at: "2026-06-10 10:05:00",
+      updated_at: "2026-06-10 10:05:00",
+      karar_veren_user_id: null,
+      karar_zamani: null,
+      karar_gerekcesi: null,
+      uygulanan_puantaj_id: null,
+      onceki_puantaj_snapshot: null,
+      sonraki_puantaj_snapshot: null,
+      uygulama_hash: null
+    },
+    {
+      id: 4,
+      genel_yonetici_bildirim_onayi_id: 10,
+      aylik_bildirim_onayi_id: 2,
+      gunluk_bildirim_id: 104,
+      personel_id: 1,
+      sube_id: 1,
+      birim_amiri_user_id: 1,
+      ay: "2026-06",
+      tarih: "2026-06-05",
+      bildirim_turu: "ERKEN_CIKIS",
+      bildirim_alt_tur: null,
+      bildirim_dakika: 30,
+      bildirim_aciklama: null,
+      bildirim_created_at: "2026-06-05 16:30:00",
+      bildirim_updated_at: "2026-06-05 16:30:00",
+      etki_turu: "ERKEN_CIKIS_DK",
+      etki_miktari: 30,
+      etki_birimi: "DK",
+      state: "UYGULANDI",
+      conflict_code: null,
+      conflict_detail: null,
+      resmi_surec_id: null,
+      resmi_surec_turu: null,
+      resmi_surec_alt_tur: null,
+      ucretli_mi_snapshot: null,
+      mevcut_puantaj_id: null,
+      source_priority: "BILDIRIM",
+      created_by: 1,
+      source_snapshot: null,
+      source_hash: "hash-3",
+      projection_version: "v1",
+      created_at: "2026-06-10 10:10:00",
+      updated_at: "2026-06-11 11:00:00",
+      karar_veren_user_id: 5,
+      karar_zamani: "2026-06-11 11:00:00",
+      karar_gerekcesi: "Otomatik uygulandi",
+      uygulanan_puantaj_id: 77,
+      onceki_puantaj_snapshot: null,
+      sonraki_puantaj_snapshot: null,
+      uygulama_hash: "apply-hash-3"
+    },
+    {
+      id: 5,
+      genel_yonetici_bildirim_onayi_id: 10,
+      aylik_bildirim_onayi_id: 2,
+      gunluk_bildirim_id: 105,
+      personel_id: 1,
+      sube_id: 1,
+      birim_amiri_user_id: 1,
+      ay: "2026-06",
+      tarih: "2026-06-06",
+      bildirim_turu: "DIGER",
+      bildirim_alt_tur: null,
+      bildirim_dakika: null,
+      bildirim_aciklama: "Diger bildirim",
+      bildirim_created_at: "2026-06-06 12:00:00",
+      bildirim_updated_at: "2026-06-06 12:00:00",
+      etki_turu: "MANUEL",
+      etki_miktari: null,
+      etki_birimi: null,
+      state: "YOK_SAYILDI",
+      conflict_code: "DIGER_MANUEL_INCELEME",
+      conflict_detail: { message: "Manuel inceleme gerekiyor." },
+      resmi_surec_id: null,
+      resmi_surec_turu: null,
+      resmi_surec_alt_tur: null,
+      ucretli_mi_snapshot: null,
+      mevcut_puantaj_id: null,
+      source_priority: "BILDIRIM",
+      created_by: 1,
+      source_snapshot: { aciklama: "Diger bildirim" },
+      source_hash: "hash-4",
+      projection_version: "v1",
+      created_at: "2026-06-10 10:15:00",
+      updated_at: "2026-06-12 09:00:00",
+      karar_veren_user_id: 5,
+      karar_zamani: "2026-06-12 09:00:00",
+      karar_gerekcesi: "Mevcut puantaj kaydıyla çakıştığı için yok sayıldı.",
+      uygulanan_puantaj_id: null,
+      onceki_puantaj_snapshot: null,
+      sonraki_puantaj_snapshot: null,
+      uygulama_hash: null
+    }
+  ];
+
+  function mapMockPuantajEtkiListRow(item: MockPuantajEtkiAday) {
+    return {
+      id: item.id,
+      genel_yonetici_bildirim_onayi_id: item.genel_yonetici_bildirim_onayi_id,
+      gunluk_bildirim_id: item.gunluk_bildirim_id,
+      personel_id: item.personel_id,
+      sube_id: item.sube_id,
+      birim_amiri_user_id: item.birim_amiri_user_id,
+      ay: item.ay,
+      tarih: item.tarih,
+      bildirim_turu: item.bildirim_turu,
+      etki_turu: item.etki_turu,
+      etki_miktari: item.etki_miktari,
+      etki_birimi: item.etki_birimi,
+      state: item.state,
+      conflict_code: item.conflict_code,
+      source_priority: item.source_priority,
+      created_at: item.created_at,
+      karar_veren_user_id: item.karar_veren_user_id,
+      karar_zamani: item.karar_zamani,
+      uygulanan_puantaj_id: item.uygulanan_puantaj_id
+    };
+  }
+
+  function mapMockPuantajEtkiDetailRow(item: MockPuantajEtkiAday) {
+    return {
+      ...mapMockPuantajEtkiListRow(item),
+      aylik_bildirim_onayi_id: item.aylik_bildirim_onayi_id,
+      bildirim_alt_tur: item.bildirim_alt_tur,
+      bildirim_dakika: item.bildirim_dakika,
+      bildirim_aciklama: item.bildirim_aciklama,
+      bildirim_created_at: item.bildirim_created_at,
+      bildirim_updated_at: item.bildirim_updated_at,
+      conflict_detail: item.conflict_detail,
+      resmi_surec_id: item.resmi_surec_id,
+      resmi_surec_turu: item.resmi_surec_turu,
+      resmi_surec_alt_tur: item.resmi_surec_alt_tur,
+      ucretli_mi_snapshot: item.ucretli_mi_snapshot,
+      mevcut_puantaj_id: item.mevcut_puantaj_id,
+      source_snapshot: item.source_snapshot,
+      source_hash: item.source_hash,
+      projection_version: item.projection_version,
+      updated_at: item.updated_at,
+      karar_gerekcesi: item.karar_gerekcesi,
+      onceki_puantaj_snapshot: item.onceki_puantaj_snapshot,
+      sonraki_puantaj_snapshot: item.sonraki_puantaj_snapshot,
+      uygulama_hash: item.uygulama_hash
+    };
+  }
+
+  function countMockPuantajEtkiAdaylari(items: MockPuantajEtkiAday[]) {
+    const counts = {
+      toplam: items.length,
+      hazir: 0,
+      inceleme_gerekli: 0,
+      uygulandi: 0,
+      yok_sayildi: 0
+    };
+    for (const item of items) {
+      if (item.state === "HAZIR") counts.hazir += 1;
+      if (item.state === "INCELEME_GEREKLI") counts.inceleme_gerekli += 1;
+      if (item.state === "UYGULANDI") counts.uygulandi += 1;
+      if (item.state === "YOK_SAYILDI") counts.yok_sayildi += 1;
+    }
+    return counts;
+  }
+
   const departmanOptions: Array<{ id: number; ad: string }> = [
     { id: 1, ad: "Muhasebe" },
     { id: 2, ad: "Finans" },
@@ -4722,6 +5045,125 @@ let personelBelgeKaydiIdCounter = 903;
       return;
     }
 
+    if (path === "/api/puantaj/bildirim-etki-adaylari/ozet" && method === "GET") {
+      if (await denyUnlessRolePermission(route, "puantaj.bildirim_etki.view")) {
+        return;
+      }
+      const gyId = Number.parseInt(url.searchParams.get("genel_yonetici_bildirim_onayi_id") ?? "", 10);
+      if (!gyId) {
+        await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "Genel yonetici bildirim onayi secilmelidir.", "genel_yonetici_bildirim_onayi_id"));
+        return;
+      }
+      const subeScope = getRequestSubeScope(request, url);
+      const scopedItems = puantajEtkiAdaylari.filter((item) => item.genel_yonetici_bildirim_onayi_id === gyId);
+      if (subeScope !== null) {
+        const allowed = scopedItems.every((item) => item.sube_id === subeScope);
+        if (!allowed && scopedItems.length > 0) {
+          await fulfillJson(route, 403, errorBody("FORBIDDEN", "Bu kayit aktif sube baglaminda goruntulenemiyor."));
+          return;
+        }
+      }
+      const visible = subeScope === null ? scopedItems : scopedItems.filter((item) => item.sube_id === subeScope);
+      const sample = visible[0] ?? scopedItems[0];
+      await fulfillJson(route, 200, okBody({
+        context: {
+          genel_yonetici_bildirim_onayi_id: gyId,
+          ay: sample?.ay ?? "2026-06",
+          ay_baslangic: "2026-06-01",
+          ay_bitis: "2026-06-30",
+          sube_id: sample?.sube_id ?? subeScope ?? 1,
+          birim_amiri_user_id: sample?.birim_amiri_user_id ?? 1,
+          aylik_bildirim_onayi_id: sample?.aylik_bildirim_onayi_id ?? 2,
+          onaylandi_at: "2026-06-09 12:00:00"
+        },
+        genel_yonetici_bildirim_onayi: {
+          id: gyId,
+          state: "TAMAMLANDI",
+          onaylandi_at: "2026-06-09 12:00:00"
+        },
+        kaynak_bildirim_sayisi: 4,
+        aday_sayilari: countMockPuantajEtkiAdaylari(visible),
+        muhur_durumu: "ACIK",
+        hazirlanabilir_mi: false,
+        blok_nedeni: null
+      }));
+      return;
+    }
+
+    if (path === "/api/puantaj/bildirim-etki-adaylari" && method === "GET") {
+      if (await denyUnlessRolePermission(route, "puantaj.bildirim_etki.view")) {
+        return;
+      }
+      const ay = url.searchParams.get("ay") ?? "";
+      if (!/^\d{4}-\d{2}$/.test(ay)) {
+        await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "Ay parametresi YYYY-MM formatinda olmalidir.", "ay"));
+        return;
+      }
+      const amirId = Number.parseInt(url.searchParams.get("birim_amiri_user_id") ?? "", 10);
+      if (!amirId) {
+        await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "Birim amiri secimi zorunludur.", "birim_amiri_user_id"));
+        return;
+      }
+      const subeScope = getRequestSubeScope(request, url) ?? mockUserSubeIds[0] ?? 1;
+      if (mockUserSubeIds.length > 0 && !mockUserSubeIds.includes(subeScope)) {
+        await fulfillJson(route, 403, errorBody("FORBIDDEN", "Bu kayit aktif sube baglaminda goruntulenemiyor."));
+        return;
+      }
+      const expectedAmirId = subeScope === 1 ? 1 : subeScope === 2 ? 4 : null;
+      if (expectedAmirId !== null && amirId !== expectedAmirId) {
+        await fulfillJson(route, 403, errorBody("FORBIDDEN", "Secilen birim amiri aktif sube ile eslesmiyor."));
+        return;
+      }
+      let items = puantajEtkiAdaylari.filter(
+        (item) => item.ay === ay && item.sube_id === subeScope && item.birim_amiri_user_id === amirId
+      );
+      const personelId = Number.parseInt(url.searchParams.get("personel_id") ?? "", 10);
+      if (Number.isFinite(personelId)) {
+        items = items.filter((item) => item.personel_id === personelId);
+      }
+      const state = (url.searchParams.get("state") ?? "").trim().toUpperCase();
+      if (state) {
+        items = items.filter((item) => item.state === state);
+      }
+      const page = Math.max(1, Number.parseInt(url.searchParams.get("page") ?? "1", 10) || 1);
+      const limit = Math.max(1, Number.parseInt(url.searchParams.get("limit") ?? "20", 10) || 20);
+      const total = items.length;
+      const offset = (page - 1) * limit;
+      const pageItems = items.slice(offset, offset + limit).map((item) => mapMockPuantajEtkiListRow(item));
+      await fulfillJson(route, 200, okBody({ items: pageItems }, {
+        page,
+        limit,
+        total,
+        total_pages: Math.max(1, Math.ceil(total / limit)),
+        has_next_page: page * limit < total,
+        has_prev_page: page > 1
+      }));
+      return;
+    }
+
+    if (path.match(/^\/api\/puantaj\/bildirim-etki-adaylari\/\d+$/) && method === "GET") {
+      if (await denyUnlessRolePermission(route, "puantaj.bildirim_etki.view")) {
+        return;
+      }
+      const adayId = Number.parseInt(path.split("/")[4] ?? "", 10);
+      const item = puantajEtkiAdaylari.find((entry) => entry.id === adayId);
+      if (!item) {
+        await fulfillJson(route, 404, errorBody("NOT_FOUND", "Puantaj etki adayi bulunamadi."));
+        return;
+      }
+      const subeScope = getRequestSubeScope(request, url);
+      if (subeScope !== null && subeScope !== item.sube_id) {
+        await fulfillJson(route, 403, errorBody("FORBIDDEN", "Bu kayit aktif sube baglaminda goruntulenemiyor."));
+        return;
+      }
+      if (mockUserSubeIds.length > 0 && !mockUserSubeIds.includes(item.sube_id)) {
+        await fulfillJson(route, 403, errorBody("FORBIDDEN", "Bu kayit aktif sube baglaminda goruntulenemiyor."));
+        return;
+      }
+      await fulfillJson(route, 200, okBody(mapMockPuantajEtkiDetailRow(item)));
+      return;
+    }
+
     if (path.match(/^\/api\/puantaj\/bildirim-etki-adaylari\/\d+\/yok-say$/) && method === "POST") {
       const authHeader = request.headers()["authorization"] ?? request.headers()["Authorization"] ?? "";
       if (!authHeader.startsWith("Bearer ")) {
@@ -4738,7 +5180,14 @@ let personelBelgeKaydiIdCounter = 903;
         return;
       }
 
-      const adaySubeId = adayId === 2 ? 2 : 1;
+      const itemIndex = puantajEtkiAdaylari.findIndex((entry) => entry.id === adayId);
+      const item = itemIndex >= 0 ? puantajEtkiAdaylari[itemIndex] : null;
+      if (!item) {
+        await fulfillJson(route, 404, errorBody("NOT_FOUND", "Puantaj etki adayi bulunamadi."));
+        return;
+      }
+
+      const adaySubeId = item.sube_id;
       const subeScope = getRequestSubeScope(request, url);
       if (subeScope !== null && subeScope !== adaySubeId) {
         await fulfillJson(route, 403, errorBody("FORBIDDEN", "Bu kayit aktif sube baglaminda goruntulenemiyor."));
@@ -4755,6 +5204,61 @@ let personelBelgeKaydiIdCounter = 903;
         await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "Yok sayma gerekcesi en az 5 karakter olmalidir.", "gerekce"));
         return;
       }
+      if ([...gerekce].length > 500) {
+        await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "Yok sayma gerekcesi en fazla 500 karakter olabilir.", "gerekce"));
+        return;
+      }
+
+      if (gerekce === "E2E state stale tetikleyici") {
+        await fulfillJson(
+          route,
+          409,
+          errorBody("STATE_STALE", "Puantaj etki adayi durumu degismis. Listeyi yenileyip tekrar deneyin.")
+        );
+        return;
+      }
+
+      if (item.state === "YOK_SAYILDI") {
+        if ((item.karar_gerekcesi ?? "").trim() === gerekce) {
+          await fulfillJson(route, 200, okBody({
+            id: adayId,
+            state: "YOK_SAYILDI",
+            karar_veren_user_id: item.karar_veren_user_id,
+            karar_zamani: item.karar_zamani,
+            karar_gerekcesi: item.karar_gerekcesi,
+            uygulanan_puantaj_id: item.uygulanan_puantaj_id,
+            idempotent: true
+          }));
+          return;
+        }
+        await fulfillJson(route, 409, errorBody("STATE_CONFLICT", "Puantaj etki adayi daha once farkli bir gerekceyle yok sayilmis."));
+        return;
+      }
+
+      if (item.state === "UYGULANDI") {
+        await fulfillJson(route, 409, errorBody("STATE_CONFLICT", "Uygulanmis puantaj etki adayi yok sayilamaz."));
+        return;
+      }
+
+      if (item.state !== "HAZIR" && item.state !== "INCELEME_GEREKLI") {
+        await fulfillJson(route, 409, errorBody("STATE_CONFLICT", "Puantaj etki adayi yok sayilamaz."));
+        return;
+      }
+
+      if (payload.expected_state !== item.state) {
+        await fulfillJson(route, 409, errorBody("STATE_STALE", "Puantaj etki adayi durumu degismis. Listeyi yenileyip tekrar deneyin."));
+        return;
+      }
+
+      const updated = {
+        ...item,
+        state: "YOK_SAYILDI" as const,
+        karar_veren_user_id: mockUserId,
+        karar_zamani: "2026-07-12 15:30:00",
+        karar_gerekcesi: gerekce,
+        updated_at: "2026-07-12 15:30:00"
+      };
+      puantajEtkiAdaylari[itemIndex] = updated;
 
       await fulfillJson(
         route,
@@ -4762,7 +5266,7 @@ let personelBelgeKaydiIdCounter = 903;
         okBody({
           id: adayId,
           state: "YOK_SAYILDI",
-          karar_veren_user_id: 1,
+          karar_veren_user_id: mockUserId,
           karar_zamani: "2026-07-12 15:30:00",
           karar_gerekcesi: gerekce,
           uygulanan_puantaj_id: null,

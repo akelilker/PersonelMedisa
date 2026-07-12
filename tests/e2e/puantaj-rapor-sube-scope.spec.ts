@@ -40,8 +40,8 @@ async function switchActiveSubeViaSession(page: Page, subeId: number) {
 }
 
 async function openPuantajRecord(page: Page, personelId: string, tarih: string = SEED_TARIH) {
-  await page.getByLabel("Personel ID").fill(personelId);
-  await page.getByLabel("Tarih").fill(tarih);
+  await page.getByLabel("Personel ID", { exact: true }).fill(personelId);
+  await page.getByLabel("Tarih", { exact: true }).fill(tarih);
   await page.getByRole("button", { name: /Kayd.*Getir/i }).click();
 }
 

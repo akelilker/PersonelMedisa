@@ -1,0 +1,472 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ApiRequestError, getApiErrorDetail } from "../api/api-client";
+import {
+  dismissBildirimPuantajEtkiAday,
+  fetchBildirimPuantajEtkiAdayDetail,
+  fetchBildirimPuantajEtkiAdayList,
+  fetchBildirimPuantajEtkiAdayOzet,
+  type BildirimPuantajEtkiAdayListParams
+} from "../api/bildirim-puantaj-etki-adaylari.api";
+import { fetchGenelYoneticiBildirimOnayiOzet } from "../api/genel-yonetici-bildirim-onaylari.api";
+import { getCurrentMonthValue, isValidAyValue } from "../lib/bildirim/aylik-bildirim-onay";
+import { trimDismissGerekce } from "../lib/bildirim-puantaj-etki-aday/display";
+import type {
+  BildirimPuantajEtkiAdayDetail,
+  BildirimPuantajEtkiAdayListItem,
+  BildirimPuantajEtkiAdayOzet,
+  BildirimPuantajEtkiAdayState
+} from "../types/bildirim-puantaj-etki-aday";
+
+export type BildirimPuantajEtkiAdayFilters = {
+  personelId: string;
+  state: "" | BildirimPuantajEtkiAdayState;
+};
+
+const EMPTY_FILTERS: BildirimPuantajEtkiAdayFilters = {
+  personelId: "",
+  state: ""
+};
+
+type PaginationState = {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+};
+
+const EMPTY_PAGINATION: PaginationState = {
+  page: 1,
+  limit: 20,
+  total: 0,
+  totalPages: 1,
+  hasNextPage: false,
+  hasPreviousPage: false
+};
+
+type UseBildirimPuantajEtkiAdaylariOptions = {
+  enabled: boolean;
+  canDismiss: boolean;
+  canResolveGyViaOnayApi: boolean;
+  subeId: number | null;
+  birimAmiriUserId: number | null;
+  ay?: string;
+  onAyChange?: (value: string) => void;
+};
+
+export function useBildirimPuantajEtkiAdaylari(options: UseBildirimPuantajEtkiAdaylariOptions) {
+  const {
+    enabled,
+    canDismiss,
+    canResolveGyViaOnayApi,
+    subeId,
+    birimAmiriUserId,
+    ay: controlledAy,
+    onAyChange
+  } = options;
+  const [internalAy, setInternalAy] = useState(getCurrentMonthValue);
+  const ay = controlledAy ?? internalAy;
+  const [draftFilters, setDraftFilters] = useState<BildirimPuantajEtkiAdayFilters>(EMPTY_FILTERS);
+  const [appliedFilters, setAppliedFilters] = useState<BildirimPuantajEtkiAdayFilters>(EMPTY_FILTERS);
+  const [page, setPage] = useState(1);
+  const [items, setItems] = useState<BildirimPuantajEtkiAdayListItem[]>([]);
+  const [ozet, setOzet] = useState<BildirimPuantajEtkiAdayOzet | null>(null);
+  const [pagination, setPagination] = useState<PaginationState>(EMPTY_PAGINATION);
+  const resolvedGyIdRef = useRef<number | null>(null);
+  const [detail, setDetail] = useState<BildirimPuantajEtkiAdayDetail | null>(null);
+  const [detailId, setDetailId] = useState<number | null>(null);
+  const [isListLoading, setIsListLoading] = useState(false);
+  const [isOzetLoading, setIsOzetLoading] = useState(false);
+  const [isDetailLoading, setIsDetailLoading] = useState(false);
+  const [listError, setListError] = useState<string | null>(null);
+  const [ozetError, setOzetError] = useState<string | null>(null);
+  const [detailError, setDetailError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [infoMessage, setInfoMessage] = useState<string | null>(null);
+  const [dismissTarget, setDismissTarget] = useState<BildirimPuantajEtkiAdayListItem | null>(null);
+  const [dismissGerekce, setDismissGerekce] = useState("");
+  const [dismissFieldError, setDismissFieldError] = useState<string | null>(null);
+  const [dismissError, setDismissError] = useState<string | null>(null);
+  const [isDismissing, setIsDismissing] = useState(false);
+  const listRequestIdRef = useRef(0);
+  const ozetRequestIdRef = useRef(0);
+  const detailRequestIdRef = useRef(0);
+  const dismissingRef = useRef(false);
+
+  const contextReady = Boolean(
+    enabled &&
+      isValidAyValue(ay) &&
+      typeof subeId === "number" &&
+      subeId > 0 &&
+      typeof birimAmiriUserId === "number" &&
+      birimAmiriUserId > 0
+  );
+
+  const contextKey = useMemo(
+    () => `${subeId ?? "none"}|${birimAmiriUserId ?? "none"}|${ay}`,
+    [ay, birimAmiriUserId, subeId]
+  );
+
+  const listParams = useMemo((): BildirimPuantajEtkiAdayListParams | null => {
+    if (!contextReady || !birimAmiriUserId) {
+      return null;
+    }
+    const personelId = appliedFilters.personelId.trim()
+      ? Number.parseInt(appliedFilters.personelId.trim(), 10)
+      : undefined;
+    return {
+      ay,
+      birim_amiri_user_id: birimAmiriUserId,
+      personel_id: Number.isFinite(personelId) ? personelId : undefined,
+      state: appliedFilters.state || undefined,
+      page,
+      limit: 20
+    };
+  }, [appliedFilters.personelId, appliedFilters.state, ay, birimAmiriUserId, contextReady, page]);
+
+  const closeDismissModal = useCallback(() => {
+    setDismissTarget(null);
+    setDismissGerekce("");
+    setDismissFieldError(null);
+    setDismissError(null);
+    setIsDismissing(false);
+    dismissingRef.current = false;
+  }, []);
+
+  const resetTransientState = useCallback(() => {
+    setItems([]);
+    setOzet(null);
+    setPagination(EMPTY_PAGINATION);
+    resolvedGyIdRef.current = null;
+    setDetail(null);
+    setDetailId(null);
+    setListError(null);
+    setOzetError(null);
+    setDetailError(null);
+    setSuccessMessage(null);
+    setInfoMessage(null);
+    setDismissTarget(null);
+    setDismissGerekce("");
+    setDismissFieldError(null);
+    setDismissError(null);
+    setIsDismissing(false);
+    dismissingRef.current = false;
+  }, []);
+
+  const closeDetail = useCallback(() => {
+    setDetail(null);
+    setDetailId(null);
+    setDetailError(null);
+    setIsDetailLoading(false);
+  }, []);
+
+  const refreshOzet = useCallback(
+    async (gyId: number) => {
+      if (!contextReady) {
+        return;
+      }
+      setIsOzetLoading(true);
+      setOzetError(null);
+      const requestId = ++ozetRequestIdRef.current;
+      try {
+        const data = await fetchBildirimPuantajEtkiAdayOzet(gyId, { subeId });
+        if (requestId === ozetRequestIdRef.current) {
+          setOzet(data);
+        }
+      } catch (caught) {
+        if (requestId === ozetRequestIdRef.current) {
+          setOzet(null);
+          setOzetError(getApiErrorDetail(caught, "Puantaj etki adayı özeti yüklenemedi.").message);
+        }
+      } finally {
+        if (requestId === ozetRequestIdRef.current) {
+          setIsOzetLoading(false);
+        }
+      }
+    },
+    [contextReady, subeId]
+  );
+
+  const resolveGyOnayId = useCallback(
+    async (listItems: BildirimPuantajEtkiAdayListItem[]): Promise<number | null> => {
+      const fromList = listItems[0]?.genel_yonetici_bildirim_onayi_id ?? null;
+      if (typeof fromList === "number" && fromList > 0) {
+        return fromList;
+      }
+      if (canResolveGyViaOnayApi && contextReady && subeId !== null && birimAmiriUserId !== null) {
+        try {
+          const gyOzet = await fetchGenelYoneticiBildirimOnayiOzet(ay, subeId, birimAmiriUserId);
+          const gyId = gyOzet.genel_yonetici_bildirim_onayi?.id;
+          if (typeof gyId === "number" && gyId > 0) {
+            return gyId;
+          }
+        } catch {
+          // MUHASEBE/BOLUM bu API'yi cagiramaz; list/cache kaynagina dusulur.
+        }
+      }
+      return resolvedGyIdRef.current;
+    },
+    [ay, birimAmiriUserId, canResolveGyViaOnayApi, contextReady, subeId]
+  );
+
+  const refreshList = useCallback(async () => {
+    if (!listParams || !contextReady || subeId === null || birimAmiriUserId === null) {
+      return;
+    }
+    setIsListLoading(true);
+    setListError(null);
+    const requestId = ++listRequestIdRef.current;
+    try {
+      const result = await fetchBildirimPuantajEtkiAdayList(listParams, { subeId });
+      if (requestId !== listRequestIdRef.current) {
+        return;
+      }
+      setItems(result.items);
+      setPagination({
+        page: result.pagination.page ?? listParams.page ?? 1,
+        limit: result.pagination.limit ?? listParams.limit ?? 20,
+        total: result.pagination.total ?? result.items.length,
+        totalPages: result.pagination.totalPages ?? 1,
+        hasNextPage: Boolean(result.pagination.hasNextPage),
+        hasPreviousPage: Boolean(result.pagination.hasPreviousPage)
+      });
+      const gyId = await resolveGyOnayId(result.items);
+      if (gyId) {
+        resolvedGyIdRef.current = gyId;
+        await refreshOzet(gyId);
+      } else {
+        resolvedGyIdRef.current = null;
+        setOzet(null);
+      }
+    } catch (caught) {
+      if (requestId === listRequestIdRef.current) {
+        setItems([]);
+        setPagination(EMPTY_PAGINATION);
+        setOzet(null);
+        resolvedGyIdRef.current = null;
+        setListError(getApiErrorDetail(caught, "Puantaj etki adayları yüklenemedi.").message);
+      }
+    } finally {
+      if (requestId === listRequestIdRef.current) {
+        setIsListLoading(false);
+      }
+    }
+  }, [birimAmiriUserId, contextReady, listParams, refreshOzet, resolveGyOnayId, subeId]);
+
+  const refreshDetail = useCallback(
+    async (id: number) => {
+      if (!contextReady) {
+        return;
+      }
+      setIsDetailLoading(true);
+      setDetailError(null);
+      const requestId = ++detailRequestIdRef.current;
+      try {
+        const data = await fetchBildirimPuantajEtkiAdayDetail(id, { subeId });
+        if (requestId === detailRequestIdRef.current) {
+          setDetail(data);
+        }
+      } catch (caught) {
+        if (requestId === detailRequestIdRef.current) {
+          setDetail(null);
+          setDetailError(getApiErrorDetail(caught, "Puantaj etki adayı detayı yüklenemedi.").message);
+        }
+      } finally {
+        if (requestId === detailRequestIdRef.current) {
+          setIsDetailLoading(false);
+        }
+      }
+    },
+    [contextReady, subeId]
+  );
+
+  const refreshAll = useCallback(async () => {
+    await refreshList();
+    if (detailId !== null) {
+      await refreshDetail(detailId);
+    }
+  }, [detailId, refreshDetail, refreshList]);
+
+  useEffect(() => {
+    listRequestIdRef.current += 1;
+    ozetRequestIdRef.current += 1;
+    detailRequestIdRef.current += 1;
+    resetTransientState();
+    setPage(1);
+    setDraftFilters(EMPTY_FILTERS);
+    setAppliedFilters(EMPTY_FILTERS);
+  }, [contextKey, enabled, resetTransientState]);
+
+  useEffect(() => {
+    if (!contextReady) {
+      return;
+    }
+    void refreshList();
+  }, [contextReady, refreshList]);
+
+  useEffect(() => {
+    if (detailId === null) {
+      return;
+    }
+    if (!items.some((item) => item.id === detailId)) {
+      closeDetail();
+    }
+  }, [closeDetail, detailId, items]);
+
+  useEffect(() => {
+    if (!contextReady || detailId === null) {
+      return;
+    }
+    void refreshDetail(detailId);
+  }, [contextReady, detailId, refreshDetail]);
+
+  const setAy = useCallback(
+    (value: string) => {
+      if (controlledAy === undefined) {
+        setInternalAy(value);
+      }
+      onAyChange?.(value);
+    },
+    [controlledAy, onAyChange]
+  );
+
+  const updateDraftFilters = useCallback((patch: Partial<BildirimPuantajEtkiAdayFilters>) => {
+    setDraftFilters((prev) => ({ ...prev, ...patch }));
+  }, []);
+
+  const submitFilters = useCallback(() => {
+    setAppliedFilters(draftFilters);
+    setPage(1);
+  }, [draftFilters]);
+
+  const clearFilters = useCallback(() => {
+    setDraftFilters(EMPTY_FILTERS);
+    setAppliedFilters(EMPTY_FILTERS);
+    setPage(1);
+  }, []);
+
+  const openDetail = useCallback((item: BildirimPuantajEtkiAdayListItem) => {
+    setDetailId(item.id);
+    setDetail(null);
+    setDetailError(null);
+  }, []);
+
+  const openDismissModal = useCallback(
+    (item: BildirimPuantajEtkiAdayListItem) => {
+      if (!canDismiss) {
+        return;
+      }
+      setDismissTarget(item);
+      setDismissGerekce("");
+      setDismissFieldError(null);
+      setDismissError(null);
+    },
+    [canDismiss]
+  );
+
+  const dismissAday = useCallback(async () => {
+    if (!canDismiss || !dismissTarget || dismissingRef.current || isDismissing) {
+      return;
+    }
+    const trimmed = trimDismissGerekce(dismissGerekce);
+    if (trimmed.length < 5 || [...trimmed].length > 500) {
+      return;
+    }
+    if (dismissTarget.state !== "HAZIR" && dismissTarget.state !== "INCELEME_GEREKLI") {
+      return;
+    }
+
+    dismissingRef.current = true;
+    setIsDismissing(true);
+    setDismissFieldError(null);
+    setDismissError(null);
+    setSuccessMessage(null);
+    setInfoMessage(null);
+
+    try {
+      const result = await dismissBildirimPuantajEtkiAday(
+        dismissTarget.id,
+        {
+          expected_state: dismissTarget.state,
+          gerekce: trimmed
+        },
+        { subeId }
+      );
+      closeDismissModal();
+      if (result.idempotent) {
+        setInfoMessage("Bu aday daha önce aynı gerekçeyle yok sayılmış.");
+      } else {
+        setSuccessMessage("Puantaj etki adayı yok sayıldı.");
+      }
+      await refreshAll();
+    } catch (caught) {
+      const detail = getApiErrorDetail(caught, "Puantaj etki adayı yok sayılamadı.");
+      if (detail.code === "VALIDATION_ERROR" && detail.field === "gerekce") {
+        setDismissFieldError(detail.message);
+      } else if (detail.code === "STATE_STALE") {
+        closeDismissModal();
+        setInfoMessage("Aday durumu değişmiş. Liste yenilendi.");
+        await refreshAll();
+      } else if (detail.code === "STATE_CONFLICT") {
+        setDismissError(detail.message);
+        await refreshAll();
+      } else {
+        setDismissError(detail.message);
+      }
+    } finally {
+      dismissingRef.current = false;
+      setIsDismissing(false);
+    }
+  }, [
+    canDismiss,
+    closeDismissModal,
+    dismissGerekce,
+    dismissTarget,
+    isDismissing,
+    refreshAll,
+    subeId
+  ]);
+
+  const isLoading = isListLoading || isOzetLoading;
+
+  return {
+    ay,
+    setAy,
+    draftFilters,
+    appliedFilters,
+    updateDraftFilters,
+    submitFilters,
+    clearFilters,
+    page,
+    setPage,
+    pagination,
+    items,
+    ozet,
+    detail,
+    detailId,
+    isLoading,
+    isListLoading,
+    isOzetLoading,
+    isDetailLoading,
+    listError,
+    ozetError,
+    detailError,
+    successMessage,
+    infoMessage,
+    dismissTarget,
+    dismissGerekce,
+    setDismissGerekce,
+    dismissFieldError,
+    dismissError,
+    isDismissing,
+    contextReady,
+    refreshList,
+    refreshAll,
+    openDetail,
+    closeDetail,
+    openDismissModal,
+    closeDismissModal,
+    dismissAday
+  };
+}

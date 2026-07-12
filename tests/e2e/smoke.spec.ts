@@ -23,8 +23,8 @@ test.describe("e2e smoke", () => {
     await page.goto("/puantaj");
     await expect(page).toHaveURL(/\/puantaj$/);
 
-    await page.getByLabel("Personel ID").fill("1");
-    await page.getByLabel("Tarih").fill("2026-04-14");
+    await page.getByLabel("Personel ID", { exact: true }).fill("1");
+    await page.getByLabel("Tarih", { exact: true }).fill("2026-04-14");
     await page.getByRole("button", { name: /Kayd.*Getir/i }).click();
 
     await page.getByRole("group", { name: "Hareket Durumu" }).getByRole("button", { name: "Geç Geldi" }).click();
@@ -72,8 +72,8 @@ test.describe("e2e smoke", () => {
     await expect(page).toHaveURL(/\/puantaj$/);
     await expect(page.locator(".modal-header h2").first()).toContainText("Günlük Puantaj");
 
-    await page.getByLabel("Personel ID").fill("1");
-    await page.getByLabel("Tarih").fill("2026-04-12");
+    await page.getByLabel("Personel ID", { exact: true }).fill("1");
+    await page.getByLabel("Tarih", { exact: true }).fill("2026-04-12");
     await page.getByRole("button", { name: /Kayd.*Getir/i }).click();
 
     const gunlukDetayKarti = page.getByTestId("puantaj-ana-detay");

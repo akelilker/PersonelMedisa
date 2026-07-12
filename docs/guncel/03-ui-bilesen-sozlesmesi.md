@@ -558,6 +558,40 @@ Bu spec kapsamında aşağıdakiler yasaktır:
 - modüle özel farklı modal-header dili açmak
 - bildirim panelini bir yerde dropdown, başka yerde modal yapmak
 
+- bildirim panelini bir yerde dropdown, başka yerde modal yapmak
+- puantaj etki aday panelinde `Uygula` butonu veya `/uygula` aksiyonu eklemek
+
+## 14.1 Puantaj Etki Adayı Karar Paneli — S74-C2B
+
+Konum: `/puantaj` ekranında `Onaylı Bildirim Puantaj Etki Adayları` bölümü.
+
+Görünürlük:
+
+- Panel `puantaj.bildirim_etki.view` yetkisine sahip kullanıcıya render edilir (Genel Yönetici, Bölüm Yöneticisi read-only; Muhasebe karar aksiyonlu).
+- `puantaj.bildirim_etki.dismiss` olmadan Yok Say aksiyonu gösterilmez.
+- Liste sayfalama: backend default `limit=20`; `module-pagination` ile sonraki/önceki sayfa.
+
+Veri ve filtreler:
+
+- Özet: `GET /puantaj/bildirim-etki-adaylari/ozet?genel_yonetici_bildirim_onayi_id=`
+- Liste: `ay`, `birim_amiri_user_id`, opsiyonel `personel_id`, `state`; şube `X-Active-Sube-Id` ile taşınır.
+- Detay: mevcut `AppModal` standardı; `source_snapshot` ham JSON dump olarak gösterilmez.
+
+Aksiyon matrisi:
+
+- `HAZIR` ve `INCELEME_GEREKLI`: Detay + Yok Say
+- `INCELEME_GEREKLI`: ek uyarı metni zorunlu
+- `UYGULANDI` ve `YOK_SAYILDI`: yalnız Detay; terminal state'te aktif karar butonu yok
+- `Uygula` aksiyonu bu fazda yoktur
+
+Yok Say modalı:
+
+- Başlık: `Puantaj Etki Adayını Yok Say`
+- Gerekçe: trim sonrası 5–500 Unicode karakter; canlı sayaç `0 / 500` biçimi
+- POST body: `{ expected_state: aday.state, gerekce: trimmed }`
+- Başarı sonrası özet/liste/açık detay refetch; backend state otoritesidir
+- `idempotent: true` → bilgi mesajı; hata değil
+
 ## 15. Geliştiriciye Teslim Mantığı
 
 Bu belge geliştiriciye şu soruların net cevabını vermelidir:

@@ -103,3 +103,140 @@
     flex: 1 1 auto;
   }
 }
+
+.puantaj-etki-aday-panel {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.puantaj-etki-aday-table-wrap {
+  overflow: auto;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-sm);
+}
+
+.puantaj-etki-aday-table {
+  width: 100%;
+  min-width: 760px;
+  border-collapse: collapse;
+}
+
+.puantaj-etki-aday-table th,
+.puantaj-etki-aday-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line-soft);
+  text-align: left;
+  vertical-align: top;
+}
+
+.puantaj-etki-aday-card-list {
+  display: none;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.puantaj-etki-aday-card {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-sm);
+}
+
+.puantaj-etki-aday-card p {
+  margin: 0;
+}
+
+.puantaj-etki-aday-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.puantaj-etki-state-badge {
+  display: inline-flex;
+  border: 1px solid var(--line-soft);
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 12px;
+}
+
+.puantaj-etki-state-hazir {
+  border-color: rgba(46, 204, 113, 0.45);
+}
+
+.puantaj-etki-state-inceleme {
+  border-color: rgba(243, 156, 18, 0.55);
+}
+
+.puantaj-etki-state-uygulandi {
+  border-color: rgba(52, 152, 219, 0.55);
+}
+
+.puantaj-etki-state-yok-sayildi {
+  border-color: rgba(149, 165, 166, 0.55);
+}
+
+.puantaj-etki-inceleme-uyari,
+.puantaj-etki-terminal-uyari {
+  margin: 0;
+  color: var(--orange, #f39c12);
+}
+
+.puantaj-etki-detail-group {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.puantaj-etki-detail-group h4 {
+  margin: 0;
+}
+
+.puantaj-etki-detail-grid {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+
+.puantaj-etki-detail-row {
+  display: grid;
+  grid-template-columns: minmax(140px, 34%) 1fr;
+  gap: var(--space-2);
+}
+
+.puantaj-etki-detail-row dt {
+  margin: 0;
+  color: var(--txt-muted);
+}
+
+.puantaj-etki-detail-row dd {
+  margin: 0;
+}
+
+.puantaj-etki-gerekce-counter {
+  margin: 0;
+  color: var(--txt-muted);
+  font-size: 12px;
+}
+
+.puantaj-form-success {
+  margin: 0;
+  color: var(--green, #2ecc71);
+}
+
+@media (max-width: 720px) {
+  .puantaj-etki-aday-table-wrap {
+    display: none;
+  }
+
+  .puantaj-etki-aday-card-list {
+    display: grid;
+  }
+
+  .puantaj-etki-detail-row {
+    grid-template-columns: 1fr;
+  }
+}

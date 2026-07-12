@@ -679,7 +679,7 @@ test.describe("S73-B genel yonetici bildirim onayi API guards (mock-api)", () =>
 });
 
 const DISMISS_BODY = {
-  expected_state: "INCELEME_GEREKLI",
+  expected_state: "HAZIR",
   gerekce: "Mevcut puantaj kaydiyla cakisti."
 } as const;
 

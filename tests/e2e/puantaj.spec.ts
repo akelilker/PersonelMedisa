@@ -28,8 +28,8 @@ const SEED_TARIH = "2026-04-09";
 const SEED_DONEM = "2026-04";
 
 async function openPuantajRecord(page: Parameters<typeof test>[0]["page"]) {
-  await page.getByLabel("Personel ID").fill(SEED_PERSONEL_ID);
-  await page.getByLabel("Tarih").fill(SEED_TARIH);
+  await page.getByLabel("Personel ID", { exact: true }).fill(SEED_PERSONEL_ID);
+  await page.getByLabel("Tarih", { exact: true }).fill(SEED_TARIH);
   await page.getByRole("button", { name: /Kayd.*Getir/i }).click();
   await expect(page.getByTestId("puantaj-ana-detay")).toBeVisible();
 }

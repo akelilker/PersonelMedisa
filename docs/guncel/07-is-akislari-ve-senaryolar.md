@@ -350,7 +350,7 @@ Yetkili kullanıcı (`BOLUM_YONETICISI`, `GENEL_YONETICI`, `MUHASEBE`) günlük 
 
 ### Tetikleyici
 
-S73 tamamlanmış Genel Yönetici bildirim üst onayı sonrası `MUHASEBE`, S74-B ile üretilmiş puantaj etki adaylarını listeler veya detayını inceler.
+S73 tamamlanmış Genel Yönetici bildirim üst onayı sonrası `puantaj.bildirim_etki.view` yetkisine sahip roller (Genel Yönetici, Bölüm Yöneticisi, Muhasebe) S74-B ile üretilmiş puantaj etki adaylarını listeler veya detayını inceler; yok sayma yalnız Muhasebe/dismiss yetkisindedir.
 
 ### Akış
 
@@ -385,6 +385,30 @@ S73 tamamlanmış Genel Yönetici bildirim üst onayı sonrası `MUHASEBE`, S74-
 - `onayli_bildirim_puantaj_etki_adaylari` tablosunda karar alanları güncellenir.
 - `gunluk_puantaj`, finans, bordro, süreç ve bildirim zinciri tabloları değişmez.
 - Uygula endpointi ve frontend karar ekranı bu fazda yoktur.
+
+- Uygula endpointi ve frontend karar ekranı bu fazda yoktur.
+
+## 15.6 Puantaj Etki Adayı Yok Say Ekranı — S74-C2B
+
+### Tetikleyici
+
+`puantaj.bildirim_etki.view` yetkisine sahip kullanıcı `/puantaj` ekranındaki `Onaylı Bildirim Puantaj Etki Adayları` bölümünden S74-B adaylarını inceler; `puantaj.bildirim_etki.dismiss` yetkisine sahip Muhasebe uygun kayıtları yok sayar.
+
+### Akış
+
+- Panel `puantaj.bildirim_etki.view` yetkisinde görünür; Genel Yönetici ve Bölüm Yöneticisi read-only kalır.
+- Yok Say yalnız `puantaj.bildirim_etki.dismiss` (Muhasebe) ile açılır.
+- Ay + birim amiri + aktif şube bağlamı hazır olmadan liste/özet isteği yapılmaz; şube değişince stale veri temizlenir.
+- Özet için `genel_yonetici_bildirim_onayi_id` gerekir: Muhasebe/Bölüm için liste satırından veya bağlam içi cache; Genel Yönetici için ayrıca `genel_yonetici_bildirim_onayi` özet API'si kullanılabilir.
+- `HAZIR` ve `INCELEME_GEREKLI` için Yok Say modalı açılır; gerekçe 5–500 karakter doğrulanır.
+- `INCELEME_GEREKLI` satırında “otomatik uygulanamaz” uyarısı gösterilir.
+- Başarılı yok sayma sonrası frontend özet/liste/detayı refetch eder; terminal `YOK_SAYILDI` görünür.
+- `Uygula` butonu ve `/uygula` endpointi bu fazda yoktur.
+
+### Sistem Etkisi
+
+- Yalnız frontend ve mock/E2E katmanı değişir; backend S74-C2A kontratı aynı kalır.
+- `gunluk_puantaj` ve diğer operasyonel tablolar değişmez.
 
 ## 16. Rapor Alma Senaryosu
 

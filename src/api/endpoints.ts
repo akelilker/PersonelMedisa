@@ -45,7 +45,13 @@ export const endpoints = {
   puantaj: {
     detail: (personelId: number | string, tarih: string) =>
       `/gunluk-puantaj/${personelId}/${encodeURIComponent(tarih)}`,
-    muhurle: "/puantaj/muhurle"
+    muhurle: "/puantaj/muhurle",
+    bildirimEtkiAdaylari: {
+      list: "/puantaj/bildirim-etki-adaylari",
+      ozet: "/puantaj/bildirim-etki-adaylari/ozet",
+      detail: (id: number | string) => `/puantaj/bildirim-etki-adaylari/${id}`,
+      yokSay: (id: number | string) => `/puantaj/bildirim-etki-adaylari/${id}/yok-say`
+    }
   },
   haftalikKapanis: {
     close: "/haftalik-kapanis",

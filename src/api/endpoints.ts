@@ -38,6 +38,10 @@ export const endpoints = {
     approve: "/aylik-bildirim-onaylari",
     detail: (id: number | string) => `/aylik-bildirim-onaylari/${id}`
   },
+  genelYoneticiBildirimOnaylari: {
+    summary: "/genel-yonetici-bildirim-onaylari/ozet",
+    approve: "/genel-yonetici-bildirim-onaylari"
+  },
   puantaj: {
     detail: (personelId: number | string, tarih: string) =>
       `/gunluk-puantaj/${personelId}/${encodeURIComponent(tarih)}`,

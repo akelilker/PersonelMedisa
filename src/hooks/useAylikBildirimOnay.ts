@@ -15,11 +15,21 @@ type UseAylikBildirimOnayOptions = {
   subeId?: number | null;
   birimAmiriUserId?: number | null;
   onApproved?: () => void | Promise<void>;
+  ay?: string;
+  onAyChange?: (value: string) => void;
 };
 
 export function useAylikBildirimOnay(options: UseAylikBildirimOnayOptions = {}) {
-  const { enabled = true, subeId = null, birimAmiriUserId = null, onApproved } = options;
-  const [ay, setAyState] = useState(getCurrentMonthValue);
+  const {
+    enabled = true,
+    subeId = null,
+    birimAmiriUserId = null,
+    onApproved,
+    ay: controlledAy,
+    onAyChange
+  } = options;
+  const [internalAy, setInternalAy] = useState(getCurrentMonthValue);
+  const ay = controlledAy ?? internalAy;
   const [ozet, setOzet] = useState<AylikBildirimOnayOzet | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -74,13 +84,14 @@ export function useAylikBildirimOnay(options: UseAylikBildirimOnayOptions = {}) 
   }, [ay, enabled, refreshOzet]);
 
   const setAy = useCallback((value: string) => {
-    setAyState(value);
+    if (controlledAy === undefined) setInternalAy(value);
+    onAyChange?.(value);
     if (value && !isValidAyValue(value)) {
       setAyWarning("Ay YYYY-MM formatinda olmalidir.");
     } else {
       setAyWarning(null);
     }
-  }, []);
+  }, [controlledAy, onAyChange]);
 
   const approveMonth = useCallback(async () => {
     if (!enabled || isApproving || !isValidAyValue(ay)) {

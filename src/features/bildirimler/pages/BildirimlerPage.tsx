@@ -11,6 +11,7 @@ import { fetchBirimAmiriSecenekleri } from "../../../api/bildirimler.api";
 import { useRoleAccess } from "../../../hooks/use-role-access";
 import { useAylikBildirimOnay } from "../../../hooks/useAylikBildirimOnay";
 import { useBildirimler } from "../../../hooks/useBildirimler";
+import { useGenelYoneticiBildirimOnayi } from "../../../hooks/useGenelYoneticiBildirimOnayi";
 import { useHaftalikBildirimMutabakat } from "../../../hooks/useHaftalikBildirimMutabakat";
 import { useAuth } from "../../../state/auth.store";
 import {
@@ -20,9 +21,16 @@ import {
   canSubmitGunlukBildirim
 } from "../../../lib/bildirim/gunluk-bildirim-actions";
 import {
+  getCurrentMonthValue,
   isAylikBildirimOnayApproveEnabled,
   resolveAylikBildirimOnayStatusMessage
 } from "../../../lib/bildirim/aylik-bildirim-onay";
+import {
+  formatGenelYoneticiBildirimOnayiDate,
+  formatGenelYoneticiBildirimOnayiState,
+  isGenelYoneticiBildirimOnayiApproveEnabled,
+  resolveGenelYoneticiBildirimOnayiBlockMessage
+} from "../../../lib/bildirim/genel-yonetici-bildirim-onayi";
 import {
   computeHaftaBitisFromMonday,
   isHaftalikMutabakatApproveEnabled,
@@ -348,6 +356,8 @@ type AylikBildirimOnayPanelProps = {
   subeId: number | null;
   birimAmiriUserId: number | null;
   contextMessage: string | null;
+  ay: string;
+  onAyChange: (value: string) => void;
 };
 
 function AylikBildirimOnayPanel({
@@ -355,10 +365,18 @@ function AylikBildirimOnayPanel({
   enabled,
   subeId,
   birimAmiriUserId,
-  contextMessage
+  contextMessage,
+  ay,
+  onAyChange
 }: AylikBildirimOnayPanelProps) {
-  const { ay, setAy, ozet, isLoading, error, ayWarning, approveMonth, isApproving } =
-    useAylikBildirimOnay({ enabled, subeId, birimAmiriUserId });
+  const { setAy, ozet, isLoading, error, ayWarning, approveMonth, isApproving } =
+    useAylikBildirimOnay({
+      enabled,
+      subeId,
+      birimAmiriUserId,
+      ay,
+      onAyChange
+    });
 
   const statusMessage = resolveAylikBildirimOnayStatusMessage(ozet);
   const approveEnabled = isAylikBildirimOnayApproveEnabled(canApprove, ozet);
@@ -451,6 +469,156 @@ function AylikBildirimOnayPanel({
   );
 }
 
+type GenelYoneticiBildirimOnayiPanelProps = {
+  canView: boolean;
+  canApprove: boolean;
+  ay: string;
+  subeId: number | null;
+  birimAmiriUserId: number | null;
+  subeLabel: string;
+  birimAmiriLabel: string;
+  contextMessage: string | null;
+};
+
+function GenelYoneticiBildirimOnayiPanel({
+  canView,
+  canApprove,
+  ay,
+  subeId,
+  birimAmiriUserId,
+  subeLabel,
+  birimAmiriLabel,
+  contextMessage
+}: GenelYoneticiBildirimOnayiPanelProps) {
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const {
+    ozet,
+    isLoading,
+    error,
+    successMessage,
+    approve,
+    isApproving,
+    contextReady
+  } = useGenelYoneticiBildirimOnayi({ canView, canApprove, ay, subeId, birimAmiriUserId });
+  const blockMessage = resolveGenelYoneticiBildirimOnayiBlockMessage(ozet?.blok_nedeni ?? null);
+  const approveEnabled = isGenelYoneticiBildirimOnayiApproveEnabled(
+    canApprove,
+    contextReady,
+    ozet
+  );
+  const gyOnay = ozet?.genel_yonetici_bildirim_onayi ?? null;
+
+  const handleApprove = async () => {
+    await approve();
+    setIsConfirmOpen(false);
+  };
+
+  return (
+    <div
+      className="state-card bildirim-mutabakat-panel"
+      data-testid="genel-yonetici-bildirim-onay-panel"
+      aria-busy={isLoading || isApproving}
+    >
+      <div className="bildirim-mutabakat-panel-head">
+        <h3>Genel Yönetici Bildirim Onayı</h3>
+        {ozet ? (
+          <p className="bildirim-mutabakat-meta">
+            Ay aralığı: {ozet.ay_baslangic} – {ozet.ay_bitis}
+          </p>
+        ) : null}
+      </div>
+
+      {!contextReady && contextMessage ? (
+        <p className="bildirim-mutabakat-status" data-testid="genel-yonetici-bildirim-onay-context">
+          {contextMessage}
+        </p>
+      ) : null}
+      {isLoading ? <LoadingState label="Genel Yönetici bildirim onayı özeti yükleniyor..." /> : null}
+      {!isLoading && error ? <p className="bildirim-form-error">{error}</p> : null}
+      {successMessage ? <p className="yonetim-success">{successMessage}</p> : null}
+
+      {!isLoading && ozet ? (
+        <>
+          <div className="bildirim-model-grid" data-testid="genel-yonetici-bildirim-onay-ozet">
+            {[
+              ["Ay", ozet.ay],
+              ["Şube", subeLabel],
+              ["Birim Amiri", birimAmiriLabel],
+              ["Toplam Bildirim", String(ozet.counts.toplam_bildirim)],
+              ["Mutabakata Alınan", String(ozet.counts.mutabakata_alinan)],
+              ["Eksik Hafta", String(ozet.counts.eksik_hafta)],
+              ["Aylık Bildirim Onay ID", ozet.aylik_bildirim_onayi ? String(ozet.aylik_bildirim_onayi.id) : "—"],
+              ["Aylık Bildirim Onay Durumu", ozet.aylik_bildirim_onayi?.state ?? "—"],
+              ["Genel Yönetici Üst Onay ID", gyOnay ? String(gyOnay.id) : "—"],
+              ["Genel Yönetici Üst Onay Durumu", formatGenelYoneticiBildirimOnayiState(gyOnay?.state)],
+              ["Onay Tarihi", formatGenelYoneticiBildirimOnayiDate(gyOnay?.onaylandi_at)]
+            ].map(([label, value]) => (
+              <div key={label} className="bildirim-model-card">
+                <span className="bildirim-model-label">{label}</span>
+                <strong>{value}</strong>
+              </div>
+            ))}
+          </div>
+
+          {blockMessage ? (
+            <p className="bildirim-mutabakat-status" data-testid="genel-yonetici-bildirim-onay-block">
+              {blockMessage}
+            </p>
+          ) : null}
+
+          {canApprove ? (
+            <div className="bildirim-mutabakat-actions">
+              <button
+                type="button"
+                className="universal-btn-aux"
+                data-testid="genel-yonetici-bildirim-onay-approve"
+                onClick={() => setIsConfirmOpen(true)}
+                disabled={!approveEnabled || isApproving}
+              >
+                {isApproving ? "Onaylanıyor..." : "Genel Yönetici Onayı Ver"}
+              </button>
+            </div>
+          ) : null}
+        </>
+      ) : null}
+
+      {isConfirmOpen ? (
+        <AppModal
+          title="Genel Yönetici Onayı"
+          onClose={() => {
+            if (!isApproving) setIsConfirmOpen(false);
+          }}
+          footer={
+            <div className="universal-btn-group modal-footer-actions">
+              <button
+                type="button"
+                className="universal-btn-cancel"
+                onClick={() => setIsConfirmOpen(false)}
+                disabled={isApproving}
+              >
+                Vazgeç
+              </button>
+              <button
+                type="button"
+                className="universal-btn-save"
+                onClick={() => void handleApprove()}
+                disabled={isApproving}
+              >
+                {isApproving ? "Onaylanıyor..." : "Onayı Ver"}
+              </button>
+            </div>
+          }
+        >
+          <p>
+            Seçilen şube, birim amiri ve ay için Genel Yönetici bildirim onayı verilecek. Bu işlem
+            mevcut sürümde geri alınamaz.
+          </p>
+        </AppModal>
+      ) : null}
+    </div>
+  );
+}
+
 export function BildirimlerPage() {
   const {
     listQuery,
@@ -510,6 +678,8 @@ export function BildirimlerPage() {
   const canApproveHaftalikMutabakat = hasPermission("haftalik_mutabakat.approve");
   const canViewAylikBildirimOnay = hasPermission("aylik_bildirim_onayi.view");
   const canApproveAylikBildirimOnay = hasPermission("aylik_bildirim_onayi.approve");
+  const canViewGenelYoneticiBildirimOnay = hasPermission("genel_yonetici_bildirim_onayi.view");
+  const canApproveGenelYoneticiBildirimOnay = hasPermission("genel_yonetici_bildirim_onayi.approve");
   const isBirimAmiri = uiProfile === "birim_amiri";
   const availableSubeler = useMemo(() => {
     const subeList = session?.sube_list ?? [];
@@ -524,6 +694,7 @@ export function BildirimlerPage() {
   const [selectedBirimAmiriUserId, setSelectedBirimAmiriUserId] = useState<number | null>(() =>
     isBirimAmiri ? session?.user.id ?? null : null
   );
+  const [selectedAy, setSelectedAy] = useState(getCurrentMonthValue);
   const [birimAmiriSecenekleri, setBirimAmiriSecenekleri] = useState<BirimAmiriSecenegi[]>([]);
   const [isBirimAmiriSecenekleriLoading, setIsBirimAmiriSecenekleriLoading] = useState(false);
   const [birimAmiriSecenekleriError, setBirimAmiriSecenekleriError] = useState<string | null>(null);
@@ -585,6 +756,19 @@ export function BildirimlerPage() {
         : selectedBirimAmiriUserId === null
           ? "Verileri görüntülemek için birim amiri seçin."
           : null;
+  const genelYoneticiContextMessage = selectedSubeId === null
+    ? "Genel Yönetici onayı için şube seçin."
+    : isBirimAmiriSecenekleriLoading
+      ? "Birim amiri seçenekleri yükleniyor..."
+      : birimAmiriSecenekleri.length === 0
+        ? "Seçilen şubede aktif birim amiri bulunamadı."
+        : selectedBirimAmiriUserId === null
+          ? "Genel Yönetici onayı için birim amiri seçin."
+          : null;
+  const selectedSubeLabel =
+    availableSubeler.find((sube) => sube.id === selectedSubeId)?.ad ?? "—";
+  const selectedBirimAmiriLabel =
+    birimAmiriSecenekleri.find((option) => option.user_id === selectedBirimAmiriUserId)?.ad_soyad ?? "—";
 
   const { draft } = listQuery;
   const page = listQuery.page;
@@ -715,7 +899,8 @@ export function BildirimlerPage() {
 
       <SubeDetailListNotice />
 
-      {!isBirimAmiri && (canViewHaftalikMutabakat || canViewAylikBildirimOnay) ? (
+      {!isBirimAmiri &&
+      (canViewHaftalikMutabakat || canViewAylikBildirimOnay || canViewGenelYoneticiBildirimOnay) ? (
         <div className="state-card" data-testid="bildirim-panel-context">
           <h3>Panel Bağlamı</h3>
           <div className="form-field-grid">
@@ -781,6 +966,21 @@ export function BildirimlerPage() {
           subeId={selectedSubeId}
           birimAmiriUserId={selectedBirimAmiriUserId}
           contextMessage={panelContextMessage}
+          ay={selectedAy}
+          onAyChange={setSelectedAy}
+        />
+      ) : null}
+
+      {canViewGenelYoneticiBildirimOnay ? (
+        <GenelYoneticiBildirimOnayiPanel
+          canView={canViewGenelYoneticiBildirimOnay}
+          canApprove={canApproveGenelYoneticiBildirimOnay}
+          ay={selectedAy}
+          subeId={selectedSubeId}
+          birimAmiriUserId={selectedBirimAmiriUserId}
+          subeLabel={selectedSubeLabel}
+          birimAmiriLabel={selectedBirimAmiriLabel}
+          contextMessage={genelYoneticiContextMessage}
         />
       ) : null}
 

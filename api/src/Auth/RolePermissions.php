@@ -127,6 +127,8 @@ class RolePermissions
             'puantaj.update',
             'puantaj.bildirim_etki.view',
             'puantaj.bildirim_etki.generate',
+            'puantaj.bildirim_etki.apply',
+            'puantaj.bildirim_etki.dismiss',
             'raporlar.view',
             'finans.view',
             'finans.create',

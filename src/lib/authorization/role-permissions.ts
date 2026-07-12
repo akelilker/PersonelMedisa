@@ -23,6 +23,8 @@ export type AppPermission =
   | "puantaj.muhurle"
   | "puantaj.bildirim_etki.view"
   | "puantaj.bildirim_etki.generate"
+  | "puantaj.bildirim_etki.apply"
+  | "puantaj.bildirim_etki.dismiss"
   | "raporlar.view"
   | "finans.view"
   | "finans.create"
@@ -182,6 +184,8 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "puantaj.update",
     "puantaj.bildirim_etki.view",
     "puantaj.bildirim_etki.generate",
+    "puantaj.bildirim_etki.apply",
+    "puantaj.bildirim_etki.dismiss",
     "raporlar.view",
     "finans.view",
     "finans.create",

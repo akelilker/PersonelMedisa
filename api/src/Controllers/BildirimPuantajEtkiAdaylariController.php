@@ -445,7 +445,7 @@ class BildirimPuantajEtkiAdaylariController
     /** @param array<string, mixed> $row */
     private static function mapListRow(array $row)
     {
-        return [
+        return array_merge([
             'id' => (int) $row['id'],
             'genel_yonetici_bildirim_onayi_id' => (int) $row['genel_yonetici_bildirim_onayi_id'],
             'gunluk_bildirim_id' => (int) $row['gunluk_bildirim_id'],
@@ -462,13 +462,13 @@ class BildirimPuantajEtkiAdaylariController
             'conflict_code' => $row['conflict_code'] !== null ? (string) $row['conflict_code'] : null,
             'source_priority' => (string) $row['source_priority'],
             'created_at' => (string) $row['created_at'],
-        ];
+        ], self::mapKararListFields($row));
     }
 
     /** @param array<string, mixed> $row */
     private static function mapDetailRow(array $row)
     {
-        return [
+        return array_merge([
             'id' => (int) $row['id'],
             'genel_yonetici_bildirim_onayi_id' => (int) $row['genel_yonetici_bildirim_onayi_id'],
             'aylik_bildirim_onayi_id' => (int) $row['aylik_bildirim_onayi_id'],
@@ -502,6 +502,30 @@ class BildirimPuantajEtkiAdaylariController
             'projection_version' => $row['projection_version'] !== null ? (string) $row['projection_version'] : null,
             'created_at' => (string) $row['created_at'],
             'updated_at' => (string) $row['updated_at'],
+        ], self::mapKararDetailFields($row));
+    }
+
+    /** @param array<string, mixed> $row @return array<string, mixed> */
+    private static function mapKararListFields(array $row)
+    {
+        return [
+            'karar_veren_user_id' => $row['karar_veren_user_id'] !== null ? (int) $row['karar_veren_user_id'] : null,
+            'karar_zamani' => $row['karar_zamani'] !== null ? (string) $row['karar_zamani'] : null,
+            'uygulanan_puantaj_id' => $row['uygulanan_puantaj_id'] !== null ? (int) $row['uygulanan_puantaj_id'] : null,
+        ];
+    }
+
+    /** @param array<string, mixed> $row @return array<string, mixed> */
+    private static function mapKararDetailFields(array $row)
+    {
+        return [
+            'karar_veren_user_id' => $row['karar_veren_user_id'] !== null ? (int) $row['karar_veren_user_id'] : null,
+            'karar_zamani' => $row['karar_zamani'] !== null ? (string) $row['karar_zamani'] : null,
+            'karar_gerekcesi' => $row['karar_gerekcesi'] !== null ? (string) $row['karar_gerekcesi'] : null,
+            'uygulanan_puantaj_id' => $row['uygulanan_puantaj_id'] !== null ? (int) $row['uygulanan_puantaj_id'] : null,
+            'onceki_puantaj_snapshot' => self::decodeJsonField($row['onceki_puantaj_snapshot'] ?? null),
+            'sonraki_puantaj_snapshot' => self::decodeJsonField($row['sonraki_puantaj_snapshot'] ?? null),
+            'uygulama_hash' => $row['uygulama_hash'] !== null ? (string) $row['uygulama_hash'] : null,
         ];
     }
 

@@ -276,6 +276,23 @@ describe("role permissions", () => {
     expect(hasRolePermission("PATRON", "puantaj.bildirim_etki.generate")).toBe(false);
   });
 
+  it("locks S74-C1 puantaj bildirim etki karar permission matrix", () => {
+    expect(hasRolePermission("MUHASEBE", "puantaj.bildirim_etki.apply")).toBe(true);
+    expect(hasRolePermission("MUHASEBE", "puantaj.bildirim_etki.dismiss")).toBe(true);
+
+    expect(hasRolePermission("GENEL_YONETICI", "puantaj.bildirim_etki.apply")).toBe(false);
+    expect(hasRolePermission("GENEL_YONETICI", "puantaj.bildirim_etki.dismiss")).toBe(false);
+
+    expect(hasRolePermission("BOLUM_YONETICISI", "puantaj.bildirim_etki.apply")).toBe(false);
+    expect(hasRolePermission("BOLUM_YONETICISI", "puantaj.bildirim_etki.dismiss")).toBe(false);
+
+    expect(hasRolePermission("BIRIM_AMIRI", "puantaj.bildirim_etki.apply")).toBe(false);
+    expect(hasRolePermission("BIRIM_AMIRI", "puantaj.bildirim_etki.dismiss")).toBe(false);
+
+    expect(hasRolePermission("PATRON", "puantaj.bildirim_etki.apply")).toBe(false);
+    expect(hasRolePermission("PATRON", "puantaj.bildirim_etki.dismiss")).toBe(false);
+  });
+
   it("keeps TS and PHP role permission matrices in parity (S70B-1)", () => {
     for (const role of ALL_ROLES) {
       const tsPermissions = [...getRolePermissions(role)].sort();

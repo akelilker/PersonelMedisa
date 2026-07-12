@@ -346,6 +346,24 @@ Yetkili kullanıcı (`BOLUM_YONETICISI`, `GENEL_YONETICI`, `MUHASEBE`) günlük 
 - Günlük puantaj satırları hesap motoru girdisi olarak davranır.
 - Hatalı veri formül yamasıyla değil, veri kaynağı düzeltilerek çözülür.
 
+## 15.4 Puantaj Etki Adayı Karar Altyapısı — S74-C1
+
+### Tetikleyici
+
+S73 tamamlanmış Genel Yönetici bildirim üst onayı sonrası `MUHASEBE`, S74-B ile üretilmiş puantaj etki adaylarını listeler veya detayını inceler.
+
+### Akış
+
+- `MUHASEBE` aday listesinde karar audit özet alanlarını (`karar_veren_user_id`, `karar_zamani`, `uygulanan_puantaj_id`) görür.
+- Detayda karar audit alanları (`karar_gerekcesi`, puantaj snapshot'ları, `uygulama_hash`) okunur.
+- `BildirimPuantajEtkiDecisionPolicy` hangi state'ten hangi kararın mümkün olduğunu belirler: `HAZIR` → UYGULA/YOK_SAY; `INCELEME_GEREKLI` → yalnız YOK_SAY; `UYGULANDI`/`YOK_SAYILDI` terminal.
+- Bu fazda uygula/yok-say endpoint'i yoktur; karar yalnız altyapı olarak hazırlanır. YOK_SAY gerekçesi zorunludur; minimum karakter sayısı henüz kararlaştırılmamıştır.
+
+### Sistem Etkisi
+
+- `onayli_bildirim_puantaj_etki_adaylari` tablosuna karar audit kolonları eklenir.
+- `gunluk_puantaj`, finans ve bordro tabloları değişmez.
+
 ## 16. Rapor Alma Senaryosu
 
 ### 16.1 Tetikleyici

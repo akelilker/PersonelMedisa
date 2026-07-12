@@ -8,9 +8,11 @@ const controllerPath = resolve(
 );
 const routerPath = resolve(process.cwd(), "api/src/Router.php");
 const rolePermissionsPath = resolve(process.cwd(), "api/src/Auth/RolePermissions.php");
+const policyPath = resolve(process.cwd(), "api/src/Services/BildirimPuantajEtkiDecisionPolicy.php");
 const controllerSource = readFileSync(controllerPath, "utf8");
 const routerSource = readFileSync(routerPath, "utf8");
 const rolePermissionsSource = readFileSync(rolePermissionsPath, "utf8");
+const policySource = readFileSync(policyPath, "utf8");
 
 describe("BildirimPuantajEtkiAdaylariController source contract", () => {
   it("exposes summary, list, detail and generate operations", () => {
@@ -72,7 +74,47 @@ describe("BildirimPuantajEtkiAdaylariController source contract", () => {
   it("does not implement apply or resolve transitions", () => {
     expect(controllerSource).not.toMatch(/public static function apply\(/);
     expect(controllerSource).not.toMatch(/public static function resolve\(/);
+    expect(controllerSource).not.toMatch(/public static function dismiss\(/);
     expect(controllerSource).not.toContain("UPDATE onayli_bildirim_puantaj_etki_adaylari");
+  });
+
+  it("maps locked karar audit fields in list/detail", () => {
+    expect(controllerSource).toContain("mapKararListFields");
+    expect(controllerSource).toContain("mapKararDetailFields");
+    for (const field of [
+      "karar_zamani",
+      "karar_veren_user_id",
+      "karar_gerekcesi",
+      "uygulanan_puantaj_id",
+      "onceki_puantaj_snapshot",
+      "sonraki_puantaj_snapshot",
+      "uygulama_hash",
+    ]) {
+      expect(controllerSource).toContain(field);
+    }
+
+    const listMapperMatch = controllerSource.match(
+      /private static function mapKararListFields[\s\S]*?^    \}/m
+    );
+    const detailMapperMatch = controllerSource.match(
+      /private static function mapKararDetailFields[\s\S]*?^    \}/m
+    );
+    expect(listMapperMatch).not.toBeNull();
+    expect(detailMapperMatch).not.toBeNull();
+    const listMapper = listMapperMatch![0];
+    const detailMapper = detailMapperMatch![0];
+
+    for (const forbidden of [
+      "karar_turu",
+      "blok_nedeni",
+      "uygulanabilir_mi",
+      "yok_sayilabilir_mi",
+      "karar_blok_nedeni",
+    ]) {
+      expect(listMapper).not.toContain(forbidden);
+      expect(detailMapper).not.toContain(forbidden);
+    }
+    expect(controllerSource).not.toContain("BildirimPuantajEtkiDecisionPolicy");
   });
 });
 
@@ -125,5 +167,62 @@ describe("S74-B backend permission matrix (RolePermissions.php)", () => {
     const block = roleBlock("PATRON");
     expect(block).not.toContain("'puantaj.bildirim_etki.view'");
     expect(block).not.toContain("'puantaj.bildirim_etki.generate'");
+  });
+});
+
+describe("S74-C1 backend permission matrix (RolePermissions.php)", () => {
+  function roleBlock(role: string): string {
+    const start = rolePermissionsSource.indexOf(`'${role}' => [`);
+    expect(start).toBeGreaterThan(-1);
+    const end = rolePermissionsSource.indexOf("],", start);
+    return rolePermissionsSource.slice(start, end);
+  }
+
+  it("MUHASEBE apply yes / dismiss yes", () => {
+    const block = roleBlock("MUHASEBE");
+    expect(block).toContain("'puantaj.bildirim_etki.apply'");
+    expect(block).toContain("'puantaj.bildirim_etki.dismiss'");
+  });
+
+  it("GENEL_YONETICI apply no / dismiss no", () => {
+    const block = roleBlock("GENEL_YONETICI");
+    expect(block).not.toContain("'puantaj.bildirim_etki.apply'");
+    expect(block).not.toContain("'puantaj.bildirim_etki.dismiss'");
+  });
+
+  it("BOLUM_YONETICISI apply no / dismiss no", () => {
+    const block = roleBlock("BOLUM_YONETICISI");
+    expect(block).not.toContain("'puantaj.bildirim_etki.apply'");
+    expect(block).not.toContain("'puantaj.bildirim_etki.dismiss'");
+  });
+
+  it("BIRIM_AMIRI apply no / dismiss no", () => {
+    const block = roleBlock("BIRIM_AMIRI");
+    expect(block).not.toContain("'puantaj.bildirim_etki.apply'");
+    expect(block).not.toContain("'puantaj.bildirim_etki.dismiss'");
+  });
+
+  it("PATRON apply no / dismiss no", () => {
+    const block = roleBlock("PATRON");
+    expect(block).not.toContain("'puantaj.bildirim_etki.apply'");
+    expect(block).not.toContain("'puantaj.bildirim_etki.dismiss'");
+  });
+});
+
+describe("BildirimPuantajEtkiDecisionPolicy source contract", () => {
+  it("defines locked state machine and action mapping", () => {
+    expect(policySource).toContain("evaluateApply");
+    expect(policySource).toContain("evaluateDismiss");
+    expect(policySource).toContain("validateExpectedState");
+    expect(policySource).toContain("isApplyAllowed");
+    expect(policySource).toContain("isDismissAllowed");
+    expect(policySource).toContain("'HAZIR'");
+    expect(policySource).toContain("'INCELEME_GEREKLI'");
+    expect(policySource).toContain("'UYGULANDI'");
+    expect(policySource).toContain("'YOK_SAYILDI'");
+    expect(policySource).not.toContain("validateDismissReason");
+    expect(policySource).not.toContain("kararTuruForAction");
+    expect(policySource).not.toContain("MANUEL_INCELEME");
+    expect(policySource).not.toContain("MIN_DISMISS_REASON_LENGTH");
   });
 });

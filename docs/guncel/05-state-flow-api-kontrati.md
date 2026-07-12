@@ -171,6 +171,51 @@ Granülarite: her üst onay tek şube, tek Birim Amiri ve tek ay bağlamına ait
 - Günlük puantaj, haftalık kapanış/snapshot ve puantaj aylık mühürleri ayrı teknik state flow'dur.
 - Bildirim onayının tamamlanması bordro girdisinin veya bordro kesinliğinin oluştuğu anlamına gelmez.
 
+### Onaylı bildirim puantaj etki adayları — S74-B
+
+DB sahibi: `onayli_bildirim_puantaj_etki_adaylari`; generate sahibi: `MUHASEBE`.
+
+| İşlem | Endpoint | Permission |
+|-------|----------|------------|
+| Özet | `GET /puantaj/bildirim-etki-adaylari/ozet?genel_yonetici_bildirim_onayi_id=` | `puantaj.bildirim_etki.view` |
+| Liste | `GET /puantaj/bildirim-etki-adaylari` | `puantaj.bildirim_etki.view` |
+| Detay | `GET /puantaj/bildirim-etki-adaylari/{id}` | `puantaj.bildirim_etki.view` |
+| Generate | `POST /puantaj/bildirim-etki-adaylari/hazirla` | `puantaj.bildirim_etki.generate` |
+
+**Migration:** `009_onayli_bildirim_puantaj_etki_adaylari.sql`, `010_bildirim_puantaj_etki_snapshot_zamanlarini_duzelt.sql`.
+
+**State modeli (generate çıktısı):** `HAZIR`, `INCELEME_GEREKLI`. Terminal hedef state'ler: `UYGULANDI`, `YOK_SAYILDI` (S74-C1 altyapısı; endpoint henüz yok).
+
+**Idempotency:** Aynı `(genel_yonetici_bildirim_onayi_id, gunluk_bildirim_id)` için tekrar generate → HTTP `200`, `created_count=0`.
+
+**Hesap sınırı:** S74-B yalnız aday üretir; `gunluk_puantaj`, finans, bordro veya bildirim zinciri state'lerini değiştirmez.
+
+### Puantaj etki adayı karar altyapısı — S74-C1
+
+DB genişlemesi: `011_bildirim_puantaj_etki_karar_altyapisi.sql` — yedi karar audit kolonu (`karar_veren_user_id`, `karar_zamani`, `karar_gerekcesi`, `uygulanan_puantaj_id`, `onceki_puantaj_snapshot`, `sonraki_puantaj_snapshot`, `uygulama_hash`).
+
+Policy sahibi: `BildirimPuantajEtkiDecisionPolicy` — yalnız state/action kararı (endpoint yok).
+
+| State | UYGULA | YOK_SAY |
+|-------|:------:|:-------:|
+| HAZIR | Evet | Evet |
+| INCELEME_GEREKLI | Hayır | Evet |
+| UYGULANDI | Hayır | Hayır |
+| YOK_SAYILDI | Hayır | Hayır |
+
+| Permission | MUHASEBE | GENEL_YONETICI | BOLUM_YONETICISI | BIRIM_AMIRI | PATRON |
+|------------|:--------:|:--------------:|:----------------:|:-----------:|:------:|
+| `puantaj.bildirim_etki.apply` | Evet | Hayır | Hayır | Hayır | Hayır |
+| `puantaj.bildirim_etki.dismiss` | Evet | Hayır | Hayır | Hayır | Hayır |
+
+**List kontratı:** `karar_veren_user_id`, `karar_zamani`, `uygulanan_puantaj_id`.
+
+**Detail kontratı:** `karar_veren_user_id`, `karar_zamani`, `karar_gerekcesi`, `uygulanan_puantaj_id`, `onceki_puantaj_snapshot`, `sonraki_puantaj_snapshot`, `uygulama_hash`.
+
+**Ürün kararları:** Mevcut puantaj otomatik overwrite edilmez. YOK_SAY gerekçesi zorunludur; minimum karakter sayısı henüz kararlaştırılmamıştır (doğrulama endpoint fazında). Migration canlıya otomatik uygulanmaz.
+
+**Sınır:** S74-C1 endpoint, puantaj mutation, finans/bordro ve canlı migration içermez. Uygula/yok-say POST'ları S74-C2+ fazındadır.
+
 ## 1. Ortak API Sözleşmesi
 
 ### 1.1 Format

@@ -210,6 +210,8 @@ describe("role permissions", () => {
     expect(hasRolePermission("BIRIM_AMIRI", "aylik_bildirim_onayi.approve")).toBe(true);
     expect(hasRolePermission("BIRIM_AMIRI", "aylik_bolum_onayi.approve")).toBe(false);
     expect(hasRolePermission("BIRIM_AMIRI", "genel_yonetici_onayi.approve")).toBe(false);
+    expect(hasRolePermission("BIRIM_AMIRI", "genel_yonetici_bildirim_onayi.view")).toBe(false);
+    expect(hasRolePermission("BIRIM_AMIRI", "genel_yonetici_bildirim_onayi.approve")).toBe(false);
     expect(hasRolePermission("BIRIM_AMIRI", "bordro_kesinlestirme.approve")).toBe(false);
   });
 
@@ -221,11 +223,15 @@ describe("role permissions", () => {
     expect(hasRolePermission("BOLUM_YONETICISI", "aylik_bildirim_onayi.approve")).toBe(false);
     expect(hasRolePermission("BOLUM_YONETICISI", "aylik_bolum_onayi.approve")).toBe(true);
     expect(hasRolePermission("BOLUM_YONETICISI", "genel_yonetici_onayi.approve")).toBe(false);
+    expect(hasRolePermission("BOLUM_YONETICISI", "genel_yonetici_bildirim_onayi.view")).toBe(false);
+    expect(hasRolePermission("BOLUM_YONETICISI", "genel_yonetici_bildirim_onayi.approve")).toBe(false);
     expect(hasRolePermission("BOLUM_YONETICISI", "bordro_kesinlestirme.approve")).toBe(false);
   });
 
   it("locks GENEL_YONETICI genel onay and bordro permissions without bolum onay (S70B-1)", () => {
     expect(hasRolePermission("GENEL_YONETICI", "genel_yonetici_onayi.approve")).toBe(true);
+    expect(hasRolePermission("GENEL_YONETICI", "genel_yonetici_bildirim_onayi.view")).toBe(true);
+    expect(hasRolePermission("GENEL_YONETICI", "genel_yonetici_bildirim_onayi.approve")).toBe(true);
     expect(hasRolePermission("GENEL_YONETICI", "sirket_parametreleri.manage")).toBe(true);
     expect(hasRolePermission("GENEL_YONETICI", "bordro_on_izleme.view")).toBe(true);
     expect(hasRolePermission("GENEL_YONETICI", "bordro_kesinlestirme.approve")).toBe(true);
@@ -247,6 +253,8 @@ describe("role permissions", () => {
     expect(hasRolePermission("MUHASEBE", "aylik_bildirim_onayi.approve")).toBe(false);
     expect(hasRolePermission("MUHASEBE", "aylik_bolum_onayi.approve")).toBe(false);
     expect(hasRolePermission("MUHASEBE", "genel_yonetici_onayi.approve")).toBe(false);
+    expect(hasRolePermission("MUHASEBE", "genel_yonetici_bildirim_onayi.view")).toBe(false);
+    expect(hasRolePermission("MUHASEBE", "genel_yonetici_bildirim_onayi.approve")).toBe(false);
     expect(hasRolePermission("MUHASEBE", "bordro_kesinlestirme.approve")).toBe(false);
     expect(hasRolePermission("MUHASEBE", "patron_ack.mark_seen")).toBe(false);
   });

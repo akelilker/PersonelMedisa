@@ -557,3 +557,123 @@ test.describe("S72-B aylik bildirim onayi API guards (mock-api)", () => {
     await expect(apiFetch(page, `/api/aylik-bildirim-onaylari/${onayId}`)).resolves.toMatchObject({ status: 403 });
   });
 });
+
+test.describe("S73-B genel yonetici bildirim onayi API guards (mock-api)", () => {
+  const weekStart = "2026-04-06";
+  const ay = "2026-04";
+
+  async function approveWeek(page: Page) {
+    await apiFetchJson(page, "/api/haftalik-bildirim-mutabakatlari", {
+      method: "POST",
+      body: { hafta_baslangic: weekStart }
+    });
+  }
+
+  async function approveAylik(page: Page) {
+    await approveWeek(page);
+    return apiFetchJson(page, "/api/aylik-bildirim-onaylari", {
+      method: "POST",
+      body: { ay }
+    });
+  }
+
+  test("GENEL_YONETICI seeded temmuz ozetinde S72 onayini gorur ve ust onay verir", async ({ page }) => {
+    await loginAs(page, "GENEL_YONETICI");
+
+    const summary = await apiFetchJson(
+      page,
+      "/api/genel-yonetici-bildirim-onaylari/ozet?ay=2026-07&sube_id=1&birim_amiri_user_id=1"
+    );
+    expect(summary.status).toBe(200);
+    const summaryData = summary.data as {
+      onay_verilebilir_mi?: boolean;
+      aylik_bildirim_onayi?: { id?: number; state?: string } | null;
+      genel_yonetici_bildirim_onayi?: unknown;
+    };
+    expect(summaryData.aylik_bildirim_onayi?.id).toBe(1);
+    expect(summaryData.aylik_bildirim_onayi?.state).toBe("TAMAMLANDI");
+    expect(summaryData.genel_yonetici_bildirim_onayi).toBeNull();
+    expect(summaryData.onay_verilebilir_mi).toBe(true);
+
+    const approved = await apiFetchJson(
+      page,
+      "/api/genel-yonetici-bildirim-onaylari?sube_id=1",
+      {
+        method: "POST",
+        body: { ay: "2026-07", birim_amiri_user_id: 1, aciklama: "Ust onay" }
+      }
+    );
+    expect(approved.status).toBe(201);
+    const detail = approved.data as { id?: number; state?: string; aylik_bildirim_onayi_id?: number };
+    expect(detail.state).toBe("TAMAMLANDI");
+    expect(detail.aylik_bildirim_onayi_id).toBe(1);
+
+    await expect(
+      apiFetch(page, "/api/genel-yonetici-bildirim-onaylari?sube_id=1", {
+        method: "POST",
+        body: { ay: "2026-07", birim_amiri_user_id: 1 }
+      })
+    ).resolves.toMatchObject({ status: 409 });
+  });
+
+  test("S72 onayi yoksa summary 200 ve approve 422 doner", async ({ page }) => {
+    await loginAs(page, "GENEL_YONETICI");
+
+    const summary = await apiFetchJson(
+      page,
+      "/api/genel-yonetici-bildirim-onaylari/ozet?ay=2099-01&sube_id=1&birim_amiri_user_id=1"
+    );
+    expect(summary.status).toBe(200);
+    expect((summary.data as { onay_verilebilir_mi?: boolean }).onay_verilebilir_mi).toBe(false);
+    expect((summary.data as { blok_nedeni?: string }).blok_nedeni).toBe("AYLIK_BILDIRIM_ONAYI_GEREKLI");
+
+    await expect(
+      apiFetch(page, "/api/genel-yonetici-bildirim-onaylari?sube_id=1", {
+        method: "POST",
+        body: { ay: "2099-01", birim_amiri_user_id: 1 }
+      })
+    ).resolves.toMatchObject({ status: 422 });
+  });
+
+  test("BIRIM_AMIRI, BOLUM_YONETICISI ve MUHASEBE ust onay POST yapamaz", async ({ page }) => {
+    for (const role of ["BIRIM_AMIRI", "BOLUM_YONETICISI", "MUHASEBE"] as const) {
+      await loginAs(page, role);
+      await expect(
+        apiFetch(page, "/api/genel-yonetici-bildirim-onaylari?sube_id=1", {
+          method: "POST",
+          body: { ay: "2026-07", birim_amiri_user_id: 1 }
+        })
+      ).resolves.toMatchObject({ status: 403 });
+      await expect(
+        apiFetch(page, "/api/genel-yonetici-bildirim-onaylari/ozet?ay=2026-07&sube_id=1&birim_amiri_user_id=1")
+      ).resolves.toMatchObject({ status: 403 });
+    }
+  });
+
+  test("GENEL_YONETICI nisan akisinda S72 sonrasi ust onay verir", async ({ page }) => {
+    await loginAs(page, "BIRIM_AMIRI");
+    const aylikApproved = await approveAylik(page);
+    expect(aylikApproved.status).toBe(201);
+
+    await loginAs(page, "GENEL_YONETICI");
+    const approved = await apiFetchJson(
+      page,
+      `/api/genel-yonetici-bildirim-onaylari?sube_id=1`,
+      {
+        method: "POST",
+        body: { ay, birim_amiri_user_id: 1 }
+      }
+    );
+    expect(approved.status).toBe(201);
+  });
+
+  test("cross-scope birim amiri 403 doner", async ({ page }) => {
+    await loginAs(page, "GENEL_YONETICI");
+    await expect(
+      apiFetch(
+        page,
+        "/api/genel-yonetici-bildirim-onaylari/ozet?ay=2026-07&sube_id=1&birim_amiri_user_id=4"
+      )
+    ).resolves.toMatchObject({ status: 403 });
+  });
+});

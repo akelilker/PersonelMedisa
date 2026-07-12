@@ -1189,6 +1189,20 @@ type MockAylikBildirimOnay = {
   updated_at: string;
 };
 
+type MockGyBildirimOnay = {
+  id: number;
+  sube_id: number;
+  birim_amiri_user_id: number;
+  ay: string;
+  aylik_bildirim_onayi_id: number;
+  state: "TAMAMLANDI";
+  onaylayan_user_id: number;
+  onaylandi_at: string;
+  aciklama: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 type MockBildirimPageState = {
   items: MockBildirimRecord[];
   nextId: number;
@@ -1196,6 +1210,8 @@ type MockBildirimPageState = {
   nextMutabakatId: number;
   aylikOnaylar: MockAylikBildirimOnay[];
   nextAylikOnayId: number;
+  gyOnaylar: MockGyBildirimOnay[];
+  nextGyOnayId: number;
 };
 
 const bildirimStateByPage = new WeakMap<Page, MockBildirimPageState>();
@@ -1282,7 +1298,9 @@ function getBildirimPageState(page: Page): MockBildirimPageState {
   const created: MockBildirimPageState = {
     items: createInitialBildirimler(),
     nextId: 800,
-    ...createSeededJulyAylikOnayState()
+    ...createSeededJulyAylikOnayState(),
+    gyOnaylar: [],
+    nextGyOnayId: 0
   };
   bildirimStateByPage.set(page, created);
   return created;
@@ -2581,6 +2599,42 @@ let personelBelgeKaydiIdCounter = 903;
     });
 
     return { ayBaslangic, ayBitis, counts, haftalar };
+  }
+
+  function resolveGyBildirimOnayApproval(input: {
+    existingGy?: MockGyBildirimOnay;
+    aylikOnay?: MockAylikBildirimOnay;
+    counts: {
+      eksik_hafta: number;
+      taslak: number;
+      duzeltme_istendi: number;
+      gonderildi: number;
+      mutabakata_alinan: number;
+      toplam_bildirim: number;
+    };
+  }) {
+    if (input.existingGy) {
+      return { onay_verilebilir_mi: false, blok_nedeni: "ZATEN_ONAYLANDI" as const };
+    }
+    if (!input.aylikOnay) {
+      return { onay_verilebilir_mi: false, blok_nedeni: "AYLIK_BILDIRIM_ONAYI_GEREKLI" as const };
+    }
+    if (input.aylikOnay.state !== "TAMAMLANDI") {
+      return { onay_verilebilir_mi: false, blok_nedeni: "AYLIK_BILDIRIM_ONAYI_TAMAMLANMADI" as const };
+    }
+    if (input.counts.eksik_hafta > 0) {
+      return { onay_verilebilir_mi: false, blok_nedeni: "EKSIK_HAFTA_VAR" as const };
+    }
+    if (
+      input.counts.taslak > 0 ||
+      input.counts.duzeltme_istendi > 0 ||
+      input.counts.gonderildi > 0 ||
+      input.counts.mutabakata_alinan < 1 ||
+      input.counts.toplam_bildirim < 1
+    ) {
+      return { onay_verilebilir_mi: false, blok_nedeni: "AYLIK_BILDIRIM_ONAYI_TAMAMLANMADI" as const };
+    }
+    return { onay_verilebilir_mi: true, blok_nedeni: null };
   }
 
   async function denyUnlessRolePermission(route: Route, permission: AppPermission) {
@@ -4001,6 +4055,180 @@ let personelBelgeKaydiIdCounter = 903;
           taslak: 0, duzeltme_istendi: 0, gonderildi: 0
         }
       }));
+      return;
+    }
+
+    if (path === "/api/genel-yonetici-bildirim-onaylari/ozet" && method === "GET") {
+      if (await denyUnlessRolePermission(route, "genel_yonetici_bildirim_onayi.view")) return;
+      const ay = url.searchParams.get("ay") ?? "";
+      if (!resolveAyBounds(ay)) {
+        await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "Ay parametresi YYYY-MM formatinda olmalidir.", "ay"));
+        return;
+      }
+      const subeId = getRequestSubeScope(request, url);
+      if (!subeId) {
+        await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "Genel yonetici bildirim onayi icin aktif sube secilmelidir.", "sube_id"));
+        return;
+      }
+      if (mockUserSubeIds.length > 0 && !mockUserSubeIds.includes(subeId)) {
+        await fulfillJson(route, 403, errorBody("FORBIDDEN", "Secili sube icin yetkiniz yok."));
+        return;
+      }
+      const amirId = Number.parseInt(url.searchParams.get("birim_amiri_user_id") ?? "", 10) || null;
+      if (!amirId) {
+        await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "Birim amiri secimi zorunludur.", "birim_amiri_user_id"));
+        return;
+      }
+      const expectedAmirId = subeId === 1 ? 1 : subeId === 2 ? 4 : null;
+      if (expectedAmirId !== null && amirId !== expectedAmirId) {
+        await fulfillJson(route, 403, errorBody("FORBIDDEN", "Secili birim amiri bu sube icin yetkili degil."));
+        return;
+      }
+      const aylikOnay = bildirimPageState.aylikOnaylar.find(
+        (item) => item.sube_id === subeId && item.birim_amiri_user_id === amirId && item.ay === ay
+      );
+      const existingGy = bildirimPageState.gyOnaylar.find(
+        (item) => item.sube_id === subeId && item.birim_amiri_user_id === amirId && item.ay === ay
+      );
+      const context = buildMockAylikOnayContext(subeId, amirId, ay);
+      const approval = resolveGyBildirimOnayApproval({
+        existingGy,
+        aylikOnay,
+        counts: context?.counts ?? {
+          toplam_bildirim: 0,
+          mutabakata_alinan: 0,
+          eksik_hafta: 0,
+          taslak: 0,
+          duzeltme_istendi: 0,
+          gonderildi: 0
+        }
+      });
+      const bounds = resolveAyBounds(ay);
+      await fulfillJson(route, 200, okBody({
+        ay,
+        ay_baslangic: context?.ayBaslangic ?? bounds?.ay_baslangic,
+        ay_bitis: context?.ayBitis ?? bounds?.ay_bitis,
+        sube_id: subeId,
+        birim_amiri_user_id: amirId,
+        counts: {
+          toplam_bildirim: context?.counts.toplam_bildirim ?? 0,
+          mutabakata_alinan: context?.counts.mutabakata_alinan ?? 0,
+          eksik_hafta: context?.counts.eksik_hafta ?? 0
+        },
+        aylik_bildirim_onayi: aylikOnay
+          ? { id: aylikOnay.id, state: aylikOnay.state, onaylandi_at: aylikOnay.onaylandi_at }
+          : null,
+        genel_yonetici_bildirim_onayi: existingGy
+          ? {
+              id: existingGy.id,
+              state: existingGy.state,
+              onaylayan_user_id: existingGy.onaylayan_user_id,
+              onaylandi_at: existingGy.onaylandi_at,
+              aciklama: existingGy.aciklama
+            }
+          : null,
+        onay_verilebilir_mi: approval.onay_verilebilir_mi,
+        blok_nedeni: approval.blok_nedeni
+      }));
+      return;
+    }
+
+    if (path === "/api/genel-yonetici-bildirim-onaylari" && method === "POST") {
+      if (await denyUnlessRolePermission(route, "genel_yonetici_bildirim_onayi.approve")) return;
+      const payload = request.postDataJSON() as {
+        ay?: string;
+        birim_amiri_user_id?: number;
+        aciklama?: string;
+      };
+      const ay = payload.ay ?? "";
+      if (!resolveAyBounds(ay)) {
+        await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "Ay parametresi YYYY-MM formatinda olmalidir.", "ay"));
+        return;
+      }
+      const subeId = getRequestSubeScope(request, url);
+      if (!subeId) {
+        await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "Genel yonetici bildirim onayi icin aktif sube secilmelidir.", "sube_id"));
+        return;
+      }
+      if (mockUserSubeIds.length > 0 && !mockUserSubeIds.includes(subeId)) {
+        await fulfillJson(route, 403, errorBody("FORBIDDEN", "Secili sube icin yetkiniz yok."));
+        return;
+      }
+      const amirId = Number.parseInt(String(payload.birim_amiri_user_id ?? ""), 10) || null;
+      if (!amirId) {
+        await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "Birim amiri secimi zorunludur.", "birim_amiri_user_id"));
+        return;
+      }
+      const expectedAmirId = subeId === 1 ? 1 : subeId === 2 ? 4 : null;
+      if (expectedAmirId !== null && amirId !== expectedAmirId) {
+        await fulfillJson(route, 403, errorBody("FORBIDDEN", "Secili birim amiri bu sube icin yetkili degil."));
+        return;
+      }
+      const existingGy = bildirimPageState.gyOnaylar.find(
+        (item) => item.sube_id === subeId && item.birim_amiri_user_id === amirId && item.ay === ay
+      );
+      if (existingGy) {
+        await fulfillJson(route, 409, errorBody("GENEL_YONETICI_BILDIRIM_ONAYI_MEVCUT", "Bu ay icin genel yonetici ust onayi zaten mevcut."));
+        return;
+      }
+      const aylikOnay = bildirimPageState.aylikOnaylar.find(
+        (item) => item.sube_id === subeId && item.birim_amiri_user_id === amirId && item.ay === ay
+      );
+      if (!aylikOnay) {
+        await fulfillJson(route, 422, errorBody("AYLIK_BILDIRIM_ONAYI_GEREKLI", "Aylik bildirim onayi bulunamadi."));
+        return;
+      }
+      const context = buildMockAylikOnayContext(subeId, amirId, ay);
+      const approval = resolveGyBildirimOnayApproval({
+        aylikOnay,
+        counts: context?.counts ?? {
+          toplam_bildirim: 0,
+          mutabakata_alinan: 0,
+          eksik_hafta: 0,
+          taslak: 0,
+          duzeltme_istendi: 0,
+          gonderildi: 0
+        }
+      });
+      if (!approval.onay_verilebilir_mi) {
+        const code = approval.blok_nedeni ?? "AYLIK_BILDIRIM_ONAYI_TAMAMLANMADI";
+        const status = code === "GENEL_YONETICI_BILDIRIM_ONAYI_MEVCUT" ? 409 : 422;
+        await fulfillJson(route, status, errorBody(code, "Genel yonetici bildirim onayi olusturulamadi."));
+        return;
+      }
+      const now = new Date().toISOString();
+      const onay: MockGyBildirimOnay = {
+        id: ++bildirimPageState.nextGyOnayId,
+        sube_id: subeId,
+        birim_amiri_user_id: amirId,
+        ay,
+        aylik_bildirim_onayi_id: aylikOnay.id,
+        state: "TAMAMLANDI",
+        onaylayan_user_id: mockUserId,
+        onaylandi_at: now,
+        aciklama: payload.aciklama?.trim() ? payload.aciklama.trim() : null,
+        created_at: now,
+        updated_at: now
+      };
+      bildirimPageState.gyOnaylar.push(onay);
+      await fulfillJson(route, 201, okBody(onay));
+      return;
+    }
+
+    if (path.match(/^\/api\/genel-yonetici-bildirim-onaylari\/\d+$/) && method === "GET") {
+      if (await denyUnlessRolePermission(route, "genel_yonetici_bildirim_onayi.view")) return;
+      const id = Number.parseInt(path.split("/")[3] ?? "0", 10);
+      const onay = bildirimPageState.gyOnaylar.find((item) => item.id === id);
+      if (!onay) {
+        await fulfillJson(route, 404, errorBody("NOT_FOUND", "Genel yonetici bildirim onayi bulunamadi."));
+        return;
+      }
+      const scope = getRequestSubeScope(request, url);
+      if ((mockUserSubeIds.length > 0 && !mockUserSubeIds.includes(onay.sube_id)) || (scope && scope !== onay.sube_id)) {
+        await fulfillJson(route, 403, errorBody("FORBIDDEN", "Bu kayit aktif sube baglaminda goruntulenemiyor."));
+        return;
+      }
+      await fulfillJson(route, 200, okBody(onay));
       return;
     }
 

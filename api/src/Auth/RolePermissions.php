@@ -47,6 +47,8 @@ class RolePermissions
             'aylik_bildirim_onayi.view',
             'genel_yonetici_onayi.view',
             'genel_yonetici_onayi.approve',
+            'genel_yonetici_bildirim_onayi.view',
+            'genel_yonetici_bildirim_onayi.approve',
             'patron_ack.view',
             'sirket_parametreleri.view',
             'sirket_parametreleri.manage',

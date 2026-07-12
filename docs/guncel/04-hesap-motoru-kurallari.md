@@ -125,11 +125,12 @@ Patron ack (`GORULDU` / `NOT_EKLENDI`) bu önkoşul listesinde yer almaz.
 
 ## Uygulama Durumu Notu — Bildirim Zinciri
 
-11.07.2026 itibarıyla günlük bildirim, haftalık bildirim mutabakatı ve aylık bildirim onayı domain'leri kendi operasyon kapsamlarında çalışır.
+11.07.2026 itibarıyla günlük bildirim, haftalık bildirim mutabakatı, aylık bildirim onayı ve Genel Yönetici bildirim üst onayı domain'leri kendi operasyon kapsamlarında çalışır.
 
 - Bu kayıtlar henüz hesap motorunun gerçek backend girdisi değildir.
 - Bir bildirimde görünen “kesinti adayı”, “fazla çalışma adayı” veya benzeri hesap etkisi otomatik olarak kesinleşmez.
-- Bildirim onayının tamamlanmış olması kaydın bordroya esas olduğu anlamına gelmez.
+- Bildirim onayının veya S73 Genel Yönetici üst onayının tamamlanmış olması kaydın bordroya esas olduğu anlamına gelmez.
+- S73 üst onayı puantaj değiştirmez, puantaj mühürlemez, finans adayı veya bordro girdisi oluşturmaz.
 - Bildirim zinciri ile hesap motoru arasındaki köprü ayrı geliştirme fazıdır.
 - Aylık bildirim onayı ile bordro girdisi ve bordro kesinleştirme arasında otomatik bağlantı yoktur.
 

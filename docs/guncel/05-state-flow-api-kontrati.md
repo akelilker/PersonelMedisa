@@ -61,11 +61,11 @@ Günlük Bildirim (BIRIM_AMIRI)
   -> Patron Ack (sembolik, paralel veya sonrası — bloklamaz)
 ```
 
-Bu özet hedef ürün zinciridir. Güncel uygulanmış S70C-S72 bildirim zincirinin owner ve endpoint kontratı aşağıda ayrıca tanımlanmıştır.
+Bu özet hedef ürün zinciridir. Güncel uygulanmış S70C-S73 bildirim zincirinin owner ve endpoint kontratı aşağıda ayrıca tanımlanmıştır.
 
-## Güncel Bildirim State Flow — S70C-S72
+## Güncel Bildirim State Flow — S70C-S73
 
-Bu bölüm 11.07.2026 tarihindeki çalışan kod kontratını kaydeder. Bildirim onay zinciri; puantaj teknik kapanışı, legacy aylık özet ve bordro kesinleştirme domain'lerinden ayrıdır.
+Bu bölüm 12.07.2026 tarihindeki çalışan kod kontratını kaydeder. Bildirim onay zinciri; puantaj teknik kapanışı, legacy aylık özet ve bordro kesinleştirme domain'lerinden ayrıdır.
 
 ### Günlük bildirim
 
@@ -117,10 +117,57 @@ DB sahibi: `aylik_bildirim_onaylari`; approve sahibi: `BIRIM_AMIRI`.
 - Aynı şube, Birim Amiri ve ay için tekrar approve `409` döner.
 - Yönetim rolleri paneli salt okunur görür; yeni S72 approve sahibi değildir.
 
+### Genel Yönetici bildirim üst onayı — S73
+
+DB sahibi: `genel_yonetici_bildirim_onaylari`; approve sahibi: `GENEL_YONETICI`.
+
+Granülarite: her üst onay tek şube, tek Birim Amiri ve tek ay bağlamına aittir. Tüm-şube aggregate üst onayı yoktur.
+
+| İşlem | Endpoint | Permission |
+|---|---|---|
+| Özet | `GET /genel-yonetici-bildirim-onaylari/ozet` | `genel_yonetici_bildirim_onayi.view` |
+| Approve | `POST /genel-yonetici-bildirim-onaylari` | `genel_yonetici_bildirim_onayi.approve` |
+| Detay | `GET /genel-yonetici-bildirim-onaylari/{id}` | `genel_yonetici_bildirim_onayi.view` |
+
+**State:** İlk sürümde yalnız `TAMAMLANDI` vardır. `BEKLIYOR`, `REDDEDILDI`, `DUZELTME_ISTENDI`, reopen ve iptal akışları yoktur.
+
+**Migration:** `api/migrations/008_genel_yonetici_bildirim_onaylari.sql` — tablo `genel_yonetici_bildirim_onaylari`. Temel alanlar: `id`, `sube_id`, `birim_amiri_user_id`, `ay`, `aylik_bildirim_onayi_id`, `state`, `onaylayan_user_id`, `onaylandi_at`, `aciklama`, `created_at`, `updated_at`. Foreign key: `aylik_bildirim_onayi_id` → `aylik_bildirim_onaylari.id`. Unique: `(sube_id, birim_amiri_user_id, ay)`. cPanel deploy migration çalıştırmaz; 008 canlıya manuel uygulanmıştır ve tekrar çalıştırılmamalıdır.
+
+**Önkoşullar (approve):**
+
+- ay geçerli (`YYYY-MM`)
+- şube seçilmiş
+- Birim Amiri seçilmiş
+- Birim Amiri seçilen şubeye bağlı ve `AKTIF`
+- S72 `aylik_bildirim_onaylari` kaydı bulunmalı
+- S72 state `TAMAMLANDI` olmalı
+- `eksik_hafta` 0 olmalı
+- aynı `(sube_id, birim_amiri_user_id, ay)` için daha önce üst onay bulunmamalı
+
+**HTTP davranışları:**
+
+- `403` — permission yok veya Birim Amiri şube kapsamı dışında
+- `409` — duplicate üst onay (`GENEL_YONETICI_BILDIRIM_ONAYI_MEVCUT`)
+- `422` — önkoşul/validasyon ihlali
+
+**Özet `blok_nedeni` kodları:**
+
+| Kod | Anlam |
+|---|---|
+| `AYLIK_BILDIRIM_ONAYI_GEREKLI` | S72 aylık onay kaydı yok |
+| `AYLIK_BILDIRIM_ONAYI_TAMAMLANMADI` | S72 tamamlanmamış veya ay bütünlüğü sağlanmıyor |
+| `EKSIK_HAFTA_VAR` | Ayda eksik haftalık mutabakat var |
+| `ZATEN_ONAYLANDI` | Üst onay zaten mevcut (özet; approve duplicate `409`) |
+
+**Hesap sınırı:** S73 üst onayı yalnız operasyonel audit/onay kaydıdır. Puantaj, puantaj mührü, finans adayı, bordro girdisi, legacy aylık kapanış ve günlük/haftalık/S72 state'lerini otomatik değiştirmez. Bildirim zincirinin hesap motoru ve bordroya bağlanması ayrı gelecek fazdır.
+
+**Legacy ayrımı:** `genel_yonetici_bildirim_onaylari`, legacy `aylik_ozet_satirlari`, `aylik_kapanis_state`, `/yonetim/aylik-ozet/*` ve `genel_yonetici_onayi.*` domain'lerinden bağımsızdır. Legacy aylık kapanış hattı S73 ile değiştirilmemiştir.
+
 ### Domain sınırı
 
 - `aylik_bildirim_onaylari`, legacy `aylik_ozet_satirlari` / `aylik-ozet` domain'i değildir.
-- Legacy aylık özet üzerindeki Genel Yönetici onayı yeni aylık bildirim onayına henüz bağlı değildir.
+- `genel_yonetici_bildirim_onaylari`, legacy `genel_yonetici_onayi.*` ve `/yonetim/aylik-ozet/*` domain'i değildir.
+- Legacy aylık özet üzerindeki Genel Yönetici onayı ile S73 üst onayı otomatik bağlı değildir.
 - Günlük puantaj, haftalık kapanış/snapshot ve puantaj aylık mühürleri ayrı teknik state flow'dur.
 - Bildirim onayının tamamlanması bordro girdisinin veya bordro kesinliğinin oluştuğu anlamına gelmez.
 
@@ -556,7 +603,7 @@ Kararlar:
 
 ### 8.2.1 Tarihsel Başlangıç Kontratı — Haftalık Mutabakat
 
-Bu state seti S70A hedef modelidir. Güncel çalışan S71 kontratı üstteki “Güncel Bildirim State Flow — S70C-S72” bölümündedir; çalışan kaydın state'i `TAMAMLANDI`, approve sahibi `BIRIM_AMIRI` rolüdür.
+Bu state seti S70A hedef modelidir. Güncel çalışan S71 kontratı üstteki “Güncel Bildirim State Flow — S70C-S73” bölümündedir; haftalık kaydın state'i `TAMAMLANDI`, approve sahibi `BIRIM_AMIRI` rolüdür.
 
 | State | Açıklama |
 |-------|----------|

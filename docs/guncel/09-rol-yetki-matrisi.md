@@ -9,7 +9,7 @@ Surum: `V3` (Ürün Reset — S70A)
 Bu dokuman, rol bazli gorunurluk ve aksiyon yetkilerini tek yerde sabitler.
 Ürün reset sonrasi hedef permission matrisidir.
 
-**Onemli:** S70C-S72 bildirim permission'lari 11.07.2026 itibarıyla çalışan kod gerçekliğine göre aşağıda güncellenmiştir. Genel Yönetici, patron, şirket parametreleri ve bordro permission'ları ise farklı legacy/hedef domain'leri de içerir; bir permission adının tanımlı olması ilgili uçtan uca ürün akışının tamamlandığı anlamına gelmez.
+**Onemli:** S70C-S73 bildirim permission'lari 12.07.2026 itibarıyla çalışan kod gerçekliğine göre aşağıda güncellenmiştir. Genel Yönetici, patron, şirket parametreleri ve bordro permission'ları ise farklı legacy/hedef domain'leri de içerir; bir permission adının tanımlı olması ilgili uçtan uca ürün akışının tamamlandığı anlamına gelmez.
 
 Mevcut kod referansi (gecis donemi):
 
@@ -17,7 +17,7 @@ Mevcut kod referansi (gecis donemi):
 
 ## Hedef Ürün Rolleri
 
-Aşağıdaki kısa tanımlar hedef ürün sorumluluklarını anlatır. Güncel S70C-S72 bildirim owner'ları, devamındaki permission matrisinde çalışan kod gerçekliğine göre ayrıca gösterilir.
+Aşağıdaki kısa tanımlar hedef ürün sorumluluklarını anlatır. Güncel S70C-S73 bildirim owner'ları, devamındaki permission matrisinde çalışan kod gerçekliğine göre ayrıca gösterilir.
 
 | Rol | Kisa tanim |
 |-----|------------|
@@ -55,6 +55,24 @@ Aşağıdaki kısa tanımlar hedef ürün sorumluluklarını anlatır. Güncel S
 | `aylik_bildirim_onayi.view` | Aylık bildirim özeti ve onayını görüntüleme |
 | `aylik_bildirim_onayi.approve` | BIRIM_AMIRI aylık bildirim onayı oluşturma |
 
+### Genel Yönetici bildirim üst onayı — S73 güncel
+
+| Permission | Açıklama |
+|---|---|
+| `genel_yonetici_bildirim_onayi.view` | Genel Yönetici bildirim üst onay özeti ve detay görüntüleme |
+| `genel_yonetici_bildirim_onayi.approve` | Genel Yönetici bildirim üst onayı oluşturma |
+
+Bu permission'lar legacy `genel_yonetici_onayi.*` ile aynı domain değildir ve alias değildir. UI ve API aynı permission kontratını kullanır.
+
+### Rol × S73 permission matrisi
+
+| Permission | BIRIM_AMIRI | BOLUM_YONETICISI | GENEL_YONETICI | MUHASEBE |
+|---|---|---|---|---|
+| `genel_yonetici_bildirim_onayi.view` | hayır | hayır | evet | hayır |
+| `genel_yonetici_bildirim_onayi.approve` | hayır | hayır | evet | hayır |
+
+`BIRIM_AMIRI`, `BOLUM_YONETICISI` ve `MUHASEBE` S73 panelini DOM'a eklemez ve S73 API isteği göndermez.
+
 ### Legacy/hedef aylık bölüm ve Genel Yönetici onayı
 
 Bu permission'lar yeni S72 `aylik_bildirim_onayi.*` domain'i değildir. Legacy `aylik-ozet` ve hedef üst onay zincirinde ayrı tutulur.
@@ -72,6 +90,8 @@ Bu permission'lar yeni S72 `aylik_bildirim_onayi.*` domain'i değildir. Legacy `
 |------------|----------|
 | `patron_ack.view` | Patron ozet raporu goruntuleme |
 | `patron_ack.mark_seen` | Gordu / not ekleme |
+
+`patron_ack.*` permission kayıtları bulunabilir; tamamlanmış patron acknowledgment domain/API/UI akışı henüz yoktur. Patron acknowledgment S73 kapsamında değildir.
 
 ### Sirket parametreleri
 
@@ -101,6 +121,7 @@ Bu permission'lar yeni S72 `aylik_bildirim_onayi.*` domain'i değildir. Legacy `
 - `aylik_bildirim_onayi.approve` — evet
 - `aylik_bolum_onayi.*` — hayir
 - `genel_yonetici_onayi.*` — hayir
+- `genel_yonetici_bildirim_onayi.*` — hayir
 - `patron_ack.*` — hayir
 - `sirket_parametreleri.*` — hayir
 - `bordro_on_izleme.view` — hayir
@@ -122,9 +143,11 @@ Ek (mevcut kod — gecis):
 - `haftalik_mutabakat.reopen_request` — permission tanımlı, çalışan S71 reopen akışı yok
 - `aylik_bildirim_onayi.view` — evet (read-only)
 - `aylik_bildirim_onayi.approve` — hayir
+- `genel_yonetici_bildirim_onayi.*` — hayir
 - `aylik_bolum_onayi.view` — evet
 - `aylik_bolum_onayi.approve` — evet (kendi bolumu)
 - `genel_yonetici_onayi.*` — hayir
+- `genel_yonetici_bildirim_onayi.*` — hayir
 - `patron_ack.*` — hayir
 - `sirket_parametreleri.view` — evet
 - `sirket_parametreleri.manage` — hayir
@@ -137,6 +160,8 @@ Ek (mevcut kod — gecis):
 - `haftalik_mutabakat.approve` — hayir
 - `aylik_bildirim_onayi.view` — evet (read-only)
 - `aylik_bildirim_onayi.approve` — hayir
+- `genel_yonetici_bildirim_onayi.view` — evet
+- `genel_yonetici_bildirim_onayi.approve` — evet
 - `genel_yonetici_onayi.view` — evet
 - `genel_yonetici_onayi.approve` — evet
 - `sirket_parametreleri.view` — evet
@@ -160,6 +185,7 @@ Ek (mevcut kod — gecis):
 - `haftalik_mutabakat.approve` — hayir
 - `aylik_bildirim_onayi.view` — evet (read-only)
 - `aylik_bildirim_onayi.approve` — hayir
+- `genel_yonetici_bildirim_onayi.*` — hayir
 - `bordro_on_izleme.view` — evet
 - Finans / bordro rapor `view` — evet
 - Operasyonel onay (`haftalik_mutabakat.approve`, `aylik_bolum_onayi.approve`, `genel_yonetici_onayi.approve`) — hayir
@@ -197,7 +223,7 @@ Asagidaki anahtarlar kodda halen kullanilmaktadir. S70B kod fazinda yeni anahtar
 
 ### Legacy aylık kapanış özeti
 
-`aylik-ozet.*`, `aylik_bolum_onayi.*` ve `genel_yonetici_onayi.*` permission'ları yeni S72 `aylik_bildirim_onayi.*` ile aynı domain değildir ve otomatik bağlı değildir.
+`aylik-ozet.*`, `aylik_bolum_onayi.*`, `genel_yonetici_onayi.*` ve `genel_yonetici_bildirim_onayi.*` permission'ları yeni S72 `aylik_bildirim_onayi.*` ile aynı domain değildir ve otomatik bağlı değildir.
 
 - `aylik-ozet.view`: `GENEL_YONETICI`, `BOLUM_YONETICISI`
 - `aylik-ozet.review`: `BOLUM_YONETICISI` — bolum onayi
@@ -217,7 +243,7 @@ Asagidaki anahtarlar kodda halen kullanilmaktadir. S70B kod fazinda yeni anahtar
 
 ## Rota Korumaları — Güncel ve Hedef Ayrımı
 
-Güncel S71/S72 haftalık ve aylık bildirim panelleri `/bildirimler` sayfasına gömülüdür. Aşağıdaki `/haftalik-mutabakat`, `/aylik-kapanis-ozeti`, patron ve bordro rotaları tarihsel/hedef ürün yüzeyleridir; çalışan S71/S72 endpoint adları değildir.
+Güncel S71/S72/S73 bildirim panelleri `/bildirimler` sayfasına gömülüdür. Panel sırası: haftalık mutabakat, aylık bildirim onayı, Genel Yönetici bildirim üst onayı (yalnız `genel_yonetici_bildirim_onayi.view` sahibinde). Aşağıdaki `/haftalik-mutabakat`, `/aylik-kapanis-ozeti`, patron ve bordro rotaları tarihsel/hedef ürün yüzeyleridir; çalışan S71/S72/S73 endpoint adları değildir.
 
 | Rota | Permission |
 |------|------------|
@@ -235,8 +261,9 @@ Tarihsel hedef notu: `/haftalik-kapanis` rotası `/` yönlendirmesi yapabilir. G
 - Yetkisiz aksiyon butonlari kullaniciya gosterilmez.
 - Yetkisiz route denemelerinde kullanici `yetkisiz` ekranina yonlendirilir.
 - `BIRIM_AMIRI` sade yüzünde günlük bildirim write, haftalık bildirim mutabakatı approve ve aylık bildirim onayı approve sahibidir.
-- `BOLUM_YONETICISI` günlük kayıt girmez; uygun kayıtta düzeltme isteyebilir ve haftalık/aylık bildirim panellerini salt okunur görür.
-- Legacy `aylik-ozet` hattında `GENEL_YONETICI` bölüm onayı tamamlanmadan üst onay veremez; bu guard yeni S72 aylık bildirim onayına henüz bağlı değildir.
+- `BOLUM_YONETICISI` günlük kayıt girmez; uygun kayıtta düzeltme isteyebilir ve haftalık/aylık bildirim panellerini salt okunur görür; S73 panelini görmez.
+- `GENEL_YONETICI` S73 bildirim üst onay panelini görür ve onaylar; legacy `aylik-ozet` hattındaki bölüm onayı guard'ı S72/S73 domain'ine otomatik bağlı değildir.
+- Legacy `aylik-ozet` hattında `GENEL_YONETICI` bölüm onayı tamamlanmadan üst onay veremez; bu guard yeni S72 aylık bildirim onayı ve S73 üst onayına otomatik bağlı değildir.
 - `PATRON` yalnizca gordu/not birakir; bordro butonlari gorunmez.
 - `MUHASEBE` bordro on izleme ve rapor gorur; operasyonel onay butonlari gorunmez.
 - Yetkisiz API denemeleri backend permission kontrolunden gecmelidir.

@@ -200,132 +200,166 @@ Günlük bildirim, süreç ve puantaj verisi çelişir veya mevzuat/şirket para
 
 ### 8.3 Sistem Etkisi
 
-- S70C-S72 bildirim onay zinciri kendi kapsamında tamamlanır.
-- Yeni aylık bildirim onayı henüz Genel Yönetici onayına, puantaj hesap motoruna veya bordro girdisine bağlanmaz.
+- S70C-S73 bildirim onay zinciri kendi kapsamında tamamlanır.
+- S73 Genel Yönetici üst onayı operasyonel audit/onay kaydıdır; puantaj hesap motoruna, bordro girdisine veya legacy aylık kapanışa otomatik bağlanmaz.
 
-## 9. Legacy/Hedef GENEL_YONETICI Bordro Öncesi Onay Senaryosu
+## 9. Genel Yönetici Bildirim Üst Onayı Senaryosu — S73
 
-Bu ve sonraki patron/bordro senaryoları hedef ürün zincirini ve legacy `aylik-ozet` hattını anlatır. Yeni S72 `aylik_bildirim_onaylari` domain'iyle otomatik bağlantı henüz yoktur.
+### 9.1 Başarılı üst onay
 
-### 9.1 Tetikleyici
+1. `GENEL_YONETICI` Bildirimler sayfasını açar.
+2. Tek şube seçer.
+3. Seçilen şubedeki Birim Amirini seçer.
+4. Ay seçer.
+5. Sistem S72 aylık onayını ve haftalık bütünlüğü doğrular.
+6. Genel Yönetici modalı onaylar.
+7. Tek üst onay kaydı `TAMAMLANDI` olarak oluşur.
+8. Panel onay ID, state ve tarihini gösterir.
+9. Onay butonu devre dışı kalır.
+
+### 9.2 Blok senaryoları
+
+- şube seçilmemiş
+- Birim Amiri seçilmemiş
+- seçilen şubede aktif Birim Amiri yok
+- S72 aylık onay kaydı yok (`AYLIK_BILDIRIM_ONAYI_GEREKLI`)
+- S72 tamamlanmamış (`AYLIK_BILDIRIM_ONAYI_TAMAMLANMADI`)
+- eksik hafta var (`EKSIK_HAFTA_VAR`)
+- üst onay zaten mevcut (`ZATEN_ONAYLANDI` / duplicate POST `409`)
+- `genel_yonetici_bildirim_onayi.view` veya `approve` permission yok (`403`)
+
+### 9.3 Kapsam dışı senaryolar
+
+- red
+- düzeltme isteme
+- reopen
+- patron acknowledgment
+- puantaj köprüsü
+- bordro üretimi
+
+## 10. Legacy/Hedef GENEL_YONETICI Bordro Öncesi Onay Senaryosu
+
+Bu ve sonraki patron/bordro senaryoları hedef ürün zincirini ve legacy `aylik-ozet` hattını anlatır. Yeni S72 `aylik_bildirim_onaylari` ve S73 `genel_yonetici_bildirim_onaylari` domain'leriyle otomatik bağlantı yoktur.
+
+### 10.1 Tetikleyici
 
 Tüm bölümler `BOLUM_ONAYLANDI` durumuna geçtikten sonra `GENEL_YONETICI` ay kapanışını değerlendirir.
 
-### 9.2 Akış
+### 10.2 Akış
 
 - Sistem açık manuel inceleme ve eksik şirket parametresi kontrolü yapar.
 - Genel yönetici özet raporu inceler.
 - Onay verildiğinde state `GENEL_YONETICI_ONAYLANDI` olur.
 - Bordro ön izleme üretilebilir hale gelir.
 
-### 9.3 Sistem Etkisi
+### 10.3 Sistem Etkisi
 
 - Nihai bordro üretimi için operasyonel kapı açılır.
 - Patron ack henüz zorunlu değildir ve bordroyu bloklamaz.
 
-## 10. PATRON Gordu / Not Ekledi Senaryosu
+## 11. PATRON Gordu / Not Ekledi Senaryosu
 
-### 10.1 Tetikleyici
+### 11.1 Tetikleyici
 
 `PATRON` aylık genel durum özetini görüntüler.
 
-### 10.2 Akış
+### 11.2 Akış
 
 - Patron özet raporu ve bordro ön izlemeyi salt okunur görür.
 - “Gördüm” işaretler (`GORULDU`) veya not ekler (`NOT_EKLENDI`).
 - Operasyonel düzeltme veya onay vermez.
 
-### 10.3 Sistem Etkisi
+### 11.3 Sistem Etkisi
 
 - Sembolik üst yönetim görünürlüğü sağlanır.
 - Bordro state'i değişmez; üretim bloklanmaz.
 
-## 11. Bordro On Izleme Olusma Senaryosu
+## 12. Bordro On Izleme Olusma Senaryosu
 
-### 11.1 Tetikleyici
+### 12.1 Tetikleyici
 
 `GENEL_YONETICI_ONAYLANDI` state'i sağlandıktan sonra `MUHASEBE` veya `GENEL_YONETICI` bordro ön izlemeyi açar.
 
-### 11.2 Akış
+### 12.2 Akış
 
 - Backend hesap motoru puantaj, süreç, onaylı bildirim ve finans adaylarını birleştirir.
 - Her satır mevzuat / şirket parametresi / manuel inceleme sınıfı taşır.
 - Ceza/kesinti kalemleri otomatik nihai bordroya bağlanmaz; ayrı işaretlenir.
 - Ön izleme raporu ve kontrol listesi üretilir.
 
-### 11.3 Sistem Etkisi
+### 12.3 Sistem Etkisi
 
 - `BORDRO_ON_IZLEME_HAZIR` state'i oluşur.
 - Muhasebe kontrolü yapılır; kesinleştirme ayrı adımdır.
 
-## 12. Parametre Eksikligi Nedeniyle Hesap Kesinlesmeme Senaryosu
+## 13. Parametre Eksikligi Nedeniyle Hesap Kesinlesmeme Senaryosu
 
-### 12.1 Tetikleyici
+### 13.1 Tetikleyici
 
 Hesap motoru zorunlu şirket parametresini bulamaz (ör. hastalık ilk 2 gün firma öder mi varsayılanı tanımsız).
 
-### 12.2 Akış
+### 13.2 Akış
 
 - Motor satırı `MANUEL_INCELEME` veya `PARAMETRE_EKSIK` olarak işaretler.
 - Bordro kesinleştirme engellenir (`409 COMPANY_PARAM_MISSING`).
 - `GENEL_YONETICI` şirket parametrelerini tanımlar veya günceller.
 - Hesap yeniden çalıştırılır.
 
-### 12.3 Sistem Etkisi
+### 13.3 Sistem Etkisi
 
 - Parametresiz kesin bordro üretilmez.
 - Denetlenebilirlik korunur.
 
-## 13. Isten Ayrilma Senaryosu
+## 14. Isten Ayrilma Senaryosu
 
-### 13.1 Tetikleyici
+### 14.1 Tetikleyici
 
 Yetkili kullanıcı personel için `İşten Ayrılma` süreci başlatır.
 
-### 13.2 Akış
+### 14.2 Akış
 
 - Ayrılış tarihi ve gerekli açıklama girilir.
 - Backend süreç kaydını oluşturur.
 - Aynı işlem içinde personel kartının durumu `PASIF` olur.
 - Personel aktif listelerde görünmez, ancak geçmiş ve rapor tarafında erişilebilir kalır.
 
-### 13.3 Sistem Etkisi
+### 14.3 Sistem Etkisi
 
 - Süreç kaydı tarihsel olarak tutulur.
 - Sonraki puantaj, mutabakat ve bordro işlemleri pasif durum dikkate alınarak yürür.
 
-## 14. Gunluk Puantaj Isleme Senaryosu
+## 15. Gunluk Puantaj Isleme Senaryosu
 
-### 14.1 Tetikleyici
+### 15.1 Tetikleyici
 
 Yetkili kullanıcı (`BOLUM_YONETICISI`, `GENEL_YONETICI`, `MUHASEBE`) günlük puantaj ekranını açar veya sistem süreç/bildirim etkileri sonrası günleri yeniden hesaplar.
 
-### 14.2 Akış
+### 15.2 Akış
 
 - Gün bazlı çalışma, yokluk ve onaylı bildirim verileri okunur.
 - Backend günlük süre, mola, fazla çalışma, hafta tatili etkisi gibi hesapları üretir.
 - Şüpheli veya manuel inceleme gereken satırlar işaretlenir.
 - `BIRIM_AMIRI` puantaj güncellemez; yalnızca görüntüleme ve amir kontrol işaretleri kullanabilir.
 
-### 14.3 Sistem Etkisi
+### 15.3 Sistem Etkisi
 
 - Günlük puantaj satırları hesap motoru girdisi olarak davranır.
 - Hatalı veri formül yamasıyla değil, veri kaynağı düzeltilerek çözülür.
 
-## 15. Rapor Alma Senaryosu
+## 16. Rapor Alma Senaryosu
 
-### 15.1 Tetikleyici
+### 16.1 Tetikleyici
 
 Yetkili kullanıcı rapor ekranını filtrelerle çalıştırır.
 
-### 15.2 Akış
+### 16.2 Akış
 
 - Kullanıcı tarih, departman, personel veya durum filtresi seçer.
 - Sistem onaylı veri katmanlarından (mutabakat snapshot, aylık özet, bordro ön izleme) veriyi toplar.
 - Liste, özet veya çıktı görünümü oluşturulur.
 - Rol bazlı yoğunluk farkı uygulanır (`PATRON` özet, `MUHASEBE` detay).
 
-### 15.3 Sistem Etkisi
+### 16.3 Sistem Etkisi
 
 - Rapor ekranı ham form girişini değil, doğrulanmış veri katmanını sunar.
 

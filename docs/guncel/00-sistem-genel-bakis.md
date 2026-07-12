@@ -105,12 +105,14 @@ Sistemde “bildirim” iki ayrı katman olarak düşünülür:
 Günlük bölüm amiri bildirimi
   -> haftalık bildirim mutabakatı
   -> aylık bildirim onayı
+  -> Genel Yönetici bildirim üst onayı
 ```
 
-- Günlük bildirimin, haftalık bildirimin ve aylık bildirim onayının create/read/approve akışları çalışır.
-- Bu zincirin write ve approve sahibi `BIRIM_AMIRI` rolüdür; yönetim rolleri haftalık ve aylık panelleri salt okunur görür.
+- Günlük bildirimin, haftalık bildirimin, aylık bildirim onayının ve Genel Yönetici üst onayının create/read/approve akışları çalışır.
+- Günlük, haftalık ve aylık bildirim write/approve sahibi `BIRIM_AMIRI` rolüdür.
+- Genel Yönetici bildirim üst onayı `GENEL_YONETICI` rolüne aittir; operasyonel audit/onay kaydıdır, bordro öncesi legacy onay değildir.
 - Bildirim onay zinciri henüz puantaj hesap motoruna gerçek backend girdisi olarak bağlı değildir.
-- Legacy aylık özet üzerindeki Genel Yönetici onayı, yeni aylık bildirim onayı domain'ine henüz bağlı değildir.
+- Legacy aylık özet üzerindeki Genel Yönetici onayı ile S73 üst onayı otomatik bağlı değildir.
 - Bordro ön izleme ve bordro kesinleştirme ayrı sonraki ürün fazlarıdır.
 
 Yukarıdaki zincir güncel uygulanmış operasyon zinciridir. Ana operasyon zincirindeki bölüm onayı, Genel Yönetici onayı, patron görünürlüğü ve bordro hedefleri ürünün hedef zincirini anlatmaya devam eder.

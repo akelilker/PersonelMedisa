@@ -8,6 +8,7 @@ use Medisa\Api\Auth\AuthMiddleware;
 use Medisa\Api\Auth\LoginController;
 use Medisa\Api\Controllers\AylikBildirimOnaylariController;
 use Medisa\Api\Controllers\GenelYoneticiBildirimOnaylariController;
+use Medisa\Api\Controllers\BildirimPuantajEtkiAdaylariController;
 use Medisa\Api\Controllers\BildirimlerController;
 use Medisa\Api\Controllers\HaftalikBildirimMutabakatlariController;
 use Medisa\Api\Controllers\EkOdemeKesintiController;
@@ -61,6 +62,18 @@ class Router
         }
         if ($method === 'POST' && $path === '/puantaj/muhurle') {
             PuantajController::muhurleAylik($this->request);
+        }
+        if ($path === '/puantaj/bildirim-etki-adaylari/ozet' && $method === 'GET') {
+            BildirimPuantajEtkiAdaylariController::summary($this->request);
+        }
+        if ($path === '/puantaj/bildirim-etki-adaylari/hazirla' && $method === 'POST') {
+            BildirimPuantajEtkiAdaylariController::generate($this->request);
+        }
+        if ($path === '/puantaj/bildirim-etki-adaylari' && $method === 'GET') {
+            BildirimPuantajEtkiAdaylariController::list($this->request);
+        }
+        if ($method === 'GET' && preg_match('#^/puantaj/bildirim-etki-adaylari/(\d+)$#', $path, $matches)) {
+            BildirimPuantajEtkiAdaylariController::detail($this->request, $matches[1]);
         }
         if ($method === 'POST' && $path === '/yonetim/aylik-ozet/bolum-onay') {
             YonetimController::aylikOzetBolumOnay($this->request);

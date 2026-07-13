@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ApiRequestError, getApiErrorDetail } from "../api/api-client";
 import {
+  applyBildirimPuantajEtkiAday,
   dismissBildirimPuantajEtkiAday,
   fetchBildirimPuantajEtkiAdayDetail,
   fetchBildirimPuantajEtkiAdayList,
@@ -48,6 +49,7 @@ const EMPTY_PAGINATION: PaginationState = {
 type UseBildirimPuantajEtkiAdaylariOptions = {
   enabled: boolean;
   canDismiss: boolean;
+  canApply: boolean;
   canResolveGyViaOnayApi: boolean;
   subeId: number | null;
   birimAmiriUserId: number | null;
@@ -59,6 +61,7 @@ export function useBildirimPuantajEtkiAdaylari(options: UseBildirimPuantajEtkiAd
   const {
     enabled,
     canDismiss,
+    canApply,
     canResolveGyViaOnayApi,
     subeId,
     birimAmiriUserId,
@@ -89,10 +92,14 @@ export function useBildirimPuantajEtkiAdaylari(options: UseBildirimPuantajEtkiAd
   const [dismissFieldError, setDismissFieldError] = useState<string | null>(null);
   const [dismissError, setDismissError] = useState<string | null>(null);
   const [isDismissing, setIsDismissing] = useState(false);
+  const [applyTarget, setApplyTarget] = useState<BildirimPuantajEtkiAdayDetail | null>(null);
+  const [applyError, setApplyError] = useState<string | null>(null);
+  const [isApplying, setIsApplying] = useState(false);
   const listRequestIdRef = useRef(0);
   const ozetRequestIdRef = useRef(0);
   const detailRequestIdRef = useRef(0);
   const dismissingRef = useRef(false);
+  const applyingRef = useRef(false);
 
   const contextReady = Boolean(
     enabled &&
@@ -134,6 +141,13 @@ export function useBildirimPuantajEtkiAdaylari(options: UseBildirimPuantajEtkiAd
     dismissingRef.current = false;
   }, []);
 
+  const closeApplyModal = useCallback(() => {
+    setApplyTarget(null);
+    setApplyError(null);
+    setIsApplying(false);
+    applyingRef.current = false;
+  }, []);
+
   const resetTransientState = useCallback(() => {
     setItems([]);
     setOzet(null);
@@ -152,6 +166,10 @@ export function useBildirimPuantajEtkiAdaylari(options: UseBildirimPuantajEtkiAd
     setDismissError(null);
     setIsDismissing(false);
     dismissingRef.current = false;
+    setApplyTarget(null);
+    setApplyError(null);
+    setIsApplying(false);
+    applyingRef.current = false;
   }, []);
 
   const closeDetail = useCallback(() => {
@@ -357,6 +375,8 @@ export function useBildirimPuantajEtkiAdaylari(options: UseBildirimPuantajEtkiAd
       if (!canDismiss) {
         return;
       }
+      setApplyTarget(null);
+      setApplyError(null);
       setDismissTarget(item);
       setDismissGerekce("");
       setDismissFieldError(null);
@@ -365,8 +385,21 @@ export function useBildirimPuantajEtkiAdaylari(options: UseBildirimPuantajEtkiAd
     [canDismiss]
   );
 
+  const openApplyModal = useCallback(
+    (item: BildirimPuantajEtkiAdayDetail) => {
+      if (!canApply || item.state !== "HAZIR" || isDetailLoading || isApplying) {
+        return;
+      }
+      setDismissTarget(null);
+      setDismissError(null);
+      setApplyTarget(item);
+      setApplyError(null);
+    },
+    [canApply, isApplying, isDetailLoading]
+  );
+
   const dismissAday = useCallback(async () => {
-    if (!canDismiss || !dismissTarget || dismissingRef.current || isDismissing) {
+    if (!canDismiss || !dismissTarget || dismissingRef.current || isDismissing || isApplying) {
       return;
     }
     const trimmed = trimDismissGerekce(dismissGerekce);
@@ -423,6 +456,66 @@ export function useBildirimPuantajEtkiAdaylari(options: UseBildirimPuantajEtkiAd
     closeDismissModal,
     dismissGerekce,
     dismissTarget,
+    isApplying,
+    isDismissing,
+    refreshAll,
+    subeId
+  ]);
+
+  const applyAday = useCallback(async () => {
+    if (!canApply || !applyTarget || applyingRef.current || isApplying || isDismissing) {
+      return;
+    }
+    if (applyTarget.state !== "HAZIR") {
+      return;
+    }
+
+    applyingRef.current = true;
+    setIsApplying(true);
+    setApplyError(null);
+    setSuccessMessage(null);
+    setInfoMessage(null);
+
+    try {
+      const result = await applyBildirimPuantajEtkiAday(
+        applyTarget.id,
+        { expected_state: "HAZIR" },
+        { subeId }
+      );
+      closeApplyModal();
+      if (result.idempotent) {
+        setInfoMessage("Bu aday daha önce uygulanmış.");
+      } else {
+        setSuccessMessage("Puantaj etki adayı günlük puantaja uygulandı.");
+      }
+      await refreshAll();
+    } catch (caught) {
+      const detail = getApiErrorDetail(caught, "Puantaj etki adayı uygulanamadı.");
+      if (detail.code === "STATE_STALE") {
+        closeApplyModal();
+        setInfoMessage("Aday durumu değişmiş. Liste yenilendi.");
+        await refreshAll();
+      } else if (
+        detail.code === "STATE_CONFLICT" ||
+        detail.code === "PERIOD_LOCKED" ||
+        detail.code === "PUANTAJ_OLUSTU" ||
+        detail.code === "APPLY_UNSUPPORTED" ||
+        detail.code === "APPLY_INTEGRITY_CONFLICT"
+      ) {
+        setApplyError(detail.message);
+        await refreshAll();
+      } else {
+        setApplyError(detail.message);
+      }
+    } finally {
+      applyingRef.current = false;
+      setIsApplying(false);
+    }
+  }, [
+    applyTarget,
+    canApply,
+    closeApplyModal,
+    isApplying,
     isDismissing,
     refreshAll,
     subeId
@@ -460,6 +553,9 @@ export function useBildirimPuantajEtkiAdaylari(options: UseBildirimPuantajEtkiAd
     dismissFieldError,
     dismissError,
     isDismissing,
+    applyTarget,
+    applyError,
+    isApplying,
     contextReady,
     refreshList,
     refreshAll,
@@ -467,6 +563,9 @@ export function useBildirimPuantajEtkiAdaylari(options: UseBildirimPuantajEtkiAd
     closeDetail,
     openDismissModal,
     closeDismissModal,
-    dismissAday
+    dismissAday,
+    openApplyModal,
+    closeApplyModal,
+    applyAday
   };
 }

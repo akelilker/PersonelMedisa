@@ -107,6 +107,9 @@ function makeHookState(overrides: Record<string, unknown> = {}) {
     dismissFieldError: null,
     dismissError: null,
     isDismissing: false,
+    applyTarget: null,
+    applyError: null,
+    isApplying: false,
     contextReady: true,
     refreshList: vi.fn(),
     refreshAll: vi.fn(),
@@ -115,6 +118,9 @@ function makeHookState(overrides: Record<string, unknown> = {}) {
     openDismissModal: vi.fn(),
     closeDismissModal: vi.fn(),
     dismissAday: vi.fn(),
+    openApplyModal: vi.fn(),
+    closeApplyModal: vi.fn(),
+    applyAday: vi.fn(),
     ...overrides
   };
 }
@@ -154,7 +160,11 @@ describe("BildirimPuantajEtkiAdaylariSection", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockPermissions(["puantaj.bildirim_etki.view", "puantaj.bildirim_etki.dismiss"]);
+    mockPermissions([
+      "puantaj.bildirim_etki.view",
+      "puantaj.bildirim_etki.dismiss",
+      "puantaj.bildirim_etki.apply"
+    ]);
     mockSession();
     fetchBirimAmiriMock.mockResolvedValue([{ user_id: 1, ad_soyad: "Merkez Birim Amiri", sube_id: 1 }]);
     useHookMock.mockReturnValue(makeHookState());
@@ -191,6 +201,152 @@ describe("BildirimPuantajEtkiAdaylariSection", () => {
     expect(screen.getAllByTestId("puantaj-etki-aday-dismiss-1").length).toBeGreaterThan(0);
     expect(screen.queryByText("Uygula")).toBeNull();
     expect(screen.queryByLabelText("Şube")).toBeNull();
+    expect(useHookMock).toHaveBeenCalledWith(
+      expect.objectContaining({ canDismiss: true, canApply: true, enabled: true })
+    );
+  });
+
+  it("HAZIR detay yukluyken Uygula butonunu gosterir", async () => {
+    useHookMock.mockReturnValue(
+      makeHookState({
+        detailId: 1,
+        detail: {
+          ...listItem,
+          aylik_bildirim_onayi_id: 2,
+          bildirim_alt_tur: null,
+          bildirim_dakika: 15,
+          bildirim_aciklama: "Sabah gecikme",
+          bildirim_created_at: "2026-06-03 08:45:00",
+          bildirim_updated_at: "2026-06-03 08:45:00",
+          conflict_detail: null,
+          resmi_surec_id: null,
+          resmi_surec_turu: null,
+          resmi_surec_alt_tur: null,
+          ucretli_mi_snapshot: null,
+          mevcut_puantaj_id: null,
+          source_snapshot: { ad_soyad: "Ali Demir" },
+          source_hash: "hash",
+          projection_version: "v1",
+          updated_at: "2026-06-10 10:00:00",
+          karar_gerekcesi: null,
+          onceki_puantaj_snapshot: null,
+          sonraki_puantaj_snapshot: null,
+          uygulama_hash: null
+        }
+      })
+    );
+    render(<BildirimPuantajEtkiAdaylariSection />);
+    expect(screen.getByTestId("puantaj-etki-aday-detail-apply")).not.toBeNull();
+    expect(screen.getByTestId("puantaj-etki-aday-detail-dismiss")).not.toBeNull();
+  });
+
+  it("Uygula confirmation modalinda aday ozetini gosterir", async () => {
+    useHookMock.mockReturnValue(
+      makeHookState({
+        applyTarget: {
+          ...listItem,
+          aylik_bildirim_onayi_id: 2,
+          bildirim_alt_tur: null,
+          bildirim_dakika: 15,
+          bildirim_aciklama: "Sabah gecikme",
+          bildirim_created_at: "2026-06-03 08:45:00",
+          bildirim_updated_at: "2026-06-03 08:45:00",
+          conflict_detail: null,
+          resmi_surec_id: null,
+          resmi_surec_turu: null,
+          resmi_surec_alt_tur: null,
+          ucretli_mi_snapshot: null,
+          mevcut_puantaj_id: null,
+          source_snapshot: { ad_soyad: "Ali Demir" },
+          source_hash: "hash",
+          projection_version: "v1",
+          updated_at: "2026-06-10 10:00:00",
+          karar_gerekcesi: null,
+          onceki_puantaj_snapshot: null,
+          sonraki_puantaj_snapshot: null,
+          uygulama_hash: null
+        }
+      })
+    );
+    render(<BildirimPuantajEtkiAdaylariSection />);
+    const modal = screen.getByTestId("puantaj-etki-aday-apply-modal");
+    expect(modal.textContent).toContain("Ali Demir");
+    expect(modal.textContent).toContain("GEC_KALMA");
+    expect(modal.textContent).toContain("GEC_KALMA_DK");
+    expect(modal.textContent).toContain("15 DK");
+    expect(modal.textContent).toContain("Merkez");
+    await waitFor(() => expect(modal.textContent).toContain("Merkez Birim Amiri"));
+    expect(modal.textContent).toContain("üzerine yazılmaz");
+    expect(screen.getByTestId("puantaj-etki-aday-apply-submit")).not.toBeNull();
+  });
+
+  it("INCELEME_GEREKLI detayinda Uygula gostermez", () => {
+    useHookMock.mockReturnValue(
+      makeHookState({
+        detailId: 3,
+        detail: {
+          ...incelemeItem,
+          aylik_bildirim_onayi_id: 2,
+          bildirim_alt_tur: null,
+          bildirim_dakika: null,
+          bildirim_aciklama: "Gelmedi",
+          bildirim_created_at: "2026-06-04 09:00:00",
+          bildirim_updated_at: "2026-06-04 09:00:00",
+          conflict_detail: { message: "x" },
+          resmi_surec_id: null,
+          resmi_surec_turu: null,
+          resmi_surec_alt_tur: null,
+          ucretli_mi_snapshot: null,
+          mevcut_puantaj_id: 55,
+          source_snapshot: null,
+          source_hash: "hash",
+          projection_version: "v1",
+          updated_at: "2026-06-10 10:05:00",
+          karar_gerekcesi: null,
+          onceki_puantaj_snapshot: null,
+          sonraki_puantaj_snapshot: null,
+          uygulama_hash: null
+        }
+      })
+    );
+    render(<BildirimPuantajEtkiAdaylariSection />);
+    expect(screen.queryByTestId("puantaj-etki-aday-detail-apply")).toBeNull();
+    expect(screen.getByTestId("puantaj-etki-aday-detail-dismiss")).not.toBeNull();
+  });
+
+  it("apply permission yoksa detayda Uygula gostermez", () => {
+    mockPermissions(["puantaj.bildirim_etki.view", "puantaj.bildirim_etki.dismiss"]);
+    useHookMock.mockReturnValue(
+      makeHookState({
+        detailId: 1,
+        detail: {
+          ...listItem,
+          aylik_bildirim_onayi_id: 2,
+          bildirim_alt_tur: null,
+          bildirim_dakika: 15,
+          bildirim_aciklama: "Sabah gecikme",
+          bildirim_created_at: "2026-06-03 08:45:00",
+          bildirim_updated_at: "2026-06-03 08:45:00",
+          conflict_detail: null,
+          resmi_surec_id: null,
+          resmi_surec_turu: null,
+          resmi_surec_alt_tur: null,
+          ucretli_mi_snapshot: null,
+          mevcut_puantaj_id: null,
+          source_snapshot: null,
+          source_hash: "hash",
+          projection_version: "v1",
+          updated_at: "2026-06-10 10:00:00",
+          karar_gerekcesi: null,
+          onceki_puantaj_snapshot: null,
+          sonraki_puantaj_snapshot: null,
+          uygulama_hash: null
+        }
+      })
+    );
+    render(<BildirimPuantajEtkiAdaylariSection />);
+    expect(screen.queryByTestId("puantaj-etki-aday-detail-apply")).toBeNull();
+    expect(useHookMock).toHaveBeenCalledWith(expect.objectContaining({ canApply: false }));
   });
 
   it("GENEL_YONETICI tum sube oturumunda yerel sube secimi olmadan request atmaz", async () => {
@@ -206,7 +362,7 @@ describe("BildirimPuantajEtkiAdaylariSection", () => {
     );
     expect(fetchBirimAmiriMock).not.toHaveBeenCalled();
     expect(useHookMock).toHaveBeenCalledWith(
-      expect.objectContaining({ subeId: null, enabled: true, canDismiss: false })
+      expect.objectContaining({ subeId: null, enabled: true, canDismiss: false, canApply: false })
     );
     expect(screen.queryByRole("button", { name: "Yok Say" })).toBeNull();
   });

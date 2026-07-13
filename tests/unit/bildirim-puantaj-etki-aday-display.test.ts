@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  canApplyBildirimPuantajEtkiAday,
   canDismissBildirimPuantajEtkiAday,
   countUnicodeCharacters,
   formatBildirimPuantajEtkiAdayStateLabel,
@@ -32,6 +33,9 @@ describe("bildirim-puantaj-etki-aday display", () => {
     expect(formatConflictDisplay("MEVCUT_PUANTAJ_VAR")).toContain("mevcut puantaj");
     expect(canDismissBildirimPuantajEtkiAday("HAZIR")).toBe(true);
     expect(canDismissBildirimPuantajEtkiAday("UYGULANDI")).toBe(false);
+    expect(canApplyBildirimPuantajEtkiAday("HAZIR")).toBe(true);
+    expect(canApplyBildirimPuantajEtkiAday("INCELEME_GEREKLI")).toBe(false);
+    expect(canApplyBildirimPuantajEtkiAday("UYGULANDI")).toBe(false);
     expect(isTerminalBildirimPuantajEtkiAdayState("YOK_SAYILDI")).toBe(true);
   });
 });

@@ -10,6 +10,7 @@ import { useBildirimPuantajEtkiAdaylari } from "../../../hooks/useBildirimPuanta
 import { useRoleAccess } from "../../../hooks/use-role-access";
 import { useAuth } from "../../../state/auth.store";
 import {
+  canApplyBildirimPuantajEtkiAday,
   canDismissBildirimPuantajEtkiAday,
   countUnicodeCharacters,
   formatBildirimPuantajEtkiAdayStateLabel,
@@ -21,6 +22,24 @@ import {
 } from "../../../lib/bildirim-puantaj-etki-aday/display";
 import type { BildirimPuantajEtkiAdayDetail, BildirimPuantajEtkiAdayListItem } from "../../../types/bildirim-puantaj-etki-aday";
 import type { BirimAmiriSecenegi } from "../../../types/bildirim";
+
+const APPLY_CONFIRM_WARNING =
+  "Bu işlem aday etkisini günlük puantaja uygulayacak ve adayı UYGULANDI durumuna geçirecektir. Mevcut bir puantaj kaydı varsa üzerine yazılmaz.";
+
+function resolvePersonelDisplayName(detail: BildirimPuantajEtkiAdayDetail): string {
+  const snapshot = detail.source_snapshot;
+  if (snapshot && typeof snapshot === "object") {
+    const adSoyad = snapshot.ad_soyad;
+    if (typeof adSoyad === "string" && adSoyad.trim()) {
+      return adSoyad.trim();
+    }
+    const personelAd = snapshot.personel_ad;
+    if (typeof personelAd === "string" && personelAd.trim()) {
+      return personelAd.trim();
+    }
+  }
+  return String(detail.personel_id);
+}
 
 const STATE_FILTER_OPTIONS = [
   { value: "", label: "Tümü" },
@@ -175,6 +194,7 @@ export function BildirimPuantajEtkiAdaylariSection() {
   const { session } = useAuth();
   const canView = hasPermission("puantaj.bildirim_etki.view");
   const canDismiss = hasPermission("puantaj.bildirim_etki.dismiss");
+  const canApply = hasPermission("puantaj.bildirim_etki.apply");
   const canResolveGyViaOnayApi = hasPermission("genel_yonetici_bildirim_onayi.view");
   const activeSubeId = session?.active_sube_id ?? null;
   const subeIds = session?.user.sube_ids ?? [];
@@ -234,16 +254,23 @@ export function BildirimPuantajEtkiAdaylariSection() {
     dismissFieldError,
     dismissError,
     isDismissing,
+    applyTarget,
+    applyError,
+    isApplying,
     contextReady,
     refreshAll,
     openDetail,
     closeDetail,
     openDismissModal,
     closeDismissModal,
-    dismissAday
+    dismissAday,
+    openApplyModal,
+    closeApplyModal,
+    applyAday
   } = useBildirimPuantajEtkiAdaylari({
     enabled: canView,
     canDismiss,
+    canApply,
     canResolveGyViaOnayApi,
     subeId: effectiveSubeId,
     birimAmiriUserId: selectedBirimAmiriUserId
@@ -319,7 +346,33 @@ export function BildirimPuantajEtkiAdaylariSection() {
 
   const gerekceValidationError = validateDismissGerekce(dismissGerekce);
   const gerekceCharCount = countUnicodeCharacters(dismissGerekce);
-  const dismissSubmitDisabled = Boolean(gerekceValidationError) || isDismissing;
+  const dismissSubmitDisabled = Boolean(gerekceValidationError) || isDismissing || isApplying;
+  const applySubmitDisabled = isApplying || isDismissing;
+
+  const applySubeLabel = useMemo(() => {
+    if (!applyTarget) {
+      return "—";
+    }
+    const match = availablePanelSubeler.find((sube) => sube.id === applyTarget.sube_id);
+    return match?.ad ?? String(applyTarget.sube_id);
+  }, [applyTarget, availablePanelSubeler]);
+
+  const applyBirimAmiriLabel = useMemo(() => {
+    if (!applyTarget) {
+      return "—";
+    }
+    const match = birimAmiriSecenekleri.find((option) => option.user_id === applyTarget.birim_amiri_user_id);
+    return match?.ad_soyad ?? String(applyTarget.birim_amiri_user_id);
+  }, [applyTarget, birimAmiriSecenekleri]);
+
+  const detailApplyVisible =
+    canApply &&
+    detail != null &&
+    !isDetailLoading &&
+    !detailError &&
+    canApplyBildirimPuantajEtkiAday(detail.state) &&
+    !isApplying &&
+    !isDismissing;
 
   function handleFilterSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -584,17 +637,34 @@ export function BildirimPuantajEtkiAdaylariSection() {
                   <DetailGroup key={group.title} title={group.title} fields={group.fields} />
                 ))}
                 <div className="form-actions-row">
+                  {detailApplyVisible ? (
+                    <button
+                      type="button"
+                      className="universal-btn-save"
+                      data-testid="puantaj-etki-aday-detail-apply"
+                      disabled={isApplying || isDismissing}
+                      onClick={() => openApplyModal(detail)}
+                    >
+                      Uygula
+                    </button>
+                  ) : null}
                   {canDismiss && canDismissBildirimPuantajEtkiAday(detail.state) ? (
                     <button
                       type="button"
                       className="universal-btn-aux"
                       data-testid="puantaj-etki-aday-detail-dismiss"
+                      disabled={isApplying || isDismissing}
                       onClick={() => openDismissModal(detail)}
                     >
                       Yok Say
                     </button>
                   ) : null}
-                  <button type="button" className="universal-btn-aux" onClick={closeDetail}>
+                  <button
+                    type="button"
+                    className="universal-btn-aux"
+                    onClick={closeDetail}
+                    disabled={isApplying || isDismissing}
+                  >
                     Kapat
                   </button>
                 </div>
@@ -671,7 +741,75 @@ export function BildirimPuantajEtkiAdaylariSection() {
                 type="button"
                 className="universal-btn-aux"
                 onClick={closeDismissModal}
-                disabled={isDismissing}
+                disabled={isDismissing || isApplying}
+              >
+                Vazgeç
+              </button>
+            </div>
+          </div>
+        </AppModal>
+      ) : null}
+
+      {applyTarget ? (
+        <AppModal title="Puantaj Etki Adayını Uygula" onClose={closeApplyModal}>
+          <div data-testid="puantaj-etki-aday-apply-modal">
+            <dl className="puantaj-etki-detail-grid">
+              <div className="puantaj-etki-detail-row">
+                <dt>Personel</dt>
+                <dd>{resolvePersonelDisplayName(applyTarget)}</dd>
+              </div>
+              <div className="puantaj-etki-detail-row">
+                <dt>Tarih</dt>
+                <dd>{applyTarget.tarih}</dd>
+              </div>
+              <div className="puantaj-etki-detail-row">
+                <dt>Bildirim türü</dt>
+                <dd>{applyTarget.bildirim_turu}</dd>
+              </div>
+              <div className="puantaj-etki-detail-row">
+                <dt>Puantaj etki türü</dt>
+                <dd>{applyTarget.etki_turu}</dd>
+              </div>
+              <div className="puantaj-etki-detail-row">
+                <dt>Etki miktarı</dt>
+                <dd>
+                  {applyTarget.etki_miktari != null
+                    ? `${applyTarget.etki_miktari}${applyTarget.etki_birimi ? ` ${applyTarget.etki_birimi}` : ""}`
+                    : "—"}
+                </dd>
+              </div>
+              <div className="puantaj-etki-detail-row">
+                <dt>Şube</dt>
+                <dd>{applySubeLabel}</dd>
+              </div>
+              <div className="puantaj-etki-detail-row">
+                <dt>Birim amiri</dt>
+                <dd>{applyBirimAmiriLabel}</dd>
+              </div>
+              <div className="puantaj-etki-detail-row">
+                <dt>Mevcut durum</dt>
+                <dd>{formatBildirimPuantajEtkiAdayStateLabel(applyTarget.state)}</dd>
+              </div>
+            </dl>
+
+            <p className="puantaj-etki-terminal-uyari">{APPLY_CONFIRM_WARNING}</p>
+            {applyError ? <p className="puantaj-form-error">{applyError}</p> : null}
+
+            <div className="form-actions-row">
+              <button
+                type="button"
+                className="universal-btn-save"
+                data-testid="puantaj-etki-aday-apply-submit"
+                disabled={applySubmitDisabled}
+                onClick={() => void applyAday()}
+              >
+                {isApplying ? "Uygulanıyor..." : "Uygula"}
+              </button>
+              <button
+                type="button"
+                className="universal-btn-aux"
+                onClick={closeApplyModal}
+                disabled={isApplying || isDismissing}
               >
                 Vazgeç
               </button>

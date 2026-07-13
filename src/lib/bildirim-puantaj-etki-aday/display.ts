@@ -119,6 +119,12 @@ export function canDismissBildirimPuantajEtkiAday(
   return state === "HAZIR" || state === "INCELEME_GEREKLI";
 }
 
+export function canApplyBildirimPuantajEtkiAday(
+  state: BildirimPuantajEtkiAdayState | string
+): boolean {
+  return state === "HAZIR";
+}
+
 export function isTerminalBildirimPuantajEtkiAdayState(
   state: BildirimPuantajEtkiAdayState | string
 ): boolean {

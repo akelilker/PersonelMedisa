@@ -216,7 +216,7 @@ Policy sahibi: `BildirimPuantajEtkiDecisionPolicy` — yalnız state/action kara
 
 **Ürün kararları:** Mevcut puantaj otomatik overwrite edilmez. YOK_SAY gerekçesi zorunludur; minimum karakter sayısı henüz kararlaştırılmamıştır (doğrulama endpoint fazında). Migration canlıya otomatik uygulanmaz.
 
-**Sınır:** S74-C1 endpoint'leri karar audit altyapısını taşır. Uygula POST S74-C3-B2 ile gelmiştir; yok-say S74-C2A ile gelmiştir. Frontend Uygula butonu bu fazda yoktur.
+**Sınır:** S74-C1 endpoint'leri karar audit altyapısını taşır. Uygula POST S74-C3-B2 ile gelmiştir; yok-say S74-C2A ile gelmiştir. Frontend Uygula akışı S74-C3-B3 ile panel detayından (confirmation + `/uygula`) bağlanmıştır.
 
 ### S74-C3-B1 — Dakika altyapısı ve projection kilidi
 
@@ -244,11 +244,11 @@ hesap_etkisi = Tam_Yevmiye_Ver
 
 **Apply gün tipi:** Pazar → `Hafta_Tatili_Pazar`; diğer günler → `null`; UBGT tahmini yok.
 
-### Puantaj etki adayı Uygula — S74-C3-B2
+### Puantaj etki adayı Uygula — S74-C3-B2 / S74-C3-B3
 
 Endpoint: `POST /puantaj/bildirim-etki-adaylari/{id}/uygula` — yalnız `puantaj.bildirim_etki.apply` (MUHASEBE).
 
-**Kapsam:** Apply backend paketi. Frontend Uygula butonu yoktur.
+**Kapsam:** S74-C3-B2 apply backend paketi. S74-C3-B3 frontend: detay `HAZIR` + apply permission ile `Uygula` → AppModal confirmation → POST; liste/detay/özet refresh; loading/success/error.
 
 **Request body:**
 
@@ -281,7 +281,7 @@ Endpoint: `POST /puantaj/bildirim-etki-adaylari/{id}/uygula` — yalnız `puanta
 
 Endpoint: `POST /puantaj/bildirim-etki-adaylari/{id}/yok-say` — yalnız `puantaj.bildirim_etki.dismiss` (MUHASEBE).
 
-**Kapsam:** S74-C2A yalnız Yok Say endpointidir. Frontend karar ekranı henüz yoktur.
+**Kapsam:** S74-C2A Yok Say endpointi; S74-C2B frontend Yok Say panel/modal.
 
 **Request body:**
 

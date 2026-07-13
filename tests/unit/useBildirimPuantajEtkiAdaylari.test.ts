@@ -8,6 +8,7 @@ const fetchListMock = vi.hoisted(() => vi.fn());
 const fetchOzetMock = vi.hoisted(() => vi.fn());
 const fetchDetailMock = vi.hoisted(() => vi.fn());
 const dismissMock = vi.hoisted(() => vi.fn());
+const applyMock = vi.hoisted(() => vi.fn());
 
 const fetchGyOzetMock = vi.hoisted(() => vi.fn());
 
@@ -15,7 +16,8 @@ vi.mock("../../src/api/bildirim-puantaj-etki-adaylari.api", () => ({
   fetchBildirimPuantajEtkiAdayList: fetchListMock,
   fetchBildirimPuantajEtkiAdayOzet: fetchOzetMock,
   fetchBildirimPuantajEtkiAdayDetail: fetchDetailMock,
-  dismissBildirimPuantajEtkiAday: dismissMock
+  dismissBildirimPuantajEtkiAday: dismissMock,
+  applyBildirimPuantajEtkiAday: applyMock
 }));
 
 vi.mock("../../src/api/genel-yonetici-bildirim-onaylari.api", () => ({
@@ -47,6 +49,7 @@ const listItem = {
 const ready = {
   enabled: true,
   canDismiss: true,
+  canApply: true,
   canResolveGyViaOnayApi: false,
   subeId: 1,
   birimAmiriUserId: 1,
@@ -101,6 +104,17 @@ describe("useBildirimPuantajEtkiAdaylari", () => {
       karar_zamani: "2026-07-12 15:30:00",
       karar_gerekcesi: "Mevcut puantaj kaydıyla çakıştı.",
       uygulanan_puantaj_id: null,
+      idempotent: false
+    });
+    applyMock.mockReset().mockResolvedValue({
+      id: 1,
+      state: "UYGULANDI",
+      karar_veren_user_id: 5,
+      karar_zamani: "2026-07-14 00:10:00",
+      uygulanan_puantaj_id: 9001,
+      onceki_puantaj_snapshot: null,
+      sonraki_puantaj_snapshot: null,
+      uygulama_hash: "hash-apply",
       idempotent: false
     });
   });
@@ -246,6 +260,205 @@ describe("useBildirimPuantajEtkiAdaylari", () => {
       await result.current.dismissAday();
     });
     expect(result.current.infoMessage).toContain("Liste yenilendi");
+    expect(fetchListMock.mock.calls.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("canApply false iken apply POST olusturmaz", async () => {
+    const hazirDetail = {
+      ...listItem,
+      id: 1,
+      state: "HAZIR" as const,
+      conflict_code: null,
+      aylik_bildirim_onayi_id: 2,
+      bildirim_alt_tur: null,
+      bildirim_dakika: 15,
+      bildirim_aciklama: "Sabah gecikme",
+      bildirim_created_at: "2026-06-03 08:45:00",
+      bildirim_updated_at: "2026-06-03 08:45:00",
+      conflict_detail: null,
+      resmi_surec_id: null,
+      resmi_surec_turu: null,
+      resmi_surec_alt_tur: null,
+      ucretli_mi_snapshot: null,
+      mevcut_puantaj_id: null,
+      source_snapshot: null,
+      source_hash: "hash",
+      projection_version: "v1",
+      updated_at: "2026-06-10 10:00:00",
+      karar_gerekcesi: null,
+      onceki_puantaj_snapshot: null,
+      sonraki_puantaj_snapshot: null,
+      uygulama_hash: null
+    };
+    const { result } = renderHook(() =>
+      useBildirimPuantajEtkiAdaylari({ ...ready, canApply: false })
+    );
+    await waitFor(() => expect(result.current.items).toHaveLength(1));
+    act(() => {
+      result.current.openApplyModal(hazirDetail);
+    });
+    expect(result.current.applyTarget).toBeNull();
+    await act(async () => {
+      await result.current.applyAday();
+    });
+    expect(applyMock).not.toHaveBeenCalled();
+  });
+
+  it("apply basarisinda refetch yapar ve cift submiti engeller", async () => {
+    const hazirDetail = {
+      ...listItem,
+      id: 1,
+      state: "HAZIR" as const,
+      conflict_code: null,
+      aylik_bildirim_onayi_id: 2,
+      bildirim_alt_tur: null,
+      bildirim_dakika: 15,
+      bildirim_aciklama: "Sabah gecikme",
+      bildirim_created_at: "2026-06-03 08:45:00",
+      bildirim_updated_at: "2026-06-03 08:45:00",
+      conflict_detail: null,
+      resmi_surec_id: null,
+      resmi_surec_turu: null,
+      resmi_surec_alt_tur: null,
+      ucretli_mi_snapshot: null,
+      mevcut_puantaj_id: null,
+      source_snapshot: null,
+      source_hash: "hash",
+      projection_version: "v1",
+      updated_at: "2026-06-10 10:00:00",
+      karar_gerekcesi: null,
+      onceki_puantaj_snapshot: null,
+      sonraki_puantaj_snapshot: null,
+      uygulama_hash: null
+    };
+    let resolveApply!: () => void;
+    applyMock.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveApply = () =>
+            resolve({
+              id: 1,
+              state: "UYGULANDI",
+              karar_veren_user_id: 5,
+              karar_zamani: "2026-07-14 00:10:00",
+              uygulanan_puantaj_id: 9001,
+              onceki_puantaj_snapshot: null,
+              sonraki_puantaj_snapshot: null,
+              uygulama_hash: "hash-apply",
+              idempotent: false
+            });
+        })
+    );
+    const { result } = renderHook(() => useBildirimPuantajEtkiAdaylari(ready));
+    await waitFor(() => expect(result.current.items).toHaveLength(1));
+    act(() => {
+      result.current.openApplyModal(hazirDetail);
+    });
+    let first!: Promise<void>;
+    act(() => {
+      first = result.current.applyAday();
+      void result.current.applyAday();
+    });
+    expect(applyMock).toHaveBeenCalledTimes(1);
+    expect(applyMock).toHaveBeenCalledWith(1, { expected_state: "HAZIR" }, { subeId: 1 });
+    await act(async () => {
+      resolveApply();
+      await first;
+    });
+    expect(fetchListMock.mock.calls.length).toBeGreaterThanOrEqual(2);
+    expect(result.current.successMessage).toBe("Puantaj etki adayı günlük puantaja uygulandı.");
+    expect(result.current.applyTarget).toBeNull();
+  });
+
+  it("apply idempotent success bilgi mesaji gosterir", async () => {
+    const hazirDetail = {
+      ...listItem,
+      id: 1,
+      state: "HAZIR" as const,
+      conflict_code: null,
+      aylik_bildirim_onayi_id: 2,
+      bildirim_alt_tur: null,
+      bildirim_dakika: 15,
+      bildirim_aciklama: "Sabah gecikme",
+      bildirim_created_at: "2026-06-03 08:45:00",
+      bildirim_updated_at: "2026-06-03 08:45:00",
+      conflict_detail: null,
+      resmi_surec_id: null,
+      resmi_surec_turu: null,
+      resmi_surec_alt_tur: null,
+      ucretli_mi_snapshot: null,
+      mevcut_puantaj_id: null,
+      source_snapshot: null,
+      source_hash: "hash",
+      projection_version: "v1",
+      updated_at: "2026-06-10 10:00:00",
+      karar_gerekcesi: null,
+      onceki_puantaj_snapshot: null,
+      sonraki_puantaj_snapshot: null,
+      uygulama_hash: null
+    };
+    applyMock.mockResolvedValueOnce({
+      id: 1,
+      state: "UYGULANDI",
+      karar_veren_user_id: 5,
+      karar_zamani: "2026-07-14 00:10:00",
+      uygulanan_puantaj_id: 9001,
+      onceki_puantaj_snapshot: null,
+      sonraki_puantaj_snapshot: null,
+      uygulama_hash: "hash-apply",
+      idempotent: true
+    });
+    const { result } = renderHook(() => useBildirimPuantajEtkiAdaylari(ready));
+    await waitFor(() => expect(result.current.items).toHaveLength(1));
+    act(() => {
+      result.current.openApplyModal(hazirDetail);
+    });
+    await act(async () => {
+      await result.current.applyAday();
+    });
+    expect(result.current.infoMessage).toContain("daha önce uygulanmış");
+  });
+
+  it("apply 409 PERIOD_LOCKED hata ve liste yenileme", async () => {
+    const hazirDetail = {
+      ...listItem,
+      id: 1,
+      state: "HAZIR" as const,
+      conflict_code: null,
+      aylik_bildirim_onayi_id: 2,
+      bildirim_alt_tur: null,
+      bildirim_dakika: 15,
+      bildirim_aciklama: "Sabah gecikme",
+      bildirim_created_at: "2026-06-03 08:45:00",
+      bildirim_updated_at: "2026-06-03 08:45:00",
+      conflict_detail: null,
+      resmi_surec_id: null,
+      resmi_surec_turu: null,
+      resmi_surec_alt_tur: null,
+      ucretli_mi_snapshot: null,
+      mevcut_puantaj_id: null,
+      source_snapshot: null,
+      source_hash: "hash",
+      projection_version: "v1",
+      updated_at: "2026-06-10 10:00:00",
+      karar_gerekcesi: null,
+      onceki_puantaj_snapshot: null,
+      sonraki_puantaj_snapshot: null,
+      uygulama_hash: null
+    };
+    applyMock.mockRejectedValueOnce(
+      new ApiRequestError("locked", 409, { code: "PERIOD_LOCKED", message: "Bu donem muhurlendi." })
+    );
+    const { result } = renderHook(() => useBildirimPuantajEtkiAdaylari(ready));
+    await waitFor(() => expect(result.current.items).toHaveLength(1));
+    act(() => {
+      result.current.openApplyModal(hazirDetail);
+    });
+    await act(async () => {
+      await result.current.applyAday();
+    });
+    expect(result.current.applyError).toBeTruthy();
+    expect(result.current.applyTarget).not.toBeNull();
     expect(fetchListMock.mock.calls.length).toBeGreaterThanOrEqual(2);
   });
 });

@@ -77,6 +77,30 @@ test.describe("S74-C2B puantaj etki adaylari paneli", () => {
     await expect(tableAction(page, "puantaj-etki-aday-state-3")).toContainText("Yok Sayıldı");
   });
 
+  test("MUHASEBE detaydan Uygula akisini tamamlar", async ({ page }) => {
+    await prepareMuhasebePanel(page);
+    await expect(tableAction(page, "puantaj-etki-aday-detail-1")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Uygula", exact: true })).toHaveCount(0);
+
+    await tableAction(page, "puantaj-etki-aday-detail-1").click();
+    await expect(page.getByTestId("puantaj-etki-aday-detail-modal")).toBeVisible();
+    await expect(page.getByTestId("puantaj-etki-aday-detail-apply")).toBeVisible();
+
+    await page.getByTestId("puantaj-etki-aday-detail-apply").click();
+    const applyModal = page.getByTestId("puantaj-etki-aday-apply-modal");
+    await expect(applyModal).toBeVisible();
+    await expect(applyModal).toContainText("Ali Demir");
+    await expect(applyModal).toContainText("GEC_KALMA");
+    await expect(applyModal).toContainText("üzerine yazılmaz");
+
+    await page.getByTestId("puantaj-etki-aday-apply-submit").click();
+    await expect(page.getByTestId("puantaj-etki-aday-success")).toContainText(
+      "Puantaj etki adayı günlük puantaja uygulandı."
+    );
+    await expect(tableAction(page, "puantaj-etki-aday-state-1")).toContainText("Uygulandı");
+    await expect(page.getByTestId("puantaj-etki-aday-detail-apply")).toHaveCount(0);
+  });
+
   test("BIRIM_AMIRI paneli gormez ve birim-amiri-secenekleri requesti olusmaz", async ({ page }) => {
     const requests: string[] = [];
     page.on("request", (request) => {

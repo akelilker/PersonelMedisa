@@ -1970,7 +1970,7 @@ export async function mockApi(page: Page, role: MockUserRole) {
       mevcut_puantaj_id: null,
       source_priority: "BILDIRIM",
       created_by: 1,
-      source_snapshot: { aciklama: "Sabah gecikme bildirimi" },
+      source_snapshot: { aciklama: "Sabah gecikme bildirimi", ad_soyad: "Ali Demir" },
       source_hash: "hash-1",
       projection_version: "v1",
       created_at: "2026-06-10 10:00:00",

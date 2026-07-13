@@ -253,9 +253,9 @@ function ucretsizIzinSurec($id = 9)
 }
 
 $result = S::projectCandidate(baseBildirim('IZINLI'), baseContext(['resmi_surecler' => [ucretsizIzinSurec()]]));
-if ($result['state'] !== 'INCELEME_GEREKLI' || $result['conflict_code'] !== 'UCRETSIZ_IZIN_DESTEKLENMIYOR') {
-    failScenario(17, 'Ucretsiz izin UCRETSIZ_IZIN_DESTEKLENMIYOR bekleniyordu');
+if ($result['state'] !== 'INCELEME_GEREKLI' || $result['etki_turu'] !== 'IZIN_GUNU' || $result['conflict_code'] !== 'UCRETSIZ_IZIN_MANUEL_INCELEME') {
+    failScenario(17, 'Ucretsiz izin UCRETSIZ_IZIN_MANUEL_INCELEME bekleniyordu');
 }
-passScenario(17, 'IZINLI + ucretsiz izin → INCELEME_GEREKLI / UCRETSIZ_IZIN_DESTEKLENMIYOR');
+passScenario(17, 'IZINLI + ucretsiz izin → INCELEME_GEREKLI / IZIN_GUNU / UCRETSIZ_IZIN_MANUEL_INCELEME');
 
 echo "OK\n";

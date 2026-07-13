@@ -432,6 +432,30 @@ describe("puantaj.api", () => {
     expect(result.erken_cikis_dakika).toBe(0);
   });
 
+  it("normalizes legacy Kesinti_Yap hesap_etkisi to Yevmiye_Kes", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        createJsonResponse(
+          {
+            data: {
+              personel_id: 21,
+              tarih: "2026-04-23",
+              hesap_etkisi: "Kesinti_Yap",
+              compliance_uyarilari: []
+            },
+            meta: {},
+            errors: []
+          },
+          200
+        )
+      )
+    );
+
+    const result = await fetchGunlukPuantaj(21, "2026-04-23");
+    expect(result?.hesap_etkisi).toBe("Yevmiye_Kes");
+  });
+
   it("sends POST request to aylik puantaj muhurle endpoint", async () => {
     const fetchMock = vi.fn(async () =>
       createJsonResponse(

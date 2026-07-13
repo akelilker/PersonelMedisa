@@ -413,6 +413,25 @@ S73 tamamlanmış Genel Yönetici bildirim üst onayı sonrası `puantaj.bildiri
 - Yalnız frontend ve mock/E2E katmanı değişir; backend S74-C2A kontratı aynı kalır.
 - `gunluk_puantaj` ve diğer operasyonel tablolar değişmez.
 
+## 15.7 Dakika Altyapısı ve Projection Kilidi — S74-C3-B1
+
+### Tetikleyici
+
+S74-C3 apply (`/uygula`) öncesi altyapı fazı; kullanıcı akışı değişmez.
+
+### Akış
+
+- Geç/erken dakika değerleri `gec_kalma_dakika` / `erken_cikis_dakika` kolonlarında saklanır; hesap motoru açık değeri saat farkından önce kullanır.
+- GÖREVDE bildirimi projection'da `GOREVDE_CALISILMIS_GUN` üretir; apply hedefi `Geldi` + `Gorevde_Calisma` + `Tam_Yevmiye_Ver`.
+- Ücretsiz izin süreci (`ucretli_mi=0`) ile `IZINLI` bildirimi → `INCELEME_GEREKLI` / `IZIN_GUNU` / `UCRETSIZ_IZIN_MANUEL_INCELEME`; otomatik `HAZIR` üretilmez.
+- Aylık mühür snapshot'ı dakika kolonlarını korur.
+
+### Sistem Etkisi
+
+- Migration `012` repoda; canlıda henüz uygulanmadı.
+- `/uygula` endpointi, apply route ve frontend Uygula butonu henüz yoktur.
+- `gunluk_puantaj` mutation bu fazda yalnız mevcut PUT upsert kontratı ile sınırlıdır; aday apply yazımı B2'de gelir.
+
 ## 16. Rapor Alma Senaryosu
 
 ### 16.1 Tetikleyici

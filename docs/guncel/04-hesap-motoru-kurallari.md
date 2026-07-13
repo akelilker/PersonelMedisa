@@ -496,6 +496,15 @@ V1 ürün kuralı:
 - `gercek_eksik_dakika = 0` ise kesinti yoktur
 - geç / erken fark hesaplanamazsa parasal kesinti gösterilmez
 
+**S74-C3-B1 authoritative dakika (apply önkoşulu):**
+
+- `gec_kalma_dakika` ve `erken_cikis_dakika` nullable unsigned integer kolonlarıdır (`gunluk_puantaj`, `puantaj_aylik_muhur_satirlari`).
+- Açık dakika alanı doluysa saat farkı hesabından **önce** authoritative kabul edilir.
+- Saat farkı yalnız açık dakika alanı yoksa fallback olarak kullanılır.
+- Explicit `0` geçerli değerdir; saat fallback'ini tetiklemez.
+- Aylık mühür snapshot'ı her iki dakika kolonunu kayıpsız kopyalar.
+- Migration `012_gunluk_puantaj_gec_erken_dakika.sql` henüz canlıda uygulanmamıştır.
+
 Bu yuvarlama tolerans değildir. Gerçek eksik süre `0` ise kesinti yoktur; `1-30 dk` arası parasal hesapta `30 dk`, `31-60 dk` arası `60 dk`, `61-90 dk` arası `90 dk` kabul edilir.
 
 Sınır örnekleri:

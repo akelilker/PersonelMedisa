@@ -174,7 +174,7 @@ class BildirimPuantajEtkiProjectionService
             if ($matchedSurec !== null && !(bool) ($matchedSurec['ucretli_mi'] ?? false)) {
                 return self::inceleme(
                     $etkiTuru,
-                    'UCRETSIZ_IZIN_DESTEKLENMIYOR',
+                    'UCRETSIZ_IZIN_MANUEL_INCELEME',
                     ['reason' => 'Ucretsiz izin sureci otomatik HAZIR aday uretimine dahil degil']
                 );
             }

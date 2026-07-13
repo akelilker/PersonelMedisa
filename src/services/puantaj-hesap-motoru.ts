@@ -23,6 +23,8 @@ export type HesapGirdisi = {
   hesap_etkisi?: PuantajHesapEtkisi;
   giris_saati?: string;
   cikis_saati?: string;
+  gec_kalma_dakika?: number | null;
+  erken_cikis_dakika?: number | null;
   gercek_mola_dakika?: number;
 };
 
@@ -1745,6 +1747,8 @@ export function gunlukPuantajToGirdi(p: GunlukPuantaj): HesapGirdisi {
     hesap_etkisi: p.hesap_etkisi,
     giris_saati: p.giris_saati,
     cikis_saati: p.cikis_saati,
+    gec_kalma_dakika: p.gec_kalma_dakika,
+    erken_cikis_dakika: p.erken_cikis_dakika,
     gercek_mola_dakika: p.gercek_mola_dakika
   };
 }
@@ -1756,7 +1760,13 @@ export function gunlukPuantajToGirdi(p: GunlukPuantaj): HesapGirdisi {
 export function hesapSonucuToGunlukPuantaj(
   sonuc: HesapSonucu,
   state?: string,
-  options?: { kontrol_durumu?: PuantajAmirKontrolDurumu }
+  options?: {
+    kontrol_durumu?: PuantajAmirKontrolDurumu;
+    gec_kalma_dakika?: number | null;
+    erken_cikis_dakika?: number | null;
+    beklenen_giris_saati?: string;
+    beklenen_cikis_saati?: string;
+  }
 ): GunlukPuantaj {
   return {
     personel_id: sonuc.personel_id,
@@ -1765,8 +1775,12 @@ export function hesapSonucuToGunlukPuantaj(
     hareket_durumu: sonuc.hareket_durumu,
     dayanak: sonuc.dayanak,
     hesap_etkisi: sonuc.hesap_etkisi,
+    beklenen_giris_saati: options?.beklenen_giris_saati,
+    beklenen_cikis_saati: options?.beklenen_cikis_saati,
     giris_saati: sonuc.giris_saati,
     cikis_saati: sonuc.cikis_saati,
+    gec_kalma_dakika: options?.gec_kalma_dakika ?? undefined,
+    erken_cikis_dakika: options?.erken_cikis_dakika ?? undefined,
     gercek_mola_dakika: sonuc.gercek_mola_dakika,
     hesaplanan_mola_dakika: sonuc.hesaplanan_mola_dakika,
     net_calisma_suresi_dakika: sonuc.net_calisma_suresi_dakika,

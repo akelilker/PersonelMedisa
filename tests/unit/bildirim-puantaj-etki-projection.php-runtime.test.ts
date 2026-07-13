@@ -46,7 +46,7 @@ describe("BildirimPuantajEtkiProjectionService PHP runtime", () => {
       "IZIN_SURECI_YOK",
       "RAPOR_SURECI_YOK",
       "DIGER_MANUEL_INCELEME",
-      "UCRETSIZ_IZIN_DESTEKLENMIYOR"
+      "UCRETSIZ_IZIN_MANUEL_INCELEME"
     ]) {
       expect(serviceSource).toContain(`'${code}'`);
     }

@@ -1286,6 +1286,69 @@ describe("hesaplaGecErkenEksikSure", () => {
       tip: "GEC_KALMA"
     });
   });
+
+  it("explicit gec_kalma_dakika 0 saat farki fallback tetiklemez", () => {
+    const sonuc = hesaplaGecErkenEksikSure({
+      hareket_durumu: "Gec_Geldi",
+      gec_kalma_dakika: 0,
+      beklenen_giris_saati: "08:00",
+      giris_saati: "08:30"
+    });
+
+    expect(sonuc.eksik_dakika).toBe(0);
+    expect(sonuc.tip).toBe("GEC_KALMA");
+  });
+
+  it("explicit dakika ile saatler cift hesaplanmaz", () => {
+    const sonuc = hesaplaGecErkenEksikSure({
+      hareket_durumu: "Gec_Geldi",
+      gec_kalma_dakika: 9,
+      beklenen_giris_saati: "08:00",
+      giris_saati: "08:45"
+    });
+
+    expect(sonuc.eksik_dakika).toBe(9);
+  });
+
+  it("acik dakika alani yoksa saat farki fallback calisir", () => {
+    const sonuc = hesaplaGecErkenEksikSure({
+      hareket_durumu: "Gec_Geldi",
+      beklenen_giris_saati: "08:00",
+      giris_saati: "08:12"
+    });
+
+    expect(sonuc.eksik_dakika).toBe(12);
+  });
+
+  it.each([
+    ["negatif", -4],
+    ["NaN", Number.NaN],
+    ["Infinity", Number.POSITIVE_INFINITY]
+  ] as const)("gecersiz gec_kalma_dakika (%s) saat fallback ile normalize edilir", (_label, value) => {
+    const sonuc = hesaplaGecErkenEksikSure({
+      hareket_durumu: "Gec_Geldi",
+      gec_kalma_dakika: value,
+      beklenen_giris_saati: "08:00",
+      giris_saati: "08:10"
+    });
+
+    expect(sonuc.eksik_dakika).toBe(10);
+  });
+
+  it.each([
+    ["negatif", -3],
+    ["NaN", Number.NaN],
+    ["Infinity", Number.POSITIVE_INFINITY]
+  ] as const)("gecersiz erken_cikis_dakika (%s) saat fallback ile normalize edilir", (_label, value) => {
+    const sonuc = hesaplaGecErkenEksikSure({
+      hareket_durumu: "Erken_Cikti",
+      erken_cikis_dakika: value,
+      beklenen_cikis_saati: "17:00",
+      cikis_saati: "16:45"
+    });
+
+    expect(sonuc.eksik_dakika).toBe(15);
+  });
 });
 
 describe("deriveGecErkenKesintiPreview (hook güvenli davranış)", () => {
@@ -1483,7 +1546,8 @@ describe("siniflandirPuantajEksikGunEtkisi", () => {
   it.each([
     ["Ucretli_Izinli"],
     ["Yillik_Izin"],
-    ["Telafi_Calismasi"]
+    ["Telafi_Calismasi"],
+    ["Gorevde_Calisma"]
   ] as const)("Gelmedi + %s SGK prim gününü düşürmez ve ücreti korur", (dayanak) => {
     const o = siniflandirPuantajEksikGunEtkisi({
       hareket_durumu: "Gelmedi",
@@ -2292,6 +2356,39 @@ describe("adaptör fonksiyonları", () => {
     expect(girdi.personel_id).toBe(1);
     expect(girdi.giris_saati).toBe("08:00");
     expect(girdi.gercek_mola_dakika).toBe(60);
+  });
+
+  it("gunlukPuantajToGirdi: acik dakika alanlarini tasir", () => {
+    const puantaj: GunlukPuantaj = {
+      personel_id: 1,
+      tarih: "2026-04-13",
+      gec_kalma_dakika: 14,
+      erken_cikis_dakika: 0,
+      compliance_uyarilari: []
+    };
+
+    const girdi = gunlukPuantajToGirdi(puantaj);
+    expect(girdi.gec_kalma_dakika).toBe(14);
+    expect(girdi.erken_cikis_dakika).toBe(0);
+  });
+
+  it("hesapSonucuToGunlukPuantaj: acik dakika alanlarini koruyabilir", () => {
+    const sonuc = hesapla({
+      personel_id: 1,
+      tarih: "2026-04-13",
+      giris_saati: "08:00",
+      cikis_saati: "17:00"
+    });
+
+    const puantaj = hesapSonucuToGunlukPuantaj(sonuc, "HESAPLANDI", {
+      gec_kalma_dakika: 11,
+      erken_cikis_dakika: null,
+      beklenen_giris_saati: "08:00",
+      beklenen_cikis_saati: "17:00"
+    });
+    expect(puantaj.gec_kalma_dakika).toBe(11);
+    expect(puantaj.erken_cikis_dakika).toBeUndefined();
+    expect(puantaj.beklenen_giris_saati).toBe("08:00");
   });
 
   it("hesapSonucuToGunlukPuantaj: sonucu GunlukPuantaj tipine çevirir", () => {

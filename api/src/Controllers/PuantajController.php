@@ -523,7 +523,31 @@ class PuantajController
     /** @param array<string, mixed> $values */
     private static function updatePuantajRow(PDO $pdo, $id, array $values)
     {
-        $values['id'] = $id;
+        $bindValues = [
+            'id' => $id,
+            'state' => $values['state'],
+            'gun_tipi' => $values['gun_tipi'],
+            'hareket_durumu' => $values['hareket_durumu'],
+            'dayanak' => $values['dayanak'],
+            'durumu_bildirdi_mi' => $values['durumu_bildirdi_mi'],
+            'durum_bildirim_aciklamasi' => $values['durum_bildirim_aciklamasi'],
+            'hesap_etkisi' => $values['hesap_etkisi'],
+            'beklenen_giris_saati' => $values['beklenen_giris_saati'],
+            'beklenen_cikis_saati' => $values['beklenen_cikis_saati'],
+            'giris_saati' => $values['giris_saati'],
+            'cikis_saati' => $values['cikis_saati'],
+            'gec_kalma_dakika' => $values['gec_kalma_dakika'],
+            'erken_cikis_dakika' => $values['erken_cikis_dakika'],
+            'gercek_mola_dakika' => $values['gercek_mola_dakika'],
+            'hesaplanan_mola_dakika' => $values['hesaplanan_mola_dakika'],
+            'net_calisma_suresi_dakika' => $values['net_calisma_suresi_dakika'],
+            'gunluk_brut_sure_dakika' => $values['gunluk_brut_sure_dakika'],
+            'hafta_tatili_hak_kazandi_mi' => $values['hafta_tatili_hak_kazandi_mi'],
+            'kontrol_durumu' => $values['kontrol_durumu'],
+            'kaynak' => $values['kaynak'],
+            'aciklama' => $values['aciklama'],
+            'muhur_id' => $values['muhur_id'],
+        ];
         $stmt = $pdo->prepare(
             'UPDATE gunluk_puantaj
              SET state = :state,
@@ -551,7 +575,7 @@ class PuantajController
                  updated_at = CURRENT_TIMESTAMP
              WHERE id = :id'
         );
-        $stmt->execute($values);
+        $stmt->execute($bindValues);
     }
 
     /** @return array<int, array<string, mixed>> */

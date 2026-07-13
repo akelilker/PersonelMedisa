@@ -217,6 +217,32 @@ Policy sahibi: `BildirimPuantajEtkiDecisionPolicy` — yalnız state/action kara
 
 **Sınır:** S74-C1 endpoint, puantaj mutation, finans/bordro ve canlı migration içermez. Uygula POST'u S74-C2B fazındadır; yok-say S74-C2A ile gelmiştir.
 
+### S74-C3-B1 — Dakika altyapısı ve projection kilidi
+
+**Kapsam:** Geç/erken dakika kolonları, mühür snapshot parity, GÖREVDE canonical dayanak, ücretsiz izin projection kilidi. `/uygula` endpointi, apply route ve frontend Uygula butonu **henüz yoktur**.
+
+**Dakika kolonları:** `gec_kalma_dakika`, `erken_cikis_dakika` — `INT UNSIGNED NULL` (`gunluk_puantaj`, `puantaj_aylik_muhur_satirlari`). Migration `012` dosyası repoda; canlıda henüz uygulanmadı.
+
+**GÖREVDE canonical apply hedefi (B2 öncesi kontrat):**
+
+```text
+hareket_durumu = Geldi
+dayanak = Gorevde_Calisma
+hesap_etkisi = Tam_Yevmiye_Ver
+```
+
+**Ücretsiz izin projection (otomatik apply dışı):**
+
+| Alan | Değer |
+|------|-------|
+| `state` | `INCELEME_GEREKLI` |
+| `etki_turu` | `IZIN_GUNU` |
+| `conflict_code` | `UCRETSIZ_IZIN_MANUEL_INCELEME` |
+
+`HAZIR` üretilmez.
+
+**Apply gün tipi kararı (gelecek B2):** Pazar → `Hafta_Tatili_Pazar`; diğer günler → `null`; UBGT tahmini yok.
+
 ### Puantaj etki adayı Yok Say — S74-C2A
 
 Endpoint: `POST /puantaj/bildirim-etki-adaylari/{id}/yok-say` — yalnız `puantaj.bildirim_etki.dismiss` (MUHASEBE).

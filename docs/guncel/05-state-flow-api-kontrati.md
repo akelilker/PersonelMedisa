@@ -182,10 +182,11 @@ DB sahibi: `onayli_bildirim_puantaj_etki_adaylari`; generate sahibi: `MUHASEBE`.
 | Detay | `GET /puantaj/bildirim-etki-adaylari/{id}` | `puantaj.bildirim_etki.view` |
 | Generate | `POST /puantaj/bildirim-etki-adaylari/hazirla` | `puantaj.bildirim_etki.generate` |
 | Yok Say | `POST /puantaj/bildirim-etki-adaylari/{id}/yok-say` | `puantaj.bildirim_etki.dismiss` |
+| Uygula | `POST /puantaj/bildirim-etki-adaylari/{id}/uygula` | `puantaj.bildirim_etki.apply` |
 
 **Migration:** `009_onayli_bildirim_puantaj_etki_adaylari.sql`, `010_bildirim_puantaj_etki_snapshot_zamanlarini_duzelt.sql`.
 
-**State modeli (generate çıktısı):** `HAZIR`, `INCELEME_GEREKLI`. Terminal hedef state'ler: `UYGULANDI`, `YOK_SAYILDI` (S74-C1 altyapısı; endpoint henüz yok).
+**State modeli (generate çıktısı):** `HAZIR`, `INCELEME_GEREKLI`. Terminal state'ler: `UYGULANDI` (apply), `YOK_SAYILDI` (yok-say).
 
 **Idempotency:** Aynı `(genel_yonetici_bildirim_onayi_id, gunluk_bildirim_id)` için tekrar generate → HTTP `200`, `created_count=0`.
 
@@ -215,15 +216,15 @@ Policy sahibi: `BildirimPuantajEtkiDecisionPolicy` — yalnız state/action kara
 
 **Ürün kararları:** Mevcut puantaj otomatik overwrite edilmez. YOK_SAY gerekçesi zorunludur; minimum karakter sayısı henüz kararlaştırılmamıştır (doğrulama endpoint fazında). Migration canlıya otomatik uygulanmaz.
 
-**Sınır:** S74-C1 endpoint, puantaj mutation, finans/bordro ve canlı migration içermez. Uygula POST'u S74-C2B fazındadır; yok-say S74-C2A ile gelmiştir.
+**Sınır:** S74-C1 endpoint'leri karar audit altyapısını taşır. Uygula POST S74-C3-B2 ile gelmiştir; yok-say S74-C2A ile gelmiştir. Frontend Uygula butonu bu fazda yoktur.
 
 ### S74-C3-B1 — Dakika altyapısı ve projection kilidi
 
-**Kapsam:** Geç/erken dakika kolonları, mühür snapshot parity, GÖREVDE canonical dayanak, ücretsiz izin projection kilidi. `/uygula` endpointi, apply route ve frontend Uygula butonu **henüz yoktur**.
+**Kapsam:** Geç/erken dakika kolonları, mühür snapshot parity, GÖREVDE canonical dayanak, ücretsiz izin projection kilidi.
 
-**Dakika kolonları:** `gec_kalma_dakika`, `erken_cikis_dakika` — `INT UNSIGNED NULL` (`gunluk_puantaj`, `puantaj_aylik_muhur_satirlari`). Migration `012` dosyası repoda; canlıda henüz uygulanmadı.
+**Dakika kolonları:** `gec_kalma_dakika`, `erken_cikis_dakika` — `INT UNSIGNED NULL` (`gunluk_puantaj`, `puantaj_aylik_muhur_satirlari`). Migration `012` canlıda mevcuttur.
 
-**GÖREVDE canonical apply hedefi (B2 öncesi kontrat):**
+**GÖREVDE canonical apply hedefi:**
 
 ```text
 hareket_durumu = Geldi
@@ -241,13 +242,46 @@ hesap_etkisi = Tam_Yevmiye_Ver
 
 `HAZIR` üretilmez.
 
-**Apply gün tipi kararı (gelecek B2):** Pazar → `Hafta_Tatili_Pazar`; diğer günler → `null`; UBGT tahmini yok.
+**Apply gün tipi:** Pazar → `Hafta_Tatili_Pazar`; diğer günler → `null`; UBGT tahmini yok.
+
+### Puantaj etki adayı Uygula — S74-C3-B2
+
+Endpoint: `POST /puantaj/bildirim-etki-adaylari/{id}/uygula` — yalnız `puantaj.bildirim_etki.apply` (MUHASEBE).
+
+**Kapsam:** Apply backend paketi. Frontend Uygula butonu yoktur.
+
+**Request body:**
+
+```json
+{
+  "expected_state": "HAZIR"
+}
+```
+
+| Alan | Kural |
+|------|-------|
+| `expected_state` | Zorunlu; yalnız `HAZIR`; DB state ile aynı olmalı |
+
+**State matrisi:**
+
+| Mevcut state | UYGULA |
+|--------------|:------:|
+| HAZIR | İzinli |
+| INCELEME_GEREKLI | Yasak (409 `STATE_CONFLICT`) |
+| UYGULANDI | Exact bütünlüklü tekrar → idempotent 200; bozuk bütünlük → 409 `APPLY_INTEGRITY_CONFLICT` |
+| YOK_SAYILDI | Yasak (409 `STATE_CONFLICT`) |
+
+**Diğer 409 kodları:** `PERIOD_LOCKED` (mühürlü ay), `PUANTAJ_OLUSTU` (duplicate personel+tarih), `APPLY_UNSUPPORTED` (ücretsiz izin / desteklenmeyen etki), `STATE_STALE`.
+
+**Kurallar:** Yalnız INSERT; mevcut `gunluk_puantaj` UPDATE edilmez. Dakika alanları aday `etki_miktari`'nden yazılır; saatten yeniden hesap yok. Canonical servis: `BildirimPuantajEtkiApplyService`.
+
+**Audit alanları:** `karar_veren_user_id`, `karar_zamani`, `uygulanan_puantaj_id`, `onceki_puantaj_snapshot`, `sonraki_puantaj_snapshot`, `uygulama_hash`.
 
 ### Puantaj etki adayı Yok Say — S74-C2A
 
 Endpoint: `POST /puantaj/bildirim-etki-adaylari/{id}/yok-say` — yalnız `puantaj.bildirim_etki.dismiss` (MUHASEBE).
 
-**Kapsam:** S74-C2A yalnız Yok Say endpointidir. Uygula endpointi henüz yoktur. Frontend karar ekranı henüz yoktur.
+**Kapsam:** S74-C2A yalnız Yok Say endpointidir. Frontend karar ekranı henüz yoktur.
 
 **Request body:**
 

@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  applyBildirimPuantajEtkiAday,
   dismissBildirimPuantajEtkiAday,
   fetchBildirimPuantajEtkiAdayDetail,
   fetchBildirimPuantajEtkiAdayList,
@@ -159,5 +160,39 @@ describe("bildirim-puantaj-etki-adaylari.api", () => {
       gerekce: "Mevcut puantaj kaydıyla çakıştı."
     });
     expect(result.state).toBe("YOK_SAYILDI");
+  });
+
+  it("applies HAZIR aday with expected_state only", async () => {
+    const fetchMock = vi.fn(async () =>
+      createJsonResponse({
+        data: {
+          id: 1,
+          state: "UYGULANDI",
+          karar_veren_user_id: 9,
+          karar_zamani: "2026-07-14 00:10:00",
+          uygulanan_puantaj_id: 9001,
+          onceki_puantaj_snapshot: { schema_version: "S74_APPLY_V1", aday_id: 1, puantaj: null },
+          sonraki_puantaj_snapshot: {
+            schema_version: "S74_APPLY_V1",
+            aday_id: 1,
+            puantaj: { id: 9001 }
+          },
+          uygulama_hash: "abc",
+          idempotent: false
+        },
+        meta: {},
+        errors: []
+      })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await applyBildirimPuantajEtkiAday(1, { expected_state: "HAZIR" });
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain("/api/puantaj/bildirim-etki-adaylari/1/uygula");
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(String(init.body))).toEqual({ expected_state: "HAZIR" });
+    expect(result.state).toBe("UYGULANDI");
+    expect(result.uygulanan_puantaj_id).toBe(9001);
+    expect(result.idempotent).toBe(false);
   });
 });

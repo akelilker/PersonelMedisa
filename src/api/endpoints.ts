@@ -50,7 +50,8 @@ export const endpoints = {
       list: "/puantaj/bildirim-etki-adaylari",
       ozet: "/puantaj/bildirim-etki-adaylari/ozet",
       detail: (id: number | string) => `/puantaj/bildirim-etki-adaylari/${id}`,
-      yokSay: (id: number | string) => `/puantaj/bildirim-etki-adaylari/${id}/yok-say`
+      yokSay: (id: number | string) => `/puantaj/bildirim-etki-adaylari/${id}/yok-say`,
+      uygula: (id: number | string) => `/puantaj/bildirim-etki-adaylari/${id}/uygula`
     }
   },
   haftalikKapanis: {

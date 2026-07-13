@@ -755,3 +755,86 @@ test.describe("S74-C2A puantaj etki adayi yok-say API guards (mock-api)", () => 
     expect(result.status).toBe(403);
   });
 });
+
+const APPLY_BODY = { expected_state: "HAZIR" } as const;
+const UYGULA_ENDPOINT = "/api/puantaj/bildirim-etki-adaylari/1/uygula";
+
+test.describe("S74-C3-B2 puantaj etki adayi uygula API guards (mock-api)", () => {
+  test("unauthenticated apply returns 401", async ({ page }) => {
+    await mockApi(page, "MUHASEBE");
+    await page.goto("/login");
+    const result = await page.evaluate(async () => {
+      const response = await fetch("/api/puantaj/bildirim-etki-adaylari/1/uygula", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ expected_state: "HAZIR" })
+      });
+      return { status: response.status };
+    });
+    expect(result.status).toBe(401);
+  });
+
+  test("MUHASEBE can apply puantaj etki adayi", async ({ page }) => {
+    await loginAs(page, "MUHASEBE");
+    const result = await apiFetchJson(page, UYGULA_ENDPOINT, {
+      method: "POST",
+      body: { ...APPLY_BODY }
+    });
+    expect(result.status).toBe(200);
+    expect(result.data).toMatchObject({
+      id: 1,
+      state: "UYGULANDI",
+      idempotent: false
+    });
+  });
+
+  test("duplicate apply is idempotent", async ({ page }) => {
+    await loginAs(page, "MUHASEBE");
+    await apiFetchJson(page, UYGULA_ENDPOINT, { method: "POST", body: { ...APPLY_BODY } });
+    const second = await apiFetchJson(page, UYGULA_ENDPOINT, {
+      method: "POST",
+      body: { ...APPLY_BODY }
+    });
+    expect(second.status).toBe(200);
+    expect(second.data).toMatchObject({
+      id: 1,
+      state: "UYGULANDI",
+      idempotent: true
+    });
+  });
+
+  test("non-MUHASEBE roles are denied apply", async ({ page }) => {
+    for (const role of ["GENEL_YONETICI", "BOLUM_YONETICISI", "BIRIM_AMIRI"] as const) {
+      await loginAs(page, role);
+      await expect(
+        apiFetch(page, UYGULA_ENDPOINT, {
+          method: "POST",
+          body: { ...APPLY_BODY }
+        })
+      ).resolves.toMatchObject({ status: 403 });
+    }
+  });
+
+  test("cross-sube apply returns 403", async ({ page }) => {
+    await loginAs(page, "MUHASEBE");
+    const result = await page.evaluate(async () => {
+      const storageKey = "medisa_auth_session";
+      const raw = sessionStorage.getItem(storageKey) ?? localStorage.getItem(storageKey);
+      const session = raw ? (JSON.parse(raw) as { token?: string }) : null;
+      const token = session?.token ?? "mock-token";
+
+      const response = await fetch("/api/puantaj/bildirim-etki-adaylari/2/uygula", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+          "X-Active-Sube-Id": "1"
+        },
+        body: JSON.stringify({ expected_state: "HAZIR" })
+      });
+
+      return { status: response.status };
+    });
+    expect(result.status).toBe(403);
+  });
+});

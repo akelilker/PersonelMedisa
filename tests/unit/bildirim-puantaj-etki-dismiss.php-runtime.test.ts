@@ -151,7 +151,11 @@ describe("BildirimPuantajEtkiAdaylariController dismiss source contract (S74-C2A
     expect(controllerSource).not.toContain("UPDATE aylik_ozet_satirlari");
   });
 
-  it("does not implement apply endpoint", () => {
-    expect(controllerSource).not.toMatch(/public static function apply\(/);
+  it("keeps dismiss path free of apply/puantaj insert side effects", () => {
+    const block = dismissBlock();
+    expect(block).not.toContain("BildirimPuantajEtkiApplyService");
+    expect(block).not.toContain("INSERT INTO gunluk_puantaj");
+    expect(block).not.toContain("PERMISSION_APPLY");
+    expect(controllerSource).toMatch(/public static function apply\(/);
   });
 });

@@ -5276,6 +5276,185 @@ let personelBelgeKaydiIdCounter = 903;
       return;
     }
 
+    if (path.match(/^\/api\/puantaj\/bildirim-etki-adaylari\/\d+\/uygula$/) && method === "POST") {
+      const authHeader = request.headers()["authorization"] ?? request.headers()["Authorization"] ?? "";
+      if (!authHeader.startsWith("Bearer ")) {
+        await fulfillJson(route, 401, errorBody("UNAUTHORIZED", "Oturum gerekli."));
+        return;
+      }
+      if (await denyUnlessRolePermission(route, "puantaj.bildirim_etki.apply")) {
+        return;
+      }
+
+      const adayId = Number.parseInt(path.split("/")[4] ?? "", 10);
+      if (!adayId) {
+        await fulfillJson(route, 404, errorBody("NOT_FOUND", "Puantaj etki adayi bulunamadi."));
+        return;
+      }
+
+      const itemIndex = puantajEtkiAdaylari.findIndex((entry) => entry.id === adayId);
+      const item = itemIndex >= 0 ? puantajEtkiAdaylari[itemIndex] : null;
+      if (!item) {
+        await fulfillJson(route, 404, errorBody("NOT_FOUND", "Puantaj etki adayi bulunamadi."));
+        return;
+      }
+
+      const adaySubeId = item.sube_id;
+      const subeScope = getRequestSubeScope(request, url);
+      if (subeScope !== null && subeScope !== adaySubeId) {
+        await fulfillJson(route, 403, errorBody("FORBIDDEN", "Bu kayit aktif sube baglaminda goruntulenemiyor."));
+        return;
+      }
+      if (mockUserSubeIds.length > 0 && !mockUserSubeIds.includes(adaySubeId)) {
+        await fulfillJson(route, 403, errorBody("FORBIDDEN", "Bu kayit aktif sube baglaminda goruntulenemiyor."));
+        return;
+      }
+
+      const payload = request.postDataJSON() as { expected_state?: string };
+      if (payload.expected_state !== "HAZIR") {
+        await fulfillJson(
+          route,
+          422,
+          errorBody("VALIDATION_ERROR", "Beklenen durum HAZIR olmalidir.", "expected_state")
+        );
+        return;
+      }
+
+      if (item.state === "UYGULANDI") {
+        if (
+          item.uygulanan_puantaj_id &&
+          item.uygulama_hash &&
+          item.sonraki_puantaj_snapshot
+        ) {
+          await fulfillJson(
+            route,
+            200,
+            okBody({
+              id: adayId,
+              state: "UYGULANDI",
+              karar_veren_user_id: item.karar_veren_user_id,
+              karar_zamani: item.karar_zamani,
+              uygulanan_puantaj_id: item.uygulanan_puantaj_id,
+              onceki_puantaj_snapshot: item.onceki_puantaj_snapshot,
+              sonraki_puantaj_snapshot: item.sonraki_puantaj_snapshot,
+              uygulama_hash: item.uygulama_hash,
+              idempotent: true
+            })
+          );
+          return;
+        }
+        await fulfillJson(
+          route,
+          409,
+          errorBody("APPLY_INTEGRITY_CONFLICT", "Uygulanmis aday butunlugu bozuk.")
+        );
+        return;
+      }
+
+      if (item.state === "YOK_SAYILDI") {
+        await fulfillJson(
+          route,
+          409,
+          errorBody("STATE_CONFLICT", "Yok sayilmis puantaj etki adayi uygulanamaz.")
+        );
+        return;
+      }
+
+      if (item.state === "INCELEME_GEREKLI") {
+        await fulfillJson(
+          route,
+          409,
+          errorBody("STATE_CONFLICT", "Inceleme gerekli puantaj etki adayi uygulanamaz.")
+        );
+        return;
+      }
+
+      if (item.state !== "HAZIR") {
+        await fulfillJson(route, 409, errorBody("STATE_CONFLICT", "Puantaj etki adayi uygulanamaz."));
+        return;
+      }
+
+      if (payload.expected_state !== item.state) {
+        await fulfillJson(
+          route,
+          409,
+          errorBody("STATE_STALE", "Puantaj etki adayi durumu degismis. Listeyi yenileyip tekrar deneyin.")
+        );
+        return;
+      }
+
+      if (item.conflict_code === "UCRETSIZ_IZIN_MANUEL_INCELEME") {
+        await fulfillJson(
+          route,
+          409,
+          errorBody("APPLY_UNSUPPORTED", "Ucretsiz izin veya manuel inceleme adayi otomatik uygulanamaz.")
+        );
+        return;
+      }
+
+      if (item.tarih === "2026-06-01") {
+        await fulfillJson(
+          route,
+          409,
+          errorBody("PERIOD_LOCKED", "Bu donem muhurlenmis, puantaj kaydi olusturulamaz.")
+        );
+        return;
+      }
+
+      const puantajId = 9000 + adayId;
+      const sonraki = {
+        schema_version: "S74_APPLY_V1",
+        aday_id: adayId,
+        puantaj: {
+          id: puantajId,
+          personel_id: item.personel_id,
+          tarih: item.tarih,
+          state: "ACIK",
+          gun_tipi: null,
+          hareket_durumu: "Gec_Geldi",
+          dayanak: "Yok_Izinsiz",
+          durumu_bildirdi_mi: true,
+          durum_bildirim_aciklamasi: item.bildirim_aciklama,
+          hesap_etkisi: "Tam_Yevmiye_Ver",
+          gec_kalma_dakika: item.etki_miktari,
+          erken_cikis_dakika: null,
+          kontrol_durumu: "BEKLIYOR",
+          kaynak: "BILDIRIM_ETKI_ADAYI",
+          muhur_id: null
+        }
+      };
+      const hash = `mock-apply-hash-${adayId}`;
+      const updated = {
+        ...item,
+        state: "UYGULANDI" as const,
+        karar_veren_user_id: mockUserId,
+        karar_zamani: "2026-07-14 00:10:00",
+        uygulanan_puantaj_id: puantajId,
+        onceki_puantaj_snapshot: { schema_version: "S74_APPLY_V1", aday_id: adayId, puantaj: null },
+        sonraki_puantaj_snapshot: sonraki,
+        uygulama_hash: hash,
+        updated_at: "2026-07-14 00:10:00"
+      };
+      puantajEtkiAdaylari[itemIndex] = updated;
+
+      await fulfillJson(
+        route,
+        200,
+        okBody({
+          id: adayId,
+          state: "UYGULANDI",
+          karar_veren_user_id: mockUserId,
+          karar_zamani: "2026-07-14 00:10:00",
+          uygulanan_puantaj_id: puantajId,
+          onceki_puantaj_snapshot: updated.onceki_puantaj_snapshot,
+          sonraki_puantaj_snapshot: updated.sonraki_puantaj_snapshot,
+          uygulama_hash: hash,
+          idempotent: false
+        })
+      );
+      return;
+    }
+
     if (path === "/api/puantaj/muhurle" && method === "POST") {
       if (await denyUnlessRolePermission(route, "puantaj.muhurle")) {
         return;

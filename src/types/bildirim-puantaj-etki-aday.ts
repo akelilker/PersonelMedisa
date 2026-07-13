@@ -96,3 +96,19 @@ export type BildirimPuantajEtkiAdayDismissResult = {
   uygulanan_puantaj_id: number | null;
   idempotent: boolean;
 };
+
+export type BildirimPuantajEtkiAdayApplyPayload = {
+  expected_state: "HAZIR";
+};
+
+export type BildirimPuantajEtkiAdayApplyResult = {
+  id: number;
+  state: BildirimPuantajEtkiAdayState;
+  karar_veren_user_id: number | null;
+  karar_zamani: string | null;
+  uygulanan_puantaj_id: number | null;
+  onceki_puantaj_snapshot: Record<string, unknown> | null;
+  sonraki_puantaj_snapshot: Record<string, unknown> | null;
+  uygulama_hash: string | null;
+  idempotent: boolean;
+};

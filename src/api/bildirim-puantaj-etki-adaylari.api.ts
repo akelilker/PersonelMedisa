@@ -1,5 +1,7 @@
 import type { ApiResponse, PaginatedResult } from "../types/api";
 import type {
+  BildirimPuantajEtkiAdayApplyPayload,
+  BildirimPuantajEtkiAdayApplyResult,
   BildirimPuantajEtkiAdayDetail,
   BildirimPuantajEtkiAdayDismissPayload,
   BildirimPuantajEtkiAdayDismissResult,
@@ -246,6 +248,31 @@ function normalizeDismissResult(data: unknown): BildirimPuantajEtkiAdayDismissRe
   };
 }
 
+function normalizeApplyResult(data: unknown): BildirimPuantajEtkiAdayApplyResult {
+  if (typeof data !== "object" || data === null) {
+    throw new Error("Puantaj etki adayi uygula yaniti beklenen formatta degil.");
+  }
+  const record = data as Record<string, unknown>;
+  const id = toNumber(record.id);
+  const state = toStringValue(record.state) as BildirimPuantajEtkiAdayState | undefined;
+  if (!id || !state) {
+    throw new Error("Puantaj etki adayi uygula yaniti eksik alan iceriyor.");
+  }
+  return {
+    id,
+    state,
+    karar_veren_user_id:
+      record.karar_veren_user_id === null ? null : toNumber(record.karar_veren_user_id) ?? null,
+    karar_zamani: record.karar_zamani === null ? null : toStringValue(record.karar_zamani) ?? null,
+    uygulanan_puantaj_id:
+      record.uygulanan_puantaj_id === null ? null : toNumber(record.uygulanan_puantaj_id) ?? null,
+    onceki_puantaj_snapshot: normalizeJsonObject(record.onceki_puantaj_snapshot),
+    sonraki_puantaj_snapshot: normalizeJsonObject(record.sonraki_puantaj_snapshot),
+    uygulama_hash: record.uygulama_hash === null ? null : toStringValue(record.uygulama_hash) ?? null,
+    idempotent: Boolean(record.idempotent)
+  };
+}
+
 export async function fetchBildirimPuantajEtkiAdayList(
   params: BildirimPuantajEtkiAdayListParams,
   context?: { subeId?: number | null }
@@ -310,4 +337,21 @@ export async function dismissBildirimPuantajEtkiAday(
     })
   });
   return normalizeDismissResult(response.data);
+}
+
+export async function applyBildirimPuantajEtkiAday(
+  id: number | string,
+  payload: BildirimPuantajEtkiAdayApplyPayload,
+  context?: { subeId?: number | null }
+): Promise<BildirimPuantajEtkiAdayApplyResult> {
+  const path = appendQueryParams(endpoints.puantaj.bildirimEtkiAdaylari.uygula(id), {
+    sube_id: context?.subeId
+  });
+  const response = await apiRequest<ApiResponse<unknown>>(path, {
+    method: "POST",
+    body: JSON.stringify({
+      expected_state: payload.expected_state
+    })
+  });
+  return normalizeApplyResult(response.data);
 }

@@ -238,4 +238,24 @@ if ($regression['state'] !== 'HAZIR') {
 }
 passScenario('R1', 'Regression: bos multi_conflict_code → HAZIR');
 
+// 17. IZINLI + ucretsiz resmi izin sureci
+function ucretsizIzinSurec($id = 9)
+{
+    return [
+        'id' => $id,
+        'surec_turu' => 'IZIN',
+        'alt_tur' => null,
+        'baslangic_tarihi' => '2026-06-15',
+        'bitis_tarihi' => '2026-06-15',
+        'ucretli_mi' => 0,
+        'state' => 'AKTIF',
+    ];
+}
+
+$result = S::projectCandidate(baseBildirim('IZINLI'), baseContext(['resmi_surecler' => [ucretsizIzinSurec()]]));
+if ($result['state'] !== 'INCELEME_GEREKLI' || $result['conflict_code'] !== 'UCRETSIZ_IZIN_DESTEKLENMIYOR') {
+    failScenario(17, 'Ucretsiz izin UCRETSIZ_IZIN_DESTEKLENMIYOR bekleniyordu');
+}
+passScenario(17, 'IZINLI + ucretsiz izin → INCELEME_GEREKLI / UCRETSIZ_IZIN_DESTEKLENMIYOR');
+
 echo "OK\n";

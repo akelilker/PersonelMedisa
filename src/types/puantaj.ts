@@ -25,12 +25,16 @@ export type PuantajDayanak =
   | "Raporlu_Hastalik"
   | "Raporlu_Is_Kazasi"
   | "Yillik_Izin"
-  | "Telafi_Calismasi";
+  | "Telafi_Calismasi"
+  | "Gorevde_Calisma";
 
 export type PuantajHesapEtkisi =
-  | "Kesinti_Yap"
   | "Tam_Yevmiye_Ver"
-  | "Mesai_Yaz";
+  | "Yevmiye_Kes"
+  | "Ucretli_Izin"
+  | "Raporlu"
+  | "Mesai_Yaz"
+  | "Telafi";
 
 /** Birim amirinin günlük kayda baktığına dair görünürlük (zorunlu onay kapısı değil). */
 export type PuantajAmirKontrolDurumu = "BEKLIYOR" | "AMIR_KONTROL_ETTI";
@@ -48,6 +52,8 @@ export type GunlukPuantaj = {
   beklenen_cikis_saati?: string;
   giris_saati?: string;
   cikis_saati?: string;
+  gec_kalma_dakika?: number;
+  erken_cikis_dakika?: number;
   gercek_mola_dakika?: number;
   hesaplanan_mola_dakika?: number;
   net_calisma_suresi_dakika?: number;
@@ -68,6 +74,8 @@ export type UpsertGunlukPuantajPayload = {
   beklenen_cikis_saati?: string;
   giris_saati?: string;
   cikis_saati?: string;
+  gec_kalma_dakika?: number;
+  erken_cikis_dakika?: number;
   gercek_mola_dakika?: number;
   kontrol_durumu?: PuantajAmirKontrolDurumu;
 };

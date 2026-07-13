@@ -1890,7 +1890,7 @@ export async function mockApi(page: Page, role: MockUserRole) {
       gun_tipi: "Normal_Is_Gunu",
       hareket_durumu: "Gelmedi",
       dayanak: "Yok_Izinsiz",
-      hesap_etkisi: "Kesinti_Yap",
+      hesap_etkisi: "Yevmiye_Kes",
       hafta_tatili_hak_kazandi_mi: false,
       state: "HESAPLANDI",
       compliance_uyarilari: []

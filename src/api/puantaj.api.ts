@@ -33,13 +33,18 @@ const PUANTAJ_DAYANAK_MAP: Record<string, PuantajDayanak> = {
   RAPORLU_HASTALIK: "Raporlu_Hastalik",
   RAPORLU_IS_KAZASI: "Raporlu_Is_Kazasi",
   YILLIK_IZIN: "Yillik_Izin",
-  TELAFI_CALISMASI: "Telafi_Calismasi"
+  TELAFI_CALISMASI: "Telafi_Calismasi",
+  GOREVDE_CALISMA: "Gorevde_Calisma"
 };
 
 const PUANTAJ_HESAP_ETKISI_MAP: Record<string, PuantajHesapEtkisi> = {
-  KESINTI_YAP: "Kesinti_Yap",
+  KESINTI_YAP: "Yevmiye_Kes",
+  YEVMIYE_KES: "Yevmiye_Kes",
   TAM_YEVMIYE_VER: "Tam_Yevmiye_Ver",
-  MESAI_YAZ: "Mesai_Yaz"
+  UCRETLI_IZIN: "Ucretli_Izin",
+  RAPORLU: "Raporlu",
+  MESAI_YAZ: "Mesai_Yaz",
+  TELAFI: "Telafi"
 };
 
 const PUANTAJ_KONTROL_DURUMU_MAP: Record<string, PuantajAmirKontrolDurumu> = {
@@ -364,6 +369,12 @@ function normalizeGunlukPuantaj(
     beklenen_cikis_saati: beklenenCikisSaati,
     giris_saati: girisSaati,
     cikis_saati: cikisSaati,
+    gec_kalma_dakika: pickNumber(record, ["gec_kalma_dakika", "gecKalmaDakika", "late_minutes"]),
+    erken_cikis_dakika: pickNumber(record, [
+      "erken_cikis_dakika",
+      "erkenCikisDakika",
+      "early_leave_minutes"
+    ]),
     gercek_mola_dakika: pickNumber(record, ["gercek_mola_dakika", "gercek_mola", "break_minutes"]),
     hesaplanan_mola_dakika: pickNumber(record, [
       "hesaplanan_mola_dakika",

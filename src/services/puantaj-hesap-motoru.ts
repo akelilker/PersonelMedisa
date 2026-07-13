@@ -347,6 +347,8 @@ export type GecErkenEksikSureGirdisi = {
   cikis_saati?: string;
   beklenen_giris_saati?: string;
   beklenen_cikis_saati?: string;
+  gec_kalma_dakika?: number | null;
+  erken_cikis_dakika?: number | null;
 };
 
 export type GecErkenEksikSureSonucu = {
@@ -369,8 +371,21 @@ function hesaplaKesintiyeEsasDakika(gercekEksikDakika: number): number {
   return Math.ceil(dk / 30) * 30;
 }
 
+function readAuthoritativeDakika(value: number | null | undefined): number | undefined {
+  if (value === null || value === undefined) {
+    return undefined;
+  }
+
+  if (!Number.isFinite(value) || value < 0) {
+    return undefined;
+  }
+
+  return Math.floor(value);
+}
+
 /**
  * Geç kalma / erken çıkma için beklenen ve gerçek saatlerden güvenli eksik süre üretir.
+ * Açık dakika alanları (gec_kalma_dakika / erken_cikis_dakika) varsa saat hesabından önce authoritative kabul edilir.
  * Hesap yapılamayan durumlarda throw etmez; neden kodu ile 0 dakika döner.
  */
 export function hesaplaGecErkenEksikSure(
@@ -385,6 +400,15 @@ export function hesaplaGecErkenEksikSure(
   }
 
   if (girdi.hareket_durumu === "Gec_Geldi") {
+    const authoritativeDakika = readAuthoritativeDakika(girdi.gec_kalma_dakika);
+    if (authoritativeDakika !== undefined) {
+      return {
+        hesaplanabilir_mi: true,
+        eksik_dakika: authoritativeDakika,
+        tip: "GEC_KALMA"
+      };
+    }
+
     if (!girdi.beklenen_giris_saati?.trim()) {
       return {
         hesaplanabilir_mi: false,
@@ -414,6 +438,15 @@ export function hesaplaGecErkenEksikSure(
       hesaplanabilir_mi: true,
       eksik_dakika: Math.max(gercek - beklenen - GEC_ERKEN_TOLERANS_DAKIKA, 0),
       tip: "GEC_KALMA"
+    };
+  }
+
+  const authoritativeDakika = readAuthoritativeDakika(girdi.erken_cikis_dakika);
+  if (authoritativeDakika !== undefined) {
+    return {
+      hesaplanabilir_mi: true,
+      eksik_dakika: authoritativeDakika,
+      tip: "ERKEN_CIKMA"
     };
   }
 
@@ -670,7 +703,7 @@ export function siniflandirPuantajEksikGunEtkisi(
     };
   }
 
-  if (dayanak === "Ucretli_Izinli" || dayanak === "Yillik_Izin" || dayanak === "Telafi_Calismasi") {
+  if (dayanak === "Ucretli_Izinli" || dayanak === "Yillik_Izin" || dayanak === "Telafi_Calismasi" || dayanak === "Gorevde_Calisma") {
     return {
       eksik_gun_adayi_mi: false,
       eksik_gun_sayisi: 0,
@@ -1287,7 +1320,7 @@ export function deriveHesapEtkisi(
   if (explicit) return explicit;
 
   if (hareketDurumu === "Gelmedi" && dayanak === "Yok_Izinsiz") {
-    return "Kesinti_Yap";
+    return "Yevmiye_Kes";
   }
 
   if (

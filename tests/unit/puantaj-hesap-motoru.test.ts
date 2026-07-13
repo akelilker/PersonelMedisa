@@ -235,8 +235,8 @@ describe("deriveDayanak", () => {
 // =========================================================================
 
 describe("deriveHesapEtkisi", () => {
-  it("Gelmedi + Yok_Izinsiz → Kesinti_Yap", () => {
-    expect(deriveHesapEtkisi("Normal_Is_Gunu", "Gelmedi", "Yok_Izinsiz")).toBe("Kesinti_Yap");
+  it("Gelmedi + Yok_Izinsiz → Yevmiye_Kes", () => {
+    expect(deriveHesapEtkisi("Normal_Is_Gunu", "Gelmedi", "Yok_Izinsiz")).toBe("Yevmiye_Kes");
   });
 
   it("Pazar + giriş var → Mesai_Yaz", () => {
@@ -277,6 +277,10 @@ describe("deriveHesapEtkisi", () => {
 
   it("Geldi → Tam_Yevmiye_Ver", () => {
     expect(deriveHesapEtkisi("Normal_Is_Gunu", "Geldi")).toBe("Tam_Yevmiye_Ver");
+  });
+
+  it("Gorevde_Calisma + Geldi → Tam_Yevmiye_Ver", () => {
+    expect(deriveHesapEtkisi("Normal_Is_Gunu", "Geldi", "Gorevde_Calisma")).toBe("Tam_Yevmiye_Ver");
   });
 });
 
@@ -638,7 +642,7 @@ describe("hesapla – entegre senaryolar", () => {
       dayanak: "Yok_Izinsiz"
     });
 
-    expect(sonuc.hesap_etkisi).toBe("Kesinti_Yap");
+    expect(sonuc.hesap_etkisi).toBe("Yevmiye_Kes");
     expect(sonuc.hafta_tatili_hak_kazandi_mi).toBe(false);
     expect(sonuc.gunluk_brut_sure_dakika).toBe(0);
     expect(sonuc.net_calisma_suresi_dakika).toBe(0);
@@ -842,7 +846,7 @@ describe("hesapla – entegre senaryolar", () => {
 
     expect(sonuc.hareket_durumu).toBe("Gelmedi");
     expect(sonuc.dayanak).toBe("Yok_Izinsiz");
-    expect(sonuc.hesap_etkisi).toBe("Kesinti_Yap");
+    expect(sonuc.hesap_etkisi).toBe("Yevmiye_Kes");
     expect(sonuc.hafta_tatili_hak_kazandi_mi).toBe(false);
   });
 });
@@ -1239,6 +1243,49 @@ describe("hesaplaGecErkenEksikSure", () => {
     expect(sonuc.hesaplanabilir_mi).toBe(true);
     expect(sonuc.eksik_dakika).toBe(15);
   });
+
+  it("gec_kalma_dakika alani saat hesabindan once authoritative kabul edilir", () => {
+    const sonuc = hesaplaGecErkenEksikSure({
+      hareket_durumu: "Gec_Geldi",
+      gec_kalma_dakika: 22,
+      beklenen_giris_saati: "08:00",
+      giris_saati: "08:05"
+    });
+
+    expect(sonuc).toEqual({
+      hesaplanabilir_mi: true,
+      eksik_dakika: 22,
+      tip: "GEC_KALMA"
+    });
+  });
+
+  it("erken_cikis_dakika alani saat hesabindan once authoritative kabul edilir", () => {
+    const sonuc = hesaplaGecErkenEksikSure({
+      hareket_durumu: "Erken_Cikti",
+      erken_cikis_dakika: 11,
+      beklenen_cikis_saati: "17:00",
+      cikis_saati: "16:50"
+    });
+
+    expect(sonuc).toEqual({
+      hesaplanabilir_mi: true,
+      eksik_dakika: 11,
+      tip: "ERKEN_CIKMA"
+    });
+  });
+
+  it("gec_kalma_dakika 0 ise beklenen saat olmadan hesaplanabilir", () => {
+    const sonuc = hesaplaGecErkenEksikSure({
+      hareket_durumu: "Gec_Geldi",
+      gec_kalma_dakika: 0
+    });
+
+    expect(sonuc).toEqual({
+      hesaplanabilir_mi: true,
+      eksik_dakika: 0,
+      tip: "GEC_KALMA"
+    });
+  });
 });
 
 describe("deriveGecErkenKesintiPreview (hook güvenli davranış)", () => {
@@ -1265,6 +1312,17 @@ describe("deriveGecErkenKesintiPreview (hook güvenli davranış)", () => {
     expect(out.gecErkenKesintiNotu).toBe(
       "Geç kalma veya erken çıkma kesintisi için beklenen mesai saati bulunmadığından saatlik kesinti ön izlemesi gösterilmiyor."
     );
+  });
+
+  it("gec_kalma_dakika doluysa beklenen saat olmadan kesinti özeti üretir", () => {
+    const p = basePuantaj({
+      hareket_durumu: "Gec_Geldi",
+      gec_kalma_dakika: 30
+    });
+    const out = deriveGecErkenKesintiPreview(p, maas);
+    expect(out.gecErkenKesintiHesaplanamadiMi).toBe(false);
+    expect(out.gecErkenKesintiOzeti?.gercek_eksik_dakika).toBe(30);
+    expect(out.gecErkenKesintiTutari).toBeGreaterThan(0);
   });
 
   it("beklenen_cikis_saati yoksa parasal kesinti özeti üretmez, not verir", () => {

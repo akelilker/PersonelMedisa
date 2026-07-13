@@ -49,7 +49,8 @@ import type {
   GunlukPuantaj,
   PuantajDayanak,
   PuantajGunTipi,
-  PuantajHareketDurumu
+  PuantajHareketDurumu,
+  PuantajHesapEtkisi
 } from "../types/puantaj";
 
 type ActiveQuery = {
@@ -293,7 +294,9 @@ export function deriveGecErkenKesintiPreview(
       giris_saati: puantaj.giris_saati,
       cikis_saati: puantaj.cikis_saati,
       beklenen_giris_saati: puantaj.beklenen_giris_saati,
-      beklenen_cikis_saati: puantaj.beklenen_cikis_saati
+      beklenen_cikis_saati: puantaj.beklenen_cikis_saati,
+      gec_kalma_dakika: puantaj.gec_kalma_dakika,
+      erken_cikis_dakika: puantaj.erken_cikis_dakika
     });
 
     if (eksikSureSonucu.hesaplanabilir_mi) {
@@ -360,14 +363,18 @@ const DAYANAK_LABELS: Record<PuantajDayanak, string> = {
   Raporlu_Hastalik: "Raporlu Hastalık",
   Raporlu_Is_Kazasi: "Raporlu İş Kazası",
   Yillik_Izin: "Yıllık İzin",
-  Telafi_Calismasi: "Telafi Çalışması"
+  Telafi_Calismasi: "Telafi Çalışması",
+  Gorevde_Calisma: "Görevde Çalışma"
 };
 
-const HESAP_ETKISI_LABELS = {
-  Kesinti_Yap: "Kesinti Yap",
+const HESAP_ETKISI_LABELS: Record<PuantajHesapEtkisi, string> = {
   Tam_Yevmiye_Ver: "Tam Yevmiye Ver",
-  Mesai_Yaz: "Mesai Yaz"
-} as const;
+  Yevmiye_Kes: "Yevmiye Kes",
+  Ucretli_Izin: "Ücretli İzin",
+  Raporlu: "Raporlu",
+  Mesai_Yaz: "Mesai Yaz",
+  Telafi: "Telafi"
+};
 
 const KONTROL_DURUMU_LABELS = {
   BEKLIYOR: "Bekliyor",

@@ -28,6 +28,7 @@ class PuantajController
         'Raporlu_Is_Kazasi',
         'Yillik_Izin',
         'Telafi_Calismasi',
+        'Gorevde_Calisma',
     ];
 
     /** @var string[] */
@@ -331,6 +332,16 @@ class PuantajController
             'beklenen_cikis_saati' => self::readTime($payload, 'beklenen_cikis_saati', self::existingValue($existing, 'beklenen_cikis_saati')),
             'giris_saati' => self::readTime($payload, 'giris_saati', self::existingValue($existing, 'giris_saati')),
             'cikis_saati' => self::readTime($payload, 'cikis_saati', self::existingValue($existing, 'cikis_saati')),
+            'gec_kalma_dakika' => self::readNullableInt(
+                $payload,
+                'gec_kalma_dakika',
+                self::existingValue($existing, 'gec_kalma_dakika')
+            ),
+            'erken_cikis_dakika' => self::readNullableInt(
+                $payload,
+                'erken_cikis_dakika',
+                self::existingValue($existing, 'erken_cikis_dakika')
+            ),
             'gercek_mola_dakika' => self::readNullableInt($payload, 'gercek_mola_dakika', self::existingValue($existing, 'gercek_mola_dakika')),
             'hesaplanan_mola_dakika' => self::readNullableInt(
                 $payload,
@@ -496,13 +507,13 @@ class PuantajController
             'INSERT INTO gunluk_puantaj
              (personel_id, tarih, state, gun_tipi, hareket_durumu, dayanak, durumu_bildirdi_mi,
               durum_bildirim_aciklamasi, hesap_etkisi, beklenen_giris_saati, beklenen_cikis_saati,
-              giris_saati, cikis_saati, gercek_mola_dakika, hesaplanan_mola_dakika,
+              giris_saati, cikis_saati, gec_kalma_dakika, erken_cikis_dakika, gercek_mola_dakika, hesaplanan_mola_dakika,
               net_calisma_suresi_dakika, gunluk_brut_sure_dakika, hafta_tatili_hak_kazandi_mi,
               kontrol_durumu, kaynak, aciklama, muhur_id)
              VALUES
              (:personel_id, :tarih, :state, :gun_tipi, :hareket_durumu, :dayanak, :durumu_bildirdi_mi,
               :durum_bildirim_aciklamasi, :hesap_etkisi, :beklenen_giris_saati, :beklenen_cikis_saati,
-              :giris_saati, :cikis_saati, :gercek_mola_dakika, :hesaplanan_mola_dakika,
+              :giris_saati, :cikis_saati, :gec_kalma_dakika, :erken_cikis_dakika, :gercek_mola_dakika, :hesaplanan_mola_dakika,
               :net_calisma_suresi_dakika, :gunluk_brut_sure_dakika, :hafta_tatili_hak_kazandi_mi,
               :kontrol_durumu, :kaynak, :aciklama, :muhur_id)'
         );
@@ -526,6 +537,8 @@ class PuantajController
                  beklenen_cikis_saati = :beklenen_cikis_saati,
                  giris_saati = :giris_saati,
                  cikis_saati = :cikis_saati,
+                 gec_kalma_dakika = :gec_kalma_dakika,
+                 erken_cikis_dakika = :erken_cikis_dakika,
                  gercek_mola_dakika = :gercek_mola_dakika,
                  hesaplanan_mola_dakika = :hesaplanan_mola_dakika,
                  net_calisma_suresi_dakika = :net_calisma_suresi_dakika,
@@ -570,13 +583,13 @@ class PuantajController
             'INSERT INTO puantaj_aylik_muhur_satirlari
              (muhur_id, personel_id, tarih, gun_tipi, hareket_durumu, dayanak, durumu_bildirdi_mi,
               durum_bildirim_aciklamasi, hesap_etkisi, beklenen_giris_saati, beklenen_cikis_saati,
-              giris_saati, cikis_saati, gercek_mola_dakika, hesaplanan_mola_dakika,
+              giris_saati, cikis_saati, gec_kalma_dakika, erken_cikis_dakika, gercek_mola_dakika, hesaplanan_mola_dakika,
               net_calisma_suresi_dakika, gunluk_brut_sure_dakika, hafta_tatili_hak_kazandi_mi,
               kontrol_durumu, kaynak, aciklama)
              VALUES
              (:muhur_id, :personel_id, :tarih, :gun_tipi, :hareket_durumu, :dayanak, :durumu_bildirdi_mi,
               :durum_bildirim_aciklamasi, :hesap_etkisi, :beklenen_giris_saati, :beklenen_cikis_saati,
-              :giris_saati, :cikis_saati, :gercek_mola_dakika, :hesaplanan_mola_dakika,
+              :giris_saati, :cikis_saati, :gec_kalma_dakika, :erken_cikis_dakika, :gercek_mola_dakika, :hesaplanan_mola_dakika,
               :net_calisma_suresi_dakika, :gunluk_brut_sure_dakika, :hafta_tatili_hak_kazandi_mi,
               :kontrol_durumu, :kaynak, :aciklama)'
         );
@@ -596,6 +609,8 @@ class PuantajController
                 'beklenen_cikis_saati' => $row['beklenen_cikis_saati'],
                 'giris_saati' => $row['giris_saati'],
                 'cikis_saati' => $row['cikis_saati'],
+                'gec_kalma_dakika' => $row['gec_kalma_dakika'] ?? null,
+                'erken_cikis_dakika' => $row['erken_cikis_dakika'] ?? null,
                 'gercek_mola_dakika' => $row['gercek_mola_dakika'],
                 'hesaplanan_mola_dakika' => $row['hesaplanan_mola_dakika'],
                 'net_calisma_suresi_dakika' => $row['net_calisma_suresi_dakika'],
@@ -636,6 +651,8 @@ class PuantajController
             'beklenen_cikis_saati' => $row['beklenen_cikis_saati'] ?? null,
             'giris_saati' => $row['giris_saati'],
             'cikis_saati' => $row['cikis_saati'],
+            'gec_kalma_dakika' => self::mapNullableInt($row['gec_kalma_dakika'] ?? null),
+            'erken_cikis_dakika' => self::mapNullableInt($row['erken_cikis_dakika'] ?? null),
             'gercek_mola_dakika' => self::mapNullableInt($row['gercek_mola_dakika'] ?? null),
             'hesaplanan_mola_dakika' => self::mapNullableInt($row['hesaplanan_mola_dakika'] ?? null),
             'net_calisma_suresi_dakika' => self::mapNullableInt($row['net_calisma_suresi_dakika'] ?? null),

@@ -119,7 +119,7 @@ async function seedDevamPrimiHastalikCacheForPersonelOne(page: Page) {
             gun_tipi: "Normal_Is_Gunu",
             hareket_durumu: "Gelmedi",
             dayanak: "Raporlu_Hastalik",
-            hesap_etkisi: "Kesinti_Yap",
+            hesap_etkisi: "Yevmiye_Kes",
             hafta_tatili_hak_kazandi_mi: true,
             state: "HESAPLANDI",
             compliance_uyarilari: []

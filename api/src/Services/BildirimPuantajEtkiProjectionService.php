@@ -170,7 +170,16 @@ class BildirimPuantajEtkiProjectionService
                 return self::inceleme($etkiTuru, 'COKLU_RESMI_SUREC', ['reason' => 'Birden fazla eslesen izin sureci']);
             }
 
-            return self::hazir($etkiTuru, 1, 'GUN', $izinResult['surec']);
+            $matchedSurec = $izinResult['surec'];
+            if ($matchedSurec !== null && !(bool) ($matchedSurec['ucretli_mi'] ?? false)) {
+                return self::inceleme(
+                    $etkiTuru,
+                    'UCRETSIZ_IZIN_DESTEKLENMIYOR',
+                    ['reason' => 'Ucretsiz izin sureci otomatik HAZIR aday uretimine dahil degil']
+                );
+            }
+
+            return self::hazir($etkiTuru, 1, 'GUN', $matchedSurec);
         }
 
         if ($tur === 'RAPORLU') {

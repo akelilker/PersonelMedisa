@@ -113,6 +113,32 @@ describe("puantaj.api", () => {
     expect(result?.beklenen_cikis_saati).toBe("17:00");
   });
 
+  it("normalizes gec_kalma_dakika and erken_cikis_dakika from snake_case or camelCase", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        createJsonResponse(
+          {
+            data: {
+              personel_id: 9,
+              tarih: "2026-04-17",
+              gecKalmaDakika: 18,
+              early_leave_minutes: 7,
+              compliance_uyarilari: []
+            },
+            meta: {},
+            errors: []
+          },
+          200
+        )
+      )
+    );
+
+    const result = await fetchGunlukPuantaj(9, "2026-04-17");
+    expect(result?.gec_kalma_dakika).toBe(18);
+    expect(result?.erken_cikis_dakika).toBe(7);
+  });
+
   it("normalizes kontrol_durumu from snake_case or camelCase", async () => {
     vi.stubGlobal(
       "fetch",
@@ -368,6 +394,42 @@ describe("puantaj.api", () => {
     );
     expect(result.beklenen_giris_saati).toBeUndefined();
     expect(result.beklenen_cikis_saati).toBeUndefined();
+  });
+
+  it("sends dakika fields in upsert payload when provided", async () => {
+    const fetchMock = vi.fn(async () =>
+      createJsonResponse(
+        {
+          data: {
+            personel_id: 14,
+            tarih: "2026-04-22",
+            gec_kalma_dakika: 25,
+            erken_cikis_dakika: 0,
+            compliance_uyarilari: []
+          },
+          meta: {},
+          errors: []
+        },
+        200
+      )
+    );
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await upsertGunlukPuantaj(14, "2026-04-22", {
+      gec_kalma_dakika: 25,
+      erken_cikis_dakika: 0
+    });
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(init.body).toBe(
+      JSON.stringify({
+        gec_kalma_dakika: 25,
+        erken_cikis_dakika: 0
+      })
+    );
+    expect(result.gec_kalma_dakika).toBe(25);
+    expect(result.erken_cikis_dakika).toBe(0);
   });
 
   it("sends POST request to aylik puantaj muhurle endpoint", async () => {

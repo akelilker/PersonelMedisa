@@ -164,14 +164,17 @@ type DemoPuantaj = {
     | "Raporlu_Hastalik"
     | "Raporlu_Is_Kazasi"
     | "Yillik_Izin"
-    | "Telafi_Calismasi";
+    | "Telafi_Calismasi"
+    | "Gorevde_Calisma";
   durumu_bildirdi_mi?: boolean;
   durum_bildirim_aciklamasi?: string;
-  hesap_etkisi?: "Kesinti_Yap" | "Tam_Yevmiye_Ver" | "Mesai_Yaz";
+  hesap_etkisi?: "Yevmiye_Kes" | "Tam_Yevmiye_Ver" | "Mesai_Yaz" | "Ucretli_Izin" | "Raporlu" | "Telafi";
   beklenen_giris_saati?: string;
   beklenen_cikis_saati?: string;
   giris_saati?: string;
   cikis_saati?: string;
+  gec_kalma_dakika?: number;
+  erken_cikis_dakika?: number;
   gercek_mola_dakika?: number;
   hesaplanan_mola_dakika?: number;
   net_calisma_suresi_dakika?: number;
@@ -524,7 +527,7 @@ const demoState: {
       gunTipi: "Normal_Is_Gunu",
       hareketDurumu: "Gelmedi",
       dayanak: "Yok_Izinsiz",
-      hesapEtkisi: "Kesinti_Yap",
+      hesapEtkisi: "Yevmiye_Kes",
       haftaTatiliHakKazandiMi: false,
       complianceUyarilari: [
         {
@@ -1974,13 +1977,18 @@ const DEMO_PUANTAJ_DAYANAK_MAP: Record<string, NonNullable<DemoPuantaj["dayanak"
   RAPORLU_HASTALIK: "Raporlu_Hastalik",
   RAPORLU_IS_KAZASI: "Raporlu_Is_Kazasi",
   YILLIK_IZIN: "Yillik_Izin",
-  TELAFI_CALISMASI: "Telafi_Calismasi"
+  TELAFI_CALISMASI: "Telafi_Calismasi",
+  GOREVDE_CALISMA: "Gorevde_Calisma"
 };
 
 const DEMO_PUANTAJ_HESAP_ETKISI_MAP: Record<string, NonNullable<DemoPuantaj["hesap_etkisi"]>> = {
-  KESINTI_YAP: "Kesinti_Yap",
+  KESINTI_YAP: "Yevmiye_Kes",
+  YEVMIYE_KES: "Yevmiye_Kes",
   TAM_YEVMIYE_VER: "Tam_Yevmiye_Ver",
-  MESAI_YAZ: "Mesai_Yaz"
+  UCRETLI_IZIN: "Ucretli_Izin",
+  RAPORLU: "Raporlu",
+  MESAI_YAZ: "Mesai_Yaz",
+  TELAFI: "Telafi"
 };
 
 function normalizeDemoLiteralToken(value: unknown) {

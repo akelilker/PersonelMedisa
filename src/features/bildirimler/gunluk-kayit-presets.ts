@@ -42,13 +42,17 @@ const DAYANAK_LABELS: Record<PuantajDayanak, string> = {
   Raporlu_Hastalik: "Raporlu Hastalik",
   Raporlu_Is_Kazasi: "Raporlu Is Kazasi",
   Yillik_Izin: "Yillik Izin",
-  Telafi_Calismasi: "Telafi Calismasi"
+  Telafi_Calismasi: "Telafi Calismasi",
+  Gorevde_Calisma: "Gorevde Calisma"
 };
 
 const HESAP_ETKISI_LABELS: Record<PuantajHesapEtkisi, string> = {
-  Kesinti_Yap: "Kesinti Yap",
   Tam_Yevmiye_Ver: "Tam Yevmiye Ver",
-  Mesai_Yaz: "Mesai Yaz"
+  Yevmiye_Kes: "Yevmiye Kes",
+  Ucretli_Izin: "Ucretli Izin",
+  Raporlu: "Raporlu",
+  Mesai_Yaz: "Mesai Yaz",
+  Telafi: "Telafi"
 };
 
 const PRESET_MAP: Record<
@@ -66,7 +70,7 @@ const PRESET_MAP: Record<
     gunTipi: "Normal_Is_Gunu",
     hareketDurumu: "Gelmedi",
     dayanak: "Yok_Izinsiz",
-    hesapEtkisi: "Kesinti_Yap",
+    hesapEtkisi: "Yevmiye_Kes",
     aciklama: "Mazeretsiz devamsizlik puantajda kesinti yaratir."
   },
   IZINLI_GELMEDI: {
@@ -80,14 +84,14 @@ const PRESET_MAP: Record<
     gunTipi: "Normal_Is_Gunu",
     hareketDurumu: "Gelmedi",
     dayanak: "Yok_Izinsiz",
-    hesapEtkisi: "Kesinti_Yap",
+    hesapEtkisi: "Yevmiye_Kes",
     aciklama: "Izinsiz devamsizlik puantajda kesinti ve hak kaybi riski tasir."
   },
   DEVAMSIZLIK: {
     gunTipi: "Normal_Is_Gunu",
     hareketDurumu: "Gelmedi",
     dayanak: "Yok_Izinsiz",
-    hesapEtkisi: "Kesinti_Yap",
+    hesapEtkisi: "Yevmiye_Kes",
     aciklama: "Devamsizlik kaydi gunluk puantajda mazeretsiz yokluk olarak islenir."
   },
   RAPORLU: {
@@ -103,6 +107,13 @@ const PRESET_MAP: Record<
     dayanak: "Telafi_Calismasi",
     hesapEtkisi: "Mesai_Yaz",
     aciklama: "Gec cikis kaydi ek calisma veya telafi mantigi ile izlenir."
+  },
+  GOREVDE: {
+    gunTipi: "Normal_Is_Gunu",
+    hareketDurumu: "Geldi",
+    dayanak: "Gorevde_Calisma",
+    hesapEtkisi: "Tam_Yevmiye_Ver",
+    aciklama: "Gorevde calisma gunu tam yevmiye ile calisilmis gun olarak islenir."
   }
 };
 

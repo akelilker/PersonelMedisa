@@ -24,11 +24,12 @@ const expectedScenarios = [
   "SCENARIO:14:PASS",
   "SCENARIO:15:PASS",
   "SCENARIO:16:PASS",
+  "SCENARIO:17:PASS",
   "SCENARIO:R1:PASS"
 ];
 
 describe("BildirimPuantajEtkiProjectionService PHP runtime", () => {
-  it("runs 16 projection scenarios plus regression via PHP CLI", () => {
+  it("runs projection scenarios plus regression via PHP CLI", () => {
     const output = execFileSync("php", [runnerPath], { encoding: "utf8" });
     expect(output.trim().endsWith("OK")).toBe(true);
     for (const marker of expectedScenarios) {
@@ -44,7 +45,8 @@ describe("BildirimPuantajEtkiProjectionService PHP runtime", () => {
       "DAKIKA_EKSIK",
       "IZIN_SURECI_YOK",
       "RAPOR_SURECI_YOK",
-      "DIGER_MANUEL_INCELEME"
+      "DIGER_MANUEL_INCELEME",
+      "UCRETSIZ_IZIN_DESTEKLENMIYOR"
     ]) {
       expect(serviceSource).toContain(`'${code}'`);
     }

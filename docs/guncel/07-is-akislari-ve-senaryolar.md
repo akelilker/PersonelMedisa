@@ -356,7 +356,8 @@ S73 tamamlanmış Genel Yönetici bildirim üst onayı sonrası `puantaj.bildiri
 
 - `MUHASEBE` aday listesinde karar audit özet alanlarını (`karar_veren_user_id`, `karar_zamani`, `uygulanan_puantaj_id`) görür.
 - Detayda karar audit alanları (`karar_gerekcesi`, puantaj snapshot'ları, `uygulama_hash`) okunur.
-- `BildirimPuantajEtkiDecisionPolicy` hangi state'ten hangi kararın mümkün olduğunu belirler: `HAZIR` → UYGULA/YOK_SAY; `INCELEME_GEREKLI` → yalnız YOK_SAY; `UYGULANDI`/`YOK_SAYILDI` terminal.
+- `BildirimPuantajEtkiDecisionPolicy` hangi state'ten hangi kararın mümkün olduğunu belirler: `HAZIR` → UYGULA/YOK_SAY; `INCELEME_GEREKLI` → MANUEL UYGULA/YOK_SAY; `UYGULANDI`/`YOK_SAYILDI` terminal.
+- S74-D1-B: `INCELEME_GEREKLI` adaylarda dört puantaj preset'i (`DEVAMSIZLIK_GUN`, `GEC_KALMA_DAKIKA`, `ERKEN_CIKIS_DAKIKA`, `GOREVDE_CALISILMIS_GUN`) ile `/manuel-uygula`; izin/rapor süreç akışına bırakılır.
 - S74-C1 yalnız altyapıdır; yok-say S74-C2A, uygula S74-C3-B2, frontend Uygula S74-C3-B3 ile tamamlanmıştır.
 
 ### Sistem Etkisi

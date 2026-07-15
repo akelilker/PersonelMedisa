@@ -9,6 +9,7 @@ const fetchOzetMock = vi.hoisted(() => vi.fn());
 const fetchDetailMock = vi.hoisted(() => vi.fn());
 const dismissMock = vi.hoisted(() => vi.fn());
 const applyMock = vi.hoisted(() => vi.fn());
+const manualApplyMock = vi.hoisted(() => vi.fn());
 
 const fetchGyOzetMock = vi.hoisted(() => vi.fn());
 
@@ -17,7 +18,8 @@ vi.mock("../../src/api/bildirim-puantaj-etki-adaylari.api", () => ({
   fetchBildirimPuantajEtkiAdayOzet: fetchOzetMock,
   fetchBildirimPuantajEtkiAdayDetail: fetchDetailMock,
   dismissBildirimPuantajEtkiAday: dismissMock,
-  applyBildirimPuantajEtkiAday: applyMock
+  applyBildirimPuantajEtkiAday: applyMock,
+  manuelUygulaBildirimPuantajEtkiAdayi: manualApplyMock
 }));
 
 vi.mock("../../src/api/genel-yonetici-bildirim-onaylari.api", () => ({
@@ -459,6 +461,75 @@ describe("useBildirimPuantajEtkiAdaylari", () => {
     });
     expect(result.current.applyError).toBeTruthy();
     expect(result.current.applyTarget).not.toBeNull();
+    expect(fetchListMock.mock.calls.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("manual apply basarili akis modal kapatir ve listeyi yeniler", async () => {
+    const incelemeDetail = {
+      ...listItem,
+      aylik_bildirim_onayi_id: 2,
+      bildirim_alt_tur: null,
+      bildirim_dakika: null,
+      bildirim_aciklama: "Diger aciklama",
+      bildirim_created_at: "2026-06-07 10:00:00",
+      bildirim_updated_at: "2026-06-07 10:00:00",
+      conflict_detail: null,
+      resmi_surec_id: null,
+      resmi_surec_turu: null,
+      resmi_surec_alt_tur: null,
+      ucretli_mi_snapshot: null,
+      mevcut_puantaj_id: null,
+      source_snapshot: { aciklama: "Diger aciklama" },
+      source_hash: "hash-6",
+      projection_version: "v1",
+      updated_at: "2026-06-10 10:20:00",
+      karar_gerekcesi: null,
+      onceki_puantaj_snapshot: null,
+      sonraki_puantaj_snapshot: null,
+      uygulama_hash: null,
+      uygulama_modu: "OTOMATIK" as const,
+      manuel_karar_turu: null,
+      manuel_karar_miktari: null
+    };
+    manualApplyMock.mockResolvedValueOnce({
+      id: 3,
+      state: "UYGULANDI",
+      uygulama_modu: "MANUEL",
+      manuel_karar_turu: "GOREVDE_CALISILMIS_GUN",
+      manuel_karar_miktari: null,
+      karar_veren_user_id: 5,
+      karar_zamani: "2026-07-15 12:00:00",
+      karar_gerekcesi: "Operasyon kayitlariyla dogrulandi.",
+      uygulanan_puantaj_id: 9103,
+      onceki_puantaj_snapshot: null,
+      sonraki_puantaj_snapshot: { schema_version: "S74_MANUAL_APPLY_V1" },
+      uygulama_hash: "manual-hash",
+      idempotent: false
+    });
+    const { result } = renderHook(() => useBildirimPuantajEtkiAdaylari(ready));
+    await waitFor(() => expect(result.current.items).toHaveLength(1));
+    act(() => {
+      result.current.openManualApplyModal(incelemeDetail);
+    });
+    act(() => {
+      result.current.setManualKararTuru("GOREVDE_CALISILMIS_GUN");
+      result.current.setManualGerekce("Operasyon kayitlariyla dogrulandi.");
+    });
+    await act(async () => {
+      await result.current.manualApplyAday();
+    });
+    expect(manualApplyMock).toHaveBeenCalledWith(
+      3,
+      {
+        expected_state: "INCELEME_GEREKLI",
+        karar_etki_turu: "GOREVDE_CALISILMIS_GUN",
+        etki_miktari: null,
+        gerekce: "Operasyon kayitlariyla dogrulandi."
+      },
+      { subeId: 1 }
+    );
+    expect(result.current.successMessage).toBe("Manuel inceleme kararı günlük puantaja uygulandı.");
+    expect(result.current.manualTarget).toBeNull();
     expect(fetchListMock.mock.calls.length).toBeGreaterThanOrEqual(2);
   });
 });

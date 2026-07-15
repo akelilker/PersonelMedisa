@@ -183,6 +183,7 @@ DB sahibi: `onayli_bildirim_puantaj_etki_adaylari`; generate sahibi: `MUHASEBE`.
 | Generate | `POST /puantaj/bildirim-etki-adaylari/hazirla` | `puantaj.bildirim_etki.generate` |
 | Yok Say | `POST /puantaj/bildirim-etki-adaylari/{id}/yok-say` | `puantaj.bildirim_etki.dismiss` |
 | Uygula | `POST /puantaj/bildirim-etki-adaylari/{id}/uygula` | `puantaj.bildirim_etki.apply` |
+| Manuel Uygula | `POST /puantaj/bildirim-etki-adaylari/{id}/manuel-uygula` | `puantaj.bildirim_etki.apply` |
 
 **Migration:** `009_onayli_bildirim_puantaj_etki_adaylari.sql`, `010_bildirim_puantaj_etki_snapshot_zamanlarini_duzelt.sql`.
 
@@ -198,21 +199,21 @@ DB genişlemesi: `011_bildirim_puantaj_etki_karar_altyapisi.sql` — yedi karar 
 
 Policy sahibi: `BildirimPuantajEtkiDecisionPolicy` — yalnız state/action kararı (endpoint yok).
 
-| State | UYGULA | YOK_SAY |
-|-------|:------:|:-------:|
-| HAZIR | Evet | Evet |
-| INCELEME_GEREKLI | Hayır | Evet |
-| UYGULANDI | Hayır | Hayır |
-| YOK_SAYILDI | Hayır | Hayır |
+| State | UYGULA | MANUEL UYGULA | YOK_SAY |
+|-------|:------:|:-------------:|:-------:|
+| HAZIR | Evet | Hayır | Evet |
+| INCELEME_GEREKLI | Hayır | Evet | Evet |
+| UYGULANDI | Hayır (otomatik idempotent) | Hayır (manuel idempotent / conflict) | Hayır |
+| YOK_SAYILDI | Hayır | Hayır | Hayır |
 
 | Permission | MUHASEBE | GENEL_YONETICI | BOLUM_YONETICISI | BIRIM_AMIRI | PATRON |
 |------------|:--------:|:--------------:|:----------------:|:-----------:|:------:|
 | `puantaj.bildirim_etki.apply` | Evet | Hayır | Hayır | Hayır | Hayır |
 | `puantaj.bildirim_etki.dismiss` | Evet | Hayır | Hayır | Hayır | Hayır |
 
-**List kontratı:** `karar_veren_user_id`, `karar_zamani`, `uygulanan_puantaj_id`.
+**List kontratı:** `karar_veren_user_id`, `karar_zamani`, `uygulanan_puantaj_id`, `uygulama_modu`, `manuel_karar_turu`, `manuel_karar_miktari`.
 
-**Detail kontratı:** `karar_veren_user_id`, `karar_zamani`, `karar_gerekcesi`, `uygulanan_puantaj_id`, `onceki_puantaj_snapshot`, `sonraki_puantaj_snapshot`, `uygulama_hash`.
+**Detail kontratı:** `karar_veren_user_id`, `karar_zamani`, `karar_gerekcesi`, `uygulanan_puantaj_id`, `onceki_puantaj_snapshot`, `sonraki_puantaj_snapshot`, `uygulama_hash`, `uygulama_modu`, `manuel_karar_turu`, `manuel_karar_miktari`.
 
 **Ürün kararları:** Mevcut puantaj otomatik overwrite edilmez. YOK_SAY gerekçesi zorunludur; minimum karakter sayısı henüz kararlaştırılmamıştır (doğrulama endpoint fazında). Migration canlıya otomatik uygulanmaz.
 
@@ -275,7 +276,42 @@ Endpoint: `POST /puantaj/bildirim-etki-adaylari/{id}/uygula` — yalnız `puanta
 
 **Kurallar:** Yalnız INSERT; mevcut `gunluk_puantaj` UPDATE edilmez. Dakika alanları aday `etki_miktari`'nden yazılır; saatten yeniden hesap yok. Canonical servis: `BildirimPuantajEtkiApplyService`.
 
-**Audit alanları:** `karar_veren_user_id`, `karar_zamani`, `uygulanan_puantaj_id`, `onceki_puantaj_snapshot`, `sonraki_puantaj_snapshot`, `uygulama_hash`.
+**Audit alanları:** `karar_veren_user_id`, `karar_zamani`, `uygulanan_puantaj_id`, `onceki_puantaj_snapshot`, `sonraki_puantaj_snapshot`, `uygulama_hash`, `uygulama_modu=OTOMATIK`.
+
+**Hash şeması:** Otomatik apply `S74_APPLY_V1` — mevcut canlı kayıtlarla geriye uyumlu; değiştirilmez.
+
+### Puantaj etki adayı Manuel Uygula — S74-D1-B
+
+Endpoint: `POST /puantaj/bildirim-etki-adaylari/{id}/manuel-uygula` — yalnız `puantaj.bildirim_etki.apply` (MUHASEBE).
+
+**Kapsam:** `INCELEME_GEREKLI` adaylarda dört puantaj preset'i ile tek `gunluk_puantaj` INSERT. İzin/rapor preset'leri yoktur; süreç akışına bırakılır.
+
+**Migration:** `013_bildirim_puantaj_etki_manual_apply.sql` — `uygulama_modu` (`OTOMATIK`/`MANUEL`), `manuel_karar_turu`, `manuel_karar_miktari`. Canlıda henüz uygulanmamıştır.
+
+**Request body:**
+
+```json
+{
+  "expected_state": "INCELEME_GEREKLI",
+  "karar_etki_turu": "GOREVDE_CALISILMIS_GUN",
+  "etki_miktari": null,
+  "gerekce": "Birim amiri açıklaması operasyon kayıtlarıyla doğrulandı."
+}
+```
+
+**Preset whitelist:** `DEVAMSIZLIK_GUN`, `GEC_KALMA_DAKIKA`, `ERKEN_CIKIS_DAKIKA`, `GOREVDE_CALISILMIS_GUN`. Dakika türlerinde `etki_miktari` 1–1440 zorunlu.
+
+**Final state:** `UYGULANDI` + `uygulama_modu=MANUEL`. Ayrı `MANUEL_UYGULANDI` state yoktur.
+
+**Hash şeması:** Manuel apply `S74_MANUAL_APPLY_V1` — otomatik `S74_APPLY_V1`'den ayrıdır; `source_snapshot`/`source_hash` değişmez.
+
+**Idempotency:** Aynı manuel karar (tür + miktar + normalize gerekçe) tekrarı → HTTP 200 `idempotent: true`. Farklı karar → 409 `MANUAL_DECISION_CONFLICT`. Otomatik uygulanmış aday → 409 `STATE_CONFLICT`.
+
+**Yeni 409 kodları:** `SOURCE_INTEGRITY_FAILED`, `MANUAL_DECISION_CONFLICT`.
+
+**Kurallar:** Yalnız INSERT; mevcut puantaj UPDATE edilmez. Canonical servis: `BildirimPuantajEtkiManualApplyService`. Mapper: `BildirimPuantajEtkiPuantajMapper`.
+
+**Canlı sınır:** Migration 013 ve canlı mutation ayrı owner onayına tabidir; canlı aday #1 dokunulmaz.
 
 ### Puantaj etki adayı Yok Say — S74-C2A
 

@@ -4,6 +4,14 @@ export type BildirimPuantajEtkiAdayState =
   | "UYGULANDI"
   | "YOK_SAYILDI";
 
+export type BildirimPuantajEtkiUygulamaModu = "OTOMATIK" | "MANUEL";
+
+export type BildirimPuantajEtkiManualKararTuru =
+  | "DEVAMSIZLIK_GUN"
+  | "GEC_KALMA_DAKIKA"
+  | "ERKEN_CIKIS_DAKIKA"
+  | "GOREVDE_CALISILMIS_GUN";
+
 export type BildirimPuantajEtkiAdayListItem = {
   id: number;
   genel_yonetici_bildirim_onayi_id: number;
@@ -24,6 +32,9 @@ export type BildirimPuantajEtkiAdayListItem = {
   karar_veren_user_id: number | null;
   karar_zamani: string | null;
   uygulanan_puantaj_id: number | null;
+  uygulama_modu: BildirimPuantajEtkiUygulamaModu;
+  manuel_karar_turu: BildirimPuantajEtkiManualKararTuru | null;
+  manuel_karar_miktari: number | null;
 };
 
 export type BildirimPuantajEtkiConflictDetail = Record<string, unknown> | null;
@@ -110,5 +121,19 @@ export type BildirimPuantajEtkiAdayApplyResult = {
   onceki_puantaj_snapshot: Record<string, unknown> | null;
   sonraki_puantaj_snapshot: Record<string, unknown> | null;
   uygulama_hash: string | null;
+  uygulama_modu: BildirimPuantajEtkiUygulamaModu;
+  manuel_karar_turu: BildirimPuantajEtkiManualKararTuru | null;
+  manuel_karar_miktari: number | null;
   idempotent: boolean;
+};
+
+export type BildirimPuantajEtkiAdayManualApplyPayload = {
+  expected_state: "INCELEME_GEREKLI";
+  karar_etki_turu: BildirimPuantajEtkiManualKararTuru;
+  etki_miktari: number | null;
+  gerekce: string;
+};
+
+export type BildirimPuantajEtkiAdayManualApplyResult = BildirimPuantajEtkiAdayApplyResult & {
+  karar_gerekcesi: string | null;
 };

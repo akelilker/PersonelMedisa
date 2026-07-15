@@ -110,6 +110,16 @@ function makeHookState(overrides: Record<string, unknown> = {}) {
     applyTarget: null,
     applyError: null,
     isApplying: false,
+    manualTarget: null,
+    manualKararTuru: "",
+    setManualKararTuru: vi.fn(),
+    manualMiktar: "",
+    setManualMiktar: vi.fn(),
+    manualGerekce: "",
+    setManualGerekce: vi.fn(),
+    manualFieldError: null,
+    manualError: null,
+    isManualApplying: false,
     contextReady: true,
     refreshList: vi.fn(),
     refreshAll: vi.fn(),
@@ -121,6 +131,9 @@ function makeHookState(overrides: Record<string, unknown> = {}) {
     openApplyModal: vi.fn(),
     closeApplyModal: vi.fn(),
     applyAday: vi.fn(),
+    openManualApplyModal: vi.fn(),
+    closeManualApplyModal: vi.fn(),
+    manualApplyAday: vi.fn(),
     ...overrides
   };
 }
@@ -452,5 +465,46 @@ describe("BildirimPuantajEtkiAdaylariSection", () => {
     const submit = screen.getByTestId("puantaj-etki-aday-dismiss-submit") as HTMLButtonElement;
     expect(submit.disabled).toBe(true);
     expect(screen.getByTestId("puantaj-etki-gerekce-counter").textContent).toBe("0 / 500");
+  });
+
+  it("INCELEME_GEREKLI detayda İncele ve Uygula butonunu gosterir", () => {
+    const openManualApplyModal = vi.fn();
+    useHookMock.mockReturnValue(
+      makeHookState({
+        detailId: 3,
+        detail: {
+          ...incelemeItem,
+          aylik_bildirim_onayi_id: 2,
+          bildirim_alt_tur: null,
+          bildirim_dakika: null,
+          bildirim_aciklama: "Gelmedi bildirimi",
+          bildirim_created_at: "2026-06-04 09:00:00",
+          bildirim_updated_at: "2026-06-04 09:00:00",
+          conflict_detail: null,
+          resmi_surec_id: null,
+          resmi_surec_turu: null,
+          resmi_surec_alt_tur: null,
+          ucretli_mi_snapshot: null,
+          mevcut_puantaj_id: 55,
+          source_snapshot: { aciklama: "Gelmedi bildirimi" },
+          source_hash: "hash",
+          projection_version: "v1",
+          updated_at: "2026-06-10 10:05:00",
+          karar_gerekcesi: null,
+          onceki_puantaj_snapshot: null,
+          sonraki_puantaj_snapshot: null,
+          uygulama_hash: null,
+          uygulama_modu: "OTOMATIK",
+          manuel_karar_turu: null,
+          manuel_karar_miktari: null
+        },
+        openManualApplyModal
+      })
+    );
+    render(<BildirimPuantajEtkiAdaylariSection />);
+    expect(screen.getByTestId("puantaj-etki-aday-detail-manual-apply")).not.toBeNull();
+    expect(screen.queryByTestId("puantaj-etki-aday-detail-apply")).toBeNull();
+    fireEvent.click(screen.getByTestId("puantaj-etki-aday-detail-manual-apply"));
+    expect(openManualApplyModal).toHaveBeenCalled();
   });
 });

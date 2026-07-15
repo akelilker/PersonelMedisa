@@ -505,6 +505,14 @@ V1 ürün kuralı:
 - Aylık mühür snapshot'ı her iki dakika kolonunu kayıpsız kopyalar.
 - Migration `012_gunluk_puantaj_gec_erken_dakika.sql` owner onayıyla canlı `karmotor_medisa` veritabanına manuel uygulanmıştır (S74-C3-B1); tekrar çalıştırılmamalıdır.
 
+**S74-D1-B manuel inceleme preset mapping (authoritative apply hedefi):**
+
+- `DEVAMSIZLIK_GUN` → `Gelmedi` / `Yok_Izinsiz` / `Yevmiye_Kes`
+- `GEC_KALMA_DAKIKA` → `Gec_Geldi` + `gec_kalma_dakika` (1–1440)
+- `ERKEN_CIKIS_DAKIKA` → `Erken_Cikti` + `erken_cikis_dakika` (1–1440)
+- `GOREVDE_CALISILMIS_GUN` → `Geldi` / `Gorevde_Calisma` / `Tam_Yevmiye_Ver`
+- İzin/rapor türleri manuel preset değildir; personel süreci dayanağı gerektirir.
+
 Bu yuvarlama tolerans değildir. Gerçek eksik süre `0` ise kesinti yoktur; `1-30 dk` arası parasal hesapta `30 dk`, `31-60 dk` arası `60 dk`, `61-90 dk` arası `90 dk` kabul edilir.
 
 Sınır örnekleri:

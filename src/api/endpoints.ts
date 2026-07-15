@@ -51,6 +51,7 @@ export const endpoints = {
       ozet: "/puantaj/bildirim-etki-adaylari/ozet",
       detail: (id: number | string) => `/puantaj/bildirim-etki-adaylari/${id}`,
       yokSay: (id: number | string) => `/puantaj/bildirim-etki-adaylari/${id}/yok-say`,
+      manuelUygula: (id: number | string) => `/puantaj/bildirim-etki-adaylari/${id}/manuel-uygula`,
       uygula: (id: number | string) => `/puantaj/bildirim-etki-adaylari/${id}/uygula`
     }
   },

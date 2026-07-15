@@ -1,7 +1,9 @@
 import type {
   BildirimPuantajEtkiAdayListItem,
   BildirimPuantajEtkiAdayState,
-  BildirimPuantajEtkiConflictDetail
+  BildirimPuantajEtkiConflictDetail,
+  BildirimPuantajEtkiManualKararTuru,
+  BildirimPuantajEtkiUygulamaModu
 } from "../../types/bildirim-puantaj-etki-aday";
 
 const STATE_LABELS: Record<BildirimPuantajEtkiAdayState, string> = {
@@ -123,6 +125,101 @@ export function canApplyBildirimPuantajEtkiAday(
   state: BildirimPuantajEtkiAdayState | string
 ): boolean {
   return state === "HAZIR";
+}
+
+export function canManualApplyBildirimPuantajEtkiAday(
+  state: BildirimPuantajEtkiAdayState | string
+): boolean {
+  return state === "INCELEME_GEREKLI";
+}
+
+export const MANUAL_KARAR_PRESET_OPTIONS: Array<{
+  value: BildirimPuantajEtkiManualKararTuru;
+  label: string;
+}> = [
+  { value: "DEVAMSIZLIK_GUN", label: "Devamsızlık" },
+  { value: "GEC_KALMA_DAKIKA", label: "Geç Kalma" },
+  { value: "ERKEN_CIKIS_DAKIKA", label: "Erken Çıkış" },
+  { value: "GOREVDE_CALISILMIS_GUN", label: "Görevde Çalışma" }
+];
+
+export function manualKararRequiresMiktar(
+  kararTuru: BildirimPuantajEtkiManualKararTuru | string
+): boolean {
+  return kararTuru === "GEC_KALMA_DAKIKA" || kararTuru === "ERKEN_CIKIS_DAKIKA";
+}
+
+export function formatManualKararPreview(
+  kararTuru: BildirimPuantajEtkiManualKararTuru | string
+): { hareket: string; dayanak: string; hesapEtkisi: string; gunTipi: string } {
+  switch (kararTuru) {
+    case "DEVAMSIZLIK_GUN":
+      return {
+        hareket: "Gelmedi",
+        dayanak: "Yok İzinsiz",
+        hesapEtkisi: "Yevmiye Kes",
+        gunTipi: "Tarihe göre sistem tarafından belirlenecek"
+      };
+    case "GEC_KALMA_DAKIKA":
+      return {
+        hareket: "Geç Geldi",
+        dayanak: "Yok İzinsiz",
+        hesapEtkisi: "Tam Yevmiye Ver",
+        gunTipi: "Tarihe göre sistem tarafından belirlenecek"
+      };
+    case "ERKEN_CIKIS_DAKIKA":
+      return {
+        hareket: "Erken Çıktı",
+        dayanak: "Yok İzinsiz",
+        hesapEtkisi: "Tam Yevmiye Ver",
+        gunTipi: "Tarihe göre sistem tarafından belirlenecek"
+      };
+    case "GOREVDE_CALISILMIS_GUN":
+    default:
+      return {
+        hareket: "Geldi",
+        dayanak: "Görevde Çalışma",
+        hesapEtkisi: "Tam Yevmiye Ver",
+        gunTipi: "Tarihe göre sistem tarafından belirlenecek"
+      };
+  }
+}
+
+export function formatUygulamaModuLabel(
+  modu: BildirimPuantajEtkiUygulamaModu | string | null | undefined
+): string {
+  if (modu === "MANUEL") {
+    return "Manuel";
+  }
+  return "Otomatik";
+}
+
+export function validateManualGerekce(value: string): string | null {
+  return validateDismissGerekce(value);
+}
+
+export function validateManualMiktar(
+  kararTuru: BildirimPuantajEtkiManualKararTuru | string,
+  value: string
+): string | null {
+  if (!manualKararRequiresMiktar(kararTuru)) {
+    if (value.trim()) {
+      return "Bu karar türü için dakika girilmemelidir.";
+    }
+    return null;
+  }
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return "Dakika değeri zorunludur.";
+  }
+  if (!/^\d+$/.test(trimmed)) {
+    return "Dakika değeri pozitif tam sayı olmalıdır.";
+  }
+  const parsed = Number.parseInt(trimmed, 10);
+  if (parsed <= 0 || parsed > 1440) {
+    return "Dakika değeri 1-1440 arasında olmalıdır.";
+  }
+  return null;
 }
 
 export function isTerminalBildirimPuantajEtkiAdayState(

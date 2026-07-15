@@ -2,12 +2,19 @@ import { describe, expect, it } from "vitest";
 import {
   canApplyBildirimPuantajEtkiAday,
   canDismissBildirimPuantajEtkiAday,
+  canManualApplyBildirimPuantajEtkiAday,
   countUnicodeCharacters,
   formatBildirimPuantajEtkiAdayStateLabel,
   formatConflictDisplay,
+  formatManualKararPreview,
+  formatUygulamaModuLabel,
   isTerminalBildirimPuantajEtkiAdayState,
+  MANUAL_KARAR_PRESET_OPTIONS,
+  manualKararRequiresMiktar,
   trimDismissGerekce,
-  validateDismissGerekce
+  validateDismissGerekce,
+  validateManualGerekce,
+  validateManualMiktar
 } from "../../src/lib/bildirim-puantaj-etki-aday/display";
 
 describe("bildirim-puantaj-etki-aday display", () => {
@@ -35,7 +42,24 @@ describe("bildirim-puantaj-etki-aday display", () => {
     expect(canDismissBildirimPuantajEtkiAday("UYGULANDI")).toBe(false);
     expect(canApplyBildirimPuantajEtkiAday("HAZIR")).toBe(true);
     expect(canApplyBildirimPuantajEtkiAday("INCELEME_GEREKLI")).toBe(false);
-    expect(canApplyBildirimPuantajEtkiAday("UYGULANDI")).toBe(false);
+    expect(canManualApplyBildirimPuantajEtkiAday("INCELEME_GEREKLI")).toBe(true);
+    expect(canManualApplyBildirimPuantajEtkiAday("HAZIR")).toBe(false);
     expect(isTerminalBildirimPuantajEtkiAdayState("YOK_SAYILDI")).toBe(true);
+  });
+
+  it("exposes four manual presets and preview mapping", () => {
+    expect(MANUAL_KARAR_PRESET_OPTIONS).toHaveLength(4);
+    expect(MANUAL_KARAR_PRESET_OPTIONS.map((item) => item.value)).toEqual([
+      "DEVAMSIZLIK_GUN",
+      "GEC_KALMA_DAKIKA",
+      "ERKEN_CIKIS_DAKIKA",
+      "GOREVDE_CALISILMIS_GUN"
+    ]);
+    expect(formatManualKararPreview("GOREVDE_CALISILMIS_GUN").dayanak).toContain("Görevde");
+    expect(formatUygulamaModuLabel("MANUEL")).toBe("Manuel");
+    expect(manualKararRequiresMiktar("GEC_KALMA_DAKIKA")).toBe(true);
+    expect(validateManualMiktar("GOREVDE_CALISILMIS_GUN", "10")).toMatch(/girilmemelidir/);
+    expect(validateManualMiktar("GEC_KALMA_DAKIKA", "")).toMatch(/zorunludur/);
+    expect(validateManualGerekce("abcde")).toBeNull();
   });
 });

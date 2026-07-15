@@ -12,19 +12,39 @@ import { useAuth } from "../../../state/auth.store";
 import {
   canApplyBildirimPuantajEtkiAday,
   canDismissBildirimPuantajEtkiAday,
+  canManualApplyBildirimPuantajEtkiAday,
   countUnicodeCharacters,
   formatBildirimPuantajEtkiAdayStateLabel,
   formatConflictDisplay,
+  formatManualKararPreview,
   formatProjectedEtkiLabel,
+  formatUygulamaModuLabel,
   getBildirimPuantajEtkiAdayStateBadgeClass,
   GEREKCE_MAX_LENGTH,
-  validateDismissGerekce
+  MANUAL_KARAR_PRESET_OPTIONS,
+  manualKararRequiresMiktar,
+  validateDismissGerekce,
+  validateManualGerekce,
+  validateManualMiktar
 } from "../../../lib/bildirim-puantaj-etki-aday/display";
-import type { BildirimPuantajEtkiAdayDetail, BildirimPuantajEtkiAdayListItem } from "../../../types/bildirim-puantaj-etki-aday";
+import type {
+  BildirimPuantajEtkiAdayDetail,
+  BildirimPuantajEtkiAdayListItem,
+  BildirimPuantajEtkiManualKararTuru
+} from "../../../types/bildirim-puantaj-etki-aday";
 import type { BirimAmiriSecenegi } from "../../../types/bildirim";
 
 const APPLY_CONFIRM_WARNING =
   "Bu işlem aday etkisini günlük puantaja uygulayacak ve adayı UYGULANDI durumuna geçirecektir. Mevcut bir puantaj kaydı varsa üzerine yazılmaz.";
+
+const MANUAL_APPLY_OVERWRITE_WARNING =
+  "Bu işlem mevcut bir puantaj kaydının üzerine yazmaz. Aynı personel ve tarihte puantaj varsa işlem engellenir.";
+
+const MANUAL_DEVAMSIZLIK_WARNING =
+  "Bu karar günlük puantajda yevmiye kesintisi etkisi oluşturacaktır.";
+
+const MANUAL_IZIN_RAPOR_INFO =
+  "İzin ve rapor kayıtları ilgili personel süreci üzerinden işlenmelidir.";
 
 function resolvePersonelDisplayName(detail: BildirimPuantajEtkiAdayDetail): string {
   const snapshot = detail.source_snapshot;
@@ -140,6 +160,15 @@ function buildDetailGroups(detail: BildirimPuantajEtkiAdayDetail): Array<{ title
     {
       title: "Karar bilgisi",
       fields: [
+        { label: "Uygulama modu", value: formatUygulamaModuLabel(detail.uygulama_modu) },
+        {
+          label: "Manuel karar türü",
+          value: detail.manuel_karar_turu ?? "—"
+        },
+        {
+          label: "Manuel karar miktarı",
+          value: detail.manuel_karar_miktari != null ? String(detail.manuel_karar_miktari) : "—"
+        },
         { label: "Karar veren", value: detail.karar_veren_user_id != null ? String(detail.karar_veren_user_id) : "—" },
         { label: "Karar zamanı", value: detail.karar_zamani ?? "—" },
         { label: "Karar gerekçesi", value: detail.karar_gerekcesi ?? "—" },
@@ -257,6 +286,16 @@ export function BildirimPuantajEtkiAdaylariSection() {
     applyTarget,
     applyError,
     isApplying,
+    manualTarget,
+    manualKararTuru,
+    setManualKararTuru,
+    manualMiktar,
+    setManualMiktar,
+    manualGerekce,
+    setManualGerekce,
+    manualFieldError,
+    manualError,
+    isManualApplying,
     contextReady,
     refreshAll,
     openDetail,
@@ -266,7 +305,10 @@ export function BildirimPuantajEtkiAdaylariSection() {
     dismissAday,
     openApplyModal,
     closeApplyModal,
-    applyAday
+    applyAday,
+    openManualApplyModal,
+    closeManualApplyModal,
+    manualApplyAday
   } = useBildirimPuantajEtkiAdaylari({
     enabled: canView,
     canDismiss,
@@ -346,8 +388,24 @@ export function BildirimPuantajEtkiAdaylariSection() {
 
   const gerekceValidationError = validateDismissGerekce(dismissGerekce);
   const gerekceCharCount = countUnicodeCharacters(dismissGerekce);
-  const dismissSubmitDisabled = Boolean(gerekceValidationError) || isDismissing || isApplying;
-  const applySubmitDisabled = isApplying || isDismissing;
+  const dismissSubmitDisabled =
+    Boolean(gerekceValidationError) || isDismissing || isApplying || isManualApplying;
+  const applySubmitDisabled = isApplying || isDismissing || isManualApplying;
+
+  const manualGerekceValidationError = validateManualGerekce(manualGerekce);
+  const manualGerekceCharCount = countUnicodeCharacters(manualGerekce);
+  const manualMiktarValidationError = manualKararTuru
+    ? validateManualMiktar(manualKararTuru, manualMiktar)
+    : null;
+  const manualSubmitDisabled =
+    !manualKararTuru ||
+    Boolean(manualGerekceValidationError) ||
+    Boolean(manualMiktarValidationError) ||
+    isManualApplying ||
+    isApplying ||
+    isDismissing;
+
+  const manualPreview = manualKararTuru ? formatManualKararPreview(manualKararTuru) : null;
 
   const applySubeLabel = useMemo(() => {
     if (!applyTarget) {
@@ -372,7 +430,42 @@ export function BildirimPuantajEtkiAdaylariSection() {
     !detailError &&
     canApplyBildirimPuantajEtkiAday(detail.state) &&
     !isApplying &&
-    !isDismissing;
+    !isDismissing &&
+    !isManualApplying;
+
+  const detailManualApplyVisible =
+    canApply &&
+    detail != null &&
+    !isDetailLoading &&
+    !detailError &&
+    canManualApplyBildirimPuantajEtkiAday(detail.state) &&
+    !isApplying &&
+    !isDismissing &&
+    !isManualApplying;
+
+  const manualSubeLabel = useMemo(() => {
+    if (!manualTarget) {
+      return "—";
+    }
+    const match = availablePanelSubeler.find((sube) => sube.id === manualTarget.sube_id);
+    return match?.ad ?? String(manualTarget.sube_id);
+  }, [manualTarget, availablePanelSubeler]);
+
+  const manualBirimAmiriLabel = useMemo(() => {
+    if (!manualTarget) {
+      return "—";
+    }
+    const match = birimAmiriSecenekleri.find((option) => option.user_id === manualTarget.birim_amiri_user_id);
+    return match?.ad_soyad ?? String(manualTarget.birim_amiri_user_id);
+  }, [manualTarget, birimAmiriSecenekleri]);
+
+  function handleManualKararChange(value: string) {
+    const next = value as BildirimPuantajEtkiManualKararTuru | "";
+    setManualKararTuru(next);
+    if (!next || !manualKararRequiresMiktar(next)) {
+      setManualMiktar("");
+    }
+  }
 
   function handleFilterSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -642,10 +735,21 @@ export function BildirimPuantajEtkiAdaylariSection() {
                       type="button"
                       className="universal-btn-save"
                       data-testid="puantaj-etki-aday-detail-apply"
-                      disabled={isApplying || isDismissing}
+                      disabled={isApplying || isDismissing || isManualApplying}
                       onClick={() => openApplyModal(detail)}
                     >
                       Uygula
+                    </button>
+                  ) : null}
+                  {detailManualApplyVisible ? (
+                    <button
+                      type="button"
+                      className="universal-btn-save"
+                      data-testid="puantaj-etki-aday-detail-manual-apply"
+                      disabled={isApplying || isDismissing || isManualApplying}
+                      onClick={() => openManualApplyModal(detail)}
+                    >
+                      İncele ve Uygula
                     </button>
                   ) : null}
                   {canDismiss && canDismissBildirimPuantajEtkiAday(detail.state) ? (
@@ -653,7 +757,7 @@ export function BildirimPuantajEtkiAdaylariSection() {
                       type="button"
                       className="universal-btn-aux"
                       data-testid="puantaj-etki-aday-detail-dismiss"
-                      disabled={isApplying || isDismissing}
+                      disabled={isApplying || isDismissing || isManualApplying}
                       onClick={() => openDismissModal(detail)}
                     >
                       Yok Say
@@ -663,7 +767,7 @@ export function BildirimPuantajEtkiAdaylariSection() {
                     type="button"
                     className="universal-btn-aux"
                     onClick={closeDetail}
-                    disabled={isApplying || isDismissing}
+                    disabled={isApplying || isDismissing || isManualApplying}
                   >
                     Kapat
                   </button>
@@ -809,7 +913,150 @@ export function BildirimPuantajEtkiAdaylariSection() {
                 type="button"
                 className="universal-btn-aux"
                 onClick={closeApplyModal}
-                disabled={isApplying || isDismissing}
+                disabled={isApplying || isDismissing || isManualApplying}
+              >
+                Vazgeç
+              </button>
+            </div>
+          </div>
+        </AppModal>
+      ) : null}
+
+      {manualTarget ? (
+        <AppModal title="Manuel İnceleme Kararı Uygula" onClose={closeManualApplyModal}>
+          <div data-testid="puantaj-etki-aday-manual-apply-modal">
+            <dl className="puantaj-etki-detail-grid">
+              <div className="puantaj-etki-detail-row">
+                <dt>Personel</dt>
+                <dd>{resolvePersonelDisplayName(manualTarget)}</dd>
+              </div>
+              <div className="puantaj-etki-detail-row">
+                <dt>Tarih</dt>
+                <dd>{manualTarget.tarih}</dd>
+              </div>
+              <div className="puantaj-etki-detail-row">
+                <dt>Şube</dt>
+                <dd>{manualSubeLabel}</dd>
+              </div>
+              <div className="puantaj-etki-detail-row">
+                <dt>Birim amiri</dt>
+                <dd>{manualBirimAmiriLabel}</dd>
+              </div>
+              <div className="puantaj-etki-detail-row">
+                <dt>Bildirim türü</dt>
+                <dd>{manualTarget.bildirim_turu}</dd>
+              </div>
+              <div className="puantaj-etki-detail-row">
+                <dt>Kaynak açıklaması</dt>
+                <dd>{manualTarget.bildirim_aciklama ?? "—"}</dd>
+              </div>
+              <div className="puantaj-etki-detail-row">
+                <dt>Çakışma kodu</dt>
+                <dd>{manualTarget.conflict_code ?? "—"}</dd>
+              </div>
+              <div className="puantaj-etki-detail-row">
+                <dt>Çakışma açıklaması</dt>
+                <dd>{formatConflictDisplay(manualTarget.conflict_code, manualTarget.conflict_detail)}</dd>
+              </div>
+            </dl>
+
+            <p className="puantaj-etki-terminal-uyari">{MANUAL_IZIN_RAPOR_INFO}</p>
+            <p className="puantaj-etki-terminal-uyari">{MANUAL_APPLY_OVERWRITE_WARNING}</p>
+
+            <FormField
+              label="Manuel karar"
+              name="puantaj-etki-aday-manual-karar"
+              as="select"
+              value={manualKararTuru}
+              onChange={handleManualKararChange}
+              selectOptions={[
+                { value: "", label: "Seçiniz" },
+                ...MANUAL_KARAR_PRESET_OPTIONS.map((option) => ({
+                  value: option.value,
+                  label: option.label
+                }))
+              ]}
+              required
+            />
+
+            {manualKararTuru && manualKararRequiresMiktar(manualKararTuru) ? (
+              <FormField
+                label="Dakika"
+                name="puantaj-etki-aday-manual-miktar"
+                type="number"
+                min={1}
+                value={manualMiktar}
+                onChange={setManualMiktar}
+                required
+              />
+            ) : null}
+
+            <FormField
+              as="textarea"
+              label="Karar Gerekçesi"
+              name="puantaj-etki-aday-manual-gerekce"
+              value={manualGerekce}
+              onChange={setManualGerekce}
+              rows={4}
+              required
+            />
+            {manualFieldError || manualGerekceValidationError ? (
+              <p className="puantaj-form-error">{manualFieldError ?? manualGerekceValidationError}</p>
+            ) : null}
+            {manualMiktarValidationError ? (
+              <p className="puantaj-form-error">{manualMiktarValidationError}</p>
+            ) : null}
+            <p className="puantaj-etki-gerekce-counter" data-testid="puantaj-etki-manual-gerekce-counter">
+              {manualGerekceCharCount} / {GEREKCE_MAX_LENGTH}
+            </p>
+
+            {manualPreview ? (
+              <div className="puantaj-etki-detail-group" data-testid="puantaj-etki-manual-preview">
+                <h4>Sonuç önizlemesi</h4>
+                <dl className="puantaj-etki-detail-grid">
+                  <div className="puantaj-etki-detail-row">
+                    <dt>Hareket</dt>
+                    <dd>{manualPreview.hareket}</dd>
+                  </div>
+                  <div className="puantaj-etki-detail-row">
+                    <dt>Dayanak</dt>
+                    <dd>{manualPreview.dayanak}</dd>
+                  </div>
+                  <div className="puantaj-etki-detail-row">
+                    <dt>Hesap Etkisi</dt>
+                    <dd>{manualPreview.hesapEtkisi}</dd>
+                  </div>
+                  <div className="puantaj-etki-detail-row">
+                    <dt>Gün Tipi</dt>
+                    <dd>{manualPreview.gunTipi}</dd>
+                  </div>
+                </dl>
+              </div>
+            ) : null}
+
+            {manualKararTuru === "DEVAMSIZLIK_GUN" ? (
+              <p className="puantaj-etki-terminal-uyari" data-testid="puantaj-etki-manual-devamsizlik-uyari">
+                {MANUAL_DEVAMSIZLIK_WARNING}
+              </p>
+            ) : null}
+
+            {manualError ? <p className="puantaj-form-error">{manualError}</p> : null}
+
+            <div className="form-actions-row">
+              <button
+                type="button"
+                className="universal-btn-save"
+                data-testid="puantaj-etki-aday-manual-apply-submit"
+                disabled={manualSubmitDisabled}
+                onClick={() => void manualApplyAday()}
+              >
+                {isManualApplying ? "Uygulanıyor..." : "Uygula"}
+              </button>
+              <button
+                type="button"
+                className="universal-btn-aux"
+                onClick={closeManualApplyModal}
+                disabled={isManualApplying || isApplying || isDismissing}
               >
                 Vazgeç
               </button>

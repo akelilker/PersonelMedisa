@@ -6,8 +6,12 @@ import type {
   BildirimPuantajEtkiAdayDismissPayload,
   BildirimPuantajEtkiAdayDismissResult,
   BildirimPuantajEtkiAdayListItem,
+  BildirimPuantajEtkiAdayManualApplyPayload,
+  BildirimPuantajEtkiAdayManualApplyResult,
   BildirimPuantajEtkiAdayOzet,
-  BildirimPuantajEtkiAdayState
+  BildirimPuantajEtkiAdayState,
+  BildirimPuantajEtkiManualKararTuru,
+  BildirimPuantajEtkiUygulamaModu
 } from "../types/bildirim-puantaj-etki-aday";
 import { appendQueryParams } from "../utils/append-query-params";
 import { apiRequest } from "./api-client";
@@ -107,7 +111,16 @@ function normalizeListItem(data: unknown): BildirimPuantajEtkiAdayListItem {
       record.karar_veren_user_id === null ? null : toNumber(record.karar_veren_user_id) ?? null,
     karar_zamani: record.karar_zamani === null ? null : toStringValue(record.karar_zamani) ?? null,
     uygulanan_puantaj_id:
-      record.uygulanan_puantaj_id === null ? null : toNumber(record.uygulanan_puantaj_id) ?? null
+      record.uygulanan_puantaj_id === null ? null : toNumber(record.uygulanan_puantaj_id) ?? null,
+    uygulama_modu: (toStringValue(record.uygulama_modu) ?? "OTOMATIK") as BildirimPuantajEtkiUygulamaModu,
+    manuel_karar_turu:
+      record.manuel_karar_turu === null
+        ? null
+        : (toStringValue(record.manuel_karar_turu) as BildirimPuantajEtkiManualKararTuru | undefined) ?? null,
+    manuel_karar_miktari:
+      record.manuel_karar_miktari === null || record.manuel_karar_miktari === undefined
+        ? null
+        : toNumber(record.manuel_karar_miktari) ?? null
   };
 }
 
@@ -269,6 +282,15 @@ function normalizeApplyResult(data: unknown): BildirimPuantajEtkiAdayApplyResult
     onceki_puantaj_snapshot: normalizeJsonObject(record.onceki_puantaj_snapshot),
     sonraki_puantaj_snapshot: normalizeJsonObject(record.sonraki_puantaj_snapshot),
     uygulama_hash: record.uygulama_hash === null ? null : toStringValue(record.uygulama_hash) ?? null,
+    uygulama_modu: (toStringValue(record.uygulama_modu) ?? "OTOMATIK") as BildirimPuantajEtkiUygulamaModu,
+    manuel_karar_turu:
+      record.manuel_karar_turu === null
+        ? null
+        : (toStringValue(record.manuel_karar_turu) as BildirimPuantajEtkiManualKararTuru | undefined) ?? null,
+    manuel_karar_miktari:
+      record.manuel_karar_miktari === null || record.manuel_karar_miktari === undefined
+        ? null
+        : toNumber(record.manuel_karar_miktari) ?? null,
     idempotent: Boolean(record.idempotent)
   };
 }
@@ -354,4 +376,30 @@ export async function applyBildirimPuantajEtkiAday(
     })
   });
   return normalizeApplyResult(response.data);
+}
+
+export async function manuelUygulaBildirimPuantajEtkiAdayi(
+  id: number | string,
+  payload: BildirimPuantajEtkiAdayManualApplyPayload,
+  context?: { subeId?: number | null }
+): Promise<BildirimPuantajEtkiAdayManualApplyResult> {
+  const path = appendQueryParams(endpoints.puantaj.bildirimEtkiAdaylari.manuelUygula(id), {
+    sube_id: context?.subeId
+  });
+  const response = await apiRequest<ApiResponse<unknown>>(path, {
+    method: "POST",
+    body: JSON.stringify({
+      expected_state: payload.expected_state,
+      karar_etki_turu: payload.karar_etki_turu,
+      etki_miktari: payload.etki_miktari,
+      gerekce: payload.gerekce.trim()
+    })
+  });
+  const result = normalizeApplyResult(response.data);
+  const record = response.data as Record<string, unknown>;
+  return {
+    ...result,
+    karar_gerekcesi:
+      record.karar_gerekcesi === null ? null : toStringValue(record.karar_gerekcesi) ?? null
+  };
 }

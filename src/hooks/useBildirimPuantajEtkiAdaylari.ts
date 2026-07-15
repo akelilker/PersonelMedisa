@@ -6,6 +6,7 @@ import {
   fetchBildirimPuantajEtkiAdayDetail,
   fetchBildirimPuantajEtkiAdayList,
   fetchBildirimPuantajEtkiAdayOzet,
+  manuelUygulaBildirimPuantajEtkiAdayi,
   type BildirimPuantajEtkiAdayListParams
 } from "../api/bildirim-puantaj-etki-adaylari.api";
 import { fetchGenelYoneticiBildirimOnayiOzet } from "../api/genel-yonetici-bildirim-onaylari.api";
@@ -15,7 +16,8 @@ import type {
   BildirimPuantajEtkiAdayDetail,
   BildirimPuantajEtkiAdayListItem,
   BildirimPuantajEtkiAdayOzet,
-  BildirimPuantajEtkiAdayState
+  BildirimPuantajEtkiAdayState,
+  BildirimPuantajEtkiManualKararTuru
 } from "../types/bildirim-puantaj-etki-aday";
 
 export type BildirimPuantajEtkiAdayFilters = {
@@ -95,11 +97,19 @@ export function useBildirimPuantajEtkiAdaylari(options: UseBildirimPuantajEtkiAd
   const [applyTarget, setApplyTarget] = useState<BildirimPuantajEtkiAdayDetail | null>(null);
   const [applyError, setApplyError] = useState<string | null>(null);
   const [isApplying, setIsApplying] = useState(false);
+  const [manualTarget, setManualTarget] = useState<BildirimPuantajEtkiAdayDetail | null>(null);
+  const [manualKararTuru, setManualKararTuru] = useState<BildirimPuantajEtkiManualKararTuru | "">("");
+  const [manualMiktar, setManualMiktar] = useState("");
+  const [manualGerekce, setManualGerekce] = useState("");
+  const [manualFieldError, setManualFieldError] = useState<string | null>(null);
+  const [manualError, setManualError] = useState<string | null>(null);
+  const [isManualApplying, setIsManualApplying] = useState(false);
   const listRequestIdRef = useRef(0);
   const ozetRequestIdRef = useRef(0);
   const detailRequestIdRef = useRef(0);
   const dismissingRef = useRef(false);
   const applyingRef = useRef(false);
+  const manualApplyingRef = useRef(false);
 
   const contextReady = Boolean(
     enabled &&
@@ -148,6 +158,17 @@ export function useBildirimPuantajEtkiAdaylari(options: UseBildirimPuantajEtkiAd
     applyingRef.current = false;
   }, []);
 
+  const closeManualApplyModal = useCallback(() => {
+    setManualTarget(null);
+    setManualKararTuru("");
+    setManualMiktar("");
+    setManualGerekce("");
+    setManualFieldError(null);
+    setManualError(null);
+    setIsManualApplying(false);
+    manualApplyingRef.current = false;
+  }, []);
+
   const resetTransientState = useCallback(() => {
     setItems([]);
     setOzet(null);
@@ -170,6 +191,14 @@ export function useBildirimPuantajEtkiAdaylari(options: UseBildirimPuantajEtkiAd
     setApplyError(null);
     setIsApplying(false);
     applyingRef.current = false;
+    setManualTarget(null);
+    setManualKararTuru("");
+    setManualMiktar("");
+    setManualGerekce("");
+    setManualFieldError(null);
+    setManualError(null);
+    setIsManualApplying(false);
+    manualApplyingRef.current = false;
   }, []);
 
   const closeDetail = useCallback(() => {
@@ -387,19 +416,40 @@ export function useBildirimPuantajEtkiAdaylari(options: UseBildirimPuantajEtkiAd
 
   const openApplyModal = useCallback(
     (item: BildirimPuantajEtkiAdayDetail) => {
-      if (!canApply || item.state !== "HAZIR" || isDetailLoading || isApplying) {
+      if (!canApply || item.state !== "HAZIR" || isDetailLoading || isApplying || isManualApplying) {
         return;
       }
       setDismissTarget(null);
       setDismissError(null);
+      setManualTarget(null);
+      setManualError(null);
       setApplyTarget(item);
       setApplyError(null);
     },
-    [canApply, isApplying, isDetailLoading]
+    [canApply, isApplying, isDetailLoading, isManualApplying]
+  );
+
+  const openManualApplyModal = useCallback(
+    (item: BildirimPuantajEtkiAdayDetail) => {
+      if (!canApply || item.state !== "INCELEME_GEREKLI" || isDetailLoading || isApplying || isManualApplying) {
+        return;
+      }
+      setDismissTarget(null);
+      setDismissError(null);
+      setApplyTarget(null);
+      setApplyError(null);
+      setManualTarget(item);
+      setManualKararTuru("");
+      setManualMiktar("");
+      setManualGerekce("");
+      setManualFieldError(null);
+      setManualError(null);
+    },
+    [canApply, isApplying, isDetailLoading, isManualApplying]
   );
 
   const dismissAday = useCallback(async () => {
-    if (!canDismiss || !dismissTarget || dismissingRef.current || isDismissing || isApplying) {
+    if (!canDismiss || !dismissTarget || dismissingRef.current || isDismissing || isApplying || isManualApplying) {
       return;
     }
     const trimmed = trimDismissGerekce(dismissGerekce);
@@ -521,6 +571,95 @@ export function useBildirimPuantajEtkiAdaylari(options: UseBildirimPuantajEtkiAd
     subeId
   ]);
 
+  const manualApplyAday = useCallback(async () => {
+    if (!canApply || !manualTarget || manualApplyingRef.current || isManualApplying || isApplying || isDismissing) {
+      return;
+    }
+    if (manualTarget.state !== "INCELEME_GEREKLI" || !manualKararTuru) {
+      return;
+    }
+    const trimmedGerekce = trimDismissGerekce(manualGerekce);
+    if (trimmedGerekce.length < 5 || [...trimmedGerekce].length > 500) {
+      return;
+    }
+
+    manualApplyingRef.current = true;
+    setIsManualApplying(true);
+    setManualFieldError(null);
+    setManualError(null);
+    setSuccessMessage(null);
+    setInfoMessage(null);
+
+    try {
+      const result = await manuelUygulaBildirimPuantajEtkiAdayi(
+        manualTarget.id,
+        {
+          expected_state: "INCELEME_GEREKLI",
+          karar_etki_turu: manualKararTuru,
+          etki_miktari:
+            manualKararTuru === "GEC_KALMA_DAKIKA" || manualKararTuru === "ERKEN_CIKIS_DAKIKA"
+              ? Number.parseInt(manualMiktar.trim(), 10)
+              : null,
+          gerekce: trimmedGerekce
+        },
+        { subeId }
+      );
+      closeManualApplyModal();
+      if (result.idempotent) {
+        setInfoMessage("Bu aday daha önce aynı manuel kararla uygulanmış.");
+      } else {
+        setSuccessMessage("Manuel inceleme kararı günlük puantaja uygulandı.");
+      }
+      await refreshAll();
+    } catch (caught) {
+      const detail = getApiErrorDetail(caught, "Manuel inceleme kararı uygulanamadı.");
+      if (detail.code === "VALIDATION_ERROR" && detail.field) {
+        setManualFieldError(detail.message);
+      } else if (detail.code === "STATE_STALE") {
+        closeManualApplyModal();
+        setInfoMessage("Adayın durumu başka bir işlemle değişti. Kayıt yenileniyor.");
+        await refreshAll();
+      } else if (
+        detail.code === "SOURCE_INTEGRITY_FAILED" ||
+        detail.code === "MANUAL_DECISION_CONFLICT" ||
+        detail.code === "STATE_CONFLICT" ||
+        detail.code === "PERIOD_LOCKED" ||
+        detail.code === "PUANTAJ_OLUSTU" ||
+        detail.code === "APPLY_INTEGRITY_CONFLICT"
+      ) {
+        if (detail.code === "SOURCE_INTEGRITY_FAILED") {
+          setManualError("Adayın kaynak verisi doğrulanamadı. Kayıt uygulanmadan yenilendi.");
+        } else if (detail.code === "MANUAL_DECISION_CONFLICT") {
+          setManualError("Bu aday daha önce farklı bir manuel kararla uygulanmış.");
+        } else if (detail.code === "PUANTAJ_OLUSTU") {
+          setManualError("Bu personel ve tarih için puantaj kaydı zaten oluşmuş. Mevcut kayıt değiştirilmedi.");
+        } else if (detail.code === "PERIOD_LOCKED") {
+          setManualError("Bu dönem mühürlendiği için manuel karar uygulanamaz.");
+        } else {
+          setManualError(detail.message);
+        }
+        await refreshAll();
+      } else {
+        setManualError(detail.message);
+      }
+    } finally {
+      manualApplyingRef.current = false;
+      setIsManualApplying(false);
+    }
+  }, [
+    canApply,
+    closeManualApplyModal,
+    isApplying,
+    isDismissing,
+    isManualApplying,
+    manualGerekce,
+    manualKararTuru,
+    manualMiktar,
+    manualTarget,
+    refreshAll,
+    subeId
+  ]);
+
   const isLoading = isListLoading || isOzetLoading;
 
   return {
@@ -556,6 +695,16 @@ export function useBildirimPuantajEtkiAdaylari(options: UseBildirimPuantajEtkiAd
     applyTarget,
     applyError,
     isApplying,
+    manualTarget,
+    manualKararTuru,
+    setManualKararTuru,
+    manualMiktar,
+    setManualMiktar,
+    manualGerekce,
+    setManualGerekce,
+    manualFieldError,
+    manualError,
+    isManualApplying,
     contextReady,
     refreshList,
     refreshAll,
@@ -566,6 +715,9 @@ export function useBildirimPuantajEtkiAdaylari(options: UseBildirimPuantajEtkiAd
     dismissAday,
     openApplyModal,
     closeApplyModal,
-    applyAday
+    applyAday,
+    openManualApplyModal,
+    closeManualApplyModal,
+    manualApplyAday
   };
 }

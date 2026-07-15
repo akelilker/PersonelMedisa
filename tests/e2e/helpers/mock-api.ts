@@ -1938,6 +1938,9 @@ export async function mockApi(page: Page, role: MockUserRole) {
     onceki_puantaj_snapshot: Record<string, unknown> | null;
     sonraki_puantaj_snapshot: Record<string, unknown> | null;
     uygulama_hash: string | null;
+    uygulama_modu: "OTOMATIK" | "MANUEL";
+    manuel_karar_turu: string | null;
+    manuel_karar_miktari: number | null;
   };
 
   const puantajEtkiAdaylari: MockPuantajEtkiAday[] = [
@@ -1981,7 +1984,10 @@ export async function mockApi(page: Page, role: MockUserRole) {
       uygulanan_puantaj_id: null,
       onceki_puantaj_snapshot: null,
       sonraki_puantaj_snapshot: null,
-      uygulama_hash: null
+      uygulama_hash: null,
+      uygulama_modu: "OTOMATIK",
+      manuel_karar_turu: null,
+      manuel_karar_miktari: null
     },
     {
       id: 2,
@@ -2023,7 +2029,10 @@ export async function mockApi(page: Page, role: MockUserRole) {
       uygulanan_puantaj_id: null,
       onceki_puantaj_snapshot: null,
       sonraki_puantaj_snapshot: null,
-      uygulama_hash: null
+      uygulama_hash: null,
+      uygulama_modu: "OTOMATIK",
+      manuel_karar_turu: null,
+      manuel_karar_miktari: null
     },
     {
       id: 3,
@@ -2065,7 +2074,10 @@ export async function mockApi(page: Page, role: MockUserRole) {
       uygulanan_puantaj_id: null,
       onceki_puantaj_snapshot: null,
       sonraki_puantaj_snapshot: null,
-      uygulama_hash: null
+      uygulama_hash: null,
+      uygulama_modu: "OTOMATIK",
+      manuel_karar_turu: null,
+      manuel_karar_miktari: null
     },
     {
       id: 4,
@@ -2107,7 +2119,10 @@ export async function mockApi(page: Page, role: MockUserRole) {
       uygulanan_puantaj_id: 77,
       onceki_puantaj_snapshot: null,
       sonraki_puantaj_snapshot: null,
-      uygulama_hash: "apply-hash-3"
+      uygulama_hash: "apply-hash-3",
+      uygulama_modu: "OTOMATIK",
+      manuel_karar_turu: null,
+      manuel_karar_miktari: null
     },
     {
       id: 5,
@@ -2149,7 +2164,55 @@ export async function mockApi(page: Page, role: MockUserRole) {
       uygulanan_puantaj_id: null,
       onceki_puantaj_snapshot: null,
       sonraki_puantaj_snapshot: null,
-      uygulama_hash: null
+      uygulama_hash: null,
+      uygulama_modu: "OTOMATIK",
+      manuel_karar_turu: null,
+      manuel_karar_miktari: null
+    },
+    {
+      id: 6,
+      genel_yonetici_bildirim_onayi_id: 10,
+      aylik_bildirim_onayi_id: 2,
+      gunluk_bildirim_id: 106,
+      personel_id: 1,
+      sube_id: 1,
+      birim_amiri_user_id: 1,
+      ay: "2026-06",
+      tarih: "2026-06-07",
+      bildirim_turu: "DIGER",
+      bildirim_alt_tur: null,
+      bildirim_dakika: null,
+      bildirim_aciklama: "Gorevde calisma aciklamasi",
+      bildirim_created_at: "2026-06-07 10:00:00",
+      bildirim_updated_at: "2026-06-07 10:00:00",
+      etki_turu: "MANUEL",
+      etki_miktari: null,
+      etki_birimi: null,
+      state: "INCELEME_GEREKLI",
+      conflict_code: "DIGER_MANUEL_INCELEME",
+      conflict_detail: { message: "Manuel inceleme gerekiyor." },
+      resmi_surec_id: null,
+      resmi_surec_turu: null,
+      resmi_surec_alt_tur: null,
+      ucretli_mi_snapshot: null,
+      mevcut_puantaj_id: null,
+      source_priority: "BILDIRIM",
+      created_by: 1,
+      source_snapshot: { aciklama: "Gorevde calisma aciklamasi", ad_soyad: "Ali Demir" },
+      source_hash: "hash-6",
+      projection_version: "v1",
+      created_at: "2026-06-10 10:20:00",
+      updated_at: "2026-06-10 10:20:00",
+      karar_veren_user_id: null,
+      karar_zamani: null,
+      karar_gerekcesi: null,
+      uygulanan_puantaj_id: null,
+      onceki_puantaj_snapshot: null,
+      sonraki_puantaj_snapshot: null,
+      uygulama_hash: null,
+      uygulama_modu: "OTOMATIK",
+      manuel_karar_turu: null,
+      manuel_karar_miktari: null
     }
   ];
 
@@ -2173,7 +2236,10 @@ export async function mockApi(page: Page, role: MockUserRole) {
       created_at: item.created_at,
       karar_veren_user_id: item.karar_veren_user_id,
       karar_zamani: item.karar_zamani,
-      uygulanan_puantaj_id: item.uygulanan_puantaj_id
+      uygulanan_puantaj_id: item.uygulanan_puantaj_id,
+      uygulama_modu: item.uygulama_modu,
+      manuel_karar_turu: item.manuel_karar_turu,
+      manuel_karar_miktari: item.manuel_karar_miktari
     };
   }
 
@@ -5276,6 +5342,214 @@ let personelBelgeKaydiIdCounter = 903;
       return;
     }
 
+    if (path.match(/^\/api\/puantaj\/bildirim-etki-adaylari\/\d+\/manuel-uygula$/) && method === "POST") {
+      const authHeader = request.headers()["authorization"] ?? request.headers()["Authorization"] ?? "";
+      if (!authHeader.startsWith("Bearer ")) {
+        await fulfillJson(route, 401, errorBody("UNAUTHORIZED", "Oturum gerekli."));
+        return;
+      }
+      if (await denyUnlessRolePermission(route, "puantaj.bildirim_etki.apply")) {
+        return;
+      }
+
+      const adayId = Number.parseInt(path.split("/")[4] ?? "", 10);
+      if (!adayId) {
+        await fulfillJson(route, 404, errorBody("NOT_FOUND", "Puantaj etki adayi bulunamadi."));
+        return;
+      }
+
+      const itemIndex = puantajEtkiAdaylari.findIndex((entry) => entry.id === adayId);
+      const item = itemIndex >= 0 ? puantajEtkiAdaylari[itemIndex] : null;
+      if (!item) {
+        await fulfillJson(route, 404, errorBody("NOT_FOUND", "Puantaj etki adayi bulunamadi."));
+        return;
+      }
+
+      const adaySubeId = item.sube_id;
+      const subeScope = getRequestSubeScope(request, url);
+      if (subeScope !== null && subeScope !== adaySubeId) {
+        await fulfillJson(route, 403, errorBody("FORBIDDEN", "Bu kayit aktif sube baglaminda goruntulenemiyor."));
+        return;
+      }
+      if (mockUserSubeIds.length > 0 && !mockUserSubeIds.includes(adaySubeId)) {
+        await fulfillJson(route, 403, errorBody("FORBIDDEN", "Bu kayit aktif sube baglaminda goruntulenemiyor."));
+        return;
+      }
+
+      const payload = request.postDataJSON() as {
+        expected_state?: string;
+        karar_etki_turu?: string;
+        etki_miktari?: number | null;
+        gerekce?: string;
+        geldi_mi?: unknown;
+        state?: unknown;
+      };
+
+      if (payload.geldi_mi !== undefined || payload.state !== undefined) {
+        await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "Bilinmeyen alan kabul edilmez."));
+        return;
+      }
+
+      if (payload.expected_state !== "INCELEME_GEREKLI") {
+        await fulfillJson(
+          route,
+          422,
+          errorBody("VALIDATION_ERROR", "Beklenen durum INCELEME_GEREKLI olmalidir.", "expected_state")
+        );
+        return;
+      }
+
+      const allowedKararTurleri = new Set([
+        "DEVAMSIZLIK_GUN",
+        "GEC_KALMA_DAKIKA",
+        "ERKEN_CIKIS_DAKIKA",
+        "GOREVDE_CALISILMIS_GUN"
+      ]);
+      const kararTuru = typeof payload.karar_etki_turu === "string" ? payload.karar_etki_turu.trim() : "";
+      if (!allowedKararTurleri.has(kararTuru)) {
+        await fulfillJson(
+          route,
+          422,
+          errorBody("VALIDATION_ERROR", "Desteklenmeyen manuel karar turu.", "karar_etki_turu")
+        );
+        return;
+      }
+
+      const gerekce = typeof payload.gerekce === "string" ? payload.gerekce.trim() : "";
+      if (gerekce.length < 5) {
+        await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "Karar gerekcesi en az 5 karakter olmalidir.", "gerekce"));
+        return;
+      }
+      if ([...gerekce].length > 500) {
+        await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "Karar gerekcesi en fazla 500 karakter olabilir.", "gerekce"));
+        return;
+      }
+
+      const requiresMiktar = kararTuru === "GEC_KALMA_DAKIKA" || kararTuru === "ERKEN_CIKIS_DAKIKA";
+      const miktarRaw = payload.etki_miktari;
+      let miktar: number | null = null;
+      if (requiresMiktar) {
+        if (typeof miktarRaw !== "number" || !Number.isInteger(miktarRaw) || miktarRaw <= 0 || miktarRaw > 1440) {
+          await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "Dakika degeri 1-1440 arasinda olmalidir.", "etki_miktari"));
+          return;
+        }
+        miktar = miktarRaw;
+      } else if (miktarRaw !== null && miktarRaw !== undefined) {
+        await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "Bu karar turu icin miktar gonderilmemelidir.", "etki_miktari"));
+        return;
+      }
+
+      if (gerekce === "E2E source integrity tetikleyici") {
+        await fulfillJson(route, 409, errorBody("SOURCE_INTEGRITY_FAILED", "Aday kaynak verisi dogrulanamadi."));
+        return;
+      }
+
+      if (item.state === "UYGULANDI") {
+        if (item.uygulama_modu === "MANUEL") {
+          const sameDecision =
+            item.manuel_karar_turu === kararTuru &&
+            item.manuel_karar_miktari === miktar &&
+            (item.karar_gerekcesi ?? "").trim() === gerekce &&
+            item.uygulanan_puantaj_id &&
+            item.uygulama_hash &&
+            item.sonraki_puantaj_snapshot;
+          if (sameDecision) {
+            await fulfillJson(route, 200, okBody({
+              id: adayId,
+              state: "UYGULANDI",
+              uygulama_modu: "MANUEL",
+              manuel_karar_turu: item.manuel_karar_turu,
+              manuel_karar_miktari: item.manuel_karar_miktari,
+              karar_veren_user_id: item.karar_veren_user_id,
+              karar_zamani: item.karar_zamani,
+              karar_gerekcesi: item.karar_gerekcesi,
+              uygulanan_puantaj_id: item.uygulanan_puantaj_id,
+              onceki_puantaj_snapshot: item.onceki_puantaj_snapshot,
+              sonraki_puantaj_snapshot: item.sonraki_puantaj_snapshot,
+              uygulama_hash: item.uygulama_hash,
+              idempotent: true
+            }));
+            return;
+          }
+          await fulfillJson(route, 409, errorBody("MANUAL_DECISION_CONFLICT", "Bu aday daha once farkli bir manuel kararla uygulanmis."));
+          return;
+        }
+        await fulfillJson(route, 409, errorBody("STATE_CONFLICT", "Otomatik uygulanmis aday manuel endpoint ile degistirilemez."));
+        return;
+      }
+
+      if (item.state !== "INCELEME_GEREKLI") {
+        await fulfillJson(route, 409, errorBody("STATE_CONFLICT", "Puantaj etki adayi manuel uygulanamaz."));
+        return;
+      }
+
+      if (payload.expected_state !== item.state) {
+        await fulfillJson(route, 409, errorBody("STATE_STALE", "Puantaj etki adayi durumu degismis. Listeyi yenileyip tekrar deneyin."));
+        return;
+      }
+
+      if (item.tarih === "2026-06-01") {
+        await fulfillJson(route, 409, errorBody("PERIOD_LOCKED", "Bu donem muhurlenmis, manuel karar uygulanamaz."));
+        return;
+      }
+
+      if (item.mevcut_puantaj_id != null) {
+        await fulfillJson(route, 409, errorBody("PUANTAJ_OLUSTU", "Bu personel ve tarih icin puantaj kaydi zaten olusmus."));
+        return;
+      }
+
+      const puantajId = 9100 + adayId;
+      const sonraki = {
+        schema_version: "S74_MANUAL_APPLY_V1",
+        aday_id: adayId,
+        uygulama_modu: "MANUEL",
+        manuel_karar_turu: kararTuru,
+        manuel_karar_miktari: miktar,
+        karar_gerekcesi: gerekce,
+        puantaj: {
+          id: puantajId,
+          personel_id: item.personel_id,
+          tarih: item.tarih,
+          state: "ACIK",
+          kaynak: "BILDIRIM_ETKI_ADAYI"
+        }
+      };
+      const hash = `mock-manual-apply-hash-${adayId}-${kararTuru}-${miktar ?? "null"}-${gerekce.length}`;
+      const updated = {
+        ...item,
+        state: "UYGULANDI" as const,
+        uygulama_modu: "MANUEL" as const,
+        manuel_karar_turu: kararTuru,
+        manuel_karar_miktari: miktar,
+        karar_veren_user_id: mockUserId,
+        karar_zamani: "2026-07-15 12:00:00",
+        karar_gerekcesi: gerekce,
+        uygulanan_puantaj_id: puantajId,
+        onceki_puantaj_snapshot: null,
+        sonraki_puantaj_snapshot: sonraki,
+        uygulama_hash: hash,
+        updated_at: "2026-07-15 12:00:00"
+      };
+      puantajEtkiAdaylari[itemIndex] = updated;
+
+      await fulfillJson(route, 200, okBody({
+        id: adayId,
+        state: "UYGULANDI",
+        uygulama_modu: "MANUEL",
+        manuel_karar_turu: kararTuru,
+        manuel_karar_miktari: miktar,
+        karar_veren_user_id: mockUserId,
+        karar_zamani: "2026-07-15 12:00:00",
+        karar_gerekcesi: gerekce,
+        uygulanan_puantaj_id: puantajId,
+        onceki_puantaj_snapshot: null,
+        sonraki_puantaj_snapshot: sonraki,
+        uygulama_hash: hash,
+        idempotent: false
+      }));
+      return;
+    }
+
     if (path.match(/^\/api\/puantaj\/bildirim-etki-adaylari\/\d+\/uygula$/) && method === "POST") {
       const authHeader = request.headers()["authorization"] ?? request.headers()["Authorization"] ?? "";
       if (!authHeader.startsWith("Bearer ")) {
@@ -5427,6 +5701,9 @@ let personelBelgeKaydiIdCounter = 903;
       const updated = {
         ...item,
         state: "UYGULANDI" as const,
+        uygulama_modu: "OTOMATIK" as const,
+        manuel_karar_turu: null,
+        manuel_karar_miktari: null,
         karar_veren_user_id: mockUserId,
         karar_zamani: "2026-07-14 00:10:00",
         uygulanan_puantaj_id: puantajId,
@@ -5443,6 +5720,9 @@ let personelBelgeKaydiIdCounter = 903;
         okBody({
           id: adayId,
           state: "UYGULANDI",
+          uygulama_modu: "OTOMATIK",
+          manuel_karar_turu: null,
+          manuel_karar_miktari: null,
           karar_veren_user_id: mockUserId,
           karar_zamani: "2026-07-14 00:10:00",
           uygulanan_puantaj_id: puantajId,

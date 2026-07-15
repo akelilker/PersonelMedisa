@@ -201,4 +201,42 @@ test.describe("S74-C2B puantaj etki adaylari paneli", () => {
     await expect(page.getByTestId("puantaj-etki-aday-info")).toContainText("Liste yenilendi");
     await expect(page.getByTestId("puantaj-etki-aday-dismiss-modal")).toHaveCount(0);
   });
+
+  test("MUHASEBE INCELEME adayinda İncele ve Uygula akisini tamamlar", async ({ page }) => {
+    await prepareMuhasebePanel(page);
+    await tableAction(page, "puantaj-etki-aday-detail-6").click();
+    await expect(page.getByTestId("puantaj-etki-aday-detail-manual-apply")).toBeVisible();
+    await expect(page.getByTestId("puantaj-etki-aday-detail-apply")).toHaveCount(0);
+
+    await page.getByTestId("puantaj-etki-aday-detail-manual-apply").click();
+    const modal = page.getByTestId("puantaj-etki-aday-manual-apply-modal");
+    await expect(modal).toBeVisible();
+    await expect(modal).toContainText("Ali Demir");
+    await expect(modal).toContainText("Gorevde calisma aciklamasi");
+    await expect(modal).toContainText("İzin ve rapor kayıtları");
+
+    await page.getByLabel("Manuel karar").selectOption("GOREVDE_CALISILMIS_GUN");
+    await expect(page.getByTestId("puantaj-etki-manual-preview")).toContainText("Görevde Çalışma");
+
+    const submit = page.getByTestId("puantaj-etki-aday-manual-apply-submit");
+    await expect(submit).toBeDisabled();
+    await page.getByLabel("Karar Gerekçesi").fill("Birim amiri aciklamasi operasyon kayitlariyla dogrulandi.");
+    await expect(submit).toBeEnabled();
+    await submit.click();
+
+    await expect(page.getByTestId("puantaj-etki-aday-success")).toContainText(
+      "Manuel inceleme kararı günlük puantaja uygulandı."
+    );
+    await expect(tableAction(page, "puantaj-etki-aday-state-6")).toContainText("Uygulandı");
+    await expect(page.getByTestId("puantaj-etki-aday-detail-manual-apply")).toHaveCount(0);
+  });
+
+  test("GENEL_YONETICI İncele ve Uygula butonunu gormez", async ({ page }) => {
+    await openPuantaj(page, "GENEL_YONETICI");
+    await page.getByLabel("Şube", { exact: true }).selectOption("1");
+    await page.getByLabel("Ay", { exact: true }).last().fill(PANEL_AY_WITH_DATA);
+    await page.getByLabel("Birim Amiri", { exact: true }).selectOption("1");
+    await tableAction(page, "puantaj-etki-aday-detail-6").click();
+    await expect(page.getByTestId("puantaj-etki-aday-detail-manual-apply")).toHaveCount(0);
+  });
 });

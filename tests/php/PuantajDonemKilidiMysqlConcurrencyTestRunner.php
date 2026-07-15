@@ -64,21 +64,25 @@ function childMode(array $argv): void
         return;
     }
     if ($action === 'candidate-apply') {
-        [$candidateId, $signal, $holdMilliseconds] = array_slice($argv, 3, 3);
+        [$candidateId, $subeId, $tarih, $signal, $holdMilliseconds] = array_slice($argv, 3, 5);
         $pdo->beginTransaction();
-        $candidate = $pdo->query('SELECT * FROM test_adaylar WHERE id = ' . (int) $candidateId)->fetch();
-        PuantajDonemKilidiService::acquireForDate($pdo, (int) $candidate['sube_id'], (string) $candidate['tarih']);
+        PuantajDonemKilidiService::acquireForDate($pdo, (int) $subeId, (string) $tarih);
         $stmt = $pdo->prepare('SELECT * FROM test_adaylar WHERE id = ? FOR UPDATE');
         $stmt->execute([(int) $candidateId]);
         $candidate = $stmt->fetch();
         signalReady($signal);
+        if (!$candidate) {
+            $pdo->rollBack();
+            echo 'MISSING' . PHP_EOL;
+            return;
+        }
         if ($candidate['state'] === 'UYGULANDI') {
             $pdo->commit();
             echo 'IDEMPOTENT' . PHP_EOL;
             return;
         }
         $seal = $pdo->prepare('SELECT id FROM puantaj_aylik_muhurleri WHERE sube_id = ? AND yil = ? AND ay = ?');
-        $seal->execute([(int) $candidate['sube_id'], (int) substr($candidate['tarih'], 0, 4), (int) substr($candidate['tarih'], 5, 2)]);
+        $seal->execute([(int) $candidate['sube_id'], (int) substr((string) $candidate['tarih'], 0, 4), (int) substr((string) $candidate['tarih'], 5, 2)]);
         if ($seal->fetch()) {
             $pdo->rollBack();
             echo 'PERIOD_LOCKED' . PHP_EOL;
@@ -112,7 +116,15 @@ function spawnChild(array $args): array
     unset($arg);
     $phpArgs = [];
     if (PHP_OS_FAMILY === 'Windows') {
-        $phpArgs = ['-d', 'extension_dir=' . ini_get('extension_dir'), '-d', 'extension=php_pdo_mysql.dll'];
+        $extensionDir = ini_get('extension_dir');
+        if (is_string($extensionDir) && $extensionDir !== '') {
+            $phpArgs[] = '-d';
+            $phpArgs[] = 'extension_dir=' . $extensionDir;
+        }
+        if (!extension_loaded('pdo_mysql')) {
+            $phpArgs[] = '-d';
+            $phpArgs[] = 'extension=php_pdo_mysql.dll';
+        }
     }
     $command = array_merge([PHP_BINARY], $phpArgs, [__FILE__, '--child'], $args);
     $pipes = [];
@@ -123,6 +135,21 @@ function spawnChild(array $args): array
     fclose($pipes[0]);
 
     return ['process' => $process, 'pipes' => $pipes, 'signal' => $signal];
+}
+
+function childStdoutToken(string $stdout): string
+{
+    $lines = preg_split('/\R/', trim($stdout)) ?: [];
+    $token = '';
+    foreach ($lines as $line) {
+        $line = trim($line);
+        if ($line === '' || stripos($line, 'Warning:') === 0) {
+            continue;
+        }
+        $token = $line;
+    }
+
+    return $token;
 }
 
 function waitReady(array $child): void
@@ -148,7 +175,7 @@ function finishChild(array $child): string
         throw new RuntimeException('Child failed: ' . trim($stderr));
     }
 
-    return trim($stdout);
+    return childStdoutToken((string) $stdout);
 }
 
 function resetMysql(PDO $pdo): void
@@ -264,9 +291,9 @@ try {
     resetMysql($pdo);
     seedLock($pdo, 1, 2026, 5);
     $pdo->exec("INSERT INTO test_adaylar VALUES (1, 7, 1, '2026-05-15', 'HAZIR', NULL)");
-    $first = spawnChild(['candidate-apply', '1', '{SIGNAL}', '400']);
+    $first = spawnChild(['candidate-apply', '1', '1', '2026-05-15', '{SIGNAL}', '400']);
     waitReady($first);
-    $second = spawnChild(['candidate-apply', '1', '{SIGNAL}', '0']);
+    $second = spawnChild(['candidate-apply', '1', '1', '2026-05-15', '{SIGNAL}', '0']);
     $firstResult = finishChild($first);
     $secondResult = finishChild($second);
     assertMysql((int) $pdo->query('SELECT COUNT(*) FROM gunluk_puantaj')->fetchColumn() === 1
@@ -277,7 +304,7 @@ try {
     resetMysql($pdo);
     seedLock($pdo, 1, 2026, 5);
     $pdo->exec("INSERT INTO test_adaylar VALUES (1, 7, 1, '2026-05-15', 'HAZIR', NULL)");
-    $apply = spawnChild(['candidate-apply', '1', '{SIGNAL}', '500']);
+    $apply = spawnChild(['candidate-apply', '1', '1', '2026-05-15', '{SIGNAL}', '500']);
     waitReady($apply);
     $sealPdo = mysqlPdo();
     $sealPdo->beginTransaction();

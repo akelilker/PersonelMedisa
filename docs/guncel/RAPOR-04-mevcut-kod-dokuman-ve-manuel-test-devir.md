@@ -238,6 +238,88 @@ Fixture korunur; silinmez, Yok Say yapılmaz, DB temizliği yapılmaz. Gerçek o
 
 Detay checkpoint: `docs/guncel/76-s74-c3-puantaj-etki-adayi-uygula-kapanis-checkpoint.md`
 
+## RAPOR-04E — S74-D1/D3 Kontrollü Canlı Manuel Apply ve Idempotency Kapanışı
+
+**Kapanış etiketi:** `S74_D1D3_CLOSED_MANUAL_APPLY_IDEMPOTENCY_VERIFIED`
+
+**Başarılı canlı doğrulama etiketi:** `S74_D1D3_MANUAL_APPLY_IDEMPOTENCY_OK`
+
+### Tam veritabanı yedeği
+
+| Alan | Kanıt |
+|------|-------|
+| Dosya | `C:\Users\Akel\Downloads\karmotor_medisa (10).sql` |
+| Boyut | 49.837 bayt |
+| Zaman | 15.07.2026 19:41:40 |
+| SHA256 | `3801A93B389433E3E17DAF142D5F28C56870C075F50CD3B4009FF85330F548F2` |
+| İçerik | Doğru veritabanı başlığı; 20 `CREATE TABLE`; 17 `INSERT`; transaction ve `COMMIT` mevcut |
+
+Yedek yalnız repo dışı canlı kabul kanıtıdır; repo içine alınmamış ve commit edilmemiştir.
+
+### Kontrollü test zinciri
+
+| Alan | Sonuç |
+|------|-------|
+| Temiz dönem | `2026-05` |
+| Hafta | 11–17 Mayıs 2026 |
+| Operasyon tarihi | `2026-05-15` |
+| Bildirim | `#6`, `DIGER` |
+| Haftalık mutabakat | `#5` |
+| Aylık onay | `#3` |
+| Genel Yönetici onayı | `#3` |
+| Tek generation | Aday `#4`, başlangıç durumu `INCELEME_GEREKLI` |
+| Tek UI manuel apply | `GOREVDE_CALISILMIS_GUN` |
+| Oluşan puantaj | `#4` |
+| Aynı body ile tek idempotency POST | HTTP `200`, `idempotent: true` |
+
+Üçüncü apply, conflict denemesi veya ek generation yapılmadı.
+
+### Canlı UI son durumu
+
+| Alan | Sonuç |
+|------|-------|
+| Aday `#4` | Uygulandı |
+| Uygulama modu | Manuel |
+| Manuel karar | `GOREVDE_CALISILMIS_GUN` |
+| Uygulanan puantaj | `#4` |
+| Mayıs özeti | Toplam `1`; inceleme gereken `0`; uygulanan `1` |
+
+### Veri artışları ve koruma kanıtı
+
+| Veri | Artış |
+|------|-------|
+| Bildirim | +1 |
+| Haftalık mutabakat | +1 |
+| Aylık onay | +1 |
+| Genel Yönetici onayı | +1 |
+| Aday | +1 |
+| Puantaj | +1 |
+
+Tüm artışlar beklenen değerlerle birebir uyumludur.
+
+- Bildirim `#4` değişmedi: durum `TASLAK`, tarih `2026-07-15`.
+- Bildirim `#5` değişmedi.
+- Haftalık mutabakat `#4` değişmedi.
+- Aday `#1` değişmedi.
+- Aday `#3` ve hash değerleri değişmedi.
+- Mevcut Temmuz aylık onayı değişmedi.
+- Mevcut Temmuz Genel Yönetici onayı değişmedi.
+
+### Repo kapanış kapısı
+
+| Alan | Sonuç |
+|------|-------|
+| Branch | `main` |
+| HEAD | `400b2e33bc0955281e6ffab62d3729565b388b2c` |
+| origin/main | `400b2e33bc0955281e6ffab62d3729565b388b2c` |
+| Ahead / behind | `0 / 0` |
+| Working tree | Temiz |
+| `git diff --check` | Temiz |
+
+### Kapanış kararı
+
+S74-D1/D3 kontrollü canlı manuel apply ve idempotency doğrulaması başarıyla tamamlandı. Manuel karar yalnızca bir kez puantaja uygulandı; aynı request body ile yapılan tekrar çağrısı idempotent sonuç verdi ve mükerrer puantaj üretmedi. Beklenen veri artışları birebir doğrulandı, korunan kayıtlar değişmedi ve ek mutation yapılmadı. S74-D1/D3 zinciri kapatıldı.
+
 ## 7. Tamamlanmayan ürün halkaları
 
 Aşağıdakiler bug değil, henüz geliştirilmemiş sonraki ürün halkalarıdır:

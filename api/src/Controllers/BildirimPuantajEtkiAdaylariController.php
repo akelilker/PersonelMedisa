@@ -15,6 +15,7 @@ use Medisa\Api\Services\BildirimPuantajEtkiDecisionPolicy;
 use Medisa\Api\Services\BildirimPuantajEtkiManualApplyService;
 use Medisa\Api\Services\BildirimPuantajEtkiProjectionService;
 use Medisa\Api\Services\BildirimPuantajEtkiPuantajMapper;
+use Medisa\Api\Services\PuantajDonemKilidiService;
 use PDO;
 
 class BildirimPuantajEtkiAdaylariController
@@ -241,12 +242,24 @@ class BildirimPuantajEtkiAdaylariController
         try {
             $pdo->beginTransaction();
 
+            $periodLock = PuantajDonemKilidiService::acquireForDate(
+                $pdo,
+                (int) $scopeRow['sube_id'],
+                (string) $scopeRow['tarih']
+            );
+            if (PuantajDonemKilidiService::isSealed($pdo, $periodLock)) {
+                self::rollbackConflict($pdo, 'PERIOD_LOCKED', 'Bu donem muhurlenmis, puantaj kaydi olusturulamaz.');
+            }
+
             $row = self::fetchAdayById($pdo, $adayId, true);
             if (!$row) {
                 if ($pdo->inTransaction()) {
                     $pdo->rollBack();
                 }
                 JsonResponse::notFound('Puantaj etki adayi bulunamadi.');
+            }
+            if (!PuantajDonemKilidiService::matchesDate($periodLock, (int) $row['sube_id'], (string) $row['tarih'])) {
+                self::rollbackConflict($pdo, 'ADAY_PERIOD_CHANGED', 'Puantaj etki adayi donemi degismis.');
             }
 
             $result = BildirimPuantajEtkiApplyService::apply(
@@ -297,7 +310,7 @@ class BildirimPuantajEtkiAdaylariController
 
             $pdo->commit();
             JsonResponse::success(self::mapApplyResponse($result['aday'], false));
-        } catch (\PDOException $e) {
+        } catch (\Throwable $e) {
             if ($pdo->inTransaction()) {
                 $pdo->rollBack();
             }
@@ -335,12 +348,24 @@ class BildirimPuantajEtkiAdaylariController
         try {
             $pdo->beginTransaction();
 
+            $periodLock = PuantajDonemKilidiService::acquireForDate(
+                $pdo,
+                (int) $scopeRow['sube_id'],
+                (string) $scopeRow['tarih']
+            );
+            if (PuantajDonemKilidiService::isSealed($pdo, $periodLock)) {
+                self::rollbackConflict($pdo, 'PERIOD_LOCKED', 'Bu donem muhurlenmis, puantaj kaydi olusturulamaz.');
+            }
+
             $row = self::fetchAdayById($pdo, $adayId, true);
             if (!$row) {
                 if ($pdo->inTransaction()) {
                     $pdo->rollBack();
                 }
                 JsonResponse::notFound('Puantaj etki adayi bulunamadi.');
+            }
+            if (!PuantajDonemKilidiService::matchesDate($periodLock, (int) $row['sube_id'], (string) $row['tarih'])) {
+                self::rollbackConflict($pdo, 'ADAY_PERIOD_CHANGED', 'Puantaj etki adayi donemi degismis.');
             }
 
             $result = BildirimPuantajEtkiManualApplyService::apply(
@@ -394,7 +419,7 @@ class BildirimPuantajEtkiAdaylariController
 
             $pdo->commit();
             JsonResponse::success(self::mapManualApplyResponse($result['aday'], false));
-        } catch (\PDOException $e) {
+        } catch (\Throwable $e) {
             if ($pdo->inTransaction()) {
                 $pdo->rollBack();
             }
@@ -437,12 +462,34 @@ class BildirimPuantajEtkiAdaylariController
         $pdo = self::connection();
         self::assertTablesReady($pdo);
 
+        $scopeGy = self::fetchGyById($pdo, $gyId);
+        if (!$scopeGy) {
+            self::validationError('genel_yonetici_bildirim_onayi_id', 'Genel yonetici bildirim onayi bulunamadi.');
+        }
+        SubeScope::assertPersonelAccess($user, $request, (int) $scopeGy['sube_id']);
+
         try {
             $pdo->beginTransaction();
+
+            $periodLock = PuantajDonemKilidiService::acquire(
+                $pdo,
+                (int) $scopeGy['sube_id'],
+                (int) substr((string) $scopeGy['ay'], 0, 4),
+                (int) substr((string) $scopeGy['ay'], 5, 2)
+            );
+            if (PuantajDonemKilidiService::isSealed($pdo, $periodLock)) {
+                self::rollbackConflict($pdo, 'PERIOD_LOCKED', 'Bu donem muhurlenmis, puantaj etki adayi olusturulamaz.');
+            }
 
             $gy = self::fetchGyById($pdo, $gyId, true);
             if (!$gy) {
                 self::rollbackValidation($pdo, 'GENEL_YONETICI_ONAYI_GEREKLI', 'Genel yonetici bildirim onayi bulunamadi.');
+            }
+
+            if ((int) $periodLock['sube_id'] !== (int) $gy['sube_id']
+                || (int) $periodLock['yil'] !== (int) substr((string) $gy['ay'], 0, 4)
+                || (int) $periodLock['ay'] !== (int) substr((string) $gy['ay'], 5, 2)) {
+                self::rollbackConflict($pdo, 'APPROVAL_PERIOD_CHANGED', 'Genel yonetici onay donemi degismis.');
             }
 
             SubeScope::assertPersonelAccess($user, $request, (int) $gy['sube_id']);
@@ -527,7 +574,7 @@ class BildirimPuantajEtkiAdaylariController
             }
 
             $pdo->commit();
-        } catch (\PDOException $e) {
+        } catch (\Throwable $e) {
             if ($pdo->inTransaction()) {
                 $pdo->rollBack();
             }
@@ -563,7 +610,7 @@ class BildirimPuantajEtkiAdaylariController
 
     private static function assertTablesReady(PDO $pdo)
     {
-        foreach ([self::TABLE, 'genel_yonetici_bildirim_onaylari', 'gunluk_bildirimler'] as $table) {
+        foreach ([self::TABLE, 'genel_yonetici_bildirim_onaylari', 'gunluk_bildirimler', 'puantaj_donem_kilitleri'] as $table) {
             $stmt = $pdo->query("SHOW TABLES LIKE '" . $table . "'");
             if (!$stmt || !$stmt->fetch()) {
                 JsonResponse::serverError('Puantaj etki adayi migration uygulanmadi.');

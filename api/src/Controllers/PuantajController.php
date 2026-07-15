@@ -10,6 +10,7 @@ use Medisa\Api\Database\Connection;
 use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
 use Medisa\Api\Scope\SubeScope;
+use Medisa\Api\Services\PuantajDonemKilidiService;
 use PDO;
 
 class PuantajController
@@ -82,23 +83,37 @@ class PuantajController
         $pdo = self::getConnection();
         $personel = self::loadPersonel($pdo, $personelId);
         SubeScope::assertPersonelAccess($user, $request, (int) $personel['sube_id']);
-        self::assertPeriodOpen($pdo, (int) $personel['sube_id'], $tarih);
 
-        $existing = self::findPuantajRow($pdo, $personelId, $tarih);
-        if ($existing && (string) ($existing['state'] ?? 'ACIK') === 'MUHURLENDI') {
-            JsonResponse::error(409, 'PERIOD_LOCKED', 'Bu donem muhurlenmis, puantaj kaydi guncellenemez.');
+        try {
+            $pdo->beginTransaction();
+            $periodLock = PuantajDonemKilidiService::acquireForDate($pdo, (int) $personel['sube_id'], $tarih);
+            if (PuantajDonemKilidiService::isSealed($pdo, $periodLock)) {
+                $pdo->rollBack();
+                JsonResponse::error(409, 'PERIOD_LOCKED', 'Bu donem muhurlenmis, puantaj kaydi guncellenemez.');
+            }
+
+            $existing = self::findPuantajRow($pdo, $personelId, $tarih);
+            if ($existing && (string) ($existing['state'] ?? 'ACIK') === 'MUHURLENDI') {
+                $pdo->rollBack();
+                JsonResponse::error(409, 'PERIOD_LOCKED', 'Bu donem muhurlenmis, puantaj kaydi guncellenemez.');
+            }
+
+            $values = self::buildUpsertValues($payload, $existing ?: [], $personelId, $tarih);
+            if ($existing) {
+                self::updatePuantajRow($pdo, (int) $existing['id'], $values);
+            } else {
+                self::insertPuantajRow($pdo, $values);
+            }
+
+            $row = self::findPuantajRow($pdo, $personelId, $tarih);
+            $pdo->commit();
+            JsonResponse::success(self::mapRow($row ?: $values));
+        } catch (\Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            JsonResponse::serverError('Puantaj kaydi guncellenemedi.');
         }
-
-        $values = self::buildUpsertValues($payload, $existing ?: [], $personelId, $tarih);
-
-        if ($existing) {
-            self::updatePuantajRow($pdo, (int) $existing['id'], $values);
-        } else {
-            self::insertPuantajRow($pdo, $values);
-        }
-
-        $row = self::findPuantajRow($pdo, $personelId, $tarih);
-        JsonResponse::success(self::mapRow($row ?: $values));
     }
 
     public static function muhurleAylik(Request $request)
@@ -119,24 +134,26 @@ class PuantajController
 
         self::assertSubeExists($pdo, (int) $subeId);
 
-        $existing = self::findMonthlySeal($pdo, (int) $subeId, $yil, $ay);
-        if ($existing) {
-            JsonResponse::success([
-                'muhur_id' => (int) $existing['id'],
-                'sube_id' => (int) $existing['sube_id'],
-                'yil' => (int) $existing['yil'],
-                'ay' => (int) $existing['ay'],
-                'donem' => (string) $existing['donem'],
-                'durum' => (string) $existing['durum'],
-                'muhurlenen_kayit_sayisi' => 0,
-            ]);
-        }
-
         $firstDay = sprintf('%04d-%02d-01', $yil, $ay);
         $lastDay = date('Y-m-t', strtotime($firstDay));
 
         try {
             $pdo->beginTransaction();
+
+            PuantajDonemKilidiService::acquire($pdo, (int) $subeId, $yil, $ay);
+            $existing = self::findMonthlySeal($pdo, (int) $subeId, $yil, $ay);
+            if ($existing) {
+                $pdo->commit();
+                JsonResponse::success([
+                    'muhur_id' => (int) $existing['id'],
+                    'sube_id' => (int) $existing['sube_id'],
+                    'yil' => (int) $existing['yil'],
+                    'ay' => (int) $existing['ay'],
+                    'donem' => (string) $existing['donem'],
+                    'durum' => (string) $existing['durum'],
+                    'muhurlenen_kayit_sayisi' => 0,
+                ]);
+            }
 
             $insertSeal = $pdo->prepare(
                 'INSERT INTO puantaj_aylik_muhurleri (sube_id, yil, ay, donem, durum, muhurlenen_kayit_sayisi, created_by)

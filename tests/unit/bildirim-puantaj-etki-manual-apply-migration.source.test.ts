@@ -35,12 +35,13 @@ describe("S74-D1 migration 013 bildirim puantaj etki manual apply", () => {
     expect(migrationSource).not.toMatch(/\bgunluk_puantaj\b/i);
   });
 
-  it("keeps migration 013 unique and last in sequence", () => {
+  it("keeps migration 013 unique in the contiguous sequence before 014", () => {
     expect(migrationFiles.map((fileName) => Number(fileName.slice(0, 3)))).toEqual(
-      Array.from({ length: 13 }, (_, index) => index + 1)
+      Array.from({ length: 14 }, (_, index) => index + 1)
     );
     expect(migrationFiles.filter((fileName) => fileName.startsWith("013_"))).toEqual([
       "013_bildirim_puantaj_etki_manual_apply.sql",
     ]);
+    expect(migrationFiles.at(-1)).toBe("014_puantaj_donem_kilitleri.sql");
   });
 });

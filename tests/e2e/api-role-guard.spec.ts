@@ -838,3 +838,83 @@ test.describe("S74-C3-B2 puantaj etki adayi uygula API guards (mock-api)", () =>
     expect(result.status).toBe(403);
   });
 });
+
+const MANUAL_APPLY_BODY = {
+  expected_state: "INCELEME_GEREKLI",
+  karar_etki_turu: "GOREVDE_CALISILMIS_GUN",
+  etki_miktari: null,
+  gerekce: "Kontrollu operasyon teyidi"
+} as const;
+const MANUAL_APPLY_ENDPOINT = "/api/puantaj/bildirim-etki-adaylari/6/manuel-uygula";
+
+test.describe("S74-D1/D3R manuel apply API guards (mock-api)", () => {
+  test("unauthenticated manual apply returns 401", async ({ page }) => {
+    await mockApi(page, "MUHASEBE");
+    await page.goto("/login");
+    const result = await page.evaluate(async (body) => {
+      const response = await fetch("/api/puantaj/bildirim-etki-adaylari/6/manuel-uygula", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+      });
+      return { status: response.status };
+    }, MANUAL_APPLY_BODY);
+    expect(result.status).toBe(401);
+  });
+
+  test("MUHASEBE can manual apply and same request is idempotent", async ({ page }) => {
+    await loginAs(page, "MUHASEBE");
+    const first = await apiFetchJson(page, MANUAL_APPLY_ENDPOINT, {
+      method: "POST",
+      body: { ...MANUAL_APPLY_BODY }
+    });
+    expect(first.status).toBe(200);
+    expect(first.data).toMatchObject({ id: 6, state: "UYGULANDI", uygulama_modu: "MANUEL", idempotent: false });
+
+    const second = await apiFetchJson(page, MANUAL_APPLY_ENDPOINT, {
+      method: "POST",
+      body: { ...MANUAL_APPLY_BODY }
+    });
+    expect(second.status).toBe(200);
+    expect(second.data).toMatchObject({ id: 6, state: "UYGULANDI", idempotent: true });
+  });
+
+  test("different manual decision conflicts after apply", async ({ page }) => {
+    await loginAs(page, "MUHASEBE");
+    await apiFetchJson(page, MANUAL_APPLY_ENDPOINT, { method: "POST", body: { ...MANUAL_APPLY_BODY } });
+    await expect(
+      apiFetch(page, MANUAL_APPLY_ENDPOINT, {
+        method: "POST",
+        body: { ...MANUAL_APPLY_BODY, karar_etki_turu: "DEVAMSIZLIK_GUN" }
+      })
+    ).resolves.toMatchObject({ status: 409 });
+  });
+
+  test("non-MUHASEBE roles are denied manual apply", async ({ page }) => {
+    for (const role of ["GENEL_YONETICI", "BOLUM_YONETICISI", "BIRIM_AMIRI"] as const) {
+      await loginAs(page, role);
+      await expect(
+        apiFetch(page, MANUAL_APPLY_ENDPOINT, { method: "POST", body: { ...MANUAL_APPLY_BODY } })
+      ).resolves.toMatchObject({ status: 403 });
+    }
+  });
+
+  test("cross-sube manual apply returns 403", async ({ page }) => {
+    await loginAs(page, "MUHASEBE");
+    const status = await page.evaluate(async (body) => {
+      const raw = sessionStorage.getItem("medisa_auth_session") ?? localStorage.getItem("medisa_auth_session");
+      const token = raw ? (JSON.parse(raw) as { token?: string }).token : "mock-token";
+      const response = await fetch("/api/puantaj/bildirim-etki-adaylari/2/manuel-uygula", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+          "X-Active-Sube-Id": "1"
+        },
+        body: JSON.stringify(body)
+      });
+      return response.status;
+    }, MANUAL_APPLY_BODY);
+    expect(status).toBe(403);
+  });
+});

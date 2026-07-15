@@ -140,11 +140,12 @@ Her fazın çıkış kriteri `05-state-flow-api-kontrati.md` ve `09-rol-yetki-ma
 - S71 haftalık bildirim mutabakatı fazı tamamlandı.
 - S72 aylık bildirim onayı fazı tamamlandı.
 - S73 Genel Yönetici bildirim üst onayı fazı tamamlandı.
+- S74-B/C puantaj etki adayı generate + karar (Yok Say / Uygula) köprüsü kodda tamamlandı; canlı apply E2E kanıtı C3-B4 ile bekliyor.
 - Günlük, haftalık ve aylık bildirim write/approve sahibi `BIRIM_AMIRI` rolüdür.
 - `GENEL_YONETICI`, S73 kapsamında bildirim üst onayını görür ve onaylar (`genel_yonetici_bildirim_onayi.*`).
 - `BOLUM_YONETICISI`, `GENEL_YONETICI` (S72 panelleri) ve `MUHASEBE` haftalık ve aylık bildirim panellerini salt okunur görür; S72 approve sahibi değildir.
 - Patron acknowledgment katmanının tamamlanmış domain/API/UI akışı henüz yoktur (`patron_ack.*` permission kayıtları ayrı kalır).
-- Bildirim zincirinin puantaj hesap motoru ve bordro girdisiyle gerçek backend köprüsü henüz yoktur.
+- Bildirim zincirinin puantaj hesap motoru ve bordro girdisiyle tam otomatik köprüsü henüz yoktur; S74-B/C3 ile sınırlı «etki adayı → tek günlük puantaj INSERT» hattı açılmıştır (finans/bordro dışı).
 
 Bu bölüm çalışan mevcut zinciri kaydeder. Bölüm onayı, legacy Genel Yönetici onayı, patron görünürlüğü, hesap motoru ve nihai bordrodan oluşan daha geniş akış ise **hedef ürün zinciridir**; S70C-S73'nin tamamlanması ürünün tamamlandığı anlamına gelmez.
 

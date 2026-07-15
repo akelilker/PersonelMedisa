@@ -558,10 +558,7 @@ Bu spec kapsamında aşağıdakiler yasaktır:
 - modüle özel farklı modal-header dili açmak
 - bildirim panelini bir yerde dropdown, başka yerde modal yapmak
 
-- bildirim panelini bir yerde dropdown, başka yerde modal yapmak
-- puantaj etki aday panelinde `Uygula` butonu veya `/uygula` aksiyonu eklemek
-
-## 14.1 Puantaj Etki Adayı Karar Paneli — S74-C2B
+## 14.1 Puantaj Etki Adayı Karar Paneli — S74-C2B / S74-C3-B3
 
 Konum: `/puantaj` ekranında `Onaylı Bildirim Puantaj Etki Adayları` bölümü.
 
@@ -583,10 +580,10 @@ Veri ve filtreler:
 
 Aksiyon matrisi:
 
-- `HAZIR` ve `INCELEME_GEREKLI`: Detay + Yok Say
-- `INCELEME_GEREKLI`: ek uyarı metni zorunlu
+- `HAZIR`: Detay + Uygula + Yok Say (`puantaj.bildirim_etki.apply` / `dismiss` ayrı)
+- `INCELEME_GEREKLI`: Detay + Yok Say; ek uyarı metni zorunlu; Uygula yok
 - `UYGULANDI` ve `YOK_SAYILDI`: yalnız Detay; terminal state'te aktif karar butonu yok
-- `Uygula` aksiyonu bu fazda yoktur
+- Liste satırında Uygula yok; karar aksiyonları yalnız detayda
 
 Yok Say modalı:
 
@@ -595,6 +592,28 @@ Yok Say modalı:
 - POST body: `{ expected_state: aday.state, gerekce: trimmed }`
 - Başarı sonrası özet/liste/açık detay refetch; backend state otoritesidir
 - `idempotent: true` → bilgi mesajı; hata değil
+
+## 14.2 Puantaj Etki Adayı Uygula Modalı — S74-C3-B3
+
+Konum: detay `AppModal` içi; Yok Say modalından ayrı akış.
+
+Görünürlük:
+
+- Yalnız `puantaj.bildirim_etki.apply` + state `HAZIR` + detay yüklü + işlem yokken.
+- Buton sınıfı: `universal-btn-save`; metin: `Uygula`.
+- Sıra: Uygula → Yok Say → Kapat.
+
+Onay içeriği (özet):
+
+- personel, tarih, bildirim, etki türü/miktarı, şube, birim amiri, state
+- `HAZIR` dışı veya desteklenmeyen etki için uyarı metni
+
+API:
+
+- `POST /puantaj/bildirim-etki-adaylari/{id}/uygula`
+- body: `{ "expected_state": "HAZIR" }`
+- loading / success / error yüzeyleri zorunlu
+- başarı sonrası özet + liste + açık detay refetch
 
 ## 15. Geliştiriciye Teslim Mantığı
 

@@ -357,7 +357,7 @@ S73 tamamlanmış Genel Yönetici bildirim üst onayı sonrası `puantaj.bildiri
 - `MUHASEBE` aday listesinde karar audit özet alanlarını (`karar_veren_user_id`, `karar_zamani`, `uygulanan_puantaj_id`) görür.
 - Detayda karar audit alanları (`karar_gerekcesi`, puantaj snapshot'ları, `uygulama_hash`) okunur.
 - `BildirimPuantajEtkiDecisionPolicy` hangi state'ten hangi kararın mümkün olduğunu belirler: `HAZIR` → UYGULA/YOK_SAY; `INCELEME_GEREKLI` → yalnız YOK_SAY; `UYGULANDI`/`YOK_SAYILDI` terminal.
-- S74-C1 yalnız altyapıdır; yok-say endpoint'i S74-C2A ile gelmiştir. Uygula endpoint'i ve frontend karar ekranı henüz yoktur.
+- S74-C1 yalnız altyapıdır; yok-say S74-C2A, uygula S74-C3-B2, frontend Uygula S74-C3-B3 ile tamamlanmıştır.
 
 ### Sistem Etkisi
 
@@ -384,10 +384,6 @@ S73 tamamlanmış Genel Yönetici bildirim üst onayı sonrası `puantaj.bildiri
 
 - `onayli_bildirim_puantaj_etki_adaylari` tablosunda karar alanları güncellenir.
 - `gunluk_puantaj`, finans, bordro, süreç ve bildirim zinciri tabloları değişmez.
-- Uygula endpointi ve frontend karar ekranı bu fazda yoktur.
-
-- Uygula endpointi ve frontend karar ekranı bu fazda yoktur.
-
 ## 15.6 Puantaj Etki Adayı Yok Say Ekranı — S74-C2B
 
 ### Tetikleyici
@@ -406,12 +402,11 @@ S73 tamamlanmış Genel Yönetici bildirim üst onayı sonrası `puantaj.bildiri
 - `HAZIR` ve `INCELEME_GEREKLI` için Yok Say modalı açılır; gerekçe 5–500 karakter doğrulanır.
 - `INCELEME_GEREKLI` satırında “otomatik uygulanamaz” uyarısı gösterilir.
 - Başarılı yok sayma sonrası frontend özet/liste/detayı refetch eder; terminal `YOK_SAYILDI` görünür.
-- `Uygula` butonu ve `/uygula` endpointi bu fazda yoktur.
-
 ### Sistem Etkisi
 
 - Yalnız frontend ve mock/E2E katmanı değişir; backend S74-C2A kontratı aynı kalır.
 - `gunluk_puantaj` ve diğer operasyonel tablolar değişmez.
+- Uygula aksiyonu S74-C3-B3 ile aynı panelde eklenmiştir; Yok Say kontratı değişmez.
 
 ## 15.7 Dakika Altyapısı ve Projection Kilidi — S74-C3-B1
 
@@ -428,9 +423,36 @@ S74-C3 apply (`/uygula`) öncesi altyapı fazı; kullanıcı akışı değişmez
 
 ### Sistem Etkisi
 
-- Migration `012` repoda; canlıda henüz uygulanmadı.
-- `/uygula` endpointi, apply route ve frontend Uygula butonu henüz yoktur.
-- `gunluk_puantaj` mutation bu fazda yalnız mevcut PUT upsert kontratı ile sınırlıdır; aday apply yazımı B2'de gelir.
+- Migration `012` repoda ve canlıda uygulanmıştır.
+- `/uygula` endpointi S74-C3-B2, frontend Uygula S74-C3-B3 ile tamamlanmıştır.
+- `gunluk_puantaj` mutation: mevcut PUT upsert + HAZIR aday apply INSERT (overwrite yok).
+
+## 15.8 Puantaj Etki Adayı Uygula — S74-C3-B2 / S74-C3-B3
+
+### Tetikleyici
+
+`MUHASEBE`, S74-B ile üretilmiş ve `HAZIR` durumundaki puantaj etki adayını `/puantaj` panelinden uygular.
+
+### Akış
+
+- Detayda `puantaj.bildirim_etki.apply` + state `HAZIR` + detay yüklü iken **Uygula** görünür.
+- AppModal onayı: personel, tarih, bildirim, etki, miktar, şube, birim amiri, state ve uyarı metni.
+- `POST /puantaj/bildirim-etki-adaylari/{id}/uygula` body: `{ "expected_state": "HAZIR" }`.
+- Optimistic lock: stale state → `409 STATE_STALE`.
+- Başarı: aday `UYGULANDI`, yeni `gunluk_puantaj` INSERT, audit snapshot/hash dolar; liste/detay/özet refetch.
+- `INCELEME_GEREKLI` ve terminal state'lerde Uygula gösterilmez.
+- Buton sırası: Uygula → Yok Say → Kapat; liste satırında Uygula yok.
+
+### Sistem Etkisi
+
+- Yalnız hedef `(personel_id, tarih)` için INSERT; mevcut puantaj UPDATE edilmez.
+- Mühürlü ay → `409 PERIOD_LOCKED`.
+- Duplicate puantaj → `409 PUANTAJ_OLUSTU`.
+- Finans, bordro ve bildirim zinciri state'leri değişmez.
+
+### Canlı kanıt sınırı
+
+Kod ve deploy tamamlanmıştır. Kontrollü canlı apply/idempotency (S74-C3-B4) güvenli HAZIR fixture bulunamadığı için `NO_SAFE_LIVE_APPLY_FIXTURE` ile tamamlanmamıştır.
 
 ## 16. Rapor Alma Senaryosu
 

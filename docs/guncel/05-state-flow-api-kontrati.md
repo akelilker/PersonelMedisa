@@ -193,8 +193,9 @@ DB sahibi: `onayli_bildirim_puantaj_etki_adaylari`; generate sahibi: `MUHASEBE`.
 | Yok Say | `POST /puantaj/bildirim-etki-adaylari/{id}/yok-say` | `puantaj.bildirim_etki.dismiss` |
 | Uygula | `POST /puantaj/bildirim-etki-adaylari/{id}/uygula` | `puantaj.bildirim_etki.apply` |
 | Manuel Uygula | `POST /puantaj/bildirim-etki-adaylari/{id}/manuel-uygula` | `puantaj.bildirim_etki.apply` |
+| Çakışma Çöz | `POST /puantaj/bildirim-etki-adaylari/{id}/cakisma-coz` | `puantaj.bildirim_etki.resolve_conflict` |
 
-**Migration:** `009_onayli_bildirim_puantaj_etki_adaylari.sql`, `010_bildirim_puantaj_etki_snapshot_zamanlarini_duzelt.sql`.
+**Migration:** `009_onayli_bildirim_puantaj_etki_adaylari.sql`, `010_bildirim_puantaj_etki_snapshot_zamanlarini_duzelt.sql`, `015_bildirim_puantaj_etki_cakisma_cozumleri.sql` (S75 audit tablosu; lokal, canlıda yok).
 
 **State modeli (generate çıktısı):** `HAZIR`, `INCELEME_GEREKLI`. Terminal state'ler: `UYGULANDI` (apply), `YOK_SAYILDI` (yok-say).
 
@@ -219,10 +220,11 @@ Policy sahibi: `BildirimPuantajEtkiDecisionPolicy` — yalnız state/action kara
 |------------|:--------:|:--------------:|:----------------:|:-----------:|:------:|
 | `puantaj.bildirim_etki.apply` | Evet | Hayır | Hayır | Hayır | Hayır |
 | `puantaj.bildirim_etki.dismiss` | Evet | Hayır | Hayır | Hayır | Hayır |
+| `puantaj.bildirim_etki.resolve_conflict` | Evet | Hayır | Hayır | Hayır | Hayır |
 
 **List kontratı:** `karar_veren_user_id`, `karar_zamani`, `uygulanan_puantaj_id`, `uygulama_modu`, `manuel_karar_turu`, `manuel_karar_miktari`.
 
-**Detail kontratı:** `karar_veren_user_id`, `karar_zamani`, `karar_gerekcesi`, `uygulanan_puantaj_id`, `onceki_puantaj_snapshot`, `sonraki_puantaj_snapshot`, `uygulama_hash`, `uygulama_modu`, `manuel_karar_turu`, `manuel_karar_miktari`.
+**Detail kontratı:** `karar_veren_user_id`, `karar_zamani`, `karar_gerekcesi`, `uygulanan_puantaj_id`, `onceki_puantaj_snapshot`, `sonraki_puantaj_snapshot`, `uygulama_hash`, `uygulama_modu`, `manuel_karar_turu`, `manuel_karar_miktari`. S75 çakışma bağlamı (mevcut puantaj varken): `mevcut_puantaj`, `current_puantaj_hash`, `conflict_class`, `conflict_default_karar`, `conflict_revise_allowed`, `conflict_risk`, `revize_onizleme`, `cakisma_cozum`.
 
 **Ürün kararları:** Mevcut puantaj otomatik overwrite edilmez. YOK_SAY gerekçesi zorunludur; minimum karakter sayısı henüz kararlaştırılmamıştır (doğrulama endpoint fazında). Migration canlıya otomatik uygulanmaz.
 
@@ -321,6 +323,51 @@ Endpoint: `POST /puantaj/bildirim-etki-adaylari/{id}/manuel-uygula` — yalnız 
 **Kurallar:** Yalnız INSERT; mevcut puantaj UPDATE edilmez. Canonical servis: `BildirimPuantajEtkiManualApplyService`. Mapper: `BildirimPuantajEtkiPuantajMapper`.
 
 **Canlı sınır:** Kontrollü kabulte oluşturulan aday `#4` dışında aday `#1` ve `#3` korunmuştur. Yeni canlı mutation ayrıca owner onayına tabidir.
+
+### Puantaj etki adayı Çakışma Çöz — S75-BC
+
+Endpoint: `POST /puantaj/bildirim-etki-adaylari/{id}/cakisma-coz` — yalnız `puantaj.bildirim_etki.resolve_conflict` (MUHASEBE).
+
+**Kapsam:** Apply/manuel apply `409 PUANTAJ_OLUSTU` sonrası mevcut puantaj satırına karşı bilinçli karar. Yeni aday state'i tanımlanmaz; terminal sonuçlar mevcut `YOK_SAYILDI` / `UYGULANDI` state'leridir.
+
+**Request body:**
+
+```json
+{
+  "expected_state": "INCELEME_GEREKLI",
+  "karar_turu": "MEVCUT_PUANTAJI_KORU",
+  "gerekce": "Mevcut puantaj kaydi dogrulandi ve korunmasina karar verildi.",
+  "expected_puantaj_id": 55,
+  "expected_puantaj_hash": "64-karakter-hex-sha256"
+}
+```
+
+| Alan | Kural |
+|------|-------|
+| `expected_state` | Zorunlu; `HAZIR` veya `INCELEME_GEREKLI`; DB state ile aynı olmalı |
+| `karar_turu` | Zorunlu; `MEVCUT_PUANTAJI_KORU` veya `ADAY_ETKISIYLE_REVIZE_ET` |
+| `gerekce` | Zorunlu; trim sonrası 5–500 karakter |
+| `expected_puantaj_id` | Zorunlu; pozitif integer; kilitlenen mevcut puantaj |
+| `expected_puantaj_hash` | Zorunlu; 64 karakter hex; `BildirimPuantajEtkiPuantajMapper::computeCurrentPuantajHash` |
+
+**Karar sonuçları:**
+
+| `karar_turu` | Aday state | Puantaj | `uygulama_modu` |
+|--------------|------------|---------|-----------------|
+| `MEVCUT_PUANTAJI_KORU` | `YOK_SAYILDI` | değişmez | `CAKISMA_COZUM` |
+| `ADAY_ETKISIYLE_REVIZE_ET` | `UYGULANDI` | aynı id UPDATE | `CAKISMA_COZUM` |
+
+**Audit tablosu:** `bildirim_puantaj_etki_cakisma_cozumleri` — aday başına tek satır (`uq_bpecc_aday`); `onceki_snapshot`, `sonraki_snapshot`, `request_hash`, `sonuc_hash`, `expected_puantaj_hash`, `conflict_class`, `karar_turu`, `gerekce`.
+
+**Hash şeması:** `S75_CONFLICT_RESOLUTION_V1` — `request_hash` (istek gövdesi + puantaj concurrency payload) ve `sonuc_hash` (karar sonucu + önce/sonra puantaj özeti). Revize yolunda aday `uygulama_hash` = `sonuc_hash`.
+
+**Idempotency:** Aynı aday için kayıtlı `request_hash` ile birebir aynı istek → HTTP `200`, `idempotent: true`, transaction yok. Farklı karar/gerekçe/puantaj → `409 REVISION_DECISION_CONFLICT`.
+
+**409 kodları:** `STATE_CONFLICT`, `STATE_STALE`, `PERIOD_LOCKED`, `ADAY_PERIOD_CHANGED`, `PUANTAJ_ARTIK_YOK`, `PUANTAJ_STALE`, `PUANTAJ_SOURCE_PROTECTED`, `REVISION_NOT_ALLOWED`, `REVISION_INTEGRITY_FAILED`, `REVISION_DECISION_CONFLICT`, `SOURCE_INTEGRITY_FAILED`.
+
+**Kurallar:** Dönem kilidi apply ile aynı protokol (`PuantajDonemKilidiService`). Puantaj satırı `FOR UPDATE`. Canonical servisler: `BildirimPuantajEtkiConflictClassificationService`, `BildirimPuantajEtkiConflictResolutionService`.
+
+**Lokal sınır:** Kod/test paketi tamam; canlı deploy ve migration `015` uygulaması yok (`S75_BC_CONFLICT_RESOLUTION_LOCAL_COMPLETE`).
 
 ### Puantaj dönem transaction kilidi — S74-D1/D3R
 

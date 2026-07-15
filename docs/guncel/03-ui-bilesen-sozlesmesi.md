@@ -615,6 +615,43 @@ API:
 - loading / success / error yüzeyleri zorunlu
 - başarı sonrası özet + liste + açık detay refetch
 
+## 14.3 Puantaj Çakışma Çözüm Modalı — S75-BC
+
+Konum: mevcut aday detay akışı içinde; `/uygula` veya `/manuel-uygula` `409 PUANTAJ_OLUSTU` (veya manuel çakışma) sonrası otomatik açılır. Ayrı liste satırı aksiyonu yok.
+
+Görünürlük:
+
+- Yalnız `puantaj.bildirim_etki.resolve_conflict` (MUHASEBE).
+- Detayda `mevcut_puantaj` + `current_puantaj_hash` varken; `cakisma_cozum` yokken; state `HAZIR` veya `INCELEME_GEREKLI`; `conflict_class=MUHURLU_PUANTAJ` ise modal açılmaz.
+- Başlık: `Puantaj Çakışmasını Çöz`; `AppModal` standardı korunur.
+
+İçerik:
+
+- `conflict_class`, risk mesajı, personel/tarih/kaynak/kontrol özeti, aday etki önizlemesi.
+- Sınıfa göre uyarı: `AMIR_KONTROL_EDILMIS`, `RESMI_SUREC_DAYANAK`, `MUHURLU_PUANTAJ`.
+- Mevcut vs revize alan karşılaştırma tablosu (`revize_onizleme` kaynaklı).
+- Gerekçe: trim sonrası 5–500 karakter; sayaç zorunlu.
+
+Aksiyonlar:
+
+- **Mevcut Puantajı Koru** (`universal-btn-save`, `data-testid="puantaj-etki-conflict-keep"`) → `MEVCUT_PUANTAJI_KORU`
+- **Aday Etkisiyle Revize Et** (`data-testid="puantaj-etki-conflict-revise"`) → yalnız `conflict_revise_allowed` true iken
+- Kapat; işlem sırasında butonlar kilitlenir
+
+API:
+
+- `POST /puantaj/bildirim-etki-adaylari/{id}/cakisma-coz`
+- body: `{ expected_state, karar_turu, gerekce, expected_puantaj_id, expected_puantaj_hash }`
+- başarı/`idempotent: true` sonrası modal kapanır; özet/liste/detay refetch
+- `STATE_STALE`, `PUANTAJ_STALE`, `REVISION_DECISION_CONFLICT` → refetch + kullanıcı mesajı
+
+CSS (owner: `src/styles/modules/puantaj.css`):
+
+- `.puantaj-etki-conflict-modal` — modal gövde grid
+- `.puantaj-etki-conflict-class`, `.puantaj-etki-conflict-risk` — sınıf/risk metni
+- `.puantaj-etki-conflict-warning` — sınıf uyarı kutusu
+- `.puantaj-etki-conflict-compare`, `.puantaj-etki-conflict-compare-table` — karşılaştırma tablosu
+
 ## 15. Geliştiriciye Teslim Mantığı
 
 Bu belge geliştiriciye şu soruların net cevabını vermelidir:

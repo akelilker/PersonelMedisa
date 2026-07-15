@@ -223,6 +223,7 @@ Asagidaki anahtarlar kodda halen kullanilmaktadir. S70B kod fazinda yeni anahtar
 - `puantaj.bildirim_etki.view`: `GENEL_YONETICI`, `BOLUM_YONETICISI`, `MUHASEBE` (S74-B liste/detay read-only; S74-C2B panel)
 - `puantaj.bildirim_etki.generate`: `MUHASEBE` (S74-B)
 - `puantaj.bildirim_etki.apply`, `puantaj.bildirim_etki.dismiss`: yalniz `MUHASEBE` (`dismiss` S74-C2A/C2B; otomatik `apply` S74-C3 `/uygula`; manuel `apply` S74-D1 `/manuel-uygula` — ayni permission)
+- `puantaj.bildirim_etki.resolve_conflict`: yalniz `MUHASEBE` (S75-BC `/cakisma-coz`; apply `PUANTAJ_OLUSTU` sonrasi mevcut puantaj karari)
 
 ### Legacy aylık kapanış özeti
 

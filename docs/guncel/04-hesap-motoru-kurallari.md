@@ -515,6 +515,15 @@ V1 ürün kuralı:
 
 Bu yuvarlama tolerans değildir. Gerçek eksik süre `0` ise kesinti yoktur; `1-30 dk` arası parasal hesapta `30 dk`, `31-60 dk` arası `60 dk`, `61-90 dk` arası `90 dk` kabul edilir.
 
+**S75-BC çakışma revize mapping (`ADAY_ETKISIYLE_REVIZE_ET`):**
+
+- Hedef: mevcut `gunluk_puantaj` satırı UPDATE; yeni satır INSERT edilmez. Alan kaynağı `BildirimPuantajEtkiPuantajMapper::mapEtkiToPuantajFields` (otomatik apply ile aynı canonical hedefler).
+- `kaynak` → `BILDIRIM_ETKI_REVIZYON`; `state=ACIK`; `kontrol_durumu=BEKLIYOR` (amir kontrolü sıfırlanır).
+- **Korunan zaman alanları (revize sırasında değişmez):** `giris_saati`, `cikis_saati`, `beklenen_giris_saati`, `beklenen_cikis_saati`, `gercek_mola_dakika`, mevcut `aciklama`.
+- **Türetilmiş alan invalidation (NULL):** `hesaplanan_mola_dakika`, `net_calisma_suresi_dakika`, `gunluk_brut_sure_dakika`, `hafta_tatili_hak_kazandi_mi` — revize sonrası yeniden hesap beklenir; stale türetilmiş süre taşınmaz.
+- **Revize yasak:** resmî süreç dayanakları (`Yillik_Izin`, `Ucretli_Izinli`, `Raporlu_*`) ve mühürlü puantaj (`MUHURLU_PUANTAJ` / `PERIOD_LOCKED`).
+- **Koru kararı:** puantaj satırına yazım yok; aday `YOK_SAYILDI` + `uygulama_modu=CAKISMA_COZUM`.
+
 Sınır örnekleri:
 
 | Gerçek eksik süre | Kesintiye esas süre |

@@ -490,6 +490,40 @@ Kontrollü canlı apply ve idempotency tamamlandı (`LIVE_APPLY_IDEMPOTENCY_PASS
 
 Detay: `docs/guncel/76-s74-c3-puantaj-etki-adayi-uygula-kapanis-checkpoint.md` §8–9.
 
+## 15.9 Puantaj Çakışma Çözümü — S75-BC
+
+### Tetikleyici
+
+`MUHASEBE`, `HAZIR` veya `INCELEME_GEREKLI` adayda `/uygula` veya `/manuel-uygula` dener; hedef `(personel_id, tarih)` için puantaj zaten vardır → `409 PUANTAJ_OLUSTU`. `puantaj.bildirim_etki.resolve_conflict` varsa çakışma modalı açılır.
+
+### Akış
+
+- Detay refetch; `mevcut_puantaj`, `current_puantaj_hash`, `conflict_class`, `conflict_default_karar`, `revize_onizleme` yüklenir.
+- MUHASEBE sınıf/risk/alan karşılaştırmasını inceler; gerekçe girer.
+- **Mevcut Puantajı Koru:** mevcut satır korunur; aday `YOK_SAYILDI`, `uygulama_modu=CAKISMA_COZUM`.
+- **Aday Etkisiyle Revize Et:** aynı puantaj id UPDATE (`kaynak=BILDIRIM_ETKI_REVIZYON`); aday `UYGULANDI`.
+- `POST /puantaj/bildirim-etki-adaylari/{id}/cakisma-coz`; başarı veya `idempotent: true` → özet/liste/detay refetch.
+
+### Çakışma sınıfları (A–G)
+
+| Sınıf | Koşul | Varsayılan karar | Revize |
+|-------|-------|------------------|:------:|
+| **A** `AYNI_ADAY_PUANTAJI` | Aday `UYGULANDI` + `uygulanan_puantaj_id` = mevcut id | Revize | Evet |
+| **B** `BASKA_ADAY_KAYNAGI` | `kaynak` = `BILDIRIM_ETKI_ADAYI` veya `BILDIRIM_ETKI_REVIZYON` | Koru | Evet |
+| **C** `MANUEL_KAYNAK` | `kaynak=MANUEL` | Koru | Evet |
+| **D** `RESMI_SUREC_DAYANAK` | Dayanak: `Yillik_Izin`, `Ucretli_Izinli`, `Raporlu_*` | Koru | Hayır |
+| **E** `MUHURLU_PUANTAJ` | `state=MUHURLENDI` veya `muhur_id` dolu | Koru | Hayır |
+| **F** `AMIR_KONTROL_EDILMIS` | `kontrol_durumu=AMIR_KONTROL_ETTI` | Koru | Evet (revize sonrası `BEKLIYOR`) |
+| **G** `LEGACY_BELIRSIZ` | Boş/belirsiz `kaynak` | Koru | Evet |
+
+### Sistem Etkisi
+
+- Audit: `bildirim_puantaj_etki_cakisma_cozumleri` (aday başına tek kayıt).
+- Koru: puantaj mutation yok. Revize: yalnız hedef satır UPDATE; INSERT yok.
+- Mühürlü ay / sınıf D/E revize → `409 PERIOD_LOCKED` / `PUANTAJ_SOURCE_PROTECTED`.
+- Finans, bordro, bildirim zinciri state'leri değişmez.
+- **Lokal paket:** canlı deploy yok; `docs/guncel/78-s75-puantaj-cakisma-cozum-kapanis-checkpoint.md`.
+
 ## 16. Rapor Alma Senaryosu
 
 ### 16.1 Tetikleyici

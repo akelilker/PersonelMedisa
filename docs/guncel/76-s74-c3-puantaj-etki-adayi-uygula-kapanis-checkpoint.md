@@ -4,38 +4,40 @@
 
 ## 1. Doküman Amacı
 
-Bu checkpoint, S74-C3 «Uygula» hattının (C3-A analiz → C3-B1 dakika altyapısı → C3-B2 apply backend → C3-B3 frontend Uygula) kod ve kontrat kapanışını, canlı doğrulama sınırlarını ve sıradaki faz önerisini tek yerde toplar.
+Bu checkpoint, S74-C3 «Uygula» hattının (C3-A analiz → C3-B1 dakika altyapısı → C3-B2 apply backend → C3-B3 frontend Uygula → C3-B4 kontrollü canlı apply) kod, kontrat ve canlı kabul kapanışını tek yerde toplar.
 
 **Son kilit kod commit:** `3355369` — `feat(ui): puantaj etki adayi uygula akisini ekle`
-**Branch:** `main` (`origin/main` ile hizalı — `3355369c4abc0ea28082ff1485b2f5ed896859d4`)
+**Canlı kabul:** S74-C3-B4 — `LIVE_APPLY_IDEMPOTENCY_PASSED`
+**Final karar:** `S74_C3_FULLY_COMPLETE`
 
 ---
 
 ## 2. Zincir Özeti
 
-| Alt faz | Açıklama | Commit / referans | Kod durumu | Canlı doğrulama |
-|---------|----------|-------------------|------------|-----------------|
+| Alt faz | Açıklama | Commit / referans | Kod | Canlı |
+|---------|----------|-------------------|-----|-------|
 | **C3-A** | Apply kontratı ön analizi | analiz-only | Kapalı | — |
 | **C3-A-R1** | Owner karar matrisi | analiz-only | Kapalı | — |
-| **C3-B1** | Dakika kolonları + projection kilidi | `695186a`, `6d2b365` | Kapalı | Migration `012` manuel uygulandı |
-| **C3-B2** | `/uygula` backend + `BildirimPuantajEtkiApplyService` | `e2dd1bb` | Kapalı | Read-only guard smoke |
-| **C3-B3** | Frontend Uygula + confirmation modal | `3355369` | Kapalı | Deploy retry + read-only UI smoke |
-| **C3-B4** | Kontrollü canlı apply + idempotency | — | **Açık** | `NO_SAFE_LIVE_APPLY_FIXTURE` |
+| **C3-B1** | Dakika kolonları + projection kilidi | `695186a`, `6d2b365` | Kapalı | Migration `012` canlıda |
+| **C3-B2** | `/uygula` backend | `e2dd1bb` | Kapalı | Canlıda |
+| **C3-B3** | Frontend Uygula + confirmation modal | `3355369` | Kapalı | Canlıda |
+| **C3-B4** | Kontrollü canlı apply + idempotency | — | Kapalı | `LIVE_APPLY_IDEMPOTENCY_PASSED` |
+
+**S74-C3 faz durumu:** tam kapalı (B1–B4).
 
 ---
 
-## 3. Tamamlanan Yetkinlikler (Kod)
+## 3. Tamamlanan Yetkinlikler (Kod + Canlı)
 
 - `HAZIR` aday için atomik `gunluk_puantaj` INSERT (`BildirimPuantajEtkiApplyService`).
 - Mevcut puantaj satırı UPDATE edilmez; duplicate `(personel_id, tarih)` → `409 PUANTAJ_OLUSTU`.
 - Mühürlü ay blokajı (`409 PERIOD_LOCKED`).
 - Karar audit: snapshot'lar, `uygulama_hash`, `uygulanan_puantaj_id`.
-- Idempotent tekrar: bütünlük korunursa `200` + `idempotent: true`.
-- `gec_kalma_dakika` / `erken_cikis_dakika` authoritative alanları (migration `012`).
-- Ücretsiz izin projection → `INCELEME_GEREKLI` / `UCRETSIZ_IZIN_MANUEL_INCELEME` (otomatik HAZIR yok).
-- GÖREVDE canonical hedef: `Geldi` + `Gorevde_Calisma` + `Tam_Yevmiye_Ver`.
-- MUHASEBE frontend: detay `HAZIR` + `puantaj.bildirim_etki.apply` → Uygula → AppModal onay → POST `/uygula`.
-- Liste / detay / özet refetch; Yok Say akışı korundu.
+- Idempotent tekrar: bütünlük korunursa `200` + `idempotent: true` — **canlıda doğrulandı**.
+- `gec_kalma_dakika` / `erken_cikis_dakika` authoritative alanları (migration `012` canlıda).
+- Ücretsiz izin projection → `INCELEME_GEREKLI` / `UCRETSIZ_IZIN_MANUEL_INCELEME`.
+- GÖREVDE canonical hedef: `Geldi` + `Gorevde_Calisma` + `Tam_Yevmiye_Ver` — **canlı mapping doğrulandı**.
+- MUHASEBE frontend Uygula akışı — **canlı UI apply başarılı**.
 
 ---
 
@@ -66,8 +68,7 @@ Bu checkpoint, S74-C3 «Uygula» hattının (C3-A analiz → C3-B1 dakika altyap
 | Legacy aylık özet | `aylik_ozet` / `genel_yonetici_onayi.*` hattı değişmez |
 | INCELEME_GEREKLI | Yalnız Yok Say; Uygula yasak |
 | Ücretsiz izin | Otomatik apply desteklenmez |
-| Toplu / sessiz apply | Yok; her karar tek aday + onay modalı |
-| Canlı apply kanıtı | **Henüz yok** (B4 blokajı) |
+| Canlı apply kanıtı | **Tamam** (C3-B4) |
 
 ---
 
@@ -75,10 +76,17 @@ Bu checkpoint, S74-C3 «Uygula» hattının (C3-A analiz → C3-B1 dakika altyap
 
 | Tablo | Kolonlar | Canlı |
 |-------|----------|-------|
-| `gunluk_puantaj` | `gec_kalma_dakika`, `erken_cikis_dakika` | Uygulandı (owner onaylı tek seferlik run) |
+| `gunluk_puantaj` | `gec_kalma_dakika`, `erken_cikis_dakika` | Uygulandı |
 | `puantaj_aylik_muhur_satirlari` | aynı | Uygulandı |
 
 `api/migrations` deploy otomasyonu dışındadır; tekrar çalıştırılmamalıdır.
+
+**Backup ayrımı:**
+
+- Migration `012` öncesi backup kanıtı **yoktur**; bu eksiklik geriye dönük kapatılmış gibi gösterilmez.
+- `karmotor_medisa.sql.gz` — 15 Temmuz 2026 tarihinde doğrulanan, migration sonrası ve C3-B4 mutation öncesi canlı snapshot'tır.
+- Backup kanıtı: tarih `2026-07-15 08:38:46`, SHA256 `E3398457E917B7A815E458FB52CF2F086BCD9A3F388D9495A906DB22D9FF9302`, gzip açılmış, doğru veritabanı doğrulanmış, 20 `CREATE TABLE` ve 17 `INSERT` bulunmuş.
+- Backup dosyası repoya eklenmez.
 
 ---
 
@@ -89,54 +97,150 @@ Bu checkpoint, S74-C3 «Uygula» hattının (C3-A analiz → C3-B1 dakika altyap
 | B2 apply API | `e2dd1bb` | `29291328279` success | success | Read-only `/uygula` guard |
 | B3 Uygula UI | `3355369` | `29292315309` success | `29292358038` attempt 2 success | Canlı bundle örn. `index-Bd29xmV9.js` |
 
-B3 read-only UI smoke: Uygula/Yok Say string'leri ve permission işaretleri canlı bundle'da; **canlıda HAZIR aday yok** (`LIVE_HAZIR_ADAY_YOK`).
+B3 öncesi read-only smoke: canlıda HAZIR aday yoktu (`LIVE_HAZIR_ADAY_YOK`); B4 ile kontrollü fixture üzerinden apply kanıtlandı.
 
 ---
 
-## 8. C3-B4 Blokajı
+## 8. C3-B4 — Kontrollü Canlı Apply ve İdempotency Kabulü
 
-**Final karar:** `NO_SAFE_LIVE_APPLY_FIXTURE`
+**Final kararlar:**
 
-- Canlıda güvenli HAZIR aday bulunamadı veya meşru kaynak üzerinden kontrollü üretim koşulları sağlanamadı.
-- Tek `/uygula` mutation, idempotency POST ve puantaj satırı doğrulaması yapılmadı.
-- Canlı aday/puantaj verisi bu oturumda değişmedi.
+- `LIVE_APPLY_IDEMPOTENCY_PASSED`
+- `S74_C3B4_LIVE_APPLY_IDEMPOTENCY_OK`
+- `S74_C3_FULLY_COMPLETE`
 
-Bu nedenle S74-C3 **kod hattı kapalı**, **canlı apply E2E kanıtı açık** kabul edilir.
+### Kontrollü kabul zinciri
+
+| Alan | Değer |
+|------|-------|
+| Bildirim | `#3` |
+| Bildirim türü | `GOREVDE` |
+| Personel | `#1` |
+| Tarih | `2026-07-15` |
+| Haftalık mutabakat | `#3` |
+| Aylık onay | `#1` |
+| Genel Yönetici üst onayı | `#2` |
+| Oluşan yeni aday | `#3` |
+| Aday başlangıç state | `HAZIR` |
+| UI apply | başarılı |
+| Aday final state | `UYGULANDI` |
+| Uygulanan günlük puantaj | `#3` |
+
+### İdempotency
+
+| Kontrol | Sonuç |
+|---------|-------|
+| İkinci apply POST | HTTP `200` |
+| İkinci response | `idempotent: true` |
+| Puantaj ID | değişmedi |
+| Yeni puantaj satırı | oluşmadı |
+| 64 karakterlik `uygulama_hash` | değişmedi |
+| `sonraki_puantaj_snapshot` | değişmedi |
+| Aday state | değişmedi |
+| Karar audit alanları | değişmedi |
+
+### Canonical canlı mapping (`gunluk_puantaj` #3)
+
+| Alan | Değer |
+|------|-------|
+| `hareket_durumu` | `Geldi` |
+| `dayanak` | `Gorevde_Calisma` |
+| `hesap_etkisi` / yevmiye | `Tam_Yevmiye_Ver` |
+| `state` | `ACIK` |
+| `gec_kalma_dakika` | `NULL` |
+| `erken_cikis_dakika` | `NULL` |
+
+### UI özet sayaçları (kabul sonrası)
+
+| State | Adet |
+|-------|------|
+| `HAZIR` | 0 |
+| `INCELEME_GEREKLI` | 1 |
+| `UYGULANDI` | 1 |
+
+### API health
+
+- HTTP `200`, `status: ok`
+
+### Repo durumu (kabul sırasında)
+
+- Kod değişikliği yok
+- HEAD / `origin/main` senkrondu (`3355369`)
+- Canlı kabul sırasında repo dosyası değişmedi
 
 ---
 
-## 9. Bilinen Operasyonel Durumlar
+## 9. Fixture Niteliği (Aday #3 / Bildirim #3)
 
-- Şube 2 (Giresun) için aktif Birim Amiri eksikliği kod hatası değil; canlı veri/organizasyon eksikliği (C2B-R3 teşhisi geçerlidir).
-- Canlı kontrollü smoke dönemi çoğunlukla `2026-06`; `2026-07` boş-state beklenen sonuç olabilir.
+- Bu bildirim normal günlük operasyon kaydı değil; **kontrollü canlı kabul fixture'ıdır**.
+- Bildirim açıklamasında bu durum açıkça belirtilmiştir.
+- Kayıt sistemin gerçek onay zincirinden geçirilmiştir (mutabakat → aylık onay → GY üst onay → generate → apply).
+- Doğrudan DB INSERT/UPDATE kullanılmamıştır.
+- Fixture **silinmeyecek**, Yok Say yapılmayacak, DB'den temizlenmeyecek.
+- Canlı kabul ve audit kanıtı olarak korunacaktır.
+- «Gerçek operasyon kaydı» şeklinde yanlış ifade kullanılmaz.
+
+---
+
+## 10. Bilinen Operasyonel Durumlar
+
+- Şube 2 (Giresun) aktif Birim Amiri eksikliği kod hatası değil; canlı veri eksikliği (C2B-R3 geçerlidir).
 - Mock `user_id=4` canlı Birim Amiri olarak kullanılmaz.
-- S74-B generate sonrası aday sayısı düşük; HAZIR yoğunluğu ortam verisine bağlıdır.
+- Kabul fixture'ı dışındaki aday yoğunluğu ortam verisine bağlıdır; `INCELEME_GEREKLI: 1` açık kayıt vardır.
 
 ---
 
-## 10. Sıradaki Faz Tespiti
+## 11. Sonraki Geniş Faz Tespiti
 
-| Seçenek | Artı | Eksi | Öneri |
-|---------|------|------|-------|
-| **A. S74-C3-B4 retry** | Apply/idempotency/audit canlı kanıtı | Gerçek DB mutation + güvenli fixture gerekir | **Öncelikli** — B4 blokajı kalkınca |
-| **B. S74-D — Finans / bordro köprüsü ön analizi** | Ürün zincirini genişletir | Apply canlı kanıtı olmadan erken risk | B4 sonrası |
-| **C. Toplu generate / operasyon otomasyonu** | Daha fazla HAZIR aday | Scope genişler; veri politikası gerekir | Acele edilmemeli |
-| **D. Kapalı dönem / düzeltme workflow** | Mühür sonrası apply etkisi netleşir | Geniş karar fazı | Paralel ürün kararı |
+### Aday 1 — MANUEL_INCELEME karar ve çözüm akışı
 
-**Önerilen sıradaki adım:** Owner onayı ve güvenli meşru HAZIR fixture ile **S74-C3-B4 kontrollü canlı apply ve idempotency doğrulamasının** tamamlanması. Kod/deploy tarafı hazır; eksik parça canlı mutation kanıtıdır.
+| Boyut | Değerlendirme |
+|-------|---------------|
+| Ürün değeri | Yüksek — `DIGER` / `INCELEME_GEREKLI` kayıtlarının operasyonel kapanışı |
+| Kapsam | Karar modeli, UI/endpoint, süreç/puantaj bağlantısı |
+| Risk | Orta — yanlış otomatik kapanış üretim verisini bozar |
+| Migration | Muhtemelen yok; mevcut aday state altyapısı üzerinde |
+| Canlı mutation | Düşük (karar fazı) / orta (çözüm uygulama fazında) |
+| Ürün kararı | İnceleme kaydının hangi kararla kapatılacağı, manuel düzeltme sınırı |
+
+### Aday 2 — Mevcut puantaj çakışması (`PUANTAJ_OLUSTU`) çözüm akışı
+
+| Boyut | Değerlendirme |
+|-------|---------------|
+| Ürün değeri | Yüksek — apply öncesi çakışma gerçek üretim senaryosu |
+| Kapsam | Kullanıcı yolu, audit, overwrite yasağı netliği |
+| Risk | Yüksek — mevcut puantajın ezilmesi |
+| Migration | Muhtemelen yok |
+| Canlı mutation | Orta (kontrollü senaryo gerekir) |
+| Ürün kararı | Çakışma sonrası düzeltme/iptal/reopen politikası |
+
+### Aday 3 — Etki adaylarının raporlama ve dönem kapanışına bağlanması
+
+| Boyut | Değerlendirme |
+|-------|---------------|
+| Ürün değeri | Orta-yüksek — operasyon görünürlüğü |
+| Kapsam | Rapor/read model, aylık kapanış öncesi kontrol kapısı |
+| Risk | Orta — scope genişleyebilir |
+| Migration | Olası (rapor aggregate) |
+| Canlı mutation | Düşük (read-only rapor fazı) |
+| Ürün kararı | UYGULANDI / YOK_SAYILDI / İNCELEME dağılımı ve kapanış öncesi blok kuralları |
+
+**Önerilen sonraki ana sprint:** **S74-D1 — MANUEL_INCELEME karar ve çözüm akışı ön analizi / karar fazı**
+
+Gerekçe: Canlı kabul sonrası panelde `INCELEME_GEREKLI: 1` açık kayıt vardır; apply hattı kapandıktan sonra en dar ve ürün değeri yüksek boşluk, inceleme kayıtlarının operasyonel kapanış modelidir. `PUANTAJ_OLUSTU` ve raporlama fazları bunu takip etmelidir.
 
 ---
 
-## 11. Kapsam Dışı (Bu Checkpoint Sonrası Otomatik Açılmaz)
+## 12. Kapsam Dışı (S74-C3 Sonrası Otomatik Açılmaz)
 
 - Yeni apply kuralları veya overwrite davranışı
 - Finans tabloları / bordro entegrasyonu
 - Patron acknowledgment
 - Migration `012` dışı şema değişikliği
-- Sahte personel/bildirim üretimi
+- Kabul fixture'ının silinmesi veya temizlenmesi
 
 ---
 
-## 12. Kapanış Cümlesi
+## 13. Kapanış Cümlesi
 
-S74-C3 ile bildirim → puantaj etki adayı «Uygula» hattının backend, frontend, test ve kontrat omurgası tamamlanmış ve `3355369` canlıya dağıtılmıştır. Zincirin operasyonel kapanışı, güvenli canlı apply kanıtı (C3-B4) tamamlanana kadar **kısmi** sayılır; sıradaki en dar ve güvenli adım kontrollü canlı apply/idempotency fazıdır.
+S74-C3 ile bildirim → puantaj etki adayı «Uygula» hattının backend, frontend, test, kontrat ve kontrollü canlı apply/idempotency kanıtı tamamlanmıştır. Faz **tam kapalıdır** (`S74_C3_FULLY_COMPLETE`). Sıradaki önerilen geniş adım MANUEL_INCELEME karar ve çözüm akışıdır.

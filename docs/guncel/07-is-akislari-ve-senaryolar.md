@@ -450,9 +450,17 @@ S74-C3 apply (`/uygula`) öncesi altyapı fazı; kullanıcı akışı değişmez
 - Duplicate puantaj → `409 PUANTAJ_OLUSTU`.
 - Finans, bordro ve bildirim zinciri state'leri değişmez.
 
-### Canlı kanıt sınırı
+### Canlı kanıt (C3-B4)
 
-Kod ve deploy tamamlanmıştır. Kontrollü canlı apply/idempotency (S74-C3-B4) güvenli HAZIR fixture bulunamadığı için `NO_SAFE_LIVE_APPLY_FIXTURE` ile tamamlanmamıştır.
+Kontrollü canlı apply ve idempotency tamamlandı (`LIVE_APPLY_IDEMPOTENCY_PASSED`).
+
+- Fixture: bildirim `#3` (GOREVDE, kontrollü kabul fixture'ı — gerçek operasyon kaydı değil)
+- Aday `#3`: `HAZIR` → UI apply → `UYGULANDI`; puantaj `#3` oluştu
+- İkinci POST: HTTP `200`, `idempotent: true`; hash/snapshot/audit değişmedi
+- Canonical mapping: `Geldi` + `Gorevde_Calisma` + `Tam_Yevmiye_Ver`, `ACIK`, dakika `NULL`
+- UI özet: HAZIR `0`, INCELEME_GEREKLI `1`, UYGULANDI `1`
+
+Detay: `docs/guncel/76-s74-c3-puantaj-etki-adayi-uygula-kapanis-checkpoint.md` §8–9.
 
 ## 16. Rapor Alma Senaryosu
 

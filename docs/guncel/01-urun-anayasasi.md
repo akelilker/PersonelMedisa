@@ -140,7 +140,7 @@ Her fazın çıkış kriteri `05-state-flow-api-kontrati.md` ve `09-rol-yetki-ma
 - S71 haftalık bildirim mutabakatı fazı tamamlandı.
 - S72 aylık bildirim onayı fazı tamamlandı.
 - S73 Genel Yönetici bildirim üst onayı fazı tamamlandı.
-- S74-B/C puantaj etki adayı generate + karar (Yok Say / Uygula) köprüsü kodda tamamlandı; canlı apply E2E kanıtı C3-B4 ile bekliyor.
+- S74-B/C puantaj etki adayı generate + karar (Yok Say / Uygula) köprüsü kod ve canlıda tamamlandı (S74-C3-B4 `LIVE_APPLY_IDEMPOTENCY_PASSED`).
 - Günlük, haftalık ve aylık bildirim write/approve sahibi `BIRIM_AMIRI` rolüdür.
 - `GENEL_YONETICI`, S73 kapsamında bildirim üst onayını görür ve onaylar (`genel_yonetici_bildirim_onayi.*`).
 - `BOLUM_YONETICISI`, `GENEL_YONETICI` (S72 panelleri) ve `MUHASEBE` haftalık ve aylık bildirim panellerini salt okunur görür; S72 approve sahibi değildir.

@@ -10,6 +10,7 @@ namespace Medisa\Api\Services;
 class BildirimPuantajEtkiPuantajMapper
 {
   public const KAYNAK = 'BILDIRIM_ETKI_ADAYI';
+  public const KAYNAK_REVIZYON = 'BILDIRIM_ETKI_REVIZYON';
 
   /** @var array<int, string> */
   public static $manualKararTurleri = [
@@ -329,6 +330,91 @@ class BildirimPuantajEtkiPuantajMapper
    * @param array<string, mixed> $row
    * @return array<string, mixed>
    */
+  /**
+   * @param array<string, mixed> $row
+   * @return array<string, mixed>
+   */
+  public static function canonicalPuantajConcurrencyPayload(array $row)
+  {
+    $payload = self::canonicalPuantajPayload($row);
+    $payload['muhur_id'] = isset($row['muhur_id']) && $row['muhur_id'] !== null ? (int) $row['muhur_id'] : null;
+    $payload['updated_at'] = array_key_exists('updated_at', $row) && $row['updated_at'] !== null
+      ? (string) $row['updated_at']
+      : null;
+
+    return $payload;
+  }
+
+  public static function computeCurrentPuantajHash(array $row)
+  {
+    return hash(
+      'sha256',
+      BildirimPuantajEtkiProjectionService::canonicalJson(self::canonicalPuantajConcurrencyPayload($row))
+    );
+  }
+
+  /**
+   * @param array<string, mixed> $aday
+   * @param array<string, mixed> $existingRow
+   * @return array{ok: bool, values?: array<string, mixed>, code?: string, message?: string}
+   */
+  public static function buildRevizeUpdateValues(array $aday, array $existingRow)
+  {
+    $mapped = self::mapEtkiToPuantajFields($aday);
+    if (($mapped['ok'] ?? false) !== true) {
+      return $mapped;
+    }
+
+    /** @var array<string, mixed> $fields */
+    $fields = $mapped['fields'];
+    $tarih = (string) ($aday['tarih'] ?? '');
+    $gunTipi = self::resolveGunTipi($tarih);
+    $aciklama = $aday['bildirim_aciklama'] !== null ? (string) $aday['bildirim_aciklama'] : null;
+    $derived = self::invalidateDerivedFieldsForRevize($fields);
+
+    return [
+      'ok' => true,
+      'values' => [
+        'gun_tipi' => $gunTipi,
+        'hareket_durumu' => $fields['hareket_durumu'],
+        'dayanak' => $fields['dayanak'],
+        'durumu_bildirdi_mi' => 1,
+        'durum_bildirim_aciklamasi' => $aciklama,
+        'hesap_etkisi' => $fields['hesap_etkisi'],
+        'gec_kalma_dakika' => $fields['gec_kalma_dakika'],
+        'erken_cikis_dakika' => $fields['erken_cikis_dakika'],
+        'giris_saati' => $existingRow['giris_saati'] ?? null,
+        'cikis_saati' => $existingRow['cikis_saati'] ?? null,
+        'beklenen_giris_saati' => $existingRow['beklenen_giris_saati'] ?? null,
+        'beklenen_cikis_saati' => $existingRow['beklenen_cikis_saati'] ?? null,
+        'gercek_mola_dakika' => self::nullableInt($existingRow['gercek_mola_dakika'] ?? null),
+        'hesaplanan_mola_dakika' => $derived['hesaplanan_mola_dakika'],
+        'net_calisma_suresi_dakika' => $derived['net_calisma_suresi_dakika'],
+        'gunluk_brut_sure_dakika' => $derived['gunluk_brut_sure_dakika'],
+        'hafta_tatili_hak_kazandi_mi' => $derived['hafta_tatili_hak_kazandi_mi'],
+        'state' => 'ACIK',
+        'kontrol_durumu' => 'BEKLIYOR',
+        'kaynak' => self::KAYNAK_REVIZYON,
+        'aciklama' => $existingRow['aciklama'] ?? null,
+        'muhur_id' => null,
+      ],
+    ];
+  }
+
+  /**
+   * @param array<string, mixed> $effectFields
+   * @return array<string, mixed>
+   */
+  public static function invalidateDerivedFieldsForRevize(array $effectFields)
+  {
+    return [
+      'hesaplanan_mola_dakika' => null,
+      'net_calisma_suresi_dakika' => null,
+      'gunluk_brut_sure_dakika' => null,
+      'hafta_tatili_hak_kazandi_mi' => null,
+    ];
+  }
+
   public static function canonicalPuantajPayload(array $row)
   {
     return [

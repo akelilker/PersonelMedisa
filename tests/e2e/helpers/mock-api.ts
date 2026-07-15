@@ -1,4 +1,5 @@
-﻿import type { Page, Route } from "@playwright/test";
+﻿import { createHash } from "node:crypto";
+import type { Page, Route } from "@playwright/test";
 import type { GunlukPuantaj } from "../../../src/types/puantaj";
 import { hesaplaAylikSgkPuantajOzetleri } from "../../../src/services/dashboard-rapor-servisi";
 import {
@@ -2005,7 +2006,7 @@ export async function mockApi(page: Page, role: MockUserRole) {
       bildirim_aciklama: "Sube 2 gelmedi bildirimi",
       bildirim_created_at: "2026-06-04 09:00:00",
       bildirim_updated_at: "2026-06-04 09:00:00",
-      etki_turu: "DEVAMSIZLIK",
+      etki_turu: "DEVAMSIZLIK_GUN",
       etki_miktari: null,
       etki_birimi: null,
       state: "INCELEME_GEREKLI",
@@ -2050,7 +2051,7 @@ export async function mockApi(page: Page, role: MockUserRole) {
       bildirim_aciklama: "Gelmedi bildirimi",
       bildirim_created_at: "2026-06-04 09:00:00",
       bildirim_updated_at: "2026-06-04 09:00:00",
-      etki_turu: "DEVAMSIZLIK",
+      etki_turu: "DEVAMSIZLIK_GUN",
       etki_miktari: null,
       etki_birimi: null,
       state: "INCELEME_GEREKLI",
@@ -2213,8 +2214,431 @@ export async function mockApi(page: Page, role: MockUserRole) {
       uygulama_modu: "OTOMATIK",
       manuel_karar_turu: null,
       manuel_karar_miktari: null
+    },
+    {
+      id: 7,
+      genel_yonetici_bildirim_onayi_id: 10,
+      aylik_bildirim_onayi_id: 2,
+      gunluk_bildirim_id: 107,
+      personel_id: 1,
+      sube_id: 1,
+      birim_amiri_user_id: 1,
+      ay: "2026-06",
+      tarih: "2026-06-08",
+      bildirim_turu: "GELMEDI",
+      bildirim_alt_tur: null,
+      bildirim_dakika: null,
+      bildirim_aciklama: "Resmi surec cakismasi",
+      bildirim_created_at: "2026-06-08 09:00:00",
+      bildirim_updated_at: "2026-06-08 09:00:00",
+      etki_turu: "DEVAMSIZLIK_GUN",
+      etki_miktari: null,
+      etki_birimi: null,
+      state: "INCELEME_GEREKLI",
+      conflict_code: "MEVCUT_PUANTAJ_VAR",
+      conflict_detail: { message: "Resmi surec dayanakli puantaj cakismasi." },
+      resmi_surec_id: null,
+      resmi_surec_turu: null,
+      resmi_surec_alt_tur: null,
+      ucretli_mi_snapshot: null,
+      mevcut_puantaj_id: 57,
+      source_priority: "BILDIRIM",
+      created_by: 1,
+      source_snapshot: { aciklama: "Resmi surec cakismasi" },
+      source_hash: "hash-7",
+      projection_version: "v1",
+      created_at: "2026-06-10 10:25:00",
+      updated_at: "2026-06-10 10:25:00",
+      karar_veren_user_id: null,
+      karar_zamani: null,
+      karar_gerekcesi: null,
+      uygulanan_puantaj_id: null,
+      onceki_puantaj_snapshot: null,
+      sonraki_puantaj_snapshot: null,
+      uygulama_hash: null,
+      uygulama_modu: "OTOMATIK",
+      manuel_karar_turu: null,
+      manuel_karar_miktari: null
+    },
+    {
+      id: 8,
+      genel_yonetici_bildirim_onayi_id: 10,
+      aylik_bildirim_onayi_id: 2,
+      gunluk_bildirim_id: 108,
+      personel_id: 1,
+      sube_id: 1,
+      birim_amiri_user_id: 1,
+      ay: "2026-06",
+      tarih: "2026-06-09",
+      bildirim_turu: "GELMEDI",
+      bildirim_alt_tur: null,
+      bildirim_dakika: null,
+      bildirim_aciklama: "Muhurlu puantaj cakismasi",
+      bildirim_created_at: "2026-06-09 09:00:00",
+      bildirim_updated_at: "2026-06-09 09:00:00",
+      etki_turu: "DEVAMSIZLIK_GUN",
+      etki_miktari: null,
+      etki_birimi: null,
+      state: "INCELEME_GEREKLI",
+      conflict_code: "MEVCUT_PUANTAJ_VAR",
+      conflict_detail: { message: "Muhurlu puantaj kaydi ile cakisma." },
+      resmi_surec_id: null,
+      resmi_surec_turu: null,
+      resmi_surec_alt_tur: null,
+      ucretli_mi_snapshot: null,
+      mevcut_puantaj_id: 58,
+      source_priority: "BILDIRIM",
+      created_by: 1,
+      source_snapshot: { aciklama: "Muhurlu puantaj cakismasi" },
+      source_hash: "hash-8",
+      projection_version: "v1",
+      created_at: "2026-06-10 10:30:00",
+      updated_at: "2026-06-10 10:30:00",
+      karar_veren_user_id: null,
+      karar_zamani: null,
+      karar_gerekcesi: null,
+      uygulanan_puantaj_id: null,
+      onceki_puantaj_snapshot: null,
+      sonraki_puantaj_snapshot: null,
+      uygulama_hash: null,
+      uygulama_modu: "OTOMATIK",
+      manuel_karar_turu: null,
+      manuel_karar_miktari: null
     }
   ];
+
+  type MockConflictPuantajRow = {
+    id: number;
+    personel_id: number;
+    tarih: string;
+    state: string;
+    gun_tipi: string | null;
+    hareket_durumu: string | null;
+    dayanak: string | null;
+    durumu_bildirdi_mi: number;
+    durum_bildirim_aciklamasi: string | null;
+    hesap_etkisi: string | null;
+    beklenen_giris_saati: string | null;
+    beklenen_cikis_saati: string | null;
+    giris_saati: string | null;
+    cikis_saati: string | null;
+    gec_kalma_dakika: number | null;
+    erken_cikis_dakika: number | null;
+    gercek_mola_dakika: number | null;
+    hesaplanan_mola_dakika: number | null;
+    net_calisma_suresi_dakika: number | null;
+    gunluk_brut_sure_dakika: number | null;
+    hafta_tatili_hak_kazandi_mi: number | null;
+    kontrol_durumu: string;
+    kaynak: string | null;
+    aciklama: string | null;
+    muhur_id: number | null;
+    updated_at: string;
+  };
+
+  const mockConflictPuantajByKey = new Map<string, MockConflictPuantajRow>([
+    [
+      "1:2026-06-04",
+      {
+        id: 55,
+        personel_id: 1,
+        tarih: "2026-06-04",
+        state: "ACIK",
+        gun_tipi: null,
+        hareket_durumu: "Geldi",
+        dayanak: "Yok_Izinsiz",
+        durumu_bildirdi_mi: 0,
+        durum_bildirim_aciklamasi: null,
+        hesap_etkisi: "Tam_Yevmiye_Ver",
+        beklenen_giris_saati: "08:00",
+        beklenen_cikis_saati: "17:00",
+        giris_saati: "08:30",
+        cikis_saati: "17:30",
+        gec_kalma_dakika: null,
+        erken_cikis_dakika: null,
+        gercek_mola_dakika: 60,
+        hesaplanan_mola_dakika: 60,
+        net_calisma_suresi_dakika: 480,
+        gunluk_brut_sure_dakika: 540,
+        hafta_tatili_hak_kazandi_mi: 0,
+        kontrol_durumu: "BEKLIYOR",
+        kaynak: "MANUEL",
+        aciklama: null,
+        muhur_id: null,
+        updated_at: "2026-06-10 08:00:00"
+      }
+    ],
+    [
+      "2:2026-06-04",
+      {
+        id: 56,
+        personel_id: 2,
+        tarih: "2026-06-04",
+        state: "ACIK",
+        gun_tipi: null,
+        hareket_durumu: "Geldi",
+        dayanak: "Yok_Izinsiz",
+        durumu_bildirdi_mi: 0,
+        durum_bildirim_aciklamasi: null,
+        hesap_etkisi: "Tam_Yevmiye_Ver",
+        beklenen_giris_saati: "08:00",
+        beklenen_cikis_saati: "17:00",
+        giris_saati: "08:30",
+        cikis_saati: "17:30",
+        gec_kalma_dakika: null,
+        erken_cikis_dakika: null,
+        gercek_mola_dakika: 60,
+        hesaplanan_mola_dakika: 60,
+        net_calisma_suresi_dakika: 480,
+        gunluk_brut_sure_dakika: 540,
+        hafta_tatili_hak_kazandi_mi: 0,
+        kontrol_durumu: "BEKLIYOR",
+        kaynak: "BILDIRIM_ETKI_ADAYI",
+        aciklama: null,
+        muhur_id: null,
+        updated_at: "2026-06-10 08:00:00"
+      }
+    ],
+    [
+      "1:2026-06-08",
+      {
+        id: 57,
+        personel_id: 1,
+        tarih: "2026-06-08",
+        state: "ACIK",
+        gun_tipi: null,
+        hareket_durumu: "Gelmedi",
+        dayanak: "Yillik_Izin",
+        durumu_bildirdi_mi: 0,
+        durum_bildirim_aciklamasi: null,
+        hesap_etkisi: "Yillik_Izin",
+        beklenen_giris_saati: null,
+        beklenen_cikis_saati: null,
+        giris_saati: null,
+        cikis_saati: null,
+        gec_kalma_dakika: null,
+        erken_cikis_dakika: null,
+        gercek_mola_dakika: null,
+        hesaplanan_mola_dakika: null,
+        net_calisma_suresi_dakika: null,
+        gunluk_brut_sure_dakika: null,
+        hafta_tatili_hak_kazandi_mi: null,
+        kontrol_durumu: "BEKLIYOR",
+        kaynak: "MANUEL",
+        aciklama: null,
+        muhur_id: null,
+        updated_at: "2026-06-10 08:00:00"
+      }
+    ],
+    [
+      "1:2026-06-09",
+      {
+        id: 58,
+        personel_id: 1,
+        tarih: "2026-06-09",
+        state: "MUHURLENDI",
+        gun_tipi: null,
+        hareket_durumu: "Geldi",
+        dayanak: "Yok_Izinsiz",
+        durumu_bildirdi_mi: 0,
+        durum_bildirim_aciklamasi: null,
+        hesap_etkisi: "Tam_Yevmiye_Ver",
+        beklenen_giris_saati: "08:00",
+        beklenen_cikis_saati: "17:00",
+        giris_saati: "08:30",
+        cikis_saati: "17:30",
+        gec_kalma_dakika: null,
+        erken_cikis_dakika: null,
+        gercek_mola_dakika: 60,
+        hesaplanan_mola_dakika: 60,
+        net_calisma_suresi_dakika: 480,
+        gunluk_brut_sure_dakika: 540,
+        hafta_tatili_hak_kazandi_mi: 0,
+        kontrol_durumu: "BEKLIYOR",
+        kaynak: "MANUEL",
+        aciklama: null,
+        muhur_id: 1,
+        updated_at: "2026-06-10 08:00:00"
+      }
+    ]
+  ]);
+
+  const mockConflictResolutions = new Map<
+    number,
+    {
+      id: number;
+      aday_id: number;
+      puantaj_id: number | null;
+      conflict_class: string;
+      karar_turu: string;
+      gerekce: string;
+      request_hash: string;
+      sonuc_hash: string;
+      karar_veren_user_id: number;
+      karar_zamani: string;
+    }
+  >();
+
+  function sortKeysRecursive(value: unknown): unknown {
+    if (Array.isArray(value)) {
+      return value.map((entry) => sortKeysRecursive(entry));
+    }
+    if (value && typeof value === "object") {
+      const sorted: Record<string, unknown> = {};
+      for (const key of Object.keys(value as Record<string, unknown>).sort()) {
+        sorted[key] = sortKeysRecursive((value as Record<string, unknown>)[key]);
+      }
+      return sorted;
+    }
+    return value;
+  }
+
+  function canonicalJson(data: unknown): string {
+    return JSON.stringify(sortKeysRecursive(data));
+  }
+
+  function mockPuantajConcurrencyPayload(row: MockConflictPuantajRow) {
+    return {
+      id: row.id,
+      personel_id: row.personel_id,
+      tarih: row.tarih,
+      state: row.state,
+      gun_tipi: row.gun_tipi,
+      hareket_durumu: row.hareket_durumu,
+      dayanak: row.dayanak,
+      durumu_bildirdi_mi: Boolean(row.durumu_bildirdi_mi),
+      durum_bildirim_aciklamasi: row.durum_bildirim_aciklamasi,
+      hesap_etkisi: row.hesap_etkisi,
+      beklenen_giris_saati: row.beklenen_giris_saati,
+      beklenen_cikis_saati: row.beklenen_cikis_saati,
+      giris_saati: row.giris_saati,
+      cikis_saati: row.cikis_saati,
+      gec_kalma_dakika: row.gec_kalma_dakika,
+      erken_cikis_dakika: row.erken_cikis_dakika,
+      gercek_mola_dakika: row.gercek_mola_dakika,
+      hesaplanan_mola_dakika: row.hesaplanan_mola_dakika,
+      net_calisma_suresi_dakika: row.net_calisma_suresi_dakika,
+      gunluk_brut_sure_dakika: row.gunluk_brut_sure_dakika,
+      hafta_tatili_hak_kazandi_mi: row.hafta_tatili_hak_kazandi_mi === null ? null : Boolean(row.hafta_tatili_hak_kazandi_mi),
+      kontrol_durumu: row.kontrol_durumu || "BEKLIYOR",
+      kaynak: row.kaynak,
+      aciklama: row.aciklama,
+      muhur_id: row.muhur_id,
+      updated_at: row.updated_at
+    };
+  }
+
+  function computeMockPuantajHash(row: MockConflictPuantajRow): string {
+    return createHash("sha256").update(canonicalJson(mockPuantajConcurrencyPayload(row))).digest("hex");
+  }
+
+  function getMockConflictPuantaj(item: MockPuantajEtkiAday): MockConflictPuantajRow | null {
+    return mockConflictPuantajByKey.get(`${item.personel_id}:${item.tarih}`) ?? null;
+  }
+
+  function classifyMockConflict(item: MockPuantajEtkiAday, puantaj: MockConflictPuantajRow) {
+    if (puantaj.state === "MUHURLENDI" || (puantaj.muhur_id ?? 0) > 0) {
+      return {
+        class: "MUHURLU_PUANTAJ",
+        default_karar: "MEVCUT_PUANTAJI_KORU",
+        revise_allowed: false,
+        risk: "KRITIK"
+      };
+    }
+    if (item.state === "UYGULANDI" && item.uygulanan_puantaj_id === puantaj.id) {
+      return {
+        class: "AYNI_ADAY_PUANTAJI",
+        default_karar: "ADAY_ETKISIYLE_REVIZE_ET",
+        revise_allowed: true,
+        risk: "DUSUK"
+      };
+    }
+    const kaynak = (puantaj.kaynak ?? "").toUpperCase();
+    if (kaynak === "BILDIRIM_ETKI_ADAYI" || kaynak === "BILDIRIM_ETKI_REVIZYON") {
+      return {
+        class: "BASKA_ADAY_KAYNAGI",
+        default_karar: "MEVCUT_PUANTAJI_KORU",
+        revise_allowed: true,
+        risk: "ORTA"
+      };
+    }
+    if (["Yillik_Izin", "Ucretli_Izinli", "Raporlu_Hastalik", "Raporlu_Is_Kazasi"].includes(puantaj.dayanak ?? "")) {
+      return {
+        class: "RESMI_SUREC_DAYANAK",
+        default_karar: "MEVCUT_PUANTAJI_KORU",
+        revise_allowed: false,
+        risk: "YUKSEK"
+      };
+    }
+    if (puantaj.kontrol_durumu === "AMIR_KONTROL_ETTI") {
+      return {
+        class: "AMIR_KONTROL_EDILMIS",
+        default_karar: "MEVCUT_PUANTAJI_KORU",
+        revise_allowed: true,
+        risk: "ORTA"
+      };
+    }
+    if (kaynak === "MANUEL") {
+      return {
+        class: "MANUEL_KAYNAK",
+        default_karar: "MEVCUT_PUANTAJI_KORU",
+        revise_allowed: true,
+        risk: "YUKSEK"
+      };
+    }
+    if (!kaynak) {
+      return {
+        class: "LEGACY_BELIRSIZ",
+        default_karar: "MEVCUT_PUANTAJI_KORU",
+        revise_allowed: true,
+        risk: "YUKSEK"
+      };
+    }
+    return {
+      class: "MANUEL_KAYNAK",
+      default_karar: "MEVCUT_PUANTAJI_KORU",
+      revise_allowed: true,
+      risk: "YUKSEK"
+    };
+  }
+
+  function buildMockRevizePreview(item: MockPuantajEtkiAday, puantaj: MockConflictPuantajRow) {
+    if (item.etki_turu !== "DEVAMSIZLIK_GUN") {
+      return null;
+    }
+    return {
+      hareket_durumu: "Gelmedi",
+      dayanak: "Yok_Izinsiz",
+      hesap_etkisi: "Yevmiye_Kes",
+      gec_kalma_dakika: null,
+      erken_cikis_dakika: null,
+      kontrol_durumu: "BEKLIYOR",
+      kaynak: "BILDIRIM_ETKI_REVIZYON"
+    };
+  }
+
+  function computeMockConflictRequestHash(input: {
+    aday_id: number;
+    expected_state: string;
+    karar_turu: string;
+    gerekce: string;
+    expected_puantaj_id: number;
+    expected_puantaj_hash: string;
+  }) {
+    return createHash("sha256")
+      .update(
+        canonicalJson({
+          schema_version: "S75_CONFLICT_RESOLUTION_V1",
+          aday_id: input.aday_id,
+          expected_state: input.expected_state,
+          karar_turu: input.karar_turu,
+          gerekce: input.gerekce,
+          expected_puantaj_id: input.expected_puantaj_id,
+          expected_puantaj_hash: input.expected_puantaj_hash.toLowerCase()
+        })
+      )
+      .digest("hex");
+  }
 
   function mapMockPuantajEtkiListRow(item: MockPuantajEtkiAday) {
     return {
@@ -2244,7 +2668,7 @@ export async function mockApi(page: Page, role: MockUserRole) {
   }
 
   function mapMockPuantajEtkiDetailRow(item: MockPuantajEtkiAday) {
-    return {
+    const base = {
       ...mapMockPuantajEtkiListRow(item),
       aylik_bildirim_onayi_id: item.aylik_bildirim_onayi_id,
       bildirim_alt_tur: item.bildirim_alt_tur,
@@ -2266,6 +2690,32 @@ export async function mockApi(page: Page, role: MockUserRole) {
       onceki_puantaj_snapshot: item.onceki_puantaj_snapshot,
       sonraki_puantaj_snapshot: item.sonraki_puantaj_snapshot,
       uygulama_hash: item.uygulama_hash
+    };
+    const puantaj = getMockConflictPuantaj(item);
+    if (!puantaj) {
+      return {
+        ...base,
+        mevcut_puantaj: null,
+        current_puantaj_hash: null,
+        conflict_class: null,
+        conflict_default_karar: null,
+        conflict_revise_allowed: false,
+        conflict_risk: null,
+        revize_onizleme: null,
+        cakisma_cozum: mockConflictResolutions.get(item.id) ?? null
+      };
+    }
+    const classification = classifyMockConflict(item, puantaj);
+    return {
+      ...base,
+      mevcut_puantaj: mockPuantajConcurrencyPayload(puantaj),
+      current_puantaj_hash: computeMockPuantajHash(puantaj),
+      conflict_class: classification.class,
+      conflict_default_karar: classification.default_karar,
+      conflict_revise_allowed: classification.revise_allowed,
+      conflict_risk: classification.risk,
+      revize_onizleme: buildMockRevizePreview(item, puantaj),
+      cakisma_cozum: mockConflictResolutions.get(item.id) ?? null
     };
   }
 
@@ -5228,6 +5678,216 @@ let personelBelgeKaydiIdCounter = 903;
         return;
       }
       await fulfillJson(route, 200, okBody(mapMockPuantajEtkiDetailRow(item)));
+      return;
+    }
+
+    if (path.match(/^\/api\/puantaj\/bildirim-etki-adaylari\/\d+\/cakisma-coz$/) && method === "POST") {
+      const authHeader = request.headers()["authorization"] ?? request.headers()["Authorization"] ?? "";
+      if (!authHeader.startsWith("Bearer ")) {
+        await fulfillJson(route, 401, errorBody("UNAUTHORIZED", "Oturum gerekli."));
+        return;
+      }
+      if (await denyUnlessRolePermission(route, "puantaj.bildirim_etki.resolve_conflict")) {
+        return;
+      }
+
+      const adayId = Number.parseInt(path.split("/")[4] ?? "", 10);
+      if (!adayId) {
+        await fulfillJson(route, 404, errorBody("NOT_FOUND", "Puantaj etki adayi bulunamadi."));
+        return;
+      }
+
+      const itemIndex = puantajEtkiAdaylari.findIndex((entry) => entry.id === adayId);
+      const item = itemIndex >= 0 ? puantajEtkiAdaylari[itemIndex] : null;
+      if (!item) {
+        await fulfillJson(route, 404, errorBody("NOT_FOUND", "Puantaj etki adayi bulunamadi."));
+        return;
+      }
+
+      const adaySubeId = item.sube_id;
+      const subeScope = getRequestSubeScope(request, url);
+      if (subeScope !== null && subeScope !== adaySubeId) {
+        await fulfillJson(route, 403, errorBody("FORBIDDEN", "Bu kayit aktif sube baglaminda goruntulenemiyor."));
+        return;
+      }
+      if (mockUserSubeIds.length > 0 && !mockUserSubeIds.includes(adaySubeId)) {
+        await fulfillJson(route, 403, errorBody("FORBIDDEN", "Bu kayit aktif sube baglaminda goruntulenemiyor."));
+        return;
+      }
+
+      const payload = request.postDataJSON() as Record<string, unknown>;
+      const allowedKeys = new Set([
+        "expected_state",
+        "karar_turu",
+        "gerekce",
+        "expected_puantaj_id",
+        "expected_puantaj_hash"
+      ]);
+      for (const key of Object.keys(payload)) {
+        if (!allowedKeys.has(key)) {
+          await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "Desteklenmeyen istek alani.", key));
+          return;
+        }
+      }
+
+      const expectedState = typeof payload.expected_state === "string" ? payload.expected_state.trim() : "";
+      const kararTuru = typeof payload.karar_turu === "string" ? payload.karar_turu.trim() : "";
+      const gerekce = typeof payload.gerekce === "string" ? payload.gerekce.trim() : "";
+      const expectedPuantajId = Number(payload.expected_puantaj_id ?? 0);
+      const expectedPuantajHash = typeof payload.expected_puantaj_hash === "string" ? payload.expected_puantaj_hash.trim().toLowerCase() : "";
+
+      if (expectedState !== "HAZIR" && expectedState !== "INCELEME_GEREKLI") {
+        await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "Beklenen durum gecersiz.", "expected_state"));
+        return;
+      }
+      if (kararTuru !== "MEVCUT_PUANTAJI_KORU" && kararTuru !== "ADAY_ETKISIYLE_REVIZE_ET") {
+        await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "Desteklenmeyen karar turu.", "karar_turu"));
+        return;
+      }
+      if (gerekce.length < 5 || [...gerekce].length > 500) {
+        await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "Gerekce 5-500 karakter olmalidir.", "gerekce"));
+        return;
+      }
+      if (!/^[a-f0-9]{64}$/.test(expectedPuantajHash)) {
+        await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "Puantaj hash gecersiz.", "expected_puantaj_hash"));
+        return;
+      }
+
+      if (gerekce === "E2E puantaj stale tetikleyici") {
+        await fulfillJson(route, 409, errorBody("PUANTAJ_STALE", "Mevcut puantaj kaydi degismis. Listeyi yenileyip tekrar deneyin."));
+        return;
+      }
+
+      const puantaj = getMockConflictPuantaj(item);
+      if (!puantaj) {
+        await fulfillJson(route, 409, errorBody("PUANTAJ_ARTIK_YOK", "Mevcut puantaj kaydi bulunamadi."));
+        return;
+      }
+
+      const classification = classifyMockConflict(item, puantaj);
+      const requestHash = computeMockConflictRequestHash({
+        aday_id: adayId,
+        expected_state: expectedState,
+        karar_turu: kararTuru,
+        gerekce,
+        expected_puantaj_id: expectedPuantajId,
+        expected_puantaj_hash: expectedPuantajHash
+      });
+      const existingResolution = mockConflictResolutions.get(adayId);
+      if (existingResolution) {
+        if (existingResolution.request_hash === requestHash) {
+          await fulfillJson(route, 200, okBody({
+            aday: mapMockPuantajEtkiDetailRow(item),
+            puantaj: mockPuantajConcurrencyPayload(puantaj),
+            conflict_class: existingResolution.conflict_class,
+            karar_turu: existingResolution.karar_turu,
+            cakisma_cozum: existingResolution,
+            onceki_ozet: null,
+            sonraki_ozet: null,
+            idempotent: true
+          }));
+          return;
+        }
+        await fulfillJson(route, 409, errorBody("REVISION_DECISION_CONFLICT", "Bu aday icin daha once farkli bir cakisma karari verilmis."));
+        return;
+      }
+
+      if (item.state !== "HAZIR" && item.state !== "INCELEME_GEREKLI") {
+        await fulfillJson(route, 409, errorBody("STATE_CONFLICT", "Puantaj etki adayi cakisma cozumu icin uygun degil."));
+        return;
+      }
+      if (expectedState !== item.state) {
+        await fulfillJson(route, 409, errorBody("STATE_STALE", "Puantaj etki adayi durumu degismis. Listeyi yenileyip tekrar deneyin."));
+        return;
+      }
+      if (expectedPuantajId !== puantaj.id) {
+        await fulfillJson(route, 409, errorBody("PUANTAJ_STALE", "Mevcut puantaj kaydi degismis. Listeyi yenileyip tekrar deneyin."));
+        return;
+      }
+      if (expectedPuantajHash !== computeMockPuantajHash(puantaj)) {
+        await fulfillJson(route, 409, errorBody("PUANTAJ_STALE", "Mevcut puantaj kaydi degismis. Listeyi yenileyip tekrar deneyin."));
+        return;
+      }
+
+      if (classification.class === "MUHURLU_PUANTAJ") {
+        await fulfillJson(route, 409, errorBody("PERIOD_LOCKED", "Muhurlu puantaj kaydi revize edilemez."));
+        return;
+      }
+      if (kararTuru === "ADAY_ETKISIYLE_REVIZE_ET" && classification.class === "RESMI_SUREC_DAYANAK") {
+        await fulfillJson(route, 409, errorBody("PUANTAJ_SOURCE_PROTECTED", "Resmi surec dayanakli puantaj bildirim etkisiyle revize edilemez."));
+        return;
+      }
+
+      const kararZamani = "2026-07-12 16:00:00";
+      const resolution = {
+        id: adayId + 1000,
+        aday_id: adayId,
+        puantaj_id: puantaj.id,
+        conflict_class: classification.class,
+        karar_turu: kararTuru,
+        gerekce,
+        request_hash: requestHash,
+        sonuc_hash: `sonuc-${requestHash.slice(0, 16)}`,
+        karar_veren_user_id: mockUserId,
+        karar_zamani: kararZamani
+      };
+      mockConflictResolutions.set(adayId, resolution);
+
+      if (kararTuru === "MEVCUT_PUANTAJI_KORU") {
+        puantajEtkiAdaylari[itemIndex] = {
+          ...item,
+          state: "YOK_SAYILDI",
+          uygulama_modu: "CAKISMA_COZUM",
+          karar_veren_user_id: mockUserId,
+          karar_zamani: kararZamani,
+          karar_gerekcesi: gerekce,
+          uygulanan_puantaj_id: null,
+          updated_at: kararZamani
+        };
+      } else {
+        const revised: MockConflictPuantajRow = {
+          ...puantaj,
+          hareket_durumu: "Gelmedi",
+          dayanak: "Yok_Izinsiz",
+          hesap_etkisi: "Yevmiye_Kes",
+          gec_kalma_dakika: null,
+          erken_cikis_dakika: null,
+          net_calisma_suresi_dakika: null,
+          gunluk_brut_sure_dakika: null,
+          hesaplanan_mola_dakika: null,
+          hafta_tatili_hak_kazandi_mi: null,
+          kontrol_durumu: "BEKLIYOR",
+          kaynak: "BILDIRIM_ETKI_REVIZYON",
+          durumu_bildirdi_mi: 1,
+          durum_bildirim_aciklamasi: item.bildirim_aciklama,
+          updated_at: kararZamani
+        };
+        mockConflictPuantajByKey.set(`${item.personel_id}:${item.tarih}`, revised);
+        puantajEtkiAdaylari[itemIndex] = {
+          ...item,
+          state: "UYGULANDI",
+          uygulama_modu: "CAKISMA_COZUM",
+          karar_veren_user_id: mockUserId,
+          karar_zamani: kararZamani,
+          karar_gerekcesi: gerekce,
+          uygulanan_puantaj_id: puantaj.id,
+          uygulama_hash: resolution.sonuc_hash,
+          updated_at: kararZamani
+        };
+      }
+
+      const updatedItem = puantajEtkiAdaylari[itemIndex];
+      const updatedPuantaj = getMockConflictPuantaj(updatedItem)!;
+      await fulfillJson(route, 200, okBody({
+        aday: mapMockPuantajEtkiDetailRow(updatedItem),
+        puantaj: mockPuantajConcurrencyPayload(updatedPuantaj),
+        conflict_class: classification.class,
+        karar_turu: kararTuru,
+        cakisma_cozum: resolution,
+        onceki_ozet: { puantaj: mockPuantajConcurrencyPayload(puantaj) },
+        sonraki_ozet: { puantaj: mockPuantajConcurrencyPayload(updatedPuantaj) },
+        idempotent: false
+      }));
       return;
     }
 

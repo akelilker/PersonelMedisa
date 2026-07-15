@@ -15,7 +15,7 @@ const rolePermissionsSource = readFileSync(rolePermissionsPath, "utf8");
 const policySource = readFileSync(policyPath, "utf8");
 
 describe("BildirimPuantajEtkiAdaylariController source contract", () => {
-  it("exposes summary, list, detail, generate, dismiss, apply and manualApply operations", () => {
+  it("exposes summary, list, detail, generate, dismiss, apply, manualApply and resolveConflict operations", () => {
     expect(controllerSource).toMatch(/public static function summary\(/);
     expect(controllerSource).toMatch(/public static function list\(/);
     expect(controllerSource).toMatch(/public static function detail\(/);
@@ -23,6 +23,7 @@ describe("BildirimPuantajEtkiAdaylariController source contract", () => {
     expect(controllerSource).toMatch(/public static function dismiss\(/);
     expect(controllerSource).toMatch(/public static function apply\(/);
     expect(controllerSource).toMatch(/public static function manualApply\(/);
+    expect(controllerSource).toMatch(/public static function resolveConflict\(/);
   });
 
   it("uses permission guards without hard-coded role checks", () => {
@@ -135,13 +136,14 @@ describe("BildirimPuantajEtkiAdaylariController source contract", () => {
 });
 
 describe("Router source contract for puantaj bildirim etki adaylari", () => {
-  it("registers ozet, hazirla, yok-say, manuel-uygula and uygula before dynamic id route", () => {
+  it("registers ozet, hazirla, yok-say, manuel-uygula, uygula and cakisma-coz before dynamic id route", () => {
     const ozetIndex = routerSource.indexOf("'/puantaj/bildirim-etki-adaylari/ozet'");
     const hazirlaIndex = routerSource.indexOf("'/puantaj/bildirim-etki-adaylari/hazirla'");
     const listIndex = routerSource.indexOf("'/puantaj/bildirim-etki-adaylari' && $method === 'GET'");
     const yokSayIndex = routerSource.indexOf("#^/puantaj/bildirim-etki-adaylari/(\\d+)/yok-say$#");
     const manuelUygulaIndex = routerSource.indexOf("#^/puantaj/bildirim-etki-adaylari/(\\d+)/manuel-uygula$#");
     const uygulaIndex = routerSource.indexOf("#^/puantaj/bildirim-etki-adaylari/(\\d+)/uygula$#");
+    const cakismaCozIndex = routerSource.indexOf("#^/puantaj/bildirim-etki-adaylari/(\\d+)/cakisma-coz$#");
     const detailIndex = routerSource.indexOf("#^/puantaj/bildirim-etki-adaylari/(\\d+)$#");
     expect(ozetIndex).toBeGreaterThan(-1);
     expect(hazirlaIndex).toBeGreaterThan(ozetIndex);
@@ -149,7 +151,8 @@ describe("Router source contract for puantaj bildirim etki adaylari", () => {
     expect(yokSayIndex).toBeGreaterThan(listIndex);
     expect(manuelUygulaIndex).toBeGreaterThan(yokSayIndex);
     expect(uygulaIndex).toBeGreaterThan(manuelUygulaIndex);
-    expect(detailIndex).toBeGreaterThan(uygulaIndex);
+    expect(cakismaCozIndex).toBeGreaterThan(uygulaIndex);
+    expect(detailIndex).toBeGreaterThan(cakismaCozIndex);
   });
 });
 

@@ -4,7 +4,62 @@ export type BildirimPuantajEtkiAdayState =
   | "UYGULANDI"
   | "YOK_SAYILDI";
 
-export type BildirimPuantajEtkiUygulamaModu = "OTOMATIK" | "MANUEL";
+export type BildirimPuantajEtkiUygulamaModu = "OTOMATIK" | "MANUEL" | "CAKISMA_COZUM";
+
+export type BildirimPuantajEtkiConflictClass =
+  | "AYNI_ADAY_PUANTAJI"
+  | "BASKA_ADAY_KAYNAGI"
+  | "MANUEL_KAYNAK"
+  | "RESMI_SUREC_DAYANAK"
+  | "MUHURLU_PUANTAJ"
+  | "AMIR_KONTROL_EDILMIS"
+  | "LEGACY_BELIRSIZ";
+
+export type BildirimPuantajEtkiConflictKararTuru =
+  | "MEVCUT_PUANTAJI_KORU"
+  | "ADAY_ETKISIYLE_REVIZE_ET";
+
+export type BildirimPuantajEtkiPuantajOzet = {
+  id: number | null;
+  personel_id: number;
+  tarih: string;
+  state: string;
+  gun_tipi: string | null;
+  hareket_durumu: string | null;
+  dayanak: string | null;
+  hesap_etkisi: string | null;
+  durumu_bildirdi_mi: boolean | null;
+  durum_bildirim_aciklamasi: string | null;
+  beklenen_giris_saati: string | null;
+  beklenen_cikis_saati: string | null;
+  giris_saati: string | null;
+  cikis_saati: string | null;
+  gec_kalma_dakika: number | null;
+  erken_cikis_dakika: number | null;
+  gercek_mola_dakika: number | null;
+  hesaplanan_mola_dakika: number | null;
+  net_calisma_suresi_dakika: number | null;
+  gunluk_brut_sure_dakika: number | null;
+  hafta_tatili_hak_kazandi_mi: boolean | null;
+  kontrol_durumu: string;
+  kaynak: string | null;
+  aciklama: string | null;
+  muhur_id: number | null;
+  updated_at: string | null;
+};
+
+export type BildirimPuantajEtkiCakismaCozumOzet = {
+  id: number;
+  aday_id: number;
+  puantaj_id: number | null;
+  conflict_class: BildirimPuantajEtkiConflictClass | string;
+  karar_turu: BildirimPuantajEtkiConflictKararTuru | string;
+  gerekce: string;
+  request_hash: string;
+  sonuc_hash: string;
+  karar_veren_user_id: number;
+  karar_zamani: string;
+};
 
 export type BildirimPuantajEtkiManualKararTuru =
   | "DEVAMSIZLIK_GUN"
@@ -60,6 +115,33 @@ export type BildirimPuantajEtkiAdayDetail = BildirimPuantajEtkiAdayListItem & {
   onceki_puantaj_snapshot: Record<string, unknown> | null;
   sonraki_puantaj_snapshot: Record<string, unknown> | null;
   uygulama_hash: string | null;
+  mevcut_puantaj: BildirimPuantajEtkiPuantajOzet | null;
+  current_puantaj_hash: string | null;
+  conflict_class: BildirimPuantajEtkiConflictClass | string | null;
+  conflict_default_karar: BildirimPuantajEtkiConflictKararTuru | string | null;
+  conflict_revise_allowed: boolean;
+  conflict_risk: string | null;
+  revize_onizleme: Record<string, unknown> | null;
+  cakisma_cozum: BildirimPuantajEtkiCakismaCozumOzet | null;
+};
+
+export type BildirimPuantajEtkiAdayConflictResolvePayload = {
+  expected_state: "HAZIR" | "INCELEME_GEREKLI";
+  karar_turu: BildirimPuantajEtkiConflictKararTuru;
+  gerekce: string;
+  expected_puantaj_id: number;
+  expected_puantaj_hash: string;
+};
+
+export type BildirimPuantajEtkiAdayConflictResolveResult = {
+  aday: BildirimPuantajEtkiAdayDetail;
+  puantaj: BildirimPuantajEtkiPuantajOzet | null;
+  conflict_class: BildirimPuantajEtkiConflictClass | string | null;
+  karar_turu: BildirimPuantajEtkiConflictKararTuru | string | null;
+  cakisma_cozum: BildirimPuantajEtkiCakismaCozumOzet | null;
+  onceki_ozet: Record<string, unknown> | null;
+  sonraki_ozet: Record<string, unknown> | null;
+  idempotent: boolean;
 };
 
 export type BildirimPuantajEtkiAdayCounts = {

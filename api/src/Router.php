@@ -81,6 +81,9 @@ class Router
         if ($method === 'POST' && preg_match('#^/puantaj/bildirim-etki-adaylari/(\d+)/uygula$#', $path, $matches)) {
             BildirimPuantajEtkiAdaylariController::apply($this->request, $matches[1]);
         }
+        if ($method === 'POST' && preg_match('#^/puantaj/bildirim-etki-adaylari/(\d+)/cakisma-coz$#', $path, $matches)) {
+            BildirimPuantajEtkiAdaylariController::resolveConflict($this->request, $matches[1]);
+        }
         if ($method === 'GET' && preg_match('#^/puantaj/bildirim-etki-adaylari/(\d+)$#', $path, $matches)) {
             BildirimPuantajEtkiAdaylariController::detail($this->request, $matches[1]);
         }

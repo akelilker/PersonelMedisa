@@ -9,9 +9,13 @@ class BildirimPuantajEtkiDecisionPolicy
     public const ACTION_APPLY = 'apply';
     public const ACTION_MANUAL_APPLY = 'manual_apply';
     public const ACTION_DISMISS = 'dismiss';
+    public const ACTION_RESOLVE_CONFLICT = 'resolve_conflict';
 
     public const PERMISSION_APPLY = 'puantaj.bildirim_etki.apply';
     public const PERMISSION_DISMISS = 'puantaj.bildirim_etki.dismiss';
+    public const PERMISSION_RESOLVE_CONFLICT = 'puantaj.bildirim_etki.resolve_conflict';
+
+    public const UYGULAMA_MODU_CAKISMA_COZUM = 'CAKISMA_COZUM';
 
     /** @var array<int, string> */
     public static $allowedStates = [
@@ -48,7 +52,8 @@ class BildirimPuantajEtkiDecisionPolicy
 
         return $action === self::ACTION_APPLY
             || $action === self::ACTION_MANUAL_APPLY
-            || $action === self::ACTION_DISMISS;
+            || $action === self::ACTION_DISMISS
+            || $action === self::ACTION_RESOLVE_CONFLICT;
     }
 
     public static function permissionForAction($action)
@@ -56,6 +61,9 @@ class BildirimPuantajEtkiDecisionPolicy
         $action = strtolower(trim((string) $action));
         if ($action === self::ACTION_APPLY || $action === self::ACTION_MANUAL_APPLY) {
             return self::PERMISSION_APPLY;
+        }
+        if ($action === self::ACTION_RESOLVE_CONFLICT) {
+            return self::PERMISSION_RESOLVE_CONFLICT;
         }
         if ($action === self::ACTION_DISMISS) {
             return self::PERMISSION_DISMISS;
@@ -110,6 +118,17 @@ class BildirimPuantajEtkiDecisionPolicy
     public static function isDismissAllowed($state)
     {
         if (!self::isAllowedState($state) || self::isTerminalState($state)) {
+            return false;
+        }
+
+        $state = self::normalizeState($state);
+
+        return $state === 'HAZIR' || $state === 'INCELEME_GEREKLI';
+    }
+
+    public static function isConflictResolveAllowed($state)
+    {
+        if (!self::isAllowedState($state)) {
             return false;
         }
 

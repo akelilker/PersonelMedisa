@@ -918,3 +918,64 @@ test.describe("S74-D1/D3R manuel apply API guards (mock-api)", () => {
     expect(status).toBe(403);
   });
 });
+
+const CAKISMA_COZ_ENDPOINT = "/api/puantaj/bildirim-etki-adaylari/3/cakisma-coz";
+const CAKISMA_COZ_BODY = {
+  expected_state: "INCELEME_GEREKLI",
+  karar_turu: "MEVCUT_PUANTAJI_KORU",
+  gerekce: "Mevcut puantaj kaydı doğrulandı ve korunmasına karar verildi.",
+  expected_puantaj_id: 55,
+  expected_puantaj_hash: "ecfccbdf408b4467973f553486c6b02de06c5b52105d03a73d16fc31752069a1"
+};
+
+test.describe("puantaj etki adayi cakisma coz role guard", () => {
+  test("unauthenticated cakisma coz returns 401", async ({ page }) => {
+    await mockApi(page, "MUHASEBE");
+    await page.goto("/login");
+    const status = await page.evaluate(async (body) => {
+      const response = await fetch("/api/puantaj/bildirim-etki-adaylari/3/cakisma-coz", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+      });
+      return response.status;
+    }, CAKISMA_COZ_BODY);
+    expect(status).toBe(401);
+  });
+
+  test("MUHASEBE cakisma coz returns 200", async ({ page }) => {
+    await loginAs(page, "MUHASEBE");
+    const status = await page.evaluate(async (body) => {
+      const raw = sessionStorage.getItem("medisa_auth_session") ?? localStorage.getItem("medisa_auth_session");
+      const token = raw ? (JSON.parse(raw) as { token?: string }).token : "mock-token";
+      const response = await fetch("/api/puantaj/bildirim-etki-adaylari/3/cakisma-coz", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(body)
+      });
+      return response.status;
+    }, CAKISMA_COZ_BODY);
+    expect(status).toBe(200);
+  });
+
+  test("GENEL_YONETICI cakisma coz returns 403", async ({ page }) => {
+    await loginAs(page, "GENEL_YONETICI");
+    const status = await page.evaluate(async (body) => {
+      const raw = sessionStorage.getItem("medisa_auth_session") ?? localStorage.getItem("medisa_auth_session");
+      const token = raw ? (JSON.parse(raw) as { token?: string }).token : "mock-token";
+      const response = await fetch("/api/puantaj/bildirim-etki-adaylari/3/cakisma-coz", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(body)
+      });
+      return response.status;
+    }, CAKISMA_COZ_BODY);
+    expect(status).toBe(403);
+  });
+});

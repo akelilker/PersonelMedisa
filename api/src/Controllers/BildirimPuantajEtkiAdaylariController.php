@@ -11,6 +11,8 @@ use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
 use Medisa\Api\Scope\SubeScope;
 use Medisa\Api\Services\BildirimPuantajEtkiApplyService;
+use Medisa\Api\Services\BildirimPuantajEtkiConflictClassificationService;
+use Medisa\Api\Services\BildirimPuantajEtkiConflictResolutionService;
 use Medisa\Api\Services\BildirimPuantajEtkiDecisionPolicy;
 use Medisa\Api\Services\BildirimPuantajEtkiManualApplyService;
 use Medisa\Api\Services\BildirimPuantajEtkiProjectionService;
@@ -427,6 +429,124 @@ class BildirimPuantajEtkiAdaylariController
         }
     }
 
+    public static function resolveConflict(Request $request, $id)
+    {
+        $user = AuthMiddleware::authenticate($request, true);
+        RolePermissions::assert($user, BildirimPuantajEtkiDecisionPolicy::PERMISSION_RESOLVE_CONFLICT);
+
+        $adayId = self::positiveInt($id);
+        if ($adayId === null) {
+            JsonResponse::notFound('Puantaj etki adayi bulunamadi.');
+        }
+
+        $body = $request->getJsonBody();
+        self::assertConflictResolveBodyKeys($body);
+        $expectedState = self::validateConflictResolveExpectedState($body['expected_state'] ?? null);
+        $kararTuru = self::validateConflictResolveKararTuru($body['karar_turu'] ?? null);
+        $gerekce = self::validateConflictResolveGerekce($body['gerekce'] ?? null);
+        $expectedPuantajId = self::validateConflictResolvePuantajId($body['expected_puantaj_id'] ?? null);
+        $expectedPuantajHash = self::validateConflictResolvePuantajHash($body['expected_puantaj_hash'] ?? null);
+
+        $pdo = self::connection();
+        self::assertTablesReady($pdo);
+
+        $scopeRow = self::fetchAdayById($pdo, $adayId);
+        if (!$scopeRow) {
+            JsonResponse::notFound('Puantaj etki adayi bulunamadi.');
+        }
+
+        SubeScope::assertPersonelAccess($user, $request, (int) $scopeRow['sube_id']);
+
+        try {
+            $pdo->beginTransaction();
+
+            $periodLock = PuantajDonemKilidiService::acquireForDate(
+                $pdo,
+                (int) $scopeRow['sube_id'],
+                (string) $scopeRow['tarih']
+            );
+            if (PuantajDonemKilidiService::isSealed($pdo, $periodLock)) {
+                self::rollbackConflict($pdo, 'PERIOD_LOCKED', 'Bu donem muhurlenmis, puantaj cakismasi cozulemez.');
+            }
+
+            $row = self::fetchAdayById($pdo, $adayId, true);
+            if (!$row) {
+                if ($pdo->inTransaction()) {
+                    $pdo->rollBack();
+                }
+                JsonResponse::notFound('Puantaj etki adayi bulunamadi.');
+            }
+            if (!PuantajDonemKilidiService::matchesDate($periodLock, (int) $row['sube_id'], (string) $row['tarih'])) {
+                self::rollbackConflict($pdo, 'ADAY_PERIOD_CHANGED', 'Puantaj etki adayi donemi degismis.');
+            }
+
+            $puantajRow = BildirimPuantajEtkiConflictResolutionService::fetchPuantajForUpdate(
+                $pdo,
+                (int) $row['personel_id'],
+                (string) $row['tarih']
+            );
+
+            $result = BildirimPuantajEtkiConflictResolutionService::resolve(
+                $pdo,
+                $row,
+                $puantajRow ?: null,
+                $expectedState,
+                $kararTuru,
+                $gerekce,
+                $expectedPuantajId,
+                $expectedPuantajHash,
+                self::userId($user)
+            );
+
+            $status = (string) ($result['status'] ?? '');
+            if ($status === 'idempotent') {
+                if ($pdo->inTransaction()) {
+                    $pdo->rollBack();
+                }
+                JsonResponse::success(self::mapConflictResolveResponse($result, true));
+            }
+
+            if ($status === 'stale') {
+                self::rollbackConflict(
+                    $pdo,
+                    (string) ($result['code'] ?? 'STATE_STALE'),
+                    (string) ($result['message'] ?? 'Puantaj etki adayi durumu degismis.')
+                );
+            }
+
+            if ($status === 'conflict') {
+                self::rollbackConflict(
+                    $pdo,
+                    (string) ($result['code'] ?? 'STATE_CONFLICT'),
+                    (string) ($result['message'] ?? 'Puantaj cakismasi cozulemedi.')
+                );
+            }
+
+            if ($status === 'validation') {
+                self::rollbackValidation(
+                    $pdo,
+                    (string) ($result['code'] ?? 'VALIDATION_ERROR'),
+                    (string) ($result['message'] ?? 'Cakisma cozum istegi dogrulanamadi.')
+                );
+            }
+
+            if ($status !== 'success' || !isset($result['aday']) || !is_array($result['aday'])) {
+                if ($pdo->inTransaction()) {
+                    $pdo->rollBack();
+                }
+                JsonResponse::serverError('Puantaj cakismasi cozulemedi.');
+            }
+
+            $pdo->commit();
+            JsonResponse::success(self::mapConflictResolveResponse($result, false));
+        } catch (\Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            JsonResponse::serverError('Puantaj cakismasi cozulemedi.');
+        }
+    }
+
     public static function detail(Request $request, $id)
     {
         $user = AuthMiddleware::authenticate($request, true);
@@ -445,7 +565,7 @@ class BildirimPuantajEtkiAdaylariController
         }
 
         SubeScope::assertPersonelAccess($user, $request, (int) $row['sube_id']);
-        JsonResponse::success(self::mapDetailRow($row));
+        JsonResponse::success(self::enrichDetailWithConflictContext($pdo, $row));
     }
 
     public static function generate(Request $request)
@@ -610,7 +730,13 @@ class BildirimPuantajEtkiAdaylariController
 
     private static function assertTablesReady(PDO $pdo)
     {
-        foreach ([self::TABLE, 'genel_yonetici_bildirim_onaylari', 'gunluk_bildirimler', 'puantaj_donem_kilitleri'] as $table) {
+        foreach ([
+            self::TABLE,
+            'genel_yonetici_bildirim_onaylari',
+            'gunluk_bildirimler',
+            'puantaj_donem_kilitleri',
+            BildirimPuantajEtkiConflictResolutionService::RESOLUTION_TABLE,
+        ] as $table) {
             $stmt = $pdo->query("SHOW TABLES LIKE '" . $table . "'");
             if (!$stmt || !$stmt->fetch()) {
                 JsonResponse::serverError('Puantaj etki adayi migration uygulanmadi.');
@@ -1396,6 +1522,164 @@ class BildirimPuantajEtkiAdaylariController
             'uygulama_hash' => $row['uygulama_hash'] !== null ? (string) $row['uygulama_hash'] : null,
             'idempotent' => (bool) $idempotent,
         ], self::mapUygulamaModuFields($row));
+    }
+
+    /** @param array<string, mixed> $row @return array<string, mixed> */
+    private static function enrichDetailWithConflictContext(PDO $pdo, array $row)
+    {
+        $detail = self::mapDetailRow($row);
+        $puantaj = self::fetchPuantajByPersonelDate($pdo, (int) $row['personel_id'], (string) $row['tarih']);
+        if ($puantaj) {
+            $detail['mevcut_puantaj'] = BildirimPuantajEtkiConflictResolutionService::mapPuantajOzet($puantaj);
+            $detail['current_puantaj_hash'] = BildirimPuantajEtkiPuantajMapper::computeCurrentPuantajHash($puantaj);
+            $classification = BildirimPuantajEtkiConflictClassificationService::classify($row, $puantaj);
+            $detail['conflict_class'] = (string) ($classification['class'] ?? null);
+            $detail['conflict_default_karar'] = (string) ($classification['default_karar'] ?? null);
+            $detail['conflict_revise_allowed'] = (bool) ($classification['revise_allowed'] ?? false);
+            $detail['conflict_risk'] = (string) ($classification['risk'] ?? null);
+            $revizePreview = BildirimPuantajEtkiPuantajMapper::buildRevizeUpdateValues($row, $puantaj);
+            if (($revizePreview['ok'] ?? false) === true) {
+                $detail['revize_onizleme'] = $revizePreview['values'];
+            } else {
+                $detail['revize_onizleme'] = null;
+            }
+        } else {
+            $detail['mevcut_puantaj'] = null;
+            $detail['current_puantaj_hash'] = null;
+            $detail['conflict_class'] = null;
+            $detail['conflict_default_karar'] = null;
+            $detail['conflict_revise_allowed'] = false;
+            $detail['conflict_risk'] = null;
+            $detail['revize_onizleme'] = null;
+        }
+
+        $resolution = BildirimPuantajEtkiConflictResolutionService::fetchResolutionByAdayId($pdo, (int) $row['id']);
+        $detail['cakisma_cozum'] = $resolution
+            ? BildirimPuantajEtkiConflictResolutionService::mapResolutionSummary($resolution)
+            : null;
+
+        return $detail;
+    }
+
+    /** @return array<string, mixed>|false */
+    private static function fetchPuantajByPersonelDate(PDO $pdo, $personelId, $tarih)
+    {
+        $stmt = $pdo->prepare(
+            'SELECT * FROM gunluk_puantaj WHERE personel_id = :personel_id AND tarih = :tarih LIMIT 1'
+        );
+        $stmt->execute([
+            'personel_id' => (int) $personelId,
+            'tarih' => (string) $tarih,
+        ]);
+
+        return $stmt->fetch(PDO::FETCH_ASSOC);
+    }
+
+    /** @param array<string, mixed> $result @return array<string, mixed> */
+    private static function mapConflictResolveResponse(array $result, $idempotent)
+    {
+        $aday = is_array($result['aday'] ?? null) ? $result['aday'] : [];
+        $puantaj = is_array($result['puantaj'] ?? null) ? $result['puantaj'] : null;
+
+        return [
+            'aday' => self::mapDetailRow($aday),
+            'puantaj' => $puantaj
+                ? BildirimPuantajEtkiConflictResolutionService::mapPuantajOzet($puantaj)
+                : null,
+            'conflict_class' => isset($result['conflict_class']) ? (string) $result['conflict_class'] : null,
+            'karar_turu' => isset($result['karar_turu']) ? (string) $result['karar_turu'] : null,
+            'cakisma_cozum' => is_array($result['cakisma_cozum'] ?? null) ? $result['cakisma_cozum'] : null,
+            'onceki_ozet' => $result['onceki_ozet'] ?? null,
+            'sonraki_ozet' => $result['sonraki_ozet'] ?? null,
+            'idempotent' => (bool) $idempotent,
+        ];
+    }
+
+    /** @param array<string, mixed> $body */
+    private static function assertConflictResolveBodyKeys(array $body)
+    {
+        $allowed = [
+            'expected_state',
+            'karar_turu',
+            'gerekce',
+            'expected_puantaj_id',
+            'expected_puantaj_hash',
+        ];
+        foreach (array_keys($body) as $key) {
+            if (!in_array($key, $allowed, true)) {
+                self::validationError((string) $key, 'Desteklenmeyen istek alani.');
+            }
+        }
+    }
+
+    private static function validateConflictResolveExpectedState($value)
+    {
+        if ($value === null || $value === '') {
+            self::validationError('expected_state', 'Beklenen durum secilmelidir.');
+        }
+
+        $state = BildirimPuantajEtkiDecisionPolicy::normalizeState($value);
+        if ($state !== 'HAZIR' && $state !== 'INCELEME_GEREKLI') {
+            self::validationError('expected_state', 'Beklenen durum HAZIR veya INCELEME_GEREKLI olmalidir.');
+        }
+
+        return $state;
+    }
+
+    private static function validateConflictResolveKararTuru($value)
+    {
+        if ($value === null || $value === '') {
+            self::validationError('karar_turu', 'Karar turu secilmelidir.');
+        }
+
+        $kararTuru = strtoupper(trim((string) $value));
+        if ($kararTuru !== BildirimPuantajEtkiConflictClassificationService::KARAR_MEVCUT_KORU
+            && $kararTuru !== BildirimPuantajEtkiConflictClassificationService::KARAR_REVIZE) {
+            self::validationError('karar_turu', 'Desteklenmeyen karar turu.');
+        }
+
+        return $kararTuru;
+    }
+
+    private static function validateConflictResolveGerekce($value)
+    {
+        if ($value === null || $value === '') {
+            self::validationError('gerekce', 'Karar gerekcesi en az 5 karakter olmalidir.');
+        }
+
+        $gerekce = trim((string) $value);
+        if ($gerekce === '' || mb_strlen($gerekce) < 5) {
+            self::validationError('gerekce', 'Karar gerekcesi en az 5 karakter olmalidir.');
+        }
+        if (mb_strlen($gerekce) > 500) {
+            self::validationError('gerekce', 'Karar gerekcesi en fazla 500 karakter olabilir.');
+        }
+
+        return $gerekce;
+    }
+
+    private static function validateConflictResolvePuantajId($value)
+    {
+        $id = self::positiveInt($value);
+        if ($id === null) {
+            self::validationError('expected_puantaj_id', 'Gecerli puantaj kimligi gerekli.');
+        }
+
+        return $id;
+    }
+
+    private static function validateConflictResolvePuantajHash($value)
+    {
+        if ($value === null || $value === '') {
+            self::validationError('expected_puantaj_hash', 'Puantaj hash degeri gerekli.');
+        }
+
+        $hash = strtolower(trim((string) $value));
+        if (!preg_match('/^[a-f0-9]{64}$/', $hash)) {
+            self::validationError('expected_puantaj_hash', 'Puantaj hash degeri 64 karakter hex olmalidir.');
+        }
+
+        return $hash;
     }
 
     /** @param array<string, mixed> $body */

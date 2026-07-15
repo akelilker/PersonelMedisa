@@ -3,11 +3,14 @@ import {
   canApplyBildirimPuantajEtkiAday,
   canDismissBildirimPuantajEtkiAday,
   canManualApplyBildirimPuantajEtkiAday,
+  canResolveConflictForDetail,
   countUnicodeCharacters,
   formatBildirimPuantajEtkiAdayStateLabel,
+  formatConflictClassDisplay,
   formatConflictDisplay,
   formatManualKararPreview,
   formatUygulamaModuLabel,
+  isConflictReviseAllowed,
   isTerminalBildirimPuantajEtkiAdayState,
   MANUAL_KARAR_PRESET_OPTIONS,
   manualKararRequiresMiktar,
@@ -57,9 +60,38 @@ describe("bildirim-puantaj-etki-aday display", () => {
     ]);
     expect(formatManualKararPreview("GOREVDE_CALISILMIS_GUN").dayanak).toContain("Görevde");
     expect(formatUygulamaModuLabel("MANUEL")).toBe("Manuel");
+    expect(formatUygulamaModuLabel("CAKISMA_COZUM")).toBe("Çakışma Çözümü");
     expect(manualKararRequiresMiktar("GEC_KALMA_DAKIKA")).toBe(true);
     expect(validateManualMiktar("GOREVDE_CALISILMIS_GUN", "10")).toMatch(/girilmemelidir/);
     expect(validateManualMiktar("GEC_KALMA_DAKIKA", "")).toMatch(/zorunludur/);
     expect(validateManualGerekce("abcde")).toBeNull();
+  });
+
+  it("describes conflict resolution visibility and revise policy", () => {
+    expect(formatConflictClassDisplay("MANUEL_KAYNAK")).toContain("Manuel");
+    expect(
+      canResolveConflictForDetail({
+        state: "INCELEME_GEREKLI",
+        mevcut_puantaj: { id: 55, kaynak: "MANUEL" },
+        current_puantaj_hash: "a".repeat(64),
+        cakisma_cozum: null,
+        conflict_class: "MANUEL_KAYNAK"
+      })
+    ).toBe(true);
+    expect(
+      canResolveConflictForDetail({
+        state: "INCELEME_GEREKLI",
+        mevcut_puantaj: { id: 55, kaynak: "MANUEL" },
+        current_puantaj_hash: "a".repeat(64),
+        cakisma_cozum: null,
+        conflict_class: "MUHURLU_PUANTAJ"
+      })
+    ).toBe(false);
+    expect(
+      isConflictReviseAllowed({
+        conflict_revise_allowed: true,
+        conflict_class: "RESMI_SUREC_DAYANAK"
+      })
+    ).toBe(false);
   });
 });

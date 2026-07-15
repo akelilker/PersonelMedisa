@@ -1,8 +1,11 @@
 import type {
+  BildirimPuantajEtkiAdayDetail,
   BildirimPuantajEtkiAdayListItem,
   BildirimPuantajEtkiAdayState,
   BildirimPuantajEtkiConflictDetail,
+  BildirimPuantajEtkiConflictKararTuru,
   BildirimPuantajEtkiManualKararTuru,
+  BildirimPuantajEtkiPuantajOzet,
   BildirimPuantajEtkiUygulamaModu
 } from "../../types/bildirim-puantaj-etki-aday";
 
@@ -20,6 +23,23 @@ const STATE_BADGE_CLASS: Record<BildirimPuantajEtkiAdayState, string> = {
   YOK_SAYILDI: "puantaj-etki-state-yok-sayildi"
 };
 
+const CONFLICT_CLASS_LABELS: Record<string, string> = {
+  AYNI_ADAY_PUANTAJI: "Aynı adayın daha önce uyguladığı puantaj",
+  BASKA_ADAY_KAYNAGI: "Başka bildirim etki adayının oluşturduğu puantaj",
+  MANUEL_KAYNAK: "Manuel girilmiş puantaj kaydı",
+  RESMI_SUREC_DAYANAK: "Resmî süreç dayanaklı puantaj",
+  MUHURLU_PUANTAJ: "Mühürlenmiş puantaj",
+  AMIR_KONTROL_EDILMIS: "Amir kontrolü yapılmış puantaj",
+  LEGACY_BELIRSIZ: "Kaynağı belirsiz puantaj"
+};
+
+const CONFLICT_RISK_MESSAGES: Record<string, string> = {
+  DUSUK: "Düşük risk: aynı aday tekrarı.",
+  ORTA: "Orta risk: mevcut kayıt üzerinde bilinçli karar gerekir.",
+  YUKSEK: "Yüksek risk: manuel veya belirsiz veri kaybı olasılığı vardır.",
+  KRITIK: "Kritik: mühürlü dönem veya kaynak koruması geçerlidir."
+};
+
 const CONFLICT_CODE_LABELS: Record<string, string> = {
   COKLU_BILDIRIM_CELISKISI: "Aynı günde çakışan bildirimler var.",
   MEVCUT_PUANTAJ_VAR: "İlgili gün için mevcut puantaj kaydı bulunuyor.",
@@ -32,6 +52,90 @@ const CONFLICT_CODE_LABELS: Record<string, string> = {
 
 export const GEREKCE_MIN_LENGTH = 5;
 export const GEREKCE_MAX_LENGTH = 500;
+
+export function formatConflictClassDisplay(conflictClass: string | null | undefined): string {
+  if (!conflictClass) {
+    return "—";
+  }
+  return CONFLICT_CLASS_LABELS[conflictClass] ?? conflictClass.split("_").join(" ").toLowerCase();
+}
+
+export function formatConflictRiskMessage(risk: string | null | undefined): string {
+  if (!risk) {
+    return "Çakışma riski değerlendirilmelidir.";
+  }
+  return CONFLICT_RISK_MESSAGES[risk] ?? "Çakışma riski değerlendirilmelidir.";
+}
+
+export function canResolveConflictForDetail(detail: Pick<
+  BildirimPuantajEtkiAdayDetail,
+  "state" | "mevcut_puantaj" | "current_puantaj_hash" | "cakisma_cozum" | "conflict_class"
+>): boolean {
+  if (detail.cakisma_cozum) {
+    return false;
+  }
+  if (detail.state !== "HAZIR" && detail.state !== "INCELEME_GEREKLI") {
+    return false;
+  }
+  if (!detail.mevcut_puantaj || detail.mevcut_puantaj.id == null || !detail.current_puantaj_hash) {
+    return false;
+  }
+  if (detail.conflict_class === "MUHURLU_PUANTAJ") {
+    return false;
+  }
+  return true;
+}
+
+export function isConflictReviseAllowed(detail: Pick<BildirimPuantajEtkiAdayDetail, "conflict_revise_allowed" | "conflict_class">): boolean {
+  if (detail.conflict_class === "RESMI_SUREC_DAYANAK" || detail.conflict_class === "MUHURLU_PUANTAJ") {
+    return false;
+  }
+  return Boolean(detail.conflict_revise_allowed);
+}
+
+const CONFLICT_COMPARE_FIELDS: Array<{ key: keyof BildirimPuantajEtkiPuantajOzet; label: string }> = [
+  { key: "hareket_durumu", label: "Hareket" },
+  { key: "dayanak", label: "Dayanak" },
+  { key: "hesap_etkisi", label: "Hesap etkisi" },
+  { key: "gec_kalma_dakika", label: "Geç kalma (dk)" },
+  { key: "erken_cikis_dakika", label: "Erken çıkış (dk)" },
+  { key: "giris_saati", label: "Giriş saati" },
+  { key: "cikis_saati", label: "Çıkış saati" },
+  { key: "kontrol_durumu", label: "Kontrol durumu" },
+  { key: "kaynak", label: "Kaynak" }
+];
+
+export function buildConflictFieldComparisons(
+  current: BildirimPuantajEtkiPuantajOzet,
+  preview: Record<string, unknown> | null
+): Array<{ label: string; current: string; next: string; changes: boolean; preserved: boolean }> {
+  return CONFLICT_COMPARE_FIELDS.map(({ key, label }) => {
+    const currentValue = current[key];
+    const nextRaw = preview?.[key];
+    const currentText = currentValue == null || currentValue === "" ? "—" : String(currentValue);
+    const nextText = nextRaw == null || nextRaw === "" ? "—" : String(nextRaw);
+    const changes = currentText !== nextText;
+    const preserved = !changes && ["giris_saati", "cikis_saati"].includes(key);
+    return { label, current: currentText, next: nextText, changes, preserved };
+  });
+}
+
+export function defaultConflictKararTuru(detail: Pick<
+  BildirimPuantajEtkiAdayDetail,
+  "conflict_default_karar" | "conflict_class"
+>): BildirimPuantajEtkiConflictKararTuru {
+  if (detail.conflict_default_karar === "ADAY_ETKISIYLE_REVIZE_ET") {
+    return "ADAY_ETKISIYLE_REVIZE_ET";
+  }
+  return "MEVCUT_PUANTAJI_KORU";
+}
+
+export function formatConflictKararTuruLabel(karar: BildirimPuantajEtkiConflictKararTuru | string): string {
+  if (karar === "ADAY_ETKISIYLE_REVIZE_ET") {
+    return "Aday Etkisiyle Revize Et";
+  }
+  return "Mevcut Puantajı Koru";
+}
 
 export function formatBildirimPuantajEtkiAdayStateLabel(
   state: BildirimPuantajEtkiAdayState | string | null | undefined
@@ -190,6 +294,9 @@ export function formatUygulamaModuLabel(
 ): string {
   if (modu === "MANUEL") {
     return "Manuel";
+  }
+  if (modu === "CAKISMA_COZUM") {
+    return "Çakışma Çözümü";
   }
   return "Otomatik";
 }

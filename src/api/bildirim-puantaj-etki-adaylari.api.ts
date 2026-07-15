@@ -2,6 +2,8 @@ import type { ApiResponse, PaginatedResult } from "../types/api";
 import type {
   BildirimPuantajEtkiAdayApplyPayload,
   BildirimPuantajEtkiAdayApplyResult,
+  BildirimPuantajEtkiAdayConflictResolvePayload,
+  BildirimPuantajEtkiAdayConflictResolveResult,
   BildirimPuantajEtkiAdayDetail,
   BildirimPuantajEtkiAdayDismissPayload,
   BildirimPuantajEtkiAdayDismissResult,
@@ -10,7 +12,9 @@ import type {
   BildirimPuantajEtkiAdayManualApplyResult,
   BildirimPuantajEtkiAdayOzet,
   BildirimPuantajEtkiAdayState,
+  BildirimPuantajEtkiCakismaCozumOzet,
   BildirimPuantajEtkiManualKararTuru,
+  BildirimPuantajEtkiPuantajOzet,
   BildirimPuantajEtkiUygulamaModu
 } from "../types/bildirim-puantaj-etki-aday";
 import { appendQueryParams } from "../utils/append-query-params";
@@ -134,6 +138,106 @@ function normalizeJsonObject(value: unknown): Record<string, unknown> | null {
   return null;
 }
 
+function normalizePuantajOzet(data: unknown): BildirimPuantajEtkiPuantajOzet | null {
+  if (typeof data !== "object" || data === null) {
+    return null;
+  }
+  const record = data as Record<string, unknown>;
+  const personelId = toNumber(record.personel_id);
+  const tarih = toStringValue(record.tarih);
+  if (!personelId || !tarih) {
+    return null;
+  }
+  return {
+    id: record.id === null || record.id === undefined ? null : toNumber(record.id) ?? null,
+    personel_id: personelId,
+    tarih,
+    state: toStringValue(record.state) ?? "ACIK",
+    gun_tipi: record.gun_tipi === null ? null : toStringValue(record.gun_tipi) ?? null,
+    hareket_durumu: record.hareket_durumu === null ? null : toStringValue(record.hareket_durumu) ?? null,
+    dayanak: record.dayanak === null ? null : toStringValue(record.dayanak) ?? null,
+    hesap_etkisi: record.hesap_etkisi === null ? null : toStringValue(record.hesap_etkisi) ?? null,
+    durumu_bildirdi_mi:
+      record.durumu_bildirdi_mi === null || record.durumu_bildirdi_mi === undefined
+        ? null
+        : Boolean(record.durumu_bildirdi_mi),
+    durum_bildirim_aciklamasi:
+      record.durum_bildirim_aciklamasi === null
+        ? null
+        : toStringValue(record.durum_bildirim_aciklamasi) ?? null,
+    beklenen_giris_saati:
+      record.beklenen_giris_saati === null ? null : toStringValue(record.beklenen_giris_saati) ?? null,
+    beklenen_cikis_saati:
+      record.beklenen_cikis_saati === null ? null : toStringValue(record.beklenen_cikis_saati) ?? null,
+    giris_saati: record.giris_saati === null ? null : toStringValue(record.giris_saati) ?? null,
+    cikis_saati: record.cikis_saati === null ? null : toStringValue(record.cikis_saati) ?? null,
+    gec_kalma_dakika:
+      record.gec_kalma_dakika === null || record.gec_kalma_dakika === undefined
+        ? null
+        : toNumber(record.gec_kalma_dakika) ?? null,
+    erken_cikis_dakika:
+      record.erken_cikis_dakika === null || record.erken_cikis_dakika === undefined
+        ? null
+        : toNumber(record.erken_cikis_dakika) ?? null,
+    gercek_mola_dakika:
+      record.gercek_mola_dakika === null || record.gercek_mola_dakika === undefined
+        ? null
+        : toNumber(record.gercek_mola_dakika) ?? null,
+    hesaplanan_mola_dakika:
+      record.hesaplanan_mola_dakika === null || record.hesaplanan_mola_dakika === undefined
+        ? null
+        : toNumber(record.hesaplanan_mola_dakika) ?? null,
+    net_calisma_suresi_dakika:
+      record.net_calisma_suresi_dakika === null || record.net_calisma_suresi_dakika === undefined
+        ? null
+        : toNumber(record.net_calisma_suresi_dakika) ?? null,
+    gunluk_brut_sure_dakika:
+      record.gunluk_brut_sure_dakika === null || record.gunluk_brut_sure_dakika === undefined
+        ? null
+        : toNumber(record.gunluk_brut_sure_dakika) ?? null,
+    hafta_tatili_hak_kazandi_mi:
+      record.hafta_tatili_hak_kazandi_mi === null || record.hafta_tatili_hak_kazandi_mi === undefined
+        ? null
+        : Boolean(record.hafta_tatili_hak_kazandi_mi),
+    kontrol_durumu: toStringValue(record.kontrol_durumu) ?? "BEKLIYOR",
+    kaynak: record.kaynak === null ? null : toStringValue(record.kaynak) ?? null,
+    aciklama: record.aciklama === null ? null : toStringValue(record.aciklama) ?? null,
+    muhur_id: record.muhur_id === null || record.muhur_id === undefined ? null : toNumber(record.muhur_id) ?? null,
+    updated_at: record.updated_at === null ? null : toStringValue(record.updated_at) ?? null
+  };
+}
+
+function normalizeCakismaCozum(data: unknown): BildirimPuantajEtkiCakismaCozumOzet | null {
+  if (typeof data !== "object" || data === null) {
+    return null;
+  }
+  const record = data as Record<string, unknown>;
+  const id = toNumber(record.id);
+  const adayId = toNumber(record.aday_id);
+  const kararVeren = toNumber(record.karar_veren_user_id);
+  const kararZamani = toStringValue(record.karar_zamani);
+  const kararTuru = toStringValue(record.karar_turu);
+  const conflictClass = toStringValue(record.conflict_class);
+  const gerekce = toStringValue(record.gerekce);
+  const requestHash = toStringValue(record.request_hash);
+  const sonucHash = toStringValue(record.sonuc_hash);
+  if (!id || !adayId || !kararVeren || !kararZamani || !kararTuru || !conflictClass || !gerekce || !requestHash || !sonucHash) {
+    return null;
+  }
+  return {
+    id,
+    aday_id: adayId,
+    puantaj_id: record.puantaj_id === null ? null : toNumber(record.puantaj_id) ?? null,
+    conflict_class: conflictClass,
+    karar_turu: kararTuru,
+    gerekce,
+    request_hash: requestHash,
+    sonuc_hash: sonucHash,
+    karar_veren_user_id: kararVeren,
+    karar_zamani: kararZamani
+  };
+}
+
 function normalizeDetail(data: unknown): BildirimPuantajEtkiAdayDetail {
   const base = normalizeListItem(data);
   if (typeof data !== "object" || data === null) {
@@ -181,7 +285,17 @@ function normalizeDetail(data: unknown): BildirimPuantajEtkiAdayDetail {
       record.karar_gerekcesi === null ? null : toStringValue(record.karar_gerekcesi) ?? null,
     onceki_puantaj_snapshot: normalizeJsonObject(record.onceki_puantaj_snapshot),
     sonraki_puantaj_snapshot: normalizeJsonObject(record.sonraki_puantaj_snapshot),
-    uygulama_hash: record.uygulama_hash === null ? null : toStringValue(record.uygulama_hash) ?? null
+    uygulama_hash: record.uygulama_hash === null ? null : toStringValue(record.uygulama_hash) ?? null,
+    mevcut_puantaj: normalizePuantajOzet(record.mevcut_puantaj),
+    current_puantaj_hash:
+      record.current_puantaj_hash === null ? null : toStringValue(record.current_puantaj_hash) ?? null,
+    conflict_class: record.conflict_class === null ? null : toStringValue(record.conflict_class) ?? null,
+    conflict_default_karar:
+      record.conflict_default_karar === null ? null : toStringValue(record.conflict_default_karar) ?? null,
+    conflict_revise_allowed: Boolean(record.conflict_revise_allowed),
+    conflict_risk: record.conflict_risk === null ? null : toStringValue(record.conflict_risk) ?? null,
+    revize_onizleme: normalizeJsonObject(record.revize_onizleme),
+    cakisma_cozum: normalizeCakismaCozum(record.cakisma_cozum)
   };
 }
 
@@ -402,4 +516,46 @@ export async function manuelUygulaBildirimPuantajEtkiAdayi(
     karar_gerekcesi:
       record.karar_gerekcesi === null ? null : toStringValue(record.karar_gerekcesi) ?? null
   };
+}
+
+function normalizeConflictResolveResult(data: unknown): BildirimPuantajEtkiAdayConflictResolveResult {
+  if (typeof data !== "object" || data === null) {
+    throw new Error("Cakisma cozum yaniti beklenen formatta degil.");
+  }
+  const record = data as Record<string, unknown>;
+  const adayRaw = record.aday;
+  if (!adayRaw) {
+    throw new Error("Cakisma cozum yaniti aday bilgisi icermiyor.");
+  }
+  return {
+    aday: normalizeDetail(adayRaw),
+    puantaj: normalizePuantajOzet(record.puantaj),
+    conflict_class: record.conflict_class === null ? null : toStringValue(record.conflict_class) ?? null,
+    karar_turu: record.karar_turu === null ? null : toStringValue(record.karar_turu) ?? null,
+    cakisma_cozum: normalizeCakismaCozum(record.cakisma_cozum),
+    onceki_ozet: normalizeJsonObject(record.onceki_ozet),
+    sonraki_ozet: normalizeJsonObject(record.sonraki_ozet),
+    idempotent: Boolean(record.idempotent)
+  };
+}
+
+export async function cakismaCozBildirimPuantajEtkiAdayi(
+  id: number | string,
+  payload: BildirimPuantajEtkiAdayConflictResolvePayload,
+  context?: { subeId?: number | null }
+): Promise<BildirimPuantajEtkiAdayConflictResolveResult> {
+  const path = appendQueryParams(endpoints.puantaj.bildirimEtkiAdaylari.cakismaCoz(id), {
+    sube_id: context?.subeId
+  });
+  const response = await apiRequest<ApiResponse<unknown>>(path, {
+    method: "POST",
+    body: JSON.stringify({
+      expected_state: payload.expected_state,
+      karar_turu: payload.karar_turu,
+      gerekce: payload.gerekce.trim(),
+      expected_puantaj_id: payload.expected_puantaj_id,
+      expected_puantaj_hash: payload.expected_puantaj_hash
+    })
+  });
+  return normalizeConflictResolveResult(response.data);
 }

@@ -10,17 +10,23 @@ import { useBildirimPuantajEtkiAdaylari } from "../../../hooks/useBildirimPuanta
 import { useRoleAccess } from "../../../hooks/use-role-access";
 import { useAuth } from "../../../state/auth.store";
 import {
+  buildConflictFieldComparisons,
   canApplyBildirimPuantajEtkiAday,
   canDismissBildirimPuantajEtkiAday,
   canManualApplyBildirimPuantajEtkiAday,
+  canResolveConflictForDetail,
   countUnicodeCharacters,
   formatBildirimPuantajEtkiAdayStateLabel,
+  formatConflictClassDisplay,
   formatConflictDisplay,
+  formatConflictKararTuruLabel,
+  formatConflictRiskMessage,
   formatManualKararPreview,
   formatProjectedEtkiLabel,
   formatUygulamaModuLabel,
   getBildirimPuantajEtkiAdayStateBadgeClass,
   GEREKCE_MAX_LENGTH,
+  isConflictReviseAllowed,
   MANUAL_KARAR_PRESET_OPTIONS,
   manualKararRequiresMiktar,
   validateDismissGerekce,
@@ -224,6 +230,7 @@ export function BildirimPuantajEtkiAdaylariSection() {
   const canView = hasPermission("puantaj.bildirim_etki.view");
   const canDismiss = hasPermission("puantaj.bildirim_etki.dismiss");
   const canApply = hasPermission("puantaj.bildirim_etki.apply");
+  const canResolveConflict = hasPermission("puantaj.bildirim_etki.resolve_conflict");
   const canResolveGyViaOnayApi = hasPermission("genel_yonetici_bildirim_onayi.view");
   const activeSubeId = session?.active_sube_id ?? null;
   const subeIds = session?.user.sube_ids ?? [];
@@ -308,11 +315,23 @@ export function BildirimPuantajEtkiAdaylariSection() {
     applyAday,
     openManualApplyModal,
     closeManualApplyModal,
-    manualApplyAday
+    manualApplyAday,
+    conflictTarget,
+    conflictKararTuru,
+    setConflictKararTuru,
+    conflictGerekce,
+    setConflictGerekce,
+    conflictFieldError,
+    conflictError,
+    isConflictResolving,
+    openConflictModal,
+    closeConflictModal,
+    resolveConflictAday
   } = useBildirimPuantajEtkiAdaylari({
     enabled: canView,
     canDismiss,
     canApply,
+    canResolveConflict,
     canResolveGyViaOnayApi,
     subeId: effectiveSubeId,
     birimAmiriUserId: selectedBirimAmiriUserId
@@ -441,7 +460,36 @@ export function BildirimPuantajEtkiAdaylariSection() {
     canManualApplyBildirimPuantajEtkiAday(detail.state) &&
     !isApplying &&
     !isDismissing &&
-    !isManualApplying;
+    !isManualApplying &&
+    !isConflictResolving;
+
+  const detailConflictVisible =
+    canResolveConflict &&
+    detail != null &&
+    !isDetailLoading &&
+    !detailError &&
+    canResolveConflictForDetail(detail) &&
+    !isApplying &&
+    !isDismissing &&
+    !isManualApplying &&
+    !isConflictResolving;
+
+  const conflictComparisons = useMemo(() => {
+    if (!conflictTarget?.mevcut_puantaj) {
+      return [];
+    }
+    return buildConflictFieldComparisons(conflictTarget.mevcut_puantaj, conflictTarget.revize_onizleme);
+  }, [conflictTarget]);
+
+  const conflictGerekceValidationError = validateDismissGerekce(conflictGerekce);
+  const conflictGerekceCharCount = countUnicodeCharacters(conflictGerekce);
+  const conflictReviseAllowed = conflictTarget ? isConflictReviseAllowed(conflictTarget) : false;
+  const conflictSubmitDisabled =
+    Boolean(conflictGerekceValidationError) ||
+    isConflictResolving ||
+    isApplying ||
+    isDismissing ||
+    isManualApplying;
 
   const manualSubeLabel = useMemo(() => {
     if (!manualTarget) {
@@ -730,12 +778,23 @@ export function BildirimPuantajEtkiAdaylariSection() {
                   <DetailGroup key={group.title} title={group.title} fields={group.fields} />
                 ))}
                 <div className="form-actions-row">
+                  {detailConflictVisible ? (
+                    <button
+                      type="button"
+                      className="universal-btn-save"
+                      data-testid="puantaj-etki-aday-detail-resolve-conflict"
+                      disabled={isApplying || isDismissing || isManualApplying || isConflictResolving}
+                      onClick={() => openConflictModal(detail)}
+                    >
+                      Çakışmayı Çöz
+                    </button>
+                  ) : null}
                   {detailApplyVisible ? (
                     <button
                       type="button"
                       className="universal-btn-save"
                       data-testid="puantaj-etki-aday-detail-apply"
-                      disabled={isApplying || isDismissing || isManualApplying}
+                      disabled={isApplying || isDismissing || isManualApplying || isConflictResolving}
                       onClick={() => openApplyModal(detail)}
                     >
                       Uygula
@@ -746,7 +805,7 @@ export function BildirimPuantajEtkiAdaylariSection() {
                       type="button"
                       className="universal-btn-save"
                       data-testid="puantaj-etki-aday-detail-manual-apply"
-                      disabled={isApplying || isDismissing || isManualApplying}
+                      disabled={isApplying || isDismissing || isManualApplying || isConflictResolving}
                       onClick={() => openManualApplyModal(detail)}
                     >
                       İncele ve Uygula
@@ -757,7 +816,7 @@ export function BildirimPuantajEtkiAdaylariSection() {
                       type="button"
                       className="universal-btn-aux"
                       data-testid="puantaj-etki-aday-detail-dismiss"
-                      disabled={isApplying || isDismissing || isManualApplying}
+                      disabled={isApplying || isDismissing || isManualApplying || isConflictResolving}
                       onClick={() => openDismissModal(detail)}
                     >
                       Yok Say
@@ -767,13 +826,132 @@ export function BildirimPuantajEtkiAdaylariSection() {
                     type="button"
                     className="universal-btn-aux"
                     onClick={closeDetail}
-                    disabled={isApplying || isDismissing || isManualApplying}
+                    disabled={isApplying || isDismissing || isManualApplying || isConflictResolving}
                   >
                     Kapat
                   </button>
                 </div>
               </>
             ) : null}
+          </div>
+        </AppModal>
+      ) : null}
+
+      {conflictTarget ? (
+        <AppModal title="Puantaj Çakışmasını Çöz" onClose={closeConflictModal}>
+          <div className="puantaj-etki-conflict-modal" data-testid="puantaj-etki-aday-conflict-modal">
+            <p className="puantaj-etki-conflict-class" data-testid="puantaj-etki-conflict-class">
+              {formatConflictClassDisplay(conflictTarget.conflict_class)}
+            </p>
+            <p className="puantaj-etki-conflict-risk" data-testid="puantaj-etki-conflict-risk">
+              {formatConflictRiskMessage(conflictTarget.conflict_risk)}
+            </p>
+            {conflictTarget.conflict_class === "AMIR_KONTROL_EDILMIS" ? (
+              <p className="puantaj-etki-conflict-warning">
+                Bu kayıt amir kontrolünden geçmiş. Revize sonrası kontrol durumu yeniden bekliyor olacaktır.
+              </p>
+            ) : null}
+            {conflictTarget.conflict_class === "RESMI_SUREC_DAYANAK" ? (
+              <p className="puantaj-etki-conflict-warning">
+                Resmî süreç dayanaklı puantaj revize edilemez. Yalnız mevcut kaydı koruyabilirsiniz.
+              </p>
+            ) : null}
+            {conflictTarget.conflict_class === "MUHURLU_PUANTAJ" ? (
+              <p className="puantaj-etki-conflict-warning">
+                Mühürlü dönemde çakışma çözümü uygulanamaz.
+              </p>
+            ) : null}
+            <dl className="puantaj-etki-detail-grid">
+              <div className="puantaj-etki-detail-row">
+                <dt>Personel</dt>
+                <dd>{resolvePersonelDisplayName(conflictTarget)}</dd>
+              </div>
+              <div className="puantaj-etki-detail-row">
+                <dt>Tarih</dt>
+                <dd>{conflictTarget.tarih}</dd>
+              </div>
+              <div className="puantaj-etki-detail-row">
+                <dt>Mevcut kaynak</dt>
+                <dd>{conflictTarget.mevcut_puantaj?.kaynak ?? "—"}</dd>
+              </div>
+              <div className="puantaj-etki-detail-row">
+                <dt>Kontrol durumu</dt>
+                <dd>{conflictTarget.mevcut_puantaj?.kontrol_durumu ?? "—"}</dd>
+              </div>
+              <div className="puantaj-etki-detail-row">
+                <dt>Önerilen etki</dt>
+                <dd>{formatProjectedEtkiLabel(conflictTarget)}</dd>
+              </div>
+            </dl>
+            {conflictComparisons.length > 0 ? (
+              <div className="puantaj-etki-conflict-compare">
+                <h4>Alan karşılaştırması</h4>
+                <table className="puantaj-etki-conflict-compare-table">
+                  <thead>
+                    <tr>
+                      <th>Alan</th>
+                      <th>Mevcut</th>
+                      <th>Revize sonrası</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {conflictComparisons.map((row) => (
+                      <tr key={row.label} data-changes={row.changes ? "true" : "false"}>
+                        <td>{row.label}</td>
+                        <td>{row.current}</td>
+                        <td>{row.next}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : null}
+            <FormField
+              label="Karar gerekçesi"
+              name="puantaj-etki-conflict-gerekce"
+              as="textarea"
+              value={conflictGerekce}
+              onChange={setConflictGerekce}
+              rows={4}
+              required
+            />
+            {(conflictFieldError ?? conflictGerekceValidationError) ? (
+              <p className="puantaj-form-error">{conflictFieldError ?? conflictGerekceValidationError}</p>
+            ) : null}
+            <p className="puantaj-etki-gerekce-counter">
+              {conflictGerekceCharCount} / {GEREKCE_MAX_LENGTH}
+            </p>
+            {conflictError ? <p className="form-error-text">{conflictError}</p> : null}
+            <div className="form-actions-row">
+              <button
+                type="button"
+                className="universal-btn-save"
+                data-testid="puantaj-etki-conflict-keep"
+                disabled={conflictSubmitDisabled}
+                onClick={() => void resolveConflictAday("MEVCUT_PUANTAJI_KORU")}
+              >
+                Mevcut Puantajı Koru
+              </button>
+              {conflictReviseAllowed ? (
+                <button
+                  type="button"
+                  className="universal-btn-aux"
+                  data-testid="puantaj-etki-conflict-revise"
+                  disabled={conflictSubmitDisabled}
+                  onClick={() => void resolveConflictAday("ADAY_ETKISIYLE_REVIZE_ET")}
+                >
+                  {formatConflictKararTuruLabel("ADAY_ETKISIYLE_REVIZE_ET")}
+                </button>
+              ) : null}
+              <button
+                type="button"
+                className="universal-btn-aux"
+                onClick={closeConflictModal}
+                disabled={isConflictResolving}
+              >
+                Kapat
+              </button>
+            </div>
           </div>
         </AppModal>
       ) : null}

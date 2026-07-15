@@ -134,6 +134,17 @@ function makeHookState(overrides: Record<string, unknown> = {}) {
     openManualApplyModal: vi.fn(),
     closeManualApplyModal: vi.fn(),
     manualApplyAday: vi.fn(),
+    conflictTarget: null,
+    conflictKararTuru: "MEVCUT_PUANTAJI_KORU",
+    setConflictKararTuru: vi.fn(),
+    conflictGerekce: "",
+    setConflictGerekce: vi.fn(),
+    conflictFieldError: null,
+    conflictError: null,
+    isConflictResolving: false,
+    openConflictModal: vi.fn(),
+    closeConflictModal: vi.fn(),
+    resolveConflictAday: vi.fn(),
     ...overrides
   };
 }

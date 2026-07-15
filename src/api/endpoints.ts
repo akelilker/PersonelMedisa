@@ -52,7 +52,8 @@ export const endpoints = {
       detail: (id: number | string) => `/puantaj/bildirim-etki-adaylari/${id}`,
       yokSay: (id: number | string) => `/puantaj/bildirim-etki-adaylari/${id}/yok-say`,
       manuelUygula: (id: number | string) => `/puantaj/bildirim-etki-adaylari/${id}/manuel-uygula`,
-      uygula: (id: number | string) => `/puantaj/bildirim-etki-adaylari/${id}/uygula`
+      uygula: (id: number | string) => `/puantaj/bildirim-etki-adaylari/${id}/uygula`,
+      cakismaCoz: (id: number | string) => `/puantaj/bildirim-etki-adaylari/${id}/cakisma-coz`
     }
   },
   haftalikKapanis: {

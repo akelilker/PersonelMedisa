@@ -240,3 +240,46 @@ test.describe("S74-C2B puantaj etki adaylari paneli", () => {
     await expect(page.getByTestId("puantaj-etki-aday-detail-manual-apply")).toHaveCount(0);
   });
 });
+
+test.describe("S75 puantaj cakisma cozumu", () => {
+  test("MUHASEBE cakisma cozumunu Koru ile tamamlar", async ({ page }) => {
+    await prepareMuhasebePanel(page);
+    await tableAction(page, "puantaj-etki-aday-detail-3").click();
+    await expect(page.getByTestId("puantaj-etki-aday-detail-resolve-conflict")).toBeVisible();
+    await page.getByTestId("puantaj-etki-aday-detail-resolve-conflict").click();
+    await expect(page.getByTestId("puantaj-etki-aday-conflict-modal")).toBeVisible();
+    await expect(page.getByTestId("puantaj-etki-conflict-class")).toContainText("Manuel girilmiş");
+
+    const gerekce = "Mevcut puantaj kaydı doğrulandı ve korunmasına karar verildi.";
+    await page.getByLabel("Karar gerekçesi").fill(gerekce);
+    await page.getByTestId("puantaj-etki-conflict-keep").click();
+
+    await expect(page.getByTestId("puantaj-etki-aday-success")).toContainText("Mevcut puantaj korunarak aday kapatıldı.");
+    await expect(tableAction(page, "puantaj-etki-aday-state-3")).toContainText("Yok Sayıldı");
+    await expect(page.getByTestId("puantaj-etki-aday-detail-resolve-conflict")).toHaveCount(0);
+  });
+
+  test("D sinifinda Revize butonu gorunmez", async ({ page }) => {
+    await prepareMuhasebePanel(page);
+    await tableAction(page, "puantaj-etki-aday-detail-7").click();
+    await page.getByTestId("puantaj-etki-aday-detail-resolve-conflict").click();
+    await expect(page.getByTestId("puantaj-etki-aday-conflict-modal")).toBeVisible();
+    await expect(page.getByTestId("puantaj-etki-conflict-revise")).toHaveCount(0);
+    await expect(page.getByTestId("puantaj-etki-conflict-keep")).toBeVisible();
+  });
+
+  test("E sinifinda mutation aksiyonlari yok", async ({ page }) => {
+    await prepareMuhasebePanel(page);
+    await tableAction(page, "puantaj-etki-aday-detail-8").click();
+    await expect(page.getByTestId("puantaj-etki-aday-detail-resolve-conflict")).toHaveCount(0);
+  });
+
+  test("GY read-only cakisma cozum butonunu gormez", async ({ page }) => {
+    await openPuantaj(page, "GENEL_YONETICI");
+    await page.getByLabel("Şube", { exact: true }).selectOption("1");
+    await page.getByLabel("Ay", { exact: true }).last().fill(PANEL_AY_WITH_DATA);
+    await page.getByLabel("Birim Amiri", { exact: true }).selectOption("1");
+    await tableAction(page, "puantaj-etki-aday-detail-7").click();
+    await expect(page.getByTestId("puantaj-etki-aday-detail-resolve-conflict")).toHaveCount(0);
+  });
+});

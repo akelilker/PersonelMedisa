@@ -32,10 +32,10 @@ describe("S74-D1/D3R puantaj period lock source contract", () => {
     expect(migration).not.toMatch(/\b(?:gunluk_puantaj|puantaj_aylik_muhurleri|puantaj_aylik_muhur_satirlari)\b/i);
   });
 
-  it("keeps 014 as the single last migration", () => {
+  it("keeps 015 as the single last migration", () => {
     const migrations = readdirSync(resolve(root, "api/migrations")).filter((name) => /^\d{3}_.*\.sql$/.test(name)).sort();
-    expect(migrations.at(-1)).toBe("014_puantaj_donem_kilitleri.sql");
-    expect(migrations.filter((name) => name.startsWith("014_"))).toHaveLength(1);
+    expect(migrations.at(-1)).toBe("015_bildirim_puantaj_etki_cakisma_cozumleri.sql");
+    expect(migrations.filter((name) => name.startsWith("015_"))).toHaveLength(1);
   });
 
   it("requires a caller transaction and locks the canonical tuple row FOR UPDATE", () => {

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ApiRequestError, getApiErrorDetail } from "../api/api-client";
 import {
   applyBildirimPuantajEtkiAday,
+  cakismaCozBildirimPuantajEtkiAdayi,
   dismissBildirimPuantajEtkiAday,
   fetchBildirimPuantajEtkiAdayDetail,
   fetchBildirimPuantajEtkiAdayList,
@@ -11,12 +12,16 @@ import {
 } from "../api/bildirim-puantaj-etki-adaylari.api";
 import { fetchGenelYoneticiBildirimOnayiOzet } from "../api/genel-yonetici-bildirim-onaylari.api";
 import { getCurrentMonthValue, isValidAyValue } from "../lib/bildirim/aylik-bildirim-onay";
-import { trimDismissGerekce } from "../lib/bildirim-puantaj-etki-aday/display";
+import {
+  canResolveConflictForDetail,
+  trimDismissGerekce
+} from "../lib/bildirim-puantaj-etki-aday/display";
 import type {
   BildirimPuantajEtkiAdayDetail,
   BildirimPuantajEtkiAdayListItem,
   BildirimPuantajEtkiAdayOzet,
   BildirimPuantajEtkiAdayState,
+  BildirimPuantajEtkiConflictKararTuru,
   BildirimPuantajEtkiManualKararTuru
 } from "../types/bildirim-puantaj-etki-aday";
 
@@ -52,6 +57,7 @@ type UseBildirimPuantajEtkiAdaylariOptions = {
   enabled: boolean;
   canDismiss: boolean;
   canApply: boolean;
+  canResolveConflict: boolean;
   canResolveGyViaOnayApi: boolean;
   subeId: number | null;
   birimAmiriUserId: number | null;
@@ -64,6 +70,7 @@ export function useBildirimPuantajEtkiAdaylari(options: UseBildirimPuantajEtkiAd
     enabled,
     canDismiss,
     canApply,
+    canResolveConflict,
     canResolveGyViaOnayApi,
     subeId,
     birimAmiriUserId,
@@ -104,12 +111,32 @@ export function useBildirimPuantajEtkiAdaylari(options: UseBildirimPuantajEtkiAd
   const [manualFieldError, setManualFieldError] = useState<string | null>(null);
   const [manualError, setManualError] = useState<string | null>(null);
   const [isManualApplying, setIsManualApplying] = useState(false);
+  const [conflictTarget, setConflictTarget] = useState<BildirimPuantajEtkiAdayDetail | null>(null);
+  const [conflictKararTuru, setConflictKararTuru] = useState<BildirimPuantajEtkiConflictKararTuru>("MEVCUT_PUANTAJI_KORU");
+  const [conflictGerekce, setConflictGerekce] = useState("");
+  const [conflictFieldError, setConflictFieldError] = useState<string | null>(null);
+  const [conflictError, setConflictError] = useState<string | null>(null);
+  const [isConflictResolving, setIsConflictResolving] = useState(false);
   const listRequestIdRef = useRef(0);
   const ozetRequestIdRef = useRef(0);
   const detailRequestIdRef = useRef(0);
   const dismissingRef = useRef(false);
   const applyingRef = useRef(false);
   const manualApplyingRef = useRef(false);
+  const conflictResolvingRef = useRef(false);
+
+  const STALE_CONFLICT_CODES = new Set([
+    "PUANTAJ_STALE",
+    "PUANTAJ_ARTIK_YOK",
+    "STATE_STALE"
+  ]);
+
+  const REFETCH_CONFLICT_CODES = new Set([
+    ...STALE_CONFLICT_CODES,
+    "REVISION_DECISION_CONFLICT",
+    "REVISION_INTEGRITY_FAILED",
+    "SOURCE_INTEGRITY_FAILED"
+  ]);
 
   const contextReady = Boolean(
     enabled &&
@@ -169,6 +196,16 @@ export function useBildirimPuantajEtkiAdaylari(options: UseBildirimPuantajEtkiAd
     manualApplyingRef.current = false;
   }, []);
 
+  const closeConflictModal = useCallback(() => {
+    setConflictTarget(null);
+    setConflictKararTuru("MEVCUT_PUANTAJI_KORU");
+    setConflictGerekce("");
+    setConflictFieldError(null);
+    setConflictError(null);
+    setIsConflictResolving(false);
+    conflictResolvingRef.current = false;
+  }, []);
+
   const resetTransientState = useCallback(() => {
     setItems([]);
     setOzet(null);
@@ -199,6 +236,13 @@ export function useBildirimPuantajEtkiAdaylari(options: UseBildirimPuantajEtkiAd
     setManualError(null);
     setIsManualApplying(false);
     manualApplyingRef.current = false;
+    setConflictTarget(null);
+    setConflictKararTuru("MEVCUT_PUANTAJI_KORU");
+    setConflictGerekce("");
+    setConflictFieldError(null);
+    setConflictError(null);
+    setIsConflictResolving(false);
+    conflictResolvingRef.current = false;
   }, []);
 
   const closeDetail = useCallback(() => {
@@ -512,6 +556,130 @@ export function useBildirimPuantajEtkiAdaylari(options: UseBildirimPuantajEtkiAd
     subeId
   ]);
 
+  const openConflictModal = useCallback((target: BildirimPuantajEtkiAdayDetail) => {
+    setConflictTarget(target);
+    setConflictKararTuru(
+      target.conflict_default_karar === "ADAY_ETKISIYLE_REVIZE_ET"
+        ? "ADAY_ETKISIYLE_REVIZE_ET"
+        : "MEVCUT_PUANTAJI_KORU"
+    );
+    setConflictGerekce("");
+    setConflictFieldError(null);
+    setConflictError(null);
+  }, []);
+
+  const maybeOpenConflictFromDetail = useCallback(
+    async (targetId: number) => {
+      if (!canResolveConflict || !subeId) {
+        return null;
+      }
+      try {
+        const fresh = await fetchBildirimPuantajEtkiAdayDetail(targetId, { subeId });
+        if (canResolveConflictForDetail(fresh)) {
+          openConflictModal(fresh);
+          setDetail(fresh);
+          return fresh;
+        }
+        return fresh;
+      } catch {
+        return null;
+      }
+    },
+    [canResolveConflict, openConflictModal, subeId]
+  );
+
+  const resolveConflictAday = useCallback(async (kararOverride?: BildirimPuantajEtkiConflictKararTuru) => {
+    if (
+      !canResolveConflict ||
+      !conflictTarget ||
+      conflictResolvingRef.current ||
+      isConflictResolving ||
+      isApplying ||
+      isDismissing ||
+      isManualApplying
+    ) {
+      return;
+    }
+    const effectiveKarar = kararOverride ?? conflictKararTuru;
+    const trimmedGerekce = trimDismissGerekce(conflictGerekce);
+    if (trimmedGerekce.length < 5 || [...trimmedGerekce].length > 500) {
+      return;
+    }
+    const puantaj = conflictTarget.mevcut_puantaj;
+    const hash = conflictTarget.current_puantaj_hash;
+    if (!puantaj?.id || !hash) {
+      return;
+    }
+
+    conflictResolvingRef.current = true;
+    setIsConflictResolving(true);
+    setConflictFieldError(null);
+    setConflictError(null);
+    setSuccessMessage(null);
+    setInfoMessage(null);
+
+    try {
+      const result = await cakismaCozBildirimPuantajEtkiAdayi(
+        conflictTarget.id,
+        {
+          expected_state: conflictTarget.state === "HAZIR" ? "HAZIR" : "INCELEME_GEREKLI",
+          karar_turu: effectiveKarar,
+          gerekce: trimmedGerekce,
+          expected_puantaj_id: puantaj.id,
+          expected_puantaj_hash: hash
+        },
+        { subeId }
+      );
+      closeConflictModal();
+      closeApplyModal();
+      closeManualApplyModal();
+      if (result.idempotent) {
+        setInfoMessage("Bu çakışma kararı daha önce kaydedilmiş.");
+      } else if (effectiveKarar === "MEVCUT_PUANTAJI_KORU") {
+        setSuccessMessage("Mevcut puantaj korunarak aday kapatıldı.");
+      } else {
+        setSuccessMessage("Aday etkisi mevcut puantaja kontrollü biçimde uygulandı.");
+      }
+      setDetail(result.aday);
+      await refreshAll();
+    } catch (caught) {
+      const errorDetail = getApiErrorDetail(caught, "Puantaj çakışması çözülemedi.");
+      if (errorDetail.code === "VALIDATION_ERROR" && errorDetail.field) {
+        setConflictFieldError(errorDetail.message);
+      } else if (errorDetail.code && REFETCH_CONFLICT_CODES.has(errorDetail.code)) {
+        setConflictError(errorDetail.message);
+        const refreshed = await maybeOpenConflictFromDetail(conflictTarget.id);
+        if (!refreshed || !canResolveConflictForDetail(refreshed)) {
+          closeConflictModal();
+        }
+        await refreshAll();
+      } else {
+        setConflictError(errorDetail.message);
+        if (errorDetail.code === "PERIOD_LOCKED" || errorDetail.code === "PUANTAJ_SOURCE_PROTECTED") {
+          await refreshAll();
+        }
+      }
+    } finally {
+      conflictResolvingRef.current = false;
+      setIsConflictResolving(false);
+    }
+  }, [
+    canResolveConflict,
+    closeApplyModal,
+    closeConflictModal,
+    closeManualApplyModal,
+    conflictGerekce,
+    conflictKararTuru,
+    conflictTarget,
+    isApplying,
+    isConflictResolving,
+    isDismissing,
+    isManualApplying,
+    maybeOpenConflictFromDetail,
+    refreshAll,
+    subeId
+  ]);
+
   const applyAday = useCallback(async () => {
     if (!canApply || !applyTarget || applyingRef.current || isApplying || isDismissing) {
       return;
@@ -552,7 +720,12 @@ export function useBildirimPuantajEtkiAdaylari(options: UseBildirimPuantajEtkiAd
         detail.code === "APPLY_UNSUPPORTED" ||
         detail.code === "APPLY_INTEGRITY_CONFLICT"
       ) {
-        setApplyError(detail.message);
+        if (detail.code === "PUANTAJ_OLUSTU" && canResolveConflict) {
+          closeApplyModal();
+          await maybeOpenConflictFromDetail(applyTarget.id);
+        } else {
+          setApplyError(detail.message);
+        }
         await refreshAll();
       } else {
         setApplyError(detail.message);
@@ -564,9 +737,11 @@ export function useBildirimPuantajEtkiAdaylari(options: UseBildirimPuantajEtkiAd
   }, [
     applyTarget,
     canApply,
+    canResolveConflict,
     closeApplyModal,
     isApplying,
     isDismissing,
+    maybeOpenConflictFromDetail,
     refreshAll,
     subeId
   ]);
@@ -632,7 +807,12 @@ export function useBildirimPuantajEtkiAdaylari(options: UseBildirimPuantajEtkiAd
         } else if (detail.code === "MANUAL_DECISION_CONFLICT") {
           setManualError("Bu aday daha önce farklı bir manuel kararla uygulanmış.");
         } else if (detail.code === "PUANTAJ_OLUSTU") {
-          setManualError("Bu personel ve tarih için puantaj kaydı zaten oluşmuş. Mevcut kayıt değiştirilmedi.");
+          if (canResolveConflict) {
+            closeManualApplyModal();
+            await maybeOpenConflictFromDetail(manualTarget.id);
+          } else {
+            setManualError("Bu personel ve tarih için puantaj kaydı zaten oluşmuş. Mevcut kayıt değiştirilmedi.");
+          }
         } else if (detail.code === "PERIOD_LOCKED") {
           setManualError("Bu dönem mühürlendiği için manuel karar uygulanamaz.");
         } else {
@@ -648,6 +828,7 @@ export function useBildirimPuantajEtkiAdaylari(options: UseBildirimPuantajEtkiAd
     }
   }, [
     canApply,
+    canResolveConflict,
     closeManualApplyModal,
     isApplying,
     isDismissing,
@@ -656,6 +837,7 @@ export function useBildirimPuantajEtkiAdaylari(options: UseBildirimPuantajEtkiAd
     manualKararTuru,
     manualMiktar,
     manualTarget,
+    maybeOpenConflictFromDetail,
     refreshAll,
     subeId
   ]);
@@ -705,6 +887,14 @@ export function useBildirimPuantajEtkiAdaylari(options: UseBildirimPuantajEtkiAd
     manualFieldError,
     manualError,
     isManualApplying,
+    conflictTarget,
+    conflictKararTuru,
+    setConflictKararTuru,
+    conflictGerekce,
+    setConflictGerekce,
+    conflictFieldError,
+    conflictError,
+    isConflictResolving,
     contextReady,
     refreshList,
     refreshAll,
@@ -718,6 +908,9 @@ export function useBildirimPuantajEtkiAdaylari(options: UseBildirimPuantajEtkiAd
     applyAday,
     openManualApplyModal,
     closeManualApplyModal,
-    manualApplyAday
+    manualApplyAday,
+    openConflictModal,
+    closeConflictModal,
+    resolveConflictAday
   };
 }

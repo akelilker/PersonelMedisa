@@ -15,13 +15,14 @@ const rolePermissionsSource = readFileSync(rolePermissionsPath, "utf8");
 const policySource = readFileSync(policyPath, "utf8");
 
 describe("BildirimPuantajEtkiAdaylariController source contract", () => {
-  it("exposes summary, list, detail, generate, dismiss and apply operations", () => {
+  it("exposes summary, list, detail, generate, dismiss, apply and manualApply operations", () => {
     expect(controllerSource).toMatch(/public static function summary\(/);
     expect(controllerSource).toMatch(/public static function list\(/);
     expect(controllerSource).toMatch(/public static function detail\(/);
     expect(controllerSource).toMatch(/public static function generate\(/);
     expect(controllerSource).toMatch(/public static function dismiss\(/);
     expect(controllerSource).toMatch(/public static function apply\(/);
+    expect(controllerSource).toMatch(/public static function manualApply\(/);
   });
 
   it("uses permission guards without hard-coded role checks", () => {
@@ -75,14 +76,19 @@ describe("BildirimPuantajEtkiAdaylariController source contract", () => {
     }
   });
 
-  it("implements dismiss and apply transitions with shared decision policy", () => {
+  it("implements dismiss, apply and manual apply transitions with shared decision policy", () => {
     expect(controllerSource).toMatch(/public static function dismiss\(/);
     expect(controllerSource).toMatch(/public static function apply\(/);
+    expect(controllerSource).toMatch(/public static function manualApply\(/);
     expect(controllerSource).toContain("UPDATE ' . self::TABLE");
     expect(controllerSource).toContain("BildirimPuantajEtkiDecisionPolicy");
     expect(controllerSource).toContain("BildirimPuantajEtkiApplyService::apply");
+    expect(controllerSource).toContain("BildirimPuantajEtkiManualApplyService::apply");
     expect(controllerSource).toContain("validateApplyExpectedState");
+    expect(controllerSource).toContain("validateManualApplyExpectedState");
     expect(controllerSource).toContain("mapApplyResponse");
+    expect(controllerSource).toContain("mapManualApplyResponse");
+    expect(controllerSource).toContain("mapUygulamaModuFields");
   });
 
   it("maps locked karar audit fields in list/detail", () => {
@@ -96,6 +102,9 @@ describe("BildirimPuantajEtkiAdaylariController source contract", () => {
       "onceki_puantaj_snapshot",
       "sonraki_puantaj_snapshot",
       "uygulama_hash",
+      "uygulama_modu",
+      "manuel_karar_turu",
+      "manuel_karar_miktari",
     ]) {
       expect(controllerSource).toContain(field);
     }
@@ -126,18 +135,20 @@ describe("BildirimPuantajEtkiAdaylariController source contract", () => {
 });
 
 describe("Router source contract for puantaj bildirim etki adaylari", () => {
-  it("registers ozet, hazirla, yok-say and uygula before dynamic id route", () => {
+  it("registers ozet, hazirla, yok-say, manuel-uygula and uygula before dynamic id route", () => {
     const ozetIndex = routerSource.indexOf("'/puantaj/bildirim-etki-adaylari/ozet'");
     const hazirlaIndex = routerSource.indexOf("'/puantaj/bildirim-etki-adaylari/hazirla'");
     const listIndex = routerSource.indexOf("'/puantaj/bildirim-etki-adaylari' && $method === 'GET'");
     const yokSayIndex = routerSource.indexOf("#^/puantaj/bildirim-etki-adaylari/(\\d+)/yok-say$#");
+    const manuelUygulaIndex = routerSource.indexOf("#^/puantaj/bildirim-etki-adaylari/(\\d+)/manuel-uygula$#");
     const uygulaIndex = routerSource.indexOf("#^/puantaj/bildirim-etki-adaylari/(\\d+)/uygula$#");
     const detailIndex = routerSource.indexOf("#^/puantaj/bildirim-etki-adaylari/(\\d+)$#");
     expect(ozetIndex).toBeGreaterThan(-1);
     expect(hazirlaIndex).toBeGreaterThan(ozetIndex);
     expect(listIndex).toBeGreaterThan(hazirlaIndex);
     expect(yokSayIndex).toBeGreaterThan(listIndex);
-    expect(uygulaIndex).toBeGreaterThan(yokSayIndex);
+    expect(manuelUygulaIndex).toBeGreaterThan(yokSayIndex);
+    expect(uygulaIndex).toBeGreaterThan(manuelUygulaIndex);
     expect(detailIndex).toBeGreaterThan(uygulaIndex);
   });
 });
@@ -226,6 +237,7 @@ describe("BildirimPuantajEtkiDecisionPolicy source contract", () => {
     expect(policySource).toContain("evaluateDismiss");
     expect(policySource).toContain("validateExpectedState");
     expect(policySource).toContain("isApplyAllowed");
+    expect(policySource).toContain("isManualApplyAllowed");
     expect(policySource).toContain("isDismissAllowed");
     expect(policySource).toContain("'HAZIR'");
     expect(policySource).toContain("'INCELEME_GEREKLI'");

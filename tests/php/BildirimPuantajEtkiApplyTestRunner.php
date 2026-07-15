@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../api/src/Services/BildirimPuantajEtkiDecisionPolicy.php';
 require_once __DIR__ . '/../../api/src/Services/BildirimPuantajEtkiProjectionService.php';
+require_once __DIR__ . '/../../api/src/Services/BildirimPuantajEtkiPuantajMapper.php';
 require_once __DIR__ . '/../../api/src/Services/BildirimPuantajEtkiApplyService.php';
 
 use Medisa\Api\Services\BildirimPuantajEtkiApplyService;

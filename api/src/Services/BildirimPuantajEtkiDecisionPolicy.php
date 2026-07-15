@@ -7,6 +7,7 @@ namespace Medisa\Api\Services;
 class BildirimPuantajEtkiDecisionPolicy
 {
     public const ACTION_APPLY = 'apply';
+    public const ACTION_MANUAL_APPLY = 'manual_apply';
     public const ACTION_DISMISS = 'dismiss';
 
     public const PERMISSION_APPLY = 'puantaj.bildirim_etki.apply';
@@ -45,13 +46,15 @@ class BildirimPuantajEtkiDecisionPolicy
     {
         $action = strtolower(trim((string) $action));
 
-        return $action === self::ACTION_APPLY || $action === self::ACTION_DISMISS;
+        return $action === self::ACTION_APPLY
+            || $action === self::ACTION_MANUAL_APPLY
+            || $action === self::ACTION_DISMISS;
     }
 
     public static function permissionForAction($action)
     {
         $action = strtolower(trim((string) $action));
-        if ($action === self::ACTION_APPLY) {
+        if ($action === self::ACTION_APPLY || $action === self::ACTION_MANUAL_APPLY) {
             return self::PERMISSION_APPLY;
         }
         if ($action === self::ACTION_DISMISS) {
@@ -93,6 +96,15 @@ class BildirimPuantajEtkiDecisionPolicy
         }
 
         return self::normalizeState($state) === 'HAZIR';
+    }
+
+    public static function isManualApplyAllowed($state)
+    {
+        if (!self::isAllowedState($state) || self::isTerminalState($state)) {
+            return false;
+        }
+
+        return self::normalizeState($state) === 'INCELEME_GEREKLI';
     }
 
     public static function isDismissAllowed($state)

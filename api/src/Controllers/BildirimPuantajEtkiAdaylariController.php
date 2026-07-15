@@ -12,7 +12,9 @@ use Medisa\Api\Http\Request;
 use Medisa\Api\Scope\SubeScope;
 use Medisa\Api\Services\BildirimPuantajEtkiApplyService;
 use Medisa\Api\Services\BildirimPuantajEtkiDecisionPolicy;
+use Medisa\Api\Services\BildirimPuantajEtkiManualApplyService;
 use Medisa\Api\Services\BildirimPuantajEtkiProjectionService;
+use Medisa\Api\Services\BildirimPuantajEtkiPuantajMapper;
 use PDO;
 
 class BildirimPuantajEtkiAdaylariController
@@ -300,6 +302,103 @@ class BildirimPuantajEtkiAdaylariController
                 $pdo->rollBack();
             }
             JsonResponse::serverError('Puantaj etki adayi uygulanamadi.');
+        }
+    }
+
+    public static function manualApply(Request $request, $id)
+    {
+        $user = AuthMiddleware::authenticate($request, true);
+        RolePermissions::assert($user, BildirimPuantajEtkiDecisionPolicy::PERMISSION_APPLY);
+
+        $adayId = self::positiveInt($id);
+        if ($adayId === null) {
+            JsonResponse::notFound('Puantaj etki adayi bulunamadi.');
+        }
+
+        $body = $request->getJsonBody();
+        self::assertManualApplyBodyKeys($body);
+        $expectedState = self::validateManualApplyExpectedState($body['expected_state'] ?? null);
+        $kararTuru = self::validateManualKararTuru($body['karar_etki_turu'] ?? null);
+        $gerekce = self::validateManualGerekce($body['gerekce'] ?? null);
+        $etkiMiktari = self::validateManualEtkiMiktari($kararTuru, $body['etki_miktari'] ?? null);
+
+        $pdo = self::connection();
+        self::assertTablesReady($pdo);
+
+        $scopeRow = self::fetchAdayById($pdo, $adayId);
+        if (!$scopeRow) {
+            JsonResponse::notFound('Puantaj etki adayi bulunamadi.');
+        }
+
+        SubeScope::assertPersonelAccess($user, $request, (int) $scopeRow['sube_id']);
+
+        try {
+            $pdo->beginTransaction();
+
+            $row = self::fetchAdayById($pdo, $adayId, true);
+            if (!$row) {
+                if ($pdo->inTransaction()) {
+                    $pdo->rollBack();
+                }
+                JsonResponse::notFound('Puantaj etki adayi bulunamadi.');
+            }
+
+            $result = BildirimPuantajEtkiManualApplyService::apply(
+                $pdo,
+                $row,
+                $expectedState,
+                $kararTuru,
+                $etkiMiktari,
+                $gerekce,
+                self::userId($user)
+            );
+
+            $status = (string) ($result['status'] ?? '');
+            if ($status === 'idempotent') {
+                if ($pdo->inTransaction()) {
+                    $pdo->rollBack();
+                }
+                JsonResponse::success(self::mapManualApplyResponse($result['aday'], true));
+            }
+
+            if ($status === 'stale') {
+                self::rollbackConflict(
+                    $pdo,
+                    (string) ($result['code'] ?? 'STATE_STALE'),
+                    (string) ($result['message'] ?? 'Puantaj etki adayi durumu degismis.')
+                );
+            }
+
+            if ($status === 'conflict') {
+                self::rollbackConflict(
+                    $pdo,
+                    (string) ($result['code'] ?? 'STATE_CONFLICT'),
+                    (string) ($result['message'] ?? 'Puantaj etki adayi manuel uygulanamaz.')
+                );
+            }
+
+            if ($status === 'validation') {
+                self::rollbackValidation(
+                    $pdo,
+                    (string) ($result['code'] ?? 'VALIDATION_ERROR'),
+                    (string) ($result['message'] ?? 'Manuel karar dogrulanamadi.')
+                );
+            }
+
+            if ($status !== 'success' || !isset($result['aday']) || !is_array($result['aday'])) {
+                if ($pdo->inTransaction()) {
+                    $pdo->rollBack();
+                }
+                JsonResponse::serverError('Puantaj etki adayi manuel uygulanamadi.');
+            }
+
+            $pdo->commit();
+            JsonResponse::success(self::mapManualApplyResponse($result['aday'], false));
+        } catch (\PDOException $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            JsonResponse::serverError('Puantaj etki adayi manuel uygulanamadi.');
         }
     }
 
@@ -696,17 +795,17 @@ class BildirimPuantajEtkiAdaylariController
     /** @param array<string, mixed> $row @return array<string, mixed> */
     private static function mapKararListFields(array $row)
     {
-        return [
+        return array_merge([
             'karar_veren_user_id' => $row['karar_veren_user_id'] !== null ? (int) $row['karar_veren_user_id'] : null,
             'karar_zamani' => $row['karar_zamani'] !== null ? (string) $row['karar_zamani'] : null,
             'uygulanan_puantaj_id' => $row['uygulanan_puantaj_id'] !== null ? (int) $row['uygulanan_puantaj_id'] : null,
-        ];
+        ], self::mapUygulamaModuFields($row));
     }
 
     /** @param array<string, mixed> $row @return array<string, mixed> */
     private static function mapKararDetailFields(array $row)
     {
-        return [
+        return array_merge([
             'karar_veren_user_id' => $row['karar_veren_user_id'] !== null ? (int) $row['karar_veren_user_id'] : null,
             'karar_zamani' => $row['karar_zamani'] !== null ? (string) $row['karar_zamani'] : null,
             'karar_gerekcesi' => $row['karar_gerekcesi'] !== null ? (string) $row['karar_gerekcesi'] : null,
@@ -714,6 +813,18 @@ class BildirimPuantajEtkiAdaylariController
             'onceki_puantaj_snapshot' => self::decodeJsonField($row['onceki_puantaj_snapshot'] ?? null),
             'sonraki_puantaj_snapshot' => self::decodeJsonField($row['sonraki_puantaj_snapshot'] ?? null),
             'uygulama_hash' => $row['uygulama_hash'] !== null ? (string) $row['uygulama_hash'] : null,
+        ], self::mapUygulamaModuFields($row));
+    }
+
+    /** @param array<string, mixed> $row @return array<string, mixed> */
+    private static function mapUygulamaModuFields(array $row)
+    {
+        $modu = $row['uygulama_modu'] ?? 'OTOMATIK';
+
+        return [
+            'uygulama_modu' => (string) $modu,
+            'manuel_karar_turu' => $row['manuel_karar_turu'] !== null ? (string) $row['manuel_karar_turu'] : null,
+            'manuel_karar_miktari' => $row['manuel_karar_miktari'] !== null ? (int) $row['manuel_karar_miktari'] : null,
         ];
     }
 
@@ -1210,7 +1321,7 @@ class BildirimPuantajEtkiAdaylariController
     /** @param array<string, mixed> $row @return array<string, mixed> */
     private static function mapApplyResponse(array $row, $idempotent)
     {
-        return [
+        return array_merge([
             'id' => (int) $row['id'],
             'state' => (string) $row['state'],
             'karar_veren_user_id' => $row['karar_veren_user_id'] !== null ? (int) $row['karar_veren_user_id'] : null,
@@ -1220,7 +1331,108 @@ class BildirimPuantajEtkiAdaylariController
             'sonraki_puantaj_snapshot' => self::decodeJsonField($row['sonraki_puantaj_snapshot'] ?? null),
             'uygulama_hash' => $row['uygulama_hash'] !== null ? (string) $row['uygulama_hash'] : null,
             'idempotent' => (bool) $idempotent,
-        ];
+        ], self::mapUygulamaModuFields($row));
+    }
+
+    /** @param array<string, mixed> $row @return array<string, mixed> */
+    private static function mapManualApplyResponse(array $row, $idempotent)
+    {
+        return array_merge([
+            'id' => (int) $row['id'],
+            'state' => (string) $row['state'],
+            'karar_veren_user_id' => $row['karar_veren_user_id'] !== null ? (int) $row['karar_veren_user_id'] : null,
+            'karar_zamani' => $row['karar_zamani'] !== null ? (string) $row['karar_zamani'] : null,
+            'karar_gerekcesi' => $row['karar_gerekcesi'] !== null ? (string) $row['karar_gerekcesi'] : null,
+            'uygulanan_puantaj_id' => $row['uygulanan_puantaj_id'] !== null ? (int) $row['uygulanan_puantaj_id'] : null,
+            'onceki_puantaj_snapshot' => self::decodeJsonField($row['onceki_puantaj_snapshot'] ?? null),
+            'sonraki_puantaj_snapshot' => self::decodeJsonField($row['sonraki_puantaj_snapshot'] ?? null),
+            'uygulama_hash' => $row['uygulama_hash'] !== null ? (string) $row['uygulama_hash'] : null,
+            'idempotent' => (bool) $idempotent,
+        ], self::mapUygulamaModuFields($row));
+    }
+
+    /** @param array<string, mixed> $body */
+    private static function assertManualApplyBodyKeys(array $body)
+    {
+        $allowed = ['expected_state', 'karar_etki_turu', 'etki_miktari', 'gerekce'];
+        foreach (array_keys($body) as $key) {
+            if (!in_array($key, $allowed, true)) {
+                self::validationError((string) $key, 'Desteklenmeyen istek alani.');
+            }
+        }
+    }
+
+    private static function validateManualApplyExpectedState($value)
+    {
+        if ($value === null || $value === '') {
+            self::validationError('expected_state', 'Beklenen durum secilmelidir.');
+        }
+
+        $state = BildirimPuantajEtkiDecisionPolicy::normalizeState($value);
+        if ($state !== 'INCELEME_GEREKLI') {
+            self::validationError('expected_state', 'Beklenen durum INCELEME_GEREKLI olmalidir.');
+        }
+
+        return $state;
+    }
+
+    private static function validateManualKararTuru($value)
+    {
+        if ($value === null || $value === '') {
+            self::validationError('karar_etki_turu', 'Manuel karar turu secilmelidir.');
+        }
+
+        $kararTuru = strtoupper(trim((string) $value));
+        if (!BildirimPuantajEtkiPuantajMapper::isManualKararTuru($kararTuru)) {
+            self::validationError('karar_etki_turu', 'Desteklenmeyen manuel karar turu.');
+        }
+
+        return $kararTuru;
+    }
+
+    private static function validateManualGerekce($value)
+    {
+        if ($value === null || $value === '') {
+            self::validationError('gerekce', 'Manuel karar gerekcesi en az 5 karakter olmalidir.');
+        }
+
+        $gerekce = trim((string) $value);
+        if ($gerekce === '' || mb_strlen($gerekce) < 5) {
+            self::validationError('gerekce', 'Manuel karar gerekcesi en az 5 karakter olmalidir.');
+        }
+        if (mb_strlen($gerekce) > 500) {
+            self::validationError('gerekce', 'Manuel karar gerekcesi en fazla 500 karakter olabilir.');
+        }
+
+        return $gerekce;
+    }
+
+  /** @param mixed $miktar */
+    private static function validateManualEtkiMiktari($kararTuru, $miktar)
+    {
+        $kararTuru = strtoupper(trim((string) $kararTuru));
+        $requiresMiktar = $kararTuru === 'GEC_KALMA_DAKIKA' || $kararTuru === 'ERKEN_CIKIS_DAKIKA';
+
+        if ($requiresMiktar) {
+            if ($miktar === null || $miktar === '') {
+                self::validationError('etki_miktari', 'Dakika degeri zorunludur.');
+            }
+            if (!is_int($miktar) && !(is_string($miktar) && ctype_digit((string) $miktar))) {
+                self::validationError('etki_miktari', 'Dakika degeri pozitif tam sayi olmalidir.');
+            }
+            $miktarInt = (int) $miktar;
+            if ($miktarInt <= 0 || $miktarInt > 1440) {
+                self::validationError('etki_miktari', 'Dakika degeri 1-1440 arasinda olmalidir.');
+            }
+
+            return $miktarInt;
+        }
+
+        if ($miktar !== null && $miktar !== '') {
+            self::validationError('etki_miktari', 'Bu karar turu icin etki miktari gonderilmemelidir.');
+        }
+
+        return null;
     }
 
     private static function validateDismissGerekce($value)

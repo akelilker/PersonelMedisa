@@ -75,6 +75,9 @@ class Router
         if ($method === 'POST' && preg_match('#^/puantaj/bildirim-etki-adaylari/(\d+)/yok-say$#', $path, $matches)) {
             BildirimPuantajEtkiAdaylariController::dismiss($this->request, $matches[1]);
         }
+        if ($method === 'POST' && preg_match('#^/puantaj/bildirim-etki-adaylari/(\d+)/manuel-uygula$#', $path, $matches)) {
+            BildirimPuantajEtkiAdaylariController::manualApply($this->request, $matches[1]);
+        }
         if ($method === 'POST' && preg_match('#^/puantaj/bildirim-etki-adaylari/(\d+)/uygula$#', $path, $matches)) {
             BildirimPuantajEtkiAdaylariController::apply($this->request, $matches[1]);
         }

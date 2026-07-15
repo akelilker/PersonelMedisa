@@ -411,7 +411,7 @@ Bu sıra aday generation, otomatik `/uygula`, manuel `/manuel-uygula`, günlük 
 
 ### Yayın ve canlı sınır
 
-Migration 014 eski kod için additive ve etkisizdir; bu nedenle schema-first uygulanır. Hardening kodu tablo olmadan kilitsiz devam etmez. Migration 014 ve hardening deploy edilene kadar yeni canlı apply kabulü yapılmaz; fixture `#4/#5`, aday `#1/#3` ve mevcut canlı kayıtlar korunur.
+Migration 014 eski kod için additive ve etkisizdir; bu nedenle schema-first uygulanır. Hardening kodu tablo olmadan kilitsiz devam etmez. Bu sıra 15.07.2026'da canlıda tamamlanmıştır. Kontrollü `2026-04` zincirinde bildirim `#7` → haftalık `#6` → aylık `#4` → GY `#4` → aday `#5` → puantaj `#5` üretilmiş; tek UI manuel apply ve aynı body ile tek idempotency POST doğrulanmıştır. Fixture `#4/#5`, haftalık `#4` ve aday `#1/#3` değişmemiştir.
 ## 15.6 Puantaj Etki Adayı Yok Say Ekranı — S74-C2B
 
 ### Tetikleyici

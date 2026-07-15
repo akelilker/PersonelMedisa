@@ -141,8 +141,8 @@ Her fazın çıkış kriteri `05-state-flow-api-kontrati.md` ve `09-rol-yetki-ma
 - S72 aylık bildirim onayı fazı tamamlandı.
 - S73 Genel Yönetici bildirim üst onayı fazı tamamlandı.
 - S74-B/C puantaj etki adayı generate + karar (Yok Say / Uygula) köprüsü kod ve canlıda tamamlandı (S74-C3-B4 `LIVE_APPLY_IDEMPOTENCY_PASSED`).
-- S74-D1/D3 `INCELEME_GEREKLI` adaylar için manuel preset uygulama (`/manuel-uygula`) canlı kabul ve aynı-body idempotency kanıtı tamamlandı. Son denetimde apply ile aylık mühürleme arasında dönem-snapshot yarış riski bulunduğu için S74 nihai kapanışı yeniden açıldı (`S74_REOPEN_REQUIRED`).
-- S74-D1/D3R hardening paketinde `(şube, yıl, ay)` ortak transaction kilidi; generate, otomatik/manüel apply, doğrudan puantaj upsert ve aylık mühürleme owner yollarına eklendi. Migration `014_puantaj_donem_kilitleri.sql` ve kod paketi lokalde doğrulandı; canlı migration/deploy yapılmadı.
+- S74-D1/D3 `INCELEME_GEREKLI` adaylar için manuel preset uygulama (`/manuel-uygula`) ve aynı-body idempotency kontratı canlıda doğrulandı.
+- S74-D1/D3R hardening paketindeki `(şube, yıl, ay)` ortak transaction kilidi generate, otomatik/manüel apply, doğrudan puantaj upsert ve aylık mühürleme owner yollarında zorunludur. Migration `014_puantaj_donem_kilitleri.sql` 15.07.2026'da schema-first uygulanmış, hardening kodu CI/deploy sonrası kontrollü Nisan fixture'ı ile canlıda kabul edilmiştir. Yeniden açılma kararı kapanmıştır: `S74_PERIOD_LOCK_DEPLOYED`, `S74_MANUAL_APPLY_LIVE_ACCEPTANCE_OK`, `S74_FULLY_COMPLETE`.
 - Günlük, haftalık ve aylık bildirim write/approve sahibi `BIRIM_AMIRI` rolüdür.
 - `GENEL_YONETICI`, S73 kapsamında bildirim üst onayını görür ve onaylar (`genel_yonetici_bildirim_onayi.*`).
 - `BOLUM_YONETICISI`, `GENEL_YONETICI` (S72 panelleri) ve `MUHASEBE` haftalık ve aylık bildirim panellerini salt okunur görür; S72 approve sahibi değildir.

@@ -801,6 +801,8 @@ Bu kilit, apply commit etmeden seal snapshot'ının tamamlanmasını veya seal c
 
 Guard tablo additive migration `014_puantaj_donem_kilitleri.sql` ile oluşturulur. Schema-first yayın zorunludur: önce migration 014, sonra hardening kodu. Tablo yoksa yeni kod fail-open çalışmaz.
 
+Bu yayın sırası 15.07.2026'da canlıda tamamlanmıştır. Kontrollü Nisan 2026 kabulünde generation ve manuel apply aynı canonical guard satırını kullanmış; tek apply puantaj `#5` üretmiş, aynı body tekrarı mükerrer satır üretmeden idempotent dönmüştür.
+
 ## 19. Sonuç
 
 Bu motorun özü şudur:
@@ -820,6 +822,7 @@ Bu belge sonrası sıradaki doğru doküman:
 
 | Tarih | Not |
 |-------|-----|
+| 2026-07-15 | S74 final canlı kabulü: migration 014, dönem kilidi deploy'u, kontrollü manuel apply ve aynı-body idempotency doğrulandı; `S74_FULLY_COMPLETE`. |
 | 2026-07-15 | S74-D1/D3R: ortak `(şube, yıl, ay)` dönem kilidi, tek kilit sırası ve schema-first migration 014 kontratı eklendi. |
 | 2026-07-07 | S62A: net maaş canonical alan, brüt salt okunur, FSC V1 backlog, hastalık ilk 2 gün rapor event politikası kilitlendi. |
 | 2026-05-15 | Geç kalma / erken çıkma için 30 dakikalık yukarı yuvarlama ve `kesintiye_esas_dakika` notu eklendi. |

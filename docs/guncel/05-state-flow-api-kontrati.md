@@ -328,7 +328,7 @@ Canonical kilit anahtarı `(sube_id, yil, ay)` tuple'ıdır. `puantaj_donem_kili
 
 Aynı protokol aday generate, otomatik apply, manuel apply, doğrudan günlük puantaj upsert ve aylık mühürleme/snapshot yollarında zorunludur. Böylece mühür snapshot'ı alınırken aynı döneme yeni puantaj satırı commit edilemez; bekleyen write, kilit serbest kaldıktan sonra mühür kaydını görür ve `PERIOD_LOCKED` ile durur.
 
-Migration `014_puantaj_donem_kilitleri.sql` additive guard tablosudur. Lokal kod ve test paketi tamamlanmıştır; migration 014 canlıda uygulanmadan bu hardening kodu deploy edilmez.
+Migration `014_puantaj_donem_kilitleri.sql` additive guard tablosudur. Schema-first sıra 15.07.2026'da canlıda uygulanmıştır: migration sonrası hardening kodu deploy edilmiş, `(sube_id=1, yil=2026, ay=4)` guard satırı tek generation ve manuel apply/idempotency zincirinde doğrulanmıştır. Kontrollü aday `#5` aynı body tekrarında HTTP `200`, `idempotent: true` ve aynı puantaj `#5` sonucunu vermiştir.
 
 ### Puantaj etki adayı Yok Say — S74-C2A
 

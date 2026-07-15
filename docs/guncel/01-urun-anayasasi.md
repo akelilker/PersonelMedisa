@@ -134,14 +134,15 @@ Her fazın çıkış kriteri `05-state-flow-api-kontrati.md` ve `09-rol-yetki-ma
 
 Önceki V1 kararında “tam bordro motoru kurmak hedef değil; doğru veri, doğru state ve doğru UI omurgasını ayağa kaldırmak” ifadesi kullanılmıştı. Ürün reset (RAPOR-01/02/03/04) ile bu karar **aktif ana karar olmaktan çıkarılmıştır**. Omurga kodu korunur; ürün ekseni bordro yönetim sistemine çekilir.
 
-## Uygulanmış Faz Durumu — 11.07.2026
+## Uygulanmış Faz Durumu — 15.07.2026
 
 - S70C günlük bildirim fazı tamamlandı.
 - S71 haftalık bildirim mutabakatı fazı tamamlandı.
 - S72 aylık bildirim onayı fazı tamamlandı.
 - S73 Genel Yönetici bildirim üst onayı fazı tamamlandı.
 - S74-B/C puantaj etki adayı generate + karar (Yok Say / Uygula) köprüsü kod ve canlıda tamamlandı (S74-C3-B4 `LIVE_APPLY_IDEMPOTENCY_PASSED`).
-- S74-D1-B `INCELEME_GEREKLI` adaylar için manuel preset uygulama (`/manuel-uygula`) kod paketi tamamlandı; canlı migration/mutation henüz yapılmadı.
+- S74-D1/D3 `INCELEME_GEREKLI` adaylar için manuel preset uygulama (`/manuel-uygula`) canlı kabul ve aynı-body idempotency kanıtı tamamlandı. Son denetimde apply ile aylık mühürleme arasında dönem-snapshot yarış riski bulunduğu için S74 nihai kapanışı yeniden açıldı (`S74_REOPEN_REQUIRED`).
+- S74-D1/D3R hardening paketinde `(şube, yıl, ay)` ortak transaction kilidi; generate, otomatik/manüel apply, doğrudan puantaj upsert ve aylık mühürleme owner yollarına eklendi. Migration `014_puantaj_donem_kilitleri.sql` ve kod paketi lokalde doğrulandı; canlı migration/deploy yapılmadı.
 - Günlük, haftalık ve aylık bildirim write/approve sahibi `BIRIM_AMIRI` rolüdür.
 - `GENEL_YONETICI`, S73 kapsamında bildirim üst onayını görür ve onaylar (`genel_yonetici_bildirim_onayi.*`).
 - `BOLUM_YONETICISI`, `GENEL_YONETICI` (S72 panelleri) ve `MUHASEBE` haftalık ve aylık bildirim panellerini salt okunur görür; S72 approve sahibi değildir.

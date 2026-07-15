@@ -388,6 +388,30 @@ S73 tamamlanmış Genel Yönetici bildirim üst onayı sonrası `puantaj.bildiri
 
 - `onayli_bildirim_puantaj_etki_adaylari` tablosunda karar alanları güncellenir.
 - `gunluk_puantaj`, finans, bordro, süreç ve bildirim zinciri tabloları değişmez.
+
+## 15.5.1 Puantaj Yazımı ve Aylık Mühür Yarış Koruması — S74-D1/D3R
+
+### Ortak dönem anahtarı
+
+Generate zincirindeki onay ayı ile apply/upsert zincirindeki operasyon tarihi aynı `(sube_id, yil, ay)` tuple'ına normalize edilir. Cross-month batch akışı yoktur; her request tek dönem kilitler. Farklı şube veya aylar bağımsız ilerler.
+
+### Bağlayıcı akış
+
+1. Transaction başlar.
+2. `puantaj_donem_kilitleri` satırı güvenli biçimde ensure edilir ve `FOR UPDATE` kilitlenir.
+3. Aylık mühür durumu kontrol edilir.
+4. Aday veya mevcut puantaj owner satırı kontrol/kilit işlemine alınır.
+5. Business validation çalışır.
+6. Puantaj, aday audit/hash veya mühür snapshot mutation'ı yapılır.
+7. Transaction commit edilir; hata halinde tamamı rollback olur.
+
+Bu sıra aday generation, otomatik `/uygula`, manuel `/manuel-uygula`, günlük puantaj create/upsert ve aylık mühür/snapshot için aynıdır. Seal önce tamamlarsa bekleyen write `PERIOD_LOCKED` ile durur. Apply/upsert önce tamamlarsa seal bekler ve yeni puantajı snapshot kapsamına alır. Kör deadlock/timeout retry yoktur.
+
+`/yok-say` yalnız aday karar alanlarını günceller; puantaj veya mühür üretmediği için dönem kilidine dahil değildir.
+
+### Yayın ve canlı sınır
+
+Migration 014 eski kod için additive ve etkisizdir; bu nedenle schema-first uygulanır. Hardening kodu tablo olmadan kilitsiz devam etmez. Migration 014 ve hardening deploy edilene kadar yeni canlı apply kabulü yapılmaz; fixture `#4/#5`, aday `#1/#3` ve mevcut canlı kayıtlar korunur.
 ## 15.6 Puantaj Etki Adayı Yok Say Ekranı — S74-C2B
 
 ### Tetikleyici

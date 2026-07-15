@@ -791,6 +791,16 @@ Bu dokümanın `V1` sınırında şunlar sonraki detay dokümana bırakılmışt
 - dönem kapatma ve geri açma workflow'u
 - API endpoint ve request/response sözleşmesi
 
+## 18.1 Puantaj Dönem Kilidi — S74-D1/D3R
+
+Puantaj yazımı ile aylık mühür/snapshot aynı `(sube_id, yil, ay)` dönem anahtarında serialize edilir. Yıl ve ay `gunluk_puantaj.tarih` veya onay zincirinin operasyon ayından türetilir; `created_at` ve timezone dönüşümü dönem anahtarı değildir.
+
+Bağlayıcı sıra: transaction başlat → `puantaj_donem_kilitleri` guard satırını ensure et → `SELECT ... FOR UPDATE` → mühür kontrolü → aday/puantaj owner satırı kontrolü → business validation → write/audit/snapshot → commit. Generate, otomatik apply, manuel apply, doğrudan günlük puantaj upsert ve aylık mühür/snapshot bu sırayı paylaşır. Akışların hiçbiri birden fazla dönem anahtarı kilitlemez.
+
+Bu kilit, apply commit etmeden seal snapshot'ının tamamlanmasını veya seal commit ettikten sonra snapshot dışında yeni puantaj yazılmasını engeller. `/yok-say` puantaj veya mühür üretmediği için dönem kilidi almaz.
+
+Guard tablo additive migration `014_puantaj_donem_kilitleri.sql` ile oluşturulur. Schema-first yayın zorunludur: önce migration 014, sonra hardening kodu. Tablo yoksa yeni kod fail-open çalışmaz.
+
 ## 19. Sonuç
 
 Bu motorun özü şudur:
@@ -810,6 +820,7 @@ Bu belge sonrası sıradaki doğru doküman:
 
 | Tarih | Not |
 |-------|-----|
+| 2026-07-15 | S74-D1/D3R: ortak `(şube, yıl, ay)` dönem kilidi, tek kilit sırası ve schema-first migration 014 kontratı eklendi. |
 | 2026-07-07 | S62A: net maaş canonical alan, brüt salt okunur, FSC V1 backlog, hastalık ilk 2 gün rapor event politikası kilitlendi. |
 | 2026-05-15 | Geç kalma / erken çıkma için 30 dakikalık yukarı yuvarlama ve `kesintiye_esas_dakika` notu eklendi. |
 | 2026-05-15 | Geç / Erken Kesinti V1 kapanış davranışı, güvenli hesap prensibi, katman sınırı ve test kapsamı sabitlendi. |

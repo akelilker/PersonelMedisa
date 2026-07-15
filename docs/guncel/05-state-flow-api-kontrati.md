@@ -295,7 +295,7 @@ Endpoint: `POST /puantaj/bildirim-etki-adaylari/{id}/manuel-uygula` — yalnız 
 
 **Kapsam:** `INCELEME_GEREKLI` adaylarda dört puantaj preset'i ile tek `gunluk_puantaj` INSERT. İzin/rapor preset'leri yoktur; süreç akışına bırakılır.
 
-**Migration:** `013_bildirim_puantaj_etki_manual_apply.sql` — `uygulama_modu` (`OTOMATIK`/`MANUEL`), `manuel_karar_turu`, `manuel_karar_miktari`. Canlıda henüz uygulanmamıştır.
+**Migration:** `013_bildirim_puantaj_etki_manual_apply.sql` — `uygulama_modu` (`OTOMATIK`/`MANUEL`), `manuel_karar_turu`, `manuel_karar_miktari`. Owner onaylı canlı uygulama ve kontrollü manuel apply/idempotency kabulü tamamlanmıştır.
 
 **Request body:**
 
@@ -320,7 +320,15 @@ Endpoint: `POST /puantaj/bildirim-etki-adaylari/{id}/manuel-uygula` — yalnız 
 
 **Kurallar:** Yalnız INSERT; mevcut puantaj UPDATE edilmez. Canonical servis: `BildirimPuantajEtkiManualApplyService`. Mapper: `BildirimPuantajEtkiPuantajMapper`.
 
-**Canlı sınır:** Migration 013 ve canlı mutation ayrı owner onayına tabidir; canlı aday #1 dokunulmaz.
+**Canlı sınır:** Kontrollü kabulte oluşturulan aday `#4` dışında aday `#1` ve `#3` korunmuştur. Yeni canlı mutation ayrıca owner onayına tabidir.
+
+### Puantaj dönem transaction kilidi — S74-D1/D3R
+
+Canonical kilit anahtarı `(sube_id, yil, ay)` tuple'ıdır. `puantaj_donem_kilitleri` guard satırı transaction içinde oluşturulur ve `SELECT ... FOR UPDATE` ile kilitlenir. Kilit, aday/puantaj satır kilitlerinden önce alınır.
+
+Aynı protokol aday generate, otomatik apply, manuel apply, doğrudan günlük puantaj upsert ve aylık mühürleme/snapshot yollarında zorunludur. Böylece mühür snapshot'ı alınırken aynı döneme yeni puantaj satırı commit edilemez; bekleyen write, kilit serbest kaldıktan sonra mühür kaydını görür ve `PERIOD_LOCKED` ile durur.
+
+Migration `014_puantaj_donem_kilitleri.sql` additive guard tablosudur. Lokal kod ve test paketi tamamlanmıştır; migration 014 canlıda uygulanmadan bu hardening kodu deploy edilmez.
 
 ### Puantaj etki adayı Yok Say — S74-C2A
 

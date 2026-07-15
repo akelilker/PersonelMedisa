@@ -409,6 +409,20 @@ export function useBildirimler() {
     setIsCreateModalOpen(false);
   }, []);
 
+  const updateCreateDate = useCallback((value: string) => {
+    setCreateForm((prev) => ({ ...prev, tarih: value }));
+    if (value.trim()) {
+      setCreateErrorMessage((current) =>
+        current === "Tarih zorunludur." ? null : current
+      );
+    }
+  }, []);
+
+  const handleCreateDateInvalid = useCallback((event: FormEvent<HTMLInputElement>) => {
+    event.preventDefault();
+    setCreateErrorMessage("Tarih zorunludur.");
+  }, []);
+
   const refreshPageOne = useCallback(async () => {
     const pageOneKey = dataCacheKeys.bildirimlerList(
       activeSube,
@@ -781,6 +795,8 @@ export function useBildirimler() {
     createForm,
     createPreview,
     setCreateForm,
+    updateCreateDate,
+    handleCreateDateInvalid,
     createErrorMessage,
     isCreateSubmitting,
     createBildirimHandler,

@@ -639,6 +639,8 @@ export function BildirimlerPage() {
     createForm,
     createPreview,
     setCreateForm,
+    updateCreateDate,
+    handleCreateDateInvalid,
     createErrorMessage,
     isCreateSubmitting,
     createBildirimHandler,
@@ -1215,7 +1217,8 @@ export function BildirimlerPage() {
               name="bildirim-create-tarih"
               type="date"
               value={createForm.tarih}
-              onChange={(value) => setCreateForm((prev) => ({ ...prev, tarih: value }))}
+              onChange={updateCreateDate}
+              onInvalid={handleCreateDateInvalid}
               required
             />
 

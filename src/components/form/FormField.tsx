@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { FormEventHandler, ReactNode } from "react";
 
 export type FormFieldOption = { value: string; label: string };
 
@@ -15,6 +15,7 @@ type FormFieldBase = {
 type FormFieldAsInput = FormFieldBase & {
   as?: "input";
   type?: "text" | "date" | "tel" | "number" | "month" | "time" | "password";
+  onInvalid?: FormEventHandler<HTMLInputElement>;
   min?: number | string;
   step?: string;
   rows?: never;
@@ -98,6 +99,7 @@ export function FormField(props: FormFieldProps) {
         step={props.step}
         value={value}
         onChange={(event) => onChange(event.target.value)}
+        onInvalid={props.onInvalid}
       />
     );
   }

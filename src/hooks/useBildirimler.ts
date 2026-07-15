@@ -443,6 +443,10 @@ export function useBildirimler() {
         setCreateErrorMessage("Bu islem icin yetkin bulunmuyor.");
         return;
       }
+      if (!createForm.tarih.trim()) {
+        setCreateErrorMessage("Tarih zorunludur.");
+        return;
+      }
 
       setCreateErrorMessage(null);
       setIsCreateSubmitting(true);
@@ -450,7 +454,7 @@ export function useBildirimler() {
       try {
         const personelId = parseRequiredPositiveInt(createForm.personelId, "Personel");
         const payload: CreateBildirimPayload = {
-          tarih: createForm.tarih || getTodayIsoDate(),
+          tarih: createForm.tarih,
           departman_id: resolveDepartmanIdForBildirim(
             createForm.personelId,
             createForm.departmanId,

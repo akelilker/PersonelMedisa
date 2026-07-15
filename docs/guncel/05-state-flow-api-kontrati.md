@@ -85,6 +85,15 @@ DB sahibi: `gunluk_bildirimler`; write sahibi: `BIRIM_AMIRI`.
 
 `BIRIM_AMIRI` yalnız kendi açık kaydını güncelleyebilir. Yönetim rolü uygun `GONDERILDI` kaydı için düzeltme isteyebilir. Geçersiz state geçişleri `409` döner.
 
+#### Operasyon tarihi kontratı
+
+- Yetkili `BIRIM_AMIRI`, geçmişteki açık bir gün için günlük bildirim oluşturabilir.
+- Operasyon tarihi request body'de zorunlu `tarih` alanıyla `YYYY-MM-DD` formatında gönderilir.
+- Backend bu değeri doğrular ve `gunluk_bildirimler.tarih` kolonunda aynen saklar.
+- Eksik veya geçersiz tarih reddedilir; hiçbir frontend, backend veya DB katmanı tarihi sessizce bugüne çeviremez.
+- `created_at` audit oluşturma zamanıdır; operasyon tarihi değildir.
+- Haftalık mutabakat, aylık bildirim onayı, Genel Yönetici onayı ve puantaj etki adayı kapsamları operasyon tarihi olan `tarih` üzerinden belirlenir.
+
 ### Haftalık bildirim mutabakatı
 
 DB sahibi: `haftalik_bildirim_mutabakatlari`; approve sahibi: `BIRIM_AMIRI`.

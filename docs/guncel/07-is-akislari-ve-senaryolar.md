@@ -105,8 +105,10 @@ Yetkili kullanıcı devamsızlık, hastalık raporu veya benzeri yokluk sürecin
 ### 4.2 Akış
 
 - Kullanıcı `Günlük Kayıt Merkezi` ekranından kendi kapsamındaki personeli seçer.
+- Kullanıcı bugünü veya geçmişteki açık bir operasyon gününü `tarih` alanında seçer.
 - Sistem seçilen personelin bölümünü ve hızlı iletişim bilgilerini gösterir.
 - Amir `GEC_GELDI`, `GELMEDI`, `IZINLI_GELMEDI`, `IZINSIZ_GELMEDI`, `RAPORLU` veya görevde/erken çıktı gibi tiplerden birini seçerek kayıt girer.
+- Seçilen tarih request, create response, liste ve detay boyunca aynen korunur; eksik veya geçersiz tarih kaydı engeller.
 - Kayıt önce `TASLAK`, gönderimde `GONDERILDI` state'ine geçer.
 - Güncel S70C çalışan state seti `TASLAK`, `GONDERILDI`, `DUZELTME_ISTENDI`, `HAFTALIK_MUTABAKATA_ALINDI` ve `IPTAL` değerlerinden oluşur.
 - Kayıt sürece otomatik dönüşmez; operasyonel ham veri olarak kalır.
@@ -115,6 +117,7 @@ Yetkili kullanıcı devamsızlık, hastalık raporu veya benzeri yokluk sürecin
 ### 4.3 Sistem Etkisi
 
 - Operasyonel günlük kayıt oluşur.
+- `created_at` yalnız audit zamanıdır; haftalık, aylık, Genel Yönetici ve aday projection kapsamları operasyon tarihi olan `tarih` alanını kullanır.
 - `BOLUM_YONETICISI` haftalık mutabakat öncesi kayıtları denetler.
 - Header bildirim paneli bu kayıt tipinden ayrıdır; panel yalnızca sistem uyarıları ve okunma durumu için kullanılır.
 

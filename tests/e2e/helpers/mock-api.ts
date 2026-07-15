@@ -4962,7 +4962,8 @@ let personelBelgeKaydiIdCounter = 903;
             { key: "IZINLI_GELMEDI", label: "İzinli Gelmedi" },
             { key: "IZINSIZ_GELMEDI", label: "İzinsiz Gelmedi" },
             { key: "DEVAMSIZLIK", label: "Devamsızlık" },
-            { key: "RAPORLU", label: "Raporlu" }
+            { key: "RAPORLU", label: "Raporlu" },
+            { key: "DIGER", label: "Diğer" }
           ])
         );
         return;

@@ -195,7 +195,7 @@ DB sahibi: `onayli_bildirim_puantaj_etki_adaylari`; generate sahibi: `MUHASEBE`.
 | Manuel Uygula | `POST /puantaj/bildirim-etki-adaylari/{id}/manuel-uygula` | `puantaj.bildirim_etki.apply` |
 | Çakışma Çöz | `POST /puantaj/bildirim-etki-adaylari/{id}/cakisma-coz` | `puantaj.bildirim_etki.resolve_conflict` |
 
-**Migration:** `009_onayli_bildirim_puantaj_etki_adaylari.sql`, `010_bildirim_puantaj_etki_snapshot_zamanlarini_duzelt.sql`, `015_bildirim_puantaj_etki_cakisma_cozumleri.sql` (S75 audit tablosu; lokal, canlıda yok).
+**Migration:** `009_onayli_bildirim_puantaj_etki_adaylari.sql`, `010_bildirim_puantaj_etki_snapshot_zamanlarini_duzelt.sql`, `015_bildirim_puantaj_etki_cakisma_cozumleri.sql`. Migration `015` canlı `karmotor_medisa` şemasında uygulanmıştır.
 
 **State modeli (generate çıktısı):** `HAZIR`, `INCELEME_GEREKLI`. Terminal state'ler: `UYGULANDI` (apply), `YOK_SAYILDI` (yok-say).
 
@@ -367,7 +367,9 @@ Endpoint: `POST /puantaj/bildirim-etki-adaylari/{id}/cakisma-coz` — yalnız `p
 
 **Kurallar:** Dönem kilidi apply ile aynı protokol (`PuantajDonemKilidiService`). Puantaj satırı `FOR UPDATE`. Canonical servisler: `BildirimPuantajEtkiConflictClassificationService`, `BildirimPuantajEtkiConflictResolutionService`.
 
-**Lokal sınır:** Kod/test paketi tamam; canlı deploy ve migration `015` uygulaması yok (`S75_BC_CONFLICT_RESOLUTION_LOCAL_COMPLETE`).
+**Canlı kabul (16.07.2026):** İlk S75 deploy `86dbdfe`; payload projection fix `36f28b1`; E2E tarih bağımsızlığı fix `ed010b2`. `S75_V2` yeni canonical projection semantiğidir. Mevcut `S74_V1` adaylar, raw miktar/birim boş olduğunda yalnız geçerli source hash + snapshot kimliği altında dar legacy fallback ile effective DTO üretir; backfill/UPDATE yapılmaz.
+
+Mevcut fixture reuse kabulünde aday `#6` Koru, aday `#7` Revize; aynı-body idempotency ve tek farklı-karar `409 REVISION_DECISION_CONFLICT` doğrulandı. Audit tam iki satırdır; retry/conflict yeni audit üretmez. Final: `S75_FULLY_COMPLETE`.
 
 ### Puantaj dönem transaction kilidi — S74-D1/D3R
 

@@ -524,6 +524,14 @@ Bu yuvarlama tolerans değildir. Gerçek eksik süre `0` ise kesinti yoktur; `1-
 - **Revize yasak:** resmî süreç dayanakları (`Yillik_Izin`, `Ucretli_Izinli`, `Raporlu_*`) ve mühürlü puantaj (`MUHURLU_PUANTAJ` / `PERIOD_LOCKED`).
 - **Koru kararı:** puantaj satırına yazım yok; aday `YOK_SAYILDI` + `uygulama_modu=CAKISMA_COZUM`.
 
+**S75 canlı projection ve kabul notu (16.07.2026):**
+
+- `S75_V2`, yeni üretilen adaylarda canonical `etki_turu + etki_miktari + etki_birimi` semantiğidir.
+- `S74_V1` mevcut adaylar backfill edilmez; yalnız kaynak snapshot/hash ve kimlik doğrulaması geçen dar legacy fallback effective miktarı çözer.
+- Mevcut aday `#6` Koru kararında puantaj `#6` tam-kolon fingerprint ve `updated_at` değeriyle değişmeden kaldı.
+- Mevcut aday `#7`, raw DB miktarı `NULL` iken legacy snapshot'tan `20 DAKIKA` çözüldü; puantaj `#7` aynı ID ile revize edildi. Saat/mola/açıklama/created_at korundu; hareket/dayanak/dakika/kaynak/kontrol alanları canonical owner mapping ile değişti; stale türetilmiş alanlar `NULL`landı.
+- Aynı pre-revision concurrency hash'li retry ikinci UPDATE üretmedi. Final: `S75_FULLY_COMPLETE`.
+
 Sınır örnekleri:
 
 | Gerçek eksik süre | Kesintiye esas süre |

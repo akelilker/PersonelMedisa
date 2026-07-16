@@ -225,6 +225,8 @@ Asagidaki anahtarlar kodda halen kullanilmaktadir. S70B kod fazinda yeni anahtar
 - `puantaj.bildirim_etki.apply`, `puantaj.bildirim_etki.dismiss`: yalniz `MUHASEBE` (`dismiss` S74-C2A/C2B; otomatik `apply` S74-C3 `/uygula`; manuel `apply` S74-D1 `/manuel-uygula` — ayni permission)
 - `puantaj.bildirim_etki.resolve_conflict`: yalniz `MUHASEBE` (S75-BC `/cakisma-coz`; apply `PUANTAJ_OLUSTU` sonrasi mevcut puantaj karari)
 
+S75 canlı kabulünde bu permission doğrulanmış MUHASEBE oturumuyla kullanılmış; aday `#6` Koru ve aday `#7` Revize kararları, aynı-body idempotency ve farklı-karar conflict akışı başka role genişletilmeden tamamlanmıştır (`S75_FULLY_COMPLETE`).
+
 ### Legacy aylık kapanış özeti
 
 `aylik-ozet.*`, `aylik_bolum_onayi.*`, `genel_yonetici_onayi.*` ve `genel_yonetici_bildirim_onayi.*` permission'ları yeni S72 `aylik_bildirim_onayi.*` ile aynı domain değildir ve otomatik bağlı değildir.

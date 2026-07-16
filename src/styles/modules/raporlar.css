@@ -202,3 +202,157 @@
   color: var(--line-soft);
   user-select: none;
 }
+
+.raporlar-panel-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.raporlar-panel-nav a {
+  font-size: 0.9rem;
+  color: var(--text-muted, #5c5c5c);
+  text-decoration: none;
+  padding-bottom: 0.25rem;
+  border-bottom: 2px solid transparent;
+}
+
+.raporlar-panel-nav a[aria-current="page"] {
+  color: var(--text, inherit);
+  font-weight: 600;
+  border-bottom-color: var(--accent, #2563eb);
+}
+
+.donem-durum-bandi {
+  display: grid;
+  gap: 0.35rem;
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line-soft);
+  background: #fff;
+}
+
+.donem-durum-bandi--ready {
+  border-color: rgba(46, 204, 113, 0.45);
+}
+
+.donem-durum-bandi--blocked {
+  border-color: rgba(231, 76, 60, 0.45);
+}
+
+.donem-durum-bandi--sealed {
+  border-color: rgba(52, 152, 219, 0.45);
+}
+
+.donem-durum-bandi--warning {
+  border-color: rgba(243, 156, 18, 0.45);
+}
+
+.donem-durum-bandi-meta {
+  font-size: 0.85rem;
+  color: var(--text-muted, #5c5c5c);
+}
+
+.kapanis-severity {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-radius: 999px;
+  padding: 2px 8px;
+  border: 1px solid var(--line-soft);
+}
+
+.kapanis-severity--blocker {
+  color: #c0392b;
+  border-color: rgba(192, 57, 43, 0.35);
+  background: rgba(231, 76, 60, 0.08);
+}
+
+.kapanis-severity--warning {
+  color: #b7791f;
+  border-color: rgba(243, 156, 18, 0.45);
+  background: rgba(243, 156, 18, 0.1);
+}
+
+.kapanis-severity--info {
+  color: var(--text-muted, #5c5c5c);
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.kapanis-issue-panel {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.kapanis-issue-section h3 {
+  margin: 0 0 var(--space-2);
+  font-size: 1rem;
+}
+
+.kapanis-issue-list {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.kapanis-issue-row {
+  padding: var(--space-3);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-sm);
+  background: #fff;
+}
+
+.kapanis-issue-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+}
+
+.kapanis-issue-count {
+  margin-left: auto;
+  font-weight: 600;
+}
+
+.kapanis-issue-message {
+  margin: 0.5rem 0 0;
+  color: var(--text-muted, #5c5c5c);
+}
+
+.kapanis-issue-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+  align-items: center;
+}
+
+.kapanis-audit-panel {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.kapanis-audit-panel h3 {
+  margin: 0;
+}
+
+.kapanis-hash-cell {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.78rem;
+}
+
+.etki-adayi-rapor-result {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.donem-kapanis-page,
+.etki-adayi-rapor-page {
+  display: grid;
+  gap: var(--space-3);
+}

@@ -37,6 +37,17 @@ import {
   parseRaporlarQueryPrefill,
   type RaporQueryExtraFilters
 } from "../rapor-query-prefill";
+import { DonemKapanisMerkeziPage } from "./DonemKapanisMerkeziPage";
+import { EtkiAdayiRaporuPage } from "./EtkiAdayiRaporuPage";
+
+type RaporlarPanel = "standart" | "donem-kapanis" | "etki-adayi";
+
+function parseRaporlarPanel(value: string | null): RaporlarPanel {
+  if (value === "donem-kapanis" || value === "etki-adayi") {
+    return value;
+  }
+  return "standart";
+}
 
 type RaporFormState = {
   raporTipi: RaporTipi;
@@ -567,7 +578,10 @@ function AylikKapanisOzetiSection() {
 export function RaporlarPage() {
   const { hasPermission } = useRoleAccess();
   const canViewAylikOzet = hasPermission("aylik-ozet.view");
+  const canViewDonemKapanis = hasPermission("puantaj.donem_kapanis.view");
+  const canViewEtkiAdayiRapor = hasPermission("puantaj.bildirim_etki.rapor.view");
   const [searchParams] = useSearchParams();
+  const activePanel = parseRaporlarPanel(searchParams.get("panel"));
   const lastAppliedQueryKeyRef = useRef<string | null>(null);
   const searchQueryKey = searchParams.toString();
 
@@ -648,6 +662,10 @@ export function RaporlarPage() {
   }
 
   useEffect(() => {
+    if (activePanel !== "standart") {
+      return;
+    }
+
     if (lastAppliedQueryKeyRef.current === searchQueryKey) {
       return;
     }
@@ -664,7 +682,7 @@ export function RaporlarPage() {
     if (prefill.shouldAutoRun) {
       void loadRapor(1, { form: nextForm, extraFilters: nextExtraFilters });
     }
-  }, [searchQueryKey]);
+  }, [searchQueryKey, activePanel]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -684,6 +702,13 @@ export function RaporlarPage() {
     setReportMeta(null);
   }
 
+  function buildPanelHref(panel: RaporlarPanel) {
+    if (panel === "standart") {
+      return "/raporlar";
+    }
+    return `/raporlar?panel=${panel}`;
+  }
+
   return (
     <section className="raporlar-page raporlar-page--premium">
       <header className="raporlar-page-head">
@@ -691,6 +716,39 @@ export function RaporlarPage() {
         <p className="raporlar-page-lead">Filtreleri kullanarak liste raporlarını ve aylık kapanış özetini görüntüleyin.</p>
       </header>
 
+      <nav className="raporlar-panel-nav" aria-label="Rapor panelleri" data-testid="raporlar-panel-nav">
+        <Link
+          to={buildPanelHref("standart")}
+          aria-current={activePanel === "standart" ? "page" : undefined}
+          data-testid="raporlar-panel-standart"
+        >
+          Liste ve aylık özet
+        </Link>
+        {canViewDonemKapanis ? (
+          <Link
+            to={buildPanelHref("donem-kapanis")}
+            aria-current={activePanel === "donem-kapanis" ? "page" : undefined}
+            data-testid="raporlar-panel-donem-kapanis"
+          >
+            Dönem kapanış merkezi
+          </Link>
+        ) : null}
+        {canViewEtkiAdayiRapor ? (
+          <Link
+            to={buildPanelHref("etki-adayi")}
+            aria-current={activePanel === "etki-adayi" ? "page" : undefined}
+            data-testid="raporlar-panel-etki-adayi"
+          >
+            Etki adayı raporu
+          </Link>
+        ) : null}
+      </nav>
+
+      {activePanel === "donem-kapanis" && canViewDonemKapanis ? <DonemKapanisMerkeziPage /> : null}
+      {activePanel === "etki-adayi" && canViewEtkiAdayiRapor ? <EtkiAdayiRaporuPage /> : null}
+
+      {activePanel === "standart" ? (
+        <>
       {canViewAylikOzet ? <AylikKapanisOzetiSection /> : null}
 
       <div className="raporlar-standart-panel">
@@ -833,6 +891,8 @@ export function RaporlarPage() {
           Ana ekran
         </Link>
       </nav>
+        </>
+      ) : null}
     </section>
   );
 }

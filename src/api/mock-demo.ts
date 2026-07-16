@@ -4548,5 +4548,262 @@ export function resolveDemoApiResponse(
     return ok({ id: finans.id, state: finans.state });
   }
 
+  if (pathname === "/puantaj/donem-kapanis-preflight" && method === "GET") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(actor, "puantaj.donem_kapanis.view");
+    if (permissionError) {
+      return permissionError;
+    }
+
+    const subeId = toNumber(requestUrl.searchParams.get("sube_id"));
+    const yil = toNumber(requestUrl.searchParams.get("yil")) ?? 2026;
+    const ay = toNumber(requestUrl.searchParams.get("ay")) ?? 6;
+    if (!subeId) {
+      return demoRevizyonError("VALIDATION_ERROR", "sube_id zorunludur.");
+    }
+
+    const donem = `${yil}-${String(ay).padStart(2, "0")}`;
+    const sube = demoState.subeler.find((item) => item.id === subeId);
+    const blockers = [
+      {
+        code: "CANDIDATE_HAZIR_PENDING",
+        severity: "BLOCKER",
+        domain: "etki_adayi",
+        title: "HAZIR etki adayi",
+        message: "Uygulanmayi bekleyen HAZIR etki adayi var.",
+        count: 1,
+        owner_role: "MUHASEBE",
+        action_route: "/puantaj",
+        action_permission: "puantaj.bildirim_etki.view",
+        record_ids: [1],
+        metadata: {}
+      }
+    ];
+    const warnings = [
+      {
+        code: "PUANTAJ_MANUAL_NO_NOTE",
+        severity: "WARNING",
+        domain: "puantaj",
+        title: "Aciklamasiz manuel puantaj",
+        message: "Manuel puantaj kaydinda aciklama eksik.",
+        count: 1,
+        owner_role: "MUHASEBE",
+        action_route: "/puantaj",
+        action_permission: "puantaj.view",
+        record_ids: [12],
+        metadata: {}
+      }
+    ];
+    const infos = [
+      {
+        code: "CANDIDATE_APPLIED_COUNT",
+        severity: "INFO",
+        domain: "etki_adayi",
+        title: "Uygulanan aday",
+        message: "Uygulanan etki adayi sayisi.",
+        count: 2,
+        owner_role: "MUHASEBE",
+        action_route: "/puantaj",
+        action_permission: "puantaj.bildirim_etki.view",
+        record_ids: [],
+        metadata: {}
+      }
+    ];
+
+    return ok({
+      sube: sube ? { id: sube.id, ad: sube.ad } : { id: subeId, ad: `Sube ${subeId}` },
+      yil,
+      ay,
+      donem,
+      donem_state: "ACIK",
+      muhur_state: "ACIK",
+      muhur_id: null,
+      kapanabilir_mi: false,
+      blocker_count: blockers.length,
+      warning_count: warnings.length,
+      info_count: infos.length,
+      kategori_sayaclari: { etki_adayi: 1, puantaj: 1 },
+      blockers,
+      warnings,
+      infos,
+      candidate_state_counts: { HAZIR: 1, INCELEME_GEREKLI: 1, UYGULANDI: 2, YOK_SAYILDI: 0 },
+      notification_chain_counts: { taslak: 0, haftalik_eksik: 0 },
+      puantaj_counts: { kontrol_bekleyen: 1 },
+      finance_readiness: { salary_missing: 0 },
+      preflight_hash: "demo-preflight-hash",
+      schema_version: "S76_PERIOD_CLOSE_PREFLIGHT_V1",
+      generated_at: new Date().toISOString()
+    });
+  }
+
+  if (pathname === "/puantaj/donem-kapanis-preflight/items" && method === "GET") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(actor, "puantaj.donem_kapanis.view");
+    if (permissionError) {
+      return permissionError;
+    }
+
+    const code = toStringValue(requestUrl.searchParams.get("code")) ?? "";
+    const items =
+      code === "CANDIDATE_HAZIR_PENDING"
+        ? [
+            {
+              record_id: 1,
+              personel_id: 1,
+              tarih: "2026-06-03",
+              state: "HAZIR",
+              detail: "Gec kalma etkisi",
+              severity: "BLOCKER"
+            }
+          ]
+        : [
+            {
+              record_id: 12,
+              personel_id: 2,
+              tarih: "2026-06-04",
+              state: "BEKLIYOR",
+              detail: "Kontrol bekliyor",
+              severity: code.includes("WARNING") ? "WARNING" : "BLOCKER"
+            }
+          ];
+
+    return ok(
+      { items },
+      { page: 1, limit: 20, total: items.length, total_pages: 1, has_next_page: false, has_prev_page: false }
+    );
+  }
+
+  if (pathname === "/puantaj/donem-kapanis-preflight/export.csv" && method === "GET") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(actor, "puantaj.donem_kapanis.export");
+    if (permissionError) {
+      return permissionError;
+    }
+
+    return ok("code,severity,domain,title\nCANDIDATE_HAZIR_PENDING,BLOCKER,etki_adayi,HAZIR etki adayi\n");
+  }
+
+  if (pathname === "/puantaj/donem-kapanis-auditleri" && method === "GET") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(actor, "puantaj.donem_kapanis.view");
+    if (permissionError) {
+      return permissionError;
+    }
+
+    const subeId = toNumber(requestUrl.searchParams.get("sube_id")) ?? 1;
+    const yil = toNumber(requestUrl.searchParams.get("yil")) ?? 2026;
+    const ay = toNumber(requestUrl.searchParams.get("ay")) ?? 6;
+    const items = [
+      {
+        id: 1,
+        sube_id: subeId,
+        yil,
+        ay,
+        action: "CLOSE_ATTEMPT_BLOCKED",
+        result_state: "BLOCKED",
+        muhur_id: null,
+        blocker_count: 1,
+        warning_count: 1,
+        preflight_hash: "demo-preflight-hash",
+        request_hash: "demo-request-hash",
+        result_hash: "demo-result-hash",
+        actor_user_id: actor.userId,
+        created_at: new Date().toISOString()
+      }
+    ];
+
+    return ok({ items }, { page: 1, limit: 20, total: items.length, total_pages: 1 });
+  }
+
+  if (pathname === "/puantaj/bildirim-etki-adaylari/rapor" && method === "GET") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(actor, "puantaj.bildirim_etki.rapor.view");
+    if (permissionError) {
+      return permissionError;
+    }
+
+    const ay = toStringValue(requestUrl.searchParams.get("ay")) ?? "2026-06";
+    const subeId = toNumber(requestUrl.searchParams.get("sube_id")) ?? 1;
+    const items = [
+      {
+        id: 1,
+        personel_id: 1,
+        personel_ad_soyad: "Ali Demir",
+        sicil_no: "1001",
+        sube_ad: "Merkez",
+        departman_ad: "Uretim",
+        tarih: `${ay}-03`,
+        bildirim_turu: "GEC_KALMA",
+        etki_turu: "GEC_KALMA_DK",
+        effective_miktar: 15,
+        effective_birim: "DK",
+        state: "HAZIR",
+        conflict_code: null,
+        mevcut_puantaj_ozet: null,
+        uygulanan_puantaj_ozet: null,
+        karar_turu: null,
+        karar_veren: null,
+        karar_zamani: null,
+        uygulama_modu: "OTOMATIK",
+        projection_version: 1,
+        source_integrity: "OK",
+        audit_integrity: "OK"
+      },
+      {
+        id: 2,
+        personel_id: 2,
+        personel_ad_soyad: "Ayse Yilmaz",
+        sicil_no: "1002",
+        sube_ad: "Sube 2",
+        departman_ad: "Lojistik",
+        tarih: `${ay}-04`,
+        bildirim_turu: "GELMEDI",
+        etki_turu: "DEVAMSIZLIK_GUN",
+        effective_miktar: 1,
+        effective_birim: "GUN",
+        state: "UYGULANDI",
+        conflict_code: "MEVCUT_PUANTAJ_VAR",
+        mevcut_puantaj_ozet: "Geldi / Normal",
+        uygulanan_puantaj_ozet: "Gelmedi",
+        karar_turu: "ADAY_ETKISIYLE_REVIZE_ET",
+        karar_veren: "Muhasebe Demo",
+        karar_zamani: "2026-06-12T10:00:00Z",
+        uygulama_modu: "CAKISMA_COZUM",
+        projection_version: 1,
+        source_integrity: "OK",
+        audit_integrity: "OK"
+      }
+    ];
+
+    const summary = {
+      toplam_aday: items.length,
+      otomatik_uygulanan: 0,
+      manuel_uygulanan: 1,
+      koru: 0,
+      revize: 1,
+      yok_sayilan: 0,
+      bekleyen: 1,
+      conflict_dagilimi: { MEVCUT_PUANTAJ_VAR: 1 },
+      toplam_gec_kalma_dakika: 15,
+      toplam_erken_cikis_dakika: 0,
+      toplam_devamsizlik_gun: 1
+    };
+
+    return ok(
+      { items, summary, sube_id: subeId, ay },
+      { page: 1, limit: 20, total: items.length, total_pages: 1, has_next_page: false, has_prev_page: false }
+    );
+  }
+
+  if (pathname === "/puantaj/bildirim-etki-adaylari/rapor/export.csv" && method === "GET") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(actor, "puantaj.bildirim_etki.rapor.export");
+    if (permissionError) {
+      return permissionError;
+    }
+
+    return ok("id,personel_id,tarih,state\n1,1,2026-06-03,HAZIR\n2,2,2026-06-04,UYGULANDI\n");
+  }
+
   return null;
 }

@@ -10,6 +10,7 @@ use Medisa\Api\Controllers\AylikBildirimOnaylariController;
 use Medisa\Api\Controllers\GenelYoneticiBildirimOnaylariController;
 use Medisa\Api\Controllers\BildirimPuantajEtkiAdaylariController;
 use Medisa\Api\Controllers\BildirimlerController;
+use Medisa\Api\Controllers\DonemKapanisController;
 use Medisa\Api\Controllers\HaftalikBildirimMutabakatlariController;
 use Medisa\Api\Controllers\EkOdemeKesintiController;
 use Medisa\Api\Controllers\PersonelBelgelerController;
@@ -62,6 +63,24 @@ class Router
         }
         if ($method === 'POST' && $path === '/puantaj/muhurle') {
             PuantajController::muhurleAylik($this->request);
+        }
+        if ($path === '/puantaj/donem-kapanis-preflight' && $method === 'GET') {
+            DonemKapanisController::summary($this->request);
+        }
+        if ($path === '/puantaj/donem-kapanis-preflight/items' && $method === 'GET') {
+            DonemKapanisController::items($this->request);
+        }
+        if ($path === '/puantaj/donem-kapanis-preflight/export.csv' && $method === 'GET') {
+            DonemKapanisController::exportCsv($this->request);
+        }
+        if ($path === '/puantaj/donem-kapanis-auditleri' && $method === 'GET') {
+            DonemKapanisController::listAudits($this->request);
+        }
+        if ($path === '/puantaj/bildirim-etki-adaylari/rapor' && $method === 'GET') {
+            BildirimPuantajEtkiAdaylariController::report($this->request);
+        }
+        if ($path === '/puantaj/bildirim-etki-adaylari/rapor/export.csv' && $method === 'GET') {
+            BildirimPuantajEtkiAdaylariController::reportExportCsv($this->request);
         }
         if ($path === '/puantaj/bildirim-etki-adaylari/ozet' && $method === 'GET') {
             BildirimPuantajEtkiAdaylariController::summary($this->request);

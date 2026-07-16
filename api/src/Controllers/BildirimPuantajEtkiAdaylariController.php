@@ -7,10 +7,11 @@ namespace Medisa\Api\Controllers;
 use Medisa\Api\Auth\AuthMiddleware;
 use Medisa\Api\Auth\RolePermissions;
 use Medisa\Api\Database\Connection;
+use Medisa\Api\Http\CsvResponse;
 use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
 use Medisa\Api\Scope\SubeScope;
-use Medisa\Api\Services\BildirimPuantajEtkiApplyService;
+use Medisa\Api\Services\BildirimPuantajEtkiRaporQueryService;
 use Medisa\Api\Services\BildirimPuantajEtkiConflictClassificationService;
 use Medisa\Api\Services\BildirimPuantajEtkiConflictResolutionService;
 use Medisa\Api\Services\BildirimPuantajEtkiDecisionPolicy;
@@ -120,6 +121,101 @@ class BildirimPuantajEtkiAdaylariController
                 'has_prev_page' => $page > 1,
             ]
         );
+    }
+
+    public static function report(Request $request)
+    {
+        $user = AuthMiddleware::authenticate($request, true);
+        RolePermissions::assert($user, 'puantaj.bildirim_etki.rapor.view');
+
+        [$filters, $restrictAmirId] = self::resolveReportContext($user, $request);
+        $page = max(1, (int) ($request->getQuery('page', 1) ?: 1));
+        $limit = max(1, min(self::MAX_LIMIT, (int) ($request->getQuery('limit', 20) ?: 20)));
+
+        $pdo = self::connection();
+        self::assertTablesReady($pdo);
+
+        $result = BildirimPuantajEtkiRaporQueryService::query(
+            $pdo,
+            $filters,
+            $page,
+            $limit,
+            $restrictAmirId
+        );
+
+        JsonResponse::success(
+            [
+                'items' => $result['items'],
+                'summary' => $result['summary'],
+            ],
+            [
+                'page' => $result['page'],
+                'limit' => $result['limit'],
+                'total' => $result['total'],
+                'total_pages' => $result['total_pages'],
+                'has_next_page' => $result['has_next_page'],
+                'has_prev_page' => $result['has_prev_page'],
+            ]
+        );
+    }
+
+    public static function reportExportCsv(Request $request)
+    {
+        $user = AuthMiddleware::authenticate($request, true);
+        RolePermissions::assert($user, 'puantaj.bildirim_etki.rapor.export');
+
+        [$filters, $restrictAmirId] = self::resolveReportContext($user, $request);
+
+        $pdo = self::connection();
+        self::assertTablesReady($pdo);
+
+        $rows = BildirimPuantajEtkiRaporQueryService::exportRows($pdo, $filters, $restrictAmirId);
+        $csvRows = [];
+        foreach ($rows as $row) {
+            $personel = is_array($row['personel'] ?? null) ? $row['personel'] : [];
+            $csvRows[] = [
+                'aday_id' => $row['aday_id'] ?? null,
+                'personel_id' => $row['personel_id'] ?? null,
+                'sicil_no' => $personel['sicil_no'] ?? null,
+                'maskeli_ad_soyad' => $personel['maskeli_ad_soyad'] ?? null,
+                'departman' => $row['departman'] ?? null,
+                'tarih' => $row['tarih'] ?? null,
+                'bildirim_turu' => $row['bildirim_turu'] ?? null,
+                'etki_turu' => $row['etki_turu'] ?? null,
+                'etki_miktari' => $row['etki_miktari'] ?? null,
+                'etki_birimi' => $row['etki_birimi'] ?? null,
+                'state' => $row['state'] ?? null,
+                'conflict_code' => $row['conflict_code'] ?? null,
+                'uygulama_modu' => $row['uygulama_modu'] ?? null,
+                'karar_turu' => $row['karar_turu'] ?? null,
+                'source_integrity' => $row['source_integrity'] ?? null,
+                'audit_integrity' => $row['audit_integrity'] ?? null,
+            ];
+        }
+
+        $filename = sprintf(
+            'bildirim-etki-adaylari-rapor-%s-sube-%d.csv',
+            (string) $filters['donem'],
+            (int) $filters['sube_id']
+        );
+        CsvResponse::send($filename, [
+            'aday_id',
+            'personel_id',
+            'sicil_no',
+            'maskeli_ad_soyad',
+            'departman',
+            'tarih',
+            'bildirim_turu',
+            'etki_turu',
+            'etki_miktari',
+            'etki_birimi',
+            'state',
+            'conflict_code',
+            'uygulama_modu',
+            'karar_turu',
+            'source_integrity',
+            'audit_integrity',
+        ], $csvRows);
     }
 
     public static function dismiss(Request $request, $id)
@@ -1785,6 +1881,71 @@ class BildirimPuantajEtkiAdaylariController
         }
 
         return $gerekce;
+    }
+
+    /** @param array<string, mixed> $user @return array{0: array<string, mixed>, 1: int|null} */
+    private static function resolveReportContext(array $user, Request $request)
+    {
+        $subeId = self::requireScope($user, $request);
+        $yil = self::readReportQueryInt($request, 'yil', 2000, 2100);
+        $ay = self::readReportQueryInt($request, 'ay', 1, 12);
+        $donem = sprintf('%04d-%02d', $yil, $ay);
+
+        $filters = [
+            'sube_id' => $subeId,
+            'yil' => $yil,
+            'ay' => $ay,
+            'donem' => $donem,
+        ];
+
+        $departmanId = self::positiveInt($request->getQuery('departman_id'));
+        if ($departmanId !== null) {
+            $filters['departman_id'] = $departmanId;
+        }
+        $personelId = self::positiveInt($request->getQuery('personel_id'));
+        if ($personelId !== null) {
+            $filters['personel_id'] = $personelId;
+        }
+
+        foreach ([
+            'state',
+            'conflict_code',
+            'etki_turu',
+            'uygulama_modu',
+            'karar_turu',
+            'projection_version',
+        ] as $field) {
+            $value = trim((string) $request->getQuery($field, ''));
+            if ($value !== '') {
+                $filters[$field] = $value;
+            }
+        }
+
+        $kararVerenUserId = self::positiveInt($request->getQuery('karar_veren_user_id'));
+        if ($kararVerenUserId !== null) {
+            $filters['karar_veren_user_id'] = $kararVerenUserId;
+        }
+
+        $restrictAmirId = SubeScope::restrictBirimAmiriUserId($user);
+
+        return [$filters, $restrictAmirId];
+    }
+
+    private static function readReportQueryInt(Request $request, $field, $min, $max)
+    {
+        $value = $request->getQuery($field);
+        if ($value === null || $value === '') {
+            self::validationError($field, ucfirst((string) $field) . ' parametresi zorunludur.');
+        }
+        if (!is_int($value) && !(is_string($value) && ctype_digit((string) $value))) {
+            self::validationError($field, ucfirst((string) $field) . ' gecerli bir tam sayi olmalidir.');
+        }
+        $parsed = (int) $value;
+        if ($parsed < $min || $parsed > $max) {
+            self::validationError($field, ucfirst((string) $field) . ' ' . $min . '-' . $max . ' araliginda olmalidir.');
+        }
+
+        return $parsed;
     }
 
     private static function validationError($field, $message)

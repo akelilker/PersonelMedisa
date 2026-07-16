@@ -56,10 +56,10 @@ describe("015_bildirim_puantaj_etki_cakisma_cozumleri migration source", () => {
     expect(migrationSource).not.toMatch(/backfill/i);
   });
 
-  it("is the latest numbered migration", () => {
+  it("is part of the contiguous migration sequence ending at 017", () => {
     const migrations = readdirSync(resolve(process.cwd(), "api/migrations"))
       .filter((name) => /^\d{3}_.*\.sql$/.test(name))
       .sort();
-    expect(migrations.at(-1)).toBe("015_bildirim_puantaj_etki_cakisma_cozumleri.sql");
+    expect(migrations.at(-1)).toBe("017_donem_kapanis_ve_etki_rapor_indexleri.sql");
   });
 });

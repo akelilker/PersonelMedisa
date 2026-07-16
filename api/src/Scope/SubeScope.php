@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Medisa\Api\Scope;
 
+use Medisa\Api\Auth\RolePermissions;
 use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
 
@@ -41,6 +42,26 @@ class SubeScope
         }
 
         return $requested;
+    }
+
+    /**
+     * BA-scoped read surfaces: own birim amiri context when user is branch-amir only.
+     *
+     * @param array<string, mixed> $user
+     * @return int|null
+     */
+    public static function restrictBirimAmiriUserId(array $user)
+    {
+        if (!RolePermissions::has($user, 'puantaj.amir_kontrol')) {
+            return null;
+        }
+        if (RolePermissions::has($user, 'puantaj.bildirim_etki.generate')) {
+            return null;
+        }
+
+        $userId = isset($user['id']) ? (int) $user['id'] : 0;
+
+        return $userId > 0 ? $userId : null;
     }
 
     /**

@@ -10,6 +10,8 @@ use Medisa\Api\Database\Connection;
 use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
 use Medisa\Api\Scope\SubeScope;
+use Medisa\Api\Services\DonemKapanisAuditService;
+use Medisa\Api\Services\DonemKapanisPreflightService;
 use Medisa\Api\Services\PuantajDonemKilidiService;
 use PDO;
 
@@ -136,6 +138,7 @@ class PuantajController
 
         $firstDay = sprintf('%04d-%02d-01', $yil, $ay);
         $lastDay = date('Y-m-t', strtotime($firstDay));
+        $requestHashPayload = self::canonicalizeMuhurPayload($payload);
 
         try {
             $pdo->beginTransaction();
@@ -153,6 +156,30 @@ class PuantajController
                     'durum' => (string) $existing['durum'],
                     'muhurlenen_kayit_sayisi' => 0,
                 ]);
+            }
+
+            $preflight = DonemKapanisPreflightService::evaluate($pdo, (int) $subeId, $yil, $ay);
+            $requestHash = DonemKapanisAuditService::computeRequestHash(
+                $user,
+                (int) $subeId,
+                $yil,
+                $ay,
+                $requestHashPayload,
+                (string) ($preflight['preflight_hash'] ?? '')
+            );
+
+            if ((int) ($preflight['blocker_count'] ?? 0) > 0) {
+                $audit = DonemKapanisAuditService::recordBlocked(
+                    $pdo,
+                    $preflight,
+                    $user,
+                    (int) $subeId,
+                    $yil,
+                    $ay,
+                    $requestHash
+                );
+                $pdo->commit();
+                self::periodCloseBlocked($preflight, $audit);
             }
 
             $insertSeal = $pdo->prepare(
@@ -189,6 +216,17 @@ class PuantajController
                 'id' => $muhurId,
             ]);
 
+            $audit = DonemKapanisAuditService::recordSuccess(
+                $pdo,
+                $preflight,
+                $user,
+                (int) $subeId,
+                $yil,
+                $ay,
+                $muhurId,
+                $requestHash
+            );
+
             $pdo->commit();
         } catch (\Throwable $e) {
             if ($pdo->inTransaction()) {
@@ -205,7 +243,79 @@ class PuantajController
             'donem' => $donem,
             'durum' => 'MUHURLENDI',
             'muhurlenen_kayit_sayisi' => count($rows),
+            'preflight_hash' => (string) ($preflight['preflight_hash'] ?? ''),
+            'audit' => self::mapCloseAuditSummary($audit),
         ]);
+    }
+
+    /** @param array<string, mixed> $payload @return array<string, mixed> */
+    private static function canonicalizeMuhurPayload(array $payload)
+    {
+        $allowed = ['yil', 'ay'];
+        $out = [];
+        foreach ($allowed as $key) {
+            if (array_key_exists($key, $payload)) {
+                $out[$key] = $payload[$key];
+            }
+        }
+        ksort($out);
+
+        return $out;
+    }
+
+    /** @param array<string, mixed>|null $audit @return array<string, mixed>|null */
+    private static function mapCloseAuditSummary($audit)
+    {
+        if (!is_array($audit)) {
+            return null;
+        }
+
+        return [
+            'id' => (int) ($audit['id'] ?? 0),
+            'action' => (string) ($audit['action'] ?? ''),
+            'result_state' => (string) ($audit['result_state'] ?? ''),
+            'muhur_id' => isset($audit['muhur_id']) && $audit['muhur_id'] !== null ? (int) $audit['muhur_id'] : null,
+            'blocker_count' => (int) ($audit['blocker_count'] ?? 0),
+            'warning_count' => (int) ($audit['warning_count'] ?? 0),
+            'preflight_hash' => (string) ($audit['preflight_hash'] ?? ''),
+            'request_hash' => (string) ($audit['request_hash'] ?? ''),
+            'result_hash' => (string) ($audit['result_hash'] ?? ''),
+            'created_at' => (string) ($audit['created_at'] ?? ''),
+        ];
+    }
+
+    /** @param array<string, mixed> $preflight @param array<string, mixed>|null $audit */
+    private static function periodCloseBlocked(array $preflight, $audit)
+    {
+        $blockerCodes = [];
+        foreach ($preflight['blockers'] ?? [] as $issue) {
+            if (is_array($issue) && isset($issue['code'])) {
+                $blockerCodes[] = (string) $issue['code'];
+            }
+        }
+        $blockerCodes = array_values(array_unique($blockerCodes));
+        sort($blockerCodes);
+
+        if (!headers_sent()) {
+            header('Content-Type: application/json; charset=utf-8');
+            http_response_code(409);
+        }
+
+        echo json_encode([
+            'data' => [
+                'blocker_count' => (int) ($preflight['blocker_count'] ?? 0),
+                'blocker_codes' => $blockerCodes,
+                'preflight_hash' => (string) ($preflight['preflight_hash'] ?? ''),
+                'generated_at' => (string) ($preflight['generated_at'] ?? ''),
+                'audit' => self::mapCloseAuditSummary(is_array($audit) ? $audit : null),
+            ],
+            'meta' => [],
+            'errors' => [[
+                'code' => 'PERIOD_CLOSE_BLOCKED',
+                'message' => 'Donem kapanisi engellendi.',
+            ]],
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        exit;
     }
 
     /** @return PDO */

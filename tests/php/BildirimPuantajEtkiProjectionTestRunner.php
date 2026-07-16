@@ -258,4 +258,112 @@ if ($result['state'] !== 'INCELEME_GEREKLI' || $result['etki_turu'] !== 'IZIN_GU
 }
 passScenario(17, 'IZINLI + ucretsiz izin → INCELEME_GEREKLI / IZIN_GUNU / UCRETSIZ_IZIN_MANUEL_INCELEME');
 
+// 18. GEC_GELDI + mevcut puantaj deterministik etki payloadini korur
+$result = S::projectCandidate(
+    baseBildirim('GEC_GELDI', ['dakika' => 20]),
+    baseContext(['has_puantaj_row' => true])
+);
+if ($result['state'] !== 'INCELEME_GEREKLI'
+    || $result['conflict_code'] !== 'MEVCUT_PUANTAJ_VAR'
+    || $result['etki_turu'] !== 'GEC_KALMA_DAKIKA'
+    || $result['etki_miktari'] !== 20
+    || $result['etki_birimi'] !== 'DAKIKA') {
+    failScenario(18, 'GEC_GELDI mevcut puantaj cakisimasinda 20 DAKIKA payload korunmaliydi');
+}
+passScenario(18, 'GEC_GELDI + mevcut puantaj → INCELEME_GEREKLI / 20 DAKIKA korunur');
+
+// 19. ERKEN_CIKTI + mevcut puantaj deterministik etki payloadini korur
+$result = S::projectCandidate(
+    baseBildirim('ERKEN_CIKTI', ['dakika' => 20]),
+    baseContext(['has_puantaj_row' => true])
+);
+if ($result['state'] !== 'INCELEME_GEREKLI'
+    || $result['conflict_code'] !== 'MEVCUT_PUANTAJ_VAR'
+    || $result['etki_turu'] !== 'ERKEN_CIKIS_DAKIKA'
+    || $result['etki_miktari'] !== 20
+    || $result['etki_birimi'] !== 'DAKIKA') {
+    failScenario(19, 'ERKEN_CIKTI mevcut puantaj cakisimasinda 20 DAKIKA payload korunmaliydi');
+}
+passScenario(19, 'ERKEN_CIKTI + mevcut puantaj → INCELEME_GEREKLI / 20 DAKIKA korunur');
+
+// 20. GELMEDI + mevcut puantaj gun payloadini korur
+$result = S::projectCandidate(baseBildirim('GELMEDI'), baseContext(['has_puantaj_row' => true]));
+if ($result['etki_miktari'] !== 1 || $result['etki_birimi'] !== 'GUN') {
+    failScenario(20, 'GELMEDI mevcut puantaj cakisimasinda 1 GUN payload korunmaliydi');
+}
+passScenario(20, 'GELMEDI + mevcut puantaj → 1 GUN korunur');
+
+// 21. GOREVDE + mevcut puantaj deterministikse gun payloadini korur
+$result = S::projectCandidate(baseBildirim('GOREVDE'), baseContext(['has_puantaj_row' => true]));
+if ($result['etki_miktari'] !== 1 || $result['etki_birimi'] !== 'GUN') {
+    failScenario(21, 'GOREVDE mevcut puantaj cakisimasinda 1 GUN payload korunmaliydi');
+}
+passScenario(21, 'GOREVDE + mevcut puantaj → 1 GUN korunur');
+
+// 22. GEC_GELDI coklu bildirim cakisimasinda dakika payloadini korur
+$result = S::projectCandidate(baseBildirim('GEC_GELDI', ['dakika' => 20]), baseContext([
+    'multi_conflict_code' => 'COKLU_BILDIRIM_CELISKISI',
+]));
+if ($result['conflict_code'] !== 'COKLU_BILDIRIM_CELISKISI' || $result['etki_miktari'] !== 20 || $result['etki_birimi'] !== 'DAKIKA') {
+    failScenario(22, 'GEC_GELDI coklu cakisimasinda 20 DAKIKA payload korunmaliydi');
+}
+passScenario(22, 'GEC_GELDI + coklu cakisima → 20 DAKIKA korunur');
+
+// 23. ERKEN_CIKTI absence-like peer cakisimasinda dakika payloadini korur
+$result = S::projectCandidate(baseBildirim('ERKEN_CIKTI', ['dakika' => 20]), baseContext([
+    'day_bildirim_turleri' => ['ERKEN_CIKTI', 'GELMEDI'],
+]));
+if ($result['conflict_code'] !== 'COKLU_BILDIRIM_CELISKISI' || $result['etki_miktari'] !== 20 || $result['etki_birimi'] !== 'DAKIKA') {
+    failScenario(23, 'ERKEN_CIKTI peer cakisimasinda 20 DAKIKA payload korunmaliydi');
+}
+passScenario(23, 'ERKEN_CIKTI + absence peer → 20 DAKIKA korunur');
+
+// 24. GEC_GELDI sifir dakika mevcut puantajda fail-closed kalir
+$result = S::projectCandidate(baseBildirim('GEC_GELDI', ['dakika' => 0]), baseContext(['has_puantaj_row' => true]));
+if ($result['conflict_code'] !== 'MEVCUT_PUANTAJ_VAR' || $result['etki_miktari'] !== null || $result['etki_birimi'] !== null) {
+    failScenario(24, 'GEC_GELDI sifir dakika payload uretmemeliydi');
+}
+passScenario(24, 'GEC_GELDI 0 + mevcut puantaj → payload fail-closed');
+
+// 25. ERKEN_CIKTI limit ustu dakika mevcut puantajda fail-closed kalir
+$result = S::projectCandidate(baseBildirim('ERKEN_CIKTI', ['dakika' => 1441]), baseContext(['has_puantaj_row' => true]));
+if ($result['conflict_code'] !== 'MEVCUT_PUANTAJ_VAR' || $result['etki_miktari'] !== null || $result['etki_birimi'] !== null) {
+    failScenario(25, 'ERKEN_CIKTI limit ustu dakika payload uretmemeliydi');
+}
+passScenario(25, 'ERKEN_CIKTI 1441 + mevcut puantaj → payload fail-closed');
+
+// 26. IZINLI + mevcut puantaj, yalniz dogrulanmis ucretli surecle payload tasir
+$result = S::projectCandidate(baseBildirim('IZINLI'), baseContext([
+    'has_puantaj_row' => true,
+    'resmi_surecler' => [izinSurec()],
+]));
+if ($result['etki_miktari'] !== 1 || $result['etki_birimi'] !== 'GUN' || !isset($result['matched_surec'])) {
+    failScenario(26, 'IZINLI dogrulanmis surec payloadi korunmaliydi');
+}
+passScenario(26, 'IZINLI + mevcut puantaj + dogrulanmis surec → 1 GUN korunur');
+
+// 27. IZINLI + mevcut puantaj, surec yoksa payload uretmez
+$result = S::projectCandidate(baseBildirim('IZINLI'), baseContext(['has_puantaj_row' => true]));
+if ($result['etki_miktari'] !== null || $result['etki_birimi'] !== null || isset($result['matched_surec'])) {
+    failScenario(27, 'IZINLI surecsiz payload uretmemeliydi');
+}
+passScenario(27, 'IZINLI + mevcut puantaj + surec yok → payload fail-closed');
+
+// 28. RAPORLU + mevcut puantaj, yalniz dogrulanmis surecle payload tasir
+$result = S::projectCandidate(baseBildirim('RAPORLU'), baseContext([
+    'has_puantaj_row' => true,
+    'resmi_surecler' => [raporSurec()],
+]));
+if ($result['etki_miktari'] !== 1 || $result['etki_birimi'] !== 'GUN' || !isset($result['matched_surec'])) {
+    failScenario(28, 'RAPORLU dogrulanmis surec payloadi korunmaliydi');
+}
+passScenario(28, 'RAPORLU + mevcut puantaj + dogrulanmis surec → 1 GUN korunur');
+
+// 29. RAPORLU + mevcut puantaj, surec yoksa payload uretmez
+$result = S::projectCandidate(baseBildirim('RAPORLU'), baseContext(['has_puantaj_row' => true]));
+if ($result['etki_miktari'] !== null || $result['etki_birimi'] !== null || isset($result['matched_surec'])) {
+    failScenario(29, 'RAPORLU surecsiz payload uretmemeliydi');
+}
+passScenario(29, 'RAPORLU + mevcut puantaj + surec yok → payload fail-closed');
+
 echo "OK\n";

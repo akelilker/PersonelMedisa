@@ -6,7 +6,7 @@ namespace Medisa\Api\Services;
 
 class BildirimPuantajEtkiProjectionService
 {
-    public const PROJECTION_VERSION = 'S74_V1';
+    public const PROJECTION_VERSION = 'S75_V2';
     public const SOURCE_PRIORITY_BILDIRIM = 'ONAYLI_GUNLUK_BILDIRIM';
 
     /** @var array<int, string> */
@@ -133,21 +133,43 @@ class BildirimPuantajEtkiProjectionService
             return self::inceleme('MANUEL_INCELEME', 'DIGER_MANUEL_INCELEME', ['reason' => 'DIGER bildirimi otomatik etki uretmez']);
         }
 
+        $deterministicPayload = self::resolveDeterministicPayload($tur, $dakika, $context, $resmiSurecler);
+
         if ($hasPuantaj) {
-            return self::inceleme($etkiTuru, 'MEVCUT_PUANTAJ_VAR', ['reason' => 'Mevcut gunluk_puantaj satiri var']);
+            return self::inceleme(
+                $etkiTuru,
+                'MEVCUT_PUANTAJ_VAR',
+                ['reason' => 'Mevcut gunluk_puantaj satiri var'],
+                $deterministicPayload['etki_miktari'] ?? null,
+                $deterministicPayload['etki_birimi'] ?? null,
+                $deterministicPayload['matched_surec'] ?? null
+            );
         }
 
         if ($multiConflictCode !== '') {
-            return self::inceleme($etkiTuru, $multiConflictCode, ['reason' => 'Ayni gun coklu bildirim celiskisi']);
+            return self::inceleme(
+                $etkiTuru,
+                $multiConflictCode,
+                ['reason' => 'Ayni gun coklu bildirim celiskisi'],
+                $deterministicPayload['etki_miktari'] ?? null,
+                $deterministicPayload['etki_birimi'] ?? null,
+                $deterministicPayload['matched_surec'] ?? null
+            );
         }
 
         if ($tur === 'GEC_GELDI' || $tur === 'ERKEN_CIKTI') {
-            if ($dakika === null || $dakika <= 0) {
+            if ($dakika === null || $dakika <= 0 || $dakika > 1440) {
                 return self::inceleme($etkiTuru, 'DAKIKA_EKSIK', ['bildirim_turu' => $tur]);
             }
 
             if (self::hasAbsenceLikePeer($context, $tur)) {
-                return self::inceleme($etkiTuru, 'COKLU_BILDIRIM_CELISKISI', ['reason' => 'Absence-like bildirim ile cakisiyor']);
+                return self::inceleme(
+                    $etkiTuru,
+                    'COKLU_BILDIRIM_CELISKISI',
+                    ['reason' => 'Absence-like bildirim ile cakisiyor'],
+                    $dakika,
+                    'DAKIKA'
+                );
             }
 
             return self::hazir($etkiTuru, $dakika, 'DAKIKA');
@@ -428,17 +450,77 @@ class BildirimPuantajEtkiProjectionService
         return $result;
     }
 
-    /** @param array<string, mixed> $details @return array<string, mixed> */
-    private static function inceleme($etkiTuru, $code, array $details)
+    /**
+     * @param array<string, mixed> $context
+     * @param array<int, array<string, mixed>> $resmiSurecler
+     * @return array<string, mixed>|null
+     */
+    private static function resolveDeterministicPayload($tur, $dakika, array $context, array $resmiSurecler)
     {
-        return [
+        if ($tur === 'GEC_GELDI' || $tur === 'ERKEN_CIKTI') {
+            if ($dakika === null || $dakika <= 0 || $dakika > 1440) {
+                return null;
+            }
+
+            return ['etki_miktari' => $dakika, 'etki_birimi' => 'DAKIKA'];
+        }
+
+        if ($tur === 'GELMEDI') {
+            if (self::hasResmiIzin($resmiSurecler) || self::hasResmiRapor($resmiSurecler) || self::hasResmiGorev($resmiSurecler)) {
+                return null;
+            }
+
+            return ['etki_miktari' => 1, 'etki_birimi' => 'GUN'];
+        }
+
+        if ($tur === 'IZINLI') {
+            $result = self::resolveIzinSurecleri($resmiSurecler);
+            $matchedSurec = $result['status'] === 'single' ? $result['surec'] : null;
+            if ($matchedSurec === null || !(bool) ($matchedSurec['ucretli_mi'] ?? false)) {
+                return null;
+            }
+
+            return ['etki_miktari' => 1, 'etki_birimi' => 'GUN', 'matched_surec' => $matchedSurec];
+        }
+
+        if ($tur === 'RAPORLU') {
+            $result = self::resolveRaporSurecleri($resmiSurecler);
+            if ($result['status'] !== 'single' || $result['surec'] === null) {
+                return null;
+            }
+
+            return ['etki_miktari' => 1, 'etki_birimi' => 'GUN', 'matched_surec' => $result['surec']];
+        }
+
+        if ($tur === 'GOREVDE') {
+            if (self::hasResmiIzin($resmiSurecler)
+                || self::hasResmiRapor($resmiSurecler)
+                || self::hasAbsenceLikePeer($context, $tur)) {
+                return null;
+            }
+
+            return ['etki_miktari' => 1, 'etki_birimi' => 'GUN'];
+        }
+
+        return null;
+    }
+
+    /** @param array<string, mixed> $details @return array<string, mixed> */
+    private static function inceleme($etkiTuru, $code, array $details, $miktar = null, $birim = null, $matchedSurec = null)
+    {
+        $result = [
             'etki_turu' => (string) $etkiTuru,
-            'etki_miktari' => null,
-            'etki_birimi' => null,
+            'etki_miktari' => $miktar !== null ? (int) $miktar : null,
+            'etki_birimi' => $birim !== null ? (string) $birim : null,
             'state' => 'INCELEME_GEREKLI',
             'conflict_code' => (string) $code,
             'conflict_detail' => $details,
         ];
+        if ($matchedSurec !== null) {
+            $result['matched_surec'] = $matchedSurec;
+        }
+
+        return $result;
     }
 
     /** @param mixed $value */

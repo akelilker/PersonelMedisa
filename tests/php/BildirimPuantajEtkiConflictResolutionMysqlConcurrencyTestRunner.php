@@ -68,6 +68,7 @@ function conflictSourceSnapshot(): array
         'personel_id' => 1,
         'tarih' => '2026-06-04',
         'bildirim_turu' => 'GELMEDI',
+        'bildirim_dakika' => null,
     ];
 }
 
@@ -97,11 +98,13 @@ function conflictSeedFixture(PDO $pdo): array
     )");
 
     $stmt = $pdo->prepare("INSERT INTO onayli_bildirim_puantaj_etki_adaylari (
-        id, personel_id, sube_id, tarih, state, etki_turu, etki_miktari, etki_birimi,
-        conflict_code, bildirim_aciklama, source_snapshot, source_hash, uygulama_modu
+        id, gunluk_bildirim_id, personel_id, sube_id, tarih, bildirim_turu, bildirim_dakika,
+        state, etki_turu, etki_miktari, etki_birimi, conflict_code, bildirim_aciklama,
+        source_snapshot, source_hash, projection_version, uygulama_modu
     ) VALUES (
-        3, 1, 1, '2026-06-04', 'INCELEME_GEREKLI', 'DEVAMSIZLIK_GUN', NULL, NULL,
-        'MEVCUT_PUANTAJ_VAR', 'Gelmedi bildirimi', :snapshot, :hash, 'OTOMATIK'
+        3, 901, 1, 1, '2026-06-04', 'GELMEDI', NULL,
+        'INCELEME_GEREKLI', 'DEVAMSIZLIK_GUN', NULL, NULL, 'MEVCUT_PUANTAJ_VAR',
+        'Gelmedi bildirimi', :snapshot, :hash, 'S74_V1', 'OTOMATIK'
     )");
     $stmt->execute([
         'snapshot' => json_encode($snapshot, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
@@ -364,9 +367,12 @@ function createConflictSchema(PDO $pdo): void
 
     $pdo->exec('CREATE TABLE onayli_bildirim_puantaj_etki_adaylari (
         id INT UNSIGNED NOT NULL PRIMARY KEY,
+        gunluk_bildirim_id INT UNSIGNED NOT NULL,
         personel_id INT UNSIGNED NOT NULL,
         sube_id INT UNSIGNED NOT NULL,
         tarih DATE NOT NULL,
+        bildirim_turu VARCHAR(32) NOT NULL,
+        bildirim_dakika INT NULL,
         state VARCHAR(32) NOT NULL,
         etki_turu VARCHAR(64) NOT NULL,
         etki_miktari INT NULL,
@@ -375,6 +381,7 @@ function createConflictSchema(PDO $pdo): void
         bildirim_aciklama TEXT NULL,
         source_snapshot JSON NULL,
         source_hash CHAR(64) NULL,
+        projection_version VARCHAR(32) NULL,
         uygulama_modu VARCHAR(32) NULL,
         karar_veren_user_id INT UNSIGNED NULL,
         karar_zamani DATETIME NULL,

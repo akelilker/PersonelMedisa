@@ -25,6 +25,18 @@ const expectedScenarios = [
   "SCENARIO:15:PASS",
   "SCENARIO:16:PASS",
   "SCENARIO:17:PASS",
+  "SCENARIO:18:PASS",
+  "SCENARIO:19:PASS",
+  "SCENARIO:20:PASS",
+  "SCENARIO:21:PASS",
+  "SCENARIO:22:PASS",
+  "SCENARIO:23:PASS",
+  "SCENARIO:24:PASS",
+  "SCENARIO:25:PASS",
+  "SCENARIO:26:PASS",
+  "SCENARIO:27:PASS",
+  "SCENARIO:28:PASS",
+  "SCENARIO:29:PASS",
   "SCENARIO:R1:PASS"
 ];
 
@@ -53,6 +65,10 @@ describe("BildirimPuantajEtkiProjectionService PHP runtime", () => {
     expect(serviceSource).not.toContain("RESMI_SUREC_GEREKLI");
     expect(serviceSource).not.toContain("RESMI_SUREC_DOGRULANAMADI");
     expect(serviceSource).not.toContain("RESMI_SUREC_CELISKISI");
+  });
+
+  it("uses S75_V2 for newly generated candidates", () => {
+    expect(serviceSource).toContain("public const PROJECTION_VERSION = 'S75_V2'");
   });
 
   it("does not write to operational tables", () => {

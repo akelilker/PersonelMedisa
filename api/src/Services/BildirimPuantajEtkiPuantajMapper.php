@@ -26,6 +26,89 @@ class BildirimPuantajEtkiPuantajMapper
   }
 
   /**
+   * Resolves the stored canonical payload first, then the narrowly-scoped S74 legacy fallback.
+   *
+   * @param array<string, mixed> $aday
+   * @return array{ok: bool, payload?: array<string, mixed>, source?: string, code?: string, message?: string}
+   */
+  public static function resolveEffectiveEtkiPayload(array $aday)
+  {
+    $etkiTuru = strtoupper(trim((string) ($aday['etki_turu'] ?? '')));
+    $miktar = $aday['etki_miktari'] ?? null;
+    $birim = strtoupper(trim((string) ($aday['etki_birimi'] ?? '')));
+
+    if ($miktar !== null && $miktar !== '' && $birim !== '') {
+      $canonical = self::validateDeterministicPayload($etkiTuru, $miktar, $birim);
+      if (($canonical['ok'] ?? false) === true) {
+        return [
+          'ok' => true,
+          'payload' => $canonical['payload'],
+          'source' => 'CANONICAL_COLUMNS',
+        ];
+      }
+
+      return $canonical;
+    }
+
+    if (strtoupper(trim((string) ($aday['projection_version'] ?? ''))) !== 'S74_V1'
+      || strtoupper(trim((string) ($aday['state'] ?? ''))) !== 'INCELEME_GEREKLI'
+      || strtoupper(trim((string) ($aday['conflict_code'] ?? ''))) !== 'MEVCUT_PUANTAJ_VAR'
+      || $miktar !== null) {
+      return self::unsupportedPayload();
+    }
+
+    $snapshot = self::decodeSnapshot($aday['source_snapshot'] ?? null);
+    $storedHash = trim((string) ($aday['source_hash'] ?? ''));
+    if ($snapshot === null || $storedHash === '') {
+      return self::sourceIntegrityFailed();
+    }
+
+    $recomputedHash = BildirimPuantajEtkiProjectionService::computeSourceHash($snapshot);
+    if (!hash_equals($storedHash, $recomputedHash)) {
+      return self::sourceIntegrityFailed();
+    }
+
+    if (!self::legacyIdentityMatches($aday, $snapshot)) {
+      return self::sourceIntegrityFailed();
+    }
+
+    $bildirimTuru = strtoupper(trim((string) ($snapshot['bildirim_turu'] ?? '')));
+    $snapshotDakika = self::identityMinute($snapshot['bildirim_dakika'] ?? null);
+    if ($bildirimTuru === 'GEC_GELDI' && $etkiTuru === 'GEC_KALMA_DAKIKA') {
+      return self::legacyMinutePayload($etkiTuru, $snapshotDakika);
+    }
+    if ($bildirimTuru === 'ERKEN_CIKTI' && $etkiTuru === 'ERKEN_CIKIS_DAKIKA') {
+      return self::legacyMinutePayload($etkiTuru, $snapshotDakika);
+    }
+    if ($bildirimTuru === 'GELMEDI' && $etkiTuru === 'DEVAMSIZLIK_GUN' && $snapshotDakika === null) {
+      return [
+        'ok' => true,
+        'payload' => ['etki_turu' => $etkiTuru, 'etki_miktari' => 1, 'etki_birimi' => 'GUN'],
+        'source' => 'S74_SOURCE_SNAPSHOT',
+      ];
+    }
+
+    return self::unsupportedPayload();
+  }
+
+  /** @param array<string, mixed> $aday @return array<string, mixed> */
+  public static function withEffectiveEtkiPayload(array $aday)
+  {
+    $resolved = self::resolveEffectiveEtkiPayload($aday);
+    if (($resolved['ok'] ?? false) !== true) {
+      return $aday;
+    }
+
+    /** @var array<string, mixed> $payload */
+    $payload = $resolved['payload'];
+    $aday['etki_turu'] = $payload['etki_turu'];
+    $aday['etki_miktari'] = $payload['etki_miktari'];
+    $aday['etki_birimi'] = $payload['etki_birimi'];
+
+    return $aday;
+  }
+
+  /**
    * @return array{ok: bool, fields?: array<string, mixed>, code?: string, message?: string}
    */
   public static function mapManualKararToFields($kararTuru, $miktar)
@@ -133,9 +216,15 @@ class BildirimPuantajEtkiPuantajMapper
    */
   public static function mapEtkiToPuantajFields(array $aday)
   {
-    $etkiTuru = strtoupper(trim((string) ($aday['etki_turu'] ?? '')));
-    $miktar = $aday['etki_miktari'];
-    $miktarInt = $miktar === null || $miktar === '' ? null : (int) $miktar;
+    $resolved = self::resolveEffectiveEtkiPayload($aday);
+    if (($resolved['ok'] ?? false) !== true) {
+      return $resolved;
+    }
+
+    /** @var array<string, mixed> $payload */
+    $payload = $resolved['payload'];
+    $etkiTuru = (string) $payload['etki_turu'];
+    $miktarInt = (int) $payload['etki_miktari'];
 
     switch ($etkiTuru) {
       case 'DEVAMSIZLIK_GUN':
@@ -209,6 +298,119 @@ class BildirimPuantajEtkiPuantajMapper
           'message' => 'Desteklenmeyen etki turu otomatik uygulanamaz.',
         ];
     }
+  }
+
+  /** @return array{ok: bool, payload?: array<string, mixed>, code?: string, message?: string} */
+  private static function validateDeterministicPayload($etkiTuru, $miktar, $birim)
+  {
+    if (!is_numeric($miktar) || (int) $miktar != $miktar) {
+      return self::unsupportedPayload();
+    }
+
+    $miktarInt = (int) $miktar;
+    if (($etkiTuru === 'GEC_KALMA_DAKIKA' || $etkiTuru === 'ERKEN_CIKIS_DAKIKA')
+      && $miktarInt >= 1 && $miktarInt <= 1440 && $birim === 'DAKIKA') {
+      return [
+        'ok' => true,
+        'payload' => ['etki_turu' => $etkiTuru, 'etki_miktari' => $miktarInt, 'etki_birimi' => 'DAKIKA'],
+      ];
+    }
+
+    if (in_array($etkiTuru, ['DEVAMSIZLIK_GUN', 'IZIN_GUNU', 'RAPOR_GUNU', 'GOREVDE_CALISILMIS_GUN'], true)
+      && $miktarInt === 1 && $birim === 'GUN') {
+      return [
+        'ok' => true,
+        'payload' => ['etki_turu' => $etkiTuru, 'etki_miktari' => 1, 'etki_birimi' => 'GUN'],
+      ];
+    }
+
+    return self::unsupportedPayload();
+  }
+
+  /** @param array<string, mixed> $aday @param array<string, mixed> $snapshot */
+  private static function legacyIdentityMatches(array $aday, array $snapshot)
+  {
+    foreach (['gunluk_bildirim_id', 'personel_id', 'tarih', 'bildirim_turu', 'bildirim_dakika'] as $field) {
+      if (!array_key_exists($field, $aday) || !array_key_exists($field, $snapshot)) {
+        return false;
+      }
+    }
+
+    if ((int) $aday['gunluk_bildirim_id'] < 1
+      || (int) $aday['gunluk_bildirim_id'] !== (int) $snapshot['gunluk_bildirim_id']
+      || (int) $aday['personel_id'] < 1
+      || (int) $aday['personel_id'] !== (int) $snapshot['personel_id']
+      || trim((string) $aday['tarih']) !== trim((string) $snapshot['tarih'])
+      || strtoupper(trim((string) $aday['bildirim_turu'])) !== strtoupper(trim((string) $snapshot['bildirim_turu']))) {
+      return false;
+    }
+
+    $rowDakika = self::identityMinute($aday['bildirim_dakika'] ?? null);
+    $snapshotDakika = self::identityMinute($snapshot['bildirim_dakika'] ?? null);
+
+    return $rowDakika === $snapshotDakika;
+  }
+
+  /** @return array{ok: bool, payload?: array<string, mixed>, source?: string, code?: string, message?: string} */
+  private static function legacyMinutePayload($etkiTuru, $dakika)
+  {
+    if ($dakika === null || $dakika < 1 || $dakika > 1440) {
+      return self::unsupportedPayload();
+    }
+
+    return [
+      'ok' => true,
+      'payload' => ['etki_turu' => (string) $etkiTuru, 'etki_miktari' => $dakika, 'etki_birimi' => 'DAKIKA'],
+      'source' => 'S74_SOURCE_SNAPSHOT',
+    ];
+  }
+
+  /** @return int|null */
+  private static function identityMinute($value)
+  {
+    if ($value === null || $value === '') {
+      return null;
+    }
+    if (!is_numeric($value) || (int) $value != $value) {
+      return -1;
+    }
+
+    return (int) $value;
+  }
+
+  /** @return array<string, mixed>|null */
+  private static function decodeSnapshot($value)
+  {
+    if (is_array($value)) {
+      return $value;
+    }
+    if ($value === null || $value === '') {
+      return null;
+    }
+
+    $decoded = json_decode((string) $value, true);
+
+    return is_array($decoded) ? $decoded : null;
+  }
+
+  /** @return array{ok: bool, code: string, message: string} */
+  private static function unsupportedPayload()
+  {
+    return [
+      'ok' => false,
+      'code' => 'APPLY_UNSUPPORTED',
+      'message' => 'Aday etki payloadi guvenli bicimde cozumlenemedi.',
+    ];
+  }
+
+  /** @return array{ok: bool, code: string, message: string} */
+  private static function sourceIntegrityFailed()
+  {
+    return [
+      'ok' => false,
+      'code' => 'SOURCE_INTEGRITY_FAILED',
+      'message' => 'Aday kaynak butunlugu dogrulanamadi.',
+    ];
   }
 
   /** @param array<string, mixed> $aday @return array{ok: bool, fields?: array<string, mixed>, code?: string, message?: string} */

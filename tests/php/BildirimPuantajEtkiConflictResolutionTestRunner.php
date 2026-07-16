@@ -23,6 +23,7 @@ function conflictBaseAday(array $overrides = []): array
         'personel_id' => 1,
         'tarih' => '2026-06-04',
         'bildirim_turu' => 'GELMEDI',
+        'bildirim_dakika' => null,
     ];
 
     return array_merge([
@@ -30,6 +31,9 @@ function conflictBaseAday(array $overrides = []): array
         'personel_id' => 1,
         'sube_id' => 1,
         'tarih' => '2026-06-04',
+        'gunluk_bildirim_id' => 103,
+        'bildirim_turu' => 'GELMEDI',
+        'bildirim_dakika' => null,
         'state' => 'INCELEME_GEREKLI',
         'etki_turu' => 'DEVAMSIZLIK_GUN',
         'etki_miktari' => null,
@@ -38,6 +42,7 @@ function conflictBaseAday(array $overrides = []): array
         'bildirim_aciklama' => 'Gelmedi bildirimi',
         'source_snapshot' => $snapshot,
         'source_hash' => BildirimPuantajEtkiProjectionService::computeSourceHash($snapshot),
+        'projection_version' => 'S74_V1',
         'uygulama_modu' => 'OTOMATIK',
         'uygulanan_puantaj_id' => null,
     ], $overrides);
@@ -88,8 +93,9 @@ function createConflictSchema(PDO $pdo): void
 {
     $pdo->exec('CREATE TABLE onayli_bildirim_puantaj_etki_adaylari (
         id INTEGER PRIMARY KEY, personel_id INTEGER, sube_id INTEGER, tarih TEXT, state TEXT,
+        gunluk_bildirim_id INTEGER, bildirim_turu TEXT, bildirim_dakika INTEGER,
         etki_turu TEXT, etki_miktari INTEGER, etki_birimi TEXT, conflict_code TEXT,
-        bildirim_aciklama TEXT, source_snapshot TEXT, source_hash TEXT,
+        bildirim_aciklama TEXT, source_snapshot TEXT, source_hash TEXT, projection_version TEXT,
         uygulama_modu TEXT, karar_veren_user_id INTEGER, karar_zamani TEXT, karar_gerekcesi TEXT,
         uygulanan_puantaj_id INTEGER, onceki_puantaj_snapshot TEXT,
         sonraki_puantaj_snapshot TEXT, uygulama_hash TEXT
@@ -134,6 +140,42 @@ function assertConflict(bool $condition, string $name): void
         exit(1);
     }
     echo '[PASS] ' . $name . PHP_EOL;
+}
+
+function legacyCandidate(string $bildirimTuru, string $etkiTuru, ?int $dakika): array
+{
+    $snapshot = [
+        'gunluk_bildirim_id' => 700,
+        'personel_id' => 70,
+        'tarih' => '2026-06-07',
+        'bildirim_turu' => $bildirimTuru,
+        'bildirim_dakika' => $dakika,
+    ];
+
+    return [
+        'id' => 7,
+        'gunluk_bildirim_id' => 700,
+        'personel_id' => 70,
+        'tarih' => '2026-06-07',
+        'bildirim_turu' => $bildirimTuru,
+        'bildirim_dakika' => $dakika,
+        'etki_turu' => $etkiTuru,
+        'etki_miktari' => null,
+        'etki_birimi' => null,
+        'state' => 'INCELEME_GEREKLI',
+        'conflict_code' => 'MEVCUT_PUANTAJ_VAR',
+        'projection_version' => 'S74_V1',
+        'source_snapshot' => $snapshot,
+        'source_hash' => BildirimPuantajEtkiProjectionService::computeSourceHash($snapshot),
+    ];
+}
+
+function legacyCandidateWithSnapshot(array $aday, array $snapshot): array
+{
+    $aday['source_snapshot'] = $snapshot;
+    $aday['source_hash'] = BildirimPuantajEtkiProjectionService::computeSourceHash($snapshot);
+
+    return $aday;
 }
 
 $scenarios = [
@@ -272,6 +314,127 @@ $scenarios = [
         $integrity = BildirimPuantajEtkiManualApplyService::verifySourceIntegrity($aday);
 
         return ($integrity['ok'] ?? false) === false;
+    }],
+    ['name' => 'legacy candidate 6 absence payload resolves', 'fn' => function () {
+        $resolved = BildirimPuantajEtkiPuantajMapper::resolveEffectiveEtkiPayload(
+            legacyCandidate('GELMEDI', 'DEVAMSIZLIK_GUN', null)
+        );
+
+        return ($resolved['ok'] ?? false) === true
+            && ($resolved['payload']['etki_miktari'] ?? null) === 1
+            && ($resolved['payload']['etki_birimi'] ?? null) === 'GUN';
+    }],
+    ['name' => 'legacy candidate 7 late 20 payload resolves', 'fn' => function () {
+        $resolved = BildirimPuantajEtkiPuantajMapper::resolveEffectiveEtkiPayload(
+            legacyCandidate('GEC_GELDI', 'GEC_KALMA_DAKIKA', 20)
+        );
+
+        return ($resolved['ok'] ?? false) === true
+            && ($resolved['payload']['etki_miktari'] ?? null) === 20
+            && ($resolved['payload']['etki_birimi'] ?? null) === 'DAKIKA';
+    }],
+    ['name' => 'legacy candidate 7 late 20 DTO payload is effective', 'fn' => function () {
+        $effective = BildirimPuantajEtkiPuantajMapper::withEffectiveEtkiPayload(
+            legacyCandidate('GEC_GELDI', 'GEC_KALMA_DAKIKA', 20)
+        );
+
+        return ($effective['etki_miktari'] ?? null) === 20
+            && ($effective['etki_birimi'] ?? null) === 'DAKIKA';
+    }],
+    ['name' => 'legacy candidate 7 late 20 revise mapper succeeds', 'fn' => function () {
+        $aday = legacyCandidate('GEC_GELDI', 'GEC_KALMA_DAKIKA', 20);
+        $aday['bildirim_aciklama'] = '20 dakika gec geldi';
+        $mapped = BildirimPuantajEtkiPuantajMapper::buildRevizeUpdateValues($aday, conflictBasePuantaj());
+
+        return ($mapped['ok'] ?? false) === true
+            && ($mapped['values']['gec_kalma_dakika'] ?? null) === 20
+            && ($mapped['values']['erken_cikis_dakika'] ?? null) === null;
+    }],
+    ['name' => 'legacy bad hash fails closed', 'fn' => function () {
+        $resolved = BildirimPuantajEtkiPuantajMapper::resolveEffectiveEtkiPayload(
+            array_merge(legacyCandidate('GEC_GELDI', 'GEC_KALMA_DAKIKA', 20), ['source_hash' => str_repeat('0', 64)])
+        );
+
+        return ($resolved['code'] ?? '') === 'SOURCE_INTEGRITY_FAILED';
+    }],
+    ['name' => 'legacy bad json fails closed', 'fn' => function () {
+        $resolved = BildirimPuantajEtkiPuantajMapper::resolveEffectiveEtkiPayload(
+            array_merge(legacyCandidate('GEC_GELDI', 'GEC_KALMA_DAKIKA', 20), ['source_snapshot' => '{broken'])
+        );
+
+        return ($resolved['code'] ?? '') === 'SOURCE_INTEGRITY_FAILED';
+    }],
+    ['name' => 'legacy notification identity mismatch fails closed', 'fn' => function () {
+        $aday = legacyCandidate('GEC_GELDI', 'GEC_KALMA_DAKIKA', 20);
+        $snapshot = $aday['source_snapshot'];
+        $snapshot['gunluk_bildirim_id'] = 701;
+        $resolved = BildirimPuantajEtkiPuantajMapper::resolveEffectiveEtkiPayload(
+            legacyCandidateWithSnapshot($aday, $snapshot)
+        );
+
+        return ($resolved['code'] ?? '') === 'SOURCE_INTEGRITY_FAILED';
+    }],
+    ['name' => 'legacy personnel identity mismatch fails closed', 'fn' => function () {
+        $aday = legacyCandidate('GEC_GELDI', 'GEC_KALMA_DAKIKA', 20);
+        $snapshot = $aday['source_snapshot'];
+        $snapshot['personel_id'] = 71;
+        $resolved = BildirimPuantajEtkiPuantajMapper::resolveEffectiveEtkiPayload(
+            legacyCandidateWithSnapshot($aday, $snapshot)
+        );
+
+        return ($resolved['code'] ?? '') === 'SOURCE_INTEGRITY_FAILED';
+    }],
+    ['name' => 'legacy date identity mismatch fails closed', 'fn' => function () {
+        $aday = legacyCandidate('GEC_GELDI', 'GEC_KALMA_DAKIKA', 20);
+        $snapshot = $aday['source_snapshot'];
+        $snapshot['tarih'] = '2026-06-08';
+        $resolved = BildirimPuantajEtkiPuantajMapper::resolveEffectiveEtkiPayload(
+            legacyCandidateWithSnapshot($aday, $snapshot)
+        );
+
+        return ($resolved['code'] ?? '') === 'SOURCE_INTEGRITY_FAILED';
+    }],
+    ['name' => 'legacy unsupported type fails closed', 'fn' => function () {
+        $resolved = BildirimPuantajEtkiPuantajMapper::resolveEffectiveEtkiPayload(
+            legacyCandidate('DIGER', 'GEC_KALMA_DAKIKA', 20)
+        );
+
+        return ($resolved['code'] ?? '') === 'APPLY_UNSUPPORTED';
+    }],
+    ['name' => 'legacy zero minute fails closed', 'fn' => function () {
+        $resolved = BildirimPuantajEtkiPuantajMapper::resolveEffectiveEtkiPayload(
+            legacyCandidate('GEC_GELDI', 'GEC_KALMA_DAKIKA', 0)
+        );
+
+        return ($resolved['code'] ?? '') === 'APPLY_UNSUPPORTED';
+    }],
+    ['name' => 'legacy over-limit minute fails closed', 'fn' => function () {
+        $resolved = BildirimPuantajEtkiPuantajMapper::resolveEffectiveEtkiPayload(
+            legacyCandidate('ERKEN_CIKTI', 'ERKEN_CIKIS_DAKIKA', 1441)
+        );
+
+        return ($resolved['code'] ?? '') === 'APPLY_UNSUPPORTED';
+    }],
+    ['name' => 'legacy wrong conflict fails closed', 'fn' => function () {
+        $resolved = BildirimPuantajEtkiPuantajMapper::resolveEffectiveEtkiPayload(
+            array_merge(legacyCandidate('GEC_GELDI', 'GEC_KALMA_DAKIKA', 20), ['conflict_code' => 'COKLU_BILDIRIM_CELISKISI'])
+        );
+
+        return ($resolved['code'] ?? '') === 'APPLY_UNSUPPORTED';
+    }],
+    ['name' => 'legacy wrong version fails closed', 'fn' => function () {
+        $resolved = BildirimPuantajEtkiPuantajMapper::resolveEffectiveEtkiPayload(
+            array_merge(legacyCandidate('GEC_GELDI', 'GEC_KALMA_DAKIKA', 20), ['projection_version' => 'S75_V2'])
+        );
+
+        return ($resolved['code'] ?? '') === 'APPLY_UNSUPPORTED';
+    }],
+    ['name' => 'legacy terminal state fails closed', 'fn' => function () {
+        $resolved = BildirimPuantajEtkiPuantajMapper::resolveEffectiveEtkiPayload(
+            array_merge(legacyCandidate('GEC_GELDI', 'GEC_KALMA_DAKIKA', 20), ['state' => 'UYGULANDI'])
+        );
+
+        return ($resolved['code'] ?? '') === 'APPLY_UNSUPPORTED';
     }],
 ];
 

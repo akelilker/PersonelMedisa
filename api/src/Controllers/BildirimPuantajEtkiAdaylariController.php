@@ -905,6 +905,8 @@ class BildirimPuantajEtkiAdaylariController
     /** @param array<string, mixed> $row */
     private static function mapListRow(array $row)
     {
+        $row = BildirimPuantajEtkiPuantajMapper::withEffectiveEtkiPayload($row);
+
         return array_merge([
             'id' => (int) $row['id'],
             'genel_yonetici_bildirim_onayi_id' => (int) $row['genel_yonetici_bildirim_onayi_id'],
@@ -928,6 +930,8 @@ class BildirimPuantajEtkiAdaylariController
     /** @param array<string, mixed> $row */
     private static function mapDetailRow(array $row)
     {
+        $row = BildirimPuantajEtkiPuantajMapper::withEffectiveEtkiPayload($row);
+
         return array_merge([
             'id' => (int) $row['id'],
             'genel_yonetici_bildirim_onayi_id' => (int) $row['genel_yonetici_bildirim_onayi_id'],

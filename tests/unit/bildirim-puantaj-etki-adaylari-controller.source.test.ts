@@ -77,6 +77,14 @@ describe("BildirimPuantajEtkiAdaylariController source contract", () => {
     }
   });
 
+  it("uses the shared effective payload resolver for list and detail DTOs", () => {
+    const listMapper = controllerSource.match(/private static function mapListRow[\s\S]*?^    \}/m)?.[0] ?? "";
+    const detailMapper = controllerSource.match(/private static function mapDetailRow[\s\S]*?^    \}/m)?.[0] ?? "";
+
+    expect(listMapper).toContain("BildirimPuantajEtkiPuantajMapper::withEffectiveEtkiPayload");
+    expect(detailMapper).toContain("BildirimPuantajEtkiPuantajMapper::withEffectiveEtkiPayload");
+  });
+
   it("implements dismiss, apply and manual apply transitions with shared decision policy", () => {
     expect(controllerSource).toMatch(/public static function dismiss\(/);
     expect(controllerSource).toMatch(/public static function apply\(/);

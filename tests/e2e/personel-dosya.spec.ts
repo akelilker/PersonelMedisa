@@ -778,7 +778,9 @@ test.describe("personel dosyasi surec akisi", () => {
   });
 
   test("yonetici egitim belgeler sekmesinde read-only belge durumunu gorur", async ({ page }) => {
-    await mockApi(page, "GENEL_YONETICI");
+    const belgeReferenceDate = new Date("2026-12-02T12:00:00.000Z");
+    await page.clock.setFixedTime(belgeReferenceDate);
+    await mockApi(page, "GENEL_YONETICI", { belgeReferenceDate });
 
     await login(page, { username: "yonetici", password: "secret" });
 
@@ -799,7 +801,13 @@ test.describe("personel dosyasi surec akisi", () => {
     await expect(belgelerPanel.getByTestId("personel-belge-kayit-list")).toBeVisible();
     await expect(belgelerPanel.getByTestId("personel-belge-kayit-list")).toContainText(/Forklift Operatör Belgesi/i);
     await expect(belgelerPanel.getByTestId("personel-belge-kayit-list")).toContainText(/B Sınıfı Ehliyet/i);
-    await expect(belgelerPanel.getByTestId("personel-belge-kayit-list")).toContainText(/Yakında doluyor/i);
+    const belgeListesi = belgelerPanel.getByTestId("personel-belge-kayit-list");
+    await expect(belgeListesi.getByRole("row", { name: /Süresi Dolmuş Belge/i })).toContainText(/Süresi dolmuş/i);
+    await expect(belgeListesi.getByRole("row", { name: /Sınırdan Bir Gün Önce Belgesi/i })).toContainText(
+      /Yakında doluyor/i
+    );
+    await expect(belgeListesi.getByRole("row", { name: /B Sınıfı Ehliyet/i })).toContainText(/Yakında doluyor/i);
+    await expect(belgeListesi.getByRole("row", { name: /Forklift Operatör Belgesi/i })).toContainText(/Geçerli/i);
     await expect(belgelerPanel.locator('input[type="radio"]')).toHaveCount(0);
     await expect(belgelerPanel.getByRole("button", { name: "Kaydet" })).toHaveCount(0);
   });

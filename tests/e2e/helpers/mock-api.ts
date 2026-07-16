@@ -21,6 +21,19 @@ import {
 
 export type MockUserRole = "GENEL_YONETICI" | "BOLUM_YONETICISI" | "MUHASEBE" | "BIRIM_AMIRI";
 
+type MockApiOptions = {
+  belgeReferenceDate?: Date;
+};
+
+function isoDateDaysFrom(referenceDate: Date, days: number): string {
+  const referenceUtc = Date.UTC(
+    referenceDate.getUTCFullYear(),
+    referenceDate.getUTCMonth(),
+    referenceDate.getUTCDate()
+  );
+  return new Date(referenceUtc + days * 86_400_000).toISOString().slice(0, 10);
+}
+
 type MockAylikOzetRow = {
   ay: string;
   personel_id: number;
@@ -1443,7 +1456,7 @@ function resolveMockIlkIkiGunFirmaOderMi(
   return null;
 }
 
-export async function mockApi(page: Page, role: MockUserRole) {
+export async function mockApi(page: Page, role: MockUserRole, options: MockApiOptions = {}) {
   const bildirimPageState = getBildirimPageState(page);
   const bildirimler = bildirimPageState.items;
   const bagliAmirReferanslari: Array<{ id: number; ad: string; sube_id: number; departman_id: number }> = [
@@ -1771,7 +1784,9 @@ export async function mockApi(page: Page, role: MockUserRole) {
       veren_kurum: "Medisa Eğitim Merkezi",
       belge_no: "FRK-2024-001",
       baslangic_tarihi: "2024-03-01",
-      bitis_tarihi: "2027-03-01",
+      bitis_tarihi: options.belgeReferenceDate
+        ? isoDateDaysFrom(options.belgeReferenceDate, 31)
+        : "2027-03-01",
       durum: "AKTIF",
       created_at: "2024-03-01T10:00:00.000Z"
     },
@@ -1783,10 +1798,32 @@ export async function mockApi(page: Page, role: MockUserRole) {
       veren_kurum: "İstanbul İl Emniyet",
       belge_no: "TR-987654",
       baslangic_tarihi: "2018-05-10",
-      bitis_tarihi: "2026-07-15",
+      bitis_tarihi: options.belgeReferenceDate
+        ? isoDateDaysFrom(options.belgeReferenceDate, 30)
+        : "2026-07-15",
       durum: "AKTIF",
       created_at: "2018-05-10T10:00:00.000Z"
     },
+    ...(options.belgeReferenceDate
+      ? [
+          {
+            id: 9901,
+            personel_id: 1,
+            kayit_tipi: "SERTIFIKA" as const,
+            ad: "Sınırdan Bir Gün Önce Belgesi",
+            bitis_tarihi: isoDateDaysFrom(options.belgeReferenceDate, 29),
+            durum: "AKTIF" as const
+          },
+          {
+            id: 9902,
+            personel_id: 1,
+            kayit_tipi: "SERTIFIKA" as const,
+            ad: "Süresi Dolmuş Belge",
+            bitis_tarihi: isoDateDaysFrom(options.belgeReferenceDate, -1),
+            durum: "AKTIF" as const
+          }
+        ]
+      : []),
     {
       id: 903,
       personel_id: 1,
@@ -2977,7 +3014,7 @@ let personelBelgeKaydiIdCounter = 903;
       baslangic_tarihi: record.baslangic_tarihi ?? null,
       bitis_tarihi: bitisTarihi,
       durum: record.durum,
-      gecerlilik_durumu: computeGecerlilikDurumu(bitisTarihi),
+      gecerlilik_durumu: computeGecerlilikDurumu(bitisTarihi, options.belgeReferenceDate),
       ek_ref: record.ek_ref ?? null,
       aciklama: record.aciklama ?? null,
       created_at: record.created_at ?? null,

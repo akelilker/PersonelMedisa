@@ -24,13 +24,15 @@ vi.mock("../../src/api/referans.api", () => ({
   fetchDepartmanOptions: vi.fn().mockResolvedValue([{ id: 3, label: "Operasyon" }])
 }));
 
+const authSession = vi.hoisted(() => ({
+  active_sube_id: 1,
+  sube_list: [{ id: 1, ad: "Merkez" }],
+  user: { id: 1, rol: "GENEL_YONETICI", sube_ids: [1] }
+}));
+
 vi.mock("../../src/state/auth.store", () => ({
   useAuth: () => ({
-    session: {
-      active_sube_id: 1,
-      sube_list: [{ id: 1, ad: "Merkez" }],
-      user: { id: 1, rol: "GENEL_YONETICI", sube_ids: [1] }
-    }
+    session: authSession
   })
 }));
 

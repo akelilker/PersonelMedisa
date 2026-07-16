@@ -1,17 +1,18 @@
 import { expect, test, type Page } from "@playwright/test";
-import { login } from "./helpers/auth";
-import { mockApi, type MockUserRole } from "./helpers/mock-api";
-
-const ROLE_LOGIN: Record<MockUserRole, { username: string; password: string }> = {
-  GENEL_YONETICI: { username: "yonetici", password: "secret" },
-  BOLUM_YONETICISI: { username: "bolum_yoneticisi", password: "demo123" },
-  MUHASEBE: { username: "muhasebe", password: "demo123" },
-  BIRIM_AMIRI: { username: "birim_amiri", password: "demo123" }
-};
+import {
+  expectRaporlarScopeFromSession,
+  expectSubeSelectScoped,
+  openRaporlarPanel,
+  reloadRaporlarPanel
+} from "./helpers/raporlar-panel";
 
 const PANEL_AY = "2026-06";
 
-async function setActiveSube(page: Page, subeId: number, panel: "donem-kapanis" | "etki-adayi") {
+function ignoreBenignConsoleError(line: string): boolean {
+  return line.includes("favicon") || line.includes("403 (Forbidden)");
+}
+
+async function setActiveSube(page: Page, subeId: number) {
   await page.evaluate((nextSubeId) => {
     const key = "medisa_auth_session";
     const fromSession = sessionStorage.getItem(key);
@@ -24,7 +25,7 @@ async function setActiveSube(page: Page, subeId: number, panel: "donem-kapanis" 
     session.active_sube_id = nextSubeId;
     storage.setItem(key, JSON.stringify(session));
   }, subeId);
-  await page.goto(`/raporlar?panel=${panel}`, { waitUntil: "domcontentloaded" });
+  await page.goto("/raporlar?panel=donem-kapanis", { waitUntil: "domcontentloaded" });
 }
 
 async function submitDonemKapanisFilters(page: Page, subeId = 1) {
@@ -32,22 +33,19 @@ async function submitDonemKapanisFilters(page: Page, subeId = 1) {
   const subeSelect = page.getByLabel("Şube");
   await expect(subeSelect.locator(`option[value="${subeId}"]`)).toHaveCount(1, { timeout: 15_000 });
   await subeSelect.selectOption(String(subeId));
+  const preflight = page.waitForResponse((response) =>
+    response.url().includes("/api/puantaj/donem-kapanis-preflight")
+  );
   await page.getByTestId("donem-kapanis-submit").click();
+  const response = await preflight;
+  expect(response.status()).toBe(200);
+  expect(response.url()).toContain(`sube_id=${subeId}`);
 }
-
-async function openDonemKapanisPanel(page: Page, role: MockUserRole) {
-  await mockApi(page, role);
-  await login(page, ROLE_LOGIN[role]);
-  await page.goto("/raporlar?panel=donem-kapanis");
-  await expect(page.getByTestId("donem-kapanis-merkezi")).toBeVisible({ timeout: 15_000 });
-}
-
-test.describe.configure({ retries: 1 });
 
 test.describe("S76 donem kapanis merkezi", () => {
   test("MUHASEBE sees blockers and salary warning context", async ({ page }) => {
-    await openDonemKapanisPanel(page, "MUHASEBE");
-    await setActiveSube(page, 1, "donem-kapanis");
+    await openRaporlarPanel(page, "MUHASEBE", "donem-kapanis");
+    await setActiveSube(page, 1);
     await submitDonemKapanisFilters(page);
     await expect(page.getByTestId("donem-kapanis-issue-CANDIDATE_HAZIR_PENDING")).toBeVisible();
     await expect(page.getByTestId("donem-kapanis-severity-CANDIDATE_HAZIR_PENDING")).toContainText("Engelleyici");
@@ -55,8 +53,8 @@ test.describe("S76 donem kapanis merkezi", () => {
   });
 
   test("GENEL_YONETICI sees seal action and blocked close feedback", async ({ page }) => {
-    await openDonemKapanisPanel(page, "GENEL_YONETICI");
-    await setActiveSube(page, 1, "donem-kapanis");
+    await openRaporlarPanel(page, "GENEL_YONETICI", "donem-kapanis");
+    await setActiveSube(page, 1);
     await submitDonemKapanisFilters(page);
     await expect(page.getByTestId("donem-kapanis-muhurle")).toBeVisible();
     await expect(page.getByTestId("donem-kapanis-muhurle")).toBeDisabled();
@@ -64,15 +62,47 @@ test.describe("S76 donem kapanis merkezi", () => {
   });
 
   test("BIRIM_AMIRI can view own-scope preflight without export", async ({ page }) => {
-    await openDonemKapanisPanel(page, "BIRIM_AMIRI");
-    await expect(page.getByTestId("donem-kapanis-filters")).toBeVisible();
+    const consoleErrors: string[] = [];
+    page.on("console", (message) => {
+      if (message.type() === "error") {
+        consoleErrors.push(message.text());
+      }
+    });
+
+    await openRaporlarPanel(page, "BIRIM_AMIRI", "donem-kapanis");
+    await expectRaporlarScopeFromSession(page, [1]);
+    await expectSubeSelectScoped(page, [1]);
     await expect(page.getByTestId("donem-kapanis-export-csv")).toHaveCount(0);
     await expect(page.getByTestId("donem-kapanis-muhurle")).toHaveCount(0);
+    await expect(page.getByTestId("donem-kapanis-durum-bandi")).toBeVisible();
+
+    await page.getByLabel("Ay", { exact: true }).first().fill(PANEL_AY);
+    const preflight = page.waitForResponse((response) =>
+      response.url().includes("/api/puantaj/donem-kapanis-preflight")
+    );
+    await page.getByTestId("donem-kapanis-submit").click();
+    const response = await preflight;
+    expect(response.status()).toBe(200);
+    expect(response.url()).toContain("sube_id=1");
+    await expect(page.getByTestId("donem-kapanis-durum-bandi")).toBeVisible();
+
+    await reloadRaporlarPanel(page, "donem-kapanis");
+    await expectSubeSelectScoped(page, [1]);
+    expect(consoleErrors.filter((line) => !ignoreBenignConsoleError(line))).toEqual([]);
+  });
+
+  test("BIRIM_AMIRI keeps panel usable when yonetim subeler returns 403", async ({ page }) => {
+    const subeResponse = page.waitForResponse((response) => response.url().includes("/api/yonetim/subeler"));
+    await openRaporlarPanel(page, "BIRIM_AMIRI", "donem-kapanis");
+    expect((await subeResponse).status()).toBe(403);
+    await expect(page).not.toHaveURL(/\/yetkisiz$/);
+    await expect(page.getByTestId("donem-kapanis-filters")).toBeVisible();
+    await expectSubeSelectScoped(page, [1]);
   });
 
   test("issue detail modal opens from blocker list", async ({ page }) => {
-    await openDonemKapanisPanel(page, "GENEL_YONETICI");
-    await setActiveSube(page, 1, "donem-kapanis");
+    await openRaporlarPanel(page, "GENEL_YONETICI", "donem-kapanis");
+    await setActiveSube(page, 1);
     await submitDonemKapanisFilters(page);
     await page.getByTestId("donem-kapanis-issue-detail-CANDIDATE_HAZIR_PENDING").click();
     await expect(page.getByTestId("donem-kapanis-personel-detay-modal")).toBeVisible();
@@ -80,16 +110,16 @@ test.describe("S76 donem kapanis merkezi", () => {
 
   test("desktop layout keeps issue list visible", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
-    await openDonemKapanisPanel(page, "GENEL_YONETICI");
-    await setActiveSube(page, 1, "donem-kapanis");
+    await openRaporlarPanel(page, "GENEL_YONETICI", "donem-kapanis");
+    await setActiveSube(page, 1);
     await submitDonemKapanisFilters(page);
     await expect(page.getByTestId("donem-kapanis-issue-listesi")).toBeVisible();
   });
 
   test("mobile layout keeps preflight summary readable", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
-    await openDonemKapanisPanel(page, "GENEL_YONETICI");
-    await setActiveSube(page, 1, "donem-kapanis");
+    await openRaporlarPanel(page, "GENEL_YONETICI", "donem-kapanis");
+    await setActiveSube(page, 1);
     await submitDonemKapanisFilters(page);
     await expect(page.getByTestId("donem-kapanis-durum-bandi")).toBeVisible();
     await expect(page.getByTestId("donem-kapanis-issue-CANDIDATE_HAZIR_PENDING")).toBeVisible();

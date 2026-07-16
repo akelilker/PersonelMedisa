@@ -8,6 +8,7 @@ build/
 coverage/
 playwright-report/
 test-results/
+.test-mariadb/
 
 # Environment files
 .env.local

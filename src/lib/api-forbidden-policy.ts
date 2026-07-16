@@ -67,5 +67,10 @@ export function shouldEmitGlobalAuthForbidden(path: string, method?: string): bo
     return false;
   }
 
+  // Scoped roller oturumdaki sube_list ile calisir; yonetim listesi 403 beklenen bir fallback'tir.
+  if (normalizedMethod === "GET" && normalizedPath === "/yonetim/subeler") {
+    return false;
+  }
+
   return true;
 }

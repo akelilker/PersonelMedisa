@@ -266,10 +266,8 @@ function spawnConflictChild(array $args): array
             $phpArgs[] = '-d';
             $phpArgs[] = 'extension_dir=' . $extensionDir;
         }
-        if (!extension_loaded('pdo_mysql')) {
-            $phpArgs[] = '-d';
-            $phpArgs[] = 'extension=php_pdo_mysql.dll';
-        }
+        $phpArgs[] = '-d';
+        $phpArgs[] = 'extension=pdo_mysql';
     }
     $command = array_merge([PHP_BINARY], $phpArgs, [__FILE__, '--child'], $args);
     $pipes = [];

@@ -68,6 +68,9 @@ export function EtkiAdayiRaporuPage() {
       autoRun: false
     });
 
+  const sessionSubeKey = (session?.sube_list ?? []).map((sube) => `${sube.id}:${sube.ad}`).join("|");
+  const allowedSubeKey = (session?.user?.sube_ids ?? []).join(",");
+
   useEffect(() => {
     const sessionSubeler = (session?.sube_list ?? []).map((sube) => ({ id: sube.id, label: sube.ad }));
     if (sessionSubeler.length > 0) {
@@ -75,14 +78,26 @@ export function EtkiAdayiRaporuPage() {
     }
     const activeSubeId = session?.active_sube_id;
     if (activeSubeId) {
-      setFilters((prev) => ({ ...prev, subeId: String(activeSubeId) }));
+      setFilters((prev) =>
+        prev.subeId === String(activeSubeId) ? prev : { ...prev, subeId: String(activeSubeId) }
+      );
     }
+
+    const allowedSubeIds = allowedSubeKey
+      ? allowedSubeKey.split(",").map((value) => Number.parseInt(value, 10)).filter((id) => Number.isFinite(id))
+      : [];
 
     void (async () => {
       try {
         const yonetimSubeler = await fetchYonetimSubeleri();
         if (yonetimSubeler.length > 0) {
-          setSubeOptions(yonetimSubeler.map((sube) => ({ id: sube.id, label: sube.ad })));
+          const scoped =
+            allowedSubeIds.length > 0
+              ? yonetimSubeler.filter((sube) => allowedSubeIds.includes(sube.id))
+              : yonetimSubeler;
+          if (scoped.length > 0) {
+            setSubeOptions(scoped.map((sube) => ({ id: sube.id, label: sube.ad })));
+          }
         }
       } catch {
         /* session sube_list fallback */
@@ -90,7 +105,7 @@ export function EtkiAdayiRaporuPage() {
       const departmanlar = await fetchDepartmanOptions();
       setDepartmanOptions(departmanlar);
     })();
-  }, [session?.active_sube_id, session?.sube_list]);
+  }, [session?.active_sube_id, sessionSubeKey, allowedSubeKey]);
 
   async function handleSubmit() {
     await load(1, apiFilters);

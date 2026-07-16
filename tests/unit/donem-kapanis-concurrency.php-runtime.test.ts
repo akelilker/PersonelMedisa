@@ -1,17 +1,22 @@
-import { spawnSync } from "node:child_process";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { resolve } from "node:path";
-import { describe, expect, it } from "vitest";
+import {
+  ensureDisposableMariaDbEnv,
+  runPhpMysqlRunner
+} from "../scripts/disposable-mariadb.mjs";
 
 const runnerPath = resolve(process.cwd(), "tests/php/DonemKapanisMysqlConcurrencyTestRunner.php");
 
 describe("DonemKapanis MariaDB concurrency", () => {
-  it("serializes close races when MySQL test credentials exist", () => {
-    if (!process.env.MEDISA_TEST_MYSQL_DSN || !process.env.MEDISA_TEST_MYSQL_USER) {
-      expect(true).toBe(true);
-      return;
-    }
+  beforeAll(async () => {
+    await ensureDisposableMariaDbEnv();
+  }, 60_000);
 
-    const result = spawnSync("php", [runnerPath], { encoding: "utf8", cwd: process.cwd() });
+  // Keep disposable MariaDB alive for sibling concurrency files in the same vitest run.
+  afterAll(() => undefined);
+
+  it("serializes close races on disposable MariaDB/InnoDB", () => {
+    const result = runPhpMysqlRunner(runnerPath);
     expect(result.status, result.stderr || result.stdout).toBe(0);
     expect(result.stdout).toContain("verify-donem-kapanis-mysql-concurrency: OK");
     expect(result.stdout).toContain("[PASS] parallel close leaves one seal and one idempotent result");

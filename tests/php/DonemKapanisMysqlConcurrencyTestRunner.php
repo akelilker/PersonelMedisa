@@ -78,10 +78,8 @@ function closeSpawnChild(array $args): array
             $phpArgs[] = '-d';
             $phpArgs[] = 'extension_dir=' . $extensionDir;
         }
-        if (!extension_loaded('pdo_mysql')) {
-            $phpArgs[] = '-d';
-            $phpArgs[] = 'extension=php_pdo_mysql.dll';
-        }
+        $phpArgs[] = '-d';
+        $phpArgs[] = 'extension=pdo_mysql';
     }
     $command = array_merge([PHP_BINARY], $phpArgs, [__FILE__, '--child'], $args);
     $pipes = [];
@@ -114,7 +112,7 @@ function closeFinishChild(array $child): string
     $code = proc_close($child['process']);
     @unlink($child['signal']);
     if ($code !== 0) {
-        throw new RuntimeException('Child failed: ' . trim($stderr));
+        throw new RuntimeException('Child failed: ' . trim($stderr . ' ' . $stdout));
     }
 
     return closeChildStdoutToken((string) $stdout);
@@ -255,8 +253,12 @@ function closeChildMode(array $argv): void
             return;
         }
         closeSignalReady($signal);
-        $insert = $pdo->prepare('INSERT INTO gunluk_puantaj (personel_id, sube_id, tarih, state, kontrol_durumu) VALUES (?, ?, ?, ?, ?)');
-        $insert->execute([(int) $personelId, (int) $subeId, (string) $tarih, 'ACIK', 'BEKLIYOR']);
+        $upsert = $pdo->prepare(
+            'INSERT INTO gunluk_puantaj (personel_id, sube_id, tarih, state, kontrol_durumu, kaynak)
+             VALUES (?, ?, ?, ?, ?, ?)
+             ON DUPLICATE KEY UPDATE state = VALUES(state), kontrol_durumu = VALUES(kontrol_durumu)'
+        );
+        $upsert->execute([(int) $personelId, (int) $subeId, (string) $tarih, 'ACIK', 'BEKLIYOR', 'MANUEL']);
         usleep((int) $holdMilliseconds * 1000);
         $pdo->commit();
         echo 'UPSERTED' . PHP_EOL;
@@ -317,29 +319,19 @@ putenv('MEDISA_TEST_MYSQL_DSN=' . preg_replace('/dbname=[^;]*/', 'dbname=' . $da
 $pdo = closeMysqlPdo();
 
 try {
-    $pdo->exec('CREATE TABLE subeler (id INT UNSIGNED NOT NULL PRIMARY KEY) ENGINE=InnoDB');
-    $pdo->exec('INSERT INTO subeler (id) VALUES (1), (2)');
+    $pdo->exec('CREATE TABLE subeler (
+        id INT UNSIGNED NOT NULL PRIMARY KEY, kod VARCHAR(32) NOT NULL, ad VARCHAR(120) NOT NULL
+    ) ENGINE=InnoDB');
+    $pdo->exec('INSERT INTO subeler (id, kod, ad) VALUES (1, \'MRK\', \'Merkez\'), (2, \'DEP\', \'Depolama\')');
     $pdo->exec('CREATE TABLE personeller (
         id INT UNSIGNED NOT NULL PRIMARY KEY, sube_id INT UNSIGNED NOT NULL,
         departman_id INT UNSIGNED NULL, aktif_durum VARCHAR(16) NOT NULL, maas_tutari DECIMAL(12,2) NULL
     ) ENGINE=InnoDB');
-    $pdo->exec('INSERT INTO personeller (id, sube_id, departman_id, aktif_durum, maas_tutari) VALUES (7, 1, 3, \'AKTIF\', 25000)');
+    $pdo->exec('INSERT INTO personeller (id, sube_id, departman_id, aktif_durum, maas_tutari) VALUES (7, 1, 3, \'AKTIF\', 25000), (8, 1, 3, \'AKTIF\', NULL)');
     $migration = file_get_contents(__DIR__ . '/../../api/migrations/014_puantaj_donem_kilitleri.sql');
     $migration = preg_replace('/^\s*--.*$/m', '', (string) $migration);
     foreach (array_filter(array_map('trim', explode(';', (string) $migration))) as $statement) {
         if ($statement !== '') {
-            $pdo->exec($statement);
-        }
-    }
-    $auditMigration = file_get_contents(__DIR__ . '/../../api/migrations/016_donem_kapanis_auditleri.sql');
-    $auditMigration = preg_replace('/^\s*--.*$/m', '', (string) $auditMigration);
-    $auditMigration = preg_replace('/,\s*CONSTRAINT fk_dka_sube[^)]+\)/', '', (string) $auditMigration);
-    $auditMigration = preg_replace('/,\s*CONSTRAINT fk_dka_muhur[^)]+\)/', '', (string) $auditMigration);
-    $auditMigration = preg_replace('/,\s*CONSTRAINT fk_dka_actor[^)]+\)/', '', (string) $auditMigration);
-    $auditMigration = preg_replace('/,\s*CONSTRAINT chk_dka_yil[^)]+\)/', '', (string) $auditMigration);
-    $auditMigration = preg_replace('/,\s*CONSTRAINT chk_dka_ay[^)]+\)/', '', (string) $auditMigration);
-    foreach (array_filter(array_map('trim', explode(';', (string) $auditMigration))) as $statement) {
-        if ($statement !== '' && stripos($statement, 'SET ') !== 0) {
             $pdo->exec($statement);
         }
     }
@@ -349,10 +341,31 @@ try {
         durum VARCHAR(32) NOT NULL, muhurlenen_kayit_sayisi INT UNSIGNED NOT NULL DEFAULT 0,
         created_by INT UNSIGNED NULL, UNIQUE KEY uniq_test_seal (sube_id, yil, ay)
     ) ENGINE=InnoDB');
+    $pdo->exec('CREATE TABLE donem_kapanis_auditleri (
+        id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        sube_id INT UNSIGNED NOT NULL,
+        yil SMALLINT UNSIGNED NOT NULL,
+        ay TINYINT UNSIGNED NOT NULL,
+        action VARCHAR(40) NOT NULL,
+        result_state VARCHAR(40) NOT NULL,
+        muhur_id INT UNSIGNED NULL,
+        blocker_count INT UNSIGNED NOT NULL DEFAULT 0,
+        warning_count INT UNSIGNED NOT NULL DEFAULT 0,
+        preflight_hash CHAR(64) NOT NULL,
+        request_hash CHAR(64) NOT NULL,
+        result_hash CHAR(64) NOT NULL,
+        preflight_snapshot JSON NOT NULL,
+        actor_user_id INT UNSIGNED NOT NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY uq_dka_idempotency (sube_id, yil, ay, action, request_hash),
+        KEY idx_dka_sube_donem_created (sube_id, yil, ay, created_at)
+    ) ENGINE=InnoDB');
     $pdo->exec('CREATE TABLE gunluk_puantaj (
         id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY, personel_id INT UNSIGNED NOT NULL,
         sube_id INT UNSIGNED NOT NULL, tarih DATE NOT NULL, state VARCHAR(32) NOT NULL,
-        kontrol_durumu VARCHAR(32) NOT NULL, UNIQUE KEY uniq_test_personel_tarih (personel_id, tarih)
+        kontrol_durumu VARCHAR(32) NOT NULL, kaynak VARCHAR(32) NOT NULL DEFAULT \'MANUEL\',
+        aciklama TEXT NULL,
+        UNIQUE KEY uniq_test_personel_tarih (personel_id, tarih)
     ) ENGINE=InnoDB');
     $pdo->exec('CREATE TABLE test_adaylar (
         id INT UNSIGNED NOT NULL PRIMARY KEY, personel_id INT UNSIGNED NOT NULL, sube_id INT UNSIGNED NOT NULL,
@@ -366,7 +379,7 @@ try {
     $pdo->exec('CREATE TABLE gunluk_bildirimler (
         id INT UNSIGNED NOT NULL PRIMARY KEY, personel_id INT UNSIGNED NOT NULL, tarih DATE NOT NULL,
         sube_id INT UNSIGNED NOT NULL, departman_id INT UNSIGNED NULL, state VARCHAR(32) NOT NULL,
-        created_by INT UNSIGNED NULL
+        created_by INT UNSIGNED NULL, haftalik_mutabakat_id INT UNSIGNED NULL
     ) ENGINE=InnoDB');
     $pdo->exec('CREATE TABLE haftalik_bildirim_mutabakatlari (
         id INT UNSIGNED NOT NULL PRIMARY KEY, sube_id INT UNSIGNED NOT NULL, birim_amiri_user_id INT UNSIGNED NOT NULL,

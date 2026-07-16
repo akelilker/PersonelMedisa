@@ -499,6 +499,8 @@ describe("shouldEmitGlobalAuthForbidden", () => {
     expect(shouldEmitGlobalAuthForbidden("/api/surecler?personel_id=2", "GET")).toBe(false);
     expect(shouldEmitGlobalAuthForbidden("/surecler/9", "GET")).toBe(false);
     expect(shouldEmitGlobalAuthForbidden("/bildirimler/4", "GET")).toBe(false);
+    expect(shouldEmitGlobalAuthForbidden("/yonetim/subeler", "GET")).toBe(false);
+    expect(shouldEmitGlobalAuthForbidden("/api/yonetim/subeler", "GET")).toBe(false);
   });
 
   it("keeps global forbidden for list, sub-resources, puantaj and unknown paths", () => {

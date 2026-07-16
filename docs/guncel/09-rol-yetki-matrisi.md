@@ -242,6 +242,17 @@ S75 canlı kabulünde bu permission doğrulanmış MUHASEBE oturumuyla kullanıl
 ### Raporlar
 
 - `raporlar.view`: tum roller (rol bazli yogunluk farki UI'da)
+- `puantaj.donem_kapanis.view` / `puantaj.donem_kapanis.export`: dönem kapanış merkezi (`/raporlar?panel=donem-kapanis`)
+- `puantaj.bildirim_etki.rapor.view` / `puantaj.bildirim_etki.rapor.export`: etki adayı dönem raporu (`/raporlar?panel=etki-adayi`)
+
+| Permission | GY | MUHASEBE | BOLUM_YONETICISI | BIRIM_AMIRI |
+|------------|----|-----------|--------------------|-------------|
+| `puantaj.donem_kapanis.view` | ✓ | ✓ | ✓ | ✓ (kendi kapsam) |
+| `puantaj.donem_kapanis.export` | ✓ | ✓ | — | — |
+| `puantaj.bildirim_etki.rapor.view` | ✓ | ✓ | ✓ | ✓ (kendi kapsam) |
+| `puantaj.bildirim_etki.rapor.export` | ✓ | ✓ | — | — |
+
+`puantaj.muhurle` MUHASEBE'ye otomatik genişletilmez.
 
 ### Finans
 

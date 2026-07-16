@@ -379,6 +379,23 @@ Aynı protokol aday generate, otomatik apply, manuel apply, doğrudan günlük p
 
 Migration `014_puantaj_donem_kilitleri.sql` additive guard tablosudur. Schema-first sıra 15.07.2026'da canlıda uygulanmıştır: migration sonrası hardening kodu deploy edilmiş, `(sube_id=1, yil=2026, ay=4)` guard satırı tek generation ve manuel apply/idempotency zincirinde doğrulanmıştır. Kontrollü aday `#5` aynı body tekrarında HTTP `200`, `idempotent: true` ve aynı puantaj `#5` sonucunu vermiştir.
 
+### Dönem kapanış preflight ve mühür enforcement — S76 (yerel)
+
+Canonical kapanış owner: `puantaj_aylik_muhurleri`. Yeni paralel close endpoint yok; `POST /puantaj/muhurle` transaction içinde dönem kilidi sonrası `DonemKapanisPreflightService` ile BLOCKER denetimi yapar.
+
+| Endpoint | Açıklama |
+|----------|----------|
+| `GET /puantaj/donem-kapanis-preflight` | Özet: BLOCKER/WARNING/INFO, `kapanabilir_mi`, `preflight_hash` |
+| `GET /puantaj/donem-kapanis-preflight/items` | Issue kodu bazlı pagination |
+| `GET /puantaj/donem-kapanis-preflight/export.csv` | UTF-8 BOM CSV |
+| `GET /puantaj/donem-kapanis-auditleri` | Kapanış audit listesi |
+| `GET /puantaj/bildirim-etki-adaylari/rapor` | Etki adayı dönem raporu |
+| `GET /puantaj/bildirim-etki-adaylari/rapor/export.csv` | Rapor CSV |
+
+Blocker varsa mühür: `409 PERIOD_CLOSE_BLOCKED` (`blocker_count`, `blocker_codes`, `preflight_hash`). Mühürlü dönem idempotent `200`; `PERIOD_ALREADY_SEALED` blocker üretilmez. Audit: `donem_kapanis_auditleri` (`016` migration). Hash şeması: `S76_PERIOD_CLOSE_PREFLIGHT_V1`.
+
+**Yerel durum:** `S76_LOCAL_IMPLEMENTATION_COMPLETE` — canlı migration/deploy yapılmadı (`docs/guncel/79-s76-donem-kapanis-merkezi-yerel-checkpoint.md`).
+
 ### Puantaj etki adayı Yok Say — S74-C2A
 
 Endpoint: `POST /puantaj/bildirim-etki-adaylari/{id}/yok-say` — yalnız `puantaj.bildirim_etki.dismiss` (MUHASEBE).

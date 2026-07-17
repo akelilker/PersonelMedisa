@@ -29,6 +29,8 @@ export function PersonelDetayPage() {
   const canViewPuantaj = hasPermission("puantaj.view");
   const canViewRevizyon = hasPermission("revizyon.view");
   const canViewFinans = hasPermission("finans.view");
+  const canViewUcret = hasPermission("personeller.ucret.view");
+  const canManageUcret = hasPermission("personeller.ucret.manage");
   const canCreateZimmet = canEditPersonel;
 
   const [activeTab, setActiveTab] = useState<PersonelDosyaTabId>("genel-bilgiler");
@@ -141,7 +143,7 @@ export function PersonelDetayPage() {
 
       {!isLoading && !errorMessage && personel ? (
         <div className="personel-detail-card">
-          <PersonelDosyaHero personel={personel} />
+          <PersonelDosyaHero personel={personel} canViewUcret={canViewUcret} />
 
           {!isEditing ? (
             <PersonelDosyaActionRow
@@ -170,6 +172,7 @@ export function PersonelDetayPage() {
               hasLifecycleDiff={hasLifecycleDiff}
               editErrorMessage={editErrorMessage}
               isSubmitting={isSubmitting}
+              canManageUcret={canManageUcret}
               onSubmit={handleEditSubmit}
               onDiscard={discardEdit}
             />
@@ -192,6 +195,8 @@ export function PersonelDetayPage() {
               canAccessSurecler={canAccessSurecler}
               canCreateSurec={canCreateSurec}
               canViewFinans={canViewFinans}
+              canViewUcret={canViewUcret}
+              canManageUcret={canManageUcret}
               onOpenZimmetCreate={handleOpenPersonelZimmetGateway}
               onOpenCreateSurecModal={handleOpenSurecModal}
             />

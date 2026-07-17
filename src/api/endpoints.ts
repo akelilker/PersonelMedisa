@@ -7,6 +7,21 @@ export const endpoints = {
     detail: (id: number | string) => `/personeller/${id}`,
     belgeDurumu: (id: number | string) => `/personeller/${id}/belge-durumu`
   },
+  personelUcretleri: {
+    list: (personelId: number | string) => `/personeller/${personelId}/ucretler`,
+    aktif: (personelId: number | string) => `/personeller/${personelId}/ucretler/aktif`,
+    create: (personelId: number | string) => `/personeller/${personelId}/ucretler`,
+    detail: (personelId: number | string, ucretId: number | string) =>
+      `/personeller/${personelId}/ucretler/${ucretId}`,
+    cancel: (personelId: number | string, ucretId: number | string) =>
+      `/personeller/${personelId}/ucretler/${ucretId}/iptal`
+  },
+  mevzuatParametreleri: {
+    list: "/mevzuat-parametreleri",
+    create: "/mevzuat-parametreleri",
+    detail: (id: number | string) => `/mevzuat-parametreleri/${id}`,
+    cancel: (id: number | string) => `/mevzuat-parametreleri/${id}/iptal`
+  },
   personelBelgeKayitlari: {
     listByPersonel: (personelId: number | string) => `/personeller/${personelId}/belge-kayitlari`,
     create: (personelId: number | string) => `/personeller/${personelId}/belge-kayitlari`,

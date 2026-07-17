@@ -160,6 +160,7 @@ export function KayitSurecWorkspace({
   const canCreatePersonel = hasPermission("personeller.create");
   const canCreateSurec = hasPermission("surecler.create");
   const canUpdatePersonel = hasPermission("personeller.update");
+  const canManageUcret = hasPermission("personeller.ucret.manage");
   const canCreateZimmet = canUpdatePersonel;
   const canCreateFinans = hasPermission("finans.create");
   const canEditSurec = hasPermission("surecler.update");
@@ -1056,6 +1057,7 @@ export function KayitSurecWorkspace({
                         }}
                         referenceError={null}
                         className="workspace-form-stack"
+                        canManageUcret={canManageUcret}
                       />
                     </form>
                     {personelInfo ? <p className="workspace-success">{personelInfo}</p> : null}

@@ -4,7 +4,14 @@ import { isPersonelMaasMissing } from "../../personel-create-utils";
 import { DossierField } from "./personel-dosya-dossier";
 import { formatDetailValue, formatIsoDateDetail, formatReferenceValue } from "./personel-dosya-format-utils";
 
-export function PersonelDosyaHero({ personel }: { personel: Personel }) {
+export function PersonelDosyaHero({
+  personel,
+  canViewUcret
+}: {
+  personel: Personel;
+  /** Ücret görme yetkisi olmayan roller maaş eksikliği bilgisini de görmemeli. */
+  canViewUcret: boolean;
+}) {
   const durumLabel =
     personel.aktif_durum === "PASIF"
       ? formatDetailValue(personel.pasiflik_durumu_etiketi) !== "-"
@@ -48,7 +55,7 @@ export function PersonelDosyaHero({ personel }: { personel: Personel }) {
         <DossierField label="İşe Giriş Tarihi" value={formatIsoDateDetail(personel.ise_giris_tarihi)} />
       </div>
 
-      {isPersonelMaasMissing(personel.maas_tutari, personel.net_maas_tutari) ? (
+      {canViewUcret && isPersonelMaasMissing(personel.maas_tutari, personel.net_maas_tutari) ? (
         <p className="personel-dosya-maas-alert" data-testid="personel-maas-eksik-uyari">
           Maaş bilgisi eksik.
         </p>

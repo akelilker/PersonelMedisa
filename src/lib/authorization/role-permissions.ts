@@ -6,6 +6,10 @@ export type AppPermission =
   | "personeller.create"
   | "personeller.update"
   | "personeller.detail.view"
+  | "personeller.ucret.view"
+  | "personeller.ucret.manage"
+  | "mevzuat_parametreleri.view"
+  | "mevzuat_parametreleri.manage"
   | "surecler.view"
   | "surecler.view.sube"
   | "surecler.create"
@@ -78,6 +82,10 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "personeller.create",
     "personeller.update",
     "personeller.detail.view",
+    "personeller.ucret.view",
+    "personeller.ucret.manage",
+    "mevzuat_parametreleri.view",
+    "mevzuat_parametreleri.manage",
     "surecler.view",
     "surecler.view.sube",
     "surecler.create",
@@ -180,6 +188,9 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "personeller.create",
     "personeller.update",
     "personeller.detail.view",
+    "personeller.ucret.view",
+    "personeller.ucret.manage",
+    "mevzuat_parametreleri.view",
     "surecler.view",
     "surecler.view.sube",
     "surecler.create",

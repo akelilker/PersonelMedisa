@@ -18,6 +18,7 @@ import {
   updateYonetimSube
 } from "../../../api/yonetim.api";
 import { useRoleAccess } from "../../../hooks/use-role-access";
+import { MevzuatParametreleriPanel } from "../components/MevzuatParametreleriPanel";
 import { isRealYonetimKullaniciApi } from "../../../lib/yonetim/kullanici-api-contract";
 import type { UserRole } from "../../../types/auth";
 import type { Personel } from "../../../types/personel";
@@ -31,13 +32,16 @@ import type {
   YonetimSube
 } from "../../../types/yonetim";
 
-type ActiveTab = "kullanicilar" | "subeler";
+type ActiveTab = "kullanicilar" | "subeler" | "mevzuat";
 type YonetimViewMode = "card" | "list";
 
 function resolveYonetimActiveTab(tabParam: string | null): ActiveTab {
   const normalized = tabParam?.trim().toLowerCase() ?? "";
   if (normalized === "subeler" || normalized === "sube") {
     return "subeler";
+  }
+  if (normalized === "mevzuat") {
+    return "mevzuat";
   }
   return "kullanicilar";
 }
@@ -430,8 +434,11 @@ export function YonetimPaneliPage() {
   const [searchParams] = useSearchParams();
   const { hasPermission } = useRoleAccess();
   const canManageYonetimPanel = hasPermission("yonetim-paneli.manage");
+  const canViewMevzuat = hasPermission("mevzuat_parametreleri.view");
+  const canManageMevzuat = hasPermission("mevzuat_parametreleri.manage");
   const realKullaniciApi = isRealYonetimKullaniciApi();
-  const activeTab = resolveYonetimActiveTab(searchParams.get("tab"));
+  const requestedTab = resolveYonetimActiveTab(searchParams.get("tab"));
+  const activeTab: ActiveTab = requestedTab === "mevzuat" && !canViewMevzuat ? "kullanicilar" : requestedTab;
 
   const [kullaniciViewMode, setKullaniciViewMode] = useState<YonetimViewMode>("card");
   const [subeViewMode, setSubeViewMode] = useState<YonetimViewMode>("card");
@@ -943,6 +950,10 @@ export function YonetimPaneliPage() {
             </div>
           )}
         </section>
+      ) : null}
+
+      {!isLoading && !errorMessage && activeTab === "mevzuat" && canViewMevzuat ? (
+        <MevzuatParametreleriPanel canManage={canManageMevzuat} />
       ) : null}
 
       {isKullaniciFormOpen ? (

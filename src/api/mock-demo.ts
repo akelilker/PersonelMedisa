@@ -142,6 +142,41 @@ type DemoBildirim = {
   haftalik_mutabakat_id?: number | null;
 };
 
+type DemoPersonelUcretKaydi = {
+  id: number;
+  personel_id: number;
+  ucret_tutari: number;
+  ucret_turu: "BRUT" | "NET";
+  para_birimi: string;
+  gecerlilik_baslangic: string;
+  gecerlilik_bitis: string | null;
+  state: "AKTIF" | "IPTAL";
+  kaynak: "MANUEL" | "PERSONEL_KAYDI_MIGRASYON" | "SISTEM";
+  aciklama: string | null;
+  created_at: string;
+  created_by: number | null;
+  updated_at: string;
+  updated_by: number | null;
+};
+
+type DemoMevzuatParametresi = {
+  id: number;
+  parametre_kodu: string;
+  deger_tipi: "SAYISAL" | "METIN";
+  sayisal_deger: number | null;
+  metin_deger: string | null;
+  gecerlilik_baslangic: string;
+  gecerlilik_bitis: string | null;
+  birim: string | null;
+  aciklama: string | null;
+  kaynak_referansi: string | null;
+  state: "AKTIF" | "IPTAL";
+  created_at: string;
+  created_by: number | null;
+  updated_at: string;
+  updated_by: number | null;
+};
+
 type DemoFinansKalem = {
   id: number;
   personel_id: number;
@@ -296,6 +331,8 @@ const demoState: {
   haftalikBildirimMutabakatlari: HaftalikBildirimMutabakat[];
   aylikBildirimOnaylari: AylikBildirimOnay[];
   finansKalemleri: DemoFinansKalem[];
+  personelUcretleri: DemoPersonelUcretKaydi[];
+  mevzuatParametreleri: DemoMevzuatParametresi[];
   puantajMap: Record<string, DemoPuantaj>;
   makineler: DemoMakine[];
   bakimKayitlari: DemoMakineBakimKaydi[];
@@ -321,6 +358,8 @@ const demoState: {
     haftalikBildirimMutabakat: number;
     aylikBildirimOnay: number;
     finans: number;
+    personelUcret: number;
+    mevzuatParametre: number;
     kapanis: number;
     odemeTercihi: number;
     serbestZamanEvent: number;
@@ -505,6 +544,8 @@ const demoState: {
       state: "IPTAL"
     }
   ],
+  personelUcretleri: [],
+  mevzuatParametreleri: [],
   puantajMap: {
     "1|2026-04-09": buildDemoPuantaj({
       personelId: 1,
@@ -719,6 +760,8 @@ const demoState: {
     haftalikBildirimMutabakat: 0,
     aylikBildirimOnay: 0,
     finans: 950,
+    personelUcret: 0,
+    mevzuatParametre: 0,
     kapanis: 1000,
     odemeTercihi: 1,
     serbestZamanEvent: 1,
@@ -1906,6 +1949,231 @@ function demoSerbestZamanOlusumError(
   };
 }
 
+const DEMO_UCRET_OVERLAP_MESAJI = "Ucret gecerlilik tarihleri mevcut kayitla cakisiyor.";
+const DEMO_MEVZUAT_OVERLAP_MESAJI = "Mevzuat parametresi tarih araligi mevcut kayitla cakisiyor.";
+
+function isDemoIsoDate(value: unknown): value is string {
+  return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value);
+}
+
+function demoTodayIsoDate(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function addDaysToIsoDate(value: string, days: number): string {
+  const date = new Date(`${value}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+function demoPersonelSubeScopeError(
+  actor: RevizyonActorContext,
+  personel: DemoPersonel
+): ApiResponse<unknown> | null {
+  if (
+    actor.subeIds.length > 0 &&
+    typeof personel.sube_id === "number" &&
+    !actor.subeIds.includes(personel.sube_id)
+  ) {
+    return demoRevizyonError("FORBIDDEN", "Secili sube icin yetkiniz yok.");
+  }
+  return null;
+}
+
+type DemoUcretNormalizedBody = {
+  ucret_tutari: number;
+  ucret_turu: "BRUT" | "NET";
+  para_birimi: string;
+  gecerlilik_baslangic: string;
+  gecerlilik_bitis: string | null;
+  aciklama: string | null;
+};
+
+function normalizeDemoUcretBody(
+  source: Record<string, unknown>
+): { error: ApiResponse<unknown> } | { value: DemoUcretNormalizedBody } {
+  const tutar = toNumber(source.ucret_tutari);
+  if (tutar === null || tutar <= 0) {
+    return { error: demoRevizyonError("SALARY_AMOUNT_INVALID", "Ucret tutari sifirdan buyuk olmalidir.") };
+  }
+
+  const turu = (toStringValue(source.ucret_turu) ?? "").toUpperCase();
+  if (turu !== "BRUT" && turu !== "NET") {
+    return { error: demoRevizyonError("SALARY_TYPE_INVALID", "Ucret turu BRUT veya NET olmalidir.") };
+  }
+
+  const paraBirimi = (toStringValue(source.para_birimi) ?? "TRY").toUpperCase();
+  if (!/^[A-Z]{3}$/.test(paraBirimi)) {
+    return { error: demoRevizyonError("SALARY_CURRENCY_INVALID", "Para birimi uc harfli ISO kodu olmalidir.") };
+  }
+
+  const baslangic = source.gecerlilik_baslangic;
+  if (!isDemoIsoDate(baslangic)) {
+    return { error: demoRevizyonError("DATE_INVALID", "gecerlilik_baslangic gecerli bir tarih olmalidir.") };
+  }
+
+  const bitisRaw = source.gecerlilik_bitis;
+  let bitis: string | null = null;
+  if (bitisRaw !== null && bitisRaw !== undefined && bitisRaw !== "") {
+    if (!isDemoIsoDate(bitisRaw)) {
+      return { error: demoRevizyonError("DATE_INVALID", "gecerlilik_bitis gecerli bir tarih olmalidir.") };
+    }
+    bitis = bitisRaw;
+  }
+
+  if (bitis !== null && bitis < baslangic) {
+    return { error: demoRevizyonError("DATE_RANGE_INVALID", "Bitis tarihi baslangic tarihinden once olamaz.") };
+  }
+
+  return {
+    value: {
+      ucret_tutari: tutar,
+      ucret_turu: turu,
+      para_birimi: paraBirimi,
+      gecerlilik_baslangic: baslangic,
+      gecerlilik_bitis: bitis,
+      aciklama: toStringValue(source.aciklama) ?? null
+    }
+  };
+}
+
+/** Tarih dahil (inclusive) cakisma kontrolu: start <= yeniBitis && (bitis yok || bitis >= yeniBaslangic). */
+function demoUcretHasOverlap(
+  personelId: number,
+  start: string,
+  end: string | null,
+  excludeId?: number
+): boolean {
+  const yeniBitis = end ?? "9999-12-31";
+  return demoState.personelUcretleri.some(
+    (item) =>
+      item.personel_id === personelId &&
+      item.state === "AKTIF" &&
+      (excludeId === undefined || item.id !== excludeId) &&
+      item.gecerlilik_baslangic <= yeniBitis &&
+      (item.gecerlilik_bitis === null || item.gecerlilik_bitis >= start)
+  );
+}
+
+function sortDemoUcretKayitlari(items: DemoPersonelUcretKaydi[]): DemoPersonelUcretKaydi[] {
+  return [...items].sort((left, right) => {
+    if (left.gecerlilik_baslangic !== right.gecerlilik_baslangic) {
+      return left.gecerlilik_baslangic < right.gecerlilik_baslangic ? 1 : -1;
+    }
+    return right.id - left.id;
+  });
+}
+
+function findDemoGuncelUcret(personelId: number, tarih: string): DemoPersonelUcretKaydi | null {
+  const matches = sortDemoUcretKayitlari(
+    demoState.personelUcretleri.filter(
+      (item) =>
+        item.personel_id === personelId &&
+        item.state === "AKTIF" &&
+        item.gecerlilik_baslangic <= tarih &&
+        (item.gecerlilik_bitis === null || tarih <= item.gecerlilik_bitis)
+    )
+  );
+  return matches[0] ?? null;
+}
+
+/** Backend gibi legacy personeller.maas_tutari alanini guncel ucretle senkron tutar. */
+function syncDemoLegacyMaas(personelId: number): void {
+  const personel = demoState.personeller.find((item) => item.id === personelId);
+  if (!personel) {
+    return;
+  }
+  if (!demoState.personelUcretleri.some((item) => item.personel_id === personelId)) {
+    return;
+  }
+  const guncel = findDemoGuncelUcret(personelId, demoTodayIsoDate());
+  personel.maas_tutari = guncel ? guncel.ucret_tutari : undefined;
+}
+
+type DemoMevzuatNormalizedBody = {
+  parametre_kodu: string;
+  deger_tipi: "SAYISAL" | "METIN";
+  sayisal_deger: number | null;
+  metin_deger: string | null;
+  gecerlilik_baslangic: string;
+  gecerlilik_bitis: string | null;
+  birim: string | null;
+  aciklama: string | null;
+  kaynak_referansi: string | null;
+};
+
+function normalizeDemoMevzuatBody(
+  source: Record<string, unknown>
+): { error: ApiResponse<unknown> } | { value: DemoMevzuatNormalizedBody } {
+  const kod = (toStringValue(source.parametre_kodu) ?? "").toUpperCase();
+  if (!kod || kod.length > 80 || !/^[A-Z0-9_.-]+$/.test(kod)) {
+    return { error: demoRevizyonError("VALIDATION_ERROR", "Gecersiz parametre kodu.") };
+  }
+
+  const tip = (toStringValue(source.deger_tipi) ?? "").toUpperCase();
+  if (tip !== "SAYISAL" && tip !== "METIN") {
+    return { error: demoRevizyonError("VALIDATION_ERROR", "Deger tipi SAYISAL veya METIN olmalidir.") };
+  }
+
+  const sayisal = toNumber(source.sayisal_deger);
+  const metin = toStringValue(source.metin_deger) ?? null;
+  if (tip === "SAYISAL" && (sayisal === null || metin !== null)) {
+    return { error: demoRevizyonError("VALIDATION_ERROR", "Sayisal parametre yalniz sayisal deger icermelidir.") };
+  }
+  if (tip === "METIN" && (metin === null || sayisal !== null)) {
+    return { error: demoRevizyonError("VALIDATION_ERROR", "Metin parametresi yalniz metin degeri icermelidir.") };
+  }
+
+  const baslangic = source.gecerlilik_baslangic;
+  if (!isDemoIsoDate(baslangic)) {
+    return { error: demoRevizyonError("DATE_INVALID", "Gecerli bir tarih zorunludur.") };
+  }
+
+  const bitisRaw = source.gecerlilik_bitis;
+  let bitis: string | null = null;
+  if (bitisRaw !== null && bitisRaw !== undefined && bitisRaw !== "") {
+    if (!isDemoIsoDate(bitisRaw)) {
+      return { error: demoRevizyonError("DATE_INVALID", "Gecerli bir tarih zorunludur.") };
+    }
+    bitis = bitisRaw;
+  }
+
+  if (bitis !== null && bitis < baslangic) {
+    return { error: demoRevizyonError("DATE_RANGE_INVALID", "Bitis tarihi baslangic tarihinden once olamaz.") };
+  }
+
+  return {
+    value: {
+      parametre_kodu: kod,
+      deger_tipi: tip,
+      sayisal_deger: tip === "SAYISAL" ? sayisal : null,
+      metin_deger: tip === "METIN" ? metin : null,
+      gecerlilik_baslangic: baslangic,
+      gecerlilik_bitis: bitis,
+      birim: toStringValue(source.birim) ?? null,
+      aciklama: toStringValue(source.aciklama) ?? null,
+      kaynak_referansi: toStringValue(source.kaynak_referansi) ?? null
+    }
+  };
+}
+
+function demoMevzuatHasOverlap(
+  kod: string,
+  start: string,
+  end: string | null,
+  excludeId?: number
+): boolean {
+  const yeniBitis = end ?? "9999-12-31";
+  return demoState.mevzuatParametreleri.some(
+    (item) =>
+      item.parametre_kodu === kod &&
+      item.state === "AKTIF" &&
+      (excludeId === undefined || item.id !== excludeId) &&
+      item.gecerlilik_baslangic <= yeniBitis &&
+      (item.gecerlilik_bitis === null || item.gecerlilik_bitis >= start)
+  );
+}
+
 function parsePath(path: string): URL {
   const normalized = path.startsWith("/") ? path : `/${path}`;
   return new URL(normalized, "https://demo.local");
@@ -2897,6 +3165,241 @@ export function resolveDemoApiResponse(
       Object.assign(personel, body);
       return ok(buildDemoPersonelDetail(personel));
     }
+  }
+
+  const personelUcretAktifMatch = pathname.match(/^\/personeller\/(\d+)\/ucret(?:ler)?\/aktif$/);
+  if (personelUcretAktifMatch && method === "GET") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(
+      actor,
+      "personeller.ucret.view",
+      "Ucret bilgisine erisim yetkiniz yok."
+    );
+    if (permissionError) return permissionError;
+
+    const personelId = Number.parseInt(personelUcretAktifMatch[1], 10);
+    const personel = demoState.personeller.find((item) => item.id === personelId);
+    if (!personel) {
+      return demoRevizyonError("SALARY_RECORD_NOT_FOUND", "Personel bulunamadi.");
+    }
+    const scopeError = demoPersonelSubeScopeError(actor, personel);
+    if (scopeError) return scopeError;
+
+    const tarihParam = toStringValue(requestUrl.searchParams.get("tarih"));
+    const tarih = tarihParam && isDemoIsoDate(tarihParam) ? tarihParam : demoTodayIsoDate();
+    const guncel = findDemoGuncelUcret(personelId, tarih);
+    if (guncel) {
+      return ok(guncel);
+    }
+
+    const hasHistory = demoState.personelUcretleri.some((item) => item.personel_id === personelId);
+    if (!hasHistory && typeof personel.maas_tutari === "number" && personel.maas_tutari > 0) {
+      const legacyStart = personel.ise_giris_tarihi ?? "1900-01-01";
+      if (legacyStart <= tarih) {
+        return ok({
+          id: null,
+          personel_id: personelId,
+          ucret_tutari: personel.maas_tutari,
+          ucret_turu: "NET",
+          para_birimi: "TRY",
+          gecerlilik_baslangic: legacyStart,
+          gecerlilik_bitis: null,
+          state: "AKTIF",
+          kaynak: "PERSONEL_KAYDI_MIGRASYON",
+          virtual: true
+        });
+      }
+    }
+
+    return demoRevizyonError("SALARY_MISSING", "Belirtilen tarihte gecerli ucret kaydi yok.");
+  }
+
+  const personelUcretListMatch = pathname.match(/^\/personeller\/(\d+)\/ucretler$/);
+  if (personelUcretListMatch && (method === "GET" || method === "POST")) {
+    const actor = readDemoApiActor(init);
+    const personelId = Number.parseInt(personelUcretListMatch[1], 10);
+    const personel = demoState.personeller.find((item) => item.id === personelId);
+    if (!personel) {
+      return demoRevizyonError("SALARY_RECORD_NOT_FOUND", "Personel bulunamadi.");
+    }
+
+    if (method === "GET") {
+      const permissionError = enforceDemoPermission(
+        actor,
+        "personeller.ucret.view",
+        "Ucret bilgisine erisim yetkiniz yok."
+      );
+      if (permissionError) return permissionError;
+      const scopeError = demoPersonelSubeScopeError(actor, personel);
+      if (scopeError) return scopeError;
+
+      return ok({
+        items: sortDemoUcretKayitlari(
+          demoState.personelUcretleri.filter((item) => item.personel_id === personelId)
+        )
+      });
+    }
+
+    const permissionError = enforceDemoPermission(
+      actor,
+      "personeller.ucret.manage",
+      "Ucret bilgisine erisim yetkiniz yok."
+    );
+    if (permissionError) return permissionError;
+    const scopeError = demoPersonelSubeScopeError(actor, personel);
+    if (scopeError) return scopeError;
+
+    const normalized = normalizeDemoUcretBody(body);
+    if ("error" in normalized) {
+      return normalized.error;
+    }
+    const data = normalized.value;
+    const now = new Date().toISOString();
+
+    const hasHistory = demoState.personelUcretleri.some((item) => item.personel_id === personelId);
+    if (!hasHistory && typeof personel.maas_tutari === "number" && personel.maas_tutari > 0) {
+      const legacyStart = personel.ise_giris_tarihi ?? "1900-01-01";
+      if (legacyStart < data.gecerlilik_baslangic) {
+        demoState.personelUcretleri.push({
+          id: ++demoState.nextIds.personelUcret,
+          personel_id: personelId,
+          ucret_tutari: personel.maas_tutari,
+          ucret_turu: "NET",
+          para_birimi: "TRY",
+          gecerlilik_baslangic: legacyStart,
+          gecerlilik_bitis: addDaysToIsoDate(data.gecerlilik_baslangic, -1),
+          state: "AKTIF",
+          kaynak: "PERSONEL_KAYDI_MIGRASYON",
+          aciklama: "Legacy personel maasindan tarihce gecisi",
+          created_at: now,
+          created_by: actor.userId,
+          updated_at: now,
+          updated_by: actor.userId
+        });
+      }
+    }
+
+    const openKayit = sortDemoUcretKayitlari(
+      demoState.personelUcretleri.filter(
+        (item) =>
+          item.personel_id === personelId && item.state === "AKTIF" && item.gecerlilik_bitis === null
+      )
+    )[0];
+    if (openKayit && openKayit.gecerlilik_baslangic <= data.gecerlilik_baslangic) {
+      if (openKayit.gecerlilik_baslangic === data.gecerlilik_baslangic) {
+        return demoRevizyonError(
+          "DATE_RANGE_INVALID",
+          "Ayni baslangic tarihli acik ucret kaydi kapatilamaz."
+        );
+      }
+      openKayit.gecerlilik_bitis = addDaysToIsoDate(data.gecerlilik_baslangic, -1);
+      openKayit.updated_at = now;
+      openKayit.updated_by = actor.userId;
+    }
+
+    if (demoUcretHasOverlap(personelId, data.gecerlilik_baslangic, data.gecerlilik_bitis)) {
+      return demoRevizyonError("SALARY_DATE_OVERLAP", DEMO_UCRET_OVERLAP_MESAJI);
+    }
+
+    const next: DemoPersonelUcretKaydi = {
+      id: ++demoState.nextIds.personelUcret,
+      personel_id: personelId,
+      ...data,
+      state: "AKTIF",
+      kaynak: "MANUEL",
+      created_at: now,
+      created_by: actor.userId,
+      updated_at: now,
+      updated_by: actor.userId
+    };
+    demoState.personelUcretleri.push(next);
+    syncDemoLegacyMaas(personelId);
+    return ok(next);
+  }
+
+  const personelUcretDetailMatch = pathname.match(/^\/personeller\/(\d+)\/ucretler\/(\d+)$/);
+  if (personelUcretDetailMatch && method === "PUT") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(
+      actor,
+      "personeller.ucret.manage",
+      "Ucret bilgisine erisim yetkiniz yok."
+    );
+    if (permissionError) return permissionError;
+
+    const personelId = Number.parseInt(personelUcretDetailMatch[1], 10);
+    const ucretId = Number.parseInt(personelUcretDetailMatch[2], 10);
+    const record = demoState.personelUcretleri.find(
+      (item) => item.id === ucretId && item.personel_id === personelId
+    );
+    if (!record) {
+      return demoRevizyonError("SALARY_RECORD_NOT_FOUND", "Ucret kaydi bulunamadi.");
+    }
+    if (record.state !== "AKTIF" || record.gecerlilik_baslangic <= demoTodayIsoDate()) {
+      return demoRevizyonError(
+        "SALARY_CHANGE_FORBIDDEN",
+        "Baslamis veya iptal edilmis ucret kaydi degistirilemez."
+      );
+    }
+
+    const normalized = normalizeDemoUcretBody({
+      ucret_tutari: record.ucret_tutari,
+      ucret_turu: record.ucret_turu,
+      para_birimi: record.para_birimi,
+      gecerlilik_baslangic: record.gecerlilik_baslangic,
+      gecerlilik_bitis: record.gecerlilik_bitis,
+      aciklama: record.aciklama,
+      ...body
+    });
+    if ("error" in normalized) {
+      return normalized.error;
+    }
+    if (
+      demoUcretHasOverlap(
+        personelId,
+        normalized.value.gecerlilik_baslangic,
+        normalized.value.gecerlilik_bitis,
+        record.id
+      )
+    ) {
+      return demoRevizyonError("SALARY_DATE_OVERLAP", DEMO_UCRET_OVERLAP_MESAJI);
+    }
+
+    Object.assign(record, normalized.value, {
+      updated_at: new Date().toISOString(),
+      updated_by: actor.userId
+    });
+    syncDemoLegacyMaas(personelId);
+    return ok(record);
+  }
+
+  const personelUcretCancelMatch = pathname.match(/^\/personeller\/(\d+)\/ucretler\/(\d+)\/iptal$/);
+  if (personelUcretCancelMatch && method === "POST") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(
+      actor,
+      "personeller.ucret.manage",
+      "Ucret bilgisine erisim yetkiniz yok."
+    );
+    if (permissionError) return permissionError;
+
+    const personelId = Number.parseInt(personelUcretCancelMatch[1], 10);
+    const ucretId = Number.parseInt(personelUcretCancelMatch[2], 10);
+    const record = demoState.personelUcretleri.find(
+      (item) => item.id === ucretId && item.personel_id === personelId
+    );
+    if (!record) {
+      return demoRevizyonError("SALARY_RECORD_NOT_FOUND", "Ucret kaydi bulunamadi.");
+    }
+    if (record.state !== "AKTIF") {
+      return demoRevizyonError("SALARY_CHANGE_FORBIDDEN", "Ucret kaydi zaten iptal.");
+    }
+
+    record.state = "IPTAL";
+    record.updated_at = new Date().toISOString();
+    record.updated_by = actor.userId;
+    syncDemoLegacyMaas(personelId);
+    return ok(record);
   }
 
   if (pathname === "/surecler" && method === "GET") {
@@ -4546,6 +5049,173 @@ export function resolveDemoApiResponse(
 
     finans.state = "IPTAL";
     return ok({ id: finans.id, state: finans.state });
+  }
+
+  if (pathname === "/mevzuat-parametreleri" && method === "GET") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(
+      actor,
+      "mevzuat_parametreleri.view",
+      "Mevzuat parametrelerine erisim yetkiniz yok."
+    );
+    if (permissionError) return permissionError;
+
+    const kodFilter = (toStringValue(requestUrl.searchParams.get("parametre_kodu")) ?? "").toUpperCase();
+    const items = demoState.mevzuatParametreleri
+      .filter((item) => !kodFilter || item.parametre_kodu === kodFilter)
+      .sort((left, right) => {
+        if (left.parametre_kodu !== right.parametre_kodu) {
+          return left.parametre_kodu < right.parametre_kodu ? -1 : 1;
+        }
+        if (left.gecerlilik_baslangic !== right.gecerlilik_baslangic) {
+          return left.gecerlilik_baslangic < right.gecerlilik_baslangic ? 1 : -1;
+        }
+        return right.id - left.id;
+      });
+
+    return ok({ items });
+  }
+
+  if (pathname === "/mevzuat-parametreleri" && method === "POST") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(
+      actor,
+      "mevzuat_parametreleri.manage",
+      "Mevzuat parametrelerini yonetme yetkiniz yok."
+    );
+    if (permissionError) return permissionError;
+
+    const normalized = normalizeDemoMevzuatBody(body);
+    if ("error" in normalized) {
+      return normalized.error;
+    }
+    const data = normalized.value;
+    const now = new Date().toISOString();
+
+    const openKayit = demoState.mevzuatParametreleri
+      .filter(
+        (item) =>
+          item.parametre_kodu === data.parametre_kodu &&
+          item.state === "AKTIF" &&
+          item.gecerlilik_bitis === null
+      )
+      .sort((left, right) =>
+        left.gecerlilik_baslangic === right.gecerlilik_baslangic
+          ? right.id - left.id
+          : left.gecerlilik_baslangic < right.gecerlilik_baslangic
+            ? 1
+            : -1
+      )[0];
+    if (openKayit && openKayit.gecerlilik_baslangic <= data.gecerlilik_baslangic) {
+      if (openKayit.gecerlilik_baslangic === data.gecerlilik_baslangic) {
+        return demoRevizyonError(
+          "DATE_RANGE_INVALID",
+          "Ayni baslangic tarihli acik parametre kapatilamaz."
+        );
+      }
+      openKayit.gecerlilik_bitis = addDaysToIsoDate(data.gecerlilik_baslangic, -1);
+      openKayit.updated_at = now;
+      openKayit.updated_by = actor.userId;
+    }
+
+    if (demoMevzuatHasOverlap(data.parametre_kodu, data.gecerlilik_baslangic, data.gecerlilik_bitis)) {
+      return demoRevizyonError("LEGAL_PARAMETER_OVERLAP", DEMO_MEVZUAT_OVERLAP_MESAJI);
+    }
+
+    const next: DemoMevzuatParametresi = {
+      id: ++demoState.nextIds.mevzuatParametre,
+      ...data,
+      state: "AKTIF",
+      created_at: now,
+      created_by: actor.userId,
+      updated_at: now,
+      updated_by: actor.userId
+    };
+    demoState.mevzuatParametreleri.push(next);
+    return ok(next);
+  }
+
+  const mevzuatDetailMatch = pathname.match(/^\/mevzuat-parametreleri\/(\d+)$/);
+  if (mevzuatDetailMatch && method === "PUT") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(
+      actor,
+      "mevzuat_parametreleri.manage",
+      "Mevzuat parametrelerini yonetme yetkiniz yok."
+    );
+    if (permissionError) return permissionError;
+
+    const id = Number.parseInt(mevzuatDetailMatch[1], 10);
+    const record = demoState.mevzuatParametreleri.find((item) => item.id === id);
+    if (!record) {
+      return demoRevizyonError("NOT_FOUND", "Mevzuat parametresi bulunamadi.");
+    }
+    if (record.state !== "AKTIF" || record.gecerlilik_baslangic <= demoTodayIsoDate()) {
+      return demoRevizyonError(
+        "LEGAL_PARAMETER_CHANGE_FORBIDDEN",
+        "Baslamis veya iptal edilmis parametre degistirilemez."
+      );
+    }
+
+    const normalized = normalizeDemoMevzuatBody({
+      parametre_kodu: record.parametre_kodu,
+      deger_tipi: record.deger_tipi,
+      sayisal_deger: record.sayisal_deger,
+      metin_deger: record.metin_deger,
+      gecerlilik_baslangic: record.gecerlilik_baslangic,
+      gecerlilik_bitis: record.gecerlilik_bitis,
+      birim: record.birim,
+      aciklama: record.aciklama,
+      kaynak_referansi: record.kaynak_referansi,
+      ...body
+    });
+    if ("error" in normalized) {
+      return normalized.error;
+    }
+    if (normalized.value.parametre_kodu !== record.parametre_kodu) {
+      return demoRevizyonError("LEGAL_PARAMETER_CHANGE_FORBIDDEN", "Parametre kodu degistirilemez.");
+    }
+    if (
+      demoMevzuatHasOverlap(
+        normalized.value.parametre_kodu,
+        normalized.value.gecerlilik_baslangic,
+        normalized.value.gecerlilik_bitis,
+        record.id
+      )
+    ) {
+      return demoRevizyonError("LEGAL_PARAMETER_OVERLAP", DEMO_MEVZUAT_OVERLAP_MESAJI);
+    }
+
+    Object.assign(record, normalized.value, {
+      updated_at: new Date().toISOString(),
+      updated_by: actor.userId
+    });
+    return ok(record);
+  }
+
+  const mevzuatCancelMatch = pathname.match(/^\/mevzuat-parametreleri\/(\d+)\/iptal$/);
+  if (mevzuatCancelMatch && method === "POST") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(
+      actor,
+      "mevzuat_parametreleri.manage",
+      "Mevzuat parametrelerini yonetme yetkiniz yok."
+    );
+    if (permissionError) return permissionError;
+
+    const id = Number.parseInt(mevzuatCancelMatch[1], 10);
+    const record = demoState.mevzuatParametreleri.find((item) => item.id === id);
+    if (!record) {
+      return demoRevizyonError("NOT_FOUND", "Mevzuat parametresi bulunamadi.");
+    }
+    if (record.state !== "AKTIF") {
+      return demoRevizyonError("LEGAL_PARAMETER_CHANGE_FORBIDDEN", "Parametre zaten iptal.");
+    }
+
+    record.state = "IPTAL";
+    record.updated_at = new Date().toISOString();
+    record.updated_by = actor.userId;
+    return ok(record);
   }
 
   if (pathname === "/puantaj/donem-kapanis-preflight" && method === "GET") {

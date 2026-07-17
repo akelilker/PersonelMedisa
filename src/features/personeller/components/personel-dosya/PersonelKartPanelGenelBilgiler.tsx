@@ -4,6 +4,7 @@ import { DossierRecord, DossierSection } from "./personel-dosya-dossier";
 import { formatDetailValue, formatIsoDateDetail, formatReferenceValue } from "./personel-dosya-format-utils";
 import { PersonelIzinOzetSection } from "./PersonelIzinOzetSection";
 import { PersonelPuantajOzetSection } from "./PersonelPuantajOzetSection";
+import { PersonelUcretGecmisiSection } from "./PersonelUcretGecmisiSection";
 
 export function PersonelKartPanelGenelBilgiler({
   personel,
@@ -11,6 +12,8 @@ export function PersonelKartPanelGenelBilgiler({
   canViewPuantaj,
   canViewRevizyon,
   canViewFinans,
+  canViewUcret,
+  canManageUcret,
   isActive,
   onOpenSurecHistory
 }: {
@@ -19,6 +22,8 @@ export function PersonelKartPanelGenelBilgiler({
   canViewPuantaj: boolean;
   canViewRevizyon: boolean;
   canViewFinans: boolean;
+  canViewUcret: boolean;
+  canManageUcret: boolean;
   isActive: boolean;
   onOpenSurecHistory?: () => void;
 }) {
@@ -57,6 +62,14 @@ export function PersonelKartPanelGenelBilgiler({
         canViewFinans={canViewFinans}
         isActive={isActive}
       />
+
+      {canViewUcret ? (
+        <PersonelUcretGecmisiSection
+          personel={personel}
+          canManageUcret={canManageUcret}
+          isActive={isActive}
+        />
+      ) : null}
 
       <PersonelIzinOzetSection
         personel={personel}

@@ -29,6 +29,8 @@ type PersonelCreateFieldsProps = {
   onFieldErrorClear?: (field: "tcKimlikNo" | "subeId") => void;
   referenceError?: string | null;
   className?: string;
+  /** Ücret yönetim yetkisi olmayan roller maaş alanını görmez. */
+  canManageUcret?: boolean;
 };
 
 type PersonelCreateSelectProps = {
@@ -187,7 +189,8 @@ export function PersonelCreateFields({
   fieldErrors,
   onFieldErrorClear,
   referenceError,
-  className
+  className,
+  canManageUcret = false
 }: PersonelCreateFieldsProps) {
   const [openSelectName, setOpenSelectName] = useState<string | null>(null);
   const tcKimlikNoFieldError = fieldErrors?.tcKimlikNo;
@@ -458,16 +461,18 @@ export function PersonelCreateFields({
           ) : (
             refMissingNote("Ücret Tipi", false)
           )}
-          <FormField
-            label="Net Maaş"
-            name="create-maas"
-            type="number"
-            min={0}
-            step="0.01"
-            value={form.maasTutari}
-            onChange={(value) => setForm((prev) => ({ ...prev, maasTutari: value }))}
-            placeholder="Örn. 35000"
-          />
+          {canManageUcret ? (
+            <FormField
+              label="Net Maaş"
+              name="create-maas"
+              type="number"
+              min={0}
+              step="0.01"
+              value={form.maasTutari}
+              onChange={(value) => setForm((prev) => ({ ...prev, maasTutari: value }))}
+              placeholder="Örn. 35000"
+            />
+          ) : null}
         </div>
       </div>
 

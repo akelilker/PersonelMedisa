@@ -19,6 +19,7 @@ export type PersonelInlineEditFormProps = {
   hasLifecycleDiff: boolean;
   editErrorMessage: string | null;
   isSubmitting: boolean;
+  canManageUcret: boolean;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onDiscard: () => void;
 };
@@ -33,6 +34,7 @@ export function PersonelInlineEditForm({
   hasLifecycleDiff,
   editErrorMessage,
   isSubmitting,
+  canManageUcret,
   onSubmit,
   onDiscard
 }: PersonelInlineEditFormProps) {
@@ -131,15 +133,15 @@ export function PersonelInlineEditForm({
         ) : (
           <p className="personel-create-error">Ücret tipi listesi yüklenemedi.</p>
         )}
-        <FormField
-          label="Net Maaş"
-          name="edit-maas"
-          type="number"
-          min={0}
-          step="0.01"
-          value={editForm.maasTutari}
-          onChange={(value) => setEditForm((prev) => ({ ...prev, maasTutari: value }))}
-        />
+        {canManageUcret ? (
+          <p
+            className="personel-form-note personel-form-note--info"
+            data-testid="personel-edit-ucret-yonlendirme"
+          >
+            Maaş bilgisi artık Genel sekmesindeki Ücret Geçmişi bölümünden yönetilir; yeni tutar
+            için oradan yeni ücret dönemi başlatın.
+          </p>
+        ) : null}
         {personelRefs.primKuraliOptions.length > 0 ? (
           <FormField
             as="select"

@@ -140,6 +140,7 @@ export function ShellHeaderActions({ contextLabel, minimal = false }: ShellHeade
   const canViewFinans = hasPermission("finans.view");
   const canViewYonetimPanel = hasPermission("yonetim-paneli.view");
   const canManageYonetimPanel = hasPermission("yonetim-paneli.manage");
+  const canViewMevzuat = hasPermission("mevzuat_parametreleri.view");
 
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -555,6 +556,17 @@ export function ShellHeaderActions({ contextLabel, minimal = false }: ShellHeade
               }}
             >
               Şube Yönetimi
+            </button>
+          ) : null}
+          {canViewYonetimPanel && canViewMevzuat ? (
+            <button
+              type="button"
+              data-testid="settings-mevzuat-parametreleri"
+              onClick={() => {
+                navigateTo("/yonetim-paneli?tab=mevzuat");
+              }}
+            >
+              Mevzuat Parametreleri
             </button>
           ) : null}
           <button

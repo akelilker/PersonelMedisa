@@ -1888,6 +1888,11 @@ export async function mockApi(page: Page, role: MockUserRole, options: MockApiOp
     }
   ];
 
+  const maasSnapshots: Array<Record<string, any>> = [];
+  const maasAudits: Array<Record<string, any>> = [];
+  let maasNextId = 0;
+  let maasNextAuditId = 0;
+
   const puantajKayitlari: GunlukPuantaj[] = [
     {
       personel_id: 1,
@@ -6814,6 +6819,323 @@ let personelBelgeKaydiIdCounter = 903;
         total: 1,
         total_pages: 1
       }));
+      return;
+    }
+
+    // --- S77-C Maaş Hesaplama ---
+    if (path === "/api/maas-hesaplama/preflight" && method === "GET") {
+      if (await denyUnlessRolePermission(route, "maas_hesaplama.view")) {
+        return;
+      }
+      const subeId = Number.parseInt(url.searchParams.get("sube_id") ?? "", 10);
+      const yil = Number.parseInt(url.searchParams.get("yil") ?? "", 10) || 2026;
+      const ay = Number.parseInt(url.searchParams.get("ay") ?? "", 10) || 3;
+      if (!Number.isFinite(subeId) || subeId <= 0) {
+        await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "sube_id zorunludur.", "sube_id"));
+        return;
+      }
+      const donem = `${yil}-${String(ay).padStart(2, "0")}`;
+      const sealed = subeId === 1 && yil === 2026 && ay === 3;
+      const existing = maasSnapshots.find(
+        (item) => item.sube_id === subeId && item.yil === yil && item.ay === ay && item.state === "OLUSTURULDU"
+      );
+      const items = sealed
+        ? [
+            {
+              severity: "INFO",
+              code: "PERIOD_SEALED",
+              message: "Donem muhurlu.",
+              record_type: "muhur",
+              record_id: 1,
+              personel_id: null,
+              personel_adi: null,
+              metadata: {}
+            },
+            {
+              severity: "WARNING",
+              code: "LEGAL_PARAMETER_SET_EMPTY",
+              message: "Donemle kesisen mevzuat parametresi yok.",
+              record_type: "mevzuat",
+              record_id: null,
+              personel_id: null,
+              personel_adi: null,
+              metadata: {}
+            },
+            {
+              severity: "INFO",
+              code: "PERSONNEL_COUNT",
+              message: "Bordro kumesindeki personel sayisi.",
+              record_type: "personel",
+              record_id: null,
+              personel_id: null,
+              personel_adi: null,
+              metadata: { adet: 2 }
+            }
+          ]
+        : [
+            {
+              severity: "BLOCKER",
+              code: "PERIOD_NOT_SEALED",
+              message: "Donem muhurlenmemis; snapshot olusturulamaz.",
+              record_type: "muhur",
+              record_id: null,
+              personel_id: null,
+              personel_adi: null,
+              metadata: {}
+            }
+          ];
+      const sourceHash = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+      const preflightHash = sealed
+        ? "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        : "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd";
+      await fulfillJson(
+        route,
+        200,
+        okBody({
+          sube: { id: subeId, ad: subeId === 1 ? "Merkez" : `Sube ${subeId}` },
+          yil,
+          ay,
+          donem,
+          donem_baslangic: `${donem}-01`,
+          donem_bitis: `${donem}-31`,
+          muhur: sealed
+            ? { id: 1, durum: "MUHURLENDI", muhurlenen_kayit_sayisi: 2, created_at: "2026-03-31 23:59:00" }
+            : null,
+          snapshot_olusturulabilir_mi: sealed && !existing,
+          blocker_count: sealed ? 0 : 1,
+          warning_count: sealed ? 1 : 0,
+          info_count: sealed ? 2 : 0,
+          items,
+          personel_summary: sealed
+            ? [
+                {
+                  personel_id: 7,
+                  ad_soyad: "Ali Yilmaz",
+                  istihdam_baslangic: `${donem}-01`,
+                  istihdam_bitis: `${donem}-15`,
+                  ucret_segment_sayisi: 2,
+                  puantaj_kayit_sayisi: 1,
+                  finans_kalem_sayisi: 0,
+                  hazir_mi: true,
+                  blocker_count: 0,
+                  warning_count: 0
+                },
+                {
+                  personel_id: 8,
+                  ad_soyad: "Ayse Demir",
+                  istihdam_baslangic: `${donem}-01`,
+                  istihdam_bitis: `${donem}-31`,
+                  ucret_segment_sayisi: 1,
+                  puantaj_kayit_sayisi: 1,
+                  finans_kalem_sayisi: 0,
+                  hazir_mi: true,
+                  blocker_count: 0,
+                  warning_count: 0
+                }
+              ]
+            : [],
+          source_summary: {
+            personel_sayisi: sealed ? 2 : 0,
+            ucret_segment_sayisi: sealed ? 3 : 0,
+            puantaj_kayit_sayisi: sealed ? 2 : 0,
+            finans_kalem_sayisi: 0,
+            mevzuat_parametre_sayisi: 0
+          },
+          existing_snapshot: existing
+            ? {
+                id: existing.id,
+                state: existing.state,
+                revision_no: existing.revision_no,
+                source_hash: existing.source_hash,
+                snapshot_hash: existing.snapshot_hash,
+                created_at: existing.created_at,
+                source_changed: false
+              }
+            : null,
+          preflight_hash: preflightHash,
+          source_hash: sourceHash,
+          hashes: { source_hash: sourceHash },
+          schema_version: "S77_C_SNAPSHOT_V1",
+          contract_version: "S77_C_SNAPSHOT_V1",
+          generated_at: new Date().toISOString()
+        })
+      );
+      return;
+    }
+
+    if (path === "/api/maas-hesaplama/snapshotlar" && method === "GET") {
+      if (await denyUnlessRolePermission(route, "maas_hesaplama.view")) {
+        return;
+      }
+      const subeId = Number.parseInt(url.searchParams.get("sube_id") ?? "", 10);
+      const yil = Number.parseInt(url.searchParams.get("yil") ?? "", 10);
+      const ay = Number.parseInt(url.searchParams.get("ay") ?? "", 10);
+      await fulfillJson(
+        route,
+        200,
+        okBody({
+          items: maasSnapshots.filter(
+            (item) =>
+              item.sube_id === subeId &&
+              (!Number.isFinite(yil) || item.yil === yil) &&
+              (!Number.isFinite(ay) || item.ay === ay)
+          )
+        })
+      );
+      return;
+    }
+
+    if (path === "/api/maas-hesaplama/snapshotlar" && method === "POST") {
+      if (await denyUnlessRolePermission(route, "maas_hesaplama.manage")) {
+        return;
+      }
+      const payload = request.postDataJSON() as {
+        sube_id?: number;
+        yil?: number;
+        ay?: number;
+        expected_preflight_hash?: string;
+      };
+      const subeId = Number(payload.sube_id);
+      const yil = Number(payload.yil);
+      const ay = Number(payload.ay);
+      const expected = String(payload.expected_preflight_hash ?? "");
+      const sourceHash = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+      const preflightHash = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
+      const active = maasSnapshots.find(
+        (item) => item.sube_id === subeId && item.yil === yil && item.ay === ay && item.state === "OLUSTURULDU"
+      );
+      if (active && active.source_hash === sourceHash) {
+        await fulfillJson(route, 200, okBody({ snapshot: active, idempotent: true, audit: null }));
+        return;
+      }
+      if (!(subeId === 1 && yil === 2026 && ay === 3)) {
+        await fulfillJson(route, 409, errorBody("PAYROLL_PREFLIGHT_BLOCKED", "Preflight blocker iceriyor."));
+        return;
+      }
+      if (expected !== preflightHash) {
+        await fulfillJson(route, 409, errorBody("PAYROLL_PREFLIGHT_STALE", "Preflight sonucu guncel degil."));
+        return;
+      }
+      const cancelled = [...maasSnapshots]
+        .filter((item) => item.sube_id === subeId && item.yil === yil && item.ay === ay)
+        .sort((a, b) => b.revision_no - a.revision_no)[0];
+      const id = ++maasNextId;
+      const snapshot = {
+        id,
+        snapshot_id: id,
+        sube_id: subeId,
+        yil,
+        ay,
+        donem: "2026-03",
+        donem_baslangic: "2026-03-01",
+        donem_bitis: "2026-03-31",
+        muhur_id: 1,
+        revision_no: cancelled ? cancelled.revision_no + 1 : 1,
+        parent_snapshot_id: cancelled?.id ?? null,
+        state: "OLUSTURULDU",
+        contract_version: "S77_C_SNAPSHOT_V1",
+        cutoff_at: "2026-03-31 23:59:00",
+        preflight_hash: preflightHash,
+        source_hash: sourceHash,
+        snapshot_hash: sourceHash,
+        personel_sayisi: 2,
+        girdi_sayisi: 8,
+        blocker_count: 0,
+        warning_count: 1,
+        created_by: 1,
+        created_at: new Date().toISOString(),
+        iptal_edildi_by: null,
+        iptal_edildi_at: null,
+        iptal_nedeni: null
+      };
+      maasSnapshots.push(snapshot);
+      maasAudits.push({
+        id: ++maasNextAuditId,
+        donem_snapshot_id: id,
+        sube_id: subeId,
+        yil,
+        ay,
+        muhur_id: 1,
+        aksiyon: "SNAPSHOT_CREATE",
+        sonuc: "CREATED",
+        actor_id: 1,
+        actor_rol: "MUHASEBE",
+        request_hash: "e2e-request",
+        preflight_hash: preflightHash,
+        source_hash: sourceHash,
+        result_hash: sourceHash,
+        blocker_count: 0,
+        warning_count: 1,
+        created_at: snapshot.created_at
+      });
+      await fulfillJson(route, 201, okBody({ snapshot, idempotent: false, audit: maasAudits[maasAudits.length - 1] }));
+      return;
+    }
+
+    const maasDetailMatch = path.match(/^\/api\/maas-hesaplama\/snapshotlar\/(\d+)$/);
+    if (maasDetailMatch && method === "GET") {
+      if (await denyUnlessRolePermission(route, "maas_hesaplama.view")) {
+        return;
+      }
+      const id = Number.parseInt(maasDetailMatch[1], 10);
+      const snapshot = maasSnapshots.find((item) => item.id === id);
+      if (!snapshot) {
+        await fulfillJson(route, 404, errorBody("PAYROLL_SNAPSHOT_NOT_FOUND", "Snapshot bulunamadi."));
+        return;
+      }
+      await fulfillJson(
+        route,
+        200,
+        okBody({
+          ...snapshot,
+          girdi_ozet: { PERSONEL: 2, UCRET: 2, PUANTAJ: 2, MUHUR: 1 },
+          hash_dogrulama: { dogrulandi: true, hesaplanan_snapshot_hash: snapshot.snapshot_hash }
+        })
+      );
+      return;
+    }
+
+    const maasCancelMatch = path.match(/^\/api\/maas-hesaplama\/snapshotlar\/(\d+)\/iptal$/);
+    if (maasCancelMatch && method === "POST") {
+      if (await denyUnlessRolePermission(route, "maas_hesaplama.manage")) {
+        return;
+      }
+      const id = Number.parseInt(maasCancelMatch[1], 10);
+      const snapshot = maasSnapshots.find((item) => item.id === id);
+      if (!snapshot) {
+        await fulfillJson(route, 404, errorBody("PAYROLL_SNAPSHOT_NOT_FOUND", "Snapshot bulunamadi."));
+        return;
+      }
+      const payload = request.postDataJSON() as { neden?: string };
+      if (!String(payload.neden ?? "").trim()) {
+        await fulfillJson(route, 400, errorBody("VALIDATION_ERROR", "Iptal nedeni zorunludur.", "neden"));
+        return;
+      }
+      if (snapshot.state === "IPTAL") {
+        await fulfillJson(route, 200, okBody({ snapshot, idempotent: true, audit: null }));
+        return;
+      }
+      snapshot.state = "IPTAL";
+      snapshot.iptal_nedeni = String(payload.neden);
+      snapshot.iptal_edildi_at = new Date().toISOString();
+      await fulfillJson(route, 200, okBody({ snapshot, idempotent: false, audit: null }));
+      return;
+    }
+
+    if (path === "/api/maas-hesaplama/auditler" && method === "GET") {
+      if (await denyUnlessRolePermission(route, "maas_hesaplama.view")) {
+        return;
+      }
+      const subeId = Number.parseInt(url.searchParams.get("sube_id") ?? "", 10);
+      const yil = Number.parseInt(url.searchParams.get("yil") ?? "", 10) || 2026;
+      const ay = Number.parseInt(url.searchParams.get("ay") ?? "", 10) || 3;
+      await fulfillJson(
+        route,
+        200,
+        okBody({
+          items: maasAudits.filter((item) => item.sube_id === subeId && item.yil === yil && item.ay === ay)
+        })
+      );
       return;
     }
 

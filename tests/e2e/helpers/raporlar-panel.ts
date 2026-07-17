@@ -2,16 +2,18 @@ import { expect, type Page } from "@playwright/test";
 import { loginAsMockRole, waitForAuthSession, type MockRoleCredentials } from "./auth";
 import type { MockUserRole } from "./mock-api";
 
-export type RaporlarPanel = "donem-kapanis" | "etki-adayi";
+export type RaporlarPanel = "donem-kapanis" | "etki-adayi" | "maas-hesaplama" | "standart";
 
-const PANEL_TEST_ID: Record<RaporlarPanel, string> = {
+const PANEL_TEST_ID: Record<Exclude<RaporlarPanel, "standart">, string> = {
   "donem-kapanis": "donem-kapanis-merkezi",
-  "etki-adayi": "etki-adayi-rapor-page"
+  "etki-adayi": "etki-adayi-rapor-page",
+  "maas-hesaplama": "maas-hesaplama-merkezi"
 };
 
-const PANEL_FILTER_TEST_ID: Record<RaporlarPanel, string> = {
+const PANEL_FILTER_TEST_ID: Record<Exclude<RaporlarPanel, "standart">, string> = {
   "donem-kapanis": "donem-kapanis-filters",
-  "etki-adayi": "etki-adayi-rapor-filters"
+  "etki-adayi": "etki-adayi-rapor-filters",
+  "maas-hesaplama": "maas-hesaplama-filters"
 };
 
 export async function openRaporlarPanel(
@@ -21,6 +23,11 @@ export async function openRaporlarPanel(
   credentials?: MockRoleCredentials
 ) {
   await loginAsMockRole(page, role, credentials);
+  if (panel === "standart") {
+    await page.goto("/raporlar");
+    await expect(page.getByTestId("raporlar-panel-nav")).toBeVisible();
+    return;
+  }
   await page.goto(`/raporlar?panel=${panel}`);
   await expect(page).toHaveURL(new RegExp(`/raporlar\\?panel=${panel}`));
   await expect(page.getByTestId("raporlar-panel-nav")).toBeVisible();
@@ -76,7 +83,7 @@ export async function waitForPreflightRequest(page: Page, subeId: number) {
   expect(response.status()).toBe(200);
 }
 
-export async function reloadRaporlarPanel(page: Page, panel: RaporlarPanel) {
+export async function reloadRaporlarPanel(page: Page, panel: Exclude<RaporlarPanel, "standart">) {
   await page.goto(`/raporlar?panel=${panel}`);
   await waitForAuthSession(page);
   await expect(page.getByTestId(PANEL_TEST_ID[panel])).toBeVisible({ timeout: 15_000 });

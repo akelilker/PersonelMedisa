@@ -89,6 +89,9 @@ try {
     foreach ([
         '020_maas_hesaplama_snapshotlari.sql',
         '021_maas_hesaplama_snapshot_guvenlik_indexleri.sql',
+        '022_personel_bordro_devirleri.sql',
+        '023_maas_hesaplama_adaylari.sql',
+        '024_maas_hesaplama_aday_guvenlik_indexleri.sql',
     ] as $file) {
         $sql = file_get_contents(__DIR__ . '/../../api/migrations/' . $file);
         if ($sql === false) {
@@ -109,6 +112,11 @@ try {
         'maas_hesaplama_personel_snapshotlari',
         'maas_hesaplama_girdi_snapshotlari',
         'maas_hesaplama_snapshot_auditleri',
+        'personel_bordro_devirleri',
+        'maas_hesaplama_calistirmalari',
+        'maas_hesaplama_adaylari',
+        'maas_hesaplama_aday_kalemleri',
+        'maas_hesaplama_auditleri',
     ] as $table) {
         $stmt = $pdo->prepare('SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = :db AND table_name = :table');
         $stmt->execute(['db' => $database, 'table' => $table]);
@@ -144,7 +152,7 @@ try {
            AND table_name LIKE 'maas_hesaplama_%'
            AND table_collation = 'utf8mb4_unicode_ci'"
     )->fetchColumn();
-    migrationAssert((int) $charset === 4, 'charset/collation utf8mb4_unicode_ci');
+    migrationAssert((int) $charset === 8, 'charset/collation utf8mb4_unicode_ci');
 
     $triggers = $pdo->query(
         "SELECT COUNT(*) FROM information_schema.triggers
@@ -152,10 +160,14 @@ try {
             'trg_mhps_no_update', 'trg_mhps_no_delete',
             'trg_mhgs_no_update', 'trg_mhgs_no_delete',
             'trg_mhds_no_delete', 'trg_mhds_guarded_update',
-            'trg_mhsa_no_update', 'trg_mhsa_no_delete'
+            'trg_mhsa_no_update', 'trg_mhsa_no_delete',
+            'trg_mha_no_update', 'trg_mha_no_delete',
+            'trg_mhak_no_update', 'trg_mhak_no_delete',
+            'trg_mhc_no_delete', 'trg_mhc_guarded_update',
+            'trg_mhaud_no_update', 'trg_mhaud_no_delete'
          )"
     )->fetchColumn();
-    migrationAssert((int) $triggers === 8, 'immutability triggerlari olusturuldu');
+    migrationAssert((int) $triggers === 16, 'immutability triggerlari olusturuldu');
 
     $foreignKeys = $pdo->query(
         "SELECT COUNT(*) FROM information_schema.referential_constraints
@@ -190,6 +202,32 @@ try {
         payload_json, payload_hash
     ) VALUES ($snapshotId, $personelSnapshotId, 'UCRET', 'personel_ucret_gecmisi', 1, '{\"t\":1}', REPEAT('e', 64))");
 
+    $pdo->exec("INSERT INTO maas_hesaplama_calistirmalari (
+        snapshot_id, sube_id, yil, ay, revision_no, state, engine_version, contract_version,
+        snapshot_hash, parameter_set_hash, carryover_set_hash, request_hash, source_hash, result_hash,
+        calculation_input_hash, personel_sayisi, basarili_aday_sayisi, created_by
+    ) VALUES (
+        $snapshotId, 1, 2026, 3, 1, 'HESAPLANDI', 'S77D_PAYROLL_ENGINE_V1', 'S77D_PAYROLL_CANDIDATE_V1',
+        REPEAT('c', 64), REPEAT('p', 64), REPEAT('q', 64), REPEAT('r', 64), REPEAT('s', 64), REPEAT('t', 64),
+        REPEAT('u', 64), 1, 1, 1
+    )");
+    $calistirmaId = (int) $pdo->lastInsertId();
+    $pdo->exec("INSERT INTO maas_hesaplama_adaylari (
+        calistirma_id, personel_snapshot_id, personel_id, revision_no, state, ucret_turu, para_birimi,
+        sozlesme_brut_tutar, hesaplanan_brut_tutar, sgk_matrahi, gelir_vergisi_matrahi,
+        damga_vergisi_matrahi, sgk_isci_primi, issizlik_isci_primi, gelir_vergisi, damga_vergisi,
+        toplam_ek_odeme, toplam_kesinti, net_odenecek, sonraki_kumulatif_vergi_matrahi,
+        input_hash, result_hash, engine_version
+    ) VALUES (
+        $calistirmaId, $personelSnapshotId, 1, 1, 'HESAPLANDI', 'BRUT', 'TRY',
+        50000, 50000, 50000, 42500, 50000, 7000, 500, 3375, 182,
+        0, 11057, 38943, 42500, REPEAT('v', 64), REPEAT('w', 64), 'S77D_PAYROLL_ENGINE_V1'
+    )");
+    $adayId = (int) $pdo->lastInsertId();
+    $pdo->exec("INSERT INTO maas_hesaplama_aday_kalemleri (
+        aday_id, sira_no, kalem_grubu, kalem_kodu, yon, tutar, payload_json, payload_hash
+    ) VALUES ($adayId, 1, 'UCRET', 'BAZ_UCRET', 'BILGI', 50000, '{\"t\":1}', REPEAT('x', 64))");
+
     $updateBlocked = false;
     try {
         $pdo->exec("UPDATE maas_hesaplama_girdi_snapshotlari SET payload_json = '{\"t\":2}' WHERE id = 1");
@@ -205,6 +243,22 @@ try {
         $deleteBlocked = strpos($e->getMessage(), 'PAYROLL_SNAPSHOT_IMMUTABLE') !== false;
     }
     migrationAssert($deleteBlocked, 'personel snapshot DELETE trigger ile reddedildi');
+
+    $adayUpdateBlocked = false;
+    try {
+        $pdo->exec("UPDATE maas_hesaplama_adaylari SET net_odenecek = 1 WHERE id = $adayId");
+    } catch (PDOException $e) {
+        $adayUpdateBlocked = strpos($e->getMessage(), 'PAYROLL_CALCULATION_IMMUTABLE') !== false;
+    }
+    migrationAssert($adayUpdateBlocked, 'aday UPDATE trigger ile reddedildi');
+
+    $kalemDeleteBlocked = false;
+    try {
+        $pdo->exec("DELETE FROM maas_hesaplama_aday_kalemleri WHERE aday_id = $adayId");
+    } catch (PDOException $e) {
+        $kalemDeleteBlocked = strpos($e->getMessage(), 'PAYROLL_CALCULATION_IMMUTABLE') !== false;
+    }
+    migrationAssert($kalemDeleteBlocked, 'aday kalem DELETE trigger ile reddedildi');
 
     $rootSourceBlocked = false;
     try {

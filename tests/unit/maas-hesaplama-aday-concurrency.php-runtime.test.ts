@@ -5,16 +5,16 @@ import {
   runPhpMysqlRunner
 } from "../scripts/disposable-mariadb.mjs";
 
-const runnerPath = resolve(process.cwd(), "tests/php/MaasHesaplamaMigrationTestRunner.php");
+const runnerPath = resolve(process.cwd(), "tests/php/MaasHesaplamaAdayMysqlConcurrencyTestRunner.php");
 
-describe("MaasHesaplama migrations", () => {
+describe("MaasHesaplamaAday MariaDB concurrency", () => {
   beforeAll(async () => {
     await ensureDisposableMariaDbEnv();
   }, 60_000);
 
-  it("applies 020-024 cleanly and enforces snapshot/candidate immutability triggers", () => {
+  it("serializes calculation create races and preserves immutable aday rows", () => {
     const result = runPhpMysqlRunner(runnerPath);
     expect(result.status, result.stderr || result.stdout).toBe(0);
-    expect(result.stdout).toContain("verify-maas-hesaplama-migrations: OK");
+    expect(result.stdout).toContain("verify-maas-hesaplama-aday-concurrency: OK");
   });
 });

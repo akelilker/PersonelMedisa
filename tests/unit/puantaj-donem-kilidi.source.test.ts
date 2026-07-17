@@ -34,7 +34,7 @@ describe("S74-D1/D3R puantaj period lock source contract", () => {
 
   it("keeps one 017 migration in the contiguous sequence", () => {
     const migrations = readdirSync(resolve(root, "api/migrations")).filter((name) => /^\d{3}_.*\.sql$/.test(name)).sort();
-    expect(migrations.at(-1)).toBe("021_maas_hesaplama_snapshot_guvenlik_indexleri.sql");
+    expect(migrations.at(-1)).toBe("024_maas_hesaplama_aday_guvenlik_indexleri.sql");
     expect(migrations.filter((name) => name.startsWith("017_"))).toHaveLength(1);
   });
 

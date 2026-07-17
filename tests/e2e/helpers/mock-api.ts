@@ -1890,8 +1890,13 @@ export async function mockApi(page: Page, role: MockUserRole, options: MockApiOp
 
   const maasSnapshots: Array<Record<string, any>> = [];
   const maasAudits: Array<Record<string, any>> = [];
+  const maasCalistirmalar: Array<Record<string, any>> = [];
+  const maasAdaylar: Array<Record<string, any>> = [];
+  const maasKalemler: Array<Record<string, any>> = [];
+  const maasDevirler: Array<Record<string, any>> = [];
   let maasNextId = 0;
   let maasNextAuditId = 0;
+  let maasNextDevirId = 0;
 
   const puantajKayitlari: GunlukPuantaj[] = [
     {
@@ -7069,6 +7074,265 @@ let personelBelgeKaydiIdCounter = 903;
         created_at: snapshot.created_at
       });
       await fulfillJson(route, 201, okBody({ snapshot, idempotent: false, audit: maasAudits[maasAudits.length - 1] }));
+      return;
+    }
+
+    const maasCalculationPreflightMatch = path.match(
+      /^\/api\/maas-hesaplama\/snapshotlar\/(\d+)\/hesaplama-preflight$/
+    );
+    if (maasCalculationPreflightMatch && method === "GET") {
+      if (await denyUnlessRolePermission(route, "maas_hesaplama_adaylari.view")) {
+        return;
+      }
+      const id = Number.parseInt(maasCalculationPreflightMatch[1], 10);
+      const snapshot = maasSnapshots.find((item) => item.id === id);
+      if (!snapshot) {
+        await fulfillJson(route, 404, errorBody("PAYROLL_SNAPSHOT_NOT_FOUND", "Snapshot bulunamadi."));
+        return;
+      }
+      const existing = maasCalistirmalar.find((item) => item.donem_snapshot_id === snapshot.id && item.state !== "IPTAL");
+      await fulfillJson(
+        route,
+        200,
+        okBody({
+          snapshot_id: snapshot.id,
+          sube_id: snapshot.sube_id,
+          yil: snapshot.yil,
+          ay: snapshot.ay,
+          donem: snapshot.donem,
+          hesaplanabilir_mi: false,
+          blocker_count: 1,
+          warning_count: 0,
+          info_count: 0,
+          items: [
+            {
+              severity: "BLOCKER",
+              code: "LEGAL_PARAMETER_REQUIRED_MISSING",
+              message: "Demo mock mevzuat katalogu olmadigi icin hesaplama blokeli.",
+              record_type: "mevzuat",
+              record_id: null,
+              personel_id: null,
+              personel_adi: null,
+              metadata: {}
+            }
+          ],
+          personel_summary: [],
+          parameter_summary: { mevzuat_parametre_sayisi: 0 },
+          engine_version: "S77_D_E2E_ENGINE_V1",
+          contract_version: "S77_D_CALCULATION_V1",
+          calculation_input_hash: "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          source_hash: snapshot.source_hash,
+          parameter_set_hash: "0000000000000000000000000000000000000000000000000000000000000000",
+          carryover_set_hash: "1111111111111111111111111111111111111111111111111111111111111111",
+          snapshot_hash: snapshot.snapshot_hash,
+          existing_calculation: existing
+            ? {
+                id: existing.id,
+                revision_no: existing.revision_no,
+                state: existing.state,
+                source_hash: existing.source_hash,
+                result_hash: existing.result_hash
+              }
+            : null
+        })
+      );
+      return;
+    }
+
+    const maasCalculateMatch = path.match(/^\/api\/maas-hesaplama\/snapshotlar\/(\d+)\/hesapla$/);
+    if (maasCalculateMatch && method === "POST") {
+      if (await denyUnlessRolePermission(route, "maas_hesaplama_adaylari.manage")) {
+        return;
+      }
+      await fulfillJson(route, 409, errorBody("PAYROLL_CALCULATION_BLOCKED", "Hesaplama preflight blocker iceriyor."));
+      return;
+    }
+
+    if (path === "/api/maas-hesaplama/calistirmalar" && method === "GET") {
+      if (await denyUnlessRolePermission(route, "maas_hesaplama_adaylari.view")) {
+        return;
+      }
+      const subeId = Number.parseInt(url.searchParams.get("sube_id") ?? "", 10);
+      const yil = Number.parseInt(url.searchParams.get("yil") ?? "", 10);
+      const ay = Number.parseInt(url.searchParams.get("ay") ?? "", 10);
+      await fulfillJson(
+        route,
+        200,
+        okBody({
+          items: maasCalistirmalar.filter(
+            (item) =>
+              (!Number.isFinite(subeId) || item.sube_id === subeId) &&
+              (!Number.isFinite(yil) || item.yil === yil) &&
+              (!Number.isFinite(ay) || item.ay === ay)
+          )
+        })
+      );
+      return;
+    }
+
+    const maasCalistirmaDetailMatch = path.match(/^\/api\/maas-hesaplama\/calistirmalar\/(\d+)$/);
+    if (maasCalistirmaDetailMatch && method === "GET") {
+      if (await denyUnlessRolePermission(route, "maas_hesaplama_adaylari.view")) {
+        return;
+      }
+      const id = Number.parseInt(maasCalistirmaDetailMatch[1], 10);
+      const calistirma = maasCalistirmalar.find((item) => item.id === id);
+      await fulfillJson(
+        route,
+        calistirma ? 200 : 404,
+        calistirma ? okBody(calistirma) : errorBody("PAYROLL_CALCULATION_NOT_FOUND", "Calistirma bulunamadi.")
+      );
+      return;
+    }
+
+    const maasCalistirmaAdayMatch = path.match(/^\/api\/maas-hesaplama\/calistirmalar\/(\d+)\/adaylar$/);
+    if (maasCalistirmaAdayMatch && method === "GET") {
+      if (await denyUnlessRolePermission(route, "maas_hesaplama_adaylari.view")) {
+        return;
+      }
+      const calistirmaId = Number.parseInt(maasCalistirmaAdayMatch[1], 10);
+      await fulfillJson(
+        route,
+        200,
+        okBody({ items: maasAdaylar.filter((item) => item.calistirma_id === calistirmaId) })
+      );
+      return;
+    }
+
+    const maasCalistirmaAuditMatch = path.match(/^\/api\/maas-hesaplama\/calistirmalar\/(\d+)\/audit$/);
+    if (maasCalistirmaAuditMatch && method === "GET") {
+      if (await denyUnlessRolePermission(route, "maas_hesaplama_adaylari.view")) {
+        return;
+      }
+      await fulfillJson(route, 200, okBody({ items: [] }));
+      return;
+    }
+
+    const maasCalistirmaCancelMatch = path.match(/^\/api\/maas-hesaplama\/calistirmalar\/(\d+)\/iptal$/);
+    if (maasCalistirmaCancelMatch && method === "POST") {
+      if (await denyUnlessRolePermission(route, "maas_hesaplama_adaylari.manage")) {
+        return;
+      }
+      const id = Number.parseInt(maasCalistirmaCancelMatch[1], 10);
+      const calistirma = maasCalistirmalar.find((item) => item.id === id);
+      if (!calistirma) {
+        await fulfillJson(route, 404, errorBody("PAYROLL_CALCULATION_NOT_FOUND", "Calistirma bulunamadi."));
+        return;
+      }
+      const payload = request.postDataJSON() as { neden?: string };
+      if (!String(payload.neden ?? "").trim()) {
+        await fulfillJson(route, 400, errorBody("VALIDATION_ERROR", "Iptal nedeni zorunludur.", "neden"));
+        return;
+      }
+      calistirma.state = "IPTAL";
+      calistirma.iptal_nedeni = String(payload.neden);
+      calistirma.iptal_edildi_at = new Date().toISOString();
+      await fulfillJson(route, 200, okBody({ calistirma, idempotent: false, audit: null }));
+      return;
+    }
+
+    const maasAdayDetailMatch = path.match(/^\/api\/maas-hesaplama\/adaylar\/(\d+)$/);
+    if (maasAdayDetailMatch && method === "GET") {
+      if (await denyUnlessRolePermission(route, "maas_hesaplama_adaylari.view")) {
+        return;
+      }
+      const id = Number.parseInt(maasAdayDetailMatch[1], 10);
+      const aday = maasAdaylar.find((item) => item.id === id);
+      await fulfillJson(
+        route,
+        aday ? 200 : 404,
+        aday ? okBody(aday) : errorBody("PAYROLL_CANDIDATE_NOT_FOUND", "Aday bulunamadi.")
+      );
+      return;
+    }
+
+    const maasAdayKalemMatch = path.match(/^\/api\/maas-hesaplama\/adaylar\/(\d+)\/kalemler$/);
+    if (maasAdayKalemMatch && method === "GET") {
+      if (await denyUnlessRolePermission(route, "maas_hesaplama_adaylari.view")) {
+        return;
+      }
+      const adayId = Number.parseInt(maasAdayKalemMatch[1], 10);
+      await fulfillJson(route, 200, okBody({ items: maasKalemler.filter((item) => item.aday_id === adayId) }));
+      return;
+    }
+
+    if (path === "/api/maas-hesaplama/yasal-katalog" && method === "GET") {
+      if (await denyUnlessRolePermission(route, "maas_hesaplama_adaylari.view")) {
+        return;
+      }
+      await fulfillJson(
+        route,
+        200,
+        okBody({ engine_version: "S77_D_E2E_ENGINE_V1", contract_version: "S77_D_CALCULATION_V1", items: [] })
+      );
+      return;
+    }
+
+    if (path === "/api/maas-hesaplama/devirler" && method === "GET") {
+      if (await denyUnlessRolePermission(route, "maas_hesaplama_adaylari.view")) {
+        return;
+      }
+      const subeId = Number.parseInt(url.searchParams.get("sube_id") ?? "", 10);
+      const yil = Number.parseInt(url.searchParams.get("yil") ?? "", 10);
+      const ay = Number.parseInt(url.searchParams.get("ay") ?? "", 10);
+      await fulfillJson(
+        route,
+        200,
+        okBody({
+          items: maasDevirler.filter(
+            (item) =>
+              (!Number.isFinite(subeId) || item.sube_id === subeId) &&
+              (!Number.isFinite(yil) || item.yil === yil) &&
+              (!Number.isFinite(ay) || item.ay === ay)
+          )
+        })
+      );
+      return;
+    }
+
+    if (path === "/api/maas-hesaplama/devirler" && method === "POST") {
+      if (await denyUnlessRolePermission(route, "maas_hesaplama_adaylari.manage")) {
+        return;
+      }
+      const payload = request.postDataJSON() as Record<string, unknown>;
+      const personelId = Number(payload.personel_id);
+      const subeId = Number(payload.sube_id);
+      const yil = Number(payload.yil);
+      const ay = Number(payload.ay);
+      const matrah = Number(payload.onceki_kumulatif_gelir_vergisi_matrahi);
+      const vergi = Number(payload.onceki_kumulatif_gelir_vergisi);
+      if (![personelId, subeId, yil, ay, matrah, vergi].every(Number.isFinite)) {
+        await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "Devir alani gecersiz."));
+        return;
+      }
+      const personel = personeller.find((item) => item.id === personelId);
+      const existing = maasDevirler.find(
+        (item) => item.personel_id === personelId && item.sube_id === subeId && item.yil === yil && item.ay === ay
+      );
+      const now = new Date().toISOString();
+      const devir =
+        existing ??
+        {
+          id: ++maasNextDevirId,
+          personel_id: personelId,
+          personel_ad_soyad: personel ? `${personel.ad} ${personel.soyad}` : null,
+          sube_id: subeId,
+          yil,
+          ay,
+          created_at: now
+        };
+      Object.assign(devir, {
+        onceki_kumulatif_gelir_vergisi_matrahi: matrah,
+        onceki_kumulatif_gelir_vergisi: vergi,
+        onceki_kumulatif_sgk_matrahi: null,
+        kaynak: String(payload.kaynak ?? "MANUEL"),
+        aciklama: payload.aciklama ? String(payload.aciklama) : null,
+        updated_at: now
+      });
+      if (!existing) {
+        maasDevirler.push(devir);
+      }
+      await fulfillJson(route, existing ? 200 : 201, okBody(devir));
       return;
     }
 

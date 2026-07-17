@@ -118,9 +118,21 @@ export const endpoints = {
     preflight: "/maas-hesaplama/preflight",
     snapshots: "/maas-hesaplama/snapshotlar",
     snapshotDetail: (id: number | string) => `/maas-hesaplama/snapshotlar/${id}`,
+    snapshotCalculationPreflight: (id: number | string) =>
+      `/maas-hesaplama/snapshotlar/${id}/hesaplama-preflight`,
+    calculateSnapshot: (id: number | string) => `/maas-hesaplama/snapshotlar/${id}/hesapla`,
     cancel: (id: number | string) => `/maas-hesaplama/snapshotlar/${id}/iptal`,
     audits: "/maas-hesaplama/auditler",
-    snapshotAudit: (id: number | string) => `/maas-hesaplama/snapshotlar/${id}/audit`
+    snapshotAudit: (id: number | string) => `/maas-hesaplama/snapshotlar/${id}/audit`,
+    calistirmalar: "/maas-hesaplama/calistirmalar",
+    calistirmaDetail: (id: number | string) => `/maas-hesaplama/calistirmalar/${id}`,
+    calistirmaAdaylar: (id: number | string) => `/maas-hesaplama/calistirmalar/${id}/adaylar`,
+    calistirmaAudit: (id: number | string) => `/maas-hesaplama/calistirmalar/${id}/audit`,
+    cancelCalistirma: (id: number | string) => `/maas-hesaplama/calistirmalar/${id}/iptal`,
+    adayDetail: (id: number | string) => `/maas-hesaplama/adaylar/${id}`,
+    adayKalemler: (id: number | string) => `/maas-hesaplama/adaylar/${id}/kalemler`,
+    yasalKatalog: "/maas-hesaplama/yasal-katalog",
+    devirler: "/maas-hesaplama/devirler"
   },
   finans: {
     list: "/ek-odeme-kesinti",

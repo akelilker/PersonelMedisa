@@ -385,7 +385,7 @@ class DonemKapanisPreflightService
     {
         $warnings = [];
 
-        $salaryIds = self::fetchSalaryMissingPersonelIds($pdo, $subeId, $filters);
+        $salaryIds = self::fetchSalaryMissingPersonelIds($pdo, $subeId, $ayBitis, $filters);
         if (count($salaryIds) > 0) {
             $warnings[] = self::issue(
                 'FINANCE_SALARY_MISSING',
@@ -580,12 +580,8 @@ class DonemKapanisPreflightService
 
     private static function fetchFinanceReadiness(PDO $pdo, $subeId, $donem)
     {
-        $stmt = $pdo->prepare(
-            'SELECT COUNT(*) FROM personeller WHERE sube_id = :sube_id AND aktif_durum = \'AKTIF\'
-             AND (maas_tutari IS NULL OR maas_tutari <= 0)'
-        );
-        $stmt->execute(['sube_id' => $subeId]);
-        $missingSalary = (int) $stmt->fetchColumn();
+        $periodEnd = date('Y-m-t', strtotime($donem . '-01'));
+        $missingSalary = count(self::fetchSalaryMissingPersonelIds($pdo, $subeId, $periodEnd, []));
 
         return ['eksik_maas_sayisi' => $missingSalary, 'finans_kayit_sayisi' => self::countFinansKayit($pdo, $subeId, $donem)];
     }
@@ -603,9 +599,9 @@ class DonemKapanisPreflightService
     }
 
     /** @param array<string, mixed> $filters */
-    private static function fetchSalaryMissingPersonelIds(PDO $pdo, $subeId, array $filters)
+    private static function fetchSalaryMissingPersonelIds(PDO $pdo, $subeId, $resolveDate, array $filters)
     {
-        $where = ['sube_id = :sube_id', "aktif_durum = 'AKTIF'", '(maas_tutari IS NULL OR maas_tutari <= 0)'];
+        $where = ['sube_id = :sube_id', "aktif_durum = 'AKTIF'"];
         $params = ['sube_id' => $subeId];
         if (isset($filters['departman_id']) && (int) $filters['departman_id'] > 0) {
             $where[] = 'departman_id = :departman_id';
@@ -618,9 +614,24 @@ class DonemKapanisPreflightService
         $stmt = $pdo->prepare('SELECT id FROM personeller WHERE ' . implode(' AND ', $where));
         $stmt->execute($params);
 
-        return array_map(static function ($row) {
-            return (int) $row['id'];
-        }, $stmt->fetchAll(PDO::FETCH_ASSOC));
+        $missing = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $personelId = (int) $row['id'];
+            try {
+                $salary = PersonelUcretService::resolveSalaryForDate($pdo, $personelId, $resolveDate);
+                if (!isset($salary['ucret_tutari']) || (float) $salary['ucret_tutari'] <= 0) {
+                    $missing[] = $personelId;
+                }
+            } catch (PersonelUcretException $e) {
+                if (in_array($e->getCodeString(), ['SALARY_MISSING', 'SALARY_OVERLAP_DATA_ERROR'], true)) {
+                    $missing[] = $personelId;
+                    continue;
+                }
+                throw $e;
+            }
+        }
+
+        return $missing;
     }
 
     /** @param array<string, mixed> $filters */

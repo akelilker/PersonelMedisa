@@ -5,10 +5,13 @@ declare(strict_types=1);
 namespace Medisa\Api\Controllers;
 
 use Medisa\Api\Auth\AuthMiddleware;
+use Medisa\Api\Auth\RolePermissions;
 use Medisa\Api\Database\Connection;
 use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
 use Medisa\Api\Scope\SubeScope;
+use Medisa\Api\Services\PersonelUcretException;
+use Medisa\Api\Services\PersonelUcretService;
 use PDO;
 
 class PersonellerController
@@ -99,7 +102,7 @@ class PersonellerController
 
         $items = [];
         foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
-            $items[] = self::mapPersonelRow($row);
+            $items[] = self::mapPersonelRow($row, $user);
         }
 
         JsonResponse::success(
@@ -153,7 +156,7 @@ class PersonellerController
             JsonResponse::notFound();
         }
 
-        JsonResponse::success(self::mapPersonelRow($row));
+        JsonResponse::success(self::mapPersonelRow($row, $user));
     }
 
     public static function create(Request $request)
@@ -162,7 +165,14 @@ class PersonellerController
         self::assertWriteRole($user);
 
         $body = $request->getJsonBody();
+        $hasSalary = self::hasSalaryField($body);
+        if ($hasSalary && !RolePermissions::has($user, 'personeller.ucret.manage')) {
+            JsonResponse::error(403, 'SALARY_ACCESS_FORBIDDEN', 'Ucret bilgisi yonetme yetkiniz yok.');
+        }
         $payload = self::normalizeAndValidateCreatePayload($body);
+        if ($hasSalary && ($payload['maas_tutari'] === null || (float) $payload['maas_tutari'] <= 0)) {
+            JsonResponse::error(400, 'SALARY_AMOUNT_INVALID', 'Ucret tutari sifirdan buyuk olmalidir.', 'maas_tutari');
+        }
 
         try {
             $pdo = Connection::get();
@@ -177,6 +187,15 @@ class PersonellerController
         $pdo->beginTransaction();
         try {
             $insertId = self::insertPersonel($pdo, $payload);
+            if ($hasSalary && $payload['maas_tutari'] !== null) {
+                PersonelUcretService::createSalaryRecord($pdo, $insertId, [
+                    'ucret_tutari' => $payload['maas_tutari'],
+                    'ucret_turu' => 'NET',
+                    'para_birimi' => 'TRY',
+                    'gecerlilik_baslangic' => $payload['ise_giris_tarihi'],
+                    'kaynak' => 'MANUEL',
+                ], $user);
+            }
             $row = self::fetchPersonelRowById($pdo, $insertId);
             if (!$row) {
                 $pdo->rollBack();
@@ -184,7 +203,12 @@ class PersonellerController
             }
 
             $pdo->commit();
-            JsonResponse::success(self::mapPersonelRow($row), [], 201);
+            JsonResponse::success(self::mapPersonelRow($row, $user), [], 201);
+        } catch (PersonelUcretException $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            JsonResponse::error($e->getHttpStatus(), $e->getCodeString(), $e->getMessage());
         } catch (\PDOException $e) {
             if ($pdo->inTransaction()) {
                 $pdo->rollBack();
@@ -209,7 +233,14 @@ class PersonellerController
         }
 
         $body = $request->getJsonBody();
+        $hasSalary = self::hasSalaryField($body);
+        if ($hasSalary && !RolePermissions::has($user, 'personeller.ucret.manage')) {
+            JsonResponse::error(403, 'SALARY_ACCESS_FORBIDDEN', 'Ucret bilgisi yonetme yetkiniz yok.');
+        }
         $payload = self::normalizeAndValidateUpdatePayload($body);
+        if ($hasSalary && (!array_key_exists('maas_tutari', $payload) || $payload['maas_tutari'] === null || (float) $payload['maas_tutari'] <= 0)) {
+            JsonResponse::error(400, 'SALARY_AMOUNT_INVALID', 'Ucret tutari sifirdan buyuk olmalidir.', 'maas_tutari');
+        }
 
         try {
             $pdo = Connection::get();
@@ -230,15 +261,43 @@ class PersonellerController
             self::assertTcAvailableForUpdate($pdo, $payload['tc_kimlik_no'], $personelId);
         }
 
+        $salaryChanged = $hasSalary
+            && array_key_exists('maas_tutari', $payload)
+            && (float) $payload['maas_tutari'] !== (float) ($current['maas_tutari'] ?? 0);
+        $salaryAmount = $payload['maas_tutari'] ?? null;
+        unset($payload['maas_tutari']);
+
+        $pdo->beginTransaction();
         try {
             self::updatePersonelRow($pdo, $personelId, $payload);
+            if ($salaryChanged) {
+                PersonelUcretService::createSalaryRecord($pdo, $personelId, [
+                    'ucret_tutari' => $salaryAmount,
+                    'ucret_turu' => 'NET',
+                    'para_birimi' => 'TRY',
+                    'gecerlilik_baslangic' => isset($body['effective_date']) && trim((string) $body['effective_date']) !== ''
+                        ? trim((string) $body['effective_date'])
+                        : date('Y-m-d'),
+                    'kaynak' => 'MANUEL',
+                ], $user);
+            }
             $row = self::fetchPersonelRowById($pdo, $personelId);
             if (!$row) {
+                $pdo->rollBack();
                 JsonResponse::serverError('Kayit guncellenemedi.');
             }
 
-            JsonResponse::success(self::mapPersonelRow($row));
+            $pdo->commit();
+            JsonResponse::success(self::mapPersonelRow($row, $user));
+        } catch (PersonelUcretException $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            JsonResponse::error($e->getHttpStatus(), $e->getCodeString(), $e->getMessage());
         } catch (\PDOException $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
             if (self::isDuplicateTcException($e)) {
                 self::duplicateTcResponse();
             }
@@ -841,7 +900,7 @@ class PersonellerController
     }
 
     /** @param array<string, mixed> $row @return array<string, mixed> */
-    private static function mapPersonelRow(array $row)
+    private static function mapPersonelRow(array $row, array $user)
     {
         $ucretTipiId = $row['ucret_tipi_id'] !== null ? (int) $row['ucret_tipi_id'] : null;
         $primKuraliId = $row['prim_kurali_id'] !== null ? (int) $row['prim_kurali_id'] : null;
@@ -849,7 +908,7 @@ class PersonellerController
         $primKuraliAdlari = [1 => 'Devamsizlik Primi Yok', 2 => 'Tam Prim', 3 => 'Kismi Prim'];
         $maasTutari = $row['maas_tutari'] !== null ? (float) $row['maas_tutari'] : null;
 
-        return [
+        $mapped = [
             'id' => (int) $row['id'],
             'tc_kimlik_no' => (string) $row['tc_kimlik_no'],
             'ad' => (string) $row['ad'],
@@ -889,5 +948,19 @@ class PersonellerController
                 ? $primKuraliAdlari[$primKuraliId]
                 : null,
         ];
+
+        if (!RolePermissions::has($user, 'personeller.ucret.view')) {
+            unset($mapped['maas_tutari'], $mapped['net_maas_tutari'], $mapped['brut_maas_tutari']);
+        }
+
+        return $mapped;
+    }
+
+    /** @param array<string, mixed> $body */
+    private static function hasSalaryField(array $body)
+    {
+        return array_key_exists('maas_tutari', $body)
+            || array_key_exists('net_maas_tutari', $body)
+            || array_key_exists('brut_maas_tutari', $body);
     }
 }

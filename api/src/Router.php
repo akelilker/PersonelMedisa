@@ -13,8 +13,10 @@ use Medisa\Api\Controllers\BildirimlerController;
 use Medisa\Api\Controllers\DonemKapanisController;
 use Medisa\Api\Controllers\HaftalikBildirimMutabakatlariController;
 use Medisa\Api\Controllers\EkOdemeKesintiController;
+use Medisa\Api\Controllers\MevzuatParametreController;
 use Medisa\Api\Controllers\PersonelBelgelerController;
 use Medisa\Api\Controllers\PersonellerController;
+use Medisa\Api\Controllers\PersonelUcretController;
 use Medisa\Api\Controllers\PuantajController;
 use Medisa\Api\Controllers\RaporlarController;
 use Medisa\Api\Controllers\ReferansController;
@@ -121,6 +123,21 @@ class Router
         if ($method === 'GET' && preg_match('#^/personeller/(\d+)$#', $path, $matches)) {
             PersonellerController::detail($this->request, $matches[1]);
         }
+        if ($method === 'GET' && preg_match('#^/personeller/(\d+)/ucretler$#', $path, $matches)) {
+            PersonelUcretController::list($this->request, $matches[1]);
+        }
+        if ($method === 'GET' && preg_match('#^/personeller/(\d+)/ucretler/aktif$#', $path, $matches)) {
+            PersonelUcretController::aktif($this->request, $matches[1]);
+        }
+        if ($method === 'POST' && preg_match('#^/personeller/(\d+)/ucretler$#', $path, $matches)) {
+            PersonelUcretController::create($this->request, $matches[1]);
+        }
+        if ($method === 'PUT' && preg_match('#^/personeller/(\d+)/ucretler/(\d+)$#', $path, $matches)) {
+            PersonelUcretController::update($this->request, $matches[1], $matches[2]);
+        }
+        if ($method === 'POST' && preg_match('#^/personeller/(\d+)/ucretler/(\d+)/iptal$#', $path, $matches)) {
+            PersonelUcretController::iptal($this->request, $matches[1], $matches[2]);
+        }
         if ($method === 'GET' && preg_match('#^/personeller/(\d+)/belge-durumu$#', $path, $matches)) {
             PersonelBelgelerController::belgeDurumu($this->request, $matches[1]);
         }
@@ -160,6 +177,19 @@ class Router
         }
         if ($path === '/referans/bildirim-turleri' && $method === 'GET') {
             ReferansController::bildirimTurleri($this->request);
+        }
+
+        if ($path === '/mevzuat-parametreleri' && $method === 'GET') {
+            MevzuatParametreController::list($this->request);
+        }
+        if ($path === '/mevzuat-parametreleri' && $method === 'POST') {
+            MevzuatParametreController::create($this->request);
+        }
+        if ($method === 'PUT' && preg_match('#^/mevzuat-parametreleri/(\d+)$#', $path, $matches)) {
+            MevzuatParametreController::update($this->request, $matches[1]);
+        }
+        if ($method === 'POST' && preg_match('#^/mevzuat-parametreleri/(\d+)/iptal$#', $path, $matches)) {
+            MevzuatParametreController::iptal($this->request, $matches[1]);
         }
 
         if ($path === '/bildirimler' && $method === 'GET') {

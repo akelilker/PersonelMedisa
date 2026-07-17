@@ -114,6 +114,14 @@ export const endpoints = {
     isKazasi: "/raporlar/is-kazasi",
     bildirim: "/raporlar/bildirim"
   },
+  maasHesaplama: {
+    preflight: "/maas-hesaplama/preflight",
+    snapshots: "/maas-hesaplama/snapshotlar",
+    snapshotDetail: (id: number | string) => `/maas-hesaplama/snapshotlar/${id}`,
+    cancel: (id: number | string) => `/maas-hesaplama/snapshotlar/${id}/iptal`,
+    audits: "/maas-hesaplama/auditler",
+    snapshotAudit: (id: number | string) => `/maas-hesaplama/snapshotlar/${id}/audit`
+  },
   finans: {
     list: "/ek-odeme-kesinti",
     detail: (id: number | string) => `/ek-odeme-kesinti/${id}`

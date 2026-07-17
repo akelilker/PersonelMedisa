@@ -931,6 +931,221 @@ function demoRevizyonError(code: string, message: string): ApiResponse<unknown> 
   };
 }
 
+type MaasDemoSnapshot = {
+  id: number;
+  snapshot_id: number;
+  sube_id: number;
+  yil: number;
+  ay: number;
+  donem: string;
+  donem_baslangic: string;
+  donem_bitis: string;
+  muhur_id: number;
+  revision_no: number;
+  parent_snapshot_id: number | null;
+  state: string;
+  contract_version: string;
+  cutoff_at: string;
+  preflight_hash: string;
+  source_hash: string;
+  snapshot_hash: string;
+  personel_sayisi: number;
+  girdi_sayisi: number;
+  blocker_count: number;
+  warning_count: number;
+  created_by: number | null;
+  created_at: string;
+  iptal_edildi_by: number | null;
+  iptal_edildi_at: string | null;
+  iptal_nedeni: string | null;
+};
+
+type MaasDemoAudit = {
+  id: number;
+  donem_snapshot_id: number | null;
+  sube_id: number;
+  yil: number;
+  ay: number;
+  muhur_id: number | null;
+  aksiyon: string;
+  sonuc: string;
+  actor_id: number | null;
+  actor_rol: string | null;
+  request_hash: string;
+  preflight_hash: string | null;
+  source_hash: string | null;
+  result_hash: string | null;
+  blocker_count: number;
+  warning_count: number;
+  created_at: string;
+};
+
+const maasHesaplamaDemoState: {
+  snapshots: MaasDemoSnapshot[];
+  audits: MaasDemoAudit[];
+  nextId: number;
+  nextAuditId: number;
+  sealedKeys: Set<string>;
+} = {
+  snapshots: [],
+  audits: [],
+  nextId: 1,
+  nextAuditId: 1,
+  sealedKeys: new Set(["1:2026:3"])
+};
+
+function ensureMaasHesaplamaDemoState() {
+  return maasHesaplamaDemoState;
+}
+
+function buildMaasHesaplamaPreflight(
+  state: typeof maasHesaplamaDemoState,
+  subeId: number,
+  yil: number,
+  ay: number
+) {
+  const donem = `${yil}-${String(ay).padStart(2, "0")}`;
+  const lastDay = new Date(Date.UTC(yil, ay, 0)).getUTCDate();
+  const sealed = state.sealedKeys.has(`${subeId}:${yil}:${ay}`);
+  const existing = state.snapshots.find(
+    (item) => item.sube_id === subeId && item.yil === yil && item.ay === ay && item.state === "OLUSTURULDU"
+  );
+  const items = [];
+  if (!sealed) {
+    items.push({
+      severity: "BLOCKER",
+      code: "PERIOD_NOT_SEALED",
+      message: "Donem muhurlenmemis; snapshot olusturulamaz.",
+      record_type: "muhur",
+      record_id: null,
+      personel_id: null,
+      personel_adi: null,
+      metadata: {}
+    });
+  } else {
+    items.push({
+      severity: "INFO",
+      code: "PERIOD_SEALED",
+      message: "Donem muhurlu.",
+      record_type: "muhur",
+      record_id: 1,
+      personel_id: null,
+      personel_adi: null,
+      metadata: { muhurlenen_kayit_sayisi: 2 }
+    });
+    items.push({
+      severity: "WARNING",
+      code: "LEGAL_PARAMETER_SET_EMPTY",
+      message: "Donemle kesisen mevzuat parametresi yok.",
+      record_type: "mevzuat",
+      record_id: null,
+      personel_id: null,
+      personel_adi: null,
+      metadata: {}
+    });
+  }
+
+  const sourceHash = sealed
+    ? "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+  const preflightHash = sealed
+    ? "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    : "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd";
+
+  if (existing && existing.source_hash !== sourceHash) {
+    items.push({
+      severity: "BLOCKER",
+      code: "EXISTING_ACTIVE_SNAPSHOT_SOURCE_CHANGED",
+      message: "Aktif snapshot sonrasi kaynaklar degisti.",
+      record_type: "snapshot",
+      record_id: existing.id,
+      personel_id: null,
+      personel_adi: null,
+      metadata: {}
+    });
+  }
+
+  const blockerCount = items.filter((item) => item.severity === "BLOCKER").length;
+  const warningCount = items.filter((item) => item.severity === "WARNING").length;
+  const infoCount = items.filter((item) => item.severity === "INFO").length;
+
+  return {
+    sube: { id: subeId, ad: subeId === 1 ? "Merkez" : `Sube ${subeId}`, kod: subeId === 1 ? "MRK" : `S${subeId}` },
+    yil,
+    ay,
+    donem,
+    donem_baslangic: `${donem}-01`,
+    donem_bitis: `${donem}-${String(lastDay).padStart(2, "0")}`,
+    muhur: sealed
+      ? {
+          id: 1,
+          durum: "MUHURLENDI",
+          muhurlenen_kayit_sayisi: 2,
+          created_at: "2026-03-31 23:59:00"
+        }
+      : null,
+    snapshot_olusturulabilir_mi: sealed && blockerCount === 0 && !existing,
+    blocker_count: blockerCount,
+    warning_count: warningCount,
+    info_count: infoCount,
+    items,
+    personel_summary: sealed
+      ? [
+          {
+            personel_id: 7,
+            ad_soyad: "Ali Yilmaz",
+            istihdam_baslangic: `${donem}-01`,
+            istihdam_bitis: `${donem}-${String(lastDay).padStart(2, "0")}`,
+            ucret_segment_sayisi: 2,
+            puantaj_kayit_sayisi: 1,
+            finans_kalem_sayisi: 0,
+            hazir_mi: true,
+            blocker_count: 0,
+            warning_count: 0
+          },
+          {
+            personel_id: 8,
+            ad_soyad: "Ayse Demir",
+            istihdam_baslangic: `${donem}-01`,
+            istihdam_bitis: `${donem}-${String(lastDay).padStart(2, "0")}`,
+            ucret_segment_sayisi: 1,
+            puantaj_kayit_sayisi: 1,
+            finans_kalem_sayisi: 0,
+            hazir_mi: true,
+            blocker_count: 0,
+            warning_count: 0
+          }
+        ]
+      : [],
+    source_summary: {
+      personel_sayisi: sealed ? 2 : 0,
+      ucret_segment_sayisi: sealed ? 3 : 0,
+      puantaj_kayit_sayisi: sealed ? 2 : 0,
+      izin_kayit_sayisi: 0,
+      etki_aday_sayisi: 0,
+      finans_kalem_sayisi: 0,
+      mevzuat_parametre_sayisi: 0
+    },
+    existing_snapshot: existing
+      ? {
+          id: existing.id,
+          state: existing.state,
+          revision_no: existing.revision_no,
+          source_hash: existing.source_hash,
+          snapshot_hash: existing.snapshot_hash,
+          created_at: existing.created_at,
+          source_changed: existing.source_hash !== sourceHash
+        }
+      : null,
+    preflight_hash: preflightHash,
+    source_hash: sourceHash,
+    hashes: { source_hash: sourceHash },
+    schema_version: "S77_C_SNAPSHOT_V1",
+    contract_version: "S77_C_SNAPSHOT_V1",
+    generated_at: new Date().toISOString()
+  };
+}
+
 const DEMO_USER_ROLES: readonly UserRole[] = [
   "GENEL_YONETICI",
   "BOLUM_YONETICISI",
@@ -5383,6 +5598,209 @@ export function resolveDemoApiResponse(
     ];
 
     return ok({ items }, { page: 1, limit: 20, total: items.length, total_pages: 1 });
+  }
+
+  // --- S77-C Maaş Hesaplama Merkezi (demo parity) ---
+  const maasDemo = ensureMaasHesaplamaDemoState();
+
+  if (pathname === "/maas-hesaplama/preflight" && method === "GET") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(
+      actor,
+      "maas_hesaplama.view",
+      "Maas hesaplama merkezine erisim yetkiniz yok."
+    );
+    if (permissionError) {
+      return permissionError;
+    }
+
+    const subeId = toNumber(requestUrl.searchParams.get("sube_id"));
+    const yil = toNumber(requestUrl.searchParams.get("yil")) ?? 2026;
+    const ay = toNumber(requestUrl.searchParams.get("ay")) ?? 3;
+    if (!subeId) {
+      return demoRevizyonError("VALIDATION_ERROR", "sube_id zorunludur.");
+    }
+
+    return ok(buildMaasHesaplamaPreflight(maasDemo, subeId, yil, ay));
+  }
+
+  if (pathname === "/maas-hesaplama/snapshotlar" && method === "GET") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(actor, "maas_hesaplama.view");
+    if (permissionError) {
+      return permissionError;
+    }
+    const subeId = toNumber(requestUrl.searchParams.get("sube_id"));
+    const yil = toNumber(requestUrl.searchParams.get("yil"));
+    const ay = toNumber(requestUrl.searchParams.get("ay"));
+    if (!subeId) {
+      return demoRevizyonError("VALIDATION_ERROR", "sube_id zorunludur.");
+    }
+    const items = maasDemo.snapshots.filter(
+      (item) =>
+        item.sube_id === subeId &&
+        (yil === null || item.yil === yil) &&
+        (ay === null || item.ay === ay)
+    );
+    return ok({ items });
+  }
+
+  if (pathname === "/maas-hesaplama/snapshotlar" && method === "POST") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(
+      actor,
+      "maas_hesaplama.manage",
+      "Maas hesaplama snapshot yonetme yetkiniz yok."
+    );
+    if (permissionError) {
+      return permissionError;
+    }
+    const body = readBody(init) as {
+      sube_id?: number;
+      yil?: number;
+      ay?: number;
+      expected_preflight_hash?: string;
+    };
+    const subeId = toNumber(body.sube_id);
+    const yil = toNumber(body.yil);
+    const ay = toNumber(body.ay);
+    const expected = String(body.expected_preflight_hash ?? "");
+    if (!subeId || !yil || !ay || !/^[a-f0-9]{64}$/.test(expected)) {
+      return demoRevizyonError("VALIDATION_ERROR", "sube_id/yil/ay/expected_preflight_hash zorunludur.");
+    }
+    const preflight = buildMaasHesaplamaPreflight(maasDemo, subeId, yil, ay);
+    const active = maasDemo.snapshots.find(
+      (item) => item.sube_id === subeId && item.yil === yil && item.ay === ay && item.state === "OLUSTURULDU"
+    );
+    if (active) {
+      if (active.source_hash === preflight.source_hash) {
+        return ok({ snapshot: active, idempotent: true, audit: null });
+      }
+      return demoRevizyonError("PAYROLL_SNAPSHOT_SOURCE_CHANGED", "Kaynaklar degisti.");
+    }
+    if (preflight.blocker_count > 0 || !preflight.muhur) {
+      return demoRevizyonError("PAYROLL_PREFLIGHT_BLOCKED", "Preflight blocker iceriyor.");
+    }
+    if (expected !== preflight.preflight_hash) {
+      return demoRevizyonError("PAYROLL_PREFLIGHT_STALE", "Preflight sonucu guncel degil.");
+    }
+    const cancelled = [...maasDemo.snapshots]
+      .filter((item) => item.sube_id === subeId && item.yil === yil && item.ay === ay)
+      .sort((a, b) => b.revision_no - a.revision_no)[0];
+    const snapshotId = ++maasDemo.nextId;
+    const snapshot = {
+      id: snapshotId,
+      snapshot_id: snapshotId,
+      sube_id: subeId,
+      yil,
+      ay,
+      donem: preflight.donem,
+      donem_baslangic: preflight.donem_baslangic,
+      donem_bitis: preflight.donem_bitis,
+      muhur_id: preflight.muhur?.id ?? 1,
+      revision_no: cancelled ? cancelled.revision_no + 1 : 1,
+      parent_snapshot_id: cancelled?.id ?? null,
+      state: "OLUSTURULDU",
+      contract_version: "S77_C_SNAPSHOT_V1",
+      cutoff_at: new Date().toISOString().slice(0, 19).replace("T", " "),
+      preflight_hash: preflight.preflight_hash,
+      source_hash: preflight.source_hash,
+      snapshot_hash: preflight.source_hash,
+      personel_sayisi: preflight.personel_summary.length,
+      girdi_sayisi: 8,
+      blocker_count: 0,
+      warning_count: preflight.warning_count,
+      created_by: actor.userId,
+      created_at: new Date().toISOString(),
+      iptal_edildi_by: null,
+      iptal_edildi_at: null,
+      iptal_nedeni: null
+    };
+    maasDemo.snapshots.push(snapshot);
+    maasDemo.audits.push({
+      id: ++maasDemo.nextAuditId,
+      donem_snapshot_id: snapshot.id,
+      sube_id: subeId,
+      yil,
+      ay,
+      muhur_id: snapshot.muhur_id,
+      aksiyon: "SNAPSHOT_CREATE",
+      sonuc: "CREATED",
+      actor_id: actor.userId,
+      actor_rol: actor.role,
+      request_hash: "demo-request-hash",
+      preflight_hash: snapshot.preflight_hash,
+      source_hash: snapshot.source_hash,
+      result_hash: snapshot.snapshot_hash,
+      blocker_count: 0,
+      warning_count: snapshot.warning_count,
+      created_at: snapshot.created_at
+    });
+    return ok({ snapshot, idempotent: false, audit: maasDemo.audits[maasDemo.audits.length - 1] });
+  }
+
+  const maasDetailMatch = pathname.match(/^\/maas-hesaplama\/snapshotlar\/(\d+)$/);
+  if (maasDetailMatch && method === "GET") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(actor, "maas_hesaplama.view");
+    if (permissionError) {
+      return permissionError;
+    }
+    const id = Number.parseInt(maasDetailMatch[1], 10);
+    const snapshot = maasDemo.snapshots.find((item) => item.id === id);
+    if (!snapshot) {
+      return demoRevizyonError("PAYROLL_SNAPSHOT_NOT_FOUND", "Snapshot bulunamadi.");
+    }
+    return ok({
+      ...snapshot,
+      girdi_ozet: { PERSONEL: 2, UCRET: 2, PUANTAJ: 2, FINANS: 1, MEVZUAT: 0, MUHUR: 1 },
+      hash_dogrulama: { dogrulandi: true, hesaplanan_snapshot_hash: snapshot.snapshot_hash }
+    });
+  }
+
+  const maasCancelMatch = pathname.match(/^\/maas-hesaplama\/snapshotlar\/(\d+)\/iptal$/);
+  if (maasCancelMatch && method === "POST") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(actor, "maas_hesaplama.manage");
+    if (permissionError) {
+      return permissionError;
+    }
+    const id = Number.parseInt(maasCancelMatch[1], 10);
+    const snapshot = maasDemo.snapshots.find((item) => item.id === id);
+    if (!snapshot) {
+      return demoRevizyonError("PAYROLL_SNAPSHOT_NOT_FOUND", "Snapshot bulunamadi.");
+    }
+    const body = readBody(init) as { neden?: string };
+    const neden = String(body.neden ?? "").trim();
+    if (!neden) {
+      return demoRevizyonError("VALIDATION_ERROR", "Iptal nedeni zorunludur.");
+    }
+    if (snapshot.state === "IPTAL") {
+      return ok({ snapshot, idempotent: true, audit: null });
+    }
+    snapshot.state = "IPTAL";
+    snapshot.iptal_edildi_by = actor.userId;
+    snapshot.iptal_edildi_at = new Date().toISOString();
+    snapshot.iptal_nedeni = neden;
+    return ok({ snapshot, idempotent: false, audit: null });
+  }
+
+  if (pathname === "/maas-hesaplama/auditler" && method === "GET") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(actor, "maas_hesaplama.view");
+    if (permissionError) {
+      return permissionError;
+    }
+    const subeId = toNumber(requestUrl.searchParams.get("sube_id"));
+    const yil = toNumber(requestUrl.searchParams.get("yil")) ?? 2026;
+    const ay = toNumber(requestUrl.searchParams.get("ay")) ?? 3;
+    if (!subeId) {
+      return demoRevizyonError("VALIDATION_ERROR", "sube_id zorunludur.");
+    }
+    const items = maasDemo.audits.filter(
+      (item) => item.sube_id === subeId && item.yil === yil && item.ay === ay
+    );
+    return ok({ items });
   }
 
   if (pathname === "/puantaj/bildirim-etki-adaylari/rapor" && method === "GET") {

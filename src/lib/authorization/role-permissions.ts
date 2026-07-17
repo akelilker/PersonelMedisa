@@ -34,6 +34,8 @@ export type AppPermission =
   | "puantaj.donem_kapanis.export"
   | "puantaj.bildirim_etki.rapor.view"
   | "puantaj.bildirim_etki.rapor.export"
+  | "maas_hesaplama.view"
+  | "maas_hesaplama.manage"
   | "raporlar.view"
   | "finans.view"
   | "finans.create"
@@ -105,6 +107,8 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "puantaj.donem_kapanis.export",
     "puantaj.bildirim_etki.rapor.view",
     "puantaj.bildirim_etki.rapor.export",
+    "maas_hesaplama.view",
+    "maas_hesaplama.manage",
     "raporlar.view",
     "finans.view",
     "finans.create",
@@ -213,6 +217,8 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "puantaj.donem_kapanis.export",
     "puantaj.bildirim_etki.rapor.view",
     "puantaj.bildirim_etki.rapor.export",
+    "maas_hesaplama.view",
+    "maas_hesaplama.manage",
     "raporlar.view",
     "finans.view",
     "finans.create",

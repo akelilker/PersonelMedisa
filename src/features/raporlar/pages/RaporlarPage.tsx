@@ -39,11 +39,12 @@ import {
 } from "../rapor-query-prefill";
 import { DonemKapanisMerkeziPage } from "./DonemKapanisMerkeziPage";
 import { EtkiAdayiRaporuPage } from "./EtkiAdayiRaporuPage";
+import { MaasHesaplamaMerkeziPage } from "./MaasHesaplamaMerkeziPage";
 
-type RaporlarPanel = "standart" | "donem-kapanis" | "etki-adayi";
+type RaporlarPanel = "standart" | "donem-kapanis" | "etki-adayi" | "maas-hesaplama";
 
 function parseRaporlarPanel(value: string | null): RaporlarPanel {
-  if (value === "donem-kapanis" || value === "etki-adayi") {
+  if (value === "donem-kapanis" || value === "etki-adayi" || value === "maas-hesaplama") {
     return value;
   }
   return "standart";
@@ -580,6 +581,7 @@ export function RaporlarPage() {
   const canViewAylikOzet = hasPermission("aylik-ozet.view");
   const canViewDonemKapanis = hasPermission("puantaj.donem_kapanis.view");
   const canViewEtkiAdayiRapor = hasPermission("puantaj.bildirim_etki.rapor.view");
+  const canViewMaasHesaplama = hasPermission("maas_hesaplama.view");
   const [searchParams] = useSearchParams();
   const activePanel = parseRaporlarPanel(searchParams.get("panel"));
   const lastAppliedQueryKeyRef = useRef<string | null>(null);
@@ -742,10 +744,20 @@ export function RaporlarPage() {
             Etki adayı raporu
           </Link>
         ) : null}
+        {canViewMaasHesaplama ? (
+          <Link
+            to={buildPanelHref("maas-hesaplama")}
+            aria-current={activePanel === "maas-hesaplama" ? "page" : undefined}
+            data-testid="raporlar-panel-maas-hesaplama"
+          >
+            Maaş hesaplama merkezi
+          </Link>
+        ) : null}
       </nav>
 
       {activePanel === "donem-kapanis" && canViewDonemKapanis ? <DonemKapanisMerkeziPage /> : null}
       {activePanel === "etki-adayi" && canViewEtkiAdayiRapor ? <EtkiAdayiRaporuPage /> : null}
+      {activePanel === "maas-hesaplama" && canViewMaasHesaplama ? <MaasHesaplamaMerkeziPage /> : null}
 
       {activePanel === "standart" ? (
         <>

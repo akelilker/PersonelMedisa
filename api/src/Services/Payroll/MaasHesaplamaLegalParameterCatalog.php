@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace Medisa\Api\Services\Payroll;
 
 /**
- * S77-D zorunlu mevzuat parametre katalogu.
+ * S77-D2 zorunlu mevzuat parametre katalogu (Engine V2).
  * Degerler burada sabitlenmez; yalniz kod/tip/birim kontrati tanimlanir.
  */
 final class MaasHesaplamaLegalParameterCatalog
 {
-    public const ENGINE_VERSION = 'S77D_PAYROLL_ENGINE_V1';
+    public const ENGINE_VERSION = 'S77D_PAYROLL_ENGINE_V2';
 
     /** @var array<string, array{deger_tipi: string, birim: string, zorunlu: bool}> */
     private static $codes = [
@@ -34,9 +34,13 @@ final class MaasHesaplamaLegalParameterCatalog
         'NORMAL_AY_GUN_SAYISI' => ['deger_tipi' => 'SAYISAL', 'birim' => 'GUN', 'zorunlu' => true],
         'GUNLUK_CALISMA_SAATI' => ['deger_tipi' => 'SAYISAL', 'birim' => 'SAAT', 'zorunlu' => true],
         'AYLIK_NORMAL_CALISMA_SAATI' => ['deger_tipi' => 'SAYISAL', 'birim' => 'SAAT', 'zorunlu' => true],
+        'HAFTALIK_IS_GUNU_SAYISI' => ['deger_tipi' => 'SAYISAL', 'birim' => 'GUN', 'zorunlu' => true],
         'FAZLA_MESAI_CARPANI' => ['deger_tipi' => 'SAYISAL', 'birim' => 'CARPAN', 'zorunlu' => true],
+        'FAZLA_SURELERLE_CALISMA_CARPANI' => ['deger_tipi' => 'SAYISAL', 'birim' => 'CARPAN', 'zorunlu' => true],
         'HAFTA_TATILI_CARPANI' => ['deger_tipi' => 'SAYISAL', 'birim' => 'CARPAN', 'zorunlu' => true],
         'UBGT_CARPANI' => ['deger_tipi' => 'SAYISAL', 'birim' => 'CARPAN', 'zorunlu' => true],
+        'HAFTA_TATILI_HESAP_MODU' => ['deger_tipi' => 'METIN', 'birim' => 'MOD', 'zorunlu' => true],
+        'UBGT_HESAP_MODU' => ['deger_tipi' => 'METIN', 'birim' => 'MOD', 'zorunlu' => true],
     ];
 
     /** @return array<string, array{deger_tipi: string, birim: string, zorunlu: bool}> */

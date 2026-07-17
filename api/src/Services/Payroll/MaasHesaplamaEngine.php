@@ -14,10 +14,15 @@ use Medisa\Api\Services\Money\RoundingPolicy;
  */
 final class MaasHesaplamaEngine
 {
-    public const ENGINE_VERSION = 'S77D_PAYROLL_ENGINE_V1';
-    public const CONTRACT_VERSION = 'S77D_PAYROLL_CANDIDATE_V1';
+    public const ENGINE_VERSION = 'S77D_PAYROLL_ENGINE_V2';
+    public const CONTRACT_VERSION = 'S77D_PAYROLL_CANDIDATE_V2';
     public const SOLVER_MAX_ITERATIONS = 64;
     public const SOLVER_TOLERANCE_KURUS = 1;
+    /** Is Kanunu haftalik azami normal sure (45 saat). */
+    public const LEGAL_WEEKLY_LIMIT_MINUTES = 2700;
+
+    /** @var array<int, string> */
+    private static $holidayModes = ['GUNLUK_ILAVE', 'SAAT_CARPAN', 'GUNLUK_ILAVE_VE_SAAT_CARPAN'];
 
     /**
      * @param array{
@@ -70,9 +75,16 @@ final class MaasHesaplamaEngine
         }
 
         $normalAyGun = self::paramInt($params, 'NORMAL_AY_GUN_SAYISI');
-        $gunlukSaat = self::paramInt($params, 'GUNLUK_CALISMA_SAATI');
-        if ($normalAyGun < 1 || $gunlukSaat < 1) {
-            return self::errorResult('LEGAL_PARAMETER_REQUIRED_MISSING', 'NORMAL_AY_GUN_SAYISI veya GUNLUK_CALISMA_SAATI gecersiz.');
+        $gunlukDk = self::paramHoursToMinutes($params, 'GUNLUK_CALISMA_SAATI');
+        $aylikDk = self::paramHoursToMinutes($params, 'AYLIK_NORMAL_CALISMA_SAATI');
+        $haftalikIsGunu = self::paramInt($params, 'HAFTALIK_IS_GUNU_SAYISI');
+        $htMode = strtoupper((string) $params['HAFTA_TATILI_HESAP_MODU']);
+        $ubgtMode = strtoupper((string) $params['UBGT_HESAP_MODU']);
+        if ($normalAyGun < 1 || $gunlukDk < 1 || $aylikDk < 1 || $haftalikIsGunu < 1) {
+            return self::errorResult('LEGAL_PARAMETER_REQUIRED_MISSING', 'Calisma suresi parametreleri gecersiz.');
+        }
+        if (!in_array($htMode, self::$holidayModes, true) || !in_array($ubgtMode, self::$holidayModes, true)) {
+            return self::errorResult('LEGAL_PARAMETER_REQUIRED_MISSING', 'HAFTA_TATILI_HESAP_MODU veya UBGT_HESAP_MODU gecersiz.');
         }
 
         // Baz sozlesme tutari: istihdam kesisimindeki prorata toplam
@@ -93,7 +105,8 @@ final class MaasHesaplamaEngine
             ]);
         }
 
-        $hourly = $contractBase->mulDiv(1, $normalAyGun)->mulDiv(1, $gunlukSaat);
+        // Saatlik ucret: sozlesme_baz * 60 / AYLIK_NORMAL_CALISMA_DAKIKA
+        $hourly = $contractBase->mulDiv(60, $aylikDk);
         $daily = $contractBase->mulDiv(1, $normalAyGun);
 
         $attendance = self::buildAttendanceLines($input, $hourly, $daily, $params, $sira, $warnings);
@@ -272,7 +285,12 @@ final class MaasHesaplamaEngine
                 throw new \InvalidArgumentException('Missing parameter ' . $code);
             }
             $row = $mevzuatByCode[$code];
-            $out[$code] = (string) ($row['sayisal_deger'] ?? '');
+            $meta = MaasHesaplamaLegalParameterCatalog::meta($code);
+            if ($meta !== null && $meta['deger_tipi'] === 'METIN') {
+                $out[$code] = (string) ($row['metin_deger'] ?? '');
+            } else {
+                $out[$code] = (string) ($row['sayisal_deger'] ?? '');
+            }
         }
 
         return $out;
@@ -281,12 +299,42 @@ final class MaasHesaplamaEngine
     private static function paramInt(array $params, $code)
     {
         $raw = (string) $params[$code];
-        // "30.000000" -> 30
+        // "30.000000" -> 30 (yalniz tam sayi beklenen kodlar)
         if (strpos($raw, '.') !== false) {
             $raw = explode('.', $raw, 2)[0];
         }
 
         return (int) $raw;
+    }
+
+    /**
+     * Decimal saat → dakika. Ornek: "7.5" → 450. Truncate/paramInt yasak.
+     *
+     * @param array<string, string> $params
+     */
+    private static function paramHoursToMinutes(array $params, $code)
+    {
+        $raw = trim((string) $params[$code]);
+        if ($raw === '' || preg_match('/^\d+(\.\d+)?$/', $raw) !== 1) {
+            return 0;
+        }
+        if (strpos($raw, '.') === false) {
+            return ((int) $raw) * 60;
+        }
+        $parts = explode('.', $raw, 2);
+        $whole = (int) $parts[0];
+        $frac = rtrim($parts[1], '0');
+        if ($frac === '') {
+            return $whole * 60;
+        }
+        $denom = 1;
+        for ($i = 0, $n = strlen($frac); $i < $n; $i++) {
+            $denom *= 10;
+        }
+        $numer = $whole * $denom + (int) $frac;
+
+        // numer * 60 / denom — half-up integer dakika
+        return intdiv($numer * 60 + intdiv($denom, 2), $denom);
     }
 
     private static function paramMoney(array $params, $code)
@@ -323,8 +371,17 @@ final class MaasHesaplamaEngine
         $grossDeduct = Money::zero();
         $netOnly = Money::zero();
         $fmCarpan = self::paramRate($params, 'FAZLA_MESAI_CARPANI');
+        $fsCarpan = self::paramRate($params, 'FAZLA_SURELERLE_CALISMA_CARPANI');
         $htCarpan = self::paramRate($params, 'HAFTA_TATILI_CARPANI');
         $ubgtCarpan = self::paramRate($params, 'UBGT_CARPANI');
+        $htMode = strtoupper((string) $params['HAFTA_TATILI_HESAP_MODU']);
+        $ubgtMode = strtoupper((string) $params['UBGT_HESAP_MODU']);
+        $gunlukDk = self::paramHoursToMinutes($params, 'GUNLUK_CALISMA_SAATI');
+        $haftalikIsGunu = self::paramInt($params, 'HAFTALIK_IS_GUNU_SAYISI');
+        $contractualWeeklyDk = $gunlukDk * $haftalikIsGunu;
+        if ($contractualWeeklyDk > self::LEGAL_WEEKLY_LIMIT_MINUTES) {
+            $contractualWeeklyDk = self::LEGAL_WEEKLY_LIMIT_MINUTES;
+        }
         $hasOt = false;
         $absenceDates = [];
 
@@ -381,13 +438,15 @@ final class MaasHesaplamaEngine
                 $sira++;
                 $kalemler[] = self::line($sira, 'IZIN', 'UCRETLI_IZIN', 'BILGI', $days, 'GUN', null, null, Money::zero(), 'IZIN', isset($izin['surec_id']) ? (int) $izin['surec_id'] : null, 'Ucretli izin - kesinti yok', []);
             } else {
-                // skip days already counted as absence
                 $tutar = $daily->mulDiv($days, 1);
                 $grossDeduct = $grossDeduct->add($tutar);
                 $sira++;
                 $kalemler[] = self::line($sira, 'IZIN', 'UCRETSIZ_IZIN_KESINTISI', 'EKSI', $days, 'GUN', null, $daily->toDecimalString(), $tutar, 'IZIN', isset($izin['surec_id']) ? (int) $izin['surec_id'] : null, 'Ucretsiz izin kesintisi', []);
             }
         }
+
+        /** @var array<string, int> $weeklyNormalMinutes ISO hafta anahtari => Normal_Is_Gunu net dk */
+        $weeklyNormalMinutes = [];
 
         foreach ($input['puantajlar'] as $row) {
             $tarih = (string) ($row['tarih'] ?? '');
@@ -396,7 +455,6 @@ final class MaasHesaplamaEngine
             $gec = isset($row['gec_kalma_dakika']) ? (int) $row['gec_kalma_dakika'] : 0;
             $erken = isset($row['erken_cikis_dakika']) ? (int) $row['erken_cikis_dakika'] : 0;
 
-            // Puantaj dakikalari: etki adayi yoksa dogrudan uygula; duplicate tarih absencede atla
             if ($tarih !== '' && !isset($absenceDates[$tarih])) {
                 if ($gec > 0) {
                     $tutar = $hourly->mulDiv($gec, 60);
@@ -413,31 +471,95 @@ final class MaasHesaplamaEngine
             }
 
             if ($gunTipi === 'Hafta_Tatili_Pazar' && $netDk > 0) {
-                $base = $hourly->mulDiv($netDk, 60);
-                $tutar = $base->applyRate($htCarpan);
-                $grossAdd = $grossAdd->add($tutar);
+                $premium = self::holidayPremium($hourly, $daily, $netDk, $htCarpan, $htMode);
+                $grossAdd = $grossAdd->add($premium['tutar']);
                 $hasOt = true;
                 $sira++;
-                $kalemler[] = self::line($sira, 'HAFTA_TATILI', 'HAFTA_TATILI_ODEMESI', 'ARTI', $netDk, 'DAKIKA', $htCarpan->toDecimalString(), $base->toDecimalString(), $tutar, 'PUANTAJ', isset($row['muhur_satir_id']) ? (int) $row['muhur_satir_id'] : null, 'Hafta tatili calismasi', []);
+                $kalemler[] = self::line(
+                    $sira,
+                    'HAFTA_TATILI',
+                    'HAFTA_TATILI_ODEMESI',
+                    'ARTI',
+                    $premium['miktar'],
+                    $premium['birim'],
+                    $htCarpan->toDecimalString(),
+                    $premium['matrah'],
+                    $premium['tutar'],
+                    'PUANTAJ',
+                    isset($row['muhur_satir_id']) ? (int) $row['muhur_satir_id'] : null,
+                    'Hafta tatili calismasi',
+                    ['hesap_modu' => $htMode, 'net_dakika' => $netDk]
+                );
             } elseif ($gunTipi === 'UBGT_Resmi_Tatil' && $netDk > 0) {
-                $base = $hourly->mulDiv($netDk, 60);
-                $tutar = $base->applyRate($ubgtCarpan);
+                $premium = self::holidayPremium($hourly, $daily, $netDk, $ubgtCarpan, $ubgtMode);
+                $grossAdd = $grossAdd->add($premium['tutar']);
+                $hasOt = true;
+                $sira++;
+                $kalemler[] = self::line(
+                    $sira,
+                    'UBGT',
+                    'UBGT_ODEMESI',
+                    'ARTI',
+                    $premium['miktar'],
+                    $premium['birim'],
+                    $ubgtCarpan->toDecimalString(),
+                    $premium['matrah'],
+                    $premium['tutar'],
+                    'PUANTAJ',
+                    isset($row['muhur_satir_id']) ? (int) $row['muhur_satir_id'] : null,
+                    'UBGT calismasi',
+                    ['hesap_modu' => $ubgtMode, 'net_dakika' => $netDk]
+                );
+            } elseif ($gunTipi === 'Normal_Is_Gunu' && $netDk > 0 && $tarih !== '') {
+                $weekKey = self::isoWeekKey($tarih);
+                if (!isset($weeklyNormalMinutes[$weekKey])) {
+                    $weeklyNormalMinutes[$weekKey] = 0;
+                }
+                $weeklyNormalMinutes[$weekKey] += $netDk;
+            }
+        }
+
+        ksort($weeklyNormalMinutes);
+        foreach ($weeklyNormalMinutes as $weekKey => $totalDk) {
+            $fsDk = 0;
+            $fmDk = 0;
+            if ($totalDk > $contractualWeeklyDk) {
+                $overContract = $totalDk - $contractualWeeklyDk;
+                $fsCap = self::LEGAL_WEEKLY_LIMIT_MINUTES - $contractualWeeklyDk;
+                if ($fsCap < 0) {
+                    $fsCap = 0;
+                }
+                $fsDk = $overContract < $fsCap ? $overContract : $fsCap;
+                $fmDk = $totalDk > self::LEGAL_WEEKLY_LIMIT_MINUTES
+                    ? ($totalDk - self::LEGAL_WEEKLY_LIMIT_MINUTES)
+                    : 0;
+            }
+
+            if ($fsDk > 0) {
+                $base = $hourly->mulDiv($fsDk, 60);
+                $tutar = $base->applyRate($fsCarpan);
                 $grossAdd = $grossAdd->add($tutar);
                 $hasOt = true;
                 $sira++;
-                $kalemler[] = self::line($sira, 'UBGT', 'UBGT_ODEMESI', 'ARTI', $netDk, 'DAKIKA', $ubgtCarpan->toDecimalString(), $base->toDecimalString(), $tutar, 'PUANTAJ', isset($row['muhur_satir_id']) ? (int) $row['muhur_satir_id'] : null, 'UBGT calismasi', []);
-            } elseif ($gunTipi === 'Normal_Is_Gunu') {
-                $normalDk = self::paramInt($params, 'GUNLUK_CALISMA_SAATI') * 60;
-                if ($netDk <= $normalDk) {
-                    continue;
-                }
-                $fmDk = $netDk - $normalDk;
+                $kalemler[] = self::line($sira, 'FAZLA_SURELERLE', 'FAZLA_SURELERLE_CALISMA_ODEMESI', 'ARTI', $fsDk, 'DAKIKA', $fsCarpan->toDecimalString(), $base->toDecimalString(), $tutar, 'PUANTAJ', null, 'Fazla surelerle calisma', [
+                    'iso_hafta' => $weekKey,
+                    'haftalik_toplam_dk' => $totalDk,
+                    'sozlesme_haftalik_dk' => $contractualWeeklyDk,
+                    'yasal_haftalik_limit_dk' => self::LEGAL_WEEKLY_LIMIT_MINUTES,
+                ]);
+            }
+            if ($fmDk > 0) {
                 $base = $hourly->mulDiv($fmDk, 60);
                 $tutar = $base->applyRate($fmCarpan);
                 $grossAdd = $grossAdd->add($tutar);
                 $hasOt = true;
                 $sira++;
-                $kalemler[] = self::line($sira, 'FAZLA_MESAI', 'FAZLA_MESAI_ODEMESI', 'ARTI', $fmDk, 'DAKIKA', $fmCarpan->toDecimalString(), $base->toDecimalString(), $tutar, 'PUANTAJ', isset($row['muhur_satir_id']) ? (int) $row['muhur_satir_id'] : null, 'Fazla mesai', []);
+                $kalemler[] = self::line($sira, 'FAZLA_MESAI', 'FAZLA_MESAI_ODEMESI', 'ARTI', $fmDk, 'DAKIKA', $fmCarpan->toDecimalString(), $base->toDecimalString(), $tutar, 'PUANTAJ', null, 'Fazla mesai', [
+                    'iso_hafta' => $weekKey,
+                    'haftalik_toplam_dk' => $totalDk,
+                    'sozlesme_haftalik_dk' => $contractualWeeklyDk,
+                    'yasal_haftalik_limit_dk' => self::LEGAL_WEEKLY_LIMIT_MINUTES,
+                ]);
             }
         }
 
@@ -452,6 +574,55 @@ final class MaasHesaplamaEngine
             'gross_deduct' => $grossDeduct,
             'net_only' => $netOnly,
         ];
+    }
+
+    /**
+     * @return array{tutar: Money, matrah: string, miktar: int, birim: string}
+     */
+    private static function holidayPremium(Money $hourly, Money $daily, $netDk, Rate $carpan, $mode)
+    {
+        $netDk = (int) $netDk;
+        $mode = strtoupper((string) $mode);
+        if ($mode === 'GUNLUK_ILAVE') {
+            $tutar = $daily->applyRate($carpan);
+
+            return [
+                'tutar' => $tutar,
+                'matrah' => $daily->toDecimalString(),
+                'miktar' => 1,
+                'birim' => 'GUN',
+            ];
+        }
+        if ($mode === 'GUNLUK_ILAVE_VE_SAAT_CARPAN') {
+            $ilave = $daily->applyRate($carpan);
+            $saatUcret = $hourly->mulDiv($netDk, 60);
+            $tutar = $ilave->add($saatUcret);
+
+            return [
+                'tutar' => $tutar,
+                'matrah' => $ilave->add($saatUcret)->toDecimalString(),
+                'miktar' => $netDk,
+                'birim' => 'DAKIKA',
+            ];
+        }
+
+        // SAAT_CARPAN (V1 uyumlu)
+        $base = $hourly->mulDiv($netDk, 60);
+        $tutar = $base->applyRate($carpan);
+
+        return [
+            'tutar' => $tutar,
+            'matrah' => $base->toDecimalString(),
+            'miktar' => $netDk,
+            'birim' => 'DAKIKA',
+        ];
+    }
+
+    private static function isoWeekKey($tarih)
+    {
+        $dt = new \DateTimeImmutable((string) $tarih);
+
+        return $dt->format('o') . '-W' . $dt->format('W');
     }
 
     /**

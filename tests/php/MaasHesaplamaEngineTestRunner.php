@@ -24,7 +24,7 @@ function decimalKurus(string $value): int
 }
 
 /** @return array<string, array<string, mixed>> */
-function mevzuatFixture(): array
+function mevzuatFixture(array $overrides = []): array
 {
     $values = [
         'ASGARI_UCRET_BRUT' => '26005.74',
@@ -46,24 +46,41 @@ function mevzuatFixture(): array
         'GELIR_VERGISI_DILIM_5_ORAN' => '0.40',
         'NORMAL_AY_GUN_SAYISI' => '30',
         'GUNLUK_CALISMA_SAATI' => '8',
-        'AYLIK_NORMAL_CALISMA_SAATI' => '240',
+        'AYLIK_NORMAL_CALISMA_SAATI' => '225',
+        'HAFTALIK_IS_GUNU_SAYISI' => '5',
         'FAZLA_MESAI_CARPANI' => '1.5',
-        'HAFTA_TATILI_CARPANI' => '2',
-        'UBGT_CARPANI' => '2',
+        'FAZLA_SURELERLE_CALISMA_CARPANI' => '1.25',
+        'HAFTA_TATILI_CARPANI' => '1',
+        'UBGT_CARPANI' => '1',
+        'HAFTA_TATILI_HESAP_MODU' => 'GUNLUK_ILAVE',
+        'UBGT_HESAP_MODU' => 'GUNLUK_ILAVE',
     ];
+    foreach ($overrides as $code => $value) {
+        $values[$code] = $value;
+    }
 
     $fixture = [];
     foreach ($values as $code => $value) {
         $meta = MaasHesaplamaLegalParameterCatalog::meta($code);
+        $isMetin = $meta && $meta['deger_tipi'] === 'METIN';
         $fixture[$code] = [
             'parametre_kodu' => $code,
-            'sayisal_deger' => $value,
+            'sayisal_deger' => $isMetin ? null : $value,
+            'metin_deger' => $isMetin ? $value : null,
             'deger_tipi' => $meta ? $meta['deger_tipi'] : 'SAYISAL',
             'birim' => $meta ? $meta['birim'] : null,
         ];
     }
 
     return $fixture;
+}
+
+/** @return array<int, array<string, mixed>> */
+function findKalemler(array $result, string $kod): array
+{
+    return array_values(array_filter($result['kalemler'], static function (array $k) use ($kod) {
+        return (string) $k['kalem_kodu'] === $kod;
+    }));
 }
 
 /** @return array<string, mixed> */
@@ -134,7 +151,9 @@ engineAssert($ceza !== null && $ceza['yon'] === 'EKSI' && $ceza['net_odeme'] ===
 engineAssert(FinanceKalemCatalog::isDuplicateSalary('MAAS'), 'FinanceKalemCatalog MAAS duplicate');
 
 // Legal catalog
-engineAssert(count(MaasHesaplamaLegalParameterCatalog::requiredCodes()) === 23, 'LegalParameterCatalog requiredCodes 23');
+engineAssert(count(MaasHesaplamaLegalParameterCatalog::requiredCodes()) === 27, 'LegalParameterCatalog requiredCodes 27');
+engineAssert(MaasHesaplamaEngine::ENGINE_VERSION === 'S77D_PAYROLL_ENGINE_V2', 'Engine version V2');
+engineAssert(MaasHesaplamaEngine::CONTRACT_VERSION === 'S77D_PAYROLL_CANDIDATE_V2', 'Contract version V2');
 
 // Engine BRUT path
 $brut = MaasHesaplamaEngine::calculate(engineInput('BRUT', '50000.00', [
@@ -154,6 +173,7 @@ $brut = MaasHesaplamaEngine::calculate(engineInput('BRUT', '50000.00', [
 assertKalemIntegrity($brut, 'BRUT happy path');
 engineAssert((string) $brut['ozet']['ucret_turu'] === 'BRUT', 'BRUT path ucret_turu');
 engineAssert(decimalKurus((string) $brut['ozet']['net_odenecek']) > 0, 'BRUT path net positive');
+engineAssert((string) $brut['engine_version'] === 'S77D_PAYROLL_ENGINE_V2', 'BRUT result engine_version V2');
 
 // Engine NET path, no extras
 $targetNet = '30000.00';
@@ -190,5 +210,120 @@ $input = engineInput('BRUT', '50000.00');
 $first = MaasHesaplamaEngine::calculate($input);
 $second = MaasHesaplamaEngine::calculate($input);
 engineAssert(!empty($first['ok']) && $first['result_hash'] === $second['result_hash'], 'same input same result_hash');
+engineAssert(isset($first['input_hash']) && strlen((string) $first['input_hash']) === 64, 'input_hash SHA-256');
+
+// V2: 7.5 saat truncate edilmez; AYLIK_NORMAL_CALISMA_SAATI saatlik divisor
+$frac = MaasHesaplamaEngine::calculate(engineInput('BRUT', '45000.00', [
+    'mevzuat' => mevzuatFixture([
+        'GUNLUK_CALISMA_SAATI' => '7.5',
+        'AYLIK_NORMAL_CALISMA_SAATI' => '225',
+        'HAFTALIK_IS_GUNU_SAYISI' => '6',
+    ]),
+    'puantajlar' => [[
+        'muhur_satir_id' => 2,
+        'tarih' => '2026-03-02',
+        'gun_tipi' => 'UBGT_Resmi_Tatil',
+        'net_calisma_suresi_dakika' => 450,
+    ]],
+]));
+assertKalemIntegrity($frac, 'fractional hours path');
+$ubgt = findKalemler($frac, 'UBGT_ODEMESI');
+engineAssert(count($ubgt) === 1, 'UBGT GUNLUK_ILAVE kalem');
+// gunluk = 45000/30 = 1500; carpan=1 → 1500.00
+engineAssert((string) $ubgt[0]['tutar'] === '1500.00', 'UBGT gunluk ilave tutar');
+engineAssert((string) $ubgt[0]['birim'] === 'GUN', 'UBGT birim GUN');
+
+// Haftalik FS + FM siniflandirmasi (sozlesme 5*8h=2400, yasal 2700)
+$weekDays = [];
+// 2026-03-02 Pazartesi ... 2026-03-06 Cuma: 5x540=2700 → FS=300, FM=0
+for ($d = 2; $d <= 6; $d++) {
+    $weekDays[] = [
+        'muhur_satir_id' => 100 + $d,
+        'tarih' => sprintf('2026-03-%02d', $d),
+        'gun_tipi' => 'Normal_Is_Gunu',
+        'net_calisma_suresi_dakika' => 540,
+    ];
+}
+$weekFs = MaasHesaplamaEngine::calculate(engineInput('BRUT', '45000.00', [
+    'mevzuat' => mevzuatFixture([
+        'GUNLUK_CALISMA_SAATI' => '8',
+        'HAFTALIK_IS_GUNU_SAYISI' => '5',
+        'AYLIK_NORMAL_CALISMA_SAATI' => '225',
+    ]),
+    'puantajlar' => $weekDays,
+]));
+assertKalemIntegrity($weekFs, 'weekly FS path');
+$fs = findKalemler($weekFs, 'FAZLA_SURELERLE_CALISMA_ODEMESI');
+$fm = findKalemler($weekFs, 'FAZLA_MESAI_ODEMESI');
+engineAssert(count($fs) === 1 && (int) $fs[0]['miktar'] === 300, 'FS 300 dk (2400..2700)');
+engineAssert(count($fm) === 0, 'FM yok when total=2700');
+
+// FM band: 5x600=3000 → FS=300, FM=300
+$weekFmDays = [];
+for ($d = 2; $d <= 6; $d++) {
+    $weekFmDays[] = [
+        'muhur_satir_id' => 200 + $d,
+        'tarih' => sprintf('2026-03-%02d', $d),
+        'gun_tipi' => 'Normal_Is_Gunu',
+        'net_calisma_suresi_dakika' => 600,
+    ];
+}
+$weekFm = MaasHesaplamaEngine::calculate(engineInput('BRUT', '45000.00', [
+    'mevzuat' => mevzuatFixture([
+        'GUNLUK_CALISMA_SAATI' => '8',
+        'HAFTALIK_IS_GUNU_SAYISI' => '5',
+        'AYLIK_NORMAL_CALISMA_SAATI' => '225',
+    ]),
+    'puantajlar' => $weekFmDays,
+]));
+assertKalemIntegrity($weekFm, 'weekly FM path');
+$fs2 = findKalemler($weekFm, 'FAZLA_SURELERLE_CALISMA_ODEMESI');
+$fm2 = findKalemler($weekFm, 'FAZLA_MESAI_ODEMESI');
+engineAssert(count($fs2) === 1 && (int) $fs2[0]['miktar'] === 300, 'FS 300 dk above contract');
+engineAssert(count($fm2) === 1 && (int) $fm2[0]['miktar'] === 300, 'FM 300 dk above 2700');
+
+// Hafta tatili GUNLUK_ILAVE
+$ht = MaasHesaplamaEngine::calculate(engineInput('BRUT', '30000.00', [
+    'puantajlar' => [[
+        'muhur_satir_id' => 3,
+        'tarih' => '2026-03-08',
+        'gun_tipi' => 'Hafta_Tatili_Pazar',
+        'net_calisma_suresi_dakika' => 480,
+    ]],
+]));
+assertKalemIntegrity($ht, 'HT path');
+$htKalem = findKalemler($ht, 'HAFTA_TATILI_ODEMESI');
+engineAssert(count($htKalem) === 1 && (string) $htKalem[0]['tutar'] === '1000.00', 'HT gunluk ilave = 30000/30');
+
+// UBGT SAAT_CARPAN modu
+$ubgtSaat = MaasHesaplamaEngine::calculate(engineInput('BRUT', '45000.00', [
+    'mevzuat' => mevzuatFixture([
+        'UBGT_HESAP_MODU' => 'SAAT_CARPAN',
+        'UBGT_CARPANI' => '2',
+        'AYLIK_NORMAL_CALISMA_SAATI' => '225',
+    ]),
+    'puantajlar' => [[
+        'muhur_satir_id' => 4,
+        'tarih' => '2026-03-02',
+        'gun_tipi' => 'UBGT_Resmi_Tatil',
+        'net_calisma_suresi_dakika' => 60,
+    ]],
+]));
+assertKalemIntegrity($ubgtSaat, 'UBGT SAAT_CARPAN path');
+$ubgt2 = findKalemler($ubgtSaat, 'UBGT_ODEMESI');
+// hourly = 45000 * 60 / (225*60) = 45000/225 = 200; 1h * 2 = 400
+engineAssert(count($ubgt2) === 1 && (string) $ubgt2[0]['tutar'] === '400.00', 'UBGT SAAT_CARPAN tutar');
+
+// Tek gunluk 9h Normal_Is_Gunu artik gunluk FM uretmez
+$noDailyOt = MaasHesaplamaEngine::calculate(engineInput('BRUT', '50000.00', [
+    'puantajlar' => [[
+        'muhur_satir_id' => 5,
+        'tarih' => '2026-03-10',
+        'gun_tipi' => 'Normal_Is_Gunu',
+        'net_calisma_suresi_dakika' => 540,
+    ]],
+]));
+engineAssert(count(findKalemler($noDailyOt, 'FAZLA_MESAI_ODEMESI')) === 0, 'V1 daily OT removed');
+engineAssert(count(findKalemler($noDailyOt, 'FAZLA_SURELERLE_CALISMA_ODEMESI')) === 0, 'single day under weekly contract');
 
 echo 'verify-maas-hesaplama-engine: OK' . PHP_EOL;

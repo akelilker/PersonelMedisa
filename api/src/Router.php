@@ -13,6 +13,7 @@ use Medisa\Api\Controllers\BildirimlerController;
 use Medisa\Api\Controllers\DonemKapanisController;
 use Medisa\Api\Controllers\HaftalikBildirimMutabakatlariController;
 use Medisa\Api\Controllers\EkOdemeKesintiController;
+use Medisa\Api\Controllers\MaasHesaplamaController;
 use Medisa\Api\Controllers\MevzuatParametreController;
 use Medisa\Api\Controllers\PersonelBelgelerController;
 use Medisa\Api\Controllers\PersonellerController;
@@ -177,6 +178,28 @@ class Router
         }
         if ($path === '/referans/bildirim-turleri' && $method === 'GET') {
             ReferansController::bildirimTurleri($this->request);
+        }
+
+        if ($path === '/maas-hesaplama/preflight' && $method === 'GET') {
+            MaasHesaplamaController::preflight($this->request);
+        }
+        if ($path === '/maas-hesaplama/snapshotlar' && $method === 'GET') {
+            MaasHesaplamaController::listSnapshots($this->request);
+        }
+        if ($path === '/maas-hesaplama/snapshotlar' && $method === 'POST') {
+            MaasHesaplamaController::create($this->request);
+        }
+        if ($path === '/maas-hesaplama/auditler' && $method === 'GET') {
+            MaasHesaplamaController::listAudits($this->request);
+        }
+        if ($method === 'GET' && preg_match('#^/maas-hesaplama/snapshotlar/(\d+)$#', $path, $matches)) {
+            MaasHesaplamaController::detail($this->request, $matches[1]);
+        }
+        if ($method === 'POST' && preg_match('#^/maas-hesaplama/snapshotlar/(\d+)/iptal$#', $path, $matches)) {
+            MaasHesaplamaController::cancel($this->request, $matches[1]);
+        }
+        if ($method === 'GET' && preg_match('#^/maas-hesaplama/snapshotlar/(\d+)/audit$#', $path, $matches)) {
+            MaasHesaplamaController::audit($this->request, $matches[1]);
         }
 
         if ($path === '/mevzuat-parametreleri' && $method === 'GET') {

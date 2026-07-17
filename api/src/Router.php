@@ -201,6 +201,42 @@ class Router
         if ($method === 'GET' && preg_match('#^/maas-hesaplama/snapshotlar/(\d+)/audit$#', $path, $matches)) {
             MaasHesaplamaController::audit($this->request, $matches[1]);
         }
+        if ($method === 'GET' && preg_match('#^/maas-hesaplama/snapshotlar/(\d+)/hesaplama-preflight$#', $path, $matches)) {
+            MaasHesaplamaController::calculationPreflight($this->request, $matches[1]);
+        }
+        if ($method === 'POST' && preg_match('#^/maas-hesaplama/snapshotlar/(\d+)/hesapla$#', $path, $matches)) {
+            MaasHesaplamaController::calculate($this->request, $matches[1]);
+        }
+        if ($path === '/maas-hesaplama/calistirmalar' && $method === 'GET') {
+            MaasHesaplamaController::listCalistirmalar($this->request);
+        }
+        if ($method === 'GET' && preg_match('#^/maas-hesaplama/calistirmalar/(\d+)$#', $path, $matches)) {
+            MaasHesaplamaController::calistirmaDetail($this->request, $matches[1]);
+        }
+        if ($method === 'GET' && preg_match('#^/maas-hesaplama/calistirmalar/(\d+)/adaylar$#', $path, $matches)) {
+            MaasHesaplamaController::listAdaylar($this->request, $matches[1]);
+        }
+        if ($method === 'GET' && preg_match('#^/maas-hesaplama/calistirmalar/(\d+)/audit$#', $path, $matches)) {
+            MaasHesaplamaController::calistirmaAudit($this->request, $matches[1]);
+        }
+        if ($method === 'POST' && preg_match('#^/maas-hesaplama/calistirmalar/(\d+)/iptal$#', $path, $matches)) {
+            MaasHesaplamaController::cancelCalistirma($this->request, $matches[1]);
+        }
+        if ($method === 'GET' && preg_match('#^/maas-hesaplama/adaylar/(\d+)$#', $path, $matches)) {
+            MaasHesaplamaController::adayDetail($this->request, $matches[1]);
+        }
+        if ($method === 'GET' && preg_match('#^/maas-hesaplama/adaylar/(\d+)/kalemler$#', $path, $matches)) {
+            MaasHesaplamaController::adayKalemler($this->request, $matches[1]);
+        }
+        if ($path === '/maas-hesaplama/yasal-katalog' && $method === 'GET') {
+            MaasHesaplamaController::legalCatalog($this->request);
+        }
+        if ($path === '/maas-hesaplama/devirler' && $method === 'GET') {
+            MaasHesaplamaController::listDevirler($this->request);
+        }
+        if ($path === '/maas-hesaplama/devirler' && $method === 'POST') {
+            MaasHesaplamaController::upsertDevir($this->request);
+        }
 
         if ($path === '/mevzuat-parametreleri' && $method === 'GET') {
             MevzuatParametreController::list($this->request);

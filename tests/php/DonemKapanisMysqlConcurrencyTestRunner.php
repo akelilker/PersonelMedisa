@@ -5,6 +5,8 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../api/src/Services/PuantajDonemKilidiService.php';
 require_once __DIR__ . '/../../api/src/Services/BildirimDonemContextService.php';
 require_once __DIR__ . '/../../api/src/Services/DonemKapanisAuditService.php';
+require_once __DIR__ . '/../../api/src/Services/PersonelUcretException.php';
+require_once __DIR__ . '/../../api/src/Services/PersonelUcretService.php';
 require_once __DIR__ . '/../../api/src/Services/DonemKapanisPreflightService.php';
 
 use Medisa\Api\Services\DonemKapanisAuditService;
@@ -325,9 +327,18 @@ try {
     $pdo->exec('INSERT INTO subeler (id, kod, ad) VALUES (1, \'MRK\', \'Merkez\'), (2, \'DEP\', \'Depolama\')');
     $pdo->exec('CREATE TABLE personeller (
         id INT UNSIGNED NOT NULL PRIMARY KEY, sube_id INT UNSIGNED NOT NULL,
-        departman_id INT UNSIGNED NULL, aktif_durum VARCHAR(16) NOT NULL, maas_tutari DECIMAL(12,2) NULL
+        departman_id INT UNSIGNED NULL, aktif_durum VARCHAR(16) NOT NULL,
+        maas_tutari DECIMAL(12,2) NULL, ise_giris_tarihi DATE NULL
     ) ENGINE=InnoDB');
-    $pdo->exec('INSERT INTO personeller (id, sube_id, departman_id, aktif_durum, maas_tutari) VALUES (7, 1, 3, \'AKTIF\', 25000), (8, 1, 3, \'AKTIF\', NULL)');
+    $pdo->exec('CREATE TABLE personel_ucret_gecmisi (
+        id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY, personel_id INT UNSIGNED NOT NULL,
+        ucret_tutari DECIMAL(12,2) NOT NULL, ucret_turu VARCHAR(8) NOT NULL,
+        para_birimi CHAR(3) NOT NULL DEFAULT \'TRY\', gecerlilik_baslangic DATE NOT NULL,
+        gecerlilik_bitis DATE NULL, state VARCHAR(16) NOT NULL DEFAULT \'AKTIF\',
+        kaynak VARCHAR(40) NOT NULL DEFAULT \'MANUEL\'
+    ) ENGINE=InnoDB');
+    $pdo->exec('INSERT INTO personeller (id, sube_id, departman_id, aktif_durum, maas_tutari, ise_giris_tarihi)
+        VALUES (7, 1, 3, \'AKTIF\', 25000, \'2020-01-01\'), (8, 1, 3, \'AKTIF\', NULL, \'2020-01-01\')');
     $migration = file_get_contents(__DIR__ . '/../../api/migrations/014_puantaj_donem_kilitleri.sql');
     $migration = preg_replace('/^\s*--.*$/m', '', (string) $migration);
     foreach (array_filter(array_map('trim', explode(';', (string) $migration))) as $statement) {

@@ -32,9 +32,9 @@ describe("S74-D1/D3R puantaj period lock source contract", () => {
     expect(migration).not.toMatch(/\b(?:gunluk_puantaj|puantaj_aylik_muhurleri|puantaj_aylik_muhur_satirlari)\b/i);
   });
 
-  it("keeps 017 as the single last migration", () => {
+  it("keeps one 017 migration in the contiguous sequence", () => {
     const migrations = readdirSync(resolve(root, "api/migrations")).filter((name) => /^\d{3}_.*\.sql$/.test(name)).sort();
-    expect(migrations.at(-1)).toBe("017_donem_kapanis_ve_etki_rapor_indexleri.sql");
+    expect(migrations.at(-1)).toBe("019_mevzuat_parametreleri.sql");
     expect(migrations.filter((name) => name.startsWith("017_"))).toHaveLength(1);
   });
 

@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../../api/src/Services/BildirimDonemContextService.php';
+require_once __DIR__ . '/../../api/src/Services/PersonelUcretException.php';
+require_once __DIR__ . '/../../api/src/Services/PersonelUcretService.php';
 require_once __DIR__ . '/../../api/src/Services/DonemKapanisPreflightService.php';
 
 use Medisa\Api\Services\DonemKapanisPreflightService;
@@ -22,7 +24,13 @@ function createPreflightSchema(PDO $pdo): void
     $pdo->exec('CREATE TABLE subeler (id INTEGER PRIMARY KEY, kod TEXT, ad TEXT)');
     $pdo->exec('CREATE TABLE personeller (
         id INTEGER PRIMARY KEY, sube_id INTEGER NOT NULL, departman_id INTEGER,
-        aktif_durum TEXT NOT NULL DEFAULT \'AKTIF\', maas_tutari REAL
+        aktif_durum TEXT NOT NULL DEFAULT \'AKTIF\', maas_tutari REAL, ise_giris_tarihi TEXT
+    )');
+    $pdo->exec('CREATE TABLE personel_ucret_gecmisi (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, personel_id INTEGER NOT NULL, ucret_tutari REAL NOT NULL,
+        ucret_turu TEXT NOT NULL, para_birimi TEXT NOT NULL DEFAULT \'TRY\',
+        gecerlilik_baslangic TEXT NOT NULL, gecerlilik_bitis TEXT,
+        state TEXT NOT NULL DEFAULT \'AKTIF\', kaynak TEXT NOT NULL DEFAULT \'MANUEL\'
     )');
     $pdo->exec('CREATE TABLE gunluk_bildirimler (
         id INTEGER PRIMARY KEY, personel_id INTEGER NOT NULL, tarih TEXT NOT NULL,
@@ -68,13 +76,15 @@ function resetPreflightData(PDO $pdo): void
         'aylik_ozet_satirlari', 'ek_odeme_kesinti', 'puantaj_aylik_muhurleri', 'gunluk_puantaj',
         'onayli_bildirim_puantaj_etki_adaylari', 'genel_yonetici_bildirim_onaylari',
         'aylik_bildirim_onaylari', 'haftalik_bildirim_mutabakatlari', 'gunluk_bildirimler',
-        'personeller', 'subeler',
+        'personel_ucret_gecmisi', 'personeller', 'subeler',
     ] as $table) {
         $pdo->exec('DELETE FROM ' . $table);
     }
     $pdo->exec('INSERT INTO subeler (id, kod, ad) VALUES (1, \'MRK\', \'Merkez\')');
-    $pdo->exec('INSERT INTO personeller (id, sube_id, departman_id, aktif_durum, maas_tutari)
-        VALUES (10, 1, 3, \'AKTIF\', 25000), (11, 1, 4, \'AKTIF\', 0), (12, 1, 4, \'AKTIF\', 18000)');
+    $pdo->exec('INSERT INTO personeller (id, sube_id, departman_id, aktif_durum, maas_tutari, ise_giris_tarihi)
+        VALUES (10, 1, 3, \'AKTIF\', 25000, \'2020-01-01\'),
+               (11, 1, 4, \'AKTIF\', 0, \'2020-01-01\'),
+               (12, 1, 4, \'AKTIF\', 18000, \'2020-01-01\')');
 }
 
 function seedBildirim(PDO $pdo, int $id, int $personelId, string $tarih, string $state, int $amirId = 5): void
@@ -276,6 +286,20 @@ try {
     $salary = DonemKapanisPreflightService::evaluate($pdo, 1, 2026, 6);
     assertPreflight(hasWarningCode($salary, 'FINANCE_SALARY_MISSING'), 'missing salary is warning');
     assertPreflight($salary['kapanabilir_mi'] === true, 'salary warning does not block close preflight');
+
+    resetPreflightData($pdo);
+    $pdo->exec("INSERT INTO personel_ucret_gecmisi (
+        personel_id, ucret_tutari, ucret_turu, gecerlilik_baslangic, gecerlilik_bitis, state, kaynak
+    ) VALUES (11, 21000, 'NET', '2026-01-01', NULL, 'AKTIF', 'MANUEL')");
+    $salaryHistory = DonemKapanisPreflightService::evaluate($pdo, 1, 2026, 6);
+    assertPreflight(!hasWarningCode($salaryHistory, 'FINANCE_SALARY_MISSING'), 'salary history at period end clears warning');
+
+    resetPreflightData($pdo);
+    $pdo->exec("INSERT INTO personel_ucret_gecmisi (
+        personel_id, ucret_tutari, ucret_turu, gecerlilik_baslangic, gecerlilik_bitis, state, kaynak
+    ) VALUES (11, 21000, 'NET', '2026-07-01', NULL, 'AKTIF', 'MANUEL')");
+    $futureSalary = DonemKapanisPreflightService::evaluate($pdo, 1, 2026, 6);
+    assertPreflight(hasWarningCode($futureSalary, 'FINANCE_SALARY_MISSING'), 'future-only salary warns for past period end');
 
     resetPreflightData($pdo);
     $pdo->exec('INSERT INTO puantaj_aylik_muhurleri (sube_id, yil, ay) VALUES (1, 2026, 6)');

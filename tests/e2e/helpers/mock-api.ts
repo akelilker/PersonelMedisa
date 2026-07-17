@@ -2985,6 +2985,45 @@ let personelBelgeKaydiIdCounter = 903;
   let subeIdCounter = 2;
   let departmanIdCounter = 12;
   let personelIdCounter = 5;
+  let personelUcretIdCounter = 1;
+  let mevzuatParametreIdCounter = 1;
+  type MockPersonelUcret = {
+    id: number;
+    personel_id: number;
+    ucret_tutari: number;
+    ucret_turu: "BRUT" | "NET";
+    para_birimi: string;
+    gecerlilik_baslangic: string;
+    gecerlilik_bitis: string | null;
+    state: "AKTIF" | "IPTAL";
+    kaynak: "MANUEL" | "PERSONEL_KAYDI_MIGRASYON" | "SISTEM";
+    aciklama?: string | null;
+  };
+  type MockMevzuatParametresi = {
+    id: number;
+    parametre_kodu: string;
+    deger_tipi: "SAYISAL" | "METIN";
+    sayisal_deger: number | null;
+    metin_deger: string | null;
+    gecerlilik_baslangic: string;
+    gecerlilik_bitis: string | null;
+    birim?: string | null;
+    aciklama?: string | null;
+    state: "AKTIF" | "IPTAL";
+  };
+  const personelUcretleri: MockPersonelUcret[] = [];
+  const mevzuatParametreleri: MockMevzuatParametresi[] = [];
+
+  function rangesOverlapInclusive(
+    startA: string,
+    endA: string | null,
+    startB: string,
+    endB: string | null
+  ) {
+    const aEnd = endA ?? "9999-12-31";
+    const bEnd = endB ?? "9999-12-31";
+    return startA <= bEnd && startB <= aEnd;
+  }
 
   function encodePersonelBelgeKaydiSurecMetadata(payload: {
     kayit_tipi: string;
@@ -4077,6 +4116,191 @@ let personelBelgeKaydiIdCounter = 903;
       }
 
       await fulfillJson(route, 200, okBody(buildPersonelDetail(personel)));
+      return;
+    }
+
+    const personelUcretAktifMatch = path.match(/^\/api\/personeller\/(\d+)\/ucretler\/aktif$/);
+    if (personelUcretAktifMatch && method === "GET") {
+      if (await denyUnlessRolePermission(route, "personeller.ucret.view")) return;
+      const personelId = Number.parseInt(personelUcretAktifMatch[1] ?? "0", 10);
+      const personel = personeller.find((item) => item.id === personelId);
+      if (!personel) {
+        await fulfillJson(route, 404, errorBody("SALARY_RECORD_NOT_FOUND", "Personel bulunamadi."));
+        return;
+      }
+      const subeScope = getRequestSubeScope(request, url);
+      if (subeScope !== null && personel.sube_id !== subeScope) {
+        await fulfillJson(route, 403, errorBody("FORBIDDEN", SUBE_SCOPE_MISMATCH_MESSAGE));
+        return;
+      }
+      const tarih = url.searchParams.get("tarih") ?? new Date().toISOString().slice(0, 10);
+      const matches = personelUcretleri.filter(
+        (item) =>
+          item.personel_id === personelId &&
+          item.state === "AKTIF" &&
+          item.gecerlilik_baslangic <= tarih &&
+          (item.gecerlilik_bitis === null || tarih <= item.gecerlilik_bitis)
+      );
+      if (matches.length > 1) {
+        await fulfillJson(route, 409, errorBody("SALARY_OVERLAP_DATA_ERROR", "Ucret gecmisinde cakisan kayitlar var."));
+        return;
+      }
+      if (matches[0]) {
+        await fulfillJson(route, 200, okBody(matches[0]));
+        return;
+      }
+      await fulfillJson(route, 404, errorBody("SALARY_MISSING", "Belirtilen tarihte gecerli ucret kaydi yok."));
+      return;
+    }
+
+    const personelUcretListMatch = path.match(/^\/api\/personeller\/(\d+)\/ucretler$/);
+    if (personelUcretListMatch && (method === "GET" || method === "POST")) {
+      const personelId = Number.parseInt(personelUcretListMatch[1] ?? "0", 10);
+      const personel = personeller.find((item) => item.id === personelId);
+      if (!personel) {
+        await fulfillJson(route, 404, errorBody("SALARY_RECORD_NOT_FOUND", "Personel bulunamadi."));
+        return;
+      }
+      const subeScope = getRequestSubeScope(request, url);
+      if (subeScope !== null && personel.sube_id !== subeScope) {
+        await fulfillJson(route, 403, errorBody("FORBIDDEN", SUBE_SCOPE_MISMATCH_MESSAGE));
+        return;
+      }
+
+      if (method === "GET") {
+        if (await denyUnlessRolePermission(route, "personeller.ucret.view")) return;
+        const items = personelUcretleri
+          .filter((item) => item.personel_id === personelId)
+          .sort((a, b) => b.gecerlilik_baslangic.localeCompare(a.gecerlilik_baslangic) || b.id - a.id);
+        await fulfillJson(route, 200, okBody({ items }));
+        return;
+      }
+
+      if (await denyUnlessRolePermission(route, "personeller.ucret.manage")) return;
+      const payload = request.postDataJSON() as Record<string, unknown>;
+      const tutar = Number(payload.ucret_tutari);
+      const baslangic = String(payload.gecerlilik_baslangic ?? "");
+      const bitis =
+        payload.gecerlilik_bitis === null || payload.gecerlilik_bitis === undefined || payload.gecerlilik_bitis === ""
+          ? null
+          : String(payload.gecerlilik_bitis);
+      if (!Number.isFinite(tutar) || tutar <= 0 || !/^\d{4}-\d{2}-\d{2}$/.test(baslangic)) {
+        await fulfillJson(route, 400, errorBody("SALARY_AMOUNT_INVALID", "Ucret tutari veya tarih gecersiz."));
+        return;
+      }
+      const open = personelUcretleri.find(
+        (item) => item.personel_id === personelId && item.state === "AKTIF" && item.gecerlilik_bitis === null
+      );
+      if (open && open.gecerlilik_baslangic < baslangic) {
+        const closeDate = new Date(`${baslangic}T00:00:00Z`);
+        closeDate.setUTCDate(closeDate.getUTCDate() - 1);
+        open.gecerlilik_bitis = closeDate.toISOString().slice(0, 10);
+      }
+      const overlap = personelUcretleri.some(
+        (item) =>
+          item.personel_id === personelId &&
+          item.state === "AKTIF" &&
+          rangesOverlapInclusive(baslangic, bitis, item.gecerlilik_baslangic, item.gecerlilik_bitis)
+      );
+      if (overlap) {
+        await fulfillJson(
+          route,
+          409,
+          errorBody(
+            "SALARY_DATE_OVERLAP",
+            "Bu personel için seçilen tarih aralığında başka bir ücret kaydı bulunmaktadır."
+          )
+        );
+        return;
+      }
+      const created: MockPersonelUcret = {
+        id: ++personelUcretIdCounter,
+        personel_id: personelId,
+        ucret_tutari: tutar,
+        ucret_turu: payload.ucret_turu === "BRUT" ? "BRUT" : "NET",
+        para_birimi: String(payload.para_birimi ?? "TRY"),
+        gecerlilik_baslangic: baslangic,
+        gecerlilik_bitis: bitis,
+        state: "AKTIF",
+        kaynak: "MANUEL",
+        aciklama: typeof payload.aciklama === "string" ? payload.aciklama : null
+      };
+      personelUcretleri.push(created);
+      personel.maas_tutari = tutar;
+      personel.net_maas_tutari = tutar;
+      await fulfillJson(route, 201, okBody(created));
+      return;
+    }
+
+    const personelUcretCancelMatch = path.match(/^\/api\/personeller\/(\d+)\/ucretler\/(\d+)\/iptal$/);
+    if (personelUcretCancelMatch && method === "POST") {
+      if (await denyUnlessRolePermission(route, "personeller.ucret.manage")) return;
+      const personelId = Number.parseInt(personelUcretCancelMatch[1] ?? "0", 10);
+      const ucretId = Number.parseInt(personelUcretCancelMatch[2] ?? "0", 10);
+      const record = personelUcretleri.find((item) => item.id === ucretId && item.personel_id === personelId);
+      if (!record) {
+        await fulfillJson(route, 404, errorBody("SALARY_RECORD_NOT_FOUND", "Ucret kaydi bulunamadi."));
+        return;
+      }
+      record.state = "IPTAL";
+      await fulfillJson(route, 200, okBody(record));
+      return;
+    }
+
+    if (path === "/api/mevzuat-parametreleri" && method === "GET") {
+      if (await denyUnlessRolePermission(route, "mevzuat_parametreleri.view")) return;
+      await fulfillJson(route, 200, okBody({ items: [...mevzuatParametreleri] }));
+      return;
+    }
+
+    if (path === "/api/mevzuat-parametreleri" && method === "POST") {
+      if (await denyUnlessRolePermission(route, "mevzuat_parametreleri.manage")) return;
+      const payload = request.postDataJSON() as Record<string, unknown>;
+      const kod = String(payload.parametre_kodu ?? "").trim().toUpperCase();
+      const baslangic = String(payload.gecerlilik_baslangic ?? "");
+      const bitis =
+        payload.gecerlilik_bitis === null || payload.gecerlilik_bitis === undefined || payload.gecerlilik_bitis === ""
+          ? null
+          : String(payload.gecerlilik_bitis);
+      const degerTipi = payload.deger_tipi === "METIN" ? "METIN" : "SAYISAL";
+      const overlap = mevzuatParametreleri.some(
+        (item) =>
+          item.parametre_kodu === kod &&
+          item.state === "AKTIF" &&
+          rangesOverlapInclusive(baslangic, bitis, item.gecerlilik_baslangic, item.gecerlilik_bitis)
+      );
+      if (overlap) {
+        await fulfillJson(route, 409, errorBody("LEGAL_PARAMETER_OVERLAP", "Mevzuat parametresi tarih araligi cakisiyor."));
+        return;
+      }
+      const created: MockMevzuatParametresi = {
+        id: ++mevzuatParametreIdCounter,
+        parametre_kodu: kod,
+        deger_tipi: degerTipi,
+        sayisal_deger: degerTipi === "SAYISAL" ? Number(payload.sayisal_deger) : null,
+        metin_deger: degerTipi === "METIN" ? String(payload.metin_deger ?? "") : null,
+        gecerlilik_baslangic: baslangic,
+        gecerlilik_bitis: bitis,
+        birim: typeof payload.birim === "string" ? payload.birim : null,
+        aciklama: typeof payload.aciklama === "string" ? payload.aciklama : null,
+        state: "AKTIF"
+      };
+      mevzuatParametreleri.push(created);
+      await fulfillJson(route, 201, okBody(created));
+      return;
+    }
+
+    const mevzuatCancelMatch = path.match(/^\/api\/mevzuat-parametreleri\/(\d+)\/iptal$/);
+    if (mevzuatCancelMatch && method === "POST") {
+      if (await denyUnlessRolePermission(route, "mevzuat_parametreleri.manage")) return;
+      const id = Number.parseInt(mevzuatCancelMatch[1] ?? "0", 10);
+      const record = mevzuatParametreleri.find((item) => item.id === id);
+      if (!record) {
+        await fulfillJson(route, 404, errorBody("NOT_FOUND", "Parametre bulunamadi."));
+        return;
+      }
+      record.state = "IPTAL";
+      await fulfillJson(route, 200, okBody(record));
       return;
     }
 

@@ -48,11 +48,11 @@ describe("016_donem_kapanis_auditleri migration source", () => {
     expect(migrationSource).not.toMatch(/backfill/i);
   });
 
-  it("is part of the contiguous migration sequence ending at 017", () => {
+  it("is part of the contiguous migration sequence", () => {
     const migrations = readdirSync(resolve(process.cwd(), "api/migrations"))
       .filter((name) => /^\d{3}_.*\.sql$/.test(name))
       .sort();
     expect(migrations).toContain("016_donem_kapanis_auditleri.sql");
-    expect(migrations.at(-1)).toBe("017_donem_kapanis_ve_etki_rapor_indexleri.sql");
+    expect(migrations.at(-1)).toBe("019_mevzuat_parametreleri.sql");
   });
 });

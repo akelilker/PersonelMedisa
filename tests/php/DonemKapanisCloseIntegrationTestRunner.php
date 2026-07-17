@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../api/src/Services/BildirimDonemContextService.php';
 require_once __DIR__ . '/../../api/src/Services/DonemKapanisAuditService.php';
+require_once __DIR__ . '/../../api/src/Services/PersonelUcretException.php';
+require_once __DIR__ . '/../../api/src/Services/PersonelUcretService.php';
 require_once __DIR__ . '/../../api/src/Services/DonemKapanisPreflightService.php';
 require_once __DIR__ . '/../../api/src/Services/PuantajDonemKilidiService.php';
 require_once __DIR__ . '/../../api/src/Services/BildirimPuantajEtkiDecisionPolicy.php';
@@ -33,7 +35,13 @@ function createCloseSchema(PDO $pdo): void
     $pdo->exec('CREATE TABLE subeler (id INTEGER PRIMARY KEY, kod TEXT, ad TEXT)');
     $pdo->exec('CREATE TABLE personeller (
         id INTEGER PRIMARY KEY, sube_id INTEGER NOT NULL, departman_id INTEGER,
-        aktif_durum TEXT NOT NULL DEFAULT \'AKTIF\', maas_tutari REAL
+        aktif_durum TEXT NOT NULL DEFAULT \'AKTIF\', maas_tutari REAL, ise_giris_tarihi TEXT
+    )');
+    $pdo->exec('CREATE TABLE personel_ucret_gecmisi (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, personel_id INTEGER NOT NULL, ucret_tutari REAL NOT NULL,
+        ucret_turu TEXT NOT NULL, para_birimi TEXT NOT NULL DEFAULT \'TRY\',
+        gecerlilik_baslangic TEXT NOT NULL, gecerlilik_bitis TEXT,
+        state TEXT NOT NULL DEFAULT \'AKTIF\', kaynak TEXT NOT NULL DEFAULT \'MANUEL\'
     )');
     $pdo->exec('CREATE TABLE gunluk_bildirimler (
         id INTEGER PRIMARY KEY, personel_id INTEGER NOT NULL, tarih TEXT NOT NULL,
@@ -106,13 +114,13 @@ function resetCloseData(PDO $pdo): void
         'donem_kapanis_auditleri', 'puantaj_aylik_muhurleri', 'puantaj_donem_kilitleri',
         'gunluk_puantaj', 'onayli_bildirim_puantaj_etki_adaylari', 'genel_yonetici_bildirim_onaylari',
         'aylik_bildirim_onaylari', 'haftalik_bildirim_mutabakatlari', 'gunluk_bildirimler',
-        'ek_odeme_kesinti', 'aylik_ozet_satirlari', 'personeller', 'subeler',
+        'ek_odeme_kesinti', 'aylik_ozet_satirlari', 'personel_ucret_gecmisi', 'personeller', 'subeler',
     ] as $table) {
         $pdo->exec('DELETE FROM ' . $table);
     }
     $pdo->exec('INSERT INTO subeler (id, kod, ad) VALUES (1, \'MRK\', \'Merkez\')');
-    $pdo->exec('INSERT INTO personeller (id, sube_id, departman_id, aktif_durum, maas_tutari)
-        VALUES (7, 1, 3, \'AKTIF\', 25000), (8, 1, 3, \'AKTIF\', NULL)');
+    $pdo->exec('INSERT INTO personeller (id, sube_id, departman_id, aktif_durum, maas_tutari, ise_giris_tarihi)
+        VALUES (7, 1, 3, \'AKTIF\', 25000, \'2020-01-01\'), (8, 1, 3, \'AKTIF\', NULL, \'2020-01-01\')');
 }
 
 function findMonthlySeal(PDO $pdo, int $subeId, int $yil, int $ay): ?array

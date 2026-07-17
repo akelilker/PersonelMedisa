@@ -7118,8 +7118,8 @@ let personelBelgeKaydiIdCounter = 903;
           ],
           personel_summary: [],
           parameter_summary: { mevzuat_parametre_sayisi: 0 },
-          engine_version: "S77_D_E2E_ENGINE_V1",
-          contract_version: "S77_D_CALCULATION_V1",
+          engine_version: "S77_D_E2E_ENGINE_V2",
+          contract_version: "S77_D_CALCULATION_V2",
           calculation_input_hash: "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
           source_hash: snapshot.source_hash,
           parameter_set_hash: "0000000000000000000000000000000000000000000000000000000000000000",
@@ -7263,7 +7263,7 @@ let personelBelgeKaydiIdCounter = 903;
       await fulfillJson(
         route,
         200,
-        okBody({ engine_version: "S77_D_E2E_ENGINE_V1", contract_version: "S77_D_CALCULATION_V1", items: [] })
+        okBody({ engine_version: "S77_D_E2E_ENGINE_V2", contract_version: "S77_D_CALCULATION_V2", items: [] })
       );
       return;
     }

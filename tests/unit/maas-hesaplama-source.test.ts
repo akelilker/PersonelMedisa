@@ -80,4 +80,23 @@ describe("S77-C/S77-D maas hesaplama source contract", () => {
       expect(source).not.toMatch(/\(\s*float\s*\)/i);
     }
   });
+
+  it("wires Engine V2 version, minute-based hours and weekly OT owners", () => {
+    const engine = readFileSync(resolve(root, "api/src/Services/Payroll/MaasHesaplamaEngine.php"), "utf8");
+    const catalog = readFileSync(
+      resolve(root, "api/src/Services/Payroll/MaasHesaplamaLegalParameterCatalog.php"),
+      "utf8"
+    );
+    const aday = readFileSync(resolve(root, "api/src/Services/MaasHesaplamaAdayService.php"), "utf8");
+
+    expect(engine).toContain("S77D_PAYROLL_ENGINE_V2");
+    expect(engine).toContain("S77D_PAYROLL_CANDIDATE_V2");
+    expect(engine).toContain("paramHoursToMinutes");
+    expect(engine).toContain("FAZLA_SURELERLE_CALISMA_ODEMESI");
+    expect(engine).toContain("LEGAL_WEEKLY_LIMIT_MINUTES");
+    expect(catalog).toContain("FAZLA_SURELERLE_CALISMA_CARPANI");
+    expect(catalog).toContain("HAFTA_TATILI_HESAP_MODU");
+    expect(catalog).toContain("UBGT_HESAP_MODU");
+    expect(aday).toContain("S77D_PAYROLL_CANDIDATE_V2");
+  });
 });

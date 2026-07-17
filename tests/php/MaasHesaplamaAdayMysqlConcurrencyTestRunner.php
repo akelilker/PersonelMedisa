@@ -169,17 +169,23 @@ function mhacMevzuatFixture(): array
         'GELIR_VERGISI_DILIM_5_ORAN' => '0.40',
         'NORMAL_AY_GUN_SAYISI' => '30',
         'GUNLUK_CALISMA_SAATI' => '8',
-        'AYLIK_NORMAL_CALISMA_SAATI' => '240',
+        'AYLIK_NORMAL_CALISMA_SAATI' => '225',
+        'HAFTALIK_IS_GUNU_SAYISI' => '5',
         'FAZLA_MESAI_CARPANI' => '1.5',
-        'HAFTA_TATILI_CARPANI' => '2',
-        'UBGT_CARPANI' => '2',
+        'FAZLA_SURELERLE_CALISMA_CARPANI' => '1.25',
+        'HAFTA_TATILI_CARPANI' => '1',
+        'UBGT_CARPANI' => '1',
+        'HAFTA_TATILI_HESAP_MODU' => 'GUNLUK_ILAVE',
+        'UBGT_HESAP_MODU' => 'GUNLUK_ILAVE',
     ];
     $fixture = [];
     foreach ($values as $code => $value) {
         $meta = MaasHesaplamaLegalParameterCatalog::meta($code);
+        $isMetin = $meta && $meta['deger_tipi'] === 'METIN';
         $fixture[$code] = [
             'parametre_kodu' => $code,
-            'sayisal_deger' => $value,
+            'sayisal_deger' => $isMetin ? null : $value,
+            'metin_deger' => $isMetin ? $value : null,
             'deger_tipi' => $meta ? $meta['deger_tipi'] : 'SAYISAL',
             'birim' => $meta ? $meta['birim'] : null,
         ];

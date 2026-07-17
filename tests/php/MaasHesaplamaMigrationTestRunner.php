@@ -207,7 +207,7 @@ try {
         snapshot_hash, parameter_set_hash, carryover_set_hash, request_hash, source_hash, result_hash,
         calculation_input_hash, personel_sayisi, basarili_aday_sayisi, created_by
     ) VALUES (
-        $snapshotId, 1, 2026, 3, 1, 'HESAPLANDI', 'S77D_PAYROLL_ENGINE_V1', 'S77D_PAYROLL_CANDIDATE_V1',
+        $snapshotId, 1, 2026, 3, 1, 'HESAPLANDI', 'S77D_PAYROLL_ENGINE_V2', 'S77D_PAYROLL_CANDIDATE_V2',
         REPEAT('c', 64), REPEAT('p', 64), REPEAT('q', 64), REPEAT('r', 64), REPEAT('s', 64), REPEAT('t', 64),
         REPEAT('u', 64), 1, 1, 1
     )");
@@ -221,7 +221,7 @@ try {
     ) VALUES (
         $calistirmaId, $personelSnapshotId, 1, 1, 'HESAPLANDI', 'BRUT', 'TRY',
         50000, 50000, 50000, 42500, 50000, 7000, 500, 3375, 182,
-        0, 11057, 38943, 42500, REPEAT('v', 64), REPEAT('w', 64), 'S77D_PAYROLL_ENGINE_V1'
+        0, 11057, 38943, 42500, REPEAT('v', 64), REPEAT('w', 64), 'S77D_PAYROLL_ENGINE_V2'
     )");
     $adayId = (int) $pdo->lastInsertId();
     $pdo->exec("INSERT INTO maas_hesaplama_aday_kalemleri (

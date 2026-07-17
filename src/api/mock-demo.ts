@@ -1117,8 +1117,8 @@ function buildMaasHesaplamaCalculationPreflight(state: typeof maasHesaplamaDemoS
       { personel_id: 8, ad_soyad: "Ayse Demir", hesaplanabilir_mi: false }
     ],
     parameter_summary: { mevzuat_parametre_sayisi: 0 },
-    engine_version: "S77_D_DEMO_ENGINE_V1",
-    contract_version: "S77_D_CALCULATION_V1",
+    engine_version: "S77_D_DEMO_ENGINE_V2",
+    contract_version: "S77_D_CALCULATION_V2",
     calculation_input_hash: buildMaasHesaplamaCalculationInputHash(snapshot),
     source_hash: snapshot.source_hash,
     parameter_set_hash: "0000000000000000000000000000000000000000000000000000000000000000",
@@ -6020,8 +6020,8 @@ export function resolveDemoApiResponse(
       return permissionError;
     }
     return ok({
-      engine_version: "S77_D_DEMO_ENGINE_V1",
-      contract_version: "S77_D_CALCULATION_V1",
+      engine_version: "S77_D_DEMO_ENGINE_V2",
+      contract_version: "S77_D_CALCULATION_V2",
       items: []
     });
   }

@@ -16,7 +16,7 @@ use PDOException;
  */
 class MaasHesaplamaAdayService
 {
-    public const CONTRACT_VERSION = 'S77D_PAYROLL_CANDIDATE_V1';
+    public const CONTRACT_VERSION = 'S77D_PAYROLL_CANDIDATE_V2';
 
     /**
      * @return array<string, mixed>
@@ -41,7 +41,15 @@ class MaasHesaplamaAdayService
         $mevzuat = $bundle['mevzuat_by_code'];
         $missing = [];
         foreach (MaasHesaplamaLegalParameterCatalog::requiredCodes() as $code) {
-            if (!isset($mevzuat[$code]) || ($mevzuat[$code]['sayisal_deger'] ?? null) === null || (string) $mevzuat[$code]['sayisal_deger'] === '') {
+            $meta = MaasHesaplamaLegalParameterCatalog::meta($code);
+            $row = isset($mevzuat[$code]) ? $mevzuat[$code] : null;
+            $absent = $row === null;
+            if (!$absent && $meta !== null && $meta['deger_tipi'] === 'METIN') {
+                $absent = ($row['metin_deger'] ?? null) === null || trim((string) $row['metin_deger']) === '';
+            } elseif (!$absent) {
+                $absent = ($row['sayisal_deger'] ?? null) === null || (string) $row['sayisal_deger'] === '';
+            }
+            if ($absent) {
                 $missing[] = $code;
                 $items[] = self::issue('BLOCKER', 'LEGAL_PARAMETER_REQUIRED_MISSING', 'Zorunlu mevzuat parametresi eksik: ' . $code, 'mevzuat', null, null, ['parametre_kodu' => $code]);
             }

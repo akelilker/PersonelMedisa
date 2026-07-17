@@ -39,7 +39,7 @@ Post-migration:
 
 Başarı kodu: `S77_D_SCHEMA_FIRST_LIVE_OK`
 
-Geçici migrate endpoint (`api/public/_s77d_migrate.php`) canlı kabul sonrası repodan kaldırılır.
+Geçici migrate endpoint canlı kabul sonrası **410 Gone stub** ile emekli edildi (`api/public/_s77d_migrate.php`). cPanel `api/public` FTP mirror `--delete` kullanmadığı için dosya adı kalabilir; içerik inerttir.
 
 ## 4. Commit Zinciri
 

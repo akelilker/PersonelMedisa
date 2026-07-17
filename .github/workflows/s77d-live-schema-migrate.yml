@@ -1,0 +1,155 @@
+name: S77-D Live Schema Migrate
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type MIGRATE_S77D to confirm schema-first live migration'
+        required: true
+        type: string
+
+jobs:
+  migrate:
+    name: Backup + apply 022/023/024 via temporary FTP ops
+    if: github.event.inputs.confirm == 'MIGRATE_S77D'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Validate FTP secrets
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+          FTP_PORT: ${{ secrets.FTP_PORT }}
+        run: |
+          test -n "$FTP_SERVER" || (echo "FTP_SERVER missing" && exit 1)
+          test -n "$FTP_USERNAME" || (echo "FTP_USERNAME missing" && exit 1)
+          test -n "$FTP_PASSWORD" || (echo "FTP_PASSWORD missing" && exit 1)
+          test "${FTP_PORT}" = "21" || (echo "FTP_PORT must be 21" && exit 1)
+
+      - name: Install lftp
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lftp
+
+      - name: Prepare one-shot ops payload
+        id: prep
+        run: |
+          set -euo pipefail
+          TOKEN="$(openssl rand -hex 24)"
+          echo "token=$TOKEN" >> "$GITHUB_OUTPUT"
+          mkdir -p /tmp/s77d-ops
+          cp api/migrations/022_personel_bordro_devirleri.sql /tmp/s77d-ops/
+          cp api/migrations/023_maas_hesaplama_adaylari.sql /tmp/s77d-ops/
+          cp api/migrations/024_maas_hesaplama_aday_guvenlik_indexleri.sql /tmp/s77d-ops/
+          # UTF-8 without BOM
+          sed "s/REPLACE_S77D_MIGRATE_TOKEN/${TOKEN}/" scripts/s77d-live-migrate.php > /tmp/s77d-ops/_s77d_migrate.php
+          # Ensure no BOM
+          if head -c 3 /tmp/s77d-ops/_s77d_migrate.php | grep -q $'\xEF\xBB\xBF'; then
+            echo "BOM detected" && exit 1
+          fi
+          ls -la /tmp/s77d-ops
+
+      - name: Upload ops files via FTP
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+          FTP_PORT: ${{ secrets.FTP_PORT }}
+        run: |
+          set -euo pipefail
+          upload() {
+            local use_ftps="$1"
+            lftp -u "${FTP_USERNAME}","${FTP_PASSWORD}" -p "${FTP_PORT}" "ftp://${FTP_SERVER}" -e "
+              set cmd:fail-exit true;
+              set net:max-retries 5;
+              set net:timeout 30;
+              set ssl:verify-certificate no;
+              set ftp:passive-mode on;
+              set ftp:ssl-allow ${use_ftps};
+              set ftp:ssl-force ${use_ftps};
+              set ftp:ssl-protect-data ${use_ftps};
+              cd .;
+              mkdir -p api/public;
+              lcd /tmp/s77d-ops;
+              put -O api/public _s77d_migrate.php;
+              put -O api/public 022_personel_bordro_devirleri.sql;
+              put -O api/public 023_maas_hesaplama_adaylari.sql;
+              put -O api/public 024_maas_hesaplama_aday_guvenlik_indexleri.sql;
+              bye
+            "
+          }
+          upload true || upload false
+
+      - name: Run backup then migrate
+        id: migrate
+        env:
+          TOKEN: ${{ steps.prep.outputs.token }}
+        run: |
+          set -euo pipefail
+          BASE="https://www.karmotors.com.tr/personelmedisa/api/_s77d_migrate.php"
+          echo "Inventory before..."
+          curl -fsS "${BASE}?token=${TOKEN}&action=inventory" | tee /tmp/s77d-inventory-before.json
+          echo
+          echo "Backup..."
+          curl -fsS "${BASE}?token=${TOKEN}&action=backup" | tee /tmp/s77d-backup.json
+          echo
+          echo "Migrate..."
+          curl -fsS "${BASE}?token=${TOKEN}&action=migrate" | tee /tmp/s77d-migrate.json
+          echo
+          python3 - <<'PY'
+          import json,sys
+          data=json.load(open('/tmp/s77d-migrate.json'))
+          print(json.dumps({k:data.get(k) for k in ('ok','code')}, indent=2))
+          if not data.get('ok'):
+            sys.exit(1)
+          PY
+
+      - name: Delete ops files via FTP
+        if: always()
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+          FTP_PORT: ${{ secrets.FTP_PORT }}
+        run: |
+          set -euo pipefail
+          cleanup() {
+            local use_ftps="$1"
+            lftp -u "${FTP_USERNAME}","${FTP_PASSWORD}" -p "${FTP_PORT}" "ftp://${FTP_SERVER}" -e "
+              set cmd:fail-exit false;
+              set net:max-retries 3;
+              set ssl:verify-certificate no;
+              set ftp:passive-mode on;
+              set ftp:ssl-allow ${use_ftps};
+              set ftp:ssl-force ${use_ftps};
+              set ftp:ssl-protect-data ${use_ftps};
+              cd api/public;
+              rm -f _s77d_migrate.php;
+              rm -f 022_personel_bordro_devirleri.sql;
+              rm -f 023_maas_hesaplama_adaylari.sql;
+              rm -f 024_maas_hesaplama_aday_guvenlik_indexleri.sql;
+              bye
+            "
+          }
+          cleanup true || cleanup false
+          # Confirm deleted
+          code=$(curl -sS -o /tmp/gone.txt -w "%{http_code}" "https://www.karmotors.com.tr/personelmedisa/api/_s77d_migrate.php" || true)
+          echo "post-delete HTTP=$code"
+          test "$code" != "200"
+
+      - name: Upload migrate artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: s77d-live-schema-migrate
+          path: |
+            /tmp/s77d-inventory-before.json
+            /tmp/s77d-backup.json
+            /tmp/s77d-migrate.json
+          if-no-files-found: warn

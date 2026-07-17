@@ -1,10 +1,19 @@
 import { useEffect, useMemo, useState } from "react";
 import { ApiRequestError } from "../../../api/api-client";
 import {
+  calculateMaasHesaplamaSnapshot,
+  cancelMaasHesaplamaCalistirma,
   cancelMaasHesaplamaSnapshot,
   createMaasHesaplamaSnapshot,
+  fetchMaasHesaplamaAdayDetail,
+  fetchMaasHesaplamaAdayKalemler,
+  fetchMaasHesaplamaCalistirmaAdaylari,
   fetchMaasHesaplamaSnapshotDetail,
+  upsertMaasHesaplamaDevir,
+  type MaasHesaplamaAday,
+  type MaasHesaplamaCalistirma,
   type MaasHesaplamaIssue,
+  type MaasHesaplamaKalem,
   type MaasHesaplamaSnapshotDetail
 } from "../../../api/maas-hesaplama.api";
 import { fetchYonetimSubeleri } from "../../../api/yonetim.api";
@@ -33,29 +42,82 @@ function issuesBySeverity(items: MaasHesaplamaIssue[], severity: MaasHesaplamaIs
   return items.filter((item) => item.severity === severity);
 }
 
+function formatMoney(value: number | null | undefined): string {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return "—";
+  }
+  return `${new Intl.NumberFormat("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)} TL`;
+}
+
+function firstNumber(...values: Array<number | null | undefined>): number | null {
+  const found = values.find((value): value is number => typeof value === "number" && Number.isFinite(value));
+  return found ?? null;
+}
+
+function adayName(aday: MaasHesaplamaAday): string {
+  return aday.personel_ad_soyad ?? aday.personel_adi ?? `Personel #${aday.personel_id}`;
+}
+
+function calistirmaLabel(calistirma: MaasHesaplamaCalistirma): string {
+  return `#${calistirma.id} · ${calistirma.state} · rev ${calistirma.revision_no}`;
+}
+
+function parseDecimal(value: string): number | null {
+  const parsed = Number.parseFloat(value.replace(",", "."));
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 export function MaasHesaplamaMerkeziPage() {
   const { hasPermission } = useRoleAccess();
   const { session } = useAuth();
   const canManage = hasPermission("maas_hesaplama.manage");
+  const canViewAdaylari = hasPermission("maas_hesaplama_adaylari.view");
+  const canManageAdaylari = hasPermission("maas_hesaplama_adaylari.manage");
 
   const [filters, setFilters] = useState<MaasHesaplamaFilterState>(INITIAL_FILTERS);
   const [subeOptions, setSubeOptions] = useState<IdOption[]>([]);
   const [isCreating, setIsCreating] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
+  const [isCalculating, setIsCalculating] = useState(false);
+  const [isCancellingCalistirma, setIsCancellingCalistirma] = useState(false);
+  const [isLoadingAdaylar, setIsLoadingAdaylar] = useState(false);
+  const [isSavingDevir, setIsSavingDevir] = useState(false);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [selectedDetail, setSelectedDetail] = useState<MaasHesaplamaSnapshotDetail | null>(null);
+  const [selectedCalistirmaId, setSelectedCalistirmaId] = useState<number | null>(null);
+  const [adaylar, setAdaylar] = useState<MaasHesaplamaAday[]>([]);
+  const [selectedAday, setSelectedAday] = useState<MaasHesaplamaAday | null>(null);
+  const [selectedAdayKalemler, setSelectedAdayKalemler] = useState<MaasHesaplamaKalem[]>([]);
   const [cancelNeden, setCancelNeden] = useState("");
+  const [cancelCalistirmaNeden, setCancelCalistirmaNeden] = useState("");
+  const [devirForm, setDevirForm] = useState({
+    personelId: "",
+    matrah: "",
+    vergi: ""
+  });
 
   const parsedAy = parseAyValue(filters.ay);
   const subeId = filters.subeId ? Number.parseInt(filters.subeId, 10) : null;
 
-  const { preflight, snapshots, audits, isLoading, errorMessage, refetch } = useMaasHesaplama({
+  const {
+    preflight,
+    snapshots,
+    audits,
+    calculationPreflight,
+    calistirmalar,
+    devirler,
+    isLoading,
+    errorMessage,
+    calculationErrorMessage,
+    refetch
+  } = useMaasHesaplama({
     enabled: Boolean(parsedAy && subeId),
     filters,
     yil: parsedAy?.yil ?? currentMonthParts().yil,
     ay: parsedAy?.ay ?? currentMonthParts().ayNum,
-    subeId: Number.isFinite(subeId) ? subeId : null
+    subeId: Number.isFinite(subeId) ? subeId : null,
+    loadCalculationCandidates: canViewAdaylari
   });
 
   const sessionSubeKey = (session?.sube_list ?? []).map((sube) => `${sube.id}:${sube.ad}`).join("|");
@@ -112,9 +174,68 @@ export function MaasHesaplamaMerkeziPage() {
   }, [preflight, canManage, isCreating]);
 
   const activeSnapshot = snapshots.find((item) => item.state === "OLUSTURULDU") ?? null;
+  const activeCalistirma =
+    calistirmalar.find((item) => item.id === selectedCalistirmaId) ??
+    calistirmalar.find((item) => item.state !== "IPTAL") ??
+    calistirmalar[0] ??
+    null;
   const blockers = issuesBySeverity(preflight?.items ?? [], "BLOCKER");
   const warnings = issuesBySeverity(preflight?.items ?? [], "WARNING");
   const infos = issuesBySeverity(preflight?.items ?? [], "INFO");
+  const calcBlockers = issuesBySeverity(calculationPreflight?.items ?? [], "BLOCKER");
+  const calcWarnings = issuesBySeverity(calculationPreflight?.items ?? [], "WARNING");
+  const calcInfos = issuesBySeverity(calculationPreflight?.items ?? [], "INFO");
+  const calculateDisabled =
+    !activeSnapshot ||
+    !calculationPreflight ||
+    !calculationPreflight.hesaplanabilir_mi ||
+    !canManageAdaylari ||
+    isCalculating;
+
+  useEffect(() => {
+    const nextCalistirma =
+      calistirmalar.find((item) => item.id === selectedCalistirmaId) ??
+      calistirmalar.find((item) => item.state !== "IPTAL") ??
+      calistirmalar[0] ??
+      null;
+    const nextId = nextCalistirma?.id ?? null;
+    if (selectedCalistirmaId !== nextId) {
+      setSelectedCalistirmaId(nextId);
+    }
+  }, [calistirmalar, selectedCalistirmaId]);
+
+  useEffect(() => {
+    if (!canViewAdaylari || !activeCalistirma) {
+      setAdaylar([]);
+      setSelectedAday(null);
+      setSelectedAdayKalemler([]);
+      return;
+    }
+    let cancelled = false;
+    setIsLoadingAdaylar(true);
+    void fetchMaasHesaplamaCalistirmaAdaylari(activeCalistirma.id)
+      .then((items) => {
+        if (!cancelled) {
+          setAdaylar(items);
+          setSelectedAday(null);
+          setSelectedAdayKalemler([]);
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setAdaylar([]);
+          setActionError(error instanceof Error ? error.message : "Aday listesi alınamadı.");
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsLoadingAdaylar(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeCalistirma, canViewAdaylari]);
 
   async function handleCreate() {
     if (!parsedAy || !subeId || !preflight || createDisabled) {
@@ -194,13 +315,116 @@ export function MaasHesaplamaMerkeziPage() {
     }
   }
 
+  async function handleCalculate() {
+    if (!activeSnapshot || !calculationPreflight || calculateDisabled) {
+      return;
+    }
+    const confirmed = window.confirm("Aktif snapshot için maaş hesaplama adayları üretilecek. Devam edilsin mi?");
+    if (!confirmed) {
+      return;
+    }
+    setIsCalculating(true);
+    setActionMessage(null);
+    setActionError(null);
+    try {
+      const result = await calculateMaasHesaplamaSnapshot({
+        snapshot_id: activeSnapshot.id,
+        expected_calculation_input_hash: calculationPreflight.calculation_input_hash,
+        engine_version: calculationPreflight.engine_version
+      });
+      setActionMessage(
+        result.idempotent
+          ? `Mevcut hesaplama döndürüldü (#${result.calistirma?.id ?? "?"}).`
+          : `Hesaplama çalıştırıldı (#${result.calistirma?.id ?? "?"}).`
+      );
+      await refetch();
+    } catch (error) {
+      if (error instanceof ApiRequestError) {
+        setActionError(`${error.code}: ${error.message}`);
+      } else {
+        setActionError(error instanceof Error ? error.message : "Hesaplama çalıştırılamadı.");
+      }
+      await refetch();
+    } finally {
+      setIsCalculating(false);
+    }
+  }
+
+  async function handleCancelCalistirma() {
+    if (!activeCalistirma || !canManageAdaylari || !cancelCalistirmaNeden.trim()) {
+      setActionError("Çalıştırma iptali için neden zorunludur.");
+      return;
+    }
+    setIsCancellingCalistirma(true);
+    setActionMessage(null);
+    setActionError(null);
+    try {
+      await cancelMaasHesaplamaCalistirma(activeCalistirma.id, cancelCalistirmaNeden.trim());
+      setActionMessage(`Çalıştırma iptal edildi (#${activeCalistirma.id}).`);
+      setCancelCalistirmaNeden("");
+      await refetch();
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "Çalıştırma iptal edilemedi.");
+    } finally {
+      setIsCancellingCalistirma(false);
+    }
+  }
+
+  async function handleOpenAday(adayId: number) {
+    setActionError(null);
+    try {
+      const [detail, kalemler] = await Promise.all([
+        fetchMaasHesaplamaAdayDetail(adayId),
+        fetchMaasHesaplamaAdayKalemler(adayId)
+      ]);
+      setSelectedAday(detail);
+      setSelectedAdayKalemler(kalemler);
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "Aday kalemleri alınamadı.");
+    }
+  }
+
+  async function handleSaveDevir() {
+    if (!parsedAy || !subeId || !canManageAdaylari) {
+      return;
+    }
+    const personelId = Number.parseInt(devirForm.personelId, 10);
+    const matrah = parseDecimal(devirForm.matrah);
+    const vergi = parseDecimal(devirForm.vergi);
+    if (!Number.isFinite(personelId) || personelId <= 0 || matrah === null || vergi === null) {
+      setActionError("Devir için personel, matrah ve vergi sayısal olmalıdır.");
+      return;
+    }
+    setIsSavingDevir(true);
+    setActionMessage(null);
+    setActionError(null);
+    try {
+      await upsertMaasHesaplamaDevir({
+        personel_id: personelId,
+        sube_id: subeId,
+        yil: parsedAy.yil,
+        ay: parsedAy.ay,
+        onceki_kumulatif_gelir_vergisi_matrahi: matrah,
+        onceki_kumulatif_gelir_vergisi: vergi,
+        kaynak: "MANUEL"
+      });
+      setActionMessage(`Devir kaydedildi (personel #${personelId}).`);
+      setDevirForm({ personelId: "", matrah: "", vergi: "" });
+      await refetch();
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "Devir kaydedilemedi.");
+    } finally {
+      setIsSavingDevir(false);
+    }
+  }
+
   return (
     <section className="yonetim-page donem-kapanis-page" data-testid="maas-hesaplama-merkezi">
       <div className="yonetim-header-row">
         <h2>Maaş Hesaplama Merkezi</h2>
         <p className="raporlar-aylik-lead">
-          Mühürlü dönem için kaynak preflight’ı, kanonik girdi çözümleme ve değişmez snapshot.
-          Bu ekranda maaş hesaplanmaz.
+          Mühürlü dönem için kaynak preflight’ı, değişmez snapshot, hesaplama adayları ve devir yönetimi.
+          Muhasebe onayı ve PDF üretimi bu ekranda yoktur.
         </p>
       </div>
 
@@ -429,6 +653,299 @@ export function MaasHesaplamaMerkeziPage() {
               ) : null}
               <p className="muted-note">Snapshot payload düzenleme API’si yoktur; değerler salt okunur.</p>
             </section>
+          ) : null}
+
+          {activeSnapshot && canViewAdaylari ? (
+            <>
+              <section data-testid="maas-hesaplama-calc-preflight">
+                <h3>Hesaplama preflight</h3>
+                {calculationErrorMessage ? (
+                  <p className="yonetim-error" data-testid="maas-hesaplama-calc-error">
+                    {calculationErrorMessage}
+                  </p>
+                ) : null}
+                {calculationPreflight ? (
+                  <>
+                    <div className="kapanis-ozet-grid">
+                      <article className="kapanis-ozet-card">
+                        <h3>Hesaplanabilir</h3>
+                        <p data-testid="maas-hesaplama-calc-ready">
+                          {calculationPreflight.hesaplanabilir_mi ? "Evet" : "Hayır"}
+                        </p>
+                        <p>
+                          Blocker {calculationPreflight.blocker_count} · Warning{" "}
+                          {calculationPreflight.warning_count} · Info {calculationPreflight.info_count}
+                        </p>
+                      </article>
+                      <article className="kapanis-ozet-card">
+                        <h3>Girdi hash</h3>
+                        <p data-testid="maas-hesaplama-calc-input-hash">
+                          {shortHash(calculationPreflight.calculation_input_hash)}
+                        </p>
+                        <p>Kaynak: {shortHash(calculationPreflight.source_hash)}</p>
+                      </article>
+                      <article className="kapanis-ozet-card">
+                        <h3>Set hash</h3>
+                        <p>Parametre: {shortHash(calculationPreflight.parameter_set_hash)}</p>
+                        <p>Devir: {shortHash(calculationPreflight.carryover_set_hash)}</p>
+                      </article>
+                      <article className="kapanis-ozet-card">
+                        <h3>Motor</h3>
+                        <p>{calculationPreflight.engine_version}</p>
+                        <p>{calculationPreflight.contract_version}</p>
+                      </article>
+                    </div>
+
+                    <section className="kapanis-issue-section" data-testid="maas-hesaplama-calc-issues">
+                      {[...calcBlockers, ...calcWarnings, ...calcInfos].map((item) => (
+                        <article
+                          key={`calc-${item.severity}-${item.code}-${item.personel_id ?? "x"}-${item.record_id ?? "y"}`}
+                          className={`kapanis-issue kapanis-issue--${item.severity.toLowerCase()}`}
+                          data-testid={`maas-hesaplama-calc-issue-${item.code}`}
+                        >
+                          <strong>
+                            [{item.severity}] {item.code}
+                          </strong>
+                          <p>{item.message}</p>
+                        </article>
+                      ))}
+                    </section>
+
+                    {canManageAdaylari ? (
+                      <div className="form-actions-row">
+                        <button
+                          type="button"
+                          className="universal-btn-save"
+                          data-testid="maas-hesaplama-calc-run"
+                          disabled={calculateDisabled}
+                          onClick={() => void handleCalculate()}
+                        >
+                          {isCalculating ? "Hesaplanıyor…" : "Hesapla"}
+                        </button>
+                      </div>
+                    ) : null}
+                  </>
+                ) : null}
+              </section>
+
+              <section data-testid="maas-hesaplama-calc-calistirmalar">
+                <h3>Hesaplama çalıştırmaları</h3>
+                {calistirmalar.length === 0 ? <p>Bu dönem için hesaplama çalıştırması yok.</p> : null}
+                <div className="table-scroll">
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>Çalıştırma</th>
+                        <th>Durum</th>
+                        <th>Aday</th>
+                        <th>Net</th>
+                        <th>Brüt</th>
+                        <th>Hash</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {calistirmalar.map((calistirma) => (
+                        <tr key={calistirma.id} data-testid={`maas-hesaplama-calc-run-${calistirma.id}`}>
+                          <td>
+                            <button
+                              type="button"
+                              className="linkish-button"
+                              onClick={() => setSelectedCalistirmaId(calistirma.id)}
+                            >
+                              {calistirmaLabel(calistirma)}
+                            </button>
+                          </td>
+                          <td>{calistirma.state}</td>
+                          <td>{calistirma.aday_sayisi ?? calistirma.personel_sayisi ?? "—"}</td>
+                          <td>{formatMoney(calistirma.toplam_net)}</td>
+                          <td>{formatMoney(calistirma.toplam_brut)}</td>
+                          <td>{shortHash(calistirma.result_hash)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {activeCalistirma && canManageAdaylari ? (
+                  <div className="form-field-grid">
+                    <FormField
+                      label="Çalıştırma iptal nedeni"
+                      name="maas-hesaplama-calc-cancel-neden"
+                      value={cancelCalistirmaNeden}
+                      onChange={setCancelCalistirmaNeden}
+                    />
+                    <div className="form-actions-row">
+                      <button
+                        type="button"
+                        className="universal-btn-danger"
+                        data-testid="maas-hesaplama-calc-cancel"
+                        disabled={
+                          isCancellingCalistirma ||
+                          !cancelCalistirmaNeden.trim() ||
+                          activeCalistirma.state === "IPTAL"
+                        }
+                        onClick={() => void handleCancelCalistirma()}
+                      >
+                        {isCancellingCalistirma ? "İptal ediliyor…" : "Çalıştırmayı iptal et"}
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+              </section>
+
+              <section data-testid="maas-hesaplama-aday-table">
+                <h3>Hesaplama adayları</h3>
+                {isLoadingAdaylar ? <LoadingState label="Adaylar yükleniyor…" /> : null}
+                {!isLoadingAdaylar && adaylar.length === 0 ? <p>Seçili çalıştırma için aday yok.</p> : null}
+                <div className="table-scroll">
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>Personel</th>
+                        <th>Durum</th>
+                        <th>Net</th>
+                        <th>Brüt</th>
+                        <th>GV</th>
+                        <th>SGK</th>
+                        <th>Kalem</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {adaylar.map((aday) => {
+                        const net = firstNumber(aday.net_ucret, aday.net);
+                        const brut = firstNumber(aday.brut_ucret, aday.brut);
+                        const gv = firstNumber(aday.gelir_vergisi, aday.gv);
+                        const sgk = firstNumber(aday.sgk_primi, aday.sgk, aday.toplam_isci_sgk);
+                        return (
+                          <tr key={aday.id} data-testid={`maas-hesaplama-aday-row-${aday.id}`}>
+                            <td>{adayName(aday)}</td>
+                            <td>{aday.state ?? "—"}</td>
+                            <td>{formatMoney(net)}</td>
+                            <td>{formatMoney(brut)}</td>
+                            <td>{formatMoney(gv)}</td>
+                            <td>{formatMoney(sgk)}</td>
+                            <td>
+                              <button
+                                type="button"
+                                className="linkish-button"
+                                data-testid={`maas-hesaplama-aday-open-${aday.id}`}
+                                onClick={() => void handleOpenAday(aday.id)}
+                              >
+                                Aç
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+
+              {selectedAday ? (
+                <section data-testid="maas-hesaplama-aday-kalemler">
+                  <h3>Aday kalemleri · {adayName(selectedAday)}</h3>
+                  <div className="table-scroll">
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <th>Kod</th>
+                          <th>Ad</th>
+                          <th>Kategori</th>
+                          <th>Tutar</th>
+                          <th>Matrah</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {selectedAdayKalemler.map((kalem) => (
+                          <tr key={kalem.id} data-testid={`maas-hesaplama-aday-kalem-${kalem.id}`}>
+                            <td>{kalem.kalem_kodu ?? kalem.kod ?? "—"}</td>
+                            <td>{kalem.kalem_adi ?? kalem.ad ?? "—"}</td>
+                            <td>{kalem.kategori ?? kalem.tur ?? "—"}</td>
+                            <td>{formatMoney(kalem.tutar)}</td>
+                            <td>{formatMoney(kalem.matrah)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </section>
+              ) : null}
+
+              <section data-testid="maas-hesaplama-devir-list">
+                <h3>Bordro devirleri</h3>
+                <div className="table-scroll">
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>Personel</th>
+                        <th>Matrah</th>
+                        <th>Vergi</th>
+                        <th>Kaynak</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {devirler.map((devir) => (
+                        <tr key={devir.id} data-testid={`maas-hesaplama-devir-row-${devir.id}`}>
+                          <td>{devir.personel_ad_soyad ?? `Personel #${devir.personel_id}`}</td>
+                          <td>{formatMoney(devir.onceki_kumulatif_gelir_vergisi_matrahi)}</td>
+                          <td>{formatMoney(devir.onceki_kumulatif_gelir_vergisi)}</td>
+                          <td>{devir.kaynak ?? "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {canManageAdaylari ? (
+                  <form
+                    className="form-filter-panel"
+                    data-testid="maas-hesaplama-devir-form"
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      void handleSaveDevir();
+                    }}
+                  >
+                    <div className="form-field-grid">
+                      <FormField
+                        label="Personel ID"
+                        name="maas-hesaplama-devir-personel"
+                        type="number"
+                        min={1}
+                        value={devirForm.personelId}
+                        onChange={(value) => setDevirForm((prev) => ({ ...prev, personelId: value }))}
+                      />
+                      <FormField
+                        label="Önceki GV matrahı"
+                        name="maas-hesaplama-devir-matrah"
+                        type="number"
+                        step="0.01"
+                        value={devirForm.matrah}
+                        onChange={(value) => setDevirForm((prev) => ({ ...prev, matrah: value }))}
+                      />
+                      <FormField
+                        label="Önceki GV"
+                        name="maas-hesaplama-devir-vergi"
+                        type="number"
+                        step="0.01"
+                        value={devirForm.vergi}
+                        onChange={(value) => setDevirForm((prev) => ({ ...prev, vergi: value }))}
+                      />
+                    </div>
+                    <div className="form-actions-row">
+                      <button
+                        type="submit"
+                        className="universal-btn-save"
+                        data-testid="maas-hesaplama-devir-save"
+                        disabled={isSavingDevir}
+                      >
+                        {isSavingDevir ? "Kaydediliyor…" : "Devir kaydet"}
+                      </button>
+                    </div>
+                  </form>
+                ) : null}
+              </section>
+            </>
           ) : null}
 
           <section data-testid="maas-hesaplama-audits">

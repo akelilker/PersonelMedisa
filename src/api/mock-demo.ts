@@ -980,22 +980,160 @@ type MaasDemoAudit = {
   created_at: string;
 };
 
+type MaasDemoCalistirma = {
+  id: number;
+  donem_snapshot_id: number;
+  sube_id: number;
+  yil: number;
+  ay: number;
+  donem: string;
+  revision_no: number;
+  state: string;
+  engine_version: string;
+  contract_version: string;
+  calculation_input_hash: string;
+  source_hash: string;
+  result_hash: string;
+  personel_sayisi: number;
+  aday_sayisi: number;
+  toplam_net: number;
+  toplam_brut: number;
+  toplam_gelir_vergisi: number;
+  toplam_sgk: number;
+  created_at: string;
+  iptal_edildi_at: string | null;
+  iptal_nedeni: string | null;
+};
+
+type MaasDemoAday = {
+  id: number;
+  calistirma_id: number;
+  personel_id: number;
+  personel_ad_soyad: string;
+  sicil_no: string;
+  state: string;
+  net_ucret: number;
+  brut_ucret: number;
+  gelir_vergisi: number;
+  sgk_primi: number;
+  result_hash: string;
+};
+
+type MaasDemoKalem = {
+  id: number;
+  aday_id: number;
+  kalem_kodu: string;
+  kalem_adi: string;
+  kategori: string;
+  tutar: number;
+  matrah: number | null;
+  metadata: Record<string, unknown>;
+};
+
+type MaasDemoDevir = {
+  id: number;
+  personel_id: number;
+  personel_ad_soyad: string | null;
+  sube_id: number;
+  yil: number;
+  ay: number;
+  onceki_kumulatif_gelir_vergisi_matrahi: number;
+  onceki_kumulatif_gelir_vergisi: number;
+  onceki_kumulatif_sgk_matrahi: number | null;
+  kaynak: string | null;
+  aciklama: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 const maasHesaplamaDemoState: {
   snapshots: MaasDemoSnapshot[];
   audits: MaasDemoAudit[];
+  calistirmalar: MaasDemoCalistirma[];
+  adaylar: MaasDemoAday[];
+  kalemler: MaasDemoKalem[];
+  devirler: MaasDemoDevir[];
   nextId: number;
   nextAuditId: number;
+  nextCalistirmaId: number;
+  nextAdayId: number;
+  nextKalemId: number;
+  nextDevirId: number;
   sealedKeys: Set<string>;
 } = {
   snapshots: [],
   audits: [],
+  calistirmalar: [],
+  adaylar: [],
+  kalemler: [],
+  devirler: [],
   nextId: 1,
   nextAuditId: 1,
+  nextCalistirmaId: 1,
+  nextAdayId: 1,
+  nextKalemId: 1,
+  nextDevirId: 1,
   sealedKeys: new Set(["1:2026:3"])
 };
 
 function ensureMaasHesaplamaDemoState() {
   return maasHesaplamaDemoState;
+}
+
+function buildMaasHesaplamaCalculationInputHash(snapshot: MaasDemoSnapshot): string {
+  return snapshot.source_hash.replace(/^a/, "e");
+}
+
+function buildMaasHesaplamaCalculationPreflight(state: typeof maasHesaplamaDemoState, snapshot: MaasDemoSnapshot) {
+  const existing = state.calistirmalar.find(
+    (item) => item.donem_snapshot_id === snapshot.id && item.state !== "IPTAL"
+  );
+  const items = [
+    {
+      severity: "BLOCKER",
+      code: "LEGAL_PARAMETER_REQUIRED_MISSING",
+      message: "Demo modda hesaplama için zorunlu mevzuat kataloğu bulunamadı.",
+      record_type: "mevzuat",
+      record_id: null,
+      personel_id: null,
+      personel_adi: null,
+      metadata: { demo: true }
+    }
+  ];
+
+  return {
+    snapshot_id: snapshot.id,
+    sube_id: snapshot.sube_id,
+    yil: snapshot.yil,
+    ay: snapshot.ay,
+    donem: snapshot.donem,
+    hesaplanabilir_mi: false,
+    blocker_count: items.length,
+    warning_count: 0,
+    info_count: 0,
+    items,
+    personel_summary: [
+      { personel_id: 7, ad_soyad: "Ali Yilmaz", hesaplanabilir_mi: false },
+      { personel_id: 8, ad_soyad: "Ayse Demir", hesaplanabilir_mi: false }
+    ],
+    parameter_summary: { mevzuat_parametre_sayisi: 0 },
+    engine_version: "S77_D_DEMO_ENGINE_V1",
+    contract_version: "S77_D_CALCULATION_V1",
+    calculation_input_hash: buildMaasHesaplamaCalculationInputHash(snapshot),
+    source_hash: snapshot.source_hash,
+    parameter_set_hash: "0000000000000000000000000000000000000000000000000000000000000000",
+    carryover_set_hash: "1111111111111111111111111111111111111111111111111111111111111111",
+    snapshot_hash: snapshot.snapshot_hash,
+    existing_calculation: existing
+      ? {
+          id: existing.id,
+          revision_no: existing.revision_no,
+          state: existing.state,
+          source_hash: existing.source_hash,
+          result_hash: existing.result_hash
+        }
+      : null
+  };
 }
 
 function buildMaasHesaplamaPreflight(
@@ -5737,6 +5875,223 @@ export function resolveDemoApiResponse(
       created_at: snapshot.created_at
     });
     return ok({ snapshot, idempotent: false, audit: maasDemo.audits[maasDemo.audits.length - 1] });
+  }
+
+  const maasCalculationPreflightMatch = pathname.match(
+    /^\/maas-hesaplama\/snapshotlar\/(\d+)\/hesaplama-preflight$/
+  );
+  if (maasCalculationPreflightMatch && method === "GET") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(actor, "maas_hesaplama_adaylari.view");
+    if (permissionError) {
+      return permissionError;
+    }
+    const id = Number.parseInt(maasCalculationPreflightMatch[1], 10);
+    const snapshot = maasDemo.snapshots.find((item) => item.id === id);
+    if (!snapshot) {
+      return demoRevizyonError("PAYROLL_SNAPSHOT_NOT_FOUND", "Snapshot bulunamadi.");
+    }
+    return ok(buildMaasHesaplamaCalculationPreflight(maasDemo, snapshot));
+  }
+
+  const maasCalculateMatch = pathname.match(/^\/maas-hesaplama\/snapshotlar\/(\d+)\/hesapla$/);
+  if (maasCalculateMatch && method === "POST") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(actor, "maas_hesaplama_adaylari.manage");
+    if (permissionError) {
+      return permissionError;
+    }
+    const id = Number.parseInt(maasCalculateMatch[1], 10);
+    const snapshot = maasDemo.snapshots.find((item) => item.id === id);
+    if (!snapshot) {
+      return demoRevizyonError("PAYROLL_SNAPSHOT_NOT_FOUND", "Snapshot bulunamadi.");
+    }
+    const preflight = buildMaasHesaplamaCalculationPreflight(maasDemo, snapshot);
+    const body = readBody(init) as { expected_calculation_input_hash?: string };
+    if (String(body.expected_calculation_input_hash ?? "") !== preflight.calculation_input_hash) {
+      return demoRevizyonError("PAYROLL_CALCULATION_PREFLIGHT_STALE", "Hesaplama girdisi guncel degil.");
+    }
+    if (!preflight.hesaplanabilir_mi) {
+      return demoRevizyonError("PAYROLL_CALCULATION_BLOCKED", "Hesaplama preflight blocker iceriyor.");
+    }
+    return ok({ calistirma: preflight.existing_calculation ?? undefined, idempotent: true, audit: null });
+  }
+
+  if (pathname === "/maas-hesaplama/calistirmalar" && method === "GET") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(actor, "maas_hesaplama_adaylari.view");
+    if (permissionError) {
+      return permissionError;
+    }
+    const subeId = toNumber(requestUrl.searchParams.get("sube_id"));
+    const yil = toNumber(requestUrl.searchParams.get("yil"));
+    const ay = toNumber(requestUrl.searchParams.get("ay"));
+    const items = maasDemo.calistirmalar.filter(
+      (item) =>
+        (subeId === null || item.sube_id === subeId) &&
+        (yil === null || item.yil === yil) &&
+        (ay === null || item.ay === ay)
+    );
+    return ok({ items });
+  }
+
+  const maasCalistirmaDetailMatch = pathname.match(/^\/maas-hesaplama\/calistirmalar\/(\d+)$/);
+  if (maasCalistirmaDetailMatch && method === "GET") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(actor, "maas_hesaplama_adaylari.view");
+    if (permissionError) {
+      return permissionError;
+    }
+    const id = Number.parseInt(maasCalistirmaDetailMatch[1], 10);
+    const calistirma = maasDemo.calistirmalar.find((item) => item.id === id);
+    return calistirma ? ok(calistirma) : demoRevizyonError("PAYROLL_CALCULATION_NOT_FOUND", "Calistirma bulunamadi.");
+  }
+
+  const maasCalistirmaAdayMatch = pathname.match(/^\/maas-hesaplama\/calistirmalar\/(\d+)\/adaylar$/);
+  if (maasCalistirmaAdayMatch && method === "GET") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(actor, "maas_hesaplama_adaylari.view");
+    if (permissionError) {
+      return permissionError;
+    }
+    const calistirmaId = Number.parseInt(maasCalistirmaAdayMatch[1], 10);
+    return ok({ items: maasDemo.adaylar.filter((item) => item.calistirma_id === calistirmaId) });
+  }
+
+  const maasCalistirmaAuditMatch = pathname.match(/^\/maas-hesaplama\/calistirmalar\/(\d+)\/audit$/);
+  if (maasCalistirmaAuditMatch && method === "GET") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(actor, "maas_hesaplama_adaylari.view");
+    if (permissionError) {
+      return permissionError;
+    }
+    return ok({ items: [] });
+  }
+
+  const maasCalistirmaCancelMatch = pathname.match(/^\/maas-hesaplama\/calistirmalar\/(\d+)\/iptal$/);
+  if (maasCalistirmaCancelMatch && method === "POST") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(actor, "maas_hesaplama_adaylari.manage");
+    if (permissionError) {
+      return permissionError;
+    }
+    const id = Number.parseInt(maasCalistirmaCancelMatch[1], 10);
+    const calistirma = maasDemo.calistirmalar.find((item) => item.id === id);
+    if (!calistirma) {
+      return demoRevizyonError("PAYROLL_CALCULATION_NOT_FOUND", "Calistirma bulunamadi.");
+    }
+    const neden = String(readBody(init).neden ?? "").trim();
+    if (!neden) {
+      return demoRevizyonError("VALIDATION_ERROR", "Iptal nedeni zorunludur.");
+    }
+    calistirma.state = "IPTAL";
+    calistirma.iptal_edildi_at = new Date().toISOString();
+    calistirma.iptal_nedeni = neden;
+    return ok({ calistirma, idempotent: false, audit: null });
+  }
+
+  const maasAdayDetailMatch = pathname.match(/^\/maas-hesaplama\/adaylar\/(\d+)$/);
+  if (maasAdayDetailMatch && method === "GET") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(actor, "maas_hesaplama_adaylari.view");
+    if (permissionError) {
+      return permissionError;
+    }
+    const id = Number.parseInt(maasAdayDetailMatch[1], 10);
+    const aday = maasDemo.adaylar.find((item) => item.id === id);
+    return aday ? ok(aday) : demoRevizyonError("PAYROLL_CANDIDATE_NOT_FOUND", "Aday bulunamadi.");
+  }
+
+  const maasAdayKalemMatch = pathname.match(/^\/maas-hesaplama\/adaylar\/(\d+)\/kalemler$/);
+  if (maasAdayKalemMatch && method === "GET") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(actor, "maas_hesaplama_adaylari.view");
+    if (permissionError) {
+      return permissionError;
+    }
+    const adayId = Number.parseInt(maasAdayKalemMatch[1], 10);
+    return ok({ items: maasDemo.kalemler.filter((item) => item.aday_id === adayId) });
+  }
+
+  if (pathname === "/maas-hesaplama/yasal-katalog" && method === "GET") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(actor, "maas_hesaplama_adaylari.view");
+    if (permissionError) {
+      return permissionError;
+    }
+    return ok({
+      engine_version: "S77_D_DEMO_ENGINE_V1",
+      contract_version: "S77_D_CALCULATION_V1",
+      items: []
+    });
+  }
+
+  if (pathname === "/maas-hesaplama/devirler" && method === "GET") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(actor, "maas_hesaplama_adaylari.view");
+    if (permissionError) {
+      return permissionError;
+    }
+    const subeId = toNumber(requestUrl.searchParams.get("sube_id"));
+    const yil = toNumber(requestUrl.searchParams.get("yil"));
+    const ay = toNumber(requestUrl.searchParams.get("ay"));
+    const items = maasDemo.devirler.filter(
+      (item) =>
+        (subeId === null || item.sube_id === subeId) &&
+        (yil === null || item.yil === yil) &&
+        (ay === null || item.ay === ay)
+    );
+    return ok({ items });
+  }
+
+  if (pathname === "/maas-hesaplama/devirler" && method === "POST") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(actor, "maas_hesaplama_adaylari.manage");
+    if (permissionError) {
+      return permissionError;
+    }
+    const payload = readBody(init);
+    const personelId = toNumber(payload.personel_id);
+    const subeId = toNumber(payload.sube_id);
+    const yil = toNumber(payload.yil);
+    const ay = toNumber(payload.ay);
+    const matrah = toNumber(payload.onceki_kumulatif_gelir_vergisi_matrahi);
+    const vergi = toNumber(payload.onceki_kumulatif_gelir_vergisi);
+    if (!personelId || !subeId || !yil || !ay || matrah === null || vergi === null) {
+      return demoRevizyonError("VALIDATION_ERROR", "personel_id/sube_id/yil/ay/matrah/vergi zorunludur.");
+    }
+    const now = new Date().toISOString();
+    const existing = maasDemo.devirler.find(
+      (item) => item.personel_id === personelId && item.sube_id === subeId && item.yil === yil && item.ay === ay
+    );
+    const personel = demoState.personeller.find((item) => item.id === personelId);
+    const next = existing ?? {
+      id: ++maasDemo.nextDevirId,
+      personel_id: personelId,
+      personel_ad_soyad: personel ? `${personel.ad} ${personel.soyad}` : null,
+      sube_id: subeId,
+      yil,
+      ay,
+      onceki_kumulatif_gelir_vergisi_matrahi: matrah,
+      onceki_kumulatif_gelir_vergisi: vergi,
+      onceki_kumulatif_sgk_matrahi: null,
+      kaynak: null,
+      aciklama: null,
+      created_at: now,
+      updated_at: now
+    };
+    Object.assign(next, {
+      onceki_kumulatif_gelir_vergisi_matrahi: matrah,
+      onceki_kumulatif_gelir_vergisi: vergi,
+      onceki_kumulatif_sgk_matrahi: toNumber(payload.onceki_kumulatif_sgk_matrahi),
+      kaynak: toStringValue(payload.kaynak) ?? "MANUEL",
+      aciklama: toStringValue(payload.aciklama),
+      updated_at: now
+    });
+    if (!existing) {
+      maasDemo.devirler.push(next);
+    }
+    return ok(next);
   }
 
   const maasDetailMatch = pathname.match(/^\/maas-hesaplama\/snapshotlar\/(\d+)$/);

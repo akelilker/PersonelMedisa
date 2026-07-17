@@ -10,8 +10,12 @@ use Medisa\Api\Database\Connection;
 use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
 use Medisa\Api\Scope\SubeScope;
+use Medisa\Api\Services\MaasHesaplamaAdayService;
 use Medisa\Api\Services\MaasHesaplamaException;
 use Medisa\Api\Services\MaasHesaplamaSnapshotService;
+use Medisa\Api\Services\PersonelBordroDevirService;
+use Medisa\Api\Services\Payroll\MaasHesaplamaEngine;
+use Medisa\Api\Services\Payroll\MaasHesaplamaLegalParameterCatalog;
 use PDO;
 
 /**
@@ -160,6 +164,214 @@ class MaasHesaplamaController
             ]);
         } catch (\Throwable $e) {
             JsonResponse::serverError('Snapshot audit kayitlari okunamadi.');
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // S77-D hesaplama adaylari
+    // ------------------------------------------------------------------
+
+    public static function calculationPreflight(Request $request, $snapshotId)
+    {
+        [$pdo, $user] = self::authOnly($request, 'maas_hesaplama_adaylari.view');
+        $row = MaasHesaplamaSnapshotService::fetchSnapshotRow($pdo, (int) $snapshotId);
+        if (!$row) {
+            JsonResponse::error(404, 'PAYROLL_CALCULATION_SNAPSHOT_INVALID', 'Snapshot bulunamadi.');
+        }
+        self::assertSnapshotScope($user, $request, (int) $row['sube_id']);
+
+        try {
+            $preflight = MaasHesaplamaAdayService::buildCalculationPreflight($pdo, (int) $snapshotId);
+            JsonResponse::success(MaasHesaplamaAdayService::publicPreflight($preflight));
+        } catch (MaasHesaplamaException $e) {
+            self::domainError($e);
+        } catch (\Throwable $e) {
+            JsonResponse::serverError('Hesaplama preflight olusturulamadi.');
+        }
+    }
+
+    public static function calculate(Request $request, $snapshotId)
+    {
+        [$pdo, $user] = self::authOnly($request, 'maas_hesaplama_adaylari.manage');
+        $row = MaasHesaplamaSnapshotService::fetchSnapshotRow($pdo, (int) $snapshotId);
+        if (!$row) {
+            JsonResponse::error(404, 'PAYROLL_CALCULATION_SNAPSHOT_INVALID', 'Snapshot bulunamadi.');
+        }
+        self::assertSnapshotScope($user, $request, (int) $row['sube_id']);
+
+        $body = $request->getJsonBody();
+        $expected = trim((string) ($body['expected_calculation_input_hash'] ?? ''));
+        if ($expected === '' || !preg_match('/^[a-f0-9]{64}$/', $expected)) {
+            self::validationError('expected_calculation_input_hash', 'Gecerli expected_calculation_input_hash zorunludur.');
+        }
+        $engineVersion = trim((string) ($body['engine_version'] ?? MaasHesaplamaEngine::ENGINE_VERSION));
+
+        try {
+            $result = MaasHesaplamaAdayService::createCalculation($pdo, (int) $snapshotId, $expected, $engineVersion, $user);
+            JsonResponse::success([
+                'calistirma' => $result['calistirma'],
+                'idempotent' => (bool) $result['idempotent'],
+                'audit' => $result['audit'],
+            ], [], $result['idempotent'] ? 200 : 201);
+        } catch (MaasHesaplamaException $e) {
+            self::domainError($e);
+        } catch (\Throwable $e) {
+            JsonResponse::serverError('Hesaplama olusturulamadi.');
+        }
+    }
+
+    public static function listCalistirmalar(Request $request)
+    {
+        [$pdo, $user, $subeId] = self::context($request, 'maas_hesaplama_adaylari.view');
+        $yil = self::optionalQueryInt($request, 'yil', 2000, 2100);
+        $ay = self::optionalQueryInt($request, 'ay', 1, 12);
+        try {
+            JsonResponse::success(['items' => MaasHesaplamaAdayService::listCalistirmalar($pdo, $subeId, $yil, $ay)]);
+        } catch (\Throwable $e) {
+            JsonResponse::serverError('Calistirma listesi okunamadi.');
+        }
+    }
+
+    public static function calistirmaDetail(Request $request, $id)
+    {
+        [$pdo, $user] = self::authOnly($request, 'maas_hesaplama_adaylari.view');
+        $detail = MaasHesaplamaAdayService::getCalistirmaDetail($pdo, (int) $id);
+        if (!$detail) {
+            JsonResponse::error(404, 'PAYROLL_CALCULATION_NOT_FOUND', 'Calistirma bulunamadi.');
+        }
+        self::assertSnapshotScope($user, $request, (int) $detail['sube_id']);
+        JsonResponse::success($detail);
+    }
+
+    public static function listAdaylar(Request $request, $calistirmaId)
+    {
+        [$pdo, $user] = self::authOnly($request, 'maas_hesaplama_adaylari.view');
+        $row = MaasHesaplamaAdayService::fetchCalistirma($pdo, (int) $calistirmaId);
+        if (!$row) {
+            JsonResponse::error(404, 'PAYROLL_CALCULATION_NOT_FOUND', 'Calistirma bulunamadi.');
+        }
+        self::assertSnapshotScope($user, $request, (int) $row['sube_id']);
+        JsonResponse::success(['items' => MaasHesaplamaAdayService::listAdaylar($pdo, (int) $calistirmaId)]);
+    }
+
+    public static function adayDetail(Request $request, $adayId)
+    {
+        [$pdo, $user] = self::authOnly($request, 'maas_hesaplama_adaylari.view');
+        $aday = MaasHesaplamaAdayService::getAday($pdo, (int) $adayId);
+        if (!$aday) {
+            JsonResponse::error(404, 'PAYROLL_CALCULATION_NOT_FOUND', 'Aday bulunamadi.');
+        }
+        $row = MaasHesaplamaAdayService::fetchCalistirma($pdo, (int) $aday['calistirma_id']);
+        if (!$row) {
+            JsonResponse::error(404, 'PAYROLL_CALCULATION_NOT_FOUND', 'Calistirma bulunamadi.');
+        }
+        self::assertSnapshotScope($user, $request, (int) $row['sube_id']);
+        JsonResponse::success($aday);
+    }
+
+    public static function adayKalemler(Request $request, $adayId)
+    {
+        [$pdo, $user] = self::authOnly($request, 'maas_hesaplama_adaylari.view');
+        $aday = MaasHesaplamaAdayService::getAday($pdo, (int) $adayId);
+        if (!$aday) {
+            JsonResponse::error(404, 'PAYROLL_CALCULATION_NOT_FOUND', 'Aday bulunamadi.');
+        }
+        $row = MaasHesaplamaAdayService::fetchCalistirma($pdo, (int) $aday['calistirma_id']);
+        if (!$row) {
+            JsonResponse::error(404, 'PAYROLL_CALCULATION_NOT_FOUND', 'Calistirma bulunamadi.');
+        }
+        self::assertSnapshotScope($user, $request, (int) $row['sube_id']);
+        JsonResponse::success(['items' => MaasHesaplamaAdayService::listKalemler($pdo, (int) $adayId)]);
+    }
+
+    public static function calistirmaAudit(Request $request, $calistirmaId)
+    {
+        [$pdo, $user] = self::authOnly($request, 'maas_hesaplama_adaylari.view');
+        $row = MaasHesaplamaAdayService::fetchCalistirma($pdo, (int) $calistirmaId);
+        if (!$row) {
+            JsonResponse::error(404, 'PAYROLL_CALCULATION_NOT_FOUND', 'Calistirma bulunamadi.');
+        }
+        self::assertSnapshotScope($user, $request, (int) $row['sube_id']);
+        JsonResponse::success(['items' => MaasHesaplamaAdayService::listAudits($pdo, (int) $calistirmaId)]);
+    }
+
+    public static function cancelCalistirma(Request $request, $calistirmaId)
+    {
+        [$pdo, $user] = self::authOnly($request, 'maas_hesaplama_adaylari.manage');
+        $row = MaasHesaplamaAdayService::fetchCalistirma($pdo, (int) $calistirmaId);
+        if (!$row) {
+            JsonResponse::error(404, 'PAYROLL_CALCULATION_NOT_FOUND', 'Calistirma bulunamadi.');
+        }
+        self::assertSnapshotScope($user, $request, (int) $row['sube_id']);
+        $body = $request->getJsonBody();
+        $neden = trim((string) ($body['neden'] ?? ''));
+        if ($neden === '') {
+            self::validationError('neden', 'Iptal nedeni zorunludur.');
+        }
+        try {
+            $result = MaasHesaplamaAdayService::cancelCalculation($pdo, (int) $calistirmaId, $neden, $user);
+            JsonResponse::success([
+                'calistirma' => $result['calistirma'],
+                'idempotent' => (bool) $result['idempotent'],
+                'audit' => $result['audit'],
+            ]);
+        } catch (MaasHesaplamaException $e) {
+            self::domainError($e);
+        } catch (\Throwable $e) {
+            JsonResponse::serverError('Calistirma iptal edilemedi.');
+        }
+    }
+
+    public static function legalCatalog(Request $request)
+    {
+        self::authOnly($request, 'maas_hesaplama_adaylari.view');
+        $items = [];
+        foreach (MaasHesaplamaLegalParameterCatalog::all() as $code => $meta) {
+            $items[] = array_merge(['parametre_kodu' => $code], $meta);
+        }
+        JsonResponse::success(['items' => $items, 'engine_version' => MaasHesaplamaEngine::ENGINE_VERSION]);
+    }
+
+    public static function listDevirler(Request $request)
+    {
+        [$pdo, $user, $subeId] = self::context($request, 'maas_hesaplama_adaylari.view');
+        $yil = self::readQueryInt($request, 'yil', 2000, 2100);
+        $ay = self::readQueryInt($request, 'ay', 1, 12);
+        JsonResponse::success(['items' => PersonelBordroDevirService::listForSube($pdo, $subeId, $yil, $ay)]);
+    }
+
+    public static function upsertDevir(Request $request)
+    {
+        [$pdo, $user] = self::authOnly($request, 'maas_hesaplama_adaylari.manage');
+        $body = $request->getJsonBody();
+        $personelId = isset($body['personel_id']) ? (int) $body['personel_id'] : 0;
+        $subeId = isset($body['sube_id']) ? (int) $body['sube_id'] : 0;
+        if ($personelId < 1 || $subeId < 1) {
+            self::validationError('personel_id', 'personel_id ve sube_id zorunludur.');
+        }
+        self::assertSnapshotScope($user, $request, $subeId);
+        $yil = self::readBodyInt($body, 'yil', 2000, 2100);
+        $ay = self::readBodyInt($body, 'ay', 1, 12);
+        if (!isset($body['onceki_kumulatif_gelir_vergisi_matrahi']) || !isset($body['onceki_kumulatif_gelir_vergisi'])) {
+            self::validationError('onceki_kumulatif_gelir_vergisi_matrahi', 'Devir matrah/vergi zorunludur.');
+        }
+        try {
+            $row = PersonelBordroDevirService::upsert($pdo, [
+                'personel_id' => $personelId,
+                'sube_id' => $subeId,
+                'yil' => $yil,
+                'ay' => $ay,
+                'onceki_kumulatif_gelir_vergisi_matrahi' => (string) $body['onceki_kumulatif_gelir_vergisi_matrahi'],
+                'onceki_kumulatif_gelir_vergisi' => (string) $body['onceki_kumulatif_gelir_vergisi'],
+                'onceki_kumulatif_sgk_matrahi' => $body['onceki_kumulatif_sgk_matrahi'] ?? null,
+                'devir_kaynagi' => $body['devir_kaynagi'] ?? 'MANUEL',
+                'aciklama' => $body['aciklama'] ?? null,
+            ], $user);
+            JsonResponse::success(['devir' => $row], [], 201);
+        } catch (MaasHesaplamaException $e) {
+            self::domainError($e);
+        } catch (\Throwable $e) {
+            JsonResponse::serverError('Devir kaydi olusturulamadi.');
         }
     }
 

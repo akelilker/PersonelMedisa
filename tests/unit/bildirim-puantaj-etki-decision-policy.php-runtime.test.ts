@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import { phpQuietCliArgs } from "../scripts/php-cli-args.mjs";
 
 const runnerPath = resolve(process.cwd(), "tests/php/BildirimPuantajEtkiDecisionPolicyTestRunner.php");
 const policyPath = resolve(process.cwd(), "api/src/Services/BildirimPuantajEtkiDecisionPolicy.php");
@@ -9,7 +10,9 @@ const policySource = readFileSync(policyPath, "utf8");
 
 describe("BildirimPuantajEtkiDecisionPolicy PHP runtime", () => {
   it("runs 16 decision policy scenarios via PHP CLI", () => {
-    const output = execFileSync("php", [runnerPath], { encoding: "utf8" });
+    // Local php.ini duplicates mysqli and leaves display_errors=1; startup Warnings
+    // were landing on stdout and breaking JSON.parse. Keep stdout JSON-only.
+    const output = execFileSync("php", [...phpQuietCliArgs(), runnerPath], { encoding: "utf8" });
     const result = JSON.parse(output.trim()) as {
       total: number;
       passed: number;

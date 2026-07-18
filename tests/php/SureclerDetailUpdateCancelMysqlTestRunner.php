@@ -312,10 +312,31 @@ $okUpdate = invokeSurecHttp($pdo, $gy, 'PUT', '/surecler/100', [
 surecAssert($okUpdate['status'] === 200, 'HTTP update → 200');
 surecAssert(($okUpdate['payload']['data']['aciklama'] ?? '') === 'Guncellendi', 'update aciklama');
 surecAssert(($okUpdate['payload']['data']['bitis_tarihi'] ?? '') === '2026-07-06', 'update bitis');
+surecAssert(array_key_exists('personel_sube_id', $okUpdate['payload']['data'] ?? []) === false, 'update response omits personel_sube_id');
+surecAssert(isset($okUpdate['payload']['data']['id'], $okUpdate['payload']['data']['personel_id'], $okUpdate['payload']['data']['surec_turu'], $okUpdate['payload']['data']['state']), 'update response Surec shape');
 
 $row = $pdo->query('SELECT aciklama, bitis_tarihi, personel_id FROM surecler WHERE id = 100')->fetch();
 surecAssert(($row['aciklama'] ?? '') === 'Guncellendi', 'DB update side effect');
 surecAssert((int) ($row['personel_id'] ?? 0) === 10, 'DB personel unchanged');
+
+$sameValueUpdate = invokeSurecHttp($pdo, $gy, 'PUT', '/surecler/100', [
+    'surec_turu' => 'IZIN',
+    'baslangic_tarihi' => '2026-07-01',
+    'bitis_tarihi' => '2026-07-06',
+    'ucretli_mi' => true,
+    'aciklama' => 'Guncellendi',
+]);
+surecAssert($sameValueUpdate['status'] === 200, 'HTTP same-value update → 200');
+surecAssert(($sameValueUpdate['payload']['data']['aciklama'] ?? '') === 'Guncellendi', 'same-value aciklama preserved');
+
+$istenUpdate = invokeSurecHttp($pdo, $gy, 'PUT', '/surecler/100', [
+    'surec_turu' => 'ISTEN_AYRILMA',
+    'baslangic_tarihi' => '2026-07-01',
+    'aciklama' => 'Ayrilma update',
+]);
+surecAssert($istenUpdate['status'] === 200, 'HTTP update → ISTEN_AYRILMA → 200');
+$personelAktif = (string) $pdo->query('SELECT aktif_durum FROM personeller WHERE id = 10')->fetchColumn();
+surecAssert($personelAktif === 'AKTIF', 'update ISTEN_AYRILMA does not passivate personel');
 
 $tamamUpdate = invokeSurecHttp($pdo, $gy, 'PUT', '/surecler/102', [
     'aciklama' => 'nope',
@@ -325,6 +346,8 @@ surecAssert($tamamUpdate['status'] === 409, 'HTTP update TAMAMLANDI → 409');
 $cancel = invokeSurecHttp($pdo, $gy, 'POST', '/surecler/100/iptal');
 surecAssert($cancel['status'] === 200, 'HTTP cancel → 200');
 surecAssert(($cancel['payload']['data']['state'] ?? '') === 'IPTAL', 'cancel state');
+surecAssert((int) ($cancel['payload']['data']['id'] ?? 0) === 100, 'cancel id');
+surecAssert(count($cancel['payload']['data'] ?? []) === 2, 'cancel response is {id,state} only');
 $dbState = (string) $pdo->query('SELECT state FROM surecler WHERE id = 100')->fetchColumn();
 surecAssert($dbState === 'IPTAL', 'DB cancel state');
 $count = (int) $pdo->query('SELECT COUNT(*) FROM surecler WHERE id = 100')->fetchColumn();
@@ -334,6 +357,11 @@ $cancelAgain = invokeSurecHttp($pdo, $gy, 'POST', '/surecler/100/iptal');
 surecAssert($cancelAgain['status'] === 200, 'HTTP cancel idempotent → 200');
 surecAssert(($cancelAgain['payload']['data']['state'] ?? '') === 'IPTAL', 'idempotent state');
 
+$iptalUpdate = invokeSurecHttp($pdo, $gy, 'PUT', '/surecler/100', [
+    'aciklama' => 'after cancel',
+]);
+surecAssert($iptalUpdate['status'] === 409, 'HTTP update IPTAL → 409');
+
 $cancelTamam = invokeSurecHttp($pdo, $gy, 'POST', '/surecler/102/iptal');
 surecAssert($cancelTamam['status'] === 409, 'HTTP cancel TAMAMLANDI → 409');
 
@@ -342,5 +370,38 @@ surecAssert($baCancel['status'] === 403, 'HTTP BA cancel other → 403');
 
 $muhCancelOwnScope = invokeSurecHttp($pdo, $muhasebe, 'POST', '/surecler/101/iptal');
 surecAssert($muhCancelOwnScope['status'] === 200, 'HTTP MUHASEBE cancel → 200');
+
+// Seed a fresh AKTIF row for last-write-wins / cancel race checks.
+$pdo->exec("
+    INSERT INTO surecler (id, personel_id, surec_turu, baslangic_tarihi, ucretli_mi, aciklama, state)
+    VALUES (200, 10, 'IZIN', '2026-07-10', 1, 'Race seed', 'AKTIF')
+");
+$writeA = invokeSurecHttp($pdo, $gy, 'PUT', '/surecler/200', [
+    'surec_turu' => 'IZIN',
+    'baslangic_tarihi' => '2026-07-10',
+    'aciklama' => 'Writer A',
+]);
+$writeB = invokeSurecHttp($pdo, $gy, 'PUT', '/surecler/200', [
+    'surec_turu' => 'IZIN',
+    'baslangic_tarihi' => '2026-07-10',
+    'aciklama' => 'Writer B',
+]);
+surecAssert($writeA['status'] === 200 && $writeB['status'] === 200, 'serial update/update both 200');
+$finalAciklama = (string) $pdo->query('SELECT aciklama FROM surecler WHERE id = 200')->fetchColumn();
+surecAssert($finalAciklama === 'Writer B', 'update/update last-write-wins');
+
+$updateThenCancel = invokeSurecHttp($pdo, $gy, 'PUT', '/surecler/200', [
+    'surec_turu' => 'IZIN',
+    'baslangic_tarihi' => '2026-07-10',
+    'aciklama' => 'Before cancel',
+]);
+$cancelAfterUpdate = invokeSurecHttp($pdo, $gy, 'POST', '/surecler/200/iptal');
+surecAssert($updateThenCancel['status'] === 200, 'update before cancel → 200');
+surecAssert($cancelAfterUpdate['status'] === 200, 'cancel after update → 200');
+surecAssert((string) $pdo->query('SELECT state FROM surecler WHERE id = 200')->fetchColumn() === 'IPTAL', 'update/cancel final IPTAL');
+
+$cancelCancelA = invokeSurecHttp($pdo, $gy, 'POST', '/surecler/200/iptal');
+$cancelCancelB = invokeSurecHttp($pdo, $gy, 'POST', '/surecler/200/iptal');
+surecAssert($cancelCancelA['status'] === 200 && $cancelCancelB['status'] === 200, 'cancel/cancel both idempotent 200');
 
 echo "verify-surecler-detail-update-cancel-mysql: OK\n";

@@ -248,17 +248,31 @@ class SureclerController
             ]);
 
             if ($stmt->rowCount() === 0) {
-                $pdo->rollBack();
+                // MariaDB "affected rows" can be 0 for identical values or for a
+                // concurrent terminal-state transition. Distinguish those cases.
                 $fresh = self::fetchSurecWithPersonel($pdo, $surecId);
                 if (!$fresh) {
+                    $pdo->rollBack();
                     JsonResponse::notFound('Surec bulunamadi.');
                 }
-                JsonResponse::error(409, 'CONFLICT', 'Surec guncellenemedi.');
+
+                $freshState = strtoupper((string) ($fresh['state'] ?? ''));
+                if (in_array($freshState, ['IPTAL', 'TAMAMLANDI'], true)) {
+                    $pdo->rollBack();
+                    JsonResponse::error(409, 'CONFLICT', 'Iptal veya tamamlanmis surec guncellenemez.');
+                }
+
+                // Same-value / no-op update: treat as successful idempotent write.
+                $row = self::fetchSurecRowById($pdo, $surecId);
+                if (!$row) {
+                    $pdo->rollBack();
+                    JsonResponse::serverError('Kayit guncellenemedi.');
+                }
+                $pdo->commit();
+                JsonResponse::success(self::mapSurecRow($row));
             }
 
-            if ($payload['surec_turu'] === 'ISTEN_AYRILMA') {
-                self::deactivatePersonel($pdo, (int) $existing['personel_id']);
-            }
+            // ISTEN_AYRILMA personel pasiflestirme yalnız create yolunda (UI/E2E kanıtı).
 
             $row = self::fetchSurecRowById($pdo, $surecId);
             if (!$row) {

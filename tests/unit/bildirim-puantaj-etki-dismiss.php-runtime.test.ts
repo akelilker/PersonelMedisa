@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import { phpQuietCliArgs } from "../scripts/php-cli-args.mjs";
 
 const runnerPath = resolve(process.cwd(), "tests/php/BildirimPuantajEtkiDismissTestRunner.php");
 const controllerPath = resolve(
@@ -12,7 +13,11 @@ const controllerSource = readFileSync(controllerPath, "utf8");
 
 describe("BildirimPuantajEtkiDismiss PHP runtime", () => {
   it("runs 36 dismiss validation and state scenarios via PHP CLI", () => {
-    const output = execFileSync("php", [runnerPath], { encoding: "utf8" });
+    // Production dismiss validation uses mb_strlen; CI/setup-php provides mbstring.
+    // Local WinGet PHP often has mbstring commented out — load it for this runner only.
+    const output = execFileSync("php", [...phpQuietCliArgs(["mbstring"]), runnerPath], {
+      encoding: "utf8"
+    });
     const result = JSON.parse(output.trim()) as {
       total: number;
       passed: number;

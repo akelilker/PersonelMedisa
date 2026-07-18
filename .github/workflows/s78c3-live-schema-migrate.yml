@@ -42,20 +42,22 @@ jobs:
         run: |
           set -euo pipefail
           TOKEN="$(openssl rand -hex 24)"
+          export TOKEN
           echo "token=$TOKEN" >> "$GITHUB_OUTPUT"
           mkdir -p /tmp/s78c3-ops /tmp/s78c3-artifacts
           cp api/migrations/025_departmanlar_ad_unique.sql /tmp/s78c3-ops/
           # Replace only the assignment placeholder; leave UNSET_ sentinel intact.
-          python3 - <<PY
-from pathlib import Path
-src = Path('scripts/s78c3-live-migrate.php').read_text(encoding='utf-8')
-token = '''${TOKEN}'''
-if src.count("REPLACE_S78C3_MIGRATE_TOKEN") != 1:
-    raise SystemExit(f"expected exactly 1 REPLACE placeholder, got {src.count('REPLACE_S78C3_MIGRATE_TOKEN')}")
-out = src.replace("REPLACE_S78C3_MIGRATE_TOKEN", token, 1)
-Path('/tmp/s78c3-ops/_s78c3_migrate.php').write_text(out, encoding='utf-8', newline='\n')
-print('token_injected_ok')
-PY
+          python3 - <<'PY'
+          from pathlib import Path
+          import os
+          src = Path('scripts/s78c3-live-migrate.php').read_text(encoding='utf-8')
+          token = os.environ['TOKEN']
+          if src.count('REPLACE_S78C3_MIGRATE_TOKEN') != 1:
+              raise SystemExit(f"expected exactly 1 REPLACE placeholder, got {src.count('REPLACE_S78C3_MIGRATE_TOKEN')}")
+          out = src.replace('REPLACE_S78C3_MIGRATE_TOKEN', token, 1)
+          Path('/tmp/s78c3-ops/_s78c3_migrate.php').write_text(out, encoding='utf-8', newline='\n')
+          print('token_injected_ok')
+          PY
           if head -c 3 /tmp/s78c3-ops/_s78c3_migrate.php | grep -q $'\xEF\xBB\xBF'; then
             echo "BOM detected" && exit 1
           fi

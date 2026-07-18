@@ -540,8 +540,8 @@ if ($action === 'migrate') {
         s78c2_json(['ok' => false, 'error' => 'MIGRATION_READ_FAILED', 'code' => 'S78_C2_R3_BLOCKED_MIGRATION_APPLY'], 500);
     }
 
-    // Safety: refuse unexpected destructive statements (not ON DELETE RESTRICT).
-    if (preg_match('/\b(DROP\s+TABLE|DELETE\s+FROM|UPDATE\s+|TRUNCATE\s+)/i', $sql)) {
+    // Safety: refuse destructive statements. Do not flag ON UPDATE CURRENT_TIMESTAMP / ON DELETE RESTRICT.
+    if (preg_match('/\b(DROP\s+TABLE|DELETE\s+FROM|TRUNCATE\s+TABLE|\bUPDATE\s+[A-Za-z0-9_\x60]+\s+SET\b)/i', $sql)) {
         s78c2_json(['ok' => false, 'error' => 'MIGRATION_UNSAFE_KEYWORDS', 'code' => 'S78_C2_R3_BLOCKED_MIGRATION_DRIFT'], 500);
     }
     if (!preg_match('/CREATE\s+TABLE\s+zimmetler\b/i', $sql)) {

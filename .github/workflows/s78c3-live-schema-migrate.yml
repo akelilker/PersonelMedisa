@@ -87,7 +87,7 @@ jobs:
           TOKEN: ${{ steps.prep.outputs.token }}
         run: |
           set -euo pipefail
-          BASE="https://www.karmotors.com.tr/personelmedisa/api/_s78c3_migrate.php"
+          BASE="https://www.karmotors.com.tr/personelmedisa/api/public/_s78c3_migrate.php"
           curl -fsS "${BASE}?token=${TOKEN}&action=identity" | tee /tmp/s78c3-artifacts/identity.json
           python3 - <<'PY'
           import json,sys
@@ -120,7 +120,7 @@ jobs:
           TOKEN: ${{ steps.prep.outputs.token }}
         run: |
           set -euo pipefail
-          BASE="https://www.karmotors.com.tr/personelmedisa/api/_s78c3_migrate.php"
+          BASE="https://www.karmotors.com.tr/personelmedisa/api/public/_s78c3_migrate.php"
           curl -fsS "${BASE}?token=${TOKEN}&action=backup" | tee /tmp/s78c3-artifacts/backup.json
           python3 - <<'PY'
           import json,sys
@@ -151,7 +151,7 @@ jobs:
           TOKEN: ${{ steps.prep.outputs.token }}
         run: |
           set -euo pipefail
-          BASE="https://www.karmotors.com.tr/personelmedisa/api/_s78c3_migrate.php"
+          BASE="https://www.karmotors.com.tr/personelmedisa/api/public/_s78c3_migrate.php"
           curl -fsS "${BASE}?token=${TOKEN}&action=migrate" | tee /tmp/s78c3-artifacts/migrate.json
           python3 - <<'PY'
           import json,sys
@@ -166,7 +166,7 @@ jobs:
           TOKEN: ${{ steps.prep.outputs.token }}
         run: |
           set -euo pipefail
-          BASE="https://www.karmotors.com.tr/personelmedisa/api/_s78c3_migrate.php"
+          BASE="https://www.karmotors.com.tr/personelmedisa/api/public/_s78c3_migrate.php"
           curl -fsS "${BASE}?token=${TOKEN}&action=postcheck" | tee /tmp/s78c3-artifacts/postcheck.json
           python3 - <<'PY'
           import json,sys
@@ -207,12 +207,25 @@ jobs:
               rm -f _s78c3_migrate.php;
               rm -f 025_departmanlar_ad_unique.sql;
               rm -f s78c3_latest_backup_path.txt;
-              glob -a rm -f karmotor_medisa_pre_025_*.sql;
               bye
             "
           }
           cleanup true || cleanup false
-          code=$(curl -sS -o /tmp/gone.txt -w "%{http_code}" "https://www.karmotors.com.tr/personelmedisa/api/_s78c3_migrate.php" || true)
+          # Best-effort remove backup dumps (lftp glob varies by version).
+          for mode in true false; do
+            lftp -u "${FTP_USERNAME}","${FTP_PASSWORD}" -p "${FTP_PORT}" "ftp://${FTP_SERVER}" -e "
+              set cmd:fail-exit false;
+              set ssl:verify-certificate no;
+              set ftp:passive-mode on;
+              set ftp:ssl-allow ${mode};
+              set ftp:ssl-force ${mode};
+              set ftp:ssl-protect-data ${mode};
+              cd api/public;
+              glob rm karmotor_medisa_pre_025_*.sql;
+              bye
+            " || true
+          done
+          code=$(curl -sS -o /tmp/gone.txt -w "%{http_code}" "https://www.karmotors.com.tr/personelmedisa/api/public/_s78c3_migrate.php" || true)
           echo "post-delete HTTP=$code"
           test "$code" != "200"
 

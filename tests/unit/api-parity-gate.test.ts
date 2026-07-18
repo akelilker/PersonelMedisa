@@ -248,22 +248,16 @@ describe("api-parity integration (canonical repo)", () => {
       byGap.get(gapId).push(`${method} ${path}`);
     }
 
-    expect(byGap.get("P1-01")).toEqual(
-      expect.arrayContaining([
-        "PUT /surecler/:id",
-        "POST /surecler/:id/iptal",
-        "GET /surecler/:id"
-      ])
-    );
+    expect(byGap.get("P1-01")).toBeUndefined();
     expect(byGap.get("P1-02")).toEqual(expect.arrayContaining(["POST /zimmetler"]));
     expect(byGap.has("P1-03")).toBe(false);
 
     const php = report.inventories.php;
     const hasPhp = (method: string, path: string) =>
       php.some((r) => r.method === method && r.normalizedPath === path);
-    expect(hasPhp("PUT", "/surecler/:id")).toBe(false);
-    expect(hasPhp("POST", "/surecler/:id/iptal")).toBe(false);
-    expect(hasPhp("GET", "/surecler/:id")).toBe(false);
+    expect(hasPhp("PUT", "/surecler/:id")).toBe(true);
+    expect(hasPhp("POST", "/surecler/:id/iptal")).toBe(true);
+    expect(hasPhp("GET", "/surecler/:id")).toBe(true);
     expect(hasPhp("POST", "/zimmetler")).toBe(false);
     expect(hasPhp("POST", "/referans/departmanlar")).toBe(true);
 
@@ -271,7 +265,17 @@ describe("api-parity integration (canonical repo)", () => {
       (r) => r.method === "POST" && r.normalizedPath === "/referans/departmanlar"
     );
     expect(departman?.classification).toBe("FULL_PARITY");
-    expect(report.summary.knownGaps).toBe(4);
+
+    for (const [method, path] of [
+      ["GET", "/surecler/:id"],
+      ["PUT", "/surecler/:id"],
+      ["POST", "/surecler/:id/iptal"]
+    ] as const) {
+      const row = report.results.find((r) => r.method === method && r.normalizedPath === path);
+      expect(row?.classification).toBe("FULL_PARITY");
+    }
+
+    expect(report.summary.knownGaps).toBe(1);
   });
 
   it("allowlist file declares required P1 metadata without P1-03", () => {
@@ -281,14 +285,13 @@ describe("api-parity integration (canonical repo)", () => {
     const { entries, errors } = validateAllowlist(doc);
     expect(errors).toEqual([]);
     expect(entries.some((e) => e.gapId === "P1-03")).toBe(false);
-    for (const gapId of ["P1-01", "P1-02"]) {
-      const rows = entries.filter((e) => e.gapId === gapId);
-      expect(rows.length).toBeGreaterThan(0);
-      for (const row of rows) {
-        expect(row.category).toBe("known_active_gap");
-        expect(row.targetPhase).toMatch(/^S78-C/);
-        expect(row.reason.length).toBeGreaterThan(0);
-      }
+    expect(entries.some((e) => e.gapId === "P1-01")).toBe(false);
+    const rows = entries.filter((e) => e.gapId === "P1-02");
+    expect(rows.length).toBeGreaterThan(0);
+    for (const row of rows) {
+      expect(row.category).toBe("known_active_gap");
+      expect(row.targetPhase).toMatch(/^S78-C/);
+      expect(row.reason.length).toBeGreaterThan(0);
     }
   });
 });

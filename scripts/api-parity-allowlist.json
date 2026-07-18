@@ -2,36 +2,6 @@
   "version": 1,
   "entries": [
     {
-      "method": "PUT",
-      "path": "/surecler/:id",
-      "category": "known_active_gap",
-      "gapId": "P1-01",
-      "reason": "Active UI client and mocks exist; SureclerController PHP owner for update is scheduled for S78-C1.",
-      "owner": "SureclerController",
-      "targetPhase": "S78-C1",
-      "introducedOrConfirmedAt": "2026-07-18"
-    },
-    {
-      "method": "POST",
-      "path": "/surecler/:id/iptal",
-      "category": "known_active_gap",
-      "gapId": "P1-01",
-      "reason": "Active UI client and mocks exist; SureclerController PHP cancel route is scheduled for S78-C1.",
-      "owner": "SureclerController",
-      "targetPhase": "S78-C1",
-      "introducedOrConfirmedAt": "2026-07-18"
-    },
-    {
-      "method": "GET",
-      "path": "/surecler/:id",
-      "category": "known_active_gap",
-      "gapId": "P1-01",
-      "reason": "Active UI client and mocks exist; SureclerController PHP detail route is scheduled for S78-C1.",
-      "owner": "SureclerController",
-      "targetPhase": "S78-C1",
-      "introducedOrConfirmedAt": "2026-07-18"
-    },
-    {
       "method": "POST",
       "path": "/zimmetler",
       "category": "known_active_gap",

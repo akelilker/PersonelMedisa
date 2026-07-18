@@ -75,18 +75,32 @@ function isPortOpen(port) {
 }
 
 function phpMysqlBootstrapArgs() {
-  const args = [];
+  const args = ["-d", "display_errors=0"];
   if (process.platform === "win32") {
     const extensionDirResult = spawnSync("php", ["-d", "display_errors=0", "-r", "echo ini_get('extension_dir');"], {
       encoding: "utf8"
     });
-    const extensionDir = (extensionDirResult.stdout || "").trim().split(/\r?\n/).filter(Boolean).pop();
-    if (extensionDir && !extensionDir.includes("Warning")) {
+    const extensionDir = (extensionDirResult.stdout || "")
+      .trim()
+      .split(/\r?\n/)
+      .filter((line) => line && !/warning/i.test(line))
+      .pop();
+    if (extensionDir) {
       args.push("-d", `extension_dir=${extensionDir}`);
     }
   }
-  args.push("-d", "extension=pdo_mysql");
-  args.push("-d", "display_errors=0");
+
+  // Avoid "Module pdo_mysql is already loaded" when php.ini already enables it.
+  const loaded = spawnSync(
+    "php",
+    ["-d", "display_errors=0", "-r", "echo extension_loaded('pdo_mysql') ? '1' : '0';"],
+    { encoding: "utf8" }
+  );
+  const hasPdoMysql = (loaded.stdout || "").trim().split(/\r?\n/).filter(Boolean).pop() === "1";
+  if (!hasPdoMysql) {
+    args.push("-d", process.platform === "win32" ? "extension=php_pdo_mysql.dll" : "extension=pdo_mysql");
+  }
+
   return args;
 }
 

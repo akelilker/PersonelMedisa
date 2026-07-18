@@ -3,16 +3,6 @@
   "entries": [
     {
       "method": "POST",
-      "path": "/zimmetler",
-      "category": "known_active_gap",
-      "gapId": "P1-02",
-      "reason": "Active UI client exists; persistent ZimmetlerController PHP create owner is scheduled for S78-C2.",
-      "owner": "ZimmetlerController",
-      "targetPhase": "S78-C2",
-      "introducedOrConfirmedAt": "2026-07-18"
-    },
-    {
-      "method": "POST",
       "path": "/haftalik-kapanis",
       "category": "approved_deferred",
       "gapId": "D-HK-01",

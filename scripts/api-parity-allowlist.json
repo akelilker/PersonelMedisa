@@ -1,0 +1,346 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "method": "PUT",
+      "path": "/surecler/:id",
+      "category": "known_active_gap",
+      "gapId": "P1-01",
+      "reason": "Active UI client and mocks exist; SureclerController PHP owner for update is scheduled for S78-C1.",
+      "owner": "SureclerController",
+      "targetPhase": "S78-C1",
+      "introducedOrConfirmedAt": "2026-07-18"
+    },
+    {
+      "method": "POST",
+      "path": "/surecler/:id/iptal",
+      "category": "known_active_gap",
+      "gapId": "P1-01",
+      "reason": "Active UI client and mocks exist; SureclerController PHP cancel route is scheduled for S78-C1.",
+      "owner": "SureclerController",
+      "targetPhase": "S78-C1",
+      "introducedOrConfirmedAt": "2026-07-18"
+    },
+    {
+      "method": "GET",
+      "path": "/surecler/:id",
+      "category": "known_active_gap",
+      "gapId": "P1-01",
+      "reason": "Active UI client and mocks exist; SureclerController PHP detail route is scheduled for S78-C1.",
+      "owner": "SureclerController",
+      "targetPhase": "S78-C1",
+      "introducedOrConfirmedAt": "2026-07-18"
+    },
+    {
+      "method": "POST",
+      "path": "/zimmetler",
+      "category": "known_active_gap",
+      "gapId": "P1-02",
+      "reason": "Active UI client exists; persistent ZimmetlerController PHP create owner is scheduled for S78-C2.",
+      "owner": "ZimmetlerController",
+      "targetPhase": "S78-C2",
+      "introducedOrConfirmedAt": "2026-07-18"
+    },
+    {
+      "method": "POST",
+      "path": "/referans/departmanlar",
+      "category": "known_active_gap",
+      "gapId": "P1-03",
+      "reason": "Active UI client exists; ReferansController PHP create-departman owner is scheduled for S78-C3.",
+      "owner": "ReferansController",
+      "targetPhase": "S78-C3",
+      "introducedOrConfirmedAt": "2026-07-18"
+    },
+    {
+      "method": "POST",
+      "path": "/haftalik-kapanis",
+      "category": "approved_deferred",
+      "gapId": "D-HK-01",
+      "reason": "Haftalik kapanis entity backend deferred; client/mock close surface has no PHP owner yet.",
+      "owner": "HaftalikKapanis",
+      "targetPhase": "S78-D",
+      "introducedOrConfirmedAt": "2026-07-18"
+    },
+    {
+      "method": "GET",
+      "path": "/haftalik-kapanis/:id",
+      "category": "approved_deferred",
+      "gapId": "D-HK-02",
+      "reason": "Haftalik kapanis detail deferred with entity backend; no PHP owner yet.",
+      "owner": "HaftalikKapanis",
+      "targetPhase": "S78-D",
+      "introducedOrConfirmedAt": "2026-07-18"
+    },
+    {
+      "method": "GET",
+      "path": "/haftalik-kapanis/yillik-fazla-calisma",
+      "category": "approved_deferred",
+      "gapId": "D-YFC-01",
+      "reason": "Yillik fazla calisma aggregate backend deferred from S78-A.",
+      "owner": "HaftalikKapanis",
+      "targetPhase": "S78-D",
+      "introducedOrConfirmedAt": "2026-07-18"
+    },
+    {
+      "method": "GET",
+      "path": "/fazla-calisma-odeme-tercihi",
+      "category": "approved_deferred",
+      "gapId": "D-FCOT-01",
+      "reason": "Fazla calisma odeme tercihi backend deferred from S78-A.",
+      "owner": "FazlaCalismaOdemeTercihi",
+      "targetPhase": "S78-D",
+      "introducedOrConfirmedAt": "2026-07-18"
+    },
+    {
+      "method": "PUT",
+      "path": "/fazla-calisma-odeme-tercihi",
+      "category": "approved_deferred",
+      "gapId": "D-FCOT-02",
+      "reason": "Fazla calisma odeme tercihi write backend deferred from S78-A.",
+      "owner": "FazlaCalismaOdemeTercihi",
+      "targetPhase": "S78-D",
+      "introducedOrConfirmedAt": "2026-07-18"
+    },
+    {
+      "method": "GET",
+      "path": "/serbest-zaman/events",
+      "category": "approved_deferred",
+      "gapId": "D-SZ-01",
+      "reason": "Serbest zaman event store backend deferred from S78-A.",
+      "owner": "SerbestZaman",
+      "targetPhase": "S78-D",
+      "introducedOrConfirmedAt": "2026-07-18"
+    },
+    {
+      "method": "GET",
+      "path": "/serbest-zaman/bakiye",
+      "category": "approved_deferred",
+      "gapId": "D-SZ-02",
+      "reason": "Serbest zaman bakiye backend deferred from S78-A.",
+      "owner": "SerbestZaman",
+      "targetPhase": "S78-D",
+      "introducedOrConfirmedAt": "2026-07-18"
+    },
+    {
+      "method": "POST",
+      "path": "/serbest-zaman/olusum",
+      "category": "approved_deferred",
+      "gapId": "D-SZ-03",
+      "reason": "Serbest zaman olusum event write deferred from S78-A.",
+      "owner": "SerbestZaman",
+      "targetPhase": "S78-D",
+      "introducedOrConfirmedAt": "2026-07-18"
+    },
+    {
+      "method": "POST",
+      "path": "/serbest-zaman/kullanim",
+      "category": "approved_deferred",
+      "gapId": "D-SZ-04",
+      "reason": "Serbest zaman kullanim event write deferred from S78-A.",
+      "owner": "SerbestZaman",
+      "targetPhase": "S78-D",
+      "introducedOrConfirmedAt": "2026-07-18"
+    },
+    {
+      "method": "POST",
+      "path": "/serbest-zaman/iptal",
+      "category": "approved_deferred",
+      "gapId": "D-SZ-05",
+      "reason": "Serbest zaman iptal event write deferred from S78-A.",
+      "owner": "SerbestZaman",
+      "targetPhase": "S78-D",
+      "introducedOrConfirmedAt": "2026-07-18"
+    },
+    {
+      "method": "POST",
+      "path": "/serbest-zaman/duzeltme",
+      "category": "approved_deferred",
+      "gapId": "D-SZ-06",
+      "reason": "Serbest zaman duzeltme event write deferred from S78-A.",
+      "owner": "SerbestZaman",
+      "targetPhase": "S78-D",
+      "introducedOrConfirmedAt": "2026-07-18"
+    },
+    {
+      "method": "POST",
+      "path": "/haftalik-kapanis/revizyon-talepleri",
+      "category": "approved_deferred",
+      "gapId": "D-REV-01",
+      "reason": "Revizyon talebi create write transition deferred; PHP currently lists only.",
+      "owner": "RevizyonController",
+      "targetPhase": "S78-D",
+      "introducedOrConfirmedAt": "2026-07-18"
+    },
+    {
+      "method": "GET",
+      "path": "/haftalik-kapanis/revizyon-talepleri/:id",
+      "category": "approved_deferred",
+      "gapId": "D-REV-02",
+      "reason": "Revizyon talebi detail deferred; PHP list-only surface today.",
+      "owner": "RevizyonController",
+      "targetPhase": "S78-D",
+      "introducedOrConfirmedAt": "2026-07-18"
+    },
+    {
+      "method": "POST",
+      "path": "/haftalik-kapanis/revizyon-talepleri/:id/gonder",
+      "category": "approved_deferred",
+      "gapId": "D-REV-03",
+      "reason": "Revizyon write transition (gonder) deferred from S78-A.",
+      "owner": "RevizyonController",
+      "targetPhase": "S78-D",
+      "introducedOrConfirmedAt": "2026-07-18"
+    },
+    {
+      "method": "POST",
+      "path": "/haftalik-kapanis/revizyon-talepleri/:id/onay",
+      "category": "approved_deferred",
+      "gapId": "D-REV-04",
+      "reason": "Revizyon write transition (onay) deferred from S78-A.",
+      "owner": "RevizyonController",
+      "targetPhase": "S78-D",
+      "introducedOrConfirmedAt": "2026-07-18"
+    },
+    {
+      "method": "POST",
+      "path": "/haftalik-kapanis/revizyon-talepleri/:id/red",
+      "category": "approved_deferred",
+      "gapId": "D-REV-05",
+      "reason": "Revizyon write transition (red) deferred from S78-A.",
+      "owner": "RevizyonController",
+      "targetPhase": "S78-D",
+      "introducedOrConfirmedAt": "2026-07-18"
+    },
+    {
+      "method": "POST",
+      "path": "/haftalik-kapanis/revizyon-talepleri/:id/iptal",
+      "category": "approved_deferred",
+      "gapId": "D-REV-06",
+      "reason": "Revizyon write transition (iptal) deferred from S78-A.",
+      "owner": "RevizyonController",
+      "targetPhase": "S78-D",
+      "introducedOrConfirmedAt": "2026-07-18"
+    },
+    {
+      "method": "POST",
+      "path": "/haftalik-kapanis/revizyon-talepleri/:id/correction-uret",
+      "category": "approved_deferred",
+      "gapId": "D-COR-01",
+      "reason": "Correction uretimi deferred from S78-A; no PHP produce owner yet.",
+      "owner": "RevizyonController",
+      "targetPhase": "S78-D",
+      "introducedOrConfirmedAt": "2026-07-18"
+    },
+    {
+      "method": "GET",
+      "path": "/haftalik-kapanis/revizyon-corrections/:id",
+      "category": "approved_deferred",
+      "gapId": "D-COR-02",
+      "reason": "Correction detail deferred; PHP corrections list-only today.",
+      "owner": "RevizyonController",
+      "targetPhase": "S78-D",
+      "introducedOrConfirmedAt": "2026-07-18"
+    },
+    {
+      "method": "POST",
+      "path": "/haftalik-kapanis/revizyon-corrections/:id/iptal",
+      "category": "approved_deferred",
+      "gapId": "D-COR-03",
+      "reason": "Correction iptal write deferred from S78-A.",
+      "owner": "RevizyonController",
+      "targetPhase": "S78-D",
+      "introducedOrConfirmedAt": "2026-07-18"
+    },
+    {
+      "method": "PUT",
+      "path": "/belge-kayitlari/:id",
+      "category": "approved_deferred",
+      "gapId": "D-BEL-01",
+      "reason": "Personel belge kaydi update has client/mock surface without PHP owner; deferred pending belge persistence phase.",
+      "owner": "PersonelBelgelerController",
+      "targetPhase": "S78-D",
+      "introducedOrConfirmedAt": "2026-07-18"
+    },
+    {
+      "method": "GET",
+      "path": "/isg/makineler",
+      "category": "demo_only",
+      "gapId": "D-ISG-01",
+      "reason": "ISG makineler live only in demo/e2e mocks; active src client api removed to archive.",
+      "owner": "archive/isg-module",
+      "introducedOrConfirmedAt": "2026-07-18"
+    },
+    {
+      "method": "GET",
+      "path": "/isg/makineler/:id",
+      "category": "demo_only",
+      "gapId": "D-ISG-02",
+      "reason": "ISG makine detail lives only in demo/e2e mocks; no active client owner.",
+      "owner": "archive/isg-module",
+      "introducedOrConfirmedAt": "2026-07-18"
+    },
+    {
+      "method": "GET",
+      "path": "/isg/makineler/:id/bakimlar",
+      "category": "demo_only",
+      "gapId": "D-ISG-03",
+      "reason": "ISG bakimlar lives only in demo/e2e mocks; no active client owner.",
+      "owner": "archive/isg-module",
+      "introducedOrConfirmedAt": "2026-07-18"
+    },
+    {
+      "method": "GET",
+      "path": "/health",
+      "category": "php_external_or_ops",
+      "gapId": "OPS-HEALTH",
+      "reason": "Ops health probe; intentionally PHP-only.",
+      "owner": "Router",
+      "introducedOrConfirmedAt": "2026-07-18"
+    },
+    {
+      "method": "POST",
+      "path": "/puantaj/bildirim-etki-adaylari/hazirla",
+      "category": "php_external_or_ops",
+      "gapId": "OPS-HAZIRLA",
+      "reason": "Internal prepare/hazirla route; intentionally PHP-only without FE client.",
+      "owner": "BildirimPuantajEtkiAdaylariController",
+      "introducedOrConfirmedAt": "2026-07-18"
+    },
+    {
+      "method": "GET",
+      "path": "/ek-odeme-kesinti/:id",
+      "category": "php_external_or_ops",
+      "gapId": "OPS-FIN-DETAIL",
+      "reason": "Finans detail helper is PHP-only; FE uses list/create/update/iptal surfaces.",
+      "owner": "FinansController",
+      "introducedOrConfirmedAt": "2026-07-18"
+    },
+    {
+      "method": "GET",
+      "path": "/maas-hesaplama/snapshotlar/:id/audit",
+      "category": "php_external_or_ops",
+      "gapId": "OPS-MAAS-AUDIT",
+      "reason": "Snapshot audit detail is PHP route; FE may use alternate audit list surfaces.",
+      "owner": "MaasHesaplamaController",
+      "introducedOrConfirmedAt": "2026-07-18"
+    },
+    {
+      "method": "GET",
+      "path": "/personeller/:personelId/belge-kayitlari",
+      "category": "php_external_or_ops",
+      "gapId": "OPS-BELGE-LIST",
+      "reason": "PHP list helper for belge kayitlari; FE create/update paths differ.",
+      "owner": "PersonelBelgelerController",
+      "introducedOrConfirmedAt": "2026-07-18"
+    },
+    {
+      "method": "GET",
+      "path": "/puantaj/bildirim-etki-adaylari/rapor/export.csv",
+      "category": "php_external_or_ops",
+      "gapId": "OPS-ETKI-CSV",
+      "reason": "CSV export helper; download path may bypass standard apiRequest inventory.",
+      "owner": "BildirimEtkiRapor",
+      "introducedOrConfirmedAt": "2026-07-18"
+    }
+  ]
+}

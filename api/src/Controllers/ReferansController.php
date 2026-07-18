@@ -5,16 +5,153 @@ declare(strict_types=1);
 namespace Medisa\Api\Controllers;
 
 use Medisa\Api\Auth\AuthMiddleware;
+use Medisa\Api\Auth\RolePermissions;
 use Medisa\Api\Database\Connection;
 use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
 use PDO;
+use PDOException;
 
 class ReferansController
 {
+    private const DEPARTMAN_AD_MAX_LENGTH = 120;
+
     public static function departmanlar(Request $request)
     {
         self::listByTable($request, 'departmanlar');
+    }
+
+    public static function createDepartman(Request $request)
+    {
+        $user = AuthMiddleware::authenticate($request, true);
+        RolePermissions::assert($user, 'yonetim-paneli.manage');
+
+        $body = $request->getJsonBody();
+        if (!is_array($body)) {
+            $body = [];
+        }
+
+        try {
+            $pdo = Connection::get();
+        } catch (\Throwable $e) {
+            JsonResponse::serverError('Veritabani baglantisi kurulamadi.');
+        }
+
+        try {
+            $created = self::createDepartmanRecord($pdo, $body);
+        } catch (\InvalidArgumentException $e) {
+            $code = $e->getMessage();
+            if ($code === 'DEPARTMAN_NAME_REQUIRED') {
+                JsonResponse::badRequest('Departman adi zorunludur.', 'DEPARTMAN_NAME_REQUIRED', 'ad');
+            }
+            if ($code === 'DEPARTMAN_NAME_TYPE') {
+                JsonResponse::badRequest('Departman adi metin olmalidir.', 'VALIDATION_ERROR', 'ad');
+            }
+            if ($code === 'DEPARTMAN_NAME_TOO_LONG') {
+                JsonResponse::badRequest(
+                    'Departman adi en fazla ' . self::DEPARTMAN_AD_MAX_LENGTH . ' karakter olabilir.',
+                    'VALIDATION_ERROR',
+                    'ad'
+                );
+            }
+            JsonResponse::badRequest('Gecersiz istek.', 'VALIDATION_ERROR', 'ad');
+        } catch (\DomainException $e) {
+            if ($e->getMessage() === 'DEPARTMAN_ZATEN_VAR') {
+                JsonResponse::error(409, 'DEPARTMAN_ZATEN_VAR', 'Bu departman adi zaten kayitli.', 'ad');
+            }
+            JsonResponse::serverError('Departman kaydi olusturulamadi.');
+        } catch (PDOException $e) {
+            if (self::isDuplicateKeyException($e)) {
+                JsonResponse::error(409, 'DEPARTMAN_ZATEN_VAR', 'Bu departman adi zaten kayitli.', 'ad');
+            }
+            JsonResponse::serverError('Departman kaydi olusturulamadi.');
+        } catch (\Throwable $e) {
+            JsonResponse::serverError('Departman kaydi olusturulamadi.');
+        }
+
+        JsonResponse::success($created, [], 201);
+    }
+
+    /**
+     * Global departman katalog kaydı. Caller auth sorumluluğundadır.
+     * Payload allowlist: yalnız `ad` (trim). sube_id ve diğer alanlar yok sayılır.
+     *
+     * @param array<string, mixed> $body
+     * @return array{id: int, ad: string}
+     */
+    public static function createDepartmanRecord(PDO $pdo, array $body)
+    {
+        if (!array_key_exists('ad', $body)) {
+            throw new \InvalidArgumentException('DEPARTMAN_NAME_REQUIRED');
+        }
+        if (!is_string($body['ad']) && !is_numeric($body['ad'])) {
+            throw new \InvalidArgumentException('DEPARTMAN_NAME_TYPE');
+        }
+
+        $ad = trim((string) $body['ad']);
+        if ($ad === '') {
+            throw new \InvalidArgumentException('DEPARTMAN_NAME_REQUIRED');
+        }
+        if (self::utf8Length($ad) > self::DEPARTMAN_AD_MAX_LENGTH) {
+            throw new \InvalidArgumentException('DEPARTMAN_NAME_TOO_LONG');
+        }
+
+        self::assertDepartmanAdUniqueOrThrow($pdo, $ad);
+
+        $stmt = $pdo->prepare(
+            "INSERT INTO departmanlar (ad, durum) VALUES (:ad, 'AKTIF')"
+        );
+        $stmt->execute(['ad' => $ad]);
+        $id = (int) $pdo->lastInsertId();
+        if ($id <= 0) {
+            throw new \RuntimeException('INSERT_FAILED');
+        }
+
+        // Beklenmeyen alanlar (ör. sube_id) insert edilmez — yalnız ad/durum.
+        return [
+            'id' => $id,
+            'ad' => $ad,
+        ];
+    }
+
+    private static function assertDepartmanAdUniqueOrThrow(PDO $pdo, $ad)
+    {
+        $normalized = self::normalizeDepartmanAdForCompare($ad);
+        $stmt = $pdo->query('SELECT id, ad FROM departmanlar');
+        $rows = $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
+        foreach ($rows as $row) {
+            if (self::normalizeDepartmanAdForCompare((string) $row['ad']) === $normalized) {
+                throw new \DomainException('DEPARTMAN_ZATEN_VAR');
+            }
+        }
+    }
+
+    private static function normalizeDepartmanAdForCompare($ad)
+    {
+        // utf8mb4_unicode_ci ile uyumlu ASCII/Unicode case-fold; TR locale I→ı asimetrisi yok.
+        $value = (string) $ad;
+        if (function_exists('mb_strtolower')) {
+            return mb_strtolower($value, 'UTF-8');
+        }
+
+        return strtolower($value);
+    }
+
+    private static function utf8Length($value)
+    {
+        if (function_exists('mb_strlen')) {
+            return (int) mb_strlen((string) $value, 'UTF-8');
+        }
+
+        return strlen((string) $value);
+    }
+
+    private static function isDuplicateKeyException(PDOException $e)
+    {
+        $sqlState = isset($e->errorInfo[0]) ? (string) $e->errorInfo[0] : '';
+        $driverCode = isset($e->errorInfo[1]) ? (int) $e->errorInfo[1] : 0;
+
+        return $sqlState === '23000' || $driverCode === 1062;
     }
 
     public static function gorevler(Request $request)

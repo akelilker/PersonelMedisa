@@ -43,16 +43,6 @@
     },
     {
       "method": "POST",
-      "path": "/referans/departmanlar",
-      "category": "known_active_gap",
-      "gapId": "P1-03",
-      "reason": "Active UI client exists; ReferansController PHP create-departman owner is scheduled for S78-C3.",
-      "owner": "ReferansController",
-      "targetPhase": "S78-C3",
-      "introducedOrConfirmedAt": "2026-07-18"
-    },
-    {
-      "method": "POST",
       "path": "/haftalik-kapanis",
       "category": "approved_deferred",
       "gapId": "D-HK-01",

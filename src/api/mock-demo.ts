@@ -5083,16 +5083,40 @@ export function resolveDemoApiResponse(
         errors: [
           {
             code: "DEPARTMAN_NAME_REQUIRED",
-            message: "Departman adÄ± zorunludur."
+            message: "Departman adı zorunludur."
           }
         ]
       };
     }
 
-    const normalized = ad.toLocaleLowerCase("tr-TR");
-    const existing = demoState.departmanlar.find((item) => item.ad.toLocaleLowerCase("tr-TR") === normalized);
+    if (ad.length > 120) {
+      return {
+        data: null,
+        meta: {},
+        errors: [
+          {
+            code: "VALIDATION_ERROR",
+            message: "Departman adı en fazla 120 karakter olabilir.",
+            field: "ad"
+          }
+        ]
+      };
+    }
+
+    const normalized = ad.toLocaleLowerCase("en-US");
+    const existing = demoState.departmanlar.find((item) => item.ad.toLocaleLowerCase("en-US") === normalized);
     if (existing) {
-      return ok(existing);
+      return {
+        data: null,
+        meta: {},
+        errors: [
+          {
+            code: "DEPARTMAN_ZATEN_VAR",
+            message: "Bu departman adı zaten kayıtlı.",
+            field: "ad"
+          }
+        ]
+      };
     }
 
     const created: DemoDepartman = {

@@ -158,6 +158,9 @@ class Router
         if ($path === '/referans/departmanlar' && $method === 'GET') {
             ReferansController::departmanlar($this->request);
         }
+        if ($path === '/referans/departmanlar' && $method === 'POST') {
+            ReferansController::createDepartman($this->request);
+        }
         if ($path === '/referans/gorevler' && $method === 'GET') {
             ReferansController::gorevler($this->request);
         }

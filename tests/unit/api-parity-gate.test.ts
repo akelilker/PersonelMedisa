@@ -256,7 +256,7 @@ describe("api-parity integration (canonical repo)", () => {
       ])
     );
     expect(byGap.get("P1-02")).toEqual(expect.arrayContaining(["POST /zimmetler"]));
-    expect(byGap.get("P1-03")).toEqual(expect.arrayContaining(["POST /referans/departmanlar"]));
+    expect(byGap.has("P1-03")).toBe(false);
 
     const php = report.inventories.php;
     const hasPhp = (method: string, path: string) =>
@@ -265,16 +265,23 @@ describe("api-parity integration (canonical repo)", () => {
     expect(hasPhp("POST", "/surecler/:id/iptal")).toBe(false);
     expect(hasPhp("GET", "/surecler/:id")).toBe(false);
     expect(hasPhp("POST", "/zimmetler")).toBe(false);
-    expect(hasPhp("POST", "/referans/departmanlar")).toBe(false);
+    expect(hasPhp("POST", "/referans/departmanlar")).toBe(true);
+
+    const departman = report.results.find(
+      (r) => r.method === "POST" && r.normalizedPath === "/referans/departmanlar"
+    );
+    expect(departman?.classification).toBe("FULL_PARITY");
+    expect(report.summary.knownGaps).toBe(4);
   });
 
-  it("allowlist file declares required P1 metadata", () => {
+  it("allowlist file declares required P1 metadata without P1-03", () => {
     const doc = JSON.parse(
       readFileSync(join(root, "scripts/api-parity-allowlist.json"), "utf8")
     );
     const { entries, errors } = validateAllowlist(doc);
     expect(errors).toEqual([]);
-    for (const gapId of ["P1-01", "P1-02", "P1-03"]) {
+    expect(entries.some((e) => e.gapId === "P1-03")).toBe(false);
+    for (const gapId of ["P1-01", "P1-02"]) {
       const rows = entries.filter((e) => e.gapId === gapId);
       expect(rows.length).toBeGreaterThan(0);
       for (const row of rows) {

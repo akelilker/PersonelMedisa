@@ -5613,9 +5613,22 @@ let personelBelgeKaydiIdCounter = 903;
         return;
       }
 
-      const existing = departmanOptions.find((item) => item.ad.toLocaleLowerCase("tr-TR") === ad.toLocaleLowerCase("tr-TR"));
+      if (ad.length > 120) {
+        await fulfillJson(
+          route,
+          400,
+          errorBody("VALIDATION_ERROR", "Departman adı en fazla 120 karakter olabilir.", "ad")
+        );
+        return;
+      }
+
+      const existing = departmanOptions.find((item) => item.ad.toLocaleLowerCase("en-US") === ad.toLocaleLowerCase("en-US"));
       if (existing) {
-        await fulfillJson(route, 200, okBody(existing));
+        await fulfillJson(
+          route,
+          409,
+          errorBody("DEPARTMAN_ZATEN_VAR", "Bu departman adı zaten kayıtlı.", "ad")
+        );
         return;
       }
 
@@ -5624,7 +5637,7 @@ let personelBelgeKaydiIdCounter = 903;
         ad
       };
       departmanOptions.push(created);
-      await fulfillJson(route, 200, okBody(created));
+      await fulfillJson(route, 201, okBody(created));
       return;
     }
 

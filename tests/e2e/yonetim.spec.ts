@@ -210,6 +210,30 @@ test.describe("yonetim paneli ve aylik ozet", () => {
     await expect(page.locator(".yonetim-card-grid--branches")).toContainText("Merkez");
   });
 
+  test("genel yonetici departman olusturur, listede secer ve duplicate hatasi alir", async ({ page }) => {
+    await mockApi(page, "GENEL_YONETICI");
+    await login(page, { username: "genel_yonetici", password: "demo123" });
+
+    await page.goto("/yonetim-paneli?tab=subeler");
+    await expect(page.getByTestId("yonetim-section-subeler")).toBeVisible();
+
+    await page.getByTestId("yonetim-sube-yeni").click();
+    const panel = page.getByTestId("yonetim-sube-departman-panel");
+    await panel.getByRole("button", { name: /\+ Yeni Departman/i }).click();
+    await panel.getByPlaceholder("Yeni departman adı").fill("  Kalite Kontrol  ");
+    await page.getByRole("button", { name: "Ekle" }).click();
+
+    await expect(page.getByText(/"Kalite Kontrol" departmanı seçeneklere eklendi/i)).toBeVisible();
+    await expect(panel).toContainText("Kalite Kontrol");
+    await expect(panel.getByRole("button", { name: /^Kalite Kontrol$/i })).toBeVisible();
+
+    await panel.getByRole("button", { name: /\+ Yeni Departman/i }).click();
+    await panel.getByPlaceholder("Yeni departman adı").fill("kalite kontrol");
+    await page.getByRole("button", { name: "Ekle" }).click();
+
+    await expect(page.getByText("Bu departman adı zaten kayıtlı.")).toBeVisible();
+  });
+
   test("yonetim paneli tab query param ile dogru bolum acilir ve url senkron kalir", async ({ page }) => {
     await mockApi(page, "GENEL_YONETICI");
     await login(page, { username: "genel_yonetici", password: "demo123" });

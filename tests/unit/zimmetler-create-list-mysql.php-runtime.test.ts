@@ -29,12 +29,15 @@ describe("ZimmetlerController create/list MariaDB", () => {
     expect(controllerSource).toContain("personeller.update");
     expect(controllerSource).toContain("JsonResponse::success(self::mapZimmetRow($row), [], 201)");
     expect(controllerSource).toContain("SubeScope::assertPersonelAccess");
+    expect(controllerSource).toContain("personeller.view");
     expect(controllerSource).toMatch(/!is_string\(\$body\[\$field\]\)/);
-    expect(migrationSource).toContain("CREATE TABLE IF NOT EXISTS zimmetler");
+    expect(migrationSource).toMatch(/CREATE TABLE\s+zimmetler\s*\(/);
+    expect(migrationSource).not.toContain("CREATE TABLE IF NOT EXISTS");
     expect(migrationSource).not.toMatch(/\bDROP\b/);
     expect(migrationSource).not.toMatch(/\bDELETE\s+FROM\b/i);
     expect(migrationSource).not.toMatch(/(?:^|;)\s*UPDATE\b/im);
-    expect(migrationSource).toContain("ON DELETE CASCADE");
+    expect(migrationSource).toContain("ON DELETE RESTRICT");
+    expect(migrationSource).not.toContain("ON DELETE CASCADE");
     expect(migrationSource).toContain("ON UPDATE CURRENT_TIMESTAMP");
 
     const migrations = readdirSync(resolve(process.cwd(), "api/migrations"))
@@ -49,12 +52,19 @@ describe("ZimmetlerController create/list MariaDB", () => {
     expect(result.stdout).toContain("verify-zimmetler-create-list-mysql: OK");
     expect(result.stdout).toContain("[PASS] HTTP authorized create → 201");
     expect(result.stdout).toContain("[PASS] HTTP list → 200");
-    expect(result.stdout).toContain("[PASS] duplicate same product allowed → 201");
-    expect(result.stdout).toContain("[PASS] empty urun_turu → 422");
-    expect(result.stdout).toContain("[PASS] numeric urun_turu → 422");
-    expect(result.stdout).toContain("[PASS] BA create → 403 (no personeller.update)");
-    expect(result.stdout).toContain("[PASS] BA other sube → 403");
-    expect(result.stdout).toContain("[PASS] unauthenticated → 401");
+    expect(result.stdout).toContain("[PASS] FK DELETE_RULE RESTRICT/NO ACTION");
+    expect(result.stdout).toContain("[PASS] partial existing zimmetler → migration fails");
+    expect(result.stdout).toContain("[PASS] personel hard delete blocked by FK");
+    expect(result.stdout).toContain("[PASS] pasif personel old zimmets visible");
+    expect(result.stdout).toContain("[PASS] pasif does not auto-iade zimmet");
+    expect(result.stdout).toContain("[PASS] empty total_pages=1 repo standard");
+    expect(result.stdout).toContain("[PASS] list missing personel → 404");
+    expect(result.stdout).toContain("[PASS] create missing personel → 422");
+    expect(result.stdout).toContain("[PASS] BA empty allowedSubeIds global list → 403");
+    expect(result.stdout).toContain("[PASS] GY empty allowedSubeIds sees all subeler");
     expect(result.stdout).toContain("[PASS] server owns zimmet_durumu");
+    expect(result.stdout).toContain("[PASS] client id ignored");
+    expect(result.stdout).toContain("[PASS] numeric teslim_eden → 422");
+    expect(result.stdout).toContain("[PASS] unauthenticated → 401");
   });
 });

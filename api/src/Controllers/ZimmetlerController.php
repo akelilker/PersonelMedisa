@@ -71,6 +71,12 @@ class ZimmetlerController
                 $params[$key] = $subeId;
             }
             $where[] = 'p.sube_id IN (' . implode(', ', $placeholders) . ')';
+        } else {
+            // Empty allowedSubeIds + null scope is GENEL unrestricted global list only.
+            // Branch-scoped roles without assigned sube_ids must not see all rows.
+            if (!RolePermissions::has($user, 'personeller.view')) {
+                JsonResponse::forbidden('Sube baglami olmadan zimmet listesi goruntulenemez.');
+            }
         }
 
         if ($zimmetDurumu !== null) {

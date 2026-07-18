@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       confirm:
-        description: 'Type MIGRATE_S78C2_026 to confirm production 026 migrate'
+        description: 'MIGRATE_S78C2_026 or CLEANUP_S78C2_026'
         required: true
         type: string
 
@@ -248,5 +248,135 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: s78c2-live-schema-migrate
+          path: /tmp/s78c2-artifacts
+          if-no-files-found: warn
+
+  cleanup:
+    name: Cleanup R3 smoke rows via temporary FTP ops
+    if: github.event.inputs.confirm == 'CLEANUP_S78C2_026'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Validate FTP secrets
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+          FTP_PORT: ${{ secrets.FTP_PORT }}
+        run: |
+          test -n "$FTP_SERVER" && test -n "$FTP_USERNAME" && test -n "$FTP_PASSWORD"
+          test "${FTP_PORT}" = "21"
+
+      - name: Install lftp
+        run: sudo apt-get update && sudo apt-get install -y lftp
+
+      - name: Prepare cleanup ops payload
+        id: prep
+        run: |
+          set -euo pipefail
+          TOKEN="$(openssl rand -hex 24)"
+          export TOKEN
+          echo "token=$TOKEN" >> "$GITHUB_OUTPUT"
+          mkdir -p /tmp/s78c2-ops /tmp/s78c2-artifacts
+          python3 - <<'PY'
+          from pathlib import Path
+          import os
+          src = Path('scripts/s78c2-live-migrate.php').read_text(encoding='utf-8')
+          token = os.environ['TOKEN']
+          if src.count('REPLACE_S78C2_MIGRATE_TOKEN') != 1:
+              raise SystemExit('bad REPLACE count')
+          out = src.replace('REPLACE_S78C2_MIGRATE_TOKEN', token, 1)
+          Path('/tmp/s78c2-ops/_s78c2_migrate.php').write_text(out, encoding='utf-8', newline='\n')
+          PY
+
+      - name: Upload cleanup ops via FTP
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+          FTP_PORT: ${{ secrets.FTP_PORT }}
+        run: |
+          set -euo pipefail
+          upload() {
+            local use_ftps="$1"
+            lftp -u "${FTP_USERNAME}","${FTP_PASSWORD}" -p "${FTP_PORT}" "ftp://${FTP_SERVER}" -e "
+              set cmd:fail-exit true;
+              set ssl:verify-certificate no;
+              set ftp:passive-mode on;
+              set ftp:ssl-allow ${use_ftps};
+              set ftp:ssl-force ${use_ftps};
+              set ftp:ssl-protect-data ${use_ftps};
+              mkdir -p api/public;
+              lcd /tmp/s78c2-ops;
+              put -O api/public _s78c2_migrate.php;
+              bye
+            "
+          }
+          upload true || upload false
+
+      - name: Cleanup smoke + final integrity
+        env:
+          TOKEN: ${{ steps.prep.outputs.token }}
+        run: |
+          set -euo pipefail
+          BASE="https://www.karmotors.com.tr/personelmedisa/api/public/_s78c2_migrate.php"
+          code=$(curl -sS -o /tmp/s78c2-artifacts/cleanup.json -w "%{http_code}" "${BASE}?token=${TOKEN}&action=cleanup_smoke" || true)
+          echo "cleanup_http=$code"
+          cat /tmp/s78c2-artifacts/cleanup.json
+          echo
+          test "$code" = "200"
+          python3 - <<'PY'
+          import json,sys
+          data=json.load(open('/tmp/s78c2-artifacts/cleanup.json'))
+          print(json.dumps(data, indent=2))
+          if not data.get('ok'):
+            sys.exit(1)
+          PY
+          code=$(curl -sS -o /tmp/s78c2-artifacts/final_integrity.json -w "%{http_code}" "${BASE}?token=${TOKEN}&action=final_integrity" || true)
+          echo "final_http=$code"
+          cat /tmp/s78c2-artifacts/final_integrity.json
+          echo
+          test "$code" = "200"
+          python3 - <<'PY'
+          import json,sys
+          data=json.load(open('/tmp/s78c2-artifacts/final_integrity.json'))
+          print(json.dumps(data, indent=2))
+          if not data.get('ok'):
+            sys.exit(1)
+          PY
+
+      - name: Delete cleanup ops via FTP
+        if: always()
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+          FTP_PORT: ${{ secrets.FTP_PORT }}
+        run: |
+          set -euo pipefail
+          cleanup() {
+            local use_ftps="$1"
+            lftp -u "${FTP_USERNAME}","${FTP_PASSWORD}" -p "${FTP_PORT}" "ftp://${FTP_SERVER}" -e "
+              set cmd:fail-exit false;
+              set ssl:verify-certificate no;
+              set ftp:passive-mode on;
+              set ftp:ssl-allow ${use_ftps};
+              set ftp:ssl-force ${use_ftps};
+              set ftp:ssl-protect-data ${use_ftps};
+              cd api/public;
+              rm -f _s78c2_migrate.php;
+              bye
+            "
+          }
+          cleanup true || cleanup false
+
+      - name: Upload cleanup artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: s78c2-live-cleanup
           path: /tmp/s78c2-artifacts
           if-no-files-found: warn

@@ -628,6 +628,84 @@ if ($action === 'postcheck') {
     ], $ok ? 200 : 500);
 }
 
+if ($action === 'cleanup_smoke') {
+    $identity = s78c2_identity($pdo);
+    if ($identity['aktif_veritabani'] !== 'karmotor_medisa') {
+        s78c2_json(['ok' => false, 'code' => 'S78_C2_R3_BLOCKED_DB_IDENTITY', 'identity' => $identity], 409);
+    }
+
+    $before = s78c2_counts($pdo);
+    $deleted = [];
+
+    // Exact create-smoke row (section 16).
+    $stmt = $pdo->prepare(
+        "SELECT id, personel_id, aciklama, teslim_eden
+         FROM zimmetler
+         WHERE id = 2
+           AND aciklama = 'S78-C2-R3 geçici kabul kaydı'
+         LIMIT 1"
+    );
+    $stmt->execute();
+    $row2 = $stmt->fetch();
+    if (is_array($row2)) {
+        $del = $pdo->prepare(
+            "DELETE FROM zimmetler
+             WHERE id = 2
+               AND aciklama = 'S78-C2-R3 geçici kabul kaydı'"
+        );
+        $del->execute();
+        $deleted[] = ['id' => 2, 'reason' => 'exact_create_smoke', 'affected' => $del->rowCount()];
+    }
+
+    // Accidental permission-matrix write from this R3 session.
+    $stmt = $pdo->prepare(
+        "SELECT id, personel_id, aciklama, teslim_eden, urun_turu, teslim_tarihi
+         FROM zimmetler
+         WHERE id = 1
+           AND personel_id = 1
+           AND teslim_eden = 'Smoke'
+           AND aciklama IS NULL
+           AND urun_turu = 'DIGER'
+           AND teslim_tarihi = '2026-07-19'
+         LIMIT 1"
+    );
+    $stmt->execute();
+    $row1 = $stmt->fetch();
+    if (is_array($row1)) {
+        $del = $pdo->prepare(
+            "DELETE FROM zimmetler
+             WHERE id = 1
+               AND personel_id = 1
+               AND teslim_eden = 'Smoke'
+               AND aciklama IS NULL
+               AND urun_turu = 'DIGER'
+               AND teslim_tarihi = '2026-07-19'"
+        );
+        $del->execute();
+        $deleted[] = ['id' => 1, 'reason' => 'permission_matrix_smoke', 'affected' => $del->rowCount()];
+    }
+
+    $after = s78c2_counts($pdo);
+    $leftExact = (int) $pdo->query(
+        "SELECT COUNT(*) FROM zimmetler WHERE aciklama = 'S78-C2-R3 geçici kabul kaydı'"
+    )->fetchColumn();
+    $leftId1 = (int) $pdo->query('SELECT COUNT(*) FROM zimmetler WHERE id = 1')->fetchColumn();
+    $leftId2 = (int) $pdo->query('SELECT COUNT(*) FROM zimmetler WHERE id = 2')->fetchColumn();
+    $ok = $leftExact === 0 && $leftId1 === 0 && $leftId2 === 0 && (int) $after['zimmet_count'] === 0;
+
+    s78c2_json([
+        'ok' => $ok,
+        'code' => $ok ? 'S78_C2_CLEANUP_OK' : 'S78_C2_CLEANUP_FAILED',
+        'identity' => $identity,
+        'deleted' => $deleted,
+        'before' => $before,
+        'after' => $after,
+        'left_exact_smoke' => $leftExact,
+        'left_id_1' => $leftId1,
+        'left_id_2' => $leftId2,
+    ], $ok ? 200 : 500);
+}
+
 if ($action === 'final_integrity') {
     $identity = s78c2_identity($pdo);
     $counts = s78c2_counts($pdo);
@@ -640,7 +718,7 @@ if ($action === 'final_integrity') {
     $smokeLeft = (int) $pdo->query(
         "SELECT COUNT(*) FROM zimmetler WHERE aciklama = 'S78-C2-R3 geçici kabul kaydı'"
     )->fetchColumn();
-    $ok = $orphan === 0 && $smokeLeft === 0;
+    $ok = $orphan === 0 && $smokeLeft === 0 && (int) $counts['zimmet_count'] === 0;
     s78c2_json([
         'ok' => $ok,
         'code' => $ok ? 'S78_C2_FINAL_INTEGRITY_OK' : 'S78_C2_FINAL_INTEGRITY_FAILED',

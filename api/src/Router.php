@@ -323,6 +323,9 @@ class Router
         if ($path === '/zimmetler' && $method === 'GET') {
             ZimmetlerController::list($this->request);
         }
+        if ($path === '/zimmetler' && $method === 'POST') {
+            ZimmetlerController::create($this->request);
+        }
         if ($path === '/haftalik-kapanis/revizyon-talepleri' && $method === 'GET') {
             RevizyonController::talepleri($this->request);
         }

@@ -3830,6 +3830,12 @@ export function resolveDemoApiResponse(
   }
 
   if (pathname === "/zimmetler" && method === "GET") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(actor, "personeller.detail.view");
+    if (permissionError) {
+      return permissionError;
+    }
+
     const personelId = toNumber(requestUrl.searchParams.get("personel_id"));
     const subeId = toNumber(requestUrl.searchParams.get("sube_id"));
     const zimmetDurumu = toStringValue(requestUrl.searchParams.get("zimmet_durumu"));
@@ -3869,14 +3875,102 @@ export function resolveDemoApiResponse(
   }
 
   if (pathname === "/zimmetler" && method === "POST") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(actor, "personeller.update");
+    if (permissionError) {
+      return permissionError;
+    }
+
+    if (typeof body.personel_id !== "number" && typeof body.personel_id !== "string") {
+      return {
+        data: null,
+        meta: {},
+        errors: [{ code: "VALIDATION_ERROR", message: "Personel secilmelidir.", field: "personel_id" }]
+      };
+    }
+    const personelId = toNumber(body.personel_id);
+    if (personelId === null || personelId <= 0) {
+      return {
+        data: null,
+        meta: {},
+        errors: [{ code: "VALIDATION_ERROR", message: "Personel secilmelidir.", field: "personel_id" }]
+      };
+    }
+
+    const targetPersonel = demoState.personeller.find((personel) => personel.id === personelId);
+    if (!targetPersonel) {
+      return {
+        data: null,
+        meta: {},
+        errors: [{ code: "VALIDATION_ERROR", message: "Personel bulunamadi.", field: "personel_id" }]
+      };
+    }
+    if (targetPersonel.aktif_durum === "PASIF") {
+      return {
+        data: null,
+        meta: {},
+        errors: [{ code: "VALIDATION_ERROR", message: "Pasif personele zimmet kaydi eklenemez.", field: "personel_id" }]
+      };
+    }
+
+    const requireString = (field: string, message: string) => {
+      if (typeof body[field] !== "string" || body[field].trim() === "") {
+        return {
+          data: null,
+          meta: {},
+          errors: [{ code: "VALIDATION_ERROR", message, field }]
+        };
+      }
+      return null;
+    };
+
+    for (const check of [
+      requireString("urun_turu", "Urun turu zorunludur."),
+      requireString("teslim_tarihi", "Teslim tarihi zorunludur."),
+      requireString("teslim_eden", "Teslim eden bilgisi zorunludur."),
+      requireString("teslim_durumu", "Teslim durumu zorunludur.")
+    ]) {
+      if (check) {
+        return check;
+      }
+    }
+
+    const urunTuru = String(body.urun_turu).trim().toUpperCase();
+    const teslimDurumu = String(body.teslim_durumu).trim().toUpperCase();
+    const validUrun = ["AYAKKABI", "KASK", "KULAKLIK", "MASKE", "TELEFON", "DIGER"];
+    const validTeslim = ["YENI", "IKINCI_EL", "ARIZALI"];
+    if (!validUrun.includes(urunTuru)) {
+      return {
+        data: null,
+        meta: {},
+        errors: [{ code: "VALIDATION_ERROR", message: "Urun turu gecerli degil.", field: "urun_turu" }]
+      };
+    }
+    if (!validTeslim.includes(teslimDurumu)) {
+      return {
+        data: null,
+        meta: {},
+        errors: [{ code: "VALIDATION_ERROR", message: "Teslim durumu gecerli degil.", field: "teslim_durumu" }]
+      };
+    }
+
+    const teslimTarihi = String(body.teslim_tarihi).trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(teslimTarihi)) {
+      return {
+        data: null,
+        meta: {},
+        errors: [{ code: "VALIDATION_ERROR", message: "Teslim tarihi gecerli olmalidir.", field: "teslim_tarihi" }]
+      };
+    }
+
     const next: DemoZimmet = {
       id: ++demoState.nextIds.zimmet,
-      personel_id: toNumber(body.personel_id) ?? 1,
-      urun_turu: toStringValue(body.urun_turu) ?? "DIGER",
-      teslim_tarihi: toStringValue(body.teslim_tarihi) ?? new Date().toISOString().slice(0, 10),
-      teslim_eden: toStringValue(body.teslim_eden) ?? undefined,
-      aciklama: toStringValue(body.aciklama) ?? undefined,
-      teslim_durumu: toStringValue(body.teslim_durumu) ?? "YENI",
+      personel_id: personelId,
+      urun_turu: urunTuru,
+      teslim_tarihi: teslimTarihi,
+      teslim_eden: String(body.teslim_eden).trim(),
+      aciklama: typeof body.aciklama === "string" && body.aciklama.trim() ? body.aciklama.trim() : undefined,
+      teslim_durumu: teslimDurumu,
       zimmet_durumu: "AKTIF"
     };
     demoState.zimmetler.unshift(next);

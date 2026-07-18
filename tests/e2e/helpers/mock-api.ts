@@ -4518,6 +4518,7 @@ let personelBelgeKaydiIdCounter = 903;
     }
 
     if (path === "/api/zimmetler" && method === "GET") {
+      if (await denyUnlessRolePermission(route, "personeller.detail.view")) return;
       const personelId = Number.parseInt(url.searchParams.get("personel_id") ?? "", 10);
       const zimmetDurumu = url.searchParams.get("zimmet_durumu");
       const subeId = Number.parseInt(url.searchParams.get("sube_id") ?? "", 10);
@@ -4543,28 +4544,77 @@ let personelBelgeKaydiIdCounter = 903;
     }
 
     if (path === "/api/zimmetler" && method === "POST") {
-      const payload = request.postDataJSON() as {
-        personel_id: number;
-        urun_turu: string;
-        teslim_tarihi: string;
-        teslim_eden?: string;
-        aciklama?: string;
-        teslim_durumu: string;
-      };
+      if (await denyUnlessRolePermission(route, "personeller.update")) return;
+      const payload = (request.postDataJSON() ?? {}) as Record<string, unknown>;
+
+      const personelId = Number(payload.personel_id);
+      if (!Number.isFinite(personelId) || personelId <= 0) {
+        await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "Personel secilmelidir.", "personel_id"));
+        return;
+      }
+
+      const targetPersonel = personeller.find((personel) => personel.id === personelId);
+      if (!targetPersonel) {
+        await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "Personel bulunamadi.", "personel_id"));
+        return;
+      }
+      if (targetPersonel.aktif_durum === "PASIF") {
+        await fulfillJson(
+          route,
+          422,
+          errorBody("VALIDATION_ERROR", "Pasif personele zimmet kaydi eklenemez.", "personel_id")
+        );
+        return;
+      }
+
+      for (const [field, message] of [
+        ["urun_turu", "Urun turu zorunludur."],
+        ["teslim_tarihi", "Teslim tarihi zorunludur."],
+        ["teslim_eden", "Teslim eden bilgisi zorunludur."],
+        ["teslim_durumu", "Teslim durumu zorunludur."]
+      ] as const) {
+        if (typeof payload[field] !== "string" || payload[field].trim() === "") {
+          await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", message, field));
+          return;
+        }
+      }
+
+      const urunTuru = String(payload.urun_turu).trim().toUpperCase();
+      const teslimDurumu = String(payload.teslim_durumu).trim().toUpperCase();
+      const teslimTarihi = String(payload.teslim_tarihi).trim();
+      if (!["AYAKKABI", "KASK", "KULAKLIK", "MASKE", "TELEFON", "DIGER"].includes(urunTuru)) {
+        await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "Urun turu gecerli degil.", "urun_turu"));
+        return;
+      }
+      if (!["YENI", "IKINCI_EL", "ARIZALI"].includes(teslimDurumu)) {
+        await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "Teslim durumu gecerli degil.", "teslim_durumu"));
+        return;
+      }
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(teslimTarihi)) {
+        await fulfillJson(
+          route,
+          422,
+          errorBody("VALIDATION_ERROR", "Teslim tarihi gecerli olmalidir.", "teslim_tarihi")
+        );
+        return;
+      }
 
       const created = {
         id: ++zimmetIdCounter,
-        personel_id: payload.personel_id,
-        urun_turu: payload.urun_turu,
-        teslim_tarihi: payload.teslim_tarihi,
-        teslim_eden: payload.teslim_eden,
-        aciklama: payload.aciklama,
-        teslim_durumu: payload.teslim_durumu,
+        personel_id: personelId,
+        urun_turu: urunTuru,
+        teslim_tarihi: teslimTarihi,
+        teslim_eden: String(payload.teslim_eden).trim(),
+        aciklama:
+          typeof payload.aciklama === "string" && payload.aciklama.trim()
+            ? payload.aciklama.trim()
+            : undefined,
+        teslim_durumu: teslimDurumu,
         zimmet_durumu: "AKTIF"
       };
       zimmetler.unshift(created);
 
-      await fulfillJson(route, 200, okBody(created));
+      await fulfillJson(route, 201, okBody(created));
       return;
     }
 

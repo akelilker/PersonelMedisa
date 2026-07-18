@@ -249,7 +249,7 @@ describe("api-parity integration (canonical repo)", () => {
     }
 
     expect(byGap.get("P1-01")).toBeUndefined();
-    expect(byGap.get("P1-02")).toEqual(expect.arrayContaining(["POST /zimmetler"]));
+    expect(byGap.get("P1-02")).toBeUndefined();
     expect(byGap.has("P1-03")).toBe(false);
 
     const php = report.inventories.php;
@@ -258,7 +258,8 @@ describe("api-parity integration (canonical repo)", () => {
     expect(hasPhp("PUT", "/surecler/:id")).toBe(true);
     expect(hasPhp("POST", "/surecler/:id/iptal")).toBe(true);
     expect(hasPhp("GET", "/surecler/:id")).toBe(true);
-    expect(hasPhp("POST", "/zimmetler")).toBe(false);
+    expect(hasPhp("POST", "/zimmetler")).toBe(true);
+    expect(hasPhp("GET", "/zimmetler")).toBe(true);
     expect(hasPhp("POST", "/referans/departmanlar")).toBe(true);
 
     const departman = report.results.find(
@@ -269,16 +270,18 @@ describe("api-parity integration (canonical repo)", () => {
     for (const [method, path] of [
       ["GET", "/surecler/:id"],
       ["PUT", "/surecler/:id"],
-      ["POST", "/surecler/:id/iptal"]
+      ["POST", "/surecler/:id/iptal"],
+      ["GET", "/zimmetler"],
+      ["POST", "/zimmetler"]
     ] as const) {
       const row = report.results.find((r) => r.method === method && r.normalizedPath === path);
       expect(row?.classification).toBe("FULL_PARITY");
     }
 
-    expect(report.summary.knownGaps).toBe(1);
+    expect(report.summary.knownGaps).toBe(0);
   });
 
-  it("allowlist file declares required P1 metadata without P1-03", () => {
+  it("allowlist file has no remaining active P1 gaps", () => {
     const doc = JSON.parse(
       readFileSync(join(root, "scripts/api-parity-allowlist.json"), "utf8")
     );
@@ -286,12 +289,7 @@ describe("api-parity integration (canonical repo)", () => {
     expect(errors).toEqual([]);
     expect(entries.some((e) => e.gapId === "P1-03")).toBe(false);
     expect(entries.some((e) => e.gapId === "P1-01")).toBe(false);
-    const rows = entries.filter((e) => e.gapId === "P1-02");
-    expect(rows.length).toBeGreaterThan(0);
-    for (const row of rows) {
-      expect(row.category).toBe("known_active_gap");
-      expect(row.targetPhase).toMatch(/^S78-C/);
-      expect(row.reason.length).toBeGreaterThan(0);
-    }
+    expect(entries.some((e) => e.gapId === "P1-02")).toBe(false);
+    expect(entries.every((e) => e.category !== "known_active_gap")).toBe(true);
   });
 });

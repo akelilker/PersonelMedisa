@@ -311,6 +311,15 @@ class Router
         if ($path === '/surecler' && $method === 'POST') {
             SureclerController::create($this->request);
         }
+        if ($method === 'GET' && preg_match('#^/surecler/(\d+)$#', $path, $matches)) {
+            SureclerController::detail($this->request, $matches[1]);
+        }
+        if ($method === 'PUT' && preg_match('#^/surecler/(\d+)$#', $path, $matches)) {
+            SureclerController::update($this->request, $matches[1]);
+        }
+        if ($method === 'POST' && preg_match('#^/surecler/(\d+)/iptal$#', $path, $matches)) {
+            SureclerController::cancel($this->request, $matches[1]);
+        }
         if ($path === '/zimmetler' && $method === 'GET') {
             ZimmetlerController::list($this->request);
         }

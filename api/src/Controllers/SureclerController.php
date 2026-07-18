@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Medisa\Api\Controllers;
 
 use Medisa\Api\Auth\AuthMiddleware;
+use Medisa\Api\Auth\RolePermissions;
 use Medisa\Api\Database\Connection;
 use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
@@ -159,6 +160,255 @@ class SureclerController
         }
     }
 
+    public static function detail(Request $request, $id)
+    {
+        $user = AuthMiddleware::authenticate($request, true);
+        RolePermissions::assert($user, 'surecler.detail.view');
+
+        $surecId = self::parsePositiveInt($id);
+        if ($surecId === null) {
+            JsonResponse::notFound('Surec bulunamadi.');
+        }
+
+        try {
+            $pdo = Connection::get();
+        } catch (\Throwable $e) {
+            JsonResponse::serverError('Veritabani baglantisi kurulamadi.');
+        }
+
+        $row = self::fetchSurecWithPersonel($pdo, $surecId);
+        if (!$row) {
+            JsonResponse::notFound('Surec bulunamadi.');
+        }
+
+        SubeScope::assertPersonelAccess($user, $request, (int) $row['personel_sube_id']);
+        JsonResponse::success(self::mapSurecRow($row));
+    }
+
+    public static function update(Request $request, $id)
+    {
+        $user = AuthMiddleware::authenticate($request, true);
+        RolePermissions::assert($user, 'surecler.update');
+
+        $surecId = self::parsePositiveInt($id);
+        if ($surecId === null) {
+            JsonResponse::notFound('Surec bulunamadi.');
+        }
+
+        $body = $request->getJsonBody();
+        if (!is_array($body)) {
+            self::validationError('body', 'Guncelleme govdesi gecersiz.');
+        }
+
+        try {
+            $pdo = Connection::get();
+        } catch (\Throwable $e) {
+            JsonResponse::serverError('Veritabani baglantisi kurulamadi.');
+        }
+
+        $existing = self::fetchSurecWithPersonel($pdo, $surecId);
+        if (!$existing) {
+            JsonResponse::notFound('Surec bulunamadi.');
+        }
+
+        $state = strtoupper((string) ($existing['state'] ?? ''));
+        if (in_array($state, ['IPTAL', 'TAMAMLANDI'], true)) {
+            JsonResponse::error(409, 'CONFLICT', 'Iptal veya tamamlanmis surec guncellenemez.');
+        }
+
+        SubeScope::assertPersonelAccess($user, $request, (int) $existing['personel_sube_id']);
+
+        $payload = self::normalizeAndValidateUpdatePayload($body, $existing);
+
+        $pdo->beginTransaction();
+        try {
+            $stmt = $pdo->prepare('
+                UPDATE surecler
+                SET surec_turu = :surec_turu,
+                    alt_tur = :alt_tur,
+                    baslangic_tarihi = :baslangic_tarihi,
+                    bitis_tarihi = :bitis_tarihi,
+                    ucretli_mi = :ucretli_mi,
+                    ilk_iki_gun_firma_oder_mi = :ilk_iki_gun_firma_oder_mi,
+                    aciklama = :aciklama
+                WHERE id = :id
+                  AND state NOT IN (\'IPTAL\', \'TAMAMLANDI\')
+            ');
+            $stmt->execute([
+                'surec_turu' => $payload['surec_turu'],
+                'alt_tur' => $payload['alt_tur'],
+                'baslangic_tarihi' => $payload['baslangic_tarihi'],
+                'bitis_tarihi' => $payload['bitis_tarihi'],
+                'ucretli_mi' => $payload['ucretli_mi'] ? 1 : 0,
+                'ilk_iki_gun_firma_oder_mi' => $payload['ilk_iki_gun_firma_oder_mi'] === null
+                    ? null
+                    : ($payload['ilk_iki_gun_firma_oder_mi'] ? 1 : 0),
+                'aciklama' => $payload['aciklama'],
+                'id' => $surecId,
+            ]);
+
+            if ($stmt->rowCount() === 0) {
+                $pdo->rollBack();
+                $fresh = self::fetchSurecWithPersonel($pdo, $surecId);
+                if (!$fresh) {
+                    JsonResponse::notFound('Surec bulunamadi.');
+                }
+                JsonResponse::error(409, 'CONFLICT', 'Surec guncellenemedi.');
+            }
+
+            if ($payload['surec_turu'] === 'ISTEN_AYRILMA') {
+                self::deactivatePersonel($pdo, (int) $existing['personel_id']);
+            }
+
+            $row = self::fetchSurecRowById($pdo, $surecId);
+            if (!$row) {
+                $pdo->rollBack();
+                JsonResponse::serverError('Kayit guncellenemedi.');
+            }
+
+            $pdo->commit();
+            JsonResponse::success(self::mapSurecRow($row));
+        } catch (\PDOException $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            JsonResponse::serverError('Kayit guncellenemedi.');
+        }
+    }
+
+    public static function cancel(Request $request, $id)
+    {
+        $user = AuthMiddleware::authenticate($request, true);
+        RolePermissions::assert($user, 'surecler.cancel');
+
+        $surecId = self::parsePositiveInt($id);
+        if ($surecId === null) {
+            JsonResponse::notFound('Surec bulunamadi.');
+        }
+
+        try {
+            $pdo = Connection::get();
+        } catch (\Throwable $e) {
+            JsonResponse::serverError('Veritabani baglantisi kurulamadi.');
+        }
+
+        $existing = self::fetchSurecWithPersonel($pdo, $surecId);
+        if (!$existing) {
+            JsonResponse::notFound('Surec bulunamadi.');
+        }
+
+        SubeScope::assertPersonelAccess($user, $request, (int) $existing['personel_sube_id']);
+
+        $state = strtoupper((string) ($existing['state'] ?? ''));
+        if ($state === 'IPTAL') {
+            // Idempotent: already cancelled.
+            JsonResponse::success([
+                'id' => (int) $existing['id'],
+                'state' => 'IPTAL',
+            ]);
+        }
+
+        if ($state === 'TAMAMLANDI') {
+            JsonResponse::error(409, 'CONFLICT', 'Tamamlanmis surec iptal edilemez.');
+        }
+
+        $stmt = $pdo->prepare("
+            UPDATE surecler
+            SET state = 'IPTAL'
+            WHERE id = :id
+              AND state NOT IN ('IPTAL', 'TAMAMLANDI')
+        ");
+        $stmt->execute(['id' => $surecId]);
+
+        if ($stmt->rowCount() === 0) {
+            $fresh = self::fetchSurecWithPersonel($pdo, $surecId);
+            if (!$fresh) {
+                JsonResponse::notFound('Surec bulunamadi.');
+            }
+            $freshState = strtoupper((string) ($fresh['state'] ?? ''));
+            if ($freshState === 'IPTAL') {
+                JsonResponse::success([
+                    'id' => (int) $fresh['id'],
+                    'state' => 'IPTAL',
+                ]);
+            }
+            if ($freshState === 'TAMAMLANDI') {
+                JsonResponse::error(409, 'CONFLICT', 'Tamamlanmis surec iptal edilemez.');
+            }
+            JsonResponse::error(409, 'CONFLICT', 'Surec iptal edilemedi.');
+        }
+
+        JsonResponse::success([
+            'id' => $surecId,
+            'state' => 'IPTAL',
+        ]);
+    }
+
+    /** @param array<string, mixed> $body @param array<string, mixed> $existing @return array<string, mixed> */
+    private static function normalizeAndValidateUpdatePayload(array $body, array $existing)
+    {
+        $mutableKeys = [
+            'surec_turu',
+            'alt_tur',
+            'baslangic_tarihi',
+            'bitis_tarihi',
+            'ucretli_mi',
+            'ilk_iki_gun_firma_oder_mi',
+            'aciklama',
+        ];
+        $hasMutable = false;
+        foreach ($mutableKeys as $key) {
+            if (array_key_exists($key, $body)) {
+                $hasMutable = true;
+                break;
+            }
+        }
+        if (!$hasMutable) {
+            self::validationError('body', 'Guncellenecek alan bulunamadi.');
+        }
+
+        if (array_key_exists('personel_id', $body) && $body['personel_id'] !== null && $body['personel_id'] !== '') {
+            $incomingPersonelId = self::parsePositiveInt($body['personel_id']);
+            if ($incomingPersonelId === null) {
+                self::validationError('personel_id', 'Personel secimi gecersiz.');
+            }
+            if ($incomingPersonelId !== (int) $existing['personel_id']) {
+                self::validationError('personel_id', 'Surec personeli degistirilemez.');
+            }
+        }
+
+        $merged = [
+            'surec_turu' => array_key_exists('surec_turu', $body)
+                ? $body['surec_turu']
+                : $existing['surec_turu'],
+            'alt_tur' => array_key_exists('alt_tur', $body)
+                ? $body['alt_tur']
+                : $existing['alt_tur'],
+            'baslangic_tarihi' => array_key_exists('baslangic_tarihi', $body)
+                ? $body['baslangic_tarihi']
+                : $existing['baslangic_tarihi'],
+            'bitis_tarihi' => array_key_exists('bitis_tarihi', $body)
+                ? $body['bitis_tarihi']
+                : $existing['bitis_tarihi'],
+            'ucretli_mi' => array_key_exists('ucretli_mi', $body)
+                ? $body['ucretli_mi']
+                : (bool) ((int) ($existing['ucretli_mi'] ?? 0)),
+            'aciklama' => array_key_exists('aciklama', $body)
+                ? $body['aciklama']
+                : $existing['aciklama'],
+        ];
+        if (array_key_exists('ilk_iki_gun_firma_oder_mi', $body)) {
+            $merged['ilk_iki_gun_firma_oder_mi'] = $body['ilk_iki_gun_firma_oder_mi'];
+        } elseif ($existing['ilk_iki_gun_firma_oder_mi'] !== null) {
+            $merged['ilk_iki_gun_firma_oder_mi'] = (bool) ((int) $existing['ilk_iki_gun_firma_oder_mi']);
+        }
+
+        // Reuse create validation for field shapes; personel_id stays locked to existing.
+        $merged['personel_id'] = (int) $existing['personel_id'];
+
+        return self::normalizeAndValidateCreatePayload($merged);
+    }
+
     /** @param array<string, mixed> $body @return array<string, mixed> */
     private static function normalizeAndValidateCreatePayload(array $body)
     {
@@ -272,6 +522,24 @@ class SureclerController
                    ucretli_mi, ilk_iki_gun_firma_oder_mi, aciklama, state
             FROM surecler
             WHERE id = :id
+            LIMIT 1
+        ');
+        $stmt->execute(['id' => (int) $surecId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        return is_array($row) ? $row : null;
+    }
+
+    /** @return array<string, mixed>|null */
+    private static function fetchSurecWithPersonel(PDO $pdo, $surecId)
+    {
+        $stmt = $pdo->prepare('
+            SELECT sc.id, sc.personel_id, sc.surec_turu, sc.alt_tur, sc.baslangic_tarihi, sc.bitis_tarihi,
+                   sc.ucretli_mi, sc.ilk_iki_gun_firma_oder_mi, sc.aciklama, sc.state,
+                   p.sube_id AS personel_sube_id
+            FROM surecler sc
+            INNER JOIN personeller p ON p.id = sc.personel_id
+            WHERE sc.id = :id
             LIMIT 1
         ');
         $stmt->execute(['id' => (int) $surecId]);

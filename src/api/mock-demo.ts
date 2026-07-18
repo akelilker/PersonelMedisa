@@ -3886,17 +3886,65 @@ export function resolveDemoApiResponse(
   const surecDetailMatch = pathname.match(/^\/surecler\/(\d+)$/);
   if (surecDetailMatch) {
     const id = Number.parseInt(surecDetailMatch[1], 10);
+    const actor = readDemoApiActor(init);
     const surec = demoState.surecler.find((item) => item.id === id);
-    if (!surec) {
-      return null;
-    }
 
     if (method === "GET") {
+      const permissionError = enforceDemoPermission(actor, "surecler.detail.view");
+      if (permissionError) {
+        return permissionError;
+      }
+      if (!surec) {
+        return demoRevizyonError("NOT_FOUND", "Surec bulunamadi.");
+      }
       return ok(surec);
     }
 
     if (method === "PUT") {
-      Object.assign(surec, body);
+      const permissionError = enforceDemoPermission(actor, "surecler.update");
+      if (permissionError) {
+        return permissionError;
+      }
+      if (!surec) {
+        return demoRevizyonError("NOT_FOUND", "Surec bulunamadi.");
+      }
+      const state = String(surec.state ?? "").toUpperCase();
+      if (state === "IPTAL" || state === "TAMAMLANDI") {
+        return demoRevizyonError("CONFLICT", "Iptal veya tamamlanmis surec guncellenemez.");
+      }
+      if (body.personel_id !== undefined && body.personel_id !== null && body.personel_id !== "") {
+        const incoming = toNumber(body.personel_id);
+        if (incoming !== null && incoming !== surec.personel_id) {
+          return {
+            data: null,
+            meta: {},
+            errors: [{ code: "VALIDATION_ERROR", message: "Surec personeli degistirilemez.", field: "personel_id" }]
+          };
+        }
+      }
+      const mutableKeys = [
+        "surec_turu",
+        "alt_tur",
+        "baslangic_tarihi",
+        "bitis_tarihi",
+        "ucretli_mi",
+        "ilk_iki_gun_firma_oder_mi",
+        "aciklama"
+      ] as const;
+      const patch: Record<string, unknown> = {};
+      for (const key of mutableKeys) {
+        if (Object.prototype.hasOwnProperty.call(body, key)) {
+          patch[key] = body[key];
+        }
+      }
+      if (Object.keys(patch).length === 0) {
+        return {
+          data: null,
+          meta: {},
+          errors: [{ code: "VALIDATION_ERROR", message: "Guncellenecek alan bulunamadi.", field: "body" }]
+        };
+      }
+      Object.assign(surec, patch);
       return ok(surec);
     }
   }
@@ -3904,11 +3952,19 @@ export function resolveDemoApiResponse(
   const surecCancelMatch = pathname.match(/^\/surecler\/(\d+)\/iptal$/);
   if (surecCancelMatch && method === "POST") {
     const id = Number.parseInt(surecCancelMatch[1], 10);
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(actor, "surecler.cancel");
+    if (permissionError) {
+      return permissionError;
+    }
     const surec = demoState.surecler.find((item) => item.id === id);
     if (!surec) {
-      return null;
+      return demoRevizyonError("NOT_FOUND", "Surec bulunamadi.");
     }
-
+    const state = String(surec.state ?? "").toUpperCase();
+    if (state === "TAMAMLANDI") {
+      return demoRevizyonError("CONFLICT", "Tamamlanmis surec iptal edilemez.");
+    }
     surec.state = "IPTAL";
     return ok({ id: surec.id, state: surec.state });
   }

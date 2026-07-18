@@ -4856,6 +4856,7 @@ let personelBelgeKaydiIdCounter = 903;
     }
 
     if (path.match(/^\/api\/surecler\/\d+$/) && method === "GET") {
+      if (await denyUnlessRolePermission(route, "surecler.detail.view")) return;
       const surecId = Number.parseInt(path.split("/")[3] ?? "0", 10);
       const surec = surecler.find((item) => item.id === surecId);
       if (!surec) {
@@ -4868,6 +4869,7 @@ let personelBelgeKaydiIdCounter = 903;
     }
 
     if (path.match(/^\/api\/surecler\/\d+$/) && method === "PUT") {
+      if (await denyUnlessRolePermission(route, "surecler.update")) return;
       const surecId = Number.parseInt(path.split("/")[3] ?? "0", 10);
       const surec = surecler.find((item) => item.id === surecId);
       if (!surec) {
@@ -4875,18 +4877,58 @@ let personelBelgeKaydiIdCounter = 903;
         return;
       }
 
-      const payload = request.postDataJSON() as Partial<typeof surec>;
-      Object.assign(surec, payload);
+      const state = String(surec.state ?? "").toUpperCase();
+      if (state === "IPTAL" || state === "TAMAMLANDI") {
+        await fulfillJson(route, 409, errorBody("CONFLICT", "Iptal veya tamamlanmis surec guncellenemez."));
+        return;
+      }
 
+      const payload = (request.postDataJSON() ?? {}) as Record<string, unknown>;
+      if (payload.personel_id !== undefined && payload.personel_id !== null && payload.personel_id !== "") {
+        const incoming = Number(payload.personel_id);
+        if (Number.isFinite(incoming) && incoming !== surec.personel_id) {
+          await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "Surec personeli degistirilemez.", "personel_id"));
+          return;
+        }
+      }
+
+      const mutableKeys = [
+        "surec_turu",
+        "alt_tur",
+        "baslangic_tarihi",
+        "bitis_tarihi",
+        "ucretli_mi",
+        "ilk_iki_gun_firma_oder_mi",
+        "aciklama"
+      ] as const;
+      const patch: Record<string, unknown> = {};
+      for (const key of mutableKeys) {
+        if (Object.prototype.hasOwnProperty.call(payload, key)) {
+          patch[key] = payload[key];
+        }
+      }
+      if (Object.keys(patch).length === 0) {
+        await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "Guncellenecek alan bulunamadi.", "body"));
+        return;
+      }
+
+      Object.assign(surec, patch);
       await fulfillJson(route, 200, okBody(surec));
       return;
     }
 
     if (path.match(/^\/api\/surecler\/\d+\/iptal$/) && method === "POST") {
+      if (await denyUnlessRolePermission(route, "surecler.cancel")) return;
       const surecId = Number.parseInt(path.split("/")[3] ?? "0", 10);
       const surec = surecler.find((item) => item.id === surecId);
       if (!surec) {
         await fulfillJson(route, 404, errorBody("NOT_FOUND", "Surec bulunamadi."));
+        return;
+      }
+
+      const state = String(surec.state ?? "").toUpperCase();
+      if (state === "TAMAMLANDI") {
+        await fulfillJson(route, 409, errorBody("CONFLICT", "Tamamlanmis surec iptal edilemez."));
         return;
       }
 

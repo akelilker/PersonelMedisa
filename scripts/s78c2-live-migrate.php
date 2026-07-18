@@ -208,6 +208,14 @@ function s78c2_expected_columns(): array
     ];
 }
 
+function s78c2_normalize_type(string $type): string
+{
+    $type = strtolower(trim($type));
+    $type = preg_replace('/^int\(\d+\)/', 'int', $type) ?? $type;
+    $type = preg_replace('/\s+/', ' ', $type) ?? $type;
+    return $type;
+}
+
 function s78c2_schema_matches_026(array $schema): array
 {
     if (!$schema['exists']) {
@@ -240,7 +248,7 @@ function s78c2_schema_matches_026(array $schema): array
     ];
     foreach ($checks as [$field, $typeNeedle, $nullable, $default]) {
         $col = $byField[$field];
-        $type = strtolower((string) ($col['Type'] ?? ''));
+        $type = s78c2_normalize_type((string) ($col['Type'] ?? ''));
         if (strpos($type, $typeNeedle) === false) {
             return ['ok' => false, 'reason' => 'type_' . $field];
         }
@@ -348,7 +356,7 @@ if ($action === 'preflight') {
 
     $idCol = s78c2_personel_id_column($pdo);
     $idType = strtolower((string) ($idCol['Type'] ?? ''));
-    $parentOk = $idCol !== null && strpos($idType, 'int unsigned') !== false;
+    $parentOk = $idCol !== null && preg_match('/^int(\(\d+\))?\s+unsigned$/i', $idType) === 1;
     $engineRow = $pdo->query(
         "SELECT ENGINE FROM information_schema.TABLES
          WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'personeller'"

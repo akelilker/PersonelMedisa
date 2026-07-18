@@ -5606,10 +5606,36 @@ let personelBelgeKaydiIdCounter = 903;
     }
 
     if (path === "/api/referans/departmanlar" && method === "POST") {
-      const payload = request.postDataJSON() as { ad?: string };
-      const ad = (payload.ad ?? "").trim();
+      if (await denyUnlessRolePermission(route, "yonetim-paneli.manage")) {
+        return;
+      }
+
+      const payload = (request.postDataJSON() ?? {}) as Record<string, unknown>;
+      if (!Object.prototype.hasOwnProperty.call(payload, "ad")) {
+        await fulfillJson(
+          route,
+          400,
+          errorBody("DEPARTMAN_NAME_REQUIRED", "Departman adı zorunludur.", "ad")
+        );
+        return;
+      }
+
+      if (typeof payload.ad !== "string") {
+        await fulfillJson(
+          route,
+          400,
+          errorBody("VALIDATION_ERROR", "Departman adı metin olmalıdır.", "ad")
+        );
+        return;
+      }
+
+      const ad = payload.ad.trim();
       if (!ad) {
-        await fulfillJson(route, 400, errorBody("DEPARTMAN_NAME_REQUIRED", "Departman adı zorunludur."));
+        await fulfillJson(
+          route,
+          400,
+          errorBody("DEPARTMAN_NAME_REQUIRED", "Departman adı zorunludur.", "ad")
+        );
         return;
       }
 
@@ -5622,7 +5648,9 @@ let personelBelgeKaydiIdCounter = 903;
         return;
       }
 
-      const existing = departmanOptions.find((item) => item.ad.toLocaleLowerCase("en-US") === ad.toLocaleLowerCase("en-US"));
+      const existing = departmanOptions.find(
+        (item) => item.ad.localeCompare(ad, "en", { sensitivity: "accent" }) === 0
+      );
       if (existing) {
         await fulfillJson(
           route,

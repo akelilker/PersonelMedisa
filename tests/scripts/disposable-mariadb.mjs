@@ -77,13 +77,16 @@ function isPortOpen(port) {
 function phpMysqlBootstrapArgs() {
   const args = [];
   if (process.platform === "win32") {
-    const extensionDirResult = spawnSync("php", ["-r", "echo ini_get('extension_dir');"], { encoding: "utf8" });
-    const extensionDir = extensionDirResult.stdout.trim();
-    if (extensionDir) {
+    const extensionDirResult = spawnSync("php", ["-d", "display_errors=0", "-r", "echo ini_get('extension_dir');"], {
+      encoding: "utf8"
+    });
+    const extensionDir = (extensionDirResult.stdout || "").trim().split(/\r?\n/).filter(Boolean).pop();
+    if (extensionDir && !extensionDir.includes("Warning")) {
       args.push("-d", `extension_dir=${extensionDir}`);
     }
   }
   args.push("-d", "extension=pdo_mysql");
+  args.push("-d", "display_errors=0");
   return args;
 }
 
@@ -98,8 +101,10 @@ function tryPdoPing(dsn, user, password) {
   fwrite(STDERR, $e->getMessage());
   exit(1);
 }`;
-  const result = spawnSync("php", [...phpMysqlBootstrapArgs(), "-r", script], { encoding: "utf8" });
-  return result.status === 0 && result.stdout.trim() === "OK";
+  const result = spawnSync("php", [...phpMysqlBootstrapArgs(), "-d", "display_errors=0", "-r", script], {
+    encoding: "utf8"
+  });
+  return result.status === 0 && result.stdout.includes("OK");
 }
 
 function ensureDataDir(mysqldPath) {

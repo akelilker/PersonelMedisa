@@ -5075,7 +5075,35 @@ export function resolveDemoApiResponse(
   }
 
   if (pathname === "/referans/departmanlar" && method === "POST") {
-    const ad = toStringValue(body.ad);
+    if (!Object.prototype.hasOwnProperty.call(body, "ad")) {
+      return {
+        data: null,
+        meta: {},
+        errors: [
+          {
+            code: "DEPARTMAN_NAME_REQUIRED",
+            message: "Departman adı zorunludur.",
+            field: "ad"
+          }
+        ]
+      };
+    }
+
+    if (typeof body.ad !== "string") {
+      return {
+        data: null,
+        meta: {},
+        errors: [
+          {
+            code: "VALIDATION_ERROR",
+            message: "Departman adı metin olmalıdır.",
+            field: "ad"
+          }
+        ]
+      };
+    }
+
+    const ad = body.ad.trim();
     if (!ad) {
       return {
         data: null,
@@ -5083,7 +5111,8 @@ export function resolveDemoApiResponse(
         errors: [
           {
             code: "DEPARTMAN_NAME_REQUIRED",
-            message: "Departman adı zorunludur."
+            message: "Departman adı zorunludur.",
+            field: "ad"
           }
         ]
       };
@@ -5103,8 +5132,10 @@ export function resolveDemoApiResponse(
       };
     }
 
-    const normalized = ad.toLocaleLowerCase("en-US");
-    const existing = demoState.departmanlar.find((item) => item.ad.toLocaleLowerCase("en-US") === normalized);
+    // Approximation of utf8mb4_unicode_ci equality for known ASCII/case pairs.
+    const existing = demoState.departmanlar.find(
+      (item) => item.ad.localeCompare(ad, "en", { sensitivity: "accent" }) === 0
+    );
     if (existing) {
       return {
         data: null,

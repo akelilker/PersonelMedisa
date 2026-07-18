@@ -2,6 +2,11 @@
 
 declare(strict_types=1);
 
+/**
+ * Validation-only helper runner (SQLite). Persistence/duplicate/concurrency
+ * acceptance lives in ReferansDepartmanCreateMysqlTestRunner.php.
+ */
+
 require_once __DIR__ . '/../../api/src/Http/JsonResponse.php';
 require_once __DIR__ . '/../../api/src/Auth/RolePermissions.php';
 require_once __DIR__ . '/../../api/src/Controllers/ReferansController.php';
@@ -31,7 +36,7 @@ function departmanExpectCode(callable $callback, string $code, string $name): vo
     throw new RuntimeException('[FAIL] ' . $name . ' (no exception)');
 }
 
-function createDepartmanPdo(): PDO
+function createDepartmanSqlitePdo(): PDO
 {
     $pdo = new PDO('sqlite::memory:');
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
@@ -40,67 +45,84 @@ function createDepartmanPdo(): PDO
         'CREATE TABLE departmanlar (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             ad VARCHAR(120) NOT NULL,
-            durum TEXT NOT NULL DEFAULT \'AKTIF\',
-            created_at TEXT,
-            updated_at TEXT
+            durum TEXT NOT NULL DEFAULT \'AKTIF\'
         )'
     );
+    $pdo->exec('CREATE UNIQUE INDEX uq_departmanlar_ad ON departmanlar (ad)');
 
     return $pdo;
 }
 
-$controllerSource = file_get_contents(__DIR__ . '/../../api/src/Controllers/ReferansController.php');
-$routerSource = file_get_contents(__DIR__ . '/../../api/src/Router.php');
+$controllerSource = (string) file_get_contents(__DIR__ . '/../../api/src/Controllers/ReferansController.php');
+$routerSource = (string) file_get_contents(__DIR__ . '/../../api/src/Router.php');
+$migrationSource = (string) file_get_contents(__DIR__ . '/../../api/migrations/025_departmanlar_ad_unique.sql');
 
+departmanAssert(strpos($routerSource, 'ReferansController::createDepartman') !== false, 'router registers POST createDepartman');
 departmanAssert(
-    is_string($routerSource) && strpos($routerSource, "ReferansController::createDepartman") !== false,
-    'router registers POST createDepartman owner'
-);
-departmanAssert(
-    is_string($controllerSource)
-        && strpos($controllerSource, "RolePermissions::assert(\$user, 'yonetim-paneli.manage')") !== false,
+    strpos($controllerSource, "RolePermissions::assert(\$user, 'yonetim-paneli.manage')") !== false,
     'createDepartman requires yonetim-paneli.manage'
 );
+departmanAssert(strpos($controllerSource, 'SELECT id, ad FROM departmanlar') === false, 'no SELECT-all duplicate scan');
+departmanAssert(strpos($controllerSource, 'normalizeDepartmanAdForCompare') === false, 'no PHP normalize helper');
+departmanAssert(strpos($controllerSource, 'WHERE ad = :ad') !== false, 'early unique check uses WHERE ad = :ad');
+departmanAssert(strpos($migrationSource, 'uq_departmanlar_ad') !== false, 'additive unique migration present');
 departmanAssert(
-    is_string($controllerSource) && strpos($controllerSource, 'JsonResponse::success($created, [], 201)') !== false,
-    'createDepartman returns HTTP 201 on success'
-);
-departmanAssert(
-    is_string($controllerSource) && strpos($controllerSource, 'DEPARTMAN_ZATEN_VAR') !== false,
-    'createDepartman uses DEPARTMAN_ZATEN_VAR duplicate code'
-);
-
-departmanAssert(
-    RolePermissions::has(['rol' => 'GENEL_YONETICI'], 'yonetim-paneli.manage'),
-    'GENEL_YONETICI has departman manage permission'
-);
-departmanAssert(
-    !RolePermissions::has(['rol' => 'BOLUM_YONETICISI'], 'yonetim-paneli.manage'),
-    'BOLUM_YONETICISI lacks departman manage permission (403 path)'
-);
-departmanAssert(
-    !RolePermissions::has(['rol' => 'BIRIM_AMIRI'], 'yonetim-paneli.manage'),
-    'BIRIM_AMIRI lacks departman manage permission (403 path)'
-);
-departmanAssert(
-    !RolePermissions::has(['rol' => 'MUHASEBE'], 'yonetim-paneli.manage'),
-    'MUHASEBE lacks departman manage permission (403 path)'
+    strpos($controllerSource, '!is_string($body[\'ad\'])') !== false
+        && strpos($controllerSource, 'is_numeric($body[\'ad\'])') === false,
+    'ad accepts only JSON string type'
 );
 
-$pdo = createDepartmanPdo();
+departmanAssert(RolePermissions::has(['rol' => 'GENEL_YONETICI'], 'yonetim-paneli.manage'), 'GENEL_YONETICI manage');
+departmanAssert(!RolePermissions::has(['rol' => 'BIRIM_AMIRI'], 'yonetim-paneli.manage'), 'BIRIM_AMIRI forbidden');
+departmanAssert(!RolePermissions::has(['rol' => 'MUHASEBE'], 'yonetim-paneli.manage'), 'MUHASEBE forbidden');
+departmanAssert(!RolePermissions::has(['rol' => 'IK'], 'yonetim-paneli.manage'), 'IK forbidden');
+departmanAssert(!RolePermissions::has(['rol' => 'PATRON'], 'yonetim-paneli.manage'), 'PATRON forbidden');
+
+$pdo = createDepartmanSqlitePdo();
+
+departmanExpectCode(function () use ($pdo): void {
+    ReferansController::createDepartmanRecord($pdo, ['ad' => 123]);
+}, 'DEPARTMAN_NAME_TYPE', 'numeric int ad rejected');
+
+departmanExpectCode(function () use ($pdo): void {
+    ReferansController::createDepartmanRecord($pdo, ['ad' => 12.5]);
+}, 'DEPARTMAN_NAME_TYPE', 'numeric float ad rejected');
+
+departmanExpectCode(function () use ($pdo): void {
+    ReferansController::createDepartmanRecord($pdo, ['ad' => true]);
+}, 'DEPARTMAN_NAME_TYPE', 'boolean ad rejected');
+
+departmanExpectCode(function () use ($pdo): void {
+    ReferansController::createDepartmanRecord($pdo, ['ad' => null]);
+}, 'DEPARTMAN_NAME_TYPE', 'null ad rejected');
+
+departmanExpectCode(function () use ($pdo): void {
+    ReferansController::createDepartmanRecord($pdo, ['ad' => []]);
+}, 'DEPARTMAN_NAME_TYPE', 'array ad rejected');
+
+departmanExpectCode(function () use ($pdo): void {
+    ReferansController::createDepartmanRecord($pdo, ['ad' => ['x' => 1]]);
+}, 'DEPARTMAN_NAME_TYPE', 'object-like array ad rejected');
+
+departmanExpectCode(function () use ($pdo): void {
+    ReferansController::createDepartmanRecord($pdo, []);
+}, 'DEPARTMAN_NAME_REQUIRED', 'missing ad rejected');
+
+departmanExpectCode(function () use ($pdo): void {
+    ReferansController::createDepartmanRecord($pdo, ['ad' => '']);
+}, 'DEPARTMAN_NAME_REQUIRED', 'empty ad rejected');
+
+departmanExpectCode(function () use ($pdo): void {
+    ReferansController::createDepartmanRecord($pdo, ['ad' => "  \t  "]);
+}, 'DEPARTMAN_NAME_REQUIRED', 'whitespace ad rejected');
+
+departmanExpectCode(function () use ($pdo): void {
+    ReferansController::createDepartmanRecord($pdo, ['ad' => str_repeat('A', 121)]);
+}, 'DEPARTMAN_NAME_TOO_LONG', 'too long ad rejected');
 
 $created = ReferansController::createDepartmanRecord($pdo, ['ad' => '  Kalite  ']);
-departmanAssert((int) $created['id'] > 0, 'authorized create returns positive id');
-departmanAssert($created['ad'] === 'Kalite', 'create trims department name');
-departmanAssert(
-    (int) $pdo->query('SELECT COUNT(*) FROM departmanlar')->fetchColumn() === 1,
-    'authorized create writes exactly one row'
-);
-
-$row = $pdo->query('SELECT * FROM departmanlar WHERE id = ' . (int) $created['id'])->fetch();
-departmanAssert(is_array($row) && $row['ad'] === 'Kalite', 'DB stores trimmed name');
-departmanAssert(is_array($row) && $row['durum'] === 'AKTIF', 'DB stores AKTIF durum');
-departmanAssert(is_array($row) && !array_key_exists('sube_id', $row), 'departmanlar table has no sube_id (global model)');
+departmanAssert($created['ad'] === 'Kalite', 'trim accepted on string ad');
+departmanAssert((int) $created['id'] > 0, 'insert returns id');
 
 ReferansController::createDepartmanRecord($pdo, [
     'ad' => 'Depo',
@@ -109,43 +131,11 @@ ReferansController::createDepartmanRecord($pdo, [
     'id' => 42,
 ]);
 $depo = $pdo->query("SELECT * FROM departmanlar WHERE ad = 'Depo'")->fetch();
-departmanAssert(is_array($depo) && (int) $depo['id'] !== 42, 'client-supplied id is ignored');
-departmanAssert(is_array($depo) && $depo['durum'] === 'AKTIF', 'unexpected durum payload is not written');
-departmanAssert(
-    (int) $pdo->query('SELECT COUNT(*) FROM departmanlar')->fetchColumn() === 2,
-    'unexpected payload fields do not create extra rows'
-);
+departmanAssert(is_array($depo) && (int) $depo['id'] !== 42, 'client id ignored');
+departmanAssert(is_array($depo) && $depo['durum'] === 'AKTIF', 'unexpected durum ignored (allowlist)');
 
 departmanExpectCode(function () use ($pdo): void {
-    ReferansController::createDepartmanRecord($pdo, []);
-}, 'DEPARTMAN_NAME_REQUIRED', 'missing ad is rejected');
-
-departmanExpectCode(function () use ($pdo): void {
-    ReferansController::createDepartmanRecord($pdo, ['ad' => '']);
-}, 'DEPARTMAN_NAME_REQUIRED', 'empty ad is rejected');
-
-departmanExpectCode(function () use ($pdo): void {
-    ReferansController::createDepartmanRecord($pdo, ['ad' => "  \t  "]);
-}, 'DEPARTMAN_NAME_REQUIRED', 'whitespace-only ad is rejected');
-
-departmanExpectCode(function () use ($pdo): void {
-    ReferansController::createDepartmanRecord($pdo, ['ad' => ['x']]);
-}, 'DEPARTMAN_NAME_TYPE', 'non-string ad is rejected');
-
-$long = str_repeat('A', 121);
-departmanExpectCode(function () use ($pdo, $long): void {
-    ReferansController::createDepartmanRecord($pdo, ['ad' => $long]);
-}, 'DEPARTMAN_NAME_TOO_LONG', 'ad longer than 120 is rejected');
-
-departmanExpectCode(function () use ($pdo): void {
-    ReferansController::createDepartmanRecord($pdo, ['ad' => 'kalite']);
-}, 'DEPARTMAN_ZATEN_VAR', 'duplicate name is rejected (case-insensitive)');
-
-departmanExpectCode(function () use ($pdo): void {
-    ReferansController::createDepartmanRecord($pdo, ['ad' => '  KALITE  ']);
-}, 'DEPARTMAN_ZATEN_VAR', 'duplicate name is rejected after trim');
-
-$countAfterDup = (int) $pdo->query('SELECT COUNT(*) FROM departmanlar')->fetchColumn();
-departmanAssert($countAfterDup === 2, 'duplicate attempts do not insert rows');
+    ReferansController::createDepartmanRecord($pdo, ['ad' => 'Kalite']);
+}, 'DEPARTMAN_ZATEN_VAR', 'exact duplicate rejected');
 
 echo 'verify-referans-departman-create: OK' . PHP_EOL;

@@ -84,11 +84,12 @@ class ReferansController
         if (!array_key_exists('ad', $body)) {
             throw new \InvalidArgumentException('DEPARTMAN_NAME_REQUIRED');
         }
-        if (!is_string($body['ad']) && !is_numeric($body['ad'])) {
+        // JSON string zorunlu; numeric/boolean/null/array/object reddedilir.
+        if (!is_string($body['ad'])) {
             throw new \InvalidArgumentException('DEPARTMAN_NAME_TYPE');
         }
 
-        $ad = trim((string) $body['ad']);
+        $ad = trim($body['ad']);
         if ($ad === '') {
             throw new \InvalidArgumentException('DEPARTMAN_NAME_REQUIRED');
         }
@@ -96,18 +97,27 @@ class ReferansController
             throw new \InvalidArgumentException('DEPARTMAN_NAME_TOO_LONG');
         }
 
+        // Erken kullanıcı dostu hata; asıl concurrency güvenliği UNIQUE(ad) + 1062.
         self::assertDepartmanAdUniqueOrThrow($pdo, $ad);
 
-        $stmt = $pdo->prepare(
-            "INSERT INTO departmanlar (ad, durum) VALUES (:ad, 'AKTIF')"
-        );
-        $stmt->execute(['ad' => $ad]);
+        try {
+            $stmt = $pdo->prepare(
+                "INSERT INTO departmanlar (ad, durum) VALUES (:ad, 'AKTIF')"
+            );
+            $stmt->execute(['ad' => $ad]);
+        } catch (PDOException $e) {
+            if (self::isDuplicateKeyException($e)) {
+                throw new \DomainException('DEPARTMAN_ZATEN_VAR');
+            }
+            throw $e;
+        }
+
         $id = (int) $pdo->lastInsertId();
         if ($id <= 0) {
             throw new \RuntimeException('INSERT_FAILED');
         }
 
-        // Beklenmeyen alanlar (ör. sube_id) insert edilmez — yalnız ad/durum.
+        // Allowlist: beklenmeyen alanlar (ör. sube_id) insert edilmez — yalnız ad/durum.
         return [
             'id' => $id,
             'ad' => $ad,
@@ -116,25 +126,13 @@ class ReferansController
 
     private static function assertDepartmanAdUniqueOrThrow(PDO $pdo, $ad)
     {
-        $normalized = self::normalizeDepartmanAdForCompare($ad);
-        $stmt = $pdo->query('SELECT id, ad FROM departmanlar');
-        $rows = $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
-        foreach ($rows as $row) {
-            if (self::normalizeDepartmanAdForCompare((string) $row['ad']) === $normalized) {
-                throw new \DomainException('DEPARTMAN_ZATEN_VAR');
-            }
+        // Collation (utf8mb4_unicode_ci) eşitliğini DB uygular; PHP normalize yok.
+        $stmt = $pdo->prepare('SELECT id FROM departmanlar WHERE ad = :ad LIMIT 1');
+        $stmt->execute(['ad' => $ad]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($row) {
+            throw new \DomainException('DEPARTMAN_ZATEN_VAR');
         }
-    }
-
-    private static function normalizeDepartmanAdForCompare($ad)
-    {
-        // utf8mb4_unicode_ci ile uyumlu ASCII/Unicode case-fold; TR locale I→ı asimetrisi yok.
-        $value = (string) $ad;
-        if (function_exists('mb_strtolower')) {
-            return mb_strtolower($value, 'UTF-8');
-        }
-
-        return strtolower($value);
     }
 
     private static function utf8Length($value)

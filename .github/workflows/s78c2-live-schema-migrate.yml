@@ -1,0 +1,248 @@
+name: S78-C2 Live Schema Migrate
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type MIGRATE_S78C2_026 to confirm production 026 migrate'
+        required: true
+        type: string
+
+jobs:
+  migrate:
+    name: Preflight + backup + apply 026 via temporary FTP ops
+    if: github.event.inputs.confirm == 'MIGRATE_S78C2_026'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Validate FTP secrets
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+          FTP_PORT: ${{ secrets.FTP_PORT }}
+        run: |
+          test -n "$FTP_SERVER" || (echo "FTP_SERVER missing" && exit 1)
+          test -n "$FTP_USERNAME" || (echo "FTP_USERNAME missing" && exit 1)
+          test -n "$FTP_PASSWORD" || (echo "FTP_PASSWORD missing" && exit 1)
+          test "${FTP_PORT}" = "21" || (echo "FTP_PORT must be 21" && exit 1)
+
+      - name: Install lftp
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lftp
+
+      - name: Prepare one-shot ops payload
+        id: prep
+        run: |
+          set -euo pipefail
+          TOKEN="$(openssl rand -hex 24)"
+          export TOKEN
+          echo "token=$TOKEN" >> "$GITHUB_OUTPUT"
+          mkdir -p /tmp/s78c2-ops /tmp/s78c2-artifacts
+          cp api/migrations/026_zimmetler.sql /tmp/s78c2-ops/
+          python3 - <<'PY'
+          from pathlib import Path
+          import os
+          src = Path('scripts/s78c2-live-migrate.php').read_text(encoding='utf-8')
+          token = os.environ['TOKEN']
+          if src.count('REPLACE_S78C2_MIGRATE_TOKEN') != 1:
+              raise SystemExit(f"expected exactly 1 REPLACE placeholder, got {src.count('REPLACE_S78C2_MIGRATE_TOKEN')}")
+          out = src.replace('REPLACE_S78C2_MIGRATE_TOKEN', token, 1)
+          Path('/tmp/s78c2-ops/_s78c2_migrate.php').write_text(out, encoding='utf-8', newline='\n')
+          print('token_injected_ok')
+          PY
+          if head -c 3 /tmp/s78c2-ops/_s78c2_migrate.php | grep -q $'\xEF\xBB\xBF'; then
+            echo "BOM detected" && exit 1
+          fi
+          grep -q "UNSET_S78C2_MIGRATE_TOKEN" /tmp/s78c2-ops/_s78c2_migrate.php
+          grep -q "$TOKEN" /tmp/s78c2-ops/_s78c2_migrate.php
+          sha256sum api/migrations/026_zimmetler.sql | tee /tmp/s78c2-artifacts/migration-sha256.txt
+          ls -la /tmp/s78c2-ops
+
+      - name: Upload ops files via FTP
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+          FTP_PORT: ${{ secrets.FTP_PORT }}
+        run: |
+          set -euo pipefail
+          upload() {
+            local use_ftps="$1"
+            lftp -u "${FTP_USERNAME}","${FTP_PASSWORD}" -p "${FTP_PORT}" "ftp://${FTP_SERVER}" -e "
+              set cmd:fail-exit true;
+              set net:max-retries 5;
+              set net:timeout 30;
+              set ssl:verify-certificate no;
+              set ftp:passive-mode on;
+              set ftp:ssl-allow ${use_ftps};
+              set ftp:ssl-force ${use_ftps};
+              set ftp:ssl-protect-data ${use_ftps};
+              cd .;
+              mkdir -p api/public;
+              lcd /tmp/s78c2-ops;
+              put -O api/public _s78c2_migrate.php;
+              put -O api/public 026_zimmetler.sql;
+              bye
+            "
+          }
+          upload true || upload false
+
+      - name: Identity + preflight
+        id: preflight
+        env:
+          TOKEN: ${{ steps.prep.outputs.token }}
+        run: |
+          set -euo pipefail
+          BASE="https://www.karmotors.com.tr/personelmedisa/api/public/_s78c2_migrate.php"
+          code=$(curl -sS -o /tmp/s78c2-artifacts/identity.json -w "%{http_code}" "${BASE}?token=${TOKEN}&action=identity" || true)
+          echo "identity_http=$code"
+          cat /tmp/s78c2-artifacts/identity.json
+          echo
+          test "$code" = "200"
+          python3 - <<'PY'
+          import json,sys
+          data=json.load(open('/tmp/s78c2-artifacts/identity.json'))
+          print(json.dumps(data, indent=2))
+          if not data.get('ok'):
+            sys.exit(1)
+          PY
+          code=$(curl -sS -o /tmp/s78c2-artifacts/preflight.json -w "%{http_code}" "${BASE}?token=${TOKEN}&action=preflight" || true)
+          echo "preflight_http=$code"
+          cat /tmp/s78c2-artifacts/preflight.json
+          echo
+          test "$code" = "200"
+          python3 - <<'PY'
+          import json,sys
+          data=json.load(open('/tmp/s78c2-artifacts/preflight.json'))
+          print(json.dumps({
+            'ok': data.get('ok'),
+            'code': data.get('code'),
+            'already_applied': data.get('already_applied'),
+            'counts': data.get('counts'),
+          }, indent=2))
+          if not data.get('ok'):
+            sys.exit(1)
+          open('/tmp/s78c2-artifacts/already_applied.txt','w').write('1' if data.get('already_applied') else '0')
+          PY
+
+      - name: Backup
+        id: backup
+        env:
+          TOKEN: ${{ steps.prep.outputs.token }}
+        run: |
+          set -euo pipefail
+          BASE="https://www.karmotors.com.tr/personelmedisa/api/public/_s78c2_migrate.php"
+          curl -fsS "${BASE}?token=${TOKEN}&action=backup" | tee /tmp/s78c2-artifacts/backup.json
+          python3 - <<'PY'
+          import json,sys
+          data=json.load(open('/tmp/s78c2-artifacts/backup.json'))
+          print(json.dumps({k:data.get(k) for k in ('ok','code','backup','counts')}, indent=2))
+          if not data.get('ok'):
+            sys.exit(1)
+          name=(data.get('backup') or {}).get('file') or 'karmotor_medisa_pre_026.sql'
+          open('/tmp/s78c2-artifacts/backup_filename.txt','w').write(name)
+          PY
+          FNAME="$(cat /tmp/s78c2-artifacts/backup_filename.txt)"
+          curl -fsS "${BASE}?token=${TOKEN}&action=download_backup" -o "/tmp/s78c2-artifacts/${FNAME}"
+          ls -la "/tmp/s78c2-artifacts/${FNAME}"
+          python3 - <<PY
+          from pathlib import Path
+          p=Path('/tmp/s78c2-artifacts')/Path(open('/tmp/s78c2-artifacts/backup_filename.txt').read().strip())
+          text=p.read_text(encoding='utf-8', errors='replace')
+          assert p.stat().st_size > 0
+          assert 'personeller' in text
+          assert 'CREATE TABLE' in text
+          assert 'INSERT INTO' in text
+          assert 'COMMIT' in text or 'Dump completed' in text
+          print('backup local verify OK bytes', p.stat().st_size)
+          PY
+
+      - name: Apply migration 026
+        id: migrate
+        env:
+          TOKEN: ${{ steps.prep.outputs.token }}
+        run: |
+          set -euo pipefail
+          BASE="https://www.karmotors.com.tr/personelmedisa/api/public/_s78c2_migrate.php"
+          curl -fsS "${BASE}?token=${TOKEN}&action=migrate" | tee /tmp/s78c2-artifacts/migrate.json
+          python3 - <<'PY'
+          import json,sys
+          data=json.load(open('/tmp/s78c2-artifacts/migrate.json'))
+          print(json.dumps(data, indent=2))
+          if not data.get('ok'):
+            sys.exit(1)
+          PY
+
+      - name: Postcheck
+        env:
+          TOKEN: ${{ steps.prep.outputs.token }}
+        run: |
+          set -euo pipefail
+          BASE="https://www.karmotors.com.tr/personelmedisa/api/public/_s78c2_migrate.php"
+          curl -fsS "${BASE}?token=${TOKEN}&action=postcheck" | tee /tmp/s78c2-artifacts/postcheck.json
+          python3 - <<'PY'
+          import json,sys
+          data=json.load(open('/tmp/s78c2-artifacts/postcheck.json'))
+          print(json.dumps(data, indent=2))
+          if not data.get('ok'):
+            sys.exit(1)
+          PY
+
+      - name: Delete ops files via FTP
+        if: always()
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+          FTP_PORT: ${{ secrets.FTP_PORT }}
+        run: |
+          set -euo pipefail
+          cleanup() {
+            local use_ftps="$1"
+            lftp -u "${FTP_USERNAME}","${FTP_PASSWORD}" -p "${FTP_PORT}" "ftp://${FTP_SERVER}" -e "
+              set cmd:fail-exit false;
+              set net:max-retries 3;
+              set ssl:verify-certificate no;
+              set ftp:passive-mode on;
+              set ftp:ssl-allow ${use_ftps};
+              set ftp:ssl-force ${use_ftps};
+              set ftp:ssl-protect-data ${use_ftps};
+              cd api/public;
+              rm -f _s78c2_migrate.php;
+              rm -f 026_zimmetler.sql;
+              rm -f s78c2_latest_backup_path.txt;
+              bye
+            "
+          }
+          cleanup true || cleanup false
+          for mode in true false; do
+            lftp -u "${FTP_USERNAME}","${FTP_PASSWORD}" -p "${FTP_PORT}" "ftp://${FTP_SERVER}" -e "
+              set cmd:fail-exit false;
+              set ssl:verify-certificate no;
+              set ftp:passive-mode on;
+              set ftp:ssl-allow ${mode};
+              set ftp:ssl-force ${mode};
+              set ftp:ssl-protect-data ${mode};
+              cd api/public;
+              glob rm karmotor_medisa_pre_026_*.sql;
+              bye
+            " || true
+          done
+          code=$(curl -sS -o /tmp/gone.txt -w "%{http_code}" "https://www.karmotors.com.tr/personelmedisa/api/public/_s78c2_migrate.php" || true)
+          echo "post-delete HTTP=$code"
+          test "$code" != "200"
+
+      - name: Upload migrate artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: s78c2-live-schema-migrate
+          path: /tmp/s78c2-artifacts
+          if-no-files-found: warn

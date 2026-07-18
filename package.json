@@ -10,6 +10,7 @@
     "pack:cpanel": "npm run build && node scripts/zip-dist.mjs",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
+    "check:api-parity": "node scripts/check-api-parity.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "e2e": "playwright test",

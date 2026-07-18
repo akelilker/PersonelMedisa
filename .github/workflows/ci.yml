@@ -74,6 +74,9 @@ jobs:
             exit(1);
           '
 
+      - name: Run API parity gate
+        run: npm run check:api-parity
+
       - name: Run type check
         run: npm run typecheck
 

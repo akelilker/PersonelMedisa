@@ -45,10 +45,22 @@ jobs:
           echo "token=$TOKEN" >> "$GITHUB_OUTPUT"
           mkdir -p /tmp/s78c3-ops /tmp/s78c3-artifacts
           cp api/migrations/025_departmanlar_ad_unique.sql /tmp/s78c3-ops/
-          sed "s/REPLACE_S78C3_MIGRATE_TOKEN/${TOKEN}/" scripts/s78c3-live-migrate.php > /tmp/s78c3-ops/_s78c3_migrate.php
+          # Replace only the assignment placeholder; leave UNSET_ sentinel intact.
+          python3 - <<PY
+from pathlib import Path
+src = Path('scripts/s78c3-live-migrate.php').read_text(encoding='utf-8')
+token = '''${TOKEN}'''
+if src.count("REPLACE_S78C3_MIGRATE_TOKEN") != 1:
+    raise SystemExit(f"expected exactly 1 REPLACE placeholder, got {src.count('REPLACE_S78C3_MIGRATE_TOKEN')}")
+out = src.replace("REPLACE_S78C3_MIGRATE_TOKEN", token, 1)
+Path('/tmp/s78c3-ops/_s78c3_migrate.php').write_text(out, encoding='utf-8', newline='\n')
+print('token_injected_ok')
+PY
           if head -c 3 /tmp/s78c3-ops/_s78c3_migrate.php | grep -q $'\xEF\xBB\xBF'; then
             echo "BOM detected" && exit 1
           fi
+          grep -q "UNSET_S78C3_MIGRATE_TOKEN" /tmp/s78c3-ops/_s78c3_migrate.php
+          grep -q "$TOKEN" /tmp/s78c3-ops/_s78c3_migrate.php
           sha256sum api/migrations/025_departmanlar_ad_unique.sql | tee /tmp/s78c3-artifacts/migration-sha256.txt
           ls -la /tmp/s78c3-ops
 
@@ -88,7 +100,12 @@ jobs:
         run: |
           set -euo pipefail
           BASE="https://www.karmotors.com.tr/personelmedisa/api/public/_s78c3_migrate.php"
-          curl -fsS "${BASE}?token=${TOKEN}&action=identity" | tee /tmp/s78c3-artifacts/identity.json
+          # Capture body even on non-2xx for diagnostics.
+          code=$(curl -sS -o /tmp/s78c3-artifacts/identity.json -w "%{http_code}" "${BASE}?token=${TOKEN}&action=identity" || true)
+          echo "identity_http=$code"
+          cat /tmp/s78c3-artifacts/identity.json
+          echo
+          test "$code" = "200"
           python3 - <<'PY'
           import json,sys
           data=json.load(open('/tmp/s78c3-artifacts/identity.json'))
@@ -96,7 +113,11 @@ jobs:
           if not data.get('ok'):
             sys.exit(1)
           PY
-          curl -fsS "${BASE}?token=${TOKEN}&action=preflight" | tee /tmp/s78c3-artifacts/preflight.json
+          code=$(curl -sS -o /tmp/s78c3-artifacts/preflight.json -w "%{http_code}" "${BASE}?token=${TOKEN}&action=preflight" || true)
+          echo "preflight_http=$code"
+          cat /tmp/s78c3-artifacts/preflight.json
+          echo
+          test "$code" = "200"
           python3 - <<'PY'
           import json,sys
           data=json.load(open('/tmp/s78c3-artifacts/preflight.json'))

@@ -11,7 +11,8 @@ header('X-Content-Type-Options: nosniff');
 
 $tokenExpected = 'REPLACE_S78C3_MIGRATE_TOKEN';
 $tokenProvided = isset($_GET['token']) ? (string) $_GET['token'] : '';
-if ($tokenExpected === 'REPLACE_S78C3_MIGRATE_TOKEN' || $tokenProvided === '' || !hash_equals($tokenExpected, $tokenProvided)) {
+// Sentinel must stay literally "UNSET_S78C3_MIGRATE_TOKEN" after token injection.
+if ($tokenExpected === 'UNSET_S78C3_MIGRATE_TOKEN' || $tokenProvided === '' || !hash_equals($tokenExpected, $tokenProvided)) {
     http_response_code(403);
     echo json_encode(['ok' => false, 'error' => 'FORBIDDEN'], JSON_UNESCAPED_UNICODE);
     exit;

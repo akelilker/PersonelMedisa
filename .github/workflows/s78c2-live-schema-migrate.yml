@@ -171,7 +171,10 @@ jobs:
         run: |
           set -euo pipefail
           BASE="https://www.karmotors.com.tr/personelmedisa/api/public/_s78c2_migrate.php"
-          curl -fsS "${BASE}?token=${TOKEN}&action=migrate" | tee /tmp/s78c2-artifacts/migrate.json
+          code=$(curl -sS -o /tmp/s78c2-artifacts/migrate.json -w "%{http_code}" "${BASE}?token=${TOKEN}&action=migrate" || true)
+          echo "migrate_http=$code"
+          cat /tmp/s78c2-artifacts/migrate.json
+          echo
           python3 - <<'PY'
           import json,sys
           data=json.load(open('/tmp/s78c2-artifacts/migrate.json'))
@@ -179,6 +182,7 @@ jobs:
           if not data.get('ok'):
             sys.exit(1)
           PY
+          test "$code" = "200"
 
       - name: Postcheck
         env:

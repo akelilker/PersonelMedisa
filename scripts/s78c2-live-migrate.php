@@ -544,8 +544,11 @@ if ($action === 'migrate') {
     if (preg_match('/\b(DROP\s+TABLE|DELETE\s+FROM|UPDATE\s+|TRUNCATE\s+)/i', $sql)) {
         s78c2_json(['ok' => false, 'error' => 'MIGRATION_UNSAFE_KEYWORDS', 'code' => 'S78_C2_R3_BLOCKED_MIGRATION_DRIFT'], 500);
     }
-    if (stripos($sql, 'CREATE TABLE zimmetler') === false || stripos($sql, 'IF NOT EXISTS') !== false) {
+    if (!preg_match('/CREATE\s+TABLE\s+zimmetler\b/i', $sql)) {
         s78c2_json(['ok' => false, 'error' => 'MIGRATION_CREATE_SHAPE', 'code' => 'S78_C2_R3_BLOCKED_MIGRATION_DRIFT'], 500);
+    }
+    if (preg_match('/CREATE\s+TABLE\s+IF\s+NOT\s+EXISTS\s+zimmetler\b/i', $sql)) {
+        s78c2_json(['ok' => false, 'error' => 'MIGRATION_IF_NOT_EXISTS', 'code' => 'S78_C2_R3_BLOCKED_MIGRATION_DRIFT'], 500);
     }
     if (stripos($sql, 'ON DELETE CASCADE') !== false || !preg_match('/ON DELETE RESTRICT/i', $sql)) {
         s78c2_json(['ok' => false, 'error' => 'MIGRATION_FK_SHAPE', 'code' => 'S78_C2_R3_BLOCKED_MIGRATION_DRIFT'], 500);

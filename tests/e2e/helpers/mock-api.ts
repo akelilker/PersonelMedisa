@@ -7820,7 +7820,12 @@ let personelBelgeKaydiIdCounter = 903;
       const items = Array.from(revizyonTalebiById.values())
         .filter((t) => !Number.isFinite(personelId) || t.personel_id === personelId)
         .filter((t) => !durum || t.durum === durum)
-        .sort((a, b) => (a.talep_zamani < b.talep_zamani ? 1 : -1));
+        .sort((a, b) => {
+          if (a.talep_zamani !== b.talep_zamani) {
+            return a.talep_zamani < b.talep_zamani ? 1 : -1;
+          }
+          return b.id - a.id;
+        });
       await fulfillJson(route, 200, okBody({ items }));
       return;
     }
@@ -7828,7 +7833,16 @@ let personelBelgeKaydiIdCounter = 903;
     if (path === "/api/haftalik-kapanis/revizyon-talepleri" && method === "POST") {
       if (await denyUnlessRolePermission(route, "revizyon.create")) return;
       const payload = (request.postDataJSON() ?? {}) as Record<string, unknown>;
-      if ("sube_id" in payload || "durum" in payload || "talep_eden_kullanici_id" in payload) {
+      if (
+        "sube_id" in payload ||
+        "durum" in payload ||
+        "talep_eden_kullanici_id" in payload ||
+        "kapanis_id" in payload ||
+        "snapshot_id" in payload ||
+        "correction_event_id" in payload ||
+        "acik_talep_slot" in payload ||
+        "id" in payload
+      ) {
         await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "server-owned alan kabul edilmez."));
         return;
       }

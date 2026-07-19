@@ -54,6 +54,7 @@ class RevizyonController
         $user = AuthMiddleware::authenticate($request, true);
         RolePermissions::assert($user, 'revizyon.view');
         self::assertSchemaReady();
+        self::rejectClientSubeQuery($request);
 
         $pdo = Connection::get();
         $filters = self::parseListFilters($request);
@@ -72,6 +73,7 @@ class RevizyonController
         $user = AuthMiddleware::authenticate($request, true);
         RolePermissions::assert($user, 'revizyon.view');
         self::assertSchemaReady();
+        self::rejectClientSubeQuery($request);
 
         $talepId = self::parsePositiveInt($id, 'id', true);
         $pdo = Connection::get();
@@ -89,6 +91,7 @@ class RevizyonController
         $user = AuthMiddleware::authenticate($request, true);
         RolePermissions::assert($user, 'revizyon.create');
         self::assertSchemaReady();
+        self::rejectClientSubeQuery($request);
 
         $body = $request->getJsonBody();
         if (!is_array($body)) {
@@ -120,8 +123,8 @@ class RevizyonController
 
         $bordroEtkiVarMi = self::optionalBool($body, 'bordro_etki_var_mi', false);
         $bordroEtkiNotu = self::optionalNullableString($body, 'bordro_etki_notu', 1000);
-        $oncekiDegerJson = self::encodeScalarJson($body['onceki_deger'] ?? null, 'onceki_deger');
-        $talepEdilenDegerJson = self::encodeScalarJson($body['talep_edilen_deger'] ?? null, 'talep_edilen_deger');
+        $oncekiDegerJson = self::encodeJsonValue($body['onceki_deger'] ?? null, 'onceki_deger');
+        $talepEdilenDegerJson = self::encodeJsonValue($body['talep_edilen_deger'] ?? null, 'talep_edilen_deger');
 
         $pdo = Connection::get();
         $personel = self::loadPersonel($pdo, $personelId);
@@ -214,13 +217,14 @@ class RevizyonController
         $user = AuthMiddleware::authenticate($request, true);
         RolePermissions::assert($user, 'revizyon.cancel');
         self::assertSchemaReady();
+        self::rejectClientSubeQuery($request);
 
         $talepId = self::parsePositiveInt($id, 'id', true);
         $body = $request->getJsonBody();
         if (!is_array($body)) {
             $body = [];
         }
-        self::rejectUnknownTransitionBody($body, false);
+        self::rejectUnknownTransitionBody($body, true);
 
         $pdo = Connection::get();
         $pdo->beginTransaction();
@@ -279,6 +283,7 @@ class RevizyonController
         $user = AuthMiddleware::authenticate($request, true);
         RolePermissions::assert($user, $permission);
         self::assertSchemaReady();
+        self::rejectClientSubeQuery($request);
 
         $talepId = self::parsePositiveInt($id, 'id', true);
         $body = $request->getJsonBody();
@@ -374,8 +379,8 @@ class RevizyonController
             'kaynak_tipi' => (string) $row['kaynak_tipi'],
             'kaynak_id' => (int) $row['kaynak_id'],
             'revizyon_tipi' => (string) $row['revizyon_tipi'],
-            'onceki_deger' => self::decodeScalarJson($row['onceki_deger'] ?? null),
-            'talep_edilen_deger' => self::decodeScalarJson($row['talep_edilen_deger'] ?? null),
+            'onceki_deger' => self::decodeJsonValue($row['onceki_deger'] ?? null),
+            'talep_edilen_deger' => self::decodeJsonValue($row['talep_edilen_deger'] ?? null),
             'gerekce' => (string) $row['gerekce'],
             'talep_eden_kullanici_id' => (int) $row['talep_eden_kullanici_id'],
             'talep_zamani' => self::toIsoDatetime((string) $row['talep_zamani']),
@@ -490,15 +495,18 @@ class RevizyonController
     /** @return array{personel_id:?int,durum:?string,hafta_baslangic:?string,hafta_bitis:?string} */
     private static function parseListFilters(Request $request): array
     {
+        $allowedKeys = ['personel_id', 'durum', 'hafta_baslangic', 'hafta_bitis'];
+        foreach (array_keys($_GET) as $key) {
+            $name = (string) $key;
+            if (!in_array($name, $allowedKeys, true)) {
+                self::validationError($name, 'Bilinmeyen query alani.');
+            }
+        }
+
         $personelId = $request->getQuery('personel_id');
         $durum = $request->getQuery('durum');
         $haftaBaslangic = $request->getQuery('hafta_baslangic');
         $haftaBitis = $request->getQuery('hafta_bitis');
-
-        if ($request->getQuery('sube_id') !== null && $request->getQuery('sube_id') !== '') {
-            // Active sube comes from header/scope helpers; query sube_id as filter field is rejected
-            // only when used as body-like domain override. Header-based SubeScope still applies.
-        }
 
         return [
             'personel_id' => $personelId !== null && $personelId !== ''
@@ -512,6 +520,14 @@ class RevizyonController
                 ? self::normalizeDate((string) $haftaBitis, 'hafta_bitis')
                 : null,
         ];
+    }
+
+    private static function rejectClientSubeQuery(Request $request): void
+    {
+        $subeId = $request->getQuery('sube_id');
+        if ($subeId !== null && $subeId !== '') {
+            self::validationError('sube_id', 'sube_id istemci tarafindan belirlenemez.');
+        }
     }
 
     private static function requireDurumFilter(string $durum): string
@@ -546,6 +562,11 @@ class RevizyonController
     {
         $rol = (string) ($user['rol'] ?? '');
         if ($rol === 'PATRON') {
+            JsonResponse::error(403, 'REVISION_SCOPE_DENIED', 'Revizyon talebi kapsam disi.');
+        }
+
+        $allowed = SubeScope::allowedSubeIds($user);
+        if (count($allowed) === 0 && $rol !== 'GENEL_YONETICI') {
             JsonResponse::error(403, 'REVISION_SCOPE_DENIED', 'Revizyon talebi kapsam disi.');
         }
 
@@ -594,6 +615,11 @@ class RevizyonController
     ): void {
         $rol = (string) ($user['rol'] ?? '');
         if ($rol === 'PATRON') {
+            JsonResponse::error(403, 'REVISION_SCOPE_DENIED', 'Revizyon talebi kapsam disi.');
+        }
+
+        $allowed = SubeScope::allowedSubeIds($user);
+        if (count($allowed) === 0 && $rol !== 'GENEL_YONETICI') {
             JsonResponse::error(403, 'REVISION_SCOPE_DENIED', 'Revizyon talebi kapsam disi.');
         }
 
@@ -705,6 +731,11 @@ class RevizyonController
         string $haftaBitis
     ): void {
         $tipi = strtoupper(trim($kaynakTipi));
+        $allowed = ['PUANTAJ', 'HAFTALIK_KAPANIS_SATIR', 'KAPANIS_SATIR', 'SERBEST_ZAMAN', 'SUREC'];
+        if (!in_array($tipi, $allowed, true)) {
+            self::validationError('kaynak_tipi', 'kaynak_tipi gecersiz.');
+        }
+
         if ($tipi === 'PUANTAJ') {
             $stmt = $pdo->prepare(
                 'SELECT id FROM gunluk_puantaj
@@ -988,38 +1019,42 @@ class RevizyonController
         return $fallback;
     }
 
-    private static function encodeScalarJson($value, string $field)
+    private static function encodeJsonValue($value, string $field)
     {
         if ($value === null) {
             return null;
         }
-        if (is_string($value) || is_int($value) || is_float($value) || is_bool($value)) {
-            return json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        if (is_resource($value)) {
+            self::validationError($field, $field . ' JSON seri hale getirilemez.');
         }
-        self::validationError($field, $field . ' skaler tip olmalidir.');
+        try {
+            return json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+        } catch (\JsonException $e) {
+            self::validationError($field, $field . ' gecerli JSON olmalidir.');
+        }
 
         return null;
     }
 
-    private static function decodeScalarJson($raw)
+    private static function decodeJsonValue($raw)
     {
         if ($raw === null) {
             return null;
         }
-        if (is_string($raw) || is_int($raw) || is_float($raw) || is_bool($raw)) {
-            if (is_string($raw)) {
-                $decoded = json_decode($raw, true);
-                if (json_last_error() === JSON_ERROR_NONE) {
-                    if (is_string($decoded) || is_int($decoded) || is_float($decoded) || is_bool($decoded) || $decoded === null) {
-                        return $decoded;
-                    }
-                }
-                return $raw;
-            }
+        if (is_array($raw) || is_int($raw) || is_float($raw) || is_bool($raw)) {
             return $raw;
         }
-
-        return null;
+        if (!is_string($raw)) {
+            return null;
+        }
+        if ($raw === '') {
+            return null;
+        }
+        try {
+            return json_decode($raw, true, 512, JSON_THROW_ON_ERROR);
+        } catch (\JsonException $e) {
+            throw new \RuntimeException('Revizyon JSON degeri bozulmus: ' . $e->getMessage(), 0, $e);
+        }
     }
 
     private static function parsePositiveInt($value, string $field, bool $required): int

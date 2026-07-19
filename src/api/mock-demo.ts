@@ -1946,6 +1946,30 @@ function createDemoRevizyonTalebi(
     return demoRevizyonError("INVALID_BODY", "Revizyon talebi payload gecersiz.");
   }
 
+  const serverOwnedFields = [
+    "id",
+    "sube_id",
+    "kapanis_id",
+    "snapshot_id",
+    "durum",
+    "talep_eden_kullanici_id",
+    "talep_eden_rol",
+    "talep_zamani",
+    "karar_veren_kullanici_id",
+    "karar_zamani",
+    "karar_aciklamasi",
+    "karar_notu",
+    "correction_event_id",
+    "created_at",
+    "updated_at",
+    "acik_talep_slot"
+  ] as const;
+  for (const field of serverOwnedFields) {
+    if (Object.prototype.hasOwnProperty.call(body, field)) {
+      return demoRevizyonError("VALIDATION_ERROR", `${field} istemci tarafindan belirlenemez.`);
+    }
+  }
+
   const personelDepartmanId = findDemoPersonelDepartmanId(personel_id);
   const scopeDecision = canCreateRevizyonForPersonel(actor, personel_id, personelDepartmanId, {
     bordro_etki_var_mi: body.bordro_etki_var_mi === true,
@@ -1984,21 +2008,13 @@ function createDemoRevizyonTalebi(
     kaynak_id,
     revizyon_tipi,
     onceki_deger:
-      typeof body.onceki_deger === "string" ||
-      typeof body.onceki_deger === "number" ||
-      typeof body.onceki_deger === "boolean"
-        ? body.onceki_deger
-        : body.onceki_deger === null
-          ? null
-          : null,
+      body.onceki_deger === undefined
+        ? null
+        : (body.onceki_deger as RevizyonTalebi["onceki_deger"]),
     talep_edilen_deger:
-      typeof body.talep_edilen_deger === "string" ||
-      typeof body.talep_edilen_deger === "number" ||
-      typeof body.talep_edilen_deger === "boolean"
-        ? body.talep_edilen_deger
-        : body.talep_edilen_deger === null
-          ? null
-          : null,
+      body.talep_edilen_deger === undefined
+        ? null
+        : (body.talep_edilen_deger as RevizyonTalebi["talep_edilen_deger"]),
     gerekce,
     talep_eden_kullanici_id: actor.userId,
     talep_zamani: new Date().toISOString(),

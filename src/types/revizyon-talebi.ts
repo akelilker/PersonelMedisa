@@ -28,6 +28,14 @@ export type RevizyonHataKodu =
   | "INVALID_BODY"
   | "NOT_FOUND";
 
+export type RevizyonJsonDeger =
+  | string
+  | number
+  | boolean
+  | null
+  | RevizyonJsonDeger[]
+  | { [key: string]: RevizyonJsonDeger };
+
 export type RevizyonTalebi = {
   id: number;
   personel_id: number;
@@ -37,8 +45,8 @@ export type RevizyonTalebi = {
   kaynak_tipi: string;
   kaynak_id: number;
   revizyon_tipi: RevizyonTipi;
-  onceki_deger: string | number | boolean | null;
-  talep_edilen_deger: string | number | boolean | null;
+  onceki_deger: RevizyonJsonDeger;
+  talep_edilen_deger: RevizyonJsonDeger;
   gerekce: string;
   talep_eden_kullanici_id: number;
   talep_zamani: string;
@@ -59,8 +67,8 @@ export type PostRevizyonTalebiPayload = {
   kaynak_tipi: string;
   kaynak_id: number | string;
   revizyon_tipi: RevizyonTipi;
-  onceki_deger: string | number | boolean | null;
-  talep_edilen_deger: string | number | boolean | null;
+  onceki_deger: RevizyonJsonDeger;
+  talep_edilen_deger: RevizyonJsonDeger;
   gerekce: string;
   bordro_etki_var_mi?: boolean;
   bordro_etki_notu?: string | null;

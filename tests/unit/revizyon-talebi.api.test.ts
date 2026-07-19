@@ -513,7 +513,7 @@ describe("revizyon-talebi mock integration", () => {
     expect(talep.bordro_etki_notu).toBeNull();
   });
 
-  it("create client talep_eden_kullanici_id gonderse ignore eder", () => {
+  it("create client talep_eden_kullanici_id gonderse VALIDATION_ERROR doner", () => {
     closeDemoHaftalikKapanis("2026-07-08", "2026-07-14", 3);
 
     const created = resolveDemoApiResponse("/haftalik-kapanis/revizyon-talepleri", {
@@ -533,9 +533,9 @@ describe("revizyon-talebi mock integration", () => {
         talep_eden_kullanici_id: 999
       })
     });
-    const talep = created?.data as { talep_eden_kullanici_id?: number };
 
-    expect(talep.talep_eden_kullanici_id).toBe(3);
+    expect(created?.data).toBeNull();
+    expect(created?.errors?.[0]?.code).toBe("VALIDATION_ERROR");
   });
 
   it("GENEL_YONETICI ONAY_BEKLIYOR talebi onaylayabilir", () => {

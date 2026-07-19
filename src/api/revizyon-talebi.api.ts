@@ -1,6 +1,7 @@
 import type { ApiResponse } from "../types/api";
 import type {
   PostRevizyonTalebiPayload,
+  RevizyonJsonDeger,
   RevizyonTalebi,
   RevizyonTalebiDurumu,
   RevizyonTalebiKararPayload,
@@ -55,13 +56,25 @@ function toBoolean(value: unknown, fallback = false): boolean {
   return fallback;
 }
 
-function toNullableScalar(value: unknown): string | number | boolean | null {
+function toJsonDeger(value: unknown): RevizyonJsonDeger {
   if (value === null || value === undefined) {
     return null;
   }
 
   if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
     return value;
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((item) => toJsonDeger(item));
+  }
+
+  if (typeof value === "object") {
+    const out: { [key: string]: RevizyonJsonDeger } = {};
+    for (const [key, nested] of Object.entries(value as Record<string, unknown>)) {
+      out[key] = toJsonDeger(nested);
+    }
+    return out;
   }
 
   return null;
@@ -180,8 +193,8 @@ export function normalizeRevizyonTalebi(raw: unknown): RevizyonTalebi {
     kaynak_tipi,
     kaynak_id,
     revizyon_tipi,
-    onceki_deger: toNullableScalar(record.onceki_deger),
-    talep_edilen_deger: toNullableScalar(record.talep_edilen_deger),
+    onceki_deger: toJsonDeger(record.onceki_deger),
+    talep_edilen_deger: toJsonDeger(record.talep_edilen_deger),
     gerekce,
     talep_eden_kullanici_id,
     talep_zamani,

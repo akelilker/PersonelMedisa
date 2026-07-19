@@ -311,6 +311,40 @@ function createRtParentTables(PDO $pdo): void
           CONSTRAINT fk_gp_personel FOREIGN KEY (personel_id) REFERENCES personeller (id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     ");
+    $pdo->exec("
+        CREATE TABLE surecler (
+          id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+          personel_id INT UNSIGNED NOT NULL,
+          surec_turu VARCHAR(64) NOT NULL,
+          baslangic_tarihi DATE NOT NULL,
+          state VARCHAR(32) NOT NULL DEFAULT 'AKTIF',
+          CONSTRAINT fk_surecler_personel FOREIGN KEY (personel_id) REFERENCES personeller (id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ");
+    $pdo->exec("
+        CREATE TABLE serbest_zaman_events (
+          id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+          personel_id INT UNSIGNED NOT NULL,
+          event_tipi VARCHAR(32) NOT NULL,
+          event_tarihi DATE NOT NULL,
+          dakika INT UNSIGNED NULL,
+          CONSTRAINT fk_sz_personel FOREIGN KEY (personel_id) REFERENCES personeller (id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ");
+    $pdo->exec("
+        CREATE TABLE puantaj_aylik_muhurleri (
+          id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+          sube_id INT UNSIGNED NOT NULL,
+          yil SMALLINT UNSIGNED NOT NULL,
+          ay TINYINT UNSIGNED NOT NULL,
+          donem CHAR(7) NOT NULL,
+          created_by INT UNSIGNED NOT NULL,
+          created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE KEY uq_pam_sube_donem (sube_id, yil, ay),
+          CONSTRAINT fk_pam_sube FOREIGN KEY (sube_id) REFERENCES subeler (id),
+          CONSTRAINT fk_pam_user FOREIGN KEY (created_by) REFERENCES users (id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ");
 }
 
 function seedRtFixtures(PDO $pdo): void
@@ -340,6 +374,7 @@ function seedRtFixtures(PDO $pdo): void
         VALUES (:personel_id, :tarih, 480)
     ');
     foreach ([
+        ['personel_id' => 10, 'tarih' => '2026-04-06'],
         ['personel_id' => 10, 'tarih' => '2026-04-07'],
         ['personel_id' => 10, 'tarih' => '2026-04-08'],
         ['personel_id' => 10, 'tarih' => '2026-04-09'],
@@ -347,9 +382,23 @@ function seedRtFixtures(PDO $pdo): void
         ['personel_id' => 10, 'tarih' => '2026-04-11'],
         ['personel_id' => 10, 'tarih' => '2026-04-12'],
         ['personel_id' => 10, 'tarih' => '2026-06-03'],
+        ['personel_id' => 20, 'tarih' => '2026-04-07'],
     ] as $row) {
         $stmt->execute($row);
     }
+
+    $pdo->exec("
+        INSERT INTO surecler (id, personel_id, surec_turu, baslangic_tarihi, state)
+        VALUES (501, 10, 'IZIN', '2026-04-07', 'AKTIF'), (502, 20, 'IZIN', '2026-04-07', 'AKTIF')
+    ");
+    $pdo->exec("
+        INSERT INTO serbest_zaman_events (id, personel_id, event_tipi, event_tarihi, dakika)
+        VALUES (601, 10, 'OLUSUM', '2026-04-07', 60), (602, 20, 'OLUSUM', '2026-04-07', 60)
+    ");
+    $pdo->exec("
+        INSERT INTO puantaj_aylik_muhurleri (id, sube_id, yil, ay, donem, created_by)
+        VALUES (1, 1, 2026, 4, '2026-04', 1)
+    ");
 }
 
 /**
@@ -456,15 +505,78 @@ function assertRtSchemaPostconditions(PDO $pdo): void
     foreach (['haftalik_kapanis_revizyon_talepleri', 'haftalik_kapanis_revizyon_talebi_gecmisi'] as $table) {
         $create = (string) $pdo->query('SHOW CREATE TABLE `' . $table . '`')->fetch(PDO::FETCH_ASSOC)['Create Table'];
         rtAssert(stripos($create, 'CREATE TABLE `' . $table . '`') !== false, 'SHOW CREATE TABLE ' . $table);
+        rtAssert(stripos($create, 'ENGINE=InnoDB') !== false, $table . ' engine InnoDB');
         rtAssert(stripos($create, 'utf8mb4') !== false, $table . ' charset utf8mb4');
         rtAssert(stripos($create, 'utf8mb4_unicode_ci') !== false, $table . ' collation unicode_ci');
         echo '[SCHEMA] ' . $table . ' CREATE: ' . preg_replace('/\s+/', ' ', $create) . PHP_EOL;
+
+        $cols = $pdo->query('SHOW FULL COLUMNS FROM `' . $table . '`')->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($cols as $col) {
+            echo '[SCHEMA] COL ' . $table . '.' . $col['Field']
+                . ' type=' . $col['Type']
+                . ' null=' . $col['Null']
+                . ' default=' . var_export($col['Default'], true)
+                . ' key=' . $col['Key']
+                . ' extra=' . ($col['Extra'] ?? '')
+                . PHP_EOL;
+        }
+        $indexes = $pdo->query('SHOW INDEX FROM `' . $table . '`')->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($indexes as $idx) {
+            echo '[SCHEMA] IDX ' . $table . '.' . $idx['Key_name']
+                . ' col=' . $idx['Column_name']
+                . ' unique=' . (((int) $idx['Non_unique'] === 0) ? '1' : '0')
+                . PHP_EOL;
+        }
     }
 
     $talepCreate = (string) $pdo->query('SHOW CREATE TABLE haftalik_kapanis_revizyon_talepleri')->fetch(PDO::FETCH_ASSOC)['Create Table'];
     rtAssert(stripos($talepCreate, 'acik_talep_slot') !== false, 'acik_talep_slot generated column present');
     rtAssert(stripos($talepCreate, 'uq_hkrt_acik_kaynak') !== false, 'uq_hkrt_acik_kaynak present');
     rtAssert(stripos($talepCreate, 'GENERATED') !== false, 'acik_talep_slot is GENERATED');
+    rtAssert(
+        preg_match(
+            "/acik_talep_slot[\\s\\S]*?case\\s+when\\s+`?durum`?\\s+in\\s*\\(\\s*'TASLAK'\\s*,\\s*'ONAY_BEKLIYOR'\\s*\\)\\s+then\\s+1\\s+else\\s+NULL\\s+end/i",
+            $talepCreate
+        ) === 1,
+        'acik_talep_slot exact CASE WHEN expression'
+    );
+
+    $talepCols = array_column(
+        $pdo->query('SHOW FULL COLUMNS FROM haftalik_kapanis_revizyon_talepleri')->fetchAll(PDO::FETCH_ASSOC),
+        'Field'
+    );
+    foreach ([
+        'id', 'personel_id', 'sube_id', 'kapanis_id', 'snapshot_id', 'hafta_baslangic', 'hafta_bitis',
+        'etkilenen_tarih', 'kaynak_tipi', 'kaynak_id', 'revizyon_tipi', 'onceki_deger', 'talep_edilen_deger',
+        'gerekce', 'durum', 'talep_eden_kullanici_id', 'talep_eden_rol', 'talep_zamani',
+        'karar_veren_kullanici_id', 'karar_zamani', 'karar_aciklamasi', 'correction_event_id',
+        'acik_talep_slot', 'created_at', 'updated_at',
+    ] as $col) {
+        rtAssert(in_array($col, $talepCols, true), 'talep column ' . $col);
+    }
+    rtAssert(!in_array('karar_notu', $talepCols, true), 'talep has no karar_notu DB column');
+
+    $gecmisCols = array_column(
+        $pdo->query('SHOW FULL COLUMNS FROM haftalik_kapanis_revizyon_talebi_gecmisi')->fetchAll(PDO::FETCH_ASSOC),
+        'Field'
+    );
+    foreach ([
+        'id', 'revizyon_talebi_id', 'onceki_durum', 'yeni_durum', 'aksiyon', 'aciklama',
+        'islem_yapan_kullanici_id', 'islem_zamani',
+    ] as $col) {
+        rtAssert(in_array($col, $gecmisCols, true), 'gecmis column ' . $col);
+    }
+
+    $indexNames = array_values(array_unique(array_column(
+        $pdo->query('SHOW INDEX FROM haftalik_kapanis_revizyon_talepleri')->fetchAll(PDO::FETCH_ASSOC),
+        'Key_name'
+    )));
+    foreach ([
+        'PRIMARY', 'uq_hkrt_acik_kaynak', 'idx_hkrt_personel_talep', 'idx_hkrt_sube_hafta',
+        'idx_hkrt_durum', 'idx_hkrt_kapanis', 'idx_hkrt_snapshot',
+    ] as $idx) {
+        rtAssert(in_array($idx, $indexNames, true), 'talep index ' . $idx);
+    }
 
     $fks = $pdo->query("
         SELECT CONSTRAINT_NAME, TABLE_NAME, REFERENCED_TABLE_NAME, DELETE_RULE, UPDATE_RULE
@@ -473,15 +585,28 @@ function assertRtSchemaPostconditions(PDO $pdo): void
           AND TABLE_NAME IN ('haftalik_kapanis_revizyon_talepleri', 'haftalik_kapanis_revizyon_talebi_gecmisi')
         ORDER BY TABLE_NAME, CONSTRAINT_NAME
     ")->fetchAll(PDO::FETCH_ASSOC);
-    rtAssert(count($fks) >= 7, 'revizyon FK count >= 7');
+    rtAssert(count($fks) >= 8, 'revizyon FK count >= 8');
     foreach ($fks as $fk) {
         rtAssert(
             in_array((string) $fk['DELETE_RULE'], ['RESTRICT', 'NO ACTION'], true),
             'FK ' . $fk['CONSTRAINT_NAME'] . ' DELETE_RULE RESTRICT/NO ACTION'
         );
+        rtAssert(
+            in_array((string) $fk['UPDATE_RULE'], ['RESTRICT', 'NO ACTION'], true),
+            'FK ' . $fk['CONSTRAINT_NAME'] . ' UPDATE_RULE RESTRICT/NO ACTION'
+        );
         echo '[SCHEMA] FK ' . $fk['CONSTRAINT_NAME'] . ' → ' . $fk['REFERENCED_TABLE_NAME']
             . ' DELETE=' . $fk['DELETE_RULE'] . ' UPDATE=' . $fk['UPDATE_RULE'] . PHP_EOL;
     }
+
+    $corrFk = $pdo->query("
+        SELECT COUNT(*) FROM information_schema.KEY_COLUMN_USAGE
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'haftalik_kapanis_revizyon_talepleri'
+          AND COLUMN_NAME = 'correction_event_id'
+          AND REFERENCED_TABLE_NAME IS NOT NULL
+    ")->fetchColumn();
+    rtAssert((int) $corrFk === 0, 'correction_event_id has no FK');
 }
 
 function bootstrapRtSchema(PDO $pdo): string
@@ -837,5 +962,482 @@ $redOk = invokeRtHttp($pdo, $gy, 'POST', '/haftalik-kapanis/revizyon-talepleri/'
 rtAssert($redOk['status'] === 200, 'red with karar_notu → 200');
 rtAssert(($redOk['payload']['data']['durum'] ?? '') === 'REDDEDILDI', 'red → REDDEDILDI');
 rtAssert(rtGecmisCount($pdo, $redSetupId, 'RED') === 1, 'gecmis RED on red');
+
+$redRetry = invokeRtHttp($pdo, $gy, 'POST', '/haftalik-kapanis/revizyon-talepleri/' . $redSetupId . '/red', [
+    'karar_notu' => 'Tekrar red',
+], $subeHeader);
+rtAssert($redRetry['status'] === 409, 'red retry → 409');
+rtAssert(($redRetry['payload']['errors'][0]['code'] ?? '') === 'STATE_CONFLICT', 'red retry STATE_CONFLICT');
+rtAssert(rtGecmisCount($pdo, $redSetupId, 'RED') === 1, 'red retry audit artmaz');
+
+$iptalReddedildi = invokeRtHttp($pdo, $gy, 'POST', '/haftalik-kapanis/revizyon-talepleri/' . $redSetupId . '/iptal', [], $subeHeader);
+rtAssert($iptalReddedildi['status'] === 409, 'iptal REDDEDILDI → 409');
+rtAssert(($iptalReddedildi['payload']['errors'][0]['code'] ?? '') === 'STATE_CONFLICT', 'iptal REDDEDILDI STATE_CONFLICT');
+
+// --- Terminal recreate → 201 ---
+$recreateOnay = invokeRtHttp($pdo, $ba, 'POST', '/haftalik-kapanis/revizyon-talepleri', rtCreateBody(
+    10,
+    $puantaj08,
+    '2026-04-08',
+    '2026-04-06',
+    '2026-04-12'
+), $subeHeader);
+rtAssert($recreateOnay['status'] === 201, 'terminal ONAYLANDI sonrası recreate → 201');
+
+$recreateRed = invokeRtHttp($pdo, $ba, 'POST', '/haftalik-kapanis/revizyon-talepleri', rtCreateBody(
+    10,
+    $puantaj09,
+    '2026-04-09',
+    '2026-04-06',
+    '2026-04-12'
+), $subeHeader);
+rtAssert($recreateRed['status'] === 201, 'terminal REDDEDILDI sonrası recreate → 201');
+$recreateRedId = (int) ($recreateRed['payload']['data']['id'] ?? 0);
+$recreateIptal = invokeRtHttp($pdo, $ba, 'POST', '/haftalik-kapanis/revizyon-talepleri/' . $recreateRedId . '/iptal', [], $subeHeader);
+rtAssert($recreateIptal['status'] === 200, 'recreate iptal setup → 200');
+$recreateAfterIptal = invokeRtHttp($pdo, $ba, 'POST', '/haftalik-kapanis/revizyon-talepleri', rtCreateBody(
+    10,
+    $puantaj09,
+    '2026-04-09',
+    '2026-04-06',
+    '2026-04-12'
+), $subeHeader);
+rtAssert($recreateAfterIptal['status'] === 201, 'terminal IPTAL sonrası recreate → 201');
+
+// --- Permission matrix spot checks ---
+$puantaj06 = rtPuantajId($pdo, 10, '2026-04-06');
+foreach ([$bolum, $muhasebe, $ba] as $roleUser) {
+    $label = (string) $roleUser['rol'];
+    $permView = invokeRtHttp($pdo, $roleUser, 'GET', '/haftalik-kapanis/revizyon-talepleri', [], $subeHeader);
+    rtAssert($permView['status'] === 200, $label . ' view → 200');
+}
+$bolumCreate = invokeRtHttp($pdo, $bolum, 'POST', '/haftalik-kapanis/revizyon-talepleri', array_merge(
+    rtCreateBody(10, $puantaj06, '2026-04-06', '2026-04-06', '2026-04-12'),
+    ['bordro_etki_var_mi' => true, 'bordro_etki_notu' => 'bordro']
+), $subeHeader);
+rtAssert($bolumCreate['status'] === 201, 'BOLUM create → 201');
+$bolumCreateId = (int) ($bolumCreate['payload']['data']['id'] ?? 0);
+$bolumGonder = invokeRtHttp($pdo, $bolum, 'POST', '/haftalik-kapanis/revizyon-talepleri/' . $bolumCreateId . '/gonder', [], $subeHeader);
+rtAssert($bolumGonder['status'] === 200, 'BOLUM gonder own → 200');
+$bolumOnay = invokeRtHttp($pdo, $bolum, 'POST', '/haftalik-kapanis/revizyon-talepleri/' . $bolumCreateId . '/onay', [], $subeHeader);
+rtAssert($bolumOnay['status'] === 403, 'BOLUM onay → 403');
+$bolumRed = invokeRtHttp($pdo, $bolum, 'POST', '/haftalik-kapanis/revizyon-talepleri/' . $bolumCreateId . '/red', [
+    'karar_notu' => 'x',
+], $subeHeader);
+rtAssert($bolumRed['status'] === 403, 'BOLUM red → 403');
+$gyCancelBolum = invokeRtHttp($pdo, $gy, 'POST', '/haftalik-kapanis/revizyon-talepleri/' . $bolumCreateId . '/iptal', [], $subeHeader);
+rtAssert($gyCancelBolum['status'] === 200, 'GY iptal başkasının ONAY_BEKLIYOR → 200');
+
+$muhCreate = invokeRtHttp($pdo, $muhasebe, 'POST', '/haftalik-kapanis/revizyon-talepleri', array_merge(
+    rtCreateBody(10, $puantaj06, '2026-04-06', '2026-04-06', '2026-04-12'),
+    ['bordro_etki_var_mi' => true, 'bordro_etki_notu' => 'muhasebe notu']
+), $subeHeader);
+rtAssert($muhCreate['status'] === 201, 'MUHASEBE create → 201');
+$muhCreateId = (int) ($muhCreate['payload']['data']['id'] ?? 0);
+$muhGonder = invokeRtHttp($pdo, $muhasebe, 'POST', '/haftalik-kapanis/revizyon-talepleri/' . $muhCreateId . '/gonder', [], $subeHeader);
+rtAssert($muhGonder['status'] === 200, 'MUHASEBE gonder → 200');
+$muhIptal = invokeRtHttp($pdo, $muhasebe, 'POST', '/haftalik-kapanis/revizyon-talepleri/' . $muhCreateId . '/iptal', [], $subeHeader);
+rtAssert($muhIptal['status'] === 200, 'MUHASEBE iptal own → 200');
+
+foreach (['GET' => '/haftalik-kapanis/revizyon-talepleri', 'POST' => '/haftalik-kapanis/revizyon-talepleri'] as $method => $path) {
+    $patronAct = invokeRtHttp($pdo, $patron, $method, $path, $method === 'POST' ? rtCreateBody(
+        10,
+        $puantaj06,
+        '2026-04-06',
+        '2026-04-06',
+        '2026-04-12'
+    ) : [], $subeHeader);
+    rtAssert($patronAct['status'] === 403, 'PATRON ' . $method . ' → 403');
+}
+$unauthCreate = invokeRtHttp($pdo, null, 'POST', '/haftalik-kapanis/revizyon-talepleri', rtCreateBody(
+    10,
+    $puantaj06,
+    '2026-04-06',
+    '2026-04-06',
+    '2026-04-12'
+), $subeHeader);
+rtAssert($unauthCreate['status'] === 401, 'unauthenticated create → 401');
+
+// --- Ownership GY bypass + non-owner iptal ---
+$ownCreate = invokeRtHttp($pdo, $ba, 'POST', '/haftalik-kapanis/revizyon-talepleri', rtCreateBody(
+    10,
+    $puantaj06,
+    '2026-04-06',
+    '2026-04-06',
+    '2026-04-12'
+), $subeHeader);
+rtAssert($ownCreate['status'] === 201, 'ownership setup create → 201');
+$ownId = (int) ($ownCreate['payload']['data']['id'] ?? 0);
+$nonOwnerIptal = invokeRtHttp($pdo, $bolum, 'POST', '/haftalik-kapanis/revizyon-talepleri/' . $ownId . '/iptal', [], $subeHeader);
+rtAssert($nonOwnerIptal['status'] === 403, 'non-owner iptal → 403');
+rtAssert(($nonOwnerIptal['payload']['errors'][0]['code'] ?? '') === 'REVISION_OWNER_DENIED', 'non-owner iptal REVISION_OWNER_DENIED');
+$gyGonderOther = invokeRtHttp($pdo, $gy, 'POST', '/haftalik-kapanis/revizyon-talepleri/' . $ownId . '/gonder', [], $subeHeader);
+rtAssert($gyGonderOther['status'] === 200, 'GY başkasının gonder → 200');
+$gyIptalOther = invokeRtHttp($pdo, $gy, 'POST', '/haftalik-kapanis/revizyon-talepleri/' . $ownId . '/iptal', [], $subeHeader);
+rtAssert($gyIptalOther['status'] === 200, 'GY başkasının iptal → 200');
+
+// --- Scope matrix ---
+$baEmpty = ['id' => 2, 'rol' => 'BIRIM_AMIRI', 'sube_ids' => []];
+$emptyList = invokeRtHttp($pdo, $baEmpty, 'GET', '/haftalik-kapanis/revizyon-talepleri', [], $subeHeader);
+rtAssert($emptyList['status'] === 200, 'allowedSubeIds=[] list → 200');
+rtAssert(is_array($emptyList['payload']['data']['items'] ?? null)
+    && count($emptyList['payload']['data']['items']) === 0, 'allowedSubeIds=[] global erişim yok');
+$emptyCreate = invokeRtHttp($pdo, $baEmpty, 'POST', '/haftalik-kapanis/revizyon-talepleri', rtCreateBody(
+    10,
+    $puantaj06,
+    '2026-04-06',
+    '2026-04-06',
+    '2026-04-12'
+), $subeHeader);
+rtAssert($emptyCreate['status'] === 403, 'allowedSubeIds=[] create → 403');
+
+$outOfScopeCreate = invokeRtHttp($pdo, $ba, 'POST', '/haftalik-kapanis/revizyon-talepleri', rtCreateBody(
+    20,
+    rtPuantajId($pdo, 20, '2026-04-07'),
+    '2026-04-07',
+    '2026-04-06',
+    '2026-04-12'
+), $subeHeader);
+rtAssert($outOfScopeCreate['status'] === 403, 'scope dışı create → 403');
+
+$gySeedOtherSube = seedRtKapanis($pdo, 2, 20, '2026-04-06', '2026-04-12');
+$gyOtherCreate = invokeRtHttp($pdo, $gy, 'POST', '/haftalik-kapanis/revizyon-talepleri', rtCreateBody(
+    20,
+    rtPuantajId($pdo, 20, '2026-04-07'),
+    '2026-04-07',
+    '2026-04-06',
+    '2026-04-12'
+), ['x-active-sube-id' => '2']);
+rtAssert($gyOtherCreate['status'] === 201, 'GY global create other sube → 201');
+$gyOtherId = (int) ($gyOtherCreate['payload']['data']['id'] ?? 0);
+$baList = invokeRtHttp($pdo, $ba, 'GET', '/haftalik-kapanis/revizyon-talepleri', [], $subeHeader);
+$baListIds = array_map(static function ($item) {
+    return (int) ($item['id'] ?? 0);
+}, $baList['payload']['data']['items'] ?? []);
+rtAssert(!in_array($gyOtherId, $baListIds, true), 'scope dışı satır listeden hariç');
+$baDetailOut = invokeRtHttp($pdo, $ba, 'GET', '/haftalik-kapanis/revizyon-talepleri/' . $gyOtherId, [], $subeHeader);
+rtAssert($baDetailOut['status'] === 403, 'scope dışı detail → 403');
+
+$querySube = invokeRtHttp($pdo, $gy, 'GET', '/haftalik-kapanis/revizyon-talepleri', [], $subeHeader, ['sube_id' => '1']);
+rtAssert($querySube['status'] === 422, 'query sube_id → 422');
+rtAssert(($querySube['payload']['errors'][0]['code'] ?? '') === 'VALIDATION_ERROR', 'query sube_id VALIDATION_ERROR');
+$unknownQuery = invokeRtHttp($pdo, $gy, 'GET', '/haftalik-kapanis/revizyon-talepleri', [], $subeHeader, ['foo' => '1']);
+rtAssert($unknownQuery['status'] === 422, 'unknown query → 422');
+
+// --- GET list no-write + sort + detail leak ---
+$beforeTalep = (int) $pdo->query('SELECT COUNT(*) FROM haftalik_kapanis_revizyon_talepleri')->fetchColumn();
+$beforeGecmis = (int) $pdo->query('SELECT COUNT(*) FROM haftalik_kapanis_revizyon_talebi_gecmisi')->fetchColumn();
+$sortList = invokeRtHttp($pdo, $gy, 'GET', '/haftalik-kapanis/revizyon-talepleri', [], $subeHeader);
+rtAssert($sortList['status'] === 200, 'GET list no-write → 200');
+$afterTalep = (int) $pdo->query('SELECT COUNT(*) FROM haftalik_kapanis_revizyon_talepleri')->fetchColumn();
+$afterGecmis = (int) $pdo->query('SELECT COUNT(*) FROM haftalik_kapanis_revizyon_talebi_gecmisi')->fetchColumn();
+rtAssert($beforeTalep === $afterTalep && $beforeGecmis === $afterGecmis, 'GET list no-write counts');
+$items = $sortList['payload']['data']['items'] ?? [];
+rtAssert(is_array($items) && count($items) >= 2, 'GET list has sortable items');
+for ($i = 1; $i < count($items); $i++) {
+    $prev = (string) ($items[$i - 1]['talep_zamani'] ?? '');
+    $cur = (string) ($items[$i]['talep_zamani'] ?? '');
+    $prevId = (int) ($items[$i - 1]['id'] ?? 0);
+    $curId = (int) ($items[$i]['id'] ?? 0);
+    rtAssert($prev > $cur || ($prev === $cur && $prevId >= $curId), 'list sort talep_zamani DESC, id DESC');
+}
+$detailKeys = array_keys($detail200['payload']['data'] ?? []);
+rtAssert(!in_array('acik_talep_slot', $detailKeys, true), 'detail no acik_talep_slot leak');
+
+$olusturRow = $pdo->query(
+    'SELECT onceki_durum, yeni_durum, aksiyon FROM haftalik_kapanis_revizyon_talebi_gecmisi
+     WHERE revizyon_talebi_id = ' . (int) $talepId . ' AND aksiyon = \'OLUSTUR\' LIMIT 1'
+)->fetch(PDO::FETCH_ASSOC);
+rtAssert($olusturRow !== false && $olusturRow['onceki_durum'] === null, 'OLUSTUR onceki_durum null');
+rtAssert(($olusturRow['yeni_durum'] ?? '') === 'TASLAK', 'OLUSTUR yeni_durum TASLAK');
+
+// --- Red karar_notu variants ---
+$redVarCreate = invokeRtHttp($pdo, $ba, 'POST', '/haftalik-kapanis/revizyon-talepleri', rtCreateBody(
+    10,
+    $puantaj06,
+    '2026-04-06',
+    '2026-04-06',
+    '2026-04-12'
+), $subeHeader);
+rtAssert($redVarCreate['status'] === 201, 'red variants setup → 201');
+$redVarId = (int) ($redVarCreate['payload']['data']['id'] ?? 0);
+invokeRtHttp($pdo, $ba, 'POST', '/haftalik-kapanis/revizyon-talepleri/' . $redVarId . '/gonder', [], $subeHeader);
+$redNull = invokeRtHttp($pdo, $gy, 'POST', '/haftalik-kapanis/revizyon-talepleri/' . $redVarId . '/red', [
+    'karar_notu' => null,
+], $subeHeader);
+rtAssert($redNull['status'] === 422, 'red null karar_notu → 422');
+$redWs = invokeRtHttp($pdo, $gy, 'POST', '/haftalik-kapanis/revizyon-talepleri/' . $redVarId . '/red', [
+    'karar_notu' => '   ',
+], $subeHeader);
+rtAssert($redWs['status'] === 422, 'red whitespace karar_notu → 422');
+
+// --- JSON normalization ---
+$jsonCreate = invokeRtHttp($pdo, $ba, 'POST', '/haftalik-kapanis/revizyon-talepleri', array_merge(
+    rtCreateBody(10, $puantaj06, '2026-04-06', '2026-04-06', '2026-04-12'),
+    [
+        'onceki_deger' => ['giris' => '08:00', 'flags' => [true, 1]],
+        'talep_edilen_deger' => ['giris' => '09:00', 'flags' => [false, 2]],
+    ]
+), $subeHeader);
+// may conflict if open slot still held by redVar — cancel first
+if ($jsonCreate['status'] !== 201) {
+    invokeRtHttp($pdo, $gy, 'POST', '/haftalik-kapanis/revizyon-talepleri/' . $redVarId . '/iptal', [], $subeHeader);
+    $jsonCreate = invokeRtHttp($pdo, $ba, 'POST', '/haftalik-kapanis/revizyon-talepleri', array_merge(
+        rtCreateBody(10, $puantaj06, '2026-04-06', '2026-04-06', '2026-04-12'),
+        [
+            'onceki_deger' => ['giris' => '08:00', 'flags' => [true, 1]],
+            'talep_edilen_deger' => ['giris' => '09:00', 'flags' => [false, 2]],
+        ]
+    ), $subeHeader);
+}
+rtAssert($jsonCreate['status'] === 201, 'JSON object/array create → 201');
+$jsonOnceki = $jsonCreate['payload']['data']['onceki_deger'] ?? null;
+$jsonTalep = $jsonCreate['payload']['data']['talep_edilen_deger'] ?? null;
+rtAssert(is_array($jsonOnceki) && ($jsonOnceki['giris'] ?? '') === '08:00', 'JSON onceki object roundtrip');
+rtAssert(is_array($jsonTalep) && is_array($jsonTalep['flags'] ?? null), 'JSON talep array roundtrip');
+$jsonId = (int) ($jsonCreate['payload']['data']['id'] ?? 0);
+invokeRtHttp($pdo, $ba, 'POST', '/haftalik-kapanis/revizyon-talepleri/' . $jsonId . '/iptal', [], $subeHeader);
+
+$jsonScalar = invokeRtHttp($pdo, $ba, 'POST', '/haftalik-kapanis/revizyon-talepleri', array_merge(
+    rtCreateBody(10, $puantaj06, '2026-04-06', '2026-04-06', '2026-04-12'),
+    ['onceki_deger' => '08:00', 'talep_edilen_deger' => 42]
+), $subeHeader);
+rtAssert($jsonScalar['status'] === 201, 'JSON scalar create → 201');
+rtAssert(($jsonScalar['payload']['data']['onceki_deger'] ?? null) === '08:00', 'JSON string roundtrip');
+rtAssert(($jsonScalar['payload']['data']['talep_edilen_deger'] ?? null) === 42, 'JSON number roundtrip');
+$jsonScalarId = (int) ($jsonScalar['payload']['data']['id'] ?? 0);
+invokeRtHttp($pdo, $ba, 'POST', '/haftalik-kapanis/revizyon-talepleri/' . $jsonScalarId . '/iptal', [], $subeHeader);
+
+// --- Server-owned full list sample ---
+foreach (['id', 'kapanis_id', 'snapshot_id', 'correction_event_id', 'acik_talep_slot', 'talep_zamani'] as $field) {
+    $owned = invokeRtHttp($pdo, $ba, 'POST', '/haftalik-kapanis/revizyon-talepleri', array_merge(
+        rtCreateBody(10, $puantaj06, '2026-04-06', '2026-04-06', '2026-04-12'),
+        [$field => 1]
+    ), $subeHeader);
+    rtAssert($owned['status'] === 422, 'server-owned ' . $field . ' → 422');
+}
+
+// --- Source validation ---
+$invalidTip = invokeRtHttp($pdo, $ba, 'POST', '/haftalik-kapanis/revizyon-talepleri', array_merge(
+    rtCreateBody(10, $puantaj06, '2026-04-06', '2026-04-06', '2026-04-12'),
+    ['kaynak_tipi' => 'BILINMEYEN']
+), $subeHeader);
+rtAssert($invalidTip['status'] === 422, 'invalid kaynak_tipi → 422');
+
+$snapshotId = (int) $pdo->query(
+    'SELECT id FROM haftalik_kapanis_satirlari WHERE personel_id = 10 ORDER BY id ASC LIMIT 1'
+)->fetchColumn();
+$kapanisSatirOk = invokeRtHttp($pdo, $ba, 'POST', '/haftalik-kapanis/revizyon-talepleri', [
+    'personel_id' => 10,
+    'hafta_baslangic' => '2026-04-06',
+    'hafta_bitis' => '2026-04-12',
+    'etkilenen_tarih' => '2026-04-07',
+    'kaynak_tipi' => 'HAFTALIK_KAPANIS_SATIR',
+    'kaynak_id' => $snapshotId,
+    'revizyon_tipi' => 'KAPANIS_HESAP_REVIZYONU',
+    'gerekce' => 'kapanis satir revizyon',
+], $subeHeader);
+rtAssert($kapanisSatirOk['status'] === 201, 'HAFTALIK_KAPANIS_SATIR create → 201');
+$kapanisSatirId = (int) ($kapanisSatirOk['payload']['data']['id'] ?? 0);
+invokeRtHttp($pdo, $ba, 'POST', '/haftalik-kapanis/revizyon-talepleri/' . $kapanisSatirId . '/iptal', [], $subeHeader);
+
+$surecOk = invokeRtHttp($pdo, $ba, 'POST', '/haftalik-kapanis/revizyon-talepleri', [
+    'personel_id' => 10,
+    'hafta_baslangic' => '2026-04-06',
+    'hafta_bitis' => '2026-04-12',
+    'etkilenen_tarih' => '2026-04-07',
+    'kaynak_tipi' => 'SUREC',
+    'kaynak_id' => 501,
+    'revizyon_tipi' => 'SUREC_GEC_GIRIS',
+    'gerekce' => 'surec revizyon',
+], $subeHeader);
+rtAssert($surecOk['status'] === 201, 'SUREC create → 201');
+$surecId = (int) ($surecOk['payload']['data']['id'] ?? 0);
+invokeRtHttp($pdo, $ba, 'POST', '/haftalik-kapanis/revizyon-talepleri/' . $surecId . '/iptal', [], $subeHeader);
+
+$surecWrongPersonel = invokeRtHttp($pdo, $ba, 'POST', '/haftalik-kapanis/revizyon-talepleri', [
+    'personel_id' => 10,
+    'hafta_baslangic' => '2026-04-06',
+    'hafta_bitis' => '2026-04-12',
+    'etkilenen_tarih' => '2026-04-07',
+    'kaynak_tipi' => 'SUREC',
+    'kaynak_id' => 502,
+    'revizyon_tipi' => 'SUREC_GEC_GIRIS',
+    'gerekce' => 'surec wrong personel',
+], $subeHeader);
+rtAssert($surecWrongPersonel['status'] === 404, 'SUREC wrong personel → 404');
+rtAssert(($surecWrongPersonel['payload']['errors'][0]['code'] ?? '') === 'TARGET_NOT_FOUND', 'SUREC wrong personel TARGET_NOT_FOUND');
+
+$szOk = invokeRtHttp($pdo, $ba, 'POST', '/haftalik-kapanis/revizyon-talepleri', [
+    'personel_id' => 10,
+    'hafta_baslangic' => '2026-04-06',
+    'hafta_bitis' => '2026-04-12',
+    'etkilenen_tarih' => '2026-04-07',
+    'kaynak_tipi' => 'SERBEST_ZAMAN',
+    'kaynak_id' => 601,
+    'revizyon_tipi' => 'SERBEST_ZAMAN_ETKI_DUZELTME',
+    'gerekce' => 'sz revizyon',
+], $subeHeader);
+rtAssert($szOk['status'] === 201, 'SERBEST_ZAMAN create → 201');
+$szId = (int) ($szOk['payload']['data']['id'] ?? 0);
+invokeRtHttp($pdo, $ba, 'POST', '/haftalik-kapanis/revizyon-talepleri/' . $szId . '/iptal', [], $subeHeader);
+
+$szWrong = invokeRtHttp($pdo, $ba, 'POST', '/haftalik-kapanis/revizyon-talepleri', [
+    'personel_id' => 10,
+    'hafta_baslangic' => '2026-04-06',
+    'hafta_bitis' => '2026-04-12',
+    'etkilenen_tarih' => '2026-04-07',
+    'kaynak_tipi' => 'SERBEST_ZAMAN',
+    'kaynak_id' => 602,
+    'revizyon_tipi' => 'SERBEST_ZAMAN_ETKI_DUZELTME',
+    'gerekce' => 'sz wrong',
+], $subeHeader);
+rtAssert($szWrong['status'] === 404, 'SERBEST_ZAMAN wrong personel → 404');
+rtAssert(($szWrong['payload']['errors'][0]['code'] ?? '') === 'TARGET_NOT_FOUND', 'SERBEST_ZAMAN TARGET_NOT_FOUND');
+
+// --- Aylık mühür does not block ---
+$muhurCreate = invokeRtHttp($pdo, $ba, 'POST', '/haftalik-kapanis/revizyon-talepleri', rtCreateBody(
+    10,
+    $puantaj06,
+    '2026-04-06',
+    '2026-04-06',
+    '2026-04-12'
+), $subeHeader);
+rtAssert($muhurCreate['status'] === 201, 'aylik muhur varken create → 201');
+$muhurCode = (string) ($muhurCreate['payload']['errors'][0]['code'] ?? '');
+rtAssert($muhurCode !== 'PERIOD_LOCKED' && $muhurCode !== 'PERIOD_STATE_UNKNOWN', 'aylik muhur PERIOD_LOCKED/UNKNOWN üretmez');
+$muhurId = (int) ($muhurCreate['payload']['data']['id'] ?? 0);
+$muhurGonder = invokeRtHttp($pdo, $ba, 'POST', '/haftalik-kapanis/revizyon-talepleri/' . $muhurId . '/gonder', [], $subeHeader);
+rtAssert($muhurGonder['status'] === 200, 'aylik muhur varken gonder → 200');
+rtAssert(((string) ($muhurGonder['payload']['errors'][0]['code'] ?? '')) !== 'PERIOD_LOCKED', 'gonder PERIOD_LOCKED üretmez');
+
+// --- Onay correction write yok ---
+$corrBefore = (int) $pdo->query("
+    SELECT COUNT(*) FROM information_schema.TABLES
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME LIKE '%correction%'
+")->fetchColumn();
+$onayCorr = invokeRtHttp($pdo, $gy, 'POST', '/haftalik-kapanis/revizyon-talepleri/' . $muhurId . '/onay', [], $subeHeader);
+rtAssert($onayCorr['status'] === 200, 'onay for correction proof → 200');
+rtAssert(($onayCorr['payload']['data']['correction_event_id'] ?? null) === null, 'onay correction_event_id null proof');
+$corrAfter = (int) $pdo->query("
+    SELECT COUNT(*) FROM information_schema.TABLES
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME LIKE '%correction%'
+")->fetchColumn();
+rtAssert($corrBefore === $corrAfter, 'onayda correction tablo write yok');
+
+// --- Parallel iptal/onay ---
+$parIoCreate = invokeRtHttp($pdo, $ba, 'POST', '/haftalik-kapanis/revizyon-talepleri', rtCreateBody(
+    10,
+    $puantaj06,
+    '2026-04-06',
+    '2026-04-06',
+    '2026-04-12'
+), $subeHeader);
+rtAssert($parIoCreate['status'] === 201, 'parallel iptal/onay setup create → 201');
+$parIoId = (int) ($parIoCreate['payload']['data']['id'] ?? 0);
+$parIoGonder = invokeRtHttp($pdo, $ba, 'POST', '/haftalik-kapanis/revizyon-talepleri/' . $parIoId . '/gonder', [], $subeHeader);
+rtAssert($parIoGonder['status'] === 200, 'parallel iptal/onay setup gonder → 200');
+$pio1 = spawnRtHttp($pdo, $ba, 'POST', '/haftalik-kapanis/revizyon-talepleri/' . $parIoId . '/iptal', [], $subeHeader);
+$pio2 = spawnRtHttp($pdo, $gy, 'POST', '/haftalik-kapanis/revizyon-talepleri/' . $parIoId . '/onay', [], $subeHeader);
+$rio1 = finishRtHttp($pio1);
+$rio2 = finishRtHttp($pio2);
+$parIoOk = (($rio1['status'] === 200) ? 1 : 0) + (($rio2['status'] === 200) ? 1 : 0);
+rtAssert($parIoOk === 1, 'parallel iptal/onay → one success');
+$parIoConflict = ($rio1['status'] === 409 ? ($rio1['payload']['errors'][0]['code'] ?? '') : ($rio2['payload']['errors'][0]['code'] ?? ''));
+rtAssert($parIoConflict === 'STATE_CONFLICT', 'parallel iptal/onay loser STATE_CONFLICT');
+
+// --- Transaction rollback injection ---
+$rbCreate = invokeRtHttp($pdo, $ba, 'POST', '/haftalik-kapanis/revizyon-talepleri', rtCreateBody(
+    10,
+    $puantaj11,
+    '2026-04-11',
+    '2026-04-06',
+    '2026-04-12'
+), $subeHeader);
+// 11 may still be open from parallel gonder — if conflict, use recreate path after ensuring closed
+if ($rbCreate['status'] !== 201) {
+    // find a free identity: cancel any open on 11 or use SUREC 501 again after iptal
+    $rbCreate = invokeRtHttp($pdo, $ba, 'POST', '/haftalik-kapanis/revizyon-talepleri', [
+        'personel_id' => 10,
+        'hafta_baslangic' => '2026-04-06',
+        'hafta_bitis' => '2026-04-12',
+        'etkilenen_tarih' => '2026-04-07',
+        'kaynak_tipi' => 'SUREC',
+        'kaynak_id' => 501,
+        'revizyon_tipi' => 'SUREC_GEC_GIRIS',
+        'gerekce' => 'rollback create setup',
+    ], $subeHeader);
+}
+rtAssert($rbCreate['status'] === 201, 'rollback setup create → 201');
+$rbId = (int) ($rbCreate['payload']['data']['id'] ?? 0);
+$beforeRbMain = (int) $pdo->query('SELECT COUNT(*) FROM haftalik_kapanis_revizyon_talepleri WHERE id = ' . $rbId)->fetchColumn();
+$beforeRbAudit = rtGecmisCount($pdo, $rbId);
+$pdo->exec("
+    CREATE TRIGGER trg_rt_gecmis_fail BEFORE INSERT ON haftalik_kapanis_revizyon_talebi_gecmisi
+    FOR EACH ROW SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'forced gecmis fail'
+");
+$rbGonderFailed = false;
+try {
+    $rbGonder = invokeRtHttp($pdo, $ba, 'POST', '/haftalik-kapanis/revizyon-talepleri/' . $rbId . '/gonder', [], $subeHeader);
+    $rbGonderFailed = $rbGonder['status'] >= 500 || $rbGonder['status'] === 409 || $rbGonder['status'] !== 200;
+} catch (Throwable $e) {
+    $rbGonderFailed = true;
+}
+$pdo->exec('DROP TRIGGER IF EXISTS trg_rt_gecmis_fail');
+$afterRbDurum = (string) $pdo->query('SELECT durum FROM haftalik_kapanis_revizyon_talepleri WHERE id = ' . $rbId)->fetchColumn();
+$afterRbAudit = rtGecmisCount($pdo, $rbId);
+rtAssert($afterRbDurum === 'TASLAK', 'rollback gonder ana state TASLAK');
+rtAssert($afterRbAudit === $beforeRbAudit, 'rollback gonder orphan audit yok');
+rtAssert($beforeRbMain === 1, 'rollback setup main mevcut');
+rtAssert($rbGonderFailed, 'rollback gonder audit fail surfaced');
+
+$pdo->exec("
+    CREATE TRIGGER trg_rt_gecmis_fail_create BEFORE INSERT ON haftalik_kapanis_revizyon_talebi_gecmisi
+    FOR EACH ROW SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'forced create gecmis fail'
+");
+$beforeCreateCnt = (int) $pdo->query('SELECT COUNT(*) FROM haftalik_kapanis_revizyon_talepleri')->fetchColumn();
+$beforeCreateAudit = (int) $pdo->query('SELECT COUNT(*) FROM haftalik_kapanis_revizyon_talebi_gecmisi')->fetchColumn();
+$rbCreateFail = false;
+try {
+    $rbCreateResp = invokeRtHttp($pdo, $ba, 'POST', '/haftalik-kapanis/revizyon-talepleri', [
+        'personel_id' => 10,
+        'hafta_baslangic' => '2026-04-06',
+        'hafta_bitis' => '2026-04-12',
+        'etkilenen_tarih' => '2026-04-07',
+        'kaynak_tipi' => 'SERBEST_ZAMAN',
+        'kaynak_id' => 601,
+        'revizyon_tipi' => 'SERBEST_ZAMAN_ETKI_DUZELTME',
+        'gerekce' => 'rollback create fail',
+    ], $subeHeader);
+    $rbCreateFail = $rbCreateResp['status'] !== 201;
+} catch (Throwable $e) {
+    $rbCreateFail = true;
+}
+$pdo->exec('DROP TRIGGER IF EXISTS trg_rt_gecmis_fail_create');
+$afterCreateCnt = (int) $pdo->query('SELECT COUNT(*) FROM haftalik_kapanis_revizyon_talepleri')->fetchColumn();
+$afterCreateAudit = (int) $pdo->query('SELECT COUNT(*) FROM haftalik_kapanis_revizyon_talebi_gecmisi')->fetchColumn();
+rtAssert($rbCreateFail, 'rollback create audit fail surfaced');
+rtAssert($beforeCreateCnt === $afterCreateCnt, 'rollback create ana kayıt yok');
+rtAssert($beforeCreateAudit === $afterCreateAudit, 'rollback create orphan audit yok');
+
+// --- Drift migration fail-loud ---
+$driftRoot = rtPdo($dsn);
+$driftDb = 'rt_drift_' . bin2hex(random_bytes(3));
+$driftRoot->exec('CREATE DATABASE `' . $driftDb . '` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');
+$driftRoot->exec('USE `' . $driftDb . '`');
+createRtParentTables($driftRoot);
+applySqlFile($driftRoot, __DIR__ . '/../../api/migrations/027_haftalik_kapanis.sql');
+$driftRoot->exec('CREATE TABLE haftalik_kapanis_revizyon_talepleri (
+  id INT UNSIGNED NOT NULL PRIMARY KEY,
+  bogus_col VARCHAR(8) NOT NULL
+) ENGINE=InnoDB');
+$driftFailed = false;
+try {
+    applySqlFile($driftRoot, __DIR__ . '/../../api/migrations/030_haftalik_kapanis_revizyon_talepleri.sql');
+} catch (Throwable $e) {
+    $driftFailed = true;
+}
+rtAssert($driftFailed, 'driftli tablo varken apply fail-loud');
+$driftRoot->exec('DROP DATABASE `' . $driftDb . '`');
 
 echo "verify-revizyon-talebi-mysql: OK\n";

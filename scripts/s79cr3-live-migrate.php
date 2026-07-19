@@ -1171,12 +1171,19 @@ if ($action === 'smoke_cleanup') {
 
         // Smoke week is far-future 2036-07; remove period-lock row created by PUT acquire.
         $subeId = (int) ($meta['sube_id'] ?? 0);
-        if ($subeId > 0 && s79_table_exists($pdo, 'puantaj_donem_kilitleri')) {
-            $d = $pdo->prepare(
-                'DELETE FROM puantaj_donem_kilitleri WHERE sube_id = :s AND yil = 2036 AND ay = 7'
-            );
-            $d->execute(['s' => $subeId]);
-            $deleted['donem_kilit'] = $d->rowCount();
+        if (s79_table_exists($pdo, 'puantaj_donem_kilitleri')) {
+            if ($subeId > 0) {
+                $d = $pdo->prepare(
+                    'DELETE FROM puantaj_donem_kilitleri WHERE sube_id = :s AND yil = 2036 AND ay = 7'
+                );
+                $d->execute(['s' => $subeId]);
+                $deleted['donem_kilit'] = $d->rowCount();
+            } else {
+                // Fallback: only far-future smoke month, never touch real periods.
+                $deleted['donem_kilit'] = (int) $pdo->exec(
+                    'DELETE FROM puantaj_donem_kilitleri WHERE yil = 2036 AND ay = 7'
+                );
+            }
         }
 
         if ($kapanisId > 0) {

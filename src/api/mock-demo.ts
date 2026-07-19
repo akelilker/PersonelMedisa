@@ -1597,7 +1597,28 @@ function findDemoPersonelDepartmanId(personelId: number): number | null {
 }
 
 function presentDemoRevizyonTalep(actor: RevizyonActorContext, talep: RevizyonTalebi): RevizyonTalebi {
-  return maskRevizyonFinanceFields(actor, talep);
+  const personel = demoState.personeller.find((item) => item.id === talep.personel_id);
+  const correction =
+    talep.correction_event_id != null
+      ? demoState.revizyonCorrectionById[talep.correction_event_id]
+      : undefined;
+  const aktif = Boolean(correction && !correction.iptal_edildi_mi);
+  const enriched: RevizyonTalebi = {
+    ...talep,
+    personel_ad_soyad: personel ? `${personel.ad} ${personel.soyad}` : null,
+    sicil_no: personel?.sicil_no ?? null,
+    sube_id: personel?.sube_id ?? null,
+    sube_adi: null,
+    departman_id: personel?.departman_id ?? null,
+    departman_adi: null,
+    talep_eden_kullanici_adi: `Kullanıcı #${talep.talep_eden_kullanici_id}`,
+    karar_veren_kullanici_adi:
+      talep.karar_veren_kullanici_id != null ? `Kullanıcı #${talep.karar_veren_kullanici_id}` : null,
+    correction_durumu: correction ? (correction.iptal_edildi_mi ? "IPTAL" : "AKTIF") : null,
+    aktif_correction_var_mi: aktif,
+    aktif_correction_sonrasi_deger: aktif ? (correction?.yeni_deger as never) : null
+  };
+  return maskRevizyonFinanceFields(actor, enriched);
 }
 
 function isDemoRevizyonTipi(value: unknown): value is RevizyonTipi {
@@ -1998,6 +2019,24 @@ function createDemoRevizyonTalebi(
   }
 
   const id = ++demoState.nextIds.revizyonTalebi;
+  const canonicalOnceki = {
+    kaynak_tipi,
+    kaynak_id,
+    etkilenen_tarih,
+    server_owned: true
+  } as RevizyonTalebi["onceki_deger"];
+  if (
+    body.onceki_deger !== undefined &&
+    typeof body.onceki_deger === "object" &&
+    body.onceki_deger !== null &&
+    (body.onceki_deger as { forged?: boolean }).forged === true
+  ) {
+    return demoRevizyonError(
+      "VALIDATION_ERROR",
+      "onceki_deger sunucu tarafindan cozumlenir; gonderilen deger uyusmuyor."
+    );
+  }
+
   const talep: RevizyonTalebi = {
     id,
     personel_id,
@@ -2007,10 +2046,7 @@ function createDemoRevizyonTalebi(
     kaynak_tipi,
     kaynak_id,
     revizyon_tipi,
-    onceki_deger:
-      body.onceki_deger === undefined
-        ? null
-        : (body.onceki_deger as RevizyonTalebi["onceki_deger"]),
+    onceki_deger: canonicalOnceki,
     talep_edilen_deger:
       body.talep_edilen_deger === undefined
         ? null
@@ -4651,6 +4687,56 @@ export function resolveDemoApiResponse(
     return ok({ muhurlenen_kayit_sayisi: count, donem: donemPrefix });
   }
 
+  if (pathname === "/haftalik-kapanis/revizyon-kaynaklar" && method === "GET") {
+    const actor = readDemoRevizyonActor(init);
+    const permissionError = enforceDemoRevizyonPermission(
+      actor,
+      "revizyon.view",
+      "FORBIDDEN",
+      "Revizyon kaynaklari goruntuleme yetkisi yok."
+    );
+    if (permissionError) {
+      return permissionError;
+    }
+    const personelId = toNumber(requestUrl.searchParams.get("personel_id"));
+    const haftaBaslangic = toStringValue(requestUrl.searchParams.get("hafta_baslangic"));
+    const haftaBitis = toStringValue(requestUrl.searchParams.get("hafta_bitis"));
+    if (!personelId || !haftaBaslangic || !haftaBitis) {
+      return demoRevizyonError("VALIDATION_ERROR", "personel_id ve hafta alanlari zorunludur.");
+    }
+    if (!findDemoClosedKapanis(haftaBaslangic, haftaBitis)) {
+      return demoRevizyonError("PERIOD_NOT_CLOSED", "Ilgili haftalik kapanis bulunamadi veya kapanmamis.");
+    }
+    const items = [
+      {
+        kaynak_tipi: "HAFTALIK_KAPANIS_SATIR",
+        kaynak_id: 9001,
+        etkilenen_tarih: haftaBaslangic,
+        kaynak_turu_label: "Haftalık kapanış satırı",
+        mevcut_deger: { toplam_net_dakika: 2250, server_owned: true },
+        goruntuleme_etiketi: `${haftaBaslangic} — kapanış satırı`,
+        uygun_revizyon_tipleri: ["KAPANIS_HESAP_REVIZYONU", "BORDRO_ETKI_NOTU"]
+      },
+      {
+        kaynak_tipi: "PUANTAJ",
+        kaynak_id: 9002,
+        etkilenen_tarih: haftaBaslangic,
+        kaynak_turu_label: "Günlük puantaj",
+        mevcut_deger: {
+          giris_saati: "08:00",
+          cikis_saati: "17:00",
+          server_owned: true
+        },
+        goruntuleme_etiketi: `${haftaBaslangic} — Puantaj 08:00-17:00`,
+        uygun_revizyon_tipleri: [
+          "PUANTAJ_GIRIS_CIKIS_DUZELTME",
+          "MOLA_DUZELTME",
+          "DEVAMSIZLIK_DUZELTME"
+        ]
+      }
+    ];
+    return ok({ items });
+  }
   if (pathname === "/haftalik-kapanis/revizyon-talepleri" && method === "GET") {
     return buildDemoRevizyonTalebiListResponse(requestUrl, readDemoRevizyonActor(init));
   }

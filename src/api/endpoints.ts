@@ -81,6 +81,7 @@ export const endpoints = {
     list: "/haftalik-kapanis/revizyon-talepleri",
     detail: (id: number | string) => `/haftalik-kapanis/revizyon-talepleri/${id}`,
     create: "/haftalik-kapanis/revizyon-talepleri",
+    kaynaklar: "/haftalik-kapanis/revizyon-kaynaklar",
     submit: (id: number | string) => `/haftalik-kapanis/revizyon-talepleri/${id}/gonder`,
     approve: (id: number | string) => `/haftalik-kapanis/revizyon-talepleri/${id}/onay`,
     reject: (id: number | string) => `/haftalik-kapanis/revizyon-talepleri/${id}/red`,

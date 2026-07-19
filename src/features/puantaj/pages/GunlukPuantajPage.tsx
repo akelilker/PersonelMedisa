@@ -720,6 +720,12 @@ export function GunlukPuantajPage() {
         </div>
       ) : null}
 
+      <div className="universal-btn-group" style={{ marginTop: "1rem" }}>
+        <Link className="universal-btn-aux" to="/haftalik-kapanis" data-testid="puantaj-haftalik-kapanis-link">
+          Haftalık Kapanış / Revizyon
+        </Link>
+      </div>
+
       {isMuhurModalOpen ? (
         <AppModal
           onClose={() => setIsMuhurModalOpen(false)}

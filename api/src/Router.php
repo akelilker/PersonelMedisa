@@ -362,6 +362,9 @@ class Router
         if ($method === 'GET' && preg_match('#^/haftalik-kapanis/(\d+)$#', $path, $matches)) {
             HaftalikKapanisController::detail($this->request, $matches[1]);
         }
+        if ($path === '/haftalik-kapanis/revizyon-kaynaklar' && $method === 'GET') {
+            RevizyonController::kaynaklar($this->request);
+        }
         if ($path === '/haftalik-kapanis/revizyon-talepleri' && $method === 'GET') {
             RevizyonController::talepleri($this->request);
         }

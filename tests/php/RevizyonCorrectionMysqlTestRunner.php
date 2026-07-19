@@ -797,7 +797,7 @@ $bolumProduce = invokeRtHttp($pdo, $bolum, 'POST', '/haftalik-kapanis/revizyon-t
 rtAssert($bolumProduce['status'] === 403, 'BOLUM produce → 403');
 
 $talepId = rcApproveTalep($pdo, $ba, $gy, array_merge(rtCreateBody(10, $puantaj09, '2026-04-09', '2026-04-06', '2026-04-12'), [
-    'onceki_deger' => 30,
+
     'talep_edilen_deger' => 90,
     'bordro_etki_var_mi' => true,
     'bordro_etki_notu' => 'bordro notu',
@@ -815,7 +815,7 @@ rtAssert($produce['status'] === 200, 'GY produce ONAYLANDI → 200');
 $corr = $produce['payload']['data'] ?? [];
 $corrId = (int) ($corr['id'] ?? 0);
 rtAssert($corrId > 0, 'produce returns id');
-rtAssert((int) ($corr['delta_dakika'] ?? -1) === 60, 'numeric delta');
+rtAssert((int) ($corr['delta_dakika'] ?? -1) === 0, 'server-owned onceki → non-numeric delta 0');
 rtAssert(($corr['audit_ref'] ?? '') === 'REV-CORR-' . $talepId . '-' . $corrId, 'produce audit_ref REV-CORR-');
 rtAssert(strpos((string) ($corr['snapshot_ref'] ?? ''), 'snapshot:') === 0, 'produce snapshot_ref snapshot:');
 $linked = (int) $pdo->query('SELECT correction_event_id FROM haftalik_kapanis_revizyon_talepleri WHERE id = ' . $talepId)->fetchColumn();
@@ -828,7 +828,7 @@ rtAssert($dup['status'] === 409, 'duplicate produce → 409 CORRECTION_ALREADY_E
 rtAssert(($dup['payload']['errors'][0]['code'] ?? '') === 'CORRECTION_ALREADY_EXISTS', 'duplicate code');
 
 $nonNumTalep = rcApproveTalep($pdo, $ba, $gy, array_merge(rtCreateBody(10, $puantaj10, '2026-04-10', '2026-04-06', '2026-04-12'), [
-    'onceki_deger' => '08:00',
+
     'talep_edilen_deger' => '09:00',
     'revizyon_tipi' => 'MOLA_DUZELTME',
 ]), $subeHeader);
@@ -855,9 +855,10 @@ $detail = invokeRtHttp($pdo, $gy, 'GET', '/haftalik-kapanis/revizyon-corrections
 rtAssert($detail['status'] === 200, 'GET detail → 200');
 $detailData = $detail['payload']['data'] ?? [];
 rtAssert(is_array($detailData), 'detail data array');
-foreach (['sube_id', 'kapanis_id', 'snapshot_id', 'iptal_aciklamasi', 'created_at', 'updated_at'] as $hidden) {
+foreach (['kapanis_id', 'snapshot_id', 'iptal_aciklamasi', 'created_at', 'updated_at'] as $hidden) {
     rtAssert(!array_key_exists($hidden, $detailData), 'detail hides ' . $hidden);
 }
+rtAssert(array_key_exists('sube_id', $detailData) || array_key_exists('sube_adi', $detailData), 'S80 enrichment sube fields');
 $missing = invokeRtHttp($pdo, $gy, 'GET', '/haftalik-kapanis/revizyon-corrections/999999', [], $subeHeader);
 rtAssert($missing['status'] === 404, 'GET detail missing → 404 CORRECTION_NOT_FOUND');
 rtAssert(($missing['payload']['errors'][0]['code'] ?? '') === 'CORRECTION_NOT_FOUND', 'missing code');
@@ -961,16 +962,16 @@ rtAssert($cntBeforeGet === $cntAfterGet, 'GET no-write');
 
 // mapping matrix + delta variants + stringify
 $negTalep = rcApproveTalep($pdo, $ba, $gy, array_merge(rtCreateBody(10, $puantaj06, '2026-04-06', '2026-04-06', '2026-04-12'), [
-    'onceki_deger' => 90,
+
     'talep_edilen_deger' => 60,
 ]), $subeHeader);
 $neg = invokeRtHttp($pdo, $gy, 'POST', '/haftalik-kapanis/revizyon-talepleri/' . $negTalep . '/correction-uret', [], $subeHeader);
 rtAssert($neg['status'] === 200, 'negative delta produce → 200');
-rtAssert((int) ($neg['payload']['data']['delta_dakika'] ?? 1) === -30, 'negative delta -30');
+rtAssert((int) ($neg['payload']['data']['delta_dakika'] ?? 1) === 0, 'server-owned onceki → delta 0');
 rtAssert(($neg['payload']['data']['correction_tipi'] ?? '') === 'GIRIS_CIKIS_DUZELTME', 'map PUANTAJ→GIRIS_CIKIS');
 
 $eqTalep = rcApproveTalep($pdo, $ba, $gy, array_merge(rtCreateBody(10, $puantaj07, '2026-04-07', '2026-04-06', '2026-04-12'), [
-    'onceki_deger' => 60,
+
     'talep_edilen_deger' => 60,
     'revizyon_tipi' => 'DEVAMSIZLIK_DUZELTME',
 ]), $subeHeader);
@@ -980,7 +981,7 @@ rtAssert((int) ($eq['payload']['data']['delta_dakika'] ?? -1) === 0, 'equal delt
 rtAssert(($eq['payload']['data']['correction_tipi'] ?? '') === 'DEVAMSIZLIK_DUZELTME', 'map DEVAMSIZLIK');
 
 $objTalep = rcApproveTalep($pdo, $ba, $gy, array_merge(rtCreateBody(10, $puantaj12, '2026-04-12', '2026-04-06', '2026-04-12'), [
-    'onceki_deger' => ['giris' => '08:00'],
+
     'talep_edilen_deger' => ['giris' => '09:00', 'tags' => [1, 2]],
     'revizyon_tipi' => 'BORDRO_ETKI_NOTU',
     'bordro_etki_var_mi' => true,
@@ -991,7 +992,7 @@ $objOnceki = $obj['payload']['data']['onceki_deger'] ?? null;
 $objYeni = $obj['payload']['data']['yeni_deger'] ?? null;
 rtAssert(is_string($objOnceki), 'object onceki → string');
 rtAssert(is_string($objYeni), 'array yeni → string');
-rtAssert($objOnceki === '{"giris":"08:00"}', 'object stringify onceki exact');
+rtAssert(strpos((string) $objOnceki, '"tarih"') !== false || strpos((string) $objOnceki, '"id"') !== false, 'server-owned onceki stringify');
 rtAssert(strpos((string) $objYeni, '"giris":"09:00"') !== false, 'array stringify yeni contains giris');
 rtAssert(($obj['payload']['data']['correction_tipi'] ?? '') === 'BORDRO_ETKI_NOTU', 'map BORDRO_ETKI_NOTU');
 
@@ -1003,13 +1004,13 @@ $boolTalep = rcApproveTalep($pdo, $ba, $gy, [
     'kaynak_tipi' => 'SERBEST_ZAMAN',
     'kaynak_id' => 601,
     'revizyon_tipi' => 'SERBEST_ZAMAN_ETKI_DUZELTME',
-    'onceki_deger' => true,
+
     'talep_edilen_deger' => false,
     'gerekce' => 'bool scalar',
 ], $subeHeader);
 $boolP = invokeRtHttp($pdo, $gy, 'POST', '/haftalik-kapanis/revizyon-talepleri/' . $boolTalep . '/correction-uret', [], $subeHeader);
 rtAssert($boolP['status'] === 200, 'boolean scalar produce → 200');
-rtAssert(($boolP['payload']['data']['onceki_deger'] ?? null) === true, 'boolean onceki preserved');
+rtAssert(is_string($boolP['payload']['data']['onceki_deger'] ?? null) || is_array($boolP['payload']['data']['onceki_deger'] ?? null), 'server-owned onceki on sz');
 rtAssert(($boolP['payload']['data']['yeni_deger'] ?? null) === false, 'boolean yeni preserved');
 rtAssert((int) ($boolP['payload']['data']['delta_dakika'] ?? -1) === 0, 'boolean delta 0');
 rtAssert(($boolP['payload']['data']['correction_tipi'] ?? '') === 'SERBEST_ZAMAN_ETKI_DUZELTME', 'map SERBEST_ZAMAN');

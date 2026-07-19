@@ -28,6 +28,7 @@ export function PersonelDetayPage() {
   const canAccessSurecler = canCreateSurec || canViewSurecler;
   const canViewPuantaj = hasPermission("puantaj.view");
   const canViewRevizyon = hasPermission("revizyon.view");
+  const canCreateRevizyon = hasPermission("revizyon.create");
   const canViewFinans = hasPermission("finans.view");
   const canViewUcret = hasPermission("personeller.ucret.view");
   const canManageUcret = hasPermission("personeller.ucret.manage");
@@ -191,6 +192,7 @@ export function PersonelDetayPage() {
               zimmetHistoryErrorMessage={zimmetHistoryErrorMessage}
               canViewPuantaj={canViewPuantaj}
               canViewRevizyon={canViewRevizyon}
+              canCreateRevizyon={canCreateRevizyon}
               canCreateZimmet={canCreateZimmet}
               canAccessSurecler={canAccessSurecler}
               canCreateSurec={canCreateSurec}

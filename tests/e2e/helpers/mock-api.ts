@@ -7842,6 +7842,39 @@ let personelBelgeKaydiIdCounter = 903;
       return;
     }
 
+    if (path === "/api/haftalik-kapanis/revizyon-kaynaklar" && method === "GET") {
+      if (await denyUnlessRolePermission(route, "revizyon.view")) return;
+      const personelId = Number.parseInt(url.searchParams.get("personel_id") ?? "", 10);
+      const haftaBaslangic = url.searchParams.get("hafta_baslangic") ?? "";
+      const haftaBitis = url.searchParams.get("hafta_bitis") ?? "";
+      if (!Number.isFinite(personelId) || !haftaBaslangic || !haftaBitis) {
+        await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "personel_id ve hafta alanlari zorunludur."));
+        return;
+      }
+      await fulfillJson(
+        route,
+        200,
+        okBody({
+          items: [
+            {
+              kaynak_tipi: "PUANTAJ",
+              kaynak_id: 9002,
+              etkilenen_tarih: haftaBaslangic,
+              kaynak_turu_label: "Günlük puantaj",
+              mevcut_deger: { giris_saati: "08:00", cikis_saati: "17:00", server_owned: true },
+              goruntuleme_etiketi: `${haftaBaslangic} — Puantaj 08:00-17:00`,
+              uygun_revizyon_tipleri: [
+                "PUANTAJ_GIRIS_CIKIS_DUZELTME",
+                "MOLA_DUZELTME",
+                "DEVAMSIZLIK_DUZELTME"
+              ]
+            }
+          ]
+        })
+      );
+      return;
+    }
+
     if (path === "/api/haftalik-kapanis/revizyon-talepleri" && method === "GET") {
       if (await denyUnlessRolePermission(route, "revizyon.view")) return;
       const personelId = Number.parseInt(url.searchParams.get("personel_id") ?? "", 10);

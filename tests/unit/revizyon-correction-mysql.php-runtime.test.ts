@@ -84,12 +84,12 @@ describe("RevizyonController correction MariaDB", () => {
     expect(result.stdout).toContain("[PASS] duplicate produce → 409 CORRECTION_ALREADY_EXISTS");
     expect(result.stdout).toContain("[PASS] produce after cancel → 409 CORRECTION_ALREADY_EXISTS");
     expect(result.stdout).toContain("[PASS] SUREC_GEC_GIRIS → 404 CORRECTION_TARGET_NOT_FOUND");
-    expect(result.stdout).toContain("[PASS] numeric delta");
-    expect(result.stdout).toContain("[PASS] negative delta -30");
+    expect(result.stdout).toContain("[PASS] server-owned onceki → non-numeric delta 0");
+    expect(result.stdout).toContain("[PASS] server-owned onceki → delta 0");
     expect(result.stdout).toContain("[PASS] equal delta 0");
     expect(result.stdout).toContain("[PASS] non-numeric delta 0");
     expect(result.stdout).toContain("[PASS] object onceki → string");
-    expect(result.stdout).toContain("[PASS] boolean onceki preserved");
+    expect(result.stdout).toContain("[PASS] server-owned onceki on sz");
     expect(result.stdout).toContain("[PASS] map PUANTAJ→GIRIS_CIKIS");
     expect(result.stdout).toContain("[PASS] map MOLA_DUZELTME");
     expect(result.stdout).toContain("[PASS] map DEVAMSIZLIK");
@@ -99,7 +99,7 @@ describe("RevizyonController correction MariaDB", () => {
     expect(result.stdout).toContain("[PASS] finance mask BA: bordro_etki_tipi null");
     expect(result.stdout).toContain("[PASS] finance mask on cancelled correction");
     expect(result.stdout).toContain("[PASS] GET detail → 200");
-    expect(result.stdout).toContain("[PASS] detail hides sube_id");
+    expect(result.stdout).toContain("[PASS] S80 enrichment sube fields");
     expect(result.stdout).toContain("[PASS] GET detail missing → 404 CORRECTION_NOT_FOUND");
     expect(result.stdout).toContain("[PASS] scope dışı detail → 403 CORRECTION_SCOPE_DENIED");
     expect(result.stdout).toContain("[PASS] allowedSubeIds=[] list empty");

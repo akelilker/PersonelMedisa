@@ -124,7 +124,42 @@ class RevizyonController
         }
 
         self::assertCanViewTalep($user, $request, $row);
-        JsonResponse::success(self::presentTalep($user, $row));
+        $payload = self::presentTalep($user, $row);
+        if (RolePermissions::has($user, 'revizyon.view_audit_history')) {
+            $payload['audit_gecmisi'] = self::loadAuditGecmisi($pdo, $talepId);
+        }
+        JsonResponse::success($payload);
+    }
+
+    public static function kaynaklar(Request $request)
+    {
+        $user = AuthMiddleware::authenticate($request, true);
+        RolePermissions::assert($user, 'revizyon.view');
+        self::assertSchemaReady();
+        self::rejectClientSubeQuery($request);
+
+        $personelId = self::parsePositiveInt($request->getQuery('personel_id'), 'personel_id', true);
+        $haftaBaslangic = self::normalizeDate((string) ($request->getQuery('hafta_baslangic') ?? ''), 'hafta_baslangic');
+        $haftaBitis = self::normalizeDate((string) ($request->getQuery('hafta_bitis') ?? ''), 'hafta_bitis');
+        if ($haftaBitis !== self::addDays($haftaBaslangic, 6)) {
+            self::validationError('hafta_bitis', 'hafta_bitis hafta_baslangic + 6 gun olmalidir.');
+        }
+
+        $pdo = Connection::get();
+        $personel = self::loadPersonel($pdo, $personelId);
+        self::assertCanViewTalep($user, $request, [
+            'personel_id' => (int) $personel['id'],
+            'sube_id' => (int) $personel['sube_id'],
+            'bordro_etki_var_mi' => 1,
+        ]);
+
+        $kapanis = self::findClosedKapanisForPersonel($pdo, $personel, $haftaBaslangic, $haftaBitis);
+        if ($kapanis === null) {
+            self::conflict('PERIOD_NOT_CLOSED', 'Ilgili haftalik kapanis bulunamadi veya kapanmamis.');
+        }
+
+        $items = self::listKaynakSecenekleri($pdo, $personelId, $haftaBaslangic, $haftaBitis);
+        JsonResponse::success(['items' => $items]);
     }
 
     public static function createTalep(Request $request)
@@ -164,7 +199,6 @@ class RevizyonController
 
         $bordroEtkiVarMi = self::optionalBool($body, 'bordro_etki_var_mi', false);
         $bordroEtkiNotu = self::optionalNullableString($body, 'bordro_etki_notu', 1000);
-        $oncekiDegerJson = self::encodeJsonValue($body['onceki_deger'] ?? null, 'onceki_deger');
         $talepEdilenDegerJson = self::encodeJsonValue($body['talep_edilen_deger'] ?? null, 'talep_edilen_deger');
 
         $pdo = Connection::get();
@@ -176,6 +210,26 @@ class RevizyonController
         if ($kapanis === null) {
             self::conflict('PERIOD_NOT_CLOSED', 'Ilgili haftalik kapanis bulunamadi veya kapanmamis.');
         }
+
+        $canonicalOnceki = self::resolveCanonicalOncekiDeger(
+            $pdo,
+            $kaynakTipi,
+            $kaynakId,
+            $personelId,
+            $etkilenenTarih,
+            $haftaBaslangic,
+            $haftaBitis,
+            $revizyonTipi
+        );
+        // Client onceki_deger is never trusted: if present and mismatched, reject.
+        if (array_key_exists('onceki_deger', $body)
+            && !self::jsonValuesEqual($body['onceki_deger'], $canonicalOnceki)) {
+            self::validationError(
+                'onceki_deger',
+                'onceki_deger sunucu tarafindan cozumlenir; gonderilen deger uyusmuyor.'
+            );
+        }
+        $oncekiDegerJson = self::encodeJsonValue($canonicalOnceki, 'onceki_deger');
 
         $snapshotId = (int) $kapanis['snapshot_id'];
         $kapanisId = (int) $kapanis['kapanis_id'];
@@ -644,9 +698,37 @@ class RevizyonController
      */
     private static function presentTalep(array $user, array $row): array
     {
+        $correctionEventId = $row['correction_event_id'] !== null
+            ? (int) $row['correction_event_id']
+            : null;
+        $correctionIptal = array_key_exists('corr_iptal_edildi_mi', $row)
+            ? ((int) ($row['corr_iptal_edildi_mi'] ?? 0)) === 1
+            : null;
+        $correctionDurumu = null;
+        $aktifCorrectionVarMi = false;
+        if ($correctionEventId !== null) {
+            if ($correctionIptal === true) {
+                $correctionDurumu = 'IPTAL';
+            } elseif ($correctionIptal === false) {
+                $correctionDurumu = 'AKTIF';
+                $aktifCorrectionVarMi = true;
+            } else {
+                $correctionDurumu = 'AKTIF';
+                $aktifCorrectionVarMi = true;
+            }
+        }
+
         $payload = [
             'id' => (int) $row['id'],
             'personel_id' => (int) $row['personel_id'],
+            'personel_ad_soyad' => isset($row['personel_ad_soyad']) ? (string) $row['personel_ad_soyad'] : null,
+            'sicil_no' => isset($row['sicil_no']) ? (string) $row['sicil_no'] : null,
+            'sube_id' => isset($row['sube_id']) ? (int) $row['sube_id'] : null,
+            'sube_adi' => isset($row['sube_adi']) ? (string) $row['sube_adi'] : null,
+            'departman_id' => array_key_exists('departman_id', $row) && $row['departman_id'] !== null
+                ? (int) $row['departman_id']
+                : null,
+            'departman_adi' => isset($row['departman_adi']) ? (string) $row['departman_adi'] : null,
             'hafta_baslangic' => (string) $row['hafta_baslangic'],
             'hafta_bitis' => (string) $row['hafta_bitis'],
             'etkilenen_tarih' => (string) $row['etkilenen_tarih'],
@@ -655,12 +737,21 @@ class RevizyonController
             'revizyon_tipi' => (string) $row['revizyon_tipi'],
             'onceki_deger' => self::decodeJsonValue($row['onceki_deger'] ?? null),
             'talep_edilen_deger' => self::decodeJsonValue($row['talep_edilen_deger'] ?? null),
+            'aktif_correction_sonrasi_deger' => $aktifCorrectionVarMi
+                ? self::decodeJsonValue($row['corr_yeni_deger'] ?? null)
+                : null,
             'gerekce' => (string) $row['gerekce'],
             'talep_eden_kullanici_id' => (int) $row['talep_eden_kullanici_id'],
+            'talep_eden_kullanici_adi' => isset($row['talep_eden_kullanici_adi'])
+                ? (string) $row['talep_eden_kullanici_adi']
+                : null,
             'talep_zamani' => self::toIsoDatetime((string) $row['talep_zamani']),
             'durum' => (string) $row['durum'],
             'karar_veren_kullanici_id' => $row['karar_veren_kullanici_id'] !== null
                 ? (int) $row['karar_veren_kullanici_id']
+                : null,
+            'karar_veren_kullanici_adi' => isset($row['karar_veren_kullanici_adi'])
+                ? (string) $row['karar_veren_kullanici_adi']
                 : null,
             'karar_zamani' => $row['karar_zamani'] !== null
                 ? self::toIsoDatetime((string) $row['karar_zamani'])
@@ -668,9 +759,9 @@ class RevizyonController
             'karar_notu' => $row['karar_aciklamasi'] !== null ? (string) $row['karar_aciklamasi'] : null,
             'bordro_etki_var_mi' => ((int) ($row['bordro_etki_var_mi'] ?? 0)) === 1,
             'bordro_etki_notu' => $row['bordro_etki_notu'] !== null ? (string) $row['bordro_etki_notu'] : null,
-            'correction_event_id' => $row['correction_event_id'] !== null
-                ? (int) $row['correction_event_id']
-                : null,
+            'correction_event_id' => $correctionEventId,
+            'correction_durumu' => $correctionDurumu,
+            'aktif_correction_var_mi' => $aktifCorrectionVarMi,
         ];
 
         if ((string) ($user['rol'] ?? '') === 'BIRIM_AMIRI') {
@@ -709,6 +800,34 @@ class RevizyonController
         if ($filters['hafta_bitis'] !== null) {
             $where[] = 't.hafta_bitis = :filter_hafta_bitis';
             $params['filter_hafta_bitis'] = $filters['hafta_bitis'];
+        }
+        if ($filters['revizyon_tipi'] !== null) {
+            $where[] = 't.revizyon_tipi = :filter_revizyon_tipi';
+            $params['filter_revizyon_tipi'] = $filters['revizyon_tipi'];
+        }
+        if ($filters['departman_id'] !== null) {
+            $where[] = 'p.departman_id = :filter_departman_id';
+            $params['filter_departman_id'] = (int) $filters['departman_id'];
+        }
+        if ($filters['bordro_etki_var_mi'] !== null) {
+            $where[] = 't.bordro_etki_var_mi = :filter_bordro_etki';
+            $params['filter_bordro_etki'] = $filters['bordro_etki_var_mi'] ? 1 : 0;
+        }
+        if ($filters['correction_var_mi'] === true) {
+            $where[] = 't.correction_event_id IS NOT NULL';
+        } elseif ($filters['correction_var_mi'] === false) {
+            $where[] = 't.correction_event_id IS NULL';
+        }
+        if (self::correctionsTableExists($pdo)) {
+            if ($filters['correction_durumu'] === 'AKTIF') {
+                $where[] = 'c.iptal_edildi_mi = 0';
+                $where[] = 't.correction_event_id IS NOT NULL';
+            } elseif ($filters['correction_durumu'] === 'IPTAL') {
+                $where[] = 'c.iptal_edildi_mi = 1';
+            }
+        } elseif ($filters['correction_durumu'] !== null) {
+            // Corrections semasi yoksa durum filtresi bos sonuc doner.
+            return [];
         }
 
         $rol = (string) ($user['rol'] ?? '');
@@ -752,9 +871,34 @@ class RevizyonController
             return [];
         }
 
-        $sql = 'SELECT t.*
+        $sql = 'SELECT t.*,
+                       CONCAT(TRIM(p.ad), CHAR(32), TRIM(p.soyad)) AS personel_ad_soyad,
+                       p.sicil_no AS sicil_no,
+                       p.departman_id AS departman_id,
+                       d.ad AS departman_adi,
+                       s.ad AS sube_adi,
+                       te.ad_soyad AS talep_eden_kullanici_adi,
+                       kv.ad_soyad AS karar_veren_kullanici_adi';
+        if (self::correctionsTableExists($pdo)) {
+            $sql .= ',
+                       c.iptal_edildi_mi AS corr_iptal_edildi_mi,
+                       c.yeni_deger AS corr_yeni_deger';
+        } else {
+            $sql .= ',
+                       NULL AS corr_iptal_edildi_mi,
+                       NULL AS corr_yeni_deger';
+        }
+        $sql .= '
                 FROM haftalik_kapanis_revizyon_talepleri t
-                INNER JOIN personeller p ON p.id = t.personel_id';
+                INNER JOIN personeller p ON p.id = t.personel_id
+                LEFT JOIN departmanlar d ON d.id = p.departman_id
+                LEFT JOIN subeler s ON s.id = t.sube_id
+                LEFT JOIN users te ON te.id = t.talep_eden_kullanici_id
+                LEFT JOIN users kv ON kv.id = t.karar_veren_kullanici_id';
+        if (self::correctionsTableExists($pdo)) {
+            $sql .= '
+                LEFT JOIN haftalik_kapanis_revizyon_corrections c ON c.id = t.correction_event_id';
+        }
         if (count($where) > 0) {
             $sql .= ' WHERE ' . implode(' AND ', $where);
         }
@@ -766,10 +910,20 @@ class RevizyonController
         return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
     }
 
-    /** @return array{personel_id:?int,durum:?string,hafta_baslangic:?string,hafta_bitis:?string} */
+    /** @return array{personel_id:?int,durum:?string,hafta_baslangic:?string,hafta_bitis:?string,revizyon_tipi:?string,departman_id:?int,bordro_etki_var_mi:?bool,correction_var_mi:?bool,correction_durumu:?string} */
     private static function parseListFilters(Request $request): array
     {
-        $allowedKeys = ['personel_id', 'durum', 'hafta_baslangic', 'hafta_bitis'];
+        $allowedKeys = [
+            'personel_id',
+            'durum',
+            'hafta_baslangic',
+            'hafta_bitis',
+            'revizyon_tipi',
+            'departman_id',
+            'bordro_etki_var_mi',
+            'correction_var_mi',
+            'correction_durumu',
+        ];
         foreach (array_keys($_GET) as $key) {
             $name = (string) $key;
             if (!in_array($name, $allowedKeys, true)) {
@@ -781,6 +935,51 @@ class RevizyonController
         $durum = $request->getQuery('durum');
         $haftaBaslangic = $request->getQuery('hafta_baslangic');
         $haftaBitis = $request->getQuery('hafta_bitis');
+        $revizyonTipi = $request->getQuery('revizyon_tipi');
+        $departmanId = $request->getQuery('departman_id');
+        $bordroEtki = $request->getQuery('bordro_etki_var_mi');
+        $correctionVarMi = $request->getQuery('correction_var_mi');
+        $correctionDurumu = $request->getQuery('correction_durumu');
+
+        $parsedBordro = null;
+        if ($bordroEtki !== null && $bordroEtki !== '') {
+            if ($bordroEtki === '1' || $bordroEtki === 'true' || $bordroEtki === true) {
+                $parsedBordro = true;
+            } elseif ($bordroEtki === '0' || $bordroEtki === 'false' || $bordroEtki === false) {
+                $parsedBordro = false;
+            } else {
+                self::validationError('bordro_etki_var_mi', 'bordro_etki_var_mi boolean olmalidir.');
+            }
+        }
+
+        $parsedCorrectionVar = null;
+        if ($correctionVarMi !== null && $correctionVarMi !== '') {
+            if ($correctionVarMi === '1' || $correctionVarMi === 'true' || $correctionVarMi === true) {
+                $parsedCorrectionVar = true;
+            } elseif ($correctionVarMi === '0' || $correctionVarMi === 'false' || $correctionVarMi === false) {
+                $parsedCorrectionVar = false;
+            } else {
+                self::validationError('correction_var_mi', 'correction_var_mi boolean olmalidir.');
+            }
+        }
+
+        $parsedCorrectionDurum = null;
+        if ($correctionDurumu !== null && $correctionDurumu !== '') {
+            $cd = strtoupper(trim((string) $correctionDurumu));
+            if (!in_array($cd, ['AKTIF', 'IPTAL'], true)) {
+                self::validationError('correction_durumu', 'correction_durumu AKTIF veya IPTAL olmalidir.');
+            }
+            $parsedCorrectionDurum = $cd;
+        }
+
+        $parsedRevizyonTipi = null;
+        if ($revizyonTipi !== null && $revizyonTipi !== '') {
+            $rt = (string) $revizyonTipi;
+            if (!in_array($rt, self::REVIZYON_TIPLERI, true)) {
+                self::validationError('revizyon_tipi', 'revizyon_tipi gecersiz.');
+            }
+            $parsedRevizyonTipi = $rt;
+        }
 
         return [
             'personel_id' => $personelId !== null && $personelId !== ''
@@ -793,6 +992,13 @@ class RevizyonController
             'hafta_bitis' => $haftaBitis !== null && $haftaBitis !== ''
                 ? self::normalizeDate((string) $haftaBitis, 'hafta_bitis')
                 : null,
+            'revizyon_tipi' => $parsedRevizyonTipi,
+            'departman_id' => $departmanId !== null && $departmanId !== ''
+                ? self::parsePositiveInt($departmanId, 'departman_id', true)
+                : null,
+            'bordro_etki_var_mi' => $parsedBordro,
+            'correction_var_mi' => $parsedCorrectionVar,
+            'correction_durumu' => $parsedCorrectionDurum,
         ];
     }
 
@@ -839,10 +1045,43 @@ class RevizyonController
     /** @return array<string, mixed>|null */
     private static function loadTalepById(PDO $pdo, int $id, bool $forUpdate)
     {
-        $sql = 'SELECT * FROM haftalik_kapanis_revizyon_talepleri WHERE id = :id';
         if ($forUpdate) {
-            $sql .= ' FOR UPDATE';
+            $sql = 'SELECT * FROM haftalik_kapanis_revizyon_talepleri WHERE id = :id FOR UPDATE';
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute(['id' => $id]);
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+            return $row ?: null;
         }
+
+        $sql = 'SELECT t.*,
+                       CONCAT(TRIM(p.ad), CHAR(32), TRIM(p.soyad)) AS personel_ad_soyad,
+                       p.sicil_no AS sicil_no,
+                       p.departman_id AS departman_id,
+                       d.ad AS departman_adi,
+                       s.ad AS sube_adi,
+                       te.ad_soyad AS talep_eden_kullanici_adi,
+                       kv.ad_soyad AS karar_veren_kullanici_adi';
+        if (self::correctionsTableExists($pdo)) {
+            $sql .= ',
+                       c.iptal_edildi_mi AS corr_iptal_edildi_mi,
+                       c.yeni_deger AS corr_yeni_deger';
+        } else {
+            $sql .= ',
+                       NULL AS corr_iptal_edildi_mi,
+                       NULL AS corr_yeni_deger';
+        }
+        $sql .= '
+                FROM haftalik_kapanis_revizyon_talepleri t
+                INNER JOIN personeller p ON p.id = t.personel_id
+                LEFT JOIN departmanlar d ON d.id = p.departman_id
+                LEFT JOIN subeler s ON s.id = t.sube_id
+                LEFT JOIN users te ON te.id = t.talep_eden_kullanici_id
+                LEFT JOIN users kv ON kv.id = t.karar_veren_kullanici_id';
+        if (self::correctionsTableExists($pdo)) {
+            $sql .= '
+                LEFT JOIN haftalik_kapanis_revizyon_corrections c ON c.id = t.correction_event_id';
+        }
+        $sql .= ' WHERE t.id = :id';
         $stmt = $pdo->prepare($sql);
         $stmt->execute(['id' => $id]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -1231,9 +1470,18 @@ class RevizyonController
     {
         self::assertSchemaReady();
         $pdo = Connection::get();
-        $stmt = $pdo->query("SHOW TABLES LIKE 'haftalik_kapanis_revizyon_corrections'");
-        if (!$stmt || !$stmt->fetch(PDO::FETCH_NUM)) {
+        if (!self::correctionsTableExists($pdo)) {
             JsonResponse::error(409, 'SCHEMA_NOT_READY', 'Revizyon correction semasi hazir degil.');
+        }
+    }
+
+    private static function correctionsTableExists(PDO $pdo): bool
+    {
+        try {
+            $stmt = $pdo->query("SHOW TABLES LIKE 'haftalik_kapanis_revizyon_corrections'");
+            return (bool) ($stmt && $stmt->fetch(PDO::FETCH_NUM));
+        } catch (Throwable $e) {
+            return false;
         }
     }
 
@@ -1339,9 +1587,16 @@ class RevizyonController
             return [];
         }
 
-        $sql = 'SELECT c.*
+        $sql = 'SELECT c.*,
+                       CONCAT(TRIM(p.ad), CHAR(32), TRIM(p.soyad)) AS personel_ad_soyad,
+                       p.sicil_no AS sicil_no,
+                       p.departman_id AS departman_id,
+                       d.ad AS departman_adi,
+                       s.ad AS sube_adi
                 FROM haftalik_kapanis_revizyon_corrections c
                 INNER JOIN personeller p ON p.id = c.personel_id
+                LEFT JOIN departmanlar d ON d.id = p.departman_id
+                LEFT JOIN subeler s ON s.id = c.sube_id
                 INNER JOIN haftalik_kapanis_revizyon_talepleri t ON t.id = c.revizyon_talebi_id';
         if (count($where) > 0) {
             $sql .= ' WHERE ' . implode(' AND ', $where);
@@ -1357,10 +1612,25 @@ class RevizyonController
     /** @return array<string, mixed>|null */
     private static function loadCorrectionById(PDO $pdo, int $id, bool $forUpdate)
     {
-        $sql = 'SELECT * FROM haftalik_kapanis_revizyon_corrections WHERE id = :id';
         if ($forUpdate) {
-            $sql .= ' FOR UPDATE';
+            $sql = 'SELECT * FROM haftalik_kapanis_revizyon_corrections WHERE id = :id FOR UPDATE';
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute(['id' => $id]);
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+            return $row ?: null;
         }
+
+        $sql = 'SELECT c.*,
+                       CONCAT(TRIM(p.ad), CHAR(32), TRIM(p.soyad)) AS personel_ad_soyad,
+                       p.sicil_no AS sicil_no,
+                       p.departman_id AS departman_id,
+                       d.ad AS departman_adi,
+                       s.ad AS sube_adi
+                FROM haftalik_kapanis_revizyon_corrections c
+                INNER JOIN personeller p ON p.id = c.personel_id
+                LEFT JOIN departmanlar d ON d.id = p.departman_id
+                LEFT JOIN subeler s ON s.id = c.sube_id
+                WHERE c.id = :id';
         $stmt = $pdo->prepare($sql);
         $stmt->execute(['id' => $id]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -1393,6 +1663,14 @@ class RevizyonController
             'id' => (int) $row['id'],
             'revizyon_talebi_id' => (int) $row['revizyon_talebi_id'],
             'personel_id' => (int) $row['personel_id'],
+            'personel_ad_soyad' => isset($row['personel_ad_soyad']) ? (string) $row['personel_ad_soyad'] : null,
+            'sicil_no' => isset($row['sicil_no']) ? (string) $row['sicil_no'] : null,
+            'sube_id' => isset($row['sube_id']) ? (int) $row['sube_id'] : null,
+            'sube_adi' => isset($row['sube_adi']) ? (string) $row['sube_adi'] : null,
+            'departman_id' => array_key_exists('departman_id', $row) && $row['departman_id'] !== null
+                ? (int) $row['departman_id']
+                : null,
+            'departman_adi' => isset($row['departman_adi']) ? (string) $row['departman_adi'] : null,
             'hafta_baslangic' => (string) $row['hafta_baslangic'],
             'hafta_bitis' => (string) $row['hafta_bitis'],
             'etkilenen_tarih' => (string) $row['etkilenen_tarih'],
@@ -1847,4 +2125,376 @@ class RevizyonController
     {
         JsonResponse::error(409, $code, $message);
     }
+
+    /** @return array<int, array<string, mixed>> */
+    private static function loadAuditGecmisi(PDO $pdo, int $talepId): array
+    {
+        $stmt = $pdo->prepare(
+            'SELECT g.aksiyon, g.onceki_durum, g.yeni_durum, g.aciklama,
+                    g.islem_yapan_kullanici_id, g.islem_zamani, u.ad_soyad AS islem_yapan_kullanici_adi
+             FROM haftalik_kapanis_revizyon_talebi_gecmisi g
+             LEFT JOIN users u ON u.id = g.islem_yapan_kullanici_id
+             WHERE g.revizyon_talebi_id = :talep_id
+             ORDER BY g.islem_zamani ASC, g.id ASC'
+        );
+        $stmt->execute(['talep_id' => $talepId]);
+        $items = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) ?: [] as $row) {
+            $items[] = [
+                'aksiyon' => (string) $row['aksiyon'],
+                'onceki_durum' => $row['onceki_durum'] !== null ? (string) $row['onceki_durum'] : null,
+                'sonraki_durum' => (string) $row['yeni_durum'],
+                'islem_yapan_kullanici_id' => (int) $row['islem_yapan_kullanici_id'],
+                'islem_yapan_kullanici_adi' => $row['islem_yapan_kullanici_adi'] !== null
+                    ? (string) $row['islem_yapan_kullanici_adi']
+                    : null,
+                'islem_zamani' => self::toIsoDatetime((string) $row['islem_zamani']),
+                'aciklama' => $row['aciklama'] !== null ? (string) $row['aciklama'] : null,
+            ];
+        }
+
+        return $items;
+    }
+
+    /**
+     * @return mixed
+     */
+    private static function resolveCanonicalOncekiDeger(
+        PDO $pdo,
+        string $kaynakTipi,
+        int $kaynakId,
+        int $personelId,
+        string $etkilenenTarih,
+        string $haftaBaslangic,
+        string $haftaBitis,
+        string $revizyonTipi
+    ) {
+        $tipi = strtoupper(trim($kaynakTipi));
+
+        if ($tipi === 'PUANTAJ') {
+            $stmt = $pdo->prepare(
+                'SELECT *
+                 FROM gunluk_puantaj
+                 WHERE id = :id AND personel_id = :personel_id AND tarih = :tarih
+                 LIMIT 1'
+            );
+            $stmt->execute([
+                'id' => $kaynakId,
+                'personel_id' => $personelId,
+                'tarih' => $etkilenenTarih,
+            ]);
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$row) {
+                JsonResponse::error(404, 'TARGET_NOT_FOUND', 'Revize edilecek kaynak bulunamadi.');
+            }
+            $payload = [
+                'id' => (int) $row['id'],
+                'personel_id' => (int) $row['personel_id'],
+                'tarih' => (string) $row['tarih'],
+            ];
+            foreach ([
+                'giris_saati',
+                'cikis_saati',
+                'gun_tipi',
+                'hareket_durumu',
+                'dayanak',
+                'hesap_etkisi',
+            ] as $field) {
+                if (array_key_exists($field, $row)) {
+                    $payload[$field] = $row[$field];
+                }
+            }
+            foreach (['gercek_mola_dakika', 'gec_kalma_dakika', 'net_calisma_suresi_dakika'] as $field) {
+                if (array_key_exists($field, $row)) {
+                    $payload[$field] = $row[$field] !== null ? (int) $row[$field] : null;
+                }
+            }
+            return $payload;
+        }
+
+        if ($tipi === 'HAFTALIK_KAPANIS_SATIR' || $tipi === 'KAPANIS_SATIR') {
+            $stmt = $pdo->prepare(
+                'SELECT *
+                 FROM haftalik_kapanis_satirlari
+                 WHERE id = :id AND personel_id = :personel_id
+                   AND hafta_baslangic = :hafta_baslangic AND hafta_bitis = :hafta_bitis
+                 LIMIT 1'
+            );
+            $stmt->execute([
+                'id' => $kaynakId,
+                'personel_id' => $personelId,
+                'hafta_baslangic' => $haftaBaslangic,
+                'hafta_bitis' => $haftaBitis,
+            ]);
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$row) {
+                JsonResponse::error(404, 'TARGET_NOT_FOUND', 'Revize edilecek kaynak bulunamadi.');
+            }
+            $payload = ['id' => (int) $row['id'], 'personel_id' => (int) $row['personel_id']];
+            foreach ([
+                'hafta_baslangic',
+                'hafta_bitis',
+                'toplam_net_dakika',
+                'normal_calisma_dakika',
+                'fazla_calisma_dakika',
+                'fazla_surelerle_calisma_dakika',
+                'tam_hafta_verisi',
+                'kaynak_gun_sayisi',
+            ] as $field) {
+                if (array_key_exists($field, $row)) {
+                    $payload[$field] = $row[$field];
+                }
+            }
+            return $payload;
+        }
+
+        if ($tipi === 'SERBEST_ZAMAN') {
+            $stmt = $pdo->prepare(
+                'SELECT *
+                 FROM serbest_zaman_events
+                 WHERE id = :id AND personel_id = :personel_id AND event_tarihi = :tarih
+                 LIMIT 1'
+            );
+            try {
+                $stmt->execute([
+                    'id' => $kaynakId,
+                    'personel_id' => $personelId,
+                    'tarih' => $etkilenenTarih,
+                ]);
+            } catch (PDOException $e) {
+                JsonResponse::error(404, 'TARGET_NOT_FOUND', 'Revize edilecek kaynak bulunamadi.');
+            }
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$row) {
+                JsonResponse::error(404, 'TARGET_NOT_FOUND', 'Revize edilecek kaynak bulunamadi.');
+            }
+            $payload = ['id' => (int) $row['id']];
+            foreach (['event_tipi', 'dakika', 'yeni_dakika', 'event_tarihi', 'aciklama'] as $field) {
+                if (array_key_exists($field, $row)) {
+                    $payload[$field] = $row[$field];
+                }
+            }
+            return $payload;
+        }
+
+        if ($tipi === 'SUREC') {
+            $stmt = $pdo->prepare(
+                'SELECT * FROM surecler WHERE id = :id AND personel_id = :personel_id LIMIT 1'
+            );
+            $stmt->execute(['id' => $kaynakId, 'personel_id' => $personelId]);
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$row) {
+                JsonResponse::error(404, 'TARGET_NOT_FOUND', 'Revize edilecek kaynak bulunamadi.');
+            }
+            $payload = ['id' => (int) $row['id']];
+            foreach ([
+                'surec_turu',
+                'alt_tur',
+                'baslangic_tarihi',
+                'bitis_tarihi',
+                'ucretli_mi',
+                'state',
+                'aciklama',
+            ] as $field) {
+                if (array_key_exists($field, $row)) {
+                    $payload[$field] = $row[$field];
+                }
+            }
+            return $payload;
+        }
+
+        // Bordro etki notu / generic fallback for closed week context
+        if ($revizyonTipi === 'BORDRO_ETKI_NOTU') {
+            return ['bordro_etki_notu' => null];
+        }
+
+        JsonResponse::error(404, 'TARGET_NOT_FOUND', 'Revize edilecek kaynak bulunamadi.');
+        return null;
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    private static function listKaynakSecenekleri(
+        PDO $pdo,
+        int $personelId,
+        string $haftaBaslangic,
+        string $haftaBitis
+    ): array {
+        $items = [];
+
+        $puantajStmt = $pdo->prepare(
+            'SELECT *
+             FROM gunluk_puantaj
+             WHERE personel_id = :personel_id
+               AND tarih >= :hafta_baslangic AND tarih <= :hafta_bitis
+             ORDER BY tarih ASC, id ASC'
+        );
+        $puantajStmt->execute([
+            'personel_id' => $personelId,
+            'hafta_baslangic' => $haftaBaslangic,
+            'hafta_bitis' => $haftaBitis,
+        ]);
+        foreach ($puantajStmt->fetchAll(PDO::FETCH_ASSOC) ?: [] as $row) {
+            $mevcut = [
+                'giris_saati' => $row['giris_saati'] ?? null,
+                'cikis_saati' => $row['cikis_saati'] ?? null,
+                'net_calisma_suresi_dakika' => array_key_exists('net_calisma_suresi_dakika', $row) && $row['net_calisma_suresi_dakika'] !== null
+                    ? (int) $row['net_calisma_suresi_dakika']
+                    : null,
+                'hareket_durumu' => $row['hareket_durumu'] ?? null,
+                'dayanak' => $row['dayanak'] ?? null,
+            ];
+            $label = sprintf(
+                '%s — Puantaj %s-%s',
+                (string) $row['tarih'],
+                (string) ($row['giris_saati'] ?? '-'),
+                (string) ($row['cikis_saati'] ?? '-')
+            );
+            $items[] = [
+                'kaynak_tipi' => 'PUANTAJ',
+                'kaynak_id' => (int) $row['id'],
+                'etkilenen_tarih' => (string) $row['tarih'],
+                'kaynak_turu_label' => 'Günlük puantaj',
+                'mevcut_deger' => $mevcut,
+                'goruntuleme_etiketi' => $label,
+                'uygun_revizyon_tipleri' => [
+                    'PUANTAJ_GIRIS_CIKIS_DUZELTME',
+                    'MOLA_DUZELTME',
+                    'DEVAMSIZLIK_DUZELTME',
+                ],
+            ];
+        }
+
+        $satirStmt = $pdo->prepare(
+            "SELECT id, hafta_baslangic, hafta_bitis, toplam_net_dakika, fazla_calisma_dakika
+             FROM haftalik_kapanis_satirlari
+             WHERE personel_id = :personel_id
+               AND hafta_baslangic = :hafta_baslangic AND hafta_bitis = :hafta_bitis
+               AND state = 'KAPANDI'
+             ORDER BY id ASC"
+        );
+        $satirStmt->execute([
+            'personel_id' => $personelId,
+            'hafta_baslangic' => $haftaBaslangic,
+            'hafta_bitis' => $haftaBitis,
+        ]);
+        foreach ($satirStmt->fetchAll(PDO::FETCH_ASSOC) ?: [] as $row) {
+            $mevcut = [
+                'toplam_net_dakika' => (int) $row['toplam_net_dakika'],
+                'fazla_calisma_dakika' => (int) $row['fazla_calisma_dakika'],
+            ];
+            $items[] = [
+                'kaynak_tipi' => 'HAFTALIK_KAPANIS_SATIR',
+                'kaynak_id' => (int) $row['id'],
+                'etkilenen_tarih' => $haftaBaslangic,
+                'kaynak_turu_label' => 'Haftalık kapanış satırı',
+                'mevcut_deger' => $mevcut,
+                'goruntuleme_etiketi' => sprintf(
+                    '%s — %s kapanış (net %d dk)',
+                    $haftaBaslangic,
+                    $haftaBitis,
+                    (int) $row['toplam_net_dakika']
+                ),
+                'uygun_revizyon_tipleri' => [
+                    'KAPANIS_HESAP_REVIZYONU',
+                    'BORDRO_ETKI_NOTU',
+                ],
+            ];
+        }
+
+        try {
+            $szStmt = $pdo->prepare(
+                'SELECT id, event_tipi, dakika, yeni_dakika, event_tarihi
+                 FROM serbest_zaman_events
+                 WHERE personel_id = :personel_id
+                   AND event_tarihi >= :hafta_baslangic AND event_tarihi <= :hafta_bitis
+                 ORDER BY event_tarihi ASC, id ASC'
+            );
+            $szStmt->execute([
+                'personel_id' => $personelId,
+                'hafta_baslangic' => $haftaBaslangic,
+                'hafta_bitis' => $haftaBitis,
+            ]);
+            foreach ($szStmt->fetchAll(PDO::FETCH_ASSOC) ?: [] as $row) {
+                $items[] = [
+                    'kaynak_tipi' => 'SERBEST_ZAMAN',
+                    'kaynak_id' => (int) $row['id'],
+                    'etkilenen_tarih' => (string) $row['event_tarihi'],
+                    'kaynak_turu_label' => 'Serbest zaman etkisi',
+                    'mevcut_deger' => [
+                        'event_tipi' => (string) $row['event_tipi'],
+                        'dakika' => $row['dakika'] !== null ? (int) $row['dakika'] : null,
+                        'yeni_dakika' => $row['yeni_dakika'] !== null ? (int) $row['yeni_dakika'] : null,
+                    ],
+                    'goruntuleme_etiketi' => sprintf(
+                        '%s — %s',
+                        (string) $row['event_tarihi'],
+                        (string) $row['event_tipi']
+                    ),
+                    'uygun_revizyon_tipleri' => ['SERBEST_ZAMAN_ETKI_DUZELTME'],
+                ];
+            }
+        } catch (PDOException $e) {
+            // table may be absent in partial envs
+        }
+
+        $surecStmt = $pdo->prepare(
+            'SELECT id, surec_turu, baslangic_tarihi, bitis_tarihi, state
+             FROM surecler
+             WHERE personel_id = :personel_id
+               AND baslangic_tarihi <= :hafta_bitis
+               AND (bitis_tarihi IS NULL OR bitis_tarihi >= :hafta_baslangic)
+             ORDER BY baslangic_tarihi ASC, id ASC'
+        );
+        $surecStmt->execute([
+            'personel_id' => $personelId,
+            'hafta_baslangic' => $haftaBaslangic,
+            'hafta_bitis' => $haftaBitis,
+        ]);
+        foreach ($surecStmt->fetchAll(PDO::FETCH_ASSOC) ?: [] as $row) {
+            $etkilenen = (string) $row['baslangic_tarihi'];
+            if ($etkilenen < $haftaBaslangic) {
+                $etkilenen = $haftaBaslangic;
+            }
+            if ($etkilenen > $haftaBitis) {
+                $etkilenen = $haftaBitis;
+            }
+            $items[] = [
+                'kaynak_tipi' => 'SUREC',
+                'kaynak_id' => (int) $row['id'],
+                'etkilenen_tarih' => $etkilenen,
+                'kaynak_turu_label' => 'Süreç / geç giriş',
+                'mevcut_deger' => [
+                    'surec_turu' => (string) $row['surec_turu'],
+                    'baslangic_tarihi' => (string) $row['baslangic_tarihi'],
+                    'bitis_tarihi' => $row['bitis_tarihi'] !== null ? (string) $row['bitis_tarihi'] : null,
+                    'state' => (string) $row['state'],
+                ],
+                'goruntuleme_etiketi' => sprintf(
+                    '%s — %s (%s)',
+                    (string) $row['baslangic_tarihi'],
+                    (string) $row['surec_turu'],
+                    (string) $row['state']
+                ),
+                'uygun_revizyon_tipleri' => ['SUREC_GEC_GIRIS'],
+            ];
+        }
+
+        return $items;
+    }
+
+    /**
+     * @param mixed $left
+     * @param mixed $right
+     */
+    private static function jsonValuesEqual($left, $right): bool
+    {
+        try {
+            $a = json_encode($left, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+            $b = json_encode($right, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+            return $a === $b;
+        } catch (JsonException $e) {
+            return false;
+        }
+    }
+
 }

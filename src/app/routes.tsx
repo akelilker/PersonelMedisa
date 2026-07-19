@@ -1,4 +1,4 @@
-import { Link, Navigate, Route, Routes, useOutletContext } from "react-router-dom";
+import { Link, Route, Routes, useOutletContext } from "react-router-dom";
 import { AppShell, type AppShellOutletContext } from "./AppShell";
 import { MainMenu } from "../components/main-menu/MainMenu";
 import { ProtectedRoute } from "../router/ProtectedRoute";
@@ -14,6 +14,11 @@ import { FinansPage } from "../features/finans/pages/FinansPage";
 import { YonetimPaneliPage } from "../features/yonetim/pages/YonetimPaneliPage";
 import { LoginPage } from "../features/auth/pages/LoginPage";
 import { InternalDiagnosticsPage } from "./InternalDiagnosticsPage";
+import { HaftalikKapanisPage } from "../features/revizyon/pages/HaftalikKapanisPage";
+import { RevizyonMerkeziPage } from "../features/revizyon/pages/RevizyonMerkeziPage";
+import { RevizyonTalebiDetailPage } from "../features/revizyon/pages/RevizyonTalebiDetailPage";
+import { RevizyonTalebiCreatePage } from "../features/revizyon/pages/RevizyonTalebiCreatePage";
+import { RevizyonCorrectionDetailPage } from "../features/revizyon/pages/RevizyonCorrectionDetailPage";
 import {
   PERSONELLER_LIST_ANY,
   ROUTE_PERMISSION,
@@ -123,7 +128,46 @@ export function AppRoutes() {
             </ProtectedRoute>
           }
         />
-        <Route path="haftalik-kapanis" element={<Navigate to="/" replace />} />
+        <Route
+          path="haftalik-kapanis"
+          element={
+            <ProtectedRoute requirePermission={ROUTE_PERMISSION.haftalikKapanisPage}>
+              <HaftalikKapanisPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="haftalik-kapanis/revizyonlar"
+          element={
+            <ProtectedRoute requirePermission={ROUTE_PERMISSION.haftalikKapanisPage}>
+              <RevizyonMerkeziPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="haftalik-kapanis/revizyonlar/yeni"
+          element={
+            <ProtectedRoute requirePermission={ROUTE_PERMISSION.haftalikKapanisPage}>
+              <RevizyonTalebiCreatePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="haftalik-kapanis/revizyonlar/:revizyonId"
+          element={
+            <ProtectedRoute requirePermission={ROUTE_PERMISSION.haftalikKapanisPage}>
+              <RevizyonTalebiDetailPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="haftalik-kapanis/corrections/:correctionId"
+          element={
+            <ProtectedRoute requirePermission={ROUTE_PERMISSION.haftalikKapanisPage}>
+              <RevizyonCorrectionDetailPage />
+            </ProtectedRoute>
+          }
+        />
         <Route
           path="raporlar"
           element={

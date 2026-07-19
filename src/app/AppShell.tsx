@@ -80,6 +80,9 @@ function resolveModuleModal(pathname: string, tabParam: string | null): ModuleMo
   if (pathname === "/puantaj") {
     return { title: "Günlük Puantaj", closeTo: "/", titleVariant: "premium" };
   }
+  if (pathname.startsWith("/haftalik-kapanis")) {
+    return { title: "Haftalık Kapanış / Revizyon", closeTo: "/", titleVariant: "premium" };
+  }
   if (pathname === "/finans") {
     return { title: "Finans", closeTo: "/", titleVariant: "premium" };
   }

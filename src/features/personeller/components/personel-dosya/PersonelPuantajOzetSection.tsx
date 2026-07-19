@@ -159,13 +159,17 @@ function formatRevizyonCorrectionSummary(correction: RevizyonCorrectionEvent) {
 }
 
 function PersonelRevizyonCorrectionPanel({
+  personelId,
   canViewRevizyon,
+  canCreateRevizyon,
   isLoading,
   errorMessage,
   talepler,
   corrections
 }: {
+  personelId: number;
   canViewRevizyon: boolean;
+  canCreateRevizyon: boolean;
   isLoading: boolean;
   errorMessage: string | null;
   talepler: RevizyonTalebi[];
@@ -182,7 +186,7 @@ function PersonelRevizyonCorrectionPanel({
   return (
     <DossierSection
       title="Revizyon / Correction İzleri"
-      description="Kapalı dönem düzeltme talepleri ve üretilen correction etkileri burada salt okunur izlenir."
+      description="Kapalı dönem düzeltme talepleri ve üretilen correction etkileri. Ham snapshot değişmez; correction görünürlüğü rapor motoru overlay’i değildir."
     >
       {!canViewRevizyon ? (
         <DossierRecord label="Yetki" value="Revizyon kayıtlarını görüntüleme yetkiniz yok." />
@@ -198,26 +202,63 @@ function PersonelRevizyonCorrectionPanel({
           <DossierRecord label="Toplam Talep" value={String(talepler.length)} />
           <DossierRecord label="Açık Talep" value={String(acikTalepSayisi)} />
           <DossierRecord label="Onaylanan Talep" value={String(onayliTalepSayisi)} />
-          <DossierRecord label="Aktif Correction" value={String(aktifCorrectionSayisi)} />
+          <DossierRecord
+            label="Aktif Correction"
+            value={
+              aktifCorrectionSayisi > 0
+                ? `${aktifCorrectionSayisi} (aktif correction etiketi)`
+                : "0"
+            }
+          />
+
+          <div className="universal-btn-group" style={{ marginBottom: "0.75rem", flexWrap: "wrap" }}>
+            <Link
+              className="universal-btn-aux"
+              to={`/haftalik-kapanis/revizyonlar?personel_id=${personelId}`}
+              data-testid="personel-revizyon-tumunu-gor"
+            >
+              Tümünü Gör
+            </Link>
+            {canCreateRevizyon ? (
+              <Link
+                className="universal-btn-save"
+                to={`/haftalik-kapanis/revizyonlar/yeni?personel_id=${personelId}`}
+                data-testid="personel-revizyon-talebi-ac"
+              >
+                Revizyon Talebi Aç
+              </Link>
+            ) : null}
+          </div>
 
           {talepler.length === 0 && corrections.length === 0 ? (
             <DossierRecord label="Kayıt" value="Bu personel için revizyon veya correction kaydı yok." />
           ) : null}
 
           {sonTalepler.map((talep) => (
-            <DossierRecord
-              key={`revizyon-talebi-${talep.id}`}
-              label={`Talep #${talep.id}`}
-              value={formatRevizyonTalebiSummary(talep)}
-            />
+            <div key={`revizyon-talebi-${talep.id}`}>
+              <DossierRecord label={`Talep #${talep.id}`} value={formatRevizyonTalebiSummary(talep)} />
+              <Link
+                className="universal-btn-aux"
+                to={`/haftalik-kapanis/revizyonlar/${talep.id}`}
+              >
+                Talep detayına git
+              </Link>
+            </div>
           ))}
 
           {sonCorrections.map((correction) => (
-            <DossierRecord
-              key={`revizyon-correction-${correction.id}`}
-              label={`Correction #${correction.id}`}
-              value={formatRevizyonCorrectionSummary(correction)}
-            />
+            <div key={`revizyon-correction-${correction.id}`}>
+              <DossierRecord
+                label={`Correction #${correction.id}${correction.iptal_edildi_mi ? "" : " · Aktif"}`}
+                value={formatRevizyonCorrectionSummary(correction)}
+              />
+              <Link
+                className="universal-btn-aux"
+                to={`/haftalik-kapanis/corrections/${correction.id}`}
+              >
+                Correction detayına git
+              </Link>
+            </div>
           ))}
         </>
       ) : null}
@@ -229,12 +270,14 @@ export function PersonelPuantajOzetSection({
   personel,
   canViewPuantaj,
   canViewRevizyon,
+  canCreateRevizyon = false,
   canViewFinans,
   isActive
 }: {
   personel: Personel;
   canViewPuantaj: boolean;
   canViewRevizyon: boolean;
+  canCreateRevizyon?: boolean;
   canViewFinans: boolean;
   isActive: boolean;
 }) {
@@ -557,7 +600,9 @@ export function PersonelPuantajOzetSection({
       </DossierSection>
 
       <PersonelRevizyonCorrectionPanel
+        personelId={personel.id}
         canViewRevizyon={canViewRevizyon}
+        canCreateRevizyon={canCreateRevizyon}
         isLoading={isRevizyonLoading}
         errorMessage={revizyonErrorMessage}
         talepler={revizyonTalepleri}

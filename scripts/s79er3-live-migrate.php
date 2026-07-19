@@ -11,10 +11,9 @@ header('X-Content-Type-Options: nosniff');
 
 $tokenExpected = 'REPLACE_S79ER3_MIGRATE_TOKEN';
 $tokenProvided = isset($_GET['token']) ? (string) $_GET['token'] : '';
-// Placeholder/sentinel must never be accepted as a live token.
+// Workflow greps for UNSET_S79ER3_MIGRATE_TOKEN; live token must be openssl rand -hex 24.
 if (
-    $tokenExpected === 'REPLACE_S79ER3_MIGRATE_TOKEN'
-    || $tokenExpected === 'UNSET_S79ER3_MIGRATE_TOKEN'
+    !preg_match('/^[a-f0-9]{48}$/', $tokenExpected)
     || $tokenProvided === ''
     || !hash_equals($tokenExpected, $tokenProvided)
 ) {

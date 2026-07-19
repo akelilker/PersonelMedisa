@@ -1209,6 +1209,7 @@ if ($action === 'smoke_prepare') {
     $personelId = 0;
     $main = null;
     $surecId = 0;
+    $tempUserSube = null;
 
     try {
         $pdo->beginTransaction();
@@ -1258,6 +1259,20 @@ if ($action === 'smoke_prepare') {
         ]);
         $surecId = (int) $pdo->lastInsertId();
 
+        // BOLUM is on sube 2 in prod; grant temporary smoke-sube access so ownership
+        // (not scope) is exercised for non-owner gonder. Exact row cleaned up later.
+        $bolumUser = $roles['BOLUM_YONETICISI'];
+        if ($bolumUser !== null) {
+            $bolumId = (int) $bolumUser['id'];
+            $hasSube = $pdo->prepare('SELECT 1 FROM user_subeler WHERE user_id = :u AND sube_id = :s LIMIT 1');
+            $hasSube->execute(['u' => $bolumId, 's' => $subeId]);
+            if (!$hasSube->fetchColumn()) {
+                $insUs = $pdo->prepare('INSERT INTO user_subeler (user_id, sube_id) VALUES (:u, :s)');
+                $insUs->execute(['u' => $bolumId, 's' => $subeId]);
+                $tempUserSube = ['user_id' => $bolumId, 'sube_id' => $subeId];
+            }
+        }
+
         $pdo->commit();
     } catch (Throwable $e) {
         if ($pdo->inTransaction()) {
@@ -1277,6 +1292,7 @@ if ($action === 'smoke_prepare') {
         'surec_id' => $surecId,
         'open_kapanis_id' => 0,
         'kapanis_ids' => [(int) $main['kapanis_id']],
+        'temp_user_sube' => $tempUserSube,
         'hafta_baslangic' => S79_SMOKE_WEEK_START,
         'hafta_bitis' => S79_SMOKE_WEEK_END,
         'open_hafta_baslangic' => S79_SMOKE_OPEN_WEEK_START,
@@ -1399,18 +1415,12 @@ if ($action === 'smoke_run') {
         $skip('PATRON list');
     }
 
-    $create1 = s79_http('POST', '/haftalik-kapanis/revizyon-talepleri', array_merge(
-        s79_rt_create_body(
-            $personelId,
-            $snapshotId,
-            $etkilenen,
-            $hb,
-            $he
-        ),
-        [
-            'bordro_etki_var_mi' => true,
-            'bordro_etki_notu' => S79_SMOKE_MARKER . ' bordro',
-        ]
+    $create1 = s79_http('POST', '/haftalik-kapanis/revizyon-talepleri', s79_rt_create_body(
+        $personelId,
+        $snapshotId,
+        $etkilenen,
+        $hb,
+        $he
     ), $baH);
     $talep1 = (int) ($create1['payload']['data']['id'] ?? 0);
     $pass(
@@ -1441,7 +1451,7 @@ if ($action === 'smoke_run') {
         true
     );
 
-    $gonder1 = s79_http('POST', '/haftalik-kapanis/revizyon-talepleri/' . $talep1 . '/gonder', [], $baH);
+    $gonder1 = s79_http('POST', '/haftalik-kapanis/revizyon-talepleri/' . $talep1 . '/gonder', null, $baH);
     $pass(
         'BA owner gonder',
         $gonder1['status'] === 200 && ($gonder1['payload']['data']['durum'] ?? '') === 'ONAY_BEKLIYOR',
@@ -1452,12 +1462,17 @@ if ($action === 'smoke_run') {
         $pass('audit GONDER', s79_gecmis_count($pdo, $talep1, 'GONDER') === 1, ['count' => s79_gecmis_count($pdo, $talep1, 'GONDER')]);
     }
 
-    if ($muhH !== null && (int) (($meta['roles']['MUHASEBE']['id'] ?? 0)) !== (int) (($meta['roles']['BIRIM_AMIRI']['id'] ?? 0))) {
-        $nonOwnerGonder = s79_http('POST', '/haftalik-kapanis/revizyon-talepleri/' . $talep1 . '/gonder', [], $muhH);
+    if ($bolumH !== null && (int) (($meta['roles']['BOLUM_YONETICISI']['id'] ?? 0)) !== (int) (($meta['roles']['BIRIM_AMIRI']['id'] ?? 0))) {
+        $nonOwnerGonder = s79_http('POST', '/haftalik-kapanis/revizyon-talepleri/' . $talep1 . '/gonder', null, $bolumH);
         $pass(
             'non-owner gonder',
             $nonOwnerGonder['status'] === 403 && s79_err_code($nonOwnerGonder['payload']) === 'REVISION_OWNER_DENIED',
-            ['status' => $nonOwnerGonder['status'], 'code' => s79_err_code($nonOwnerGonder['payload'])],
+            [
+                'status' => $nonOwnerGonder['status'],
+                'code' => s79_err_code($nonOwnerGonder['payload']),
+                'message' => is_array($nonOwnerGonder['payload']) ? ($nonOwnerGonder['payload']['message'] ?? null) : null,
+                'raw' => isset($nonOwnerGonder['raw']) ? substr((string) $nonOwnerGonder['raw'], 0, 300) : null,
+            ],
             true
         );
     } else {
@@ -1497,7 +1512,7 @@ if ($action === 'smoke_run') {
     if ($talep2 > 0) {
         s79_track_talep($meta, $talep2);
     }
-    $gonder2 = s79_http('POST', '/haftalik-kapanis/revizyon-talepleri/' . $talep2 . '/gonder', [], $baH);
+    $gonder2 = s79_http('POST', '/haftalik-kapanis/revizyon-talepleri/' . $talep2 . '/gonder', null, $baH);
     $pass('second gonder', $gonder2['status'] === 200, ['status' => $gonder2['status']]);
 
     if ($muhH !== null) {
@@ -1560,7 +1575,7 @@ if ($action === 'smoke_run') {
     if ($talep4 > 0) {
         s79_track_talep($meta, $talep4);
     }
-    $gonder4 = s79_http('POST', '/haftalik-kapanis/revizyon-talepleri/' . $talep4 . '/gonder', [], $baH);
+    $gonder4 = s79_http('POST', '/haftalik-kapanis/revizyon-talepleri/' . $talep4 . '/gonder', null, $baH);
     $pass('fourth gonder', $gonder4['status'] === 200, ['status' => $gonder4['status']]);
     $iptal4 = s79_http('POST', '/haftalik-kapanis/revizyon-talepleri/' . $talep4 . '/iptal', [], $baH);
     $pass(
@@ -1674,6 +1689,7 @@ if ($action === 'smoke_cleanup') {
         'kapanis' => 0,
         'surec' => 0,
         'personel' => 0,
+        'temp_user_sube' => 0,
     ];
 
     $talepIds = array_values(array_unique(array_map('intval', $meta['talep_ids'] ?? [])));
@@ -1783,6 +1799,31 @@ if ($action === 'smoke_cleanup') {
                 $d = $pdo->prepare('DELETE FROM personeller WHERE id = :id');
                 $d->execute(['id' => $personelId]);
                 $deleted['personel'] = $d->rowCount();
+            }
+        }
+        $tempUs = $meta['temp_user_sube'] ?? null;
+        if (!is_array($tempUs) && $personelId > 0) {
+            $bolum = s79_load_role_user($pdo, 'BOLUM_YONETICISI');
+            $ps = $pdo->prepare('SELECT sube_id FROM personeller WHERE id = :id');
+            $ps->execute(['id' => $personelId]);
+            $smokeSube = (int) $ps->fetchColumn();
+            if ($bolum !== null && $smokeSube > 0) {
+                $other = $pdo->prepare(
+                    'SELECT COUNT(*) FROM user_subeler WHERE user_id = :u AND sube_id <> :s'
+                );
+                $other->execute(['u' => (int) $bolum['id'], 's' => $smokeSube]);
+                if ((int) $other->fetchColumn() > 0) {
+                    $tempUs = ['user_id' => (int) $bolum['id'], 'sube_id' => $smokeSube];
+                }
+            }
+        }
+        if (is_array($tempUs)) {
+            $uid = (int) ($tempUs['user_id'] ?? 0);
+            $sid = (int) ($tempUs['sube_id'] ?? 0);
+            if ($uid > 0 && $sid > 0) {
+                $d = $pdo->prepare('DELETE FROM user_subeler WHERE user_id = :u AND sube_id = :s');
+                $d->execute(['u' => $uid, 's' => $sid]);
+                $deleted['temp_user_sube'] = $d->rowCount();
             }
         }
         $pdo->commit();

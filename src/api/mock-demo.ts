@@ -1597,6 +1597,85 @@ function findDemoClosedKapanis(haftaBaslangic: string, haftaBitis: string): Haft
   return null;
 }
 
+/** Test helper: seeds TAMAMLANDI mutabakat required before POST /haftalik-kapanis. */
+export function seedDemoHaftalikMutabakatForClose(params: {
+  haftaBaslangic: string;
+  haftaBitis: string;
+  subeId?: number;
+  birimAmiriUserId?: number;
+}): void {
+  const subeId = params.subeId ?? 1;
+  const birimAmiriUserId = params.birimAmiriUserId ?? 1;
+  const exists = demoState.haftalikBildirimMutabakatlari.some(
+    (item) => item.sube_id === subeId && item.hafta_baslangic === params.haftaBaslangic
+  );
+  if (exists) {
+    return;
+  }
+  demoState.haftalikBildirimMutabakatlari.push({
+    id: ++demoState.nextIds.haftalikBildirimMutabakat,
+    sube_id: subeId,
+    birim_amiri_user_id: birimAmiriUserId,
+    hafta_baslangic: params.haftaBaslangic,
+    hafta_bitis: params.haftaBitis,
+    state: "TAMAMLANDI",
+    onaylayan_user_id: birimAmiriUserId,
+    onaylandi_at: new Date().toISOString(),
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  });
+}
+
+function resolveDemoKapanisSubeId(actor: RevizyonActorContext, init?: RequestInit): number | null {
+  const headerRaw = readDemoRequestHeader(init, "X-Active-Sube-Id");
+  const headerSube = headerRaw ? Number.parseInt(headerRaw, 10) : Number.NaN;
+  if (Number.isFinite(headerSube) && headerSube > 0) {
+    if (actor.subeIds.length > 0 && !actor.subeIds.includes(headerSube)) {
+      return null;
+    }
+    return headerSube;
+  }
+  if (actor.subeIds.length === 1) {
+    return actor.subeIds[0];
+  }
+  if (actor.subeIds.length === 0) {
+    return 1;
+  }
+  return null;
+}
+
+function resolveDemoHaftaPair(
+  baslangicRaw: unknown,
+  bitisRaw: unknown
+): { start: string; end: string } | ApiResponse<unknown> {
+  const baslangic =
+    typeof baslangicRaw === "string" && baslangicRaw.trim() !== ""
+      ? baslangicRaw.trim()
+      : "2026-04-06";
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(baslangic)) {
+    return demoRevizyonError("VALIDATION_ERROR", "Hafta baslangici YYYY-MM-DD formatinda olmalidir.");
+  }
+  const startDate = new Date(`${baslangic}T12:00:00`);
+  if (Number.isNaN(startDate.getTime())) {
+    return demoRevizyonError("VALIDATION_ERROR", "Hafta baslangici YYYY-MM-DD formatinda olmalidir.");
+  }
+  const endDate = new Date(startDate);
+  endDate.setDate(startDate.getDate() + 6);
+  const expectedEnd = [
+    endDate.getFullYear(),
+    String(endDate.getMonth() + 1).padStart(2, "0"),
+    String(endDate.getDate()).padStart(2, "0")
+  ].join("-");
+  const bitis = typeof bitisRaw === "string" ? bitisRaw.trim() : "";
+  if (bitis !== "" && bitis !== expectedEnd) {
+    return demoRevizyonError(
+      "VALIDATION_ERROR",
+      `hafta_bitis hafta_baslangic + 6 gun olmalidir (${expectedEnd}).`
+    );
+  }
+  return { start: baslangic, end: expectedEnd };
+}
+
 function hasDemoOpenRevizyonTalebi(params: {
   kaynak_tipi: string;
   kaynak_id: number;
@@ -4442,6 +4521,12 @@ export function resolveDemoApiResponse(
   }
 
   if (pathname === "/haftalik-kapanis/yillik-fazla-calisma" && method === "GET") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(actor, "puantaj.view");
+    if (permissionError) {
+      return permissionError;
+    }
+
     const personelId = toNumber(requestUrl.searchParams.get("personel_id"));
     const yil = toNumber(requestUrl.searchParams.get("yil"));
 
@@ -4458,8 +4543,27 @@ export function resolveDemoApiResponse(
       };
     }
 
+    const personel = demoState.personeller.find((item) => item.id === personelId);
+    if (!personel) {
+      return demoRevizyonError("NOT_FOUND", "Personel bulunamadi.");
+    }
+    if (
+      actor.subeIds.length > 0 &&
+      (typeof personel.sube_id !== "number" || !actor.subeIds.includes(personel.sube_id))
+    ) {
+      return demoRevizyonError("FORBIDDEN", "Bu kayit aktif sube baglaminda goruntulenemiyor.");
+    }
+
+    const scopedKapanislar = Object.values(demoState.kapanisById).filter((kapanis) => {
+      const subeId = (kapanis as HaftalikKapanisSonuc & { sube_id?: number }).sube_id ?? 1;
+      if (actor.subeIds.length > 0 && !actor.subeIds.includes(subeId)) {
+        return false;
+      }
+      return true;
+    });
+
     const ozet = aggregateYillikFazlaCalisma({
-      kapanislar: Object.values(demoState.kapanisById),
+      kapanislar: scopedKapanislar,
       personel_id: personelId,
       yil
     });
@@ -4469,31 +4573,91 @@ export function resolveDemoApiResponse(
 
   const haftalikKapanisDetailMatch = pathname.match(/^\/haftalik-kapanis\/(\d+)$/);
   if (haftalikKapanisDetailMatch && method === "GET") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(actor, "puantaj.view");
+    if (permissionError) {
+      return permissionError;
+    }
+
     const kapanisId = Number.parseInt(haftalikKapanisDetailMatch[1], 10);
     const kayit = demoState.kapanisById[kapanisId];
     if (!kayit) {
+      // Fall through to HTTP layer so 404 status is preserved (apiRequest demo short-circuit).
       return null;
+    }
+    const subeId = (kayit as HaftalikKapanisSonuc & { sube_id?: number }).sube_id ?? 1;
+    if (actor.subeIds.length > 0 && !actor.subeIds.includes(subeId)) {
+      return demoRevizyonError("FORBIDDEN", "Bu kayit aktif sube baglaminda goruntulenemiyor.");
     }
 
     return ok(kayit);
   }
 
   if (pathname === "/haftalik-kapanis" && method === "POST") {
-    const kapanisId = ++demoState.nextIds.kapanis;
-    const hafta_baslangic = toStringValue(body.hafta_baslangic) ?? "2026-04-06";
-    const hafta_bitis = toStringValue(body.hafta_bitis) ?? "2026-04-12";
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(actor, "puantaj.muhurle");
+    if (permissionError) {
+      return permissionError;
+    }
+
+    const subeId = resolveDemoKapanisSubeId(actor, init);
+    if (subeId === null) {
+      return demoRevizyonError("VALIDATION_ERROR", "Haftalik kapanis icin aktif sube secilmelidir.");
+    }
+
+    const week = resolveDemoHaftaPair(body.hafta_baslangic, body.hafta_bitis);
+    if ("errors" in week) {
+      return week;
+    }
+    const { start: hafta_baslangic, end: hafta_bitis } = week;
+
     const departmanIdFromBody = toNumber(body.departman_id);
-    const departman_id = departmanIdFromBody ?? 3;
+    const departman_id =
+      body.departman_id === undefined || body.departman_id === null ? undefined : departmanIdFromBody;
+    if (body.departman_id !== undefined && body.departman_id !== null && departman_id === null) {
+      return demoRevizyonError("VALIDATION_ERROR", "departman_id pozitif tam sayi olmalidir.");
+    }
+
+    const mutabakatlar = demoState.haftalikBildirimMutabakatlari.filter(
+      (item) => item.sube_id === subeId && item.hafta_baslangic === hafta_baslangic
+    );
+    if (mutabakatlar.length < 1) {
+      return demoRevizyonError("STATE_CONFLICT", "Haftalik mutabakat bulunamadi.");
+    }
+    if (mutabakatlar.some((item) => item.state !== "TAMAMLANDI")) {
+      return demoRevizyonError("STATE_CONFLICT", "Haftalik mutabakat tamamlanmamis.");
+    }
+
+    const duplicate = Object.values(demoState.kapanisById).find((item) => {
+      const itemSube = (item as HaftalikKapanisSonuc & { sube_id?: number }).sube_id ?? 1;
+      const itemDepartman = item.departman_id ?? null;
+      const requestDepartman = departman_id ?? null;
+      return (
+        itemSube === subeId &&
+        item.hafta_baslangic === hafta_baslangic &&
+        itemDepartman === requestDepartman
+      );
+    });
+    if (duplicate) {
+      return demoRevizyonError(
+        "STATE_CONFLICT",
+        "Bu sube, hafta ve departman kapsami icin haftalik kapanis zaten olusturulmus."
+      );
+    }
+
+    const kapanisId = ++demoState.nextIds.kapanis;
     const kapsamPersoneller =
-      departmanIdFromBody != null
-        ? demoState.personeller.filter((personel) => personel.departman_id === departman_id)
-        : demoState.personeller;
+      departman_id != null
+        ? demoState.personeller.filter(
+            (personel) => personel.departman_id === departman_id && personel.sube_id === subeId
+          )
+        : demoState.personeller.filter((personel) => personel.sube_id === subeId);
 
     const snapshot = buildHaftalikKapanisSnapshot({
       kapanis_id: kapanisId,
       hafta_baslangic,
       hafta_bitis,
-      departman_id,
+      departman_id: departman_id ?? undefined,
       personeller: kapsamPersoneller.map((personel) => ({
         id: personel.id,
         departman_id: personel.departman_id,
@@ -4505,16 +4669,17 @@ export function resolveDemoApiResponse(
       }
     });
 
-    const response: HaftalikKapanisSonuc = {
+    const response: HaftalikKapanisSonuc & { sube_id: number } = {
       id: kapanisId,
       kapanis_id: kapanisId,
       hafta_baslangic,
       hafta_bitis,
-      departman_id,
+      departman_id: departman_id ?? undefined,
       state: "KAPANDI",
       personel_sayisi: snapshot.personel_sayisi,
       snapshot_satir_sayisi: snapshot.snapshot_satir_sayisi,
-      snapshot_satirlari: snapshot.snapshot_satirlari
+      snapshot_satirlari: snapshot.snapshot_satirlari,
+      sube_id: subeId
     };
     demoState.kapanisById[kapanisId] = response;
 

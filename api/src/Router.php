@@ -12,6 +12,7 @@ use Medisa\Api\Controllers\BildirimPuantajEtkiAdaylariController;
 use Medisa\Api\Controllers\BildirimlerController;
 use Medisa\Api\Controllers\DonemKapanisController;
 use Medisa\Api\Controllers\HaftalikBildirimMutabakatlariController;
+use Medisa\Api\Controllers\HaftalikKapanisController;
 use Medisa\Api\Controllers\EkOdemeKesintiController;
 use Medisa\Api\Controllers\MaasHesaplamaController;
 use Medisa\Api\Controllers\MevzuatParametreController;
@@ -325,6 +326,15 @@ class Router
         }
         if ($path === '/zimmetler' && $method === 'POST') {
             ZimmetlerController::create($this->request);
+        }
+        if ($path === '/haftalik-kapanis/yillik-fazla-calisma' && $method === 'GET') {
+            HaftalikKapanisController::yillikFazlaCalisma($this->request);
+        }
+        if ($path === '/haftalik-kapanis' && $method === 'POST') {
+            HaftalikKapanisController::create($this->request);
+        }
+        if ($method === 'GET' && preg_match('#^/haftalik-kapanis/(\d+)$#', $path, $matches)) {
+            HaftalikKapanisController::detail($this->request, $matches[1]);
         }
         if ($path === '/haftalik-kapanis/revizyon-talepleri' && $method === 'GET') {
             RevizyonController::talepleri($this->request);

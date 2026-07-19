@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { resolveDemoApiResponse } from "../../src/api/mock-demo";
+import { resolveDemoApiResponse, seedDemoHaftalikMutabakatForClose } from "../../src/api/mock-demo";
 import {
   cancelRevizyonCorrection,
   fetchRevizyonCorrectionDetail,
@@ -46,6 +46,10 @@ function closeWeekAndCreateTalep(params: {
   talepEdilenDeger?: number;
   bordroEtkiVarMi?: boolean;
 }) {
+  seedDemoHaftalikMutabakatForClose({
+    haftaBaslangic: params.haftaBaslangic,
+    haftaBitis: params.haftaBitis
+  });
   resolveDemoApiResponse("/haftalik-kapanis", {
     method: "POST",
     body: JSON.stringify({
@@ -395,6 +399,7 @@ describe("revizyon-correction.api", () => {
     const haftaBaslangic = "2026-09-22";
     const haftaBitis = "2026-09-28";
 
+    seedDemoHaftalikMutabakatForClose({ haftaBaslangic, haftaBitis });
     const closed = resolveDemoApiResponse("/haftalik-kapanis", {
       method: "POST",
       body: JSON.stringify({

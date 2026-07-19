@@ -27,10 +27,10 @@ $action = isset($_GET['action']) ? (string) $_GET['action'] : 'preflight';
 const S79_EXPECTED_MIGRATION_SHA256 = '477e27b59e3cdfd8a3686a2dcd5a763f3db4d03d8fb388fc831bdc98a7a73e42';
 const S79_MIGRATION_FILE = '030_haftalik_kapanis_revizyon_talepleri.sql';
 const S79_SMOKE_MARKER = 'S79-E-R3 Production Smoke';
-const S79_SMOKE_WEEK_START = '2038-03-07'; // Monday
-const S79_SMOKE_WEEK_END = '2038-03-13';
-const S79_SMOKE_OPEN_WEEK_START = '2038-03-14';
-const S79_SMOKE_OPEN_WEEK_END = '2038-03-20';
+const S79_SMOKE_WEEK_START = '2038-03-08'; // Monday (MariaDB DAYOFWEEK=2)
+const S79_SMOKE_WEEK_END = '2038-03-14';
+const S79_SMOKE_OPEN_WEEK_START = '2038-03-15';
+const S79_SMOKE_OPEN_WEEK_END = '2038-03-21';
 const S79_SMOKE_TC = '90079000038';
 const S79_SMOKE_SICIL = 'S79ER3-SMOKE';
 
@@ -1204,8 +1204,8 @@ if ($action === 'smoke_prepare') {
     }
 
     $userId = (int) $gy['id'];
-    $etkilenenTarih = '2038-03-08';
-    $openEtkilenen = '2038-03-15';
+    $etkilenenTarih = '2038-03-09';
+    $openEtkilenen = '2038-03-16';
     $personelId = 0;
     $main = null;
 
@@ -1309,10 +1309,10 @@ if ($action === 'smoke_run') {
     $snapshotId = (int) ($meta['snapshot_id'] ?? 0);
     $hb = (string) ($meta['hafta_baslangic'] ?? S79_SMOKE_WEEK_START);
     $he = (string) ($meta['hafta_bitis'] ?? S79_SMOKE_WEEK_END);
-    $etkilenen = (string) ($meta['etkilenen_tarih'] ?? '2038-03-08');
+    $etkilenen = (string) ($meta['etkilenen_tarih'] ?? '2038-03-09');
     $openHb = (string) ($meta['open_hafta_baslangic'] ?? S79_SMOKE_OPEN_WEEK_START);
     $openHe = (string) ($meta['open_hafta_bitis'] ?? S79_SMOKE_OPEN_WEEK_END);
-    $openEtkilenen = (string) ($meta['open_etkilenen_tarih'] ?? '2038-03-15');
+    $openEtkilenen = (string) ($meta['open_etkilenen_tarih'] ?? '2038-03-16');
 
     $gyToken = s79_marker_token($meta, 'GENEL_YONETICI');
     $baToken = s79_marker_token($meta, 'BIRIM_AMIRI');

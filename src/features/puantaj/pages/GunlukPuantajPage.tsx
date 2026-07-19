@@ -721,9 +721,24 @@ export function GunlukPuantajPage() {
       ) : null}
 
       <div className="universal-btn-group" style={{ marginTop: "1rem" }}>
-        <Link className="universal-btn-aux" to="/haftalik-kapanis" data-testid="puantaj-haftalik-kapanis-link">
-          Haftalık Kapanış / Revizyon
-        </Link>
+        {hasPermission("revizyon.view") ? (
+          <>
+            <Link
+              className="universal-btn-aux"
+              to="/haftalik-kapanis"
+              data-testid="puantaj-haftalik-kapanis-link"
+            >
+              Haftalık Kapanış
+            </Link>
+            <Link
+              className="universal-btn-save"
+              to="/haftalik-kapanis/revizyonlar"
+              data-testid="puantaj-revizyon-merkezi-link"
+            >
+              Revizyon Merkezi
+            </Link>
+          </>
+        ) : null}
       </div>
 
       {isMuhurModalOpen ? (

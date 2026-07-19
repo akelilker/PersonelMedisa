@@ -84,7 +84,45 @@ export function revizyonUserMessage(code: string | undefined, fallback: string):
     case "NOT_FOUND":
     case "TARGET_NOT_FOUND":
       return "Kayıt bulunamadı.";
+    case "VALIDATION_ERROR":
+      return fallback.includes("onceki_deger")
+        ? "Eski değer sunucu tarafından çözümlenir; gönderilen değer uyuşmuyor."
+        : fallback;
     default:
       return fallback;
   }
+}
+
+export type RevizyonCreatePrefill = {
+  personel_id?: string | number;
+  hafta_baslangic?: string;
+  hafta_bitis?: string;
+  etkilenen_tarih?: string;
+  kaynak_tipi?: string;
+  kaynak_id?: string | number;
+};
+
+/** Create route with server-owned kaynak prefill query (no client onceki_deger). */
+export function buildRevizyonTalebiCreatePath(prefill: RevizyonCreatePrefill = {}): string {
+  const params = new URLSearchParams();
+  if (prefill.personel_id != null && String(prefill.personel_id) !== "") {
+    params.set("personel_id", String(prefill.personel_id));
+  }
+  if (prefill.hafta_baslangic) {
+    params.set("hafta_baslangic", prefill.hafta_baslangic);
+  }
+  if (prefill.hafta_bitis) {
+    params.set("hafta_bitis", prefill.hafta_bitis);
+  }
+  if (prefill.etkilenen_tarih) {
+    params.set("etkilenen_tarih", prefill.etkilenen_tarih);
+  }
+  if (prefill.kaynak_tipi) {
+    params.set("kaynak_tipi", prefill.kaynak_tipi);
+  }
+  if (prefill.kaynak_id != null && String(prefill.kaynak_id) !== "") {
+    params.set("kaynak_id", String(prefill.kaynak_id));
+  }
+  const query = params.toString();
+  return query ? `/haftalik-kapanis/revizyonlar/yeni?${query}` : "/haftalik-kapanis/revizyonlar/yeni";
 }

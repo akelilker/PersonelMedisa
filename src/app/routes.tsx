@@ -46,7 +46,7 @@ function NotFoundPage() {
 
 function UnauthorizedPage() {
   return (
-    <section className="states-page">
+    <section className="states-page" data-testid="yetkisiz-page">
       <h2>Yetkisiz Erişim</h2>
       <p>Bu modülü görmek için yeterli yetkin yok.</p>
       <Link to="/">Ana ekrana dön</Link>

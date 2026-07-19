@@ -8,6 +8,7 @@ import {
   type FormEvent,
   type KeyboardEvent
 } from "react";
+import { useNavigate } from "react-router-dom";
 import { FormField } from "../../../components/form/FormField";
 import { ErrorState } from "../../../components/states/ErrorState";
 import { LoadingState } from "../../../components/states/LoadingState";
@@ -157,6 +158,7 @@ export function KayitSurecWorkspace({
   primaryFormId
 }: KayitSurecWorkspaceProps) {
   const { hasPermission } = useRoleAccess();
+  const navigate = useNavigate();
   const canCreatePersonel = hasPermission("personeller.create");
   const canCreateSurec = hasPermission("surecler.create");
   const canUpdatePersonel = hasPermission("personeller.update");
@@ -164,6 +166,8 @@ export function KayitSurecWorkspace({
   const canCreateZimmet = canUpdatePersonel;
   const canCreateFinans = hasPermission("finans.create");
   const canEditSurec = hasPermission("surecler.update");
+  const canViewPuantaj = hasPermission("puantaj.view");
+  const canViewRevizyon = hasPermission("revizyon.view");
   /** Pozisyon: `updatePersonel` + `createSurec(POZISYON_DEGISTI)` — ikisi de zorunlu. */
   const canSubmitPozisyon = canUpdatePersonel && canCreateSurec;
 
@@ -968,6 +972,42 @@ export function KayitSurecWorkspace({
       }`}
     >
       <KayitSurecTabHeader activeTab={activeTab} onTabChange={onTabChange} />
+
+      {canViewPuantaj || canViewRevizyon ? (
+        <nav
+          className="universal-btn-group"
+          style={{ marginBottom: "0.75rem", flexWrap: "wrap", gap: "0.5rem" }}
+          aria-label="Kayıt ve süreç operasyon alanları"
+          data-testid="kayit-surec-ops-links"
+        >
+          {canViewPuantaj ? (
+            <button
+              type="button"
+              className="universal-btn-aux"
+              data-testid="kayit-surec-puantaj-link"
+              onClick={() => {
+                onClose();
+                navigate("/puantaj");
+              }}
+            >
+              Puantaj / Haftalık Kapanış
+            </button>
+          ) : null}
+          {canViewRevizyon ? (
+            <button
+              type="button"
+              className="universal-btn-save"
+              data-testid="kayit-surec-revizyon-merkezi-link"
+              onClick={() => {
+                onClose();
+                navigate("/haftalik-kapanis/revizyonlar");
+              }}
+            >
+              Revizyon Merkezi
+            </button>
+          ) : null}
+        </nav>
+      ) : null}
 
       {activeTab === "surec" && !classicSurecFormLayout && !selectedSurecPersonel ? (
         <div className="surec-workspace-toolbar" ref={surecSearchToolbarRef}>

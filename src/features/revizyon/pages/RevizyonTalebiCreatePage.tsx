@@ -22,17 +22,23 @@ function mondayOf(dateStr: string): string | null {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
     return null;
   }
-  const date = new Date(`${dateStr}T00:00:00`);
+  const date = new Date(`${dateStr}T12:00:00`);
   const day = date.getDay();
   const diff = day === 0 ? -6 : 1 - day;
   date.setDate(date.getDate() + diff);
-  return date.toISOString().slice(0, 10);
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
 }
 
 function addDays(dateStr: string, days: number): string {
-  const date = new Date(`${dateStr}T00:00:00`);
+  const date = new Date(`${dateStr}T12:00:00`);
   date.setDate(date.getDate() + days);
-  return date.toISOString().slice(0, 10);
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
 }
 
 export function RevizyonTalebiCreatePage() {
@@ -263,6 +269,11 @@ export function RevizyonTalebiCreatePage() {
           onChange={() => undefined}
           disabled
         />
+        <p className="form-hint" data-testid="revizyon-onceki-deger-readonly">
+          {selectedKaynak
+            ? formatRevizyonDeger(selectedKaynak.mevcut_deger)
+            : "Kaynak seçildiğinde sunucu değeri gösterilir"}
+        </p>
 
         <label className="form-label" htmlFor="revizyon-tipi">
           Revizyon tipi
@@ -307,7 +318,7 @@ export function RevizyonTalebiCreatePage() {
         />
 
         {canViewFinance ? (
-          <>
+          <div data-testid="revizyon-bordro-etki-alani">
             <label className="form-label">
               <input
                 type="checkbox"
@@ -322,23 +333,29 @@ export function RevizyonTalebiCreatePage() {
               value={bordroNotu}
               onChange={setBordroNotu}
             />
-          </>
+          </div>
         ) : null}
 
         {errorMessage ? (
-          <p className="workspace-error" role="alert">
+          <p className="workspace-error" role="alert" data-testid="revizyon-create-error">
             {errorMessage}
           </p>
         ) : null}
 
         <div className="universal-btn-group">
-          <button type="submit" className="universal-btn-save" disabled={isSaving}>
+          <button
+            type="submit"
+            className="universal-btn-save"
+            disabled={isSaving}
+            data-testid="revizyon-taslak-kaydet"
+          >
             Taslak Kaydet
           </button>
           <button
             type="button"
             className="universal-btn-aux"
             disabled={isSaving}
+            data-testid="revizyon-kaydet-gonder"
             onClick={(event) => void handleSubmit(event as unknown as FormEvent, true)}
           >
             Kaydet ve Onaya Gönder

@@ -21,14 +21,20 @@ export type RevizyonCorrectionEvent = {
   id: number;
   revizyon_talebi_id: number;
   personel_id: number;
+  personel_ad_soyad?: string | null;
+  sicil_no?: string | null;
+  sube_id?: number | null;
+  sube_adi?: string | null;
+  departman_id?: number | null;
+  departman_adi?: string | null;
   hafta_baslangic: string;
   hafta_bitis: string;
   etkilenen_tarih: string;
   kaynak_tipi: string;
   kaynak_id: number;
   correction_tipi: RevizyonCorrectionTipi;
-  onceki_deger: string | number | boolean | null;
-  yeni_deger: string | number | boolean | null;
+  onceki_deger: string | number | boolean | null | Record<string, unknown>;
+  yeni_deger: string | number | boolean | null | Record<string, unknown>;
   delta_dakika: number;
   delta_gun: number;
   bordro_etki_var_mi: boolean;
@@ -48,6 +54,7 @@ export type RevizyonCorrectionListFilters = {
   personel_id?: number | string;
   hafta_baslangic?: string;
   hafta_bitis?: string;
+  correction_durumu?: "AKTIF" | "IPTAL";
 };
 
 export type RevizyonCorrectionIptalPayload = {

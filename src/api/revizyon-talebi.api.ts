@@ -183,10 +183,47 @@ export function normalizeRevizyonTalebi(raw: unknown): RevizyonTalebi {
 
   const karar_veren_kullanici_id = toOptionalNumber(record.karar_veren_kullanici_id);
   const correction_event_id = toOptionalNumber(record.correction_event_id);
+  const correctionDurumuRaw = toOptionalString(record.correction_durumu);
+  const correction_durumu =
+    correctionDurumuRaw === "AKTIF" || correctionDurumuRaw === "IPTAL" ? correctionDurumuRaw : null;
+
+  const auditRaw = record.audit_gecmisi;
+  const audit_gecmisi = Array.isArray(auditRaw)
+    ? auditRaw
+        .map((item) => {
+          const row = toRecord(item);
+          if (!row) {
+            return null;
+          }
+          const aksiyon = toOptionalString(row.aksiyon);
+          const sonraki = toOptionalString(row.sonraki_durum);
+          const userId = toOptionalNumber(row.islem_yapan_kullanici_id);
+          const zaman = toOptionalString(row.islem_zamani);
+          if (!aksiyon || !sonraki || userId === undefined || !zaman) {
+            return null;
+          }
+          return {
+            aksiyon,
+            onceki_durum: toOptionalString(row.onceki_durum) ?? null,
+            sonraki_durum: sonraki,
+            islem_yapan_kullanici_id: userId,
+            islem_yapan_kullanici_adi: toOptionalString(row.islem_yapan_kullanici_adi) ?? null,
+            islem_zamani: zaman,
+            aciklama: toOptionalString(row.aciklama) ?? null
+          };
+        })
+        .filter((item): item is NonNullable<typeof item> => item !== null)
+    : undefined;
 
   return {
     id,
     personel_id,
+    personel_ad_soyad: toOptionalString(record.personel_ad_soyad) ?? null,
+    sicil_no: toOptionalString(record.sicil_no) ?? null,
+    sube_id: toOptionalNumber(record.sube_id) ?? null,
+    sube_adi: toOptionalString(record.sube_adi) ?? null,
+    departman_id: toOptionalNumber(record.departman_id) ?? null,
+    departman_adi: toOptionalString(record.departman_adi) ?? null,
     hafta_baslangic,
     hafta_bitis,
     etkilenen_tarih,
@@ -195,16 +232,25 @@ export function normalizeRevizyonTalebi(raw: unknown): RevizyonTalebi {
     revizyon_tipi,
     onceki_deger: toJsonDeger(record.onceki_deger),
     talep_edilen_deger: toJsonDeger(record.talep_edilen_deger),
+    aktif_correction_sonrasi_deger:
+      record.aktif_correction_sonrasi_deger === undefined
+        ? undefined
+        : toJsonDeger(record.aktif_correction_sonrasi_deger),
     gerekce,
     talep_eden_kullanici_id,
+    talep_eden_kullanici_adi: toOptionalString(record.talep_eden_kullanici_adi) ?? null,
     talep_zamani,
     durum,
     karar_veren_kullanici_id: karar_veren_kullanici_id ?? null,
+    karar_veren_kullanici_adi: toOptionalString(record.karar_veren_kullanici_adi) ?? null,
     karar_zamani: toOptionalString(record.karar_zamani) ?? null,
     karar_notu: toOptionalString(record.karar_notu) ?? null,
     bordro_etki_var_mi: toBoolean(record.bordro_etki_var_mi, false),
     bordro_etki_notu: toOptionalString(record.bordro_etki_notu) ?? null,
-    correction_event_id: correction_event_id ?? null
+    correction_event_id: correction_event_id ?? null,
+    correction_durumu,
+    aktif_correction_var_mi: toBoolean(record.aktif_correction_var_mi, false),
+    audit_gecmisi
   };
 }
 
@@ -226,7 +272,14 @@ export async function fetchRevizyonTalepleri(
     personel_id: filters?.personel_id,
     durum: filters?.durum,
     hafta_baslangic: filters?.hafta_baslangic,
-    hafta_bitis: filters?.hafta_bitis
+    hafta_bitis: filters?.hafta_bitis,
+    revizyon_tipi: filters?.revizyon_tipi,
+    departman_id: filters?.departman_id,
+    bordro_etki_var_mi:
+      filters?.bordro_etki_var_mi === undefined ? undefined : filters.bordro_etki_var_mi ? "1" : "0",
+    correction_var_mi:
+      filters?.correction_var_mi === undefined ? undefined : filters.correction_var_mi ? "1" : "0",
+    correction_durumu: filters?.correction_durumu
   });
 
   const response = await apiRequest<ApiResponse<unknown>>(path);
@@ -288,7 +341,6 @@ export async function createRevizyonTalebi(
       kaynak_tipi,
       kaynak_id,
       revizyon_tipi: payload.revizyon_tipi,
-      onceki_deger: payload.onceki_deger,
       talep_edilen_deger: payload.talep_edilen_deger,
       gerekce,
       bordro_etki_var_mi: payload.bordro_etki_var_mi ?? false,
@@ -297,6 +349,72 @@ export async function createRevizyonTalebi(
   });
 
   return parseRevizyonTalebiResponse(response, "Revizyon talebi olusturulamadi.");
+}
+
+export async function fetchRevizyonKaynaklar(params: {
+  personel_id: number | string;
+  hafta_baslangic: string;
+  hafta_bitis: string;
+}): Promise<
+  Array<{
+    kaynak_tipi: string;
+    kaynak_id: number;
+    etkilenen_tarih: string;
+    kaynak_turu_label: string;
+    mevcut_deger: RevizyonJsonDeger;
+    goruntuleme_etiketi: string;
+    uygun_revizyon_tipleri: string[];
+  }>
+> {
+  const personel_id = parsePositiveIntParam(params.personel_id, "personel_id");
+  const path = appendQueryParams(endpoints.revizyonTalepleri.kaynaklar, {
+    personel_id,
+    hafta_baslangic: params.hafta_baslangic,
+    hafta_bitis: params.hafta_bitis
+  });
+  const response = await apiRequest<ApiResponse<unknown>>(path);
+  if (Array.isArray(response.errors) && response.errors.length > 0) {
+    throwFirstApiError(response.errors, "Revizyon kaynaklari alinamadi.");
+  }
+  const record = toRecord(response.data);
+  const items = record?.items;
+  if (!Array.isArray(items)) {
+    return [];
+  }
+  return items
+    .map((item) => {
+      const row = toRecord(item);
+      if (!row) {
+        return null;
+      }
+      const kaynak_id = toOptionalNumber(row.kaynak_id);
+      const kaynak_tipi = toOptionalString(row.kaynak_tipi);
+      const etkilenen_tarih = toOptionalString(row.etkilenen_tarih);
+      const kaynak_turu_label = toOptionalString(row.kaynak_turu_label);
+      const goruntuleme_etiketi = toOptionalString(row.goruntuleme_etiketi);
+      if (
+        kaynak_id === undefined ||
+        !kaynak_tipi ||
+        !etkilenen_tarih ||
+        !kaynak_turu_label ||
+        !goruntuleme_etiketi
+      ) {
+        return null;
+      }
+      const uygun = Array.isArray(row.uygun_revizyon_tipleri)
+        ? row.uygun_revizyon_tipleri.filter((v): v is string => typeof v === "string")
+        : [];
+      return {
+        kaynak_tipi,
+        kaynak_id,
+        etkilenen_tarih,
+        kaynak_turu_label,
+        mevcut_deger: toJsonDeger(row.mevcut_deger),
+        goruntuleme_etiketi,
+        uygun_revizyon_tipleri: uygun
+      };
+    })
+    .filter((item): item is NonNullable<typeof item> => item !== null);
 }
 
 export async function submitRevizyonTalebi(id: number | string): Promise<RevizyonTalebi> {

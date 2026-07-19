@@ -54,13 +54,17 @@ function toBoolean(value: unknown, fallback = false): boolean {
   return fallback;
 }
 
-function toNullableScalar(value: unknown): string | number | boolean | null {
+function toNullableScalar(value: unknown): string | number | boolean | null | Record<string, unknown> {
   if (value === null || value === undefined) {
     return null;
   }
 
   if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
     return value;
+  }
+
+  if (typeof value === "object" && !Array.isArray(value)) {
+    return value as Record<string, unknown>;
   }
 
   return null;
@@ -165,6 +169,12 @@ export function normalizeRevizyonCorrection(raw: unknown): RevizyonCorrectionEve
     id,
     revizyon_talebi_id,
     personel_id,
+    personel_ad_soyad: toOptionalString(record.personel_ad_soyad) ?? null,
+    sicil_no: toOptionalString(record.sicil_no) ?? null,
+    sube_id: toOptionalNumber(record.sube_id) ?? null,
+    sube_adi: toOptionalString(record.sube_adi) ?? null,
+    departman_id: toOptionalNumber(record.departman_id) ?? null,
+    departman_adi: toOptionalString(record.departman_adi) ?? null,
     hafta_baslangic,
     hafta_bitis,
     etkilenen_tarih,

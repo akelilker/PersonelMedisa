@@ -78,12 +78,19 @@ jobs:
         run: |
           set -euo pipefail
           upload() {
-            local use_ftps="$1"
-            lftp -u "${FTP_USERNAME}","${FTP_PASSWORD}" -p "${FTP_PORT}" "ftp://${FTP_SERVER}" -e "
+            local mode_name="$1"
+            local use_ftps="$2"
+            echo "FTP upload mode: ${mode_name}"
+            # Outer timeout prevents indefinite SSL handshake hangs.
+            timeout 90s lftp -u "${FTP_USERNAME}","${FTP_PASSWORD}" -p "${FTP_PORT}" "ftp://${FTP_SERVER}" -e "
               set cmd:fail-exit true;
-              set net:max-retries 5;
-              set net:timeout 30;
+              set cmd:verbose on;
+              set net:max-retries 3;
+              set net:timeout 20;
+              set net:reconnect-interval-base 5;
+              set net:reconnect-interval-max 15;
               set ssl:verify-certificate no;
+              set ssl:check-hostname no;
               set ftp:passive-mode on;
               set ftp:ssl-allow ${use_ftps};
               set ftp:ssl-force ${use_ftps};
@@ -96,7 +103,8 @@ jobs:
               bye
             "
           }
-          upload true || upload false
+          # Prefer plain FTP first (matches recent deploy fallback success path), then FTPS.
+          upload "plain-ftp" false || upload "explicit-ftps" true
 
       - name: Identity + preflight
         id: preflight
@@ -235,10 +243,12 @@ jobs:
           set -euo pipefail
           cleanup() {
             local use_ftps="$1"
-            lftp -u "${FTP_USERNAME}","${FTP_PASSWORD}" -p "${FTP_PORT}" "ftp://${FTP_SERVER}" -e "
+            timeout 60s lftp -u "${FTP_USERNAME}","${FTP_PASSWORD}" -p "${FTP_PORT}" "ftp://${FTP_SERVER}" -e "
               set cmd:fail-exit false;
               set net:max-retries 3;
+              set net:timeout 15;
               set ssl:verify-certificate no;
+              set ssl:check-hostname no;
               set ftp:passive-mode on;
               set ftp:ssl-allow ${use_ftps};
               set ftp:ssl-force ${use_ftps};
@@ -251,11 +261,13 @@ jobs:
               bye
             "
           }
-          cleanup true || cleanup false
-          for mode in true false; do
-            lftp -u "${FTP_USERNAME}","${FTP_PASSWORD}" -p "${FTP_PORT}" "ftp://${FTP_SERVER}" -e "
+          cleanup false || cleanup true || true
+          for mode in false true; do
+            timeout 60s lftp -u "${FTP_USERNAME}","${FTP_PASSWORD}" -p "${FTP_PORT}" "ftp://${FTP_SERVER}" -e "
               set cmd:fail-exit false;
+              set net:timeout 15;
               set ssl:verify-certificate no;
+              set ssl:check-hostname no;
               set ftp:passive-mode on;
               set ftp:ssl-allow ${mode};
               set ftp:ssl-force ${mode};

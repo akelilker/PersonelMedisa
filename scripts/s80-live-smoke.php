@@ -25,10 +25,10 @@ $action = isset($_GET['action']) ? (string) $_GET['action'] : 'preflight';
 const S79_EXPECTED_MIGRATION_SHA256 = 'unused';
 const S79_MIGRATION_FILE = 'UNUSED_NO_MIGRATION.sql';
 const S80_SMOKE_MARKER = 'S80 Production Smoke';
-const S80_SMOKE_WEEK_START = '2039-04-03'; // Monday (MariaDB DAYOFWEEK=2)
-const S80_SMOKE_WEEK_END = '2039-04-09';
-const S80_SMOKE_OPEN_WEEK_START = '2039-04-10';
-const S80_SMOKE_OPEN_WEEK_END = '2039-04-16';
+const S80_SMOKE_WEEK_START = '2039-05-02'; // Monday (MariaDB DAYOFWEEK=2)
+const S80_SMOKE_WEEK_END = '2039-05-08';
+const S80_SMOKE_OPEN_WEEK_START = '2039-05-09';
+const S80_SMOKE_OPEN_WEEK_END = '2039-05-15';
 const S80_SMOKE_TC = '90079000080';
 const S80_SMOKE_SICIL = 'S80-SMOKE';
 
@@ -1432,8 +1432,8 @@ if ($action === 'smoke_prepare') {
     }
 
     $userId = (int) $gy['id'];
-    $etkilenenTarih = '2039-04-04';
-    $openEtkilenen = '2039-04-11';
+    $etkilenenTarih = '2039-05-03';
+    $openEtkilenen = '2039-05-10';
     $personelId = 0;
     $main = null;
     $surecId = 0;
@@ -1583,10 +1583,10 @@ if ($action === 'smoke_run') {
     $snapshotId = (int) ($meta['snapshot_id'] ?? 0);
     $hb = (string) ($meta['hafta_baslangic'] ?? S80_SMOKE_WEEK_START);
     $he = (string) ($meta['hafta_bitis'] ?? S80_SMOKE_WEEK_END);
-    $etkilenen = (string) ($meta['etkilenen_tarih'] ?? '2039-04-04');
+    $etkilenen = (string) ($meta['etkilenen_tarih'] ?? '2039-05-03');
     $openHb = (string) ($meta['open_hafta_baslangic'] ?? S80_SMOKE_OPEN_WEEK_START);
     $openHe = (string) ($meta['open_hafta_bitis'] ?? S80_SMOKE_OPEN_WEEK_END);
-    $openEtkilenen = (string) ($meta['open_etkilenen_tarih'] ?? '2039-04-11');
+    $openEtkilenen = (string) ($meta['open_etkilenen_tarih'] ?? '2039-05-10');
     $closedSurecIds = array_values(array_map('intval', $meta['closed_surec_ids'] ?? []));
     $surecId = (int) ($meta['surec_id'] ?? 0);
 

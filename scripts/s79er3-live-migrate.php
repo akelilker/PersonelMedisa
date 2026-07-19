@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 /**
  * ONE-SHOT S79-E-R3 live migrate for 030_haftalik_kapanis_revizyon_talepleri.sql.
  * Uploaded temporarily to api/public/, executed via HTTPS, then deleted.

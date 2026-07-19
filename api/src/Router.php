@@ -383,8 +383,17 @@ class Router
         if ($method === 'POST' && preg_match('#^/haftalik-kapanis/revizyon-talepleri/(\d+)/iptal$#', $path, $matches)) {
             RevizyonController::iptal($this->request, $matches[1]);
         }
+        if ($method === 'POST' && preg_match('#^/haftalik-kapanis/revizyon-talepleri/(\d+)/correction-uret$#', $path, $matches)) {
+            RevizyonController::correctionUret($this->request, $matches[1]);
+        }
         if ($path === '/haftalik-kapanis/revizyon-corrections' && $method === 'GET') {
             RevizyonController::corrections($this->request);
+        }
+        if ($method === 'GET' && preg_match('#^/haftalik-kapanis/revizyon-corrections/(\d+)$#', $path, $matches)) {
+            RevizyonController::correctionDetail($this->request, $matches[1]);
+        }
+        if ($method === 'POST' && preg_match('#^/haftalik-kapanis/revizyon-corrections/(\d+)/iptal$#', $path, $matches)) {
+            RevizyonController::correctionIptal($this->request, $matches[1]);
         }
 
         if ($path === '/yonetim/subeler' && $method === 'GET') {

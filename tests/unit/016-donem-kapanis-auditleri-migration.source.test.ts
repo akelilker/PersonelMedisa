@@ -53,6 +53,6 @@ describe("016_donem_kapanis_auditleri migration source", () => {
       .filter((name) => /^\d{3}_.*\.sql$/.test(name))
       .sort();
     expect(migrations).toContain("016_donem_kapanis_auditleri.sql");
-    expect(migrations.at(-1)).toBe("030_haftalik_kapanis_revizyon_talepleri.sql");
+    expect(migrations.at(-1)).toBe("031_haftalik_kapanis_revizyon_corrections.sql");
   });
 });

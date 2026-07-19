@@ -80,6 +80,8 @@ function phpMysqlArgs(): array
         }
         $phpArgs[] = '-d';
         $phpArgs[] = 'extension=pdo_mysql';
+        $phpArgs[] = '-d';
+        $phpArgs[] = 'extension=mbstring';
     }
 
     return $phpArgs;

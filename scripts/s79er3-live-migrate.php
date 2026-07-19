@@ -1082,21 +1082,6 @@ function s79_insert_week_snapshot(
     return ['kapanis_id' => $kapanisId, 'snapshot_id' => (int) $pdo->lastInsertId()];
 }
 
-function s79_insert_open_kapanis(PDO $pdo, int $subeId, int $userId, string $hb, string $he): int
-{
-    $insK = $pdo->prepare(
-        "INSERT INTO haftalik_kapanislar (
-            sube_id, hafta_baslangic, hafta_bitis, departman_id,
-            state, personel_sayisi, snapshot_satir_sayisi, kaynak_versiyon, created_by
-         ) VALUES (
-            :sube_id, :hb, :he, NULL,
-            'ACIK', 0, 0, 'A2_MOTOR_V1', :created_by
-         )"
-    );
-    $insK->execute(['sube_id' => $subeId, 'hb' => $hb, 'he' => $he, 'created_by' => $userId]);
-    return (int) $pdo->lastInsertId();
-}
-
 function s79_marker_token(array $meta, string $rol): ?string
 {
     $tokens = $meta['tokens'] ?? null;
@@ -1223,10 +1208,9 @@ if ($action === 'smoke_prepare') {
     $openEtkilenen = '2038-03-15';
     $personelId = 0;
     $main = null;
-    $openKapanisId = 0;
 
-    $pdo->beginTransaction();
     try {
+        $pdo->beginTransaction();
         $insP = $pdo->prepare(
             "INSERT INTO personeller (
                 tc_kimlik_no, ad, soyad, dogum_tarihi, telefon, acil_durum_kisi, acil_durum_telefon,
@@ -1244,6 +1228,8 @@ if ($action === 'smoke_prepare') {
         ]);
         $personelId = (int) $pdo->lastInsertId();
 
+        // Production chk_haftalik_kapanis_state only allows KAPANDI (migration 027).
+        // "ACIK" / missing-kapanis PERIOD_NOT_CLOSED is covered by open-week create without a row.
         $main = s79_insert_week_snapshot(
             $pdo,
             $subeId,
@@ -1252,13 +1238,6 @@ if ($action === 'smoke_prepare') {
             S79_SMOKE_WEEK_START,
             S79_SMOKE_WEEK_END,
             0
-        );
-        $openKapanisId = s79_insert_open_kapanis(
-            $pdo,
-            $subeId,
-            $userId,
-            S79_SMOKE_OPEN_WEEK_START,
-            S79_SMOKE_OPEN_WEEK_END
         );
 
         $pdo->commit();
@@ -1277,8 +1256,8 @@ if ($action === 'smoke_prepare') {
         'personel_id' => $personelId,
         'kapanis_id' => (int) $main['kapanis_id'],
         'snapshot_id' => (int) $main['snapshot_id'],
-        'open_kapanis_id' => $openKapanisId,
-        'kapanis_ids' => [(int) $main['kapanis_id'], $openKapanisId],
+        'open_kapanis_id' => 0,
+        'kapanis_ids' => [(int) $main['kapanis_id']],
         'hafta_baslangic' => S79_SMOKE_WEEK_START,
         'hafta_bitis' => S79_SMOKE_WEEK_END,
         'open_hafta_baslangic' => S79_SMOKE_OPEN_WEEK_START,
@@ -1289,6 +1268,7 @@ if ($action === 'smoke_prepare') {
         'roles' => [],
         'tokens' => $tokens,
         'created_at_utc' => gmdate('c'),
+        'note_acik_kapanis' => 'schema_forbids_ACIK_state_covered_by_missing_kapanis_week',
     ];
     foreach ($roles as $rol => $u) {
         $meta['roles'][$rol] = $u === null ? null : [
@@ -1597,9 +1577,13 @@ if ($action === 'smoke_run') {
         $openHe
     ), $baH);
     $pass(
-        'open week PERIOD_NOT_CLOSED',
+        'missing kapanis week PERIOD_NOT_CLOSED',
         $periodNotClosed['status'] === 409 && s79_err_code($periodNotClosed['payload']) === 'PERIOD_NOT_CLOSED',
-        ['status' => $periodNotClosed['status'], 'code' => s79_err_code($periodNotClosed['payload'])]
+        [
+            'status' => $periodNotClosed['status'],
+            'code' => s79_err_code($periodNotClosed['payload']),
+            'note' => 'ACIK row impossible under chk_haftalik_kapanis_state; missing week covers PERIOD_NOT_CLOSED',
+        ]
     );
 
     $targetNotFound = s79_http('POST', '/haftalik-kapanis/revizyon-talepleri', array_merge(

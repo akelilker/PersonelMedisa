@@ -46,6 +46,7 @@ jobs:
           set -euo pipefail
           TOKEN="$(openssl rand -hex 24)"
           export TOKEN
+          echo "::add-mask::$TOKEN"
           echo "token=$TOKEN" >> "$GITHUB_OUTPUT"
           mkdir -p /tmp/s79er3-ops /tmp/s79er3-artifacts
           cp api/migrations/030_haftalik_kapanis_revizyon_talepleri.sql /tmp/s79er3-ops/
@@ -255,9 +256,16 @@ jobs:
         run: |
           set -euo pipefail
           BASE="https://www.karmotors.com.tr/personelmedisa/api/public/_s79er3_migrate.php"
-          curl -fsS "${BASE}?token=${TOKEN}&action=postcheck" | tee /tmp/s79er3-artifacts/postcheck-before-smoke.json
-          curl -fsS "${BASE}?token=${TOKEN}&action=counts" | tee /tmp/s79er3-artifacts/counts-before-smoke.json
-          curl -fsS "${BASE}?token=${TOKEN}&action=smoke_prepare" | tee /tmp/s79er3-artifacts/smoke-prepare.json
+          curl -sS "${BASE}?token=${TOKEN}&action=postcheck" | tee /tmp/s79er3-artifacts/postcheck-before-smoke.json >/dev/null
+          python3 - <<'PY'
+          import json,sys
+          data=json.load(open('/tmp/s79er3-artifacts/postcheck-before-smoke.json'))
+          if not data.get('ok') or data.get('code') != 'S79_E_POSTCHECK_OK':
+            print(json.dumps(data, indent=2)[:2000]); sys.exit(1)
+          PY
+          curl -sS "${BASE}?token=${TOKEN}&action=counts" | tee /tmp/s79er3-artifacts/counts-before-smoke.json >/dev/null
+          code=$(curl -sS -o /tmp/s79er3-artifacts/smoke-prepare.json -w "%{http_code}" "${BASE}?token=${TOKEN}&action=smoke_prepare" || true)
+          echo "smoke_prepare_http=$code"
           python3 - <<'PY'
           import json,sys
           data=json.load(open('/tmp/s79er3-artifacts/smoke-prepare.json'))
@@ -270,7 +278,8 @@ jobs:
           if 'tokens' in data:
             print('ERROR: tokens leaked in smoke_prepare response'); sys.exit(1)
           PY
-          curl -fsS "${BASE}?token=${TOKEN}&action=smoke_run" | tee /tmp/s79er3-artifacts/smoke-run.json
+          code=$(curl -sS -o /tmp/s79er3-artifacts/smoke-run.json -w "%{http_code}" "${BASE}?token=${TOKEN}&action=smoke_run" || true)
+          echo "smoke_run_http=$code"
           python3 - <<'PY'
           import json,sys
           data=json.load(open('/tmp/s79er3-artifacts/smoke-run.json'))
@@ -286,7 +295,8 @@ jobs:
           if 'tokens' in data:
             print('ERROR: tokens leaked in smoke_run response'); sys.exit(1)
           PY
-          curl -fsS "${BASE}?token=${TOKEN}&action=smoke_cleanup" | tee /tmp/s79er3-artifacts/smoke-cleanup.json
+          code=$(curl -sS -o /tmp/s79er3-artifacts/smoke-cleanup.json -w "%{http_code}" "${BASE}?token=${TOKEN}&action=smoke_cleanup" || true)
+          echo "smoke_cleanup_http=$code"
           python3 - <<'PY'
           import json,sys
           data=json.load(open('/tmp/s79er3-artifacts/smoke-cleanup.json'))
@@ -294,7 +304,8 @@ jobs:
           if not data.get('ok') or data.get('code') != 'S79_E_SMOKE_CLEANUP_OK':
             sys.exit(1)
           PY
-          curl -fsS "${BASE}?token=${TOKEN}&action=integrity" | tee /tmp/s79er3-artifacts/integrity-final.json
+          code=$(curl -sS -o /tmp/s79er3-artifacts/integrity-final.json -w "%{http_code}" "${BASE}?token=${TOKEN}&action=integrity" || true)
+          echo "integrity_final_http=$code"
           python3 - <<'PY'
           import json,sys
           data=json.load(open('/tmp/s79er3-artifacts/integrity-final.json'))

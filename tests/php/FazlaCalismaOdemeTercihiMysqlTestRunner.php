@@ -411,6 +411,45 @@ function seedSnapshot(
     return ['kapanis_id' => $kapanisId, 'snapshot_id' => (int) $pdo->lastInsertId()];
 }
 
+function assertFcotSchemaPostconditions(PDO $pdo): void
+{
+    foreach (['fazla_calisma_odeme_tercihleri', 'fazla_calisma_odeme_tercihi_audit'] as $table) {
+        $create = (string) $pdo->query('SHOW CREATE TABLE `' . $table . '`')->fetch(PDO::FETCH_ASSOC)['Create Table'];
+        fcotAssert(stripos($create, 'CREATE TABLE `' . $table . '`') !== false, 'SHOW CREATE TABLE ' . $table);
+        fcotAssert(stripos($create, 'utf8mb4') !== false, $table . ' charset utf8mb4');
+        fcotAssert(stripos($create, 'utf8mb4_unicode_ci') !== false, $table . ' collation unicode_ci');
+        echo '[SCHEMA] ' . $table . ' CREATE: ' . preg_replace('/\s+/', ' ', $create) . PHP_EOL;
+
+        $cols = $pdo->query('SHOW FULL COLUMNS FROM `' . $table . '`')->fetchAll(PDO::FETCH_ASSOC);
+        fcotAssert(count($cols) > 0, 'SHOW FULL COLUMNS ' . $table);
+        echo '[SCHEMA] ' . $table . ' COLUMNS: ' . count($cols) . PHP_EOL;
+
+        $indexes = $pdo->query('SHOW INDEX FROM `' . $table . '`')->fetchAll(PDO::FETCH_ASSOC);
+        fcotAssert(count($indexes) > 0, 'SHOW INDEX ' . $table);
+    }
+
+    $mainCreate = (string) $pdo->query('SHOW CREATE TABLE fazla_calisma_odeme_tercihleri')->fetch(PDO::FETCH_ASSOC)['Create Table'];
+    fcotAssert(stripos($mainCreate, 'uq_fcot_snapshot') !== false, 'unique(snapshot_id) present');
+    fcotAssert(stripos($mainCreate, 'PRIMARY KEY') !== false, 'main PK present');
+
+    $fks = $pdo->query("
+        SELECT CONSTRAINT_NAME, TABLE_NAME, REFERENCED_TABLE_NAME, DELETE_RULE, UPDATE_RULE
+        FROM information_schema.REFERENTIAL_CONSTRAINTS
+        WHERE CONSTRAINT_SCHEMA = DATABASE()
+          AND TABLE_NAME IN ('fazla_calisma_odeme_tercihleri', 'fazla_calisma_odeme_tercihi_audit')
+        ORDER BY TABLE_NAME, CONSTRAINT_NAME
+    ")->fetchAll(PDO::FETCH_ASSOC);
+    fcotAssert(count($fks) >= 6, 'FK count >= 6');
+    foreach ($fks as $fk) {
+        fcotAssert(
+            in_array((string) $fk['DELETE_RULE'], ['RESTRICT', 'NO ACTION'], true),
+            'FK ' . $fk['CONSTRAINT_NAME'] . ' DELETE_RULE RESTRICT/NO ACTION'
+        );
+        echo '[SCHEMA] FK ' . $fk['CONSTRAINT_NAME'] . ' → ' . $fk['REFERENCED_TABLE_NAME']
+            . ' DELETE=' . $fk['DELETE_RULE'] . PHP_EOL;
+    }
+}
+
 function bootstrapFcotSchema(PDO $pdo): string
 {
     $suffix = bin2hex(random_bytes(4));
@@ -471,6 +510,7 @@ $partialRoot->exec('DROP DATABASE `' . $partialDb . '`');
 $root = fcotPdo($dsn);
 $dbName = bootstrapFcotSchema($root);
 $pdo = fcotPdo(preg_replace('/dbname=[^;]+/', 'dbname=' . $dbName, $dsn));
+assertFcotSchemaPostconditions($pdo);
 
 $gy = ['id' => 1, 'rol' => 'GENEL_YONETICI', 'sube_ids' => []];
 $ba = ['id' => 2, 'rol' => 'BIRIM_AMIRI', 'sube_ids' => [1]];
@@ -485,14 +525,22 @@ $seedOut = seedSnapshot($pdo, 2, 20, '2026-04-06', '2026-04-12', 90);
 $snapshotOut = $seedOut['snapshot_id'];
 
 $countBeforeGet = (int) $pdo->query('SELECT COUNT(*) FROM fazla_calisma_odeme_tercihleri')->fetchColumn();
+$auditBeforeGet = (int) $pdo->query('SELECT COUNT(*) FROM fazla_calisma_odeme_tercihi_audit')->fetchColumn();
 $getDefault = invokeFcotHttp($pdo, $gy, 'GET', '/fazla-calisma-odeme-tercihi', [], $subeHeader, [
     'snapshot_id' => (string) $snapshotId,
 ]);
 fcotAssert($getDefault['status'] === 200, 'GET default no-write → 200');
-fcotAssert(($getDefault['payload']['data']['odeme_tipi'] ?? '') === 'KARAR_BEKLIYOR', 'GET default KARAR_BEKLIYOR');
-fcotAssert(!isset($getDefault['payload']['data']['id']), 'GET default has no id');
+$dataDefault = $getDefault['payload']['data'] ?? [];
+fcotAssert(($dataDefault['odeme_tipi'] ?? '') === 'KARAR_BEKLIYOR', 'GET default KARAR_BEKLIYOR');
+fcotAssert(array_key_exists('id', $dataDefault) && $dataDefault['id'] === null, 'GET synthetic id=null');
+fcotAssert(array_key_exists('onceki_odeme_tipi', $dataDefault) && $dataDefault['onceki_odeme_tipi'] === null, 'GET synthetic onceki=null');
+fcotAssert(array_key_exists('secen_kullanici_id', $dataDefault) && $dataDefault['secen_kullanici_id'] === null, 'GET synthetic secen=null');
+fcotAssert(array_key_exists('secim_zamani', $dataDefault) && $dataDefault['secim_zamani'] === null, 'GET synthetic secim_zamani=null');
+fcotAssert(array_key_exists('gerekce', $dataDefault) && $dataDefault['gerekce'] === null, 'GET synthetic gerekce=null');
 $countAfterGet = (int) $pdo->query('SELECT COUNT(*) FROM fazla_calisma_odeme_tercihleri')->fetchColumn();
+$auditAfterGet = (int) $pdo->query('SELECT COUNT(*) FROM fazla_calisma_odeme_tercihi_audit')->fetchColumn();
 fcotAssert($countBeforeGet === $countAfterGet, 'GET default no-write');
+fcotAssert($auditBeforeGet === $auditAfterGet, 'GET default no-write audit');
 
 $missing = invokeFcotHttp($pdo, $gy, 'GET', '/fazla-calisma-odeme-tercihi', [], $subeHeader, [
     'snapshot_id' => '999999',
@@ -519,6 +567,11 @@ $patronPut = invokeFcotHttp($pdo, $patron, 'PUT', '/fazla-calisma-odeme-tercihi'
 ], $subeHeader);
 fcotAssert($patronPut['status'] === 403, 'PATRON PUT → 403');
 
+$gyGet = invokeFcotHttp($pdo, $gy, 'GET', '/fazla-calisma-odeme-tercihi', [], $subeHeader, [
+    'snapshot_id' => (string) $snapshotId,
+]);
+fcotAssert($gyGet['status'] === 200, 'GENEL_YONETICI GET → 200');
+
 $muhGet = invokeFcotHttp($pdo, $muhasebe, 'GET', '/fazla-calisma-odeme-tercihi', [], $subeHeader, [
     'snapshot_id' => (string) $snapshotId,
 ]);
@@ -539,10 +592,21 @@ $baPut = invokeFcotHttp($pdo, $ba, 'PUT', '/fazla-calisma-odeme-tercihi', [
 ], $subeHeader);
 fcotAssert($baPut['status'] === 403, 'BIRIM_AMIRI PUT → 403');
 
+$baEmpty = ['id' => 2, 'rol' => 'BIRIM_AMIRI', 'sube_ids' => []];
+$baEmptyGet = invokeFcotHttp($pdo, $baEmpty, 'GET', '/fazla-calisma-odeme-tercihi', [], [], [
+    'snapshot_id' => (string) $snapshotId,
+]);
+fcotAssert($baEmptyGet['status'] === 403, 'BA empty allowedSubeIds global GET → 403');
+
 $baOut = invokeFcotHttp($pdo, $ba, 'GET', '/fazla-calisma-odeme-tercihi', [], $subeHeader, [
     'snapshot_id' => (string) $snapshotOut,
 ]);
 fcotAssert($baOut['status'] === 403, 'scope dışı 403');
+$baOutPut = invokeFcotHttp($pdo, $ba, 'PUT', '/fazla-calisma-odeme-tercihi', [
+    'snapshot_id' => $snapshotOut,
+    'odeme_tipi' => 'UCRET',
+], $subeHeader);
+fcotAssert($baOutPut['status'] === 403, 'scope dışı PUT → 403');
 
 $bolumPut = invokeFcotHttp($pdo, $bolum, 'PUT', '/fazla-calisma-odeme-tercihi', [
     'snapshot_id' => $snapshotId,
@@ -550,6 +614,12 @@ $bolumPut = invokeFcotHttp($pdo, $bolum, 'PUT', '/fazla-calisma-odeme-tercihi', 
     'gerekce' => 'Bolum karari',
 ], $subeHeader);
 fcotAssert($bolumPut['status'] === 200, 'BOLUM_YONETICISI PUT scope içi → 200');
+
+// KAPANDI weekly close alone is not a PUT blocker (seed snapshots are KAPANDI).
+fcotAssert(
+    (string) $pdo->query('SELECT state FROM haftalik_kapanislar WHERE id = ' . (int) $seed['kapanis_id'])->fetchColumn() === 'KAPANDI',
+    'haftalik kapanis KAPANDI alone not blocker (precondition)'
+);
 
 // Reset for GY insert path on a fresh snapshot.
 $seed2 = seedSnapshot($pdo, 1, 10, '2026-04-13', '2026-04-19', 200);
@@ -564,6 +634,7 @@ fcotAssert($putInsert['status'] === 200, 'PUT insert');
 fcotAssert(($putInsert['payload']['data']['odeme_tipi'] ?? '') === 'SERBEST_ZAMAN', 'PUT insert odeme_tipi');
 $tercihId = (int) ($putInsert['payload']['data']['id'] ?? 0);
 fcotAssert($tercihId > 0, 'PUT insert returns id');
+fcotAssert((int) ($putInsert['payload']['data']['secen_kullanici_id'] ?? 0) === 1, 'secen_kullanici_id from auth');
 
 $getPersisted = invokeFcotHttp($pdo, $gy, 'GET', '/fazla-calisma-odeme-tercihi', [], $subeHeader, [
     'snapshot_id' => (string) $snap2,
@@ -571,13 +642,13 @@ $getPersisted = invokeFcotHttp($pdo, $gy, 'GET', '/fazla-calisma-odeme-tercihi',
 fcotAssert($getPersisted['status'] === 200, 'GET persisted');
 fcotAssert((int) ($getPersisted['payload']['data']['id'] ?? 0) === $tercihId, 'GET persisted id');
 
-$rowBefore = $pdo->query('SELECT updated_at, odeme_tipi FROM fazla_calisma_odeme_tercihleri WHERE id = ' . $tercihId)->fetch(PDO::FETCH_ASSOC);
+$rowBefore = $pdo->query('SELECT updated_at, odeme_tipi, gerekce FROM fazla_calisma_odeme_tercihleri WHERE id = ' . $tercihId)->fetch(PDO::FETCH_ASSOC);
 $auditBefore = (int) $pdo->query('SELECT COUNT(*) FROM fazla_calisma_odeme_tercihi_audit WHERE tercih_id = ' . $tercihId)->fetchColumn();
 fcotAssert($auditBefore === 1, 'audit append on insert');
-fcotAssert(
-    (string) $pdo->query('SELECT onceki_odeme_tipi FROM fazla_calisma_odeme_tercihi_audit WHERE tercih_id = ' . $tercihId)->fetchColumn() === 'KARAR_BEKLIYOR',
-    'audit zinciri tutarlı (ilk onceki=KARAR_BEKLIYOR)'
-);
+$firstAudit = $pdo->query('SELECT onceki_odeme_tipi, yeni_odeme_tipi, secen_kullanici_id, gerekce FROM fazla_calisma_odeme_tercihi_audit WHERE tercih_id = ' . $tercihId)->fetch(PDO::FETCH_ASSOC);
+fcotAssert((string) ($firstAudit['onceki_odeme_tipi'] ?? '') === 'KARAR_BEKLIYOR', 'audit zinciri tutarlı (ilk onceki=KARAR_BEKLIYOR)');
+fcotAssert((string) ($firstAudit['yeni_odeme_tipi'] ?? '') === 'SERBEST_ZAMAN', 'audit ilk yeni=SERBEST_ZAMAN');
+fcotAssert((int) ($firstAudit['secen_kullanici_id'] ?? 0) === 1, 'audit secen_kullanici_id (=degistiren)');
 
 $putIdem = invokeFcotHttp($pdo, $gy, 'PUT', '/fazla-calisma-odeme-tercihi', [
     'snapshot_id' => $snap2,
@@ -589,9 +660,34 @@ $auditAfterIdem = (int) $pdo->query('SELECT COUNT(*) FROM fazla_calisma_odeme_te
 fcotAssert((string) $rowBefore['updated_at'] === (string) $rowAfterIdem['updated_at'], 'idempotent updated_at unchanged');
 fcotAssert($auditAfterIdem === $auditBefore, 'audit no-op üretmiyor');
 
-// SZ guard: active OLUSUM blocks leaving SERBEST_ZAMAN
+// Same odeme_tipi + different gerekce is NOT a real change (locked contract).
+$putGerekceOnly = invokeFcotHttp($pdo, $gy, 'PUT', '/fazla-calisma-odeme-tercihi', [
+    'snapshot_id' => $snap2,
+    'odeme_tipi' => 'SERBEST_ZAMAN',
+    'gerekce' => 'Farkli gerekce ama ayni tercih',
+], $subeHeader);
+fcotAssert($putGerekceOnly['status'] === 200, 'gerekce-only idempotent → 200');
+$rowAfterGerekce = $pdo->query('SELECT updated_at, gerekce FROM fazla_calisma_odeme_tercihleri WHERE id = ' . $tercihId)->fetch(PDO::FETCH_ASSOC);
+$auditAfterGerekce = (int) $pdo->query('SELECT COUNT(*) FROM fazla_calisma_odeme_tercihi_audit WHERE tercih_id = ' . $tercihId)->fetchColumn();
+fcotAssert((string) $rowBefore['updated_at'] === (string) $rowAfterGerekce['updated_at'], 'gerekce-only updated_at unchanged');
+fcotAssert((string) ($rowAfterGerekce['gerekce'] ?? '') === (string) ($rowBefore['gerekce'] ?? ''), 'gerekce-only row gerekce unchanged');
+fcotAssert($auditAfterGerekce === $auditBefore, 'gerekce-only audit +0');
+
+// Period lock wins over SZ guard when both would apply.
 $pdo->exec("INSERT INTO serbest_zaman_events (event_tipi, kaynak_odeme_tercihi_id, personel_id, dakika)
             VALUES ('SERBEST_ZAMAN_OLUSUM', {$tercihId}, 10, 200)");
+$pdo->exec("INSERT INTO puantaj_aylik_muhurleri (sube_id, yil, ay, donem, durum, created_by)
+            VALUES (1, 2026, 4, '2026-04', 'MUHURLENDI', 1)");
+$periodBeforeSz = invokeFcotHttp($pdo, $gy, 'PUT', '/fazla-calisma-odeme-tercihi', [
+    'snapshot_id' => $snap2,
+    'odeme_tipi' => 'UCRET',
+], $subeHeader);
+fcotAssert($periodBeforeSz['status'] === 409, 'period before SZ → 409');
+fcotAssert(($periodBeforeSz['payload']['errors'][0]['code'] ?? '') === 'PERIOD_LOCKED', 'period before SZ → PERIOD_LOCKED');
+// Unseal April for remaining tests on snap2 week.
+$pdo->exec('DELETE FROM puantaj_aylik_muhurleri WHERE sube_id = 1 AND yil = 2026 AND ay = 4');
+
+// SZ guard: active OLUSUM blocks leaving SERBEST_ZAMAN
 $szGuard = invokeFcotHttp($pdo, $gy, 'PUT', '/fazla-calisma-odeme-tercihi', [
     'snapshot_id' => $snap2,
     'odeme_tipi' => 'UCRET',
@@ -599,8 +695,14 @@ $szGuard = invokeFcotHttp($pdo, $gy, 'PUT', '/fazla-calisma-odeme-tercihi', [
 fcotAssert($szGuard['status'] === 409, 'aktif SZ oluşum guard 409');
 fcotAssert(($szGuard['payload']['errors'][0]['code'] ?? '') === 'STATE_CONFLICT', 'SZ guard STATE_CONFLICT');
 
+$szGuardKb = invokeFcotHttp($pdo, $gy, 'PUT', '/fazla-calisma-odeme-tercihi', [
+    'snapshot_id' => $snap2,
+    'odeme_tipi' => 'KARAR_BEKLIYOR',
+], $subeHeader);
+fcotAssert($szGuardKb['status'] === 409, 'SZ → KARAR_BEKLIYOR guard 409');
+
 // Cancel SZ then allow update
-$olusumId = (int) $pdo->query('SELECT id FROM serbest_zaman_events WHERE kaynak_odeme_tercihi_id = ' . $tercihId)->fetchColumn();
+$olusumId = (int) $pdo->query('SELECT id FROM serbest_zaman_events WHERE kaynak_odeme_tercihi_id = ' . $tercihId . ' ORDER BY id DESC LIMIT 1')->fetchColumn();
 $pdo->exec("INSERT INTO serbest_zaman_events (event_tipi, hedef_event_id, personel_id)
             VALUES ('SERBEST_ZAMAN_IPTAL', {$olusumId}, 10)");
 
@@ -614,6 +716,13 @@ fcotAssert(($putUpdate['payload']['data']['odeme_tipi'] ?? '') === 'UCRET', 'PUT
 fcotAssert(($putUpdate['payload']['data']['onceki_odeme_tipi'] ?? '') === 'SERBEST_ZAMAN', 'PUT update onceki');
 $auditAfterUpdate = (int) $pdo->query('SELECT COUNT(*) FROM fazla_calisma_odeme_tercihi_audit WHERE tercih_id = ' . $tercihId)->fetchColumn();
 fcotAssert($auditAfterUpdate === 2, 'audit append on real update');
+
+// UCRET → SERBEST_ZAMAN allowed when no active olusum
+$putBackSz = invokeFcotHttp($pdo, $gy, 'PUT', '/fazla-calisma-odeme-tercihi', [
+    'snapshot_id' => $snap2,
+    'odeme_tipi' => 'SERBEST_ZAMAN',
+], $subeHeader);
+fcotAssert($putBackSz['status'] === 200, 'UCRET → SERBEST_ZAMAN allowed');
 
 $mainCount = (int) $pdo->query('SELECT COUNT(*) FROM fazla_calisma_odeme_tercihleri WHERE snapshot_id = ' . $snap2)->fetchColumn();
 fcotAssert($mainCount === 1, 'tek ana kayıt');
@@ -632,7 +741,7 @@ $badEnum = invokeFcotHttp($pdo, $gy, 'PUT', '/fazla-calisma-odeme-tercihi', [
 ], $subeHeader);
 fcotAssert($badEnum['status'] === 422, 'gecersiz enum 422');
 
-// Period locked
+// Period locked (May)
 $seedLocked = seedSnapshot($pdo, 1, 10, '2026-05-04', '2026-05-10', 50);
 $snapLocked = $seedLocked['snapshot_id'];
 $pdo->exec("INSERT INTO puantaj_aylik_muhurleri (sube_id, yil, ay, donem, durum, created_by)
@@ -644,14 +753,33 @@ $periodLocked = invokeFcotHttp($pdo, $gy, 'PUT', '/fazla-calisma-odeme-tercihi',
 fcotAssert($periodLocked['status'] === 409, 'period locked 409');
 fcotAssert(($periodLocked['payload']['errors'][0]['code'] ?? '') === 'PERIOD_LOCKED', 'PERIOD_LOCKED code');
 
-// Cross-month week: May 25–31 open, but if June sealed → lock
-$seedCross = seedSnapshot($pdo, 1, 10, '2026-05-25', '2026-05-31', 40);
-// May already sealed above → PERIOD_LOCKED for this week too
-$crossLocked = invokeFcotHttp($pdo, $gy, 'PUT', '/fazla-calisma-odeme-tercihi', [
-    'snapshot_id' => $seedCross['snapshot_id'],
+// Cross-month week Apr 27–May 3: April open, May locked → PERIOD_LOCKED
+$seedCrossMay = seedSnapshot($pdo, 1, 10, '2026-04-27', '2026-05-03', 40);
+$crossMay = invokeFcotHttp($pdo, $gy, 'PUT', '/fazla-calisma-odeme-tercihi', [
+    'snapshot_id' => $seedCrossMay['snapshot_id'],
     'odeme_tipi' => 'UCRET',
 ], $subeHeader);
-fcotAssert($crossLocked['status'] === 409, 'cross-month any sealed → PERIOD_LOCKED');
+fcotAssert($crossMay['status'] === 409, 'cross-month first open second locked → PERIOD_LOCKED');
+
+// Cross-month: June sealed, July open on 2026-06-29..2026-07-05
+$pdo->exec('DELETE FROM puantaj_aylik_muhurleri WHERE sube_id = 1 AND yil = 2026 AND ay = 5');
+$pdo->exec("INSERT INTO puantaj_aylik_muhurleri (sube_id, yil, ay, donem, durum, created_by)
+            VALUES (1, 2026, 6, '2026-06', 'MUHURLENDI', 1)");
+$seedCrossJunJul = seedSnapshot($pdo, 1, 10, '2026-06-29', '2026-07-05', 43);
+$crossJunJul = invokeFcotHttp($pdo, $gy, 'PUT', '/fazla-calisma-odeme-tercihi', [
+    'snapshot_id' => $seedCrossJunJul['snapshot_id'],
+    'odeme_tipi' => 'UCRET',
+], $subeHeader);
+fcotAssert($crossJunJul['status'] === 409, 'cross-month first locked second open → PERIOD_LOCKED');
+
+// Both months open → PUT continues
+$pdo->exec('DELETE FROM puantaj_aylik_muhurleri WHERE sube_id = 1 AND yil = 2026 AND ay = 6');
+$seedBothOpen = seedSnapshot($pdo, 1, 10, '2026-07-27', '2026-08-02', 44);
+$bothOpen = invokeFcotHttp($pdo, $gy, 'PUT', '/fazla-calisma-odeme-tercihi', [
+    'snapshot_id' => $seedBothOpen['snapshot_id'],
+    'odeme_tipi' => 'UCRET',
+], $subeHeader);
+fcotAssert($bothOpen['status'] === 200, 'cross-month both open → PUT 200');
 
 // Period unknown: drop period tables on isolated DB
 $unknownRoot = fcotPdo($dsn);
@@ -674,10 +802,8 @@ fcotAssert($periodUnknown['status'] === 409, 'period unknown 409');
 fcotAssert(($periodUnknown['payload']['errors'][0]['code'] ?? '') === 'PERIOD_STATE_UNKNOWN', 'PERIOD_STATE_UNKNOWN code');
 $unknownRoot->exec('DROP DATABASE `' . $unknownDb . '`');
 
-// Transaction rollback: force audit FK failure by deleting user mid-flight is hard;
-// instead verify bad snapshot leaves zero rows when validation fails after begin via missing period already tested.
-// Parallel PUT same snapshot → single main row
-$seedPar = seedSnapshot($pdo, 1, 10, '2026-06-01', '2026-06-07', 70);
+// Parallel PUT competing tipileri → tek ana satır
+$seedPar = seedSnapshot($pdo, 1, 10, '2026-08-03', '2026-08-09', 70);
 $snapPar = $seedPar['snapshot_id'];
 $p1 = spawnFcotHttp($pdo, $gy, 'PUT', '/fazla-calisma-odeme-tercihi', [
     'snapshot_id' => $snapPar,
@@ -697,17 +823,68 @@ $parCount = (int) $pdo->query('SELECT COUNT(*) FROM fazla_calisma_odeme_tercihle
 fcotAssert($parCount === 1, 'parallel PUT tek ana kayıt');
 $okCount = (($r1['status'] === 200) ? 1 : 0) + (($r2['status'] === 200) ? 1 : 0);
 fcotAssert($okCount >= 1, 'parallel PUT at least one 200');
+$parAudit = (int) $pdo->query('SELECT COUNT(*) FROM fazla_calisma_odeme_tercihi_audit a
+    INNER JOIN fazla_calisma_odeme_tercihleri t ON t.id = a.tercih_id
+    WHERE t.snapshot_id = ' . $snapPar)->fetchColumn();
+fcotAssert($parAudit >= 1, 'parallel PUT audit zinciri mevcut');
+$orphanAudit = (int) $pdo->query('SELECT COUNT(*) FROM fazla_calisma_odeme_tercihi_audit a
+    LEFT JOIN fazla_calisma_odeme_tercihleri t ON t.id = a.tercih_id
+    WHERE t.id IS NULL')->fetchColumn();
+fcotAssert($orphanAudit === 0, 'parallel PUT orphan audit yok');
 
-// Transaction rollback: simulate by inserting with invalid secen (user 999) via direct SQL after testing controller
-// Controller always uses auth user. Force rollback by opening transaction and calling put with schema drop mid-flight is flaky.
-// Use invalid snapshot that passes parse then fails FOR UPDATE after we delete satir inside a child — skip brittle path;
-// instead assert failed server-owned leaves row count unchanged (already) and add explicit rollback probe:
+// Parallel same payload
+$seedParSame = seedSnapshot($pdo, 1, 10, '2026-08-10', '2026-08-16', 71);
+$snapParSame = $seedParSame['snapshot_id'];
+$ps1 = spawnFcotHttp($pdo, $gy, 'PUT', '/fazla-calisma-odeme-tercihi', [
+    'snapshot_id' => $snapParSame,
+    'odeme_tipi' => 'UCRET',
+], $subeHeader);
+$ps2 = spawnFcotHttp($pdo, $gy, 'PUT', '/fazla-calisma-odeme-tercihi', [
+    'snapshot_id' => $snapParSame,
+    'odeme_tipi' => 'UCRET',
+], $subeHeader);
+$rs1 = finishFcotHttp($ps1);
+$rs2 = finishFcotHttp($ps2);
+fcotAssert($rs1['status'] === 200 && $rs2['status'] === 200, 'parallel same payload both 200');
+fcotAssert(
+    (int) $pdo->query('SELECT COUNT(*) FROM fazla_calisma_odeme_tercihleri WHERE snapshot_id = ' . $snapParSame)->fetchColumn() === 1,
+    'parallel same payload tek ana kayıt'
+);
+$sameAudit = (int) $pdo->query('SELECT COUNT(*) FROM fazla_calisma_odeme_tercihi_audit a
+    INNER JOIN fazla_calisma_odeme_tercihleri t ON t.id = a.tercih_id
+    WHERE t.snapshot_id = ' . $snapParSame)->fetchColumn();
+fcotAssert($sameAudit === 1, 'parallel same payload audit=1');
+
+// Audit fail after insert → full rollback (trigger injection)
+$seedAuditFail = seedSnapshot($pdo, 1, 10, '2026-08-17', '2026-08-23', 72);
+$beforeAf = (int) $pdo->query('SELECT COUNT(*) FROM fazla_calisma_odeme_tercihleri')->fetchColumn();
+$beforeAfAudit = (int) $pdo->query('SELECT COUNT(*) FROM fazla_calisma_odeme_tercihi_audit')->fetchColumn();
+$pdo->exec("
+    CREATE TRIGGER trg_fcot_audit_fail BEFORE INSERT ON fazla_calisma_odeme_tercihi_audit
+    FOR EACH ROW SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'forced audit fail'
+");
+$afFailed = false;
+try {
+    invokeFcotHttp($pdo, $gy, 'PUT', '/fazla-calisma-odeme-tercihi', [
+        'snapshot_id' => $seedAuditFail['snapshot_id'],
+        'odeme_tipi' => 'UCRET',
+    ], $subeHeader);
+} catch (Throwable $e) {
+    $afFailed = true;
+}
+$pdo->exec('DROP TRIGGER IF EXISTS trg_fcot_audit_fail');
+$afterAf = (int) $pdo->query('SELECT COUNT(*) FROM fazla_calisma_odeme_tercihleri')->fetchColumn();
+$afterAfAudit = (int) $pdo->query('SELECT COUNT(*) FROM fazla_calisma_odeme_tercihi_audit')->fetchColumn();
+fcotAssert($afFailed || $beforeAf === $afterAf, 'audit fail rollback (no partial main)');
+fcotAssert($beforeAf === $afterAf, 'transaction rollback audit-fail main');
+fcotAssert($beforeAfAudit === $afterAfAudit, 'transaction rollback audit-fail audit');
+
+// Period locked rollback path (no partial write)
 $beforeRollback = (int) $pdo->query('SELECT COUNT(*) FROM fazla_calisma_odeme_tercihleri')->fetchColumn();
 $beforeAudit = (int) $pdo->query('SELECT COUNT(*) FROM fazla_calisma_odeme_tercihi_audit')->fetchColumn();
-$seedRb = seedSnapshot($pdo, 1, 10, '2026-06-08', '2026-06-14', 33);
-// Seal June so PUT fails after beginTransaction with PERIOD_LOCKED (rollback)
+$seedRb = seedSnapshot($pdo, 1, 10, '2026-09-07', '2026-09-13', 33);
 $pdo->exec("INSERT INTO puantaj_aylik_muhurleri (sube_id, yil, ay, donem, durum, created_by)
-            VALUES (1, 2026, 6, '2026-06', 'MUHURLENDI', 1)");
+            VALUES (1, 2026, 9, '2026-09', 'MUHURLENDI', 1)");
 $rb = invokeFcotHttp($pdo, $gy, 'PUT', '/fazla-calisma-odeme-tercihi', [
     'snapshot_id' => $seedRb['snapshot_id'],
     'odeme_tipi' => 'UCRET',

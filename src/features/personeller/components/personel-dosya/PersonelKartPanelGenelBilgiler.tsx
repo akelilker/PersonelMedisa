@@ -13,6 +13,7 @@ export function PersonelKartPanelGenelBilgiler({
   canViewRevizyon,
   canCreateRevizyon = false,
   canViewFinans,
+  canViewBordro = false,
   canViewUcret,
   canManageUcret,
   isActive,
@@ -24,6 +25,7 @@ export function PersonelKartPanelGenelBilgiler({
   canViewRevizyon: boolean;
   canCreateRevizyon?: boolean;
   canViewFinans: boolean;
+  canViewBordro?: boolean;
   canViewUcret: boolean;
   canManageUcret: boolean;
   isActive: boolean;
@@ -63,6 +65,7 @@ export function PersonelKartPanelGenelBilgiler({
         canViewRevizyon={canViewRevizyon}
         canCreateRevizyon={canCreateRevizyon}
         canViewFinans={canViewFinans}
+        canViewBordro={canViewBordro}
         isActive={isActive}
       />
 

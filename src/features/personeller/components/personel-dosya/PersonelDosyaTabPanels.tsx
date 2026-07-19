@@ -27,6 +27,7 @@ export type PersonelDosyaTabPanelsProps = {
   canAccessSurecler: boolean;
   canCreateSurec: boolean;
   canViewFinans: boolean;
+  canViewBordro?: boolean;
   canViewUcret: boolean;
   canManageUcret: boolean;
   onOpenZimmetCreate: () => void;
@@ -52,6 +53,7 @@ export function PersonelDosyaTabPanels({
   canAccessSurecler,
   canCreateSurec,
   canViewFinans,
+  canViewBordro = false,
   canViewUcret,
   canManageUcret,
   onOpenZimmetCreate,
@@ -79,6 +81,7 @@ export function PersonelDosyaTabPanels({
           canViewRevizyon={canViewRevizyon}
           canCreateRevizyon={canCreateRevizyon}
           canViewFinans={canViewFinans}
+          canViewBordro={canViewBordro}
           canViewUcret={canViewUcret}
           canManageUcret={canManageUcret}
           isActive={activeTab === "genel-bilgiler"}

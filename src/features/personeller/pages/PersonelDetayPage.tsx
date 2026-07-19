@@ -30,6 +30,7 @@ export function PersonelDetayPage() {
   const canViewRevizyon = hasPermission("revizyon.view");
   const canCreateRevizyon = hasPermission("revizyon.create");
   const canViewFinans = hasPermission("finans.view");
+  const canViewBordro = hasPermission("bordro_on_izleme.view");
   const canViewUcret = hasPermission("personeller.ucret.view");
   const canManageUcret = hasPermission("personeller.ucret.manage");
   const canCreateZimmet = canEditPersonel;
@@ -197,6 +198,7 @@ export function PersonelDetayPage() {
               canAccessSurecler={canAccessSurecler}
               canCreateSurec={canCreateSurec}
               canViewFinans={canViewFinans}
+              canViewBordro={canViewBordro}
               canViewUcret={canViewUcret}
               canManageUcret={canManageUcret}
               onOpenZimmetCreate={handleOpenPersonelZimmetGateway}

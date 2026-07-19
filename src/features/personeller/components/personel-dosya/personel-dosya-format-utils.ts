@@ -53,7 +53,10 @@ export function formatDetailNumber(value: number | null | undefined) {
   return typeof value === "number" ? String(value) : "-";
 }
 
-export function formatNullableScalar(value: string | number | boolean | null | undefined) {
+export function formatNullableScalar(value: string | number | boolean | null | undefined | object) {
+  if (value === null || value === undefined) {
+    return "-";
+  }
   if (typeof value === "boolean") {
     return value ? "Evet" : "Hayır";
   }
@@ -62,6 +65,9 @@ export function formatNullableScalar(value: string | number | boolean | null | u
   }
   if (typeof value === "string") {
     return formatDetailValue(value);
+  }
+  if (typeof value === "object") {
+    return JSON.stringify(value);
   }
   return "-";
 }

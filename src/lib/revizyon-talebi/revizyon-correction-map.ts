@@ -1,5 +1,13 @@
 import type { RevizyonCorrectionEvent, RevizyonCorrectionTipi } from "../../types/revizyon-correction";
-import type { RevizyonTalebi, RevizyonTipi } from "../../types/revizyon-talebi";
+import type { RevizyonJsonDeger, RevizyonTalebi, RevizyonTipi } from "../../types/revizyon-talebi";
+
+function toCorrectionScalar(value: RevizyonJsonDeger): string | number | boolean | null {
+  if (value === null || typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+    return value;
+  }
+
+  return JSON.stringify(value);
+}
 
 export function mapRevizyonTipiToCorrectionTipi(
   revizyonTipi: RevizyonTipi
@@ -81,8 +89,8 @@ export function buildCorrectionFromRevizyonTalebi(
     kaynak_tipi: talep.kaynak_tipi,
     kaynak_id: talep.kaynak_id,
     correction_tipi,
-    onceki_deger: talep.onceki_deger,
-    yeni_deger: talep.talep_edilen_deger,
+    onceki_deger: toCorrectionScalar(talep.onceki_deger),
+    yeni_deger: toCorrectionScalar(talep.talep_edilen_deger),
     delta_dakika,
     delta_gun,
     bordro_etki_var_mi: talep.bordro_etki_var_mi,

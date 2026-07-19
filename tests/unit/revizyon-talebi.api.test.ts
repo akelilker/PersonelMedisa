@@ -294,7 +294,7 @@ describe("revizyon-talebi mock integration", () => {
     expect(response?.errors?.[0]?.code).toBe("PERIOD_NOT_CLOSED");
   });
 
-  it("duplicate acik talep REVISION_ALREADY_EXISTS doner", () => {
+  it("duplicate acik talep ALREADY_EXISTS doner", () => {
     closeDemoHaftalikKapanis("2026-05-01", "2026-05-07", 3);
 
     const revizyonBody = {
@@ -326,10 +326,10 @@ describe("revizyon-talebi mock integration", () => {
       body: JSON.stringify(revizyonBody)
     });
 
-    expect(duplicate?.errors?.[0]?.code).toBe("REVISION_ALREADY_EXISTS");
+    expect(duplicate?.errors?.[0]?.code).toBe("ALREADY_EXISTS");
   });
 
-  it("REDDEDILDI durumundan ONAYLANDI gecisi INVALID_STATE_TRANSITION doner", () => {
+  it("REDDEDILDI durumundan ONAYLANDI gecisi STATE_CONFLICT doner", () => {
     closeDemoHaftalikKapanis("2026-05-08", "2026-05-14", 3);
 
     const revizyonBody = {
@@ -366,7 +366,7 @@ describe("revizyon-talebi mock integration", () => {
       body: JSON.stringify({ karar_notu: "Tekrar onay" })
     });
 
-    expect(invalid?.errors?.[0]?.code).toBe("INVALID_STATE_TRANSITION");
+    expect(invalid?.errors?.[0]?.code).toBe("STATE_CONFLICT");
   });
 
   it("BOLUM_YONETICISI list yalniz kendi bolumundeki talepleri doner", () => {
@@ -513,7 +513,7 @@ describe("revizyon-talebi mock integration", () => {
     expect(talep.bordro_etki_notu).toBeNull();
   });
 
-  it("create client talep_eden_kullanici_id gonderse ignore eder", () => {
+  it("create client talep_eden_kullanici_id gonderse VALIDATION_ERROR doner", () => {
     closeDemoHaftalikKapanis("2026-07-08", "2026-07-14", 3);
 
     const created = resolveDemoApiResponse("/haftalik-kapanis/revizyon-talepleri", {
@@ -533,9 +533,9 @@ describe("revizyon-talebi mock integration", () => {
         talep_eden_kullanici_id: 999
       })
     });
-    const talep = created?.data as { talep_eden_kullanici_id?: number };
 
-    expect(talep.talep_eden_kullanici_id).toBe(3);
+    expect(created?.data).toBeNull();
+    expect(created?.errors?.[0]?.code).toBe("VALIDATION_ERROR");
   });
 
   it("GENEL_YONETICI ONAY_BEKLIYOR talebi onaylayabilir", () => {
@@ -576,7 +576,7 @@ describe("revizyon-talebi mock integration", () => {
     expect(talep.karar_veren_kullanici_id).toBe(1);
   });
 
-  it("ONAYLANDI talep cancel INVALID_STATE_TRANSITION doner", () => {
+  it("ONAYLANDI talep cancel STATE_CONFLICT doner", () => {
     closeDemoHaftalikKapanis("2026-07-22", "2026-07-28", 3);
 
     const created = resolveDemoApiResponse("/haftalik-kapanis/revizyon-talepleri", {
@@ -614,6 +614,6 @@ describe("revizyon-talebi mock integration", () => {
       body: JSON.stringify({})
     });
 
-    expect(cancel?.errors?.[0]?.code).toBe("INVALID_STATE_TRANSITION");
+    expect(cancel?.errors?.[0]?.code).toBe("STATE_CONFLICT");
   });
 });

@@ -177,6 +177,7 @@ describe("serbest-zaman.api", () => {
       event_tipi: "SERBEST_ZAMAN_KULLANIM",
       dakika: 30,
       event_tarihi: "2026-06-15",
+      islem_anahtari: "k-norm",
       aciklama: "Izin kullanimi"
     });
 
@@ -207,7 +208,8 @@ describe("serbest-zaman.api", () => {
               personel_id: 1,
               event_tipi: "SERBEST_ZAMAN_KULLANIM",
               dakika: 30,
-              event_tarihi: "2026-06-15"
+              event_tarihi: "2026-06-15",
+              islem_anahtari: "k1"
             }
           ]
         },
@@ -257,7 +259,8 @@ describe("serbest-zaman.api", () => {
           personel_id: 1,
           event_tipi: "SERBEST_ZAMAN_KULLANIM",
           dakika: 30,
-          event_tarihi: "2026-06-15"
+          event_tarihi: "2026-06-15",
+          islem_anahtari: "k1"
         },
         meta: {},
         errors: []
@@ -269,7 +272,8 @@ describe("serbest-zaman.api", () => {
     const result = await postSerbestZamanKullanim({
       personel_id: 1,
       dakika: 30,
-      event_tarihi: "2026-06-15"
+      event_tarihi: "2026-06-15",
+      islem_anahtari: "k1"
     });
 
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
@@ -277,7 +281,8 @@ describe("serbest-zaman.api", () => {
     expect(JSON.parse(String(init.body))).toMatchObject({
       personel_id: 1,
       dakika: 30,
-      event_tarihi: "2026-06-15"
+      event_tarihi: "2026-06-15",
+      islem_anahtari: "k1"
     });
     expect(result.event_tipi).toBe("SERBEST_ZAMAN_KULLANIM");
     expect(result.dakika).toBe(30);
@@ -298,7 +303,8 @@ describe("serbest-zaman.api", () => {
       postSerbestZamanKullanim({
         personel_id: 1,
         dakika: 100,
-        event_tarihi: "2026-06-15"
+        event_tarihi: "2026-06-15",
+        islem_anahtari: "k2"
       })
     ).rejects.toMatchObject({
       status: 409
@@ -312,7 +318,8 @@ describe("serbest-zaman.api", () => {
       event_tipi: "SERBEST_ZAMAN_IPTAL",
       hedef_event_id: 2,
       hedef_event_tipi: "SERBEST_ZAMAN_KULLANIM",
-      event_tarihi: "2026-06-20"
+      event_tarihi: "2026-06-20",
+      islem_anahtari: "i1"
     });
 
     expect(result.event_tipi).toBe("SERBEST_ZAMAN_IPTAL");
@@ -329,7 +336,9 @@ describe("serbest-zaman.api", () => {
       hedef_event_id: 1,
       hedef_event_tipi: "SERBEST_ZAMAN_OLUSUM",
       yeni_dakika: 60,
-      event_tarihi: "2026-06-20"
+      event_tarihi: "2026-06-20",
+      islem_anahtari: "d1",
+      aciklama: "duzeltme"
     });
 
     expect(result.event_tipi).toBe("SERBEST_ZAMAN_DUZELTME");
@@ -347,7 +356,8 @@ describe("serbest-zaman.api", () => {
           event_tipi: "SERBEST_ZAMAN_IPTAL",
           hedef_event_id: 2,
           hedef_event_tipi: "SERBEST_ZAMAN_KULLANIM",
-          event_tarihi: "2026-06-20"
+          event_tarihi: "2026-06-20",
+          islem_anahtari: "i-resp"
         },
         meta: {},
         errors: []
@@ -360,7 +370,8 @@ describe("serbest-zaman.api", () => {
       personel_id: 1,
       hedef_event_id: 2,
       hedef_event_tipi: "SERBEST_ZAMAN_KULLANIM",
-      event_tarihi: "2026-06-20"
+      event_tarihi: "2026-06-20",
+      islem_anahtari: "i1"
     });
 
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
@@ -382,7 +393,9 @@ describe("serbest-zaman.api", () => {
           hedef_event_id: 1,
           hedef_event_tipi: "SERBEST_ZAMAN_OLUSUM",
           yeni_dakika: 60,
-          event_tarihi: "2026-06-20"
+          event_tarihi: "2026-06-20",
+          islem_anahtari: "d-resp",
+          aciklama: "duzeltme"
         },
         meta: {},
         errors: []
@@ -396,7 +409,9 @@ describe("serbest-zaman.api", () => {
       hedef_event_id: 1,
       hedef_event_tipi: "SERBEST_ZAMAN_OLUSUM",
       yeni_dakika: 60,
-      event_tarihi: "2026-06-20"
+      event_tarihi: "2026-06-20",
+      islem_anahtari: "d1",
+      aciklama: "duzeltme"
     });
 
     const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
@@ -423,7 +438,8 @@ describe("serbest-zaman.api", () => {
         personel_id: 1,
         hedef_event_id: 999,
         hedef_event_tipi: "SERBEST_ZAMAN_KULLANIM",
-        event_tarihi: "2026-06-20"
+        islem_anahtari: "i-api",
+      event_tarihi: "2026-06-20"
       })
     ).rejects.toMatchObject({
       status: 404
@@ -446,7 +462,8 @@ describe("serbest-zaman.api", () => {
         personel_id: 1,
         hedef_event_id: 1,
         hedef_event_tipi: "SERBEST_ZAMAN_KULLANIM",
-        event_tarihi: "2026-06-20"
+        islem_anahtari: "i-api",
+      event_tarihi: "2026-06-20"
       })
     ).rejects.toMatchObject({
       status: 409

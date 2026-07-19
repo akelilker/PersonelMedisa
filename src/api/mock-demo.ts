@@ -359,6 +359,8 @@ const demoState: {
   /** Sealed puantaj months: `${subeId}|${yil}|${ay}` → true. Missing = open. */
   sealedPuantajDonemKeys: Record<string, true>;
   serbestZamanEventsById: Record<number, SerbestZamanEvent>;
+  /** Active OLUSUM uniqueness guard: odeme_tercihi_id → olusum_event_id */
+  serbestZamanAktifOlusumByTercihId: Record<number, number>;
   revizyonTalebiById: Record<number, RevizyonTalebi>;
   revizyonCorrectionById: Record<number, RevizyonCorrectionEvent>;
   nextIds: {
@@ -763,6 +765,7 @@ const demoState: {
   odemeTercihiAudit: [],
   sealedPuantajDonemKeys: {},
   serbestZamanEventsById: {},
+  serbestZamanAktifOlusumByTercihId: {},
   revizyonTalebiById: {},
   revizyonCorrectionById: {},
   nextIds: {
@@ -2438,21 +2441,61 @@ function assertDemoWeekPeriodsOpen(
 }
 
 function hasActiveDemoSerbestZamanOlusum(tercihId: number): boolean {
-  const events = listDemoSerbestZamanEvents();
-  return events.some((event) => {
-    if (event.event_tipi !== "SERBEST_ZAMAN_OLUSUM" || event.kaynak_odeme_tercihi_id !== tercihId) {
-      return false;
-    }
-    const iptal = events.some(
-      (candidate) =>
-        candidate.event_tipi === "SERBEST_ZAMAN_IPTAL" && candidate.hedef_event_id === event.id
-    );
-    return !iptal;
-  });
+  return demoState.serbestZamanAktifOlusumByTercihId[tercihId] !== undefined;
 }
 
 function listDemoSerbestZamanEvents(): SerbestZamanEvent[] {
-  return Object.values(demoState.serbestZamanEventsById);
+  return Object.values(demoState.serbestZamanEventsById).sort((a, b) => {
+    const dateCmp = a.event_tarihi.localeCompare(b.event_tarihi);
+    if (dateCmp !== 0) {
+      return dateCmp;
+    }
+    return (a.id ?? 0) - (b.id ?? 0);
+  });
+}
+
+function findDemoPersonelById(personelId: number): DemoPersonel | undefined {
+  return demoState.personeller.find((item) => item.id === personelId);
+}
+
+function findDemoSerbestZamanByIslemAnahtari(
+  personelId: number,
+  islemAnahtari: string
+): SerbestZamanEvent | null {
+  for (const event of listDemoSerbestZamanEvents()) {
+    if (
+      event.personel_id === personelId &&
+      "islem_anahtari" in event &&
+      event.islem_anahtari === islemAnahtari
+    ) {
+      return event;
+    }
+  }
+  return null;
+}
+
+function resolveDemoDonemMeta(
+  subeId: number,
+  eventTarihi: string
+): { donem_yil: number; donem_ay: number; donem_kilitli_miydi: boolean } {
+  const yil = Number.parseInt(eventTarihi.slice(0, 4), 10);
+  const ay = Number.parseInt(eventTarihi.slice(5, 7), 10);
+  const key = `${subeId}|${yil}|${ay}`;
+  return {
+    donem_yil: yil,
+    donem_ay: ay,
+    donem_kilitli_miydi: demoState.sealedPuantajDonemKeys[key] === true
+  };
+}
+
+function assertDemoSzPersonelScope(
+  actor: RevizyonActorContext,
+  personel: DemoPersonel
+): ApiResponse<unknown> | null {
+  if (actor.subeIds.length === 0 && !hasRolePermission(actor.role, "personeller.view")) {
+    return demoRevizyonError("FORBIDDEN", "Sube baglami olmadan serbest zaman erisilemez.");
+  }
+  return demoPersonelSubeScopeError(actor, personel);
 }
 
 function findDemoOdemeTercihiById(odemeTercihiId: number): FazlaCalismaOdemeTercihi | null {
@@ -4933,6 +4976,10 @@ export function resolveDemoApiResponse(
   }
 
   if (pathname === "/serbest-zaman/events" && method === "GET") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(actor, "puantaj.view");
+    if (permissionError) return permissionError;
+
     const personelId = toNumber(requestUrl.searchParams.get("personel_id"));
     if (personelId === null || personelId < 1) {
       return {
@@ -4946,12 +4993,23 @@ export function resolveDemoApiResponse(
         ]
       };
     }
+
+    const personel = findDemoPersonelById(personelId);
+    if (!personel) {
+      return demoSerbestZamanOlusumError("NOT_FOUND", "personel bulunamadi.");
+    }
+    const scopeError = assertDemoSzPersonelScope(actor, personel);
+    if (scopeError) return scopeError;
 
     const items = listDemoSerbestZamanEvents().filter((event) => event.personel_id === personelId);
     return ok({ items });
   }
 
   if (pathname === "/serbest-zaman/bakiye" && method === "GET") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(actor, "puantaj.view");
+    if (permissionError) return permissionError;
+
     const personelId = toNumber(requestUrl.searchParams.get("personel_id"));
     if (personelId === null || personelId < 1) {
       return {
@@ -4965,6 +5023,13 @@ export function resolveDemoApiResponse(
         ]
       };
     }
+
+    const personel = findDemoPersonelById(personelId);
+    if (!personel) {
+      return demoSerbestZamanOlusumError("NOT_FOUND", "personel bulunamadi.");
+    }
+    const scopeError = assertDemoSzPersonelScope(actor, personel);
+    if (scopeError) return scopeError;
 
     const referans_tarih = toStringValue(requestUrl.searchParams.get("referans_tarih"));
     const bakiye = hesaplaSerbestZamanBakiye({
@@ -4977,6 +5042,25 @@ export function resolveDemoApiResponse(
   }
 
   if (pathname === "/serbest-zaman/olusum" && method === "POST") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(actor, "puantaj.muhurle");
+    if (permissionError) return permissionError;
+
+    for (const field of [
+      "personel_id",
+      "dakika",
+      "event_tarihi",
+      "son_kullanim_tarihi",
+      "created_by",
+      "created_at",
+      "sube_id",
+      "islem_anahtari"
+    ]) {
+      if (Object.prototype.hasOwnProperty.call(body, field)) {
+        return demoFcotValidationError(field, `${field} istemci tarafindan belirlenemez.`);
+      }
+    }
+
     const odemeTercihiId = toNumber(body.odeme_tercihi_id);
     const snapshotId = toNumber(body.snapshot_id);
 
@@ -4984,16 +5068,10 @@ export function resolveDemoApiResponse(
       (odemeTercihiId === null || odemeTercihiId < 1) &&
       (snapshotId === null || snapshotId < 1)
     ) {
-      return {
-        data: null,
-        meta: {},
-        errors: [
-          {
-            code: "INVALID_BODY",
-            message: "odeme_tercihi_id veya snapshot_id zorunludur."
-          }
-        ]
-      };
+      return demoFcotValidationError(
+        "odeme_tercihi_id",
+        "odeme_tercihi_id veya snapshot_id zorunludur."
+      );
     }
 
     const tercih = resolvePersistedOdemeTercihi({
@@ -5001,10 +5079,24 @@ export function resolveDemoApiResponse(
       snapshot_id: snapshotId !== null && snapshotId >= 1 ? snapshotId : undefined
     });
 
-    if (!tercih) {
+    if (!tercih || tercih.id === undefined) {
       return demoSerbestZamanOlusumError(
-        "NOT_FOUND",
-        "Persist edilmis odeme tercihi bulunamadi."
+        "NOT_PERSISTED",
+        "Odeme tercihi persist edilmemis; olusum eventi uretilemez."
+      );
+    }
+
+    const personel = findDemoPersonelById(tercih.personel_id);
+    if (!personel) {
+      return demoSerbestZamanOlusumError("NOT_FOUND", "personel bulunamadi.");
+    }
+    const scopeError = assertDemoSzPersonelScope(actor, personel);
+    if (scopeError) return scopeError;
+
+    if (hasActiveDemoSerbestZamanOlusum(tercih.id)) {
+      return demoSerbestZamanOlusumError(
+        "ALREADY_EXISTS",
+        "Bu odeme tercihi icin aktif serbest zaman olusumu zaten mevcut."
       );
     }
 
@@ -5025,57 +5117,79 @@ export function resolveDemoApiResponse(
     }
 
     const eventId = ++demoState.nextIds.serbestZamanEvent;
+    const subeId = typeof personel.sube_id === "number" ? personel.sube_id : 1;
+    const donem = resolveDemoDonemMeta(subeId, sonuc.event.event_tarihi);
     const persisted: SerbestZamanEvent = {
       ...sonuc.event,
-      id: eventId
+      id: eventId,
+      ...donem
     };
     demoState.serbestZamanEventsById[eventId] = persisted;
+    demoState.serbestZamanAktifOlusumByTercihId[tercih.id] = eventId;
 
     return ok(persisted);
   }
 
   if (pathname === "/serbest-zaman/kullanim" && method === "POST") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(actor, "puantaj.muhurle");
+    if (permissionError) return permissionError;
+
+    if (Object.prototype.hasOwnProperty.call(body, "sube_id")) {
+      return demoFcotValidationError("sube_id", "sube_id istemci tarafindan belirlenemez.");
+    }
+
     const personelId = toNumber(body.personel_id);
     const dakika = toNumber(body.dakika);
     const eventTarihi = toStringValue(body.event_tarihi);
+    const islemAnahtari = toStringValue(body.islem_anahtari);
 
     if (personelId === null || personelId < 1) {
-      return {
-        data: null,
-        meta: {},
-        errors: [
-          {
-            code: "INVALID_BODY",
-            message: "personel_id zorunludur ve pozitif tam sayi olmalidir."
-          }
-        ]
-      };
-    }
-
-    if (dakika === null || dakika <= 0) {
-      return demoSerbestZamanOlusumError(
-        "ZERO_DAKIKA",
-        "Kullanim dakikasi pozitif olmalidir."
+      return demoFcotValidationError(
+        "personel_id",
+        "personel_id zorunludur ve pozitif tam sayi olmalidir."
       );
     }
 
+    if (dakika === null || dakika <= 0) {
+      return demoSerbestZamanOlusumError("ZERO_DAKIKA", "Kullanim dakikasi pozitif olmalidir.");
+    }
+
     if (!eventTarihi || !/^\d{4}-\d{2}-\d{2}$/.test(eventTarihi.trim())) {
-      return {
-        data: null,
-        meta: {},
-        errors: [
-          {
-            code: "INVALID_BODY",
-            message: "event_tarihi YYYY-MM-DD formatinda olmalidir."
-          }
-        ]
-      };
+      return demoFcotValidationError("event_tarihi", "event_tarihi YYYY-MM-DD formatinda olmalidir.");
+    }
+
+    if (!islemAnahtari) {
+      return demoFcotValidationError("islem_anahtari", "islem_anahtari zorunludur.");
+    }
+
+    const personel = findDemoPersonelById(personelId);
+    if (!personel) {
+      return demoSerbestZamanOlusumError("NOT_FOUND", "personel bulunamadi.");
+    }
+    const scopeError = assertDemoSzPersonelScope(actor, personel);
+    if (scopeError) return scopeError;
+
+    const existing = findDemoSerbestZamanByIslemAnahtari(personelId, islemAnahtari);
+    if (existing) {
+      if (
+        existing.event_tipi !== "SERBEST_ZAMAN_KULLANIM" ||
+        existing.dakika !== dakika ||
+        existing.event_tarihi !== eventTarihi.trim().slice(0, 10)
+      ) {
+        return demoSerbestZamanOlusumError(
+          "IDEMPOTENCY_CONFLICT",
+          "Ayni islem_anahtari farkli payload ile kullanilmis."
+        );
+      }
+      return ok(existing);
     }
 
     const sonuc = olusturKullanimEvent({
       personel_id: personelId,
       dakika,
       event_tarihi: eventTarihi.trim().slice(0, 10),
+      islem_anahtari: islemAnahtari,
       mevcutEvents: listDemoSerbestZamanEvents(),
       aciklama: toStringValue(body.aciklama) ?? undefined
     });
@@ -5084,16 +5198,19 @@ export function resolveDemoApiResponse(
       const messages: Record<string, string> = {
         ZERO_DAKIKA: "Kullanim dakikasi pozitif olmalidir.",
         NO_ELIGIBLE_BALANCE: "Kullanilabilir serbest zaman bakiyesi yok.",
-        INSUFFICIENT_BALANCE: "Kullanim miktarı mevcut bakiyeyi asiyor."
+        INSUFFICIENT_BALANCE: "Kullanim miktari mevcut bakiyeyi asiyor."
       };
 
       return demoSerbestZamanOlusumError(sonuc.code, messages[sonuc.code] ?? sonuc.code);
     }
 
     const eventId = ++demoState.nextIds.serbestZamanEvent;
+    const subeId = typeof personel.sube_id === "number" ? personel.sube_id : 1;
+    const donem = resolveDemoDonemMeta(subeId, sonuc.event.event_tarihi);
     const persisted: SerbestZamanEvent = {
       ...sonuc.event,
-      id: eventId
+      id: eventId,
+      ...donem
     };
     demoState.serbestZamanEventsById[eventId] = persisted;
 
@@ -5101,22 +5218,25 @@ export function resolveDemoApiResponse(
   }
 
   if (pathname === "/serbest-zaman/iptal" && method === "POST") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(actor, "puantaj.muhurle");
+    if (permissionError) return permissionError;
+
+    if (Object.prototype.hasOwnProperty.call(body, "sube_id")) {
+      return demoFcotValidationError("sube_id", "sube_id istemci tarafindan belirlenemez.");
+    }
+
     const personelId = toNumber(body.personel_id);
     const hedefEventId = toNumber(body.hedef_event_id);
     const hedefEventTipi = toStringValue(body.hedef_event_tipi);
     const eventTarihi = toStringValue(body.event_tarihi);
+    const islemAnahtari = toStringValue(body.islem_anahtari);
 
     if (personelId === null || personelId < 1) {
-      return {
-        data: null,
-        meta: {},
-        errors: [
-          {
-            code: "INVALID_BODY",
-            message: "personel_id zorunludur ve pozitif tam sayi olmalidir."
-          }
-        ]
-      };
+      return demoFcotValidationError(
+        "personel_id",
+        "personel_id zorunludur ve pozitif tam sayi olmalidir."
+      );
     }
 
     if (hedefEventId === null || hedefEventId < 1) {
@@ -5137,16 +5257,34 @@ export function resolveDemoApiResponse(
     }
 
     if (!eventTarihi || !/^\d{4}-\d{2}-\d{2}$/.test(eventTarihi.trim())) {
-      return {
-        data: null,
-        meta: {},
-        errors: [
-          {
-            code: "INVALID_BODY",
-            message: "event_tarihi YYYY-MM-DD formatinda olmalidir."
-          }
-        ]
-      };
+      return demoFcotValidationError("event_tarihi", "event_tarihi YYYY-MM-DD formatinda olmalidir.");
+    }
+
+    if (!islemAnahtari) {
+      return demoFcotValidationError("islem_anahtari", "islem_anahtari zorunludur.");
+    }
+
+    const personel = findDemoPersonelById(personelId);
+    if (!personel) {
+      return demoSerbestZamanOlusumError("NOT_FOUND", "personel bulunamadi.");
+    }
+    const scopeError = assertDemoSzPersonelScope(actor, personel);
+    if (scopeError) return scopeError;
+
+    const existing = findDemoSerbestZamanByIslemAnahtari(personelId, islemAnahtari);
+    if (existing) {
+      if (
+        existing.event_tipi !== "SERBEST_ZAMAN_IPTAL" ||
+        existing.hedef_event_id !== hedefEventId ||
+        existing.hedef_event_tipi !== hedefEventTipi ||
+        existing.event_tarihi !== eventTarihi.trim().slice(0, 10)
+      ) {
+        return demoSerbestZamanOlusumError(
+          "IDEMPOTENCY_CONFLICT",
+          "Ayni islem_anahtari farkli payload ile kullanilmis."
+        );
+      }
+      return ok(existing);
     }
 
     const sonuc = olusturIptalEvent({
@@ -5154,6 +5292,7 @@ export function resolveDemoApiResponse(
       hedef_event_id: hedefEventId,
       hedef_event_tipi: hedefEventTipi,
       event_tarihi: eventTarihi.trim().slice(0, 10),
+      islem_anahtari: islemAnahtari,
       mevcutEvents: listDemoSerbestZamanEvents(),
       aciklama: toStringValue(body.aciklama) ?? undefined
     });
@@ -5171,33 +5310,48 @@ export function resolveDemoApiResponse(
     }
 
     const eventId = ++demoState.nextIds.serbestZamanEvent;
+    const subeId = typeof personel.sube_id === "number" ? personel.sube_id : 1;
+    const donem = resolveDemoDonemMeta(subeId, sonuc.event.event_tarihi);
     const persisted = {
       ...sonuc.event,
-      id: eventId
+      id: eventId,
+      ...donem
     };
     demoState.serbestZamanEventsById[eventId] = persisted;
+
+    if (hedefEventTipi === "SERBEST_ZAMAN_OLUSUM") {
+      for (const [tercihId, olusumId] of Object.entries(demoState.serbestZamanAktifOlusumByTercihId)) {
+        if (olusumId === hedefEventId) {
+          delete demoState.serbestZamanAktifOlusumByTercihId[Number(tercihId)];
+        }
+      }
+    }
 
     return ok(persisted);
   }
 
   if (pathname === "/serbest-zaman/duzeltme" && method === "POST") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(actor, "puantaj.muhurle");
+    if (permissionError) return permissionError;
+
+    if (Object.prototype.hasOwnProperty.call(body, "sube_id")) {
+      return demoFcotValidationError("sube_id", "sube_id istemci tarafindan belirlenemez.");
+    }
+
     const personelId = toNumber(body.personel_id);
     const hedefEventId = toNumber(body.hedef_event_id);
     const hedefEventTipi = toStringValue(body.hedef_event_tipi);
     const yeniDakika = toNumber(body.yeni_dakika);
     const eventTarihi = toStringValue(body.event_tarihi);
+    const islemAnahtari = toStringValue(body.islem_anahtari);
+    const aciklama = toStringValue(body.aciklama);
 
     if (personelId === null || personelId < 1) {
-      return {
-        data: null,
-        meta: {},
-        errors: [
-          {
-            code: "INVALID_BODY",
-            message: "personel_id zorunludur ve pozitif tam sayi olmalidir."
-          }
-        ]
-      };
+      return demoFcotValidationError(
+        "personel_id",
+        "personel_id zorunludur ve pozitif tam sayi olmalidir."
+      );
     }
 
     if (hedefEventId === null || hedefEventId < 1) {
@@ -5222,16 +5376,40 @@ export function resolveDemoApiResponse(
     }
 
     if (!eventTarihi || !/^\d{4}-\d{2}-\d{2}$/.test(eventTarihi.trim())) {
-      return {
-        data: null,
-        meta: {},
-        errors: [
-          {
-            code: "INVALID_BODY",
-            message: "event_tarihi YYYY-MM-DD formatinda olmalidir."
-          }
-        ]
-      };
+      return demoFcotValidationError("event_tarihi", "event_tarihi YYYY-MM-DD formatinda olmalidir.");
+    }
+
+    if (!islemAnahtari) {
+      return demoFcotValidationError("islem_anahtari", "islem_anahtari zorunludur.");
+    }
+
+    if (!aciklama) {
+      return demoFcotValidationError("aciklama", "aciklama zorunludur.");
+    }
+
+    const personel = findDemoPersonelById(personelId);
+    if (!personel) {
+      return demoSerbestZamanOlusumError("NOT_FOUND", "personel bulunamadi.");
+    }
+    const scopeError = assertDemoSzPersonelScope(actor, personel);
+    if (scopeError) return scopeError;
+
+    const existing = findDemoSerbestZamanByIslemAnahtari(personelId, islemAnahtari);
+    if (existing) {
+      if (
+        existing.event_tipi !== "SERBEST_ZAMAN_DUZELTME" ||
+        existing.hedef_event_id !== hedefEventId ||
+        existing.hedef_event_tipi !== hedefEventTipi ||
+        existing.yeni_dakika !== yeniDakika ||
+        existing.event_tarihi !== eventTarihi.trim().slice(0, 10) ||
+        (existing.aciklama ?? "") !== aciklama
+      ) {
+        return demoSerbestZamanOlusumError(
+          "IDEMPOTENCY_CONFLICT",
+          "Ayni islem_anahtari farkli payload ile kullanilmis."
+        );
+      }
+      return ok(existing);
     }
 
     const sonuc = olusturDuzeltmeEvent({
@@ -5240,8 +5418,9 @@ export function resolveDemoApiResponse(
       hedef_event_tipi: hedefEventTipi,
       yeni_dakika: yeniDakika,
       event_tarihi: eventTarihi.trim().slice(0, 10),
+      islem_anahtari: islemAnahtari,
       mevcutEvents: listDemoSerbestZamanEvents(),
-      aciklama: toStringValue(body.aciklama) ?? undefined
+      aciklama
     });
 
     if (!sonuc.ok) {
@@ -5258,9 +5437,12 @@ export function resolveDemoApiResponse(
     }
 
     const eventId = ++demoState.nextIds.serbestZamanEvent;
+    const subeId = typeof personel.sube_id === "number" ? personel.sube_id : 1;
+    const donem = resolveDemoDonemMeta(subeId, sonuc.event.event_tarihi);
     const persisted = {
       ...sonuc.event,
-      id: eventId
+      id: eventId,
+      ...donem
     };
     demoState.serbestZamanEventsById[eventId] = persisted;
 

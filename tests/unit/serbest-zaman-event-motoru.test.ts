@@ -47,6 +47,7 @@ function kullanimEvent(
     event_tipi: "SERBEST_ZAMAN_KULLANIM",
     dakika: 30,
     event_tarihi: "2026-06-15",
+    islem_anahtari: "key-kullanim-default",
     ...overrides
   } as SerbestZamanEvent;
 }
@@ -198,6 +199,7 @@ describe("serbest-zaman-event-motoru", () => {
     const sonuc = olusturKullanimEvent({
       personel_id: 1,
       dakika: 30,
+      islem_anahtari: "key-kullanim",
       event_tarihi: "2026-06-15",
       mevcutEvents: [olusumEvent({ id: 1, dakika: 90, son_kullanim_tarihi: "2026-12-31" })],
       referans_tarih: "2026-06-01"
@@ -221,6 +223,7 @@ describe("serbest-zaman-event-motoru", () => {
     const kullanimSonuc = olusturKullanimEvent({
       personel_id: 1,
       dakika: 30,
+      islem_anahtari: "key-kullanim",
       event_tarihi: "2026-06-15",
       mevcutEvents: events,
       referans_tarih: "2026-06-01"
@@ -248,6 +251,7 @@ describe("serbest-zaman-event-motoru", () => {
     const sonuc = olusturKullanimEvent({
       personel_id: 1,
       dakika: 100,
+      islem_anahtari: "key-kullanim",
       event_tarihi: "2026-06-15",
       mevcutEvents: [olusumEvent({ id: 1, dakika: 90, son_kullanim_tarihi: "2026-12-31" })],
       referans_tarih: "2026-06-01"
@@ -260,6 +264,7 @@ describe("serbest-zaman-event-motoru", () => {
     const sonuc = olusturKullanimEvent({
       personel_id: 1,
       dakika: 10,
+      islem_anahtari: "key-kullanim",
       event_tarihi: "2026-06-15",
       mevcutEvents: [],
       referans_tarih: "2026-06-01"
@@ -272,6 +277,7 @@ describe("serbest-zaman-event-motoru", () => {
     const sonucSifir = olusturKullanimEvent({
       personel_id: 1,
       dakika: 0,
+      islem_anahtari: "key-kullanim",
       event_tarihi: "2026-06-15",
       mevcutEvents: [olusumEvent({ id: 1 })],
       referans_tarih: "2026-06-01"
@@ -282,6 +288,7 @@ describe("serbest-zaman-event-motoru", () => {
     const sonucNegatif = olusturKullanimEvent({
       personel_id: 1,
       dakika: -5,
+      islem_anahtari: "key-kullanim",
       event_tarihi: "2026-06-15",
       mevcutEvents: [olusumEvent({ id: 1 })],
       referans_tarih: "2026-06-01"
@@ -294,6 +301,7 @@ describe("serbest-zaman-event-motoru", () => {
     const sonuc = olusturKullanimEvent({
       personel_id: 1,
       dakika: 10,
+      islem_anahtari: "key-kullanim",
       event_tarihi: "2026-06-15",
       mevcutEvents: [
         olusumEvent({
@@ -333,6 +341,7 @@ describe("serbest-zaman-event-motoru", () => {
       personel_id: 1,
       hedef_event_id: 1,
       hedef_event_tipi: "SERBEST_ZAMAN_OLUSUM",
+      islem_anahtari: "key-iptal",
       event_tarihi: "2026-06-20",
       mevcutEvents: events
     });
@@ -364,6 +373,7 @@ describe("serbest-zaman-event-motoru", () => {
       personel_id: 1,
       hedef_event_id: 2,
       hedef_event_tipi: "SERBEST_ZAMAN_KULLANIM",
+      islem_anahtari: "key-iptal",
       event_tarihi: "2026-06-20",
       mevcutEvents: events
     });
@@ -395,8 +405,10 @@ describe("serbest-zaman-event-motoru", () => {
       hedef_event_id: 1,
       hedef_event_tipi: "SERBEST_ZAMAN_OLUSUM",
       yeni_dakika: 60,
+      islem_anahtari: "key-duzeltme",
       event_tarihi: "2026-06-20",
-      mevcutEvents: events
+      mevcutEvents: events,
+      aciklama: "duzeltme gerekcesi"
     });
 
     expect(duzeltmeSonuc.ok).toBe(true);
@@ -427,9 +439,11 @@ describe("serbest-zaman-event-motoru", () => {
       hedef_event_id: 2,
       hedef_event_tipi: "SERBEST_ZAMAN_KULLANIM",
       yeni_dakika: 20,
+      islem_anahtari: "key-duzeltme",
       event_tarihi: "2026-06-20",
       mevcutEvents: events,
-      referans_tarih: "2026-06-01"
+      referans_tarih: "2026-06-01",
+      aciklama: "duzeltme gerekcesi"
     });
 
     expect(duzeltmeSonuc.ok).toBe(true);
@@ -467,8 +481,10 @@ describe("serbest-zaman-event-motoru", () => {
       hedef_event_id: 1,
       hedef_event_tipi: "SERBEST_ZAMAN_OLUSUM",
       yeni_dakika: 60,
+      islem_anahtari: "key-duzeltme",
       event_tarihi: "2026-06-21",
-      mevcutEvents: events
+      mevcutEvents: events,
+      aciklama: "duzeltme gerekcesi"
     });
 
     expect(sonuc).toEqual({ ok: false, code: "TARGET_ALREADY_CANCELLED" });
@@ -491,6 +507,7 @@ describe("serbest-zaman-event-motoru", () => {
       personel_id: 1,
       hedef_event_id: 1,
       hedef_event_tipi: "SERBEST_ZAMAN_KULLANIM",
+      islem_anahtari: "key-iptal",
       event_tarihi: "2026-06-21",
       mevcutEvents: events
     });
@@ -509,9 +526,11 @@ describe("serbest-zaman-event-motoru", () => {
       hedef_event_id: 2,
       hedef_event_tipi: "SERBEST_ZAMAN_KULLANIM",
       yeni_dakika: 100,
+      islem_anahtari: "key-duzeltme",
       event_tarihi: "2026-06-20",
       mevcutEvents: events,
-      referans_tarih: "2026-06-01"
+      referans_tarih: "2026-06-01",
+      aciklama: "duzeltme gerekcesi"
     });
 
     expect(sonuc).toEqual({ ok: false, code: "INSUFFICIENT_BALANCE" });
@@ -548,4 +567,44 @@ describe("serbest-zaman-event-motoru", () => {
 
     expect(bakiye.toplam_hak_dakika).toBe(50);
   });
+
+  it("iptal sonrasi ayni FCOT icin yeniden olusum yapilabilir", () => {
+    const tercihKayit = tercih({ id: 10, odeme_tipi: "SERBEST_ZAMAN", fazla_calisma_dakika: 60 });
+    const olusum = olusturOlusumEvent({ tercih: tercihKayit, mevcutEvents: [] });
+    expect(olusum.ok).toBe(true);
+    if (!olusum.ok) return;
+    const events: SerbestZamanEvent[] = [{ ...olusum.event, id: 1 }];
+    const iptal = olusturIptalEvent({
+      personel_id: tercihKayit.personel_id,
+      hedef_event_id: 1,
+      hedef_event_tipi: "SERBEST_ZAMAN_OLUSUM",
+      islem_anahtari: "key-re-iptal",
+      event_tarihi: "2026-06-20",
+      mevcutEvents: events
+    });
+    expect(iptal.ok).toBe(true);
+    if (!iptal.ok) return;
+    events.push({ ...iptal.event, id: 2 });
+    const tekrar = olusturOlusumEvent({ tercih: tercihKayit, mevcutEvents: events });
+    expect(tekrar.ok).toBe(true);
+  });
+
+  it("event_sayisi yalniz aktif OLUSUM adedini sayar", () => {
+    const events: SerbestZamanEvent[] = [
+      olusumEvent({ id: 1, dakika: 90, son_kullanim_tarihi: "2026-12-31" }),
+      {
+        id: 2,
+        personel_id: 1,
+        event_tipi: "SERBEST_ZAMAN_IPTAL",
+        hedef_event_id: 1,
+        hedef_event_tipi: "SERBEST_ZAMAN_OLUSUM",
+        event_tarihi: "2026-06-20",
+        islem_anahtari: "key-iptal-count"
+      }
+    ];
+    const bakiye = hesaplaSerbestZamanBakiye({ personel_id: 1, events, referans_tarih: "2026-06-01" });
+    expect(bakiye.event_sayisi).toBe(0);
+    expect(bakiye.toplam_hak_dakika).toBe(0);
+  });
+
 });

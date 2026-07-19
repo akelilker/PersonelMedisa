@@ -23,6 +23,9 @@ export type SerbestZamanOlusumEvent = {
   event_tarihi: string;
   son_kullanim_tarihi: string;
   aciklama?: string;
+  donem_yil?: number | null;
+  donem_ay?: number | null;
+  donem_kilitli_miydi?: boolean;
 };
 
 export type SerbestZamanKullanimEvent = {
@@ -31,7 +34,11 @@ export type SerbestZamanKullanimEvent = {
   event_tipi: "SERBEST_ZAMAN_KULLANIM";
   dakika: number;
   event_tarihi: string;
+  islem_anahtari: string;
   aciklama?: string;
+  donem_yil?: number | null;
+  donem_ay?: number | null;
+  donem_kilitli_miydi?: boolean;
 };
 
 export type SerbestZamanIptalEvent = {
@@ -41,7 +48,11 @@ export type SerbestZamanIptalEvent = {
   hedef_event_id: number;
   hedef_event_tipi: SerbestZamanHedefEventTipi;
   event_tarihi: string;
+  islem_anahtari: string;
   aciklama?: string;
+  donem_yil?: number | null;
+  donem_ay?: number | null;
+  donem_kilitli_miydi?: boolean;
 };
 
 export type SerbestZamanDuzeltmeEvent = {
@@ -52,7 +63,11 @@ export type SerbestZamanDuzeltmeEvent = {
   hedef_event_tipi: SerbestZamanHedefEventTipi;
   yeni_dakika: number;
   event_tarihi: string;
-  aciklama?: string;
+  islem_anahtari: string;
+  aciklama: string;
+  donem_yil?: number | null;
+  donem_ay?: number | null;
+  donem_kilitli_miydi?: boolean;
 };
 
 export type SerbestZamanHedefEvent = SerbestZamanOlusumEvent | SerbestZamanKullanimEvent;
@@ -81,6 +96,7 @@ export type PostSerbestZamanKullanimPayload = {
   personel_id: number | string;
   dakika: number;
   event_tarihi: string;
+  islem_anahtari: string;
   aciklama?: string;
 };
 
@@ -89,6 +105,7 @@ export type PostSerbestZamanIptalPayload = {
   hedef_event_id: number | string;
   hedef_event_tipi: SerbestZamanHedefEventTipi;
   event_tarihi: string;
+  islem_anahtari: string;
   aciklama?: string;
 };
 
@@ -98,5 +115,6 @@ export type PostSerbestZamanDuzeltmePayload = {
   hedef_event_tipi: SerbestZamanHedefEventTipi;
   yeni_dakika: number;
   event_tarihi: string;
-  aciklama?: string;
+  islem_anahtari: string;
+  aciklama: string;
 };

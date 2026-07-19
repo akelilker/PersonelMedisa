@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ApiRequestError } from "../../src/api/api-client";
-import { resolveDemoApiResponse } from "../../src/api/mock-demo";
+import { resolveDemoApiResponse, seedDemoHaftalikMutabakatForClose } from "../../src/api/mock-demo";
 import {
   approveRevizyonTalebi,
   cancelRevizyonTalebi,
@@ -18,6 +18,19 @@ function createJsonResponse(body: unknown, status = 200) {
     headers: {
       "Content-Type": "application/json"
     }
+  });
+}
+
+
+function closeDemoHaftalikKapanis(haftaBaslangic: string, haftaBitis: string, departmanId = 3) {
+  seedDemoHaftalikMutabakatForClose({ haftaBaslangic, haftaBitis });
+  return resolveDemoApiResponse("/haftalik-kapanis", {
+    method: "POST",
+    body: JSON.stringify({
+      hafta_baslangic: haftaBaslangic,
+      hafta_bitis: haftaBitis,
+      departman_id: departmanId
+    })
   });
 }
 
@@ -282,14 +295,7 @@ describe("revizyon-talebi mock integration", () => {
   });
 
   it("duplicate acik talep REVISION_ALREADY_EXISTS doner", () => {
-    resolveDemoApiResponse("/haftalik-kapanis", {
-      method: "POST",
-      body: JSON.stringify({
-        hafta_baslangic: "2026-05-01",
-        hafta_bitis: "2026-05-07",
-        departman_id: 3
-      })
-    });
+    closeDemoHaftalikKapanis("2026-05-01", "2026-05-07", 3);
 
     const revizyonBody = {
       personel_id: 1,
@@ -324,14 +330,7 @@ describe("revizyon-talebi mock integration", () => {
   });
 
   it("REDDEDILDI durumundan ONAYLANDI gecisi INVALID_STATE_TRANSITION doner", () => {
-    resolveDemoApiResponse("/haftalik-kapanis", {
-      method: "POST",
-      body: JSON.stringify({
-        hafta_baslangic: "2026-05-08",
-        hafta_bitis: "2026-05-14",
-        departman_id: 3
-      })
-    });
+    closeDemoHaftalikKapanis("2026-05-08", "2026-05-14", 3);
 
     const revizyonBody = {
       personel_id: 1,
@@ -371,22 +370,8 @@ describe("revizyon-talebi mock integration", () => {
   });
 
   it("BOLUM_YONETICISI list yalniz kendi bolumundeki talepleri doner", () => {
-    resolveDemoApiResponse("/haftalik-kapanis", {
-      method: "POST",
-      body: JSON.stringify({
-        hafta_baslangic: "2026-06-01",
-        hafta_bitis: "2026-06-07",
-        departman_id: 3
-      })
-    });
-    resolveDemoApiResponse("/haftalik-kapanis", {
-      method: "POST",
-      body: JSON.stringify({
-        hafta_baslangic: "2026-06-08",
-        hafta_bitis: "2026-06-14",
-        departman_id: 6
-      })
-    });
+    closeDemoHaftalikKapanis("2026-06-01", "2026-06-07", 3);
+    closeDemoHaftalikKapanis("2026-06-08", "2026-06-14", 6);
 
     resolveDemoApiResponse("/haftalik-kapanis/revizyon-talepleri", {
       method: "POST",
@@ -432,14 +417,7 @@ describe("revizyon-talebi mock integration", () => {
   });
 
   it("BOLUM_YONETICISI scope disi detail REVISION_SCOPE_DENIED doner", () => {
-    resolveDemoApiResponse("/haftalik-kapanis", {
-      method: "POST",
-      body: JSON.stringify({
-        hafta_baslangic: "2026-06-15",
-        hafta_bitis: "2026-06-21",
-        departman_id: 3
-      })
-    });
+    closeDemoHaftalikKapanis("2026-06-15", "2026-06-21", 3);
 
     const created = resolveDemoApiResponse("/haftalik-kapanis/revizyon-talepleri", {
       method: "POST",
@@ -467,14 +445,7 @@ describe("revizyon-talebi mock integration", () => {
   });
 
   it("MUHASEBE approve UNAUTHORIZED_REVISION_APPROVAL doner", () => {
-    resolveDemoApiResponse("/haftalik-kapanis", {
-      method: "POST",
-      body: JSON.stringify({
-        hafta_baslangic: "2026-06-22",
-        hafta_bitis: "2026-06-28",
-        departman_id: 3
-      })
-    });
+    closeDemoHaftalikKapanis("2026-06-22", "2026-06-28", 3);
 
     const created = resolveDemoApiResponse("/haftalik-kapanis/revizyon-talepleri", {
       method: "POST",
@@ -511,14 +482,7 @@ describe("revizyon-talebi mock integration", () => {
   });
 
   it("BIRIM_AMIRI detail finance alanini maskeler", () => {
-    resolveDemoApiResponse("/haftalik-kapanis", {
-      method: "POST",
-      body: JSON.stringify({
-        hafta_baslangic: "2026-07-01",
-        hafta_bitis: "2026-07-07",
-        departman_id: 3
-      })
-    });
+    closeDemoHaftalikKapanis("2026-07-01", "2026-07-07", 3);
 
     const created = resolveDemoApiResponse("/haftalik-kapanis/revizyon-talepleri", {
       method: "POST",
@@ -550,14 +514,7 @@ describe("revizyon-talebi mock integration", () => {
   });
 
   it("create client talep_eden_kullanici_id gonderse ignore eder", () => {
-    resolveDemoApiResponse("/haftalik-kapanis", {
-      method: "POST",
-      body: JSON.stringify({
-        hafta_baslangic: "2026-07-08",
-        hafta_bitis: "2026-07-14",
-        departman_id: 3
-      })
-    });
+    closeDemoHaftalikKapanis("2026-07-08", "2026-07-14", 3);
 
     const created = resolveDemoApiResponse("/haftalik-kapanis/revizyon-talepleri", {
       method: "POST",
@@ -582,14 +539,7 @@ describe("revizyon-talebi mock integration", () => {
   });
 
   it("GENEL_YONETICI ONAY_BEKLIYOR talebi onaylayabilir", () => {
-    resolveDemoApiResponse("/haftalik-kapanis", {
-      method: "POST",
-      body: JSON.stringify({
-        hafta_baslangic: "2026-07-15",
-        hafta_bitis: "2026-07-21",
-        departman_id: 3
-      })
-    });
+    closeDemoHaftalikKapanis("2026-07-15", "2026-07-21", 3);
 
     const created = resolveDemoApiResponse("/haftalik-kapanis/revizyon-talepleri", {
       method: "POST",
@@ -627,14 +577,7 @@ describe("revizyon-talebi mock integration", () => {
   });
 
   it("ONAYLANDI talep cancel INVALID_STATE_TRANSITION doner", () => {
-    resolveDemoApiResponse("/haftalik-kapanis", {
-      method: "POST",
-      body: JSON.stringify({
-        hafta_baslangic: "2026-07-22",
-        hafta_bitis: "2026-07-28",
-        departman_id: 3
-      })
-    });
+    closeDemoHaftalikKapanis("2026-07-22", "2026-07-28", 3);
 
     const created = resolveDemoApiResponse("/haftalik-kapanis/revizyon-talepleri", {
       method: "POST",

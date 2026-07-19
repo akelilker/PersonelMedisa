@@ -2,36 +2,6 @@
   "version": 1,
   "entries": [
     {
-      "method": "POST",
-      "path": "/haftalik-kapanis",
-      "category": "approved_deferred",
-      "gapId": "D-HK-01",
-      "reason": "Haftalik kapanis entity backend deferred; client/mock close surface has no PHP owner yet.",
-      "owner": "HaftalikKapanis",
-      "targetPhase": "S78-D",
-      "introducedOrConfirmedAt": "2026-07-18"
-    },
-    {
-      "method": "GET",
-      "path": "/haftalik-kapanis/:id",
-      "category": "approved_deferred",
-      "gapId": "D-HK-02",
-      "reason": "Haftalik kapanis detail deferred with entity backend; no PHP owner yet.",
-      "owner": "HaftalikKapanis",
-      "targetPhase": "S78-D",
-      "introducedOrConfirmedAt": "2026-07-18"
-    },
-    {
-      "method": "GET",
-      "path": "/haftalik-kapanis/yillik-fazla-calisma",
-      "category": "approved_deferred",
-      "gapId": "D-YFC-01",
-      "reason": "Yillik fazla calisma aggregate backend deferred from S78-A.",
-      "owner": "HaftalikKapanis",
-      "targetPhase": "S78-D",
-      "introducedOrConfirmedAt": "2026-07-18"
-    },
-    {
       "method": "GET",
       "path": "/fazla-calisma-odeme-tercihi",
       "category": "approved_deferred",

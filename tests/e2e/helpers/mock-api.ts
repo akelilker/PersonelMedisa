@@ -7662,6 +7662,8 @@ let personelBelgeKaydiIdCounter = 903;
     }
 
     if (path === "/api/haftalik-kapanis" && method === "POST") {
+      if (await denyUnlessRolePermission(route, "puantaj.muhurle")) return;
+
       const payload = request.postDataJSON() as {
         hafta_baslangic?: string;
         hafta_bitis?: string;

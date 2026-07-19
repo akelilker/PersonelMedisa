@@ -365,6 +365,24 @@ class Router
         if ($path === '/haftalik-kapanis/revizyon-talepleri' && $method === 'GET') {
             RevizyonController::talepleri($this->request);
         }
+        if ($path === '/haftalik-kapanis/revizyon-talepleri' && $method === 'POST') {
+            RevizyonController::createTalep($this->request);
+        }
+        if ($method === 'GET' && preg_match('#^/haftalik-kapanis/revizyon-talepleri/(\d+)$#', $path, $matches)) {
+            RevizyonController::talepDetail($this->request, $matches[1]);
+        }
+        if ($method === 'POST' && preg_match('#^/haftalik-kapanis/revizyon-talepleri/(\d+)/gonder$#', $path, $matches)) {
+            RevizyonController::gonder($this->request, $matches[1]);
+        }
+        if ($method === 'POST' && preg_match('#^/haftalik-kapanis/revizyon-talepleri/(\d+)/onay$#', $path, $matches)) {
+            RevizyonController::onay($this->request, $matches[1]);
+        }
+        if ($method === 'POST' && preg_match('#^/haftalik-kapanis/revizyon-talepleri/(\d+)/red$#', $path, $matches)) {
+            RevizyonController::red($this->request, $matches[1]);
+        }
+        if ($method === 'POST' && preg_match('#^/haftalik-kapanis/revizyon-talepleri/(\d+)/iptal$#', $path, $matches)) {
+            RevizyonController::iptal($this->request, $matches[1]);
+        }
         if ($path === '/haftalik-kapanis/revizyon-corrections' && $method === 'GET') {
             RevizyonController::corrections($this->request);
         }

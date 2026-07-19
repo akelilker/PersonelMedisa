@@ -3,66 +3,6 @@
   "entries": [
     {
       "method": "POST",
-      "path": "/haftalik-kapanis/revizyon-talepleri",
-      "category": "approved_deferred",
-      "gapId": "D-REV-01",
-      "reason": "Revizyon talebi create write transition deferred; PHP currently lists only.",
-      "owner": "RevizyonController",
-      "targetPhase": "S78-D",
-      "introducedOrConfirmedAt": "2026-07-18"
-    },
-    {
-      "method": "GET",
-      "path": "/haftalik-kapanis/revizyon-talepleri/:id",
-      "category": "approved_deferred",
-      "gapId": "D-REV-02",
-      "reason": "Revizyon talebi detail deferred; PHP list-only surface today.",
-      "owner": "RevizyonController",
-      "targetPhase": "S78-D",
-      "introducedOrConfirmedAt": "2026-07-18"
-    },
-    {
-      "method": "POST",
-      "path": "/haftalik-kapanis/revizyon-talepleri/:id/gonder",
-      "category": "approved_deferred",
-      "gapId": "D-REV-03",
-      "reason": "Revizyon write transition (gonder) deferred from S78-A.",
-      "owner": "RevizyonController",
-      "targetPhase": "S78-D",
-      "introducedOrConfirmedAt": "2026-07-18"
-    },
-    {
-      "method": "POST",
-      "path": "/haftalik-kapanis/revizyon-talepleri/:id/onay",
-      "category": "approved_deferred",
-      "gapId": "D-REV-04",
-      "reason": "Revizyon write transition (onay) deferred from S78-A.",
-      "owner": "RevizyonController",
-      "targetPhase": "S78-D",
-      "introducedOrConfirmedAt": "2026-07-18"
-    },
-    {
-      "method": "POST",
-      "path": "/haftalik-kapanis/revizyon-talepleri/:id/red",
-      "category": "approved_deferred",
-      "gapId": "D-REV-05",
-      "reason": "Revizyon write transition (red) deferred from S78-A.",
-      "owner": "RevizyonController",
-      "targetPhase": "S78-D",
-      "introducedOrConfirmedAt": "2026-07-18"
-    },
-    {
-      "method": "POST",
-      "path": "/haftalik-kapanis/revizyon-talepleri/:id/iptal",
-      "category": "approved_deferred",
-      "gapId": "D-REV-06",
-      "reason": "Revizyon write transition (iptal) deferred from S78-A.",
-      "owner": "RevizyonController",
-      "targetPhase": "S78-D",
-      "introducedOrConfirmedAt": "2026-07-18"
-    },
-    {
-      "method": "POST",
       "path": "/haftalik-kapanis/revizyon-talepleri/:id/correction-uret",
       "category": "approved_deferred",
       "gapId": "D-COR-01",

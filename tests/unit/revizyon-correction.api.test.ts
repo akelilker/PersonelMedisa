@@ -94,6 +94,14 @@ function submitAndApprove(talepId: number) {
   });
 }
 
+function produceCorrection(talepId: number) {
+  return resolveDemoApiResponse(`/haftalik-kapanis/revizyon-talepleri/${talepId}/correction-uret`, {
+    method: "POST",
+    headers: demoHeaders(1),
+    body: JSON.stringify({})
+  });
+}
+
 describe("revizyon-correction.api", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -155,7 +163,7 @@ describe("revizyon-correction.api", () => {
     expect(calledUrl).toContain("hafta_baslangic=2026-08-01");
   });
 
-  it("approve ONAY_BEKLIYOR talep icin correction_event_id set eder", () => {
+  it("approve ONAY_BEKLIYOR talep icin correction_event_id null birakir; produce set eder", () => {
     const talepId = closeWeekAndCreateTalep({
       haftaBaslangic: "2026-08-04",
       haftaBitis: "2026-08-10",
@@ -167,7 +175,18 @@ describe("revizyon-correction.api", () => {
     const talep = approved?.data as { correction_event_id?: number | null; durum?: string };
 
     expect(talep.durum).toBe("ONAYLANDI");
-    expect(typeof talep.correction_event_id).toBe("number");
+    expect(talep.correction_event_id).toBeNull();
+
+    const produced = produceCorrection(talepId);
+    expect(produced?.errors ?? []).toEqual([]);
+    const correction = produced?.data as { id?: number };
+    expect(typeof correction.id).toBe("number");
+
+    const detail = resolveDemoApiResponse(`/haftalik-kapanis/revizyon-talepleri/${talepId}`, {
+      method: "GET",
+      headers: demoHeaders(1)
+    });
+    expect((detail?.data as { correction_event_id?: number }).correction_event_id).toBe(correction.id);
   });
 
   it("produceRevizyonCorrection ikinci kez CORRECTION_ALREADY_EXISTS doner", async () => {
@@ -179,15 +198,9 @@ describe("revizyon-correction.api", () => {
     });
 
     submitAndApprove(talepId);
+    produceCorrection(talepId);
 
-    const duplicate = resolveDemoApiResponse(
-      `/haftalik-kapanis/revizyon-talepleri/${talepId}/correction-uret`,
-      {
-        method: "POST",
-        headers: demoHeaders(1),
-        body: JSON.stringify({})
-      }
-    );
+    const duplicate = produceCorrection(talepId);
 
     expect(duplicate?.errors?.[0]?.code).toBe("CORRECTION_ALREADY_EXISTS");
 
@@ -240,8 +253,9 @@ describe("revizyon-correction.api", () => {
       kaynakId: 8805
     });
 
-    const approved = submitAndApprove(talepId);
-    const correctionEventId = (approved?.data as { correction_event_id?: number }).correction_event_id;
+    submitAndApprove(talepId);
+    const produced = produceCorrection(talepId);
+    const correctionEventId = (produced?.data as { id?: number }).id;
 
     const cancelled = resolveDemoApiResponse(
       `/haftalik-kapanis/revizyon-corrections/${correctionEventId}/iptal`,
@@ -302,8 +316,9 @@ describe("revizyon-correction.api", () => {
       kaynakId: 8806
     });
 
-    const approved = submitAndApprove(talepId);
-    const correctionEventId = (approved?.data as { correction_event_id?: number }).correction_event_id;
+    submitAndApprove(talepId);
+    const produced = produceCorrection(talepId);
+    const correctionEventId = (produced?.data as { id?: number }).id;
 
     resolveDemoApiResponse(`/haftalik-kapanis/revizyon-corrections/${correctionEventId}/iptal`, {
       method: "POST",
@@ -334,8 +349,9 @@ describe("revizyon-correction.api", () => {
       bordroEtkiVarMi: true
     });
 
-    const approved = submitAndApprove(talepId);
-    const correctionEventId = (approved?.data as { correction_event_id?: number }).correction_event_id;
+    submitAndApprove(talepId);
+    const produced = produceCorrection(talepId);
+    const correctionEventId = (produced?.data as { id?: number }).id;
 
     const detail = resolveDemoApiResponse(
       `/haftalik-kapanis/revizyon-corrections/${correctionEventId}`,
@@ -362,8 +378,9 @@ describe("revizyon-correction.api", () => {
       kaynakId: 8808
     });
 
-    const approved = submitAndApprove(talepId);
-    const correctionEventId = (approved?.data as { correction_event_id?: number }).correction_event_id;
+    submitAndApprove(talepId);
+    const produced = produceCorrection(talepId);
+    const correctionEventId = (produced?.data as { id?: number }).id;
 
     const detail = resolveDemoApiResponse(
       `/haftalik-kapanis/revizyon-corrections/${correctionEventId}`,
@@ -421,6 +438,7 @@ describe("revizyon-correction.api", () => {
     });
 
     submitAndApprove(talepId);
+    produceCorrection(talepId);
 
     const detail = resolveDemoApiResponse(`/haftalik-kapanis/${kapanisId}`, {
       method: "GET"

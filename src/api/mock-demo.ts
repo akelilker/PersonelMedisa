@@ -1694,13 +1694,15 @@ function resolveDemoHaftaPair(
 }
 
 function hasDemoOpenRevizyonTalebi(params: {
+  personel_id: number;
   kaynak_tipi: string;
   kaynak_id: number;
   etkilenen_tarih: string;
 }): boolean {
   return Object.values(demoState.revizyonTalebiById).some(
     (talep) =>
-      talep.durum === "ONAY_BEKLIYOR" &&
+      (talep.durum === "TASLAK" || talep.durum === "ONAY_BEKLIYOR") &&
+      talep.personel_id === params.personel_id &&
       talep.kaynak_tipi === params.kaynak_tipi &&
       talep.kaynak_id === params.kaynak_id &&
       talep.etkilenen_tarih === params.etkilenen_tarih
@@ -1797,59 +1799,16 @@ function persistDemoCorrectionForTalep(
   return ok(presentDemoRevizyonCorrection(actor, buildResult));
 }
 
-function approveDemoRevizyonWithCorrection(
+function approveDemoRevizyonTalebi(
   actor: RevizyonActorContext,
   talep: RevizyonTalebi,
   kararNotu: string | null
 ): ApiResponse<unknown> {
-  const transition = assertRevizyonTransition(talep.durum, "ONAYLANDI");
-  if (!transition.ok) {
-    return demoRevizyonError(transition.code, "Gecersiz revizyon durum gecisi.");
-  }
-
-  const nowIso = new Date().toISOString();
-  const tentativeTalep: RevizyonTalebi = {
-    ...talep,
-    durum: "ONAYLANDI",
+  // S79-E: onay correction uretmez; correction_event_id null kalir (S79-F).
+  return applyDemoRevizyonTransition(actor, talep, "ONAYLANDI", {
     karar_veren_kullanici_id: actor.userId,
-    karar_zamani: nowIso,
     karar_notu: kararNotu
-  };
-
-  const produceError = getProduceCorrectionError(tentativeTalep);
-  if (produceError) {
-    return demoCorrectionError(produceError, "Revizyon correction uretilemedi.");
-  }
-
-  const previewId = demoState.nextIds.revizyonCorrection + 1;
-  const buildPreview = buildCorrectionFromRevizyonTalebi({
-    talep: tentativeTalep,
-    id: previewId,
-    actorUserId: actor.userId,
-    nowIso,
-    snapshotRef: findDemoSnapshotRefForTalep(tentativeTalep)
   });
-
-  if (!("id" in buildPreview)) {
-    return demoCorrectionError(buildPreview.code, "Revizyon correction uretilemedi.");
-  }
-
-  talep.durum = "ONAYLANDI";
-  talep.karar_veren_kullanici_id = actor.userId;
-  talep.karar_zamani = nowIso;
-  talep.karar_notu = kararNotu;
-
-  const persistResult = persistDemoCorrectionForTalep(talep, actor, nowIso);
-  if (persistResult.errors && persistResult.errors.length > 0) {
-    talep.durum = "ONAY_BEKLIYOR";
-    talep.karar_veren_kullanici_id = null;
-    talep.karar_zamani = null;
-    talep.karar_notu = null;
-    demoState.revizyonTalebiById[talep.id] = talep;
-    return persistResult;
-  }
-
-  return ok(presentDemoRevizyonTalep(actor, talep));
 }
 
 function applyDemoRevizyonTransition(
@@ -1860,7 +1819,7 @@ function applyDemoRevizyonTransition(
 ): ApiResponse<unknown> {
   const transition = assertRevizyonTransition(talep.durum, nextDurum);
   if (!transition.ok) {
-    return demoRevizyonError(transition.code, "Gecersiz revizyon durum gecisi.");
+    return demoRevizyonError("STATE_CONFLICT", "Gecersiz revizyon durum gecisi.");
   }
 
   talep.durum = nextDurum;
@@ -1869,6 +1828,10 @@ function applyDemoRevizyonTransition(
     talep.karar_veren_kullanici_id = karar.karar_veren_kullanici_id ?? actor.userId;
     talep.karar_zamani = new Date().toISOString();
     talep.karar_notu = karar.karar_notu ?? null;
+  }
+
+  if (nextDurum === "ONAYLANDI") {
+    talep.correction_event_id = null;
   }
 
   demoState.revizyonTalebiById[talep.id] = talep;
@@ -1998,13 +1961,14 @@ function createDemoRevizyonTalebi(
 
   if (
     hasDemoOpenRevizyonTalebi({
+      personel_id,
       kaynak_tipi,
       kaynak_id,
       etkilenen_tarih
     })
   ) {
     return demoRevizyonError(
-      "REVISION_ALREADY_EXISTS",
+      "ALREADY_EXISTS",
       "Ayni kaynak icin acik revizyon talebi zaten mevcut."
     );
   }
@@ -2077,6 +2041,9 @@ function handleDemoRevizyonAction(
     }
 
     if (!canSubmitRevizyon(actor, talep, personelDepartmanId)) {
+      if (talep.talep_eden_kullanici_id !== actor.userId && actor.role !== "GENEL_YONETICI") {
+        return demoRevizyonError("REVISION_OWNER_DENIED", "Bu revizyon talebi size ait degil.");
+      }
       return demoRevizyonError("REVISION_SCOPE_DENIED", "Revizyon talebi gonderilemez.");
     }
 
@@ -2103,7 +2070,11 @@ function handleDemoRevizyonAction(
     }
 
     if (action === "onay") {
-      return approveDemoRevizyonWithCorrection(actor, talep, kararNotu);
+      return approveDemoRevizyonTalebi(actor, talep, kararNotu);
+    }
+
+    if (!kararNotu || !kararNotu.trim()) {
+      return demoRevizyonError("VALIDATION_ERROR", "Red aciklamasi zorunludur.");
     }
 
     return applyDemoRevizyonTransition(
@@ -2128,6 +2099,9 @@ function handleDemoRevizyonAction(
   }
 
   if (!canCancelRevizyon(actor, talep, personelDepartmanId)) {
+    if (talep.talep_eden_kullanici_id !== actor.userId && actor.role !== "GENEL_YONETICI") {
+      return demoRevizyonError("REVISION_OWNER_DENIED", "Bu revizyon talebi size ait degil.");
+    }
     return demoRevizyonError("REVISION_SCOPE_DENIED", "Revizyon talebi iptal edilemez.");
   }
 

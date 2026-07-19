@@ -1910,6 +1910,33 @@ export async function mockApi(page: Page, role: MockUserRole, options: MockApiOp
       sube_id: number;
     }
   >();
+  const revizyonTalebiById = new Map<
+    number,
+    {
+      id: number;
+      personel_id: number;
+      hafta_baslangic: string;
+      hafta_bitis: string;
+      etkilenen_tarih: string;
+      kaynak_tipi: string;
+      kaynak_id: number;
+      revizyon_tipi: string;
+      onceki_deger: string | number | boolean | null;
+      talep_edilen_deger: string | number | boolean | null;
+      gerekce: string;
+      talep_eden_kullanici_id: number;
+      talep_zamani: string;
+      durum: "TASLAK" | "ONAY_BEKLIYOR" | "ONAYLANDI" | "REDDEDILDI" | "IPTAL";
+      karar_veren_kullanici_id: number | null;
+      karar_zamani: string | null;
+      karar_notu: string | null;
+      bordro_etki_var_mi: boolean;
+      bordro_etki_notu: string | null;
+      correction_event_id: number | null;
+    }
+  >();
+  let nextRevizyonTalebiId = 1;
+  const closedRevizyonWeeks = new Set<string>();
   const fcotTercihBySnapshotId = new Map<
     number,
     {
@@ -7766,6 +7793,8 @@ let personelBelgeKaydiIdCounter = 903;
         });
       }
 
+      closedRevizyonWeeks.add(`${hafta_baslangic}|${hafta_bitis}`);
+
       await fulfillJson(
         route,
         200,
@@ -7781,6 +7810,170 @@ let personelBelgeKaydiIdCounter = 903;
           snapshot_satirlari
         })
       );
+      return;
+    }
+
+    if (path === "/api/haftalik-kapanis/revizyon-talepleri" && method === "GET") {
+      if (await denyUnlessRolePermission(route, "revizyon.view")) return;
+      const personelId = Number.parseInt(url.searchParams.get("personel_id") ?? "", 10);
+      const durum = url.searchParams.get("durum");
+      const items = Array.from(revizyonTalebiById.values())
+        .filter((t) => !Number.isFinite(personelId) || t.personel_id === personelId)
+        .filter((t) => !durum || t.durum === durum)
+        .sort((a, b) => (a.talep_zamani < b.talep_zamani ? 1 : -1));
+      await fulfillJson(route, 200, okBody({ items }));
+      return;
+    }
+
+    if (path === "/api/haftalik-kapanis/revizyon-talepleri" && method === "POST") {
+      if (await denyUnlessRolePermission(route, "revizyon.create")) return;
+      const payload = (request.postDataJSON() ?? {}) as Record<string, unknown>;
+      if ("sube_id" in payload || "durum" in payload || "talep_eden_kullanici_id" in payload) {
+        await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "server-owned alan kabul edilmez."));
+        return;
+      }
+      const personel_id = Number(payload.personel_id);
+      const hafta_baslangic = String(payload.hafta_baslangic ?? "");
+      const hafta_bitis = String(payload.hafta_bitis ?? "");
+      const etkilenen_tarih = String(payload.etkilenen_tarih ?? "");
+      const kaynak_tipi = String(payload.kaynak_tipi ?? "");
+      const kaynak_id = Number(payload.kaynak_id);
+      const gerekce = String(payload.gerekce ?? "").trim();
+      if (!personel_id || !hafta_baslangic || !hafta_bitis || !etkilenen_tarih || !kaynak_tipi || !kaynak_id || !gerekce) {
+        await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "Revizyon payload gecersiz."));
+        return;
+      }
+      if (!closedRevizyonWeeks.has(`${hafta_baslangic}|${hafta_bitis}`)) {
+        await fulfillJson(route, 409, errorBody("PERIOD_NOT_CLOSED", "Donem kapanmamis."));
+        return;
+      }
+      const openExists = Array.from(revizyonTalebiById.values()).some(
+        (t) =>
+          (t.durum === "TASLAK" || t.durum === "ONAY_BEKLIYOR") &&
+          t.personel_id === personel_id &&
+          t.kaynak_tipi === kaynak_tipi &&
+          t.kaynak_id === kaynak_id &&
+          t.etkilenen_tarih === etkilenen_tarih
+      );
+      if (openExists) {
+        await fulfillJson(route, 409, errorBody("ALREADY_EXISTS", "Acik revizyon talebi mevcut."));
+        return;
+      }
+      const actor = { id: 1, role };
+      const id = nextRevizyonTalebiId++;
+      const talep = {
+        id,
+        personel_id,
+        hafta_baslangic,
+        hafta_bitis,
+        etkilenen_tarih,
+        kaynak_tipi,
+        kaynak_id,
+        revizyon_tipi: String(payload.revizyon_tipi ?? "PUANTAJ_GIRIS_CIKIS_DUZELTME"),
+        onceki_deger: (payload.onceki_deger as string | number | boolean | null) ?? null,
+        talep_edilen_deger: (payload.talep_edilen_deger as string | number | boolean | null) ?? null,
+        gerekce,
+        talep_eden_kullanici_id: actor.id,
+        talep_zamani: new Date().toISOString(),
+        durum: "TASLAK" as const,
+        karar_veren_kullanici_id: null,
+        karar_zamani: null,
+        karar_notu: null,
+        bordro_etki_var_mi: payload.bordro_etki_var_mi === true,
+        bordro_etki_notu: payload.bordro_etki_notu == null ? null : String(payload.bordro_etki_notu),
+        correction_event_id: null
+      };
+      revizyonTalebiById.set(id, talep);
+      await fulfillJson(route, 201, okBody(talep));
+      return;
+    }
+
+    const revizyonDetailMatch = path.match(/^\/api\/haftalik-kapanis\/revizyon-talepleri\/(\d+)$/);
+    if (revizyonDetailMatch && method === "GET") {
+      if (await denyUnlessRolePermission(route, "revizyon.view")) return;
+      const talep = revizyonTalebiById.get(Number(revizyonDetailMatch[1]));
+      if (!talep) {
+        await fulfillJson(route, 404, errorBody("NOT_FOUND", "Revizyon talebi bulunamadi."));
+        return;
+      }
+      await fulfillJson(route, 200, okBody(talep));
+      return;
+    }
+
+    const revizyonActionMatch = path.match(
+      /^\/api\/haftalik-kapanis\/revizyon-talepleri\/(\d+)\/(gonder|onay|red|iptal)$/
+    );
+    if (revizyonActionMatch && method === "POST") {
+      const talepId = Number(revizyonActionMatch[1]);
+      const action = revizyonActionMatch[2] as "gonder" | "onay" | "red" | "iptal";
+      const perm =
+        action === "gonder"
+          ? "revizyon.submit"
+          : action === "onay"
+            ? "revizyon.approve"
+            : action === "red"
+              ? "revizyon.reject"
+              : "revizyon.cancel";
+      if (await denyUnlessRolePermission(route, perm)) return;
+      const talep = revizyonTalebiById.get(talepId);
+      if (!talep) {
+        await fulfillJson(route, 404, errorBody("NOT_FOUND", "Revizyon talebi bulunamadi."));
+        return;
+      }
+      const actor = { id: 1, role };
+      const payload = (request.postDataJSON() ?? {}) as Record<string, unknown>;
+      const kararNotu =
+        payload.karar_notu == null ? null : String(payload.karar_notu).trim() || null;
+
+      if (action === "gonder") {
+        if (actor.role !== "GENEL_YONETICI" && talep.talep_eden_kullanici_id !== actor.id) {
+          await fulfillJson(route, 403, errorBody("REVISION_OWNER_DENIED", "Talep size ait degil."));
+          return;
+        }
+        if (talep.durum !== "TASLAK") {
+          await fulfillJson(route, 409, errorBody("STATE_CONFLICT", "Gecersiz gecis."));
+          return;
+        }
+        talep.durum = "ONAY_BEKLIYOR";
+      } else if (action === "onay") {
+        if (talep.durum !== "ONAY_BEKLIYOR") {
+          await fulfillJson(route, 409, errorBody("STATE_CONFLICT", "Gecersiz gecis."));
+          return;
+        }
+        talep.durum = "ONAYLANDI";
+        talep.karar_veren_kullanici_id = actor.id;
+        talep.karar_zamani = new Date().toISOString();
+        talep.karar_notu = kararNotu;
+        talep.correction_event_id = null;
+      } else if (action === "red") {
+        if (!kararNotu) {
+          await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "Red aciklamasi zorunludur.", "karar_notu"));
+          return;
+        }
+        if (talep.durum !== "ONAY_BEKLIYOR") {
+          await fulfillJson(route, 409, errorBody("STATE_CONFLICT", "Gecersiz gecis."));
+          return;
+        }
+        talep.durum = "REDDEDILDI";
+        talep.karar_veren_kullanici_id = actor.id;
+        talep.karar_zamani = new Date().toISOString();
+        talep.karar_notu = kararNotu;
+      } else {
+        if (actor.role !== "GENEL_YONETICI" && talep.talep_eden_kullanici_id !== actor.id) {
+          await fulfillJson(route, 403, errorBody("REVISION_OWNER_DENIED", "Talep size ait degil."));
+          return;
+        }
+        if (talep.durum !== "TASLAK" && talep.durum !== "ONAY_BEKLIYOR") {
+          await fulfillJson(route, 409, errorBody("STATE_CONFLICT", "Gecersiz gecis."));
+          return;
+        }
+        talep.durum = "IPTAL";
+        talep.karar_veren_kullanici_id = actor.id;
+        talep.karar_zamani = new Date().toISOString();
+        talep.karar_notu = kararNotu;
+      }
+      revizyonTalebiById.set(talepId, talep);
+      await fulfillJson(route, 200, okBody(talep));
       return;
     }
 

@@ -94,14 +94,20 @@ function resolveRevizyonErrorStatus(code: string): number {
     case "UNAUTHORIZED_REVISION_REQUEST":
     case "UNAUTHORIZED_REVISION_APPROVAL":
     case "REVISION_SCOPE_DENIED":
+    case "REVISION_OWNER_DENIED":
     case "FINANCE_EFFECT_ACCESS_DENIED":
+    case "FORBIDDEN":
       return 403;
     case "PERIOD_NOT_CLOSED":
     case "PERIOD_LOCKED":
     case "REVISION_ALREADY_EXISTS":
+    case "ALREADY_EXISTS":
     case "INVALID_STATE_TRANSITION":
+    case "STATE_CONFLICT":
     case "SNAPSHOT_IMMUTABLE":
       return 409;
+    case "VALIDATION_ERROR":
+      return 422;
     case "INVALID_BODY":
       return 400;
     default:

@@ -22,6 +22,7 @@ export type PersonelDosyaTabPanelsProps = {
   zimmetHistoryErrorMessage: string | null;
   canViewPuantaj: boolean;
   canViewRevizyon: boolean;
+  canCreateRevizyon?: boolean;
   canCreateZimmet: boolean;
   canAccessSurecler: boolean;
   canCreateSurec: boolean;
@@ -46,6 +47,7 @@ export function PersonelDosyaTabPanels({
   zimmetHistoryErrorMessage,
   canViewPuantaj,
   canViewRevizyon,
+  canCreateRevizyon = false,
   canCreateZimmet,
   canAccessSurecler,
   canCreateSurec,
@@ -75,6 +77,7 @@ export function PersonelDosyaTabPanels({
           surecler={surecler}
           canViewPuantaj={canViewPuantaj}
           canViewRevizyon={canViewRevizyon}
+          canCreateRevizyon={canCreateRevizyon}
           canViewFinans={canViewFinans}
           canViewUcret={canViewUcret}
           canManageUcret={canManageUcret}

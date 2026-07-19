@@ -337,5 +337,6 @@ export const ROUTE_PERMISSION = {
   finansPage: "finans.view",
   isgPage: "isg.view",
   yonetimPaneliPage: "yonetim-paneli.view",
-  aylikOzetPage: "aylik-ozet.view"
+  aylikOzetPage: "aylik-ozet.view",
+  haftalikKapanisPage: "revizyon.view"
 } as const satisfies Record<string, AppPermission>;

@@ -266,6 +266,15 @@ class Router
         if ($path === '/bildirimler/birim-amiri-secenekleri' && $method === 'GET') {
             BildirimlerController::birimAmiriSecenekleri($this->request);
         }
+        if ($path === '/bildirimler/gunluk-ozet' && $method === 'GET') {
+            BildirimlerController::gunlukOzet($this->request);
+        }
+        if ($path === '/bildirimler/gunluk-tamamlama' && $method === 'GET') {
+            BildirimlerController::gunlukTamamlamaGet($this->request);
+        }
+        if ($path === '/bildirimler/gunluk-tamamlama' && $method === 'POST') {
+            BildirimlerController::gunlukTamamlamaCreate($this->request);
+        }
         if ($method === 'POST' && preg_match('#^/bildirimler/(\d+)/submit$#', $path, $matches)) {
             BildirimlerController::submit($this->request, $matches[1]);
         }

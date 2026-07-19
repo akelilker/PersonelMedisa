@@ -257,7 +257,7 @@ class DonemKapanisPreflightService
                 'Tamamlanmis aylik onay icin Genel Yonetici ust onayi eksik.',
                 $gyIncomplete,
                 'GENEL_YONETICI',
-                '/yonetim',
+                '/bildirimler',
                 'genel_yonetici_bildirim_onayi.view',
                 [],
                 ['birim_amiri_ids' => $amirIds]

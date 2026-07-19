@@ -9,7 +9,8 @@ use Medisa\Api\Auth\LoginController;
 use Medisa\Api\Controllers\AylikBildirimOnaylariController;
 use Medisa\Api\Controllers\GenelYoneticiBildirimOnaylariController;
 use Medisa\Api\Controllers\BildirimPuantajEtkiAdaylariController;
-use Medisa\Api\Controllers\BildirimlerController;
+use Medisa\Api\Controllers\BordroHazirlikController;
+use Medisa\Api\Controllers\SirketCalismaPolitikasiController;
 use Medisa\Api\Controllers\DonemKapanisController;
 use Medisa\Api\Controllers\HaftalikBildirimMutabakatlariController;
 use Medisa\Api\Controllers\HaftalikKapanisController;
@@ -242,6 +243,56 @@ class Router
         }
         if ($path === '/maas-hesaplama/devirler' && $method === 'POST') {
             MaasHesaplamaController::upsertDevir($this->request);
+        }
+
+        if ($path === '/bordro-hazirlik/preflight' && $method === 'GET') {
+            BordroHazirlikController::preflight($this->request);
+        }
+        if ($path === '/bordro-hazirlik/on-izleme' && $method === 'GET') {
+            BordroHazirlikController::onIzleme($this->request);
+        }
+        if ($path === '/bordro-hazirlik/devirler' && $method === 'GET') {
+            BordroHazirlikController::listDevirler($this->request);
+        }
+        if ($path === '/bordro-hazirlik/devirler/import' && $method === 'POST') {
+            BordroHazirlikController::importDevirler($this->request);
+        }
+        if ($method === 'GET' && preg_match('#^/bordro-hazirlik/adaylar/(\d+)$#', $path, $matches)) {
+            BordroHazirlikController::adayDetay($this->request, $matches[1]);
+        }
+        if ($method === 'POST' && preg_match('#^/bordro-hazirlik/calistirmalar/(\d+)/kontrol-gonder$#', $path, $matches)) {
+            BordroHazirlikController::submitKontrol($this->request, $matches[1]);
+        }
+        if ($method === 'POST' && preg_match('#^/bordro-hazirlik/calistirmalar/(\d+)/geri-gonder$#', $path, $matches)) {
+            BordroHazirlikController::geriGonder($this->request, $matches[1]);
+        }
+        if ($method === 'POST' && preg_match('#^/bordro-hazirlik/calistirmalar/(\d+)/kesinlestir$#', $path, $matches)) {
+            BordroHazirlikController::kesinlestir($this->request, $matches[1]);
+        }
+
+        if ($path === '/sirket-calisma-politikalari/katalog' && $method === 'GET') {
+            SirketCalismaPolitikasiController::katalog($this->request);
+        }
+        if ($path === '/sirket-calisma-politikalari' && $method === 'GET') {
+            SirketCalismaPolitikasiController::list($this->request);
+        }
+        if ($path === '/sirket-calisma-politikalari' && $method === 'POST') {
+            SirketCalismaPolitikasiController::create($this->request);
+        }
+        if ($method === 'GET' && preg_match('#^/sirket-calisma-politikalari/(\d+)$#', $path, $matches)) {
+            SirketCalismaPolitikasiController::detail($this->request, $matches[1]);
+        }
+        if ($method === 'PUT' && preg_match('#^/sirket-calisma-politikalari/(\d+)$#', $path, $matches)) {
+            SirketCalismaPolitikasiController::update($this->request, $matches[1]);
+        }
+        if ($method === 'POST' && preg_match('#^/sirket-calisma-politikalari/(\d+)/onaya-gonder$#', $path, $matches)) {
+            SirketCalismaPolitikasiController::submit($this->request, $matches[1]);
+        }
+        if ($method === 'POST' && preg_match('#^/sirket-calisma-politikalari/(\d+)/onayla$#', $path, $matches)) {
+            SirketCalismaPolitikasiController::approve($this->request, $matches[1]);
+        }
+        if ($method === 'POST' && preg_match('#^/sirket-calisma-politikalari/(\d+)/iptal$#', $path, $matches)) {
+            SirketCalismaPolitikasiController::cancel($this->request, $matches[1]);
         }
 
         if ($path === '/mevzuat-parametreleri' && $method === 'GET') {

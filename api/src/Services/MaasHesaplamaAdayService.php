@@ -7,6 +7,7 @@ namespace Medisa\Api\Services;
 use Medisa\Api\Services\Payroll\FinanceKalemCatalog;
 use Medisa\Api\Services\Payroll\MaasHesaplamaEngine;
 use Medisa\Api\Services\Payroll\MaasHesaplamaLegalParameterCatalog;
+use Medisa\Api\Services\Payroll\SirketCalismaPolitikasiCatalog;
 use PDO;
 use PDOException;
 
@@ -41,6 +42,9 @@ class MaasHesaplamaAdayService
         $mevzuat = $bundle['mevzuat_by_code'];
         $missing = [];
         foreach (MaasHesaplamaLegalParameterCatalog::requiredCodes() as $code) {
+            if (SirketCalismaPolitikasiCatalog::isCompanyPolicyCode($code)) {
+                continue;
+            }
             $meta = MaasHesaplamaLegalParameterCatalog::meta($code);
             $row = isset($mevzuat[$code]) ? $mevzuat[$code] : null;
             $absent = $row === null;
@@ -56,6 +60,21 @@ class MaasHesaplamaAdayService
         }
         if (count($mevzuat) === 0) {
             $items[] = self::issue('BLOCKER', 'LEGAL_PARAMETER_REQUIRED_MISSING', 'Snapshot mevzuat seti bos.');
+        }
+        $policy = SirketCalismaPolitikasiService::resolveApprovedForPeriod(
+            $pdo,
+            (string) $bundle['snapshot']['donem_baslangic'],
+            (string) $bundle['snapshot']['donem_bitis']
+        );
+        if ($policy['politika'] === null) {
+            $items[] = self::issue('BLOCKER', 'BUSINESS_POLICY_REQUIRED', 'Onayli sirket calisma politikasi yok.', 'sirket_politikasi', null, null, []);
+        } else {
+            foreach (SirketCalismaPolitikasiCatalog::requiredCodes() as $code) {
+                if (!isset($policy['degerler_by_code'][$code])) {
+                    $missing[] = $code;
+                    $items[] = self::issue('BLOCKER', 'BUSINESS_POLICY_INCOMPLETE', 'Sirket politikasinda eksik parametre: ' . $code, 'sirket_politikasi', (int) $policy['politika']['id'], null, ['parametre_kodu' => $code]);
+                }
+            }
         }
         $items[] = self::issue('INFO', 'PARAMETER_COUNT', 'Mevzuat parametre sayisi.', 'mevzuat', null, null, ['adet' => count($mevzuat), 'eksik' => count($missing)]);
         $items[] = self::issue('INFO', 'ENGINE_VERSION', MaasHesaplamaEngine::ENGINE_VERSION);
@@ -98,6 +117,26 @@ class MaasHesaplamaAdayService
         $items[] = self::issue('INFO', 'CARRYOVER_COUNT', 'Devir kayit sayisi.', 'devir', null, null, ['adet' => $carryCount]);
         $items[] = self::issue('INFO', 'PERSONNEL_COUNT', 'Personel sayisi.', 'personel', null, null, ['adet' => count($bundle['personeller'])]);
 
+        $projection = MaasHesaplamaCorrectionProjectionService::buildProjection(
+            $pdo,
+            (int) $snapshot['sube_id'],
+            $personelIds,
+            (string) $bundle['snapshot']['donem_baslangic'],
+            (string) $bundle['snapshot']['donem_bitis']
+        );
+        foreach ($projection['blocker_items'] as $blocker) {
+            $items[] = [
+                'severity' => (string) $blocker['severity'],
+                'code' => (string) $blocker['code'],
+                'message' => (string) $blocker['message'],
+                'record_type' => $blocker['record_type'] ?? null,
+                'record_id' => $blocker['record_id'] ?? null,
+                'personel_id' => $blocker['personel_id'] ?? null,
+                'personel_adi' => $blocker['personel_adi'] ?? null,
+                'metadata' => $blocker['metadata'] ?? [],
+            ];
+        }
+
         // Segment / finans quick checks from snapshot only
         foreach ($bundle['personeller'] as $personel) {
             $pid = (int) $personel['personel_id'];
@@ -131,10 +170,14 @@ class MaasHesaplamaAdayService
         $existing = self::findActiveCalistirma($pdo, (int) $snapshot['id']);
         $parameterSetHash = MaasHesaplamaEngine::hashCanonical($mevzuat);
         $carryoverSetHash = MaasHesaplamaEngine::hashCanonical($carryovers);
+        $policyVersionHash = $policy['policy_version_hash'] ?? null;
+        $correctionProjectionHash = $projection['projection_hash'];
         $sourceHash = MaasHesaplamaEngine::hashCanonical([
             'snapshot_hash' => (string) $snapshot['snapshot_hash'],
             'parameter_set_hash' => $parameterSetHash,
             'carryover_set_hash' => $carryoverSetHash,
+            'policy_version_hash' => $policyVersionHash,
+            'correction_projection_hash' => $correctionProjectionHash,
             'engine_version' => MaasHesaplamaEngine::ENGINE_VERSION,
         ]);
         if ($existing && (string) $existing['source_hash'] !== $sourceHash) {
@@ -190,6 +233,8 @@ class MaasHesaplamaAdayService
             'source_hash' => $sourceHash,
             'parameter_set_hash' => $parameterSetHash,
             'carryover_set_hash' => $carryoverSetHash,
+            'policy_version_hash' => $policyVersionHash,
+            'correction_projection_hash' => $correctionProjectionHash,
             'snapshot_hash' => (string) $snapshot['snapshot_hash'],
             'existing_calculation' => $existing ? [
                 'id' => (int) $existing['id'],
@@ -201,13 +246,15 @@ class MaasHesaplamaAdayService
             // Internal only — stripped by publicPreflight()
             '_bundle' => $bundle,
             '_carryovers' => $carryovers,
+            '_policy' => $policy,
+            '_projection' => $projection,
         ];
     }
 
     /** @param array<string, mixed> $preflight @return array<string, mixed> */
     public static function publicPreflight(array $preflight)
     {
-        unset($preflight['_bundle'], $preflight['_carryovers']);
+        unset($preflight['_bundle'], $preflight['_carryovers'], $preflight['_policy'], $preflight['_projection']);
 
         return $preflight;
     }
@@ -302,17 +349,30 @@ class MaasHesaplamaAdayService
 
             $bundle = $preflight['_bundle'];
             $carryovers = $preflight['_carryovers'];
+            $policy = $preflight['_policy'] ?? ['degerler_by_code' => []];
+            $projection = $preflight['_projection'] ?? ['projections_by_personel' => []];
+            $mergedMevzuat = array_merge(
+                $bundle['mevzuat_by_code'],
+                SirketCalismaPolitikasiService::toEngineParams($policy['degerler_by_code'] ?? [])
+            );
             $results = [];
+            $correctionSnapshots = [];
             foreach ($bundle['personeller'] as $personel) {
                 $pid = (int) $personel['personel_id'];
+                $puantajlar = $bundle['puantaj_by_personel'][$pid] ?? [];
+                $appliedProjection = MaasHesaplamaCorrectionProjectionService::applyToPuantajlar(
+                    $puantajlar,
+                    $projection['projections_by_personel'][$pid] ?? []
+                );
+                $correctionSnapshots[$pid] = $appliedProjection['applied'];
                 $engineInput = [
                     'personel' => $personel,
                     'ucret_segmentleri' => $bundle['ucret_by_personel'][$pid] ?? [],
-                    'puantajlar' => $bundle['puantaj_by_personel'][$pid] ?? [],
+                    'puantajlar' => $appliedProjection['puantajlar'],
                     'izinler' => $bundle['izin_by_personel'][$pid] ?? [],
                     'etki_adaylari' => $bundle['etki_by_personel'][$pid] ?? [],
                     'finanslar' => $bundle['finans_by_personel'][$pid] ?? [],
-                    'mevzuat' => $bundle['mevzuat_by_code'],
+                    'mevzuat' => $mergedMevzuat,
                     'carryover' => $carryovers[$pid],
                     'donem_baslangic' => (string) $bundle['snapshot']['donem_baslangic'],
                     'donem_bitis' => (string) $bundle['snapshot']['donem_bitis'],
@@ -363,11 +423,13 @@ class MaasHesaplamaAdayService
                 'INSERT INTO maas_hesaplama_calistirmalari (
                     snapshot_id, sube_id, yil, ay, revision_no, parent_calistirma_id, state,
                     engine_version, contract_version, snapshot_hash, parameter_set_hash, carryover_set_hash,
+                    correction_projection_hash, policy_version_hash,
                     request_hash, source_hash, result_hash, calculation_input_hash,
                     personel_sayisi, basarili_aday_sayisi, hatali_aday_sayisi, blocker_count, warning_count, created_by
                  ) VALUES (
                     :snapshot_id, :sube_id, :yil, :ay, :revision_no, :parent_id, \'HESAPLANDI\',
                     :engine_version, :contract_version, :snapshot_hash, :parameter_set_hash, :carryover_set_hash,
+                    :correction_projection_hash, :policy_version_hash,
                     :request_hash, :source_hash, :result_hash, :calculation_input_hash,
                     :personel_sayisi, :basarili, 0, 0, :warning_count, :created_by
                  )'
@@ -384,6 +446,8 @@ class MaasHesaplamaAdayService
                 'snapshot_hash' => (string) $bundle['snapshot']['snapshot_hash'],
                 'parameter_set_hash' => (string) $preflight['parameter_set_hash'],
                 'carryover_set_hash' => (string) $preflight['carryover_set_hash'],
+                'correction_projection_hash' => (string) ($preflight['correction_projection_hash'] ?? ''),
+                'policy_version_hash' => $preflight['policy_version_hash'] ?? null,
                 'request_hash' => $requestHash,
                 'source_hash' => (string) $preflight['source_hash'],
                 'result_hash' => $resultHash,
@@ -401,13 +465,13 @@ class MaasHesaplamaAdayService
                     hedef_net_tutar, sozlesme_brut_tutar, hesaplanan_brut_tutar, sgk_matrahi, gelir_vergisi_matrahi,
                     damga_vergisi_matrahi, sgk_isci_primi, issizlik_isci_primi, gelir_vergisi, damga_vergisi,
                     toplam_ek_odeme, toplam_kesinti, net_odenecek, sonraki_kumulatif_vergi_matrahi,
-                    input_hash, result_hash, engine_version, carryover_json, solver_json
+                    input_hash, result_hash, engine_version, carryover_json, solver_json, correction_projection_json
                  ) VALUES (
                     :calistirma_id, :personel_snapshot_id, :personel_id, 1, \'HESAPLANDI\', :ucret_turu, :para_birimi,
                     :hedef_net, :sozlesme_brut, :hesaplanan_brut, :sgk_matrah, :gv_matrah,
                     :damga_matrah, :sgk, :issizlik, :gv, :damga,
                     :ek, :kesinti, :net, :sonraki_matrah,
-                    :input_hash, :result_hash, :engine_version, :carryover_json, :solver_json
+                    :input_hash, :result_hash, :engine_version, :carryover_json, :solver_json, :correction_projection_json
                  )'
             );
             $insKalem = $pdo->prepare(
@@ -449,6 +513,8 @@ class MaasHesaplamaAdayService
                     'engine_version' => MaasHesaplamaEngine::ENGINE_VERSION,
                     'carryover_json' => json_encode($calc['carryover_snapshot'], JSON_UNESCAPED_UNICODE),
                     'solver_json' => $calc['solver'] ? json_encode($calc['solver'], JSON_UNESCAPED_UNICODE) : null,
+                    'correction_projection_json' => !empty($correctionSnapshots[$pid])
+                        ? json_encode($correctionSnapshots[$pid], JSON_UNESCAPED_UNICODE) : null,
                 ]);
                 $adayId = (int) $pdo->lastInsertId();
                 foreach ($calc['kalemler'] as $kalem) {

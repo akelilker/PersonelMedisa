@@ -1,0 +1,243 @@
+name: S80 Live Smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "SMOKE_S80 | CLEANUP_S80"
+        required: true
+        type: string
+
+jobs:
+  smoke:
+    name: Controlled S80 production smoke via temporary FTP ops
+    if: >
+      github.event.inputs.confirm == 'SMOKE_S80' ||
+      github.event.inputs.confirm == 'CLEANUP_S80'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Validate FTP secrets
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+          FTP_PORT: ${{ secrets.FTP_PORT }}
+        run: |
+          test -n "$FTP_SERVER" || (echo "FTP_SERVER missing" && exit 1)
+          test -n "$FTP_USERNAME" || (echo "FTP_USERNAME missing" && exit 1)
+          test -n "$FTP_PASSWORD" || (echo "FTP_PASSWORD missing" && exit 1)
+          test "${FTP_PORT}" = "21" || (echo "FTP_PORT must be 21" && exit 1)
+
+      - name: Install lftp
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lftp
+
+      - name: Prepare one-shot ops payload
+        id: prep
+        run: |
+          set -euo pipefail
+          TOKEN="$(openssl rand -hex 24)"
+          export TOKEN
+          echo "::add-mask::$TOKEN"
+          echo "token=$TOKEN" >> "$GITHUB_OUTPUT"
+          mkdir -p /tmp/s80-ops /tmp/s80-artifacts
+          python3 - <<'PY'
+          from pathlib import Path
+          import os
+          src = Path('scripts/s80-live-smoke.php').read_text(encoding='utf-8')
+          token = os.environ['TOKEN']
+          if src.count('REPLACE_S80_SMOKE_TOKEN') != 1:
+              raise SystemExit(f"expected exactly 1 REPLACE placeholder, got {src.count('REPLACE_S80_SMOKE_TOKEN')}")
+          if 'UNSET_S80_SMOKE_TOKEN' not in src:
+              raise SystemExit('UNSET_S80_SMOKE_TOKEN sentinel missing')
+          out = src.replace('REPLACE_S80_SMOKE_TOKEN', token, 1)
+          Path('/tmp/s80-ops/_s80_smoke.php').write_text(out, encoding='utf-8', newline='\n')
+          print('token_injected_ok')
+          PY
+          if head -c 3 /tmp/s80-ops/_s80_smoke.php | grep -q $'\xEF\xBB\xBF'; then
+            echo "BOM detected" && exit 1
+          fi
+          grep -q "UNSET_S80_SMOKE_TOKEN" /tmp/s80-ops/_s80_smoke.php
+          grep -q "$TOKEN" /tmp/s80-ops/_s80_smoke.php
+          ls -la /tmp/s80-ops
+
+      - name: Upload ops file via FTP
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+          FTP_PORT: ${{ secrets.FTP_PORT }}
+        run: |
+          set -euo pipefail
+          upload() {
+            local mode_name="$1"
+            local use_ftps="$2"
+            echo "FTP upload mode: ${mode_name}"
+            timeout 90s lftp -u "${FTP_USERNAME}","${FTP_PASSWORD}" -p "${FTP_PORT}" "ftp://${FTP_SERVER}" -e "
+              set cmd:fail-exit true;
+              set cmd:verbose on;
+              set net:max-retries 3;
+              set net:timeout 20;
+              set net:reconnect-interval-base 5;
+              set net:reconnect-interval-max 15;
+              set ssl:verify-certificate no;
+              set ssl:check-hostname no;
+              set ftp:passive-mode on;
+              set ftp:ssl-allow ${use_ftps};
+              set ftp:ssl-force ${use_ftps};
+              set ftp:ssl-protect-data ${use_ftps};
+              cd .;
+              mkdir -p api/public;
+              lcd /tmp/s80-ops;
+              put -O api/public _s80_smoke.php;
+              bye
+            "
+          }
+          upload "plain-ftp" false || upload "explicit-ftps" true
+
+      - name: Identity
+        env:
+          TOKEN: ${{ steps.prep.outputs.token }}
+        run: |
+          set -euo pipefail
+          BASE="https://www.karmotors.com.tr/personelmedisa/api/public/_s80_smoke.php"
+          code=$(curl -sS -o /tmp/s80-artifacts/identity.json -w "%{http_code}" "${BASE}?token=${TOKEN}&action=identity" || true)
+          echo "identity_http=$code"
+          cat /tmp/s80-artifacts/identity.json
+          echo
+          test "$code" = "200"
+          python3 - <<'PY'
+          import json,sys
+          data=json.load(open('/tmp/s80-artifacts/identity.json'))
+          print(json.dumps(data, indent=2))
+          if not data.get('ok'):
+            sys.exit(1)
+          db=data.get('aktif_veritabani') or data.get('identity',{}).get('aktif_veritabani')
+          # tolerate either shape
+          PY
+
+      - name: Smoke prepare + run
+        if: github.event.inputs.confirm == 'SMOKE_S80'
+        env:
+          TOKEN: ${{ steps.prep.outputs.token }}
+        run: |
+          set -euo pipefail
+          BASE="https://www.karmotors.com.tr/personelmedisa/api/public/_s80_smoke.php"
+          code=$(curl -sS -o /tmp/s80-artifacts/prepare.json -w "%{http_code}" "${BASE}?token=${TOKEN}&action=smoke_prepare" || true)
+          echo "prepare_http=$code"
+          cat /tmp/s80-artifacts/prepare.json
+          echo
+          test "$code" = "200"
+          python3 - <<'PY'
+          import json,sys
+          data=json.load(open('/tmp/s80-artifacts/prepare.json'))
+          print(json.dumps({k:data.get(k) for k in ['ok','code','personel_id','snapshot_id']}, indent=2))
+          if not data.get('ok') or data.get('code') != 'S80_SMOKE_PREPARE_OK':
+            sys.exit(1)
+          PY
+          code=$(curl -sS -o /tmp/s80-artifacts/run.json -w "%{http_code}" "${BASE}?token=${TOKEN}&action=smoke_run" || true)
+          echo "run_http=$code"
+          python3 - <<'PY'
+          import json,sys
+          data=json.load(open('/tmp/s80-artifacts/run.json'))
+          steps=data.get('steps') or []
+          failed=[s for s in steps if not s.get('ok')]
+          print('ok=', data.get('ok'), 'code=', data.get('code'), 'steps=', len(steps), 'failed=', len(failed))
+          for s in failed[:40]:
+            print('FAIL', s.get('name'), s.get('detail'))
+          for name in ['S80 kaynaklar','S80 forged onceki_deger rejected','S80 create server-owned onceki','S80 list enrichment fields','S80 detail enrichment + audit']:
+            hit=next((s for s in steps if s.get('name')==name), None)
+            print(name, hit)
+          if not data.get('ok') or data.get('code') != 'S80_SMOKE_RUN_OK':
+            sys.exit(1)
+          PY
+          test "$code" = "200"
+
+      - name: Cleanup + integrity
+        if: always() && (github.event.inputs.confirm == 'SMOKE_S80' || github.event.inputs.confirm == 'CLEANUP_S80')
+        env:
+          TOKEN: ${{ steps.prep.outputs.token }}
+        run: |
+          set -euo pipefail
+          BASE="https://www.karmotors.com.tr/personelmedisa/api/public/_s80_smoke.php"
+          code=$(curl -sS -o /tmp/s80-artifacts/cleanup.json -w "%{http_code}" "${BASE}?token=${TOKEN}&action=smoke_cleanup" || true)
+          echo "cleanup_http=$code"
+          cat /tmp/s80-artifacts/cleanup.json
+          echo
+          test "$code" = "200"
+          python3 - <<'PY'
+          import json,sys
+          data=json.load(open('/tmp/s80-artifacts/cleanup.json'))
+          print(json.dumps({k:data.get(k) for k in ['ok','code','deleted']}, indent=2))
+          if not data.get('ok') or 'SMOKE_CLEANUP_OK' not in str(data.get('code','')):
+            sys.exit(1)
+          PY
+          code=$(curl -sS -o /tmp/s80-artifacts/integrity.json -w "%{http_code}" "${BASE}?token=${TOKEN}&action=integrity" || true)
+          echo "integrity_http=$code"
+          cat /tmp/s80-artifacts/integrity.json
+          echo
+          test "$code" = "200"
+          python3 - <<'PY'
+          import json,sys
+          data=json.load(open('/tmp/s80-artifacts/integrity.json'))
+          print(json.dumps(data, indent=2)[:4000])
+          markers=data.get('marker_rows') or {}
+          # marker counts should be zero after cleanup
+          total=0
+          if isinstance(markers, dict):
+            for v in markers.values():
+              if isinstance(v, int):
+                total += v
+              elif isinstance(v, list):
+                total += len(v)
+          print('marker_total_approx', total)
+          if not data.get('ok'):
+            sys.exit(1)
+          PY
+
+      - name: Delete temporary public smoke stub
+        if: always()
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+          FTP_PORT: ${{ secrets.FTP_PORT }}
+        run: |
+          set -euo pipefail
+          delete() {
+            local use_ftps="$1"
+            timeout 90s lftp -u "${FTP_USERNAME}","${FTP_PASSWORD}" -p "${FTP_PORT}" "ftp://${FTP_SERVER}" -e "
+              set cmd:fail-exit false;
+              set net:max-retries 3;
+              set net:timeout 20;
+              set ssl:verify-certificate no;
+              set ssl:check-hostname no;
+              set ftp:passive-mode on;
+              set ftp:ssl-allow ${use_ftps};
+              set ftp:ssl-force ${use_ftps};
+              set ftp:ssl-protect-data ${use_ftps};
+              cd .;
+              rm -f api/public/_s80_smoke.php;
+              rm -f api/public/s80_smoke_marker.json;
+              bye
+            "
+          }
+          delete false || delete true
+          code=$(curl -sS -o /tmp/s80-artifacts/gone.txt -w "%{http_code}" "https://www.karmotors.com.tr/personelmedisa/api/public/_s80_smoke.php" || true)
+          echo "stub_http_after_delete=$code"
+          test "$code" != "200"
+
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: s80-live-smoke-artifacts
+          path: /tmp/s80-artifacts
+          if-no-files-found: ignore

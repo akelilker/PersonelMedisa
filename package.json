@@ -14,6 +14,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "e2e": "playwright test",
+    "e2e:s80": "playwright test tests/e2e/revizyon-merkezi.spec.ts",
     "e2e:headed": "playwright test --headed",
     "e2e:ui": "playwright test --ui",
     "icons:generate": "node scripts/generate-icons.mjs",

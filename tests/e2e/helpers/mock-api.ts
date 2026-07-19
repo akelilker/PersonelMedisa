@@ -1898,6 +1898,37 @@ export async function mockApi(page: Page, role: MockUserRole, options: MockApiOp
   let maasNextAuditId = 0;
   let maasNextDevirId = 0;
 
+  const fcotSnapshotById = new Map<
+    number,
+    {
+      snapshot_id: number;
+      kapanis_id: number;
+      personel_id: number;
+      hafta_baslangic: string;
+      hafta_bitis: string;
+      fazla_calisma_dakika: number;
+      sube_id: number;
+    }
+  >();
+  const fcotTercihBySnapshotId = new Map<
+    number,
+    {
+      id: number;
+      snapshot_id: number;
+      kapanis_id: number;
+      personel_id: number;
+      hafta_baslangic: string;
+      hafta_bitis: string;
+      fazla_calisma_dakika: number;
+      odeme_tipi: string;
+      secim_zamani: string;
+      secen_kullanici_id: number;
+      onceki_odeme_tipi: string;
+      gerekce?: string;
+    }
+  >();
+  let fcotNextId = 0;
+
   const puantajKayitlari: GunlukPuantaj[] = [
     {
       personel_id: 1,
@@ -7701,6 +7732,18 @@ let personelBelgeKaydiIdCounter = 903;
         notlar: ["A1 contract stub; gerçek hesap A2 fazında bağlanacak."]
       }));
 
+      for (const satir of snapshot_satirlari) {
+        fcotSnapshotById.set(satir.snapshot_id, {
+          snapshot_id: satir.snapshot_id,
+          kapanis_id: satir.kapanis_id,
+          personel_id: satir.personel_id,
+          hafta_baslangic: satir.hafta_baslangic,
+          hafta_bitis: satir.hafta_bitis,
+          fazla_calisma_dakika: satir.fazla_calisma_dakika,
+          sube_id: personeller.find((p) => p.id === satir.personel_id)?.sube_id ?? 1
+        });
+      }
+
       await fulfillJson(
         route,
         200,
@@ -7716,6 +7759,138 @@ let personelBelgeKaydiIdCounter = 903;
           snapshot_satirlari
         })
       );
+      return;
+    }
+
+    if (path === "/api/fazla-calisma-odeme-tercihi" && method === "GET") {
+      if (await denyUnlessRolePermission(route, "puantaj.view")) return;
+
+      const snapshotId = Number.parseInt(url.searchParams.get("snapshot_id") ?? "", 10);
+      if (!Number.isFinite(snapshotId) || snapshotId < 1) {
+        await fulfillJson(
+          route,
+          400,
+          errorBody("INVALID_QUERY", "snapshot_id zorunludur ve pozitif tam sayi olmalidir.", "snapshot_id")
+        );
+        return;
+      }
+
+      const satir = fcotSnapshotById.get(snapshotId);
+      if (!satir) {
+        await fulfillJson(
+          route,
+          404,
+          errorBody(
+            "NOT_FOUND",
+            `snapshot_id ${snapshotId} icin odeme tercihi veya kapanis satiri bulunamadi.`
+          )
+        );
+        return;
+      }
+
+      const stored = fcotTercihBySnapshotId.get(snapshotId);
+      if (stored) {
+        await fulfillJson(route, 200, okBody(stored));
+        return;
+      }
+
+      await fulfillJson(
+        route,
+        200,
+        okBody({
+          snapshot_id: satir.snapshot_id,
+          kapanis_id: satir.kapanis_id,
+          personel_id: satir.personel_id,
+          hafta_baslangic: satir.hafta_baslangic,
+          hafta_bitis: satir.hafta_bitis,
+          fazla_calisma_dakika: satir.fazla_calisma_dakika,
+          odeme_tipi: "KARAR_BEKLIYOR"
+        })
+      );
+      return;
+    }
+
+    if (path === "/api/fazla-calisma-odeme-tercihi" && method === "PUT") {
+      if (await denyUnlessRolePermission(route, "puantaj.muhurle")) return;
+
+      const payload = (request.postDataJSON() ?? {}) as Record<string, unknown>;
+      const serverOwned = [
+        "id",
+        "kapanis_id",
+        "personel_id",
+        "hafta_baslangic",
+        "hafta_bitis",
+        "fazla_calisma_dakika",
+        "secen_kullanici_id",
+        "secim_zamani",
+        "onceki_odeme_tipi",
+        "created_at",
+        "updated_at",
+        "sube_id"
+      ];
+      for (const field of serverOwned) {
+        if (Object.prototype.hasOwnProperty.call(payload, field)) {
+          await fulfillJson(
+            route,
+            422,
+            errorBody("VALIDATION_ERROR", `${field} istemci tarafindan belirlenemez.`, field)
+          );
+          return;
+        }
+      }
+
+      const snapshotId = Number(payload.snapshot_id);
+      if (!Number.isFinite(snapshotId) || snapshotId < 1) {
+        await fulfillJson(
+          route,
+          422,
+          errorBody("VALIDATION_ERROR", "snapshot_id zorunludur ve pozitif tam sayi olmalidir.", "snapshot_id")
+        );
+        return;
+      }
+
+      const odemeTipi = payload.odeme_tipi;
+      if (odemeTipi !== "KARAR_BEKLIYOR" && odemeTipi !== "UCRET" && odemeTipi !== "SERBEST_ZAMAN") {
+        await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "odeme_tipi gecersiz.", "odeme_tipi"));
+        return;
+      }
+
+      const satir = fcotSnapshotById.get(snapshotId);
+      if (!satir) {
+        await fulfillJson(
+          route,
+          404,
+          errorBody(
+            "NOT_FOUND",
+            `snapshot_id ${snapshotId} icin odeme tercihi veya kapanis satiri bulunamadi.`
+          )
+        );
+        return;
+      }
+
+      const existing = fcotTercihBySnapshotId.get(snapshotId);
+      if (existing && existing.odeme_tipi === odemeTipi) {
+        await fulfillJson(route, 200, okBody(existing));
+        return;
+      }
+
+      const nextId = existing?.id ?? ++fcotNextId;
+      const next = {
+        id: nextId,
+        snapshot_id: snapshotId,
+        kapanis_id: satir.kapanis_id,
+        personel_id: satir.personel_id,
+        hafta_baslangic: satir.hafta_baslangic,
+        hafta_bitis: satir.hafta_bitis,
+        fazla_calisma_dakika: satir.fazla_calisma_dakika,
+        odeme_tipi: odemeTipi,
+        secim_zamani: new Date().toISOString(),
+        secen_kullanici_id: 1,
+        onceki_odeme_tipi: existing?.odeme_tipi ?? "KARAR_BEKLIYOR",
+        gerekce: typeof payload.gerekce === "string" ? payload.gerekce : undefined
+      };
+      fcotTercihBySnapshotId.set(snapshotId, next);
+      await fulfillJson(route, 200, okBody(next));
       return;
     }
 

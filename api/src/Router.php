@@ -14,6 +14,7 @@ use Medisa\Api\Controllers\DonemKapanisController;
 use Medisa\Api\Controllers\HaftalikBildirimMutabakatlariController;
 use Medisa\Api\Controllers\HaftalikKapanisController;
 use Medisa\Api\Controllers\EkOdemeKesintiController;
+use Medisa\Api\Controllers\FazlaCalismaOdemeTercihiController;
 use Medisa\Api\Controllers\MaasHesaplamaController;
 use Medisa\Api\Controllers\MevzuatParametreController;
 use Medisa\Api\Controllers\PersonelBelgelerController;
@@ -326,6 +327,12 @@ class Router
         }
         if ($path === '/zimmetler' && $method === 'POST') {
             ZimmetlerController::create($this->request);
+        }
+        if ($path === '/fazla-calisma-odeme-tercihi' && $method === 'GET') {
+            FazlaCalismaOdemeTercihiController::get($this->request);
+        }
+        if ($path === '/fazla-calisma-odeme-tercihi' && $method === 'PUT') {
+            FazlaCalismaOdemeTercihiController::put($this->request);
         }
         if ($path === '/haftalik-kapanis/yillik-fazla-calisma' && $method === 'GET') {
             HaftalikKapanisController::yillikFazlaCalisma($this->request);

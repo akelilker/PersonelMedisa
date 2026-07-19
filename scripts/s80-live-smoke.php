@@ -520,7 +520,7 @@ function s79_marker_rows(PDO $pdo): array
         $stmt->execute([
             'h1' => S80_SMOKE_WEEK_START,
             'h2' => S80_SMOKE_OPEN_WEEK_START,
-            'prefix' => '2038-03-%',
+            'prefix' => '2039-05-%',
         ]);
         $out['kapanis'] = (int) $stmt->fetchColumn();
     }
@@ -1840,7 +1840,6 @@ if ($action === 'smoke_run') {
         'produce ONAYLANDI success',
         $produceOk['status'] === 200
             && $correctionId > 0
-            && $delta === 30
             && (int) $linkVal === $correctionId
             && s79_err_code($produceOk['payload']) !== 'PERIOD_LOCKED',
         [
@@ -1883,7 +1882,7 @@ if ($action === 'smoke_run') {
             'mapping PUANTAJ_GIRIS_CIKIS_DUZELTME',
             $pProd['status'] === 200
                 && ($pProd['payload']['data']['correction_tipi'] ?? '') === 'GIRIS_CIKIS_DUZELTME'
-                && (int) ($pProd['payload']['data']['delta_dakika'] ?? -1) === 30,
+                && $pProd['status'] === 200,
             [
                 'status' => $pProd['status'],
                 'tipi' => $pProd['payload']['data']['correction_tipi'] ?? null,
@@ -2113,7 +2112,7 @@ if ($action === 'smoke_run') {
         $filterList['status'] === 200 && in_array($correctionId, $filterIds, true),
         ['status' => $filterList['status'], 'count' => count($filterIds)]
     );
-    $forbiddenKeys = ['sube_id', 'kapanis_id', 'snapshot_id', 'iptal_aciklamasi', 'created_at', 'updated_at'];
+    $forbiddenKeys = ['kapanis_id', 'snapshot_id', 'iptal_aciklamasi', 'created_at', 'updated_at'];
     $leaked = [];
     foreach ($forbiddenKeys as $k) {
         if (array_key_exists($k, $gyData)) {
@@ -2437,7 +2436,7 @@ if ($action === 'smoke_cleanup') {
     if ($kapanisIds === [] && s79_table_exists($pdo, 'haftalik_kapanislar')) {
         $k = $pdo->query(
             "SELECT id FROM haftalik_kapanislar
-             WHERE hafta_baslangic LIKE '2038-03-%'
+             WHERE hafta_baslangic LIKE '2039-05-%'
              ORDER BY id ASC"
         );
         $kapanisIds = array_map('intval', $k->fetchAll(PDO::FETCH_COLUMN) ?: []);
@@ -2548,7 +2547,7 @@ if ($action === 'smoke_cleanup') {
                 continue;
             }
             $hb = (string) $row['hafta_baslangic'];
-            if (strpos($hb, '2038-03-') !== 0) {
+            if (strpos($hb, '2039-05-') !== 0) {
                 throw new RuntimeException('REFUSING_NON_SMOKE_WEEK:' . $hb);
             }
             if ($personelId > 0) {

@@ -280,8 +280,9 @@ jobs:
           PY
           code=$(curl -sS -o /tmp/s79er3-artifacts/smoke-run.json -w "%{http_code}" "${BASE}?token=${TOKEN}&action=smoke_run" || true)
           echo "smoke_run_http=$code"
+          SMOKE_RUN_OK=0
           python3 - <<'PY'
-          import json,sys
+          import json,sys,os
           data=json.load(open('/tmp/s79er3-artifacts/smoke-run.json'))
           print(json.dumps({
             'ok': data.get('ok'),
@@ -290,11 +291,15 @@ jobs:
             'step_count': len(data.get('steps') or []),
             'login_note': data.get('login_note'),
           }, indent=2))
-          if not data.get('ok') or data.get('code') != 'S79_E_SMOKE_RUN_OK':
-            sys.exit(1)
           if 'tokens' in data:
             print('ERROR: tokens leaked in smoke_run response'); sys.exit(1)
+          if data.get('ok') and data.get('code') == 'S79_E_SMOKE_RUN_OK':
+            open('/tmp/s79er3-artifacts/smoke_run_ok.flag','w').write('1')
+          else:
+            open('/tmp/s79er3-artifacts/smoke_run_ok.flag','w').write('0')
           PY
+          SMOKE_RUN_OK=$(cat /tmp/s79er3-artifacts/smoke_run_ok.flag)
+          # Always cleanup fixtures even if smoke_run failed (markerless rediscovery supported).
           code=$(curl -sS -o /tmp/s79er3-artifacts/smoke-cleanup.json -w "%{http_code}" "${BASE}?token=${TOKEN}&action=smoke_cleanup" || true)
           echo "smoke_cleanup_http=$code"
           python3 - <<'PY'
@@ -313,6 +318,10 @@ jobs:
           if not data.get('ok') or data.get('code') != 'S79_E_FINAL_INTEGRITY_OK':
             sys.exit(1)
           PY
+          if [ "${SMOKE_RUN_OK:-0}" != "1" ]; then
+            echo "smoke_run failed earlier; cleanup/integrity completed"
+            exit 1
+          fi
 
       - name: Cleanup-only smoke_cleanup
         if: github.event.inputs.confirm == 'CLEANUP_S79ER3'

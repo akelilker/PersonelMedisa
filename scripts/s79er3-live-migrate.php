@@ -1399,12 +1399,18 @@ if ($action === 'smoke_run') {
         $skip('PATRON list');
     }
 
-    $create1 = s79_http('POST', '/haftalik-kapanis/revizyon-talepleri', s79_rt_create_body(
-        $personelId,
-        $snapshotId,
-        $etkilenen,
-        $hb,
-        $he
+    $create1 = s79_http('POST', '/haftalik-kapanis/revizyon-talepleri', array_merge(
+        s79_rt_create_body(
+            $personelId,
+            $snapshotId,
+            $etkilenen,
+            $hb,
+            $he
+        ),
+        [
+            'bordro_etki_var_mi' => true,
+            'bordro_etki_notu' => S79_SMOKE_MARKER . ' bordro',
+        ]
     ), $baH);
     $talep1 = (int) ($create1['payload']['data']['id'] ?? 0);
     $pass(
@@ -1658,7 +1664,9 @@ if ($action === 'smoke_run') {
 }
 
 if ($action === 'smoke_cleanup') {
-    $meta = s79_load_smoke_marker();
+    $loadedMarker = s79_load_smoke_marker();
+    $markerWasPresent = $loadedMarker !== null;
+    $meta = $loadedMarker ?? [];
     $deleted = [
         'gecmis' => 0,
         'talep' => 0,
@@ -1675,6 +1683,8 @@ if ($action === 'smoke_cleanup') {
     if ($kapanisIds === [] && isset($meta['kapanis_id'])) {
         $kapanisIds = [(int) $meta['kapanis_id']];
     }
+
+    // Marker file may be gone after a failed run; rediscover exact smoke fixtures.
     if ($personelId <= 0) {
         $p = $pdo->prepare('SELECT id FROM personeller WHERE tc_kimlik_no = :tc OR sicil_no = :sicil LIMIT 1');
         $p->execute(['tc' => S79_SMOKE_TC, 'sicil' => S79_SMOKE_SICIL]);
@@ -1682,6 +1692,27 @@ if ($action === 'smoke_cleanup') {
         if ($pid !== false) {
             $personelId = (int) $pid;
         }
+    }
+    if ($surecId <= 0 && s79_table_exists($pdo, 'surecler')) {
+        $s = $pdo->prepare('SELECT id FROM surecler WHERE aciklama LIKE :m ORDER BY id DESC LIMIT 1');
+        $s->execute(['m' => '%' . S79_SMOKE_MARKER . '%']);
+        $sid = $s->fetchColumn();
+        if ($sid !== false) {
+            $surecId = (int) $sid;
+        }
+    }
+    if ($kapanisIds === [] && s79_table_exists($pdo, 'haftalik_kapanislar')) {
+        $k = $pdo->query(
+            "SELECT id FROM haftalik_kapanislar
+             WHERE hafta_baslangic LIKE '2038-03-%'
+             ORDER BY id ASC"
+        );
+        $kapanisIds = array_map('intval', $k->fetchAll(PDO::FETCH_COLUMN) ?: []);
+    }
+    if ($talepIds === [] && s79_table_exists($pdo, 'haftalik_kapanis_revizyon_talepleri')) {
+        $t = $pdo->prepare('SELECT id FROM haftalik_kapanis_revizyon_talepleri WHERE gerekce LIKE :m');
+        $t->execute(['m' => '%' . S79_SMOKE_MARKER . '%']);
+        $talepIds = array_map('intval', $t->fetchAll(PDO::FETCH_COLUMN) ?: []);
     }
 
     $pdo->beginTransaction();
@@ -1721,6 +1752,10 @@ if ($action === 'smoke_cleanup') {
                 $d1 = $pdo->prepare('DELETE FROM haftalik_kapanis_satirlari WHERE kapanis_id = :id AND personel_id = :p');
                 $d1->execute(['id' => $kid, 'p' => $personelId]);
                 $deleted['satir'] += $d1->rowCount();
+            } else {
+                $d1 = $pdo->prepare('DELETE FROM haftalik_kapanis_satirlari WHERE kapanis_id = :id');
+                $d1->execute(['id' => $kid]);
+                $deleted['satir'] += $d1->rowCount();
             }
             $d2 = $pdo->prepare('DELETE FROM haftalik_kapanislar WHERE id = :id');
             $d2->execute(['id' => $kid]);
@@ -1735,6 +1770,10 @@ if ($action === 'smoke_cleanup') {
                 $d->execute(['id' => $surecId]);
                 $deleted['surec'] = $d->rowCount();
             }
+        } elseif (s79_table_exists($pdo, 'surecler')) {
+            $d = $pdo->prepare('DELETE FROM surecler WHERE aciklama LIKE :m');
+            $d->execute(['m' => '%' . S79_SMOKE_MARKER . '%']);
+            $deleted['surec'] += $d->rowCount();
         }
         if ($personelId > 0) {
             $chk = $pdo->prepare('SELECT id, tc_kimlik_no, sicil_no FROM personeller WHERE id = :id');
@@ -1769,6 +1808,7 @@ if ($action === 'smoke_cleanup') {
         'deleted' => $deleted,
         'marker_rows' => $markers,
         'counts' => s79_counts($pdo),
+        'marker_was_present' => $markerWasPresent,
     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     exit;
 }

@@ -3,26 +3,6 @@
   "entries": [
     {
       "method": "GET",
-      "path": "/fazla-calisma-odeme-tercihi",
-      "category": "approved_deferred",
-      "gapId": "D-FCOT-01",
-      "reason": "Fazla calisma odeme tercihi backend deferred from S78-A.",
-      "owner": "FazlaCalismaOdemeTercihi",
-      "targetPhase": "S78-D",
-      "introducedOrConfirmedAt": "2026-07-18"
-    },
-    {
-      "method": "PUT",
-      "path": "/fazla-calisma-odeme-tercihi",
-      "category": "approved_deferred",
-      "gapId": "D-FCOT-02",
-      "reason": "Fazla calisma odeme tercihi write backend deferred from S78-A.",
-      "owner": "FazlaCalismaOdemeTercihi",
-      "targetPhase": "S78-D",
-      "introducedOrConfirmedAt": "2026-07-18"
-    },
-    {
-      "method": "GET",
       "path": "/serbest-zaman/events",
       "category": "approved_deferred",
       "gapId": "D-SZ-01",

@@ -27,5 +27,4 @@ export type PutFazlaCalismaOdemeTercihiPayload = {
   snapshot_id: number;
   odeme_tipi: OdemeTipi;
   gerekce?: string;
-  secen_kullanici_id?: number;
 };

@@ -91,16 +91,17 @@ describe("fazla-calisma-odeme-tercihi.api", () => {
     const result = await putFazlaCalismaOdemeTercihi({
       snapshot_id: 1001,
       odeme_tipi: "SERBEST_ZAMAN",
-      gerekce: "Personel talebi",
-      secen_kullanici_id: 5
+      gerekce: "Personel talebi"
     });
 
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(init.method).toBe("PUT");
-    expect(JSON.parse(String(init.body))).toMatchObject({
+    expect(JSON.parse(String(init.body))).toEqual({
       snapshot_id: 1001,
-      odeme_tipi: "SERBEST_ZAMAN"
+      odeme_tipi: "SERBEST_ZAMAN",
+      gerekce: "Personel talebi"
     });
+    expect(JSON.parse(String(init.body))).not.toHaveProperty("secen_kullanici_id");
     expect(result.odeme_tipi).toBe("SERBEST_ZAMAN");
     expect(result.onceki_odeme_tipi).toBe("KARAR_BEKLIYOR");
     expect(result.id).toBe(1);

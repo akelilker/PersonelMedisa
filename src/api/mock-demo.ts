@@ -346,6 +346,18 @@ const demoState: {
   >;
   kapanisById: Record<number, HaftalikKapanisSonuc>;
   odemeTercihiBySnapshotId: Record<number, FazlaCalismaOdemeTercihi>;
+  /** Append-only FCOT audit trail (demo parity). */
+  odemeTercihiAudit: Array<{
+    tercih_id: number;
+    snapshot_id: number;
+    onceki_odeme_tipi: OdemeTipi;
+    yeni_odeme_tipi: OdemeTipi;
+    secen_kullanici_id: number;
+    secim_zamani: string;
+    gerekce?: string;
+  }>;
+  /** Sealed puantaj months: `${subeId}|${yil}|${ay}` → true. Missing = open. */
+  sealedPuantajDonemKeys: Record<string, true>;
   serbestZamanEventsById: Record<number, SerbestZamanEvent>;
   revizyonTalebiById: Record<number, RevizyonTalebi>;
   revizyonCorrectionById: Record<number, RevizyonCorrectionEvent>;
@@ -748,6 +760,8 @@ const demoState: {
   belgeDurumByPersonelId: {},
   kapanisById: {},
   odemeTercihiBySnapshotId: {},
+  odemeTercihiAudit: [],
+  sealedPuantajDonemKeys: {},
   serbestZamanEventsById: {},
   revizyonTalebiById: {},
   revizyonCorrectionById: {},
@@ -2339,6 +2353,97 @@ function demoOdemeTercihiNotFound(snapshotId: number): ApiResponse<unknown> {
       }
     ]
   };
+}
+
+const FCOT_SERVER_OWNED_FIELDS = [
+  "id",
+  "kapanis_id",
+  "personel_id",
+  "hafta_baslangic",
+  "hafta_bitis",
+  "fazla_calisma_dakika",
+  "secen_kullanici_id",
+  "secim_zamani",
+  "onceki_odeme_tipi",
+  "created_at",
+  "updated_at",
+  "sube_id"
+] as const;
+
+function demoFcotValidationError(field: string, message: string): ApiResponse<unknown> {
+  return {
+    data: null,
+    meta: {},
+    errors: [{ code: "VALIDATION_ERROR", message, field }]
+  };
+}
+
+function findDemoKapanisSubeIdForSnapshot(snapshotId: number): number | null {
+  for (const kapanis of Object.values(demoState.kapanisById)) {
+    for (const satir of kapanis.snapshot_satirlari ?? []) {
+      if (satir.snapshot_id === snapshotId) {
+        return (kapanis as HaftalikKapanisSonuc & { sube_id?: number }).sube_id ?? 1;
+      }
+    }
+  }
+
+  return null;
+}
+
+function monthsCoveredByDemoWeek(haftaBaslangic: string, haftaBitis: string): Array<{ yil: number; ay: number }> {
+  const start = new Date(`${haftaBaslangic}T00:00:00Z`);
+  const end = new Date(`${haftaBitis}T00:00:00Z`);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end < start) {
+    return [];
+  }
+
+  const seen = new Map<string, { yil: number; ay: number }>();
+  const cursor = new Date(start);
+  while (cursor <= end) {
+    const yil = cursor.getUTCFullYear();
+    const ay = cursor.getUTCMonth() + 1;
+    seen.set(`${yil}-${ay}`, { yil, ay });
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+
+  return Array.from(seen.values());
+}
+
+function assertDemoWeekPeriodsOpen(
+  subeId: number,
+  haftaBaslangic: string,
+  haftaBitis: string
+): ApiResponse<unknown> | null {
+  const months = monthsCoveredByDemoWeek(haftaBaslangic, haftaBitis);
+  if (months.length === 0) {
+    return demoRevizyonError("PERIOD_STATE_UNKNOWN", "Puantaj donem durumu belirlenemedi.");
+  }
+
+  for (const month of months) {
+    const key = `${subeId}|${month.yil}|${month.ay}`;
+    if (demoState.sealedPuantajDonemKeys[key]) {
+      return demoRevizyonError(
+        "PERIOD_LOCKED",
+        "Bu donem muhurlenmis, odeme tercihi guncellenemez."
+      );
+    }
+  }
+
+  return null;
+}
+
+function hasActiveDemoSerbestZamanOlusum(tercihId: number): boolean {
+  const events = listDemoSerbestZamanEvents();
+  return events.some((event) => {
+    if (event.event_tipi !== "SERBEST_ZAMAN_OLUSUM" || event.kaynak_odeme_tercihi_id !== tercihId) {
+      return false;
+    }
+    const iptal = events.some(
+      (candidate) =>
+        candidate.event_tipi === "SERBEST_ZAMAN_IPTAL" && candidate.hedef_event_id === event.id
+    );
+    return !iptal;
+  });
 }
 
 function listDemoSerbestZamanEvents(): SerbestZamanEvent[] {
@@ -4687,6 +4792,12 @@ export function resolveDemoApiResponse(
   }
 
   if (pathname === "/fazla-calisma-odeme-tercihi" && method === "GET") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(actor, "puantaj.view");
+    if (permissionError) {
+      return permissionError;
+    }
+
     const snapshotId = toNumber(requestUrl.searchParams.get("snapshot_id"));
     if (snapshotId === null || snapshotId < 1) {
       return {
@@ -4701,46 +4812,49 @@ export function resolveDemoApiResponse(
       };
     }
 
+    const satir = findDemoSnapshotSatir(snapshotId);
+    if (!satir) {
+      return demoOdemeTercihiNotFound(snapshotId);
+    }
+
+    const subeId = findDemoKapanisSubeIdForSnapshot(snapshotId);
+    if (subeId !== null && actor.subeIds.length > 0 && !actor.subeIds.includes(subeId)) {
+      return demoRevizyonError("FORBIDDEN", "Bu kayit aktif sube baglaminda goruntulenemiyor.");
+    }
+
     const stored = demoState.odemeTercihiBySnapshotId[snapshotId];
     if (stored) {
       return ok(stored);
     }
 
-    const satir = findDemoSnapshotSatir(snapshotId);
-    if (!satir) {
-      return demoOdemeTercihiNotFound(snapshotId);
-    }
-
+    // Synthetic default — no DB/demo write.
     return ok(buildSyntheticOdemeTercihi(satir));
   }
 
   if (pathname === "/fazla-calisma-odeme-tercihi" && method === "PUT") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(actor, "puantaj.muhurle");
+    if (permissionError) {
+      return permissionError;
+    }
+
+    for (const field of FCOT_SERVER_OWNED_FIELDS) {
+      if (Object.prototype.hasOwnProperty.call(body, field)) {
+        return demoFcotValidationError(field, `${field} istemci tarafindan belirlenemez.`);
+      }
+    }
+
     const snapshotId = toNumber(body.snapshot_id);
     if (snapshotId === null || snapshotId < 1) {
-      return {
-        data: null,
-        meta: {},
-        errors: [
-          {
-            code: "INVALID_BODY",
-            message: "snapshot_id zorunludur ve pozitif tam sayi olmalidir."
-          }
-        ]
-      };
+      return demoFcotValidationError(
+        "snapshot_id",
+        "snapshot_id zorunludur ve pozitif tam sayi olmalidir."
+      );
     }
 
     const odemeTipi = body.odeme_tipi;
     if (!isDemoOdemeTipi(odemeTipi)) {
-      return {
-        data: null,
-        meta: {},
-        errors: [
-          {
-            code: "INVALID_BODY",
-            message: "odeme_tipi gecersiz."
-          }
-        ]
-      };
+      return demoFcotValidationError("odeme_tipi", "odeme_tipi gecersiz.");
     }
 
     const satir = findDemoSnapshotSatir(snapshotId);
@@ -4748,16 +4862,44 @@ export function resolveDemoApiResponse(
       return demoOdemeTercihiNotFound(snapshotId);
     }
 
-    const existing = demoState.odemeTercihiBySnapshotId[snapshotId];
-    const onceki_odeme_tipi = existing?.odeme_tipi ?? DEFAULT_ODEME_TIPI;
     const kapanis_id = satir.kapanis_id;
-
     if (kapanis_id === undefined) {
       return demoOdemeTercihiNotFound(snapshotId);
     }
 
+    const subeId = findDemoKapanisSubeIdForSnapshot(snapshotId) ?? 1;
+    if (actor.subeIds.length > 0 && !actor.subeIds.includes(subeId)) {
+      return demoRevizyonError("FORBIDDEN", "Bu kayit aktif sube baglaminda goruntulenemiyor.");
+    }
+
+    const periodError = assertDemoWeekPeriodsOpen(subeId, satir.hafta_baslangic, satir.hafta_bitis);
+    if (periodError) {
+      return periodError;
+    }
+
+    const existing = demoState.odemeTercihiBySnapshotId[snapshotId];
+    if (existing && existing.odeme_tipi === odemeTipi) {
+      // Idempotent: no updated_at / audit side effects.
+      return ok(existing);
+    }
+
+    const onceki_odeme_tipi = existing?.odeme_tipi ?? DEFAULT_ODEME_TIPI;
+    if (
+      existing?.id !== undefined &&
+      onceki_odeme_tipi === "SERBEST_ZAMAN" &&
+      (odemeTipi === "UCRET" || odemeTipi === "KARAR_BEKLIYOR") &&
+      hasActiveDemoSerbestZamanOlusum(existing.id)
+    ) {
+      return demoRevizyonError(
+        "STATE_CONFLICT",
+        "Aktif serbest zaman olusumu varken odeme tipi degistirilemez."
+      );
+    }
+
+    const now = new Date().toISOString();
+    const tercihId = existing?.id ?? ++demoState.nextIds.odemeTercihi;
     const next: FazlaCalismaOdemeTercihi = {
-      id: existing?.id ?? ++demoState.nextIds.odemeTercihi,
+      id: tercihId,
       snapshot_id: snapshotId,
       kapanis_id,
       personel_id: satir.personel_id,
@@ -4765,13 +4907,23 @@ export function resolveDemoApiResponse(
       hafta_bitis: satir.hafta_bitis,
       fazla_calisma_dakika: guvenliFazlaCalismaDakika(satir.fazla_calisma_dakika),
       odeme_tipi: odemeTipi,
-      secim_zamani: new Date().toISOString(),
-      secen_kullanici_id: toNumber(body.secen_kullanici_id) ?? undefined,
+      secim_zamani: now,
+      secen_kullanici_id: actor.userId,
       onceki_odeme_tipi,
       gerekce: toStringValue(body.gerekce) ?? undefined
     };
 
     demoState.odemeTercihiBySnapshotId[snapshotId] = next;
+    demoState.odemeTercihiAudit.push({
+      tercih_id: tercihId,
+      snapshot_id: snapshotId,
+      onceki_odeme_tipi,
+      yeni_odeme_tipi: odemeTipi,
+      secen_kullanici_id: actor.userId,
+      secim_zamani: now,
+      gerekce: next.gerekce
+    });
+
     return ok(next);
   }
 

@@ -176,8 +176,7 @@ export async function putFazlaCalismaOdemeTercihi(
     body: JSON.stringify({
       snapshot_id,
       odeme_tipi: payload.odeme_tipi,
-      gerekce: payload.gerekce,
-      secen_kullanici_id: payload.secen_kullanici_id
+      gerekce: payload.gerekce
     })
   });
 

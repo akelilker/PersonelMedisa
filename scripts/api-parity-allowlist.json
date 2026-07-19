@@ -2,66 +2,6 @@
   "version": 1,
   "entries": [
     {
-      "method": "GET",
-      "path": "/serbest-zaman/events",
-      "category": "approved_deferred",
-      "gapId": "D-SZ-01",
-      "reason": "Serbest zaman event store backend deferred from S78-A.",
-      "owner": "SerbestZaman",
-      "targetPhase": "S78-D",
-      "introducedOrConfirmedAt": "2026-07-18"
-    },
-    {
-      "method": "GET",
-      "path": "/serbest-zaman/bakiye",
-      "category": "approved_deferred",
-      "gapId": "D-SZ-02",
-      "reason": "Serbest zaman bakiye backend deferred from S78-A.",
-      "owner": "SerbestZaman",
-      "targetPhase": "S78-D",
-      "introducedOrConfirmedAt": "2026-07-18"
-    },
-    {
-      "method": "POST",
-      "path": "/serbest-zaman/olusum",
-      "category": "approved_deferred",
-      "gapId": "D-SZ-03",
-      "reason": "Serbest zaman olusum event write deferred from S78-A.",
-      "owner": "SerbestZaman",
-      "targetPhase": "S78-D",
-      "introducedOrConfirmedAt": "2026-07-18"
-    },
-    {
-      "method": "POST",
-      "path": "/serbest-zaman/kullanim",
-      "category": "approved_deferred",
-      "gapId": "D-SZ-04",
-      "reason": "Serbest zaman kullanim event write deferred from S78-A.",
-      "owner": "SerbestZaman",
-      "targetPhase": "S78-D",
-      "introducedOrConfirmedAt": "2026-07-18"
-    },
-    {
-      "method": "POST",
-      "path": "/serbest-zaman/iptal",
-      "category": "approved_deferred",
-      "gapId": "D-SZ-05",
-      "reason": "Serbest zaman iptal event write deferred from S78-A.",
-      "owner": "SerbestZaman",
-      "targetPhase": "S78-D",
-      "introducedOrConfirmedAt": "2026-07-18"
-    },
-    {
-      "method": "POST",
-      "path": "/serbest-zaman/duzeltme",
-      "category": "approved_deferred",
-      "gapId": "D-SZ-06",
-      "reason": "Serbest zaman duzeltme event write deferred from S78-A.",
-      "owner": "SerbestZaman",
-      "targetPhase": "S78-D",
-      "introducedOrConfirmedAt": "2026-07-18"
-    },
-    {
       "method": "POST",
       "path": "/haftalik-kapanis/revizyon-talepleri",
       "category": "approved_deferred",

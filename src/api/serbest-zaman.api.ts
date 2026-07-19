@@ -108,8 +108,49 @@ function normalizeSerbestZamanOlusumEvent(
     dakika: toNonNegativeNumber(record.dakika),
     event_tarihi,
     son_kullanim_tarihi,
-    aciklama: toOptionalString(record.aciklama)
+    aciklama: toOptionalString(record.aciklama),
+    ...toDonemMeta(record)
   };
+}
+
+function toDonemMeta(record: Record<string, unknown>): {
+  donem_yil?: number | null;
+  donem_ay?: number | null;
+  donem_kilitli_miydi?: boolean;
+} {
+  const donem_yil =
+    record.donem_yil === null || record.donem_yil === undefined
+      ? record.donem_yil === null
+        ? null
+        : undefined
+      : toOptionalNumber(record.donem_yil) ?? null;
+  const donem_ay =
+    record.donem_ay === null || record.donem_ay === undefined
+      ? record.donem_ay === null
+        ? null
+        : undefined
+      : toOptionalNumber(record.donem_ay) ?? null;
+  const donem_kilitli_miydi =
+    typeof record.donem_kilitli_miydi === "boolean"
+      ? record.donem_kilitli_miydi
+      : record.donem_kilitli_miydi === 1 || record.donem_kilitli_miydi === "1"
+        ? true
+        : record.donem_kilitli_miydi === 0 || record.donem_kilitli_miydi === "0"
+          ? false
+          : undefined;
+
+  return { donem_yil, donem_ay, donem_kilitli_miydi };
+}
+
+function requireIslemAnahtari(value: unknown): string {
+  const anahtar = toOptionalString(value);
+  if (!anahtar) {
+    throw new ApiRequestError("Serbest zaman event yaniti eksik alan iceriyor.", 400, {
+      code: "INVALID_RESPONSE"
+    });
+  }
+
+  return anahtar;
 }
 
 function normalizeSerbestZamanIptalEvent(record: Record<string, unknown>): SerbestZamanIptalEvent {
@@ -117,6 +158,7 @@ function normalizeSerbestZamanIptalEvent(record: Record<string, unknown>): Serbe
   const hedef_event_id = toOptionalNumber(record.hedef_event_id);
   const event_tarihi = toOptionalString(record.event_tarihi);
   const hedef_event_tipi = record.hedef_event_tipi;
+  const islem_anahtari = requireIslemAnahtari(record.islem_anahtari);
 
   if (
     personel_id === undefined ||
@@ -138,7 +180,9 @@ function normalizeSerbestZamanIptalEvent(record: Record<string, unknown>): Serbe
     hedef_event_id,
     hedef_event_tipi,
     event_tarihi,
-    aciklama: toOptionalString(record.aciklama)
+    islem_anahtari,
+    aciklama: toOptionalString(record.aciklama),
+    ...toDonemMeta(record)
   };
 }
 
@@ -149,12 +193,15 @@ function normalizeSerbestZamanDuzeltmeEvent(
   const hedef_event_id = toOptionalNumber(record.hedef_event_id);
   const event_tarihi = toOptionalString(record.event_tarihi);
   const hedef_event_tipi = record.hedef_event_tipi;
+  const islem_anahtari = requireIslemAnahtari(record.islem_anahtari);
+  const aciklama = toOptionalString(record.aciklama);
 
   if (
     personel_id === undefined ||
     hedef_event_id === undefined ||
     !event_tarihi ||
-    !isHedefEventTipi(hedef_event_tipi)
+    !isHedefEventTipi(hedef_event_tipi) ||
+    !aciklama
   ) {
     throw new ApiRequestError("Serbest zaman event yaniti eksik alan iceriyor.", 400, {
       code: "INVALID_RESPONSE"
@@ -171,7 +218,9 @@ function normalizeSerbestZamanDuzeltmeEvent(
     hedef_event_tipi,
     yeni_dakika: toNonNegativeNumber(record.yeni_dakika),
     event_tarihi,
-    aciklama: toOptionalString(record.aciklama)
+    islem_anahtari,
+    aciklama,
+    ...toDonemMeta(record)
   };
 }
 
@@ -180,6 +229,7 @@ function normalizeSerbestZamanKullanimEvent(
 ): SerbestZamanKullanimEvent {
   const personel_id = toOptionalNumber(record.personel_id);
   const event_tarihi = toOptionalString(record.event_tarihi);
+  const islem_anahtari = requireIslemAnahtari(record.islem_anahtari);
 
   if (personel_id === undefined || !event_tarihi) {
     throw new ApiRequestError("Serbest zaman event yaniti eksik alan iceriyor.", 400, {
@@ -195,7 +245,9 @@ function normalizeSerbestZamanKullanimEvent(
     event_tipi: "SERBEST_ZAMAN_KULLANIM",
     dakika: toNonNegativeNumber(record.dakika),
     event_tarihi,
-    aciklama: toOptionalString(record.aciklama)
+    islem_anahtari,
+    aciklama: toOptionalString(record.aciklama),
+    ...toDonemMeta(record)
   };
 }
 
@@ -277,13 +329,20 @@ function throwFirstApiError(
   const status =
     code === "NOT_FOUND" || code === "TARGET_NOT_FOUND"
       ? 404
-      : code === "ALREADY_EXISTS" ||
-          code === "INSUFFICIENT_BALANCE" ||
-          code === "NO_ELIGIBLE_BALANCE" ||
-          code === "ALREADY_CANCELLED" ||
-          code === "TARGET_ALREADY_CANCELLED"
-        ? 409
-        : fallbackStatus;
+      : code === "ZERO_DAKIKA"
+        ? 422
+        : code === "ALREADY_EXISTS" ||
+            code === "INSUFFICIENT_BALANCE" ||
+            code === "NO_ELIGIBLE_BALANCE" ||
+            code === "ALREADY_CANCELLED" ||
+            code === "TARGET_ALREADY_CANCELLED" ||
+            code === "NOT_ELIGIBLE" ||
+            code === "NOT_PERSISTED" ||
+            code === "IDEMPOTENCY_CONFLICT" ||
+            code === "TARGET_PERSONEL_MISMATCH" ||
+            code === "UNSUPPORTED_TARGET_EVENT"
+          ? 409
+          : fallbackStatus;
 
   throw new ApiRequestError(
     typeof first?.message === "string" ? first.message : fallbackMessage,
@@ -383,12 +442,18 @@ export async function postSerbestZamanKullanim(
     });
   }
 
+  const islem_anahtari = toOptionalString(payload.islem_anahtari);
+  if (!islem_anahtari) {
+    throw new ApiRequestError("islem_anahtari zorunludur.", 400, { code: "INVALID_BODY" });
+  }
+
   const response = await apiRequest<ApiResponse<unknown>>(endpoints.serbestZaman.kullanim, {
     method: "POST",
     body: JSON.stringify({
       personel_id,
       dakika,
       event_tarihi: event_tarihi.trim().slice(0, 10),
+      islem_anahtari,
       aciklama: toOptionalString(payload.aciklama)
     })
   });
@@ -424,6 +489,11 @@ export async function postSerbestZamanIptal(
     });
   }
 
+  const islem_anahtari = toOptionalString(payload.islem_anahtari);
+  if (!islem_anahtari) {
+    throw new ApiRequestError("islem_anahtari zorunludur.", 400, { code: "INVALID_BODY" });
+  }
+
   const response = await apiRequest<ApiResponse<unknown>>(endpoints.serbestZaman.iptal, {
     method: "POST",
     body: JSON.stringify({
@@ -431,6 +501,7 @@ export async function postSerbestZamanIptal(
       hedef_event_id,
       hedef_event_tipi: payload.hedef_event_tipi,
       event_tarihi: event_tarihi.trim().slice(0, 10),
+      islem_anahtari,
       aciklama: toOptionalString(payload.aciklama)
     })
   });
@@ -471,6 +542,16 @@ export async function postSerbestZamanDuzeltme(
     });
   }
 
+  const islem_anahtari = toOptionalString(payload.islem_anahtari);
+  if (!islem_anahtari) {
+    throw new ApiRequestError("islem_anahtari zorunludur.", 400, { code: "INVALID_BODY" });
+  }
+
+  const aciklama = toOptionalString(payload.aciklama);
+  if (!aciklama) {
+    throw new ApiRequestError("aciklama zorunludur.", 400, { code: "INVALID_BODY" });
+  }
+
   const response = await apiRequest<ApiResponse<unknown>>(endpoints.serbestZaman.duzeltme, {
     method: "POST",
     body: JSON.stringify({
@@ -479,7 +560,8 @@ export async function postSerbestZamanDuzeltme(
       hedef_event_tipi: payload.hedef_event_tipi,
       yeni_dakika,
       event_tarihi: event_tarihi.trim().slice(0, 10),
-      aciklama: toOptionalString(payload.aciklama)
+      islem_anahtari,
+      aciklama
     })
   });
 

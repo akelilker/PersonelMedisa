@@ -1929,6 +1929,28 @@ export async function mockApi(page: Page, role: MockUserRole, options: MockApiOp
   >();
   let fcotNextId = 0;
 
+  type E2eSzEvent = {
+    id: number;
+    personel_id: number;
+    event_tipi: string;
+    dakika?: number;
+    yeni_dakika?: number;
+    event_tarihi: string;
+    son_kullanim_tarihi?: string;
+    kaynak_snapshot_id?: number;
+    kaynak_odeme_tercihi_id?: number;
+    hedef_event_id?: number;
+    hedef_event_tipi?: string;
+    islem_anahtari?: string;
+    aciklama?: string;
+    donem_yil?: number;
+    donem_ay?: number;
+    donem_kilitli_miydi?: boolean;
+  };
+  const szEventsById = new Map<number, E2eSzEvent>();
+  const szAktifOlusumByTercihId = new Map<number, number>();
+  let szNextId = 0;
+
   const puantajKayitlari: GunlukPuantaj[] = [
     {
       personel_id: 1,
@@ -7891,6 +7913,216 @@ let personelBelgeKaydiIdCounter = 903;
       };
       fcotTercihBySnapshotId.set(snapshotId, next);
       await fulfillJson(route, 200, okBody(next));
+      return;
+    }
+
+    if (path === "/api/serbest-zaman/events" && method === "GET") {
+      if (await denyUnlessRolePermission(route, "puantaj.view")) return;
+      const personelId = Number.parseInt(url.searchParams.get("personel_id") ?? "", 10);
+      if (!Number.isFinite(personelId) || personelId < 1) {
+        await fulfillJson(route, 400, errorBody("INVALID_QUERY", "personel_id zorunludur.", "personel_id"));
+        return;
+      }
+      const items = [...szEventsById.values()]
+        .filter((event) => event.personel_id === personelId)
+        .sort((a, b) => a.event_tarihi.localeCompare(b.event_tarihi) || a.id - b.id);
+      await fulfillJson(route, 200, okBody({ items }));
+      return;
+    }
+
+    if (path === "/api/serbest-zaman/bakiye" && method === "GET") {
+      if (await denyUnlessRolePermission(route, "puantaj.view")) return;
+      const personelId = Number.parseInt(url.searchParams.get("personel_id") ?? "", 10);
+      if (!Number.isFinite(personelId) || personelId < 1) {
+        await fulfillJson(route, 400, errorBody("INVALID_QUERY", "personel_id zorunludur.", "personel_id"));
+        return;
+      }
+      const events = [...szEventsById.values()].filter((event) => event.personel_id === personelId);
+      const iptal = new Set(
+        events.filter((e) => e.event_tipi === "SERBEST_ZAMAN_IPTAL").map((e) => e.hedef_event_id!)
+      );
+      let toplam = 0;
+      let aktif = 0;
+      for (const e of events) {
+        if (e.event_tipi !== "SERBEST_ZAMAN_OLUSUM" || iptal.has(e.id)) continue;
+        aktif += 1;
+        toplam += e.dakika ?? 0;
+      }
+      let kullanilan = 0;
+      for (const e of events) {
+        if (e.event_tipi !== "SERBEST_ZAMAN_KULLANIM" || iptal.has(e.id)) continue;
+        kullanilan += e.dakika ?? 0;
+      }
+      await fulfillJson(
+        route,
+        200,
+        okBody({
+          personel_id: personelId,
+          toplam_hak_dakika: toplam,
+          kullanilan_dakika: kullanilan,
+          kalan_dakika: Math.max(toplam - kullanilan, 0),
+          suresi_dolan_dakika: 0,
+          event_sayisi: aktif
+        })
+      );
+      return;
+    }
+
+    if (path === "/api/serbest-zaman/olusum" && method === "POST") {
+      if (await denyUnlessRolePermission(route, "puantaj.muhurle")) return;
+      const payload = (request.postDataJSON() ?? {}) as Record<string, unknown>;
+      if ("sube_id" in payload) {
+        await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "sube_id istemci tarafindan belirlenemez.", "sube_id"));
+        return;
+      }
+      const tercihId = Number(payload.odeme_tercihi_id);
+      const snapshotId = Number(payload.snapshot_id);
+      let tercih =
+        Number.isFinite(tercihId) && tercihId >= 1
+          ? [...fcotTercihBySnapshotId.values()].find((t) => t.id === tercihId)
+          : Number.isFinite(snapshotId) && snapshotId >= 1
+            ? fcotTercihBySnapshotId.get(snapshotId)
+            : undefined;
+      if (!tercih) {
+        await fulfillJson(route, 409, errorBody("NOT_PERSISTED", "Odeme tercihi persist edilmemis."));
+        return;
+      }
+      if (tercih.odeme_tipi !== "SERBEST_ZAMAN") {
+        await fulfillJson(route, 409, errorBody("NOT_ELIGIBLE", "Odeme tercihi SERBEST_ZAMAN degil."));
+        return;
+      }
+      if (szAktifOlusumByTercihId.has(tercih.id)) {
+        await fulfillJson(route, 409, errorBody("ALREADY_EXISTS", "Aktif olusum mevcut."));
+        return;
+      }
+      const dakika = Math.round(tercih.fazla_calisma_dakika * 1.5);
+      if (dakika <= 0) {
+        await fulfillJson(route, 422, errorBody("ZERO_DAKIKA", "Sifir dakika."));
+        return;
+      }
+      const id = ++szNextId;
+      const event: E2eSzEvent = {
+        id,
+        personel_id: tercih.personel_id,
+        event_tipi: "SERBEST_ZAMAN_OLUSUM",
+        dakika,
+        event_tarihi: (tercih.secim_zamani ?? "").slice(0, 10) || "2026-04-10",
+        son_kullanim_tarihi: "2026-10-10",
+        kaynak_snapshot_id: tercih.snapshot_id,
+        kaynak_odeme_tercihi_id: tercih.id,
+        donem_yil: 2026,
+        donem_ay: 4,
+        donem_kilitli_miydi: false
+      };
+      szEventsById.set(id, event);
+      szAktifOlusumByTercihId.set(tercih.id, id);
+      await fulfillJson(route, 200, okBody(event));
+      return;
+    }
+
+    if (path === "/api/serbest-zaman/kullanim" && method === "POST") {
+      if (await denyUnlessRolePermission(route, "puantaj.muhurle")) return;
+      const payload = (request.postDataJSON() ?? {}) as Record<string, unknown>;
+      const personelId = Number(payload.personel_id);
+      const dakika = Number(payload.dakika);
+      const eventTarihi = String(payload.event_tarihi ?? "");
+      const islem = String(payload.islem_anahtari ?? "").trim();
+      if (!Number.isFinite(personelId) || personelId < 1 || !Number.isFinite(dakika) || dakika <= 0 || !islem) {
+        await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "Gecersiz kullanim body."));
+        return;
+      }
+      const existing = [...szEventsById.values()].find(
+        (e) => e.personel_id === personelId && e.islem_anahtari === islem
+      );
+      if (existing) {
+        if (existing.dakika !== dakika || existing.event_tarihi !== eventTarihi) {
+          await fulfillJson(route, 409, errorBody("IDEMPOTENCY_CONFLICT", "Idempotency conflict."));
+          return;
+        }
+        await fulfillJson(route, 200, okBody(existing));
+        return;
+      }
+      const id = ++szNextId;
+      const event: E2eSzEvent = {
+        id,
+        personel_id: personelId,
+        event_tipi: "SERBEST_ZAMAN_KULLANIM",
+        dakika,
+        event_tarihi: eventTarihi,
+        islem_anahtari: islem,
+        aciklama: typeof payload.aciklama === "string" ? payload.aciklama : undefined
+      };
+      szEventsById.set(id, event);
+      await fulfillJson(route, 200, okBody(event));
+      return;
+    }
+
+    if (path === "/api/serbest-zaman/iptal" && method === "POST") {
+      if (await denyUnlessRolePermission(route, "puantaj.muhurle")) return;
+      const payload = (request.postDataJSON() ?? {}) as Record<string, unknown>;
+      const personelId = Number(payload.personel_id);
+      const hedefId = Number(payload.hedef_event_id);
+      const hedefTipi = String(payload.hedef_event_tipi ?? "");
+      const eventTarihi = String(payload.event_tarihi ?? "");
+      const islem = String(payload.islem_anahtari ?? "").trim();
+      if (!Number.isFinite(personelId) || !Number.isFinite(hedefId) || !islem) {
+        await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "Gecersiz iptal body."));
+        return;
+      }
+      if ([...szEventsById.values()].some((e) => e.event_tipi === "SERBEST_ZAMAN_IPTAL" && e.hedef_event_id === hedefId)) {
+        await fulfillJson(route, 409, errorBody("ALREADY_CANCELLED", "Zaten iptal."));
+        return;
+      }
+      const id = ++szNextId;
+      const event: E2eSzEvent = {
+        id,
+        personel_id: personelId,
+        event_tipi: "SERBEST_ZAMAN_IPTAL",
+        hedef_event_id: hedefId,
+        hedef_event_tipi: hedefTipi,
+        event_tarihi: eventTarihi,
+        islem_anahtari: islem
+      };
+      szEventsById.set(id, event);
+      for (const [tid, eid] of szAktifOlusumByTercihId.entries()) {
+        if (eid === hedefId) szAktifOlusumByTercihId.delete(tid);
+      }
+      await fulfillJson(route, 200, okBody(event));
+      return;
+    }
+
+    if (path === "/api/serbest-zaman/duzeltme" && method === "POST") {
+      if (await denyUnlessRolePermission(route, "puantaj.muhurle")) return;
+      const payload = (request.postDataJSON() ?? {}) as Record<string, unknown>;
+      const personelId = Number(payload.personel_id);
+      const hedefId = Number(payload.hedef_event_id);
+      const hedefTipi = String(payload.hedef_event_tipi ?? "");
+      const yeniDakika = Number(payload.yeni_dakika);
+      const eventTarihi = String(payload.event_tarihi ?? "");
+      const islem = String(payload.islem_anahtari ?? "").trim();
+      const aciklama = String(payload.aciklama ?? "").trim();
+      if (!aciklama) {
+        await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "aciklama zorunludur.", "aciklama"));
+        return;
+      }
+      if (!Number.isFinite(personelId) || !Number.isFinite(hedefId) || !Number.isFinite(yeniDakika) || !islem) {
+        await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "Gecersiz duzeltme body."));
+        return;
+      }
+      const id = ++szNextId;
+      const event: E2eSzEvent = {
+        id,
+        personel_id: personelId,
+        event_tipi: "SERBEST_ZAMAN_DUZELTME",
+        hedef_event_id: hedefId,
+        hedef_event_tipi: hedefTipi,
+        yeni_dakika: yeniDakika,
+        event_tarihi: eventTarihi,
+        islem_anahtari: islem,
+        aciklama
+      };
+      szEventsById.set(id, event);
+      await fulfillJson(route, 200, okBody(event));
       return;
     }
 

@@ -230,20 +230,39 @@ function validateHedefForMutation(params: {
   return { ok: true, hedef };
 }
 
-export function findOlusumByOdemeTercihiId(
+function isEventCancelled(events: readonly SerbestZamanEvent[], eventId: number | undefined): boolean {
+  if (eventId === undefined) {
+    return false;
+  }
+
+  return events.some(
+    (event) => event.event_tipi === "SERBEST_ZAMAN_IPTAL" && event.hedef_event_id === eventId
+  );
+}
+
+export function findActiveOlusumByOdemeTercihiId(
   events: readonly SerbestZamanEvent[],
   odemeTercihiId: number
 ): SerbestZamanOlusumEvent | null {
   for (const event of events) {
     if (
       event.event_tipi === "SERBEST_ZAMAN_OLUSUM" &&
-      event.kaynak_odeme_tercihi_id === odemeTercihiId
+      event.kaynak_odeme_tercihi_id === odemeTercihiId &&
+      !isEventCancelled(events, event.id)
     ) {
       return event;
     }
   }
 
   return null;
+}
+
+/** Active-only lookup (cancelled olusum is not active). */
+export function findOlusumByOdemeTercihiId(
+  events: readonly SerbestZamanEvent[],
+  odemeTercihiId: number
+): SerbestZamanOlusumEvent | null {
+  return findActiveOlusumByOdemeTercihiId(events, odemeTercihiId);
 }
 
 export function findOlusumBySnapshotId(
@@ -253,7 +272,8 @@ export function findOlusumBySnapshotId(
   for (const event of events) {
     if (
       event.event_tipi === "SERBEST_ZAMAN_OLUSUM" &&
-      event.kaynak_snapshot_id === snapshotId
+      event.kaynak_snapshot_id === snapshotId &&
+      !isEventCancelled(events, event.id)
     ) {
       return event;
     }
@@ -277,7 +297,7 @@ export function olusturOlusumEvent(params: {
     return { ok: false, code: "NOT_ELIGIBLE" };
   }
 
-  if (findOlusumByOdemeTercihiId(mevcutEvents, tercih.id)) {
+  if (findActiveOlusumByOdemeTercihiId(mevcutEvents, tercih.id)) {
     return { ok: false, code: "ALREADY_EXISTS" };
   }
 
@@ -311,11 +331,20 @@ export function olusturKullanimEvent(params: {
   personel_id: number;
   dakika: number;
   event_tarihi: string;
+  islem_anahtari: string;
   mevcutEvents: readonly SerbestZamanEvent[];
   referans_tarih?: string;
   aciklama?: string;
 }): OlusturKullanimEventSonuc {
-  const { personel_id, dakika, event_tarihi, mevcutEvents, aciklama, referans_tarih } = params;
+  const {
+    personel_id,
+    dakika,
+    event_tarihi,
+    islem_anahtari,
+    mevcutEvents,
+    aciklama,
+    referans_tarih
+  } = params;
 
   if (!Number.isFinite(personel_id) || personel_id < 1) {
     return { ok: false, code: "NO_ELIGIBLE_BALANCE" };
@@ -326,6 +355,11 @@ export function olusturKullanimEvent(params: {
   }
 
   if (!isValidEventTarihi(event_tarihi)) {
+    return { ok: false, code: "ZERO_DAKIKA" };
+  }
+
+  const anahtar = islem_anahtari.trim();
+  if (!anahtar) {
     return { ok: false, code: "ZERO_DAKIKA" };
   }
 
@@ -350,6 +384,7 @@ export function olusturKullanimEvent(params: {
       event_tipi: "SERBEST_ZAMAN_KULLANIM",
       dakika,
       event_tarihi: event_tarihi.trim().slice(0, 10),
+      islem_anahtari: anahtar,
       aciklama
     }
   };
@@ -360,11 +395,19 @@ export function olusturIptalEvent(params: {
   hedef_event_id: number;
   hedef_event_tipi: SerbestZamanHedefEventTipi;
   event_tarihi: string;
+  islem_anahtari: string;
   mevcutEvents: readonly SerbestZamanEvent[];
   aciklama?: string;
 }): OlusturIptalEventSonuc {
-  const { personel_id, hedef_event_id, hedef_event_tipi, event_tarihi, mevcutEvents, aciklama } =
-    params;
+  const {
+    personel_id,
+    hedef_event_id,
+    hedef_event_tipi,
+    event_tarihi,
+    islem_anahtari,
+    mevcutEvents,
+    aciklama
+  } = params;
 
   if (!Number.isFinite(personel_id) || personel_id < 1) {
     return { ok: false, code: "TARGET_PERSONEL_MISMATCH" };
@@ -375,6 +418,11 @@ export function olusturIptalEvent(params: {
   }
 
   if (!isValidEventTarihi(event_tarihi)) {
+    return { ok: false, code: "UNSUPPORTED_TARGET_EVENT" };
+  }
+
+  const anahtar = islem_anahtari.trim();
+  if (!anahtar) {
     return { ok: false, code: "UNSUPPORTED_TARGET_EVENT" };
   }
 
@@ -398,6 +446,7 @@ export function olusturIptalEvent(params: {
       hedef_event_id,
       hedef_event_tipi,
       event_tarihi: event_tarihi.trim().slice(0, 10),
+      islem_anahtari: anahtar,
       aciklama
     }
   };
@@ -409,9 +458,10 @@ export function olusturDuzeltmeEvent(params: {
   hedef_event_tipi: SerbestZamanHedefEventTipi;
   yeni_dakika: number;
   event_tarihi: string;
+  islem_anahtari: string;
   mevcutEvents: readonly SerbestZamanEvent[];
   referans_tarih?: string;
-  aciklama?: string;
+  aciklama: string;
 }): OlusturDuzeltmeEventSonuc {
   const {
     personel_id,
@@ -419,6 +469,7 @@ export function olusturDuzeltmeEvent(params: {
     hedef_event_tipi,
     yeni_dakika,
     event_tarihi,
+    islem_anahtari,
     mevcutEvents,
     referans_tarih,
     aciklama
@@ -437,6 +488,12 @@ export function olusturDuzeltmeEvent(params: {
   }
 
   if (!isValidEventTarihi(event_tarihi)) {
+    return { ok: false, code: "ZERO_DAKIKA" };
+  }
+
+  const anahtar = islem_anahtari.trim();
+  const gerekce = aciklama.trim();
+  if (!anahtar || !gerekce) {
     return { ok: false, code: "ZERO_DAKIKA" };
   }
 
@@ -459,7 +516,9 @@ export function olusturDuzeltmeEvent(params: {
       hedef_event_id,
       hedef_event_tipi,
       yeni_dakika,
-      event_tarihi: event_tarihi.trim().slice(0, 10)
+      event_tarihi: event_tarihi.trim().slice(0, 10),
+      islem_anahtari: anahtar,
+      aciklama: gerekce
     };
 
     const bakiye = hesaplaSerbestZamanBakiye({
@@ -483,7 +542,8 @@ export function olusturDuzeltmeEvent(params: {
       hedef_event_tipi,
       yeni_dakika,
       event_tarihi: event_tarihi.trim().slice(0, 10),
-      aciklama
+      islem_anahtari: anahtar,
+      aciklama: gerekce
     }
   };
 }
@@ -506,6 +566,7 @@ export function hesaplaSerbestZamanBakiye(params: {
 
   let toplam_hak_dakika = 0;
   let suresi_dolan_dakika = 0;
+  let aktif_olusum_sayisi = 0;
 
   for (const event of olusumEvents) {
     const dakika = etkinDakika(event.dakika, event.id, iptalHedefIds, duzeltmeOverrides);
@@ -513,6 +574,7 @@ export function hesaplaSerbestZamanBakiye(params: {
       continue;
     }
 
+    aktif_olusum_sayisi += 1;
     toplam_hak_dakika += dakika;
     if (referans > event.son_kullanim_tarihi) {
       suresi_dolan_dakika += dakika;
@@ -538,6 +600,6 @@ export function hesaplaSerbestZamanBakiye(params: {
     kullanilan_dakika,
     kalan_dakika,
     suresi_dolan_dakika,
-    event_sayisi: olusumEvents.length
+    event_sayisi: aktif_olusum_sayisi
   };
 }

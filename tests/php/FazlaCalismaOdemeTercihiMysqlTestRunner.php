@@ -316,18 +316,11 @@ function createFcotParentTables(PDO $pdo): void
           CONSTRAINT fk_puantaj_aylik_muhur_created_by FOREIGN KEY (created_by) REFERENCES users (id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     ");
-    // Minimal SZ events table for guard tests (product migration not yet present).
-    $pdo->exec("
-        CREATE TABLE serbest_zaman_events (
-          id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
-          event_tipi VARCHAR(64) NOT NULL,
-          kaynak_odeme_tercihi_id INT UNSIGNED NULL,
-          hedef_event_id INT UNSIGNED NULL,
-          personel_id INT UNSIGNED NOT NULL DEFAULT 0,
-          dakika INT UNSIGNED NOT NULL DEFAULT 0,
-          event_tarihi DATE NULL
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-    ");
+}
+
+function applySzMigration(PDO $pdo): void
+{
+    applySqlFile($pdo, __DIR__ . '/../../api/migrations/029_serbest_zaman_events.sql');
 }
 
 function seedFcotFixtures(PDO $pdo): void
@@ -459,6 +452,7 @@ function bootstrapFcotSchema(PDO $pdo): string
     createFcotParentTables($pdo);
     applyHkMigration($pdo);
     applyFcotMigration($pdo);
+    applySzMigration($pdo);
     seedFcotFixtures($pdo);
 
     return $dbName;
@@ -674,8 +668,9 @@ fcotAssert((string) ($rowAfterGerekce['gerekce'] ?? '') === (string) ($rowBefore
 fcotAssert($auditAfterGerekce === $auditBefore, 'gerekce-only audit +0');
 
 // Period lock wins over SZ guard when both would apply.
-$pdo->exec("INSERT INTO serbest_zaman_events (event_tipi, kaynak_odeme_tercihi_id, personel_id, dakika)
-            VALUES ('SERBEST_ZAMAN_OLUSUM', {$tercihId}, 10, 200)");
+$pdo->exec("INSERT INTO serbest_zaman_events
+    (personel_id, event_tipi, dakika, event_tarihi, son_kullanim_tarihi, kaynak_snapshot_id, kaynak_odeme_tercihi_id)
+    VALUES (10, 'SERBEST_ZAMAN_OLUSUM', 200, '2026-04-10', '2026-10-10', {$snap2}, {$tercihId})");
 $pdo->exec("INSERT INTO puantaj_aylik_muhurleri (sube_id, yil, ay, donem, durum, created_by)
             VALUES (1, 2026, 4, '2026-04', 'MUHURLENDI', 1)");
 $periodBeforeSz = invokeFcotHttp($pdo, $gy, 'PUT', '/fazla-calisma-odeme-tercihi', [
@@ -703,8 +698,9 @@ fcotAssert($szGuardKb['status'] === 409, 'SZ → KARAR_BEKLIYOR guard 409');
 
 // Cancel SZ then allow update
 $olusumId = (int) $pdo->query('SELECT id FROM serbest_zaman_events WHERE kaynak_odeme_tercihi_id = ' . $tercihId . ' ORDER BY id DESC LIMIT 1')->fetchColumn();
-$pdo->exec("INSERT INTO serbest_zaman_events (event_tipi, hedef_event_id, personel_id)
-            VALUES ('SERBEST_ZAMAN_IPTAL', {$olusumId}, 10)");
+$pdo->exec("INSERT INTO serbest_zaman_events
+    (personel_id, event_tipi, event_tarihi, hedef_event_id, hedef_event_tipi, islem_anahtari)
+    VALUES (10, 'SERBEST_ZAMAN_IPTAL', '2026-04-15', {$olusumId}, 'SERBEST_ZAMAN_OLUSUM', 'fcot-sz-iptal-1')");
 
 $putUpdate = invokeFcotHttp($pdo, $gy, 'PUT', '/fazla-calisma-odeme-tercihi', [
     'snapshot_id' => $snap2,

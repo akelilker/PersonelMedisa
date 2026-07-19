@@ -15,6 +15,7 @@ use Medisa\Api\Controllers\HaftalikBildirimMutabakatlariController;
 use Medisa\Api\Controllers\HaftalikKapanisController;
 use Medisa\Api\Controllers\EkOdemeKesintiController;
 use Medisa\Api\Controllers\FazlaCalismaOdemeTercihiController;
+use Medisa\Api\Controllers\SerbestZamanController;
 use Medisa\Api\Controllers\MaasHesaplamaController;
 use Medisa\Api\Controllers\MevzuatParametreController;
 use Medisa\Api\Controllers\PersonelBelgelerController;
@@ -333,6 +334,24 @@ class Router
         }
         if ($path === '/fazla-calisma-odeme-tercihi' && $method === 'PUT') {
             FazlaCalismaOdemeTercihiController::put($this->request);
+        }
+        if ($path === '/serbest-zaman/events' && $method === 'GET') {
+            SerbestZamanController::listEvents($this->request);
+        }
+        if ($path === '/serbest-zaman/bakiye' && $method === 'GET') {
+            SerbestZamanController::bakiye($this->request);
+        }
+        if ($path === '/serbest-zaman/olusum' && $method === 'POST') {
+            SerbestZamanController::olusum($this->request);
+        }
+        if ($path === '/serbest-zaman/kullanim' && $method === 'POST') {
+            SerbestZamanController::kullanim($this->request);
+        }
+        if ($path === '/serbest-zaman/iptal' && $method === 'POST') {
+            SerbestZamanController::iptal($this->request);
+        }
+        if ($path === '/serbest-zaman/duzeltme' && $method === 'POST') {
+            SerbestZamanController::duzeltme($this->request);
         }
         if ($path === '/haftalik-kapanis/yillik-fazla-calisma' && $method === 'GET') {
             HaftalikKapanisController::yillikFazlaCalisma($this->request);

@@ -306,7 +306,7 @@ class RevizyonController
         $user = AuthMiddleware::authenticate($request, true);
         RolePermissions::assert($user, 'revizyon.view');
         self::assertCorrectionSchemaReady();
-        self::rejectClientSubeQuery($request);
+        self::rejectCorrectionClientSubeQuery($request);
 
         $pdo = Connection::get();
         $filters = self::parseCorrectionListFilters($request);
@@ -325,7 +325,7 @@ class RevizyonController
         $user = AuthMiddleware::authenticate($request, true);
         RolePermissions::assert($user, 'revizyon.view');
         self::assertCorrectionSchemaReady();
-        self::rejectClientSubeQuery($request);
+        self::rejectCorrectionClientSubeQuery($request);
 
         $correctionId = self::parsePositiveInt($id, 'id', true);
         $pdo = Connection::get();
@@ -343,16 +343,10 @@ class RevizyonController
         $user = AuthMiddleware::authenticate($request, true);
         RolePermissions::assert($user, 'revizyon.approve');
         self::assertCorrectionSchemaReady();
-        self::rejectClientSubeQuery($request);
+        self::rejectCorrectionClientSubeQuery($request);
 
         $talepId = self::parsePositiveInt($id, 'id', true);
-        $body = $request->getJsonBody();
-        if ($body === null) {
-            $body = [];
-        }
-        if (!is_array($body)) {
-            self::correctionPayloadError('body', 'Gecersiz JSON body.');
-        }
+        $body = self::readCorrectionJsonBody($request);
         self::rejectCorrectionProduceBody($body);
 
         $pdo = Connection::get();
@@ -495,18 +489,12 @@ class RevizyonController
         $user = AuthMiddleware::authenticate($request, true);
         RolePermissions::assert($user, 'revizyon.approve');
         self::assertCorrectionSchemaReady();
-        self::rejectClientSubeQuery($request);
+        self::rejectCorrectionClientSubeQuery($request);
 
         $correctionId = self::parsePositiveInt($id, 'id', true);
-        $body = $request->getJsonBody();
-        if ($body === null) {
-            $body = [];
-        }
-        if (!is_array($body)) {
-            self::correctionPayloadError('body', 'Gecersiz JSON body.');
-        }
+        $body = self::readCorrectionJsonBody($request);
         self::rejectCorrectionCancelBody($body);
-        $iptalAciklamasi = self::optionalNullableString($body, 'aciklama', 1000);
+        $iptalAciklamasi = self::optionalCorrectionCancelAciklama($body);
 
         $pdo = Connection::get();
         $pdo->beginTransaction();
@@ -814,6 +802,28 @@ class RevizyonController
         if ($subeId !== null && $subeId !== '') {
             self::validationError('sube_id', 'sube_id istemci tarafindan belirlenemez.');
         }
+    }
+
+    private static function rejectCorrectionClientSubeQuery(Request $request): void
+    {
+        $subeId = $request->getQuery('sube_id');
+        if ($subeId !== null && $subeId !== '') {
+            self::correctionPayloadError('sube_id', 'sube_id istemci tarafindan belirlenemez.');
+        }
+    }
+
+    /** @return array<string, mixed> */
+    private static function readCorrectionJsonBody(Request $request): array
+    {
+        if ($request->hasInvalidJsonBody()) {
+            self::correctionPayloadError('body', 'Gecersiz JSON body.');
+        }
+        $body = $request->getJsonBody();
+        if (!is_array($body)) {
+            self::correctionPayloadError('body', 'Gecersiz JSON body.');
+        }
+
+        return $body;
     }
 
     private static function requireDurumFilter(string $durum): string
@@ -1619,6 +1629,26 @@ class RevizyonController
             }
             self::correctionPayloadError((string) $key, 'Bilinmeyen correction iptal alani.');
         }
+    }
+
+    /** @param array<string, mixed> $body */
+    private static function optionalCorrectionCancelAciklama(array $body)
+    {
+        if (!array_key_exists('aciklama', $body) || $body['aciklama'] === null) {
+            return null;
+        }
+        if (!is_string($body['aciklama'])) {
+            self::correctionPayloadError('aciklama', 'aciklama metin olmalidir.');
+        }
+        $value = trim($body['aciklama']);
+        if ($value === '') {
+            return null;
+        }
+        if (mb_strlen($value) > 1000) {
+            self::correctionPayloadError('aciklama', 'aciklama en fazla 1000 karakter olabilir.');
+        }
+
+        return $value;
     }
 
     private static function correctionPayloadError(string $field, string $message): void

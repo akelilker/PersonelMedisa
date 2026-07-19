@@ -1,7 +1,7 @@
 -- S79-F: haftalik kapanis revizyon correction events
 -- Additive only. Snapshot remains immutable; corrections are overlay records.
--- CREATE TABLE / ALTER without IF NOT EXISTS: unexpected/partial schema fails loudly.
--- No DROP / TRUNCATE / DELETE / UPDATE / backfill / fixture.
+-- CREATE TABLE / ALTER are fail-loud on unexpected/partial schema (no soft-create guards).
+-- Forbidden: DROP, TRUNCATE, DELETE, UPDATE, data seeding.
 
 SET NAMES utf8mb4;
 SET time_zone = '+00:00';
@@ -78,6 +78,7 @@ CREATE TABLE haftalik_kapanis_revizyon_corrections (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 ALTER TABLE haftalik_kapanis_revizyon_talepleri
+  ADD UNIQUE KEY uq_hkrt_correction_event (correction_event_id),
   ADD CONSTRAINT fk_hkrt_correction_event
   FOREIGN KEY (correction_event_id) REFERENCES haftalik_kapanis_revizyon_corrections (id)
   ON DELETE RESTRICT ON UPDATE RESTRICT;

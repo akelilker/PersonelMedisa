@@ -8145,6 +8145,21 @@ let personelBelgeKaydiIdCounter = 903;
     if (correctionCancelMatch && method === "POST") {
       if (await denyUnlessRolePermission(route, "revizyon.approve")) return;
       const correctionId = Number(correctionCancelMatch[1]);
+      const payload = (request.postDataJSON() ?? {}) as Record<string, unknown>;
+      for (const key of Object.keys(payload)) {
+        if (key !== "aciklama") {
+          await fulfillJson(route, 400, errorBody("INVALID_CORRECTION_PAYLOAD", "Bilinmeyen alan."));
+          return;
+        }
+      }
+      if (
+        Object.prototype.hasOwnProperty.call(payload, "aciklama") &&
+        payload.aciklama !== null &&
+        typeof payload.aciklama !== "string"
+      ) {
+        await fulfillJson(route, 400, errorBody("INVALID_CORRECTION_PAYLOAD", "aciklama metin olmalidir."));
+        return;
+      }
       const correction = revizyonCorrectionById.get(correctionId);
       if (!correction || correction.iptal_edildi_mi) {
         await fulfillJson(route, 404, errorBody("CORRECTION_NOT_FOUND", "Correction bulunamadi."));

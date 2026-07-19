@@ -516,7 +516,11 @@ function rtGecmisCount(PDO $pdo, int $talepId, ?string $aksiyon = null): int
 
 function assertRtSchemaPostconditions(PDO $pdo): void
 {
-    foreach (['haftalik_kapanis_revizyon_talepleri', 'haftalik_kapanis_revizyon_talebi_gecmisi'] as $table) {
+    foreach ([
+        'haftalik_kapanis_revizyon_corrections',
+        'haftalik_kapanis_revizyon_talepleri',
+        'haftalik_kapanis_revizyon_talebi_gecmisi',
+    ] as $table) {
         $create = (string) $pdo->query('SHOW CREATE TABLE `' . $table . '`')->fetch(PDO::FETCH_ASSOC)['Create Table'];
         rtAssert(stripos($create, 'CREATE TABLE `' . $table . '`') !== false, 'SHOW CREATE TABLE ' . $table);
         rtAssert(stripos($create, 'ENGINE=InnoDB') !== false, $table . ' engine InnoDB');
@@ -546,6 +550,7 @@ function assertRtSchemaPostconditions(PDO $pdo): void
     $talepCreate = (string) $pdo->query('SHOW CREATE TABLE haftalik_kapanis_revizyon_talepleri')->fetch(PDO::FETCH_ASSOC)['Create Table'];
     rtAssert(stripos($talepCreate, 'acik_talep_slot') !== false, 'acik_talep_slot generated column present');
     rtAssert(stripos($talepCreate, 'uq_hkrt_acik_kaynak') !== false, 'uq_hkrt_acik_kaynak present');
+    rtAssert(stripos($talepCreate, 'uq_hkrt_correction_event') !== false, 'UNIQUE(correction_event_id)');
     rtAssert(stripos($talepCreate, 'GENERATED') !== false, 'acik_talep_slot is GENERATED');
     rtAssert(
         preg_match(
@@ -554,6 +559,28 @@ function assertRtSchemaPostconditions(PDO $pdo): void
         ) === 1,
         'acik_talep_slot exact CASE WHEN expression'
     );
+
+    $corrCols = array_column(
+        $pdo->query('SHOW FULL COLUMNS FROM haftalik_kapanis_revizyon_corrections')->fetchAll(PDO::FETCH_ASSOC),
+        'Field'
+    );
+    foreach ([
+        'id', 'revizyon_talebi_id', 'personel_id', 'sube_id', 'kapanis_id', 'snapshot_id',
+        'hafta_baslangic', 'hafta_bitis', 'etkilenen_tarih', 'kaynak_tipi', 'kaynak_id',
+        'correction_tipi', 'onceki_deger', 'yeni_deger', 'delta_dakika', 'delta_gun',
+        'bordro_etki_var_mi', 'bordro_etki_tipi', 'aciklama', 'olusturan_kullanici_id',
+        'olusturma_zamani', 'iptal_edildi_mi', 'iptal_zamani', 'iptal_eden_kullanici_id',
+        'iptal_aciklamasi', 'audit_ref', 'snapshot_ref', 'created_at', 'updated_at',
+    ] as $col) {
+        rtAssert(in_array($col, $corrCols, true), 'correction column ' . $col);
+    }
+    $auditNull = $pdo->query("
+        SELECT IS_NULLABLE FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'haftalik_kapanis_revizyon_corrections'
+          AND COLUMN_NAME = 'audit_ref'
+    ")->fetchColumn();
+    rtAssert((string) $auditNull === 'NO', 'audit_ref NOT NULL');
 
     $talepCols = array_column(
         $pdo->query('SHOW FULL COLUMNS FROM haftalik_kapanis_revizyon_talepleri')->fetchAll(PDO::FETCH_ASSOC),
@@ -586,7 +613,7 @@ function assertRtSchemaPostconditions(PDO $pdo): void
         'Key_name'
     )));
     foreach ([
-        'PRIMARY', 'uq_hkrt_acik_kaynak', 'idx_hkrt_personel_talep', 'idx_hkrt_sube_hafta',
+        'PRIMARY', 'uq_hkrt_acik_kaynak', 'uq_hkrt_correction_event', 'idx_hkrt_personel_talep', 'idx_hkrt_sube_hafta',
         'idx_hkrt_durum', 'idx_hkrt_kapanis', 'idx_hkrt_snapshot',
     ] as $idx) {
         rtAssert(in_array($idx, $indexNames, true), 'talep index ' . $idx);
@@ -596,10 +623,14 @@ function assertRtSchemaPostconditions(PDO $pdo): void
         SELECT CONSTRAINT_NAME, TABLE_NAME, REFERENCED_TABLE_NAME, DELETE_RULE, UPDATE_RULE
         FROM information_schema.REFERENTIAL_CONSTRAINTS
         WHERE CONSTRAINT_SCHEMA = DATABASE()
-          AND TABLE_NAME IN ('haftalik_kapanis_revizyon_talepleri', 'haftalik_kapanis_revizyon_talebi_gecmisi')
+          AND TABLE_NAME IN (
+            'haftalik_kapanis_revizyon_corrections',
+            'haftalik_kapanis_revizyon_talepleri',
+            'haftalik_kapanis_revizyon_talebi_gecmisi'
+          )
         ORDER BY TABLE_NAME, CONSTRAINT_NAME
     ")->fetchAll(PDO::FETCH_ASSOC);
-    rtAssert(count($fks) >= 8, 'revizyon FK count >= 8');
+    rtAssert(count($fks) >= 15, 'revizyon+correction FK count >= 15');
     foreach ($fks as $fk) {
         rtAssert(
             in_array((string) $fk['DELETE_RULE'], ['RESTRICT', 'NO ACTION'], true),
@@ -609,7 +640,7 @@ function assertRtSchemaPostconditions(PDO $pdo): void
             in_array((string) $fk['UPDATE_RULE'], ['RESTRICT', 'NO ACTION'], true),
             'FK ' . $fk['CONSTRAINT_NAME'] . ' UPDATE_RULE RESTRICT/NO ACTION'
         );
-        echo '[SCHEMA] FK ' . $fk['CONSTRAINT_NAME'] . ' â†’ ' . $fk['REFERENCED_TABLE_NAME']
+        echo '[SCHEMA] FK ' . $fk['CONSTRAINT_NAME'] . ' → ' . $fk['REFERENCED_TABLE_NAME']
             . ' DELETE=' . $fk['DELETE_RULE'] . ' UPDATE=' . $fk['UPDATE_RULE'] . PHP_EOL;
     }
 
@@ -665,11 +696,14 @@ rtAssert(stripos($migrationSource, 'CREATE TABLE IF NOT EXISTS') === false, 'mig
 rtAssert(stripos($migrationSource, 'ON DELETE RESTRICT') !== false, 'migration FK RESTRICT');
 rtAssert(stripos($migrationSource, 'uq_hkrc_revizyon_talebi') !== false, 'migration uq_hkrc_revizyon_talebi');
 rtAssert(stripos($migrationSource, 'uq_hkrc_audit_ref') !== false, 'migration uq_hkrc_audit_ref');
+rtAssert(stripos($migrationSource, 'uq_hkrt_correction_event') !== false, 'migration uq_hkrt_correction_event');
 rtAssert(stripos($migrationSource, 'fk_hkrt_correction_event') !== false, 'migration fk_hkrt_correction_event text');
 rtAssert(preg_match('/\bDROP\s+(TABLE|DATABASE|INDEX)\b/i', $migrationSource) !== 1, 'migration no DROP');
 rtAssert(preg_match('/(?:^|;)\s*TRUNCATE\b/im', $migrationSource) !== 1, 'migration no TRUNCATE');
 rtAssert(preg_match('/\bDELETE\s+FROM\b/i', $migrationSource) !== 1, 'migration no DELETE FROM');
 rtAssert(preg_match('/(?:^|;)\s*UPDATE\b/im', $migrationSource) !== 1, 'migration no UPDATE');
+rtAssert(preg_match('/^\s*[^-\s].*\bIF NOT EXISTS\b/im', $migrationSource) !== 1, 'migration no IF NOT EXISTS phrase');
+rtAssert(stripos($migrationSource, 'ON DELETE CASCADE') === false, 'migration no ON DELETE CASCADE');
 
 $partialRoot = rtPdo($dsn);
 $partialDb = 'rc_partial_' . bin2hex(random_bytes(3));
@@ -697,6 +731,8 @@ $corrCreate = (string) $pdo->query('SHOW CREATE TABLE haftalik_kapanis_revizyon_
 rtAssert(stripos($corrCreate, 'ENGINE=InnoDB') !== false, 'schema postcondition corrections table');
 rtAssert(stripos($corrCreate, 'uq_hkrc_revizyon_talebi') !== false, 'UNIQUE(revizyon_talebi_id)');
 rtAssert(stripos($corrCreate, 'uq_hkrc_audit_ref') !== false, 'UNIQUE(audit_ref)');
+$talepCreatePost = (string) $pdo->query('SHOW CREATE TABLE haftalik_kapanis_revizyon_talepleri')->fetch(PDO::FETCH_ASSOC)['Create Table'];
+rtAssert(stripos($talepCreatePost, 'uq_hkrt_correction_event') !== false, 'UNIQUE(correction_event_id) postcondition');
 
 $gy = ['id' => 1, 'rol' => 'GENEL_YONETICI', 'sube_ids' => []];
 $ba = ['id' => 2, 'rol' => 'BIRIM_AMIRI', 'sube_ids' => [1]];
@@ -711,7 +747,11 @@ $puantaj08 = rtPuantajId($pdo, 10, '2026-04-08');
 $puantaj09 = rtPuantajId($pdo, 10, '2026-04-09');
 $puantaj10 = rtPuantajId($pdo, 10, '2026-04-10');
 $puantaj11 = rtPuantajId($pdo, 10, '2026-04-11');
+$puantaj06 = rtPuantajId($pdo, 10, '2026-04-06');
+$puantaj07 = rtPuantajId($pdo, 10, '2026-04-07');
+$puantaj12 = rtPuantajId($pdo, 10, '2026-04-12');
 $puantaj07p20 = rtPuantajId($pdo, 20, '2026-04-07');
+$snapshot10 = (int) $pdo->query('SELECT id FROM haftalik_kapanis_satirlari WHERE personel_id = 10 LIMIT 1')->fetchColumn();
 
 function rcApproveTalep(PDO $pdo, array $ba, array $gy, array $body, array $headers): int
 {
@@ -813,6 +853,11 @@ rtAssert(($surecProduce['payload']['errors'][0]['code'] ?? '') === 'CORRECTION_T
 
 $detail = invokeRtHttp($pdo, $gy, 'GET', '/haftalik-kapanis/revizyon-corrections/' . $corrId, [], $subeHeader);
 rtAssert($detail['status'] === 200, 'GET detail → 200');
+$detailData = $detail['payload']['data'] ?? [];
+rtAssert(is_array($detailData), 'detail data array');
+foreach (['sube_id', 'kapanis_id', 'snapshot_id', 'iptal_aciklamasi', 'created_at', 'updated_at'] as $hidden) {
+    rtAssert(!array_key_exists($hidden, $detailData), 'detail hides ' . $hidden);
+}
 $missing = invokeRtHttp($pdo, $gy, 'GET', '/haftalik-kapanis/revizyon-corrections/999999', [], $subeHeader);
 rtAssert($missing['status'] === 404, 'GET detail missing → 404 CORRECTION_NOT_FOUND');
 rtAssert(($missing['payload']['errors'][0]['code'] ?? '') === 'CORRECTION_NOT_FOUND', 'missing code');
@@ -825,6 +870,22 @@ rtAssert(array_key_exists('bordro_etki_tipi', $baData), 'BA detail has bordro_et
 rtAssert($baData['bordro_etki_tipi'] === null, 'finance mask BA: bordro_etki_tipi null');
 rtAssert(($baData['bordro_etki_var_mi'] ?? false) === true, 'BA bordro_etki_var_mi korunur');
 rtAssert(array_key_exists('aciklama', $baData) && $baData['aciklama'] === null, 'BA bordro etkili aciklama null');
+
+$muhDetail = invokeRtHttp($pdo, $muhasebe, 'GET', '/haftalik-kapanis/revizyon-corrections/' . $corrId, [], $subeHeader);
+rtAssert($muhDetail['status'] === 200, 'MUHASEBE detail finance unmasked');
+$muhData = $muhDetail['payload']['data'] ?? [];
+rtAssert(($muhData['bordro_etki_tipi'] ?? null) !== null, 'MUHASEBE sees bordro_etki_tipi');
+
+$baEmpty = ['id' => 2, 'rol' => 'BIRIM_AMIRI', 'sube_ids' => []];
+$emptyList = invokeRtHttp($pdo, $baEmpty, 'GET', '/haftalik-kapanis/revizyon-corrections', [], $subeHeader);
+rtAssert($emptyList['status'] === 200, 'allowedSubeIds=[] list → 200');
+rtAssert(count($emptyList['payload']['data']['items'] ?? ['x']) === 0, 'allowedSubeIds=[] list empty');
+$emptyDetail = invokeRtHttp($pdo, $baEmpty, 'GET', '/haftalik-kapanis/revizyon-corrections/' . $corrId, [], $subeHeader);
+rtAssert($emptyDetail['status'] === 403, 'allowedSubeIds=[] detail → 403 CORRECTION_SCOPE_DENIED');
+
+$subeQuery = invokeRtHttp($pdo, $gy, 'GET', '/haftalik-kapanis/revizyon-corrections', [], $subeHeader, ['sube_id' => '1']);
+rtAssert($subeQuery['status'] === 400, 'query sube_id → 400 INVALID_CORRECTION_PAYLOAD');
+rtAssert(($subeQuery['payload']['errors'][0]['code'] ?? '') === 'INVALID_CORRECTION_PAYLOAD', 'query sube_id code');
 
 $scopeDenied = invokeRtHttp($pdo, $baOther, 'GET', '/haftalik-kapanis/revizyon-corrections/' . $corrId, [], $sube2Header);
 rtAssert($scopeDenied['status'] === 403, 'scope dışı detail → 403 CORRECTION_SCOPE_DENIED');
@@ -849,18 +910,44 @@ for ($i = 1; $i < count($items); $i++) {
 }
 rtAssert($ordered, 'list ordering olusturma_zamani DESC');
 
+$cancelBadType = invokeRtHttp($pdo, $gy, 'POST', '/haftalik-kapanis/revizyon-corrections/' . $corrId . '/iptal', ['aciklama' => 123], $subeHeader);
+rtAssert($cancelBadType['status'] === 400, 'cancel aciklama number → 400');
+rtAssert(($cancelBadType['payload']['errors'][0]['code'] ?? '') === 'INVALID_CORRECTION_PAYLOAD', 'cancel number code');
+$cancelBadObj = invokeRtHttp($pdo, $gy, 'POST', '/haftalik-kapanis/revizyon-corrections/' . $corrId . '/iptal', ['aciklama' => ['x' => 1]], $subeHeader);
+rtAssert($cancelBadObj['status'] === 400, 'cancel aciklama object → 400');
+$cancelUnknown = invokeRtHttp($pdo, $gy, 'POST', '/haftalik-kapanis/revizyon-corrections/' . $corrId . '/iptal', ['foo' => 'bar'], $subeHeader);
+rtAssert($cancelUnknown['status'] === 400, 'cancel unknown field → 400');
+
 $origAciklama = (string) $pdo->query('SELECT aciklama FROM haftalik_kapanis_revizyon_corrections WHERE id = ' . $corrId)->fetchColumn();
 $cancel = invokeRtHttp($pdo, $gy, 'POST', '/haftalik-kapanis/revizyon-corrections/' . $corrId . '/iptal', ['aciklama' => 'iptal nedeni'], $subeHeader);
 rtAssert($cancel['status'] === 200, 'cancel → 200 iptal_edildi_mi true');
 rtAssert(($cancel['payload']['data']['iptal_edildi_mi'] ?? false) === true, 'cancel flag');
 rtAssert(($cancel['payload']['data']['aciklama'] ?? '') === $origAciklama || ($cancel['payload']['data']['aciklama'] ?? null) !== 'iptal nedeni', 'cancel does not overwrite aciklama');
+rtAssert(!array_key_exists('iptal_aciklamasi', $cancel['payload']['data'] ?? []), 'cancel response hides iptal_aciklamasi');
 $stillLinked = (int) $pdo->query('SELECT correction_event_id FROM haftalik_kapanis_revizyon_talepleri WHERE id = ' . $talepId)->fetchColumn();
 rtAssert($stillLinked === $corrId, 'cancel keeps talep.correction_event_id');
 $iptalAcik = (string) $pdo->query('SELECT COALESCE(iptal_aciklamasi, "") FROM haftalik_kapanis_revizyon_corrections WHERE id = ' . $corrId)->fetchColumn();
 rtAssert($iptalAcik === 'iptal nedeni', 'iptal_aciklamasi internal set');
+$metaAfterCancel = $pdo->query('SELECT iptal_zamani, iptal_eden_kullanici_id, iptal_aciklamasi, updated_at, olusturan_kullanici_id, olusturma_zamani, audit_ref, snapshot_ref FROM haftalik_kapanis_revizyon_corrections WHERE id = ' . $corrId)->fetch(PDO::FETCH_ASSOC);
+rtAssert($metaAfterCancel['iptal_zamani'] !== null, 'cancel sets iptal_zamani');
+rtAssert((int) $metaAfterCancel['iptal_eden_kullanici_id'] === 1, 'cancel sets iptal_eden');
 
-$secondCancel = invokeRtHttp($pdo, $gy, 'POST', '/haftalik-kapanis/revizyon-corrections/' . $corrId . '/iptal', [], $subeHeader);
+$dupAfterCancel = invokeRtHttp($pdo, $gy, 'POST', '/haftalik-kapanis/revizyon-talepleri/' . $talepId . '/correction-uret', [], $subeHeader);
+rtAssert($dupAfterCancel['status'] === 409, 'produce after cancel → 409 CORRECTION_ALREADY_EXISTS');
+rtAssert(($dupAfterCancel['payload']['errors'][0]['code'] ?? '') === 'CORRECTION_ALREADY_EXISTS', 'produce after cancel code');
+
+$secondCancel = invokeRtHttp($pdo, $gy, 'POST', '/haftalik-kapanis/revizyon-corrections/' . $corrId . '/iptal', ['aciklama' => 'ikinci'], $subeHeader);
 rtAssert($secondCancel['status'] === 404, 'second cancel → 404 CORRECTION_NOT_FOUND');
+$metaAfterSecond = $pdo->query('SELECT iptal_zamani, iptal_eden_kullanici_id, iptal_aciklamasi, updated_at FROM haftalik_kapanis_revizyon_corrections WHERE id = ' . $corrId)->fetch(PDO::FETCH_ASSOC);
+rtAssert($metaAfterSecond['iptal_zamani'] === $metaAfterCancel['iptal_zamani'], 'second cancel iptal_zamani immutable');
+rtAssert((string) $metaAfterSecond['iptal_aciklamasi'] === 'iptal nedeni', 'second cancel iptal_aciklamasi immutable');
+rtAssert((int) $metaAfterSecond['iptal_eden_kullanici_id'] === (int) $metaAfterCancel['iptal_eden_kullanici_id'], 'second cancel iptal_eden immutable');
+
+$cancelMasked = invokeRtHttp($pdo, $ba, 'GET', '/haftalik-kapanis/revizyon-corrections/' . $corrId, [], $subeHeader);
+rtAssert($cancelMasked['status'] === 200, 'cancelled detail still readable');
+$cancelMaskedData = $cancelMasked['payload']['data'] ?? [];
+rtAssert(is_array($cancelMaskedData) && array_key_exists('bordro_etki_tipi', $cancelMaskedData), 'cancelled detail has bordro_etki_tipi key');
+rtAssert($cancelMaskedData['bordro_etki_tipi'] === null, 'finance mask on cancelled correction');
 
 $snapAfter = (string) $pdo->query('SELECT state FROM haftalik_kapanis_satirlari WHERE personel_id = 10 LIMIT 1')->fetchColumn();
 $snapJsonAfter = (string) $pdo->query('SELECT COALESCE(notlar_json, "") FROM haftalik_kapanis_satirlari WHERE personel_id = 10 LIMIT 1')->fetchColumn();
@@ -871,6 +958,78 @@ invokeRtHttp($pdo, $gy, 'GET', '/haftalik-kapanis/revizyon-corrections', [], $su
 invokeRtHttp($pdo, $gy, 'GET', '/haftalik-kapanis/revizyon-corrections/' . $corrId, [], $subeHeader);
 $cntAfterGet = (int) $pdo->query('SELECT COUNT(*) FROM haftalik_kapanis_revizyon_corrections')->fetchColumn();
 rtAssert($cntBeforeGet === $cntAfterGet, 'GET no-write');
+
+// mapping matrix + delta variants + stringify
+$negTalep = rcApproveTalep($pdo, $ba, $gy, array_merge(rtCreateBody(10, $puantaj06, '2026-04-06', '2026-04-06', '2026-04-12'), [
+    'onceki_deger' => 90,
+    'talep_edilen_deger' => 60,
+]), $subeHeader);
+$neg = invokeRtHttp($pdo, $gy, 'POST', '/haftalik-kapanis/revizyon-talepleri/' . $negTalep . '/correction-uret', [], $subeHeader);
+rtAssert($neg['status'] === 200, 'negative delta produce → 200');
+rtAssert((int) ($neg['payload']['data']['delta_dakika'] ?? 1) === -30, 'negative delta -30');
+rtAssert(($neg['payload']['data']['correction_tipi'] ?? '') === 'GIRIS_CIKIS_DUZELTME', 'map PUANTAJ→GIRIS_CIKIS');
+
+$eqTalep = rcApproveTalep($pdo, $ba, $gy, array_merge(rtCreateBody(10, $puantaj07, '2026-04-07', '2026-04-06', '2026-04-12'), [
+    'onceki_deger' => 60,
+    'talep_edilen_deger' => 60,
+    'revizyon_tipi' => 'DEVAMSIZLIK_DUZELTME',
+]), $subeHeader);
+$eq = invokeRtHttp($pdo, $gy, 'POST', '/haftalik-kapanis/revizyon-talepleri/' . $eqTalep . '/correction-uret', [], $subeHeader);
+rtAssert($eq['status'] === 200, 'equal delta produce → 200');
+rtAssert((int) ($eq['payload']['data']['delta_dakika'] ?? -1) === 0, 'equal delta 0');
+rtAssert(($eq['payload']['data']['correction_tipi'] ?? '') === 'DEVAMSIZLIK_DUZELTME', 'map DEVAMSIZLIK');
+
+$objTalep = rcApproveTalep($pdo, $ba, $gy, array_merge(rtCreateBody(10, $puantaj12, '2026-04-12', '2026-04-06', '2026-04-12'), [
+    'onceki_deger' => ['giris' => '08:00'],
+    'talep_edilen_deger' => ['giris' => '09:00', 'tags' => [1, 2]],
+    'revizyon_tipi' => 'BORDRO_ETKI_NOTU',
+    'bordro_etki_var_mi' => true,
+]), $subeHeader);
+$obj = invokeRtHttp($pdo, $gy, 'POST', '/haftalik-kapanis/revizyon-talepleri/' . $objTalep . '/correction-uret', [], $subeHeader);
+rtAssert($obj['status'] === 200, 'object/array stringify produce → 200');
+$objOnceki = $obj['payload']['data']['onceki_deger'] ?? null;
+$objYeni = $obj['payload']['data']['yeni_deger'] ?? null;
+rtAssert(is_string($objOnceki), 'object onceki → string');
+rtAssert(is_string($objYeni), 'array yeni → string');
+rtAssert($objOnceki === '{"giris":"08:00"}', 'object stringify onceki exact');
+rtAssert(strpos((string) $objYeni, '"giris":"09:00"') !== false, 'array stringify yeni contains giris');
+rtAssert(($obj['payload']['data']['correction_tipi'] ?? '') === 'BORDRO_ETKI_NOTU', 'map BORDRO_ETKI_NOTU');
+
+$boolTalep = rcApproveTalep($pdo, $ba, $gy, [
+    'personel_id' => 10,
+    'hafta_baslangic' => '2026-04-06',
+    'hafta_bitis' => '2026-04-12',
+    'etkilenen_tarih' => '2026-04-07',
+    'kaynak_tipi' => 'SERBEST_ZAMAN',
+    'kaynak_id' => 601,
+    'revizyon_tipi' => 'SERBEST_ZAMAN_ETKI_DUZELTME',
+    'onceki_deger' => true,
+    'talep_edilen_deger' => false,
+    'gerekce' => 'bool scalar',
+], $subeHeader);
+$boolP = invokeRtHttp($pdo, $gy, 'POST', '/haftalik-kapanis/revizyon-talepleri/' . $boolTalep . '/correction-uret', [], $subeHeader);
+rtAssert($boolP['status'] === 200, 'boolean scalar produce → 200');
+rtAssert(($boolP['payload']['data']['onceki_deger'] ?? null) === true, 'boolean onceki preserved');
+rtAssert(($boolP['payload']['data']['yeni_deger'] ?? null) === false, 'boolean yeni preserved');
+rtAssert((int) ($boolP['payload']['data']['delta_dakika'] ?? -1) === 0, 'boolean delta 0');
+rtAssert(($boolP['payload']['data']['correction_tipi'] ?? '') === 'SERBEST_ZAMAN_ETKI_DUZELTME', 'map SERBEST_ZAMAN');
+
+$kapTalep = rcApproveTalep($pdo, $ba, $gy, [
+    'personel_id' => 10,
+    'hafta_baslangic' => '2026-04-06',
+    'hafta_bitis' => '2026-04-12',
+    'etkilenen_tarih' => '2026-04-08',
+    'kaynak_tipi' => 'HAFTALIK_KAPANIS_SATIR',
+    'kaynak_id' => $snapshot10,
+    'revizyon_tipi' => 'KAPANIS_HESAP_REVIZYONU',
+    'gerekce' => 'kapanis hesap',
+], $subeHeader);
+$kap = invokeRtHttp($pdo, $gy, 'POST', '/haftalik-kapanis/revizyon-talepleri/' . $kapTalep . '/correction-uret', [], $subeHeader);
+rtAssert($kap['status'] === 200, 'KAPANIS produce with seal/period → 200');
+rtAssert(($kap['payload']['data']['correction_tipi'] ?? '') === 'KAPANIS_HESAP_REVIZYONU', 'map KAPANIS_HESAP');
+rtAssert(($kap['payload']['errors'][0]['code'] ?? '') !== 'PERIOD_LOCKED', 'period seal does not block produce');
+
+rtAssert(($nonNum['payload']['data']['correction_tipi'] ?? '') === 'MOLA_DUZELTME', 'map MOLA_DUZELTME');
 
 $parTalep = rcApproveTalep($pdo, $ba, $gy, rtCreateBody(10, $puantaj11, '2026-04-11', '2026-04-06', '2026-04-12'), $subeHeader);
 $c1 = spawnRtHttp($pdo, $gy, 'POST', '/haftalik-kapanis/revizyon-talepleri/' . $parTalep . '/correction-uret', [], $subeHeader);
@@ -894,24 +1053,39 @@ $cStatuses = [$cr1['status'], $cr2['status']];
 sort($cStatuses);
 rtAssert($cStatuses === [200, 404], 'parallel cancel → one 200 one 404');
 
-$orphan = (int) $pdo->query('
-    SELECT COUNT(*) FROM haftalik_kapanis_revizyon_corrections c
-    LEFT JOIN haftalik_kapanis_revizyon_talepleri t ON t.correction_event_id = c.id
-    WHERE t.id IS NULL
-')->fetchColumn();
-rtAssert($orphan === 0, 'orphan correction check');
-
-// produce rollback: fail talep link update
-$rbTalep = rcApproveTalep($pdo, $ba, $gy, [
+$linkDupTalep = rcApproveTalep($pdo, $ba, $gy, [
     'personel_id' => 10,
     'hafta_baslangic' => '2026-04-06',
     'hafta_bitis' => '2026-04-12',
     'etkilenen_tarih' => '2026-04-07',
-    'kaynak_tipi' => 'SERBEST_ZAMAN',
-    'kaynak_id' => 601,
-    'revizyon_tipi' => 'SERBEST_ZAMAN_ETKI_DUZELTME',
-    'gerekce' => 'rollback produce',
+    'kaynak_tipi' => 'SUREC',
+    'kaynak_id' => 501,
+    'revizyon_tipi' => 'MOLA_DUZELTME',
+    'gerekce' => 'unique link probe',
 ], $subeHeader);
+$linkDupFailed = false;
+try {
+    $pdo->prepare('UPDATE haftalik_kapanis_revizyon_talepleri SET correction_event_id = :cid WHERE id = :id')->execute([
+        'cid' => $corrId,
+        'id' => $linkDupTalep,
+    ]);
+} catch (Throwable $e) {
+    $linkDupFailed = true;
+}
+rtAssert($linkDupFailed, 'UNIQUE(correction_event_id) blocks dual talep link');
+
+$orphan = (int) $pdo->query('
+    SELECT COUNT(*)
+    FROM haftalik_kapanis_revizyon_corrections c
+    LEFT JOIN haftalik_kapanis_revizyon_talepleri r
+      ON r.id = c.revizyon_talebi_id
+    WHERE r.id IS NULL
+       OR r.correction_event_id <> c.id
+')->fetchColumn();
+rtAssert($orphan === 0, 'orphan correction check');
+
+// produce rollback: fail talep link update
+$rbTalep = rcApproveTalep($pdo, $baOther, $gy, rtCreateBody(20, $puantaj07p20, '2026-04-07', '2026-04-06', '2026-04-12'), $sube2Header);
 $beforeRb = (int) $pdo->query('SELECT COUNT(*) FROM haftalik_kapanis_revizyon_corrections')->fetchColumn();
 $pdo->exec("
     CREATE TRIGGER trg_rc_link_fail BEFORE UPDATE ON haftalik_kapanis_revizyon_talepleri
@@ -924,7 +1098,7 @@ $pdo->exec("
 ");
 $rbFailed = false;
 try {
-    $rbResp = invokeRtHttp($pdo, $gy, 'POST', '/haftalik-kapanis/revizyon-talepleri/' . $rbTalep . '/correction-uret', [], $subeHeader);
+    $rbResp = invokeRtHttp($pdo, $gy, 'POST', '/haftalik-kapanis/revizyon-talepleri/' . $rbTalep . '/correction-uret', [], $sube2Header);
     $rbFailed = $rbResp['status'] !== 200;
 } catch (Throwable $e) {
     $rbFailed = true;
@@ -935,5 +1109,43 @@ $rbLink = $pdo->query('SELECT correction_event_id FROM haftalik_kapanis_revizyon
 rtAssert($rbFailed, 'produce rollback surfaced');
 rtAssert($beforeRb === $afterRb, 'produce rollback orphan correction yok');
 rtAssert($rbLink === null, 'produce rollback link null');
+
+// cancel rollback
+$cancelRbTalep = rcApproveTalep($pdo, $ba, $gy, [
+    'personel_id' => 10,
+    'hafta_baslangic' => '2026-04-06',
+    'hafta_bitis' => '2026-04-12',
+    'etkilenen_tarih' => '2026-04-07',
+    'kaynak_tipi' => 'SUREC',
+    'kaynak_id' => 501,
+    'revizyon_tipi' => 'MOLA_DUZELTME',
+    'gerekce' => 'cancel rollback',
+], $subeHeader);
+// SUREC 501 may still be open from surecTalep (ONAYLANDI not open) - open slot allows new. Good.
+$cancelRbProduce = invokeRtHttp($pdo, $gy, 'POST', '/haftalik-kapanis/revizyon-talepleri/' . $cancelRbTalep . '/correction-uret', [], $subeHeader);
+rtAssert($cancelRbProduce['status'] === 200, 'cancel-rollback fixture produce');
+$cancelRbId = (int) ($cancelRbProduce['payload']['data']['id'] ?? 0);
+$pdo->exec("
+    CREATE TRIGGER trg_rc_cancel_fail BEFORE UPDATE ON haftalik_kapanis_revizyon_corrections
+    FOR EACH ROW
+    BEGIN
+      IF NEW.iptal_edildi_mi = 1 AND OLD.iptal_edildi_mi = 0 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'forced cancel fail';
+      END IF;
+    END
+");
+$cancelRbFailed = false;
+try {
+    $cancelRbResp = invokeRtHttp($pdo, $gy, 'POST', '/haftalik-kapanis/revizyon-corrections/' . $cancelRbId . '/iptal', [], $subeHeader);
+    $cancelRbFailed = $cancelRbResp['status'] !== 200;
+} catch (Throwable $e) {
+    $cancelRbFailed = true;
+}
+$pdo->exec('DROP TRIGGER IF EXISTS trg_rc_cancel_fail');
+$cancelRbRow = $pdo->query('SELECT iptal_edildi_mi, iptal_zamani, iptal_eden_kullanici_id, iptal_aciklamasi FROM haftalik_kapanis_revizyon_corrections WHERE id = ' . $cancelRbId)->fetch(PDO::FETCH_ASSOC);
+rtAssert($cancelRbFailed, 'cancel rollback surfaced');
+rtAssert((int) $cancelRbRow['iptal_edildi_mi'] === 0, 'cancel rollback stays active');
+rtAssert($cancelRbRow['iptal_zamani'] === null, 'cancel rollback iptal_zamani null');
+rtAssert($cancelRbRow['iptal_eden_kullanici_id'] === null, 'cancel rollback iptal_eden null');
 
 echo "verify-revizyon-correction-mysql: OK\n";

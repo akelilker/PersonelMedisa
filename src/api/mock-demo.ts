@@ -2319,7 +2319,15 @@ function cancelDemoRevizyonCorrection(
   }
 
   // iptal aciklamasi internal-only; public aciklama (karar_notu/gerekce) korunur.
-  void toStringValue(body.aciklama);
+  if (Object.prototype.hasOwnProperty.call(body, "aciklama")) {
+    const raw = body.aciklama;
+    if (raw !== null && typeof raw !== "string") {
+      return demoCorrectionError("INVALID_CORRECTION_PAYLOAD", "aciklama metin olmalidir.");
+    }
+    if (typeof raw === "string" && raw.trim().length > 1000) {
+      return demoCorrectionError("INVALID_CORRECTION_PAYLOAD", "aciklama en fazla 1000 karakter olabilir.");
+    }
+  }
 
   correction.iptal_edildi_mi = true;
   correction.iptal_zamani = new Date().toISOString();

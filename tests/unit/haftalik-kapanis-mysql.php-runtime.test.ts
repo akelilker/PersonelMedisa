@@ -93,5 +93,30 @@ describe("HaftalikKapanisController MariaDB", () => {
     expect(result.stdout).toContain("[PASS] FK sube DELETE RESTRICT");
     expect(result.stdout).toContain("[PASS] FK DELETE_RULE RESTRICT/NO ACTION");
     expect(result.stdout).toContain("[PASS] transaction: no partial kapanis row");
+    expect(result.stdout).toContain("[PASS] BOLUM_YONETICISI POST scope içi → 201");
+    expect(result.stdout).toContain("[PASS] BOLUM_YONETICISI detail → 200");
+    expect(result.stdout).toContain("[PASS] BOLUM_YONETICISI YFC → 200");
+    expect(result.stdout).toContain("[PASS] MUHASEBE detail scope içi → 200");
+    expect(result.stdout).toContain("[PASS] MUHASEBE YFC scope içi → 200");
+    expect(result.stdout).toContain("[PASS] BIRIM_AMIRI detail scope içi → 200");
+    expect(result.stdout).toContain("[PASS] BIRIM_AMIRI YFC scope içi → 200");
+    expect(result.stdout).toContain("[PASS] PATRON detail → 403");
+    expect(result.stdout).toContain("[PASS] PATRON YFC → 403");
+    expect(result.stdout).toContain("[PASS] BA empty allowedSubeIds global YFC → 403");
+    expect(result.stdout).toContain("[PASS] open GONDERILDI blocks genel kapanis → 409");
+    expect(result.stdout).toContain(
+      "[PASS] open other departman does not block dept 3 close → 201"
+    );
+    expect(result.stdout).toContain(
+      "[PASS] snapshot immutability: live puantaj change does not alter GET"
+    );
+    expect(result.stdout).toContain(
+      "[PASS] aggregate double-count: max kapanis_id wins once"
+    );
+    expect(result.stdout).toContain("[PASS] concurrency different departman → both 201");
+    expect(result.stdout).toContain("[PASS] server-owned departman_scope_key → 422");
+    expect(result.stdout).toContain(
+      "[PASS] partial existing haftalik_kapanis_satirlari → migration fails"
+    );
   });
 });

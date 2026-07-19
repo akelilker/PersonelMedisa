@@ -329,15 +329,17 @@ function seedHkFixtures(PDO $pdo): void
           (1, 'gy', 'x', 'Genel Yonetici', 'GENEL_YONETICI', 'AKTIF'),
           (2, 'ba', 'x', 'Birim Amiri', 'BIRIM_AMIRI', 'AKTIF'),
           (3, 'patron', 'x', 'Patron', 'PATRON', 'AKTIF'),
-          (4, 'muh', 'x', 'Muhasebe', 'MUHASEBE', 'AKTIF')
+          (4, 'muh', 'x', 'Muhasebe', 'MUHASEBE', 'AKTIF'),
+          (5, 'bolum', 'x', 'Bolum Yoneticisi', 'BOLUM_YONETICISI', 'AKTIF')
     ");
-    $pdo->exec('INSERT INTO user_subeler (user_id, sube_id) VALUES (2, 1), (4, 1)');
+    $pdo->exec('INSERT INTO user_subeler (user_id, sube_id) VALUES (2, 1), (4, 1), (5, 1)');
     $pdo->exec("
         INSERT INTO personeller (
           id, tc_kimlik_no, ad, soyad, dogum_tarihi, sicil_no, ise_giris_tarihi, sube_id, departman_id, aktif_durum
         ) VALUES
           (10, '11111111111', 'Ayse', 'Yilmaz', '1990-01-01', 'S10', '2020-01-01', 1, 3, 'AKTIF'),
-          (20, '22222222222', 'Mehmet', 'Demir', '1988-01-01', 'S20', '2020-01-01', 2, NULL, 'AKTIF')
+          (20, '22222222222', 'Mehmet', 'Demir', '1988-01-01', 'S20', '2020-01-01', 2, NULL, 'AKTIF'),
+          (30, '33333333333', 'Can', 'Kara', '1991-01-01', 'S30', '2020-01-01', 1, 4, 'AKTIF')
     ");
 
     // Week 2026-04-06..12 mutabakat TAMAMLANDI for sube 1
@@ -374,7 +376,36 @@ function seedHkFixtures(PDO $pdo): void
           (2, 1, 2, '2026-04-20', '2026-04-26', 'TAMAMLANDI', 2, '2026-04-26 18:00:00'),
           (3, 2, 2, '2026-04-06', '2026-04-12', 'TAMAMLANDI', 2, '2026-04-12 18:00:00'),
           (4, 1, 2, '2025-12-29', '2026-01-04', 'TAMAMLANDI', 2, '2026-01-04 18:00:00'),
-          (5, 1, 2, '2026-05-04', '2026-05-10', 'TAMAMLANDI', 2, '2026-05-10 18:00:00')
+          (5, 1, 2, '2026-05-04', '2026-05-10', 'TAMAMLANDI', 2, '2026-05-10 18:00:00'),
+          (6, 1, 2, '2026-05-11', '2026-05-17', 'TAMAMLANDI', 2, '2026-05-17 18:00:00'),
+          (7, 1, 2, '2026-05-18', '2026-05-24', 'TAMAMLANDI', 2, '2026-05-24 18:00:00'),
+          (8, 1, 2, '2026-05-25', '2026-05-31', 'TAMAMLANDI', 2, '2026-05-31 18:00:00')
+    ");
+
+    // Incomplete mutabakat scope week: mutabakat exists but open GONDERILDI bildirim remains.
+    $pdo->exec("
+        INSERT INTO haftalik_bildirim_mutabakatlari
+          (id, sube_id, birim_amiri_user_id, hafta_baslangic, hafta_bitis, state, onaylayan_user_id, onaylandi_at)
+        VALUES
+          (9, 1, 2, '2026-06-01', '2026-06-07', 'TAMAMLANDI', 2, '2026-06-07 18:00:00')
+    ");
+    $pdo->exec("
+        INSERT INTO gunluk_bildirimler (sube_id, departman_id, tarih, state, haftalik_mutabakat_id, created_by)
+        VALUES (1, 3, '2026-06-02', 'GONDERILDI', NULL, 2)
+    ");
+    // Departman isolation: open in dept 4 must not block dept 3 close on another week.
+    $pdo->exec("
+        INSERT INTO haftalik_bildirim_mutabakatlari
+          (id, sube_id, birim_amiri_user_id, hafta_baslangic, hafta_bitis, state, onaylayan_user_id, onaylandi_at)
+        VALUES
+          (10, 1, 2, '2026-06-08', '2026-06-14', 'TAMAMLANDI', 2, '2026-06-14 18:00:00')
+    ");
+    $pdo->exec("
+        INSERT INTO gunluk_bildirimler (sube_id, departman_id, tarih, state, haftalik_mutabakat_id, created_by)
+        VALUES
+          (1, 4, '2026-06-09', 'GONDERILDI', NULL, 2),
+          (1, 3, '2026-06-09', 'HAFTALIK_MUTABAKATA_ALINDI', 10, 2),
+          (1, 3, '2026-06-10', 'IPTAL', NULL, 2)
     ");
 }
 
@@ -779,5 +810,152 @@ $afterTx = (int) $pdo->query("
 ")->fetchColumn();
 hkAssert($txResult['status'] >= 400, 'transaction: insert fail after mutabakat → error status');
 hkAssert($beforeTx === $afterTx && $afterTx === 0, 'transaction: no partial kapanis row');
+
+$bolum = ['id' => 5, 'rol' => 'BOLUM_YONETICISI', 'sube_ids' => [1]];
+$bolumPost = invokeHkHttp($pdo, $bolum, 'POST', '/haftalik-kapanis', [
+    'hafta_baslangic' => '2026-05-11',
+    'hafta_bitis' => '2026-05-17',
+], $subeHeader);
+hkAssert($bolumPost['status'] === 201, 'BOLUM_YONETICISI POST scope içi → 201');
+$bolumId = (int) ($bolumPost['payload']['data']['id'] ?? 0);
+$bolumDetail = invokeHkHttp($pdo, $bolum, 'GET', '/haftalik-kapanis/' . $bolumId, [], $subeHeader);
+hkAssert($bolumDetail['status'] === 200, 'BOLUM_YONETICISI detail → 200');
+$bolumYfc = invokeHkHttp($pdo, $bolum, 'GET', '/haftalik-kapanis/yillik-fazla-calisma', [], $subeHeader, [
+    'personel_id' => '10',
+    'yil' => '2026',
+]);
+hkAssert($bolumYfc['status'] === 200, 'BOLUM_YONETICISI YFC → 200');
+
+$muhDetail = invokeHkHttp($pdo, $muhasebe, 'GET', '/haftalik-kapanis/' . $createdId, [], $subeHeader);
+hkAssert($muhDetail['status'] === 200, 'MUHASEBE detail scope içi → 200');
+$muhYfc = invokeHkHttp($pdo, $muhasebe, 'GET', '/haftalik-kapanis/yillik-fazla-calisma', [], $subeHeader, [
+    'personel_id' => '10',
+    'yil' => '2026',
+]);
+hkAssert($muhYfc['status'] === 200, 'MUHASEBE YFC scope içi → 200');
+
+$baDetail = invokeHkHttp($pdo, $ba, 'GET', '/haftalik-kapanis/' . $createdId, [], $subeHeader);
+hkAssert($baDetail['status'] === 200, 'BIRIM_AMIRI detail scope içi → 200');
+$baYfc = invokeHkHttp($pdo, $ba, 'GET', '/haftalik-kapanis/yillik-fazla-calisma', [], $subeHeader, [
+    'personel_id' => '10',
+    'yil' => '2026',
+]);
+hkAssert($baYfc['status'] === 200, 'BIRIM_AMIRI YFC scope içi → 200');
+
+$patronDetail = invokeHkHttp($pdo, $patron, 'GET', '/haftalik-kapanis/' . $createdId, [], $subeHeader);
+hkAssert($patronDetail['status'] === 403, 'PATRON detail → 403');
+$patronYfc = invokeHkHttp($pdo, $patron, 'GET', '/haftalik-kapanis/yillik-fazla-calisma', [], $subeHeader, [
+    'personel_id' => '10',
+    'yil' => '2026',
+]);
+hkAssert($patronYfc['status'] === 403, 'PATRON YFC → 403');
+
+$baEmpty = ['id' => 2, 'rol' => 'BIRIM_AMIRI', 'sube_ids' => []];
+$baEmptyYfc = invokeHkHttp($pdo, $baEmpty, 'GET', '/haftalik-kapanis/yillik-fazla-calisma', [], [], [
+    'personel_id' => '10',
+    'yil' => '2026',
+]);
+hkAssert($baEmptyYfc['status'] === 403, 'BA empty allowedSubeIds global YFC → 403');
+
+$incompleteMut = invokeHkHttp($pdo, $gy, 'POST', '/haftalik-kapanis', [
+    'hafta_baslangic' => '2026-06-01',
+    'hafta_bitis' => '2026-06-07',
+], $subeHeader);
+hkAssert($incompleteMut['status'] === 409, 'open GONDERILDI blocks genel kapanis → 409');
+hkAssert(($incompleteMut['payload']['errors'][0]['code'] ?? '') === 'STATE_CONFLICT', 'open bildirim STATE_CONFLICT');
+
+$deptIsolated = invokeHkHttp($pdo, $gy, 'POST', '/haftalik-kapanis', [
+    'hafta_baslangic' => '2026-06-08',
+    'hafta_bitis' => '2026-06-14',
+    'departman_id' => 3,
+], $subeHeader);
+hkAssert($deptIsolated['status'] === 201, 'open other departman does not block dept 3 close → 201');
+
+// Snapshot immutability: change live puantaj after create; GET keeps sealed minutes.
+$sealedRow = null;
+foreach (($detail['payload']['data']['snapshot_satirlari'] ?? []) as $row) {
+    if ((int) ($row['personel_id'] ?? 0) === 10) {
+        $sealedRow = $row;
+        break;
+    }
+}
+hkAssert(is_array($sealedRow), 'immutability: personel 10 snapshot row present');
+$sealedFazla = (int) ($sealedRow['fazla_calisma_dakika'] ?? -1);
+$pdo->exec("UPDATE gunluk_puantaj SET net_calisma_suresi_dakika = 9999 WHERE personel_id = 10 AND tarih = '2026-04-06'");
+$detailAfter = invokeHkHttp($pdo, $gy, 'GET', '/haftalik-kapanis/' . $createdId, [], $subeHeader);
+$fazlaAfter = -2;
+foreach (($detailAfter['payload']['data']['snapshot_satirlari'] ?? []) as $row) {
+    if ((int) ($row['personel_id'] ?? 0) === 10) {
+        $fazlaAfter = (int) ($row['fazla_calisma_dakika'] ?? -2);
+        break;
+    }
+}
+hkAssert($detailAfter['status'] === 200, 'immutability detail → 200');
+hkAssert($fazlaAfter === $sealedFazla, 'snapshot immutability: live puantaj change does not alter GET');
+hkAssert(!array_key_exists('departman_scope_key', $detailAfter['payload']['data'] ?? []), 'detail does not leak departman_scope_key');
+
+// Aggregate double-count: genel + departman same week → max kapanis_id once.
+$pdo->exec('DELETE FROM haftalik_kapanis_satirlari WHERE yil = 2028');
+$pdo->exec("DELETE FROM haftalik_kapanislar WHERE hafta_baslangic >= '2028-01-01'");
+seedAggregateSatir($pdo, 1, 10, '2028-01-03', '2028-01-09', 2028, 100, 1, null);
+seedAggregateSatir($pdo, 1, 10, '2028-01-03', '2028-01-09', 2028, 900, 1, 3);
+$aggDup = invokeHkHttp($pdo, $gy, 'GET', '/haftalik-kapanis/yillik-fazla-calisma', [], $subeHeader, [
+    'personel_id' => '10',
+    'yil' => '2028',
+]);
+hkAssert((int) ($aggDup['payload']['data']['kullanilan_dakika'] ?? -1) === 900, 'aggregate double-count: max kapanis_id wins once');
+hkAssert((int) ($aggDup['payload']['data']['kapanan_hafta_sayisi'] ?? -1) === 1, 'aggregate double-count: one week counted');
+hkAssert((int) ($aggDup['payload']['data']['atlanan_duplicate_hafta_sayisi'] ?? -1) === 1, 'aggregate double-count: duplicate skipped');
+
+// Concurrent different identities both succeed.
+$c1 = spawnHkHttp($pdo, $gy, 'POST', '/haftalik-kapanis', [
+    'hafta_baslangic' => '2026-05-18',
+    'hafta_bitis' => '2026-05-24',
+    'departman_id' => 3,
+], $subeHeader);
+$c2 = spawnHkHttp($pdo, $gy, 'POST', '/haftalik-kapanis', [
+    'hafta_baslangic' => '2026-05-18',
+    'hafta_bitis' => '2026-05-24',
+    'departman_id' => 4,
+], $subeHeader);
+$rc1 = finishHkHttp($c1);
+$rc2 = finishHkHttp($c2);
+hkAssert($rc1['status'] === 201 && $rc2['status'] === 201, 'concurrency different departman → both 201');
+$diffDeptCount = (int) $pdo->query("
+    SELECT COUNT(*) FROM haftalik_kapanislar
+    WHERE sube_id = 1 AND hafta_baslangic = '2026-05-18'
+")->fetchColumn();
+hkAssert($diffDeptCount === 2, 'concurrency different departman DB count=2');
+
+$serverOwnedScope = invokeHkHttp($pdo, $gy, 'POST', '/haftalik-kapanis', [
+    'hafta_baslangic' => '2026-05-25',
+    'hafta_bitis' => '2026-05-31',
+    'departman_scope_key' => 999,
+], $subeHeader);
+hkAssert($serverOwnedScope['status'] === 422, 'server-owned departman_scope_key → 422');
+
+// Partial existing detail table must fail loudly.
+$partialDetailRoot = hkPdo($dsn);
+$partialDetailDb = 'hk_partial_det_' . bin2hex(random_bytes(3));
+$partialDetailRoot->exec('CREATE DATABASE `' . $partialDetailDb . '` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');
+$partialDetailRoot->exec('USE `' . $partialDetailDb . '`');
+createHkParentTables($partialDetailRoot);
+applyHkMigration($partialDetailRoot);
+$partialDetailRoot->exec('DROP TABLE haftalik_kapanis_satirlari');
+$partialDetailRoot->exec('CREATE TABLE haftalik_kapanis_satirlari (id INT UNSIGNED NOT NULL PRIMARY KEY) ENGINE=InnoDB');
+// Re-apply should fail because header already exists; recreate empty DB with only partial satirlar.
+$partialDetailRoot->exec('DROP DATABASE `' . $partialDetailDb . '`');
+$partialDetailRoot->exec('CREATE DATABASE `' . $partialDetailDb . '` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');
+$partialDetailRoot->exec('USE `' . $partialDetailDb . '`');
+createHkParentTables($partialDetailRoot);
+$partialDetailRoot->exec('CREATE TABLE haftalik_kapanis_satirlari (id INT UNSIGNED NOT NULL PRIMARY KEY) ENGINE=InnoDB');
+$partialDetailFailed = false;
+try {
+    applyHkMigration($partialDetailRoot);
+} catch (Throwable $e) {
+    $partialDetailFailed = true;
+}
+hkAssert($partialDetailFailed, 'partial existing haftalik_kapanis_satirlari → migration fails');
+$partialDetailRoot->exec('DROP DATABASE `' . $partialDetailDb . '`');
 
 echo "verify-haftalik-kapanis-mysql: OK\n";

@@ -23,8 +23,9 @@ use PDOException;
  *
  * Mutabakat onkosulu:
  * - En az bir haftalik_bildirim_mutabakatlari satiri (sube_id, hafta_baslangic) ve hepsi TAMAMLANDI.
- * - departman_id set ise: o departmandaki IPTAL-disi bildirimler mutabakata bagli olmali;
- *   acik (TASLAK/GONDERILDI/DUZELTME_ISTENDI) bildirim kalmamali.
+ * - Genel (departman_id null) ve departman kapanisinda: kapsamdaki IPTAL-disi bildirimler
+ *   mutabakata bagli olmali; acik (TASLAK/GONDERILDI/DUZELTME_ISTENDI) bildirim kalmamali.
+ * - IPTAL bildirimler blocker degildir.
  */
 class HaftalikKapanisController
 {
@@ -141,7 +142,7 @@ class HaftalikKapanisController
             if ($pdo->inTransaction()) {
                 $pdo->rollBack();
             }
-            if ((string) $e->getCode() === '23000') {
+            if (self::isDuplicateScopeException($e)) {
                 self::conflict(
                     'Bu sube, hafta ve departman kapsami icin haftalik kapanis zaten olusturulmus.'
                 );
@@ -168,7 +169,7 @@ class HaftalikKapanisController
             JsonResponse::notFound('Haftalik kapanis bulunamadi.');
         }
 
-        SubeScope::assertPersonelAccess($user, $request, (int) $header['sube_id']);
+        self::assertReadScope($user, $request, (int) $header['sube_id']);
 
         $satirlar = self::fetchSatirlar($pdo, $kapanisId);
         JsonResponse::success(self::mapKapanisResponse($header, $satirlar));
@@ -195,16 +196,7 @@ class HaftalikKapanisController
         if (!$personel) {
             JsonResponse::notFound('Personel bulunamadi.');
         }
-        SubeScope::assertPersonelAccess($user, $request, (int) $personel['sube_id']);
-
-        $scope = SubeScope::resolveScope($user, $request);
-        $allowed = SubeScope::allowedSubeIds($user);
-        if ($scope !== null && (int) $personel['sube_id'] !== $scope) {
-            JsonResponse::forbidden();
-        }
-        if (count($allowed) > 0 && !in_array((int) $personel['sube_id'], $allowed, true)) {
-            JsonResponse::forbidden();
-        }
+        self::assertReadScope($user, $request, (int) $personel['sube_id']);
 
         $ozet = self::aggregateYillik($pdo, $personelId, $yil, (int) $personel['sube_id']);
         JsonResponse::success($ozet);
@@ -246,11 +238,49 @@ class HaftalikKapanisController
 
     private static function rejectServerOwnedOverrides(array $body)
     {
-        foreach (['id', 'kapanis_id', 'sube_id', 'state', 'created_at', 'created_by', 'snapshot_satirlari'] as $field) {
+        foreach ([
+            'id',
+            'kapanis_id',
+            'sube_id',
+            'state',
+            'created_at',
+            'created_by',
+            'departman_scope_key',
+            'personel_sayisi',
+            'snapshot_satir_sayisi',
+            'kaynak_versiyon',
+            'snapshot_satirlari',
+        ] as $field) {
             if (array_key_exists($field, $body)) {
                 self::validationError($field, $field . ' istemci tarafindan belirlenemez.');
             }
         }
+    }
+
+    /**
+     * Read surfaces: SubeScope + empty allowedSubeIds must not leak for branch-only roles.
+     * GENEL/MUHASEBE (personeller.view) may read globally when allowed is empty.
+     *
+     * @param array<string, mixed> $user
+     */
+    private static function assertReadScope(array $user, Request $request, $recordSubeId)
+    {
+        $allowed = SubeScope::allowedSubeIds($user);
+        if (count($allowed) === 0 && !RolePermissions::has($user, 'personeller.view')) {
+            JsonResponse::forbidden('Sube baglami olmadan haftalik kapanis goruntulenemez.');
+        }
+        SubeScope::assertPersonelAccess($user, $request, (int) $recordSubeId);
+    }
+
+    private static function isDuplicateScopeException(PDOException $e)
+    {
+        $driverCode = isset($e->errorInfo[1]) ? (int) $e->errorInfo[1] : 0;
+        if ($driverCode === 1062) {
+            return true;
+        }
+        $message = strtolower($e->getMessage());
+
+        return strpos($message, 'uq_haftalik_kapanis_scope') !== false;
     }
 
     private static function resolveWeek($baslangicRaw, $bitisRaw)
@@ -286,9 +316,11 @@ class HaftalikKapanisController
     /**
      * Mutabakat onkosulu — exact kural:
      * 1) (sube_id, hafta_baslangic) icin en az bir mutabakat satiri olmali; yoksa 409.
-     * 2) Tum satirlarda state = TAMAMLANDI olmali; aksi 409.
-     * 3) departman_id set ise: o departmandaki IPTAL-disi gunluk_bildirimler
-     *    haftalik_mutabakat_id dolu olmali ve acik state kalmamali.
+     * 2) Tum mutabakat satirlarinda state = TAMAMLANDI olmali; aksi 409.
+     * 3) Kapsamdaki (genel=tum sube / departman filtresi) IPTAL-disi gunluk_bildirimler
+     *    haftalik_mutabakat_id dolu olmali; acik state kalmamali.
+     * 4) IPTAL bildirimler blocker degildir.
+     * 5) Baska departman/subenin acik bildirimi bu kapsami etkilemez.
      */
     private static function assertMutabakatReady(
         PDO $pdo,
@@ -318,43 +350,50 @@ class HaftalikKapanisController
             }
         }
 
-        if ($departmanId === null) {
-            return;
+        $deptSql = '';
+        $params = [
+            'sube_id' => (int) $subeId,
+            'hafta_baslangic' => $haftaBaslangic,
+            'hafta_bitis' => $haftaBitis,
+        ];
+        if ($departmanId !== null) {
+            $deptSql = ' AND departman_id = :departman_id';
+            $params['departman_id'] = (int) $departmanId;
         }
 
         $open = $pdo->prepare('
             SELECT COUNT(*) FROM gunluk_bildirimler
             WHERE sube_id = :sube_id
-              AND departman_id = :departman_id
               AND tarih BETWEEN :hafta_baslangic AND :hafta_bitis
               AND state IN (\'TASLAK\', \'GONDERILDI\', \'DUZELTME_ISTENDI\')
+            ' . $deptSql . '
         ');
-        $open->execute([
-            'sube_id' => (int) $subeId,
-            'departman_id' => (int) $departmanId,
-            'hafta_baslangic' => $haftaBaslangic,
-            'hafta_bitis' => $haftaBitis,
-        ]);
+        $open->execute($params);
         if ((int) $open->fetchColumn() > 0) {
-            self::rollbackConflict($pdo, 'Departman kapsaminda mutabakat tamamlanmamis.');
+            self::rollbackConflict(
+                $pdo,
+                $departmanId === null
+                    ? 'Sube kapsaminda mutabakat tamamlanmamis.'
+                    : 'Departman kapsaminda mutabakat tamamlanmamis.'
+            );
         }
 
         $unlinked = $pdo->prepare('
             SELECT COUNT(*) FROM gunluk_bildirimler
             WHERE sube_id = :sube_id
-              AND departman_id = :departman_id
               AND tarih BETWEEN :hafta_baslangic AND :hafta_bitis
               AND state <> \'IPTAL\'
               AND haftalik_mutabakat_id IS NULL
+            ' . $deptSql . '
         ');
-        $unlinked->execute([
-            'sube_id' => (int) $subeId,
-            'departman_id' => (int) $departmanId,
-            'hafta_baslangic' => $haftaBaslangic,
-            'hafta_bitis' => $haftaBitis,
-        ]);
+        $unlinked->execute($params);
         if ((int) $unlinked->fetchColumn() > 0) {
-            self::rollbackConflict($pdo, 'Departman kapsaminda mutabakat tamamlanmamis.');
+            self::rollbackConflict(
+                $pdo,
+                $departmanId === null
+                    ? 'Sube kapsaminda mutabakat tamamlanmamis.'
+                    : 'Departman kapsaminda mutabakat tamamlanmamis.'
+            );
         }
     }
 

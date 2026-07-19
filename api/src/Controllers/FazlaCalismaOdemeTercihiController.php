@@ -119,6 +119,7 @@ class FazlaCalismaOdemeTercihiController
             );
 
             $existing = self::loadTercihBySnapshot($pdo, $snapshotId, true);
+            // Idempotency key is odeme_tipi only; gerekce-only delta is not a real preference change.
             if ($existing !== null && (string) $existing['odeme_tipi'] === $odemeTipi) {
                 $pdo->commit();
                 JsonResponse::success(self::mapTercih($existing));
@@ -374,6 +375,7 @@ class FazlaCalismaOdemeTercihiController
     private static function syntheticTercih(array $satir): array
     {
         return [
+            'id' => null,
             'snapshot_id' => (int) $satir['id'],
             'kapanis_id' => (int) $satir['kapanis_id'],
             'personel_id' => (int) $satir['personel_id'],
@@ -381,6 +383,10 @@ class FazlaCalismaOdemeTercihiController
             'hafta_bitis' => (string) $satir['hafta_bitis'],
             'fazla_calisma_dakika' => (int) $satir['fazla_calisma_dakika'],
             'odeme_tipi' => self::DEFAULT_ODEME_TIPI,
+            'secim_zamani' => null,
+            'secen_kullanici_id' => null,
+            'onceki_odeme_tipi' => null,
+            'gerekce' => null,
         ];
     }
 

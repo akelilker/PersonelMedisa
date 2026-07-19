@@ -59,21 +59,39 @@ describe("FazlaCalismaOdemeTercihiController MariaDB", () => {
     expect(result.status, result.stderr || result.stdout).toBe(0);
     expect(result.stdout).toContain("verify-fazla-calisma-odeme-tercihi-mysql: OK");
     expect(result.stdout).toContain("[PASS] GET default no-write");
+    expect(result.stdout).toContain("[PASS] GET synthetic id=null");
     expect(result.stdout).toContain("[PASS] GET persisted");
     expect(result.stdout).toContain("[PASS] snapshot 404");
     expect(result.stdout).toContain("[PASS] scope dışı 403");
+    expect(result.stdout).toContain("[PASS] BA empty allowedSubeIds global GET → 403");
     expect(result.stdout).toContain("[PASS] PUT insert");
     expect(result.stdout).toContain("[PASS] PUT gerçek update");
     expect(result.stdout).toContain("[PASS] aynı payload idempotent");
+    expect(result.stdout).toContain("[PASS] gerekce-only idempotent → 200");
+    expect(result.stdout).toContain("[PASS] gerekce-only audit +0");
     expect(result.stdout).toContain("[PASS] audit append on insert");
     expect(result.stdout).toContain("[PASS] audit no-op üretmiyor");
     expect(result.stdout).toContain("[PASS] server-owned override 422");
     expect(result.stdout).toContain("[PASS] period locked 409");
     expect(result.stdout).toContain("[PASS] period unknown 409");
+    expect(result.stdout).toContain("[PASS] period before SZ → PERIOD_LOCKED");
+    expect(result.stdout).toContain(
+      "[PASS] cross-month first open second locked → PERIOD_LOCKED"
+    );
+    expect(result.stdout).toContain(
+      "[PASS] cross-month first locked second open → PERIOD_LOCKED"
+    );
+    expect(result.stdout).toContain("[PASS] cross-month both open → PUT 200");
     expect(result.stdout).toContain("[PASS] aktif SZ oluşum guard 409");
+    expect(result.stdout).toContain("[PASS] UCRET → SERBEST_ZAMAN allowed");
     expect(result.stdout).toContain("[PASS] transaction rollback");
+    expect(result.stdout).toContain("[PASS] transaction rollback audit-fail main");
     expect(result.stdout).toContain("[PASS] parallel PUT tek ana kayıt");
+    expect(result.stdout).toContain("[PASS] parallel same payload both 200");
+    expect(result.stdout).toContain("[PASS] parallel same payload audit=1");
     expect(result.stdout).toContain("[PASS] tek ana kayıt");
     expect(result.stdout).toContain("[PASS] audit zinciri tutarlı (ilk onceki=KARAR_BEKLIYOR)");
+    expect(result.stdout).toContain("[PASS] SHOW CREATE TABLE fazla_calisma_odeme_tercihleri");
+    expect(result.stdout).toContain("[PASS] unique(snapshot_id) present");
   });
 });

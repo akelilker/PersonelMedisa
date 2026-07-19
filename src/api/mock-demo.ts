@@ -2338,7 +2338,12 @@ function buildSyntheticOdemeTercihi(satir: HaftalikKapanisSnapshotSatir): FazlaC
     hafta_baslangic: satir.hafta_baslangic,
     hafta_bitis: satir.hafta_bitis,
     fazla_calisma_dakika: guvenliFazlaCalismaDakika(satir.fazla_calisma_dakika),
-    odeme_tipi: DEFAULT_ODEME_TIPI
+    odeme_tipi: DEFAULT_ODEME_TIPI,
+    id: undefined,
+    secim_zamani: undefined,
+    secen_kullanici_id: undefined,
+    onceki_odeme_tipi: undefined,
+    gerekce: undefined
   };
 }
 

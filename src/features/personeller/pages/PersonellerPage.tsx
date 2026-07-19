@@ -198,6 +198,7 @@ export function PersonellerPage() {
   const canOpenDetail = hasPermission("personeller.detail.view");
   const canViewPuantaj = hasPermission("puantaj.view");
   const canViewBildirimler = hasPermission("bildirimler.view");
+  const canViewRevizyon = hasPermission("revizyon.view");
   const navigate = useNavigate();
   const [searchExpanded, setSearchExpanded] = useState(false);
   const [filterExpanded, setFilterExpanded] = useState(false);
@@ -208,6 +209,7 @@ export function PersonellerPage() {
   const page = listQuery.page;
   const departmanFilterOptions = toSelectOptions(refs.departmanOptions);
   const personelTipiFilterOptions = toSelectOptions(refs.personelTipiOptions);
+  const hasModuleLinks = canViewPuantaj || canViewBildirimler || canViewRevizyon;
 
   return (
     <section className="personeller-page" aria-labelledby="personeller-page-heading">
@@ -217,10 +219,10 @@ export function PersonellerPage() {
 
       <div
         className={`personeller-toolbar${
-          canViewPuantaj || canViewBildirimler ? " personeller-toolbar--has-module-links" : ""
+          hasModuleLinks ? " personeller-toolbar--has-module-links" : ""
         }`}
       >
-        {canViewPuantaj || canViewBildirimler ? (
+        {hasModuleLinks ? (
           <nav className="personeller-toolbar-top" aria-label="Personel kartı ilişkili modüller">
             <div className="personeller-toolbar-module-links">
               {canViewPuantaj ? (
@@ -231,6 +233,15 @@ export function PersonellerPage() {
               {canViewBildirimler ? (
                 <Link className="personeller-toolbar-module-link" to="/bildirimler">
                   Günlük Kayıt
+                </Link>
+              ) : null}
+              {canViewRevizyon ? (
+                <Link
+                  className="personeller-toolbar-module-link"
+                  to="/haftalik-kapanis/revizyonlar"
+                  data-testid="personeller-revizyon-merkezi-link"
+                >
+                  Revizyon Merkezi
                 </Link>
               ) : null}
             </div>

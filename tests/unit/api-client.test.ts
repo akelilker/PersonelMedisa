@@ -351,7 +351,7 @@ describe("apiRequest", () => {
     });
   });
 
-  it("emits forbidden event and throws ApiRequestError for 403 GET /personeller list", async () => {
+  it("does not emit global forbidden for 403 GET /personeller list (bootstrap)", async () => {
     const fetchMock = vi.fn(async () =>
       createJsonResponse(
         {
@@ -374,10 +374,7 @@ describe("apiRequest", () => {
       code: "FORBIDDEN"
     });
 
-    expect(forbiddenListener).toHaveBeenCalledWith({
-      status: 403,
-      path: "/personeller?page=1&limit=10"
-    });
+    expect(forbiddenListener).not.toHaveBeenCalled();
   });
 });
 
@@ -499,13 +496,14 @@ describe("shouldEmitGlobalAuthForbidden", () => {
     expect(shouldEmitGlobalAuthForbidden("/api/surecler?personel_id=2", "GET")).toBe(false);
     expect(shouldEmitGlobalAuthForbidden("/surecler/9", "GET")).toBe(false);
     expect(shouldEmitGlobalAuthForbidden("/bildirimler/4", "GET")).toBe(false);
+    expect(shouldEmitGlobalAuthForbidden("/bildirimler", "GET")).toBe(false);
+    expect(shouldEmitGlobalAuthForbidden("/personeller", "GET")).toBe(false);
+    expect(shouldEmitGlobalAuthForbidden("/personeller?page=1", "GET")).toBe(false);
     expect(shouldEmitGlobalAuthForbidden("/yonetim/subeler", "GET")).toBe(false);
     expect(shouldEmitGlobalAuthForbidden("/api/yonetim/subeler", "GET")).toBe(false);
   });
 
-  it("keeps global forbidden for list, sub-resources, puantaj and unknown paths", () => {
-    expect(shouldEmitGlobalAuthForbidden("/personeller", "GET")).toBe(true);
-    expect(shouldEmitGlobalAuthForbidden("/personeller?page=1", "GET")).toBe(true);
+  it("keeps global forbidden for sub-resources, puantaj and unknown paths", () => {
     expect(shouldEmitGlobalAuthForbidden("/gunluk-puantaj/2/2026-01-01", "GET")).toBe(true);
     expect(shouldEmitGlobalAuthForbidden("/yonetim/kullanicilar", "GET")).toBe(true);
     expect(shouldEmitGlobalAuthForbidden("/belge-kayitlari/9", "PUT")).toBe(true);

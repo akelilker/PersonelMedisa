@@ -77,6 +77,14 @@ export function RevizyonTalebiDetailPage() {
     try {
       const next = await action();
       setTalep(next);
+      // Action yaniti audit/enrichment icermeyebilir; detail GET canonical sunumdur.
+      if (revizyonId) {
+        try {
+          setTalep(await fetchRevizyonTalebiDetail(revizyonId));
+        } catch {
+          /* action basarili; enrichment yenileme opsiyonel */
+        }
+      }
       setActionMessage(success);
     } catch (error) {
       const code = error instanceof ApiRequestError ? error.code : undefined;
@@ -189,7 +197,7 @@ export function RevizyonTalebiDetailPage() {
           <dd>{talep.gerekce}</dd>
         </div>
         {canViewFinance ? (
-          <>
+          <div data-testid="revizyon-detail-bordro-alani">
             <div>
               <dt>Bordro etkisi</dt>
               <dd>{talep.bordro_etki_var_mi ? "Var" : "Yok"}</dd>
@@ -198,7 +206,7 @@ export function RevizyonTalebiDetailPage() {
               <dt>Bordro etki notu</dt>
               <dd>{talep.bordro_etki_notu ?? "—"}</dd>
             </div>
-          </>
+          </div>
         ) : null}
         <div>
           <dt>Talep eden</dt>
@@ -253,6 +261,7 @@ export function RevizyonTalebiDetailPage() {
             type="button"
             className="universal-btn-save"
             disabled={isActing}
+            data-testid="revizyon-onaya-gonder"
             onClick={() =>
               void runAction(() => submitRevizyonTalebi(talep.id), "Talep onaya gönderildi.")
             }
@@ -265,6 +274,7 @@ export function RevizyonTalebiDetailPage() {
             type="button"
             className="universal-btn-save"
             disabled={isActing}
+            data-testid="revizyon-onayla"
             onClick={() => {
               if (!window.confirm("Talebi onaylamak istediğinize emin misiniz?")) {
                 return;
@@ -283,6 +293,7 @@ export function RevizyonTalebiDetailPage() {
             type="button"
             className="universal-btn-cancel"
             disabled={isActing}
+            data-testid="revizyon-reddet"
             onClick={() => {
               if (!kararNotu.trim()) {
                 setActionError("Red için karar notu zorunludur.");
@@ -305,6 +316,7 @@ export function RevizyonTalebiDetailPage() {
             type="button"
             className="universal-btn-cancel"
             disabled={isActing}
+            data-testid="revizyon-talep-iptal"
             onClick={() => {
               if (!window.confirm("Talebi iptal etmek istediğinize emin misiniz?")) {
                 return;
@@ -323,6 +335,7 @@ export function RevizyonTalebiDetailPage() {
             type="button"
             className="universal-btn-save"
             disabled={isActing}
+            data-testid="revizyon-correction-uret"
             onClick={() =>
               void runAction(async () => {
                 await produceRevizyonCorrection(talep.id);
@@ -337,6 +350,7 @@ export function RevizyonTalebiDetailPage() {
           <button
             type="button"
             className="universal-btn-aux"
+            data-testid="revizyon-correction-detay-git"
             onClick={() => navigate(`/haftalik-kapanis/corrections/${talep.correction_event_id}`)}
           >
             Correction detayına git
@@ -347,6 +361,7 @@ export function RevizyonTalebiDetailPage() {
             type="button"
             className="universal-btn-cancel"
             disabled={isActing}
+            data-testid="revizyon-correction-iptal"
             onClick={() => {
               const aciklama = window.prompt("İptal açıklaması (opsiyonel):") ?? "";
               void runAction(async () => {
@@ -362,9 +377,13 @@ export function RevizyonTalebiDetailPage() {
         ) : null}
       </div>
 
-      {actionMessage ? <p className="workspace-success">{actionMessage}</p> : null}
+      {actionMessage ? (
+        <p className="workspace-success" data-testid="revizyon-action-success">
+          {actionMessage}
+        </p>
+      ) : null}
       {actionError ? (
-        <p className="workspace-error" role="alert">
+        <p className="workspace-error" role="alert" data-testid="revizyon-action-error">
           {actionError}
         </p>
       ) : null}

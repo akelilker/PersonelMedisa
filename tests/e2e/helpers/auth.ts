@@ -15,17 +15,12 @@ export const MOCK_ROLE_LOGIN: Record<MockUserRole, MockRoleCredentials> = {
   GENEL_YONETICI: { username: "yonetici", password: "secret" },
   BOLUM_YONETICISI: { username: "bolum_yoneticisi", password: "demo123" },
   MUHASEBE: { username: "muhasebe", password: "demo123" },
-  BIRIM_AMIRI: { username: "birim_amiri", password: "demo123" }
+  BIRIM_AMIRI: { username: "birim_amiri", password: "demo123" },
+  PATRON: { username: "patron", password: "demo123" }
 };
 
 async function ensureLoginForm(page: Page): Promise<void> {
-  await page.goto("/login", { waitUntil: "domcontentloaded" });
-
-  const username = page.locator('input[name="username"]');
-  for (let attempt = 0; attempt < 2; attempt++) {
-    if (await username.isVisible().catch(() => false)) {
-      return;
-    }
+  const clearAuthStorage = async () => {
     await page.evaluate((keys) => {
       for (const key of keys) {
         try {
@@ -36,9 +31,23 @@ async function ensureLoginForm(page: Page): Promise<void> {
         }
       }
     }, [...AUTH_SESSION_KEYS]);
+  };
+
+  await page.goto("/login", { waitUntil: "domcontentloaded" });
+  await clearAuthStorage();
+  await page.goto("/login", { waitUntil: "domcontentloaded" });
+
+  const username = page.locator('input[name="username"]');
+  for (let attempt = 0; attempt < 2; attempt++) {
+    await expect(page).toHaveURL(/\/login(?:\?|$)/);
+    if (await username.isVisible().catch(() => false)) {
+      return;
+    }
+    await clearAuthStorage();
     await page.goto("/login", { waitUntil: "domcontentloaded" });
   }
 
+  await expect(page).toHaveURL(/\/login(?:\?|$)/);
   await expect(username).toBeVisible({ timeout: 30_000 });
 }
 

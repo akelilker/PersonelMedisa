@@ -35,6 +35,7 @@ import {
   formatSgkHesaplamaModuLabel,
   timestampValue
 } from "./personel-dosya-format-utils";
+import { buildRevizyonTalebiCreatePath } from "../../../revizyon/revizyon-display";
 
 const BORDRO_ADAY_OZETI_HENUZ_OLUSMADI =
   "Bu ay için puantaj özeti henüz oluşmadı. Aday kalemler oluştuğunda burada gösterilir.";
@@ -222,7 +223,7 @@ function PersonelRevizyonCorrectionPanel({
             {canCreateRevizyon ? (
               <Link
                 className="universal-btn-save"
-                to={`/haftalik-kapanis/revizyonlar/yeni?personel_id=${personelId}`}
+                to={buildRevizyonTalebiCreatePath({ personel_id: personelId })}
                 data-testid="personel-revizyon-talebi-ac"
               >
                 Revizyon Talebi Aç

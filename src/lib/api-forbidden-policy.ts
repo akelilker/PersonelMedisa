@@ -67,6 +67,15 @@ export function shouldEmitGlobalAuthForbidden(path: string, method?: string): bo
     return false;
   }
 
+  // Bootstrap / header preview: yetkisiz roller icin 403 beklenir, global redirect yapma.
+  if (normalizedMethod === "GET" && normalizedPath === "/bildirimler") {
+    return false;
+  }
+
+  if (normalizedMethod === "GET" && normalizedPath === "/personeller") {
+    return false;
+  }
+
   // Scoped roller oturumdaki sube_list ile calisir; yonetim listesi 403 beklenen bir fallback'tir.
   if (normalizedMethod === "GET" && normalizedPath === "/yonetim/subeler") {
     return false;

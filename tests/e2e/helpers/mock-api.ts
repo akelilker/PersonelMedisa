@@ -19,7 +19,20 @@ import {
   resolveAyBounds
 } from "../../../src/lib/bildirim/aylik-bildirim-onay";
 
-export type MockUserRole = "GENEL_YONETICI" | "BOLUM_YONETICISI" | "MUHASEBE" | "BIRIM_AMIRI";
+export type MockUserRole =
+  | "GENEL_YONETICI"
+  | "BOLUM_YONETICISI"
+  | "MUHASEBE"
+  | "BIRIM_AMIRI"
+  | "PATRON";
+
+const MOCK_ROLE_USER_ID: Record<MockUserRole, number> = {
+  GENEL_YONETICI: 1,
+  MUHASEBE: 2,
+  BIRIM_AMIRI: 3,
+  BOLUM_YONETICISI: 4,
+  PATRON: 5
+};
 
 type MockApiOptions = {
   belgeReferenceDate?: Date;
@@ -1921,8 +1934,8 @@ export async function mockApi(page: Page, role: MockUserRole, options: MockApiOp
       kaynak_tipi: string;
       kaynak_id: number;
       revizyon_tipi: string;
-      onceki_deger: string | number | boolean | null;
-      talep_edilen_deger: string | number | boolean | null;
+      onceki_deger: string | number | boolean | Record<string, unknown> | null;
+      talep_edilen_deger: string | number | boolean | Record<string, unknown> | null;
       gerekce: string;
       talep_eden_kullanici_id: number;
       talep_zamani: string;
@@ -1936,7 +1949,7 @@ export async function mockApi(page: Page, role: MockUserRole, options: MockApiOp
     }
   >();
   let nextRevizyonTalebiId = 1;
-  const closedRevizyonWeeks = new Set<string>();
+  const closedRevizyonWeeks = new Set<string>(["2024-01-01|2024-01-07"]);
   const revizyonCorrectionById = new Map<
     number,
     {
@@ -3725,7 +3738,7 @@ let personelBelgeKaydiIdCounter = 903;
             .filter((item) => item.durum === "AKTIF" && (mockUserSubeIds.length === 0 || mockUserSubeIds.includes(item.id)))
             .map((item) => ({ id: item.id, ad: item.ad })),
           user: {
-            id: 1,
+            id: MOCK_ROLE_USER_ID[role],
             ad_soyad: "Mock Kullanıcı",
             rol: role,
             sube_ids: mockUserSubeIds
@@ -7879,6 +7892,7 @@ let personelBelgeKaydiIdCounter = 903;
       if (await denyUnlessRolePermission(route, "revizyon.view")) return;
       const personelId = Number.parseInt(url.searchParams.get("personel_id") ?? "", 10);
       const durum = url.searchParams.get("durum");
+      const canViewFinance = hasRolePermission(role, "revizyon.view_finance_effect");
       const items = Array.from(revizyonTalebiById.values())
         .filter((t) => !Number.isFinite(personelId) || t.personel_id === personelId)
         .filter((t) => !durum || t.durum === durum)
@@ -7887,6 +7901,27 @@ let personelBelgeKaydiIdCounter = 903;
             return a.talep_zamani < b.talep_zamani ? 1 : -1;
           }
           return b.id - a.id;
+        })
+        .map((t) => {
+          const personel = personeller.find((p) => p.id === t.personel_id);
+          const activeCorrection =
+            t.correction_event_id != null ? revizyonCorrectionById.get(t.correction_event_id) : undefined;
+          const aktif = activeCorrection != null && !activeCorrection.iptal_edildi_mi;
+          const row: Record<string, unknown> = {
+            ...t,
+            personel_ad_soyad: personel ? `${personel.ad} ${personel.soyad}` : null,
+            sicil_no: personel?.sicil_no ?? null,
+            sube_adi: personel?.sube_adi ?? null,
+            departman_adi: personel?.departman_adi ?? null,
+            talep_eden_kullanici_adi: "Mock Kullanıcı",
+            aktif_correction_var_mi: aktif,
+            correction_durumu: aktif ? "AKTIF" : t.correction_event_id != null ? "IPTAL" : null
+          };
+          if (!canViewFinance) {
+            delete row.bordro_etki_var_mi;
+            delete row.bordro_etki_notu;
+          }
+          return row;
         });
       await fulfillJson(route, 200, okBody({ items }));
       return;
@@ -7935,31 +7970,65 @@ let personelBelgeKaydiIdCounter = 903;
         await fulfillJson(route, 409, errorBody("ALREADY_EXISTS", "Acik revizyon talebi mevcut."));
         return;
       }
-      const actor = { id: 1, role };
+      const actor = { id: MOCK_ROLE_USER_ID[role], role };
       const id = nextRevizyonTalebiId++;
+      const canonicalOnceki = {
+        giris_saati: "08:00",
+        cikis_saati: "17:00",
+        server_owned: true
+      };
+      if (
+        payload.onceki_deger !== undefined &&
+        JSON.stringify(payload.onceki_deger) !== JSON.stringify(canonicalOnceki)
+      ) {
+        await fulfillJson(
+          route,
+          422,
+          errorBody(
+            "VALIDATION_ERROR",
+            "onceki_deger sunucu tarafindan cozumlenir; gonderilen deger uyusmuyor.",
+            "onceki_deger"
+          )
+        );
+        return;
+      }
+      const personel = personeller.find((p) => p.id === personel_id);
+      const canViewFinance = hasRolePermission(role, "revizyon.view_finance_effect");
       const talep = {
         id,
         personel_id,
+        personel_ad_soyad: personel ? `${personel.ad} ${personel.soyad}` : null,
+        sicil_no: personel?.sicil_no ?? null,
+        sube_id: personel?.sube_id ?? null,
+        sube_adi: personel?.sube_adi ?? null,
+        departman_id: personel?.departman_id ?? null,
+        departman_adi: personel?.departman_adi ?? null,
         hafta_baslangic,
         hafta_bitis,
         etkilenen_tarih,
         kaynak_tipi,
         kaynak_id,
         revizyon_tipi: String(payload.revizyon_tipi ?? "PUANTAJ_GIRIS_CIKIS_DUZELTME"),
-        onceki_deger: (payload.onceki_deger as string | number | boolean | null) ?? null,
+        onceki_deger: canonicalOnceki,
         talep_edilen_deger: (payload.talep_edilen_deger as string | number | boolean | null) ?? null,
         gerekce,
         talep_eden_kullanici_id: actor.id,
+        talep_eden_kullanici_adi: "Mock Kullanıcı",
         talep_zamani: new Date().toISOString(),
         durum: "TASLAK" as const,
         karar_veren_kullanici_id: null,
+        karar_veren_kullanici_adi: null,
         karar_zamani: null,
         karar_notu: null,
-        bordro_etki_var_mi: payload.bordro_etki_var_mi === true,
-        bordro_etki_notu: payload.bordro_etki_notu == null ? null : String(payload.bordro_etki_notu),
-        correction_event_id: null
+        bordro_etki_var_mi: canViewFinance ? payload.bordro_etki_var_mi === true : false,
+        bordro_etki_notu:
+          canViewFinance && payload.bordro_etki_notu != null ? String(payload.bordro_etki_notu) : null,
+        correction_event_id: null,
+        correction_durumu: null,
+        aktif_correction_var_mi: false,
+        aktif_correction_sonrasi_deger: null
       };
-      revizyonTalebiById.set(id, talep);
+      revizyonTalebiById.set(id, talep as never);
       await fulfillJson(route, 201, okBody(talep));
       return;
     }
@@ -7972,7 +8041,59 @@ let personelBelgeKaydiIdCounter = 903;
         await fulfillJson(route, 404, errorBody("NOT_FOUND", "Revizyon talebi bulunamadi."));
         return;
       }
-      await fulfillJson(route, 200, okBody(talep));
+      const personel = personeller.find((p) => p.id === talep.personel_id);
+      const activeCorrection =
+        talep.correction_event_id != null
+          ? revizyonCorrectionById.get(talep.correction_event_id)
+          : undefined;
+      const aktif =
+        activeCorrection != null && !activeCorrection.iptal_edildi_mi ? activeCorrection : null;
+      const canViewFinance = hasRolePermission(role, "revizyon.view_finance_effect");
+      const canViewAudit = hasRolePermission(role, "revizyon.view_audit_history");
+      const presented: Record<string, unknown> = {
+        ...talep,
+        personel_ad_soyad: personel ? `${personel.ad} ${personel.soyad}` : null,
+        sicil_no: personel?.sicil_no ?? null,
+        sube_id: personel?.sube_id ?? null,
+        sube_adi: personel?.sube_adi ?? null,
+        departman_id: personel?.departman_id ?? null,
+        departman_adi: personel?.departman_adi ?? null,
+        talep_eden_kullanici_adi: "Mock Kullanıcı",
+        karar_veren_kullanici_adi: talep.karar_veren_kullanici_id != null ? "Mock Karar Veren" : null,
+        aktif_correction_var_mi: aktif != null,
+        aktif_correction_sonrasi_deger: aktif ? aktif.yeni_deger : null,
+        correction_durumu: aktif ? "AKTIF" : talep.correction_event_id != null ? "IPTAL" : null
+      };
+      if (!canViewFinance) {
+        delete presented.bordro_etki_var_mi;
+        delete presented.bordro_etki_notu;
+      }
+      if (canViewAudit) {
+        presented.audit_gecmisi = [
+          {
+            aksiyon: "OLUSTUR",
+            onceki_durum: null,
+            sonraki_durum: "TASLAK",
+            islem_yapan_kullanici_id: talep.talep_eden_kullanici_id ?? MOCK_ROLE_USER_ID[role],
+            islem_yapan_kullanici_adi: "Mock Kullanıcı",
+            islem_zamani: talep.talep_zamani,
+            aciklama: talep.gerekce
+          }
+        ];
+        if (talep.durum !== "TASLAK") {
+          (presented.audit_gecmisi as Array<Record<string, unknown>>).push({
+            aksiyon: talep.durum,
+            onceki_durum: "TASLAK",
+            sonraki_durum: talep.durum,
+            islem_yapan_kullanici_id:
+              talep.karar_veren_kullanici_id ?? MOCK_ROLE_USER_ID[role],
+            islem_yapan_kullanici_adi: "Mock Karar Veren",
+            islem_zamani: talep.karar_zamani ?? talep.talep_zamani,
+            aciklama: talep.karar_notu
+          });
+        }
+      }
+      await fulfillJson(route, 200, okBody(presented));
       return;
     }
 
@@ -7996,7 +8117,7 @@ let personelBelgeKaydiIdCounter = 903;
         await fulfillJson(route, 404, errorBody("NOT_FOUND", "Revizyon talebi bulunamadi."));
         return;
       }
-      const actor = { id: 1, role };
+      const actor = { id: MOCK_ROLE_USER_ID[role], role };
       const payload = (request.postDataJSON() ?? {}) as Record<string, unknown>;
       const kararNotu =
         payload.karar_notu == null ? null : String(payload.karar_notu).trim() || null;

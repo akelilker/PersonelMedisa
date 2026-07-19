@@ -78,7 +78,7 @@ function AuthNavigationEffects() {
 
   useEffect(() => {
     return onAuthForbidden(() => {
-      if (location.pathname === "/yetkisiz") {
+      if (location.pathname === "/yetkisiz" || location.pathname === "/login") {
         return;
       }
 

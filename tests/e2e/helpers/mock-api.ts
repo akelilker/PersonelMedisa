@@ -1937,6 +1937,35 @@ export async function mockApi(page: Page, role: MockUserRole, options: MockApiOp
   >();
   let nextRevizyonTalebiId = 1;
   const closedRevizyonWeeks = new Set<string>();
+  const revizyonCorrectionById = new Map<
+    number,
+    {
+      id: number;
+      revizyon_talebi_id: number;
+      personel_id: number;
+      hafta_baslangic: string;
+      hafta_bitis: string;
+      etkilenen_tarih: string;
+      kaynak_tipi: string;
+      kaynak_id: number;
+      correction_tipi: string;
+      onceki_deger: string | number | boolean | null;
+      yeni_deger: string | number | boolean | null;
+      delta_dakika: number;
+      delta_gun: number;
+      bordro_etki_var_mi: boolean;
+      bordro_etki_tipi: string | null;
+      aciklama: string | null;
+      olusturan_kullanici_id: number;
+      olusturma_zamani: string;
+      iptal_edildi_mi: boolean;
+      iptal_zamani: string | null;
+      iptal_eden_kullanici_id: number | null;
+      audit_ref: string;
+      snapshot_ref: string | null;
+    }
+  >();
+  let nextRevizyonCorrectionId = 1;
   const fcotTercihBySnapshotId = new Map<
     number,
     {
@@ -7988,6 +8017,159 @@ let personelBelgeKaydiIdCounter = 903;
       }
       revizyonTalebiById.set(talepId, talep);
       await fulfillJson(route, 200, okBody(talep));
+      return;
+    }
+
+    const correctionProduceMatch = path.match(
+      /^\/api\/haftalik-kapanis\/revizyon-talepleri\/(\d+)\/correction-uret$/
+    );
+    if (correctionProduceMatch && method === "POST") {
+      if (await denyUnlessRolePermission(route, "revizyon.approve")) return;
+      const talepId = Number(correctionProduceMatch[1]);
+      const payload = (request.postDataJSON() ?? {}) as Record<string, unknown>;
+      if (Object.keys(payload).length > 0) {
+        await fulfillJson(route, 400, errorBody("INVALID_CORRECTION_PAYLOAD", "Body bos olmalidir."));
+        return;
+      }
+      const talep = revizyonTalebiById.get(talepId);
+      if (!talep) {
+        await fulfillJson(route, 404, errorBody("CORRECTION_TARGET_NOT_FOUND", "Talep bulunamadi."));
+        return;
+      }
+      if (talep.durum !== "ONAYLANDI") {
+        await fulfillJson(
+          route,
+          409,
+          errorBody("CORRECTION_NOT_ALLOWED_FOR_STATE", "Yalniz ONAYLANDI.")
+        );
+        return;
+      }
+      if (talep.correction_event_id != null || Array.from(revizyonCorrectionById.values()).some((c) => c.revizyon_talebi_id === talepId)) {
+        await fulfillJson(route, 409, errorBody("CORRECTION_ALREADY_EXISTS", "Correction mevcut."));
+        return;
+      }
+      if (talep.revizyon_tipi === "SUREC_GEC_GIRIS") {
+        await fulfillJson(route, 404, errorBody("CORRECTION_TARGET_NOT_FOUND", "Tip desteklenmiyor."));
+        return;
+      }
+      const tipMap: Record<string, string> = {
+        PUANTAJ_GIRIS_CIKIS_DUZELTME: "GIRIS_CIKIS_DUZELTME",
+        MOLA_DUZELTME: "MOLA_DUZELTME",
+        DEVAMSIZLIK_DUZELTME: "DEVAMSIZLIK_DUZELTME",
+        SERBEST_ZAMAN_ETKI_DUZELTME: "SERBEST_ZAMAN_ETKI_DUZELTME",
+        KAPANIS_HESAP_REVIZYONU: "KAPANIS_HESAP_REVIZYONU",
+        BORDRO_ETKI_NOTU: "BORDRO_ETKI_NOTU"
+      };
+      const correction_tipi = tipMap[talep.revizyon_tipi];
+      if (!correction_tipi) {
+        await fulfillJson(route, 404, errorBody("CORRECTION_TARGET_NOT_FOUND", "Tip desteklenmiyor."));
+        return;
+      }
+      const onceki = talep.onceki_deger;
+      const yeni = talep.talep_edilen_deger;
+      const delta_dakika =
+        typeof onceki === "number" && typeof yeni === "number" ? yeni - onceki : 0;
+      const id = nextRevizyonCorrectionId++;
+      const correction = {
+        id,
+        revizyon_talebi_id: talepId,
+        personel_id: talep.personel_id,
+        hafta_baslangic: talep.hafta_baslangic,
+        hafta_bitis: talep.hafta_bitis,
+        etkilenen_tarih: talep.etkilenen_tarih,
+        kaynak_tipi: talep.kaynak_tipi,
+        kaynak_id: talep.kaynak_id,
+        correction_tipi,
+        onceki_deger: onceki,
+        yeni_deger: yeni,
+        delta_dakika,
+        delta_gun: 0,
+        bordro_etki_var_mi: talep.bordro_etki_var_mi,
+        bordro_etki_tipi: talep.bordro_etki_var_mi ? talep.revizyon_tipi : null,
+        aciklama: talep.karar_notu ?? talep.gerekce,
+        olusturan_kullanici_id: 1,
+        olusturma_zamani: new Date().toISOString(),
+        iptal_edildi_mi: false,
+        iptal_zamani: null,
+        iptal_eden_kullanici_id: null,
+        audit_ref: `REV-CORR-${talepId}-${id}`,
+        snapshot_ref: "snapshot:1"
+      };
+      revizyonCorrectionById.set(id, correction);
+      talep.correction_event_id = id;
+      revizyonTalebiById.set(talepId, talep);
+      await fulfillJson(route, 200, okBody(correction));
+      return;
+    }
+
+    if (path === "/api/haftalik-kapanis/revizyon-corrections" && method === "GET") {
+      if (await denyUnlessRolePermission(route, "revizyon.view")) return;
+      const talepId = Number.parseInt(url.searchParams.get("revizyon_talebi_id") ?? "", 10);
+      const personelId = Number.parseInt(url.searchParams.get("personel_id") ?? "", 10);
+      const items = Array.from(revizyonCorrectionById.values())
+        .filter((c) => !Number.isFinite(talepId) || c.revizyon_talebi_id === talepId)
+        .filter((c) => !Number.isFinite(personelId) || c.personel_id === personelId)
+        .sort((a, b) => {
+          if (a.olusturma_zamani !== b.olusturma_zamani) {
+            return a.olusturma_zamani < b.olusturma_zamani ? 1 : -1;
+          }
+          return b.id - a.id;
+        });
+      await fulfillJson(route, 200, okBody({ items }));
+      return;
+    }
+
+    const correctionDetailMatch = path.match(/^\/api\/haftalik-kapanis\/revizyon-corrections\/(\d+)$/);
+    if (correctionDetailMatch && method === "GET") {
+      if (await denyUnlessRolePermission(route, "revizyon.view")) return;
+      const correction = revizyonCorrectionById.get(Number(correctionDetailMatch[1]));
+      if (!correction) {
+        await fulfillJson(route, 404, errorBody("CORRECTION_NOT_FOUND", "Correction bulunamadi."));
+        return;
+      }
+      const presented =
+        role === "BIRIM_AMIRI"
+          ? {
+              ...correction,
+              bordro_etki_tipi: null,
+              aciklama: correction.bordro_etki_var_mi ? null : correction.aciklama
+            }
+          : correction;
+      await fulfillJson(route, 200, okBody(presented));
+      return;
+    }
+
+    const correctionCancelMatch = path.match(
+      /^\/api\/haftalik-kapanis\/revizyon-corrections\/(\d+)\/iptal$/
+    );
+    if (correctionCancelMatch && method === "POST") {
+      if (await denyUnlessRolePermission(route, "revizyon.approve")) return;
+      const correctionId = Number(correctionCancelMatch[1]);
+      const payload = (request.postDataJSON() ?? {}) as Record<string, unknown>;
+      for (const key of Object.keys(payload)) {
+        if (key !== "aciklama") {
+          await fulfillJson(route, 400, errorBody("INVALID_CORRECTION_PAYLOAD", "Bilinmeyen alan."));
+          return;
+        }
+      }
+      if (
+        Object.prototype.hasOwnProperty.call(payload, "aciklama") &&
+        payload.aciklama !== null &&
+        typeof payload.aciklama !== "string"
+      ) {
+        await fulfillJson(route, 400, errorBody("INVALID_CORRECTION_PAYLOAD", "aciklama metin olmalidir."));
+        return;
+      }
+      const correction = revizyonCorrectionById.get(correctionId);
+      if (!correction || correction.iptal_edildi_mi) {
+        await fulfillJson(route, 404, errorBody("CORRECTION_NOT_FOUND", "Correction bulunamadi."));
+        return;
+      }
+      correction.iptal_edildi_mi = true;
+      correction.iptal_zamani = new Date().toISOString();
+      correction.iptal_eden_kullanici_id = 1;
+      revizyonCorrectionById.set(correctionId, correction);
+      await fulfillJson(route, 200, okBody(correction));
       return;
     }
 

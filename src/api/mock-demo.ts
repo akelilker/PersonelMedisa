@@ -2141,6 +2141,18 @@ function buildDemoRevizyonCorrectionListResponse(
     return permissionError;
   }
 
+  const allowedQueryKeys = new Set([
+    "revizyon_talebi_id",
+    "personel_id",
+    "hafta_baslangic",
+    "hafta_bitis"
+  ]);
+  for (const key of searchUrl.searchParams.keys()) {
+    if (!allowedQueryKeys.has(key)) {
+      return demoCorrectionError("INVALID_CORRECTION_PAYLOAD", "Bilinmeyen query alani.");
+    }
+  }
+
   const revizyonTalebiId = toNumber(searchUrl.searchParams.get("revizyon_talebi_id"));
   const personelId = toNumber(searchUrl.searchParams.get("personel_id"));
   const haftaBaslangic = toStringValue(searchUrl.searchParams.get("hafta_baslangic"));
@@ -2173,6 +2185,13 @@ function buildDemoRevizyonCorrectionListResponse(
         talep,
         findDemoPersonelDepartmanId(talep.personel_id)
       );
+    })
+    .sort((a, b) => {
+      const timeCmp = b.olusturma_zamani.localeCompare(a.olusturma_zamani);
+      if (timeCmp !== 0) {
+        return timeCmp;
+      }
+      return b.id - a.id;
     })
     .map((correction) => presentDemoRevizyonCorrection(actor, correction));
 
@@ -2213,7 +2232,8 @@ function buildDemoRevizyonCorrectionDetailResponse(
 
 function produceDemoRevizyonCorrection(
   talepId: number,
-  actor: RevizyonActorContext
+  actor: RevizyonActorContext,
+  body: Record<string, unknown> = {}
 ): ApiResponse<unknown> {
   const permissionError = enforceDemoRevizyonPermission(
     actor,
@@ -2232,9 +2252,18 @@ function produceDemoRevizyonCorrection(
     );
   }
 
+  for (const key of Object.keys(body)) {
+    return demoCorrectionError("INVALID_CORRECTION_PAYLOAD", "Correction uretim body bos olmalidir.");
+  }
+
   const talep = findDemoRevizyonTalebi(talepId);
   if (!talep) {
     return demoCorrectionError("CORRECTION_TARGET_NOT_FOUND", "Revizyon talebi bulunamadi.");
+  }
+
+  const personelDepartmanId = findDemoPersonelDepartmanId(talep.personel_id);
+  if (!canViewRevizyonCorrection(actor, talep, personelDepartmanId)) {
+    return demoCorrectionError("CORRECTION_SCOPE_DENIED", "Revizyon correction kapsam disi.");
   }
 
   const nowIso = new Date().toISOString();
@@ -2263,6 +2292,12 @@ function cancelDemoRevizyonCorrection(
     );
   }
 
+  for (const key of Object.keys(body)) {
+    if (key !== "aciklama") {
+      return demoCorrectionError("INVALID_CORRECTION_PAYLOAD", "Bilinmeyen correction iptal alani.");
+    }
+  }
+
   const correction = findDemoRevizyonCorrection(correctionId);
   if (!correction) {
     return demoCorrectionError("CORRECTION_NOT_FOUND", "Revizyon correction bulunamadi.");
@@ -2278,14 +2313,25 @@ function cancelDemoRevizyonCorrection(
     return demoCorrectionError("CORRECTION_TARGET_NOT_FOUND", "Revizyon talebi bulunamadi.");
   }
 
+  const personelDepartmanId = findDemoPersonelDepartmanId(talep.personel_id);
+  if (!canViewRevizyonCorrection(actor, talep, personelDepartmanId)) {
+    return demoCorrectionError("CORRECTION_SCOPE_DENIED", "Revizyon correction kapsam disi.");
+  }
+
+  // iptal aciklamasi internal-only; public aciklama (karar_notu/gerekce) korunur.
+  if (Object.prototype.hasOwnProperty.call(body, "aciklama")) {
+    const raw = body.aciklama;
+    if (raw !== null && typeof raw !== "string") {
+      return demoCorrectionError("INVALID_CORRECTION_PAYLOAD", "aciklama metin olmalidir.");
+    }
+    if (typeof raw === "string" && raw.trim().length > 1000) {
+      return demoCorrectionError("INVALID_CORRECTION_PAYLOAD", "aciklama en fazla 1000 karakter olabilir.");
+    }
+  }
+
   correction.iptal_edildi_mi = true;
   correction.iptal_zamani = new Date().toISOString();
   correction.iptal_eden_kullanici_id = actor.userId;
-
-  const iptalAciklama = toStringValue(body.aciklama);
-  if (iptalAciklama) {
-    correction.aciklama = iptalAciklama;
-  }
 
   demoState.revizyonCorrectionById[correctionId] = correction;
 
@@ -4633,7 +4679,7 @@ export function resolveDemoApiResponse(
   );
   if (revizyonCorrectionProduceMatch && method === "POST") {
     const talepId = Number.parseInt(revizyonCorrectionProduceMatch[1], 10);
-    return produceDemoRevizyonCorrection(talepId, readDemoRevizyonActor(init));
+    return produceDemoRevizyonCorrection(talepId, readDemoRevizyonActor(init), body);
   }
 
   if (pathname === "/haftalik-kapanis/revizyon-corrections" && method === "GET") {

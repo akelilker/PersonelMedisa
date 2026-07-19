@@ -18,12 +18,20 @@ class Request
     /** @var array<string, mixed>|null */
     private $jsonBody;
 
+    /** @var bool */
+    private $jsonBodyInvalid = false;
+
+    /** @var bool */
+    private $jsonBodyParsed = false;
+
     public function __construct()
     {
         $this->method = strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET');
         $this->path = self::normalizePath($_SERVER['REQUEST_URI'] ?? '/');
         $this->headers = self::readHeaders();
         $this->jsonBody = null;
+        $this->jsonBodyInvalid = false;
+        $this->jsonBodyParsed = false;
     }
 
     public function getMethod()
@@ -60,20 +68,40 @@ class Request
     /** @return array<string, mixed> */
     public function getJsonBody()
     {
-        if ($this->jsonBody !== null) {
-            return $this->jsonBody;
+        $this->parseJsonBody();
+
+        return $this->jsonBody ?? [];
+    }
+
+    public function hasInvalidJsonBody(): bool
+    {
+        $this->parseJsonBody();
+
+        return $this->jsonBodyInvalid;
+    }
+
+    private function parseJsonBody(): void
+    {
+        if ($this->jsonBodyParsed || $this->jsonBody !== null) {
+            $this->jsonBodyParsed = true;
+            return;
         }
 
+        $this->jsonBodyParsed = true;
         $raw = file_get_contents('php://input');
         if ($raw === false || trim($raw) === '') {
             $this->jsonBody = [];
-            return $this->jsonBody;
+            return;
         }
 
         $decoded = json_decode($raw, true);
-        $this->jsonBody = is_array($decoded) ? $decoded : [];
+        if (json_last_error() !== JSON_ERROR_NONE || !is_array($decoded)) {
+            $this->jsonBodyInvalid = true;
+            $this->jsonBody = [];
+            return;
+        }
 
-        return $this->jsonBody;
+        $this->jsonBody = $decoded;
     }
 
     private static function normalizePath($uri)

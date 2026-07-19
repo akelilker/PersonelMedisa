@@ -2,36 +2,6 @@
   "version": 1,
   "entries": [
     {
-      "method": "POST",
-      "path": "/haftalik-kapanis/revizyon-talepleri/:id/correction-uret",
-      "category": "approved_deferred",
-      "gapId": "D-COR-01",
-      "reason": "Correction uretimi deferred from S78-A; no PHP produce owner yet.",
-      "owner": "RevizyonController",
-      "targetPhase": "S78-D",
-      "introducedOrConfirmedAt": "2026-07-18"
-    },
-    {
-      "method": "GET",
-      "path": "/haftalik-kapanis/revizyon-corrections/:id",
-      "category": "approved_deferred",
-      "gapId": "D-COR-02",
-      "reason": "Correction detail deferred; PHP corrections list-only today.",
-      "owner": "RevizyonController",
-      "targetPhase": "S78-D",
-      "introducedOrConfirmedAt": "2026-07-18"
-    },
-    {
-      "method": "POST",
-      "path": "/haftalik-kapanis/revizyon-corrections/:id/iptal",
-      "category": "approved_deferred",
-      "gapId": "D-COR-03",
-      "reason": "Correction iptal write deferred from S78-A.",
-      "owner": "RevizyonController",
-      "targetPhase": "S78-D",
-      "introducedOrConfirmedAt": "2026-07-18"
-    },
-    {
       "method": "PUT",
       "path": "/belge-kayitlari/:id",
       "category": "approved_deferred",

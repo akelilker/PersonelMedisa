@@ -70,6 +70,16 @@ describe("haftalik bildirim mutabakati", () => {
     expect(resolveHaftalikMutabakatApproval(counts(), null).onaylanabilir_mi).toBe(true);
   });
 
+  it("eksik_gun varsayilan 0 iken onaylanabilirligi bozmaz", () => {
+    expect(resolveHaftalikMutabakatApproval(counts({ eksik_gun: 0 }), null).onaylanabilir_mi).toBe(true);
+  });
+
+  it("eksik_gun > 0 ise onayi bloklar", () => {
+    const result = resolveHaftalikMutabakatApproval(counts({ eksik_gun: 2 }), null);
+    expect(result.onaylanabilir_mi).toBe(false);
+    expect(result.blok_nedeni).toBe("Bu hafta için tamamlanmamış bildirimler var.");
+  });
+
   it.each([
     [counts({ taslak: 1 }), null],
     [counts({ duzeltme_istendi: 1 }), null],

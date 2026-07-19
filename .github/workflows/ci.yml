@@ -107,3 +107,25 @@ jobs:
 
       - name: Run S80 Revizyon Merkezi Playwright
         run: npm run e2e:s80
+
+  s81-e2e:
+    name: S81 Bildirim ve Onay Zinciri E2E
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.58.2-noble
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run S81 Bildirim ve Onay Zinciri Playwright
+        run: npm run e2e:s81

@@ -7,6 +7,15 @@ export type HaftalikBildirimMutabakatCounts = {
   duzeltme_istendi: number;
   haftalik_mutabakata_alindi: number;
   iptal: number;
+  eksik_gun?: number;
+  tamamlanan_gun?: number;
+};
+
+export type HaftalikMutabakatBlok = {
+  tur: string;
+  mesaj: string;
+  tarih?: string | null;
+  bildirim_id?: number | null;
 };
 
 export type HaftalikBildirimMutabakatOzet = {
@@ -18,6 +27,8 @@ export type HaftalikBildirimMutabakatOzet = {
   onaylanabilir_mi: boolean;
   blok_nedeni: string | null;
   mevcut_mutabakat_id: number | null;
+  eksik_gunler?: string[];
+  bloklar?: HaftalikMutabakatBlok[];
 };
 
 export type HaftalikBildirimMutabakat = {

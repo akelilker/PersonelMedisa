@@ -33,6 +33,10 @@ class HaftalikBildirimMutabakatlariController
         self::assertAmirScope($pdo, $subeId, $amirId);
         $counts = self::fetchCounts($pdo, $subeId, $amirId, $haftaBaslangic, $haftaBitis);
         $existing = self::fetchExisting($pdo, $subeId, $amirId, $haftaBaslangic);
+        $completionMeta = self::fetchCompletionMeta($pdo, $subeId, $amirId, $haftaBaslangic, $haftaBitis);
+        $counts['eksik_gun'] = $completionMeta['eksik_gun'];
+        $counts['tamamlanan_gun'] = $completionMeta['tamamlanan_gun'];
+        $bloklar = self::buildBloklar($pdo, $subeId, $amirId, $haftaBaslangic, $haftaBitis, $completionMeta['eksik_gunler']);
         [$canApprove, $blockReason] = self::approvalState($counts, $existing);
 
         JsonResponse::success([
@@ -43,6 +47,8 @@ class HaftalikBildirimMutabakatlariController
                 ? $amirId
                 : ($existing ? (int) $existing['birim_amiri_user_id'] : null),
             'counts' => $counts,
+            'eksik_gunler' => $completionMeta['eksik_gunler'],
+            'bloklar' => $bloklar,
             'onaylanabilir_mi' => $canApprove,
             'blok_nedeni' => $blockReason,
             'mevcut_mutabakat_id' => $existing ? (int) $existing['id'] : null,
@@ -72,6 +78,9 @@ class HaftalikBildirimMutabakatlariController
             }
 
             $counts = self::fetchCounts($pdo, $subeId, $amirId, $haftaBaslangic, $haftaBitis, true);
+            $completionMeta = self::fetchCompletionMeta($pdo, $subeId, $amirId, $haftaBaslangic, $haftaBitis);
+            $counts['eksik_gun'] = $completionMeta['eksik_gun'];
+            $counts['tamamlanan_gun'] = $completionMeta['tamamlanan_gun'];
             [$canApprove, $blockReason] = self::approvalState($counts, null);
             if (!$canApprove) {
                 self::rollbackConflict($pdo, (string) $blockReason);
@@ -254,6 +263,7 @@ class HaftalikBildirimMutabakatlariController
         $counts = [
             'toplam' => 0, 'taslak' => 0, 'gonderildi' => 0,
             'duzeltme_istendi' => 0, 'haftalik_mutabakata_alindi' => 0, 'iptal' => 0,
+            'eksik_gun' => 0, 'tamamlanan_gun' => 0,
         ];
         $map = [
             'TASLAK' => 'taslak', 'GONDERILDI' => 'gonderildi',
@@ -273,11 +283,151 @@ class HaftalikBildirimMutabakatlariController
     private static function approvalState(array $counts, $existing)
     {
         if ($existing) return [false, 'Bu hafta icin mutabakat zaten mevcut.'];
+        if (($counts['eksik_gun'] ?? 0) > 0) return [false, 'Bu hafta için tamamlanmamış bildirimler var.'];
         if ($counts['taslak'] > 0) return [false, 'Haftada taslak bildirim bulunuyor.'];
         if ($counts['duzeltme_istendi'] > 0) return [false, 'Haftada duzeltme bekleyen bildirim bulunuyor.'];
         if ($counts['haftalik_mutabakata_alindi'] > 0) return [false, 'Haftadaki bildirimler daha once mutabakata alinmis.'];
         if ($counts['gonderildi'] < 1) return [false, 'Mutabakata alinacak gonderilmis bildirim bulunamadi.'];
         return [true, null];
+    }
+
+    /**
+     * @return array{eksik_gun:int, tamamlanan_gun:int, eksik_gunler:array<int, string>}
+     */
+    private static function fetchCompletionMeta(PDO $pdo, $subeId, $amirId, $start, $end)
+    {
+        $empty = ['eksik_gun' => 0, 'tamamlanan_gun' => 0, 'eksik_gunler' => []];
+        if (!self::isCompletionTableReady($pdo)) {
+            return $empty;
+        }
+
+        try {
+            $tz = new \DateTimeZone('Europe/Istanbul');
+            $today = (new \DateTimeImmutable('now', $tz))->format('Y-m-d');
+        } catch (\Throwable $e) {
+            $today = date('Y-m-d');
+        }
+
+        $completed = [];
+        $stmt = $pdo->prepare('
+            SELECT tarih
+            FROM gunluk_bildirim_tamamlamalari
+            WHERE sube_id = :sube_id
+              AND birim_amiri_user_id = :amir_id
+              AND tarih BETWEEN :start AND :end
+        ');
+        $stmt->execute([
+            'sube_id' => (int) $subeId,
+            'amir_id' => (int) $amirId,
+            'start' => $start,
+            'end' => $end,
+        ]);
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $completed[(string) $row['tarih']] = true;
+        }
+
+        $eksikGunler = [];
+        $tamamlanan = 0;
+        $cursor = \DateTimeImmutable::createFromFormat('!Y-m-d', $start);
+        $endDate = \DateTimeImmutable::createFromFormat('!Y-m-d', $end);
+        if (!$cursor || !$endDate) {
+            return $empty;
+        }
+
+        $activeDays = [];
+        $activeStmt = $pdo->prepare('
+            SELECT DISTINCT tarih
+            FROM gunluk_bildirimler
+            WHERE sube_id = :sube_id
+              AND created_by = :amir_id
+              AND tarih BETWEEN :start AND :end
+              AND state <> \'IPTAL\'
+        ');
+        $activeStmt->execute([
+            'sube_id' => (int) $subeId,
+            'amir_id' => (int) $amirId,
+            'start' => $start,
+            'end' => $end,
+        ]);
+        foreach ($activeStmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $activeDays[(string) $row['tarih']] = true;
+        }
+
+        while ($cursor <= $endDate) {
+            $day = $cursor->format('Y-m-d');
+            if ($day <= $today && isset($activeDays[$day])) {
+                if (isset($completed[$day])) {
+                    $tamamlanan++;
+                } else {
+                    $eksikGunler[] = $day;
+                }
+            }
+            $cursor = $cursor->modify('+1 day');
+        }
+
+        return [
+            'eksik_gun' => count($eksikGunler),
+            'tamamlanan_gun' => $tamamlanan,
+            'eksik_gunler' => $eksikGunler,
+        ];
+    }
+
+    private static function isCompletionTableReady(PDO $pdo)
+    {
+        try {
+            $stmt = $pdo->query("SHOW TABLES LIKE 'gunluk_bildirim_tamamlamalari'");
+            return $stmt && (bool) $stmt->fetch();
+        } catch (\PDOException $e) {
+            return false;
+        }
+    }
+
+    /**
+     * @param array<int, string> $eksikGunler
+     * @return array<int, array<string, mixed>>
+     */
+    private static function buildBloklar(PDO $pdo, $subeId, $amirId, $start, $end, array $eksikGunler)
+    {
+        $bloklar = [];
+        $ownerWhere = $amirId !== null ? ' AND created_by = :created_by' : '';
+        $stmt = $pdo->prepare('
+            SELECT id, tarih, state, bildirim_turu
+            FROM gunluk_bildirimler
+            WHERE sube_id = :sube_id' . $ownerWhere . '
+              AND tarih BETWEEN :hafta_baslangic AND :hafta_bitis
+              AND state IN (\'TASLAK\', \'DUZELTME_ISTENDI\')
+            ORDER BY tarih ASC, id ASC
+        ');
+        $params = [
+            'sube_id' => (int) $subeId,
+            'hafta_baslangic' => $start,
+            'hafta_bitis' => $end,
+        ];
+        if ($amirId !== null) {
+            $params['created_by'] = (int) $amirId;
+        }
+        $stmt->execute($params);
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $state = (string) $row['state'];
+            $bloklar[] = [
+                'tur' => $state === 'TASLAK' ? 'TASLAK' : 'DUZELTME_ISTENDI',
+                'mesaj' => $state === 'TASLAK'
+                    ? 'Taslak bildirim duzenlenmeli.'
+                    : 'Duzeltme bekleyen bildirim var.',
+                'tarih' => (string) $row['tarih'],
+                'bildirim_id' => (int) $row['id'],
+            ];
+        }
+        foreach ($eksikGunler as $gun) {
+            $bloklar[] = [
+                'tur' => 'EKSIK_GUN',
+                'mesaj' => 'Bu gun icin bildirim tamamlanmamis.',
+                'tarih' => $gun,
+                'bildirim_id' => null,
+            ];
+        }
+
+        return $bloklar;
     }
 
     private static function fetchExisting(PDO $pdo, $subeId, $amirId, $start, $forUpdate = false)

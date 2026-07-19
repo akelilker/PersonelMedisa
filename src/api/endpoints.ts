@@ -39,6 +39,8 @@ export const endpoints = {
   bildirimler: {
     list: "/bildirimler",
     birimAmiriSecenekleri: "/bildirimler/birim-amiri-secenekleri",
+    gunlukOzet: "/bildirimler/gunluk-ozet",
+    gunlukTamamlama: "/bildirimler/gunluk-tamamlama",
     detail: (id: number | string) => `/bildirimler/${id}`,
     submit: (id: number | string) => `/bildirimler/${id}/submit`,
     requestCorrection: (id: number | string) => `/bildirimler/${id}/request-correction`
@@ -64,6 +66,7 @@ export const endpoints = {
     bildirimEtkiAdaylari: {
       list: "/puantaj/bildirim-etki-adaylari",
       ozet: "/puantaj/bildirim-etki-adaylari/ozet",
+      hazirla: "/puantaj/bildirim-etki-adaylari/hazirla",
       detail: (id: number | string) => `/puantaj/bildirim-etki-adaylari/${id}`,
       yokSay: (id: number | string) => `/puantaj/bildirim-etki-adaylari/${id}/yok-say`,
       manuelUygula: (id: number | string) => `/puantaj/bildirim-etki-adaylari/${id}/manuel-uygula`,

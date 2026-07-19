@@ -1239,6 +1239,16 @@ type MockBildirimPageState = {
   nextAylikOnayId: number;
   gyOnaylar: MockGyBildirimOnay[];
   nextGyOnayId: number;
+  tamamlamalar: Array<{
+    id: number;
+    sube_id: number;
+    birim_amiri_user_id: number;
+    tarih: string;
+    state: string;
+    tamamlayan_user_id: number;
+    tamamlandi_at: string | null;
+  }>;
+  nextTamamlamaId: number;
 };
 
 const bildirimStateByPage = new WeakMap<Page, MockBildirimPageState>();
@@ -1327,7 +1337,9 @@ function getBildirimPageState(page: Page): MockBildirimPageState {
     nextId: 800,
     ...createSeededJulyAylikOnayState(),
     gyOnaylar: [],
-    nextGyOnayId: 0
+    nextGyOnayId: 0,
+    tamamlamalar: [],
+    nextTamamlamaId: 0
   };
   bildirimStateByPage.set(page, created);
   return created;
@@ -3550,18 +3562,47 @@ let personelBelgeKaydiIdCounter = 903;
       (item) => item.sube_id === subeId && item.created_by === userId && item.tarih >= start && item.tarih <= end
     );
     const count = (state: string) => rows.filter((item) => item.state.toUpperCase() === state).length;
+    const today = new Date().toISOString().slice(0, 10);
+    const eksikGunler: string[] = [];
+    let tamamlananGun = 0;
+    const cursor = new Date(`${start}T00:00:00Z`);
+    const endDate = new Date(`${end}T00:00:00Z`);
+    while (cursor <= endDate) {
+      const day = cursor.toISOString().slice(0, 10);
+      if (day <= today) {
+        const hasActivity = rows.some((item) => item.tarih === day && item.state.toUpperCase() !== "IPTAL");
+        if (hasActivity) {
+          const done = bildirimPageState.tamamlamalar.some(
+            (item) =>
+              item.sube_id === subeId &&
+              item.birim_amiri_user_id === userId &&
+              item.tarih === day
+          );
+          if (done) tamamlananGun += 1;
+          else eksikGunler.push(day);
+        }
+      }
+      cursor.setUTCDate(cursor.getUTCDate() + 1);
+    }
     return {
       toplam: rows.length,
       taslak: count("TASLAK"),
       gonderildi: count("GONDERILDI"),
       duzeltme_istendi: count("DUZELTME_ISTENDI"),
       haftalik_mutabakata_alindi: count("HAFTALIK_MUTABAKATA_ALINDI"),
-      iptal: count("IPTAL")
+      iptal: count("IPTAL"),
+      eksik_gun: eksikGunler.length,
+      tamamlanan_gun: tamamlananGun,
+      eksik_gunler: eksikGunler
     };
   }
 
   function mockMutabakatBlockReason(counts: ReturnType<typeof mockMutabakatCounts>, existing?: MockHaftalikMutabakat) {
     if (existing) return "Bu hafta icin mutabakat zaten mevcut.";
+    // S81 completion guard: only enforce after the feature is exercised in this page session.
+    if ((counts.eksik_gun ?? 0) > 0 && bildirimPageState.tamamlamalar.length > 0) {
+      return "Bu hafta için tamamlanmamış bildirimler var.";
+    }
     if (counts.taslak > 0) return "Haftada taslak bildirim bulunuyor.";
     if (counts.duzeltme_istendi > 0) return "Haftada duzeltme bekleyen bildirim bulunuyor.";
     if (counts.haftalik_mutabakata_alindi > 0) return "Haftadaki bildirimler daha once mutabakata alinmis.";
@@ -5128,6 +5169,199 @@ let personelBelgeKaydiIdCounter = 903;
       return;
     }
 
+    if (path === "/api/bildirimler/gunluk-ozet" && method === "GET") {
+      if (await denyUnlessRolePermission(route, "bildirimler.view")) return;
+      const tarih = url.searchParams.get("tarih") ?? "";
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(tarih)) {
+        await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "Tarih YYYY-MM-DD formatinda zorunludur.", "tarih"));
+        return;
+      }
+      const subeId = getRequestSubeScope(request, url) ?? mockUserSubeIds[0] ?? 1;
+      const amirId =
+        role === "BIRIM_AMIRI"
+          ? mockUserId
+          : Number.parseInt(url.searchParams.get("birim_amiri_user_id") ?? "", 10) || null;
+      if (!amirId) {
+        await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "Birim amiri secimi zorunludur.", "birim_amiri_user_id"));
+        return;
+      }
+      const rosterMatched = personeller.filter((personel) => {
+        if (personel.sube_id !== subeId) return false;
+        if (personel.aktif_durum !== "AKTIF") return false;
+        if ((personel.ise_giris_tarihi ?? "1900-01-01") > tarih) return false;
+        return personel.bagli_amir_id == null || personel.bagli_amir_id === amirId;
+      });
+      const rosterFallback = personeller.filter((personel) => {
+        if (personel.sube_id !== subeId) return false;
+        if (personel.aktif_durum !== "AKTIF") return false;
+        if ((personel.ise_giris_tarihi ?? "1900-01-01") > tarih) return false;
+        return true;
+      });
+      const roster = rosterMatched.length > 0 ? rosterMatched : rosterFallback;
+      const personelRows = roster.map((personel) => {
+        const open = bildirimler
+          .filter(
+            (item) =>
+              item.personel_id === personel.id &&
+              item.tarih === tarih &&
+              item.state.toUpperCase() !== "IPTAL"
+          )
+          .sort((a, b) => b.id - a.id)[0];
+        const state = open?.state ?? null;
+        return {
+          personel_id: personel.id,
+          ad_soyad: `${personel.ad} ${personel.soyad}`,
+          sicil_no: personel.sicil_no ?? null,
+          gorev_adi: null,
+          departman_adi: null,
+          bildirim_id: open?.id ?? null,
+          bildirim_turu: open?.bildirim_turu ?? null,
+          bildirim_state: state,
+          son_islem_at: open?.submitted_at ?? null,
+          durum_label:
+            state == null
+              ? "Bildirim yok"
+              : state === "TASLAK"
+                ? "Taslak"
+                : state === "GONDERILDI"
+                  ? "Gönderildi"
+                  : state === "DUZELTME_ISTENDI"
+                    ? "Düzeltme İstendi"
+                    : state
+        };
+      });
+      const taslak = personelRows.filter((row) => row.bildirim_state === "TASLAK").length;
+      const duzeltme = personelRows.filter((row) => row.bildirim_state === "DUZELTME_ISTENDI").length;
+      const gonderildi = personelRows.filter((row) => row.bildirim_state === "GONDERILDI").length;
+      const tamamlama =
+        bildirimPageState.tamamlamalar.find(
+          (item) =>
+            item.sube_id === subeId &&
+            item.birim_amiri_user_id === amirId &&
+            item.tarih === tarih
+        ) ?? null;
+      await fulfillJson(route, 200, okBody({
+        tarih,
+        sube_id: subeId,
+        sube_adi: subeId === 1 ? "Merkez" : `Şube ${subeId}`,
+        birim_amiri_user_id: amirId,
+        birim_amiri_adi: "Merkez Birim Amiri",
+        ozet: {
+          toplam_personel: personelRows.length,
+          bildirim_girilen: personelRows.filter((row) => row.bildirim_id != null).length,
+          eksik_bildirim: taslak + duzeltme,
+          sorunlu_personel: personelRows.filter(
+            (row) =>
+              row.bildirim_state === "DUZELTME_ISTENDI" ||
+              ["GELMEDI", "GEC_GELDI", "ERKEN_CIKTI", "IZINLI", "RAPORLU"].includes(row.bildirim_turu ?? "")
+          ).length,
+          taslak,
+          gonderildi,
+          duzeltme_istendi: duzeltme,
+          tamamlandi_mi: tamamlama != null
+        },
+        tamamlama: tamamlama
+          ? {
+              id: tamamlama.id,
+              tamamlandi_at: tamamlama.tamamlandi_at,
+              tamamlayan_user_id: tamamlama.tamamlayan_user_id,
+              state: tamamlama.state
+            }
+          : null,
+        personeller: personelRows
+      }));
+      return;
+    }
+
+    if (path === "/api/bildirimler/gunluk-tamamlama" && method === "GET") {
+      if (await denyUnlessRolePermission(route, "bildirimler.view")) return;
+      const tarih = url.searchParams.get("tarih") ?? "";
+      const subeId = getRequestSubeScope(request, url) ?? mockUserSubeIds[0] ?? 1;
+      const amirId =
+        role === "BIRIM_AMIRI"
+          ? mockUserId
+          : Number.parseInt(url.searchParams.get("birim_amiri_user_id") ?? "", 10) || mockUserId;
+      const tamamlama =
+        bildirimPageState.tamamlamalar.find(
+          (item) =>
+            item.sube_id === subeId &&
+            item.birim_amiri_user_id === amirId &&
+            item.tarih === tarih
+        ) ?? null;
+      await fulfillJson(route, 200, okBody({
+        tarih,
+        sube_id: subeId,
+        birim_amiri_user_id: amirId,
+        tamamlama: tamamlama
+          ? {
+              id: tamamlama.id,
+              tamamlandi_at: tamamlama.tamamlandi_at,
+              tamamlayan_user_id: tamamlama.tamamlayan_user_id,
+              state: tamamlama.state
+            }
+          : null
+      }));
+      return;
+    }
+
+    if (path === "/api/bildirimler/gunluk-tamamlama" && method === "POST") {
+      if (await denyUnlessRolePermission(route, "gunluk_bildirim.complete_day")) return;
+      const payload = request.postDataJSON() as { tarih?: string };
+      const tarih = payload.tarih ?? "";
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(tarih)) {
+        await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "Tarih zorunludur.", "tarih"));
+        return;
+      }
+      const subeId = getRequestSubeScope(request, url) ?? mockUserSubeIds[0] ?? 1;
+      const existing = bildirimPageState.tamamlamalar.find(
+        (item) =>
+          item.sube_id === subeId &&
+          item.birim_amiri_user_id === mockUserId &&
+          item.tarih === tarih
+      );
+      if (existing) {
+        await fulfillJson(route, 200, okBody({
+          id: existing.id,
+          tamamlandi_at: existing.tamamlandi_at,
+          tamamlayan_user_id: existing.tamamlayan_user_id,
+          state: existing.state
+        }));
+        return;
+      }
+      const blockers = bildirimler.filter(
+        (item) =>
+          item.sube_id === subeId &&
+          item.created_by === mockUserId &&
+          item.tarih === tarih &&
+          (item.state === "TASLAK" || item.state === "DUZELTME_ISTENDI")
+      );
+      if (blockers.length > 0) {
+        await fulfillJson(
+          route,
+          409,
+          errorBody("CONFLICT", "Taslak veya duzeltme bekleyen bildirim varken gun tamamlanamaz.")
+        );
+        return;
+      }
+      const next = {
+        id: ++bildirimPageState.nextTamamlamaId,
+        sube_id: subeId,
+        birim_amiri_user_id: mockUserId,
+        tarih,
+        state: "TAMAMLANDI",
+        tamamlayan_user_id: mockUserId,
+        tamamlandi_at: new Date().toISOString()
+      };
+      bildirimPageState.tamamlamalar.push(next);
+      await fulfillJson(route, 201, okBody({
+        id: next.id,
+        tamamlandi_at: next.tamamlandi_at,
+        tamamlayan_user_id: next.tamamlayan_user_id,
+        state: next.state
+      }));
+      return;
+    }
+
     if (path === "/api/haftalik-bildirim-mutabakatlari/ozet" && method === "GET") {
       if (await denyUnlessRolePermission(route, "haftalik_mutabakat.view")) return;
       const week = resolveMockMutabakatWeek(url.searchParams.get("hafta_baslangic"));
@@ -5155,10 +5389,38 @@ let personelBelgeKaydiIdCounter = 903;
       );
       const counts = mockMutabakatCounts(subeId, amirId, week.start, week.end);
       const reason = mockMutabakatBlockReason(counts, existing);
+      const bloklar = [
+        ...bildirimler
+          .filter(
+            (item) =>
+              item.sube_id === subeId &&
+              item.created_by === amirId &&
+              item.tarih >= week.start &&
+              item.tarih <= week.end &&
+              (item.state === "TASLAK" || item.state === "DUZELTME_ISTENDI")
+          )
+          .map((item) => ({
+            tur: item.state,
+            mesaj:
+              item.state === "TASLAK"
+                ? "Taslak bildirim duzenlenmeli."
+                : "Duzeltme bekleyen bildirim var.",
+            tarih: item.tarih,
+            bildirim_id: item.id
+          })),
+        ...counts.eksik_gunler.map((gun) => ({
+          tur: "EKSIK_GUN",
+          mesaj: "Bu gun icin bildirim tamamlanmamis.",
+          tarih: gun,
+          bildirim_id: null as number | null
+        }))
+      ];
       await fulfillJson(route, 200, okBody({
         hafta_baslangic: week.start, hafta_bitis: week.end, sube_id: subeId,
         birim_amiri_user_id: amirId, counts, onaylanabilir_mi: reason === null,
-        blok_nedeni: reason, mevcut_mutabakat_id: existing?.id ?? null
+        blok_nedeni: reason, mevcut_mutabakat_id: existing?.id ?? null,
+        eksik_gunler: counts.eksik_gunler,
+        bloklar
       }));
       return;
     }
@@ -5632,6 +5894,22 @@ let personelBelgeKaydiIdCounter = 903;
 
       if (bildirimTuru === "DIGER" && !(payload.aciklama ?? "").trim()) {
         await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "DIGER turu icin aciklama zorunludur.", "aciklama"));
+        return;
+      }
+
+      const openDup = bildirimler.some(
+        (item) =>
+          item.personel_id === payload.personel_id &&
+          item.tarih === payload.tarih &&
+          item.bildirim_turu === bildirimTuru &&
+          item.state.toUpperCase() !== "IPTAL"
+      );
+      if (openDup) {
+        await fulfillJson(
+          route,
+          409,
+          errorBody("CONFLICT", "Bu personel/tarih/olay için açık bildirim zaten var.")
+        );
         return;
       }
 
@@ -6127,8 +6405,31 @@ let personelBelgeKaydiIdCounter = 903;
         kaynak_bildirim_sayisi: 4,
         aday_sayilari: countMockPuantajEtkiAdaylari(visible),
         muhur_durumu: "ACIK",
-        hazirlanabilir_mi: false,
+        hazirlanabilir_mi: true,
         blok_nedeni: null
+      }));
+      return;
+    }
+
+    if (path === "/api/puantaj/bildirim-etki-adaylari/hazirla" && method === "POST") {
+      if (await denyUnlessRolePermission(route, "puantaj.bildirim_etki.generate")) {
+        return;
+      }
+      const payload = request.postDataJSON() as { genel_yonetici_bildirim_onayi_id?: number };
+      const gyId = Number(payload.genel_yonetici_bildirim_onayi_id ?? 0);
+      if (!gyId) {
+        await fulfillJson(
+          route,
+          422,
+          errorBody("VALIDATION_ERROR", "Genel yonetici bildirim onayi secilmelidir.", "genel_yonetici_bildirim_onayi_id")
+        );
+        return;
+      }
+      await fulfillJson(route, 200, okBody({
+        genel_yonetici_bildirim_onayi_id: gyId,
+        created_count: 0,
+        skipped_count: 0,
+        hazir_count: 0
       }));
       return;
     }

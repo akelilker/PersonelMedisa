@@ -53,6 +53,7 @@ export type AppPermission =
   | "gunluk_bildirim.update_own_open"
   | "gunluk_bildirim.submit"
   | "gunluk_bildirim.request_correction"
+  | "gunluk_bildirim.complete_day"
   | "haftalik_mutabakat.view"
   | "haftalik_mutabakat.approve"
   | "haftalik_mutabakat.reopen_request"
@@ -265,6 +266,7 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "gunluk_bildirim.create",
     "gunluk_bildirim.update_own_open",
     "gunluk_bildirim.submit",
+    "gunluk_bildirim.complete_day",
     "haftalik_mutabakat.view",
     "haftalik_mutabakat.approve",
     "aylik_bildirim_onayi.view",

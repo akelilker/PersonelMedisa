@@ -1,5 +1,10 @@
 import type { ApiResponse, PaginatedResult } from "../types/api";
-import type { Bildirim, BirimAmiriSecenegi } from "../types/bildirim";
+import type {
+  Bildirim,
+  BirimAmiriSecenegi,
+  GunlukBildirimTamamlama,
+  GunlukOzet
+} from "../types/bildirim";
 import { appendQueryParams } from "../utils/append-query-params";
 import { logAction } from "../audit/audit-service";
 import { apiRequest } from "./api-client";
@@ -13,6 +18,7 @@ export type BildirimlerListParams = {
   departman_id?: number;
   personel_id?: number;
   bildirim_turu?: string;
+  state?: string;
   sube_id?: number;
   page?: number;
   limit?: number;
@@ -20,10 +26,14 @@ export type BildirimlerListParams = {
 
 export type CreateBildirimPayload = {
   tarih: string;
-  departman_id: number;
+  departman_id?: number;
   personel_id: number;
   bildirim_turu: string;
   aciklama?: string;
+  alt_tur?: string | null;
+  baslangic_saati?: string | null;
+  bitis_saati?: string | null;
+  dakika?: number | null;
 };
 
 export type UpdateBildirimPayload = {
@@ -38,6 +48,11 @@ export type UpdateBildirimPayload = {
 
 export type RequestBildirimCorrectionPayload = {
   correction_reason: string;
+};
+
+export type CompleteGunlukTamamlamaPayload = {
+  tarih: string;
+  not_metni?: string;
 };
 
 export async function fetchBirimAmiriSecenekleri(subeId: number): Promise<BirimAmiriSecenegi[]> {
@@ -59,6 +74,24 @@ function normalizeBildirim(data: unknown): Bildirim {
   return bildirim as Bildirim;
 }
 
+function normalizeGunlukOzet(data: unknown): GunlukOzet {
+  if (typeof data !== "object" || data === null) {
+    throw new Error("Gunluk ozet yaniti beklenen formatta degil.");
+  }
+  return data as GunlukOzet;
+}
+
+function normalizeTamamlama(data: unknown): GunlukBildirimTamamlama {
+  if (typeof data !== "object" || data === null) {
+    throw new Error("Gunluk tamamlama yaniti beklenen formatta degil.");
+  }
+  const row = data as Partial<GunlukBildirimTamamlama>;
+  if (typeof row.id !== "number" || typeof row.state !== "string") {
+    throw new Error("Gunluk tamamlama yaniti eksik alan iceriyor.");
+  }
+  return row as GunlukBildirimTamamlama;
+}
+
 export async function fetchBildirimlerList(
   params?: BildirimlerListParams
 ): Promise<PaginatedResult<Bildirim>> {
@@ -69,6 +102,7 @@ export async function fetchBildirimlerList(
     departman_id: params?.departman_id,
     personel_id: params?.personel_id,
     bildirim_turu: params?.bildirim_turu,
+    state: params?.state,
     sube_id: params?.sube_id,
     page: params?.page,
     limit: params?.limit
@@ -78,6 +112,57 @@ export async function fetchBildirimlerList(
     requestedPage: params?.page,
     requestedLimit: params?.limit
   });
+}
+
+export async function fetchGunlukOzet(params: {
+  tarih: string;
+  sube_id?: number;
+  birim_amiri_user_id?: number;
+}): Promise<GunlukOzet> {
+  const path = appendQueryParams(endpoints.bildirimler.gunlukOzet, {
+    tarih: params.tarih,
+    sube_id: params.sube_id,
+    birim_amiri_user_id: params.birim_amiri_user_id
+  });
+  const response = await apiRequest<ApiResponse<unknown>>(path);
+  return normalizeGunlukOzet(response.data);
+}
+
+export async function fetchGunlukTamamlama(params: {
+  tarih: string;
+  sube_id?: number;
+  birim_amiri_user_id?: number;
+}): Promise<{
+  tarih: string;
+  sube_id: number;
+  birim_amiri_user_id: number;
+  tamamlama: GunlukBildirimTamamlama | null;
+}> {
+  const path = appendQueryParams(endpoints.bildirimler.gunlukTamamlama, {
+    tarih: params.tarih,
+    sube_id: params.sube_id,
+    birim_amiri_user_id: params.birim_amiri_user_id
+  });
+  const response = await apiRequest<
+    ApiResponse<{
+      tarih: string;
+      sube_id: number;
+      birim_amiri_user_id: number;
+      tamamlama: GunlukBildirimTamamlama | null;
+    }>
+  >(path);
+  return response.data;
+}
+
+export async function completeGunlukTamamlama(
+  payload: CompleteGunlukTamamlamaPayload
+): Promise<GunlukBildirimTamamlama> {
+  const response = await apiRequest<ApiResponse<unknown>>(endpoints.bildirimler.gunlukTamamlama, {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+  const created = normalizeTamamlama(response.data);
+  return created;
 }
 
 export async function createBildirim(payload: CreateBildirimPayload): Promise<Bildirim> {

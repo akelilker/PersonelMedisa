@@ -4,7 +4,8 @@ import {
   dismissBildirimPuantajEtkiAday,
   fetchBildirimPuantajEtkiAdayDetail,
   fetchBildirimPuantajEtkiAdayList,
-  fetchBildirimPuantajEtkiAdayOzet
+  fetchBildirimPuantajEtkiAdayOzet,
+  generateBildirimPuantajEtkiAdaylari
 } from "../../src/api/bildirim-puantaj-etki-adaylari.api";
 
 function createJsonResponse(body: unknown, status = 200) {
@@ -194,5 +195,25 @@ describe("bildirim-puantaj-etki-adaylari.api", () => {
     expect(result.state).toBe("UYGULANDI");
     expect(result.uygulanan_puantaj_id).toBe(9001);
     expect(result.idempotent).toBe(false);
+  });
+
+  it("posts hazirla with genel_yonetici_bildirim_onayi_id", async () => {
+    const fetchMock = vi.fn(async () =>
+      createJsonResponse({
+        data: { genel_yonetici_bildirim_onayi_id: 10, created_count: 2 },
+        meta: {},
+        errors: []
+      })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await generateBildirimPuantajEtkiAdaylari({
+      genel_yonetici_bildirim_onayi_id: 10
+    });
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain("/api/puantaj/bildirim-etki-adaylari/hazirla");
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(String(init.body))).toEqual({ genel_yonetici_bildirim_onayi_id: 10 });
+    expect(result).toMatchObject({ genel_yonetici_bildirim_onayi_id: 10, created_count: 2 });
   });
 });

@@ -195,6 +195,7 @@ class RolePermissions
             'gunluk_bildirim.create',
             'gunluk_bildirim.update_own_open',
             'gunluk_bildirim.submit',
+            'gunluk_bildirim.complete_day',
             'haftalik_mutabakat.view',
             'haftalik_mutabakat.approve',
             'aylik_bildirim_onayi.view',

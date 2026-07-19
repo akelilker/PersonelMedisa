@@ -559,3 +559,23 @@ export async function cakismaCozBildirimPuantajEtkiAdayi(
   });
   return normalizeConflictResolveResult(response.data);
 }
+
+export type GenerateBildirimPuantajEtkiAdaylariPayload = {
+  genel_yonetici_bildirim_onayi_id: number;
+};
+
+export async function generateBildirimPuantajEtkiAdaylari(
+  payload: GenerateBildirimPuantajEtkiAdaylariPayload,
+  context?: { subeId?: number | null }
+): Promise<unknown> {
+  const path = appendQueryParams(endpoints.puantaj.bildirimEtkiAdaylari.hazirla, {
+    sube_id: context?.subeId
+  });
+  const response = await apiRequest<ApiResponse<unknown>>(path, {
+    method: "POST",
+    body: JSON.stringify({
+      genel_yonetici_bildirim_onayi_id: payload.genel_yonetici_bildirim_onayi_id
+    })
+  });
+  return response.data;
+}

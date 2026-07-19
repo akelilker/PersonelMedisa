@@ -231,6 +231,7 @@ export function BildirimPuantajEtkiAdaylariSection() {
   const canDismiss = hasPermission("puantaj.bildirim_etki.dismiss");
   const canApply = hasPermission("puantaj.bildirim_etki.apply");
   const canResolveConflict = hasPermission("puantaj.bildirim_etki.resolve_conflict");
+  const canGenerate = hasPermission("puantaj.bildirim_etki.generate");
   const canResolveGyViaOnayApi = hasPermission("genel_yonetici_bildirim_onayi.view");
   const activeSubeId = session?.active_sube_id ?? null;
   const subeIds = session?.user.sube_ids ?? [];
@@ -326,13 +327,17 @@ export function BildirimPuantajEtkiAdaylariSection() {
     isConflictResolving,
     openConflictModal,
     closeConflictModal,
-    resolveConflictAday
+    resolveConflictAday,
+    isGenerating,
+    generateError,
+    generateAdaylar
   } = useBildirimPuantajEtkiAdaylari({
     enabled: canView,
     canDismiss,
     canApply,
     canResolveConflict,
     canResolveGyViaOnayApi,
+    canGenerate,
     subeId: effectiveSubeId,
     birimAmiriUserId: selectedBirimAmiriUserId
   });
@@ -636,6 +641,25 @@ export function BildirimPuantajEtkiAdaylariSection() {
             </div>
           ))}
         </div>
+      ) : null}
+
+      {contextReady && canGenerate && ozet?.hazirlanabilir_mi ? (
+        <div className="form-actions-row">
+          <button
+            type="button"
+            className="universal-btn-aux"
+            data-testid="puantaj-etki-aday-hazirla"
+            onClick={() => void generateAdaylar()}
+            disabled={isGenerating}
+          >
+            {isGenerating ? "Hazırlanıyor..." : "Etki Adaylarını Hazırla"}
+          </button>
+        </div>
+      ) : null}
+      {generateError ? (
+        <p className="puantaj-form-error" data-testid="puantaj-etki-aday-generate-error">
+          {generateError}
+        </p>
       ) : null}
 
       {contextReady && isLoading ? <LoadingState label="Puantaj etki adayları yükleniyor..." /> : null}

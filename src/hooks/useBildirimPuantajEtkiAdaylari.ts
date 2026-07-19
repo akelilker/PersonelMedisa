@@ -7,6 +7,7 @@ import {
   fetchBildirimPuantajEtkiAdayDetail,
   fetchBildirimPuantajEtkiAdayList,
   fetchBildirimPuantajEtkiAdayOzet,
+  generateBildirimPuantajEtkiAdaylari,
   manuelUygulaBildirimPuantajEtkiAdayi,
   type BildirimPuantajEtkiAdayListParams
 } from "../api/bildirim-puantaj-etki-adaylari.api";
@@ -59,6 +60,7 @@ type UseBildirimPuantajEtkiAdaylariOptions = {
   canApply: boolean;
   canResolveConflict: boolean;
   canResolveGyViaOnayApi: boolean;
+  canGenerate?: boolean;
   subeId: number | null;
   birimAmiriUserId: number | null;
   ay?: string;
@@ -72,6 +74,7 @@ export function useBildirimPuantajEtkiAdaylari(options: UseBildirimPuantajEtkiAd
     canApply,
     canResolveConflict,
     canResolveGyViaOnayApi,
+    canGenerate = false,
     subeId,
     birimAmiriUserId,
     ay: controlledAy,
@@ -117,6 +120,8 @@ export function useBildirimPuantajEtkiAdaylari(options: UseBildirimPuantajEtkiAd
   const [conflictFieldError, setConflictFieldError] = useState<string | null>(null);
   const [conflictError, setConflictError] = useState<string | null>(null);
   const [isConflictResolving, setIsConflictResolving] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generateError, setGenerateError] = useState<string | null>(null);
   const listRequestIdRef = useRef(0);
   const ozetRequestIdRef = useRef(0);
   const detailRequestIdRef = useRef(0);
@@ -124,6 +129,7 @@ export function useBildirimPuantajEtkiAdaylari(options: UseBildirimPuantajEtkiAd
   const applyingRef = useRef(false);
   const manualApplyingRef = useRef(false);
   const conflictResolvingRef = useRef(false);
+  const generatingRef = useRef(false);
 
   const STALE_CONFLICT_CODES = new Set([
     "PUANTAJ_STALE",
@@ -243,6 +249,9 @@ export function useBildirimPuantajEtkiAdaylari(options: UseBildirimPuantajEtkiAd
     setConflictError(null);
     setIsConflictResolving(false);
     conflictResolvingRef.current = false;
+    setIsGenerating(false);
+    setGenerateError(null);
+    generatingRef.current = false;
   }, []);
 
   const closeDetail = useCallback(() => {
@@ -842,6 +851,34 @@ export function useBildirimPuantajEtkiAdaylari(options: UseBildirimPuantajEtkiAd
     subeId
   ]);
 
+  const generateAdaylar = useCallback(async () => {
+    if (!canGenerate || !ozet?.hazirlanabilir_mi || generatingRef.current || isGenerating) {
+      return;
+    }
+    const gyId = ozet.context.genel_yonetici_bildirim_onayi_id;
+    if (!gyId) {
+      return;
+    }
+    generatingRef.current = true;
+    setIsGenerating(true);
+    setGenerateError(null);
+    setSuccessMessage(null);
+    setInfoMessage(null);
+    try {
+      await generateBildirimPuantajEtkiAdaylari(
+        { genel_yonetici_bildirim_onayi_id: gyId },
+        { subeId }
+      );
+      setSuccessMessage("Puantaj etki adayları hazırlandı.");
+      await refreshAll();
+    } catch (caught) {
+      setGenerateError(getApiErrorDetail(caught, "Puantaj etki adayları hazırlanamadı.").message);
+    } finally {
+      generatingRef.current = false;
+      setIsGenerating(false);
+    }
+  }, [canGenerate, isGenerating, ozet, refreshAll, subeId]);
+
   const isLoading = isListLoading || isOzetLoading;
 
   return {
@@ -895,6 +932,8 @@ export function useBildirimPuantajEtkiAdaylari(options: UseBildirimPuantajEtkiAd
     conflictFieldError,
     conflictError,
     isConflictResolving,
+    isGenerating,
+    generateError,
     contextReady,
     refreshList,
     refreshAll,
@@ -911,6 +950,7 @@ export function useBildirimPuantajEtkiAdaylari(options: UseBildirimPuantajEtkiAd
     manualApplyAday,
     openConflictModal,
     closeConflictModal,
-    resolveConflictAday
+    resolveConflictAday,
+    generateAdaylar
   };
 }

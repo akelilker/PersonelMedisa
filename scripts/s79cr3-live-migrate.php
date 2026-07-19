@@ -664,7 +664,9 @@ if ($action === 'migrate') {
     if (preg_match('/\bDELETE\s+FROM\b/i', $withoutComments)) {
         $badHits[] = 'DELETE FROM';
     }
-    if (preg_match('/\bUPDATE\b/i', $withoutComments)) {
+    // Allow "ON UPDATE CURRENT_TIMESTAMP"; refuse standalone DML UPDATE.
+    $noOnUpdate = preg_replace('/\bON\s+UPDATE\b/i', 'ON_UPDATE_OK', $withoutComments) ?? $withoutComments;
+    if (preg_match('/\bUPDATE\b/i', $noOnUpdate)) {
         $badHits[] = 'UPDATE';
     }
     if (preg_match('/\bCREATE\s+TABLE\s+IF\s+NOT\s+EXISTS\b/i', $withoutComments)) {
@@ -833,9 +835,11 @@ if ($action === 'smoke_prepare') {
     try {
         $insP = $pdo->prepare(
             "INSERT INTO personeller (
-                tc_kimlik_no, ad, soyad, dogum_tarihi, sicil_no, ise_giris_tarihi, sube_id, departman_id, aktif_durum
+                tc_kimlik_no, ad, soyad, dogum_tarihi, telefon, acil_durum_kisi, acil_durum_telefon,
+                sicil_no, ise_giris_tarihi, sube_id, departman_id, aktif_durum
              ) VALUES (
-                :tc, 'S79CR3', 'Smoke', '1990-01-01', :sicil, '2030-01-01', :sube_id, NULL, 'AKTIF'
+                :tc, 'S79CR3', 'Smoke', '1990-01-01', '05000000000', 'S79CR3 Contact', '05000000001',
+                :sicil, '2030-01-01', :sube_id, NULL, 'AKTIF'
              )"
         );
         $insP->execute(['tc' => S79_SMOKE_TC, 'sicil' => S79_SMOKE_SICIL, 'sube_id' => $subeId]);

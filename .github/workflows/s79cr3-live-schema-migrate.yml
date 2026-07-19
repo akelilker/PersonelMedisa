@@ -189,10 +189,15 @@ jobs:
         run: |
           set -euo pipefail
           BASE="https://www.karmotors.com.tr/personelmedisa/api/public/_s79cr3_migrate.php"
-          curl -fsS "${BASE}?token=${TOKEN}&action=migrate" | tee /tmp/s79cr3-artifacts/migrate.json
+          code=$(curl -sS -o /tmp/s79cr3-artifacts/migrate.json -w "%{http_code}" "${BASE}?token=${TOKEN}&action=migrate" || true)
+          echo "migrate_http=$code"
+          cat /tmp/s79cr3-artifacts/migrate.json
           python3 - <<'PY'
           import json,sys
-          data=json.load(open('/tmp/s79cr3-artifacts/migrate.json'))
+          raw=open('/tmp/s79cr3-artifacts/migrate.json').read().strip()
+          if not raw:
+            print('empty migrate response'); sys.exit(1)
+          data=json.loads(raw)
           print(json.dumps({
             'ok': data.get('ok'),
             'code': data.get('code'),
@@ -202,6 +207,8 @@ jobs:
             'before_counts': data.get('before_counts'),
             'after_counts': data.get('after_counts'),
             'schema_issues': ((data.get('schema_match') or {}).get('issues')),
+            'error': data.get('error'),
+            'bad_tokens': data.get('bad_tokens'),
           }, indent=2))
           if not data.get('ok') or data.get('code') != 'S79_C_MIGRATE_OK':
             sys.exit(1)

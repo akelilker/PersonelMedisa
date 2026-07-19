@@ -936,16 +936,28 @@ $pig1 = spawnRtHttp($pdo, $ba, 'POST', '/haftalik-kapanis/revizyon-talepleri/' .
 $pig2 = spawnRtHttp($pdo, $ba, 'POST', '/haftalik-kapanis/revizyon-talepleri/' . $parIptalGonderId . '/gonder', [], $subeHeader);
 $rig1 = finishRtHttp($pig1);
 $rig2 = finishRtHttp($pig2);
-$parIptalGonderOk = (($rig1['status'] === 200) ? 1 : 0) + (($rig2['status'] === 200) ? 1 : 0);
-rtAssert($parIptalGonderOk === 1, 'parallel iptal/gonder → one success');
-$parIptalGonderConflict = ($rig1['status'] === 409 ? ($rig1['payload']['errors'][0]['code'] ?? '') : ($rig2['payload']['errors'][0]['code'] ?? ''));
-rtAssert($parIptalGonderConflict === 'STATE_CONFLICT', 'parallel iptal/gonder loser STATE_CONFLICT');
+$parIptalGonderStatuses = [$rig1['status'], $rig2['status']];
+sort($parIptalGonderStatuses);
+// Product: iptal accepts TASLAK and ONAY_BEKLIYOR. If gonder commits first, iptal can also
+// succeed (200+200 → IPTAL). If iptal commits first, gonder must lose with STATE_CONFLICT.
+rtAssert(
+    $parIptalGonderStatuses === [200, 200] || $parIptalGonderStatuses === [200, 409],
+    'parallel iptal/gonder → serialized outcomes'
+);
 $parIptalGonderDurum = (string) $pdo->query(
     'SELECT durum FROM haftalik_kapanis_revizyon_talepleri WHERE id = ' . (int) $parIptalGonderId
 )->fetchColumn();
-rtAssert(in_array($parIptalGonderDurum, ['IPTAL', 'ONAY_BEKLIYOR'], true), 'parallel iptal/gonder terminal durum tutarli');
-$parIptalGonderAudit = rtGecmisCount($pdo, $parIptalGonderId);
-rtAssert($parIptalGonderAudit === 2, 'parallel iptal/gonder tek gecis audit (OLUSTUR+aksiyon)');
+if ($parIptalGonderStatuses === [200, 409]) {
+    $parIptalGonderConflict = ($rig1['status'] === 409 ? ($rig1['payload']['errors'][0]['code'] ?? '') : ($rig2['payload']['errors'][0]['code'] ?? ''));
+    rtAssert($parIptalGonderConflict === 'STATE_CONFLICT', 'parallel iptal/gonder loser STATE_CONFLICT');
+    rtAssert(in_array($parIptalGonderDurum, ['IPTAL', 'ONAY_BEKLIYOR'], true), 'parallel iptal/gonder terminal durum tutarli');
+    $parIptalGonderAudit = rtGecmisCount($pdo, $parIptalGonderId);
+    rtAssert($parIptalGonderAudit === 2, 'parallel iptal/gonder tek gecis audit (OLUSTUR+aksiyon)');
+} else {
+    rtAssert($parIptalGonderDurum === 'IPTAL', 'parallel iptal/gonder both-200 ends IPTAL');
+    $parIptalGonderAudit = rtGecmisCount($pdo, $parIptalGonderId);
+    rtAssert($parIptalGonderAudit === 3, 'parallel iptal/gonder both-200 audit (OLUSTUR+GONDER+IPTAL)');
+}
 
 $redSetup = invokeRtHttp($pdo, $ba, 'POST', '/haftalik-kapanis/revizyon-talepleri', rtCreateBody(
     10,

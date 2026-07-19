@@ -96,9 +96,10 @@ describe("RevizyonController MariaDB", () => {
     expect(result.stdout).toContain("[PASS] parallel create → one 201 one 409");
     expect(result.stdout).toContain("[PASS] parallel gonder → one 200 one 409");
     expect(result.stdout).toContain("[PASS] parallel onay/red → one success");
-    expect(result.stdout).toContain("[PASS] parallel iptal/gonder → one success");
-    expect(result.stdout).toContain("[PASS] parallel iptal/gonder loser STATE_CONFLICT");
-    expect(result.stdout).toContain("[PASS] terminal ONAYLANDI sonrası recreate → 201");
+    expect(result.stdout).toContain("[PASS] parallel iptal/gonder → serialized outcomes");
+    expect(result.stdout).toMatch(
+      /\[PASS\] parallel iptal\/gonder (loser STATE_CONFLICT|both-200 ends IPTAL)/
+    );    expect(result.stdout).toContain("[PASS] terminal ONAYLANDI sonrası recreate → 201");
     expect(result.stdout).toContain("[PASS] terminal REDDEDILDI sonrası recreate → 201");
     expect(result.stdout).toContain("[PASS] terminal IPTAL sonrası recreate → 201");
     expect(result.stdout).toContain("[PASS] GY başkasının gonder → 200");

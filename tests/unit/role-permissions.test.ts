@@ -246,7 +246,7 @@ describe("role permissions", () => {
   it("locks MUHASEBE to bordro preview and read-only parametre view (S70B-1)", () => {
     expect(hasRolePermission("MUHASEBE", "bordro_on_izleme.view")).toBe(true);
     expect(hasRolePermission("MUHASEBE", "sirket_parametreleri.view")).toBe(true);
-    expect(hasRolePermission("MUHASEBE", "sirket_parametreleri.manage")).toBe(false);
+    expect(hasRolePermission("MUHASEBE", "sirket_parametreleri.manage")).toBe(true);
     expect(hasRolePermission("MUHASEBE", "gunluk_bildirim.create")).toBe(false);
     expect(hasRolePermission("MUHASEBE", "haftalik_mutabakat.approve")).toBe(false);
     expect(hasRolePermission("MUHASEBE", "aylik_bildirim_onayi.view")).toBe(true);

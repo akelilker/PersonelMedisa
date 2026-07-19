@@ -2,18 +2,20 @@ import { expect, type Page } from "@playwright/test";
 import { loginAsMockRole, waitForAuthSession, type MockRoleCredentials } from "./auth";
 import type { MockUserRole } from "./mock-api";
 
-export type RaporlarPanel = "donem-kapanis" | "etki-adayi" | "maas-hesaplama" | "standart";
+export type RaporlarPanel = "donem-kapanis" | "etki-adayi" | "maas-hesaplama" | "bordro-hazirlik" | "standart";
 
 const PANEL_TEST_ID: Record<Exclude<RaporlarPanel, "standart">, string> = {
   "donem-kapanis": "donem-kapanis-merkezi",
   "etki-adayi": "etki-adayi-rapor-page",
-  "maas-hesaplama": "maas-hesaplama-merkezi"
+  "maas-hesaplama": "maas-hesaplama-merkezi",
+  "bordro-hazirlik": "bordro-hazirlik-merkezi"
 };
 
 const PANEL_FILTER_TEST_ID: Record<Exclude<RaporlarPanel, "standart">, string> = {
   "donem-kapanis": "donem-kapanis-filters",
   "etki-adayi": "etki-adayi-rapor-filters",
-  "maas-hesaplama": "maas-hesaplama-filters"
+  "maas-hesaplama": "maas-hesaplama-filters",
+  "bordro-hazirlik": "bordro-hazirlik-filters"
 };
 
 export async function openRaporlarPanel(

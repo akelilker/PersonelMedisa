@@ -1094,6 +1094,7 @@ if ($action === 'smoke_cleanup') {
         'audit' => 0,
         'tercih' => 0,
         'muhur' => 0,
+        'donem_kilit' => 0,
         'satir' => 0,
         'kapanis' => 0,
         'personel' => 0,
@@ -1166,6 +1167,16 @@ if ($action === 'smoke_cleanup') {
                 $d->execute(['id' => $muhurId]);
                 $deleted['muhur'] = $d->rowCount();
             }
+        }
+
+        // Smoke week is far-future 2036-07; remove period-lock row created by PUT acquire.
+        $subeId = (int) ($meta['sube_id'] ?? 0);
+        if ($subeId > 0 && s79_table_exists($pdo, 'puantaj_donem_kilitleri')) {
+            $d = $pdo->prepare(
+                'DELETE FROM puantaj_donem_kilitleri WHERE sube_id = :s AND yil = 2036 AND ay = 7'
+            );
+            $d->execute(['s' => $subeId]);
+            $deleted['donem_kilit'] = $d->rowCount();
         }
 
         if ($kapanisId > 0) {

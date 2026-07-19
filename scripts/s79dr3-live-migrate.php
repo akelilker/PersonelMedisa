@@ -1482,10 +1482,16 @@ if ($action === 'smoke_cleanup') {
             $deleted['aktif_guard'] = (int) $pdo->exec('DELETE FROM serbest_zaman_aktif_olusumlar WHERE odeme_tercihi_id IN (' . $in . ')');
         }
         if ($personelId > 0 && s79_table_exists($pdo, 'serbest_zaman_events')) {
-            // Delete children first (iptal/duzeltme referencing), then all for personel with marker or all smoke personel events
+            // Children first: IPTAL/DUZELTME reference parent events via FK RESTRICT.
+            $dChild = $pdo->prepare(
+                'DELETE FROM serbest_zaman_events
+                 WHERE personel_id = :p AND hedef_event_id IS NOT NULL'
+            );
+            $dChild->execute(['p' => $personelId]);
+            $deleted['sz_event'] = $dChild->rowCount();
             $d = $pdo->prepare('DELETE FROM serbest_zaman_events WHERE personel_id = :p');
             $d->execute(['p' => $personelId]);
-            $deleted['sz_event'] = $d->rowCount();
+            $deleted['sz_event'] += $d->rowCount();
         }
         if ($tercihIds !== []) {
             $in = implode(',', $tercihIds);

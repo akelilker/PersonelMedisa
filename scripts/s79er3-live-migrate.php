@@ -1208,6 +1208,7 @@ if ($action === 'smoke_prepare') {
     $openEtkilenen = '2038-03-16';
     $personelId = 0;
     $main = null;
+    $surecId = 0;
 
     try {
         $pdo->beginTransaction();
@@ -1240,6 +1241,23 @@ if ($action === 'smoke_prepare') {
             0
         );
 
+        $insSurec = $pdo->prepare(
+            "INSERT INTO surecler (
+                personel_id, surec_turu, alt_tur, baslangic_tarihi, bitis_tarihi,
+                ucretli_mi, aciklama, state
+             ) VALUES (
+                :personel_id, 'IZIN', 'YILLIK_IZIN', :bas, :bit,
+                0, :aciklama, 'AKTIF'
+             )"
+        );
+        $insSurec->execute([
+            'personel_id' => $personelId,
+            'bas' => S79_SMOKE_OPEN_WEEK_START,
+            'bit' => S79_SMOKE_OPEN_WEEK_START,
+            'aciklama' => S79_SMOKE_MARKER,
+        ]);
+        $surecId = (int) $pdo->lastInsertId();
+
         $pdo->commit();
     } catch (Throwable $e) {
         if ($pdo->inTransaction()) {
@@ -1256,6 +1274,7 @@ if ($action === 'smoke_prepare') {
         'personel_id' => $personelId,
         'kapanis_id' => (int) $main['kapanis_id'],
         'snapshot_id' => (int) $main['snapshot_id'],
+        'surec_id' => $surecId,
         'open_kapanis_id' => 0,
         'kapanis_ids' => [(int) $main['kapanis_id']],
         'hafta_baslangic' => S79_SMOKE_WEEK_START,
@@ -1268,7 +1287,7 @@ if ($action === 'smoke_prepare') {
         'roles' => [],
         'tokens' => $tokens,
         'created_at_utc' => gmdate('c'),
-        'note_acik_kapanis' => 'schema_forbids_ACIK_state_covered_by_missing_kapanis_week',
+        'note_acik_kapanis' => 'schema_forbids_ACIK_state_covered_by_missing_kapanis_week_via_SUREC',
     ];
     foreach ($roles as $rol => $u) {
         $meta['roles'][$rol] = $u === null ? null : [
@@ -1427,12 +1446,13 @@ if ($action === 'smoke_run') {
         $pass('audit GONDER', s79_gecmis_count($pdo, $talep1, 'GONDER') === 1, ['count' => s79_gecmis_count($pdo, $talep1, 'GONDER')]);
     }
 
-    if ($bolumH !== null && (int) (($meta['roles']['BOLUM_YONETICISI']['id'] ?? 0)) !== (int) (($meta['roles']['BIRIM_AMIRI']['id'] ?? 0))) {
-        $nonOwnerGonder = s79_http('POST', '/haftalik-kapanis/revizyon-talepleri/' . $talep1 . '/gonder', [], $bolumH);
+    if ($muhH !== null && (int) (($meta['roles']['MUHASEBE']['id'] ?? 0)) !== (int) (($meta['roles']['BIRIM_AMIRI']['id'] ?? 0))) {
+        $nonOwnerGonder = s79_http('POST', '/haftalik-kapanis/revizyon-talepleri/' . $talep1 . '/gonder', [], $muhH);
         $pass(
             'non-owner gonder',
             $nonOwnerGonder['status'] === 403 && s79_err_code($nonOwnerGonder['payload']) === 'REVISION_OWNER_DENIED',
-            ['status' => $nonOwnerGonder['status'], 'code' => s79_err_code($nonOwnerGonder['payload'])]
+            ['status' => $nonOwnerGonder['status'], 'code' => s79_err_code($nonOwnerGonder['payload'])],
+            true
         );
     } else {
         $skip('non-owner gonder');
@@ -1569,21 +1589,28 @@ if ($action === 'smoke_run') {
         ['status' => $detailResp['status'], 'keys' => $detailKeys]
     );
 
-    $periodNotClosed = s79_http('POST', '/haftalik-kapanis/revizyon-talepleri', s79_rt_create_body(
-        $personelId,
-        $snapshotId,
-        $openEtkilenen,
-        $openHb,
-        $openHe
-    ), $baH);
+    $surecId = (int) ($meta['surec_id'] ?? 0);
+    $periodNotClosed = s79_http('POST', '/haftalik-kapanis/revizyon-talepleri', [
+        'personel_id' => $personelId,
+        'hafta_baslangic' => $openHb,
+        'hafta_bitis' => $openHe,
+        'etkilenen_tarih' => $openEtkilenen,
+        'kaynak_tipi' => 'SUREC',
+        'kaynak_id' => $surecId > 0 ? $surecId : 99999999,
+        'revizyon_tipi' => 'SUREC_GEC_GIRIS',
+        'gerekce' => S79_SMOKE_MARKER . ' period-not-closed',
+        'onceki_deger' => ['dakika' => 60],
+        'talep_edilen_deger' => ['dakika' => 90],
+    ], $baH);
     $pass(
         'missing kapanis week PERIOD_NOT_CLOSED',
         $periodNotClosed['status'] === 409 && s79_err_code($periodNotClosed['payload']) === 'PERIOD_NOT_CLOSED',
         [
             'status' => $periodNotClosed['status'],
             'code' => s79_err_code($periodNotClosed['payload']),
-            'note' => 'ACIK row impossible under chk_haftalik_kapanis_state; missing week covers PERIOD_NOT_CLOSED',
-        ]
+            'note' => 'ACIK row impossible under chk_haftalik_kapanis_state; SUREC on week without KAPANDI covers PERIOD_NOT_CLOSED',
+        ],
+        true
     );
 
     $targetNotFound = s79_http('POST', '/haftalik-kapanis/revizyon-talepleri', array_merge(
@@ -1615,7 +1642,7 @@ if ($action === 'smoke_run') {
         ]
     );
 
-    $ok = !$criticalFailed;
+    $ok = !$failed;
     $fixturePublic = $meta;
     unset($fixturePublic['tokens']);
     echo json_encode([
@@ -1637,11 +1664,13 @@ if ($action === 'smoke_cleanup') {
         'talep' => 0,
         'satir' => 0,
         'kapanis' => 0,
+        'surec' => 0,
         'personel' => 0,
     ];
 
     $talepIds = array_values(array_unique(array_map('intval', $meta['talep_ids'] ?? [])));
     $personelId = (int) ($meta['personel_id'] ?? 0);
+    $surecId = (int) ($meta['surec_id'] ?? 0);
     $kapanisIds = array_values(array_unique(array_map('intval', $meta['kapanis_ids'] ?? [])));
     if ($kapanisIds === [] && isset($meta['kapanis_id'])) {
         $kapanisIds = [(int) $meta['kapanis_id']];
@@ -1696,6 +1725,16 @@ if ($action === 'smoke_cleanup') {
             $d2 = $pdo->prepare('DELETE FROM haftalik_kapanislar WHERE id = :id');
             $d2->execute(['id' => $kid]);
             $deleted['kapanis'] += $d2->rowCount();
+        }
+        if ($surecId > 0 && s79_table_exists($pdo, 'surecler')) {
+            $chk = $pdo->prepare('SELECT id, aciklama FROM surecler WHERE id = :id');
+            $chk->execute(['id' => $surecId]);
+            $row = $chk->fetch();
+            if ($row && strpos((string) $row['aciklama'], S79_SMOKE_MARKER) !== false) {
+                $d = $pdo->prepare('DELETE FROM surecler WHERE id = :id');
+                $d->execute(['id' => $surecId]);
+                $deleted['surec'] = $d->rowCount();
+            }
         }
         if ($personelId > 0) {
             $chk = $pdo->prepare('SELECT id, tc_kimlik_no, sicil_no FROM personeller WHERE id = :id');

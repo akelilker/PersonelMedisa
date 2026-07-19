@@ -1185,11 +1185,10 @@ $redWs = invokeRtHttp($pdo, $gy, 'POST', '/haftalik-kapanis/revizyon-talepleri/'
 ], $subeHeader);
 rtAssert($redWs['status'] === 422, 'red whitespace karar_notu → 422');
 
-// --- JSON normalization ---
+// --- JSON normalization + server-owned onceki_deger ---
 $jsonCreate = invokeRtHttp($pdo, $ba, 'POST', '/haftalik-kapanis/revizyon-talepleri', array_merge(
     rtCreateBody(10, $puantaj06, '2026-04-06', '2026-04-06', '2026-04-12'),
     [
-        'onceki_deger' => ['giris' => '08:00', 'flags' => [true, 1]],
         'talep_edilen_deger' => ['giris' => '09:00', 'flags' => [false, 2]],
     ]
 ), $subeHeader);
@@ -1199,7 +1198,6 @@ if ($jsonCreate['status'] !== 201) {
     $jsonCreate = invokeRtHttp($pdo, $ba, 'POST', '/haftalik-kapanis/revizyon-talepleri', array_merge(
         rtCreateBody(10, $puantaj06, '2026-04-06', '2026-04-06', '2026-04-12'),
         [
-            'onceki_deger' => ['giris' => '08:00', 'flags' => [true, 1]],
             'talep_edilen_deger' => ['giris' => '09:00', 'flags' => [false, 2]],
         ]
     ), $subeHeader);
@@ -1207,17 +1205,23 @@ if ($jsonCreate['status'] !== 201) {
 rtAssert($jsonCreate['status'] === 201, 'JSON object/array create → 201');
 $jsonOnceki = $jsonCreate['payload']['data']['onceki_deger'] ?? null;
 $jsonTalep = $jsonCreate['payload']['data']['talep_edilen_deger'] ?? null;
-rtAssert(is_array($jsonOnceki) && ($jsonOnceki['giris'] ?? '') === '08:00', 'JSON onceki object roundtrip');
+rtAssert(is_array($jsonOnceki) && isset($jsonOnceki['id'], $jsonOnceki['tarih']), 'server-owned onceki object');
 rtAssert(is_array($jsonTalep) && is_array($jsonTalep['flags'] ?? null), 'JSON talep array roundtrip');
 $jsonId = (int) ($jsonCreate['payload']['data']['id'] ?? 0);
 invokeRtHttp($pdo, $ba, 'POST', '/haftalik-kapanis/revizyon-talepleri/' . $jsonId . '/iptal', [], $subeHeader);
 
+$forgedOnceki = invokeRtHttp($pdo, $ba, 'POST', '/haftalik-kapanis/revizyon-talepleri', array_merge(
+    rtCreateBody(10, $puantaj06, '2026-04-06', '2026-04-06', '2026-04-12'),
+    ['onceki_deger' => ['forged' => true, 'giris' => '00:00'], 'talep_edilen_deger' => 42]
+), $subeHeader);
+rtAssert($forgedOnceki['status'] === 422, 'forged onceki_deger → 422');
+
 $jsonScalar = invokeRtHttp($pdo, $ba, 'POST', '/haftalik-kapanis/revizyon-talepleri', array_merge(
     rtCreateBody(10, $puantaj06, '2026-04-06', '2026-04-06', '2026-04-12'),
-    ['onceki_deger' => '08:00', 'talep_edilen_deger' => 42]
+    ['talep_edilen_deger' => 42]
 ), $subeHeader);
 rtAssert($jsonScalar['status'] === 201, 'JSON scalar create → 201');
-rtAssert(($jsonScalar['payload']['data']['onceki_deger'] ?? null) === '08:00', 'JSON string roundtrip');
+rtAssert(is_array($jsonScalar['payload']['data']['onceki_deger'] ?? null), 'server-owned onceki on scalar create');
 rtAssert(($jsonScalar['payload']['data']['talep_edilen_deger'] ?? null) === 42, 'JSON number roundtrip');
 $jsonScalarId = (int) ($jsonScalar['payload']['data']['id'] ?? 0);
 invokeRtHttp($pdo, $ba, 'POST', '/haftalik-kapanis/revizyon-talepleri/' . $jsonScalarId . '/iptal', [], $subeHeader);

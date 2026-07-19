@@ -87,7 +87,9 @@ test.describe("e2e smoke", () => {
     await expect(readonlyFieldInCardByLabel(gunlukDetayKarti, "Günlük Brüt Süre (dk)").getByText(/^570$/)).toBeVisible();
 
     await page.goto("/haftalik-kapanis");
-    await expect(page).toHaveURL(/\/$/);
+    await expect(page).toHaveURL(/\/haftalik-kapanis$/);
+    await expect(page.getByTestId("haftalik-kapanis-page")).toBeVisible();
+    await expect(page.getByTestId("hk-revizyon-merkezi-link")).toBeVisible();
 
     await page.goto("/raporlar");
     await expect(page).toHaveURL(/\/raporlar$/);
@@ -146,7 +148,8 @@ test.describe("e2e smoke", () => {
     await expect(page.getByRole("button", { name: "Kaydet" })).toBeDisabled();
 
     await page.goto("/haftalik-kapanis");
-    await expect(page).toHaveURL(/\/$/);
+    await expect(page).toHaveURL(/\/haftalik-kapanis$/);
+    await expect(page.getByTestId("haftalik-kapanis-page")).toBeVisible();
 
     await page.goto("/raporlar");
     await expect(page).toHaveURL(/\/raporlar$/);

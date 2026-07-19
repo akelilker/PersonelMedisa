@@ -48,15 +48,6 @@
       "introducedOrConfirmedAt": "2026-07-18"
     },
     {
-      "method": "POST",
-      "path": "/puantaj/bildirim-etki-adaylari/hazirla",
-      "category": "php_external_or_ops",
-      "gapId": "OPS-HAZIRLA",
-      "reason": "Internal prepare/hazirla route; intentionally PHP-only without FE client.",
-      "owner": "BildirimPuantajEtkiAdaylariController",
-      "introducedOrConfirmedAt": "2026-07-18"
-    },
-    {
       "method": "GET",
       "path": "/ek-odeme-kesinti/:id",
       "category": "php_external_or_ops",

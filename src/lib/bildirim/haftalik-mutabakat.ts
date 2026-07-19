@@ -60,6 +60,9 @@ export function resolveHaftalikMutabakatApproval(
   mevcutMutabakatId: number | null
 ): { onaylanabilir_mi: boolean; blok_nedeni: string | null } {
   if (mevcutMutabakatId) return { onaylanabilir_mi: false, blok_nedeni: "Bu hafta icin mutabakat zaten mevcut." };
+  if ((counts.eksik_gun ?? 0) > 0) {
+    return { onaylanabilir_mi: false, blok_nedeni: "Bu hafta için tamamlanmamış bildirimler var." };
+  }
   if (counts.taslak > 0) return { onaylanabilir_mi: false, blok_nedeni: "Haftada taslak bildirim bulunuyor." };
   if (counts.duzeltme_istendi > 0) return { onaylanabilir_mi: false, blok_nedeni: "Haftada duzeltme bekleyen bildirim bulunuyor." };
   if (counts.haftalik_mutabakata_alindi > 0) return { onaylanabilir_mi: false, blok_nedeni: "Haftadaki bildirimler daha once mutabakata alinmis." };

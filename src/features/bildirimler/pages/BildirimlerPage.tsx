@@ -7,7 +7,7 @@ import { ErrorState } from "../../../components/states/ErrorState";
 import { LoadingState } from "../../../components/states/LoadingState";
 import { SubeDetailListNotice } from "../../../components/states/SubeDetailListNotice";
 import { getApiErrorMessage } from "../../../api/api-client";
-import { fetchBirimAmiriSecenekleri } from "../../../api/bildirimler.api";
+import { fetchBirimAmiriSecenekleri, fetchGunlukOzet, completeGunlukTamamlama } from "../../../api/bildirimler.api";
 import { useRoleAccess } from "../../../hooks/use-role-access";
 import { useAylikBildirimOnay } from "../../../hooks/useAylikBildirimOnay";
 import { useBildirimler } from "../../../hooks/useBildirimler";
@@ -41,7 +41,7 @@ import {
   formatBildirimStateLabel
 } from "../../../lib/display/enum-display";
 import type { AylikBildirimOnayCounts } from "../../../types/aylik-bildirim-onay";
-import type { Bildirim, BirimAmiriSecenegi } from "../../../types/bildirim";
+import type { Bildirim, BirimAmiriSecenegi, GunlukOzet } from "../../../types/bildirim";
 import type { HaftalikBildirimMutabakatCounts } from "../../../types/haftalik-bildirim-mutabakat";
 import type { Personel } from "../../../types/personel";
 import type { IdOption } from "../../../types/referans";
@@ -220,7 +220,9 @@ const HAFTALIK_MUTABAKAT_COUNT_LABELS: Array<{
   { key: "gonderildi", label: "Gönderildi" },
   { key: "duzeltme_istendi", label: "Düzeltme İstendi" },
   { key: "haftalik_mutabakata_alindi", label: "Mutabakata Alındı" },
-  { key: "iptal", label: "İptal" }
+  { key: "iptal", label: "İptal" },
+  { key: "eksik_gun", label: "Eksik Gün" },
+  { key: "tamamlanan_gun", label: "Tamamlanan Gün" }
 ];
 
 const AYLIK_BILDIRIM_ONAY_COUNT_LABELS: Array<{
@@ -244,6 +246,7 @@ type HaftalikMutabakatPanelProps = {
   contextMessage: string | null;
   onWeekApplied: (baslangic: string, bitis: string) => void;
   onApproved: () => void | Promise<void>;
+  onBlokBildirimClick?: (bildirimId: number) => void;
 };
 
 function HaftalikMutabakatPanel({
@@ -253,7 +256,8 @@ function HaftalikMutabakatPanel({
   birimAmiriUserId,
   contextMessage,
   onWeekApplied,
-  onApproved
+  onApproved,
+  onBlokBildirimClick
 }: HaftalikMutabakatPanelProps) {
   const userSelectedWeekRef = useRef(false);
   const {
@@ -314,7 +318,7 @@ function HaftalikMutabakatPanel({
             {HAFTALIK_MUTABAKAT_COUNT_LABELS.map(({ key, label }) => (
               <div key={key} className="bildirim-model-card" data-testid={`haftalik-mutabakat-count-${key}`}>
                 <span className="bildirim-model-label">{label}</span>
-                <strong>{ozet.counts[key]}</strong>
+                <strong>{ozet.counts[key] ?? 0}</strong>
               </div>
             ))}
           </div>
@@ -326,9 +330,38 @@ function HaftalikMutabakatPanel({
           ) : null}
 
           {typeof ozet.mevcut_mutabakat_id === "number" ? (
-            <p className="bildirim-mutabakat-meta" data-testid="haftalik-mutabakat-id">
-              Mutabakat ID: {ozet.mevcut_mutabakat_id}
-            </p>
+            <span data-testid="haftalik-mutabakat-id" hidden>
+              {ozet.mevcut_mutabakat_id}
+            </span>
+          ) : null}
+
+          {Array.isArray(ozet.bloklar) && ozet.bloklar.length > 0 ? (
+            <ul className="bildirim-aylik-hafta-list" data-testid="haftalik-mutabakat-bloklar">
+              {ozet.bloklar.map((blok, index) => {
+                const key = `${blok.tur}-${blok.tarih ?? "x"}-${blok.bildirim_id ?? index}`;
+                const clickable = typeof blok.bildirim_id === "number" && onBlokBildirimClick;
+                return (
+                  <li key={key} className="bildirim-aylik-hafta-item">
+                    {clickable ? (
+                      <button
+                        type="button"
+                        className="universal-btn-aux"
+                        data-testid={`haftalik-mutabakat-blok-${blok.bildirim_id}`}
+                        onClick={() => onBlokBildirimClick(blok.bildirim_id!)}
+                      >
+                        {blok.mesaj}
+                        {blok.tarih ? ` (${blok.tarih})` : ""}
+                      </button>
+                    ) : (
+                      <p>
+                        {blok.mesaj}
+                        {blok.tarih ? ` (${blok.tarih})` : ""}
+                      </p>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
           ) : null}
 
           {canApprove ? (
@@ -429,8 +462,12 @@ function AylikBildirimOnayPanel({
                   </strong>
                   <p>
                     Bildirim: {hafta.bildirim_sayisi} | Mutabakata alınan: {hafta.mutabakata_alinan_sayisi}
-                    {typeof hafta.mutabakat_id === "number" ? ` | Mutabakat ID: ${hafta.mutabakat_id}` : ""}
                     {hafta.eksik_mi ? " | Eksik hafta" : ""}
+                    {typeof hafta.mutabakat_id === "number" ? (
+                      <span data-testid={`aylik-hafta-mutabakat-id-${hafta.hafta_baslangic}`} hidden>
+                        {hafta.mutabakat_id}
+                      </span>
+                    ) : null}
                   </p>
                   {hafta.blok_nedeni ? <p>{hafta.blok_nedeni}</p> : null}
                 </li>
@@ -445,9 +482,9 @@ function AylikBildirimOnayPanel({
           ) : null}
 
           {typeof ozet.mevcut_onay_id === "number" ? (
-            <p className="bildirim-mutabakat-meta" data-testid="aylik-bildirim-onay-id">
-              Aylık Onay ID: {ozet.mevcut_onay_id}
-            </p>
+            <span data-testid="aylik-bildirim-onay-id" hidden>
+              {ozet.mevcut_onay_id}
+            </span>
           ) : null}
 
           {canApprove ? (
@@ -547,9 +584,7 @@ function GenelYoneticiBildirimOnayiPanel({
               ["Toplam Bildirim", String(ozet.counts.toplam_bildirim)],
               ["Mutabakata Alınan", String(ozet.counts.mutabakata_alinan)],
               ["Eksik Hafta", String(ozet.counts.eksik_hafta)],
-              ["Aylık Bildirim Onay ID", ozet.aylik_bildirim_onayi ? String(ozet.aylik_bildirim_onayi.id) : "—"],
               ["Aylık Bildirim Onay Durumu", ozet.aylik_bildirim_onayi?.state ?? "—"],
-              ["Genel Yönetici Üst Onay ID", gyOnay ? String(gyOnay.id) : "—"],
               ["Genel Yönetici Üst Onay Durumu", formatGenelYoneticiBildirimOnayiState(gyOnay?.state)],
               ["Onay Tarihi", formatGenelYoneticiBildirimOnayiDate(gyOnay?.onaylandi_at)]
             ].map(([label, value]) => (
@@ -558,6 +593,16 @@ function GenelYoneticiBildirimOnayiPanel({
                 <strong>{value}</strong>
               </div>
             ))}
+            {ozet.aylik_bildirim_onayi ? (
+              <span data-testid="aylik-bildirim-onay-ref-id" hidden>
+                {ozet.aylik_bildirim_onayi.id}
+              </span>
+            ) : null}
+            {gyOnay ? (
+              <span data-testid="genel-yonetici-bildirim-onay-id" hidden>
+                {gyOnay.id}
+              </span>
+            ) : null}
           </div>
 
           {blockMessage ? (
@@ -675,6 +720,7 @@ export function BildirimlerPage() {
   const { session } = useAuth();
   const { hasPermission, uiProfile } = useRoleAccess();
   const canCreateBildirim = hasPermission("gunluk_bildirim.create");
+  const canCompleteDay = hasPermission("gunluk_bildirim.complete_day");
   const canOpenBildirimDetail = hasPermission("bildirimler.detail.view");
   const canViewHaftalikMutabakat = hasPermission("haftalik_mutabakat.view");
   const canApproveHaftalikMutabakat = hasPermission("haftalik_mutabakat.approve");
@@ -700,8 +746,23 @@ export function BildirimlerPage() {
   const [birimAmiriSecenekleri, setBirimAmiriSecenekleri] = useState<BirimAmiriSecenegi[]>([]);
   const [isBirimAmiriSecenekleriLoading, setIsBirimAmiriSecenekleriLoading] = useState(false);
   const [birimAmiriSecenekleriError, setBirimAmiriSecenekleriError] = useState<string | null>(null);
+  const [gunlukOzet, setGunlukOzet] = useState<GunlukOzet | null>(null);
+  const [gunlukOzetError, setGunlukOzetError] = useState<string | null>(null);
+  const [isGunlukOzetLoading, setIsGunlukOzetLoading] = useState(false);
+  const [isCompletingDay, setIsCompletingDay] = useState(false);
+  const [completeDayError, setCompleteDayError] = useState<string | null>(null);
+  const [completeDaySuccess, setCompleteDaySuccess] = useState<string | null>(null);
+  const [rosterSearch, setRosterSearch] = useState("");
   const location = useLocation();
   const navigate = useNavigate();
+
+  const todayIso = useMemo(() => {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, "0");
+    const d = String(now.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  }, []);
 
   useEffect(() => {
     setSelectedSubeId(session?.active_sube_id ?? null);
@@ -774,6 +835,75 @@ export function BildirimlerPage() {
 
   const { draft } = listQuery;
   const page = listQuery.page;
+  const ozetTarih = draft.tarih && /^\d{4}-\d{2}-\d{2}$/.test(draft.tarih) ? draft.tarih : todayIso;
+
+  const refreshGunlukOzet = async () => {
+    if (selectedSubeId === null) {
+      setGunlukOzet(null);
+      return;
+    }
+    if (!isBirimAmiri && selectedBirimAmiriUserId === null) {
+      setGunlukOzet(null);
+      return;
+    }
+    setIsGunlukOzetLoading(true);
+    setGunlukOzetError(null);
+    try {
+      const data = await fetchGunlukOzet({
+        tarih: ozetTarih,
+        sube_id: selectedSubeId,
+        birim_amiri_user_id: isBirimAmiri ? undefined : selectedBirimAmiriUserId ?? undefined
+      });
+      setGunlukOzet(data);
+    } catch (caught) {
+      setGunlukOzet(null);
+      setGunlukOzetError(getApiErrorMessage(caught, "Günlük özet yüklenemedi."));
+    } finally {
+      setIsGunlukOzetLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void refreshGunlukOzet();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- refetch on context/tarih
+  }, [isBirimAmiri, ozetTarih, selectedBirimAmiriUserId, selectedSubeId]);
+
+  const filteredRoster = useMemo(() => {
+    const rows = gunlukOzet?.personeller ?? [];
+    const q = rosterSearch.trim().toLocaleLowerCase("tr-TR");
+    if (!q) return rows;
+    return rows.filter((row) => {
+      const haystack = [row.ad_soyad, row.sicil_no, row.gorev_adi, row.departman_adi]
+        .filter(Boolean)
+        .join(" ")
+        .toLocaleLowerCase("tr-TR");
+      return haystack.includes(q);
+    });
+  }, [gunlukOzet?.personeller, rosterSearch]);
+
+  const canCompleteToday =
+    canCompleteDay &&
+    gunlukOzet !== null &&
+    !gunlukOzet.ozet.tamamlandi_mi &&
+    gunlukOzet.ozet.taslak === 0 &&
+    gunlukOzet.ozet.duzeltme_istendi === 0;
+
+  async function handleCompleteDay() {
+    if (!canCompleteToday || isCompletingDay) return;
+    setIsCompletingDay(true);
+    setCompleteDayError(null);
+    setCompleteDaySuccess(null);
+    try {
+      await completeGunlukTamamlama({ tarih: ozetTarih });
+      setCompleteDaySuccess("Bugünkü bildirim tamamlandı.");
+      await refreshGunlukOzet();
+      await refetch();
+    } catch (caught) {
+      setCompleteDayError(getApiErrorMessage(caught, "Gün tamamlanamadı."));
+    } finally {
+      setIsCompletingDay(false);
+    }
+  }
 
   const personelMap = useMemo(
     () => new Map(personelOptions.map((personel) => [personel.id, personel])),
@@ -876,13 +1006,14 @@ export function BildirimlerPage() {
     }));
   }
 
-  const createTitle = isBirimAmiri ? "Günlük Kayıt Gir" : "Yeni Günlük Kayıt";
-  const createButtonLabel = isBirimAmiri ? "Günlük Kayıt Gir" : "Yeni Günlük Kayıt";
+  const createTitle = isBirimAmiri ? "Bildirim Gir" : "Yeni Bildirim";
+  const createButtonLabel = isBirimAmiri ? "Bildirim Gir" : "Yeni Bildirim";
+  const pageTitle = isBirimAmiri || canCreateBildirim ? "Bugünkü Personel Durumu" : "Günlük Bildirimler";
 
   return (
     <section className="bildirimler-page">
       <div className="bildirimler-header-row">
-        <h2>Günlük Kayıt Merkezi</h2>
+        <h2>{pageTitle}</h2>
         {canCreateBildirim ? (
           <button type="button" className="universal-btn-aux" onClick={openCreateModal}>
             {createButtonLabel}
@@ -890,14 +1021,135 @@ export function BildirimlerPage() {
         ) : null}
       </div>
 
-      <div className="state-card">
-        <h3>Günlük Kayıt Akışı</h3>
+      <div className="state-card" data-testid="bildirim-gunluk-hero">
+        <h3>{isBirimAmiri ? "Operasyonel gün durumu" : "Bildirim akışı"}</h3>
         <p>
-          Bu ekran, puantaj ham verisini hızlı toplamak için kullanılır. Kayıt senaryosu seçilir,
-          personel ve tarih belirlenir, sistem puantaj tarafına gidecek temel hareket ve dayanak
-          bilgisini aynı kayıtta toplar.
+          {isBirimAmiri
+            ? "Personelinizin bugünkü durumunu girin, taslakları gönderin ve günü tamamlayın. Haftalık mutabakat için günlük tamamlama gerekir."
+            : "Şube ve birim amiri bağlamında günlük bildirimleri, haftalık mutabakatı ve onay zincirini izleyin."}
         </p>
       </div>
+
+      {(isBirimAmiri || canCreateBildirim || canViewHaftalikMutabakat) && selectedSubeId !== null ? (
+        <div className="state-card" data-testid="gunluk-bildirim-ozet">
+          <div className="bildirim-mutabakat-panel-head">
+            <h3>Gün Özeti</h3>
+            {canCompleteToday ? (
+              <button
+                type="button"
+                className="universal-btn-aux"
+                data-testid="gunluk-bildirim-tamamla"
+                onClick={() => void handleCompleteDay()}
+                disabled={isCompletingDay}
+              >
+                {isCompletingDay ? "Tamamlanıyor..." : "Bugünkü bildirimi tamamla"}
+              </button>
+            ) : null}
+          </div>
+          {isGunlukOzetLoading ? <LoadingState label="Gün özeti yükleniyor..." /> : null}
+          {gunlukOzetError ? <p className="bildirim-form-error">{gunlukOzetError}</p> : null}
+          {completeDayError ? <p className="bildirim-form-error">{completeDayError}</p> : null}
+          {completeDaySuccess ? <p className="yonetim-success">{completeDaySuccess}</p> : null}
+          {gunlukOzet ? (
+            <>
+              <div className="bildirim-model-grid" data-testid="gunluk-bildirim-ozet-cards">
+                {[
+                  ["Bugünün Tarihi", gunlukOzet.tarih],
+                  ["Aktif Şube", gunlukOzet.sube_adi || selectedSubeLabel],
+                  ["Sorumlu Amir", gunlukOzet.birim_amiri_adi || selectedBirimAmiriLabel],
+                  ["Toplam Personel", String(gunlukOzet.ozet.toplam_personel)],
+                  ["Bildirim Girilen", String(gunlukOzet.ozet.bildirim_girilen)],
+                  ["Taslak", String(gunlukOzet.ozet.taslak)],
+                  ["Düzeltme", String(gunlukOzet.ozet.duzeltme_istendi)],
+                  ["Tamamlandı mı", gunlukOzet.ozet.tamamlandi_mi ? "Evet" : "Hayır"]
+                ].map(([label, value]) => (
+                  <div key={label} className="bildirim-model-card">
+                    <span className="bildirim-model-label">{label}</span>
+                    <strong>{value}</strong>
+                  </div>
+                ))}
+              </div>
+
+              <FormField
+                label="Personel ara"
+                name="gunluk-ozet-roster-search"
+                value={rosterSearch}
+                onChange={setRosterSearch}
+                placeholder="Ad, sicil, görev, departman..."
+              />
+
+              {filteredRoster.length === 0 ? (
+                <EmptyState
+                  title="Kapsamda personel bulunamadı"
+                  message="Seçili şube ve amir kapsamında aktif personel yok."
+                />
+              ) : (
+                <div className="puantaj-etki-aday-table-wrap" data-testid="gunluk-ozet-personel-table">
+                  <table className="puantaj-etki-aday-table">
+                    <thead>
+                      <tr>
+                        <th>Ad Soyad</th>
+                        <th>Sicil</th>
+                        <th>Görev</th>
+                        <th>Durum</th>
+                        <th>Bildirim</th>
+                        <th>Son İşlem</th>
+                        <th>Aksiyon</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredRoster.map((row) => (
+                        <tr key={row.personel_id}>
+                          <td>{row.ad_soyad}</td>
+                          <td>{row.sicil_no ?? "—"}</td>
+                          <td>{row.gorev_adi ?? "—"}</td>
+                          <td>{row.durum_label}</td>
+                          <td>{row.bildirim_turu ?? "—"}</td>
+                          <td>{row.son_islem_at ?? "—"}</td>
+                          <td>
+                            {canCreateBildirim && row.bildirim_id == null ? (
+                              <button
+                                type="button"
+                                className="universal-btn-aux"
+                                onClick={() => {
+                                  setCreateForm((prev) => ({
+                                    ...prev,
+                                    personelId: String(row.personel_id),
+                                    tarih: ozetTarih
+                                  }));
+                                  openCreateModal();
+                                }}
+                              >
+                                Bildirim Gir
+                              </button>
+                            ) : null}
+                            {row.bildirim_id != null ? (
+                              <button
+                                type="button"
+                                className="universal-btn-aux"
+                                onClick={() => {
+                                  const existing = bildirimler.find((item) => item.id === row.bildirim_id);
+                                  if (existing && canEditGunlukBildirim(existing, hasPermission, currentUserId)) {
+                                    openEditModal(existing, true);
+                                  } else if (canOpenBildirimDetail) {
+                                    navigate(`/bildirimler/${row.bildirim_id}`);
+                                  }
+                                }}
+                              >
+                                Düzenle
+                              </button>
+                            ) : null}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </>
+          ) : null}
+        </div>
+      ) : null}
 
       <SubeDetailListNotice />
 
@@ -958,6 +1210,11 @@ export function BildirimlerPage() {
           contextMessage={panelContextMessage}
           onWeekApplied={applyWeekRange}
           onApproved={refetch}
+          onBlokBildirimClick={(bildirimId) => {
+            if (canOpenBildirimDetail) {
+              navigate(`/bildirimler/${bildirimId}`);
+            }
+          }}
         />
       ) : null}
 
@@ -999,13 +1256,9 @@ export function BildirimlerPage() {
               selectOptions={personelSelectOptions}
             />
           ) : (
-            <FormField
-              label="Personel ID"
-              name="bildirim-filter-personel"
-              type="number"
-              min={1}
-              value={draft.personelId}
-              onChange={(value) => updateDraft({ personelId: value })}
+            <EmptyState
+              title="Kapsamda personel bulunamadı"
+              message="Filtre için personel listesi yok."
             />
           )}
           {gunlukKayitOptions.length > 0 ? (
@@ -1080,12 +1333,16 @@ export function BildirimlerPage() {
                   <strong>{preset.label}</strong>
                   <p>Kayıt Durumu: {formatBildirimStateLabel(bildirim.state)}</p>
                   <p>Tarih: {bildirim.tarih ?? "-"}</p>
-                  <p>Personel: {personel ? `${personel.ad} ${personel.soyad}` : bildirim.personel_id ?? "-"}</p>
+                  <p>
+                    Personel:{" "}
+                    {bildirim.personel_ad_soyad ??
+                      (personel ? `${personel.ad} ${personel.soyad}` : "—")}
+                  </p>
                   <p>
                     Bölüm:{" "}
                     {formatDepartmanLabel(
                       bildirim.departman_id,
-                      personel?.departman_adi,
+                      bildirim.departman_adi ?? personel?.departman_adi,
                       departmanOptions
                     )}
                   </p>
@@ -1234,14 +1491,9 @@ export function BildirimlerPage() {
                 selectOptions={personelSelectOptions}
               />
             ) : (
-              <FormField
-                label="Personel ID"
-                name="bildirim-create-personel-num"
-                type="number"
-                min={1}
-                value={createForm.personelId}
-                onChange={(value) => setCreateForm((prev) => ({ ...prev, personelId: value }))}
-                required
+              <EmptyState
+                title="Kapsamda personel bulunamadı"
+                message="Bildirim girmek için kapsamda aktif personel olmalıdır."
               />
             )}
 
@@ -1257,17 +1509,7 @@ export function BildirimlerPage() {
                 onChange={() => undefined}
                 disabled
               />
-            ) : (
-              <FormField
-                label="Bölüm"
-                name="bildirim-create-departman-num"
-                type="number"
-                min={1}
-                value={createForm.departmanId}
-                onChange={(value) => setCreateForm((prev) => ({ ...prev, departmanId: value }))}
-                required
-              />
-            )}
+            ) : null}
 
             <PersonelContextCard personel={selectedCreatePersonel} />
 
@@ -1353,11 +1595,14 @@ export function BildirimlerPage() {
               />
             ) : (
               <FormField
-                label="Personel ID"
-                name="bildirim-edit-personel-num"
-                type="number"
-                min={1}
-                value={editForm.personelId}
+                label="Personel"
+                name="bildirim-edit-personel-readonly"
+                value={
+                  editingBildirim?.personel_ad_soyad ??
+                  (selectedEditPersonel
+                    ? `${selectedEditPersonel.ad} ${selectedEditPersonel.soyad}`
+                    : "—")
+                }
                 onChange={() => undefined}
                 disabled
               />
@@ -1378,10 +1623,15 @@ export function BildirimlerPage() {
             ) : (
               <FormField
                 label="Bölüm"
-                name="bildirim-edit-departman-num"
-                type="number"
-                min={1}
-                value={editForm.departmanId}
+                name="bildirim-edit-departman-readonly"
+                value={
+                  editingBildirim?.departman_adi ??
+                  formatDepartmanLabel(
+                    editingBildirim?.departman_id,
+                    selectedEditPersonel?.departman_adi,
+                    departmanOptions
+                  )
+                }
                 onChange={() => undefined}
                 disabled
               />

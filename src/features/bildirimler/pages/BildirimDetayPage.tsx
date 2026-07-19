@@ -43,11 +43,23 @@ export function BildirimDetayPage() {
             <strong>Tarih:</strong> {bildirim.tarih ?? "-"}
           </p>
           <p>
-            <strong>Departman ID:</strong> {bildirim.departman_id ?? "-"}
+            <strong>Personel:</strong>{" "}
+            {bildirim.personel_ad_soyad ??
+              (bildirim.personel_id != null ? `Personel #${bildirim.personel_id}` : "-")}
           </p>
+          {bildirim.sicil_no ? (
+            <p>
+              <strong>Sicil:</strong> {bildirim.sicil_no}
+            </p>
+          ) : null}
           <p>
-            <strong>Personel ID:</strong> {bildirim.personel_id ?? "-"}
+            <strong>Departman:</strong> {bildirim.departman_adi ?? bildirim.departman_id ?? "-"}
           </p>
+          {bildirim.gorev_adi ? (
+            <p>
+              <strong>Görev:</strong> {bildirim.gorev_adi}
+            </p>
+          ) : null}
           <p>
             <strong>Kayıt Senaryosu:</strong> {preset.label}
           </p>

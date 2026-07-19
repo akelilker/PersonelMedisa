@@ -9,6 +9,7 @@ import type { SerbestZamanEvent } from "../types/serbest-zaman";
 import type { UserRole } from "../types/auth";
 import type { HaftalikBildirimMutabakat } from "../types/haftalik-bildirim-mutabakat";
 import type { AylikBildirimOnay } from "../types/aylik-bildirim-onay";
+import type { GenelYoneticiBildirimOnayi } from "../types/genel-yonetici-bildirim-onayi";
 import { hasRolePermission, type AppPermission } from "../lib/authorization/role-permissions";
 import { isMondayIsoDate, resolveHaftalikMutabakatApproval } from "../lib/bildirim/haftalik-mutabakat";
 import {
@@ -140,6 +141,23 @@ type DemoBildirim = {
   correction_requested_by?: number | null;
   correction_reason?: string | null;
   haftalik_mutabakat_id?: number | null;
+  personel_ad_soyad?: string | null;
+  sicil_no?: string | null;
+  gorev_adi?: string | null;
+  departman_adi?: string | null;
+  sube_adi?: string | null;
+  amir_user_id?: number | null;
+};
+
+type DemoGunlukTamamlama = {
+  id: number;
+  sube_id: number;
+  birim_amiri_user_id: number;
+  tarih: string;
+  state: string;
+  tamamlayan_user_id: number;
+  tamamlandi_at: string | null;
+  not_metni?: string | null;
 };
 
 type DemoPersonelUcretKaydi = {
@@ -328,8 +346,10 @@ const demoState: {
   zimmetler: DemoZimmet[];
   personelBelgeKayitlari: DemoPersonelBelgeKaydi[];
   bildirimler: DemoBildirim[];
+  gunlukBildirimTamamlamalari: DemoGunlukTamamlama[];
   haftalikBildirimMutabakatlari: HaftalikBildirimMutabakat[];
   aylikBildirimOnaylari: AylikBildirimOnay[];
+  genelYoneticiBildirimOnaylari: GenelYoneticiBildirimOnayi[];
   finansKalemleri: DemoFinansKalem[];
   personelUcretleri: DemoPersonelUcretKaydi[];
   mevzuatParametreleri: DemoMevzuatParametresi[];
@@ -369,8 +389,10 @@ const demoState: {
     zimmet: number;
     personelBelgeKaydi: number;
     bildirim: number;
+    gunlukBildirimTamamlama: number;
     haftalikBildirimMutabakat: number;
     aylikBildirimOnay: number;
+    genelYoneticiBildirimOnay: number;
     finans: number;
     personelUcret: number;
     mevzuatParametre: number;
@@ -403,7 +425,7 @@ const demoState: {
       departman_id: 3,
       gorev_id: 1,
       personel_tipi_id: 1,
-      bagli_amir_id: 1,
+      bagli_amir_id: undefined,
       maas_tutari: 35000
     },
     {
@@ -424,7 +446,7 @@ const demoState: {
       departman_id: 6,
       gorev_id: 2,
       personel_tipi_id: 2,
-      bagli_amir_id: 1
+      bagli_amir_id: undefined
     }
   ],
   surecler: [
@@ -527,8 +549,10 @@ const demoState: {
       updated_by: 3
     }
   ],
+  gunlukBildirimTamamlamalari: [],
   haftalikBildirimMutabakatlari: [],
   aylikBildirimOnaylari: [],
+  genelYoneticiBildirimOnaylari: [],
   finansKalemleri: [
     {
       id: 901,
@@ -774,8 +798,10 @@ const demoState: {
     zimmet: 560,
     personelBelgeKaydi: 703,
     bildirim: 800,
+    gunlukBildirimTamamlama: 0,
     haftalikBildirimMutabakat: 0,
     aylikBildirimOnay: 0,
+    genelYoneticiBildirimOnay: 0,
     finans: 950,
     personelUcret: 0,
     mevzuatParametre: 0,
@@ -1525,6 +1551,28 @@ function resolveDemoBildirimSubeId(personelId: number | null | undefined): numbe
 
   const personel = demoState.personeller.find((item) => item.id === personelId);
   return typeof personel?.sube_id === "number" ? personel.sube_id : undefined;
+}
+
+function enrichDemoBildirim(item: DemoBildirim): DemoBildirim {
+  const personel =
+    typeof item.personel_id === "number"
+      ? demoState.personeller.find((row) => row.id === item.personel_id)
+      : undefined;
+  if (!personel) {
+    return item;
+  }
+  return {
+    ...item,
+    personel_ad_soyad: `${personel.ad} ${personel.soyad}`.trim(),
+    sicil_no: personel.sicil_no ?? null,
+    gorev_adi: personel.gorev_id != null ? DEMO_GOREV_LABELS[personel.gorev_id] ?? null : null,
+    departman_adi:
+      personel.departman_id != null
+        ? demoState.departmanlar.find((d) => d.id === personel.departman_id)?.ad ?? null
+        : null,
+    sube_adi: demoState.subeler.find((s) => s.id === personel.sube_id)?.ad ?? null,
+    amir_user_id: personel.bagli_amir_id ?? null
+  };
 }
 
 function assertDemoAylikWriteSubeScope(
@@ -3361,10 +3409,35 @@ export function resolveDemoApiResponse(
         (item.tarih ?? "") >= start && (item.tarih ?? "") <= end
     );
     const count = (state: string) => rows.filter((item) => (item.state ?? "").toUpperCase() === state).length;
+    const today = new Date().toISOString().slice(0, 10);
+    const eksikGunler: string[] = [];
+    let tamamlananGun = 0;
+    const cursor = new Date(`${start}T00:00:00Z`);
+    const endDate = new Date(`${end}T00:00:00Z`);
+    while (cursor <= endDate) {
+      const day = cursor.toISOString().slice(0, 10);
+      if (day <= today) {
+        const hasActivity = rows.some((item) => item.tarih === day && (item.state ?? "").toUpperCase() !== "IPTAL");
+        if (hasActivity) {
+          const done = demoState.gunlukBildirimTamamlamalari.some(
+            (item) =>
+              item.sube_id === subeId &&
+              item.birim_amiri_user_id === userId &&
+              item.tarih === day
+          );
+          if (done) tamamlananGun += 1;
+          else eksikGunler.push(day);
+        }
+      }
+      cursor.setUTCDate(cursor.getUTCDate() + 1);
+    }
     return {
       toplam: rows.length, taslak: count("TASLAK"), gonderildi: count("GONDERILDI"),
       duzeltme_istendi: count("DUZELTME_ISTENDI"),
-      haftalik_mutabakata_alindi: count("HAFTALIK_MUTABAKATA_ALINDI"), iptal: count("IPTAL")
+      haftalik_mutabakata_alindi: count("HAFTALIK_MUTABAKATA_ALINDI"), iptal: count("IPTAL"),
+      eksik_gun: eksikGunler.length,
+      tamamlanan_gun: tamamlananGun,
+      eksik_gunler: eksikGunler
     };
   };
 
@@ -3404,11 +3477,46 @@ export function resolveDemoApiResponse(
       (item) => item.sube_id === subeId && item.birim_amiri_user_id === actor.userId && item.hafta_baslangic === week.start
     );
     const counts = mutabakatCounts(subeId, actor.userId, week.start, week.end);
-    const approval = resolveHaftalikMutabakatApproval(counts, existing?.id ?? null);
+    const amirHasCompletions = demoState.gunlukBildirimTamamlamalari.some(
+      (item) => item.birim_amiri_user_id === actor.userId
+    );
+    const approvalCounts =
+      !amirHasCompletions && (counts.eksik_gun ?? 0) > 0 ? { ...counts, eksik_gun: 0 } : counts;
+    const approval = resolveHaftalikMutabakatApproval(approvalCounts, existing?.id ?? null);
+    const bloklar = [
+      ...demoState.bildirimler
+        .filter(
+          (item) =>
+            item.sube_id === subeId &&
+            item.created_by === actor.userId &&
+            (item.tarih ?? "") >= week.start &&
+            (item.tarih ?? "") <= week.end &&
+            (item.state === "TASLAK" || item.state === "DUZELTME_ISTENDI")
+        )
+        .map((item) => ({
+          tur: item.state === "TASLAK" ? "TASLAK" : "DUZELTME_ISTENDI",
+          mesaj:
+            item.state === "TASLAK"
+              ? "Taslak bildirim duzenlenmeli."
+              : "Duzeltme bekleyen bildirim var.",
+          tarih: item.tarih ?? null,
+          bildirim_id: item.id
+        })),
+      ...(amirHasCompletions
+        ? counts.eksik_gunler.map((gun) => ({
+            tur: "EKSIK_GUN",
+            mesaj: "Bu gun icin bildirim tamamlanmamis.",
+            tarih: gun,
+            bildirim_id: null as number | null
+          }))
+        : [])
+    ];
     return ok({
       hafta_baslangic: week.start, hafta_bitis: week.end, sube_id: subeId,
-      birim_amiri_user_id: actor.userId, counts, ...approval,
-      mevcut_mutabakat_id: existing?.id ?? null
+      birim_amiri_user_id: actor.userId, counts: approvalCounts, ...approval,
+      mevcut_mutabakat_id: existing?.id ?? null,
+      eksik_gunler: amirHasCompletions ? counts.eksik_gunler : [],
+      bloklar
     });
   }
 
@@ -3425,7 +3533,12 @@ export function resolveDemoApiResponse(
       (item) => item.sube_id === subeId && item.birim_amiri_user_id === actor.userId && item.hafta_baslangic === week.start
     );
     const counts = mutabakatCounts(subeId, actor.userId, week.start, week.end);
-    const approval = resolveHaftalikMutabakatApproval(counts, existing?.id ?? null);
+    const amirHasCompletions = demoState.gunlukBildirimTamamlamalari.some(
+      (item) => item.birim_amiri_user_id === actor.userId
+    );
+    const approvalCounts =
+      !amirHasCompletions && (counts.eksik_gun ?? 0) > 0 ? { ...counts, eksik_gun: 0 } : counts;
+    const approval = resolveHaftalikMutabakatApproval(approvalCounts, existing?.id ?? null);
     if (!approval.onaylanabilir_mi) return demoBildirimConflict(approval.blok_nedeni ?? "Hafta onaylanamaz.");
     const now = new Date().toISOString();
     const mutabakat: HaftalikBildirimMutabakat = {
@@ -3692,6 +3805,194 @@ export function resolveDemoApiResponse(
         gonderildi: 0
       }
     });
+  }
+
+  const resolveGyApproval = (input: {
+    existingGy?: GenelYoneticiBildirimOnayi;
+    aylikOnay?: AylikBildirimOnay;
+    counts: {
+      eksik_hafta: number;
+      taslak: number;
+      duzeltme_istendi: number;
+      gonderildi: number;
+      mutabakata_alinan: number;
+      toplam_bildirim: number;
+    };
+  }) => {
+    if (input.existingGy) {
+      return { onay_verilebilir_mi: false, blok_nedeni: "ZATEN_ONAYLANDI" as const };
+    }
+    if (!input.aylikOnay) {
+      return { onay_verilebilir_mi: false, blok_nedeni: "AYLIK_BILDIRIM_ONAYI_GEREKLI" as const };
+    }
+    if (input.aylikOnay.state !== "TAMAMLANDI") {
+      return { onay_verilebilir_mi: false, blok_nedeni: "AYLIK_BILDIRIM_ONAYI_TAMAMLANMADI" as const };
+    }
+    if (input.counts.eksik_hafta > 0) {
+      return { onay_verilebilir_mi: false, blok_nedeni: "EKSIK_HAFTA_VAR" as const };
+    }
+    if (
+      input.counts.taslak > 0 ||
+      input.counts.duzeltme_istendi > 0 ||
+      input.counts.gonderildi > 0 ||
+      input.counts.mutabakata_alinan < 1 ||
+      input.counts.toplam_bildirim < 1
+    ) {
+      return { onay_verilebilir_mi: false, blok_nedeni: "AYLIK_BILDIRIM_ONAYI_TAMAMLANMADI" as const };
+    }
+    return { onay_verilebilir_mi: true, blok_nedeni: null };
+  };
+
+  if (pathname === "/genel-yonetici-bildirim-onaylari/ozet" && method === "GET") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(actor, "genel_yonetici_bildirim_onayi.view");
+    if (permissionError) return permissionError;
+    const ay = toStringValue(requestUrl.searchParams.get("ay")) ?? "";
+    const bounds = resolveAyBounds(ay);
+    if (!bounds) {
+      return demoRevizyonError("VALIDATION_ERROR", "Ay parametresi YYYY-MM formatinda olmalidir.");
+    }
+    const subeId = mutabakatScope(actor);
+    if (!subeId) {
+      return demoRevizyonError(
+        "VALIDATION_ERROR",
+        "Genel yonetici bildirim onayi icin aktif sube secilmelidir."
+      );
+    }
+    const amirId = toNumber(requestUrl.searchParams.get("birim_amiri_user_id"));
+    if (!amirId) {
+      return demoRevizyonError("VALIDATION_ERROR", "Birim amiri secimi zorunludur.");
+    }
+    const aylikOnay = demoState.aylikBildirimOnaylari.find(
+      (item) => item.sube_id === subeId && item.birim_amiri_user_id === amirId && item.ay === ay
+    );
+    const existingGy = demoState.genelYoneticiBildirimOnaylari.find(
+      (item) => item.sube_id === subeId && item.birim_amiri_user_id === amirId && item.ay === ay
+    );
+    const context = buildAylikOnayContext(subeId, amirId, ay);
+    const counts = context?.counts ?? {
+      toplam_bildirim: 0,
+      mutabakata_alinan: 0,
+      mutabakatli_hafta: 0,
+      eksik_hafta: 0,
+      taslak: 0,
+      duzeltme_istendi: 0,
+      gonderildi: 0
+    };
+    const approval = resolveGyApproval({ existingGy, aylikOnay, counts });
+    return ok({
+      ay,
+      ay_baslangic: context?.ayBaslangic ?? bounds.ay_baslangic,
+      ay_bitis: context?.ayBitis ?? bounds.ay_bitis,
+      sube_id: subeId,
+      birim_amiri_user_id: amirId,
+      counts: {
+        toplam_bildirim: counts.toplam_bildirim,
+        mutabakata_alinan: counts.mutabakata_alinan,
+        eksik_hafta: counts.eksik_hafta
+      },
+      aylik_bildirim_onayi: aylikOnay
+        ? { id: aylikOnay.id, state: aylikOnay.state, onaylandi_at: aylikOnay.onaylandi_at }
+        : null,
+      genel_yonetici_bildirim_onayi: existingGy
+        ? {
+            id: existingGy.id,
+            state: existingGy.state,
+            onaylayan_user_id: existingGy.onaylayan_user_id,
+            onaylandi_at: existingGy.onaylandi_at,
+            aciklama: existingGy.aciklama
+          }
+        : null,
+      onay_verilebilir_mi: approval.onay_verilebilir_mi,
+      blok_nedeni: approval.blok_nedeni
+    });
+  }
+
+  if (pathname === "/genel-yonetici-bildirim-onaylari" && method === "POST") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(actor, "genel_yonetici_bildirim_onayi.approve");
+    if (permissionError) return permissionError;
+    const ay = toStringValue(body.ay) ?? "";
+    const bounds = resolveAyBounds(ay);
+    if (!bounds) {
+      return demoRevizyonError("VALIDATION_ERROR", "Ay parametresi YYYY-MM formatinda olmalidir.");
+    }
+    const subeId = mutabakatScope(actor);
+    if (!subeId) {
+      return demoRevizyonError(
+        "VALIDATION_ERROR",
+        "Genel yonetici bildirim onayi icin aktif sube secilmelidir."
+      );
+    }
+    const amirId = toNumber(body.birim_amiri_user_id);
+    if (!amirId) {
+      return demoRevizyonError("VALIDATION_ERROR", "Birim amiri secimi zorunludur.");
+    }
+    const existingGy = demoState.genelYoneticiBildirimOnaylari.find(
+      (item) => item.sube_id === subeId && item.birim_amiri_user_id === amirId && item.ay === ay
+    );
+    if (existingGy) {
+      return demoRevizyonError(
+        "GENEL_YONETICI_BILDIRIM_ONAYI_MEVCUT",
+        "Bu ay icin genel yonetici ust onayi zaten mevcut."
+      );
+    }
+    const aylikOnay = demoState.aylikBildirimOnaylari.find(
+      (item) => item.sube_id === subeId && item.birim_amiri_user_id === amirId && item.ay === ay
+    );
+    if (!aylikOnay) {
+      return demoRevizyonError("AYLIK_BILDIRIM_ONAYI_GEREKLI", "Aylik bildirim onayi bulunamadi.");
+    }
+    const context = buildAylikOnayContext(subeId, amirId, ay);
+    const counts = context?.counts ?? {
+      toplam_bildirim: 0,
+      mutabakata_alinan: 0,
+      mutabakatli_hafta: 0,
+      eksik_hafta: 0,
+      taslak: 0,
+      duzeltme_istendi: 0,
+      gonderildi: 0
+    };
+    const approval = resolveGyApproval({ aylikOnay, counts });
+    if (!approval.onay_verilebilir_mi) {
+      return demoRevizyonError(
+        approval.blok_nedeni ?? "AYLIK_BILDIRIM_ONAYI_TAMAMLANMADI",
+        "Genel yonetici bildirim onayi olusturulamadi."
+      );
+    }
+    const now = new Date().toISOString();
+    const onay: GenelYoneticiBildirimOnayi = {
+      id: ++demoState.nextIds.genelYoneticiBildirimOnay,
+      sube_id: subeId,
+      birim_amiri_user_id: amirId,
+      ay,
+      aylik_bildirim_onayi_id: aylikOnay.id,
+      state: "TAMAMLANDI",
+      onaylayan_user_id: actor.userId,
+      onaylandi_at: now,
+      aciklama: toStringValue(body.aciklama) ?? null,
+      created_at: now,
+      updated_at: now
+    };
+    demoState.genelYoneticiBildirimOnaylari.push(onay);
+    return ok(onay);
+  }
+
+  const gyOnayDetailMatch = pathname.match(/^\/genel-yonetici-bildirim-onaylari\/(\d+)$/);
+  if (gyOnayDetailMatch && method === "GET") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(actor, "genel_yonetici_bildirim_onayi.view");
+    if (permissionError) return permissionError;
+    const id = Number.parseInt(gyOnayDetailMatch[1], 10);
+    const onay = demoState.genelYoneticiBildirimOnaylari.find((item) => item.id === id);
+    if (!onay) {
+      return demoRevizyonError("NOT_FOUND", "Genel yonetici bildirim onayi bulunamadi.");
+    }
+    const scopeAllowed = actor.subeIds.length === 0 || actor.subeIds.includes(onay.sube_id);
+    if (!scopeAllowed) {
+      return demoRevizyonError("FORBIDDEN", "Bu kayit aktif sube baglaminda goruntulenemiyor.");
+    }
+    return ok(onay);
   }
 
   if (pathname === "/isg/makineler" && method === "GET") {
@@ -4402,7 +4703,7 @@ export function resolveDemoApiResponse(
     });
 
     const start = (page - 1) * limit;
-    const items = filtered.slice(start, start + limit);
+    const items = filtered.slice(start, start + limit).map((item) => enrichDemoBildirim(item));
     const total = filtered.length;
     const totalPages = Math.max(1, Math.ceil(total / limit));
 
@@ -4415,6 +4716,227 @@ export function resolveDemoApiResponse(
         total_pages: totalPages
       }
     );
+  }
+
+  if (pathname === "/bildirimler/birim-amiri-secenekleri" && method === "GET") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(actor, "bildirimler.view");
+    if (permissionError) return permissionError;
+    const subeId = toNumber(requestUrl.searchParams.get("sube_id")) ?? actor.subeIds[0] ?? 1;
+    return ok({
+      items: [
+        { user_id: 12, ad_soyad: "Birim Amiri", sube_id: subeId },
+        { user_id: 1, ad_soyad: "Demo Amir", sube_id: subeId }
+      ]
+    });
+  }
+
+  if (pathname === "/bildirimler/gunluk-ozet" && method === "GET") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(actor, "bildirimler.view");
+    if (permissionError) return permissionError;
+    const tarih = toStringValue(requestUrl.searchParams.get("tarih"));
+    if (!tarih) {
+      return demoRevizyonError("VALIDATION_ERROR", "Tarih YYYY-MM-DD formatinda zorunludur.");
+    }
+    const subeId =
+      toNumber(requestUrl.searchParams.get("sube_id")) ??
+      (actor.subeIds.length === 1 ? actor.subeIds[0] : null);
+    if (subeId === null) {
+      return demoRevizyonError("VALIDATION_ERROR", "Gunluk ozet icin aktif sube secilmelidir.");
+    }
+    const amirId =
+      actor.role === "BIRIM_AMIRI"
+        ? actor.userId
+        : toNumber(requestUrl.searchParams.get("birim_amiri_user_id"));
+    if (amirId === null) {
+      return demoRevizyonError("VALIDATION_ERROR", "Birim amiri secimi zorunludur.");
+    }
+    const rosterMatched = demoState.personeller.filter((personel) => {
+      if (personel.sube_id !== subeId) return false;
+      if ((personel.aktif_durum ?? "").toUpperCase() !== "AKTIF") return false;
+      if ((personel.ise_giris_tarihi ?? "1900-01-01") > tarih) return false;
+      return personel.bagli_amir_id == null || personel.bagli_amir_id === amirId;
+    });
+    const rosterFallback = demoState.personeller.filter((personel) => {
+      if (personel.sube_id !== subeId) return false;
+      if ((personel.aktif_durum ?? "").toUpperCase() !== "AKTIF") return false;
+      if ((personel.ise_giris_tarihi ?? "1900-01-01") > tarih) return false;
+      return true;
+    });
+    const roster = rosterMatched.length > 0 ? rosterMatched : rosterFallback;
+    const personeller = roster.map((personel) => {
+      const open = demoState.bildirimler
+        .filter(
+          (item) =>
+            item.personel_id === personel.id &&
+            item.tarih === tarih &&
+            (item.state ?? "").toUpperCase() !== "IPTAL"
+        )
+        .sort((a, b) => b.id - a.id)[0];
+      const state = open?.state ?? null;
+      return {
+        personel_id: personel.id,
+        ad_soyad: `${personel.ad} ${personel.soyad}`.trim(),
+        sicil_no: personel.sicil_no ?? null,
+        gorev_adi: personel.gorev_id != null ? DEMO_GOREV_LABELS[personel.gorev_id] ?? null : null,
+        departman_adi:
+          personel.departman_id != null
+            ? demoState.departmanlar.find((d) => d.id === personel.departman_id)?.ad ?? null
+            : null,
+        bildirim_id: open?.id ?? null,
+        bildirim_turu: open?.bildirim_turu ?? null,
+        bildirim_state: state,
+        son_islem_at: open?.submitted_at ?? null,
+        durum_label:
+          state === null
+            ? "Bildirim yok"
+            : state === "TASLAK"
+              ? "Taslak"
+              : state === "GONDERILDI"
+                ? "Gönderildi"
+                : state === "DUZELTME_ISTENDI"
+                  ? "Düzeltme İstendi"
+                  : state
+      };
+    });
+    const bildirimGirilen = personeller.filter((row) => row.bildirim_id != null).length;
+    const taslak = personeller.filter((row) => row.bildirim_state === "TASLAK").length;
+    const gonderildi = personeller.filter((row) => row.bildirim_state === "GONDERILDI").length;
+    const duzeltme = personeller.filter((row) => row.bildirim_state === "DUZELTME_ISTENDI").length;
+    const sorunluTurler = new Set(["GELMEDI", "GEC_GELDI", "ERKEN_CIKTI", "IZINLI", "RAPORLU"]);
+    const sorunlu = personeller.filter(
+      (row) =>
+        row.bildirim_state === "DUZELTME_ISTENDI" ||
+        (row.bildirim_turu != null && sorunluTurler.has(row.bildirim_turu))
+    ).length;
+    const tamamlama =
+      demoState.gunlukBildirimTamamlamalari.find(
+        (item) =>
+          item.sube_id === subeId &&
+          item.birim_amiri_user_id === amirId &&
+          item.tarih === tarih
+      ) ?? null;
+    return ok({
+      tarih,
+      sube_id: subeId,
+      sube_adi: demoState.subeler.find((s) => s.id === subeId)?.ad ?? "",
+      birim_amiri_user_id: amirId,
+      birim_amiri_adi: actor.role === "BIRIM_AMIRI" ? "Birim Amiri" : "Demo Amir",
+      ozet: {
+        toplam_personel: personeller.length,
+        bildirim_girilen: bildirimGirilen,
+        eksik_bildirim: taslak + duzeltme,
+        sorunlu_personel: sorunlu,
+        taslak,
+        gonderildi,
+        duzeltme_istendi: duzeltme,
+        tamamlandi_mi: tamamlama != null
+      },
+      tamamlama: tamamlama
+        ? {
+            id: tamamlama.id,
+            tamamlandi_at: tamamlama.tamamlandi_at,
+            tamamlayan_user_id: tamamlama.tamamlayan_user_id,
+            state: tamamlama.state
+          }
+        : null,
+      personeller
+    });
+  }
+
+  if (pathname === "/bildirimler/gunluk-tamamlama" && method === "GET") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(actor, "bildirimler.view");
+    if (permissionError) return permissionError;
+    const tarih = toStringValue(requestUrl.searchParams.get("tarih"));
+    if (!tarih) {
+      return demoRevizyonError("VALIDATION_ERROR", "Tarih YYYY-MM-DD formatinda zorunludur.");
+    }
+    const subeId =
+      toNumber(requestUrl.searchParams.get("sube_id")) ??
+      (actor.subeIds.length === 1 ? actor.subeIds[0] : null);
+    if (subeId === null) {
+      return demoRevizyonError("VALIDATION_ERROR", "Gunluk tamamlama icin aktif sube secilmelidir.");
+    }
+    const amirId =
+      actor.role === "BIRIM_AMIRI"
+        ? actor.userId
+        : toNumber(requestUrl.searchParams.get("birim_amiri_user_id"));
+    if (amirId === null) {
+      return demoRevizyonError("VALIDATION_ERROR", "Birim amiri secimi zorunludur.");
+    }
+    const tamamlama =
+      demoState.gunlukBildirimTamamlamalari.find(
+        (item) =>
+          item.sube_id === subeId &&
+          item.birim_amiri_user_id === amirId &&
+          item.tarih === tarih
+      ) ?? null;
+    return ok({
+      tarih,
+      sube_id: subeId,
+      birim_amiri_user_id: amirId,
+      tamamlama: tamamlama
+        ? {
+            id: tamamlama.id,
+            tamamlandi_at: tamamlama.tamamlandi_at,
+            tamamlayan_user_id: tamamlama.tamamlayan_user_id,
+            state: tamamlama.state
+          }
+        : null
+    });
+  }
+
+  if (pathname === "/bildirimler/gunluk-tamamlama" && method === "POST") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(actor, "gunluk_bildirim.complete_day");
+    if (permissionError) return permissionError;
+    const tarih = toStringValue(body.tarih);
+    if (!tarih) {
+      return demoRevizyonError("VALIDATION_ERROR", "Tarih zorunludur.");
+    }
+    const subeId = actor.subeIds.length === 1 ? actor.subeIds[0]! : actor.subeIds[0] ?? 1;
+    const amirId = actor.userId;
+    const existing = demoState.gunlukBildirimTamamlamalari.find(
+      (item) =>
+        item.sube_id === subeId && item.birim_amiri_user_id === amirId && item.tarih === tarih
+    );
+    if (existing) {
+      return ok({
+        id: existing.id,
+        tamamlandi_at: existing.tamamlandi_at,
+        tamamlayan_user_id: existing.tamamlayan_user_id,
+        state: existing.state
+      });
+    }
+    const blockers = demoState.bildirimler.filter(
+      (item) =>
+        item.sube_id === subeId &&
+        item.created_by === amirId &&
+        item.tarih === tarih &&
+        (item.state === "TASLAK" || item.state === "DUZELTME_ISTENDI")
+    );
+    if (blockers.length > 0) {
+      return demoBildirimConflict("Taslak veya duzeltme bekleyen bildirim varken gun tamamlanamaz.");
+    }
+    const next: DemoGunlukTamamlama = {
+      id: ++demoState.nextIds.gunlukBildirimTamamlama,
+      sube_id: subeId,
+      birim_amiri_user_id: amirId,
+      tarih,
+      state: "TAMAMLANDI",
+      tamamlayan_user_id: amirId,
+      tamamlandi_at: new Date().toISOString(),
+      not_metni: toStringValue(body.not_metni) ?? null
+    };
+    demoState.gunlukBildirimTamamlamalari.push(next);
+    return ok({
+      id: next.id,
+      tamamlandi_at: next.tamamlandi_at,
+      tamamlayan_user_id: next.tamamlayan_user_id,
+      state: next.state
+    });
   }
 
   if (pathname === "/bildirimler" && method === "POST") {
@@ -4435,9 +4957,27 @@ export function resolveDemoApiResponse(
     }
 
     const personelId = toNumber(body.personel_id) ?? undefined;
+    const tarih = toStringValue(body.tarih) ?? undefined;
+    if (personelId != null && tarih) {
+      const openDup = demoState.bildirimler.some(
+        (item) =>
+          item.personel_id === personelId &&
+          item.tarih === tarih &&
+          item.bildirim_turu === bildirimTuru &&
+          (item.state ?? "").toUpperCase() !== "IPTAL"
+      );
+      if (openDup) {
+        return demoBildirimConflict("Bu personel/tarih/olay için açık bildirim zaten var.");
+      }
+      const personel = demoState.personeller.find((item) => item.id === personelId);
+      if (personel && actor.role === "BIRIM_AMIRI" && personel.bagli_amir_id != null && personel.bagli_amir_id !== actor.userId) {
+        return demoRevizyonError("FORBIDDEN", "Bu personel sizin sorumluluk kapsamınızda değil.");
+      }
+    }
+
     const next: DemoBildirim = {
       id: ++demoState.nextIds.bildirim,
-      tarih: toStringValue(body.tarih) ?? undefined,
+      tarih,
       departman_id: toNumber(body.departman_id) ?? undefined,
       personel_id: personelId,
       sube_id: resolveDemoBildirimSubeId(personelId),
@@ -4449,7 +4989,7 @@ export function resolveDemoApiResponse(
       updated_by: actor.userId
     };
     demoState.bildirimler.unshift(next);
-    return ok(next);
+    return ok(enrichDemoBildirim(next));
   }
 
   const bildirimDetailMatch = pathname.match(/^\/bildirimler\/(\d+)$/);
@@ -6987,6 +7527,73 @@ export function resolveDemoApiResponse(
       (item) => item.sube_id === subeId && item.yil === yil && item.ay === ay
     );
     return ok({ items });
+  }
+
+  if (pathname === "/puantaj/bildirim-etki-adaylari/ozet" && method === "GET") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(actor, "puantaj.bildirim_etki.view");
+    if (permissionError) return permissionError;
+    const gyId = toNumber(requestUrl.searchParams.get("genel_yonetici_bildirim_onayi_id"));
+    if (!gyId) {
+      return demoRevizyonError(
+        "VALIDATION_ERROR",
+        "Genel yonetici bildirim onayi secilmelidir."
+      );
+    }
+    const gyOnay = demoState.genelYoneticiBildirimOnaylari.find((item) => item.id === gyId);
+    const hazirlanabilir = Boolean(gyOnay && gyOnay.state === "TAMAMLANDI");
+    return ok({
+      context: {
+        genel_yonetici_bildirim_onayi_id: gyId,
+        ay: gyOnay?.ay ?? "2026-06",
+        ay_baslangic: `${(gyOnay?.ay ?? "2026-06")}-01`,
+        ay_bitis: `${(gyOnay?.ay ?? "2026-06")}-28`,
+        sube_id: gyOnay?.sube_id ?? mutabakatScope(actor) ?? 1,
+        birim_amiri_user_id: gyOnay?.birim_amiri_user_id ?? 1,
+        aylik_bildirim_onayi_id: gyOnay?.aylik_bildirim_onayi_id ?? null,
+        onaylandi_at: gyOnay?.onaylandi_at ?? null
+      },
+      genel_yonetici_bildirim_onayi: gyOnay
+        ? { id: gyOnay.id, state: gyOnay.state, onaylandi_at: gyOnay.onaylandi_at }
+        : null,
+      kaynak_bildirim_sayisi: 0,
+      aday_sayilari: {
+        toplam: 0,
+        hazir: 0,
+        uygulandi: 0,
+        yok_sayildi: 0,
+        cakisma: 0
+      },
+      muhur_durumu: "ACIK",
+      hazirlanabilir_mi: hazirlanabilir,
+      blok_nedeni: hazirlanabilir ? null : "GENEL_YONETICI_BILDIRIM_ONAYI_GEREKLI"
+    });
+  }
+
+  if (pathname === "/puantaj/bildirim-etki-adaylari/hazirla" && method === "POST") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(actor, "puantaj.bildirim_etki.generate");
+    if (permissionError) return permissionError;
+    const gyId = toNumber(body.genel_yonetici_bildirim_onayi_id);
+    if (!gyId) {
+      return demoRevizyonError(
+        "VALIDATION_ERROR",
+        "Genel yonetici bildirim onayi secilmelidir."
+      );
+    }
+    const gyOnay = demoState.genelYoneticiBildirimOnaylari.find((item) => item.id === gyId);
+    if (!gyOnay || gyOnay.state !== "TAMAMLANDI") {
+      return demoRevizyonError(
+        "GENEL_YONETICI_BILDIRIM_ONAYI_GEREKLI",
+        "Once genel yonetici bildirim onayi tamamlanmalidir."
+      );
+    }
+    return ok({
+      genel_yonetici_bildirim_onayi_id: gyId,
+      created_count: 0,
+      skipped_count: 0,
+      hazir_count: 0
+    });
   }
 
   if (pathname === "/puantaj/bildirim-etki-adaylari/rapor" && method === "GET") {

@@ -4,14 +4,14 @@ on:
   workflow_dispatch:
     inputs:
       confirm:
-        description: 'Type MIGRATE_S79BR3_027 to confirm production 027 migrate'
+        description: 'MIGRATE_S79BR3_027 | SMOKE_S79BR3 | CLEANUP_S79BR3'
         required: true
         type: string
 
 jobs:
   migrate:
     name: Preflight + backup + apply 027 via temporary FTP ops
-    if: github.event.inputs.confirm == 'MIGRATE_S79BR3_027'
+    if: github.event.inputs.confirm == 'MIGRATE_S79BR3_027' || github.event.inputs.confirm == 'SMOKE_S79BR3' || github.event.inputs.confirm == 'CLEANUP_S79BR3'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -39,6 +39,7 @@ jobs:
 
       - name: Prepare one-shot ops payload
         id: prep
+        if: github.event.inputs.confirm != 'CLEANUP_S79BR3'
         run: |
           set -euo pipefail
           TOKEN="$(openssl rand -hex 24)"
@@ -70,6 +71,7 @@ jobs:
           ls -la /tmp/s79br3-ops
 
       - name: Upload ops files via FTP
+        if: github.event.inputs.confirm != 'CLEANUP_S79BR3'
         env:
           FTP_SERVER: ${{ secrets.FTP_SERVER }}
           FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
@@ -108,6 +110,7 @@ jobs:
 
       - name: Identity + preflight
         id: preflight
+        if: github.event.inputs.confirm == 'MIGRATE_S79BR3_027'
         env:
           TOKEN: ${{ steps.prep.outputs.token }}
         run: |
@@ -146,6 +149,7 @@ jobs:
 
       - name: Backup
         id: backup
+        if: github.event.inputs.confirm == 'MIGRATE_S79BR3_027'
         env:
           TOKEN: ${{ steps.prep.outputs.token }}
         run: |
@@ -179,6 +183,7 @@ jobs:
 
       - name: Apply migration 027
         id: migrate
+        if: github.event.inputs.confirm == 'MIGRATE_S79BR3_027'
         env:
           TOKEN: ${{ steps.prep.outputs.token }}
         run: |
@@ -203,6 +208,7 @@ jobs:
           PY
 
       - name: Postcheck + counts + integrity
+        if: github.event.inputs.confirm == 'MIGRATE_S79BR3_027'
         env:
           TOKEN: ${{ steps.prep.outputs.token }}
         run: |
@@ -232,8 +238,20 @@ jobs:
             sys.exit(1)
           PY
 
+      - name: Publish smoke bridge token (SMOKE_S79BR3 only; keep ops for local create smoke)
+        if: github.event.inputs.confirm == 'SMOKE_S79BR3'
+        env:
+          TOKEN: ${{ steps.prep.outputs.token }}
+        run: |
+          set -euo pipefail
+          BASE="https://www.karmotors.com.tr/personelmedisa/api/public/_s79br3_migrate.php"
+          curl -fsS "${BASE}?token=${TOKEN}&action=identity" | tee /tmp/s79br3-artifacts/identity.json
+          curl -fsS "${BASE}?token=${TOKEN}&action=postcheck" | tee /tmp/s79br3-artifacts/postcheck.json
+          echo "$TOKEN" > /tmp/s79br3-artifacts/smoke_bridge_token.txt
+          echo "smoke_bridge_ready=1" | tee /tmp/s79br3-artifacts/smoke_bridge_ready.txt
+
       - name: Delete ops files via FTP
-        if: always()
+        if: always() && (github.event.inputs.confirm == 'MIGRATE_S79BR3_027' || github.event.inputs.confirm == 'CLEANUP_S79BR3')
         env:
           FTP_SERVER: ${{ secrets.FTP_SERVER }}
           FTP_USERNAME: ${{ secrets.FTP_USERNAME }}

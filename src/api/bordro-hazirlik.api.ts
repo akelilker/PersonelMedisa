@@ -104,10 +104,10 @@ export type BordroOnIzlemePersonelSatiri = {
   sube_ad: string;
   departman_ad: string;
   net_maas: string | null;
-  brut_maas: string;
-  net_odenecek: string;
-  toplam_ek_odeme: string;
-  toplam_kesinti: string;
+  brut_maas: string | null;
+  net_odenecek: string | null;
+  toplam_ek_odeme: string | null;
+  toplam_kesinti: string | null;
   durum: string;
   bordro_onay_durumu: string;
   aktif_correction_var_mi: boolean;
@@ -122,10 +122,11 @@ export type BordroOnIzlemeOzet = {
   aday_olusturulan: number;
   kontrol_bekleyen: number;
   kesinlesen: number;
-  toplam_net: string;
-  toplam_brut: string;
-  toplam_ek_odeme: string;
-  toplam_kesinti: string;
+  toplam_net: string | null;
+  toplam_brut: string | null;
+  toplam_ek_odeme: string | null;
+  toplam_kesinti: string | null;
+  finance_masked?: boolean;
   calistirma: {
     id: number;
     bordro_onay_durumu: string;

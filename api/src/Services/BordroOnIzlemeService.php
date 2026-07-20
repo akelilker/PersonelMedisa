@@ -11,6 +11,58 @@ use PDO;
  */
 class BordroOnIzlemeService
 {
+    /**
+     * Mask finance money fields when actor lacks finans.view (UI + API parity).
+     *
+     * @param array<string, mixed> $ozet
+     * @return array<string, mixed>
+     */
+    public static function maskFinanceFields(array $ozet)
+    {
+        $ozet['toplam_net'] = null;
+        $ozet['toplam_brut'] = null;
+        $ozet['toplam_ek_odeme'] = null;
+        $ozet['toplam_kesinti'] = null;
+        $ozet['finance_masked'] = true;
+        if (isset($ozet['personel_satirlari']) && is_array($ozet['personel_satirlari'])) {
+            $ozet['personel_satirlari'] = array_map(static function (array $row) {
+                $row['net_maas'] = null;
+                $row['brut_maas'] = null;
+                $row['net_odenecek'] = null;
+                $row['toplam_ek_odeme'] = null;
+                $row['toplam_kesinti'] = null;
+
+                return $row;
+            }, $ozet['personel_satirlari']);
+        }
+
+        return $ozet;
+    }
+
+    /**
+     * @param array<string, mixed> $detail
+     * @return array<string, mixed>
+     */
+    public static function maskAdayFinanceFields(array $detail)
+    {
+        $detail['net_maas'] = null;
+        $detail['brut_maas'] = null;
+        $detail['net_odenecek'] = null;
+        $detail['toplam_ek_odeme'] = null;
+        $detail['toplam_kesinti'] = null;
+        $detail['finance_masked'] = true;
+        if (isset($detail['kalemler']) && is_array($detail['kalemler'])) {
+            $detail['kalemler'] = array_map(static function (array $kalem) {
+                $kalem['tutar'] = null;
+                $kalem['oran'] = null;
+
+                return $kalem;
+            }, $detail['kalemler']);
+        }
+
+        return $detail;
+    }
+
     /** @return array<string, mixed> */
     public static function buildDonemOzeti(PDO $pdo, $subeId, $yil, $ay, $departmanId = null)
     {

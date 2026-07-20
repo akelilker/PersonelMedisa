@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import {
   downloadBordroDevirSablonCsv,
+  downloadBordroReadinessCsv,
   fetchBordroDevirListesi,
   fetchBordroHazirlikPreflight,
   fetchBordroNetMaasEksikleri,
@@ -341,6 +342,16 @@ export function BordroHazirlikMerkeziPage() {
     }
   }
 
+  async function handleDownloadReadinessCsv() {
+    if (!subeId) return;
+    try {
+      await downloadBordroReadinessCsv({ yil, ay, subeId });
+      setActionMessage("Readiness CSV indirildi.");
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Readiness CSV indirilemedi.");
+    }
+  }
+
   return (
     <section className="yonetim-page donem-kapanis-page" data-testid="bordro-hazirlik-merkezi">
       <header className="yonetim-page-header">
@@ -427,6 +438,12 @@ export function BordroHazirlikMerkeziPage() {
             </div>
           </div>
 
+          <div>
+            <button type="button" data-testid="bordro-readiness-csv-indir" onClick={() => void handleDownloadReadinessCsv()}>
+              Readiness CSV İndir
+            </button>
+          </div>
+
           {candidateGate && !candidateGate.aktif ? (
             <section data-testid="bordro-candidate-gate-nedenleri" className="kapanis-issue-section">
               <h3>Maaş adayı üretimi engelleri</h3>
@@ -448,6 +465,16 @@ export function BordroHazirlikMerkeziPage() {
                   Eksik kayıt: {domain.eksik_kayit_sayisi} · Etkilenen personel: {domain.etkilenen_personel_sayisi}
                 </p>
                 <p>{domain.aciklama}</p>
+                {domain.blocker_codes && domain.blocker_codes.length > 0 ? (
+                  <p data-testid={`bordro-readiness-blockers-${domain.key}`}>
+                    Blocker kodları: {domain.blocker_codes.join(", ")}
+                  </p>
+                ) : null}
+                {domain.eksik_kodlar && domain.eksik_kodlar.length > 0 ? (
+                  <p data-testid={`bordro-readiness-eksik-kodlar-${domain.key}`}>
+                    Eksik kodlar: {domain.eksik_kodlar.join(", ")}
+                  </p>
+                ) : null}
                 {domain.action_link ? (
                   <Link to={domain.action_link} data-testid={`bordro-readiness-link-${domain.key}`}>
                     İlgili ekrana git
@@ -731,7 +758,12 @@ export function BordroHazirlikMerkeziPage() {
                   <p data-testid="bordro-on-izleme-toplam-brut">{formatMoney(onIzleme.toplam_brut)}</p>
                 </div>
               </>
-            ) : null}
+            ) : (
+              <div data-testid="bordro-on-izleme-finance-masked">
+                <strong>Finans tutarları</strong>
+                <p>finans.view yetkisi olmadığı için gizlendi.</p>
+              </div>
+            )}
           </div>
 
           {canManageAday ? (

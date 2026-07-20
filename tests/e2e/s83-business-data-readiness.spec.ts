@@ -26,8 +26,15 @@ test.describe("S83 Business Data Readiness", () => {
     await expect(page.getByTestId("bordro-hazirlik-tab-veri-hazirlik")).toBeVisible();
     await page.getByTestId("bordro-hazirlik-tab-veri-hazirlik").click();
     await expect(page.getByTestId("bordro-veri-hazirlik")).toBeVisible();
+    await expect(page.getByTestId("bordro-readiness-csv-indir")).toBeVisible();
     await expect(page.getByTestId("bordro-readiness-domain-s81_final_onay")).toBeVisible();
     await expect(page.getByTestId("bordro-readiness-domain-net_maas")).toBeVisible();
+    await expect(page.getByTestId("bordro-readiness-blockers-s81_final_onay")).toContainText(
+      "S81_GENEL_YONETICI_FINAL_ONAY_EKSIK"
+    );
+    await expect(page.getByTestId("bordro-readiness-eksik-kodlar-sirket_calisma_politikasi")).toContainText(
+      "NORMAL_AY_GUN_SAYISI"
+    );
     await expect(page.getByTestId("bordro-candidate-gate-aktif")).toHaveText("Kapalı");
     await expect(page.getByTestId("bordro-candidate-gate-nedenleri")).toBeVisible();
     await expect(page.getByTestId("bordro-net-maas-row-0")).toBeVisible();
@@ -43,6 +50,16 @@ test.describe("S83 Business Data Readiness", () => {
     await page.getByTestId("bordro-hazirlik-tab-hesaplama").click();
     await expect(page.getByTestId("bordro-candidate-uret")).toBeDisabled();
     await expect(page.getByTestId("bordro-candidate-disabled-nedenleri")).toBeVisible();
+  });
+
+  test("MUHASEBE: ön izleme finans tutarları görünür", async ({ page }) => {
+    await openRaporlarPanel(page, "MUHASEBE", "bordro-hazirlik");
+    await submitBordroFilters(page);
+    await page.getByTestId("bordro-hazirlik-tab-on-izleme").click();
+    await expect(page.getByTestId("bordro-on-izleme")).toBeVisible();
+    await expect(page.getByTestId("bordro-on-izleme-toplam-net")).toBeVisible();
+    await expect(page.getByTestId("bordro-on-izleme-toplam-brut")).toBeVisible();
+    await expect(page.getByTestId("bordro-on-izleme-finance-masked")).toHaveCount(0);
   });
 
   test("GENEL_YONETICI: readiness + politika karar özeti + S81 deep-link", async ({ page }) => {

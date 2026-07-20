@@ -62,11 +62,25 @@ describe("S83 bordro business data readiness sources", () => {
     expect(page).toContain("veri-hazirlik");
     expect(page).toContain("bordro-readiness-domains");
     expect(page).toContain("candidate_gate");
+    expect(page).toContain("bordro-readiness-csv-indir");
+    expect(page).toContain("downloadBordroReadinessCsv");
+    expect(page).toContain("bordro-readiness-eksik-kodlar");
+    expect(page).toContain("finans.view");
+    expect(page).toContain("bordro-on-izleme-finance-masked");
     expect(api).toContain("fetchBordroNetMaasEksikleri");
     expect(api).toContain("BordroCandidateGate");
     expect(endpoints).toContain("netMaasEksikleri");
     expect(endpoints).toContain("devirSablonCsv");
     expect(endpoints).toContain("kararOzeti");
+  });
+
+  it("on-izleme finance mask lives in API owner", () => {
+    const controller = readFileSync("api/src/Controllers/BordroHazirlikController.php", "utf8");
+    const service = readFileSync("api/src/Services/BordroOnIzlemeService.php", "utf8");
+    expect(controller).toContain("finans.view");
+    expect(controller).toContain("maskFinanceFields");
+    expect(service).toContain("maskFinanceFields");
+    expect(service).toContain("finance_masked");
   });
 
   it("keeps 034 as latest migration when no 035", () => {

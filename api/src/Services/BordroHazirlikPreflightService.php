@@ -387,11 +387,32 @@ class BordroHazirlikPreflightService
         $mevzuatItems = self::filterCodes($items, $mevzuatCodes);
         $mevzuatBlockers = self::filterSeverity($mevzuatItems, 'BLOCKER');
         $mevzuatStatus = count($mevzuatBlockers) > 0 ? 'BLOKE' : (count($mevzuatItems) > 0 ? 'İNCELEME_GEREKLİ' : 'HAZIR');
+        $mevzuatEksikKodlar = [];
+        foreach ($mevzuatItems as $mi) {
+            $meta = is_array($mi['metadata'] ?? null) ? $mi['metadata'] : [];
+            if (isset($meta['parametre_kodu']) && (string) $meta['parametre_kodu'] !== '') {
+                $mevzuatEksikKodlar[] = (string) $meta['parametre_kodu'];
+            }
+            if (isset($meta['eksik_kodlar']) && is_array($meta['eksik_kodlar'])) {
+                foreach ($meta['eksik_kodlar'] as $kod) {
+                    if ((string) $kod !== '') {
+                        $mevzuatEksikKodlar[] = (string) $kod;
+                    }
+                }
+            }
+            if (isset($mi['eksik_kodlar']) && is_array($mi['eksik_kodlar'])) {
+                foreach ($mi['eksik_kodlar'] as $kod) {
+                    if ((string) $kod !== '') {
+                        $mevzuatEksikKodlar[] = (string) $kod;
+                    }
+                }
+            }
+        }
         $domains[] = self::domain(
             'mevzuat_parametreleri',
             'Mevzuat Parametreleri',
             $mevzuatStatus,
-            count($mevzuatItems),
+            count($mevzuatEksikKodlar) > 0 ? count(array_unique($mevzuatEksikKodlar)) : count($mevzuatItems),
             0,
             count($mevzuatItems) === 0
                 ? 'Mevzuat parametreleri preflight açısından sorun göstermiyor.'
@@ -399,7 +420,8 @@ class BordroHazirlikPreflightService
             '/yonetim-paneli?tab=mevzuat',
             array_values(array_unique(array_map(static function (array $i) {
                 return (string) $i['code'];
-            }, $mevzuatItems)))
+            }, $mevzuatItems))),
+            $mevzuatEksikKodlar
         );
 
         $policyCodes = ['BUSINESS_POLICY_REQUIRED', 'BUSINESS_POLICY_INCOMPLETE', 'COMPANY_POLICY_MISSING'];

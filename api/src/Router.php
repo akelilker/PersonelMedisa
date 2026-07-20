@@ -248,8 +248,20 @@ class Router
         if ($path === '/bordro-hazirlik/preflight' && $method === 'GET') {
             BordroHazirlikController::preflight($this->request);
         }
+        if ($path === '/bordro-hazirlik/readiness' && $method === 'GET') {
+            BordroHazirlikController::readiness($this->request);
+        }
+        if ($path === '/bordro-hazirlik/readiness/export.csv' && $method === 'GET') {
+            BordroHazirlikController::readinessExportCsv($this->request);
+        }
+        if ($path === '/bordro-hazirlik/net-maas-eksikleri' && $method === 'GET') {
+            BordroHazirlikController::netMaasEksikleri($this->request);
+        }
         if ($path === '/bordro-hazirlik/on-izleme' && $method === 'GET') {
             BordroHazirlikController::onIzleme($this->request);
+        }
+        if ($path === '/bordro-hazirlik/devirler/sablon.csv' && $method === 'GET') {
+            BordroHazirlikController::devirSablonCsv($this->request);
         }
         if ($path === '/bordro-hazirlik/devirler' && $method === 'GET') {
             BordroHazirlikController::listDevirler($this->request);
@@ -278,6 +290,9 @@ class Router
         }
         if ($path === '/sirket-calisma-politikalari' && $method === 'POST') {
             SirketCalismaPolitikasiController::create($this->request);
+        }
+        if ($method === 'GET' && preg_match('#^/sirket-calisma-politikalari/(\d+)/karar-ozeti$#', $path, $matches)) {
+            SirketCalismaPolitikasiController::kararOzeti($this->request, $matches[1]);
         }
         if ($method === 'GET' && preg_match('#^/sirket-calisma-politikalari/(\d+)$#', $path, $matches)) {
             SirketCalismaPolitikasiController::detail($this->request, $matches[1]);

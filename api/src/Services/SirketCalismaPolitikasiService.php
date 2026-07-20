@@ -55,6 +55,109 @@ class SirketCalismaPolitikasiService
         return $detail;
     }
 
+    /**
+     * S83 GY onay oncesi karar ozeti (gercek mevzuat/politika degeri seed etmez).
+     *
+     * @return array<string, mixed>|null
+     */
+    public static function getKararOzeti(PDO $pdo, $id, $subeId = null)
+    {
+        $detail = self::getPolitikaDetail($pdo, (int) $id);
+        if (!$detail) {
+            return null;
+        }
+        $required = SirketCalismaPolitikasiCatalog::requiredCodes();
+        $present = [];
+        foreach ($detail['degerler'] ?? [] as $deger) {
+            $present[(string) $deger['parametre_kodu']] = $deger;
+        }
+        $eksik = array_values(array_diff($required, array_keys($present)));
+        $onceki = null;
+        try {
+            $stmt = $pdo->prepare(
+                "SELECT * FROM sirket_calisma_politikalari
+                 WHERE state = 'ONAYLANDI' AND id <> :id
+                 ORDER BY gecerlilik_baslangic DESC, revision_no DESC, id DESC
+                 LIMIT 1"
+            );
+            $stmt->execute(['id' => (int) $id]);
+            $prevRow = $stmt->fetch(PDO::FETCH_ASSOC);
+            if ($prevRow) {
+                $onceki = self::mapPolitika($prevRow);
+                $oncekiDegerler = self::listDegerler($pdo, (int) $prevRow['id']);
+                $prevMap = [];
+                foreach ($oncekiDegerler as $d) {
+                    $prevMap[(string) $d['parametre_kodu']] = (string) ($d['mevcut_deger'] ?? '');
+                }
+                $diff = [];
+                foreach ($present as $code => $deger) {
+                    $curr = (string) ($deger['mevcut_deger'] ?? '');
+                    $prev = $prevMap[$code] ?? null;
+                    if ($prev === null || $prev !== $curr) {
+                        $diff[] = [
+                            'parametre_kodu' => $code,
+                            'onceki' => $prev,
+                            'yeni' => $curr,
+                        ];
+                    }
+                }
+                $onceki['diff'] = $diff;
+                $onceki['policy_version_hash'] = $prevRow['policy_version_hash'] !== null
+                    ? (string) $prevRow['policy_version_hash'] : null;
+            }
+        } catch (\Throwable $e) {
+            $onceki = null;
+        }
+
+        $etkilenenPersonel = 0;
+        if ($subeId !== null) {
+            try {
+                $c = $pdo->prepare("SELECT COUNT(*) FROM personeller WHERE sube_id = :s AND durum = 'AKTIF'");
+                $c->execute(['s' => (int) $subeId]);
+                $etkilenenPersonel = (int) $c->fetchColumn();
+            } catch (\Throwable $e) {
+                $etkilenenPersonel = 0;
+            }
+        }
+
+        $hashDegisecek = true;
+        if ($onceki && isset($onceki['policy_version_hash']) && $detail['policy_version_hash']) {
+            $hashDegisecek = (string) $onceki['policy_version_hash'] !== (string) $detail['policy_version_hash'];
+        }
+
+        return [
+            'politika_id' => (int) $detail['id'],
+            'revision_no' => (int) $detail['revision_no'],
+            'state' => (string) $detail['state'],
+            'gecerlilik_baslangic' => (string) $detail['gecerlilik_baslangic'],
+            'gecerlilik_bitis' => $detail['gecerlilik_bitis'],
+            'policy_version_hash' => $detail['policy_version_hash'],
+            'zorunlu_parametreler' => $required,
+            'eksik_parametreler' => $eksik,
+            'onceki_onayli' => $onceki,
+            'etkilenen_donem_ipucu' => sprintf(
+                '%s ve sonrası dönemler (geçerlilik bitiş: %s)',
+                $detail['gecerlilik_baslangic'],
+                $detail['gecerlilik_bitis'] ?? 'açık'
+            ),
+            'etkilenen_personel_sayisi' => $etkilenenPersonel,
+            'aday_snapshot_etki_notu' => $hashDegisecek
+                ? 'Politika hash değişirse mevcut aday/snapshot girdi hash doğrulaması yeniden değerlendirilmelidir.'
+                : 'Politika hash önceki onaylı sürümle aynı görünüyor.',
+            'katalog_ornek_bicim' => array_map(static function ($code) {
+                $meta = SirketCalismaPolitikasiCatalog::meta($code);
+
+                return [
+                    'parametre_kodu' => $code,
+                    'etiket' => $meta['etiket'] ?? $code,
+                    'deger_tipi' => $meta['deger_tipi'] ?? 'SAYISAL',
+                    'birim' => $meta['birim'] ?? null,
+                    'ornek_bicim' => ($meta['deger_tipi'] ?? '') === 'METIN' ? 'METIN_DEGER' : '0.00',
+                ];
+            }, $required),
+        ];
+    }
+
     /** @return array<int, array<string, mixed>> */
     public static function listDegerler(PDO $pdo, $politikaId)
     {

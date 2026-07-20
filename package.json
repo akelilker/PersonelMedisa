@@ -18,6 +18,7 @@
     "e2e:s81": "playwright test tests/e2e/s81-bildirim-onay-zinciri.spec.ts",
     "e2e:s82": "playwright test tests/e2e/s82-bordro-hazirlik-merkezi.spec.ts",
     "e2e:s83": "playwright test tests/e2e/s83-business-data-readiness.spec.ts",
+    "e2e:s84r2": "playwright test tests/e2e/s84r2-payroll-scope.spec.ts",
     "e2e:headed": "playwright test --headed",
     "e2e:ui": "playwright test --ui",
     "icons:generate": "node scripts/generate-icons.mjs",

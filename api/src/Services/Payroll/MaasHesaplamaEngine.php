@@ -20,6 +20,10 @@ final class MaasHesaplamaEngine
     public const SOLVER_TOLERANCE_KURUS = 1;
     /** Is Kanunu haftalik azami normal sure (45 saat). */
     public const LEGAL_WEEKLY_LIMIT_MINUTES = 2700;
+    public const HOLIDAY_OVERTIME_POLICY_CODE = 'TATIL_FSC_FM_CAKISMA_HESAP_MODU';
+    public const HOLIDAY_OVERTIME_ERROR_CODE = 'HOLIDAY_OVERTIME_POLICY_REQUIRED';
+    public const HOLIDAY_OVERTIME_BLOCKER_CODE = 'TATIL_FSC_FM_CAKISMA_POLITIKASI_EKSIK';
+    public const HOLIDAY_OVERTIME_ERROR_MESSAGE = 'Tatil çalışması ile fazla çalışma çakışma politikası yetkili onayı bekliyor';
 
     /** @var array<int, string> */
     private static $holidayModes = ['GUNLUK_ILAVE', 'SAAT_CARPAN', 'GUNLUK_ILAVE_VE_SAAT_CARPAN'];
@@ -139,6 +143,9 @@ final class MaasHesaplamaEngine
             $sira,
             $warnings
         );
+        if (isset($attendance['error'])) {
+            return self::errorResult($attendance['error']['code'], $attendance['error']['message']);
+        }
         $sira = $attendance['sira'];
         $kalemler = array_merge($kalemler, $attendance['kalemler']);
         $grossAdd = $attendance['gross_add'];
@@ -327,7 +334,13 @@ final class MaasHesaplamaEngine
      */
     private static function paramHoursToMinutes(array $params, $code)
     {
-        $raw = trim((string) $params[$code]);
+        return self::decimalHoursToMinutes($params[$code]);
+    }
+
+    /** Decimal saat degerini float kullanmadan tam dakikaya cevirir. */
+    public static function decimalHoursToMinutes($value)
+    {
+        $raw = trim((string) $value);
         if ($raw === '' || preg_match('/^\d+(\.\d+)?$/', $raw) !== 1) {
             return 0;
         }
@@ -372,10 +385,84 @@ final class MaasHesaplamaEngine
     }
 
     /**
+     * HT/UBGT fiili dakikalari haftalik havuzda tutulur. Bu havuz FSC veya FM
+     * bandina girdiginde, yetkili hesap modu onaylanana kadar parasal sonuc
+     * uretilmez. Metot preflight ve motor tarafinda ayni owner'i kullanir.
+     *
+     * @param array<int, array<string, mixed>> $puantajlar
+     * @return array{has_conflict: bool, weeks: array<int, array<string, int|string>>}
+     */
+    public static function detectHolidayOvertimePolicyConflict(array $puantajlar, $gunlukCalismaDakika, $haftalikIsGunu)
+    {
+        $gunlukCalismaDakika = max(0, (int) $gunlukCalismaDakika);
+        $haftalikIsGunu = max(0, (int) $haftalikIsGunu);
+        $contractualWeeklyDk = min(
+            $gunlukCalismaDakika * $haftalikIsGunu,
+            self::LEGAL_WEEKLY_LIMIT_MINUTES
+        );
+        if ($contractualWeeklyDk < 1) {
+            return ['has_conflict' => false, 'weeks' => []];
+        }
+
+        /** @var array<string, array{toplam_dk:int, ht_dk:int, ubgt_dk:int}> $weeks */
+        $weeks = [];
+        foreach ($puantajlar as $row) {
+            $gunTipi = (string) ($row['gun_tipi'] ?? '');
+            if (!in_array($gunTipi, ['Normal_Is_Gunu', 'Hafta_Tatili_Pazar', 'UBGT_Resmi_Tatil'], true)) {
+                continue;
+            }
+            $netDk = max(0, (int) ($row['net_calisma_suresi_dakika'] ?? 0));
+            $tarih = (string) ($row['tarih'] ?? '');
+            if ($netDk < 1 || $tarih === '') {
+                continue;
+            }
+            try {
+                $weekKey = self::isoWeekKey($tarih);
+            } catch (\Throwable $e) {
+                continue;
+            }
+            if (!isset($weeks[$weekKey])) {
+                $weeks[$weekKey] = ['toplam_dk' => 0, 'ht_dk' => 0, 'ubgt_dk' => 0];
+            }
+            $weeks[$weekKey]['toplam_dk'] += $netDk;
+            if ($gunTipi === 'Hafta_Tatili_Pazar') {
+                $weeks[$weekKey]['ht_dk'] += $netDk;
+            } elseif ($gunTipi === 'UBGT_Resmi_Tatil') {
+                $weeks[$weekKey]['ubgt_dk'] += $netDk;
+            }
+        }
+
+        ksort($weeks);
+        $conflicts = [];
+        foreach ($weeks as $weekKey => $week) {
+            $holidayDk = $week['ht_dk'] + $week['ubgt_dk'];
+            if ($holidayDk < 1) {
+                continue;
+            }
+            $bands = self::hesaplaHaftalikCalismaBantlari($week['toplam_dk'], $contractualWeeklyDk);
+            if ($bands['fs_dk'] < 1 && $bands['fm_dk'] < 1) {
+                continue;
+            }
+            $conflicts[] = [
+                'iso_hafta' => $weekKey,
+                'haftalik_toplam_dk' => $week['toplam_dk'],
+                'hafta_tatili_calisma_dk' => $week['ht_dk'],
+                'ubgt_calisma_dk' => $week['ubgt_dk'],
+                'ham_fazla_surelerle_calisma_dk' => $bands['fs_dk'],
+                'ham_fazla_calisma_dk' => $bands['fm_dk'],
+                'sozlesme_haftalik_dk' => $contractualWeeklyDk,
+                'yasal_haftalik_limit_dk' => self::LEGAL_WEEKLY_LIMIT_MINUTES,
+            ];
+        }
+
+        return ['has_conflict' => count($conflicts) > 0, 'weeks' => $conflicts];
+    }
+
+    /**
      * @param array<string, mixed> $input
      * @param array<string, string> $params
      * @param array<int, string> $warnings
-     * @return array{kalemler: array, sira: int, gross_add: Money, gross_deduct: Money, net_only: Money}
+     * @return array{kalemler?: array, sira?: int, gross_add?: Money, gross_deduct?: Money, net_only?: Money, error?: array{code:string, message:string}}
      */
     private static function buildAttendanceLines(
         array $input,
@@ -402,6 +489,19 @@ final class MaasHesaplamaEngine
         $contractualWeeklyDk = $gunlukDk * $haftalikIsGunu;
         if ($contractualWeeklyDk > self::LEGAL_WEEKLY_LIMIT_MINUTES) {
             $contractualWeeklyDk = self::LEGAL_WEEKLY_LIMIT_MINUTES;
+        }
+        $holidayOvertimeConflict = self::detectHolidayOvertimePolicyConflict(
+            $input['puantajlar'],
+            $gunlukDk,
+            $haftalikIsGunu
+        );
+        if ($holidayOvertimeConflict['has_conflict']) {
+            return [
+                'error' => [
+                    'code' => self::HOLIDAY_OVERTIME_ERROR_CODE,
+                    'message' => self::HOLIDAY_OVERTIME_ERROR_MESSAGE,
+                ],
+            ];
         }
         $hasOt = false;
         $absenceDates = [];
@@ -469,9 +569,9 @@ final class MaasHesaplamaEngine
         /**
          * ISO hafta bazinda iki ayri owner havuzu:
          * - fiili_dk: Normal + HT + UBGT gercek calisma (45 saat sinifi)
-         * - tatil_*: yalniz tatil ek odemesi ve taban ucret mukerrerlik mahsubu
+         * - tatil_dk: HT/UBGT fiili calisma audit havuzu
          *
-         * @var array<string, array{fiili_dk:int, normal_dk:int, tatil_dk:int, tatil_taban_odenmis_dk:int}>
+         * @var array<string, array{fiili_dk:int, normal_dk:int, tatil_dk:int}>
          */
         $weeklyWorkPools = [];
 
@@ -498,7 +598,7 @@ final class MaasHesaplamaEngine
             }
 
             if ($gunTipi === 'Hafta_Tatili_Pazar' && $netDk > 0) {
-                $premium = self::holidayPremium($hourly, $daily, $gunlukDk, $netDk, $htCarpan, $htMode);
+                $premium = self::holidayPremium($hourly, $daily, $netDk, $htCarpan, $htMode);
                 $grossAdd = $grossAdd->add($premium['tutar']);
                 $hasOt = true;
                 $sira++;
@@ -518,7 +618,7 @@ final class MaasHesaplamaEngine
                     ['hesap_modu' => $htMode, 'net_dakika' => $netDk]
                 );
             } elseif ($gunTipi === 'UBGT_Resmi_Tatil' && $netDk > 0) {
-                $premium = self::holidayPremium($hourly, $daily, $gunlukDk, $netDk, $ubgtCarpan, $ubgtMode);
+                $premium = self::holidayPremium($hourly, $daily, $netDk, $ubgtCarpan, $ubgtMode);
                 $grossAdd = $grossAdd->add($premium['tutar']);
                 $hasOt = true;
                 $sira++;
@@ -550,7 +650,6 @@ final class MaasHesaplamaEngine
                         'fiili_dk' => 0,
                         'normal_dk' => 0,
                         'tatil_dk' => 0,
-                        'tatil_taban_odenmis_dk' => 0,
                     ];
                 }
                 $weeklyWorkPools[$weekKey]['fiili_dk'] += $netDk;
@@ -558,7 +657,6 @@ final class MaasHesaplamaEngine
                     $weeklyWorkPools[$weekKey]['normal_dk'] += $netDk;
                 } else {
                     $weeklyWorkPools[$weekKey]['tatil_dk'] += $netDk;
-                    $weeklyWorkPools[$weekKey]['tatil_taban_odenmis_dk'] += (int) $premium['taban_odenmis_dakika'];
                 }
             }
         }
@@ -566,35 +664,15 @@ final class MaasHesaplamaEngine
         ksort($weeklyWorkPools);
         foreach ($weeklyWorkPools as $weekKey => $pool) {
             $totalDk = (int) $pool['fiili_dk'];
-            $tatilTabanOdenmisDk = min((int) $pool['tatil_taban_odenmis_dk'], (int) $pool['tatil_dk']);
             $bands = self::hesaplaHaftalikCalismaBantlari($totalDk, $contractualWeeklyDk);
-            $bandsWithoutPaidHolidayBase = self::hesaplaHaftalikCalismaBantlari(
-                max(0, $totalDk - $tatilTabanOdenmisDk),
-                $contractualWeeklyDk
-            );
             $rawFsDk = $bands['fs_dk'];
             $rawFmDk = $bands['fm_dk'];
-            $fsTatilTabanMahsupDk = max(0, $rawFsDk - $bandsWithoutPaidHolidayBase['fs_dk']);
-            $fmTatilTabanMahsupDk = max(0, $rawFmDk - $bandsWithoutPaidHolidayBase['fm_dk']);
             $fsDk = self::hesaplaMevzuatFazlaCalismaOdemeDakika($rawFsDk);
             $fmDk = self::hesaplaMevzuatFazlaCalismaOdemeDakika($rawFmDk);
 
             if ($fsDk > 0) {
                 $base = $hourly->mulDiv($fsDk, 60);
-                $tamTutar = $base->applyRate($fsCarpan);
-                $tatilTabanMahsup = $hourly->mulDiv($fsTatilTabanMahsupDk, 60);
-                if ($tatilTabanMahsup->cmp($tamTutar) > 0) {
-                    $tatilTabanMahsup = $tamTutar;
-                }
-                $tutar = $tamTutar->sub($tatilTabanMahsup);
-                if (!$tatilTabanMahsup->isZero()) {
-                    $sira++;
-                    $kalemler[] = self::line($sira, 'FAZLA_SURELERLE', 'TATIL_TABAN_UCRET_MAHSUBU', 'BILGI', $fsTatilTabanMahsupDk, 'DAKIKA', null, $hourly->toDecimalString(), $tatilTabanMahsup, 'PUANTAJ', null, 'Tatil kaleminde odenmis FSC taban ucreti', [
-                        'hedef_kalem_kodu' => 'FAZLA_SURELERLE_CALISMA_ODEMESI',
-                        'iso_hafta' => $weekKey,
-                        'ham_tatil_taban_mahsup_dk' => $fsTatilTabanMahsupDk,
-                    ]);
-                }
+                $tutar = $base->applyRate($fsCarpan);
                 $grossAdd = $grossAdd->add($tutar);
                 $hasOt = true;
                 $sira++;
@@ -607,28 +685,13 @@ final class MaasHesaplamaEngine
                     'yasal_haftalik_limit_dk' => self::LEGAL_WEEKLY_LIMIT_MINUTES,
                     'ham_fazla_surelerle_calisma_dk' => $rawFsDk,
                     'odeme_esas_fazla_surelerle_calisma_dk' => $fsDk,
-                    'tatil_taban_mahsup_dk' => $fsTatilTabanMahsupDk,
-                    'tatil_taban_mahsup_tutari' => $tatilTabanMahsup->toDecimalString(),
                     'ucret_hesaplama_baz_brut_tutar' => $sozlesmeBrut->toDecimalString(),
                     'saatlik_brut_ucret' => $hourly->toDecimalString(),
                 ]);
             }
             if ($fmDk > 0) {
                 $base = $hourly->mulDiv($fmDk, 60);
-                $tamTutar = $base->applyRate($fmCarpan);
-                $tatilTabanMahsup = $hourly->mulDiv($fmTatilTabanMahsupDk, 60);
-                if ($tatilTabanMahsup->cmp($tamTutar) > 0) {
-                    $tatilTabanMahsup = $tamTutar;
-                }
-                $tutar = $tamTutar->sub($tatilTabanMahsup);
-                if (!$tatilTabanMahsup->isZero()) {
-                    $sira++;
-                    $kalemler[] = self::line($sira, 'FAZLA_MESAI', 'TATIL_TABAN_UCRET_MAHSUBU', 'BILGI', $fmTatilTabanMahsupDk, 'DAKIKA', null, $hourly->toDecimalString(), $tatilTabanMahsup, 'PUANTAJ', null, 'Tatil kaleminde odenmis FM taban ucreti', [
-                        'hedef_kalem_kodu' => 'FAZLA_MESAI_ODEMESI',
-                        'iso_hafta' => $weekKey,
-                        'ham_tatil_taban_mahsup_dk' => $fmTatilTabanMahsupDk,
-                    ]);
-                }
+                $tutar = $base->applyRate($fmCarpan);
                 $grossAdd = $grossAdd->add($tutar);
                 $hasOt = true;
                 $sira++;
@@ -641,8 +704,6 @@ final class MaasHesaplamaEngine
                     'yasal_haftalik_limit_dk' => self::LEGAL_WEEKLY_LIMIT_MINUTES,
                     'ham_fazla_calisma_dk' => $rawFmDk,
                     'odeme_esas_fazla_calisma_dk' => $fmDk,
-                    'tatil_taban_mahsup_dk' => $fmTatilTabanMahsupDk,
-                    'tatil_taban_mahsup_tutari' => $tatilTabanMahsup->toDecimalString(),
                     'ucret_hesaplama_baz_brut_tutar' => $sozlesmeBrut->toDecimalString(),
                     'saatlik_brut_ucret' => $hourly->toDecimalString(),
                 ]);
@@ -662,36 +723,25 @@ final class MaasHesaplamaEngine
         ];
     }
 
-    /**
-     * Tatil ek odemesi ile haftalik FSC/FM ayni fiili dakikayi kullanabilir.
-     * `taban_odenmis_dakika`, tatil kaleminin zaten karsiladigi bir adet temel
-     * ucret parcasini gosterir; haftalik kalem bu dakikayi ikinci kez odemez.
-     *
-     * @return array{tutar: Money, matrah: string, miktar: int, birim: string, taban_odenmis_dakika: int}
-     */
+    /** @return array{tutar: Money, matrah: string, miktar: int, birim: string} */
     private static function holidayPremium(
         Money $hourly,
         Money $daily,
-        $gunlukDk,
         $netDk,
         Rate $carpan,
         $mode
     )
     {
         $netDk = (int) $netDk;
-        $gunlukDk = max(0, (int) $gunlukDk);
         $mode = strtoupper((string) $mode);
-        $birTemelUcreteKadarPpm = min($carpan->ppm(), 1000000);
         if ($mode === 'GUNLUK_ILAVE') {
             $tutar = $daily->applyRate($carpan);
-            $tabanOdenmisDk = min($netDk, intdiv($gunlukDk * $birTemelUcreteKadarPpm, 1000000));
 
             return [
                 'tutar' => $tutar,
                 'matrah' => $daily->toDecimalString(),
                 'miktar' => 1,
                 'birim' => 'GUN',
-                'taban_odenmis_dakika' => $tabanOdenmisDk,
             ];
         }
         if ($mode === 'GUNLUK_ILAVE_VE_SAAT_CARPAN') {
@@ -704,7 +754,6 @@ final class MaasHesaplamaEngine
                 'matrah' => $ilave->add($saatUcret)->toDecimalString(),
                 'miktar' => $netDk,
                 'birim' => 'DAKIKA',
-                'taban_odenmis_dakika' => $netDk,
             ];
         }
 
@@ -717,7 +766,6 @@ final class MaasHesaplamaEngine
             'matrah' => $base->toDecimalString(),
             'miktar' => $netDk,
             'birim' => 'DAKIKA',
-            'taban_odenmis_dakika' => intdiv($netDk * $birTemelUcreteKadarPpm, 1000000),
         ];
     }
 

@@ -72,6 +72,12 @@ final class SirketCalismaPolitikasiCatalog
             'deger_tipi' => 'METIN',
             'birim' => 'MOD',
         ],
+        'TATIL_FSC_FM_CAKISMA_HESAP_MODU' => [
+            'etiket' => 'Tatil ve Fazla Çalışma Çakışma Hesap Modu',
+            'aciklama' => 'HT/UBGT çalışması ile FSC/FM çakıştığında uygulanacak, yetkili hukuk ve şirket onayı gerektiren hesap yöntemi.',
+            'deger_tipi' => 'METIN',
+            'birim' => 'MOD',
+        ],
     ];
 
     /** @return array<string, array{etiket: string, aciklama: string, deger_tipi: string, birim: string}> */

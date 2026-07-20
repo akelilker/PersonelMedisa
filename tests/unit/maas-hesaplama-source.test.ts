@@ -99,4 +99,32 @@ describe("S77-C/S77-D maas hesaplama source contract", () => {
     expect(catalog).toContain("UBGT_HESAP_MODU");
     expect(aday).toContain("S85B_PAYROLL_CANDIDATE_V1");
   });
+
+  it("keeps holiday overtime overlap fail-closed across engine, readiness and frontend", () => {
+    const engine = readFileSync(resolve(root, "api/src/Services/Payroll/MaasHesaplamaEngine.php"), "utf8");
+    const aday = readFileSync(resolve(root, "api/src/Services/MaasHesaplamaAdayService.php"), "utf8");
+    const policyCatalog = readFileSync(
+      resolve(root, "api/src/Services/Payroll/SirketCalismaPolitikasiCatalog.php"),
+      "utf8"
+    );
+    const frontendEngine = readFileSync(
+      resolve(root, "src/services/puantaj-hesap-motoru.ts"),
+      "utf8"
+    );
+    const frontendPage = readFileSync(
+      resolve(root, "src/features/puantaj/pages/GunlukPuantajPage.tsx"),
+      "utf8"
+    );
+
+    expect(policyCatalog).toContain("TATIL_FSC_FM_CAKISMA_HESAP_MODU");
+    expect(engine).toContain("HOLIDAY_OVERTIME_POLICY_REQUIRED");
+    expect(engine).toContain("TATIL_FSC_FM_CAKISMA_POLITIKASI_EKSIK");
+    expect(engine).not.toContain("TATIL_TABAN_UCRET_MAHSUBU");
+    expect(aday).toContain("HOLIDAY_OVERTIME_BLOCKER_CODE");
+    expect(frontendEngine).toContain("HOLIDAY_OVERTIME_POLICY_REQUIRED");
+    expect(frontendEngine).toContain(
+      "Tatil çalışması ile fazla çalışma çakışma politikası yetkili onayı bekliyor"
+    );
+    expect(frontendPage).toContain("tatil-fsc-fm-cakisma-politikasi-eksik");
+  });
 });

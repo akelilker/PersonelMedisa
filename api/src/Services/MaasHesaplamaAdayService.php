@@ -124,6 +124,43 @@ class MaasHesaplamaAdayService
             (string) $bundle['snapshot']['donem_baslangic'],
             (string) $bundle['snapshot']['donem_bitis']
         );
+        $gunlukCalismaRow = $policy['degerler_by_code']['GUNLUK_CALISMA_SAATI'] ?? null;
+        $haftalikIsGunuRow = $policy['degerler_by_code']['HAFTALIK_IS_GUNU_SAYISI'] ?? null;
+        $gunlukCalismaDakika = is_array($gunlukCalismaRow)
+            ? MaasHesaplamaEngine::decimalHoursToMinutes($gunlukCalismaRow['sayisal_deger'] ?? '')
+            : 0;
+        $haftalikIsGunu = is_array($haftalikIsGunuRow)
+            ? (int) ($haftalikIsGunuRow['sayisal_deger'] ?? 0)
+            : 0;
+        if ($gunlukCalismaDakika > 0 && $haftalikIsGunu > 0) {
+            foreach ($bundle['personeller'] as $personel) {
+                $pid = (int) $personel['personel_id'];
+                $projected = MaasHesaplamaCorrectionProjectionService::applyToPuantajlar(
+                    $bundle['puantaj_by_personel'][$pid] ?? [],
+                    $projection['projections_by_personel'][$pid] ?? []
+                );
+                $conflict = MaasHesaplamaEngine::detectHolidayOvertimePolicyConflict(
+                    $projected['puantajlar'],
+                    $gunlukCalismaDakika,
+                    $haftalikIsGunu
+                );
+                if ($conflict['has_conflict']) {
+                    $items[] = self::issue(
+                        'BLOCKER',
+                        MaasHesaplamaEngine::HOLIDAY_OVERTIME_BLOCKER_CODE,
+                        MaasHesaplamaEngine::HOLIDAY_OVERTIME_ERROR_MESSAGE,
+                        'puantaj',
+                        null,
+                        $pid,
+                        [
+                            'politika_kodu' => MaasHesaplamaEngine::HOLIDAY_OVERTIME_POLICY_CODE,
+                            'cakisan_haftalar' => $conflict['weeks'],
+                        ],
+                        $personel['ad_soyad'] ?? null
+                    );
+                }
+            }
+        }
         foreach ($projection['blocker_items'] as $blocker) {
             $items[] = [
                 'severity' => (string) $blocker['severity'],

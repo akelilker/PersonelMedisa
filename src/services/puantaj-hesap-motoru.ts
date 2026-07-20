@@ -260,43 +260,16 @@ export function hesaplaSaatlikUcret(
   return yuvarlaParaIkiliOndalik(maas / payda);
 }
 
-type CarpanliFazlaCalismaDetayi = {
-  tutar: number;
-  tatil_taban_mahsup_tutari: number;
-};
-
-function hesaplaCarpanliFazlaCalismaDetayi(
-  hamDakika: number,
-  saatlikUcret: number,
-  carpan: number,
-  tatilTabanMahsupDakika = 0
-): CarpanliFazlaCalismaDetayi {
-  const odemeEsasDakika = hesaplaMevzuatFazlaCalismaOdemeDakika(hamDakika);
-  const su = ucretIcinGuvenliNegatifOlmayanSayi(saatlikUcret);
-  const oran = ucretIcinGuvenliNegatifOlmayanSayi(carpan);
-  const matrah = yuvarlaParaIkiliOndalik(su * (odemeEsasDakika / 60));
-  const tamTutar = yuvarlaParaIkiliOndalik(matrah * oran);
-  const mahsupDakika = Math.min(
-    Math.floor(ucretIcinGuvenliNegatifOlmayanSayi(tatilTabanMahsupDakika)),
-    Math.floor(ucretIcinGuvenliNegatifOlmayanSayi(hamDakika))
-  );
-  const tatil_taban_mahsup_tutari = Math.min(
-    tamTutar,
-    yuvarlaParaIkiliOndalik(su * (mahsupDakika / 60))
-  );
-
-  return {
-    tutar: yuvarlaParaIkiliOndalik(tamTutar - tatil_taban_mahsup_tutari),
-    tatil_taban_mahsup_tutari
-  };
-}
-
 function hesaplaCarpanliFazlaCalismaTutari(
   hamDakika: number,
   saatlikUcret: number,
   carpan: number
 ): number {
-  return hesaplaCarpanliFazlaCalismaDetayi(hamDakika, saatlikUcret, carpan).tutar;
+  const odemeEsasDakika = hesaplaMevzuatFazlaCalismaOdemeDakika(hamDakika);
+  const su = ucretIcinGuvenliNegatifOlmayanSayi(saatlikUcret);
+  const oran = ucretIcinGuvenliNegatifOlmayanSayi(carpan);
+  const matrah = yuvarlaParaIkiliOndalik(su * (odemeEsasDakika / 60));
+  return yuvarlaParaIkiliOndalik(matrah * oran);
 }
 
 /**
@@ -349,6 +322,11 @@ export function hesaplaHaftalikFazlaCalismaUcreti(
 // ---------------------------------------------------------------------------
 
 export const FAZLA_SURELERLE_CALISMA_UCRET_CARPANI = 1.25;
+export const HOLIDAY_OVERTIME_POLICY_REQUIRED = "HOLIDAY_OVERTIME_POLICY_REQUIRED";
+export const TATIL_FSC_FM_CAKISMA_POLITIKASI_EKSIK =
+  "TATIL_FSC_FM_CAKISMA_POLITIKASI_EKSIK";
+export const HOLIDAY_OVERTIME_POLICY_REQUIRED_MESSAGE =
+  "Tatil çalışması ile fazla çalışma çakışma politikası yetkili onayı bekliyor";
 
 export type EngineV2TatilHesapModu =
   | "GUNLUK_ILAVE"
@@ -377,23 +355,21 @@ export const ENGINE_V2_VARSAYILAN_HAFTALIK_POLITIKA: EngineV2HaftalikPolitika = 
 
 /** Engine V2 haftalık FS/FM bantları + ücret + hafta aralığı. */
 export type HaftalikPuantajUcretOzeti = {
+  hesaplanabilir_mi: boolean;
+  hata_kodu: typeof HOLIDAY_OVERTIME_POLICY_REQUIRED | null;
+  hata_mesaji: string | null;
   toplam_net_dakika: number;
   normal_calisma_dakika: number;
   haftalik_esik_dakika: number;
   sozlesme_haftalik_dakika: number;
   normal_gun_calisma_dakika: number;
   tatil_calisma_dakika: number;
-  tatil_taban_odenmis_dakika: number;
   fazla_surelerle_calisma_dakika: number;
   odeme_esas_fazla_surelerle_calisma_dakika: number;
-  fazla_surelerle_tatil_taban_mahsup_dakika: number;
-  fazla_surelerle_tatil_taban_mahsup_tutari: number;
   fazla_surelerle_calisma_saat: number;
   fazla_surelerle_calisma_tutari: number;
   fazla_calisma_dakika: number;
   odeme_esas_fazla_calisma_dakika: number;
-  fazla_calisma_tatil_taban_mahsup_dakika: number;
-  fazla_calisma_tatil_taban_mahsup_tutari: number;
   fazla_calisma_saat: number;
   fazla_calisma_tutari: number;
   toplam_fazla_calisma_tutari: number;
@@ -421,27 +397,6 @@ function hesaplaEngineV2HaftalikBantlari(
   );
 
   return { fazla_surelerle_calisma_dakika, fazla_calisma_dakika };
-}
-
-function hesaplaTatilTabanOdenmisDakika(
-  netDakika: number,
-  gunlukCalismaDakika: number,
-  mod: EngineV2TatilHesapModu,
-  carpan: number
-): number {
-  const net = Math.floor(ucretIcinGuvenliNegatifOlmayanSayi(netDakika));
-  const gunluk = Math.floor(ucretIcinGuvenliNegatifOlmayanSayi(gunlukCalismaDakika));
-  const birTemelUcreteKadarOran = Math.min(
-    ucretIcinGuvenliNegatifOlmayanSayi(carpan),
-    1
-  );
-  if (mod === "GUNLUK_ILAVE_VE_SAAT_CARPAN") {
-    return net;
-  }
-  if (mod === "SAAT_CARPAN") {
-    return Math.floor(net * birTemelUcreteKadarOran);
-  }
-  return Math.min(net, Math.floor(gunluk * birTemelUcreteKadarOran));
 }
 
 /**
@@ -485,83 +440,57 @@ export function hesaplaHaftalikPuantajUcretOzeti(
     gunlukCalismaDakika * haftalikIsGunu,
     HAFTALIK_NORMAL_CALISMA_ESIK_DAKIKA
   );
-  const tatil_taban_odenmis_dakika = Math.min(
-    tatil_calisma_dakika,
-    tatilGunleri.reduce((toplam, gun) => {
-      const haftaTatiliMi = gun.gun_tipi === "Hafta_Tatili_Pazar";
-      return (
-        toplam +
-        hesaplaTatilTabanOdenmisDakika(
-          haftalikNetDakikaSatir(gun.net_calisma_suresi_dakika),
-          gunlukCalismaDakika,
-          haftaTatiliMi ? politika.hafta_tatili_hesap_modu : politika.ubgt_hesap_modu,
-          haftaTatiliMi ? politika.hafta_tatili_carpani : politika.ubgt_carpani
-        )
-      );
-    }, 0)
-  );
   const normal_calisma_dakika = Math.min(toplam_net_dakika, sozlesme_haftalik_dakika);
   const bantlar = hesaplaEngineV2HaftalikBantlari(
     toplam_net_dakika,
     sozlesme_haftalik_dakika
   );
-  const mahsupHaricBantlar = hesaplaEngineV2HaftalikBantlari(
-    Math.max(0, toplam_net_dakika - tatil_taban_odenmis_dakika),
-    sozlesme_haftalik_dakika
-  );
   const fazla_surelerle_calisma_dakika = bantlar.fazla_surelerle_calisma_dakika;
   const fazla_calisma_dakika = bantlar.fazla_calisma_dakika;
-  const fazla_surelerle_tatil_taban_mahsup_dakika = Math.max(
-    0,
-    fazla_surelerle_calisma_dakika - mahsupHaricBantlar.fazla_surelerle_calisma_dakika
-  );
-  const fazla_calisma_tatil_taban_mahsup_dakika = Math.max(
-    0,
-    fazla_calisma_dakika - mahsupHaricBantlar.fazla_calisma_dakika
-  );
-  const odeme_esas_fazla_surelerle_calisma_dakika =
-    hesaplaMevzuatFazlaCalismaOdemeDakika(fazla_surelerle_calisma_dakika);
-  const odeme_esas_fazla_calisma_dakika =
-    hesaplaMevzuatFazlaCalismaOdemeDakika(fazla_calisma_dakika);
+  const tatilFscFmCakismasi =
+    tatil_calisma_dakika > 0 &&
+    (fazla_surelerle_calisma_dakika > 0 || fazla_calisma_dakika > 0);
+  const odeme_esas_fazla_surelerle_calisma_dakika = tatilFscFmCakismasi
+    ? 0
+    : hesaplaMevzuatFazlaCalismaOdemeDakika(fazla_surelerle_calisma_dakika);
+  const odeme_esas_fazla_calisma_dakika = tatilFscFmCakismasi
+    ? 0
+    : hesaplaMevzuatFazlaCalismaOdemeDakika(fazla_calisma_dakika);
   const saatlikUcretHam = hesaplaSaatlikUcret(
     maasTutari,
     politika.aylik_normal_calisma_saati
   );
-  const fazlaSurelerleDetay = hesaplaCarpanliFazlaCalismaDetayi(
-    fazla_surelerle_calisma_dakika,
-    saatlikUcretHam,
-    FAZLA_SURELERLE_CALISMA_UCRET_CARPANI,
-    fazla_surelerle_tatil_taban_mahsup_dakika
-  );
-  const fazlaCalismaDetay = hesaplaCarpanliFazlaCalismaDetayi(
-    fazla_calisma_dakika,
-    saatlikUcretHam,
-    FAZLA_CALISMA_UCRET_CARPANI,
-    fazla_calisma_tatil_taban_mahsup_dakika
-  );
-  const fazla_surelerle_calisma_tutari = fazlaSurelerleDetay.tutar;
-  const fazla_calisma_tutari = fazlaCalismaDetay.tutar;
+  const fazla_surelerle_calisma_tutari = tatilFscFmCakismasi
+    ? 0
+    : hesaplaCarpanliFazlaCalismaTutari(
+        fazla_surelerle_calisma_dakika,
+        saatlikUcretHam,
+        FAZLA_SURELERLE_CALISMA_UCRET_CARPANI
+      );
+  const fazla_calisma_tutari = tatilFscFmCakismasi
+    ? 0
+    : hesaplaCarpanliFazlaCalismaTutari(
+        fazla_calisma_dakika,
+        saatlikUcretHam,
+        FAZLA_CALISMA_UCRET_CARPANI
+      );
 
   return {
+    hesaplanabilir_mi: !tatilFscFmCakismasi,
+    hata_kodu: tatilFscFmCakismasi ? HOLIDAY_OVERTIME_POLICY_REQUIRED : null,
+    hata_mesaji: tatilFscFmCakismasi ? HOLIDAY_OVERTIME_POLICY_REQUIRED_MESSAGE : null,
     toplam_net_dakika,
     normal_calisma_dakika,
     haftalik_esik_dakika: HAFTALIK_NORMAL_CALISMA_ESIK_DAKIKA,
     sozlesme_haftalik_dakika,
     normal_gun_calisma_dakika,
     tatil_calisma_dakika,
-    tatil_taban_odenmis_dakika,
     fazla_surelerle_calisma_dakika,
     odeme_esas_fazla_surelerle_calisma_dakika,
-    fazla_surelerle_tatil_taban_mahsup_dakika,
-    fazla_surelerle_tatil_taban_mahsup_tutari:
-      fazlaSurelerleDetay.tatil_taban_mahsup_tutari,
     fazla_surelerle_calisma_saat: odeme_esas_fazla_surelerle_calisma_dakika / 60,
     fazla_surelerle_calisma_tutari,
     fazla_calisma_dakika,
     odeme_esas_fazla_calisma_dakika,
-    fazla_calisma_tatil_taban_mahsup_dakika,
-    fazla_calisma_tatil_taban_mahsup_tutari:
-      fazlaCalismaDetay.tatil_taban_mahsup_tutari,
     fazla_calisma_saat: odeme_esas_fazla_calisma_dakika / 60,
     fazla_calisma_tutari,
     toplam_fazla_calisma_tutari: yuvarlaParaIkiliOndalik(

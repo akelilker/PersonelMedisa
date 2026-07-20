@@ -24,6 +24,10 @@ import { LoadingState } from "../../../components/states/LoadingState";
 import { useRoleAccess } from "../../../hooks/use-role-access";
 import { useMaasHesaplama, type MaasHesaplamaFilterState } from "../../../hooks/useMaasHesaplama";
 import { currentMonthParts, parseAyValue } from "../../../lib/donem-kapanis/display";
+import {
+  HOLIDAY_OVERTIME_POLICY_REQUIRED,
+  HOLIDAY_OVERTIME_POLICY_REQUIRED_MESSAGE
+} from "../../../services/puantaj-hesap-motoru";
 import { useAuth } from "../../../state/auth.store";
 import type { IdOption } from "../../../types/referans";
 
@@ -268,7 +272,11 @@ export function MaasHesaplamaMerkeziPage() {
       await refetch();
     } catch (error) {
       if (error instanceof ApiRequestError) {
-        setActionError(`${error.code}: ${error.message}`);
+        setActionError(
+          error.code === HOLIDAY_OVERTIME_POLICY_REQUIRED
+            ? HOLIDAY_OVERTIME_POLICY_REQUIRED_MESSAGE
+            : `${error.code}: ${error.message}`
+        );
       } else {
         setActionError(error instanceof Error ? error.message : "Snapshot oluşturulamadı.");
       }

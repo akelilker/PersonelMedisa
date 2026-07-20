@@ -30,6 +30,8 @@ import {
   hesaplaFazlaCalismaTutari,
   hesaplaHaftalikFazlaCalismaUcreti,
   hesaplaHaftalikPuantajUcretOzeti,
+  HOLIDAY_OVERTIME_POLICY_REQUIRED,
+  HOLIDAY_OVERTIME_POLICY_REQUIRED_MESSAGE,
   HAFTALIK_NORMAL_CALISMA_ESIK_DAKIKA,
   hesaplaGunlukUcret,
   hesaplaSaatlikKesintiTutari,
@@ -2205,6 +2207,7 @@ describe("hesaplaHaftalikPuantajUcretOzeti", () => {
     expect(o.toplam_net_dakika).toBe(2400);
     expect(o.fazla_surelerle_calisma_dakika).toBe(0);
     expect(o.fazla_calisma_dakika).toBe(0);
+    expect(o.hesaplanabilir_mi).toBe(true);
     expect(o.toplam_fazla_calisma_tutari).toBe(0);
     expect(o.fazla_calisma_tutari).toBe(0);
     expect(o.saatlik_ucret).toBe(200);
@@ -2293,44 +2296,76 @@ describe("hesaplaHaftalikPuantajUcretOzeti", () => {
     expect(o.toplam_net_dakika).toBe(300);
   });
 
-  it("HT fiilî dakika haftalık havuza girer; tatilde ödenmiş temel ücret FSC'de ikinci kez ödenmez", () => {
-    const gunler = [
-      gunlukSatir(1, "2026-04-13", 480),
-      gunlukSatir(1, "2026-04-14", 480),
-      gunlukSatir(1, "2026-04-15", 480),
-      gunlukSatir(1, "2026-04-16", 480),
-      gunlukSatir(1, "2026-04-17", 480),
-      gunlukSatir(1, "2026-04-19", 120, "Hafta_Tatili_Pazar")
-    ];
-    const o = hesaplaHaftalikPuantajUcretOzeti(gunler, ref, maas);
-    expect(o.toplam_net_dakika).toBe(2520);
-    expect(o.normal_gun_calisma_dakika).toBe(2400);
-    expect(o.tatil_calisma_dakika).toBe(120);
-    expect(o.tatil_taban_odenmis_dakika).toBe(120);
-    expect(o.fazla_calisma_dakika).toBe(0);
-    expect(o.fazla_surelerle_calisma_dakika).toBe(120);
-    expect(o.fazla_surelerle_tatil_taban_mahsup_dakika).toBe(120);
-    expect(o.fazla_surelerle_tatil_taban_mahsup_tutari).toBe(400);
-    expect(o.fazla_surelerle_calisma_tutari).toBe(100);
-  });
-
-  it("UBGT fiilî 60 dk FM havuzuna girer; PHP Engine V2 ile aynı 0.50 ilave farkı üretir", () => {
+  it.each(
+    (["Hafta_Tatili_Pazar", "UBGT_Resmi_Tatil"] as const).flatMap((gunTipi) =>
+      ([1, 29, 30, 31, 59, 60, 61] as const).flatMap((dakika) => [
+        [gunTipi, "FSC", 2400, dakika, dakika, 0],
+        [gunTipi, "FM", 2700, dakika, 300, dakika]
+      ] as const)
+    )
+  )("%s %s çakışması %i+%i dk → payable üretmeden fail-closed", (gunTipi, _bant, normalDakika, dakika, hamFsc, hamFm) => {
     const o = hesaplaHaftalikPuantajUcretOzeti(
       [
-        gunlukSatir(1, "2026-04-13", 2700),
-        gunlukSatir(1, "2026-04-14", 60, "UBGT_Resmi_Tatil")
+        gunlukSatir(1, "2026-04-13", normalDakika),
+        gunlukSatir(1, "2026-04-19", dakika, gunTipi)
       ],
       ref,
       maas
     );
-    expect(o.toplam_net_dakika).toBe(2760);
-    expect(o.tatil_calisma_dakika).toBe(60);
-    expect(o.fazla_calisma_dakika).toBe(60);
-    expect(o.odeme_esas_fazla_calisma_dakika).toBe(60);
-    expect(o.fazla_calisma_tatil_taban_mahsup_dakika).toBe(60);
-    expect(o.fazla_calisma_tatil_taban_mahsup_tutari).toBe(200);
-    expect(o.fazla_calisma_tutari).toBe(100);
+    expect(o.toplam_net_dakika).toBe(normalDakika + dakika);
+    expect(o.tatil_calisma_dakika).toBe(dakika);
+    expect(o.fazla_surelerle_calisma_dakika).toBe(hamFsc);
+    expect(o.fazla_calisma_dakika).toBe(hamFm);
+    expect(o.odeme_esas_fazla_surelerle_calisma_dakika).toBe(0);
+    expect(o.odeme_esas_fazla_calisma_dakika).toBe(0);
+    expect(o.fazla_surelerle_calisma_tutari).toBe(0);
+    expect(o.fazla_calisma_tutari).toBe(0);
+    expect(o.hesaplanabilir_mi).toBe(false);
+    expect(o.hata_kodu).toBe(HOLIDAY_OVERTIME_POLICY_REQUIRED);
+    expect(o.hata_mesaji).toBe(HOLIDAY_OVERTIME_POLICY_REQUIRED_MESSAGE);
+    expect(o).not.toHaveProperty("fazla_surelerle_tatil_taban_mahsup_dakika");
   });
+
+  it.each([449, 450, 451])(
+    "UBGT günlük aday sınırı %i dk yetkili politika olmadan authoritative hesap üretmez",
+    (tatilDakika) => {
+      const o = hesaplaHaftalikPuantajUcretOzeti(
+        [
+          gunlukSatir(1, "2026-04-13", 2400),
+          gunlukSatir(1, "2026-04-14", tatilDakika, "UBGT_Resmi_Tatil")
+        ],
+        ref,
+        maas
+      );
+      expect(o.tatil_calisma_dakika).toBe(tatilDakika);
+      expect(o.hesaplanabilir_mi).toBe(false);
+      expect(o.toplam_fazla_calisma_tutari).toBe(0);
+    }
+  );
+
+  it.each([
+    [2399, false, 0, 0],
+    [2400, false, 0, 0],
+    [2401, true, 1, 0],
+    [2699, true, 299, 0],
+    [2700, true, 300, 0],
+    [2701, true, 300, 1]
+  ])(
+    "haftalık havuz %i dk → çakışma=%s, ham FSC=%i, ham FM=%i",
+    (toplamDakika, blocked, hamFsc, hamFm) => {
+      const o = hesaplaHaftalikPuantajUcretOzeti(
+        [
+          gunlukSatir(1, "2026-04-13", toplamDakika - 1),
+          gunlukSatir(1, "2026-04-14", 1, "Hafta_Tatili_Pazar")
+        ],
+        ref,
+        maas
+      );
+      expect(o.hesaplanabilir_mi).toBe(!blocked);
+      expect(o.fazla_surelerle_calisma_dakika).toBe(hamFsc);
+      expect(o.fazla_calisma_dakika).toBe(hamFm);
+    }
+  );
 
   it("geçersiz referans tarih → sıfır özet, hafta aralığı null", () => {
     const o = hesaplaHaftalikPuantajUcretOzeti(
@@ -2601,13 +2636,13 @@ describe("birlestirUbgtFazlaMesaiCakismaUyari", () => {
     });
 
     const haftalik = hesaplaHaftalikPuantajUcretOzeti(tamHafta, ref, 45000);
-    // Engine V2: UBGT fiilî 480 dk havuza girer; tatil tabanı FSC/FM'de mahsup edilir.
+    // Engine V2: ham süre audit'te kalır, yetkili çakışma politikası olmadan payable üretilmez.
     expect(haftalik.fazla_calisma_dakika).toBe(180);
     expect(haftalik.fazla_surelerle_calisma_dakika).toBe(300);
-    expect(haftalik.fazla_surelerle_tatil_taban_mahsup_dakika).toBe(300);
-    expect(haftalik.fazla_calisma_tatil_taban_mahsup_dakika).toBe(180);
-    expect(haftalik.fazla_surelerle_calisma_tutari).toBe(250);
-    expect(haftalik.fazla_calisma_tutari).toBe(300);
+    expect(haftalik.hesaplanabilir_mi).toBe(false);
+    expect(haftalik.hata_kodu).toBe(HOLIDAY_OVERTIME_POLICY_REQUIRED);
+    expect(haftalik.fazla_surelerle_calisma_tutari).toBe(0);
+    expect(haftalik.fazla_calisma_tutari).toBe(0);
 
     const tatil = hesaplaTatilEkOdemeOzeti(maas, ubgt);
     expect(tatil!.ek_odeme_tutari).toBe(1000);

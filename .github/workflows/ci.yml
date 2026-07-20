@@ -151,3 +151,25 @@ jobs:
 
       - name: Run S82 Bordro Hazirlik Merkezi Playwright
         run: npm run e2e:s82
+
+  s83-e2e:
+    name: S83 Business Data Readiness E2E
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.58.2-noble
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run S83 Business Data Readiness Playwright
+        run: npm run e2e:s83

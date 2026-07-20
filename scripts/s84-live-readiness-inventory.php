@@ -288,7 +288,7 @@ if ($action === 'inventory') {
         "SELECT p.id, p.ad, p.soyad, p.sicil_no, d.ad AS departman_adi
          FROM personeller p
          LEFT JOIN departmanlar d ON d.id = p.departman_id
-         WHERE p.sube_id = :sube AND p.durum = 'AKTIF'
+         WHERE p.sube_id = :sube AND p.aktif_durum = 'AKTIF'
          ORDER BY p.ad ASC, p.soyad ASC"
     );
     $stmt->execute(['sube' => $subeId]);

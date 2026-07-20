@@ -630,11 +630,12 @@ class BordroHazirlikPreflightService
     {
         $donem = sprintf('%04d-%02d', (int) $yil, (int) $ay);
         try {
+            // Canonical S81 schema: state=TAMAMLANDI, timestamp=onaylandi_at (migration 008).
             $stmt = $pdo->prepare(
-                "SELECT gy.id, gy.state, gy.onay_zamani
+                "SELECT gy.id, gy.state, gy.onaylandi_at
                  FROM genel_yonetici_bildirim_onaylari gy
-                 WHERE gy.sube_id = :sube_id AND gy.ay = :ay AND gy.state = 'ONAYLANDI'
-                 ORDER BY gy.onay_zamani DESC, gy.id DESC LIMIT 1"
+                 WHERE gy.sube_id = :sube_id AND gy.ay = :ay AND gy.state = 'TAMAMLANDI'
+                 ORDER BY gy.onaylandi_at DESC, gy.id DESC LIMIT 1"
             );
             $stmt->execute(['sube_id' => (int) $subeId, 'ay' => $donem]);
             $row = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -645,11 +646,19 @@ class BordroHazirlikPreflightService
             return [
                 'tamam' => true,
                 'genel_yonetici_bildirim_onayi_id' => (int) $row['id'],
-                'onay_zamani' => (string) $row['onay_zamani'],
+                'onay_zamani' => (string) ($row['onaylandi_at'] ?? ''),
                 'neden' => null,
             ];
         } catch (\Throwable $e) {
-            return ['tamam' => false, 'neden' => 'ONAY_TABLOSU_YOK'];
+            $msg = $e->getMessage();
+            $tableMissing = stripos($msg, "doesn't exist") !== false
+                || stripos($msg, 'no such table') !== false
+                || stripos($msg, 'Base table or view not found') !== false
+                || stripos($msg, '42S02') !== false;
+            return [
+                'tamam' => false,
+                'neden' => $tableMissing ? 'ONAY_TABLOSU_YOK' : 'ONAY_KAYDI_YOK',
+            ];
         }
     }
 

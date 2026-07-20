@@ -21,7 +21,7 @@ export type DashboardKpi = {
   toplam_izinsiz_devamsizlik: number;
   toplam_net_calisma_dakika: number;
   ortalama_gunluk_net_calisma_dakika: number;
-  ortalama_kalan_izin: number;
+  ortalama_kalan_izin: number | null;
   hafta_tatili_hak_kaybi_sayisi: number;
 };
 
@@ -285,8 +285,9 @@ export function hesaplaPuantajIstatistikleri(kayitlar: GunlukPuantaj[]): {
 
 export function hesaplaOrtalamaKalanIzin(
   personeller: Personel[],
-  surecler: Surec[]
-): number {
+  surecler: Surec[],
+  puantajKayitlari: GunlukPuantaj[] = []
+): number | null {
   const aktifPersoneller = personeller.filter((p) => p.aktif_durum === "AKTIF" && p.ise_giris_tarihi);
 
   if (aktifPersoneller.length === 0) return 0;
@@ -295,10 +296,13 @@ export function hesaplaOrtalamaKalanIzin(
 
   for (const p of aktifPersoneller) {
     const personelSurecleri = surecler.filter((s) => s.personel_id === p.id);
+    const personelTakvimGunleri = puantajKayitlari.filter((kayit) => kayit.personel_id === p.id);
     const bakiye = hesaplaIzinBakiye(
       { ise_giris_tarihi: p.ise_giris_tarihi!, dogum_tarihi: p.dogum_tarihi },
-      personelSurecleri
+      personelSurecleri,
+      personelTakvimGunleri
     );
+    if (bakiye.kalan_gun === null) return null;
     toplamKalan += bakiye.kalan_gun;
   }
 
@@ -316,7 +320,7 @@ export function hesaplaDashboardKpi(
 ): DashboardKpi {
   const personelStats = hesaplaPersonelIstatistikleri(personeller);
   const puantajStats = hesaplaPuantajIstatistikleri(puantajKayitlari);
-  const ortalamaKalanIzin = hesaplaOrtalamaKalanIzin(personeller, surecler);
+  const ortalamaKalanIzin = hesaplaOrtalamaKalanIzin(personeller, surecler, puantajKayitlari);
 
   return {
     toplam_personel: personelStats.toplam,

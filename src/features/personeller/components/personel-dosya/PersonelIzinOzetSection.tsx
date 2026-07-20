@@ -57,15 +57,23 @@ export function PersonelIzinOzetSection({
             <p>
               <strong>Yıllık İzin Hakkı:</strong> {bakiye.hak_edis.yillik_izin_gun} gün
               {bakiye.hak_edis.yas_istisna_uygulandi ? (
-                <span className="personel-izin-istisna-badge"> (50 yaş istisnası)</span>
+                <span className="personel-izin-istisna-badge"> (yaş istisnası)</span>
               ) : null}
             </p>
             <p>
-              <strong>Kullanılan:</strong> {bakiye.kullanilan_gun} gün
+              <strong>Kullanılan:</strong>{" "}
+              {bakiye.kullanilan_gun === null ? "Kesinleştirilemedi" : `${bakiye.kullanilan_gun} gün`}
             </p>
             <p className="personel-izin-kalan">
-              <strong>Kalan İzin:</strong> {bakiye.kalan_gun} gün
+              <strong>Kalan İzin:</strong>{" "}
+              {bakiye.kalan_gun === null ? "Kesinleştirilemedi" : `${bakiye.kalan_gun} gün`}
             </p>
+            {!bakiye.kullanim_ozeti.takvim_dogrulandi_mi ? (
+              <p data-testid="izin-takvim-eksik-uyarisi">
+                Canonical çalışma takviminde {bakiye.kullanim_ozeti.eksik_takvim_tarihleri.length} tarih
+                sınıflandırılmadığı için kullanılan ve kalan izin kesinleştirilemedi.
+              </p>
+            ) : null}
           </div>
         ) : (
           <p>İşe giriş tarihi bilgisi eksik; izin hakkı hesaplanamadı.</p>

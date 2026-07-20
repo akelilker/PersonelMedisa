@@ -1,4 +1,5 @@
 import type { Surec } from "../types/surec";
+import type { PuantajGunTipi } from "../types/puantaj";
 
 // ---------------------------------------------------------------------------
 // Giriş tipi
@@ -21,10 +22,25 @@ export type IzinHakEdis = {
   yas_istisna_uygulandi: boolean;
 };
 
+export type CanonicalIzinTakvimGunu = {
+  tarih: string;
+  gun_tipi?: PuantajGunTipi;
+};
+
+export type IzinKullanimOzeti = {
+  kullanilan_gun: number | null;
+  sayilan_normal_gun: number;
+  haric_tutulan_hafta_tatili_gun: number;
+  haric_tutulan_ubgt_gun: number;
+  takvim_dogrulandi_mi: boolean;
+  eksik_takvim_tarihleri: string[];
+};
+
 export type IzinBakiye = {
   hak_edis: IzinHakEdis;
-  kullanilan_gun: number;
-  kalan_gun: number;
+  kullanilan_gun: number | null;
+  kalan_gun: number | null;
+  kullanim_ozeti: IzinKullanimOzeti;
 };
 
 // ---------------------------------------------------------------------------
@@ -89,21 +105,38 @@ export function hesaplaYas(dogumTarihi: string, referansTarih?: string): number 
   return diffYil;
 }
 
+export function isYillikIzinYasIstisnasiKapsaminda(yas: number | null): boolean {
+  return yas !== null && (yas <= 18 || yas >= 50);
+}
+
 // ---------------------------------------------------------------------------
 // İş Kanunu md.53 – Yıllık İzin Hak Ediş
 //
-//   1-5 yıl   → 14 gün
-//   5-15 yıl  → 20 gün
+//   1-5 yıl (5 dahil) → 14 gün
+//   5 yıldan fazla, 15 yıldan az → 20 gün
 //   15+ yıl   → 26 gün
 //
-// 50 yaş istisnası: yaş >= 50 ise minimum 20 gün
+// Yaş istisnası: yaş <= 18 veya yaş >= 50 ise minimum 20 gün
 // 1 yılını doldurmamış personel → 0 gün (henüz hak kazanmadı)
 // ---------------------------------------------------------------------------
 
-export function hesaplaYillikIzinGun(kidemYil: number, yas: number | null): {
+export function hesaplaYillikIzinGun(girdi: IzinHesapGirdisi): {
   gun: number;
   yas_istisna_uygulandi: boolean;
 } {
+  const giris = parseDate(girdi.ise_giris_tarihi);
+  if (!giris) {
+    return { gun: 0, yas_istisna_uygulandi: false };
+  }
+
+  const ref = girdi.referans_tarih ? parseDate(girdi.referans_tarih) ?? today() : today();
+  if (ref < giris) {
+    return { gun: 0, yas_istisna_uygulandi: false };
+  }
+
+  const kidemYil = hesaplaKidemYil(girdi.ise_giris_tarihi, girdi.referans_tarih);
+  const yas = girdi.dogum_tarihi ? hesaplaYas(girdi.dogum_tarihi, girdi.referans_tarih) : null;
+
   if (kidemYil < 1) {
     return { gun: 0, yas_istisna_uygulandi: false };
   }
@@ -112,7 +145,10 @@ export function hesaplaYillikIzinGun(kidemYil: number, yas: number | null): {
 
   if (kidemYil >= 15) {
     gun = 26;
-  } else if (kidemYil >= 5) {
+  } else if (
+    kidemYil > 5 ||
+    (kidemYil === 5 && (ref.getMonth() !== giris.getMonth() || ref.getDate() !== giris.getDate()))
+  ) {
     gun = 20;
   } else {
     gun = 14;
@@ -120,7 +156,7 @@ export function hesaplaYillikIzinGun(kidemYil: number, yas: number | null): {
 
   let yasIstisna = false;
 
-  if (yas !== null && (yas <= 18 || yas >= 50) && gun < 20) {
+  if (isYillikIzinYasIstisnasiKapsaminda(yas) && gun < 20) {
     gun = 20;
     yasIstisna = true;
   }
@@ -135,7 +171,7 @@ export function hesaplaYillikIzinGun(kidemYil: number, yas: number | null): {
 export function hesaplaIzinHakEdis(girdi: IzinHesapGirdisi): IzinHakEdis {
   const kidemYil = hesaplaKidemYil(girdi.ise_giris_tarihi, girdi.referans_tarih);
   const yas = girdi.dogum_tarihi ? hesaplaYas(girdi.dogum_tarihi, girdi.referans_tarih) : null;
-  const { gun, yas_istisna_uygulandi } = hesaplaYillikIzinGun(kidemYil, yas);
+  const { gun, yas_istisna_uygulandi } = hesaplaYillikIzinGun(girdi);
 
   return {
     kidem_yil: kidemYil,
@@ -154,8 +190,55 @@ export function hesaplaIzinHakEdis(girdi: IzinHesapGirdisi): IzinHakEdis {
 //   - state !== "IPTAL"
 // ---------------------------------------------------------------------------
 
-export function hesaplaKullanilanIzinGun(surecler: Surec[]): number {
-  let toplam = 0;
+function listInclusiveDateKeys(baslangic: Date, bitis: Date): string[] {
+  if (bitis < baslangic) return [];
+
+  const cursor = new Date(baslangic.getFullYear(), baslangic.getMonth(), baslangic.getDate());
+  const son = new Date(bitis.getFullYear(), bitis.getMonth(), bitis.getDate());
+  const tarihler: string[] = [];
+
+  while (cursor <= son) {
+    tarihler.push(
+      `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, "0")}-${String(
+        cursor.getDate()
+      ).padStart(2, "0")}`
+    );
+    cursor.setDate(cursor.getDate() + 1);
+  }
+
+  return tarihler;
+}
+
+function buildCanonicalTakvimMap(
+  gunler: readonly CanonicalIzinTakvimGunu[]
+): Map<string, PuantajGunTipi | null> {
+  const takvim = new Map<string, PuantajGunTipi | null>();
+
+  for (const gun of gunler) {
+    if (!parseDate(gun.tarih) || !gun.gun_tipi) continue;
+    if (!takvim.has(gun.tarih)) {
+      takvim.set(gun.tarih, gun.gun_tipi);
+      continue;
+    }
+
+    const mevcut = takvim.get(gun.tarih);
+    if (mevcut !== gun.gun_tipi) {
+      takvim.set(gun.tarih, null);
+    }
+  }
+
+  return takvim;
+}
+
+export function hesaplaKullanilanIzinOzeti(
+  surecler: Surec[],
+  canonicalTakvimGunleri: readonly CanonicalIzinTakvimGunu[] = []
+): IzinKullanimOzeti {
+  let sayilanNormalGun = 0;
+  let haricTutulanHaftaTatiliGun = 0;
+  let haricTutulanUbgtGun = 0;
+  const eksikTakvimTarihleri = new Set<string>();
+  const canonicalTakvim = buildCanonicalTakvimMap(canonicalTakvimGunleri);
 
   for (const surec of surecler) {
     if (surec.surec_turu !== "IZIN") continue;
@@ -165,30 +248,61 @@ export function hesaplaKullanilanIzinGun(surecler: Surec[]): number {
     const bas = surec.baslangic_tarihi ? parseDate(surec.baslangic_tarihi) : null;
     const bit = surec.bitis_tarihi ? parseDate(surec.bitis_tarihi) : null;
 
-    if (bas && bit) {
-      const diffMs = bit.getTime() - bas.getTime();
-      const gun = Math.max(Math.ceil(diffMs / (1000 * 60 * 60 * 24)) + 1, 1);
-      toplam += gun;
-    } else if (bas) {
-      toplam += 1;
+    if (!bas) continue;
+
+    const tarihler = listInclusiveDateKeys(bas, bit ?? bas);
+    for (const tarih of tarihler) {
+      const gunTipi = canonicalTakvim.get(tarih);
+      if (!gunTipi) {
+        eksikTakvimTarihleri.add(tarih);
+      } else if (gunTipi === "Hafta_Tatili_Pazar") {
+        haricTutulanHaftaTatiliGun += 1;
+      } else if (gunTipi === "UBGT_Resmi_Tatil") {
+        haricTutulanUbgtGun += 1;
+      } else {
+        sayilanNormalGun += 1;
+      }
     }
   }
 
-  return toplam;
+  const eksikTarihler = [...eksikTakvimTarihleri].sort();
+  const takvimDogrulandiMi = eksikTarihler.length === 0;
+
+  return {
+    kullanilan_gun: takvimDogrulandiMi ? sayilanNormalGun : null,
+    sayilan_normal_gun: sayilanNormalGun,
+    haric_tutulan_hafta_tatili_gun: haricTutulanHaftaTatiliGun,
+    haric_tutulan_ubgt_gun: haricTutulanUbgtGun,
+    takvim_dogrulandi_mi: takvimDogrulandiMi,
+    eksik_takvim_tarihleri: eksikTarihler
+  };
+}
+
+export function hesaplaKullanilanIzinGun(
+  surecler: Surec[],
+  canonicalTakvimGunleri: readonly CanonicalIzinTakvimGunu[] = []
+): number | null {
+  return hesaplaKullanilanIzinOzeti(surecler, canonicalTakvimGunleri).kullanilan_gun;
 }
 
 // ---------------------------------------------------------------------------
 // Bakiye hesaplama (hak ediş - kullanılan)
 // ---------------------------------------------------------------------------
 
-export function hesaplaIzinBakiye(girdi: IzinHesapGirdisi, surecler: Surec[]): IzinBakiye {
+export function hesaplaIzinBakiye(
+  girdi: IzinHesapGirdisi,
+  surecler: Surec[],
+  canonicalTakvimGunleri: readonly CanonicalIzinTakvimGunu[] = []
+): IzinBakiye {
   const hakEdis = hesaplaIzinHakEdis(girdi);
-  const kullanilan = hesaplaKullanilanIzinGun(surecler);
-  const kalan = Math.max(hakEdis.yillik_izin_gun - kullanilan, 0);
+  const kullanimOzeti = hesaplaKullanilanIzinOzeti(surecler, canonicalTakvimGunleri);
+  const kullanilan = kullanimOzeti.kullanilan_gun;
+  const kalan = kullanilan === null ? null : Math.max(hakEdis.yillik_izin_gun - kullanilan, 0);
 
   return {
     hak_edis: hakEdis,
     kullanilan_gun: kullanilan,
-    kalan_gun: kalan
+    kalan_gun: kalan,
+    kullanim_ozeti: kullanimOzeti
   };
 }

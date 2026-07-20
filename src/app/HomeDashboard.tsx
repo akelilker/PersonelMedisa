@@ -142,7 +142,10 @@ export function HomeDashboard() {
         <div className="dashboard-kpi-grid">
           <KpiCard label="Toplam Net Çalışma" value={formatDakikaToSaat(kpi.toplam_net_calisma_dakika)} />
           <KpiCard label="Ortalama Günlük Net" value={formatDakikaToSaat(kpi.ortalama_gunluk_net_calisma_dakika)} />
-          <KpiCard label="Ortalama Kalan İzin" value={`${kpi.ortalama_kalan_izin} gün`} />
+          <KpiCard
+            label="Ortalama Kalan İzin"
+            value={kpi.ortalama_kalan_izin === null ? "Kesinleştirilemedi" : `${kpi.ortalama_kalan_izin} gün`}
+          />
         </div>
       </div>
 

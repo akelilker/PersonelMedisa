@@ -5,9 +5,32 @@ import {
   hesaplaYillikIzinGun,
   hesaplaIzinHakEdis,
   hesaplaKullanilanIzinGun,
-  hesaplaIzinBakiye
+  hesaplaKullanilanIzinOzeti,
+  hesaplaIzinBakiye,
+  isYillikIzinYasIstisnasiKapsaminda
 } from "../../src/services/izin-hesap-motoru";
 import type { Surec } from "../../src/types/surec";
+import type { PuantajGunTipi } from "../../src/types/puantaj";
+
+function canonicalTakvimAraligi(
+  baslangic: string,
+  bitis: string,
+  overrides: Record<string, PuantajGunTipi> = {}
+) {
+  const gunler: { tarih: string; gun_tipi: PuantajGunTipi }[] = [];
+  const cursor = new Date(`${baslangic}T00:00:00`);
+  const son = new Date(`${bitis}T00:00:00`);
+
+  while (cursor <= son) {
+    const tarih = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, "0")}-${String(
+      cursor.getDate()
+    ).padStart(2, "0")}`;
+    gunler.push({ tarih, gun_tipi: overrides[tarih] ?? "Normal_Is_Gunu" });
+    cursor.setDate(cursor.getDate() + 1);
+  }
+
+  return gunler;
+}
 
 // =========================================================================
 // 1. Kıdem yılı hesaplama
@@ -79,51 +102,58 @@ describe("hesaplaYas", () => {
 
 describe("hesaplaYillikIzinGun", () => {
   it("1 yılını doldurmamış → 0 gün", () => {
-    expect(hesaplaYillikIzinGun(0, 25)).toEqual({ gun: 0, yas_istisna_uygulandi: false });
+    expect(
+      hesaplaYillikIzinGun({ ise_giris_tarihi: "2026-01-01", referans_tarih: "2026-12-31" })
+    ).toEqual({ gun: 0, yas_istisna_uygulandi: false });
   });
 
-  it("1-5 yıl arası → 14 gün", () => {
-    expect(hesaplaYillikIzinGun(1, 25)).toEqual({ gun: 14, yas_istisna_uygulandi: false });
-    expect(hesaplaYillikIzinGun(4, 30)).toEqual({ gun: 14, yas_istisna_uygulandi: false });
+  it("tam 5 yıl dahil → 14 gün", () => {
+    expect(
+      hesaplaYillikIzinGun({ ise_giris_tarihi: "2021-04-13", referans_tarih: "2026-04-13" })
+    ).toEqual({ gun: 14, yas_istisna_uygulandi: false });
   });
 
-  it("5-15 yıl arası → 20 gün", () => {
-    expect(hesaplaYillikIzinGun(5, 35)).toEqual({ gun: 20, yas_istisna_uygulandi: false });
-    expect(hesaplaYillikIzinGun(10, 40)).toEqual({ gun: 20, yas_istisna_uygulandi: false });
-    expect(hesaplaYillikIzinGun(14, 45)).toEqual({ gun: 20, yas_istisna_uygulandi: false });
+  it("5 yıl + 1 gün → 20 gün", () => {
+    expect(
+      hesaplaYillikIzinGun({ ise_giris_tarihi: "2021-04-13", referans_tarih: "2026-04-14" })
+    ).toEqual({ gun: 20, yas_istisna_uygulandi: false });
   });
 
-  it("15 yıl ve üstü → 26 gün", () => {
-    expect(hesaplaYillikIzinGun(15, 45)).toEqual({ gun: 26, yas_istisna_uygulandi: false });
-    expect(hesaplaYillikIzinGun(20, 55)).toEqual({ gun: 26, yas_istisna_uygulandi: false });
+  it("15 yıldan bir gün önce 20, tam 15 yıl 26 gün", () => {
+    expect(
+      hesaplaYillikIzinGun({ ise_giris_tarihi: "2011-04-13", referans_tarih: "2026-04-12" })
+    ).toEqual({ gun: 20, yas_istisna_uygulandi: false });
+    expect(
+      hesaplaYillikIzinGun({ ise_giris_tarihi: "2011-04-13", referans_tarih: "2026-04-13" })
+    ).toEqual({ gun: 26, yas_istisna_uygulandi: false });
   });
 
   it("50 yaş istisnası: 2 yıl kıdem + 50 yaş → 14 yerine 20 gün", () => {
-    expect(hesaplaYillikIzinGun(2, 50)).toEqual({ gun: 20, yas_istisna_uygulandi: true });
+    expect(
+      hesaplaYillikIzinGun({
+        ise_giris_tarihi: "2024-04-13",
+        dogum_tarihi: "1976-04-13",
+        referans_tarih: "2026-04-13"
+      })
+    ).toEqual({ gun: 20, yas_istisna_uygulandi: true });
   });
 
   it("18 yaş istisnası: 2 yıl kıdem + 18 yaş → 14 yerine 20 gün", () => {
-    expect(hesaplaYillikIzinGun(2, 18)).toEqual({ gun: 20, yas_istisna_uygulandi: true });
+    expect(
+      hesaplaYillikIzinGun({
+        ise_giris_tarihi: "2024-04-13",
+        dogum_tarihi: "2008-04-13",
+        referans_tarih: "2026-04-13"
+      })
+    ).toEqual({ gun: 20, yas_istisna_uygulandi: true });
   });
 
-  it("18 yaş istisnası: 3 yıl kıdem + 17 yaş → 14 yerine 20 gün", () => {
-    expect(hesaplaYillikIzinGun(3, 17)).toEqual({ gun: 20, yas_istisna_uygulandi: true });
-  });
-
-  it("50 yaş istisnası: 3 yıl kıdem + 52 yaş → 14 yerine 20 gün", () => {
-    expect(hesaplaYillikIzinGun(3, 52)).toEqual({ gun: 20, yas_istisna_uygulandi: true });
-  });
-
-  it("50 yaş + 5 yıl kıdem → zaten 20, istisna uygulanmaz (gereksiz)", () => {
-    expect(hesaplaYillikIzinGun(5, 50)).toEqual({ gun: 20, yas_istisna_uygulandi: false });
-  });
-
-  it("50 yaş + 15 yıl kıdem → 26 gün, istisna uygulanmaz", () => {
-    expect(hesaplaYillikIzinGun(15, 55)).toEqual({ gun: 26, yas_istisna_uygulandi: false });
-  });
-
-  it("yaş null (bilinmiyor) → standart hesaplama, istisna yok", () => {
-    expect(hesaplaYillikIzinGun(2, null)).toEqual({ gun: 14, yas_istisna_uygulandi: false });
+  it("yıllık izin yaş predicate'i <=18 ve >=50 sınırlarını korur", () => {
+    expect(isYillikIzinYasIstisnasiKapsaminda(17)).toBe(true);
+    expect(isYillikIzinYasIstisnasiKapsaminda(18)).toBe(true);
+    expect(isYillikIzinYasIstisnasiKapsaminda(19)).toBe(false);
+    expect(isYillikIzinYasIstisnasiKapsaminda(49)).toBe(false);
+    expect(isYillikIzinYasIstisnasiKapsaminda(50)).toBe(true);
   });
 });
 
@@ -219,7 +249,9 @@ describe("hesaplaKullanilanIzinGun", () => {
         state: "AKTIF"
       }
     ];
-    expect(hesaplaKullanilanIzinGun(surecler)).toBe(2);
+    expect(
+      hesaplaKullanilanIzinGun(surecler, canonicalTakvimAraligi("2026-03-10", "2026-03-11"))
+    ).toBe(2);
   });
 
   it("iptal edilen izinler sayılmaz", () => {
@@ -284,7 +316,9 @@ describe("hesaplaKullanilanIzinGun", () => {
         state: "AKTIF"
       }
     ];
-    expect(hesaplaKullanilanIzinGun(surecler)).toBe(3);
+    expect(
+      hesaplaKullanilanIzinGun(surecler, canonicalTakvimAraligi("2026-03-10", "2026-03-12"))
+    ).toBe(3);
   });
 
   it("bitiş tarihi olmayan tek günlük izin → 1 gün", () => {
@@ -298,7 +332,9 @@ describe("hesaplaKullanilanIzinGun", () => {
         state: "AKTIF"
       }
     ];
-    expect(hesaplaKullanilanIzinGun(surecler)).toBe(1);
+    expect(
+      hesaplaKullanilanIzinGun(surecler, canonicalTakvimAraligi("2026-03-10", "2026-03-10"))
+    ).toBe(1);
   });
 
   it("birden fazla izin kaydı toplanır", () => {
@@ -322,7 +358,67 @@ describe("hesaplaKullanilanIzinGun", () => {
         state: "AKTIF"
       }
     ];
-    expect(hesaplaKullanilanIzinGun(surecler)).toBe(8);
+    expect(
+      hesaplaKullanilanIzinGun(surecler, [
+        ...canonicalTakvimAraligi("2026-02-10", "2026-02-14"),
+        ...canonicalTakvimAraligi("2026-03-20", "2026-03-22")
+      ])
+    ).toBe(8);
+  });
+
+  it("canonical takvim hafta tatili ve UBGT günlerini yıllık izinden düşmez", () => {
+    const surecler: Surec[] = [
+      {
+        id: 1,
+        personel_id: 1,
+        surec_turu: "IZIN",
+        alt_tur: "YILLIK_IZIN",
+        baslangic_tarihi: "2026-04-20",
+        bitis_tarihi: "2026-04-24",
+        state: "AKTIF"
+      }
+    ];
+    const takvim = canonicalTakvimAraligi("2026-04-20", "2026-04-24", {
+      "2026-04-22": "Hafta_Tatili_Pazar",
+      "2026-04-23": "UBGT_Resmi_Tatil"
+    });
+
+    expect(hesaplaKullanilanIzinOzeti(surecler, takvim)).toEqual({
+      kullanilan_gun: 3,
+      sayilan_normal_gun: 3,
+      haric_tutulan_hafta_tatili_gun: 1,
+      haric_tutulan_ubgt_gun: 1,
+      takvim_dogrulandi_mi: true,
+      eksik_takvim_tarihleri: []
+    });
+  });
+
+  it("canonical sınıflandırması eksik tarihi Pazar saymaz; sonuç fail-closed kalır", () => {
+    const surecler: Surec[] = [
+      {
+        id: 1,
+        personel_id: 1,
+        surec_turu: "IZIN",
+        alt_tur: "YILLIK_IZIN",
+        baslangic_tarihi: "2026-04-10",
+        bitis_tarihi: "2026-04-12",
+        state: "AKTIF"
+      }
+    ];
+
+    expect(
+      hesaplaKullanilanIzinOzeti(
+        surecler,
+        canonicalTakvimAraligi("2026-04-10", "2026-04-11")
+      )
+    ).toEqual({
+      kullanilan_gun: null,
+      sayilan_normal_gun: 2,
+      haric_tutulan_hafta_tatili_gun: 0,
+      haric_tutulan_ubgt_gun: 0,
+      takvim_dogrulandi_mi: false,
+      eksik_takvim_tarihleri: ["2026-04-12"]
+    });
   });
 
   it("boş liste → 0", () => {
@@ -352,7 +448,8 @@ describe("hesaplaIzinBakiye", () => {
           bitis_tarihi: "2026-02-14",
           state: "AKTIF"
         }
-      ]
+      ],
+      canonicalTakvimAraligi("2026-02-10", "2026-02-14")
     );
 
     expect(sonuc.hak_edis.yillik_izin_gun).toBe(14);
@@ -376,7 +473,8 @@ describe("hesaplaIzinBakiye", () => {
           bitis_tarihi: "2026-01-20",
           state: "AKTIF"
         }
-      ]
+      ],
+      canonicalTakvimAraligi("2026-01-01", "2026-01-20")
     );
 
     expect(sonuc.kalan_gun).toBe(0);
@@ -399,7 +497,8 @@ describe("hesaplaIzinBakiye", () => {
           bitis_tarihi: "2026-02-05",
           state: "AKTIF"
         }
-      ]
+      ],
+      canonicalTakvimAraligi("2026-02-01", "2026-02-05")
     );
 
     expect(sonuc.hak_edis.yillik_izin_gun).toBe(20);

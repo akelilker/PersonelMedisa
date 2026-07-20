@@ -127,9 +127,31 @@ describe("hesaplaOrtalamaKalanIzin", () => {
     const surecler: Surec[] = [
       { id: 1, personel_id: 1, surec_turu: "IZIN", alt_tur: "YILLIK_IZIN", baslangic_tarihi: "2026-03-01", bitis_tarihi: "2026-03-05", state: "AKTIF" }
     ];
+    const takvimGunleri = [1, 2, 3, 4, 5].map((gun) =>
+      makePuantaj({
+        personel_id: 1,
+        tarih: `2026-03-${String(gun).padStart(2, "0")}`,
+        gun_tipi: "Normal_Is_Gunu"
+      })
+    );
 
-    const sonuc = hesaplaOrtalamaKalanIzin(personeller, surecler);
+    const sonuc = hesaplaOrtalamaKalanIzin(personeller, surecler, takvimGunleri);
     expect(sonuc).toBe(12);
+  });
+
+  it("canonical takvim günü eksikse ortalamayı kesinleştirmez", () => {
+    const personeller = [
+      makePersonel({ id: 1, ise_giris_tarihi: "2023-01-01", dogum_tarihi: "1990-01-01" })
+    ];
+    const surecler: Surec[] = [
+      { id: 1, personel_id: 1, surec_turu: "IZIN", alt_tur: "YILLIK_IZIN", baslangic_tarihi: "2026-03-01", bitis_tarihi: "2026-03-02", state: "AKTIF" }
+    ];
+
+    expect(
+      hesaplaOrtalamaKalanIzin(personeller, surecler, [
+        makePuantaj({ personel_id: 1, tarih: "2026-03-01", gun_tipi: "Normal_Is_Gunu" })
+      ])
+    ).toBeNull();
   });
 
   it("pasif personelleri dahil etmez", () => {

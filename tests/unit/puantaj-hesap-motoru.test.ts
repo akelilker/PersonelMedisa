@@ -2265,6 +2265,24 @@ describe("hesaplaHaftalikPuantajUcretOzeti", () => {
     expect(o.odeme_esas_fazla_calisma_dakika).toBe(odemeEsasDakika);
   });
 
+  it("parçalı çalışma önce ISO haftada agregasyon olur, 31 dk yalnız bir kez 60'a yuvarlanır", () => {
+    const o = hesaplaHaftalikPuantajUcretOzeti(
+      [
+        gunlukSatir(1, "2026-04-13", 487),
+        gunlukSatir(1, "2026-04-14", 486),
+        gunlukSatir(1, "2026-04-15", 486),
+        gunlukSatir(1, "2026-04-16", 486),
+        gunlukSatir(1, "2026-04-17", 486)
+      ],
+      ref,
+      maas
+    );
+    expect(o.toplam_net_dakika).toBe(2431);
+    expect(o.fazla_surelerle_calisma_dakika).toBe(31);
+    expect(o.odeme_esas_fazla_surelerle_calisma_dakika).toBe(60);
+    expect(o.fazla_surelerle_calisma_tutari).toBe(250);
+  });
+
   it("karışık haftalardaki kayıtlar → yalnız referans haftası", () => {
     const gunler = [
       gunlukSatir(1, "2026-04-13", 100),
@@ -2275,7 +2293,7 @@ describe("hesaplaHaftalikPuantajUcretOzeti", () => {
     expect(o.toplam_net_dakika).toBe(300);
   });
 
-  it("Pazar HT satırı haftalık OT havuzuna girmez (Engine V2)", () => {
+  it("HT fiilî dakika haftalık havuza girer; tatilde ödenmiş temel ücret FSC'de ikinci kez ödenmez", () => {
     const gunler = [
       gunlukSatir(1, "2026-04-13", 480),
       gunlukSatir(1, "2026-04-14", 480),
@@ -2285,9 +2303,33 @@ describe("hesaplaHaftalikPuantajUcretOzeti", () => {
       gunlukSatir(1, "2026-04-19", 120, "Hafta_Tatili_Pazar")
     ];
     const o = hesaplaHaftalikPuantajUcretOzeti(gunler, ref, maas);
-    expect(o.toplam_net_dakika).toBe(2400);
+    expect(o.toplam_net_dakika).toBe(2520);
+    expect(o.normal_gun_calisma_dakika).toBe(2400);
+    expect(o.tatil_calisma_dakika).toBe(120);
+    expect(o.tatil_taban_odenmis_dakika).toBe(120);
     expect(o.fazla_calisma_dakika).toBe(0);
-    expect(o.fazla_surelerle_calisma_dakika).toBe(0);
+    expect(o.fazla_surelerle_calisma_dakika).toBe(120);
+    expect(o.fazla_surelerle_tatil_taban_mahsup_dakika).toBe(120);
+    expect(o.fazla_surelerle_tatil_taban_mahsup_tutari).toBe(400);
+    expect(o.fazla_surelerle_calisma_tutari).toBe(100);
+  });
+
+  it("UBGT fiilî 60 dk FM havuzuna girer; PHP Engine V2 ile aynı 0.50 ilave farkı üretir", () => {
+    const o = hesaplaHaftalikPuantajUcretOzeti(
+      [
+        gunlukSatir(1, "2026-04-13", 2700),
+        gunlukSatir(1, "2026-04-14", 60, "UBGT_Resmi_Tatil")
+      ],
+      ref,
+      maas
+    );
+    expect(o.toplam_net_dakika).toBe(2760);
+    expect(o.tatil_calisma_dakika).toBe(60);
+    expect(o.fazla_calisma_dakika).toBe(60);
+    expect(o.odeme_esas_fazla_calisma_dakika).toBe(60);
+    expect(o.fazla_calisma_tatil_taban_mahsup_dakika).toBe(60);
+    expect(o.fazla_calisma_tatil_taban_mahsup_tutari).toBe(200);
+    expect(o.fazla_calisma_tutari).toBe(100);
   });
 
   it("geçersiz referans tarih → sıfır özet, hafta aralığı null", () => {
@@ -2559,9 +2601,13 @@ describe("birlestirUbgtFazlaMesaiCakismaUyari", () => {
     });
 
     const haftalik = hesaplaHaftalikPuantajUcretOzeti(tamHafta, ref, 45000);
-    // Engine V2: yalnız Normal_Is_Gunu; 5×480=2400 → FM yok (UBGT havuza girmez)
-    expect(haftalik.fazla_calisma_dakika).toBe(0);
-    expect(haftalik.fazla_surelerle_calisma_dakika).toBe(0);
+    // Engine V2: UBGT fiilî 480 dk havuza girer; tatil tabanı FSC/FM'de mahsup edilir.
+    expect(haftalik.fazla_calisma_dakika).toBe(180);
+    expect(haftalik.fazla_surelerle_calisma_dakika).toBe(300);
+    expect(haftalik.fazla_surelerle_tatil_taban_mahsup_dakika).toBe(300);
+    expect(haftalik.fazla_calisma_tatil_taban_mahsup_dakika).toBe(180);
+    expect(haftalik.fazla_surelerle_calisma_tutari).toBe(250);
+    expect(haftalik.fazla_calisma_tutari).toBe(300);
 
     const tatil = hesaplaTatilEkOdemeOzeti(maas, ubgt);
     expect(tatil!.ek_odeme_tutari).toBe(1000);

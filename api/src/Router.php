@@ -20,6 +20,7 @@ use Medisa\Api\Controllers\SerbestZamanController;
 use Medisa\Api\Controllers\MaasHesaplamaController;
 use Medisa\Api\Controllers\MevzuatParametreController;
 use Medisa\Api\Controllers\PersonelBelgelerController;
+use Medisa\Api\Controllers\PersonelBordroKapsamController;
 use Medisa\Api\Controllers\PersonellerController;
 use Medisa\Api\Controllers\PersonelUcretController;
 use Medisa\Api\Controllers\PuantajController;
@@ -142,6 +143,24 @@ class Router
         }
         if ($method === 'POST' && preg_match('#^/personeller/(\d+)/ucretler/(\d+)/iptal$#', $path, $matches)) {
             PersonelUcretController::iptal($this->request, $matches[1], $matches[2]);
+        }
+        if ($method === 'GET' && preg_match('#^/personeller/(\d+)/bordro-kapsamlari$#', $path, $matches)) {
+            PersonelBordroKapsamController::list($this->request, $matches[1]);
+        }
+        if ($method === 'POST' && preg_match('#^/personeller/(\d+)/bordro-kapsamlari/dry-run$#', $path, $matches)) {
+            PersonelBordroKapsamController::dryRun($this->request, $matches[1]);
+        }
+        if ($method === 'POST' && preg_match('#^/personeller/(\d+)/bordro-kapsamlari$#', $path, $matches)) {
+            PersonelBordroKapsamController::create($this->request, $matches[1]);
+        }
+        if ($method === 'POST' && preg_match('#^/personeller/(\d+)/bordro-kapsamlari/(\d+)/onaya-gonder$#', $path, $matches)) {
+            PersonelBordroKapsamController::submit($this->request, $matches[1], $matches[2]);
+        }
+        if ($method === 'POST' && preg_match('#^/personeller/(\d+)/bordro-kapsamlari/(\d+)/onayla$#', $path, $matches)) {
+            PersonelBordroKapsamController::approve($this->request, $matches[1], $matches[2]);
+        }
+        if ($method === 'POST' && preg_match('#^/personeller/(\d+)/bordro-kapsamlari/(\d+)/iptal$#', $path, $matches)) {
+            PersonelBordroKapsamController::cancel($this->request, $matches[1], $matches[2]);
         }
         if ($method === 'GET' && preg_match('#^/personeller/(\d+)/belge-durumu$#', $path, $matches)) {
             PersonelBelgelerController::belgeDurumu($this->request, $matches[1]);

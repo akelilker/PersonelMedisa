@@ -245,7 +245,17 @@ class BordroHazirlikPreflightService
         }
 
         $items = [];
+        $excluded = PersonelBordroKapsamService::listExcludedPersonelIds(
+            $pdo,
+            (int) $subeId,
+            $donemBaslangic,
+            $donemBitis
+        );
         foreach ($rows as $row) {
+            $pid = (int) $row['id'];
+            if (isset($excluded[$pid])) {
+                continue;
+            }
             $cikis = $row['isten_ayrilma_tarihi'] ?? null;
             if ($cikis !== null && (string) $cikis < $donemBaslangic) {
                 continue;
@@ -331,8 +341,16 @@ class BordroHazirlikPreflightService
             return 0;
         }
         try {
+            $donemBaslangic = sprintf('%04d-%02d-01', (int) $yil, (int) $ay);
+            $donemBitis = sprintf('%04d-%02d-%02d', (int) $yil, (int) $ay, (int) cal_days_in_month(CAL_GREGORIAN, (int) $ay, (int) $yil));
+            $excluded = PersonelBordroKapsamService::listExcludedPersonelIds(
+                $pdo,
+                (int) $subeId,
+                $donemBaslangic,
+                $donemBitis
+            );
             $stmt = $pdo->prepare(
-                "SELECT COUNT(*) FROM personeller p
+                "SELECT p.id FROM personeller p
                  WHERE p.sube_id = :sube AND p.aktif_durum = 'AKTIF'
                    AND NOT EXISTS (
                      SELECT 1 FROM personel_bordro_devirleri d
@@ -340,8 +358,15 @@ class BordroHazirlikPreflightService
                    )"
             );
             $stmt->execute(['sube' => (int) $subeId, 'yil' => (int) $yil, 'ay' => (int) $ay]);
+            $count = 0;
+            foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+                if (isset($excluded[(int) $row['id']])) {
+                    continue;
+                }
+                $count++;
+            }
 
-            return (int) $stmt->fetchColumn();
+            return $count;
         } catch (\Throwable $e) {
             return 0;
         }
@@ -528,6 +553,20 @@ class BordroHazirlikPreflightService
             array_values(array_unique(array_map(static function (array $i) {
                 return (string) $i['code'];
             }, $etkiItems)))
+        );
+
+        $scopeItems = self::filterCodes($items, ['PAYROLL_SCOPE_EXCLUDED']);
+        $domains[] = self::domain(
+            'bordro_kapsam',
+            'Bordro Kapsam',
+            count($scopeItems) > 0 ? 'BİLGİ' : 'HAZIR',
+            0,
+            self::uniquePersonelCount($scopeItems),
+            count($scopeItems) > 0
+                ? 'Dönemde HARIC kapsamlı personel var; yeni snapshot setine alınmaz (bilgi).'
+                : 'Dönemde HARIC kapsam kaydı yok.',
+            '/raporlar?panel=bordro-hazirlik&tab=veri-hazirlik',
+            ['PAYROLL_SCOPE_EXCLUDED']
         );
 
         $adayCodes = ['PERIOD_NOT_SEALED', 'PERIOD_SEAL_INVALID'];
@@ -732,6 +771,8 @@ class BordroHazirlikPreflightService
                 return 'Genel yönetici final onayı yok (ONAY_KAYDI_YOK). Bildirimler ekranından final onayı tamamlayın.';
             case 'CORRECTION_SOURCE_CONFLICT':
                 return 'Açık revizyon / correction çatışması var. Revizyon merkezinden çözün.';
+            case 'PAYROLL_SCOPE_EXCLUDED':
+                return $prefix . 'Bu dönemde bordro kapsamı HARIC; yeni snapshot/revision setine alınmaz. Carryover ve net maaş eksikleri üretilmez.';
             default:
                 return (string) ($item['message'] ?? $code);
         }
@@ -779,6 +820,13 @@ class BordroHazirlikPreflightService
                 return '/bildirimler';
             case 'CORRECTION_SOURCE_CONFLICT':
                 return '/revizyon-merkezi';
+            case 'PAYROLL_SCOPE_EXCLUDED':
+                $pid = (int) ($item['personel_id'] ?? 0);
+                if ($pid > 0) {
+                    return '/personeller/' . $pid . '?tab=genel-bilgiler';
+                }
+
+                return '/raporlar?panel=bordro-hazirlik&tab=veri-hazirlik';
             default:
                 return '/raporlar?panel=bordro-hazirlik&tab=veri-hazirlik';
         }

@@ -130,3 +130,33 @@ export async function approveSirketPolitika(id: number) {
   );
   return unwrapData(response, "Politika onaylanamadi.");
 }
+
+export type SirketPolitikaKararOzeti = {
+  politika_id: number;
+  revision_no: number;
+  state: string;
+  gecerlilik_baslangic: string;
+  gecerlilik_bitis: string | null;
+  policy_version_hash: string | null;
+  zorunlu_parametreler: string[];
+  eksik_parametreler: string[];
+  onceki_onayli: Record<string, unknown> | null;
+  etkilenen_donem_ipucu: string;
+  etkilenen_personel_sayisi: number;
+  aday_snapshot_etki_notu: string;
+  katalog_ornek_bicim: Array<{
+    parametre_kodu: string;
+    etiket: string;
+    deger_tipi: string;
+    birim?: string | null;
+    ornek_bicim: string;
+  }>;
+};
+
+export async function fetchSirketPolitikaKararOzeti(id: number, subeId?: number | null) {
+  const path = appendQueryParams(endpoints.sirketCalismaPolitikalari.kararOzeti(id), {
+    ...(subeId ? { sube_id: subeId } : {})
+  });
+  const response = await apiRequest<ApiResponse<SirketPolitikaKararOzeti> | SirketPolitikaKararOzeti>(path);
+  return unwrapData(response, "Politika karar ozeti alinamadi.");
+}

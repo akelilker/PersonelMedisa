@@ -1,24 +1,30 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import {
+  downloadBordroDevirSablonCsv,
   fetchBordroDevirListesi,
   fetchBordroHazirlikPreflight,
+  fetchBordroNetMaasEksikleri,
   fetchBordroOnIzleme,
   geriGonderBordro,
   importBordroDevirler,
   kesinlestirBordro,
   submitBordroKontrol,
+  type BordroDevirImportResult,
   type BordroDevirListItem,
+  type BordroNetMaasEksikItem,
   type BordroOnIzlemeOzet
 } from "../../../api/bordro-hazirlik.api";
 import {
   approveSirketPolitika,
   createSirketPolitikaDraft,
+  fetchSirketPolitikaKararOzeti,
   fetchSirketPolitikaKatalog,
   fetchSirketPolitikalari,
   submitSirketPolitika,
   type SirketCalismaPolitikasi,
-  type SirketPolitikaDeger
+  type SirketPolitikaDeger,
+  type SirketPolitikaKararOzeti
 } from "../../../api/sirket-calisma-politikasi.api";
 import {
   calculateMaasHesaplamaSnapshot,
@@ -36,7 +42,7 @@ import { useAuth } from "../../../state/auth.store";
 import type { IdOption } from "../../../types/referans";
 import { MaasHesaplamaMerkeziPage } from "./MaasHesaplamaMerkeziPage";
 
-type TabKey = "preflight" | "politika" | "devir" | "on-izleme" | "hesaplama";
+type TabKey = "veri-hazirlik" | "preflight" | "politika" | "devir" | "on-izleme" | "hesaplama";
 
 type FilterState = {
   ay: string;
@@ -46,6 +52,15 @@ type FilterState = {
 const INITIAL_FILTERS: FilterState = {
   ay: currentMonthParts().ay,
   subeId: ""
+};
+
+const TAB_LABELS: Record<TabKey, string> = {
+  "veri-hazirlik": "Veri Hazırlık Durumu",
+  preflight: "Preflight",
+  politika: "Şirket Politikası",
+  devir: "Devir Verileri",
+  "on-izleme": "Bordro Ön İzleme",
+  hesaplama: "Maaş Hesaplama"
 };
 
 function blockerItems(items: MaasHesaplamaIssue[]) {
@@ -65,25 +80,28 @@ export function BordroHazirlikMerkeziPage() {
   const { session } = useAuth();
   const canView = hasPermission("bordro_on_izleme.view");
   const canManageAday = hasPermission("maas_hesaplama_adaylari.manage");
+  const canViewAday = hasPermission("maas_hesaplama_adaylari.view");
   const canManagePolicy = hasPermission("sirket_parametreleri.manage");
   const canApprove = hasPermission("bordro_kesinlestirme.approve");
   const canViewFinance = hasPermission("finans.view");
 
   const [filters, setFilters] = useState<FilterState>(INITIAL_FILTERS);
   const [subeOptions, setSubeOptions] = useState<IdOption[]>([]);
-  const [activeTab, setActiveTab] = useState<TabKey>("preflight");
+  const [activeTab, setActiveTab] = useState<TabKey>("veri-hazirlik");
   const [preflight, setPreflight] = useState<Awaited<ReturnType<typeof fetchBordroHazirlikPreflight>> | null>(null);
   const [onIzleme, setOnIzleme] = useState<BordroOnIzlemeOzet | null>(null);
   const [devirler, setDevirler] = useState<BordroDevirListItem[]>([]);
+  const [netMaasEksikleri, setNetMaasEksikleri] = useState<BordroNetMaasEksikItem[]>([]);
   const [politikalar, setPolitikalar] = useState<SirketCalismaPolitikasi[]>([]);
   const [katalog, setKatalog] = useState<SirketPolitikaDeger[]>([]);
   const [policyForm, setPolicyForm] = useState<Record<string, string>>({});
+  const [kararOzeti, setKararOzeti] = useState<SirketPolitikaKararOzeti | null>(null);
   const [selectedAdayId, setSelectedAdayId] = useState<number | null>(null);
   const [selectedKalemler, setSelectedKalemler] = useState<Awaited<ReturnType<typeof fetchMaasHesaplamaAdayKalemler>> | null>(null);
   const [kontrolNotu, setKontrolNotu] = useState("");
   const [geriGonderNotu, setGeriGonderNotu] = useState("");
   const [importCsv, setImportCsv] = useState("");
-  const [importSummary, setImportSummary] = useState<string | null>(null);
+  const [importResult, setImportResult] = useState<BordroDevirImportResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
@@ -108,10 +126,15 @@ export function BordroHazirlikMerkeziPage() {
   });
 
   const activeSnapshot = snapshots[0] ?? null;
+  const candidateGate = preflight?.candidate_gate;
+  const candidateDisabled =
+    !(candidateGate?.aktif ?? preflight?.hesaplanabilir_mi ?? false) ||
+    !(calculationPreflight?.hesaplanabilir_mi ?? false);
 
   useEffect(() => {
     const tab = searchParams.get("tab");
     if (
+      tab === "veri-hazirlik" ||
       tab === "preflight" ||
       tab === "politika" ||
       tab === "devir" ||
@@ -140,12 +163,13 @@ export function BordroHazirlikMerkeziPage() {
     setIsLoading(true);
     setErrorMessage(null);
     try {
-      const [preflightData, onIzlemeData, devirData, politikaData, katalogData] = await Promise.all([
+      const [preflightData, onIzlemeData, devirData, politikaData, katalogData, netMaasData] = await Promise.all([
         fetchBordroHazirlikPreflight({ yil, ay, subeId }),
         fetchBordroOnIzleme({ yil, ay, subeId }),
         fetchBordroDevirListesi({ yil, ay, subeId, eksik: false }),
         fetchSirketPolitikalari(),
-        fetchSirketPolitikaKatalog()
+        fetchSirketPolitikaKatalog(),
+        fetchBordroNetMaasEksikleri({ yil, ay, subeId })
       ]);
       if (requestId !== loadRequestIdRef.current) {
         return;
@@ -155,6 +179,7 @@ export function BordroHazirlikMerkeziPage() {
       setDevirler(devirData);
       setPolitikalar(politikaData);
       setKatalog(katalogData);
+      setNetMaasEksikleri(netMaasData);
       const initialForm: Record<string, string> = {};
       katalogData.forEach((item: SirketPolitikaDeger) => {
         initialForm[item.parametre_kodu] = "";
@@ -177,7 +202,23 @@ export function BordroHazirlikMerkeziPage() {
     void loadData();
   }, [loadData]);
 
+  useEffect(() => {
+    if (!canApprove || !subeId) {
+      setKararOzeti(null);
+      return;
+    }
+    const pending = politikalar.find((item) => item.state === "ONAY_BEKLIYOR");
+    if (!pending) {
+      setKararOzeti(null);
+      return;
+    }
+    void fetchSirketPolitikaKararOzeti(pending.id, subeId)
+      .then(setKararOzeti)
+      .catch(() => setKararOzeti(null));
+  }, [canApprove, politikalar, subeId]);
+
   const blockers = useMemo(() => blockerItems(preflight?.items ?? []), [preflight]);
+  const readinessDomains = preflight?.readiness_domains ?? [];
 
   if (!canView) {
     return <ErrorState message="Bordro hazırlık merkezine erişim yetkiniz yok." />;
@@ -195,7 +236,7 @@ export function BordroHazirlikMerkeziPage() {
       }));
       await createSirketPolitikaDraft({
         gecerlilik_baslangic: `${yil}-${String(ay).padStart(2, "0")}-01`,
-        aciklama: "S82 bordro hazırlık politikası taslağı",
+        aciklama: "S83 bordro hazırlık politikası taslağı",
         degerler
       });
       setActionMessage("Politika taslağı oluşturuldu.");
@@ -255,46 +296,33 @@ export function BordroHazirlikMerkeziPage() {
     await loadData();
   }
 
-  async function handleImportDryRun() {
-    const rows = importCsv
+  function parseImportRows() {
+    return importCsv
       .split("\n")
       .map((line) => line.trim())
       .filter(Boolean)
       .map((line) => {
-        const [sicil, gvMatrah, gv] = line.split(/[;,]/).map((part) => part.trim());
+        const [sicil, gvMatrah, gv, sgk, aciklama] = line.split(/[;,]/).map((part) => part.trim());
         return {
           sicil,
           onceki_kumulatif_gelir_vergisi_matrahi: gvMatrah,
-          onceki_kumulatif_gelir_vergisi: gv
+          onceki_kumulatif_gelir_vergisi: gv,
+          ...(sgk ? { onceki_kumulatif_sgk_matrahi: sgk } : {}),
+          ...(aciklama ? { aciklama } : {})
         };
       });
+  }
+
+  async function handleImportDryRun() {
     if (!subeId) return;
-    const result = (await importBordroDevirler({ yil, ay, subeId, dryRun: true, rows })) as {
-      basarili_satir: number;
-      hatali_satir: number;
-    };
-    setImportSummary(`Ön izleme: ${result.basarili_satir} başarılı, ${result.hatali_satir} hatalı.`);
+    const result = await importBordroDevirler({ yil, ay, subeId, dryRun: true, rows: parseImportRows() });
+    setImportResult(result);
   }
 
   async function handleImportCommit() {
-    const rows = importCsv
-      .split("\n")
-      .map((line) => line.trim())
-      .filter(Boolean)
-      .map((line) => {
-        const [sicil, gvMatrah, gv] = line.split(/[;,]/).map((part) => part.trim());
-        return {
-          sicil,
-          onceki_kumulatif_gelir_vergisi_matrahi: gvMatrah,
-          onceki_kumulatif_gelir_vergisi: gv
-        };
-      });
     if (!subeId) return;
-    const result = (await importBordroDevirler({ yil, ay, subeId, dryRun: false, rows })) as {
-      basarili_satir: number;
-      hatali_satir: number;
-    };
-    setImportSummary(`İçe aktarma: ${result.basarili_satir} başarılı, ${result.hatali_satir} hatalı.`);
+    const result = await importBordroDevirler({ yil, ay, subeId, dryRun: false, rows: parseImportRows() });
+    setImportResult(result);
     await loadData();
   }
 
@@ -304,11 +332,20 @@ export function BordroHazirlikMerkeziPage() {
     setSelectedKalemler(kalemler);
   }
 
+  async function handleDownloadDevirSablon() {
+    if (!subeId || !canViewAday) return;
+    try {
+      await downloadBordroDevirSablonCsv({ yil, ay, subeId, eksik: true });
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Devir şablonu indirilemedi.");
+    }
+  }
+
   return (
     <section className="yonetim-page donem-kapanis-page" data-testid="bordro-hazirlik-merkezi">
       <header className="yonetim-page-header">
         <h2>Bordro Hazırlık Merkezi</h2>
-        <p>Mevzuat ve şirket politikası ayrımı, devir verileri, preflight, aday üretimi ve bordro ön izleme.</p>
+        <p>İş verisi hazırlık durumu, mevzuat/politika ayrımı, devir, preflight ve bordro ön izleme.</p>
       </header>
 
       <form
@@ -347,7 +384,7 @@ export function BordroHazirlikMerkeziPage() {
       </form>
 
       <nav className="raporlar-panel-nav" aria-label="Bordro hazırlık sekmeleri">
-        {(["preflight", "politika", "devir", "on-izleme", "hesaplama"] as TabKey[]).map((tab) => (
+        {(["veri-hazirlik", "preflight", "politika", "devir", "on-izleme", "hesaplama"] as TabKey[]).map((tab) => (
           <button
             key={tab}
             type="button"
@@ -355,15 +392,7 @@ export function BordroHazirlikMerkeziPage() {
             data-testid={`bordro-hazirlik-tab-${tab}`}
             onClick={() => setActiveTab(tab)}
           >
-            {tab === "preflight"
-              ? "Preflight"
-              : tab === "politika"
-                ? "Şirket Politikası"
-                : tab === "devir"
-                  ? "Devir Verileri"
-                  : tab === "on-izleme"
-                    ? "Bordro Ön İzleme"
-                    : "Maaş Hesaplama"}
+            {TAB_LABELS[tab]}
           </button>
         ))}
       </nav>
@@ -381,8 +410,8 @@ export function BordroHazirlikMerkeziPage() {
 
       {isLoading && !preflight ? <LoadingState label="Bordro hazırlık verileri yükleniyor..." /> : null}
 
-      {activeTab === "preflight" && preflight ? (
-        <section data-testid="bordro-hazirlik-preflight">
+      {activeTab === "veri-hazirlik" && preflight ? (
+        <section data-testid="bordro-veri-hazirlik">
           <div className="kapanis-ozet-grid">
             <div>
               <strong>Hesaplanabilir</strong>
@@ -392,12 +421,104 @@ export function BordroHazirlikMerkeziPage() {
               <strong>Blocker</strong>
               <p data-testid="bordro-hazirlik-blocker-count">{preflight.blocker_count}</p>
             </div>
+            <div>
+              <strong>Aday kapısı</strong>
+              <p data-testid="bordro-candidate-gate-aktif">{candidateGate?.aktif ? "Açık" : "Kapalı"}</p>
+            </div>
+          </div>
+
+          {candidateGate && !candidateGate.aktif ? (
+            <section data-testid="bordro-candidate-gate-nedenleri" className="kapanis-issue-section">
+              <h3>Maaş adayı üretimi engelleri</h3>
+              <ul>
+                {candidateGate.disabled_nedenleri.map((neden) => (
+                  <li key={neden}>{neden}</li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
+
+          <section className="kapanis-issue-section" data-testid="bordro-readiness-domains">
+            {readinessDomains.map((domain) => (
+              <article key={domain.key} data-testid={`bordro-readiness-domain-${domain.key}`}>
+                <strong>
+                  {domain.label} — {domain.status}
+                </strong>
+                <p>
+                  Eksik kayıt: {domain.eksik_kayit_sayisi} · Etkilenen personel: {domain.etkilenen_personel_sayisi}
+                </p>
+                <p>{domain.aciklama}</p>
+                {domain.action_link ? (
+                  <Link to={domain.action_link} data-testid={`bordro-readiness-link-${domain.key}`}>
+                    İlgili ekrana git
+                  </Link>
+                ) : null}
+              </article>
+            ))}
+          </section>
+
+          <section data-testid="bordro-net-maas-eksik-list">
+            <h3>Net maaş / ücret eksikleri</h3>
+            <p className="personel-puantaj-summary-note">
+              Mevzuat parametreleri buradan yönetilmez.{" "}
+              <Link to="/yonetim-paneli?tab=mevzuat" data-testid="bordro-mevzuat-link">
+                Yönetim → Mevzuat
+              </Link>
+            </p>
+            <table className="yonetim-table">
+              <thead>
+                <tr>
+                  <th>Personel</th>
+                  <th>Sicil</th>
+                  <th>Şube</th>
+                  <th>Departman</th>
+                  <th>Görev</th>
+                  <th>İşe giriş</th>
+                  <th>Durum</th>
+                  <th>Kart</th>
+                </tr>
+              </thead>
+              <tbody>
+                {netMaasEksikleri.map((item, index) => (
+                  <tr key={`${item.sicil_no}-${index}`} data-testid={`bordro-net-maas-row-${index}`}>
+                    <td>{item.ad_soyad}</td>
+                    <td>{item.sicil_no}</td>
+                    <td>{item.sube_adi}</td>
+                    <td>{item.departman_adi}</td>
+                    <td>{item.gorev_adi}</td>
+                    <td>{item.ise_giris_tarihi ?? "—"}</td>
+                    <td>{item.net_maas_durumu}</td>
+                    <td>
+                      <Link to={item.action_link} data-testid={`bordro-net-maas-link-${index}`}>
+                        Personel kartı
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {netMaasEksikleri.length === 0 ? <p>Eksik net maaş kaydı yok.</p> : null}
+          </section>
+        </section>
+      ) : null}
+
+      {activeTab === "preflight" && preflight ? (
+        <section data-testid="bordro-hazirlik-preflight">
+          <div className="kapanis-ozet-grid">
+            <div>
+              <strong>Hesaplanabilir</strong>
+              <p>{preflight.hesaplanabilir_mi ? "Evet" : "Hayır"}</p>
+            </div>
+            <div>
+              <strong>Blocker</strong>
+              <p>{preflight.blocker_count}</p>
+            </div>
           </div>
           <section className="kapanis-issue-section">
             {blockers.map((item) => (
               <article key={`${item.code}-${item.record_id ?? "x"}`} data-testid={`bordro-hazirlik-issue-${item.code}`}>
                 <strong>{item.code}</strong>
-                <p>{item.message}</p>
+                <p>{"kullanici_mesaji" in item && item.kullanici_mesaji ? String(item.kullanici_mesaji) : item.message}</p>
                 {"action_link" in item && item.action_link ? (
                   <Link to={String(item.action_link)} data-testid={`bordro-hazirlik-issue-link-${item.code}`}>
                     Sorunu çöz
@@ -412,10 +533,15 @@ export function BordroHazirlikMerkeziPage() {
       {activeTab === "politika" ? (
         <section data-testid="bordro-hazirlik-politika">
           <p className="personel-puantaj-summary-note">
-            Mevzuat parametreleri yönetim panelinde kalır; burada yalnız şirket çalışma politikası yönetilir.
+            Mevzuat parametreleri yönetim panelinde kalır; burada yalnız şirket çalışma politikası yönetilir.{" "}
+            <Link to="/yonetim-paneli?tab=mevzuat">Mevzuat paneli</Link>
           </p>
           {canManagePolicy ? (
             <div data-testid="bordro-politika-form">
+              <p data-testid="bordro-politika-ornek-bicim">
+                Katalog örnek biçim (değerler otomatik doldurulmaz):{" "}
+                {katalog.map((item) => `${item.parametre_kodu}=${item.deger_tipi === "METIN" ? "METIN" : "0.00"}`).join(", ")}
+              </p>
               {katalog.map((item) => (
                 <label key={item.parametre_kodu}>
                   {item.etiket}
@@ -433,6 +559,27 @@ export function BordroHazirlikMerkeziPage() {
               </button>
             </div>
           ) : null}
+
+          {canApprove && kararOzeti ? (
+            <section data-testid="bordro-politika-karar-ozeti" className="kapanis-issue-section">
+              <h3>Onay karar özeti</h3>
+              <p>
+                Revizyon #{kararOzeti.revision_no} · {kararOzeti.gecerlilik_baslangic}
+                {kararOzeti.gecerlilik_bitis ? ` → ${kararOzeti.gecerlilik_bitis}` : ""}
+              </p>
+              <p>Etkilenen personel (şube): {kararOzeti.etkilenen_personel_sayisi}</p>
+              <p>{kararOzeti.etkilenen_donem_ipucu}</p>
+              <p>{kararOzeti.aday_snapshot_etki_notu}</p>
+              {kararOzeti.eksik_parametreler.length > 0 ? (
+                <p data-testid="bordro-politika-eksik-parametreler">
+                  Eksik: {kararOzeti.eksik_parametreler.join(", ")}
+                </p>
+              ) : (
+                <p>Zorunlu parametreler tamam.</p>
+              )}
+            </section>
+          ) : null}
+
           <table className="yonetim-table">
             <thead>
               <tr>
@@ -472,11 +619,18 @@ export function BordroHazirlikMerkeziPage() {
 
       {activeTab === "devir" ? (
         <section data-testid="bordro-hazirlik-devir">
+          {canViewAday ? (
+            <p>
+              <button type="button" data-testid="bordro-devir-sablon-indir" onClick={() => void handleDownloadDevirSablon()}>
+                Eksik devir CSV şablonunu indir
+              </button>
+            </p>
+          ) : null}
           <textarea
             aria-label="CSV devir içe aktarma"
             value={importCsv}
             onChange={(event) => setImportCsv(event.target.value)}
-            placeholder="sicil;gv_matrah;gv"
+            placeholder="sicil;gv_matrah;gv;sgk_matrah;aciklama"
             data-testid="bordro-devir-import-csv"
           />
           <div>
@@ -489,7 +643,43 @@ export function BordroHazirlikMerkeziPage() {
               </button>
             ) : null}
           </div>
-          {importSummary ? <p data-testid="bordro-devir-import-summary">{importSummary}</p> : null}
+          {importResult ? (
+            <section data-testid="bordro-devir-import-summary">
+              <p>
+                {importResult.dry_run ? "Ön izleme" : "İçe aktarma"}: {importResult.basarili_satir} başarılı,{" "}
+                {importResult.hatali_satir} hatalı
+              </p>
+              <ul data-testid="bordro-devir-import-counts">
+                <li>Eklenecek: {importResult.eklenecek ?? importResult.counts?.eklenecek ?? 0}</li>
+                <li>Güncellenecek: {importResult.guncellenecek ?? importResult.counts?.guncellenecek ?? 0}</li>
+                <li>Değişmeyecek: {importResult.degismeyecek ?? importResult.counts?.degismeyecek ?? 0}</li>
+                <li>Hatalı: {importResult.hatali ?? importResult.counts?.hatali ?? 0}</li>
+                <li>Eşleşmeyen: {importResult.eslesmeyen ?? importResult.counts?.eslesmeyen ?? 0}</li>
+                <li>Duplicate: {importResult.duplicate ?? importResult.counts?.duplicate ?? 0}</li>
+                <li>Kapsam dışı: {importResult.scope_disi ?? importResult.counts?.scope_disi ?? 0}</li>
+              </ul>
+              <table className="yonetim-table" data-testid="bordro-devir-import-rows">
+                <thead>
+                  <tr>
+                    <th>Satır</th>
+                    <th>Sicil</th>
+                    <th>Sınıf</th>
+                    <th>Hata</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {importResult.satirlar.map((row) => (
+                    <tr key={`${row.satir}-${row.sicil ?? ""}`}>
+                      <td>{row.satir}</td>
+                      <td>{row.sicil ?? "—"}</td>
+                      <td>{row.sinif ?? (row.ok ? "ok" : "hatali")}</td>
+                      <td>{row.hata ?? "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </section>
+          ) : null}
           <table className="yonetim-table">
             <thead>
               <tr>
@@ -645,15 +835,24 @@ export function BordroHazirlikMerkeziPage() {
       {activeTab === "hesaplama" ? (
         <section data-testid="bordro-hazirlik-hesaplama">
           {canManageAday ? (
-            <button
-              type="button"
-              className="universal-btn-save"
-              data-testid="bordro-candidate-uret"
-              disabled={!calculationPreflight?.hesaplanabilir_mi}
-              onClick={() => void handleCalculateCandidate()}
-            >
-              Maaş Adayı Üret
-            </button>
+            <>
+              <button
+                type="button"
+                className="universal-btn-save"
+                data-testid="bordro-candidate-uret"
+                disabled={candidateDisabled}
+                onClick={() => void handleCalculateCandidate()}
+              >
+                Maaş Adayı Üret
+              </button>
+              {candidateDisabled && candidateGate?.disabled_nedenleri?.length ? (
+                <ul data-testid="bordro-candidate-disabled-nedenleri">
+                  {candidateGate.disabled_nedenleri.map((neden) => (
+                    <li key={neden}>{neden}</li>
+                  ))}
+                </ul>
+              ) : null}
+            </>
           ) : null}
           <MaasHesaplamaMerkeziPage />
         </section>

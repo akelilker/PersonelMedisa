@@ -140,8 +140,12 @@ export const endpoints = {
   },
   bordroHazirlik: {
     preflight: "/bordro-hazirlik/preflight",
+    readiness: "/bordro-hazirlik/readiness",
+    readinessExportCsv: "/bordro-hazirlik/readiness/export.csv",
+    netMaasEksikleri: "/bordro-hazirlik/net-maas-eksikleri",
     onIzleme: "/bordro-hazirlik/on-izleme",
     devirler: "/bordro-hazirlik/devirler",
+    devirSablonCsv: "/bordro-hazirlik/devirler/sablon.csv",
     devirImport: "/bordro-hazirlik/devirler/import",
     adayDetail: (id: number | string) => `/bordro-hazirlik/adaylar/${id}`,
     kontrolGonder: (id: number | string) => `/bordro-hazirlik/calistirmalar/${id}/kontrol-gonder`,
@@ -152,6 +156,7 @@ export const endpoints = {
     katalog: "/sirket-calisma-politikalari/katalog",
     list: "/sirket-calisma-politikalari",
     detail: (id: number | string) => `/sirket-calisma-politikalari/${id}`,
+    kararOzeti: (id: number | string) => `/sirket-calisma-politikalari/${id}/karar-ozeti`,
     submit: (id: number | string) => `/sirket-calisma-politikalari/${id}/onaya-gonder`,
     approve: (id: number | string) => `/sirket-calisma-politikalari/${id}/onayla`,
     cancel: (id: number | string) => `/sirket-calisma-politikalari/${id}/iptal`

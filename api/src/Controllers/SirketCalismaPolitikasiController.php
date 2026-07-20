@@ -43,6 +43,23 @@ class SirketCalismaPolitikasiController
         JsonResponse::success($detail);
     }
 
+    public static function kararOzeti(Request $request, $id)
+    {
+        $user = AuthMiddleware::authenticate($request);
+        RolePermissions::assert($user, 'bordro_kesinlestirme.approve');
+        $pdo = Connection::get();
+        $subeId = null;
+        $rawSube = $request->getQuery('sube_id', '');
+        if ($rawSube !== '' && $rawSube !== null) {
+            $subeId = (int) $rawSube;
+        }
+        $ozet = SirketCalismaPolitikasiService::getKararOzeti($pdo, (int) $id, $subeId);
+        if (!$ozet) {
+            JsonResponse::error(404, 'POLICY_NOT_FOUND', 'Politika bulunamadi.');
+        }
+        JsonResponse::success($ozet);
+    }
+
     public static function create(Request $request)
     {
         $user = AuthMiddleware::authenticate($request);

@@ -47,6 +47,7 @@ test.describe("S82 Bordro Hazirlik Merkezi", () => {
     await submitBordroFilters(page);
 
     await expect(page.getByTestId("bordro-hazirlik-merkezi")).toBeVisible();
+    await page.getByTestId("bordro-hazirlik-tab-preflight").click();
     await expect(page.getByTestId("bordro-hazirlik-issue-BUSINESS_POLICY_REQUIRED")).toBeVisible();
     await page.getByTestId("bordro-hazirlik-issue-link-BUSINESS_POLICY_REQUIRED").click();
     await expect(page).toHaveURL(/panel=bordro-hazirlik/);

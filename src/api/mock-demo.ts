@@ -1163,6 +1163,177 @@ const SIRKET_POLITIKA_KATALOG = [
   { parametre_kodu: "UBGT_HESAP_MODU", etiket: "UBGT Hesap Modu", deger_tipi: "METIN", birim: "MOD", zorunlu: true }
 ];
 
+function buildDemoBordroReadiness(yil: number, ay: number, subeId: number) {
+  const maasDemo = ensureMaasHesaplamaDemoState();
+  const approvedPolicy = sirketPolitikaDemoState.items.find((item) => item.state === "ONAYLANDI");
+  const snapshot = maasDemo.snapshots.find(
+    (item) => item.sube_id === subeId && item.yil === yil && item.ay === ay && item.state === "OLUSTURULDU"
+  );
+  const items: Array<Record<string, unknown>> = [];
+  if (!approvedPolicy) {
+    items.push({
+      severity: "BLOCKER",
+      code: "BUSINESS_POLICY_REQUIRED",
+      message: "Onaylı şirket çalışma politikası bulunamadı.",
+      kullanici_mesaji: "Onaylı şirket çalışma politikası yok. Politika sekmesinden taslak oluşturup GY onayına gönderin.",
+      action_link: "/raporlar?panel=bordro-hazirlik&tab=politika",
+      metadata: {}
+    });
+    items.push({
+      severity: "BLOCKER",
+      code: "S81_GENEL_YONETICI_FINAL_ONAY_EKSIK",
+      message: "Genel yönetici final onayı tamamlanmamış.",
+      kullanici_mesaji: "Genel yönetici final onayı yok (ONAY_KAYDI_YOK). Bildirimler ekranından final onayı tamamlayın.",
+      action_link: "/bildirimler",
+      metadata: { neden: "ONAY_KAYDI_YOK" }
+    });
+  }
+  if (approvedPolicy && !snapshot) {
+    items.push({
+      severity: "BLOCKER",
+      code: "PERIOD_NOT_SEALED",
+      message: "Dönem mühürlenmemiş.",
+      kullanici_mesaji: "Dönem mühürlenmemiş. Dönem kapanış panelinden mühürleyin.",
+      action_link: "/raporlar?panel=donem-kapanis",
+      metadata: {}
+    });
+  }
+  const blockerCount = items.filter((item) => item.severity === "BLOCKER").length;
+  const hesaplanabilir = blockerCount === 0;
+  const readiness_domains = [
+    {
+      key: "s81_final_onay",
+      label: "S81 Final Onay",
+      status: approvedPolicy ? "HAZIR" : "BLOKE",
+      eksik_kayit_sayisi: approvedPolicy ? 0 : 1,
+      etkilenen_personel_sayisi: 0,
+      aciklama: approvedPolicy ? "Genel yönetici final onayı tamam." : "Final onay eksik: ONAY_KAYDI_YOK",
+      action_link: "/bildirimler",
+      blocker_codes: approvedPolicy ? [] : ["S81_GENEL_YONETICI_FINAL_ONAY_EKSIK"]
+    },
+    {
+      key: "mevzuat_parametreleri",
+      label: "Mevzuat Parametreleri",
+      status: "HAZIR",
+      eksik_kayit_sayisi: 0,
+      etkilenen_personel_sayisi: 0,
+      aciklama: "Mevzuat parametreleri preflight açısından sorun göstermiyor.",
+      action_link: "/yonetim-paneli?tab=mevzuat",
+      blocker_codes: []
+    },
+    {
+      key: "sirket_calisma_politikasi",
+      label: "Şirket Çalışma Politikası",
+      status: approvedPolicy ? "HAZIR" : "BLOKE",
+      eksik_kayit_sayisi: approvedPolicy ? 0 : 1,
+      etkilenen_personel_sayisi: 0,
+      aciklama: approvedPolicy
+        ? "Onaylı şirket çalışma politikası mevcut."
+        : "Onaylı şirket politikası yok veya zorunlu parametreler eksik.",
+      action_link: "/raporlar?panel=bordro-hazirlik&tab=politika",
+      blocker_codes: approvedPolicy ? [] : ["BUSINESS_POLICY_REQUIRED"]
+    },
+    {
+      key: "net_maas",
+      label: "Net Maaş / Ücret",
+      status: "EKSİK",
+      eksik_kayit_sayisi: 1,
+      etkilenen_personel_sayisi: 1,
+      aciklama: "Net maaş veya ücret geçmişi eksik personeller var; personel kartından tamamlayın.",
+      action_link: "/raporlar?panel=bordro-hazirlik&tab=veri-hazirlik",
+      blocker_codes: []
+    },
+    {
+      key: "bordro_devir",
+      label: "Bordro Devir",
+      status: ay > 1 && maasDemo.devirler.length === 0 ? "EKSİK" : "HAZIR",
+      eksik_kayit_sayisi: ay > 1 && maasDemo.devirler.length === 0 ? 1 : 0,
+      etkilenen_personel_sayisi: ay > 1 && maasDemo.devirler.length === 0 ? 1 : 0,
+      aciklama:
+        ay > 1 && maasDemo.devirler.length === 0
+          ? "Önceki dönem kumulatif vergi/SGK devirleri eksik; şablon ile yükleyin."
+          : "Yasal devir kayıtları tamam.",
+      action_link: "/raporlar?panel=bordro-hazirlik&tab=devir",
+      blocker_codes: []
+    },
+    {
+      key: "acik_revizyon_correction",
+      label: "Açık Revizyon / Correction",
+      status: "HAZIR",
+      eksik_kayit_sayisi: 0,
+      etkilenen_personel_sayisi: 0,
+      aciklama: "Açık correction çatışması yok.",
+      action_link: "/revizyon-merkezi",
+      blocker_codes: []
+    },
+    {
+      key: "puantaj_etki_adaylari",
+      label: "Puantaj Etki Adayları",
+      status: "HAZIR",
+      eksik_kayit_sayisi: 0,
+      etkilenen_personel_sayisi: 0,
+      aciklama: "Çözülmemiş etki adayı yok.",
+      action_link: "/raporlar?panel=etki-adayi",
+      blocker_codes: []
+    },
+    {
+      key: "maas_adayi_hazirlik",
+      label: "Maaş Adayı Hazırlık",
+      status: hesaplanabilir ? "HAZIR" : "BLOKE",
+      eksik_kayit_sayisi: hesaplanabilir ? 0 : 1,
+      etkilenen_personel_sayisi: 0,
+      aciklama: hesaplanabilir
+        ? "Maaş adayı üretimi için dönem hazır."
+        : "Dönem mühürü veya hesaplama ön koşulları eksik.",
+      action_link: "/raporlar?panel=bordro-hazirlik&tab=hesaplama",
+      blocker_codes: hesaplanabilir ? [] : ["PERIOD_NOT_SEALED"]
+    }
+  ];
+  const disabled = readiness_domains
+    .filter((d) => d.status === "BLOKE")
+    .map((d) => `${d.label}: ${d.aciklama}`);
+  return {
+    sube_id: subeId,
+    yil,
+    ay,
+    donem: `${yil}-${String(ay).padStart(2, "0")}`,
+    hesaplanabilir_mi: hesaplanabilir,
+    blocker_count: blockerCount,
+    warning_count: 0,
+    info_count: blockerCount === 0 ? 1 : 0,
+    items:
+      items.length > 0
+        ? items
+        : [
+            {
+              severity: "INFO",
+              code: "PREFLIGHT_READY",
+              message: "Bordro hazırlık kontrolleri tamam.",
+              kullanici_mesaji: "Bordro hazırlık kontrolleri tamam.",
+              action_link: "/raporlar?panel=bordro-hazirlik&tab=on-izleme",
+              metadata: {}
+            }
+          ],
+    readiness_domains,
+    candidate_gate: {
+      aktif: hesaplanabilir,
+      disabled_nedenleri: hesaplanabilir ? [] : disabled,
+      checks: readiness_domains.map((d) => ({
+        key: d.key,
+        ok: d.status === "HAZIR",
+        mesaj: d.aciklama
+      }))
+    },
+    policy_summary: {
+      onayli_politika_id: approvedPolicy?.id ?? null,
+      policy_version_hash: approvedPolicy?.policy_version_hash ?? null,
+      zorunlu_adet: SIRKET_POLITIKA_KATALOG.length
+    },
+    correction_projection_hash: "demo-correction-hash",
+    contract_version: "S83_BORDRO_BUSINESS_DATA_READINESS_V1"
+  };
+}
+
 function ensureMaasHesaplamaDemoState() {
   return maasHesaplamaDemoState;
 }
@@ -7824,46 +7995,60 @@ export function resolveDemoApiResponse(
     const yil = toNumber(requestUrl.searchParams.get("yil")) ?? 2026;
     const ay = toNumber(requestUrl.searchParams.get("ay")) ?? 3;
     const subeId = toNumber(requestUrl.searchParams.get("sube_id")) ?? 1;
-    const approvedPolicy = sirketPolitikaDemoState.items.find((item) => item.state === "ONAYLANDI");
-    const snapshot = maasDemo.snapshots.find(
-      (item) => item.sube_id === subeId && item.yil === yil && item.ay === ay && item.state === "OLUSTURULDU"
-    );
-    const items: Array<Record<string, unknown>> = [];
-    if (!approvedPolicy) {
-      items.push({
-        severity: "BLOCKER",
-        code: "BUSINESS_POLICY_REQUIRED",
-        message: "Onaylı şirket çalışma politikası bulunamadı.",
-        action_link: "/raporlar?panel=bordro-hazirlik&tab=politika"
-      });
-    }
-    if (approvedPolicy && !snapshot) {
-      items.push({
-        severity: "BLOCKER",
-        code: "PERIOD_NOT_SEALED",
-        message: "Dönem mühürlenmemiş.",
-        action_link: "/raporlar?panel=donem-kapanis"
-      });
-    }
-    const blockerCount = items.filter((item) => item.severity === "BLOCKER").length;
+    return ok(buildDemoBordroReadiness(yil, ay, subeId));
+  }
+
+  if (pathname === "/bordro-hazirlik/readiness" && method === "GET") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(actor, "bordro_on_izleme.view");
+    if (permissionError) return permissionError;
+    const yil = toNumber(requestUrl.searchParams.get("yil")) ?? 2026;
+    const ay = toNumber(requestUrl.searchParams.get("ay")) ?? 3;
+    const subeId = toNumber(requestUrl.searchParams.get("sube_id")) ?? 1;
+    return ok(buildDemoBordroReadiness(yil, ay, subeId));
+  }
+
+  if (pathname === "/bordro-hazirlik/net-maas-eksikleri" && method === "GET") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(actor, "bordro_on_izleme.view");
+    if (permissionError) return permissionError;
     return ok({
-      sube_id: subeId,
-      yil,
-      ay,
-      donem: `${yil}-${String(ay).padStart(2, "0")}`,
-      hesaplanabilir_mi: blockerCount === 0,
-      blocker_count: blockerCount,
-      warning_count: 0,
-      info_count: blockerCount === 0 ? 1 : 0,
-      items,
-      policy_summary: {
-        onayli_politika_id: approvedPolicy?.id ?? null,
-        policy_version_hash: approvedPolicy?.policy_version_hash ?? null,
-        zorunlu_adet: SIRKET_POLITIKA_KATALOG.length
-      },
-      correction_projection_hash: "demo-correction-hash",
-      contract_version: "S82_BORDRO_HAZIRLIK_PREFLIGHT_V1"
+      items: [
+        {
+          ad_soyad: "Demo Eksik Maas",
+          sicil_no: "P-002",
+          sube_adi: "Merkez",
+          departman_adi: "Demo",
+          gorev_adi: "Personel",
+          ise_giris_tarihi: "2024-01-01",
+          isten_ayrilma: null,
+          net_maas_durumu: "NULL",
+          legacy_maas_durumu: "NULL",
+          action_link: "/personeller/2?tab=genel-bilgiler"
+        }
+      ],
+      total: 1
     });
+  }
+
+  if (pathname === "/bordro-hazirlik/readiness/export.csv" && method === "GET") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(actor, "bordro_on_izleme.view");
+    if (permissionError) return permissionError;
+    return ok(
+      "domain_key,domain_label,status,eksik_kayit_sayisi,etkilenen_personel_sayisi,aciklama,action_link,blocker_codes\ns81_final_onay,S81 Final Onay,BLOKE,1,0,Final onay eksik,/bildirimler,S81_GENEL_YONETICI_FINAL_ONAY_EKSIK\n"
+    );
+  }
+
+  if (pathname === "/bordro-hazirlik/devirler/sablon.csv" && method === "GET") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(actor, "maas_hesaplama_adaylari.view");
+    if (permissionError) return permissionError;
+    const yil = toNumber(requestUrl.searchParams.get("yil")) ?? 2026;
+    const ay = toNumber(requestUrl.searchParams.get("ay")) ?? 3;
+    return ok(
+      `sicil_no,ad_soyad,yil,ay,onceki_kumulatif_gelir_vergisi_matrahi,onceki_kumulatif_gelir_vergisi,onceki_kumulatif_sgk_matrahi,aciklama\nP-001,Demo Personel,${yil},${ay},,,,EKSIK_DEVIR\n`
+    );
   }
 
   if (pathname === "/bordro-hazirlik/on-izleme" && method === "GET") {
@@ -7934,12 +8119,34 @@ export function resolveDemoApiResponse(
     const permissionError = enforceDemoPermission(actor, "maas_hesaplama_adaylari.manage");
     if (permissionError) return permissionError;
     const rows = Array.isArray(body.rows) ? (body.rows as Array<Record<string, string>>) : [];
-    let basarili = 0;
-    let hatali = 0;
+    const counts = {
+      eklenecek: 0,
+      guncellenecek: 0,
+      degismeyecek: 0,
+      hatali: 0,
+      eslesmeyen: 0,
+      duplicate: 0,
+      scope_disi: 0
+    };
+    const seen = new Set<string>();
     const satirlar = rows.map((row, index) => {
-      if (!row.sicil) {
-        hatali += 1;
-        return { satir: index + 1, ok: false, hata: "sicil zorunlu" };
+      const sicil = String(row.sicil ?? row.sicil_no ?? "").trim().toUpperCase();
+      if (!sicil) {
+        counts.hatali += 1;
+        return { satir: index + 1, ok: false, sinif: "hatali", hata: "sicil zorunlu" };
+      }
+      if (seen.has(sicil)) {
+        counts.duplicate += 1;
+        return { satir: index + 1, sicil, ok: false, sinif: "duplicate", hata: "duplicate personel/donem" };
+      }
+      seen.add(sicil);
+      if (sicil === "OUT-OF-SCOPE") {
+        counts.scope_disi += 1;
+        return { satir: index + 1, sicil, ok: false, sinif: "scope_disi", hata: "personel aktif sube kapsaminda degil" };
+      }
+      if (sicil === "UNKNOWN") {
+        counts.eslesmeyen += 1;
+        return { satir: index + 1, sicil, ok: false, sinif: "eslesmeyen", hata: "personel bulunamadi" };
       }
       if (!body.dry_run) {
         const now = new Date().toISOString();
@@ -7959,14 +8166,18 @@ export function resolveDemoApiResponse(
           updated_at: now
         });
       }
-      basarili += 1;
-      return { satir: index + 1, sicil: row.sicil, ok: true };
+      counts.eklenecek += 1;
+      return { satir: index + 1, sicil, ok: true, sinif: "eklenecek", personel_id: 1 };
     });
+    const hatali =
+      counts.hatali + counts.eslesmeyen + counts.duplicate + counts.scope_disi;
     return ok({
       dry_run: body.dry_run === true,
       toplam_satir: rows.length,
-      basarili_satir: basarili,
+      basarili_satir: counts.eklenecek + counts.guncellenecek + counts.degismeyecek,
       hatali_satir: hatali,
+      counts,
+      ...counts,
       satirlar
     });
   }
@@ -8060,6 +8271,38 @@ export function resolveDemoApiResponse(
     if (!politika) return demoRevizyonError("NOT_FOUND", "Politika bulunamadi.");
     politika.state = "ONAYLANDI";
     return ok(politika);
+  }
+
+  const sirketPolitikaKararMatch = pathname.match(/^\/sirket-calisma-politikalari\/(\d+)\/karar-ozeti$/);
+  if (sirketPolitikaKararMatch && method === "GET") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(actor, "bordro_kesinlestirme.approve");
+    if (permissionError) return permissionError;
+    const id = Number.parseInt(sirketPolitikaKararMatch[1] ?? "", 10);
+    const politika = sirketPolitikaDemoState.items.find((item) => item.id === id);
+    if (!politika) return demoRevizyonError("NOT_FOUND", "Politika bulunamadi.");
+    return ok({
+      politika_id: politika.id,
+      revision_no: 1,
+      state: politika.state,
+      gecerlilik_baslangic: politika.gecerlilik_baslangic,
+      gecerlilik_bitis: politika.gecerlilik_bitis,
+      policy_version_hash: politika.policy_version_hash,
+      zorunlu_parametreler: SIRKET_POLITIKA_KATALOG.map((item) => item.parametre_kodu),
+      eksik_parametreler: [],
+      onceki_onayli: null,
+      etkilenen_donem_ipucu: `${politika.gecerlilik_baslangic} ve sonrası dönemler (geçerlilik bitiş: açık)`,
+      etkilenen_personel_sayisi: 2,
+      aday_snapshot_etki_notu:
+        "Politika hash değişirse mevcut aday/snapshot girdi hash doğrulaması yeniden değerlendirilmelidir.",
+      katalog_ornek_bicim: SIRKET_POLITIKA_KATALOG.map((item) => ({
+        parametre_kodu: item.parametre_kodu,
+        etiket: item.etiket,
+        deger_tipi: item.deger_tipi,
+        birim: item.birim,
+        ornek_bicim: item.deger_tipi === "METIN" ? "METIN_DEGER" : "0.00"
+      }))
+    });
   }
 
   return null;

@@ -7,6 +7,7 @@ namespace Medisa\Api\Controllers;
 use Medisa\Api\Auth\AuthMiddleware;
 use Medisa\Api\Auth\RolePermissions;
 use Medisa\Api\Database\Connection;
+use Medisa\Api\Http\CsvResponse;
 use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
 use Medisa\Api\Scope\SubeScope;
@@ -14,8 +15,7 @@ use Medisa\Api\Services\BordroHazirlikPreflightService;
 use Medisa\Api\Services\BordroOnIzlemeService;
 use Medisa\Api\Services\MaasHesaplamaException;
 use Medisa\Api\Services\PersonelBordroDevirService;
-use Medisa\Api\Services\SirketCalismaPolitikasiException;
-use Medisa\Api\Services\SirketCalismaPolitikasiService;
+use PDO;
 
 class BordroHazirlikController
 {
@@ -28,6 +28,117 @@ class BordroHazirlikController
             JsonResponse::success(BordroHazirlikPreflightService::build($pdo, $subeId, $yil, $ay));
         } catch (\Throwable $e) {
             JsonResponse::serverError('Bordro hazirlik preflight olusturulamadi.');
+        }
+    }
+
+    /** S83 readiness alias — same projection as preflight. */
+    public static function readiness(Request $request)
+    {
+        self::preflight($request);
+    }
+
+    public static function netMaasEksikleri(Request $request)
+    {
+        [$pdo, $user, $subeId] = self::context($request, 'bordro_on_izleme.view');
+        $yil = self::readQueryInt($request, 'yil', 2000, 2100);
+        $ay = self::readQueryInt($request, 'ay', 1, 12);
+        $departmanId = self::optionalQueryInt($request, 'departman_id', 1, 999999);
+        try {
+            $result = BordroHazirlikPreflightService::listNetMaasEksikleri($pdo, $subeId, $yil, $ay, $departmanId);
+            JsonResponse::success($result);
+        } catch (\Throwable $e) {
+            JsonResponse::serverError('Net maas eksikleri okunamadi.');
+        }
+    }
+
+    public static function readinessExportCsv(Request $request)
+    {
+        [$pdo, $user, $subeId] = self::context($request, 'bordro_on_izleme.view');
+        $yil = self::readQueryInt($request, 'yil', 2000, 2100);
+        $ay = self::readQueryInt($request, 'ay', 1, 12);
+        try {
+            $preflight = BordroHazirlikPreflightService::build($pdo, $subeId, $yil, $ay);
+            $columns = [
+                'domain_key',
+                'domain_label',
+                'status',
+                'eksik_kayit_sayisi',
+                'etkilenen_personel_sayisi',
+                'aciklama',
+                'action_link',
+                'blocker_codes',
+            ];
+            $rows = [];
+            foreach ($preflight['readiness_domains'] ?? [] as $domain) {
+                $rows[] = [
+                    'domain_key' => $domain['key'] ?? '',
+                    'domain_label' => $domain['label'] ?? '',
+                    'status' => $domain['status'] ?? '',
+                    'eksik_kayit_sayisi' => $domain['eksik_kayit_sayisi'] ?? 0,
+                    'etkilenen_personel_sayisi' => $domain['etkilenen_personel_sayisi'] ?? 0,
+                    'aciklama' => $domain['aciklama'] ?? '',
+                    'action_link' => $domain['action_link'] ?? '',
+                    'blocker_codes' => implode('|', $domain['blocker_codes'] ?? []),
+                ];
+            }
+            CsvResponse::send(
+                sprintf('bordro-readiness-%04d-%02d.csv', $yil, $ay),
+                $columns,
+                $rows
+            );
+        } catch (\Throwable $e) {
+            JsonResponse::serverError('Readiness export olusturulamadi.');
+        }
+    }
+
+    public static function devirSablonCsv(Request $request)
+    {
+        [$pdo, $user, $subeId] = self::context($request, 'maas_hesaplama_adaylari.view');
+        $yil = self::readQueryInt($request, 'yil', 2000, 2100);
+        $ay = self::readQueryInt($request, 'ay', 1, 12);
+        $departmanId = self::optionalQueryInt($request, 'departman_id', 1, 999999);
+        $eksikOnly = (string) $request->getQuery('eksik', '1') === '1';
+        try {
+            $items = self::enrichDevirler(
+                $pdo,
+                PersonelBordroDevirService::listForSube($pdo, $subeId, $yil, $ay),
+                $subeId,
+                $yil,
+                $ay,
+                $eksikOnly,
+                $departmanId
+            );
+            $columns = [
+                'sicil_no',
+                'ad_soyad',
+                'yil',
+                'ay',
+                'onceki_kumulatif_gelir_vergisi_matrahi',
+                'onceki_kumulatif_gelir_vergisi',
+                'onceki_kumulatif_sgk_matrahi',
+                'aciklama',
+            ];
+            $rows = [];
+            foreach ($items as $item) {
+                $devir = $item['devir'] ?? null;
+                $rows[] = [
+                    'sicil_no' => $item['personel']['sicil'] ?? '',
+                    'ad_soyad' => trim(($item['personel']['ad'] ?? '') . ' ' . ($item['personel']['soyad'] ?? '')),
+                    'yil' => (int) $yil,
+                    'ay' => (int) $ay,
+                    'onceki_kumulatif_gelir_vergisi_matrahi' => $devir['onceki_kumulatif_gelir_vergisi_matrahi'] ?? '',
+                    'onceki_kumulatif_gelir_vergisi' => $devir['onceki_kumulatif_gelir_vergisi'] ?? '',
+                    'onceki_kumulatif_sgk_matrahi' => $devir['onceki_kumulatif_sgk_matrahi'] ?? '',
+                    'aciklama' => count($item['eksik_alanlar'] ?? []) > 0 ? 'EKSIK_DEVIR' : '',
+                ];
+            }
+            CsvResponse::send(
+                sprintf('bordro-devir-sablon-%04d-%02d.csv', $yil, $ay),
+                $columns,
+                $rows
+            );
+        } catch (\Throwable $e) {
+            JsonResponse::serverError('Devir sablonu olusturulamadi.');
         }
     }
 
@@ -107,8 +218,17 @@ class BordroHazirlikController
         $yil = self::readQueryInt($request, 'yil', 2000, 2100);
         $ay = self::readQueryInt($request, 'ay', 1, 12);
         $eksik = (string) $request->getQuery('eksik', '') === '1';
+        $departmanId = self::optionalQueryInt($request, 'departman_id', 1, 999999);
         try {
-            $items = self::enrichDevirler($pdo, PersonelBordroDevirService::listForSube($pdo, $subeId, $yil, $ay), $subeId, $yil, $ay, $eksik);
+            $items = self::enrichDevirler(
+                $pdo,
+                PersonelBordroDevirService::listForSube($pdo, $subeId, $yil, $ay),
+                $subeId,
+                $yil,
+                $ay,
+                $eksik,
+                $departmanId
+            );
             JsonResponse::success(['items' => $items]);
         } catch (\Throwable $e) {
             JsonResponse::serverError('Devir listesi okunamadi.');
@@ -121,13 +241,16 @@ class BordroHazirlikController
         $body = $request->getJsonBody();
         $yil = (int) ($body['yil'] ?? 0);
         $ay = (int) ($body['ay'] ?? 0);
-        $dryRun = (bool) ($body['dry_run'] ?? true);
+        if ($yil < 2000 || $yil > 2100 || $ay < 1 || $ay > 12) {
+            self::validationError('yil', 'Gecerli yil/ay zorunludur.');
+        }
+        $dryRun = array_key_exists('dry_run', $body) ? (bool) $body['dry_run'] : true;
         $rows = $body['rows'] ?? [];
         if (!is_array($rows)) {
             self::validationError('rows', 'rows dizisi zorunludur.');
         }
         try {
-            JsonResponse::success(self::processDevirImport($pdo, $subeId, $yil, $ay, $rows, $dryRun, $user));
+            JsonResponse::success(PersonelBordroDevirService::processImport($pdo, $subeId, $yil, $ay, $rows, $dryRun, $user));
         } catch (MaasHesaplamaException $e) {
             self::domainError($e);
         } catch (\Throwable $e) {
@@ -135,97 +258,24 @@ class BordroHazirlikController
         }
     }
 
-    /** @return array<string, mixed> */
-    private static function processDevirImport(PDO $pdo, $subeId, $yil, $ay, array $rows, $dryRun, array $user)
+    /**
+     * @param array<int, array<string, mixed>> $devirler
+     * @return array<int, array<string, mixed>>
+     */
+    private static function enrichDevirler(PDO $pdo, array $devirler, $subeId, $yil, $ay, $eksikOnly, $departmanId = null)
     {
-        $results = [];
-        $success = 0;
-        $failed = 0;
-        $seen = [];
-        foreach ($rows as $index => $row) {
-            $sicil = trim((string) ($row['sicil'] ?? $row['sicil_no'] ?? ''));
-            if ($sicil === '') {
-                $results[] = ['satir' => $index + 1, 'ok' => false, 'hata' => 'sicil zorunlu'];
-                $failed++;
-                continue;
-            }
-            $personel = self::findPersonelBySicil($pdo, $sicil, (int) $subeId);
-            if (!$personel) {
-                $results[] = ['satir' => $index + 1, 'sicil' => $sicil, 'ok' => false, 'hata' => 'personel bulunamadi'];
-                $failed++;
-                continue;
-            }
-            $key = $sicil . ':' . $yil . ':' . $ay;
-            if (isset($seen[$key])) {
-                $results[] = ['satir' => $index + 1, 'sicil' => $sicil, 'ok' => false, 'hata' => 'duplicate personel/donem'];
-                $failed++;
-                continue;
-            }
-            $seen[$key] = true;
-            $payload = [
-                'personel_id' => (int) $personel['id'],
-                'sube_id' => (int) $subeId,
-                'yil' => (int) $yil,
-                'ay' => (int) $ay,
-                'onceki_kumulatif_gelir_vergisi_matrahi' => (string) ($row['onceki_kumulatif_gelir_vergisi_matrahi'] ?? $row['gv_matrah'] ?? '0'),
-                'onceki_kumulatif_gelir_vergisi' => (string) ($row['onceki_kumulatif_gelir_vergisi'] ?? $row['gv'] ?? '0'),
-                'devir_kaynagi' => 'CSV_IMPORT',
-            ];
-            if (!$dryRun) {
-                PersonelBordroDevirService::upsert($pdo, $payload, $user);
-            }
-            $results[] = ['satir' => $index + 1, 'sicil' => $sicil, 'ok' => true];
-            $success++;
-        }
-        if (!$dryRun) {
-            $pdo->prepare(
-                'INSERT INTO personel_bordro_devir_importlari (sube_id, yil, ay, dry_run, toplam_satir, basarili_satir, hatali_satir, hata_ozeti, actor_id)
-                 VALUES (:s, :y, :a, 0, :t, :b, :h, :ozet, :actor)'
-            )->execute([
-                's' => (int) $subeId,
-                'y' => (int) $yil,
-                'a' => (int) $ay,
-                't' => count($rows),
-                'b' => $success,
-                'h' => $failed,
-                'ozet' => json_encode($results, JSON_UNESCAPED_UNICODE),
-                'actor' => isset($user['id']) ? (int) $user['id'] : null,
-            ]);
-        }
-
-        return [
-            'dry_run' => (bool) $dryRun,
-            'toplam_satir' => count($rows),
-            'basarili_satir' => $success,
-            'hatali_satir' => $failed,
-            'satirlar' => $results,
-        ];
-    }
-
-    /** @return array<string, mixed>|null */
-    private static function findPersonelBySicil(PDO $pdo, $sicil, $subeId)
-    {
-        $stmt = $pdo->prepare(
-            "SELECT id, ad, soyad, sicil_no, departman_id FROM personeller
-             WHERE sicil_no = :sicil AND sube_id = :sube AND durum = 'AKTIF' LIMIT 1"
-        );
-        $stmt->execute(['sicil' => (string) $sicil, 'sube' => (int) $subeId]);
-        $row = $stmt->fetch(PDO::FETCH_ASSOC);
-
-        return $row ?: null;
-    }
-
-    /** @param array<int, array<string, mixed>> $devirler @return array<int, array<string, mixed>> */
-    private static function enrichDevirler(PDO $pdo, array $devirler, $subeId, $yil, $ay, $eksikOnly)
-    {
-        $stmt = $pdo->prepare(
-            "SELECT p.id, p.ad, p.soyad, p.sicil_no, p.departman_id, d.ad AS departman_ad
+        $sql = "SELECT p.id, p.ad, p.soyad, p.sicil_no, p.departman_id, d.ad AS departman_ad
              FROM personeller p
              LEFT JOIN departmanlar d ON d.id = p.departman_id
-             WHERE p.sube_id = :sube AND p.durum = 'AKTIF'
-             ORDER BY p.ad ASC, p.soyad ASC"
-        );
-        $stmt->execute(['sube' => (int) $subeId]);
+             WHERE p.sube_id = :sube AND p.durum = 'AKTIF'";
+        $params = ['sube' => (int) $subeId];
+        if ($departmanId !== null) {
+            $sql .= ' AND p.departman_id = :departman_id';
+            $params['departman_id'] = (int) $departmanId;
+        }
+        $sql .= ' ORDER BY p.ad ASC, p.soyad ASC';
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
         $personeller = $stmt->fetchAll(PDO::FETCH_ASSOC);
         $devirByPersonel = [];
         foreach ($devirler as $devir) {
@@ -319,6 +369,12 @@ class BordroHazirlikController
 
     private static function domainError(MaasHesaplamaException $e)
     {
-        JsonResponse::error($e->getCode() > 0 ? (int) $e->getCode() : 409, $e->getErrorCode(), $e->getMessage(), null, $e->getContext());
+        JsonResponse::error(
+            $e->getHttpStatus() > 0 ? $e->getHttpStatus() : 409,
+            $e->getCodeString(),
+            $e->getMessage(),
+            null,
+            $e->getDetails()
+        );
     }
 }

@@ -1,11 +1,12 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { EmptyState } from "../../../components/states/EmptyState";
 import { ErrorState } from "../../../components/states/ErrorState";
 import { LoadingState } from "../../../components/states/LoadingState";
 import { useRoleAccess } from "../../../hooks/use-role-access";
 import { usePersonelDetail } from "../../../hooks/usePersonelDetail";
 import {
+  PERSONEL_DOSYA_TABS,
   PersonelDosyaActionRow,
   PersonelDosyaHero,
   PersonelDosyaTabPanels,
@@ -15,9 +16,17 @@ import {
 } from "../components/personel-dosya";
 import { usePersonelKartGatewayReturn } from "../hooks/usePersonelKartGatewayReturn";
 
+function resolvePersonelTab(raw: string | null): PersonelDosyaTabId | null {
+  if (!raw) return null;
+  if (raw === "genel" || raw === "ucret") return "genel-bilgiler";
+  const match = PERSONEL_DOSYA_TABS.find((tab) => tab.id === raw);
+  return match ? match.id : null;
+}
+
 export function PersonelDetayPage() {
   const location = useLocation();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { personelId } = useParams();
   const parsedPersonelId = Number.parseInt(personelId ?? "", 10);
   const hasValidId = !Number.isNaN(parsedPersonelId) && parsedPersonelId > 0;
@@ -35,7 +44,8 @@ export function PersonelDetayPage() {
   const canManageUcret = hasPermission("personeller.ucret.manage");
   const canCreateZimmet = canEditPersonel;
 
-  const [activeTab, setActiveTab] = useState<PersonelDosyaTabId>("genel-bilgiler");
+  const initialTab = resolvePersonelTab(searchParams.get("tab")) ?? "genel-bilgiler";
+  const [activeTab, setActiveTab] = useState<PersonelDosyaTabId>(initialTab);
   const [isActionMenuOpen, setIsActionMenuOpen] = useState(false);
 
   const detail = usePersonelDetail(parsedPersonelId, hasValidId, {
@@ -102,9 +112,10 @@ export function PersonelDetayPage() {
       return;
     }
 
-    setActiveTab("genel-bilgiler");
+    const fromQuery = resolvePersonelTab(searchParams.get("tab"));
+    setActiveTab(fromQuery ?? "genel-bilgiler");
     setIsActionMenuOpen(false);
-  }, [parsedPersonelId]);
+  }, [parsedPersonelId, searchParams]);
 
   useEffect(() => {
     if (isEditing || isZimmetModalOpen) {

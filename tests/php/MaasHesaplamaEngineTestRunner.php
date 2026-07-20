@@ -131,6 +131,24 @@ function engineSgkFixture(int $primDay): array
     ];
 }
 
+/** @return array<string, mixed> */
+function weeklyEngineResult(int $totalMinutes): array
+{
+    return MaasHesaplamaEngine::calculate(engineInput('BRUT', '45000.00', [
+        'mevzuat' => mevzuatFixture([
+            'GUNLUK_CALISMA_SAATI' => '8',
+            'HAFTALIK_IS_GUNU_SAYISI' => '5',
+            'AYLIK_NORMAL_CALISMA_SAATI' => '225',
+        ]),
+        'puantajlar' => [[
+            'muhur_satir_id' => 900,
+            'tarih' => '2026-03-02',
+            'gun_tipi' => 'Normal_Is_Gunu',
+            'net_calisma_suresi_dakika' => $totalMinutes,
+        ]],
+    ]));
+}
+
 function assertKalemIntegrity(array $result, string $name): void
 {
     engineAssert(!empty($result['ok']), $name . ' ok=true');
@@ -302,6 +320,66 @@ $fs2 = findKalemler($weekFm, 'FAZLA_SURELERLE_CALISMA_ODEMESI');
 $fm2 = findKalemler($weekFm, 'FAZLA_MESAI_ODEMESI');
 engineAssert(count($fs2) === 1 && (int) $fs2[0]['miktar'] === 300, 'FS 300 dk above contract');
 engineAssert(count($fm2) === 1 && (int) $fm2[0]['miktar'] === 300, 'FM 300 dk above 2700');
+
+// Mevzuat yuvarlamasi yalniz FSC/FM bantlarinda: <30 => 30, =30 => 30, >30 => 60.
+$overtimeBoundaries = [
+    0 => 0,
+    1 => 30,
+    29 => 30,
+    30 => 30,
+    31 => 60,
+    59 => 60,
+    60 => 60,
+    61 => 90,
+];
+foreach ($overtimeBoundaries as $rawMinutes => $roundedMinutes) {
+    $fsBoundary = findKalemler(weeklyEngineResult(2400 + $rawMinutes), 'FAZLA_SURELERLE_CALISMA_ODEMESI');
+    engineAssert(
+        $rawMinutes === 0
+            ? count($fsBoundary) === 0
+            : count($fsBoundary) === 1 && (int) $fsBoundary[0]['miktar'] === $roundedMinutes,
+        'Engine V2 FSC rounding boundary ' . $rawMinutes . ' => ' . $roundedMinutes
+    );
+    if ($rawMinutes > 0) {
+        engineAssert(
+            (int) $fsBoundary[0]['payload_json']['ham_fazla_surelerle_calisma_dk'] === $rawMinutes,
+            'Engine V2 FSC raw audit minute ' . $rawMinutes
+        );
+    }
+
+    $fmBoundary = findKalemler(weeklyEngineResult(2700 + $rawMinutes), 'FAZLA_MESAI_ODEMESI');
+    engineAssert(
+        $rawMinutes === 0
+            ? count($fmBoundary) === 0
+            : count($fmBoundary) === 1 && (int) $fmBoundary[0]['miktar'] === $roundedMinutes,
+        'Engine V2 FM rounding boundary ' . $rawMinutes . ' => ' . $roundedMinutes
+    );
+    if ($rawMinutes > 0) {
+        engineAssert(
+            (int) $fmBoundary[0]['payload_json']['ham_fazla_calisma_dk'] === $rawMinutes,
+            'Engine V2 FM raw audit minute ' . $rawMinutes
+        );
+    }
+}
+
+// Gec/erken kesintisi ayri owner: ham dakika korunur; FM mevzuat yuvarlamasi uygulanmaz.
+$lateEarly = MaasHesaplamaEngine::calculate(engineInput('BRUT', '30000.00', [
+    'puantajlar' => [[
+        'muhur_satir_id' => 901,
+        'tarih' => '2026-03-02',
+        'gun_tipi' => 'Normal_Is_Gunu',
+        'net_calisma_suresi_dakika' => 0,
+        'gec_kalma_dakika' => 1,
+        'erken_cikis_dakika' => 31,
+    ]],
+]));
+$lateLines = findKalemler($lateEarly, 'GEC_KALMA_KESINTISI');
+$earlyLines = findKalemler($lateEarly, 'ERKEN_CIKIS_KESINTISI');
+engineAssert(count($lateLines) === 1 && (int) $lateLines[0]['miktar'] === 1, 'Engine V2 gec kalma ham 1 dk');
+engineAssert(count($earlyLines) === 1 && (int) $earlyLines[0]['miktar'] === 31, 'Engine V2 erken cikis ham 31 dk');
+// Saatlik = 30000/225 = 133.333...; 1dk = 2.22, 31dk = 68.89
+engineAssert((string) $lateLines[0]['tutar'] === '2.22', 'Engine V2 gec kalma tutar FE parity');
+engineAssert((string) $earlyLines[0]['tutar'] === '68.89', 'Engine V2 erken cikis tutar FE parity');
 
 // Hafta tatili GUNLUK_ILAVE
 $ht = MaasHesaplamaEngine::calculate(engineInput('BRUT', '30000.00', [

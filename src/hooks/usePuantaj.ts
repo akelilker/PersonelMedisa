@@ -882,7 +882,7 @@ export function usePuantaj() {
 
     const haftalik_fazla_calisma_tutari =
       haftalikOzetDurumu === "hazir" && haftalikOzet
-        ? haftalikOzet.fazla_calisma_tutari
+        ? haftalikOzet.toplam_fazla_calisma_tutari
         : 0;
 
     const tatil_ek_odeme_tutari = tatilEkOdemeOzeti?.ek_odeme_tutari ?? 0;

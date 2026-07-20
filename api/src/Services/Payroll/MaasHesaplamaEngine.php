@@ -536,19 +536,21 @@ final class MaasHesaplamaEngine
 
         ksort($weeklyNormalMinutes);
         foreach ($weeklyNormalMinutes as $weekKey => $totalDk) {
-            $fsDk = 0;
-            $fmDk = 0;
+            $rawFsDk = 0;
+            $rawFmDk = 0;
             if ($totalDk > $contractualWeeklyDk) {
                 $overContract = $totalDk - $contractualWeeklyDk;
                 $fsCap = self::LEGAL_WEEKLY_LIMIT_MINUTES - $contractualWeeklyDk;
                 if ($fsCap < 0) {
                     $fsCap = 0;
                 }
-                $fsDk = $overContract < $fsCap ? $overContract : $fsCap;
-                $fmDk = $totalDk > self::LEGAL_WEEKLY_LIMIT_MINUTES
+                $rawFsDk = $overContract < $fsCap ? $overContract : $fsCap;
+                $rawFmDk = $totalDk > self::LEGAL_WEEKLY_LIMIT_MINUTES
                     ? ($totalDk - self::LEGAL_WEEKLY_LIMIT_MINUTES)
                     : 0;
             }
+            $fsDk = self::hesaplaMevzuatFazlaCalismaOdemeDakika($rawFsDk);
+            $fmDk = self::hesaplaMevzuatFazlaCalismaOdemeDakika($rawFmDk);
 
             if ($fsDk > 0) {
                 $base = $hourly->mulDiv($fsDk, 60);
@@ -561,6 +563,7 @@ final class MaasHesaplamaEngine
                     'haftalik_toplam_dk' => $totalDk,
                     'sozlesme_haftalik_dk' => $contractualWeeklyDk,
                     'yasal_haftalik_limit_dk' => self::LEGAL_WEEKLY_LIMIT_MINUTES,
+                    'ham_fazla_surelerle_calisma_dk' => $rawFsDk,
                 ]);
             }
             if ($fmDk > 0) {
@@ -574,6 +577,7 @@ final class MaasHesaplamaEngine
                     'haftalik_toplam_dk' => $totalDk,
                     'sozlesme_haftalik_dk' => $contractualWeeklyDk,
                     'yasal_haftalik_limit_dk' => self::LEGAL_WEEKLY_LIMIT_MINUTES,
+                    'ham_fazla_calisma_dk' => $rawFmDk,
                 ]);
             }
         }
@@ -638,6 +642,26 @@ final class MaasHesaplamaEngine
         $dt = new \DateTimeImmutable((string) $tarih);
 
         return $dt->format('o') . '-W' . $dt->format('W');
+    }
+
+    /**
+     * Fazla Calisma Yonetmeligi odeme esas dakika (yalniz FM/FSC).
+     * Kalan 1-29 → 30; 31-59 → 60; tam 0/30 degismez.
+     */
+    private static function hesaplaMevzuatFazlaCalismaOdemeDakika($minutes)
+    {
+        $minutes = max(0, (int) $minutes);
+        if ($minutes <= 0) {
+            return 0;
+        }
+
+        $fullHours = intdiv($minutes, 60) * 60;
+        $remainder = $minutes % 60;
+        if ($remainder === 0 || $remainder === 30) {
+            return $minutes;
+        }
+
+        return $fullHours + ($remainder < 30 ? 30 : 60);
     }
 
     /**

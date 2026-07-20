@@ -25,6 +25,7 @@ import {
   hesaplaHaftaAraligi,
   filtreleHaftalikPuantajSatirlari,
   hesaplaTarihtenHaftalikCalismaOzeti,
+  hesaplaMevzuatFazlaCalismaOdemeDakika,
   hesaplaSaatlikUcret,
   hesaplaFazlaCalismaTutari,
   hesaplaHaftalikFazlaCalismaUcreti,
@@ -35,6 +36,7 @@ import {
   GEC_ERKEN_TOLERANS_DAKIKA,
   hesaplaGecErkenEksikSure,
   hesaplaGecKalmaErkenCikmaKesintiOzeti,
+  hesaplaKesintiyeEsasDakika,
   hesaplaDevamsizlikKesintiOzeti,
   siniflandirPuantajEksikGunEtkisi,
   siniflandirHastalikRaporGunUcretEtkisi,
@@ -46,7 +48,7 @@ import {
   hesapSonucuToGunlukPuantaj,
   birlestirUbgtFazlaMesaiCakismaUyari,
   birlestirOnsekizYasAltiFazlaCalismaUyari,
-  isOnsekizYasAltiPersonel,
+  isFazlaCalismaGeceYasagiKapsaminda,
   birlestirMazeretsizDevamsizlikAdayUyariari,
   UBGT_FAZLA_MESAI_CAKISMASI_CODE,
   UBGT_FAZLA_MESAI_CAKISMASI_MESSAGE,
@@ -562,11 +564,22 @@ describe("18 yas alti blok kurallari", () => {
     ).toBeNull();
   });
 
+  it("tam 18 yaş personelde gece ve fazla çalışma yasağı uygulanmaz", () => {
+    expect(
+      hesaplaYasKuraliBlokMesaji({
+        tarih: "2026-04-13",
+        dogum_tarihi: "2008-04-13",
+        giris_saati: "12:00",
+        cikis_saati: "20:30"
+      })
+    ).toBeNull();
+  });
+
   it("18 yas alti gece calismasini bloklar", () => {
     expect(
       hesaplaYasKuraliBlokMesaji({
         tarih: "2026-04-13",
-        dogum_tarihi: "2008-01-01",
+        dogum_tarihi: "2009-01-01",
         giris_saati: "12:00",
         cikis_saati: "20:30"
       })
@@ -577,7 +590,7 @@ describe("18 yas alti blok kurallari", () => {
     expect(
       hesaplaYasKuraliBlokMesaji({
         tarih: "2026-04-12",
-        dogum_tarihi: "2008-01-01",
+        dogum_tarihi: "2009-01-01",
         giris_saati: "09:00",
         cikis_saati: "17:00"
       })
@@ -956,6 +969,42 @@ describe("hesaplaFazlaCalismaTutari", () => {
   it("90 dk → 1.5 saat × 1.5 × 200 = 450", () => {
     expect(hesaplaFazlaCalismaTutari(90, saatlik)).toBe(450);
   });
+
+  it("31 dk ham → ödeme esas 60 dk → tutar 300", () => {
+    expect(hesaplaFazlaCalismaTutari(31, saatlik)).toBe(300);
+  });
+});
+
+describe("hesaplaMevzuatFazlaCalismaOdemeDakika", () => {
+  it.each([
+    [0, 0],
+    [1, 30],
+    [29, 30],
+    [30, 30],
+    [31, 60],
+    [59, 60],
+    [60, 60],
+    [61, 90]
+  ])("%i dk ham → %i dk ödeme esas", (ham, odemeEsas) => {
+    expect(hesaplaMevzuatFazlaCalismaOdemeDakika(ham)).toBe(odemeEsas);
+  });
+
+  it("haftalık aggregate ham kalır; ödeme katmanı yuvarlar", () => {
+    const ozet = hesaplaHaftalikCalismaOzeti([{ net_calisma_suresi_dakika: 2700 + 31 }]);
+    expect(ozet.fazla_calisma_dakika).toBe(31);
+    const ucret = hesaplaHaftalikFazlaCalismaUcreti(ozet, 45000);
+    expect(ucret.odeme_esas_fazla_calisma_dakika).toBe(60);
+    expect(ucret.fazla_calisma_tutari).toBe(300);
+  });
+
+  it("geç/erken ham dakikası FM mevzuat yuvarlamasından ayrıdır", () => {
+    expect(hesaplaKesintiyeEsasDakika(31)).toBe(31);
+    expect(hesaplaMevzuatFazlaCalismaOdemeDakika(31)).toBe(60);
+    expect(hesaplaKesintiyeEsasDakika(45)).toBe(45);
+    expect(hesaplaMevzuatFazlaCalismaOdemeDakika(45)).toBe(60);
+    expect(hesaplaKesintiyeEsasDakika(61)).toBe(61);
+    expect(hesaplaMevzuatFazlaCalismaOdemeDakika(61)).toBe(90);
+  });
 });
 
 // =========================================================================
@@ -999,12 +1048,12 @@ describe("hesaplaSaatlikKesintiTutari ve gecKalmaErkenCikma özeti", () => {
     expect(o.kesinti_tutari).toBe(0);
   });
 
-  it("ondalıklı para: günlük ücret ve 30 dk yuvarlanmis kesinti 2 hane", () => {
+  it("ondalıklı para: günlük ücret ve ham dakika kesintisi 2 hane", () => {
     expect(hesaplaGunlukUcret(10001)).toBe(333.37);
     const o = hesaplaGecKalmaErkenCikmaKesintiOzeti(45, 30000);
     expect(o.gercek_eksik_dakika).toBe(45);
-    expect(o.kesintiye_esas_dakika).toBe(60);
-    expect(o.kesinti_tutari).toBeCloseTo(133.33, 2);
+    expect(o.kesintiye_esas_dakika).toBe(45);
+    expect(o.kesinti_tutari).toBeCloseTo(100, 2);
   });
 
   it("0 dk eksik → kesintiye esas 0 ve kesinti 0", () => {
@@ -1014,11 +1063,11 @@ describe("hesaplaSaatlikKesintiTutari ve gecKalmaErkenCikma özeti", () => {
     expect(o.kesinti_tutari).toBe(0);
   });
 
-  it("1 dk eksik → 30 dk kesintiye esas sure", () => {
+  it("1 dk eksik → 1 dk kesintiye esas süre", () => {
     const o = hesaplaGecKalmaErkenCikmaKesintiOzeti(1, maas);
     expect(o.gercek_eksik_dakika).toBe(1);
-    expect(o.kesintiye_esas_dakika).toBe(30);
-    expect(o.kesinti_tutari).toBeCloseTo(66.67, 2);
+    expect(o.kesintiye_esas_dakika).toBe(1);
+    expect(o.kesinti_tutari).toBe(hesaplaSaatlikKesintiTutari(1, maas));
   });
 
   it("30 dk eksik → 30 dk kesintiye esas sure", () => {
@@ -1027,18 +1076,18 @@ describe("hesaplaSaatlikKesintiTutari ve gecKalmaErkenCikma özeti", () => {
     expect(o.kesinti_tutari).toBeCloseTo(66.67, 2);
   });
 
-  it("31 dk eksik → 60 dk kesintiye esas sure", () => {
+  it("31 dk eksik → 31 dk kesintiye esas süre", () => {
     const o = hesaplaGecKalmaErkenCikmaKesintiOzeti(31, maas);
     expect(o.gercek_eksik_dakika).toBe(31);
-    expect(o.kesintiye_esas_dakika).toBe(60);
-    expect(o.kesinti_tutari).toBeCloseTo(133.33, 2);
+    expect(o.kesintiye_esas_dakika).toBe(31);
+    expect(o.kesinti_tutari).toBe(hesaplaSaatlikKesintiTutari(31, maas));
   });
 
-  it("61 dk eksik → 90 dk kesintiye esas sure", () => {
+  it("61 dk eksik → 61 dk kesintiye esas süre", () => {
     const o = hesaplaGecKalmaErkenCikmaKesintiOzeti(61, maas);
     expect(o.gercek_eksik_dakika).toBe(61);
-    expect(o.kesintiye_esas_dakika).toBe(90);
-    expect(o.kesinti_tutari).toBeCloseTo(200, 2);
+    expect(o.kesintiye_esas_dakika).toBe(61);
+    expect(o.kesinti_tutari).toBe(hesaplaSaatlikKesintiTutari(61, maas));
   });
 });
 
@@ -1458,7 +1507,7 @@ describe("deriveGecErkenKesintiPreview (hook güvenli davranış)", () => {
     expect(out.gecErkenKesintiHesaplanamadiMi).toBe(false);
   });
 
-  it("eksik_dakika = 1 ise kesintiye_esas_dakika = 30 (yuvarlama bozulmaz)", () => {
+  it("eksik_dakika = 1 ise Engine V2 gibi ham 1 dakika kesilir", () => {
     const p = basePuantaj({
       hareket_durumu: "Gec_Geldi",
       beklenen_giris_saati: "08:00",
@@ -1467,7 +1516,7 @@ describe("deriveGecErkenKesintiPreview (hook güvenli davranış)", () => {
     const out = deriveGecErkenKesintiPreview(p, maas);
     expect(out.gecErkenKesintiOzeti).not.toBeNull();
     expect(out.gecErkenKesintiOzeti!.gercek_eksik_dakika).toBe(1);
-    expect(out.gecErkenKesintiOzeti!.kesintiye_esas_dakika).toBe(30);
+    expect(out.gecErkenKesintiOzeti!.kesintiye_esas_dakika).toBe(1);
   });
 });
 
@@ -2126,11 +2175,13 @@ describe("hesaplaHaftalikFazlaCalismaUcreti", () => {
 function gunlukSatir(
   personel_id: number,
   tarih: string,
-  net?: number
+  net?: number,
+  gun_tipi: GunlukPuantaj["gun_tipi"] = "Normal_Is_Gunu"
 ): GunlukPuantaj {
   return {
     personel_id,
     tarih,
+    gun_tipi,
     compliance_uyarilari: [],
     ...(net !== undefined ? { net_calisma_suresi_dakika: net } : {})
   };
@@ -2152,7 +2203,9 @@ describe("hesaplaHaftalikPuantajUcretOzeti", () => {
     expect(o.hafta_baslangic).toBe("2026-04-13");
     expect(o.hafta_bitis).toBe("2026-04-19");
     expect(o.toplam_net_dakika).toBe(2400);
+    expect(o.fazla_surelerle_calisma_dakika).toBe(0);
     expect(o.fazla_calisma_dakika).toBe(0);
+    expect(o.toplam_fazla_calisma_tutari).toBe(0);
     expect(o.fazla_calisma_tutari).toBe(0);
     expect(o.saatlik_ucret).toBe(200);
   });
@@ -2164,11 +2217,52 @@ describe("hesaplaHaftalikPuantajUcretOzeti", () => {
     expect(o.fazla_calisma_tutari).toBe(0);
   });
 
-  it("46 saat (2760 dk) → 60 dk fazla + tutar 300", () => {
+  it("46 saat (2760 dk) → FSC 300 + FM 60 (Engine V2 bant) ve tutarlar", () => {
     const gunler = [gunlukSatir(1, "2026-04-14", 2760)];
     const o = hesaplaHaftalikPuantajUcretOzeti(gunler, ref, maas);
+    expect(o.fazla_surelerle_calisma_dakika).toBe(300);
     expect(o.fazla_calisma_dakika).toBe(60);
+    expect(o.fazla_surelerle_calisma_tutari).toBe(1250);
     expect(o.fazla_calisma_tutari).toBe(300);
+    expect(o.toplam_fazla_calisma_tutari).toBe(1550);
+  });
+
+  it.each([
+    [0, 0],
+    [1, 30],
+    [29, 30],
+    [30, 30],
+    [31, 60],
+    [59, 60],
+    [60, 60],
+    [61, 90]
+  ])("Engine V2 frontend FSC sınırı %i dk → %i dk", (hamDakika, odemeEsasDakika) => {
+    const o = hesaplaHaftalikPuantajUcretOzeti(
+      [gunlukSatir(1, "2026-04-14", 2400 + hamDakika)],
+      ref,
+      maas
+    );
+    expect(o.fazla_surelerle_calisma_dakika).toBe(hamDakika);
+    expect(o.odeme_esas_fazla_surelerle_calisma_dakika).toBe(odemeEsasDakika);
+  });
+
+  it.each([
+    [0, 0],
+    [1, 30],
+    [29, 30],
+    [30, 30],
+    [31, 60],
+    [59, 60],
+    [60, 60],
+    [61, 90]
+  ])("Engine V2 frontend FM sınırı %i dk → %i dk", (hamDakika, odemeEsasDakika) => {
+    const o = hesaplaHaftalikPuantajUcretOzeti(
+      [gunlukSatir(1, "2026-04-14", 2700 + hamDakika)],
+      ref,
+      maas
+    );
+    expect(o.fazla_calisma_dakika).toBe(hamDakika);
+    expect(o.odeme_esas_fazla_calisma_dakika).toBe(odemeEsasDakika);
   });
 
   it("karışık haftalardaki kayıtlar → yalnız referans haftası", () => {
@@ -2181,18 +2275,19 @@ describe("hesaplaHaftalikPuantajUcretOzeti", () => {
     expect(o.toplam_net_dakika).toBe(300);
   });
 
-  it("Pazar satırı haftaya dahil", () => {
+  it("Pazar HT satırı haftalık OT havuzuna girmez (Engine V2)", () => {
     const gunler = [
       gunlukSatir(1, "2026-04-13", 480),
       gunlukSatir(1, "2026-04-14", 480),
       gunlukSatir(1, "2026-04-15", 480),
       gunlukSatir(1, "2026-04-16", 480),
       gunlukSatir(1, "2026-04-17", 480),
-      gunlukSatir(1, "2026-04-19", 120)
+      gunlukSatir(1, "2026-04-19", 120, "Hafta_Tatili_Pazar")
     ];
     const o = hesaplaHaftalikPuantajUcretOzeti(gunler, ref, maas);
-    expect(o.toplam_net_dakika).toBe(2520);
+    expect(o.toplam_net_dakika).toBe(2400);
     expect(o.fazla_calisma_dakika).toBe(0);
+    expect(o.fazla_surelerle_calisma_dakika).toBe(0);
   });
 
   it("geçersiz referans tarih → sıfır özet, hafta aralığı null", () => {
@@ -2464,8 +2559,9 @@ describe("birlestirUbgtFazlaMesaiCakismaUyari", () => {
     });
 
     const haftalik = hesaplaHaftalikPuantajUcretOzeti(tamHafta, ref, 45000);
-    expect(haftalik.fazla_calisma_dakika).toBeGreaterThan(0);
-    expect(haftalik.fazla_calisma_tutari).toBeGreaterThan(0);
+    // Engine V2: yalnız Normal_Is_Gunu; 5×480=2400 → FM yok (UBGT havuza girmez)
+    expect(haftalik.fazla_calisma_dakika).toBe(0);
+    expect(haftalik.fazla_surelerle_calisma_dakika).toBe(0);
 
     const tatil = hesaplaTatilEkOdemeOzeti(maas, ubgt);
     expect(tatil!.ek_odeme_tutari).toBe(1000);
@@ -2538,23 +2634,25 @@ describe("birlestirUbgtFazlaMesaiCakismaUyari", () => {
 // 18 yaş altı haftalık fazla çalışma (Faz D2)
 // =========================================================================
 
-describe("isOnsekizYasAltiPersonel", () => {
-  it("18 yaş tam sınırda true", () => {
-    expect(isOnsekizYasAltiPersonel("2008-04-13", "2026-04-13")).toBe(true);
+describe("isFazlaCalismaGeceYasagiKapsaminda", () => {
+  it("17 yaşta true, tam 18 yaş sınırında false", () => {
+    expect(isFazlaCalismaGeceYasagiKapsaminda("2009-04-13", "2026-04-13")).toBe(true);
+    expect(isFazlaCalismaGeceYasagiKapsaminda("2008-04-13", "2026-04-13")).toBe(false);
   });
 
   it("yetişkin false", () => {
-    expect(isOnsekizYasAltiPersonel("1990-01-01", "2026-04-13")).toBe(false);
+    expect(isFazlaCalismaGeceYasagiKapsaminda("1990-01-01", "2026-04-13")).toBe(false);
   });
 
   it("geçersiz doğum tarihi false", () => {
-    expect(isOnsekizYasAltiPersonel("invalid", "2026-04-13")).toBe(false);
+    expect(isFazlaCalismaGeceYasagiKapsaminda("invalid", "2026-04-13")).toBe(false);
   });
 });
 
 describe("birlestirOnsekizYasAltiFazlaCalismaUyari", () => {
   const referans = "2026-04-15";
-  const gencDogum = "2008-01-01";
+  const gencDogum = "2009-01-01";
+  const tamOnsekizDogum = "2008-04-15";
   const yetiskinDogum = "1990-01-01";
 
   const girdi = (
@@ -2570,6 +2668,11 @@ describe("birlestirOnsekizYasAltiFazlaCalismaUyari", () => {
 
   it("yetişkin + fazla_calisma_dakika > 0 → uyarı yok", () => {
     const merged = birlestirOnsekizYasAltiFazlaCalismaUyari([], girdi(yetiskinDogum, 60));
+    expect(merged).toHaveLength(0);
+  });
+
+  it("tam 18 yaş + fazla_calisma_dakika > 0 → yaş yasağı uyarısı yok", () => {
+    const merged = birlestirOnsekizYasAltiFazlaCalismaUyari([], girdi(tamOnsekizDogum, 60));
     expect(merged).toHaveLength(0);
   });
 

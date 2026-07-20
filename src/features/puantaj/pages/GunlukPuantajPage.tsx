@@ -396,8 +396,12 @@ export function GunlukPuantajPage() {
               value={String(haftalikOzet.normal_calisma_dakika)}
             />
             <ReadonlyField
+              label="Fazla Sürelerle Çalışma (dk)"
+              value={String(haftalikOzet.odeme_esas_fazla_surelerle_calisma_dakika)}
+            />
+            <ReadonlyField
               label="Fazla Çalışma (dk)"
-              value={String(haftalikOzet.fazla_calisma_dakika)}
+              value={String(haftalikOzet.odeme_esas_fazla_calisma_dakika)}
             />
             <ReadonlyField
               label="Fazla Çalışma (saat)"
@@ -405,8 +409,16 @@ export function GunlukPuantajPage() {
             />
             <ReadonlyField label="Saatlik Ücret" value={formatTurkcePara(haftalikOzet.saatlik_ucret)} />
             <ReadonlyField
+              label="Fazla Sürelerle Çalışma Tutarı"
+              value={formatTurkcePara(haftalikOzet.fazla_surelerle_calisma_tutari)}
+            />
+            <ReadonlyField
               label="Fazla Çalışma Tutarı"
               value={formatTurkcePara(haftalikOzet.fazla_calisma_tutari)}
+            />
+            <ReadonlyField
+              label="Toplam Fazla Çalışma Tutarı"
+              value={formatTurkcePara(haftalikOzet.toplam_fazla_calisma_tutari)}
             />
           </div>
         </div>

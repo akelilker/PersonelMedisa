@@ -76,10 +76,30 @@ function haftalikNetDakikaSatir(value: number | undefined): number {
 }
 
 /**
+ * Fazla Çalışma Yönetmeliği: ödeme esas dakika.
+ * Tam saatten kalan süre 30 dk'dan azsa 30, 30'dan fazlaysa 60 sayılır; tam 30/60 değişmez.
+ * Yalnız FM/FSC ödeme zincirinde kullanılır; geç/erken kesintisine uygulanmaz.
+ */
+export function hesaplaMevzuatFazlaCalismaOdemeDakika(gercekDakika: number): number {
+  const dk = Math.floor(ucretIcinGuvenliNegatifOlmayanSayi(gercekDakika));
+  if (dk <= 0) {
+    return 0;
+  }
+
+  const tamSaatDakika = Math.floor(dk / 60) * 60;
+  const kalan = dk % 60;
+  if (kalan === 0 || kalan === 30) {
+    return dk;
+  }
+
+  return tamSaatDakika + (kalan < 30 ? 30 : 60);
+}
+
+/**
  * Bir haftaya ait günlük net çalışma dakikalarından haftalık özeti üretir.
  * - toplam: satırların net dakikalarının toplamı (güvenli satır birleştirme)
  * - normal: min(toplam, haftalık eşik)
- * - fazla: max(toplam − eşik, 0)
+ * - fazla: max(toplam − eşik, 0) — ham; mevzuat yuvarlama ödeme katmanında
  */
 export function hesaplaHaftalikCalismaOzeti(
   gunler: readonly HaftalikGunNetCalisma[]
@@ -229,46 +249,67 @@ function yuvarlaParaIkiliOndalik(value: number): number {
  * Aylık brüt maaştan saatlik ücret: maaş / 225.
  * Maaş 0, negatif, NaN, ±Infinity → 0 (throw yok).
  */
-export function hesaplaSaatlikUcret(maasTutari: number): number {
+export function hesaplaSaatlikUcret(
+  maasTutari: number,
+  aylikNormalCalismaSaati = AYLIK_MAAS_SAAT_PAYDASI
+): number {
   const maas = ucretIcinGuvenliPozitifMaas(maasTutari);
-  if (maas === 0) return 0;
-  return maas / AYLIK_MAAS_SAAT_PAYDASI;
+  const payda = ucretIcinGuvenliPozitifMaas(aylikNormalCalismaSaati);
+  if (maas === 0 || payda === 0) return 0;
+  return maas / payda;
+}
+
+function hesaplaCarpanliFazlaCalismaTutari(
+  hamDakika: number,
+  saatlikUcret: number,
+  carpan: number
+): number {
+  const odemeEsasDakika = hesaplaMevzuatFazlaCalismaOdemeDakika(hamDakika);
+  const su = ucretIcinGuvenliNegatifOlmayanSayi(saatlikUcret);
+  const oran = ucretIcinGuvenliNegatifOlmayanSayi(carpan);
+  return yuvarlaParaIkiliOndalik(su * oran * (odemeEsasDakika / 60));
 }
 
 /**
- * Fazla mesai tutarı: saatlik × 1.5 × (fazla dakika / 60).
- * Negatif / NaN dakika veya saatlik → 0 kabul; tutar 2 ondalığa yuvarlanır.
+ * Fazla mesai tutarı: saatlik × 1.5 × (ödeme esas dakika / 60).
+ * Ham dakika önce mevzuat yuvarlamasından geçer; tutar 2 ondalığa yuvarlanır.
  */
 export function hesaplaFazlaCalismaTutari(fazlaCalismaDakika: number, saatlikUcret: number): number {
-  const dk = ucretIcinGuvenliNegatifOlmayanSayi(fazlaCalismaDakika);
-  const su = ucretIcinGuvenliNegatifOlmayanSayi(saatlikUcret);
-  const fazlaSaat = dk / 60;
-  const ham = su * FAZLA_CALISMA_UCRET_CARPANI * fazlaSaat;
-  return yuvarlaParaIkiliOndalik(ham);
+  return hesaplaCarpanliFazlaCalismaTutari(
+    fazlaCalismaDakika,
+    saatlikUcret,
+    FAZLA_CALISMA_UCRET_CARPANI
+  );
 }
 
 /** Haftalık süre özeti + saatlik ücret ve FM tutarı. */
 export type HaftalikCalismaVeFazlaUcretOzeti = HaftalikCalismaOzeti & {
   saatlik_ucret: number;
+  /** Mevzuat yuvarlaması sonrası ödeme esas FM dakikası. */
+  odeme_esas_fazla_calisma_dakika: number;
   fazla_calisma_saat: number;
   fazla_calisma_tutari: number;
 };
 
 /**
  * `HaftalikCalismaOzeti` üzerinden saatlik ücret ve haftalık fazla çalışma parasını ekler.
+ * `fazla_calisma_dakika` ham kalır; ödeme `odeme_esas_fazla_calisma_dakika` üzerinden yapılır.
  */
 export function hesaplaHaftalikFazlaCalismaUcreti(
   ozet: HaftalikCalismaOzeti,
   maasTutari: number
 ): HaftalikCalismaVeFazlaUcretOzeti {
   const hamSaatlik = hesaplaSaatlikUcret(maasTutari);
-  const fazla_dk = ucretIcinGuvenliNegatifOlmayanSayi(ozet.fazla_calisma_dakika);
-  const fazla_calisma_saat = fazla_dk / 60;
+  const odeme_esas_fazla_calisma_dakika = hesaplaMevzuatFazlaCalismaOdemeDakika(
+    ozet.fazla_calisma_dakika
+  );
+  const fazla_calisma_saat = odeme_esas_fazla_calisma_dakika / 60;
   const fazla_calisma_tutari = hesaplaFazlaCalismaTutari(ozet.fazla_calisma_dakika, hamSaatlik);
 
   return {
     ...ozet,
     saatlik_ucret: yuvarlaParaIkiliOndalik(hamSaatlik),
+    odeme_esas_fazla_calisma_dakika,
     fazla_calisma_saat,
     fazla_calisma_tutari
   };
@@ -278,8 +319,36 @@ export function hesaplaHaftalikFazlaCalismaUcreti(
 // Günlük puantaj → haftalık fazla mesai ücret özeti (servis adapter)
 // ---------------------------------------------------------------------------
 
-/** Haftalık süre + ücret + hafta aralığı (geçersiz referansta aralık `null`). */
-export type HaftalikPuantajUcretOzeti = HaftalikCalismaVeFazlaUcretOzeti & {
+export const FAZLA_SURELERLE_CALISMA_UCRET_CARPANI = 1.25;
+
+export type EngineV2HaftalikPolitika = {
+  gunluk_calisma_saati: number;
+  haftalik_is_gunu_sayisi: number;
+  aylik_normal_calisma_saati: number;
+};
+
+export const ENGINE_V2_VARSAYILAN_HAFTALIK_POLITIKA: EngineV2HaftalikPolitika = {
+  gunluk_calisma_saati: 8,
+  haftalik_is_gunu_sayisi: 5,
+  aylik_normal_calisma_saati: AYLIK_MAAS_SAAT_PAYDASI
+};
+
+/** Engine V2 haftalık FS/FM bantları + ücret + hafta aralığı. */
+export type HaftalikPuantajUcretOzeti = {
+  toplam_net_dakika: number;
+  normal_calisma_dakika: number;
+  haftalik_esik_dakika: number;
+  sozlesme_haftalik_dakika: number;
+  fazla_surelerle_calisma_dakika: number;
+  odeme_esas_fazla_surelerle_calisma_dakika: number;
+  fazla_surelerle_calisma_saat: number;
+  fazla_surelerle_calisma_tutari: number;
+  fazla_calisma_dakika: number;
+  odeme_esas_fazla_calisma_dakika: number;
+  fazla_calisma_saat: number;
+  fazla_calisma_tutari: number;
+  toplam_fazla_calisma_tutari: number;
+  saatlik_ucret: number;
   hafta_baslangic: string | null;
   hafta_bitis: string | null;
 };
@@ -292,14 +361,71 @@ export type HaftalikPuantajUcretOzeti = HaftalikCalismaVeFazlaUcretOzeti & {
 export function hesaplaHaftalikPuantajUcretOzeti(
   gunler: readonly GunlukPuantaj[],
   referansTarih: string,
-  maasTutari: number
+  maasTutari: number,
+  politika: EngineV2HaftalikPolitika = ENGINE_V2_VARSAYILAN_HAFTALIK_POLITIKA
 ): HaftalikPuantajUcretOzeti {
   const aralik = hesaplaHaftaAraligi(referansTarih);
-  const ozet = hesaplaTarihtenHaftalikCalismaOzeti(gunler, referansTarih);
-  const ucret = hesaplaHaftalikFazlaCalismaUcreti(ozet, maasTutari);
+  const hafta = filtreleHaftalikPuantajSatirlari(gunler, referansTarih).filter(
+    (gun) => gun.gun_tipi === "Normal_Is_Gunu"
+  );
+  const toplam_net_dakika = hafta.reduce(
+    (toplam, gun) => toplam + haftalikNetDakikaSatir(gun.net_calisma_suresi_dakika),
+    0
+  );
+  const gunlukCalismaDakika = Math.round(
+    ucretIcinGuvenliNegatifOlmayanSayi(politika.gunluk_calisma_saati) * 60
+  );
+  const haftalikIsGunu = Math.floor(
+    ucretIcinGuvenliNegatifOlmayanSayi(politika.haftalik_is_gunu_sayisi)
+  );
+  const sozlesme_haftalik_dakika = Math.min(
+    gunlukCalismaDakika * haftalikIsGunu,
+    HAFTALIK_NORMAL_CALISMA_ESIK_DAKIKA
+  );
+  const normal_calisma_dakika = Math.min(toplam_net_dakika, sozlesme_haftalik_dakika);
+  const fazla_surelerle_calisma_dakika = Math.min(
+    Math.max(toplam_net_dakika - sozlesme_haftalik_dakika, 0),
+    Math.max(HAFTALIK_NORMAL_CALISMA_ESIK_DAKIKA - sozlesme_haftalik_dakika, 0)
+  );
+  const fazla_calisma_dakika = Math.max(
+    toplam_net_dakika - HAFTALIK_NORMAL_CALISMA_ESIK_DAKIKA,
+    0
+  );
+  const odeme_esas_fazla_surelerle_calisma_dakika =
+    hesaplaMevzuatFazlaCalismaOdemeDakika(fazla_surelerle_calisma_dakika);
+  const odeme_esas_fazla_calisma_dakika =
+    hesaplaMevzuatFazlaCalismaOdemeDakika(fazla_calisma_dakika);
+  const saatlikUcretHam = hesaplaSaatlikUcret(
+    maasTutari,
+    politika.aylik_normal_calisma_saati
+  );
+  const fazla_surelerle_calisma_tutari = hesaplaCarpanliFazlaCalismaTutari(
+    fazla_surelerle_calisma_dakika,
+    saatlikUcretHam,
+    FAZLA_SURELERLE_CALISMA_UCRET_CARPANI
+  );
+  const fazla_calisma_tutari = hesaplaFazlaCalismaTutari(
+    fazla_calisma_dakika,
+    saatlikUcretHam
+  );
 
   return {
-    ...ucret,
+    toplam_net_dakika,
+    normal_calisma_dakika,
+    haftalik_esik_dakika: HAFTALIK_NORMAL_CALISMA_ESIK_DAKIKA,
+    sozlesme_haftalik_dakika,
+    fazla_surelerle_calisma_dakika,
+    odeme_esas_fazla_surelerle_calisma_dakika,
+    fazla_surelerle_calisma_saat: odeme_esas_fazla_surelerle_calisma_dakika / 60,
+    fazla_surelerle_calisma_tutari,
+    fazla_calisma_dakika,
+    odeme_esas_fazla_calisma_dakika,
+    fazla_calisma_saat: odeme_esas_fazla_calisma_dakika / 60,
+    fazla_calisma_tutari,
+    toplam_fazla_calisma_tutari: yuvarlaParaIkiliOndalik(
+      fazla_surelerle_calisma_tutari + fazla_calisma_tutari
+    ),
+    saatlik_ucret: yuvarlaParaIkiliOndalik(saatlikUcretHam),
     hafta_baslangic: aralik?.hafta_baslangic ?? null,
     hafta_bitis: aralik?.hafta_bitis ?? null
   };
@@ -364,13 +490,12 @@ export type GecErkenEksikSureSonucu = {
   tip?: "GEC_KALMA" | "ERKEN_CIKMA";
 };
 
-function hesaplaKesintiyeEsasDakika(gercekEksikDakika: number): number {
-  const dk = ucretIcinGuvenliNegatifOlmayanSayi(gercekEksikDakika);
-  if (dk === 0) {
-    return 0;
-  }
-
-  return Math.ceil(dk / 30) * 30;
+/**
+ * Geç/erken kesintiye esas dakika (ayrı owner; mevzuat FM yuvarlaması değil).
+ * Engine V2 ile aynı şekilde ham tam dakika korunur.
+ */
+export function hesaplaKesintiyeEsasDakika(gercekEksikDakika: number): number {
+  return Math.floor(ucretIcinGuvenliNegatifOlmayanSayi(gercekEksikDakika));
 }
 
 function readAuthoritativeDakika(value: number | null | undefined): number | undefined {
@@ -1570,9 +1695,13 @@ export const ONSEKIZ_YAS_ALTI_FAZLA_CALISMA_CODE = "ONSEKIZ_YAS_ALTI_FAZLA_CALIS
 export const ONSEKIZ_YAS_ALTI_FAZLA_CALISMA_MESSAGE =
   "18 yaş altı personel için haftalık fazla çalışma tespit edildi; mevzuat uyumu manuel doğrulanmalıdır.";
 
-export function isOnsekizYasAltiPersonel(dogumTarihi: string, referansTarih: string): boolean {
+/** Fazla çalışma / gece yasağı: yalnız 18 yaş altı (`yas < 18`). Yıllık izin `<=18` ayrı predicate. */
+export function isFazlaCalismaGeceYasagiKapsaminda(
+  dogumTarihi: string,
+  referansTarih: string
+): boolean {
   const yas = hesaplaYas(dogumTarihi, referansTarih);
-  return yas !== null && yas <= 18;
+  return yas !== null && yas < 18;
 }
 
 export function uretOnsekizYasAltiFazlaCalismaUyari(): ComplianceUyari {
@@ -1607,7 +1736,7 @@ export function birlestirOnsekizYasAltiFazlaCalismaUyari(
   if (girdi.fazla_calisma_dakika <= 0) {
     return [...mevcut];
   }
-  if (!isOnsekizYasAltiPersonel(girdi.dogum_tarihi, girdi.referans_tarih)) {
+  if (!isFazlaCalismaGeceYasagiKapsaminda(girdi.dogum_tarihi, girdi.referans_tarih)) {
     return [...mevcut];
   }
   if (complianceUyariKoduVar(mevcut, ONSEKIZ_YAS_ALTI_FAZLA_CALISMA_CODE)) {
@@ -1628,8 +1757,7 @@ export function hesaplaYasKuraliBlokMesaji(
     return null;
   }
 
-  const yas = hesaplaYas(girdi.dogum_tarihi, girdi.tarih);
-  if (yas === null || yas > 18) {
+  if (!isFazlaCalismaGeceYasagiKapsaminda(girdi.dogum_tarihi, girdi.tarih)) {
     return null;
   }
 

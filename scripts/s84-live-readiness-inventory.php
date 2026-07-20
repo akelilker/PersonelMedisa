@@ -197,6 +197,7 @@ if ($action === 'inventory') {
         exit;
     }
 
+    try {
     $subeId = isset($_GET['sube_id']) ? (int) $_GET['sube_id'] : 1;
     $yil = isset($_GET['yil']) ? (int) $_GET['yil'] : 0;
     $ay = isset($_GET['ay']) ? (int) $_GET['ay'] : 0;
@@ -338,14 +339,18 @@ if ($action === 'inventory') {
         }
     }
     $gyTableExists = s84_table_exists($pdo, 'genel_yonetici_bildirim_onaylari');
+    $nedenKodu = 'ONAY_KAYDI_YOK';
+    if (!$gyTableExists) {
+        $nedenKodu = 'ONAY_TABLOSU_YOK';
+    } elseif (strpos($s81Neden, 'ONAY_TABLOSU_YOK') !== false) {
+        $nedenKodu = 'ONAY_TABLOSU_YOK_UNEXPECTED';
+    }
     $s81Rows = [[
         'donem' => sprintf('%04d-%02d', $yil, $ay),
         'sube_id' => $subeId,
         'tablo_var_mi' => $gyTableExists ? 'EVET' : 'HAYIR',
         'domain_status' => (string) ($s81Domain['status'] ?? ''),
-        'neden_kodu' => $gyTableExists
-            ? (str_contains($s81Neden, 'ONAY_TABLOSU_YOK') ? 'ONAY_TABLOSU_YOK_UNEXPECTED' : 'ONAY_KAYDI_YOK')
-            : 'ONAY_TABLOSU_YOK',
+        'neden_kodu' => $nedenKodu,
         'aciklama' => (string) ($s81Domain['aciklama'] ?? $s81Neden),
         'action_link' => '/bildirimler',
         'durum' => ((string) ($s81Domain['status'] ?? '')) === 'HAZIR' ? 'TAMAM' : 'BUSINESS_INPUT_REQUIRED',
@@ -451,6 +456,17 @@ if ($action === 'inventory') {
         'candidate_decision' => 'BLOCKED_BUSINESS_DATA_PENDING',
     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     exit;
+    } catch (Throwable $e) {
+        http_response_code(500);
+        echo json_encode([
+            'ok' => false,
+            'code' => 'S84_INVENTORY_EXCEPTION',
+            'error' => $e->getMessage(),
+            'file' => $e->getFile(),
+            'line' => $e->getLine(),
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        exit;
+    }
 }
 
 echo json_encode(['ok' => false, 'error' => 'UNKNOWN_ACTION', 'action' => $action], JSON_UNESCAPED_UNICODE);

@@ -115,7 +115,10 @@ jobs:
           assert data.get('ok') and data.get('code')=='PRODUCTION_DB_IDENTITY_OK', data
           print('identity_ok', data['identity']['aktif_veritabani'])
           PY
-          curl -fsS "${BASE}?token=${TOKEN}&action=inventory&sube_id=${SUBE_ID}" | tee /tmp/s84-artifacts/inventory.json
+          HTTP_CODE=$(curl -sS -o /tmp/s84-artifacts/inventory.json -w "%{http_code}" "${BASE}?token=${TOKEN}&action=inventory&sube_id=${SUBE_ID}")
+          echo "inventory_http=${HTTP_CODE}"
+          head -c 4000 /tmp/s84-artifacts/inventory.json; echo
+          test "${HTTP_CODE}" = "200"
           python3 - <<'PY'
           import json, pathlib
           data=json.load(open('/tmp/s84-artifacts/inventory.json'))

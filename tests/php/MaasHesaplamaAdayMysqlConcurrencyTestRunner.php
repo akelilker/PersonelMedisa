@@ -9,6 +9,7 @@ use Medisa\Api\Services\MaasHesaplamaException;
 use Medisa\Api\Services\MaasHesaplamaSnapshotService as SnapshotSvc;
 use Medisa\Api\Services\Payroll\MaasHesaplamaEngine;
 use Medisa\Api\Services\Payroll\MaasHesaplamaLegalParameterCatalog;
+use Medisa\Api\Services\Payroll\SirketCalismaPolitikasiCatalog;
 
 function mhacPdo(): PDO
 {
@@ -210,10 +211,56 @@ function mhacJson(array $value): string
     return json_encode(SnapshotSvc::canonicalize($value), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 }
 
+function mhacSeedApprovedPolicy(PDO $pdo): void
+{
+    $values = [
+        'NORMAL_AY_GUN_SAYISI' => '30',
+        'GUNLUK_CALISMA_SAATI' => '8',
+        'AYLIK_NORMAL_CALISMA_SAATI' => '225',
+        'HAFTALIK_IS_GUNU_SAYISI' => '5',
+        'HAFTA_TATILI_HESAP_MODU' => 'GUNLUK_ILAVE',
+        'HAFTA_TATILI_CARPANI' => '1',
+        'FAZLA_MESAI_CARPANI' => '1.5',
+        'FAZLA_SURELERLE_CALISMA_CARPANI' => '1.25',
+        'UBGT_CARPANI' => '1',
+        'UBGT_HESAP_MODU' => 'GUNLUK_ILAVE',
+    ];
+    $pdo->exec(
+        "INSERT INTO sirket_calisma_politikalari (
+            revision_no, state, gecerlilik_baslangic, gecerlilik_bitis, policy_version_hash,
+            hazirlayan_id, onaylayan_id, onay_zamani, created_by
+        ) VALUES (
+            1, 'ONAYLANDI', '2020-01-01', NULL, '" . str_repeat('c', 64) . "',
+            1, 1, '2026-01-01 00:00:00', 1
+        )"
+    );
+    $policyId = (int) $pdo->lastInsertId();
+    $stmt = $pdo->prepare(
+        'INSERT INTO sirket_calisma_politika_degerleri (
+            politika_id, parametre_kodu, deger_tipi, sayisal_deger, metin_deger, birim
+        ) VALUES (
+            :politika_id, :kod, :tip, :sayisal, :metin, :birim
+        )'
+    );
+    foreach (SirketCalismaPolitikasiCatalog::requiredCodes() as $code) {
+        $meta = SirketCalismaPolitikasiCatalog::meta($code);
+        $isMetin = $meta && $meta['deger_tipi'] === 'METIN';
+        $stmt->execute([
+            'politika_id' => $policyId,
+            'kod' => $code,
+            'tip' => $isMetin ? 'METIN' : 'SAYISAL',
+            'sayisal' => $isMetin ? null : $values[$code],
+            'metin' => $isMetin ? $values[$code] : null,
+            'birim' => $meta['birim'] ?? null,
+        ]);
+    }
+}
+
 function mhacSeedSnapshot(PDO $pdo): int
 {
     $pdo->exec("INSERT INTO subeler VALUES (1, 'MRK', 'Merkez')");
     $pdo->exec('INSERT INTO users VALUES (1), (11), (12), (99)');
+    mhacSeedApprovedPolicy($pdo);
     $pdo->exec("INSERT INTO personeller (id, tc_kimlik_no, ad, soyad, sicil_no, ise_giris_tarihi, sube_id)
         VALUES (7, '11111111111', 'Test', 'Personel', 'S007', '2020-01-01', 1)");
     $pdo->exec("INSERT INTO puantaj_aylik_muhurleri (sube_id, yil, ay, donem, durum, muhurlenen_kayit_sayisi, created_by)
@@ -361,6 +408,8 @@ try {
         '022_personel_bordro_devirleri.sql',
         '023_maas_hesaplama_adaylari.sql',
         '024_maas_hesaplama_aday_guvenlik_indexleri.sql',
+        '033_sirket_calisma_politikalari.sql',
+        '034_bordro_onay_ve_projection.sql',
     ] as $file) {
         mhacApplyMigration($pdo, $file);
     }

@@ -235,6 +235,7 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "aylik_bildirim_onayi.view",
     "bordro_on_izleme.view",
     "sirket_parametreleri.view",
+    "sirket_parametreleri.manage",
     "revizyon.view",
     "revizyon.create",
     "revizyon.submit",

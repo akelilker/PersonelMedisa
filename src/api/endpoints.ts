@@ -138,6 +138,24 @@ export const endpoints = {
     yasalKatalog: "/maas-hesaplama/yasal-katalog",
     devirler: "/maas-hesaplama/devirler"
   },
+  bordroHazirlik: {
+    preflight: "/bordro-hazirlik/preflight",
+    onIzleme: "/bordro-hazirlik/on-izleme",
+    devirler: "/bordro-hazirlik/devirler",
+    devirImport: "/bordro-hazirlik/devirler/import",
+    adayDetail: (id: number | string) => `/bordro-hazirlik/adaylar/${id}`,
+    kontrolGonder: (id: number | string) => `/bordro-hazirlik/calistirmalar/${id}/kontrol-gonder`,
+    geriGonder: (id: number | string) => `/bordro-hazirlik/calistirmalar/${id}/geri-gonder`,
+    kesinlestir: (id: number | string) => `/bordro-hazirlik/calistirmalar/${id}/kesinlestir`
+  },
+  sirketCalismaPolitikalari: {
+    katalog: "/sirket-calisma-politikalari/katalog",
+    list: "/sirket-calisma-politikalari",
+    detail: (id: number | string) => `/sirket-calisma-politikalari/${id}`,
+    submit: (id: number | string) => `/sirket-calisma-politikalari/${id}/onaya-gonder`,
+    approve: (id: number | string) => `/sirket-calisma-politikalari/${id}/onayla`,
+    cancel: (id: number | string) => `/sirket-calisma-politikalari/${id}/iptal`
+  },
   finans: {
     list: "/ek-odeme-kesinti",
     detail: (id: number | string) => `/ek-odeme-kesinti/${id}`

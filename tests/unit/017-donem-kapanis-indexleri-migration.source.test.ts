@@ -29,6 +29,6 @@ describe("017_donem_kapanis_ve_etki_rapor_indexleri migration source", () => {
       .filter((name) => /^\d{3}_.*\.sql$/.test(name))
       .sort();
     expect(migrations).toContain("017_donem_kapanis_ve_etki_rapor_indexleri.sql");
-    expect(migrations.at(-1)).toBe("032_gunluk_bildirim_tamamlama_ve_duplicate.sql");
+    expect(migrations.at(-1)).toBe("034_bordro_onay_ve_projection.sql");
   });
 });

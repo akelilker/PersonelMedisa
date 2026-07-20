@@ -22,6 +22,7 @@ import type {
 } from "../../../../types/revizyon-talebi";
 import { DossierRecord, DossierSection } from "./personel-dosya-dossier";
 import { PersonelFinansAdaylariSection } from "./PersonelFinansAdaylariSection";
+import { PersonelBordroGatewaySection } from "./PersonelBordroGatewaySection";
 import {
   computeFinansAdayToplamlari,
   formatFinansKayitTutar,
@@ -273,6 +274,7 @@ export function PersonelPuantajOzetSection({
   canViewRevizyon,
   canCreateRevizyon = false,
   canViewFinans,
+  canViewBordro = false,
   isActive
 }: {
   personel: Personel;
@@ -280,6 +282,7 @@ export function PersonelPuantajOzetSection({
   canViewRevizyon: boolean;
   canCreateRevizyon?: boolean;
   canViewFinans: boolean;
+  canViewBordro?: boolean;
   isActive: boolean;
 }) {
   const devamPrimiOzeti = useDevamPrimiEligibilityOzeti(personel);
@@ -550,6 +553,8 @@ export function PersonelPuantajOzetSection({
         canFetch={canFetchFinans}
         fetchResolved={finansFetchResolved}
       />
+
+      <PersonelBordroGatewaySection canViewBordro={canViewBordro} />
 
       <DossierSection
         title="Aylık Puantaj Özeti"

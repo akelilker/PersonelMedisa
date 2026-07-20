@@ -16,6 +16,7 @@
     "e2e": "playwright test",
     "e2e:s80": "playwright test tests/e2e/revizyon-merkezi.spec.ts",
     "e2e:s81": "playwright test tests/e2e/s81-bildirim-onay-zinciri.spec.ts",
+    "e2e:s82": "playwright test tests/e2e/s82-bordro-hazirlik-merkezi.spec.ts",
     "e2e:headed": "playwright test --headed",
     "e2e:ui": "playwright test --ui",
     "icons:generate": "node scripts/generate-icons.mjs",

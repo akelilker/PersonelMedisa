@@ -1345,6 +1345,81 @@ function getBildirimPageState(page: Page): MockBildirimPageState {
   return created;
 }
 
+type MockMaasBordroPageState = {
+  maasSnapshots: Array<Record<string, any>>;
+  maasAudits: Array<Record<string, any>>;
+  maasCalistirmalar: Array<Record<string, any>>;
+  maasAdaylar: Array<Record<string, any>>;
+  maasKalemler: Array<Record<string, any>>;
+  maasDevirler: Array<Record<string, any>>;
+  sirketPolitikalari: Array<Record<string, any>>;
+  bordroDevirImportlari: Array<Record<string, any>>;
+  maasNextId: number;
+  maasNextAuditId: number;
+  maasNextDevirId: number;
+  sirketPolitikaNextId: number;
+};
+
+const maasBordroStateByPage = new WeakMap<Page, MockMaasBordroPageState>();
+
+function getMaasBordroPageState(page: Page): MockMaasBordroPageState {
+  const existing = maasBordroStateByPage.get(page);
+  if (existing) {
+    return existing;
+  }
+
+  const sourceHash = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+  const created: MockMaasBordroPageState = {
+    maasSnapshots: [
+      {
+        id: 1,
+        snapshot_id: 1,
+        sube_id: 1,
+        yil: 2026,
+        ay: 3,
+        donem: "2026-03",
+        donem_baslangic: "2026-03-01",
+        donem_bitis: "2026-03-31",
+        muhur_id: 1,
+        revision_no: 1,
+        parent_snapshot_id: null,
+        state: "OLUSTURULDU",
+        contract_version: "S77_C_SNAPSHOT_V1",
+        cutoff_at: "2026-03-31 23:59:00",
+        preflight_hash: "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        source_hash: sourceHash,
+        snapshot_hash: sourceHash,
+        personel_sayisi: 2,
+        girdi_sayisi: 8,
+        blocker_count: 0,
+        warning_count: 1,
+        created_by: 1,
+        created_at: "2026-03-01T00:00:00.000Z",
+        iptal_edildi_by: null,
+        iptal_edildi_at: null,
+        iptal_nedeni: null
+      }
+    ],
+    maasAudits: [],
+    maasCalistirmalar: [],
+    maasAdaylar: [],
+    maasKalemler: [],
+    maasDevirler: [],
+    sirketPolitikalari: [],
+    bordroDevirImportlari: [],
+    maasNextId: 1,
+    maasNextAuditId: 0,
+    maasNextDevirId: 0,
+    sirketPolitikaNextId: 0
+  };
+  maasBordroStateByPage.set(page, created);
+  return created;
+}
+
+export function resetMaasBordroPageState(page: Page): void {
+  maasBordroStateByPage.delete(page);
+}
+
 function normalizeMockSubeIdsWithVarsayilan(subeIds: number[], varsayilanSubeId: number | null | undefined) {
   if (varsayilanSubeId == null || subeIds.length === 0) {
     return subeIds;
@@ -1547,6 +1622,7 @@ export async function mockApi(page: Page, role: MockUserRole, options: MockApiOp
       ucret_tipi_id: 1,
       ucret_tipi_adi: "Aylık",
       maas_tutari: 35000,
+      net_maas_tutari: 35000,
       prim_kurali_id: 7,
       prim_kurali_adi: "7 No'lu Prim Kuralı"
     },
@@ -1913,15 +1989,17 @@ export async function mockApi(page: Page, role: MockUserRole, options: MockApiOp
     }
   ];
 
-  const maasSnapshots: Array<Record<string, any>> = [];
-  const maasAudits: Array<Record<string, any>> = [];
-  const maasCalistirmalar: Array<Record<string, any>> = [];
-  const maasAdaylar: Array<Record<string, any>> = [];
-  const maasKalemler: Array<Record<string, any>> = [];
-  const maasDevirler: Array<Record<string, any>> = [];
-  let maasNextId = 0;
-  let maasNextAuditId = 0;
-  let maasNextDevirId = 0;
+  const maasBordroState = getMaasBordroPageState(page);
+  const {
+    maasSnapshots,
+    maasAudits,
+    maasCalistirmalar,
+    maasAdaylar,
+    maasKalemler,
+    maasDevirler,
+    sirketPolitikalari,
+    bordroDevirImportlari
+  } = maasBordroState;
 
   const fcotSnapshotById = new Map<
     number,
@@ -3754,14 +3832,17 @@ let personelBelgeKaydiIdCounter = 903;
     return denyUnlessRolePermission(route, "puantaj.update");
   }
 
+  const apiRoutePredicate = (testUrl: string) => {
+    try {
+      return new URL(testUrl).pathname.startsWith("/api/");
+    } catch {
+      return false;
+    }
+  };
+
+  await page.unroute(apiRoutePredicate);
   await page.route(
-    (testUrl) => {
-      try {
-        return new URL(testUrl).pathname.startsWith("/api/");
-      } catch {
-        return false;
-      }
-    },
+    apiRoutePredicate,
     async (route) => {
     const request = route.request();
     const url = new URL(request.url());
@@ -7580,7 +7661,7 @@ let personelBelgeKaydiIdCounter = 903;
       const cancelled = [...maasSnapshots]
         .filter((item) => item.sube_id === subeId && item.yil === yil && item.ay === ay)
         .sort((a, b) => b.revision_no - a.revision_no)[0];
-      const id = ++maasNextId;
+      const id = ++maasBordroState.maasNextId;
       const snapshot = {
         id,
         snapshot_id: id,
@@ -7611,7 +7692,7 @@ let personelBelgeKaydiIdCounter = 903;
       };
       maasSnapshots.push(snapshot);
       maasAudits.push({
-        id: ++maasNextAuditId,
+        id: ++maasBordroState.maasNextAuditId,
         donem_snapshot_id: id,
         sube_id: subeId,
         yil,
@@ -7647,6 +7728,32 @@ let personelBelgeKaydiIdCounter = 903;
         return;
       }
       const existing = maasCalistirmalar.find((item) => item.donem_snapshot_id === snapshot.id && item.state !== "IPTAL");
+      const approvedPolicy = sirketPolitikalari.find((item) => item.state === "ONAYLANDI");
+      const blockers = [];
+      if (!approvedPolicy) {
+        blockers.push({
+          severity: "BLOCKER",
+          code: "BUSINESS_POLICY_REQUIRED",
+          message: "Onayli sirket politikasi yok.",
+          record_type: "sirket_politikasi",
+          record_id: null,
+          personel_id: null,
+          personel_adi: null,
+          metadata: {}
+        });
+      }
+      if (maasDevirler.length === 0 && snapshot.ay > 1) {
+        blockers.push({
+          severity: "BLOCKER",
+          code: "PERSONNEL_CARRYOVER_MISSING",
+          message: "Devir eksik.",
+          record_type: "devir",
+          record_id: null,
+          personel_id: 1,
+          personel_adi: "Ayşe Yılmaz",
+          metadata: {}
+        });
+      }
       await fulfillJson(
         route,
         200,
@@ -7656,27 +7763,18 @@ let personelBelgeKaydiIdCounter = 903;
           yil: snapshot.yil,
           ay: snapshot.ay,
           donem: snapshot.donem,
-          hesaplanabilir_mi: false,
-          blocker_count: 1,
+          hesaplanabilir_mi: blockers.length === 0,
+          blocker_count: blockers.length,
           warning_count: 0,
           info_count: 0,
-          items: [
-            {
-              severity: "BLOCKER",
-              code: "LEGAL_PARAMETER_REQUIRED_MISSING",
-              message: "Demo mock mevzuat katalogu olmadigi icin hesaplama blokeli.",
-              record_type: "mevzuat",
-              record_id: null,
-              personel_id: null,
-              personel_adi: null,
-              metadata: {}
-            }
-          ],
+          items: blockers.length > 0 ? blockers : [{ severity: "INFO", code: "ENGINE_VERSION", message: "OK", record_type: null, record_id: null, personel_id: null, personel_adi: null, metadata: {} }],
           personel_summary: [],
-          parameter_summary: { mevzuat_parametre_sayisi: 0 },
+          parameter_summary: { mevzuat_parametre_sayisi: approvedPolicy ? 10 : 0 },
           engine_version: "S77_D_E2E_ENGINE_V2",
           contract_version: "S77_D_CALCULATION_V2",
-          calculation_input_hash: "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          calculation_input_hash: approvedPolicy
+            ? "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            : "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
           source_hash: snapshot.source_hash,
           parameter_set_hash: "0000000000000000000000000000000000000000000000000000000000000000",
           carryover_set_hash: "1111111111111111111111111111111111111111111111111111111111111111",
@@ -7700,7 +7798,58 @@ let personelBelgeKaydiIdCounter = 903;
       if (await denyUnlessRolePermission(route, "maas_hesaplama_adaylari.manage")) {
         return;
       }
-      await fulfillJson(route, 409, errorBody("PAYROLL_CALCULATION_BLOCKED", "Hesaplama preflight blocker iceriyor."));
+      const snapshotId = Number.parseInt(maasCalculateMatch[1] ?? "", 10);
+      const snapshot = maasSnapshots.find((item) => item.id === snapshotId);
+      const approvedPolicy = sirketPolitikalari.find((item) => item.state === "ONAYLANDI");
+      if (!snapshot || !approvedPolicy) {
+        await fulfillJson(route, 409, errorBody("PAYROLL_CALCULATION_BLOCKED", "Hesaplama preflight blocker iceriyor."));
+        return;
+      }
+      const existing = maasCalistirmalar.find((item) => item.donem_snapshot_id === snapshot.id && item.state !== "IPTAL");
+      if (existing) {
+        await fulfillJson(route, 200, okBody({ calistirma: existing, idempotent: true, audit: null }));
+        return;
+      }
+      const calistirmaId = ++maasBordroState.maasNextId;
+      const calistirma = {
+        id: calistirmaId,
+        donem_snapshot_id: snapshot.id,
+        snapshot_id: snapshot.id,
+        sube_id: snapshot.sube_id,
+        yil: snapshot.yil,
+        ay: snapshot.ay,
+        revision_no: 1,
+        state: "HESAPLANDI",
+        bordro_onay_durumu: "HESAPLANDI",
+        personel_sayisi: 1
+      };
+      maasCalistirmalar.push(calistirma);
+      const adayId = ++maasBordroState.maasNextId;
+      maasAdaylar.push({
+        id: adayId,
+        calistirma_id: calistirmaId,
+        personel_id: 1,
+        personel_ad_soyad: "Ayşe Yılmaz",
+        state: "HESAPLANDI",
+        hedef_net_tutar: "25000.00",
+        hesaplanan_brut_tutar: "32000.00",
+        net_odenecek: "25000.00",
+        toplam_ek_odeme: "0.00",
+        toplam_kesinti: "0.00",
+        correction_projection_json: [{ correction_event_id: 1, delta_dakika: 30 }]
+      });
+      maasKalemler.push({
+        id: ++maasBordroState.maasNextId,
+        aday_id: adayId,
+        sira_no: 1,
+        kalem_grubu: "NET",
+        kalem_kodu: "NET_ODENECEK",
+        yon: "ARTI",
+        tutar: 25000,
+        kaynak_turu: "HESAP",
+        aciklama: "Net odenecek"
+      });
+      await fulfillJson(route, 201, okBody({ calistirma, idempotent: false, audit: null }));
       return;
     }
 
@@ -7869,7 +8018,7 @@ let personelBelgeKaydiIdCounter = 903;
       const devir =
         existing ??
         {
-          id: ++maasNextDevirId,
+          id: ++maasBordroState.maasNextDevirId,
           personel_id: personelId,
           personel_ad_soyad: personel ? `${personel.ad} ${personel.soyad}` : null,
           sube_id: subeId,
@@ -7956,6 +8105,375 @@ let personelBelgeKaydiIdCounter = 903;
           items: maasAudits.filter((item) => item.sube_id === subeId && item.yil === yil && item.ay === ay)
         })
       );
+      return;
+    }
+
+    if (path === "/api/bordro-hazirlik/preflight" && method === "GET") {
+      if (await denyUnlessRolePermission(route, "bordro_on_izleme.view")) {
+        return;
+      }
+      const yil = Number.parseInt(url.searchParams.get("yil") ?? "", 10) || 2026;
+      const ay = Number.parseInt(url.searchParams.get("ay") ?? "", 10) || 3;
+      const subeId = Number.parseInt(url.searchParams.get("sube_id") ?? "1", 10);
+      const approvedPolicy = sirketPolitikalari.find((item) => item.state === "ONAYLANDI");
+      const snapshot = maasSnapshots.find(
+        (item) => item.sube_id === subeId && item.yil === yil && item.ay === ay && item.state === "OLUSTURULDU"
+      );
+      const items: Array<Record<string, unknown>> = [];
+      if (!approvedPolicy) {
+        items.push({
+          severity: "BLOCKER",
+          code: "BUSINESS_POLICY_REQUIRED",
+          message: "Onaylı şirket çalışma politikası bulunamadı.",
+          record_type: "sirket_politikasi",
+          record_id: null,
+          personel_id: null,
+          personel_adi: null,
+          metadata: {},
+          action_link: "/raporlar?panel=bordro-hazirlik&tab=politika",
+          etkilenen_personel_sayisi: 0,
+          etkilenen_kayit_sayisi: 0
+        });
+        items.push({
+          severity: "BLOCKER",
+          code: "S81_GENEL_YONETICI_FINAL_ONAY_EKSIK",
+          message: "Genel yönetici final onayı tamamlanmamış.",
+          record_type: "onay_zinciri",
+          record_id: null,
+          personel_id: null,
+          personel_adi: null,
+          metadata: {},
+          action_link: "/bildirimler",
+          etkilenen_personel_sayisi: 0,
+          etkilenen_kayit_sayisi: 0
+        });
+      }
+      if (approvedPolicy && !snapshot) {
+        items.push({
+          severity: "BLOCKER",
+          code: "PERIOD_NOT_SEALED",
+          message: "Dönem mühürlenmemiş.",
+          record_type: "muhur",
+          record_id: null,
+          personel_id: null,
+          personel_adi: null,
+          metadata: {},
+          action_link: "/raporlar?panel=donem-kapanis",
+          etkilenen_personel_sayisi: 0,
+          etkilenen_kayit_sayisi: 0
+        });
+      }
+      const blockerCount = items.filter((item) => item.severity === "BLOCKER").length;
+      await fulfillJson(route, 200, okBody({
+        sube_id: subeId,
+        yil,
+        ay,
+        donem: `${yil}-${String(ay).padStart(2, "0")}`,
+        hesaplanabilir_mi: blockerCount === 0,
+        blocker_count: blockerCount,
+        warning_count: 0,
+        info_count: approvedPolicy && snapshot ? 1 : 0,
+        items:
+          items.length > 0
+            ? items
+            : [
+                {
+                  severity: "INFO",
+                  code: "PREFLIGHT_READY",
+                  message: "Bordro hazırlık kontrolleri tamam.",
+                  record_type: null,
+                  record_id: null,
+                  personel_id: null,
+                  personel_adi: null,
+                  metadata: {},
+                  action_link: "/raporlar?panel=bordro-hazirlik&tab=on-izleme",
+                  etkilenen_personel_sayisi: 0,
+                  etkilenen_kayit_sayisi: 0
+                }
+              ],
+        policy_summary: {
+          onayli_politika_id: approvedPolicy?.id ?? null,
+          policy_version_hash: approvedPolicy?.policy_version_hash ?? null,
+          zorunlu_adet: 10
+        },
+        correction_projection_hash: "mock-correction-hash",
+        contract_version: "S82_BORDRO_HAZIRLIK_PREFLIGHT_V1"
+      }));
+      return;
+    }
+
+    if (path === "/api/bordro-hazirlik/on-izleme" && method === "GET") {
+      if (await denyUnlessRolePermission(route, "bordro_on_izleme.view")) {
+        return;
+      }
+      const yil = Number.parseInt(url.searchParams.get("yil") ?? "", 10) || 2026;
+      const ay = Number.parseInt(url.searchParams.get("ay") ?? "", 10) || 3;
+      const subeId = Number.parseInt(url.searchParams.get("sube_id") ?? "1", 10);
+      const approvedPolicy = sirketPolitikalari.find((item) => item.state === "ONAYLANDI");
+      const snapshot = maasSnapshots.find(
+        (item) => item.sube_id === subeId && item.yil === yil && item.ay === ay && item.state === "OLUSTURULDU"
+      );
+      const blockerCount = approvedPolicy && snapshot ? 0 : 1;
+      const calistirma = maasCalistirmalar.find((item) => item.yil === yil && item.ay === ay && item.state !== "IPTAL") ?? null;
+      const adaylar = calistirma
+        ? maasAdaylar.filter((item) => item.calistirma_id === calistirma.id)
+        : [];
+      await fulfillJson(route, 200, okBody({
+        donem: `${yil}-${String(ay).padStart(2, "0")}`,
+        sube_id: Number.parseInt(url.searchParams.get("sube_id") ?? "1", 10),
+        toplam_personel: adaylar.length,
+        hesaplanabilir: 0,
+        blocker_bulunan: blockerCount,
+        aday_olusturulan: adaylar.length,
+        kontrol_bekleyen: calistirma?.bordro_onay_durumu === "ONAY_BEKLIYOR" ? adaylar.length : 0,
+        kesinlesen: calistirma?.bordro_onay_durumu === "KESINLESTI" ? adaylar.length : 0,
+        toplam_net: adaylar.reduce((sum, item) => sum + Number(item.net_odenecek ?? 0), 0).toFixed(2),
+        toplam_brut: adaylar.reduce((sum, item) => sum + Number(item.hesaplanan_brut_tutar ?? 0), 0).toFixed(2),
+        toplam_ek_odeme: "0.00",
+        toplam_kesinti: "0.00",
+        calistirma,
+        preflight: {
+          sube_id: Number.parseInt(url.searchParams.get("sube_id") ?? "1", 10),
+          yil,
+          ay,
+          donem: `${yil}-${String(ay).padStart(2, "0")}`,
+          hesaplanabilir_mi: blockerCount === 0,
+          blocker_count: blockerCount,
+          warning_count: 0,
+          info_count: 0,
+          items: [],
+          policy_summary: {
+            onayli_politika_id: approvedPolicy?.id ?? null,
+            policy_version_hash: approvedPolicy?.policy_version_hash ?? null,
+            zorunlu_adet: 10
+          },
+          correction_projection_hash: "mock-correction-hash",
+          contract_version: "S82_BORDRO_HAZIRLIK_PREFLIGHT_V1"
+        },
+        personel_satirlari: adaylar.map((aday) => {
+          const personel = personeller.find((entry) => entry.id === aday.personel_id);
+          return {
+            aday_id: aday.id,
+            personel_id: aday.personel_id,
+            ad_soyad: personel ? `${personel.ad} ${personel.soyad}` : `Personel #${aday.personel_id}`,
+            sicil: personel?.sicil_no ?? "",
+            sube_ad: "Merkez",
+            departman_ad: "Demo",
+            net_maas: aday.hedef_net_tutar,
+            brut_maas: aday.hesaplanan_brut_tutar,
+            net_odenecek: aday.net_odenecek,
+            toplam_ek_odeme: aday.toplam_ek_odeme,
+            toplam_kesinti: aday.toplam_kesinti,
+            durum: aday.state,
+            bordro_onay_durumu: calistirma?.bordro_onay_durumu ?? "HESAPLANDI",
+            aktif_correction_var_mi: Boolean(aday.correction_projection_json)
+          };
+        })
+      }));
+      return;
+    }
+
+    if (path === "/api/bordro-hazirlik/devirler" && method === "GET") {
+      if (await denyUnlessRolePermission(route, "maas_hesaplama_adaylari.view")) {
+        return;
+      }
+      const yil = Number.parseInt(url.searchParams.get("yil") ?? "", 10) || 2026;
+      const ay = Number.parseInt(url.searchParams.get("ay") ?? "", 10) || 3;
+      const items = personeller
+        .filter((personel) => personel.sube_id === 1)
+        .map((personel) => {
+          const devir = maasDevirler.find(
+            (item) => item.personel_id === personel.id && item.yil === yil && item.ay === ay
+          );
+          const eksikAlanlar = ay > 1 && !devir
+            ? ["onceki_kumulatif_gelir_vergisi_matrahi", "onceki_kumulatif_gelir_vergisi"]
+            : [];
+          return {
+            personel: {
+              ad: personel.ad,
+              soyad: personel.soyad,
+              sicil: personel.sicil_no,
+              departman: "Demo"
+            },
+            donem: `${yil}-${String(ay).padStart(2, "0")}`,
+            devir: devir ?? null,
+            eksik_alanlar: eksikAlanlar,
+            dogrulama_durumu: eksikAlanlar.length === 0 ? "TAMAM" : "EKSIK"
+          };
+        });
+      await fulfillJson(route, 200, okBody({ items }));
+      return;
+    }
+
+    if (path === "/api/bordro-hazirlik/devirler/import" && method === "POST") {
+      if (await denyUnlessRolePermission(route, "maas_hesaplama_adaylari.manage")) {
+        return;
+      }
+      const body = request.postDataJSON() as {
+        yil?: number;
+        ay?: number;
+        dry_run?: boolean;
+        rows?: Array<Record<string, string>>;
+      };
+      const rows = body.rows ?? [];
+      let basarili = 0;
+      let hatali = 0;
+      const satirlar = rows.map((row, index) => {
+        const personel = personeller.find((entry) => entry.sicil_no === row.sicil);
+        if (!personel) {
+          hatali += 1;
+          return { satir: index + 1, ok: false, hata: "personel bulunamadi" };
+        }
+        if (!body.dry_run) {
+          maasDevirler.push({
+            id: ++maasBordroState.maasNextDevirId,
+            personel_id: personel.id,
+            sube_id: personel.sube_id,
+            yil: body.yil ?? 2026,
+            ay: body.ay ?? 3,
+            onceki_kumulatif_gelir_vergisi_matrahi: row.onceki_kumulatif_gelir_vergisi_matrahi ?? "0",
+            onceki_kumulatif_gelir_vergisi: row.onceki_kumulatif_gelir_vergisi ?? "0",
+            state: "AKTIF"
+          });
+        }
+        basarili += 1;
+        return { satir: index + 1, sicil: row.sicil, ok: true };
+      });
+      await fulfillJson(route, 200, okBody({
+        dry_run: Boolean(body.dry_run),
+        toplam_satir: rows.length,
+        basarili_satir: basarili,
+        hatali_satir: hatali,
+        satirlar
+      }));
+      return;
+    }
+
+    const bordroKontrolMatch = path.match(/^\/api\/bordro-hazirlik\/calistirmalar\/(\d+)\/kontrol-gonder$/);
+    if (bordroKontrolMatch && method === "POST") {
+      if (await denyUnlessRolePermission(route, "maas_hesaplama_adaylari.manage")) {
+        return;
+      }
+      const id = Number.parseInt(bordroKontrolMatch[1] ?? "", 10);
+      const calistirma = maasCalistirmalar.find((item) => item.id === id);
+      if (!calistirma) {
+        await fulfillJson(route, 404, errorBody("NOT_FOUND", "Calistirma bulunamadi."));
+        return;
+      }
+      calistirma.bordro_onay_durumu = "ONAY_BEKLIYOR";
+      await fulfillJson(route, 200, okBody({ calistirma }));
+      return;
+    }
+
+    const bordroGeriGonderMatch = path.match(/^\/api\/bordro-hazirlik\/calistirmalar\/(\d+)\/geri-gonder$/);
+    if (bordroGeriGonderMatch && method === "POST") {
+      if (await denyUnlessRolePermission(route, "bordro_kesinlestirme.approve")) {
+        return;
+      }
+      const id = Number.parseInt(bordroGeriGonderMatch[1] ?? "", 10);
+      const calistirma = maasCalistirmalar.find((item) => item.id === id);
+      if (!calistirma) {
+        await fulfillJson(route, 404, errorBody("NOT_FOUND", "Calistirma bulunamadi."));
+        return;
+      }
+      calistirma.bordro_onay_durumu = "MUHASEBE_KONTROLUNDE";
+      await fulfillJson(route, 200, okBody({ calistirma }));
+      return;
+    }
+
+    const bordroKesinlestirMatch = path.match(/^\/api\/bordro-hazirlik\/calistirmalar\/(\d+)\/kesinlestir$/);
+    if (bordroKesinlestirMatch && method === "POST") {
+      if (await denyUnlessRolePermission(route, "bordro_kesinlestirme.approve")) {
+        return;
+      }
+      const id = Number.parseInt(bordroKesinlestirMatch[1] ?? "", 10);
+      const calistirma = maasCalistirmalar.find((item) => item.id === id);
+      if (!calistirma) {
+        await fulfillJson(route, 404, errorBody("NOT_FOUND", "Calistirma bulunamadi."));
+        return;
+      }
+      calistirma.bordro_onay_durumu = "KESINLESTI";
+      await fulfillJson(route, 200, okBody({ calistirma }));
+      return;
+    }
+
+    if (path === "/api/sirket-calisma-politikalari/katalog" && method === "GET") {
+      if (await denyUnlessRolePermission(route, "sirket_parametreleri.view")) {
+        return;
+      }
+      await fulfillJson(route, 200, okBody({
+        items: [
+          { parametre_kodu: "NORMAL_AY_GUN_SAYISI", etiket: "Normal Ay Gün Sayısı", deger_tipi: "SAYISAL", birim: "GUN", zorunlu: true },
+          { parametre_kodu: "GUNLUK_CALISMA_SAATI", etiket: "Günlük Çalışma Saati", deger_tipi: "SAYISAL", birim: "SAAT", zorunlu: true },
+          { parametre_kodu: "AYLIK_NORMAL_CALISMA_SAATI", etiket: "Aylık Normal Çalışma Saati", deger_tipi: "SAYISAL", birim: "SAAT", zorunlu: true },
+          { parametre_kodu: "HAFTALIK_IS_GUNU_SAYISI", etiket: "Haftalık İş Günü Sayısı", deger_tipi: "SAYISAL", birim: "GUN", zorunlu: true },
+          { parametre_kodu: "HAFTA_TATILI_HESAP_MODU", etiket: "Hafta Tatili Hesap Modu", deger_tipi: "METIN", birim: "MOD", zorunlu: true },
+          { parametre_kodu: "HAFTA_TATILI_CARPANI", etiket: "Hafta Tatili Çarpanı", deger_tipi: "SAYISAL", birim: "CARPAN", zorunlu: true },
+          { parametre_kodu: "FAZLA_MESAI_CARPANI", etiket: "Fazla Mesai Çarpanı", deger_tipi: "SAYISAL", birim: "CARPAN", zorunlu: true },
+          { parametre_kodu: "FAZLA_SURELERLE_CALISMA_CARPANI", etiket: "Fazla Sürelerle Çalışma Çarpanı", deger_tipi: "SAYISAL", birim: "CARPAN", zorunlu: true },
+          { parametre_kodu: "UBGT_CARPANI", etiket: "UBGT Çarpanı", deger_tipi: "SAYISAL", birim: "CARPAN", zorunlu: true },
+          { parametre_kodu: "UBGT_HESAP_MODU", etiket: "UBGT Hesap Modu", deger_tipi: "METIN", birim: "MOD", zorunlu: true }
+        ]
+      }));
+      return;
+    }
+
+    if (path === "/api/sirket-calisma-politikalari" && method === "GET") {
+      if (await denyUnlessRolePermission(route, "sirket_parametreleri.view")) {
+        return;
+      }
+      await fulfillJson(route, 200, okBody({ items: sirketPolitikalari }));
+      return;
+    }
+
+    if (path === "/api/sirket-calisma-politikalari" && method === "POST") {
+      if (await denyUnlessRolePermission(route, "sirket_parametreleri.manage")) {
+        return;
+      }
+      const body = request.postDataJSON() as Record<string, unknown>;
+      const politika = {
+        id: ++maasBordroState.sirketPolitikaNextId,
+        state: "TASLAK",
+        gecerlilik_baslangic: body.gecerlilik_baslangic ?? "2026-03-01",
+        gecerlilik_bitis: null,
+        aciklama: body.aciklama ?? null,
+        policy_version_hash: "mock-policy-hash",
+        degerler: body.degerler ?? []
+      };
+      sirketPolitikalari.push(politika);
+      await fulfillJson(route, 201, okBody(politika));
+      return;
+    }
+
+    const sirketPolitikaSubmitMatch = path.match(/^\/api\/sirket-calisma-politikalari\/(\d+)\/onaya-gonder$/);
+    if (sirketPolitikaSubmitMatch && method === "POST") {
+      if (await denyUnlessRolePermission(route, "sirket_parametreleri.manage")) {
+        return;
+      }
+      const id = Number.parseInt(sirketPolitikaSubmitMatch[1] ?? "", 10);
+      const politika = sirketPolitikalari.find((item) => item.id === id);
+      if (!politika) {
+        await fulfillJson(route, 404, errorBody("NOT_FOUND", "Politika bulunamadi."));
+        return;
+      }
+      politika.state = "ONAY_BEKLIYOR";
+      await fulfillJson(route, 200, okBody(politika));
+      return;
+    }
+
+    const sirketPolitikaApproveMatch = path.match(/^\/api\/sirket-calisma-politikalari\/(\d+)\/onayla$/);
+    if (sirketPolitikaApproveMatch && method === "POST") {
+      if (await denyUnlessRolePermission(route, "bordro_kesinlestirme.approve")) {
+        return;
+      }
+      const id = Number.parseInt(sirketPolitikaApproveMatch[1] ?? "", 10);
+      const politika = sirketPolitikalari.find((item) => item.id === id);
+      if (!politika) {
+        await fulfillJson(route, 404, errorBody("NOT_FOUND", "Politika bulunamadi."));
+        return;
+      }
+      politika.state = "ONAYLANDI";
+      await fulfillJson(route, 200, okBody(politika));
       return;
     }
 

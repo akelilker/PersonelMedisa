@@ -112,7 +112,7 @@ class SirketCalismaPolitikasiService
         $etkilenenPersonel = 0;
         if ($subeId !== null) {
             try {
-                $c = $pdo->prepare("SELECT COUNT(*) FROM personeller WHERE sube_id = :s AND durum = 'AKTIF'");
+                $c = $pdo->prepare("SELECT COUNT(*) FROM personeller WHERE sube_id = :s AND aktif_durum = 'AKTIF'");
                 $c->execute(['s' => (int) $subeId]);
                 $etkilenenPersonel = (int) $c->fetchColumn();
             } catch (\Throwable $e) {

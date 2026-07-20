@@ -83,6 +83,16 @@ jobs:
       - name: Run unit and integration tests
         run: npm run test
 
+      - name: Prove S83 MariaDB carryover import acceptance
+        run: |
+          set -euo pipefail
+          OUT="$(php tests/php/S83BordroDevirImportMysqlTestRunner.php)"
+          echo "$OUT"
+          echo "$OUT" | grep -F "verify-s83-devir-import-mysql: OK"
+          echo "$OUT" | grep -F "[PASS] dry_run: eklenecek for valid sicil"
+          echo "$OUT" | grep -F "[PASS] commit dry_run=false with all-valid rows inserts AKTIF row"
+          echo "$OUT" | grep -F "[PASS] commit with any invalid row throws DEVIR_IMPORT_VALIDATION_FAILED"
+
       - name: Run build
         run: npm run build
 

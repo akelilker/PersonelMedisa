@@ -149,7 +149,11 @@ class BordroHazirlikController
         $ay = self::readQueryInt($request, 'ay', 1, 12);
         $departmanId = self::optionalQueryInt($request, 'departman_id', 1, 999999);
         try {
-            JsonResponse::success(BordroOnIzlemeService::buildDonemOzeti($pdo, $subeId, $yil, $ay, $departmanId));
+            $ozet = BordroOnIzlemeService::buildDonemOzeti($pdo, $subeId, $yil, $ay, $departmanId);
+            if (!RolePermissions::has($user, 'finans.view')) {
+                $ozet = BordroOnIzlemeService::maskFinanceFields($ozet);
+            }
+            JsonResponse::success($ozet);
         } catch (\Throwable $e) {
             JsonResponse::serverError('Bordro on izleme olusturulamadi.');
         }
@@ -163,6 +167,9 @@ class BordroHazirlikController
             JsonResponse::error(404, 'BORDRO_ADAY_NOT_FOUND', 'Bordro adayi bulunamadi.');
         }
         self::assertSubeScope($user, $request, (int) ($detail['sube_id'] ?? 0));
+        if (!RolePermissions::has($user, 'finans.view')) {
+            $detail = BordroOnIzlemeService::maskAdayFinanceFields($detail);
+        }
         JsonResponse::success($detail);
     }
 

@@ -1231,7 +1231,8 @@ function buildDemoBordroReadiness(yil: number, ay: number, subeId: number) {
         ? "Onaylı şirket çalışma politikası mevcut."
         : "Onaylı şirket politikası yok veya zorunlu parametreler eksik.",
       action_link: "/raporlar?panel=bordro-hazirlik&tab=politika",
-      blocker_codes: approvedPolicy ? [] : ["BUSINESS_POLICY_REQUIRED"]
+      blocker_codes: approvedPolicy ? [] : ["BUSINESS_POLICY_REQUIRED"],
+      ...(approvedPolicy ? {} : { eksik_kodlar: ["NORMAL_AY_GUN_SAYISI"] })
     },
     {
       key: "net_maas",
@@ -8061,7 +8062,8 @@ export function resolveDemoApiResponse(
     const calistirma =
       maasDemo.calistirmalar.find((item) => item.yil === yil && item.ay === ay && item.state !== "IPTAL") ?? null;
     const adaylar = calistirma ? maasDemo.adaylar.filter((item) => item.calistirma_id === calistirma.id) : [];
-    return ok({
+    const canViewFinance = hasRolePermission(actor.role, "finans.view");
+    const ozet = {
       donem: `${yil}-${String(ay).padStart(2, "0")}`,
       sube_id: subeId,
       toplam_personel: adaylar.length,
@@ -8070,10 +8072,15 @@ export function resolveDemoApiResponse(
       aday_olusturulan: adaylar.length,
       kontrol_bekleyen: calistirma?.bordro_onay_durumu === "ONAY_BEKLIYOR" ? adaylar.length : 0,
       kesinlesen: calistirma?.bordro_onay_durumu === "KESINLESTI" ? adaylar.length : 0,
-      toplam_net: adaylar.reduce((sum, item) => sum + Number(item.net_odenecek ?? 0), 0).toFixed(2),
-      toplam_brut: adaylar.reduce((sum, item) => sum + Number(item.hesaplanan_brut_tutar ?? 0), 0).toFixed(2),
-      toplam_ek_odeme: "0.00",
-      toplam_kesinti: "0.00",
+      toplam_net: canViewFinance
+        ? adaylar.reduce((sum, item) => sum + Number(item.net_odenecek ?? 0), 0).toFixed(2)
+        : null,
+      toplam_brut: canViewFinance
+        ? adaylar.reduce((sum, item) => sum + Number(item.hesaplanan_brut_tutar ?? 0), 0).toFixed(2)
+        : null,
+      toplam_ek_odeme: canViewFinance ? "0.00" : null,
+      toplam_kesinti: canViewFinance ? "0.00" : null,
+      finance_masked: !canViewFinance,
       calistirma,
       preflight: { blocker_count: 0, items: [] },
       personel_satirlari: adaylar.map((aday) => ({
@@ -8083,16 +8090,17 @@ export function resolveDemoApiResponse(
         sicil: "P-001",
         sube_ad: "Merkez",
         departman_ad: "Demo",
-        net_maas: aday.hedef_net_tutar,
-        brut_maas: aday.hesaplanan_brut_tutar,
-        net_odenecek: aday.net_odenecek,
-        toplam_ek_odeme: aday.toplam_ek_odeme,
-        toplam_kesinti: aday.toplam_kesinti,
+        net_maas: canViewFinance ? aday.hedef_net_tutar : null,
+        brut_maas: canViewFinance ? aday.hesaplanan_brut_tutar : null,
+        net_odenecek: canViewFinance ? aday.net_odenecek : null,
+        toplam_ek_odeme: canViewFinance ? aday.toplam_ek_odeme : null,
+        toplam_kesinti: canViewFinance ? aday.toplam_kesinti : null,
         durum: aday.state,
         bordro_onay_durumu: calistirma?.bordro_onay_durumu ?? "HESAPLANDI",
         aktif_correction_var_mi: Boolean(aday.correction_projection_json)
       }))
-    });
+    };
+    return ok(ozet);
   }
 
   if (pathname === "/bordro-hazirlik/devirler" && method === "GET") {

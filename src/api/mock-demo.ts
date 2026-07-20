@@ -177,6 +177,32 @@ type DemoPersonelUcretKaydi = {
   updated_by: number | null;
 };
 
+type DemoPersonelBordroKapsamKaydi = {
+  id: number;
+  personel_id: number;
+  sube_id: number;
+  durum: "DAHIL" | "HARIC";
+  neden_kodu: "DEMO_TEST_VERISI" | "BORDRO_DISI_STATU" | "HARICI_BORDRO" | "DIGER_ONAYLI_NEDEN";
+  aciklama: string;
+  gecerlilik_baslangic: string;
+  gecerlilik_bitis: string | null;
+  state: "TASLAK" | "ONAY_BEKLIYOR" | "ONAYLANDI" | "IPTAL";
+  hazirlayan_id: number | null;
+  onaylayan_id: number | null;
+  onay_zamani: string | null;
+  iptal_eden_id: number | null;
+  iptal_zamani: string | null;
+  iptal_nedeni: string | null;
+  parent_kapsam_id: number | null;
+  created_by: number | null;
+  created_at: string;
+  updated_by: number | null;
+  updated_at: string;
+  sicil_no?: string | null;
+  ad_soyad?: string | null;
+  contract_version: string;
+};
+
 type DemoMevzuatParametresi = {
   id: number;
   parametre_kodu: string;
@@ -352,6 +378,7 @@ const demoState: {
   genelYoneticiBildirimOnaylari: GenelYoneticiBildirimOnayi[];
   finansKalemleri: DemoFinansKalem[];
   personelUcretleri: DemoPersonelUcretKaydi[];
+  personelBordroKapsamlari: DemoPersonelBordroKapsamKaydi[];
   mevzuatParametreleri: DemoMevzuatParametresi[];
   puantajMap: Record<string, DemoPuantaj>;
   makineler: DemoMakine[];
@@ -395,6 +422,7 @@ const demoState: {
     genelYoneticiBildirimOnay: number;
     finans: number;
     personelUcret: number;
+    personelBordroKapsam: number;
     mevzuatParametre: number;
     kapanis: number;
     odemeTercihi: number;
@@ -583,6 +611,7 @@ const demoState: {
     }
   ],
   personelUcretleri: [],
+  personelBordroKapsamlari: [],
   mevzuatParametreleri: [],
   puantajMap: {
     "1|2026-04-09": buildDemoPuantaj({
@@ -804,6 +833,7 @@ const demoState: {
     genelYoneticiBildirimOnay: 0,
     finans: 950,
     personelUcret: 0,
+    personelBordroKapsam: 0,
     mevzuatParametre: 0,
     kapanis: 1000,
     odemeTercihi: 1,
@@ -2932,6 +2962,205 @@ function demoPersonelSubeScopeError(
   return null;
 }
 
+const DEMO_BORDRO_KAPSAM_CONTRACT = "S84R2_PAYROLL_SCOPE_V1";
+const DEMO_BORDRO_KAPSAM_NEDENLER = [
+  "DEMO_TEST_VERISI",
+  "BORDRO_DISI_STATU",
+  "HARICI_BORDRO",
+  "DIGER_ONAYLI_NEDEN"
+] as const;
+
+function demoPayrollScopeHash(payload: unknown): string {
+  const raw = JSON.stringify(payload);
+  let h1 = 0x811c9dc5;
+  let h2 = 0x1000193;
+  for (let i = 0; i < raw.length; i += 1) {
+    const c = raw.charCodeAt(i);
+    h1 ^= c;
+    h1 = Math.imul(h1, 0x01000193);
+    h2 = Math.imul(h2 ^ c, 0x01000193);
+  }
+  const a = (h1 >>> 0).toString(16).padStart(8, "0");
+  const b = (h2 >>> 0).toString(16).padStart(8, "0");
+  return `${a}${b}${"0".repeat(48)}`.slice(0, 64);
+}
+
+function demoMonthEndIso(yil: number, ay: number): string {
+  const day = new Date(Date.UTC(yil, ay, 0)).getUTCDate();
+  return `${String(yil).padStart(4, "0")}-${String(ay).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+function demoHasMockActivePayrollSnapshot(personel: DemoPersonel): boolean {
+  const sicil = (personel.sicil_no ?? "").toUpperCase();
+  return personel.id === 1 || sicil === "P-001" || sicil === "P-0001";
+}
+
+function demoRangesOverlapInclusive(
+  startA: string,
+  endA: string | null,
+  startB: string,
+  endB: string | null
+): boolean {
+  const aEnd = endA ?? "9999-12-31";
+  const bEnd = endB ?? "9999-12-31";
+  return startA <= bEnd && startB <= aEnd;
+}
+
+function serializeDemoBordroKapsam(
+  row: DemoPersonelBordroKapsamKaydi,
+  personel?: DemoPersonel
+): DemoPersonelBordroKapsamKaydi {
+  const adSoyad = personel
+    ? `${personel.ad} ${personel.soyad}`.trim()
+    : row.ad_soyad ?? null;
+  return {
+    ...row,
+    sicil_no: personel?.sicil_no ?? row.sicil_no ?? null,
+    ad_soyad: adSoyad,
+    contract_version: DEMO_BORDRO_KAPSAM_CONTRACT
+  };
+}
+
+function buildDemoBordroKapsamDryRun(
+  personel: DemoPersonel,
+  body: Record<string, unknown>,
+  actor: RevizyonActorContext
+): { error: ApiResponse<unknown> } | { result: Record<string, unknown> } {
+  const durum = (toStringValue(body.durum) ?? "").toUpperCase();
+  if (durum !== "DAHIL" && durum !== "HARIC") {
+    return { error: demoRevizyonError("VALIDATION_ERROR", "durum DAHIL veya HARIC olmali.") };
+  }
+  const neden = (toStringValue(body.neden_kodu) ?? "").toUpperCase();
+  if (!(DEMO_BORDRO_KAPSAM_NEDENLER as readonly string[]).includes(neden)) {
+    return { error: demoRevizyonError("VALIDATION_ERROR", "neden_kodu gecersiz.") };
+  }
+  const aciklama = (toStringValue(body.aciklama) ?? "").trim();
+  if (aciklama.length < 3) {
+    return { error: demoRevizyonError("VALIDATION_ERROR", "aciklama zorunlu (min 3 karakter).") };
+  }
+  const bas = toStringValue(body.gecerlilik_baslangic) ?? "";
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(bas)) {
+    return { error: demoRevizyonError("VALIDATION_ERROR", "gecerlilik_baslangic YYYY-MM-DD olmali.") };
+  }
+  let bit: string | null = toStringValue(body.gecerlilik_bitis);
+  if (bit === "") {
+    bit = null;
+  }
+  if (bit && !/^\d{4}-\d{2}-\d{2}$/.test(bit)) {
+    return { error: demoRevizyonError("VALIDATION_ERROR", "gecerlilik_bitis YYYY-MM-DD olmali.") };
+  }
+  if (bit && bit < bas) {
+    return { error: demoRevizyonError("VALIDATION_ERROR", "gecerlilik_bitis baslangictan once olamaz.") };
+  }
+
+  const overlap = demoState.personelBordroKapsamlari.some(
+    (item) =>
+      item.personel_id === personel.id &&
+      item.state === "ONAYLANDI" &&
+      demoRangesOverlapInclusive(bas, bit, item.gecerlilik_baslangic, item.gecerlilik_bitis)
+  );
+  if (overlap) {
+    return {
+      error: demoRevizyonError("KAPSAM_OVERLAP", "Ayni personel icin cakisan onayli kapsam araligi var.")
+    };
+  }
+
+  let donemBaslangic = toStringValue(body.donem_baslangic) ?? bas;
+  let donemBitis = toStringValue(body.donem_bitis) ?? bit ?? bas;
+  const yil = toNumber(body.yil);
+  const ay = toNumber(body.ay);
+  if (yil !== null && ay !== null && ay >= 1 && ay <= 12) {
+    donemBaslangic = `${String(yil).padStart(4, "0")}-${String(ay).padStart(2, "0")}-01`;
+    donemBitis = demoMonthEndIso(yil, ay);
+  }
+
+  const previewState = (toStringValue(body.preview_state) ?? "ONAYLANDI").toUpperCase();
+  const wouldExclude = durum === "HARIC" && previewState === "ONAYLANDI";
+  const existingExcluded = demoState.personelBordroKapsamlari.some(
+    (item) =>
+      item.personel_id === personel.id &&
+      item.state === "ONAYLANDI" &&
+      item.durum === "HARIC" &&
+      item.gecerlilik_baslangic <= donemBitis &&
+      (item.gecerlilik_bitis === null || item.gecerlilik_bitis >= donemBaslangic)
+  );
+
+  const hasActiveSnapshot = demoHasMockActivePayrollSnapshot(personel);
+  const activeSnapshot = hasActiveSnapshot
+    ? {
+        id: 9001,
+        snapshot_hash: "demo-snapshot-hash-p001",
+        source_hash: "demo-source-hash-p001",
+        revision_no: 1
+      }
+    : null;
+  const revisionRequired = wouldExclude && activeSnapshot !== null;
+
+  const normalized = {
+    personel_id: personel.id,
+    sube_id: personel.sube_id ?? 1,
+    durum,
+    neden_kodu: neden,
+    aciklama,
+    gecerlilik_baslangic: bas,
+    gecerlilik_bitis: bit,
+    parent_kapsam_id: toNumber(body.parent_kapsam_id)
+  };
+
+  const dryRunHash = demoPayrollScopeHash({
+    contract: DEMO_BORDRO_KAPSAM_CONTRACT,
+    personel_id: personel.id,
+    normalized,
+    donem_baslangic: donemBaslangic,
+    donem_bitis: donemBitis,
+    actor_id: actor.userId
+  });
+
+  return {
+    result: {
+      ok: true,
+      contract_version: DEMO_BORDRO_KAPSAM_CONTRACT,
+      write_performed: false,
+      dry_run_hash: dryRunHash,
+      personel: {
+        id: personel.id,
+        sicil_no: personel.sicil_no ?? "",
+        ad_soyad: `${personel.ad} ${personel.soyad}`.trim(),
+        sube_id: personel.sube_id ?? 1
+      },
+      proposed: {
+        durum,
+        neden_kodu: neden,
+        aciklama,
+        gecerlilik_baslangic: bas,
+        gecerlilik_bitis: bit
+      },
+      donem: {
+        baslangic: donemBaslangic,
+        bitis: donemBitis
+      },
+      effects: {
+        currently_excluded: existingExcluded,
+        would_exclude_from_new_snapshot: wouldExclude || existingExcluded,
+        muhur_satiri_var_mi: false,
+        muhur_satir_sayisi: 0,
+        existing_snapshot_unchanged: true,
+        existing_snapshot: activeSnapshot,
+        source_hash_would_change: wouldExclude && !existingExcluded,
+        explicit_snapshot_revision_required: revisionRequired,
+        carryover_blocker_suppressed: wouldExclude || existingExcluded,
+        net_maas_blocker_suppressed: wouldExclude || existingExcluded,
+        candidate_item_excluded: wouldExclude || existingExcluded
+      },
+      warnings: revisionRequired
+        ? [
+            "Aktif snapshot var; kapsam ONAYLANDI HARIC sonrasi EXISTING_ACTIVE_SNAPSHOT_SOURCE_CHANGED / explicit cancel+revision gerekir."
+          ]
+        : []
+    }
+  };
+}
+
 type DemoUcretNormalizedBody = {
   ucret_tutari: number;
   ucret_turu: "BRUT" | "NET";
@@ -4605,6 +4834,240 @@ export function resolveDemoApiResponse(
     record.updated_by = actor.userId;
     syncDemoLegacyMaas(personelId);
     return ok(record);
+  }
+
+  const personelBordroKapsamListMatch = pathname.match(/^\/personeller\/(\d+)\/bordro-kapsamlari$/);
+  if (personelBordroKapsamListMatch && (method === "GET" || method === "POST")) {
+    const actor = readDemoApiActor(init);
+    const personelId = Number.parseInt(personelBordroKapsamListMatch[1], 10);
+    const personel = demoState.personeller.find((item) => item.id === personelId);
+    if (!personel) {
+      return demoRevizyonError("PERSONEL_NOT_FOUND", "Personel bulunamadi.");
+    }
+    const scopeError = demoPersonelSubeScopeError(actor, personel);
+    if (scopeError) return scopeError;
+
+    if (method === "GET") {
+      const permissionError = enforceDemoPermission(
+        actor,
+        "personel_bordro_kapsam.view",
+        "Bordro kapsam bilgisini goruntuleme yetkiniz yok."
+      );
+      if (permissionError) return permissionError;
+      return ok({
+        items: demoState.personelBordroKapsamlari
+          .filter((item) => item.personel_id === personelId)
+          .sort((a, b) => {
+            if (a.gecerlilik_baslangic === b.gecerlilik_baslangic) {
+              return b.id - a.id;
+            }
+            return a.gecerlilik_baslangic < b.gecerlilik_baslangic ? 1 : -1;
+          })
+          .map((item) => serializeDemoBordroKapsam(item, personel)),
+        contract_version: DEMO_BORDRO_KAPSAM_CONTRACT
+      });
+    }
+
+    const permissionError = enforceDemoPermission(
+      actor,
+      "personel_bordro_kapsam.manage",
+      "Bordro kapsam yonetim yetkiniz yok."
+    );
+    if (permissionError) return permissionError;
+
+    const dryRunHash = toStringValue(body.dry_run_hash) ?? "";
+    if (!dryRunHash) {
+      return demoRevizyonError("DRY_RUN_HASH_REQUIRED", "Commit oncesi dry-run hash zorunlu.");
+    }
+
+    const createBody = { ...body };
+    if (actor.role === "MUHASEBE") {
+      delete createBody.direkt_onayla;
+    }
+    const neden = (toStringValue(createBody.neden_kodu) ?? "").toUpperCase();
+    if (neden === "DEMO_TEST_VERISI" && actor.role !== "GENEL_YONETICI") {
+      return demoRevizyonError(
+        "FORBIDDEN",
+        "DEMO_TEST_VERISI yalniz GENEL_YONETICI tarafindan secilebilir."
+      );
+    }
+
+    const preview = buildDemoBordroKapsamDryRun(
+      personel,
+      { ...createBody, preview_state: "ONAYLANDI" },
+      actor
+    );
+    if ("error" in preview) {
+      return preview.error;
+    }
+    if (preview.result.dry_run_hash !== dryRunHash) {
+      return demoRevizyonError("DRY_RUN_STALE", "Dry-run hash guncel degil; yeniden dry-run calistirin.");
+    }
+
+    const proposed = preview.result.proposed as {
+      durum: "DAHIL" | "HARIC";
+      neden_kodu: DemoPersonelBordroKapsamKaydi["neden_kodu"];
+      aciklama: string;
+      gecerlilik_baslangic: string;
+      gecerlilik_bitis: string | null;
+    };
+    const now = new Date().toISOString();
+    let initialState: DemoPersonelBordroKapsamKaydi["state"] = "TASLAK";
+    if (actor.role === "GENEL_YONETICI" && createBody.direkt_onayla === true) {
+      initialState = "ONAYLANDI";
+    }
+    const next: DemoPersonelBordroKapsamKaydi = {
+      id: ++demoState.nextIds.personelBordroKapsam,
+      personel_id: personelId,
+      sube_id: personel.sube_id ?? 1,
+      durum: proposed.durum,
+      neden_kodu: proposed.neden_kodu,
+      aciklama: proposed.aciklama,
+      gecerlilik_baslangic: proposed.gecerlilik_baslangic,
+      gecerlilik_bitis: proposed.gecerlilik_bitis,
+      state: initialState,
+      hazirlayan_id: actor.userId,
+      onaylayan_id: initialState === "ONAYLANDI" ? actor.userId : null,
+      onay_zamani: initialState === "ONAYLANDI" ? now : null,
+      iptal_eden_id: null,
+      iptal_zamani: null,
+      iptal_nedeni: null,
+      parent_kapsam_id: toNumber(createBody.parent_kapsam_id),
+      created_by: actor.userId,
+      created_at: now,
+      updated_by: actor.userId,
+      updated_at: now,
+      contract_version: DEMO_BORDRO_KAPSAM_CONTRACT
+    };
+    demoState.personelBordroKapsamlari.push(next);
+    return ok(serializeDemoBordroKapsam(next, personel));
+  }
+
+  const personelBordroKapsamDryRunMatch = pathname.match(
+    /^\/personeller\/(\d+)\/bordro-kapsamlari\/dry-run$/
+  );
+  if (personelBordroKapsamDryRunMatch && method === "POST") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(
+      actor,
+      "personel_bordro_kapsam.view",
+      "Bordro kapsam bilgisini goruntuleme yetkiniz yok."
+    );
+    if (permissionError) return permissionError;
+
+    const personelId = Number.parseInt(personelBordroKapsamDryRunMatch[1], 10);
+    const personel = demoState.personeller.find((item) => item.id === personelId);
+    if (!personel) {
+      return demoRevizyonError("PERSONEL_NOT_FOUND", "Personel bulunamadi.");
+    }
+    const scopeError = demoPersonelSubeScopeError(actor, personel);
+    if (scopeError) return scopeError;
+
+    const preview = buildDemoBordroKapsamDryRun(personel, body, actor);
+    if ("error" in preview) {
+      return preview.error;
+    }
+    return ok(preview.result);
+  }
+
+  const personelBordroKapsamActionMatch = pathname.match(
+    /^\/personeller\/(\d+)\/bordro-kapsamlari\/(\d+)\/(onaya-gonder|onayla|iptal)$/
+  );
+  if (personelBordroKapsamActionMatch && method === "POST") {
+    const actor = readDemoApiActor(init);
+    const personelId = Number.parseInt(personelBordroKapsamActionMatch[1], 10);
+    const kapsamId = Number.parseInt(personelBordroKapsamActionMatch[2], 10);
+    const action = personelBordroKapsamActionMatch[3];
+    const personel = demoState.personeller.find((item) => item.id === personelId);
+    if (!personel) {
+      return demoRevizyonError("PERSONEL_NOT_FOUND", "Personel bulunamadi.");
+    }
+    const scopeError = demoPersonelSubeScopeError(actor, personel);
+    if (scopeError) return scopeError;
+
+    const record = demoState.personelBordroKapsamlari.find(
+      (item) => item.id === kapsamId && item.personel_id === personelId
+    );
+    if (!record) {
+      return demoRevizyonError("NOT_FOUND", "Kapsam kaydi bulunamadi.");
+    }
+
+    const now = new Date().toISOString();
+    if (action === "onaya-gonder") {
+      const permissionError = enforceDemoPermission(
+        actor,
+        "personel_bordro_kapsam.manage",
+        "Bordro kapsam yonetim yetkiniz yok."
+      );
+      if (permissionError) return permissionError;
+      if (record.state !== "TASLAK") {
+        return demoRevizyonError("INVALID_STATE", "Yalniz TASLAK kayit onaya gonderilebilir.");
+      }
+      record.state = "ONAY_BEKLIYOR";
+      record.updated_at = now;
+      record.updated_by = actor.userId;
+      return ok(serializeDemoBordroKapsam(record, personel));
+    }
+
+    if (action === "onayla") {
+      const permissionError = enforceDemoPermission(
+        actor,
+        "personel_bordro_kapsam.approve",
+        "Bordro kapsam onay yetkiniz yok."
+      );
+      if (permissionError) return permissionError;
+      if (record.state !== "TASLAK" && record.state !== "ONAY_BEKLIYOR") {
+        return demoRevizyonError("INVALID_STATE", "Bu kayit onaylanamaz.");
+      }
+      if (record.neden_kodu === "DEMO_TEST_VERISI" && actor.role !== "GENEL_YONETICI") {
+        return demoRevizyonError("FORBIDDEN", "DEMO_TEST_VERISI onayi yalniz GENEL_YONETICI.");
+      }
+      const overlap = demoState.personelBordroKapsamlari.some(
+        (item) =>
+          item.id !== record.id &&
+          item.personel_id === personelId &&
+          item.state === "ONAYLANDI" &&
+          demoRangesOverlapInclusive(
+            record.gecerlilik_baslangic,
+            record.gecerlilik_bitis,
+            item.gecerlilik_baslangic,
+            item.gecerlilik_bitis
+          )
+      );
+      if (overlap) {
+        return demoRevizyonError(
+          "KAPSAM_OVERLAP",
+          "Ayni personel icin cakisan onayli kapsam araligi var."
+        );
+      }
+      record.state = "ONAYLANDI";
+      record.onaylayan_id = actor.userId;
+      record.onay_zamani = now;
+      record.updated_at = now;
+      record.updated_by = actor.userId;
+      return ok(serializeDemoBordroKapsam(record, personel));
+    }
+
+    const permissionError = enforceDemoPermission(
+      actor,
+      "personel_bordro_kapsam.manage",
+      "Bordro kapsam yonetim yetkiniz yok."
+    );
+    if (permissionError) return permissionError;
+    if (record.state === "IPTAL") {
+      return demoRevizyonError("ALREADY_CANCELLED", "Kayit zaten iptal.");
+    }
+    const neden = (toStringValue(body.neden) ?? toStringValue(body.iptal_nedeni) ?? "").trim();
+    if (neden.length < 3) {
+      return demoRevizyonError("VALIDATION_ERROR", "Iptal nedeni zorunlu.");
+    }
+    record.state = "IPTAL";
+    record.iptal_eden_id = actor.userId;
+    record.iptal_zamani = now;
+    record.iptal_nedeni = neden;
+    record.updated_at = now;
+    record.updated_by = actor.userId;
+    return ok(serializeDemoBordroKapsam(record, personel));
   }
 
   if (pathname === "/surecler" && method === "GET") {

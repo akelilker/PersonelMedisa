@@ -70,10 +70,25 @@ class MaasHesaplamaSnapshotService
         $salaries = self::resolveSalarySegments($pdo, $personeller, $items);
         $attendance = $muhur ? self::resolveSealedAttendance($pdo, $muhur, $items) : ['rows' => [], 'by_personel' => []];
         $izinler = self::resolveLeaveSources($pdo, $personeller, $donemBaslangic, $donemBitis);
-        $finance = self::resolveFinanceInputs($pdo, $subeId, $donem, $personeller, $muhur, $items);
+        $finance = self::resolveFinanceInputs($pdo, $subeId, $donem, $donemBaslangic, $donemBitis, $personeller, $muhur, $items);
         $legal = self::resolveLegalParameters($pdo, $donemBaslangic, $donemBitis, $items);
 
-        $hashes = self::buildSourceFingerprint($muhur, $personeller, $salaries, $attendance, $izinler, $finance, $legal);
+        $scopeFingerprint = PersonelBordroKapsamService::scopeFingerprintForPeriod(
+            $pdo,
+            $subeId,
+            $donemBaslangic,
+            $donemBitis
+        );
+        $hashes = self::buildSourceFingerprint(
+            $muhur,
+            $personeller,
+            $salaries,
+            $attendance,
+            $izinler,
+            $finance,
+            $legal,
+            $scopeFingerprint
+        );
 
         $existing = self::findActiveSnapshot($pdo, $subeId, $yil, $ay, $forUpdate);
         if ($existing) {
@@ -218,6 +233,13 @@ class MaasHesaplamaSnapshotService
             }
         }
 
+        $excludedIds = PersonelBordroKapsamService::listExcludedPersonelIds(
+            $pdo,
+            $subeId,
+            $donemBaslangic,
+            $donemBitis
+        );
+
         $personeller = [];
         foreach ($rows as $row) {
             $personelId = (int) $row['id'];
@@ -236,6 +258,24 @@ class MaasHesaplamaSnapshotService
             $intersects = $iseGiris <= $donemBitis && ($cikis === null || $cikis >= $donemBaslangic);
             $hasSealedRows = isset($sealedPersonelIds[$personelId]);
             if (!$intersects && !$hasSealedRows) {
+                continue;
+            }
+
+            // S84-R2: ONAYLANDI HARIC kapsam, muhur satiri olsa bile yeni snapshot setine alinmaz.
+            if (isset($excludedIds[$personelId])) {
+                $items[] = self::issue(
+                    self::SEVERITY_INFO,
+                    'PAYROLL_SCOPE_EXCLUDED',
+                    'Personel donemde bordro kapsaminda HARIC; yeni snapshot setine alinmadi.',
+                    'personel',
+                    $personelId,
+                    $personelId,
+                    [
+                        'sicil_no' => $row['sicil_no'] !== null ? (string) $row['sicil_no'] : null,
+                        'muhurlu_kayit_var_mi' => $hasSealedRows,
+                    ],
+                    $adSoyad
+                );
                 continue;
             }
 
@@ -490,7 +530,7 @@ class MaasHesaplamaSnapshotService
      * @param array<int, array<string, mixed>> $items
      * @return array<string, mixed>
      */
-    public static function resolveFinanceInputs(PDO $pdo, $subeId, $donem, array $personeller, $muhur, array &$items)
+    public static function resolveFinanceInputs(PDO $pdo, $subeId, $donem, $donemBaslangic, $donemBitis, array $personeller, $muhur, array &$items)
     {
         $stmt = $pdo->prepare(
             'SELECT * FROM onayli_bildirim_puantaj_etki_adaylari
@@ -501,9 +541,18 @@ class MaasHesaplamaSnapshotService
         $candidates = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         $finalCandidates = [];
+        $excludedIds = PersonelBordroKapsamService::listExcludedPersonelIds(
+            $pdo,
+            $subeId,
+            $donemBaslangic,
+            $donemBitis
+        );
         foreach ($candidates as $candidate) {
             $state = strtoupper((string) $candidate['state']);
             $personelId = (int) $candidate['personel_id'];
+            if (isset($excludedIds[$personelId])) {
+                continue;
+            }
             $adSoyad = isset($personeller[$personelId]) ? (string) $personeller[$personelId]['ad_soyad'] : null;
             if (in_array($state, self::CANDIDATE_PENDING_STATES, true)) {
                 $code = $candidate['conflict_code'] !== null && $candidate['conflict_code'] !== ''
@@ -547,7 +596,12 @@ class MaasHesaplamaSnapshotService
              ORDER BY fk.id ASC"
         );
         $finansStmt->execute(['sube_id' => $subeId, 'donem' => $donem]);
-        $finansRows = $finansStmt->fetchAll(PDO::FETCH_ASSOC);
+        $finansRows = array_values(array_filter(
+            $finansStmt->fetchAll(PDO::FETCH_ASSOC),
+            static function (array $row) use ($excludedIds) {
+                return !isset($excludedIds[(int) $row['personel_id']]);
+            }
+        ));
 
         $duplicateKeys = [];
         foreach ($finansRows as $finansRow) {
@@ -677,8 +731,16 @@ class MaasHesaplamaSnapshotService
      * @param array<int, array<string, mixed>> $legal
      * @return array<string, string>
      */
-    public static function buildSourceFingerprint($muhur, array $personeller, array $salaries, array $attendance, array $izinler, array $finance, array $legal)
-    {
+    public static function buildSourceFingerprint(
+        $muhur,
+        array $personeller,
+        array $salaries,
+        array $attendance,
+        array $izinler,
+        array $finance,
+        array $legal,
+        $scopeFingerprint = null
+    ) {
         $muhurHash = self::hashCanonical($muhur ? self::muhurPayload($muhur) : null);
         $personelSetHash = self::hashCanonical(array_map([self::class, 'personelPayload'], array_values($personeller)));
         $salaryHash = self::hashCanonical(array_values(array_map('array_values', $salaries)));
@@ -689,8 +751,13 @@ class MaasHesaplamaSnapshotService
             'finans' => array_map([self::class, 'financePayloadStatic'], $finance['finans_rows'] ?? []),
         ]);
         $legalHash = self::hashCanonical(array_map([self::class, 'legalPayloadStatic'], $legal));
+        $emptyScopeHash = PersonelBordroKapsamService::emptyScopeFingerprint();
+        $scopeHash = $scopeFingerprint !== null && $scopeFingerprint !== ''
+            ? (string) $scopeFingerprint
+            : $emptyScopeHash;
 
-        $sourceHash = self::hashCanonical([
+        // Bos kapsamda eski source_hash formulunu koru (mevcut snapshotlarla silent mismatch olmasin).
+        $sourcePayload = [
             'contract_version' => self::CONTRACT_VERSION,
             'muhur_hash' => $muhurHash,
             'personel_set_hash' => $personelSetHash,
@@ -699,7 +766,11 @@ class MaasHesaplamaSnapshotService
             'izin_source_hash' => $izinHash,
             'finance_source_hash' => $financeHash,
             'legal_parameter_hash' => $legalHash,
-        ]);
+        ];
+        if ($scopeHash !== $emptyScopeHash) {
+            $sourcePayload['payroll_scope_hash'] = $scopeHash;
+        }
+        $sourceHash = self::hashCanonical($sourcePayload);
 
         return [
             'muhur_hash' => $muhurHash,
@@ -709,6 +780,7 @@ class MaasHesaplamaSnapshotService
             'izin_source_hash' => $izinHash,
             'finance_source_hash' => $financeHash,
             'legal_parameter_hash' => $legalHash,
+            'payroll_scope_hash' => $scopeHash,
             'source_hash' => $sourceHash,
         ];
     }

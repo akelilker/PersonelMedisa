@@ -30,6 +30,9 @@ export type PersonelDosyaTabPanelsProps = {
   canViewBordro?: boolean;
   canViewUcret: boolean;
   canManageUcret: boolean;
+  canViewBordroKapsam?: boolean;
+  canManageBordroKapsam?: boolean;
+  canApproveBordroKapsam?: boolean;
   onOpenZimmetCreate: () => void;
   onOpenCreateSurecModal: () => void;
 };
@@ -56,6 +59,9 @@ export function PersonelDosyaTabPanels({
   canViewBordro = false,
   canViewUcret,
   canManageUcret,
+  canViewBordroKapsam = false,
+  canManageBordroKapsam = false,
+  canApproveBordroKapsam = false,
   onOpenZimmetCreate,
   onOpenCreateSurecModal
 }: PersonelDosyaTabPanelsProps) {
@@ -84,6 +90,9 @@ export function PersonelDosyaTabPanels({
           canViewBordro={canViewBordro}
           canViewUcret={canViewUcret}
           canManageUcret={canManageUcret}
+          canViewBordroKapsam={canViewBordroKapsam}
+          canManageBordroKapsam={canManageBordroKapsam}
+          canApproveBordroKapsam={canApproveBordroKapsam}
           isActive={activeTab === "genel-bilgiler"}
           onOpenSurecHistory={handleOpenSurecHistory}
         />

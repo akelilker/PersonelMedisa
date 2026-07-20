@@ -98,9 +98,9 @@ describe("S83 bordro business data readiness sources", () => {
     expect(service).toContain("finance_masked");
   });
 
-  it("keeps 034 as latest migration when no 035", () => {
-    const migrations = readFileSync("api/migrations/034_bordro_onay_ve_projection.sql", "utf8");
-    expect(migrations).toContain("bordro_onay_durumu");
+  it("keeps 035 as latest migration", () => {
+    const migrations = readFileSync("api/migrations/035_personel_bordro_kapsamlari.sql", "utf8");
+    expect(migrations).toContain("personel_bordro_kapsamlari");
   });
 });
 

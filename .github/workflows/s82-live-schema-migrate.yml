@@ -7,11 +7,20 @@ on:
         description: 'MIGRATE_S82_033_034 | ACCEPT_S82_READONLY | CLEANUP_S82'
         required: true
         type: string
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/s82-live-schema-migrate.yml'
+      - 'scripts/s82-live-migrate.php'
+      - 'api/migrations/033_sirket_calisma_politikalari.sql'
+      - 'api/migrations/034_bordro_onay_ve_projection.sql'
 
 jobs:
   migrate:
     name: Preflight + backup + apply 033/034 + read-only acceptance
     if: >
+      github.event_name == 'push' ||
       github.event.inputs.confirm == 'MIGRATE_S82_033_034' ||
       github.event.inputs.confirm == 'ACCEPT_S82_READONLY' ||
       github.event.inputs.confirm == 'CLEANUP_S82'
@@ -104,7 +113,7 @@ jobs:
           upload "plain-ftp" false || upload "explicit-ftps" true
 
       - name: Identity + preflight
-        if: github.event.inputs.confirm == 'MIGRATE_S82_033_034'
+        if: github.event_name == 'push' || github.event.inputs.confirm == 'MIGRATE_S82_033_034'
         env:
           TOKEN: ${{ steps.prep.outputs.token }}
         run: |
@@ -144,7 +153,7 @@ jobs:
           PY
 
       - name: Backup
-        if: github.event.inputs.confirm == 'MIGRATE_S82_033_034'
+        if: github.event_name == 'push' || github.event.inputs.confirm == 'MIGRATE_S82_033_034'
         env:
           TOKEN: ${{ steps.prep.outputs.token }}
         run: |
@@ -176,7 +185,7 @@ jobs:
           PY
 
       - name: Apply migrations 033 and 034
-        if: github.event.inputs.confirm == 'MIGRATE_S82_033_034'
+        if: github.event_name == 'push' || github.event.inputs.confirm == 'MIGRATE_S82_033_034'
         env:
           TOKEN: ${{ steps.prep.outputs.token }}
         run: |
@@ -206,7 +215,10 @@ jobs:
           PY
 
       - name: Postcheck + business audit + bordro preflight + role matrix
-        if: github.event.inputs.confirm == 'MIGRATE_S82_033_034' || github.event.inputs.confirm == 'ACCEPT_S82_READONLY'
+        if: >
+          github.event_name == 'push' ||
+          github.event.inputs.confirm == 'MIGRATE_S82_033_034' ||
+          github.event.inputs.confirm == 'ACCEPT_S82_READONLY'
         env:
           TOKEN: ${{ steps.prep.outputs.token }}
         run: |
@@ -262,7 +274,10 @@ jobs:
           PY
 
       - name: HTTP smoke + unauthorized bordro matrix
-        if: github.event.inputs.confirm == 'MIGRATE_S82_033_034' || github.event.inputs.confirm == 'ACCEPT_S82_READONLY'
+        if: >
+          github.event_name == 'push' ||
+          github.event.inputs.confirm == 'MIGRATE_S82_033_034' ||
+          github.event.inputs.confirm == 'ACCEPT_S82_READONLY'
         run: |
           set -euo pipefail
           SMOKE_BASE_URL=https://www.karmotors.com.tr npm run smoke:live | tee /tmp/s82-artifacts/http-smoke.log
@@ -281,7 +296,7 @@ jobs:
           curl -fsS "https://www.karmotors.com.tr${JS_HASH}" | grep -q 'bordro-hazirlik' && echo "bundle contains bordro-hazirlik"
 
       - name: Delete ops files via FTP
-        if: always() && (github.event.inputs.confirm == 'MIGRATE_S82_033_034' || github.event.inputs.confirm == 'ACCEPT_S82_READONLY' || github.event.inputs.confirm == 'CLEANUP_S82')
+        if: always() && (github.event_name == 'push' || github.event.inputs.confirm == 'MIGRATE_S82_033_034' || github.event.inputs.confirm == 'ACCEPT_S82_READONLY' || github.event.inputs.confirm == 'CLEANUP_S82')
         env:
           FTP_SERVER: ${{ secrets.FTP_SERVER }}
           FTP_USERNAME: ${{ secrets.FTP_USERNAME }}

@@ -685,11 +685,12 @@ if ($action === 'role_matrix') {
     $roles = ['GENEL_YONETICI', 'MUHASEBE', 'BOLUM_YONETICISI', 'BIRIM_AMIRI', 'PATRON'];
     $matrix = [];
     foreach ($roles as $rol) {
+        $user = ['rol' => $rol];
         $matrix[$rol] = [
-            'bordro_on_izleme.view' => \Medisa\Api\Auth\RolePermissions::has($rol, 'bordro_on_izleme.view'),
-            'sirket_parametreleri.manage' => \Medisa\Api\Auth\RolePermissions::has($rol, 'sirket_parametreleri.manage'),
-            'bordro_kesinlestirme.approve' => \Medisa\Api\Auth\RolePermissions::has($rol, 'bordro_kesinlestirme.approve'),
-            'maas_hesaplama_adaylari.manage' => \Medisa\Api\Auth\RolePermissions::has($rol, 'maas_hesaplama_adaylari.manage'),
+            'bordro_on_izleme.view' => \Medisa\Api\Auth\RolePermissions::has($user, 'bordro_on_izleme.view'),
+            'sirket_parametreleri.manage' => \Medisa\Api\Auth\RolePermissions::has($user, 'sirket_parametreleri.manage'),
+            'bordro_kesinlestirme.approve' => \Medisa\Api\Auth\RolePermissions::has($user, 'bordro_kesinlestirme.approve'),
+            'maas_hesaplama_adaylari.manage' => \Medisa\Api\Auth\RolePermissions::has($user, 'maas_hesaplama_adaylari.manage'),
         ];
     }
     $expected = [

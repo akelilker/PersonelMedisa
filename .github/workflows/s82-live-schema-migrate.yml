@@ -11,10 +11,7 @@ on:
     branches:
       - main
     paths:
-      - '.github/workflows/s82-live-schema-migrate.yml'
       - 'scripts/s82-live-migrate.php'
-      - 'api/migrations/033_sirket_calisma_politikalari.sql'
-      - 'api/migrations/034_bordro_onay_ve_projection.sql'
 
 jobs:
   migrate:
@@ -113,7 +110,7 @@ jobs:
           upload "plain-ftp" false || upload "explicit-ftps" true
 
       - name: Identity + preflight
-        if: github.event_name == 'push' || github.event.inputs.confirm == 'MIGRATE_S82_033_034'
+        if: github.event_name != 'push' && github.event.inputs.confirm == 'MIGRATE_S82_033_034'
         env:
           TOKEN: ${{ steps.prep.outputs.token }}
         run: |
@@ -153,7 +150,7 @@ jobs:
           PY
 
       - name: Backup
-        if: github.event_name == 'push' || github.event.inputs.confirm == 'MIGRATE_S82_033_034'
+        if: github.event_name != 'push' && github.event.inputs.confirm == 'MIGRATE_S82_033_034'
         env:
           TOKEN: ${{ steps.prep.outputs.token }}
         run: |
@@ -185,7 +182,7 @@ jobs:
           PY
 
       - name: Apply migrations 033 and 034
-        if: github.event_name == 'push' || github.event.inputs.confirm == 'MIGRATE_S82_033_034'
+        if: github.event_name != 'push' && github.event.inputs.confirm == 'MIGRATE_S82_033_034'
         env:
           TOKEN: ${{ steps.prep.outputs.token }}
         run: |
@@ -215,10 +212,7 @@ jobs:
           PY
 
       - name: Postcheck + business audit + bordro preflight + role matrix
-        if: >
-          github.event_name == 'push' ||
-          github.event.inputs.confirm == 'MIGRATE_S82_033_034' ||
-          github.event.inputs.confirm == 'ACCEPT_S82_READONLY'
+        if: github.event_name == 'push' || github.event.inputs.confirm == 'MIGRATE_S82_033_034' || github.event.inputs.confirm == 'ACCEPT_S82_READONLY'
         env:
           TOKEN: ${{ steps.prep.outputs.token }}
         run: |
@@ -274,10 +268,7 @@ jobs:
           PY
 
       - name: HTTP smoke + unauthorized bordro matrix
-        if: >
-          github.event_name == 'push' ||
-          github.event.inputs.confirm == 'MIGRATE_S82_033_034' ||
-          github.event.inputs.confirm == 'ACCEPT_S82_READONLY'
+        if: github.event_name == 'push' || github.event.inputs.confirm == 'MIGRATE_S82_033_034' || github.event.inputs.confirm == 'ACCEPT_S82_READONLY'
         run: |
           set -euo pipefail
           SMOKE_BASE_URL=https://www.karmotors.com.tr npm run smoke:live | tee /tmp/s82-artifacts/http-smoke.log

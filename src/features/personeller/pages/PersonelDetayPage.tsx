@@ -42,6 +42,9 @@ export function PersonelDetayPage() {
   const canViewBordro = hasPermission("bordro_on_izleme.view");
   const canViewUcret = hasPermission("personeller.ucret.view");
   const canManageUcret = hasPermission("personeller.ucret.manage");
+  const canViewBordroKapsam = hasPermission("personel_bordro_kapsam.view");
+  const canManageBordroKapsam = hasPermission("personel_bordro_kapsam.manage");
+  const canApproveBordroKapsam = hasPermission("personel_bordro_kapsam.approve");
   const canCreateZimmet = canEditPersonel;
 
   const initialTab = resolvePersonelTab(searchParams.get("tab")) ?? "genel-bilgiler";
@@ -212,6 +215,9 @@ export function PersonelDetayPage() {
               canViewBordro={canViewBordro}
               canViewUcret={canViewUcret}
               canManageUcret={canManageUcret}
+              canViewBordroKapsam={canViewBordroKapsam}
+              canManageBordroKapsam={canManageBordroKapsam}
+              canApproveBordroKapsam={canApproveBordroKapsam}
               onOpenZimmetCreate={handleOpenPersonelZimmetGateway}
               onOpenCreateSurecModal={handleOpenSurecModal}
             />

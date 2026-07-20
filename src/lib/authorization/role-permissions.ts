@@ -71,6 +71,9 @@ export type AppPermission =
   | "sirket_parametreleri.manage"
   | "bordro_on_izleme.view"
   | "bordro_kesinlestirme.approve"
+  | "personel_bordro_kapsam.view"
+  | "personel_bordro_kapsam.manage"
+  | "personel_bordro_kapsam.approve"
   | "revizyon.view"
   | "revizyon.create"
   | "revizyon.submit"
@@ -138,6 +141,9 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "sirket_parametreleri.manage",
     "bordro_on_izleme.view",
     "bordro_kesinlestirme.approve",
+    "personel_bordro_kapsam.view",
+    "personel_bordro_kapsam.manage",
+    "personel_bordro_kapsam.approve",
     "revizyon.view",
     "revizyon.create",
     "revizyon.submit",
@@ -236,6 +242,8 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "bordro_on_izleme.view",
     "sirket_parametreleri.view",
     "sirket_parametreleri.manage",
+    "personel_bordro_kapsam.view",
+    "personel_bordro_kapsam.manage",
     "revizyon.view",
     "revizyon.create",
     "revizyon.submit",

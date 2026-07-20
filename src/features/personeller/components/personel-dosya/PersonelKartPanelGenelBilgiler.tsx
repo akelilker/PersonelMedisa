@@ -5,6 +5,7 @@ import { formatDetailValue, formatIsoDateDetail, formatReferenceValue } from "./
 import { PersonelIzinOzetSection } from "./PersonelIzinOzetSection";
 import { PersonelPuantajOzetSection } from "./PersonelPuantajOzetSection";
 import { PersonelUcretGecmisiSection } from "./PersonelUcretGecmisiSection";
+import { PersonelBordroKapsamSection } from "./PersonelBordroKapsamSection";
 
 export function PersonelKartPanelGenelBilgiler({
   personel,
@@ -16,6 +17,9 @@ export function PersonelKartPanelGenelBilgiler({
   canViewBordro = false,
   canViewUcret,
   canManageUcret,
+  canViewBordroKapsam = false,
+  canManageBordroKapsam = false,
+  canApproveBordroKapsam = false,
   isActive,
   onOpenSurecHistory
 }: {
@@ -28,6 +32,9 @@ export function PersonelKartPanelGenelBilgiler({
   canViewBordro?: boolean;
   canViewUcret: boolean;
   canManageUcret: boolean;
+  canViewBordroKapsam?: boolean;
+  canManageBordroKapsam?: boolean;
+  canApproveBordroKapsam?: boolean;
   isActive: boolean;
   onOpenSurecHistory?: () => void;
 }) {
@@ -73,6 +80,15 @@ export function PersonelKartPanelGenelBilgiler({
         <PersonelUcretGecmisiSection
           personel={personel}
           canManageUcret={canManageUcret}
+          isActive={isActive}
+        />
+      ) : null}
+
+      {canViewBordroKapsam ? (
+        <PersonelBordroKapsamSection
+          personel={personel}
+          canManage={canManageBordroKapsam}
+          canApprove={canApproveBordroKapsam}
           isActive={isActive}
         />
       ) : null}

@@ -16,6 +16,17 @@ export const endpoints = {
     cancel: (personelId: number | string, ucretId: number | string) =>
       `/personeller/${personelId}/ucretler/${ucretId}/iptal`
   },
+  personelBordroKapsamlari: {
+    list: (personelId: number | string) => `/personeller/${personelId}/bordro-kapsamlari`,
+    dryRun: (personelId: number | string) => `/personeller/${personelId}/bordro-kapsamlari/dry-run`,
+    create: (personelId: number | string) => `/personeller/${personelId}/bordro-kapsamlari`,
+    submit: (personelId: number | string, kapsamId: number | string) =>
+      `/personeller/${personelId}/bordro-kapsamlari/${kapsamId}/onaya-gonder`,
+    approve: (personelId: number | string, kapsamId: number | string) =>
+      `/personeller/${personelId}/bordro-kapsamlari/${kapsamId}/onayla`,
+    cancel: (personelId: number | string, kapsamId: number | string) =>
+      `/personeller/${personelId}/bordro-kapsamlari/${kapsamId}/iptal`
+  },
   mevzuatParametreleri: {
     list: "/mevzuat-parametreleri",
     create: "/mevzuat-parametreleri",

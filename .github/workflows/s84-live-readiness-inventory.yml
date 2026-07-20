@@ -1,0 +1,211 @@
+name: S84 Live Readiness Inventory
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "ACCEPT_S84_READONLY | CLEANUP_S84"
+        required: true
+        type: string
+      sube_id:
+        description: "Sube id (default 1)"
+        required: false
+        default: "1"
+        type: string
+
+jobs:
+  inventory:
+    name: Read-only readiness inventory + package export
+    if: >
+      github.event.inputs.confirm == 'ACCEPT_S84_READONLY' ||
+      github.event.inputs.confirm == 'CLEANUP_S84'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Validate FTP secrets
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+          FTP_PORT: ${{ secrets.FTP_PORT }}
+        run: |
+          test -n "$FTP_SERVER" || (echo "FTP_SERVER missing" && exit 1)
+          test -n "$FTP_USERNAME" || (echo "FTP_USERNAME missing" && exit 1)
+          test -n "$FTP_PASSWORD" || (echo "FTP_PASSWORD missing" && exit 1)
+          test "${FTP_PORT}" = "21" || (echo "FTP_PORT must be 21" && exit 1)
+
+      - name: Install lftp
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lftp
+
+      - name: Prepare one-shot ops payload
+        id: prep
+        if: github.event.inputs.confirm == 'ACCEPT_S84_READONLY'
+        run: |
+          set -euo pipefail
+          TOKEN="$(openssl rand -hex 24)"
+          export TOKEN
+          echo "token=$TOKEN" >> "$GITHUB_OUTPUT"
+          mkdir -p /tmp/s84-ops /tmp/s84-artifacts
+          python3 - <<'PY'
+          from pathlib import Path
+          import os
+          src = Path('scripts/s84-live-readiness-inventory.php').read_text(encoding='utf-8')
+          token = os.environ['TOKEN']
+          if src.count('REPLACE_S84_INVENTORY_TOKEN') != 1:
+              raise SystemExit(f"expected exactly 1 REPLACE placeholder, got {src.count('REPLACE_S84_INVENTORY_TOKEN')}")
+          out = src.replace('REPLACE_S84_INVENTORY_TOKEN', token, 1)
+          Path('/tmp/s84-ops/_s84_inventory.php').write_text(out, encoding='utf-8', newline='\n')
+          print('token_injected_ok')
+          PY
+          if head -c 3 /tmp/s84-ops/_s84_inventory.php | grep -q $'\xEF\xBB\xBF'; then
+            echo "BOM detected" && exit 1
+          fi
+          grep -q "UNSET_S84_INVENTORY_TOKEN" /tmp/s84-ops/_s84_inventory.php
+          grep -q "$TOKEN" /tmp/s84-ops/_s84_inventory.php
+          ls -la /tmp/s84-ops
+
+      - name: Upload ops file via FTP
+        if: github.event.inputs.confirm == 'ACCEPT_S84_READONLY'
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+          FTP_PORT: ${{ secrets.FTP_PORT }}
+        run: |
+          set -euo pipefail
+          upload() {
+            local use_ftps="$1"
+            lftp -u "${FTP_USERNAME}","${FTP_PASSWORD}" -p "${FTP_PORT}" "ftp://${FTP_SERVER}" -e "
+              set cmd:fail-exit true;
+              set net:max-retries 5;
+              set net:timeout 30;
+              set ssl:verify-certificate no;
+              set ftp:passive-mode on;
+              set ftp:ssl-allow ${use_ftps};
+              set ftp:ssl-force ${use_ftps};
+              set ftp:ssl-protect-data ${use_ftps};
+              cd .;
+              mkdir -p api/public;
+              lcd /tmp/s84-ops;
+              put -O api/public _s84_inventory.php;
+              bye
+            "
+          }
+          upload true || upload false
+
+      - name: Identity + inventory
+        if: github.event.inputs.confirm == 'ACCEPT_S84_READONLY'
+        env:
+          TOKEN: ${{ steps.prep.outputs.token }}
+          SUBE_ID: ${{ github.event.inputs.sube_id }}
+        run: |
+          set -euo pipefail
+          BASE="https://www.karmotors.com.tr/personelmedisa/api/public/_s84_inventory.php"
+          curl -fsS "${BASE}?token=${TOKEN}&action=identity" | tee /tmp/s84-artifacts/identity.json
+          python3 - <<'PY'
+          import json
+          data=json.load(open('/tmp/s84-artifacts/identity.json'))
+          assert data.get('ok') and data.get('code')=='PRODUCTION_DB_IDENTITY_OK', data
+          print('identity_ok', data['identity']['aktif_veritabani'])
+          PY
+          curl -fsS "${BASE}?token=${TOKEN}&action=inventory&sube_id=${SUBE_ID}" | tee /tmp/s84-artifacts/inventory.json
+          python3 - <<'PY'
+          import json, pathlib
+          data=json.load(open('/tmp/s84-artifacts/inventory.json'))
+          assert data.get('ok') and data.get('code')=='S84_READINESS_INVENTORY_READONLY_OK', data
+          out=pathlib.Path('/tmp/s84-artifacts/packages')
+          out.mkdir(parents=True, exist_ok=True)
+          for name, csv in (data.get('packages') or {}).items():
+              (out / name).write_text(csv, encoding='utf-8', newline='\n')
+          summary={
+            'donem': data.get('donem'),
+            'sube_id': data.get('sube_id'),
+            'yil': data.get('yil'),
+            'ay': data.get('ay'),
+            'blocker_count': data.get('blocker_count'),
+            'hesaplanabilir_mi': data.get('hesaplanabilir_mi'),
+            'counts': data.get('counts'),
+            'candidate_gate_aktif': (data.get('candidate_gate') or {}).get('aktif'),
+            'snapshot': data.get('snapshot'),
+            'policy_summary': data.get('policy_summary'),
+            'readiness_domains': [
+              {
+                'key': d.get('key'),
+                'status': d.get('status'),
+                'eksik_kayit_sayisi': d.get('eksik_kayit_sayisi'),
+                'etkilenen_personel_sayisi': d.get('etkilenen_personel_sayisi'),
+                'blocker_codes': d.get('blocker_codes'),
+                'eksik_kodlar': d.get('eksik_kodlar'),
+                'action_link': d.get('action_link'),
+              } for d in (data.get('readiness_domains') or [])
+            ],
+            'blocker_items': [
+              {
+                'code': b.get('code'),
+                'message': b.get('message'),
+                'etkilenen_personel_sayisi': b.get('etkilenen_personel_sayisi'),
+                'etkilenen_kayit_sayisi': b.get('etkilenen_kayit_sayisi'),
+                'action_link': b.get('action_link'),
+              } for b in (data.get('blocker_items') or [])
+            ],
+            'business_values_status': data.get('business_values_status'),
+            'candidate_decision': data.get('candidate_decision'),
+            'identity': data.get('identity'),
+          }
+          pathlib.Path('/tmp/s84-artifacts/summary.json').write_text(
+            json.dumps(summary, ensure_ascii=False, indent=2), encoding='utf-8'
+          )
+          slim=dict(data)
+          slim['packages']={k: f'{len(v)} bytes' for k,v in (data.get('packages') or {}).items()}
+          pathlib.Path('/tmp/s84-artifacts/inventory-slim.json').write_text(
+            json.dumps(slim, ensure_ascii=False, indent=2), encoding='utf-8'
+          )
+          print('inventory_ok', summary['donem'], 'blockers', summary['blocker_count'])
+          PY
+
+      - name: Upload artifacts
+        if: github.event.inputs.confirm == 'ACCEPT_S84_READONLY'
+        uses: actions/upload-artifact@v4
+        with:
+          name: s84-readiness-packages
+          path: |
+            /tmp/s84-artifacts/summary.json
+            /tmp/s84-artifacts/inventory-slim.json
+            /tmp/s84-artifacts/identity.json
+            /tmp/s84-artifacts/packages/
+          if-no-files-found: error
+
+      - name: Cleanup ops file via FTP
+        if: always()
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+          FTP_PORT: ${{ secrets.FTP_PORT }}
+        run: |
+          set -euo pipefail
+          cleanup() {
+            local use_ftps="$1"
+            lftp -u "${FTP_USERNAME}","${FTP_PASSWORD}" -p "${FTP_PORT}" "ftp://${FTP_SERVER}" -e "
+              set cmd:fail-exit false;
+              set net:max-retries 5;
+              set net:timeout 30;
+              set ssl:verify-certificate no;
+              set ftp:passive-mode on;
+              set ftp:ssl-allow ${use_ftps};
+              set ftp:ssl-force ${use_ftps};
+              set ftp:ssl-protect-data ${use_ftps};
+              cd api/public;
+              rm -f _s84_inventory.php;
+              bye
+            "
+          }
+          cleanup true || cleanup false
+          echo "cleanup_attempted"

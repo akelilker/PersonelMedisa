@@ -30,6 +30,10 @@ describe("S83 bordro business data readiness sources", () => {
     expect(preflight).toContain("ONAY_KAYDI_YOK");
     expect(preflight).toContain("p.aktif_durum = 'AKTIF'");
     expect(preflight).not.toContain("p.durum = 'AKTIF'");
+    expect(preflight).toContain("gy.onaylandi_at");
+    expect(preflight).toContain("gy.state = 'TAMAMLANDI'");
+    expect(preflight).not.toContain("gy.onay_zamani");
+    expect(preflight).not.toContain("gy.state = 'ONAYLANDI'");
   });
 
   it("bordro hazirlik personel filters use aktif_durum", () => {

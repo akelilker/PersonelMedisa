@@ -3411,6 +3411,7 @@ let personelBelgeKaydiIdCounter = 903;
   let departmanIdCounter = 12;
   let personelIdCounter = 5;
   let personelUcretIdCounter = 1;
+  let personelBordroKapsamIdCounter = 1;
   let mevzuatParametreIdCounter = 1;
   type MockPersonelUcret = {
     id: number;
@@ -3423,6 +3424,27 @@ let personelBelgeKaydiIdCounter = 903;
     state: "AKTIF" | "IPTAL";
     kaynak: "MANUEL" | "PERSONEL_KAYDI_MIGRASYON" | "SISTEM";
     aciklama?: string | null;
+  };
+  type MockPersonelBordroKapsam = {
+    id: number;
+    personel_id: number;
+    sube_id: number;
+    durum: "DAHIL" | "HARIC";
+    neden_kodu: "DEMO_TEST_VERISI" | "BORDRO_DISI_STATU" | "HARICI_BORDRO" | "DIGER_ONAYLI_NEDEN";
+    aciklama: string;
+    gecerlilik_baslangic: string;
+    gecerlilik_bitis: string | null;
+    state: "TASLAK" | "ONAY_BEKLIYOR" | "ONAYLANDI" | "IPTAL";
+    hazirlayan_id: number | null;
+    onaylayan_id: number | null;
+    onay_zamani: string | null;
+    iptal_eden_id: number | null;
+    iptal_zamani: string | null;
+    iptal_nedeni: string | null;
+    parent_kapsam_id: number | null;
+    created_at: string;
+    updated_at: string;
+    contract_version: string;
   };
   type MockMevzuatParametresi = {
     id: number;
@@ -3437,6 +3459,7 @@ let personelBelgeKaydiIdCounter = 903;
     state: "AKTIF" | "IPTAL";
   };
   const personelUcretleri: MockPersonelUcret[] = [];
+  const personelBordroKapsamlari: MockPersonelBordroKapsam[] = [];
   const mevzuatParametreleri: MockMevzuatParametresi[] = [];
 
   function rangesOverlapInclusive(
@@ -3448,6 +3471,176 @@ let personelBelgeKaydiIdCounter = 903;
     const aEnd = endA ?? "9999-12-31";
     const bEnd = endB ?? "9999-12-31";
     return startA <= bEnd && startB <= aEnd;
+  }
+
+  const MOCK_BORDRO_KAPSAM_CONTRACT = "S84R2_PAYROLL_SCOPE_V1";
+  const MOCK_BORDRO_KAPSAM_NEDENLER = [
+    "DEMO_TEST_VERISI",
+    "BORDRO_DISI_STATU",
+    "HARICI_BORDRO",
+    "DIGER_ONAYLI_NEDEN"
+  ] as const;
+
+  function mockPayrollScopeHash(payload: unknown): string {
+    const raw = JSON.stringify(payload);
+    let h1 = 0x811c9dc5;
+    let h2 = 0x1000193;
+    for (let i = 0; i < raw.length; i += 1) {
+      const c = raw.charCodeAt(i);
+      h1 ^= c;
+      h1 = Math.imul(h1, 0x01000193);
+      h2 = Math.imul(h2 ^ c, 0x01000193);
+    }
+    const a = (h1 >>> 0).toString(16).padStart(8, "0");
+    const b = (h2 >>> 0).toString(16).padStart(8, "0");
+    return `${a}${b}${"0".repeat(48)}`.slice(0, 64);
+  }
+
+  function mockMonthEndIso(yil: number, ay: number): string {
+    const day = new Date(Date.UTC(yil, ay, 0)).getUTCDate();
+    return `${String(yil).padStart(4, "0")}-${String(ay).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+  }
+
+  function mockHasActivePayrollSnapshot(personel: (typeof personeller)[number]): boolean {
+    const sicil = String(personel.sicil_no ?? "").toUpperCase();
+    return personel.id === 1 || sicil === "P-001" || sicil === "P-0001";
+  }
+
+  function buildMockBordroKapsamDryRun(
+    personel: (typeof personeller)[number],
+    payload: Record<string, unknown>,
+    actorUserId: number
+  ) {
+    const durum = String(payload.durum ?? "").toUpperCase();
+    if (durum !== "DAHIL" && durum !== "HARIC") {
+      return { error: errorBody("VALIDATION_ERROR", "durum DAHIL veya HARIC olmali.") };
+    }
+    const neden = String(payload.neden_kodu ?? "").toUpperCase();
+    if (!(MOCK_BORDRO_KAPSAM_NEDENLER as readonly string[]).includes(neden)) {
+      return { error: errorBody("VALIDATION_ERROR", "neden_kodu gecersiz.") };
+    }
+    const aciklama = String(payload.aciklama ?? "").trim();
+    if (aciklama.length < 3) {
+      return { error: errorBody("VALIDATION_ERROR", "aciklama zorunlu (min 3 karakter).") };
+    }
+    const bas = String(payload.gecerlilik_baslangic ?? "");
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(bas)) {
+      return { error: errorBody("VALIDATION_ERROR", "gecerlilik_baslangic YYYY-MM-DD olmali.") };
+    }
+    let bit =
+      payload.gecerlilik_bitis === null ||
+      payload.gecerlilik_bitis === undefined ||
+      payload.gecerlilik_bitis === ""
+        ? null
+        : String(payload.gecerlilik_bitis);
+    if (bit && !/^\d{4}-\d{2}-\d{2}$/.test(bit)) {
+      return { error: errorBody("VALIDATION_ERROR", "gecerlilik_bitis YYYY-MM-DD olmali.") };
+    }
+    if (bit && bit < bas) {
+      return { error: errorBody("VALIDATION_ERROR", "gecerlilik_bitis baslangictan once olamaz.") };
+    }
+
+    const overlap = personelBordroKapsamlari.some(
+      (item) =>
+        item.personel_id === personel.id &&
+        item.state === "ONAYLANDI" &&
+        rangesOverlapInclusive(bas, bit, item.gecerlilik_baslangic, item.gecerlilik_bitis)
+    );
+    if (overlap) {
+      return {
+        error: errorBody("KAPSAM_OVERLAP", "Ayni personel icin cakisan onayli kapsam araligi var.")
+      };
+    }
+
+    let donemBaslangic = typeof payload.donem_baslangic === "string" ? payload.donem_baslangic : bas;
+    let donemBitis =
+      typeof payload.donem_bitis === "string" ? payload.donem_bitis : (bit ?? bas);
+    const yil = Number(payload.yil);
+    const ay = Number(payload.ay);
+    if (Number.isFinite(yil) && Number.isFinite(ay) && ay >= 1 && ay <= 12) {
+      donemBaslangic = `${String(yil).padStart(4, "0")}-${String(ay).padStart(2, "0")}-01`;
+      donemBitis = mockMonthEndIso(yil, ay);
+    }
+
+    const previewState = String(payload.preview_state ?? "ONAYLANDI").toUpperCase();
+    const wouldExclude = durum === "HARIC" && previewState === "ONAYLANDI";
+    const existingExcluded = personelBordroKapsamlari.some(
+      (item) =>
+        item.personel_id === personel.id &&
+        item.state === "ONAYLANDI" &&
+        item.durum === "HARIC" &&
+        item.gecerlilik_baslangic <= donemBitis &&
+        (item.gecerlilik_bitis === null || item.gecerlilik_bitis >= donemBaslangic)
+    );
+    const activeSnapshot = mockHasActivePayrollSnapshot(personel)
+      ? {
+          id: 9001,
+          snapshot_hash: "demo-snapshot-hash-p001",
+          source_hash: "demo-source-hash-p001",
+          revision_no: 1
+        }
+      : null;
+    const revisionRequired = wouldExclude && activeSnapshot !== null;
+    const normalized = {
+      personel_id: personel.id,
+      sube_id: personel.sube_id,
+      durum,
+      neden_kodu: neden,
+      aciklama,
+      gecerlilik_baslangic: bas,
+      gecerlilik_bitis: bit,
+      parent_kapsam_id:
+        payload.parent_kapsam_id == null ? null : Number(payload.parent_kapsam_id)
+    };
+    const dryRunHash = mockPayrollScopeHash({
+      contract: MOCK_BORDRO_KAPSAM_CONTRACT,
+      personel_id: personel.id,
+      normalized,
+      donem_baslangic: donemBaslangic,
+      donem_bitis: donemBitis,
+      actor_id: actorUserId
+    });
+
+    return {
+      result: {
+        ok: true,
+        contract_version: MOCK_BORDRO_KAPSAM_CONTRACT,
+        write_performed: false,
+        dry_run_hash: dryRunHash,
+        personel: {
+          id: personel.id,
+          sicil_no: personel.sicil_no ?? "",
+          ad_soyad: `${personel.ad} ${personel.soyad}`.trim(),
+          sube_id: personel.sube_id
+        },
+        proposed: {
+          durum,
+          neden_kodu: neden,
+          aciklama,
+          gecerlilik_baslangic: bas,
+          gecerlilik_bitis: bit
+        },
+        donem: { baslangic: donemBaslangic, bitis: donemBitis },
+        effects: {
+          currently_excluded: existingExcluded,
+          would_exclude_from_new_snapshot: wouldExclude || existingExcluded,
+          muhur_satiri_var_mi: false,
+          muhur_satir_sayisi: 0,
+          existing_snapshot_unchanged: true,
+          existing_snapshot: activeSnapshot,
+          source_hash_would_change: wouldExclude && !existingExcluded,
+          explicit_snapshot_revision_required: revisionRequired,
+          carryover_blocker_suppressed: wouldExclude || existingExcluded,
+          net_maas_blocker_suppressed: wouldExclude || existingExcluded,
+          candidate_item_excluded: wouldExclude || existingExcluded
+        },
+        warnings: revisionRequired
+          ? [
+              "Aktif snapshot var; kapsam ONAYLANDI HARIC sonrasi EXISTING_ACTIVE_SNAPSHOT_SOURCE_CHANGED / explicit cancel+revision gerekir."
+            ]
+          : []
+      }
+    };
   }
 
   function encodePersonelBelgeKaydiSurecMetadata(payload: {
@@ -4701,6 +4894,259 @@ let personelBelgeKaydiIdCounter = 903;
       }
       record.state = "IPTAL";
       await fulfillJson(route, 200, okBody(record));
+      return;
+    }
+
+    const personelBordroKapsamListMatch = path.match(/^\/api\/personeller\/(\d+)\/bordro-kapsamlari$/);
+    if (personelBordroKapsamListMatch && (method === "GET" || method === "POST")) {
+      const personelId = Number.parseInt(personelBordroKapsamListMatch[1] ?? "0", 10);
+      const personel = personeller.find((item) => item.id === personelId);
+      if (!personel) {
+        await fulfillJson(route, 404, errorBody("PERSONEL_NOT_FOUND", "Personel bulunamadi."));
+        return;
+      }
+      if (method === "GET") {
+        if (await denyUnlessRolePermission(route, "personel_bordro_kapsam.view")) return;
+        const items = personelBordroKapsamlari
+          .filter((item) => item.personel_id === personelId)
+          .sort((a, b) => {
+            if (a.gecerlilik_baslangic === b.gecerlilik_baslangic) {
+              return b.id - a.id;
+            }
+            return a.gecerlilik_baslangic < b.gecerlilik_baslangic ? 1 : -1;
+          })
+          .map((item) => ({
+            ...item,
+            sicil_no: personel.sicil_no ?? null,
+            ad_soyad: `${personel.ad} ${personel.soyad}`.trim()
+          }));
+        await fulfillJson(
+          route,
+          200,
+          okBody({ items, contract_version: MOCK_BORDRO_KAPSAM_CONTRACT })
+        );
+        return;
+      }
+
+      if (await denyUnlessRolePermission(route, "personel_bordro_kapsam.manage")) return;
+      const payload = { ...(request.postDataJSON() as Record<string, unknown>) };
+      if (role === "MUHASEBE") {
+        delete payload.direkt_onayla;
+      }
+      const dryRunHash = String(payload.dry_run_hash ?? "");
+      if (!dryRunHash) {
+        await fulfillJson(
+          route,
+          422,
+          errorBody("DRY_RUN_HASH_REQUIRED", "Commit oncesi dry-run hash zorunlu.")
+        );
+        return;
+      }
+      const neden = String(payload.neden_kodu ?? "").toUpperCase();
+      if (neden === "DEMO_TEST_VERISI" && role !== "GENEL_YONETICI") {
+        await fulfillJson(
+          route,
+          403,
+          errorBody("FORBIDDEN", "DEMO_TEST_VERISI yalniz GENEL_YONETICI tarafindan secilebilir.")
+        );
+        return;
+      }
+      const preview = buildMockBordroKapsamDryRun(
+        personel,
+        { ...payload, preview_state: "ONAYLANDI" },
+        mockUserId
+      );
+      if ("error" in preview) {
+        await fulfillJson(route, 409, preview.error);
+        return;
+      }
+      if (preview.result.dry_run_hash !== dryRunHash) {
+        await fulfillJson(
+          route,
+          409,
+          errorBody("DRY_RUN_STALE", "Dry-run hash guncel degil; yeniden dry-run calistirin.")
+        );
+        return;
+      }
+      const now = new Date().toISOString();
+      let initialState: MockPersonelBordroKapsam["state"] = "TASLAK";
+      if (role === "GENEL_YONETICI" && payload.direkt_onayla === true) {
+        initialState = "ONAYLANDI";
+      }
+      const proposed = preview.result.proposed;
+      const created: MockPersonelBordroKapsam = {
+        id: ++personelBordroKapsamIdCounter,
+        personel_id: personelId,
+        sube_id: Number(personel.sube_id ?? 1),
+        durum: proposed.durum as "DAHIL" | "HARIC",
+        neden_kodu: proposed.neden_kodu as MockPersonelBordroKapsam["neden_kodu"],
+        aciklama: proposed.aciklama,
+        gecerlilik_baslangic: proposed.gecerlilik_baslangic,
+        gecerlilik_bitis: proposed.gecerlilik_bitis,
+        state: initialState,
+        hazirlayan_id: mockUserId,
+        onaylayan_id: initialState === "ONAYLANDI" ? mockUserId : null,
+        onay_zamani: initialState === "ONAYLANDI" ? now : null,
+        iptal_eden_id: null,
+        iptal_zamani: null,
+        iptal_nedeni: null,
+        parent_kapsam_id:
+          payload.parent_kapsam_id == null ? null : Number(payload.parent_kapsam_id),
+        created_at: now,
+        updated_at: now,
+        contract_version: MOCK_BORDRO_KAPSAM_CONTRACT
+      };
+      personelBordroKapsamlari.push(created);
+      await fulfillJson(
+        route,
+        201,
+        okBody({
+          ...created,
+          sicil_no: personel.sicil_no ?? null,
+          ad_soyad: `${personel.ad} ${personel.soyad}`.trim()
+        })
+      );
+      return;
+    }
+
+    const personelBordroKapsamDryRunMatch = path.match(
+      /^\/api\/personeller\/(\d+)\/bordro-kapsamlari\/dry-run$/
+    );
+    if (personelBordroKapsamDryRunMatch && method === "POST") {
+      if (await denyUnlessRolePermission(route, "personel_bordro_kapsam.view")) return;
+      const personelId = Number.parseInt(personelBordroKapsamDryRunMatch[1] ?? "0", 10);
+      const personel = personeller.find((item) => item.id === personelId);
+      if (!personel) {
+        await fulfillJson(route, 404, errorBody("PERSONEL_NOT_FOUND", "Personel bulunamadi."));
+        return;
+      }
+      const payload = (request.postDataJSON() as Record<string, unknown>) ?? {};
+      const preview = buildMockBordroKapsamDryRun(personel, payload, mockUserId);
+      if ("error" in preview) {
+        await fulfillJson(route, 422, preview.error);
+        return;
+      }
+      await fulfillJson(route, 200, okBody(preview.result));
+      return;
+    }
+
+    const personelBordroKapsamActionMatch = path.match(
+      /^\/api\/personeller\/(\d+)\/bordro-kapsamlari\/(\d+)\/(onaya-gonder|onayla|iptal)$/
+    );
+    if (personelBordroKapsamActionMatch && method === "POST") {
+      const personelId = Number.parseInt(personelBordroKapsamActionMatch[1] ?? "0", 10);
+      const kapsamId = Number.parseInt(personelBordroKapsamActionMatch[2] ?? "0", 10);
+      const action = personelBordroKapsamActionMatch[3];
+      const personel = personeller.find((item) => item.id === personelId);
+      if (!personel) {
+        await fulfillJson(route, 404, errorBody("PERSONEL_NOT_FOUND", "Personel bulunamadi."));
+        return;
+      }
+      const record = personelBordroKapsamlari.find(
+        (item) => item.id === kapsamId && item.personel_id === personelId
+      );
+      if (!record) {
+        await fulfillJson(route, 404, errorBody("NOT_FOUND", "Kapsam kaydi bulunamadi."));
+        return;
+      }
+      const now = new Date().toISOString();
+      if (action === "onaya-gonder") {
+        if (await denyUnlessRolePermission(route, "personel_bordro_kapsam.manage")) return;
+        if (record.state !== "TASLAK") {
+          await fulfillJson(
+            route,
+            409,
+            errorBody("INVALID_STATE", "Yalniz TASLAK kayit onaya gonderilebilir.")
+          );
+          return;
+        }
+        record.state = "ONAY_BEKLIYOR";
+        record.updated_at = now;
+        await fulfillJson(
+          route,
+          200,
+          okBody({
+            ...record,
+            sicil_no: personel.sicil_no ?? null,
+            ad_soyad: `${personel.ad} ${personel.soyad}`.trim()
+          })
+        );
+        return;
+      }
+      if (action === "onayla") {
+        if (await denyUnlessRolePermission(route, "personel_bordro_kapsam.approve")) return;
+        if (record.state !== "TASLAK" && record.state !== "ONAY_BEKLIYOR") {
+          await fulfillJson(route, 409, errorBody("INVALID_STATE", "Bu kayit onaylanamaz."));
+          return;
+        }
+        if (record.neden_kodu === "DEMO_TEST_VERISI" && role !== "GENEL_YONETICI") {
+          await fulfillJson(
+            route,
+            403,
+            errorBody("FORBIDDEN", "DEMO_TEST_VERISI onayi yalniz GENEL_YONETICI.")
+          );
+          return;
+        }
+        const overlap = personelBordroKapsamlari.some(
+          (item) =>
+            item.id !== record.id &&
+            item.personel_id === personelId &&
+            item.state === "ONAYLANDI" &&
+            rangesOverlapInclusive(
+              record.gecerlilik_baslangic,
+              record.gecerlilik_bitis,
+              item.gecerlilik_baslangic,
+              item.gecerlilik_bitis
+            )
+        );
+        if (overlap) {
+          await fulfillJson(
+            route,
+            409,
+            errorBody("KAPSAM_OVERLAP", "Ayni personel icin cakisan onayli kapsam araligi var.")
+          );
+          return;
+        }
+        record.state = "ONAYLANDI";
+        record.onaylayan_id = mockUserId;
+        record.onay_zamani = now;
+        record.updated_at = now;
+        await fulfillJson(
+          route,
+          200,
+          okBody({
+            ...record,
+            sicil_no: personel.sicil_no ?? null,
+            ad_soyad: `${personel.ad} ${personel.soyad}`.trim()
+          })
+        );
+        return;
+      }
+      if (await denyUnlessRolePermission(route, "personel_bordro_kapsam.manage")) return;
+      if (record.state === "IPTAL") {
+        await fulfillJson(route, 409, errorBody("ALREADY_CANCELLED", "Kayit zaten iptal."));
+        return;
+      }
+      const payload = (request.postDataJSON() as Record<string, unknown>) ?? {};
+      const neden = String(payload.neden ?? payload.iptal_nedeni ?? "").trim();
+      if (neden.length < 3) {
+        await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "Iptal nedeni zorunlu."));
+        return;
+      }
+      record.state = "IPTAL";
+      record.iptal_eden_id = mockUserId;
+      record.iptal_zamani = now;
+      record.iptal_nedeni = neden;
+      record.updated_at = now;
+      await fulfillJson(
+        route,
+        200,
+        okBody({
+          ...record,
+          sicil_no: personel.sicil_no ?? null,
+          ad_soyad: `${personel.ad} ${personel.soyad}`.trim()
+        })
+      );
       return;
     }
 

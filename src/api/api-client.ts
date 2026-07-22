@@ -346,7 +346,10 @@ export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T
     const requestMethod = (init?.method ?? "GET").toUpperCase();
 
     if (isUnauthorizedStatus(response.status)) {
-      emitAuthUnauthorized({ status: response.status, path });
+      // Session yokken bootstrap 401'leri logout/yönlendirme döngüsü üretmesin.
+      if (getAuthTokenForApi()) {
+        emitAuthUnauthorized({ status: response.status, path });
+      }
     } else if (isForbiddenStatus(response.status)) {
       if (shouldEmitGlobalAuthForbidden(path, requestMethod)) {
         emitAuthForbidden({ status: response.status, path });

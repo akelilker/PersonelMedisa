@@ -138,6 +138,30 @@ describe("apiRequest", () => {
     });
   });
 
+  it("session/token yokken 401 unauthorized event emit etmez", async () => {
+    getAuthTokenForApiMock.mockReturnValue(null);
+    const fetchMock = vi.fn(async () =>
+      createJsonResponse(
+        {
+          data: null,
+          meta: {},
+          errors: [{ code: "UNAUTHORIZED", message: "Oturum gerekli." }]
+        },
+        401
+      )
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const unauthorizedListener = vi.fn();
+    window.addEventListener(AUTH_UNAUTHORIZED_EVENT, unauthorizedListener);
+
+    await expect(apiRequest("/bildirimler")).rejects.toMatchObject({
+      status: 401,
+      code: "UNAUTHORIZED"
+    });
+    expect(unauthorizedListener).not.toHaveBeenCalled();
+  });
+
   it("emits forbidden event and throws ApiRequestError for global 403 response", async () => {
     const fetchMock = vi.fn(async () =>
       createJsonResponse(

@@ -12,6 +12,11 @@ import { ErrorState } from "../../../components/states/ErrorState";
 import { LoadingState } from "../../../components/states/LoadingState";
 import { useRoleAccess } from "../../../hooks/use-role-access";
 import { usePuantaj } from "../../../hooks/usePuantaj";
+import {
+  HALF_DAY_UBGT_POLICY_ERROR_CODE,
+  HOLIDAY_OVERTIME_POLICY_REQUIRED,
+  UBGT_DAY_SCOPE_ERROR_CODE
+} from "../../../services/puantaj-hesap-motoru";
 import { BildirimPuantajEtkiAdaylariSection } from "../components/BildirimPuantajEtkiAdaylariSection";
 import { formatComplianceLevelLabel } from "../../../lib/display/enum-display";
 import type {
@@ -382,6 +387,22 @@ export function GunlukPuantajPage() {
           {haftalikOzetEksikVeriNotu ? (
             <p className="puantaj-form-readonly">{haftalikOzetEksikVeriNotu}</p>
           ) : null}
+          {!haftalikOzet.hesaplanabilir_mi && haftalikOzet.hata_mesaji ? (
+            <p
+              className="yonetim-error"
+              data-testid={
+                haftalikOzet.hata_kodu === HOLIDAY_OVERTIME_POLICY_REQUIRED
+                  ? "tatil-fsc-fm-cakisma-politikasi-eksik"
+                  : haftalikOzet.hata_kodu === UBGT_DAY_SCOPE_ERROR_CODE
+                    ? "ubgt-gun-kapsami-eksik"
+                    : haftalikOzet.hata_kodu === HALF_DAY_UBGT_POLICY_ERROR_CODE
+                      ? "yarim-gun-ubgt-hesap-politikasi-eksik"
+                      : "haftalik-ucret-ozeti-hesaplanamadi"
+              }
+            >
+              {haftalikOzet.hata_mesaji}
+            </p>
+          ) : null}
           <div className="form-field-grid">
             <ReadonlyField
               label="Hafta Aralığı"
@@ -395,19 +416,46 @@ export function GunlukPuantajPage() {
               label="Normal Çalışma (dk)"
               value={String(haftalikOzet.normal_calisma_dakika)}
             />
-            <ReadonlyField
-              label="Fazla Çalışma (dk)"
-              value={String(haftalikOzet.fazla_calisma_dakika)}
-            />
-            <ReadonlyField
-              label="Fazla Çalışma (saat)"
-              value={formatOndalikSaat(haftalikOzet.fazla_calisma_saat)}
-            />
-            <ReadonlyField label="Saatlik Ücret" value={formatTurkcePara(haftalikOzet.saatlik_ucret)} />
-            <ReadonlyField
-              label="Fazla Çalışma Tutarı"
-              value={formatTurkcePara(haftalikOzet.fazla_calisma_tutari)}
-            />
+            {haftalikOzet.hesaplanabilir_mi ? (
+              <>
+                <ReadonlyField
+                  label="Fazla Sürelerle Çalışma (dk)"
+                  value={String(haftalikOzet.odeme_esas_fazla_surelerle_calisma_dakika)}
+                />
+                <ReadonlyField
+                  label="Fazla Çalışma (dk)"
+                  value={String(haftalikOzet.odeme_esas_fazla_calisma_dakika)}
+                />
+                <ReadonlyField
+                  label="Fazla Çalışma (saat)"
+                  value={formatOndalikSaat(haftalikOzet.fazla_calisma_saat)}
+                />
+                <ReadonlyField label="Saatlik Ücret" value={formatTurkcePara(haftalikOzet.saatlik_ucret)} />
+                <ReadonlyField
+                  label="Fazla Sürelerle Çalışma Tutarı"
+                  value={formatTurkcePara(haftalikOzet.fazla_surelerle_calisma_tutari)}
+                />
+                <ReadonlyField
+                  label="Fazla Çalışma Tutarı"
+                  value={formatTurkcePara(haftalikOzet.fazla_calisma_tutari)}
+                />
+                <ReadonlyField
+                  label="Toplam Fazla Çalışma Tutarı"
+                  value={formatTurkcePara(haftalikOzet.toplam_fazla_calisma_tutari)}
+                />
+              </>
+            ) : (
+              <>
+                <ReadonlyField
+                  label="Ham Fazla Sürelerle Çalışma (dk, audit)"
+                  value={String(haftalikOzet.fazla_surelerle_calisma_dakika)}
+                />
+                <ReadonlyField
+                  label="Ham Fazla Çalışma (dk, audit)"
+                  value={String(haftalikOzet.fazla_calisma_dakika)}
+                />
+              </>
+            )}
           </div>
         </div>
       ) : null}

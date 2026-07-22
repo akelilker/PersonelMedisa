@@ -224,6 +224,7 @@ function mhacSeedApprovedPolicy(PDO $pdo): void
         'FAZLA_SURELERLE_CALISMA_CARPANI' => '1.25',
         'UBGT_CARPANI' => '1',
         'UBGT_HESAP_MODU' => 'GUNLUK_ILAVE',
+        'TATIL_FSC_FM_CAKISMA_HESAP_MODU' => 'YARGITAY_7_5_SAAT_AYRIMI',
     ];
     $pdo->exec(
         "INSERT INTO sirket_calisma_politikalari (

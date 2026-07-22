@@ -1,7 +1,7 @@
 # 91 — Bordro Hesaplama Çalışma Politikası Karar ve Onay Formu
 
 > Bu form `S77-D1-R2` fazındaki `S77_D1_R2_COMPANY_POLICY_BLOCKED` blokajını çözecek resmi karar kaydının şablonudur.
-> Form onaylanmadan `NORMAL_AY_GUN_SAYISI`, `GUNLUK_CALISMA_SAATI`, `AYLIK_NORMAL_CALISMA_SAATI`, `HAFTALIK_IS_GUNU_SAYISI`, `HAFTA_TATILI_HESAP_MODU`, `HAFTA_TATILI_CARPANI` parametreleri production sistemine girilmez.
+> Form onaylanmadan `NORMAL_AY_GUN_SAYISI`, `GUNLUK_CALISMA_SAATI`, `AYLIK_NORMAL_CALISMA_SAATI`, `HAFTALIK_IS_GUNU_SAYISI`, `HAFTA_TATILI_HESAP_MODU`, `HAFTA_TATILI_CARPANI`, `UBGT_HESAP_MODU`, `UBGT_CARPANI` ve `TATIL_FSC_FM_CAKISMA_HESAP_MODU` parametreleri production sistemine girilmez.
 
 ## 1. Amaç
 
@@ -92,7 +92,31 @@ Seçilen yöntemin aynı çalışma için mükerrer ödeme veya eksik ödeme ür
 - [ ] Evet
 - [ ] Hayır
 
-## 5. Kullanılan dayanaklar
+## 5. HT/UBGT ile FSC/FM çakışma politikası
+
+Zorunlu sistem kodu: `TATIL_FSC_FM_CAKISMA_HESAP_MODU`
+
+Bu parametrenin varsayılan değeri yoktur. Yetkili hukuk görüşü ve şirket onayı tamamlanana kadar HT/UBGT çalışması haftalık FSC/FM bandıyla çakışırsa sistem `HOLIDAY_OVERTIME_POLICY_REQUIRED` hatası ve `TATIL_FSC_FM_CAKISMA_POLITIKASI_EKSIK` readiness blocker'ı üretir; bordro adayı oluşturmaz.
+
+### Hukuk onayına sunulacak aday: `YARGITAY_7_5_SAAT_AYRIMI`
+
+- HT/UBGT günündeki ilk `450` dakika yalnız tatil çalışması hesabında değerlendirilir.
+- Yalnız `450` dakikayı aşan günlük tatil çalışması fazla çalışma adayıdır.
+- Tam süreli/kısmi süreli çalışma, TİS veya özel sözleşme, günlük çalışma süresi ve HT ile UBGT'nin aynı güne gelmesi ayrıca değerlendirilmelidir.
+- Bu aday henüz authoritative production modu değildir; resmî karar veri tabanı üzerinden kurum hukukçusu doğrulaması ve yetkili şirket politika onayı beklemektedir.
+- `TABAN_MAHSUBU` ve `AYRI_HAKLAR` doğrulanmış seçenek değildir ve production hesap modu olarak kullanılamaz.
+
+Hukuk görüşü / karar numarası ve tarihi:
+
+---
+
+Yetkili şirket kararı:
+
+---
+
+Onaylanan `TATIL_FSC_FM_CAKISMA_HESAP_MODU` değeri: ______________________________
+
+## 6. Kullanılan dayanaklar
 
 - [ ] İş sözleşmeleri
 - [ ] Vardiya çizelgeleri
@@ -110,7 +134,7 @@ Seçilen yöntemin aynı çalışma için mükerrer ödeme veya eksik ödeme ür
 
 ---
 
-## 6. Karar özeti
+## 7. Karar özeti
 
 | Parametre | Kesin Değer |
 | --- | ---: |
@@ -120,6 +144,9 @@ Seçilen yöntemin aynı çalışma için mükerrer ödeme veya eksik ödeme ür
 | `HAFTALIK_IS_GUNU_SAYISI` | |
 | `HAFTA_TATILI_HESAP_MODU` | |
 | `HAFTA_TATILI_CARPANI` | |
+| `UBGT_HESAP_MODU` | |
+| `UBGT_CARPANI` | |
+| `TATIL_FSC_FM_CAKISMA_HESAP_MODU` | |
 
 Karar tarihi: ____ / ____ / 2026
 
@@ -127,7 +154,7 @@ Geçerlilik başlangıcı: ____ / ____ / 2026
 
 Geçerlilik bitişi: ____ / ____ / ______ veya süresiz
 
-## 7. Onaylar
+## 8. Onaylar
 
 **Genel Yönetici**
 
@@ -157,6 +184,28 @@ Ad Soyad: ______________________________
 
 Tarih: ____ / ____ / 2026
 
-## 8. Sistem kayıt notu
+## 9. Sistem kayıt notu
 
 Bu form onaylanmadan ilgili şirket parametreleri production sistemine girilmeyecek ve gerçek maaş hesaplama adayı oluşturulmayacaktır.
+
+---
+
+## S87 karar kaydı (2026-07-22)
+
+**Onaylanan `TATIL_FSC_FM_CAKISMA_HESAP_MODU`:** `YARGITAY_7_5_SAAT_AYRIMI`
+
+**Özet kurallar:**
+- Tam gün HT/UBGT fiili çalışmasında ilk 7,5 saat (450 dk) tatil primi havuzunda kalır; FSC/FM değerlendirme havuzuna yalnızca 450 dk aşımı girer.
+- HT ve UBGT aynı günde çakışırsa tatil primi HT esas alınır; haftalık asım tek kez sayılır.
+- Mod onaylıyken tam gün HT/UBGT + FSC/FM çakışması aday üretimini bloke etmez.
+- Mod yok veya geçersizse mevcut fail-closed davranış korunur (tatil + FSC/FM → hesap durur).
+
+**Yarım gün UBGT:** `ONAY_BEKLIYOR` — tatil dönemi net overlap ve yetkili hesap politikası eksik; `YARIM_GUN` + net>0 satırlar fail-closed (`HALF_DAY_UBGT_POLICY_REQUIRED`). Interval karşılaştırma / 0,5–1 yevmiye / 450 dk ayrımı uygulanmaz.
+
+**S87-B (2026-07-22) UBGT gün kapsamı fail-closed:**
+- Canonical owner: `resolveUbgtGunKapsami` → yalnız `TAM_GUN` | `YARIM_GUN` | `BILINMIYOR` (`ubgt_gun_kapsami` / `tatil_gun_kapsami`).
+- Bilinmeyen kapsam + yalnız UBGT + net>0 → `UBGT_DAY_SCOPE_REQUIRED` (YARGITAY bu blocker’ı açmaz).
+- Tam gün algoritması yalnız açık `TAM_GUN` işaretinde.
+- HT+UBGT aynı gün: `HAFTA_TATILI_ESAS` korunur; eksik UBGT kapsamı ikinci ödeme doğurmaz.
+
+**Production notu:** Bu kayıt yalnızca karar dokümantasyonudur; production policy yazımı yapılmamıştır.

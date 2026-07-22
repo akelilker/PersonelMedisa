@@ -124,6 +124,63 @@ class MaasHesaplamaAdayService
             (string) $bundle['snapshot']['donem_baslangic'],
             (string) $bundle['snapshot']['donem_bitis']
         );
+        $gunlukCalismaRow = $policy['degerler_by_code']['GUNLUK_CALISMA_SAATI'] ?? null;
+        $haftalikIsGunuRow = $policy['degerler_by_code']['HAFTALIK_IS_GUNU_SAYISI'] ?? null;
+        $gunlukCalismaDakika = is_array($gunlukCalismaRow)
+            ? MaasHesaplamaEngine::decimalHoursToMinutes($gunlukCalismaRow['sayisal_deger'] ?? '')
+            : 0;
+        $haftalikIsGunu = is_array($haftalikIsGunuRow)
+            ? (int) ($haftalikIsGunuRow['sayisal_deger'] ?? 0)
+            : 0;
+        $modeRow = $policy['degerler_by_code']['TATIL_FSC_FM_CAKISMA_HESAP_MODU'] ?? null;
+        $holidayOvertimeMode = is_array($modeRow) ? ($modeRow['metin_deger'] ?? null) : null;
+        if ($gunlukCalismaDakika > 0 && $haftalikIsGunu > 0) {
+            foreach ($bundle['personeller'] as $personel) {
+                $pid = (int) $personel['personel_id'];
+                $projected = MaasHesaplamaCorrectionProjectionService::applyToPuantajlar(
+                    $bundle['puantaj_by_personel'][$pid] ?? [],
+                    $projection['projections_by_personel'][$pid] ?? []
+                );
+                $conflict = MaasHesaplamaEngine::detectHolidayOvertimePolicyConflict(
+                    $projected['puantajlar'],
+                    $gunlukCalismaDakika,
+                    $haftalikIsGunu,
+                    $holidayOvertimeMode
+                );
+                if ($conflict['has_conflict']) {
+                    $reason = (string) ($conflict['reason'] ?? '');
+                    if ($reason === 'UBGT_DAY_SCOPE' || $reason === 'HALF_DAY_UBGT_POLICY') {
+                        $items[] = self::issue(
+                            'BLOCKER',
+                            (string) $conflict['blocker_code'],
+                            (string) $conflict['message'],
+                            'puantaj',
+                            null,
+                            $pid,
+                            [
+                                'politika_kodu' => MaasHesaplamaEngine::HOLIDAY_OVERTIME_POLICY_CODE,
+                                'ubgt_kapsam_satirlari' => $conflict['scope_rows'] ?? [],
+                            ],
+                            $personel['ad_soyad'] ?? null
+                        );
+                        continue;
+                    }
+                    $items[] = self::issue(
+                        'BLOCKER',
+                        MaasHesaplamaEngine::HOLIDAY_OVERTIME_BLOCKER_CODE,
+                        MaasHesaplamaEngine::HOLIDAY_OVERTIME_ERROR_MESSAGE,
+                        'puantaj',
+                        null,
+                        $pid,
+                        [
+                            'politika_kodu' => MaasHesaplamaEngine::HOLIDAY_OVERTIME_POLICY_CODE,
+                            'cakisan_haftalar' => $conflict['weeks'],
+                        ],
+                        $personel['ad_soyad'] ?? null
+                    );
+                }
+            }
+        }
         foreach ($projection['blocker_items'] as $blocker) {
             $items[] = [
                 'severity' => (string) $blocker['severity'],

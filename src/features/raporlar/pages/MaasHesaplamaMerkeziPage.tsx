@@ -24,6 +24,14 @@ import { LoadingState } from "../../../components/states/LoadingState";
 import { useRoleAccess } from "../../../hooks/use-role-access";
 import { useMaasHesaplama, type MaasHesaplamaFilterState } from "../../../hooks/useMaasHesaplama";
 import { currentMonthParts, parseAyValue } from "../../../lib/donem-kapanis/display";
+import {
+  HALF_DAY_UBGT_POLICY_ERROR_CODE,
+  HALF_DAY_UBGT_POLICY_ERROR_MESSAGE,
+  HOLIDAY_OVERTIME_POLICY_REQUIRED,
+  HOLIDAY_OVERTIME_POLICY_REQUIRED_MESSAGE,
+  UBGT_DAY_SCOPE_ERROR_CODE,
+  UBGT_DAY_SCOPE_ERROR_MESSAGE
+} from "../../../services/puantaj-hesap-motoru";
 import { useAuth } from "../../../state/auth.store";
 import type { IdOption } from "../../../types/referans";
 
@@ -268,7 +276,15 @@ export function MaasHesaplamaMerkeziPage() {
       await refetch();
     } catch (error) {
       if (error instanceof ApiRequestError) {
-        setActionError(`${error.code}: ${error.message}`);
+        const readableMessage =
+          error.code === HOLIDAY_OVERTIME_POLICY_REQUIRED
+            ? HOLIDAY_OVERTIME_POLICY_REQUIRED_MESSAGE
+            : error.code === UBGT_DAY_SCOPE_ERROR_CODE
+              ? UBGT_DAY_SCOPE_ERROR_MESSAGE
+              : error.code === HALF_DAY_UBGT_POLICY_ERROR_CODE
+                ? HALF_DAY_UBGT_POLICY_ERROR_MESSAGE
+                : `${error.code}: ${error.message}`;
+        setActionError(readableMessage);
       } else {
         setActionError(error instanceof Error ? error.message : "Snapshot oluşturulamadı.");
       }

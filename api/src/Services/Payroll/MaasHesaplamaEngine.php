@@ -20,6 +20,18 @@ final class MaasHesaplamaEngine
     public const SOLVER_TOLERANCE_KURUS = 1;
     /** Is Kanunu haftalik azami normal sure (45 saat). */
     public const LEGAL_WEEKLY_LIMIT_MINUTES = 2700;
+    public const HOLIDAY_OVERTIME_POLICY_CODE = 'TATIL_FSC_FM_CAKISMA_HESAP_MODU';
+    public const HOLIDAY_OVERTIME_APPROVED_MODE = SirketCalismaPolitikasiCatalog::TATIL_FSC_FM_APPROVED_MODE;
+    public const YARGITAY_HOLIDAY_SPLIT_MINUTES = 450;
+    public const HOLIDAY_OVERTIME_ERROR_CODE = 'HOLIDAY_OVERTIME_POLICY_REQUIRED';
+    public const HOLIDAY_OVERTIME_BLOCKER_CODE = 'TATIL_FSC_FM_CAKISMA_POLITIKASI_EKSIK';
+    public const HOLIDAY_OVERTIME_ERROR_MESSAGE = 'Tatil çalışması ile fazla çalışma çakışma politikası yetkili onayı bekliyor';
+    public const UBGT_DAY_SCOPE_ERROR_CODE = 'UBGT_DAY_SCOPE_REQUIRED';
+    public const UBGT_DAY_SCOPE_BLOCKER_CODE = 'UBGT_GUN_KAPSAMI_EKSIK';
+    public const UBGT_DAY_SCOPE_ERROR_MESSAGE = 'Resmî tatilin tam gün veya yarım gün kapsamı doğrulanamadığı için otomatik hesaplama yapılamıyor';
+    public const HALF_DAY_UBGT_POLICY_ERROR_CODE = 'HALF_DAY_UBGT_POLICY_REQUIRED';
+    public const HALF_DAY_UBGT_POLICY_BLOCKER_CODE = 'YARIM_GUN_UBGT_HESAP_POLITIKASI_EKSIK';
+    public const HALF_DAY_UBGT_POLICY_ERROR_MESSAGE = 'Yarım günlük resmî tatil çalışma hesabı için tatil dönemi net çalışma süresi ve yetkili hesap politikası eksik';
 
     /** @var array<int, string> */
     private static $holidayModes = ['GUNLUK_ILAVE', 'SAAT_CARPAN', 'GUNLUK_ILAVE_VE_SAAT_CARPAN'];
@@ -110,11 +122,38 @@ final class MaasHesaplamaEngine
             ]);
         }
 
-        // Saatlik ucret: sozlesme_baz * 60 / AYLIK_NORMAL_CALISMA_DAKIKA
-        $hourly = $contractBase->mulDiv(60, $aylikDk);
-        $daily = $contractBase->mulDiv(1, $normalAyGun);
+        // Ucret hesaplama tabani BRUT sozlesmede dogrudan baz brut, NET sozlesmede
+        // ise yasal kesintilerle cozulmus baz bruttur. Mesai/tatil tabani hedef net olamaz.
+        $solverInfo = null;
+        $hedefNet = null;
+        $sozlesmeBrut = $contractBase;
+        if ($ucretTuru === 'NET') {
+            $warnings[] = 'NET_TO_GROSS_SOLVER_USED';
+            $solved = self::solveNetToGross($contractBase, $params, $prevMatrah, $sgkHesabi);
+            if (isset($solved['error'])) {
+                return self::errorResult($solved['error']['code'], $solved['error']['message']);
+            }
+            $solverInfo = $solved['solver'];
+            $sozlesmeBrut = $solved['brut'];
+            $hedefNet = $contractBase;
+        }
 
-        $attendance = self::buildAttendanceLines($input, $hourly, $daily, $params, $sira, $warnings);
+        // Saatlik/gunluk ucret yalniz solver sonrasi baz brutten uretilir.
+        $hourly = $sozlesmeBrut->mulDiv(60, $aylikDk);
+        $daily = $sozlesmeBrut->mulDiv(1, $normalAyGun);
+
+        $attendance = self::buildAttendanceLines(
+            $input,
+            $hourly,
+            $daily,
+            $sozlesmeBrut,
+            $params,
+            $sira,
+            $warnings
+        );
+        if (isset($attendance['error'])) {
+            return self::errorResult($attendance['error']['code'], $attendance['error']['message']);
+        }
         $sira = $attendance['sira'];
         $kalemler = array_merge($kalemler, $attendance['kalemler']);
         $grossAdd = $attendance['gross_add'];
@@ -131,7 +170,6 @@ final class MaasHesaplamaEngine
         $netOnlyDeduct = $netOnlyDeduct->add($finance['net_deduct']);
         $netOnlyAdd = $finance['net_add'];
 
-        $solverInfo = null;
         if ($ucretTuru === 'BRUT') {
             $brut = $contractBase->add($grossAdd)->sub($grossDeduct);
             if ($brut->isNegative()) {
@@ -142,34 +180,10 @@ final class MaasHesaplamaEngine
             $kalemler = array_merge($kalemler, $legal['kalemler']);
             $net = $brut->sub($legal['sgk'])->sub($legal['issizlik'])->sub($legal['gv'])->sub($legal['damga']);
             $net = $net->add($netOnlyAdd)->sub($netOnlyDeduct);
-            $hedefNet = null;
-            $sozlesmeBrut = $contractBase;
         } else {
-            $warnings[] = 'NET_TO_GROSS_SOLVER_USED';
-            $hedefNet = $contractBase->add($grossAdd)->sub($grossDeduct)->add($netOnlyAdd)->sub($netOnlyDeduct);
-            // Solver targets net AFTER legal deductions from gross base; attendance/finance already in hedef
-            // Reconstruct: find brut such that brut - legal(brut) + netOnlyAdd - netOnlyDeduct ~= hedefNet
-            // Actually hedefNet already includes net-only effects. Legal applies to gross.
-            // Define: net_from_gross(brut) = brut - sgk - issizlik - gv - damga
-            // We need net_from_gross(brut) + netOnlyAdd - netOnlyDeduct == hedefNet_full
-            // where hedefNet_full = contractBase(net target) + grossAdd - grossDeduct + netOnlyAdd - netOnlyDeduct
-            // Wait - for NET salary, contractBase is target net for the base work. Gross adds (overtime) increase
-            // what employee should receive. Simpler model:
-            // target_net = contractBase + overtime_gross_equiv treated as net additions? 
-            // Contract: NET model uses solver so that final net_odenecek equals
-            //   prorata_net_contract + net_finance_add - net_finance_deduct
-            //   and gross attendance premiums are included in gross before legal, which changes net.
-            // Practical approach used here:
-            //   base_target_net = contractBase
-            //   Solve brut0 such that net(brut0) = base_target_net
-            //   Then add grossAdd as gross, recompute legal on (brut0 + grossAdd - grossDeduct)
-            //   Then apply net-only finance.
-            $solved = self::solveNetToGross($contractBase, $params, $prevMatrah, $sgkHesabi);
-            if (isset($solved['error'])) {
-                return self::errorResult($solved['error']['code'], $solved['error']['message']);
-            }
-            $solverInfo = $solved['solver'];
-            $brut0 = $solved['brut'];
+            // Baz hedef net solver ile bir kez baz brüte çevrildi. Puantaj/finans
+            // brüt etkileri bu bazın üstüne eklenir; yasal kesintiler nihai brütte hesaplanır.
+            $brut0 = $sozlesmeBrut;
             $brut = $brut0->add($grossAdd)->sub($grossDeduct);
             if ($brut->isNegative()) {
                 return self::errorResult('NEGATIVE_CALCULATION_BASE', 'Hesaplanan brüt negatif.');
@@ -179,9 +193,6 @@ final class MaasHesaplamaEngine
             $kalemler = array_merge($kalemler, $legal['kalemler']);
             $net = $brut->sub($legal['sgk'])->sub($legal['issizlik'])->sub($legal['gv'])->sub($legal['damga']);
             $net = $net->add($netOnlyAdd)->sub($netOnlyDeduct);
-            $diff = $net->sub($contractBase->add($netOnlyAdd)->sub($netOnlyDeduct));
-            // After overtime gross effects, net may differ from pure contract target; rounding line for solver residue vs base
-            $baseNetExpected = $contractBase->add($netOnlyAdd)->sub($netOnlyDeduct);
             // Compare solved path without OT: net(brut0) should be within tolerance of contractBase
             $legal0 = self::computeLegalDeductions($brut0, Money::zero(), $params, $prevMatrah, 0, $sgkHesabi);
             $net0 = $brut0->sub($legal0['sgk'])->sub($legal0['issizlik'])->sub($legal0['gv'])->sub($legal0['damga']);
@@ -194,7 +205,6 @@ final class MaasHesaplamaEngine
                     'hesaplanan_net_baz' => $net0->toDecimalString(),
                 ]);
             }
-            $sozlesmeBrut = $brut0;
             $hedefNet = $contractBase;
         }
 
@@ -231,6 +241,9 @@ final class MaasHesaplamaEngine
             'para_birimi' => 'TRY',
             'hedef_net_tutar' => $hedefNet ? $hedefNet->toDecimalString() : null,
             'sozlesme_brut_tutar' => $sozlesmeBrut->toDecimalString(),
+            'ucret_hesaplama_baz_brut_tutar' => $sozlesmeBrut->toDecimalString(),
+            'saatlik_brut_ucret' => $hourly->toDecimalString(),
+            'gunluk_brut_ucret' => $daily->toDecimalString(),
             'hesaplanan_brut_tutar' => $brut->toDecimalString(),
             'sgk_matrahi' => $legal['sgk_matrah']->toDecimalString(),
             'gelir_vergisi_matrahi' => $legal['gv_matrah']->toDecimalString(),
@@ -307,8 +320,186 @@ final class MaasHesaplamaEngine
                 $out[$code] = (string) ($row['sayisal_deger'] ?? '');
             }
         }
+        if (isset($mevzuatByCode[self::HOLIDAY_OVERTIME_POLICY_CODE])) {
+            $row = $mevzuatByCode[self::HOLIDAY_OVERTIME_POLICY_CODE];
+            $out[self::HOLIDAY_OVERTIME_POLICY_CODE] = (string) ($row['metin_deger'] ?? '');
+        }
 
         return $out;
+    }
+
+    /** @param array<string, string> $params */
+    /**
+     * Canonical UBGT gün kapsamı. Tarih/net dakika/magic listeden tahmin yok.
+     *
+     * @param array<string, mixed> $row
+     * @return 'TAM_GUN'|'YARIM_GUN'|'BILINMIYOR'
+     */
+    public static function resolveUbgtGunKapsami(array $row)
+    {
+        $raw = null;
+        if (array_key_exists('ubgt_gun_kapsami', $row) && $row['ubgt_gun_kapsami'] !== null) {
+            $raw = (string) $row['ubgt_gun_kapsami'];
+        } elseif (array_key_exists('tatil_gun_kapsami', $row) && $row['tatil_gun_kapsami'] !== null) {
+            $raw = (string) $row['tatil_gun_kapsami'];
+        }
+        if ($raw === null) {
+            return 'BILINMIYOR';
+        }
+        $normalized = strtoupper(trim($raw));
+        if ($normalized === 'TAM_GUN' || $normalized === 'YARIM_GUN') {
+            return $normalized;
+        }
+
+        return 'BILINMIYOR';
+    }
+
+    /**
+     * Yalnız UBGT satırlarında kapsam fail-closed.
+     * HT+UBGT aynı gün (HT esas) bu blocker'a girmez.
+     *
+     * @param array<int, array<string, mixed>> $puantajlar
+     * @return array{
+     *   has_conflict: bool,
+     *   reason: string|null,
+     *   error_code: string|null,
+     *   blocker_code: string|null,
+     *   message: string|null,
+     *   rows: array<int, array<string, mixed>>
+     * }
+     */
+    public static function detectUbgtScopeConflict(array $puantajlar)
+    {
+        $unknownRows = [];
+        $halfDayRows = [];
+        foreach ($puantajlar as $row) {
+            $netDk = max(0, (int) ($row['net_calisma_suresi_dakika'] ?? 0));
+            if ($netDk < 1) {
+                continue;
+            }
+            $class = self::classifyHolidayDay($row);
+            // Precedence 1: HT+UBGT aynı gün → HT esas; UBGT kapsam blocker üretilmez.
+            if ($class['both'] || !$class['ubgt'] || $class['ht']) {
+                continue;
+            }
+            $kapsam = self::resolveUbgtGunKapsami($row);
+            if ($kapsam === 'BILINMIYOR') {
+                $unknownRows[] = $row;
+            } elseif ($kapsam === 'YARIM_GUN') {
+                $halfDayRows[] = $row;
+            }
+        }
+        if (count($unknownRows) > 0) {
+            return [
+                'has_conflict' => true,
+                'reason' => 'UBGT_DAY_SCOPE',
+                'error_code' => self::UBGT_DAY_SCOPE_ERROR_CODE,
+                'blocker_code' => self::UBGT_DAY_SCOPE_BLOCKER_CODE,
+                'message' => self::UBGT_DAY_SCOPE_ERROR_MESSAGE,
+                'rows' => $unknownRows,
+            ];
+        }
+        if (count($halfDayRows) > 0) {
+            return [
+                'has_conflict' => true,
+                'reason' => 'HALF_DAY_UBGT_POLICY',
+                'error_code' => self::HALF_DAY_UBGT_POLICY_ERROR_CODE,
+                'blocker_code' => self::HALF_DAY_UBGT_POLICY_BLOCKER_CODE,
+                'message' => self::HALF_DAY_UBGT_POLICY_ERROR_MESSAGE,
+                'rows' => $halfDayRows,
+            ];
+        }
+
+        return [
+            'has_conflict' => false,
+            'reason' => null,
+            'error_code' => null,
+            'blocker_code' => null,
+            'message' => null,
+            'rows' => [],
+        ];
+    }
+
+    public static function resolveHolidayOvertimeMode(array $params)
+    {
+        $raw = strtoupper(trim((string) ($params[self::HOLIDAY_OVERTIME_POLICY_CODE] ?? '')));
+
+        return SirketCalismaPolitikasiCatalog::isHolidayOvertimeModeAllowed($raw) ? $raw : null;
+    }
+
+    /**
+     * @param array<string, mixed> $row
+     * @return array{ht: bool, ubgt: bool, both: bool}
+     */
+    public static function classifyHolidayDay(array $row)
+    {
+        $gunTipi = (string) ($row['gun_tipi'] ?? '');
+        $ht = $gunTipi === 'Hafta_Tatili_Pazar';
+        $ubgt = $gunTipi === 'UBGT_Resmi_Tatil';
+        $siniflar = $row['gun_siniflandirmalari'] ?? null;
+        if (is_array($siniflar)) {
+            foreach ($siniflar as $sinif) {
+                $sinif = (string) $sinif;
+                if ($sinif === 'Hafta_Tatili_Pazar') {
+                    $ht = true;
+                }
+                if ($sinif === 'UBGT_Resmi_Tatil') {
+                    $ubgt = true;
+                }
+            }
+        }
+        if (!empty($row['ht_ubgt_ayni_gun_mi'])) {
+            $ht = true;
+            $ubgt = true;
+        }
+
+        return ['ht' => $ht, 'ubgt' => $ubgt, 'both' => $ht && $ubgt];
+    }
+
+    public static function holidayOtPoolMinutes($netDk, $isHoliday)
+    {
+        $netDk = max(0, (int) $netDk);
+        if (!$isHoliday) {
+            return $netDk;
+        }
+
+        return max(0, $netDk - self::YARGITAY_HOLIDAY_SPLIT_MINUTES);
+    }
+
+    /**
+     * FM/FSC degerlendirme havuzu: normal tam + (HT veya TAM_GUN UBGT) 450 asim.
+     * HT+UBGT ayni gun tek asim; bilinmeyen/yarim gun UBGT hesap yoluna girmez.
+     *
+     * @param array<int, array<string, mixed>> $puantajlar
+     */
+    public static function buildFmDegerlendirmeHavuzuDk(array $puantajlar)
+    {
+        $total = 0;
+        foreach ($puantajlar as $row) {
+            $netDk = max(0, (int) ($row['net_calisma_suresi_dakika'] ?? 0));
+            if ($netDk < 1) {
+                continue;
+            }
+            $class = self::classifyHolidayDay($row);
+            if ($class['both'] || $class['ht']) {
+                $total += self::holidayOtPoolMinutes($netDk, true);
+                continue;
+            }
+            if ($class['ubgt']) {
+                if (self::resolveUbgtGunKapsami($row) !== 'TAM_GUN') {
+                    continue;
+                }
+                $total += self::holidayOtPoolMinutes($netDk, true);
+                continue;
+            }
+            $gunTipi = (string) ($row['gun_tipi'] ?? '');
+            if ($gunTipi !== 'Normal_Is_Gunu') {
+                continue;
+            }
+            $total += $netDk;
+        }
+
+        return $total;
     }
 
     private static function paramInt(array $params, $code)
@@ -329,7 +520,13 @@ final class MaasHesaplamaEngine
      */
     private static function paramHoursToMinutes(array $params, $code)
     {
-        $raw = trim((string) $params[$code]);
+        return self::decimalHoursToMinutes($params[$code]);
+    }
+
+    /** Decimal saat degerini float kullanmadan tam dakikaya cevirir. */
+    public static function decimalHoursToMinutes($value)
+    {
+        $raw = trim((string) $value);
         if ($raw === '' || preg_match('/^\d+(\.\d+)?$/', $raw) !== 1) {
             return 0;
         }
@@ -374,12 +571,147 @@ final class MaasHesaplamaEngine
     }
 
     /**
+     * HT/UBGT fiili dakikalari haftalik havuzda tutulur. Bu havuz FSC veya FM
+     * bandina girdiginde, yetkili hesap modu onaylanana kadar parasal sonuc
+     * uretilmez. Metot preflight ve motor tarafinda ayni owner'i kullanir.
+     *
+     * @param array<int, array<string, mixed>> $puantajlar
+     * @return array{has_conflict: bool, weeks: array<int, array<string, int|string>>}
+     */
+    public static function detectHolidayOvertimePolicyConflict(array $puantajlar, $gunlukCalismaDakika, $haftalikIsGunu, $holidayOvertimeMode = null)
+    {
+        $scope = self::detectUbgtScopeConflict($puantajlar);
+        if ($scope['has_conflict']) {
+            return [
+                'has_conflict' => true,
+                'reason' => $scope['reason'],
+                'error_code' => $scope['error_code'],
+                'blocker_code' => $scope['blocker_code'],
+                'message' => $scope['message'],
+                'scope_rows' => $scope['rows'],
+                'half_day_rows' => ($scope['reason'] ?? '') === 'HALF_DAY_UBGT_POLICY' ? $scope['rows'] : [],
+                'weeks' => [],
+            ];
+        }
+
+        $approvedMode = self::resolveHolidayOvertimeMode([
+            self::HOLIDAY_OVERTIME_POLICY_CODE => (string) $holidayOvertimeMode,
+        ]);
+        if ($approvedMode !== null) {
+            return [
+                'has_conflict' => false,
+                'reason' => null,
+                'error_code' => null,
+                'blocker_code' => null,
+                'message' => null,
+                'scope_rows' => [],
+                'half_day_rows' => [],
+                'weeks' => [],
+            ];
+        }
+
+        $gunlukCalismaDakika = max(0, (int) $gunlukCalismaDakika);
+        $haftalikIsGunu = max(0, (int) $haftalikIsGunu);
+        $contractualWeeklyDk = min(
+            $gunlukCalismaDakika * $haftalikIsGunu,
+            self::LEGAL_WEEKLY_LIMIT_MINUTES
+        );
+        if ($contractualWeeklyDk < 1) {
+            return [
+                'has_conflict' => false,
+                'reason' => null,
+                'error_code' => null,
+                'blocker_code' => null,
+                'message' => null,
+                'scope_rows' => [],
+                'half_day_rows' => [],
+                'weeks' => [],
+            ];
+        }
+
+        /** @var array<string, array{toplam_dk:int, ht_dk:int, ubgt_dk:int}> $weeks */
+        $weeks = [];
+        foreach ($puantajlar as $row) {
+            $gunTipi = (string) ($row['gun_tipi'] ?? '');
+            $class = self::classifyHolidayDay($row);
+            if (!$class['ht'] && !$class['ubgt'] && $gunTipi !== 'Normal_Is_Gunu') {
+                continue;
+            }
+            $netDk = max(0, (int) ($row['net_calisma_suresi_dakika'] ?? 0));
+            $tarih = (string) ($row['tarih'] ?? '');
+            if ($netDk < 1 || $tarih === '') {
+                continue;
+            }
+            try {
+                $weekKey = self::isoWeekKey($tarih);
+            } catch (\Throwable $e) {
+                continue;
+            }
+            if (!isset($weeks[$weekKey])) {
+                $weeks[$weekKey] = ['toplam_dk' => 0, 'ht_dk' => 0, 'ubgt_dk' => 0];
+            }
+            $weeks[$weekKey]['toplam_dk'] += $netDk;
+            $class = self::classifyHolidayDay($row);
+            if ($class['ht']) {
+                $weeks[$weekKey]['ht_dk'] += $netDk;
+            }
+            if ($class['ubgt'] && !$class['both']) {
+                $weeks[$weekKey]['ubgt_dk'] += $netDk;
+            } elseif ($class['ubgt'] && $class['both']) {
+                // HT+UBGT ayni gun audit: UBGT dakikasi ayri tutulmaz, HT tarafinda sayildi.
+            }
+        }
+
+        ksort($weeks);
+        $conflicts = [];
+        foreach ($weeks as $weekKey => $week) {
+            $holidayDk = $week['ht_dk'] + $week['ubgt_dk'];
+            if ($holidayDk < 1) {
+                continue;
+            }
+            $bands = self::hesaplaHaftalikCalismaBantlari($week['toplam_dk'], $contractualWeeklyDk);
+            if ($bands['fs_dk'] < 1 && $bands['fm_dk'] < 1) {
+                continue;
+            }
+            $conflicts[] = [
+                'iso_hafta' => $weekKey,
+                'haftalik_toplam_dk' => $week['toplam_dk'],
+                'hafta_tatili_calisma_dk' => $week['ht_dk'],
+                'ubgt_calisma_dk' => $week['ubgt_dk'],
+                'ham_fazla_surelerle_calisma_dk' => $bands['fs_dk'],
+                'ham_fazla_calisma_dk' => $bands['fm_dk'],
+                'sozlesme_haftalik_dk' => $contractualWeeklyDk,
+                'yasal_haftalik_limit_dk' => self::LEGAL_WEEKLY_LIMIT_MINUTES,
+            ];
+        }
+
+        return [
+            'has_conflict' => count($conflicts) > 0,
+            'reason' => count($conflicts) > 0 ? 'HOLIDAY_OVERTIME_POLICY_REQUIRED' : null,
+            'error_code' => count($conflicts) > 0 ? self::HOLIDAY_OVERTIME_ERROR_CODE : null,
+            'blocker_code' => count($conflicts) > 0 ? self::HOLIDAY_OVERTIME_BLOCKER_CODE : null,
+            'message' => count($conflicts) > 0 ? self::HOLIDAY_OVERTIME_ERROR_MESSAGE : null,
+            'scope_rows' => [],
+            'half_day_rows' => [],
+            'weeks' => $conflicts,
+        ];
+    }
+
+    /**
      * @param array<string, mixed> $input
      * @param array<string, string> $params
      * @param array<int, string> $warnings
-     * @return array{kalemler: array, sira: int, gross_add: Money, gross_deduct: Money, net_only: Money}
+     * @return array{kalemler?: array, sira?: int, gross_add?: Money, gross_deduct?: Money, net_only?: Money, error?: array{code:string, message:string}}
      */
-    private static function buildAttendanceLines(array $input, Money $hourly, Money $daily, array $params, $sira, array &$warnings)
+    private static function buildAttendanceLines(
+        array $input,
+        Money $hourly,
+        Money $daily,
+        Money $sozlesmeBrut,
+        array $params,
+        $sira,
+        array &$warnings
+    )
     {
         $kalemler = [];
         $grossAdd = Money::zero();
@@ -396,6 +728,31 @@ final class MaasHesaplamaEngine
         $contractualWeeklyDk = $gunlukDk * $haftalikIsGunu;
         if ($contractualWeeklyDk > self::LEGAL_WEEKLY_LIMIT_MINUTES) {
             $contractualWeeklyDk = self::LEGAL_WEEKLY_LIMIT_MINUTES;
+        }
+        $holidayOvertimeMode = self::resolveHolidayOvertimeMode($params);
+        $holidayOvertimeConflict = self::detectHolidayOvertimePolicyConflict(
+            $input['puantajlar'],
+            $gunlukDk,
+            $haftalikIsGunu,
+            $params[self::HOLIDAY_OVERTIME_POLICY_CODE] ?? null
+        );
+        if ($holidayOvertimeConflict['has_conflict']) {
+            $reason = (string) ($holidayOvertimeConflict['reason'] ?? '');
+            if ($reason === 'UBGT_DAY_SCOPE' || $reason === 'HALF_DAY_UBGT_POLICY') {
+                return [
+                    'error' => [
+                        'code' => (string) $holidayOvertimeConflict['error_code'],
+                        'message' => (string) $holidayOvertimeConflict['message'],
+                    ],
+                ];
+            }
+
+            return [
+                'error' => [
+                    'code' => self::HOLIDAY_OVERTIME_ERROR_CODE,
+                    'message' => self::HOLIDAY_OVERTIME_ERROR_MESSAGE,
+                ],
+            ];
         }
         $hasOt = false;
         $absenceDates = [];
@@ -460,8 +817,14 @@ final class MaasHesaplamaEngine
             }
         }
 
-        /** @var array<string, int> $weeklyNormalMinutes ISO hafta anahtari => Normal_Is_Gunu net dk */
-        $weeklyNormalMinutes = [];
+        /**
+         * ISO hafta bazinda iki ayri owner havuzu:
+         * - fiili_dk: Normal + HT + UBGT gercek calisma (45 saat sinifi)
+         * - tatil_dk: HT/UBGT fiili calisma audit havuzu
+         *
+         * @var array<string, array{fiili_dk:int, normal_dk:int, tatil_dk:int, tatil_asim_dk:int}>
+         */
+        $weeklyWorkPools = [];
 
         foreach ($input['puantajlar'] as $row) {
             $tarih = (string) ($row['tarih'] ?? '');
@@ -469,6 +832,7 @@ final class MaasHesaplamaEngine
             $netDk = isset($row['net_calisma_suresi_dakika']) ? (int) $row['net_calisma_suresi_dakika'] : 0;
             $gec = isset($row['gec_kalma_dakika']) ? (int) $row['gec_kalma_dakika'] : 0;
             $erken = isset($row['erken_cikis_dakika']) ? (int) $row['erken_cikis_dakika'] : 0;
+            $class = self::classifyHolidayDay($row);
 
             if ($tarih !== '' && !isset($absenceDates[$tarih])) {
                 if ($gec > 0) {
@@ -485,70 +849,144 @@ final class MaasHesaplamaEngine
                 }
             }
 
-            if ($gunTipi === 'Hafta_Tatili_Pazar' && $netDk > 0) {
-                $premium = self::holidayPremium($hourly, $daily, $netDk, $htCarpan, $htMode);
-                $grossAdd = $grossAdd->add($premium['tutar']);
-                $hasOt = true;
-                $sira++;
-                $kalemler[] = self::line(
-                    $sira,
-                    'HAFTA_TATILI',
-                    'HAFTA_TATILI_ODEMESI',
-                    'ARTI',
-                    $premium['miktar'],
-                    $premium['birim'],
-                    $htCarpan->toDecimalString(),
-                    $premium['matrah'],
-                    $premium['tutar'],
-                    'PUANTAJ',
-                    isset($row['muhur_satir_id']) ? (int) $row['muhur_satir_id'] : null,
-                    'Hafta tatili calismasi',
-                    ['hesap_modu' => $htMode, 'net_dakika' => $netDk]
-                );
-            } elseif ($gunTipi === 'UBGT_Resmi_Tatil' && $netDk > 0) {
-                $premium = self::holidayPremium($hourly, $daily, $netDk, $ubgtCarpan, $ubgtMode);
-                $grossAdd = $grossAdd->add($premium['tutar']);
-                $hasOt = true;
-                $sira++;
-                $kalemler[] = self::line(
-                    $sira,
-                    'UBGT',
-                    'UBGT_ODEMESI',
-                    'ARTI',
-                    $premium['miktar'],
-                    $premium['birim'],
-                    $ubgtCarpan->toDecimalString(),
-                    $premium['matrah'],
-                    $premium['tutar'],
-                    'PUANTAJ',
-                    isset($row['muhur_satir_id']) ? (int) $row['muhur_satir_id'] : null,
-                    'UBGT calismasi',
-                    ['hesap_modu' => $ubgtMode, 'net_dakika' => $netDk]
-                );
-            } elseif ($gunTipi === 'Normal_Is_Gunu' && $netDk > 0 && $tarih !== '') {
-                $weekKey = self::isoWeekKey($tarih);
-                if (!isset($weeklyNormalMinutes[$weekKey])) {
-                    $weeklyNormalMinutes[$weekKey] = 0;
+            if ($netDk > 0 && ($class['ht'] || $class['ubgt'])) {
+                if ($class['both']) {
+                    $premium = self::holidayPremium($hourly, $daily, $netDk, $htCarpan, $htMode);
+                    $grossAdd = $grossAdd->add($premium['tutar']);
+                    $hasOt = true;
+                    $sira++;
+                    $kalemler[] = self::line(
+                        $sira,
+                        'HAFTA_TATILI',
+                        'HAFTA_TATILI_ODEMESI',
+                        'ARTI',
+                        $premium['miktar'],
+                        $premium['birim'],
+                        $htCarpan->toDecimalString(),
+                        $premium['matrah'],
+                        $premium['tutar'],
+                        'PUANTAJ',
+                        isset($row['muhur_satir_id']) ? (int) $row['muhur_satir_id'] : null,
+                        'Hafta tatili + UBGT ayni gun calismasi',
+                        [
+                            'hesap_modu' => $htMode,
+                            'net_dakika' => $netDk,
+                            'ht_ubgt_cakisma_hesap_modu' => 'HAFTA_TATILI_ESAS',
+                            'ham_gun_siniflari' => ['Hafta_Tatili_Pazar', 'UBGT_Resmi_Tatil'],
+                        ]
+                    );
+                } elseif ($class['ht']) {
+                    $premium = self::holidayPremium($hourly, $daily, $netDk, $htCarpan, $htMode);
+                    $grossAdd = $grossAdd->add($premium['tutar']);
+                    $hasOt = true;
+                    $sira++;
+                    $kalemler[] = self::line(
+                        $sira,
+                        'HAFTA_TATILI',
+                        'HAFTA_TATILI_ODEMESI',
+                        'ARTI',
+                        $premium['miktar'],
+                        $premium['birim'],
+                        $htCarpan->toDecimalString(),
+                        $premium['matrah'],
+                        $premium['tutar'],
+                        'PUANTAJ',
+                        isset($row['muhur_satir_id']) ? (int) $row['muhur_satir_id'] : null,
+                        'Hafta tatili calismasi',
+                        ['hesap_modu' => $htMode, 'net_dakika' => $netDk]
+                    );
+                } elseif ($class['ubgt']) {
+                    // Yalnız açıkça TAM_GUN işaretli UBGT tam gün algoritmasına girer.
+                    if (self::resolveUbgtGunKapsami($row) === 'YARIM_GUN') {
+                        return [
+                            'error' => [
+                                'code' => self::HALF_DAY_UBGT_POLICY_ERROR_CODE,
+                                'message' => self::HALF_DAY_UBGT_POLICY_ERROR_MESSAGE,
+                            ],
+                        ];
+                    }
+                    if (self::resolveUbgtGunKapsami($row) !== 'TAM_GUN') {
+                        return [
+                            'error' => [
+                                'code' => self::UBGT_DAY_SCOPE_ERROR_CODE,
+                                'message' => self::UBGT_DAY_SCOPE_ERROR_MESSAGE,
+                            ],
+                        ];
+                    }
+                    $premium = self::holidayPremium($hourly, $daily, $netDk, $ubgtCarpan, $ubgtMode);
+                    $grossAdd = $grossAdd->add($premium['tutar']);
+                    $hasOt = true;
+                    $sira++;
+                    $kalemler[] = self::line(
+                        $sira,
+                        'UBGT',
+                        'UBGT_ODEMESI',
+                        'ARTI',
+                        $premium['miktar'],
+                        $premium['birim'],
+                        $ubgtCarpan->toDecimalString(),
+                        $premium['matrah'],
+                        $premium['tutar'],
+                        'PUANTAJ',
+                        isset($row['muhur_satir_id']) ? (int) $row['muhur_satir_id'] : null,
+                        'UBGT calismasi',
+                        [
+                            'hesap_modu' => $ubgtMode,
+                            'net_dakika' => $netDk,
+                            'ubgt_gun_kapsami' => 'TAM_GUN',
+                        ]
+                    );
                 }
-                $weeklyNormalMinutes[$weekKey] += $netDk;
+            }
+
+            if (
+                $netDk > 0
+                && $tarih !== ''
+                && ($class['ht'] || $class['ubgt'] || $gunTipi === 'Normal_Is_Gunu')
+            ) {
+                $weekKey = self::isoWeekKey($tarih);
+                if (!isset($weeklyWorkPools[$weekKey])) {
+                    $weeklyWorkPools[$weekKey] = [
+                        'fiili_dk' => 0,
+                        'normal_dk' => 0,
+                        'tatil_dk' => 0,
+                        'tatil_asim_dk' => 0,
+                    ];
+                }
+                if ($holidayOvertimeMode !== null) {
+                    if ($class['both'] || $class['ht']) {
+                        $asim = self::holidayOtPoolMinutes($netDk, true);
+                        $weeklyWorkPools[$weekKey]['fiili_dk'] += $asim;
+                        $weeklyWorkPools[$weekKey]['tatil_dk'] += $netDk;
+                        $weeklyWorkPools[$weekKey]['tatil_asim_dk'] += $asim;
+                    } elseif ($class['ubgt'] && self::resolveUbgtGunKapsami($row) === 'TAM_GUN') {
+                        $asim = self::holidayOtPoolMinutes($netDk, true);
+                        $weeklyWorkPools[$weekKey]['fiili_dk'] += $asim;
+                        $weeklyWorkPools[$weekKey]['tatil_dk'] += $netDk;
+                        $weeklyWorkPools[$weekKey]['tatil_asim_dk'] += $asim;
+                    } elseif (!$class['ht'] && !$class['ubgt']) {
+                        $weeklyWorkPools[$weekKey]['fiili_dk'] += $netDk;
+                        $weeklyWorkPools[$weekKey]['normal_dk'] += $netDk;
+                    }
+                } else {
+                    $weeklyWorkPools[$weekKey]['fiili_dk'] += $netDk;
+                    if ($gunTipi === 'Normal_Is_Gunu') {
+                        $weeklyWorkPools[$weekKey]['normal_dk'] += $netDk;
+                    } else {
+                        $weeklyWorkPools[$weekKey]['tatil_dk'] += $netDk;
+                    }
+                }
             }
         }
 
-        ksort($weeklyNormalMinutes);
-        foreach ($weeklyNormalMinutes as $weekKey => $totalDk) {
-            $fsDk = 0;
-            $fmDk = 0;
-            if ($totalDk > $contractualWeeklyDk) {
-                $overContract = $totalDk - $contractualWeeklyDk;
-                $fsCap = self::LEGAL_WEEKLY_LIMIT_MINUTES - $contractualWeeklyDk;
-                if ($fsCap < 0) {
-                    $fsCap = 0;
-                }
-                $fsDk = $overContract < $fsCap ? $overContract : $fsCap;
-                $fmDk = $totalDk > self::LEGAL_WEEKLY_LIMIT_MINUTES
-                    ? ($totalDk - self::LEGAL_WEEKLY_LIMIT_MINUTES)
-                    : 0;
-            }
+        ksort($weeklyWorkPools);
+        foreach ($weeklyWorkPools as $weekKey => $pool) {
+            $totalDk = (int) $pool['fiili_dk'];
+            $bands = self::hesaplaHaftalikCalismaBantlari($totalDk, $contractualWeeklyDk);
+            $rawFsDk = $bands['fs_dk'];
+            $rawFmDk = $bands['fm_dk'];
+            $fsDk = self::hesaplaMevzuatFazlaCalismaOdemeDakika($rawFsDk);
+            $fmDk = self::hesaplaMevzuatFazlaCalismaOdemeDakika($rawFmDk);
 
             if ($fsDk > 0) {
                 $base = $hourly->mulDiv($fsDk, 60);
@@ -559,8 +997,16 @@ final class MaasHesaplamaEngine
                 $kalemler[] = self::line($sira, 'FAZLA_SURELERLE', 'FAZLA_SURELERLE_CALISMA_ODEMESI', 'ARTI', $fsDk, 'DAKIKA', $fsCarpan->toDecimalString(), $base->toDecimalString(), $tutar, 'PUANTAJ', null, 'Fazla surelerle calisma', [
                     'iso_hafta' => $weekKey,
                     'haftalik_toplam_dk' => $totalDk,
+                    'haftalik_normal_gun_calisma_dk' => (int) $pool['normal_dk'],
+                    'haftalik_tatil_calisma_dk' => (int) $pool['tatil_dk'],
+                    'haftalik_tatil_asim_dk' => (int) ($pool['tatil_asim_dk'] ?? 0),
                     'sozlesme_haftalik_dk' => $contractualWeeklyDk,
                     'yasal_haftalik_limit_dk' => self::LEGAL_WEEKLY_LIMIT_MINUTES,
+                    'ham_fazla_surelerle_calisma_dk' => $rawFsDk,
+                    'odeme_esas_fazla_surelerle_calisma_dk' => $fsDk,
+                    'ucret_hesaplama_baz_brut_tutar' => $sozlesmeBrut->toDecimalString(),
+                    'saatlik_brut_ucret' => $hourly->toDecimalString(),
+                    'tatil_fsc_fm_cakisma_hesap_modu' => $holidayOvertimeMode,
                 ]);
             }
             if ($fmDk > 0) {
@@ -572,8 +1018,16 @@ final class MaasHesaplamaEngine
                 $kalemler[] = self::line($sira, 'FAZLA_MESAI', 'FAZLA_MESAI_ODEMESI', 'ARTI', $fmDk, 'DAKIKA', $fmCarpan->toDecimalString(), $base->toDecimalString(), $tutar, 'PUANTAJ', null, 'Fazla mesai', [
                     'iso_hafta' => $weekKey,
                     'haftalik_toplam_dk' => $totalDk,
+                    'haftalik_normal_gun_calisma_dk' => (int) $pool['normal_dk'],
+                    'haftalik_tatil_calisma_dk' => (int) $pool['tatil_dk'],
+                    'haftalik_tatil_asim_dk' => (int) ($pool['tatil_asim_dk'] ?? 0),
                     'sozlesme_haftalik_dk' => $contractualWeeklyDk,
                     'yasal_haftalik_limit_dk' => self::LEGAL_WEEKLY_LIMIT_MINUTES,
+                    'ham_fazla_calisma_dk' => $rawFmDk,
+                    'odeme_esas_fazla_calisma_dk' => $fmDk,
+                    'ucret_hesaplama_baz_brut_tutar' => $sozlesmeBrut->toDecimalString(),
+                    'saatlik_brut_ucret' => $hourly->toDecimalString(),
+                    'tatil_fsc_fm_cakisma_hesap_modu' => $holidayOvertimeMode,
                 ]);
             }
         }
@@ -591,10 +1045,14 @@ final class MaasHesaplamaEngine
         ];
     }
 
-    /**
-     * @return array{tutar: Money, matrah: string, miktar: int, birim: string}
-     */
-    private static function holidayPremium(Money $hourly, Money $daily, $netDk, Rate $carpan, $mode)
+    /** @return array{tutar: Money, matrah: string, miktar: int, birim: string} */
+    private static function holidayPremium(
+        Money $hourly,
+        Money $daily,
+        $netDk,
+        Rate $carpan,
+        $mode
+    )
     {
         $netDk = (int) $netDk;
         $mode = strtoupper((string) $mode);
@@ -633,11 +1091,49 @@ final class MaasHesaplamaEngine
         ];
     }
 
+    /** @return array{fs_dk:int, fm_dk:int} */
+    private static function hesaplaHaftalikCalismaBantlari($totalDk, $contractualWeeklyDk)
+    {
+        $totalDk = max(0, (int) $totalDk);
+        $contractualWeeklyDk = max(0, min((int) $contractualWeeklyDk, self::LEGAL_WEEKLY_LIMIT_MINUTES));
+        if ($totalDk <= $contractualWeeklyDk) {
+            return ['fs_dk' => 0, 'fm_dk' => 0];
+        }
+
+        $overContract = $totalDk - $contractualWeeklyDk;
+        $fsCap = self::LEGAL_WEEKLY_LIMIT_MINUTES - $contractualWeeklyDk;
+
+        return [
+            'fs_dk' => min($overContract, $fsCap),
+            'fm_dk' => max(0, $totalDk - self::LEGAL_WEEKLY_LIMIT_MINUTES),
+        ];
+    }
+
     private static function isoWeekKey($tarih)
     {
         $dt = new \DateTimeImmutable((string) $tarih);
 
         return $dt->format('o') . '-W' . $dt->format('W');
+    }
+
+    /**
+     * Fazla Calisma Yonetmeligi odeme esas dakika (yalniz FM/FSC).
+     * Kalan 1-29 → 30; 31-59 → 60; tam 0/30 degismez.
+     */
+    private static function hesaplaMevzuatFazlaCalismaOdemeDakika($minutes)
+    {
+        $minutes = max(0, (int) $minutes);
+        if ($minutes <= 0) {
+            return 0;
+        }
+
+        $fullHours = intdiv($minutes, 60) * 60;
+        $remainder = $minutes % 60;
+        if ($remainder === 0 || $remainder === 30) {
+            return $minutes;
+        }
+
+        return $fullHours + ($remainder < 30 ? 30 : 60);
     }
 
     /**

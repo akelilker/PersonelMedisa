@@ -72,7 +72,29 @@ final class SirketCalismaPolitikasiCatalog
             'deger_tipi' => 'METIN',
             'birim' => 'MOD',
         ],
+        'TATIL_FSC_FM_CAKISMA_HESAP_MODU' => [
+            'etiket' => 'Tatil ve Fazla Çalışma Çakışma Hesap Modu',
+            'aciklama' => 'HT/UBGT çalışması ile FSC/FM çakıştığında uygulanacak, yetkili hukuk ve şirket onayı gerektiren hesap yöntemi. Desteklenen: YARGITAY_7_5_SAAT_AYRIMI.',
+            'deger_tipi' => 'METIN',
+            'birim' => 'MOD',
+        ],
     ];
+
+    /** Production hesabında kabul edilen tek çakışma modu. */
+    public const TATIL_FSC_FM_APPROVED_MODE = 'YARGITAY_7_5_SAAT_AYRIMI';
+
+    /** @return array<int, string> */
+    public static function holidayOvertimeAllowedModes()
+    {
+        return [self::TATIL_FSC_FM_APPROVED_MODE];
+    }
+
+    public static function isHolidayOvertimeModeAllowed($mode)
+    {
+        $normalized = strtoupper(trim((string) $mode));
+
+        return in_array($normalized, self::holidayOvertimeAllowedModes(), true);
+    }
 
     /** @return array<string, array{etiket: string, aciklama: string, deger_tipi: string, birim: string}> */
     public static function all()

@@ -25,16 +25,28 @@ import {
   hesaplaHaftaAraligi,
   filtreleHaftalikPuantajSatirlari,
   hesaplaTarihtenHaftalikCalismaOzeti,
+  hesaplaMevzuatFazlaCalismaOdemeDakika,
   hesaplaSaatlikUcret,
   hesaplaFazlaCalismaTutari,
   hesaplaHaftalikFazlaCalismaUcreti,
   hesaplaHaftalikPuantajUcretOzeti,
+  HOLIDAY_OVERTIME_POLICY_REQUIRED,
+  HOLIDAY_OVERTIME_POLICY_REQUIRED_MESSAGE,
+  HALF_DAY_UBGT_POLICY_ERROR_CODE,
+  HALF_DAY_UBGT_POLICY_ERROR_MESSAGE,
+  UBGT_DAY_SCOPE_ERROR_CODE,
+  UBGT_DAY_SCOPE_ERROR_MESSAGE,
+  YARGITAY_HOLIDAY_OVERTIME_MODE,
+  YARGITAY_HOLIDAY_SPLIT_MINUTES,
+  resolveUbgtGunKapsami,
+  ENGINE_V2_VARSAYILAN_HAFTALIK_POLITIKA,
   HAFTALIK_NORMAL_CALISMA_ESIK_DAKIKA,
   hesaplaGunlukUcret,
   hesaplaSaatlikKesintiTutari,
   GEC_ERKEN_TOLERANS_DAKIKA,
   hesaplaGecErkenEksikSure,
   hesaplaGecKalmaErkenCikmaKesintiOzeti,
+  hesaplaKesintiyeEsasDakika,
   hesaplaDevamsizlikKesintiOzeti,
   siniflandirPuantajEksikGunEtkisi,
   siniflandirHastalikRaporGunUcretEtkisi,
@@ -46,7 +58,7 @@ import {
   hesapSonucuToGunlukPuantaj,
   birlestirUbgtFazlaMesaiCakismaUyari,
   birlestirOnsekizYasAltiFazlaCalismaUyari,
-  isOnsekizYasAltiPersonel,
+  isFazlaCalismaGeceYasagiKapsaminda,
   birlestirMazeretsizDevamsizlikAdayUyariari,
   UBGT_FAZLA_MESAI_CAKISMASI_CODE,
   UBGT_FAZLA_MESAI_CAKISMASI_MESSAGE,
@@ -562,11 +574,22 @@ describe("18 yas alti blok kurallari", () => {
     ).toBeNull();
   });
 
+  it("tam 18 yaş personelde gece ve fazla çalışma yasağı uygulanmaz", () => {
+    expect(
+      hesaplaYasKuraliBlokMesaji({
+        tarih: "2026-04-13",
+        dogum_tarihi: "2008-04-13",
+        giris_saati: "12:00",
+        cikis_saati: "20:30"
+      })
+    ).toBeNull();
+  });
+
   it("18 yas alti gece calismasini bloklar", () => {
     expect(
       hesaplaYasKuraliBlokMesaji({
         tarih: "2026-04-13",
-        dogum_tarihi: "2008-01-01",
+        dogum_tarihi: "2009-01-01",
         giris_saati: "12:00",
         cikis_saati: "20:30"
       })
@@ -577,7 +600,7 @@ describe("18 yas alti blok kurallari", () => {
     expect(
       hesaplaYasKuraliBlokMesaji({
         tarih: "2026-04-12",
-        dogum_tarihi: "2008-01-01",
+        dogum_tarihi: "2009-01-01",
         giris_saati: "09:00",
         cikis_saati: "17:00"
       })
@@ -956,6 +979,42 @@ describe("hesaplaFazlaCalismaTutari", () => {
   it("90 dk → 1.5 saat × 1.5 × 200 = 450", () => {
     expect(hesaplaFazlaCalismaTutari(90, saatlik)).toBe(450);
   });
+
+  it("31 dk ham → ödeme esas 60 dk → tutar 300", () => {
+    expect(hesaplaFazlaCalismaTutari(31, saatlik)).toBe(300);
+  });
+});
+
+describe("hesaplaMevzuatFazlaCalismaOdemeDakika", () => {
+  it.each([
+    [0, 0],
+    [1, 30],
+    [29, 30],
+    [30, 30],
+    [31, 60],
+    [59, 60],
+    [60, 60],
+    [61, 90]
+  ])("%i dk ham → %i dk ödeme esas", (ham, odemeEsas) => {
+    expect(hesaplaMevzuatFazlaCalismaOdemeDakika(ham)).toBe(odemeEsas);
+  });
+
+  it("haftalık aggregate ham kalır; ödeme katmanı yuvarlar", () => {
+    const ozet = hesaplaHaftalikCalismaOzeti([{ net_calisma_suresi_dakika: 2700 + 31 }]);
+    expect(ozet.fazla_calisma_dakika).toBe(31);
+    const ucret = hesaplaHaftalikFazlaCalismaUcreti(ozet, 45000);
+    expect(ucret.odeme_esas_fazla_calisma_dakika).toBe(60);
+    expect(ucret.fazla_calisma_tutari).toBe(300);
+  });
+
+  it("geç/erken ham dakikası FM mevzuat yuvarlamasından ayrıdır", () => {
+    expect(hesaplaKesintiyeEsasDakika(31)).toBe(31);
+    expect(hesaplaMevzuatFazlaCalismaOdemeDakika(31)).toBe(60);
+    expect(hesaplaKesintiyeEsasDakika(45)).toBe(45);
+    expect(hesaplaMevzuatFazlaCalismaOdemeDakika(45)).toBe(60);
+    expect(hesaplaKesintiyeEsasDakika(61)).toBe(61);
+    expect(hesaplaMevzuatFazlaCalismaOdemeDakika(61)).toBe(90);
+  });
 });
 
 // =========================================================================
@@ -999,12 +1058,12 @@ describe("hesaplaSaatlikKesintiTutari ve gecKalmaErkenCikma özeti", () => {
     expect(o.kesinti_tutari).toBe(0);
   });
 
-  it("ondalıklı para: günlük ücret ve 30 dk yuvarlanmis kesinti 2 hane", () => {
+  it("ondalıklı para: günlük ücret ve ham dakika kesintisi 2 hane", () => {
     expect(hesaplaGunlukUcret(10001)).toBe(333.37);
     const o = hesaplaGecKalmaErkenCikmaKesintiOzeti(45, 30000);
     expect(o.gercek_eksik_dakika).toBe(45);
-    expect(o.kesintiye_esas_dakika).toBe(60);
-    expect(o.kesinti_tutari).toBeCloseTo(133.33, 2);
+    expect(o.kesintiye_esas_dakika).toBe(45);
+    expect(o.kesinti_tutari).toBeCloseTo(100, 2);
   });
 
   it("0 dk eksik → kesintiye esas 0 ve kesinti 0", () => {
@@ -1014,11 +1073,11 @@ describe("hesaplaSaatlikKesintiTutari ve gecKalmaErkenCikma özeti", () => {
     expect(o.kesinti_tutari).toBe(0);
   });
 
-  it("1 dk eksik → 30 dk kesintiye esas sure", () => {
+  it("1 dk eksik → 1 dk kesintiye esas süre", () => {
     const o = hesaplaGecKalmaErkenCikmaKesintiOzeti(1, maas);
     expect(o.gercek_eksik_dakika).toBe(1);
-    expect(o.kesintiye_esas_dakika).toBe(30);
-    expect(o.kesinti_tutari).toBeCloseTo(66.67, 2);
+    expect(o.kesintiye_esas_dakika).toBe(1);
+    expect(o.kesinti_tutari).toBe(hesaplaSaatlikKesintiTutari(1, maas));
   });
 
   it("30 dk eksik → 30 dk kesintiye esas sure", () => {
@@ -1027,18 +1086,18 @@ describe("hesaplaSaatlikKesintiTutari ve gecKalmaErkenCikma özeti", () => {
     expect(o.kesinti_tutari).toBeCloseTo(66.67, 2);
   });
 
-  it("31 dk eksik → 60 dk kesintiye esas sure", () => {
+  it("31 dk eksik → 31 dk kesintiye esas süre", () => {
     const o = hesaplaGecKalmaErkenCikmaKesintiOzeti(31, maas);
     expect(o.gercek_eksik_dakika).toBe(31);
-    expect(o.kesintiye_esas_dakika).toBe(60);
-    expect(o.kesinti_tutari).toBeCloseTo(133.33, 2);
+    expect(o.kesintiye_esas_dakika).toBe(31);
+    expect(o.kesinti_tutari).toBe(hesaplaSaatlikKesintiTutari(31, maas));
   });
 
-  it("61 dk eksik → 90 dk kesintiye esas sure", () => {
+  it("61 dk eksik → 61 dk kesintiye esas süre", () => {
     const o = hesaplaGecKalmaErkenCikmaKesintiOzeti(61, maas);
     expect(o.gercek_eksik_dakika).toBe(61);
-    expect(o.kesintiye_esas_dakika).toBe(90);
-    expect(o.kesinti_tutari).toBeCloseTo(200, 2);
+    expect(o.kesintiye_esas_dakika).toBe(61);
+    expect(o.kesinti_tutari).toBe(hesaplaSaatlikKesintiTutari(61, maas));
   });
 });
 
@@ -1458,7 +1517,7 @@ describe("deriveGecErkenKesintiPreview (hook güvenli davranış)", () => {
     expect(out.gecErkenKesintiHesaplanamadiMi).toBe(false);
   });
 
-  it("eksik_dakika = 1 ise kesintiye_esas_dakika = 30 (yuvarlama bozulmaz)", () => {
+  it("eksik_dakika = 1 ise Engine V2 gibi ham 1 dakika kesilir", () => {
     const p = basePuantaj({
       hareket_durumu: "Gec_Geldi",
       beklenen_giris_saati: "08:00",
@@ -1467,7 +1526,7 @@ describe("deriveGecErkenKesintiPreview (hook güvenli davranış)", () => {
     const out = deriveGecErkenKesintiPreview(p, maas);
     expect(out.gecErkenKesintiOzeti).not.toBeNull();
     expect(out.gecErkenKesintiOzeti!.gercek_eksik_dakika).toBe(1);
-    expect(out.gecErkenKesintiOzeti!.kesintiye_esas_dakika).toBe(30);
+    expect(out.gecErkenKesintiOzeti!.kesintiye_esas_dakika).toBe(1);
   });
 });
 
@@ -1937,18 +1996,39 @@ describe("hesaplaTatilEkOdemeOzeti", () => {
     ).toBeNull();
   });
 
-  it("UBGT + Mesai_Yaz + saat → çarpan 1 ve günlük ücret kadar ek ödeme", () => {
+  it("UBGT + Mesai_Yaz + saat + TAM_GUN → çarpan 1 ve günlük ücret kadar ek ödeme", () => {
     const o = hesaplaTatilEkOdemeOzeti(maas, {
       gun_tipi: "UBGT_Resmi_Tatil",
       hesap_etkisi: "Mesai_Yaz",
       giris_saati: "08:00",
-      cikis_saati: "12:00"
+      cikis_saati: "12:00",
+      ubgt_gun_kapsami: "TAM_GUN"
     });
     expect(o).not.toBeNull();
     expect(o!.tur).toBe("UBGT");
     expect(o!.carpani).toBe(1);
     expect(o!.gunluk_ucret).toBe(1000);
     expect(o!.ek_odeme_tutari).toBe(1000);
+  });
+
+  it("UBGT kapsam yok veya YARIM_GUN → payable gizlenir", () => {
+    expect(
+      hesaplaTatilEkOdemeOzeti(maas, {
+        gun_tipi: "UBGT_Resmi_Tatil",
+        hesap_etkisi: "Mesai_Yaz",
+        giris_saati: "08:00",
+        cikis_saati: "12:00"
+      })
+    ).toBeNull();
+    expect(
+      hesaplaTatilEkOdemeOzeti(maas, {
+        gun_tipi: "UBGT_Resmi_Tatil",
+        hesap_etkisi: "Mesai_Yaz",
+        giris_saati: "08:00",
+        cikis_saati: "12:00",
+        ubgt_gun_kapsami: "YARIM_GUN"
+      })
+    ).toBeNull();
   });
 
   it("Hafta tatili + Mesai_Yaz + saat + hak var → çarpan 1,5 ve pazar kararı", () => {
@@ -2003,7 +2083,8 @@ describe("hesaplaTatilEkOdemeOzeti", () => {
       gun_tipi: "UBGT_Resmi_Tatil",
       hesap_etkisi: "Mesai_Yaz",
       giris_saati: "08:00",
-      cikis_saati: "12:00"
+      cikis_saati: "12:00",
+      ubgt_gun_kapsami: "TAM_GUN"
     });
     expect(o!.gunluk_ucret).toBe(0);
     expect(o!.ek_odeme_tutari).toBe(0);
@@ -2085,7 +2166,8 @@ describe("hesaplaTatilEkOdemeOzeti — Pazar / hafta tatili hak entegrasyonu", (
       gun_tipi: "UBGT_Resmi_Tatil",
       hesap_etkisi: "Mesai_Yaz",
       giris_saati: "08:00",
-      cikis_saati: "12:00"
+      cikis_saati: "12:00",
+      ubgt_gun_kapsami: "TAM_GUN"
     });
     expect(o!.tur).toBe("UBGT");
     expect(o!.carpani).toBe(1);
@@ -2126,11 +2208,13 @@ describe("hesaplaHaftalikFazlaCalismaUcreti", () => {
 function gunlukSatir(
   personel_id: number,
   tarih: string,
-  net?: number
+  net?: number,
+  gun_tipi: GunlukPuantaj["gun_tipi"] = "Normal_Is_Gunu"
 ): GunlukPuantaj {
   return {
     personel_id,
     tarih,
+    gun_tipi,
     compliance_uyarilari: [],
     ...(net !== undefined ? { net_calisma_suresi_dakika: net } : {})
   };
@@ -2139,6 +2223,10 @@ function gunlukSatir(
 describe("hesaplaHaftalikPuantajUcretOzeti", () => {
   const ref = "2026-04-15";
   const maas = 45000;
+  const yargitayPolitika = {
+    ...ENGINE_V2_VARSAYILAN_HAFTALIK_POLITIKA,
+    tatil_fsc_fm_cakisma_hesap_modu: YARGITAY_HOLIDAY_OVERTIME_MODE
+  };
 
   it("aynı haftadaki 5 günlük kayıt + maaş → özet ve hafta aralığı doğru", () => {
     const gunler = [
@@ -2152,7 +2240,10 @@ describe("hesaplaHaftalikPuantajUcretOzeti", () => {
     expect(o.hafta_baslangic).toBe("2026-04-13");
     expect(o.hafta_bitis).toBe("2026-04-19");
     expect(o.toplam_net_dakika).toBe(2400);
+    expect(o.fazla_surelerle_calisma_dakika).toBe(0);
     expect(o.fazla_calisma_dakika).toBe(0);
+    expect(o.hesaplanabilir_mi).toBe(true);
+    expect(o.toplam_fazla_calisma_tutari).toBe(0);
     expect(o.fazla_calisma_tutari).toBe(0);
     expect(o.saatlik_ucret).toBe(200);
   });
@@ -2164,11 +2255,70 @@ describe("hesaplaHaftalikPuantajUcretOzeti", () => {
     expect(o.fazla_calisma_tutari).toBe(0);
   });
 
-  it("46 saat (2760 dk) → 60 dk fazla + tutar 300", () => {
+  it("46 saat (2760 dk) → FSC 300 + FM 60 (Engine V2 bant) ve tutarlar", () => {
     const gunler = [gunlukSatir(1, "2026-04-14", 2760)];
     const o = hesaplaHaftalikPuantajUcretOzeti(gunler, ref, maas);
+    expect(o.fazla_surelerle_calisma_dakika).toBe(300);
     expect(o.fazla_calisma_dakika).toBe(60);
+    expect(o.fazla_surelerle_calisma_tutari).toBe(1250);
     expect(o.fazla_calisma_tutari).toBe(300);
+    expect(o.toplam_fazla_calisma_tutari).toBe(1550);
+  });
+
+  it.each([
+    [0, 0],
+    [1, 30],
+    [29, 30],
+    [30, 30],
+    [31, 60],
+    [59, 60],
+    [60, 60],
+    [61, 90]
+  ])("Engine V2 frontend FSC sınırı %i dk → %i dk", (hamDakika, odemeEsasDakika) => {
+    const o = hesaplaHaftalikPuantajUcretOzeti(
+      [gunlukSatir(1, "2026-04-14", 2400 + hamDakika)],
+      ref,
+      maas
+    );
+    expect(o.fazla_surelerle_calisma_dakika).toBe(hamDakika);
+    expect(o.odeme_esas_fazla_surelerle_calisma_dakika).toBe(odemeEsasDakika);
+  });
+
+  it.each([
+    [0, 0],
+    [1, 30],
+    [29, 30],
+    [30, 30],
+    [31, 60],
+    [59, 60],
+    [60, 60],
+    [61, 90]
+  ])("Engine V2 frontend FM sınırı %i dk → %i dk", (hamDakika, odemeEsasDakika) => {
+    const o = hesaplaHaftalikPuantajUcretOzeti(
+      [gunlukSatir(1, "2026-04-14", 2700 + hamDakika)],
+      ref,
+      maas
+    );
+    expect(o.fazla_calisma_dakika).toBe(hamDakika);
+    expect(o.odeme_esas_fazla_calisma_dakika).toBe(odemeEsasDakika);
+  });
+
+  it("parçalı çalışma önce ISO haftada agregasyon olur, 31 dk yalnız bir kez 60'a yuvarlanır", () => {
+    const o = hesaplaHaftalikPuantajUcretOzeti(
+      [
+        gunlukSatir(1, "2026-04-13", 487),
+        gunlukSatir(1, "2026-04-14", 486),
+        gunlukSatir(1, "2026-04-15", 486),
+        gunlukSatir(1, "2026-04-16", 486),
+        gunlukSatir(1, "2026-04-17", 486)
+      ],
+      ref,
+      maas
+    );
+    expect(o.toplam_net_dakika).toBe(2431);
+    expect(o.fazla_surelerle_calisma_dakika).toBe(31);
+    expect(o.odeme_esas_fazla_surelerle_calisma_dakika).toBe(60);
+    expect(o.fazla_surelerle_calisma_tutari).toBe(250);
   });
 
   it("karışık haftalardaki kayıtlar → yalnız referans haftası", () => {
@@ -2181,19 +2331,259 @@ describe("hesaplaHaftalikPuantajUcretOzeti", () => {
     expect(o.toplam_net_dakika).toBe(300);
   });
 
-  it("Pazar satırı haftaya dahil", () => {
-    const gunler = [
-      gunlukSatir(1, "2026-04-13", 480),
-      gunlukSatir(1, "2026-04-14", 480),
-      gunlukSatir(1, "2026-04-15", 480),
-      gunlukSatir(1, "2026-04-16", 480),
-      gunlukSatir(1, "2026-04-17", 480),
-      gunlukSatir(1, "2026-04-19", 120)
-    ];
-    const o = hesaplaHaftalikPuantajUcretOzeti(gunler, ref, maas);
-    expect(o.toplam_net_dakika).toBe(2520);
-    expect(o.fazla_calisma_dakika).toBe(0);
+  it.each(
+    (["Hafta_Tatili_Pazar", "UBGT_Resmi_Tatil"] as const).flatMap((gunTipi) =>
+      ([1, 29, 30, 31, 59, 60, 61] as const).flatMap((dakika) => [
+        [gunTipi, "FSC", 2400, dakika, dakika, 0],
+        [gunTipi, "FM", 2700, dakika, 300, dakika]
+      ] as const)
+    )
+  )("%s %s çakışması %i+%i dk → payable üretmeden fail-closed", (gunTipi, _bant, normalDakika, dakika, hamFsc, hamFm) => {
+    const tatilSatir =
+      gunTipi === "UBGT_Resmi_Tatil"
+        ? { ...gunlukSatir(1, "2026-04-19", dakika, gunTipi), ubgt_gun_kapsami: "TAM_GUN" as const }
+        : gunlukSatir(1, "2026-04-19", dakika, gunTipi);
+    const o = hesaplaHaftalikPuantajUcretOzeti(
+      [gunlukSatir(1, "2026-04-13", normalDakika), tatilSatir],
+      ref,
+      maas
+    );
+    expect(o.toplam_net_dakika).toBe(normalDakika + dakika);
+    expect(o.tatil_calisma_dakika).toBe(dakika);
+    expect(o.fazla_surelerle_calisma_dakika).toBe(hamFsc);
+    expect(o.fazla_calisma_dakika).toBe(hamFm);
+    expect(o.odeme_esas_fazla_surelerle_calisma_dakika).toBe(0);
+    expect(o.odeme_esas_fazla_calisma_dakika).toBe(0);
+    expect(o.fazla_surelerle_calisma_tutari).toBe(0);
+    expect(o.fazla_calisma_tutari).toBe(0);
+    expect(o.hesaplanabilir_mi).toBe(false);
+    expect(o.hata_kodu).toBe(HOLIDAY_OVERTIME_POLICY_REQUIRED);
+    expect(o.hata_mesaji).toBe(HOLIDAY_OVERTIME_POLICY_REQUIRED_MESSAGE);
+    expect(o).not.toHaveProperty("fazla_surelerle_tatil_taban_mahsup_dakika");
   });
+
+  it.each([449, 450, 451])(
+    "UBGT günlük aday sınırı %i dk yetkili politika olmadan authoritative hesap üretmez",
+    (tatilDakika) => {
+      const o = hesaplaHaftalikPuantajUcretOzeti(
+        [
+          gunlukSatir(1, "2026-04-13", 2400),
+          { ...gunlukSatir(1, "2026-04-14", tatilDakika, "UBGT_Resmi_Tatil"), ubgt_gun_kapsami: "TAM_GUN" }
+        ],
+        ref,
+        maas
+      );
+      expect(o.tatil_calisma_dakika).toBe(tatilDakika);
+      expect(o.hesaplanabilir_mi).toBe(false);
+      expect(o.toplam_fazla_calisma_tutari).toBe(0);
+    }
+  );
+
+  it("YARGITAY: Normal 2400 + HT 450 → FM/FSC 0, hesaplanabilir", () => {
+    const o = hesaplaHaftalikPuantajUcretOzeti(
+      [
+        gunlukSatir(1, "2026-04-13", 2400),
+        gunlukSatir(1, "2026-04-19", 450, "Hafta_Tatili_Pazar")
+      ],
+      ref,
+      maas,
+      yargitayPolitika
+    );
+    expect(o.hesaplanabilir_mi).toBe(true);
+    expect(o.fazla_calisma_dakika).toBe(0);
+    expect(o.fazla_surelerle_calisma_dakika).toBe(0);
+  });
+
+  it("YARGITAY: Normal 2700 + HT 600 → FM 150", () => {
+    const o = hesaplaHaftalikPuantajUcretOzeti(
+      [
+        gunlukSatir(1, "2026-04-13", 2700),
+        gunlukSatir(1, "2026-04-19", 600, "Hafta_Tatili_Pazar")
+      ],
+      ref,
+      maas,
+      yargitayPolitika
+    );
+    expect(o.hesaplanabilir_mi).toBe(true);
+    expect(o.fazla_calisma_dakika).toBe(150);
+    expect(o.odeme_esas_fazla_calisma_dakika).toBe(150);
+  });
+
+  it.each([
+    [0, 0, 0],
+    [1, 0, 0],
+    [449, 0, 0],
+    [450, 0, 0],
+    [451, 1, 0],
+    [600, 150, 0]
+  ])("YARGITAY HT FSC bandı tatil %i dk → ham FSC=%i FM=%i", (tatilDakika, hamFsc, hamFm) => {
+    const o = hesaplaHaftalikPuantajUcretOzeti(
+      [
+        gunlukSatir(1, "2026-04-13", 2400),
+        gunlukSatir(1, "2026-04-19", tatilDakika, "Hafta_Tatili_Pazar")
+      ],
+      ref,
+      maas,
+      yargitayPolitika
+    );
+    expect(o.hesaplanabilir_mi).toBe(true);
+    expect(o.fazla_surelerle_calisma_dakika).toBe(hamFsc);
+    expect(o.fazla_calisma_dakika).toBe(hamFm);
+  });
+
+  it.each([
+    [0, 300, 0],
+    [1, 300, 0],
+    [449, 300, 0],
+    [450, 300, 0],
+    [451, 300, 1],
+    [600, 300, 150]
+  ])("YARGITAY HT FM bandı tatil %i dk → ham FSC=%i FM=%i", (tatilDakika, hamFsc, hamFm) => {
+    const o = hesaplaHaftalikPuantajUcretOzeti(
+      [
+        gunlukSatir(1, "2026-04-13", 2700),
+        gunlukSatir(1, "2026-04-19", tatilDakika, "Hafta_Tatili_Pazar")
+      ],
+      ref,
+      maas,
+      yargitayPolitika
+    );
+    expect(o.hesaplanabilir_mi).toBe(true);
+    expect(o.fazla_surelerle_calisma_dakika).toBe(hamFsc);
+    expect(o.fazla_calisma_dakika).toBe(hamFm);
+  });
+
+  it("YARGITAY HT+UBGT aynı gün tek havuz asımı", () => {
+    const o = hesaplaHaftalikPuantajUcretOzeti(
+      [
+        gunlukSatir(1, "2026-04-13", 2700),
+        {
+          ...gunlukSatir(1, "2026-04-19", 600, "Hafta_Tatili_Pazar"),
+          ht_ubgt_ayni_gun_mi: true
+        }
+      ],
+      ref,
+      maas,
+      yargitayPolitika
+    );
+    expect(o.hesaplanabilir_mi).toBe(true);
+    expect(o.fazla_calisma_dakika).toBe(150);
+  });
+
+  it.each([1, 225, 450, 600])(
+    "YARIM_GUN UBGT net %i dk YARGITAY onaylı olsa bile fail-closed",
+    (netDk) => {
+      const o = hesaplaHaftalikPuantajUcretOzeti(
+        [
+          {
+            ...gunlukSatir(1, "2026-04-14", netDk, "UBGT_Resmi_Tatil"),
+            ubgt_gun_kapsami: "YARIM_GUN",
+            yarim_gun_tatil_interval_dakika: 240
+          }
+        ],
+        ref,
+        maas,
+        yargitayPolitika
+      );
+      expect(o.hesaplanabilir_mi).toBe(false);
+      expect(o.hata_kodu).toBe(HALF_DAY_UBGT_POLICY_ERROR_CODE);
+      expect(o.hata_mesaji).toBe(HALF_DAY_UBGT_POLICY_ERROR_MESSAGE);
+      expect(o.toplam_fazla_calisma_tutari).toBe(0);
+    }
+  );
+
+  it.each([undefined, "", " ", "FULL_DAY", "tam"])(
+    "UBGT bilinmeyen kapsam %j → UBGT_DAY_SCOPE_REQUIRED",
+    (kapsam) => {
+      const satir = gunlukSatir(1, "2026-04-14", 1, "UBGT_Resmi_Tatil");
+      const o = hesaplaHaftalikPuantajUcretOzeti(
+        [
+          kapsam === undefined
+            ? satir
+            : { ...satir, ubgt_gun_kapsami: kapsam }
+        ],
+        ref,
+        maas,
+        yargitayPolitika
+      );
+      expect(o.hesaplanabilir_mi).toBe(false);
+      expect(o.hata_kodu).toBe(UBGT_DAY_SCOPE_ERROR_CODE);
+      expect(o.hata_mesaji).toBe(UBGT_DAY_SCOPE_ERROR_MESSAGE);
+    }
+  );
+
+  it("YARGITAY TAM_GUN UBGT 600 → FM havuzu 150", () => {
+    const o = hesaplaHaftalikPuantajUcretOzeti(
+      [
+        gunlukSatir(1, "2026-04-13", 2700),
+        { ...gunlukSatir(1, "2026-04-14", 600, "UBGT_Resmi_Tatil"), ubgt_gun_kapsami: "TAM_GUN" }
+      ],
+      ref,
+      maas,
+      yargitayPolitika
+    );
+    expect(o.hesaplanabilir_mi).toBe(true);
+    expect(o.fazla_calisma_dakika).toBe(150);
+  });
+
+  it("HT+UBGT aynı gün kapsam yok → HT esas hesaplanır", () => {
+    const o = hesaplaHaftalikPuantajUcretOzeti(
+      [
+        gunlukSatir(1, "2026-04-13", 2700),
+        {
+          ...gunlukSatir(1, "2026-04-19", 600, "Hafta_Tatili_Pazar"),
+          ht_ubgt_ayni_gun_mi: true
+        }
+      ],
+      ref,
+      maas,
+      yargitayPolitika
+    );
+    expect(o.hesaplanabilir_mi).toBe(true);
+    expect(o.fazla_calisma_dakika).toBe(150);
+    expect(o.hata_kodu).toBeNull();
+  });
+
+  it("resolveUbgtGunKapsami tarih/net inference yapmaz", () => {
+    expect(resolveUbgtGunKapsami({ tarih: "2026-01-01", net_calisma_suresi_dakika: 480 })).toBe(
+      "BILINMIYOR"
+    );
+    expect(resolveUbgtGunKapsami({ ubgt_gun_kapsami: " tam_gun " })).toBe("TAM_GUN");
+    expect(resolveUbgtGunKapsami({ tatil_gun_kapsami: "YARIM_GUN" })).toBe("YARIM_GUN");
+  });
+
+  it("yarım gün alanları yoksa magic inference yok; bilinmeyen kapsam blocker", () => {
+    const o = hesaplaHaftalikPuantajUcretOzeti(
+      [gunlukSatir(1, "2026-04-14", 120, "UBGT_Resmi_Tatil")],
+      ref,
+      maas
+    );
+    expect(o.hata_kodu).toBe(UBGT_DAY_SCOPE_ERROR_CODE);
+  });
+
+  it.each([
+    [2399, false, 0, 0],
+    [2400, false, 0, 0],
+    [2401, true, 1, 0],
+    [2699, true, 299, 0],
+    [2700, true, 300, 0],
+    [2701, true, 300, 1]
+  ])(
+    "haftalık havuz %i dk → çakışma=%s, ham FSC=%i, ham FM=%i",
+    (toplamDakika, blocked, hamFsc, hamFm) => {
+      const o = hesaplaHaftalikPuantajUcretOzeti(
+        [
+          gunlukSatir(1, "2026-04-13", toplamDakika - 1),
+          gunlukSatir(1, "2026-04-14", 1, "Hafta_Tatili_Pazar")
+        ],
+        ref,
+        maas
+      );
+      expect(o.hesaplanabilir_mi).toBe(!blocked);
+      expect(o.fazla_surelerle_calisma_dakika).toBe(hamFsc);
+      expect(o.fazla_calisma_dakika).toBe(hamFm);
+    }
+  );
 
   it("geçersiz referans tarih → sıfır özet, hafta aralığı null", () => {
     const o = hesaplaHaftalikPuantajUcretOzeti(
@@ -2449,7 +2839,8 @@ describe("birlestirUbgtFazlaMesaiCakismaUyari", () => {
     gun_tipi: "UBGT_Resmi_Tatil",
     hesap_etkisi: "Mesai_Yaz",
     giris_saati: "08:00",
-    cikis_saati: "16:00"
+    cikis_saati: "16:00",
+    ubgt_gun_kapsami: "TAM_GUN"
   });
 
   it("pozitif: tam hafta, FM > 0 ve UBGT mesai günü → UBGT_FAZLA_MESAI_CAKISMASI", () => {
@@ -2464,8 +2855,13 @@ describe("birlestirUbgtFazlaMesaiCakismaUyari", () => {
     });
 
     const haftalik = hesaplaHaftalikPuantajUcretOzeti(tamHafta, ref, 45000);
-    expect(haftalik.fazla_calisma_dakika).toBeGreaterThan(0);
-    expect(haftalik.fazla_calisma_tutari).toBeGreaterThan(0);
+    // Engine V2: ham süre audit'te kalır, yetkili çakışma politikası olmadan payable üretilmez.
+    expect(haftalik.fazla_calisma_dakika).toBe(180);
+    expect(haftalik.fazla_surelerle_calisma_dakika).toBe(300);
+    expect(haftalik.hesaplanabilir_mi).toBe(false);
+    expect(haftalik.hata_kodu).toBe(HOLIDAY_OVERTIME_POLICY_REQUIRED);
+    expect(haftalik.fazla_surelerle_calisma_tutari).toBe(0);
+    expect(haftalik.fazla_calisma_tutari).toBe(0);
 
     const tatil = hesaplaTatilEkOdemeOzeti(maas, ubgt);
     expect(tatil!.ek_odeme_tutari).toBe(1000);
@@ -2538,23 +2934,25 @@ describe("birlestirUbgtFazlaMesaiCakismaUyari", () => {
 // 18 yaş altı haftalık fazla çalışma (Faz D2)
 // =========================================================================
 
-describe("isOnsekizYasAltiPersonel", () => {
-  it("18 yaş tam sınırda true", () => {
-    expect(isOnsekizYasAltiPersonel("2008-04-13", "2026-04-13")).toBe(true);
+describe("isFazlaCalismaGeceYasagiKapsaminda", () => {
+  it("17 yaşta true, tam 18 yaş sınırında false", () => {
+    expect(isFazlaCalismaGeceYasagiKapsaminda("2009-04-13", "2026-04-13")).toBe(true);
+    expect(isFazlaCalismaGeceYasagiKapsaminda("2008-04-13", "2026-04-13")).toBe(false);
   });
 
   it("yetişkin false", () => {
-    expect(isOnsekizYasAltiPersonel("1990-01-01", "2026-04-13")).toBe(false);
+    expect(isFazlaCalismaGeceYasagiKapsaminda("1990-01-01", "2026-04-13")).toBe(false);
   });
 
   it("geçersiz doğum tarihi false", () => {
-    expect(isOnsekizYasAltiPersonel("invalid", "2026-04-13")).toBe(false);
+    expect(isFazlaCalismaGeceYasagiKapsaminda("invalid", "2026-04-13")).toBe(false);
   });
 });
 
 describe("birlestirOnsekizYasAltiFazlaCalismaUyari", () => {
   const referans = "2026-04-15";
-  const gencDogum = "2008-01-01";
+  const gencDogum = "2009-01-01";
+  const tamOnsekizDogum = "2008-04-15";
   const yetiskinDogum = "1990-01-01";
 
   const girdi = (
@@ -2570,6 +2968,11 @@ describe("birlestirOnsekizYasAltiFazlaCalismaUyari", () => {
 
   it("yetişkin + fazla_calisma_dakika > 0 → uyarı yok", () => {
     const merged = birlestirOnsekizYasAltiFazlaCalismaUyari([], girdi(yetiskinDogum, 60));
+    expect(merged).toHaveLength(0);
+  });
+
+  it("tam 18 yaş + fazla_calisma_dakika > 0 → yaş yasağı uyarısı yok", () => {
+    const merged = birlestirOnsekizYasAltiFazlaCalismaUyari([], girdi(tamOnsekizDogum, 60));
     expect(merged).toHaveLength(0);
   });
 

@@ -32,6 +32,11 @@ import {
   hesaplaHaftalikPuantajUcretOzeti,
   HOLIDAY_OVERTIME_POLICY_REQUIRED,
   HOLIDAY_OVERTIME_POLICY_REQUIRED_MESSAGE,
+  HALF_DAY_UBGT_PARTIAL_ERROR_CODE,
+  HALF_DAY_UBGT_PARTIAL_ERROR_MESSAGE,
+  YARGITAY_HOLIDAY_OVERTIME_MODE,
+  YARGITAY_HOLIDAY_SPLIT_MINUTES,
+  ENGINE_V2_VARSAYILAN_HAFTALIK_POLITIKA,
   HAFTALIK_NORMAL_CALISMA_ESIK_DAKIKA,
   hesaplaGunlukUcret,
   hesaplaSaatlikKesintiTutari,
@@ -2192,6 +2197,10 @@ function gunlukSatir(
 describe("hesaplaHaftalikPuantajUcretOzeti", () => {
   const ref = "2026-04-15";
   const maas = 45000;
+  const yargitayPolitika = {
+    ...ENGINE_V2_VARSAYILAN_HAFTALIK_POLITIKA,
+    tatil_fsc_fm_cakisma_hesap_modu: YARGITAY_HOLIDAY_OVERTIME_MODE
+  };
 
   it("aynı haftadaki 5 günlük kayıt + maaş → özet ve hafta aralığı doğru", () => {
     const gunler = [
@@ -2342,6 +2351,124 @@ describe("hesaplaHaftalikPuantajUcretOzeti", () => {
       expect(o.toplam_fazla_calisma_tutari).toBe(0);
     }
   );
+
+  it("YARGITAY: Normal 2400 + HT 450 → FM/FSC 0, hesaplanabilir", () => {
+    const o = hesaplaHaftalikPuantajUcretOzeti(
+      [
+        gunlukSatir(1, "2026-04-13", 2400),
+        gunlukSatir(1, "2026-04-19", 450, "Hafta_Tatili_Pazar")
+      ],
+      ref,
+      maas,
+      yargitayPolitika
+    );
+    expect(o.hesaplanabilir_mi).toBe(true);
+    expect(o.fazla_calisma_dakika).toBe(0);
+    expect(o.fazla_surelerle_calisma_dakika).toBe(0);
+  });
+
+  it("YARGITAY: Normal 2700 + HT 600 → FM 150", () => {
+    const o = hesaplaHaftalikPuantajUcretOzeti(
+      [
+        gunlukSatir(1, "2026-04-13", 2700),
+        gunlukSatir(1, "2026-04-19", 600, "Hafta_Tatili_Pazar")
+      ],
+      ref,
+      maas,
+      yargitayPolitika
+    );
+    expect(o.hesaplanabilir_mi).toBe(true);
+    expect(o.fazla_calisma_dakika).toBe(150);
+    expect(o.odeme_esas_fazla_calisma_dakika).toBe(150);
+  });
+
+  it.each([
+    [0, 0, 0],
+    [1, 0, 0],
+    [449, 0, 0],
+    [450, 0, 0],
+    [451, 1, 0],
+    [600, 150, 0]
+  ])("YARGITAY HT FSC bandı tatil %i dk → ham FSC=%i FM=%i", (tatilDakika, hamFsc, hamFm) => {
+    const o = hesaplaHaftalikPuantajUcretOzeti(
+      [
+        gunlukSatir(1, "2026-04-13", 2400),
+        gunlukSatir(1, "2026-04-19", tatilDakika, "Hafta_Tatili_Pazar")
+      ],
+      ref,
+      maas,
+      yargitayPolitika
+    );
+    expect(o.hesaplanabilir_mi).toBe(true);
+    expect(o.fazla_surelerle_calisma_dakika).toBe(hamFsc);
+    expect(o.fazla_calisma_dakika).toBe(hamFm);
+  });
+
+  it.each([
+    [0, 300, 0],
+    [1, 300, 0],
+    [449, 300, 0],
+    [450, 300, 0],
+    [451, 300, 1],
+    [600, 300, 150]
+  ])("YARGITAY HT FM bandı tatil %i dk → ham FSC=%i FM=%i", (tatilDakika, hamFsc, hamFm) => {
+    const o = hesaplaHaftalikPuantajUcretOzeti(
+      [
+        gunlukSatir(1, "2026-04-13", 2700),
+        gunlukSatir(1, "2026-04-19", tatilDakika, "Hafta_Tatili_Pazar")
+      ],
+      ref,
+      maas,
+      yargitayPolitika
+    );
+    expect(o.hesaplanabilir_mi).toBe(true);
+    expect(o.fazla_surelerle_calisma_dakika).toBe(hamFsc);
+    expect(o.fazla_calisma_dakika).toBe(hamFm);
+  });
+
+  it("YARGITAY HT+UBGT aynı gün tek havuz asımı", () => {
+    const o = hesaplaHaftalikPuantajUcretOzeti(
+      [
+        gunlukSatir(1, "2026-04-13", 2700),
+        {
+          ...gunlukSatir(1, "2026-04-19", 600, "Hafta_Tatili_Pazar"),
+          ht_ubgt_ayni_gun_mi: true
+        }
+      ],
+      ref,
+      maas,
+      yargitayPolitika
+    );
+    expect(o.hesaplanabilir_mi).toBe(true);
+    expect(o.fazla_calisma_dakika).toBe(150);
+  });
+
+  it("yarım gün UBGT kısmi çalışma canonical alanlarla fail-closed", () => {
+    const o = hesaplaHaftalikPuantajUcretOzeti(
+      [
+        {
+          ...gunlukSatir(1, "2026-04-14", 120, "UBGT_Resmi_Tatil"),
+          ubgt_gun_kapsami: "YARIM_GUN",
+          yarim_gun_tatil_interval_dakika: 240
+        }
+      ],
+      ref,
+      maas,
+      yargitayPolitika
+    );
+    expect(o.hesaplanabilir_mi).toBe(false);
+    expect(o.hata_kodu).toBe(HALF_DAY_UBGT_PARTIAL_ERROR_CODE);
+    expect(o.hata_mesaji).toBe(HALF_DAY_UBGT_PARTIAL_ERROR_MESSAGE);
+  });
+
+  it("yarım gün alanları yoksa magic inference yok", () => {
+    const o = hesaplaHaftalikPuantajUcretOzeti(
+      [gunlukSatir(1, "2026-04-14", 120, "UBGT_Resmi_Tatil")],
+      ref,
+      maas
+    );
+    expect(o.hata_kodu).not.toBe(HALF_DAY_UBGT_PARTIAL_ERROR_CODE);
+  });
 
   it.each([
     [2399, false, 0, 0],

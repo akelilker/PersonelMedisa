@@ -322,11 +322,18 @@ export function hesaplaHaftalikFazlaCalismaUcreti(
 // ---------------------------------------------------------------------------
 
 export const FAZLA_SURELERLE_CALISMA_UCRET_CARPANI = 1.25;
+export const YARGITAY_HOLIDAY_OVERTIME_MODE = "YARGITAY_7_5_SAAT_AYRIMI";
+export const YARGITAY_HOLIDAY_SPLIT_MINUTES = 450;
 export const HOLIDAY_OVERTIME_POLICY_REQUIRED = "HOLIDAY_OVERTIME_POLICY_REQUIRED";
 export const TATIL_FSC_FM_CAKISMA_POLITIKASI_EKSIK =
   "TATIL_FSC_FM_CAKISMA_POLITIKASI_EKSIK";
 export const HOLIDAY_OVERTIME_POLICY_REQUIRED_MESSAGE =
   "Tatil çalışması ile fazla çalışma çakışma politikası yetkili onayı bekliyor";
+export const HALF_DAY_UBGT_PARTIAL_ERROR_CODE = "HALF_DAY_UBGT_PARTIAL_POLICY_REQUIRED";
+export const HALF_DAY_UBGT_PARTIAL_BLOCKER_CODE =
+  "YARIM_GUN_UBGT_KISMI_CALISMA_POLITIKASI_EKSIK";
+export const HALF_DAY_UBGT_PARTIAL_ERROR_MESSAGE =
+  "Yarım günlük resmî tatilde kısmi çalışma hesap politikası yetkili onayı bekliyor";
 
 export type EngineV2TatilHesapModu =
   | "GUNLUK_ILAVE"
@@ -341,6 +348,7 @@ export type EngineV2HaftalikPolitika = {
   hafta_tatili_carpani: number;
   ubgt_hesap_modu: EngineV2TatilHesapModu;
   ubgt_carpani: number;
+  tatil_fsc_fm_cakisma_hesap_modu?: string | null;
 };
 
 export const ENGINE_V2_VARSAYILAN_HAFTALIK_POLITIKA: EngineV2HaftalikPolitika = {
@@ -356,7 +364,10 @@ export const ENGINE_V2_VARSAYILAN_HAFTALIK_POLITIKA: EngineV2HaftalikPolitika = 
 /** Engine V2 haftalık FS/FM bantları + ücret + hafta aralığı. */
 export type HaftalikPuantajUcretOzeti = {
   hesaplanabilir_mi: boolean;
-  hata_kodu: typeof HOLIDAY_OVERTIME_POLICY_REQUIRED | null;
+  hata_kodu:
+    | typeof HOLIDAY_OVERTIME_POLICY_REQUIRED
+    | typeof HALF_DAY_UBGT_PARTIAL_ERROR_CODE
+    | null;
   hata_mesaji: string | null;
   toplam_net_dakika: number;
   normal_calisma_dakika: number;
@@ -399,6 +410,89 @@ function hesaplaEngineV2HaftalikBantlari(
   return { fazla_surelerle_calisma_dakika, fazla_calisma_dakika };
 }
 
+type HolidayDayClass = { ht: boolean; ubgt: boolean; both: boolean };
+
+function resolveHolidayOvertimeMode(mode: string | null | undefined): string | null {
+  const normalized = String(mode ?? "")
+    .trim()
+    .toUpperCase();
+  if (!normalized || normalized.startsWith("TEST_")) {
+    return null;
+  }
+  return normalized === YARGITAY_HOLIDAY_OVERTIME_MODE ? YARGITAY_HOLIDAY_OVERTIME_MODE : null;
+}
+
+function classifyHolidayDay(gun: GunlukPuantaj): HolidayDayClass {
+  let ht = gun.gun_tipi === "Hafta_Tatili_Pazar";
+  let ubgt = gun.gun_tipi === "UBGT_Resmi_Tatil";
+  const siniflar = (gun as GunlukPuantaj & { gun_siniflandirmalari?: string[] })
+    .gun_siniflandirmalari;
+  if (Array.isArray(siniflar)) {
+    for (const sinif of siniflar) {
+      if (sinif === "Hafta_Tatili_Pazar") ht = true;
+      if (sinif === "UBGT_Resmi_Tatil") ubgt = true;
+    }
+  }
+  if ((gun as GunlukPuantaj & { ht_ubgt_ayni_gun_mi?: boolean }).ht_ubgt_ayni_gun_mi) {
+    ht = true;
+    ubgt = true;
+  }
+  return { ht, ubgt, both: ht && ubgt };
+}
+
+function holidayOtPoolMinutes(netDk: number, isHoliday: boolean): number {
+  const net = Math.max(0, Math.floor(netDk));
+  if (!isHoliday) return net;
+  return Math.max(0, net - YARGITAY_HOLIDAY_SPLIT_MINUTES);
+}
+
+function detectHalfDayUbgtPartial(
+  gunler: readonly GunlukPuantaj[]
+): { has_partial: boolean; rows: GunlukPuantaj[] } {
+  const rows: GunlukPuantaj[] = [];
+  for (const gun of gunler) {
+    const extended = gun as GunlukPuantaj & {
+      ubgt_gun_kapsami?: string;
+      tatil_gun_kapsami?: string;
+      yarim_gun_tatil_interval_dakika?: number;
+    };
+    const kapsam =
+      extended.ubgt_gun_kapsami !== undefined
+        ? extended.ubgt_gun_kapsami
+        : extended.tatil_gun_kapsami;
+    if (kapsam === undefined || String(kapsam).trim().toUpperCase() !== "YARIM_GUN") {
+      continue;
+    }
+    const cls = classifyHolidayDay(gun);
+    if (!cls.ubgt) continue;
+    const interval = Math.max(
+      0,
+      Math.floor(ucretIcinGuvenliNegatifOlmayanSayi(extended.yarim_gun_tatil_interval_dakika ?? 0))
+    );
+    const net = haftalikNetDakikaSatir(gun.net_calisma_suresi_dakika);
+    if (interval < 1 || net < 1 || net >= interval) continue;
+    rows.push(gun);
+  }
+  return { has_partial: rows.length > 0, rows };
+}
+
+function buildFmEvaluationPoolDk(gunler: readonly GunlukPuantaj[]): number {
+  let total = 0;
+  for (const gun of gunler) {
+    const net = haftalikNetDakikaSatir(gun.net_calisma_suresi_dakika);
+    if (net < 1) continue;
+    const cls = classifyHolidayDay(gun);
+    if (cls.ht || cls.ubgt) {
+      total += holidayOtPoolMinutes(net, true);
+      continue;
+    }
+    if (gun.gun_tipi === "Normal_Is_Gunu") {
+      total += net;
+    }
+  }
+  return total;
+}
+
 /**
  * `GunlukPuantaj` satırları (çağıranın tek personel listesi vermesi beklenir),
  * referans tarih ve maaş ile haftalık fazla mesai ücret özetini üretir.
@@ -416,15 +510,42 @@ export function hesaplaHaftalikPuantajUcretOzeti(
       gun.gun_tipi !== undefined &&
       ["Normal_Is_Gunu", "Hafta_Tatili_Pazar", "UBGT_Resmi_Tatil"].includes(gun.gun_tipi)
   );
+  const halfDayPartial = detectHalfDayUbgtPartial(hafta);
+  if (halfDayPartial.has_partial) {
+    return {
+      hesaplanabilir_mi: false,
+      hata_kodu: HALF_DAY_UBGT_PARTIAL_ERROR_CODE,
+      hata_mesaji: HALF_DAY_UBGT_PARTIAL_ERROR_MESSAGE,
+      toplam_net_dakika: 0,
+      normal_calisma_dakika: 0,
+      haftalik_esik_dakika: HAFTALIK_NORMAL_CALISMA_ESIK_DAKIKA,
+      sozlesme_haftalik_dakika: 0,
+      normal_gun_calisma_dakika: 0,
+      tatil_calisma_dakika: 0,
+      fazla_surelerle_calisma_dakika: 0,
+      odeme_esas_fazla_surelerle_calisma_dakika: 0,
+      fazla_surelerle_calisma_saat: 0,
+      fazla_surelerle_calisma_tutari: 0,
+      fazla_calisma_dakika: 0,
+      odeme_esas_fazla_calisma_dakika: 0,
+      fazla_calisma_saat: 0,
+      fazla_calisma_tutari: 0,
+      toplam_fazla_calisma_tutari: 0,
+      saatlik_ucret: 0,
+      hafta_baslangic: aralik?.hafta_baslangic ?? null,
+      hafta_bitis: aralik?.hafta_bitis ?? null
+    };
+  }
   const normal_gun_calisma_dakika = hafta
     .filter((gun) => gun.gun_tipi === "Normal_Is_Gunu")
     .reduce(
       (toplam, gun) => toplam + haftalikNetDakikaSatir(gun.net_calisma_suresi_dakika),
       0
     );
-  const tatilGunleri = hafta.filter(
-    (gun) => gun.gun_tipi === "Hafta_Tatili_Pazar" || gun.gun_tipi === "UBGT_Resmi_Tatil"
-  );
+  const tatilGunleri = hafta.filter((gun) => {
+    const cls = classifyHolidayDay(gun);
+    return cls.ht || cls.ubgt;
+  });
   const tatil_calisma_dakika = tatilGunleri.reduce(
     (toplam, gun) => toplam + haftalikNetDakikaSatir(gun.net_calisma_suresi_dakika),
     0
@@ -441,15 +562,24 @@ export function hesaplaHaftalikPuantajUcretOzeti(
     HAFTALIK_NORMAL_CALISMA_ESIK_DAKIKA
   );
   const normal_calisma_dakika = Math.min(toplam_net_dakika, sozlesme_haftalik_dakika);
+  const approvedMode = resolveHolidayOvertimeMode(politika.tatil_fsc_fm_cakisma_hesap_modu);
+  const evaluationPoolDk =
+    approvedMode !== null ? buildFmEvaluationPoolDk(hafta) : toplam_net_dakika;
   const bantlar = hesaplaEngineV2HaftalikBantlari(
+    evaluationPoolDk,
+    sozlesme_haftalik_dakika
+  );
+  const fullPoolBantlar = hesaplaEngineV2HaftalikBantlari(
     toplam_net_dakika,
     sozlesme_haftalik_dakika
   );
   const fazla_surelerle_calisma_dakika = bantlar.fazla_surelerle_calisma_dakika;
   const fazla_calisma_dakika = bantlar.fazla_calisma_dakika;
   const tatilFscFmCakismasi =
+    approvedMode === null &&
     tatil_calisma_dakika > 0 &&
-    (fazla_surelerle_calisma_dakika > 0 || fazla_calisma_dakika > 0);
+    (fullPoolBantlar.fazla_surelerle_calisma_dakika > 0 ||
+      fullPoolBantlar.fazla_calisma_dakika > 0);
   const odeme_esas_fazla_surelerle_calisma_dakika = tatilFscFmCakismasi
     ? 0
     : hesaplaMevzuatFazlaCalismaOdemeDakika(fazla_surelerle_calisma_dakika);

@@ -187,3 +187,19 @@ Tarih: ____ / ____ / 2026
 ## 9. Sistem kayıt notu
 
 Bu form onaylanmadan ilgili şirket parametreleri production sistemine girilmeyecek ve gerçek maaş hesaplama adayı oluşturulmayacaktır.
+
+---
+
+## S87 karar kaydı (2026-07-22)
+
+**Onaylanan `TATIL_FSC_FM_CAKISMA_HESAP_MODU`:** `YARGITAY_7_5_SAAT_AYRIMI`
+
+**Özet kurallar:**
+- Tam gün HT/UBGT fiili çalışmasında ilk 7,5 saat (450 dk) tatil primi havuzunda kalır; FSC/FM değerlendirme havuzuna yalnızca 450 dk aşımı girer.
+- HT ve UBGT aynı günde çakışırsa tatil primi HT esas alınır; haftalık asım tek kez sayılır.
+- Mod onaylıyken tam gün HT/UBGT + FSC/FM çakışması aday üretimini bloke etmez.
+- Mod yok veya geçersizse mevcut fail-closed davranış korunur (tatil + FSC/FM → hesap durur).
+
+**Yarım gün UBGT kısmi çalışma:** `ONAY_BEKLIYOR` — canonical yarım gün kaynağı repoda yok; alanlar mevcut olduğunda `ubgt_gun_kapsami` / `tatil_gun_kapsami` = `YARIM_GUN` ve `yarim_gun_tatil_interval_dakika` ile fail-closed.
+
+**Production notu:** Bu kayıt yalnızca karar dokümantasyonudur; production policy yazımı yapılmamıştır.

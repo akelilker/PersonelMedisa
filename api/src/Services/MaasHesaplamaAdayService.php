@@ -132,6 +132,8 @@ class MaasHesaplamaAdayService
         $haftalikIsGunu = is_array($haftalikIsGunuRow)
             ? (int) ($haftalikIsGunuRow['sayisal_deger'] ?? 0)
             : 0;
+        $modeRow = $policy['degerler_by_code']['TATIL_FSC_FM_CAKISMA_HESAP_MODU'] ?? null;
+        $holidayOvertimeMode = is_array($modeRow) ? ($modeRow['metin_deger'] ?? null) : null;
         if ($gunlukCalismaDakika > 0 && $haftalikIsGunu > 0) {
             foreach ($bundle['personeller'] as $personel) {
                 $pid = (int) $personel['personel_id'];
@@ -142,9 +144,26 @@ class MaasHesaplamaAdayService
                 $conflict = MaasHesaplamaEngine::detectHolidayOvertimePolicyConflict(
                     $projected['puantajlar'],
                     $gunlukCalismaDakika,
-                    $haftalikIsGunu
+                    $haftalikIsGunu,
+                    $holidayOvertimeMode
                 );
                 if ($conflict['has_conflict']) {
+                    if (($conflict['reason'] ?? '') === 'HALF_DAY_UBGT_PARTIAL') {
+                        $items[] = self::issue(
+                            'BLOCKER',
+                            MaasHesaplamaEngine::HALF_DAY_UBGT_PARTIAL_BLOCKER_CODE,
+                            MaasHesaplamaEngine::HALF_DAY_UBGT_PARTIAL_ERROR_MESSAGE,
+                            'puantaj',
+                            null,
+                            $pid,
+                            [
+                                'politika_kodu' => MaasHesaplamaEngine::HOLIDAY_OVERTIME_POLICY_CODE,
+                                'yarim_gun_satirlari' => $conflict['half_day_rows'] ?? [],
+                            ],
+                            $personel['ad_soyad'] ?? null
+                        );
+                        continue;
+                    }
                     $items[] = self::issue(
                         'BLOCKER',
                         MaasHesaplamaEngine::HOLIDAY_OVERTIME_BLOCKER_CODE,

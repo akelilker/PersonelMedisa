@@ -59,6 +59,11 @@ export type GunlukPuantaj = {
   net_calisma_suresi_dakika?: number;
   gunluk_brut_sure_dakika?: number;
   hafta_tatili_hak_kazandi_mi?: boolean;
+  ubgt_gun_kapsami?: string;
+  tatil_gun_kapsami?: string;
+  yarim_gun_tatil_interval_dakika?: number;
+  ht_ubgt_ayni_gun_mi?: boolean;
+  gun_siniflandirmalari?: string[];
   state?: GunlukPuantajState;
   kontrol_durumu?: PuantajAmirKontrolDurumu;
   compliance_uyarilari: ComplianceUyari[];

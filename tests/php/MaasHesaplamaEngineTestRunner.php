@@ -63,6 +63,9 @@ function mevzuatFixture(array $overrides = []): array
     $fixture = [];
     foreach ($values as $code => $value) {
         $meta = MaasHesaplamaLegalParameterCatalog::meta($code);
+        if ($meta === null) {
+            $meta = SirketCalismaPolitikasiCatalog::meta($code);
+        }
         $isMetin = $meta && $meta['deger_tipi'] === 'METIN';
         $fixture[$code] = [
             'parametre_kodu' => $code,
@@ -160,10 +163,13 @@ function holidayOverlapResult(
     string $tutar,
     string $gunTipi,
     int $normalMinutes,
-    int $holidayMinutes
+    int $holidayMinutes,
+    array $mevzuatOverrides = [],
+    array $extraPuantaj = []
 ): array {
     return MaasHesaplamaEngine::calculate(engineInput($ucretTuru, $tutar, [
-        'puantajlar' => [
+        'mevzuat' => mevzuatFixture($mevzuatOverrides),
+        'puantajlar' => array_merge([
             [
                 'muhur_satir_id' => 920,
                 'tarih' => '2026-03-02',
@@ -176,7 +182,7 @@ function holidayOverlapResult(
                 'gun_tipi' => $gunTipi,
                 'net_calisma_suresi_dakika' => $holidayMinutes,
             ],
-        ],
+        ], $extraPuantaj),
     ]));
 }
 
@@ -500,9 +506,130 @@ foreach ([449, 450, 451] as $holidayMinutes) {
     engineAssert(
         empty($candidateBoundary['ok'])
             && (string) $candidateBoundary['error_code'] === MaasHesaplamaEngine::HOLIDAY_OVERTIME_ERROR_CODE,
-        'YARGITAY_7_5_SAAT_AYRIMI candidate ' . $holidayMinutes . ' dk authoritative degil'
+        'missing mode UBGT candidate ' . $holidayMinutes . ' dk fail-closed'
     );
 }
+
+$yargitayMode = [MaasHesaplamaEngine::HOLIDAY_OVERTIME_POLICY_CODE => MaasHesaplamaEngine::HOLIDAY_OVERTIME_APPROVED_MODE];
+foreach (['Hafta_Tatili_Pazar' => 'HT', 'UBGT_Resmi_Tatil' => 'UBGT'] as $holidayType => $holidayLabel) {
+    foreach ([0, 1, 449, 450, 451, 600] as $holidayMinutes) {
+        foreach ([2400 => 'FSC', 2700 => 'FM'] as $normalMinutes => $bandLabel) {
+            $overlap = holidayOverlapResult(
+                'BRUT',
+                '45000.00',
+                $holidayType,
+                $normalMinutes,
+                $holidayMinutes,
+                $yargitayMode
+            );
+            $poolExcess = max(0, $holidayMinutes - MaasHesaplamaEngine::YARGITAY_HOLIDAY_SPLIT_MINUTES);
+            $expectedTotal = $normalMinutes + $poolExcess;
+            $rawFs = max(0, min($expectedTotal - 2400, 300));
+            $rawFm = max(0, $expectedTotal - 2700);
+            $expectedFs = $bandLabel === 'FSC' ? $rawFs : 0;
+            $expectedFm = $bandLabel === 'FM' ? $rawFm : 0;
+            engineAssert(!empty($overlap['ok']), $holidayLabel . ' YARGITAY ' . $bandLabel . ' ' . $holidayMinutes . ' dk hesaplanir');
+            $fsLines = findKalemler($overlap, 'FAZLA_SURELERLE_CALISMA_ODEMESI');
+            $fmLines = findKalemler($overlap, 'FAZLA_MESAI_ODEMESI');
+            if ($bandLabel === 'FSC') {
+                engineAssert(
+                    $expectedFs < 1 ? count($fsLines) === 0 : count($fsLines) === 1 && (int) $fsLines[0]['payload_json']['ham_fazla_surelerle_calisma_dk'] === $expectedFs,
+                    $holidayLabel . ' YARGITAY FSC boundary ' . $holidayMinutes . ' dk raw=' . $expectedFs
+                );
+            } else {
+                engineAssert(
+                    $expectedFm < 1 ? count($fmLines) === 0 : count($fmLines) === 1 && (int) $fmLines[0]['payload_json']['ham_fazla_calisma_dk'] === $expectedFm,
+                    $holidayLabel . ' YARGITAY FM boundary ' . $holidayMinutes . ' dk raw=' . $expectedFm
+                );
+            }
+        }
+    }
+}
+
+$yargitayWeekly = holidayOverlapResult(
+    'BRUT',
+    '45000.00',
+    'Hafta_Tatili_Pazar',
+    2400,
+    450,
+    $yargitayMode
+);
+engineAssert(!empty($yargitayWeekly['ok']), 'YARGITAY Normal 2400 + HT 450 => FSC/FM 0');
+engineAssert(count(findKalemler($yargitayWeekly, 'FAZLA_MESAI_ODEMESI')) === 0, 'YARGITAY HT 450 FM yok');
+engineAssert(count(findKalemler($yargitayWeekly, 'FAZLA_SURELERLE_CALISMA_ODEMESI')) === 0, 'YARGITAY HT 450 FSC yok');
+engineAssert(count(findKalemler($yargitayWeekly, 'HAFTA_TATILI_ODEMESI')) === 1, 'YARGITAY HT 450 premium odendi');
+
+$yargitayFm150 = holidayOverlapResult(
+    'BRUT',
+    '45000.00',
+    'Hafta_Tatili_Pazar',
+    2700,
+    600,
+    $yargitayMode
+);
+$fm150 = findKalemler($yargitayFm150, 'FAZLA_MESAI_ODEMESI');
+engineAssert(
+    !empty($yargitayFm150['ok']) && count($fm150) === 1 && (int) $fm150[0]['payload_json']['ham_fazla_calisma_dk'] === 150,
+    'YARGITAY Normal 2700 + HT 600 => FM 150'
+);
+
+$htUbgtSameDay = MaasHesaplamaEngine::calculate(engineInput('BRUT', '45000.00', [
+    'mevzuat' => mevzuatFixture($yargitayMode),
+    'puantajlar' => [
+        [
+            'muhur_satir_id' => 920,
+            'tarih' => '2026-03-02',
+            'gun_tipi' => 'Normal_Is_Gunu',
+            'net_calisma_suresi_dakika' => 2700,
+        ],
+        [
+            'muhur_satir_id' => 921,
+            'tarih' => '2026-03-08',
+            'gun_tipi' => 'Hafta_Tatili_Pazar',
+            'net_calisma_suresi_dakika' => 600,
+            'ht_ubgt_ayni_gun_mi' => true,
+        ],
+    ],
+]));
+$htUbgtLine = findKalemler($htUbgtSameDay, 'HAFTA_TATILI_ODEMESI');
+engineAssert(
+    !empty($htUbgtSameDay['ok'])
+        && count($htUbgtLine) === 1
+        && (string) ($htUbgtLine[0]['payload_json']['ht_ubgt_cakisma_hesap_modu'] ?? '') === 'HAFTA_TATILI_ESAS',
+    'HT+UBGT ayni gun yalniz HT premium'
+);
+engineAssert(count(findKalemler($htUbgtSameDay, 'UBGT_ODEMESI')) === 0, 'HT+UBGT ayni gun UBGT premium yok');
+
+$halfDayPartial = MaasHesaplamaEngine::calculate(engineInput('BRUT', '45000.00', [
+    'puantajlar' => [[
+        'muhur_satir_id' => 950,
+        'tarih' => '2026-03-03',
+        'gun_tipi' => 'UBGT_Resmi_Tatil',
+        'net_calisma_suresi_dakika' => 120,
+        'ubgt_gun_kapsami' => 'YARIM_GUN',
+        'yarim_gun_tatil_interval_dakika' => 240,
+    ]],
+]));
+engineAssert(
+    empty($halfDayPartial['ok'])
+        && (string) $halfDayPartial['error_code'] === MaasHesaplamaEngine::HALF_DAY_UBGT_PARTIAL_ERROR_CODE,
+    'yarim gun UBGT kismi calisma fail-closed'
+);
+
+engineAssert(
+    MaasHesaplamaEngine::buildFmDegerlendirmeHavuzuDk([
+        ['gun_tipi' => 'Normal_Is_Gunu', 'net_calisma_suresi_dakika' => 2700],
+        ['gun_tipi' => 'Hafta_Tatili_Pazar', 'net_calisma_suresi_dakika' => 450],
+    ]) === 2700,
+    'buildFmDegerlendirmeHavuzuDk Normal 2700 + HT 450'
+);
+engineAssert(
+    MaasHesaplamaEngine::buildFmDegerlendirmeHavuzuDk([
+        ['gun_tipi' => 'Normal_Is_Gunu', 'net_calisma_suresi_dakika' => 2700],
+        ['gun_tipi' => 'Hafta_Tatili_Pazar', 'net_calisma_suresi_dakika' => 600],
+    ]) === 2850,
+    'buildFmDegerlendirmeHavuzuDk Normal 2700 + HT 600'
+);
 
 foreach ([
     2399 => false,

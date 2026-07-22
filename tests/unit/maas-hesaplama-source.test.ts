@@ -119,9 +119,14 @@ describe("S77-C/S77-D maas hesaplama source contract", () => {
     expect(policyCatalog).toContain("TATIL_FSC_FM_CAKISMA_HESAP_MODU");
     expect(engine).toContain("HOLIDAY_OVERTIME_POLICY_REQUIRED");
     expect(engine).toContain("TATIL_FSC_FM_CAKISMA_POLITIKASI_EKSIK");
+    expect(engine).toContain("HALF_DAY_UBGT_PARTIAL_ERROR_CODE");
+    expect(engine).toContain("YARGITAY_HOLIDAY_SPLIT_MINUTES");
     expect(engine).not.toContain("TATIL_TABAN_UCRET_MAHSUBU");
     expect(aday).toContain("HOLIDAY_OVERTIME_BLOCKER_CODE");
+    expect(aday).toContain("HALF_DAY_UBGT_PARTIAL_BLOCKER_CODE");
     expect(frontendEngine).toContain("HOLIDAY_OVERTIME_POLICY_REQUIRED");
+    expect(frontendEngine).toContain("YARGITAY_HOLIDAY_OVERTIME_MODE");
+    expect(frontendEngine).toContain("HALF_DAY_UBGT_PARTIAL_ERROR_CODE");
     expect(frontendEngine).toContain(
       "Tatil çalışması ile fazla çalışma çakışma politikası yetkili onayı bekliyor"
     );

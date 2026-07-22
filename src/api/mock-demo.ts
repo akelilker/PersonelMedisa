@@ -1444,7 +1444,14 @@ const SIRKET_POLITIKA_KATALOG = [
   { parametre_kodu: "FAZLA_MESAI_CARPANI", etiket: "Fazla Mesai Çarpanı", deger_tipi: "SAYISAL", birim: "CARPAN", zorunlu: true },
   { parametre_kodu: "FAZLA_SURELERLE_CALISMA_CARPANI", etiket: "Fazla Sürelerle Çalışma Çarpanı", deger_tipi: "SAYISAL", birim: "CARPAN", zorunlu: true },
   { parametre_kodu: "UBGT_CARPANI", etiket: "UBGT Çarpanı", deger_tipi: "SAYISAL", birim: "CARPAN", zorunlu: true },
-  { parametre_kodu: "UBGT_HESAP_MODU", etiket: "UBGT Hesap Modu", deger_tipi: "METIN", birim: "MOD", zorunlu: true }
+  { parametre_kodu: "UBGT_HESAP_MODU", etiket: "UBGT Hesap Modu", deger_tipi: "METIN", birim: "MOD", zorunlu: true },
+  {
+    parametre_kodu: "TATIL_FSC_FM_CAKISMA_HESAP_MODU",
+    etiket: "Tatil ve Fazla Çalışma Çakışma Hesap Modu",
+    deger_tipi: "METIN",
+    birim: "MOD",
+    zorunlu: true
+  }
 ];
 
 function buildDemoBordroReadiness(yil: number, ay: number, subeId: number) {

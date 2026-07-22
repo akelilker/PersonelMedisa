@@ -499,6 +499,15 @@ class SirketCalismaPolitikasiService
                 if ($metin === '') {
                     throw new SirketCalismaPolitikasiException('VALIDATION_ERROR', $code . ' metin degeri zorunlu.', 400);
                 }
+                if ($code === 'TATIL_FSC_FM_CAKISMA_HESAP_MODU'
+                    && !SirketCalismaPolitikasiCatalog::isHolidayOvertimeModeAllowed($metin)
+                ) {
+                    throw new SirketCalismaPolitikasiException(
+                        'VALIDATION_ERROR',
+                        $code . ' yalnız YARGITAY_7_5_SAAT_AYRIMI kabul eder.',
+                        400
+                    );
+                }
             } else {
                 $raw = $deger['sayisal_deger'] ?? $deger['mevcut_deger'] ?? null;
                 if ($raw === null || $raw === '') {

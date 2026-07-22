@@ -16,8 +16,11 @@ class JsonResponse
         ], $status);
     }
 
-    /** @param array<int, array<string, string>> $errors */
-    public static function error($status, $code, $message, $field = null)
+    /**
+     * @param array<int, array<string, string>> $errors
+     * @param array<string, mixed> $meta
+     */
+    public static function error($status, $code, $message, $field = null, $meta = [])
     {
         $error = [
             'code' => $code,
@@ -29,7 +32,7 @@ class JsonResponse
 
         self::send([
             'data' => null,
-            'meta' => [],
+            'meta' => is_array($meta) ? $meta : [],
             'errors' => [$error],
         ], $status);
     }

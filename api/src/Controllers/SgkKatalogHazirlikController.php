@@ -16,6 +16,7 @@ use Medisa\Api\Services\Payroll\SgkKatalogOnayService;
 use Medisa\Api\Services\Payroll\SgkKatalogPreviewService;
 use Medisa\Api\Services\Payroll\SgkKatalogTamlikService;
 use Medisa\Api\Services\Payroll\SgkKaynakManifestReader;
+use Medisa\Api\Services\Payroll\SgkOperasyonelKanitBase64Guard;
 use Medisa\Api\Services\Payroll\SgkOperasyonelKanitValidator;
 use Medisa\Api\Services\Payroll\SgkSurecKodEslemeValidator;
 use PDO;
@@ -138,14 +139,38 @@ class SgkKatalogHazirlikController
     {
         self::context($request, 'mevzuat_parametreleri.view');
         $body = self::jsonBody($request);
-        $bytes = null;
-        if (isset($body['dosya_icerik_base64']) && is_string($body['dosya_icerik_base64']) && $body['dosya_icerik_base64'] !== '') {
-            $decoded = base64_decode($body['dosya_icerik_base64'], true);
-            if ($decoded !== false) {
-                $bytes = $decoded;
+        $encoded = null;
+        if (array_key_exists('dosya_icerik_base64', $body)) {
+            if (!is_string($body['dosya_icerik_base64'])) {
+                JsonResponse::error(
+                    422,
+                    SgkOperasyonelKanitBase64Guard::ERROR_BASE64_GECERSIZ,
+                    'Operasyonel kanit Base64 alani metin olmalidir.',
+                    'dosya_icerik_base64',
+                    ['limit_byte' => SgkOperasyonelKanitBase64Guard::MAX_DECODED_BYTES]
+                );
             }
+            $encoded = $body['dosya_icerik_base64'];
         }
-        JsonResponse::success(SgkOperasyonelKanitValidator::validate($body, $bytes));
+
+        $resolved = SgkOperasyonelKanitBase64Guard::resolve($encoded);
+        if ($resolved['ok'] !== true) {
+            // Never echo payload / decoded content in errors or logs.
+            JsonResponse::error(
+                $resolved['http'],
+                $resolved['code'],
+                $resolved['message'],
+                $resolved['field'],
+                $resolved['meta']
+            );
+        }
+
+        JsonResponse::success(
+            SgkOperasyonelKanitValidator::validate($body, $resolved['bytes']),
+            [
+                'operasyonel_kanit_max_decoded_bytes' => SgkOperasyonelKanitBase64Guard::MAX_DECODED_BYTES,
+            ]
+        );
     }
 
     public static function kismiSureliPreview(Request $request)

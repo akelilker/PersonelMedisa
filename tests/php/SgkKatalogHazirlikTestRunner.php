@@ -6,6 +6,7 @@ require_once __DIR__ . '/../../api/src/Services/Payroll/SgkKatalogContracts.php'
 require_once __DIR__ . '/../../api/src/Services/Payroll/SgkKatalogTamlikService.php';
 require_once __DIR__ . '/../../api/src/Services/Payroll/SgkKatalogImportValidator.php';
 require_once __DIR__ . '/../../api/src/Services/Payroll/SgkOperasyonelKanitValidator.php';
+require_once __DIR__ . '/../../api/src/Services/Payroll/SgkOperasyonelKanitBase64Guard.php';
 require_once __DIR__ . '/../../api/src/Services/Payroll/SgkKatalogOnayService.php';
 require_once __DIR__ . '/../../api/src/Services/Payroll/SgkSurecKodEslemeValidator.php';
 require_once __DIR__ . '/../../api/src/Services/Payroll/SgkCokluNedenValidator.php';
@@ -21,6 +22,7 @@ use Medisa\Api\Services\Payroll\SgkKatalogOnayService;
 use Medisa\Api\Services\Payroll\SgkKatalogPreviewService;
 use Medisa\Api\Services\Payroll\SgkKatalogTamlikService;
 use Medisa\Api\Services\Payroll\SgkKaynakManifestReader;
+use Medisa\Api\Services\Payroll\SgkOperasyonelKanitBase64Guard;
 use Medisa\Api\Services\Payroll\SgkOperasyonelKanitValidator;
 use Medisa\Api\Services\Payroll\SgkSurecKodEslemeValidator;
 
@@ -256,6 +258,112 @@ $opMev = SgkOperasyonelKanitValidator::validate([
 ], $bytes);
 assertTrue(in_array(SgkKatalogContracts::BLOCKER_TAMLIK, $opMev['blocker_kodlari'], true), 'op mevzuat authority reddi');
 assertTrue($opMev['mevzuat_kaynagi_mi'] === false, 'op her zaman mevzuat false');
+
+// --- Operasyonel Base64 guard (S85-C1.1) ---
+assertTrue(SgkOperasyonelKanitBase64Guard::MAX_DECODED_BYTES === 10 * 1024 * 1024, 'base64 limit 10MiB canonical');
+
+$bMissing = SgkOperasyonelKanitBase64Guard::resolve(null);
+assertTrue($bMissing['ok'] === true && $bMissing['bytes'] === null, 'base64 alan yok → null bytes');
+
+$bEmpty = SgkOperasyonelKanitBase64Guard::resolve('');
+assertTrue($bEmpty['ok'] === true && $bEmpty['bytes'] === null, 'base64 bos string → null bytes');
+
+$small = 'kanit-ok';
+$bSmall = SgkOperasyonelKanitBase64Guard::resolve(base64_encode($small));
+assertTrue($bSmall['ok'] === true && $bSmall['bytes'] === $small, 'base64 gecerli kucuk payload');
+
+$utf8 = "üçğışİUTF8✓";
+$bUtf = SgkOperasyonelKanitBase64Guard::resolve(base64_encode($utf8));
+assertTrue($bUtf['ok'] === true && $bUtf['bytes'] === $utf8, 'base64 utf8 içerik');
+
+$binary = "\x00\x01\x02\xff\xfe\x80binary";
+$bBin = SgkOperasyonelKanitBase64Guard::resolve(base64_encode($binary));
+assertTrue($bBin['ok'] === true && $bBin['bytes'] === $binary, 'base64 binary içerik');
+
+$bBadChar = SgkOperasyonelKanitBase64Guard::resolve('@@@not-base64@@@');
+assertTrue(
+    $bBadChar['ok'] === false
+    && $bBadChar['http'] === 422
+    && $bBadChar['code'] === SgkOperasyonelKanitBase64Guard::ERROR_BASE64_GECERSIZ,
+    'base64 gecersiz karakter'
+);
+
+$bPad = SgkOperasyonelKanitBase64Guard::resolve('YQ='); // "a" without proper padding length
+assertTrue(
+    $bPad['ok'] === false
+    && $bPad['http'] === 422
+    && $bPad['code'] === SgkOperasyonelKanitBase64Guard::ERROR_BASE64_GECERSIZ,
+    'base64 hatali padding'
+);
+
+$bWs = SgkOperasyonelKanitBase64Guard::resolve(base64_encode('x') . "\n");
+assertTrue(
+    $bWs['ok'] === false
+    && $bWs['code'] === SgkOperasyonelKanitBase64Guard::ERROR_BASE64_GECERSIZ,
+    'base64 whitespace/newline reddedilir (strip yok)'
+);
+
+$bNonCanon = SgkOperasyonelKanitBase64Guard::resolve('YWJjZA'); // "abcd" without padding (len 6)
+assertTrue(
+    $bNonCanon['ok'] === false
+    && $bNonCanon['code'] === SgkOperasyonelKanitBase64Guard::ERROR_BASE64_GECERSIZ,
+    'base64 non-canonical / hatali uzunluk'
+);
+
+$max = SgkOperasyonelKanitBase64Guard::MAX_DECODED_BYTES;
+$underBytes = str_repeat('U', $max - 1);
+$bUnder = SgkOperasyonelKanitBase64Guard::resolve(base64_encode($underBytes));
+assertTrue($bUnder['ok'] === true && strlen((string) $bUnder['bytes']) === $max - 1, 'base64 limit-1 kabul');
+
+$exactBytes = str_repeat('E', $max);
+$bExact = SgkOperasyonelKanitBase64Guard::resolve(base64_encode($exactBytes));
+assertTrue($bExact['ok'] === true && strlen((string) $bExact['bytes']) === $max, 'base64 limit tam kabul');
+
+$overBytes = str_repeat('O', $max + 1);
+$bOver = SgkOperasyonelKanitBase64Guard::resolve(base64_encode($overBytes));
+assertTrue(
+    $bOver['ok'] === false
+    && $bOver['http'] === 413
+    && $bOver['code'] === SgkOperasyonelKanitBase64Guard::ERROR_DOSYA_BOYUTU_ASILDI
+    && ($bOver['meta']['limit_byte'] ?? null) === $max
+    && (($bOver['meta']['byte_sayisi'] ?? null) === $max + 1 || ($bOver['meta']['tahmini_byte'] ?? 0) > $max),
+    'base64 limit+1 413'
+);
+assertTrue(
+    !isset($bOver['meta']['payload'])
+    && strpos(json_encode($bOver), base64_encode($overBytes)) === false,
+    'base64 size hata payload sizdirmaz'
+);
+
+$hugeEncoded = str_repeat('A', SgkOperasyonelKanitBase64Guard::maxEncodedLength() + 4);
+$bHuge = SgkOperasyonelKanitBase64Guard::resolve($hugeEncoded);
+assertTrue(
+    $bHuge['ok'] === false
+    && $bHuge['http'] === 413
+    && $bHuge['code'] === SgkOperasyonelKanitBase64Guard::ERROR_DOSYA_BOYUTU_ASILDI
+    && isset($bHuge['meta']['tahmini_byte']),
+    'base64 cok buyuk encoded decode oncesi reddedilir'
+);
+
+$reHashBytes = 'sha-rehash-proof';
+$resolvedHash = SgkOperasyonelKanitBase64Guard::resolve(base64_encode($reHashBytes));
+$opHash = SgkOperasyonelKanitValidator::validate([
+    'dosya_adi' => 'proof.bin',
+    'sha256' => str_repeat('0', 64),
+    'byte_boyutu' => 1,
+], $resolvedHash['bytes']);
+assertTrue($opHash['sha256'] === hash('sha256', $reHashBytes), 'base64 sonrasi SHA256 re-hash');
+assertTrue($opHash['byte_boyutu'] === strlen($reHashBytes), 'base64 sonrasi gercek byte');
+
+$controllerOpSrc = file_get_contents(__DIR__ . '/../../api/src/Controllers/SgkKatalogHazirlikController.php');
+assertTrue(
+    strpos($controllerOpSrc, 'SgkOperasyonelKanitBase64Guard::resolve') !== false,
+    'controller base64 guard kullanir'
+);
+assertTrue(strpos($controllerOpSrc, "self::context(\$request, 'mevzuat_parametreleri.view')") !== false, 'op endpoint auth/permission korur');
+assertTrue(!preg_match('/file_put_contents|fwrite\s*\(|INSERT\s+INTO|UPDATE\s+/i', $controllerOpSrc), 'op endpoint write yapmaz');
+assertTrue(strpos($controllerOpSrc, 'operasyonel_kanit_max_decoded_bytes') !== false, 'op response limit metadata gosterir');
+assertTrue(strpos($controllerOpSrc, 'base64_decode($body') === false, 'controller dogrudan base64_decode kullanmaz');
 
 // --- Onay ---
 $o1 = SgkKatalogOnayService::validateTransition([

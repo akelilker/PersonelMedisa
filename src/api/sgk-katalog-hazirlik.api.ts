@@ -3,6 +3,9 @@ import { appendQueryParams } from "../utils/append-query-params";
 import { apiRequest } from "./api-client";
 import { endpoints } from "./endpoints";
 
+/** Canonical decoded-byte limit for operasyonel kanıt Base64 (matches PHP SgkOperasyonelKanitBase64Guard::MAX_DECODED_BYTES). */
+export const SGK_OPERASYONEL_KANIT_MAX_DECODED_BYTES = 10 * 1024 * 1024;
+
 export type SgkKatalogBlocker = {
   severity: "BLOCKER" | string;
   code: string;

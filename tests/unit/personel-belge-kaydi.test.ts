@@ -3,13 +3,18 @@ import { formatSurecTuruLabel } from "../../src/lib/display/enum-display";
 import { normalizePersonelBelgeKaydi } from "../../src/api/personel-belge-kayitlari.api";
 import {
   computeGecerlilikDurumu,
+  deriveTakipDurumu,
   formatPersonelBelgeDisplayText,
   formatPersonelBelgeKayitDurumLabel,
   formatPersonelBelgeKayitTipiLabel,
+  maskBelgeNo,
   normalizePersonelBelgeKayitTipi,
+  PERSONEL_BELGE_EXPIRY_WARNING_DAYS,
   PERSONEL_BELGE_GECERLILIK_LABELS,
   PERSONEL_BELGE_KAYIT_EMPTY_MESSAGE,
-  PERSONEL_BELGE_KAYIT_TIPI_LABELS
+  PERSONEL_BELGE_KAYIT_TIPI_KEYS,
+  PERSONEL_BELGE_KAYIT_TIPI_LABELS,
+  PERSONEL_BELGE_MAX_DECODED_BYTES
 } from "../../src/types/personel-belge-kaydi";
 
 describe("personel-belge-kaydi helpers", () => {
@@ -36,6 +41,40 @@ describe("personel-belge-kaydi helpers", () => {
     );
   });
 
+  it("deriveTakipDurumu dosya yoksa BELGE_DOSYASI_EKSIK yapar", () => {
+    expect(deriveTakipDurumu("AKTIF", "2028-01-01", false)).toBe("BELGE_DOSYASI_EKSIK");
+  });
+
+  it("deriveTakipDurumu iptal durumunu korur", () => {
+    expect(deriveTakipDurumu("IPTAL", "2028-01-01", true)).toBe("IPTAL");
+  });
+
+  it("deriveTakipDurumu suresi dolmus belgeyi SURESI_DOLDU yapar", () => {
+    expect(
+      deriveTakipDurumu("AKTIF", "2020-01-01", true, new Date("2026-06-27T12:00:00.000Z"))
+    ).toBe("SURESI_DOLDU");
+  });
+
+  it("deriveTakipDurumu yakin bitisi SURESI_YAKLASIYOR yapar", () => {
+    expect(
+      deriveTakipDurumu("AKTIF", "2026-07-15", true, new Date("2026-06-27T12:00:00.000Z"))
+    ).toBe("SURESI_YAKLASIYOR");
+  });
+
+  it("maskBelgeNo son dort karakteri gosterir", () => {
+    expect(maskBelgeNo("FRK-2024-001")).toBe("********-001");
+    expect(maskBelgeNo("AB")).toBe("**");
+    expect(maskBelgeNo(null)).toBeNull();
+  });
+
+  it("tip catalog ve limit sabitleri tanimli", () => {
+    expect(PERSONEL_BELGE_KAYIT_TIPI_KEYS).toContain("KIMLIK");
+    expect(PERSONEL_BELGE_KAYIT_TIPI_KEYS).toContain("DIGER");
+    expect(PERSONEL_BELGE_KAYIT_TIPI_LABELS.ISG_EGITIM).toBe("İSG / eğitim sertifikası");
+    expect(PERSONEL_BELGE_MAX_DECODED_BYTES).toBe(10 * 1024 * 1024);
+    expect(PERSONEL_BELGE_EXPIRY_WARNING_DAYS).toBe(30);
+  });
+
   it("tip label map dogru calisir", () => {
     expect(PERSONEL_BELGE_KAYIT_TIPI_LABELS.SERTIFIKA).toBe("Sertifika");
     expect(PERSONEL_BELGE_KAYIT_TIPI_LABELS.EGITIM).toBe("Eğitim");
@@ -47,6 +86,7 @@ describe("personel-belge-kaydi helpers", () => {
 
   it("belge kayit tipi alias ve durum label'larini normalize eder", () => {
     expect(normalizePersonelBelgeKayitTipi("SERTFIKA")).toBe("SERTIFIKA");
+    expect(normalizePersonelBelgeKayitTipi("KIMLIK")).toBe("KIMLIK");
     expect(formatPersonelBelgeKayitDurumLabel("IPTAL")).toBe("İptal");
     expect(formatPersonelBelgeKayitDurumLabel("AKTIF")).toBe("Aktif");
     expect(PERSONEL_BELGE_KAYIT_EMPTY_MESSAGE).toBe("Belge kaydı bulunmuyor.");
@@ -75,11 +115,13 @@ describe("personel-belge-kaydi helpers", () => {
       personel_id: 1,
       kayit_tipi: "SERTFIKA",
       ad: "Forklift Sertifikasi",
-      durum: "AKTIF"
+      durum: "AKTIF",
+      dosya: { var_mi: true }
     });
 
     expect(normalized.kayit_tipi).toBe("SERTIFIKA");
     expect(formatPersonelBelgeKayitTipiLabel(normalized.kayit_tipi)).toBe("Sertifika");
+    expect(normalized.takip_durumu).toBe("AKTIF");
   });
 
   it("normalizePersonelBelgeKaydi eksik opsiyonel alanlari null yapar", () => {
@@ -89,7 +131,8 @@ describe("personel-belge-kaydi helpers", () => {
       kayit_tipi: "YETKINLIK",
       ad: "Kaynakçı Yetkinliği",
       durum: "AKTIF",
-      bitis_tarihi: "2027-01-01"
+      bitis_tarihi: "2027-01-01",
+      dosya: { var_mi: true }
     });
 
     expect(normalized.veren_kurum).toBeNull();
@@ -97,6 +140,7 @@ describe("personel-belge-kaydi helpers", () => {
     expect(normalized.ek_ref).toBeNull();
     expect(normalized.aciklama).toBeNull();
     expect(normalized.gecerlilik_durumu).toBe("GECERLI");
+    expect(normalized.belge_no_masked).toBeNull();
   });
 
   it("normalizePersonelBelgeKaydi hatali gecerlilik alanini yeniden hesaplar", () => {
@@ -107,10 +151,12 @@ describe("personel-belge-kaydi helpers", () => {
       ad: "B Sınıfı Ehliyet",
       durum: "AKTIF",
       bitis_tarihi: "2020-05-01",
-      gecerlilik_durumu: "GECERLI"
+      gecerlilik_durumu: "GECERLI",
+      dosya: { var_mi: true }
     });
 
     expect(normalized.gecerlilik_durumu).toBe("SURESI_DOLMUS");
+    expect(normalized.takip_durumu).toBe("SURESI_DOLDU");
   });
 
   it("normalizePersonelBelgeKaydi zorunlu alan eksikse hata firlatir", () => {

@@ -111,11 +111,18 @@ export function KayitBelgeKayitlariSection({
       return;
     }
 
+    const iptalNedeni = window.prompt("İptal nedeni girin:");
+    if (!iptalNedeni?.trim()) {
+      setValidationNote("İptal nedeni zorunludur.");
+      return;
+    }
+
     setCancelingId(id);
     setErrorMessage(null);
     setInfoMessage(null);
+    setValidationNote(null);
     try {
-      await cancelPersonelBelgeKaydi(id);
+      await cancelPersonelBelgeKaydi(id, { iptal_nedeni: iptalNedeni.trim() });
       setInfoMessage("Belge kaydı iptal edildi.");
       await loadItems();
     } catch (err) {

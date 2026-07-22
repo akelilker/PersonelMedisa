@@ -3,6 +3,7 @@ import { AppShell, type AppShellOutletContext } from "./AppShell";
 import { MainMenu } from "../components/main-menu/MainMenu";
 import { ProtectedRoute } from "../router/ProtectedRoute";
 import { PersonellerPage } from "../features/personeller/pages/PersonellerPage";
+import { BelgeTakipPage } from "../features/personeller/pages/BelgeTakipPage";
 import { PersonelDetayPage } from "../features/personeller/pages/PersonelDetayPage";
 import { SurecTakipPage } from "../features/surecler/pages/SurecTakipPage";
 import { SurecDetayPage } from "../features/surecler/pages/SurecDetayPage";
@@ -77,6 +78,14 @@ export function AppRoutes() {
           element={
             <ProtectedRoute requireAny={PERSONELLER_LIST_ANY}>
               <PersonellerPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="personeller/belge-takip"
+          element={
+            <ProtectedRoute requireAny={PERSONELLER_LIST_ANY}>
+              <BelgeTakipPage />
             </ProtectedRoute>
           }
         />

@@ -199,6 +199,7 @@ export function PersonellerPage() {
   const canViewPuantaj = hasPermission("puantaj.view");
   const canViewBildirimler = hasPermission("bildirimler.view");
   const canViewRevizyon = hasPermission("revizyon.view");
+  const canViewBelgeTakip = canOpenDetail;
   const navigate = useNavigate();
   const [searchExpanded, setSearchExpanded] = useState(false);
   const [filterExpanded, setFilterExpanded] = useState(false);
@@ -209,7 +210,7 @@ export function PersonellerPage() {
   const page = listQuery.page;
   const departmanFilterOptions = toSelectOptions(refs.departmanOptions);
   const personelTipiFilterOptions = toSelectOptions(refs.personelTipiOptions);
-  const hasModuleLinks = canViewPuantaj || canViewBildirimler || canViewRevizyon;
+  const hasModuleLinks = canViewPuantaj || canViewBildirimler || canViewRevizyon || canViewBelgeTakip;
 
   return (
     <section className="personeller-page" aria-labelledby="personeller-page-heading">
@@ -242,6 +243,15 @@ export function PersonellerPage() {
                   data-testid="personeller-revizyon-merkezi-link"
                 >
                   Revizyon Merkezi
+                </Link>
+              ) : null}
+              {canViewBelgeTakip ? (
+                <Link
+                  className="personeller-toolbar-module-link"
+                  to="/personeller/belge-takip"
+                  data-testid="personeller-belge-takip-link"
+                >
+                  Belge Takip
                 </Link>
               ) : null}
             </div>

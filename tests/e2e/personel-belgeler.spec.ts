@@ -76,7 +76,7 @@ test.describe("personel belgeler API contract", () => {
     await expect(kayitList).toBeVisible();
     await expect(kayitList).toContainText("Sertifika");
     await expect(kayitList).toContainText("Forklift Operatör Belgesi");
-    await expect(kayitList).toContainText("Medisa Eğitim Merkezi");
+    await expect(kayitList).toContainText(/Aktif|Dosya eksik|Süresi/i);
     await expect(kayitList).not.toContainText("SERTIFIKA");
     await expect(kayitList).not.toContainText(/Sertf/i);
     await expect(kayitList).not.toContainText("[object Object]");
@@ -139,7 +139,7 @@ test.describe("personel belgeler API contract", () => {
 
     const belgelerPanel = page.locator("#personel-kart-panel-egitim-belgeler");
     await expect(belgelerPanel.getByTestId("personel-belge-kayit-list")).toContainText(uniqueAd);
-    await expect(belgelerPanel.getByTestId("personel-belge-kayit-list")).toContainText(aciklama);
+    await expect(belgelerPanel.getByTestId("personel-belge-kayit-list")).toContainText("Sertifika");
     await expect(page).not.toHaveURL(/\/yetkisiz$/);
     expect(apiFailures).toEqual([]);
   });

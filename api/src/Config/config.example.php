@@ -11,4 +11,5 @@ return [
     'jwt_secret' => 'CHANGE_ME_JWT_SECRET_MIN_32_CHARS',
     'jwt_ttl_seconds' => 86400,
     'cors_allowed_origins' => '',
+    'personel_belge_storage_root' => '',
 ];

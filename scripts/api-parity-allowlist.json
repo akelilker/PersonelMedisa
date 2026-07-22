@@ -2,16 +2,6 @@
   "version": 1,
   "entries": [
     {
-      "method": "PUT",
-      "path": "/belge-kayitlari/:id",
-      "category": "approved_deferred",
-      "gapId": "D-BEL-01",
-      "reason": "Personel belge kaydi update has client/mock surface without PHP owner; deferred pending belge persistence phase.",
-      "owner": "PersonelBelgelerController",
-      "targetPhase": "S78-D",
-      "introducedOrConfirmedAt": "2026-07-18"
-    },
-    {
       "method": "GET",
       "path": "/isg/makineler",
       "category": "demo_only",

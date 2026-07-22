@@ -53,6 +53,6 @@ describe("016_donem_kapanis_auditleri migration source", () => {
       .filter((name) => /^\d{3}_.*\.sql$/.test(name))
       .sort();
     expect(migrations).toContain("016_donem_kapanis_auditleri.sql");
-    expect(migrations.at(-1)).toBe("037_sgk_resmi_kaynak_manifesti_v1.sql");
+    expect(migrations.at(-1)).toBe("038_personel_belge_yonetimi.sql");
   });
 });

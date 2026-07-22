@@ -59,6 +59,30 @@ export function shouldEmitGlobalAuthForbidden(path: string, method?: string): bo
     return false;
   }
 
+  if (normalizedMethod === "PUT" && /^\/belge-kayitlari\/\d+$/.test(normalizedPath)) {
+    return false;
+  }
+
+  if (normalizedMethod === "GET" && /^\/belge-kayitlari\/\d+$/.test(normalizedPath)) {
+    return false;
+  }
+
+  if (normalizedMethod === "POST" && /^\/belge-kayitlari\/\d+\/dosya-degistir$/.test(normalizedPath)) {
+    return false;
+  }
+
+  if (normalizedMethod === "GET" && /^\/belge-kayitlari\/\d+\/gecmis$/.test(normalizedPath)) {
+    return false;
+  }
+
+  if (normalizedMethod === "GET" && /^\/belge-kayitlari\/\d+\/indir$/.test(normalizedPath)) {
+    return false;
+  }
+
+  if (normalizedMethod === "GET" && normalizedPath === "/belge-takip") {
+    return false;
+  }
+
   if (normalizedMethod === "GET" && /^\/surecler\/\d+$/.test(normalizedPath)) {
     return false;
   }

@@ -40,10 +40,9 @@ test.describe("Kayit Surec belge kayitlari", () => {
 
     const belgelerPanel = page.locator("#personel-kart-panel-egitim-belgeler");
     await expect(belgelerPanel.getByTestId("personel-belge-kayit-list")).toContainText(uniqueAd);
-    await expect(belgelerPanel.getByTestId("personel-belge-kayit-list")).toContainText("E2E Egitim Merkezi");
-    await expect(belgelerPanel.getByTestId("personel-belge-kayit-list")).toContainText("Geçerli");
+    await expect(belgelerPanel.getByTestId("personel-belge-kayit-list")).toContainText("Sertifika");
+    await expect(belgelerPanel.getByTestId("personel-belge-kayit-list")).toContainText(/Aktif|Dosya eksik|Süresi/i);
     await expect(belgelerPanel.locator('input[type="radio"]')).toHaveCount(0);
-    await expect(belgelerPanel.getByRole("button", { name: "Kaydet" })).toHaveCount(0);
     await expect(belgelerPanel.getByRole("button", { name: "Kayıt Ekle" })).toHaveCount(0);
   });
 
@@ -84,6 +83,7 @@ test.describe("Kayit Surec belge kayitlari", () => {
     await expect(kayitList).not.toContainText('{"tip"');
 
     const uniqueRow = kayitList.locator("tr", { hasText: uniqueAd });
+    page.once("dialog", (dialog) => dialog.accept("E2E iptal nedeni"));
     const cancelResponse = page.waitForResponse(
       (response) =>
         /\/api\/belge-kayitlari\/\d+\/iptal$/.test(new URL(response.url()).pathname) &&

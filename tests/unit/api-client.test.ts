@@ -491,6 +491,12 @@ describe("shouldEmitGlobalAuthForbidden", () => {
     expect(shouldEmitGlobalAuthForbidden("/personeller/3/belge-kayitlari", "POST")).toBe(false);
     expect(shouldEmitGlobalAuthForbidden("/api/personeller/2/belge-durumu", "GET")).toBe(false);
     expect(shouldEmitGlobalAuthForbidden("/belge-kayitlari/9/iptal", "POST")).toBe(false);
+    expect(shouldEmitGlobalAuthForbidden("/belge-kayitlari/9", "PUT")).toBe(false);
+    expect(shouldEmitGlobalAuthForbidden("/belge-kayitlari/9", "GET")).toBe(false);
+    expect(shouldEmitGlobalAuthForbidden("/belge-kayitlari/9/dosya-degistir", "POST")).toBe(false);
+    expect(shouldEmitGlobalAuthForbidden("/belge-kayitlari/9/gecmis", "GET")).toBe(false);
+    expect(shouldEmitGlobalAuthForbidden("/belge-kayitlari/9/indir", "GET")).toBe(false);
+    expect(shouldEmitGlobalAuthForbidden("/belge-takip", "GET")).toBe(false);
     expect(shouldEmitGlobalAuthForbidden("/surecler", "GET")).toBe(false);
     expect(shouldEmitGlobalAuthForbidden("/surecler?personel_id=2&sube_id=1", "GET")).toBe(false);
     expect(shouldEmitGlobalAuthForbidden("/api/surecler?personel_id=2", "GET")).toBe(false);
@@ -506,7 +512,6 @@ describe("shouldEmitGlobalAuthForbidden", () => {
   it("keeps global forbidden for sub-resources, puantaj and unknown paths", () => {
     expect(shouldEmitGlobalAuthForbidden("/gunluk-puantaj/2/2026-01-01", "GET")).toBe(true);
     expect(shouldEmitGlobalAuthForbidden("/yonetim/kullanicilar", "GET")).toBe(true);
-    expect(shouldEmitGlobalAuthForbidden("/belge-kayitlari/9", "PUT")).toBe(true);
     expect(shouldEmitGlobalAuthForbidden("/unknown-endpoint", "GET")).toBe(true);
   });
 });

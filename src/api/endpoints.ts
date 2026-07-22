@@ -37,8 +37,12 @@ export const endpoints = {
     listByPersonel: (personelId: number | string) => `/personeller/${personelId}/belge-kayitlari`,
     create: (personelId: number | string) => `/personeller/${personelId}/belge-kayitlari`,
     detail: (id: number | string) => `/belge-kayitlari/${id}`,
-    cancel: (id: number | string) => `/belge-kayitlari/${id}/iptal`
+    cancel: (id: number | string) => `/belge-kayitlari/${id}/iptal`,
+    replaceDosya: (id: number | string) => `/belge-kayitlari/${id}/dosya-degistir`,
+    download: (id: number | string) => `/belge-kayitlari/${id}/indir`,
+    history: (id: number | string) => `/belge-kayitlari/${id}/gecmis`
   },
+  belgeTakip: "/belge-takip",
   surecler: {
     list: "/surecler",
     detail: (id: number | string) => `/surecler/${id}`

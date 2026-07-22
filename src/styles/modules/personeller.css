@@ -1187,3 +1187,53 @@
 .personel-belge-kayit-state.is-expiring {
   color: #fbbf24;
 }
+
+.personel-belge-kayit-state.is-missing-file {
+  color: #fb923c;
+}
+
+.personel-belge-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.personel-belge-actions .universal-btn-aux {
+  font-size: 12px;
+  padding: 4px 8px;
+}
+
+.personel-belge-panel-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.personel-belge-file-meta {
+  font-size: 12px;
+  color: var(--txt-muted);
+}
+
+.belge-takip-page {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-3);
+}
+
+.belge-takip-summary-grid {
+  display: grid;
+  gap: var(--space-2);
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+}
+
+.belge-takip-filter-panel {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.belge-takip-table-wrap {
+  overflow-x: auto;
+}

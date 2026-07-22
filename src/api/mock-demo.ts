@@ -58,7 +58,12 @@ import {
 import { aggregateYillikFazlaCalisma } from "../services/yillik-fazla-calisma-aggregate";
 import {
   computeGecerlilikDurumu,
+  deriveTakipDurumu,
+  maskBelgeNo,
+  PERSONEL_BELGE_ALLOWED_MIME_BY_EXTENSION,
+  PERSONEL_BELGE_BLOCKED_EXTENSIONS,
   PERSONEL_BELGE_KAYIT_TIPI_KEYS,
+  PERSONEL_BELGE_MAX_DECODED_BYTES,
   type PersonelBelgeKayitDurum,
   type PersonelBelgeKayitTipi
 } from "../types/personel-belge-kaydi";
@@ -114,6 +119,17 @@ type DemoZimmet = {
   iade_tarihi?: string;
 };
 
+type DemoPersonelBelgeDosya = {
+  var_mi: boolean;
+  surum_no?: number;
+  orijinal_dosya_adi?: string;
+  mime_type?: string;
+  byte_boyutu?: number;
+  sha256?: string;
+  created_at?: string;
+  content_base64?: string;
+};
+
 type DemoPersonelBelgeKaydi = {
   id: number;
   personel_id: number;
@@ -126,8 +142,23 @@ type DemoPersonelBelgeKaydi = {
   durum: PersonelBelgeKayitDurum;
   ek_ref?: string | null;
   aciklama?: string | null;
+  iptal_nedeni?: string | null;
+  dosya?: DemoPersonelBelgeDosya;
+  yukleyen_ad?: string | null;
   created_at?: string;
   updated_at?: string;
+};
+
+type DemoPersonelBelgeAudit = {
+  id: number;
+  belge_kaydi_id: number;
+  islem_turu: string;
+  yapan_kullanici_ad?: string | null;
+  gerekce?: string | null;
+  dosya_adi?: string | null;
+  dosya_mime?: string | null;
+  dosya_byte?: number | null;
+  created_at: string;
 };
 
 type DemoBildirim = {
@@ -376,6 +407,7 @@ const demoState: {
   surecler: DemoSurec[];
   zimmetler: DemoZimmet[];
   personelBelgeKayitlari: DemoPersonelBelgeKaydi[];
+  personelBelgeAudits: DemoPersonelBelgeAudit[];
   bildirimler: DemoBildirim[];
   gunlukBildirimTamamlamalari: DemoGunlukTamamlama[];
   haftalikBildirimMutabakatlari: HaftalikBildirimMutabakat[];
@@ -420,6 +452,7 @@ const demoState: {
     surec: number;
     zimmet: number;
     personelBelgeKaydi: number;
+    personelBelgeAudit: number;
     bildirim: number;
     gunlukBildirimTamamlama: number;
     haftalikBildirimMutabakat: number;
@@ -539,6 +572,17 @@ const demoState: {
       baslangic_tarihi: "2024-03-01",
       bitis_tarihi: "2027-03-01",
       durum: "AKTIF",
+      dosya: {
+        var_mi: true,
+        surum_no: 1,
+        orijinal_dosya_adi: "forklift-sertifika.pdf",
+        mime_type: "application/pdf",
+        byte_boyutu: 16,
+        sha256: "a".repeat(64),
+        created_at: "2024-03-01T10:00:00.000Z",
+        content_base64: btoa("%PDF-1.4 demo")
+      },
+      yukleyen_ad: "Demo Yönetici",
       created_at: "2024-03-01T10:00:00.000Z"
     },
     {
@@ -551,9 +595,35 @@ const demoState: {
       baslangic_tarihi: "2018-05-10",
       bitis_tarihi: "2026-07-15",
       durum: "AKTIF",
+      dosya: {
+        var_mi: true,
+        surum_no: 1,
+        orijinal_dosya_adi: "ehliyet.pdf",
+        mime_type: "application/pdf",
+        byte_boyutu: 16,
+        sha256: "b".repeat(64),
+        created_at: "2018-05-10T10:00:00.000Z",
+        content_base64: btoa("%PDF-1.4 demo")
+      },
+      yukleyen_ad: "Demo Yönetici",
       created_at: "2018-05-10T10:00:00.000Z"
+    },
+    {
+      id: 703,
+      personel_id: 1,
+      kayit_tipi: "SERTIFIKA",
+      ad: "S34 İptal Sertifika",
+      veren_kurum: "Medisa Eğitim Merkezi",
+      belge_no: "S34-001",
+      baslangic_tarihi: "2023-01-01",
+      bitis_tarihi: "2025-01-01",
+      durum: "IPTAL",
+      aciklama: "Eski kayıt iptal edildi",
+      created_at: "2023-01-01T10:00:00.000Z",
+      updated_at: "2024-06-15T10:00:00.000Z"
     }
   ],
+  personelBelgeAudits: [],
   bildirimler: [
     {
       id: 701,
@@ -831,6 +901,7 @@ const demoState: {
     surec: 600,
     zimmet: 560,
     personelBelgeKaydi: 703,
+    personelBelgeAudit: 1,
     bildirim: 800,
     gunlukBildirimTamamlama: 0,
     haftalikBildirimMutabakat: 0,
@@ -864,6 +935,19 @@ function buildDemoBelgeDurumResponse(personelId: number) {
 
 function serializeDemoPersonelBelgeKaydi(record: DemoPersonelBelgeKaydi) {
   const bitisTarihi = record.bitis_tarihi ?? null;
+  const hasActiveFile = record.dosya?.var_mi === true;
+  const dosya = record.dosya
+    ? {
+        var_mi: record.dosya.var_mi,
+        surum_no: record.dosya.surum_no,
+        orijinal_dosya_adi: record.dosya.orijinal_dosya_adi,
+        mime_type: record.dosya.mime_type,
+        byte_boyutu: record.dosya.byte_boyutu,
+        sha256: record.dosya.sha256,
+        created_at: record.dosya.created_at ?? null
+      }
+    : { var_mi: false };
+
   return {
     id: record.id,
     personel_id: record.personel_id,
@@ -871,15 +955,180 @@ function serializeDemoPersonelBelgeKaydi(record: DemoPersonelBelgeKaydi) {
     ad: record.ad,
     veren_kurum: record.veren_kurum ?? null,
     belge_no: record.belge_no ?? null,
+    belge_no_masked: maskBelgeNo(record.belge_no ?? null),
     baslangic_tarihi: record.baslangic_tarihi ?? null,
     bitis_tarihi: bitisTarihi,
     durum: record.durum,
     gecerlilik_durumu: computeGecerlilikDurumu(bitisTarihi),
+    takip_durumu: deriveTakipDurumu(record.durum, bitisTarihi, hasActiveFile),
     ek_ref: record.ek_ref ?? null,
     aciklama: record.aciklama ?? null,
+    dosya,
+    yukleyen_ad: record.yukleyen_ad ?? null,
     created_at: record.created_at ?? null,
     updated_at: record.updated_at ?? null
   };
+}
+
+function appendDemoBelgeAudit(
+  belgeKaydiId: number,
+  islem: string,
+  payload?: {
+    gerekce?: string | null;
+    dosya_adi?: string | null;
+    dosya_mime?: string | null;
+    dosya_byte?: number | null;
+    yapan?: string | null;
+  }
+) {
+  demoState.personelBelgeAudits.unshift({
+    id: ++demoState.nextIds.personelBelgeAudit,
+    belge_kaydi_id: belgeKaydiId,
+    islem_turu: islem,
+    yapan_kullanici_ad: payload?.yapan ?? "Demo Kullanıcı",
+    gerekce: payload?.gerekce ?? null,
+    dosya_adi: payload?.dosya_adi ?? null,
+    dosya_mime: payload?.dosya_mime ?? null,
+    dosya_byte: payload?.dosya_byte ?? null,
+    created_at: new Date().toISOString()
+  });
+}
+
+function validateDemoBelgeUpload(originalName: unknown, claimedMime: unknown, base64: unknown) {
+  const name = toStringValue(originalName);
+  const mime = toStringValue(claimedMime) ?? "";
+  const content = toStringValue(base64);
+  if (!name || !content) {
+    return demoRevizyonError("VALIDATION_ERROR", "Dosya alanlari zorunludur.");
+  }
+
+  const lower = name.toLowerCase();
+  const parts = lower.split(".");
+  if (parts.length < 2) {
+    return demoRevizyonError("PERSONEL_BELGE_UZANTI_GECERSIZ", "Dosya uzantisi zorunludur.");
+  }
+
+  for (let index = 1; index < parts.length - 1; index += 1) {
+    if (PERSONEL_BELGE_BLOCKED_EXTENSIONS.has(parts[index] ?? "")) {
+      return demoRevizyonError(
+        "PERSONEL_BELGE_UZANTI_ENGELLENDI",
+        "Bu dosya tipi yuklenemez. Izinli: PDF, PNG, JPG, WEBP, DOC, DOCX."
+      );
+    }
+  }
+
+  const extension = parts[parts.length - 1] ?? "";
+  const allowed = PERSONEL_BELGE_ALLOWED_MIME_BY_EXTENSION[extension];
+  if (!allowed || PERSONEL_BELGE_BLOCKED_EXTENSIONS.has(extension)) {
+    return demoRevizyonError(
+      "PERSONEL_BELGE_UZANTI_ENGELLENDI",
+      "Bu dosya tipi yuklenemez. Izinli: PDF, PNG, JPG, WEBP, DOC, DOCX."
+    );
+  }
+
+  const normalizedMime = mime.toLowerCase();
+  if (normalizedMime && !allowed.includes(normalizedMime)) {
+    return demoRevizyonError("PERSONEL_BELGE_MIME_UYUSMUYOR", "Dosya uzantisi ile MIME tipi uyusmuyor.");
+  }
+
+  let decodedLength = 0;
+  try {
+    decodedLength = atob(content).length;
+  } catch {
+    return demoRevizyonError("VALIDATION_ERROR", "Dosya icerigi gecersiz.");
+  }
+
+  if (decodedLength > PERSONEL_BELGE_MAX_DECODED_BYTES) {
+    return demoRevizyonError("VALIDATION_ERROR", "Dosya boyutu sinirini asti.");
+  }
+
+  return {
+    name,
+    mime: normalizedMime || allowed[0],
+    content,
+    byteBoyutu: decodedLength,
+    extension
+  };
+}
+
+function buildDemoBelgeTakipResponse(requestUrl: URL) {
+  const personelId = toNumber(requestUrl.searchParams.get("personel_id"));
+  const departmanId = toNumber(requestUrl.searchParams.get("departman_id"));
+  const subeId = toNumber(requestUrl.searchParams.get("sube_id"));
+  const kayitTipi = toStringValue(requestUrl.searchParams.get("kayit_tipi"));
+  const takipDurumu = toStringValue(requestUrl.searchParams.get("takip_durumu"));
+  const baslangic = toStringValue(requestUrl.searchParams.get("baslangic_tarihi"));
+  const bitis = toStringValue(requestUrl.searchParams.get("bitis_tarihi"));
+  const aktiflik = toStringValue(requestUrl.searchParams.get("personel_aktiflik")) ?? "AKTIF";
+
+  const personelById = new Map(demoState.personeller.map((item) => [item.id, item]));
+  const activeBelgeByPersonel = new Map<number, number>();
+
+  const rows = demoState.personelBelgeKayitlari
+    .filter((item) => item.durum === "AKTIF")
+    .map((item) => {
+      const personel = personelById.get(item.personel_id);
+      if (!personel) {
+        return null;
+      }
+
+      activeBelgeByPersonel.set(item.personel_id, (activeBelgeByPersonel.get(item.personel_id) ?? 0) + 1);
+
+      if (personelId !== null && personel.id !== personelId) {
+        return null;
+      }
+      if (departmanId !== null && personel.departman_id !== departmanId) {
+        return null;
+      }
+      if (subeId !== null && personel.sube_id !== subeId) {
+        return null;
+      }
+      if (aktiflik !== "tum" && personel.aktif_durum !== aktiflik) {
+        return null;
+      }
+      if (kayitTipi && item.kayit_tipi !== kayitTipi) {
+        return null;
+      }
+
+      const serialized = serializeDemoPersonelBelgeKaydi(item);
+      if (takipDurumu && serialized.takip_durumu !== takipDurumu) {
+        return null;
+      }
+      if (baslangic && (!item.bitis_tarihi || item.bitis_tarihi < baslangic)) {
+        return null;
+      }
+      if (bitis && (!item.bitis_tarihi || item.bitis_tarihi > bitis)) {
+        return null;
+      }
+
+      return {
+        belge_kaydi_id: item.id,
+        personel_id: personel.id,
+        personel_ad_soyad: `${personel.ad} ${personel.soyad}`,
+        sube_id: personel.sube_id ?? null,
+        departman_id: personel.departman_id ?? null,
+        kayit_tipi: item.kayit_tipi,
+        ad: item.ad,
+        takip_durumu: serialized.takip_durumu,
+        bitis_tarihi: item.bitis_tarihi ?? null,
+        belge_no_masked: serialized.belge_no_masked,
+        updated_at: item.updated_at ?? item.created_at ?? null
+      };
+    })
+    .filter((item): item is NonNullable<typeof item> => item !== null);
+
+  const ozet = {
+    toplam_aktif: demoState.personelBelgeKayitlari.filter((item) => item.durum === "AKTIF").length,
+    suresi_yaklasan: rows.filter((item) => item.takip_durumu === "SURESI_YAKLASIYOR").length,
+    suresi_dolan: rows.filter((item) => item.takip_durumu === "SURESI_DOLDU").length,
+    dosyasi_eksik: rows.filter((item) => item.takip_durumu === "BELGE_DOSYASI_EKSIK").length,
+    belgesi_hic_bulunmayan: demoState.personeller.filter(
+      (personel) =>
+        personel.aktif_durum === "AKTIF" && !activeBelgeByPersonel.has(personel.id)
+    ).length
+  };
+
+  return ok({ ozet, items: rows }, { page: 1, limit: 100, total: rows.length, total_pages: 1 });
 }
 
 function isPersonelBelgeKayitTipi(value: unknown): value is PersonelBelgeKayitTipi {
@@ -7304,10 +7553,19 @@ export function resolveDemoApiResponse(
   }
 
   if (belgeKayitlariListMatch && method === "POST") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(actor, "surecler.create");
+    if (permissionError) {
+      return permissionError;
+    }
+
     const personelId = Number.parseInt(belgeKayitlariListMatch[1] ?? "0", 10);
-    const exists = demoState.personeller.some((item) => item.id === personelId);
-    if (!exists) {
+    const personel = demoState.personeller.find((item) => item.id === personelId);
+    if (!personel) {
       return null;
+    }
+    if (personel.aktif_durum === "PASIF") {
+      return demoRevizyonError("VALIDATION_ERROR", "Pasif personele belge kaydi eklenemez.");
     }
 
     const kayitTipi = body.kayit_tipi;
@@ -7329,15 +7587,65 @@ export function resolveDemoApiResponse(
       durum: "AKTIF",
       ek_ref: toStringValue(body.ek_ref) ?? null,
       aciklama: toStringValue(body.aciklama) ?? null,
+      dosya: { var_mi: false },
       created_at: now,
       updated_at: now
     };
+
+    const uploadFieldsPresent =
+      toStringValue(body.dosya_adi) ||
+      toStringValue(body.dosya_mime) ||
+      toStringValue(body.dosya_icerik_base64);
+    if (uploadFieldsPresent) {
+      const upload = validateDemoBelgeUpload(body.dosya_adi, body.dosya_mime, body.dosya_icerik_base64);
+      if ("errors" in upload) {
+        return upload;
+      }
+      next.dosya = {
+        var_mi: true,
+        surum_no: 1,
+        orijinal_dosya_adi: upload.name,
+        mime_type: upload.mime,
+        byte_boyutu: upload.byteBoyutu,
+        sha256: "c".repeat(64),
+        created_at: now,
+        content_base64: upload.content
+      };
+      next.yukleyen_ad = "Demo Kullanıcı";
+    }
+
     demoState.personelBelgeKayitlari.unshift(next);
+    appendDemoBelgeAudit(next.id, "CREATED", {
+      yapan: "Demo Kullanıcı"
+    });
+    if (next.dosya?.var_mi) {
+      appendDemoBelgeAudit(next.id, "FILE_REPLACED", {
+        dosya_adi: next.dosya.orijinal_dosya_adi,
+        dosya_mime: next.dosya.mime_type,
+        dosya_byte: next.dosya.byte_boyutu,
+        yapan: "Demo Kullanıcı"
+      });
+    }
     return ok(serializeDemoPersonelBelgeKaydi(next));
   }
 
   const belgeKayitDetailMatch = pathname.match(/^\/belge-kayitlari\/(\d+)$/);
+  if (belgeKayitDetailMatch && method === "GET") {
+    const id = Number.parseInt(belgeKayitDetailMatch[1], 10);
+    const kayit = demoState.personelBelgeKayitlari.find((item) => item.id === id);
+    if (!kayit) {
+      return null;
+    }
+    return ok(serializeDemoPersonelBelgeKaydi(kayit));
+  }
+
   if (belgeKayitDetailMatch && method === "PUT") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(actor, "surecler.update");
+    if (permissionError) {
+      return permissionError;
+    }
+
     const id = Number.parseInt(belgeKayitDetailMatch[1], 10);
     const kayit = demoState.personelBelgeKayitlari.find((item) => item.id === id);
     if (!kayit) {
@@ -7374,20 +7682,133 @@ export function resolveDemoApiResponse(
       kayit.aciklama = toStringValue(body.aciklama) ?? null;
     }
     kayit.updated_at = new Date().toISOString();
+    appendDemoBelgeAudit(kayit.id, "METADATA_UPDATED", {
+      yapan: "Demo Kullanıcı"
+    });
     return ok(serializeDemoPersonelBelgeKaydi(kayit));
+  }
+
+  const belgeKayitReplaceMatch = pathname.match(/^\/belge-kayitlari\/(\d+)\/dosya-degistir$/);
+  if (belgeKayitReplaceMatch && method === "POST") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(actor, "surecler.update");
+    if (permissionError) {
+      return permissionError;
+    }
+
+    const id = Number.parseInt(belgeKayitReplaceMatch[1], 10);
+    const kayit = demoState.personelBelgeKayitlari.find((item) => item.id === id);
+    if (!kayit) {
+      return null;
+    }
+    if (kayit.durum === "IPTAL") {
+      return demoRevizyonError("INVALID_STATE", "Iptal edilmis kayit guncellenemez.");
+    }
+
+    const upload = validateDemoBelgeUpload(body.dosya_adi, body.dosya_mime, body.dosya_icerik_base64);
+    if (upload && "errors" in upload) {
+      return upload;
+    }
+    if (!upload || typeof upload !== "object" || !("content" in upload)) {
+      return demoRevizyonError("VALIDATION_ERROR", "Dosya alanlari zorunludur.");
+    }
+
+    const now = new Date().toISOString();
+    const nextSurum = (kayit.dosya?.surum_no ?? 0) + 1;
+    kayit.dosya = {
+      var_mi: true,
+      surum_no: nextSurum,
+      orijinal_dosya_adi: upload.name,
+      mime_type: upload.mime,
+      byte_boyutu: upload.byteBoyutu,
+      sha256: "d".repeat(64),
+      created_at: now,
+      content_base64: upload.content
+    };
+    kayit.yukleyen_ad = "Demo Kullanıcı";
+    kayit.updated_at = now;
+    appendDemoBelgeAudit(kayit.id, "FILE_REPLACED", {
+      dosya_adi: upload.name,
+      dosya_mime: upload.mime,
+      dosya_byte: upload.byteBoyutu,
+      yapan: "Demo Kullanıcı"
+    });
+    return ok(serializeDemoPersonelBelgeKaydi(kayit));
+  }
+
+  const belgeKayitHistoryMatch = pathname.match(/^\/belge-kayitlari\/(\d+)\/gecmis$/);
+  if (belgeKayitHistoryMatch && method === "GET") {
+    const id = Number.parseInt(belgeKayitHistoryMatch[1], 10);
+    const kayit = demoState.personelBelgeKayitlari.find((item) => item.id === id);
+    if (!kayit) {
+      return null;
+    }
+
+    const items = demoState.personelBelgeAudits
+      .filter((item) => item.belge_kaydi_id === id)
+      .map((item) => ({
+        id: item.id,
+        islem_turu: item.islem_turu,
+        yapan_kullanici_ad: item.yapan_kullanici_ad ?? null,
+        gerekce: item.gerekce ?? null,
+        dosya_adi: item.dosya_adi ?? null,
+        dosya_mime: item.dosya_mime ?? null,
+        dosya_byte: item.dosya_byte ?? null,
+        created_at: item.created_at
+      }));
+
+    return ok({ items });
+  }
+
+  const belgeKayitDownloadMatch = pathname.match(/^\/belge-kayitlari\/(\d+)\/indir$/);
+  if (belgeKayitDownloadMatch && method === "GET") {
+    const id = Number.parseInt(belgeKayitDownloadMatch[1], 10);
+    const kayit = demoState.personelBelgeKayitlari.find((item) => item.id === id);
+    if (!kayit) {
+      return null;
+    }
+
+    return {
+      data: kayit.dosya?.content_base64 ?? btoa("%PDF-1.4 demo"),
+      meta: {
+        filename: kayit.dosya?.orijinal_dosya_adi ?? `belge-${id}.pdf`,
+        mime_type: kayit.dosya?.mime_type ?? "application/pdf"
+      },
+      errors: []
+    };
   }
 
   const belgeKayitCancelMatch = pathname.match(/^\/belge-kayitlari\/(\d+)\/iptal$/);
   if (belgeKayitCancelMatch && method === "POST") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(actor, "surecler.cancel");
+    if (permissionError) {
+      return permissionError;
+    }
+
     const id = Number.parseInt(belgeKayitCancelMatch[1], 10);
     const kayit = demoState.personelBelgeKayitlari.find((item) => item.id === id);
     if (!kayit) {
       return null;
     }
 
+    const iptalNedeni = toStringValue(body.iptal_nedeni);
+    if (!iptalNedeni) {
+      return demoRevizyonError("VALIDATION_ERROR", "iptal_nedeni zorunludur.");
+    }
+
     kayit.durum = "IPTAL";
+    kayit.iptal_nedeni = iptalNedeni;
     kayit.updated_at = new Date().toISOString();
+    appendDemoBelgeAudit(kayit.id, "CANCELLED", {
+      gerekce: iptalNedeni,
+      yapan: "Demo Kullanıcı"
+    });
     return ok(serializeDemoPersonelBelgeKaydi(kayit));
+  }
+
+  if (pathname === "/belge-takip" && method === "GET") {
+    return buildDemoBelgeTakipResponse(requestUrl);
   }
 
   const belgeDurumMatch = pathname.match(/^\/personeller\/(\d+)\/belge-durumu$/);

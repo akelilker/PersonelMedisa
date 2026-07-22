@@ -178,6 +178,24 @@ class Router
         if ($method === 'POST' && preg_match('#^/belge-kayitlari/(\d+)/iptal$#', $path, $matches)) {
             PersonelBelgelerController::cancelKaydi($this->request, $matches[1]);
         }
+        if ($method === 'GET' && preg_match('#^/belge-kayitlari/(\d+)$#', $path, $matches)) {
+            PersonelBelgelerController::getKaydi($this->request, $matches[1]);
+        }
+        if ($method === 'PUT' && preg_match('#^/belge-kayitlari/(\d+)$#', $path, $matches)) {
+            PersonelBelgelerController::updateKaydi($this->request, $matches[1]);
+        }
+        if ($method === 'POST' && preg_match('#^/belge-kayitlari/(\d+)/dosya-degistir$#', $path, $matches)) {
+            PersonelBelgelerController::replaceDosya($this->request, $matches[1]);
+        }
+        if ($method === 'GET' && preg_match('#^/belge-kayitlari/(\d+)/indir$#', $path, $matches)) {
+            PersonelBelgelerController::indir($this->request, $matches[1]);
+        }
+        if ($method === 'GET' && preg_match('#^/belge-kayitlari/(\d+)/gecmis$#', $path, $matches)) {
+            PersonelBelgelerController::gecmis($this->request, $matches[1]);
+        }
+        if ($path === '/belge-takip' && $method === 'GET') {
+            PersonelBelgelerController::belgeTakip($this->request);
+        }
 
         if ($path === '/referans/departmanlar' && $method === 'GET') {
             ReferansController::departmanlar($this->request);

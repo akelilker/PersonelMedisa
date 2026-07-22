@@ -8,7 +8,12 @@ import {
 } from "../../../src/lib/yonetim/sube-delete";
 import {
   computeGecerlilikDurumu,
+  deriveTakipDurumu,
+  maskBelgeNo,
+  PERSONEL_BELGE_ALLOWED_MIME_BY_EXTENSION,
+  PERSONEL_BELGE_BLOCKED_EXTENSIONS,
   PERSONEL_BELGE_KAYIT_TIPI_KEYS,
+  PERSONEL_BELGE_MAX_DECODED_BYTES,
   type PersonelBelgeKayitDurum,
   type PersonelBelgeKayitTipi
 } from "../../../src/types/personel-belge-kaydi";
@@ -2082,6 +2087,18 @@ export async function mockApi(page: Page, role: MockUserRole, options: MockApiOp
     durum: PersonelBelgeKayitDurum;
     ek_ref?: string | null;
     aciklama?: string | null;
+    iptal_nedeni?: string | null;
+    dosya?: {
+      var_mi: boolean;
+      surum_no?: number;
+      orijinal_dosya_adi?: string;
+      mime_type?: string;
+      byte_boyutu?: number;
+      sha256?: string;
+      created_at?: string;
+      content_base64?: string;
+    };
+    yukleyen_ad?: string | null;
     created_at?: string;
     updated_at?: string;
   }> = [
@@ -2097,6 +2114,15 @@ export async function mockApi(page: Page, role: MockUserRole, options: MockApiOp
         ? isoDateDaysFrom(options.belgeReferenceDate, 31)
         : "2027-03-01",
       durum: "AKTIF",
+      dosya: {
+        var_mi: true,
+        surum_no: 1,
+        orijinal_dosya_adi: "forklift-sertifika.pdf",
+        mime_type: "application/pdf",
+        byte_boyutu: 16,
+        content_base64: Buffer.from("%PDF-1.4 demo").toString("base64")
+      },
+      yukleyen_ad: "Demo Yönetici",
       created_at: "2024-03-01T10:00:00.000Z"
     },
     {
@@ -2111,6 +2137,15 @@ export async function mockApi(page: Page, role: MockUserRole, options: MockApiOp
         ? isoDateDaysFrom(options.belgeReferenceDate, 30)
         : "2026-07-15",
       durum: "AKTIF",
+      dosya: {
+        var_mi: true,
+        surum_no: 1,
+        orijinal_dosya_adi: "ehliyet.pdf",
+        mime_type: "application/pdf",
+        byte_boyutu: 16,
+        content_base64: Buffer.from("%PDF-1.4 demo").toString("base64")
+      },
+      yukleyen_ad: "Demo Yönetici",
       created_at: "2018-05-10T10:00:00.000Z"
     },
     ...(options.belgeReferenceDate
@@ -2121,7 +2156,8 @@ export async function mockApi(page: Page, role: MockUserRole, options: MockApiOp
             kayit_tipi: "SERTIFIKA" as const,
             ad: "Sınırdan Bir Gün Önce Belgesi",
             bitis_tarihi: isoDateDaysFrom(options.belgeReferenceDate, 29),
-            durum: "AKTIF" as const
+            durum: "AKTIF" as const,
+            dosya: { var_mi: true, surum_no: 1, orijinal_dosya_adi: "yakin.pdf", mime_type: "application/pdf", byte_boyutu: 8 }
           },
           {
             id: 9902,
@@ -2129,7 +2165,8 @@ export async function mockApi(page: Page, role: MockUserRole, options: MockApiOp
             kayit_tipi: "SERTIFIKA" as const,
             ad: "Süresi Dolmuş Belge",
             bitis_tarihi: isoDateDaysFrom(options.belgeReferenceDate, -1),
-            durum: "AKTIF" as const
+            durum: "AKTIF" as const,
+            dosya: { var_mi: true, surum_no: 1, orijinal_dosya_adi: "eski.pdf", mime_type: "application/pdf", byte_boyutu: 8 }
           }
         ]
       : []),
@@ -3666,6 +3703,19 @@ let personelBelgeKaydiIdCounter = 903;
 
   function serializePersonelBelgeKaydi(record: (typeof personelBelgeKayitlari)[number]) {
     const bitisTarihi = record.bitis_tarihi ?? null;
+    const hasActiveFile = record.dosya?.var_mi === true;
+    const dosya = record.dosya
+      ? {
+          var_mi: record.dosya.var_mi,
+          surum_no: record.dosya.surum_no,
+          orijinal_dosya_adi: record.dosya.orijinal_dosya_adi,
+          mime_type: record.dosya.mime_type,
+          byte_boyutu: record.dosya.byte_boyutu,
+          sha256: record.dosya.sha256,
+          created_at: record.dosya.created_at ?? null
+        }
+      : { var_mi: false };
+
     return {
       id: record.id,
       personel_id: record.personel_id,
@@ -3673,15 +3723,119 @@ let personelBelgeKaydiIdCounter = 903;
       ad: record.ad,
       veren_kurum: record.veren_kurum ?? null,
       belge_no: record.belge_no ?? null,
+      belge_no_masked: maskBelgeNo(record.belge_no ?? null),
       baslangic_tarihi: record.baslangic_tarihi ?? null,
       bitis_tarihi: bitisTarihi,
       durum: record.durum,
       gecerlilik_durumu: computeGecerlilikDurumu(bitisTarihi, options.belgeReferenceDate),
+      takip_durumu: deriveTakipDurumu(
+        record.durum,
+        bitisTarihi,
+        hasActiveFile,
+        options.belgeReferenceDate
+      ),
       ek_ref: record.ek_ref ?? null,
       aciklama: record.aciklama ?? null,
+      dosya,
+      yukleyen_ad: record.yukleyen_ad ?? null,
       created_at: record.created_at ?? null,
       updated_at: record.updated_at ?? null
     };
+  }
+
+  const personelBelgeAudits: Array<{
+    id: number;
+    belge_kaydi_id: number;
+    islem_turu: string;
+    yapan_kullanici_ad?: string | null;
+    gerekce?: string | null;
+    dosya_adi?: string | null;
+    dosya_mime?: string | null;
+    dosya_byte?: number | null;
+    created_at: string;
+  }> = [];
+
+  let personelBelgeAuditIdCounter = 1;
+
+  function appendPersonelBelgeAudit(
+    belgeKaydiId: number,
+    islem: string,
+    payload?: {
+      gerekce?: string | null;
+      dosya_adi?: string | null;
+      dosya_mime?: string | null;
+      dosya_byte?: number | null;
+    }
+  ) {
+    personelBelgeAudits.unshift({
+      id: ++personelBelgeAuditIdCounter,
+      belge_kaydi_id: belgeKaydiId,
+      islem_turu: islem,
+      yapan_kullanici_ad: "Demo Kullanıcı",
+      gerekce: payload?.gerekce ?? null,
+      dosya_adi: payload?.dosya_adi ?? null,
+      dosya_mime: payload?.dosya_mime ?? null,
+      dosya_byte: payload?.dosya_byte ?? null,
+      created_at: new Date().toISOString()
+    });
+  }
+
+  function validateMockBelgeUpload(originalName: unknown, claimedMime: unknown, base64: unknown) {
+    const name = typeof originalName === "string" ? originalName.trim() : "";
+    const mime = typeof claimedMime === "string" ? claimedMime.trim() : "";
+    const content = typeof base64 === "string" ? base64.trim() : "";
+    if (!name || !content) {
+      return errorBody("VALIDATION_ERROR", "Dosya alanlari zorunludur.");
+    }
+
+    const lower = name.toLowerCase();
+    const parts = lower.split(".");
+    if (parts.length < 2) {
+      return errorBody("PERSONEL_BELGE_UZANTI_GECERSIZ", "Dosya uzantisi zorunludur.");
+    }
+
+    for (let index = 1; index < parts.length - 1; index += 1) {
+      if (PERSONEL_BELGE_BLOCKED_EXTENSIONS.has(parts[index] ?? "")) {
+        return errorBody(
+          "PERSONEL_BELGE_UZANTI_ENGELLENDI",
+          "Bu dosya tipi yuklenemez. Izinli: PDF, PNG, JPG, WEBP, DOC, DOCX."
+        );
+      }
+    }
+
+    const extension = parts[parts.length - 1] ?? "";
+    const allowed = PERSONEL_BELGE_ALLOWED_MIME_BY_EXTENSION[extension];
+    if (!allowed || PERSONEL_BELGE_BLOCKED_EXTENSIONS.has(extension)) {
+      return errorBody(
+        "PERSONEL_BELGE_UZANTI_ENGELLENDI",
+        "Bu dosya tipi yuklenemez. Izinli: PDF, PNG, JPG, WEBP, DOC, DOCX."
+      );
+    }
+
+    const normalizedMime = mime.toLowerCase();
+    if (normalizedMime && !allowed.includes(normalizedMime)) {
+      return errorBody("PERSONEL_BELGE_MIME_UYUSMUYOR", "Dosya uzantisi ile MIME tipi uyusmuyor.");
+    }
+
+    const decodedLength = Buffer.from(content, "base64").length;
+    if (decodedLength > PERSONEL_BELGE_MAX_DECODED_BYTES) {
+      return errorBody("VALIDATION_ERROR", "Dosya boyutu sinirini asti.");
+    }
+
+    return {
+      name,
+      mime: normalizedMime || allowed[0],
+      content,
+      byteBoyutu: decodedLength,
+      extension
+    };
+  }
+
+  function assertBelgeWritePermission(permission: AppPermission) {
+    if (!hasRolePermission(role, permission)) {
+      return errorBody("FORBIDDEN", "Bu islem icin yetkiniz yok.");
+    }
+    return null;
   }
 
   function assertBelgePersonelScope(request: { headers(): { [key: string]: string } }, url: URL, personelId: number) {
@@ -5553,6 +5707,12 @@ let personelBelgeKaydiIdCounter = 903;
     }
 
     if (belgeKayitlariListMatch && method === "POST") {
+      const writeError = assertBelgeWritePermission("surecler.create");
+      if (writeError) {
+        await fulfillJson(route, 403, writeError);
+        return;
+      }
+
       const pid = Number.parseInt(belgeKayitlariListMatch[1] ?? "0", 10);
       const scopeResult = assertBelgePersonelScope(request, url, pid);
       if (!scopeResult.personel) {
@@ -5577,6 +5737,9 @@ let personelBelgeKaydiIdCounter = 903;
         bitis_tarihi?: string | null;
         ek_ref?: string | null;
         aciklama?: string | null;
+        dosya_adi?: string | null;
+        dosya_mime?: string | null;
+        dosya_icerik_base64?: string | null;
       };
 
       const kayitTipi = payload.kayit_tipi?.trim();
@@ -5607,10 +5770,37 @@ let personelBelgeKaydiIdCounter = 903;
         durum: "AKTIF" as const,
         ek_ref: payload.ek_ref?.trim() || null,
         aciklama: payload.aciklama?.trim() || null,
+        dosya: { var_mi: false },
         created_at: now,
         updated_at: now
       };
+
+      if (payload.dosya_adi || payload.dosya_icerik_base64) {
+        const upload = validateMockBelgeUpload(payload.dosya_adi, payload.dosya_mime, payload.dosya_icerik_base64);
+        if (typeof upload === "string") {
+          await fulfillJson(route, 422, upload);
+          return;
+        }
+        created.dosya = {
+          var_mi: true,
+          surum_no: 1,
+          orijinal_dosya_adi: upload.name,
+          mime_type: upload.mime,
+          byte_boyutu: upload.byteBoyutu,
+          content_base64: upload.content
+        };
+        created.yukleyen_ad = "Demo Kullanıcı";
+      }
+
       personelBelgeKayitlari.unshift(created);
+      appendPersonelBelgeAudit(created.id, "CREATED");
+      if (created.dosya?.var_mi) {
+        appendPersonelBelgeAudit(created.id, "FILE_REPLACED", {
+          dosya_adi: created.dosya.orijinal_dosya_adi,
+          dosya_mime: created.dosya.mime_type,
+          dosya_byte: created.dosya.byte_boyutu
+        });
+      }
       surecler.unshift({
         id: created.id,
         personel_id: pid,
@@ -5635,8 +5825,165 @@ let personelBelgeKaydiIdCounter = 903;
       return;
     }
 
+    const belgeKayitDetailMatch = path.match(/^\/api\/belge-kayitlari\/(\d+)$/);
+    if (belgeKayitDetailMatch && method === "GET") {
+      const id = Number.parseInt(belgeKayitDetailMatch[1] ?? "0", 10);
+      const kayit = personelBelgeKayitlari.find((item) => item.id === id);
+      if (!kayit) {
+        await fulfillJson(route, 404, errorBody("NOT_FOUND", "Belge kaydi bulunamadi."));
+        return;
+      }
+      await fulfillJson(route, 200, okBody(serializePersonelBelgeKaydi(kayit)));
+      return;
+    }
+
+    if (belgeKayitDetailMatch && method === "PUT") {
+      const writeError = assertBelgeWritePermission("surecler.update");
+      if (writeError) {
+        await fulfillJson(route, 403, writeError);
+        return;
+      }
+
+      const id = Number.parseInt(belgeKayitDetailMatch[1] ?? "0", 10);
+      const kayit = personelBelgeKayitlari.find((item) => item.id === id);
+      if (!kayit) {
+        await fulfillJson(route, 404, errorBody("NOT_FOUND", "Belge kaydi bulunamadi."));
+        return;
+      }
+      if (kayit.durum === "IPTAL") {
+        await fulfillJson(route, 422, errorBody("INVALID_STATE", "Iptal edilmis kayit guncellenemez."));
+        return;
+      }
+
+      const payload = (request.postDataJSON() ?? {}) as Record<string, unknown>;
+      const kayitTipi = typeof payload.kayit_tipi === "string" ? payload.kayit_tipi.trim() : "";
+      if (kayitTipi && (PERSONEL_BELGE_KAYIT_TIPI_KEYS as readonly string[]).includes(kayitTipi)) {
+        kayit.kayit_tipi = kayitTipi as PersonelBelgeKayitTipi;
+      }
+      if (typeof payload.ad === "string" && payload.ad.trim()) {
+        kayit.ad = payload.ad.trim();
+      }
+      if ("veren_kurum" in payload) {
+        kayit.veren_kurum = typeof payload.veren_kurum === "string" ? payload.veren_kurum.trim() || null : null;
+      }
+      if ("belge_no" in payload) {
+        kayit.belge_no = typeof payload.belge_no === "string" ? payload.belge_no.trim() || null : null;
+      }
+      if ("baslangic_tarihi" in payload) {
+        kayit.baslangic_tarihi = typeof payload.baslangic_tarihi === "string" ? payload.baslangic_tarihi.trim() || null : null;
+      }
+      if ("bitis_tarihi" in payload) {
+        kayit.bitis_tarihi = typeof payload.bitis_tarihi === "string" ? payload.bitis_tarihi.trim() || null : null;
+      }
+      if ("ek_ref" in payload) {
+        kayit.ek_ref = typeof payload.ek_ref === "string" ? payload.ek_ref.trim() || null : null;
+      }
+      if ("aciklama" in payload) {
+        kayit.aciklama = typeof payload.aciklama === "string" ? payload.aciklama.trim() || null : null;
+      }
+      kayit.updated_at = new Date().toISOString();
+      appendPersonelBelgeAudit(kayit.id, "METADATA_UPDATED");
+      await fulfillJson(route, 200, okBody(serializePersonelBelgeKaydi(kayit)));
+      return;
+    }
+
+    const belgeKayitReplaceMatch = path.match(/^\/api\/belge-kayitlari\/(\d+)\/dosya-degistir$/);
+    if (belgeKayitReplaceMatch && method === "POST") {
+      const writeError = assertBelgeWritePermission("surecler.update");
+      if (writeError) {
+        await fulfillJson(route, 403, writeError);
+        return;
+      }
+
+      const id = Number.parseInt(belgeKayitReplaceMatch[1] ?? "0", 10);
+      const kayit = personelBelgeKayitlari.find((item) => item.id === id);
+      if (!kayit) {
+        await fulfillJson(route, 404, errorBody("NOT_FOUND", "Belge kaydi bulunamadi."));
+        return;
+      }
+
+      const payload = (request.postDataJSON() ?? {}) as Record<string, unknown>;
+      const upload = validateMockBelgeUpload(payload.dosya_adi, payload.dosya_mime, payload.dosya_icerik_base64);
+      if (typeof upload === "string") {
+        await fulfillJson(route, 422, upload);
+        return;
+      }
+
+      const now = new Date().toISOString();
+      kayit.dosya = {
+        var_mi: true,
+        surum_no: (kayit.dosya?.surum_no ?? 0) + 1,
+        orijinal_dosya_adi: upload.name,
+        mime_type: upload.mime,
+        byte_boyutu: upload.byteBoyutu,
+        content_base64: upload.content
+      };
+      kayit.yukleyen_ad = "Demo Kullanıcı";
+      kayit.updated_at = now;
+      appendPersonelBelgeAudit(kayit.id, "FILE_REPLACED", {
+        dosya_adi: upload.name,
+        dosya_mime: upload.mime,
+        dosya_byte: upload.byteBoyutu
+      });
+      await fulfillJson(route, 200, okBody(serializePersonelBelgeKaydi(kayit)));
+      return;
+    }
+
+    const belgeKayitHistoryMatch = path.match(/^\/api\/belge-kayitlari\/(\d+)\/gecmis$/);
+    if (belgeKayitHistoryMatch && method === "GET") {
+      const id = Number.parseInt(belgeKayitHistoryMatch[1] ?? "0", 10);
+      const kayit = personelBelgeKayitlari.find((item) => item.id === id);
+      if (!kayit) {
+        await fulfillJson(route, 404, errorBody("NOT_FOUND", "Belge kaydi bulunamadi."));
+        return;
+      }
+
+      const items = personelBelgeAudits
+        .filter((item) => item.belge_kaydi_id === id)
+        .map((item) => ({
+          id: item.id,
+          islem_turu: item.islem_turu,
+          yapan_kullanici_ad: item.yapan_kullanici_ad ?? null,
+          gerekce: item.gerekce ?? null,
+          dosya_adi: item.dosya_adi ?? null,
+          dosya_mime: item.dosya_mime ?? null,
+          dosya_byte: item.dosya_byte ?? null,
+          created_at: item.created_at
+        }));
+      await fulfillJson(route, 200, okBody({ items }));
+      return;
+    }
+
+    const belgeKayitDownloadMatch = path.match(/^\/api\/belge-kayitlari\/(\d+)\/indir$/);
+    if (belgeKayitDownloadMatch && method === "GET") {
+      const id = Number.parseInt(belgeKayitDownloadMatch[1] ?? "0", 10);
+      const kayit = personelBelgeKayitlari.find((item) => item.id === id);
+      if (!kayit) {
+        await fulfillJson(route, 404, errorBody("NOT_FOUND", "Belge kaydi bulunamadi."));
+        return;
+      }
+
+      const content = kayit.dosya?.content_base64 ?? Buffer.from("%PDF-1.4 demo").toString("base64");
+      const bytes = Buffer.from(content, "base64");
+      await route.fulfill({
+        status: 200,
+        headers: {
+          "Content-Type": kayit.dosya?.mime_type ?? "application/pdf",
+          "Content-Disposition": `attachment; filename="${kayit.dosya?.orijinal_dosya_adi ?? `belge-${id}.pdf`}"`
+        },
+        body: bytes
+      });
+      return;
+    }
+
     const belgeKayitCancelMatch = path.match(/^\/api\/belge-kayitlari\/(\d+)\/iptal$/);
     if (belgeKayitCancelMatch && method === "POST") {
+      const writeError = assertBelgeWritePermission("surecler.cancel");
+      if (writeError) {
+        await fulfillJson(route, 403, writeError);
+        return;
+      }
+
       const id = Number.parseInt(belgeKayitCancelMatch[1] ?? "0", 10);
       const kayit = personelBelgeKayitlari.find((item) => item.id === id);
       if (!kayit) {
@@ -5648,9 +5995,89 @@ let personelBelgeKaydiIdCounter = 903;
         await fulfillJson(route, scopeResult.status, scopeResult.body);
         return;
       }
+
+      const payload = (request.postDataJSON() ?? {}) as { iptal_nedeni?: string };
+      const iptalNedeni = payload.iptal_nedeni?.trim();
+      if (!iptalNedeni) {
+        await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "iptal_nedeni zorunludur."));
+        return;
+      }
+
       kayit.durum = "IPTAL";
+      kayit.iptal_nedeni = iptalNedeni;
       kayit.updated_at = new Date().toISOString();
+      appendPersonelBelgeAudit(kayit.id, "CANCELLED", { gerekce: iptalNedeni });
       await fulfillJson(route, 200, okBody(serializePersonelBelgeKaydi(kayit)));
+      return;
+    }
+
+    if (path === "/api/belge-takip" && method === "GET") {
+      const personelId = Number.parseInt(url.searchParams.get("personel_id") ?? "", 10);
+      const departmanId = Number.parseInt(url.searchParams.get("departman_id") ?? "", 10);
+      const kayitTipi = url.searchParams.get("kayit_tipi");
+      const takipDurumu = url.searchParams.get("takip_durumu");
+      const aktiflik = url.searchParams.get("personel_aktiflik") ?? "AKTIF";
+      const activeBelgeByPersonel = new Map<number, number>();
+
+      const rows = personelBelgeKayitlari
+        .filter((item) => item.durum === "AKTIF")
+        .map((item) => {
+          const personel = personeller.find((row) => row.id === item.personel_id);
+          if (!personel) {
+            return null;
+          }
+          activeBelgeByPersonel.set(item.personel_id, (activeBelgeByPersonel.get(item.personel_id) ?? 0) + 1);
+          if (Number.isFinite(personelId) && personel.id !== personelId) {
+            return null;
+          }
+          if (Number.isFinite(departmanId) && personel.departman_id !== departmanId) {
+            return null;
+          }
+          if (aktiflik !== "tum" && personel.aktif_durum !== aktiflik) {
+            return null;
+          }
+          if (kayitTipi && item.kayit_tipi !== kayitTipi) {
+            return null;
+          }
+          const serialized = serializePersonelBelgeKaydi(item);
+          if (takipDurumu && serialized.takip_durumu !== takipDurumu) {
+            return null;
+          }
+          return {
+            belge_kaydi_id: item.id,
+            personel_id: personel.id,
+            personel_ad_soyad: `${personel.ad} ${personel.soyad}`,
+            sube_id: personel.sube_id ?? null,
+            departman_id: personel.departman_id ?? null,
+            kayit_tipi: item.kayit_tipi,
+            ad: item.ad,
+            takip_durumu: serialized.takip_durumu,
+            bitis_tarihi: item.bitis_tarihi ?? null,
+            belge_no_masked: serialized.belge_no_masked,
+            updated_at: item.updated_at ?? item.created_at ?? null
+          };
+        })
+        .filter((item): item is NonNullable<typeof item> => item !== null);
+
+      const ozet = {
+        toplam_aktif: personelBelgeKayitlari.filter((item) => item.durum === "AKTIF").length,
+        suresi_yaklasan: rows.filter((item) => item.takip_durumu === "SURESI_YAKLASIYOR").length,
+        suresi_dolan: rows.filter((item) => item.takip_durumu === "SURESI_DOLDU").length,
+        dosyasi_eksik: rows.filter((item) => item.takip_durumu === "BELGE_DOSYASI_EKSIK").length,
+        belgesi_hic_bulunmayan: personeller.filter(
+          (personel) => personel.aktif_durum === "AKTIF" && !activeBelgeByPersonel.has(personel.id)
+        ).length
+      };
+
+      await fulfillJson(
+        route,
+        200,
+        JSON.stringify({
+          data: { ozet, items: rows },
+          meta: { page: 1, limit: 100, total: rows.length, total_pages: 1 },
+          errors: []
+        })
+      );
       return;
     }
 

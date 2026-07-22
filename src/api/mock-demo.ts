@@ -11,6 +11,11 @@ import type { HaftalikBildirimMutabakat } from "../types/haftalik-bildirim-mutab
 import type { AylikBildirimOnay } from "../types/aylik-bildirim-onay";
 import type { GenelYoneticiBildirimOnayi } from "../types/genel-yonetici-bildirim-onayi";
 import { hasRolePermission, type AppPermission } from "../lib/authorization/role-permissions";
+import {
+  buildSgkKatalogBlockerRaporuMock,
+  buildSgkKatalogImportDryRunMock,
+  buildSgkKatalogTamlikMock
+} from "./sgk-katalog-hazirlik.mock";
 import { isMondayIsoDate, resolveHaftalikMutabakatApproval } from "../lib/bildirim/haftalik-mutabakat";
 import {
   listWeeksIntersectingMonth,
@@ -8480,6 +8485,130 @@ export function resolveDemoApiResponse(
     const ay = toNumber(requestUrl.searchParams.get("ay")) ?? 3;
     const subeId = toNumber(requestUrl.searchParams.get("sube_id")) ?? 1;
     return ok(buildDemoBordroReadiness(yil, ay, subeId));
+  }
+
+  if (pathname === "/sgk-katalog-hazirlik/tamlik" && method === "GET") {
+    const actor = readDemoApiActor(init);
+    const viewError = enforceDemoPermission(actor, "bordro_on_izleme.view");
+    if (viewError) return viewError;
+    return ok(buildSgkKatalogTamlikMock());
+  }
+  if (pathname === "/sgk-katalog-hazirlik/tamlik" && method === "POST") {
+    const actor = readDemoApiActor(init);
+    const viewError = enforceDemoPermission(actor, "bordro_on_izleme.view");
+    if (viewError) return viewError;
+    return ok(buildSgkKatalogTamlikMock());
+  }
+  if (pathname === "/sgk-katalog-hazirlik/kaynaklar" && method === "GET") {
+    const actor = readDemoApiActor(init);
+    const viewError = enforceDemoPermission(actor, "bordro_on_izleme.view");
+    if (viewError) return viewError;
+    return ok({ items: [], page: 1, limit: 50, total: 0, seed_var_mi: false, response_hash: "demo-sgk-kaynak-empty" });
+  }
+  if (pathname === "/sgk-katalog-hazirlik/surumler" && method === "GET") {
+    const actor = readDemoApiActor(init);
+    const viewError = enforceDemoPermission(actor, "bordro_on_izleme.view");
+    if (viewError) return viewError;
+    return ok({ items: [], total: 0, dogrulanmis_tam_var_mi: false, response_hash: "demo-sgk-surum-empty" });
+  }
+  if (pathname === "/sgk-katalog-hazirlik/blocker-raporu" && method === "GET") {
+    const actor = readDemoApiActor(init);
+    const viewError = enforceDemoPermission(actor, "bordro_on_izleme.view");
+    if (viewError) return viewError;
+    return ok(buildSgkKatalogBlockerRaporuMock());
+  }
+  if (pathname === "/sgk-katalog-hazirlik/import/dry-run" && method === "POST") {
+    const actor = readDemoApiActor(init);
+    const mevzuatError = enforceDemoPermission(actor, "mevzuat_parametreleri.view");
+    if (mevzuatError) return mevzuatError;
+    return ok(buildSgkKatalogImportDryRunMock());
+  }
+  if (pathname === "/sgk-katalog-hazirlik/surec-esleme/validate" && method === "POST") {
+    const actor = readDemoApiActor(init);
+    const viewError = enforceDemoPermission(actor, "bordro_on_izleme.view");
+    if (viewError) return viewError;
+    return ok({
+      surec_turu: String(body.surec_turu ?? ""),
+      alt_tur: String(body.alt_tur ?? "*"),
+      esleme_sayisi: 0,
+      esleme_modu: "YOK",
+      seed_var_mi: false,
+      blocker_kodlari: ["SGK_SUREC_KOD_ESLEMESI_BULUNAMADI"],
+      blocker_detaylari: [
+        {
+          severity: "BLOCKER",
+          code: "SGK_SUREC_KOD_ESLEMESI_BULUNAMADI",
+          message: "Surec→SGK kod eslemesi bulunamadi.",
+          cozum_onerisi: "Resmi katalog onayindan sonra esleme ekleyin."
+        }
+      ],
+      gecerli_mi: false,
+      response_hash: "demo-sgk-esleme"
+    });
+  }
+  if (pathname === "/sgk-katalog-hazirlik/coklu-neden/validate" && method === "POST") {
+    const actor = readDemoApiActor(init);
+    const viewError = enforceDemoPermission(actor, "bordro_on_izleme.view");
+    if (viewError) return viewError;
+    return ok({
+      kodlar_normalize: Array.isArray(body.kodlar) ? [...body.kodlar].map(String).sort() : [],
+      sonuc_eksik_gun_kodu: null,
+      seed_matrisi_var_mi: false,
+      blocker_kodlari: ["SGK_COKLU_NEDEN_BIRLESIK_KOD_BULUNAMADI"],
+      gecerli_mi: false,
+      response_hash: "demo-sgk-coklu"
+    });
+  }
+  if (pathname === "/sgk-katalog-hazirlik/operasyonel-kanit/validate" && method === "POST") {
+    const actor = readDemoApiActor(init);
+    const mevzuatError = enforceDemoPermission(actor, "mevzuat_parametreleri.view");
+    if (mevzuatError) return mevzuatError;
+    return ok({
+      kanit_turu: "OPERASYONEL_DOGRULAMA_KANITI",
+      mevzuat_kaynagi_mi: false,
+      katalog_tamligi_icin_tek_basina_yeterli_mi: false,
+      blocker_kodlari: body.dosya_erisilebilir_mi === false ? ["SGK_OPERASYONEL_KANIT_ICERIGI_DOGRULANAMADI"] : [],
+      gecerli_mi: body.dosya_erisilebilir_mi !== false,
+      response_hash: "demo-sgk-op"
+    });
+  }
+  if (pathname === "/sgk-katalog-hazirlik/kismi-sureli/preview" && method === "POST") {
+    const actor = readDemoApiActor(init);
+    const viewError = enforceDemoPermission(actor, "bordro_on_izleme.view");
+    if (viewError) return viewError;
+    return ok({
+      preview_modu: "BLOCKER_ONLY",
+      hesap_sonucu_uretildi_mi: false,
+      saat_bol_7_5_kullanildi_mi: false,
+      blocker_kodlari: ["SGK_KISMI_SURELI_HESAP_KURALI_EKSIK", "SGK_KISMI_SURELI_SOZLESME_BELGESI_EKSIK"],
+      response_hash: "demo-sgk-kismi"
+    });
+  }
+  if (pathname === "/sgk-katalog-hazirlik/bildirim-donemi/preview" && method === "POST") {
+    const actor = readDemoApiActor(init);
+    const viewError = enforceDemoPermission(actor, "bordro_on_izleme.view");
+    if (viewError) return viewError;
+    return ok({
+      preview_modu: "BLOCKER_ONLY",
+      aktif_edildi_mi: false,
+      varsayilan_15_14_uygulandi_mi: false,
+      blocker_kodlari: ["SGK_BILDIRIM_DONEMI_POLITIKASI_EKSIK"],
+      response_hash: "demo-sgk-bildirim"
+    });
+  }
+  if (pathname === "/sgk-katalog-hazirlik/onay/validate" && method === "POST") {
+    const actor = readDemoApiActor(init);
+    const manageError = enforceDemoPermission(actor, "mevzuat_parametreleri.manage");
+    if (manageError) return manageError;
+    return ok({
+      current_state: String(body.current_state ?? "TASLAK"),
+      action: String(body.action ?? ""),
+      next_state: "ONAY_BEKLIYOR",
+      allowed_mi: false,
+      yazma_aktif_mi: false,
+      blocker_kodlari: ["SGK_KATALOG_TAMLIK_KANITI_EKSIK", "SGK_KATALOG_YAZMA_KAPALI"],
+      response_hash: "demo-sgk-onay"
+    });
   }
 
   if (pathname === "/bordro-hazirlik/readiness" && method === "GET") {

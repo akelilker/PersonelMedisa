@@ -10,6 +10,7 @@ use Medisa\Api\Controllers\AylikBildirimOnaylariController;
 use Medisa\Api\Controllers\GenelYoneticiBildirimOnaylariController;
 use Medisa\Api\Controllers\BildirimPuantajEtkiAdaylariController;
 use Medisa\Api\Controllers\BordroHazirlikController;
+use Medisa\Api\Controllers\SgkKatalogHazirlikController;
 use Medisa\Api\Controllers\SirketCalismaPolitikasiController;
 use Medisa\Api\Controllers\DonemKapanisController;
 use Medisa\Api\Controllers\HaftalikBildirimMutabakatlariController;
@@ -305,6 +306,46 @@ class Router
         }
         if ($method === 'POST' && preg_match('#^/bordro-hazirlik/calistirmalar/(\d+)/kesinlestir$#', $path, $matches)) {
             BordroHazirlikController::kesinlestir($this->request, $matches[1]);
+        }
+
+        if ($path === '/sgk-katalog-hazirlik/tamlik' && $method === 'GET') {
+            SgkKatalogHazirlikController::tamlik($this->request);
+        }
+        if ($path === '/sgk-katalog-hazirlik/tamlik' && $method === 'POST') {
+            SgkKatalogHazirlikController::tamlik($this->request);
+        }
+        if ($path === '/sgk-katalog-hazirlik/kaynaklar' && $method === 'GET') {
+            SgkKatalogHazirlikController::manifests($this->request);
+        }
+        if ($method === 'GET' && preg_match('#^/sgk-katalog-hazirlik/kaynaklar/([^/]+)$#', $path, $matches)) {
+            SgkKatalogHazirlikController::manifestDetail($this->request, $matches[1]);
+        }
+        if ($path === '/sgk-katalog-hazirlik/surumler' && $method === 'GET') {
+            SgkKatalogHazirlikController::surumler($this->request);
+        }
+        if ($path === '/sgk-katalog-hazirlik/import/dry-run' && $method === 'POST') {
+            SgkKatalogHazirlikController::importDryRun($this->request);
+        }
+        if ($path === '/sgk-katalog-hazirlik/surec-esleme/validate' && $method === 'POST') {
+            SgkKatalogHazirlikController::surecEslemeValidate($this->request);
+        }
+        if ($path === '/sgk-katalog-hazirlik/coklu-neden/validate' && $method === 'POST') {
+            SgkKatalogHazirlikController::cokluNedenValidate($this->request);
+        }
+        if ($path === '/sgk-katalog-hazirlik/blocker-raporu' && $method === 'GET') {
+            SgkKatalogHazirlikController::blockerReport($this->request);
+        }
+        if ($path === '/sgk-katalog-hazirlik/operasyonel-kanit/validate' && $method === 'POST') {
+            SgkKatalogHazirlikController::operasyonelKanitValidate($this->request);
+        }
+        if ($path === '/sgk-katalog-hazirlik/kismi-sureli/preview' && $method === 'POST') {
+            SgkKatalogHazirlikController::kismiSureliPreview($this->request);
+        }
+        if ($path === '/sgk-katalog-hazirlik/bildirim-donemi/preview' && $method === 'POST') {
+            SgkKatalogHazirlikController::bildirimDonemiPreview($this->request);
+        }
+        if ($path === '/sgk-katalog-hazirlik/onay/validate' && $method === 'POST') {
+            SgkKatalogHazirlikController::onayValidate($this->request);
         }
 
         if ($path === '/sirket-calisma-politikalari/katalog' && $method === 'GET') {

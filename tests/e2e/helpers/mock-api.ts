@@ -18,6 +18,11 @@ import {
   resolveAylikBildirimOnayApproval,
   resolveAyBounds
 } from "../../../src/lib/bildirim/aylik-bildirim-onay";
+import {
+  buildSgkKatalogBlockerRaporuMock,
+  buildSgkKatalogImportDryRunMock,
+  buildSgkKatalogTamlikMock
+} from "../../../src/api/sgk-katalog-hazirlik.mock";
 
 export type MockUserRole =
   | "GENEL_YONETICI"
@@ -9066,6 +9071,102 @@ let personelBelgeKaydiIdCounter = 903;
       }
       calistirma.bordro_onay_durumu = "KESINLESTI";
       await fulfillJson(route, 200, okBody({ calistirma }));
+      return;
+    }
+
+    if (path === "/api/sgk-katalog-hazirlik/tamlik" && method === "GET") {
+      if (await denyUnlessRolePermission(route, "bordro_on_izleme.view")) return;
+      await fulfillJson(route, 200, okBody(buildSgkKatalogTamlikMock()));
+      return;
+    }
+    if (path === "/api/sgk-katalog-hazirlik/tamlik" && method === "POST") {
+      if (await denyUnlessRolePermission(route, "bordro_on_izleme.view")) return;
+      await fulfillJson(route, 200, okBody(buildSgkKatalogTamlikMock()));
+      return;
+    }
+    if (path === "/api/sgk-katalog-hazirlik/kaynaklar" && method === "GET") {
+      if (await denyUnlessRolePermission(route, "bordro_on_izleme.view")) return;
+      await fulfillJson(route, 200, okBody({ items: [], page: 1, limit: 50, total: 0, seed_var_mi: false, response_hash: "e2e-sgk-kaynak-empty" }));
+      return;
+    }
+    if (path === "/api/sgk-katalog-hazirlik/surumler" && method === "GET") {
+      if (await denyUnlessRolePermission(route, "bordro_on_izleme.view")) return;
+      await fulfillJson(route, 200, okBody({ items: [], total: 0, dogrulanmis_tam_var_mi: false, response_hash: "e2e-sgk-surum-empty" }));
+      return;
+    }
+    if (path === "/api/sgk-katalog-hazirlik/blocker-raporu" && method === "GET") {
+      if (await denyUnlessRolePermission(route, "bordro_on_izleme.view")) return;
+      await fulfillJson(route, 200, okBody(buildSgkKatalogBlockerRaporuMock()));
+      return;
+    }
+    if (path === "/api/sgk-katalog-hazirlik/import/dry-run" && method === "POST") {
+      if (await denyUnlessRolePermission(route, "mevzuat_parametreleri.view")) return;
+      await fulfillJson(route, 200, okBody(buildSgkKatalogImportDryRunMock()));
+      return;
+    }
+    if (path === "/api/sgk-katalog-hazirlik/surec-esleme/validate" && method === "POST") {
+      if (await denyUnlessRolePermission(route, "bordro_on_izleme.view")) return;
+      await fulfillJson(route, 200, okBody({
+        surec_turu: "RAPOR",
+        esleme_sayisi: 0,
+        seed_var_mi: false,
+        blocker_kodlari: ["SGK_SUREC_KOD_ESLEMESI_BULUNAMADI"],
+        gecerli_mi: false,
+        response_hash: "e2e-sgk-esleme"
+      }));
+      return;
+    }
+    if (path === "/api/sgk-katalog-hazirlik/coklu-neden/validate" && method === "POST") {
+      if (await denyUnlessRolePermission(route, "bordro_on_izleme.view")) return;
+      await fulfillJson(route, 200, okBody({
+        seed_matrisi_var_mi: false,
+        blocker_kodlari: ["SGK_COKLU_NEDEN_BIRLESIK_KOD_BULUNAMADI"],
+        gecerli_mi: false,
+        response_hash: "e2e-sgk-coklu"
+      }));
+      return;
+    }
+    if (path === "/api/sgk-katalog-hazirlik/operasyonel-kanit/validate" && method === "POST") {
+      if (await denyUnlessRolePermission(route, "mevzuat_parametreleri.view")) return;
+      await fulfillJson(route, 200, okBody({
+        kanit_turu: "OPERASYONEL_DOGRULAMA_KANITI",
+        mevzuat_kaynagi_mi: false,
+        katalog_tamligi_icin_tek_basina_yeterli_mi: false,
+        blocker_kodlari: ["SGK_OPERASYONEL_KANIT_ICERIGI_DOGRULANAMADI"],
+        gecerli_mi: false,
+        response_hash: "e2e-sgk-op"
+      }));
+      return;
+    }
+    if (path === "/api/sgk-katalog-hazirlik/kismi-sureli/preview" && method === "POST") {
+      if (await denyUnlessRolePermission(route, "bordro_on_izleme.view")) return;
+      await fulfillJson(route, 200, okBody({
+        preview_modu: "BLOCKER_ONLY",
+        hesap_sonucu_uretildi_mi: false,
+        saat_bol_7_5_kullanildi_mi: false,
+        blocker_kodlari: ["SGK_KISMI_SURELI_HESAP_KURALI_EKSIK"],
+        response_hash: "e2e-sgk-kismi"
+      }));
+      return;
+    }
+    if (path === "/api/sgk-katalog-hazirlik/bildirim-donemi/preview" && method === "POST") {
+      if (await denyUnlessRolePermission(route, "bordro_on_izleme.view")) return;
+      await fulfillJson(route, 200, okBody({
+        preview_modu: "BLOCKER_ONLY",
+        varsayilan_15_14_uygulandi_mi: false,
+        blocker_kodlari: ["SGK_BILDIRIM_DONEMI_POLITIKASI_EKSIK"],
+        response_hash: "e2e-sgk-bildirim"
+      }));
+      return;
+    }
+    if (path === "/api/sgk-katalog-hazirlik/onay/validate" && method === "POST") {
+      if (await denyUnlessRolePermission(route, "mevzuat_parametreleri.manage")) return;
+      await fulfillJson(route, 200, okBody({
+        allowed_mi: false,
+        yazma_aktif_mi: false,
+        blocker_kodlari: ["SGK_KATALOG_TAMLIK_KANITI_EKSIK", "SGK_KATALOG_YAZMA_KAPALI"],
+        response_hash: "e2e-sgk-onay"
+      }));
       return;
     }
 

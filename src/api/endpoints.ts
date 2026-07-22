@@ -165,6 +165,20 @@ export const endpoints = {
     geriGonder: (id: number | string) => `/bordro-hazirlik/calistirmalar/${id}/geri-gonder`,
     kesinlestir: (id: number | string) => `/bordro-hazirlik/calistirmalar/${id}/kesinlestir`
   },
+  sgkKatalogHazirlik: {
+    tamlik: "/sgk-katalog-hazirlik/tamlik",
+    kaynaklar: "/sgk-katalog-hazirlik/kaynaklar",
+    kaynakDetail: (id: string | number) => `/sgk-katalog-hazirlik/kaynaklar/${id}`,
+    surumler: "/sgk-katalog-hazirlik/surumler",
+    importDryRun: "/sgk-katalog-hazirlik/import/dry-run",
+    surecEslemeValidate: "/sgk-katalog-hazirlik/surec-esleme/validate",
+    cokluNedenValidate: "/sgk-katalog-hazirlik/coklu-neden/validate",
+    blockerRaporu: "/sgk-katalog-hazirlik/blocker-raporu",
+    operasyonelKanitValidate: "/sgk-katalog-hazirlik/operasyonel-kanit/validate",
+    kismiSureliPreview: "/sgk-katalog-hazirlik/kismi-sureli/preview",
+    bildirimDonemiPreview: "/sgk-katalog-hazirlik/bildirim-donemi/preview",
+    onayValidate: "/sgk-katalog-hazirlik/onay/validate"
+  },
   sirketCalismaPolitikalari: {
     katalog: "/sirket-calisma-politikalari/katalog",
     list: "/sirket-calisma-politikalari",

@@ -38,7 +38,7 @@ export function toSurecFormState(surec: Surec): SurecFormState {
     baslangicTarihi: surec.baslangic_tarihi ?? "",
     bitisTarihi: surec.bitis_tarihi ?? "",
     ucretliMi: surec.ucretli_mi ?? true,
-    ilkIkiGunFirmaOderMi: surec.ilk_iki_gun_firma_oder_mi ?? false,
+    ilkIkiGunFirmaOderMi: surec.ilk_iki_gun_firma_oder_mi ?? null,
     aciklama: surec.aciklama ?? ""
   };
 }

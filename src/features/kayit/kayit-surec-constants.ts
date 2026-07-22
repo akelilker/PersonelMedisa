@@ -106,7 +106,11 @@ export const DEVAMSIZLIK_ALT_TUR_CONFIG: Record<DevamsizlikSubId, DevamsizlikAlt
   },
   rapor: {
     label: "Rapor Türü",
-    options: [{ value: "Raporlu_Hastalik", label: "Raporlu" }]
+    options: [
+      { value: "Raporlu_Hastalik", label: "Hastalık" },
+      { value: "Raporlu_Meslek_Hastaligi", label: "Meslek hastalığı" },
+      { value: "Raporlu_Analik", label: "Analık" }
+    ]
   },
   is_kazasi: {
     label: "Kayıt Türü",

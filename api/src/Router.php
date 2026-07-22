@@ -257,6 +257,12 @@ class Router
         if ($path === '/maas-hesaplama/yasal-katalog' && $method === 'GET') {
             MaasHesaplamaController::legalCatalog($this->request);
         }
+        if ($path === '/maas-hesaplama/sgk-sonuclari' && $method === 'GET') {
+            MaasHesaplamaController::sgkResults($this->request);
+        }
+        if ($path === '/maas-hesaplama/sgk-sonuclari/export.csv' && $method === 'GET') {
+            MaasHesaplamaController::sgkResultsExport($this->request);
+        }
         if ($path === '/maas-hesaplama/devirler' && $method === 'GET') {
             MaasHesaplamaController::listDevirler($this->request);
         }

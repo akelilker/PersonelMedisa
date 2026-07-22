@@ -1753,7 +1753,7 @@ function resolveMockIlkIkiGunFirmaOderMi(
     if (payload.ilk_iki_gun_firma_oder_mi !== undefined && payload.ilk_iki_gun_firma_oder_mi !== null) {
       return Boolean(payload.ilk_iki_gun_firma_oder_mi);
     }
-    return false;
+    return null;
   }
 
   return null;

@@ -6,6 +6,8 @@ require_once __DIR__ . '/../../api/src/Services/BildirimDonemContextService.php'
 require_once __DIR__ . '/../../api/src/Services/PuantajDonemKilidiService.php';
 require_once __DIR__ . '/../../api/src/Services/MaasHesaplamaException.php';
 require_once __DIR__ . '/../../api/src/Services/PersonelBordroKapsamService.php';
+require_once __DIR__ . '/../../api/src/Services/Payroll/SgkPrimGunuEngine.php';
+require_once __DIR__ . '/../../api/src/Services/SgkPrimGunuService.php';
 require_once __DIR__ . '/../../api/src/Services/MaasHesaplamaSnapshotService.php';
 
 use Medisa\Api\Services\MaasHesaplamaException;
@@ -173,15 +175,19 @@ $pdo = mhsMysqlPdo();
 function mhsSeal(PDO $pdo, int $subeId, int $yil, int $ay, int $rowCount = 2): int
 {
     $donem = sprintf('%04d-%02d', $yil, $ay);
+    $daysInMonth = cal_days_in_month(CAL_GREGORIAN, $ay, $yil);
+    $personelIds = $subeId === 1 ? [7, 8] : [9];
+    $actualRowCount = $daysInMonth * count($personelIds);
     $pdo->prepare("INSERT INTO puantaj_aylik_muhurleri (sube_id, yil, ay, donem, durum, muhurlenen_kayit_sayisi, created_by)
-        VALUES (?, ?, ?, ?, 'MUHURLENDI', ?, 1)")->execute([$subeId, $yil, $ay, $donem, $rowCount]);
+        VALUES (?, ?, ?, ?, 'MUHURLENDI', ?, 1)")->execute([$subeId, $yil, $ay, $donem, $actualRowCount]);
     $muhurId = (int) $pdo->lastInsertId();
-    for ($i = 0; $i < $rowCount; $i++) {
-        $personelId = $subeId === 1 ? ($i % 2 === 0 ? 7 : 8) : 9;
-        $pdo->prepare("INSERT INTO puantaj_aylik_muhur_satirlari
-            (muhur_id, personel_id, tarih, gun_tipi, kontrol_durumu, kaynak)
-            VALUES (?, ?, ?, 'NORMAL', 'AMIR_KONTROL_ETTI', 'SISTEM')")
-            ->execute([$muhurId, $personelId, sprintf('%s-%02d', $donem, 4 + $i)]);
+    foreach ($personelIds as $personelId) {
+        for ($day = 1; $day <= $daysInMonth; $day++) {
+            $pdo->prepare("INSERT INTO puantaj_aylik_muhur_satirlari
+                (muhur_id, personel_id, tarih, gun_tipi, kontrol_durumu, kaynak, net_calisma_suresi_dakika)
+                VALUES (?, ?, ?, 'NORMAL', 'AMIR_KONTROL_ETTI', 'SISTEM', 480)")
+                ->execute([$muhurId, $personelId, sprintf('%s-%02d', $donem, $day)]);
+        }
     }
 
     return $muhurId;
@@ -191,8 +197,13 @@ function mhsReset(PDO $pdo): void
 {
     $pdo->exec('SET FOREIGN_KEY_CHECKS = 0');
     foreach ([
+        'maas_hesaplama_sgk_snapshotlari', 'sgk_hesap_auditleri',
         'maas_hesaplama_snapshot_auditleri', 'maas_hesaplama_girdi_snapshotlari',
         'maas_hesaplama_personel_snapshotlari', 'maas_hesaplama_donem_snapshotlari',
+        'sgk_is_goremezlik_finans_kayitlari', 'sgk_personel_sigortalilik_surumleri',
+        'sgk_belge_surec_baglantilari', 'sgk_eksik_gun_belgeleri', 'sgk_sirket_politika_degerleri',
+        'sgk_sirket_politika_surumleri', 'sgk_surec_neden_eslemeleri',
+        'sgk_eksik_gun_kod_cakismalari', 'sgk_eksik_gun_kodlari', 'sgk_eksik_gun_katalog_surumleri',
         'puantaj_donem_kilitleri', 'mevzuat_parametreleri', 'ek_odeme_kesinti',
         'bildirim_puantaj_etki_cakisma_cozumleri', 'onayli_bildirim_puantaj_etki_adaylari',
         'puantaj_aylik_muhur_satirlari', 'puantaj_aylik_muhurleri', 'personel_ucret_gecmisi', 'surecler',
@@ -204,6 +215,24 @@ function mhsReset(PDO $pdo): void
         VALUES (7, 30000, 'NET', '2025-01-01', NULL, 'AKTIF'),
                (8, 28000, 'NET', '2025-01-01', NULL, 'AKTIF'),
                (9, 27000, 'NET', '2025-01-01', NULL, 'AKTIF')");
+    $manifestHash = str_repeat('a', 64);
+    $policyHash = str_repeat('b', 64);
+    $pdo->exec("INSERT INTO sgk_eksik_gun_katalog_surumleri
+        (id, surum_kodu, gecerlilik_baslangic, tamlik_durumu, state, manifest_set_hash, aciklama, onaylayan_id, onay_zamani)
+        VALUES (1, 'TEST-SGK-V1', '2026-01-01', 'DOGRULANMIS_TAM', 'ONAYLANDI', '$manifestHash', 'test', 1, NOW())");
+    $pdo->exec("INSERT INTO sgk_sirket_politika_surumleri
+        (id, sube_id, surum_kodu, gecerlilik_baslangic, bildirim_donem_tipi, state, politika_hash, aciklama, onaylayan_id, onay_zamani)
+        VALUES (1, 1, 'TEST-1', '2026-01-01', 'AY_1_SON_GUN', 'ONAYLANDI', '$policyHash', 'test', 1, NOW()),
+               (2, 2, 'TEST-2', '2026-01-01', 'AY_1_SON_GUN', 'ONAYLANDI', '$policyHash', 'test', 1, NOW())");
+    $pdo->exec("INSERT INTO sgk_personel_sigortalilik_surumleri
+        (id, personel_id, sigortalilik_statusu, sozlesme_turu, bildirim_donem_tipi, gecerlilik_baslangic, state, aciklama, onaylayan_id, onay_zamani)
+        VALUES (1, 7, '4A', 'TAM_SURELI', 'SIRKET_POLITIKASINDAN', '2026-01-01', 'ONAYLANDI', 'test', 1, NOW()),
+               (2, 8, '4A', 'TAM_SURELI', 'SIRKET_POLITIKASINDAN', '2026-01-01', 'ONAYLANDI', 'test', 1, NOW()),
+               (3, 9, '4A', 'TAM_SURELI', 'SIRKET_POLITIKASINDAN', '2026-01-01', 'ONAYLANDI', 'test', 1, NOW())");
+    $pdo->exec("INSERT INTO mevzuat_parametreleri
+        (parametre_kodu, deger_tipi, sayisal_deger, birim, gecerlilik_baslangic)
+        VALUES ('SGK_GUNLUK_TABAN', 'SAYISAL', 100, 'TRY', '2026-01-01'),
+               ('SGK_GUNLUK_TAVAN', 'SAYISAL', 750, 'TRY', '2026-01-01')");
 }
 
 try {
@@ -224,6 +253,7 @@ try {
         id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY, personel_id INT UNSIGNED NOT NULL,
         surec_turu VARCHAR(64) NOT NULL, alt_tur VARCHAR(64) NULL, baslangic_tarihi DATE NOT NULL,
         bitis_tarihi DATE NULL, ucretli_mi TINYINT(1) NOT NULL DEFAULT 0, aciklama TEXT NULL,
+        ilk_iki_gun_firma_oder_mi TINYINT(1) NULL,
         state VARCHAR(32) NOT NULL DEFAULT 'AKTIF', created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
     ) ENGINE=InnoDB");
     $pdo->exec("CREATE TABLE personel_ucret_gecmisi (
@@ -294,6 +324,7 @@ try {
     foreach ([
         '020_maas_hesaplama_snapshotlari.sql',
         '021_maas_hesaplama_snapshot_guvenlik_indexleri.sql',
+        '036_sgk_prim_gunu_owner.sql',
     ] as $file) {
         $sql = file_get_contents(__DIR__ . '/../../api/migrations/' . $file);
         foreach (mhsSplitMigrationStatements((string) $sql) as $statement) {
@@ -303,10 +334,10 @@ try {
 
     $pdo->exec("INSERT INTO subeler VALUES (1, 'MRK', 'Merkez'), (2, 'SB2', 'Sube 2')");
     $pdo->exec('INSERT INTO users VALUES (1), (11), (12), (13), (14), (15), (16), (17), (18), (19), (20), (99)');
-    $pdo->exec("INSERT INTO personeller (id, tc_kimlik_no, ad, soyad, sicil_no, ise_giris_tarihi, sube_id)
-        VALUES (7, '11111111111', 'Ali', 'Yilmaz', 'S007', '2020-01-01', 1),
-               (8, '22222222222', 'Ayse', 'Demir', 'S008', '2020-01-01', 1),
-               (9, '33333333333', 'Can', 'Kaya', 'S009', '2020-01-01', 2)");
+    $pdo->exec("INSERT INTO personeller (id, tc_kimlik_no, ad, soyad, sicil_no, ise_giris_tarihi, sube_id, ucret_tipi_id)
+        VALUES (7, '11111111111', 'Ali', 'Yilmaz', 'S007', '2020-01-01', 1, 1),
+               (8, '22222222222', 'Ayse', 'Demir', 'S008', '2020-01-01', 1, 1),
+               (9, '33333333333', 'Can', 'Kaya', 'S009', '2020-01-01', 2, 1)");
 
     $actor = ['id' => 99, 'rol' => 'MUHASEBE'];
 
@@ -329,6 +360,7 @@ try {
     $girdiSayisi = (int) $pdo->query("SELECT girdi_sayisi FROM maas_hesaplama_donem_snapshotlari WHERE id = $snapshotId")->fetchColumn();
     mhsAssert((int) $pdo->query("SELECT COUNT(*) FROM maas_hesaplama_girdi_snapshotlari WHERE donem_snapshot_id = $snapshotId")->fetchColumn() === $girdiSayisi, 'partial/duplicate child girdi yok');
     mhsAssert((int) $pdo->query("SELECT COUNT(*) FROM maas_hesaplama_snapshot_auditleri WHERE aksiyon = 'SNAPSHOT_CREATE' AND sonuc = 'CREATED'")->fetchColumn() === 1, 'tek success audit');
+    mhsAssert((int) $pdo->query("SELECT COUNT(*) FROM sgk_hesap_auditleri WHERE aksiyon = 'SNAPSHOT_CREATE' AND sonuc = 'CREATED'")->fetchColumn() === 2, 'iki personel icin tekil immutable SGK auditleri');
 
     // 3) Snapshot create ile finans kaydi ekleme yarisi (TOCTOU korumasi)
     mhsReset($pdo);

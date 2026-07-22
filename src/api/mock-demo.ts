@@ -5127,7 +5127,7 @@ export function resolveDemoApiResponse(
         surecTuru === "RAPOR" && altTur === "Raporlu_Hastalik"
           ? body.ilk_iki_gun_firma_oder_mi !== undefined && body.ilk_iki_gun_firma_oder_mi !== null
             ? Boolean(body.ilk_iki_gun_firma_oder_mi)
-            : false
+            : null
           : null,
       aciklama: toStringValue(body.aciklama) ?? undefined,
       state: "AKTIF"
@@ -7259,7 +7259,7 @@ export function resolveDemoApiResponse(
             rapor_tipi: pathname.replace("/raporlar/", ""),
             net_calisma_dakika: 510,
             sgk_donem: sgkOzeti?.donem ?? "2026-04",
-            sgk_prim_gun: sgkOzeti?.sgk_prim_gun ?? 30,
+            sgk_prim_gun: sgkOzeti?.sgk_prim_gun ?? null,
             eksik_gun_nedeni_kodu: sgkOzeti?.eksik_gun_nedeni_kodu ?? "-"
           }
         ]
@@ -8148,6 +8148,26 @@ export function resolveDemoApiResponse(
     }
     const adayId = Number.parseInt(maasAdayKalemMatch[1], 10);
     return ok({ items: maasDemo.kalemler.filter((item) => item.aday_id === adayId) });
+  }
+
+  if (pathname === "/maas-hesaplama/sgk-sonuclari" && method === "GET") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(actor, "maas_hesaplama_adaylari.view");
+    if (permissionError) {
+      return permissionError;
+    }
+    return ok({ items: [] });
+  }
+
+  if (pathname === "/maas-hesaplama/sgk-sonuclari/export.csv" && method === "GET") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(actor, "maas_hesaplama_adaylari.view");
+    if (permissionError) {
+      return permissionError;
+    }
+    return ok(
+      "personel_id,hesaplanan_prim_gunu,eksik_gun_sayisi,sgk_hesap_hash,snapshot_id,snapshot_revision_no\n"
+    );
   }
 
   if (pathname === "/maas-hesaplama/yasal-katalog" && method === "GET") {

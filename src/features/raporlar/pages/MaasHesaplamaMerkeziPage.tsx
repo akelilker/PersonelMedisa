@@ -5,6 +5,7 @@ import {
   cancelMaasHesaplamaCalistirma,
   cancelMaasHesaplamaSnapshot,
   createMaasHesaplamaSnapshot,
+  downloadSgkPrimGunuSonuclariCsv,
   fetchMaasHesaplamaAdayDetail,
   fetchMaasHesaplamaAdayKalemler,
   fetchMaasHesaplamaCalistirmaAdaylari,
@@ -82,6 +83,7 @@ export function MaasHesaplamaMerkeziPage() {
   const [isCancellingCalistirma, setIsCancellingCalistirma] = useState(false);
   const [isLoadingAdaylar, setIsLoadingAdaylar] = useState(false);
   const [isSavingDevir, setIsSavingDevir] = useState(false);
+  const [isExportingSgk, setIsExportingSgk] = useState(false);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [selectedDetail, setSelectedDetail] = useState<MaasHesaplamaSnapshotDetail | null>(null);
@@ -418,6 +420,28 @@ export function MaasHesaplamaMerkeziPage() {
     }
   }
 
+  async function handleDownloadSgkCsv() {
+    if (!parsedAy || !Number.isFinite(subeId)) {
+      setActionError("SGK CSV için ay ve şube seçilmelidir.");
+      return;
+    }
+    setIsExportingSgk(true);
+    setActionError(null);
+    setActionMessage(null);
+    try {
+      await downloadSgkPrimGunuSonuclariCsv({
+        sube_id: subeId as number,
+        yil: parsedAy.yil,
+        ay: parsedAy.ay
+      });
+      setActionMessage("Authoritative SGK CSV indirildi.");
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "SGK CSV indirilemedi.");
+    } finally {
+      setIsExportingSgk(false);
+    }
+  }
+
   return (
     <section className="yonetim-page donem-kapanis-page" data-testid="maas-hesaplama-merkezi">
       <div className="yonetim-header-row">
@@ -460,6 +484,16 @@ export function MaasHesaplamaMerkeziPage() {
           <button type="submit" className="universal-btn-save" data-testid="maas-hesaplama-submit">
             Preflight getir
           </button>
+          {canViewAdaylari ? (
+            <button
+              type="button"
+              data-testid="maas-hesaplama-sgk-export-csv"
+              disabled={!parsedAy || !Number.isFinite(subeId) || isExportingSgk}
+              onClick={() => void handleDownloadSgkCsv()}
+            >
+              {isExportingSgk ? "SGK CSV hazırlanıyor…" : "SGK CSV İndir"}
+            </button>
+          ) : null}
         </div>
       </form>
 
@@ -557,6 +591,8 @@ export function MaasHesaplamaMerkeziPage() {
                     <th>Ücret segmenti</th>
                     <th>Puantaj</th>
                     <th>Finans</th>
+                    <th>SGK Prim / Eksik</th>
+                    <th>SGK Kod / Model</th>
                     <th>Hazırlık</th>
                     <th>Blocker/Warning</th>
                   </tr>
@@ -571,6 +607,24 @@ export function MaasHesaplamaMerkeziPage() {
                       <td>{row.ucret_segment_sayisi}</td>
                       <td>{row.puantaj_kayit_sayisi}</td>
                       <td>{row.finans_kalem_sayisi}</td>
+                      <td>
+                        {row.sgk_sonucu?.hesaplanan_prim_gunu ?? "-"} / {row.sgk_sonucu?.eksik_gun_sayisi ?? "-"}
+                      </td>
+                      <td>
+                        {row.sgk_sonucu?.eksik_gun_kodu
+                          ? `${row.sgk_sonucu.eksik_gun_kodu}${row.sgk_sonucu.eksik_gun_aciklamasi ? ` — ${row.sgk_sonucu.eksik_gun_aciklamasi}` : ""}`
+                          : "-"}
+                        {" / "}
+                        {row.sgk_sonucu?.ucret_modeli === "MAKTU_AYLIK"
+                          ? "Maktu aylık"
+                          : row.sgk_sonucu?.ucret_modeli === "GUNLUK"
+                            ? "Günlük"
+                            : row.sgk_sonucu?.ucret_modeli === "SAATLIK"
+                              ? "Saatlik"
+                              : row.sgk_sonucu?.ucret_modeli === "DIGER"
+                                ? "Diğer"
+                                : row.sgk_sonucu?.ucret_modeli ?? "-"}
+                      </td>
                       <td>{row.hazir_mi ? "Hazır" : "Engelli"}</td>
                       <td>
                         {row.blocker_count}/{row.warning_count}

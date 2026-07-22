@@ -146,6 +146,8 @@ export const endpoints = {
     cancelCalistirma: (id: number | string) => `/maas-hesaplama/calistirmalar/${id}/iptal`,
     adayDetail: (id: number | string) => `/maas-hesaplama/adaylar/${id}`,
     adayKalemler: (id: number | string) => `/maas-hesaplama/adaylar/${id}/kalemler`,
+    sgkSonuclari: "/maas-hesaplama/sgk-sonuclari",
+    sgkSonuclariExportCsv: "/maas-hesaplama/sgk-sonuclari/export.csv",
     yasalKatalog: "/maas-hesaplama/yasal-katalog",
     devirler: "/maas-hesaplama/devirler"
   },

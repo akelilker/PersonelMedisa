@@ -17,7 +17,7 @@ use PDOException;
  */
 class MaasHesaplamaAdayService
 {
-    public const CONTRACT_VERSION = 'S77D_PAYROLL_CANDIDATE_V2';
+    public const CONTRACT_VERSION = 'S85B_PAYROLL_CANDIDATE_V1';
 
     /**
      * @return array<string, mixed>
@@ -140,6 +140,27 @@ class MaasHesaplamaAdayService
         // Segment / finans quick checks from snapshot only
         foreach ($bundle['personeller'] as $personel) {
             $pid = (int) $personel['personel_id'];
+            $sgk = $bundle['sgk_by_personel'][$pid] ?? null;
+            if ($sgk === null) {
+                $items[] = self::issue('BLOCKER', 'SGK_PRIM_GUNU_HESAPLANAMADI', 'Immutable SGK snapshot sonucu yok.', 'sgk', null, $pid);
+            } elseif (!empty($sgk['manuel_inceleme_gerekli_mi']) || count($sgk['blocker_kodlari']) > 0) {
+                foreach ($sgk['blocker_detaylari'] as $blocker) {
+                    $items[] = self::issue(
+                        'BLOCKER',
+                        (string) ($blocker['code'] ?? 'SGK_PRIM_GUNU_HESAPLANAMADI'),
+                        (string) ($blocker['message'] ?? 'SGK sonucu bloke.'),
+                        'sgk',
+                        $blocker['kaynak_surec_id'] ?? null,
+                        $pid,
+                        [
+                            'tarih_baslangic' => $blocker['tarih_baslangic'] ?? null,
+                            'tarih_bitis' => $blocker['tarih_bitis'] ?? null,
+                            'kaynak_belge_id' => $blocker['kaynak_belge_id'] ?? null,
+                            'cozum_onerisi' => $blocker['cozum_onerisi'] ?? null,
+                        ]
+                    );
+                }
+            }
             $segments = $bundle['ucret_by_personel'][$pid] ?? [];
             if (count($segments) === 0) {
                 $items[] = self::issue('BLOCKER', 'SALARY_SEGMENT_INVALID', 'Snapshot ucret segmenti yok.', 'ucret', null, $pid);
@@ -172,12 +193,16 @@ class MaasHesaplamaAdayService
         $carryoverSetHash = MaasHesaplamaEngine::hashCanonical($carryovers);
         $policyVersionHash = $policy['policy_version_hash'] ?? null;
         $correctionProjectionHash = $projection['projection_hash'];
+        $sgkSetHash = MaasHesaplamaEngine::hashCanonical(array_map(static function (array $result) {
+            return $result['sgk_hesap_hash'];
+        }, $bundle['sgk_by_personel']));
         $sourceHash = MaasHesaplamaEngine::hashCanonical([
             'snapshot_hash' => (string) $snapshot['snapshot_hash'],
             'parameter_set_hash' => $parameterSetHash,
             'carryover_set_hash' => $carryoverSetHash,
             'policy_version_hash' => $policyVersionHash,
             'correction_projection_hash' => $correctionProjectionHash,
+            'sgk_set_hash' => $sgkSetHash,
             'engine_version' => MaasHesaplamaEngine::ENGINE_VERSION,
         ]);
         if ($existing && (string) $existing['source_hash'] !== $sourceHash) {
@@ -220,6 +245,7 @@ class MaasHesaplamaAdayService
                     'puantaj_kayit_sayisi' => count($bundle['puantaj_by_personel'][$pid] ?? []),
                     'finans_kalem_sayisi' => count($bundle['finans_by_personel'][$pid] ?? []),
                     'devir_var_mi' => isset($carryovers[$pid]),
+                    'sgk_sonucu' => $bundle['sgk_by_personel'][$pid] ?? null,
                 ];
             }, $bundle['personeller']),
             'parameter_summary' => [
@@ -235,6 +261,7 @@ class MaasHesaplamaAdayService
             'carryover_set_hash' => $carryoverSetHash,
             'policy_version_hash' => $policyVersionHash,
             'correction_projection_hash' => $correctionProjectionHash,
+            'sgk_set_hash' => $sgkSetHash,
             'snapshot_hash' => (string) $snapshot['snapshot_hash'],
             'existing_calculation' => $existing ? [
                 'id' => (int) $existing['id'],
@@ -374,6 +401,7 @@ class MaasHesaplamaAdayService
                     'finanslar' => $bundle['finans_by_personel'][$pid] ?? [],
                     'mevzuat' => $mergedMevzuat,
                     'carryover' => $carryovers[$pid],
+                    'sgk_hesabi' => $bundle['sgk_by_personel'][$pid],
                     'donem_baslangic' => (string) $bundle['snapshot']['donem_baslangic'],
                     'donem_bitis' => (string) $bundle['snapshot']['donem_bitis'],
                 ];
@@ -638,7 +666,18 @@ class MaasHesaplamaAdayService
     /** @return array<int, array<string, mixed>> */
     public static function listAdaylar(PDO $pdo, $calistirmaId)
     {
-        $stmt = $pdo->prepare('SELECT * FROM maas_hesaplama_adaylari WHERE calistirma_id = :id ORDER BY personel_id ASC');
+        $stmt = $pdo->prepare(
+            'SELECT a.*,
+                    sgk.hesaplanan_prim_gunu AS sgk_prim_gunu,
+                    sgk.eksik_gun_sayisi AS sgk_eksik_gun_sayisi,
+                    sgk.eksik_gun_kodu AS sgk_eksik_gun_kodu,
+                    sgk.eksik_gun_aciklamasi AS sgk_eksik_gun_aciklamasi,
+                    sgk.sgk_hesap_hash, sgk.katalog_surumu AS sgk_katalog_surumu,
+                    sgk.kaynak_manifest_hash AS sgk_manifest_hash
+             FROM maas_hesaplama_adaylari a
+             INNER JOIN maas_hesaplama_sgk_snapshotlari sgk ON sgk.personel_snapshot_id = a.personel_snapshot_id
+             WHERE a.calistirma_id = :id ORDER BY a.personel_id ASC'
+        );
         $stmt->execute(['id' => (int) $calistirmaId]);
 
         return array_map([self::class, 'mapAday'], $stmt->fetchAll(PDO::FETCH_ASSOC));
@@ -647,7 +686,18 @@ class MaasHesaplamaAdayService
     /** @return array<string, mixed>|null */
     public static function getAday(PDO $pdo, $adayId)
     {
-        $stmt = $pdo->prepare('SELECT * FROM maas_hesaplama_adaylari WHERE id = :id LIMIT 1');
+        $stmt = $pdo->prepare(
+            'SELECT a.*,
+                    sgk.hesaplanan_prim_gunu AS sgk_prim_gunu,
+                    sgk.eksik_gun_sayisi AS sgk_eksik_gun_sayisi,
+                    sgk.eksik_gun_kodu AS sgk_eksik_gun_kodu,
+                    sgk.eksik_gun_aciklamasi AS sgk_eksik_gun_aciklamasi,
+                    sgk.sgk_hesap_hash, sgk.katalog_surumu AS sgk_katalog_surumu,
+                    sgk.kaynak_manifest_hash AS sgk_manifest_hash
+             FROM maas_hesaplama_adaylari a
+             INNER JOIN maas_hesaplama_sgk_snapshotlari sgk ON sgk.personel_snapshot_id = a.personel_snapshot_id
+             WHERE a.id = :id LIMIT 1'
+        );
         $stmt->execute(['id' => (int) $adayId]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -732,6 +782,7 @@ class MaasHesaplamaAdayService
         $etkiBy = [];
         $finansBy = [];
         $mevzuatBy = [];
+        $sgkBy = SgkPrimGunuService::loadSnapshotResults($pdo, $snapshotId);
         foreach ($gStmt->fetchAll(PDO::FETCH_ASSOC) as $g) {
             $payload = json_decode((string) $g['payload_json'], true);
             if (!is_array($payload)) {
@@ -777,6 +828,7 @@ class MaasHesaplamaAdayService
             'etki_by_personel' => $etkiBy,
             'finans_by_personel' => $finansBy,
             'mevzuat_by_code' => $mevzuatBy,
+            'sgk_by_personel' => $sgkBy,
         ];
     }
 
@@ -867,6 +919,13 @@ class MaasHesaplamaAdayService
             'result_hash' => (string) $row['result_hash'],
             'engine_version' => (string) $row['engine_version'],
             'created_at' => (string) $row['created_at'],
+            'sgk_prim_gunu' => isset($row['sgk_prim_gunu']) ? (int) $row['sgk_prim_gunu'] : null,
+            'sgk_eksik_gun_sayisi' => isset($row['sgk_eksik_gun_sayisi']) ? (int) $row['sgk_eksik_gun_sayisi'] : null,
+            'sgk_eksik_gun_kodu' => $row['sgk_eksik_gun_kodu'] ?? null,
+            'sgk_eksik_gun_aciklamasi' => $row['sgk_eksik_gun_aciklamasi'] ?? null,
+            'sgk_hesap_hash' => $row['sgk_hesap_hash'] ?? null,
+            'sgk_katalog_surumu' => $row['sgk_katalog_surumu'] ?? null,
+            'sgk_manifest_hash' => $row['sgk_manifest_hash'] ?? null,
         ];
     }
 

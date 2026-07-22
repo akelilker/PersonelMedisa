@@ -25,7 +25,7 @@ export type CreateSurecPayload = {
   baslangic_tarihi: string;
   bitis_tarihi?: string;
   ucretli_mi?: boolean;
-  ilk_iki_gun_firma_oder_mi?: boolean;
+  ilk_iki_gun_firma_oder_mi?: boolean | null;
   aciklama?: string;
 };
 

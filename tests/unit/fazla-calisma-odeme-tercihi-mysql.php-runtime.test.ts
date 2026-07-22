@@ -51,7 +51,7 @@ describe("FazlaCalismaOdemeTercihiController MariaDB", () => {
     const migrations = readdirSync(resolve(process.cwd(), "api/migrations"))
       .filter((name) => name.endsWith(".sql"))
       .sort();
-    expect(migrations.at(-1)).toBe("035_personel_bordro_kapsamlari.sql");
+    expect(migrations.at(-1)).toBe("037_sgk_resmi_kaynak_manifesti_v1.sql");
   });
 
   it("runs HTTP fazla calisma odeme tercihi acceptance on MariaDB", () => {

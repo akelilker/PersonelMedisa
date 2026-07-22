@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { createConnection } from "node:net";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -8,9 +8,17 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, "../..");
 const dataRoot = join(repoRoot, ".test-mariadb");
 const dataDir = join(dataRoot, "data");
+const startupLockDir = join(dataRoot, "startup.lock");
+const executionLockDir = join(dataRoot, "execution.lock");
+const executionLockOwner = join(executionLockDir, "owner.pid");
+const managedPidFile = join(dataRoot, "mysqld.pid");
 const defaultPort = Number.parseInt(process.env.MEDISA_TEST_MYSQL_PORT ?? "3307", 10);
 const defaultUser = process.env.MEDISA_TEST_MYSQL_USER ?? "root";
 const defaultPassword = process.env.MEDISA_TEST_MYSQL_PASSWORD ?? "";
+const LOCAL_TEST_MYSQL_HOSTS = new Set(["127.0.0.1", "localhost", "::1"]);
+const STALE_STARTUP_LOCK_MS = 60_000;
+const STALE_EXECUTION_LOCK_MS = 900_000;
+const ORPHAN_EXECUTION_LOCK_MS = 60_000;
 
 /** @type {import('node:child_process').ChildProcess | null} */
 let managedProcess = null;
@@ -74,8 +82,86 @@ function isPortOpen(port) {
   });
 }
 
+async function acquireStartupLock(timeoutMs = 45_000) {
+  mkdirSync(dataRoot, { recursive: true });
+  const started = Date.now();
+  while (Date.now() - started <= timeoutMs) {
+    try {
+      mkdirSync(startupLockDir);
+      return () => rmSync(startupLockDir, { recursive: true, force: true });
+    } catch (error) {
+      if (error?.code !== "EEXIST") {
+        throw error;
+      }
+      try {
+        if (Date.now() - statSync(startupLockDir).mtimeMs > STALE_STARTUP_LOCK_MS) {
+          rmSync(startupLockDir, { recursive: true, force: true });
+          continue;
+        }
+      } catch {
+        // Lock owner may have released it between exists/stat checks.
+      }
+      await new Promise((resolvePromise) => setTimeout(resolvePromise, 100));
+    }
+  }
+  throw new Error("Timed out waiting for disposable MariaDB startup owner lock.");
+}
+
+function sleepSync(milliseconds) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, milliseconds);
+}
+
+function isProcessAlive(pid) {
+  if (!Number.isInteger(pid) || pid <= 0) {
+    return false;
+  }
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function acquireExecutionLock(timeoutMs = 600_000) {
+  mkdirSync(dataRoot, { recursive: true });
+  const started = Date.now();
+  while (Date.now() - started <= timeoutMs) {
+    try {
+      mkdirSync(executionLockDir);
+      writeFileSync(executionLockOwner, String(process.pid), "utf8");
+      return () => rmSync(executionLockDir, { recursive: true, force: true });
+    } catch (error) {
+      if (error?.code !== "EEXIST") {
+        throw error;
+      }
+
+      let ownerPid = 0;
+      try {
+        ownerPid = Number.parseInt(readFileSync(executionLockOwner, "utf8").trim(), 10);
+      } catch {
+        // Lock directory creation and owner file write are not atomic together.
+      }
+      try {
+        const lockAgeMs = Date.now() - statSync(executionLockDir).mtimeMs;
+        const ownerDead = ownerPid > 0 && !isProcessAlive(ownerPid);
+        const ownerMissing = !(ownerPid > 0);
+        if (ownerDead || lockAgeMs > STALE_EXECUTION_LOCK_MS || (ownerMissing && lockAgeMs > ORPHAN_EXECUTION_LOCK_MS)) {
+          rmSync(executionLockDir, { recursive: true, force: true });
+          continue;
+        }
+      } catch {
+        // Lock owner may have released it between exists/read/stat checks.
+      }
+      sleepSync(100);
+    }
+  }
+  throw new Error("Timed out waiting for disposable MariaDB execution owner lock.");
+}
+
 function phpMysqlBootstrapArgs() {
-  const args = ["-d", "display_errors=0"];
+  // Fatal runner errors must remain visible; otherwise PHP exits 255 with no owner evidence.
+  const args = ["-d", "display_errors=stderr", "-d", "log_errors=0"];
   if (process.platform === "win32") {
     const extensionDirResult = spawnSync("php", ["-d", "display_errors=0", "-r", "echo ini_get('extension_dir');"], {
       encoding: "utf8"
@@ -172,13 +258,27 @@ function startManagedInstance(port) {
       "--skip-grant-tables",
       "--console"
     ],
-    { stdio: "ignore", windowsHide: true }
+    { stdio: "ignore", windowsHide: true, detached: true }
   );
+  if (managedProcess.pid) {
+    writeFileSync(managedPidFile, String(managedProcess.pid), "utf8");
+  }
   managedProcess.unref();
 
   managedProcess.on("exit", () => {
     managedProcess = null;
+    rmSync(managedPidFile, { force: true });
   });
+}
+
+function assertLocalTestMysqlDsn(dsn) {
+  const hostMatch = /(?:^|[;])\s*host\s*=\s*([^;]+)/i.exec(String(dsn));
+  const host = (hostMatch?.[1] ?? "").trim().toLowerCase();
+  if (!LOCAL_TEST_MYSQL_HOSTS.has(host)) {
+    throw new Error(
+      `MEDISA_TEST_MYSQL_DSN yalnız localhost/127.0.0.1/::1 kabul eder; production veya uzak host engellendi (${host || "bos"}).`
+    );
+  }
 }
 
 export function buildMysqlDsn(port) {
@@ -187,6 +287,7 @@ export function buildMysqlDsn(port) {
 
 export async function ensureDisposableMariaDbEnv() {
   if (process.env.MEDISA_TEST_MYSQL_DSN && process.env.MEDISA_TEST_MYSQL_USER) {
+    assertLocalTestMysqlDsn(process.env.MEDISA_TEST_MYSQL_DSN);
     if (tryPdoPing(process.env.MEDISA_TEST_MYSQL_DSN, process.env.MEDISA_TEST_MYSQL_USER, process.env.MEDISA_TEST_MYSQL_PASSWORD ?? "")) {
       return {
         dsn: process.env.MEDISA_TEST_MYSQL_DSN,
@@ -206,11 +307,16 @@ export async function ensureDisposableMariaDbEnv() {
     return { dsn, user: defaultUser, password: defaultPassword, managed: false };
   }
 
-  if (!managedProcess && !(await isPortOpen(port))) {
-    startManagedInstance(port);
-    await waitForPort(port);
-  } else if (!managedProcess) {
-    await waitForPort(port);
+  const releaseStartupLock = await acquireStartupLock();
+  try {
+    if (!managedProcess && !(await isPortOpen(port))) {
+      startManagedInstance(port);
+      await waitForPort(port);
+    } else if (!managedProcess) {
+      await waitForPort(port);
+    }
+  } finally {
+    releaseStartupLock();
   }
 
   if (!tryPdoPing(dsn, defaultUser, defaultPassword)) {
@@ -225,26 +331,37 @@ export async function ensureDisposableMariaDbEnv() {
 }
 
 export async function stopDisposableMariaDb() {
-  if (!managedProcess || managedProcess.killed) {
-    managedProcess = null;
-    return;
+  let pid = managedProcess && !managedProcess.killed ? managedProcess.pid : null;
+  if (!pid && existsSync(managedPidFile)) {
+    pid = Number.parseInt(readFileSync(managedPidFile, "utf8").trim(), 10);
   }
 
-  const proc = managedProcess;
   managedProcess = null;
-  proc.kill();
-  await new Promise((resolvePromise) => {
-    proc.once("exit", () => resolvePromise(undefined));
-    setTimeout(() => resolvePromise(undefined), 2_000);
-  });
+  if (Number.isInteger(pid) && pid > 0 && isProcessAlive(pid)) {
+    try {
+      process.kill(pid);
+    } catch {
+      // Process may have exited between the alive check and kill.
+    }
+    const started = Date.now();
+    while (isProcessAlive(pid) && Date.now() - started < 2_000) {
+      sleepSync(50);
+    }
+  }
+  rmSync(managedPidFile, { force: true });
 }
 
 export function runPhpMysqlRunner(runnerPath) {
-  return spawnSync("php", [...phpMysqlBootstrapArgs(), runnerPath], {
-    encoding: "utf8",
-    cwd: repoRoot,
-    env: process.env
-  });
+  const releaseExecutionLock = acquireExecutionLock();
+  try {
+    return spawnSync("php", [...phpMysqlBootstrapArgs(), runnerPath], {
+      encoding: "utf8",
+      cwd: repoRoot,
+      env: process.env
+    });
+  } finally {
+    releaseExecutionLock();
+  }
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {

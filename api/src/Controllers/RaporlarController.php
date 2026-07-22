@@ -10,6 +10,7 @@ use Medisa\Api\Database\Connection;
 use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
 use Medisa\Api\Scope\SubeScope;
+use Medisa\Api\Services\SgkPrimGunuService;
 use PDO;
 
 class RaporlarController
@@ -316,16 +317,17 @@ class RaporlarController
     $sql = '
       SELECT
         p.id AS personel_id,
+        p.sube_id AS personel_sube_id,
         CONCAT(p.ad, \' \', p.soyad) AS ad_soyad,
         p.sicil_no,
         p.aktif_durum,
         s.ad AS sube,
         d.ad AS bolum,
         COALESCE(SUM(snap.net_calisma_suresi_dakika), 0) AS net_calisma_dakika,
-        LEAST(30, COUNT(DISTINCT snap.tarih)) AS sgk_prim_gun,
+        NULL AS sgk_prim_gun,
         COUNT(DISTINCT CASE WHEN COALESCE(snap.net_calisma_suresi_dakika, 0) > 0 THEN snap.tarih END) AS toplam_calisma_gunu
       ' . $fromSql . '
-      GROUP BY p.id, p.ad, p.soyad, p.sicil_no, p.aktif_durum, s.ad, d.ad
+      GROUP BY p.id, p.sube_id, p.ad, p.soyad, p.sicil_no, p.aktif_durum, s.ad, d.ad
       ORDER BY p.id ASC
       LIMIT :limit OFFSET :offset
     ';
@@ -337,7 +339,7 @@ class RaporlarController
     $stmt->execute();
 
     $items = [];
-    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+    foreach (self::attachCanonicalSgk($pdo, $stmt->fetchAll(PDO::FETCH_ASSOC), (string) $resolved['donem']) as $row) {
       $items[] = self::mapPersonelOzetRow($row);
     }
 
@@ -373,16 +375,17 @@ class RaporlarController
     $sql = '
       SELECT
         p.id AS personel_id,
+        p.sube_id AS personel_sube_id,
         CONCAT(p.ad, \' \', p.soyad) AS ad_soyad,
         p.sicil_no,
         p.aktif_durum,
         s.ad AS sube,
         d.ad AS bolum,
         COALESCE(SUM(gp.net_calisma_suresi_dakika), 0) AS net_calisma_dakika,
-        LEAST(30, COUNT(DISTINCT gp.tarih)) AS sgk_prim_gun,
+        NULL AS sgk_prim_gun,
         COUNT(DISTINCT CASE WHEN COALESCE(gp.net_calisma_suresi_dakika, 0) > 0 THEN gp.tarih END) AS toplam_calisma_gunu
       ' . $fromSql . '
-      GROUP BY p.id, p.ad, p.soyad, p.sicil_no, p.aktif_durum, s.ad, d.ad
+      GROUP BY p.id, p.sube_id, p.ad, p.soyad, p.sicil_no, p.aktif_durum, s.ad, d.ad
       ORDER BY p.id ASC
       LIMIT :limit OFFSET :offset
     ';
@@ -394,7 +397,7 @@ class RaporlarController
     $stmt->execute();
 
     $items = [];
-    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+    foreach (self::attachCanonicalSgk($pdo, $stmt->fetchAll(PDO::FETCH_ASSOC), $donem) as $row) {
       $items[] = self::mapPersonelOzetRow($row);
     }
 
@@ -1311,6 +1314,55 @@ class RaporlarController
     return substr($baslangic, 0, 7);
   }
 
+  /**
+   * Personel ozetindeki SGK alanlarini yalniz immutable S85-B snapshot owner'indan doldurur.
+   * Snapshot yoksa tarih sayarak veya puantajdan tahmin uretilmez.
+   *
+   * @param array<int, array<string, mixed>> $rows
+   * @return array<int, array<string, mixed>>
+   */
+  private static function attachCanonicalSgk(PDO $pdo, array $rows, $donem)
+  {
+    if (!preg_match('/^(\d{4})-(\d{2})$/', (string) $donem, $matches)) {
+      return $rows;
+    }
+
+    $rowsBySube = [];
+    foreach ($rows as $index => $row) {
+      $subeId = isset($row['personel_sube_id']) ? (int) $row['personel_sube_id'] : 0;
+      if ($subeId > 0) {
+        $rowsBySube[$subeId][] = $index;
+      }
+    }
+
+    foreach ($rowsBySube as $subeId => $indexes) {
+      $canonicalByPersonel = [];
+      foreach (SgkPrimGunuService::listCanonicalResults(
+        $pdo,
+        (int) $subeId,
+        (int) $matches[1],
+        (int) $matches[2]
+      ) as $sgk) {
+        $canonicalByPersonel[(int) $sgk['personel_id']] = $sgk;
+      }
+
+      foreach ($indexes as $index) {
+        $sgk = $canonicalByPersonel[(int) $rows[$index]['personel_id']] ?? null;
+        if ($sgk === null) {
+          continue;
+        }
+        $rows[$index]['sgk_prim_gun'] = $sgk['hesaplanan_prim_gunu'];
+        $rows[$index]['sgk_eksik_gun_sayisi'] = $sgk['eksik_gun_sayisi'];
+        $rows[$index]['sgk_eksik_gun_kodu'] = $sgk['eksik_gun_kodu'];
+        $rows[$index]['sgk_hesap_hash'] = $sgk['sgk_hesap_hash'];
+        $rows[$index]['sgk_snapshot_id'] = $sgk['snapshot_id'];
+        $rows[$index]['sgk_snapshot_revision_no'] = $sgk['snapshot_revision_no'] ?? null;
+      }
+    }
+
+    return $rows;
+  }
+
   /** @param array<string, mixed> $row @return array<string, mixed> */
   private static function mapPersonelOzetRow(array $row)
   {
@@ -1322,7 +1374,12 @@ class RaporlarController
       'sube' => $row['sube'],
       'bolum' => $row['bolum'],
       'net_calisma_dakika' => (int) $row['net_calisma_dakika'],
-      'sgk_prim_gun' => min(30, (int) $row['sgk_prim_gun']),
+      'sgk_prim_gun' => $row['sgk_prim_gun'] !== null ? (int) $row['sgk_prim_gun'] : null,
+      'sgk_eksik_gun_sayisi' => isset($row['sgk_eksik_gun_sayisi']) ? (int) $row['sgk_eksik_gun_sayisi'] : null,
+      'sgk_eksik_gun_kodu' => $row['sgk_eksik_gun_kodu'] ?? null,
+      'sgk_hesap_hash' => $row['sgk_hesap_hash'] ?? null,
+      'sgk_snapshot_id' => isset($row['sgk_snapshot_id']) ? (int) $row['sgk_snapshot_id'] : null,
+      'sgk_snapshot_revision_no' => isset($row['sgk_snapshot_revision_no']) ? (int) $row['sgk_snapshot_revision_no'] : null,
       'toplam_calisma_gunu' => (int) $row['toplam_calisma_gunu'],
     ];
   }

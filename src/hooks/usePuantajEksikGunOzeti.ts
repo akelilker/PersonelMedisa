@@ -1,328 +1,241 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { fetchGunlukPuantaj } from "../api/puantaj.api";
+import { useEffect, useMemo, useState } from "react";
 import {
-  dataCacheKeys,
-  ensureAppData,
-  fetchWithCacheMerge,
-  getCacheEntry,
-  useAppDataRevision
-} from "../data/data-manager";
-import { runDeduped } from "../lib/in-flight-dedupe";
-import { hesaplaAylikPuantajEksikGunOzeti } from "../services/puantaj-hesap-motoru";
+  fetchSgkPrimGunuSonuclari,
+  type SgkPrimGunuSonucu
+} from "../api/maas-hesaplama.api";
 import { useAuth } from "../state/auth.store";
 import type { Personel } from "../types/personel";
-import type { GunlukPuantaj } from "../types/puantaj";
-import {
-  buildGunlukPuantajEksikGunSiniflandirmaGirdisi,
-  readHastalikRaporSurecleriFromCache
-} from "../services/puantaj-hastalik-rapor-cozumu";
 
-const PUANTAJ_EKSIK_GUN_HYDRATE_LIMIT = 7;
-
-export type PuantajEksikGunOzetiDurum =
-  | "hazir"
-  | "manuel_inceleme"
-  | "veri_kapsami_eksik";
-
-export type PuantajEksikGunHydrateDurumu = "idle" | "loading" | "success" | "error";
+export type PuantajEksikGunOzetiDurum = "hazir" | "manuel_inceleme" | "bulunamadi" | "hata";
 
 export type PuantajEksikGunOzetiView = {
   donem: string;
   durum: PuantajEksikGunOzetiDurum;
   durumLabel: string;
-  toplamKayitSayisi: number;
-  donemGunSayisi: number;
-  eksikGunAdayiKayitSayisi: number;
-  sgkPrimGununuDusurenEksikGunSayisi: number;
-  manuelIncelemeKayitSayisi: number;
-  dakikaBazliUcretEtkisiAdayiSayisi: number;
-  gunlukKesintiAdayiSayisi: number;
-  ucretKorunanKayitSayisi: number;
-  haberliYoklukSinyaliSayisi: number;
-  habersizYoklukSinyaliSayisi: number;
-  kesinSgkPrimGunuHesaplanabilirMi: boolean;
-  eksikTarihSayisi: number;
-  eksikTarihListesi: string[];
-  veriKapsamiTamMi: boolean;
-  hydrateEksikPuantajTarihleri: () => Promise<void>;
-  hydrateDurumu: PuantajEksikGunHydrateDurumu;
-  hydrateEdilenTarihSayisi: number;
-  hydrateHataMesaji: string | null;
-  hydrateMumkunMu: boolean;
-  aciklama: string;
-  kayitKapsamiNotu: string | null;
+  hesaplananPrimGunu: number | null;
+  eksikGunSayisi: number | null;
+  eksikGunKodu: string | null;
+  eksikGunAciklamasi: string | null;
+  kaynakSurecIdleri: number[];
+  kaynakPuantajIdleri: number[];
+  kaynakBelgeIdleri: number[];
+  ucretModeli: string | null;
+  ucretModeliLabel: string | null;
+  sirketPolitikaSurumId: number | null;
+  sgkOdenekDurumu: string | null;
+  sgkOdenekDurumuLabel: string | null;
+  manuelIncelemeGerekliMi: boolean;
+  blockerKodlari: string[];
+  blockerEtiketleri: string[];
+  sgkHesapHash: string | null;
+  katalogSurumu: string | null;
+  kaynakManifestHash: string | null;
+  snapshotId: number | null;
+  snapshotRevisionNo: number | null;
+  sourceHash: string | null;
+  isLoading: boolean;
+  errorMessage: string | null;
 };
 
-export const PUANTAJ_EKSIK_GUN_VERI_KAPSAMI_EKSIK_ACIKLAMA =
-  "Bu dönem için tüm günlük puantaj kayıtları yüklenmeden eksik gün / SGK prim günü özeti kesinleştirilemez.";
+const UCRET_MODELI_ETIKET: Record<string, string> = {
+  MAKTU_AYLIK: "Maktu aylık",
+  GUNLUK: "Günlük",
+  SAATLIK: "Saatlik",
+  DIGER: "Diğer",
+  BELIRSIZ: "Belirsiz"
+};
 
-function parseDonemFromPersonel(personel: Personel): { yil: number; ay: number; donem: string } | null {
-  const raw = personel.sgk_donem?.trim();
-  if (!raw) {
+const ODENEK_DURUMU_ETIKET: Record<string, string> = {
+  UYGULANMAZ: "Uygulanmaz",
+  KESINLESMEMIS: "Kesinleşmemiş",
+  KESINLESTI: "Kesinleşti",
+  MAHSUP_BEKLIYOR: "Mahsup bekliyor"
+};
+
+const BLOCKER_ETIKET: Record<string, string> = {
+  SGK_PRIM_GUNU_HESAPLANAMADI: "SGK prim günü hesaplanamadı",
+  SGK_EKSIK_GUN_KODU_BULUNAMADI: "Eksik gün kodu bulunamadı",
+  SGK_EKSIK_GUN_KODU_CAKISTI: "Eksik gün kodları çakıştı",
+  SGK_KATALOG_SURUMU_GECERSIZ: "SGK katalog sürümü geçersiz",
+  SGK_EKSIK_GUN_BELGESI_EKSIK: "Eksik gün belgesi eksik",
+  SGK_KAYNAK_SUREC_CELISKILI: "Kaynak süreç çelişkili",
+  RAPOR_TURU_BELIRSIZ: "Rapor türü belirsiz",
+  HASTALIK_ILK_IKI_GUN_POLITIKASI_EKSIK: "Hastalık ilk iki gün politikası eksik",
+  UCRET_MODELI_BELIRSIZ: "Ücret modeli belirsiz",
+  SGK_ODENEK_MAHSUP_POLITIKASI_EKSIK: "SGK ödenek/mahsup politikası eksik",
+  CANONICAL_TAKVIM_EKSIK: "Canonical takvim eksik"
+};
+
+export function formatSgkUcretModeli(value: string | null | undefined): string | null {
+  if (value == null || value === "") {
     return null;
   }
+  return UCRET_MODELI_ETIKET[value] ?? value;
+}
 
-  const match = raw.match(/^(\d{4})-(\d{2})$/);
+export function formatSgkOdenekDurumu(value: string | null | undefined): string | null {
+  if (value == null || value === "") {
+    return null;
+  }
+  return ODENEK_DURUMU_ETIKET[value] ?? value;
+}
+
+export function formatSgkBlockerKodu(code: string): string {
+  return BLOCKER_ETIKET[code] ?? code;
+}
+
+function parseDonem(personel: Personel): { yil: number; ay: number; donem: string } | null {
+  const match = personel.sgk_donem?.trim().match(/^(\d{4})-(\d{2})$/);
   if (!match) {
     return null;
   }
-
   const yil = Number.parseInt(match[1], 10);
   const ay = Number.parseInt(match[2], 10);
-  if (!Number.isInteger(yil) || !Number.isInteger(ay) || ay < 1 || ay > 12) {
-    return null;
-  }
-
-  return { yil, ay, donem: `${yil}-${String(ay).padStart(2, "0")}` };
+  return ay >= 1 && ay <= 12 ? { yil, ay, donem: `${yil}-${match[2]}` } : null;
 }
 
-function listDonemTarihleri(yil: number, ay: number): string[] {
-  const daysInMonth = new Date(yil, ay, 0).getDate();
-  const ayStr = String(ay).padStart(2, "0");
-  const out: string[] = [];
-  for (let day = 1; day <= daysInMonth; day++) {
-    out.push(`${yil}-${ayStr}-${String(day).padStart(2, "0")}`);
+export function mapCanonicalSgkSonucuToView(
+  donem: string,
+  row: SgkPrimGunuSonucu | null,
+  isLoading = false,
+  errorMessage: string | null = null
+): PuantajEksikGunOzetiView {
+  if (isLoading) {
+    return emptyView(donem, "bulunamadi", "Yükleniyor", true, null);
   }
-  return out;
-}
-
-function buildKayitKapsamiNotu(kayitSayisi: number, donemGunSayisi: number): string {
-  return `Bu dönem için önbellekte ${kayitSayisi}/${donemGunSayisi} günlük kayıt bulundu.`;
-}
-
-function toplaDonemPuantajKapsami(
-  activeSube: number | null,
-  personelId: number,
-  yil: number,
-  ay: number
-): {
-  kayitlar: GunlukPuantaj[];
-  tumTarihler: string[];
-  eksikTarihListesi: string[];
-  kapsamdakiTarihSayisi: number;
-} {
-  const tarihler = listDonemTarihleri(yil, ay);
-  const byTarih = new Map<string, GunlukPuantaj>();
-  const kapsamdakiTarihler = new Set<string>();
-  const cache = ensureAppData().cache;
-
-  for (const tarih of tarihler) {
-    const key = dataCacheKeys.puantajDetail(activeSube, personelId, tarih);
-    if (Object.prototype.hasOwnProperty.call(cache, key)) {
-      kapsamdakiTarihler.add(tarih);
-    }
-    const cached = getCacheEntry<GunlukPuantaj | null>(key);
-    if (cached != null) {
-      byTarih.set(tarih, cached);
-    }
+  if (errorMessage) {
+    return emptyView(donem, "hata", "Yüklenemedi", false, errorMessage);
+  }
+  if (!row) {
+    return emptyView(
+      donem,
+      "bulunamadi",
+      "Immutable snapshot yok",
+      false,
+      "Bu dönem için authoritative SGK snapshot sonucu bulunamadı; frontend tahmin üretmedi."
+    );
   }
 
-  const activeSubePersonelPrefix = dataCacheKeys.puantajDetail(activeSube, personelId, "");
-  const donemPrefix = `${yil}-${String(ay).padStart(2, "0")}-`;
-  for (const key of Object.keys(ensureAppData().cache)) {
-    if (!key.startsWith(activeSubePersonelPrefix)) {
-      continue;
-    }
-
-    const match = key.match(/^puantaj:s[^:]+:(\d+)\|(\d{4}-\d{2}-\d{2})$/);
-    if (!match) {
-      continue;
-    }
-
-    const cachedPersonelId = Number.parseInt(match[1], 10);
-    const tarih = match[2];
-    if (cachedPersonelId !== personelId || !tarih.startsWith(donemPrefix)) {
-      continue;
-    }
-
-    kapsamdakiTarihler.add(tarih);
-    const cached = getCacheEntry<GunlukPuantaj | null>(key);
-    if (cached != null) {
-      byTarih.set(tarih, cached);
-    }
-  }
-
+  const manuel = row.manuel_inceleme_gerekli_mi || row.blocker_kodlari.length > 0;
   return {
-    kayitlar: [...byTarih.values()],
-    tumTarihler: tarihler,
-    eksikTarihListesi: tarihler.filter((tarih) => !kapsamdakiTarihler.has(tarih)),
-    kapsamdakiTarihSayisi: kapsamdakiTarihler.size
+    donem,
+    durum: manuel ? "manuel_inceleme" : "hazir",
+    durumLabel: manuel ? "Manuel İnceleme Gerekli" : "Snapshot Hazır",
+    hesaplananPrimGunu: row.hesaplanan_prim_gunu,
+    eksikGunSayisi: row.eksik_gun_sayisi,
+    eksikGunKodu: row.eksik_gun_kodu,
+    eksikGunAciklamasi: row.eksik_gun_aciklamasi,
+    kaynakSurecIdleri: row.kaynak_surec_idleri,
+    kaynakPuantajIdleri: row.kaynak_puantaj_idleri,
+    kaynakBelgeIdleri: row.kaynak_belge_idleri,
+    ucretModeli: row.ucret_modeli,
+    ucretModeliLabel: formatSgkUcretModeli(row.ucret_modeli),
+    sirketPolitikaSurumId: row.sirket_politika_surum_id,
+    sgkOdenekDurumu: row.sgk_odenek_durumu,
+    sgkOdenekDurumuLabel: formatSgkOdenekDurumu(row.sgk_odenek_durumu),
+    manuelIncelemeGerekliMi: manuel,
+    blockerKodlari: row.blocker_kodlari,
+    blockerEtiketleri: row.blocker_kodlari.map(formatSgkBlockerKodu),
+    sgkHesapHash: row.sgk_hesap_hash,
+    katalogSurumu: row.katalog_surumu,
+    kaynakManifestHash: row.kaynak_manifest_hash,
+    snapshotId: row.snapshot_id,
+    snapshotRevisionNo: row.snapshot_revision_no,
+    sourceHash: row.source_hash,
+    isLoading: false,
+    errorMessage: null
   };
 }
 
-export function mapAylikPuantajEksikGunOzetiToView(
-  sonuc: ReturnType<typeof hesaplaAylikPuantajEksikGunOzeti>,
+function emptyView(
   donem: string,
-  kayitSayisi: number,
-  donemGunSayisi: number,
-  eksikTarihListesi: string[],
-  kapsamdakiTarihSayisi = donemGunSayisi - eksikTarihListesi.length
+  durum: PuantajEksikGunOzetiDurum,
+  durumLabel: string,
+  isLoading: boolean,
+  errorMessage: string | null
 ): PuantajEksikGunOzetiView {
-  const eksikTarihSayisi = eksikTarihListesi.length;
-  const veriKapsamiTamMi = eksikTarihSayisi === 0 && kapsamdakiTarihSayisi >= donemGunSayisi;
-  const kapsamEksik = !veriKapsamiTamMi;
-  const kesinSgkPrimGunuHesaplanabilirMi =
-    sonuc.kesin_sgk_prim_gunu_hesaplanabilir_mi && !kapsamEksik;
-
-  let durum: PuantajEksikGunOzetiDurum = "hazir";
-  let durumLabel = "Hesaplanabilir";
-  let aciklama = sonuc.aciklama;
-
-  if (kapsamEksik) {
-    durum = "veri_kapsami_eksik";
-    durumLabel = "Veri Kapsamı Eksik";
-    aciklama = PUANTAJ_EKSIK_GUN_VERI_KAPSAMI_EKSIK_ACIKLAMA;
-  } else if (sonuc.manuel_inceleme_kayit_sayisi > 0) {
-    durum = "manuel_inceleme";
-    durumLabel = "Manuel İnceleme Gerekli";
-  }
-
   return {
     donem,
     durum,
     durumLabel,
-    toplamKayitSayisi: sonuc.toplam_kayit_sayisi,
-    donemGunSayisi,
-    eksikGunAdayiKayitSayisi: sonuc.eksik_gun_adayi_kayit_sayisi,
-    sgkPrimGununuDusurenEksikGunSayisi: sonuc.sgk_prim_gununu_dusuren_eksik_gun_sayisi,
-    manuelIncelemeKayitSayisi: sonuc.manuel_inceleme_kayit_sayisi,
-    dakikaBazliUcretEtkisiAdayiSayisi: sonuc.dakika_bazli_ucret_etkisi_adayi_sayisi,
-    gunlukKesintiAdayiSayisi: sonuc.gunluk_kesinti_adayi_sayisi,
-    ucretKorunanKayitSayisi: sonuc.ucret_korunan_kayit_sayisi,
-    haberliYoklukSinyaliSayisi: sonuc.haberli_yokluk_sinyali_sayisi,
-    habersizYoklukSinyaliSayisi: sonuc.habersiz_yokluk_sinyali_sayisi,
-    kesinSgkPrimGunuHesaplanabilirMi,
-    eksikTarihSayisi,
-    eksikTarihListesi,
-    veriKapsamiTamMi,
-    hydrateEksikPuantajTarihleri: async () => undefined,
-    hydrateDurumu: "idle",
-    hydrateEdilenTarihSayisi: 0,
-    hydrateHataMesaji: null,
-    hydrateMumkunMu: false,
-    aciklama,
-    kayitKapsamiNotu: kapsamEksik ? buildKayitKapsamiNotu(kayitSayisi, donemGunSayisi) : null
+    hesaplananPrimGunu: null,
+    eksikGunSayisi: null,
+    eksikGunKodu: null,
+    eksikGunAciklamasi: null,
+    kaynakSurecIdleri: [],
+    kaynakPuantajIdleri: [],
+    kaynakBelgeIdleri: [],
+    ucretModeli: null,
+    ucretModeliLabel: null,
+    sirketPolitikaSurumId: null,
+    sgkOdenekDurumu: null,
+    sgkOdenekDurumuLabel: null,
+    manuelIncelemeGerekliMi: false,
+    blockerKodlari: [],
+    blockerEtiketleri: [],
+    sgkHesapHash: null,
+    katalogSurumu: null,
+    kaynakManifestHash: null,
+    snapshotId: null,
+    snapshotRevisionNo: null,
+    sourceHash: null,
+    isLoading,
+    errorMessage
   };
 }
 
-export function usePuantajEksikGunOzeti(personel: Personel): PuantajEksikGunOzetiView | null {
+export function usePuantajEksikGunOzeti(
+  personel: Personel,
+  enabled = true
+): PuantajEksikGunOzetiView | null {
   const { session } = useAuth();
   const activeSube = session?.active_sube_id ?? null;
-  const appDataRevision = useAppDataRevision();
-  const parsedDonem = useMemo(() => parseDonemFromPersonel(personel), [personel.sgk_donem]);
-  const snapshotKey = parsedDonem
-    ? `${activeSube ?? "all"}|${personel.id}|${parsedDonem.donem}`
-    : null;
-  const latestSnapshotRef = useRef<string | null>(snapshotKey);
-  latestSnapshotRef.current = snapshotKey;
-  const [hydrateDurumu, setHydrateDurumu] = useState<PuantajEksikGunHydrateDurumu>("idle");
-  const [hydrateEdilenTarihSayisi, setHydrateEdilenTarihSayisi] = useState(0);
-  const [hydrateHataMesaji, setHydrateHataMesaji] = useState<string | null>(null);
+  const parsedDonem = useMemo(() => parseDonem(personel), [personel.sgk_donem]);
+  const [row, setRow] = useState<SgkPrimGunuSonucu | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    setHydrateDurumu("idle");
-    setHydrateEdilenTarihSayisi(0);
-    setHydrateHataMesaji(null);
-  }, [snapshotKey]);
-
-  const readonlyOzeti = useMemo(() => {
-    void appDataRevision;
-
-    if (!parsedDonem) {
-      return null;
-    }
-
-    const puantajKapsami = toplaDonemPuantajKapsami(
-      activeSube,
-      personel.id,
-      parsedDonem.yil,
-      parsedDonem.ay
-    );
-    const donemGunSayisi = puantajKapsami.tumTarihler.length;
-
-    const hastalikRaporSurecleri = readHastalikRaporSurecleriFromCache(activeSube, personel.id);
-    const siniflandirmaGirdileri = puantajKapsami.kayitlar.map((kayit) =>
-      buildGunlukPuantajEksikGunSiniflandirmaGirdisi(kayit, hastalikRaporSurecleri)
-    );
-    const sonuc = hesaplaAylikPuantajEksikGunOzeti({ kayitlar: siniflandirmaGirdileri });
-
-    return mapAylikPuantajEksikGunOzetiToView(
-      sonuc,
-      parsedDonem.donem,
-      puantajKapsami.kayitlar.length,
-      donemGunSayisi,
-      puantajKapsami.eksikTarihListesi,
-      puantajKapsami.kapsamdakiTarihSayisi
-    );
-  }, [activeSube, appDataRevision, parsedDonem, personel.id]);
-
-  const hydrateMumkunMu =
-    readonlyOzeti !== null &&
-    readonlyOzeti.eksikTarihSayisi > 0 &&
-    hydrateDurumu !== "loading";
-
-  const hydrateEksikPuantajTarihleri = useCallback(async () => {
-    if (!parsedDonem || !readonlyOzeti || hydrateDurumu === "loading") {
+    let cancelled = false;
+    if (!enabled || activeSube == null || !parsedDonem) {
+      setRow(null);
+      setIsLoading(false);
+      setErrorMessage(null);
       return;
     }
 
-    const hedefTarihler = readonlyOzeti.eksikTarihListesi.slice(0, PUANTAJ_EKSIK_GUN_HYDRATE_LIMIT);
-    if (hedefTarihler.length === 0) {
-      return;
-    }
-
-    const hydrateSnapshotKey = snapshotKey;
-    setHydrateDurumu("loading");
-    setHydrateEdilenTarihSayisi(0);
-    setHydrateHataMesaji(null);
-
-    const sonuclar = await Promise.allSettled(
-      hedefTarihler.map(async (tarih) => {
-        const key = dataCacheKeys.puantajDetail(activeSube, personel.id, tarih);
-        const fetched = await runDeduped(key, () => fetchGunlukPuantaj(personel.id, tarih));
-        await fetchWithCacheMerge(key, () => Promise.resolve(fetched));
+    setIsLoading(true);
+    setErrorMessage(null);
+    fetchSgkPrimGunuSonuclari({
+      sube_id: activeSube,
+      yil: parsedDonem.yil,
+      ay: parsedDonem.ay,
+      personel_id: personel.id
+    })
+      .then((items) => {
+        if (!cancelled) {
+          setRow(items[0] ?? null);
+        }
       })
-    );
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          setRow(null);
+          setErrorMessage(error instanceof Error ? error.message : "SGK sonucu yüklenemedi.");
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsLoading(false);
+        }
+      });
 
-    if (latestSnapshotRef.current !== hydrateSnapshotKey) {
-      return;
-    }
-
-    const basariliSayisi = sonuclar.filter((sonuc) => sonuc.status === "fulfilled").length;
-    const hata = sonuclar.find((sonuc): sonuc is PromiseRejectedResult => sonuc.status === "rejected");
-
-    setHydrateEdilenTarihSayisi(basariliSayisi);
-    if (hata) {
-      setHydrateDurumu("error");
-      setHydrateHataMesaji(
-        hata.reason instanceof Error ? hata.reason.message : "Eksik puantaj tarihleri yüklenemedi."
-      );
-      return;
-    }
-
-    setHydrateDurumu("success");
-    setHydrateHataMesaji(null);
-  }, [activeSube, hydrateDurumu, parsedDonem, personel.id, readonlyOzeti, snapshotKey]);
-
-  return useMemo(() => {
-    if (!readonlyOzeti) {
-      return null;
-    }
-
-    return {
-      ...readonlyOzeti,
-      hydrateEksikPuantajTarihleri,
-      hydrateDurumu,
-      hydrateEdilenTarihSayisi,
-      hydrateHataMesaji,
-      hydrateMumkunMu
+    return () => {
+      cancelled = true;
     };
-  }, [
-    hydrateDurumu,
-    hydrateEdilenTarihSayisi,
-    hydrateEksikPuantajTarihleri,
-    hydrateHataMesaji,
-    hydrateMumkunMu,
-    readonlyOzeti
-  ]);
+  }, [activeSube, enabled, parsedDonem, personel.id]);
+
+  if (!parsedDonem || !enabled) {
+    return null;
+  }
+  return mapCanonicalSgkSonucuToView(parsedDonem.donem, row, isLoading, errorMessage);
 }

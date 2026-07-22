@@ -1,0 +1,152 @@
+name: S87-C Production Read-Only Gate
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Type S87C_READONLY_INVENTORY to confirm"
+        required: true
+        type: string
+
+jobs:
+  readonly:
+    name: Temporary FTP read-only inventory
+    if: github.event.inputs.confirm == 'S87C_READONLY_INVENTORY'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Validate FTP secrets
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+          FTP_PORT: ${{ secrets.FTP_PORT }}
+        run: |
+          test -n "$FTP_SERVER" || (echo "FTP_SERVER missing" && exit 1)
+          test -n "$FTP_USERNAME" || (echo "FTP_USERNAME missing" && exit 1)
+          test -n "$FTP_PASSWORD" || (echo "FTP_PASSWORD missing" && exit 1)
+          test "${FTP_PORT}" = "21" || (echo "FTP_PORT must be 21" && exit 1)
+
+      - name: Install lftp
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lftp
+
+      - name: Prepare one-shot probe
+        id: prep
+        run: |
+          set -euo pipefail
+          TOKEN="$(openssl rand -hex 24)"
+          echo "token=$TOKEN" >> "$GITHUB_OUTPUT"
+          mkdir -p /tmp/s87c-ops /tmp/s87c-artifacts
+          export TOKEN
+          python3 - <<'PY'
+          from pathlib import Path
+          import os
+          src = Path('scripts/s87c-readonly-probe.php').read_text(encoding='utf-8')
+          token = os.environ['TOKEN']
+          if src.count('REPLACE_S87C_READONLY_TOKEN') != 1:
+              raise SystemExit('expected exactly 1 REPLACE placeholder')
+          out = src.replace('REPLACE_S87C_READONLY_TOKEN', token, 1)
+          Path('/tmp/s87c-ops/_s87c_readonly.php').write_text(out, encoding='utf-8', newline='\n')
+          print('token_injected_ok')
+          PY
+          if head -c 3 /tmp/s87c-ops/_s87c_readonly.php | grep -q $'\xEF\xBB\xBF'; then
+            echo "BOM detected" && exit 1
+          fi
+          grep -q "UNSET_S87C_READONLY_TOKEN" /tmp/s87c-ops/_s87c_readonly.php
+          grep -q "$TOKEN" /tmp/s87c-ops/_s87c_readonly.php
+
+      - name: Upload probe via FTP
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+          FTP_PORT: ${{ secrets.FTP_PORT }}
+        run: |
+          set -euo pipefail
+          upload() {
+            local use_ftps="$1"
+            lftp -u "${FTP_USERNAME}","${FTP_PASSWORD}" -p "${FTP_PORT}" "ftp://${FTP_SERVER}" -e "
+              set cmd:fail-exit true;
+              set net:max-retries 5;
+              set net:timeout 30;
+              set ssl:verify-certificate no;
+              set ftp:passive-mode on;
+              set ftp:ssl-allow ${use_ftps};
+              set ftp:ssl-force ${use_ftps};
+              set ftp:ssl-protect-data ${use_ftps};
+              cd .;
+              mkdir -p api/public;
+              lcd /tmp/s87c-ops;
+              put -O api/public _s87c_readonly.php;
+              bye
+            "
+          }
+          upload true || upload false
+
+      - name: Identity + inventory
+        env:
+          TOKEN: ${{ steps.prep.outputs.token }}
+        run: |
+          set -euo pipefail
+          BASE="https://www.karmotors.com.tr/personelmedisa/api/public/_s87c_readonly.php"
+          curl -fsS "${BASE}?token=${TOKEN}&action=identity" | tee /tmp/s87c-artifacts/identity.json
+          python3 - <<'PY'
+          import json,sys
+          data=json.load(open('/tmp/s87c-artifacts/identity.json'))
+          print(json.dumps(data, indent=2, ensure_ascii=False))
+          if not data.get('ok'):
+            sys.exit(1)
+          if data.get('identity',{}).get('aktif_veritabani') != 'karmotor_medisa':
+            sys.exit('unexpected database')
+          PY
+          curl -fsS "${BASE}?token=${TOKEN}&action=inventory" | tee /tmp/s87c-artifacts/inventory.json
+          python3 - <<'PY'
+          import json,sys
+          data=json.load(open('/tmp/s87c-artifacts/inventory.json'))
+          print(json.dumps(data, indent=2, ensure_ascii=False))
+          if not data.get('ok') or not data.get('read_only'):
+            sys.exit(1)
+          PY
+
+      - name: Cleanup probe via FTP
+        if: always()
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+          FTP_PORT: ${{ secrets.FTP_PORT }}
+        run: |
+          set -euo pipefail
+          cleanup() {
+            local use_ftps="$1"
+            lftp -u "${FTP_USERNAME}","${FTP_PASSWORD}" -p "${FTP_PORT}" "ftp://${FTP_SERVER}" -e "
+              set cmd:fail-exit true;
+              set net:max-retries 5;
+              set net:timeout 30;
+              set ssl:verify-certificate no;
+              set ftp:passive-mode on;
+              set ftp:ssl-allow ${use_ftps};
+              set ftp:ssl-force ${use_ftps};
+              set ftp:ssl-protect-data ${use_ftps};
+              cd .;
+              rm -f api/public/_s87c_readonly.php;
+              bye
+            "
+          }
+          cleanup true || cleanup false || true
+          # confirm gone
+          code=$(curl -s -o /dev/null -w '%{http_code}' 'https://www.karmotors.com.tr/personelmedisa/api/public/_s87c_readonly.php' || true)
+          echo "probe_http_after_cleanup=$code"
+
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: s87c-readonly-inventory
+          path: /tmp/s87c-artifacts/
+          if-no-files-found: warn

@@ -22,7 +22,7 @@ describe("PersonelBelge contracts php runtime", () => {
 });
 
 describe("S86 personel belge parity source", () => {
-  it("keeps FE/PHP contract and route parity without 039", () => {
+  it("keeps FE/PHP contract and route parity with current migration tip", () => {
     const types = readFileSync(resolve("src/types/personel-belge-kaydi.ts"), "utf8");
     const endpoints = readFileSync(resolve("src/api/endpoints.ts"), "utf8");
     const router = readFileSync(resolve("api/src/Router.php"), "utf8");
@@ -50,8 +50,9 @@ describe("S86 personel belge parity source", () => {
 
     expect(allowlist).not.toContain("D-BEL-01");
     expect(existsSync(resolve("api/migrations/038_personel_belge_yonetimi.sql"))).toBe(true);
-    expect(migrations.some((n) => n.startsWith("039_"))).toBe(false);
-    expect(migrations.at(-1)).toBe("038_personel_belge_yonetimi.sql");
+    expect(existsSync(resolve("api/migrations/039_ubgt_gun_kapsami_tatil_takvimi.sql"))).toBe(true);
+    expect(migrations.some((n) => n.startsWith("039_"))).toBe(true);
+    expect(migrations.at(-1)).toBe("039_ubgt_gun_kapsami_tatil_takvimi.sql");
     expect(existsSync(resolve("src/features/personeller/pages/BelgeTakipPage.tsx"))).toBe(true);
   });
 });

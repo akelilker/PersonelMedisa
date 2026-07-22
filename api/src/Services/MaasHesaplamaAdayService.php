@@ -8,6 +8,7 @@ use Medisa\Api\Services\Payroll\FinanceKalemCatalog;
 use Medisa\Api\Services\Payroll\MaasHesaplamaEngine;
 use Medisa\Api\Services\Payroll\MaasHesaplamaLegalParameterCatalog;
 use Medisa\Api\Services\Payroll\SirketCalismaPolitikasiCatalog;
+use Medisa\Api\Services\ResmiTatilTakvimProjectionService;
 use PDO;
 use PDOException;
 
@@ -178,6 +179,56 @@ class MaasHesaplamaAdayService
                         ],
                         $personel['ad_soyad'] ?? null
                     );
+                }
+            }
+        }
+        foreach ($bundle['personeller'] as $personel) {
+            $pid = (int) $personel['personel_id'];
+            foreach ($bundle['puantaj_by_personel'][$pid] ?? [] as $row) {
+                $class = MaasHesaplamaEngine::classifyHolidayDay($row);
+                if ($class['both'] || $class['ht'] || !$class['ubgt']) {
+                    continue;
+                }
+                $sinif = strtoupper((string) ($row['tatil_siniflandirma_durumu'] ?? ''));
+                if ($sinif === 'CAKISMA') {
+                    $items[] = self::issue(
+                        'BLOCKER',
+                        'TATIL_TAKVIM_CAKISMASI',
+                        'Ayni tarihte birden fazla aktif UBGT takvim kaydi tespit edildi.',
+                        'puantaj',
+                        isset($row['muhur_satir_id']) ? (int) $row['muhur_satir_id'] : null,
+                        $pid,
+                        ['tarih' => $row['tarih'] ?? null],
+                        $personel['ad_soyad'] ?? null
+                    );
+                    continue;
+                }
+                if ($sinif === 'KAYNAK_EKSIK') {
+                    $items[] = self::issue(
+                        'BLOCKER',
+                        MaasHesaplamaEngine::UBGT_DAY_SCOPE_BLOCKER_CODE,
+                        MaasHesaplamaEngine::UBGT_DAY_SCOPE_ERROR_MESSAGE,
+                        'puantaj',
+                        isset($row['muhur_satir_id']) ? (int) $row['muhur_satir_id'] : null,
+                        $pid,
+                        ['tarih' => $row['tarih'] ?? null, 'tatil_siniflandirma_durumu' => $sinif],
+                        $personel['ad_soyad'] ?? null
+                    );
+                    continue;
+                }
+                if ($sinif === 'DOGRULANDI' && MaasHesaplamaEngine::resolveUbgtGunKapsami($row) === 'YARIM_GUN') {
+                    if (!isset($row['tatil_donemi_net_calisma_dakika']) || $row['tatil_donemi_net_calisma_dakika'] === null) {
+                        $items[] = self::issue(
+                            'BLOCKER',
+                            ResmiTatilTakvimProjectionService::TATIL_DONEMI_CALISMA_INTERVALI_EKSIK,
+                            'Yarim gun UBGT icin guvenilir calisma/ara dinlenmesi interval owner bulunamadi; tatil donemi net dakika uretilemedi.',
+                            'puantaj',
+                            isset($row['muhur_satir_id']) ? (int) $row['muhur_satir_id'] : null,
+                            $pid,
+                            ['tarih' => $row['tarih'] ?? null],
+                            $personel['ad_soyad'] ?? null
+                        );
+                    }
                 }
             }
         }

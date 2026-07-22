@@ -64,6 +64,21 @@ export type GunlukPuantaj = {
   yarim_gun_tatil_interval_dakika?: number;
   ht_ubgt_ayni_gun_mi?: boolean;
   gun_siniflandirmalari?: string[];
+  tatil_takvim_id?: number | null;
+  tatil_turu?: string | null;
+  tatil_interval_baslangic?: string | null;
+  tatil_interval_bitis?: string | null;
+  tatil_siniflandirma_durumu?:
+    | "DOGRULANDI"
+    | "BILINMIYOR"
+    | "CAKISMA"
+    | "KAYNAK_EKSIK"
+    | null;
+  tatil_snapshot_hash?: string | null;
+  tatil_kaynak_referansi?: string | null;
+  tatil_donemi_brut_calisma_dakika?: number | null;
+  tatil_donemi_ara_dinlenme_dakika?: number | null;
+  tatil_donemi_net_calisma_dakika?: number | null;
   state?: GunlukPuantajState;
   kontrol_durumu?: PuantajAmirKontrolDurumu;
   compliance_uyarilari: ComplianceUyari[];

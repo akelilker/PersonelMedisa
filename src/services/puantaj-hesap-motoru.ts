@@ -457,7 +457,14 @@ export function resolveUbgtGunKapsami(
   const extended = row as {
     ubgt_gun_kapsami?: string | null;
     tatil_gun_kapsami?: string | null;
+    tatil_siniflandirma_durumu?: string | null;
   };
+  const sinif = String(extended.tatil_siniflandirma_durumu ?? "")
+    .trim()
+    .toUpperCase();
+  if (sinif === "CAKISMA" || sinif === "KAYNAK_EKSIK" || sinif === "BILINMIYOR") {
+    return "BILINMIYOR";
+  }
   let raw: string | null = null;
   if (extended.ubgt_gun_kapsami !== undefined && extended.ubgt_gun_kapsami !== null) {
     raw = String(extended.ubgt_gun_kapsami);

@@ -113,13 +113,13 @@ try {
 
     $files = pbmMigrationFiles();
     pbmAssert($files !== [] && $files[0] === '001_initial_schema.sql', 'zincir 001 ile baslar');
-    pbmAssert(end($files) === '038_personel_belge_yonetimi.sql', 'zincir 038 ile biter');
-    pbmAssert(!in_array('039_personel_belge_yonetimi.sql', $files, true), '039 yok');
+    pbmAssert(end($files) === '039_ubgt_gun_kapsami_tatil_takvimi.sql', 'zincir 039 ile biter');
+    pbmAssert(!in_array('039_personel_belge_yonetimi.sql', $files, true), '039 personel belge yok');
 
     foreach ($files as $file) {
         pbmApplyFile($pdo, $file);
     }
-    pbmAssert(true, '001-038 ilk apply tamam');
+    pbmAssert(true, '001-039 ilk apply tamam');
 
     // Second apply of 038 (idempotency)
     $secondOk = true;
@@ -193,8 +193,12 @@ try {
     pbmAssert((int) $pdo->query('SELECT COUNT(*) FROM personel_belge_dosya_surumleri')->fetchColumn() === 0, 'surum baslangic satiri 0');
     pbmAssert((int) $pdo->query('SELECT COUNT(*) FROM personel_belge_auditleri')->fetchColumn() === 0, 'audit baslangic satiri 0');
 
-    $has039 = (bool) array_filter(pbmMigrationFiles(), static fn ($f) => str_starts_with($f, '039_'));
-    pbmAssert(!$has039, 'repo 039 migration yok');
+    $has039Ubgt = in_array('039_ubgt_gun_kapsami_tatil_takvimi.sql', pbmMigrationFiles(), true);
+    pbmAssert($has039Ubgt, 'repo 039 ubgt tatil takvimi mevcut');
+    pbmAssert(
+        (int) $pdo->query("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'resmi_tatil_takvimi'")->fetchColumn() === 1,
+        '039 resmi_tatil_takvimi tablosu apply edildi'
+    );
 
     echo 'verify-personel-belge-migration-mysql: OK' . PHP_EOL;
 } finally {

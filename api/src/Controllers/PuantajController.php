@@ -13,6 +13,7 @@ use Medisa\Api\Scope\SubeScope;
 use Medisa\Api\Services\DonemKapanisAuditService;
 use Medisa\Api\Services\DonemKapanisPreflightService;
 use Medisa\Api\Services\PuantajDonemKilidiService;
+use Medisa\Api\Services\ResmiTatilTakvimProjectionService;
 use PDO;
 
 class PuantajController
@@ -101,6 +102,7 @@ class PuantajController
             }
 
             $values = self::buildUpsertValues($payload, $existing ?: [], $personelId, $tarih);
+            $values = self::applyTatilProjection($pdo, $values);
             if ($existing) {
                 self::updatePuantajRow($pdo, (int) $existing['id'], $values);
             } else {
@@ -502,6 +504,32 @@ class PuantajController
         ];
     }
 
+    /** @param array<string, mixed> $values @return array<string, mixed> */
+    private static function applyTatilProjection(PDO $pdo, array $values)
+    {
+        $projection = ResmiTatilTakvimProjectionService::projectForPuantajRow($pdo, $values);
+        foreach (self::$tatilProjectionColumns as $column) {
+            $values[$column] = $projection[$column] ?? null;
+        }
+
+        return $values;
+    }
+
+    /** @var string[] */
+    private static $tatilProjectionColumns = [
+        'tatil_takvim_id',
+        'tatil_turu',
+        'tatil_gun_kapsami',
+        'tatil_interval_baslangic',
+        'tatil_interval_bitis',
+        'tatil_siniflandirma_durumu',
+        'tatil_snapshot_hash',
+        'tatil_kaynak_referansi',
+        'tatil_donemi_brut_calisma_dakika',
+        'tatil_donemi_ara_dinlenme_dakika',
+        'tatil_donemi_net_calisma_dakika',
+    ];
+
     /** @param array<string, mixed> $row */
     private static function existingValue(array $row, $key)
     {
@@ -636,13 +664,19 @@ class PuantajController
               durum_bildirim_aciklamasi, hesap_etkisi, beklenen_giris_saati, beklenen_cikis_saati,
               giris_saati, cikis_saati, gec_kalma_dakika, erken_cikis_dakika, gercek_mola_dakika, hesaplanan_mola_dakika,
               net_calisma_suresi_dakika, gunluk_brut_sure_dakika, hafta_tatili_hak_kazandi_mi,
-              kontrol_durumu, kaynak, aciklama, muhur_id)
+              kontrol_durumu, kaynak, aciklama, muhur_id,
+              tatil_takvim_id, tatil_turu, tatil_gun_kapsami, tatil_interval_baslangic, tatil_interval_bitis,
+              tatil_siniflandirma_durumu, tatil_snapshot_hash, tatil_kaynak_referansi,
+              tatil_donemi_brut_calisma_dakika, tatil_donemi_ara_dinlenme_dakika, tatil_donemi_net_calisma_dakika)
              VALUES
              (:personel_id, :tarih, :state, :gun_tipi, :hareket_durumu, :dayanak, :durumu_bildirdi_mi,
               :durum_bildirim_aciklamasi, :hesap_etkisi, :beklenen_giris_saati, :beklenen_cikis_saati,
               :giris_saati, :cikis_saati, :gec_kalma_dakika, :erken_cikis_dakika, :gercek_mola_dakika, :hesaplanan_mola_dakika,
               :net_calisma_suresi_dakika, :gunluk_brut_sure_dakika, :hafta_tatili_hak_kazandi_mi,
-              :kontrol_durumu, :kaynak, :aciklama, :muhur_id)'
+              :kontrol_durumu, :kaynak, :aciklama, :muhur_id,
+              :tatil_takvim_id, :tatil_turu, :tatil_gun_kapsami, :tatil_interval_baslangic, :tatil_interval_bitis,
+              :tatil_siniflandirma_durumu, :tatil_snapshot_hash, :tatil_kaynak_referansi,
+              :tatil_donemi_brut_calisma_dakika, :tatil_donemi_ara_dinlenme_dakika, :tatil_donemi_net_calisma_dakika)'
         );
         $stmt->execute($values);
     }
@@ -675,6 +709,9 @@ class PuantajController
             'aciklama' => $values['aciklama'],
             'muhur_id' => $values['muhur_id'],
         ];
+        foreach (self::$tatilProjectionColumns as $column) {
+            $bindValues[$column] = $values[$column] ?? null;
+        }
         $stmt = $pdo->prepare(
             'UPDATE gunluk_puantaj
              SET state = :state,
@@ -699,6 +736,17 @@ class PuantajController
                  kaynak = :kaynak,
                  aciklama = :aciklama,
                  muhur_id = :muhur_id,
+                 tatil_takvim_id = :tatil_takvim_id,
+                 tatil_turu = :tatil_turu,
+                 tatil_gun_kapsami = :tatil_gun_kapsami,
+                 tatil_interval_baslangic = :tatil_interval_baslangic,
+                 tatil_interval_bitis = :tatil_interval_bitis,
+                 tatil_siniflandirma_durumu = :tatil_siniflandirma_durumu,
+                 tatil_snapshot_hash = :tatil_snapshot_hash,
+                 tatil_kaynak_referansi = :tatil_kaynak_referansi,
+                 tatil_donemi_brut_calisma_dakika = :tatil_donemi_brut_calisma_dakika,
+                 tatil_donemi_ara_dinlenme_dakika = :tatil_donemi_ara_dinlenme_dakika,
+                 tatil_donemi_net_calisma_dakika = :tatil_donemi_net_calisma_dakika,
                  updated_at = CURRENT_TIMESTAMP
              WHERE id = :id'
         );
@@ -736,17 +784,23 @@ class PuantajController
               durum_bildirim_aciklamasi, hesap_etkisi, beklenen_giris_saati, beklenen_cikis_saati,
               giris_saati, cikis_saati, gec_kalma_dakika, erken_cikis_dakika, gercek_mola_dakika, hesaplanan_mola_dakika,
               net_calisma_suresi_dakika, gunluk_brut_sure_dakika, hafta_tatili_hak_kazandi_mi,
-              kontrol_durumu, kaynak, aciklama)
+              kontrol_durumu, kaynak, aciklama,
+              tatil_takvim_id, tatil_turu, tatil_gun_kapsami, tatil_interval_baslangic, tatil_interval_bitis,
+              tatil_siniflandirma_durumu, tatil_snapshot_hash, tatil_kaynak_referansi,
+              tatil_donemi_brut_calisma_dakika, tatil_donemi_ara_dinlenme_dakika, tatil_donemi_net_calisma_dakika)
              VALUES
              (:muhur_id, :personel_id, :tarih, :gun_tipi, :hareket_durumu, :dayanak, :durumu_bildirdi_mi,
               :durum_bildirim_aciklamasi, :hesap_etkisi, :beklenen_giris_saati, :beklenen_cikis_saati,
               :giris_saati, :cikis_saati, :gec_kalma_dakika, :erken_cikis_dakika, :gercek_mola_dakika, :hesaplanan_mola_dakika,
               :net_calisma_suresi_dakika, :gunluk_brut_sure_dakika, :hafta_tatili_hak_kazandi_mi,
-              :kontrol_durumu, :kaynak, :aciklama)'
+              :kontrol_durumu, :kaynak, :aciklama,
+              :tatil_takvim_id, :tatil_turu, :tatil_gun_kapsami, :tatil_interval_baslangic, :tatil_interval_bitis,
+              :tatil_siniflandirma_durumu, :tatil_snapshot_hash, :tatil_kaynak_referansi,
+              :tatil_donemi_brut_calisma_dakika, :tatil_donemi_ara_dinlenme_dakika, :tatil_donemi_net_calisma_dakika)'
         );
 
         foreach ($rows as $row) {
-            $stmt->execute([
+            $bind = [
                 'muhur_id' => $muhurId,
                 'personel_id' => (int) $row['personel_id'],
                 'tarih' => $row['tarih'],
@@ -770,7 +824,11 @@ class PuantajController
                 'kontrol_durumu' => $row['kontrol_durumu'] ?: 'BEKLIYOR',
                 'kaynak' => $row['kaynak'],
                 'aciklama' => $row['aciklama'],
-            ]);
+            ];
+            foreach (self::$tatilProjectionColumns as $column) {
+                $bind[$column] = $row[$column] ?? null;
+            }
+            $stmt->execute($bind);
         }
     }
 
@@ -812,6 +870,18 @@ class PuantajController
             'state' => $row['state'] ?? 'ACIK',
             'kontrol_durumu' => $row['kontrol_durumu'] ?: 'BEKLIYOR',
             'compliance_uyarilari' => [],
+            'tatil_takvim_id' => isset($row['tatil_takvim_id']) && $row['tatil_takvim_id'] !== null
+                ? (int) $row['tatil_takvim_id'] : null,
+            'tatil_turu' => $row['tatil_turu'] ?? null,
+            'tatil_gun_kapsami' => $row['tatil_gun_kapsami'] ?? null,
+            'tatil_interval_baslangic' => $row['tatil_interval_baslangic'] ?? null,
+            'tatil_interval_bitis' => $row['tatil_interval_bitis'] ?? null,
+            'tatil_siniflandirma_durumu' => $row['tatil_siniflandirma_durumu'] ?? null,
+            'tatil_snapshot_hash' => $row['tatil_snapshot_hash'] ?? null,
+            'tatil_kaynak_referansi' => $row['tatil_kaynak_referansi'] ?? null,
+            'tatil_donemi_brut_calisma_dakika' => self::mapNullableInt($row['tatil_donemi_brut_calisma_dakika'] ?? null),
+            'tatil_donemi_ara_dinlenme_dakika' => self::mapNullableInt($row['tatil_donemi_ara_dinlenme_dakika'] ?? null),
+            'tatil_donemi_net_calisma_dakika' => self::mapNullableInt($row['tatil_donemi_net_calisma_dakika'] ?? null),
         ];
     }
 

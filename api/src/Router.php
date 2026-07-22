@@ -27,6 +27,7 @@ use Medisa\Api\Controllers\PersonelUcretController;
 use Medisa\Api\Controllers\PuantajController;
 use Medisa\Api\Controllers\RaporlarController;
 use Medisa\Api\Controllers\ReferansController;
+use Medisa\Api\Controllers\ResmiTatilTakvimiController;
 use Medisa\Api\Controllers\RevizyonController;
 use Medisa\Api\Controllers\SureclerController;
 use Medisa\Api\Controllers\YonetimController;
@@ -392,6 +393,31 @@ class Router
         }
         if ($method === 'POST' && preg_match('#^/sirket-calisma-politikalari/(\d+)/iptal$#', $path, $matches)) {
             SirketCalismaPolitikasiController::cancel($this->request, $matches[1]);
+        }
+
+        if ($path === '/resmi-tatil-takvimi' && $method === 'GET') {
+            ResmiTatilTakvimiController::list($this->request);
+        }
+        if ($path === '/resmi-tatil-takvimi' && $method === 'POST') {
+            ResmiTatilTakvimiController::create($this->request);
+        }
+        if ($path === '/resmi-tatil-takvimi/envanter/ozet' && $method === 'GET') {
+            ResmiTatilTakvimiController::envanterOzet($this->request);
+        }
+        if ($method === 'GET' && preg_match('#^/resmi-tatil-takvimi/(\d+)$#', $path, $matches)) {
+            ResmiTatilTakvimiController::detail($this->request, $matches[1]);
+        }
+        if ($method === 'PUT' && preg_match('#^/resmi-tatil-takvimi/(\d+)$#', $path, $matches)) {
+            ResmiTatilTakvimiController::update($this->request, $matches[1]);
+        }
+        if ($method === 'POST' && preg_match('#^/resmi-tatil-takvimi/(\d+)/aktiflestir$#', $path, $matches)) {
+            ResmiTatilTakvimiController::activate($this->request, $matches[1]);
+        }
+        if ($method === 'POST' && preg_match('#^/resmi-tatil-takvimi/(\d+)/revize$#', $path, $matches)) {
+            ResmiTatilTakvimiController::revise($this->request, $matches[1]);
+        }
+        if ($method === 'POST' && preg_match('#^/resmi-tatil-takvimi/(\d+)/iptal$#', $path, $matches)) {
+            ResmiTatilTakvimiController::cancel($this->request, $matches[1]);
         }
 
         if ($path === '/mevzuat-parametreleri' && $method === 'GET') {

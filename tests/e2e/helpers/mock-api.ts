@@ -9720,6 +9720,60 @@ let personelBelgeKaydiIdCounter = 903;
       return;
     }
 
+    // S88 resmi tatil takvimi — demo parity (seed yok)
+    if (path === "/api/resmi-tatil-takvimi/envanter/ozet" && method === "GET") {
+      if (await denyUnlessRolePermission(route, "resmi_tatil_takvimi.view")) {
+        return;
+      }
+      await fulfillJson(route, {
+        yil: Number.parseInt(url.searchParams.get("yil") ?? "2026", 10),
+        ay: Number.parseInt(url.searchParams.get("ay") ?? "4", 10),
+        donem: "2026-04",
+        toplam: 0,
+        aktif: 0,
+        taslak: 0,
+        iptal: 0,
+        aktif_ubgt_tam_gun: 0,
+        aktif_ubgt_yarim_gun: 0,
+        siniflandirma: {
+          toplam_ubgt_satiri: 0,
+          tam_gun: 0,
+          yarim_gun: 0,
+          bilinmiyor: 0,
+          cakisma: 0,
+          kaynak_eksik: 0,
+          ht_ubgt: 0,
+          muhurlu: 0,
+          muhursuz: 0,
+          policy_activation_blocker: 0
+        }
+      });
+      return;
+    }
+    if (path === "/api/resmi-tatil-takvimi" && method === "GET") {
+      if (await denyUnlessRolePermission(route, "resmi_tatil_takvimi.view")) {
+        return;
+      }
+      await fulfillJson(route, { items: [] });
+      return;
+    }
+    if (path === "/api/resmi-tatil-takvimi" && method === "POST") {
+      if (await denyUnlessRolePermission(route, "resmi_tatil_takvimi.manage")) {
+        return;
+      }
+      const body = route.request().postDataJSON() as Record<string, unknown>;
+      await fulfillJson(route, {
+        id: 1,
+        ...body,
+        durum: "TASLAK",
+        revizyon_no: 1,
+        onceki_kayit_id: null,
+        tatil_interval_baslangic: body.tatil_interval_baslangic ?? null,
+        tatil_interval_bitis: body.tatil_interval_bitis ?? null
+      });
+      return;
+    }
+
     if (path === "/api/puantaj/bildirim-etki-adaylari/rapor" && method === "GET") {
       if (await denyUnlessRolePermission(route, "puantaj.bildirim_etki.rapor.view")) {
         return;

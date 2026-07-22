@@ -69,6 +69,8 @@ export type AppPermission =
   | "patron_ack.mark_seen"
   | "sirket_parametreleri.view"
   | "sirket_parametreleri.manage"
+  | "resmi_tatil_takvimi.view"
+  | "resmi_tatil_takvimi.manage"
   | "bordro_on_izleme.view"
   | "bordro_kesinlestirme.approve"
   | "personel_bordro_kapsam.view"
@@ -139,6 +141,8 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "patron_ack.view",
     "sirket_parametreleri.view",
     "sirket_parametreleri.manage",
+    "resmi_tatil_takvimi.view",
+    "resmi_tatil_takvimi.manage",
     "bordro_on_izleme.view",
     "bordro_kesinlestirme.approve",
     "personel_bordro_kapsam.view",
@@ -242,6 +246,7 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "bordro_on_izleme.view",
     "sirket_parametreleri.view",
     "sirket_parametreleri.manage",
+    "resmi_tatil_takvimi.view",
     "personel_bordro_kapsam.view",
     "personel_bordro_kapsam.manage",
     "revizyon.view",

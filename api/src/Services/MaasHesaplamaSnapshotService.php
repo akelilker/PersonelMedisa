@@ -1841,12 +1841,28 @@ class MaasHesaplamaSnapshotService
     /** @param array<string, mixed> $row @return array<string, mixed> */
     public static function attendancePayload(array $row)
     {
+        $siniflandirma = isset($row['tatil_siniflandirma_durumu']) && $row['tatil_siniflandirma_durumu'] !== null
+            ? (string) $row['tatil_siniflandirma_durumu'] : null;
+        $tatilGunKapsami = isset($row['tatil_gun_kapsami']) && $row['tatil_gun_kapsami'] !== null
+            ? (string) $row['tatil_gun_kapsami'] : null;
+        $ubgtGunKapsami = ($siniflandirma === 'DOGRULANDI' && $tatilGunKapsami !== null) ? $tatilGunKapsami : null;
+        $gunTipi = $row['gun_tipi'] !== null ? (string) $row['gun_tipi'] : null;
+        $htUbgtSameDay = $gunTipi === 'Hafta_Tatili_Pazar'
+            && isset($row['tatil_takvim_id'])
+            && $row['tatil_takvim_id'] !== null;
+        $gunSiniflandirmalari = null;
+        if ($htUbgtSameDay) {
+            $gunSiniflandirmalari = ['Hafta_Tatili_Pazar', 'UBGT_Resmi_Tatil'];
+        } elseif ($gunTipi === 'UBGT_Resmi_Tatil') {
+            $gunSiniflandirmalari = ['UBGT_Resmi_Tatil'];
+        }
+
         return [
             'muhur_satir_id' => (int) $row['id'],
             'muhur_id' => (int) $row['muhur_id'],
             'personel_id' => (int) $row['personel_id'],
             'tarih' => (string) $row['tarih'],
-            'gun_tipi' => $row['gun_tipi'] !== null ? (string) $row['gun_tipi'] : null,
+            'gun_tipi' => $gunTipi,
             'hareket_durumu' => $row['hareket_durumu'] !== null ? (string) $row['hareket_durumu'] : null,
             'dayanak' => $row['dayanak'] !== null ? (string) $row['dayanak'] : null,
             'durumu_bildirdi_mi' => $row['durumu_bildirdi_mi'] !== null ? (int) $row['durumu_bildirdi_mi'] : null,
@@ -1866,6 +1882,27 @@ class MaasHesaplamaSnapshotService
             'kontrol_durumu' => (string) $row['kontrol_durumu'],
             'kaynak' => $row['kaynak'] !== null ? (string) $row['kaynak'] : null,
             'aciklama' => $row['aciklama'] !== null ? (string) $row['aciklama'] : null,
+            'tatil_takvim_id' => isset($row['tatil_takvim_id']) && $row['tatil_takvim_id'] !== null ? (int) $row['tatil_takvim_id'] : null,
+            'tatil_turu' => isset($row['tatil_turu']) && $row['tatil_turu'] !== null ? (string) $row['tatil_turu'] : null,
+            'tatil_gun_kapsami' => $tatilGunKapsami,
+            'ubgt_gun_kapsami' => $ubgtGunKapsami,
+            'tatil_interval_baslangic' => isset($row['tatil_interval_baslangic']) && $row['tatil_interval_baslangic'] !== null
+                ? (string) $row['tatil_interval_baslangic'] : null,
+            'tatil_interval_bitis' => isset($row['tatil_interval_bitis']) && $row['tatil_interval_bitis'] !== null
+                ? (string) $row['tatil_interval_bitis'] : null,
+            'tatil_siniflandirma_durumu' => $siniflandirma,
+            'tatil_snapshot_hash' => isset($row['tatil_snapshot_hash']) && $row['tatil_snapshot_hash'] !== null
+                ? (string) $row['tatil_snapshot_hash'] : null,
+            'tatil_kaynak_referansi' => isset($row['tatil_kaynak_referansi']) && $row['tatil_kaynak_referansi'] !== null
+                ? (string) $row['tatil_kaynak_referansi'] : null,
+            'tatil_donemi_brut_calisma_dakika' => isset($row['tatil_donemi_brut_calisma_dakika']) && $row['tatil_donemi_brut_calisma_dakika'] !== null
+                ? (int) $row['tatil_donemi_brut_calisma_dakika'] : null,
+            'tatil_donemi_ara_dinlenme_dakika' => isset($row['tatil_donemi_ara_dinlenme_dakika']) && $row['tatil_donemi_ara_dinlenme_dakika'] !== null
+                ? (int) $row['tatil_donemi_ara_dinlenme_dakika'] : null,
+            'tatil_donemi_net_calisma_dakika' => isset($row['tatil_donemi_net_calisma_dakika']) && $row['tatil_donemi_net_calisma_dakika'] !== null
+                ? (int) $row['tatil_donemi_net_calisma_dakika'] : null,
+            'ht_ubgt_ayni_gun_mi' => $htUbgtSameDay ? 1 : 0,
+            'gun_siniflandirmalari' => $gunSiniflandirmalari,
             'created_at' => self::normalizeTimestamp($row['created_at'] ?? null),
         ];
     }

@@ -37,11 +37,11 @@ describe("S74-D1 migration 013 bildirim puantaj etki manual apply", () => {
 
   it("keeps migration 013 unique in the contiguous sequence before 015", () => {
     expect(migrationFiles.map((fileName) => Number(fileName.slice(0, 3)))).toEqual(
-      Array.from({ length: 38 }, (_, index) => index + 1)
+      Array.from({ length: 39 }, (_, index) => index + 1)
     );
     expect(migrationFiles.filter((fileName) => fileName.startsWith("013_"))).toEqual([
       "013_bildirim_puantaj_etki_manual_apply.sql",
     ]);
-    expect(migrationFiles.at(-1)).toBe("038_personel_belge_yonetimi.sql");
+    expect(migrationFiles.at(-1)).toBe("039_ubgt_gun_kapsami_tatil_takvimi.sql");
   });
 });

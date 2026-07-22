@@ -49,6 +49,26 @@ function createMemoryPdo(): PDO
     $pdo = new PDO('sqlite::memory:');
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
     $pdo->exec(
+        'CREATE TABLE resmi_tatil_takvimi (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tarih TEXT NOT NULL,
+            tatil_kodu TEXT NOT NULL,
+            tatil_adi TEXT NOT NULL,
+            tatil_turu TEXT NOT NULL,
+            gun_kapsami TEXT NOT NULL,
+            tatil_interval_baslangic TEXT,
+            tatil_interval_bitis TEXT,
+            durum TEXT NOT NULL,
+            kaynak_turu TEXT NOT NULL,
+            kaynak_referansi TEXT NOT NULL,
+            kaynak_tarihi TEXT,
+            aciklama TEXT,
+            revizyon_no INTEGER NOT NULL DEFAULT 1,
+            onceki_kayit_id INTEGER,
+            yapan_kullanici_id INTEGER
+        )'
+    );
+    $pdo->exec(
         'CREATE TABLE gunluk_puantaj (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             personel_id INTEGER NOT NULL,
@@ -75,6 +95,17 @@ function createMemoryPdo(): PDO
             kaynak TEXT,
             aciklama TEXT,
             muhur_id INTEGER,
+            tatil_takvim_id INTEGER,
+            tatil_turu TEXT,
+            tatil_gun_kapsami TEXT,
+            tatil_interval_baslangic TEXT,
+            tatil_interval_bitis TEXT,
+            tatil_siniflandirma_durumu TEXT,
+            tatil_snapshot_hash TEXT,
+            tatil_kaynak_referansi TEXT,
+            tatil_donemi_brut_calisma_dakika INTEGER,
+            tatil_donemi_ara_dinlenme_dakika INTEGER,
+            tatil_donemi_net_calisma_dakika INTEGER,
             updated_at TEXT
         )'
     );
@@ -103,7 +134,18 @@ function createMemoryPdo(): PDO
             hafta_tatili_hak_kazandi_mi INTEGER,
             kontrol_durumu TEXT,
             kaynak TEXT,
-            aciklama TEXT
+            aciklama TEXT,
+            tatil_takvim_id INTEGER,
+            tatil_turu TEXT,
+            tatil_gun_kapsami TEXT,
+            tatil_interval_baslangic TEXT,
+            tatil_interval_bitis TEXT,
+            tatil_siniflandirma_durumu TEXT,
+            tatil_snapshot_hash TEXT,
+            tatil_kaynak_referansi TEXT,
+            tatil_donemi_brut_calisma_dakika INTEGER,
+            tatil_donemi_ara_dinlenme_dakika INTEGER,
+            tatil_donemi_net_calisma_dakika INTEGER
         )'
     );
 

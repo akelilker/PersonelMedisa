@@ -6,7 +6,6 @@
  */
 declare(strict_types=1);
 
-header('Content-Type: application/json; charset=utf-8');
 header('X-Content-Type-Options: nosniff');
 
 $tokenExpected = 'REPLACE_S86_MIGRATE_TOKEN';
@@ -14,6 +13,7 @@ $tokenProvided = isset($_GET['token']) ? (string) $_GET['token'] : '';
 // Sentinel must stay literally "UNSET_S86_MIGRATE_TOKEN" after token injection.
 if ($tokenExpected === 'UNSET_S86_MIGRATE_TOKEN' || $tokenProvided === '' || !hash_equals($tokenExpected, $tokenProvided)) {
     http_response_code(403);
+    header('Content-Type: application/json; charset=utf-8');
     echo json_encode(['ok' => false, 'error' => 'FORBIDDEN'], JSON_UNESCAPED_UNICODE);
     exit;
 }
@@ -21,6 +21,14 @@ if ($tokenExpected === 'UNSET_S86_MIGRATE_TOKEN' || $tokenProvided === '' || !ha
 $action = isset($_GET['action']) ? (string) $_GET['action'] : 'identity';
 $expected038 = 'e72ccad0231722c0d846017c9f54bc6b29f62720901efb43c0af56d3e2ae30ed';
 $migrationFile = '038_personel_belge_yonetimi.sql';
+
+function s86_json(array $payload, int $status = 200): void
+{
+    http_response_code($status);
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    exit;
+}
 
 $configCandidates = [
     dirname(__DIR__) . '/config.local.php',
@@ -34,9 +42,7 @@ foreach ($configCandidates as $path) {
     }
 }
 if (!is_array($config)) {
-    http_response_code(500);
-    echo json_encode(['ok' => false, 'error' => 'CONFIG_MISSING'], JSON_UNESCAPED_UNICODE);
-    exit;
+    s86_json(['ok' => false, 'error' => 'CONFIG_MISSING'], 500);
 }
 
 $host = (string) ($config['db_host'] ?? 'localhost');
@@ -596,9 +602,7 @@ if ($action === 'backup') {
         $inventory = s86_inventory_json($pdo);
         $payload = json_encode($inventory, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         if (!is_string($payload) || $payload === '') {
-            http_response_code(500);
-            echo json_encode(['ok' => false, 'error' => 'INVENTORY_JSON_ENCODE_FAILED'], JSON_UNESCAPED_UNICODE);
-            exit;
+            s86_json(['ok' => false, 'error' => 'INVENTORY_JSON_ENCODE_FAILED'], 500);
         }
         $backupPath = $paths['json'];
         file_put_contents($backupPath, $payload);
@@ -606,12 +610,13 @@ if ($action === 'backup') {
         $meta['file'] = basename($backupPath);
         $meta['inventory_json'] = true;
         $meta['contains_create_table'] = count($inventory['create_tables'] ?? []) > 0;
+        $meta['key_row_counts'] = $inventory['key_row_counts'] ?? [];
+        $meta['table_count'] = $inventory['table_count'] ?? 0;
+        $meta['trigger_count'] = count($inventory['triggers'] ?? []);
     }
 
     if ($meta['file'] === null || !is_file(__DIR__ . '/' . $meta['file']) || filesize(__DIR__ . '/' . $meta['file']) <= 0) {
-        http_response_code(500);
-        echo json_encode(['ok' => false, 'error' => 'BACKUP_FILE_MISSING'], JSON_UNESCAPED_UNICODE);
-        exit;
+        s86_json(['ok' => false, 'error' => 'BACKUP_FILE_MISSING'], 500);
     }
 
     $fullPath = __DIR__ . '/' . $meta['file'];
@@ -621,6 +626,7 @@ if ($action === 'backup') {
     if ($meta['method'] === 'mysqldump') {
         $meta['contains_create_table'] = stripos($contents, 'CREATE TABLE') !== false;
         $meta['contains_insert'] = stripos($contents, 'INSERT INTO') !== false;
+        $meta['single_transaction'] = true;
     }
 
     file_put_contents(__DIR__ . '/s86_latest_backup_path.txt', $meta['file']);
@@ -629,14 +635,17 @@ if ($action === 'backup') {
         || ($meta['method'] === 'inventory_json' && $meta['contains_create_table'])
     );
 
-    echo json_encode([
+    $response = [
         'ok' => $ok,
         'code' => $ok ? 'S86_BACKUP_OK' : 'S86_BACKUP_INCOMPLETE',
         'backup' => $meta,
         'identity' => $identity,
         'preflight' => s86_preflight($pdo, $config),
-    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-    exit;
+    ];
+    if ($meta['method'] === 'inventory_json') {
+        $response['inventory'] = json_decode($contents, true);
+    }
+    s86_json($response);
 }
 
 if ($action === 'download_backup') {
@@ -657,15 +666,19 @@ if ($action === 'download_backup') {
         $backupPath = $matches[0] ?? '';
     }
     if ($backupPath === '' || !is_file($backupPath)) {
-        http_response_code(404);
-        echo json_encode(['ok' => false, 'error' => 'BACKUP_NOT_FOUND'], JSON_UNESCAPED_UNICODE);
-        exit;
+        s86_json(['ok' => false, 'error' => 'BACKUP_NOT_FOUND'], 404);
     }
 
-    $mime = str_ends_with(strtolower($backupPath), '.json') ? 'application/json' : 'application/sql';
-    header('Content-Type: ' . $mime . '; charset=utf-8');
+    $size = filesize($backupPath);
+    if ($size === false || $size <= 0) {
+        s86_json(['ok' => false, 'error' => 'BACKUP_EMPTY'], 500);
+    }
+
+    $isJson = substr(strtolower($backupPath), -5) === '.json';
+    header('Content-Type: ' . ($isJson ? 'application/json' : 'application/sql') . '; charset=utf-8');
     header('Content-Disposition: attachment; filename="' . basename($backupPath) . '"');
-    header('Content-Length: ' . (string) filesize($backupPath));
+    header('Content-Length: ' . (string) $size);
+    header('Cache-Control: no-store');
     readfile($backupPath);
     exit;
 }
@@ -768,54 +781,140 @@ if ($action === 'storage_probe') {
 
 if ($action === 'storage_ensure') {
     if (!isset($_GET['mkdir']) || (string) $_GET['mkdir'] !== '1') {
-        http_response_code(400);
-        echo json_encode(['ok' => false, 'error' => 'MKDIR_PARAM_REQUIRED', 'hint' => 'Use action=storage_ensure&mkdir=1'], JSON_UNESCAPED_UNICODE);
-        exit;
+        s86_json(['ok' => false, 'error' => 'MKDIR_PARAM_REQUIRED', 'hint' => 'Use action=storage_ensure&mkdir=1'], 400);
     }
 
     $configured = s86_configured_storage_root($config);
     if ($configured === null) {
-        http_response_code(409);
-        echo json_encode([
+        s86_json([
             'ok' => false,
             'code' => 'S86_STORAGE_ENSURE_BLOCKED',
             'error' => 'CONFIG_EMPTY',
             'message' => 'personel_belge_storage_root not configured; will not invent path',
-        ], JSON_UNESCAPED_UNICODE);
-        exit;
+        ], 409);
     }
     if (s86_path_under_public_web_root($configured)) {
-        http_response_code(409);
-        echo json_encode([
+        s86_json([
             'ok' => false,
             'code' => 'S86_STORAGE_ENSURE_BLOCKED',
             'error' => 'UNDER_PUBLIC_WEB_ROOT',
             'path' => $configured,
-        ], JSON_UNESCAPED_UNICODE);
-        exit;
+        ], 409);
     }
 
     $created = false;
     if (!is_dir($configured)) {
         $created = @mkdir($configured, 0750, true);
         if (!$created && !is_dir($configured)) {
-            http_response_code(500);
-            echo json_encode(['ok' => false, 'code' => 'S86_STORAGE_ENSURE_FAILED', 'path' => $configured], JSON_UNESCAPED_UNICODE);
-            exit;
+            s86_json(['ok' => false, 'code' => 'S86_STORAGE_ENSURE_FAILED', 'path' => $configured], 500);
         }
         $created = true;
     }
 
     @chmod($configured, 0750);
     $probe = s86_storage_probe($config);
-    echo json_encode([
+    s86_json([
         'ok' => $probe['ok'],
         'code' => $probe['ok'] ? 'S86_STORAGE_ENSURE_OK' : 'S86_STORAGE_ENSURE_INCOMPLETE',
         'created' => $created,
         'storage_probe' => $probe,
-    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-    exit;
+    ]);
 }
 
-http_response_code(400);
-echo json_encode(['ok' => false, 'error' => 'UNKNOWN_ACTION', 'action' => $action], JSON_UNESCAPED_UNICODE);
+if ($action === 'storage_configure') {
+    if (!isset($_GET['confirm']) || (string) $_GET['confirm'] !== 'SET_RECOMMENDED_ROOT') {
+        s86_json(['ok' => false, 'error' => 'CONFIRM_REQUIRED', 'hint' => 'confirm=SET_RECOMMENDED_ROOT'], 400);
+    }
+
+    $configPath = null;
+    foreach ($configCandidates as $path) {
+        if (is_file($path)) {
+            $configPath = $path;
+            break;
+        }
+    }
+    if ($configPath === null || !is_writable($configPath)) {
+        s86_json(['ok' => false, 'code' => 'S86_STORAGE_CONFIGURE_BLOCKED', 'error' => 'CONFIG_NOT_WRITABLE'], 500);
+    }
+
+    $recommended = s86_recommended_storage_path();
+    if (s86_path_under_public_web_root($recommended)) {
+        s86_json(['ok' => false, 'code' => 'S86_STORAGE_CONFIGURE_BLOCKED', 'error' => 'RECOMMENDED_UNDER_PUBLIC'], 409);
+    }
+
+    $raw = (string) file_get_contents($configPath);
+    if ($raw === '') {
+        s86_json(['ok' => false, 'error' => 'CONFIG_READ_FAILED'], 500);
+    }
+
+    $updated = false;
+    $patterns = [
+        "/('personel_belge_storage_root'\\s*=>\\s*)''/",
+        '/("personel_belge_storage_root"\\s*=>\\s*)""/',
+        "/('personel_belge_storage_root'\\s*=>\\s*)null/i",
+    ];
+    foreach ($patterns as $pattern) {
+        $next = preg_replace($pattern, '${1}' . var_export($recommended, true), $raw, 1, $count);
+        if (is_string($next) && $count === 1) {
+            $raw = $next;
+            $updated = true;
+            break;
+        }
+    }
+    if (!$updated && strpos($raw, 'personel_belge_storage_root') === false) {
+        $raw = preg_replace(
+            '/(return\\s*\\[)/',
+            "$1\n    'personel_belge_storage_root' => " . var_export($recommended, true) . ',',
+            $raw,
+            1,
+            $count
+        );
+        $updated = is_string($raw) && $count === 1;
+    }
+    if (!$updated) {
+        // Already set — do not overwrite existing non-empty value.
+        $current = s86_configured_storage_root($config);
+        if ($current !== null) {
+            s86_json([
+                'ok' => true,
+                'code' => 'S86_STORAGE_ALREADY_CONFIGURED',
+                'path' => $current,
+                'changed' => false,
+            ]);
+        }
+        s86_json(['ok' => false, 'code' => 'S86_STORAGE_CONFIGURE_BLOCKED', 'error' => 'PATTERN_NOT_MATCHED'], 409);
+    }
+
+    $backupCfg = $configPath . '.s86bak.' . gmdate('YmdHis');
+    if (!@copy($configPath, $backupCfg)) {
+        s86_json(['ok' => false, 'error' => 'CONFIG_BACKUP_FAILED'], 500);
+    }
+    if (@file_put_contents($configPath, $raw) === false) {
+        s86_json(['ok' => false, 'error' => 'CONFIG_WRITE_FAILED'], 500);
+    }
+
+    $dirCreated = false;
+    if (!is_dir($recommended)) {
+        $dirCreated = @mkdir($recommended, 0750, true);
+        if (!$dirCreated && !is_dir($recommended)) {
+            s86_json(['ok' => false, 'code' => 'S86_STORAGE_DIR_CREATE_FAILED', 'path' => $recommended], 500);
+        }
+        $dirCreated = true;
+    }
+    @chmod($recommended, 0750);
+
+    $fresh = $config;
+    $fresh['personel_belge_storage_root'] = $recommended;
+    $probe = s86_storage_probe($fresh);
+    s86_json([
+        'ok' => $probe['ok'],
+        'code' => $probe['ok'] ? 'S86_STORAGE_CONFIGURE_OK' : 'S86_STORAGE_CONFIGURE_INCOMPLETE',
+        'path' => $recommended,
+        'changed' => true,
+        'dir_created' => $dirCreated,
+        'config_backup_basename' => basename($backupCfg),
+        'storage_probe' => $probe,
+    ]);
+}
+
+s86_json(['ok' => false, 'error' => 'UNKNOWN_ACTION', 'action' => $action], 400);

@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       confirm:
-        description: "PREFLIGHT_BACKUP_S86 | MIGRATE_S86_038 | STORAGE_PROBE_S86 | CLEANUP_S86"
+        description: "PREFLIGHT_BACKUP_S86 | MIGRATE_S86_038 | STORAGE_CONFIGURE_S86 | STORAGE_PROBE_S86 | CLEANUP_S86"
         required: true
         type: string
 
@@ -14,6 +14,7 @@ jobs:
     if: >-
       github.event.inputs.confirm == 'PREFLIGHT_BACKUP_S86' ||
       github.event.inputs.confirm == 'MIGRATE_S86_038' ||
+      github.event.inputs.confirm == 'STORAGE_CONFIGURE_S86' ||
       github.event.inputs.confirm == 'STORAGE_PROBE_S86' ||
       github.event.inputs.confirm == 'CLEANUP_S86'
     runs-on: ubuntu-latest
@@ -162,6 +163,10 @@ jobs:
         if: github.event.inputs.confirm == 'PREFLIGHT_BACKUP_S86'
         env:
           TOKEN: ${{ steps.prep.outputs.token }}
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+          FTP_PORT: ${{ secrets.FTP_PORT }}
         run: |
           set -euo pipefail
           BASE="https://www.karmotors.com.tr/personelmedisa/api/public/_s86_migrate.php"
@@ -176,9 +181,28 @@ jobs:
           open('/tmp/s86-artifacts/backup_filename.txt','w').write(name)
           method=(data.get('backup') or {}).get('method')
           open('/tmp/s86-artifacts/backup_method.txt','w').write(str(method or ''))
+          # Prefer embedded inventory when present (avoids fragile HTTP download of large dumps).
+          inv=data.get('inventory')
+          if isinstance(inv, dict) and method == 'inventory_json':
+              import json as _json
+              from pathlib import Path
+              out=Path('/tmp/s86-artifacts')/name
+              out.write_text(_json.dumps(inv, ensure_ascii=False, indent=2), encoding='utf-8')
+              print('embedded inventory written bytes', out.stat().st_size)
           PY
           FNAME="$(cat /tmp/s86-artifacts/backup_filename.txt)"
-          curl -fsS "${BASE}?token=${TOKEN}&action=download_backup" -o "/tmp/s86-artifacts/${FNAME}"
+          if [ ! -s "/tmp/s86-artifacts/${FNAME}" ]; then
+            curl -fsS "${BASE}?token=${TOKEN}&action=download_backup" -o "/tmp/s86-artifacts/${FNAME}" \
+              || lftp -u "${FTP_USERNAME}","${FTP_PASSWORD}" -p "${FTP_PORT}" "ftp://${FTP_SERVER}" -e "
+                   set cmd:fail-exit true; set ssl:verify-certificate no; set ftp:passive-mode on;
+                   set ftp:ssl-allow true; set ftp:ssl-force true; set ftp:ssl-protect-data true;
+                   cd api/public; get ${FNAME} -o /tmp/s86-artifacts/${FNAME}; bye
+                 " \
+              || lftp -u "${FTP_USERNAME}","${FTP_PASSWORD}" -p "${FTP_PORT}" "ftp://${FTP_SERVER}" -e "
+                   set cmd:fail-exit true; set ssl:verify-certificate no; set ftp:passive-mode on;
+                   set ftp:ssl-allow false; cd api/public; get ${FNAME} -o /tmp/s86-artifacts/${FNAME}; bye
+                 "
+          fi
           ls -la "/tmp/s86-artifacts/${FNAME}"
           python3 - <<PY
           from pathlib import Path
@@ -196,7 +220,8 @@ jobs:
               assert payload.get('tables')
               assert payload.get('create_tables')
               assert payload.get('triggers') is not None
-              print('backup verify OK inventory_json tables', len(payload.get('tables') or []))
+              assert payload.get('key_row_counts')
+              print('backup verify OK inventory_json tables', len(payload.get('tables') or []), 'key_counts', payload.get('key_row_counts'))
           else:
               raise SystemExit(f'unknown backup method: {method}')
           h=hashlib.sha256(p.read_bytes()).hexdigest()
@@ -228,6 +253,30 @@ jobs:
           python3 - <<'PY'
           import json,sys
           data=json.load(open('/tmp/s86-artifacts/postcheck.json'))
+          print(json.dumps(data, indent=2))
+          if not data.get('ok'):
+            sys.exit(1)
+          PY
+
+      - name: Storage configure + probe
+        if: github.event.inputs.confirm == 'STORAGE_CONFIGURE_S86'
+        env:
+          TOKEN: ${{ steps.prep.outputs.token }}
+        run: |
+          set -euo pipefail
+          BASE="https://www.karmotors.com.tr/personelmedisa/api/public/_s86_migrate.php"
+          curl -fsS "${BASE}?token=${TOKEN}&action=storage_configure&confirm=SET_RECOMMENDED_ROOT" | tee /tmp/s86-artifacts/storage_configure.json
+          python3 - <<'PY'
+          import json,sys
+          data=json.load(open('/tmp/s86-artifacts/storage_configure.json'))
+          print(json.dumps(data, indent=2))
+          if not data.get('ok'):
+            sys.exit(1)
+          PY
+          curl -fsS "${BASE}?token=${TOKEN}&action=storage_probe" | tee /tmp/s86-artifacts/storage_probe.json
+          python3 - <<'PY'
+          import json,sys
+          data=json.load(open('/tmp/s86-artifacts/storage_probe.json'))
           print(json.dumps(data, indent=2))
           if not data.get('ok'):
             sys.exit(1)

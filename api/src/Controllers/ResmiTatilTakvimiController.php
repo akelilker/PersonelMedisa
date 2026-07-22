@@ -38,7 +38,8 @@ class ResmiTatilTakvimiController
                 $request->getQuery('durum'),
                 $request->getQuery('tatil_turu'),
                 $request->getQuery('tarih_bas'),
-                $request->getQuery('tarih_bit')
+                $request->getQuery('tarih_bit'),
+                $request->getQuery('gun_kapsami')
             ),
         ]);
     }
@@ -156,7 +157,7 @@ class ResmiTatilTakvimiController
         self::assertManage($user);
         $pdo = Connection::get();
         $body = $request->getJsonBody();
-        $gerekce = trim((string) ($body['gerekce'] ?? $body['neden'] ?? ''));
+        $gerekce = trim((string) ($body['iptal_gerekcesi'] ?? $body['gerekce'] ?? $body['neden'] ?? ''));
         try {
             JsonResponse::success(
                 ResmiTatilTakvimiService::cancel($pdo, (int) $id, $gerekce, $user, self::requestHash($request, $user))
@@ -165,6 +166,41 @@ class ResmiTatilTakvimiController
             self::error($e);
         } catch (\Throwable $e) {
             JsonResponse::serverError('Resmi tatil kaydi iptal edilemedi.');
+        }
+    }
+
+    public static function history(Request $request, $id)
+    {
+        $user = AuthMiddleware::authenticate($request);
+        self::assertView($user);
+        $pdo = Connection::get();
+        try {
+            JsonResponse::success(ResmiTatilTakvimiService::history($pdo, (int) $id));
+        } catch (ResmiTatilTakvimiException $e) {
+            self::error($e);
+        }
+    }
+
+    public static function projectionPreview(Request $request)
+    {
+        $user = AuthMiddleware::authenticate($request);
+        self::assertView($user);
+        $pdo = Connection::get();
+        $scope = \Medisa\Api\Scope\SubeScope::resolveScope($user, $request);
+        $allowed = \Medisa\Api\Scope\SubeScope::allowedSubeIds($user);
+        $body = $request->getJsonBody();
+        if (isset($body['sube_id']) && (int) $body['sube_id'] > 0) {
+            \Medisa\Api\Scope\SubeScope::assertPersonelAccess($user, $request, (int) $body['sube_id']);
+            $scope = (int) $body['sube_id'];
+        }
+        try {
+            JsonResponse::success(
+                ResmiTatilTakvimiService::projectionPreview($pdo, $user, $body, $scope, $allowed)
+            );
+        } catch (ResmiTatilTakvimiException $e) {
+            self::error($e);
+        } catch (\Throwable $e) {
+            JsonResponse::serverError('Projection onizleme uretilemedi.');
         }
     }
 

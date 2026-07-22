@@ -1,4 +1,5 @@
 import type { ApiResponse } from "../types/api";
+import { appendQueryParams } from "../utils/append-query-params";
 import { apiRequest } from "./api-client";
 import { endpoints } from "./endpoints";
 
@@ -22,6 +23,8 @@ export type ResmiTatilTakvimKaydi = {
   aciklama: string | null;
   revizyon_no: number;
   onceki_kayit_id: number | null;
+  yapan_ad?: string | null;
+  iptal_gerekcesi?: string | null;
 };
 
 export type ResmiTatilSiniflandirmaOzet = {
@@ -64,6 +67,54 @@ export type ResmiTatilUpsertPayload = {
   aciklama?: string | null;
 };
 
+export type ResmiTatilListFilters = {
+  durum?: ResmiTatilDurum | "";
+  tatil_turu?: ResmiTatilTuru | "";
+  gun_kapsami?: ResmiTatilGunKapsami | "";
+  tarih_bas?: string;
+  tarih_bit?: string;
+};
+
+export type ResmiTatilHistoryAudit = {
+  id: number;
+  kayit_id: number;
+  aksiyon: string;
+  actor_id: number | null;
+  actor_rol: string | null;
+  actor_ad: string | null;
+  request_hash: string | null;
+  created_at: string;
+};
+
+export type ResmiTatilHistoryResponse = {
+  items: ResmiTatilTakvimKaydi[];
+  auditler: ResmiTatilHistoryAudit[];
+};
+
+export type ResmiTatilProjectionPreview = {
+  tarih_bas: string;
+  tarih_bit: string;
+  preview_modu: string;
+  read_only: true;
+  policy_aktif_degil: true;
+  toplam_satir: number;
+  dogrulandi: number;
+  kaynak_eksik: number;
+  cakisma: number;
+  bilinmiyor: number;
+  tam_gun: number;
+  yarim_gun: number;
+  ht_ubgt: number;
+  interval_olcumu_eksik: number;
+  policy_blocker: number;
+  muhurlu: number;
+  muhursuz: number;
+  muhur_projection_eksik: number;
+  tam_gun_aktivasyona_hazir: number;
+  yarim_gun_odeme_politikasi_bekliyor: number;
+  genel_sistem_hazir: false;
+};
+
 function unwrapData<T>(payload: ApiResponse<T> | T): T {
   if (typeof payload === "object" && payload !== null && "data" in payload) {
     return (payload as ApiResponse<T>).data;
@@ -71,9 +122,18 @@ function unwrapData<T>(payload: ApiResponse<T> | T): T {
   return payload as T;
 }
 
-export async function fetchResmiTatilTakvimiList(): Promise<ResmiTatilTakvimKaydi[]> {
+export async function fetchResmiTatilTakvimiList(
+  filters: ResmiTatilListFilters = {}
+): Promise<ResmiTatilTakvimKaydi[]> {
+  const path = appendQueryParams(endpoints.resmiTatilTakvimi.list, {
+    durum: filters.durum || undefined,
+    tatil_turu: filters.tatil_turu || undefined,
+    gun_kapsami: filters.gun_kapsami || undefined,
+    tarih_bas: filters.tarih_bas || undefined,
+    tarih_bit: filters.tarih_bit || undefined
+  });
   const response = await apiRequest<ApiResponse<{ items: ResmiTatilTakvimKaydi[] }> | { items: ResmiTatilTakvimKaydi[] }>(
-    endpoints.resmiTatilTakvimi.list
+    path
   );
   return unwrapData(response).items ?? [];
 }
@@ -132,6 +192,28 @@ export async function cancelResmiTatilTakvimi(
   const response = await apiRequest<ApiResponse<ResmiTatilTakvimKaydi> | ResmiTatilTakvimKaydi>(
     endpoints.resmiTatilTakvimi.cancel(id),
     { method: "POST", body: JSON.stringify({ iptal_gerekcesi }) }
+  );
+  return unwrapData(response);
+}
+
+export async function fetchResmiTatilHistory(id: number): Promise<ResmiTatilHistoryResponse> {
+  const response = await apiRequest<ApiResponse<ResmiTatilHistoryResponse> | ResmiTatilHistoryResponse>(
+    endpoints.resmiTatilTakvimi.history(id)
+  );
+  return unwrapData(response);
+}
+
+export async function previewResmiTatilProjection(payload: {
+  tarih?: string;
+  tarih_bas?: string;
+  tarih_bit?: string;
+  sube_id?: number;
+  personel_id?: number;
+  preview_modu?: string;
+}): Promise<ResmiTatilProjectionPreview> {
+  const response = await apiRequest<ApiResponse<ResmiTatilProjectionPreview> | ResmiTatilProjectionPreview>(
+    endpoints.resmiTatilTakvimi.projectionPreview,
+    { method: "POST", body: JSON.stringify(payload) }
   );
   return unwrapData(response);
 }

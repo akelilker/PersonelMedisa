@@ -141,6 +141,7 @@ export function ShellHeaderActions({ contextLabel, minimal = false }: ShellHeade
   const canViewYonetimPanel = hasPermission("yonetim-paneli.view");
   const canManageYonetimPanel = hasPermission("yonetim-paneli.manage");
   const canViewMevzuat = hasPermission("mevzuat_parametreleri.view");
+  const canViewResmiTatilTakvimi = hasPermission("resmi_tatil_takvimi.view");
 
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -567,6 +568,17 @@ export function ShellHeaderActions({ contextLabel, minimal = false }: ShellHeade
               }}
             >
               Mevzuat Parametreleri
+            </button>
+          ) : null}
+          {canViewResmiTatilTakvimi ? (
+            <button
+              type="button"
+              data-testid="settings-resmi-tatil-takvimi"
+              onClick={() => {
+                navigateTo("/resmi-tatil-takvimi");
+              }}
+            >
+              Resmî Tatil Takvimi
             </button>
           ) : null}
           <button

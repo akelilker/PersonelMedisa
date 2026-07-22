@@ -1477,6 +1477,34 @@ function mapDemoResmiTatilRecord(record: ResmiTatilTakvimDemoRecord) {
   return { ...record };
 }
 
+function buildDemoResmiTatilProjectionPreview(body: Record<string, unknown>) {
+  const tarihBas = toStringValue(body.tarih_bas) ?? toStringValue(body.tarih) ?? "2099-01-15";
+  const tarihBit = toStringValue(body.tarih_bit) ?? toStringValue(body.tarih) ?? tarihBas;
+  return {
+    tarih_bas: tarihBas,
+    tarih_bit: tarihBit,
+    preview_modu: toStringValue(body.preview_modu) ?? "AGGREGATE",
+    read_only: true as const,
+    policy_aktif_degil: true as const,
+    toplam_satir: 0,
+    dogrulandi: 0,
+    kaynak_eksik: 0,
+    cakisma: 0,
+    bilinmiyor: 0,
+    tam_gun: 0,
+    yarim_gun: 0,
+    ht_ubgt: 0,
+    interval_olcumu_eksik: 0,
+    policy_blocker: 0,
+    muhurlu: 0,
+    muhursuz: 0,
+    muhur_projection_eksik: 0,
+    tam_gun_aktivasyona_hazir: 0,
+    yarim_gun_odeme_politikasi_bekliyor: 0,
+    genel_sistem_hazir: false as const
+  };
+}
+
 const SIRKET_POLITIKA_KATALOG = [
   { parametre_kodu: "NORMAL_AY_GUN_SAYISI", etiket: "Normal Ay Gün Sayısı", deger_tipi: "SAYISAL", birim: "GUN", zorunlu: true },
   { parametre_kodu: "GUNLUK_CALISMA_SAATI", etiket: "Günlük Çalışma Saati", deger_tipi: "SAYISAL", birim: "SAAT", zorunlu: true },
@@ -9528,7 +9556,7 @@ export function resolveDemoApiResponse(
     if (record.durum !== "AKTIF") {
       return demoRevizyonError("TATIL_TAKVIM_INVALID_STATE", "Yalniz aktif kayit revize edilebilir.");
     }
-    const gerekce = toStringValue(body.gerekce);
+    const gerekce = toStringValue(body.iptal_gerekcesi) ?? toStringValue(body.gerekce);
     if (!gerekce) return demoRevizyonError("VALIDATION_ERROR", "Revizyon gerekcesi zorunludur.");
     record.durum = "IPTAL";
     record.iptal_gerekcesi = gerekce;
@@ -9553,11 +9581,29 @@ export function resolveDemoApiResponse(
     const id = Number.parseInt(resmiTatilCancelMatch[1] ?? "", 10);
     const record = resmiTatilTakvimiDemoState.items.find((item) => item.id === id);
     if (!record) return demoRevizyonError("NOT_FOUND", "Kayit bulunamadi.");
-    const gerekce = toStringValue(body.gerekce) ?? toStringValue(body.neden);
+    const gerekce = toStringValue(body.iptal_gerekcesi) ?? toStringValue(body.gerekce) ?? toStringValue(body.neden);
     if (!gerekce) return demoRevizyonError("VALIDATION_ERROR", "Iptal gerekcesi zorunludur.");
     record.durum = "IPTAL";
     record.iptal_gerekcesi = gerekce;
     return ok(mapDemoResmiTatilRecord(record));
+  }
+
+  const resmiTatilHistoryMatch = pathname.match(/^\/resmi-tatil-takvimi\/(\d+)\/gecmis$/);
+  if (resmiTatilHistoryMatch && method === "GET") {
+    const actor = readDemoApiActor(init);
+    const permissionError = assertDemoResmiTatilView(actor);
+    if (permissionError) return permissionError;
+    const id = Number.parseInt(resmiTatilHistoryMatch[1] ?? "", 10);
+    const record = resmiTatilTakvimiDemoState.items.find((item) => item.id === id);
+    if (!record) return demoRevizyonError("NOT_FOUND", "Kayit bulunamadi.");
+    return ok({ items: [mapDemoResmiTatilRecord(record)], auditler: [] });
+  }
+
+  if (pathname === "/resmi-tatil-takvimi/projection-preview" && method === "POST") {
+    const actor = readDemoApiActor(init);
+    const permissionError = assertDemoResmiTatilView(actor);
+    if (permissionError) return permissionError;
+    return ok(buildDemoResmiTatilProjectionPreview(body));
   }
 
   return null;

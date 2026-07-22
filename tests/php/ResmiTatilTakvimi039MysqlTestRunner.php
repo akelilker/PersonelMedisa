@@ -75,13 +75,18 @@ try {
         PDO::MYSQL_ATTR_USE_BUFFERED_QUERY => true,
     ]);
 
-    $pdo->exec('CREATE TABLE users (id INT UNSIGNED NOT NULL PRIMARY KEY) ENGINE=InnoDB');
-    $pdo->exec('CREATE TABLE personeller (id INT UNSIGNED NOT NULL PRIMARY KEY, ad VARCHAR(80) NOT NULL) ENGINE=InnoDB');
+    $pdo->exec('CREATE TABLE users (id INT UNSIGNED NOT NULL PRIMARY KEY, ad_soyad VARCHAR(120) NULL) ENGINE=InnoDB');
+    $pdo->exec('CREATE TABLE personeller (id INT UNSIGNED NOT NULL PRIMARY KEY, ad VARCHAR(80) NOT NULL, sube_id INT UNSIGNED NOT NULL DEFAULT 1) ENGINE=InnoDB');
     $pdo->exec("CREATE TABLE gunluk_puantaj (
         id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
         personel_id INT UNSIGNED NOT NULL,
         tarih DATE NOT NULL,
         gun_tipi VARCHAR(40) NULL,
+        muhur_id INT UNSIGNED NULL,
+        giris_saati TIME NULL,
+        cikis_saati TIME NULL,
+        gercek_mola_dakika INT NULL,
+        net_calisma_suresi_dakika INT NULL,
         UNIQUE KEY uq_gp (personel_id, tarih)
     ) ENGINE=InnoDB");
     $pdo->exec("CREATE TABLE puantaj_aylik_muhurleri (
@@ -97,11 +102,11 @@ try {
         UNIQUE KEY uq_pams (muhur_id, personel_id, tarih),
         CONSTRAINT fk_pams_muhur FOREIGN KEY (muhur_id) REFERENCES puantaj_aylik_muhurleri (id)
     ) ENGINE=InnoDB");
-    $pdo->exec('INSERT INTO users VALUES (1)');
-    $pdo->exec("INSERT INTO personeller VALUES (1, 'Baseline')");
-    $pdo->exec("INSERT INTO gunluk_puantaj (personel_id, tarih, gun_tipi) VALUES (1, '2026-04-23', 'UBGT_Resmi_Tatil')");
+    $pdo->exec("INSERT INTO users VALUES (1, 'Test User')");
+    $pdo->exec("INSERT INTO personeller VALUES (1, 'Baseline', 1)");
+    $pdo->exec("INSERT INTO gunluk_puantaj (personel_id, tarih, gun_tipi) VALUES (1, '2099-04-23', 'UBGT_Resmi_Tatil')");
     $pdo->exec('INSERT INTO puantaj_aylik_muhurleri VALUES (1, 1)');
-    $pdo->exec("INSERT INTO puantaj_aylik_muhur_satirlari (muhur_id, personel_id, tarih, gun_tipi) VALUES (1, 1, '2026-04-23', 'UBGT_Resmi_Tatil')");
+    $pdo->exec("INSERT INTO puantaj_aylik_muhur_satirlari (muhur_id, personel_id, tarih, gun_tipi) VALUES (1, 1, '2099-04-23', 'UBGT_Resmi_Tatil')");
 
     applyRttMigration($pdo, '039_ubgt_gun_kapsami_tatil_takvimi.sql');
     rttAssert(
@@ -135,7 +140,7 @@ try {
     $pdo->exec("INSERT INTO resmi_tatil_takvimi (
         tarih, tatil_kodu, tatil_adi, tatil_turu, gun_kapsami, durum, kaynak_turu, kaynak_referansi, yapan_kullanici_id
     ) VALUES (
-        '2026-04-23', 'TEST_UBGT', 'Test', 'UBGT', 'TAM_GUN', 'AKTIF', 'TEST', 'ref-1', 1
+        '2099-04-23', 'TEST_UBGT', 'Test', 'UBGT', 'TAM_GUN', 'AKTIF', 'TEST', 'ref-1', 1
     )");
     rttAssert(true, 'TAM_GUN aktif UBGT kaydi eklenebilir');
 
@@ -145,7 +150,7 @@ try {
         $pdo->exec("INSERT INTO resmi_tatil_takvimi (
             tarih, tatil_kodu, tatil_adi, tatil_turu, gun_kapsami, durum, kaynak_turu, kaynak_referansi, yapan_kullanici_id
         ) VALUES (
-            '2026-04-23', 'TEST_UBGT2', 'Test2', 'UBGT', 'TAM_GUN', 'AKTIF', 'TEST', 'ref-2', 1
+            '2099-04-23', 'TEST_UBGT2', 'Test2', 'UBGT', 'TAM_GUN', 'AKTIF', 'TEST', 'ref-2', 1
         )");
     } catch (Throwable $e) {
         $dupFailed = true;
@@ -170,11 +175,111 @@ try {
         tatil_interval_baslangic, tatil_interval_bitis,
         durum, kaynak_turu, kaynak_referansi, yapan_kullanici_id
     ) VALUES (
-        '2026-05-01', 'HALF', 'Half', 'UBGT', 'YARIM_GUN',
+        '2099-05-01', 'HALF', 'Half', 'UBGT', 'YARIM_GUN',
         '13:00:00', '23:59:59',
         'TASLAK', 'TEST', 'ref-h', 1
     )");
     rttAssert(true, 'YARIM_GUN gecerli interval kabul edilir');
+
+    // CHECK / FK hardening
+    rttAssert(
+        (int) $pdo->query("SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'gunluk_puantaj' AND CONSTRAINT_NAME = 'chk_gp_tatil_sinif'")->fetchColumn() === 1,
+        'chk_gp_tatil_sinif mevcut'
+    );
+    rttAssert(
+        (int) $pdo->query("SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'puantaj_aylik_muhur_satirlari' AND CONSTRAINT_NAME = 'chk_pams_tatil_hash'")->fetchColumn() === 1,
+        'chk_pams_tatil_hash mevcut'
+    );
+    $fkDelete = (string) $pdo->query("SELECT DELETE_RULE FROM information_schema.REFERENTIAL_CONSTRAINTS WHERE CONSTRAINT_SCHEMA = DATABASE() AND CONSTRAINT_NAME = 'fk_rtta_kayit'")->fetchColumn();
+    rttAssert($fkDelete === 'RESTRICT', 'audit FK ON DELETE RESTRICT');
+
+    // Service lifecycle + history + preview read-only
+    require_once __DIR__ . '/../../api/src/bootstrap.php';
+    $actor = ['id' => 1, 'rol' => 'GENEL_YONETICI'];
+    $draft = \Medisa\Api\Services\ResmiTatilTakvimiService::create($pdo, [
+        'tarih' => '2099-06-10',
+        'tatil_kodu' => 'SYN_A',
+        'tatil_adi' => 'Sentetik A',
+        'tatil_turu' => 'UBGT',
+        'gun_kapsami' => 'TAM_GUN',
+        'kaynak_turu' => 'TEST',
+        'kaynak_referansi' => 's88-a-1',
+    ], $actor, str_repeat('a', 64));
+    rttAssert(($draft['durum'] ?? '') === 'TASLAK', 'service create draft');
+
+    $updated = \Medisa\Api\Services\ResmiTatilTakvimiService::update($pdo, (int) $draft['id'], [
+        'tarih' => '2099-06-10',
+        'tatil_kodu' => 'SYN_A',
+        'tatil_adi' => 'Sentetik A2',
+        'tatil_turu' => 'UBGT',
+        'gun_kapsami' => 'TAM_GUN',
+        'kaynak_turu' => 'TEST',
+        'kaynak_referansi' => 's88-a-1b',
+    ], $actor, str_repeat('b', 64));
+    rttAssert(($updated['tatil_adi'] ?? '') === 'Sentetik A2', 'service update draft');
+
+    $aktif = \Medisa\Api\Services\ResmiTatilTakvimiService::activate($pdo, (int) $draft['id'], $actor, str_repeat('c', 64));
+    rttAssert(($aktif['durum'] ?? '') === 'AKTIF', 'service activate');
+
+    $history = \Medisa\Api\Services\ResmiTatilTakvimiService::history($pdo, (int) $draft['id']);
+    rttAssert(count($history['items']) >= 1, 'history items');
+    rttAssert(count($history['auditler']) >= 2, 'history audit chain');
+
+    $rev = \Medisa\Api\Services\ResmiTatilTakvimiService::revise($pdo, (int) $draft['id'], [
+        'tarih' => '2099-06-10',
+        'tatil_kodu' => 'SYN_A',
+        'tatil_adi' => 'Sentetik A3',
+        'tatil_turu' => 'UBGT',
+        'gun_kapsami' => 'TAM_GUN',
+        'kaynak_turu' => 'TEST',
+        'kaynak_referansi' => 's88-a-2',
+        'iptal_gerekcesi' => 'Revizyon test',
+    ], $actor, str_repeat('d', 64));
+    rttAssert(($rev['durum'] ?? '') === 'AKTIF' && (int) $rev['revizyon_no'] === 2, 'revise yeni aktif revizyon');
+    $old = \Medisa\Api\Services\ResmiTatilTakvimiService::get($pdo, (int) $draft['id']);
+    rttAssert(($old['durum'] ?? '') === 'IPTAL', 'eski aktif iptal oldu');
+
+    $beforeHash = (string) $pdo->query('CHECKSUM TABLE gunluk_puantaj')->fetch(PDO::FETCH_ASSOC)['Checksum'];
+    $beforeCount = (int) $pdo->query('SELECT COUNT(*) FROM gunluk_puantaj')->fetchColumn();
+    $preview = \Medisa\Api\Services\ResmiTatilTakvimiService::projectionPreview(
+        $pdo,
+        $actor,
+        ['tarih_bas' => '2099-06-01', 'tarih_bit' => '2099-06-30', 'preview_modu' => 'OZET'],
+        null,
+        []
+    );
+    rttAssert(($preview['read_only'] ?? false) === true, 'preview read_only');
+    $afterHash = (string) $pdo->query('CHECKSUM TABLE gunluk_puantaj')->fetch(PDO::FETCH_ASSOC)['Checksum'];
+    $afterCount = (int) $pdo->query('SELECT COUNT(*) FROM gunluk_puantaj')->fetchColumn();
+    rttAssert($beforeCount === $afterCount && $beforeHash === $afterHash, 'preview puantaj mutate etmedi');
+
+    $cancelled = \Medisa\Api\Services\ResmiTatilTakvimiService::cancel($pdo, (int) $rev['id'], 'Iptal test', $actor, str_repeat('e', 64));
+    rttAssert(($cancelled['durum'] ?? '') === 'IPTAL', 'service cancel');
+
+    // Seal immutability: muhur satir snapshot takvim revizyonundan etkilenmez
+    $pdo->exec("INSERT INTO resmi_tatil_takvimi (
+        tarih, tatil_kodu, tatil_adi, tatil_turu, gun_kapsami, durum, kaynak_turu, kaynak_referansi, yapan_kullanici_id
+    ) VALUES ('2099-07-01', 'SEAL', 'Seal', 'UBGT', 'TAM_GUN', 'AKTIF', 'TEST', 'seal-1', 1)");
+    $calId = (int) $pdo->lastInsertId();
+    $pdo->exec("UPDATE gunluk_puantaj SET
+        tatil_takvim_id = $calId,
+        tatil_turu = 'UBGT',
+        tatil_gun_kapsami = 'TAM_GUN',
+        tatil_siniflandirma_durumu = 'DOGRULANDI',
+        tatil_snapshot_hash = '" . str_repeat('f', 64) . "',
+        tatil_kaynak_referansi = 'seal-1'
+      WHERE id = 1");
+    $pdo->exec("UPDATE puantaj_aylik_muhur_satirlari SET
+        tatil_takvim_id = $calId,
+        tatil_turu = 'UBGT',
+        tatil_gun_kapsami = 'TAM_GUN',
+        tatil_siniflandirma_durumu = 'DOGRULANDI',
+        tatil_snapshot_hash = '" . str_repeat('f', 64) . "',
+        tatil_kaynak_referansi = 'seal-1'
+      WHERE id = 1");
+    $pdo->exec("UPDATE resmi_tatil_takvimi SET durum = 'IPTAL', iptal_edildi_at = NOW(), iptal_gerekcesi = 'seal test' WHERE id = $calId");
+    $muhurKapsam = (string) $pdo->query('SELECT tatil_gun_kapsami FROM puantaj_aylik_muhur_satirlari WHERE id = 1')->fetchColumn();
+    rttAssert($muhurKapsam === 'TAM_GUN', 'muhur snapshot takvim iptalinden etkilenmedi');
 
     echo 'verify-rtt-039-migration-mysql: OK' . PHP_EOL;
 } finally {

@@ -200,6 +200,8 @@ export const endpoints = {
     activate: (id: number | string) => `/resmi-tatil-takvimi/${id}/aktiflestir`,
     revise: (id: number | string) => `/resmi-tatil-takvimi/${id}/revize`,
     cancel: (id: number | string) => `/resmi-tatil-takvimi/${id}/iptal`,
+    history: (id: number | string) => `/resmi-tatil-takvimi/${id}/gecmis`,
+    projectionPreview: "/resmi-tatil-takvimi/projection-preview",
     envanterOzet: "/resmi-tatil-takvimi/envanter/ozet"
   },
   finans: {

@@ -50,7 +50,7 @@ class ResmiTatilTakvimiService
     private static $durumlar = ['TASLAK', 'AKTIF', 'IPTAL'];
 
     /** @return array<int, array<string, mixed>> */
-    public static function list(PDO $pdo, $durum = null, $tatilTuru = null, $tarihBas = null, $tarihBit = null)
+    public static function list(PDO $pdo, $durum = null, $tatilTuru = null, $tarihBas = null, $tarihBit = null, $gunKapsami = null)
     {
         $sql = 'SELECT r.*, u.ad_soyad AS yapan_ad
                 FROM resmi_tatil_takvimi r
@@ -64,6 +64,10 @@ class ResmiTatilTakvimiService
         if ($tatilTuru !== null && trim((string) $tatilTuru) !== '') {
             $sql .= ' AND r.tatil_turu = :tur';
             $params['tur'] = strtoupper(trim((string) $tatilTuru));
+        }
+        if ($gunKapsami !== null && trim((string) $gunKapsami) !== '') {
+            $sql .= ' AND r.gun_kapsami = :kapsam';
+            $params['kapsam'] = strtoupper(trim((string) $gunKapsami));
         }
         if ($tarihBas !== null && trim((string) $tarihBas) !== '') {
             $sql .= ' AND r.tarih >= :tarih_bas';
@@ -214,7 +218,7 @@ class ResmiTatilTakvimiService
      */
     public static function revise(PDO $pdo, $id, array $payload, array $actor, $requestHash = null)
     {
-        $gerekce = trim((string) ($payload['gerekce'] ?? ''));
+        $gerekce = trim((string) ($payload['iptal_gerekcesi'] ?? $payload['gerekce'] ?? ''));
         if ($gerekce === '') {
             throw new ResmiTatilTakvimiException('VALIDATION_ERROR', 'Revizyon gerekcesi zorunludur.', 400);
         }
@@ -460,6 +464,230 @@ class ResmiTatilTakvimiService
         }
 
         return $rapor;
+    }
+
+    /**
+     * Revizyon zinciri + audit (PII yok: TCKN/ucret/puantaj yok).
+     *
+     * @return array{items: array<int, array<string, mixed>>, auditler: array<int, array<string, mixed>>}
+     */
+    public static function history(PDO $pdo, $id)
+    {
+        $seed = self::fetch($pdo, (int) $id);
+        if (!$seed) {
+            throw new ResmiTatilTakvimiException('TATIL_TAKVIM_NOT_FOUND', 'Kayit bulunamadi.', 404);
+        }
+
+        $rootId = (int) $seed['id'];
+        $cursor = $seed;
+        while ($cursor['onceki_kayit_id'] !== null) {
+            $prev = self::fetch($pdo, (int) $cursor['onceki_kayit_id']);
+            if (!$prev) {
+                break;
+            }
+            $rootId = (int) $prev['id'];
+            $cursor = $prev;
+        }
+
+        $ids = [$rootId];
+        $frontier = [$rootId];
+        while ($frontier !== []) {
+            $placeholders = implode(',', array_fill(0, count($frontier), '?'));
+            $stmt = $pdo->prepare(
+                "SELECT id FROM resmi_tatil_takvimi WHERE onceki_kayit_id IN ($placeholders)"
+            );
+            $stmt->execute($frontier);
+            $next = [];
+            foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) as $childId) {
+                $childId = (int) $childId;
+                if (!in_array($childId, $ids, true)) {
+                    $ids[] = $childId;
+                    $next[] = $childId;
+                }
+            }
+            $frontier = $next;
+        }
+
+        $idPlaceholders = implode(',', array_fill(0, count($ids), '?'));
+        $rowsStmt = $pdo->prepare(
+            "SELECT r.*, u.ad_soyad AS yapan_ad
+             FROM resmi_tatil_takvimi r
+             LEFT JOIN users u ON u.id = r.yapan_kullanici_id
+             WHERE r.id IN ($idPlaceholders)
+             ORDER BY r.revizyon_no ASC, r.id ASC"
+        );
+        $rowsStmt->execute($ids);
+        $items = array_map([self::class, 'mapRow'], $rowsStmt->fetchAll(PDO::FETCH_ASSOC));
+
+        $auditStmt = $pdo->prepare(
+            "SELECT a.id, a.kayit_id, a.aksiyon, a.actor_id, a.actor_rol, a.request_hash, a.created_at,
+                    u.ad_soyad AS actor_ad
+             FROM resmi_tatil_takvim_auditleri a
+             LEFT JOIN users u ON u.id = a.actor_id
+             WHERE a.kayit_id IN ($idPlaceholders)
+             ORDER BY a.created_at ASC, a.id ASC"
+        );
+        $auditStmt->execute($ids);
+        $auditler = [];
+        foreach ($auditStmt->fetchAll(PDO::FETCH_ASSOC) as $audit) {
+            $auditler[] = [
+                'id' => (int) $audit['id'],
+                'kayit_id' => (int) $audit['kayit_id'],
+                'aksiyon' => (string) $audit['aksiyon'],
+                'actor_id' => $audit['actor_id'] !== null ? (int) $audit['actor_id'] : null,
+                'actor_rol' => $audit['actor_rol'] !== null ? (string) $audit['actor_rol'] : null,
+                'actor_ad' => $audit['actor_ad'] !== null ? (string) $audit['actor_ad'] : null,
+                'request_hash' => $audit['request_hash'] !== null ? (string) $audit['request_hash'] : null,
+                'created_at' => (string) $audit['created_at'],
+            ];
+        }
+
+        return ['items' => $items, 'auditler' => $auditler];
+    }
+
+    /**
+     * Read-only projection onizleme. Tabloya yazmaz.
+     *
+     * @param array<string, mixed> $user
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
+    public static function projectionPreview(PDO $pdo, array $user, array $payload, $scopeSubeId = null, array $allowedSubeIds = [])
+    {
+        $tarihBas = isset($payload['tarih_bas']) && trim((string) $payload['tarih_bas']) !== ''
+            ? self::validDate($payload['tarih_bas'])
+            : (isset($payload['tarih']) ? self::validDate($payload['tarih']) : null);
+        $tarihBit = isset($payload['tarih_bit']) && trim((string) $payload['tarih_bit']) !== ''
+            ? self::validDate($payload['tarih_bit'])
+            : $tarihBas;
+        if ($tarihBas === null || $tarihBit === null) {
+            throw new ResmiTatilTakvimiException('VALIDATION_ERROR', 'tarih veya tarih_bas/tarih_bit zorunludur.', 400);
+        }
+        if ($tarihBit < $tarihBas) {
+            throw new ResmiTatilTakvimiException('VALIDATION_ERROR', 'tarih_bit tarih_bas\'tan kucuk olamaz.', 400);
+        }
+
+        $previewModu = strtoupper(trim((string) ($payload['preview_modu'] ?? 'OZET')));
+        if ($previewModu !== 'OZET' && $previewModu !== 'DETAYSIZ') {
+            $previewModu = 'OZET';
+        }
+
+        $hasColumns = self::tableHasColumn($pdo, 'gunluk_puantaj', 'tatil_siniflandirma_durumu');
+        $ozet = [
+            'tarih_bas' => $tarihBas,
+            'tarih_bit' => $tarihBit,
+            'preview_modu' => $previewModu,
+            'read_only' => true,
+            'policy_aktif_degil' => true,
+            'toplam_satir' => 0,
+            'dogrulandi' => 0,
+            'kaynak_eksik' => 0,
+            'cakisma' => 0,
+            'bilinmiyor' => 0,
+            'tam_gun' => 0,
+            'yarim_gun' => 0,
+            'ht_ubgt' => 0,
+            'interval_olcumu_eksik' => 0,
+            'policy_blocker' => 0,
+            'muhurlu' => 0,
+            'muhursuz' => 0,
+            'muhur_projection_eksik' => 0,
+            'tam_gun_aktivasyona_hazir' => 0,
+            'yarim_gun_odeme_politikasi_bekliyor' => 0,
+            'genel_sistem_hazir' => false,
+        ];
+
+        if (!$hasColumns) {
+            return $ozet;
+        }
+
+        $sql = "SELECT gp.tarih, gp.gun_tipi, gp.muhur_id, gp.giris_saati, gp.cikis_saati,
+                       gp.gercek_mola_dakika, gp.net_calisma_suresi_dakika,
+                       gp.tatil_siniflandirma_durumu AS mevcut_sinif
+                FROM gunluk_puantaj gp
+                INNER JOIN personeller p ON p.id = gp.personel_id
+                WHERE gp.tarih BETWEEN :bas AND :bit
+                  AND (
+                    gp.gun_tipi = 'UBGT_Resmi_Tatil'
+                    OR gp.gun_tipi = 'Hafta_Tatili_Pazar'
+                  )";
+        $params = ['bas' => $tarihBas, 'bit' => $tarihBit];
+        if ($scopeSubeId !== null) {
+            $sql .= ' AND p.sube_id = :sube';
+            $params['sube'] = (int) $scopeSubeId;
+        } elseif (count($allowedSubeIds) > 0) {
+            $placeholders = [];
+            foreach (array_values($allowedSubeIds) as $i => $sid) {
+                $key = 'sube_' . $i;
+                $placeholders[] = ':' . $key;
+                $params[$key] = (int) $sid;
+            }
+            $sql .= ' AND p.sube_id IN (' . implode(',', $placeholders) . ')';
+        }
+        if (isset($payload['personel_id']) && (int) $payload['personel_id'] > 0) {
+            $sql .= ' AND gp.personel_id = :personel';
+            $params['personel'] = (int) $payload['personel_id'];
+        }
+
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $projection = ResmiTatilTakvimProjectionService::projectForPuantajRow($pdo, $row);
+            $sinif = strtoupper((string) ($projection['tatil_siniflandirma_durumu'] ?? ''));
+            $kapsam = strtoupper((string) ($projection['tatil_gun_kapsami'] ?? ''));
+            $gunTipi = (string) ($row['gun_tipi'] ?? '');
+            $muhurlu = isset($row['muhur_id']) && $row['muhur_id'] !== null;
+
+            if ($gunTipi === 'Hafta_Tatili_Pazar' && empty($projection['ht_ubgt_ayni_gun_mi']) && $sinif === '') {
+                continue;
+            }
+
+            $ozet['toplam_satir']++;
+            if ($muhurlu) {
+                $ozet['muhurlu']++;
+                $mevcut = strtoupper((string) ($row['mevcut_sinif'] ?? ''));
+                if ($mevcut === '' || $mevcut === 'BILINMIYOR' || $mevcut === 'KAYNAK_EKSIK') {
+                    $ozet['muhur_projection_eksik']++;
+                }
+            } else {
+                $ozet['muhursuz']++;
+            }
+
+            if (!empty($projection['ht_ubgt_ayni_gun_mi'])) {
+                $ozet['ht_ubgt']++;
+            }
+
+            if ($sinif === 'DOGRULANDI') {
+                $ozet['dogrulandi']++;
+                if ($kapsam === 'TAM_GUN') {
+                    $ozet['tam_gun']++;
+                    $ozet['tam_gun_aktivasyona_hazir']++;
+                } elseif ($kapsam === 'YARIM_GUN') {
+                    $ozet['yarim_gun']++;
+                    $ozet['yarim_gun_odeme_politikasi_bekliyor']++;
+                    $ozet['policy_blocker']++;
+                    if (($projection['tatil_donemi_net_calisma_dakika'] ?? null) === null) {
+                        $ozet['interval_olcumu_eksik']++;
+                    }
+                }
+            } elseif ($sinif === 'KAYNAK_EKSIK') {
+                $ozet['kaynak_eksik']++;
+                $ozet['policy_blocker']++;
+            } elseif ($sinif === 'CAKISMA') {
+                $ozet['cakisma']++;
+                $ozet['policy_blocker']++;
+            } elseif ($sinif !== '') {
+                $ozet['bilinmiyor']++;
+                $ozet['policy_blocker']++;
+            } elseif ($gunTipi === 'UBGT_Resmi_Tatil') {
+                $ozet['bilinmiyor']++;
+                $ozet['policy_blocker']++;
+            }
+        }
+
+        $ozet['genel_sistem_hazir'] = false;
+
+        return $ozet;
     }
 
     private static function tableHasColumn(PDO $pdo, $table, $column)

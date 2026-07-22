@@ -404,8 +404,14 @@ class Router
         if ($path === '/resmi-tatil-takvimi/envanter/ozet' && $method === 'GET') {
             ResmiTatilTakvimiController::envanterOzet($this->request);
         }
+        if ($path === '/resmi-tatil-takvimi/projection-preview' && $method === 'POST') {
+            ResmiTatilTakvimiController::projectionPreview($this->request);
+        }
         if ($method === 'GET' && preg_match('#^/resmi-tatil-takvimi/(\d+)$#', $path, $matches)) {
             ResmiTatilTakvimiController::detail($this->request, $matches[1]);
+        }
+        if ($method === 'GET' && preg_match('#^/resmi-tatil-takvimi/(\d+)/gecmis$#', $path, $matches)) {
+            ResmiTatilTakvimiController::history($this->request, $matches[1]);
         }
         if ($method === 'PUT' && preg_match('#^/resmi-tatil-takvimi/(\d+)$#', $path, $matches)) {
             ResmiTatilTakvimiController::update($this->request, $matches[1]);

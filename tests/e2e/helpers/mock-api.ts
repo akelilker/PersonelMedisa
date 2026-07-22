@@ -1145,6 +1145,61 @@ function errorBody(code: string, message: string, field?: string) {
   });
 }
 
+type MockResmiTatilTakvimRecord = {
+  id: number;
+  tarih: string;
+  tatil_kodu: string;
+  tatil_adi: string;
+  tatil_turu: "UBGT" | "DIGER";
+  gun_kapsami: "TAM_GUN" | "YARIM_GUN";
+  tatil_interval_baslangic: string | null;
+  tatil_interval_bitis: string | null;
+  durum: "TASLAK" | "AKTIF" | "IPTAL";
+  kaynak_turu: string;
+  kaynak_referansi: string;
+  kaynak_tarihi: string | null;
+  aciklama: string | null;
+  revizyon_no: number;
+  onceki_kayit_id: number | null;
+  iptal_gerekcesi: string | null;
+};
+
+const resmiTatilTakvimiItems: MockResmiTatilTakvimRecord[] = [];
+let resmiTatilTakvimiNextId = 0;
+
+function buildMockResmiTatilProjectionPreview(body: Record<string, unknown>) {
+  const tarihBas =
+    typeof body.tarih_bas === "string"
+      ? body.tarih_bas
+      : typeof body.tarih === "string"
+        ? body.tarih
+        : "2099-01-15";
+  const tarihBit = typeof body.tarih_bit === "string" ? body.tarih_bit : tarihBas;
+  return {
+    tarih_bas: tarihBas,
+    tarih_bit: tarihBit,
+    preview_modu: typeof body.preview_modu === "string" ? body.preview_modu : "AGGREGATE",
+    read_only: true as const,
+    policy_aktif_degil: true as const,
+    toplam_satir: 0,
+    dogrulandi: 0,
+    kaynak_eksik: 0,
+    cakisma: 0,
+    bilinmiyor: 0,
+    tam_gun: 0,
+    yarim_gun: 0,
+    ht_ubgt: 0,
+    interval_olcumu_eksik: 0,
+    policy_blocker: 0,
+    muhurlu: 0,
+    muhursuz: 0,
+    muhur_projection_eksik: 0,
+    tam_gun_aktivasyona_hazir: 0,
+    yarim_gun_odeme_politikasi_bekliyor: 0,
+    genel_sistem_hazir: false as const
+  };
+}
+
 const MOCK_BILDIRIM_ALLOWED_TURLER = [
   "GELMEDI",
   "GEC_GELDI",
@@ -9725,36 +9780,56 @@ let personelBelgeKaydiIdCounter = 903;
       if (await denyUnlessRolePermission(route, "resmi_tatil_takvimi.view")) {
         return;
       }
-      await fulfillJson(route, {
-        yil: Number.parseInt(url.searchParams.get("yil") ?? "2026", 10),
-        ay: Number.parseInt(url.searchParams.get("ay") ?? "4", 10),
-        donem: "2026-04",
-        toplam: 0,
-        aktif: 0,
-        taslak: 0,
-        iptal: 0,
-        aktif_ubgt_tam_gun: 0,
-        aktif_ubgt_yarim_gun: 0,
-        siniflandirma: {
-          toplam_ubgt_satiri: 0,
-          tam_gun: 0,
-          yarim_gun: 0,
-          bilinmiyor: 0,
-          cakisma: 0,
-          kaynak_eksik: 0,
-          ht_ubgt: 0,
-          muhurlu: 0,
-          muhursuz: 0,
-          policy_activation_blocker: 0
-        }
-      });
+      const yil = Number.parseInt(url.searchParams.get("yil") ?? "2099", 10);
+      const ay = Number.parseInt(url.searchParams.get("ay") ?? "1", 10);
+      const prefix = `${String(yil).padStart(4, "0")}-${String(ay).padStart(2, "0")}`;
+      const inMonth = resmiTatilTakvimiItems.filter((item) => item.tarih.startsWith(prefix));
+      await fulfillJson(
+        route,
+        200,
+        okBody({
+          yil,
+          ay,
+          donem: prefix,
+          toplam: inMonth.length,
+          aktif: inMonth.filter((item) => item.durum === "AKTIF").length,
+          taslak: inMonth.filter((item) => item.durum === "TASLAK").length,
+          iptal: inMonth.filter((item) => item.durum === "IPTAL").length,
+          aktif_ubgt_tam_gun: inMonth.filter(
+            (item) => item.durum === "AKTIF" && item.tatil_turu === "UBGT" && item.gun_kapsami === "TAM_GUN"
+          ).length,
+          aktif_ubgt_yarim_gun: inMonth.filter(
+            (item) => item.durum === "AKTIF" && item.tatil_turu === "UBGT" && item.gun_kapsami === "YARIM_GUN"
+          ).length,
+          siniflandirma: {
+            toplam_ubgt_satiri: 0,
+            tam_gun: 0,
+            yarim_gun: 0,
+            bilinmiyor: 0,
+            cakisma: 0,
+            kaynak_eksik: 0,
+            ht_ubgt: 0,
+            muhurlu: 0,
+            muhursuz: 0,
+            policy_activation_blocker: 0
+          }
+        })
+      );
+      return;
+    }
+    if (path === "/api/resmi-tatil-takvimi/projection-preview" && method === "POST") {
+      if (await denyUnlessRolePermission(route, "resmi_tatil_takvimi.view")) {
+        return;
+      }
+      const body = route.request().postDataJSON() as Record<string, unknown>;
+      await fulfillJson(route, 200, okBody(buildMockResmiTatilProjectionPreview(body)));
       return;
     }
     if (path === "/api/resmi-tatil-takvimi" && method === "GET") {
       if (await denyUnlessRolePermission(route, "resmi_tatil_takvimi.view")) {
         return;
       }
-      await fulfillJson(route, { items: [] });
+      await fulfillJson(route, 200, okBody({ items: [...resmiTatilTakvimiItems] }));
       return;
     }
     if (path === "/api/resmi-tatil-takvimi" && method === "POST") {
@@ -9762,15 +9837,180 @@ let personelBelgeKaydiIdCounter = 903;
         return;
       }
       const body = route.request().postDataJSON() as Record<string, unknown>;
-      await fulfillJson(route, {
-        id: 1,
-        ...body,
+      const record: MockResmiTatilTakvimRecord = {
+        id: ++resmiTatilTakvimiNextId,
+        tarih: typeof body.tarih === "string" ? body.tarih : "2099-01-15",
+        tatil_kodu: typeof body.tatil_kodu === "string" ? body.tatil_kodu : "E2E_UBGT",
+        tatil_adi: typeof body.tatil_adi === "string" ? body.tatil_adi : "E2E resmi tatil",
+        tatil_turu: body.tatil_turu === "DIGER" ? "DIGER" : "UBGT",
+        gun_kapsami: body.gun_kapsami === "YARIM_GUN" ? "YARIM_GUN" : "TAM_GUN",
+        tatil_interval_baslangic:
+          typeof body.tatil_interval_baslangic === "string" ? body.tatil_interval_baslangic : null,
+        tatil_interval_bitis: typeof body.tatil_interval_bitis === "string" ? body.tatil_interval_bitis : null,
         durum: "TASLAK",
+        kaynak_turu: typeof body.kaynak_turu === "string" ? body.kaynak_turu : "E2E",
+        kaynak_referansi: typeof body.kaynak_referansi === "string" ? body.kaynak_referansi : "e2e-kaynak",
+        kaynak_tarihi: typeof body.kaynak_tarihi === "string" ? body.kaynak_tarihi : null,
+        aciklama: typeof body.aciklama === "string" ? body.aciklama : null,
         revizyon_no: 1,
         onceki_kayit_id: null,
-        tatil_interval_baslangic: body.tatil_interval_baslangic ?? null,
-        tatil_interval_bitis: body.tatil_interval_bitis ?? null
-      });
+        iptal_gerekcesi: null
+      };
+      resmiTatilTakvimiItems.push(record);
+      await fulfillJson(route, 201, okBody(record));
+      return;
+    }
+
+    const resmiTatilDetailMatch = path.match(/^\/api\/resmi-tatil-takvimi\/(\d+)$/);
+    if (resmiTatilDetailMatch && method === "GET") {
+      if (await denyUnlessRolePermission(route, "resmi_tatil_takvimi.view")) {
+        return;
+      }
+      const id = Number.parseInt(resmiTatilDetailMatch[1] ?? "", 10);
+      const record = resmiTatilTakvimiItems.find((item) => item.id === id);
+      if (!record) {
+        await fulfillJson(route, 404, errorBody("NOT_FOUND", "Kayit bulunamadi."));
+        return;
+      }
+      await fulfillJson(route, 200, okBody(record));
+      return;
+    }
+    if (resmiTatilDetailMatch && method === "PUT") {
+      if (await denyUnlessRolePermission(route, "resmi_tatil_takvimi.manage")) {
+        return;
+      }
+      const id = Number.parseInt(resmiTatilDetailMatch[1] ?? "", 10);
+      const record = resmiTatilTakvimiItems.find((item) => item.id === id);
+      if (!record) {
+        await fulfillJson(route, 404, errorBody("NOT_FOUND", "Kayit bulunamadi."));
+        return;
+      }
+      if (record.durum !== "TASLAK") {
+        await fulfillJson(route, 409, errorBody("TATIL_TAKVIM_NOT_EDITABLE", "Yalniz taslak kayit duzenlenebilir."));
+        return;
+      }
+      const body = route.request().postDataJSON() as Record<string, unknown>;
+      if (typeof body.tatil_adi === "string") {
+        record.tatil_adi = body.tatil_adi;
+      }
+      if (typeof body.aciklama === "string") {
+        record.aciklama = body.aciklama;
+      }
+      await fulfillJson(route, 200, okBody(record));
+      return;
+    }
+
+    const resmiTatilHistoryMatch = path.match(/^\/api\/resmi-tatil-takvimi\/(\d+)\/gecmis$/);
+    if (resmiTatilHistoryMatch && method === "GET") {
+      if (await denyUnlessRolePermission(route, "resmi_tatil_takvimi.view")) {
+        return;
+      }
+      const id = Number.parseInt(resmiTatilHistoryMatch[1] ?? "", 10);
+      const record = resmiTatilTakvimiItems.find((item) => item.id === id);
+      if (!record) {
+        await fulfillJson(route, 404, errorBody("NOT_FOUND", "Kayit bulunamadi."));
+        return;
+      }
+      await fulfillJson(route, 200, okBody({ items: [record], auditler: [] }));
+      return;
+    }
+
+    const resmiTatilActivateMatch = path.match(/^\/api\/resmi-tatil-takvimi\/(\d+)\/aktiflestir$/);
+    if (resmiTatilActivateMatch && method === "POST") {
+      if (await denyUnlessRolePermission(route, "resmi_tatil_takvimi.manage")) {
+        return;
+      }
+      const id = Number.parseInt(resmiTatilActivateMatch[1] ?? "", 10);
+      const record = resmiTatilTakvimiItems.find((item) => item.id === id);
+      if (!record) {
+        await fulfillJson(route, 404, errorBody("NOT_FOUND", "Kayit bulunamadi."));
+        return;
+      }
+      if (record.durum !== "TASLAK") {
+        await fulfillJson(route, 409, errorBody("TATIL_TAKVIM_INVALID_STATE", "Yalniz taslak kayit aktiflestirilebilir."));
+        return;
+      }
+      const conflict = resmiTatilTakvimiItems.some(
+        (item) => item.id !== id && item.durum === "AKTIF" && item.tatil_turu === "UBGT" && item.tarih === record.tarih
+      );
+      if (conflict) {
+        await fulfillJson(route, 409, errorBody("TATIL_TAKVIM_AKTIF_CAKISMA", "Bu tarihte aktif UBGT kaydi zaten mevcut."));
+        return;
+      }
+      record.durum = "AKTIF";
+      await fulfillJson(route, 200, okBody(record));
+      return;
+    }
+
+    const resmiTatilRevizeMatch = path.match(/^\/api\/resmi-tatil-takvimi\/(\d+)\/revize$/);
+    if (resmiTatilRevizeMatch && method === "POST") {
+      if (await denyUnlessRolePermission(route, "resmi_tatil_takvimi.manage")) {
+        return;
+      }
+      const id = Number.parseInt(resmiTatilRevizeMatch[1] ?? "", 10);
+      const record = resmiTatilTakvimiItems.find((item) => item.id === id);
+      if (!record) {
+        await fulfillJson(route, 404, errorBody("NOT_FOUND", "Kayit bulunamadi."));
+        return;
+      }
+      if (record.durum !== "AKTIF") {
+        await fulfillJson(route, 409, errorBody("TATIL_TAKVIM_INVALID_STATE", "Yalniz aktif kayit revize edilebilir."));
+        return;
+      }
+      const body = route.request().postDataJSON() as Record<string, unknown>;
+      const gerekce =
+        typeof body.iptal_gerekcesi === "string"
+          ? body.iptal_gerekcesi
+          : typeof body.gerekce === "string"
+            ? body.gerekce
+            : null;
+      if (!gerekce) {
+        await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "Revizyon gerekcesi zorunludur."));
+        return;
+      }
+      record.durum = "IPTAL";
+      record.iptal_gerekcesi = gerekce;
+      const next: MockResmiTatilTakvimRecord = {
+        ...record,
+        id: ++resmiTatilTakvimiNextId,
+        durum: "AKTIF",
+        revizyon_no: record.revizyon_no + 1,
+        onceki_kayit_id: record.id,
+        iptal_gerekcesi: null,
+        tatil_adi: typeof body.tatil_adi === "string" ? body.tatil_adi : record.tatil_adi
+      };
+      resmiTatilTakvimiItems.push(next);
+      await fulfillJson(route, 200, okBody(next));
+      return;
+    }
+
+    const resmiTatilCancelMatch = path.match(/^\/api\/resmi-tatil-takvimi\/(\d+)\/iptal$/);
+    if (resmiTatilCancelMatch && method === "POST") {
+      if (await denyUnlessRolePermission(route, "resmi_tatil_takvimi.manage")) {
+        return;
+      }
+      const id = Number.parseInt(resmiTatilCancelMatch[1] ?? "", 10);
+      const record = resmiTatilTakvimiItems.find((item) => item.id === id);
+      if (!record) {
+        await fulfillJson(route, 404, errorBody("NOT_FOUND", "Kayit bulunamadi."));
+        return;
+      }
+      const body = route.request().postDataJSON() as Record<string, unknown>;
+      const gerekce =
+        typeof body.gerekce === "string"
+          ? body.gerekce
+          : typeof body.neden === "string"
+            ? body.neden
+            : typeof body.iptal_gerekcesi === "string"
+              ? body.iptal_gerekcesi
+              : null;
+      if (!gerekce) {
+        await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "Iptal gerekcesi zorunludur."));
+        return;
+      }
+      record.durum = "IPTAL";
+      record.iptal_gerekcesi = gerekce;
+      await fulfillJson(route, 200, okBody(record));
       return;
     }
 

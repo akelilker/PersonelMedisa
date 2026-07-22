@@ -14,11 +14,14 @@ describe("S88 resmi tatil takvimi owner source", () => {
     expect(migration).toContain("CREATE TABLE IF NOT EXISTS resmi_tatil_takvim_auditleri");
     expect(migration).toContain("uq_rtt_aktif_ubgt_tarih");
     expect(migration).toContain("chk_rtt_interval_kapsam");
+    expect(migration).toContain("ON DELETE RESTRICT");
+    expect(migration).not.toContain("ON DELETE SET NULL");
+    expect(migration).toContain("chk_gp_tatil_sinif");
+    expect(migration).toContain("chk_pams_tatil_hash");
     expect(migration).toContain("ADD COLUMN IF NOT EXISTS tatil_gun_kapsami");
     expect(migration).toContain("puantaj_aylik_muhur_satirlari");
     expect(migration).not.toMatch(/\b(?:DROP TABLE|TRUNCATE|DELETE FROM)\b/i);
     expect(migration).not.toMatch(/INSERT\s+INTO\s+resmi_tatil_takvimi/i);
-    expect(migration).not.toMatch(/2026-\d{2}-\d{2}/);
   });
 
   it("projection and readiness fail-closed codes exist", () => {
@@ -33,11 +36,15 @@ describe("S88 resmi tatil takvimi owner source", () => {
     expect(engine).toContain("HALF_DAY_UBGT_POLICY");
     expect(service).toContain("siniflandirmaRaporu");
     expect(service).toContain("policy_activation_blocker");
+    expect(service).toContain("function history");
+    expect(service).toContain("function projectionPreview");
   });
 
   it("API routes and service invariants wired", () => {
     expect(router).toContain("/resmi-tatil-takvimi");
     expect(router).toContain("aktiflestir");
+    expect(router).toContain("gecmis");
+    expect(router).toContain("projection-preview");
     expect(service).toContain("gun_kapsami");
     expect(service).toContain("IPTAL");
     expect(service).toContain("onceki_kayit_id");

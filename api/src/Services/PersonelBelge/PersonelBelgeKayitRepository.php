@@ -93,6 +93,20 @@ final class PersonelBelgeKayitRepository
     }
 
     /**
+     * Lock parent surec row for version mutations (serialize concurrent file replace).
+     *
+     * @return array<string,mixed>|null
+     */
+    public static function lockSurecRowForUpdate(PDO $pdo, int $surecId): ?array
+    {
+        $stmt = $pdo->prepare('SELECT id, personel_id, state FROM surecler WHERE id = :id FOR UPDATE');
+        $stmt->execute(['id' => $surecId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        return is_array($row) ? $row : null;
+    }
+
+    /**
      * @param array<string,mixed> $payload
      */
     public static function insertVersion(PDO $pdo, array $payload): int

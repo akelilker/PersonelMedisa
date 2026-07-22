@@ -33,6 +33,27 @@ CREATE TABLE IF NOT EXISTS personel_belge_dosya_surumleri (
   CONSTRAINT chk_pbd_surum CHECK (surum_no > 0)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Tek aktif surum invariant (NULL'lar UNIQUE disinda kalir).
+ALTER TABLE personel_belge_dosya_surumleri
+  ADD COLUMN IF NOT EXISTS aktif_surec_key INT UNSIGNED
+    AS (CASE WHEN aktif_mi = 1 THEN surec_id ELSE NULL END) VIRTUAL;
+
+-- Index may already exist on re-apply; ignore duplicate-name errors in runner, keep statement additive.
+SET @s86_idx := (
+  SELECT COUNT(*) FROM information_schema.STATISTICS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'personel_belge_dosya_surumleri'
+    AND INDEX_NAME = 'uq_pbd_tek_aktif'
+);
+SET @s86_sql := IF(
+  @s86_idx = 0,
+  'ALTER TABLE personel_belge_dosya_surumleri ADD UNIQUE KEY uq_pbd_tek_aktif (aktif_surec_key)',
+  'DO 0'
+);
+PREPARE s86_stmt FROM @s86_sql;
+EXECUTE s86_stmt;
+DEALLOCATE PREPARE s86_stmt;
+
 CREATE TABLE IF NOT EXISTS personel_belge_auditleri (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   surec_id INT UNSIGNED NOT NULL,

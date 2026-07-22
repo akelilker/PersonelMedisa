@@ -471,6 +471,17 @@ class PersonelBelgelerController
 
         $pdo->beginTransaction();
         try {
+            // Serialize concurrent replaces on the same belge (exactly one aktif version).
+            $locked = PersonelBelgeKayitRepository::lockSurecRowForUpdate($pdo, $kayitId);
+            if ($locked === null) {
+                $pdo->rollBack();
+                JsonResponse::notFound('Belge kaydi bulunamadi.');
+            }
+            if (strtoupper((string) ($locked['state'] ?? '')) === 'IPTAL') {
+                $pdo->rollBack();
+                JsonResponse::error(409, 'CONFLICT', 'Iptal edilmis belge kaydinin dosyasi degistirilemez.');
+            }
+
             $stored = PersonelBelgeStorageService::writeNewVersion($filePayload['bytes'], $filePayload['extension']);
             $orphanStorageKey = $stored['storage_key'];
             $surumNo = PersonelBelgeKayitRepository::nextSurumNo($pdo, $kayitId);

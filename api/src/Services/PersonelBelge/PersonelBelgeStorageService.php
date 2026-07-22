@@ -13,6 +13,11 @@ final class PersonelBelgeStorageService
 {
     public static function storageRoot(): string
     {
+        $envRoot = getenv('MEDISA_PERSONEL_BELGE_STORAGE_ROOT');
+        if (is_string($envRoot) && trim($envRoot) !== '') {
+            return rtrim($envRoot, "\\/");
+        }
+
         // Prefer already-bootstrapped config (api/src/bootstrap.php). Avoid require-inside-method
         // because config.php assigns $config locally and medisa_config() reads global $config.
         if (function_exists('medisa_config')) {

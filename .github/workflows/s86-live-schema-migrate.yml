@@ -265,7 +265,14 @@ jobs:
         run: |
           set -euo pipefail
           BASE="https://www.karmotors.com.tr/personelmedisa/api/public/_s86_migrate.php"
-          curl -fsS "${BASE}?token=${TOKEN}&action=storage_configure&confirm=SET_RECOMMENDED_ROOT" | tee /tmp/s86-artifacts/storage_configure.json
+          code=$(curl -sS -o /tmp/s86-artifacts/storage_diag.json -w "%{http_code}" "${BASE}?token=${TOKEN}&action=storage_diag" || true)
+          echo "storage_diag_http=$code"
+          cat /tmp/s86-artifacts/storage_diag.json
+          echo
+          code=$(curl -sS -o /tmp/s86-artifacts/storage_configure.json -w "%{http_code}" "${BASE}?token=${TOKEN}&action=storage_configure&confirm=SET_RECOMMENDED_ROOT" || true)
+          echo "storage_configure_http=$code"
+          cat /tmp/s86-artifacts/storage_configure.json
+          echo
           python3 - <<'PY'
           import json,sys
           data=json.load(open('/tmp/s86-artifacts/storage_configure.json'))
@@ -273,7 +280,10 @@ jobs:
           if not data.get('ok'):
             sys.exit(1)
           PY
-          curl -fsS "${BASE}?token=${TOKEN}&action=storage_probe" | tee /tmp/s86-artifacts/storage_probe.json
+          code=$(curl -sS -o /tmp/s86-artifacts/storage_probe.json -w "%{http_code}" "${BASE}?token=${TOKEN}&action=storage_probe" || true)
+          echo "storage_probe_http=$code"
+          cat /tmp/s86-artifacts/storage_probe.json
+          echo
           python3 - <<'PY'
           import json,sys
           data=json.load(open('/tmp/s86-artifacts/storage_probe.json'))

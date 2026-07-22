@@ -74,6 +74,7 @@ function s86_identity(PDO $pdo): array
         'aktif_veritabani' => (string) $pdo->query('SELECT DATABASE()')->fetchColumn(),
         'db_version' => (string) $pdo->query('SELECT @@version')->fetchColumn(),
         'db_now' => (string) $pdo->query('SELECT NOW()')->fetchColumn(),
+        'php_version' => PHP_VERSION,
     ];
 }
 
@@ -155,7 +156,9 @@ function s86_path_under_public_web_root(string $path): bool
     }
     $candidate = rtrim(str_replace('\\', '/', $real), '/');
     foreach (s86_public_web_roots() as $root) {
-        if ($candidate === $root || str_starts_with($candidate . '/', $root . '/')) {
+        $prefix = $root . '/';
+        $haystack = $candidate . '/';
+        if ($candidate === $root || strpos($haystack, $prefix) === 0) {
             return true;
         }
     }
@@ -821,11 +824,7 @@ if ($action === 'storage_ensure') {
     ]);
 }
 
-if ($action === 'storage_configure') {
-    if (!isset($_GET['confirm']) || (string) $_GET['confirm'] !== 'SET_RECOMMENDED_ROOT') {
-        s86_json(['ok' => false, 'error' => 'CONFIRM_REQUIRED', 'hint' => 'confirm=SET_RECOMMENDED_ROOT'], 400);
-    }
-
+if ($action === 'storage_diag') {
     $configPath = null;
     foreach ($configCandidates as $path) {
         if (is_file($path)) {
@@ -833,88 +832,135 @@ if ($action === 'storage_configure') {
             break;
         }
     }
-    if ($configPath === null || !is_writable($configPath)) {
-        s86_json(['ok' => false, 'code' => 'S86_STORAGE_CONFIGURE_BLOCKED', 'error' => 'CONFIG_NOT_WRITABLE'], 500);
-    }
-
     $recommended = s86_recommended_storage_path();
-    if (s86_path_under_public_web_root($recommended)) {
-        s86_json(['ok' => false, 'code' => 'S86_STORAGE_CONFIGURE_BLOCKED', 'error' => 'RECOMMENDED_UNDER_PUBLIC'], 409);
-    }
-
-    $raw = (string) file_get_contents($configPath);
-    if ($raw === '') {
-        s86_json(['ok' => false, 'error' => 'CONFIG_READ_FAILED'], 500);
-    }
-
-    $updated = false;
-    $patterns = [
-        "/('personel_belge_storage_root'\\s*=>\\s*)''/",
-        '/("personel_belge_storage_root"\\s*=>\\s*)""/',
-        "/('personel_belge_storage_root'\\s*=>\\s*)null/i",
-    ];
-    foreach ($patterns as $pattern) {
-        $next = preg_replace($pattern, '${1}' . var_export($recommended, true), $raw, 1, $count);
-        if (is_string($next) && $count === 1) {
-            $raw = $next;
-            $updated = true;
-            break;
-        }
-    }
-    if (!$updated && strpos($raw, 'personel_belge_storage_root') === false) {
-        $raw = preg_replace(
-            '/(return\\s*\\[)/',
-            "$1\n    'personel_belge_storage_root' => " . var_export($recommended, true) . ',',
-            $raw,
-            1,
-            $count
-        );
-        $updated = is_string($raw) && $count === 1;
-    }
-    if (!$updated) {
-        // Already set — do not overwrite existing non-empty value.
-        $current = s86_configured_storage_root($config);
-        if ($current !== null) {
-            s86_json([
-                'ok' => true,
-                'code' => 'S86_STORAGE_ALREADY_CONFIGURED',
-                'path' => $current,
-                'changed' => false,
-            ]);
-        }
-        s86_json(['ok' => false, 'code' => 'S86_STORAGE_CONFIGURE_BLOCKED', 'error' => 'PATTERN_NOT_MATCHED'], 409);
-    }
-
-    $backupCfg = $configPath . '.s86bak.' . gmdate('YmdHis');
-    if (!@copy($configPath, $backupCfg)) {
-        s86_json(['ok' => false, 'error' => 'CONFIG_BACKUP_FAILED'], 500);
-    }
-    if (@file_put_contents($configPath, $raw) === false) {
-        s86_json(['ok' => false, 'error' => 'CONFIG_WRITE_FAILED'], 500);
-    }
-
-    $dirCreated = false;
-    if (!is_dir($recommended)) {
-        $dirCreated = @mkdir($recommended, 0750, true);
-        if (!$dirCreated && !is_dir($recommended)) {
-            s86_json(['ok' => false, 'code' => 'S86_STORAGE_DIR_CREATE_FAILED', 'path' => $recommended], 500);
-        }
-        $dirCreated = true;
-    }
-    @chmod($recommended, 0750);
-
-    $fresh = $config;
-    $fresh['personel_belge_storage_root'] = $recommended;
-    $probe = s86_storage_probe($fresh);
+    $openBasedir = ini_get('open_basedir');
     s86_json([
-        'ok' => $probe['ok'],
-        'code' => $probe['ok'] ? 'S86_STORAGE_CONFIGURE_OK' : 'S86_STORAGE_CONFIGURE_INCOMPLETE',
-        'path' => $recommended,
-        'changed' => true,
-        'dir_created' => $dirCreated,
-        'config_backup_basename' => basename($backupCfg),
-        'storage_probe' => $probe,
+        'ok' => true,
+        'code' => 'S86_STORAGE_DIAG',
+        'php_version' => PHP_VERSION,
+        'open_basedir' => $openBasedir === false || $openBasedir === '' ? null : $openBasedir,
+        'config_basename' => $configPath !== null ? basename($configPath) : null,
+        'config_writable' => $configPath !== null && is_writable($configPath),
+        'config_has_storage_key' => $configPath !== null && strpos((string) file_get_contents($configPath), 'personel_belge_storage_root') !== false,
+        'personel_belge_storage_root_configured' => s86_configured_storage_root($config),
+        'recommended_path' => $recommended,
+        'recommended_is_dir' => is_dir($recommended),
+        'recommended_parent_writable' => is_writable(dirname($recommended)),
+        'recommended_under_public' => s86_path_under_public_web_root($recommended),
+        'default_under_public' => s86_path_under_public_web_root(s86_default_storage_root()),
     ]);
+}
+
+if ($action === 'storage_configure') {
+    try {
+        if (!isset($_GET['confirm']) || (string) $_GET['confirm'] !== 'SET_RECOMMENDED_ROOT') {
+            s86_json(['ok' => false, 'error' => 'CONFIRM_REQUIRED', 'hint' => 'confirm=SET_RECOMMENDED_ROOT'], 400);
+        }
+
+        $configPath = null;
+        foreach ($configCandidates as $path) {
+            if (is_file($path)) {
+                $configPath = $path;
+                break;
+            }
+        }
+        if ($configPath === null || !is_writable($configPath)) {
+            s86_json(['ok' => false, 'code' => 'S86_STORAGE_CONFIGURE_BLOCKED', 'error' => 'CONFIG_NOT_WRITABLE'], 500);
+        }
+
+        $recommended = s86_recommended_storage_path();
+        if (s86_path_under_public_web_root($recommended)) {
+            s86_json(['ok' => false, 'code' => 'S86_STORAGE_CONFIGURE_BLOCKED', 'error' => 'RECOMMENDED_UNDER_PUBLIC'], 409);
+        }
+
+        $raw = (string) file_get_contents($configPath);
+        if ($raw === '') {
+            s86_json(['ok' => false, 'error' => 'CONFIG_READ_FAILED'], 500);
+        }
+
+        $updated = false;
+        $patterns = [
+            "/('personel_belge_storage_root'\\s*=>\\s*)''/",
+            '/("personel_belge_storage_root"\\s*=>\\s*)""/',
+            "/('personel_belge_storage_root'\\s*=>\\s*)null/i",
+        ];
+        foreach ($patterns as $pattern) {
+            $next = preg_replace($pattern, '${1}' . var_export($recommended, true), $raw, 1, $count);
+            if (is_string($next) && $count === 1) {
+                $raw = $next;
+                $updated = true;
+                break;
+            }
+        }
+        if (!$updated && strpos($raw, 'personel_belge_storage_root') === false) {
+            $raw = preg_replace(
+                '/(return\\s*\\[)/',
+                "$1\n    'personel_belge_storage_root' => " . var_export($recommended, true) . ',',
+                $raw,
+                1,
+                $count
+            );
+            $updated = is_string($raw) && $count === 1;
+        }
+        if (!$updated) {
+            // Already set — do not overwrite existing non-empty value.
+            $current = s86_configured_storage_root($config);
+            if ($current !== null) {
+                s86_json([
+                    'ok' => true,
+                    'code' => 'S86_STORAGE_ALREADY_CONFIGURED',
+                    'path' => $current,
+                    'changed' => false,
+                ]);
+            }
+            s86_json(['ok' => false, 'code' => 'S86_STORAGE_CONFIGURE_BLOCKED', 'error' => 'PATTERN_NOT_MATCHED'], 409);
+        }
+
+        $backupCfg = $configPath . '.s86bak.' . gmdate('YmdHis');
+        if (!@copy($configPath, $backupCfg)) {
+            s86_json(['ok' => false, 'error' => 'CONFIG_BACKUP_FAILED'], 500);
+        }
+        if (@file_put_contents($configPath, $raw) === false) {
+            s86_json(['ok' => false, 'error' => 'CONFIG_WRITE_FAILED'], 500);
+        }
+
+        $dirCreated = false;
+        if (!is_dir($recommended)) {
+            $dirCreated = @mkdir($recommended, 0750, true);
+            if (!$dirCreated && !is_dir($recommended)) {
+                s86_json([
+                    'ok' => false,
+                    'code' => 'S86_STORAGE_DIR_CREATE_FAILED',
+                    'path' => $recommended,
+                    'open_basedir' => (ini_get('open_basedir') ?: null),
+                    'parent_writable' => is_writable(dirname($recommended)),
+                ], 500);
+            }
+            $dirCreated = true;
+        }
+        @chmod($recommended, 0750);
+
+        $fresh = $config;
+        $fresh['personel_belge_storage_root'] = $recommended;
+        $probe = s86_storage_probe($fresh);
+        s86_json([
+            'ok' => $probe['ok'],
+            'code' => $probe['ok'] ? 'S86_STORAGE_CONFIGURE_OK' : 'S86_STORAGE_CONFIGURE_INCOMPLETE',
+            'path' => $recommended,
+            'changed' => true,
+            'dir_created' => $dirCreated,
+            'config_backup_basename' => basename($backupCfg),
+            'storage_probe' => $probe,
+            'php_version' => PHP_VERSION,
+        ]);
+    } catch (Throwable $e) {
+        s86_json([
+            'ok' => false,
+            'code' => 'S86_STORAGE_CONFIGURE_EXCEPTION',
+            'error' => $e->getMessage(),
+            'php_version' => PHP_VERSION,
+        ], 500);
+    }
 }
 
 s86_json(['ok' => false, 'error' => 'UNKNOWN_ACTION', 'action' => $action], 400);

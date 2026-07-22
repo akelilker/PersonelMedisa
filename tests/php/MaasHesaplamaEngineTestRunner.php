@@ -105,9 +105,30 @@ function engineInput(string $ucretTuru, string $tutar, array $overrides = []): a
             'onceki_kumulatif_gelir_vergisi_matrahi' => '0.00',
             'onceki_kumulatif_gelir_vergisi' => '0.00',
         ],
+        'sgk_hesabi' => engineSgkFixture(30),
         'donem_baslangic' => '2026-03-01',
         'donem_bitis' => '2026-03-31',
     ], $overrides);
+}
+
+/** @return array<string, mixed> */
+function engineSgkFixture(int $primDay): array
+{
+    return [
+        'hesaplanan_prim_gunu' => $primDay,
+        'eksik_gun_sayisi' => 30 - $primDay,
+        'eksik_gun_kodu' => $primDay < 30 ? '01' : null,
+        'eksik_gun_aciklamasi' => $primDay < 30 ? 'Istirahat' : null,
+        'manuel_inceleme_gerekli_mi' => false,
+        'blocker_kodlari' => [],
+        'sgk_hesap_hash' => hash('sha256', 'sgk-' . $primDay),
+        'katalog_surumu' => 'TEST_DOGRULANMIS_KATALOG_V1',
+        'kaynak_manifest_hash' => str_repeat('b', 64),
+        'gunluk_alt_sinir' => '866.86',
+        'gunluk_ust_sinir' => '6501.45',
+        'donem_alt_sinir' => bcmul('866.86', (string) $primDay, 2),
+        'donem_ust_sinir' => bcmul('6501.45', (string) $primDay, 2),
+    ];
 }
 
 function assertKalemIntegrity(array $result, string $name): void
@@ -152,8 +173,8 @@ engineAssert(FinanceKalemCatalog::isDuplicateSalary('MAAS'), 'FinanceKalemCatalo
 
 // Legal catalog
 engineAssert(count(MaasHesaplamaLegalParameterCatalog::requiredCodes()) === 27, 'LegalParameterCatalog requiredCodes 27');
-engineAssert(MaasHesaplamaEngine::ENGINE_VERSION === 'S77D_PAYROLL_ENGINE_V2', 'Engine version V2');
-engineAssert(MaasHesaplamaEngine::CONTRACT_VERSION === 'S77D_PAYROLL_CANDIDATE_V2', 'Contract version V2');
+engineAssert(MaasHesaplamaEngine::ENGINE_VERSION === 'S85B_PAYROLL_ENGINE_V2', 'Engine version S85-B V2');
+engineAssert(MaasHesaplamaEngine::CONTRACT_VERSION === 'S85B_PAYROLL_CANDIDATE_V1', 'Contract version S85-B');
 
 // Engine BRUT path
 $brut = MaasHesaplamaEngine::calculate(engineInput('BRUT', '50000.00', [
@@ -173,7 +194,7 @@ $brut = MaasHesaplamaEngine::calculate(engineInput('BRUT', '50000.00', [
 assertKalemIntegrity($brut, 'BRUT happy path');
 engineAssert((string) $brut['ozet']['ucret_turu'] === 'BRUT', 'BRUT path ucret_turu');
 engineAssert(decimalKurus((string) $brut['ozet']['net_odenecek']) > 0, 'BRUT path net positive');
-engineAssert((string) $brut['engine_version'] === 'S77D_PAYROLL_ENGINE_V2', 'BRUT result engine_version V2');
+engineAssert((string) $brut['engine_version'] === 'S85B_PAYROLL_ENGINE_V2', 'BRUT result engine_version S85-B V2');
 
 // Engine NET path, no extras
 $targetNet = '30000.00';
@@ -325,5 +346,21 @@ $noDailyOt = MaasHesaplamaEngine::calculate(engineInput('BRUT', '50000.00', [
 ]));
 engineAssert(count(findKalemler($noDailyOt, 'FAZLA_MESAI_ODEMESI')) === 0, 'V1 daily OT removed');
 engineAssert(count(findKalemler($noDailyOt, 'FAZLA_SURELERLE_CALISMA_ODEMESI')) === 0, 'single day under weekly contract');
+
+foreach (['BRUT', 'NET'] as $salaryType) {
+    foreach ([1, 29, 30] as $primDay) {
+        $bounded = MaasHesaplamaEngine::calculate(engineInput($salaryType, '50000.00', [
+            'sgk_hesabi' => engineSgkFixture($primDay),
+        ]));
+        engineAssert(!empty($bounded['ok']), $salaryType . ' SGK ' . $primDay . ' gun hesaplanir');
+        engineAssert((int) $bounded['ozet']['hesaplanan_prim_gunu'] === $primDay, $salaryType . ' SGK prim gunu parity');
+        $matrahLines = findKalemler($bounded, 'SGK_MATRAH');
+        engineAssert(count($matrahLines) === 1 && (int) $matrahLines[0]['miktar'] === $primDay, $salaryType . ' SGK matrah gunu');
+        engineAssert(
+            (string) $matrahLines[0]['payload_json']['taban'] === bcmul('866.86', (string) $primDay, 2),
+            $salaryType . ' SGK PEK taban gun olcegi'
+        );
+    }
+}
 
 echo 'verify-maas-hesaplama-engine: OK' . PHP_EOL;

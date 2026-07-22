@@ -15,8 +15,8 @@ use PDOException;
  */
 class MaasHesaplamaSnapshotService
 {
-    public const SCHEMA_VERSION = 'S77C_PAYROLL_INPUT_PREFLIGHT_V1';
-    public const CONTRACT_VERSION = 'S77C_PAYROLL_INPUT_SNAPSHOT_V1';
+    public const SCHEMA_VERSION = 'S85B_PAYROLL_INPUT_PREFLIGHT_V1';
+    public const CONTRACT_VERSION = 'S85B_PAYROLL_INPUT_SNAPSHOT_V1';
 
     public const SEVERITY_BLOCKER = 'BLOCKER';
     public const SEVERITY_WARNING = 'WARNING';
@@ -73,6 +73,18 @@ class MaasHesaplamaSnapshotService
         $finance = self::resolveFinanceInputs($pdo, $subeId, $donem, $donemBaslangic, $donemBitis, $personeller, $muhur, $items);
         $legal = self::resolveLegalParameters($pdo, $donemBaslangic, $donemBitis, $items);
 
+        $sgk = SgkPrimGunuService::calculateResolution($pdo, [
+            'sube_id' => $subeId,
+            'donem' => $donem,
+            'donem_baslangic' => $donemBaslangic,
+            'donem_bitis' => $donemBitis,
+            'personeller' => $personeller,
+            'attendance' => $attendance,
+            'izinler' => $izinler,
+            'legal' => $legal,
+        ]);
+        $items = array_merge($items, $sgk['items']);
+
         $scopeFingerprint = PersonelBordroKapsamService::scopeFingerprintForPeriod(
             $pdo,
             $subeId,
@@ -87,7 +99,8 @@ class MaasHesaplamaSnapshotService
             $izinler,
             $finance,
             $legal,
-            $scopeFingerprint
+            $scopeFingerprint,
+            $sgk
         );
 
         $existing = self::findActiveSnapshot($pdo, $subeId, $yil, $ay, $forUpdate);
@@ -135,6 +148,7 @@ class MaasHesaplamaSnapshotService
             'izinler' => $izinler,
             'finance' => $finance,
             'legal' => $legal,
+            'sgk' => $sgk,
             'items' => $items,
             'hashes' => $hashes,
             'existing_snapshot' => $existing,
@@ -508,7 +522,7 @@ class MaasHesaplamaSnapshotService
         $turPlaceholders = implode(', ', array_fill(0, count(self::IZIN_SUREC_TURLERI), '?'));
         $stmt = $pdo->prepare(
             "SELECT id, personel_id, surec_turu, alt_tur, baslangic_tarihi, bitis_tarihi,
-                    ucretli_mi, aciklama, state, created_at
+                    ucretli_mi, ilk_iki_gun_firma_oder_mi, aciklama, state, created_at
              FROM surecler
              WHERE personel_id IN ($placeholders)
                AND surec_turu IN ($turPlaceholders)
@@ -739,7 +753,8 @@ class MaasHesaplamaSnapshotService
         array $izinler,
         array $finance,
         array $legal,
-        $scopeFingerprint = null
+        $scopeFingerprint = null,
+        $sgk = null
     ) {
         $muhurHash = self::hashCanonical($muhur ? self::muhurPayload($muhur) : null);
         $personelSetHash = self::hashCanonical(array_map([self::class, 'personelPayload'], array_values($personeller)));
@@ -770,6 +785,9 @@ class MaasHesaplamaSnapshotService
         if ($scopeHash !== $emptyScopeHash) {
             $sourcePayload['payroll_scope_hash'] = $scopeHash;
         }
+        if (is_array($sgk)) {
+            $sourcePayload['sgk_source_hash'] = (string) ($sgk['source_hash'] ?? '');
+        }
         $sourceHash = self::hashCanonical($sourcePayload);
 
         return [
@@ -781,6 +799,7 @@ class MaasHesaplamaSnapshotService
             'finance_source_hash' => $financeHash,
             'legal_parameter_hash' => $legalHash,
             'payroll_scope_hash' => $scopeHash,
+            'sgk_source_hash' => is_array($sgk) ? (string) ($sgk['source_hash'] ?? '') : '',
             'source_hash' => $sourceHash,
         ];
     }
@@ -952,8 +971,10 @@ class MaasHesaplamaSnapshotService
         return $sqlState === '40001'
             || $driverCode === 1213
             || $driverCode === 1205
+            || $driverCode === 1020
             || stripos($message, 'Deadlock') !== false
-            || stripos($message, 'Lock wait timeout') !== false;
+            || stripos($message, 'Lock wait timeout') !== false
+            || stripos($message, 'Record has changed since last read') !== false;
     }
 
     /**
@@ -1135,6 +1156,9 @@ class MaasHesaplamaSnapshotService
             'preflight_hash' => (string) $resolution['preflight_hash'],
             'personel_hashes' => $personelHashes,
             'girdi_hashes' => $girdiHashes,
+            'sgk_hashes' => array_values(array_map(static function (array $result) {
+                return (string) $result['sgk_hesap_hash'];
+            }, $resolution['sgk']['results_by_personel'] ?? [])),
         ]);
 
         $cutoffAt = gmdate('Y-m-d H:i:s');
@@ -1199,6 +1223,19 @@ class MaasHesaplamaSnapshotService
             $personelSnapshotIds[$personelId] = (int) $pdo->lastInsertId();
         }
 
+        SgkPrimGunuService::persistSnapshotRows(
+            $pdo,
+            $snapshotId,
+            $personelSnapshotIds,
+            $resolution['sgk']['results_by_personel'] ?? [],
+            [
+                'yil' => $yil,
+                'ay' => $ay,
+                'request_hash' => (string) $resolution['preflight_hash'],
+                'actor_id' => self::actorId($user),
+            ]
+        );
+
         $insertGirdi = $pdo->prepare(
             'INSERT INTO maas_hesaplama_girdi_snapshotlari (
                 donem_snapshot_id, personel_snapshot_id, kaynak_turu, kaynak_tablo, kaynak_id,
@@ -1227,7 +1264,10 @@ class MaasHesaplamaSnapshotService
         // Count dogrulamasi: kismi snapshot kesinlikle kalmamali
         $personelCount = (int) $pdo->query('SELECT COUNT(*) FROM maas_hesaplama_personel_snapshotlari WHERE donem_snapshot_id = ' . $snapshotId)->fetchColumn();
         $girdiCount = (int) $pdo->query('SELECT COUNT(*) FROM maas_hesaplama_girdi_snapshotlari WHERE donem_snapshot_id = ' . $snapshotId)->fetchColumn();
-        if ($personelCount !== count($personelEntries) || $girdiCount !== count($girdiEntries)) {
+        $sgkCount = (int) $pdo->query('SELECT COUNT(*) FROM maas_hesaplama_sgk_snapshotlari WHERE donem_snapshot_id = ' . $snapshotId)->fetchColumn();
+        if ($personelCount !== count($personelEntries)
+            || $girdiCount !== count($girdiEntries)
+            || $sgkCount !== count($personelEntries)) {
             throw new MaasHesaplamaException('PAYROLL_SOURCE_INCONSISTENT', 'Snapshot count dogrulamasi basarisiz; islem geri alindi.', 500);
         }
 
@@ -1361,6 +1401,9 @@ class MaasHesaplamaSnapshotService
         }
 
         $verification = self::verifySnapshotHash($pdo, $row);
+        $sgkSonuclari = strpos((string) $row['contract_version'], 'S85B_') === 0
+            ? array_values(SgkPrimGunuService::loadSnapshotResults($pdo, (int) $snapshotId))
+            : [];
 
         $personeller = array_map(static function (array $personelRow) use ($includePayloads) {
             $decoded = json_decode((string) $personelRow['personel_snapshot_json'], true);
@@ -1386,6 +1429,7 @@ class MaasHesaplamaSnapshotService
             'personeller' => $personeller,
             'girdi_ozeti' => $girdiOzeti,
             'hash_dogrulama' => $verification,
+            'sgk_sonuclari' => $sgkSonuclari,
         ]);
     }
 
@@ -1431,12 +1475,31 @@ class MaasHesaplamaSnapshotService
             'preflight_hash' => (string) $row['preflight_hash'],
             'personel_hashes' => $personelHashes,
             'girdi_hashes' => $girdiHashes,
-        ]);
+        ] + self::sgkHashPayloadForContract($pdo, $snapshotId, (string) $row['contract_version']));
 
         return [
             'beklenen' => (string) $row['snapshot_hash'],
             'hesaplanan' => $computed,
             'dogrulandi' => hash_equals((string) $row['snapshot_hash'], $computed),
+        ];
+    }
+
+    /** @return array<string, array<int, string>> */
+    private static function sgkHashPayloadForContract(PDO $pdo, $snapshotId, $contractVersion)
+    {
+        if (strpos((string) $contractVersion, 'S85B_') !== 0) {
+            return [];
+        }
+        $stmt = $pdo->prepare(
+            'SELECT sgk_hesap_hash FROM maas_hesaplama_sgk_snapshotlari
+             WHERE donem_snapshot_id = :id ORDER BY personel_id ASC'
+        );
+        $stmt->execute(['id' => (int) $snapshotId]);
+
+        return [
+            'sgk_hashes' => array_map(static function (array $row) {
+                return (string) $row['sgk_hesap_hash'];
+            }, $stmt->fetchAll(PDO::FETCH_ASSOC)),
         ];
     }
 
@@ -1776,7 +1839,7 @@ class MaasHesaplamaSnapshotService
     }
 
     /** @param array<string, mixed> $row @return array<string, mixed> */
-    private static function attendancePayload(array $row)
+    public static function attendancePayload(array $row)
     {
         return [
             'muhur_satir_id' => (int) $row['id'],
@@ -1808,7 +1871,7 @@ class MaasHesaplamaSnapshotService
     }
 
     /** @param array<string, mixed> $izin @return array<string, mixed> */
-    private static function leavePayload(array $izin)
+    public static function leavePayload(array $izin)
     {
         return [
             'surec_id' => (int) $izin['id'],
@@ -1818,6 +1881,8 @@ class MaasHesaplamaSnapshotService
             'baslangic_tarihi' => (string) $izin['baslangic_tarihi'],
             'bitis_tarihi' => $izin['bitis_tarihi'] !== null ? (string) $izin['bitis_tarihi'] : null,
             'ucretli_mi' => (int) $izin['ucretli_mi'],
+            'ilk_iki_gun_firma_oder_mi' => $izin['ilk_iki_gun_firma_oder_mi'] !== null
+                ? (bool) $izin['ilk_iki_gun_firma_oder_mi'] : null,
             'aciklama' => $izin['aciklama'] !== null ? (string) $izin['aciklama'] : null,
             'state' => (string) $izin['state'],
             'created_at' => self::normalizeTimestamp($izin['created_at'] ?? null),
@@ -2001,6 +2066,7 @@ class MaasHesaplamaSnapshotService
                 'blocker_count' => $blockerCount,
                 'warning_count' => $warningCount,
                 'hazir_mi' => $blockerCount === 0,
+                'sgk_sonucu' => $resolution['sgk']['results_by_personel'][$personelId] ?? null,
             ];
         }
 

@@ -679,11 +679,16 @@ class SureclerController
             return null;
         }
 
-        if (array_key_exists('ilk_iki_gun_firma_oder_mi', $body) && $body['ilk_iki_gun_firma_oder_mi'] !== null) {
-            return self::normalizeBoolean($body['ilk_iki_gun_firma_oder_mi']);
+        if (!array_key_exists('ilk_iki_gun_firma_oder_mi', $body) || $body['ilk_iki_gun_firma_oder_mi'] === null) {
+            return null;
         }
 
-        return false;
+        $value = $body['ilk_iki_gun_firma_oder_mi'];
+        if (is_string($value) && trim($value) === '') {
+            return null;
+        }
+
+        return self::normalizeBoolean($value);
     }
 
     /** @param mixed $surecTuru @param mixed $altTur */

@@ -44,6 +44,14 @@ test.describe("S77-C maas hesaplama merkezi", () => {
     await expect(page.getByTestId("maas-hesaplama-personel-7")).toBeVisible();
     await expect(page.getByTestId("maas-hesaplama-create")).toBeEnabled();
 
+    const sgkCsvDownload = page.waitForEvent("download");
+    await page.getByTestId("maas-hesaplama-sgk-export-csv").click();
+    const sgkCsv = await sgkCsvDownload;
+    expect(sgkCsv.suggestedFilename()).toBe("sgk-kontrol-2026-03-sube-1.csv");
+    await expect(page.getByTestId("maas-hesaplama-action-success")).toContainText(
+      "Authoritative SGK CSV indirildi."
+    );
+
     const create = page.waitForResponse(
       (response) =>
         response.url().includes("/api/maas-hesaplama/snapshotlar") && response.request().method() === "POST"
@@ -58,7 +66,7 @@ test.describe("S77-C maas hesaplama merkezi", () => {
     await expect(page.getByTestId("maas-hesaplama-hash-dogrulama")).toContainText("OK");
     await expect(page.getByTestId("maas-hesaplama-calc-preflight")).toBeVisible();
     await expect(page.getByTestId("maas-hesaplama-calc-ready")).toContainText("Hayır");
-    await expect(page.getByTestId("maas-hesaplama-calc-issue-LEGAL_PARAMETER_REQUIRED_MISSING")).toBeVisible();
+    await expect(page.getByTestId("maas-hesaplama-calc-issue-BUSINESS_POLICY_REQUIRED")).toBeVisible();
     await expect(page.getByTestId("maas-hesaplama-calc-run")).toBeDisabled();
     await page.getByLabel("Personel ID").fill("7");
     await page.getByLabel("Önceki GV matrahı").fill("12345.67");

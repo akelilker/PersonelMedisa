@@ -69,7 +69,7 @@ export type SurecFormState = {
   baslangicTarihi: string;
   bitisTarihi: string;
   ucretliMi: boolean;
-  ilkIkiGunFirmaOderMi: boolean;
+  ilkIkiGunFirmaOderMi: boolean | null;
   aciklama: string;
 };
 
@@ -80,7 +80,7 @@ export const INITIAL_SUREC_FORM: SurecFormState = {
   baslangicTarihi: "",
   bitisTarihi: "",
   ucretliMi: true,
-  ilkIkiGunFirmaOderMi: false,
+  ilkIkiGunFirmaOderMi: null,
   aciklama: ""
 };
 

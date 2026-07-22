@@ -16,7 +16,7 @@ describe("surecler.api", () => {
     vi.restoreAllMocks();
   });
 
-  it("createSurec hastalik raporunda varsayilan ilk_iki_gun_firma_oder_mi=false doner", async () => {
+  it("createSurec hastalik raporunda varsayilan ilk_iki_gun_firma_oder_mi=null doner", async () => {
     const fetchMock = vi.fn(async () =>
       createJsonResponse(
         {
@@ -27,7 +27,7 @@ describe("surecler.api", () => {
             alt_tur: "Raporlu_Hastalik",
             baslangic_tarihi: "2026-04-10",
             bitis_tarihi: "2026-04-14",
-            ilk_iki_gun_firma_oder_mi: false,
+            ilk_iki_gun_firma_oder_mi: null,
             state: "AKTIF"
           },
           meta: {},
@@ -46,7 +46,7 @@ describe("surecler.api", () => {
       bitis_tarihi: "2026-04-14"
     });
 
-    expect(result.ilk_iki_gun_firma_oder_mi).toBe(false);
+    expect(result.ilk_iki_gun_firma_oder_mi).toBeNull();
   });
 
   it("createSurec is kazasi raporunda ilk_iki_gun_firma_oder_mi null kalir", async () => {

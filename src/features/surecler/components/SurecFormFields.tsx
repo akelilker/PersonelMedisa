@@ -154,7 +154,7 @@ export function SurecFormFields({
               setForm((prev) => ({
                 ...prev,
                 surecTuru: value,
-                ilkIkiGunFirmaOderMi: isHastalikRaporSureci(value, prev.altTur) ? prev.ilkIkiGunFirmaOderMi : false
+                ilkIkiGunFirmaOderMi: isHastalikRaporSureci(value, prev.altTur) ? prev.ilkIkiGunFirmaOderMi : null
               }))
             }
             required
@@ -171,7 +171,7 @@ export function SurecFormFields({
               setForm((prev) => ({
                 ...prev,
                 surecTuru: value,
-                ilkIkiGunFirmaOderMi: isHastalikRaporSureci(value, prev.altTur) ? prev.ilkIkiGunFirmaOderMi : false
+                ilkIkiGunFirmaOderMi: isHastalikRaporSureci(value, prev.altTur) ? prev.ilkIkiGunFirmaOderMi : null
               }))
             }
             required
@@ -195,7 +195,7 @@ export function SurecFormFields({
                   altTur: value,
                   ilkIkiGunFirmaOderMi: isHastalikRaporSureci(prev.surecTuru, value)
                     ? prev.ilkIkiGunFirmaOderMi
-                    : false
+                    : null
                 }))
             )
           : (
@@ -210,7 +210,7 @@ export function SurecFormFields({
                     altTur: value,
                     ilkIkiGunFirmaOderMi: isHastalikRaporSureci(prev.surecTuru, value)
                       ? prev.ilkIkiGunFirmaOderMi
-                      : false
+                      : null
                   }))
                 }
                 required
@@ -231,7 +231,7 @@ export function SurecFormFields({
               altTur: value,
               ilkIkiGunFirmaOderMi: isHastalikRaporSureci(prev.surecTuru, value)
                 ? prev.ilkIkiGunFirmaOderMi
-                : false
+                : null
             }))
           }
         />
@@ -242,20 +242,29 @@ export function SurecFormFields({
   const showIlkIkiGunFirmaOderMi = isHastalikRaporSureci(form.surecTuru, form.altTur);
 
   const ilkIkiGunFirmaOderMiFieldNode = showIlkIkiGunFirmaOderMi ? (
-    <div className="form-section">
-      <label>
-        <input
-          type="checkbox"
-          name="surec-ilk-iki-gun-firma-oder-mi"
-          data-testid="surec-ilk-iki-gun-firma-oder-mi"
-          checked={form.ilkIkiGunFirmaOderMi}
-          onChange={(event) =>
-            setForm((prev) => ({ ...prev, ilkIkiGunFirmaOderMi: event.target.checked }))
-          }
-        />
-        <span> İlk 2 gün firma tarafından ödenecek mi?</span>
-      </label>
-    </div>
+    <FormField
+      as="select"
+      label="İlk 2 gün firma tarafından ödenecek mi?"
+      name="surec-ilk-iki-gun-firma-oder-mi"
+      value={
+        form.ilkIkiGunFirmaOderMi === null
+          ? "belirsiz"
+          : form.ilkIkiGunFirmaOderMi
+            ? "evet"
+            : "hayir"
+      }
+      onChange={(value) =>
+        setForm((prev) => ({
+          ...prev,
+          ilkIkiGunFirmaOderMi: value === "belirsiz" ? null : value === "evet"
+        }))
+      }
+      selectOptions={[
+        { value: "belirsiz", label: "Belirlenmedi — bordroyu bloke eder" },
+        { value: "evet", label: "Evet — ücret korunur" },
+        { value: "hayir", label: "Hayır — kesinti adayı" }
+      ]}
+    />
   ) : null;
 
   const dateFields = (

@@ -6,6 +6,8 @@ require_once __DIR__ . '/../../api/src/Services/BildirimDonemContextService.php'
 require_once __DIR__ . '/../../api/src/Services/PuantajDonemKilidiService.php';
 require_once __DIR__ . '/../../api/src/Services/MaasHesaplamaException.php';
 require_once __DIR__ . '/../../api/src/Services/PersonelBordroKapsamService.php';
+require_once __DIR__ . '/../../api/src/Services/Payroll/SgkPrimGunuEngine.php';
+require_once __DIR__ . '/../../api/src/Services/SgkPrimGunuService.php';
 require_once __DIR__ . '/../../api/src/Services/MaasHesaplamaSnapshotService.php';
 
 use Medisa\Api\Services\MaasHesaplamaException;
@@ -36,6 +38,7 @@ function createSnapshotSchema(PDO $pdo): void
     $pdo->exec('CREATE TABLE surecler (
         id INTEGER PRIMARY KEY, personel_id INTEGER NOT NULL, surec_turu TEXT NOT NULL, alt_tur TEXT,
         baslangic_tarihi TEXT NOT NULL, bitis_tarihi TEXT, ucretli_mi INTEGER NOT NULL DEFAULT 0,
+        ilk_iki_gun_firma_oder_mi INTEGER,
         aciklama TEXT, state TEXT NOT NULL DEFAULT \'AKTIF\',
         created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     )');
@@ -131,40 +134,141 @@ function createSnapshotSchema(PDO $pdo): void
         snapshot_json TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
         UNIQUE (sube_id, yil, ay, aksiyon, request_hash)
     )');
+    $pdo->exec('CREATE TABLE sgk_eksik_gun_katalog_surumleri (
+        id INTEGER PRIMARY KEY, surum_kodu TEXT NOT NULL, gecerlilik_baslangic TEXT NOT NULL,
+        gecerlilik_bitis TEXT, tamlik_durumu TEXT NOT NULL, state TEXT NOT NULL,
+        manifest_set_hash TEXT NOT NULL
+    )');
+    $pdo->exec('CREATE TABLE sgk_eksik_gun_kodlari (
+        id INTEGER PRIMARY KEY, katalog_surum_id INTEGER NOT NULL, eksik_gun_kodu TEXT NOT NULL,
+        resmi_aciklama TEXT NOT NULL, belge_zorunlulugu TEXT NOT NULL,
+        sifir_gun_sifir_kazanc_kullanilabilir_mi INTEGER NOT NULL,
+        kismi_sureli_sozlesme_gerekli_mi INTEGER NOT NULL,
+        tek_basina_kullanilabilir_mi INTEGER NOT NULL,
+        diger_nedenlerle_birlikte_kullanim TEXT NOT NULL, aktif_mi INTEGER NOT NULL,
+        gecerlilik_baslangic TEXT NOT NULL, gecerlilik_bitis TEXT
+    )');
+    $pdo->exec('CREATE TABLE sgk_eksik_gun_kod_cakismalari (
+        id INTEGER PRIMARY KEY, katalog_surum_id INTEGER NOT NULL, kaynak_kod_set_hash TEXT NOT NULL,
+        sonuc_eksik_gun_kodu TEXT NOT NULL, aktif_mi INTEGER NOT NULL
+    )');
+    $pdo->exec('CREATE TABLE sgk_sirket_politika_surumleri (
+        id INTEGER PRIMARY KEY, sube_id INTEGER NOT NULL, bildirim_donem_tipi TEXT NOT NULL,
+        politika_hash TEXT NOT NULL, gecerlilik_baslangic TEXT NOT NULL, gecerlilik_bitis TEXT,
+        state TEXT NOT NULL
+    )');
+    $pdo->exec('CREATE TABLE sgk_sirket_politika_degerleri (
+        id INTEGER PRIMARY KEY, politika_surum_id INTEGER NOT NULL, politika_kodu TEXT NOT NULL, deger TEXT NOT NULL
+    )');
+    $pdo->exec('CREATE TABLE sgk_personel_sigortalilik_surumleri (
+        id INTEGER PRIMARY KEY, personel_id INTEGER NOT NULL, sigortalilik_statusu TEXT NOT NULL,
+        sozlesme_turu TEXT NOT NULL, bildirim_donem_tipi TEXT NOT NULL,
+        gecerlilik_baslangic TEXT NOT NULL, gecerlilik_bitis TEXT, state TEXT NOT NULL
+    )');
+    $pdo->exec('CREATE TABLE sgk_surec_neden_eslemeleri (
+        id INTEGER PRIMARY KEY, katalog_surum_id INTEGER NOT NULL, surec_turu TEXT NOT NULL, alt_tur TEXT,
+        canonical_surec_turu TEXT NOT NULL, eksik_gun_kodu TEXT, prim_gunu_etkisi TEXT NOT NULL,
+        kosullar_json TEXT, aktif_mi INTEGER NOT NULL
+    )');
+    $pdo->exec('CREATE TABLE sgk_eksik_gun_belgeleri (
+        id INTEGER PRIMARY KEY, dogrulama_durumu TEXT NOT NULL, dosya_hash TEXT NOT NULL
+    )');
+    $pdo->exec('CREATE TABLE sgk_belge_surec_baglantilari (
+        id INTEGER PRIMARY KEY, belge_id INTEGER NOT NULL, surec_id INTEGER NOT NULL
+    )');
+    $pdo->exec('CREATE TABLE maas_hesaplama_sgk_snapshotlari (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, donem_snapshot_id INTEGER NOT NULL,
+        personel_snapshot_id INTEGER NOT NULL, personel_id INTEGER NOT NULL,
+        hesaplanan_prim_gunu INTEGER, eksik_gun_sayisi INTEGER, eksik_gun_kodu TEXT,
+        eksik_gun_aciklamasi TEXT, kaynak_surec_idleri_json TEXT NOT NULL,
+        kaynak_puantaj_idleri_json TEXT NOT NULL, kaynak_belge_idleri_json TEXT NOT NULL,
+        katalog_surum_id INTEGER, katalog_surumu TEXT, kaynak_manifest_hash TEXT,
+        sgk_hesap_hash TEXT NOT NULL, gunluk_karar_dokumu_hash TEXT NOT NULL,
+        gunluk_karar_dokumu_json TEXT NOT NULL, manuel_inceleme_gerekli_mi INTEGER NOT NULL,
+        blocker_kodlari_json TEXT NOT NULL, blocker_detaylari_json TEXT NOT NULL,
+        ucret_modeli TEXT NOT NULL, ilk_iki_gun_politika_ozeti_json TEXT NOT NULL,
+        sirket_politika_surum_id INTEGER, sirket_politika_hash TEXT, sgk_odenek_durumu TEXT NOT NULL,
+        is_goremezlik_finans_ozeti_json TEXT NOT NULL,
+        gunluk_alt_sinir REAL, gunluk_ust_sinir REAL, donem_alt_sinir REAL, donem_ust_sinir REAL,
+        sinir_mevzuat_surumu TEXT, source_hash TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE (donem_snapshot_id, personel_id)
+    )');
+    $pdo->exec('CREATE TABLE sgk_hesap_auditleri (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        donem_snapshot_id INTEGER,
+        personel_id INTEGER NOT NULL,
+        yil INTEGER NOT NULL,
+        ay INTEGER NOT NULL,
+        aksiyon TEXT NOT NULL,
+        sonuc TEXT NOT NULL,
+        request_hash TEXT NOT NULL,
+        source_hash TEXT NOT NULL,
+        result_hash TEXT NOT NULL,
+        blocker_kodlari_json TEXT NOT NULL,
+        actor_id INTEGER,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    )');
 }
 
 function resetSnapshotData(PDO $pdo): void
 {
     foreach ([
-        'maas_hesaplama_snapshot_auditleri', 'maas_hesaplama_girdi_snapshotlari',
+        'sgk_hesap_auditleri', 'maas_hesaplama_sgk_snapshotlari', 'maas_hesaplama_snapshot_auditleri', 'maas_hesaplama_girdi_snapshotlari',
         'maas_hesaplama_personel_snapshotlari', 'maas_hesaplama_donem_snapshotlari',
         'puantaj_donem_kilitleri', 'mevzuat_parametreleri', 'ek_odeme_kesinti',
         'bildirim_puantaj_etki_cakisma_cozumleri', 'onayli_bildirim_puantaj_etki_adaylari',
         'puantaj_aylik_muhur_satirlari', 'puantaj_aylik_muhurleri',
+        'sgk_belge_surec_baglantilari', 'sgk_eksik_gun_belgeleri', 'sgk_surec_neden_eslemeleri',
+        'sgk_personel_sigortalilik_surumleri', 'sgk_sirket_politika_degerleri',
+        'sgk_sirket_politika_surumleri', 'sgk_eksik_gun_kod_cakismalari',
+        'sgk_eksik_gun_kodlari', 'sgk_eksik_gun_katalog_surumleri',
         'personel_ucret_gecmisi', 'surecler', 'personeller', 'subeler',
     ] as $table) {
         $pdo->exec('DELETE FROM ' . $table);
     }
     $pdo->exec("INSERT INTO subeler (id, kod, ad) VALUES (1, 'MRK', 'Merkez'), (2, 'SB2', 'Sube 2')");
-    $pdo->exec("INSERT INTO personeller (id, tc_kimlik_no, ad, soyad, sicil_no, ise_giris_tarihi, sube_id, aktif_durum)
-        VALUES (7, '11111111111', 'Ali', 'Yilmaz', 'S007', '2020-01-01', 1, 'AKTIF'),
-               (8, '22222222222', 'Ayse', 'Demir', 'S008', '2020-01-01', 1, 'AKTIF')");
+    $pdo->exec("INSERT INTO personeller (id, tc_kimlik_no, ad, soyad, sicil_no, ise_giris_tarihi, sube_id, aktif_durum, ucret_tipi_id)
+        VALUES (7, '11111111111', 'Ali', 'Yilmaz', 'S007', '2020-01-01', 1, 'AKTIF', 1),
+               (8, '22222222222', 'Ayse', 'Demir', 'S008', '2020-01-01', 1, 'AKTIF', 1)");
+    $manifestHash = str_repeat('a', 64);
+    $policyHash = str_repeat('b', 64);
+    $pdo->exec("INSERT INTO sgk_eksik_gun_katalog_surumleri
+        (id, surum_kodu, gecerlilik_baslangic, tamlik_durumu, state, manifest_set_hash)
+        VALUES (1, 'TEST-SGK-V1', '2026-01-01', 'DOGRULANMIS_TAM', 'ONAYLANDI', '$manifestHash')");
+    $pdo->exec("INSERT INTO sgk_sirket_politika_surumleri
+        (id, sube_id, bildirim_donem_tipi, politika_hash, gecerlilik_baslangic, state)
+        VALUES (1, 1, 'AY_1_SON_GUN', '$policyHash', '2026-01-01', 'ONAYLANDI')");
+    $pdo->exec("INSERT INTO sgk_personel_sigortalilik_surumleri
+        (id, personel_id, sigortalilik_statusu, sozlesme_turu, bildirim_donem_tipi, gecerlilik_baslangic, state)
+        VALUES (1, 7, '4A', 'TAM_SURELI', 'SIRKET_POLITIKASINDAN', '2026-01-01', 'ONAYLANDI'),
+               (2, 8, '4A', 'TAM_SURELI', 'SIRKET_POLITIKASINDAN', '2026-01-01', 'ONAYLANDI')");
+    $pdo->exec("INSERT INTO sgk_surec_neden_eslemeleri
+        (id, katalog_surum_id, surec_turu, alt_tur, canonical_surec_turu, prim_gunu_etkisi, aktif_mi)
+        VALUES (1, 1, 'IZIN', NULL, 'YILLIK_IZIN', 'DAHIL', 1)");
+    $pdo->exec("INSERT INTO mevzuat_parametreleri
+        (id, parametre_kodu, deger_tipi, sayisal_deger, birim, gecerlilik_baslangic)
+        VALUES (901, 'SGK_GUNLUK_TABAN', 'SAYISAL', 100, 'TRY', '2026-01-01'),
+               (902, 'SGK_GUNLUK_TAVAN', 'SAYISAL', 750, 'TRY', '2026-01-01')");
 }
 
 function sealPeriod(PDO $pdo, int $subeId = 1, int $yil = 2026, int $ay = 3, int $rowCount = 2): int
 {
     $donem = sprintf('%04d-%02d', $yil, $ay);
+    $daysInMonth = cal_days_in_month(CAL_GREGORIAN, $ay, $yil);
+    $actualRowCount = $daysInMonth * 2;
     $pdo->prepare('INSERT INTO puantaj_aylik_muhurleri (sube_id, yil, ay, donem, durum, muhurlenen_kayit_sayisi, created_by)
         VALUES (:s, :y, :a, :d, \'MUHURLENDI\', :c, 99)')
-        ->execute(['s' => $subeId, 'y' => $yil, 'a' => $ay, 'd' => $donem, 'c' => $rowCount]);
+        ->execute(['s' => $subeId, 'y' => $yil, 'a' => $ay, 'd' => $donem, 'c' => $actualRowCount]);
     $muhurId = (int) $pdo->lastInsertId();
-    for ($i = 0; $i < $rowCount; $i++) {
-        $personelId = $i % 2 === 0 ? 7 : 8;
-        $tarih = sprintf('%s-%02d', $donem, 4 + $i);
-        $pdo->prepare('INSERT INTO puantaj_aylik_muhur_satirlari
-            (muhur_id, personel_id, tarih, gun_tipi, kontrol_durumu, kaynak, net_calisma_suresi_dakika)
-            VALUES (:m, :p, :t, \'NORMAL\', \'AMIR_KONTROL_ETTI\', \'SISTEM\', 480)')
-            ->execute(['m' => $muhurId, 'p' => $personelId, 't' => $tarih]);
+    foreach ([7, 8] as $personelId) {
+        for ($day = 1; $day <= $daysInMonth; $day++) {
+            $tarih = sprintf('%s-%02d', $donem, $day);
+            $pdo->prepare('INSERT INTO puantaj_aylik_muhur_satirlari
+                (muhur_id, personel_id, tarih, gun_tipi, kontrol_durumu, kaynak, net_calisma_suresi_dakika)
+                VALUES (:m, :p, :t, \'NORMAL\', \'AMIR_KONTROL_ETTI\', \'SISTEM\', 480)')
+                ->execute(['m' => $muhurId, 'p' => $personelId, 't' => $tarih]);
+        }
     }
 
     return $muhurId;
@@ -302,7 +406,7 @@ try {
         }
     }
     snapAssert($midMonthSegments === 2, 'mid-month iki segment cozumlendi');
-    snapAssert(issueByCode($preflight, 'LEGAL_PARAMETER_SET_EMPTY') !== null, 'bos mevzuat seti warning uretti');
+    snapAssert(issueByCode($preflight, 'LEGAL_PARAMETER_SET_EMPTY') === null, 'SGK PEK mevzuat seti owner fixture ile dolu');
 
     // --- Integration: puantaj count mismatch + unresolved candidate ---
     resetSnapshotData($pdo);
@@ -367,12 +471,14 @@ try {
     $detail = Svc::getSnapshotDetail($pdo, $snapshotId);
     snapAssert($detail !== null && $detail['hash_dogrulama']['dogrulandi'] === true, 'snapshot hash yeniden hesaplanip dogrulandi');
     snapAssert((int) $pdo->query("SELECT COUNT(*) FROM maas_hesaplama_snapshot_auditleri WHERE aksiyon = 'SNAPSHOT_CREATE' AND sonuc = 'CREATED'")->fetchColumn() === 1, 'success audit olustu');
+    snapAssert((int) $pdo->query("SELECT COUNT(*) FROM sgk_hesap_auditleri WHERE aksiyon = 'SNAPSHOT_CREATE' AND sonuc = 'CREATED'")->fetchColumn() === 2, 'her personel icin immutable SGK snapshot audit olustu');
 
     $repeat = Svc::createSnapshot($pdo, 1, 2026, 3, (string) Svc::buildPreflight($pdo, 1, 2026, 3)['preflight_hash'], $actor);
     snapAssert($repeat['idempotent'] === true && (int) $repeat['snapshot']['id'] === $snapshotId, 'ayni kaynak seti idempotent ayni snapshot');
     snapAssert((int) $pdo->query('SELECT COUNT(*) FROM maas_hesaplama_donem_snapshotlari')->fetchColumn() === 1, 'duplicate snapshot yok');
     snapAssert((int) $pdo->query("SELECT COUNT(*) FROM maas_hesaplama_girdi_snapshotlari WHERE donem_snapshot_id = $snapshotId")->fetchColumn() === $girdiCount, 'duplicate child row yok');
     snapAssert((int) $pdo->query("SELECT COUNT(*) FROM maas_hesaplama_snapshot_auditleri WHERE aksiyon = 'SNAPSHOT_CREATE' AND sonuc = 'CREATED'")->fetchColumn() === 1, 'duplicate success audit yok');
+    snapAssert((int) $pdo->query("SELECT COUNT(*) FROM sgk_hesap_auditleri WHERE aksiyon = 'SNAPSHOT_CREATE'")->fetchColumn() === 2, 'idempotent tekrar duplicate SGK audit uretmedi');
 
     // Immutability: canli kaynak degisiklikleri snapshot'i etkilemez
     $hashBefore = (string) $pdo->query("SELECT snapshot_hash FROM maas_hesaplama_donem_snapshotlari WHERE id = $snapshotId")->fetchColumn();
@@ -444,6 +550,8 @@ try {
     snapAssert($rollbackEx !== null, 'girdi insert hatasi exception firlatti');
     snapAssert((int) $pdo->query('SELECT COUNT(*) FROM maas_hesaplama_donem_snapshotlari')->fetchColumn() === 0, 'rollback sonrasi root satiri yok');
     snapAssert((int) $pdo->query('SELECT COUNT(*) FROM maas_hesaplama_personel_snapshotlari')->fetchColumn() === 0, 'rollback sonrasi partial personel satiri yok');
+    snapAssert((int) $pdo->query('SELECT COUNT(*) FROM maas_hesaplama_sgk_snapshotlari')->fetchColumn() === 0, 'rollback sonrasi SGK snapshot satiri yok');
+    snapAssert((int) $pdo->query('SELECT COUNT(*) FROM sgk_hesap_auditleri')->fetchColumn() === 0, 'rollback sonrasi SGK audit satiri yok');
 
     // --- Personel kumesi: donem ici giris/cikis ---
     resetSnapshotData($pdo);

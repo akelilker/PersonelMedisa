@@ -89,14 +89,14 @@ describe("S77-C/S77-D maas hesaplama source contract", () => {
     );
     const aday = readFileSync(resolve(root, "api/src/Services/MaasHesaplamaAdayService.php"), "utf8");
 
-    expect(engine).toContain("S77D_PAYROLL_ENGINE_V2");
-    expect(engine).toContain("S77D_PAYROLL_CANDIDATE_V2");
+    expect(engine).toContain("S85B_PAYROLL_ENGINE_V2");
+    expect(engine).toContain("S85B_PAYROLL_CANDIDATE_V1");
     expect(engine).toContain("paramHoursToMinutes");
     expect(engine).toContain("FAZLA_SURELERLE_CALISMA_ODEMESI");
     expect(engine).toContain("LEGAL_WEEKLY_LIMIT_MINUTES");
     expect(catalog).toContain("FAZLA_SURELERLE_CALISMA_CARPANI");
     expect(catalog).toContain("HAFTA_TATILI_HESAP_MODU");
     expect(catalog).toContain("UBGT_HESAP_MODU");
-    expect(aday).toContain("S77D_PAYROLL_CANDIDATE_V2");
+    expect(aday).toContain("S85B_PAYROLL_CANDIDATE_V1");
   });
 });

@@ -409,7 +409,10 @@ test.describe("personel dosyasi surec akisi", () => {
     await page.getByRole("link", { name: /Ayşe Yılmaz.*kişisinin kartını aç/i }).first().click();
     await expect(page).toHaveURL(/\/personeller\/1$/);
 
-    await expect(page.getByTestId("personel-sgk-prim-gun-card")).toContainText(/30 Gün/i);
+    await expect(page.getByTestId("personel-sgk-prim-gun-card")).toContainText(
+      /frontend SGK hesabı veya tahmini üretmez/i
+    );
+    await expect(page.getByTestId("personel-sgk-prim-gun-card")).not.toContainText(/30 Gün/i);
     await expect(page.getByText(/30 gün standart/i)).toBeVisible();
     await expect(page.locator("#personel-kart-panel-genel-bilgiler")).toContainText(/Eksik Gün Nedeni/i);
     await expect(page.locator("#personel-kart-panel-genel-bilgiler")).toContainText("-");

@@ -275,6 +275,7 @@ function mhacSeedSnapshot(PDO $pdo): int
         'istihdam_bitis' => null,
     ];
     $personelHash = SnapshotSvc::hashCanonical($personelPayload);
+    $sgkHash = str_repeat('c', 64);
 
     $ucretPayload = [
         'id' => 1,
@@ -322,6 +323,7 @@ function mhacSeedSnapshot(PDO $pdo): int
         'girdi_hashes' => array_map(static function (array $entry) {
             return $entry['payload_hash'];
         }, $girdiEntries),
+        'sgk_hashes' => [$sgkHash],
     ]);
 
     $stmt = $pdo->prepare("INSERT INTO maas_hesaplama_donem_snapshotlari (
@@ -374,6 +376,33 @@ function mhacSeedSnapshot(PDO $pdo): int
         ]);
     }
 
+    $manifestHash = str_repeat('d', 64);
+    $sourceHashSgk = str_repeat('e', 64);
+    $pdo->prepare("INSERT INTO maas_hesaplama_sgk_snapshotlari (
+        donem_snapshot_id, personel_snapshot_id, personel_id,
+        hesaplanan_prim_gunu, eksik_gun_sayisi,
+        kaynak_surec_idleri_json, kaynak_puantaj_idleri_json, kaynak_belge_idleri_json,
+        katalog_surumu, kaynak_manifest_hash, sgk_hesap_hash,
+        gunluk_karar_dokumu_hash, gunluk_karar_dokumu_json,
+        manuel_inceleme_gerekli_mi, blocker_kodlari_json, blocker_detaylari_json,
+        ucret_modeli, ilk_iki_gun_politika_ozeti_json, sgk_odenek_durumu,
+        is_goremezlik_finans_ozeti_json,
+        gunluk_alt_sinir, gunluk_ust_sinir, donem_alt_sinir, donem_ust_sinir,
+        sinir_mevzuat_surumu, source_hash
+    ) VALUES (
+        :snapshot_id, :personel_snapshot_id, 7, 30, 0,
+        '[]', '[]', '[]', 'TEST-SGK-V1', :manifest_hash, :sgk_hash,
+        :daily_hash, '[]', 0, '[]', '[]', 'MAKTU_AYLIK', '[]', 'UYGULANMAZ', '[]',
+        866.86, 6501.45, 26005.80, 195043.50, 'TEST-PEK-V1', :source_hash
+    )")->execute([
+        'snapshot_id' => $snapshotId,
+        'personel_snapshot_id' => $personelSnapshotId,
+        'manifest_hash' => $manifestHash,
+        'sgk_hash' => $sgkHash,
+        'daily_hash' => $sgkHash,
+        'source_hash' => $sourceHashSgk,
+    ]);
+
     $row = SnapshotSvc::fetchSnapshotRow($pdo, $snapshotId);
     mhacAssert($row !== null && SnapshotSvc::verifySnapshotHash($pdo, $row)['dogrulandi'] === true, 'seed snapshot hash dogrulandi');
 
@@ -394,6 +423,9 @@ try {
         id INT UNSIGNED NOT NULL PRIMARY KEY, tc_kimlik_no CHAR(11), ad VARCHAR(80), soyad VARCHAR(80),
         sicil_no VARCHAR(32), ise_giris_tarihi DATE, sube_id INT UNSIGNED NOT NULL
     ) ENGINE=InnoDB");
+    $pdo->exec("CREATE TABLE surecler (
+        id INT UNSIGNED NOT NULL PRIMARY KEY, personel_id INT UNSIGNED NOT NULL
+    ) ENGINE=InnoDB");
     $pdo->exec("CREATE TABLE puantaj_aylik_muhurleri (
         id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY, sube_id INT UNSIGNED NOT NULL,
         yil SMALLINT UNSIGNED NOT NULL, ay TINYINT UNSIGNED NOT NULL, donem CHAR(7) NOT NULL,
@@ -410,6 +442,7 @@ try {
         '024_maas_hesaplama_aday_guvenlik_indexleri.sql',
         '033_sirket_calisma_politikalari.sql',
         '034_bordro_onay_ve_projection.sql',
+        '036_sgk_prim_gunu_owner.sql',
     ] as $file) {
         mhacApplyMigration($pdo, $file);
     }

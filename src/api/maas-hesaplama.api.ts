@@ -27,6 +27,19 @@ export type MaasHesaplamaPersonelSummary = {
   hazir_mi: boolean;
   blocker_count: number;
   warning_count: number;
+  sgk_sonucu: {
+    hesaplanan_prim_gunu: number | null;
+    eksik_gun_sayisi: number | null;
+    eksik_gun_kodu: string | null;
+    eksik_gun_aciklamasi: string | null;
+    ucret_modeli: string | null;
+    sgk_odenek_durumu: string | null;
+    manuel_inceleme_gerekli_mi: boolean;
+    blocker_kodlari: string[];
+    sgk_hesap_hash: string;
+    katalog_surumu: string | null;
+    kaynak_manifest_hash: string | null;
+  } | null;
 };
 
 export type MaasHesaplamaPreflight = {
@@ -243,6 +256,46 @@ export type MaasHesaplamaParams = {
   ay: number;
 };
 
+export type SgkPrimGunuSonucu = {
+  id: number;
+  snapshot_id: number;
+  snapshot_revision_no: number;
+  personel_snapshot_id: number;
+  personel_id: number;
+  yil: number;
+  ay: number;
+  donem: string;
+  hesaplanan_prim_gunu: number | null;
+  eksik_gun_sayisi: number | null;
+  eksik_gun_kodu: string | null;
+  eksik_gun_aciklamasi: string | null;
+  kaynak_surec_idleri: number[];
+  kaynak_puantaj_idleri: number[];
+  kaynak_belge_idleri: number[];
+  katalog_surumu: string | null;
+  kaynak_manifest_hash: string | null;
+  sgk_hesap_hash: string;
+  gunluk_karar_dokumu_hash: string;
+  manuel_inceleme_gerekli_mi: boolean;
+  blocker_kodlari: string[];
+  blocker_detaylari: Array<Record<string, unknown>>;
+  ucret_modeli: string;
+  ilk_iki_gun_politika_ozeti: Record<string, unknown>;
+  sirket_politika_surum_id: number | null;
+  sirket_politika_hash: string | null;
+  sgk_odenek_durumu: string;
+  is_goremezlik_finans_ozeti: Array<Record<string, unknown>>;
+  gunluk_alt_sinir: string | null;
+  gunluk_ust_sinir: string | null;
+  donem_alt_sinir: string | null;
+  donem_ust_sinir: string | null;
+  sinir_mevzuat_surumu: string | null;
+  source_hash: string;
+  ad?: string;
+  soyad?: string;
+  sicil_no?: string | null;
+};
+
 function assertNoMaasApiErrors(response: ApiResponse<unknown>, fallback: string): void {
   if (Array.isArray(response.errors) && response.errors.length > 0) {
     const first = response.errors[0] as { code?: string; message?: string };
@@ -282,6 +335,64 @@ export async function fetchMaasHesaplamaSnapshots(
     ApiResponse<{ items: MaasHesaplamaSnapshot[] }> | { items: MaasHesaplamaSnapshot[] }
   >(path);
   return unwrapData(response, "Snapshot listesi alinamadi.").items ?? [];
+}
+
+export async function fetchSgkPrimGunuSonuclari(
+  params: MaasHesaplamaParams & { personel_id?: number }
+): Promise<SgkPrimGunuSonucu[]> {
+  const path = appendQueryParams(endpoints.maasHesaplama.sgkSonuclari, {
+    sube_id: params.sube_id,
+    yil: params.yil,
+    ay: params.ay,
+    personel_id: params.personel_id
+  });
+  const response = await apiRequest<
+    ApiResponse<{ items: SgkPrimGunuSonucu[] }> | { items: SgkPrimGunuSonucu[] }
+  >(path);
+  return unwrapData(response, "SGK prim gunu sonuclari alinamadi.").items ?? [];
+}
+
+export async function downloadSgkPrimGunuSonuclariCsv(params: MaasHesaplamaParams): Promise<void> {
+  const path = appendQueryParams(endpoints.maasHesaplama.sgkSonuclariExportCsv, {
+    sube_id: params.sube_id,
+    yil: params.yil,
+    ay: params.ay
+  });
+  const { resolveDemoApiResponse } = await import("./mock-demo");
+  const { buildApiUrl } = await import("./api-client");
+  const { getAuthTokenForApi } = await import("../auth/auth-token-provider");
+  const { getActiveSubeIdForApiHeader } = await import("../auth/auth-manager");
+
+  let blob: Blob;
+  const demoResponse = resolveDemoApiResponse(path, { method: "GET" });
+  if (demoResponse !== null) {
+    if (typeof demoResponse.data !== "string") {
+      throw new ApiRequestError("SGK CSV indirilemedi.", 403);
+    }
+    blob = new Blob([demoResponse.data], { type: "text/csv;charset=utf-8" });
+  } else {
+    const headers = new Headers();
+    const token = getAuthTokenForApi();
+    if (token) {
+      headers.set("Authorization", `Bearer ${token}`);
+    }
+    const subeHeader = getActiveSubeIdForApiHeader();
+    if (subeHeader) {
+      headers.set("X-Active-Sube-Id", subeHeader);
+    }
+    const response = await fetch(buildApiUrl(path), { headers });
+    if (!response.ok) {
+      throw new ApiRequestError("SGK CSV indirilemedi.", response.status);
+    }
+    blob = await response.blob();
+  }
+
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = `sgk-kontrol-${params.yil}-${String(params.ay).padStart(2, "0")}-sube-${params.sube_id}.csv`;
+  anchor.click();
+  URL.revokeObjectURL(url);
 }
 
 export async function fetchMaasHesaplamaSnapshotDetail(

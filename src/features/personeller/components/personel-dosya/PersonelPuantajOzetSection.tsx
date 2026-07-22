@@ -7,8 +7,7 @@ import {
   type DevamPrimiEligibilityDurum
 } from "../../../../hooks/useDevamPrimiEligibilityOzeti";
 import {
-  usePuantajEksikGunOzeti,
-  type PuantajEksikGunOzetiView
+  usePuantajEksikGunOzeti
 } from "../../../../hooks/usePuantajEksikGunOzeti";
 import type { Personel } from "../../../../types/personel";
 import type {
@@ -39,17 +38,8 @@ import {
 import { buildRevizyonTalebiCreatePath } from "../../../revizyon/revizyon-display";
 
 const BORDRO_ADAY_OZETI_HENUZ_OLUSMADI =
-  "Bu ay için puantaj özeti henüz oluşmadı. Aday kalemler oluştuğunda burada gösterilir.";
+  "Bu dönem için immutable SGK snapshot sonucu henüz oluşmadı.";
 const BORDRO_ADAY_KALEM_GORMUNUYOR = "Bu ay bordroya yansıyacak aday kalem görünmüyor.";
-
-function hasBordroAdaySayaci(ozet: PuantajEksikGunOzetiView): boolean {
-  return (
-    ozet.eksikGunAdayiKayitSayisi > 0 ||
-    ozet.gunlukKesintiAdayiSayisi > 0 ||
-    ozet.dakikaBazliUcretEtkisiAdayiSayisi > 0 ||
-    ozet.ucretKorunanKayitSayisi > 0
-  );
-}
 
 function hasMesaiFinansKaydi(kayitlar: { kalem_turu: string; tutar: number; state?: string }[]): boolean {
   return kayitlar.some(
@@ -286,7 +276,7 @@ export function PersonelPuantajOzetSection({
   isActive: boolean;
 }) {
   const devamPrimiOzeti = useDevamPrimiEligibilityOzeti(personel);
-  const puantajEksikGunOzeti = usePuantajEksikGunOzeti(personel);
+  const puantajEksikGunOzeti = usePuantajEksikGunOzeti(personel, canViewBordro && isActive);
   const {
     finansKayitlari,
     isLoading: isFinansLoading,
@@ -307,8 +297,7 @@ export function PersonelPuantajOzetSection({
     hasFinansAdayToplami(finansAdayToplamlari);
   const showBordroAdayFinansLoading = canFetchFinans && !finansFetchResolved;
   const showBordroAdayBos =
-    puantajEksikGunOzeti !== null &&
-    !hasBordroAdaySayaci(puantajEksikGunOzeti) &&
+    puantajEksikGunOzeti?.snapshotId == null &&
     !showFinansAdayToplamlari &&
     !showBordroAdayFinansLoading &&
     (!canFetchFinans || finansFetchResolved);
@@ -317,20 +306,18 @@ export function PersonelPuantajOzetSection({
   const [revizyonCorrections, setRevizyonCorrections] = useState<RevizyonCorrectionEvent[]>([]);
   const [isRevizyonLoading, setIsRevizyonLoading] = useState(false);
   const [revizyonErrorMessage, setRevizyonErrorMessage] = useState<string | null>(null);
-  const sgkPrimGunu = typeof personel.sgk_prim_gun === "number" ? `${personel.sgk_prim_gun} Gün` : "-";
-  const eksikGun = typeof personel.sgk_eksik_gun_sayisi === "number" ? `${personel.sgk_eksik_gun_sayisi} Gün` : "-";
-  const eksikGunNedeni = formatDetailValue(personel.sgk_eksik_gun_nedeni_kodu);
+  const sgkPrimGunu = typeof puantajEksikGunOzeti?.hesaplananPrimGunu === "number"
+    ? `${puantajEksikGunOzeti.hesaplananPrimGunu} Gün`
+    : "-";
+  const eksikGun = typeof puantajEksikGunOzeti?.eksikGunSayisi === "number"
+    ? `${puantajEksikGunOzeti.eksikGunSayisi} Gün`
+    : "-";
+  const eksikGunNedeni = puantajEksikGunOzeti?.eksikGunKodu
+    ? `${puantajEksikGunOzeti.eksikGunKodu} · ${puantajEksikGunOzeti.eksikGunAciklamasi ?? "-"}`
+    : "-";
   const takvimGun = typeof personel.sgk_ayin_takvim_gun_sayisi === "number" ? `${personel.sgk_ayin_takvim_gun_sayisi} Gün` : "-";
   const donem = formatDetailValue(personel.sgk_donem);
   const hesaplamaModu = formatSgkHesaplamaModuLabel(personel.sgk_hesaplama_modu);
-  const puantajHydrateDurumMetni =
-    puantajEksikGunOzeti?.hydrateDurumu === "loading"
-      ? "Eksik puantaj tarihleri yükleniyor..."
-      : puantajEksikGunOzeti?.hydrateDurumu === "success"
-        ? `${puantajEksikGunOzeti.hydrateEdilenTarihSayisi} tarih kontrol edildi.`
-        : puantajEksikGunOzeti?.hydrateDurumu === "error"
-          ? puantajEksikGunOzeti.hydrateHataMesaji
-          : null;
 
   useEffect(() => {
     let isCancelled = false;
@@ -386,7 +373,7 @@ export function PersonelPuantajOzetSection({
           {sgkPrimGunu}
         </strong>
         <p className="personel-puantaj-summary-note">
-          Aylık puantajdan türetilen resmi prim günü özeti burada salt okunur izlenir.
+          Immutable backend snapshot sonucudur; frontend SGK hesabı veya tahmini üretmez.
         </p>
       </section>
 
@@ -427,59 +414,61 @@ export function PersonelPuantajOzetSection({
         data-testid="personel-bordro-aday-ozet-card"
       >
         <span className="personel-puantaj-summary-kicker">Bu Ay Bordroya Yansıyacak Adaylar</span>
-        {!puantajEksikGunOzeti ? (
+        {!puantajEksikGunOzeti || puantajEksikGunOzeti.isLoading ? (
           <p
             className="personel-puantaj-summary-note"
             data-testid="personel-bordro-aday-ozet-beklemede"
           >
             {BORDRO_ADAY_OZETI_HENUZ_OLUSMADI}
           </p>
-        ) : hasBordroAdaySayaci(puantajEksikGunOzeti) ? (
+        ) : puantajEksikGunOzeti.snapshotId != null ? (
           <>
             <div className="personel-devam-primi-meta">
               <div className="personel-devam-primi-row">
-                <span className="personel-devam-primi-label">Eksik Gün Adayı</span>
+                <span className="personel-devam-primi-label">SGK Prim / Eksik Gün</span>
                 <span
                   className="personel-devam-primi-value"
                   data-testid="personel-bordro-aday-eksik-gun"
                 >
-                  {puantajEksikGunOzeti.eksikGunAdayiKayitSayisi}
+                  {puantajEksikGunOzeti.hesaplananPrimGunu ?? "-"} / {puantajEksikGunOzeti.eksikGunSayisi ?? "-"}
                 </span>
               </div>
               <div className="personel-devam-primi-row">
-                <span className="personel-devam-primi-label">Günlük Kesinti Adayı</span>
+                <span className="personel-devam-primi-label">Eksik Gün Kodu</span>
                 <span
                   className="personel-devam-primi-value"
                   data-testid="personel-bordro-aday-gunluk-kesinti"
                 >
-                  {puantajEksikGunOzeti.gunlukKesintiAdayiSayisi}
+                  {puantajEksikGunOzeti.eksikGunKodu ?? "-"}
                 </span>
               </div>
               <div className="personel-devam-primi-row">
-                <span className="personel-devam-primi-label">Dakika Bazlı Ücret Etkisi Adayı</span>
+                <span className="personel-devam-primi-label">Ücret Modeli / SGK Ödeneği</span>
                 <span
                   className="personel-devam-primi-value"
                   data-testid="personel-bordro-aday-dakika-kesinti"
                 >
-                  {puantajEksikGunOzeti.dakikaBazliUcretEtkisiAdayiSayisi}
+                  {puantajEksikGunOzeti.ucretModeliLabel ?? "-"} / {puantajEksikGunOzeti.sgkOdenekDurumuLabel ?? "-"}
                 </span>
               </div>
               <div className="personel-devam-primi-row">
-                <span className="personel-devam-primi-label">Ücret Korunan Kayıt</span>
+                <span className="personel-devam-primi-label">Readiness</span>
                 <span
                   className="personel-devam-primi-value"
                   data-testid="personel-bordro-aday-ucret-korunan"
                 >
-                  {puantajEksikGunOzeti.ucretKorunanKayitSayisi}
+                  {puantajEksikGunOzeti.durumLabel}
                 </span>
               </div>
             </div>
             <p className="personel-puantaj-summary-note">
-              Salt okunur aday sayaçlarıdır; tutar veya bordro kesinliği taşımaz. Kaynak: dönem
-              puantaj önbelleği.
+              Snapshot #{puantajEksikGunOzeti.snapshotId} rev {puantajEksikGunOzeti.snapshotRevisionNo};
+              kaynak süreç ve belgeler backend owner tarafından mühürlenmiştir.
             </p>
-            {puantajEksikGunOzeti.kayitKapsamiNotu ? (
-              <p className="personel-devam-primi-scope-note">{puantajEksikGunOzeti.kayitKapsamiNotu}</p>
+            {puantajEksikGunOzeti.blockerEtiketleri.length > 0 ? (
+              <p className="personel-devam-primi-scope-note">
+                Blocker: {puantajEksikGunOzeti.blockerEtiketleri.join(", ")}
+              </p>
             ) : null}
           </>
         ) : showBordroAdayFinansLoading ? (
@@ -568,39 +557,30 @@ export function PersonelPuantajOzetSection({
         <DossierRecord label="Hesaplama Modu" value={hesaplamaModu} />
         {puantajEksikGunOzeti ? (
           <>
-            <DossierRecord label="Çekirdek Durum" value={puantajEksikGunOzeti.durumLabel} />
+            <DossierRecord label="Authoritative Durum" value={puantajEksikGunOzeti.durumLabel} />
             <DossierRecord
-              label="Önbellek Kapsamı"
-              value={`${puantajEksikGunOzeti.toplamKayitSayisi}/${puantajEksikGunOzeti.donemGunSayisi} Gün`}
+              label="Kaynak Süreç / Puantaj / Belge"
+              value={`${puantajEksikGunOzeti.kaynakSurecIdleri.join(", ") || "-"} / ${puantajEksikGunOzeti.kaynakPuantajIdleri.join(", ") || "-"} / ${puantajEksikGunOzeti.kaynakBelgeIdleri.join(", ") || "-"}`}
             />
             <DossierRecord
-              label="SGK Düşüren Eksik Gün Adayı"
-              value={`${puantajEksikGunOzeti.sgkPrimGununuDusurenEksikGunSayisi} Gün`}
+              label="Ücret Modeli / Şirket Politikası"
+              value={`${puantajEksikGunOzeti.ucretModeliLabel ?? "-"} / ${puantajEksikGunOzeti.sirketPolitikaSurumId ?? "-"}`}
             />
             <DossierRecord
-              label="Manuel İnceleme Kaydı"
-              value={String(puantajEksikGunOzeti.manuelIncelemeKayitSayisi)}
+              label="SGK Ödenek Durumu"
+              value={puantajEksikGunOzeti.sgkOdenekDurumuLabel ?? "-"}
             />
             <DossierRecord
-              label="Haberli / Habersiz Yokluk"
-              value={`${puantajEksikGunOzeti.haberliYoklukSinyaliSayisi} / ${puantajEksikGunOzeti.habersizYoklukSinyaliSayisi}`}
+              label="Blocker"
+              value={puantajEksikGunOzeti.blockerEtiketleri.join(", ") || "Yok"}
             />
-            {puantajEksikGunOzeti.hydrateMumkunMu && !puantajEksikGunOzeti.veriKapsamiTamMi ? (
-              <div className="personel-dosya-record">
-                <span className="personel-dosya-record-label">Kapsam Kontrolü</span>
-                <span className="personel-dosya-record-value">
-                  <button
-                    type="button"
-                    className="universal-btn-aux"
-                    disabled={puantajEksikGunOzeti.hydrateDurumu === "loading"}
-                    onClick={() => void puantajEksikGunOzeti.hydrateEksikPuantajTarihleri()}
-                  >
-                    Kapsamı Tamamla
-                  </button>
-                  {puantajHydrateDurumMetni ? <span>{puantajHydrateDurumMetni}</span> : null}
-                </span>
-              </div>
-            ) : null}
+            <DossierRecord
+              label="Snapshot / Revision"
+              value={puantajEksikGunOzeti.snapshotId == null ? "-" : `#${puantajEksikGunOzeti.snapshotId} / ${puantajEksikGunOzeti.snapshotRevisionNo}`}
+            />
+            <DossierRecord label="SGK Hesap Hash" value={puantajEksikGunOzeti.sgkHesapHash ?? "-"} />
+            <DossierRecord label="Katalog Sürümü" value={puantajEksikGunOzeti.katalogSurumu ?? "-"} />
+            <DossierRecord label="Mevzuat Manifest Hash" value={puantajEksikGunOzeti.kaynakManifestHash ?? "-"} />
           </>
         ) : null}
       </DossierSection>

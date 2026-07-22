@@ -14,8 +14,8 @@ use Medisa\Api\Services\Money\RoundingPolicy;
  */
 final class MaasHesaplamaEngine
 {
-    public const ENGINE_VERSION = 'S77D_PAYROLL_ENGINE_V2';
-    public const CONTRACT_VERSION = 'S77D_PAYROLL_CANDIDATE_V2';
+    public const ENGINE_VERSION = 'S85B_PAYROLL_ENGINE_V2';
+    public const CONTRACT_VERSION = 'S85B_PAYROLL_CANDIDATE_V1';
     public const SOLVER_MAX_ITERATIONS = 64;
     public const SOLVER_TOLERANCE_KURUS = 1;
     /** Is Kanunu haftalik azami normal sure (45 saat). */
@@ -42,6 +42,11 @@ final class MaasHesaplamaEngine
     public static function calculate(array $input)
     {
         $params = self::resolveParams($input['mevzuat']);
+        $sgkHesabi = is_array($input['sgk_hesabi'] ?? null) ? $input['sgk_hesabi'] : null;
+        $sgkValidation = self::validateSgkInput($sgkHesabi, $params);
+        if ($sgkValidation !== null) {
+            return self::errorResult($sgkValidation['code'], $sgkValidation['message']);
+        }
         $carryover = $input['carryover'];
         $prevMatrah = Money::fromDecimalString((string) ($carryover['onceki_kumulatif_gelir_vergisi_matrahi'] ?? '0'));
         $segments = $input['ucret_segmentleri'];
@@ -132,7 +137,7 @@ final class MaasHesaplamaEngine
             if ($brut->isNegative()) {
                 return self::errorResult('NEGATIVE_CALCULATION_BASE', 'Hesaplanan brüt negatif.');
             }
-            $legal = self::computeLegalDeductions($brut, $grossAdd, $params, $prevMatrah, $sira);
+            $legal = self::computeLegalDeductions($brut, $grossAdd, $params, $prevMatrah, $sira, $sgkHesabi);
             $sira = $legal['sira'];
             $kalemler = array_merge($kalemler, $legal['kalemler']);
             $net = $brut->sub($legal['sgk'])->sub($legal['issizlik'])->sub($legal['gv'])->sub($legal['damga']);
@@ -159,7 +164,7 @@ final class MaasHesaplamaEngine
             //   Solve brut0 such that net(brut0) = base_target_net
             //   Then add grossAdd as gross, recompute legal on (brut0 + grossAdd - grossDeduct)
             //   Then apply net-only finance.
-            $solved = self::solveNetToGross($contractBase, $params, $prevMatrah);
+            $solved = self::solveNetToGross($contractBase, $params, $prevMatrah, $sgkHesabi);
             if (isset($solved['error'])) {
                 return self::errorResult($solved['error']['code'], $solved['error']['message']);
             }
@@ -169,7 +174,7 @@ final class MaasHesaplamaEngine
             if ($brut->isNegative()) {
                 return self::errorResult('NEGATIVE_CALCULATION_BASE', 'Hesaplanan brüt negatif.');
             }
-            $legal = self::computeLegalDeductions($brut, $grossAdd, $params, $prevMatrah, $sira);
+            $legal = self::computeLegalDeductions($brut, $grossAdd, $params, $prevMatrah, $sira, $sgkHesabi);
             $sira = $legal['sira'];
             $kalemler = array_merge($kalemler, $legal['kalemler']);
             $net = $brut->sub($legal['sgk'])->sub($legal['issizlik'])->sub($legal['gv'])->sub($legal['damga']);
@@ -178,7 +183,7 @@ final class MaasHesaplamaEngine
             // After overtime gross effects, net may differ from pure contract target; rounding line for solver residue vs base
             $baseNetExpected = $contractBase->add($netOnlyAdd)->sub($netOnlyDeduct);
             // Compare solved path without OT: net(brut0) should be within tolerance of contractBase
-            $legal0 = self::computeLegalDeductions($brut0, Money::zero(), $params, $prevMatrah, 0);
+            $legal0 = self::computeLegalDeductions($brut0, Money::zero(), $params, $prevMatrah, 0, $sgkHesabi);
             $net0 = $brut0->sub($legal0['sgk'])->sub($legal0['issizlik'])->sub($legal0['gv'])->sub($legal0['damga']);
             $roundDiff = $net0->sub($contractBase);
             if (!$roundDiff->isZero()) {
@@ -238,6 +243,13 @@ final class MaasHesaplamaEngine
             'toplam_kesinti' => $toplamKesinti->toDecimalString(),
             'net_odenecek' => RoundingPolicy::normalizeZero($net)->toDecimalString(),
             'sonraki_kumulatif_vergi_matrahi' => $sonrakiMatrah->toDecimalString(),
+            'hesaplanan_prim_gunu' => (int) $sgkHesabi['hesaplanan_prim_gunu'],
+            'eksik_gun_sayisi' => (int) $sgkHesabi['eksik_gun_sayisi'],
+            'eksik_gun_kodu' => $sgkHesabi['eksik_gun_kodu'],
+            'eksik_gun_aciklamasi' => $sgkHesabi['eksik_gun_aciklamasi'],
+            'sgk_hesap_hash' => (string) $sgkHesabi['sgk_hesap_hash'],
+            'sgk_katalog_surumu' => $sgkHesabi['katalog_surumu'],
+            'sgk_mevzuat_manifest_hash' => $sgkHesabi['kaynak_manifest_hash'],
         ];
 
         $inputHash = self::hashCanonical([
@@ -250,6 +262,7 @@ final class MaasHesaplamaEngine
             'finans_count' => count($input['finanslar']),
             'params' => $params,
             'carryover' => $carryover,
+            'sgk_hesap_hash' => (string) $sgkHesabi['sgk_hesap_hash'],
         ]);
         $resultHash = self::hashCanonical([
             'engine_version' => self::ENGINE_VERSION,
@@ -257,6 +270,7 @@ final class MaasHesaplamaEngine
             'kalem_hashes' => array_map(static function (array $k) {
                 return $k['payload_hash'];
             }, $kalemler),
+            'sgk_hesap_hash' => (string) $sgkHesabi['sgk_hesap_hash'],
         ]);
 
         return [
@@ -270,6 +284,7 @@ final class MaasHesaplamaEngine
             'input_hash' => $inputHash,
             'result_hash' => $resultHash,
             'carryover_snapshot' => $carryover,
+            'sgk_snapshot' => $sgkHesabi,
         ];
     }
 
@@ -688,12 +703,11 @@ final class MaasHesaplamaEngine
      * @param array<string, string> $params
      * @return array<string, mixed>
      */
-    private static function computeLegalDeductions(Money $brut, Money $grossAddIgnored, array $params, Money $prevMatrah, $sira)
+    private static function computeLegalDeductions(Money $brut, Money $grossAddIgnored, array $params, Money $prevMatrah, $sira, array $sgkHesabi)
     {
-        // SGK gun sayisi: NORMAL_AY_GUN for full month base (simplified deterministic)
-        $gun = self::paramInt($params, 'NORMAL_AY_GUN_SAYISI');
-        $taban = self::paramMoney($params, 'SGK_GUNLUK_TABAN')->mulDiv($gun, 1);
-        $tavan = self::paramMoney($params, 'SGK_GUNLUK_TAVAN')->mulDiv($gun, 1);
+        $gun = (int) $sgkHesabi['hesaplanan_prim_gunu'];
+        $taban = Money::fromDecimalString((string) $sgkHesabi['donem_alt_sinir']);
+        $tavan = Money::fromDecimalString((string) $sgkHesabi['donem_ust_sinir']);
         $sgkMatrah = $brut->max($taban)->min($tavan);
         $sgkOran = self::paramRate($params, 'SGK_ISCI_PRIM_ORANI');
         $issizlikOran = self::paramRate($params, 'ISSIZLIK_ISCI_PRIM_ORANI');
@@ -735,7 +749,13 @@ final class MaasHesaplamaEngine
 
         $kalemler = [];
         $sira++;
-        $kalemler[] = self::line($sira, 'SGK', 'SGK_MATRAH', 'BILGI', $gun, 'GUN', null, null, $sgkMatrah, 'MEVZUAT', null, 'SGK matrahi', ['taban' => $taban->toDecimalString(), 'tavan' => $tavan->toDecimalString()]);
+        $kalemler[] = self::line($sira, 'SGK', 'SGK_MATRAH', 'BILGI', $gun, 'GUN', null, null, $sgkMatrah, 'SGK_SNAPSHOT', null, 'SGK matrahi', [
+            'taban' => $taban->toDecimalString(),
+            'tavan' => $tavan->toDecimalString(),
+            'sgk_hesap_hash' => (string) $sgkHesabi['sgk_hesap_hash'],
+            'katalog_surumu' => $sgkHesabi['katalog_surumu'],
+            'kaynak_manifest_hash' => $sgkHesabi['kaynak_manifest_hash'],
+        ]);
         $sira++;
         $kalemler[] = self::line($sira, 'SGK', 'SGK_ISCI_PRIMI', 'EKSI', null, null, $sgkOran->toDecimalString(), $sgkMatrah->toDecimalString(), $sgk, 'MEVZUAT', null, 'Isci SGK primi', []);
         $sira++;
@@ -766,6 +786,48 @@ final class MaasHesaplamaEngine
             'gv_matrah' => $gvMatrah,
             'damga_matrah' => $damgaMatrah,
         ];
+    }
+
+    /** @return array{code: string, message: string}|null */
+    private static function validateSgkInput($sgkHesabi, array $params)
+    {
+        if (!is_array($sgkHesabi)) {
+            return ['code' => 'SGK_PRIM_GUNU_HESAPLANAMADI', 'message' => 'Immutable SGK hesap snapshoti zorunludur.'];
+        }
+        if (!empty($sgkHesabi['manuel_inceleme_gerekli_mi'])
+            || count(is_array($sgkHesabi['blocker_kodlari'] ?? null) ? $sgkHesabi['blocker_kodlari'] : []) > 0) {
+            return ['code' => 'SGK_PRIM_GUNU_HESAPLANAMADI', 'message' => 'SGK hesap snapshoti blocker iceriyor.'];
+        }
+        $primDay = $sgkHesabi['hesaplanan_prim_gunu'] ?? null;
+        if (!is_int($primDay) || $primDay < 0 || $primDay > 30) {
+            return ['code' => 'SGK_PRIM_GUNU_HESAPLANAMADI', 'message' => 'SGK prim gunu 0..30 araliginda kesin tam sayi olmalidir.'];
+        }
+        if (!is_int($sgkHesabi['eksik_gun_sayisi'] ?? null) || (int) $sgkHesabi['eksik_gun_sayisi'] < 0) {
+            return ['code' => 'SGK_PRIM_GUNU_HESAPLANAMADI', 'message' => 'Eksik gun sayisi gecersiz.'];
+        }
+        if (preg_match('/^[0-9a-f]{64}$/', (string) ($sgkHesabi['sgk_hesap_hash'] ?? '')) !== 1
+            || preg_match('/^[0-9a-f]{64}$/', (string) ($sgkHesabi['kaynak_manifest_hash'] ?? '')) !== 1
+            || trim((string) ($sgkHesabi['katalog_surumu'] ?? '')) === '') {
+            return ['code' => 'SGK_KATALOG_SURUMU_GECERSIZ', 'message' => 'SGK hesap/katalog/manifest surum kaniti gecersiz.'];
+        }
+        foreach (['gunluk_alt_sinir', 'gunluk_ust_sinir', 'donem_alt_sinir', 'donem_ust_sinir'] as $field) {
+            if (!isset($sgkHesabi[$field]) || !is_numeric($sgkHesabi[$field]) || bccomp((string) $sgkHesabi[$field], '0', 2) < 0) {
+                return ['code' => 'SGK_PRIM_GUNU_HESAPLANAMADI', 'message' => 'SGK PEK sinir snapshoti gecersiz: ' . $field];
+            }
+        }
+        $dailyLower = self::paramMoney($params, 'SGK_GUNLUK_TABAN');
+        $dailyUpper = self::paramMoney($params, 'SGK_GUNLUK_TAVAN');
+        $snapshotDailyLower = Money::fromDecimalString((string) $sgkHesabi['gunluk_alt_sinir']);
+        $snapshotDailyUpper = Money::fromDecimalString((string) $sgkHesabi['gunluk_ust_sinir']);
+        $snapshotPeriodLower = Money::fromDecimalString((string) $sgkHesabi['donem_alt_sinir']);
+        $snapshotPeriodUpper = Money::fromDecimalString((string) $sgkHesabi['donem_ust_sinir']);
+        if ($dailyLower->cmp($snapshotDailyLower) !== 0 || $dailyUpper->cmp($snapshotDailyUpper) !== 0
+            || $dailyLower->mulDiv($primDay, 1)->cmp($snapshotPeriodLower) !== 0
+            || $dailyUpper->mulDiv($primDay, 1)->cmp($snapshotPeriodUpper) !== 0) {
+            return ['code' => 'SGK_PRIM_GUNU_HESAPLANAMADI', 'message' => 'SGK PEK gunluk/donem sinirlari prim gunu ile uyusmuyor.'];
+        }
+
+        return null;
     }
 
     /**
@@ -847,7 +909,7 @@ final class MaasHesaplamaEngine
      * @param array<string, string> $params
      * @return array<string, mixed>
      */
-    private static function solveNetToGross(Money $targetNet, array $params, Money $prevMatrah)
+    private static function solveNetToGross(Money $targetNet, array $params, Money $prevMatrah, array $sgkHesabi)
     {
         // Search brut in [targetNet, targetNet * 3] roughly via kurus bounds
         $low = $targetNet;
@@ -861,7 +923,7 @@ final class MaasHesaplamaEngine
             $iterations++;
             $midKurus = intdiv($low->kurus() + $high->kurus(), 2);
             $mid = Money::fromKurus($midKurus);
-            $legal = self::computeLegalDeductions($mid, Money::zero(), $params, $prevMatrah, 0);
+            $legal = self::computeLegalDeductions($mid, Money::zero(), $params, $prevMatrah, 0, $sgkHesabi);
             $net = $mid->sub($legal['sgk'])->sub($legal['issizlik'])->sub($legal['gv'])->sub($legal['damga']);
             $diff = $net->kurus() - $targetNet->kurus();
             $best = ['brut' => $mid, 'net' => $net, 'diff' => $diff];

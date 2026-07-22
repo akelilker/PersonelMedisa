@@ -8,11 +8,13 @@ use Medisa\Api\Auth\AuthMiddleware;
 use Medisa\Api\Auth\RolePermissions;
 use Medisa\Api\Database\Connection;
 use Medisa\Api\Http\JsonResponse;
+use Medisa\Api\Http\CsvResponse;
 use Medisa\Api\Http\Request;
 use Medisa\Api\Scope\SubeScope;
 use Medisa\Api\Services\MaasHesaplamaAdayService;
 use Medisa\Api\Services\MaasHesaplamaException;
 use Medisa\Api\Services\MaasHesaplamaSnapshotService;
+use Medisa\Api\Services\SgkPrimGunuService;
 use Medisa\Api\Services\PersonelBordroDevirService;
 use Medisa\Api\Services\Payroll\MaasHesaplamaEngine;
 use Medisa\Api\Services\Payroll\MaasHesaplamaLegalParameterCatalog;
@@ -320,6 +322,43 @@ class MaasHesaplamaController
         } catch (\Throwable $e) {
             JsonResponse::serverError('Calistirma iptal edilemedi.');
         }
+    }
+
+    public static function sgkResults(Request $request)
+    {
+        [$pdo, $user, $subeId] = self::context($request, 'maas_hesaplama_adaylari.view');
+        $yil = self::readQueryInt($request, 'yil', 2000, 2100);
+        $ay = self::readQueryInt($request, 'ay', 1, 12);
+        $personelId = self::optionalQueryInt($request, 'personel_id', 1, PHP_INT_MAX);
+        try {
+            JsonResponse::success([
+                'items' => SgkPrimGunuService::listCanonicalResults($pdo, $subeId, $yil, $ay, $personelId),
+            ]);
+        } catch (\Throwable $e) {
+            JsonResponse::serverError('SGK prim gunu sonuclari okunamadi.');
+        }
+    }
+
+    public static function sgkResultsExport(Request $request)
+    {
+        [$pdo, $user, $subeId] = self::context($request, 'maas_hesaplama_adaylari.view');
+        $yil = self::readQueryInt($request, 'yil', 2000, 2100);
+        $ay = self::readQueryInt($request, 'ay', 1, 12);
+        $rows = SgkPrimGunuService::listCanonicalResults($pdo, $subeId, $yil, $ay);
+        CsvResponse::send(
+            sprintf('sgk-kontrol-%04d-%02d-sube-%d.csv', $yil, $ay, $subeId),
+            [
+                'personel_id', 'sicil_no', 'ad', 'soyad', 'yil', 'ay', 'donem',
+                'hesaplanan_prim_gunu', 'eksik_gun_sayisi', 'eksik_gun_kodu', 'eksik_gun_aciklamasi',
+                'kaynak_surec_idleri', 'kaynak_puantaj_idleri', 'kaynak_belge_idleri',
+                'ucret_modeli', 'sirket_politika_surum_id', 'sgk_odenek_durumu',
+                'is_goremezlik_finans_ozeti',
+                'manuel_inceleme_gerekli_mi', 'blocker_kodlari',
+                'sgk_hesap_hash', 'katalog_surumu', 'kaynak_manifest_hash',
+                'snapshot_id', 'snapshot_revision_no', 'source_hash'
+            ],
+            $rows
+        );
     }
 
     public static function legalCatalog(Request $request)

@@ -42,8 +42,16 @@ import { currentMonthParts, parseAyValue } from "../../../lib/donem-kapanis/disp
 import { useAuth } from "../../../state/auth.store";
 import type { IdOption } from "../../../types/referans";
 import { MaasHesaplamaMerkeziPage } from "./MaasHesaplamaMerkeziPage";
+import { SgkKatalogHazirlikPanel } from "../components/SgkKatalogHazirlikPanel";
 
-type TabKey = "veri-hazirlik" | "preflight" | "politika" | "devir" | "on-izleme" | "hesaplama";
+type TabKey =
+  | "veri-hazirlik"
+  | "preflight"
+  | "politika"
+  | "devir"
+  | "on-izleme"
+  | "hesaplama"
+  | "sgk-katalog";
 
 type FilterState = {
   ay: string;
@@ -61,7 +69,8 @@ const TAB_LABELS: Record<TabKey, string> = {
   politika: "Şirket Politikası",
   devir: "Devir Verileri",
   "on-izleme": "Bordro Ön İzleme",
-  hesaplama: "Maaş Hesaplama"
+  hesaplama: "Maaş Hesaplama",
+  "sgk-katalog": "SGK Katalog Hazırlık"
 };
 
 function blockerItems(items: MaasHesaplamaIssue[]) {
@@ -140,7 +149,8 @@ export function BordroHazirlikMerkeziPage() {
       tab === "politika" ||
       tab === "devir" ||
       tab === "on-izleme" ||
-      tab === "hesaplama"
+      tab === "hesaplama" ||
+      tab === "sgk-katalog"
     ) {
       setActiveTab(tab);
     }
@@ -395,7 +405,7 @@ export function BordroHazirlikMerkeziPage() {
       </form>
 
       <nav className="raporlar-panel-nav" aria-label="Bordro hazırlık sekmeleri">
-        {(["veri-hazirlik", "preflight", "politika", "devir", "on-izleme", "hesaplama"] as TabKey[]).map((tab) => (
+        {(["veri-hazirlik", "preflight", "politika", "devir", "on-izleme", "hesaplama", "sgk-katalog"] as TabKey[]).map((tab) => (
           <button
             key={tab}
             type="button"
@@ -889,6 +899,8 @@ export function BordroHazirlikMerkeziPage() {
           <MaasHesaplamaMerkeziPage />
         </section>
       ) : null}
+
+      {activeTab === "sgk-katalog" ? <SgkKatalogHazirlikPanel /> : null}
     </section>
   );
 }

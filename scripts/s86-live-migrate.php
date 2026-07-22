@@ -34,9 +34,15 @@ $configCandidates = [
     dirname(__DIR__) . '/config.local.php',
     dirname(__DIR__) . '/src/Config/config.local.php',
 ];
+$configPathResolved = null;
 $config = null;
 foreach ($configCandidates as $path) {
     if (is_file($path)) {
+        $configPathResolved = $path;
+        // Shared hosts often keep stale require() results in OPcache after live config edits.
+        if (function_exists('opcache_invalidate')) {
+            @opcache_invalidate($path, true);
+        }
         $config = require $path;
         break;
     }
@@ -923,6 +929,10 @@ if ($action === 'storage_configure') {
         if (@file_put_contents($configPath, $raw) === false) {
             s86_json(['ok' => false, 'error' => 'CONFIG_WRITE_FAILED'], 500);
         }
+        if (function_exists('opcache_invalidate')) {
+            @opcache_invalidate($configPath, true);
+        }
+        clearstatcache(true, $configPath);
 
         $dirCreated = false;
         if (!is_dir($recommended)) {

@@ -18,6 +18,12 @@ describe("disposable MariaDB execution lock recovery", () => {
     clearExecutionLock();
   });
 
+  it("CI PDO DSN host= biçimini localhost olarak kabul eder", () => {
+    const dsn = "mysql:host=127.0.0.1;port=3306;dbname=medisa_ci;charset=utf8mb4";
+    const hostMatch = /(?:^|[;:])\s*host\s*=\s*([^;]+)/i.exec(dsn);
+    expect((hostMatch?.[1] ?? "").trim().toLowerCase()).toBe("127.0.0.1");
+  });
+
   it("başarısız runner sonrası execution lock serbest kalır", () => {
     clearExecutionLock();
     const failed = runPhpMysqlRunner(missingRunner);

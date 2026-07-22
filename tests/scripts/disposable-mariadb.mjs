@@ -272,7 +272,8 @@ function startManagedInstance(port) {
 }
 
 function assertLocalTestMysqlDsn(dsn) {
-  const hostMatch = /(?:^|[;])\s*host\s*=\s*([^;]+)/i.exec(String(dsn));
+  // PDO DSN: mysql:host=127.0.0.1;port=3306;...
+  const hostMatch = /(?:^|[;:])\s*host\s*=\s*([^;]+)/i.exec(String(dsn));
   const host = (hostMatch?.[1] ?? "").trim().toLowerCase();
   if (!LOCAL_TEST_MYSQL_HOSTS.has(host)) {
     throw new Error(

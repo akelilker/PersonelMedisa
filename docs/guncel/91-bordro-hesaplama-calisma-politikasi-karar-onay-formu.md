@@ -208,4 +208,6 @@ Bu form onaylanmadan ilgili şirket parametreleri production sistemine girilmeye
 - Tam gün algoritması yalnız açık `TAM_GUN` işaretinde.
 - HT+UBGT aynı gün: `HAFTA_TATILI_ESAS` korunur; eksik UBGT kapsamı ikinci ödeme doğurmaz.
 
+**S88 (devam):** Canonical `resmi_tatil_takvimi` owner + migration 039 + puantaj/mühür projection. YARIM_GUN ödeme politikası kapalı kalır; tatil dönemi net dakika için güvenilir çoklu interval owner yoksa `TATIL_DONEMI_CALISMA_INTERVALI_EKSIK`. Production seed/policy write/merge/deploy bu fazda yok.
+
 **Production notu:** Bu kayıt yalnızca karar dokümantasyonudur; production policy yazımı yapılmamıştır.

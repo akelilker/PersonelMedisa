@@ -96,6 +96,9 @@ function resolveModuleModal(pathname: string, tabParam: string | null): ModuleMo
       bodyClassName: "modal-body--yonetim"
     };
   }
+  if (pathname === "/resmi-tatil-takvimi") {
+    return { title: "Resmî Tatil Takvimi", closeTo: "/", titleVariant: "premium" };
+  }
 
   return { title: "Modül", closeTo: "/" };
 }

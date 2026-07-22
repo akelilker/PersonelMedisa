@@ -192,6 +192,18 @@ export const endpoints = {
     approve: (id: number | string) => `/sirket-calisma-politikalari/${id}/onayla`,
     cancel: (id: number | string) => `/sirket-calisma-politikalari/${id}/iptal`
   },
+  resmiTatilTakvimi: {
+    list: "/resmi-tatil-takvimi",
+    detail: (id: number | string) => `/resmi-tatil-takvimi/${id}`,
+    create: "/resmi-tatil-takvimi",
+    update: (id: number | string) => `/resmi-tatil-takvimi/${id}`,
+    activate: (id: number | string) => `/resmi-tatil-takvimi/${id}/aktiflestir`,
+    revise: (id: number | string) => `/resmi-tatil-takvimi/${id}/revize`,
+    cancel: (id: number | string) => `/resmi-tatil-takvimi/${id}/iptal`,
+    history: (id: number | string) => `/resmi-tatil-takvimi/${id}/gecmis`,
+    projectionPreview: "/resmi-tatil-takvimi/projection-preview",
+    envanterOzet: "/resmi-tatil-takvimi/envanter/ozet"
+  },
   finans: {
     list: "/ek-odeme-kesinti",
     detail: (id: number | string) => `/ek-odeme-kesinti/${id}`

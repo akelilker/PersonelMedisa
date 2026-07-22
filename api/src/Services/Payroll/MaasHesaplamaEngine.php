@@ -337,6 +337,13 @@ final class MaasHesaplamaEngine
      */
     public static function resolveUbgtGunKapsami(array $row)
     {
+        $sinif = isset($row['tatil_siniflandirma_durumu']) && $row['tatil_siniflandirma_durumu'] !== null
+            ? strtoupper(trim((string) $row['tatil_siniflandirma_durumu']))
+            : '';
+        if (in_array($sinif, ['CAKISMA', 'KAYNAK_EKSIK', 'BILINMIYOR'], true)) {
+            return 'BILINMIYOR';
+        }
+
         $raw = null;
         if (array_key_exists('ubgt_gun_kapsami', $row) && $row['ubgt_gun_kapsami'] !== null) {
             $raw = (string) $row['ubgt_gun_kapsami'];

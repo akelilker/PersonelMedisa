@@ -1434,6 +1434,77 @@ const sirketPolitikaDemoState: {
   nextId: 0
 };
 
+type ResmiTatilTakvimDemoRecord = {
+  id: number;
+  tarih: string;
+  tatil_kodu: string;
+  tatil_adi: string;
+  tatil_turu: "UBGT" | "DIGER";
+  gun_kapsami: "TAM_GUN" | "YARIM_GUN";
+  tatil_interval_baslangic: string | null;
+  tatil_interval_bitis: string | null;
+  durum: "TASLAK" | "AKTIF" | "IPTAL";
+  kaynak_turu: string;
+  kaynak_referansi: string;
+  kaynak_tarihi: string | null;
+  aciklama: string | null;
+  revizyon_no: number;
+  onceki_kayit_id: number | null;
+  iptal_gerekcesi: string | null;
+};
+
+const resmiTatilTakvimiDemoState: {
+  items: ResmiTatilTakvimDemoRecord[];
+  nextId: number;
+} = {
+  items: [],
+  nextId: 0
+};
+
+function assertDemoResmiTatilView(actor: ReturnType<typeof readDemoApiActor>) {
+  return enforceDemoAnyPermission(actor, [
+    "mevzuat_parametreleri.view",
+    "sirket_parametreleri.view",
+    "resmi_tatil_takvimi.view"
+  ]);
+}
+
+function assertDemoResmiTatilManage(actor: ReturnType<typeof readDemoApiActor>) {
+  return enforceDemoAnyPermission(actor, ["sirket_parametreleri.manage", "resmi_tatil_takvimi.manage"]);
+}
+
+function mapDemoResmiTatilRecord(record: ResmiTatilTakvimDemoRecord) {
+  return { ...record };
+}
+
+function buildDemoResmiTatilProjectionPreview(body: Record<string, unknown>) {
+  const tarihBas = toStringValue(body.tarih_bas) ?? toStringValue(body.tarih) ?? "2099-01-15";
+  const tarihBit = toStringValue(body.tarih_bit) ?? toStringValue(body.tarih) ?? tarihBas;
+  return {
+    tarih_bas: tarihBas,
+    tarih_bit: tarihBit,
+    preview_modu: toStringValue(body.preview_modu) ?? "AGGREGATE",
+    read_only: true as const,
+    policy_aktif_degil: true as const,
+    toplam_satir: 0,
+    dogrulandi: 0,
+    kaynak_eksik: 0,
+    cakisma: 0,
+    bilinmiyor: 0,
+    tam_gun: 0,
+    yarim_gun: 0,
+    ht_ubgt: 0,
+    interval_olcumu_eksik: 0,
+    policy_blocker: 0,
+    muhurlu: 0,
+    muhursuz: 0,
+    muhur_projection_eksik: 0,
+    tam_gun_aktivasyona_hazir: 0,
+    yarim_gun_odeme_politikasi_bekliyor: 0,
+    genel_sistem_hazir: false as const
+  };
+}
+
 const SIRKET_POLITIKA_KATALOG = [
   { parametre_kodu: "NORMAL_AY_GUN_SAYISI", etiket: "Normal Ay Gün Sayısı", deger_tipi: "SAYISAL", birim: "GUN", zorunlu: true },
   { parametre_kodu: "GUNLUK_CALISMA_SAATI", etiket: "Günlük Çalışma Saati", deger_tipi: "SAYISAL", birim: "SAAT", zorunlu: true },
@@ -9351,6 +9422,188 @@ export function resolveDemoApiResponse(
         ornek_bicim: item.deger_tipi === "METIN" ? "METIN_DEGER" : "0.00"
       }))
     });
+  }
+
+  if (pathname === "/resmi-tatil-takvimi/envanter/ozet" && method === "GET") {
+    const actor = readDemoApiActor(init);
+    const permissionError = assertDemoResmiTatilView(actor);
+    if (permissionError) return permissionError;
+    const yil = Number.parseInt(requestUrl.searchParams.get("yil") ?? "", 10);
+    const ay = Number.parseInt(requestUrl.searchParams.get("ay") ?? "", 10);
+    if (!Number.isFinite(yil) || !Number.isFinite(ay)) {
+      return demoRevizyonError("VALIDATION_ERROR", "Gecersiz donem.");
+    }
+    const prefix = `${String(yil).padStart(4, "0")}-${String(ay).padStart(2, "0")}`;
+    const inMonth = resmiTatilTakvimiDemoState.items.filter((item) => item.tarih.startsWith(prefix));
+    const ozet = {
+      yil,
+      ay,
+      donem: prefix,
+      toplam: inMonth.length,
+      aktif: inMonth.filter((item) => item.durum === "AKTIF").length,
+      taslak: inMonth.filter((item) => item.durum === "TASLAK").length,
+      iptal: inMonth.filter((item) => item.durum === "IPTAL").length,
+      aktif_ubgt_tam_gun: inMonth.filter(
+        (item) => item.durum === "AKTIF" && item.tatil_turu === "UBGT" && item.gun_kapsami === "TAM_GUN"
+      ).length,
+      aktif_ubgt_yarim_gun: inMonth.filter(
+        (item) => item.durum === "AKTIF" && item.tatil_turu === "UBGT" && item.gun_kapsami === "YARIM_GUN"
+      ).length,
+      siniflandirma: {
+        toplam_ubgt_satiri: 0,
+        tam_gun: 0,
+        yarim_gun: 0,
+        bilinmiyor: 0,
+        cakisma: 0,
+        kaynak_eksik: 0,
+        ht_ubgt: 0,
+        muhurlu: 0,
+        muhursuz: 0,
+        policy_activation_blocker: 0
+      }
+    };
+    return ok(ozet);
+  }
+
+  if (pathname === "/resmi-tatil-takvimi" && method === "GET") {
+    const actor = readDemoApiActor(init);
+    const permissionError = assertDemoResmiTatilView(actor);
+    if (permissionError) return permissionError;
+    return ok({ items: resmiTatilTakvimiDemoState.items.map(mapDemoResmiTatilRecord) });
+  }
+
+  if (pathname === "/resmi-tatil-takvimi" && method === "POST") {
+    const actor = readDemoApiActor(init);
+    const permissionError = assertDemoResmiTatilManage(actor);
+    if (permissionError) return permissionError;
+    const record: ResmiTatilTakvimDemoRecord = {
+      id: ++resmiTatilTakvimiDemoState.nextId,
+      tarih: toStringValue(body.tarih) ?? "2026-01-01",
+      tatil_kodu: toStringValue(body.tatil_kodu) ?? "DEMO_UBGT",
+      tatil_adi: toStringValue(body.tatil_adi) ?? "Demo resmi tatil",
+      tatil_turu: toStringValue(body.tatil_turu) === "DIGER" ? "DIGER" : "UBGT",
+      gun_kapsami: toStringValue(body.gun_kapsami) === "YARIM_GUN" ? "YARIM_GUN" : "TAM_GUN",
+      tatil_interval_baslangic: toStringValue(body.tatil_interval_baslangic),
+      tatil_interval_bitis: toStringValue(body.tatil_interval_bitis),
+      durum: "TASLAK",
+      kaynak_turu: toStringValue(body.kaynak_turu) ?? "DEMO",
+      kaynak_referansi: toStringValue(body.kaynak_referansi) ?? "demo-kaynak",
+      kaynak_tarihi: toStringValue(body.kaynak_tarihi),
+      aciklama: toStringValue(body.aciklama),
+      revizyon_no: 1,
+      onceki_kayit_id: null,
+      iptal_gerekcesi: null
+    };
+    resmiTatilTakvimiDemoState.items.push(record);
+    return ok(mapDemoResmiTatilRecord(record));
+  }
+
+  const resmiTatilDetailMatch = pathname.match(/^\/resmi-tatil-takvimi\/(\d+)$/);
+  if (resmiTatilDetailMatch && method === "GET") {
+    const actor = readDemoApiActor(init);
+    const permissionError = assertDemoResmiTatilView(actor);
+    if (permissionError) return permissionError;
+    const id = Number.parseInt(resmiTatilDetailMatch[1] ?? "", 10);
+    const record = resmiTatilTakvimiDemoState.items.find((item) => item.id === id);
+    if (!record) return demoRevizyonError("NOT_FOUND", "Kayit bulunamadi.");
+    return ok(mapDemoResmiTatilRecord(record));
+  }
+
+  if (resmiTatilDetailMatch && method === "PUT") {
+    const actor = readDemoApiActor(init);
+    const permissionError = assertDemoResmiTatilManage(actor);
+    if (permissionError) return permissionError;
+    const id = Number.parseInt(resmiTatilDetailMatch[1] ?? "", 10);
+    const record = resmiTatilTakvimiDemoState.items.find((item) => item.id === id);
+    if (!record) return demoRevizyonError("NOT_FOUND", "Kayit bulunamadi.");
+    if (record.durum !== "TASLAK") {
+      return demoRevizyonError("TATIL_TAKVIM_NOT_EDITABLE", "Yalniz taslak kayit duzenlenebilir.");
+    }
+    record.tatil_adi = toStringValue(body.tatil_adi) ?? record.tatil_adi;
+    record.aciklama = toStringValue(body.aciklama) ?? record.aciklama;
+    return ok(mapDemoResmiTatilRecord(record));
+  }
+
+  const resmiTatilActivateMatch = pathname.match(/^\/resmi-tatil-takvimi\/(\d+)\/aktiflestir$/);
+  if (resmiTatilActivateMatch && method === "POST") {
+    const actor = readDemoApiActor(init);
+    const permissionError = assertDemoResmiTatilManage(actor);
+    if (permissionError) return permissionError;
+    const id = Number.parseInt(resmiTatilActivateMatch[1] ?? "", 10);
+    const record = resmiTatilTakvimiDemoState.items.find((item) => item.id === id);
+    if (!record) return demoRevizyonError("NOT_FOUND", "Kayit bulunamadi.");
+    if (record.durum !== "TASLAK") {
+      return demoRevizyonError("TATIL_TAKVIM_INVALID_STATE", "Yalniz taslak kayit aktiflestirilebilir.");
+    }
+    const conflict = resmiTatilTakvimiDemoState.items.some(
+      (item) => item.id !== id && item.durum === "AKTIF" && item.tatil_turu === "UBGT" && item.tarih === record.tarih
+    );
+    if (conflict) {
+      return demoRevizyonError("TATIL_TAKVIM_AKTIF_CAKISMA", "Bu tarihte aktif UBGT kaydi zaten mevcut.");
+    }
+    record.durum = "AKTIF";
+    return ok(mapDemoResmiTatilRecord(record));
+  }
+
+  const resmiTatilRevizeMatch = pathname.match(/^\/resmi-tatil-takvimi\/(\d+)\/revize$/);
+  if (resmiTatilRevizeMatch && method === "POST") {
+    const actor = readDemoApiActor(init);
+    const permissionError = assertDemoResmiTatilManage(actor);
+    if (permissionError) return permissionError;
+    const id = Number.parseInt(resmiTatilRevizeMatch[1] ?? "", 10);
+    const record = resmiTatilTakvimiDemoState.items.find((item) => item.id === id);
+    if (!record) return demoRevizyonError("NOT_FOUND", "Kayit bulunamadi.");
+    if (record.durum !== "AKTIF") {
+      return demoRevizyonError("TATIL_TAKVIM_INVALID_STATE", "Yalniz aktif kayit revize edilebilir.");
+    }
+    const gerekce = toStringValue(body.iptal_gerekcesi) ?? toStringValue(body.gerekce);
+    if (!gerekce) return demoRevizyonError("VALIDATION_ERROR", "Revizyon gerekcesi zorunludur.");
+    record.durum = "IPTAL";
+    record.iptal_gerekcesi = gerekce;
+    const next: ResmiTatilTakvimDemoRecord = {
+      ...record,
+      id: ++resmiTatilTakvimiDemoState.nextId,
+      durum: "AKTIF",
+      revizyon_no: record.revizyon_no + 1,
+      onceki_kayit_id: record.id,
+      iptal_gerekcesi: null,
+      tatil_adi: toStringValue(body.tatil_adi) ?? record.tatil_adi
+    };
+    resmiTatilTakvimiDemoState.items.push(next);
+    return ok(mapDemoResmiTatilRecord(next));
+  }
+
+  const resmiTatilCancelMatch = pathname.match(/^\/resmi-tatil-takvimi\/(\d+)\/iptal$/);
+  if (resmiTatilCancelMatch && method === "POST") {
+    const actor = readDemoApiActor(init);
+    const permissionError = assertDemoResmiTatilManage(actor);
+    if (permissionError) return permissionError;
+    const id = Number.parseInt(resmiTatilCancelMatch[1] ?? "", 10);
+    const record = resmiTatilTakvimiDemoState.items.find((item) => item.id === id);
+    if (!record) return demoRevizyonError("NOT_FOUND", "Kayit bulunamadi.");
+    const gerekce = toStringValue(body.iptal_gerekcesi) ?? toStringValue(body.gerekce) ?? toStringValue(body.neden);
+    if (!gerekce) return demoRevizyonError("VALIDATION_ERROR", "Iptal gerekcesi zorunludur.");
+    record.durum = "IPTAL";
+    record.iptal_gerekcesi = gerekce;
+    return ok(mapDemoResmiTatilRecord(record));
+  }
+
+  const resmiTatilHistoryMatch = pathname.match(/^\/resmi-tatil-takvimi\/(\d+)\/gecmis$/);
+  if (resmiTatilHistoryMatch && method === "GET") {
+    const actor = readDemoApiActor(init);
+    const permissionError = assertDemoResmiTatilView(actor);
+    if (permissionError) return permissionError;
+    const id = Number.parseInt(resmiTatilHistoryMatch[1] ?? "", 10);
+    const record = resmiTatilTakvimiDemoState.items.find((item) => item.id === id);
+    if (!record) return demoRevizyonError("NOT_FOUND", "Kayit bulunamadi.");
+    return ok({ items: [mapDemoResmiTatilRecord(record)], auditler: [] });
+  }
+
+  if (pathname === "/resmi-tatil-takvimi/projection-preview" && method === "POST") {
+    const actor = readDemoApiActor(init);
+    const permissionError = assertDemoResmiTatilView(actor);
+    if (permissionError) return permissionError;
+    return ok(buildDemoResmiTatilProjectionPreview(body));
   }
 
   return null;

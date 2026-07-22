@@ -13,6 +13,7 @@ import { GunlukPuantajPage } from "../features/puantaj/pages/GunlukPuantajPage";
 import { RaporlarPage } from "../features/raporlar/pages/RaporlarPage";
 import { FinansPage } from "../features/finans/pages/FinansPage";
 import { YonetimPaneliPage } from "../features/yonetim/pages/YonetimPaneliPage";
+import { ResmiTatilTakvimiPage } from "../features/yonetim/pages/ResmiTatilTakvimiPage";
 import { LoginPage } from "../features/auth/pages/LoginPage";
 import { InternalDiagnosticsPage } from "./InternalDiagnosticsPage";
 import { HaftalikKapanisPage } from "../features/revizyon/pages/HaftalikKapanisPage";
@@ -198,6 +199,14 @@ export function AppRoutes() {
           element={
             <ProtectedRoute requirePermission={ROUTE_PERMISSION.yonetimPaneliPage}>
               <YonetimPaneliPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="resmi-tatil-takvimi"
+          element={
+            <ProtectedRoute requirePermission={ROUTE_PERMISSION.resmiTatilTakvimiPage}>
+              <ResmiTatilTakvimiPage />
             </ProtectedRoute>
           }
         />

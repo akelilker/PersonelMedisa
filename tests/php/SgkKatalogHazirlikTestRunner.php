@@ -11,6 +11,7 @@ require_once __DIR__ . '/../../api/src/Services/Payroll/SgkSurecKodEslemeValidat
 require_once __DIR__ . '/../../api/src/Services/Payroll/SgkCokluNedenValidator.php';
 require_once __DIR__ . '/../../api/src/Services/Payroll/SgkKatalogPreviewService.php';
 require_once __DIR__ . '/../../api/src/Services/Payroll/SgkBelgeGereksinimValidator.php';
+require_once __DIR__ . '/../../api/src/Services/Payroll/SgkKaynakManifestReader.php';
 
 use Medisa\Api\Services\Payroll\SgkBelgeGereksinimValidator;
 use Medisa\Api\Services\Payroll\SgkCokluNedenValidator;
@@ -19,6 +20,7 @@ use Medisa\Api\Services\Payroll\SgkKatalogImportValidator;
 use Medisa\Api\Services\Payroll\SgkKatalogOnayService;
 use Medisa\Api\Services\Payroll\SgkKatalogPreviewService;
 use Medisa\Api\Services\Payroll\SgkKatalogTamlikService;
+use Medisa\Api\Services\Payroll\SgkKaynakManifestReader;
 use Medisa\Api\Services\Payroll\SgkOperasyonelKanitValidator;
 use Medisa\Api\Services\Payroll\SgkSurecKodEslemeValidator;
 
@@ -331,5 +333,33 @@ assertTrue(in_array(SgkKatalogContracts::BLOCKER_BILDIRIM, $b['blocker_kodlari']
 
 $belge = SgkBelgeGereksinimValidator::validate(['eksik_gun_kodu' => '01', 'belge_matrisi' => []]);
 assertTrue(in_array(SgkKatalogContracts::BLOCKER_TAMLIK, $belge['blocker_kodlari'], true), 'belge matrisi eksik');
+
+// --- Manifest storage vs empty catalog ---
+$emptyStmt = new class {
+    public function fetchAll(int $mode = 0): array
+    {
+        return [];
+    }
+};
+assertTrue(SgkKaynakManifestReader::hydrate($emptyStmt) === [], 'manifest hydrate basarili bos []');
+
+$storageFromFalse = false;
+try {
+    SgkKaynakManifestReader::hydrate(false);
+} catch (RuntimeException $e) {
+    $storageFromFalse = $e->getMessage() === SgkKaynakManifestReader::STORAGE_ERROR_CODE;
+}
+assertTrue($storageFromFalse, 'hydrate(false) STORAGE_HATASI');
+
+$wrapped = SgkKaynakManifestReader::storageError(new PDOException('SQLSTATE[42S02]: no such table: secret'));
+assertTrue($wrapped->getMessage() === SgkKaynakManifestReader::STORAGE_ERROR_CODE, 'storageError kodu sabit');
+assertTrue(strpos($wrapped->getMessage(), 'secret') === false, 'storageError SQL sizdirmaz');
+assertTrue($wrapped->getPrevious() instanceof PDOException, 'storageError previous korur');
+
+$controllerSrc = file_get_contents(__DIR__ . '/../../api/src/Controllers/SgkKatalogHazirlikController.php');
+assertTrue(!preg_match('/catch\s*\([^)]+\)\s*\{\s*return\s*\[\];/s', $controllerSrc), 'controller catch-return-empty yok');
+assertTrue(strpos($controllerSrc, 'SgkKaynakManifestReader::fetchAll') !== false, 'controller reader kullanir');
+assertTrue(strpos($controllerSrc, 'SgkKaynakManifestReader::STORAGE_ERROR_CODE') !== false, 'controller 503 storage kodu');
+assertTrue(strpos($controllerSrc, "'manifests' => self::loadManifests(\$pdo)") !== false, 'onayValidate DB manifest okur');
 
 echo 'verify-sgk-katalog-hazirlik: OK' . PHP_EOL;

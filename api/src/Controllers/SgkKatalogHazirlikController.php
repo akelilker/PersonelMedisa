@@ -15,9 +15,11 @@ use Medisa\Api\Services\Payroll\SgkKatalogImportValidator;
 use Medisa\Api\Services\Payroll\SgkKatalogOnayService;
 use Medisa\Api\Services\Payroll\SgkKatalogPreviewService;
 use Medisa\Api\Services\Payroll\SgkKatalogTamlikService;
+use Medisa\Api\Services\Payroll\SgkKaynakManifestReader;
 use Medisa\Api\Services\Payroll\SgkOperasyonelKanitValidator;
 use Medisa\Api\Services\Payroll\SgkSurecKodEslemeValidator;
 use PDO;
+use RuntimeException;
 
 /**
  * S85-C1: Read-only / dry-run SGK catalog readiness endpoints. No seed/write activation.
@@ -160,33 +162,41 @@ class SgkKatalogHazirlikController
 
     public static function onayValidate(Request $request)
     {
-        self::context($request, 'mevzuat_parametreleri.manage');
+        [$pdo] = self::context($request, 'mevzuat_parametreleri.manage');
         $body = self::jsonBody($request);
         if (empty($body['tamlik'])) {
-            $body['tamlik'] = SgkKatalogTamlikService::evaluate([]);
+            // P1: never evaluate approval readiness against a silent empty catalog.
+            $body['tamlik'] = SgkKatalogTamlikService::evaluate([
+                'manifests' => self::loadManifests($pdo),
+                'kod_satirlari' => [],
+            ]);
         }
         JsonResponse::success(SgkKatalogOnayService::validateTransition($body));
     }
 
-    /** @return list<array<string,mixed>> */
+    /**
+     * Successful empty table → []. Storage/schema/query failure → 503 (never disguised as empty).
+     *
+     * @return list<array<string,mixed>>
+     */
     private static function loadManifests(PDO $pdo): array
     {
         try {
-            $stmt = $pdo->query(
-                "SELECT kaynak_id, kaynak_turu, kurum, belge_basligi, belge_tarihi, yayimlanma_tarihi,
-                        yururluk_baslangic, yururluk_bitis, kaynak_adresi,
-                        indirilen_dosya_sha256, icerik_sha256, indirilen_dosya_byte,
-                        durum, dogrulama_turu, observed_at, arsiv_kopyasi_repoda_mi, aciklama
-                 FROM sgk_kaynak_manifestleri
-                 ORDER BY kaynak_id ASC"
+            return SgkKaynakManifestReader::fetchAll($pdo);
+        } catch (RuntimeException $e) {
+            if ($e->getMessage() === SgkKaynakManifestReader::STORAGE_ERROR_CODE) {
+                // Do not leak PDO/SQL/internal exception details to clients.
+                JsonResponse::error(
+                    503,
+                    SgkKaynakManifestReader::STORAGE_ERROR_CODE,
+                    'SGK kaynak manifesti okunamadi. Sema veya baglanti durumunu kontrol edin.'
+                );
+            }
+            JsonResponse::error(
+                503,
+                SgkKaynakManifestReader::STORAGE_ERROR_CODE,
+                'SGK kaynak manifesti okunamadi. Sema veya baglanti durumunu kontrol edin.'
             );
-            $rows = $stmt ? ($stmt->fetchAll(PDO::FETCH_ASSOC) ?: []) : [];
-            return array_map(static function (array $r): array {
-                $r['arsiv_kopyasi_repoda_mi'] = (bool) ($r['arsiv_kopyasi_repoda_mi'] ?? false);
-                return $r;
-            }, $rows);
-        } catch (\Throwable $e) {
-            return [];
         }
     }
 

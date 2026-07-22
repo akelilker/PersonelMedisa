@@ -28,6 +28,8 @@ describe("S85-C1 SGK katalog hazirlik parity", () => {
     const page = readFileSync(resolve("src/features/raporlar/pages/BordroHazirlikMerkeziPage.tsx"), "utf8");
     const panel = readFileSync(resolve("src/features/raporlar/components/SgkKatalogHazirlikPanel.tsx"), "utf8");
     const docs = readFileSync(resolve("docs/guncel/94-s85c-sgk-katalog-manuel-kanit-talep-paketi.md"), "utf8");
+    const controller = readFileSync(resolve("api/src/Controllers/SgkKatalogHazirlikController.php"), "utf8");
+    const reader = readFileSync(resolve("api/src/Services/Payroll/SgkKaynakManifestReader.php"), "utf8");
     const migrationNames = readdirSync(resolve("api/migrations"));
 
     expect(router).toContain("/sgk-katalog-hazirlik/tamlik");
@@ -43,6 +45,12 @@ describe("S85-C1 SGK katalog hazirlik parity", () => {
     expect(existsSync(resolve("api/migrations/037_sgk_resmi_kaynak_manifesti_v1.sql"))).toBe(true);
     expect(migrationNames.some((name) => name.startsWith("038_"))).toBe(false);
     expect(migrationNames.some((name) => name.startsWith("039_"))).toBe(false);
+
+    expect(reader).toContain("SGK_KAYNAK_MANIFEST_STORAGE_HATASI");
+    expect(controller).toContain("SgkKaynakManifestReader::fetchAll");
+    expect(controller).toContain("SgkKaynakManifestReader::STORAGE_ERROR_CODE");
+    expect(controller).not.toMatch(/catch\s*\([^)]*\)\s*\{\s*return\s*\[\];/);
+    expect(controller).toContain("'manifests' => self::loadManifests($pdo)");
 
     const importValidator = readFileSync(
       resolve("api/src/Services/Payroll/SgkKatalogImportValidator.php"),

@@ -1,6 +1,7 @@
 -- S86: Personel belge dosya surumleri + audit (surecler BELGE kayitlari uzerine additive)
 -- Soft cancel only; physical hard-delete cascade yok (ON DELETE RESTRICT).
--- Production seed yok. MariaDB 10.6 uyumlu.
+-- Production seed yok. MariaDB 10.6+ / 11.4 uyumlu.
+-- FK/CHECK adlari personel_bordro_devirleri (fk_pbd_*) ile cakismasin diye pbds_/pba_ kullanilir.
 
 SET NAMES utf8mb4;
 SET time_zone = '+00:00';
@@ -20,17 +21,17 @@ CREATE TABLE IF NOT EXISTS personel_belge_dosya_surumleri (
   yukleyen_kullanici_id INT UNSIGNED NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
-  UNIQUE KEY uq_pbd_storage_key (storage_key),
-  UNIQUE KEY uq_pbd_surec_surum (surec_id, surum_no),
-  KEY idx_pbd_personel (personel_id),
-  KEY idx_pbd_surec_aktif (surec_id, aktif_mi),
-  KEY idx_pbd_sha256 (sha256),
-  CONSTRAINT fk_pbd_surec FOREIGN KEY (surec_id) REFERENCES surecler (id) ON DELETE RESTRICT,
-  CONSTRAINT fk_pbd_personel FOREIGN KEY (personel_id) REFERENCES personeller (id) ON DELETE RESTRICT,
-  CONSTRAINT fk_pbd_yukleyen FOREIGN KEY (yukleyen_kullanici_id) REFERENCES users (id),
-  CONSTRAINT chk_pbd_sha256 CHECK (sha256 REGEXP '^[0-9a-f]{64}$'),
-  CONSTRAINT chk_pbd_byte CHECK (byte_boyutu > 0),
-  CONSTRAINT chk_pbd_surum CHECK (surum_no > 0)
+  UNIQUE KEY uq_pbds_storage_key (storage_key),
+  UNIQUE KEY uq_pbds_surec_surum (surec_id, surum_no),
+  KEY idx_pbds_personel (personel_id),
+  KEY idx_pbds_surec_aktif (surec_id, aktif_mi),
+  KEY idx_pbds_sha256 (sha256),
+  CONSTRAINT fk_pbds_surec FOREIGN KEY (surec_id) REFERENCES surecler (id) ON DELETE RESTRICT,
+  CONSTRAINT fk_pbds_personel FOREIGN KEY (personel_id) REFERENCES personeller (id) ON DELETE RESTRICT,
+  CONSTRAINT fk_pbds_yukleyen FOREIGN KEY (yukleyen_kullanici_id) REFERENCES users (id),
+  CONSTRAINT chk_pbds_sha256 CHECK (sha256 REGEXP '^[0-9a-f]{64}$'),
+  CONSTRAINT chk_pbds_byte CHECK (byte_boyutu > 0),
+  CONSTRAINT chk_pbds_surum CHECK (surum_no > 0)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Tek aktif surum invariant (NULL'lar UNIQUE disinda kalir).
@@ -43,11 +44,11 @@ SET @s86_idx := (
   SELECT COUNT(*) FROM information_schema.STATISTICS
   WHERE TABLE_SCHEMA = DATABASE()
     AND TABLE_NAME = 'personel_belge_dosya_surumleri'
-    AND INDEX_NAME = 'uq_pbd_tek_aktif'
+    AND INDEX_NAME = 'uq_pbds_tek_aktif'
 );
 SET @s86_sql := IF(
   @s86_idx = 0,
-  'ALTER TABLE personel_belge_dosya_surumleri ADD UNIQUE KEY uq_pbd_tek_aktif (aktif_surec_key)',
+  'ALTER TABLE personel_belge_dosya_surumleri ADD UNIQUE KEY uq_pbds_tek_aktif (aktif_surec_key)',
   'DO 0'
 );
 PREPARE s86_stmt FROM @s86_sql;
@@ -72,11 +73,11 @@ CREATE TABLE IF NOT EXISTS personel_belge_auditleri (
   KEY idx_pba_surec (surec_id),
   KEY idx_pba_personel (personel_id),
   KEY idx_pba_created (created_at),
-  CONSTRAINT fk_pba_surec FOREIGN KEY (surec_id) REFERENCES surecler (id) ON DELETE RESTRICT,
-  CONSTRAINT fk_pba_personel FOREIGN KEY (personel_id) REFERENCES personeller (id) ON DELETE RESTRICT,
-  CONSTRAINT fk_pba_surum FOREIGN KEY (belge_surum_id) REFERENCES personel_belge_dosya_surumleri (id) ON DELETE RESTRICT,
-  CONSTRAINT fk_pba_user FOREIGN KEY (yapan_kullanici_id) REFERENCES users (id),
-  CONSTRAINT chk_pba_islem CHECK (
+  CONSTRAINT fk_pbaud_surec FOREIGN KEY (surec_id) REFERENCES surecler (id) ON DELETE RESTRICT,
+  CONSTRAINT fk_pbaud_personel FOREIGN KEY (personel_id) REFERENCES personeller (id) ON DELETE RESTRICT,
+  CONSTRAINT fk_pbaud_surum FOREIGN KEY (belge_surum_id) REFERENCES personel_belge_dosya_surumleri (id) ON DELETE RESTRICT,
+  CONSTRAINT fk_pbaud_user FOREIGN KEY (yapan_kullanici_id) REFERENCES users (id),
+  CONSTRAINT chk_pbaud_islem CHECK (
     islem_turu IN ('CREATED', 'METADATA_UPDATED', 'FILE_REPLACED', 'CANCELLED')
   )
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

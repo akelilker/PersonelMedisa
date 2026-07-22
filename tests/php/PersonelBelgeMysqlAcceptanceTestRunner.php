@@ -638,7 +638,7 @@ try {
     $ctrlSrc = (string) file_get_contents(__DIR__ . '/../../api/src/Controllers/PersonelBelgelerController.php');
     pbAssert(strpos($repoSrc, 'FOR UPDATE') !== false, 'repo FOR UPDATE lock');
     pbAssert(strpos($ctrlSrc, 'lockSurecRowForUpdate') !== false, 'controller lock kullanir');
-    pbAssert(strpos((string) file_get_contents(__DIR__ . '/../../api/migrations/038_personel_belge_yonetimi.sql'), 'uq_pbd_tek_aktif') !== false, '038 tek aktif unique');
+    pbAssert(strpos((string) file_get_contents(__DIR__ . '/../../api/migrations/038_personel_belge_yonetimi.sql'), 'uq_pbds_tek_aktif') !== false, '038 tek aktif unique');
 
     echo 'verify-personel-belge-mysql-acceptance: OK' . PHP_EOL;
 } finally {

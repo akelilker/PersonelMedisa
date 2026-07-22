@@ -19,7 +19,9 @@ describe("S86 personel belge 038 MariaDB migration", () => {
     expect(migrationSource).toContain("personel_belge_auditleri");
     expect(migrationSource).toContain("ON DELETE RESTRICT");
     expect(migrationSource).not.toContain("ON DELETE CASCADE");
-    expect(migrationSource).toContain("uq_pbd_tek_aktif");
+    expect(migrationSource).toContain("uq_pbds_tek_aktif");
+    expect(migrationSource).toContain("fk_pbds_surec");
+    expect(migrationSource).not.toContain("CONSTRAINT fk_pbd_personel");
     expect(migrationSource).toContain("aktif_surec_key");
     expect(migrationSource).toMatch(/CREATE TABLE IF NOT EXISTS personel_belge_dosya_surumleri/);
     expect(migrationSource).toMatch(/CREATE TABLE IF NOT EXISTS personel_belge_auditleri/);

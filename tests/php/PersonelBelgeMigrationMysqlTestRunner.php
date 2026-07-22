@@ -145,7 +145,7 @@ try {
         FROM information_schema.REFERENTIAL_CONSTRAINTS
         WHERE CONSTRAINT_SCHEMA = DATABASE()
           AND TABLE_NAME = 'personel_belge_dosya_surumleri'
-          AND CONSTRAINT_NAME IN ('fk_pbd_surec', 'fk_pbd_personel')
+          AND CONSTRAINT_NAME IN ('fk_pbds_surec', 'fk_pbds_personel')
     ")->fetchAll(PDO::FETCH_ASSOC);
     pbmAssert(count($fkSurum) === 2, 'surum FK sayisi 2');
     foreach ($fkSurum as $fk) {
@@ -157,7 +157,7 @@ try {
         FROM information_schema.REFERENTIAL_CONSTRAINTS
         WHERE CONSTRAINT_SCHEMA = DATABASE()
           AND TABLE_NAME = 'personel_belge_auditleri'
-          AND CONSTRAINT_NAME IN ('fk_pba_surec', 'fk_pba_personel', 'fk_pba_surum')
+          AND CONSTRAINT_NAME IN ('fk_pbaud_surec', 'fk_pbaud_personel', 'fk_pbaud_surum')
     ")->fetchAll(PDO::FETCH_ASSOC);
     pbmAssert(count($fkAudit) === 3, 'audit FK sayisi 3');
     foreach ($fkAudit as $fk) {
@@ -186,9 +186,9 @@ try {
         SELECT INDEX_NAME FROM information_schema.STATISTICS
         WHERE TABLE_SCHEMA = DATABASE()
           AND TABLE_NAME = 'personel_belge_dosya_surumleri'
-          AND INDEX_NAME = 'uq_pbd_tek_aktif'
+          AND INDEX_NAME = 'uq_pbds_tek_aktif'
     ")->fetchColumn();
-    pbmAssert($uniq === 'uq_pbd_tek_aktif', 'tek aktif unique index mevcut');
+    pbmAssert($uniq === 'uq_pbds_tek_aktif', 'tek aktif unique index mevcut');
 
     pbmAssert((int) $pdo->query('SELECT COUNT(*) FROM personel_belge_dosya_surumleri')->fetchColumn() === 0, 'surum baslangic satiri 0');
     pbmAssert((int) $pdo->query('SELECT COUNT(*) FROM personel_belge_auditleri')->fetchColumn() === 0, 'audit baslangic satiri 0');

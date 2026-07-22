@@ -51,6 +51,20 @@ describe("S85-C1 SGK katalog hazirlik parity", () => {
     expect(controller).toContain("SgkKaynakManifestReader::STORAGE_ERROR_CODE");
     expect(controller).not.toMatch(/catch\s*\([^)]*\)\s*\{\s*return\s*\[\];/);
     expect(controller).toContain("'manifests' => self::loadManifests($pdo)");
+    expect(controller).toContain("SgkOperasyonelKanitBase64Guard::resolve");
+    expect(controller).toContain("operasyonel_kanit_max_decoded_bytes");
+    expect(controller).not.toMatch(/base64_decode\(\$body/);
+
+    const base64Guard = readFileSync(
+      resolve("api/src/Services/Payroll/SgkOperasyonelKanitBase64Guard.php"),
+      "utf8"
+    );
+    expect(base64Guard).toContain("MAX_DECODED_BYTES = 10 * 1024 * 1024");
+    expect(base64Guard).toContain("SGK_OPERASYONEL_KANIT_BASE64_GECERSIZ");
+    expect(base64Guard).toContain("SGK_OPERASYONEL_KANIT_DOSYA_BOYUTU_ASILDI");
+
+    const apiClient = readFileSync(resolve("src/api/sgk-katalog-hazirlik.api.ts"), "utf8");
+    expect(apiClient).toContain("SGK_OPERASYONEL_KANIT_MAX_DECODED_BYTES = 10 * 1024 * 1024");
 
     const importValidator = readFileSync(
       resolve("api/src/Services/Payroll/SgkKatalogImportValidator.php"),

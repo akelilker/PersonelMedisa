@@ -204,24 +204,29 @@ function s88_policy_probe(PDO $pdo): array
     $hasValues = s88_table_exists($pdo, 'sirket_calisma_politika_degerleri');
     $activeHoliday = [];
     $yargitayWrites = [];
+    $error = null;
     if ($hasPolicy && $hasValues) {
-        $stmt = $pdo->query(
-            "SELECT p.id, p.state, d.parametre_kodu, d.deger
-             FROM sirket_calisma_politikalari p
-             INNER JOIN sirket_calisma_politika_degerleri d ON d.politika_id = p.id
-             WHERE d.parametre_kodu = 'TATIL_FSC_FM_CAKISMA_HESAP_MODU'
-               AND p.state = 'ONAYLANDI'
-               AND p.gecerlilik_bitis IS NULL"
-        );
-        $activeHoliday = $stmt ? $stmt->fetchAll() : [];
-        $stmt2 = $pdo->query(
-            "SELECT p.id, p.state, d.parametre_kodu, d.deger
-             FROM sirket_calisma_politikalari p
-             INNER JOIN sirket_calisma_politika_degerleri d ON d.politika_id = p.id
-             WHERE d.deger = 'YARGITAY_7_5_SAAT_AYRIMI'
-                OR d.parametre_kodu = 'TATIL_FSC_FM_CAKISMA_HESAP_MODU'"
-        );
-        $yargitayWrites = $stmt2 ? $stmt2->fetchAll() : [];
+        try {
+            $stmt = $pdo->query(
+                "SELECT p.id, p.state, d.parametre_kodu, d.deger_tipi, d.sayisal_deger, d.metin_deger
+                 FROM sirket_calisma_politikalari p
+                 INNER JOIN sirket_calisma_politika_degerleri d ON d.politika_id = p.id
+                 WHERE d.parametre_kodu = 'TATIL_FSC_FM_CAKISMA_HESAP_MODU'
+                   AND p.state = 'ONAYLANDI'
+                   AND p.gecerlilik_bitis IS NULL"
+            );
+            $activeHoliday = $stmt ? $stmt->fetchAll() : [];
+            $stmt2 = $pdo->query(
+                "SELECT p.id, p.state, d.parametre_kodu, d.deger_tipi, d.sayisal_deger, d.metin_deger
+                 FROM sirket_calisma_politikalari p
+                 INNER JOIN sirket_calisma_politika_degerleri d ON d.politika_id = p.id
+                 WHERE d.metin_deger = 'YARGITAY_7_5_SAAT_AYRIMI'
+                    OR d.parametre_kodu = 'TATIL_FSC_FM_CAKISMA_HESAP_MODU'"
+            );
+            $yargitayWrites = $stmt2 ? $stmt2->fetchAll() : [];
+        } catch (Throwable $e) {
+            $error = $e->getMessage();
+        }
     }
 
     return [
@@ -229,6 +234,7 @@ function s88_policy_probe(PDO $pdo): array
         'active_tatil_fsc_fm_rows' => $activeHoliday,
         'related_policy_rows' => $yargitayWrites,
         'active_tatil_fsc_fm_count' => count($activeHoliday),
+        'probe_error' => $error,
     ];
 }
 

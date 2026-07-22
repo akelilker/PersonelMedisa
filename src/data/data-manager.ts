@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from "react";
-import { getActiveSubeId } from "../auth/auth-manager";
+import { getActiveSubeId, getToken } from "../auth/auth-manager";
 import { ApiRequestError } from "../api/api-client";
 import {
   cancelBildirim,
@@ -144,6 +144,8 @@ export function clearAllAppPersistence(): void {
   if (typeof window === "undefined") {
     return;
   }
+
+  resetProtectedDataLoadGate();
 
   const empty = createEmptyAppData();
   window.appData = empty;
@@ -456,6 +458,10 @@ function dequeueSyncOperation(id: string): void {
 }
 
 export async function processSyncQueue(): Promise<void> {
+  if (!getToken()) {
+    return;
+  }
+
   if (typeof navigator !== "undefined" && navigator.onLine === false) {
     return;
   }
@@ -1271,78 +1277,123 @@ export function handleRealtimeEnvelope(env: RealtimeEnvelope): void {
   }
 }
 
-export async function loadDataFromServer(): Promise<void> {
-  const sube = getActiveSube();
-  const subeQ = getSubeIdForApiRequest();
-  const tasks: Array<Promise<void>> = [
-    (async () => {
-      const key = dataCacheKeys.personellerList(sube, "", "tum", "", "", 1);
-      try {
-        const data = await fetchPersonellerList({ aktiflik: "tum", page: 1, limit: 10, sube_id: subeQ });
-        setCacheEntry(key, data);
-      } catch {
-        /* sessiz */
-      }
-    })(),
-    (async () => {
-      const key = dataCacheKeys.bildirimlerHeader(sube);
-      try {
-        const data = await fetchBildirimlerList({ page: 1, limit: 8, sube_id: subeQ });
-        setCacheEntry(key, data);
-      } catch {
-        /* sessiz */
-      }
-    })(),
-    (async () => {
-      const key = dataCacheKeys.referansPersonel();
-      try {
-        const bundle: PersonelReferenceBundle = {
-          departmanOptions: await fetchDepartmanOptions(),
-          gorevOptions: await fetchGorevOptions(),
-          personelTipiOptions: await fetchPersonelTipiOptions(),
-          bagliAmirOptions: await fetchBagliAmirOptions(),
-          ucretTipiOptions: await fetchUcretTipiOptions(),
-          primKuraliOptions: await fetchPrimKuraliOptions()
-        };
-        setCacheEntry(key, bundle);
-      } catch {
-        /* sessiz */
-      }
-    })(),
-    (async () => {
-      const key = dataCacheKeys.surecTuruRef();
-      try {
-        const data = await fetchSurecTuruOptions();
-        setCacheEntry(key, data);
-      } catch {
-        /* sessiz */
-      }
-    })(),
-    (async () => {
-      const key = dataCacheKeys.bildirimRef();
-      try {
-        const [departman, bildirimTuru, personeller] = await Promise.all([
-          fetchDepartmanOptions(),
-          fetchBildirimTuruOptions(),
-          fetchPersonellerList({
-            aktiflik: "aktif",
-            sube_id: subeQ,
-            page: 1,
-            limit: BILDIRIM_PERSONEL_FETCH_LIMIT
-          })
-        ]);
-        setCacheEntry(key, { departman, bildirimTuru, personeller: personeller.items });
-      } catch {
-        /* sessiz */
-      }
-    })()
-  ];
+let protectedDataLoadInFlight: Promise<void> | null = null;
+let lastProtectedDataLoadSignature: string | null = null;
 
-  await Promise.allSettled(tasks);
-  persistAppData();
-  notifyAppData();
+function buildProtectedDataLoadSignature(): string | null {
+  const token = getToken();
+  if (!token) {
+    return null;
+  }
+  const sube = getActiveSubeId();
+  return `${token}::${sube === null ? "all" : String(sube)}`;
+}
 
-  void processSyncQueue();
+/** Logout / session clear: aynı token ile stale coalesce'i sıfırla. */
+export function resetProtectedDataLoadGate(): void {
+  lastProtectedDataLoadSignature = null;
+  protectedDataLoadInFlight = null;
+}
+
+export type LoadDataFromServerOptions = {
+  /** Online dönüş gibi aynı session imzasında bile yenile. */
+  force?: boolean;
+};
+
+export async function loadDataFromServer(options?: LoadDataFromServerOptions): Promise<void> {
+  const force = options?.force === true;
+  const signature = buildProtectedDataLoadSignature();
+  if (!signature) {
+    return;
+  }
+
+  if (protectedDataLoadInFlight) {
+    return protectedDataLoadInFlight;
+  }
+
+  if (!force && lastProtectedDataLoadSignature === signature) {
+    return;
+  }
+
+  // StrictMode / eşzamanlı çağrılarda ikinci isteği coalesce et.
+  lastProtectedDataLoadSignature = signature;
+
+  protectedDataLoadInFlight = (async () => {
+    const sube = getActiveSube();
+    const subeQ = getSubeIdForApiRequest();
+    const tasks: Array<Promise<void>> = [
+      (async () => {
+        const key = dataCacheKeys.personellerList(sube, "", "tum", "", "", 1);
+        try {
+          const data = await fetchPersonellerList({ aktiflik: "tum", page: 1, limit: 10, sube_id: subeQ });
+          setCacheEntry(key, data);
+        } catch {
+          /* sessiz */
+        }
+      })(),
+      (async () => {
+        const key = dataCacheKeys.bildirimlerHeader(sube);
+        try {
+          const data = await fetchBildirimlerList({ page: 1, limit: 8, sube_id: subeQ });
+          setCacheEntry(key, data);
+        } catch {
+          /* sessiz */
+        }
+      })(),
+      (async () => {
+        const key = dataCacheKeys.referansPersonel();
+        try {
+          const bundle: PersonelReferenceBundle = {
+            departmanOptions: await fetchDepartmanOptions(),
+            gorevOptions: await fetchGorevOptions(),
+            personelTipiOptions: await fetchPersonelTipiOptions(),
+            bagliAmirOptions: await fetchBagliAmirOptions(),
+            ucretTipiOptions: await fetchUcretTipiOptions(),
+            primKuraliOptions: await fetchPrimKuraliOptions()
+          };
+          setCacheEntry(key, bundle);
+        } catch {
+          /* sessiz */
+        }
+      })(),
+      (async () => {
+        const key = dataCacheKeys.surecTuruRef();
+        try {
+          const data = await fetchSurecTuruOptions();
+          setCacheEntry(key, data);
+        } catch {
+          /* sessiz */
+        }
+      })(),
+      (async () => {
+        const key = dataCacheKeys.bildirimRef();
+        try {
+          const [departman, bildirimTuru, personeller] = await Promise.all([
+            fetchDepartmanOptions(),
+            fetchBildirimTuruOptions(),
+            fetchPersonellerList({
+              aktiflik: "aktif",
+              sube_id: subeQ,
+              page: 1,
+              limit: BILDIRIM_PERSONEL_FETCH_LIMIT
+            })
+          ]);
+          setCacheEntry(key, { departman, bildirimTuru, personeller: personeller.items });
+        } catch {
+          /* sessiz */
+        }
+      })()
+    ];
+
+    await Promise.allSettled(tasks);
+    persistAppData();
+    notifyAppData();
+    void processSyncQueue();
+  })().finally(() => {
+    protectedDataLoadInFlight = null;
+  });
+
+  return protectedDataLoadInFlight;
 }
 
 export function attachConnectivityListeners(): () => void {
@@ -1351,7 +1402,11 @@ export function attachConnectivityListeners(): () => void {
   }
 
   const handleOnline = () => {
-    void loadDataFromServer();
+    // Token yoksa protected preload yapma; session varsa force refresh.
+    if (!getToken()) {
+      return;
+    }
+    void loadDataFromServer({ force: true });
   };
 
   window.addEventListener("online", handleOnline);

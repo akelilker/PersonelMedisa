@@ -8,6 +8,7 @@ use Medisa\Api\Auth\AuthMiddleware;
 use Medisa\Api\Auth\LoginController;
 use Medisa\Api\Controllers\AylikBildirimOnaylariController;
 use Medisa\Api\Controllers\GenelYoneticiBildirimOnaylariController;
+use Medisa\Api\Controllers\BildirimlerController;
 use Medisa\Api\Controllers\BildirimPuantajEtkiAdaylariController;
 use Medisa\Api\Controllers\BordroHazirlikController;
 use Medisa\Api\Controllers\SgkKatalogHazirlikController;

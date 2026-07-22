@@ -4,6 +4,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode
 } from "react";
@@ -35,6 +36,7 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export function AuthProvider({ children }: AuthProviderProps) {
   const [session, setSession] = useState<AuthSession | null>(() => getSession());
+  const didBootstrapRef = useRef(false);
 
   const forceLogout = useCallback(() => {
     const before = getSession();
@@ -46,6 +48,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     disconnectRealtime();
     clearAuthEverywhere();
     clearAllAppPersistence();
+    didBootstrapRef.current = false;
     setSession(null);
   }, []);
 
@@ -62,7 +65,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
       payload: { username: credentials.username.trim(), ui_profile: nextSession.ui_profile }
     });
     bumpAppDataRevision();
-    void loadDataFromServer();
+    // Login sonrası tek preload; mount effect ile çakışmayı engelle.
+    didBootstrapRef.current = true;
+    void loadDataFromServer({ force: true });
   }, []);
 
   const logout = useCallback(() => {
@@ -75,6 +80,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     disconnectRealtime();
     clearAuthEverywhere();
     clearAllAppPersistence();
+    didBootstrapRef.current = false;
     setSession(null);
   }, []);
 
@@ -82,8 +88,20 @@ export function AuthProvider({ children }: AuthProviderProps) {
     persistActiveSubeId(subeId);
     setSession(getSession());
     bumpAppDataRevision();
-    void loadDataFromServer();
+    void loadDataFromServer({ force: true });
   }, []);
+
+  // Stored valid session refresh: auth hazır olduktan sonra tek bootstrap.
+  useEffect(() => {
+    if (didBootstrapRef.current) {
+      return;
+    }
+    if (!session) {
+      return;
+    }
+    didBootstrapRef.current = true;
+    void loadDataFromServer();
+  }, [session]);
 
   useEffect(() => {
     return onAuthUnauthorized(() => {

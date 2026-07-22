@@ -148,17 +148,18 @@ class MaasHesaplamaAdayService
                     $holidayOvertimeMode
                 );
                 if ($conflict['has_conflict']) {
-                    if (($conflict['reason'] ?? '') === 'HALF_DAY_UBGT_PARTIAL') {
+                    $reason = (string) ($conflict['reason'] ?? '');
+                    if ($reason === 'UBGT_DAY_SCOPE' || $reason === 'HALF_DAY_UBGT_POLICY') {
                         $items[] = self::issue(
                             'BLOCKER',
-                            MaasHesaplamaEngine::HALF_DAY_UBGT_PARTIAL_BLOCKER_CODE,
-                            MaasHesaplamaEngine::HALF_DAY_UBGT_PARTIAL_ERROR_MESSAGE,
+                            (string) $conflict['blocker_code'],
+                            (string) $conflict['message'],
                             'puantaj',
                             null,
                             $pid,
                             [
                                 'politika_kodu' => MaasHesaplamaEngine::HOLIDAY_OVERTIME_POLICY_CODE,
-                                'yarim_gun_satirlari' => $conflict['half_day_rows'] ?? [],
+                                'ubgt_kapsam_satirlari' => $conflict['scope_rows'] ?? [],
                             ],
                             $personel['ad_soyad'] ?? null
                         );

@@ -119,17 +119,31 @@ describe("S77-C/S77-D maas hesaplama source contract", () => {
     expect(policyCatalog).toContain("TATIL_FSC_FM_CAKISMA_HESAP_MODU");
     expect(engine).toContain("HOLIDAY_OVERTIME_POLICY_REQUIRED");
     expect(engine).toContain("TATIL_FSC_FM_CAKISMA_POLITIKASI_EKSIK");
-    expect(engine).toContain("HALF_DAY_UBGT_PARTIAL_ERROR_CODE");
+    expect(engine).toContain("UBGT_DAY_SCOPE_ERROR_CODE");
+    expect(engine).toContain("HALF_DAY_UBGT_POLICY_ERROR_CODE");
+    expect(engine).toContain("resolveUbgtGunKapsami");
     expect(engine).toContain("YARGITAY_HOLIDAY_SPLIT_MINUTES");
     expect(engine).not.toContain("TATIL_TABAN_UCRET_MAHSUBU");
+    expect(engine).not.toContain("HALF_DAY_UBGT_PARTIAL");
     expect(aday).toContain("HOLIDAY_OVERTIME_BLOCKER_CODE");
-    expect(aday).toContain("HALF_DAY_UBGT_PARTIAL_BLOCKER_CODE");
+    expect(aday).toContain("UBGT_DAY_SCOPE");
+    expect(aday).toContain("HALF_DAY_UBGT_POLICY");
     expect(frontendEngine).toContain("HOLIDAY_OVERTIME_POLICY_REQUIRED");
     expect(frontendEngine).toContain("YARGITAY_HOLIDAY_OVERTIME_MODE");
-    expect(frontendEngine).toContain("HALF_DAY_UBGT_PARTIAL_ERROR_CODE");
+    expect(frontendEngine).toContain("UBGT_DAY_SCOPE_ERROR_CODE");
+    expect(frontendEngine).toContain("HALF_DAY_UBGT_POLICY_ERROR_CODE");
+    expect(frontendEngine).toContain("resolveUbgtGunKapsami");
     expect(frontendEngine).toContain(
       "Tatil çalışması ile fazla çalışma çakışma politikası yetkili onayı bekliyor"
     );
+    expect(frontendEngine).toContain(
+      "Resmî tatilin tam gün veya yarım gün kapsamı doğrulanamadığı için otomatik hesaplama yapılamıyor"
+    );
+    expect(frontendEngine).toContain(
+      "Yarım günlük resmî tatil çalışma hesabı için tatil dönemi net çalışma süresi ve yetkili hesap politikası eksik"
+    );
     expect(frontendPage).toContain("tatil-fsc-fm-cakisma-politikasi-eksik");
+    expect(frontendPage).toContain("ubgt-gun-kapsami-eksik");
+    expect(frontendPage).toContain("yarim-gun-ubgt-hesap-politikasi-eksik");
   });
 });

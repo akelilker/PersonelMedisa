@@ -12,6 +12,11 @@ import { ErrorState } from "../../../components/states/ErrorState";
 import { LoadingState } from "../../../components/states/LoadingState";
 import { useRoleAccess } from "../../../hooks/use-role-access";
 import { usePuantaj } from "../../../hooks/usePuantaj";
+import {
+  HALF_DAY_UBGT_POLICY_ERROR_CODE,
+  HOLIDAY_OVERTIME_POLICY_REQUIRED,
+  UBGT_DAY_SCOPE_ERROR_CODE
+} from "../../../services/puantaj-hesap-motoru";
 import { BildirimPuantajEtkiAdaylariSection } from "../components/BildirimPuantajEtkiAdaylariSection";
 import { formatComplianceLevelLabel } from "../../../lib/display/enum-display";
 import type {
@@ -383,7 +388,18 @@ export function GunlukPuantajPage() {
             <p className="puantaj-form-readonly">{haftalikOzetEksikVeriNotu}</p>
           ) : null}
           {!haftalikOzet.hesaplanabilir_mi && haftalikOzet.hata_mesaji ? (
-            <p className="yonetim-error" data-testid="tatil-fsc-fm-cakisma-politikasi-eksik">
+            <p
+              className="yonetim-error"
+              data-testid={
+                haftalikOzet.hata_kodu === HOLIDAY_OVERTIME_POLICY_REQUIRED
+                  ? "tatil-fsc-fm-cakisma-politikasi-eksik"
+                  : haftalikOzet.hata_kodu === UBGT_DAY_SCOPE_ERROR_CODE
+                    ? "ubgt-gun-kapsami-eksik"
+                    : haftalikOzet.hata_kodu === HALF_DAY_UBGT_POLICY_ERROR_CODE
+                      ? "yarim-gun-ubgt-hesap-politikasi-eksik"
+                      : "haftalik-ucret-ozeti-hesaplanamadi"
+              }
+            >
               {haftalikOzet.hata_mesaji}
             </p>
           ) : null}

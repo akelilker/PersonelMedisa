@@ -200,6 +200,12 @@ Bu form onaylanmadan ilgili şirket parametreleri production sistemine girilmeye
 - Mod onaylıyken tam gün HT/UBGT + FSC/FM çakışması aday üretimini bloke etmez.
 - Mod yok veya geçersizse mevcut fail-closed davranış korunur (tatil + FSC/FM → hesap durur).
 
-**Yarım gün UBGT kısmi çalışma:** `ONAY_BEKLIYOR` — canonical yarım gün kaynağı repoda yok; alanlar mevcut olduğunda `ubgt_gun_kapsami` / `tatil_gun_kapsami` = `YARIM_GUN` ve `yarim_gun_tatil_interval_dakika` ile fail-closed.
+**Yarım gün UBGT:** `ONAY_BEKLIYOR` — tatil dönemi net overlap ve yetkili hesap politikası eksik; `YARIM_GUN` + net>0 satırlar fail-closed (`HALF_DAY_UBGT_POLICY_REQUIRED`). Interval karşılaştırma / 0,5–1 yevmiye / 450 dk ayrımı uygulanmaz.
+
+**S87-B (2026-07-22) UBGT gün kapsamı fail-closed:**
+- Canonical owner: `resolveUbgtGunKapsami` → yalnız `TAM_GUN` | `YARIM_GUN` | `BILINMIYOR` (`ubgt_gun_kapsami` / `tatil_gun_kapsami`).
+- Bilinmeyen kapsam + yalnız UBGT + net>0 → `UBGT_DAY_SCOPE_REQUIRED` (YARGITAY bu blocker’ı açmaz).
+- Tam gün algoritması yalnız açık `TAM_GUN` işaretinde.
+- HT+UBGT aynı gün: `HAFTA_TATILI_ESAS` korunur; eksik UBGT kapsamı ikinci ödeme doğurmaz.
 
 **Production notu:** Bu kayıt yalnızca karar dokümantasyonudur; production policy yazımı yapılmamıştır.

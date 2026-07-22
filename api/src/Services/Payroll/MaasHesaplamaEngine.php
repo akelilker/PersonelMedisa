@@ -26,9 +26,12 @@ final class MaasHesaplamaEngine
     public const HOLIDAY_OVERTIME_ERROR_CODE = 'HOLIDAY_OVERTIME_POLICY_REQUIRED';
     public const HOLIDAY_OVERTIME_BLOCKER_CODE = 'TATIL_FSC_FM_CAKISMA_POLITIKASI_EKSIK';
     public const HOLIDAY_OVERTIME_ERROR_MESSAGE = 'Tatil çalışması ile fazla çalışma çakışma politikası yetkili onayı bekliyor';
-    public const HALF_DAY_UBGT_PARTIAL_ERROR_CODE = 'HALF_DAY_UBGT_PARTIAL_POLICY_REQUIRED';
-    public const HALF_DAY_UBGT_PARTIAL_BLOCKER_CODE = 'YARIM_GUN_UBGT_KISMI_CALISMA_POLITIKASI_EKSIK';
-    public const HALF_DAY_UBGT_PARTIAL_ERROR_MESSAGE = 'Yarım günlük resmî tatilde kısmi çalışma hesap politikası yetkili onayı bekliyor';
+    public const UBGT_DAY_SCOPE_ERROR_CODE = 'UBGT_DAY_SCOPE_REQUIRED';
+    public const UBGT_DAY_SCOPE_BLOCKER_CODE = 'UBGT_GUN_KAPSAMI_EKSIK';
+    public const UBGT_DAY_SCOPE_ERROR_MESSAGE = 'Resmî tatilin tam gün veya yarım gün kapsamı doğrulanamadığı için otomatik hesaplama yapılamıyor';
+    public const HALF_DAY_UBGT_POLICY_ERROR_CODE = 'HALF_DAY_UBGT_POLICY_REQUIRED';
+    public const HALF_DAY_UBGT_POLICY_BLOCKER_CODE = 'YARIM_GUN_UBGT_HESAP_POLITIKASI_EKSIK';
+    public const HALF_DAY_UBGT_POLICY_ERROR_MESSAGE = 'Yarım günlük resmî tatil çalışma hesabı için tatil dönemi net çalışma süresi ve yetkili hesap politikası eksik';
 
     /** @var array<int, string> */
     private static $holidayModes = ['GUNLUK_ILAVE', 'SAAT_CARPAN', 'GUNLUK_ILAVE_VE_SAAT_CARPAN'];
@@ -326,6 +329,97 @@ final class MaasHesaplamaEngine
     }
 
     /** @param array<string, string> $params */
+    /**
+     * Canonical UBGT gün kapsamı. Tarih/net dakika/magic listeden tahmin yok.
+     *
+     * @param array<string, mixed> $row
+     * @return 'TAM_GUN'|'YARIM_GUN'|'BILINMIYOR'
+     */
+    public static function resolveUbgtGunKapsami(array $row)
+    {
+        $raw = null;
+        if (array_key_exists('ubgt_gun_kapsami', $row) && $row['ubgt_gun_kapsami'] !== null) {
+            $raw = (string) $row['ubgt_gun_kapsami'];
+        } elseif (array_key_exists('tatil_gun_kapsami', $row) && $row['tatil_gun_kapsami'] !== null) {
+            $raw = (string) $row['tatil_gun_kapsami'];
+        }
+        if ($raw === null) {
+            return 'BILINMIYOR';
+        }
+        $normalized = strtoupper(trim($raw));
+        if ($normalized === 'TAM_GUN' || $normalized === 'YARIM_GUN') {
+            return $normalized;
+        }
+
+        return 'BILINMIYOR';
+    }
+
+    /**
+     * Yalnız UBGT satırlarında kapsam fail-closed.
+     * HT+UBGT aynı gün (HT esas) bu blocker'a girmez.
+     *
+     * @param array<int, array<string, mixed>> $puantajlar
+     * @return array{
+     *   has_conflict: bool,
+     *   reason: string|null,
+     *   error_code: string|null,
+     *   blocker_code: string|null,
+     *   message: string|null,
+     *   rows: array<int, array<string, mixed>>
+     * }
+     */
+    public static function detectUbgtScopeConflict(array $puantajlar)
+    {
+        $unknownRows = [];
+        $halfDayRows = [];
+        foreach ($puantajlar as $row) {
+            $netDk = max(0, (int) ($row['net_calisma_suresi_dakika'] ?? 0));
+            if ($netDk < 1) {
+                continue;
+            }
+            $class = self::classifyHolidayDay($row);
+            // Precedence 1: HT+UBGT aynı gün → HT esas; UBGT kapsam blocker üretilmez.
+            if ($class['both'] || !$class['ubgt'] || $class['ht']) {
+                continue;
+            }
+            $kapsam = self::resolveUbgtGunKapsami($row);
+            if ($kapsam === 'BILINMIYOR') {
+                $unknownRows[] = $row;
+            } elseif ($kapsam === 'YARIM_GUN') {
+                $halfDayRows[] = $row;
+            }
+        }
+        if (count($unknownRows) > 0) {
+            return [
+                'has_conflict' => true,
+                'reason' => 'UBGT_DAY_SCOPE',
+                'error_code' => self::UBGT_DAY_SCOPE_ERROR_CODE,
+                'blocker_code' => self::UBGT_DAY_SCOPE_BLOCKER_CODE,
+                'message' => self::UBGT_DAY_SCOPE_ERROR_MESSAGE,
+                'rows' => $unknownRows,
+            ];
+        }
+        if (count($halfDayRows) > 0) {
+            return [
+                'has_conflict' => true,
+                'reason' => 'HALF_DAY_UBGT_POLICY',
+                'error_code' => self::HALF_DAY_UBGT_POLICY_ERROR_CODE,
+                'blocker_code' => self::HALF_DAY_UBGT_POLICY_BLOCKER_CODE,
+                'message' => self::HALF_DAY_UBGT_POLICY_ERROR_MESSAGE,
+                'rows' => $halfDayRows,
+            ];
+        }
+
+        return [
+            'has_conflict' => false,
+            'reason' => null,
+            'error_code' => null,
+            'blocker_code' => null,
+            'message' => null,
+            'rows' => [],
+        ];
+    }
+
     public static function resolveHolidayOvertimeMode(array $params)
     {
         $raw = strtoupper(trim((string) ($params[self::HOLIDAY_OVERTIME_POLICY_CODE] ?? '')));
@@ -373,40 +467,8 @@ final class MaasHesaplamaEngine
     }
 
     /**
-     * @param array<int, array<string, mixed>> $puantajlar
-     * @return array{has_partial: bool, rows: array<int, array<string, mixed>>}
-     */
-    public static function detectHalfDayUbgtPartial(array $puantajlar)
-    {
-        $rows = [];
-        foreach ($puantajlar as $row) {
-            $kapsam = null;
-            if (array_key_exists('ubgt_gun_kapsami', $row)) {
-                $kapsam = (string) $row['ubgt_gun_kapsami'];
-            } elseif (array_key_exists('tatil_gun_kapsami', $row)) {
-                $kapsam = (string) $row['tatil_gun_kapsami'];
-            }
-            if ($kapsam === null || strtoupper(trim($kapsam)) !== 'YARIM_GUN') {
-                continue;
-            }
-            $class = self::classifyHolidayDay($row);
-            if (!$class['ubgt']) {
-                continue;
-            }
-            $interval = max(0, (int) ($row['yarim_gun_tatil_interval_dakika'] ?? 0));
-            $netDk = max(0, (int) ($row['net_calisma_suresi_dakika'] ?? 0));
-            if ($interval < 1 || $netDk < 1 || $netDk >= $interval) {
-                continue;
-            }
-            $rows[] = $row;
-        }
-
-        return ['has_partial' => count($rows) > 0, 'rows' => $rows];
-    }
-
-    /**
-     * FM/FSC degerlendirme havuzu: normal tam + tatil asim (450 dk sonrasi).
-     * HT+UBGT ayni gun tek satirda ise asim yalniz bir kez sayilir.
+     * FM/FSC degerlendirme havuzu: normal tam + (HT veya TAM_GUN UBGT) 450 asim.
+     * HT+UBGT ayni gun tek asim; bilinmeyen/yarim gun UBGT hesap yoluna girmez.
      *
      * @param array<int, array<string, mixed>> $puantajlar
      */
@@ -419,7 +481,14 @@ final class MaasHesaplamaEngine
                 continue;
             }
             $class = self::classifyHolidayDay($row);
-            if ($class['ht'] || $class['ubgt']) {
+            if ($class['both'] || $class['ht']) {
+                $total += self::holidayOtPoolMinutes($netDk, true);
+                continue;
+            }
+            if ($class['ubgt']) {
+                if (self::resolveUbgtGunKapsami($row) !== 'TAM_GUN') {
+                    continue;
+                }
                 $total += self::holidayOtPoolMinutes($netDk, true);
                 continue;
             }
@@ -511,12 +580,16 @@ final class MaasHesaplamaEngine
      */
     public static function detectHolidayOvertimePolicyConflict(array $puantajlar, $gunlukCalismaDakika, $haftalikIsGunu, $holidayOvertimeMode = null)
     {
-        $halfDay = self::detectHalfDayUbgtPartial($puantajlar);
-        if ($halfDay['has_partial']) {
+        $scope = self::detectUbgtScopeConflict($puantajlar);
+        if ($scope['has_conflict']) {
             return [
                 'has_conflict' => true,
-                'reason' => 'HALF_DAY_UBGT_PARTIAL',
-                'half_day_rows' => $halfDay['rows'],
+                'reason' => $scope['reason'],
+                'error_code' => $scope['error_code'],
+                'blocker_code' => $scope['blocker_code'],
+                'message' => $scope['message'],
+                'scope_rows' => $scope['rows'],
+                'half_day_rows' => ($scope['reason'] ?? '') === 'HALF_DAY_UBGT_POLICY' ? $scope['rows'] : [],
                 'weeks' => [],
             ];
         }
@@ -528,6 +601,10 @@ final class MaasHesaplamaEngine
             return [
                 'has_conflict' => false,
                 'reason' => null,
+                'error_code' => null,
+                'blocker_code' => null,
+                'message' => null,
+                'scope_rows' => [],
                 'half_day_rows' => [],
                 'weeks' => [],
             ];
@@ -543,6 +620,10 @@ final class MaasHesaplamaEngine
             return [
                 'has_conflict' => false,
                 'reason' => null,
+                'error_code' => null,
+                'blocker_code' => null,
+                'message' => null,
+                'scope_rows' => [],
                 'half_day_rows' => [],
                 'weeks' => [],
             ];
@@ -607,6 +688,10 @@ final class MaasHesaplamaEngine
         return [
             'has_conflict' => count($conflicts) > 0,
             'reason' => count($conflicts) > 0 ? 'HOLIDAY_OVERTIME_POLICY_REQUIRED' : null,
+            'error_code' => count($conflicts) > 0 ? self::HOLIDAY_OVERTIME_ERROR_CODE : null,
+            'blocker_code' => count($conflicts) > 0 ? self::HOLIDAY_OVERTIME_BLOCKER_CODE : null,
+            'message' => count($conflicts) > 0 ? self::HOLIDAY_OVERTIME_ERROR_MESSAGE : null,
+            'scope_rows' => [],
             'half_day_rows' => [],
             'weeks' => $conflicts,
         ];
@@ -645,15 +730,6 @@ final class MaasHesaplamaEngine
             $contractualWeeklyDk = self::LEGAL_WEEKLY_LIMIT_MINUTES;
         }
         $holidayOvertimeMode = self::resolveHolidayOvertimeMode($params);
-        $halfDayPartial = self::detectHalfDayUbgtPartial($input['puantajlar']);
-        if ($halfDayPartial['has_partial']) {
-            return [
-                'error' => [
-                    'code' => self::HALF_DAY_UBGT_PARTIAL_ERROR_CODE,
-                    'message' => self::HALF_DAY_UBGT_PARTIAL_ERROR_MESSAGE,
-                ],
-            ];
-        }
         $holidayOvertimeConflict = self::detectHolidayOvertimePolicyConflict(
             $input['puantajlar'],
             $gunlukDk,
@@ -661,11 +737,12 @@ final class MaasHesaplamaEngine
             $params[self::HOLIDAY_OVERTIME_POLICY_CODE] ?? null
         );
         if ($holidayOvertimeConflict['has_conflict']) {
-            if (($holidayOvertimeConflict['reason'] ?? '') === 'HALF_DAY_UBGT_PARTIAL') {
+            $reason = (string) ($holidayOvertimeConflict['reason'] ?? '');
+            if ($reason === 'UBGT_DAY_SCOPE' || $reason === 'HALF_DAY_UBGT_POLICY') {
                 return [
                     'error' => [
-                        'code' => self::HALF_DAY_UBGT_PARTIAL_ERROR_CODE,
-                        'message' => self::HALF_DAY_UBGT_PARTIAL_ERROR_MESSAGE,
+                        'code' => (string) $holidayOvertimeConflict['error_code'],
+                        'message' => (string) $holidayOvertimeConflict['message'],
                     ],
                 ];
             }
@@ -819,6 +896,23 @@ final class MaasHesaplamaEngine
                         ['hesap_modu' => $htMode, 'net_dakika' => $netDk]
                     );
                 } elseif ($class['ubgt']) {
+                    // Yalnız açıkça TAM_GUN işaretli UBGT tam gün algoritmasına girer.
+                    if (self::resolveUbgtGunKapsami($row) === 'YARIM_GUN') {
+                        return [
+                            'error' => [
+                                'code' => self::HALF_DAY_UBGT_POLICY_ERROR_CODE,
+                                'message' => self::HALF_DAY_UBGT_POLICY_ERROR_MESSAGE,
+                            ],
+                        ];
+                    }
+                    if (self::resolveUbgtGunKapsami($row) !== 'TAM_GUN') {
+                        return [
+                            'error' => [
+                                'code' => self::UBGT_DAY_SCOPE_ERROR_CODE,
+                                'message' => self::UBGT_DAY_SCOPE_ERROR_MESSAGE,
+                            ],
+                        ];
+                    }
                     $premium = self::holidayPremium($hourly, $daily, $netDk, $ubgtCarpan, $ubgtMode);
                     $grossAdd = $grossAdd->add($premium['tutar']);
                     $hasOt = true;
@@ -836,7 +930,11 @@ final class MaasHesaplamaEngine
                         'PUANTAJ',
                         isset($row['muhur_satir_id']) ? (int) $row['muhur_satir_id'] : null,
                         'UBGT calismasi',
-                        ['hesap_modu' => $ubgtMode, 'net_dakika' => $netDk]
+                        [
+                            'hesap_modu' => $ubgtMode,
+                            'net_dakika' => $netDk,
+                            'ubgt_gun_kapsami' => 'TAM_GUN',
+                        ]
                     );
                 }
             }
@@ -856,12 +954,17 @@ final class MaasHesaplamaEngine
                     ];
                 }
                 if ($holidayOvertimeMode !== null) {
-                    if ($class['ht'] || $class['ubgt']) {
+                    if ($class['both'] || $class['ht']) {
                         $asim = self::holidayOtPoolMinutes($netDk, true);
                         $weeklyWorkPools[$weekKey]['fiili_dk'] += $asim;
                         $weeklyWorkPools[$weekKey]['tatil_dk'] += $netDk;
                         $weeklyWorkPools[$weekKey]['tatil_asim_dk'] += $asim;
-                    } else {
+                    } elseif ($class['ubgt'] && self::resolveUbgtGunKapsami($row) === 'TAM_GUN') {
+                        $asim = self::holidayOtPoolMinutes($netDk, true);
+                        $weeklyWorkPools[$weekKey]['fiili_dk'] += $asim;
+                        $weeklyWorkPools[$weekKey]['tatil_dk'] += $netDk;
+                        $weeklyWorkPools[$weekKey]['tatil_asim_dk'] += $asim;
+                    } elseif (!$class['ht'] && !$class['ubgt']) {
                         $weeklyWorkPools[$weekKey]['fiili_dk'] += $netDk;
                         $weeklyWorkPools[$weekKey]['normal_dk'] += $netDk;
                     }

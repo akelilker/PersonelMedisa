@@ -181,7 +181,7 @@ function holidayOverlapResult(
                 'tarih' => $gunTipi === 'Hafta_Tatili_Pazar' ? '2026-03-08' : '2026-03-03',
                 'gun_tipi' => $gunTipi,
                 'net_calisma_suresi_dakika' => $holidayMinutes,
-            ],
+            ] + ($gunTipi === 'UBGT_Resmi_Tatil' ? ['ubgt_gun_kapsami' => 'TAM_GUN'] : []),
         ], $extraPuantaj),
     ]));
 }
@@ -326,6 +326,7 @@ $frac = MaasHesaplamaEngine::calculate(engineInput('BRUT', '45000.00', [
         'tarih' => '2026-03-02',
         'gun_tipi' => 'UBGT_Resmi_Tatil',
         'net_calisma_suresi_dakika' => 450,
+        'ubgt_gun_kapsami' => 'TAM_GUN',
     ]],
 ]));
 assertKalemIntegrity($frac, 'fractional hours path');
@@ -334,6 +335,7 @@ engineAssert(count($ubgt) === 1, 'UBGT GUNLUK_ILAVE kalem');
 // gunluk = 45000/30 = 1500; carpan=1 → 1500.00
 engineAssert((string) $ubgt[0]['tutar'] === '1500.00', 'UBGT gunluk ilave tutar');
 engineAssert((string) $ubgt[0]['birim'] === 'GUN', 'UBGT birim GUN');
+engineAssert((string) ($ubgt[0]['payload_json']['ubgt_gun_kapsami'] ?? '') === 'TAM_GUN', 'UBGT TAM_GUN audit');
 
 // Haftalik FS + FM siniflandirmasi (sozlesme 5*8h=2400, yasal 2700)
 $weekDays = [];
@@ -600,7 +602,8 @@ engineAssert(
 );
 engineAssert(count(findKalemler($htUbgtSameDay, 'UBGT_ODEMESI')) === 0, 'HT+UBGT ayni gun UBGT premium yok');
 
-$halfDayPartial = MaasHesaplamaEngine::calculate(engineInput('BRUT', '45000.00', [
+$halfDayPolicy = MaasHesaplamaEngine::calculate(engineInput('BRUT', '45000.00', [
+    'mevzuat' => mevzuatFixture($yargitayMode),
     'puantajlar' => [[
         'muhur_satir_id' => 950,
         'tarih' => '2026-03-03',
@@ -611,9 +614,91 @@ $halfDayPartial = MaasHesaplamaEngine::calculate(engineInput('BRUT', '45000.00',
     ]],
 ]));
 engineAssert(
-    empty($halfDayPartial['ok'])
-        && (string) $halfDayPartial['error_code'] === MaasHesaplamaEngine::HALF_DAY_UBGT_PARTIAL_ERROR_CODE,
-    'yarim gun UBGT kismi calisma fail-closed'
+    empty($halfDayPolicy['ok'])
+        && (string) $halfDayPolicy['error_code'] === MaasHesaplamaEngine::HALF_DAY_UBGT_POLICY_ERROR_CODE
+        && (string) $halfDayPolicy['error_message'] === MaasHesaplamaEngine::HALF_DAY_UBGT_POLICY_ERROR_MESSAGE,
+    'yarim gun UBGT tum net sureler fail-closed'
+);
+
+foreach ([1, 225, 450, 600] as $halfNet) {
+    $halfMatrix = MaasHesaplamaEngine::calculate(engineInput('BRUT', '45000.00', [
+        'mevzuat' => mevzuatFixture($yargitayMode),
+        'puantajlar' => [[
+            'muhur_satir_id' => 951,
+            'tarih' => '2026-03-03',
+            'gun_tipi' => 'UBGT_Resmi_Tatil',
+            'net_calisma_suresi_dakika' => $halfNet,
+            'ubgt_gun_kapsami' => 'YARIM_GUN',
+            'yarim_gun_tatil_interval_dakika' => 240,
+        ]],
+    ]));
+    engineAssert(
+        empty($halfMatrix['ok'])
+            && (string) $halfMatrix['error_code'] === MaasHesaplamaEngine::HALF_DAY_UBGT_POLICY_ERROR_CODE,
+        'YARIM_GUN UBGT net ' . $halfNet . ' fail-closed'
+    );
+}
+
+foreach ([null, '', ' ', 'TAM', 'FULL_DAY'] as $idx => $badScope) {
+    $row = [
+        'muhur_satir_id' => 960 + $idx,
+        'tarih' => '2026-03-03',
+        'gun_tipi' => 'UBGT_Resmi_Tatil',
+        'net_calisma_suresi_dakika' => 1,
+    ];
+    if ($badScope !== null) {
+        $row['ubgt_gun_kapsami'] = $badScope;
+    }
+    $unknownScope = MaasHesaplamaEngine::calculate(engineInput('BRUT', '45000.00', [
+        'mevzuat' => mevzuatFixture($yargitayMode),
+        'puantajlar' => [$row],
+    ]));
+    engineAssert(
+        empty($unknownScope['ok'])
+            && (string) $unknownScope['error_code'] === MaasHesaplamaEngine::UBGT_DAY_SCOPE_ERROR_CODE
+            && (string) $unknownScope['error_message'] === MaasHesaplamaEngine::UBGT_DAY_SCOPE_ERROR_MESSAGE,
+        'UBGT bilinmeyen kapsam fail-closed case ' . var_export($badScope, true)
+    );
+}
+
+engineAssert(
+    MaasHesaplamaEngine::resolveUbgtGunKapsami(['ubgt_gun_kapsami' => 'tam_gun']) === 'TAM_GUN',
+    'resolveUbgtGunKapsami trim+upper TAM_GUN'
+);
+engineAssert(
+    MaasHesaplamaEngine::resolveUbgtGunKapsami(['tatil_gun_kapsami' => 'YARIM_GUN']) === 'YARIM_GUN',
+    'resolveUbgtGunKapsami tatil_gun_kapsami'
+);
+engineAssert(
+    MaasHesaplamaEngine::resolveUbgtGunKapsami(['tarih' => '2026-01-01', 'net_calisma_suresi_dakika' => 480]) === 'BILINMIYOR',
+    'resolveUbgtGunKapsami tarih/net inference yok'
+);
+
+$htUbgtMissingScope = MaasHesaplamaEngine::calculate(engineInput('BRUT', '45000.00', [
+    'mevzuat' => mevzuatFixture($yargitayMode),
+    'puantajlar' => [[
+        'muhur_satir_id' => 970,
+        'tarih' => '2026-03-08',
+        'gun_tipi' => 'Hafta_Tatili_Pazar',
+        'net_calisma_suresi_dakika' => 480,
+        'ht_ubgt_ayni_gun_mi' => true,
+    ]],
+]));
+engineAssert(!empty($htUbgtMissingScope['ok']), 'HT+UBGT kapsam yok HT esas hesaplanir');
+engineAssert(count(findKalemler($htUbgtMissingScope, 'HAFTA_TATILI_ODEMESI')) === 1, 'HT+UBGT tek HT odeme');
+engineAssert(count(findKalemler($htUbgtMissingScope, 'UBGT_ODEMESI')) === 0, 'HT+UBGT UBGT odeme yok');
+
+engineAssert(
+    MaasHesaplamaEngine::buildFmDegerlendirmeHavuzuDk([
+        ['gun_tipi' => 'UBGT_Resmi_Tatil', 'net_calisma_suresi_dakika' => 600],
+    ]) === 0,
+    'buildFmDegerlendirmeHavuzuDk UBGT kapsamsiz 0'
+);
+engineAssert(
+    MaasHesaplamaEngine::buildFmDegerlendirmeHavuzuDk([
+        ['gun_tipi' => 'UBGT_Resmi_Tatil', 'net_calisma_suresi_dakika' => 600, 'ubgt_gun_kapsami' => 'TAM_GUN'],
+    ]) === 150,
+    'buildFmDegerlendirmeHavuzuDk UBGT TAM_GUN 600 => 150'
 );
 
 engineAssert(
@@ -664,6 +749,7 @@ $netHoliday = MaasHesaplamaEngine::calculate(engineInput('NET', '30000.00', [
         'tarih' => '2026-03-02',
         'gun_tipi' => 'UBGT_Resmi_Tatil',
         'net_calisma_suresi_dakika' => 60,
+        'ubgt_gun_kapsami' => 'TAM_GUN',
     ]],
 ]));
 $netHolidayLine = findKalemler($netHoliday, 'UBGT_ODEMESI');
@@ -717,6 +803,7 @@ $ubgtSaat = MaasHesaplamaEngine::calculate(engineInput('BRUT', '45000.00', [
         'tarih' => '2026-03-02',
         'gun_tipi' => 'UBGT_Resmi_Tatil',
         'net_calisma_suresi_dakika' => 60,
+        'ubgt_gun_kapsami' => 'TAM_GUN',
     ]],
 ]));
 assertKalemIntegrity($ubgtSaat, 'UBGT SAAT_CARPAN path');

@@ -211,3 +211,25 @@ Bu form onaylanmadan ilgili şirket parametreleri production sistemine girilmeye
 **S88 (devam):** Canonical `resmi_tatil_takvimi` owner + migration 039 + puantaj/mühür projection. YARIM_GUN ödeme politikası kapalı kalır; tatil dönemi net dakika için güvenilir çoklu interval owner yoksa `TATIL_DONEMI_CALISMA_INTERVALI_EKSIK`. Production seed/policy write/merge/deploy bu fazda yok.
 
 **Production notu:** Bu kayıt yalnızca karar dokümantasyonudur; production policy yazımı yapılmamıştır.
+
+## S91-C2 karar kaydı (2026-07-23)
+
+**Onaylayan:** İlker (Medisa ürün kararı)
+
+**Kapsam:** `YARGITAY_7_5_SAAT_AYRIMI` onaylı modunun canonical bordro anlamı. Hukuk yorumu iddiası değildir; şirket ürün kararıdır.
+
+**FSC/FM değerlendirme havuzu:**
+`NORMAL_IS_GUNLERI_NET_DAKIKA + HT_450_DAKIKA_ASIMI + TAM_GUN_UBGT_450_DAKIKA_ASIMI`
+
+**HT/UBGT premium mahsup:**
+- İlk 450 dakika HT/UBGT ödeme kaleminde kalır.
+- 450 dakikayı aşan bölüm HT/UBGT ödeme kaleminden düşülür.
+- Aşan bölüm yalnız FSC/FM değerlendirme havuzuna girer.
+- Aynı dakika HT/UBGT ve FSC/FM kalemlerinde çift ücretlendirilmez.
+
+**Sözleşme haftalık süre:**
+- `raw = GUNLUK_CALISMA_SAATI × HAFTALIK_IS_GUNU_SAYISI`
+- `raw > 2700` → fail-closed (`CONTRACT_WEEKLY_MINUTES_EXCEEDS_LEGAL_LIMIT` / `SOZLESME_HAFTALIK_DAKIKA_YASAL_LIMIT_ASIMI`)
+- 2700 kabul; 2701+ reddedilir. Sessiz clamp / otomatik düzeltme / warning ile devam yoktur.
+
+**Engine version:** `S91C2_PAYROLL_ENGINE_V2` (contract version değişmedi).

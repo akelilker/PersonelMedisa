@@ -38,6 +38,14 @@ import {
   UBGT_DAY_SCOPE_ERROR_MESSAGE,
   YARGITAY_HOLIDAY_OVERTIME_MODE,
   YARGITAY_HOLIDAY_SPLIT_MINUTES,
+  PAYROLL_ENGINE_VERSION,
+  holidayPremiumSplitMinutes,
+  resolveContractWeeklyMinutes,
+  hesaplaEngineV2TatilPremiumTutari,
+  CONTRACT_WEEKLY_LIMIT_ERROR_CODE,
+  CONTRACT_WEEKLY_LIMIT_ERROR_MESSAGE,
+  CONTRACT_WEEKLY_LIMIT_BLOCKER_CODE,
+  CONTRACT_WEEKLY_LIMIT_REASON,
   resolveUbgtGunKapsami,
   ENGINE_V2_VARSAYILAN_HAFTALIK_POLITIKA,
   HAFTALIK_NORMAL_CALISMA_ESIK_DAKIKA,
@@ -3145,5 +3153,157 @@ describe("Faz B — devamsızlık matematiği ve parasal net kilidi", () => {
       1000 -
       parasalNetEtkidenDusulecekKesintiTutari(kesintiToplam, false);
     expect(netKesin).toBe(-700);
+  });
+});
+
+describe("S91-C2 HT/UBGT mahsup ve haftalık sözleşme guard", () => {
+  const ref = "2026-04-15";
+  const maas = 45000;
+  const yargitayPolitika = {
+    ...ENGINE_V2_VARSAYILAN_HAFTALIK_POLITIKA,
+    tatil_fsc_fm_cakisma_hesap_modu: YARGITAY_HOLIDAY_OVERTIME_MODE
+  };
+
+  it("engine version S91C2", () => {
+    expect(PAYROLL_ENGINE_VERSION).toBe("S91C2_PAYROLL_ENGINE_V2");
+  });
+
+  it.each([
+    [449, 449, 0],
+    [450, 450, 0],
+    [451, 450, 1],
+    [600, 450, 150]
+  ])("premium split %i → esas %i asim %i", (raw, esas, asim) => {
+    const split = holidayPremiumSplitMinutes(raw, true);
+    expect(split.premium_esas_dakika).toBe(esas);
+    expect(split.fsc_fm_havuz_asim_dakika).toBe(asim);
+    expect(split.mahsup_uygulandi_mi).toBe(true);
+  });
+
+  it("mahsup kapalıyken premium full net", () => {
+    const split = holidayPremiumSplitMinutes(600, false);
+    expect(split.premium_esas_dakika).toBe(600);
+    expect(split.fsc_fm_havuz_asim_dakika).toBe(0);
+    expect(split.mahsup_uygulandi_mi).toBe(false);
+  });
+
+  it.each(["GUNLUK_ILAVE", "SAAT_CARPAN", "GUNLUK_ILAVE_VE_SAAT_CARPAN"] as const)(
+    "%s 600dk premium tutarı 450dk ile eşit",
+    (mode) => {
+      const saatlik = 200;
+      const gunluk = 1500;
+      const capped = hesaplaEngineV2TatilPremiumTutari({
+        saatlik_ucret: saatlik,
+        gunluk_ucret: gunluk,
+        premium_esas_dakika: 450,
+        carpan: 1,
+        mode
+      });
+      const base = hesaplaEngineV2TatilPremiumTutari({
+        saatlik_ucret: saatlik,
+        gunluk_ucret: gunluk,
+        premium_esas_dakika: 450,
+        carpan: 1,
+        mode
+      });
+      const uncappedWould = hesaplaEngineV2TatilPremiumTutari({
+        saatlik_ucret: saatlik,
+        gunluk_ucret: gunluk,
+        premium_esas_dakika: 600,
+        carpan: 1,
+        mode
+      });
+      expect(capped.tutar).toBe(base.tutar);
+      if (mode !== "GUNLUK_ILAVE") {
+        expect(capped.tutar).toBeLessThan(uncappedWould.tutar);
+      }
+    }
+  );
+
+  it.each([
+    [2300, 2400, 0, 0],
+    [2500, 2400, 100, 0],
+    [2700, 2400, 300, 0],
+    [2800, 2400, 300, 100],
+    [2800, 2700, 0, 100]
+  ])(
+    "havuz %i sozlesme %i → FSC %i FM %i",
+    (havuz, sozlesme, fs, fm) => {
+      const politika = {
+        ...yargitayPolitika,
+        gunluk_calisma_saati: sozlesme === 2700 ? 9 : 8,
+        haftalik_is_gunu_sayisi: 5
+      };
+      const o = hesaplaHaftalikPuantajUcretOzeti(
+        [gunlukSatir(1, "2026-04-13", havuz)],
+        ref,
+        maas,
+        politika
+      );
+      expect(o.hesaplanabilir_mi).toBe(true);
+      expect(o.sozlesme_haftalik_dakika).toBe(sozlesme);
+      expect(o.fazla_surelerle_calisma_dakika).toBe(fs);
+      expect(o.fazla_calisma_dakika).toBe(fm);
+    }
+  );
+
+  it("aynı hafta HT 600 + TAM_GUN UBGT 600 → tatil havuz katkısı 300", () => {
+    const o = hesaplaHaftalikPuantajUcretOzeti(
+      [
+        gunlukSatir(1, "2026-04-13", 2400),
+        gunlukSatir(1, "2026-04-19", 600, "Hafta_Tatili_Pazar"),
+        {
+          ...gunlukSatir(1, "2026-04-14", 600, "UBGT_Resmi_Tatil"),
+          ubgt_gun_kapsami: "TAM_GUN"
+        }
+      ],
+      ref,
+      maas,
+      yargitayPolitika
+    );
+    expect(o.hesaplanabilir_mi).toBe(true);
+    expect(o.fazla_surelerle_calisma_dakika).toBe(300);
+    expect(o.fazla_calisma_dakika).toBe(0);
+    const ht = holidayPremiumSplitMinutes(600, true);
+    const ubgt = holidayPremiumSplitMinutes(600, true);
+    expect(ht.fsc_fm_havuz_asim_dakika + ubgt.fsc_fm_havuz_asim_dakika).toBe(300);
+    expect(ht.premium_esas_dakika).toBe(450);
+    expect(ubgt.premium_esas_dakika).toBe(450);
+  });
+
+  it("7.5x6 ve 9x5 = 2700 PASS", () => {
+    expect(resolveContractWeeklyMinutes(450, 6).ok).toBe(true);
+    expect(resolveContractWeeklyMinutes(450, 6).sozlesme_haftalik_dk).toBe(2700);
+    expect(resolveContractWeeklyMinutes(540, 5).ok).toBe(true);
+    expect(resolveContractWeeklyMinutes(540, 5).sozlesme_haftalik_dk).toBe(2700);
+  });
+
+  it("8x6=2880 ve 7.6x6=2736 fail-closed", () => {
+    const a = resolveContractWeeklyMinutes(480, 6);
+    expect(a.ok).toBe(false);
+    expect(a.error_code).toBe(CONTRACT_WEEKLY_LIMIT_ERROR_CODE);
+    expect(a.blocker_code).toBe(CONTRACT_WEEKLY_LIMIT_BLOCKER_CODE);
+    expect(a.reason).toBe(CONTRACT_WEEKLY_LIMIT_REASON);
+    expect(a.message).toBe(CONTRACT_WEEKLY_LIMIT_ERROR_MESSAGE);
+    const b = resolveContractWeeklyMinutes(Math.round(7.6 * 60), 6);
+    expect(b.ok).toBe(false);
+    expect(b.sozlesme_haftalik_dk).toBe(2736);
+  });
+
+  it("haftalık özet 8x6 politikada fail-closed", () => {
+    const o = hesaplaHaftalikPuantajUcretOzeti(
+      [gunlukSatir(1, "2026-04-13", 480)],
+      ref,
+      maas,
+      {
+        ...yargitayPolitika,
+        gunluk_calisma_saati: 8,
+        haftalik_is_gunu_sayisi: 6
+      }
+    );
+    expect(o.hesaplanabilir_mi).toBe(false);
+    expect(o.hata_kodu).toBe(CONTRACT_WEEKLY_LIMIT_ERROR_CODE);
+    expect(o.hata_mesaji).toBe(CONTRACT_WEEKLY_LIMIT_ERROR_MESSAGE);
+    expect(o.toplam_fazla_calisma_tutari).toBe(0);
   });
 });

@@ -1940,7 +1940,8 @@ const DEMO_USER_ROLES: readonly UserRole[] = [
   "GENEL_YONETICI",
   "BOLUM_YONETICISI",
   "MUHASEBE",
-  "BIRIM_AMIRI"
+  "BIRIM_AMIRI",
+  "PATRON"
 ];
 
 function isDemoUserRole(value: string): value is UserRole {
@@ -3709,8 +3710,11 @@ function resolveDemoRole(username: string) {
   if (normalized.includes("muhasebe")) {
     return "MUHASEBE";
   }
-  if (normalized.includes("bolum") || normalized.includes("bÃ¶lÃ¼m")) {
+  if (normalized.includes("bolum") || normalized.includes("bölüm")) {
     return "BOLUM_YONETICISI";
+  }
+  if (normalized.includes("patron")) {
+    return "PATRON";
   }
 
   return "GENEL_YONETICI";

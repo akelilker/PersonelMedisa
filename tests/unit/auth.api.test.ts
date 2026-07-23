@@ -135,4 +135,23 @@ describe("auth.api login", () => {
     expect(session.ui_profile).toBe("yonetim");
     expect(session.active_sube_id).toBeNull();
   });
+
+  it("maps demo username containing patron to PATRON role", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        createJsonResponse(
+          {
+            data: null,
+            errors: [{ code: "NOT_FOUND", message: "Endpoint bulunamadi." }]
+          },
+          404
+        )
+      )
+    );
+
+    const session = await login({ username: "patron", password: "demo123" });
+    expect(session.user.rol).toBe("PATRON");
+    expect(session.ui_profile).toBe("yonetim");
+  });
 });

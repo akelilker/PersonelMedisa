@@ -198,6 +198,9 @@ function resolveDemoRole(username: string): AuthSession["user"]["rol"] {
   if (normalized.includes("bolum") || normalized.includes("bölüm")) {
     return "BOLUM_YONETICISI";
   }
+  if (normalized.includes("patron")) {
+    return "PATRON";
+  }
 
   return "GENEL_YONETICI";
 }

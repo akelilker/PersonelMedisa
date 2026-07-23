@@ -108,13 +108,26 @@ test.describe("Rol bazli smoke", () => {
     await expect(page).toHaveURL("/");
 
     await expectMainMenuForRole(page, "BIRIM_AMIRI");
+    const kayitMenuHome = page.getByTestId("menu-kayit-surec");
+    await expect(kayitMenuHome).toHaveAttribute(
+      "title",
+      "Kayıt ve Süreç işlemleri için yetkiniz bulunmuyor."
+    );
+    await expect(kayitMenuHome).toHaveAttribute(
+      "aria-describedby",
+      "menu-kayit-surec-disabled-description"
+    );
+    await expect(page.locator("#menu-kayit-surec-disabled-description")).toHaveText(
+      "Kayıt ve Süreç işlemleri için yetkiniz bulunmuyor."
+    );
+    await expect(kayitMenuHome).not.toHaveAttribute("aria-label");
 
     await page.getByTestId("menu-personel-karti").click();
     await expect(page).toHaveURL(/\/personeller$/);
     await page.getByRole("link", { name: "Günlük Kayıt" }).click();
     await expect(page.locator(".modal-header h2").first()).toContainText("Günlük Kayıt Merkezi");
     await expect(
-      page.locator(".bildirimler-header-row").getByRole("button", { name: /Günlük Kayıt Gir|Yeni Günlük Kayıt/i })
+      page.locator(".bildirimler-header-row").getByRole("button", { name: /Bildirim Gir/i })
     ).toBeVisible();
 
     await page.goto("/raporlar");
@@ -124,6 +137,8 @@ test.describe("Rol bazli smoke", () => {
     await expect(page).toHaveURL(/\/yetkisiz$/);
 
     await page.goto("/haftalik-kapanis");
-    await expect(page).toHaveURL(/\/$/);
+    await expect(page).toHaveURL(/\/haftalik-kapanis$/);
+    await expect(page.locator(".modal-header h2").first()).toContainText("Haftalık Kapanış / Revizyon");
+    await expect(page.getByTestId("haftalik-kapanis-page")).toBeVisible();
   });
 });

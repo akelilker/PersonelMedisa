@@ -322,6 +322,7 @@ export function hesaplaHaftalikFazlaCalismaUcreti(
 // ---------------------------------------------------------------------------
 
 export const FAZLA_SURELERLE_CALISMA_UCRET_CARPANI = 1.25;
+export const PAYROLL_ENGINE_VERSION = "S91C2_PAYROLL_ENGINE_V2";
 export const YARGITAY_HOLIDAY_OVERTIME_MODE = "YARGITAY_7_5_SAAT_AYRIMI";
 export const YARGITAY_HOLIDAY_SPLIT_MINUTES = 450;
 export const HOLIDAY_OVERTIME_POLICY_REQUIRED = "HOLIDAY_OVERTIME_POLICY_REQUIRED";
@@ -337,6 +338,13 @@ export const HALF_DAY_UBGT_POLICY_ERROR_CODE = "HALF_DAY_UBGT_POLICY_REQUIRED";
 export const HALF_DAY_UBGT_POLICY_BLOCKER_CODE = "YARIM_GUN_UBGT_HESAP_POLITIKASI_EKSIK";
 export const HALF_DAY_UBGT_POLICY_ERROR_MESSAGE =
   "Yarım günlük resmî tatil çalışma hesabı için tatil dönemi net çalışma süresi ve yetkili hesap politikası eksik";
+export const CONTRACT_WEEKLY_LIMIT_ERROR_CODE =
+  "CONTRACT_WEEKLY_MINUTES_EXCEEDS_LEGAL_LIMIT";
+export const CONTRACT_WEEKLY_LIMIT_BLOCKER_CODE =
+  "SOZLESME_HAFTALIK_DAKIKA_YASAL_LIMIT_ASIMI";
+export const CONTRACT_WEEKLY_LIMIT_REASON = "CONTRACT_WEEKLY_LIMIT_EXCEEDED";
+export const CONTRACT_WEEKLY_LIMIT_ERROR_MESSAGE =
+  "Sözleşme haftalık çalışma süresi 2700 dakikalık üst sınırı aşıyor";
 
 export type EngineV2TatilHesapModu =
   | "GUNLUK_ILAVE"
@@ -371,6 +379,7 @@ export type HaftalikPuantajUcretOzeti = {
     | typeof HOLIDAY_OVERTIME_POLICY_REQUIRED
     | typeof UBGT_DAY_SCOPE_ERROR_CODE
     | typeof HALF_DAY_UBGT_POLICY_ERROR_CODE
+    | typeof CONTRACT_WEEKLY_LIMIT_ERROR_CODE
     | null;
   hata_mesaji: string | null;
   toplam_net_dakika: number;
@@ -398,9 +407,8 @@ function hesaplaEngineV2HaftalikBantlari(
   sozlesmeHaftalikDakika: number
 ): { fazla_surelerle_calisma_dakika: number; fazla_calisma_dakika: number } {
   const toplam = Math.floor(ucretIcinGuvenliNegatifOlmayanSayi(toplamDakika));
-  const sozlesme = Math.min(
-    Math.floor(ucretIcinGuvenliNegatifOlmayanSayi(sozlesmeHaftalikDakika)),
-    HAFTALIK_NORMAL_CALISMA_ESIK_DAKIKA
+  const sozlesme = Math.floor(
+    ucretIcinGuvenliNegatifOlmayanSayi(sozlesmeHaftalikDakika)
   );
   const fazla_surelerle_calisma_dakika = Math.min(
     Math.max(toplam - sozlesme, 0),
@@ -448,6 +456,95 @@ function holidayOtPoolMinutes(netDk: number, isHoliday: boolean): number {
   const net = Math.max(0, Math.floor(netDk));
   if (!isHoliday) return net;
   return Math.max(0, net - YARGITAY_HOLIDAY_SPLIT_MINUTES);
+}
+
+/** YARGITAY mahsup: premium en fazla 450 dk; aşım yalnız FSC/FM havuzuna. */
+export function holidayPremiumSplitMinutes(
+  netDk: number,
+  applyMahsup: boolean
+): {
+  premium_esas_dakika: number;
+  fsc_fm_havuz_asim_dakika: number;
+  mahsup_uygulandi_mi: boolean;
+} {
+  const net = Math.max(0, Math.floor(netDk));
+  if (!applyMahsup) {
+    return {
+      premium_esas_dakika: net,
+      fsc_fm_havuz_asim_dakika: 0,
+      mahsup_uygulandi_mi: false
+    };
+  }
+  return {
+    premium_esas_dakika: Math.min(net, YARGITAY_HOLIDAY_SPLIT_MINUTES),
+    fsc_fm_havuz_asim_dakika: Math.max(0, net - YARGITAY_HOLIDAY_SPLIT_MINUTES),
+    mahsup_uygulandi_mi: true
+  };
+}
+
+export function resolveContractWeeklyMinutes(
+  gunlukCalismaDakika: number,
+  haftalikIsGunu: number
+): {
+  ok: boolean;
+  sozlesme_haftalik_dk: number;
+  error_code: typeof CONTRACT_WEEKLY_LIMIT_ERROR_CODE | null;
+  blocker_code: typeof CONTRACT_WEEKLY_LIMIT_BLOCKER_CODE | null;
+  reason: typeof CONTRACT_WEEKLY_LIMIT_REASON | null;
+  message: string | null;
+} {
+  const gunluk = Math.max(0, Math.floor(gunlukCalismaDakika));
+  const isGunu = Math.max(0, Math.floor(haftalikIsGunu));
+  const raw = gunluk * isGunu;
+  if (raw > HAFTALIK_NORMAL_CALISMA_ESIK_DAKIKA) {
+    return {
+      ok: false,
+      sozlesme_haftalik_dk: raw,
+      error_code: CONTRACT_WEEKLY_LIMIT_ERROR_CODE,
+      blocker_code: CONTRACT_WEEKLY_LIMIT_BLOCKER_CODE,
+      reason: CONTRACT_WEEKLY_LIMIT_REASON,
+      message: CONTRACT_WEEKLY_LIMIT_ERROR_MESSAGE
+    };
+  }
+  return {
+    ok: true,
+    sozlesme_haftalik_dk: raw,
+    error_code: null,
+    blocker_code: null,
+    reason: null,
+    message: null
+  };
+}
+
+/**
+ * PHP `holidayPremium` mirror — YARGITAY mahsup aktifken `premiumEsasDk` zaten
+ * en fazla 450 olmalıdır.
+ */
+export function hesaplaEngineV2TatilPremiumTutari(input: {
+  saatlik_ucret: number;
+  gunluk_ucret: number;
+  premium_esas_dakika: number;
+  carpan: number;
+  mode: EngineV2TatilHesapModu;
+}): { tutar: number; miktar: number; birim: "GUN" | "DAKIKA"; matrah: number } {
+  const carpan = ucretIcinGuvenliNegatifOlmayanSayi(input.carpan);
+  const premiumDk = Math.max(0, Math.floor(input.premium_esas_dakika));
+  const saatlik = ucretIcinGuvenliNegatifOlmayanSayi(input.saatlik_ucret);
+  const gunluk = ucretIcinGuvenliNegatifOlmayanSayi(input.gunluk_ucret);
+  if (input.mode === "GUNLUK_ILAVE") {
+    const matrah = gunluk;
+    const tutar = yuvarlaParaIkiliOndalik(matrah * carpan);
+    return { tutar, miktar: 1, birim: "GUN", matrah };
+  }
+  if (input.mode === "GUNLUK_ILAVE_VE_SAAT_CARPAN") {
+    const ilave = yuvarlaParaIkiliOndalik(gunluk * carpan);
+    const saatUcret = yuvarlaParaIkiliOndalik((saatlik * premiumDk) / 60);
+    const tutar = yuvarlaParaIkiliOndalik(ilave + saatUcret);
+    return { tutar, miktar: premiumDk, birim: "DAKIKA", matrah: tutar };
+  }
+  const matrah = yuvarlaParaIkiliOndalik((saatlik * premiumDk) / 60);
+  const tutar = yuvarlaParaIkiliOndalik(matrah * carpan);
+  return { tutar, miktar: premiumDk, birim: "DAKIKA", matrah };
 }
 
 /** Canonical UBGT gün kapsamı. Tarih/net dakika/magic listeden tahmin yok. */
@@ -603,10 +700,33 @@ export function hesaplaHaftalikPuantajUcretOzeti(
   const haftalikIsGunu = Math.floor(
     ucretIcinGuvenliNegatifOlmayanSayi(politika.haftalik_is_gunu_sayisi)
   );
-  const sozlesme_haftalik_dakika = Math.min(
-    gunlukCalismaDakika * haftalikIsGunu,
-    HAFTALIK_NORMAL_CALISMA_ESIK_DAKIKA
-  );
+  const contractWeekly = resolveContractWeeklyMinutes(gunlukCalismaDakika, haftalikIsGunu);
+  if (!contractWeekly.ok) {
+    return {
+      hesaplanabilir_mi: false,
+      hata_kodu: CONTRACT_WEEKLY_LIMIT_ERROR_CODE,
+      hata_mesaji: CONTRACT_WEEKLY_LIMIT_ERROR_MESSAGE,
+      toplam_net_dakika: 0,
+      normal_calisma_dakika: 0,
+      haftalik_esik_dakika: HAFTALIK_NORMAL_CALISMA_ESIK_DAKIKA,
+      sozlesme_haftalik_dakika: contractWeekly.sozlesme_haftalik_dk,
+      normal_gun_calisma_dakika: 0,
+      tatil_calisma_dakika: 0,
+      fazla_surelerle_calisma_dakika: 0,
+      odeme_esas_fazla_surelerle_calisma_dakika: 0,
+      fazla_surelerle_calisma_saat: 0,
+      fazla_surelerle_calisma_tutari: 0,
+      fazla_calisma_dakika: 0,
+      odeme_esas_fazla_calisma_dakika: 0,
+      fazla_calisma_saat: 0,
+      fazla_calisma_tutari: 0,
+      toplam_fazla_calisma_tutari: 0,
+      saatlik_ucret: 0,
+      hafta_baslangic: aralik?.hafta_baslangic ?? null,
+      hafta_bitis: aralik?.hafta_bitis ?? null
+    };
+  }
+  const sozlesme_haftalik_dakika = contractWeekly.sozlesme_haftalik_dk;
   const normal_calisma_dakika = Math.min(toplam_net_dakika, sozlesme_haftalik_dakika);
   const approvedMode = resolveHolidayOvertimeMode(politika.tatil_fsc_fm_cakisma_hesap_modu);
   const evaluationPoolDk =

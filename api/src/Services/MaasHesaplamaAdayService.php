@@ -150,7 +150,11 @@ class MaasHesaplamaAdayService
                 );
                 if ($conflict['has_conflict']) {
                     $reason = (string) ($conflict['reason'] ?? '');
-                    if ($reason === 'UBGT_DAY_SCOPE' || $reason === 'HALF_DAY_UBGT_POLICY') {
+                    if (
+                        $reason === 'UBGT_DAY_SCOPE'
+                        || $reason === 'HALF_DAY_UBGT_POLICY'
+                        || $reason === MaasHesaplamaEngine::CONTRACT_WEEKLY_LIMIT_REASON
+                    ) {
                         $items[] = self::issue(
                             'BLOCKER',
                             (string) $conflict['blocker_code'],
@@ -161,6 +165,8 @@ class MaasHesaplamaAdayService
                             [
                                 'politika_kodu' => MaasHesaplamaEngine::HOLIDAY_OVERTIME_POLICY_CODE,
                                 'ubgt_kapsam_satirlari' => $conflict['scope_rows'] ?? [],
+                                'raw_sozlesme_haftalik_dk' => $conflict['raw_sozlesme_haftalik_dk'] ?? null,
+                                'yasal_haftalik_limit_dk' => $conflict['yasal_haftalik_limit_dk'] ?? null,
                             ],
                             $personel['ad_soyad'] ?? null
                         );

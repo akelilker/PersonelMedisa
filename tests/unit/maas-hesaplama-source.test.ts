@@ -89,15 +89,18 @@ describe("S77-C/S77-D maas hesaplama source contract", () => {
     );
     const aday = readFileSync(resolve(root, "api/src/Services/MaasHesaplamaAdayService.php"), "utf8");
 
-    expect(engine).toContain("S85B_PAYROLL_ENGINE_V2");
+    expect(engine).toContain("S91C2_PAYROLL_ENGINE_V2");
     expect(engine).toContain("S85B_PAYROLL_CANDIDATE_V1");
     expect(engine).toContain("paramHoursToMinutes");
     expect(engine).toContain("FAZLA_SURELERLE_CALISMA_ODEMESI");
     expect(engine).toContain("LEGAL_WEEKLY_LIMIT_MINUTES");
+    expect(engine).toContain("CONTRACT_WEEKLY_MINUTES_EXCEEDS_LEGAL_LIMIT");
+    expect(engine).toContain("holidayPremiumSplitMinutes");
     expect(catalog).toContain("FAZLA_SURELERLE_CALISMA_CARPANI");
     expect(catalog).toContain("HAFTA_TATILI_HESAP_MODU");
     expect(catalog).toContain("UBGT_HESAP_MODU");
     expect(aday).toContain("S85B_PAYROLL_CANDIDATE_V1");
+    expect(aday).toContain("CONTRACT_WEEKLY_LIMIT_REASON");
   });
 
   it("keeps holiday overtime overlap fail-closed across engine, readiness and frontend", () => {
@@ -128,10 +131,17 @@ describe("S77-C/S77-D maas hesaplama source contract", () => {
     expect(aday).toContain("HOLIDAY_OVERTIME_BLOCKER_CODE");
     expect(aday).toContain("UBGT_DAY_SCOPE");
     expect(aday).toContain("HALF_DAY_UBGT_POLICY");
+    expect(engine).toContain("CONTRACT_WEEKLY_MINUTES_EXCEEDS_LEGAL_LIMIT");
+    expect(engine).toContain("SOZLESME_HAFTALIK_DAKIKA_YASAL_LIMIT_ASIMI");
     expect(frontendEngine).toContain("HOLIDAY_OVERTIME_POLICY_REQUIRED");
     expect(frontendEngine).toContain("YARGITAY_HOLIDAY_OVERTIME_MODE");
     expect(frontendEngine).toContain("UBGT_DAY_SCOPE_ERROR_CODE");
     expect(frontendEngine).toContain("HALF_DAY_UBGT_POLICY_ERROR_CODE");
+    expect(frontendEngine).toContain("CONTRACT_WEEKLY_LIMIT_ERROR_CODE");
+    expect(frontendEngine).toContain("PAYROLL_ENGINE_VERSION");
+    expect(frontendEngine).toContain("S91C2_PAYROLL_ENGINE_V2");
+    expect(frontendEngine).toContain("holidayPremiumSplitMinutes");
+    expect(frontendEngine).toContain("resolveContractWeeklyMinutes");
     expect(frontendEngine).toContain("resolveUbgtGunKapsami");
     expect(frontendEngine).toContain(
       "Tatil çalışması ile fazla çalışma çakışma politikası yetkili onayı bekliyor"
@@ -141,6 +151,9 @@ describe("S77-C/S77-D maas hesaplama source contract", () => {
     );
     expect(frontendEngine).toContain(
       "Yarım günlük resmî tatil çalışma hesabı için tatil dönemi net çalışma süresi ve yetkili hesap politikası eksik"
+    );
+    expect(frontendEngine).toContain(
+      "Sözleşme haftalık çalışma süresi 2700 dakikalık üst sınırı aşıyor"
     );
     expect(frontendPage).toContain("tatil-fsc-fm-cakisma-politikasi-eksik");
     expect(frontendPage).toContain("ubgt-gun-kapsami-eksik");

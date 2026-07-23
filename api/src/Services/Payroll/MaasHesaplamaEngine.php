@@ -14,7 +14,7 @@ use Medisa\Api\Services\Money\RoundingPolicy;
  */
 final class MaasHesaplamaEngine
 {
-    public const ENGINE_VERSION = 'S85B_PAYROLL_ENGINE_V2';
+    public const ENGINE_VERSION = 'S91C2_PAYROLL_ENGINE_V2';
     public const CONTRACT_VERSION = 'S85B_PAYROLL_CANDIDATE_V1';
     public const SOLVER_MAX_ITERATIONS = 64;
     public const SOLVER_TOLERANCE_KURUS = 1;
@@ -32,6 +32,10 @@ final class MaasHesaplamaEngine
     public const HALF_DAY_UBGT_POLICY_ERROR_CODE = 'HALF_DAY_UBGT_POLICY_REQUIRED';
     public const HALF_DAY_UBGT_POLICY_BLOCKER_CODE = 'YARIM_GUN_UBGT_HESAP_POLITIKASI_EKSIK';
     public const HALF_DAY_UBGT_POLICY_ERROR_MESSAGE = 'Yarım günlük resmî tatil çalışma hesabı için tatil dönemi net çalışma süresi ve yetkili hesap politikası eksik';
+    public const CONTRACT_WEEKLY_LIMIT_ERROR_CODE = 'CONTRACT_WEEKLY_MINUTES_EXCEEDS_LEGAL_LIMIT';
+    public const CONTRACT_WEEKLY_LIMIT_BLOCKER_CODE = 'SOZLESME_HAFTALIK_DAKIKA_YASAL_LIMIT_ASIMI';
+    public const CONTRACT_WEEKLY_LIMIT_REASON = 'CONTRACT_WEEKLY_LIMIT_EXCEEDED';
+    public const CONTRACT_WEEKLY_LIMIT_ERROR_MESSAGE = 'Sözleşme haftalık çalışma süresi 2700 dakikalık üst sınırı aşıyor';
 
     /** @var array<int, string> */
     private static $holidayModes = ['GUNLUK_ILAVE', 'SAAT_CARPAN', 'GUNLUK_ILAVE_VE_SAAT_CARPAN'];
@@ -474,6 +478,56 @@ final class MaasHesaplamaEngine
     }
 
     /**
+     * YARGITAY mahsup aktifken HT/UBGT premium en fazla 450 dk üzerinden hesaplanır.
+     *
+     * @return array{premium_esas_dakika:int, fsc_fm_havuz_asim_dakika:int, mahsup_uygulandi_mi:bool}
+     */
+    public static function holidayPremiumSplitMinutes($netDk, $applyMahsup)
+    {
+        $netDk = max(0, (int) $netDk);
+        if (!$applyMahsup) {
+            return [
+                'premium_esas_dakika' => $netDk,
+                'fsc_fm_havuz_asim_dakika' => 0,
+                'mahsup_uygulandi_mi' => false,
+            ];
+        }
+
+        return [
+            'premium_esas_dakika' => min($netDk, self::YARGITAY_HOLIDAY_SPLIT_MINUTES),
+            'fsc_fm_havuz_asim_dakika' => max(0, $netDk - self::YARGITAY_HOLIDAY_SPLIT_MINUTES),
+            'mahsup_uygulandi_mi' => true,
+        ];
+    }
+
+    /**
+     * @return array{ok:bool, sozlesme_haftalik_dk:int, error?:array{code:string, message:string, reason:string, blocker_code:string}}
+     */
+    public static function resolveContractWeeklyMinutes($gunlukCalismaDakika, $haftalikIsGunu)
+    {
+        $gunlukCalismaDakika = max(0, (int) $gunlukCalismaDakika);
+        $haftalikIsGunu = max(0, (int) $haftalikIsGunu);
+        $raw = $gunlukCalismaDakika * $haftalikIsGunu;
+        if ($raw > self::LEGAL_WEEKLY_LIMIT_MINUTES) {
+            return [
+                'ok' => false,
+                'sozlesme_haftalik_dk' => $raw,
+                'error' => [
+                    'code' => self::CONTRACT_WEEKLY_LIMIT_ERROR_CODE,
+                    'message' => self::CONTRACT_WEEKLY_LIMIT_ERROR_MESSAGE,
+                    'reason' => self::CONTRACT_WEEKLY_LIMIT_REASON,
+                    'blocker_code' => self::CONTRACT_WEEKLY_LIMIT_BLOCKER_CODE,
+                ],
+            ];
+        }
+
+        return [
+            'ok' => true,
+            'sozlesme_haftalik_dk' => $raw,
+        ];
+    }
+
+    /**
      * FM/FSC degerlendirme havuzu: normal tam + (HT veya TAM_GUN UBGT) 450 asim.
      * HT+UBGT ayni gun tek asim; bilinmeyen/yarim gun UBGT hesap yoluna girmez.
      *
@@ -601,6 +655,26 @@ final class MaasHesaplamaEngine
             ];
         }
 
+        $gunlukCalismaDakika = max(0, (int) $gunlukCalismaDakika);
+        $haftalikIsGunu = max(0, (int) $haftalikIsGunu);
+        $contractWeekly = self::resolveContractWeeklyMinutes($gunlukCalismaDakika, $haftalikIsGunu);
+        if (!$contractWeekly['ok']) {
+            $err = $contractWeekly['error'];
+
+            return [
+                'has_conflict' => true,
+                'reason' => $err['reason'],
+                'error_code' => $err['code'],
+                'blocker_code' => $err['blocker_code'],
+                'message' => $err['message'],
+                'scope_rows' => [],
+                'half_day_rows' => [],
+                'weeks' => [],
+                'raw_sozlesme_haftalik_dk' => $contractWeekly['sozlesme_haftalik_dk'],
+                'yasal_haftalik_limit_dk' => self::LEGAL_WEEKLY_LIMIT_MINUTES,
+            ];
+        }
+
         $approvedMode = self::resolveHolidayOvertimeMode([
             self::HOLIDAY_OVERTIME_POLICY_CODE => (string) $holidayOvertimeMode,
         ]);
@@ -617,12 +691,7 @@ final class MaasHesaplamaEngine
             ];
         }
 
-        $gunlukCalismaDakika = max(0, (int) $gunlukCalismaDakika);
-        $haftalikIsGunu = max(0, (int) $haftalikIsGunu);
-        $contractualWeeklyDk = min(
-            $gunlukCalismaDakika * $haftalikIsGunu,
-            self::LEGAL_WEEKLY_LIMIT_MINUTES
-        );
+        $contractualWeeklyDk = (int) $contractWeekly['sozlesme_haftalik_dk'];
         if ($contractualWeeklyDk < 1) {
             return [
                 'has_conflict' => false,
@@ -732,10 +801,16 @@ final class MaasHesaplamaEngine
         $ubgtMode = strtoupper((string) $params['UBGT_HESAP_MODU']);
         $gunlukDk = self::paramHoursToMinutes($params, 'GUNLUK_CALISMA_SAATI');
         $haftalikIsGunu = self::paramInt($params, 'HAFTALIK_IS_GUNU_SAYISI');
-        $contractualWeeklyDk = $gunlukDk * $haftalikIsGunu;
-        if ($contractualWeeklyDk > self::LEGAL_WEEKLY_LIMIT_MINUTES) {
-            $contractualWeeklyDk = self::LEGAL_WEEKLY_LIMIT_MINUTES;
+        $contractWeekly = self::resolveContractWeeklyMinutes($gunlukDk, $haftalikIsGunu);
+        if (!$contractWeekly['ok']) {
+            return [
+                'error' => [
+                    'code' => $contractWeekly['error']['code'],
+                    'message' => $contractWeekly['error']['message'],
+                ],
+            ];
         }
+        $contractualWeeklyDk = (int) $contractWeekly['sozlesme_haftalik_dk'];
         $holidayOvertimeMode = self::resolveHolidayOvertimeMode($params);
         $holidayOvertimeConflict = self::detectHolidayOvertimePolicyConflict(
             $input['puantajlar'],
@@ -745,7 +820,11 @@ final class MaasHesaplamaEngine
         );
         if ($holidayOvertimeConflict['has_conflict']) {
             $reason = (string) ($holidayOvertimeConflict['reason'] ?? '');
-            if ($reason === 'UBGT_DAY_SCOPE' || $reason === 'HALF_DAY_UBGT_POLICY') {
+            if (
+                $reason === 'UBGT_DAY_SCOPE'
+                || $reason === 'HALF_DAY_UBGT_POLICY'
+                || $reason === self::CONTRACT_WEEKLY_LIMIT_REASON
+            ) {
                 return [
                     'error' => [
                         'code' => (string) $holidayOvertimeConflict['error_code'],
@@ -761,6 +840,7 @@ final class MaasHesaplamaEngine
                 ],
             ];
         }
+        $applyHolidayMahsup = $holidayOvertimeMode !== null;
         $hasOt = false;
         $absenceDates = [];
 
@@ -858,7 +938,8 @@ final class MaasHesaplamaEngine
 
             if ($netDk > 0 && ($class['ht'] || $class['ubgt'])) {
                 if ($class['both']) {
-                    $premium = self::holidayPremium($hourly, $daily, $netDk, $htCarpan, $htMode);
+                    $split = self::holidayPremiumSplitMinutes($netDk, $applyHolidayMahsup);
+                    $premium = self::holidayPremium($hourly, $daily, $split['premium_esas_dakika'], $htCarpan, $htMode);
                     $grossAdd = $grossAdd->add($premium['tutar']);
                     $hasOt = true;
                     $sira++;
@@ -878,12 +959,17 @@ final class MaasHesaplamaEngine
                         [
                             'hesap_modu' => $htMode,
                             'net_dakika' => $netDk,
+                            'premium_esas_dakika' => $split['premium_esas_dakika'],
+                            'fsc_fm_havuz_asim_dakika' => $split['fsc_fm_havuz_asim_dakika'],
+                            'tatil_fsc_fm_cakisma_hesap_modu' => $holidayOvertimeMode,
+                            'mahsup_uygulandi_mi' => $split['mahsup_uygulandi_mi'],
                             'ht_ubgt_cakisma_hesap_modu' => 'HAFTA_TATILI_ESAS',
                             'ham_gun_siniflari' => ['Hafta_Tatili_Pazar', 'UBGT_Resmi_Tatil'],
                         ]
                     );
                 } elseif ($class['ht']) {
-                    $premium = self::holidayPremium($hourly, $daily, $netDk, $htCarpan, $htMode);
+                    $split = self::holidayPremiumSplitMinutes($netDk, $applyHolidayMahsup);
+                    $premium = self::holidayPremium($hourly, $daily, $split['premium_esas_dakika'], $htCarpan, $htMode);
                     $grossAdd = $grossAdd->add($premium['tutar']);
                     $hasOt = true;
                     $sira++;
@@ -900,7 +986,14 @@ final class MaasHesaplamaEngine
                         'PUANTAJ',
                         isset($row['muhur_satir_id']) ? (int) $row['muhur_satir_id'] : null,
                         'Hafta tatili calismasi',
-                        ['hesap_modu' => $htMode, 'net_dakika' => $netDk]
+                        [
+                            'hesap_modu' => $htMode,
+                            'net_dakika' => $netDk,
+                            'premium_esas_dakika' => $split['premium_esas_dakika'],
+                            'fsc_fm_havuz_asim_dakika' => $split['fsc_fm_havuz_asim_dakika'],
+                            'tatil_fsc_fm_cakisma_hesap_modu' => $holidayOvertimeMode,
+                            'mahsup_uygulandi_mi' => $split['mahsup_uygulandi_mi'],
+                        ]
                     );
                 } elseif ($class['ubgt']) {
                     // Yalnız açıkça TAM_GUN işaretli UBGT tam gün algoritmasına girer.
@@ -920,7 +1013,8 @@ final class MaasHesaplamaEngine
                             ],
                         ];
                     }
-                    $premium = self::holidayPremium($hourly, $daily, $netDk, $ubgtCarpan, $ubgtMode);
+                    $split = self::holidayPremiumSplitMinutes($netDk, $applyHolidayMahsup);
+                    $premium = self::holidayPremium($hourly, $daily, $split['premium_esas_dakika'], $ubgtCarpan, $ubgtMode);
                     $grossAdd = $grossAdd->add($premium['tutar']);
                     $hasOt = true;
                     $sira++;
@@ -940,6 +1034,10 @@ final class MaasHesaplamaEngine
                         [
                             'hesap_modu' => $ubgtMode,
                             'net_dakika' => $netDk,
+                            'premium_esas_dakika' => $split['premium_esas_dakika'],
+                            'fsc_fm_havuz_asim_dakika' => $split['fsc_fm_havuz_asim_dakika'],
+                            'tatil_fsc_fm_cakisma_hesap_modu' => $holidayOvertimeMode,
+                            'mahsup_uygulandi_mi' => $split['mahsup_uygulandi_mi'],
                             'ubgt_gun_kapsami' => 'TAM_GUN',
                         ]
                     );
@@ -1102,13 +1200,13 @@ final class MaasHesaplamaEngine
     private static function hesaplaHaftalikCalismaBantlari($totalDk, $contractualWeeklyDk)
     {
         $totalDk = max(0, (int) $totalDk);
-        $contractualWeeklyDk = max(0, min((int) $contractualWeeklyDk, self::LEGAL_WEEKLY_LIMIT_MINUTES));
+        $contractualWeeklyDk = max(0, (int) $contractualWeeklyDk);
         if ($totalDk <= $contractualWeeklyDk) {
             return ['fs_dk' => 0, 'fm_dk' => 0];
         }
 
         $overContract = $totalDk - $contractualWeeklyDk;
-        $fsCap = self::LEGAL_WEEKLY_LIMIT_MINUTES - $contractualWeeklyDk;
+        $fsCap = max(0, self::LEGAL_WEEKLY_LIMIT_MINUTES - $contractualWeeklyDk);
 
         return [
             'fs_dk' => min($overContract, $fsCap),

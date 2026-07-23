@@ -112,14 +112,15 @@ final class SgkKaynakManifestReader
             ? (string) $rawCode
             : (is_numeric($rawCode) ? (string) (int) $rawCode : '0');
 
-        $ownerShort = str_contains($ownerClass, '\\')
-            ? substr($ownerClass, strrpos($ownerClass, '\\') + 1)
-            : $ownerClass;
+        $nsPos = strrpos($ownerClass, '\\');
+        $ownerShort = $nsPos === false
+            ? $ownerClass
+            : substr($ownerClass, $nsPos + 1);
 
         return sprintf(
             'SGK_KATALOG_RUNTIME_EXCEPTION action=%s exception_class=%s exception_code=%s sqlstate=%s driver_code=%s owner_class=%s file=%s line=%d',
             self::sanitizeLogToken($action),
-            self::sanitizeLogToken($target::class),
+            self::sanitizeLogToken(get_class($target)),
             self::sanitizeLogToken($exceptionCode),
             self::sanitizeLogToken($sqlstate),
             self::sanitizeLogToken($driverCode),

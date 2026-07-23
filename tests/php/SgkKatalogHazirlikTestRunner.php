@@ -516,6 +516,13 @@ assertTrue(strpos($controllerSrc, 'SgkKaynakManifestReader::fetchAll') !== false
 assertTrue(strpos($controllerSrc, 'SgkKaynakManifestReader::STORAGE_ERROR_CODE') !== false, 'controller 503 storage kodu');
 assertTrue(strpos($controllerSrc, 'SgkKaynakManifestReader::formatSanitizedRuntimeLog') !== false, 'controller sanitized log');
 assertTrue(strpos($controllerSrc, 'error_log(') !== false, 'controller error_log cagirir');
+
+$readerSrc = file_get_contents(__DIR__ . '/../../api/src/Services/Payroll/SgkKaynakManifestReader.php');
+assertTrue(strpos($readerSrc, 'str_contains(') === false, 'reader str_contains kullanmaz');
+assertTrue(strpos($readerSrc, 'str_starts_with(') === false, 'reader str_starts_with kullanmaz');
+assertTrue(strpos($readerSrc, 'str_ends_with(') === false, 'reader str_ends_with kullanmaz');
+assertTrue(strpos($readerSrc, '$target::class') === false, 'reader target::class kullanmaz');
+assertTrue(strpos($readerSrc, 'get_class($target)') !== false, 'reader get_class kullanir');
 assertTrue(strpos($controllerSrc, "'manifests' => self::loadManifests(\$pdo, 'onay_validate')") !== false, 'onayValidate DB manifest okur');
 assertTrue(!preg_match('/error_log\([^;]*getMessage|error_log\([^;]*getTraceAsString|error_log\(\s*\$e\b/', $controllerSrc), 'controller raw exception loglamaz');
 

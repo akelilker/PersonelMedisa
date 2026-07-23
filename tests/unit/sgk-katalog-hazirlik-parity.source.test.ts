@@ -50,6 +50,11 @@ describe("S85-C1 SGK katalog hazirlik parity", () => {
     expect(reader).toContain("SGK_KAYNAK_MANIFEST_STORAGE_HATASI");
     expect(reader).toContain("formatSanitizedRuntimeLog");
     expect(reader).toContain("SGK_KATALOG_RUNTIME_EXCEPTION");
+    expect(reader).not.toContain("str_contains(");
+    expect(reader).not.toContain("str_starts_with(");
+    expect(reader).not.toContain("str_ends_with(");
+    expect(reader).not.toContain("$target::class");
+    expect(reader).toContain("get_class($target)");
     expect(controller).toContain("SgkKaynakManifestReader::fetchAll");
     expect(controller).toContain("SgkKaynakManifestReader::STORAGE_ERROR_CODE");
     expect(controller).toContain("SgkKaynakManifestReader::formatSanitizedRuntimeLog");

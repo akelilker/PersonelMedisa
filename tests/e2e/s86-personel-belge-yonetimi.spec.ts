@@ -80,9 +80,13 @@ test.describe("S86 personel belge yönetimi", () => {
     await login(page, users.genelYonetici);
     await page.goto("/personeller/belge-takip");
 
+    await expect(page.locator(".modal-header h2").first()).toHaveText("Belge Takip");
     await expect(page.getByTestId("belge-takip-page")).toBeVisible();
     await expect(page.getByTestId("belge-takip-table")).toContainText("Süresi yaklaşıyor");
     await expect(page.getByTestId("belge-takip-table")).toContainText("Süresi doldu");
+
+    await page.locator(".modal-close-btn").first().click();
+    await expect(page).toHaveURL(/\/personeller$/);
   });
 
   test("geçersiz dosya tipi mesajı gösterilir", async ({ page }) => {

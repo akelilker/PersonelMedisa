@@ -114,6 +114,7 @@ test.describe("S77-B personel ücret geçmişi", () => {
   test("GENEL_YONETICI mevzuat paneline erişir ve çakışmayı engeller", async ({ page }) => {
     await loginAsMockRole(page, "GENEL_YONETICI");
     await page.goto("/yonetim-paneli?tab=mevzuat");
+    await expect(page.locator(".modal-header h2").first()).toContainText("MEVZUAT PARAMETRELERİ");
     await expect(page.getByTestId("yonetim-section-mevzuat")).toBeVisible();
 
     await page.getByTestId("yonetim-mevzuat-yeni").click();

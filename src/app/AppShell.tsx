@@ -45,6 +45,9 @@ function resolveYonetimModalTitle(tabParam: string | null): string {
   if (normalized === "subeler" || normalized === "sube") {
     return "ŞUBE YÖNETİMİ";
   }
+  if (normalized === "mevzuat") {
+    return "MEVZUAT PARAMETRELERİ";
+  }
   return "KULLANICI YÖNETİMİ";
 }
 
@@ -53,6 +56,9 @@ function resolveModuleModal(pathname: string, tabParam: string | null): ModuleMo
     return null;
   }
 
+  if (pathname === "/personeller/belge-takip") {
+    return { title: "Belge Takip", closeTo: "/personeller", titleVariant: "premium" };
+  }
   if (/^\/personeller\/\d+$/.test(pathname)) {
     return { title: "Personel Kartı", closeTo: "/personeller", titleVariant: "premium" };
   }

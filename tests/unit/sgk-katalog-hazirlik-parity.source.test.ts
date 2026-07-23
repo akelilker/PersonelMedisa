@@ -55,6 +55,22 @@ describe("S85-C1 SGK katalog hazirlik parity", () => {
     expect(reader).not.toContain("str_ends_with(");
     expect(reader).not.toContain("$target::class");
     expect(reader).toContain("get_class($target)");
+    expect(reader).not.toContain("hydrate(mixed $stmt)");
+    expect(reader).toContain("function hydrate($stmt): array");
+    expect(reader).toContain("@param mixed $stmt");
+
+    for (const ownerPath of [
+      "api/src/Services/Payroll/SgkKaynakManifestReader.php",
+      "api/src/Controllers/SgkKatalogHazirlikController.php",
+      "api/src/Database/Connection.php",
+      "api/src/Router.php"
+    ]) {
+      const ownerSrc = readFileSync(resolve(ownerPath), "utf8");
+      expect(ownerSrc, ownerPath).not.toContain("str_contains(");
+      expect(ownerSrc, ownerPath).not.toContain("str_starts_with(");
+      expect(ownerSrc, ownerPath).not.toContain("str_ends_with(");
+      expect(ownerSrc, ownerPath).not.toMatch(/function\s+\w+\s*\([^)]*\bmixed\s+\$/);
+    }
     expect(controller).toContain("SgkKaynakManifestReader::fetchAll");
     expect(controller).toContain("SgkKaynakManifestReader::STORAGE_ERROR_CODE");
     expect(controller).toContain("SgkKaynakManifestReader::formatSanitizedRuntimeLog");

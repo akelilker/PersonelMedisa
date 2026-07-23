@@ -523,6 +523,24 @@ assertTrue(strpos($readerSrc, 'str_starts_with(') === false, 'reader str_starts_
 assertTrue(strpos($readerSrc, 'str_ends_with(') === false, 'reader str_ends_with kullanmaz');
 assertTrue(strpos($readerSrc, '$target::class') === false, 'reader target::class kullanmaz');
 assertTrue(strpos($readerSrc, 'get_class($target)') !== false, 'reader get_class kullanir');
+assertTrue(strpos($readerSrc, 'hydrate(mixed $stmt)') === false, 'reader hydrate mixed type yok');
+assertTrue(strpos($readerSrc, 'function hydrate($stmt): array') !== false, 'reader hydrate PHP7 imza');
+assertTrue(strpos($readerSrc, '@param mixed $stmt') !== false, 'reader hydrate mixed PHPDoc');
+
+$ownerFiles = [
+    __DIR__ . '/../../api/src/Services/Payroll/SgkKaynakManifestReader.php',
+    __DIR__ . '/../../api/src/Controllers/SgkKatalogHazirlikController.php',
+    __DIR__ . '/../../api/src/Database/Connection.php',
+    __DIR__ . '/../../api/src/Router.php',
+];
+foreach ($ownerFiles as $ownerPath) {
+    $ownerSrc = file_get_contents($ownerPath);
+    $base = basename($ownerPath);
+    assertTrue(strpos($ownerSrc, 'str_contains(') === false, $base . ' str_contains yok');
+    assertTrue(strpos($ownerSrc, 'str_starts_with(') === false, $base . ' str_starts_with yok');
+    assertTrue(strpos($ownerSrc, 'str_ends_with(') === false, $base . ' str_ends_with yok');
+    assertTrue(!preg_match('/function\s+\w+\s*\([^)]*\bmixed\s+\$/', $ownerSrc), $base . ' mixed param type yok');
+}
 assertTrue(strpos($controllerSrc, "'manifests' => self::loadManifests(\$pdo, 'onay_validate')") !== false, 'onayValidate DB manifest okur');
 assertTrue(!preg_match('/error_log\([^;]*getMessage|error_log\([^;]*getTraceAsString|error_log\(\s*\$e\b/', $controllerSrc), 'controller raw exception loglamaz');
 

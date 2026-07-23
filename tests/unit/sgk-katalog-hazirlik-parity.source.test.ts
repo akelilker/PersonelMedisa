@@ -48,11 +48,29 @@ describe("S85-C1 SGK katalog hazirlik parity", () => {
     expect(migrationNames.at(-1)).toBe("039_ubgt_gun_kapsami_tatil_takvimi.sql");
 
     expect(reader).toContain("SGK_KAYNAK_MANIFEST_STORAGE_HATASI");
+    expect(reader).toContain("formatSanitizedRuntimeLog");
+    expect(reader).toContain("SGK_KATALOG_RUNTIME_EXCEPTION");
+    expect(reader).not.toContain("str_contains(");
+    expect(reader).not.toContain("str_starts_with(");
+    expect(reader).not.toContain("str_ends_with(");
+    expect(reader).not.toContain("$target::class");
+    expect(reader).toContain("get_class($target)");
     expect(controller).toContain("SgkKaynakManifestReader::fetchAll");
     expect(controller).toContain("SgkKaynakManifestReader::STORAGE_ERROR_CODE");
+    expect(controller).toContain("SgkKaynakManifestReader::formatSanitizedRuntimeLog");
+    expect(controller).toContain("error_log(");
     expect(controller).not.toMatch(/catch\s*\([^)]*\)\s*\{\s*return\s*\[\];/);
-    expect(controller).toContain("'manifests' => self::loadManifests($pdo)");
+    expect(controller).toContain("'manifests' => self::loadManifests($pdo, 'onay_validate')");
+    expect(controller).toContain("self::loadManifests($pdo, 'kaynaklar')");
+    expect(controller).toContain("self::loadManifests($pdo, 'blocker_raporu')");
+    expect(controller).not.toMatch(/error_log\(\s*\$e->getMessage/);
+    expect(controller).not.toMatch(/error_log\(\s*\$e->getTrace/);
     expect(controller).toContain("SgkOperasyonelKanitBase64Guard::resolve");
+
+    const surumMatch = controller.match(/function surumler\(Request \$request\)\s*\{[\s\S]*?\n    \}/);
+    expect(surumMatch?.[0]).toBeTruthy();
+    expect(surumMatch?.[0]).toContain("self::context(");
+    expect(surumMatch?.[0]).not.toContain("loadManifests");
     expect(controller).toContain("operasyonel_kanit_max_decoded_bytes");
     expect(controller).not.toMatch(/base64_decode\(\$body/);
 

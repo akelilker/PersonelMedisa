@@ -72,4 +72,67 @@ final class SgkKaynakManifestReader
     {
         return new RuntimeException(self::STORAGE_ERROR_CODE, 0, $previous);
     }
+
+    /**
+     * Single-line sanitized server log for SGK catalog runtime failures.
+     * Never includes message, SQL, DSN, credentials, headers, body, or stack trace.
+     */
+    public static function formatSanitizedRuntimeLog(
+        string $action,
+        \Throwable $e,
+        string $ownerClass = self::class
+    ): string {
+        $target = $e;
+        if ($e->getPrevious() instanceof \Throwable) {
+            $target = $e->getPrevious();
+        }
+
+        $sqlstate = '';
+        $driverCode = '';
+        if ($target instanceof PDOException) {
+            $info = $target->errorInfo;
+            if (is_array($info)) {
+                if (isset($info[0]) && is_scalar($info[0])) {
+                    $sqlstate = (string) $info[0];
+                }
+                if (isset($info[1]) && is_scalar($info[1])) {
+                    $driverCode = (string) $info[1];
+                }
+            }
+            if ($sqlstate === '') {
+                $pdoCode = $target->getCode();
+                if (is_string($pdoCode) && preg_match('/^[0-9A-Z]{5}$/', $pdoCode) === 1) {
+                    $sqlstate = $pdoCode;
+                }
+            }
+        }
+
+        $rawCode = $target->getCode();
+        $exceptionCode = is_int($rawCode)
+            ? (string) $rawCode
+            : (is_numeric($rawCode) ? (string) (int) $rawCode : '0');
+
+        $nsPos = strrpos($ownerClass, '\\');
+        $ownerShort = $nsPos === false
+            ? $ownerClass
+            : substr($ownerClass, $nsPos + 1);
+
+        return sprintf(
+            'SGK_KATALOG_RUNTIME_EXCEPTION action=%s exception_class=%s exception_code=%s sqlstate=%s driver_code=%s owner_class=%s file=%s line=%d',
+            self::sanitizeLogToken($action),
+            self::sanitizeLogToken(get_class($target)),
+            self::sanitizeLogToken($exceptionCode),
+            self::sanitizeLogToken($sqlstate),
+            self::sanitizeLogToken($driverCode),
+            self::sanitizeLogToken($ownerShort),
+            self::sanitizeLogToken(basename($target->getFile())),
+            (int) $target->getLine()
+        );
+    }
+
+    private static function sanitizeLogToken(string $value): string
+    {
+        $clean = preg_replace('/[^A-Za-z0-9_\\\\.{}\/-]+/', '_', $value);
+        return $clean === null || $clean === '' ? '-' : $clean;
+    }
 }

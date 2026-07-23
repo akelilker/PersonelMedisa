@@ -32,7 +32,7 @@ class SgkKatalogHazirlikController
         [$pdo] = self::context($request, 'bordro_on_izleme.view');
         $body = self::jsonBody($request);
         if (empty($body['manifests'])) {
-            $body['manifests'] = self::loadManifests($pdo);
+            $body['manifests'] = self::loadManifests($pdo, 'tamlik');
         }
         $body['katalog_surumu'] = $body['katalog_surumu'] ?? '';
         $body['kod_satirlari'] = $body['kod_satirlari'] ?? [];
@@ -42,7 +42,7 @@ class SgkKatalogHazirlikController
     public static function manifests(Request $request)
     {
         [$pdo] = self::context($request, 'bordro_on_izleme.view');
-        $items = self::loadManifests($pdo);
+        $items = self::loadManifests($pdo, 'kaynaklar');
         $page = max(1, (int) $request->getQuery('page', 1));
         $limit = min(100, max(1, (int) $request->getQuery('limit', 50)));
         $offset = ($page - 1) * $limit;
@@ -60,7 +60,7 @@ class SgkKatalogHazirlikController
     public static function manifestDetail(Request $request, $kaynakId)
     {
         [$pdo] = self::context($request, 'bordro_on_izleme.view');
-        foreach (self::loadManifests($pdo) as $item) {
+        foreach (self::loadManifests($pdo, 'kaynaklar_detail') as $item) {
             if ((string) $item['kaynak_id'] === (string) $kaynakId) {
                 JsonResponse::success($item);
                 return;
@@ -85,7 +85,7 @@ class SgkKatalogHazirlikController
         [$pdo] = self::context($request, 'mevzuat_parametreleri.view');
         $body = self::jsonBody($request);
         if (empty($body['manifests'])) {
-            $body['manifests'] = self::loadManifests($pdo);
+            $body['manifests'] = self::loadManifests($pdo, 'import_dry_run');
         }
         JsonResponse::success(SgkKatalogImportValidator::dryRun($body));
     }
@@ -106,7 +106,7 @@ class SgkKatalogHazirlikController
     {
         [$pdo] = self::context($request, 'bordro_on_izleme.view');
         $tamlik = SgkKatalogTamlikService::evaluate([
-            'manifests' => self::loadManifests($pdo),
+            'manifests' => self::loadManifests($pdo, 'blocker_raporu'),
             'kod_satirlari' => [],
             'ebildirge_guncel_gorunum_dogrulandi_mi' => false,
         ]);
@@ -192,7 +192,7 @@ class SgkKatalogHazirlikController
         if (empty($body['tamlik'])) {
             // P1: never evaluate approval readiness against a silent empty catalog.
             $body['tamlik'] = SgkKatalogTamlikService::evaluate([
-                'manifests' => self::loadManifests($pdo),
+                'manifests' => self::loadManifests($pdo, 'onay_validate'),
                 'kod_satirlari' => [],
             ]);
         }
@@ -204,19 +204,20 @@ class SgkKatalogHazirlikController
      *
      * @return list<array<string,mixed>>
      */
-    private static function loadManifests(PDO $pdo): array
+    private static function loadManifests(PDO $pdo, string $action): array
     {
         try {
             return SgkKaynakManifestReader::fetchAll($pdo);
         } catch (RuntimeException $e) {
-            if ($e->getMessage() === SgkKaynakManifestReader::STORAGE_ERROR_CODE) {
-                // Do not leak PDO/SQL/internal exception details to clients.
-                JsonResponse::error(
-                    503,
-                    SgkKaynakManifestReader::STORAGE_ERROR_CODE,
-                    'SGK kaynak manifesti okunamadi. Sema veya baglanti durumunu kontrol edin.'
-                );
-            }
+            // Server-only sanitized observability; client contract stays opaque 503.
+            error_log(
+                SgkKaynakManifestReader::formatSanitizedRuntimeLog(
+                    $action,
+                    $e,
+                    self::class
+                )
+            );
+            // Do not leak PDO/SQL/internal exception details to clients.
             JsonResponse::error(
                 503,
                 SgkKaynakManifestReader::STORAGE_ERROR_CODE,

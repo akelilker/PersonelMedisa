@@ -48,7 +48,7 @@ final class SgkKaynakManifestReader
      * @param mixed $stmt PDOStatement|false|object with fetchAll()
      * @return list<array<string,mixed>>
      */
-    public static function hydrate(mixed $stmt): array
+    public static function hydrate($stmt): array
     {
         if ($stmt === false || $stmt === null) {
             throw new RuntimeException(self::STORAGE_ERROR_CODE);

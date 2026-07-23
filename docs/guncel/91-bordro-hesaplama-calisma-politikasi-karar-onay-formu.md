@@ -233,3 +233,92 @@ Bu form onaylanmadan ilgili şirket parametreleri production sistemine girilmeye
 - 2700 kabul; 2701+ reddedilir. Sessiz clamp / otomatik düzeltme / warning ile devam yoktur.
 
 **Engine version:** `S91C2_PAYROLL_ENGINE_V2` (contract version değişmedi).
+
+## S91-D1 — Production Şirket Çalışma Politikası Nihai Değer Onayı
+
+- **Karar tarihi:** `2026-07-23`
+- **Karar sahibi:** İlker
+- **Geçerlilik başlangıcı:** `2026-08-01`
+- **Geçerlilik bitişi:** `null` (açık uçlu)
+- **Nitelik:** Medisa şirket ürünü / bordro hesaplama politikasıdır. Bu kayıtta bağımsız hukuk görüşü üretilmemiştir.
+
+### Onaylanan 11 zorunlu parametre
+
+| Parametre | Kesin değer |
+| --- | --- |
+| `NORMAL_AY_GUN_SAYISI` | `30` |
+| `GUNLUK_CALISMA_SAATI` | `7.5` |
+| `AYLIK_NORMAL_CALISMA_SAATI` | `225` |
+| `HAFTALIK_IS_GUNU_SAYISI` | `6` |
+| `HAFTA_TATILI_HESAP_MODU` | `GUNLUK_ILAVE` |
+| `HAFTA_TATILI_CARPANI` | `1.5` |
+| `FAZLA_MESAI_CARPANI` | `1.5` |
+| `FAZLA_SURELERLE_CALISMA_CARPANI` | `1.25` |
+| `UBGT_CARPANI` | `1.0` |
+| `UBGT_HESAP_MODU` | `GUNLUK_ILAVE` |
+| `TATIL_FSC_FM_CAKISMA_HESAP_MODU` | `YARGITAY_7_5_SAAT_AYRIMI` |
+
+### Haftalık sözleşme
+
+```text
+7.5 saat × 6 gün = 45 saat
+450 dakika × 6 gün = 2700 dakika = SOZLESME_HAFTALIK_DAKIKA
+```
+
+- `2700` kabul edilir; `2701+` fail-closed.
+- Bu set ile FSC sözleşme bandı kapasitesi `0` dakikadır.
+- Değerlendirme havuzunun `2700` dakikayı aşan bölümü FM olur.
+
+### Hafta tatili ödeme semantiği
+
+```text
+HAFTA_TATILI_HESAP_MODU = GUNLUK_ILAVE
+HAFTA_TATILI_CARPANI = 1.5
+```
+
+- İlk `450` dakikalık hafta tatili çalışması için günlük ücretin `1.5` katı ilave ödeme oluşur.
+- `450` dakikayı aşan süre hafta tatili premium’una girmez; FSC/FM değerlendirme havuzuna girer.
+- Aynı dakika HT ve FSC/FM kalemlerinde çift ücretlendirilmez.
+
+### UBGT / resmî tatil ödeme semantiği
+
+```text
+UBGT_HESAP_MODU = GUNLUK_ILAVE
+UBGT_CARPANI = 1.0
+```
+
+- İlk `450` dakikalık tam gün UBGT çalışması için günlük ücretin `1.0` katı ilave ödeme oluşur.
+- `450` dakikayı aşan süre UBGT premium’una girmez; FSC/FM değerlendirme havuzuna girer.
+- Aynı dakika UBGT ve FSC/FM kalemlerinde çift ücretlendirilmez.
+
+### Canonical FSC/FM havuz formülü (korunan)
+
+```text
+HAVUZ =
+  NORMAL_IS_GUNLERI_NET_DAKIKA
+  + HT_450_DAKIKA_ASIMI
+  + TAM_GUN_UBGT_450_DAKIKA_ASIMI
+
+FSC = MAX(0, MIN(HAVUZ, 2700) - SOZLESME_HAFTALIK_DAKIKA)
+FM  = MAX(0, HAVUZ - 2700)
+```
+
+Bu politika setinde:
+
+```text
+SOZLESME_HAFTALIK_DAKIKA = 2700
+FSC = 0
+FM  = MAX(0, HAVUZ - 2700)
+```
+
+`450` üstü doğrudan ayrı bir “FM algoritması” değildir: `450` üstü → FSC/FM havuzu; havuzun `2700` üstü → FM.
+
+### Bu kararın kapsamı dışında kalanlar
+
+- Yarım gün UBGT ödeme politikası bu kararla çözülmemiştir (`YARIM_GUN_UBGT_HESAP_POLITIKASI_EKSIK` / `HALF_DAY_UBGT_POLICY_REQUIRED` ayrı blocker olarak kalır).
+- UBGT gün kapsamı bilinmeyen satırlar (`UBGT_GUN_KAPSAMI_EKSIK`) ayrı blocker olarak kalır.
+- Mevzuat parametre seti, SGK snapshot/katalog, personel bordro devri ve dönem mühür/onay eksikleri bu kararla kapanmış sayılmaz.
+
+### Production write notu
+
+Bu kayıt nihai değer onayını belgeler. S91-D1 koşusunda production’a politika taslağı/onayı yazılmamıştır. Exact create-draft payload hazırdır; production write ayrı açık onay gerektirir.

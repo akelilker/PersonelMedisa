@@ -464,10 +464,64 @@ assertTrue($wrapped->getMessage() === SgkKaynakManifestReader::STORAGE_ERROR_COD
 assertTrue(strpos($wrapped->getMessage(), 'secret') === false, 'storageError SQL sizdirmaz');
 assertTrue($wrapped->getPrevious() instanceof PDOException, 'storageError previous korur');
 
+$pdoLeak = new PDOException(
+    'SQLSTATE[HY000] [1045] Access denied for user \'db_user\'@\'db_host\' (using password: YES) DSN=mysql:host=db_host;dbname=db_name SELECT * FROM sgk_kaynak_manifestleri',
+    1045
+);
+$pdoLeak->errorInfo = ['28000', 1045, 'Access denied for user \'db_user\'@\'db_host\' (using password: YES)'];
+$wrappedLeak = SgkKaynakManifestReader::storageError($pdoLeak);
+$logLine = SgkKaynakManifestReader::formatSanitizedRuntimeLog('kaynaklar', $wrappedLeak, 'Medisa\\Api\\Controllers\\SgkKatalogHazirlikController');
+assertTrue(strpos($logLine, 'SGK_KATALOG_RUNTIME_EXCEPTION') === 0, 'log event code ile baslar');
+assertTrue(strpos($logLine, 'action=kaynaklar') !== false, 'log action');
+assertTrue(strpos($logLine, 'exception_class=PDOException') !== false, 'log exception class');
+assertTrue(strpos($logLine, 'exception_code=1045') !== false, 'log exception code');
+assertTrue(strpos($logLine, 'sqlstate=28000') !== false, 'log sqlstate');
+assertTrue(strpos($logLine, 'driver_code=1045') !== false, 'log driver code');
+assertTrue(strpos($logLine, 'owner_class=SgkKatalogHazirlikController') !== false, 'log owner class');
+assertTrue(strpos($logLine, 'file=') !== false, 'log file basename key');
+assertTrue(preg_match('/\bline=\d+/', $logLine) === 1, 'log line number');
+foreach ([
+    'db_host',
+    'db_name',
+    'db_user',
+    'db_password',
+    'mysql:host=',
+    'SELECT * FROM',
+    'Access denied',
+    'using password',
+    'password: YES',
+    'sgk_kaynak_manifestleri',
+    'stack',
+    'trace',
+] as $forbidden) {
+    assertTrue(stripos($logLine, $forbidden) === false, 'log secret/sizinti yok: ' . $forbidden);
+}
+assertTrue(strpos($logLine, $pdoLeak->getMessage()) === false, 'log ham exception message yok');
+
+$hydrateFail = null;
+try {
+    SgkKaynakManifestReader::hydrate(false);
+} catch (RuntimeException $e) {
+    $hydrateFail = $e;
+}
+assertTrue($hydrateFail instanceof RuntimeException, 'hydrate fail exception');
+$hydrateLog = SgkKaynakManifestReader::formatSanitizedRuntimeLog('tamlik', $hydrateFail, SgkKaynakManifestReader::class);
+assertTrue(strpos($hydrateLog, 'SGK_KATALOG_RUNTIME_EXCEPTION') === 0, 'hydrate log event');
+assertTrue(strpos($hydrateLog, 'exception_class=RuntimeException') !== false, 'hydrate log class');
+assertTrue(strpos($hydrateLog, SgkKaynakManifestReader::STORAGE_ERROR_CODE) === false, 'hydrate log message kodu sizdirmaz');
+
 $controllerSrc = file_get_contents(__DIR__ . '/../../api/src/Controllers/SgkKatalogHazirlikController.php');
 assertTrue(!preg_match('/catch\s*\([^)]+\)\s*\{\s*return\s*\[\];/s', $controllerSrc), 'controller catch-return-empty yok');
 assertTrue(strpos($controllerSrc, 'SgkKaynakManifestReader::fetchAll') !== false, 'controller reader kullanir');
 assertTrue(strpos($controllerSrc, 'SgkKaynakManifestReader::STORAGE_ERROR_CODE') !== false, 'controller 503 storage kodu');
-assertTrue(strpos($controllerSrc, "'manifests' => self::loadManifests(\$pdo)") !== false, 'onayValidate DB manifest okur');
+assertTrue(strpos($controllerSrc, 'SgkKaynakManifestReader::formatSanitizedRuntimeLog') !== false, 'controller sanitized log');
+assertTrue(strpos($controllerSrc, 'error_log(') !== false, 'controller error_log cagirir');
+assertTrue(strpos($controllerSrc, "'manifests' => self::loadManifests(\$pdo, 'onay_validate')") !== false, 'onayValidate DB manifest okur');
+assertTrue(!preg_match('/error_log\([^;]*getMessage|error_log\([^;]*getTraceAsString|error_log\(\s*\$e\b/', $controllerSrc), 'controller raw exception loglamaz');
+
+// surumler does not load manifests (owner chain: auth + Connection only)
+assertTrue(preg_match('/function surumler\(Request \$request\)\s*\{[^}]+\}/s', $controllerSrc, $surumMatch) === 1, 'surumler method parse');
+assertTrue(strpos($surumMatch[0], 'loadManifests') === false, 'surumler loadManifests cagirmaz');
+assertTrue(strpos($surumMatch[0], 'self::context(') !== false, 'surumler context kullanir');
 
 echo 'verify-sgk-katalog-hazirlik: OK' . PHP_EOL;

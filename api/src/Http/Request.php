@@ -18,6 +18,12 @@ class Request
     /** @var array<string, mixed>|null */
     private $jsonBody;
 
+    /** @var string|null */
+    private $rawBody;
+
+    /** @var bool */
+    private $rawBodyLoaded = false;
+
     /** @var bool */
     private $jsonBodyInvalid = false;
 
@@ -30,6 +36,8 @@ class Request
         $this->path = self::normalizePath($_SERVER['REQUEST_URI'] ?? '/');
         $this->headers = self::readHeaders();
         $this->jsonBody = null;
+        $this->rawBody = null;
+        $this->rawBodyLoaded = false;
         $this->jsonBodyInvalid = false;
         $this->jsonBodyParsed = false;
     }
@@ -73,11 +81,31 @@ class Request
         return $this->jsonBody ?? [];
     }
 
+    /**
+     * Raw request body for audit/request-hash. Cached because php://input is single-read.
+     */
+    public function getRawBody()
+    {
+        $this->loadRawBody();
+
+        return $this->rawBody === null ? '' : $this->rawBody;
+    }
+
     public function hasInvalidJsonBody(): bool
     {
         $this->parseJsonBody();
 
         return $this->jsonBodyInvalid;
+    }
+
+    private function loadRawBody()
+    {
+        if ($this->rawBodyLoaded) {
+            return;
+        }
+        $this->rawBodyLoaded = true;
+        $raw = file_get_contents('php://input');
+        $this->rawBody = ($raw === false) ? '' : $raw;
     }
 
     private function parseJsonBody(): void
@@ -88,8 +116,9 @@ class Request
         }
 
         $this->jsonBodyParsed = true;
-        $raw = file_get_contents('php://input');
-        if ($raw === false || trim($raw) === '') {
+        $this->loadRawBody();
+        $raw = $this->rawBody === null ? '' : $this->rawBody;
+        if (trim($raw) === '') {
             $this->jsonBody = [];
             return;
         }

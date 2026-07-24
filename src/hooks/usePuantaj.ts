@@ -133,7 +133,7 @@ function toPuantajFormState(
 function parseRequiredPositiveInt(value: string, label: string) {
   const number = Number.parseInt(value, 10);
   if (Number.isNaN(number) || number <= 0) {
-    throw new Error(`${label} pozitif sayi olmalidir.`);
+    throw new Error(`${label} pozitif sayı olmalıdır.`);
   }
   return number;
 }
@@ -162,7 +162,7 @@ function parseOptionalNonNegativeInt(value: string) {
 
   const number = Number.parseInt(trimmed, 10);
   if (Number.isNaN(number) || number < 0) {
-    throw new Error("Gercek mola dakika sifirdan kucuk olamaz.");
+    throw new Error("Gerçek mola dakika sıfırdan küçük olamaz.");
   }
 
   return number;
@@ -530,7 +530,7 @@ export function usePuantaj() {
         setPuantaj(data);
         patchFormState(toPuantajFormState(data, query.tarih));
       } catch {
-        setErrorMessage("Gunluk puantaj kaydi su an guncellenemiyor.");
+        setErrorMessage("Günlük puantaj kaydı şu an güncellenemiyor.");
         const cached = getCacheEntry<GunlukPuantaj | null>(key);
         if (cached !== undefined) {
           setPuantaj(cached);
@@ -572,7 +572,7 @@ export function usePuantaj() {
         setSubmitErrorMessage(null);
         await loadPuantaj(nextQuery);
       } catch (error) {
-        setErrorMessage(error instanceof Error ? error.message : "Puantaj sorgusu gecersiz.");
+        setErrorMessage(error instanceof Error ? error.message : "Puantaj sorgusu geçersiz.");
       }
     },
     [formState.queryPersonelId, formState.queryTarih, loadPuantaj]
@@ -994,12 +994,12 @@ export function usePuantaj() {
       }
 
       if (!activeQuery) {
-        setSubmitErrorMessage("Kaydi guncellemek icin once personel ve tarih sec.");
+        setSubmitErrorMessage("Kaydı güncellemek için önce personel ve tarih seç.");
         return;
       }
 
       if (!canUpdate) {
-        setSubmitErrorMessage("Bu islem icin yetkin bulunmuyor.");
+        setSubmitErrorMessage("Bu işlem için yetkin bulunmuyor.");
         return;
       }
 
@@ -1039,7 +1039,7 @@ export function usePuantaj() {
         const cikisSaati = formState.entryCikisSaati.trim();
 
         if (hareketDurumuSaatGerekliMi(hareketDurumu) && (!girisSaati || !cikisSaati)) {
-          throw new Error("Bu hareket durumu icin giris ve cikis saati zorunludur.");
+          throw new Error("Bu hareket durumu için giriş ve çıkış saati zorunludur.");
         }
 
         const body = {
@@ -1060,7 +1060,7 @@ export function usePuantaj() {
 
         const dogumTarihi = await loadPersonelDogumTarihi(activeSube, activeQuery.personelId);
         if (!dogumTarihi) {
-          throw new Error("Personelin dogum tarihi olmadan yas kurallari dogrulanamadi.");
+          throw new Error("Personelin doğum tarihi olmadan yaş kuralları doğrulanamadı.");
         }
 
         const yasBlokMesaji = hesaplaYasKuraliBlokMesaji({
@@ -1151,10 +1151,10 @@ export function usePuantaj() {
           mergePuantajCache(activeQuery.personelId, activeQuery.tarih, previousPuantaj ?? null);
           setPuantaj(previousPuantaj ?? null);
           patchFormState(toPuantajFormState(previousPuantaj ?? null, activeQuery.tarih));
-          setSubmitErrorMessage(getApiErrorMessage(error, "Puantaj kaydi guncellenemedi."));
+          setSubmitErrorMessage(getApiErrorMessage(error, "Puantaj kaydı güncellenemedi."));
         }
       } catch (error) {
-        setSubmitErrorMessage(getApiErrorMessage(error, "Puantaj kaydi guncellenemedi."));
+        setSubmitErrorMessage(getApiErrorMessage(error, "Puantaj kaydı güncellenemedi."));
       } finally {
         setIsSubmitting(false);
       }
@@ -1217,7 +1217,7 @@ export function usePuantaj() {
 
       mergePuantajCache(activeQuery.personelId, activeQuery.tarih, previousPuantaj);
       setPuantaj(previousPuantaj);
-      setSubmitErrorMessage(getApiErrorMessage(error, "Kontrol durumu guncellenemedi."));
+      setSubmitErrorMessage(getApiErrorMessage(error, "Kontrol durumu güncellenemedi."));
     } finally {
       setIsKontrolSubmitting(false);
     }

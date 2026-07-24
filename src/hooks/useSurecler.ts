@@ -373,7 +373,7 @@ export function useSurecler() {
           void processSyncQueue();
         }
       } catch (error) {
-        setCreateErrorMessage(getApiErrorMessage(error, "Surec kaydi yapilamadi."));
+        setCreateErrorMessage(getApiErrorMessage(error, "Süreç kaydı yapılamadı."));
       } finally {
         setIsCreateSubmitting(false);
       }
@@ -444,7 +444,7 @@ export function useSurecler() {
             items: base.items.map((row) => (row.id === previousSurec.id ? previousSurec : row))
           };
         });
-        setEditErrorMessage(getApiErrorMessage(error, "Surec kaydi guncellenemedi."));
+        setEditErrorMessage(getApiErrorMessage(error, "Süreç kaydı güncellenemedi."));
       } finally {
         setIsEditSubmitting(false);
       }
@@ -496,7 +496,7 @@ export function useSurecler() {
             items: base.items.map((row) => (row.id === surec.id ? surec : row))
           };
         });
-        setErrorMessage(getApiErrorMessage(error, "Surec iptal edilemedi."));
+        setErrorMessage(getApiErrorMessage(error, "Süreç iptal edilemedi."));
       } finally {
         setCancelingSurecId(null);
       }

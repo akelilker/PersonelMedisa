@@ -254,7 +254,7 @@ export function useFinans() {
         try {
           payload = buildCreateFinansKalemPayload(createForm);
         } catch (error) {
-          setCreateErrorMessage(getApiErrorMessage(error, "Finans kaydi olusturulamadi."));
+          setCreateErrorMessage(getApiErrorMessage(error, "Finans kaydı oluşturulamadı."));
           return;
         }
 
@@ -348,7 +348,7 @@ export function useFinans() {
             items: base.items.map((row) => (row.id === previousItem.id ? previousItem : row))
           };
         });
-        setEditErrorMessage(getApiErrorMessage(error, "Finans kaydi guncellenemedi."));
+        setEditErrorMessage(getApiErrorMessage(error, "Finans kaydı güncellenemedi."));
       } finally {
         setIsEditSubmitting(false);
       }
@@ -400,7 +400,7 @@ export function useFinans() {
             items: base.items.map((row) => (row.id === item.id ? item : row))
           };
         });
-        setErrorMessage(getApiErrorMessage(error, "Finans kaydi iptal edilemedi."));
+        setErrorMessage(getApiErrorMessage(error, "Finans kaydı iptal edilemedi."));
       } finally {
         setCancelOngoingId(null);
       }
@@ -487,7 +487,7 @@ export function usePersonelFinansCreate(
         return;
       }
       if (!canCreateFinans) {
-        setFinansCreateErrorMessage("Bu islem icin yetkin bulunmuyor.");
+        setFinansCreateErrorMessage("Bu işlem için yetkin bulunmuyor.");
         return;
       }
 
@@ -502,7 +502,7 @@ export function usePersonelFinansCreate(
             ...finansFields
           });
         } catch (error) {
-          setFinansCreateErrorMessage(getApiErrorMessage(error, "Finans kaydi olusturulamadi."));
+          setFinansCreateErrorMessage(getApiErrorMessage(error, "Finans kaydı oluşturulamadı."));
           return;
         }
 

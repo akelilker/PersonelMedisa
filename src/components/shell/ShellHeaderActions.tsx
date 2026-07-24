@@ -4,8 +4,11 @@ import { dataCacheKeys, getAppData, getCacheEntry, useAppDataRevision } from "..
 import { useBildirimlerHeaderPreview } from "../../hooks/useBildirimler";
 import { useRoleAccess } from "../../hooks/use-role-access";
 import { formatBildirimTuruLabel, normalizeEnumKey } from "../../lib/display/enum-display";
+import { hasRolePermission } from "../../lib/authorization/role-permissions";
+import { resolveSecondaryModules } from "../../lib/shell/secondary-module-nav";
 import { useAuth } from "../../state/auth.store";
 import type { Personel } from "../../types/personel";
+import { ShellModuleMenu } from "./ShellModuleMenu";
 
 type NotificationLevel = "neutral" | "warning" | "critical";
 
@@ -125,12 +128,13 @@ function mapBildirimLevel(bildirimTuru: string): NotificationLevel {
 
 export function ShellHeaderActions({ contextLabel, minimal = false }: ShellHeaderActionsProps) {
   const rootRef = useRef<HTMLDivElement | null>(null);
+  const modulesToggleRef = useRef<HTMLButtonElement | null>(null);
 
   const revision = useAppDataRevision();
   const navigate = useNavigate();
   const location = useLocation();
   const { logout, session, setActiveSubeId } = useAuth();
-  const { hasPermission, uiProfile } = useRoleAccess();
+  const { hasPermission, uiProfile, activeRole } = useRoleAccess();
 
   const activeSubeId = session?.active_sube_id ?? null;
 
@@ -143,9 +147,15 @@ export function ShellHeaderActions({ contextLabel, minimal = false }: ShellHeade
   const canViewMevzuat = hasPermission("mevzuat_parametreleri.view");
   const canViewResmiTatilTakvimi = hasPermission("resmi_tatil_takvimi.view");
 
+  const secondaryModules = useMemo(
+    () => resolveSecondaryModules((permission) => hasRolePermission(activeRole, permission)),
+    [activeRole]
+  );
+
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isSubeOpen, setIsSubeOpen] = useState(false);
+  const [isModulesOpen, setIsModulesOpen] = useState(false);
   const [notificationActionError, setNotificationActionError] = useState<string | null>(null);
   const [readNotificationIds, setReadNotificationIds] = useState<Record<string, true>>({});
 
@@ -233,6 +243,7 @@ export function ShellHeaderActions({ contextLabel, minimal = false }: ShellHeade
     setIsNotificationsOpen(false);
     setIsSettingsOpen(false);
     setIsSubeOpen(false);
+    setIsModulesOpen(false);
   }, [location.pathname]);
 
   useEffect(() => {
@@ -242,15 +253,19 @@ export function ShellHeaderActions({ contextLabel, minimal = false }: ShellHeade
         setIsNotificationsOpen(false);
         setIsSettingsOpen(false);
         setIsSubeOpen(false);
+        setIsModulesOpen(false);
       }
     }
 
     function handleEscape(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        setIsNotificationsOpen(false);
-        setIsSettingsOpen(false);
-        setIsSubeOpen(false);
+      if (event.key !== "Escape") {
+        return;
       }
+
+      // Modules Escape is owned by ShellModuleMenu (capture). Close other disclosures here.
+      setIsNotificationsOpen(false);
+      setIsSettingsOpen(false);
+      setIsSubeOpen(false);
     }
 
     document.addEventListener("mousedown", handleDocumentClick);
@@ -269,6 +284,7 @@ export function ShellHeaderActions({ contextLabel, minimal = false }: ShellHeade
     setIsNotificationsOpen(false);
     setIsSettingsOpen(false);
     setIsSubeOpen(false);
+    setIsModulesOpen(false);
     navigate(path);
   }
 
@@ -377,6 +393,7 @@ export function ShellHeaderActions({ contextLabel, minimal = false }: ShellHeade
                 setIsSubeOpen((prev) => !prev);
                 setIsNotificationsOpen(false);
                 setIsSettingsOpen(false);
+                setIsModulesOpen(false);
               }}
               aria-label="Şube seç"
               aria-expanded={isSubeOpen}
@@ -434,6 +451,7 @@ export function ShellHeaderActions({ contextLabel, minimal = false }: ShellHeade
               setIsNotificationsOpen((prev) => !prev);
               setIsSettingsOpen(false);
               setIsSubeOpen(false);
+              setIsModulesOpen(false);
             }}
             aria-label="Bildirimleri aç"
             aria-expanded={isNotificationsOpen}
@@ -507,6 +525,29 @@ export function ShellHeaderActions({ contextLabel, minimal = false }: ShellHeade
           </div>
         </div>
 
+        <ShellModuleMenu
+          isOpen={isModulesOpen}
+          modules={secondaryModules}
+          pathname={location.pathname}
+          toggleRef={modulesToggleRef}
+          menuId="shell-header-modules-menu"
+          toggleTestId="header-modules-toggle"
+          navTestId="shell-header-modules-nav"
+          linkTestIdPrefix="shell-header-module-link-"
+          onToggle={() => {
+            setIsModulesOpen((prev) => !prev);
+            setIsNotificationsOpen(false);
+            setIsSettingsOpen(false);
+            setIsSubeOpen(false);
+          }}
+          onClose={() => {
+            setIsModulesOpen(false);
+          }}
+          onNavigate={() => {
+            setIsModulesOpen(false);
+          }}
+        />
+
         <button
           type="button"
           className="icon-btn"
@@ -515,6 +556,7 @@ export function ShellHeaderActions({ contextLabel, minimal = false }: ShellHeade
             setIsSettingsOpen((prev) => !prev);
             setIsNotificationsOpen(false);
             setIsSubeOpen(false);
+            setIsModulesOpen(false);
           }}
           aria-label="Ayar menüsü"
           aria-expanded={isSettingsOpen}

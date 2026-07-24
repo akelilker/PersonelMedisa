@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Outlet, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { BackBar } from "../components/BackBar";
 import { AppFooter } from "../components/footer/AppFooter";
@@ -6,9 +6,12 @@ import { Hero } from "../components/hero/Hero";
 import type { KayitTab } from "../components/main-menu/MainMenu";
 import { AppModal } from "../components/modal/AppModal";
 import { ShellHeaderActions } from "../components/shell/ShellHeaderActions";
+import { ShellModuleMenu } from "../components/shell/ShellModuleMenu";
 import { KayitSurecWorkspace } from "../features/kayit/components/KayitSurecWorkspace";
 import { useKayitModalController } from "../features/kayit/hooks/useKayitModalController";
+import { hasRolePermission } from "../lib/authorization/role-permissions";
 import { formatUiProfileLabel, formatUserRoleLabel } from "../lib/display/enum-display";
+import { resolveSecondaryModules } from "../lib/shell/secondary-module-nav";
 import { useAuth } from "../state/auth.store";
 
 export type AppShellOutletContext = {
@@ -109,6 +112,59 @@ function resolveModuleModal(pathname: string, tabParam: string | null): ModuleMo
   return { title: "Modül", closeTo: "/" };
 }
 
+function OverlayModulesMenu({ pathname }: { pathname: string }) {
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+  const toggleRef = useRef<HTMLButtonElement | null>(null);
+  const { session } = useAuth();
+  const activeRole = session?.user.rol;
+  const modules = useMemo(
+    () => resolveSecondaryModules((permission) => hasRolePermission(activeRole, permission)),
+    [activeRole]
+  );
+  const [isOpen, setIsOpen] = useState(false);
+
+  useEffect(() => {
+    setIsOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    function handleDocumentClick(event: MouseEvent) {
+      const target = event.target as Node;
+      if (wrapRef.current && !wrapRef.current.contains(target)) {
+        setIsOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleDocumentClick);
+    return () => {
+      document.removeEventListener("mousedown", handleDocumentClick);
+    };
+  }, []);
+
+  if (modules.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="modal-modules-bar" ref={wrapRef}>
+      <ShellModuleMenu
+        isOpen={isOpen}
+        modules={modules}
+        pathname={pathname}
+        toggleRef={toggleRef}
+        menuId="shell-overlay-modules-menu"
+        toggleTestId="overlay-modules-toggle"
+        navTestId="shell-overlay-modules-nav"
+        linkTestIdPrefix="shell-overlay-module-link-"
+        className="modules-menu-wrap--overlay"
+        onToggle={() => setIsOpen((prev) => !prev)}
+        onClose={() => setIsOpen(false)}
+        onNavigate={() => setIsOpen(false)}
+      />
+    </div>
+  );
+}
+
 export function AppShell() {
   const { session, logout } = useAuth();
   const navigate = useNavigate();
@@ -201,6 +257,7 @@ export function AppShell() {
           bodyClassName="modal-body--kayit-surec"
           titleVariant="premium"
         >
+          <OverlayModulesMenu pathname={pathname} />
           <KayitSurecWorkspace
             activeTab={kayitTab}
             onTabChange={setKayitTab}
@@ -225,6 +282,7 @@ export function AppShell() {
           bodyClassName={moduleModal.bodyClassName}
           titleVariant={moduleModal.titleVariant}
         >
+          <OverlayModulesMenu pathname={pathname} />
           {backBarTarget ? <BackBar to={backBarTarget.to} label={backBarTarget.label} /> : null}
           <Outlet context={outletContext} />
         </AppModal>

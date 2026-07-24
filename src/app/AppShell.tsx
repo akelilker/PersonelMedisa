@@ -204,10 +204,10 @@ export function AppShell() {
   } = useKayitModalController(pathname, state);
 
   useEffect(() => {
-    document.body.classList.toggle("dashboard-page", isHomeRoute && !isLoginRoute);
+    document.body.classList.toggle("app-home-route", isHomeRoute && !isLoginRoute);
 
     return () => {
-      document.body.classList.remove("dashboard-page");
+      document.body.classList.remove("app-home-route");
     };
   }, [isHomeRoute, isLoginRoute]);
 

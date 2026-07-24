@@ -57,7 +57,14 @@
   z-index: 0;
 }
 
-body.dashboard-page .app-shell::before {
+/* Canonical home-route body marker (legacy dashboard-page / home-page retired). */
+body.app-home-route {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg, 16px);
+}
+
+body.app-home-route .app-shell::before {
   box-shadow: none;
 }
 
@@ -328,7 +335,7 @@ body.modal-open .app-shell::before {
 }
 
 @media (min-width: 769px) {
-  body:not(.dashboard-page):not(.login-page):not(.admin-report-page) .app-shell::before {
+  body:not(.app-home-route):not(.login-page):not(.admin-report-page) .app-shell::before {
     border-left-width: 0.7px;
     border-right-width: 0.7px;
     border-top-color: rgba(var(--theme-color-rgb), 0.78);

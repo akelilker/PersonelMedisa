@@ -373,7 +373,7 @@ export function RevizyonTalebiDetailPage() {
               }, "Düzeltme kaydı iptal edildi.");
             }}
           >
-            Düzeltme Kaydı İptal Et
+            Düzeltme Kaydını İptal Et
           </button>
         ) : null}
       </div>

@@ -104,7 +104,7 @@ export function RevizyonCorrectionDetailPage() {
           <dd>{formatRevizyonDeger(correction.yeni_deger as never)}</dd>
         </div>
         <div>
-          <dt>Fark (dakika / gün)</dt>
+          <dt>Fark: dakika / gün</dt>
           <dd>
             {correction.delta_dakika} / {correction.delta_gun}
           </dd>
@@ -170,7 +170,7 @@ export function RevizyonCorrectionDetailPage() {
             })();
           }}
         >
-          Düzeltme Kaydı İptal Et
+          Düzeltme Kaydını İptal Et
         </button>
       ) : null}
 

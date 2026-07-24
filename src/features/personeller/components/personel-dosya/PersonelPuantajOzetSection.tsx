@@ -168,7 +168,7 @@ function PersonelRevizyonCorrectionPanel({
 
   return (
     <DossierSection
-      title="Revizyon / Düzeltme Kaydı İzleri"
+      title="Revizyon ve Düzeltme Kayıtları"
       description="Kapalı dönem düzeltme talepleri ve üretilen düzeltme kaydı etkileri. Ham kapanış kaydı değişmez; düzeltme kaydı görünürlüğü rapor motoru katman etkisi değildir."
     >
       {!canViewRevizyon ? (

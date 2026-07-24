@@ -224,8 +224,8 @@ export function RevizyonMerkeziPage() {
                 <th>Tip</th>
                 <th>Önceki</th>
                 <th>Yeni</th>
-                <th>Fark dk</th>
-                <th>Fark gün</th>
+                <th>Fark (dk)</th>
+                <th>Fark (gün)</th>
                 {canViewFinance ? <th>Bordro</th> : null}
                 <th>Durum</th>
                 <th>Oluşturma</th>

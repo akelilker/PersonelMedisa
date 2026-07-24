@@ -18,6 +18,9 @@ test.describe("Rol bazli smoke", () => {
 
     await expectMainMenuForRole(page, "GENEL_YONETICI");
     await expect(page.getByTestId("dashboard-page")).toHaveCount(0);
+    await expect(page.locator("body")).toHaveClass(/app-home-route/);
+    await expect(page.locator("body")).not.toHaveClass(/dashboard-page/);
+    await expect(page.locator("body")).not.toHaveClass(/(?:^|\s)home-page(?:\s|$)/);
 
     await page.goto("/personeller");
     await expect(page.getByRole("heading", { name: "Personeller" })).toBeVisible();

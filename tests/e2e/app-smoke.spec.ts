@@ -10,6 +10,17 @@ test("Ana akış smoke", async ({ page }) => {
   await expect(page).toHaveURL("/");
   await expectThreeButtonMainMenu(page, true);
   await expect(page.getByTestId("dashboard-page")).toHaveCount(0);
+  await expect(page.locator("body")).toHaveClass(/app-home-route/);
+  await expect(page.locator("body")).not.toHaveClass(/dashboard-page/);
+  await expect(page.locator("body")).not.toHaveClass(/(?:^|\s)home-page(?:\s|$)/);
+  await expect
+    .poll(async () =>
+      page.evaluate(() => {
+        const cs = getComputedStyle(document.body);
+        return { display: cs.display, flexDirection: cs.flexDirection, gap: cs.gap };
+      })
+    )
+    .toEqual({ display: "flex", flexDirection: "column", gap: "16px" });
 
   await page.getByTestId("menu-kayit-surec").click();
   await expect(page.locator("#main-menu")).toHaveCount(0);
@@ -34,9 +45,11 @@ test("Ana akış smoke", async ({ page }) => {
 
   await page.getByTestId("menu-personel-karti").click();
   await expect(page).toHaveURL(/\/personeller$/);
+  await expect(page.locator("body")).not.toHaveClass(/app-home-route/);
   await expect(page.getByRole("heading", { name: "Personeller" })).toBeVisible();
   await page.locator(".modal-container").first().locator(".modal-close-btn").click();
   await expect(page).toHaveURL("/");
+  await expect(page.locator("body")).toHaveClass(/app-home-route/);
 
   await page.getByTestId("menu-raporlar").click();
   await expect(page).toHaveURL(/\/raporlar$/);

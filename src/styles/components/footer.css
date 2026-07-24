@@ -37,7 +37,7 @@
   z-index: 0;
 }
 
-body:not(.home-page):not(.login-page):not(.admin-report-page) #app-footer {
+body:not(.app-home-route):not(.login-page):not(.admin-report-page) #app-footer {
   border-top: 1px solid var(--footer-top-border);
   box-shadow:
     0 -1px 0 var(--footer-top-highlight),
@@ -141,7 +141,7 @@ body:not(.home-page):not(.login-page):not(.admin-report-page) #app-footer {
 }
 
 @media (min-width: 769px) {
-  body:not(.home-page):not(.login-page):not(.admin-report-page) #app-footer {
+  body:not(.app-home-route):not(.login-page):not(.admin-report-page) #app-footer {
     border-top: 1px solid var(--footer-top-border);
     border-left: 0.6px solid var(--footer-side-border);
     border-right: 0.6px solid var(--footer-side-border);

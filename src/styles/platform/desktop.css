@@ -9,7 +9,7 @@
 }
 
 @media (min-width: 769px) {
-  body:not(.dashboard-page):not(.login-page):not(.admin-report-page) .content-wrap {
+  body:not(.home-page):not(.login-page):not(.admin-report-page) .content-wrap {
     box-shadow:
       0 0 28px rgba(var(--theme-color-rgb), 0.16),
       inset 0 0 18px rgba(var(--theme-color-rgb), 0.05);

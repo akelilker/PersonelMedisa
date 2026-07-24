@@ -57,7 +57,14 @@
   z-index: 0;
 }
 
-body.dashboard-page .app-shell::before {
+/* Home route body marker (replaces legacy dashboard-page collision with KPI CSS). */
+body.home-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg, 16px);
+}
+
+body.home-page .app-shell::before {
   box-shadow: none;
 }
 
@@ -328,7 +335,7 @@ body.modal-open .app-shell::before {
 }
 
 @media (min-width: 769px) {
-  body:not(.dashboard-page):not(.login-page):not(.admin-report-page) .app-shell::before {
+  body:not(.home-page):not(.login-page):not(.admin-report-page) .app-shell::before {
     border-left-width: 0.7px;
     border-right-width: 0.7px;
     border-top-color: rgba(var(--theme-color-rgb), 0.78);

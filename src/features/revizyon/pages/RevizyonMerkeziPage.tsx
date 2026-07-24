@@ -10,6 +10,7 @@ import { useRoleAccess } from "../../../hooks/use-role-access";
 import type { RevizyonCorrectionEvent } from "../../../types/revizyon-correction";
 import type { RevizyonTalebi } from "../../../types/revizyon-talebi";
 import {
+  formatRevizyonCorrectionTipiLabel,
   formatRevizyonDeger,
   formatRevizyonDurumLabel,
   formatRevizyonTipiLabel,
@@ -223,8 +224,8 @@ export function RevizyonMerkeziPage() {
                 <th>Tip</th>
                 <th>Önceki</th>
                 <th>Yeni</th>
-                <th>Δ dk</th>
-                <th>Δ gün</th>
+                <th>Fark dk</th>
+                <th>Fark gün</th>
                 {canViewFinance ? <th>Bordro</th> : null}
                 <th>Durum</th>
                 <th>Oluşturma</th>
@@ -241,7 +242,7 @@ export function RevizyonMerkeziPage() {
                     {correction.hafta_baslangic} → {correction.hafta_bitis}
                   </td>
                   <td>{correction.etkilenen_tarih}</td>
-                  <td>{correction.correction_tipi}</td>
+                  <td>{formatRevizyonCorrectionTipiLabel(correction.correction_tipi)}</td>
                   <td>{formatRevizyonDeger(correction.onceki_deger as never)}</td>
                   <td>{formatRevizyonDeger(correction.yeni_deger as never)}</td>
                   <td>{correction.delta_dakika}</td>

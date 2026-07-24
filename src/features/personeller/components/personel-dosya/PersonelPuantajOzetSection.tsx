@@ -10,10 +10,7 @@ import {
   usePuantajEksikGunOzeti
 } from "../../../../hooks/usePuantajEksikGunOzeti";
 import type { Personel } from "../../../../types/personel";
-import type {
-  RevizyonCorrectionEvent,
-  RevizyonCorrectionTipi
-} from "../../../../types/revizyon-correction";
+import type { RevizyonCorrectionEvent } from "../../../../types/revizyon-correction";
 import type {
   RevizyonTalebi,
   RevizyonTalebiDurumu,
@@ -35,7 +32,10 @@ import {
   formatSgkHesaplamaModuLabel,
   timestampValue
 } from "./personel-dosya-format-utils";
-import { buildRevizyonTalebiCreatePath } from "../../../revizyon/revizyon-display";
+import {
+  buildRevizyonTalebiCreatePath,
+  formatRevizyonCorrectionTipiLabel
+} from "../../../revizyon/revizyon-display";
 
 const BORDRO_ADAY_OZETI_HENUZ_OLUSMADI =
   "Bu dönem için immutable SGK snapshot sonucu henüz oluşmadı.";
@@ -63,15 +63,6 @@ const REVIZYON_TIPI_LABELS: Record<RevizyonTipi, string> = {
   MOLA_DUZELTME: "Mola düzeltme",
   DEVAMSIZLIK_DUZELTME: "Devamsızlık düzeltme",
   SUREC_GEC_GIRIS: "Süreç geç giriş",
-  SERBEST_ZAMAN_ETKI_DUZELTME: "Serbest zaman etki düzeltme",
-  KAPANIS_HESAP_REVIZYONU: "Kapanış hesap revizyonu",
-  BORDRO_ETKI_NOTU: "Bordro etki notu"
-};
-
-const REVIZYON_CORRECTION_TIPI_LABELS: Record<RevizyonCorrectionTipi, string> = {
-  GIRIS_CIKIS_DUZELTME: "Giriş / çıkış düzeltme",
-  MOLA_DUZELTME: "Mola düzeltme",
-  DEVAMSIZLIK_DUZELTME: "Devamsızlık düzeltme",
   SERBEST_ZAMAN_ETKI_DUZELTME: "Serbest zaman etki düzeltme",
   KAPANIS_HESAP_REVIZYONU: "Kapanış hesap revizyonu",
   BORDRO_ETKI_NOTU: "Bordro etki notu"
@@ -136,7 +127,7 @@ function formatRevizyonTalebiSummary(talep: RevizyonTalebi) {
 }
 
 function formatRevizyonCorrectionSummary(correction: RevizyonCorrectionEvent) {
-  const tip = REVIZYON_CORRECTION_TIPI_LABELS[correction.correction_tipi] ?? correction.correction_tipi;
+  const tip = formatRevizyonCorrectionTipiLabel(correction.correction_tipi);
   const eskiDeger = formatNullableScalar(correction.onceki_deger);
   const yeniDeger = formatNullableScalar(correction.yeni_deger);
   const durum = correction.iptal_edildi_mi ? "İptal" : "Aktif";
@@ -144,7 +135,7 @@ function formatRevizyonCorrectionSummary(correction: RevizyonCorrectionEvent) {
     correction.delta_dakika !== 0 ? `${correction.delta_dakika} dk` : null,
     correction.delta_gun !== 0 ? `${correction.delta_gun} gün` : null
   ].filter((part): part is string => part !== null);
-  const delta = deltaParts.length > 0 ? deltaParts.join(", ") : "Delta yok";
+  const delta = deltaParts.length > 0 ? deltaParts.join(", ") : "Fark yok";
   const olusturmaZamani = formatDateTimeDetail(correction.olusturma_zamani);
 
   return `${durum} / ${tip} / ${correction.etkilenen_tarih} / ${eskiDeger} -> ${yeniDeger} / ${delta} / ${olusturmaZamani}`;
@@ -178,7 +169,7 @@ function PersonelRevizyonCorrectionPanel({
   return (
     <DossierSection
       title="Revizyon / Düzeltme Kaydı İzleri"
-      description="Kapalı dönem düzeltme talepleri ve üretilen düzeltme kaydı etkileri. Ham snapshot değişmez; düzeltme kaydı görünürlüğü rapor motoru overlay’i değildir."
+      description="Kapalı dönem düzeltme talepleri ve üretilen düzeltme kaydı etkileri. Ham kapanış kaydı değişmez; düzeltme kaydı görünürlüğü rapor motoru katman etkisi değildir."
     >
       {!canViewRevizyon ? (
         <DossierRecord label="Yetki" value="Revizyon kayıtlarını görüntüleme yetkiniz yok." />

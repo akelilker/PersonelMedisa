@@ -12,7 +12,7 @@ test.describe("S81 Bildirim ve Onay Zinciri", () => {
     await expect(page.getByTestId("haftalik-mutabakat-panel")).toBeVisible();
     await expect(page.getByLabel("Personel ID")).toHaveCount(0);
 
-    await page.getByRole("button", { name: "Bildirim Gir" }).first().click();
+    await page.getByRole("button", { name: "Günlük Kayıt Ekle" }).first().click();
     await expect(page.locator("#gunluk-kayit-create-form")).toBeVisible();
     await page.locator('select[name="bildirim-create-personel"]').selectOption({ index: 1 });
     await page.getByRole("button", { name: "Gelmedi", exact: true }).click();
@@ -30,7 +30,7 @@ test.describe("S81 Bildirim ve Onay Zinciri", () => {
     await page.goto("/bildirimler");
 
     const createTwice = async () => {
-      await page.getByRole("button", { name: "Bildirim Gir" }).first().click();
+      await page.getByRole("button", { name: "Günlük Kayıt Ekle" }).first().click();
       await page.locator('select[name="bildirim-create-personel"]').selectOption({ index: 1 });
       await page.getByRole("button", { name: "Gelmedi", exact: true }).click();
       await page.getByRole("button", { name: "Kaydet" }).click();
@@ -48,7 +48,7 @@ test.describe("S81 Bildirim ve Onay Zinciri", () => {
     await loginAsMockRole(page, "BOLUM_YONETICISI");
     await page.goto("/bildirimler");
     await expect(page.getByTestId("bildirim-panel-context")).toBeVisible();
-    await expect(page.getByRole("button", { name: "Bildirim Gir" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Günlük Kayıt Ekle" })).toHaveCount(0);
     await expect(page.getByTestId("haftalik-mutabakat-approve")).toHaveCount(0);
     await expect(page.getByTestId("aylik-bildirim-onay-approve")).toHaveCount(0);
   });
@@ -57,7 +57,7 @@ test.describe("S81 Bildirim ve Onay Zinciri", () => {
     await loginAsMockRole(page, "MUHASEBE");
     await page.goto("/bildirimler");
     await expect(page.getByTestId("bildirim-panel-context")).toBeVisible();
-    await expect(page.getByRole("button", { name: /Bildirim Gir|Yeni Bildirim/ })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /Günlük Kayıt Ekle/ })).toHaveCount(0);
     await expect(page.getByTestId("haftalik-mutabakat-approve")).toHaveCount(0);
   });
 

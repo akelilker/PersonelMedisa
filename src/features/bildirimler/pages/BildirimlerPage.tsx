@@ -1006,9 +1006,9 @@ export function BildirimlerPage() {
     }));
   }
 
-  const createTitle = isBirimAmiri ? "Bildirim Gir" : "Yeni Bildirim";
-  const createButtonLabel = isBirimAmiri ? "Bildirim Gir" : "Yeni Bildirim";
-  const pageTitle = isBirimAmiri || canCreateBildirim ? "Bugünkü Personel Durumu" : "Günlük Bildirimler";
+  const createTitle = "Günlük Kayıt Ekle";
+  const createButtonLabel = "Günlük Kayıt Ekle";
+  const pageTitle = isBirimAmiri || canCreateBildirim ? "Bugünkü Personel Durumu" : "Günlük Kayıtlar";
 
   return (
     <section className="bildirimler-page">
@@ -1022,11 +1022,11 @@ export function BildirimlerPage() {
       </div>
 
       <div className="state-card" data-testid="bildirim-gunluk-hero">
-        <h3>{isBirimAmiri ? "Operasyonel gün durumu" : "Bildirim akışı"}</h3>
+        <h3>{isBirimAmiri ? "Operasyonel gün durumu" : "Günlük kayıt akışı"}</h3>
         <p>
           {isBirimAmiri
             ? "Personelinizin bugünkü durumunu girin, taslakları gönderin ve günü tamamlayın. Haftalık mutabakat için günlük tamamlama gerekir."
-            : "Şube ve birim amiri bağlamında günlük bildirimleri, haftalık mutabakatı ve onay zincirini izleyin."}
+            : "Şube ve birim amiri bağlamında günlük kayıtları, haftalık mutabakatı ve onay zincirini izleyin."}
         </p>
       </div>
 
@@ -1058,7 +1058,7 @@ export function BildirimlerPage() {
                   ["Aktif Şube", gunlukOzet.sube_adi || selectedSubeLabel],
                   ["Sorumlu Amir", gunlukOzet.birim_amiri_adi || selectedBirimAmiriLabel],
                   ["Toplam Personel", String(gunlukOzet.ozet.toplam_personel)],
-                  ["Bildirim Girilen", String(gunlukOzet.ozet.bildirim_girilen)],
+                  ["Günlük Kayıt Girilen", String(gunlukOzet.ozet.bildirim_girilen)],
                   ["Taslak", String(gunlukOzet.ozet.taslak)],
                   ["Düzeltme", String(gunlukOzet.ozet.duzeltme_istendi)],
                   ["Tamamlandı mı", gunlukOzet.ozet.tamamlandi_mi ? "Evet" : "Hayır"]
@@ -1092,7 +1092,7 @@ export function BildirimlerPage() {
                         <th>Sicil</th>
                         <th>Görev</th>
                         <th>Durum</th>
-                        <th>Bildirim</th>
+                        <th>Günlük Kayıt</th>
                         <th>Son İşlem</th>
                         <th>Aksiyon</th>
                       </tr>
@@ -1120,7 +1120,7 @@ export function BildirimlerPage() {
                                   openCreateModal();
                                 }}
                               >
-                                Bildirim Gir
+                                Günlük Kayıt Ekle
                               </button>
                             ) : null}
                             {row.bildirim_id != null ? (
@@ -1493,7 +1493,7 @@ export function BildirimlerPage() {
             ) : (
               <EmptyState
                 title="Kapsamda personel bulunamadı"
-                message="Bildirim girmek için kapsamda aktif personel olmalıdır."
+                message="Günlük kayıt eklemek için kapsamda aktif personel olmalıdır."
               />
             )}
 

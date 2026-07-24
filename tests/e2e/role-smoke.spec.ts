@@ -130,7 +130,7 @@ test.describe("Rol bazli smoke", () => {
     await page.getByRole("link", { name: "Günlük Kayıt" }).click();
     await expect(page.locator(".modal-header h2").first()).toContainText("Günlük Kayıt Merkezi");
     await expect(
-      page.locator(".bildirimler-header-row").getByRole("button", { name: /Bildirim Gir/i })
+      page.locator(".bildirimler-header-row").getByRole("button", { name: /Günlük Kayıt Ekle/i })
     ).toBeVisible();
 
     await page.goto("/raporlar");

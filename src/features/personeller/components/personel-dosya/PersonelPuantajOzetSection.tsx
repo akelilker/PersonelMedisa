@@ -129,7 +129,7 @@ function formatRevizyonTalebiSummary(talep: RevizyonTalebi) {
   const tip = REVIZYON_TIPI_LABELS[talep.revizyon_tipi] ?? talep.revizyon_tipi;
   const eskiDeger = formatNullableScalar(talep.onceki_deger);
   const yeniDeger = formatNullableScalar(talep.talep_edilen_deger);
-  const correction = talep.correction_event_id != null ? `Correction #${talep.correction_event_id}` : "Correction yok";
+  const correction = talep.correction_event_id != null ? `Düzeltme kaydı #${talep.correction_event_id}` : "Düzeltme kaydı yok";
   const talepZamani = formatDateTimeDetail(talep.talep_zamani);
 
   return `${durum} / ${tip} / ${talep.etkilenen_tarih} / ${eskiDeger} -> ${yeniDeger} / ${correction} / ${talepZamani}`;
@@ -177,8 +177,8 @@ function PersonelRevizyonCorrectionPanel({
 
   return (
     <DossierSection
-      title="Revizyon / Correction İzleri"
-      description="Kapalı dönem düzeltme talepleri ve üretilen correction etkileri. Ham snapshot değişmez; correction görünürlüğü rapor motoru overlay’i değildir."
+      title="Revizyon / Düzeltme Kaydı İzleri"
+      description="Kapalı dönem düzeltme talepleri ve üretilen düzeltme kaydı etkileri. Ham snapshot değişmez; düzeltme kaydı görünürlüğü rapor motoru overlay’i değildir."
     >
       {!canViewRevizyon ? (
         <DossierRecord label="Yetki" value="Revizyon kayıtlarını görüntüleme yetkiniz yok." />
@@ -195,10 +195,10 @@ function PersonelRevizyonCorrectionPanel({
           <DossierRecord label="Açık Talep" value={String(acikTalepSayisi)} />
           <DossierRecord label="Onaylanan Talep" value={String(onayliTalepSayisi)} />
           <DossierRecord
-            label="Aktif Correction"
+            label="Aktif Düzeltme Kaydı"
             value={
               aktifCorrectionSayisi > 0
-                ? `${aktifCorrectionSayisi} (aktif correction etiketi)`
+                ? `${aktifCorrectionSayisi} (aktif düzeltme kaydı etiketi)`
                 : "0"
             }
           />
@@ -223,7 +223,7 @@ function PersonelRevizyonCorrectionPanel({
           </div>
 
           {talepler.length === 0 && corrections.length === 0 ? (
-            <DossierRecord label="Kayıt" value="Bu personel için revizyon veya correction kaydı yok." />
+            <DossierRecord label="Kayıt" value="Bu personel için revizyon veya düzeltme kaydı yok." />
           ) : null}
 
           {sonTalepler.map((talep) => (
@@ -241,14 +241,14 @@ function PersonelRevizyonCorrectionPanel({
           {sonCorrections.map((correction) => (
             <div key={`revizyon-correction-${correction.id}`}>
               <DossierRecord
-                label={`Correction #${correction.id}${correction.iptal_edildi_mi ? "" : " · Aktif"}`}
+                label={`Düzeltme kaydı #${correction.id}${correction.iptal_edildi_mi ? "" : " · Aktif"}`}
                 value={formatRevizyonCorrectionSummary(correction)}
               />
               <Link
                 className="universal-btn-aux"
                 to={`/haftalik-kapanis/corrections/${correction.id}`}
               >
-                Correction detayına git
+                Düzeltme kaydı detayına git
               </Link>
             </div>
           ))}
@@ -352,7 +352,7 @@ export function PersonelPuantajOzetSection({
 
         setRevizyonTalepleri([]);
         setRevizyonCorrections([]);
-        setRevizyonErrorMessage("Revizyon ve correction kayıtları yüklenemedi.");
+        setRevizyonErrorMessage("Revizyon ve düzeltme kayıtları yüklenemedi.");
       })
       .finally(() => {
         if (!isCancelled) {

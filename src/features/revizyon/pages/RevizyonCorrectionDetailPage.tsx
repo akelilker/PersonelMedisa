@@ -48,7 +48,7 @@ export function RevizyonCorrectionDetailPage() {
   }, [load]);
 
   if (isLoading) {
-    return <LoadingState label="Correction detayı yükleniyor..." />;
+    return <LoadingState label="Düzeltme kaydı detayı yükleniyor..." />;
   }
   if (errorMessage || !correction) {
     return <ErrorState message={errorMessage ?? "Kayıt bulunamadı."} onRetry={() => void load()} />;
@@ -71,10 +71,10 @@ export function RevizyonCorrectionDetailPage() {
         </button>
       </div>
 
-      <h2>Correction Detayı</h2>
+      <h2>Düzeltme Kaydı Detayı</h2>
       <dl className="dossier-grid">
         <div>
-          <dt>Correction</dt>
+          <dt>Düzeltme Kaydı</dt>
           <dd>{correction.id}</dd>
         </div>
         <div>
@@ -133,7 +133,7 @@ export function RevizyonCorrectionDetailPage() {
       </dl>
 
       <p className="form-hint">
-        Bu correction kaydı görünürlük amaçlıdır; puantaj/rapor/bordro motorunu otomatik yeniden
+        Bu düzeltme kaydı görünürlük amaçlıdır; puantaj/rapor/bordro motorunu otomatik yeniden
         hesaplamaz. Ham snapshot değişmez.
       </p>
 
@@ -143,7 +143,7 @@ export function RevizyonCorrectionDetailPage() {
           className="universal-btn-cancel"
           disabled={isActing}
           onClick={() => {
-            if (!window.confirm("Aktif correction iptal edilsin mi?")) {
+            if (!window.confirm("Aktif düzeltme kaydı iptal edilsin mi?")) {
               return;
             }
             const aciklama = window.prompt("İptal açıklaması (opsiyonel):") ?? "";
@@ -155,7 +155,7 @@ export function RevizyonCorrectionDetailPage() {
                   aciklama: aciklama || null
                 });
                 setCorrection(next);
-                setActionMessage("Correction iptal edildi.");
+                setActionMessage("Düzeltme kaydı iptal edildi.");
               } catch (error) {
                 const code = error instanceof ApiRequestError ? error.code : undefined;
                 setActionError(
@@ -170,7 +170,7 @@ export function RevizyonCorrectionDetailPage() {
             })();
           }}
         >
-          Correction İptal
+          Düzeltme Kaydı İptal
         </button>
       ) : null}
 

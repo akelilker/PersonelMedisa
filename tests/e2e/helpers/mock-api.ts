@@ -1548,11 +1548,11 @@ function buildMockBordroReadiness(params: {
     },
     {
       key: "acik_revizyon_correction",
-      label: "Açık Revizyon / Correction",
+      label: "Açık Revizyon / Düzeltme Kaydı",
       status: "HAZIR",
       eksik_kayit_sayisi: 0,
       etkilenen_personel_sayisi: 0,
-      aciklama: "Açık correction çatışması yok.",
+      aciklama: "Açık düzeltme kaydı çatışması yok.",
       action_link: "/revizyon-merkezi",
       blocker_codes: []
     },

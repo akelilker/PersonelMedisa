@@ -80,7 +80,7 @@ export function RevizyonMerkeziPage() {
       [
         { id: "talepler" as const, label: "Revizyon Talepleri", show: true },
         { id: "onay" as const, label: "Onay Bekleyenler", show: canApprove },
-        { id: "corrections" as const, label: "Corrections", show: true }
+        { id: "corrections" as const, label: "Düzeltme Kayıtları", show: true }
       ].filter((tab) => tab.show),
     [canApprove]
   );
@@ -144,7 +144,7 @@ export function RevizyonMerkeziPage() {
       ) : null}
 
       {!isLoading && !errorMessage && gorunum === "corrections" && corrections.length === 0 ? (
-        <EmptyState title="Boş liste" message="Gösterilecek correction kaydı yok." />
+        <EmptyState title="Boş liste" message="Gösterilecek düzeltme kaydı yok." />
       ) : null}
 
       {!isLoading && !errorMessage && gorunum !== "corrections" && talepler.length > 0 ? (
@@ -161,7 +161,7 @@ export function RevizyonMerkeziPage() {
                 <th>Tip</th>
                 <th>Durum</th>
                 {canViewFinance ? <th>Bordro</th> : null}
-                <th>Correction</th>
+                <th>Düzeltme Kaydı</th>
                 <th>Talep eden</th>
                 <th>Zaman</th>
                 <th>Detay</th>

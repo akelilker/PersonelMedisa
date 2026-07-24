@@ -179,16 +179,16 @@ export function RevizyonTalebiDetailPage() {
           <dd data-testid="revizyon-talep-deger">{formatRevizyonDeger(talep.talep_edilen_deger)}</dd>
         </div>
         <div>
-          <dt>Aktif correction sonrası değer</dt>
+          <dt>Aktif düzeltme kaydı sonrası değer</dt>
           <dd data-testid="revizyon-corrected-deger">
             {talep.aktif_correction_var_mi
               ? formatRevizyonDeger(talep.aktif_correction_sonrasi_deger ?? null)
-              : "Aktif correction yok"}
+              : "Aktif düzeltme kaydı yok"}
           </dd>
         </div>
       </dl>
       <p className="form-hint" data-testid="revizyon-overlay-uyari">
-        Correction görünürlüğü ile gerçek rapor/bordro etkisi aynı şey değildir. Ham snapshot değişmez.
+        Düzeltme kaydı görünürlüğü ile gerçek rapor/bordro etkisi aynı şey değildir. Ham snapshot değişmez.
       </p>
 
       <dl className="dossier-grid">
@@ -340,10 +340,10 @@ export function RevizyonTalebiDetailPage() {
               void runAction(async () => {
                 await produceRevizyonCorrection(talep.id);
                 return fetchRevizyonTalebiDetail(talep.id);
-              }, "Correction üretildi.")
+              }, "Düzeltme kaydı üretildi.")
             }
           >
-            Correction Üret
+            Düzeltme Kaydı Üret
           </button>
         ) : null}
         {showCorrectionLink && talep.correction_event_id ? (
@@ -353,7 +353,7 @@ export function RevizyonTalebiDetailPage() {
             data-testid="revizyon-correction-detay-git"
             onClick={() => navigate(`/haftalik-kapanis/corrections/${talep.correction_event_id}`)}
           >
-            Correction detayına git
+            Düzeltme kaydı detayına git
           </button>
         ) : null}
         {talep.aktif_correction_var_mi && canApprove && talep.correction_event_id ? (
@@ -369,10 +369,10 @@ export function RevizyonTalebiDetailPage() {
                   aciklama: aciklama || null
                 });
                 return fetchRevizyonTalebiDetail(talep.id);
-              }, "Correction iptal edildi.");
+              }, "Düzeltme kaydı iptal edildi.");
             }}
           >
-            Correction İptal
+            Düzeltme Kaydı İptal
           </button>
         ) : null}
       </div>

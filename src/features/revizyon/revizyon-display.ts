@@ -76,7 +76,7 @@ export function revizyonUserMessage(code: string | undefined, fallback: string):
     case "UNAUTHORIZED_REVISION_APPROVAL":
       return "Onay/red yetkiniz yok.";
     case "CORRECTION_ALREADY_EXISTS":
-      return "Bu talep için correction zaten üretilmiş.";
+      return "Bu talep için düzeltme kaydı zaten üretilmiş.";
     case "INVALID_STATE_TRANSITION":
     case "STATE_CONFLICT":
       return "Bu işlem mevcut talep durumu için geçerli değil.";

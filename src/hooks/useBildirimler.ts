@@ -99,7 +99,7 @@ function parsePositiveInt(value: string) {
 function parseRequiredPositiveInt(value: string, label: string) {
   const number = parsePositiveInt(value);
   if (!number) {
-    throw new Error(`${label} pozitif sayi olmalidir.`);
+    throw new Error(`${label} pozitif sayı olmalıdır.`);
   }
   return number;
 }
@@ -138,7 +138,7 @@ function getTodayIsoDate() {
 function resolveBildirimTuru(value: string) {
   const trimmed = value.trim();
   if (!trimmed) {
-    throw new Error("Kayit senaryosu secilmelidir.");
+    throw new Error("Kayıt senaryosu seçilmelidir.");
   }
 
   return normalizeEnumKey(trimmed);
@@ -154,7 +154,7 @@ function resolveDepartmanIdForBildirim(
     return selected.departman_id;
   }
 
-  return parseRequiredPositiveInt(departmanIdValue, "Bolum");
+  return parseRequiredPositiveInt(departmanIdValue, "Bölüm");
 }
 
 function resolveBildirimListDateParams(applied: BildirimListQueryState["applied"]) {
@@ -298,7 +298,7 @@ export function useBildirimler() {
         );
       } catch {
         if (!getCacheEntry<PaginatedResult<Bildirim>>(listKey)) {
-        setErrorMessage("Gunluk kayit listesi su an guncellenemiyor.");
+        setErrorMessage("Günlük kayıt listesi şu an güncellenemiyor.");
         }
       } finally {
         if (!cancelled) {
@@ -335,7 +335,7 @@ export function useBildirimler() {
         );
       } catch {
         if (!cancelled) {
-          setReferenceError("Kayit senaryosu referanslari su an guncellenemiyor, manuel giris kullanilabilir.");
+          setReferenceError("Kayıt senaryosu seçenekleri şu an güncellenemiyor; manuel giriş kullanılabilir.");
         }
       }
     })();
@@ -454,7 +454,7 @@ export function useBildirimler() {
         return;
       }
       if (!canCreate) {
-        setCreateErrorMessage("Bu islem icin yetkin bulunmuyor.");
+        setCreateErrorMessage("Bu işlem için yetkin bulunmuyor.");
         return;
       }
       if (!createForm.tarih.trim()) {
@@ -513,7 +513,7 @@ export function useBildirimler() {
           void processSyncQueue();
         }
       } catch (error) {
-        setCreateErrorMessage(getApiErrorMessage(error, "Gunluk kayit olusturulamadi."));
+        setCreateErrorMessage(getApiErrorMessage(error, "Günlük kayıt oluşturulamadı."));
       } finally {
         setIsCreateSubmitting(false);
       }
@@ -523,7 +523,7 @@ export function useBildirimler() {
 
   const openEditModal = useCallback((bildirim: Bildirim, canEdit: boolean) => {
     if (!canEdit) {
-      setErrorMessage("Bu gunluk kaydi duzenlemek icin yetkin bulunmuyor.");
+      setErrorMessage("Bu günlük kaydı düzenlemek için yetkin bulunmuyor.");
       return;
     }
     setEditErrorMessage(null);
@@ -544,7 +544,7 @@ export function useBildirimler() {
         return;
       }
       if (!canEdit) {
-        setEditErrorMessage("Bu gunluk kaydi duzenlemek icin yetkin bulunmuyor.");
+        setEditErrorMessage("Bu günlük kaydı düzenlemek için yetkin bulunmuyor.");
         return;
       }
 
@@ -591,7 +591,7 @@ export function useBildirimler() {
             items: base.items.map((row) => (row.id === previousBildirim.id ? previousBildirim : row))
           };
         });
-        setEditErrorMessage(getApiErrorMessage(error, "Gunluk kayit guncellenemedi."));
+        setEditErrorMessage(getApiErrorMessage(error, "Günlük kayıt güncellenemedi."));
       } finally {
         setIsEditSubmitting(false);
       }
@@ -602,11 +602,11 @@ export function useBildirimler() {
   const cancelBildirimHandler = useCallback(
     async (bildirim: Bildirim, canCancel: boolean) => {
       if (!canCancel) {
-        setErrorMessage("Bu gunluk kaydi iptal etmek icin yetkin bulunmuyor.");
+        setErrorMessage("Bu günlük kaydı iptal etmek için yetkin bulunmuyor.");
         return;
       }
 
-      const confirmed = window.confirm(`Gunluk kayit #${bildirim.id} kaydini iptal etmek istiyor musun?`);
+      const confirmed = window.confirm(`Günlük kayıt #${bildirim.id} kaydını iptal etmek istiyor musun?`);
       if (!confirmed) {
         return;
       }
@@ -643,7 +643,7 @@ export function useBildirimler() {
             items: base.items.map((row) => (row.id === bildirim.id ? bildirim : row))
           };
         });
-        setErrorMessage(getApiErrorMessage(error, "Gunluk kayit iptal edilemedi."));
+        setErrorMessage(getApiErrorMessage(error, "Günlük kayıt iptal edilemedi."));
       } finally {
         setCancelingBildirimId(null);
       }
@@ -681,7 +681,7 @@ export function useBildirimler() {
             items: base.items.map((row) => (row.id === bildirim.id ? bildirim : row))
           };
         });
-        setErrorMessage(getApiErrorMessage(error, "Gunluk kayit gonderilemedi."));
+        setErrorMessage(getApiErrorMessage(error, "Günlük kayıt gönderilemedi."));
       } finally {
         setSubmittingBildirimId(null);
       }
@@ -710,7 +710,7 @@ export function useBildirimler() {
 
       const reason = correctionReason.trim();
       if (!reason) {
-        setCorrectionErrorMessage("Duzeltme nedeni zorunludur.");
+        setCorrectionErrorMessage("Düzeltme nedeni zorunludur.");
         return;
       }
 
@@ -744,7 +744,7 @@ export function useBildirimler() {
             items: base.items.map((row) => (row.id === previousBildirim.id ? previousBildirim : row))
           };
         });
-        setCorrectionErrorMessage(getApiErrorMessage(error, "Duzeltme talebi gonderilemedi."));
+        setCorrectionErrorMessage(getApiErrorMessage(error, "Düzeltme talebi gönderilemedi."));
       } finally {
         setIsCorrectionSubmitting(false);
       }
@@ -915,7 +915,7 @@ export function useBildirimDetail(parsedBildirimId: number, hasValidId: boolean)
   const refetch = useCallback(async () => {
     if (!hasValidId) {
       setIsLoading(false);
-      setErrorMessage("Gecerli bir gunluk kayit ID verilmedi.");
+      setErrorMessage("Geçerli bir günlük kayıt ID verilmedi.");
       return;
     }
 
@@ -937,7 +937,7 @@ export function useBildirimDetail(parsedBildirimId: number, hasValidId: boolean)
         return;
       }
       if (!getCacheEntry<Bildirim>(detailKey)) {
-        setErrorMessage("Gunluk kayit detayi su an guncellenemiyor.");
+        setErrorMessage("Günlük kayıt detayı şu an güncellenemiyor.");
       }
     } finally {
       setIsLoading(false);

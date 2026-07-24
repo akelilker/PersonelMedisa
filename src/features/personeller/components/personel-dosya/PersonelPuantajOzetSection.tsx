@@ -10,10 +10,7 @@ import {
   usePuantajEksikGunOzeti
 } from "../../../../hooks/usePuantajEksikGunOzeti";
 import type { Personel } from "../../../../types/personel";
-import type {
-  RevizyonCorrectionEvent,
-  RevizyonCorrectionTipi
-} from "../../../../types/revizyon-correction";
+import type { RevizyonCorrectionEvent } from "../../../../types/revizyon-correction";
 import type {
   RevizyonTalebi,
   RevizyonTalebiDurumu,
@@ -35,7 +32,10 @@ import {
   formatSgkHesaplamaModuLabel,
   timestampValue
 } from "./personel-dosya-format-utils";
-import { buildRevizyonTalebiCreatePath } from "../../../revizyon/revizyon-display";
+import {
+  buildRevizyonTalebiCreatePath,
+  formatRevizyonCorrectionTipiLabel
+} from "../../../revizyon/revizyon-display";
 
 const BORDRO_ADAY_OZETI_HENUZ_OLUSMADI =
   "Bu dönem için immutable SGK snapshot sonucu henüz oluşmadı.";
@@ -63,15 +63,6 @@ const REVIZYON_TIPI_LABELS: Record<RevizyonTipi, string> = {
   MOLA_DUZELTME: "Mola düzeltme",
   DEVAMSIZLIK_DUZELTME: "Devamsızlık düzeltme",
   SUREC_GEC_GIRIS: "Süreç geç giriş",
-  SERBEST_ZAMAN_ETKI_DUZELTME: "Serbest zaman etki düzeltme",
-  KAPANIS_HESAP_REVIZYONU: "Kapanış hesap revizyonu",
-  BORDRO_ETKI_NOTU: "Bordro etki notu"
-};
-
-const REVIZYON_CORRECTION_TIPI_LABELS: Record<RevizyonCorrectionTipi, string> = {
-  GIRIS_CIKIS_DUZELTME: "Giriş / çıkış düzeltme",
-  MOLA_DUZELTME: "Mola düzeltme",
-  DEVAMSIZLIK_DUZELTME: "Devamsızlık düzeltme",
   SERBEST_ZAMAN_ETKI_DUZELTME: "Serbest zaman etki düzeltme",
   KAPANIS_HESAP_REVIZYONU: "Kapanış hesap revizyonu",
   BORDRO_ETKI_NOTU: "Bordro etki notu"
@@ -129,14 +120,14 @@ function formatRevizyonTalebiSummary(talep: RevizyonTalebi) {
   const tip = REVIZYON_TIPI_LABELS[talep.revizyon_tipi] ?? talep.revizyon_tipi;
   const eskiDeger = formatNullableScalar(talep.onceki_deger);
   const yeniDeger = formatNullableScalar(talep.talep_edilen_deger);
-  const correction = talep.correction_event_id != null ? `Correction #${talep.correction_event_id}` : "Correction yok";
+  const correction = talep.correction_event_id != null ? `Düzeltme kaydı #${talep.correction_event_id}` : "Düzeltme kaydı yok";
   const talepZamani = formatDateTimeDetail(talep.talep_zamani);
 
   return `${durum} / ${tip} / ${talep.etkilenen_tarih} / ${eskiDeger} -> ${yeniDeger} / ${correction} / ${talepZamani}`;
 }
 
 function formatRevizyonCorrectionSummary(correction: RevizyonCorrectionEvent) {
-  const tip = REVIZYON_CORRECTION_TIPI_LABELS[correction.correction_tipi] ?? correction.correction_tipi;
+  const tip = formatRevizyonCorrectionTipiLabel(correction.correction_tipi);
   const eskiDeger = formatNullableScalar(correction.onceki_deger);
   const yeniDeger = formatNullableScalar(correction.yeni_deger);
   const durum = correction.iptal_edildi_mi ? "İptal" : "Aktif";
@@ -144,7 +135,7 @@ function formatRevizyonCorrectionSummary(correction: RevizyonCorrectionEvent) {
     correction.delta_dakika !== 0 ? `${correction.delta_dakika} dk` : null,
     correction.delta_gun !== 0 ? `${correction.delta_gun} gün` : null
   ].filter((part): part is string => part !== null);
-  const delta = deltaParts.length > 0 ? deltaParts.join(", ") : "Delta yok";
+  const delta = deltaParts.length > 0 ? deltaParts.join(", ") : "Fark yok";
   const olusturmaZamani = formatDateTimeDetail(correction.olusturma_zamani);
 
   return `${durum} / ${tip} / ${correction.etkilenen_tarih} / ${eskiDeger} -> ${yeniDeger} / ${delta} / ${olusturmaZamani}`;
@@ -177,8 +168,8 @@ function PersonelRevizyonCorrectionPanel({
 
   return (
     <DossierSection
-      title="Revizyon / Correction İzleri"
-      description="Kapalı dönem düzeltme talepleri ve üretilen correction etkileri. Ham snapshot değişmez; correction görünürlüğü rapor motoru overlay’i değildir."
+      title="Revizyon ve Düzeltme Kayıtları"
+      description="Kapalı dönem düzeltme talepleri ve üretilen düzeltme kaydı etkileri. Ham kapanış kaydı değişmez; düzeltme kaydı görünürlüğü rapor motoru katman etkisi değildir."
     >
       {!canViewRevizyon ? (
         <DossierRecord label="Yetki" value="Revizyon kayıtlarını görüntüleme yetkiniz yok." />
@@ -195,10 +186,10 @@ function PersonelRevizyonCorrectionPanel({
           <DossierRecord label="Açık Talep" value={String(acikTalepSayisi)} />
           <DossierRecord label="Onaylanan Talep" value={String(onayliTalepSayisi)} />
           <DossierRecord
-            label="Aktif Correction"
+            label="Aktif Düzeltme Kaydı"
             value={
               aktifCorrectionSayisi > 0
-                ? `${aktifCorrectionSayisi} (aktif correction etiketi)`
+                ? `${aktifCorrectionSayisi} (aktif düzeltme kaydı etiketi)`
                 : "0"
             }
           />
@@ -223,7 +214,7 @@ function PersonelRevizyonCorrectionPanel({
           </div>
 
           {talepler.length === 0 && corrections.length === 0 ? (
-            <DossierRecord label="Kayıt" value="Bu personel için revizyon veya correction kaydı yok." />
+            <DossierRecord label="Kayıt" value="Bu personel için revizyon veya düzeltme kaydı yok." />
           ) : null}
 
           {sonTalepler.map((talep) => (
@@ -241,14 +232,14 @@ function PersonelRevizyonCorrectionPanel({
           {sonCorrections.map((correction) => (
             <div key={`revizyon-correction-${correction.id}`}>
               <DossierRecord
-                label={`Correction #${correction.id}${correction.iptal_edildi_mi ? "" : " · Aktif"}`}
+                label={`Düzeltme kaydı #${correction.id}${correction.iptal_edildi_mi ? "" : " · Aktif"}`}
                 value={formatRevizyonCorrectionSummary(correction)}
               />
               <Link
                 className="universal-btn-aux"
                 to={`/haftalik-kapanis/corrections/${correction.id}`}
               >
-                Correction detayına git
+                Düzeltme kaydı detayına git
               </Link>
             </div>
           ))}
@@ -352,7 +343,7 @@ export function PersonelPuantajOzetSection({
 
         setRevizyonTalepleri([]);
         setRevizyonCorrections([]);
-        setRevizyonErrorMessage("Revizyon ve correction kayıtları yüklenemedi.");
+        setRevizyonErrorMessage("Revizyon ve düzeltme kayıtları yüklenemedi.");
       })
       .finally(() => {
         if (!isCancelled) {

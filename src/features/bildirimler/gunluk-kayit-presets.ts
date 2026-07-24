@@ -24,7 +24,7 @@ export type GunlukKayitOption = {
 };
 
 const GUN_TIPI_LABELS: Record<PuantajGunTipi, string> = {
-  Normal_Is_Gunu: "Normal Is Gunu",
+  Normal_Is_Gunu: "Normal İş Günü",
   Hafta_Tatili_Pazar: "Hafta Tatili Pazar",
   UBGT_Resmi_Tatil: "UBGT Resmi Tatil"
 };
@@ -32,24 +32,24 @@ const GUN_TIPI_LABELS: Record<PuantajGunTipi, string> = {
 const HAREKET_DURUMU_LABELS: Record<PuantajHareketDurumu, string> = {
   Geldi: "Geldi",
   Gelmedi: "Gelmedi",
-  Gec_Geldi: "Gec Geldi",
-  Erken_Cikti: "Erken Cikti"
+  Gec_Geldi: "Geç Geldi",
+  Erken_Cikti: "Erken Çıktı"
 };
 
 const DAYANAK_LABELS: Record<PuantajDayanak, string> = {
-  Yok_Izinsiz: "Yok / Izinsiz",
-  Ucretli_Izinli: "Ucretli Izinli",
-  Raporlu_Hastalik: "Raporlu Hastalik",
-  Raporlu_Is_Kazasi: "Raporlu Is Kazasi",
-  Yillik_Izin: "Yillik Izin",
-  Telafi_Calismasi: "Telafi Calismasi",
-  Gorevde_Calisma: "Gorevde Calisma"
+  Yok_Izinsiz: "Yok / İzinsiz",
+  Ucretli_Izinli: "Ücretli İzinli",
+  Raporlu_Hastalik: "Raporlu Hastalık",
+  Raporlu_Is_Kazasi: "Raporlu İş Kazası",
+  Yillik_Izin: "Yıllık İzin",
+  Telafi_Calismasi: "Telafi Çalışması",
+  Gorevde_Calisma: "Görevde Çalışma"
 };
 
 const HESAP_ETKISI_LABELS: Record<PuantajHesapEtkisi, string> = {
   Tam_Yevmiye_Ver: "Tam Yevmiye Ver",
   Yevmiye_Kes: "Yevmiye Kes",
-  Ucretli_Izin: "Ucretli Izin",
+  Ucretli_Izin: "Ücretli İzin",
   Raporlu: "Raporlu",
   Mesai_Yaz: "Mesai Yaz",
   Telafi: "Telafi"

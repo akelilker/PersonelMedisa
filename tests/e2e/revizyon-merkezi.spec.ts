@@ -137,21 +137,32 @@ test.describe("S80 Revizyon Merkezi final UI kabul", () => {
     await expect(page.getByTestId("revizyon-deger-ayrimi")).toBeVisible();
     await expect(page.getByTestId("revizyon-ham-deger")).toBeVisible();
     await expect(page.getByTestId("revizyon-talep-deger")).toBeVisible();
-    await expect(page.getByTestId("revizyon-corrected-deger")).toContainText("Aktif correction yok");
+    await expect(page.getByTestId("revizyon-corrected-deger")).toContainText("Aktif düzeltme kaydı yok");
     await expect(page.getByTestId("revizyon-overlay-uyari")).toContainText("rapor/bordro");
     await expect(page.getByTestId("revizyon-audit-gecmisi")).toBeVisible();
 
     await page.getByTestId("revizyon-correction-uret").click();
-    await expect(page.getByTestId("revizyon-action-success")).toContainText("Correction");
-    await expect(page.getByTestId("revizyon-corrected-deger")).not.toContainText("Aktif correction yok");
+    await expect(page.getByTestId("revizyon-action-success")).toContainText("Düzeltme kaydı");
+    await expect(page.getByTestId("revizyon-corrected-deger")).not.toContainText("Aktif düzeltme kaydı yok");
     await expect(page.getByTestId("revizyon-correction-uret")).toHaveCount(0);
+    await expect(page.getByTestId("revizyon-correction-iptal")).toHaveText("Düzeltme Kaydını İptal Et");
     await page.getByTestId("revizyon-correction-detay-git").click();
     await expect(page.getByTestId("revizyon-correction-detay")).toBeVisible();
+    await expect(page.getByTestId("revizyon-correction-detay")).toContainText("Fark: dakika / gün");
+    await expect(page.getByRole("button", { name: "Düzeltme Kaydını İptal Et" })).toBeVisible();
     await page.goBack();
     await expect(page.getByTestId("revizyon-talep-detay")).toBeVisible();
 
     const talepId = page.url().match(/revizyonlar\/(\d+)/)?.[1];
     expect(talepId).toBeTruthy();
+    await page.goto("/haftalik-kapanis/revizyonlar?gorunum=corrections");
+    await expect(page.getByTestId("revizyon-correction-tablosu")).toBeVisible();
+    await expect(page.getByRole("columnheader", { name: "Fark (dk)" })).toBeVisible();
+    await expect(page.getByRole("columnheader", { name: "Fark (gün)" })).toBeVisible();
+    await page.goto(`/haftalik-kapanis/revizyonlar/${talepId}`);
+    await expect(page.getByTestId("revizyon-talep-detay")).toBeVisible();
+    await expect(page.getByTestId("revizyon-correction-iptal")).toHaveText("Düzeltme Kaydını İptal Et");
+
     const dup = await page.evaluate(async (id) => {
       const keys = ["medisa.auth.session.v1", "medisa_auth_session"];
       let raw: string | null = null;

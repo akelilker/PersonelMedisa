@@ -112,7 +112,7 @@ export function HaftalikKapanisPage() {
     <section className="states-page" data-testid="haftalik-kapanis-page">
       <h2>Haftalık Kapanış</h2>
       <p>
-        Kapalı hafta snapshot’ları korunur. Revizyon talepleri ve correction kayıtları burada yönetilir;
+        Kapalı hafta kapanış kayıtları korunur. Revizyon talepleri ve düzeltme kayıtları burada yönetilir;
         rapor/bordro motoru otomatik yeniden hesaplanmaz.
       </p>
 
@@ -146,7 +146,7 @@ export function HaftalikKapanisPage() {
               to="/haftalik-kapanis/revizyonlar?gorunum=corrections"
               data-testid="hk-corrections-link"
             >
-              Corrections
+              Düzeltme Kayıtları
             </Link>
             {canCreate ? (
               <Link
@@ -261,8 +261,8 @@ export function HaftalikKapanisPage() {
       )}
 
       <p className="form-hint" style={{ marginTop: "1.25rem" }} data-testid="hk-overlay-uyari">
-        Aktif correction görünürlüğü, rapor satırlarında gerçek overlay anlamına gelmez. Ham kapanış
-        snapshot’ı değişmez.
+        Aktif düzeltme kaydı görünürlüğü, rapor satırlarında gerçek katman etkisi anlamına gelmez. Ham
+        kapanış kaydı değişmez.
       </p>
     </section>
   );

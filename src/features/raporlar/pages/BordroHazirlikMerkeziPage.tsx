@@ -816,7 +816,7 @@ export function BordroHazirlikMerkeziPage() {
                     <th>Brüt</th>
                   </>
                 ) : null}
-                <th>Correction</th>
+                <th>Düzeltme Kaydı</th>
                 <th>Durum</th>
                 <th>Detay</th>
               </tr>

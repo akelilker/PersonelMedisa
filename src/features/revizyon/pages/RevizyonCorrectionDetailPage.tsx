@@ -9,7 +9,7 @@ import { ErrorState } from "../../../components/states/ErrorState";
 import { LoadingState } from "../../../components/states/LoadingState";
 import { useRoleAccess } from "../../../hooks/use-role-access";
 import type { RevizyonCorrectionEvent } from "../../../types/revizyon-correction";
-import { formatRevizyonDeger, revizyonUserMessage } from "../revizyon-display";
+import { formatRevizyonDeger, formatRevizyonCorrectionTipiLabel, revizyonUserMessage } from "../revizyon-display";
 
 export function RevizyonCorrectionDetailPage() {
   const { correctionId } = useParams();
@@ -48,7 +48,7 @@ export function RevizyonCorrectionDetailPage() {
   }, [load]);
 
   if (isLoading) {
-    return <LoadingState label="Correction detayı yükleniyor..." />;
+    return <LoadingState label="Düzeltme kaydı detayı yükleniyor..." />;
   }
   if (errorMessage || !correction) {
     return <ErrorState message={errorMessage ?? "Kayıt bulunamadı."} onRetry={() => void load()} />;
@@ -71,10 +71,10 @@ export function RevizyonCorrectionDetailPage() {
         </button>
       </div>
 
-      <h2>Correction Detayı</h2>
+      <h2>Düzeltme Kaydı Detayı</h2>
       <dl className="dossier-grid">
         <div>
-          <dt>Correction</dt>
+          <dt>Düzeltme Kaydı</dt>
           <dd>{correction.id}</dd>
         </div>
         <div>
@@ -93,7 +93,7 @@ export function RevizyonCorrectionDetailPage() {
         </div>
         <div>
           <dt>Tip</dt>
-          <dd>{correction.correction_tipi}</dd>
+          <dd>{formatRevizyonCorrectionTipiLabel(correction.correction_tipi)}</dd>
         </div>
         <div>
           <dt>Önceki değer</dt>
@@ -104,7 +104,7 @@ export function RevizyonCorrectionDetailPage() {
           <dd>{formatRevizyonDeger(correction.yeni_deger as never)}</dd>
         </div>
         <div>
-          <dt>Delta dakika / gün</dt>
+          <dt>Fark: dakika / gün</dt>
           <dd>
             {correction.delta_dakika} / {correction.delta_gun}
           </dd>
@@ -133,8 +133,8 @@ export function RevizyonCorrectionDetailPage() {
       </dl>
 
       <p className="form-hint">
-        Bu correction kaydı görünürlük amaçlıdır; puantaj/rapor/bordro motorunu otomatik yeniden
-        hesaplamaz. Ham snapshot değişmez.
+        Bu düzeltme kaydı görünürlük amaçlıdır; puantaj/rapor/bordro motorunu otomatik yeniden
+        hesaplamaz. Ham kapanış kaydı değişmez.
       </p>
 
       {canCancel && !correction.iptal_edildi_mi ? (
@@ -143,7 +143,7 @@ export function RevizyonCorrectionDetailPage() {
           className="universal-btn-cancel"
           disabled={isActing}
           onClick={() => {
-            if (!window.confirm("Aktif correction iptal edilsin mi?")) {
+            if (!window.confirm("Aktif düzeltme kaydı iptal edilsin mi?")) {
               return;
             }
             const aciklama = window.prompt("İptal açıklaması (opsiyonel):") ?? "";
@@ -155,7 +155,7 @@ export function RevizyonCorrectionDetailPage() {
                   aciklama: aciklama || null
                 });
                 setCorrection(next);
-                setActionMessage("Correction iptal edildi.");
+                setActionMessage("Düzeltme kaydı iptal edildi.");
               } catch (error) {
                 const code = error instanceof ApiRequestError ? error.code : undefined;
                 setActionError(
@@ -170,7 +170,7 @@ export function RevizyonCorrectionDetailPage() {
             })();
           }}
         >
-          Correction İptal
+          Düzeltme Kaydını İptal Et
         </button>
       ) : null}
 

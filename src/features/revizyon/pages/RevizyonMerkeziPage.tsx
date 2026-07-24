@@ -10,6 +10,7 @@ import { useRoleAccess } from "../../../hooks/use-role-access";
 import type { RevizyonCorrectionEvent } from "../../../types/revizyon-correction";
 import type { RevizyonTalebi } from "../../../types/revizyon-talebi";
 import {
+  formatRevizyonCorrectionTipiLabel,
   formatRevizyonDeger,
   formatRevizyonDurumLabel,
   formatRevizyonTipiLabel,
@@ -80,7 +81,7 @@ export function RevizyonMerkeziPage() {
       [
         { id: "talepler" as const, label: "Revizyon Talepleri", show: true },
         { id: "onay" as const, label: "Onay Bekleyenler", show: canApprove },
-        { id: "corrections" as const, label: "Corrections", show: true }
+        { id: "corrections" as const, label: "Düzeltme Kayıtları", show: true }
       ].filter((tab) => tab.show),
     [canApprove]
   );
@@ -144,7 +145,7 @@ export function RevizyonMerkeziPage() {
       ) : null}
 
       {!isLoading && !errorMessage && gorunum === "corrections" && corrections.length === 0 ? (
-        <EmptyState title="Boş liste" message="Gösterilecek correction kaydı yok." />
+        <EmptyState title="Boş liste" message="Gösterilecek düzeltme kaydı yok." />
       ) : null}
 
       {!isLoading && !errorMessage && gorunum !== "corrections" && talepler.length > 0 ? (
@@ -161,7 +162,7 @@ export function RevizyonMerkeziPage() {
                 <th>Tip</th>
                 <th>Durum</th>
                 {canViewFinance ? <th>Bordro</th> : null}
-                <th>Correction</th>
+                <th>Düzeltme Kaydı</th>
                 <th>Talep eden</th>
                 <th>Zaman</th>
                 <th>Detay</th>
@@ -223,8 +224,8 @@ export function RevizyonMerkeziPage() {
                 <th>Tip</th>
                 <th>Önceki</th>
                 <th>Yeni</th>
-                <th>Δ dk</th>
-                <th>Δ gün</th>
+                <th>Fark (dk)</th>
+                <th>Fark (gün)</th>
                 {canViewFinance ? <th>Bordro</th> : null}
                 <th>Durum</th>
                 <th>Oluşturma</th>
@@ -241,7 +242,7 @@ export function RevizyonMerkeziPage() {
                     {correction.hafta_baslangic} → {correction.hafta_bitis}
                   </td>
                   <td>{correction.etkilenen_tarih}</td>
-                  <td>{correction.correction_tipi}</td>
+                  <td>{formatRevizyonCorrectionTipiLabel(correction.correction_tipi)}</td>
                   <td>{formatRevizyonDeger(correction.onceki_deger as never)}</td>
                   <td>{formatRevizyonDeger(correction.yeni_deger as never)}</td>
                   <td>{correction.delta_dakika}</td>

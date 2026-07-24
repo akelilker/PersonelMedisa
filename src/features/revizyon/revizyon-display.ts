@@ -1,3 +1,4 @@
+import type { RevizyonCorrectionTipi } from "../../types/revizyon-correction";
 import type { RevizyonJsonDeger, RevizyonTipi } from "../../types/revizyon-talebi";
 
 export function formatRevizyonDeger(value: RevizyonJsonDeger | undefined | null): string {
@@ -52,6 +53,18 @@ export function formatRevizyonTipiLabel(tipi: RevizyonTipi | string): string {
   return labels[tipi] ?? tipi;
 }
 
+export function formatRevizyonCorrectionTipiLabel(tipi: RevizyonCorrectionTipi | string): string {
+  const labels: Record<string, string> = {
+    GIRIS_CIKIS_DUZELTME: "Giriş / çıkış düzeltme",
+    MOLA_DUZELTME: "Mola düzeltme",
+    DEVAMSIZLIK_DUZELTME: "Devamsızlık düzeltme",
+    SERBEST_ZAMAN_ETKI_DUZELTME: "Serbest zaman etki düzeltme",
+    KAPANIS_HESAP_REVIZYONU: "Kapanış hesap revizyonu",
+    BORDRO_ETKI_NOTU: "Bordro etki notu"
+  };
+  return labels[tipi] ?? tipi;
+}
+
 export function formatRevizyonDurumLabel(durum: string): string {
   const labels: Record<string, string> = {
     TASLAK: "Taslak",
@@ -76,7 +89,7 @@ export function revizyonUserMessage(code: string | undefined, fallback: string):
     case "UNAUTHORIZED_REVISION_APPROVAL":
       return "Onay/red yetkiniz yok.";
     case "CORRECTION_ALREADY_EXISTS":
-      return "Bu talep için correction zaten üretilmiş.";
+      return "Bu talep için düzeltme kaydı zaten oluşturulmuş.";
     case "INVALID_STATE_TRANSITION":
     case "STATE_CONFLICT":
       return "Bu işlem mevcut talep durumu için geçerli değil.";

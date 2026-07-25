@@ -72,7 +72,7 @@ function buildPersonelZimmetPayload(
   const teslimDurumu = form.teslimDurumu.trim();
 
   if (!urunTuru) {
-    throw new Error("Urun turu zorunludur.");
+    throw new Error("Ürün türü zorunludur.");
   }
 
   if (!teslimTarihi) {
@@ -140,7 +140,7 @@ export function usePersonelZimmetCreate(
       }
 
       if (!canCreateZimmet) {
-        setZimmetCreateErrorMessage("Bu islem icin yetkin bulunmuyor.");
+        setZimmetCreateErrorMessage("Bu işlem için yetkin bulunmuyor.");
         return;
       }
 
@@ -160,7 +160,7 @@ export function usePersonelZimmetCreate(
         setZimmetForm(INITIAL_PERSONEL_ZIMMET_FORM);
         onCreateSuccess?.();
       } catch (error) {
-        setZimmetCreateErrorMessage(getApiErrorMessage(error, "Zimmet kaydi yapilamadi."));
+        setZimmetCreateErrorMessage(getApiErrorMessage(error, "Zimmet kaydı yapılamadı."));
       } finally {
         setIsZimmetSubmitting(false);
       }

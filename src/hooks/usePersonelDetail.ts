@@ -729,7 +729,7 @@ function usePersonelDetailZimmetModal(
 
   const openZimmetModal = useCallback(() => {
     if (!canCreateZimmet) {
-      setZimmetCreateErrorMessage("Bu islem icin yetkin bulunmuyor.");
+      setZimmetCreateErrorMessage("Bu işlem için yetkin bulunmuyor.");
       return;
     }
 

@@ -5048,8 +5048,29 @@ let personelBelgeKaydiIdCounter = 903;
         payload.gecerlilik_bitis === null || payload.gecerlilik_bitis === undefined || payload.gecerlilik_bitis === ""
           ? null
           : String(payload.gecerlilik_bitis);
-      if (!Number.isFinite(tutar) || tutar <= 0 || !/^\d{4}-\d{2}-\d{2}$/.test(baslangic)) {
-        await fulfillJson(route, 400, errorBody("SALARY_AMOUNT_INVALID", "Ucret tutari veya tarih gecersiz."));
+      if (!Number.isFinite(tutar) || tutar <= 0) {
+        await fulfillJson(
+          route,
+          400,
+          errorBody("SALARY_AMOUNT_INVALID", "Ücret tutarı sıfırdan büyük olmalıdır.")
+        );
+        return;
+      }
+      const ucretTuru = String(payload.ucret_turu ?? "").toUpperCase();
+      if (ucretTuru !== "BRUT" && ucretTuru !== "NET") {
+        await fulfillJson(
+          route,
+          400,
+          errorBody("SALARY_TYPE_INVALID", "Ücret türü BRÜT veya NET olmalıdır.")
+        );
+        return;
+      }
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(baslangic)) {
+        await fulfillJson(
+          route,
+          400,
+          errorBody("DATE_INVALID", "gecerlilik_baslangic gecerli bir tarih olmalidir.")
+        );
         return;
       }
       const open = personelUcretleri.find(
@@ -5081,7 +5102,7 @@ let personelBelgeKaydiIdCounter = 903;
         id: ++personelUcretIdCounter,
         personel_id: personelId,
         ucret_tutari: tutar,
-        ucret_turu: payload.ucret_turu === "BRUT" ? "BRUT" : "NET",
+        ucret_turu: ucretTuru as "BRUT" | "NET",
         para_birimi: String(payload.para_birimi ?? "TRY"),
         gecerlilik_baslangic: baslangic,
         gecerlilik_bitis: bitis,
@@ -5675,7 +5696,7 @@ let personelBelgeKaydiIdCounter = 903;
       }
 
       for (const [field, message] of [
-        ["urun_turu", "Urun turu zorunludur."],
+        ["urun_turu", "Ürün türü zorunludur."],
         ["teslim_tarihi", "Teslim tarihi zorunludur."],
         ["teslim_eden", "Teslim eden bilgisi zorunludur."],
         ["teslim_durumu", "Teslim durumu zorunludur."]

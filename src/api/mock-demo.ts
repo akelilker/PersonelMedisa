@@ -3508,12 +3508,12 @@ function normalizeDemoUcretBody(
 ): { error: ApiResponse<unknown> } | { value: DemoUcretNormalizedBody } {
   const tutar = toNumber(source.ucret_tutari);
   if (tutar === null || tutar <= 0) {
-    return { error: demoRevizyonError("SALARY_AMOUNT_INVALID", "Ucret tutari sifirdan buyuk olmalidir.") };
+    return { error: demoRevizyonError("SALARY_AMOUNT_INVALID", "Ücret tutarı sıfırdan büyük olmalıdır.") };
   }
 
   const turu = (toStringValue(source.ucret_turu) ?? "").toUpperCase();
   if (turu !== "BRUT" && turu !== "NET") {
-    return { error: demoRevizyonError("SALARY_TYPE_INVALID", "Ucret turu BRUT veya NET olmalidir.") };
+    return { error: demoRevizyonError("SALARY_TYPE_INVALID", "Ücret türü BRÜT veya NET olmalıdır.") };
   }
 
   const paraBirimi = (toStringValue(source.para_birimi) ?? "TRY").toUpperCase();
@@ -5576,7 +5576,7 @@ export function resolveDemoApiResponse(
     };
 
     for (const check of [
-      requireString("urun_turu", "Urun turu zorunludur."),
+      requireString("urun_turu", "Ürün türü zorunludur."),
       requireString("teslim_tarihi", "Teslim tarihi zorunludur."),
       requireString("teslim_eden", "Teslim eden bilgisi zorunludur."),
       requireString("teslim_durumu", "Teslim durumu zorunludur.")

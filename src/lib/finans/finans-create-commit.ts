@@ -33,7 +33,7 @@ function parsePositiveInt(value: string): number | undefined {
 export function parseRequiredPositiveInt(value: string, label: string): number {
   const parsed = parsePositiveInt(value);
   if (!parsed) {
-    throw new Error(`${label} pozitif sayi olmalidir.`);
+    throw new Error(`${label} pozitif sayı olmalıdır.`);
   }
   return parsed;
 }
@@ -42,7 +42,7 @@ export function parseRequiredPositiveNumber(value: string, label: string): numbe
   const trimmed = value.trim();
   const parsed = Number.parseFloat(trimmed);
   if (!trimmed || Number.isNaN(parsed) || parsed <= 0) {
-    throw new Error(`${label} sifirdan buyuk olmali.`);
+    throw new Error(`${label} sıfırdan büyük olmalı.`);
   }
   return parsed;
 }
@@ -185,7 +185,7 @@ export async function commitFinansKalemCreate(options: {
   } catch (error) {
     return {
       outcome: "error",
-      message: getApiErrorMessage(error, "Finans kaydi olusturulamadi.")
+      message: getApiErrorMessage(error, "Finans kaydı oluşturulamadı.")
     };
   }
 }

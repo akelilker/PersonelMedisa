@@ -99,11 +99,11 @@ describe("getUcretApiErrorMessage", () => {
   });
 
   it("diger hatalarda backend mesajini veya fallback mesaji kullanir", () => {
-    const error = new ApiRequestError("Ucret tutari sifirdan buyuk olmalidir.", 400, {
+    const error = new ApiRequestError("Ücret tutarı sıfırdan büyük olmalıdır.", 400, {
       code: "SALARY_AMOUNT_INVALID"
     });
     expect(getUcretApiErrorMessage(error, "Ücret kaydı oluşturulamadı.")).toBe(
-      "Ucret tutari sifirdan buyuk olmalidir."
+      "Ücret tutarı sıfırdan büyük olmalıdır."
     );
     expect(getUcretApiErrorMessage(new Error(""), "Ücret geçmişi yüklenemedi.")).toBe(
       "Ücret geçmişi yüklenemedi."

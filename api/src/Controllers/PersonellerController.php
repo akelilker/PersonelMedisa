@@ -171,7 +171,7 @@ class PersonellerController
         }
         $payload = self::normalizeAndValidateCreatePayload($body);
         if ($hasSalary && ($payload['maas_tutari'] === null || (float) $payload['maas_tutari'] <= 0)) {
-            JsonResponse::error(400, 'SALARY_AMOUNT_INVALID', 'Ucret tutari sifirdan buyuk olmalidir.', 'maas_tutari');
+            JsonResponse::error(400, 'SALARY_AMOUNT_INVALID', 'Ücret tutarı sıfırdan büyük olmalıdır.', 'maas_tutari');
         }
 
         try {
@@ -239,7 +239,7 @@ class PersonellerController
         }
         $payload = self::normalizeAndValidateUpdatePayload($body);
         if ($hasSalary && (!array_key_exists('maas_tutari', $payload) || $payload['maas_tutari'] === null || (float) $payload['maas_tutari'] <= 0)) {
-            JsonResponse::error(400, 'SALARY_AMOUNT_INVALID', 'Ucret tutari sifirdan buyuk olmalidir.', 'maas_tutari');
+            JsonResponse::error(400, 'SALARY_AMOUNT_INVALID', 'Ücret tutarı sıfırdan büyük olmalıdır.', 'maas_tutari');
         }
 
         try {

@@ -202,7 +202,7 @@ class ZimmetlerController
     {
         $personelId = self::requirePositiveInt($body, 'personel_id', 'Personel secilmelidir.');
 
-        $urunTuru = self::requireNonEmptyString($body, 'urun_turu', 'Urun turu zorunludur.', 32);
+        $urunTuru = self::requireNonEmptyString($body, 'urun_turu', 'Ürün türü zorunludur.', 32);
         $urunTuru = strtoupper($urunTuru);
         if (!in_array($urunTuru, self::validUrunTurleri(), true)) {
             self::validationError('urun_turu', 'Urun turu gecerli degil.');

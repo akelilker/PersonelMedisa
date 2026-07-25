@@ -475,11 +475,11 @@ class PersonelUcretService
     {
         $amount = $payload['ucret_tutari'] ?? null;
         if (!is_numeric($amount) || (float) $amount <= 0) {
-            throw new PersonelUcretException('SALARY_AMOUNT_INVALID', 'Ucret tutari sifirdan buyuk olmalidir.', 400);
+            throw new PersonelUcretException('SALARY_AMOUNT_INVALID', 'Ücret tutarı sıfırdan büyük olmalıdır.', 400);
         }
         $type = strtoupper(trim((string) ($payload['ucret_turu'] ?? '')));
         if (!in_array($type, ['BRUT', 'NET'], true)) {
-            throw new PersonelUcretException('SALARY_TYPE_INVALID', 'Ucret turu BRUT veya NET olmalidir.', 400);
+            throw new PersonelUcretException('SALARY_TYPE_INVALID', 'Ücret türü BRÜT veya NET olmalıdır.', 400);
         }
         $currency = strtoupper(trim((string) ($payload['para_birimi'] ?? 'TRY')));
         if (!preg_match('/^[A-Z]{3}$/', $currency)) {

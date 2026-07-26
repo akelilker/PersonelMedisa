@@ -33,7 +33,7 @@ check(/mirror\s+-R\s+--verbose\s+api\/src\s+api\/src/.test(workflow), 'api/src u
 check(/test\s+!\s+-f\s+api\/config\.local\.php/.test(workflow), 'api/config.local.php deploy guard is missing');
 
 const unsafeSecretEchoes = lines.filter(
-  (line) => /\becho\b/.test(line) && /\$\{?(FTP_SERVER|FTP_USERNAME|FTP_PASSWORD)\}?/.test(line),
+  (line) => /\becho\b[^\n]*\$\{?(FTP_SERVER|FTP_USERNAME|FTP_PASSWORD)\}?/.test(line),
 );
 check(unsafeSecretEchoes.length === 0, 'FTP secret values must not be echoed');
 

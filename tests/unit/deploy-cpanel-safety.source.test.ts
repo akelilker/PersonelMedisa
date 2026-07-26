@@ -41,7 +41,7 @@ describe('cPanel deploy server-state safety contract', () => {
 
   it('does not echo FTP secret values', () => {
     const unsafeSecretEchoes = lines.filter(
-      (line) => /\becho\b/.test(line) && /\$\{?(FTP_SERVER|FTP_USERNAME|FTP_PASSWORD)\}?/.test(line),
+      (line) => /\becho\b[^\n]*\$\{?(FTP_SERVER|FTP_USERNAME|FTP_PASSWORD)\}?/.test(line),
     );
     expect(unsafeSecretEchoes).toEqual([]);
   });

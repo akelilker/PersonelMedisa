@@ -123,7 +123,7 @@ jobs:
               !echo 'FTP root hedefleniyor';
               cd ${REMOTE_TARGET_DIR};
               !echo 'SPA dist upload basliyor';
-              mirror -R --delete --verbose --exclude api/ . .;
+              mirror -R --verbose --exclude api/ --exclude-glob '.git*' --exclude-glob '.cpanel*' . .;
               !echo 'PHP API upload basliyor';
               lcd ${LOCAL_REPO_DIR};
               mkdir -p api;

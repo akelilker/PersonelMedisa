@@ -2,7 +2,7 @@ import type { ApiResponse, PaginatedResult } from "../types/api";
 import type { CreateZimmetPayload, Zimmet } from "../types/zimmet";
 import { appendQueryParams } from "../utils/append-query-params";
 import { logAction } from "../audit/audit-service";
-import { apiRequest } from "./api-client";
+import { ApiRequestError, apiRequest } from "./api-client";
 import { endpoints } from "./endpoints";
 import { normalizePaginatedList } from "./response-normalizers";
 
@@ -13,6 +13,30 @@ export type ZimmetlerListParams = {
   page?: number;
   limit?: number;
 };
+
+const ZIMMET_ERROR_STATUS: Record<string, number> = {
+  VALIDATION_ERROR: 422,
+  FORBIDDEN: 403
+};
+
+function throwFirstZimmetApiError(
+  errors: ApiResponse<unknown>["errors"],
+  fallbackMessage: string
+): never {
+  const first = errors?.[0];
+  const code = typeof first?.code === "string" ? first.code : "INVALID_REQUEST";
+  const message =
+    typeof first?.message === "string" && first.message.trim() ? first.message : fallbackMessage;
+  const field = typeof first?.field === "string" ? first.field : undefined;
+
+  throw new ApiRequestError(message, ZIMMET_ERROR_STATUS[code] ?? 400, { code, field });
+}
+
+function assertNoZimmetApiErrors(response: ApiResponse<unknown>, fallbackMessage: string): void {
+  if (Array.isArray(response.errors) && response.errors.length > 0) {
+    throwFirstZimmetApiError(response.errors, fallbackMessage);
+  }
+}
 
 function normalizeZimmet(data: unknown): Zimmet {
   if (typeof data !== "object" || data === null) {
@@ -61,6 +85,7 @@ export async function createZimmet(payload: CreateZimmetPayload): Promise<Zimmet
     method: "POST",
     body: JSON.stringify(payload)
   });
+  assertNoZimmetApiErrors(response, "Zimmet kaydı yapılamadı.");
   const created = normalizeZimmet(response.data);
   logAction({ action: "ZIMMET_CREATE", payload: { zimmet_id: created.id, personel_id: created.personel_id } });
   return created;

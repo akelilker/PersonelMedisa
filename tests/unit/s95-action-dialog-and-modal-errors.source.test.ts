@@ -1,6 +1,5 @@
-import { execSync } from "node:child_process";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { readdirSync, readFileSync } from "node:fs";
+import { join, resolve } from "node:path";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
@@ -14,8 +13,27 @@ const MODAL_ERROR_OWNERS = [
   "src/features/personeller/components/personel-dosya/PersonelBelgelerPanel.tsx"
 ] as const;
 
-function findNativeDialogCalls(relativePath: string): string[] {
-  const sourceText = readFileSync(resolve(process.cwd(), relativePath), "utf8");
+function listSourceFiles(dir: string): string[] {
+  const entries = readdirSync(dir, { withFileTypes: true });
+  const files: string[] = [];
+  for (const entry of entries) {
+    const absolute = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      files.push(...listSourceFiles(absolute));
+      continue;
+    }
+    if (entry.isFile() && /\.(ts|tsx)$/.test(entry.name)) {
+      files.push(absolute);
+    }
+  }
+  return files;
+}
+
+function findNativeDialogCalls(relativeOrAbsolutePath: string): string[] {
+  const cwd = resolve(process.cwd());
+  const absolutePath = resolve(cwd, relativeOrAbsolutePath);
+  const relativePath = absolutePath.slice(cwd.length + 1).replace(/\\/g, "/");
+  const sourceText = readFileSync(absolutePath, "utf8");
   const sourceFile = ts.createSourceFile(
     relativePath,
     sourceText,
@@ -36,12 +54,12 @@ function findNativeDialogCalls(relativePath: string): string[] {
           expression.name.text === "prompt" ||
           expression.name.text === "alert")
       ) {
-        hits.push(expression.getText(sourceFile));
+        hits.push(`${relativePath}:${expression.getText(sourceFile)}`);
       } else if (
         ts.isIdentifier(expression) &&
         (expression.text === "confirm" || expression.text === "prompt" || expression.text === "alert")
       ) {
-        hits.push(expression.getText(sourceFile));
+        hits.push(`${relativePath}:${expression.getText(sourceFile)}`);
       }
     }
 
@@ -85,7 +103,9 @@ describe("S95 confirm dialog and modal error surface contracts", () => {
     const source = readFileSync(resolve(process.cwd(), MODAL_ERROR_OWNERS[0]), "utf8");
     expect(source).toContain('data-testid="rtt-cancel-error"');
     expect(source).toContain("setCancelError");
-    expect(source).not.toMatch(/handleCancelSubmit[\s\S]*setActionError\(apiErrorMessage\(error, "İptal başarısız\."\)\)/);
+    expect(source).not.toMatch(
+      /handleCancelSubmit[\s\S]*setActionError\(apiErrorMessage\(error, "İptal başarısız\."\)\)/
+    );
   });
 
   it("personel belge modalları API hatasını modal içinde gösterir", () => {
@@ -98,20 +118,8 @@ describe("S95 confirm dialog and modal error surface contracts", () => {
   });
 
   it("src altında native dialog kalmamıştır", () => {
-    let output = "";
-    try {
-      output = execSync(
-        'rg -n "window\\.(confirm|prompt|alert)|globalThis\\.(confirm|prompt|alert)" src',
-        { encoding: "utf8" }
-      ).trim();
-    } catch (error) {
-      const err = error as { status?: number; stdout?: string };
-      if (err.status === 1) {
-        output = (err.stdout ?? "").trim();
-      } else {
-        throw error;
-      }
-    }
-    expect(output).toBe("");
+    const srcRoot = resolve(process.cwd(), "src");
+    const hits = listSourceFiles(srcRoot).flatMap((filePath) => findNativeDialogCalls(filePath));
+    expect(hits).toEqual([]);
   });
 });

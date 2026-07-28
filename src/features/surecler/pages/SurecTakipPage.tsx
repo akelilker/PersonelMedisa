@@ -2,6 +2,7 @@ import { useEffect, type FormEvent } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { FormField } from "../../../components/form/FormField";
 import { AppModal } from "../../../components/modal/AppModal";
+import { AppActionDialog } from "../../../components/modal/AppActionDialog";
 import { EmptyState } from "../../../components/states/EmptyState";
 import { ErrorState } from "../../../components/states/ErrorState";
 import { LoadingState } from "../../../components/states/LoadingState";
@@ -53,7 +54,11 @@ export function SurecTakipPage() {
     isEditSubmitting,
     updateSurecHandler,
     cancelingSurecId,
-    cancelSurecHandler,
+    pendingCancelSurec,
+    cancelDialogError,
+    openCancelSurecDialog,
+    closeCancelSurecDialog,
+    confirmCancelSurec,
     submitFilters,
     clearFilters,
     setPage
@@ -230,7 +235,7 @@ export function SurecTakipPage() {
                     <button
                       type="button"
                       className="universal-btn-aux"
-                      onClick={() => void cancelSurecHandler(surec, canCancelSurec)}
+                      onClick={() => openCancelSurecDialog(surec, canCancelSurec)}
                       disabled={cancelingSurecId === surec.id}
                     >
                       {cancelingSurecId === surec.id ? "İptal Ediliyor..." : "İptal"}
@@ -460,6 +465,22 @@ export function SurecTakipPage() {
             {referenceError ? <p className="surec-form-error">{referenceError}</p> : null}
           </form>
         </AppModal>
+      ) : null}
+
+      {pendingCancelSurec ? (
+        <AppActionDialog
+          open
+          testId="surec-action-dialog"
+          title="Süreci İptal Et"
+          description={`Süreç #${pendingCancelSurec.id} kaydını iptal etmek istiyor musun?`}
+          confirmLabel="İptal Et"
+          submitLabel="İptal ediliyor..."
+          destructive
+          isSubmitting={cancelingSurecId === pendingCancelSurec.id}
+          errorMessage={cancelDialogError}
+          onConfirm={confirmCancelSurec}
+          onCancel={closeCancelSurecDialog}
+        />
       ) : null}
     </section>
   );

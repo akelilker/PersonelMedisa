@@ -2,6 +2,7 @@ import { type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { FormField } from "../../../components/form/FormField";
 import { AppModal } from "../../../components/modal/AppModal";
+import { AppActionDialog } from "../../../components/modal/AppActionDialog";
 import { EmptyState } from "../../../components/states/EmptyState";
 import { ErrorState } from "../../../components/states/ErrorState";
 import { LoadingState } from "../../../components/states/LoadingState";
@@ -44,7 +45,11 @@ export function FinansPage() {
     editErrorMessage,
     isEditSubmitting,
     cancelOngoingId,
-    cancelFinansHandler,
+    pendingCancelItem,
+    cancelDialogError,
+    openCancelFinansDialog,
+    closeCancelFinansDialog,
+    confirmCancelFinans,
     updateFinansHandler,
     submitFilters,
     clearFilters,
@@ -152,7 +157,7 @@ export function FinansPage() {
                     <button
                       type="button"
                       className="universal-btn-aux"
-                      onClick={() => void cancelFinansHandler(item, canCancelFinans)}
+                      onClick={() => openCancelFinansDialog(item, canCancelFinans)}
                       disabled={cancelOngoingId === item.id}
                     >
                       {cancelOngoingId === item.id ? "İptal Ediliyor..." : "İptal"}
@@ -333,6 +338,22 @@ export function FinansPage() {
             {editErrorMessage ? <p className="finans-form-error">{editErrorMessage}</p> : null}
           </form>
         </AppModal>
+      ) : null}
+
+      {pendingCancelItem ? (
+        <AppActionDialog
+          open
+          testId="finans-action-dialog"
+          title="Finans Kaydını İptal Et"
+          description={`Finans kaydı #${pendingCancelItem.id} iptal edilsin mi?`}
+          confirmLabel="İptal Et"
+          submitLabel="İptal ediliyor..."
+          destructive
+          isSubmitting={cancelOngoingId === pendingCancelItem.id}
+          errorMessage={cancelDialogError}
+          onConfirm={confirmCancelFinans}
+          onCancel={closeCancelFinansDialog}
+        />
       ) : null}
     </section>
   );

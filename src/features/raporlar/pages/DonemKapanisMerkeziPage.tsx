@@ -4,6 +4,7 @@ import { downloadDonemKapanisPreflightCsv } from "../../../api/donem-kapanis.api
 import { fetchDepartmanOptions } from "../../../api/referans.api";
 import { fetchYonetimSubeleri } from "../../../api/yonetim.api";
 import { muhurleAylikPuantaj } from "../../../api/puantaj.api";
+import { AppActionDialog } from "../../../components/modal/AppActionDialog";
 import { ErrorState } from "../../../components/states/ErrorState";
 import { LoadingState } from "../../../components/states/LoadingState";
 import { useRoleAccess } from "../../../hooks/use-role-access";
@@ -21,6 +22,9 @@ import { KapanisAuditPaneli } from "../components/donem-kapanis/KapanisAuditPane
 import { KapanisIssueListesi } from "../components/donem-kapanis/KapanisIssueListesi";
 import { KapanisOzetKartlari } from "../components/donem-kapanis/KapanisOzetKartlari";
 import { KapanisPersonelDetayModal } from "../components/donem-kapanis/KapanisPersonelDetayModal";
+
+const DONEM_MUHUR_ONAY_MESAJI =
+  "Seçili dönem mühürlenecek. Mühür sonrası puantaj kayıtları düzenlenemez. Devam edilsin mi?";
 
 const INITIAL_FILTERS: DonemKapanisFilterState = {
   ay: currentMonthParts().ay,
@@ -41,6 +45,8 @@ export function DonemKapanisMerkeziPage() {
   const [selectedIssue, setSelectedIssue] = useState<DonemKapanisIssue | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [isSealing, setIsSealing] = useState(false);
+  const [pendingSealConfirm, setPendingSealConfirm] = useState(false);
+  const [sealDialogError, setSealDialogError] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
@@ -131,7 +137,23 @@ export function DonemKapanisMerkeziPage() {
     }
   }
 
-  async function handleSeal() {
+  function openSealDialog() {
+    if (!parsedAy || !subeId || sealDisabled) {
+      return;
+    }
+    setSealDialogError(null);
+    setPendingSealConfirm(true);
+  }
+
+  function closeSealDialog() {
+    if (isSealing) {
+      return;
+    }
+    setPendingSealConfirm(false);
+    setSealDialogError(null);
+  }
+
+  async function confirmSeal() {
     if (!parsedAy || !subeId || sealDisabled) {
       return;
     }
@@ -139,20 +161,25 @@ export function DonemKapanisMerkeziPage() {
     setIsSealing(true);
     setActionMessage(null);
     setActionError(null);
+    setSealDialogError(null);
 
     try {
       const result = await muhurleAylikPuantaj({ yil: parsedAy.yil, ay: parsedAy.ay });
       setActionMessage(
         `Dönem mühürlendi (${result.donem}). ${result.muhurlenen_kayit_sayisi} kayıt mühürlendi.`
       );
+      setPendingSealConfirm(false);
       await refetch();
       await refetchAudits();
     } catch (error) {
-      if (error instanceof ApiRequestError && error.code === "PERIOD_CLOSE_BLOCKED") {
-        setActionError("Kapanış engellendi: açık engelleyici kayıtlar var.");
-      } else {
-        setActionError(error instanceof Error ? error.message : "Dönem mühürlenemedi.");
-      }
+      const message =
+        error instanceof ApiRequestError && error.code === "PERIOD_CLOSE_BLOCKED"
+          ? "Kapanış engellendi: açık engelleyici kayıtlar var."
+          : error instanceof Error
+            ? error.message
+            : "Dönem mühürlenemedi.";
+      setSealDialogError(message);
+      setActionError(message);
       await refetch();
       await refetchAudits();
     } finally {
@@ -188,7 +215,7 @@ export function DonemKapanisMerkeziPage() {
             className="universal-btn-save"
             data-testid="donem-kapanis-muhurle"
             disabled={sealDisabled}
-            onClick={() => void handleSeal()}
+            onClick={openSealDialog}
           >
             {isSealing ? "Mühürleniyor…" : "Dönemi mühürle"}
           </button>
@@ -233,6 +260,22 @@ export function DonemKapanisMerkeziPage() {
         params={buildParams()}
         onClose={() => setSelectedIssue(null)}
       />
+
+      {pendingSealConfirm ? (
+        <AppActionDialog
+          open
+          testId="donem-kapanis-muhur-action-dialog"
+          title="Dönemi Mühürle"
+          description={DONEM_MUHUR_ONAY_MESAJI}
+          confirmLabel="Mühürle"
+          submitLabel="Mühürleniyor…"
+          destructive
+          isSubmitting={isSealing}
+          errorMessage={sealDialogError}
+          onConfirm={confirmSeal}
+          onCancel={closeSealDialog}
+        />
+      ) : null}
     </section>
   );
 }

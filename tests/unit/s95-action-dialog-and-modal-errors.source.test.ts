@@ -4,10 +4,14 @@ import { resolve } from "node:path";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
-const OWNER_PATHS = [
-  "src/features/personeller/components/personel-dosya/PersonelUcretGecmisiSection.tsx",
-  "src/features/personeller/components/personel-dosya/PersonelBordroKapsamSection.tsx",
-  "src/features/raporlar/pages/MaasHesaplamaMerkeziPage.tsx"
+const CONFIRM_DIALOG_OWNERS = [
+  "src/features/raporlar/pages/BordroHazirlikMerkeziPage.tsx",
+  "src/features/raporlar/pages/DonemKapanisMerkeziPage.tsx"
+] as const;
+
+const MODAL_ERROR_OWNERS = [
+  "src/features/yonetim/pages/ResmiTatilTakvimiPage.tsx",
+  "src/features/personeller/components/personel-dosya/PersonelBelgelerPanel.tsx"
 ] as const;
 
 function findNativeDialogCalls(relativePath: string): string[] {
@@ -48,15 +52,50 @@ function findNativeDialogCalls(relativePath: string): string[] {
   return hits;
 }
 
-describe("S93-E3D native dialog source contract", () => {
-  for (const ownerPath of OWNER_PATHS) {
+describe("S95 confirm dialog and modal error surface contracts", () => {
+  for (const ownerPath of CONFIRM_DIALOG_OWNERS) {
     it(`${ownerPath} AppActionDialog kullanır ve native dialog kullanmaz`, () => {
       const source = readFileSync(resolve(process.cwd(), ownerPath), "utf8");
-
       expect(findNativeDialogCalls(ownerPath)).toEqual([]);
       expect(source).toContain("AppActionDialog");
     });
   }
+
+  it("bordro kesinleştir dialog test id'leri sabittir", () => {
+    const source = readFileSync(
+      resolve(process.cwd(), "src/features/raporlar/pages/BordroHazirlikMerkeziPage.tsx"),
+      "utf8"
+    );
+    expect(source).toContain('testId="bordro-kesinlestir-action-dialog"');
+    expect(source).toContain("openKesinlestirDialog");
+    expect(source).toContain("confirmKesinlestir");
+  });
+
+  it("dönem mühür dialog test id'leri sabittir", () => {
+    const source = readFileSync(
+      resolve(process.cwd(), "src/features/raporlar/pages/DonemKapanisMerkeziPage.tsx"),
+      "utf8"
+    );
+    expect(source).toContain('testId="donem-kapanis-muhur-action-dialog"');
+    expect(source).toContain("openSealDialog");
+    expect(source).toContain("confirmSeal");
+  });
+
+  it("resmi tatil iptal modalı API hatasını modal içinde gösterir", () => {
+    const source = readFileSync(resolve(process.cwd(), MODAL_ERROR_OWNERS[0]), "utf8");
+    expect(source).toContain('data-testid="rtt-cancel-error"');
+    expect(source).toContain("setCancelError");
+    expect(source).not.toMatch(/handleCancelSubmit[\s\S]*setActionError\(apiErrorMessage\(error, "İptal başarısız\."\)\)/);
+  });
+
+  it("personel belge modalları API hatasını modal içinde gösterir", () => {
+    const source = readFileSync(resolve(process.cwd(), MODAL_ERROR_OWNERS[1]), "utf8");
+    expect(source).toContain('data-testid="personel-belge-create-error"');
+    expect(source).toContain('data-testid="personel-belge-edit-error"');
+    expect(source).toContain('data-testid="personel-belge-replace-error"');
+    expect(source).toContain('testId="personel-belge-action-dialog"');
+    expect(source).toContain("AppActionDialog");
+  });
 
   it("src altında native dialog kalmamıştır", () => {
     let output = "";

@@ -128,6 +128,11 @@ test.describe("S82 Bordro Hazirlik Merkezi", () => {
     await expect(page.getByTestId("bordro-on-izleme-ozet")).toBeVisible();
     await page.getByTestId("bordro-geri-gonder").click();
     await page.getByTestId("bordro-kesinlestir").click();
+    await expect(page.getByTestId("bordro-kesinlestir-action-dialog")).toBeVisible();
+    await expect(page.getByTestId("bordro-kesinlestir-action-dialog-cancel")).toBeFocused();
+    await page.getByTestId("bordro-kesinlestir-action-dialog-confirm").click();
+    await expect(page.getByTestId("bordro-kesinlestir-action-dialog")).toHaveCount(0);
+    await expect(page.getByTestId("bordro-hazirlik-action-success")).toContainText(/kesinleştirildi/i);
   });
 
   test("BIRIM_AMIRI: bordro route erisemez", async ({ page }) => {

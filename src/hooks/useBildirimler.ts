@@ -206,6 +206,8 @@ export function useBildirimler() {
   const [editErrorMessage, setEditErrorMessage] = useState<string | null>(null);
   const [isEditSubmitting, setIsEditSubmitting] = useState(false);
   const [cancelingBildirimId, setCancelingBildirimId] = useState<number | null>(null);
+  const [pendingCancelBildirim, setPendingCancelBildirim] = useState<Bildirim | null>(null);
+  const [cancelDialogError, setCancelDialogError] = useState<string | null>(null);
   const [submittingBildirimId, setSubmittingBildirimId] = useState<number | null>(null);
   const [correctingBildirim, setCorrectingBildirim] = useState<Bildirim | null>(null);
   const [correctionReason, setCorrectionReason] = useState("");
@@ -599,57 +601,75 @@ export function useBildirimler() {
     [editForm, editingBildirim, isEditSubmitting, listKey, personelOptions, refreshPageOne]
   );
 
-  const cancelBildirimHandler = useCallback(
-    async (bildirim: Bildirim, canCancel: boolean) => {
+  const openCancelBildirimDialog = useCallback(
+    (bildirim: Bildirim, canCancel: boolean) => {
+      if (cancelingBildirimId !== null) {
+        return;
+      }
       if (!canCancel) {
         setErrorMessage("Bu günlük kaydı iptal etmek için yetkin bulunmuyor.");
         return;
       }
+      setCancelDialogError(null);
+      setPendingCancelBildirim(bildirim);
+    },
+    [cancelingBildirimId]
+  );
 
-      const confirmed = window.confirm(`Günlük kayıt #${bildirim.id} kaydını iptal etmek istiyor musun?`);
-      if (!confirmed) {
+  const closeCancelBildirimDialog = useCallback(() => {
+    if (cancelingBildirimId !== null) {
+      return;
+    }
+    setPendingCancelBildirim(null);
+    setCancelDialogError(null);
+  }, [cancelingBildirimId]);
+
+  const confirmCancelBildirim = useCallback(async () => {
+    const bildirim = pendingCancelBildirim;
+    if (!bildirim || cancelingBildirimId !== null) {
+      return;
+    }
+
+    setCancelDialogError(null);
+    setCancelingBildirimId(bildirim.id);
+
+    mergeCacheEntry<PaginatedResult<Bildirim>>(listKey, (prev) => {
+      const base = prev ?? emptyPaginated<Bildirim>();
+      return {
+        ...base,
+        items: base.items.map((row) => (row.id === bildirim.id ? { ...row, state: "IPTAL" } : row))
+      };
+    });
+
+    try {
+      await cancelBildirim(bildirim.id);
+      setPendingCancelBildirim(null);
+      setListQuery((prev) => ({ ...prev, page: 1 }));
+      await refreshPageOne();
+    } catch (error) {
+      if (shouldQueueOfflineMutation(error)) {
+        enqueueSyncOperation({
+          op: "bildirimler.cancel",
+          payload: { bildirimId: bildirim.id },
+          meta: { listKey }
+        });
+        setPendingCancelBildirim(null);
+        void processSyncQueue();
         return;
       }
-
-      setCancelingBildirimId(bildirim.id);
 
       mergeCacheEntry<PaginatedResult<Bildirim>>(listKey, (prev) => {
         const base = prev ?? emptyPaginated<Bildirim>();
         return {
           ...base,
-          items: base.items.map((row) => (row.id === bildirim.id ? { ...row, state: "IPTAL" } : row))
+          items: base.items.map((row) => (row.id === bildirim.id ? bildirim : row))
         };
       });
-
-      try {
-        await cancelBildirim(bildirim.id);
-        setListQuery((prev) => ({ ...prev, page: 1 }));
-        await refreshPageOne();
-      } catch (error) {
-        if (shouldQueueOfflineMutation(error)) {
-          enqueueSyncOperation({
-            op: "bildirimler.cancel",
-            payload: { bildirimId: bildirim.id },
-            meta: { listKey }
-          });
-          void processSyncQueue();
-          return;
-        }
-
-        mergeCacheEntry<PaginatedResult<Bildirim>>(listKey, (prev) => {
-          const base = prev ?? emptyPaginated<Bildirim>();
-          return {
-            ...base,
-            items: base.items.map((row) => (row.id === bildirim.id ? bildirim : row))
-          };
-        });
-        setErrorMessage(getApiErrorMessage(error, "Günlük kayıt iptal edilemedi."));
-      } finally {
-        setCancelingBildirimId(null);
-      }
-    },
-    [listKey, refreshPageOne]
-  );
+      setCancelDialogError(getApiErrorMessage(error, "Günlük kayıt iptal edilemedi."));
+    } finally {
+      setCancelingBildirimId(null);
+    }
+  }, [cancelingBildirimId, listKey, pendingCancelBildirim, refreshPageOne]);
 
   const submitBildirimHandler = useCallback(
     async (bildirim: Bildirim) => {
@@ -810,7 +830,11 @@ export function useBildirimler() {
     isEditSubmitting,
     updateBildirimHandler,
     cancelingBildirimId,
-    cancelBildirimHandler,
+    pendingCancelBildirim,
+    cancelDialogError,
+    openCancelBildirimDialog,
+    closeCancelBildirimDialog,
+    confirmCancelBildirim,
     submittingBildirimId,
     submitBildirimHandler,
     correctingBildirim,

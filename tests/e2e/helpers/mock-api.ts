@@ -1334,6 +1334,19 @@ function createInitialBildirimler(): MockBildirimRecord[] {
       updated_by: 1
     },
     {
+      id: 802,
+      tarih: "2026-07-27",
+      departman_id: 3,
+      personel_id: 1,
+      sube_id: 1,
+      bildirim_turu: "GELMEDI",
+      aciklama: "E2E iptal taslak",
+      state: "TASLAK",
+      okundu_mi: false,
+      created_by: 3,
+      updated_by: 3
+    },
+    {
       id: 1,
       tarih: "2026-07-09",
       departman_id: 3,

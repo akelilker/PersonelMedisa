@@ -92,6 +92,8 @@ export function useFinans() {
   const [editErrorMessage, setEditErrorMessage] = useState<string | null>(null);
   const [isEditSubmitting, setIsEditSubmitting] = useState(false);
   const [cancelOngoingId, setCancelOngoingId] = useState<number | null>(null);
+  const [pendingCancelItem, setPendingCancelItem] = useState<FinansKalem | null>(null);
+  const [cancelDialogError, setCancelDialogError] = useState<string | null>(null);
 
   const applied = listQuery.applied;
   const listPage = listQuery.page;
@@ -356,57 +358,75 @@ export function useFinans() {
     [editForm, editingItem, isEditSubmitting, listKey, refreshPageOne]
   );
 
-  const cancelFinansHandler = useCallback(
-    async (item: FinansKalem, canCancel: boolean) => {
+  const openCancelFinansDialog = useCallback(
+    (item: FinansKalem, canCancel: boolean) => {
+      if (cancelOngoingId !== null) {
+        return;
+      }
       if (!canCancel) {
         setErrorMessage("Bu kaydı iptal etmek için yetkin bulunmuyor.");
         return;
       }
+      setCancelDialogError(null);
+      setPendingCancelItem(item);
+    },
+    [cancelOngoingId]
+  );
 
-      const confirmed = window.confirm(`Finans kaydı #${item.id} iptal edilsin mi?`);
-      if (!confirmed) {
+  const closeCancelFinansDialog = useCallback(() => {
+    if (cancelOngoingId !== null) {
+      return;
+    }
+    setPendingCancelItem(null);
+    setCancelDialogError(null);
+  }, [cancelOngoingId]);
+
+  const confirmCancelFinans = useCallback(async () => {
+    const item = pendingCancelItem;
+    if (!item || cancelOngoingId !== null) {
+      return;
+    }
+
+    setCancelDialogError(null);
+    setCancelOngoingId(item.id);
+
+    mergeCacheEntry<PaginatedResult<FinansKalem>>(listKey, (prev) => {
+      const base = prev ?? emptyPaginated<FinansKalem>();
+      return {
+        ...base,
+        items: base.items.map((row) => (row.id === item.id ? { ...row, state: "IPTAL" } : row))
+      };
+    });
+
+    try {
+      await cancelFinansKalem(item.id);
+      setPendingCancelItem(null);
+      setListQuery((prev) => ({ ...prev, page: 1 }));
+      await refreshPageOne();
+    } catch (error) {
+      if (shouldQueueOfflineMutation(error)) {
+        enqueueSyncOperation({
+          op: "finans.cancel",
+          payload: { kalemId: item.id },
+          meta: { listKey }
+        });
+        setPendingCancelItem(null);
+        void processSyncQueue();
         return;
       }
-
-      setCancelOngoingId(item.id);
 
       mergeCacheEntry<PaginatedResult<FinansKalem>>(listKey, (prev) => {
         const base = prev ?? emptyPaginated<FinansKalem>();
         return {
           ...base,
-          items: base.items.map((row) => (row.id === item.id ? { ...row, state: "IPTAL" } : row))
+          items: base.items.map((row) => (row.id === item.id ? item : row))
         };
       });
-
-      try {
-        await cancelFinansKalem(item.id);
-        setListQuery((prev) => ({ ...prev, page: 1 }));
-        await refreshPageOne();
-      } catch (error) {
-        if (shouldQueueOfflineMutation(error)) {
-          enqueueSyncOperation({
-            op: "finans.cancel",
-            payload: { kalemId: item.id },
-            meta: { listKey }
-          });
-          void processSyncQueue();
-          return;
-        }
-
-        mergeCacheEntry<PaginatedResult<FinansKalem>>(listKey, (prev) => {
-          const base = prev ?? emptyPaginated<FinansKalem>();
-          return {
-            ...base,
-            items: base.items.map((row) => (row.id === item.id ? item : row))
-          };
-        });
-        setErrorMessage(getApiErrorMessage(error, "Finans kaydı iptal edilemedi."));
-      } finally {
-        setCancelOngoingId(null);
-      }
-    },
-    [listKey, refreshPageOne]
-  );
+      setCancelDialogError(getApiErrorMessage(error, "Finans kaydı iptal edilemedi."));
+    } finally {
+      setCancelOngoingId(null);
+    }
+  }, [cancelOngoingId, listKey, pendingCancelItem, refreshPageOne]);
 
   return {
     listQuery,
@@ -433,7 +453,11 @@ export function useFinans() {
     editErrorMessage,
     isEditSubmitting,
     cancelOngoingId,
-    cancelFinansHandler,
+    pendingCancelItem,
+    cancelDialogError,
+    openCancelFinansDialog,
+    closeCancelFinansDialog,
+    confirmCancelFinans,
     updateFinansHandler,
     submitFilters,
     clearFilters,

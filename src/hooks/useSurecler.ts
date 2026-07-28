@@ -133,6 +133,8 @@ export function useSurecler() {
   const [editErrorMessage, setEditErrorMessage] = useState<string | null>(null);
   const [isEditSubmitting, setIsEditSubmitting] = useState(false);
   const [cancelingSurecId, setCancelingSurecId] = useState<number | null>(null);
+  const [pendingCancelSurec, setPendingCancelSurec] = useState<Surec | null>(null);
+  const [cancelDialogError, setCancelDialogError] = useState<string | null>(null);
 
   const applied = listQuery.applied;
   const listPage = listQuery.page;
@@ -452,57 +454,75 @@ export function useSurecler() {
     [editForm, editingSurec, isEditSubmitting, listKey, refreshPageOne]
   );
 
-  const cancelSurecHandler = useCallback(
-    async (surec: Surec, canCancel: boolean) => {
+  const openCancelSurecDialog = useCallback(
+    (surec: Surec, canCancel: boolean) => {
+      if (cancelingSurecId !== null) {
+        return;
+      }
       if (!canCancel) {
         setErrorMessage("Bu süreci iptal etmek için yetkin bulunmuyor.");
         return;
       }
+      setCancelDialogError(null);
+      setPendingCancelSurec(surec);
+    },
+    [cancelingSurecId]
+  );
 
-      const confirmed = window.confirm(`Süreç #${surec.id} kaydını iptal etmek istiyor musun?`);
-      if (!confirmed) {
+  const closeCancelSurecDialog = useCallback(() => {
+    if (cancelingSurecId !== null) {
+      return;
+    }
+    setPendingCancelSurec(null);
+    setCancelDialogError(null);
+  }, [cancelingSurecId]);
+
+  const confirmCancelSurec = useCallback(async () => {
+    const surec = pendingCancelSurec;
+    if (!surec || cancelingSurecId !== null) {
+      return;
+    }
+
+    setCancelDialogError(null);
+    setCancelingSurecId(surec.id);
+
+    mergeCacheEntry<PaginatedResult<Surec>>(listKey, (prev) => {
+      const base = prev ?? emptyPaginated<Surec>();
+      return {
+        ...base,
+        items: base.items.map((row) => (row.id === surec.id ? { ...row, state: "IPTAL" } : row))
+      };
+    });
+
+    try {
+      await cancelSurec(surec.id);
+      setPendingCancelSurec(null);
+      setListQuery((prev) => ({ ...prev, page: 1 }));
+      await refreshPageOne();
+    } catch (error) {
+      if (shouldQueueOfflineMutation(error)) {
+        enqueueSyncOperation({
+          op: "surecler.cancel",
+          payload: { surecId: surec.id },
+          meta: { listKey }
+        });
+        setPendingCancelSurec(null);
+        void processSyncQueue();
         return;
       }
-
-      setCancelingSurecId(surec.id);
 
       mergeCacheEntry<PaginatedResult<Surec>>(listKey, (prev) => {
         const base = prev ?? emptyPaginated<Surec>();
         return {
           ...base,
-          items: base.items.map((row) => (row.id === surec.id ? { ...row, state: "IPTAL" } : row))
+          items: base.items.map((row) => (row.id === surec.id ? surec : row))
         };
       });
-
-      try {
-        await cancelSurec(surec.id);
-        setListQuery((prev) => ({ ...prev, page: 1 }));
-        await refreshPageOne();
-      } catch (error) {
-        if (shouldQueueOfflineMutation(error)) {
-          enqueueSyncOperation({
-            op: "surecler.cancel",
-            payload: { surecId: surec.id },
-            meta: { listKey }
-          });
-          void processSyncQueue();
-          return;
-        }
-
-        mergeCacheEntry<PaginatedResult<Surec>>(listKey, (prev) => {
-          const base = prev ?? emptyPaginated<Surec>();
-          return {
-            ...base,
-            items: base.items.map((row) => (row.id === surec.id ? surec : row))
-          };
-        });
-        setErrorMessage(getApiErrorMessage(error, "Süreç iptal edilemedi."));
-      } finally {
-        setCancelingSurecId(null);
-      }
-    },
-    [listKey, refreshPageOne]
-  );
+      setCancelDialogError(getApiErrorMessage(error, "Süreç iptal edilemedi."));
+    } finally {
+      setCancelingSurecId(null);
+    }
+  }, [cancelingSurecId, listKey, pendingCancelSurec, refreshPageOne]);
 
   return {
     listQuery,
@@ -533,7 +553,11 @@ export function useSurecler() {
     isEditSubmitting,
     updateSurecHandler,
     cancelingSurecId,
-    cancelSurecHandler,
+    pendingCancelSurec,
+    cancelDialogError,
+    openCancelSurecDialog,
+    closeCancelSurecDialog,
+    confirmCancelSurec,
     submitFilters,
     clearFilters,
     setPage

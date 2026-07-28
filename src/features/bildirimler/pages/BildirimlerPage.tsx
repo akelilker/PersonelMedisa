@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { FormField } from "../../../components/form/FormField";
 import { AppModal } from "../../../components/modal/AppModal";
+import { AppActionDialog } from "../../../components/modal/AppActionDialog";
 import { EmptyState } from "../../../components/states/EmptyState";
 import { ErrorState } from "../../../components/states/ErrorState";
 import { LoadingState } from "../../../components/states/LoadingState";
@@ -699,7 +700,11 @@ export function BildirimlerPage() {
     isEditSubmitting,
     updateBildirimHandler,
     cancelingBildirimId,
-    cancelBildirimHandler,
+    pendingCancelBildirim,
+    cancelDialogError,
+    openCancelBildirimDialog,
+    closeCancelBildirimDialog,
+    confirmCancelBildirim,
     submittingBildirimId,
     submitBildirimHandler,
     correctingBildirim,
@@ -1401,7 +1406,7 @@ export function BildirimlerPage() {
                     <button
                       type="button"
                       className="universal-btn-aux"
-                      onClick={() => void cancelBildirimHandler(bildirim, true)}
+                      onClick={() => openCancelBildirimDialog(bildirim, true)}
                       disabled={rowBusy}
                     >
                       {cancelingBildirimId === bildirim.id ? "İptal Ediliyor..." : "İptal"}
@@ -1716,6 +1721,22 @@ export function BildirimlerPage() {
             ) : null}
           </form>
         </AppModal>
+      ) : null}
+
+      {pendingCancelBildirim ? (
+        <AppActionDialog
+          open
+          testId="bildirim-action-dialog"
+          title="Günlük Kaydı İptal Et"
+          description={`Günlük kayıt #${pendingCancelBildirim.id} kaydını iptal etmek istiyor musun?`}
+          confirmLabel="İptal Et"
+          submitLabel="İptal ediliyor..."
+          destructive
+          isSubmitting={cancelingBildirimId === pendingCancelBildirim.id}
+          errorMessage={cancelDialogError}
+          onConfirm={confirmCancelBildirim}
+          onCancel={closeCancelBildirimDialog}
+        />
       ) : null}
     </section>
   );

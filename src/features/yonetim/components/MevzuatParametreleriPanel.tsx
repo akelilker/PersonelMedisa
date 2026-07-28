@@ -6,6 +6,7 @@ import {
   getMevzuatApiErrorMessage
 } from "../../../api/mevzuat.api";
 import { FormField } from "../../../components/form/FormField";
+import { AppActionDialog } from "../../../components/modal/AppActionDialog";
 import { AppModal } from "../../../components/modal/AppModal";
 import { EmptyState } from "../../../components/states/EmptyState";
 import { ErrorState } from "../../../components/states/ErrorState";
@@ -85,6 +86,8 @@ export function MevzuatParametreleriPanel({ canManage }: { canManage: boolean })
   const [submitErrorMessage, setSubmitErrorMessage] = useState<string | null>(null);
   const [actionErrorMessage, setActionErrorMessage] = useState<string | null>(null);
   const [cancellingId, setCancellingId] = useState<number | null>(null);
+  const [pendingCancelItem, setPendingCancelItem] = useState<MevzuatParametresi | null>(null);
+  const [cancelDialogError, setCancelDialogError] = useState<string | null>(null);
 
   async function loadItems() {
     setIsLoading(true);
@@ -183,19 +186,41 @@ export function MevzuatParametreleriPanel({ canManage }: { canManage: boolean })
     }
   }
 
-  async function handleCancel(item: MevzuatParametresi) {
-    if (cancellingId !== null || !window.confirm(MEVZUAT_IPTAL_ONAY_MESAJI)) {
+  function openCancelDialog(item: MevzuatParametresi) {
+    if (cancellingId !== null) {
+      return;
+    }
+    setActionErrorMessage(null);
+    setCancelDialogError(null);
+    setPendingCancelItem(item);
+  }
+
+  function closeCancelDialog() {
+    if (cancellingId !== null) {
+      return;
+    }
+    setPendingCancelItem(null);
+    setCancelDialogError(null);
+  }
+
+  async function confirmCancel() {
+    const item = pendingCancelItem;
+    if (!item || cancellingId !== null) {
       return;
     }
 
     setCancellingId(item.id);
     setActionErrorMessage(null);
+    setCancelDialogError(null);
 
     try {
       await cancelMevzuatParametresi(item.id);
+      setPendingCancelItem(null);
       await loadItems();
     } catch (error) {
-      setActionErrorMessage(getMevzuatApiErrorMessage(error, "Mevzuat parametresi iptal edilemedi."));
+      const message = getMevzuatApiErrorMessage(error, "Mevzuat parametresi iptal edilemedi.");
+      setActionErrorMessage(message);
+      setCancelDialogError(message);
     } finally {
       setCancellingId(null);
     }
@@ -231,7 +256,7 @@ export function MevzuatParametreleriPanel({ canManage }: { canManage: boolean })
       {!isLoading && errorMessage ? (
         <ErrorState message={errorMessage} onRetry={() => void loadItems()} />
       ) : null}
-      {actionErrorMessage ? (
+      {actionErrorMessage && !pendingCancelItem ? (
         <p className="personel-create-error" role="alert">
           {actionErrorMessage}
         </p>
@@ -271,7 +296,7 @@ export function MevzuatParametreleriPanel({ canManage }: { canManage: boolean })
                         <button
                           type="button"
                           className="universal-btn-cancel"
-                          onClick={() => void handleCancel(item)}
+                          onClick={() => openCancelDialog(item)}
                           disabled={cancellingId !== null}
                           data-testid={`yonetim-mevzuat-iptal-${item.id}`}
                         >
@@ -400,6 +425,22 @@ export function MevzuatParametreleriPanel({ canManage }: { canManage: boolean })
             ) : null}
           </form>
         </AppModal>
+      ) : null}
+
+      {pendingCancelItem ? (
+        <AppActionDialog
+          open
+          testId="mevzuat-action-dialog"
+          title="Mevzuat Parametresini İptal Et"
+          description={MEVZUAT_IPTAL_ONAY_MESAJI}
+          confirmLabel="İptal Et"
+          submitLabel="İptal ediliyor..."
+          destructive
+          isSubmitting={cancellingId === pendingCancelItem.id}
+          errorMessage={cancelDialogError}
+          onConfirm={confirmCancel}
+          onCancel={closeCancelDialog}
+        />
       ) : null}
     </section>
   );

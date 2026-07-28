@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent, type KeyboardEvent } from "react";
 import { useSearchParams } from "react-router-dom";
 import { FormField } from "../../../components/form/FormField";
+import { AppActionDialog } from "../../../components/modal/AppActionDialog";
 import { AppModal } from "../../../components/modal/AppModal";
 import { EmptyState } from "../../../components/states/EmptyState";
 import { ErrorState } from "../../../components/states/ErrorState";
@@ -451,6 +452,8 @@ export function YonetimPaneliPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [subeDeleteError, setSubeDeleteError] = useState<string | null>(null);
+  const [isSubeDeleteDialogOpen, setIsSubeDeleteDialogOpen] = useState(false);
+  const [subeDeleteDialogError, setSubeDeleteDialogError] = useState<string | null>(null);
 
   const [kullanicilar, setKullanicilar] = useState<YonetimKullanici[]>([]);
   const [subeler, setSubeler] = useState<YonetimSube[]>([]);
@@ -577,6 +580,8 @@ export function YonetimPaneliPage() {
     setIsDepartmanCreateOpen(false);
     setIsSubeFormOpen(false);
     setSubeDeleteError(null);
+    setIsSubeDeleteDialogOpen(false);
+    setSubeDeleteDialogError(null);
   }
 
   function openYeniKullaniciForm() {
@@ -711,26 +716,43 @@ export function YonetimPaneliPage() {
     }
   }
 
-  async function handleSubeDelete() {
+  function openSubeDeleteDialog() {
     if (editingSubeId == null || isSubmitting || !canManageYonetimPanel) {
       return;
     }
+    setSubeDeleteError(null);
+    setSubeDeleteDialogError(null);
+    setIsSubeDeleteDialogOpen(true);
+  }
 
-    if (!window.confirm("Bu şubeyi silmek istediğinize emin misiniz?")) {
+  function closeSubeDeleteDialog() {
+    if (isSubmitting) {
+      return;
+    }
+    setIsSubeDeleteDialogOpen(false);
+    setSubeDeleteDialogError(null);
+  }
+
+  async function confirmSubeDelete() {
+    if (editingSubeId == null || isSubmitting || !canManageYonetimPanel) {
       return;
     }
 
     setIsSubmitting(true);
     setSubeDeleteError(null);
+    setSubeDeleteDialogError(null);
     setSuccessMessage(null);
 
     try {
       await deleteYonetimSube(editingSubeId);
+      setIsSubeDeleteDialogOpen(false);
       resetSubeEditor();
       setSuccessMessage("Şube tanımı silindi.");
       await loadPanel();
     } catch (error) {
-      setSubeDeleteError(error instanceof Error ? error.message : "Şube silinemedi.");
+      const message = error instanceof Error ? error.message : "Şube silinemedi.";
+      setSubeDeleteError(message);
+      setSubeDeleteDialogError(message);
     } finally {
       setIsSubmitting(false);
     }
@@ -1230,7 +1252,7 @@ export function YonetimPaneliPage() {
                   type="button"
                   className="universal-btn-cancel"
                   data-testid="yonetim-sube-sil"
-                  onClick={() => void handleSubeDelete()}
+                  onClick={openSubeDeleteDialog}
                   disabled={isSubmitting}
                 >
                   Şubeyi Sil
@@ -1239,6 +1261,22 @@ export function YonetimPaneliPage() {
             ) : null}
           </form>
         </AppModal>
+      ) : null}
+
+      {isSubeDeleteDialogOpen ? (
+        <AppActionDialog
+          open
+          testId="yonetim-sube-delete-dialog"
+          title="Şubeyi Sil"
+          description="Bu şubeyi silmek istediğinize emin misiniz?"
+          confirmLabel="Şubeyi Sil"
+          submitLabel="Siliniyor..."
+          destructive
+          isSubmitting={isSubmitting}
+          errorMessage={subeDeleteDialogError}
+          onConfirm={confirmSubeDelete}
+          onCancel={closeSubeDeleteDialog}
+        />
       ) : null}
     </section>
   );

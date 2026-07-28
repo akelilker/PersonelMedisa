@@ -83,13 +83,15 @@ test.describe("Kayit Surec belge kayitlari", () => {
     await expect(kayitList).not.toContainText('{"tip"');
 
     const uniqueRow = kayitList.locator("tr", { hasText: uniqueAd });
-    page.once("dialog", (dialog) => dialog.accept("E2E iptal nedeni"));
     const cancelResponse = page.waitForResponse(
       (response) =>
         /\/api\/belge-kayitlari\/\d+\/iptal$/.test(new URL(response.url()).pathname) &&
         response.request().method() === "POST"
     );
     await uniqueRow.getByRole("button", { name: "İptal" }).click();
+    await expect(page.getByTestId("belge-kayit-action-dialog")).toBeVisible();
+    await page.getByLabel("İptal nedeni").fill("E2E iptal nedeni");
+    await page.getByTestId("belge-kayit-action-dialog-confirm").click();
     expect((await cancelResponse).status()).toBe(200);
 
     await expect(kayitModal.getByText(/Belge kaydı iptal edildi/i)).toBeVisible({ timeout: 15_000 });

@@ -5,6 +5,7 @@ import {
   fetchPersonelBelgeKayitlari
 } from "../../../api/personel-belge-kayitlari.api";
 import { getApiErrorMessage } from "../../../api/api-client";
+import { AppActionDialog } from "../../../components/modal/AppActionDialog";
 import {
   createEmptyBelgeKaydiDraft,
   formatPersonelBelgeDisplayText,
@@ -42,6 +43,10 @@ export function KayitBelgeKayitlariSection({
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [cancelingId, setCancelingId] = useState<number | null>(null);
+  const [pendingCancelId, setPendingCancelId] = useState<number | null>(null);
+  const [cancelReason, setCancelReason] = useState("");
+  const [cancelDialogError, setCancelDialogError] = useState<string | null>(null);
+  const [cancelFieldError, setCancelFieldError] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [infoMessage, setInfoMessage] = useState<string | null>(null);
   const [validationNote, setValidationNote] = useState<string | null>(null);
@@ -106,27 +111,54 @@ export function KayitBelgeKayitlariSection({
     }
   }
 
-  async function handleCancel(id: number) {
-    if (!canWrite || isPersonelPasif) {
+  function openCancelDialog(id: number) {
+    if (!canWrite || isPersonelPasif || cancelingId !== null) {
       return;
     }
-
-    const iptalNedeni = window.prompt("İptal nedeni girin:");
-    if (!iptalNedeni?.trim()) {
-      setValidationNote("İptal nedeni zorunludur.");
-      return;
-    }
-
-    setCancelingId(id);
     setErrorMessage(null);
     setInfoMessage(null);
     setValidationNote(null);
+    setCancelDialogError(null);
+    setCancelFieldError(null);
+    setCancelReason("");
+    setPendingCancelId(id);
+  }
+
+  function closeCancelDialog() {
+    if (cancelingId !== null) {
+      return;
+    }
+    setPendingCancelId(null);
+    setCancelReason("");
+    setCancelDialogError(null);
+    setCancelFieldError(null);
+  }
+
+  async function confirmCancel() {
+    if (pendingCancelId == null || !canWrite || isPersonelPasif || cancelingId !== null) {
+      return;
+    }
+
+    const iptalNedeni = cancelReason.trim();
+    if (!iptalNedeni) {
+      setCancelFieldError("İptal nedeni zorunludur.");
+      return;
+    }
+
+    setCancelingId(pendingCancelId);
+    setErrorMessage(null);
+    setInfoMessage(null);
+    setValidationNote(null);
+    setCancelDialogError(null);
+    setCancelFieldError(null);
     try {
-      await cancelPersonelBelgeKaydi(id, { iptal_nedeni: iptalNedeni.trim() });
+      await cancelPersonelBelgeKaydi(pendingCancelId, { iptal_nedeni: iptalNedeni });
+      setPendingCancelId(null);
+      setCancelReason("");
       setInfoMessage("Belge kaydı iptal edildi.");
       await loadItems();
     } catch (err) {
-      setErrorMessage(getApiErrorMessage(err, "Belge kaydı iptal edilemedi."));
+      setCancelDialogError(getApiErrorMessage(err, "Belge kaydı iptal edilemedi."));
     } finally {
       setCancelingId(null);
     }
@@ -186,8 +218,9 @@ export function KayitBelgeKayitlariSection({
                       <button
                         type="button"
                         className="universal-btn-aux belge-kayit-cancel-btn"
+                        data-testid={`kayit-belge-kayit-iptal-${item.id}`}
                         disabled={cancelingId === item.id}
-                        onClick={() => void handleCancel(item.id)}
+                        onClick={() => openCancelDialog(item.id)}
                       >
                         {cancelingId === item.id ? "İptal ediliyor..." : "İptal"}
                       </button>
@@ -327,6 +360,37 @@ export function KayitBelgeKayitlariSection({
           {isSaving ? "Kaydediliyor..." : "Kayıt Ekle"}
         </button>
       </div>
+
+      {pendingCancelId != null ? (
+        <AppActionDialog
+          open
+          testId="belge-kayit-action-dialog"
+          title="Belge Kaydını İptal Et"
+          description={`Belge kaydı #${pendingCancelId} iptal edilecektir.`}
+          confirmLabel="İptal Et"
+          submitLabel="İptal ediliyor..."
+          destructive
+          isSubmitting={cancelingId === pendingCancelId}
+          errorMessage={cancelDialogError}
+          field={{
+            label: "İptal nedeni",
+            value: cancelReason,
+            onChange: (value) => {
+              setCancelReason(value);
+              if (cancelFieldError) {
+                setCancelFieldError(null);
+              }
+            },
+            placeholder: "İptal nedeni girin",
+            required: true,
+            rows: 3,
+            errorMessage: cancelFieldError,
+            testId: "belge-kayit-action-dialog-input"
+          }}
+          onConfirm={confirmCancel}
+          onCancel={closeCancelDialog}
+        />
+      ) : null}
     </div>
   );
 }

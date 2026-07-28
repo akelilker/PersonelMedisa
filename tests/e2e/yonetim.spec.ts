@@ -187,11 +187,9 @@ test.describe("yonetim paneli ve aylik ozet", () => {
     await expect(subeModal.locator(".modal-header h2")).toContainText("Şube Düzenle");
     await expect(subeModal.getByTestId("yonetim-sube-sil")).toBeVisible();
 
-    page.once("dialog", (dialog) => {
-      expect(dialog.message()).toContain("Bu şubeyi silmek istediğinize emin misiniz?");
-      void dialog.accept();
-    });
     await subeModal.getByTestId("yonetim-sube-sil").click();
+    await expect(page.getByTestId("yonetim-sube-delete-dialog")).toBeVisible();
+    await page.getByTestId("yonetim-sube-delete-dialog-confirm").click();
 
     await expect(page.getByText("Şube tanımı silindi.")).toBeVisible();
     await expect(page.locator(".yonetim-card-grid--branches")).not.toContainText("Bos Sube");
@@ -201,12 +199,13 @@ test.describe("yonetim paneli ve aylik ozet", () => {
     const merkezModal = page.locator(".modal-container").last();
     await expect(merkezModal).toBeVisible();
 
-    page.once("dialog", (dialog) => {
-      void dialog.accept();
-    });
     await merkezModal.getByTestId("yonetim-sube-sil").click();
+    await expect(page.getByTestId("yonetim-sube-delete-dialog")).toBeVisible();
+    await page.getByTestId("yonetim-sube-delete-dialog-confirm").click();
 
-    await expect(merkezModal.getByRole("alert")).toContainText(SUBE_DELETE_BLOCKED_MESSAGE);
+    await expect(page.getByTestId("yonetim-sube-delete-dialog").getByRole("alert")).toContainText(
+      SUBE_DELETE_BLOCKED_MESSAGE
+    );
     await expect(page.locator(".yonetim-card-grid--branches")).toContainText("Merkez");
   });
 

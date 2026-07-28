@@ -1335,7 +1335,7 @@ function createInitialBildirimler(): MockBildirimRecord[] {
     },
     {
       id: 802,
-      tarih: "2026-07-28",
+      tarih: "2026-07-27",
       departman_id: 3,
       personel_id: 1,
       sube_id: 1,

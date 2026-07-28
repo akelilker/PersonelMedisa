@@ -19,6 +19,7 @@ import {
 } from "../../../api/maas-hesaplama.api";
 import { fetchYonetimSubeleri } from "../../../api/yonetim.api";
 import { FormField } from "../../../components/form/FormField";
+import { AppActionDialog } from "../../../components/modal/AppActionDialog";
 import { ErrorState } from "../../../components/states/ErrorState";
 import { LoadingState } from "../../../components/states/LoadingState";
 import { useRoleAccess } from "../../../hooks/use-role-access";
@@ -101,6 +102,10 @@ export function MaasHesaplamaMerkeziPage() {
   const [selectedAdayKalemler, setSelectedAdayKalemler] = useState<MaasHesaplamaKalem[]>([]);
   const [cancelNeden, setCancelNeden] = useState("");
   const [cancelCalistirmaNeden, setCancelCalistirmaNeden] = useState("");
+  const [pendingCreateConfirm, setPendingCreateConfirm] = useState(false);
+  const [pendingCalculateConfirm, setPendingCalculateConfirm] = useState(false);
+  const [createDialogError, setCreateDialogError] = useState<string | null>(null);
+  const [calculateDialogError, setCalculateDialogError] = useState<string | null>(null);
   const [devirForm, setDevirForm] = useState({
     personelId: "",
     matrah: "",
@@ -247,20 +252,31 @@ export function MaasHesaplamaMerkeziPage() {
     };
   }, [activeCalistirma, canViewAdaylari]);
 
-  async function handleCreate() {
-    if (!parsedAy || !subeId || !preflight || createDisabled) {
+  function openCreateDialog() {
+    if (!parsedAy || !subeId || !preflight || createDisabled || isCreating) {
       return;
     }
-    const confirmed = window.confirm(
-      "Bu işlem hesaplama girdilerini değişmez snapshot olarak kaydeder. Devam edilsin mi?"
-    );
-    if (!confirmed) {
+    setCreateDialogError(null);
+    setPendingCreateConfirm(true);
+  }
+
+  function closeCreateDialog() {
+    if (isCreating) {
+      return;
+    }
+    setPendingCreateConfirm(false);
+    setCreateDialogError(null);
+  }
+
+  async function confirmCreate() {
+    if (!parsedAy || !subeId || !preflight || createDisabled || isCreating) {
       return;
     }
 
     setIsCreating(true);
     setActionMessage(null);
     setActionError(null);
+    setCreateDialogError(null);
     try {
       const result = await createMaasHesaplamaSnapshot({
         sube_id: subeId,
@@ -273,21 +289,23 @@ export function MaasHesaplamaMerkeziPage() {
           ? `Mevcut snapshot döndürüldü (#${result.snapshot.id}).`
           : `Snapshot oluşturuldu (#${result.snapshot.id}, rev ${result.snapshot.revision_no}).`
       );
+      setPendingCreateConfirm(false);
       await refetch();
     } catch (error) {
-      if (error instanceof ApiRequestError) {
-        const readableMessage =
-          error.code === HOLIDAY_OVERTIME_POLICY_REQUIRED
+      const readableMessage =
+        error instanceof ApiRequestError
+          ? error.code === HOLIDAY_OVERTIME_POLICY_REQUIRED
             ? HOLIDAY_OVERTIME_POLICY_REQUIRED_MESSAGE
             : error.code === UBGT_DAY_SCOPE_ERROR_CODE
               ? UBGT_DAY_SCOPE_ERROR_MESSAGE
               : error.code === HALF_DAY_UBGT_POLICY_ERROR_CODE
                 ? HALF_DAY_UBGT_POLICY_ERROR_MESSAGE
-                : `${error.code}: ${error.message}`;
-        setActionError(readableMessage);
-      } else {
-        setActionError(error instanceof Error ? error.message : "Snapshot oluşturulamadı.");
-      }
+                : `${error.code}: ${error.message}`
+          : error instanceof Error
+            ? error.message
+            : "Snapshot oluşturulamadı.";
+      setCreateDialogError(readableMessage);
+      setActionError(readableMessage);
       await refetch();
     } finally {
       setIsCreating(false);
@@ -333,17 +351,30 @@ export function MaasHesaplamaMerkeziPage() {
     }
   }
 
-  async function handleCalculate() {
-    if (!activeSnapshot || !calculationPreflight || calculateDisabled) {
+  function openCalculateDialog() {
+    if (!activeSnapshot || !calculationPreflight || calculateDisabled || isCalculating) {
       return;
     }
-    const confirmed = window.confirm("Aktif snapshot için maaş hesaplama adayları üretilecek. Devam edilsin mi?");
-    if (!confirmed) {
+    setCalculateDialogError(null);
+    setPendingCalculateConfirm(true);
+  }
+
+  function closeCalculateDialog() {
+    if (isCalculating) {
+      return;
+    }
+    setPendingCalculateConfirm(false);
+    setCalculateDialogError(null);
+  }
+
+  async function confirmCalculate() {
+    if (!activeSnapshot || !calculationPreflight || calculateDisabled || isCalculating) {
       return;
     }
     setIsCalculating(true);
     setActionMessage(null);
     setActionError(null);
+    setCalculateDialogError(null);
     try {
       const result = await calculateMaasHesaplamaSnapshot({
         snapshot_id: activeSnapshot.id,
@@ -355,13 +386,17 @@ export function MaasHesaplamaMerkeziPage() {
           ? `Mevcut hesaplama döndürüldü (#${result.calistirma?.id ?? "?"}).`
           : `Hesaplama çalıştırıldı (#${result.calistirma?.id ?? "?"}).`
       );
+      setPendingCalculateConfirm(false);
       await refetch();
     } catch (error) {
-      if (error instanceof ApiRequestError) {
-        setActionError(`${error.code}: ${error.message}`);
-      } else {
-        setActionError(error instanceof Error ? error.message : "Hesaplama çalıştırılamadı.");
-      }
+      const readableMessage =
+        error instanceof ApiRequestError
+          ? `${error.code}: ${error.message}`
+          : error instanceof Error
+            ? error.message
+            : "Hesaplama çalıştırılamadı.";
+      setCalculateDialogError(readableMessage);
+      setActionError(readableMessage);
       await refetch();
     } finally {
       setIsCalculating(false);
@@ -520,7 +555,7 @@ export function MaasHesaplamaMerkeziPage() {
             className="universal-btn-save"
             data-testid="maas-hesaplama-create"
             disabled={createDisabled}
-            onClick={() => void handleCreate()}
+            onClick={openCreateDialog}
           >
             {isCreating ? "Snapshot oluşturuluyor…" : "Snapshot oluştur"}
           </button>
@@ -788,7 +823,7 @@ export function MaasHesaplamaMerkeziPage() {
                           className="universal-btn-save"
                           data-testid="maas-hesaplama-calc-run"
                           disabled={calculateDisabled}
-                          onClick={() => void handleCalculate()}
+                          onClick={openCalculateDialog}
                         >
                           {isCalculating ? "Hesaplanıyor…" : "Hesapla"}
                         </button>
@@ -1052,6 +1087,36 @@ export function MaasHesaplamaMerkeziPage() {
             </div>
           </section>
         </>
+      ) : null}
+
+      {pendingCreateConfirm ? (
+        <AppActionDialog
+          open
+          testId="maas-hesaplama-create-dialog"
+          title="Snapshot Oluştur"
+          description="Bu işlem hesaplama girdilerini değişmez snapshot olarak kaydeder. Devam edilsin mi?"
+          confirmLabel="Oluştur"
+          submitLabel="Snapshot oluşturuluyor…"
+          isSubmitting={isCreating}
+          errorMessage={createDialogError}
+          onConfirm={confirmCreate}
+          onCancel={closeCreateDialog}
+        />
+      ) : null}
+
+      {pendingCalculateConfirm ? (
+        <AppActionDialog
+          open
+          testId="maas-hesaplama-calc-dialog"
+          title="Maaş Hesaplama Çalıştır"
+          description="Aktif snapshot için maaş hesaplama adayları üretilecek. Devam edilsin mi?"
+          confirmLabel="Hesapla"
+          submitLabel="Hesaplanıyor…"
+          isSubmitting={isCalculating}
+          errorMessage={calculateDialogError}
+          onConfirm={confirmCalculate}
+          onCancel={closeCalculateDialog}
+        />
       ) : null}
     </section>
   );

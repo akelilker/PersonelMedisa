@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { Personel } from "../../../../types/personel";
+import { AppActionDialog } from "../../../../components/modal/AppActionDialog";
 import { formatDetailValue } from "./personel-dosya-format-utils";
 import {
   UCRET_GUNCEL_YOK_MESAJI,
@@ -24,6 +25,8 @@ export function PersonelUcretGecmisiSection({
   isActive: boolean;
 }) {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [pendingCancelUcretId, setPendingCancelUcretId] = useState<number | null>(null);
+  const [cancelDialogError, setCancelDialogError] = useState<string | null>(null);
   const {
     ucretler,
     aktifUcret,
@@ -52,11 +55,33 @@ export function PersonelUcretGecmisiSection({
     setIsCreateModalOpen(true);
   }
 
-  function handleCancelUcret(ucretId: number) {
-    if (!window.confirm(UCRET_IPTAL_ONAY_MESAJI)) {
+  function openCancelUcretDialog(ucretId: number) {
+    if (cancellingUcretId !== null) {
       return;
     }
-    void cancelUcret(ucretId);
+    setCancelDialogError(null);
+    setPendingCancelUcretId(ucretId);
+  }
+
+  function closeCancelUcretDialog() {
+    if (cancellingUcretId !== null) {
+      return;
+    }
+    setPendingCancelUcretId(null);
+    setCancelDialogError(null);
+  }
+
+  async function confirmCancelUcret() {
+    if (pendingCancelUcretId == null || cancellingUcretId !== null) {
+      return;
+    }
+    setCancelDialogError(null);
+    const ok = await cancelUcret(pendingCancelUcretId);
+    if (ok) {
+      setPendingCancelUcretId(null);
+      return;
+    }
+    setCancelDialogError("Ücret kaydı iptal edilemedi.");
   }
 
   return (
@@ -101,7 +126,7 @@ export function PersonelUcretGecmisiSection({
         </p>
       ) : null}
 
-      {cancelErrorMessage ? (
+      {cancelErrorMessage && pendingCancelUcretId == null ? (
         <p className="personel-create-error" role="alert" data-testid="personel-ucret-iptal-hata">
           {cancelErrorMessage}
         </p>
@@ -136,7 +161,7 @@ export function PersonelUcretGecmisiSection({
                 <button
                   type="button"
                   className="universal-btn-cancel"
-                  onClick={() => handleCancelUcret(item.id as number)}
+                  onClick={() => openCancelUcretDialog(item.id as number)}
                   disabled={cancellingUcretId !== null}
                   data-testid={`personel-ucret-iptal-${item.id}`}
                 >
@@ -155,6 +180,22 @@ export function PersonelUcretGecmisiSection({
           onCreate={submitUcret}
           isSubmitting={isSubmitting}
           submitErrorMessage={submitErrorMessage}
+        />
+      ) : null}
+
+      {pendingCancelUcretId != null ? (
+        <AppActionDialog
+          open
+          testId="personel-ucret-action-dialog"
+          title="Ücret Kaydını İptal Et"
+          description={UCRET_IPTAL_ONAY_MESAJI}
+          confirmLabel="İptal Et"
+          submitLabel="İptal ediliyor..."
+          destructive
+          isSubmitting={cancellingUcretId === pendingCancelUcretId}
+          errorMessage={cancelDialogError ?? cancelErrorMessage}
+          onConfirm={confirmCancelUcret}
+          onCancel={closeCancelUcretDialog}
         />
       ) : null}
     </section>

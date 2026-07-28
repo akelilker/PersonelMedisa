@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { Personel } from "../../../../types/personel";
+import { AppActionDialog } from "../../../../components/modal/AppActionDialog";
 import { formatDetailValue } from "./personel-dosya-format-utils";
 import { PersonelBordroKapsamCreateModal } from "./PersonelBordroKapsamCreateModal";
 import { usePersonelBordroKapsam } from "./usePersonelBordroKapsam";
@@ -35,6 +36,11 @@ export function PersonelBordroKapsamSection({
   isActive: boolean;
 }) {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [pendingCancelId, setPendingCancelId] = useState<number | null>(null);
+  const [cancelReason, setCancelReason] = useState("");
+  const [cancelFieldError, setCancelFieldError] = useState<string | null>(null);
+  const [cancelDialogError, setCancelDialogError] = useState<string | null>(null);
+  const [isCancelling, setIsCancelling] = useState(false);
   const {
     kayitlar,
     isLoading,
@@ -64,6 +70,49 @@ export function PersonelBordroKapsamSection({
   const aktifOnayliHaric = kayitlar.find(
     (k) => k.state === "ONAYLANDI" && k.durum === "HARIC" && !k.gecerlilik_bitis
   );
+
+  function openCancelDialog(kapsamId: number) {
+    if (isCancelling) {
+      return;
+    }
+    setCancelDialogError(null);
+    setCancelFieldError(null);
+    setCancelReason("");
+    setPendingCancelId(kapsamId);
+  }
+
+  function closeCancelDialog() {
+    if (isCancelling) {
+      return;
+    }
+    setPendingCancelId(null);
+    setCancelReason("");
+    setCancelFieldError(null);
+    setCancelDialogError(null);
+  }
+
+  async function confirmCancel() {
+    if (pendingCancelId == null || isCancelling) {
+      return;
+    }
+    const neden = cancelReason.trim();
+    if (neden.length < 3) {
+      setCancelFieldError("İptal nedeni en az 3 karakter olmalıdır.");
+      return;
+    }
+
+    setIsCancelling(true);
+    setCancelDialogError(null);
+    setCancelFieldError(null);
+    const ok = await cancel(pendingCancelId, neden);
+    setIsCancelling(false);
+    if (ok) {
+      setPendingCancelId(null);
+      setCancelReason("");
+      return;
+    }
+    setCancelDialogError("İptal edilemedi.");
+  }
 
   return (
     <section
@@ -116,7 +165,7 @@ export function PersonelBordroKapsamSection({
         </p>
       ) : null}
 
-      {actionErrorMessage ? (
+      {actionErrorMessage && pendingCancelId == null ? (
         <p className="personel-puantaj-summary-note" data-testid="personel-bordro-kapsam-aksiyon-hata">
           {actionErrorMessage}
         </p>
@@ -158,12 +207,8 @@ export function PersonelBordroKapsamSection({
                   <button
                     type="button"
                     className="universal-btn-aux"
-                    onClick={() => {
-                      const neden = window.prompt("İptal nedeni:");
-                      if (neden && neden.trim().length >= 3) {
-                        void cancel(item.id, neden.trim());
-                      }
-                    }}
+                    onClick={() => openCancelDialog(item.id)}
+                    disabled={isCancelling}
                     data-testid={`personel-bordro-kapsam-cancel-${item.id}`}
                   >
                     İptal
@@ -185,6 +230,37 @@ export function PersonelBordroKapsamSection({
           dryRunResult={dryRunResult}
           onDryRun={runDryRun}
           onCreate={submitCreate}
+        />
+      ) : null}
+
+      {pendingCancelId != null ? (
+        <AppActionDialog
+          open
+          testId="personel-bordro-kapsam-action-dialog"
+          title="Bordro Kapsam Kaydını İptal Et"
+          description={`Kapsam kaydı #${pendingCancelId} iptal edilecektir.`}
+          confirmLabel="İptal Et"
+          submitLabel="İptal ediliyor..."
+          destructive
+          isSubmitting={isCancelling}
+          errorMessage={cancelDialogError}
+          field={{
+            label: "İptal nedeni",
+            value: cancelReason,
+            onChange: (value) => {
+              setCancelReason(value);
+              if (cancelFieldError) {
+                setCancelFieldError(null);
+              }
+            },
+            placeholder: "İptal nedeni (en az 3 karakter)",
+            required: true,
+            rows: 3,
+            errorMessage: cancelFieldError,
+            testId: "personel-bordro-kapsam-action-dialog-input"
+          }}
+          onConfirm={confirmCancel}
+          onCancel={closeCancelDialog}
         />
       ) : null}
     </section>

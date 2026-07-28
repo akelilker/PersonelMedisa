@@ -34,7 +34,6 @@ async function submitMaasFilters(page: Page, ay = PANEL_AY, subeId = 1) {
 
 test.describe("S77-C maas hesaplama merkezi", () => {
   test("MUHASEBE opens center, sees sealed preflight and creates snapshot", async ({ page }) => {
-    page.on("dialog", (dialog) => void dialog.accept());
     await openRaporlarPanel(page, "MUHASEBE", "maas-hesaplama");
     await setActiveSube(page, 1);
     await submitMaasFilters(page);
@@ -57,6 +56,7 @@ test.describe("S77-C maas hesaplama merkezi", () => {
         response.url().includes("/api/maas-hesaplama/snapshotlar") && response.request().method() === "POST"
     );
     await page.getByTestId("maas-hesaplama-create").click();
+    await page.getByTestId("maas-hesaplama-create-dialog-confirm").click();
     const createResponse = await create;
     expect([200, 201]).toContain(createResponse.status());
     await expect(page.getByTestId("maas-hesaplama-action-success")).toBeVisible();
@@ -85,6 +85,7 @@ test.describe("S77-C maas hesaplama merkezi", () => {
         response.url().includes("/api/maas-hesaplama/snapshotlar") && response.request().method() === "POST"
     );
     await page.getByTestId("maas-hesaplama-create").click();
+    await page.getByTestId("maas-hesaplama-create-dialog-confirm").click();
     const idempotentResponse = await idempotent;
     expect(idempotentResponse.status()).toBe(200);
   });
@@ -110,11 +111,11 @@ test.describe("S77-C maas hesaplama merkezi", () => {
   });
 
   test("cancel and revision flow", async ({ page }) => {
-    page.on("dialog", (dialog) => void dialog.accept());
     await openRaporlarPanel(page, "MUHASEBE", "maas-hesaplama");
     await setActiveSube(page, 1);
     await submitMaasFilters(page);
     await page.getByTestId("maas-hesaplama-create").click();
+    await page.getByTestId("maas-hesaplama-create-dialog-confirm").click();
     await expect(page.getByTestId("maas-hesaplama-action-success")).toBeVisible();
 
     await page.getByLabel("İptal nedeni").fill("E2E revision icin iptal");
@@ -122,6 +123,7 @@ test.describe("S77-C maas hesaplama merkezi", () => {
     await expect(page.getByTestId("maas-hesaplama-action-success")).toContainText("iptal");
 
     await page.getByTestId("maas-hesaplama-create").click();
+    await page.getByTestId("maas-hesaplama-create-dialog-confirm").click();
     await expect(page.getByTestId("maas-hesaplama-action-success")).toContainText("Snapshot oluşturuldu");
   });
 });

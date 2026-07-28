@@ -5,6 +5,7 @@ import {
   cancelRevizyonCorrection,
   fetchRevizyonCorrectionDetail
 } from "../../../api/revizyon-correction.api";
+import { AppActionDialog } from "../../../components/modal/AppActionDialog";
 import { ErrorState } from "../../../components/states/ErrorState";
 import { LoadingState } from "../../../components/states/LoadingState";
 import { useRoleAccess } from "../../../hooks/use-role-access";
@@ -24,6 +25,8 @@ export function RevizyonCorrectionDetailPage() {
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [isActing, setIsActing] = useState(false);
+  const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
 
   const load = useCallback(async () => {
     if (!correctionId) {
@@ -52,6 +55,48 @@ export function RevizyonCorrectionDetailPage() {
   }
   if (errorMessage || !correction) {
     return <ErrorState message={errorMessage ?? "Kayıt bulunamadı."} onRetry={() => void load()} />;
+  }
+
+  function openCancelDialog() {
+    setCancelReason("");
+    setActionError(null);
+    setActionMessage(null);
+    setIsCancelDialogOpen(true);
+  }
+
+  function closeCancelDialog() {
+    if (isActing) {
+      return;
+    }
+    setIsCancelDialogOpen(false);
+    setCancelReason("");
+    setActionError(null);
+  }
+
+  async function cancelCorrection() {
+    const currentCorrection = correction;
+    if (isActing || !currentCorrection) {
+      return;
+    }
+    setIsActing(true);
+    setActionError(null);
+    setActionMessage(null);
+    try {
+      const next = await cancelRevizyonCorrection(currentCorrection.id, {
+        aciklama: cancelReason.trim() || null
+      });
+      setCorrection(next);
+      setActionMessage("Düzeltme kaydı iptal edildi.");
+      setIsCancelDialogOpen(false);
+      setCancelReason("");
+    } catch (error) {
+      const code = error instanceof ApiRequestError ? error.code : undefined;
+      setActionError(
+        revizyonUserMessage(code, error instanceof Error ? error.message : "İptal başarısız.")
+      );
+    } finally {
+      setIsActing(false);
+    }
   }
 
   return (
@@ -142,41 +187,43 @@ export function RevizyonCorrectionDetailPage() {
           type="button"
           className="universal-btn-cancel"
           disabled={isActing}
-          onClick={() => {
-            if (!window.confirm("Aktif düzeltme kaydı iptal edilsin mi?")) {
-              return;
-            }
-            const aciklama = window.prompt("İptal açıklaması (opsiyonel):") ?? "";
-            setIsActing(true);
-            setActionError(null);
-            void (async () => {
-              try {
-                const next = await cancelRevizyonCorrection(correction.id, {
-                  aciklama: aciklama || null
-                });
-                setCorrection(next);
-                setActionMessage("Düzeltme kaydı iptal edildi.");
-              } catch (error) {
-                const code = error instanceof ApiRequestError ? error.code : undefined;
-                setActionError(
-                  revizyonUserMessage(
-                    code,
-                    error instanceof Error ? error.message : "İptal başarısız."
-                  )
-                );
-              } finally {
-                setIsActing(false);
-              }
-            })();
-          }}
+          data-testid="revizyon-correction-iptal"
+          onClick={openCancelDialog}
         >
           Düzeltme Kaydını İptal Et
         </button>
       ) : null}
 
-      {actionMessage ? <p className="workspace-success">{actionMessage}</p> : null}
-      {actionError ? (
-        <p className="workspace-error" role="alert">
+      <AppActionDialog
+        open={isCancelDialogOpen}
+        title="Düzeltme Kaydını İptal Et"
+        description="Aktif düzeltme kaydı iptal edilecektir."
+        confirmLabel="Düzeltme Kaydını İptal Et"
+        submitLabel="Düzeltme kaydı iptal ediliyor..."
+        destructive
+        isSubmitting={isActing}
+        field={{
+          label: "İptal açıklaması",
+          value: cancelReason,
+          onChange: setCancelReason,
+          placeholder: "İptal nedenini yazabilirsiniz",
+          rows: 4,
+          testId: "revizyon-action-dialog-input"
+        }}
+        errorMessage={actionError}
+        errorTestId="revizyon-action-error"
+        testId="revizyon-action-dialog"
+        onConfirm={cancelCorrection}
+        onCancel={closeCancelDialog}
+      />
+
+      {actionMessage ? (
+        <p className="workspace-success" data-testid="revizyon-action-success">
+          {actionMessage}
+        </p>
+      ) : null}
+      {actionError && !isCancelDialogOpen ? (
+        <p className="workspace-error" role="alert" data-testid="revizyon-action-error">
           {actionError}
         </p>
       ) : null}

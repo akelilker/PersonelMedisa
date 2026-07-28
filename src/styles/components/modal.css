@@ -125,6 +125,19 @@
   margin: 0;
 }
 
+.modal-footer .app-action-dialog-actions .universal-btn-aux {
+  width: 100%;
+  justify-self: stretch;
+  justify-content: center;
+}
+
+.modal-footer .app-action-dialog-actions [data-modal-initial-focus="true"]:focus {
+  border-color: rgba(var(--theme-color-rgb), 0.65);
+  color: #fff;
+  background: rgba(var(--theme-color-rgb), 0.12);
+  box-shadow: inset 0 0 0 1px rgba(var(--theme-color-rgb), 0.2);
+}
+
 .modal-body--yonetim {
   gap: 14px;
   padding-top: 16px;
@@ -237,4 +250,10 @@ body.modal-open .modal-container {
   border-color: rgba(184, 192, 201, 0.42);
   border-top-color: rgba(200, 208, 216, 0.48);
   border-bottom-color: rgba(168, 176, 186, 0.4);
+}
+
+@media (max-width: 480px) {
+  .app-action-dialog-actions {
+    grid-template-columns: 1fr;
+  }
 }

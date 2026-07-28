@@ -141,9 +141,20 @@ SMOKE_BASE_URL=https://<canlı-host> SMOKE_APP_PREFIX=/personelmedisa npm run sm
 - **Otomatik kapsam:** API health, API auth guard 401, frontend kök HTML, `index.html` asset 200
 - **Manuel kalır:** GitHub Actions doğrulama (1), cache bypass (6), login smoke (7), read smoke (8), sonuç kaydı (9)
 - **Çıkış kodu:** tüm otomatik kontroller OK → `0`; herhangi fail veya eksik env → `1`
-- **Credential yok:** login/read veya token bu scriptte desteklenmez
+- **Credential yok:** login/read veya token bu scriptte desteklenmez (anonim smoke).
+- **Opsiyonel authenticated read-only:** `SMOKE_AUTH_USERNAME` + `SMOKE_AUTH_PASSWORD` set edilirse script login + `GET /api/personeller` yapar; write çağırmaz. Ayrıntı: `docs/guncel/95-s96-release-ops-runbook.md`.
 
 `SMOKE_BASE_URL` verilmeden çalıştırılırsa usage gösterilir ve script `exit 1` döner.
+
+### Release readiness gate (S96)
+
+Kod hazırlığı ve dış ops kapılarının durumunu yazmadan raporlar:
+
+```bash
+npm run release:gate
+```
+
+Ops acknowledgement env’leri (`…=ready`) ve `REQUIRE_OPS_READY=1` için runbook’a bakın.
 
 ### 1. GitHub Actions doğrulama
 

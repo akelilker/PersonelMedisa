@@ -6,6 +6,8 @@ type AppModalProps = {
   children?: ReactNode;
   footer?: ReactNode;
   onClose?: () => void;
+  ariaDescribedBy?: string;
+  titleTestId?: string;
   backLabel?: string;
   onBack?: () => void;
   backTestId?: string;
@@ -206,6 +208,8 @@ export function AppModal({
   children,
   footer,
   onClose,
+  ariaDescribedBy,
+  titleTestId,
   backLabel,
   onBack,
   backTestId,
@@ -403,6 +407,7 @@ export function AppModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
+        aria-describedby={ariaDescribedBy}
         tabIndex={-1}
       >
         <div className="modal-header">
@@ -416,7 +421,11 @@ export function AppModal({
           ) : (
             <span className="modal-header-spacer" aria-hidden="true" />
           )}
-          <h2 id={titleId} className={titleVariant === "premium" ? "premium-title" : undefined}>
+          <h2
+            id={titleId}
+            className={titleVariant === "premium" ? "premium-title" : undefined}
+            data-testid={titleTestId}
+          >
             {title}
           </h2>
           {onClose ? (

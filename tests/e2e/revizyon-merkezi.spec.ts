@@ -36,6 +36,32 @@ async function fillCreateAndSave(
   await expect(page.getByTestId("revizyon-talep-detay")).toBeVisible({ timeout: 15_000 });
 }
 
+function trackNativeDialogs(page: Page) {
+  const nativeDialogs: string[] = [];
+  page.on("dialog", (dialog) => {
+    nativeDialogs.push(`${dialog.type()}:${dialog.message()}`);
+    void dialog.dismiss();
+  });
+  return nativeDialogs;
+}
+
+async function createApprovedCorrection(page: Page, label: string) {
+  await loginAsMockRole(page, "GENEL_YONETICI");
+  await openCreateFromKaynakRow(page, "1");
+  await fillCreateAndSave(page, {
+    gerekce: `${label} talep`,
+    yeniDeger: "09:00-18:00",
+    submit: true
+  });
+  await page.locator('input[name="karar_notu"]').fill(`${label} karar notu`);
+  await page.getByTestId("revizyon-onayla").click();
+  await expect(page.getByRole("dialog", { name: "Revizyon Talebini Onayla" })).toBeVisible();
+  await page.getByTestId("revizyon-action-dialog-confirm").click();
+  await expect(page.getByTestId("revizyon-action-success")).toContainText("onaylandı");
+  await page.getByTestId("revizyon-correction-uret").click();
+  await expect(page.getByTestId("revizyon-action-success")).toContainText("Düzeltme kaydı");
+}
+
 test.describe("S80 Revizyon Merkezi final UI kabul", () => {
   test("Kayıt ve Süreç gateway → Revizyon Merkezi (GY)", async ({ page }) => {
     await loginAsMockRole(page, "GENEL_YONETICI");
@@ -65,6 +91,7 @@ test.describe("S80 Revizyon Merkezi final UI kabul", () => {
   });
 
   test("BIRIM_AMIRI: iptal akışı", async ({ page }) => {
+    const nativeDialogs = trackNativeDialogs(page);
     await loginAsMockRole(page, "BIRIM_AMIRI");
     await openCreateFromKaynakRow(page, "1");
     await fillCreateAndSave(page, {
@@ -72,13 +99,25 @@ test.describe("S80 Revizyon Merkezi final UI kabul", () => {
       yeniDeger: "10:00-19:00",
       submit: true
     });
-    page.once("dialog", (dialog) => void dialog.accept());
+    const cancelRequest = page.waitForRequest(
+      (request) =>
+        request.method() === "POST" &&
+        /\/api\/haftalik-kapanis\/revizyon-talepleri\/\d+\/iptal$/.test(
+          new URL(request.url()).pathname
+        )
+    );
     await page.getByTestId("revizyon-talep-iptal").click();
+    await expect(page.getByRole("dialog", { name: "Revizyon Talebini İptal Et" })).toBeVisible();
+    await expect(page.getByTestId("revizyon-action-dialog-cancel")).toBeFocused();
+    await page.getByTestId("revizyon-action-dialog-confirm").click();
+    expect((await cancelRequest).postDataJSON()).toEqual({ karar_notu: null });
     await expect(page.getByTestId("revizyon-action-success")).toContainText("iptal");
     await expect(page.getByTestId("revizyon-onaya-gonder")).toHaveCount(0);
+    expect(nativeDialogs).toEqual([]);
   });
 
   test("BOLUM_YONETICISI: kendi scope create/submit/iptal, onay yok", async ({ page }) => {
+    const nativeDialogs = trackNativeDialogs(page);
     await loginAsMockRole(page, "BOLUM_YONETICISI");
     await page.goto("/haftalik-kapanis/revizyonlar");
     await expect(page.getByTestId("revizyon-merkezi-page")).toBeVisible();
@@ -90,12 +129,14 @@ test.describe("S80 Revizyon Merkezi final UI kabul", () => {
       submit: true
     });
     await expect(page.getByTestId("revizyon-onayla")).toHaveCount(0);
-    page.once("dialog", (dialog) => void dialog.accept());
     await page.getByTestId("revizyon-talep-iptal").click();
+    await page.getByTestId("revizyon-action-dialog-confirm").click();
     await expect(page.getByTestId("revizyon-action-success")).toContainText("iptal");
+    expect(nativeDialogs).toEqual([]);
   });
 
   test("MUHASEBE: finans görünür, onay/correction yok", async ({ page }) => {
+    const nativeDialogs = trackNativeDialogs(page);
     await loginAsMockRole(page, "MUHASEBE");
     await openCreateFromKaynakRow(page, "1");
     await expect(page.getByTestId("revizyon-bordro-etki-alani")).toBeVisible();
@@ -107,14 +148,16 @@ test.describe("S80 Revizyon Merkezi final UI kabul", () => {
     await expect(page.getByTestId("revizyon-detail-bordro-alani")).toBeVisible();
     await expect(page.getByTestId("revizyon-onayla")).toHaveCount(0);
     await expect(page.getByTestId("revizyon-correction-uret")).toHaveCount(0);
-    page.once("dialog", (dialog) => void dialog.accept());
     await page.getByTestId("revizyon-talep-iptal").click();
+    await page.getByTestId("revizyon-action-dialog-confirm").click();
     await expect(page.getByTestId("revizyon-action-success")).toContainText("iptal");
+    expect(nativeDialogs).toEqual([]);
   });
 
   test("GENEL_YONETICI: onay → correction → değer ayrımı → iptal + duplicate 409", async ({
     page
   }) => {
+    const nativeDialogs = trackNativeDialogs(page);
     await loginAsMockRole(page, "GENEL_YONETICI");
     await page.goto("/");
     await expect(page.getByTestId("kayit-surec-revizyon-merkezi-link")).toHaveCount(0);
@@ -130,9 +173,39 @@ test.describe("S80 Revizyon Merkezi final UI kabul", () => {
       submit: true
     });
     await page.locator('input[name="karar_notu"]').fill("S80 onay notu");
-    page.once("dialog", (dialog) => void dialog.accept());
+    const approvalRequests: Array<Record<string, unknown>> = [];
+    page.on("request", (request) => {
+      if (
+        request.method() === "POST" &&
+        /\/api\/haftalik-kapanis\/revizyon-talepleri\/\d+\/onay$/.test(
+          new URL(request.url()).pathname
+        )
+      ) {
+        approvalRequests.push((request.postDataJSON() ?? {}) as Record<string, unknown>);
+      }
+    });
     await page.getByTestId("revizyon-onayla").click();
+    const approveDialog = page.getByRole("dialog", { name: "Revizyon Talebini Onayla" });
+    await expect(approveDialog).toBeVisible();
+    await expect(page.getByTestId("revizyon-action-dialog-title")).toHaveText(
+      "Revizyon Talebini Onayla"
+    );
+    await expect(page.getByTestId("revizyon-action-dialog-description")).toContainText(
+      "Bu revizyon talebi onaylanacaktır."
+    );
+    await expect(page.getByTestId("revizyon-action-dialog-cancel")).toBeFocused();
+    await page.keyboard.press("Tab");
+    await expect(page.getByTestId("revizyon-action-dialog-confirm")).toBeFocused();
+    await page.keyboard.press("Shift+Tab");
+    await expect(page.getByTestId("revizyon-action-dialog-cancel")).toBeFocused();
+    await page.getByTestId("revizyon-action-dialog-cancel").click();
+    await expect(approveDialog).toHaveCount(0);
+    await expect(page.getByTestId("revizyon-onayla")).toBeFocused();
+    expect(approvalRequests).toHaveLength(0);
+    await page.getByTestId("revizyon-onayla").click();
+    await page.getByTestId("revizyon-action-dialog-confirm").dblclick();
     await expect(page.getByTestId("revizyon-action-success")).toContainText("onay");
+    expect(approvalRequests).toEqual([{ karar_notu: "S80 onay notu" }]);
 
     await expect(page.getByTestId("revizyon-deger-ayrimi")).toBeVisible();
     await expect(page.getByTestId("revizyon-ham-deger")).toBeVisible();
@@ -187,18 +260,31 @@ test.describe("S80 Revizyon Merkezi final UI kabul", () => {
     expect(dup.status).toBe(409);
     expect(dup.code).toBe("CORRECTION_ALREADY_EXISTS");
 
-    page.once("dialog", (dialog) => {
-      if (dialog.type() === "prompt") {
-        void dialog.accept("S80 iptal");
-      } else {
-        void dialog.accept();
+    const correctionCancelRequests: Array<Record<string, unknown>> = [];
+    page.on("request", (request) => {
+      if (
+        request.method() === "POST" &&
+        /\/api\/haftalik-kapanis\/revizyon-corrections\/\d+\/iptal$/.test(
+          new URL(request.url()).pathname
+        )
+      ) {
+        correctionCancelRequests.push((request.postDataJSON() ?? {}) as Record<string, unknown>);
       }
     });
     await page.getByTestId("revizyon-correction-iptal").click();
+    const cancelReason = page.getByRole("textbox", { name: "İptal açıklaması" });
+    await cancelReason.fill("  Hatalı vardiya kaydı  ");
+    await cancelReason.press("Enter");
+    await expect(page.getByTestId("revizyon-action-dialog")).toBeVisible();
+    expect(correctionCancelRequests).toHaveLength(0);
+    await page.getByTestId("revizyon-action-dialog-confirm").click();
     await expect(page.getByTestId("revizyon-action-success")).toContainText("iptal");
+    expect(correctionCancelRequests).toEqual([{ aciklama: "Hatalı vardiya kaydı" }]);
+    expect(nativeDialogs).toEqual([]);
   });
 
   test("GENEL_YONETICI: red + terminal state", async ({ page }) => {
+    const nativeDialogs = trackNativeDialogs(page);
     await loginAsMockRole(page, "GENEL_YONETICI");
     await openCreateFromKaynakRow(page, "1");
     await fillCreateAndSave(page, {
@@ -206,14 +292,203 @@ test.describe("S80 Revizyon Merkezi final UI kabul", () => {
       yeniDeger: "07:00-16:00",
       submit: true
     });
-    await page.locator('input[name="karar_notu"]').fill("S80 red gerekçesi");
-    page.once("dialog", (dialog) => void dialog.accept());
+    const kararNotu = page.locator('input[name="karar_notu"]');
     await page.getByTestId("revizyon-reddet").click();
+    await expect(page.getByTestId("revizyon-action-dialog")).toHaveCount(0);
+    await expect(page.getByTestId("revizyon-action-error")).toContainText(
+      "Red için karar notu zorunludur."
+    );
+    await expect(kararNotu).toBeFocused();
+    await kararNotu.fill("S80 red gerekçesi");
+    await page.getByTestId("revizyon-reddet").click();
+    await expect(page.getByRole("dialog", { name: "Revizyon Talebini Reddet" })).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(page.getByTestId("revizyon-reddet")).toBeFocused();
+    await page.getByTestId("revizyon-reddet").click();
+    const rejectRequest = page.waitForRequest(
+      (request) =>
+        request.method() === "POST" &&
+        /\/api\/haftalik-kapanis\/revizyon-talepleri\/\d+\/red$/.test(
+          new URL(request.url()).pathname
+        )
+    );
+    await page.getByTestId("revizyon-action-dialog-confirm").click();
+    expect((await rejectRequest).postDataJSON()).toEqual({ karar_notu: "S80 red gerekçesi" });
     await expect(page.getByTestId("revizyon-action-success")).toContainText("reddedildi");
     await expect(page.getByText("S80 red gerekçesi", { exact: true })).toBeVisible();
     await expect(page.getByTestId("revizyon-onayla")).toHaveCount(0);
     await expect(page.getByTestId("revizyon-reddet")).toHaveCount(0);
     await expect(page.getByTestId("revizyon-correction-uret")).toHaveCount(0);
+    expect(nativeDialogs).toEqual([]);
+  });
+
+  test("GENEL_YONETICI: correction detail boş açıklama null payload ve başarı", async ({
+    page
+  }) => {
+    const nativeDialogs = trackNativeDialogs(page);
+    await createApprovedCorrection(page, "S93-E3A boş açıklama");
+    await page.getByTestId("revizyon-correction-detay-git").click();
+    await expect(page.getByTestId("revizyon-correction-detay")).toBeVisible();
+
+    const cancelRequest = page.waitForRequest(
+      (request) =>
+        request.method() === "POST" &&
+        /\/api\/haftalik-kapanis\/revizyon-corrections\/\d+\/iptal$/.test(
+          new URL(request.url()).pathname
+        )
+    );
+    await page.getByTestId("revizyon-correction-iptal").click();
+    await expect(page.getByTestId("revizyon-action-dialog-cancel")).toBeFocused();
+    await page.getByTestId("revizyon-action-dialog-confirm").click();
+
+    expect((await cancelRequest).postDataJSON()).toEqual({ aciklama: null });
+    await expect(page.getByTestId("revizyon-action-success")).toContainText("iptal edildi");
+    await expect(page.getByText("İptal", { exact: true })).toBeVisible();
+    await expect(page.getByTestId("revizyon-correction-iptal")).toHaveCount(0);
+    expect(nativeDialogs).toEqual([]);
+  });
+
+  test("GENEL_YONETICI: correction detail failure girdiyi korur ve retry tekilleşir", async ({
+    page
+  }) => {
+    const nativeDialogs = trackNativeDialogs(page);
+    await createApprovedCorrection(page, "S93-E3A retry");
+    await page.getByTestId("revizyon-correction-detay-git").click();
+    await expect(page.getByTestId("revizyon-correction-detay")).toBeVisible();
+
+    let cancelAttempts = 0;
+    await page.route(
+      "**/api/haftalik-kapanis/revizyon-corrections/*/iptal",
+      async (route) => {
+        cancelAttempts += 1;
+        if (cancelAttempts === 1) {
+          await route.fulfill({
+            status: 409,
+            contentType: "application/json",
+            body: JSON.stringify({
+              data: null,
+              meta: {},
+              errors: [
+                {
+                  code: "CORRECTION_RECOMPUTE_REQUIRED",
+                  message: "Kontrollü S93-E3A hata."
+                }
+              ]
+            })
+          });
+          return;
+        }
+        await route.fallback();
+      }
+    );
+
+    await page.getByTestId("revizyon-correction-iptal").click();
+    const reason = page.getByRole("textbox", { name: "İptal açıklaması" });
+    await reason.fill("  Retry açıklaması  ");
+    await page.getByTestId("revizyon-action-dialog-confirm").click();
+    await expect(page.getByTestId("revizyon-action-error")).toBeVisible();
+    await expect(page.getByTestId("revizyon-action-success")).toHaveCount(0);
+    await expect(reason).toHaveValue("  Retry açıklaması  ");
+    await expect(page.getByText("Aktif", { exact: true })).toBeVisible();
+
+    await page.getByTestId("revizyon-action-dialog-confirm").dblclick();
+    await expect(page.getByTestId("revizyon-action-success")).toContainText("iptal edildi");
+    expect(cancelAttempts).toBe(2);
+    expect(nativeDialogs).toEqual([]);
+  });
+
+  test("AppActionDialog viewport matrisi taşma ve footer/body çakışması üretmez", async ({
+    page
+  }) => {
+    await createApprovedCorrection(page, "S93-E3A responsive");
+    await page.getByTestId("revizyon-correction-iptal").click();
+    await expect(page.getByRole("textbox", { name: "İptal açıklaması" })).toBeVisible();
+    const cancelButton = page.getByTestId("revizyon-action-dialog-cancel");
+    await expect(cancelButton).toBeFocused();
+
+    for (const viewport of [
+      { width: 1536, height: 864 },
+      { width: 1366, height: 768 },
+      { width: 768, height: 1024 },
+      { width: 430, height: 932 },
+      { width: 390, height: 844 },
+      { width: 360, height: 800 },
+      { width: 320, height: 568 }
+    ]) {
+      await page.setViewportSize(viewport);
+      await expect
+        .poll(() => cancelButton.evaluate((element) => getComputedStyle(element).boxShadow))
+        .not.toBe("none");
+      const metrics = await page.evaluate(() => {
+        const overlays = document.querySelectorAll(".modal-overlay.open");
+        const topmostOverlay = overlays.item(overlays.length - 1);
+        if (!(topmostOverlay instanceof HTMLElement)) {
+          throw new Error("Topmost dialog overlay eksik.");
+        }
+
+        function rect(selector: string) {
+          const element = topmostOverlay.querySelector(selector);
+          if (!(element instanceof HTMLElement)) {
+            throw new Error(`Eksik element: ${selector}`);
+          }
+          const bounds = element.getBoundingClientRect();
+          return {
+            top: bounds.top,
+            right: bounds.right,
+            bottom: bounds.bottom,
+            left: bounds.left,
+            width: bounds.width,
+            height: bounds.height
+          };
+        }
+
+        const title = topmostOverlay.querySelector(".modal-header h2");
+        const body = topmostOverlay.querySelector(".modal-body");
+        const cancel = topmostOverlay.querySelector(
+          '[data-testid="revizyon-action-dialog-cancel"]'
+        );
+        const confirm = topmostOverlay.querySelector(
+          '[data-testid="revizyon-action-dialog-confirm"]'
+        );
+        if (
+          !(title instanceof HTMLElement) ||
+          !(body instanceof HTMLElement) ||
+          !(cancel instanceof HTMLElement) ||
+          !(confirm instanceof HTMLElement)
+        ) {
+          throw new Error("Dialog kontrat elementi eksik.");
+        }
+
+        return {
+          viewportWidth: window.innerWidth,
+          documentScrollWidth: document.documentElement.scrollWidth,
+          dialog: rect(".modal-container"),
+          body: rect(".modal-body"),
+          footer: rect(".modal-footer"),
+          textarea: rect("#revizyon-action-dialog-input"),
+          cancel: rect('[data-testid="revizyon-action-dialog-cancel"]'),
+          confirm: rect('[data-testid="revizyon-action-dialog-confirm"]'),
+          titleFits: title.scrollWidth <= title.clientWidth + 1,
+          bodyOverflowY: getComputedStyle(body).overflowY,
+          cancelFocusRing: getComputedStyle(cancel).boxShadow,
+          cancelColor: getComputedStyle(cancel).color,
+          confirmColor: getComputedStyle(confirm).color
+        };
+      });
+
+      expect(metrics.documentScrollWidth).toBeLessThanOrEqual(metrics.viewportWidth + 1);
+      expect(metrics.dialog.left).toBeGreaterThanOrEqual(-1);
+      expect(metrics.dialog.right).toBeLessThanOrEqual(metrics.viewportWidth + 1);
+      expect(metrics.textarea.width).toBeGreaterThan(0);
+      expect(metrics.textarea.height).toBeGreaterThan(0);
+      expect(metrics.cancel.left).toBeGreaterThanOrEqual(metrics.dialog.left);
+      expect(metrics.confirm.right).toBeLessThanOrEqual(metrics.dialog.right);
+      expect(metrics.body.bottom).toBeLessThanOrEqual(metrics.footer.top + 1);
+      expect(metrics.titleFits).toBe(true);
+      expect(metrics.bodyOverflowY).toBe("auto");
+      expect(metrics.cancelFocusRing).not.toBe("none");
+      expect(metrics.confirmColor).not.toBe(metrics.cancelColor);
+    }
   });
 
   test("PATRON: gateway yok + doğrudan route yetkisiz", async ({ page }) => {

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ApiRequestError } from "../../../api/api-client";
 import {
@@ -13,6 +13,7 @@ import {
   submitRevizyonTalebi
 } from "../../../api/revizyon-talebi.api";
 import { FormField } from "../../../components/form/FormField";
+import { AppActionDialog } from "../../../components/modal/AppActionDialog";
 import { ErrorState } from "../../../components/states/ErrorState";
 import { LoadingState } from "../../../components/states/LoadingState";
 import { useRoleAccess } from "../../../hooks/use-role-access";
@@ -24,6 +25,44 @@ import {
   formatRevizyonTipiLabel,
   revizyonUserMessage
 } from "../revizyon-display";
+
+type PendingRevizyonAction =
+  | { type: "approve" }
+  | { type: "reject" }
+  | { type: "cancel-request" }
+  | { type: "cancel-correction" }
+  | null;
+
+const ACTION_DIALOG_COPY = {
+  approve: {
+    title: "Revizyon Talebini Onayla",
+    description: "Bu revizyon talebi onaylanacaktır. İşleme devam edilsin mi?",
+    confirmLabel: "Talebi Onayla",
+    submitLabel: "Talep onaylanıyor...",
+    destructive: false
+  },
+  reject: {
+    title: "Revizyon Talebini Reddet",
+    description: "Bu revizyon talebi reddedilecektir. İşleme devam edilsin mi?",
+    confirmLabel: "Talebi Reddet",
+    submitLabel: "Talep reddediliyor...",
+    destructive: true
+  },
+  "cancel-request": {
+    title: "Revizyon Talebini İptal Et",
+    description: "Bu revizyon talebi iptal edilecektir. İşleme devam edilsin mi?",
+    confirmLabel: "Talebi İptal Et",
+    submitLabel: "Talep iptal ediliyor...",
+    destructive: true
+  },
+  "cancel-correction": {
+    title: "Düzeltme Kaydını İptal Et",
+    description: "Aktif düzeltme kaydı iptal edilecektir.",
+    confirmLabel: "Düzeltme Kaydını İptal Et",
+    submitLabel: "Düzeltme kaydı iptal ediliyor...",
+    destructive: true
+  }
+} as const;
 
 export function RevizyonTalebiDetailPage() {
   const { revizyonId } = useParams();
@@ -44,6 +83,9 @@ export function RevizyonTalebiDetailPage() {
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [isActing, setIsActing] = useState(false);
+  const [pendingAction, setPendingAction] = useState<PendingRevizyonAction>(null);
+  const [cancelReason, setCancelReason] = useState("");
+  const isActingRef = useRef(false);
 
   const load = useCallback(async () => {
     if (!revizyonId) {
@@ -67,10 +109,14 @@ export function RevizyonTalebiDetailPage() {
     void load();
   }, [load]);
 
-  async function runAction(action: () => Promise<RevizyonTalebi>, success: string) {
-    if (isActing) {
-      return;
+  async function runAction(
+    action: () => Promise<RevizyonTalebi>,
+    success: string
+  ): Promise<boolean> {
+    if (isActingRef.current) {
+      return false;
     }
+    isActingRef.current = true;
     setIsActing(true);
     setActionError(null);
     setActionMessage(null);
@@ -86,12 +132,15 @@ export function RevizyonTalebiDetailPage() {
         }
       }
       setActionMessage(success);
+      return true;
     } catch (error) {
       const code = error instanceof ApiRequestError ? error.code : undefined;
       setActionError(
-        revizyonUserMessage(code, error instanceof Error ? error.message : "İşlem başarısız.")
+          revizyonUserMessage(code, error instanceof Error ? error.message : "İşlem başarısız.")
       );
+      return false;
     } finally {
+      isActingRef.current = false;
       setIsActing(false);
     }
   }
@@ -115,6 +164,74 @@ export function RevizyonTalebiDetailPage() {
   const showProduce =
     canApprove && talep.durum === "ONAYLANDI" && !talep.correction_event_id;
   const showCorrectionLink = Boolean(talep.correction_event_id);
+  const dialogCopy = pendingAction ? ACTION_DIALOG_COPY[pendingAction.type] : null;
+
+  function openPendingAction(type: NonNullable<PendingRevizyonAction>["type"]) {
+    if (isActingRef.current) {
+      return;
+    }
+    setActionError(null);
+    setActionMessage(null);
+    if (type === "cancel-correction") {
+      setCancelReason("");
+    }
+    setPendingAction({ type });
+  }
+
+  function closePendingAction() {
+    if (isActingRef.current) {
+      return;
+    }
+    setPendingAction(null);
+    setCancelReason("");
+    setActionError(null);
+  }
+
+  async function confirmPendingAction() {
+    const action = pendingAction;
+    const currentTalep = talep;
+    if (!action || !currentTalep) {
+      return;
+    }
+
+    let success = false;
+    switch (action.type) {
+      case "approve":
+        success = await runAction(
+          () => approveRevizyonTalebi(currentTalep.id, { karar_notu: kararNotu || null }),
+          "Talep onaylandı."
+        );
+        break;
+      case "reject":
+        success = await runAction(
+          () => rejectRevizyonTalebi(currentTalep.id, { karar_notu: kararNotu }),
+          "Talep reddedildi."
+        );
+        break;
+      case "cancel-request":
+        success = await runAction(
+          () => cancelRevizyonTalebi(currentTalep.id, { karar_notu: kararNotu || null }),
+          "Talep iptal edildi."
+        );
+        break;
+      case "cancel-correction":
+        if (!currentTalep.correction_event_id) {
+          return;
+        }
+        success = await runAction(async () => {
+          await cancelRevizyonCorrection(currentTalep.correction_event_id!, {
+            aciklama: cancelReason.trim() || null
+          });
+          return fetchRevizyonTalebiDetail(currentTalep.id);
+        }, "Düzeltme kaydı iptal edildi.");
+        break;
+    }
+
+    if (success) {
+      setPendingAction(null);
+      setCancelReason("");
+    }
+  }
 
   return (
     <section className="states-page" data-testid="revizyon-talep-detay">
@@ -276,15 +393,7 @@ export function RevizyonTalebiDetailPage() {
             className="universal-btn-save"
             disabled={isActing}
             data-testid="revizyon-onayla"
-            onClick={() => {
-              if (!window.confirm("Talebi onaylamak istediğinize emin misiniz?")) {
-                return;
-              }
-              void runAction(
-                () => approveRevizyonTalebi(talep.id, { karar_notu: kararNotu || null }),
-                "Talep onaylandı."
-              );
-            }}
+            onClick={() => openPendingAction("approve")}
           >
             Onayla
           </button>
@@ -298,15 +407,10 @@ export function RevizyonTalebiDetailPage() {
             onClick={() => {
               if (!kararNotu.trim()) {
                 setActionError("Red için karar notu zorunludur.");
+                document.getElementById("karar_notu")?.focus();
                 return;
               }
-              if (!window.confirm("Talebi reddetmek istediğinize emin misiniz?")) {
-                return;
-              }
-              void runAction(
-                () => rejectRevizyonTalebi(talep.id, { karar_notu: kararNotu }),
-                "Talep reddedildi."
-              );
+              openPendingAction("reject");
             }}
           >
             Reddet
@@ -318,15 +422,7 @@ export function RevizyonTalebiDetailPage() {
             className="universal-btn-cancel"
             disabled={isActing}
             data-testid="revizyon-talep-iptal"
-            onClick={() => {
-              if (!window.confirm("Talebi iptal etmek istediğinize emin misiniz?")) {
-                return;
-              }
-              void runAction(
-                () => cancelRevizyonTalebi(talep.id, { karar_notu: kararNotu || null }),
-                "Talep iptal edildi."
-              );
-            }}
+            onClick={() => openPendingAction("cancel-request")}
           >
             İptal
           </button>
@@ -363,27 +459,48 @@ export function RevizyonTalebiDetailPage() {
             className="universal-btn-cancel"
             disabled={isActing}
             data-testid="revizyon-correction-iptal"
-            onClick={() => {
-              const aciklama = window.prompt("İptal açıklaması (opsiyonel):") ?? "";
-              void runAction(async () => {
-                await cancelRevizyonCorrection(talep.correction_event_id!, {
-                  aciklama: aciklama || null
-                });
-                return fetchRevizyonTalebiDetail(talep.id);
-              }, "Düzeltme kaydı iptal edildi.");
-            }}
+            onClick={() => openPendingAction("cancel-correction")}
           >
             Düzeltme Kaydını İptal Et
           </button>
         ) : null}
       </div>
 
+      {pendingAction && dialogCopy ? (
+        <AppActionDialog
+          open
+          title={dialogCopy.title}
+          description={dialogCopy.description}
+          confirmLabel={dialogCopy.confirmLabel}
+          submitLabel={dialogCopy.submitLabel}
+          destructive={dialogCopy.destructive}
+          isSubmitting={isActing}
+          field={
+            pendingAction.type === "cancel-correction"
+              ? {
+                  label: "İptal açıklaması",
+                  value: cancelReason,
+                  onChange: setCancelReason,
+                  placeholder: "İptal nedenini yazabilirsiniz",
+                  rows: 4,
+                  testId: "revizyon-action-dialog-input"
+                }
+              : undefined
+          }
+          errorMessage={actionError}
+          errorTestId="revizyon-action-error"
+          testId="revizyon-action-dialog"
+          onConfirm={confirmPendingAction}
+          onCancel={closePendingAction}
+        />
+      ) : null}
+
       {actionMessage ? (
         <p className="workspace-success" data-testid="revizyon-action-success">
           {actionMessage}
         </p>
       ) : null}
-      {actionError ? (
+      {actionError && !pendingAction ? (
         <p className="workspace-error" role="alert" data-testid="revizyon-action-error">
           {actionError}
         </p>

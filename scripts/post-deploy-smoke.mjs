@@ -5,6 +5,9 @@
  * Usage:
  *   SMOKE_BASE_URL=https://example.invalid npm run smoke:live
  *   SMOKE_APP_PREFIX=/personelmedisa npm run smoke:live
+ *
+ * Optional authenticated read-only smoke (no production writes):
+ *   SMOKE_AUTH_USERNAME=... SMOKE_AUTH_PASSWORD=... npm run smoke:live
  */
 
 const REQUEST_TIMEOUT_MS = 15_000;
@@ -22,8 +25,10 @@ function printUsage() {
   console.error("  SMOKE_BASE_URL=https://example.invalid npm run smoke:live");
   console.error("");
   console.error("Environment:");
-  console.error("  SMOKE_BASE_URL   (required) Protocol + host, no trailing path slash");
-  console.error("  SMOKE_APP_PREFIX (optional) Default: /personelmedisa");
+  console.error("  SMOKE_BASE_URL      (required) Protocol + host, no trailing path slash");
+  console.error("  SMOKE_APP_PREFIX    (optional) Default: /personelmedisa");
+  console.error("  SMOKE_AUTH_USERNAME (optional) Enables authenticated read-only smoke");
+  console.error("  SMOKE_AUTH_PASSWORD (optional) Required with SMOKE_AUTH_USERNAME");
 }
 
 function normalizeBaseUrl(raw) {
@@ -500,6 +505,100 @@ async function checkBundleAssets(baseUrl, frontendUrl, html) {
   }
 }
 
+function extractToken(payload) {
+  if (!payload || typeof payload !== "object") {
+    return null;
+  }
+  const data = payload.data && typeof payload.data === "object" ? payload.data : payload;
+  if (typeof data.token === "string" && data.token.trim()) {
+    return data.token.trim();
+  }
+  return null;
+}
+
+async function checkAuthenticatedReadOnly(baseUrl, appPrefix) {
+  const step = "Authenticated read-only smoke";
+  const username = (process.env.SMOKE_AUTH_USERNAME ?? "").trim();
+  const password = process.env.SMOKE_AUTH_PASSWORD ?? "";
+
+  if (!username && !password) {
+    console.log(`[SKIP] ${step} — SMOKE_AUTH_USERNAME/PASSWORD unset (read-only anonymous smoke only)`);
+    return;
+  }
+
+  if (!username || !password) {
+    recordFailure(step, {
+      Expected: "Both SMOKE_AUTH_USERNAME and SMOKE_AUTH_PASSWORD",
+      Got: username ? "password missing" : "username missing",
+      Hint: "Authenticated smoke requires both env vars; never commit credentials"
+    });
+    return;
+  }
+
+  const loginUrl = joinUrl(baseUrl, appPrefix, "/api/auth/login");
+  let loginResponse;
+  try {
+    loginResponse = await fetchWithTimeout(loginUrl, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ username, password })
+    });
+  } catch (error) {
+    recordFailure(step, {
+      URL: loginUrl,
+      Expected: "HTTP 200 login JSON with token",
+      Got: error instanceof Error ? error.message : String(error)
+    });
+    return;
+  }
+
+  const loginPayload = parseJsonBody(loginResponse.body);
+  const token = extractToken(loginPayload);
+  if (!loginResponse.ok || !token) {
+    recordFailure(step, {
+      URL: loginUrl,
+      Expected: "HTTP 200 + data.token",
+      Got: `HTTP ${loginResponse.status}; token=${token ? "present" : "missing"}`,
+      Hint: "Use a dedicated non-prod-write test account; do not use personal credentials in logs"
+    });
+    return;
+  }
+
+  const personellerUrl = joinUrl(baseUrl, appPrefix, "/api/personeller?page=1&limit=5");
+  let personellerResponse;
+  try {
+    personellerResponse = await fetchWithTimeout(personellerUrl, {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+        Authorization: `Bearer ${token}`
+      }
+    });
+  } catch (error) {
+    recordFailure(step, {
+      URL: personellerUrl,
+      Expected: "HTTP 200 authenticated personeller read",
+      Got: error instanceof Error ? error.message : String(error)
+    });
+    return;
+  }
+
+  if (!personellerResponse.ok || !isJsonContentType(personellerResponse.contentType)) {
+    recordFailure(step, {
+      URL: personellerUrl,
+      Expected: "HTTP 200 JSON personeller list/page",
+      Got: `HTTP ${personellerResponse.status}; content-type=${personellerResponse.contentType || "n/a"}`
+    });
+    return;
+  }
+
+  // Explicit non-write assertion: this smoke never calls POST/PUT/PATCH/DELETE after login.
+  console.log(`[OK] ${step} (login + GET /api/personeller; no write calls)`);
+}
+
 async function main() {
   const rawBaseUrl = process.env.SMOKE_BASE_URL;
   if (!rawBaseUrl || !rawBaseUrl.trim()) {
@@ -522,6 +621,8 @@ async function main() {
   if (frontend.html) {
     await checkBundleAssets(baseUrl, frontend.frontendUrl ?? joinUrl(baseUrl, appPrefix, "/"), frontend.html);
   }
+
+  await checkAuthenticatedReadOnly(baseUrl, appPrefix);
 
   console.log("");
   if (failures.length > 0) {

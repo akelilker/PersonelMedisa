@@ -19,7 +19,12 @@ export function isRealYonetimKullaniciApi(): boolean {
     return true;
   }
 
-  const demoFallback = (import.meta.env.VITE_DEMO_API_FALLBACK ?? "true").trim().toLowerCase();
+  const demoFallbackDefault =
+    import.meta.env.PROD === true || import.meta.env.MODE === "production" ? "false" : "true";
+  const demoFallback = (import.meta.env.VITE_DEMO_API_FALLBACK ?? demoFallbackDefault)
+    .toString()
+    .trim()
+    .toLowerCase();
   return demoFallback === "false";
 }
 

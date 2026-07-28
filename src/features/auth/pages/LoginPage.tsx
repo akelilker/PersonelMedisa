@@ -46,7 +46,8 @@ export function LoginPage() {
     try {
       await login({
         username: username.trim(),
-        password
+        password,
+        rememberMe
       });
       navigate(redirectPath, { replace: true });
     } catch (error) {

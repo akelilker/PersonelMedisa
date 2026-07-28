@@ -251,23 +251,25 @@ export function bordroDevirSablonCsvUrl(params: {
 }
 
 async function downloadAuthenticatedCsv(path: string, filename: string) {
-  const { resolveDemoApiResponse } = await import("./mock-demo");
-  const { ApiRequestError, buildApiUrl } = await import("./api-client");
+  const { ApiRequestError, buildApiUrl, shouldPreferDemoApi } = await import("./api-client");
   const { getAuthTokenForApi } = await import("../auth/auth-token-provider");
   const { getActiveSubeIdForApiHeader } = await import("../auth/auth-manager");
 
-  const demoResponse = resolveDemoApiResponse(path, { method: "GET" });
-  if (demoResponse !== null) {
-    const csvContent =
-      typeof demoResponse.data === "string" ? demoResponse.data : "sicil_no,ad_soyad\n";
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = filename;
-    anchor.click();
-    URL.revokeObjectURL(url);
-    return;
+  if (shouldPreferDemoApi()) {
+    const { resolveDemoApiResponse } = await import("./mock-demo");
+    const demoResponse = resolveDemoApiResponse(path, { method: "GET" });
+    if (demoResponse !== null) {
+      const csvContent =
+        typeof demoResponse.data === "string" ? demoResponse.data : "sicil_no,ad_soyad\n";
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = filename;
+      anchor.click();
+      URL.revokeObjectURL(url);
+      return;
+    }
   }
 
   const headers = new Headers();

@@ -56,6 +56,9 @@ jobs:
       - name: Build production bundle
         env:
           VITE_APP_BASE_PATH: /personelmedisa/
+          VITE_API_MODE: real
+          VITE_DEMO_API_FALLBACK: "false"
+          VITE_ENABLE_DIAGNOSTICS: "false"
         run: npm run build
 
       - name: Validate SPA rewrite file

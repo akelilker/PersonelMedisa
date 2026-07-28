@@ -4247,7 +4247,9 @@ let personelBelgeKaydiIdCounter = 903;
   }
 
   function assertMockBildirimOwnership(bildirim: MockBildirimRecord): boolean {
-    return (bildirim.created_by ?? 0) === mockUserId;
+    const createdBy = bildirim.created_by ?? 0;
+    // mockUserId drives fixture mutations; login actor id may differ by role.
+    return createdBy === mockUserId || createdBy === MOCK_ROLE_USER_ID[role];
   }
 
   function resolveMockMutabakatWeek(value: unknown): { start: string; end: string } | null {
@@ -9275,6 +9277,18 @@ let personelBelgeKaydiIdCounter = 903;
           items: maasAudits.filter((item) => item.sube_id === subeId && item.yil === yil && item.ay === ay)
         })
       );
+      return;
+    }
+
+    if (path === "/api/maas-hesaplama/sgk-sonuclari/export.csv" && method === "GET") {
+      if (await denyUnlessRolePermission(route, "maas_hesaplama_adaylari.view")) {
+        return;
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: "text/csv; charset=utf-8",
+        body: "personel_id,hesaplanan_prim_gunu,eksik_gun_sayisi,sgk_hesap_hash,snapshot_id,snapshot_revision_no\n"
+      });
       return;
     }
 

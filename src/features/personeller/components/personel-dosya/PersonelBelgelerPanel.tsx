@@ -1,5 +1,6 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { AppActionDialog } from "../../../../components/modal/AppActionDialog";
 import { AppModal } from "../../../../components/modal/AppModal";
 import { fetchPersonelBelgeDurumu } from "../../../../api/belgeler.api";
 import {
@@ -37,6 +38,7 @@ import { formatIsoDateDetail } from "./personel-dosya-format-utils";
 
 const CREATE_FORM_ID = "personel-belge-create-form";
 const EDIT_FORM_ID = "personel-belge-edit-form";
+const PERSONEL_BELGE_IPTAL_ONAY_MESAJI = "Belge kaydı iptal edilecek. Hard delete yoktur.";
 
 function formatBelgeDurumLabel(durum: BelgeDurumuItem["durum"]) {
   return durum === "VAR" ? "Var" : "Yok";
@@ -98,19 +100,24 @@ export function PersonelBelgelerPanel({
   );
   const [createFile, setCreateFile] = useState<File | null>(null);
   const [createFileError, setCreateFileError] = useState<string | null>(null);
+  const [createModalError, setCreateModalError] = useState<string | null>(null);
   const [isCreateSaving, setIsCreateSaving] = useState(false);
 
   const [editingKayit, setEditingKayit] = useState<PersonelBelgeKaydi | null>(null);
   const [editDraft, setEditDraft] = useState<CreatePersonelBelgeKaydiPayload>(() => createEmptyBelgeKaydiDraft());
+  const [editModalError, setEditModalError] = useState<string | null>(null);
   const [isEditSaving, setIsEditSaving] = useState(false);
 
   const [replaceKayit, setReplaceKayit] = useState<PersonelBelgeKaydi | null>(null);
   const [replaceFile, setReplaceFile] = useState<File | null>(null);
   const [replaceFileError, setReplaceFileError] = useState<string | null>(null);
+  const [replaceModalError, setReplaceModalError] = useState<string | null>(null);
   const [isReplaceSaving, setIsReplaceSaving] = useState(false);
 
   const [cancelKayit, setCancelKayit] = useState<PersonelBelgeKaydi | null>(null);
   const [cancelReason, setCancelReason] = useState("");
+  const [cancelModalError, setCancelModalError] = useState<string | null>(null);
+  const [cancelFieldError, setCancelFieldError] = useState<string | null>(null);
   const [isCancelSaving, setIsCancelSaving] = useState(false);
 
   const [historyKayit, setHistoryKayit] = useState<PersonelBelgeKaydi | null>(null);
@@ -246,11 +253,12 @@ export function PersonelBelgelerPanel({
 
     const ad = createDraft.ad.trim();
     if (!ad) {
-      setActionError("Ad alanı zorunludur.");
+      setCreateModalError("Ad alanı zorunludur.");
       return;
     }
 
     setIsCreateSaving(true);
+    setCreateModalError(null);
     setActionError(null);
     setActionMessage(null);
     try {
@@ -276,11 +284,12 @@ export function PersonelBelgelerPanel({
       setCreateDraft(createEmptyBelgeKaydiDraft());
       setCreateFile(null);
       setCreateFileError(null);
+      setCreateModalError(null);
       setIsCreateOpen(false);
       setActionMessage("Belge kaydı eklendi.");
       await loadBelgeKayitlari();
     } catch (err) {
-      setActionError(getApiErrorMessage(err, "Belge kaydı eklenemedi."));
+      setCreateModalError(getApiErrorMessage(err, "Belge kaydı eklenemedi."));
     } finally {
       setIsCreateSaving(false);
     }
@@ -294,11 +303,12 @@ export function PersonelBelgelerPanel({
 
     const ad = editDraft.ad.trim();
     if (!ad) {
-      setActionError("Ad alanı zorunludur.");
+      setEditModalError("Ad alanı zorunludur.");
       return;
     }
 
     setIsEditSaving(true);
+    setEditModalError(null);
     setActionError(null);
     setActionMessage(null);
     try {
@@ -313,10 +323,11 @@ export function PersonelBelgelerPanel({
         aciklama: editDraft.aciklama?.trim() || null
       });
       setEditingKayit(null);
+      setEditModalError(null);
       setActionMessage("Belge bilgileri güncellendi.");
       await loadBelgeKayitlari();
     } catch (err) {
-      setActionError(getApiErrorMessage(err, "Belge güncellenemedi."));
+      setEditModalError(getApiErrorMessage(err, "Belge güncellenemedi."));
     } finally {
       setIsEditSaving(false);
     }
@@ -328,6 +339,7 @@ export function PersonelBelgelerPanel({
     }
 
     setIsReplaceSaving(true);
+    setReplaceModalError(null);
     setActionError(null);
     setActionMessage(null);
     try {
@@ -336,27 +348,50 @@ export function PersonelBelgelerPanel({
       setReplaceKayit(null);
       setReplaceFile(null);
       setReplaceFileError(null);
+      setReplaceModalError(null);
       setActionMessage("Belge dosyası güncellendi.");
       await loadBelgeKayitlari();
     } catch (err) {
-      setActionError(getApiErrorMessage(err, "Belge dosyası değiştirilemedi."));
+      setReplaceModalError(getApiErrorMessage(err, "Belge dosyası değiştirilemedi."));
     } finally {
       setIsReplaceSaving(false);
     }
   }
 
-  async function handleCancelConfirm() {
-    if (!canCancel || !cancelKayit || isPasif) {
+  function openCancelDialog(kayit: PersonelBelgeKaydi) {
+    if (isCancelSaving) {
+      return;
+    }
+    setCancelKayit(kayit);
+    setCancelReason("");
+    setCancelModalError(null);
+    setCancelFieldError(null);
+  }
+
+  function closeCancelDialog() {
+    if (isCancelSaving) {
+      return;
+    }
+    setCancelKayit(null);
+    setCancelReason("");
+    setCancelModalError(null);
+    setCancelFieldError(null);
+  }
+
+  async function confirmCancelBelge() {
+    if (!canCancel || !cancelKayit || isPasif || isCancelSaving) {
       return;
     }
 
     const reason = cancelReason.trim();
     if (!reason) {
-      setActionError("İptal nedeni zorunludur.");
+      setCancelFieldError("İptal nedeni zorunludur.");
       return;
     }
 
     setIsCancelSaving(true);
+    setCancelModalError(null);
+    setCancelFieldError(null);
     setActionError(null);
     setActionMessage(null);
     try {
@@ -366,7 +401,7 @@ export function PersonelBelgelerPanel({
       setActionMessage("Belge kaydı iptal edildi.");
       await Promise.all([loadBelgeKayitlari(), loadIptalBelgeKayitlari()]);
     } catch (err) {
-      setActionError(getApiErrorMessage(err, "Belge kaydı iptal edilemedi."));
+      setCancelModalError(getApiErrorMessage(err, "Belge kaydı iptal edilemedi."));
     } finally {
       setIsCancelSaving(false);
     }
@@ -389,6 +424,7 @@ export function PersonelBelgelerPanel({
 
   function openEditModal(kayit: PersonelBelgeKaydi) {
     setEditingKayit(kayit);
+    setEditModalError(null);
     setEditDraft({
       kayit_tipi: kayit.kayit_tipi,
       ad: kayit.ad,
@@ -461,6 +497,7 @@ export function PersonelBelgelerPanel({
                 setCreateDraft(createEmptyBelgeKaydiDraft());
                 setCreateFile(null);
                 setCreateFileError(null);
+                setCreateModalError(null);
                 setIsCreateOpen(true);
               }}
             >
@@ -562,6 +599,7 @@ export function PersonelBelgelerPanel({
                               setReplaceKayit(kayit);
                               setReplaceFile(null);
                               setReplaceFileError(null);
+                              setReplaceModalError(null);
                             }}
                           >
                             Dosya değiştir
@@ -572,10 +610,7 @@ export function PersonelBelgelerPanel({
                             type="button"
                             className="universal-btn-aux"
                             data-testid={`personel-belge-iptal-${kayit.id}`}
-                            onClick={() => {
-                              setCancelKayit(kayit);
-                              setCancelReason("");
-                            }}
+                            onClick={() => openCancelDialog(kayit)}
                           >
                             İptal
                           </button>
@@ -631,10 +666,27 @@ export function PersonelBelgelerPanel({
       {isCreateOpen ? (
         <AppModal
           title="Yeni belge ekle"
-          onClose={() => setIsCreateOpen(false)}
+          onClose={() => {
+            if (isCreateSaving) {
+              return;
+            }
+            setIsCreateOpen(false);
+            setCreateModalError(null);
+          }}
         footer={
           <>
-            <button type="button" className="universal-btn-aux" onClick={() => setIsCreateOpen(false)}>
+            <button
+              type="button"
+              className="universal-btn-aux"
+              disabled={isCreateSaving}
+              onClick={() => {
+                if (isCreateSaving) {
+                  return;
+                }
+                setIsCreateOpen(false);
+                setCreateModalError(null);
+              }}
+            >
               Vazgeç
             </button>
             <button
@@ -673,6 +725,11 @@ export function PersonelBelgelerPanel({
               </p>
             ) : null}
           </div>
+          {createModalError ? (
+            <p className="workspace-error" role="alert" data-testid="personel-belge-create-error">
+              {createModalError}
+            </p>
+          ) : null}
         </form>
         </AppModal>
       ) : null}
@@ -680,10 +737,27 @@ export function PersonelBelgelerPanel({
       {editingKayit !== null ? (
         <AppModal
           title="Belge bilgilerini düzenle"
-          onClose={() => setEditingKayit(null)}
+          onClose={() => {
+            if (isEditSaving) {
+              return;
+            }
+            setEditingKayit(null);
+            setEditModalError(null);
+          }}
         footer={
           <>
-            <button type="button" className="universal-btn-aux" onClick={() => setEditingKayit(null)}>
+            <button
+              type="button"
+              className="universal-btn-aux"
+              disabled={isEditSaving}
+              onClick={() => {
+                if (isEditSaving) {
+                  return;
+                }
+                setEditingKayit(null);
+                setEditModalError(null);
+              }}
+            >
               Vazgeç
             </button>
             <button
@@ -700,6 +774,11 @@ export function PersonelBelgelerPanel({
       >
         <form id={EDIT_FORM_ID} className="workspace-form" onSubmit={handleEditSubmit}>
           {renderBelgeFormFields(editDraft, setEditDraft)}
+          {editModalError ? (
+            <p className="workspace-error" role="alert" data-testid="personel-belge-edit-error">
+              {editModalError}
+            </p>
+          ) : null}
         </form>
         </AppModal>
       ) : null}
@@ -707,10 +786,27 @@ export function PersonelBelgelerPanel({
       {replaceKayit !== null ? (
         <AppModal
           title="Belge dosyasını değiştir"
-          onClose={() => setReplaceKayit(null)}
+          onClose={() => {
+            if (isReplaceSaving) {
+              return;
+            }
+            setReplaceKayit(null);
+            setReplaceModalError(null);
+          }}
         footer={
           <>
-            <button type="button" className="universal-btn-aux" onClick={() => setReplaceKayit(null)}>
+            <button
+              type="button"
+              className="universal-btn-aux"
+              disabled={isReplaceSaving}
+              onClick={() => {
+                if (isReplaceSaving) {
+                  return;
+                }
+                setReplaceKayit(null);
+                setReplaceModalError(null);
+              }}
+            >
               Vazgeç
             </button>
             <button
@@ -750,42 +846,41 @@ export function PersonelBelgelerPanel({
             </p>
           ) : null}
         </div>
+        {replaceModalError ? (
+          <p className="workspace-error" role="alert" data-testid="personel-belge-replace-error">
+            {replaceModalError}
+          </p>
+        ) : null}
         </AppModal>
       ) : null}
 
       {cancelKayit !== null ? (
-        <AppModal
+        <AppActionDialog
+          open
+          testId="personel-belge-action-dialog"
           title="Belge kaydını iptal et"
-          onClose={() => setCancelKayit(null)}
-        footer={
-          <>
-            <button type="button" className="universal-btn-aux" onClick={() => setCancelKayit(null)}>
-              Vazgeç
-            </button>
-            <button
-              type="button"
-              className="universal-btn-save"
-              disabled={isCancelSaving || !cancelReason.trim()}
-              data-testid="personel-belge-cancel-submit"
-              onClick={() => void handleCancelConfirm()}
-            >
-              {isCancelSaving ? "İptal ediliyor..." : "İptali onayla"}
-            </button>
-          </>
-        }
-      >
-        <div className="form-section">
-          <label className="form-label" htmlFor="personel-belge-cancel-neden">
-            İptal nedeni
-          </label>
-          <textarea
-            id="personel-belge-cancel-neden"
-            value={cancelReason}
-            data-testid="personel-belge-cancel-neden"
-            onChange={(event) => setCancelReason(event.target.value)}
-          />
-        </div>
-        </AppModal>
+          description={PERSONEL_BELGE_IPTAL_ONAY_MESAJI}
+          confirmLabel="İptali onayla"
+          submitLabel="İptal ediliyor..."
+          destructive
+          isSubmitting={isCancelSaving}
+          errorMessage={cancelModalError}
+          onConfirm={confirmCancelBelge}
+          onCancel={closeCancelDialog}
+          field={{
+            label: "İptal nedeni",
+            value: cancelReason,
+            onChange: (value) => {
+              setCancelReason(value);
+              if (cancelFieldError) {
+                setCancelFieldError(null);
+              }
+            },
+            required: true,
+            testId: "personel-belge-cancel-neden",
+            errorMessage: cancelFieldError
+          }}
+        />
       ) : null}
 
       {historyKayit !== null ? (

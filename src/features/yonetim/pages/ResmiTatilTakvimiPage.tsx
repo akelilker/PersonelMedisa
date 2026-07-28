@@ -150,6 +150,7 @@ export function ResmiTatilTakvimiPage() {
 
   const [cancelTarget, setCancelTarget] = useState<ResmiTatilTakvimKaydi | null>(null);
   const [cancelGerekce, setCancelGerekce] = useState("");
+  const [cancelError, setCancelError] = useState<string | null>(null);
   const [historyData, setHistoryData] = useState<ResmiTatilHistoryResponse | null>(null);
 
   const load = useCallback(async () => {
@@ -284,19 +285,25 @@ export function ResmiTatilTakvimiPage() {
 
   async function handleCancelSubmit(event: FormEvent) {
     event.preventDefault();
-    if (!cancelTarget || !cancelGerekce.trim()) {
-      setActionError("İptal gerekçesi zorunludur.");
+    if (!cancelTarget) {
+      return;
+    }
+    if (!cancelGerekce.trim()) {
+      setCancelError("İptal gerekçesi zorunludur.");
       return;
     }
     setIsSubmitting(true);
+    setCancelError(null);
+    setActionError(null);
     try {
       await cancelResmiTatilTakvimi(cancelTarget.id, cancelGerekce.trim());
       setCancelTarget(null);
       setCancelGerekce("");
+      setCancelError(null);
       setActionMessage("Kayıt iptal edildi.");
       await load();
     } catch (error) {
-      setActionError(apiErrorMessage(error, "İptal başarısız."));
+      setCancelError(apiErrorMessage(error, "İptal başarısız."));
     } finally {
       setIsSubmitting(false);
     }
@@ -547,6 +554,7 @@ export function ResmiTatilTakvimiPage() {
                         onClick={() => {
                           setCancelTarget(item);
                           setCancelGerekce("");
+                          setCancelError(null);
                         }}
                       >
                         İptal
@@ -715,14 +723,39 @@ export function ResmiTatilTakvimiPage() {
       {canManage && cancelTarget ? (
         <AppModal
           title="Kaydı iptal et"
-          onClose={() => setCancelTarget(null)}
+          onClose={() => {
+            if (isSubmitting) {
+              return;
+            }
+            setCancelTarget(null);
+            setCancelGerekce("");
+            setCancelError(null);
+          }}
           footer={
             <>
-              <button type="button" className="universal-btn-cancel" onClick={() => setCancelTarget(null)}>
+              <button
+                type="button"
+                className="universal-btn-cancel"
+                disabled={isSubmitting}
+                onClick={() => {
+                  if (isSubmitting) {
+                    return;
+                  }
+                  setCancelTarget(null);
+                  setCancelGerekce("");
+                  setCancelError(null);
+                }}
+              >
                 Vazgeç
               </button>
-              <button type="submit" form={IPTAL_FORM_ID} className="universal-btn-save" data-testid="rtt-cancel-submit">
-                İptal et
+              <button
+                type="submit"
+                form={IPTAL_FORM_ID}
+                className="universal-btn-save"
+                disabled={isSubmitting}
+                data-testid="rtt-cancel-submit"
+              >
+                {isSubmitting ? "İptal ediliyor..." : "İptal et"}
               </button>
             </>
           }
@@ -734,8 +767,19 @@ export function ResmiTatilTakvimiPage() {
               name="rtt-iptal-gerekce"
               required
               value={cancelGerekce}
-              onChange={(value) => setCancelGerekce(value)}
+              onChange={(value) => {
+                setCancelGerekce(value);
+                if (cancelError) {
+                  setCancelError(null);
+                }
+              }}
+              disabled={isSubmitting}
             />
+            {cancelError ? (
+              <p className="error-text" role="alert" data-testid="rtt-cancel-error">
+                {cancelError}
+              </p>
+            ) : null}
           </form>
         </AppModal>
       ) : null}

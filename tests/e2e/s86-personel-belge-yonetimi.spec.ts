@@ -51,8 +51,9 @@ test.describe("S86 personel belge yönetimi", () => {
 
     await page.getByTestId("personel-belge-history-close").click();
     await panel.getByTestId(`personel-belge-iptal-${kayitId}`).click();
-    await page.getByTestId("personel-belge-cancel-neden").fill("S86 e2e iptal");
-    await page.getByTestId("personel-belge-cancel-submit").click();
+    await expect(page.getByTestId("personel-belge-action-dialog")).toBeVisible();
+    await page.getByLabel("İptal nedeni").fill("S86 e2e iptal");
+    await page.getByTestId("personel-belge-action-dialog-confirm").click();
     await expect(panel.getByText(/Belge kaydı iptal edildi/i)).toBeVisible();
     await expect(panel.getByTestId("personel-belge-kayit-list")).not.toContainText(updatedAd);
   });

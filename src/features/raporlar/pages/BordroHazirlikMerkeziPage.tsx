@@ -34,6 +34,7 @@ import {
 } from "../../../api/maas-hesaplama.api";
 import { fetchYonetimSubeleri } from "../../../api/yonetim.api";
 import { FormField } from "../../../components/form/FormField";
+import { AppActionDialog } from "../../../components/modal/AppActionDialog";
 import { ErrorState } from "../../../components/states/ErrorState";
 import { LoadingState } from "../../../components/states/LoadingState";
 import { useRoleAccess } from "../../../hooks/use-role-access";
@@ -43,6 +44,9 @@ import { useAuth } from "../../../state/auth.store";
 import type { IdOption } from "../../../types/referans";
 import { MaasHesaplamaMerkeziPage } from "./MaasHesaplamaMerkeziPage";
 import { SgkKatalogHazirlikPanel } from "../components/SgkKatalogHazirlikPanel";
+
+const BORDRO_KESINLESTIR_ONAY_MESAJI =
+  "Bordro kesinleştirilecek. Bu işlem geri alınamaz. Devam edilsin mi?";
 
 type TabKey =
   | "veri-hazirlik"
@@ -115,6 +119,9 @@ export function BordroHazirlikMerkeziPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
+  const [pendingKesinlestirConfirm, setPendingKesinlestirConfirm] = useState(false);
+  const [isKesinlestirSubmitting, setIsKesinlestirSubmitting] = useState(false);
+  const [kesinlestirDialogError, setKesinlestirDialogError] = useState<string | null>(null);
   const loadRequestIdRef = useRef(0);
 
   const parsedAy = parseAyValue(filters.ay);
@@ -300,11 +307,42 @@ export function BordroHazirlikMerkeziPage() {
     await loadData();
   }
 
-  async function handleKesinlestir() {
-    if (!onIzleme?.calistirma?.id) return;
-    await kesinlestirBordro(onIzleme.calistirma.id);
-    setActionMessage("Bordro kesinleştirildi.");
-    await loadData();
+  function openKesinlestirDialog() {
+    if (!onIzleme?.calistirma?.id || isKesinlestirSubmitting || (preflight?.blocker_count ?? 1) > 0) {
+      return;
+    }
+    setKesinlestirDialogError(null);
+    setPendingKesinlestirConfirm(true);
+  }
+
+  function closeKesinlestirDialog() {
+    if (isKesinlestirSubmitting) {
+      return;
+    }
+    setPendingKesinlestirConfirm(false);
+    setKesinlestirDialogError(null);
+  }
+
+  async function confirmKesinlestir() {
+    if (!onIzleme?.calistirma?.id || isKesinlestirSubmitting) {
+      return;
+    }
+    setIsKesinlestirSubmitting(true);
+    setKesinlestirDialogError(null);
+    setActionMessage(null);
+    setErrorMessage(null);
+    try {
+      await kesinlestirBordro(onIzleme.calistirma.id);
+      setActionMessage("Bordro kesinleştirildi.");
+      setPendingKesinlestirConfirm(false);
+      await loadData();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Bordro kesinleştirilemedi.";
+      setKesinlestirDialogError(message);
+      setErrorMessage(message);
+    } finally {
+      setIsKesinlestirSubmitting(false);
+    }
   }
 
   function parseImportRows() {
@@ -796,8 +834,8 @@ export function BordroHazirlikMerkeziPage() {
               <button
                 type="button"
                 data-testid="bordro-kesinlestir"
-                disabled={(preflight?.blocker_count ?? 1) > 0}
-                onClick={() => void handleKesinlestir()}
+                disabled={(preflight?.blocker_count ?? 1) > 0 || isKesinlestirSubmitting}
+                onClick={openKesinlestirDialog}
               >
                 Kesinleştir
               </button>
@@ -901,6 +939,22 @@ export function BordroHazirlikMerkeziPage() {
       ) : null}
 
       {activeTab === "sgk-katalog" ? <SgkKatalogHazirlikPanel /> : null}
+
+      {pendingKesinlestirConfirm ? (
+        <AppActionDialog
+          open
+          testId="bordro-kesinlestir-action-dialog"
+          title="Bordroyu Kesinleştir"
+          description={BORDRO_KESINLESTIR_ONAY_MESAJI}
+          confirmLabel="Kesinleştir"
+          submitLabel="Kesinleştiriliyor..."
+          destructive
+          isSubmitting={isKesinlestirSubmitting}
+          errorMessage={kesinlestirDialogError}
+          onConfirm={confirmKesinlestir}
+          onCancel={closeKesinlestirDialog}
+        />
+      ) : null}
     </section>
   );
 }

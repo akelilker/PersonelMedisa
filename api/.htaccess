@@ -2,6 +2,7 @@
   RewriteEngine On
   RewriteBase /personelmedisa/api/
 
+  RewriteRule ^config\.local\.php(?:/|$) - [F,L,NC]
   RewriteRule ^(src|migrations|seeds)/ - [F,L]
 
   RewriteCond %{REQUEST_FILENAME} !-f

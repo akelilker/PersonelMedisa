@@ -8,7 +8,7 @@ async function openFilledCreateModal(page: Page) {
   await mockApi(page, "BIRIM_AMIRI");
   await login(page, { username: "birim", password: "secret" });
   await page.goto("/bildirimler");
-  await page.getByRole("button", { name: /Günlük Kayıt Gir|Yeni Günlük Kayıt/i }).click();
+  await page.getByRole("button", { name: /Günlük Kayıt Ekle|Günlük Kayıt Gir|Yeni Günlük Kayıt/i }).first().click();
 
   const modal = page.locator(".modal-container").last();
   await expect(modal).toBeVisible();
@@ -123,7 +123,7 @@ test.describe("S74-D1-D1 günlük bildirim tarih kontratı", () => {
     expect(createPostCount).toBe(0);
 
     await modal.getByRole("button", { name: "Vazgeç" }).click();
-    await page.getByRole("button", { name: /Günlük Kayıt Gir|Yeni Günlük Kayıt/i }).click();
+    await page.getByRole("button", { name: /Günlük Kayıt Ekle|Günlük Kayıt Gir|Yeni Günlük Kayıt/i }).first().click();
     const reopenedModal = page.locator(".modal-container").last();
     await expect(reopenedModal.getByText("Tarih zorunludur.")).toHaveCount(0);
     await expect(reopenedModal.getByLabel("Tarih")).not.toHaveValue("");

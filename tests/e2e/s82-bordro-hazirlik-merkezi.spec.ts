@@ -42,7 +42,6 @@ test.describe("S82 Bordro Hazirlik Merkezi", () => {
   });
 
   test("MUHASEBE: preflight blocker, politika, devir, candidate, kontrol; kesinlestirme yok", async ({ page }) => {
-    page.on("dialog", (dialog) => void dialog.accept());
     await openRaporlarPanel(page, "MUHASEBE", "bordro-hazirlik");
     await submitBordroFilters(page);
 

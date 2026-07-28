@@ -791,7 +791,7 @@ export function GunlukPuantajPage() {
 
       {isMuhurModalOpen ? (
         <AppModal
-          onClose={() => setIsMuhurModalOpen(false)}
+          onClose={isMuhurlemeSending ? undefined : () => setIsMuhurModalOpen(false)}
           title="Aylık Puantaj Mühürle"
         >
           <div className="muhur-modal-content" data-testid="muhur-modal">
@@ -805,6 +805,7 @@ export function GunlukPuantajPage() {
             value={muhurDonem}
             onChange={(value) => setMuhurDonem(value)}
             required
+            disabled={isMuhurlemeSending}
           />
           {muhurHata ? <p className="puantaj-form-error">{muhurHata}</p> : null}
           {muhurSonuc ? (
@@ -832,6 +833,7 @@ export function GunlukPuantajPage() {
             <button
               type="button"
               className="universal-btn-aux"
+              disabled={isMuhurlemeSending}
               onClick={() => setIsMuhurModalOpen(false)}
             >
               Vazgeç

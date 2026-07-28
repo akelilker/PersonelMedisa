@@ -8,16 +8,13 @@ import { resolveDemoApiResponse } from "./mock-demo";
 import { logApiFailure5xx, summarizeRequestBodyForLogs } from "../logging/error-logger";
 import { getAppPublicPath } from "../config/public-base";
 
-const ENV_API_BASE_URL = (
-  import.meta as ImportMeta & { env?: Record<string, string | undefined> }
-).env?.VITE_API_BASE_URL;
-const ENV_API_MODE = (
-  import.meta as ImportMeta & { env?: Record<string, string | undefined> }
-).env?.VITE_API_MODE;
+const ENV_META = (import.meta as ImportMeta & { env?: Record<string, string | boolean | undefined> }).env;
+const ENV_API_BASE_URL = typeof ENV_META?.VITE_API_BASE_URL === "string" ? ENV_META.VITE_API_BASE_URL : undefined;
+const ENV_API_MODE = typeof ENV_META?.VITE_API_MODE === "string" ? ENV_META.VITE_API_MODE : undefined;
+const DEMO_API_FALLBACK_DEFAULT =
+  ENV_META?.PROD === true || ENV_META?.MODE === "production" ? "false" : "true";
 const DEMO_API_FALLBACK_ENABLED =
-  (
-    (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env?.VITE_DEMO_API_FALLBACK ?? "true"
-  ).toLowerCase() !== "false";
+  String(ENV_META?.VITE_DEMO_API_FALLBACK ?? DEMO_API_FALLBACK_DEFAULT).toLowerCase() !== "false";
 
 function normalizeBase(base: string) {
   const trimmed = base.trim();
@@ -61,7 +58,7 @@ function resolveApiMode() {
   return "auto";
 }
 
-function shouldPreferDemoApi() {
+export function shouldPreferDemoApi() {
   if (!DEMO_API_FALLBACK_ENABLED) {
     return false;
   }

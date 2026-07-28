@@ -408,24 +408,27 @@ export async function downloadPersonelBelgeDosya(
   suggestedFilename?: string
 ): Promise<void> {
   const path = endpoints.personelBelgeKayitlari.download(id);
-  const { resolveDemoApiResponse } = await import("./mock-demo");
-  const demoResponse = resolveDemoApiResponse(path, { method: "GET" });
-  if (demoResponse !== null) {
-    const demoData = demoResponse.data;
-    if (typeof demoData === "string") {
-      const binary = atob(demoData);
-      const bytes = new Uint8Array(binary.length);
-      for (let index = 0; index < binary.length; index += 1) {
-        bytes[index] = binary.charCodeAt(index);
+  const { shouldPreferDemoApi } = await import("./api-client");
+  if (shouldPreferDemoApi()) {
+    const { resolveDemoApiResponse } = await import("./mock-demo");
+    const demoResponse = resolveDemoApiResponse(path, { method: "GET" });
+    if (demoResponse !== null) {
+      const demoData = demoResponse.data;
+      if (typeof demoData === "string") {
+        const binary = atob(demoData);
+        const bytes = new Uint8Array(binary.length);
+        for (let index = 0; index < binary.length; index += 1) {
+          bytes[index] = binary.charCodeAt(index);
+        }
+        const blob = new Blob([bytes], { type: "application/pdf" });
+        triggerBlobDownload(blob, suggestedFilename ?? `belge-${id}.pdf`);
+        return;
       }
-      const blob = new Blob([bytes], { type: "application/pdf" });
+
+      const blob = new Blob(["%PDF-1.4 demo"], { type: "application/pdf" });
       triggerBlobDownload(blob, suggestedFilename ?? `belge-${id}.pdf`);
       return;
     }
-
-    const blob = new Blob(["%PDF-1.4 demo"], { type: "application/pdf" });
-    triggerBlobDownload(blob, suggestedFilename ?? `belge-${id}.pdf`);
-    return;
   }
 
   const headers = new Headers();

@@ -358,33 +358,24 @@ export async function downloadSgkPrimGunuSonuclariCsv(params: MaasHesaplamaParam
     yil: params.yil,
     ay: params.ay
   });
-  const { resolveDemoApiResponse } = await import("./mock-demo");
-  const { buildApiUrl } = await import("./api-client");
+  const { buildApiUrl, shouldPreferDemoApi } = await import("./api-client");
   const { getAuthTokenForApi } = await import("../auth/auth-token-provider");
   const { getActiveSubeIdForApiHeader } = await import("../auth/auth-manager");
 
   let blob: Blob;
-  const demoResponse = resolveDemoApiResponse(path, { method: "GET" });
-  if (demoResponse !== null) {
-    if (typeof demoResponse.data !== "string") {
-      throw new ApiRequestError("SGK CSV indirilemedi.", 403);
+  if (shouldPreferDemoApi()) {
+    const { resolveDemoApiResponse } = await import("./mock-demo");
+    const demoResponse = resolveDemoApiResponse(path, { method: "GET" });
+    if (demoResponse !== null) {
+      if (typeof demoResponse.data !== "string") {
+        throw new ApiRequestError("SGK CSV indirilemedi.", 403);
+      }
+      blob = new Blob([demoResponse.data], { type: "text/csv;charset=utf-8" });
+    } else {
+      blob = await fetchAuthenticatedBlob(path, buildApiUrl, getAuthTokenForApi, getActiveSubeIdForApiHeader);
     }
-    blob = new Blob([demoResponse.data], { type: "text/csv;charset=utf-8" });
   } else {
-    const headers = new Headers();
-    const token = getAuthTokenForApi();
-    if (token) {
-      headers.set("Authorization", `Bearer ${token}`);
-    }
-    const subeHeader = getActiveSubeIdForApiHeader();
-    if (subeHeader) {
-      headers.set("X-Active-Sube-Id", subeHeader);
-    }
-    const response = await fetch(buildApiUrl(path), { headers });
-    if (!response.ok) {
-      throw new ApiRequestError("SGK CSV indirilemedi.", response.status);
-    }
-    blob = await response.blob();
+    blob = await fetchAuthenticatedBlob(path, buildApiUrl, getAuthTokenForApi, getActiveSubeIdForApiHeader);
   }
 
   const url = URL.createObjectURL(blob);
@@ -393,6 +384,28 @@ export async function downloadSgkPrimGunuSonuclariCsv(params: MaasHesaplamaParam
   anchor.download = `sgk-kontrol-${params.yil}-${String(params.ay).padStart(2, "0")}-sube-${params.sube_id}.csv`;
   anchor.click();
   URL.revokeObjectURL(url);
+}
+
+async function fetchAuthenticatedBlob(
+  path: string,
+  buildApiUrl: (path: string) => string,
+  getAuthTokenForApi: () => string | null,
+  getActiveSubeIdForApiHeader: () => string | null
+): Promise<Blob> {
+  const headers = new Headers();
+  const token = getAuthTokenForApi();
+  if (token) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+  const subeHeader = getActiveSubeIdForApiHeader();
+  if (subeHeader) {
+    headers.set("X-Active-Sube-Id", subeHeader);
+  }
+  const response = await fetch(buildApiUrl(path), { headers });
+  if (!response.ok) {
+    throw new ApiRequestError("SGK CSV indirilemedi.", response.status);
+  }
+  return response.blob();
 }
 
 export async function fetchMaasHesaplamaSnapshotDetail(

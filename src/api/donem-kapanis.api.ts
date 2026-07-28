@@ -298,21 +298,24 @@ function buildPreflightQuery(params: DonemKapanisPreflightParams) {
 }
 
 async function downloadAuthenticatedFile(path: string, filename: string) {
-  const { resolveDemoApiResponse } = await import("./mock-demo");
-  const demoResponse = resolveDemoApiResponse(path, { method: "GET" });
-  if (demoResponse !== null) {
-    const csvContent =
-      typeof demoResponse.data === "string"
-        ? demoResponse.data
-        : "code,severity\nDEMO,INFO\n";
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = filename;
-    anchor.click();
-    URL.revokeObjectURL(url);
-    return;
+  const { shouldPreferDemoApi } = await import("./api-client");
+  if (shouldPreferDemoApi()) {
+    const { resolveDemoApiResponse } = await import("./mock-demo");
+    const demoResponse = resolveDemoApiResponse(path, { method: "GET" });
+    if (demoResponse !== null) {
+      const csvContent =
+        typeof demoResponse.data === "string"
+          ? demoResponse.data
+          : "code,severity\nDEMO,INFO\n";
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = filename;
+      anchor.click();
+      URL.revokeObjectURL(url);
+      return;
+    }
   }
 
   const headers = new Headers();

@@ -1,12 +1,13 @@
+import { execSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
 const OWNER_PATHS = [
-  "src/features/yonetim/pages/YonetimPaneliPage.tsx",
-  "src/features/yonetim/components/MevzuatParametreleriPanel.tsx",
-  "src/features/kayit/components/KayitBelgeKayitlariSection.tsx"
+  "src/features/personeller/components/personel-dosya/PersonelUcretGecmisiSection.tsx",
+  "src/features/personeller/components/personel-dosya/PersonelBordroKapsamSection.tsx",
+  "src/features/raporlar/pages/MaasHesaplamaMerkeziPage.tsx"
 ] as const;
 
 function findNativeDialogCalls(relativePath: string): string[] {
@@ -47,7 +48,7 @@ function findNativeDialogCalls(relativePath: string): string[] {
   return hits;
 }
 
-describe("S93-E3C native dialog source contract", () => {
+describe("S93-E3D native dialog source contract", () => {
   for (const ownerPath of OWNER_PATHS) {
     it(`${ownerPath} AppActionDialog kullanır ve native dialog kullanmaz`, () => {
       const source = readFileSync(resolve(process.cwd(), ownerPath), "utf8");
@@ -56,4 +57,12 @@ describe("S93-E3C native dialog source contract", () => {
       expect(source).toContain("AppActionDialog");
     });
   }
+
+  it("src altında native dialog kalmamıştır", () => {
+    const output = execSync(
+      "rg -n \"window\\.(confirm|prompt|alert)|globalThis\\.(confirm|prompt|alert)\" src || true",
+      { encoding: "utf8" }
+    ).trim();
+    expect(output).toBe("");
+  });
 });

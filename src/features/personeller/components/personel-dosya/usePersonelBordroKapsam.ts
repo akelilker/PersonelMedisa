@@ -136,13 +136,15 @@ export function usePersonelBordroKapsam({
     }
   }
 
-  async function cancel(kapsamId: number, neden: string): Promise<void> {
+  async function cancel(kapsamId: number, neden: string): Promise<boolean> {
     setActionErrorMessage(null);
     try {
       await cancelPersonelBordroKapsam(personel.id, kapsamId, neden);
       refetch();
+      return true;
     } catch (err) {
       setActionErrorMessage(getBordroKapsamApiErrorMessage(err, "İptal edilemedi."));
+      return false;
     }
   }
 

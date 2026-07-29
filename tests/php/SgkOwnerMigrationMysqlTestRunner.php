@@ -103,9 +103,28 @@ try {
     migrationAssert((int) $pdo->query('SELECT COUNT(*) FROM sgk_eksik_gun_kodlari')->fetchColumn() === 0, 'dogrulanmamis eksik gun kodu seed edilmedi');
     migrationAssert((int) $pdo->query('SELECT COUNT(*) FROM sgk_sirket_politika_surumleri')->fetchColumn() === 0, 'null politika false varsayimina donusturulmedi');
 
+    applySgkMigration($pdo, '040_sgk_mevzuat_canonical_schema.sql');
+    migrationAssert((int) $pdo->query("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'sgk_eksik_gun_kodlari' AND COLUMN_NAME = 'aktiflik_durumu'")->fetchColumn() === 1, '040 aktiflik_durumu kolonu');
+    migrationAssert((int) $pdo->query("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'sgk_eksik_gun_kodlari' AND COLUMN_NAME = 'sifir_gun_sifir_kazanc_durumu'")->fetchColumn() === 1, '040 sifir_gun canonical kolonu');
+    migrationAssert((int) $pdo->query("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'sgk_eksik_gun_kodlari' AND COLUMN_NAME = 'belge_saklama_ibraz_durumu'")->fetchColumn() === 1, '040 belge saklama kolonu');
+    migrationAssert((int) $pdo->query("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'sgk_eksik_gun_kodlari' AND COLUMN_NAME = 'yabanci_kullanim_durumu'")->fetchColumn() === 1, '040 yabanci kullanim kolonu');
+    migrationAssert((int) $pdo->query("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'sgk_eksik_gun_kodlari' AND COLUMN_NAME = 'portal_teyit_durumu'")->fetchColumn() === 1, '040 portal teyit kolonu');
+    migrationAssert((int) $pdo->query("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'sgk_eksik_gun_kodlari' AND COLUMN_NAME = 'mevzuat_kurallari_json'")->fetchColumn() === 1, '040 mevzuat_kurallari_json kolonu');
+    migrationAssert((int) $pdo->query("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'sgk_eksik_gun_kodlari' AND COLUMN_NAME = 'belge_zorunlulugu'")->fetchColumn() === 1, 'legacy belge_zorunlulugu korunur');
+    migrationAssert((int) $pdo->query("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'sgk_eksik_gun_kodlari' AND COLUMN_NAME = 'aktif_mi'")->fetchColumn() === 1, 'legacy aktif_mi korunur');
+    migrationAssert((int) $pdo->query('SELECT COUNT(*) FROM sgk_eksik_gun_kodlari')->fetchColumn() === 0, '040 katalog kodu seed etmedi');
+    migrationAssert((int) $pdo->query("SELECT COUNT(*) FROM sgk_kaynak_manifestleri WHERE kaynak_id = 'SGK_EKSIK_GUN_BELGELERI_20180417' AND durum = 'AKTIF' AND belge_tarihi = '2018-04-17'")->fetchColumn() === 1, '040 dogru tarihli kaynak aktif');
+    migrationAssert((int) $pdo->query("SELECT COUNT(*) FROM sgk_kaynak_manifestleri WHERE kaynak_id = 'SGK_EKSIK_GUN_BELGELERI_20221116' AND durum = 'PASIF'")->fetchColumn() === 1, '040 eski kaynak PASIF');
+    $yerine = (int) $pdo->query("SELECT yerine_gecen_kaynak_id FROM sgk_kaynak_manifestleri WHERE kaynak_id = 'SGK_EKSIK_GUN_BELGELERI_20221116'")->fetchColumn();
+    $yeniId = (int) $pdo->query("SELECT id FROM sgk_kaynak_manifestleri WHERE kaynak_id = 'SGK_EKSIK_GUN_BELGELERI_20180417'")->fetchColumn();
+    migrationAssert($yerine === $yeniId && $yeniId > 0, '040 yerine_gecen_kaynak_id baglantisi');
+    migrationAssert((int) $pdo->query('SELECT COUNT(*) FROM sgk_kaynak_manifestleri')->fetchColumn() === 9, '040 sonrasi dokuz manifest (8+1 replacement)');
+
     applySgkMigration($pdo, '036_sgk_prim_gunu_owner.sql');
     applySgkMigration($pdo, '037_sgk_resmi_kaynak_manifesti_v1.sql');
-    migrationAssert((int) $pdo->query('SELECT COUNT(*) FROM sgk_kaynak_manifestleri')->fetchColumn() === 8, 'ikinci apply idempotent kaldi');
+    applySgkMigration($pdo, '040_sgk_mevzuat_canonical_schema.sql');
+    migrationAssert((int) $pdo->query('SELECT COUNT(*) FROM sgk_kaynak_manifestleri')->fetchColumn() === 9, 'ikinci apply 040 dahil idempotent kaldi');
+    migrationAssert((int) $pdo->query("SELECT COUNT(*) FROM sgk_kaynak_manifestleri WHERE kaynak_id = 'SGK_EKSIK_GUN_BELGELERI_20221116' AND durum = 'PASIF'")->fetchColumn() === 1, 'ikinci apply eski kaynak PASIF kaldi');
 
     $hash = str_repeat('a', 64);
     $pdo->exec("INSERT INTO maas_hesaplama_sgk_snapshotlari (

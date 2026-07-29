@@ -40,4 +40,12 @@ describe("S85-B SGK owner migrations", () => {
     expect(ownerMigration).toContain("arsiv_kopyasi_repoda_mi");
     expect(ownerMigration).toContain("ADD COLUMN IF NOT EXISTS observed_at");
   });
+
+  it("S98 040 canonical schema additive and source date correction", () => {
+    const m040 = readFileSync("api/migrations/040_sgk_mevzuat_canonical_schema.sql", "utf8");
+    expect(m040).toContain("aktiflik_durumu");
+    expect(m040).toContain("SGK_EKSIK_GUN_BELGELERI_20180417");
+    expect(m040).not.toMatch(/INSERT\s+INTO\s+sgk_eksik_gun_kodlari/i);
+    expect(m040).not.toMatch(/\b(?:DROP\s+COLUMN|DROP\s+TABLE)\b/i);
+  });
 });

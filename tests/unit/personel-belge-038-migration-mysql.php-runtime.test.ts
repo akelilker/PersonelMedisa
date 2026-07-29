@@ -30,11 +30,11 @@ describe("S86 personel belge 038 MariaDB migration", () => {
       .filter((name) => /^\d{3}_.+\.sql$/.test(name))
       .sort();
     expect(migrations[0]).toBe("001_initial_schema.sql");
-    expect(migrations.at(-1)).toBe("039_ubgt_gun_kapsami_tatil_takvimi.sql");
+    expect(migrations.at(-1)).toBe("040_sgk_mevzuat_canonical_schema.sql");
     expect(migrations.some((name) => name.startsWith("039_"))).toBe(true);
   });
 
-  it("applies 001-039, re-applies 038 idempotently, asserts FK/CHECK/empty", () => {
+  it("applies 001-040, re-applies 038 idempotently, asserts FK/CHECK/empty", () => {
     const result = runPhpMysqlRunner(runnerPath);
     expect(result.status, result.stderr || result.stdout).toBe(0);
     expect(result.stdout).toContain("verify-personel-belge-migration-mysql: OK");

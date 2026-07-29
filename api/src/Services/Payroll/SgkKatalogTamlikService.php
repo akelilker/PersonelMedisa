@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Medisa\Api\Services\Payroll;
 
 /**
- * S85-C1: Catalog completeness gate. Never promotes DOGRULANMIS_TAM without full evidence.
+ * S85-C1 / S98: Catalog completeness gate. Never promotes DOGRULANMIS_TAM without full evidence.
  */
 final class SgkKatalogTamlikService
 {
@@ -22,7 +22,8 @@ final class SgkKatalogTamlikService
      *   ebildirge_guncel_gorunum_dogrulandi_mi?: bool,
      *   ucuncu_taraf_kaynak_kullanildi_mi?: bool,
      *   gunce_tam_kod_listesi_kanitlandi_mi?: bool,
-     *   kod_bazli_yururluk_tarihi_tam_mi?: bool
+     *   kod_bazli_yururluk_tarihi_tam_mi?: bool,
+     *   expert_draft_tek_basina_mi?: bool
      * } $input
      */
     public static function evaluate(array $input): array
@@ -72,13 +73,18 @@ final class SgkKatalogTamlikService
         if ($ucuncuTaraf) {
             $eksikKanitlar[] = 'UCUNCU_TARAF_KAYNAK';
         }
+        if (!empty($input['expert_draft_tek_basina_mi'])) {
+            $eksikKanitlar[] = 'EXPERT_DRAFT_TEK_BASINA_YETERSIZ';
+        }
 
         $aktifManifest = 0;
+        $primaryManifest = 0;
         $manifestIds = [];
         foreach ($manifests as $m) {
             $id = (string) ($m['kaynak_id'] ?? $m['id'] ?? '');
             $durum = strtoupper((string) ($m['durum'] ?? 'AKTIF'));
             $hash = (string) ($m['icerik_sha256'] ?? $m['indirilen_dosya_sha256'] ?? '');
+            $sinif = strtoupper((string) ($m['kanit_sinifi'] ?? SgkKatalogContracts::KANIT_RESMI_PRIMARY));
             if ($id !== '') {
                 $manifestIds[] = $id;
             }
@@ -86,6 +92,11 @@ final class SgkKatalogTamlikService
                 $eksikKanitlar[] = 'PASIF_MANIFEST:' . $id;
             } else {
                 $aktifManifest++;
+            }
+            if ($sinif === SgkKatalogContracts::KANIT_EXPERT_DRAFT) {
+                $eksikKanitlar[] = 'EXPERT_DRAFT_MANIFEST:' . $id;
+            } elseif (SgkKatalogContracts::isPrimaryOfficialManifest($m)) {
+                $primaryManifest++;
             }
             if (!SgkKatalogContracts::isSha256($hash)) {
                 $eksikKanitlar[] = 'MANIFEST_HASH_DOGRULANAMADI:' . $id;
@@ -98,6 +109,45 @@ final class SgkKatalogTamlikService
             }
             if (array_key_exists('arsiv_kopyasi_repoda_mi', $m) && !$m['arsiv_kopyasi_repoda_mi']) {
                 $eksikKanitlar[] = 'ARSIV_KOPYASI_YOK:' . $id;
+            }
+        }
+
+        if ($kodlar !== [] && $primaryManifest === 0) {
+            $eksikKanitlar[] = 'PRIMARY_RESMI_MANIFEST_EKSIK';
+        }
+
+        foreach ($kodlar as $kodRow) {
+            $kod = strtoupper(trim((string) ($kodRow['eksik_gun_kodu'] ?? '')));
+            $sifir = strtoupper((string) ($kodRow['sifir_gun_sifir_kazanc_durumu'] ?? ''));
+            $yabanci = strtoupper((string) ($kodRow['yabanci_kullanim_durumu'] ?? ''));
+            $aktiflik = strtoupper((string) ($kodRow['aktiflik_durumu'] ?? ''));
+            $portal = strtoupper((string) ($kodRow['portal_teyit_durumu'] ?? ''));
+            $bas = (string) ($kodRow['gecerlilik_baslangic'] ?? '');
+            $manifestId = (string) ($kodRow['kaynak_manifest_id'] ?? '');
+
+            if ($sifir === 'TEYITSIZ') {
+                $eksikKanitlar[] = 'TEYITSIZ_SIFIR_GUN:' . $kod;
+            }
+            if ($yabanci === 'TEYITSIZ' || $yabanci === '') {
+                $eksikKanitlar[] = 'YABANCI_KULLANIM_BELIRSIZ:' . $kod;
+            }
+            if ($portal === 'TEYIT_BEKLIYOR' || $aktiflik === 'PORTAL_TEYIT_BEKLIYOR') {
+                $eksikKanitlar[] = 'PORTAL_TEYIT_BEKLIYOR:' . $kod;
+            }
+            if ($bas === '' || !SgkKatalogContracts::isDate($bas)) {
+                $eksikKanitlar[] = 'YURURLUK_TARIHI_EKSIK:' . $kod;
+            }
+            if ($manifestId === '') {
+                $eksikKanitlar[] = 'PRIMARY_MANIFEST_EKSIK:' . $kod;
+            }
+            if (($kod === '28' || $kod === '29') && $aktiflik === 'AKTIF') {
+                $eksikKanitlar[] = 'TARIHSEL_KOD_GUNCEL_AKTIF:' . $kod;
+            }
+            if ($kod === '27') {
+                $setHash = (string) ($kodRow['kaynak_kod_set_hash'] ?? '');
+                if (!SgkKatalogContracts::isSha256($setHash)) {
+                    $eksikKanitlar[] = 'OZEL_BIRLESIK_KOD_MATRISI_EKSIK:27';
+                }
             }
         }
 
@@ -129,7 +179,7 @@ final class SgkKatalogTamlikService
             $eksikKanitlar = array_values(array_unique($eksikKanitlar));
         }
 
-        // S85-C1: never emit DOGRULANMIS_TAM production status.
+        // S85-C1 / S98: never emit DOGRULANMIS_TAM production status.
         $tamlikDurumu = 'TASLAK';
         $onaylanabilir = false;
 
@@ -149,6 +199,7 @@ final class SgkKatalogTamlikService
             'kod_sayisi' => count($kodlar),
             'kaynak_sayisi' => count($manifests),
             'aktif_manifest_sayisi' => $aktifManifest,
+            'primary_resmi_manifest_sayisi' => $primaryManifest,
             'eksik_kanitlar' => $eksikKanitlar,
             'erisilemeyen_kaynaklar' => $erisilemeyen,
             'operasyonel_kanitlar' => array_map(static function (array $op): array {

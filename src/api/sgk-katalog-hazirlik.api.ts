@@ -14,6 +14,41 @@ export type SgkKatalogBlocker = {
   cozum_onerisi?: string;
 };
 
+/** S98 canonical catalog status (legacy boolean/enum remain temporary projections). */
+export type SgkAktiflikDurumu = "AKTIF" | "TARIHSEL" | "BAGLAMA_OZGUN" | "PORTAL_TEYIT_BEKLIYOR";
+export type SgkSifirGunDurumu = "IZINLI" | "YASAK" | "KOSULLU" | "TEYITSIZ";
+export type SgkBelgeSaklamaIbrazDurumu =
+  | "YOK"
+  | "ISVERENCE_SAKLA_TALEPTE_IBRAZ"
+  | "ELEKTRONIK_KAYNAKTAN"
+  | "KURUMA_GONDER"
+  | "KOSULLU"
+  | "TEYITSIZ";
+export type SgkYabanciKullanimDurumu = "IZINLI" | "YASAK" | "KOSULLU" | "TEYITSIZ";
+export type SgkPortalTeyitDurumu = "TEYIT_EDILDI" | "TEYIT_BEKLIYOR" | "TARIHSEL";
+
+export const SGK_AKTIFLIK_DURUMU_LABEL: Record<SgkAktiflikDurumu, string> = {
+  AKTIF: "AKTIF",
+  TARIHSEL: "TARIHSEL",
+  BAGLAMA_OZGUN: "BAĞLAMA ÖZGÜ",
+  PORTAL_TEYIT_BEKLIYOR: "PORTAL TEYİDİ BEKLİYOR"
+};
+
+/** Demo/production: TEYITSIZ and historical codes must not appear as selectable current catalog. */
+export function isSgkKodSecilebilir(input: {
+  aktiflik_durumu?: string | null;
+  portal_teyit_durumu?: string | null;
+  sifir_gun_sifir_kazanc_durumu?: string | null;
+}): boolean {
+  const aktiflik = (input.aktiflik_durumu ?? "").toUpperCase();
+  const portal = (input.portal_teyit_durumu ?? "").toUpperCase();
+  const sifir = (input.sifir_gun_sifir_kazanc_durumu ?? "").toUpperCase();
+  if (sifir === "TEYITSIZ") return false;
+  if (aktiflik === "TARIHSEL" || aktiflik === "PORTAL_TEYIT_BEKLIYOR") return false;
+  if (portal === "TEYIT_BEKLIYOR" || portal === "TARIHSEL") return false;
+  return aktiflik === "AKTIF" && portal === "TEYIT_EDILDI";
+}
+
 export type SgkKatalogTamlik = {
   tamlik_durumu: string;
   katalog_surumu: string;

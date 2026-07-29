@@ -1,4 +1,4 @@
-/** Shared S85-C1 SGK katalog hazırlık mock contract (empty catalog, tamlik blocker). */
+/** Shared S85-C1 / S98 SGK katalog hazırlık mock contract (empty catalog, tamlik blocker). */
 
 export const SGK_KATALOG_TAMLIK_BLOCKER = {
   severity: "BLOCKER" as const,
@@ -17,6 +17,7 @@ export function buildSgkKatalogTamlikMock() {
     kod_sayisi: 0,
     kaynak_sayisi: 0,
     aktif_manifest_sayisi: 0,
+    primary_resmi_manifest_sayisi: 0,
     eksik_kanitlar: [
       "GUNCEL_TAM_KOD_LISTESI",
       "KOD_BAZLI_YURURLUK_TARIHI",
@@ -35,6 +36,15 @@ export function buildSgkKatalogTamlikMock() {
     dogrulanmis_tam_secilebilir_mi: false,
     import_yazma_aktif_mi: false,
     approve_aktif_mi: false,
+    // Demo must not be more permissive than backend: no selectable TEYITSIZ/historical codes.
+    secilebilir_kod_ornekleri: [],
+    aktiflik_durumu_etiketleri: {
+      AKTIF: "AKTIF",
+      TARIHSEL: "TARIHSEL",
+      BAGLAMA_OZGUN: "BAĞLAMA ÖZGÜ",
+      PORTAL_TEYIT_BEKLIYOR: "PORTAL TEYİDİ BEKLİYOR"
+    },
+    teyitsiz_secilebilir_mi: false,
     response_hash: "demo-sgk-katalog-tamlik-hash"
   };
 }

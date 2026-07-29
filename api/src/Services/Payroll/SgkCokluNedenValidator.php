@@ -5,14 +5,15 @@ declare(strict_types=1);
 namespace Medisa\Api\Services\Payroll;
 
 /**
- * S85-C1: Multi-reason combined-code validation without seeded matrix.
+ * S85-C1 / S98: Multi-reason combined-code validation without seeded matrix.
  */
 final class SgkCokluNedenValidator
 {
     /**
      * @param array{
      *   kodlar?: list<string>,
-     *   kurallar?: list<array{kaynak_kodlar?: list<string>, sonuc_eksik_gun_kodu?: string, aktif_mi?: bool}>
+     *   kurallar?: list<array{kaynak_kodlar?: list<string>, sonuc_eksik_gun_kodu?: string, aktif_mi?: bool}>,
+     *   sonuc_eksik_gun_kodu?: string|null
      * } $input
      */
     public static function validate(array $input): array
@@ -21,6 +22,15 @@ final class SgkCokluNedenValidator
         $setHash = SgkKatalogContracts::kodSetHash($normalized);
         $kurallar = array_values($input['kurallar'] ?? []);
         $blockers = [];
+
+        // Official 18/27 combination gate (evidence fixture, not catalog seed).
+        $combo = SgkKatalogContracts::assert1827Combination(
+            $normalized,
+            isset($input['sonuc_eksik_gun_kodu']) ? (string) $input['sonuc_eksik_gun_kodu'] : null
+        );
+        foreach ($combo['blocker_detaylari'] as $b) {
+            $blockers[] = $b;
+        }
 
         $hits = [];
         foreach ($kurallar as $kural) {
@@ -34,13 +44,20 @@ final class SgkCokluNedenValidator
         }
         $hits = array_values(array_filter($hits, static fn ($c) => $c !== ''));
 
+        // Prefer official 18/27 expected result when applicable.
+        if ($combo['sonuc_eksik_gun_kodu'] !== null && $kurallar === []) {
+            $hits = [$combo['sonuc_eksik_gun_kodu']];
+        } elseif ($combo['sonuc_eksik_gun_kodu'] !== null && $hits === []) {
+            $hits = [$combo['sonuc_eksik_gun_kodu']];
+        }
+
         if ($normalized === []) {
             $blockers[] = SgkKatalogContracts::blocker(
                 SgkKatalogContracts::BLOCKER_COKLU_BULUNAMADI,
                 'Coklu neden kod seti bos.',
                 'En az bir eksik gun kodu gonderin.'
             );
-        } elseif ($hits === []) {
+        } elseif ($hits === [] && $combo['sonuc_eksik_gun_kodu'] === null) {
             $blockers[] = SgkKatalogContracts::blocker(
                 SgkKatalogContracts::BLOCKER_COKLU_BULUNAMADI,
                 'Birlesik kod kurali bulunamadi.',
@@ -54,8 +71,16 @@ final class SgkCokluNedenValidator
             );
         }
 
-        // Without seeded matrix, even a single hit is informational only in C1 if kurallar empty by default.
-        $sonuc = count(array_unique($hits)) === 1 ? $hits[0] : null;
+        $sonuc = count(array_unique($hits)) === 1 ? $hits[0] : ($combo['sonuc_eksik_gun_kodu'] ?? null);
+
+        // 27 is not a general multi-reason code; require set hash when result is 27.
+        if ($sonuc === '27' && $setHash === '') {
+            $blockers[] = SgkKatalogContracts::blocker(
+                SgkKatalogContracts::BLOCKER_KOD_KURAL,
+                '27 icin kaynak kod set hash zorunludur.',
+                '18 + baska neden setinin hashini gonderin.'
+            );
+        }
 
         $out = [
             'kodlar_normalize' => $normalized,
@@ -63,6 +88,7 @@ final class SgkCokluNedenValidator
             'sonuc_eksik_gun_kodu' => $sonuc,
             'kural_sayisi' => count($kurallar),
             'seed_matrisi_var_mi' => $kurallar !== [],
+            'ozel_18_27_kurali_uygulandi_mi' => $combo['sonuc_eksik_gun_kodu'] !== null,
             'blocker_kodlari' => array_values(array_map(static fn (array $b) => $b['code'], $blockers)),
             'blocker_detaylari' => $blockers,
             'gecerli_mi' => $blockers === [] && $sonuc !== null,

@@ -176,6 +176,133 @@ assertTrue(in_array('KAYNAKSIZ_KOD_ARALIGI_22_29', $r22['hatali_satirlar'][0]['e
 $rule07 = SgkKatalogContracts::assert07ZeroEarningsRule('07', 0, 0.0);
 assertTrue($rule07 !== null && $rule07['code'] === 'SGK_EKSIK_GUN_KODU_CAKISTI', '07 0/0 fixture kurali');
 
+// --- S98 mevzuat rules ---
+$r07 = SgkKatalogContracts::assert07PuantajRules([
+    'eksik_gun_kodu' => '07',
+    'prim_gun' => 0,
+    'kazanc' => 0,
+    'kismi_sureli_sozlesme_var_mi' => false,
+    'saat_75_bolme_kullanildi_mi' => true,
+    'puantaj_imzali_mi' => false,
+    'calisma_gunu_sayisi' => 6,
+    'hafta_tatili_degerlendirildi_mi' => false,
+]);
+assertTrue(count($r07) >= 4, '07 puantaj coklu blocker');
+assertTrue(SgkKatalogContracts::assert07ImzaliGunTamGun(true, true) === 'TAM_GUN', '07 imzali gun tam gun');
+
+$r20 = SgkKatalogContracts::assert20UcretsizYolIzniRules([
+    'eksik_gun_kodu' => '20',
+    'eksik_gun_sayisi' => 5,
+    'prim_gun' => 0,
+    'kazanc' => 0,
+    'isci_talebi_var_mi' => false,
+    'yillik_izin_baska_yer_belgesi_var_mi' => false,
+]);
+assertTrue(count($r20) >= 3, '20 yol izni blockerleri');
+
+$c18 = SgkKatalogContracts::assert1827Combination(['18']);
+assertTrue($c18['sonuc_eksik_gun_kodu'] === '18', 'yalniz kisa calisma -> 18');
+$c27 = SgkKatalogContracts::assert1827Combination(['18', '15'], '12');
+assertTrue($c27['sonuc_eksik_gun_kodu'] === '27', '18+baska -> 27');
+assertTrue($c27['blocker_detaylari'] !== [], '18+baska sonuc 12 RED');
+
+$c18v = SgkCokluNedenValidator::validate(['kodlar' => ['18'], 'kurallar' => []]);
+assertTrue($c18v['sonuc_eksik_gun_kodu'] === '18' && $c18v['gecerli_mi'] === true, 'coklu 18 sonucu');
+$c27v = SgkCokluNedenValidator::validate(['kodlar' => ['18', '01'], 'kurallar' => [], 'sonuc_eksik_gun_kodu' => '12']);
+assertTrue(in_array(SgkKatalogContracts::BLOCKER_KOD_KURAL, $c27v['blocker_kodlari'], true), 'coklu 18+x sonuc 12 blocker');
+
+$yOk = SgkKatalogContracts::assertYabanciKodIzni(['eksik_gun_kodu' => '01', 'yabanci_uyruklu_mu' => true]);
+assertTrue($yOk === [], 'yabanci temel 01 izinli');
+$y26 = SgkKatalogContracts::assertYabanciKodIzni(['eksik_gun_kodu' => '26', 'yabanci_uyruklu_mu' => true]);
+assertTrue($y26 !== [], '26 baglamsiz RED');
+$y26ok = SgkKatalogContracts::assertYabanciKodIzni([
+    'eksik_gun_kodu' => '26',
+    'yabanci_uyruklu_mu' => true,
+    'kismi_istihdam_izinli_mi' => true,
+]);
+assertTrue($y26ok === [], '26 izinli kismi baglam OK');
+$y07 = SgkKatalogContracts::assertYabanciKodIzni(['eksik_gun_kodu' => '07', 'yabanci_uyruklu_mu' => true]);
+assertTrue($y07 !== [], '07 yabanci otomatik izinli degil');
+$yAnalik = SgkKatalogContracts::assertYabanciKodIzni([
+    'eksik_gun_kodu' => '13',
+    'yabanci_uyruklu_mu' => true,
+    'analik_4857_74_baglami_mi' => true,
+]);
+assertTrue($yAnalik !== [], 'analik 4857-74 otomatik izinli degil');
+
+$histAktif = SgkKatalogContracts::assertKod22_29EvidenceGate('28', [
+    'aktiflik_durumu' => 'AKTIF',
+    'portal_teyit_durumu' => 'TEYIT_EDILDI',
+    'gecerlilik_baslangic' => '2020-04-01',
+    'gecerlilik_bitis' => '2021-07-01',
+], $manifest);
+assertTrue(in_array('TARIHSEL_KOD_AKTIF_RED', $histAktif, true), '28 AKTIF RED');
+
+$histOk = SgkKatalogContracts::assertKod22_29EvidenceGate('28', [
+    'aktiflik_durumu' => 'TARIHSEL',
+    'portal_teyit_durumu' => 'TARIHSEL',
+    'gecerlilik_baslangic' => '2020-04-01',
+    'gecerlilik_bitis' => '2021-07-01',
+], $manifest);
+assertTrue($histOk === [], '28 TARIHSEL + aralik + manifest kabul');
+
+$histNoDate = SgkKatalogContracts::assertKod22_29EvidenceGate('29', [
+    'aktiflik_durumu' => 'TARIHSEL',
+    'portal_teyit_durumu' => 'TARIHSEL',
+    'gecerlilik_baslangic' => '2020-04-01',
+], $manifest);
+assertTrue(in_array('TARIHSEL_YURURLUK_ARALIGI_EKSIK', $histNoDate, true), '29 tarih yok RED');
+
+$legacyProj = SgkKatalogContracts::projectCanonicalToLegacy([
+    'sifir_gun_sifir_kazanc_durumu' => 'KOSULLU',
+    'aktiflik_durumu' => 'PORTAL_TEYIT_BEKLIYOR',
+    'portal_teyit_durumu' => 'TEYIT_BEKLIYOR',
+    'belge_saklama_ibraz_durumu' => 'ISVERENCE_SAKLA_TALEPTE_IBRAZ',
+]);
+assertTrue($legacyProj['sifir_gun_sifir_kazanc_kullanilabilir_mi'] === false, 'KOSULLU legacy true uretemez');
+assertTrue($legacyProj['aktif_mi'] === false, 'portal teyit bekleyen aktif_mi false');
+assertTrue($legacyProj['blockers'] !== [], 'KOSULLU legacy blocker');
+
+$conflict = SgkKatalogContracts::assertLegacyCanonicalConsistency([
+    'sifir_gun_sifir_kazanc_durumu' => 'TEYITSIZ',
+    'sifir_gun_sifir_kazanc_kullanilabilir_mi' => true,
+]);
+assertTrue($conflict !== [], 'TEYITSIZ + legacy true celiski');
+
+$r28import = SgkKatalogImportValidator::dryRun([
+    'rows' => [array_merge($rowBase, [
+        'eksik_gun_kodu' => '28',
+        'aktif_mi' => false,
+        'aktiflik_durumu' => 'TARIHSEL',
+        'portal_teyit_durumu' => 'TARIHSEL',
+        'gecerlilik_baslangic' => '2020-04-01',
+        'gecerlilik_bitis' => '2021-07-01',
+        'sifir_gun_sifir_kazanc_durumu' => 'YASAK',
+        'sifir_gun_sifir_kazanc_kullanilabilir_mi' => false,
+    ])],
+    'manifests' => [$manifest],
+]);
+assertTrue(($r28import['hatali_satirlar'] ?? []) === [], 'import 28 tarihsel kabul');
+
+$tamlikPortal = SgkKatalogTamlikService::evaluate([
+    'kod_satirlari' => [[
+        'eksik_gun_kodu' => '01',
+        'sifir_gun_sifir_kazanc_durumu' => 'TEYITSIZ',
+        'yabanci_kullanim_durumu' => 'TEYITSIZ',
+        'aktiflik_durumu' => 'PORTAL_TEYIT_BEKLIYOR',
+        'portal_teyit_durumu' => 'TEYIT_BEKLIYOR',
+        'gecerlilik_baslangic' => '2020-01-01',
+        'kaynak_manifest_id' => 'MAN_1',
+    ]],
+    'manifests' => [$manifest],
+    'expert_draft_tek_basina_mi' => true,
+]);
+assertTrue(in_array('TEYITSIZ_SIFIR_GUN:01', $tamlikPortal['eksik_kanitlar'], true), 'tamlik TEYITSIZ');
+assertTrue(in_array('PORTAL_TEYIT_BEKLIYOR:01', $tamlikPortal['eksik_kanitlar'], true), 'tamlik portal bekliyor');
+assertTrue(in_array('EXPERT_DRAFT_TEK_BASINA_YETERSIZ', $tamlikPortal['eksik_kanitlar'], true), 'expert draft yetersiz');
+assertTrue($tamlikPortal['tamlik_durumu'] !== 'DOGRULANMIS_TAM', 'portal bekleyen ONAYLANDI/DOGRULANMIS_TAM olamaz');
+assertTrue($tamlikPortal['onaylanabilir_mi'] === false, 'tamlik onaylanamaz');
+
 // --- Esleme ---
 $e1 = SgkSurecKodEslemeValidator::validate(['surec_turu' => 'RAPOR', 'mappings' => []]);
 assertTrue(in_array(SgkKatalogContracts::BLOCKER_SUREC_BULUNAMADI, $e1['blocker_kodlari'], true), 'esleme yok');

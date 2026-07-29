@@ -45,7 +45,10 @@ describe("S85-C1 SGK katalog hazirlik parity", () => {
     expect(existsSync(resolve("api/migrations/037_sgk_resmi_kaynak_manifesti_v1.sql"))).toBe(true);
     expect(migrationNames.some((name) => name.startsWith("038_"))).toBe(true);
     expect(migrationNames.some((name) => name.startsWith("039_"))).toBe(true);
-    expect(migrationNames.at(-1)).toBe("039_ubgt_gun_kapsami_tatil_takvimi.sql");
+    expect(migrationNames.some((name) => name.startsWith("040_"))).toBe(true);
+    expect(migrationNames.filter((n) => n.endsWith(".sql")).sort().at(-1)).toBe(
+      "040_sgk_mevzuat_canonical_schema.sql"
+    );
 
     expect(reader).toContain("SGK_KAYNAK_MANIFEST_STORAGE_HATASI");
     expect(reader).toContain("formatSanitizedRuntimeLog");
@@ -105,9 +108,14 @@ describe("S85-C1 SGK katalog hazirlik parity", () => {
       resolve("api/src/Services/Payroll/SgkKatalogImportValidator.php"),
       "utf8"
     );
-    expect(importValidator).toContain("KAYNAKSIZ_KOD_ARALIGI_22_29");
+    expect(importValidator).toContain("assertKod22_29EvidenceGate");
     expect(importValidator).toContain("import_yapilabilir_mi");
     expect(importValidator).toContain("DRY_RUN");
+    expect(importValidator).toContain("aktiflik_durumu");
+    expect(importValidator).toContain("projectCanonicalToLegacy");
+    const contracts = readFileSync(resolve("api/src/Services/Payroll/SgkKatalogContracts.php"), "utf8");
+    expect(contracts).toContain("KAYNAKSIZ_KOD_ARALIGI_22_29");
+    expect(contracts).toContain("assertKod22_29EvidenceGate");
 
     const demo = readFileSync(resolve("src/api/mock-demo.ts"), "utf8");
     const e2e = readFileSync(resolve("tests/e2e/helpers/mock-api.ts"), "utf8");

@@ -431,11 +431,11 @@ try {
 
     $files = pbMigrationFiles();
     pbAssert($files !== [] && $files[0] === '001_initial_schema.sql', 'zincir 001 ile baslar');
-    pbAssert(end($files) === '039_ubgt_gun_kapsami_tatil_takvimi.sql', 'zincir 039 ile biter');
+    pbAssert(end($files) === '040_sgk_mevzuat_canonical_schema.sql', 'zincir 040 ile biter');
     foreach ($files as $file) {
         pbApplyFile($pdo, $file);
     }
-    pbAssert(true, '001-039 apply (acceptance DB)');
+    pbAssert(true, '001-040 apply (acceptance DB)');
 
     $pdo->exec("INSERT INTO subeler (id, kod, ad, durum) VALUES (1, 'MRK', 'Merkez', 'AKTIF')");
     $pdo->exec("INSERT INTO users (id, username, password_hash, ad_soyad, rol, durum)

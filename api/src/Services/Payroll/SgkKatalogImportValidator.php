@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Medisa\Api\Services\Payroll;
 
 /**
- * S85-C1: Deterministic catalog import dry-run validator (no write).
+ * S85-C1 / S98: Deterministic catalog import dry-run validator (no write).
  */
 final class SgkKatalogImportValidator
 {
@@ -22,6 +22,25 @@ final class SgkKatalogImportValidator
         'diger_nedenlerle_birlikte_kullanim',
         'aktif_mi',
         'aciklama_hash',
+    ];
+
+    private const OPTIONAL = [
+        'gecerlilik_bitis',
+        'kosullar',
+        'kosullar_json',
+        'row_no',
+        'aktiflik_durumu',
+        'sifir_gun_sifir_kazanc_durumu',
+        'belge_saklama_ibraz_durumu',
+        'yabanci_kullanim_durumu',
+        'portal_teyit_durumu',
+        'mevzuat_kurallari_json',
+        'mevzuat_kurallari',
+        'kaynak_kod_set_hash',
+        'kaynak_kodlar',
+        'kismi_istihdam_izinli_mi',
+        'yabanci_kismi_istihdam_baglami_mi',
+        'resmi_primary_kod_kaniti_var_mi',
     ];
 
     /**
@@ -59,9 +78,7 @@ final class SgkKatalogImportValidator
 
         foreach ($rows as $index => $row) {
             $errors = [];
-            $unknown = array_diff(array_keys($row), array_merge(self::REQUIRED, [
-                'gecerlilik_bitis', 'kosullar', 'kosullar_json', 'row_no',
-            ]));
+            $unknown = array_diff(array_keys($row), array_merge(self::REQUIRED, self::OPTIONAL));
             foreach ($unknown as $field) {
                 $errors[] = 'BILINMEYEN_ALAN:' . $field;
             }
@@ -104,15 +121,17 @@ final class SgkKatalogImportValidator
             } elseif ($aciklama !== '' && hash('sha256', $aciklama) !== $hash) {
                 $errors[] = 'HASH_UYUSMAZLIGI';
             }
+
+            $manifest = null;
             if ($manifestId === '' || !isset($manifests[$manifestId])) {
                 $errors[] = 'GECERSIZ_KAYNAK';
             } else {
-                $md = $manifests[$manifestId];
-                if (strtoupper((string) ($md['durum'] ?? '')) === 'PASIF') {
+                $manifest = $manifests[$manifestId];
+                if (strtoupper((string) ($manifest['durum'] ?? '')) === 'PASIF') {
                     $errors[] = 'PASIF_KAYNAK';
                 }
-                $mBas = $md['yururluk_baslangic'] ?? null;
-                $mBit = $md['yururluk_bitis'] ?? null;
+                $mBas = $manifest['yururluk_baslangic'] ?? null;
+                $mBit = $manifest['yururluk_bitis'] ?? null;
                 if (is_string($mBas) && $mBas !== '' && SgkKatalogContracts::isDate($bas) && $bas < $mBas) {
                     $errors[] = 'KAYNAK_YURURLUK_CELISKISI';
                 }
@@ -121,9 +140,35 @@ final class SgkKatalogImportValidator
                 }
             }
 
-            // Codes 22-29 without official primary source evidence are rejected.
-            if (preg_match('/^(2[2-9])$/', $kod) === 1) {
-                $errors[] = 'KAYNAKSIZ_KOD_ARALIGI_22_29';
+            foreach (['aktiflik_durumu' => SgkKatalogContracts::AKTIFLIK_DURUMU,
+                'sifir_gun_sifir_kazanc_durumu' => SgkKatalogContracts::SIFIR_GUN_DURUMU,
+                'belge_saklama_ibraz_durumu' => SgkKatalogContracts::BELGE_SAKLAMA_IBRAZ,
+                'yabanci_kullanim_durumu' => SgkKatalogContracts::YABANCI_KULLANIM,
+                'portal_teyit_durumu' => SgkKatalogContracts::PORTAL_TEYIT,
+            ] as $field => $allowed) {
+                if (!array_key_exists($field, $row) || $row[$field] === null || $row[$field] === '') {
+                    continue;
+                }
+                $val = strtoupper((string) $row[$field]);
+                if (!in_array($val, $allowed, true)) {
+                    $errors[] = 'GECERSIZ_ENUM:' . $field;
+                }
+            }
+
+            if (array_key_exists('mevzuat_kurallari_json', $row) || array_key_exists('mevzuat_kurallari', $row)) {
+                $rules = $row['mevzuat_kurallari_json'] ?? $row['mevzuat_kurallari'];
+                if ($rules !== null && $rules !== '' && !SgkKatalogContracts::isValidMevzuatKurallari($rules)) {
+                    $errors[] = 'GECERSIZ_MEVZUAT_KURALLARI_JSON';
+                }
+            }
+
+            foreach (SgkKatalogContracts::assertLegacyCanonicalConsistency($row) as $conflict) {
+                $errors[] = $conflict;
+            }
+
+            // S98: evidence-based 22-29 gate (no blanket reject independent of source).
+            foreach (SgkKatalogContracts::assertKod22_29EvidenceGate($kod, $row, $manifest) as $gateErr) {
+                $errors[] = $gateErr;
             }
 
             $donemKey = $kod . '|' . $bas . '|' . ($bit ?? 'OPEN');
@@ -132,7 +177,6 @@ final class SgkKatalogImportValidator
             }
             $seenKodDonem[$donemKey] = $index;
 
-            // Overlap check against prior valid/attempted rows with same code
             foreach ($canonicalRows as $prev) {
                 if ($prev['eksik_gun_kodu'] !== $kod) {
                     continue;
@@ -159,6 +203,45 @@ final class SgkKatalogImportValidator
                 'aciklama_hash' => $hash,
             ];
 
+            // Optional canonical fields + legacy projection when present.
+            $hasCanonicalStatus = false;
+            foreach ([
+                'aktiflik_durumu',
+                'sifir_gun_sifir_kazanc_durumu',
+                'belge_saklama_ibraz_durumu',
+                'yabanci_kullanim_durumu',
+                'portal_teyit_durumu',
+            ] as $cField) {
+                if (array_key_exists($cField, $row) && $row[$cField] !== null && $row[$cField] !== '') {
+                    $canonical[$cField] = strtoupper((string) $row[$cField]);
+                    $hasCanonicalStatus = true;
+                }
+            }
+            if (array_key_exists('mevzuat_kurallari_json', $row)) {
+                $canonical['mevzuat_kurallari_json'] = $row['mevzuat_kurallari_json'];
+            } elseif (array_key_exists('mevzuat_kurallari', $row)) {
+                $canonical['mevzuat_kurallari_json'] = $row['mevzuat_kurallari'];
+            }
+            if (array_key_exists('kaynak_kod_set_hash', $row)) {
+                $canonical['kaynak_kod_set_hash'] = $row['kaynak_kod_set_hash'];
+            }
+            if (array_key_exists('kaynak_kodlar', $row)) {
+                $canonical['kaynak_kodlar'] = $row['kaynak_kodlar'];
+            }
+
+            if ($hasCanonicalStatus) {
+                $proj = SgkKatalogContracts::projectCanonicalToLegacy($canonical);
+                foreach ($proj['warnings'] as $w) {
+                    $warnings[] = $w;
+                }
+                // Keep provided legacy fields; projection documents expected values without silent overwrite to true.
+                $canonical['legacy_projection'] = [
+                    'sifir_gun_sifir_kazanc_kullanilabilir_mi' => $proj['sifir_gun_sifir_kazanc_kullanilabilir_mi'],
+                    'aktif_mi' => $proj['aktif_mi'],
+                    'belge_zorunlulugu' => $proj['belge_zorunlulugu'],
+                ];
+            }
+
             if ($errors !== []) {
                 $invalid[] = [
                     'row_index' => $index,
@@ -172,7 +255,6 @@ final class SgkKatalogImportValidator
             $valid[] = $canonical;
         }
 
-        // Deterministic sort independent of input row order
         usort($canonicalRows, static function (array $a, array $b): int {
             return [$a['eksik_gun_kodu'], $a['gecerlilik_baslangic'], (string) $a['gecerlilik_bitis']]
                 <=> [$b['eksik_gun_kodu'], $b['gecerlilik_baslangic'], (string) $b['gecerlilik_bitis']];
@@ -184,13 +266,14 @@ final class SgkKatalogImportValidator
         if ($rows === []) {
             $warnings[] = 'BOS_PAKET';
         }
+        $warnings = array_values(array_unique($warnings));
 
         $manifestIds = array_keys($manifests);
         sort($manifestIds);
         $manifestSetHash = SgkKatalogContracts::sha256Canonical(['manifest_ids' => $manifestIds]);
         $payloadHash = SgkKatalogContracts::sha256Canonical(['rows' => $canonicalRows]);
 
-        $importYapilabilir = false; // S85-C1: write endpoint not activated
+        $importYapilabilir = false; // S85-C1 / S98: write endpoint not activated
 
         $out = [
             'mode' => 'DRY_RUN',

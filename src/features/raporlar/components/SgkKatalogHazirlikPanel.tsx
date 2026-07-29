@@ -11,6 +11,7 @@ import {
   validateSgkKatalogOnay,
   validateSgkOperasyonelKanit,
   validateSgkSurecEsleme,
+  SGK_AKTIFLIK_DURUMU_LABEL,
   type SgkKatalogBlocker,
   type SgkKatalogBlockerRaporu,
   type SgkKatalogImportDryRun,
@@ -209,6 +210,10 @@ export function SgkKatalogHazirlikPanel() {
         <h3>SGK Katalog Hazırlık</h3>
         <p data-testid="sgk-katalog-kaynak-tamlik-uyari">
           Kaynak tamlığı tamamlanmadı. Resmî katalog satırları gösterilmez; DOGRULANMIS_TAM seçilemez.
+          TEYITSIZ ve tarihsel kodlar güncel kayıt ekranında seçilemez.
+        </p>
+        <p data-testid="sgk-katalog-aktiflik-etiketleri" className="muted">
+          Aktiflik: {Object.values(SGK_AKTIFLIK_DURUMU_LABEL).join(" · ")}
         </p>
       </header>
 

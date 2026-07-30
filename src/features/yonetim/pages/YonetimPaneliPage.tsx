@@ -22,6 +22,7 @@ import { useRoleAccess } from "../../../hooks/use-role-access";
 import { MevzuatParametreleriPanel } from "../components/MevzuatParametreleriPanel";
 import { isRealYonetimKullaniciApi } from "../../../lib/yonetim/kullanici-api-contract";
 import type { UserRole } from "../../../types/auth";
+import { ASSIGNABLE_USER_ROLES } from "../../../types/auth";
 import type { Personel } from "../../../types/personel";
 import type { IdOption } from "../../../types/referans";
 import type {
@@ -73,7 +74,8 @@ const ROLE_LABELS: Record<UserRole, string> = {
   BOLUM_YONETICISI: "Bölüm Yöneticisi",
   BIRIM_AMIRI: "Birim Amiri",
   MUHASEBE: "Muhasebe",
-  PATRON: "Patron"
+  PATRON: "Patron",
+  AUTH_SMOKE_READONLY: "Teknik Smoke — Salt Okuma"
 };
 
 const KULLANICI_TIPI_LABELS: Record<KullaniciTipi, string> = {
@@ -181,7 +183,10 @@ function isActivationKey(event: KeyboardEvent<HTMLElement>) {
 }
 
 function roleOptions() {
-  return Object.entries(ROLE_LABELS).map(([value, label]) => ({ value, label }));
+  return ASSIGNABLE_USER_ROLES.map((value) => ({
+    value,
+    label: ROLE_LABELS[value]
+  }));
 }
 
 function formatNameToken(value: string) {

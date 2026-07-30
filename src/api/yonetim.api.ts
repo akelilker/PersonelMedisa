@@ -87,7 +87,9 @@ function normalizeUserRole(value: unknown): UserRole {
     value === "GENEL_YONETICI" ||
     value === "BOLUM_YONETICISI" ||
     value === "MUHASEBE" ||
-    value === "BIRIM_AMIRI"
+    value === "BIRIM_AMIRI" ||
+    value === "PATRON" ||
+    value === "AUTH_SMOKE_READONLY"
   ) {
     return value;
   }

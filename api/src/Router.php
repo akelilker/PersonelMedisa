@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Medisa\Api;
 
 use Medisa\Api\Auth\AuthMiddleware;
+use Medisa\Api\Auth\AuthSmokeController;
 use Medisa\Api\Auth\LoginController;
 use Medisa\Api\Controllers\AylikBildirimOnaylariController;
 use Medisa\Api\Controllers\GenelYoneticiBildirimOnaylariController;
@@ -64,6 +65,9 @@ class Router
 
         if ($path === '/auth/login' && $method === 'POST') {
             LoginController::login($this->request);
+        }
+        if ($path === '/auth/smoke-read' && $method === 'GET') {
+            AuthSmokeController::smokeRead($this->request);
         }
 
         if ($method === 'PUT' && preg_match('#^/personeller/(\d+)$#', $path, $matches)) {

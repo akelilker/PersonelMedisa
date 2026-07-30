@@ -768,7 +768,56 @@ class YonetimController
         'BOLUM_YONETICISI',
         'MUHASEBE',
         'BIRIM_AMIRI',
+        'AUTH_SMOKE_READONLY',
     ];
+
+    private static function isAuthSmokeReadonlyRole($rol)
+    {
+        return strtoupper(trim((string) $rol)) === 'AUTH_SMOKE_READONLY';
+    }
+
+    /**
+     * @param array<int, int> $subeIds
+     * @param int|null $varsayilanSubeId
+     */
+    private static function assertAuthSmokeReadonlyContract($username, $rol, array $subeIds, $varsayilanSubeId)
+    {
+        if (!self::isAuthSmokeReadonlyRole($rol)) {
+            return;
+        }
+
+        $username = trim((string) $username);
+        if (strpos($username, 'pm_smoke_ro_') !== 0) {
+            JsonResponse::error(
+                400,
+                'AUTH_SMOKE_USERNAME_INVALID',
+                'AUTH_SMOKE_READONLY kullanici adi pm_smoke_ro_ ile baslamalidir.',
+                'username'
+            );
+        }
+
+        if (count($subeIds) !== 1) {
+            JsonResponse::error(
+                400,
+                'AUTH_SMOKE_SCOPE_INVALID',
+                'AUTH_SMOKE_READONLY hesabi exact bir sube gerektirir.',
+                'sube_ids'
+            );
+        }
+
+        $onlySube = $subeIds[0];
+        if ($varsayilanSubeId === null) {
+            return;
+        }
+        if ((int) $varsayilanSubeId !== (int) $onlySube) {
+            JsonResponse::error(
+                400,
+                'AUTH_SMOKE_SCOPE_INVALID',
+                'AUTH_SMOKE_READONLY varsayilan sube atanmis tek sube ile ayni olmalidir.',
+                'varsayilan_sube_id'
+            );
+        }
+    }
 
     public static function kullanicilar(Request $request)
     {
@@ -847,6 +896,7 @@ class YonetimController
         if ($varsayilanSubeId !== null) {
             $subeIds = self::normalizeSubeIdsWithVarsayilan($subeIds, $varsayilanSubeId);
         }
+        self::assertAuthSmokeReadonlyContract($username, $rol, $subeIds, $varsayilanSubeId);
 
         $pdo->beginTransaction();
         try {
@@ -946,6 +996,16 @@ class YonetimController
             self::assertVarsayilanSubeInScope($varsayilanSubeId, $currentSubeIds);
             $subeIds = self::normalizeSubeIdsWithVarsayilan($currentSubeIds, $varsayilanSubeId);
         }
+
+        $effectiveSubeIds = $subeIds;
+        if ($effectiveSubeIds === null) {
+            $effectiveSubeIds = self::loadSubeIdsByUserIds($pdo, [$kullaniciId])[$kullaniciId] ?? [];
+        }
+        $effectiveVarsayilan = $varsayilanSubeId;
+        if ($effectiveVarsayilan === null && count($effectiveSubeIds) > 0) {
+            $effectiveVarsayilan = $effectiveSubeIds[0];
+        }
+        self::assertAuthSmokeReadonlyContract($username, $rol, $effectiveSubeIds, $effectiveVarsayilan);
 
         $responseVarsayilanSubeId = $varsayilanSubeId;
         if ($responseVarsayilanSubeId === null && $subeIds !== null && count($subeIds) > 0) {

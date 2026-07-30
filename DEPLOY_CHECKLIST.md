@@ -142,7 +142,7 @@ SMOKE_BASE_URL=https://<canlı-host> SMOKE_APP_PREFIX=/personelmedisa npm run sm
 - **Manuel kalır:** GitHub Actions doğrulama (1), cache bypass (6), login smoke (7), read smoke (8), sonuç kaydı (9)
 - **Çıkış kodu:** tüm otomatik kontroller OK → `0`; herhangi fail veya eksik env → `1`
 - **Credential yok:** login/read veya token bu scriptte desteklenmez (anonim smoke).
-- **Opsiyonel authenticated read-only:** `SMOKE_AUTH_USERNAME` + `SMOKE_AUTH_PASSWORD` set edilirse script login + `GET /api/personeller` yapar; write çağırmaz. Ayrıntı: `docs/guncel/95-s96-release-ops-runbook.md`.
+- **Opsiyonel authenticated read-only:** `SMOKE_AUTH_USERNAME` + `SMOKE_AUTH_PASSWORD` set edilirse script login + `GET /api/auth/smoke-read` yapar; write çağırmaz; personel/domain PII okumaz. Dedicated rol: `AUTH_SMOKE_READONLY`. Ayrıntı: `docs/guncel/95-s96-release-ops-runbook.md`.
 
 `SMOKE_BASE_URL` verilmeden çalıştırılırsa usage gösterilir ve script `exit 1` döner.
 

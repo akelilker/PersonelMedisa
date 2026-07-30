@@ -51,8 +51,9 @@ describe("S86 personel belge parity source", () => {
     expect(allowlist).not.toContain("D-BEL-01");
     expect(existsSync(resolve("api/migrations/038_personel_belge_yonetimi.sql"))).toBe(true);
     expect(existsSync(resolve("api/migrations/040_sgk_mevzuat_canonical_schema.sql"))).toBe(true);
+    expect(existsSync(resolve("api/migrations/041_auth_smoke_readonly_role.sql"))).toBe(true);
     expect(migrations.some((n) => n.startsWith("039_"))).toBe(true);
-    expect(migrations.at(-1)).toBe("040_sgk_mevzuat_canonical_schema.sql");
+    expect(migrations.at(-1)).toBe("041_auth_smoke_readonly_role.sql");
     expect(existsSync(resolve("src/features/personeller/pages/BelgeTakipPage.tsx"))).toBe(true);
   });
 });

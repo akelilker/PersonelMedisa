@@ -8,6 +8,7 @@ require_once __DIR__ . '/../../api/src/Services/Payroll/SgkKatalogImportValidato
 require_once __DIR__ . '/../../api/src/Services/Payroll/SgkOperasyonelKanitValidator.php';
 require_once __DIR__ . '/../../api/src/Services/Payroll/SgkOperasyonelKanitBase64Guard.php';
 require_once __DIR__ . '/../../api/src/Services/Payroll/SgkKatalogOnayService.php';
+require_once __DIR__ . '/../../api/src/Services/Payroll/SgkKatalogWriteService.php';
 require_once __DIR__ . '/../../api/src/Services/Payroll/SgkSurecKodEslemeValidator.php';
 require_once __DIR__ . '/../../api/src/Services/Payroll/SgkCokluNedenValidator.php';
 require_once __DIR__ . '/../../api/src/Services/Payroll/SgkKatalogPreviewService.php';
@@ -81,6 +82,40 @@ assertTrue(in_array('EBILDIRGE_GUNCEL_GORUNUM', $tEb['eksik_kanitlar'], true), '
 $tDog = SgkKatalogTamlikService::evaluate(['istenen_tamlik_durumu' => 'DOGRULANMIS_TAM']);
 assertTrue(in_array('DOGRULANMIS_TAM_REDDI', $tDog['eksik_kanitlar'], true), 'tamlik DOGRULANMIS_TAM reddi');
 assertTrue($tDog['dogrulanmis_tam_secilebilir_mi'] === false, 'tamlik dogrulanmis secilemez');
+assertTrue($tDog['tamlik_durumu'] === 'TASLAK', 'tamlik istenen DOGRULANMIS_TAM yine TASLAK');
+
+$tLimitedOk = SgkKatalogTamlikService::evaluate([
+    'manifests' => [$manifest],
+    'kod_satirlari' => [[
+        'eksik_gun_kodu' => '01',
+        'resmi_aciklama' => 'Istirahat',
+        'gecerlilik_tarih_durumu' => 'BELIRLENEMEDI',
+        'gecerlilik_baslangic' => '',
+        'sifir_gun_sifir_kazanc_durumu' => 'TEYITSIZ',
+        'yabanci_kullanim_durumu' => 'TEYITSIZ',
+        'aktiflik_durumu' => 'PORTAL_TEYIT_BEKLIYOR',
+        'portal_teyit_durumu' => 'TEYIT_BEKLIYOR',
+        'kaynak_manifest_id' => 'MAN_1',
+    ]],
+]);
+assertTrue($tLimitedOk['tamlik_durumu'] === 'RESMI_KAYNAKLI_KISITLI', 'tamlik RESMI_KAYNAKLI_KISITLI');
+assertTrue($tLimitedOk['onaylanabilir_mi'] === true, 'tamlik kisitli onaylanabilir');
+assertTrue($tLimitedOk['import_yazma_aktif_mi'] === true, 'tamlik kisitli import yazma aktif');
+assertTrue($tLimitedOk['blocker_kodlari'] === [], 'tamlik kisitli blocker bos');
+assertTrue(in_array('TEYITSIZ_SIFIR_GUN:01', $tLimitedOk['uyarilar'], true), 'tamlik kisitli TEYITSIZ uyari');
+
+$tUcuncu = SgkKatalogTamlikService::evaluate([
+    'manifests' => [$manifest],
+    'kod_satirlari' => [[
+        'eksik_gun_kodu' => '01',
+        'resmi_aciklama' => 'Istirahat',
+        'gecerlilik_tarih_durumu' => 'BELIRLENEMEDI',
+        'kaynak_manifest_id' => 'MAN_1',
+    ]],
+    'ucuncu_taraf_kaynak_kullanildi_mi' => true,
+]);
+assertTrue($tUcuncu['tamlik_durumu'] === 'TASLAK', 'ucuncu taraf TASLAK kalir');
+assertTrue(in_array(SgkKatalogContracts::BLOCKER_TAMLIK, $tUcuncu['blocker_kodlari'], true), 'ucuncu taraf blocker');
 
 // --- Import ---
 $empty = SgkKatalogImportValidator::dryRun(['format' => 'JSON', 'rows' => [], 'manifests' => [$manifest]]);
@@ -94,6 +129,7 @@ $rowBase = [
     'eksik_gun_kodu' => '01',
     'resmi_aciklama' => $aciklama,
     'gecerlilik_baslangic' => '2020-01-01',
+    'gecerlilik_tarih_durumu' => 'RESMI_YURURLUK',
     'gecerlilik_bitis' => null,
     'kaynak_manifest_id' => 'MAN_1',
     'belge_zorunlulugu' => 'ZORUNLU',
@@ -116,6 +152,37 @@ foreach ($dup['hatali_satirlar'] as $row) {
     }
 }
 assertTrue(in_array('DUPLICATE_KOD_DONEM', $dupErrors, true), 'import duplicate kod');
+
+$rowBelirsiz = array_merge($rowBase, [
+    'gecerlilik_baslangic' => null,
+    'gecerlilik_tarih_durumu' => 'BELIRLENEMEDI',
+]);
+$belirsizOk = SgkKatalogImportValidator::dryRun([
+    'rows' => [$rowBelirsiz],
+    'manifests' => [$manifest],
+    'tamlik' => $tLimitedOk,
+]);
+assertTrue(($belirsizOk['hatali_satirlar'] ?? []) === [], 'import BELIRLENEMEDI null baslangic kabul');
+assertTrue($belirsizOk['gecerli_satirlar'][0]['gecerlilik_baslangic'] === null, 'import canonical null baslangic');
+
+$belirsizCeliski = SgkKatalogImportValidator::dryRun([
+    'rows' => [array_merge($rowBase, ['gecerlilik_tarih_durumu' => 'BELIRLENEMEDI'])],
+    'manifests' => [$manifest],
+]);
+assertTrue(in_array('CELISKI_TARIH_DURUMU:gecerlilik_baslangic', $belirsizCeliski['hatali_satirlar'][0]['errors'] ?? [], true), 'import BELIRLENEMEDI + tarih celiski');
+
+$dupNull = SgkKatalogImportValidator::dryRun([
+    'rows' => [$rowBelirsiz, $rowBelirsiz],
+    'manifests' => [$manifest],
+    'tamlik' => $tLimitedOk,
+]);
+$dupNullErrors = [];
+foreach ($dupNull['hatali_satirlar'] as $row) {
+    foreach ($row['errors'] as $err) {
+        $dupNullErrors[] = $err;
+    }
+}
+assertTrue(in_array('DUPLICATE_KOD_DONEM', $dupNullErrors, true), 'import null start duplicate kod');
 
 $overlap = SgkKatalogImportValidator::dryRun([
     'rows' => [
@@ -300,8 +367,9 @@ $tamlikPortal = SgkKatalogTamlikService::evaluate([
 assertTrue(in_array('TEYITSIZ_SIFIR_GUN:01', $tamlikPortal['eksik_kanitlar'], true), 'tamlik TEYITSIZ');
 assertTrue(in_array('PORTAL_TEYIT_BEKLIYOR:01', $tamlikPortal['eksik_kanitlar'], true), 'tamlik portal bekliyor');
 assertTrue(in_array('EXPERT_DRAFT_TEK_BASINA_YETERSIZ', $tamlikPortal['eksik_kanitlar'], true), 'expert draft yetersiz');
-assertTrue($tamlikPortal['tamlik_durumu'] !== 'DOGRULANMIS_TAM', 'portal bekleyen ONAYLANDI/DOGRULANMIS_TAM olamaz');
-assertTrue($tamlikPortal['onaylanabilir_mi'] === false, 'tamlik onaylanamaz');
+assertTrue($tamlikPortal['tamlik_durumu'] === 'TASLAK', 'portal bekleyen expert draft TASLAK');
+assertTrue($tamlikPortal['onaylanabilir_mi'] === false, 'tamlik expert draft onaylanamaz');
+assertTrue(in_array('EXPERT_DRAFT_TEK_BASINA_YETERSIZ', $tamlikPortal['limited_blocker_kodlari'] ?? $tamlikPortal['eksik_kanitlar'], true), 'expert draft limited blocker');
 
 // --- Esleme ---
 $e1 = SgkSurecKodEslemeValidator::validate(['surec_turu' => 'RAPOR', 'mappings' => []]);
@@ -497,12 +565,21 @@ $o1 = SgkKatalogOnayService::validateTransition([
     'current_state' => 'ONAY_BEKLIYOR',
     'action' => 'APPROVE',
     'actor_id' => 5,
-    'hazirlayan_id' => 5,
-    'mali_musavir_onayladi_mi' => true,
-    'sirket_onayladi_mi' => true,
-    'tamlik' => ['tamlik_durumu' => 'DOGRULANMIS_TAM', 'onaylanabilir_mi' => true, 'blocker_kodlari' => []],
+    'tamlik' => ['tamlik_durumu' => 'RESMI_KAYNAKLI_KISITLI', 'onaylanabilir_mi' => true, 'blocker_kodlari' => []],
 ]);
-assertTrue(in_array('SGK_KATALOG_ONAY_HAZIRLAYAN_AYNI', $o1['blocker_kodlari'], true), 'onay hazirlayan ayni');
+assertTrue(in_array(SgkKatalogContracts::BLOCKER_ATTESTATION, $o1['blocker_kodlari'], true), 'onay attestation eksik');
+
+$o1b = SgkKatalogOnayService::validateTransition([
+    'current_state' => 'ONAY_BEKLIYOR',
+    'action' => 'APPROVE',
+    'actor_id' => 5,
+    'resmi_kaynaklar_incelendi_mi' => true,
+    'belirsiz_tarihler_uydurulmadi_mi' => true,
+    'kisitli_kullanim_kabul_edildi_mi' => true,
+    'tamlik' => ['tamlik_durumu' => 'RESMI_KAYNAKLI_KISITLI', 'onaylanabilir_mi' => true, 'blocker_kodlari' => []],
+]);
+assertTrue($o1b['allowed_mi'] === true, 'onay kisitli attestation ile allowed');
+assertTrue($o1b['yazma_aktif_mi'] === true, 'onay yazma aktif');
 
 $o2 = SgkKatalogOnayService::validateTransition([
     'current_state' => 'TASLAK',
@@ -515,23 +592,26 @@ $o3 = SgkKatalogOnayService::validateTransition([
     'current_state' => 'ONAY_BEKLIYOR',
     'action' => 'APPROVE',
     'actor_id' => 2,
-    'hazirlayan_id' => 1,
-    'mali_musavir_onayladi_mi' => false,
-    'sirket_onayladi_mi' => true,
-    'tamlik' => ['tamlik_durumu' => 'DOGRULANMIS_TAM', 'onaylanabilir_mi' => true, 'blocker_kodlari' => []],
+    'resmi_kaynaklar_incelendi_mi' => true,
+    'belirsiz_tarihler_uydurulmadi_mi' => false,
+    'kisitli_kullanim_kabul_edildi_mi' => true,
+    'tamlik' => ['tamlik_durumu' => 'RESMI_KAYNAKLI_KISITLI', 'onaylanabilir_mi' => true, 'blocker_kodlari' => []],
 ]);
-assertTrue(in_array('SGK_KATALOG_MALI_MUSAVIR_ONAYI_EKSIK', $o3['blocker_kodlari'], true), 'onay mali musavir eksik');
+assertTrue(in_array(SgkKatalogContracts::BLOCKER_ATTESTATION, $o3['blocker_kodlari'], true), 'onay belirsiz tarih attestation eksik');
 
 $o4 = SgkKatalogOnayService::validateTransition([
-    'current_state' => 'ONAY_BEKLIYOR',
-    'action' => 'APPROVE',
-    'actor_id' => 2,
-    'hazirlayan_id' => 1,
-    'mali_musavir_onayladi_mi' => true,
-    'sirket_onayladi_mi' => false,
-    'tamlik' => ['tamlik_durumu' => 'DOGRULANMIS_TAM', 'onaylanabilir_mi' => true, 'blocker_kodlari' => []],
+    'current_state' => 'TASLAK',
+    'action' => 'SUBMIT',
+    'tamlik' => ['tamlik_durumu' => 'TASLAK', 'onaylanabilir_mi' => false, 'blocker_kodlari' => [SgkKatalogContracts::BLOCKER_TAMLIK]],
 ]);
-assertTrue(in_array('SGK_KATALOG_SIRKET_ONAYI_EKSIK', $o4['blocker_kodlari'], true), 'onay sirket eksik');
+assertTrue(in_array(SgkKatalogContracts::BLOCKER_TAMLIK, $o4['blocker_kodlari'], true), 'onay submit tamlik TASLAK blocker');
+
+$o4b = SgkKatalogOnayService::validateTransition([
+    'current_state' => 'TASLAK',
+    'action' => 'SUBMIT',
+    'tamlik' => $tLimitedOk,
+]);
+assertTrue($o4b['allowed_mi'] === true, 'onay submit kisitli allowed');
 
 $o5 = SgkKatalogOnayService::validateTransition([
     'current_state' => 'ONAYLANDI',
@@ -546,8 +626,8 @@ $o6 = SgkKatalogOnayService::validateTransition([
     'onceki_surum_kodu' => 'V1',
     'tamlik' => ['tamlik_durumu' => 'TASLAK', 'onaylanabilir_mi' => false, 'blocker_kodlari' => [SgkKatalogContracts::BLOCKER_TAMLIK]],
 ]);
-assertTrue($o6['next_state'] === 'TASLAK' && $o6['allowed_mi'] === false, 'onay yeni surum yazma kapali');
-assertTrue(in_array('SGK_KATALOG_YAZMA_KAPALI', $o6['blocker_kodlari'], true), 'onay yazma kapali');
+assertTrue($o6['next_state'] === 'TASLAK' && $o6['allowed_mi'] === true, 'onay yeni surum allowed');
+assertTrue($o6['yazma_aktif_mi'] === true, 'onay yeni surum yazma aktif');
 $o6b = SgkKatalogOnayService::validateTransition([
     'current_state' => 'ONAYLANDI',
     'action' => 'NEW_VERSION',
@@ -637,7 +717,21 @@ assertTrue(strpos($hydrateLog, 'SGK_KATALOG_RUNTIME_EXCEPTION') === 0, 'hydrate 
 assertTrue(strpos($hydrateLog, 'exception_class=RuntimeException') !== false, 'hydrate log class');
 assertTrue(strpos($hydrateLog, SgkKaynakManifestReader::STORAGE_ERROR_CODE) === false, 'hydrate log message kodu sizdirmaz');
 
+$contractsSrc = file_get_contents(__DIR__ . '/../../api/src/Services/Payroll/SgkKatalogContracts.php');
+assertTrue(strpos($contractsSrc, 'RESMI_KAYNAKLI_KISITLI') !== false, 'contracts TAMLIK_DURUMU');
+assertTrue(strpos($contractsSrc, 'GECERLILIK_TARIH_DURUMU') !== false, 'contracts GECERLILIK_TARIH_DURUMU');
+
+$writeSrc = file_get_contents(__DIR__ . '/../../api/src/Services/Payroll/SgkKatalogWriteService.php');
+assertTrue(strpos($writeSrc, 'beginTransaction') !== false, 'write service transaction');
+assertTrue(strpos($writeSrc, 'GENEL_YONETICI') !== false, 'write service rol kontrol');
+
+$routerSrc = file_get_contents(__DIR__ . '/../../api/src/Router.php');
+assertTrue(strpos($routerSrc, '/sgk-katalog-hazirlik/import') !== false, 'router import route');
+assertTrue(strpos($routerSrc, '/sgk-katalog-hazirlik/submit') !== false, 'router submit route');
+assertTrue(strpos($routerSrc, '/sgk-katalog-hazirlik/approve') !== false, 'router approve route');
+
 $controllerSrc = file_get_contents(__DIR__ . '/../../api/src/Controllers/SgkKatalogHazirlikController.php');
+assertTrue(strpos($controllerSrc, 'SgkKatalogWriteService::import') !== false, 'controller import wired');
 assertTrue(!preg_match('/catch\s*\([^)]+\)\s*\{\s*return\s*\[\];/s', $controllerSrc), 'controller catch-return-empty yok');
 assertTrue(strpos($controllerSrc, 'SgkKaynakManifestReader::fetchAll') !== false, 'controller reader kullanir');
 assertTrue(strpos($controllerSrc, 'SgkKaynakManifestReader::STORAGE_ERROR_CODE') !== false, 'controller 503 storage kodu');
@@ -675,5 +769,52 @@ assertTrue(!preg_match('/error_log\([^;]*getMessage|error_log\([^;]*getTraceAsSt
 assertTrue(preg_match('/function surumler\(Request \$request\)\s*\{[^}]+\}/s', $controllerSrc, $surumMatch) === 1, 'surumler method parse');
 assertTrue(strpos($surumMatch[0], 'loadManifests') === false, 'surumler loadManifests cagirmaz');
 assertTrue(strpos($surumMatch[0], 'self::context(') !== false, 'surumler context kullanir');
+
+// --- S106 canonical 19-pack dry-run ---
+$canonicalPath = __DIR__ . '/../../ops/sgk/S106-SGK-EKSIK-GUN-19-CANONICAL.json';
+assertTrue(is_file($canonicalPath), 'S106 canonical paket dosyasi');
+$pkg = json_decode((string) file_get_contents($canonicalPath), true);
+assertTrue(is_array($pkg) && isset($pkg['rows'], $pkg['manifests']), 'S106 canonical parse');
+assertTrue(count($pkg['rows']) === 19, 'S106 19 satir');
+$exact = ['01','03','04','05','06','07','08','09','10','11','12','13','15','16','17','18','19','20','21'];
+$pkgCodes = array_map(static fn ($r) => (string) $r['eksik_gun_kodu'], $pkg['rows']);
+sort($pkgCodes);
+$exactSorted = $exact;
+sort($exactSorted);
+assertTrue($pkgCodes === $exactSorted, 'S106 exact kod seti');
+assertTrue(count(array_unique($pkgCodes)) === 19, 'S106 unique 19');
+foreach ($pkg['rows'] as $r) {
+    assertTrue(array_key_exists('gecerlilik_baslangic', $r) && $r['gecerlilik_baslangic'] === null, 'S106 baslangic null');
+    assertTrue(($r['gecerlilik_tarih_durumu'] ?? '') === 'BELIRLENEMEDI', 'S106 BELIRLENEMEDI');
+}
+$kod07 = null;
+foreach ($pkg['rows'] as $r) {
+    if (($r['eksik_gun_kodu'] ?? '') === '07') {
+        $kod07 = $r;
+        break;
+    }
+}
+assertTrue($kod07 !== null && ($kod07['sifir_gun_sifir_kazanc_durumu'] ?? '') === 'YASAK', 'S106 kod 07 YASAK');
+
+$s106Dry = SgkKatalogImportValidator::dryRun([
+    'format' => 'JSON',
+    'rows' => $pkg['rows'],
+    'manifests' => $pkg['manifests'],
+    'tamlik' => $pkg['tamlik_flags'] ?? [],
+]);
+assertTrue(count($s106Dry['gecerli_satirlar']) === 19, 'S106 dry-run valid=19');
+assertTrue(count($s106Dry['hatali_satirlar']) === 0, 'S106 dry-run invalid=0');
+assertTrue(($s106Dry['tamlik']['tamlik_durumu'] ?? '') === 'RESMI_KAYNAKLI_KISITLI', 'S106 dry-run kisitli');
+assertTrue(($s106Dry['import_yapilabilir_mi'] ?? false) === true, 'S106 dry-run import aktif');
+assertTrue(($s106Dry['tamlik']['onaylanabilir_mi'] ?? false) === true, 'S106 dry-run onaylanabilir');
+
+$s106FullReject = SgkKatalogTamlikService::evaluate(array_merge($pkg['tamlik_flags'] ?? [], [
+    'katalog_surumu' => $pkg['katalog_surumu'],
+    'manifests' => $pkg['manifests'],
+    'kod_satirlari' => $pkg['rows'],
+    'istenen_tamlik_durumu' => 'DOGRULANMIS_TAM',
+]));
+assertTrue(($s106FullReject['dogrulanmis_tam_secilebilir_mi'] ?? true) === false, 'S106 DOGRULANMIS_TAM secilemez');
+assertTrue(($s106FullReject['tamlik_durumu'] ?? '') === 'RESMI_KAYNAKLI_KISITLI', 'S106 istenen full yine kisitli');
 
 echo 'verify-sgk-katalog-hazirlik: OK' . PHP_EOL;

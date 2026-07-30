@@ -23,6 +23,13 @@ final class SgkKatalogContracts
     public const BLOCKER_YABANCI = 'SGK_YABANCI_KOD_IZNI_YOK';
     public const BLOCKER_TARIHSEL = 'SGK_TARIHSEL_KOD_GECERSIZ';
     public const BLOCKER_LEGACY = 'SGK_LEGACY_CANONICAL_CELISKI';
+    public const BLOCKER_ATTESTATION = 'SGK_KATALOG_ATTESTATION_EKSIK';
+
+    /** @var list<string> */
+    public const GECERLILIK_TARIH_DURUMU = ['RESMI_YURURLUK', 'ILK_RESMI_KANIT', 'BELIRLENEMEDI'];
+
+    /** @var list<string> */
+    public const TAMLIK_DURUMU = ['TASLAK', 'RESMI_KAYNAKLI_KISITLI', 'DOGRULANMIS_TAM'];
 
     public const KANIT_RESMI_PRIMARY = 'RESMI_PRIMARY';
     public const KANIT_EXPERT_DRAFT = 'EXPERT_DRAFT';

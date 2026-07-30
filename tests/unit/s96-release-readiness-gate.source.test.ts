@@ -25,7 +25,9 @@ describe("S96 release readiness gate", () => {
     expect(result.stdout).toContain("CODE_READY_OPS_PENDING");
     expect(result.stdout).toContain("[WAITING] SGK katalog resmi kaynak paketi");
     expect(result.stdout).toContain("[OK] src native dialog = 0");
-    expect(result.stdout).toContain("[OK] SGK approve_aktif_mi=false");
+    expect(result.stdout).toContain("[OK] SGK RESMI_KAYNAKLI_KISITLI tamlik seviyesi");
+    expect(result.stdout).toContain("[OK] SGK DOGRULANMIS_TAM yalnız tam kanıtla");
+    expect(result.stdout).toContain("[OK] SGK seed_var_mi=false");
   });
 
   it("REQUIRE_OPS_READY=1 exits 2 while ops pending", () => {

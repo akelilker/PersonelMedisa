@@ -34,7 +34,8 @@ describe("S85-C1 SGK katalog hazirlik parity", () => {
 
     expect(router).toContain("/sgk-katalog-hazirlik/tamlik");
     expect(router).toContain("SgkKatalogHazirlikController::importDryRun");
-    expect(router).not.toContain("importWrite");
+    expect(router).toContain("/sgk-katalog-hazirlik/import");
+    expect(router).toContain("SgkKatalogHazirlikController::import");
     expect(endpoints).toContain("sgkKatalogHazirlik");
     expect(page).toContain("sgk-katalog");
     expect(panel).toContain("DOGRULANMIS_TAM seçilemez");
@@ -48,7 +49,7 @@ describe("S85-C1 SGK katalog hazirlik parity", () => {
     expect(migrationNames.some((name) => name.startsWith("040_"))).toBe(true);
     expect(migrationNames.some((name) => name.startsWith("041_"))).toBe(true);
     expect(migrationNames.filter((n) => n.endsWith(".sql")).sort().at(-1)).toBe(
-      "041_auth_smoke_readonly_role.sql"
+      "042_sgk_resmi_kaynakli_kisitli_katalog.sql"
     );
 
     expect(reader).toContain("SGK_KAYNAK_MANIFEST_STORAGE_HATASI");

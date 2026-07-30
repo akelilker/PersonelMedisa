@@ -85,11 +85,13 @@ final class SgkPrimGunuEngine
         }
 
         $catalog = is_array($input['katalog'] ?? null) ? $input['katalog'] : [];
+        $catalogTamlik = (string) ($catalog['tamlik_durumu'] ?? '');
         $catalogReady = (string) ($catalog['state'] ?? '') === 'ONAYLANDI'
-            && (string) ($catalog['tamlik_durumu'] ?? '') === 'DOGRULANMIS_TAM'
+            && in_array($catalogTamlik, ['RESMI_KAYNAKLI_KISITLI', 'DOGRULANMIS_TAM'], true)
             && preg_match('/^[0-9a-f]{64}$/', (string) ($catalog['manifest_hash'] ?? '')) === 1;
+        $catalogLimited = $catalogTamlik === 'RESMI_KAYNAKLI_KISITLI';
         if (!$catalogReady) {
-            $blockers[] = self::issue('SGK_KATALOG_SURUMU_GECERSIZ', 'Onayli ve tamligi dogrulanmis SGK kod katalog surumu yok.', null, null, null);
+            $blockers[] = self::issue('SGK_KATALOG_SURUMU_GECERSIZ', 'Onayli ve tamligi dogrulanmis veya resmi kaynakli kisitli SGK kod katalog surumu yok.', null, null, null);
         }
         $codes = is_array($catalog['kodlar'] ?? null) ? $catalog['kodlar'] : [];
         $conflicts = is_array($catalog['cakismalar'] ?? null) ? $catalog['cakismalar'] : [];
@@ -245,7 +247,7 @@ final class SgkPrimGunuEngine
                         } else {
                             $decision['eksik_gun_kodlari'][] = $code;
                             $missingCodes[$code] = (string) $code;
-                            self::validateCodeAndDocuments($code, $codes, $process, $dateString, $blockers);
+                            self::validateCodeAndDocuments($code, $codes, $process, $dateString, $blockers, $catalogLimited);
                         }
                     }
                 }
@@ -317,14 +319,17 @@ final class SgkPrimGunuEngine
                         $employmentEnd->format('Y-m-d'),
                         null
                     );
-                } elseif ($zeroEarnings === true && empty($codeMeta['sifir_gun_sifir_kazanc_kullanilabilir_mi'])) {
-                    $blockers[] = self::issue(
-                        'SGK_EKSIK_GUN_KODU_CAKISTI',
-                        $resolvedCode . ' kodu 0 gun/0 kazanc bildiriminde kullanilamaz.',
-                        $employmentStart->format('Y-m-d'),
-                        $employmentEnd->format('Y-m-d'),
-                        null
-                    );
+                } elseif ($zeroEarnings === true) {
+                    $sifirAllowed = self::isZeroEarningsAllowed($codeMeta, $catalogLimited);
+                    if (!$sifirAllowed) {
+                        $blockers[] = self::issue(
+                            'SGK_EKSIK_GUN_KODU_CAKISTI',
+                            $resolvedCode . ' kodu 0 gun/0 kazanc bildiriminde kullanilamaz.',
+                            $employmentStart->format('Y-m-d'),
+                            $employmentEnd->format('Y-m-d'),
+                            null
+                        );
+                    }
                 }
             }
             if (!empty($codeMeta['kismi_sureli_sozlesme_gerekli_mi']) && (string) ($personel['sozlesme_turu'] ?? '') !== 'KISMI_SURELI') {
@@ -455,19 +460,71 @@ final class SgkPrimGunuEngine
     }
 
     /** @param array<string, mixed> $codes @param array<string, mixed> $process @param array<int, array<string, mixed>> $blockers */
-    private static function validateCodeAndDocuments($code, array $codes, array $process, $date, array &$blockers)
+    private static function validateCodeAndDocuments($code, array $codes, array $process, $date, array &$blockers, $catalogLimited = false)
     {
         if (!isset($codes[$code]) || !is_array($codes[$code]) || empty($codes[$code]['aktif_mi'])) {
             $blockers[] = self::issue('SGK_EKSIK_GUN_KODU_BULUNAMADI', $code . ' kodu aktif katalogda bulunamadi.', $date, $date, isset($process['surec_id']) ? (int) $process['surec_id'] : null);
             return;
         }
-        $requirement = (string) ($codes[$code]['belge_zorunlulugu'] ?? 'ZORUNLU');
+        $codeMeta = $codes[$code];
+        $tarihDurumu = strtoupper((string) ($codeMeta['gecerlilik_tarih_durumu'] ?? ''));
+        $codeStart = $codeMeta['gecerlilik_baslangic'] ?? null;
+        $codeEnd = $codeMeta['gecerlilik_bitis'] ?? null;
+        if ($catalogLimited || $tarihDurumu !== '') {
+            if ($tarihDurumu === 'BELIRLENEMEDI' || $codeStart === null || $codeStart === '') {
+                $blockers[] = self::issue(
+                    SgkKatalogContracts::BLOCKER_TARIHSEL,
+                    $code . ' kodu icin tarihsel uygunluk belirlenemedi; manuel inceleme gerekir.',
+                    $date,
+                    $date,
+                    isset($process['surec_id']) ? (int) $process['surec_id'] : null
+                );
+            } elseif (is_string($codeStart) && self::date($date) !== null) {
+                $day = self::date($date);
+                $start = self::date($codeStart);
+                $end = is_string($codeEnd) && $codeEnd !== '' ? self::date($codeEnd) : null;
+                if ($start !== null && $day !== null && $day < $start) {
+                    $blockers[] = self::issue(SgkKatalogContracts::BLOCKER_TARIHSEL, $code . ' kodu bu tarihte yururlukte degil.', $date, $date, isset($process['surec_id']) ? (int) $process['surec_id'] : null);
+                }
+                if ($end !== null && $day !== null && $day > $end) {
+                    $blockers[] = self::issue(SgkKatalogContracts::BLOCKER_TARIHSEL, $code . ' kodu bu tarihte yururlukte degil.', $date, $date, isset($process['surec_id']) ? (int) $process['surec_id'] : null);
+                }
+            }
+        }
+        if ($catalogLimited) {
+            $sifirDurumu = strtoupper((string) ($codeMeta['sifir_gun_sifir_kazanc_durumu'] ?? ''));
+            if ($sifirDurumu === 'TEYITSIZ' || $sifirDurumu === 'KOSULLU') {
+                $blockers[] = self::issue(
+                    'SGK_EKSIK_GUN_KODU_CAKISTI',
+                    $code . ' kodu sifir gun/kazanc durumu teyitsiz veya kosullu; otomatik izin verilmez.',
+                    $date,
+                    $date,
+                    isset($process['surec_id']) ? (int) $process['surec_id'] : null
+                );
+            }
+        }
+        $requirement = (string) ($codeMeta['belge_zorunlulugu'] ?? 'ZORUNLU');
         if ($requirement !== 'YOK' && empty($process['belge_dogrulandi_mi'])) {
             $blockers[] = self::issue('SGK_EKSIK_GUN_BELGESI_EKSIK', $code . ' kodu icin dogrulanmis ve hash uyumlu belge yok.', $date, $date, isset($process['surec_id']) ? (int) $process['surec_id'] : null);
         }
         if (!empty($process['belge_iptal_mi']) || !empty($process['belge_hash_uyusmazligi_mi'])) {
             $blockers[] = self::issue('SGK_EKSIK_GUN_BELGESI_EKSIK', 'Belge iptal edilmis veya dosya hash dogrulamasi basarisiz.', $date, $date, isset($process['surec_id']) ? (int) $process['surec_id'] : null);
         }
+    }
+
+    /** @param array<string,mixed> $codeMeta */
+    private static function isZeroEarningsAllowed(array $codeMeta, $catalogLimited): bool
+    {
+        $sifirDurumu = strtoupper((string) ($codeMeta['sifir_gun_sifir_kazanc_durumu'] ?? ''));
+        if ($sifirDurumu !== '') {
+            if ($catalogLimited) {
+                return $sifirDurumu === 'IZINLI';
+            }
+
+            return $sifirDurumu === 'IZINLI';
+        }
+
+        return !empty($codeMeta['sifir_gun_sifir_kazanc_kullanilabilir_mi']);
     }
 
     /** @return array<string, mixed> */

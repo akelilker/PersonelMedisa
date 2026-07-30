@@ -1,0 +1,842 @@
+{
+  "paket": "S106-SGK-EKSIK-GUN-19-CANONICAL",
+  "katalog_surumu": "SGK-EKSIK-GUN-RESMI-2026-07",
+  "tamlik_hedefi": "RESMI_KAYNAKLI_KISITLI",
+  "dogrulanmis_tam_iddiasi": false,
+  "olusturma": "2026-07-31",
+  "kod_seti": [
+    "01",
+    "03",
+    "04",
+    "05",
+    "06",
+    "07",
+    "08",
+    "09",
+    "10",
+    "11",
+    "12",
+    "13",
+    "15",
+    "16",
+    "17",
+    "18",
+    "19",
+    "20",
+    "21"
+  ],
+  "notlar": [
+    "Kod bazli resmi yururluk baslangici bulunamadi; gecerlilik_baslangic=null, gecerlilik_tarih_durumu=BELIRLENEMEDI.",
+    "ilk_resmi_kanit_tarihi yalniz kod 07 icin 2023-11-20 (0/0 duyurusu); hukuki yururluk degildir.",
+    "26/27/28/29 bu pakette yoktur.",
+    "Portal dropdown login-gated; portal_teyit_durumu=TEYIT_BEKLIYOR yayini engellemez.",
+    "Primary: EK9 APHB, Eksik Gun Belgeleri 2018-04-17, 07 Puantaj 2023-11-20, E-BildirgeV2 public sayfa."
+  ],
+  "manifests": [
+    {
+      "kaynak_id": "SGK_EK9_APHB_20260722",
+      "kaynak_turu": "RESMI_LISTE",
+      "kurum": "Sosyal Guvenlik Kurumu",
+      "belge_basligi": "Aylik Prim ve Hizmet Belgesi Ek-9 Eksik Gun Nedenleri",
+      "durum": "AKTIF",
+      "kanit_sinifi": "RESMI_PRIMARY",
+      "kaynak_adresi": "https://kocaeli.sgk.gov.tr/Download/DownloadFile?d=5efd9caa-d337-41ec-bf2a-f75441852bb5&f=a5060ca0-512f-4abc-a3bb-1dba5bae14a7.pdf",
+      "indirilen_dosya_sha256": "d0a60bc9182643086cadd9362114c6ef675abb1e50361c53cc0a38fce8eae194",
+      "icerik_sha256": "d0a60bc9182643086cadd9362114c6ef675abb1e50361c53cc0a38fce8eae194",
+      "arsiv_kopyasi_repoda_mi": false,
+      "yururluk_baslangic": null,
+      "yururluk_bitis": null
+    },
+    {
+      "kaynak_id": "SGK_EKSIK_GUN_BELGELERI_20180417",
+      "kaynak_turu": "DUYURU",
+      "kurum": "Sosyal Guvenlik Kurumu",
+      "belge_basligi": "Eksik Gun Belgelerinin Verilmesine Iliskin Duyuru",
+      "durum": "AKTIF",
+      "kanit_sinifi": "RESMI_PRIMARY",
+      "kaynak_adresi": "https://www.sgk.gov.tr/Duyuru/Detay/Eksik-Gun-Belgelerinin-Verilmesine-Iliskin-Duyuru-2022-11-16-04-41-26",
+      "belge_tarihi": "2018-04-17",
+      "yayimlanma_tarihi": "2018-04-17",
+      "yururluk_baslangic": "2018-03-01",
+      "yururluk_bitis": null,
+      "indirilen_dosya_sha256": "7f9da0d402489dcf252580c1cbef7f4094a74a6c6181019693831707354a9284",
+      "icerik_sha256": "0e74d17b6ac5b709b8ad6ac43a626d2e90d572ff279b4bd865154835f6fdb47f",
+      "arsiv_kopyasi_repoda_mi": false,
+      "not": "Gercek yayin tarihi 2018-04-17; URL slug 2022-11-16 yayin tarihi degildir."
+    },
+    {
+      "kaynak_id": "SGK_07_PUANTAJ_20231120",
+      "kaynak_turu": "DUYURU",
+      "kurum": "Sosyal Guvenlik Kurumu",
+      "belge_basligi": "07-Puantaj Kayitlari Eksik Gun Nedeninin 0 Gun ve 0 Kazancli Bildirimler Icin Secilememesi",
+      "durum": "AKTIF",
+      "kanit_sinifi": "RESMI_PRIMARY",
+      "kaynak_adresi": "https://www.sgk.gov.tr/Duyuru/Detay/07-Puantaj-Kayitlari-Eksik-Gun-Nedeninin-0-Gun-ve-0-Kazancli-Bildirimler-Icin-Secilememesi-2023-11-20-04-29-06",
+      "belge_tarihi": "2023-11-20",
+      "yayimlanma_tarihi": "2023-11-20",
+      "yururluk_baslangic": "2023-11-20",
+      "yururluk_bitis": null,
+      "indirilen_dosya_sha256": "07915d25487e81aea6dc36d1344e30f17b6035fd564fad0ee2212e92b6636454",
+      "icerik_sha256": "601f03ea3289b64a1ad742ca183f8c6785623465243d0e2d6c57a137da5dfcd0",
+      "arsiv_kopyasi_repoda_mi": false
+    },
+    {
+      "kaynak_id": "SGK_EBILDIRGEV2_20260421",
+      "kaynak_turu": "KURUM_ACIKLAMASI",
+      "kurum": "Sosyal Guvenlik Kurumu",
+      "belge_basligi": "E-BildirgeV2 Uygulama Sayfasi",
+      "durum": "AKTIF",
+      "kanit_sinifi": "RESMI_PRIMARY",
+      "kaynak_adresi": "https://e.sgk.gov.tr/Uygulamalar/Detay/E-BildirgeV2-2026-04-21-09-12-18",
+      "belge_tarihi": "2026-04-21",
+      "yayimlanma_tarihi": "2026-04-21",
+      "yururluk_baslangic": null,
+      "yururluk_bitis": null,
+      "indirilen_dosya_sha256": "9a44c612b2a85e4ae4d9c4f2aeefb93b925a2cbacd7cb5a71f4a6ef656522459",
+      "icerik_sha256": "9a44c612b2a85e4ae4d9c4f2aeefb93b925a2cbacd7cb5a71f4a6ef656522459",
+      "arsiv_kopyasi_repoda_mi": false,
+      "erisilemez_mi": false,
+      "not": "Public uygulama tanitim sayfasi; login-gated dropdown kaniti degildir. Hash paket uretiminde yerel snapshot ile doldurulur.",
+      "indirilen_dosya_byte": 29105
+    }
+  ],
+  "rows": [
+    {
+      "katalog_surumu": "SGK-EKSIK-GUN-RESMI-2026-07",
+      "eksik_gun_kodu": "01",
+      "resmi_aciklama": "İstirahat",
+      "gecerlilik_baslangic": null,
+      "gecerlilik_bitis": null,
+      "gecerlilik_tarih_durumu": "BELIRLENEMEDI",
+      "ilk_resmi_kanit_tarihi": null,
+      "kaynak_manifest_id": "SGK_EK9_APHB_20260722",
+      "aktiflik_durumu": "PORTAL_TEYIT_BEKLIYOR",
+      "portal_teyit_durumu": "TEYIT_BEKLIYOR",
+      "belge_saklama_ibraz_durumu": "ELEKTRONIK_KAYNAKTAN",
+      "belge_zorunlulugu": "KOSULLU",
+      "sifir_gun_sifir_kazanc_durumu": "KOSULLU",
+      "sifir_gun_sifir_kazanc_kullanilabilir_mi": false,
+      "kismi_sureli_sozlesme_gerekli_mi": false,
+      "yabanci_kullanim_durumu": "IZINLI",
+      "tek_basina_kullanilabilir_mi": true,
+      "diger_nedenlerle_birlikte_kullanim": "KOSULLU",
+      "aktif_mi": false,
+      "kosullar": {
+        "rapor_donemi_gun_kazanc_uyumu": true,
+        "elektronik_rapor_yoksa_resmi_saglik_raporu": true,
+        "source_ids": [
+          "SGK_EK9_APHB_20260722",
+          "SGK_EKSIK_GUN_BELGELERI_20180417"
+        ]
+      },
+      "mevzuat_kurallari_json": {
+        "schema_version": 1,
+        "source_ids": [
+          "SGK_EK9_APHB_20260722",
+          "SGK_EKSIK_GUN_BELGELERI_20180417"
+        ],
+        "aciklama": "Elektronik istirahat raporu yoksa resmi saglik raporu kaniti gerekir."
+      },
+      "aciklama_hash": "66e2e324613ded73630f767d05e3f56caa73644cfd2d152ff9dc044dc828bfa3"
+    },
+    {
+      "katalog_surumu": "SGK-EKSIK-GUN-RESMI-2026-07",
+      "eksik_gun_kodu": "03",
+      "resmi_aciklama": "Disiplin cezası",
+      "gecerlilik_baslangic": null,
+      "gecerlilik_bitis": null,
+      "gecerlilik_tarih_durumu": "BELIRLENEMEDI",
+      "ilk_resmi_kanit_tarihi": null,
+      "kaynak_manifest_id": "SGK_EK9_APHB_20260722",
+      "aktiflik_durumu": "PORTAL_TEYIT_BEKLIYOR",
+      "portal_teyit_durumu": "TEYIT_BEKLIYOR",
+      "belge_saklama_ibraz_durumu": "ISVERENCE_SAKLA_TALEPTE_IBRAZ",
+      "belge_zorunlulugu": "KOSULLU",
+      "sifir_gun_sifir_kazanc_durumu": "TEYITSIZ",
+      "sifir_gun_sifir_kazanc_kullanilabilir_mi": false,
+      "kismi_sureli_sozlesme_gerekli_mi": false,
+      "yabanci_kullanim_durumu": "YASAK",
+      "tek_basina_kullanilabilir_mi": true,
+      "diger_nedenlerle_birlikte_kullanim": "KOSULLU",
+      "aktif_mi": false,
+      "kosullar": {
+        "sigortaliya_teblig_edilmis_disiplin_cezasi_belgesi": true,
+        "disiplin_kurulu_karari_her_isyeri_icin_genellenmez": true,
+        "source_ids": [
+          "SGK_EK9_APHB_20260722",
+          "SGK_EKSIK_GUN_BELGELERI_20180417"
+        ],
+        "expert_draft_not": "EXPERT_DRAFT disiplin kurulu zorunlulugu genellenmedi"
+      },
+      "mevzuat_kurallari_json": {
+        "schema_version": 1,
+        "source_ids": [
+          "SGK_EK9_APHB_20260722",
+          "SGK_EKSIK_GUN_BELGELERI_20180417"
+        ],
+        "aciklama": "Tebliq edilmis disiplin cezasi belgesi; kurul karari her isyeri icin genellenmez."
+      },
+      "aciklama_hash": "477fe1b5119f4aac5b9ceecd9bc5e0e722bf040f45379337417fe499278d7253"
+    },
+    {
+      "katalog_surumu": "SGK-EKSIK-GUN-RESMI-2026-07",
+      "eksik_gun_kodu": "04",
+      "resmi_aciklama": "Gözaltına alınma",
+      "gecerlilik_baslangic": null,
+      "gecerlilik_bitis": null,
+      "gecerlilik_tarih_durumu": "BELIRLENEMEDI",
+      "ilk_resmi_kanit_tarihi": null,
+      "kaynak_manifest_id": "SGK_EK9_APHB_20260722",
+      "aktiflik_durumu": "PORTAL_TEYIT_BEKLIYOR",
+      "portal_teyit_durumu": "TEYIT_BEKLIYOR",
+      "belge_saklama_ibraz_durumu": "ISVERENCE_SAKLA_TALEPTE_IBRAZ",
+      "belge_zorunlulugu": "KOSULLU",
+      "sifir_gun_sifir_kazanc_durumu": "KOSULLU",
+      "sifir_gun_sifir_kazanc_kullanilabilir_mi": false,
+      "kismi_sureli_sozlesme_gerekli_mi": false,
+      "yabanci_kullanim_durumu": "IZINLI",
+      "tek_basina_kullanilabilir_mi": true,
+      "diger_nedenlerle_birlikte_kullanim": "KOSULLU",
+      "aktif_mi": false,
+      "kosullar": {
+        "resmi_makam_belgesi_gerekli": true,
+        "source_ids": [
+          "SGK_EK9_APHB_20260722",
+          "SGK_EKSIK_GUN_BELGELERI_20180417"
+        ]
+      },
+      "mevzuat_kurallari_json": {
+        "schema_version": 1,
+        "source_ids": [
+          "SGK_EK9_APHB_20260722",
+          "SGK_EKSIK_GUN_BELGELERI_20180417"
+        ]
+      },
+      "aciklama_hash": "9be938b6079ce3bdc5563603fc1438743ce5ba8a2aac9d2e5ecb9ac214e4b74d"
+    },
+    {
+      "katalog_surumu": "SGK-EKSIK-GUN-RESMI-2026-07",
+      "eksik_gun_kodu": "05",
+      "resmi_aciklama": "Tutukluluk",
+      "gecerlilik_baslangic": null,
+      "gecerlilik_bitis": null,
+      "gecerlilik_tarih_durumu": "BELIRLENEMEDI",
+      "ilk_resmi_kanit_tarihi": null,
+      "kaynak_manifest_id": "SGK_EK9_APHB_20260722",
+      "aktiflik_durumu": "PORTAL_TEYIT_BEKLIYOR",
+      "portal_teyit_durumu": "TEYIT_BEKLIYOR",
+      "belge_saklama_ibraz_durumu": "ISVERENCE_SAKLA_TALEPTE_IBRAZ",
+      "belge_zorunlulugu": "KOSULLU",
+      "sifir_gun_sifir_kazanc_durumu": "KOSULLU",
+      "sifir_gun_sifir_kazanc_kullanilabilir_mi": false,
+      "kismi_sureli_sozlesme_gerekli_mi": false,
+      "yabanci_kullanim_durumu": "IZINLI",
+      "tek_basina_kullanilabilir_mi": true,
+      "diger_nedenlerle_birlikte_kullanim": "KOSULLU",
+      "aktif_mi": false,
+      "kosullar": {
+        "resmi_makam_veya_mahkeme_belgesi_gerekli": true,
+        "source_ids": [
+          "SGK_EK9_APHB_20260722",
+          "SGK_EKSIK_GUN_BELGELERI_20180417"
+        ]
+      },
+      "mevzuat_kurallari_json": {
+        "schema_version": 1,
+        "source_ids": [
+          "SGK_EK9_APHB_20260722",
+          "SGK_EKSIK_GUN_BELGELERI_20180417"
+        ]
+      },
+      "aciklama_hash": "08241f21c94ad6d1f911287ae86d096409fcf2f60c806e1269888a37af3723aa"
+    },
+    {
+      "katalog_surumu": "SGK-EKSIK-GUN-RESMI-2026-07",
+      "eksik_gun_kodu": "06",
+      "resmi_aciklama": "Kısmi istihdam",
+      "gecerlilik_baslangic": null,
+      "gecerlilik_bitis": null,
+      "gecerlilik_tarih_durumu": "BELIRLENEMEDI",
+      "ilk_resmi_kanit_tarihi": null,
+      "kaynak_manifest_id": "SGK_EK9_APHB_20260722",
+      "aktiflik_durumu": "PORTAL_TEYIT_BEKLIYOR",
+      "portal_teyit_durumu": "TEYIT_BEKLIYOR",
+      "belge_saklama_ibraz_durumu": "ISVERENCE_SAKLA_TALEPTE_IBRAZ",
+      "belge_zorunlulugu": "KOSULLU",
+      "sifir_gun_sifir_kazanc_durumu": "TEYITSIZ",
+      "sifir_gun_sifir_kazanc_kullanilabilir_mi": false,
+      "kismi_sureli_sozlesme_gerekli_mi": true,
+      "yabanci_kullanim_durumu": "YASAK",
+      "tek_basina_kullanilabilir_mi": true,
+      "diger_nedenlerle_birlikte_kullanim": "KOSULLU",
+      "aktif_mi": false,
+      "kosullar": {
+        "yazili_kismi_sureli_is_sozlesmesi_gerekli": true,
+        "yabanci_icin_genel_06_otomatik_degil": true,
+        "yabanci_izinli_kismi_baglamda_26_degerlendirilir": true,
+        "kod_26_bu_pakette_seed_edilmez": true,
+        "source_ids": [
+          "SGK_EK9_APHB_20260722",
+          "SGK_EKSIK_GUN_BELGELERI_20180417"
+        ]
+      },
+      "mevzuat_kurallari_json": {
+        "schema_version": 1,
+        "source_ids": [
+          "SGK_EK9_APHB_20260722",
+          "SGK_EKSIK_GUN_BELGELERI_20180417"
+        ],
+        "kismi_sureli_sozlesme_gerekli": true,
+        "yabanci_genel_06_yasak": true
+      },
+      "aciklama_hash": "70fca6b365a9927b1a0b2b98a2b590097fc02fb758ee138d8db7309a472684ce"
+    },
+    {
+      "katalog_surumu": "SGK-EKSIK-GUN-RESMI-2026-07",
+      "eksik_gun_kodu": "07",
+      "resmi_aciklama": "Puantaj kayıtları",
+      "gecerlilik_baslangic": null,
+      "gecerlilik_bitis": null,
+      "gecerlilik_tarih_durumu": "BELIRLENEMEDI",
+      "ilk_resmi_kanit_tarihi": "2023-11-20",
+      "kaynak_manifest_id": "SGK_EK9_APHB_20260722",
+      "aktiflik_durumu": "PORTAL_TEYIT_BEKLIYOR",
+      "portal_teyit_durumu": "TEYIT_BEKLIYOR",
+      "belge_saklama_ibraz_durumu": "ISVERENCE_SAKLA_TALEPTE_IBRAZ",
+      "belge_zorunlulugu": "KOSULLU",
+      "sifir_gun_sifir_kazanc_durumu": "YASAK",
+      "sifir_gun_sifir_kazanc_kullanilabilir_mi": false,
+      "kismi_sureli_sozlesme_gerekli_mi": false,
+      "yabanci_kullanim_durumu": "YASAK",
+      "tek_basina_kullanilabilir_mi": true,
+      "diger_nedenlerle_birlikte_kullanim": "KOSULLU",
+      "aktif_mi": false,
+      "kosullar": {
+        "source_ids": [
+          "SGK_EK9_APHB_20260722",
+          "SGK_07_PUANTAJ_20231120",
+          "SGK_EKSIK_GUN_BELGELERI_20180417"
+        ]
+      },
+      "mevzuat_kurallari_json": {
+        "schema_version": 1,
+        "source_ids": [
+          "SGK_EK9_APHB_20260722",
+          "SGK_07_PUANTAJ_20231120",
+          "SGK_EKSIK_GUN_BELGELERI_20180417"
+        ],
+        "sifir_gun_sifir_kazanc_yasak": true,
+        "imza_gerekli": true,
+        "saat_75_bolme_yasagi": true,
+        "kismi_sureli_sozlesme_istisnasi": true,
+        "calisilan_her_gun_tam_gun": true,
+        "alti_gun_calismada_hafta_tatili_degerlendirilir": true,
+        "kurallar": [
+          "0 gun/0 kazanc bildirimlerinde 07 secilemez",
+          "Kismi sureli sozlesme olmadan saat/7,5 ile prim gunu azaltilamaz",
+          "Imzali puantajda calisilan her gun tam gun kabul edilir",
+          "Haftanin alti gunu calisma varsa hafta tatili degerlendirmesi yapilir"
+        ]
+      },
+      "aciklama_hash": "ec132a8834e8d773902129c4ed2ed384ba7efd91a007d5d2f422440b74776fc6"
+    },
+    {
+      "katalog_surumu": "SGK-EKSIK-GUN-RESMI-2026-07",
+      "eksik_gun_kodu": "08",
+      "resmi_aciklama": "Grev",
+      "gecerlilik_baslangic": null,
+      "gecerlilik_bitis": null,
+      "gecerlilik_tarih_durumu": "BELIRLENEMEDI",
+      "ilk_resmi_kanit_tarihi": null,
+      "kaynak_manifest_id": "SGK_EK9_APHB_20260722",
+      "aktiflik_durumu": "PORTAL_TEYIT_BEKLIYOR",
+      "portal_teyit_durumu": "TEYIT_BEKLIYOR",
+      "belge_saklama_ibraz_durumu": "ISVERENCE_SAKLA_TALEPTE_IBRAZ",
+      "belge_zorunlulugu": "KOSULLU",
+      "sifir_gun_sifir_kazanc_durumu": "KOSULLU",
+      "sifir_gun_sifir_kazanc_kullanilabilir_mi": false,
+      "kismi_sureli_sozlesme_gerekli_mi": false,
+      "yabanci_kullanim_durumu": "IZINLI",
+      "tek_basina_kullanilabilir_mi": true,
+      "diger_nedenlerle_birlikte_kullanim": "KOSULLU",
+      "aktif_mi": false,
+      "kosullar": {
+        "source_ids": [
+          "SGK_EK9_APHB_20260722",
+          "SGK_EKSIK_GUN_BELGELERI_20180417"
+        ]
+      },
+      "mevzuat_kurallari_json": {
+        "schema_version": 1,
+        "source_ids": [
+          "SGK_EK9_APHB_20260722",
+          "SGK_EKSIK_GUN_BELGELERI_20180417"
+        ]
+      },
+      "aciklama_hash": "3e9ad4157b16ce7de363b417c1c6d287ff5da5d6496078e47459ee0bea08358f"
+    },
+    {
+      "katalog_surumu": "SGK-EKSIK-GUN-RESMI-2026-07",
+      "eksik_gun_kodu": "09",
+      "resmi_aciklama": "Lokavt",
+      "gecerlilik_baslangic": null,
+      "gecerlilik_bitis": null,
+      "gecerlilik_tarih_durumu": "BELIRLENEMEDI",
+      "ilk_resmi_kanit_tarihi": null,
+      "kaynak_manifest_id": "SGK_EK9_APHB_20260722",
+      "aktiflik_durumu": "PORTAL_TEYIT_BEKLIYOR",
+      "portal_teyit_durumu": "TEYIT_BEKLIYOR",
+      "belge_saklama_ibraz_durumu": "ISVERENCE_SAKLA_TALEPTE_IBRAZ",
+      "belge_zorunlulugu": "KOSULLU",
+      "sifir_gun_sifir_kazanc_durumu": "KOSULLU",
+      "sifir_gun_sifir_kazanc_kullanilabilir_mi": false,
+      "kismi_sureli_sozlesme_gerekli_mi": false,
+      "yabanci_kullanim_durumu": "IZINLI",
+      "tek_basina_kullanilabilir_mi": true,
+      "diger_nedenlerle_birlikte_kullanim": "KOSULLU",
+      "aktif_mi": false,
+      "kosullar": {
+        "source_ids": [
+          "SGK_EK9_APHB_20260722",
+          "SGK_EKSIK_GUN_BELGELERI_20180417"
+        ]
+      },
+      "mevzuat_kurallari_json": {
+        "schema_version": 1,
+        "source_ids": [
+          "SGK_EK9_APHB_20260722",
+          "SGK_EKSIK_GUN_BELGELERI_20180417"
+        ]
+      },
+      "aciklama_hash": "a6fbc11a26661751a07741b3d0f1cd7c1cba217dc02cbb3b255f7a7c53a74eda"
+    },
+    {
+      "katalog_surumu": "SGK-EKSIK-GUN-RESMI-2026-07",
+      "eksik_gun_kodu": "10",
+      "resmi_aciklama": "Genel hayatı etkileyen olaylar",
+      "gecerlilik_baslangic": null,
+      "gecerlilik_bitis": null,
+      "gecerlilik_tarih_durumu": "BELIRLENEMEDI",
+      "ilk_resmi_kanit_tarihi": null,
+      "kaynak_manifest_id": "SGK_EK9_APHB_20260722",
+      "aktiflik_durumu": "PORTAL_TEYIT_BEKLIYOR",
+      "portal_teyit_durumu": "TEYIT_BEKLIYOR",
+      "belge_saklama_ibraz_durumu": "ISVERENCE_SAKLA_TALEPTE_IBRAZ",
+      "belge_zorunlulugu": "KOSULLU",
+      "sifir_gun_sifir_kazanc_durumu": "KOSULLU",
+      "sifir_gun_sifir_kazanc_kullanilabilir_mi": false,
+      "kismi_sureli_sozlesme_gerekli_mi": false,
+      "yabanci_kullanim_durumu": "IZINLI",
+      "tek_basina_kullanilabilir_mi": true,
+      "diger_nedenlerle_birlikte_kullanim": "KOSULLU",
+      "aktif_mi": false,
+      "kosullar": {
+        "resmi_makam_karari_donem_ve_isyeri_kapsami": true,
+        "source_ids": [
+          "SGK_EK9_APHB_20260722",
+          "SGK_EKSIK_GUN_BELGELERI_20180417"
+        ]
+      },
+      "mevzuat_kurallari_json": {
+        "schema_version": 1,
+        "source_ids": [
+          "SGK_EK9_APHB_20260722",
+          "SGK_EKSIK_GUN_BELGELERI_20180417"
+        ]
+      },
+      "aciklama_hash": "9824fa9e32da341d02a62146b0992ff8e7038d39864e86d4b78bae99d880be47"
+    },
+    {
+      "katalog_surumu": "SGK-EKSIK-GUN-RESMI-2026-07",
+      "eksik_gun_kodu": "11",
+      "resmi_aciklama": "Doğal afet",
+      "gecerlilik_baslangic": null,
+      "gecerlilik_bitis": null,
+      "gecerlilik_tarih_durumu": "BELIRLENEMEDI",
+      "ilk_resmi_kanit_tarihi": null,
+      "kaynak_manifest_id": "SGK_EK9_APHB_20260722",
+      "aktiflik_durumu": "PORTAL_TEYIT_BEKLIYOR",
+      "portal_teyit_durumu": "TEYIT_BEKLIYOR",
+      "belge_saklama_ibraz_durumu": "ISVERENCE_SAKLA_TALEPTE_IBRAZ",
+      "belge_zorunlulugu": "KOSULLU",
+      "sifir_gun_sifir_kazanc_durumu": "KOSULLU",
+      "sifir_gun_sifir_kazanc_kullanilabilir_mi": false,
+      "kismi_sureli_sozlesme_gerekli_mi": false,
+      "yabanci_kullanim_durumu": "IZINLI",
+      "tek_basina_kullanilabilir_mi": true,
+      "diger_nedenlerle_birlikte_kullanim": "KOSULLU",
+      "aktif_mi": false,
+      "kosullar": {
+        "source_ids": [
+          "SGK_EK9_APHB_20260722",
+          "SGK_EKSIK_GUN_BELGELERI_20180417"
+        ]
+      },
+      "mevzuat_kurallari_json": {
+        "schema_version": 1,
+        "source_ids": [
+          "SGK_EK9_APHB_20260722",
+          "SGK_EKSIK_GUN_BELGELERI_20180417"
+        ]
+      },
+      "aciklama_hash": "ae03b5e1fa3c4d09a7a23132af48031228f24c1f332b3c1924eef5f2b5ba261c"
+    },
+    {
+      "katalog_surumu": "SGK-EKSIK-GUN-RESMI-2026-07",
+      "eksik_gun_kodu": "12",
+      "resmi_aciklama": "Birden fazla",
+      "gecerlilik_baslangic": null,
+      "gecerlilik_bitis": null,
+      "gecerlilik_tarih_durumu": "BELIRLENEMEDI",
+      "ilk_resmi_kanit_tarihi": null,
+      "kaynak_manifest_id": "SGK_EK9_APHB_20260722",
+      "aktiflik_durumu": "PORTAL_TEYIT_BEKLIYOR",
+      "portal_teyit_durumu": "TEYIT_BEKLIYOR",
+      "belge_saklama_ibraz_durumu": "KOSULLU",
+      "belge_zorunlulugu": "KOSULLU",
+      "sifir_gun_sifir_kazanc_durumu": "KOSULLU",
+      "sifir_gun_sifir_kazanc_kullanilabilir_mi": false,
+      "kismi_sureli_sozlesme_gerekli_mi": false,
+      "yabanci_kullanim_durumu": "YASAK",
+      "tek_basina_kullanilabilir_mi": false,
+      "diger_nedenlerle_birlikte_kullanim": "KOSULLU",
+      "aktif_mi": false,
+      "kosullar": {
+        "genel_coklu_neden_kodu": true,
+        "ozel_birlesik_kod_varsa_12_kullanilmaz": true,
+        "kural_18_baska_neden_sonuc_27": true,
+        "tarihsel_pandemi_kombinasyonunda_29": true,
+        "source_ids": [
+          "SGK_EK9_APHB_20260722",
+          "SGK_EKSIK_GUN_BELGELERI_20180417"
+        ]
+      },
+      "mevzuat_kurallari_json": {
+        "schema_version": 1,
+        "source_ids": [
+          "SGK_EK9_APHB_20260722",
+          "SGK_EKSIK_GUN_BELGELERI_20180417"
+        ],
+        "ozel_birlesik_kod": "27",
+        "genel_12_18_baska_yasak": true
+      },
+      "aciklama_hash": "097e33b94feb6f634af5e3884c22cc2f699f8e231e6758527fda8cd0fdb32e3b"
+    },
+    {
+      "katalog_surumu": "SGK-EKSIK-GUN-RESMI-2026-07",
+      "eksik_gun_kodu": "13",
+      "resmi_aciklama": "Diğer",
+      "gecerlilik_baslangic": null,
+      "gecerlilik_bitis": null,
+      "gecerlilik_tarih_durumu": "BELIRLENEMEDI",
+      "ilk_resmi_kanit_tarihi": null,
+      "kaynak_manifest_id": "SGK_EK9_APHB_20260722",
+      "aktiflik_durumu": "PORTAL_TEYIT_BEKLIYOR",
+      "portal_teyit_durumu": "TEYIT_BEKLIYOR",
+      "belge_saklama_ibraz_durumu": "KOSULLU",
+      "belge_zorunlulugu": "KOSULLU",
+      "sifir_gun_sifir_kazanc_durumu": "TEYITSIZ",
+      "sifir_gun_sifir_kazanc_kullanilabilir_mi": false,
+      "kismi_sureli_sozlesme_gerekli_mi": false,
+      "yabanci_kullanim_durumu": "YASAK",
+      "tek_basina_kullanilabilir_mi": true,
+      "diger_nedenlerle_birlikte_kullanim": "KOSULLU",
+      "aktif_mi": false,
+      "kosullar": {
+        "her_belge_olur_semantigi_yok": true,
+        "somut_olay_ve_incelemeye_elverisli_kanit": true,
+        "source_ids": [
+          "SGK_EK9_APHB_20260722",
+          "SGK_EKSIK_GUN_BELGELERI_20180417"
+        ]
+      },
+      "mevzuat_kurallari_json": {
+        "schema_version": 1,
+        "source_ids": [
+          "SGK_EK9_APHB_20260722",
+          "SGK_EKSIK_GUN_BELGELERI_20180417"
+        ]
+      },
+      "aciklama_hash": "6cceb6797962606422fd2662519ba360f13758bd9d53a88ed5f035f890b48ace"
+    },
+    {
+      "katalog_surumu": "SGK-EKSIK-GUN-RESMI-2026-07",
+      "eksik_gun_kodu": "15",
+      "resmi_aciklama": "Devamsızlık",
+      "gecerlilik_baslangic": null,
+      "gecerlilik_bitis": null,
+      "gecerlilik_tarih_durumu": "BELIRLENEMEDI",
+      "ilk_resmi_kanit_tarihi": null,
+      "kaynak_manifest_id": "SGK_EK9_APHB_20260722",
+      "aktiflik_durumu": "PORTAL_TEYIT_BEKLIYOR",
+      "portal_teyit_durumu": "TEYIT_BEKLIYOR",
+      "belge_saklama_ibraz_durumu": "ISVERENCE_SAKLA_TALEPTE_IBRAZ",
+      "belge_zorunlulugu": "KOSULLU",
+      "sifir_gun_sifir_kazanc_durumu": "TEYITSIZ",
+      "sifir_gun_sifir_kazanc_kullanilabilir_mi": false,
+      "kismi_sureli_sozlesme_gerekli_mi": false,
+      "yabanci_kullanim_durumu": "YASAK",
+      "tek_basina_kullanilabilir_mi": true,
+      "diger_nedenlerle_birlikte_kullanim": "KOSULLU",
+      "aktif_mi": false,
+      "kosullar": {
+        "devamsizlik_gunlerini_gosteren_tutanak_veya_kayit": true,
+        "calisma_izni_iptali_sgk_eksik_gun_kurali_degil": true,
+        "source_ids": [
+          "SGK_EK9_APHB_20260722",
+          "SGK_EKSIK_GUN_BELGELERI_20180417"
+        ]
+      },
+      "mevzuat_kurallari_json": {
+        "schema_version": 1,
+        "source_ids": [
+          "SGK_EK9_APHB_20260722",
+          "SGK_EKSIK_GUN_BELGELERI_20180417"
+        ]
+      },
+      "aciklama_hash": "3287542b4e7e4273d2c7f0be1d343674726c768fe56c1da7dd05988271d540ed"
+    },
+    {
+      "katalog_surumu": "SGK-EKSIK-GUN-RESMI-2026-07",
+      "eksik_gun_kodu": "16",
+      "resmi_aciklama": "Fesih tarihinde çalışmamış",
+      "gecerlilik_baslangic": null,
+      "gecerlilik_bitis": null,
+      "gecerlilik_tarih_durumu": "BELIRLENEMEDI",
+      "ilk_resmi_kanit_tarihi": null,
+      "kaynak_manifest_id": "SGK_EK9_APHB_20260722",
+      "aktiflik_durumu": "PORTAL_TEYIT_BEKLIYOR",
+      "portal_teyit_durumu": "TEYIT_BEKLIYOR",
+      "belge_saklama_ibraz_durumu": "ISVERENCE_SAKLA_TALEPTE_IBRAZ",
+      "belge_zorunlulugu": "KOSULLU",
+      "sifir_gun_sifir_kazanc_durumu": "YASAK",
+      "sifir_gun_sifir_kazanc_kullanilabilir_mi": false,
+      "kismi_sureli_sozlesme_gerekli_mi": false,
+      "yabanci_kullanim_durumu": "YASAK",
+      "tek_basina_kullanilabilir_mi": true,
+      "diger_nedenlerle_birlikte_kullanim": "KOSULLU",
+      "aktif_mi": false,
+      "kosullar": {
+        "yalniz_isten_ayrilis_tarihindeki_calismama": true,
+        "butun_ay_genel_0_0_kodu_degil": true,
+        "birlikte_kullanim_kesin_yasak_kaniti_yok": true,
+        "source_ids": [
+          "SGK_EK9_APHB_20260722",
+          "SGK_EKSIK_GUN_BELGELERI_20180417"
+        ]
+      },
+      "mevzuat_kurallari_json": {
+        "schema_version": 1,
+        "source_ids": [
+          "SGK_EK9_APHB_20260722",
+          "SGK_EKSIK_GUN_BELGELERI_20180417"
+        ],
+        "sifir_gun_sifir_kazanc_yasak": true,
+        "yalniz_fesih_tarihi_calismama": true
+      },
+      "aciklama_hash": "503938c2509a29c710244b3dff1504474e27996b2124298230aec31e06ff0c0a"
+    },
+    {
+      "katalog_surumu": "SGK-EKSIK-GUN-RESMI-2026-07",
+      "eksik_gun_kodu": "17",
+      "resmi_aciklama": "Ev hizmetlerinde 30 günden az çalışma",
+      "gecerlilik_baslangic": null,
+      "gecerlilik_bitis": null,
+      "gecerlilik_tarih_durumu": "BELIRLENEMEDI",
+      "ilk_resmi_kanit_tarihi": null,
+      "kaynak_manifest_id": "SGK_EK9_APHB_20260722",
+      "aktiflik_durumu": "BAGLAMA_OZGUN",
+      "portal_teyit_durumu": "TEYIT_BEKLIYOR",
+      "belge_saklama_ibraz_durumu": "KOSULLU",
+      "belge_zorunlulugu": "KOSULLU",
+      "sifir_gun_sifir_kazanc_durumu": "YASAK",
+      "sifir_gun_sifir_kazanc_kullanilabilir_mi": false,
+      "kismi_sureli_sozlesme_gerekli_mi": false,
+      "yabanci_kullanim_durumu": "YASAK",
+      "tek_basina_kullanilabilir_mi": true,
+      "diger_nedenlerle_birlikte_kullanim": "KOSULLU",
+      "aktif_mi": false,
+      "kosullar": {
+        "source_ids": [
+          "SGK_EK9_APHB_20260722",
+          "SGK_EKSIK_GUN_BELGELERI_20180417"
+        ]
+      },
+      "mevzuat_kurallari_json": {
+        "schema_version": 1,
+        "source_ids": [
+          "SGK_EK9_APHB_20260722",
+          "SGK_EKSIK_GUN_BELGELERI_20180417"
+        ],
+        "yalniz_5510_ek9_ev_hizmetleri": true,
+        "medisa_normal_isyeri_personelinde_kullanilamaz": true,
+        "yabanci_30_gunden_az_beyan_yasak": true
+      },
+      "aciklama_hash": "ba134b48c544c529507dc1b09502904331f4c20ae828566071bb50fc0c0d4178"
+    },
+    {
+      "katalog_surumu": "SGK-EKSIK-GUN-RESMI-2026-07",
+      "eksik_gun_kodu": "18",
+      "resmi_aciklama": "Kısa çalışma ödeneği",
+      "gecerlilik_baslangic": null,
+      "gecerlilik_bitis": null,
+      "gecerlilik_tarih_durumu": "BELIRLENEMEDI",
+      "ilk_resmi_kanit_tarihi": null,
+      "kaynak_manifest_id": "SGK_EK9_APHB_20260722",
+      "aktiflik_durumu": "BAGLAMA_OZGUN",
+      "portal_teyit_durumu": "TEYIT_BEKLIYOR",
+      "belge_saklama_ibraz_durumu": "ELEKTRONIK_KAYNAKTAN",
+      "belge_zorunlulugu": "KOSULLU",
+      "sifir_gun_sifir_kazanc_durumu": "KOSULLU",
+      "sifir_gun_sifir_kazanc_kullanilabilir_mi": false,
+      "kismi_sureli_sozlesme_gerekli_mi": false,
+      "yabanci_kullanim_durumu": "IZINLI",
+      "tek_basina_kullanilabilir_mi": true,
+      "diger_nedenlerle_birlikte_kullanim": "KOSULLU",
+      "aktif_mi": false,
+      "kosullar": {
+        "yalniz_kisa_calisma_sonuc_18": true,
+        "18_baska_neden_sonuc_27": true,
+        "18_baska_neden_sonuc_12_yasak": true,
+        "kod_27_bu_pakette_seed_edilmez": true,
+        "source_ids": [
+          "SGK_EK9_APHB_20260722",
+          "SGK_EKSIK_GUN_BELGELERI_20180417"
+        ]
+      },
+      "mevzuat_kurallari_json": {
+        "schema_version": 1,
+        "source_ids": [
+          "SGK_EK9_APHB_20260722",
+          "SGK_EKSIK_GUN_BELGELERI_20180417"
+        ],
+        "ozel_birlesik_kod": "27",
+        "yalniz_kisa_calisma_kodu": "18",
+        "genel_12_yasak_18_baska": true
+      },
+      "aciklama_hash": "f16ddaf9b6ce68a5eb34128e76fc80a1420b39f0fe93109d105432ae61750c5e"
+    },
+    {
+      "katalog_surumu": "SGK-EKSIK-GUN-RESMI-2026-07",
+      "eksik_gun_kodu": "19",
+      "resmi_aciklama": "Ücretsiz doğum izni",
+      "gecerlilik_baslangic": null,
+      "gecerlilik_bitis": null,
+      "gecerlilik_tarih_durumu": "BELIRLENEMEDI",
+      "ilk_resmi_kanit_tarihi": null,
+      "kaynak_manifest_id": "SGK_EK9_APHB_20260722",
+      "aktiflik_durumu": "PORTAL_TEYIT_BEKLIYOR",
+      "portal_teyit_durumu": "TEYIT_BEKLIYOR",
+      "belge_saklama_ibraz_durumu": "ISVERENCE_SAKLA_TALEPTE_IBRAZ",
+      "belge_zorunlulugu": "KOSULLU",
+      "sifir_gun_sifir_kazanc_durumu": "KOSULLU",
+      "sifir_gun_sifir_kazanc_kullanilabilir_mi": false,
+      "kismi_sureli_sozlesme_gerekli_mi": false,
+      "yabanci_kullanim_durumu": "KOSULLU",
+      "tek_basina_kullanilabilir_mi": true,
+      "diger_nedenlerle_birlikte_kullanim": "KOSULLU",
+      "aktif_mi": false,
+      "kosullar": {
+        "kapsam_4857_madde_74": true,
+        "izin_donemi_isci_isveren_kayit_uyumu": true,
+        "source_ids": [
+          "SGK_EK9_APHB_20260722",
+          "SGK_EKSIK_GUN_BELGELERI_20180417"
+        ]
+      },
+      "mevzuat_kurallari_json": {
+        "schema_version": 1,
+        "source_ids": [
+          "SGK_EK9_APHB_20260722",
+          "SGK_EKSIK_GUN_BELGELERI_20180417"
+        ],
+        "kapsam_4857_74": true
+      },
+      "aciklama_hash": "a208a630e2dbb6ade7185c74e04645792aff21f16bbaace7faa3f5ce0f4a248e"
+    },
+    {
+      "katalog_surumu": "SGK-EKSIK-GUN-RESMI-2026-07",
+      "eksik_gun_kodu": "20",
+      "resmi_aciklama": "Ücretsiz yol izni",
+      "gecerlilik_baslangic": null,
+      "gecerlilik_bitis": null,
+      "gecerlilik_tarih_durumu": "BELIRLENEMEDI",
+      "ilk_resmi_kanit_tarihi": null,
+      "kaynak_manifest_id": "SGK_EK9_APHB_20260722",
+      "aktiflik_durumu": "PORTAL_TEYIT_BEKLIYOR",
+      "portal_teyit_durumu": "TEYIT_BEKLIYOR",
+      "belge_saklama_ibraz_durumu": "ISVERENCE_SAKLA_TALEPTE_IBRAZ",
+      "belge_zorunlulugu": "KOSULLU",
+      "sifir_gun_sifir_kazanc_durumu": "YASAK",
+      "sifir_gun_sifir_kazanc_kullanilabilir_mi": false,
+      "kismi_sureli_sozlesme_gerekli_mi": false,
+      "yabanci_kullanim_durumu": "YASAK",
+      "tek_basina_kullanilabilir_mi": true,
+      "diger_nedenlerle_birlikte_kullanim": "KOSULLU",
+      "aktif_mi": false,
+      "kosullar": {
+        "source_ids": [
+          "SGK_EK9_APHB_20260722",
+          "SGK_EKSIK_GUN_BELGELERI_20180417"
+        ]
+      },
+      "mevzuat_kurallari_json": {
+        "schema_version": 1,
+        "source_ids": [
+          "SGK_EK9_APHB_20260722",
+          "SGK_EKSIK_GUN_BELGELERI_20180417"
+        ],
+        "maksimum_eksik_gun": 4,
+        "isci_talebi_gerekli": true,
+        "yillik_izni_baska_yerde_gecirme_belgesi_gerekli": true,
+        "sifir_gun_sifir_kazanc_yasak": true
+      },
+      "aciklama_hash": "72ecafe6c023b12b2dbe41517093c75c0db8c8dcd2866966e00b43e23917894f"
+    },
+    {
+      "katalog_surumu": "SGK-EKSIK-GUN-RESMI-2026-07",
+      "eksik_gun_kodu": "21",
+      "resmi_aciklama": "Diğer ücretsiz izin",
+      "gecerlilik_baslangic": null,
+      "gecerlilik_bitis": null,
+      "gecerlilik_tarih_durumu": "BELIRLENEMEDI",
+      "ilk_resmi_kanit_tarihi": null,
+      "kaynak_manifest_id": "SGK_EK9_APHB_20260722",
+      "aktiflik_durumu": "PORTAL_TEYIT_BEKLIYOR",
+      "portal_teyit_durumu": "TEYIT_BEKLIYOR",
+      "belge_saklama_ibraz_durumu": "ISVERENCE_SAKLA_TALEPTE_IBRAZ",
+      "belge_zorunlulugu": "KOSULLU",
+      "sifir_gun_sifir_kazanc_durumu": "KOSULLU",
+      "sifir_gun_sifir_kazanc_kullanilabilir_mi": false,
+      "kismi_sureli_sozlesme_gerekli_mi": false,
+      "yabanci_kullanim_durumu": "YASAK",
+      "tek_basina_kullanilabilir_mi": true,
+      "diger_nedenlerle_birlikte_kullanim": "KOSULLU",
+      "aktif_mi": false,
+      "kosullar": {
+        "isci_isveren_karsilikli_irade": true,
+        "izin_donemi_acik": true,
+        "usulune_uygun_yazili_belge": true,
+        "source_ids": [
+          "SGK_EK9_APHB_20260722",
+          "SGK_EKSIK_GUN_BELGELERI_20180417"
+        ]
+      },
+      "mevzuat_kurallari_json": {
+        "schema_version": 1,
+        "source_ids": [
+          "SGK_EK9_APHB_20260722",
+          "SGK_EKSIK_GUN_BELGELERI_20180417"
+        ]
+      },
+      "aciklama_hash": "bf7effbc249a1f6adbc27dd2b44c478c4f89ce14244ac28da26a36e88d6c26f9"
+    }
+  ],
+  "tamlik_flags": {
+    "gunce_tam_kod_listesi_kanitlandi_mi": false,
+    "kod_bazli_yururluk_tarihi_tam_mi": false,
+    "ebildirge_guncel_gorunum_dogrulandi_mi": false,
+    "ucuncu_taraf_kaynak_kullanildi_mi": false,
+    "expert_draft_tek_basina_mi": false
+  }
+}

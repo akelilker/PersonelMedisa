@@ -350,6 +350,15 @@ class Router
         if ($path === '/sgk-katalog-hazirlik/import/dry-run' && $method === 'POST') {
             SgkKatalogHazirlikController::importDryRun($this->request);
         }
+        if ($path === '/sgk-katalog-hazirlik/import' && $method === 'POST') {
+            SgkKatalogHazirlikController::import($this->request);
+        }
+        if ($path === '/sgk-katalog-hazirlik/submit' && $method === 'POST') {
+            SgkKatalogHazirlikController::submit($this->request);
+        }
+        if ($path === '/sgk-katalog-hazirlik/approve' && $method === 'POST') {
+            SgkKatalogHazirlikController::approve($this->request);
+        }
         if ($path === '/sgk-katalog-hazirlik/surec-esleme/validate' && $method === 'POST') {
             SgkKatalogHazirlikController::surecEslemeValidate($this->request);
         }

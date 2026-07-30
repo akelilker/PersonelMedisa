@@ -12,6 +12,7 @@ import {
   validateSgkOperasyonelKanit,
   validateSgkSurecEsleme,
   SGK_AKTIFLIK_DURUMU_LABEL,
+  SGK_TAMLIK_DURUMU_LABEL,
   type SgkKatalogBlocker,
   type SgkKatalogBlockerRaporu,
   type SgkKatalogImportDryRun,
@@ -186,9 +187,9 @@ export function SgkKatalogHazirlikPanel() {
           current_state: "ONAY_BEKLIYOR",
           action: "APPROVE",
           actor_id: 1,
-          hazirlayan_id: 1,
-          mali_musavir_onayladi_mi: false,
-          sirket_onayladi_mi: false
+          resmi_kaynaklar_incelendi_mi: false,
+          belirsiz_tarihler_uydurulmadi_mi: false,
+          kisitli_kullanim_kabul_edildi_mi: false
         })
       );
     } catch (err) {
@@ -203,15 +204,32 @@ export function SgkKatalogHazirlikPanel() {
   if (error && !tamlik) return <ErrorState message={error} />;
 
   const blockers = blockerRapor?.blocker_detaylari ?? tamlik?.blocker_detaylari ?? [];
+  const tamlikDurumu = (tamlik?.tamlik_durumu ?? "TASLAK") as keyof typeof SGK_TAMLIK_DURUMU_LABEL;
+  const kisitliOnayli = tamlikDurumu === "RESMI_KAYNAKLI_KISITLI";
+  const importWriteAktif = tamlik?.import_yazma_aktif_mi === true;
+  const approveAktif = tamlik?.approve_aktif_mi === true;
 
   return (
     <section data-testid="sgk-katalog-hazirlik-panel">
       <header className="yonetim-page-header">
         <h3>SGK Katalog Hazırlık</h3>
-        <p data-testid="sgk-katalog-kaynak-tamlik-uyari">
-          Kaynak tamlığı tamamlanmadı. Resmî katalog satırları gösterilmez; DOGRULANMIS_TAM seçilemez.
-          TEYITSIZ ve tarihsel kodlar güncel kayıt ekranında seçilemez.
-        </p>
+        {kisitliOnayli ? (
+          <p data-testid="sgk-katalog-kisitli-badge" className="yonetim-badge">
+            {SGK_TAMLIK_DURUMU_LABEL.RESMI_KAYNAKLI_KISITLI}: Resmî kod/ad doğrulandı; bazı kod bazlı tarih ve kullanım
+            ayrıntıları belirsizdir.
+          </p>
+        ) : (
+          <p data-testid="sgk-katalog-kaynak-tamlik-uyari">
+            Kaynak tamlığı tamamlanmadı. Resmî katalog satırları gösterilmez; DOGRULANMIS_TAM seçilemez.
+            TEYITSIZ ve tarihsel kodlar güncel kayıt ekranında seçilemez.
+          </p>
+        )}
+        {kisitliOnayli ? (
+          <p data-testid="sgk-katalog-kisitli-tarih-uyari" className="muted">
+            Geçerlilik başlangıcı yoksa: Belirlenemedi. TEYITSIZ/KOSULLU alanlar otomatik izin sayılmaz; belirsiz
+            kuralda MANUEL_INCELEME uygulanır.
+          </p>
+        ) : null}
         <p data-testid="sgk-katalog-aktiflik-etiketleri" className="muted">
           Aktiflik: {Object.values(SGK_AKTIFLIK_DURUMU_LABEL).join(" · ")}
         </p>
@@ -240,10 +258,13 @@ export function SgkKatalogHazirlikPanel() {
       {subTab === "tamlik" ? (
         <div data-testid="sgk-katalog-tamlik">
           <p>
-            Durum: <strong>{tamlik?.tamlik_durumu ?? "TASLAK"}</strong> · Kod sayısı: {tamlik?.kod_sayisi ?? 0} · Kaynak:{" "}
+            Durum: <strong data-testid="sgk-katalog-tamlik-durumu">{SGK_TAMLIK_DURUMU_LABEL[tamlikDurumu] ?? tamlikDurumu}</strong> · Kod sayısı: {tamlik?.kod_sayisi ?? 0} · Kaynak:{" "}
             {tamlik?.kaynak_sayisi ?? 0} · Sürüm satırı: {surumTotal}
           </p>
           <p>Onaylanabilir mi: {tamlik?.onaylanabilir_mi ? "evet" : "hayır"}</p>
+          <p data-testid="sgk-katalog-dogrulanmis-tam-note" className="muted">
+            DOGRULANMIS_TAM: {tamlik?.dogrulanmis_tam_secilebilir_mi ? "seçilebilir" : "seçilemez (tam kanıt gerekir)"}
+          </p>
           <p data-testid="sgk-katalog-eksik-kanitlar">Eksik kanıtlar: {(tamlik?.eksik_kanitlar ?? []).join(", ") || "—"}</p>
           <BlockerList items={blockers} />
         </div>
@@ -280,12 +301,12 @@ export function SgkKatalogHazirlikPanel() {
 
       {subTab === "import" ? (
         <div data-testid="sgk-katalog-import">
-          <p>Import yalnız dry-run. Yazma endpointi kapalı.</p>
+          <p>Import önce dry-run ile doğrulanır. Yazma {importWriteAktif ? "tamlık izin veriyorsa aktif" : "kapalı"}.</p>
           <button type="button" className="universal-btn-save" data-testid="sgk-katalog-import-dry-run" onClick={() => void runImportDryRun()} disabled={!canMevzuat}>
             Dry-run doğrula
           </button>
-          <button type="button" className="universal-btn-secondary" data-testid="sgk-katalog-import-write" disabled>
-            Import yaz (kapalı)
+          <button type="button" className="universal-btn-secondary" data-testid="sgk-katalog-import-write" disabled={!importWriteAktif || !canMevzuat}>
+            Import yaz {importWriteAktif ? "(GENEL_YONETICI)" : "(kapalı)"}
           </button>
           {importResult ? (
             <div data-testid="sgk-katalog-import-result">
@@ -347,10 +368,10 @@ export function SgkKatalogHazirlikPanel() {
       {subTab === "onay" ? (
         <div data-testid="sgk-katalog-onay">
           <p data-testid="sgk-katalog-onay-disabled-note">
-            Onay/approve yazma kapalı. DOGRULANMIS_TAM seçeneği sunulmaz.
+            Onay/approve {approveAktif ? "tamlık izin veriyorsa mümkün" : "kapalı"}. DOGRULANMIS_TAM seçeneği sunulmaz.
           </p>
-          <button type="button" className="universal-btn-secondary" data-testid="sgk-katalog-approve" disabled>
-            Onayla (disabled)
+          <button type="button" className="universal-btn-secondary" data-testid="sgk-katalog-approve" disabled={!approveAktif || !canOnayValidate}>
+            Onayla {approveAktif ? "(attestation gerekir)" : "(disabled)"}
           </button>
           <button
             type="button"

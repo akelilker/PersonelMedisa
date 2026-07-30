@@ -5,7 +5,8 @@ declare(strict_types=1);
 namespace Medisa\Api\Services\Payroll;
 
 /**
- * S85-C1 / S98: Catalog completeness gate. Never promotes DOGRULANMIS_TAM without full evidence.
+ * S85-C1 / S98 / S106: Catalog completeness gate with three-level tamlik evaluation.
+ * Never promotes DOGRULANMIS_TAM without full evidence.
  */
 final class SgkKatalogTamlikService
 {
@@ -23,7 +24,8 @@ final class SgkKatalogTamlikService
      *   ucuncu_taraf_kaynak_kullanildi_mi?: bool,
      *   gunce_tam_kod_listesi_kanitlandi_mi?: bool,
      *   kod_bazli_yururluk_tarihi_tam_mi?: bool,
-     *   expert_draft_tek_basina_mi?: bool
+     *   expert_draft_tek_basina_mi?: bool,
+     *   istenen_tamlik_durumu?: string|null
      * } $input
      */
     public static function evaluate(array $input): array
@@ -36,9 +38,11 @@ final class SgkKatalogTamlikService
         $sifirKurallar = array_values($input['sifir_gun_kurallari'] ?? []);
         $kismiKurallar = array_values($input['kismi_sureli_kurallari'] ?? []);
 
-        $eksikKanitlar = [];
+        $limitedBlockers = [];
+        $limitedWarnings = [];
+        $fullBlockers = [];
         $erisilemeyen = [];
-        $blockers = [];
+        $uyarilar = [];
 
         $gunceTam = !empty($input['gunce_tam_kod_listesi_kanitlandi_mi']);
         $yururlukTam = !empty($input['kod_bazli_yururluk_tarihi_tam_mi']);
@@ -46,35 +50,45 @@ final class SgkKatalogTamlikService
         $ucuncuTaraf = !empty($input['ucuncu_taraf_kaynak_kullanildi_mi']);
 
         if (!$gunceTam) {
-            $eksikKanitlar[] = 'GUNCEL_TAM_KOD_LISTESI';
+            $limitedWarnings[] = 'GUNCEL_TAM_KOD_LISTESI';
+            $fullBlockers[] = 'GUNCEL_TAM_KOD_LISTESI';
         }
         if (!$yururlukTam) {
-            $eksikKanitlar[] = 'KOD_BAZLI_YURURLUK_TARIHI';
+            $limitedWarnings[] = 'KOD_BAZLI_YURURLUK_TARIHI';
+            $fullBlockers[] = 'KOD_BAZLI_YURURLUK_TARIHI';
         }
         if ($birlesik === []) {
-            $eksikKanitlar[] = 'BIRLESIK_NEDEN_MATRISI';
+            $limitedWarnings[] = 'BIRLESIK_NEDEN_MATRISI';
+            $fullBlockers[] = 'BIRLESIK_NEDEN_MATRISI';
         }
         if ($belgeMatrisi === []) {
-            $eksikKanitlar[] = 'KOD_BELGE_MATRISI';
+            $limitedWarnings[] = 'KOD_BELGE_MATRISI';
+            $fullBlockers[] = 'KOD_BELGE_MATRISI';
         }
         if ($sifirKurallar === []) {
-            $eksikKanitlar[] = 'SIFIR_GUN_SIFIR_KAZANC_KISITLARI';
+            $limitedWarnings[] = 'SIFIR_GUN_SIFIR_KAZANC_KISITLARI';
+            $fullBlockers[] = 'SIFIR_GUN_SIFIR_KAZANC_KISITLARI';
         }
         if ($kismiKurallar === []) {
-            $eksikKanitlar[] = 'KISMI_SURELI_KULLANIM_KURALLARI';
+            $limitedWarnings[] = 'KISMI_SURELI_KULLANIM_KURALLARI';
+            $fullBlockers[] = 'KISMI_SURELI_KULLANIM_KURALLARI';
         }
         if ($manifests === []) {
-            $eksikKanitlar[] = 'KAYNAK_MANIFESTI';
+            $limitedBlockers[] = 'KAYNAK_MANIFESTI';
+            $fullBlockers[] = 'KAYNAK_MANIFESTI';
         }
         if (!$ebildirgeOk) {
-            $eksikKanitlar[] = 'EBILDIRGE_GUNCEL_GORUNUM';
+            $limitedWarnings[] = 'EBILDIRGE_GUNCEL_GORUNUM';
+            $fullBlockers[] = 'EBILDIRGE_GUNCEL_GORUNUM';
             $erisilemeyen[] = 'e-Bildirge/e-Beyanname login-gated dropdown';
         }
         if ($ucuncuTaraf) {
-            $eksikKanitlar[] = 'UCUNCU_TARAF_KAYNAK';
+            $limitedBlockers[] = 'UCUNCU_TARAF_KAYNAK';
+            $fullBlockers[] = 'UCUNCU_TARAF_KAYNAK';
         }
         if (!empty($input['expert_draft_tek_basina_mi'])) {
-            $eksikKanitlar[] = 'EXPERT_DRAFT_TEK_BASINA_YETERSIZ';
+            $limitedBlockers[] = 'EXPERT_DRAFT_TEK_BASINA_YETERSIZ';
+            $fullBlockers[] = 'EXPERT_DRAFT_TEK_BASINA_YETERSIZ';
         }
 
         $aktifManifest = 0;
@@ -89,105 +103,168 @@ final class SgkKatalogTamlikService
                 $manifestIds[] = $id;
             }
             if ($durum !== 'AKTIF') {
-                $eksikKanitlar[] = 'PASIF_MANIFEST:' . $id;
+                $limitedBlockers[] = 'PASIF_MANIFEST:' . $id;
+                $fullBlockers[] = 'PASIF_MANIFEST:' . $id;
             } else {
                 $aktifManifest++;
             }
             if ($sinif === SgkKatalogContracts::KANIT_EXPERT_DRAFT) {
-                $eksikKanitlar[] = 'EXPERT_DRAFT_MANIFEST:' . $id;
+                $limitedBlockers[] = 'EXPERT_DRAFT_MANIFEST:' . $id;
+                $fullBlockers[] = 'EXPERT_DRAFT_MANIFEST:' . $id;
             } elseif (SgkKatalogContracts::isPrimaryOfficialManifest($m)) {
                 $primaryManifest++;
             }
             if (!SgkKatalogContracts::isSha256($hash)) {
-                $eksikKanitlar[] = 'MANIFEST_HASH_DOGRULANAMADI:' . $id;
+                $limitedBlockers[] = 'MANIFEST_HASH_DOGRULANAMADI:' . $id;
+                $fullBlockers[] = 'MANIFEST_HASH_DOGRULANAMADI:' . $id;
             }
             if (!empty($m['erisilemez_mi'])) {
                 $erisilemeyen[] = $id !== '' ? $id : 'bilinmeyen_kaynak';
             }
             if (!empty($m['volatile_html_mi']) || !empty($m['hash_degisti_mi'])) {
-                $eksikKanitlar[] = 'VOLATILE_HTML_HASH_DEGISIMI:' . $id;
+                $limitedBlockers[] = 'VOLATILE_HTML_HASH_DEGISIMI:' . $id;
+                $fullBlockers[] = 'VOLATILE_HTML_HASH_DEGISIMI:' . $id;
             }
             if (array_key_exists('arsiv_kopyasi_repoda_mi', $m) && !$m['arsiv_kopyasi_repoda_mi']) {
-                $eksikKanitlar[] = 'ARSIV_KOPYASI_YOK:' . $id;
+                $limitedWarnings[] = 'ARSIV_KOPYASI_YOK:' . $id;
+                $fullBlockers[] = 'ARSIV_KOPYASI_YOK:' . $id;
             }
         }
 
-        if ($kodlar !== [] && $primaryManifest === 0) {
-            $eksikKanitlar[] = 'PRIMARY_RESMI_MANIFEST_EKSIK';
+        if ($primaryManifest === 0) {
+            $limitedBlockers[] = 'PRIMARY_RESMI_MANIFEST_EKSIK';
+            $fullBlockers[] = 'PRIMARY_RESMI_MANIFEST_EKSIK';
+        }
+
+        if ($kodlar === [] && ($manifests !== [] || $operasyonel !== [])) {
+            $limitedBlockers[] = 'KOD_SATIRLARI_EKSIK';
+            $fullBlockers[] = 'KOD_SATIRLARI_EKSIK';
         }
 
         foreach ($kodlar as $kodRow) {
             $kod = strtoupper(trim((string) ($kodRow['eksik_gun_kodu'] ?? '')));
+            $aciklama = trim((string) ($kodRow['resmi_aciklama'] ?? ''));
             $sifir = strtoupper((string) ($kodRow['sifir_gun_sifir_kazanc_durumu'] ?? ''));
             $yabanci = strtoupper((string) ($kodRow['yabanci_kullanim_durumu'] ?? ''));
             $aktiflik = strtoupper((string) ($kodRow['aktiflik_durumu'] ?? ''));
             $portal = strtoupper((string) ($kodRow['portal_teyit_durumu'] ?? ''));
-            $bas = (string) ($kodRow['gecerlilik_baslangic'] ?? '');
+            $bas = $kodRow['gecerlilik_baslangic'] ?? null;
+            $basStr = is_string($bas) ? trim($bas) : '';
+            $tarihDurumu = strtoupper((string) ($kodRow['gecerlilik_tarih_durumu'] ?? 'BELIRLENEMEDI'));
+            if ($tarihDurumu === '') {
+                $tarihDurumu = 'BELIRLENEMEDI';
+            }
             $manifestId = (string) ($kodRow['kaynak_manifest_id'] ?? '');
 
+            if ($kod === '' || $aciklama === '') {
+                $limitedBlockers[] = 'KOD_ACIKLAMA_EKSIK:' . ($kod !== '' ? $kod : '?');
+                $fullBlockers[] = 'KOD_ACIKLAMA_EKSIK:' . ($kod !== '' ? $kod : '?');
+            }
+
             if ($sifir === 'TEYITSIZ') {
-                $eksikKanitlar[] = 'TEYITSIZ_SIFIR_GUN:' . $kod;
+                $limitedWarnings[] = 'TEYITSIZ_SIFIR_GUN:' . $kod;
+                $fullBlockers[] = 'TEYITSIZ_SIFIR_GUN:' . $kod;
             }
             if ($yabanci === 'TEYITSIZ' || $yabanci === '') {
-                $eksikKanitlar[] = 'YABANCI_KULLANIM_BELIRSIZ:' . $kod;
+                $limitedWarnings[] = 'YABANCI_KULLANIM_BELIRSIZ:' . $kod;
+                $fullBlockers[] = 'YABANCI_KULLANIM_BELIRSIZ:' . $kod;
             }
             if ($portal === 'TEYIT_BEKLIYOR' || $aktiflik === 'PORTAL_TEYIT_BEKLIYOR') {
-                $eksikKanitlar[] = 'PORTAL_TEYIT_BEKLIYOR:' . $kod;
+                $limitedWarnings[] = 'PORTAL_TEYIT_BEKLIYOR:' . $kod;
+                $fullBlockers[] = 'PORTAL_TEYIT_BEKLIYOR:' . $kod;
             }
-            if ($bas === '' || !SgkKatalogContracts::isDate($bas)) {
-                $eksikKanitlar[] = 'YURURLUK_TARIHI_EKSIK:' . $kod;
+
+            if ($basStr === '' || !SgkKatalogContracts::isDate($basStr)) {
+                if ($tarihDurumu === 'BELIRLENEMEDI') {
+                    $uyarilar[] = 'BELIRLENEMEDI_YURURLUK:' . $kod;
+                } else {
+                    $limitedBlockers[] = 'YURURLUK_TARIHI_EKSIK:' . $kod;
+                    $fullBlockers[] = 'YURURLUK_TARIHI_EKSIK:' . $kod;
+                }
             }
+
             if ($manifestId === '') {
-                $eksikKanitlar[] = 'PRIMARY_MANIFEST_EKSIK:' . $kod;
+                $limitedBlockers[] = 'PRIMARY_MANIFEST_EKSIK:' . $kod;
+                $fullBlockers[] = 'PRIMARY_MANIFEST_EKSIK:' . $kod;
             }
             if (($kod === '28' || $kod === '29') && $aktiflik === 'AKTIF') {
-                $eksikKanitlar[] = 'TARIHSEL_KOD_GUNCEL_AKTIF:' . $kod;
+                $limitedWarnings[] = 'TARIHSEL_KOD_GUNCEL_AKTIF:' . $kod;
+                $fullBlockers[] = 'TARIHSEL_KOD_GUNCEL_AKTIF:' . $kod;
             }
             if ($kod === '27') {
                 $setHash = (string) ($kodRow['kaynak_kod_set_hash'] ?? '');
                 if (!SgkKatalogContracts::isSha256($setHash)) {
-                    $eksikKanitlar[] = 'OZEL_BIRLESIK_KOD_MATRISI_EKSIK:27';
+                    $limitedWarnings[] = 'OZEL_BIRLESIK_KOD_MATRISI_EKSIK:27';
+                    $fullBlockers[] = 'OZEL_BIRLESIK_KOD_MATRISI_EKSIK:27';
                 }
             }
         }
 
         $yalnizOperasyonel = $kodlar === [] && $operasyonel !== [] && $manifests === [];
         if ($yalnizOperasyonel) {
-            $eksikKanitlar[] = 'YALNIZ_OPERASYONEL_EKRAN_GORUNTUSU';
+            $limitedBlockers[] = 'YALNIZ_OPERASYONEL_EKRAN_GORUNTUSU';
+            $fullBlockers[] = 'YALNIZ_OPERASYONEL_EKRAN_GORUNTUSU';
         }
 
         foreach ($operasyonel as $op) {
             if (!empty($op['mevzuat_kaynagi_mi'])) {
-                $eksikKanitlar[] = 'OPERASYONEL_KANIT_MEVZUAT_YERINE_KULLANILDI';
+                $limitedWarnings[] = 'OPERASYONEL_KANIT_MEVZUAT_YERINE_KULLANILDI';
+                $fullBlockers[] = 'OPERASYONEL_KANIT_MEVZUAT_YERINE_KULLANILDI';
             }
             if (!empty($op['tek_basina_yeterli_mi'])) {
-                $eksikKanitlar[] = 'OPERASYONEL_KANIT_TEK_BASINA_YETERLI_IDDIASI';
+                $limitedWarnings[] = 'OPERASYONEL_KANIT_TEK_BASINA_YETERLI_IDDIASI';
+                $fullBlockers[] = 'OPERASYONEL_KANIT_TEK_BASINA_YETERLI_IDDIASI';
             }
         }
 
-        $eksikKanitlar = array_values(array_unique($eksikKanitlar));
+        $limitedBlockers = array_values(array_unique($limitedBlockers));
+        $limitedWarnings = array_values(array_unique($limitedWarnings));
+        $fullBlockers = array_values(array_unique($fullBlockers));
         $erisilemeyen = array_values(array_unique($erisilemeyen));
+        $uyarilar = array_values(array_unique($uyarilar));
+
+        $eksikKanitlar = array_values(array_unique(array_merge($limitedBlockers, $limitedWarnings, $uyarilar)));
 
         $requested = strtoupper((string) ($input['istenen_tamlik_durumu'] ?? ''));
         if ($requested === 'DOGRULANMIS_TAM') {
+            $fullBlockers[] = 'DOGRULANMIS_TAM_REDDI';
             $eksikKanitlar[] = 'DOGRULANMIS_TAM_REDDI';
-            $blockers[] = SgkKatalogContracts::blocker(
-                SgkKatalogContracts::BLOCKER_TAMLIK,
-                'DOGRULANMIS_TAM denemesi reddedildi; kaynak tamlik kapisi acik degil.',
-                'Resmi birincil kaynak paketi tamamlanmadan DOGRULANMIS_TAM secilemez.'
-            );
             $eksikKanitlar = array_values(array_unique($eksikKanitlar));
         }
 
-        // S85-C1 / S98: never emit DOGRULANMIS_TAM production status.
+        $limitedEligible = $limitedBlockers === []
+            && $primaryManifest > 0
+            && count($kodlar) > 0;
+
+        $dogrulanmisTamEligible = $limitedEligible
+            && $fullBlockers === []
+            && $gunceTam
+            && $yururlukTam
+            && $ebildirgeOk;
+
+        $blockers = [];
         $tamlikDurumu = 'TASLAK';
         $onaylanabilir = false;
+        $importYazmaAktif = false;
+        $approveAktif = false;
 
-        $blockers[] = SgkKatalogContracts::blocker(
-            SgkKatalogContracts::BLOCKER_TAMLIK,
-            'Resmi kaynak tamlik kaniti eksik; katalog DOGRULANMIS_TAM yapilamaz ve onaylanamaz.',
-            'Mali musavir operasyonel kanit paketi + guncel resmi SGK/mevzuat eklerini tamamlayin; ucuncu taraf listeleri kullanmayin.'
-        );
+        if ($dogrulanmisTamEligible) {
+            $tamlikDurumu = 'DOGRULANMIS_TAM';
+            $onaylanabilir = true;
+            $importYazmaAktif = true;
+            $approveAktif = true;
+        } elseif ($limitedEligible) {
+            $tamlikDurumu = 'RESMI_KAYNAKLI_KISITLI';
+            $onaylanabilir = true;
+            $importYazmaAktif = true;
+            $approveAktif = true;
+        } else {
+            $blockers[] = SgkKatalogContracts::blocker(
+                SgkKatalogContracts::BLOCKER_TAMLIK,
+                'Resmi kaynak tamlik kaniti eksik; katalog RESMI_KAYNAKLI_KISITLI veya DOGRULANMIS_TAM yapilamaz.',
+                'Birincil resmi manifest, kod satirlari ve zorunlu kanit kapilarini tamamlayin; ucuncu taraf listeleri kullanmayin.'
+            );
+        }
 
         sort($manifestIds);
         $manifestSetHash = SgkKatalogContracts::sha256Canonical(['manifest_ids' => $manifestIds]);
@@ -201,6 +278,8 @@ final class SgkKatalogTamlikService
             'aktif_manifest_sayisi' => $aktifManifest,
             'primary_resmi_manifest_sayisi' => $primaryManifest,
             'eksik_kanitlar' => $eksikKanitlar,
+            'uyarilar' => array_values(array_unique(array_merge($limitedWarnings, $uyarilar))),
+            'limited_blocker_kodlari' => $limitedBlockers,
             'erisilemeyen_kaynaklar' => $erisilemeyen,
             'operasyonel_kanitlar' => array_map(static function (array $op): array {
                 return [
@@ -212,12 +291,14 @@ final class SgkKatalogTamlikService
                     'destekledigi_kodlar' => array_values($op['destekledigi_kodlar'] ?? []),
                 ];
             }, $operasyonel),
-            'blocker_kodlari' => array_values(array_map(static fn (array $b) => $b['code'], $blockers)),
+            'blocker_kodlari' => $tamlikDurumu === 'TASLAK'
+                ? array_values(array_map(static fn (array $b) => $b['code'], $blockers))
+                : [],
             'blocker_detaylari' => $blockers,
             'onaylanabilir_mi' => $onaylanabilir,
-            'dogrulanmis_tam_secilebilir_mi' => false,
-            'import_yazma_aktif_mi' => false,
-            'approve_aktif_mi' => false,
+            'dogrulanmis_tam_secilebilir_mi' => $dogrulanmisTamEligible,
+            'import_yazma_aktif_mi' => $importYazmaAktif,
+            'approve_aktif_mi' => $approveAktif,
         ];
         $payload['response_hash'] = SgkKatalogContracts::sha256Canonical($payload);
 

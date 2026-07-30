@@ -24,11 +24,12 @@ describe("S103 AUTH_SMOKE_READONLY MariaDB acceptance", () => {
 });
 
 describe("S103 source contracts", () => {
-  it("migration 041 is last and additive enum-only", () => {
+  it("migration 041 AUTH_SMOKE_READONLY exists; tip is 042 after S106", () => {
     const migrations = readdirSync(resolve("api/migrations"))
       .filter((n) => n.endsWith(".sql"))
       .sort();
-    expect(migrations.at(-1)).toBe("041_auth_smoke_readonly_role.sql");
+    expect(migrations.at(-1)).toBe("042_sgk_resmi_kaynakli_kisitli_katalog.sql");
+    expect(migrations).toContain("041_auth_smoke_readonly_role.sql");
     const sql = readFileSync("api/migrations/041_auth_smoke_readonly_role.sql", "utf8");
     expect(sql).toContain("AUTH_SMOKE_READONLY");
     expect(sql).toContain("PATRON");

@@ -303,8 +303,8 @@ final class SgkPrimGunuService
         $version = $rows[0];
         // RESMI_KAYNAKLI_KISITLI rows keep legacy aktif_mi=0 (PORTAL_TEYIT_BEKLIYOR);
         // still load them so fail-closed engine rules (YASAK/TEYITSIZ/BELIRLENEMEDI) can fire.
-        $codesStmt = $pdo->prepare(
-            "SELECT * FROM sgk_eksik_gun_kodlari
+        // Fall back to aktif_mi-only when aktiflik_durumu column is absent (pre-040 fixtures).
+        $codesSqlLimited = "SELECT * FROM sgk_eksik_gun_kodlari
              WHERE katalog_surum_id = :id
                AND (
                  aktif_mi = 1
@@ -312,9 +312,20 @@ final class SgkPrimGunuService
                )
                AND (gecerlilik_baslangic IS NULL OR gecerlilik_baslangic <= :bitis)
                AND (gecerlilik_bitis IS NULL OR gecerlilik_bitis >= :baslangic)
-             ORDER BY eksik_gun_kodu ASC"
-        );
-        $codesStmt->execute(['id' => (int) $version['id'], 'baslangic' => $from, 'bitis' => $to]);
+             ORDER BY eksik_gun_kodu ASC";
+        $codesSqlLegacy = 'SELECT * FROM sgk_eksik_gun_kodlari
+             WHERE katalog_surum_id = :id AND aktif_mi = 1
+               AND (gecerlilik_baslangic IS NULL OR gecerlilik_baslangic <= :bitis)
+               AND (gecerlilik_bitis IS NULL OR gecerlilik_bitis >= :baslangic)
+             ORDER BY eksik_gun_kodu ASC';
+        $codeParams = ['id' => (int) $version['id'], 'baslangic' => $from, 'bitis' => $to];
+        try {
+            $codesStmt = $pdo->prepare($codesSqlLimited);
+            $codesStmt->execute($codeParams);
+        } catch (PDOException $e) {
+            $codesStmt = $pdo->prepare($codesSqlLegacy);
+            $codesStmt->execute($codeParams);
+        }
         $codes = [];
         foreach ($codesStmt->fetchAll(PDO::FETCH_ASSOC) as $code) {
             $codes[(string) $code['eksik_gun_kodu']] = [

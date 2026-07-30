@@ -301,14 +301,31 @@ final class SgkPrimGunuService
             ];
         }
         $version = $rows[0];
-        $codesStmt = $pdo->prepare(
-            'SELECT * FROM sgk_eksik_gun_kodlari
+        // RESMI_KAYNAKLI_KISITLI rows keep legacy aktif_mi=0 (PORTAL_TEYIT_BEKLIYOR);
+        // still load them so fail-closed engine rules (YASAK/TEYITSIZ/BELIRLENEMEDI) can fire.
+        // Fall back to aktif_mi-only when aktiflik_durumu column is absent (pre-040 fixtures).
+        $codesSqlLimited = "SELECT * FROM sgk_eksik_gun_kodlari
+             WHERE katalog_surum_id = :id
+               AND (
+                 aktif_mi = 1
+                 OR UPPER(COALESCE(aktiflik_durumu, '')) IN ('AKTIF', 'PORTAL_TEYIT_BEKLIYOR', 'BAGLAMA_OZGUN')
+               )
+               AND (gecerlilik_baslangic IS NULL OR gecerlilik_baslangic <= :bitis)
+               AND (gecerlilik_bitis IS NULL OR gecerlilik_bitis >= :baslangic)
+             ORDER BY eksik_gun_kodu ASC";
+        $codesSqlLegacy = 'SELECT * FROM sgk_eksik_gun_kodlari
              WHERE katalog_surum_id = :id AND aktif_mi = 1
                AND (gecerlilik_baslangic IS NULL OR gecerlilik_baslangic <= :bitis)
                AND (gecerlilik_bitis IS NULL OR gecerlilik_bitis >= :baslangic)
-             ORDER BY eksik_gun_kodu ASC'
-        );
-        $codesStmt->execute(['id' => (int) $version['id'], 'baslangic' => $from, 'bitis' => $to]);
+             ORDER BY eksik_gun_kodu ASC';
+        $codeParams = ['id' => (int) $version['id'], 'baslangic' => $from, 'bitis' => $to];
+        try {
+            $codesStmt = $pdo->prepare($codesSqlLimited);
+            $codesStmt->execute($codeParams);
+        } catch (PDOException $e) {
+            $codesStmt = $pdo->prepare($codesSqlLegacy);
+            $codesStmt->execute($codeParams);
+        }
         $codes = [];
         foreach ($codesStmt->fetchAll(PDO::FETCH_ASSOC) as $code) {
             $codes[(string) $code['eksik_gun_kodu']] = [
@@ -320,6 +337,7 @@ final class SgkPrimGunuService
                 'tek_basina_kullanilabilir_mi' => (bool) $code['tek_basina_kullanilabilir_mi'],
                 'diger_nedenlerle_birlikte_kullanim' => (string) $code['diger_nedenlerle_birlikte_kullanim'],
                 'aktif_mi' => (bool) $code['aktif_mi'],
+                'aktiflik_durumu' => (string) ($code['aktiflik_durumu'] ?? ''),
                 'gecerlilik_baslangic' => $code['gecerlilik_baslangic'] ?? null,
                 'gecerlilik_bitis' => $code['gecerlilik_bitis'] ?? null,
                 'gecerlilik_tarih_durumu' => (string) ($code['gecerlilik_tarih_durumu'] ?? 'BELIRLENEMEDI'),

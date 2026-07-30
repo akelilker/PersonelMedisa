@@ -765,10 +765,15 @@ foreach ($ownerFiles as $ownerPath) {
 assertTrue(strpos($controllerSrc, "'manifests' => self::loadManifests(\$pdo, 'onay_validate')") !== false, 'onayValidate DB manifest okur');
 assertTrue(!preg_match('/error_log\([^;]*getMessage|error_log\([^;]*getTraceAsString|error_log\(\s*\$e\b/', $controllerSrc), 'controller raw exception loglamaz');
 
-// surumler does not load manifests (owner chain: auth + Connection only)
-assertTrue(preg_match('/function surumler\(Request \$request\)\s*\{[^}]+\}/s', $controllerSrc, $surumMatch) === 1, 'surumler method parse');
-assertTrue(strpos($surumMatch[0], 'loadManifests') === false, 'surumler loadManifests cagirmaz');
-assertTrue(strpos($surumMatch[0], 'self::context(') !== false, 'surumler context kullanir');
+// surumler reads DB surum list; must not load manifests
+$surumPos = strpos($controllerSrc, 'function surumler(Request $request)');
+assertTrue($surumPos !== false, 'surumler method mevcut');
+$surumChunk = substr($controllerSrc, $surumPos, 2200);
+assertTrue(strpos($surumChunk, 'loadManifests') === false, 'surumler loadManifests cagirmaz');
+assertTrue(strpos($surumChunk, 'self::context(') !== false, 'surumler context kullanir');
+assertTrue(strpos($surumChunk, 'sgk_eksik_gun_katalog_surumleri') !== false, 'surumler DB surum tablosunu okur');
+assertTrue(strpos($controllerSrc, 'storedApprovedTamlik') !== false, 'tamlik kayitli ONAYLANDI snapshot okur');
+assertTrue(strpos($writeSrc, 'function storedApprovedTamlik') !== false, 'WriteService storedApprovedTamlik');
 
 // --- S106 canonical 19-pack dry-run ---
 $canonicalPath = __DIR__ . '/../../ops/sgk/S106-SGK-EKSIK-GUN-19-CANONICAL.json';

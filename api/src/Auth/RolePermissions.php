@@ -215,6 +215,9 @@ class RolePermissions
             'patron_ack.view',
             'patron_ack.mark_seen',
         ],
+        'AUTH_SMOKE_READONLY' => [
+            'ops.auth_smoke.read',
+        ],
     ];
 
     /** @param array<string, mixed> $user */

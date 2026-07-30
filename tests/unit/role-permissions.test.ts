@@ -293,6 +293,20 @@ describe("role permissions", () => {
     expect(hasRolePermission("PATRON", "puantaj.bildirim_etki.dismiss")).toBe(false);
   });
 
+  it("locks AUTH_SMOKE_READONLY to single ops.auth_smoke.read permission (S103)", () => {
+    expect(getRolePermissions("AUTH_SMOKE_READONLY")).toEqual(["ops.auth_smoke.read"]);
+    expect(hasRolePermission("AUTH_SMOKE_READONLY", "ops.auth_smoke.read")).toBe(true);
+    expect(hasRolePermission("AUTH_SMOKE_READONLY", "personeller.view")).toBe(false);
+    expect(hasRolePermission("AUTH_SMOKE_READONLY", "personeller.view.sube")).toBe(false);
+    expect(hasRolePermission("AUTH_SMOKE_READONLY", "personeller.detail.view")).toBe(false);
+    expect(hasRolePermission("AUTH_SMOKE_READONLY", "personeller.create")).toBe(false);
+    expect(hasRolePermission("AUTH_SMOKE_READONLY", "personeller.update")).toBe(false);
+    expect(hasRolePermission("AUTH_SMOKE_READONLY", "yonetim-paneli.manage")).toBe(false);
+    expect(hasRolePermission("AUTH_SMOKE_READONLY", "resmi_tatil_takvimi.manage")).toBe(false);
+    expect(hasRolePermission("AUTH_SMOKE_READONLY", "bordro_kesinlestirme.approve")).toBe(false);
+    expect(ALL_ROLES).toContain("AUTH_SMOKE_READONLY");
+  });
+
   it("keeps TS and PHP role permission matrices in parity (S70B-1)", () => {
     for (const role of ALL_ROLES) {
       const tsPermissions = [...getRolePermissions(role)].sort();

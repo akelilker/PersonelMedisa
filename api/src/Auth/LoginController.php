@@ -47,8 +47,15 @@ class LoginController
         }
 
         $subeIds = self::loadUserSubeIds($pdo, (int) $user['id']);
-        $subeList = self::loadSubeList($pdo, $subeIds);
         $rol = (string) $user['rol'];
+        if (strtoupper(trim($rol)) === 'AUTH_SMOKE_READONLY' && count($subeIds) !== 1) {
+            JsonResponse::error(
+                403,
+                'AUTH_SMOKE_SCOPE_INVALID',
+                'AUTH_SMOKE_READONLY hesabi exact bir sube scope gerektirir.'
+            );
+        }
+        $subeList = self::loadSubeList($pdo, $subeIds);
         $activeSubeId = SubeScope::resolveInitialActiveSubeId($subeIds);
 
         $ttl = (int) medisa_config('jwt_ttl_seconds', 86400);

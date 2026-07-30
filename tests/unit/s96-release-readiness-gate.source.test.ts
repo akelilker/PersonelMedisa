@@ -59,7 +59,8 @@ describe("S96 release readiness gate", () => {
     expect(smoke).toContain("SMOKE_AUTH_USERNAME");
     expect(smoke).toContain("SMOKE_AUTH_PASSWORD");
     expect(smoke).toContain("checkAuthenticatedReadOnly");
-    expect(smoke).toContain("no write calls");
+    expect(smoke).toContain("/api/auth/smoke-read");
+    expect(smoke).toContain("no domain writes; no PII read");
   });
 
   it("ops runbook documents four external gates", () => {

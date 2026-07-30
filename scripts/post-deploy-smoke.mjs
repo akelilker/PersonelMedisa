@@ -516,6 +516,20 @@ function extractToken(payload) {
   return null;
 }
 
+function isAuthSmokeReadPayload(payload) {
+  if (!payload || typeof payload !== "object") {
+    return false;
+  }
+  const data = payload.data && typeof payload.data === "object" ? payload.data : payload;
+  return (
+    data.authenticated === true &&
+    data.read_only === true &&
+    data.role === "AUTH_SMOKE_READONLY" &&
+    data.scope_type === "SINGLE_BRANCH" &&
+    data.scope_count === 1
+  );
+}
+
 async function checkAuthenticatedReadOnly(baseUrl, appPrefix) {
   const step = "Authenticated read-only smoke";
   const username = (process.env.SMOKE_AUTH_USERNAME ?? "").trim();
@@ -562,15 +576,15 @@ async function checkAuthenticatedReadOnly(baseUrl, appPrefix) {
       URL: loginUrl,
       Expected: "HTTP 200 + data.token",
       Got: `HTTP ${loginResponse.status}; token=${token ? "present" : "missing"}`,
-      Hint: "Use a dedicated non-prod-write test account; do not use personal credentials in logs"
+      Hint: "Use dedicated AUTH_SMOKE_READONLY account; do not use personal credentials in logs"
     });
     return;
   }
 
-  const personellerUrl = joinUrl(baseUrl, appPrefix, "/api/personeller?page=1&limit=5");
-  let personellerResponse;
+  const smokeReadUrl = joinUrl(baseUrl, appPrefix, "/api/auth/smoke-read");
+  let smokeReadResponse;
   try {
-    personellerResponse = await fetchWithTimeout(personellerUrl, {
+    smokeReadResponse = await fetchWithTimeout(smokeReadUrl, {
       method: "GET",
       headers: {
         Accept: "application/json",
@@ -579,24 +593,32 @@ async function checkAuthenticatedReadOnly(baseUrl, appPrefix) {
     });
   } catch (error) {
     recordFailure(step, {
-      URL: personellerUrl,
-      Expected: "HTTP 200 authenticated personeller read",
+      URL: smokeReadUrl,
+      Expected: "HTTP 200 authenticated smoke-read",
       Got: error instanceof Error ? error.message : String(error)
     });
     return;
   }
 
-  if (!personellerResponse.ok || !isJsonContentType(personellerResponse.contentType)) {
+  const smokePayload = parseJsonBody(smokeReadResponse.body);
+  if (
+    !smokeReadResponse.ok ||
+    !isJsonContentType(smokeReadResponse.contentType) ||
+    !isAuthSmokeReadPayload(smokePayload)
+  ) {
     recordFailure(step, {
-      URL: personellerUrl,
-      Expected: "HTTP 200 JSON personeller list/page",
-      Got: `HTTP ${personellerResponse.status}; content-type=${personellerResponse.contentType || "n/a"}`
+      URL: smokeReadUrl,
+      Expected: "HTTP 200 JSON AUTH_SMOKE_READONLY single-branch contract",
+      Got: `HTTP ${smokeReadResponse.status}; content-type=${smokeReadResponse.contentType || "n/a"}; contract=${isAuthSmokeReadPayload(smokePayload) ? "ok" : "mismatch"}`
     });
     return;
   }
 
   // Explicit non-write assertion: this smoke never calls POST/PUT/PATCH/DELETE after login.
-  console.log(`[OK] ${step} (login + GET /api/personeller; no write calls)`);
+  // Dedicated role reads no personel/domain PII.
+  console.log(
+    `[OK] ${step} (login + GET /api/auth/smoke-read; no domain writes; no PII read)`
+  );
 }
 
 async function main() {

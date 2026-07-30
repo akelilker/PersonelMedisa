@@ -3,7 +3,8 @@ export type UserRole =
   | "BOLUM_YONETICISI"
   | "MUHASEBE"
   | "BIRIM_AMIRI"
-  | "PATRON";
+  | "PATRON"
+  | "AUTH_SMOKE_READONLY";
 
 export type UiProfile = "yonetim" | "birim_amiri";
 
@@ -46,4 +47,18 @@ export const MANAGEMENT_ROLES: UserRole[] = [
   "MUHASEBE"
 ];
 
-export const ALL_ROLES: UserRole[] = [...MANAGEMENT_ROLES, "BIRIM_AMIRI", "PATRON"];
+/** Insan kullanici olusturma / rol picker icin atanabilir roller (teknik rol haric). */
+export const ASSIGNABLE_USER_ROLES: UserRole[] = [
+  "GENEL_YONETICI",
+  "BOLUM_YONETICISI",
+  "MUHASEBE",
+  "BIRIM_AMIRI",
+  "PATRON"
+];
+
+export const ALL_ROLES: UserRole[] = [
+  ...MANAGEMENT_ROLES,
+  "BIRIM_AMIRI",
+  "PATRON",
+  "AUTH_SMOKE_READONLY"
+];

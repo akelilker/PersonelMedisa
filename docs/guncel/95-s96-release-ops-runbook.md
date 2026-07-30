@@ -105,9 +105,11 @@ Bu koşuda (S96) write **yapılmayacaktır**.
 ## 5) Canlı authenticated smoke hesabı geldiğinde
 
 1. Hesabı secret store’da tut; repoya koyma.
-2. Tercihen `GENEL_YONETICI` veya `MUHASEBE` read yetkili, write’sız / sınırlı test hesabı.
-3. `RELEASE_GATE_AUTH_SMOKE_CREDENTIAL=ready`
-4. Çalıştır:
+2. Dedicated teknik rol: `AUTH_SMOKE_READONLY` (exact 1 şube; yalnız `ops.auth_smoke.read`).
+3. Dedicated smoke rolü hiçbir personel veya domain verisi okumaz.
+   Endpoint yalnız authentication, permission ve tek-şube scope contractını doğrular.
+4. `RELEASE_GATE_AUTH_SMOKE_CREDENTIAL=ready`
+5. Çalıştır:
 
 ```bash
 SMOKE_BASE_URL=https://<canlı-host> \
@@ -116,8 +118,8 @@ SMOKE_AUTH_PASSWORD=<test-pass> \
 npm run smoke:live
 ```
 
-Beklenen: anonymous health/auth-guard/frontend/assets OK + `login + GET /api/personeller` OK.  
-Script login sonrası **POST/PUT/PATCH/DELETE çağırmaz**.
+Beklenen: anonymous health/auth-guard/frontend/assets OK + `login + GET /api/auth/smoke-read` OK.
+Script login sonrası **POST/PUT/PATCH/DELETE çağırmaz**. Personel listesi okumaz.
 
 ---
 

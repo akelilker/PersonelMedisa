@@ -83,7 +83,8 @@ export type AppPermission =
   | "revizyon.approve"
   | "revizyon.reject"
   | "revizyon.view_finance_effect"
-  | "revizyon.view_audit_history";
+  | "revizyon.view_audit_history"
+  | "ops.auth_smoke.read";
 
 const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
   GENEL_YONETICI: [
@@ -290,7 +291,8 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "raporlar.view",
     "patron_ack.view",
     "patron_ack.mark_seen"
-  ]
+  ],
+  AUTH_SMOKE_READONLY: ["ops.auth_smoke.read"]
 };
 
 const EMPTY_PERMISSIONS: readonly AppPermission[] = [];

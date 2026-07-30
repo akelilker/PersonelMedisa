@@ -185,11 +185,7 @@ final class SgkKatalogWriteService
             return self::result(404, 'SGK_KATALOG_SURUM_BULUNAMADI', 'Katalog surumu bulunamadi.');
         }
 
-        $tamlik = SgkKatalogTamlikService::evaluate($payload['tamlik_input'] ?? [
-            'katalog_surumu' => $surumKodu,
-            'manifests' => $payload['manifests'] ?? [],
-            'kod_satirlari' => $payload['rows'] ?? [],
-        ]);
+        $tamlik = self::resolveTamlikForTransition($pdo, $existing, $payload);
 
         $transition = SgkKatalogOnayService::validateTransition([
             'current_state' => (string) ($existing['state'] ?? 'TASLAK'),
@@ -252,11 +248,7 @@ final class SgkKatalogWriteService
             return self::result(404, 'SGK_KATALOG_SURUM_BULUNAMADI', 'Katalog surumu bulunamadi.');
         }
 
-        $tamlik = SgkKatalogTamlikService::evaluate($payload['tamlik_input'] ?? [
-            'katalog_surumu' => $surumKodu,
-            'manifests' => $payload['manifests'] ?? [],
-            'kod_satirlari' => $payload['rows'] ?? [],
-        ]);
+        $tamlik = self::resolveTamlikForTransition($pdo, $existing, $payload);
 
         $transition = SgkKatalogOnayService::validateTransition([
             'current_state' => (string) ($existing['state'] ?? 'TASLAK'),
@@ -334,6 +326,60 @@ final class SgkKatalogWriteService
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
         return is_array($row) ? $row : null;
+    }
+
+    /**
+     * Submit/approve may send only katalog_surumu. Prefer explicit package evaluation;
+     * otherwise trust the imported surum snapshot already stored in DB.
+     *
+     * @param array<string,mixed> $existing
+     * @param array<string,mixed> $payload
+     * @return array<string,mixed>
+     */
+    private static function resolveTamlikForTransition(PDO $pdo, array $existing, array $payload): array
+    {
+        if (isset($payload['tamlik_input']) && is_array($payload['tamlik_input'])) {
+            return SgkKatalogTamlikService::evaluate($payload['tamlik_input']);
+        }
+
+        $hasPackage = !empty($payload['manifests']) || !empty($payload['rows']);
+        if ($hasPackage) {
+            $flags = is_array($payload['tamlik'] ?? null) ? $payload['tamlik'] : [];
+
+            return SgkKatalogTamlikService::evaluate(array_merge($flags, [
+                'katalog_surumu' => (string) ($existing['surum_kodu'] ?? ''),
+                'manifests' => $payload['manifests'] ?? [],
+                'kod_satirlari' => $payload['rows'] ?? [],
+            ]));
+        }
+
+        $stored = strtoupper((string) ($existing['tamlik_durumu'] ?? 'TASLAK'));
+        $approved = in_array($stored, ['RESMI_KAYNAKLI_KISITLI', 'DOGRULANMIS_TAM'], true);
+        $stmt = $pdo->prepare('SELECT COUNT(*) FROM sgk_eksik_gun_kodlari WHERE katalog_surum_id = :id');
+        $stmt->execute(['id' => (int) ($existing['id'] ?? 0)]);
+        $kodSayisi = (int) $stmt->fetchColumn();
+
+        $blockers = [];
+        if (!$approved || $kodSayisi <= 0) {
+            $blockers[] = SgkKatalogContracts::blocker(
+                SgkKatalogContracts::BLOCKER_TAMLIK,
+                'Kayitli surum tamlik/kod snapshot submit/approve icin yetersiz.',
+                'Once gecerli resmi paket import edin.'
+            );
+        }
+
+        return [
+            'tamlik_durumu' => $stored,
+            'katalog_surumu' => (string) ($existing['surum_kodu'] ?? ''),
+            'manifest_set_hash' => (string) ($existing['manifest_set_hash'] ?? ''),
+            'kod_sayisi' => $kodSayisi,
+            'blocker_kodlari' => array_values(array_map(static fn (array $b) => $b['code'], $blockers)),
+            'blocker_detaylari' => $blockers,
+            'onaylanabilir_mi' => $approved && $kodSayisi > 0,
+            'dogrulanmis_tam_secilebilir_mi' => $stored === 'DOGRULANMIS_TAM',
+            'import_yazma_aktif_mi' => $approved,
+            'approve_aktif_mi' => $approved,
+        ];
     }
 
     /**

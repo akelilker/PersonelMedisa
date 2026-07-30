@@ -19,6 +19,10 @@ class PersonellerController
     public static function list(Request $request)
     {
         $user = AuthMiddleware::authenticate($request, true);
+        RolePermissions::assertAny($user, [
+            'personeller.view',
+            'personeller.view.sube',
+        ]);
         $scope = SubeScope::resolveScope($user, $request);
         $allowedSubeIds = SubeScope::allowedSubeIds($user);
 
@@ -119,6 +123,7 @@ class PersonellerController
     public static function detail(Request $request, $personelId)
     {
         $user = AuthMiddleware::authenticate($request, true);
+        RolePermissions::assert($user, 'personeller.detail.view');
         $personelId = (int) $personelId;
         if ($personelId <= 0) {
             JsonResponse::notFound();

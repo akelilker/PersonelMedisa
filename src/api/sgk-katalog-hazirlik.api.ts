@@ -27,6 +27,21 @@ export type SgkBelgeSaklamaIbrazDurumu =
 export type SgkYabanciKullanimDurumu = "IZINLI" | "YASAK" | "KOSULLU" | "TEYITSIZ";
 export type SgkPortalTeyitDurumu = "TEYIT_EDILDI" | "TEYIT_BEKLIYOR" | "TARIHSEL";
 
+export type SgkTamlikDurumu = "TASLAK" | "RESMI_KAYNAKLI_KISITLI" | "DOGRULANMIS_TAM";
+export type SgkGecerlilikTarihDurumu = "RESMI_YURURLUK" | "ILK_RESMI_KANIT" | "BELIRLENEMEDI";
+
+export const SGK_TAMLIK_DURUMU_LABEL: Record<SgkTamlikDurumu, string> = {
+  TASLAK: "TASLAK",
+  RESMI_KAYNAKLI_KISITLI: "RESMÎ KAYNAKLI KISITLI",
+  DOGRULANMIS_TAM: "DOĞRULANMIŞ TAM"
+};
+
+export const SGK_GECERLILIK_TARIH_DURUMU_LABEL: Record<SgkGecerlilikTarihDurumu, string> = {
+  RESMI_YURURLUK: "Resmî yürürlük",
+  ILK_RESMI_KANIT: "İlk resmî kanıt",
+  BELIRLENEMEDI: "Belirlenemedi"
+};
+
 export const SGK_AKTIFLIK_DURUMU_LABEL: Record<SgkAktiflikDurumu, string> = {
   AKTIF: "AKTIF",
   TARIHSEL: "TARIHSEL",
@@ -39,13 +54,21 @@ export function isSgkKodSecilebilir(input: {
   aktiflik_durumu?: string | null;
   portal_teyit_durumu?: string | null;
   sifir_gun_sifir_kazanc_durumu?: string | null;
+  katalog_tamlik_durumu?: string | null;
 }): boolean {
+  const katalogTamlik = (input.katalog_tamlik_durumu ?? "").toUpperCase();
+  const kisitliOnayli = katalogTamlik === "RESMI_KAYNAKLI_KISITLI";
   const aktiflik = (input.aktiflik_durumu ?? "").toUpperCase();
   const portal = (input.portal_teyit_durumu ?? "").toUpperCase();
   const sifir = (input.sifir_gun_sifir_kazanc_durumu ?? "").toUpperCase();
   if (sifir === "TEYITSIZ") return false;
-  if (aktiflik === "TARIHSEL" || aktiflik === "PORTAL_TEYIT_BEKLIYOR") return false;
-  if (portal === "TEYIT_BEKLIYOR" || portal === "TARIHSEL") return false;
+  if (aktiflik === "TARIHSEL") return false;
+  if (portal === "TARIHSEL") return false;
+  if (kisitliOnayli && aktiflik === "PORTAL_TEYIT_BEKLIYOR" && portal === "TEYIT_BEKLIYOR") {
+    return true;
+  }
+  if (aktiflik === "PORTAL_TEYIT_BEKLIYOR") return false;
+  if (portal === "TEYIT_BEKLIYOR") return false;
   return aktiflik === "AKTIF" && portal === "TEYIT_EDILDI";
 }
 
@@ -208,6 +231,30 @@ export async function previewSgkBildirimDonemi(body: Record<string, unknown>) {
 export async function validateSgkKatalogOnay(body: Record<string, unknown>) {
   const response = await apiRequest<ApiResponse<Record<string, unknown>> | Record<string, unknown>>(
     endpoints.sgkKatalogHazirlik.onayValidate,
+    { method: "POST", body: JSON.stringify(body) }
+  );
+  return unwrapData(response);
+}
+
+export async function importSgkKatalog(body: Record<string, unknown>) {
+  const response = await apiRequest<ApiResponse<Record<string, unknown>> | Record<string, unknown>>(
+    endpoints.sgkKatalogHazirlik.import,
+    { method: "POST", body: JSON.stringify(body) }
+  );
+  return unwrapData(response);
+}
+
+export async function submitSgkKatalog(body: Record<string, unknown>) {
+  const response = await apiRequest<ApiResponse<Record<string, unknown>> | Record<string, unknown>>(
+    endpoints.sgkKatalogHazirlik.submit,
+    { method: "POST", body: JSON.stringify(body) }
+  );
+  return unwrapData(response);
+}
+
+export async function approveSgkKatalog(body: Record<string, unknown>) {
+  const response = await apiRequest<ApiResponse<Record<string, unknown>> | Record<string, unknown>>(
+    endpoints.sgkKatalogHazirlik.approve,
     { method: "POST", body: JSON.stringify(body) }
   );
   return unwrapData(response);

@@ -126,6 +126,52 @@ try {
     migrationAssert((int) $pdo->query('SELECT COUNT(*) FROM sgk_kaynak_manifestleri')->fetchColumn() === 9, 'ikinci apply 040 dahil idempotent kaldi');
     migrationAssert((int) $pdo->query("SELECT COUNT(*) FROM sgk_kaynak_manifestleri WHERE kaynak_id = 'SGK_EKSIK_GUN_BELGELERI_20221116' AND durum = 'PASIF'")->fetchColumn() === 1, 'ikinci apply eski kaynak PASIF kaldi');
 
+    // Seed one catalog row before 042 to prove additive apply does not delete.
+    $seedHash = str_repeat('b', 64);
+    $pdo->exec("INSERT INTO sgk_eksik_gun_katalog_surumleri
+        (surum_kodu, gecerlilik_baslangic, gecerlilik_bitis, tamlik_durumu, state, manifest_set_hash, aciklama)
+        VALUES ('S106_PRE_042', '2020-01-01', NULL, 'TASLAK', 'TASLAK', '$seedHash', 'pre-042 baseline')");
+    $preSurumId = (int) $pdo->query("SELECT id FROM sgk_eksik_gun_katalog_surumleri WHERE surum_kodu = 'S106_PRE_042'")->fetchColumn();
+    $ek9Id = (int) $pdo->query("SELECT id FROM sgk_kaynak_manifestleri WHERE kaynak_id = 'SGK_EK9_APHB_20260722'")->fetchColumn();
+    $pdo->exec("INSERT INTO sgk_eksik_gun_kodlari
+        (katalog_surum_id, eksik_gun_kodu, resmi_aciklama, gecerlilik_baslangic, gecerlilik_bitis,
+         kaynak_manifest_id, belge_zorunlulugu, sifir_gun_sifir_kazanc_kullanilabilir_mi,
+         kismi_sureli_sozlesme_gerekli_mi, tek_basina_kullanilabilir_mi, diger_nedenlerle_birlikte_kullanim,
+         aktif_mi)
+        VALUES ($preSurumId, '01', 'Istirahat', '2020-01-01', NULL,
+         $ek9Id, 'KOSULLU', 0, 0, 1, 'KOSULLU', 0)");
+    $preKodCount = (int) $pdo->query('SELECT COUNT(*) FROM sgk_eksik_gun_kodlari')->fetchColumn();
+
+    applySgkMigration($pdo, '042_sgk_resmi_kaynakli_kisitli_katalog.sql');
+    migrationAssert((int) $pdo->query("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'sgk_eksik_gun_kodlari' AND COLUMN_NAME = 'gecerlilik_tarih_durumu'")->fetchColumn() === 1, '042 gecerlilik_tarih_durumu');
+    migrationAssert((int) $pdo->query("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'sgk_eksik_gun_kodlari' AND COLUMN_NAME = 'ilk_resmi_kanit_tarihi'")->fetchColumn() === 1, '042 ilk_resmi_kanit_tarihi');
+    $nullable = (string) $pdo->query("SELECT IS_NULLABLE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'sgk_eksik_gun_kodlari' AND COLUMN_NAME = 'gecerlilik_baslangic'")->fetchColumn();
+    migrationAssert($nullable === 'YES', '042 gecerlilik_baslangic NULL olabilir');
+    $enumTamlik = (string) $pdo->query("SELECT COLUMN_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'sgk_eksik_gun_katalog_surumleri' AND COLUMN_NAME = 'tamlik_durumu'")->fetchColumn();
+    migrationAssert(strpos($enumTamlik, 'RESMI_KAYNAKLI_KISITLI') !== false && strpos($enumTamlik, 'DOGRULANMIS_TAM') !== false, '042 tamlik enum RESMI_KAYNAKLI_KISITLI icerir');
+    migrationAssert((int) $pdo->query('SELECT COUNT(*) FROM sgk_eksik_gun_kodlari')->fetchColumn() === $preKodCount, '042 mevcut kod satirlari silinmedi');
+
+    applySgkMigration($pdo, '042_sgk_resmi_kaynakli_kisitli_katalog.sql');
+    migrationAssert((int) $pdo->query('SELECT COUNT(*) FROM sgk_eksik_gun_kodlari')->fetchColumn() === $preKodCount, '042 ikinci apply idempotent; veri korunur');
+    migrationAssert((int) $pdo->query("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'sgk_eksik_gun_katalog_surumleri' AND COLUMN_NAME = 'katalog_payload_hash'")->fetchColumn() === 1, '042 katalog_payload_hash');
+
+    // ONAYLANDI + RESMI_KAYNAKLI_KISITLI check constraint kabul
+    $pdo->exec("UPDATE sgk_eksik_gun_katalog_surumleri SET tamlik_durumu = 'RESMI_KAYNAKLI_KISITLI', state = 'ONAY_BEKLIYOR' WHERE id = $preSurumId");
+    $pdo->exec("UPDATE sgk_eksik_gun_katalog_surumleri SET state = 'ONAYLANDI', onaylayan_id = 1, onay_zamani = '2026-07-31 00:00:00',
+        resmi_kaynaklar_incelendi_mi = 1, belirsiz_tarihler_uydurulmadi_mi = 1, kisitli_kullanim_kabul_edildi_mi = 1
+        WHERE id = $preSurumId");
+    migrationAssert((string) $pdo->query("SELECT state FROM sgk_eksik_gun_katalog_surumleri WHERE id = $preSurumId")->fetchColumn() === 'ONAYLANDI', '042 ONAYLANDI + RESMI_KAYNAKLI_KISITLI kabul');
+
+    // NULL baslangic insert
+    $pdo->exec("INSERT INTO sgk_eksik_gun_kodlari
+        (katalog_surum_id, eksik_gun_kodu, resmi_aciklama, gecerlilik_baslangic, gecerlilik_bitis, gecerlilik_tarih_durumu,
+         kaynak_manifest_id, belge_zorunlulugu, sifir_gun_sifir_kazanc_kullanilabilir_mi,
+         kismi_sureli_sozlesme_gerekli_mi, tek_basina_kullanilabilir_mi, diger_nedenlerle_birlikte_kullanim,
+         aktif_mi)
+        VALUES ($preSurumId, '03', 'Disiplin cezasi', NULL, NULL, 'BELIRLENEMEDI',
+         $ek9Id, 'KOSULLU', 0, 0, 1, 'KOSULLU', 0)");
+    migrationAssert((int) $pdo->query("SELECT COUNT(*) FROM sgk_eksik_gun_kodlari WHERE eksik_gun_kodu = '03' AND gecerlilik_baslangic IS NULL")->fetchColumn() === 1, '042 NULL gecerlilik_baslangic insert');
+
     $hash = str_repeat('a', 64);
     $pdo->exec("INSERT INTO maas_hesaplama_sgk_snapshotlari (
         donem_snapshot_id, personel_snapshot_id, personel_id,

@@ -30,6 +30,7 @@ export function buildSgkKatalogTamlikMock() {
     ],
     erisilemeyen_kaynaklar: ["e-Bildirge/e-Beyanname login-gated dropdown"],
     operasyonel_kanitlar: [],
+    uyarilar: [],
     blocker_kodlari: [SGK_KATALOG_TAMLIK_BLOCKER.code],
     blocker_detaylari: [SGK_KATALOG_TAMLIK_BLOCKER],
     onaylanabilir_mi: false,

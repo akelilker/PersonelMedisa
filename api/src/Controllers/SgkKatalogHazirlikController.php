@@ -16,6 +16,7 @@ use Medisa\Api\Services\Payroll\SgkKatalogOnayService;
 use Medisa\Api\Services\Payroll\SgkKatalogPreviewService;
 use Medisa\Api\Services\Payroll\SgkKatalogTamlikService;
 use Medisa\Api\Services\Payroll\SgkKaynakManifestReader;
+use Medisa\Api\Services\Payroll\SgkKatalogWriteService;
 use Medisa\Api\Services\Payroll\SgkOperasyonelKanitBase64Guard;
 use Medisa\Api\Services\Payroll\SgkOperasyonelKanitValidator;
 use Medisa\Api\Services\Payroll\SgkSurecKodEslemeValidator;
@@ -23,7 +24,7 @@ use PDO;
 use RuntimeException;
 
 /**
- * S85-C1: Read-only / dry-run SGK catalog readiness endpoints. No seed/write activation.
+ * S85-C1 / S106: SGK catalog readiness endpoints. Write activated for GENEL_YONETICI when tamlik allows.
  */
 class SgkKatalogHazirlikController
 {
@@ -90,6 +91,72 @@ class SgkKatalogHazirlikController
         JsonResponse::success(SgkKatalogImportValidator::dryRun($body));
     }
 
+    public static function import(Request $request)
+    {
+        [$pdo, $user] = self::writeContext($request);
+        $body = self::jsonBody($request);
+        if (empty($body['manifests'])) {
+            $body['manifests'] = self::loadManifests($pdo, 'import');
+        }
+        try {
+            $result = SgkKatalogWriteService::import($pdo, $user, $body);
+        } catch (RuntimeException $e) {
+            if ($e->getMessage() === 'SGK_KATALOG_WRITE_FORBIDDEN') {
+                JsonResponse::error(403, 'SGK_KATALOG_WRITE_FORBIDDEN', 'SGK katalog yazma yalniz GENEL_YONETICI icindir.');
+            }
+            throw $e;
+        }
+        $status = (int) ($result['http_status'] ?? 200);
+        if ($status >= 400) {
+            JsonResponse::error($status, (string) ($result['code'] ?? 'SGK_KATALOG_IMPORT_HATASI'), (string) ($result['message'] ?? 'Import basarisiz.'), null, $result);
+        }
+        JsonResponse::success($result);
+    }
+
+    public static function submit(Request $request)
+    {
+        [$pdo, $user] = self::writeContext($request);
+        $body = self::jsonBody($request);
+        if (empty($body['manifests'])) {
+            $body['manifests'] = self::loadManifests($pdo, 'submit');
+        }
+        try {
+            $result = SgkKatalogWriteService::submit($pdo, $user, $body);
+        } catch (RuntimeException $e) {
+            if ($e->getMessage() === 'SGK_KATALOG_WRITE_FORBIDDEN') {
+                JsonResponse::error(403, 'SGK_KATALOG_WRITE_FORBIDDEN', 'SGK katalog yazma yalniz GENEL_YONETICI icindir.');
+            }
+            throw $e;
+        }
+        $status = (int) ($result['http_status'] ?? 200);
+        if ($status >= 400) {
+            JsonResponse::error($status, (string) ($result['code'] ?? 'SGK_KATALOG_SUBMIT_HATASI'), (string) ($result['message'] ?? 'Submit basarisiz.'), null, $result);
+        }
+        JsonResponse::success($result);
+    }
+
+    public static function approve(Request $request)
+    {
+        [$pdo, $user] = self::writeContext($request);
+        $body = self::jsonBody($request);
+        if (empty($body['manifests'])) {
+            $body['manifests'] = self::loadManifests($pdo, 'approve');
+        }
+        try {
+            $result = SgkKatalogWriteService::approve($pdo, $user, $body);
+        } catch (RuntimeException $e) {
+            if ($e->getMessage() === 'SGK_KATALOG_WRITE_FORBIDDEN') {
+                JsonResponse::error(403, 'SGK_KATALOG_WRITE_FORBIDDEN', 'SGK katalog yazma yalniz GENEL_YONETICI icindir.');
+            }
+            throw $e;
+        }
+        $status = (int) ($result['http_status'] ?? 200);
+        if ($status >= 400) {
+            JsonResponse::error($status, (string) ($result['code'] ?? 'SGK_KATALOG_APPROVE_HATASI'), (string) ($result['message'] ?? 'Approve basarisiz.'), null, $result);
+        }
+        JsonResponse::success($result);
+    }
+
     public static function surecEslemeValidate(Request $request)
     {
         self::context($request, 'bordro_on_izleme.view');
@@ -129,8 +196,8 @@ class SgkKatalogHazirlikController
             'blocker_kodlari' => $codes,
             'blocker_detaylari' => $all,
             'tamlik' => $tamlik,
-            'approve_disabled_mi' => true,
-            'import_write_disabled_mi' => true,
+            'approve_disabled_mi' => empty($tamlik['approve_aktif_mi']),
+            'import_write_disabled_mi' => empty($tamlik['import_yazma_aktif_mi']),
             'response_hash' => hash('sha256', json_encode($codes, JSON_UNESCAPED_UNICODE)),
         ]);
     }
@@ -224,6 +291,19 @@ class SgkKatalogHazirlikController
                 'SGK kaynak manifesti okunamadi. Sema veya baglanti durumunu kontrol edin.'
             );
         }
+    }
+
+    /** @return array{0:PDO,1:array} */
+    private static function writeContext(Request $request): array
+    {
+        $user = AuthMiddleware::authenticate($request, true);
+        if (strtoupper((string) ($user['rol'] ?? '')) !== 'GENEL_YONETICI') {
+            JsonResponse::error(403, 'SGK_KATALOG_WRITE_FORBIDDEN', 'SGK katalog yazma yalniz GENEL_YONETICI icindir.');
+        }
+        $pdo = Connection::get();
+        SubeScope::resolveScope($user, $request);
+
+        return [$pdo, $user];
     }
 
     /** @return array{0:PDO,1:array,2:?int} */

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../../api/src/Services/Payroll/SgkPrimGunuEngine.php';
+require_once __DIR__ . '/../../api/src/Services/Payroll/SgkKatalogContracts.php';
 
 use Medisa\Api\Services\Payroll\SgkPrimGunuEngine;
 
@@ -360,5 +361,30 @@ sgkAssert($pekOne['hesaplanan_prim_gunu'] === 1 && $pekOne['donem_alt_sinir'] ==
 
 $pekThirty = SgkPrimGunuEngine::calculate(sgkInput('2026-03-01', '2026-03-31'));
 sgkAssert($pekThirty['hesaplanan_prim_gunu'] === 30 && $pekThirty['donem_ust_sinir'] === '225000.00', 'PEK 30 prim gunu olceklenir');
+
+$kisitliCatalog = sgkCatalog([
+    'tamlik_durumu' => 'RESMI_KAYNAKLI_KISITLI',
+    'kodlar' => array_merge(sgkCatalog()['kodlar'], [
+        '01' => [
+            'resmi_aciklama' => 'Istirahat',
+            'aktif_mi' => true,
+            'belge_zorunlulugu' => 'ZORUNLU',
+            'sifir_gun_sifir_kazanc_kullanilabilir_mi' => true,
+            'sifir_gun_sifir_kazanc_durumu' => 'TEYITSIZ',
+            'gecerlilik_tarih_durumu' => 'BELIRLENEMEDI',
+            'gecerlilik_baslangic' => null,
+        ],
+    ]),
+]);
+$kisitliReady = SgkPrimGunuEngine::calculate(sgkInput('2026-03-01', '2026-03-31', ['katalog' => $kisitliCatalog]));
+sgkAssert(!in_array('SGK_KATALOG_SURUMU_GECERSIZ', $kisitliReady['blocker_kodlari'], true), 'RESMI_KAYNAKLI_KISITLI katalog gecerli');
+
+$teyitsizZero = sgkInput('2026-04-01', '2026-04-30', [
+    'sifir_kazanc_mi' => true,
+    'katalog' => $kisitliCatalog,
+    'surecler' => [processFixture('PUANTAJ_EKSIK_GUN', '2026-04-01', '2026-04-30', '01')],
+]);
+$teyitsizZeroResult = SgkPrimGunuEngine::calculate($teyitsizZero);
+sgkAssert(in_array('SGK_EKSIK_GUN_KODU_CAKISTI', $teyitsizZeroResult['blocker_kodlari'], true), 'kisitli katalogda TEYITSIZ sifir gun izinli sayilmaz');
 
 echo 'verify-sgk-prim-gunu-engine: OK' . PHP_EOL;

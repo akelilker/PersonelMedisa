@@ -278,7 +278,8 @@ final class SgkPrimGunuService
         try {
             $stmt = $pdo->prepare(
                 "SELECT * FROM sgk_eksik_gun_katalog_surumleri
-                 WHERE state = 'ONAYLANDI' AND tamlik_durumu = 'DOGRULANMIS_TAM'
+                 WHERE state = 'ONAYLANDI'
+                   AND tamlik_durumu IN ('RESMI_KAYNAKLI_KISITLI', 'DOGRULANMIS_TAM')
                    AND gecerlilik_baslangic <= :bitis
                    AND (gecerlilik_bitis IS NULL OR gecerlilik_bitis >= :baslangic)
                  ORDER BY gecerlilik_baslangic DESC, id DESC"
@@ -303,7 +304,7 @@ final class SgkPrimGunuService
         $codesStmt = $pdo->prepare(
             'SELECT * FROM sgk_eksik_gun_kodlari
              WHERE katalog_surum_id = :id AND aktif_mi = 1
-               AND gecerlilik_baslangic <= :bitis
+               AND (gecerlilik_baslangic IS NULL OR gecerlilik_baslangic <= :bitis)
                AND (gecerlilik_bitis IS NULL OR gecerlilik_bitis >= :baslangic)
              ORDER BY eksik_gun_kodu ASC'
         );
@@ -314,10 +315,14 @@ final class SgkPrimGunuService
                 'resmi_aciklama' => (string) $code['resmi_aciklama'],
                 'belge_zorunlulugu' => (string) $code['belge_zorunlulugu'],
                 'sifir_gun_sifir_kazanc_kullanilabilir_mi' => (bool) $code['sifir_gun_sifir_kazanc_kullanilabilir_mi'],
+                'sifir_gun_sifir_kazanc_durumu' => (string) ($code['sifir_gun_sifir_kazanc_durumu'] ?? ''),
                 'kismi_sureli_sozlesme_gerekli_mi' => (bool) $code['kismi_sureli_sozlesme_gerekli_mi'],
                 'tek_basina_kullanilabilir_mi' => (bool) $code['tek_basina_kullanilabilir_mi'],
                 'diger_nedenlerle_birlikte_kullanim' => (string) $code['diger_nedenlerle_birlikte_kullanim'],
                 'aktif_mi' => (bool) $code['aktif_mi'],
+                'gecerlilik_baslangic' => $code['gecerlilik_baslangic'] ?? null,
+                'gecerlilik_bitis' => $code['gecerlilik_bitis'] ?? null,
+                'gecerlilik_tarih_durumu' => (string) ($code['gecerlilik_tarih_durumu'] ?? 'BELIRLENEMEDI'),
             ];
         }
         $conflictStmt = $pdo->prepare('SELECT * FROM sgk_eksik_gun_kod_cakismalari WHERE katalog_surum_id = :id AND aktif_mi = 1');

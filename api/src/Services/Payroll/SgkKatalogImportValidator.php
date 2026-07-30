@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Medisa\Api\Services\Payroll;
 
 /**
- * S85-C1 / S98: Deterministic catalog import dry-run validator (no write).
+ * S85-C1 / S98 / S106: Deterministic catalog import dry-run validator (no write).
  */
 final class SgkKatalogImportValidator
 {
@@ -13,7 +13,6 @@ final class SgkKatalogImportValidator
         'katalog_surumu',
         'eksik_gun_kodu',
         'resmi_aciklama',
-        'gecerlilik_baslangic',
         'kaynak_manifest_id',
         'belge_zorunlulugu',
         'sifir_gun_sifir_kazanc_kullanilabilir_mi',
@@ -25,7 +24,10 @@ final class SgkKatalogImportValidator
     ];
 
     private const OPTIONAL = [
+        'gecerlilik_baslangic',
         'gecerlilik_bitis',
+        'gecerlilik_tarih_durumu',
+        'ilk_resmi_kanit_tarihi',
         'kosullar',
         'kosullar_json',
         'row_no',
@@ -62,11 +64,13 @@ final class SgkKatalogImportValidator
             }
         }
 
-        $tamlik = $input['tamlik'] ?? SgkKatalogTamlikService::evaluate([
+        $tamlikFlags = is_array($input['tamlik'] ?? null) ? $input['tamlik'] : [];
+        // Always re-evaluate; flags (ucuncu_taraf, ebildirge, …) may be supplied via tamlik.
+        $tamlik = SgkKatalogTamlikService::evaluate(array_merge($tamlikFlags, [
             'katalog_surumu' => (string) (($rows[0]['katalog_surumu'] ?? '')),
             'manifests' => array_values($input['manifests'] ?? []),
             'kod_satirlari' => $rows,
-        ]);
+        ]));
 
         $valid = [];
         $invalid = [];
@@ -89,9 +93,49 @@ final class SgkKatalogImportValidator
             }
 
             $kod = strtoupper(trim((string) ($row['eksik_gun_kodu'] ?? '')));
-            $bas = (string) ($row['gecerlilik_baslangic'] ?? '');
+            $basRaw = $row['gecerlilik_baslangic'] ?? null;
+            $bas = is_string($basRaw) ? trim($basRaw) : '';
+            if ($bas === '') {
+                $bas = null;
+            }
             $bit = $row['gecerlilik_bitis'] ?? null;
-            $bit = $bit === '' ? null : (is_string($bit) ? $bit : null);
+            $bit = $bit === '' ? null : (is_string($bit) ? trim($bit) : null);
+            if ($bit === '') {
+                $bit = null;
+            }
+
+            $tarihDurumu = strtoupper(trim((string) ($row['gecerlilik_tarih_durumu'] ?? 'BELIRLENEMEDI')));
+            if ($tarihDurumu === '') {
+                $tarihDurumu = 'BELIRLENEMEDI';
+            }
+            if (!in_array($tarihDurumu, SgkKatalogContracts::GECERLILIK_TARIH_DURUMU, true)) {
+                $errors[] = 'GECERSIZ_ENUM:gecerlilik_tarih_durumu';
+            }
+
+            $ilkKanit = $row['ilk_resmi_kanit_tarihi'] ?? null;
+            $ilkKanit = is_string($ilkKanit) && trim($ilkKanit) !== '' ? trim($ilkKanit) : null;
+            if ($ilkKanit !== null && !SgkKatalogContracts::isDate($ilkKanit)) {
+                $errors[] = 'GECERSIZ_TARIH:ilk_resmi_kanit_tarihi';
+            }
+
+            if ($tarihDurumu === 'RESMI_YURURLUK') {
+                if ($bas === null || !SgkKatalogContracts::isDate($bas)) {
+                    $errors[] = 'GECERSIZ_TARIH:gecerlilik_baslangic';
+                }
+            } elseif ($tarihDurumu === 'BELIRLENEMEDI') {
+                if ($bas !== null) {
+                    $errors[] = 'CELISKI_TARIH_DURUMU:gecerlilik_baslangic';
+                }
+            } elseif ($tarihDurumu === 'ILK_RESMI_KANIT') {
+                if ($ilkKanit === null && ($bas === null || !SgkKatalogContracts::isDate($bas))) {
+                    if ($bas !== null && !SgkKatalogContracts::isDate($bas)) {
+                        $errors[] = 'GECERSIZ_TARIH:gecerlilik_baslangic';
+                    } elseif ($ilkKanit === null) {
+                        $errors[] = 'ILK_RESMI_KANIT_TARIHI_EKSIK';
+                    }
+                }
+            }
+
             $aciklama = trim((string) ($row['resmi_aciklama'] ?? ''));
             $manifestId = (string) ($row['kaynak_manifest_id'] ?? '');
             $belge = strtoupper((string) ($row['belge_zorunlulugu'] ?? ''));
@@ -101,13 +145,10 @@ final class SgkKatalogImportValidator
             if ($aciklama === '') {
                 $errors[] = 'BOS_ACIKLAMA';
             }
-            if (!SgkKatalogContracts::isDate($bas)) {
-                $errors[] = 'GECERSIZ_TARIH:gecerlilik_baslangic';
-            }
             if ($bit !== null && !SgkKatalogContracts::isDate($bit)) {
                 $errors[] = 'GECERSIZ_TARIH:gecerlilik_bitis';
             }
-            if ($bit !== null && SgkKatalogContracts::isDate($bas) && SgkKatalogContracts::isDate($bit) && $bit < $bas) {
+            if ($bas !== null && $bit !== null && SgkKatalogContracts::isDate($bas) && SgkKatalogContracts::isDate($bit) && $bit < $bas) {
                 $errors[] = 'TARIH_CAKISMASI_IC';
             }
             if (!in_array($belge, SgkKatalogContracts::BELGE_ZORUNLULUK, true)) {
@@ -132,10 +173,10 @@ final class SgkKatalogImportValidator
                 }
                 $mBas = $manifest['yururluk_baslangic'] ?? null;
                 $mBit = $manifest['yururluk_bitis'] ?? null;
-                if (is_string($mBas) && $mBas !== '' && SgkKatalogContracts::isDate($bas) && $bas < $mBas) {
+                if (is_string($mBas) && $mBas !== '' && $bas !== null && SgkKatalogContracts::isDate($bas) && $bas < $mBas) {
                     $errors[] = 'KAYNAK_YURURLUK_CELISKISI';
                 }
-                if (is_string($mBit) && $mBit !== '' && SgkKatalogContracts::isDate($bas) && $bas > $mBit) {
+                if (is_string($mBit) && $mBit !== '' && $bas !== null && SgkKatalogContracts::isDate($bas) && $bas > $mBit) {
                     $errors[] = 'KAYNAK_YURURLUK_CELISKISI';
                 }
             }
@@ -166,12 +207,11 @@ final class SgkKatalogImportValidator
                 $errors[] = $conflict;
             }
 
-            // S98: evidence-based 22-29 gate (no blanket reject independent of source).
             foreach (SgkKatalogContracts::assertKod22_29EvidenceGate($kod, $row, $manifest) as $gateErr) {
                 $errors[] = $gateErr;
             }
 
-            $donemKey = $kod . '|' . $bas . '|' . ($bit ?? 'OPEN');
+            $donemKey = $kod . '|' . ($bas ?? '__NULL__') . '|' . ($bit ?? 'OPEN');
             if (isset($seenKodDonem[$donemKey])) {
                 $errors[] = 'DUPLICATE_KOD_DONEM';
             }
@@ -192,6 +232,8 @@ final class SgkKatalogImportValidator
                 'resmi_aciklama' => $aciklama,
                 'gecerlilik_baslangic' => $bas,
                 'gecerlilik_bitis' => $bit,
+                'gecerlilik_tarih_durumu' => $tarihDurumu,
+                'ilk_resmi_kanit_tarihi' => $ilkKanit,
                 'kaynak_manifest_id' => $manifestId,
                 'belge_zorunlulugu' => $belge,
                 'sifir_gun_sifir_kazanc_kullanilabilir_mi' => (bool) ($row['sifir_gun_sifir_kazanc_kullanilabilir_mi'] ?? false),
@@ -203,7 +245,6 @@ final class SgkKatalogImportValidator
                 'aciklama_hash' => $hash,
             ];
 
-            // Optional canonical fields + legacy projection when present.
             $hasCanonicalStatus = false;
             foreach ([
                 'aktiflik_durumu',
@@ -234,7 +275,6 @@ final class SgkKatalogImportValidator
                 foreach ($proj['warnings'] as $w) {
                     $warnings[] = $w;
                 }
-                // Keep provided legacy fields; projection documents expected values without silent overwrite to true.
                 $canonical['legacy_projection'] = [
                     'sifir_gun_sifir_kazanc_kullanilabilir_mi' => $proj['sifir_gun_sifir_kazanc_kullanilabilir_mi'],
                     'aktif_mi' => $proj['aktif_mi'],
@@ -256,8 +296,11 @@ final class SgkKatalogImportValidator
         }
 
         usort($canonicalRows, static function (array $a, array $b): int {
-            return [$a['eksik_gun_kodu'], $a['gecerlilik_baslangic'], (string) $a['gecerlilik_bitis']]
-                <=> [$b['eksik_gun_kodu'], $b['gecerlilik_baslangic'], (string) $b['gecerlilik_bitis']];
+            $aBas = $a['gecerlilik_baslangic'] ?? '';
+            $bBas = $b['gecerlilik_baslangic'] ?? '';
+
+            return [$a['eksik_gun_kodu'], (string) $aBas, (string) $a['gecerlilik_bitis']]
+                <=> [$b['eksik_gun_kodu'], (string) $bBas, (string) $b['gecerlilik_bitis']];
         });
 
         if (!empty($tamlik['blocker_kodlari'])) {
@@ -273,7 +316,11 @@ final class SgkKatalogImportValidator
         $manifestSetHash = SgkKatalogContracts::sha256Canonical(['manifest_ids' => $manifestIds]);
         $payloadHash = SgkKatalogContracts::sha256Canonical(['rows' => $canonicalRows]);
 
-        $importYapilabilir = false; // S85-C1 / S98: write endpoint not activated
+        $structuralOk = $invalid === [];
+        $tamlikDurumu = (string) ($tamlik['tamlik_durumu'] ?? 'TASLAK');
+        $importYapilabilir = $structuralOk
+            && ($tamlik['import_yazma_aktif_mi'] ?? false)
+            && in_array($tamlikDurumu, ['RESMI_KAYNAKLI_KISITLI', 'DOGRULANMIS_TAM'], true);
 
         $out = [
             'mode' => 'DRY_RUN',
@@ -287,10 +334,10 @@ final class SgkKatalogImportValidator
             'payload_hash' => $payloadHash,
             'manifest_set_hash' => $manifestSetHash,
             'import_yapilabilir_mi' => $importYapilabilir,
-            'yazma_endpoint_aktif_mi' => false,
+            'yazma_endpoint_aktif_mi' => (bool) ($tamlik['import_yazma_aktif_mi'] ?? false),
             'tamlik' => [
-                'tamlik_durumu' => $tamlik['tamlik_durumu'] ?? 'TASLAK',
-                'onaylanabilir_mi' => false,
+                'tamlik_durumu' => $tamlikDurumu,
+                'onaylanabilir_mi' => (bool) ($tamlik['onaylanabilir_mi'] ?? false),
                 'response_hash' => $tamlik['response_hash'] ?? null,
             ],
         ];
@@ -299,8 +346,20 @@ final class SgkKatalogImportValidator
         return $out;
     }
 
-    private static function rangesOverlap(string $a0, ?string $a1, string $b0, ?string $b1): bool
+    /**
+     * @param string|null $a0
+     * @param string|null $a1
+     * @param string|null $b0
+     * @param string|null $b1
+     */
+    private static function rangesOverlap($a0, $a1, $b0, $b1): bool
     {
+        if ($a0 === null && $b0 === null) {
+            return true;
+        }
+        if ($a0 === null || $b0 === null) {
+            return true;
+        }
         if (!SgkKatalogContracts::isDate($a0) || !SgkKatalogContracts::isDate($b0)) {
             return false;
         }

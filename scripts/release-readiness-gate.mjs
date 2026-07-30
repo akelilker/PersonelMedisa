@@ -128,23 +128,28 @@ function checkCodeContracts() {
   );
   assertContains(
     "api/src/Controllers/SgkKatalogHazirlikController.php",
-    "No seed/write activation",
-    "SGK katalog write fail-closed (controller)"
-  );
-  assertContains(
-    "api/src/Services/Payroll/SgkKatalogTamlikService.php",
-    "'approve_aktif_mi' => false",
-    "SGK approve_aktif_mi=false"
-  );
-  assertContains(
-    "api/src/Controllers/SgkKatalogHazirlikController.php",
     "'seed_var_mi' => false",
     "SGK seed_var_mi=false"
   );
-  assertNotMatches(
+  assertContains(
+    "api/src/Services/Payroll/SgkKatalogTamlikService.php",
+    "RESMI_KAYNAKLI_KISITLI",
+    "SGK RESMI_KAYNAKLI_KISITLI tamlik seviyesi"
+  );
+  assertContains(
+    "api/src/Services/Payroll/SgkKatalogTamlikService.php",
+    "'dogrulanmis_tam_secilebilir_mi' => \$dogrulanmisTamEligible",
+    "SGK DOGRULANMIS_TAM yalnız tam kanıtla"
+  );
+  assertContains(
     "api/src/Router.php",
-    /sgk-katalog-hazirlik\/import(?!\/dry-run)/,
-    "SGK import write route yok (yalnız dry-run)"
+    "/sgk-katalog-hazirlik/import",
+    "SGK import write route (S106)"
+  );
+  assertContains(
+    "api/src/Router.php",
+    "/sgk-katalog-hazirlik/approve",
+    "SGK approve write route (S106)"
   );
 
   if (!existsSync(resolve(repoRoot, "scripts/post-deploy-smoke.mjs"))) {

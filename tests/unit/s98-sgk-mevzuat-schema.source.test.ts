@@ -46,21 +46,25 @@ describe("S98 SGK mevzuat schema hardening", () => {
   it("replaces blanket 22-29 reject with evidence gate while keeping 22-25 fail-closed", () => {
     expect(importValidator).toContain("assertKod22_29EvidenceGate");
     expect(importValidator).toContain("import_yapilabilir_mi");
-    expect(importValidator).toContain("'yazma_endpoint_aktif_mi' => false");
+    expect(importValidator).toContain("gecerlilik_tarih_durumu");
+    expect(importValidator).toContain("CELISKI_TARIH_DURUMU");
+    expect(importValidator).toContain("yazma_endpoint_aktif_mi");
     expect(importValidator).toContain("aktiflik_durumu");
     expect(importValidator).toContain("legacy_projection");
     expect(contracts).toContain("KAYNAKSIZ_KOD_ARALIGI_22_29");
     expect(contracts).toContain("resmi_primary_kod_kaniti_var_mi");
   });
 
-  it("keeps DOGRULANMIS_TAM and write gates closed; blocks TEYITSIZ/portal-pending", () => {
+  it("S106 three-level tamlik: kisitli path open, DOGRULANMIS_TAM gated; blocks TEYITSIZ as full blocker", () => {
     expect(tamlik).toContain("TEYITSIZ_SIFIR_GUN");
     expect(tamlik).toContain("PORTAL_TEYIT_BEKLIYOR");
     expect(tamlik).toContain("EXPERT_DRAFT_TEK_BASINA_YETERSIZ");
     expect(tamlik).toContain("TARIHSEL_KOD_GUNCEL_AKTIF");
-    expect(tamlik).toContain("'dogrulanmis_tam_secilebilir_mi' => false");
-    expect(tamlik).toContain("'import_yazma_aktif_mi' => false");
-    expect(tamlik).toContain("'approve_aktif_mi' => false");
+    expect(tamlik).toContain("RESMI_KAYNAKLI_KISITLI");
+    expect(tamlik).toContain("limitedBlockers");
+    expect(tamlik).toContain("limitedWarnings");
+    expect(tamlik).toContain("'dogrulanmis_tam_secilebilir_mi' => \$dogrulanmisTamEligible");
+    expect(tamlik).toContain("'import_yazma_aktif_mi' => \$importYazmaAktif");
     expect(coklu).toContain("assert1827Combination");
     expect(coklu).toContain("ozel_18_27_kurali_uygulandi_mi");
   });
@@ -94,6 +98,6 @@ describe("S98 SGK mevzuat schema hardening", () => {
   it("migration sequence ends with 040 and parity last file updated", () => {
     const names = readdirSync(resolve("api/migrations")).filter((n) => n.endsWith(".sql")).sort();
     expect(names.some((n) => n.startsWith("040_"))).toBe(true);
-    expect(names.at(-1)).toBe("041_auth_smoke_readonly_role.sql");
+    expect(names.at(-1)).toBe("042_sgk_resmi_kaynakli_kisitli_katalog.sql");
   });
 });

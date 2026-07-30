@@ -32,6 +32,16 @@ class SgkKatalogHazirlikController
     {
         [$pdo] = self::context($request, 'bordro_on_izleme.view');
         $body = self::jsonBody($request);
+        $hasExplicitPackage = !empty($body['kod_satirlari'])
+            || !empty($body['rows'])
+            || isset($body['tamlik_input']);
+        if (!$hasExplicitPackage) {
+            $stored = SgkKatalogWriteService::storedApprovedTamlik($pdo);
+            if ($stored !== null) {
+                JsonResponse::success($stored);
+                return;
+            }
+        }
         if (empty($body['manifests'])) {
             $body['manifests'] = self::loadManifests($pdo, 'tamlik');
         }
@@ -72,12 +82,48 @@ class SgkKatalogHazirlikController
 
     public static function surumler(Request $request)
     {
-        self::context($request, 'bordro_on_izleme.view');
+        [$pdo] = self::context($request, 'bordro_on_izleme.view');
+        try {
+            $stmt = $pdo->query(
+                "SELECT s.id, s.surum_kodu, s.state, s.tamlik_durumu, s.gecerlilik_baslangic, s.gecerlilik_bitis,
+                        s.katalog_payload_hash, s.manifest_set_hash, s.onay_zamani,
+                        (SELECT COUNT(*) FROM sgk_eksik_gun_kodlari k WHERE k.katalog_surum_id = s.id) AS kod_sayisi
+                 FROM sgk_eksik_gun_katalog_surumleri s
+                 ORDER BY s.id DESC"
+            );
+            $rows = $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
+        } catch (\PDOException $e) {
+            JsonResponse::error(503, 'SGK_KATALOG_SURUM_OKUNAMADI', 'SGK katalog surumleri okunamadi.');
+            return;
+        }
+        $items = [];
+        $dogrulanmisTam = false;
+        foreach ($rows as $row) {
+            $tamlik = (string) ($row['tamlik_durumu'] ?? '');
+            if ($tamlik === 'DOGRULANMIS_TAM') {
+                $dogrulanmisTam = true;
+            }
+            $items[] = [
+                'id' => (int) $row['id'],
+                'surum_kodu' => (string) ($row['surum_kodu'] ?? ''),
+                'state' => (string) ($row['state'] ?? ''),
+                'tamlik_durumu' => $tamlik,
+                'kod_sayisi' => (int) ($row['kod_sayisi'] ?? 0),
+                'gecerlilik_baslangic' => $row['gecerlilik_baslangic'] ?? null,
+                'gecerlilik_bitis' => $row['gecerlilik_bitis'] ?? null,
+                'katalog_payload_hash' => $row['katalog_payload_hash'] ?? null,
+                'manifest_set_hash' => $row['manifest_set_hash'] ?? null,
+                'onay_zamani' => $row['onay_zamani'] ?? null,
+            ];
+        }
         JsonResponse::success([
-            'items' => [],
-            'total' => 0,
-            'dogrulanmis_tam_var_mi' => false,
-            'response_hash' => hash('sha256', '{"items":[]}'),
+            'items' => $items,
+            'total' => count($items),
+            'dogrulanmis_tam_var_mi' => $dogrulanmisTam,
+            'response_hash' => hash(
+                'sha256',
+                json_encode(['total' => count($items), 'ids' => array_column($items, 'id')], JSON_UNESCAPED_UNICODE)
+            ),
         ]);
     }
 

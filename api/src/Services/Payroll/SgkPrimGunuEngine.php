@@ -462,7 +462,12 @@ final class SgkPrimGunuEngine
     /** @param array<string, mixed> $codes @param array<string, mixed> $process @param array<int, array<string, mixed>> $blockers */
     private static function validateCodeAndDocuments($code, array $codes, array $process, $date, array &$blockers, $catalogLimited = false)
     {
-        if (!isset($codes[$code]) || !is_array($codes[$code]) || empty($codes[$code]['aktif_mi'])) {
+        if (!isset($codes[$code]) || !is_array($codes[$code])) {
+            $blockers[] = self::issue('SGK_EKSIK_GUN_KODU_BULUNAMADI', $code . ' kodu aktif katalogda bulunamadi.', $date, $date, isset($process['surec_id']) ? (int) $process['surec_id'] : null);
+            return;
+        }
+        // Limited catalog keeps portal-pending rows with legacy aktif_mi=0; still apply fail-closed rules.
+        if (!$catalogLimited && empty($codes[$code]['aktif_mi'])) {
             $blockers[] = self::issue('SGK_EKSIK_GUN_KODU_BULUNAMADI', $code . ' kodu aktif katalogda bulunamadi.', $date, $date, isset($process['surec_id']) ? (int) $process['surec_id'] : null);
             return;
         }

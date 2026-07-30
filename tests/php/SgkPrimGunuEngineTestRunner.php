@@ -6,6 +6,7 @@ require_once __DIR__ . '/../../api/src/Services/Payroll/SgkPrimGunuEngine.php';
 require_once __DIR__ . '/../../api/src/Services/Payroll/SgkKatalogContracts.php';
 
 use Medisa\Api\Services\Payroll\SgkPrimGunuEngine;
+use Medisa\Api\Services\Payroll\SgkKatalogContracts;
 
 function sgkAssert(bool $condition, string $name): void
 {
@@ -386,5 +387,28 @@ $teyitsizZero = sgkInput('2026-04-01', '2026-04-30', [
 ]);
 $teyitsizZeroResult = SgkPrimGunuEngine::calculate($teyitsizZero);
 sgkAssert(in_array('SGK_EKSIK_GUN_KODU_CAKISTI', $teyitsizZeroResult['blocker_kodlari'], true), 'kisitli katalogda TEYITSIZ sifir gun izinli sayilmaz');
+
+$portalPendingCatalog = sgkCatalog([
+    'tamlik_durumu' => 'RESMI_KAYNAKLI_KISITLI',
+    'kodlar' => [
+        '07' => [
+            'resmi_aciklama' => 'Puantaj Kayitlari',
+            'aktif_mi' => false,
+            'aktiflik_durumu' => 'PORTAL_TEYIT_BEKLIYOR',
+            'belge_zorunlulugu' => 'ZORUNLU',
+            'sifir_gun_sifir_kazanc_kullanilabilir_mi' => false,
+            'sifir_gun_sifir_kazanc_durumu' => 'YASAK',
+            'gecerlilik_tarih_durumu' => 'BELIRLENEMEDI',
+            'gecerlilik_baslangic' => null,
+        ],
+    ],
+]);
+$portalPendingZero = SgkPrimGunuEngine::calculate(sgkInput('2026-04-01', '2026-04-30', [
+    'sifir_kazanc_mi' => true,
+    'katalog' => $portalPendingCatalog,
+    'surecler' => [processFixture('PUANTAJ_EKSIK_GUN', '2026-04-01', '2026-04-30', '07')],
+]));
+sgkAssert(in_array('SGK_EKSIK_GUN_KODU_CAKISTI', $portalPendingZero['blocker_kodlari'], true), 'portal-pending 07 YASAK 0/0 reddedilir');
+sgkAssert(in_array(SgkKatalogContracts::BLOCKER_TARIHSEL, $portalPendingZero['blocker_kodlari'], true), 'BELIRLENEMEDI tarih fail-closed');
 
 echo 'verify-sgk-prim-gunu-engine: OK' . PHP_EOL;

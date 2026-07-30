@@ -329,6 +329,37 @@ final class SgkKatalogWriteService
     }
 
     /**
+     * Panel/read path: return stored ONAYLANDI catalog tamlik without re-evaluating an empty package.
+     *
+     * @return array<string,mixed>|null
+     */
+    public static function storedApprovedTamlik(PDO $pdo): ?array
+    {
+        try {
+            $stmt = $pdo->query(
+                "SELECT * FROM sgk_eksik_gun_katalog_surumleri
+                 WHERE state = 'ONAYLANDI'
+                   AND tamlik_durumu IN ('RESMI_KAYNAKLI_KISITLI', 'DOGRULANMIS_TAM')
+                 ORDER BY id DESC
+                 LIMIT 1"
+            );
+            $existing = $stmt ? $stmt->fetch(PDO::FETCH_ASSOC) : false;
+        } catch (PDOException $e) {
+            return null;
+        }
+        if (!is_array($existing)) {
+            return null;
+        }
+
+        $snapshot = self::resolveTamlikForTransition($pdo, $existing, []);
+        $snapshot['kaynak_sayisi'] = self::countManifestLinks($pdo, (int) ($existing['id'] ?? 0));
+        $snapshot['katalog_payload_hash'] = (string) ($existing['katalog_payload_hash'] ?? '');
+        $snapshot['state'] = (string) ($existing['state'] ?? '');
+
+        return $snapshot;
+    }
+
+    /**
      * Submit/approve may send only katalog_surumu. Prefer explicit package evaluation;
      * otherwise trust the imported surum snapshot already stored in DB.
      *
@@ -380,6 +411,24 @@ final class SgkKatalogWriteService
             'import_yazma_aktif_mi' => $approved,
             'approve_aktif_mi' => $approved,
         ];
+    }
+
+    private static function countManifestLinks(PDO $pdo, int $surumId): int
+    {
+        if ($surumId <= 0) {
+            return 0;
+        }
+        try {
+            $stmt = $pdo->prepare(
+                'SELECT COUNT(DISTINCT kaynak_manifest_id) FROM sgk_eksik_gun_kodlari
+                 WHERE katalog_surum_id = :id AND kaynak_manifest_id IS NOT NULL'
+            );
+            $stmt->execute(['id' => $surumId]);
+
+            return (int) $stmt->fetchColumn();
+        } catch (PDOException $e) {
+            return 0;
+        }
     }
 
     /**

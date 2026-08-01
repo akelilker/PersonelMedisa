@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { login } from "./helpers/auth";
+import { login, waitForAuthSession } from "./helpers/auth";
 import { mockApi, type MockUserRole } from "./helpers/mock-api";
 
 const ROLE_LOGIN: Record<MockUserRole, { username: string; password: string }> = {
@@ -51,10 +51,14 @@ test.describe("puantaj muhurleme", () => {
 
       await mockApi(page, role);
       await login(page, ROLE_LOGIN[role]);
+      await waitForAuthSession(page, role);
       await page.goto("/puantaj");
       await expect(page).toHaveURL(/\/puantaj$/);
-      await expect(page.locator(".modal-header h2").first()).toContainText("Günlük Puantaj");
-      await expect(page.getByRole("heading", { name: "Günlük Kayıt ve Puantaj" })).toBeVisible();
+
+      const moduleModal = page.getByRole("dialog").first();
+      await expect(moduleModal).toBeVisible({ timeout: 20_000 });
+      await expect(moduleModal.locator(".modal-header h2").first()).toContainText("Günlük Puantaj");
+      await expect(page.getByRole("heading", { name: "Günlük Kayıt ve Puantaj" })).toBeVisible({ timeout: 20_000 });
 
       const muhurButton = page.getByTestId("muhur-ay-kapat-btn");
       if (ROLE_MUHUR_VISIBLE[role]) {

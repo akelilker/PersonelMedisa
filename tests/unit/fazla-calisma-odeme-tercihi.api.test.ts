@@ -35,6 +35,29 @@ describe("fazla-calisma-odeme-tercihi.api", () => {
     expect(result.fazla_calisma_dakika).toBe(60);
   });
 
+  it("normalize kanit ve sisteme giris alanlarini tasir", () => {
+    const result = normalizeFazlaCalismaOdemeTercihi({
+      snapshot_id: 1001,
+      kapanis_id: 1,
+      personel_id: 2,
+      hafta_baslangic: "2026-04-06",
+      hafta_bitis: "2026-04-12",
+      fazla_calisma_dakika: 60,
+      odeme_tipi: "SERBEST_ZAMAN",
+      talep_tarihi: "2026-04-10",
+      imzali_talep_belge_id: 44,
+      sisteme_giren_kullanici_id: 7,
+      sisteme_giris_zamani: "2026-04-11T09:00:00.000Z",
+      gerekce: "Imzali talep"
+    });
+
+    expect(result.talep_tarihi).toBe("2026-04-10");
+    expect(result.imzali_talep_belge_id).toBe(44);
+    expect(result.sisteme_giren_kullanici_id).toBe(7);
+    expect(result.sisteme_giris_zamani).toBe("2026-04-11T09:00:00.000Z");
+    expect(result.gerekce).toBe("Imzali talep");
+  });
+
   it("GET store bosken default KARAR_BEKLIYOR dondurur", async () => {
     const fetchMock = vi.fn(async () =>
       createJsonResponse({
@@ -79,7 +102,11 @@ describe("fazla-calisma-odeme-tercihi.api", () => {
           secim_zamani: "2026-05-31T10:00:00.000Z",
           secen_kullanici_id: 5,
           onceki_odeme_tipi: "KARAR_BEKLIYOR",
-          gerekce: "Personel talebi"
+          gerekce: "Personel talebi",
+          talep_tarihi: "2026-05-30",
+          imzali_talep_belge_id: 12,
+          sisteme_giren_kullanici_id: 5,
+          sisteme_giris_zamani: "2026-05-31T10:00:00.000Z"
         },
         meta: {},
         errors: []
@@ -91,7 +118,9 @@ describe("fazla-calisma-odeme-tercihi.api", () => {
     const result = await putFazlaCalismaOdemeTercihi({
       snapshot_id: 1001,
       odeme_tipi: "SERBEST_ZAMAN",
-      gerekce: "Personel talebi"
+      gerekce: "Personel talebi",
+      talep_tarihi: "2026-05-30",
+      imzali_talep_belge_id: 12
     });
 
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
@@ -99,12 +128,47 @@ describe("fazla-calisma-odeme-tercihi.api", () => {
     expect(JSON.parse(String(init.body))).toEqual({
       snapshot_id: 1001,
       odeme_tipi: "SERBEST_ZAMAN",
-      gerekce: "Personel talebi"
+      gerekce: "Personel talebi",
+      talep_tarihi: "2026-05-30",
+      imzali_talep_belge_id: 12
     });
     expect(JSON.parse(String(init.body))).not.toHaveProperty("secen_kullanici_id");
+    expect(JSON.parse(String(init.body))).not.toHaveProperty("sisteme_giren_kullanici_id");
     expect(result.odeme_tipi).toBe("SERBEST_ZAMAN");
     expect(result.onceki_odeme_tipi).toBe("KARAR_BEKLIYOR");
+    expect(result.talep_tarihi).toBe("2026-05-30");
+    expect(result.imzali_talep_belge_id).toBe(12);
     expect(result.id).toBe(1);
+  });
+
+  it("SERBEST_ZAMAN kanit eksikse istemci tarafinda 422 firlatir", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      putFazlaCalismaOdemeTercihi({
+        snapshot_id: 1001,
+        odeme_tipi: "SERBEST_ZAMAN",
+        gerekce: "eksik belge"
+      })
+    ).rejects.toMatchObject({
+      status: 422,
+      code: "SERBEST_ZAMAN_IMZALI_TALEP_KANIT_EKSIK"
+    } satisfies Partial<ApiRequestError>);
+
+    await expect(
+      putFazlaCalismaOdemeTercihi({
+        snapshot_id: 1001,
+        odeme_tipi: "SERBEST_ZAMAN",
+        talep_tarihi: "2026-05-30",
+        imzali_talep_belge_id: 12
+      })
+    ).rejects.toMatchObject({
+      status: 422,
+      code: "SERBEST_ZAMAN_IMZALI_TALEP_KANIT_EKSIK"
+    } satisfies Partial<ApiRequestError>);
+
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("NOT_FOUND hatasini 404 olarak firlatir", async () => {

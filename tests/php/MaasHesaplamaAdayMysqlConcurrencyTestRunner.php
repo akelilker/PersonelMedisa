@@ -225,6 +225,9 @@ function mhacSeedApprovedPolicy(PDO $pdo): void
         'UBGT_CARPANI' => '1',
         'UBGT_HESAP_MODU' => 'GUNLUK_ILAVE',
         'TATIL_FSC_FM_CAKISMA_HESAP_MODU' => 'YARGITAY_7_5_SAAT_AYRIMI',
+        // S87 SIRKET_KARARI
+        'HAFTALIK_NORMAL_CALISMA_DAKIKA' => '2700',
+        'NORMAL_HASTALIK_ILK_IKI_GUN_ISVEREN_ODEMESI' => 'HAYIR',
     ];
     $pdo->exec(
         "INSERT INTO sirket_calisma_politikalari (
@@ -246,6 +249,9 @@ function mhacSeedApprovedPolicy(PDO $pdo): void
     foreach (SirketCalismaPolitikasiCatalog::requiredCodes() as $code) {
         $meta = SirketCalismaPolitikasiCatalog::meta($code);
         $isMetin = $meta && $meta['deger_tipi'] === 'METIN';
+        if (!array_key_exists($code, $values)) {
+            throw new RuntimeException('Missing policy seed value for ' . $code);
+        }
         $stmt->execute([
             'politika_id' => $policyId,
             'kod' => $code,

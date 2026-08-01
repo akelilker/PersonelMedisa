@@ -13,7 +13,9 @@ export default defineConfig({
   webServer: {
     command: "npm run dev -- --host 127.0.0.1 --port 4173",
     url: "http://127.0.0.1:4173/login",
-    reuseExistingServer: true,
+    // Always own the E2E server lifecycle. Sharing a leftover :4173 process caused
+    // mid-suite ERR_CONNECTION_REFUSED / first-interaction 60s timeouts under load.
+    reuseExistingServer: false,
     timeout: 120_000
   }
 });

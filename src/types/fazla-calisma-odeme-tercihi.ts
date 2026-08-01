@@ -21,10 +21,16 @@ export type FazlaCalismaOdemeTercihi = {
   secen_kullanici_id?: number;
   onceki_odeme_tipi?: OdemeTipi;
   gerekce?: string;
+  talep_tarihi?: string;
+  imzali_talep_belge_id?: number;
+  sisteme_giren_kullanici_id?: number;
+  sisteme_giris_zamani?: string;
 };
 
 export type PutFazlaCalismaOdemeTercihiPayload = {
   snapshot_id: number;
   odeme_tipi: OdemeTipi;
   gerekce?: string;
+  talep_tarihi?: string;
+  imzali_talep_belge_id?: number;
 };

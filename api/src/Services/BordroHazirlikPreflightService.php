@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Medisa\Api\Services;
 
+use Medisa\Api\Services\Payroll\PayrollComplianceGuard;
 use Medisa\Api\Services\Payroll\SirketCalismaPolitikasiCatalog;
 use PDO;
 
@@ -72,6 +73,20 @@ class BordroHazirlikPreflightService
             }
         }
 
+        $personelIds = array_map(static function (array $row) {
+            return (int) $row['personel_id'];
+        }, $snapshotPreflight['personel_summary'] ?? []);
+        $compliance = PayrollComplianceGuard::collectPeriodBlockers(
+            $pdo,
+            (int) $subeId,
+            $donemBaslangic,
+            $donemBitis,
+            $personelIds
+        );
+        foreach ($compliance as $blocker) {
+            $items[] = self::enrichItem($blocker);
+        }
+
         $gyFinal = self::checkGenelYoneticiFinalApproval($pdo, (int) $subeId, (int) $yil, (int) $ay);
         if (!$gyFinal['tamam']) {
             $items[] = self::actionableIssue(
@@ -97,9 +112,6 @@ class BordroHazirlikPreflightService
             );
         }
 
-        $personelIds = array_map(static function (array $row) {
-            return (int) $row['personel_id'];
-        }, $snapshotPreflight['personel_summary'] ?? []);
         $projection = MaasHesaplamaCorrectionProjectionService::buildProjection(
             $pdo,
             (int) $subeId,

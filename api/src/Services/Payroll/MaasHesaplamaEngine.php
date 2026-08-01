@@ -794,7 +794,7 @@ final class MaasHesaplamaEngine
         $grossDeduct = Money::zero();
         $netOnly = Money::zero();
         $fmCarpan = self::paramRate($params, 'FAZLA_MESAI_CARPANI');
-        $fsCarpan = self::paramRate($params, 'FAZLA_SURELERLE_CALISMA_CARPANI');
+        // FAZLA_SURELERLE_CALISMA_CARPANI / FAZLA_SURELERLE_CALISMA_ODEMESI: SIRKET_KARARI ile FSC bandi kapali.
         $htCarpan = self::paramRate($params, 'HAFTA_TATILI_CARPANI');
         $ubgtCarpan = self::paramRate($params, 'UBGT_CARPANI');
         $htMode = strtoupper((string) $params['HAFTA_TATILI_HESAP_MODU']);
@@ -810,7 +810,20 @@ final class MaasHesaplamaEngine
                 ],
             ];
         }
-        $contractualWeeklyDk = (int) $contractWeekly['sozlesme_haftalik_dk'];
+        // SIRKET_KARARI: tum personel ayni 2700 dk; dusuk sozlesme odeme bandinda yok sayilir.
+        // resolveContractWeeklyMinutes raw > 2700 validation korunur; odeme bantlari 2700 kullanir.
+        $contractualWeeklyDk = PayrollComplianceGuard::HAFTALIK_NORMAL_CALISMA_DAKIKA;
+        $odemeTercihiByHafta = is_array($input['odeme_tercihi_by_iso_hafta'] ?? null)
+            ? $input['odeme_tercihi_by_iso_hafta']
+            : [];
+        if (!empty($input['serbest_zaman_cift_etki_haftalar']) || !empty($input['force_ucret_with_sz'])) {
+            return [
+                'error' => [
+                    'code' => PayrollComplianceGuard::BLOCKER_SERBEST_ZAMAN_CIFT_ETKI,
+                    'message' => 'SERBEST_ZAMAN ile ucret ayni haftada cift etki olusturamaz.',
+                ],
+            ];
+        }
         $holidayOvertimeMode = self::resolveHolidayOvertimeMode($params);
         $holidayOvertimeConflict = self::detectHolidayOvertimePolicyConflict(
             $input['puantajlar'],
@@ -843,6 +856,8 @@ final class MaasHesaplamaEngine
         $applyHolidayMahsup = $holidayOvertimeMode !== null;
         $hasOt = false;
         $absenceDates = [];
+        /** @var array<string, true> HT hak kaybi satirlari icin ayri dedup (fiili yokluk ile birlestirilmez) */
+        $htHakKaybiDates = [];
 
         foreach ($input['etki_adaylari'] as $aday) {
             $state = strtoupper((string) ($aday['state'] ?? ''));
@@ -857,7 +872,91 @@ final class MaasHesaplamaEngine
             $tur = strtoupper((string) ($aday['etki_turu'] ?? ''));
             $miktar = isset($aday['etki_miktari']) ? (int) $aday['etki_miktari'] : 0;
             $tarih = (string) ($aday['tarih'] ?? '');
-            if ($tur === 'DEVAMSIZLIK_GUN' || $tur === 'IZIN_GUNU') {
+            $meta = is_array($aday['metadata'] ?? null) ? $aday['metadata'] : [];
+            if ($tur === 'DEVAMSIZLIK_GUN') {
+                if ($tarih !== '' && isset($absenceDates[$tarih])) {
+                    continue;
+                }
+                if ($tarih !== '') {
+                    $absenceDates[$tarih] = true;
+                }
+                $gun = $miktar > 0 ? $miktar : 1;
+                $tutar = $daily->mulDiv($gun, 1);
+                $grossDeduct = $grossDeduct->add($tutar);
+                $sira++;
+                $kod = PayrollComplianceGuard::KALEM_DEVAMSIZLIK_FIILI;
+                $kalemler[] = self::line(
+                    $sira,
+                    'DEVAMSIZLIK',
+                    $kod,
+                    'EKSI',
+                    $gun,
+                    'GUN',
+                    null,
+                    $daily->toDecimalString(),
+                    $tutar,
+                    'ETKI_ADAYI',
+                    isset($aday['aday_id']) ? (int) $aday['aday_id'] : null,
+                    'Devamsizlik fiili gun kesintisi',
+                    ['etki_turu' => $tur]
+                );
+                // UI parity: izinsiz yoklukta fiili + HT hak kaybi ayri EKSI satirlari (tek 2-gun satiri yok).
+                if (self::shouldEmitHaftaTatiliHakKaybiFromDevamsizlik($aday, $meta)) {
+                    $htKey = $tarih !== '' ? $tarih : ('aday:' . (string) ($aday['aday_id'] ?? $sira));
+                    if (!isset($htHakKaybiDates[$htKey])) {
+                        $htHakKaybiDates[$htKey] = true;
+                        $htTutar = $daily->mulDiv(1, 1);
+                        $grossDeduct = $grossDeduct->add($htTutar);
+                        $sira++;
+                        $kalemler[] = self::line(
+                            $sira,
+                            'DEVAMSIZLIK',
+                            PayrollComplianceGuard::KALEM_HAFTA_TATILI_HAK_KAYBI,
+                            'EKSI',
+                            1,
+                            'GUN',
+                            null,
+                            $daily->toDecimalString(),
+                            $htTutar,
+                            'ETKI_ADAYI',
+                            isset($aday['aday_id']) ? (int) $aday['aday_id'] : null,
+                            'Hafta tatili hak kaybi kesintisi',
+                            [
+                                'etki_turu' => $tur,
+                                'kaynak' => 'DEVAMSIZLIK_GUN_PARITY',
+                                'hafta_tatili_hak_kaybi_uygula' => true,
+                            ]
+                        );
+                    }
+                }
+            } elseif ($tur === 'HAFTA_TATILI_HAK_KAYBI') {
+                // Ayrı EKSI satır; DEVAMSIZLIK ile tek 2-gün satırında birleştirilmez.
+                $htKey = $tarih !== '' ? $tarih : ('aday:' . (string) ($aday['aday_id'] ?? uniqid('ht', true)));
+                if (isset($htHakKaybiDates[$htKey])) {
+                    continue;
+                }
+                $htHakKaybiDates[$htKey] = true;
+                $gun = $miktar > 0 ? $miktar : 1;
+                $tutar = $daily->mulDiv($gun, 1);
+                $grossDeduct = $grossDeduct->add($tutar);
+                $sira++;
+                $kod = PayrollComplianceGuard::KALEM_HAFTA_TATILI_HAK_KAYBI;
+                $kalemler[] = self::line(
+                    $sira,
+                    'DEVAMSIZLIK',
+                    $kod,
+                    'EKSI',
+                    $gun,
+                    'GUN',
+                    null,
+                    $daily->toDecimalString(),
+                    $tutar,
+                    'ETKI_ADAYI',
+                    isset($aday['aday_id']) ? (int) $aday['aday_id'] : null,
+                    'Hafta tatili hak kaybi kesintisi',
+                    ['etki_turu' => $tur]
+                );
+            } elseif ($tur === 'IZIN_GUNU') {
                 if ($tarih !== '' && isset($absenceDates[$tarih])) {
                     continue;
                 }
@@ -867,9 +966,8 @@ final class MaasHesaplamaEngine
                 $tutar = $daily->mulDiv($miktar > 0 ? $miktar : 1, 1);
                 $grossDeduct = $grossDeduct->add($tutar);
                 $sira++;
-                $kod = $tur === 'DEVAMSIZLIK_GUN' ? 'DEVAMSIZLIK_KESINTISI' : 'UCRETSIZ_IZIN_KESINTISI';
-                $grup = $tur === 'DEVAMSIZLIK_GUN' ? 'DEVAMSIZLIK' : 'IZIN';
-                $kalemler[] = self::line($sira, $grup, $kod, 'EKSI', $miktar > 0 ? $miktar : 1, 'GUN', null, $daily->toDecimalString(), $tutar, 'ETKI_ADAYI', isset($aday['aday_id']) ? (int) $aday['aday_id'] : null, $kod, ['etki_turu' => $tur]);
+                $kod = 'UCRETSIZ_IZIN_KESINTISI';
+                $kalemler[] = self::line($sira, 'IZIN', $kod, 'EKSI', $miktar > 0 ? $miktar : 1, 'GUN', null, $daily->toDecimalString(), $tutar, 'ETKI_ADAYI', isset($aday['aday_id']) ? (int) $aday['aday_id'] : null, $kod, ['etki_turu' => $tur]);
             } elseif ($tur === 'GEC_KALMA_DAKIKA' || $tur === 'ERKEN_CIKIS_DAKIKA') {
                 if ($tarih !== '' && isset($absenceDates[$tarih])) {
                     continue;
@@ -879,6 +977,27 @@ final class MaasHesaplamaEngine
                 $sira++;
                 $kod = $tur === 'GEC_KALMA_DAKIKA' ? 'GEC_KALMA_KESINTISI' : 'ERKEN_CIKIS_KESINTISI';
                 $kalemler[] = self::line($sira, 'DEVAMSIZLIK', $kod, 'EKSI', $miktar, 'DAKIKA', null, $hourly->toDecimalString(), $tutar, 'ETKI_ADAYI', isset($aday['aday_id']) ? (int) $aday['aday_id'] : null, $kod, ['etki_turu' => $tur]);
+            } elseif ($tur === 'NORMAL_HASTALIK_ILK_2_GUN' || self::isNormalHastalikIlkIkiGunOdenmedi($tur, $meta, $aday)) {
+                $gun = $miktar > 0 ? $miktar : 1;
+                $tutar = $daily->mulDiv($gun, 1);
+                $grossDeduct = $grossDeduct->add($tutar);
+                $sira++;
+                $kod = PayrollComplianceGuard::KALEM_NORMAL_HASTALIK_ILK_2_GUN;
+                $kalemler[] = self::line(
+                    $sira,
+                    'IZIN',
+                    $kod,
+                    'EKSI',
+                    $gun,
+                    'GUN',
+                    null,
+                    $daily->toDecimalString(),
+                    $tutar,
+                    'ETKI_ADAYI',
+                    isset($aday['aday_id']) ? (int) $aday['aday_id'] : null,
+                    'Normal hastalik ilk 2 gun isveren odemedi',
+                    ['etki_turu' => $tur, 'ilk_iki_gun' => true, 'firma_oder' => false]
+                );
             } elseif ($tur === 'RAPOR_GUNU') {
                 $sira++;
                 $kalemler[] = self::line($sira, 'IZIN', 'RAPOR_GUNU', 'BILGI', $miktar > 0 ? $miktar : 1, 'GUN', null, null, Money::zero(), 'ETKI_ADAYI', isset($aday['aday_id']) ? (int) $aday['aday_id'] : null, 'Rapor gunu bilgi', []);
@@ -1087,34 +1206,78 @@ final class MaasHesaplamaEngine
         ksort($weeklyWorkPools);
         foreach ($weeklyWorkPools as $weekKey => $pool) {
             $totalDk = (int) $pool['fiili_dk'];
-            $bands = self::hesaplaHaftalikCalismaBantlari($totalDk, $contractualWeeklyDk);
+            // SIRKET_KARARI: FSC (%25) bandi olusmaz; 2700 uzeri tamamen FM.
+            $bands = PayrollComplianceGuard::hesaplaHaftalikBantlarSirketKarari($totalDk);
             $rawFsDk = $bands['fs_dk'];
             $rawFmDk = $bands['fm_dk'];
-            $fsDk = self::hesaplaMevzuatFazlaCalismaOdemeDakika($rawFsDk);
+            // FAZLA_SURELERLE_CALISMA_ODEMESI uretilmez (fs her zaman 0).
+            $fsDk = 0;
             $fmDk = self::hesaplaMevzuatFazlaCalismaOdemeDakika($rawFmDk);
 
-            if ($fsDk > 0) {
-                $base = $hourly->mulDiv($fsDk, 60);
-                $tutar = $base->applyRate($fsCarpan);
-                $grossAdd = $grossAdd->add($tutar);
-                $hasOt = true;
-                $sira++;
-                $kalemler[] = self::line($sira, 'FAZLA_SURELERLE', 'FAZLA_SURELERLE_CALISMA_ODEMESI', 'ARTI', $fsDk, 'DAKIKA', $fsCarpan->toDecimalString(), $base->toDecimalString(), $tutar, 'PUANTAJ', null, 'Fazla surelerle calisma', [
-                    'iso_hafta' => $weekKey,
-                    'haftalik_toplam_dk' => $totalDk,
-                    'haftalik_normal_gun_calisma_dk' => (int) $pool['normal_dk'],
-                    'haftalik_tatil_calisma_dk' => (int) $pool['tatil_dk'],
-                    'haftalik_tatil_asim_dk' => (int) ($pool['tatil_asim_dk'] ?? 0),
-                    'sozlesme_haftalik_dk' => $contractualWeeklyDk,
-                    'yasal_haftalik_limit_dk' => self::LEGAL_WEEKLY_LIMIT_MINUTES,
-                    'ham_fazla_surelerle_calisma_dk' => $rawFsDk,
-                    'odeme_esas_fazla_surelerle_calisma_dk' => $fsDk,
-                    'ucret_hesaplama_baz_brut_tutar' => $sozlesmeBrut->toDecimalString(),
-                    'saatlik_brut_ucret' => $hourly->toDecimalString(),
-                    'tatil_fsc_fm_cakisma_hesap_modu' => $holidayOvertimeMode,
-                ]);
-            }
             if ($fmDk > 0) {
+                $tercih = self::resolveOdemeTercihiForWeek($odemeTercihiByHafta, $weekKey);
+                $odemeTipi = $tercih !== null
+                    ? strtoupper(trim((string) ($tercih['odeme_tipi'] ?? '')))
+                    : '';
+
+                if ($odemeTipi === '' || $odemeTipi === 'KARAR_BEKLIYOR') {
+                    return [
+                        'error' => [
+                            'code' => PayrollComplianceGuard::BLOCKER_ODEME_TERCIHI_KARAR_BEKLIYOR,
+                            'message' => 'Fazla calisma odeme tercihi KARAR_BEKLIYOR; bordro hesaplama engellendi.',
+                        ],
+                    ];
+                }
+
+                if ($odemeTipi === 'SERBEST_ZAMAN') {
+                    // SIRKET_KARARI: SZ secildiyse ARTI ucret yok; cift etki yasak.
+                    if (!empty($input['assert_no_sz_ucret_cift_etki']) || !empty($input['force_ucret_with_sz'])) {
+                        return [
+                            'error' => [
+                                'code' => PayrollComplianceGuard::BLOCKER_SERBEST_ZAMAN_CIFT_ETKI,
+                                'message' => 'SERBEST_ZAMAN ile ucret ayni haftada cift etki olusturamaz.',
+                            ],
+                        ];
+                    }
+                    $sira++;
+                    $kalemler[] = self::line(
+                        $sira,
+                        'FAZLA_MESAI',
+                        'SERBEST_ZAMAN_FM_UCRET_SUPPRESSED',
+                        'BILGI',
+                        $fmDk,
+                        'DAKIKA',
+                        null,
+                        null,
+                        Money::zero(),
+                        'PUANTAJ',
+                        isset($tercih['tercih_id']) ? (int) $tercih['tercih_id'] : null,
+                        'SERBEST_ZAMAN tercih edildi; fazla mesai ucreti odemesi bastirildi',
+                        [
+                            'iso_hafta' => $weekKey,
+                            'haftalik_toplam_dk' => $totalDk,
+                            'ham_fazla_calisma_dk' => $rawFmDk,
+                            'odeme_esas_fazla_calisma_dk' => $fmDk,
+                            'odeme_tipi' => 'SERBEST_ZAMAN',
+                            'serbest_zaman_fm_ucret_suppressed' => true,
+                            'sozlesme_haftalik_dk' => $contractualWeeklyDk,
+                            'yasal_haftalik_limit_dk' => self::LEGAL_WEEKLY_LIMIT_MINUTES,
+                            'ham_fazla_surelerle_calisma_dk' => $rawFsDk,
+                        ]
+                    );
+                    continue;
+                }
+
+                // UCRET (veya bilinmeyen ama KARAR_BEKLIYOR degil — yalniz UCRET odeme yolu)
+                if ($odemeTipi !== 'UCRET') {
+                    return [
+                        'error' => [
+                            'code' => PayrollComplianceGuard::BLOCKER_ODEME_TERCIHI_KARAR_BEKLIYOR,
+                            'message' => 'Fazla calisma odeme tercihi cozulemedi; bordro hesaplama engellendi.',
+                        ],
+                    ];
+                }
+
                 $base = $hourly->mulDiv($fmDk, 60);
                 $tutar = $base->applyRate($fmCarpan);
                 $grossAdd = $grossAdd->add($tutar);
@@ -1130,9 +1293,11 @@ final class MaasHesaplamaEngine
                     'yasal_haftalik_limit_dk' => self::LEGAL_WEEKLY_LIMIT_MINUTES,
                     'ham_fazla_calisma_dk' => $rawFmDk,
                     'odeme_esas_fazla_calisma_dk' => $fmDk,
+                    'ham_fazla_surelerle_calisma_dk' => $rawFsDk,
                     'ucret_hesaplama_baz_brut_tutar' => $sozlesmeBrut->toDecimalString(),
                     'saatlik_brut_ucret' => $hourly->toDecimalString(),
                     'tatil_fsc_fm_cakisma_hesap_modu' => $holidayOvertimeMode,
+                    'odeme_tipi' => 'UCRET',
                 ]);
             }
         }
@@ -1194,6 +1359,153 @@ final class MaasHesaplamaEngine
             'miktar' => $netDk,
             'birim' => 'DAKIKA',
         ];
+    }
+
+    /**
+     * DEVAMSIZLIK_GUN (izinsiz) icin HT hak kaybi ayri EKSI satiri uretilir mi?
+     * Metadata yoksa default ON (UI parity). RAPOR/IZIN veya explicit false → OFF.
+     *
+     * @param array<string, mixed> $aday
+     * @param array<string, mixed> $meta
+     */
+    private static function shouldEmitHaftaTatiliHakKaybiFromDevamsizlik(array $aday, array $meta)
+    {
+        $flag = $meta['hafta_tatili_hak_kaybi_uygula'] ?? $aday['hafta_tatili_hak_kaybi_uygula'] ?? null;
+        if ($flag === false || $flag === 0 || $flag === '0') {
+            return false;
+        }
+
+        $bildirim = strtoupper((string) ($aday['bildirim_turu'] ?? $meta['bildirim_turu'] ?? ''));
+        if (in_array($bildirim, ['RAPORLU', 'IZINLI', 'RAPOR', 'IZIN'], true)) {
+            return false;
+        }
+
+        $hareket = strtoupper(str_replace([' ', '-'], '_', (string) ($meta['hareket_durumu'] ?? $aday['hareket_durumu'] ?? '')));
+        if (in_array($hareket, ['IZINLI', 'RAPORLU', 'UCRETLI_IZINLI', 'YILLIK_IZIN'], true)) {
+            return false;
+        }
+
+        $dayanak = strtoupper(str_replace([' ', '-'], '_', (string) ($meta['dayanak'] ?? $aday['dayanak'] ?? '')));
+        if (in_array($dayanak, ['RAPORLU_HASTALIK', 'IS_KAZASI', 'UCRETLI_IZINLI', 'YILLIK_IZIN', 'MAZERETLI'], true)) {
+            return false;
+        }
+
+        // DEVAMSIZLIK_GUN + metadata yok → ON (UI izinsiz parity).
+        return true;
+    }
+
+    /**
+     * RAPOR etki adayi: ilk 2 gun + firma odemez → kesinti kalemi.
+     * gun_sirasi<=2 veya ilk_iki_gun; is kazasi degil; firma_oder false / HAYIR.
+     *
+     * @param array<string, mixed> $meta
+     * @param array<string, mixed> $aday
+     */
+    private static function isNormalHastalikIlkIkiGunOdenmedi($tur, array $meta, array $aday)
+    {
+        $turUp = strtoupper((string) $tur);
+        if ($turUp !== 'RAPOR' && $turUp !== 'RAPOR_GUNU' && $turUp !== 'NORMAL_HASTALIK_ILK_2_GUN') {
+            return false;
+        }
+        if ($turUp === 'NORMAL_HASTALIK_ILK_2_GUN') {
+            return true;
+        }
+
+        $isKazasi = $meta['is_kazasi'] ?? $meta['is_kazasi_mi'] ?? $aday['is_kazasi'] ?? $aday['is_kazasi_mi'] ?? null;
+        if ($isKazasi === true || $isKazasi === 1 || $isKazasi === '1') {
+            return false;
+        }
+        $meslek = $meta['meslek_hastaligi'] ?? $meta['meslek_hastaligi_mi']
+            ?? $aday['meslek_hastaligi'] ?? $aday['meslek_hastaligi_mi'] ?? null;
+        if ($meslek === true || $meslek === 1 || $meslek === '1') {
+            return false;
+        }
+        $analik = $meta['analik'] ?? $meta['analik_mi'] ?? $aday['analik'] ?? $aday['analik_mi'] ?? null;
+        if ($analik === true || $analik === 1 || $analik === '1') {
+            return false;
+        }
+        $surecTuru = strtoupper((string) (
+            $meta['surec_turu']
+            ?? $aday['surec_turu']
+            ?? $meta['resmi_surec_turu']
+            ?? $aday['resmi_surec_turu']
+            ?? ''
+        ));
+        if ($surecTuru === 'IS_KAZASI' || $surecTuru === 'ANALIK') {
+            return false;
+        }
+        $altTur = strtoupper(str_replace([' ', '-'], '_', trim((string) (
+            $meta['alt_tur']
+            ?? $aday['alt_tur']
+            ?? $meta['resmi_surec_alt_tur']
+            ?? $aday['resmi_surec_alt_tur']
+            ?? $meta['bildirim_alt_tur']
+            ?? $aday['bildirim_alt_tur']
+            ?? ''
+        ))));
+        if (
+            $altTur === 'RAPORLU_IS_KAZASI'
+            || $altTur === 'IS_KAZASI'
+            || $altTur === 'MESLEK_HASTALIGI'
+            || $altTur === 'RAPORLU_MESLEK_HASTALIGI'
+            || $altTur === 'ANALIK'
+            || $altTur === 'RAPORLU_ANALIK'
+        ) {
+            return false;
+        }
+
+        $gunSirasiRaw = $meta['gun_sirasi'] ?? $aday['gun_sirasi'] ?? null;
+        $ilkIki = $meta['ilk_iki_gun'] ?? $meta['ilk_iki_gun_mu']
+            ?? $aday['ilk_iki_gun'] ?? $aday['ilk_iki_gun_mu'] ?? null;
+        $ilkIkiBool = $ilkIki === true || $ilkIki === 1 || $ilkIki === '1';
+        if (!$ilkIkiBool && $gunSirasiRaw !== null && $gunSirasiRaw !== '') {
+            $gunSirasi = (int) $gunSirasiRaw;
+            $ilkIkiBool = $gunSirasi >= 1 && $gunSirasi <= 2;
+        }
+        if (!$ilkIkiBool) {
+            return false;
+        }
+
+        $firmaOder = $meta['firma_oder'] ?? $meta['firma_oder_mi']
+            ?? $aday['firma_oder'] ?? $aday['ilk_iki_gun_firma_oder_mi'] ?? null;
+        $firmaOderFalse = $firmaOder === false || $firmaOder === 0 || $firmaOder === '0'
+            || strtoupper((string) $firmaOder) === 'HAYIR';
+        $politika = $meta['sirket_politika_ilk_iki_gun']
+            ?? $meta['firma_odeme_politika']
+            ?? $aday['sirket_politika_ilk_iki_gun']
+            ?? null;
+        if (!$firmaOderFalse && strtoupper((string) $politika) === 'HAYIR') {
+            $firmaOderFalse = true;
+        }
+
+        return $firmaOderFalse;
+    }
+
+    /**
+     * @param array<string, mixed> $map
+     * @return array{odeme_tipi?:string, tercih_id?:int|null}|null
+     */
+    private static function resolveOdemeTercihiForWeek(array $map, $weekKey)
+    {
+        $weekKey = (string) $weekKey;
+        if (isset($map[$weekKey]) && is_array($map[$weekKey])) {
+            return $map[$weekKey];
+        }
+        // ISO hafta → o haftanin Pazartesi (hafta_baslangic) anahtari
+        if (preg_match('/^(\d{4})-W(\d{2})$/', $weekKey, $m) === 1) {
+            try {
+                $dt = new \DateTimeImmutable();
+                $dt = $dt->setISODate((int) $m[1], (int) $m[2]);
+                $bas = $dt->format('Y-m-d');
+                if (isset($map[$bas]) && is_array($map[$bas])) {
+                    return $map[$bas];
+                }
+            } catch (\Throwable $e) {
+                return null;
+            }
+        }
+
+        return null;
     }
 
     /** @return array{fs_dk:int, fm_dk:int} */

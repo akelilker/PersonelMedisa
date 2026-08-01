@@ -78,6 +78,20 @@ final class SirketCalismaPolitikasiCatalog
             'deger_tipi' => 'METIN',
             'birim' => 'MOD',
         ],
+        // SIRKET_KARARI (2026-08-01): normal hastalik ilk 2 gun isveren odemez.
+        'NORMAL_HASTALIK_ILK_IKI_GUN_ISVEREN_ODEMESI' => [
+            'etiket' => 'Normal Hastalık İlk İki Gün İşveren Ödemesi',
+            'aciklama' => 'SIRKET_KARARI: Normal hastalik raporunda ilk 2 gun isveren odemez (HAYIR). Is kazasi, meslek hastaligi ve analiga uygulanmaz. Muhurlu eski donemler yeniden hesaplanmaz.',
+            'deger_tipi' => 'METIN',
+            'birim' => 'KARAR',
+        ],
+        // SIRKET_KARARI: tum personel icin haftalik normal sure 2700 dk (45 saat).
+        'HAFTALIK_NORMAL_CALISMA_DAKIKA' => [
+            'etiket' => 'Haftalık Normal Çalışma Dakikası',
+            'aciklama' => 'SIRKET_KARARI: Tum personel icin 2700 dakika (45 saat). Kisi/grup bazli dusuk sozlesme suresi yok. 45 saat uzeri %50 zamli; %25 FSC bandi kullanilmaz.',
+            'deger_tipi' => 'SAYISAL',
+            'birim' => 'DAKIKA',
+        ],
     ];
 
     /** Production hesabında kabul edilen tek çakışma modu. */

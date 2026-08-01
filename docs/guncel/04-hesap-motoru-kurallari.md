@@ -835,10 +835,17 @@ Bu belge sonrası sıradaki doğru doküman:
 
 çünkü artık ürün mantığı, veri kapsamı, UI contract'ı ve hesap motoru netleştiğine göre, uygulamanın veri yaşam döngüsünü ve ekran-endpoint ilişkisini çivileme zamanı gelmiştir.
 
+## S87 — Payroll compliance (devamsızlık / HT / hastalık / 2700)
+
+- `DEVAMSIZLIK_GUN` otoriter motorda iki ayrı EKSI üretir: fiili + (default) HT hak kaybı; birleşik 2-gün satırı yok.
+- `RAPOR_GUNU` / `IZIN_GUNU` HT hak kaybı üretmez; normal hastalık ilk 2 gün (SIRKET_KARARI HAYIR) → `NORMAL_HASTALIK_ILK_2_GUN_ODENMEDI`.
+- Haftalık ödeme bandı 2700 dk; FSC kapalı. Detay: `99-payroll-compliance-critical-gaps-kapanis.md`.
+
 ## Belge Geçmişi
 
 | Tarih | Not |
 |-------|-----|
+| 2026-08-01 | S87: motor-UI devamsızlık/HT parity + hastalık ilk 2 + 2700/FSC kapanış notu. |
 | 2026-07-15 | S74 final canlı kabulü: migration 014, dönem kilidi deploy'u, kontrollü manuel apply ve aynı-body idempotency doğrulandı; `S74_FULLY_COMPLETE`. |
 | 2026-07-15 | S74-D1/D3R: ortak `(şube, yıl, ay)` dönem kilidi, tek kilit sırası ve schema-first migration 014 kontratı eklendi. |
 | 2026-07-07 | S62A: net maaş canonical alan, brüt salt okunur, FSC V1 backlog, hastalık ilk 2 gün rapor event politikası kilitlendi. |

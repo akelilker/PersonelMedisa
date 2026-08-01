@@ -47,7 +47,7 @@ test.describe("e2e smoke", () => {
       readonlyFieldInCardByLabel(kesintiOnIzlemeKarti, "Gerçek Eksik Süre (dk)").getByText(/^1$/)
     ).toBeVisible();
     await expect(
-      readonlyFieldInCardByLabel(kesintiOnIzlemeKarti, "Kesintiye Esas Süre (dk)").getByText(/^30$/)
+      readonlyFieldInCardByLabel(kesintiOnIzlemeKarti, "Kesintiye Esas Süre (dk)").getByText(/^1$/)
     ).toBeVisible();
   });
 
@@ -130,7 +130,7 @@ test.describe("e2e smoke", () => {
     await expect(page.locator(".bildirimler-list")).toContainText("Ayşe Yılmaz");
     await expect(page.locator(".bildirimler-list")).toContainText(/Kayıt Durumu: .*Taslak/i);
 
-    const createdRow = page.locator(".bildirimler-item").first();
+    const createdRow = page.locator(".bildirimler-item").filter({ hasText: "Habersiz devamsızlık" });
     await expect(createdRow.getByRole("button", { name: "Gönder" })).toBeVisible();
     await expect(createdRow.getByRole("button", { name: /Düzenle|Duzenle/i })).toBeVisible();
     await createdRow.getByRole("button", { name: "Gönder" }).click();
@@ -310,7 +310,7 @@ test.describe("e2e smoke", () => {
 
     await expect(page.getByTestId("haftalik-mutabakat-count-haftalik_mutabakata_alindi")).toContainText("1");
     await expect(page.getByTestId("haftalik-mutabakat-status")).toContainText(/mutabakata alinmis/i);
-    await expect(page.getByTestId("haftalik-mutabakat-id")).toContainText("Mutabakat ID: 1");
+    await expect(page.getByTestId("haftalik-mutabakat-id")).toHaveText("1");
     await expect(approveButton).toBeDisabled();
   });
 
@@ -337,7 +337,7 @@ test.describe("e2e smoke", () => {
 
     await page.locator("[name='aylik-bildirim-onay-ay']").fill("2026-07");
     await expect(page.getByTestId("aylik-bildirim-onay-status")).toContainText(/aylık bildirim onayına gönderilmiş/i);
-    await expect(page.getByTestId("aylik-bildirim-onay-id")).toContainText("Aylık Onay ID: 1");
+    await expect(page.getByTestId("aylik-bildirim-onay-id")).toHaveText("1");
 
     const approveButton = page.getByTestId("aylik-bildirim-onay-approve");
     await expect(approveButton).toBeDisabled();

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Medisa\Api\Services;
 
+use Medisa\Api\Services\Payroll\PayrollComplianceGuard;
 use PDO;
 use PDOException;
 
@@ -84,6 +85,76 @@ class MaasHesaplamaSnapshotService
             'legal' => $legal,
         ]);
         $items = array_merge($items, $sgk['items']);
+
+        // S87 write-path: yas / 270 saat / odeme tercihi blockers (snapshot create hard block)
+        $personelIds = array_map(static function (array $p) {
+            return (int) $p['personel_id'];
+        }, $personeller);
+        if ($personelIds !== []) {
+            $compliance = PayrollComplianceGuard::collectPeriodBlockers(
+                $pdo,
+                (int) $subeId,
+                (string) $donemBaslangic,
+                (string) $donemBitis,
+                $personelIds
+            );
+            foreach ($compliance as $item) {
+                $items[] = self::issue(
+                    (string) ($item['severity'] ?? self::SEVERITY_BLOCKER),
+                    (string) ($item['code'] ?? 'COMPLIANCE_BLOCKER'),
+                    (string) ($item['message'] ?? 'Uyumluluk blocker'),
+                    $item['record_type'] ?? null,
+                    isset($item['record_id']) ? (int) $item['record_id'] : null,
+                    isset($item['personel_id']) ? (int) $item['personel_id'] : null,
+                    is_array($item['metadata'] ?? null) ? $item['metadata'] : []
+                );
+            }
+            foreach ($personelIds as $pid) {
+                $periodOt = self::sumSealedOtMinutesForPeriod($pdo, $pid, $donemBaslangic, $donemBitis);
+                if ($periodOt < 1) {
+                    continue;
+                }
+                $kapanmis = PayrollComplianceGuard::loadKapanmisYillikFazlaCalisma($pdo, $pid, (int) $yil);
+                $periodWeeks = self::periodHaftaKeys($pdo, $pid, $donemBaslangic, $donemBitis);
+                $exPeriod = [];
+                foreach ($kapanmis as $row) {
+                    $hb = (string) ($row['hafta_baslangic'] ?? '');
+                    if ($hb !== '' && isset($periodWeeks[$hb])) {
+                        continue;
+                    }
+                    $exPeriod[] = $row;
+                }
+                $eval = PayrollComplianceGuard::evaluateYillikLimit($exPeriod, $periodOt);
+                if ($eval['asildi']) {
+                    $items[] = self::issue(
+                        self::SEVERITY_BLOCKER,
+                        PayrollComplianceGuard::BLOCKER_YILLIK_270_SAAT_ASIMI,
+                        'Yillik fazla calisma 270 saat limiti asiliyor.',
+                        'fazla_calisma',
+                        null,
+                        $pid,
+                        [
+                            'kullanilan_dk' => $eval['kullanilan'],
+                            'projected_dk' => $eval['projected'],
+                            'limit_dk' => PayrollComplianceGuard::YILLIK_FAZLA_CALISMA_LIMIT_DAKIKA,
+                        ]
+                    );
+                } elseif ($eval['yaklasiyor']) {
+                    $items[] = self::issue(
+                        self::SEVERITY_WARNING,
+                        'YILLIK_FAZLA_CALISMA_YAKLASMA',
+                        'Yillik fazla calisma 260 saat esigine ulasildi.',
+                        'fazla_calisma',
+                        null,
+                        $pid,
+                        [
+                            'projected_dk' => $eval['projected'],
+                            'esik_dk' => PayrollComplianceGuard::YILLIK_FAZLA_CALISMA_YAKLASMA_ESIK_DAKIKA,
+                        ]
+                    );
+                }
+            }
+        }
 
         $scopeFingerprint = PersonelBordroKapsamService::scopeFingerprintForPeriod(
             $pdo,
@@ -1930,6 +2001,7 @@ class MaasHesaplamaSnapshotService
     public static function candidatePayloadStatic(array $candidate)
     {
         $state = strtoupper((string) $candidate['state']);
+        $metadata = self::extractEtkiAdayiMetadata($candidate);
 
         return [
             'aday_id' => (int) $candidate['id'],
@@ -1946,8 +2018,81 @@ class MaasHesaplamaSnapshotService
             'mevcut_puantaj_id' => $candidate['mevcut_puantaj_id'] !== null ? (int) $candidate['mevcut_puantaj_id'] : null,
             'parasal_uygulanacak_kalem' => $state === 'UYGULANDI',
             'karar_delili' => $state === 'YOK_SAYILDI' ? 'YOK_SAYILDI' : null,
+            'resmi_surec_turu' => isset($candidate['resmi_surec_turu']) && $candidate['resmi_surec_turu'] !== null
+                ? (string) $candidate['resmi_surec_turu'] : null,
+            'resmi_surec_alt_tur' => isset($candidate['resmi_surec_alt_tur']) && $candidate['resmi_surec_alt_tur'] !== null
+                ? (string) $candidate['resmi_surec_alt_tur'] : null,
+            'ucretli_mi_snapshot' => isset($candidate['ucretli_mi_snapshot']) && $candidate['ucretli_mi_snapshot'] !== null
+                ? (int) $candidate['ucretli_mi_snapshot'] : null,
+            'metadata' => $metadata,
             'updated_at' => self::normalizeTimestamp($candidate['updated_at'] ?? null),
         ];
+    }
+
+    /**
+     * Etki adayi metadata: explicit metadata, conflict_detail veya source_snapshot policy alanlari.
+     *
+     * @param array<string, mixed> $candidate
+     * @return array<string, mixed>
+     */
+    private static function extractEtkiAdayiMetadata(array $candidate)
+    {
+        $metadata = [];
+        if (isset($candidate['metadata']) && is_array($candidate['metadata'])) {
+            $metadata = $candidate['metadata'];
+        }
+
+        $detail = $candidate['conflict_detail'] ?? null;
+        if (is_string($detail) && $detail !== '') {
+            $decoded = json_decode($detail, true);
+            if (is_array($decoded)) {
+                $metadata = array_merge($decoded, $metadata);
+            }
+        } elseif (is_array($detail)) {
+            $metadata = array_merge($detail, $metadata);
+        }
+
+        $snapshot = $candidate['source_snapshot'] ?? null;
+        if (is_string($snapshot) && $snapshot !== '') {
+            $decodedSnap = json_decode($snapshot, true);
+            $snapshot = is_array($decodedSnap) ? $decodedSnap : null;
+        }
+        if (is_array($snapshot)) {
+            foreach ([
+                'hafta_tatili_hak_kaybi_uygula',
+                'gun_sirasi',
+                'ilk_iki_gun',
+                'ilk_iki_gun_mu',
+                'firma_oder',
+                'firma_oder_mi',
+                'ilk_iki_gun_firma_oder_mi',
+                'is_kazasi',
+                'is_kazasi_mi',
+                'meslek_hastaligi',
+                'meslek_hastaligi_mi',
+                'analik',
+                'analik_mi',
+                'sirket_politika_ilk_iki_gun',
+                'dayanak',
+                'hareket_durumu',
+                'alt_tur',
+            ] as $key) {
+                if (!array_key_exists($key, $metadata) && array_key_exists($key, $snapshot)) {
+                    $metadata[$key] = $snapshot[$key];
+                }
+            }
+            $surec = $snapshot['resmi_surec_ozeti'] ?? null;
+            if (is_array($surec)) {
+                if (!isset($metadata['surec_turu']) && isset($surec['surec_turu'])) {
+                    $metadata['surec_turu'] = $surec['surec_turu'];
+                }
+                if (!isset($metadata['ilk_iki_gun_firma_oder_mi']) && array_key_exists('ilk_iki_gun_firma_oder_mi', $surec)) {
+                    $metadata['ilk_iki_gun_firma_oder_mi'] = $surec['ilk_iki_gun_firma_oder_mi'];
+                }
+            }
+        }
+
+        return $metadata;
     }
 
     /** @param array<string, mixed> $row @return array<string, mixed> */
@@ -2163,12 +2308,68 @@ class MaasHesaplamaSnapshotService
             'severity' => (string) $severity,
             'code' => (string) $code,
             'message' => (string) $message,
-            'record_type' => (string) $recordType,
+            'record_type' => $recordType !== null ? (string) $recordType : null,
             'record_id' => $recordId !== null ? (int) $recordId : null,
             'personel_id' => $personelId !== null ? (int) $personelId : null,
             'personel_adi' => $personelAdi !== null ? (string) $personelAdi : null,
             'metadata' => $metadata,
         ];
+    }
+
+    /** Kapalı haftalik FM toplamı (dönem içi); tercih yoksa kapanış satırı. */
+    private static function sumSealedOtMinutesForPeriod(PDO $pdo, $personelId, $donemBaslangic, $donemBitis)
+    {
+        if (!self::tableExists($pdo, 'haftalik_kapanis_satirlari')) {
+            return 0;
+        }
+        $stmt = $pdo->prepare(
+            "SELECT COALESCE(SUM(s.fazla_calisma_dakika), 0)
+             FROM haftalik_kapanis_satirlari s
+             WHERE s.personel_id = :pid
+               AND s.state = 'KAPANDI'
+               AND s.hafta_baslangic <= :bitis
+               AND s.hafta_bitis >= :baslangic
+               AND s.fazla_calisma_dakika > 0
+               AND COALESCE(s.tam_hafta_verisi, 1) = 1"
+        );
+        $stmt->execute([
+            'pid' => (int) $personelId,
+            'bitis' => (string) $donemBitis,
+            'baslangic' => (string) $donemBaslangic,
+        ]);
+
+        return (int) $stmt->fetchColumn();
+    }
+
+    /** @return array<string, true> */
+    private static function periodHaftaKeys(PDO $pdo, $personelId, $donemBaslangic, $donemBitis)
+    {
+        $keys = [];
+        if (!self::tableExists($pdo, 'haftalik_kapanis_satirlari')) {
+            return $keys;
+        }
+        $stmt = $pdo->prepare(
+            "SELECT hafta_baslangic
+             FROM haftalik_kapanis_satirlari
+             WHERE personel_id = :pid
+               AND state = 'KAPANDI'
+               AND hafta_baslangic <= :bitis
+               AND hafta_bitis >= :baslangic
+               AND fazla_calisma_dakika > 0"
+        );
+        $stmt->execute([
+            'pid' => (int) $personelId,
+            'bitis' => (string) $donemBitis,
+            'baslangic' => (string) $donemBaslangic,
+        ]);
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) ?: [] as $row) {
+            $hb = (string) ($row['hafta_baslangic'] ?? '');
+            if ($hb !== '') {
+                $keys[$hb] = true;
+            }
+        }
+
+        return $keys;
     }
 
     /** @param array<int, array<string, mixed>> $items */
@@ -2257,5 +2458,25 @@ class MaasHesaplamaSnapshotService
         }
 
         return $raw;
+    }
+
+    private static function tableExists(PDO $pdo, $table)
+    {
+        if ($pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite') {
+            $stmt = $pdo->prepare(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = :t"
+            );
+            $stmt->execute(['t' => (string) $table]);
+
+            return (int) $stmt->fetchColumn() === 1;
+        }
+
+        $stmt = $pdo->prepare(
+            'SELECT COUNT(*) FROM information_schema.tables
+             WHERE table_schema = DATABASE() AND table_name = :t'
+        );
+        $stmt->execute(['t' => (string) $table]);
+
+        return (int) $stmt->fetchColumn() === 1;
     }
 }

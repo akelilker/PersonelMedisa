@@ -12,6 +12,9 @@ import { appendQueryParams } from "../utils/append-query-params";
 import { ApiRequestError, apiRequest } from "./api-client";
 import { endpoints } from "./endpoints";
 
+const SERBEST_ZAMAN_KANIT_EKSIK = "SERBEST_ZAMAN_IMZALI_TALEP_KANIT_EKSIK";
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
 function toRecord(value: unknown): Record<string, unknown> | null {
   if (typeof value !== "object" || value === null) {
     return null;
@@ -101,6 +104,8 @@ export function normalizeFazlaCalismaOdemeTercihi(data: unknown): FazlaCalismaOd
   const secen_kullanici_id = toOptionalNumber(record.secen_kullanici_id);
   const onceki_odeme_tipiRaw = record.onceki_odeme_tipi;
   const onceki_odeme_tipi = isOdemeTipi(onceki_odeme_tipiRaw) ? onceki_odeme_tipiRaw : undefined;
+  const imzali_talep_belge_id = toOptionalNumber(record.imzali_talep_belge_id);
+  const sisteme_giren_kullanici_id = toOptionalNumber(record.sisteme_giren_kullanici_id);
 
   return {
     id,
@@ -114,7 +119,14 @@ export function normalizeFazlaCalismaOdemeTercihi(data: unknown): FazlaCalismaOd
     secim_zamani: toOptionalString(record.secim_zamani),
     secen_kullanici_id,
     onceki_odeme_tipi,
-    gerekce: toOptionalString(record.gerekce)
+    gerekce: toOptionalString(record.gerekce),
+    talep_tarihi: toOptionalString(record.talep_tarihi),
+    imzali_talep_belge_id:
+      imzali_talep_belge_id !== undefined && imzali_talep_belge_id >= 1
+        ? imzali_talep_belge_id
+        : undefined,
+    sisteme_giren_kullanici_id,
+    sisteme_giris_zamani: toOptionalString(record.sisteme_giris_zamani)
   };
 }
 
@@ -145,6 +157,32 @@ function throwFirstApiError(
   );
 }
 
+function assertSerbestZamanKanit(payload: PutFazlaCalismaOdemeTercihiPayload): void {
+  const talepTarihi = payload.talep_tarihi?.trim() ?? "";
+  if (!talepTarihi || !ISO_DATE_RE.test(talepTarihi)) {
+    throw new ApiRequestError("SERBEST_ZAMAN icin talep_tarihi zorunludur.", 422, {
+      code: SERBEST_ZAMAN_KANIT_EKSIK,
+      field: "talep_tarihi"
+    });
+  }
+
+  const belgeId = payload.imzali_talep_belge_id;
+  if (belgeId === undefined || !Number.isFinite(belgeId) || belgeId < 1) {
+    throw new ApiRequestError("SERBEST_ZAMAN icin imzali talep belgesi zorunludur.", 422, {
+      code: SERBEST_ZAMAN_KANIT_EKSIK,
+      field: "imzali_talep_belge_id"
+    });
+  }
+
+  const gerekce = payload.gerekce?.trim() ?? "";
+  if (!gerekce) {
+    throw new ApiRequestError("SERBEST_ZAMAN icin gerekce/not zorunludur.", 422, {
+      code: SERBEST_ZAMAN_KANIT_EKSIK,
+      field: "gerekce"
+    });
+  }
+}
+
 export async function fetchFazlaCalismaOdemeTercihi(
   snapshotId: number | string
 ): Promise<FazlaCalismaOdemeTercihi> {
@@ -171,13 +209,36 @@ export async function putFazlaCalismaOdemeTercihi(
     throw new ApiRequestError("odeme_tipi gecersiz.", 400, { code: "INVALID_BODY", field: "odeme_tipi" });
   }
 
+  if (payload.odeme_tipi === "SERBEST_ZAMAN") {
+    assertSerbestZamanKanit(payload);
+  }
+
+  const body: Record<string, unknown> = {
+    snapshot_id,
+    odeme_tipi: payload.odeme_tipi
+  };
+
+  const gerekce = payload.gerekce?.trim();
+  if (gerekce) {
+    body.gerekce = gerekce;
+  }
+
+  const talepTarihi = payload.talep_tarihi?.trim();
+  if (talepTarihi) {
+    body.talep_tarihi = talepTarihi;
+  }
+
+  if (
+    payload.imzali_talep_belge_id !== undefined &&
+    Number.isFinite(payload.imzali_talep_belge_id) &&
+    payload.imzali_talep_belge_id >= 1
+  ) {
+    body.imzali_talep_belge_id = payload.imzali_talep_belge_id;
+  }
+
   const response = await apiRequest<ApiResponse<unknown>>(endpoints.fazlaCalismaOdemeTercihi.resource, {
     method: "PUT",
-    body: JSON.stringify({
-      snapshot_id,
-      odeme_tipi: payload.odeme_tipi,
-      gerekce: payload.gerekce
-    })
+    body: JSON.stringify(body)
   });
 
   if (Array.isArray(response.errors) && response.errors.length > 0) {

@@ -10,6 +10,7 @@ use Medisa\Api\Database\Connection;
 use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
 use Medisa\Api\Scope\SubeScope;
+use Medisa\Api\Services\Payroll\PayrollComplianceGuard;
 use Medisa\Api\Services\PuantajDonemKilidiService;
 use PDO;
 use PDOException;
@@ -169,6 +170,86 @@ class SerbestZamanController
                 self::rollbackConflict($pdo, 'NOT_ELIGIBLE', 'Odeme tercihi SERBEST_ZAMAN degil; olusum eventi uretilemez.');
             }
 
+            // Write-path revalidation: kanıt + 18 yas (alternatif route bypass engeli)
+            $belgeId = isset($tercih['imzali_talep_belge_id']) ? (int) $tercih['imzali_talep_belge_id'] : 0;
+            $belgeRow = $belgeId > 0
+                ? PayrollComplianceGuard::loadBelgeKaydi($pdo, $belgeId)
+                : null;
+            $kanit = PayrollComplianceGuard::validateSerbestZamanKanit(
+                [
+                    'talep_tarihi' => $tercih['talep_tarihi'] ?? null,
+                    'imzali_talep_belge_id' => $belgeId,
+                    'gerekce' => $tercih['gerekce'] ?? null,
+                ],
+                $belgeRow,
+                (int) $tercih['personel_id']
+            );
+            if (!$kanit['ok']) {
+                self::rollbackValidation(
+                    $pdo,
+                    (string) ($kanit['code'] ?? PayrollComplianceGuard::BLOCKER_SERBEST_ZAMAN_KANIT_EKSIK),
+                    (string) ($kanit['message'] ?? 'SERBEST_ZAMAN kanit dogrulamasi basarisiz.')
+                );
+            }
+
+            $haftaBitis = (string) ($tercih['hafta_bitis'] ?? date('Y-m-d'));
+            $dobStmt = $pdo->prepare('SELECT dogum_tarihi FROM personeller WHERE id = :id LIMIT 1');
+            $dobStmt->execute(['id' => (int) $tercih['personel_id']]);
+            $dobRow = $dobStmt->fetch(PDO::FETCH_ASSOC);
+            $dob = isset($dobRow['dogum_tarihi']) && $dobRow['dogum_tarihi'] !== null
+                ? (string) $dobRow['dogum_tarihi']
+                : null;
+            $age = PayrollComplianceGuard::resolveUnder18($dob, $haftaBitis);
+            if ($age['missing_dob']) {
+                self::rollbackValidation(
+                    $pdo,
+                    PayrollComplianceGuard::BLOCKER_DOGUM_TARIHI_REQUIRED,
+                    'Dogum tarihi olmadan fazla calisma islemi yapilamaz.'
+                );
+            }
+            if ($age['under_18']) {
+                self::rollbackConflict(
+                    $pdo,
+                    PayrollComplianceGuard::BLOCKER_ONSEKIZ_YAS_FAZLA_CALISMA,
+                    '18 yasini doldurmamis personelde serbest zaman olusumu yapilamaz.'
+                );
+            }
+
+            $fmPending = (int) $tercih['fazla_calisma_dakika'];
+            if ($fmPending > 0) {
+                $yil = (int) substr((string) ($tercih['hafta_baslangic'] ?? $haftaBitis), 0, 4);
+                if ($yil >= 1) {
+                    $userId = (int) ($user['id'] ?? 0);
+                    PayrollComplianceGuard::acquireYillikLock(
+                        $pdo,
+                        (int) $tercih['personel_id'],
+                        $yil,
+                        $userId > 0 ? $userId : null
+                    );
+                    $closed = PayrollComplianceGuard::loadKapanmisYillikFazlaCalisma(
+                        $pdo,
+                        (int) $tercih['personel_id'],
+                        $yil
+                    );
+                    $haftaBas = (string) ($tercih['hafta_baslangic'] ?? '');
+                    $filtered = [];
+                    foreach ($closed as $row) {
+                        if ($haftaBas !== '' && (string) ($row['hafta_baslangic'] ?? '') === $haftaBas) {
+                            continue;
+                        }
+                        $filtered[] = $row;
+                    }
+                    $eval = PayrollComplianceGuard::evaluateYillikLimit($filtered, $fmPending);
+                    if ($eval['asildi']) {
+                        self::rollbackConflict(
+                            $pdo,
+                            PayrollComplianceGuard::BLOCKER_YILLIK_270_SAAT_ASIMI,
+                            'Yillik fazla calisma 270 saat limiti asiliyor.'
+                        );
+                    }
+                }
+            }
+
             $guard = $pdo->prepare(
                 'SELECT olusum_event_id FROM serbest_zaman_aktif_olusumlar
                  WHERE odeme_tercihi_id = :tid FOR UPDATE'
@@ -179,7 +260,7 @@ class SerbestZamanController
             }
 
             $fm = (int) $tercih['fazla_calisma_dakika'];
-            $dakika = (int) round($fm * 1.5);
+            $dakika = (int) round($fm * PayrollComplianceGuard::SERBEST_ZAMAN_DONUSUM_KATSAYISI);
             if ($dakika <= 0) {
                 if ($pdo->inTransaction()) {
                     $pdo->rollBack();
@@ -983,6 +1064,14 @@ class SerbestZamanController
             $pdo->rollBack();
         }
         JsonResponse::error(409, $code, $message);
+    }
+
+    private static function rollbackValidation(PDO $pdo, string $code, string $message): void
+    {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        JsonResponse::error(422, $code, $message);
     }
 
     private static function rollbackNotFound(PDO $pdo, string $message): void

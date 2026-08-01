@@ -236,7 +236,9 @@ final class PayrollComplianceGuard
                 $personelIds
             );
         } catch (\Throwable $e) {
-            return [self::schemaUnavailableBlocker('QUERY_FAILED', get_class($e))];
+            $message = (string) $e->getMessage();
+            $reason = strpos($message, 'QUERY_FAILED:') === 0 ? $message : 'QUERY_FAILED';
+            return [self::schemaUnavailableBlocker($reason, get_class($e))];
         }
     }
 
@@ -268,9 +270,13 @@ final class PayrollComplianceGuard
         $params = array_map('intval', $personelIds);
         $params[] = $donemBitis;
         $params[] = $donemBaslangic;
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute($params);
-        $tercihler = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        try {
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute($params);
+            $tercihler = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        } catch (\Throwable $e) {
+            throw new \RuntimeException('QUERY_FAILED:PAYMENT_PREFERENCES', 0, $e);
+        }
 
         // Also include weeks with OT but no preference row (synthetic KARAR_BEKLIYOR)
         if (self::tableExists($pdo, 'haftalik_kapanis_satirlari')) {
@@ -287,9 +293,14 @@ final class PayrollComplianceGuard
                        AND t.id IS NULL
                        AND s.state = 'KAPANDI'";
             $params2 = array_merge([(int) $subeId], array_map('intval', $personelIds), [$donemBitis, $donemBaslangic]);
-            $stmt2 = $pdo->prepare($sql2);
-            $stmt2->execute($params2);
-            foreach ($stmt2->fetchAll(PDO::FETCH_ASSOC) ?: [] as $row) {
+            try {
+                $stmt2 = $pdo->prepare($sql2);
+                $stmt2->execute($params2);
+                $missingPreferences = $stmt2->fetchAll(PDO::FETCH_ASSOC) ?: [];
+            } catch (\Throwable $e) {
+                throw new \RuntimeException('QUERY_FAILED:WEEKLY_CLOSES', 0, $e);
+            }
+            foreach ($missingPreferences as $row) {
                 $items[] = self::blockerItem(
                     self::BLOCKER_ODEME_TERCIHI_KARAR_BEKLIYOR,
                     'Fazla calisma odeme tercihi KARAR_BEKLIYOR; bordro kesinlestirme engellendi.',
@@ -337,10 +348,15 @@ final class PayrollComplianceGuard
         // Age + yearly OT for personeller with birth date
         if (self::tableExists($pdo, 'personeller') && self::columnExists($pdo, 'personeller', 'dogum_tarihi')) {
             $sqlP = "SELECT id, dogum_tarihi FROM personeller WHERE id IN ($placeholders)";
-            $stmtP = $pdo->prepare($sqlP);
-            $stmtP->execute(array_map('intval', $personelIds));
+            try {
+                $stmtP = $pdo->prepare($sqlP);
+                $stmtP->execute(array_map('intval', $personelIds));
+                $personelRows = $stmtP->fetchAll(PDO::FETCH_ASSOC) ?: [];
+            } catch (\Throwable $e) {
+                throw new \RuntimeException('QUERY_FAILED:PERSONNEL_AGE', 0, $e);
+            }
             $dobMap = [];
-            foreach ($stmtP->fetchAll(PDO::FETCH_ASSOC) ?: [] as $p) {
+            foreach ($personelRows as $p) {
                 $dobMap[(int) $p['id']] = $p['dogum_tarihi'] ?? null;
             }
 

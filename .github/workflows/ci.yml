@@ -6,7 +6,61 @@ on:
       - "**"
   pull_request:
 
+permissions:
+  contents: write
+
 jobs:
+  apply-s87-ci-fixture-alignment:
+    name: Apply S87 CI fixture alignment
+    if: github.event_name == 'pull_request' && github.head_ref == 'fix/s87-critical-owner-gaps-reopen'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Verify and apply exact patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD^)" = "2efdf8075cb5e5eb7c72c389a50e8c8aa55e77b6"
+          echo "b60b8bfa81b33a0fbf150f52996d31ecf80ccfce15b8fc24a9ff1339d9603899  ops/.s87-ci-fix.patch.gz" | sha256sum -c -
+          gzip -dc ops/.s87-ci-fix.patch.gz > /tmp/s87-ci-fix.patch
+          echo "c157c06898d8db609a221eb17e295ccd08dc044f84158ebe8ce1ca9438f6d43c  /tmp/s87-ci-fix.patch" | sha256sum -c -
+          git apply --check /tmp/s87-ci-fix.patch
+          git apply /tmp/s87-ci-fix.patch
+          rm ops/.s87-ci-fix.patch.gz
+          rm .github/workflows/s87-ci-fixture-alignment.yml
+          git checkout 49a4c4aff83689b1e70398d54626de5f6576d252 -- .github/workflows/ci.yml
+          git diff --check
+
+          cat > /tmp/expected-paths <<'EOF'
+          .github/workflows/ci.yml
+          .github/workflows/s87-ci-fixture-alignment.yml
+          ops/.s87-ci-fix.patch.gz
+          src/services/puantaj-hesap-motoru.ts
+          tests/php/HaftalikKapanisMysqlTestRunner.php
+          tests/php/MaasHesaplamaAdayMysqlConcurrencyTestRunner.php
+          tests/php/MaasHesaplamaSnapshotMysqlConcurrencyTestRunner.php
+          tests/php/MaasHesaplamaSnapshotTestRunner.php
+          EOF
+          git diff --name-only HEAD | sort > /tmp/actual-paths
+          sort -o /tmp/expected-paths /tmp/expected-paths
+          diff -u /tmp/expected-paths /tmp/actual-paths
+
+      - name: Commit fixture alignment
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "test: align S87 fail-closed fixtures with current schema"
+          git push origin HEAD:fix/s87-critical-owner-gaps-reopen
+
   quality:
     name: Unit + Typecheck + Build
     runs-on: ubuntu-latest

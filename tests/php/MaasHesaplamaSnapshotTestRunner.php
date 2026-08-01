@@ -249,9 +249,12 @@ function resetSnapshotData(PDO $pdo): void
         $pdo->exec('DELETE FROM ' . $table);
     }
     $pdo->exec("INSERT INTO subeler (id, kod, ad) VALUES (1, 'MRK', 'Merkez'), (2, 'SB2', 'Sube 2')");
-    $pdo->exec("INSERT INTO personeller (id, tc_kimlik_no, ad, soyad, sicil_no, ise_giris_tarihi, sube_id, aktif_durum, ucret_tipi_id)
-        VALUES (7, '11111111111', 'Ali', 'Yilmaz', 'S007', '2020-01-01', 1, 'AKTIF', 1),
-               (8, '22222222222', 'Ayse', 'Demir', 'S008', '2020-01-01', 1, 'AKTIF', 1)");
+    $pdo->exec("INSERT INTO personeller (
+        id, tc_kimlik_no, ad, soyad, sicil_no, ise_giris_tarihi, dogum_tarihi,
+        sube_id, aktif_durum, ucret_tipi_id
+    ) VALUES
+        (7, '11111111111', 'Ali', 'Yilmaz', 'S007', '2020-01-01', '1990-01-01', 1, 'AKTIF', 1),
+        (8, '22222222222', 'Ayse', 'Demir', 'S008', '2020-01-01', '1991-01-01', 1, 'AKTIF', 1)");
     $manifestHash = str_repeat('a', 64);
     $policyHash = str_repeat('b', 64);
     $pdo->exec("INSERT INTO sgk_eksik_gun_katalog_surumleri
@@ -454,7 +457,11 @@ try {
         VALUES (7, 30000, 'NET', '2025-01-01', '2026-03-15', 'AKTIF'),
                (7, 32000, 'NET', '2026-03-16', NULL, 'AKTIF')");
     $preflight = Svc::buildPreflight($pdo, 1, 2026, 3);
-    snapAssert((int) $preflight['blocker_count'] === 0, 'mid-month degisiklik + legacy fallback blocker uretmez');
+    snapAssert(
+        (int) $preflight['blocker_count'] === 0,
+        'mid-month degisiklik + legacy fallback blocker uretmez: '
+            . json_encode($preflight['items'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
+    );
     $legacy = issueByCode($preflight, 'LEGACY_SALARY_FALLBACK_USED');
     snapAssert($legacy !== null && (int) $legacy['personel_id'] === 8, 'legacy fallback warning uretildi');
     $midMonthSegments = null;

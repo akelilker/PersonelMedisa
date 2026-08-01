@@ -1700,10 +1700,11 @@ export function hesaplaGeceCalismaDakika(giris?: string, cikis?: string): number
 
 export function geceBandinaGiriyor(giris?: string, cikis?: string): boolean {
   const geceDakika = hesaplaGeceCalismaDakika(giris, cikis);
-  if (geceDakika !== null) {
-    return geceDakika > 0;
+  if (geceDakika !== null && geceDakika > 0) {
+    return true;
   }
 
+  // Mevcut guard kontrati: tam 20:00 cikisi da gece bandi siniri kabul edilir.
   const girisMin = giris ? parseTimeToMinutes(giris) : null;
   const cikisMin = cikis ? parseTimeToMinutes(cikis) : null;
 

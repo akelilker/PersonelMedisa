@@ -283,6 +283,17 @@ function createHkParentTables(PDO $pdo): void
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     ");
     $pdo->exec("
+        CREATE TABLE yillik_fazla_calisma_kilitleri (
+          id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+          personel_id INT UNSIGNED NOT NULL,
+          yil SMALLINT UNSIGNED NOT NULL,
+          locked_at DATETIME NOT NULL,
+          locked_by INT UNSIGNED NULL,
+          PRIMARY KEY (id),
+          UNIQUE KEY uq_yfck_personel_yil (personel_id, yil)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ");
+    $pdo->exec("
         CREATE TABLE gunluk_puantaj (
           id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
           personel_id INT UNSIGNED NOT NULL,

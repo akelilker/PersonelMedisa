@@ -709,6 +709,7 @@ fcotAssert(
 $seed2 = seedSnapshot($pdo, 1, 10, '2026-04-13', '2026-04-19', 200);
 $snap2 = $seed2['snapshot_id'];
 $belgeOk = seedImzaliBelge($pdo, 10, 'AKTIF');
+$belgeOk2 = seedImzaliBelge($pdo, 10, 'AKTIF');
 $belgeOther = seedImzaliBelge($pdo, 20, 'AKTIF');
 $belgeIptal = seedImzaliBelge($pdo, 10, 'IPTAL');
 
@@ -784,8 +785,11 @@ fcotAssert((int) ($firstAudit['secen_kullanici_id'] ?? 0) === 1, 'audit secen_ku
 $putIdem = invokeFcotHttp($pdo, $gy, 'PUT', '/fazla-calisma-odeme-tercihi', [
     'snapshot_id' => $snap2,
     'odeme_tipi' => 'SERBEST_ZAMAN',
+    'gerekce' => 'Ilk secim',
+    'talep_tarihi' => '2026-04-14',
+    'imzali_talep_belge_id' => $belgeOk,
 ], $subeHeader);
-fcotAssert($putIdem['status'] === 200, 'aynı payload idempotent');
+fcotAssert($putIdem['status'] === 200, 'aynı kanıt payloadı idempotent');
 $rowAfterIdem = $pdo->query('SELECT updated_at, odeme_tipi FROM fazla_calisma_odeme_tercihleri WHERE id = ' . $tercihId)->fetch(PDO::FETCH_ASSOC);
 $auditAfterIdem = (int) $pdo->query('SELECT COUNT(*) FROM fazla_calisma_odeme_tercihi_audit WHERE tercih_id = ' . $tercihId)->fetchColumn();
 fcotAssert((string) $rowBefore['updated_at'] === (string) $rowAfterIdem['updated_at'], 'idempotent updated_at unchanged');
@@ -796,18 +800,39 @@ $olusumAfterIdem = (int) $pdo->query(
 )->fetchColumn();
 fcotAssert($olusumAfterIdem === 1, 'idempotent SZ re-put olusum duplike etmiyor');
 
-// Same odeme_tipi + different gerekce is NOT a real change (locked contract).
-$putGerekceOnly = invokeFcotHttp($pdo, $gy, 'PUT', '/fazla-calisma-odeme-tercihi', [
+// Ayni SERBEST_ZAMAN tercihi, gecerli yeni belge/tarih/gerekce ile duzeltilebilir.
+$putEvidenceCorrection = invokeFcotHttp($pdo, $gy, 'PUT', '/fazla-calisma-odeme-tercihi', [
     'snapshot_id' => $snap2,
     'odeme_tipi' => 'SERBEST_ZAMAN',
-    'gerekce' => 'Farkli gerekce ama ayni tercih',
+    'gerekce' => 'Duzeltilmis imzali talep',
+    'talep_tarihi' => '2026-04-15',
+    'imzali_talep_belge_id' => $belgeOk2,
 ], $subeHeader);
-fcotAssert($putGerekceOnly['status'] === 200, 'gerekce-only idempotent → 200');
-$rowAfterGerekce = $pdo->query('SELECT updated_at, gerekce FROM fazla_calisma_odeme_tercihleri WHERE id = ' . $tercihId)->fetch(PDO::FETCH_ASSOC);
-$auditAfterGerekce = (int) $pdo->query('SELECT COUNT(*) FROM fazla_calisma_odeme_tercihi_audit WHERE tercih_id = ' . $tercihId)->fetchColumn();
-fcotAssert((string) $rowBefore['updated_at'] === (string) $rowAfterGerekce['updated_at'], 'gerekce-only updated_at unchanged');
-fcotAssert((string) ($rowAfterGerekce['gerekce'] ?? '') === (string) ($rowBefore['gerekce'] ?? ''), 'gerekce-only row gerekce unchanged');
-fcotAssert($auditAfterGerekce === $auditBefore, 'gerekce-only audit +0');
+fcotAssert($putEvidenceCorrection['status'] === 200, 'SERBEST_ZAMAN kanit duzeltme → 200');
+$rowAfterCorrection = $pdo->query(
+    'SELECT gerekce, talep_tarihi, imzali_talep_belge_id FROM fazla_calisma_odeme_tercihleri WHERE id = ' . $tercihId
+)->fetch(PDO::FETCH_ASSOC);
+$auditAfterCorrection = (int) $pdo->query('SELECT COUNT(*) FROM fazla_calisma_odeme_tercihi_audit WHERE tercih_id = ' . $tercihId)->fetchColumn();
+fcotAssert((string) ($rowAfterCorrection['gerekce'] ?? '') === 'Duzeltilmis imzali talep', 'SZ kanit duzeltme gerekce persist');
+fcotAssert((string) ($rowAfterCorrection['talep_tarihi'] ?? '') === '2026-04-15', 'SZ kanit duzeltme tarih persist');
+fcotAssert((int) ($rowAfterCorrection['imzali_talep_belge_id'] ?? 0) === $belgeOk2, 'SZ kanit duzeltme belge persist');
+fcotAssert($auditAfterCorrection === $auditBefore + 1, 'SZ kanit duzeltme audit +1');
+$olusumAfterCorrection = (int) $pdo->query(
+    "SELECT COUNT(*) FROM serbest_zaman_events
+     WHERE event_tipi = 'SERBEST_ZAMAN_OLUSUM' AND kaynak_odeme_tercihi_id = " . $tercihId
+)->fetchColumn();
+fcotAssert($olusumAfterCorrection === 1, 'SZ kanit duzeltme olusum duplike etmiyor');
+
+$putCorrectionIdem = invokeFcotHttp($pdo, $gy, 'PUT', '/fazla-calisma-odeme-tercihi', [
+    'snapshot_id' => $snap2,
+    'odeme_tipi' => 'SERBEST_ZAMAN',
+    'gerekce' => 'Duzeltilmis imzali talep',
+    'talep_tarihi' => '2026-04-15',
+    'imzali_talep_belge_id' => $belgeOk2,
+], $subeHeader);
+fcotAssert($putCorrectionIdem['status'] === 200, 'duzeltilmis kanit payloadi idempotent');
+$auditAfterCorrectionIdem = (int) $pdo->query('SELECT COUNT(*) FROM fazla_calisma_odeme_tercihi_audit WHERE tercih_id = ' . $tercihId)->fetchColumn();
+fcotAssert($auditAfterCorrectionIdem === $auditAfterCorrection, 'duzeltilmis kanit tekrarinda audit +0');
 
 // Period lock wins over SZ guard when both would apply (olusum is the auto-created one).
 $pdo->exec("INSERT INTO puantaj_aylik_muhurleri (sube_id, yil, ay, donem, durum, created_by)
@@ -850,7 +875,7 @@ fcotAssert($putUpdate['status'] === 200, 'PUT gerçek update');
 fcotAssert(($putUpdate['payload']['data']['odeme_tipi'] ?? '') === 'UCRET', 'PUT update odeme_tipi');
 fcotAssert(($putUpdate['payload']['data']['onceki_odeme_tipi'] ?? '') === 'SERBEST_ZAMAN', 'PUT update onceki');
 $auditAfterUpdate = (int) $pdo->query('SELECT COUNT(*) FROM fazla_calisma_odeme_tercihi_audit WHERE tercih_id = ' . $tercihId)->fetchColumn();
-fcotAssert($auditAfterUpdate === 2, 'audit append on real update');
+fcotAssert($auditAfterUpdate === 3, 'audit append on real update');
 
 // UCRET → SERBEST_ZAMAN allowed when no active olusum
 $putBackSz = invokeFcotHttp($pdo, $gy, 'PUT', '/fazla-calisma-odeme-tercihi', [
@@ -944,6 +969,7 @@ $unknownRoot->exec('USE `' . $unknownDb . '`');
 createFcotParentTables($unknownRoot);
 applyHkMigration($unknownRoot);
 applyFcotMigration($unknownRoot);
+applyPayrollCompliance043($unknownRoot);
 seedFcotFixtures($unknownRoot);
 $unknownSeed = seedSnapshot($unknownRoot, 1, 10, '2026-04-06', '2026-04-12', 10);
 $unknownRoot->exec('DROP TABLE puantaj_aylik_muhurleri');

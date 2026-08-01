@@ -1648,63 +1648,78 @@ function zamanAraligiKesisimDakika(
   return Math.max(0, Math.min(aralikBit, bandBit) - Math.max(aralikBas, bandBas));
 }
 
-/**
- * Aynı gün giriş–çıkış kaydında gece bandına (20:00–06:00) düşen brüt çalışma dakikası.
- * Mola gece bandına dağıtılmaz (Faz D3 minimum).
- * Gece yarısı geçişi (çıkış ≤ giriş) veya saat eksikliği → null.
- */
-export function hesaplaGeceCalismaDakika(giris?: string, cikis?: string): number | null {
+type CalismaAraligiDakika = { baslangic: number; bitis: number };
+
+/** Çıkış girişten erkense çıkışı ertesi güne taşır; eşit saat 0 dakika kabul edilir. */
+function normalizeCalismaAraligi(giris?: string, cikis?: string): CalismaAraligiDakika | null {
   if (!giris?.trim() || !cikis?.trim()) {
     return null;
   }
 
-  const girisMin = parseTimeToMinutes(giris);
-  const cikisMin = parseTimeToMinutes(cikis);
-  if (girisMin === null || cikisMin === null) {
+  const baslangic = parseTimeToMinutes(giris);
+  const cikisDakika = parseTimeToMinutes(cikis);
+  if (baslangic === null || cikisDakika === null) {
     return null;
   }
 
-  if (cikisMin <= girisMin) {
+  return {
+    baslangic,
+    bitis: cikisDakika < baslangic ? cikisDakika + GUN_TOPLAM_DK : cikisDakika
+  };
+}
+
+/**
+ * Giriş–çıkış aralığının gece bandına (20:00–06:00) düşen brüt çalışma dakikası.
+ * Gece yarısını aşan vardiyada çıkış ertesi gün olarak modellenir.
+ * Mola gece bandına dağıtılmaz (Faz D3 minimum).
+ */
+export function hesaplaGeceCalismaDakika(giris?: string, cikis?: string): number | null {
+  const aralik = normalizeCalismaAraligi(giris, cikis);
+  if (aralik === null) {
     return null;
   }
 
-  const sabahBandi = zamanAraligiKesisimDakika(girisMin, cikisMin, 0, GECE_BAND_SABAH_BITIS_DK);
-  const aksamBandi = zamanAraligiKesisimDakika(
-    girisMin,
-    cikisMin,
-    GECE_BAND_AKSAM_BASLANGIC_DK,
-    GUN_TOPLAM_DK
-  );
+  let toplam = 0;
+  for (const gunBaslangici of [0, GUN_TOPLAM_DK]) {
+    toplam += zamanAraligiKesisimDakika(
+      aralik.baslangic,
+      aralik.bitis,
+      gunBaslangici,
+      gunBaslangici + GECE_BAND_SABAH_BITIS_DK
+    );
+    toplam += zamanAraligiKesisimDakika(
+      aralik.baslangic,
+      aralik.bitis,
+      gunBaslangici + GECE_BAND_AKSAM_BASLANGIC_DK,
+      gunBaslangici + GUN_TOPLAM_DK
+    );
+  }
 
-  return sabahBandi + aksamBandi;
+  return toplam;
 }
 
 export function geceBandinaGiriyor(giris?: string, cikis?: string): boolean {
+  const geceDakika = hesaplaGeceCalismaDakika(giris, cikis);
+  if (geceDakika !== null && geceDakika > 0) {
+    return true;
+  }
+
+  // Mevcut guard kontrati: tam 20:00 cikisi da gece bandi siniri kabul edilir.
   const girisMin = giris ? parseTimeToMinutes(giris) : null;
   const cikisMin = cikis ? parseTimeToMinutes(cikis) : null;
 
-  if (girisMin !== null && girisMin < GECE_BAND_SABAH_BITIS_DK) {
-    return true;
-  }
-
-  if (cikisMin !== null && cikisMin >= GECE_BAND_AKSAM_BASLANGIC_DK) {
-    return true;
-  }
-
-  return false;
+  return (girisMin !== null && girisMin < GECE_BAND_SABAH_BITIS_DK)
+    || (cikisMin !== null && cikisMin >= GECE_BAND_AKSAM_BASLANGIC_DK);
 }
 
 // ---------------------------------------------------------------------------
-// Brüt çalışma süresi (giriş-çıkış farkı, dakika)
+// Brüt çalışma süresi (gece yarısı geçişinde çıkış ertesi gün)
 // ---------------------------------------------------------------------------
 
 export function hesaplaBrutSure(giris?: string, cikis?: string): number {
-  if (!giris || !cikis) return 0;
-  const g = parseTimeToMinutes(giris);
-  const c = parseTimeToMinutes(cikis);
-  if (g === null || c === null) return 0;
-  const fark = c - g;
-  return fark > 0 ? fark : 0;
+  const aralik = normalizeCalismaAraligi(giris, cikis);
+  if (aralik === null) return 0;
+  return Math.max(0, aralik.bitis - aralik.baslangic);
 }
 
 // ---------------------------------------------------------------------------

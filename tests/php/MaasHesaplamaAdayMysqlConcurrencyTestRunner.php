@@ -268,8 +268,11 @@ function mhacSeedSnapshot(PDO $pdo): int
     $pdo->exec("INSERT INTO subeler VALUES (1, 'MRK', 'Merkez')");
     $pdo->exec('INSERT INTO users VALUES (1), (11), (12), (99)');
     mhacSeedApprovedPolicy($pdo);
-    $pdo->exec("INSERT INTO personeller (id, tc_kimlik_no, ad, soyad, sicil_no, ise_giris_tarihi, sube_id)
-        VALUES (7, '11111111111', 'Test', 'Personel', 'S007', '2020-01-01', 1)");
+    $pdo->exec("INSERT INTO personeller (
+        id, tc_kimlik_no, ad, soyad, sicil_no, ise_giris_tarihi, dogum_tarihi, sube_id
+    ) VALUES (
+        7, '11111111111', 'Test', 'Personel', 'S007', '2020-01-01', '1990-01-01', 1
+    )");
     $pdo->exec("INSERT INTO puantaj_aylik_muhurleri (sube_id, yil, ay, donem, durum, muhurlenen_kayit_sayisi, created_by)
         VALUES (1, 2026, 1, '2026-01', 'MUHURLENDI', 1, 1)");
     $muhurId = (int) $pdo->lastInsertId();
@@ -428,7 +431,8 @@ try {
     $pdo->exec('CREATE TABLE users (id INT UNSIGNED NOT NULL PRIMARY KEY) ENGINE=InnoDB');
     $pdo->exec("CREATE TABLE personeller (
         id INT UNSIGNED NOT NULL PRIMARY KEY, tc_kimlik_no CHAR(11), ad VARCHAR(80), soyad VARCHAR(80),
-        sicil_no VARCHAR(32), ise_giris_tarihi DATE, sube_id INT UNSIGNED NOT NULL
+        sicil_no VARCHAR(32), ise_giris_tarihi DATE, dogum_tarihi DATE NULL,
+        sube_id INT UNSIGNED NOT NULL
     ) ENGINE=InnoDB");
     $pdo->exec("CREATE TABLE surecler (
         id INT UNSIGNED NOT NULL PRIMARY KEY, personel_id INT UNSIGNED NOT NULL
@@ -453,6 +457,27 @@ try {
     ] as $file) {
         mhacApplyMigration($pdo, $file);
     }
+
+    $pdo->exec("CREATE TABLE haftalik_kapanislar (
+        id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY, sube_id INT UNSIGNED NOT NULL
+    ) ENGINE=InnoDB");
+    $pdo->exec("CREATE TABLE haftalik_kapanis_satirlari (
+        id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY, kapanis_id INT UNSIGNED NOT NULL,
+        personel_id INT UNSIGNED NOT NULL, hafta_baslangic DATE NOT NULL, hafta_bitis DATE NOT NULL,
+        fazla_calisma_dakika INT UNSIGNED NOT NULL DEFAULT 0, tam_hafta_verisi TINYINT(1) NOT NULL DEFAULT 1,
+        state VARCHAR(16) NOT NULL DEFAULT 'KAPANDI'
+    ) ENGINE=InnoDB");
+    $pdo->exec("CREATE TABLE fazla_calisma_odeme_tercihleri (
+        id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY, snapshot_id INT UNSIGNED NOT NULL,
+        personel_id INT UNSIGNED NOT NULL, odeme_tipi VARCHAR(32) NOT NULL,
+        fazla_calisma_dakika INT UNSIGNED NOT NULL DEFAULT 0, gerekce TEXT NULL, talep_tarihi DATE NULL,
+        imzali_talep_belge_id INT UNSIGNED NULL, hafta_baslangic DATE NOT NULL, hafta_bitis DATE NOT NULL
+    ) ENGINE=InnoDB");
+    $pdo->exec("CREATE TABLE yillik_fazla_calisma_kilitleri (
+        id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY, personel_id INT UNSIGNED NOT NULL,
+        yil SMALLINT UNSIGNED NOT NULL, locked_at DATETIME NOT NULL, locked_by INT UNSIGNED NULL,
+        UNIQUE KEY uq_mhac_yfck_personel_yil (personel_id, yil)
+    ) ENGINE=InnoDB");
 
     $snapshotId = mhacSeedSnapshot($pdo);
     $preflight = AdaySvc::buildCalculationPreflight($pdo, $snapshotId);

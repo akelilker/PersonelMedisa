@@ -34,6 +34,7 @@ function createSnapshotSchema(PDO $pdo): void
         id INTEGER PRIMARY KEY, tc_kimlik_no TEXT, ad TEXT, soyad TEXT, sicil_no TEXT,
         ise_giris_tarihi TEXT, sube_id INTEGER NOT NULL, departman_id INTEGER, gorev_id INTEGER,
         personel_tipi_id INTEGER, bagli_amir_id INTEGER, aktif_durum TEXT NOT NULL DEFAULT \'AKTIF\',
+        dogum_tarihi TEXT,
         ucret_tipi_id INTEGER, maas_tutari REAL, prim_kurali_id INTEGER
     )');
     $pdo->exec('CREATE TABLE surecler (
@@ -94,6 +95,25 @@ function createSnapshotSchema(PDO $pdo): void
     $pdo->exec('CREATE TABLE puantaj_donem_kilitleri (
         sube_id INTEGER NOT NULL, yil INTEGER NOT NULL, ay INTEGER NOT NULL,
         PRIMARY KEY (sube_id, yil, ay)
+    )');
+    $pdo->exec('CREATE TABLE haftalik_kapanislar (
+        id INTEGER PRIMARY KEY, sube_id INTEGER NOT NULL
+    )');
+    $pdo->exec('CREATE TABLE haftalik_kapanis_satirlari (
+        id INTEGER PRIMARY KEY, kapanis_id INTEGER NOT NULL, personel_id INTEGER NOT NULL,
+        hafta_baslangic TEXT NOT NULL, hafta_bitis TEXT NOT NULL,
+        fazla_calisma_dakika INTEGER NOT NULL DEFAULT 0,
+        tam_hafta_verisi INTEGER NOT NULL DEFAULT 1,
+        state TEXT NOT NULL DEFAULT \'KAPANDI\'
+    )');
+    $pdo->exec('CREATE TABLE fazla_calisma_odeme_tercihleri (
+        id INTEGER PRIMARY KEY, snapshot_id INTEGER NOT NULL, personel_id INTEGER NOT NULL,
+        odeme_tipi TEXT NOT NULL, fazla_calisma_dakika INTEGER NOT NULL DEFAULT 0,
+        imzali_talep_belge_id INTEGER, talep_tarihi TEXT, gerekce TEXT,
+        hafta_baslangic TEXT NOT NULL, hafta_bitis TEXT NOT NULL
+    )');
+    $pdo->exec('CREATE TABLE yillik_fazla_calisma_kilitleri (
+        id INTEGER PRIMARY KEY, personel_id INTEGER NOT NULL, yil INTEGER NOT NULL
     )');
     $pdo->exec('CREATE TABLE maas_hesaplama_donem_snapshotlari (
         id INTEGER PRIMARY KEY AUTOINCREMENT, sube_id INTEGER NOT NULL, yil INTEGER NOT NULL, ay INTEGER NOT NULL,
@@ -229,9 +249,12 @@ function resetSnapshotData(PDO $pdo): void
         $pdo->exec('DELETE FROM ' . $table);
     }
     $pdo->exec("INSERT INTO subeler (id, kod, ad) VALUES (1, 'MRK', 'Merkez'), (2, 'SB2', 'Sube 2')");
-    $pdo->exec("INSERT INTO personeller (id, tc_kimlik_no, ad, soyad, sicil_no, ise_giris_tarihi, sube_id, aktif_durum, ucret_tipi_id)
-        VALUES (7, '11111111111', 'Ali', 'Yilmaz', 'S007', '2020-01-01', 1, 'AKTIF', 1),
-               (8, '22222222222', 'Ayse', 'Demir', 'S008', '2020-01-01', 1, 'AKTIF', 1)");
+    $pdo->exec("INSERT INTO personeller (
+        id, tc_kimlik_no, ad, soyad, sicil_no, ise_giris_tarihi, dogum_tarihi,
+        sube_id, aktif_durum, ucret_tipi_id
+    ) VALUES
+        (7, '11111111111', 'Ali', 'Yilmaz', 'S007', '2020-01-01', '1990-01-01', 1, 'AKTIF', 1),
+        (8, '22222222222', 'Ayse', 'Demir', 'S008', '2020-01-01', '1991-01-01', 1, 'AKTIF', 1)");
     $manifestHash = str_repeat('a', 64);
     $policyHash = str_repeat('b', 64);
     $pdo->exec("INSERT INTO sgk_eksik_gun_katalog_surumleri
@@ -304,6 +327,43 @@ function snapAssert(bool $condition, string $name): void
 }
 
 $actor = ['id' => 99, 'rol' => 'MUHASEBE'];
+// Persisted eski aday, guncel surec kaydindan hastalik metadata'si ile zenginlesir.
+$legacyCandidatePayload = Svc::candidatePayloadStatic([
+    'id' => 901,
+    'personel_id' => 7,
+    'tarih' => '2026-04-01',
+    'bildirim_turu' => 'RAPORLU',
+    'bildirim_alt_tur' => null,
+    'etki_turu' => 'RAPOR_GUNU',
+    'etki_miktari' => 1,
+    'etki_birimi' => 'GUN',
+    'state' => 'UYGULANDI',
+    'conflict_code' => null,
+    'source_hash' => 'legacy-source',
+    'mevcut_puantaj_id' => null,
+    'source_snapshot' => [
+        'resmi_surec_ozeti' => [
+            'id' => 77,
+            'surec_turu' => 'RAPOR',
+            'baslangic_tarihi' => '2026-03-31',
+        ],
+    ],
+    'updated_at' => '2026-04-01 09:00:00',
+], [
+    'id' => 77,
+    'surec_turu' => 'RAPOR',
+    'alt_tur' => null,
+    'baslangic_tarihi' => '2026-03-31',
+    'bitis_tarihi' => '2026-04-02',
+    'ilk_iki_gun_firma_oder_mi' => 0,
+]);
+snapAssert(
+    (int) ($legacyCandidatePayload['metadata']['gun_sirasi'] ?? 0) === 2
+        && ($legacyCandidatePayload['metadata']['ilk_iki_gun'] ?? null) === true
+        && ($legacyCandidatePayload['metadata']['ilk_iki_gun_firma_oder_mi'] ?? null) === 0,
+    'eski RAPOR_GUNU adayi snapshotta guncel surec metadata ile zenginlestirildi'
+);
+
 $path = tempnam(sys_get_temp_dir(), 'medisa-mhs-');
 if ($path === false) {
     throw new RuntimeException('Temporary database could not be created.');
@@ -397,7 +457,11 @@ try {
         VALUES (7, 30000, 'NET', '2025-01-01', '2026-03-15', 'AKTIF'),
                (7, 32000, 'NET', '2026-03-16', NULL, 'AKTIF')");
     $preflight = Svc::buildPreflight($pdo, 1, 2026, 3);
-    snapAssert((int) $preflight['blocker_count'] === 0, 'mid-month degisiklik + legacy fallback blocker uretmez');
+    snapAssert(
+        (int) $preflight['blocker_count'] === 0,
+        'mid-month degisiklik + legacy fallback blocker uretmez: '
+            . json_encode($preflight['items'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
+    );
     $legacy = issueByCode($preflight, 'LEGACY_SALARY_FALLBACK_USED');
     snapAssert($legacy !== null && (int) $legacy['personel_id'] === 8, 'legacy fallback warning uretildi');
     $midMonthSegments = null;

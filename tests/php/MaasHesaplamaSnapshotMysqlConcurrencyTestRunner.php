@@ -248,6 +248,7 @@ try {
         sicil_no VARCHAR(32), ise_giris_tarihi DATE, sube_id INT UNSIGNED NOT NULL,
         departman_id INT UNSIGNED NULL, gorev_id INT UNSIGNED NULL, personel_tipi_id INT UNSIGNED NULL,
         bagli_amir_id INT UNSIGNED NULL, aktif_durum VARCHAR(16) NOT NULL DEFAULT 'AKTIF',
+        dogum_tarihi DATE NULL,
         ucret_tipi_id INT UNSIGNED NULL, maas_tutari DECIMAL(12,2) NULL, prim_kurali_id INT UNSIGNED NULL
     ) ENGINE=InnoDB");
     $pdo->exec("CREATE TABLE surecler (
@@ -333,12 +334,35 @@ try {
         }
     }
 
+    $pdo->exec("CREATE TABLE haftalik_kapanislar (
+        id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY, sube_id INT UNSIGNED NOT NULL
+    ) ENGINE=InnoDB");
+    $pdo->exec("CREATE TABLE haftalik_kapanis_satirlari (
+        id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY, kapanis_id INT UNSIGNED NOT NULL,
+        personel_id INT UNSIGNED NOT NULL, hafta_baslangic DATE NOT NULL, hafta_bitis DATE NOT NULL,
+        fazla_calisma_dakika INT UNSIGNED NOT NULL DEFAULT 0, tam_hafta_verisi TINYINT(1) NOT NULL DEFAULT 1,
+        state VARCHAR(16) NOT NULL DEFAULT 'KAPANDI'
+    ) ENGINE=InnoDB");
+    $pdo->exec("CREATE TABLE fazla_calisma_odeme_tercihleri (
+        id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY, snapshot_id INT UNSIGNED NOT NULL,
+        personel_id INT UNSIGNED NOT NULL, odeme_tipi VARCHAR(32) NOT NULL,
+        fazla_calisma_dakika INT UNSIGNED NOT NULL DEFAULT 0, gerekce TEXT NULL, talep_tarihi DATE NULL,
+        imzali_talep_belge_id INT UNSIGNED NULL, hafta_baslangic DATE NOT NULL, hafta_bitis DATE NOT NULL
+    ) ENGINE=InnoDB");
+    $pdo->exec("CREATE TABLE yillik_fazla_calisma_kilitleri (
+        id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY, personel_id INT UNSIGNED NOT NULL,
+        yil SMALLINT UNSIGNED NOT NULL, locked_at DATETIME NOT NULL, locked_by INT UNSIGNED NULL,
+        UNIQUE KEY uq_mhs_yfck_personel_yil (personel_id, yil)
+    ) ENGINE=InnoDB");
+
     $pdo->exec("INSERT INTO subeler VALUES (1, 'MRK', 'Merkez'), (2, 'SB2', 'Sube 2')");
     $pdo->exec('INSERT INTO users VALUES (1), (11), (12), (13), (14), (15), (16), (17), (18), (19), (20), (99)');
-    $pdo->exec("INSERT INTO personeller (id, tc_kimlik_no, ad, soyad, sicil_no, ise_giris_tarihi, sube_id, ucret_tipi_id)
-        VALUES (7, '11111111111', 'Ali', 'Yilmaz', 'S007', '2020-01-01', 1, 1),
-               (8, '22222222222', 'Ayse', 'Demir', 'S008', '2020-01-01', 1, 1),
-               (9, '33333333333', 'Can', 'Kaya', 'S009', '2020-01-01', 2, 1)");
+    $pdo->exec("INSERT INTO personeller (
+        id, tc_kimlik_no, ad, soyad, sicil_no, ise_giris_tarihi, dogum_tarihi, sube_id, ucret_tipi_id
+    ) VALUES
+        (7, '11111111111', 'Ali', 'Yilmaz', 'S007', '2020-01-01', '1990-01-01', 1, 1),
+        (8, '22222222222', 'Ayse', 'Demir', 'S008', '2020-01-01', '1991-01-01', 1, 1),
+        (9, '33333333333', 'Can', 'Kaya', 'S009', '2020-01-01', '1992-01-01', 2, 1)");
 
     $actor = ['id' => 99, 'rol' => 'MUHASEBE'];
 

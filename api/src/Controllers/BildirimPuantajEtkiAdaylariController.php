@@ -1259,7 +1259,8 @@ class BildirimPuantajEtkiAdaylariController
         $ids = array_keys($personelIds);
         $placeholders = implode(',', array_fill(0, count($ids), '?'));
         $stmt = $pdo->prepare('
-            SELECT id, personel_id, surec_turu, alt_tur, baslangic_tarihi, bitis_tarihi, ucretli_mi, state
+            SELECT id, personel_id, surec_turu, alt_tur, baslangic_tarihi, bitis_tarihi,
+                   ucretli_mi, ilk_iki_gun_firma_oder_mi, state
             FROM surecler
             WHERE personel_id IN (' . $placeholders . ')
               AND state = ?

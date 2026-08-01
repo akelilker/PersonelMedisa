@@ -42,6 +42,7 @@ final class PayrollComplianceGuard
     public const BLOCKER_HASTALIK_POLITIKA_COZULEMEDI = 'NORMAL_HASTALIK_POLITIKASI_COZULEMEDI';
     public const BLOCKER_DEVAMSIZLIK_PARITY = 'DEVAMSIZLIK_HAFTA_TATILI_PARITY_UYUSMAZLIK';
     public const BLOCKER_SGK_POLITIKA_BELIRSIZ = 'SGK_SIRKET_POLITIKA_GIRDISI_BELIRSIZ';
+    public const BLOCKER_COMPLIANCE_SCHEMA_UNAVAILABLE = 'COMPLIANCE_SCHEMA_UNAVAILABLE';
 
     public const POLICY_NORMAL_HASTALIK_ILK_IKI_GUN = 'NORMAL_HASTALIK_ILK_IKI_GUN_ISVEREN_ODEMESI';
     public const POLICY_HAFTALIK_NORMAL_DAKIKA = 'HAFTALIK_NORMAL_CALISMA_DAKIKA';
@@ -217,13 +218,13 @@ final class PayrollComplianceGuard
         string $donemBitis,
         array $personelIds
     ): array {
-        $items = [];
         if ($personelIds === []) {
-            return $items;
+            return [];
         }
 
-        if (!self::tableExists($pdo, 'fazla_calisma_odeme_tercihleri')) {
-            return $items;
+        $schemaIssue = self::resolveComplianceSchemaIssue($pdo);
+        if ($schemaIssue !== null) {
+            return [self::schemaUnavailableBlocker($schemaIssue)];
         }
 
         try {
@@ -235,8 +236,7 @@ final class PayrollComplianceGuard
                 $personelIds
             );
         } catch (\Throwable $e) {
-            // Eksik kolon / sema drift: fail-closed blocker yerine preflight'i kirletme.
-            return $items;
+            return [self::schemaUnavailableBlocker('QUERY_FAILED', get_class($e))];
         }
     }
 
@@ -252,6 +252,8 @@ final class PayrollComplianceGuard
         array $personelIds
     ): array {
         $items = [];
+        // Caller may pass personel_id-keyed maps; PDO positional binds require 0-based values.
+        $personelIds = array_values(array_map('intval', $personelIds));
         $hasEvidenceCols = self::columnExists($pdo, 'fazla_calisma_odeme_tercihleri', 'imzali_talep_belge_id');
         $placeholders = implode(',', array_fill(0, count($personelIds), '?'));
         $evidenceSelect = $hasEvidenceCols
@@ -265,7 +267,7 @@ final class PayrollComplianceGuard
                   AND t.hafta_baslangic <= ?
                   AND t.hafta_bitis >= ?
                   AND t.fazla_calisma_dakika > 0";
-        $params = array_map('intval', $personelIds);
+        $params = $personelIds;
         $params[] = $donemBitis;
         $params[] = $donemBaslangic;
         $stmt = $pdo->prepare($sql);
@@ -286,7 +288,7 @@ final class PayrollComplianceGuard
                        AND s.fazla_calisma_dakika > 0
                        AND t.id IS NULL
                        AND s.state = 'KAPANDI'";
-            $params2 = array_merge([(int) $subeId], array_map('intval', $personelIds), [$donemBitis, $donemBaslangic]);
+            $params2 = array_merge([(int) $subeId], $personelIds, [$donemBitis, $donemBaslangic]);
             $stmt2 = $pdo->prepare($sql2);
             $stmt2->execute($params2);
             foreach ($stmt2->fetchAll(PDO::FETCH_ASSOC) ?: [] as $row) {
@@ -338,7 +340,7 @@ final class PayrollComplianceGuard
         if (self::tableExists($pdo, 'personeller') && self::columnExists($pdo, 'personeller', 'dogum_tarihi')) {
             $sqlP = "SELECT id, dogum_tarihi FROM personeller WHERE id IN ($placeholders)";
             $stmtP = $pdo->prepare($sqlP);
-            $stmtP->execute(array_map('intval', $personelIds));
+            $stmtP->execute($personelIds);
             $dobMap = [];
             foreach ($stmtP->fetchAll(PDO::FETCH_ASSOC) ?: [] as $p) {
                 $dobMap[(int) $p['id']] = $p['dogum_tarihi'] ?? null;
@@ -382,6 +384,17 @@ final class PayrollComplianceGuard
     private static function columnExists(PDO $pdo, string $table, string $column): bool
     {
         try {
+            if ($pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite') {
+                $stmt = $pdo->query('PRAGMA table_info(' . $pdo->quote($table) . ')');
+                foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) ?: [] as $row) {
+                    if ((string) ($row['name'] ?? '') === $column) {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+
             $stmt = $pdo->prepare(
                 'SELECT COUNT(*) FROM information_schema.columns
                  WHERE table_schema = DATABASE() AND table_name = :t AND column_name = :c'
@@ -392,6 +405,51 @@ final class PayrollComplianceGuard
         } catch (\Throwable $e) {
             return false;
         }
+    }
+
+    private static function resolveComplianceSchemaIssue(PDO $pdo): ?string
+    {
+        foreach ([
+            'fazla_calisma_odeme_tercihleri',
+            'haftalik_kapanis_satirlari',
+            'haftalik_kapanislar',
+            'personeller',
+            'yillik_fazla_calisma_kilitleri',
+        ] as $table) {
+            if (!self::tableExists($pdo, $table)) {
+                return 'MISSING_TABLE:' . $table;
+            }
+        }
+
+        foreach ([
+            ['fazla_calisma_odeme_tercihleri', 'imzali_talep_belge_id'],
+            ['fazla_calisma_odeme_tercihleri', 'talep_tarihi'],
+            ['fazla_calisma_odeme_tercihleri', 'gerekce'],
+            ['personeller', 'dogum_tarihi'],
+        ] as $required) {
+            if (!self::columnExists($pdo, $required[0], $required[1])) {
+                return 'MISSING_COLUMN:' . $required[0] . '.' . $required[1];
+            }
+        }
+
+        return null;
+    }
+
+    private static function schemaUnavailableBlocker(string $reason, ?string $exceptionType = null): array
+    {
+        $metadata = ['reason' => $reason];
+        if ($exceptionType !== null && $exceptionType !== '') {
+            $metadata['exception_type'] = $exceptionType;
+        }
+
+        return self::blockerItem(
+            self::BLOCKER_COMPLIANCE_SCHEMA_UNAVAILABLE,
+            'Bordro uyumluluk semasi okunamadi; snapshot ve bordro islemi guvenli olarak durduruldu.',
+            null,
+            'compliance_schema',
+            null,
+            $metadata
+        );
     }
 
     /**
@@ -500,7 +558,7 @@ final class PayrollComplianceGuard
     public static function loadKapanmisYillikFazlaCalisma(PDO $pdo, int $personelId, int $yil): array
     {
         if (!self::tableExists($pdo, 'haftalik_kapanis_satirlari')) {
-            return [];
+            throw new \RuntimeException(self::BLOCKER_COMPLIANCE_SCHEMA_UNAVAILABLE . ':haftalik_kapanis_satirlari');
         }
         $stmt = $pdo->prepare(
             "SELECT s.fazla_calisma_dakika, s.hafta_baslangic, s.kapanis_id, s.tam_hafta_verisi
@@ -538,7 +596,7 @@ final class PayrollComplianceGuard
     public static function acquireYillikLock(PDO $pdo, int $personelId, int $yil, ?int $actorId): void
     {
         if (!self::tableExists($pdo, 'yillik_fazla_calisma_kilitleri')) {
-            return;
+            throw new \RuntimeException(self::BLOCKER_COMPLIANCE_SCHEMA_UNAVAILABLE . ':yillik_fazla_calisma_kilitleri');
         }
         $stmt = $pdo->prepare(
             'INSERT INTO yillik_fazla_calisma_kilitleri (personel_id, yil, locked_at, locked_by)

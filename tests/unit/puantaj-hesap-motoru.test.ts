@@ -103,8 +103,9 @@ describe("hesaplaBrutSure", () => {
     expect(hesaplaBrutSure(undefined, undefined)).toBe(0);
   });
 
-  it("çıkış girişten küçükse 0 döner", () => {
-    expect(hesaplaBrutSure("18:00", "08:00")).toBe(0);
+  it("gece yarısını aşan vardiyada çıkışı ertesi gün kabul eder", () => {
+    expect(hesaplaBrutSure("22:00", "05:00")).toBe(420);
+    expect(hesaplaBrutSure("18:00", "08:00")).toBe(840);
   });
 
   it("geçersiz saat formatı 0 döner", () => {
@@ -489,8 +490,9 @@ describe("hesaplaGeceCalismaDakika", () => {
     expect(hesaplaGeceCalismaDakika(undefined, "17:00")).toBeNull();
   });
 
-  it("gece yarısı geçişli kayıt → null", () => {
-    expect(hesaplaGeceCalismaDakika("22:00", "02:00")).toBeNull();
+  it("gece yarısı geçişli kayıt gece bandını iki güne bölerek hesaplar", () => {
+    expect(hesaplaGeceCalismaDakika("22:00", "02:00")).toBe(240);
+    expect(hesaplaGeceCalismaDakika("22:00", "05:00")).toBe(420);
   });
 });
 
@@ -525,11 +527,11 @@ describe("GECE_CALISMASI_7_5_SAAT_ASIMI compliance", () => {
     ).toBe(false);
   });
 
-  it("gece yarısı geçişli kayıt → GECE_CALISMASI_7_5_SAAT_ASIMI üretmez", () => {
-    const uyarilar = uretComplianceUyarilari(240, 180, "22:00", "02:00");
-    expect(
-      uyarilar.some((u) => u.code === GECE_CALISMASI_7_5_SAAT_ASIMI_CODE)
-    ).toBe(false);
+  it("gece yarısı geçişli 451+ dakika kayıt → GECE_CALISMASI_7_5_SAAT_ASIMI üretir", () => {
+    const uyarilar = uretComplianceUyarilari(571, 511, "20:00", "05:31");
+    expect(uyarilar).toContainEqual(
+      expect.objectContaining({ code: GECE_CALISMASI_7_5_SAAT_ASIMI_CODE, level: "UYARI" })
+    );
   });
 
   it("GECE_MESAI bilgisi bozulmaz", () => {
@@ -571,6 +573,10 @@ describe("18 yas alti blok kurallari", () => {
     expect(geceBandinaGiriyor("05:30", "14:00")).toBe(true);
   });
 
+  it("gece yarısını aşan vardiya gece bandına girer", () => {
+    expect(geceBandinaGiriyor("22:00", "05:00")).toBe(true);
+  });
+
   it("yetiskin personelde blok mesaji uretmez", () => {
     expect(
       hesaplaYasKuraliBlokMesaji({
@@ -600,6 +606,17 @@ describe("18 yas alti blok kurallari", () => {
         dogum_tarihi: "2009-01-01",
         giris_saati: "12:00",
         cikis_saati: "20:30"
+      })
+    ).toBe("Yasal Uyari: 18 yas alti personele gece calismasi girilemez.");
+  });
+
+  it("18 yas alti gece yarısını aşan vardiyayı bloklar", () => {
+    expect(
+      hesaplaYasKuraliBlokMesaji({
+        tarih: "2026-04-13",
+        dogum_tarihi: "2009-01-01",
+        giris_saati: "22:00",
+        cikis_saati: "05:00"
       })
     ).toBe("Yasal Uyari: 18 yas alti personele gece calismasi girilemez.");
   });

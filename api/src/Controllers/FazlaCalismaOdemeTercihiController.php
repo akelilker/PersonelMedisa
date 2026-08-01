@@ -93,7 +93,12 @@ class FazlaCalismaOdemeTercihiController
 
         $pdo = Connection::get();
 
-        foreach (['fazla_calisma_odeme_tercihleri', 'fazla_calisma_odeme_tercihi_audit', 'haftalik_kapanis_satirlari'] as $table) {
+        foreach ([
+            'fazla_calisma_odeme_tercihleri',
+            'fazla_calisma_odeme_tercihi_audit',
+            'haftalik_kapanis_satirlari',
+            'yillik_fazla_calisma_kilitleri',
+        ] as $table) {
             if (!self::tableExists($pdo, $table)) {
                 JsonResponse::error(409, 'SCHEMA_NOT_READY', 'Odeme tercihi semasi hazir degil.');
             }
@@ -129,12 +134,6 @@ class FazlaCalismaOdemeTercihiController
             self::assertWeekPeriodsOpen($pdo, $subeId, $haftaBaslangic, $haftaBitis);
 
             $existing = self::loadTercihBySnapshot($pdo, $snapshotId, true);
-            // Idempotency key is odeme_tipi only; gerekce-only delta is not a real preference change.
-            if ($existing !== null && (string) $existing['odeme_tipi'] === $odemeTipi) {
-                $pdo->commit();
-                JsonResponse::success(self::mapTercih($existing));
-            }
-
             $onceki = $existing !== null
                 ? (string) $existing['odeme_tipi']
                 : self::DEFAULT_ODEME_TIPI;
@@ -152,23 +151,14 @@ class FazlaCalismaOdemeTercihiController
                 );
             }
 
-            if ($fazlaDk > 0) {
-                $dob = self::loadPersonelDogumTarihi($pdo, $personelId);
-                $age = PayrollComplianceGuard::resolveUnder18($dob, $haftaBitis);
-                if ($age['missing_dob']) {
-                    self::rollbackValidation(
-                        $pdo,
-                        PayrollComplianceGuard::BLOCKER_DOGUM_TARIHI_REQUIRED,
-                        'Dogum tarihi olmadan fazla calisma islemi yapilamaz.'
-                    );
-                }
-                if ($age['under_18']) {
-                    self::rollbackConflict(
-                        $pdo,
-                        PayrollComplianceGuard::BLOCKER_ONSEKIZ_YAS_FAZLA_CALISMA,
-                        '18 yasini doldurmamis personelde fazla calisma kaydedilemez.'
-                    );
-                }
+            // UCRET/KARAR_BEKLIYOR icin odeme tipi owner'dir; gerekce-only delta idempotent kalir.
+            if (
+                $existing !== null
+                && (string) $existing['odeme_tipi'] === $odemeTipi
+                && $odemeTipi !== 'SERBEST_ZAMAN'
+            ) {
+                $pdo->commit();
+                JsonResponse::success(self::mapTercih($existing));
             }
 
             $talepTarihi = null;
@@ -180,6 +170,19 @@ class FazlaCalismaOdemeTercihiController
             $now = date('Y-m-d H:i:s');
 
             if ($odemeTipi === 'SERBEST_ZAMAN') {
+                if (
+                    !$hasKanitCols
+                    || !$hasAuditKanitCols
+                    || !self::tableExists($pdo, 'surecler')
+                    || !self::tableExists($pdo, 'serbest_zaman_events')
+                ) {
+                    self::rollbackConflict(
+                        $pdo,
+                        'SCHEMA_NOT_READY',
+                        'SERBEST_ZAMAN kanit semasi hazir degil.'
+                    );
+                }
+
                 $kanitPayload = [
                     'talep_tarihi' => $body['talep_tarihi'] ?? null,
                     'imzali_talep_belge_id' => $body['imzali_talep_belge_id'] ?? null,
@@ -210,6 +213,40 @@ class FazlaCalismaOdemeTercihiController
                         $pdo,
                         PayrollComplianceGuard::BLOCKER_SERBEST_ZAMAN_KANIT_EKSIK,
                         'SERBEST_ZAMAN icin gerekce/not zorunludur.'
+                    );
+                }
+
+                // SERBEST_ZAMAN idempotency tam kanit payload'idir; belge/tarih/gerekce degisirse duzeltme yazilir.
+                if (
+                    $existing !== null
+                    && (string) $existing['odeme_tipi'] === 'SERBEST_ZAMAN'
+                    && self::isSameSerbestZamanEvidence(
+                        $existing,
+                        $talepTarihi,
+                        $imzaliTalepBelgeId,
+                        $gerekce
+                    )
+                ) {
+                    $pdo->commit();
+                    JsonResponse::success(self::mapTercih($existing));
+                }
+            }
+
+            if ($fazlaDk > 0) {
+                $dob = self::loadPersonelDogumTarihi($pdo, $personelId);
+                $age = PayrollComplianceGuard::resolveUnder18($dob, $haftaBitis);
+                if ($age['missing_dob']) {
+                    self::rollbackValidation(
+                        $pdo,
+                        PayrollComplianceGuard::BLOCKER_DOGUM_TARIHI_REQUIRED,
+                        'Dogum tarihi olmadan fazla calisma islemi yapilamaz.'
+                    );
+                }
+                if ($age['under_18']) {
+                    self::rollbackConflict(
+                        $pdo,
+                        PayrollComplianceGuard::BLOCKER_ONSEKIZ_YAS_FAZLA_CALISMA,
+                        '18 yasini doldurmamis personelde fazla calisma kaydedilemez.'
                     );
                 }
             }
@@ -412,7 +449,7 @@ class FazlaCalismaOdemeTercihiController
         ?int $createdBy
     ): void {
         if (!self::tableExists($pdo, 'serbest_zaman_events')) {
-            return;
+            throw new \RuntimeException('SCHEMA_NOT_READY:serbest_zaman_events');
         }
         if (PayrollComplianceGuard::hasActiveSerbestZamanOlusum($pdo, $tercihId)) {
             return;
@@ -714,6 +751,18 @@ class FazlaCalismaOdemeTercihiController
         }
 
         return $out;
+    }
+
+    /** @param array<string, mixed> $existing */
+    private static function isSameSerbestZamanEvidence(
+        array $existing,
+        string $talepTarihi,
+        int $imzaliTalepBelgeId,
+        string $gerekce
+    ): bool {
+        return trim((string) ($existing['talep_tarihi'] ?? '')) === $talepTarihi
+            && (int) ($existing['imzali_talep_belge_id'] ?? 0) === $imzaliTalepBelgeId
+            && trim((string) ($existing['gerekce'] ?? '')) === trim($gerekce);
     }
 
     private static function toIso(string $datetime): string

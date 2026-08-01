@@ -66,9 +66,10 @@ describe("FazlaCalismaOdemeTercihiController MariaDB", () => {
     expect(result.stdout).toContain("[PASS] BA empty allowedSubeIds global GET → 403");
     expect(result.stdout).toContain("[PASS] PUT insert");
     expect(result.stdout).toContain("[PASS] PUT gerçek update");
-    expect(result.stdout).toContain("[PASS] aynı payload idempotent");
-    expect(result.stdout).toContain("[PASS] gerekce-only idempotent → 200");
-    expect(result.stdout).toContain("[PASS] gerekce-only audit +0");
+    expect(result.stdout).toContain("[PASS] aynı kanıt payloadı idempotent");
+    expect(result.stdout).toContain("[PASS] SERBEST_ZAMAN kanit duzeltme → 200");
+    expect(result.stdout).toContain("[PASS] SZ kanit duzeltme audit +1");
+    expect(result.stdout).toContain("[PASS] duzeltilmis kanit tekrarinda audit +0");
     expect(result.stdout).toContain("[PASS] audit append on insert");
     expect(result.stdout).toContain("[PASS] audit no-op üretmiyor");
     expect(result.stdout).toContain("[PASS] server-owned override 422");

@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /**
- * S87 PayrollComplianceGuard unit runner (no DB).
+ * S87 PayrollComplianceGuard unit runner.
  * php tests/php/PayrollComplianceGuardTestRunner.php
  */
 
@@ -81,6 +81,50 @@ $iptal = PayrollComplianceGuard::validateSerbestZamanKanit(
     1
 );
 pcgAssert($iptal['ok'] === false, 'iptal belge reject');
+
+// Compliance sema/query hatalari fail-closed blocker uretir.
+if (in_array('sqlite', PDO::getAvailableDrivers(), true)) {
+    $missingSchema = new PDO('sqlite::memory:');
+    $missingSchema->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    $missingItems = PayrollComplianceGuard::collectPeriodBlockers(
+        $missingSchema,
+        1,
+        '2026-07-01',
+        '2026-07-31',
+        [1]
+    );
+    pcgAssert(
+        count($missingItems) === 1
+            && ($missingItems[0]['code'] ?? '') === PayrollComplianceGuard::BLOCKER_COMPLIANCE_SCHEMA_UNAVAILABLE
+            && str_starts_with((string) ($missingItems[0]['metadata']['reason'] ?? ''), 'MISSING_TABLE:'),
+        'eksik compliance semasi fail-closed blocker'
+    );
+
+    $queryDrift = new PDO('sqlite::memory:');
+    $queryDrift->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    $queryDrift->exec('CREATE TABLE fazla_calisma_odeme_tercihleri (
+        imzali_talep_belge_id INTEGER,
+        talep_tarihi TEXT,
+        gerekce TEXT
+    )');
+    $queryDrift->exec('CREATE TABLE haftalik_kapanis_satirlari (id INTEGER)');
+    $queryDrift->exec('CREATE TABLE haftalik_kapanislar (id INTEGER)');
+    $queryDrift->exec('CREATE TABLE personeller (id INTEGER, dogum_tarihi TEXT)');
+    $queryDrift->exec('CREATE TABLE yillik_fazla_calisma_kilitleri (id INTEGER)');
+    $queryItems = PayrollComplianceGuard::collectPeriodBlockers(
+        $queryDrift,
+        1,
+        '2026-07-01',
+        '2026-07-31',
+        [1]
+    );
+    pcgAssert(
+        count($queryItems) === 1
+            && ($queryItems[0]['code'] ?? '') === PayrollComplianceGuard::BLOCKER_COMPLIANCE_SCHEMA_UNAVAILABLE
+            && ($queryItems[0]['metadata']['reason'] ?? '') === 'QUERY_FAILED',
+        'compliance query drift fail-closed blocker'
+    );
+}
 
 echo "ALL_PAYROLL_COMPLIANCE_GUARD_TESTS_PASSED\n";
 exit(0);

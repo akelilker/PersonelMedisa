@@ -98,10 +98,15 @@ class MaasHesaplamaSnapshotService
                 (string) $donemBitis,
                 $personelIds
             );
+            $complianceSchemaUnavailable = false;
             foreach ($compliance as $item) {
+                $code = (string) ($item['code'] ?? 'COMPLIANCE_BLOCKER');
+                if ($code === PayrollComplianceGuard::BLOCKER_COMPLIANCE_SCHEMA_UNAVAILABLE) {
+                    $complianceSchemaUnavailable = true;
+                }
                 $items[] = self::issue(
                     (string) ($item['severity'] ?? self::SEVERITY_BLOCKER),
-                    (string) ($item['code'] ?? 'COMPLIANCE_BLOCKER'),
+                    $code,
                     (string) ($item['message'] ?? 'Uyumluluk blocker'),
                     $item['record_type'] ?? null,
                     isset($item['record_id']) ? (int) $item['record_id'] : null,
@@ -109,49 +114,51 @@ class MaasHesaplamaSnapshotService
                     is_array($item['metadata'] ?? null) ? $item['metadata'] : []
                 );
             }
-            foreach ($personelIds as $pid) {
-                $periodOt = self::sumSealedOtMinutesForPeriod($pdo, $pid, $donemBaslangic, $donemBitis);
-                if ($periodOt < 1) {
-                    continue;
-                }
-                $kapanmis = PayrollComplianceGuard::loadKapanmisYillikFazlaCalisma($pdo, $pid, (int) $yil);
-                $periodWeeks = self::periodHaftaKeys($pdo, $pid, $donemBaslangic, $donemBitis);
-                $exPeriod = [];
-                foreach ($kapanmis as $row) {
-                    $hb = (string) ($row['hafta_baslangic'] ?? '');
-                    if ($hb !== '' && isset($periodWeeks[$hb])) {
+            if (!$complianceSchemaUnavailable) {
+                foreach ($personelIds as $pid) {
+                    $periodOt = self::sumSealedOtMinutesForPeriod($pdo, $pid, $donemBaslangic, $donemBitis);
+                    if ($periodOt < 1) {
                         continue;
                     }
-                    $exPeriod[] = $row;
-                }
-                $eval = PayrollComplianceGuard::evaluateYillikLimit($exPeriod, $periodOt);
-                if ($eval['asildi']) {
-                    $items[] = self::issue(
-                        self::SEVERITY_BLOCKER,
-                        PayrollComplianceGuard::BLOCKER_YILLIK_270_SAAT_ASIMI,
-                        'Yillik fazla calisma 270 saat limiti asiliyor.',
-                        'fazla_calisma',
-                        null,
-                        $pid,
-                        [
-                            'kullanilan_dk' => $eval['kullanilan'],
-                            'projected_dk' => $eval['projected'],
-                            'limit_dk' => PayrollComplianceGuard::YILLIK_FAZLA_CALISMA_LIMIT_DAKIKA,
-                        ]
-                    );
-                } elseif ($eval['yaklasiyor']) {
-                    $items[] = self::issue(
-                        self::SEVERITY_WARNING,
-                        'YILLIK_FAZLA_CALISMA_YAKLASMA',
-                        'Yillik fazla calisma 260 saat esigine ulasildi.',
-                        'fazla_calisma',
-                        null,
-                        $pid,
-                        [
-                            'projected_dk' => $eval['projected'],
-                            'esik_dk' => PayrollComplianceGuard::YILLIK_FAZLA_CALISMA_YAKLASMA_ESIK_DAKIKA,
-                        ]
-                    );
+                    $kapanmis = PayrollComplianceGuard::loadKapanmisYillikFazlaCalisma($pdo, $pid, (int) $yil);
+                    $periodWeeks = self::periodHaftaKeys($pdo, $pid, $donemBaslangic, $donemBitis);
+                    $exPeriod = [];
+                    foreach ($kapanmis as $row) {
+                        $hb = (string) ($row['hafta_baslangic'] ?? '');
+                        if ($hb !== '' && isset($periodWeeks[$hb])) {
+                            continue;
+                        }
+                        $exPeriod[] = $row;
+                    }
+                    $eval = PayrollComplianceGuard::evaluateYillikLimit($exPeriod, $periodOt);
+                    if ($eval['asildi']) {
+                        $items[] = self::issue(
+                            self::SEVERITY_BLOCKER,
+                            PayrollComplianceGuard::BLOCKER_YILLIK_270_SAAT_ASIMI,
+                            'Yillik fazla calisma 270 saat limiti asiliyor.',
+                            'fazla_calisma',
+                            null,
+                            $pid,
+                            [
+                                'kullanilan_dk' => $eval['kullanilan'],
+                                'projected_dk' => $eval['projected'],
+                                'limit_dk' => PayrollComplianceGuard::YILLIK_FAZLA_CALISMA_LIMIT_DAKIKA,
+                            ]
+                        );
+                    } elseif ($eval['yaklasiyor']) {
+                        $items[] = self::issue(
+                            self::SEVERITY_WARNING,
+                            'YILLIK_FAZLA_CALISMA_YAKLASMA',
+                            'Yillik fazla calisma 260 saat esigine ulasildi.',
+                            'fazla_calisma',
+                            null,
+                            $pid,
+                            [
+                                'projected_dk' => $eval['projected'],
+                                'esik_dk' => PayrollComplianceGuard::YILLIK_FAZLA_CALISMA_YAKLASMA_ESIK_DAKIKA,
+                            ]
+                        );
+                    }
                 }
             }
         }
@@ -832,8 +839,20 @@ class MaasHesaplamaSnapshotService
         $salaryHash = self::hashCanonical(array_values(array_map('array_values', $salaries)));
         $puantajHash = self::hashCanonical(array_map([self::class, 'attendancePayload'], $attendance['rows']));
         $izinHash = self::hashCanonical(array_map([self::class, 'leavePayload'], $izinler));
+        $izinById = self::indexLeaveSourcesById($izinler);
+        $candidatePayloads = array_map(
+            static function (array $candidate) use ($izinById) {
+                $surecId = isset($candidate['resmi_surec_id']) ? (int) $candidate['resmi_surec_id'] : 0;
+
+                return self::candidatePayloadStatic(
+                    $candidate,
+                    $surecId > 0 && isset($izinById[$surecId]) ? $izinById[$surecId] : null
+                );
+            },
+            $finance['candidates'] ?? []
+        );
         $financeHash = self::hashCanonical([
-            'candidates' => array_map([self::class, 'candidatePayloadStatic'], $finance['candidates'] ?? []),
+            'candidates' => $candidatePayloads,
             'finans' => array_map([self::class, 'financePayloadStatic'], $finance['finans_rows'] ?? []),
         ]);
         $legalHash = self::hashCanonical(array_map([self::class, 'legalPayloadStatic'], $legal));
@@ -1141,9 +1160,14 @@ class MaasHesaplamaSnapshotService
             );
         }
 
+        $izinById = self::indexLeaveSourcesById($resolution['izinler']);
         foreach ($resolution['finance']['candidates'] as $candidate) {
             $personelId = (int) $candidate['personel_id'];
-            $payload = self::candidatePayloadStatic($candidate);
+            $surecId = isset($candidate['resmi_surec_id']) ? (int) $candidate['resmi_surec_id'] : 0;
+            $payload = self::candidatePayloadStatic(
+                $candidate,
+                $surecId > 0 && isset($izinById[$surecId]) ? $izinById[$surecId] : null
+            );
             $resolutionRow = $resolution['finance']['resolutions'][(int) $candidate['id']] ?? null;
             if ($resolutionRow !== null) {
                 $payload['cakisma_cozumu'] = [
@@ -1997,11 +2021,14 @@ class MaasHesaplamaSnapshotService
         ];
     }
 
-    /** @param array<string, mixed> $candidate @return array<string, mixed> */
-    public static function candidatePayloadStatic(array $candidate)
+    /** @param array<string, mixed> $candidate @param array<string, mixed>|null $matchedSurec @return array<string, mixed> */
+    public static function candidatePayloadStatic(array $candidate, $matchedSurec = null)
     {
         $state = strtoupper((string) $candidate['state']);
-        $metadata = self::extractEtkiAdayiMetadata($candidate);
+        $metadata = self::extractEtkiAdayiMetadata(
+            $candidate,
+            is_array($matchedSurec) ? $matchedSurec : null
+        );
 
         return [
             'aday_id' => (int) $candidate['id'],
@@ -2035,7 +2062,7 @@ class MaasHesaplamaSnapshotService
      * @param array<string, mixed> $candidate
      * @return array<string, mixed>
      */
-    private static function extractEtkiAdayiMetadata(array $candidate)
+    private static function extractEtkiAdayiMetadata(array $candidate, $matchedSurec = null)
     {
         $metadata = [];
         if (isset($candidate['metadata']) && is_array($candidate['metadata'])) {
@@ -2081,18 +2108,76 @@ class MaasHesaplamaSnapshotService
                     $metadata[$key] = $snapshot[$key];
                 }
             }
-            $surec = $snapshot['resmi_surec_ozeti'] ?? null;
-            if (is_array($surec)) {
-                if (!isset($metadata['surec_turu']) && isset($surec['surec_turu'])) {
-                    $metadata['surec_turu'] = $surec['surec_turu'];
+        }
+
+        $snapshotSurec = is_array($snapshot) && is_array($snapshot['resmi_surec_ozeti'] ?? null)
+            ? $snapshot['resmi_surec_ozeti']
+            : null;
+        $surec = is_array($matchedSurec) ? $matchedSurec : $snapshotSurec;
+        if (is_array($surec)) {
+            foreach ([
+                'surec_turu',
+                'alt_tur',
+                'ilk_iki_gun_firma_oder_mi',
+                'gun_sirasi',
+                'ilk_iki_gun',
+            ] as $key) {
+                if (!array_key_exists($key, $metadata) && array_key_exists($key, $surec)) {
+                    $metadata[$key] = $surec[$key];
                 }
-                if (!isset($metadata['ilk_iki_gun_firma_oder_mi']) && array_key_exists('ilk_iki_gun_firma_oder_mi', $surec)) {
-                    $metadata['ilk_iki_gun_firma_oder_mi'] = $surec['ilk_iki_gun_firma_oder_mi'];
+            }
+
+            if (!array_key_exists('gun_sirasi', $metadata)) {
+                $gunSirasi = self::resolveSurecGunSirasi(
+                    (string) ($surec['baslangic_tarihi'] ?? ''),
+                    (string) ($candidate['tarih'] ?? '')
+                );
+                if ($gunSirasi !== null) {
+                    $metadata['gun_sirasi'] = $gunSirasi;
+                    $metadata['ilk_iki_gun'] = $gunSirasi <= 2;
                 }
             }
         }
 
         return $metadata;
+    }
+
+    /** @param array<int, array<string, mixed>> $izinler @return array<int, array<string, mixed>> */
+    private static function indexLeaveSourcesById(array $izinler)
+    {
+        $map = [];
+        foreach ($izinler as $izin) {
+            $id = isset($izin['id']) ? (int) $izin['id'] : 0;
+            if ($id > 0) {
+                $map[$id] = $izin;
+            }
+        }
+
+        return $map;
+    }
+
+    private static function resolveSurecGunSirasi($baslangicTarihi, $tarih)
+    {
+        $baslangicTarihi = trim((string) $baslangicTarihi);
+        $tarih = trim((string) $tarih);
+        if (
+            !preg_match('/^\d{4}-\d{2}-\d{2}$/', $baslangicTarihi)
+            || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $tarih)
+        ) {
+            return null;
+        }
+
+        try {
+            $baslangic = new \DateTimeImmutable($baslangicTarihi);
+            $adayTarihi = new \DateTimeImmutable($tarih);
+        } catch (\Throwable $e) {
+            return null;
+        }
+        if ($adayTarihi < $baslangic) {
+            return null;
+        }
+
+        return (int) $baslangic->diff($adayTarihi)->days + 1;
     }
 
     /** @param array<string, mixed> $row @return array<string, mixed> */

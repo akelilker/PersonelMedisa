@@ -21,6 +21,8 @@ describe("payroll-compliance-guard source contracts", () => {
     expect(guard).toContain("BLOCKER_ONSEKIZ_YAS_GECE");
     expect(guard).toContain("BLOCKER_DOGUM_TARIHI_REQUIRED");
     expect(guard).toContain("BLOCKER_YILLIK_270_SAAT_ASIMI");
+    expect(guard).toContain("BLOCKER_COMPLIANCE_SCHEMA_UNAVAILABLE");
+    expect(guard).toContain("COMPLIANCE_SCHEMA_UNAVAILABLE");
   });
 
   it("documents SIRKET_KARARI weekly 2700 and no FSC company constants", () => {

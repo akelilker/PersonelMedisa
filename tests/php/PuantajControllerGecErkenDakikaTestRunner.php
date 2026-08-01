@@ -309,4 +309,16 @@ if ($probeCode !== 0) {
 }
 passScenario('10', 'Negative gec_kalma_dakika VALIDATION_ERROR');
 
+// 11. Gece yarısını aşan vardiya gece bandındadır
+if (invokePrivate('geceBandinaGiriyor', ['22:00', '05:00']) !== true) {
+    failScenario('11', '22:00-05:00 gece bandi bekleniyordu');
+}
+passScenario('11', '22:00-05:00 overnight gece bandi');
+
+// 12. Gündüz vardiyası gece bandında değildir
+if (invokePrivate('geceBandinaGiriyor', ['08:00', '17:00']) !== false) {
+    failScenario('12', '08:00-17:00 gece bandi disi bekleniyordu');
+}
+passScenario('12', '08:00-17:00 gece bandi disi');
+
 echo "OK\n";

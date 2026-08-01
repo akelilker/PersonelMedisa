@@ -15,7 +15,9 @@ const expectedScenarios = [
   "SCENARIO:7:PASS",
   "SCENARIO:8:PASS",
   "SCENARIO:9:PASS",
-  "SCENARIO:10:PASS"
+  "SCENARIO:10:PASS",
+  "SCENARIO:11:PASS",
+  "SCENARIO:12:PASS"
 ];
 
 describe("PuantajController gec/erken dakika PHP runtime", () => {

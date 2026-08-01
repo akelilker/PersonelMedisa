@@ -335,10 +335,15 @@ class MaasHesaplamaAdayService
                 return (int) $p['personel_id'];
             }, $bundle['personeller'])
         );
+        $complianceSchemaUnavailable = false;
         foreach ($compliance as $item) {
+            $code = (string) ($item['code'] ?? 'COMPLIANCE_BLOCKER');
+            if ($code === PayrollComplianceGuard::BLOCKER_COMPLIANCE_SCHEMA_UNAVAILABLE) {
+                $complianceSchemaUnavailable = true;
+            }
             $items[] = self::issue(
                 (string) ($item['severity'] ?? 'BLOCKER'),
-                (string) ($item['code'] ?? 'COMPLIANCE_BLOCKER'),
+                $code,
                 (string) ($item['message'] ?? 'Uyumluluk blocker'),
                 $item['record_type'] ?? null,
                 isset($item['record_id']) ? (int) $item['record_id'] : null,
@@ -351,39 +356,41 @@ class MaasHesaplamaAdayService
         $donemYil = (int) $snapshot['yil'];
         $donemBas = (string) $bundle['snapshot']['donem_baslangic'];
         $donemBit = (string) $bundle['snapshot']['donem_bitis'];
-        foreach ($bundle['personeller'] as $personel) {
-            $pid = (int) $personel['personel_id'];
-            $periodOt = self::sumPeriodFazlaCalismaDakika($pdo, $pid, $donemBas, $donemBit);
-            if ($periodOt < 1) {
-                continue;
-            }
-            $kapanmis = PayrollComplianceGuard::loadKapanmisYillikFazlaCalisma($pdo, $pid, $donemYil);
-            $periodWeekKeys = self::periodHaftaBaslangicKeys($pdo, $pid, $donemBas, $donemBit);
-            $kapanmisExPeriod = [];
-            foreach ($kapanmis as $row) {
-                $hb = (string) ($row['hafta_baslangic'] ?? '');
-                if ($hb !== '' && isset($periodWeekKeys[$hb])) {
+        if (!$complianceSchemaUnavailable) {
+            foreach ($bundle['personeller'] as $personel) {
+                $pid = (int) $personel['personel_id'];
+                $periodOt = self::sumPeriodFazlaCalismaDakika($pdo, $pid, $donemBas, $donemBit);
+                if ($periodOt < 1) {
                     continue;
                 }
-                $kapanmisExPeriod[] = $row;
-            }
-            $eval = PayrollComplianceGuard::evaluateYillikLimit($kapanmisExPeriod, $periodOt);
-            if ($eval['asildi']) {
-                $items[] = self::issue(
-                    'BLOCKER',
-                    PayrollComplianceGuard::BLOCKER_YILLIK_270_SAAT_ASIMI,
-                    'Yillik fazla calisma 270 saat limiti asiliyor.',
-                    'fazla_calisma',
-                    null,
-                    $pid,
-                    [
-                        'kullanilan_dk' => $eval['kullanilan'],
-                        'projected_dk' => $eval['projected'],
-                        'limit_dk' => PayrollComplianceGuard::YILLIK_FAZLA_CALISMA_LIMIT_DAKIKA,
-                        'period_ot_dk' => $periodOt,
-                    ],
-                    $personel['ad_soyad'] ?? null
-                );
+                $kapanmis = PayrollComplianceGuard::loadKapanmisYillikFazlaCalisma($pdo, $pid, $donemYil);
+                $periodWeekKeys = self::periodHaftaBaslangicKeys($pdo, $pid, $donemBas, $donemBit);
+                $kapanmisExPeriod = [];
+                foreach ($kapanmis as $row) {
+                    $hb = (string) ($row['hafta_baslangic'] ?? '');
+                    if ($hb !== '' && isset($periodWeekKeys[$hb])) {
+                        continue;
+                    }
+                    $kapanmisExPeriod[] = $row;
+                }
+                $eval = PayrollComplianceGuard::evaluateYillikLimit($kapanmisExPeriod, $periodOt);
+                if ($eval['asildi']) {
+                    $items[] = self::issue(
+                        'BLOCKER',
+                        PayrollComplianceGuard::BLOCKER_YILLIK_270_SAAT_ASIMI,
+                        'Yillik fazla calisma 270 saat limiti asiliyor.',
+                        'fazla_calisma',
+                        null,
+                        $pid,
+                        [
+                            'kullanilan_dk' => $eval['kullanilan'],
+                            'projected_dk' => $eval['projected'],
+                            'limit_dk' => PayrollComplianceGuard::YILLIK_FAZLA_CALISMA_LIMIT_DAKIKA,
+                            'period_ot_dk' => $periodOt,
+                        ],
+                        $personel['ad_soyad'] ?? null
+                    );
+                }
             }
         }
 

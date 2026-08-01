@@ -6,7 +6,7 @@ namespace Medisa\Api\Services;
 
 class BildirimPuantajEtkiProjectionService
 {
-    public const PROJECTION_VERSION = 'S75_V2';
+    public const PROJECTION_VERSION = 'S87_V2';
     public const SOURCE_PRIORITY_BILDIRIM = 'ONAYLI_GUNLUK_BILDIRIM';
 
     /** @var array<int, string> */
@@ -133,7 +133,13 @@ class BildirimPuantajEtkiProjectionService
             return self::inceleme('MANUEL_INCELEME', 'DIGER_MANUEL_INCELEME', ['reason' => 'DIGER bildirimi otomatik etki uretmez']);
         }
 
-        $deterministicPayload = self::resolveDeterministicPayload($tur, $dakika, $context, $resmiSurecler);
+        $deterministicPayload = self::resolveDeterministicPayload(
+            $tur,
+            $dakika,
+            (string) ($bildirim['tarih'] ?? ''),
+            $context,
+            $resmiSurecler
+        );
 
         if ($hasPuantaj) {
             return self::inceleme(
@@ -205,7 +211,10 @@ class BildirimPuantajEtkiProjectionService
         }
 
         if ($tur === 'RAPORLU') {
-            $raporResult = self::resolveRaporSurecleri($resmiSurecler);
+            $raporResult = self::resolveRaporSurecleri(
+                $resmiSurecler,
+                (string) ($bildirim['tarih'] ?? '')
+            );
             if ($raporResult['status'] === 'none') {
                 return self::inceleme($etkiTuru, 'RAPOR_SURECI_YOK', ['reason' => 'Resmi rapor sureci bulunamadi']);
             }
@@ -398,14 +407,14 @@ class BildirimPuantajEtkiProjectionService
     }
 
     /** @param array<int, array<string, mixed>> $surecler @return array{status: string, surec: array<string, mixed>|null} */
-    private static function resolveRaporSurecleri(array $surecler)
+    private static function resolveRaporSurecleri(array $surecler, $tarih = null)
     {
         $matches = [];
         foreach ($surecler as $surec) {
             if (!self::isRaporSureci((string) ($surec['surec_turu'] ?? ''))) {
                 continue;
             }
-            $matches[] = self::mapSurecOzet($surec);
+            $matches[] = self::mapSurecOzet($surec, $tarih);
         }
 
         if (count($matches) === 0) {
@@ -419,8 +428,13 @@ class BildirimPuantajEtkiProjectionService
     }
 
     /** @param array<string, mixed> $surec @return array<string, mixed> */
-    private static function mapSurecOzet(array $surec)
+    private static function mapSurecOzet(array $surec, $tarih = null)
     {
+        $gunSirasi = self::resolveSurecGunSirasi(
+            (string) ($surec['baslangic_tarihi'] ?? ''),
+            is_string($tarih) ? $tarih : ''
+        );
+
         return [
             'id' => (int) $surec['id'],
             'surec_turu' => (string) $surec['surec_turu'],
@@ -428,8 +442,38 @@ class BildirimPuantajEtkiProjectionService
             'baslangic_tarihi' => (string) $surec['baslangic_tarihi'],
             'bitis_tarihi' => $surec['bitis_tarihi'] !== null ? (string) $surec['bitis_tarihi'] : null,
             'ucretli_mi' => (bool) ((int) ($surec['ucretli_mi'] ?? 0)),
+            'ilk_iki_gun_firma_oder_mi' => array_key_exists('ilk_iki_gun_firma_oder_mi', $surec)
+                && $surec['ilk_iki_gun_firma_oder_mi'] !== null
+                    ? (bool) ((int) $surec['ilk_iki_gun_firma_oder_mi'])
+                    : null,
+            'gun_sirasi' => $gunSirasi,
+            'ilk_iki_gun' => $gunSirasi !== null ? $gunSirasi <= 2 : null,
             'state' => (string) ($surec['state'] ?? 'AKTIF'),
         ];
+    }
+
+    private static function resolveSurecGunSirasi($baslangicTarihi, $tarih)
+    {
+        $baslangicTarihi = trim((string) $baslangicTarihi);
+        $tarih = trim((string) $tarih);
+        if (
+            !preg_match('/^\d{4}-\d{2}-\d{2}$/', $baslangicTarihi)
+            || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $tarih)
+        ) {
+            return null;
+        }
+
+        try {
+            $baslangic = new \DateTimeImmutable($baslangicTarihi);
+            $adayTarihi = new \DateTimeImmutable($tarih);
+        } catch (\Throwable $e) {
+            return null;
+        }
+        if ($adayTarihi < $baslangic) {
+            return null;
+        }
+
+        return (int) $baslangic->diff($adayTarihi)->days + 1;
     }
 
     /** @param array<string, mixed>|null $matchedSurec @return array<string, mixed> */
@@ -455,7 +499,7 @@ class BildirimPuantajEtkiProjectionService
      * @param array<int, array<string, mixed>> $resmiSurecler
      * @return array<string, mixed>|null
      */
-    private static function resolveDeterministicPayload($tur, $dakika, array $context, array $resmiSurecler)
+    private static function resolveDeterministicPayload($tur, $dakika, $tarih, array $context, array $resmiSurecler)
     {
         if ($tur === 'GEC_GELDI' || $tur === 'ERKEN_CIKTI') {
             if ($dakika === null || $dakika <= 0 || $dakika > 1440) {
@@ -484,7 +528,7 @@ class BildirimPuantajEtkiProjectionService
         }
 
         if ($tur === 'RAPORLU') {
-            $result = self::resolveRaporSurecleri($resmiSurecler);
+            $result = self::resolveRaporSurecleri($resmiSurecler, (string) $tarih);
             if ($result['status'] !== 'single' || $result['surec'] === null) {
                 return null;
             }

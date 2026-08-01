@@ -1090,6 +1090,61 @@ engineAssert(
     'S87 her iki satır EKSI'
 );
 
+$devamsizlikAyniHafta = MaasHesaplamaEngine::calculate(engineInput('BRUT', '30000.00', [
+    'etki_adaylari' => [
+        [
+            'aday_id' => 512,
+            'tarih' => '2026-03-03',
+            'bildirim_turu' => 'GELMEDI',
+            'etki_turu' => 'DEVAMSIZLIK_GUN',
+            'etki_miktari' => 1,
+            'state' => 'UYGULANDI',
+            'parasal_uygulanacak_kalem' => true,
+        ],
+        [
+            'aday_id' => 513,
+            'tarih' => '2026-03-05',
+            'bildirim_turu' => 'GELMEDI',
+            'etki_turu' => 'DEVAMSIZLIK_GUN',
+            'etki_miktari' => 1,
+            'state' => 'UYGULANDI',
+            'parasal_uygulanacak_kalem' => true,
+        ],
+    ],
+]));
+engineAssert(
+    count(findKalemler($devamsizlikAyniHafta, PayrollComplianceGuard::KALEM_DEVAMSIZLIK_FIILI)) === 2
+        && count(findKalemler($devamsizlikAyniHafta, PayrollComplianceGuard::KALEM_HAFTA_TATILI_HAK_KAYBI)) === 1,
+    'S87 ayni ISO haftada iki devamsizlik → iki fiili kesinti, tek HT hak kaybi'
+);
+
+$devamsizlikFarkliHafta = MaasHesaplamaEngine::calculate(engineInput('BRUT', '30000.00', [
+    'etki_adaylari' => [
+        [
+            'aday_id' => 514,
+            'tarih' => '2026-03-06',
+            'bildirim_turu' => 'GELMEDI',
+            'etki_turu' => 'DEVAMSIZLIK_GUN',
+            'etki_miktari' => 1,
+            'state' => 'UYGULANDI',
+            'parasal_uygulanacak_kalem' => true,
+        ],
+        [
+            'aday_id' => 515,
+            'tarih' => '2026-03-09',
+            'bildirim_turu' => 'GELMEDI',
+            'etki_turu' => 'DEVAMSIZLIK_GUN',
+            'etki_miktari' => 1,
+            'state' => 'UYGULANDI',
+            'parasal_uygulanacak_kalem' => true,
+        ],
+    ],
+]));
+engineAssert(
+    count(findKalemler($devamsizlikFarkliHafta, PayrollComplianceGuard::KALEM_HAFTA_TATILI_HAK_KAYBI)) === 2,
+    'S87 farkli ISO haftalarda HT hak kaybi ayri degerlendirilir'
+);
+
 $devamsizlikHtOff = MaasHesaplamaEngine::calculate(engineInput('BRUT', '30000.00', [
     'etki_adaylari' => [[
         'aday_id' => 502,
@@ -1154,7 +1209,7 @@ $hastalikIlk2 = MaasHesaplamaEngine::calculate(engineInput('BRUT', '30000.00', [
         'parasal_uygulanacak_kalem' => true,
         'metadata' => [
             'gun_sirasi' => 1,
-            'firma_oder' => false,
+            'ilk_iki_gun_firma_oder_mi' => false,
             'is_kazasi' => false,
         ],
     ]],

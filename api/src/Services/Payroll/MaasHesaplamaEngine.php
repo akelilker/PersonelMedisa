@@ -857,7 +857,7 @@ final class MaasHesaplamaEngine
         $hasOt = false;
         $absenceDates = [];
         /** @var array<string, true> HT hak kaybi satirlari icin ayri dedup (fiili yokluk ile birlestirilmez) */
-        $htHakKaybiDates = [];
+        $htHakKaybiWeeks = [];
 
         foreach ($input['etki_adaylari'] as $aday) {
             $state = strtoupper((string) ($aday['state'] ?? ''));
@@ -902,9 +902,9 @@ final class MaasHesaplamaEngine
                 );
                 // UI parity: izinsiz yoklukta fiili + HT hak kaybi ayri EKSI satirlari (tek 2-gun satiri yok).
                 if (self::shouldEmitHaftaTatiliHakKaybiFromDevamsizlik($aday, $meta)) {
-                    $htKey = $tarih !== '' ? $tarih : ('aday:' . (string) ($aday['aday_id'] ?? $sira));
-                    if (!isset($htHakKaybiDates[$htKey])) {
-                        $htHakKaybiDates[$htKey] = true;
+                    $htKey = self::haftaTatiliHakKaybiDedupKey($tarih, $aday, $sira);
+                    if (!isset($htHakKaybiWeeks[$htKey])) {
+                        $htHakKaybiWeeks[$htKey] = true;
                         $htTutar = $daily->mulDiv(1, 1);
                         $grossDeduct = $grossDeduct->add($htTutar);
                         $sira++;
@@ -931,12 +931,12 @@ final class MaasHesaplamaEngine
                 }
             } elseif ($tur === 'HAFTA_TATILI_HAK_KAYBI') {
                 // Ayrı EKSI satır; DEVAMSIZLIK ile tek 2-gün satırında birleştirilmez.
-                $htKey = $tarih !== '' ? $tarih : ('aday:' . (string) ($aday['aday_id'] ?? uniqid('ht', true)));
-                if (isset($htHakKaybiDates[$htKey])) {
+                $htKey = self::haftaTatiliHakKaybiDedupKey($tarih, $aday, $sira);
+                if (isset($htHakKaybiWeeks[$htKey])) {
                     continue;
                 }
-                $htHakKaybiDates[$htKey] = true;
-                $gun = $miktar > 0 ? $miktar : 1;
+                $htHakKaybiWeeks[$htKey] = true;
+                $gun = 1;
                 $tutar = $daily->mulDiv($gun, 1);
                 $grossDeduct = $grossDeduct->add($tutar);
                 $sira++;
@@ -1467,6 +1467,7 @@ final class MaasHesaplamaEngine
         }
 
         $firmaOder = $meta['firma_oder'] ?? $meta['firma_oder_mi']
+            ?? $meta['ilk_iki_gun_firma_oder_mi']
             ?? $aday['firma_oder'] ?? $aday['ilk_iki_gun_firma_oder_mi'] ?? null;
         $firmaOderFalse = $firmaOder === false || $firmaOder === 0 || $firmaOder === '0'
             || strtoupper((string) $firmaOder) === 'HAYIR';
@@ -1524,6 +1525,18 @@ final class MaasHesaplamaEngine
             'fs_dk' => min($overContract, $fsCap),
             'fm_dk' => max(0, $totalDk - self::LEGAL_WEEKLY_LIMIT_MINUTES),
         ];
+    }
+
+    private static function haftaTatiliHakKaybiDedupKey($tarih, array $aday, $fallback)
+    {
+        $tarih = trim((string) $tarih);
+        if (preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $tarih, $m) === 1
+            && checkdate((int) $m[2], (int) $m[3], (int) $m[1])
+        ) {
+            return 'hafta:' . self::isoWeekKey($tarih);
+        }
+
+        return 'aday:' . (string) ($aday['aday_id'] ?? $fallback);
     }
 
     private static function isoWeekKey($tarih)

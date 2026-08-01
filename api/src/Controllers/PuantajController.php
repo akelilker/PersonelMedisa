@@ -451,20 +451,59 @@ class PuantajController
 
     /**
      * TS geceBandinaGiriyor parity: gece bandi [00:00, 06:00) U [20:00, 24:00).
+     * Cikis giristen erkense vardiya gece yarimini asar ve cikis ertesi gune tasinir.
      */
     private static function geceBandinaGiriyor(?string $giris, ?string $cikis): bool
     {
+        $aralik = self::normalizeCalismaAraligi($giris, $cikis);
+        if ($aralik !== null) {
+            foreach ([0, 24 * 60] as $gunBaslangici) {
+                if (self::zamanAraligiKesisimDakika(
+                    $aralik['baslangic'],
+                    $aralik['bitis'],
+                    $gunBaslangici,
+                    $gunBaslangici + (6 * 60)
+                ) > 0) {
+                    return true;
+                }
+                if (self::zamanAraligiKesisimDakika(
+                    $aralik['baslangic'],
+                    $aralik['bitis'],
+                    $gunBaslangici + (20 * 60),
+                    $gunBaslangici + (24 * 60)
+                ) > 0) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         $girisMin = self::parseTimeToMinutes($giris);
         $cikisMin = self::parseTimeToMinutes($cikis);
 
-        if ($girisMin !== null && $girisMin < 6 * 60) {
-            return true;
-        }
-        if ($cikisMin !== null && $cikisMin >= 20 * 60) {
-            return true;
+        return ($girisMin !== null && $girisMin < 6 * 60)
+            || ($cikisMin !== null && $cikisMin >= 20 * 60);
+    }
+
+    /** @return array{baslangic:int, bitis:int}|null */
+    private static function normalizeCalismaAraligi(?string $giris, ?string $cikis): ?array
+    {
+        $girisMin = self::parseTimeToMinutes($giris);
+        $cikisMin = self::parseTimeToMinutes($cikis);
+        if ($girisMin === null || $cikisMin === null) {
+            return null;
         }
 
-        return false;
+        return [
+            'baslangic' => $girisMin,
+            'bitis' => $cikisMin < $girisMin ? $cikisMin + (24 * 60) : $cikisMin,
+        ];
+    }
+
+    private static function zamanAraligiKesisimDakika(int $aralikBas, int $aralikBit, int $bandBas, int $bandBit): int
+    {
+        return max(0, min($aralikBit, $bandBit) - max($aralikBas, $bandBas));
     }
 
     private static function parseTimeToMinutes(?string $value): ?int

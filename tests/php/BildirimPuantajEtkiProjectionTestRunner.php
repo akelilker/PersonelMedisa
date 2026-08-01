@@ -58,17 +58,18 @@ function izinSurec($id = 5)
     ];
 }
 
-function raporSurec($id = 6)
+function raporSurec($id = 6, $overrides = [])
 {
-    return [
+    return array_merge([
         'id' => $id,
         'surec_turu' => 'RAPOR',
         'alt_tur' => null,
         'baslangic_tarihi' => '2026-06-15',
         'bitis_tarihi' => '2026-06-15',
         'ucretli_mi' => 0,
+        'ilk_iki_gun_firma_oder_mi' => 0,
         'state' => 'AKTIF',
-    ];
+    ], $overrides);
 }
 
 // 1. GELMEDI → HAZIR / DEVAMSIZLIK_GUN / 1 GUN
@@ -365,5 +366,28 @@ if ($result['etki_miktari'] !== null || $result['etki_birimi'] !== null || isset
     failScenario(29, 'RAPORLU surecsiz payload uretmemeliydi');
 }
 passScenario(29, 'RAPORLU + mevcut puantaj + surec yok → payload fail-closed');
+
+
+// 30. RAPORLU production metadata: ay devrinde gun sirasi + firma politikasi tasinir
+$result = S::projectCandidate(
+    baseBildirim('RAPORLU', ['tarih' => '2026-07-01']),
+    baseContext([
+        'resmi_surecler' => [raporSurec(30, [
+            'baslangic_tarihi' => '2026-06-30',
+            'bitis_tarihi' => '2026-07-02',
+        ])],
+    ])
+);
+$matched = $result['matched_surec'] ?? null;
+if (
+    $result['state'] !== 'HAZIR'
+    || !is_array($matched)
+    || (int) ($matched['gun_sirasi'] ?? 0) !== 2
+    || ($matched['ilk_iki_gun'] ?? null) !== true
+    || ($matched['ilk_iki_gun_firma_oder_mi'] ?? null) !== false
+) {
+    failScenario(30, 'RAPORLU gercek surec metadata gun 2 / firma odemez bekleniyordu');
+}
+passScenario(30, 'RAPORLU surec → gun_sirasi=2 + firma odemez metadata');
 
 echo "OK\n";

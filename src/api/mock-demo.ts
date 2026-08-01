@@ -3076,7 +3076,11 @@ function buildSyntheticOdemeTercihi(satir: HaftalikKapanisSnapshotSatir): FazlaC
     secim_zamani: undefined,
     secen_kullanici_id: undefined,
     onceki_odeme_tipi: undefined,
-    gerekce: undefined
+    gerekce: undefined,
+    talep_tarihi: undefined,
+    imzali_talep_belge_id: undefined,
+    sisteme_giren_kullanici_id: undefined,
+    sisteme_giris_zamani: undefined
   };
 }
 
@@ -3105,15 +3109,31 @@ const FCOT_SERVER_OWNED_FIELDS = [
   "onceki_odeme_tipi",
   "created_at",
   "updated_at",
-  "sube_id"
+  "sube_id",
+  "sisteme_giren_kullanici_id",
+  "sisteme_giris_zamani"
 ] as const;
 
-function demoFcotValidationError(field: string, message: string): ApiResponse<unknown> {
+const SERBEST_ZAMAN_KANIT_EKSIK = "SERBEST_ZAMAN_IMZALI_TALEP_KANIT_EKSIK";
+const FCOT_ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+function demoFcotValidationError(
+  field: string,
+  message: string,
+  code = "VALIDATION_ERROR"
+): ApiResponse<unknown> {
   return {
     data: null,
     meta: {},
-    errors: [{ code: "VALIDATION_ERROR", message, field }]
+    errors: [{ code, message, field }]
   };
+}
+
+function demoFcotSerbestZamanKanitError(
+  field: string,
+  message: string
+): ApiResponse<unknown> {
+  return demoFcotValidationError(field, message, SERBEST_ZAMAN_KANIT_EKSIK);
 }
 
 function findDemoKapanisSubeIdForSnapshot(snapshotId: number): number | null {
@@ -6652,6 +6672,61 @@ export function resolveDemoApiResponse(
       );
     }
 
+    const gerekce = toStringValue(body.gerekce) ?? undefined;
+    let talepTarihi: string | undefined;
+    let imzaliTalepBelgeId: number | undefined;
+    let sistemeGirenKullaniciId: number | undefined;
+    let sistemeGirisZamani: string | undefined;
+
+    if (odemeTipi === "SERBEST_ZAMAN") {
+      const talepRaw = toStringValue(body.talep_tarihi) ?? "";
+      if (!talepRaw || !FCOT_ISO_DATE_RE.test(talepRaw)) {
+        return demoFcotSerbestZamanKanitError(
+          "talep_tarihi",
+          "SERBEST_ZAMAN icin talep_tarihi zorunludur."
+        );
+      }
+      const belgeId = toNumber(body.imzali_talep_belge_id);
+      if (belgeId === null || belgeId < 1) {
+        return demoFcotSerbestZamanKanitError(
+          "imzali_talep_belge_id",
+          "SERBEST_ZAMAN icin imzali talep belgesi zorunludur."
+        );
+      }
+      if (!gerekce) {
+        return demoFcotSerbestZamanKanitError(
+          "gerekce",
+          "SERBEST_ZAMAN icin gerekce/not zorunludur."
+        );
+      }
+      talepTarihi = talepRaw;
+      imzaliTalepBelgeId = belgeId;
+      sistemeGirenKullaniciId = actor.userId;
+      sistemeGirisZamani = new Date().toISOString();
+    } else {
+      // Non-SZ: accept optional evidence fields if client sends them (store when present).
+      const talepRaw = toStringValue(body.talep_tarihi);
+      if (talepRaw) {
+        if (!FCOT_ISO_DATE_RE.test(talepRaw)) {
+          return demoFcotValidationError(
+            "talep_tarihi",
+            "talep_tarihi YYYY-MM-DD formatinda olmalidir."
+          );
+        }
+        talepTarihi = talepRaw;
+      }
+      const belgeId = toNumber(body.imzali_talep_belge_id);
+      if (belgeId !== null) {
+        if (belgeId < 1) {
+          return demoFcotValidationError(
+            "imzali_talep_belge_id",
+            "imzali_talep_belge_id pozitif tam sayi olmalidir."
+          );
+        }
+        imzaliTalepBelgeId = belgeId;
+      }
+    }
+
     const now = new Date().toISOString();
     const tercihId = existing?.id ?? ++demoState.nextIds.odemeTercihi;
     const next: FazlaCalismaOdemeTercihi = {
@@ -6666,7 +6741,11 @@ export function resolveDemoApiResponse(
       secim_zamani: now,
       secen_kullanici_id: actor.userId,
       onceki_odeme_tipi,
-      gerekce: toStringValue(body.gerekce) ?? undefined
+      gerekce,
+      talep_tarihi: talepTarihi,
+      imzali_talep_belge_id: imzaliTalepBelgeId,
+      sisteme_giren_kullanici_id: sistemeGirenKullaniciId,
+      sisteme_giris_zamani: sistemeGirisZamani
     };
 
     demoState.odemeTercihiBySnapshotId[snapshotId] = next;

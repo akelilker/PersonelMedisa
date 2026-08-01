@@ -323,6 +323,95 @@ function applySzMigration(PDO $pdo): void
     applySqlFile($pdo, __DIR__ . '/../../api/migrations/029_serbest_zaman_events.sql');
 }
 
+/**
+ * 043 additive columns + yearly lock. applySqlFile skips SET; apply via targeted ALTERs.
+ */
+function applyPayrollCompliance043(PDO $pdo): void
+{
+    // Minimal surecler stub for imzali belge FK (038 model: surec_turu=BELGE)
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS surecler (
+          id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+          personel_id INT UNSIGNED NOT NULL,
+          surec_turu VARCHAR(32) NOT NULL,
+          alt_tur VARCHAR(64) NULL,
+          state VARCHAR(32) NOT NULL DEFAULT 'AKTIF',
+          baslangic_tarihi DATE NULL,
+          bitis_tarihi DATE NULL,
+          KEY idx_surecler_personel (personel_id),
+          CONSTRAINT fk_surecler_personel_fcot FOREIGN KEY (personel_id) REFERENCES personeller (id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ");
+
+    $colCount = (int) $pdo->query("
+        SELECT COUNT(*) FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'fazla_calisma_odeme_tercihleri'
+          AND COLUMN_NAME = 'talep_tarihi'
+    ")->fetchColumn();
+    if ($colCount === 0) {
+        $pdo->exec("
+            ALTER TABLE fazla_calisma_odeme_tercihleri
+              ADD COLUMN talep_tarihi DATE NULL AFTER gerekce,
+              ADD COLUMN imzali_talep_belge_id INT UNSIGNED NULL AFTER talep_tarihi,
+              ADD COLUMN sisteme_giren_kullanici_id INT UNSIGNED NULL AFTER imzali_talep_belge_id,
+              ADD COLUMN sisteme_giris_zamani DATETIME NULL AFTER sisteme_giren_kullanici_id
+        ");
+        $pdo->exec("
+            ALTER TABLE fazla_calisma_odeme_tercihleri
+              ADD CONSTRAINT fk_fcot_imzali_belge
+                FOREIGN KEY (imzali_talep_belge_id) REFERENCES surecler (id) ON DELETE RESTRICT,
+              ADD CONSTRAINT fk_fcot_sisteme_giren
+                FOREIGN KEY (sisteme_giren_kullanici_id) REFERENCES users (id) ON DELETE RESTRICT,
+              ADD KEY idx_fcot_imzali_belge (imzali_talep_belge_id)
+        ");
+    }
+
+    $auditCol = (int) $pdo->query("
+        SELECT COUNT(*) FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'fazla_calisma_odeme_tercihi_audit'
+          AND COLUMN_NAME = 'imzali_talep_belge_id'
+    ")->fetchColumn();
+    if ($auditCol === 0) {
+        $pdo->exec("
+            ALTER TABLE fazla_calisma_odeme_tercihi_audit
+              ADD COLUMN imzali_talep_belge_id INT UNSIGNED NULL AFTER gerekce,
+              ADD COLUMN talep_tarihi DATE NULL AFTER imzali_talep_belge_id
+        ");
+        $pdo->exec("
+            ALTER TABLE fazla_calisma_odeme_tercihi_audit
+              ADD CONSTRAINT fk_fcota_imzali_belge
+                FOREIGN KEY (imzali_talep_belge_id) REFERENCES surecler (id) ON DELETE RESTRICT
+        ");
+    }
+
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS yillik_fazla_calisma_kilitleri (
+          id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+          personel_id INT UNSIGNED NOT NULL,
+          yil SMALLINT UNSIGNED NOT NULL,
+          locked_at DATETIME NOT NULL,
+          locked_by INT UNSIGNED NULL,
+          PRIMARY KEY (id),
+          UNIQUE KEY uq_yfck_personel_yil (personel_id, yil),
+          CONSTRAINT fk_yfck_personel FOREIGN KEY (personel_id) REFERENCES personeller (id) ON DELETE RESTRICT,
+          CONSTRAINT fk_yfck_locked_by FOREIGN KEY (locked_by) REFERENCES users (id) ON DELETE RESTRICT
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ");
+}
+
+function seedImzaliBelge(PDO $pdo, int $personelId = 10, string $state = 'AKTIF'): int
+{
+    $stmt = $pdo->prepare(
+        "INSERT INTO surecler (personel_id, surec_turu, alt_tur, state, baslangic_tarihi)
+         VALUES (:pid, 'BELGE', 'IMZALI_SERBEST_ZAMAN_TALEBI', :state, '2026-04-01')"
+    );
+    $stmt->execute(['pid' => $personelId, 'state' => $state]);
+
+    return (int) $pdo->lastInsertId();
+}
+
 function seedFcotFixtures(PDO $pdo): void
 {
     $pdo->exec("INSERT INTO subeler (id, kod, ad) VALUES (1, 'MRK', 'Merkez'), (2, 'SB2', 'Sube 2')");
@@ -453,6 +542,7 @@ function bootstrapFcotSchema(PDO $pdo): string
     applyHkMigration($pdo);
     applyFcotMigration($pdo);
     applySzMigration($pdo);
+    applyPayrollCompliance043($pdo);
     seedFcotFixtures($pdo);
 
     return $dbName;
@@ -618,17 +708,64 @@ fcotAssert(
 // Reset for GY insert path on a fresh snapshot.
 $seed2 = seedSnapshot($pdo, 1, 10, '2026-04-13', '2026-04-19', 200);
 $snap2 = $seed2['snapshot_id'];
+$belgeOk = seedImzaliBelge($pdo, 10, 'AKTIF');
+$belgeOther = seedImzaliBelge($pdo, 20, 'AKTIF');
+$belgeIptal = seedImzaliBelge($pdo, 10, 'IPTAL');
+
+// S87: SERBEST_ZAMAN without kanıt → reject
+$putNoKanit = invokeFcotHttp($pdo, $gy, 'PUT', '/fazla-calisma-odeme-tercihi', [
+    'snapshot_id' => $snap2,
+    'odeme_tipi' => 'SERBEST_ZAMAN',
+    'gerekce' => 'Kanitsiz',
+], $subeHeader);
+fcotAssert($putNoKanit['status'] === 422, 'SZ belgesiz → 422');
+fcotAssert(
+    ($putNoKanit['payload']['errors'][0]['code'] ?? '') === 'SERBEST_ZAMAN_IMZALI_TALEP_KANIT_EKSIK',
+    'SZ belgesiz → KANIT_EKSIK'
+);
+
+$putWrongPersonel = invokeFcotHttp($pdo, $gy, 'PUT', '/fazla-calisma-odeme-tercihi', [
+    'snapshot_id' => $snap2,
+    'odeme_tipi' => 'SERBEST_ZAMAN',
+    'gerekce' => 'Yanlis personel belgesi',
+    'talep_tarihi' => '2026-04-14',
+    'imzali_talep_belge_id' => $belgeOther,
+], $subeHeader);
+fcotAssert($putWrongPersonel['status'] === 422, 'SZ baska personel belgesi → 422');
+
+$putIptalBelge = invokeFcotHttp($pdo, $gy, 'PUT', '/fazla-calisma-odeme-tercihi', [
+    'snapshot_id' => $snap2,
+    'odeme_tipi' => 'SERBEST_ZAMAN',
+    'gerekce' => 'Iptal belge',
+    'talep_tarihi' => '2026-04-14',
+    'imzali_talep_belge_id' => $belgeIptal,
+], $subeHeader);
+fcotAssert($putIptalBelge['status'] === 422, 'SZ iptal belge → 422');
 
 $putInsert = invokeFcotHttp($pdo, $gy, 'PUT', '/fazla-calisma-odeme-tercihi', [
     'snapshot_id' => $snap2,
     'odeme_tipi' => 'SERBEST_ZAMAN',
     'gerekce' => 'Ilk secim',
+    'talep_tarihi' => '2026-04-14',
+    'imzali_talep_belge_id' => $belgeOk,
 ], $subeHeader);
 fcotAssert($putInsert['status'] === 200, 'PUT insert');
 fcotAssert(($putInsert['payload']['data']['odeme_tipi'] ?? '') === 'SERBEST_ZAMAN', 'PUT insert odeme_tipi');
 $tercihId = (int) ($putInsert['payload']['data']['id'] ?? 0);
 fcotAssert($tercihId > 0, 'PUT insert returns id');
 fcotAssert((int) ($putInsert['payload']['data']['secen_kullanici_id'] ?? 0) === 1, 'secen_kullanici_id from auth');
+fcotAssert((int) ($putInsert['payload']['data']['imzali_talep_belge_id'] ?? 0) === $belgeOk, 'imzali belge persist');
+fcotAssert((string) ($putInsert['payload']['data']['talep_tarihi'] ?? '') === '2026-04-14', 'talep_tarihi persist');
+fcotAssert((int) ($putInsert['payload']['data']['sisteme_giren_kullanici_id'] ?? 0) === 1, 'sisteme_giren server-owned');
+fcotAssert(($putInsert['payload']['data']['sisteme_giris_zamani'] ?? '') !== '', 'sisteme_giris_zamani server-owned');
+
+// S87: successful SERBEST_ZAMAN PUT auto-creates the SERBEST_ZAMAN_OLUSUM event.
+$autoOlusum = $pdo->query(
+    "SELECT id, dakika FROM serbest_zaman_events
+     WHERE event_tipi = 'SERBEST_ZAMAN_OLUSUM' AND kaynak_odeme_tercihi_id = " . $tercihId
+)->fetchAll(PDO::FETCH_ASSOC);
+fcotAssert(count($autoOlusum) === 1, 'SZ PUT otomatik tek SERBEST_ZAMAN_OLUSUM üretti');
+fcotAssert((int) $autoOlusum[0]['dakika'] === (int) round(200 * 1.5), 'otomatik olusum dakika = fazla * 1.5');
 
 $getPersisted = invokeFcotHttp($pdo, $gy, 'GET', '/fazla-calisma-odeme-tercihi', [], $subeHeader, [
     'snapshot_id' => (string) $snap2,
@@ -653,6 +790,11 @@ $rowAfterIdem = $pdo->query('SELECT updated_at, odeme_tipi FROM fazla_calisma_od
 $auditAfterIdem = (int) $pdo->query('SELECT COUNT(*) FROM fazla_calisma_odeme_tercihi_audit WHERE tercih_id = ' . $tercihId)->fetchColumn();
 fcotAssert((string) $rowBefore['updated_at'] === (string) $rowAfterIdem['updated_at'], 'idempotent updated_at unchanged');
 fcotAssert($auditAfterIdem === $auditBefore, 'audit no-op üretmiyor');
+$olusumAfterIdem = (int) $pdo->query(
+    "SELECT COUNT(*) FROM serbest_zaman_events
+     WHERE event_tipi = 'SERBEST_ZAMAN_OLUSUM' AND kaynak_odeme_tercihi_id = " . $tercihId
+)->fetchColumn();
+fcotAssert($olusumAfterIdem === 1, 'idempotent SZ re-put olusum duplike etmiyor');
 
 // Same odeme_tipi + different gerekce is NOT a real change (locked contract).
 $putGerekceOnly = invokeFcotHttp($pdo, $gy, 'PUT', '/fazla-calisma-odeme-tercihi', [
@@ -667,10 +809,7 @@ fcotAssert((string) $rowBefore['updated_at'] === (string) $rowAfterGerekce['upda
 fcotAssert((string) ($rowAfterGerekce['gerekce'] ?? '') === (string) ($rowBefore['gerekce'] ?? ''), 'gerekce-only row gerekce unchanged');
 fcotAssert($auditAfterGerekce === $auditBefore, 'gerekce-only audit +0');
 
-// Period lock wins over SZ guard when both would apply.
-$pdo->exec("INSERT INTO serbest_zaman_events
-    (personel_id, event_tipi, dakika, event_tarihi, son_kullanim_tarihi, kaynak_snapshot_id, kaynak_odeme_tercihi_id)
-    VALUES (10, 'SERBEST_ZAMAN_OLUSUM', 200, '2026-04-10', '2026-10-10', {$snap2}, {$tercihId})");
+// Period lock wins over SZ guard when both would apply (olusum is the auto-created one).
 $pdo->exec("INSERT INTO puantaj_aylik_muhurleri (sube_id, yil, ay, donem, durum, created_by)
             VALUES (1, 2026, 4, '2026-04', 'MUHURLENDI', 1)");
 $periodBeforeSz = invokeFcotHttp($pdo, $gy, 'PUT', '/fazla-calisma-odeme-tercihi', [
@@ -717,6 +856,9 @@ fcotAssert($auditAfterUpdate === 2, 'audit append on real update');
 $putBackSz = invokeFcotHttp($pdo, $gy, 'PUT', '/fazla-calisma-odeme-tercihi', [
     'snapshot_id' => $snap2,
     'odeme_tipi' => 'SERBEST_ZAMAN',
+    'gerekce' => 'Geri SZ',
+    'talep_tarihi' => '2026-04-14',
+    'imzali_talep_belge_id' => $belgeOk,
 ], $subeHeader);
 fcotAssert($putBackSz['status'] === 200, 'UCRET → SERBEST_ZAMAN allowed');
 
@@ -777,6 +919,23 @@ $bothOpen = invokeFcotHttp($pdo, $gy, 'PUT', '/fazla-calisma-odeme-tercihi', [
 ], $subeHeader);
 fcotAssert($bothOpen['status'] === 200, 'cross-month both open → PUT 200');
 
+// S87: UCRET requires no imzali talep evidence and stores NULL kanit columns.
+$seedUcretNoBelge = seedSnapshot($pdo, 1, 10, '2026-03-02', '2026-03-08', 60);
+$ucretNoBelge = invokeFcotHttp($pdo, $gy, 'PUT', '/fazla-calisma-odeme-tercihi', [
+    'snapshot_id' => $seedUcretNoBelge['snapshot_id'],
+    'odeme_tipi' => 'UCRET',
+    'gerekce' => 'Ucret odemesi',
+], $subeHeader);
+fcotAssert($ucretNoBelge['status'] === 200, 'UCRET belge alanlari olmadan → 200');
+$ucretRow = $pdo->query(
+    'SELECT talep_tarihi, imzali_talep_belge_id FROM fazla_calisma_odeme_tercihleri
+     WHERE snapshot_id = ' . (int) $seedUcretNoBelge['snapshot_id']
+)->fetch(PDO::FETCH_ASSOC);
+fcotAssert(
+    $ucretRow['talep_tarihi'] === null && $ucretRow['imzali_talep_belge_id'] === null,
+    'UCRET kanit alanlari NULL'
+);
+
 // Period unknown: drop period tables on isolated DB
 $unknownRoot = fcotPdo($dsn);
 $unknownDb = 'fcot_unknown_' . bin2hex(random_bytes(3));
@@ -808,6 +967,9 @@ $p1 = spawnFcotHttp($pdo, $gy, 'PUT', '/fazla-calisma-odeme-tercihi', [
 $p2 = spawnFcotHttp($pdo, $gy, 'PUT', '/fazla-calisma-odeme-tercihi', [
     'snapshot_id' => $snapPar,
     'odeme_tipi' => 'SERBEST_ZAMAN',
+    'gerekce' => 'Parallel SZ',
+    'talep_tarihi' => '2026-08-04',
+    'imzali_talep_belge_id' => seedImzaliBelge($pdo, 10, 'AKTIF'),
 ], $subeHeader);
 $r1 = finishFcotHttp($p1);
 $r2 = finishFcotHttp($p2);

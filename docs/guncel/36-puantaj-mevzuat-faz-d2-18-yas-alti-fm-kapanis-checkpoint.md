@@ -116,3 +116,7 @@ Mevcut **submit blok** davranışı (`hesaplaYasKuraliBlokMesaji` — gece çal�
 Faz D alt başlıkları (D3 + D2) kapandı; kalan Faz D kalemi yalnızca D1 (onay eksikliği uyarısı).
 
 **Belge durumu:** Faz D2 kapalı — Faz D1 karar bekliyor.
+
+## S87 eki — otoriter bordro preflight
+
+18 yaş altı FM / gece için `PayrollComplianceGuard` preflight blocker’ları (`ONSEKIZ_YAS_ALTI_*`, `DOGUM_TARIHI_REQUIRED`) aday/kesinleştirme hattına bağlandı. Detay: `99-payroll-compliance-critical-gaps-kapanis.md`.

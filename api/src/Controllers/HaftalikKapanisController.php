@@ -10,6 +10,7 @@ use Medisa\Api\Database\Connection;
 use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
 use Medisa\Api\Scope\SubeScope;
+use Medisa\Api\Services\Payroll\PayrollComplianceGuard;
 use PDO;
 use PDOException;
 
@@ -84,6 +85,34 @@ class HaftalikKapanisController
             $puantajByPersonel = self::loadPuantajForWeek($pdo, $personeller, $haftaBaslangic, $haftaBitis);
 
             $actorId = self::userId($user);
+            $yil = (int) substr($haftaBaslangic, 0, 4);
+
+            // Compliance hard-block: 18 yas alti FM + yillik 270 saat (insert oncesi)
+            foreach ($personeller as $personel) {
+                $preview = self::buildSnapshotSatir(
+                    0,
+                    0,
+                    $personel,
+                    $haftaBaslangic,
+                    $haftaBitis,
+                    $departmanId,
+                    $puantajByPersonel[(int) $personel['id']] ?? []
+                );
+                $fazlaDk = (int) ($preview['fazla_calisma_dakika'] ?? 0);
+                if ($fazlaDk <= 0) {
+                    continue;
+                }
+
+                self::assertHaftalikAgeCompliance($pdo, $personel, $haftaBitis);
+                self::assertHaftalikYillikLimit(
+                    $pdo,
+                    (int) $personel['id'],
+                    $yil,
+                    $fazlaDk,
+                    $actorId > 0 ? $actorId : null
+                );
+            }
+
             $insert = $pdo->prepare('
                 INSERT INTO haftalik_kapanislar (
                     sube_id, hafta_baslangic, hafta_bitis, departman_id,
@@ -873,21 +902,71 @@ class HaftalikKapanisController
         return null;
     }
 
+    /**
+     * @param array<string, mixed> $personel
+     */
+    private static function assertHaftalikAgeCompliance(PDO $pdo, array $personel, string $haftaBitis): void
+    {
+        $dobRaw = $personel['dogum_tarihi'] ?? null;
+        $dob = null;
+        if ($dobRaw !== null && trim((string) $dobRaw) !== '') {
+            $dob = substr(trim((string) $dobRaw), 0, 10);
+        }
+
+        $age = PayrollComplianceGuard::resolveUnder18($dob, $haftaBitis);
+        if ($age['missing_dob']) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            JsonResponse::error(
+                422,
+                PayrollComplianceGuard::BLOCKER_DOGUM_TARIHI_REQUIRED,
+                'Dogum tarihi olmadan fazla calisma islemi yapilamaz.'
+            );
+        }
+        if ($age['under_18']) {
+            self::rollbackConflict(
+                $pdo,
+                '18 yasini doldurmamis personelde fazla calisma kapanisa aktarilamaz.',
+                PayrollComplianceGuard::BLOCKER_ONSEKIZ_YAS_FAZLA_CALISMA
+            );
+        }
+    }
+
+    private static function assertHaftalikYillikLimit(
+        PDO $pdo,
+        int $personelId,
+        int $yil,
+        int $pendingFazlaDk,
+        ?int $actorId
+    ): void {
+        PayrollComplianceGuard::acquireYillikLock($pdo, $personelId, $yil, $actorId);
+        $kapanmis = PayrollComplianceGuard::loadKapanmisYillikFazlaCalisma($pdo, $personelId, $yil);
+        $eval = PayrollComplianceGuard::evaluateYillikLimit($kapanmis, $pendingFazlaDk);
+        if ($eval['asildi']) {
+            self::rollbackConflict(
+                $pdo,
+                'Yillik fazla calisma 270 saat limiti asiliyor; haftalik kapanis engellendi.',
+                PayrollComplianceGuard::BLOCKER_YILLIK_270_SAAT_ASIMI
+            );
+        }
+    }
+
     private static function validationError($field, $message)
     {
         JsonResponse::error(422, 'VALIDATION_ERROR', $message, $field);
     }
 
-    private static function conflict($message)
+    private static function conflict($message, $code = 'STATE_CONFLICT')
     {
-        JsonResponse::error(409, 'STATE_CONFLICT', $message);
+        JsonResponse::error(409, $code, $message);
     }
 
-    private static function rollbackConflict(PDO $pdo, $message)
+    private static function rollbackConflict(PDO $pdo, $message, $code = 'STATE_CONFLICT')
     {
         if ($pdo->inTransaction()) {
             $pdo->rollBack();
         }
-        self::conflict($message);
+        self::conflict($message, $code);
     }
 }

@@ -7,6 +7,7 @@ namespace Medisa\Api\Services;
 use Medisa\Api\Services\Payroll\FinanceKalemCatalog;
 use Medisa\Api\Services\Payroll\MaasHesaplamaEngine;
 use Medisa\Api\Services\Payroll\MaasHesaplamaLegalParameterCatalog;
+use Medisa\Api\Services\Payroll\PayrollComplianceGuard;
 use Medisa\Api\Services\Payroll\SirketCalismaPolitikasiCatalog;
 use Medisa\Api\Services\ResmiTatilTakvimProjectionService;
 use PDO;
@@ -75,6 +76,29 @@ class MaasHesaplamaAdayService
                     $missing[] = $code;
                     $items[] = self::issue('BLOCKER', 'BUSINESS_POLICY_INCOMPLETE', 'Sirket politikasinda eksik parametre: ' . $code, 'sirket_politikasi', (int) $policy['politika']['id'], null, ['parametre_kodu' => $code]);
                 }
+            }
+            $hastalikRow = $policy['degerler_by_code'][PayrollComplianceGuard::POLICY_NORMAL_HASTALIK_ILK_IKI_GUN] ?? null;
+            $hastalikDeger = is_array($hastalikRow)
+                ? strtoupper(trim((string) ($hastalikRow['metin_deger'] ?? '')))
+                : '';
+            // SIRKET_KARARI: politika cozulmeli ve HAYIR olmali.
+            if (
+                $hastalikDeger === ''
+                || !in_array($hastalikDeger, ['HAYIR', 'EVET'], true)
+                || $hastalikDeger !== PayrollComplianceGuard::POLICY_HASTALIK_HAYIR
+            ) {
+                $items[] = self::issue(
+                    'BLOCKER',
+                    PayrollComplianceGuard::BLOCKER_HASTALIK_POLITIKA_COZULEMEDI,
+                    'Normal hastalik ilk 2 gun isveren odemesi politikasi cozulemedi veya SIRKET_KARARI (HAYIR) degil.',
+                    'sirket_politikasi',
+                    (int) $policy['politika']['id'],
+                    null,
+                    [
+                        'parametre_kodu' => PayrollComplianceGuard::POLICY_NORMAL_HASTALIK_ILK_IKI_GUN,
+                        'metin_deger' => $hastalikDeger !== '' ? $hastalikDeger : null,
+                    ]
+                );
             }
         }
         $items[] = self::issue('INFO', 'PARAMETER_COUNT', 'Mevzuat parametre sayisi.', 'mevzuat', null, null, ['adet' => count($mevzuat), 'eksik' => count($missing)]);
@@ -302,6 +326,67 @@ class MaasHesaplamaAdayService
             }
         }
 
+        $compliance = PayrollComplianceGuard::collectPeriodBlockers(
+            $pdo,
+            (int) $bundle['snapshot']['sube_id'],
+            (string) $bundle['snapshot']['donem_baslangic'],
+            (string) $bundle['snapshot']['donem_bitis'],
+            array_map(static function (array $p) {
+                return (int) $p['personel_id'];
+            }, $bundle['personeller'])
+        );
+        foreach ($compliance as $item) {
+            $items[] = self::issue(
+                (string) ($item['severity'] ?? 'BLOCKER'),
+                (string) ($item['code'] ?? 'COMPLIANCE_BLOCKER'),
+                (string) ($item['message'] ?? 'Uyumluluk blocker'),
+                $item['record_type'] ?? null,
+                isset($item['record_id']) ? (int) $item['record_id'] : null,
+                isset($item['personel_id']) ? (int) $item['personel_id'] : null,
+                is_array($item['metadata'] ?? null) ? $item['metadata'] : []
+            );
+        }
+
+        // Yillik 270 saat (16200 dk) kontrolu — donemde FM olan personeller
+        $donemYil = (int) $snapshot['yil'];
+        $donemBas = (string) $bundle['snapshot']['donem_baslangic'];
+        $donemBit = (string) $bundle['snapshot']['donem_bitis'];
+        foreach ($bundle['personeller'] as $personel) {
+            $pid = (int) $personel['personel_id'];
+            $periodOt = self::sumPeriodFazlaCalismaDakika($pdo, $pid, $donemBas, $donemBit);
+            if ($periodOt < 1) {
+                continue;
+            }
+            $kapanmis = PayrollComplianceGuard::loadKapanmisYillikFazlaCalisma($pdo, $pid, $donemYil);
+            $periodWeekKeys = self::periodHaftaBaslangicKeys($pdo, $pid, $donemBas, $donemBit);
+            $kapanmisExPeriod = [];
+            foreach ($kapanmis as $row) {
+                $hb = (string) ($row['hafta_baslangic'] ?? '');
+                if ($hb !== '' && isset($periodWeekKeys[$hb])) {
+                    continue;
+                }
+                $kapanmisExPeriod[] = $row;
+            }
+            $eval = PayrollComplianceGuard::evaluateYillikLimit($kapanmisExPeriod, $periodOt);
+            if ($eval['asildi']) {
+                $items[] = self::issue(
+                    'BLOCKER',
+                    PayrollComplianceGuard::BLOCKER_YILLIK_270_SAAT_ASIMI,
+                    'Yillik fazla calisma 270 saat limiti asiliyor.',
+                    'fazla_calisma',
+                    null,
+                    $pid,
+                    [
+                        'kullanilan_dk' => $eval['kullanilan'],
+                        'projected_dk' => $eval['projected'],
+                        'limit_dk' => PayrollComplianceGuard::YILLIK_FAZLA_CALISMA_LIMIT_DAKIKA,
+                        'period_ot_dk' => $periodOt,
+                    ],
+                    $personel['ad_soyad'] ?? null
+                );
+            }
+        }
+
         $existing = self::findActiveCalistirma($pdo, (int) $snapshot['id']);
         $parameterSetHash = MaasHesaplamaEngine::hashCanonical($mevzuat);
         $carryoverSetHash = MaasHesaplamaEngine::hashCanonical($carryovers);
@@ -506,18 +591,34 @@ class MaasHesaplamaAdayService
                     $projection['projections_by_personel'][$pid] ?? []
                 );
                 $correctionSnapshots[$pid] = $appliedProjection['applied'];
+                $odemeMap = self::buildEngineOdemeTercihiMap(
+                    $pdo,
+                    $pid,
+                    (string) $bundle['snapshot']['donem_baslangic'],
+                    (string) $bundle['snapshot']['donem_bitis']
+                );
+                $hastalikPolitika = '';
+                $hastalikRow = $policy['degerler_by_code'][PayrollComplianceGuard::POLICY_NORMAL_HASTALIK_ILK_IKI_GUN] ?? null;
+                if (is_array($hastalikRow)) {
+                    $hastalikPolitika = strtoupper(trim((string) ($hastalikRow['metin_deger'] ?? '')));
+                }
+                $etkiAdaylari = self::enrichEtkiAdaylariMetadata(
+                    $bundle['etki_by_personel'][$pid] ?? [],
+                    $hastalikPolitika
+                );
                 $engineInput = [
                     'personel' => $personel,
                     'ucret_segmentleri' => $bundle['ucret_by_personel'][$pid] ?? [],
                     'puantajlar' => $appliedProjection['puantajlar'],
                     'izinler' => $bundle['izin_by_personel'][$pid] ?? [],
-                    'etki_adaylari' => $bundle['etki_by_personel'][$pid] ?? [],
+                    'etki_adaylari' => $etkiAdaylari,
                     'finanslar' => $bundle['finans_by_personel'][$pid] ?? [],
                     'mevzuat' => $mergedMevzuat,
                     'carryover' => $carryovers[$pid],
                     'sgk_hesabi' => $bundle['sgk_by_personel'][$pid],
                     'donem_baslangic' => (string) $bundle['snapshot']['donem_baslangic'],
                     'donem_bitis' => (string) $bundle['snapshot']['donem_bitis'],
+                    'odeme_tercihi_by_iso_hafta' => $odemeMap,
                 ];
                 $calc = MaasHesaplamaEngine::calculate($engineInput);
                 if (empty($calc['ok'])) {
@@ -1146,6 +1247,178 @@ class MaasHesaplamaAdayService
             'request_hash' => (string) $row['request_hash'],
             'created_at' => (string) $row['created_at'],
         ];
+    }
+
+    /**
+     * Snapshot ETKI_ADAYI metadata passthrough + sirket hastalikk politikasi enrich.
+     *
+     * @param array<int, array<string, mixed>> $adaylar
+     * @return array<int, array<string, mixed>>
+     */
+    private static function enrichEtkiAdaylariMetadata(array $adaylar, $hastalikPolitika)
+    {
+        $hastalikPolitika = strtoupper(trim((string) $hastalikPolitika));
+        $out = [];
+        foreach ($adaylar as $aday) {
+            if (!is_array($aday)) {
+                continue;
+            }
+            $meta = is_array($aday['metadata'] ?? null) ? $aday['metadata'] : [];
+            if ($hastalikPolitika !== '' && !isset($meta['sirket_politika_ilk_iki_gun'])) {
+                $meta['sirket_politika_ilk_iki_gun'] = $hastalikPolitika;
+            }
+            // DEVAMSIZLIK_GUN: metadata yoksa HT hak kaybi default ON (engine parity).
+            $tur = strtoupper((string) ($aday['etki_turu'] ?? ''));
+            if ($tur === 'DEVAMSIZLIK_GUN' && !array_key_exists('hafta_tatili_hak_kaybi_uygula', $meta)) {
+                $meta['hafta_tatili_hak_kaybi_uygula'] = true;
+            }
+            $aday['metadata'] = $meta;
+            $out[] = $aday;
+        }
+
+        return $out;
+    }
+
+    /**
+     * Engine icin iso-hafta / hafta_baslangic anahtarli odeme tercih haritasi.
+     *
+     * @return array<string, array{odeme_tipi:string, tercih_id:?int}>
+     */
+    private static function buildEngineOdemeTercihiMap(PDO $pdo, $personelId, $donemBaslangic, $donemBitis)
+    {
+        $raw = PayrollComplianceGuard::loadOdemeTercihiMap(
+            $pdo,
+            (int) $personelId,
+            (string) $donemBaslangic,
+            (string) $donemBitis
+        );
+        $out = [];
+        foreach ($raw as $key => $info) {
+            $parts = explode('|', (string) $key, 2);
+            $haftaBas = $parts[1] ?? '';
+            if ($haftaBas === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $haftaBas)) {
+                continue;
+            }
+            $entry = [
+                'odeme_tipi' => (string) ($info['odeme_tipi'] ?? ''),
+                'tercih_id' => isset($info['tercih_id']) ? (int) $info['tercih_id'] : null,
+            ];
+            try {
+                $dt = new \DateTimeImmutable($haftaBas);
+                $iso = $dt->format('o') . '-W' . $dt->format('W');
+                $out[$iso] = $entry;
+            } catch (\Throwable $e) {
+                // ignore invalid date
+            }
+            $out[$haftaBas] = $entry;
+        }
+
+        return $out;
+    }
+
+    private static function sumPeriodFazlaCalismaDakika(PDO $pdo, $personelId, $donemBaslangic, $donemBitis)
+    {
+        $total = 0;
+        if (self::tableExists($pdo, 'fazla_calisma_odeme_tercihleri')) {
+            $stmt = $pdo->prepare(
+                'SELECT COALESCE(SUM(fazla_calisma_dakika), 0)
+                 FROM fazla_calisma_odeme_tercihleri
+                 WHERE personel_id = :pid
+                   AND hafta_baslangic <= :bitis
+                   AND hafta_bitis >= :baslangic
+                   AND fazla_calisma_dakika > 0'
+            );
+            $stmt->execute([
+                'pid' => (int) $personelId,
+                'bitis' => (string) $donemBitis,
+                'baslangic' => (string) $donemBaslangic,
+            ]);
+            $total = (int) $stmt->fetchColumn();
+            if ($total > 0) {
+                return $total;
+            }
+        }
+        if (self::tableExists($pdo, 'haftalik_kapanis_satirlari')) {
+            $stmt = $pdo->prepare(
+                "SELECT COALESCE(SUM(s.fazla_calisma_dakika), 0)
+                 FROM haftalik_kapanis_satirlari s
+                 WHERE s.personel_id = :pid
+                   AND s.state = 'KAPANDI'
+                   AND s.hafta_baslangic <= :bitis
+                   AND s.hafta_bitis >= :baslangic
+                   AND s.fazla_calisma_dakika > 0"
+            );
+            $stmt->execute([
+                'pid' => (int) $personelId,
+                'bitis' => (string) $donemBitis,
+                'baslangic' => (string) $donemBaslangic,
+            ]);
+            $total = (int) $stmt->fetchColumn();
+        }
+
+        return $total;
+    }
+
+    /** @return array<string, true> */
+    private static function periodHaftaBaslangicKeys(PDO $pdo, $personelId, $donemBaslangic, $donemBitis)
+    {
+        $keys = [];
+        if (self::tableExists($pdo, 'fazla_calisma_odeme_tercihleri')) {
+            $stmt = $pdo->prepare(
+                'SELECT hafta_baslangic
+                 FROM fazla_calisma_odeme_tercihleri
+                 WHERE personel_id = :pid
+                   AND hafta_baslangic <= :bitis
+                   AND hafta_bitis >= :baslangic
+                   AND fazla_calisma_dakika > 0'
+            );
+            $stmt->execute([
+                'pid' => (int) $personelId,
+                'bitis' => (string) $donemBitis,
+                'baslangic' => (string) $donemBaslangic,
+            ]);
+            foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) ?: [] as $row) {
+                $hb = (string) ($row['hafta_baslangic'] ?? '');
+                if ($hb !== '') {
+                    $keys[$hb] = true;
+                }
+            }
+        }
+        if ($keys === [] && self::tableExists($pdo, 'haftalik_kapanis_satirlari')) {
+            $stmt = $pdo->prepare(
+                "SELECT hafta_baslangic
+                 FROM haftalik_kapanis_satirlari
+                 WHERE personel_id = :pid
+                   AND state = 'KAPANDI'
+                   AND hafta_baslangic <= :bitis
+                   AND hafta_bitis >= :baslangic
+                   AND fazla_calisma_dakika > 0"
+            );
+            $stmt->execute([
+                'pid' => (int) $personelId,
+                'bitis' => (string) $donemBitis,
+                'baslangic' => (string) $donemBaslangic,
+            ]);
+            foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) ?: [] as $row) {
+                $hb = (string) ($row['hafta_baslangic'] ?? '');
+                if ($hb !== '') {
+                    $keys[$hb] = true;
+                }
+            }
+        }
+
+        return $keys;
+    }
+
+    private static function tableExists(PDO $pdo, $table)
+    {
+        $stmt = $pdo->prepare(
+            'SELECT COUNT(*) FROM information_schema.tables
+             WHERE table_schema = DATABASE() AND table_name = :t'
+        );
+        $stmt->execute(['t' => (string) $table]);
+
+        return (int) $stmt->fetchColumn() === 1;
     }
 
     private static function issue($severity, $code, $message, $recordType = null, $recordId = null, $personelId = null, array $metadata = [], $personelAdi = null)

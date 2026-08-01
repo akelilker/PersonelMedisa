@@ -190,3 +190,7 @@ Yeni geliştirici bu hatta devam edecekse önce `docs/guncel/48-serbest-zaman-zi
 ## 15. Kapanış Cümlesi
 
 Serbest zaman zinciri; oluşum, kullanım, bakiye düşümü, iptal ve düzeltme event modeliyle V1 çekirdek event-store/read-model seviyesinde tamamlanmıştır. Bu zincir, haftalık snapshot ve puantaj motorunu mutate etmeden ayrı serbest zaman event store hattı olarak kapatılmıştır.
+
+## S87 eki — bordro FM bastırma
+
+Otoriter `MaasHesaplamaEngine`: `odeme_tipi=SERBEST_ZAMAN` iken FM ücreti `ARTI` üretilmez (`SERBEST_ZAMAN_FM_UCRET_SUPPRESSED`). Kanıt / çift etki preflight: `PayrollComplianceGuard`. Bkz. `99-payroll-compliance-critical-gaps-kapanis.md`.

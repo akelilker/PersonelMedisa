@@ -322,6 +322,13 @@ export function hesaplaHaftalikFazlaCalismaUcreti(
 // ---------------------------------------------------------------------------
 
 export const FAZLA_SURELERLE_CALISMA_UCRET_CARPANI = 1.25;
+/**
+ * SIRKET_KARARI: tum personel icin haftalik normal sure 2700 dk (45 saat).
+ * Contract weekly = 2700 iken %25 FSC bandi zaten 0 (esik - sozlesme = 0);
+ * 45 saat uzeri tamamen %50 FM. Dusuk sozlesme odeme bandi onizlemede kullanilabilir
+ * ancak sirket politikasi odeme bantlarinda 2700 zorlar (PHP MaasHesaplamaEngine).
+ */
+export const SIRKET_KARARI_HAFTALIK_NORMAL_CALISMA_DAKIKA = HAFTALIK_NORMAL_CALISMA_ESIK_DAKIKA;
 export const PAYROLL_ENGINE_VERSION = "S91C2_PAYROLL_ENGINE_V2";
 export const YARGITAY_HOLIDAY_OVERTIME_MODE = "YARGITAY_7_5_SAAT_AYRIMI";
 export const YARGITAY_HOLIDAY_SPLIT_MINUTES = 450;
@@ -407,6 +414,7 @@ function hesaplaEngineV2HaftalikBantlari(
   sozlesmeHaftalikDakika: number
 ): { fazla_surelerle_calisma_dakika: number; fazla_calisma_dakika: number } {
   const toplam = Math.floor(ucretIcinGuvenliNegatifOlmayanSayi(toplamDakika));
+  // SIRKET_KARARI: sozlesme=2700 → FSC bandi (HAFTALIK_ESIK - sozlesme) = 0.
   const sozlesme = Math.floor(
     ucretIcinGuvenliNegatifOlmayanSayi(sozlesmeHaftalikDakika)
   );

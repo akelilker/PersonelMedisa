@@ -132,7 +132,8 @@ function acquireExecutionLock(timeoutMs = 600_000) {
       writeFileSync(executionLockOwner, String(process.pid), "utf8");
       return () => rmSync(executionLockDir, { recursive: true, force: true });
     } catch (error) {
-      if (error?.code !== "EEXIST") {
+      // Windows can surface EPERM/EACCES instead of EEXIST during concurrent mkdir races.
+      if (error?.code !== "EEXIST" && error?.code !== "EPERM" && error?.code !== "EACCES") {
         throw error;
       }
 

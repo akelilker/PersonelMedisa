@@ -42,6 +42,7 @@ import { useMaasHesaplama } from "../../../hooks/useMaasHesaplama";
 import { currentMonthParts, parseAyValue } from "../../../lib/donem-kapanis/display";
 import { useAuth } from "../../../state/auth.store";
 import type { IdOption } from "../../../types/referans";
+import { FazlaCalismaOdemeTercihiPanel } from "../components/FazlaCalismaOdemeTercihiPanel";
 import { MaasHesaplamaMerkeziPage } from "./MaasHesaplamaMerkeziPage";
 import { SgkKatalogHazirlikPanel } from "../components/SgkKatalogHazirlikPanel";
 
@@ -55,7 +56,8 @@ type TabKey =
   | "devir"
   | "on-izleme"
   | "hesaplama"
-  | "sgk-katalog";
+  | "sgk-katalog"
+  | "fm-odeme-tercihi";
 
 type FilterState = {
   ay: string;
@@ -74,7 +76,8 @@ const TAB_LABELS: Record<TabKey, string> = {
   devir: "Devir Verileri",
   "on-izleme": "Bordro Ön İzleme",
   hesaplama: "Maaş Hesaplama",
-  "sgk-katalog": "SGK Katalog Hazırlık"
+  "sgk-katalog": "SGK Katalog Hazırlık",
+  "fm-odeme-tercihi": "FM Ödeme Tercihi"
 };
 
 function blockerItems(items: MaasHesaplamaIssue[]) {
@@ -98,10 +101,13 @@ export function BordroHazirlikMerkeziPage() {
   const canManagePolicy = hasPermission("sirket_parametreleri.manage");
   const canApprove = hasPermission("bordro_kesinlestirme.approve");
   const canViewFinance = hasPermission("finans.view");
+  const canEditOdemeTercihi = hasPermission("puantaj.muhurle");
 
   const [filters, setFilters] = useState<FilterState>(INITIAL_FILTERS);
   const [subeOptions, setSubeOptions] = useState<IdOption[]>([]);
   const [activeTab, setActiveTab] = useState<TabKey>("veri-hazirlik");
+  const [fmSnapshotIdInput, setFmSnapshotIdInput] = useState("");
+  const [fmActiveSnapshotId, setFmActiveSnapshotId] = useState<number | null>(null);
   const [preflight, setPreflight] = useState<Awaited<ReturnType<typeof fetchBordroHazirlikPreflight>> | null>(null);
   const [onIzleme, setOnIzleme] = useState<BordroOnIzlemeOzet | null>(null);
   const [devirler, setDevirler] = useState<BordroDevirListItem[]>([]);
@@ -157,7 +163,8 @@ export function BordroHazirlikMerkeziPage() {
       tab === "devir" ||
       tab === "on-izleme" ||
       tab === "hesaplama" ||
-      tab === "sgk-katalog"
+      tab === "sgk-katalog" ||
+      tab === "fm-odeme-tercihi"
     ) {
       setActiveTab(tab);
     }
@@ -443,7 +450,18 @@ export function BordroHazirlikMerkeziPage() {
       </form>
 
       <nav className="raporlar-panel-nav" aria-label="Bordro hazırlık sekmeleri">
-        {(["veri-hazirlik", "preflight", "politika", "devir", "on-izleme", "hesaplama", "sgk-katalog"] as TabKey[]).map((tab) => (
+        {(
+          [
+            "veri-hazirlik",
+            "preflight",
+            "politika",
+            "devir",
+            "on-izleme",
+            "hesaplama",
+            "sgk-katalog",
+            "fm-odeme-tercihi"
+          ] as TabKey[]
+        ).map((tab) => (
           <button
             key={tab}
             type="button"
@@ -939,6 +957,53 @@ export function BordroHazirlikMerkeziPage() {
       ) : null}
 
       {activeTab === "sgk-katalog" ? <SgkKatalogHazirlikPanel /> : null}
+
+      {activeTab === "fm-odeme-tercihi" ? (
+        <section data-testid="bordro-fm-odeme-tercihi">
+          <p className="personel-puantaj-summary-note">
+            Haftalık kapanış sonrası İK / idari birim, fazla çalışma ödeme tercihini (ücret veya
+            serbest zaman) burada girer. Serbest zaman için imzalı talep belgesi ve talep tarihi
+            zorunludur.
+          </p>
+          <form
+            className="form-filter-panel"
+            onSubmit={(event) => {
+              event.preventDefault();
+              const parsed = Number.parseInt(fmSnapshotIdInput.trim(), 10);
+              setFmActiveSnapshotId(Number.isFinite(parsed) && parsed >= 1 ? parsed : null);
+            }}
+          >
+            <div className="form-field-grid">
+              <div className="form-section">
+                <label className="form-label" htmlFor="fm-snapshot-id-input">
+                  Snapshot ID
+                </label>
+                <input
+                  id="fm-snapshot-id-input"
+                  name="fm-snapshot-id-input"
+                  type="number"
+                  className="form-input"
+                  min={1}
+                  value={fmSnapshotIdInput}
+                  data-testid="fm-snapshot-id-input"
+                  onChange={(event) => setFmSnapshotIdInput(event.target.value)}
+                />
+              </div>
+            </div>
+            <div className="form-actions-row">
+              <button type="submit" className="universal-btn-save" data-testid="fm-snapshot-yukle">
+                Snapshot yükle
+              </button>
+            </div>
+          </form>
+          {fmActiveSnapshotId !== null ? (
+            <FazlaCalismaOdemeTercihiPanel
+              snapshotId={fmActiveSnapshotId}
+              canEdit={canEditOdemeTercihi}
+            />
+          ) : null}
+        </section>
+      ) : null}
 
       {pendingKesinlestirConfirm ? (
         <AppActionDialog

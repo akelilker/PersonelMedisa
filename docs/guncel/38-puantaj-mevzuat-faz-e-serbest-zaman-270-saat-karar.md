@@ -175,3 +175,7 @@ Teknik sıradaki en doğru iş (Faz E kodu açmadan):
 Faz E yeniden açıldığında önerilen sıra: **veri altyapısı → E1 → E3 → E2+E4** (E2 helper E3 öncesi yalnızca test/doküman amaçlı tutulabilir; UI’da hak gösterilmez).
 
 **Belge durumu:** Faz E karar — kod bekliyor (yıllık aggregate + serbest zaman veri/workflow ön koşulu). Faz E üst fazı bilinçli erteleme ile bekletilmiş sayılır.
+
+## S87 eki — 270 saat + SZ bordro bağları
+
+Yıllık 270 saat (16200 dk) preflight ve SZ kanıt/FM bastırma otoriter payroll hattında kapandı (`PayrollComplianceGuard`, migration `043`). Karar matrisi: `99-payroll-compliance-critical-gaps-kapanis.md`.

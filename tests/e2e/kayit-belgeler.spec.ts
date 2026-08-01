@@ -15,7 +15,7 @@ test.describe("Kayit Surec Belgeler metadata", () => {
     await kayitModal.getByRole("option", { name: /Ayşe Yılmaz/i }).click();
 
     await kayitModal.getByTestId("kayit-surec-subtab-belgeler").click();
-    await expect(kayitModal.getByText("Kimlik")).toBeVisible();
+    await expect(kayitModal.getByText("Kimlik", { exact: true }).first()).toBeVisible();
 
     await kayitModal.locator('input[name="belge-durum-KIMLIK"][value="VAR"]').check();
     await kayitModal.locator('button[type="submit"][form="kayit-surec-belgeler-form"]').click();

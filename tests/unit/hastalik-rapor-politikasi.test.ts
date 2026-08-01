@@ -98,6 +98,20 @@ describe("cozumleHastalikRaporGunu", () => {
     });
   });
 
+  it("6b. null + sirket_politika_ilk_iki_gun_oder_mi false → KESINTI_ADAYI", () => {
+    expect(
+      cozumleHastalikRaporGunu([makeSurec({ id: 14, ilk_iki_gun_firma_oder_mi: null })], {
+        personelId: 1,
+        tarih: "2026-04-10",
+        sirket_politika_ilk_iki_gun_oder_mi: false
+      })
+    ).toMatchObject({
+      firma_oder_mi: false,
+      ucret_policy: "KESINTI_ADAYI",
+      manuel_inceleme_gerekli_mi: false
+    });
+  });
+
   it("7. state IPTAL ignore edilir", () => {
     expect(
       cozumleHastalikRaporGunu([makeSurec({ id: 15, state: "IPTAL" })], {
@@ -133,6 +147,64 @@ describe("cozumleHastalikRaporGunu", () => {
         { personelId: 1, tarih: "2026-04-10" }
       ).ucret_policy
     ).toBe("YOK");
+  });
+
+  it("8b. meslek hastaligi ignore edilir", () => {
+    expect(
+      cozumleHastalikRaporGunu(
+        [makeSurec({ id: 160, alt_tur: "Meslek_Hastaligi", ilk_iki_gun_firma_oder_mi: false })],
+        { personelId: 1, tarih: "2026-04-10" }
+      ).ucret_policy
+    ).toBe("YOK");
+  });
+
+  it("8c. analik ignore edilir", () => {
+    expect(
+      cozumleHastalikRaporGunu(
+        [
+          makeSurec({
+            id: 161,
+            surec_turu: "ANALIK",
+            alt_tur: "Analik",
+            ilk_iki_gun_firma_oder_mi: false
+          })
+        ],
+        { personelId: 1, tarih: "2026-04-10" }
+      ).ucret_policy
+    ).toBe("YOK");
+  });
+
+  it("8d. ay sonuna tasan rapor gun_sirasi dogru", () => {
+    expect(
+      cozumleHastalikRaporGunu(
+        [
+          makeSurec({
+            id: 162,
+            baslangic_tarihi: "2026-03-31",
+            bitis_tarihi: "2026-04-02",
+            ilk_iki_gun_firma_oder_mi: false
+          })
+        ],
+        { personelId: 1, tarih: "2026-04-01" }
+      )
+    ).toMatchObject({
+      gun_sirasi: 2,
+      ilk_iki_gun_mu: true,
+      ucret_policy: "KESINTI_ADAYI"
+    });
+  });
+
+  it("8e. companyDefault HAYIR (false) → null surec alani KESINTI_ADAYI", () => {
+    expect(
+      cozumleHastalikRaporGunu([makeSurec({ id: 163, ilk_iki_gun_firma_oder_mi: null })], {
+        personelId: 1,
+        tarih: "2026-04-10",
+        companyDefault: false
+      })
+    ).toMatchObject({
+      firma_oder_mi: false,
+      ucret_policy: "KESINTI_ADAYI"
+    });
   });
 
   it("9. bitis_tarihi null tek gunluk kabul edilir", () => {

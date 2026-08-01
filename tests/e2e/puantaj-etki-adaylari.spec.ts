@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { login } from "./helpers/auth";
+import { login, waitForAuthSession } from "./helpers/auth";
 import { mockApi, type MockUserRole } from "./helpers/mock-api";
 
 const ROLE_LOGIN: Record<MockUserRole, { username: string; password: string }> = {
@@ -32,8 +32,10 @@ async function setActiveSube(page: Page, subeId: number) {
 async function openPuantaj(page: Page, role: MockUserRole) {
   await mockApi(page, role);
   await login(page, ROLE_LOGIN[role]);
+  await waitForAuthSession(page, role);
   await page.goto("/puantaj");
   await expect(page).toHaveURL(/\/puantaj$/);
+  await expect(page.getByRole("heading", { name: "Günlük Kayıt ve Puantaj" })).toBeVisible({ timeout: 20_000 });
 }
 
 async function prepareMuhasebePanel(page: Page, ay = PANEL_AY_WITH_DATA) {
@@ -43,6 +45,23 @@ async function prepareMuhasebePanel(page: Page, ay = PANEL_AY_WITH_DATA) {
   if (ay === PANEL_AY_WITH_DATA) {
     await expect(page.getByTestId("puantaj-etki-aday-table")).toBeVisible();
   }
+}
+
+/**
+ * Şube seçimi birim amiri isteğini tetikler; amir select'i seçenekler gelene kadar disabled kalır.
+ */
+async function selectPanelSubeAyAmiri(page: Page, subeId = "1", amirId = "1", ay = PANEL_AY_WITH_DATA) {
+  const subeSelect = page.getByLabel("Şube", { exact: true });
+  await expect(subeSelect).toBeVisible();
+  await subeSelect.selectOption(subeId);
+
+  await page.getByLabel("Ay", { exact: true }).last().fill(ay);
+
+  const amirSelect = page.getByLabel("Birim Amiri", { exact: true });
+  await expect(amirSelect).toBeEnabled({ timeout: 15_000 });
+  await amirSelect.selectOption(amirId);
+
+  await expect(page.getByTestId("puantaj-etki-aday-panel")).toBeVisible();
 }
 
 function tableAction(page: Page, testId: string) {
@@ -233,10 +252,10 @@ test.describe("S74-C2B puantaj etki adaylari paneli", () => {
 
   test("GENEL_YONETICI İncele ve Uygula butonunu gormez", async ({ page }) => {
     await openPuantaj(page, "GENEL_YONETICI");
-    await page.getByLabel("Şube", { exact: true }).selectOption("1");
-    await page.getByLabel("Ay", { exact: true }).last().fill(PANEL_AY_WITH_DATA);
-    await page.getByLabel("Birim Amiri", { exact: true }).selectOption("1");
+    await selectPanelSubeAyAmiri(page);
+    await expect(page.getByTestId("puantaj-etki-aday-table")).toBeVisible();
     await tableAction(page, "puantaj-etki-aday-detail-6").click();
+    await expect(page.getByTestId("puantaj-etki-aday-detail-modal")).toBeVisible();
     await expect(page.getByTestId("puantaj-etki-aday-detail-manual-apply")).toHaveCount(0);
   });
 });
@@ -276,9 +295,8 @@ test.describe("S75 puantaj cakisma cozumu", () => {
 
   test("GY read-only cakisma cozum butonunu gormez", async ({ page }) => {
     await openPuantaj(page, "GENEL_YONETICI");
-    await page.getByLabel("Şube", { exact: true }).selectOption("1");
-    await page.getByLabel("Ay", { exact: true }).last().fill(PANEL_AY_WITH_DATA);
-    await page.getByLabel("Birim Amiri", { exact: true }).selectOption("1");
+    await selectPanelSubeAyAmiri(page);
+    await expect(page.getByTestId("puantaj-etki-aday-table")).toBeVisible();
     await tableAction(page, "puantaj-etki-aday-detail-7").click();
     await expect(page.getByTestId("puantaj-etki-aday-detail-resolve-conflict")).toHaveCount(0);
   });

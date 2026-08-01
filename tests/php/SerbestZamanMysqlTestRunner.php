@@ -489,27 +489,152 @@ function seedSzTercih(
     int $fazla,
     string $odemeTipi = 'SERBEST_ZAMAN'
 ): int {
-    $ins = $pdo->prepare('
-        INSERT INTO fazla_calisma_odeme_tercihleri (
-          snapshot_id, kapanis_id, personel_id, hafta_baslangic, hafta_bitis,
-          fazla_calisma_dakika, odeme_tipi, secim_zamani, secen_kullanici_id, onceki_odeme_tipi
-        ) VALUES (
-          :snapshot_id, :kapanis_id, :personel_id, :hafta_baslangic, :hafta_bitis,
-          :fazla, :odeme_tipi, :secim_zamani, 1, \'KARAR_BEKLIYOR\'
-        )
-    ');
-    $ins->execute([
-        'snapshot_id' => $snapshotId,
-        'kapanis_id' => $kapanisId,
-        'personel_id' => $personelId,
-        'hafta_baslangic' => $haftaBaslangic,
-        'hafta_bitis' => $haftaBitis,
-        'fazla' => $fazla,
-        'odeme_tipi' => $odemeTipi,
-        'secim_zamani' => $haftaBitis . ' 12:00:00',
-    ]);
+    $belgeId = null;
+    $talepTarihi = null;
+    $sistemeGiren = null;
+    $sistemeZaman = null;
+    if ($odemeTipi === 'SERBEST_ZAMAN') {
+        $belgeId = seedSzImzaliBelge($pdo, $personelId);
+        $talepTarihi = $haftaBaslangic;
+        $sistemeGiren = 1;
+        $sistemeZaman = $haftaBitis . ' 12:00:00';
+    }
+
+    $hasKanit = szColumnExists($pdo, 'fazla_calisma_odeme_tercihleri', 'talep_tarihi');
+    if ($hasKanit) {
+        $ins = $pdo->prepare('
+            INSERT INTO fazla_calisma_odeme_tercihleri (
+              snapshot_id, kapanis_id, personel_id, hafta_baslangic, hafta_bitis,
+              fazla_calisma_dakika, odeme_tipi, secim_zamani, secen_kullanici_id, onceki_odeme_tipi,
+              gerekce, talep_tarihi, imzali_talep_belge_id, sisteme_giren_kullanici_id, sisteme_giris_zamani
+            ) VALUES (
+              :snapshot_id, :kapanis_id, :personel_id, :hafta_baslangic, :hafta_bitis,
+              :fazla, :odeme_tipi, :secim_zamani, 1, \'KARAR_BEKLIYOR\',
+              :gerekce, :talep_tarihi, :belge_id, :sisteme_giren, :sisteme_zaman
+            )
+        ');
+        $ins->execute([
+            'snapshot_id' => $snapshotId,
+            'kapanis_id' => $kapanisId,
+            'personel_id' => $personelId,
+            'hafta_baslangic' => $haftaBaslangic,
+            'hafta_bitis' => $haftaBitis,
+            'fazla' => $fazla,
+            'odeme_tipi' => $odemeTipi,
+            'secim_zamani' => $haftaBitis . ' 12:00:00',
+            'gerekce' => $odemeTipi === 'SERBEST_ZAMAN' ? 'SZ test kanit' : null,
+            'talep_tarihi' => $talepTarihi,
+            'belge_id' => $belgeId,
+            'sisteme_giren' => $sistemeGiren,
+            'sisteme_zaman' => $sistemeZaman,
+        ]);
+    } else {
+        $ins = $pdo->prepare('
+            INSERT INTO fazla_calisma_odeme_tercihleri (
+              snapshot_id, kapanis_id, personel_id, hafta_baslangic, hafta_bitis,
+              fazla_calisma_dakika, odeme_tipi, secim_zamani, secen_kullanici_id, onceki_odeme_tipi
+            ) VALUES (
+              :snapshot_id, :kapanis_id, :personel_id, :hafta_baslangic, :hafta_bitis,
+              :fazla, :odeme_tipi, :secim_zamani, 1, \'KARAR_BEKLIYOR\'
+            )
+        ');
+        $ins->execute([
+            'snapshot_id' => $snapshotId,
+            'kapanis_id' => $kapanisId,
+            'personel_id' => $personelId,
+            'hafta_baslangic' => $haftaBaslangic,
+            'hafta_bitis' => $haftaBitis,
+            'fazla' => $fazla,
+            'odeme_tipi' => $odemeTipi,
+            'secim_zamani' => $haftaBitis . ' 12:00:00',
+        ]);
+    }
 
     return (int) $pdo->lastInsertId();
+}
+
+function szColumnExists(PDO $pdo, string $table, string $column): bool
+{
+    $stmt = $pdo->prepare(
+        'SELECT COUNT(*) FROM information_schema.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :t AND COLUMN_NAME = :c'
+    );
+    $stmt->execute(['t' => $table, 'c' => $column]);
+
+    return (int) $stmt->fetchColumn() === 1;
+}
+
+function seedSzImzaliBelge(PDO $pdo, int $personelId): int
+{
+    $stmt = $pdo->prepare(
+        "INSERT INTO surecler (personel_id, surec_turu, alt_tur, state, baslangic_tarihi)
+         VALUES (:pid, 'BELGE', 'IMZALI_SERBEST_ZAMAN_TALEBI', 'AKTIF', CURDATE())"
+    );
+    $stmt->execute(['pid' => $personelId]);
+
+    return (int) $pdo->lastInsertId();
+}
+
+function applySzPayrollCompliance043(PDO $pdo): void
+{
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS surecler (
+          id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+          personel_id INT UNSIGNED NOT NULL,
+          surec_turu VARCHAR(32) NOT NULL,
+          alt_tur VARCHAR(64) NULL,
+          state VARCHAR(32) NOT NULL DEFAULT 'AKTIF',
+          baslangic_tarihi DATE NULL,
+          bitis_tarihi DATE NULL,
+          KEY idx_surecler_personel (personel_id),
+          CONSTRAINT fk_surecler_personel_sz FOREIGN KEY (personel_id) REFERENCES personeller (id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ");
+
+    foreach ([
+        'talep_tarihi' => 'DATE NULL',
+        'imzali_talep_belge_id' => 'INT UNSIGNED NULL',
+        'sisteme_giren_kullanici_id' => 'INT UNSIGNED NULL',
+        'sisteme_giris_zamani' => 'DATETIME NULL',
+    ] as $col => $def) {
+        $exists = (int) $pdo->query("
+            SELECT COUNT(*) FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = 'fazla_calisma_odeme_tercihleri'
+              AND COLUMN_NAME = " . $pdo->quote($col) . "
+        ")->fetchColumn();
+        if ($exists === 0) {
+            $pdo->exec("ALTER TABLE fazla_calisma_odeme_tercihleri ADD COLUMN {$col} {$def}");
+        }
+    }
+
+    $fk = (int) $pdo->query("
+        SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'fazla_calisma_odeme_tercihleri'
+          AND CONSTRAINT_NAME = 'fk_fcot_imzali_belge'
+    ")->fetchColumn();
+    if ($fk === 0) {
+        $pdo->exec("
+            ALTER TABLE fazla_calisma_odeme_tercihleri
+              ADD CONSTRAINT fk_fcot_imzali_belge
+                FOREIGN KEY (imzali_talep_belge_id) REFERENCES surecler (id) ON DELETE RESTRICT
+        ");
+    }
+
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS yillik_fazla_calisma_kilitleri (
+          id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+          personel_id INT UNSIGNED NOT NULL,
+          yil SMALLINT UNSIGNED NOT NULL,
+          locked_at DATETIME NOT NULL,
+          locked_by INT UNSIGNED NULL,
+          PRIMARY KEY (id),
+          UNIQUE KEY uq_yfck_personel_yil (personel_id, yil),
+          CONSTRAINT fk_yfck_personel FOREIGN KEY (personel_id) REFERENCES personeller (id) ON DELETE RESTRICT,
+          CONSTRAINT fk_yfck_locked_by FOREIGN KEY (locked_by) REFERENCES users (id) ON DELETE RESTRICT
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ");
 }
 
 function bootstrapSzSchema(PDO $pdo): string
@@ -522,6 +647,7 @@ function bootstrapSzSchema(PDO $pdo): string
     applySqlFile($pdo, __DIR__ . '/../../api/migrations/027_haftalik_kapanis.sql');
     applySqlFile($pdo, __DIR__ . '/../../api/migrations/028_fazla_calisma_odeme_tercihleri.sql');
     applySqlFile($pdo, __DIR__ . '/../../api/migrations/029_serbest_zaman_events.sql');
+    applySzPayrollCompliance043($pdo);
     seedSzFixtures($pdo);
 
     return $dbName;
@@ -608,14 +734,17 @@ $subeHeader = ['x-active-sube-id' => '1'];
 $seed = seedSnapshot($pdo, 1, 10, '2026-04-06', '2026-04-12', 60);
 $snapshotId = $seed['snapshot_id'];
 $kapanisId = $seed['kapanis_id'];
+$belge1 = seedSzImzaliBelge($pdo, 10);
 
 $pdo->exec("
     INSERT INTO fazla_calisma_odeme_tercihleri (
       id, snapshot_id, kapanis_id, personel_id, hafta_baslangic, hafta_bitis,
-      fazla_calisma_dakika, odeme_tipi, secim_zamani, secen_kullanici_id, onceki_odeme_tipi
+      fazla_calisma_dakika, odeme_tipi, secim_zamani, secen_kullanici_id, onceki_odeme_tipi,
+      gerekce, talep_tarihi, imzali_talep_belge_id, sisteme_giren_kullanici_id, sisteme_giris_zamani
     ) VALUES (
       1, {$snapshotId}, {$kapanisId}, 10, '2026-04-06', '2026-04-12',
-      60, 'SERBEST_ZAMAN', '2026-04-10 12:00:00', 1, 'KARAR_BEKLIYOR'
+      60, 'SERBEST_ZAMAN', '2026-04-10 12:00:00', 1, 'KARAR_BEKLIYOR',
+      'SZ test kanit', '2026-04-06', {$belge1}, 1, '2026-04-10 12:00:00'
     )
 ");
 

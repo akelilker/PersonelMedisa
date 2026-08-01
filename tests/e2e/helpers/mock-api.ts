@@ -7166,6 +7166,7 @@ let personelBelgeKaydiIdCounter = 903;
         return;
       }
 
+      const actorUserId = MOCK_ROLE_USER_ID[role];
       const created: MockBildirimRecord = {
         id: ++bildirimPageState.nextId,
         tarih: payload.tarih,
@@ -7175,8 +7176,9 @@ let personelBelgeKaydiIdCounter = 903;
         bildirim_turu: bildirimTuru,
         aciklama: payload.aciklama,
         state: "TASLAK",
-        created_by: mockUserId,
-        updated_by: mockUserId
+        // UI ownership uses login actor id (role-specific); keep created_by in sync.
+        created_by: actorUserId,
+        updated_by: actorUserId
       };
       bildirimler.unshift(created);
 

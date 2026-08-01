@@ -12,6 +12,7 @@ use Medisa\Api\Http\Request;
 use Medisa\Api\Scope\SubeScope;
 use Medisa\Api\Services\DonemKapanisAuditService;
 use Medisa\Api\Services\DonemKapanisPreflightService;
+use Medisa\Api\Services\Payroll\PayrollComplianceGuard;
 use Medisa\Api\Services\PuantajDonemKilidiService;
 use Medisa\Api\Services\ResmiTatilTakvimProjectionService;
 use PDO;
@@ -103,6 +104,7 @@ class PuantajController
 
             $values = self::buildUpsertValues($payload, $existing ?: [], $personelId, $tarih);
             $values = self::applyTatilProjection($pdo, $values);
+            self::assertAgeCompliance($personel, $values, $tarih);
             if ($existing) {
                 self::updatePuantajRow($pdo, (int) $existing['id'], $values);
             } else {
@@ -367,7 +369,7 @@ class PuantajController
     /** @return array<string, mixed> */
     private static function loadPersonel(PDO $pdo, $personelId)
     {
-        $stmt = $pdo->prepare('SELECT id, sube_id FROM personeller WHERE id = :id LIMIT 1');
+        $stmt = $pdo->prepare('SELECT id, sube_id, dogum_tarihi FROM personeller WHERE id = :id LIMIT 1');
         $stmt->execute(['id' => $personelId]);
         $personel = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!$personel) {
@@ -375,6 +377,111 @@ class PuantajController
         }
 
         return $personel;
+    }
+
+    /**
+     * 18 yas alti / dogum tarihi hard-block (gece bandi veya Mesai_Yaz).
+     *
+     * @param array<string, mixed> $personel
+     * @param array<string, mixed> $values
+     */
+    private static function assertAgeCompliance(array $personel, array $values, string $tarih): void
+    {
+        $isOvertime = self::valuesInvolveOvertime($values);
+        $isNight = self::geceBandinaGiriyor(
+            isset($values['giris_saati']) ? (string) $values['giris_saati'] : null,
+            isset($values['cikis_saati']) ? (string) $values['cikis_saati'] : null
+        );
+
+        if (!$isOvertime && !$isNight) {
+            return;
+        }
+
+        $dobRaw = $personel['dogum_tarihi'] ?? null;
+        $dob = null;
+        if ($dobRaw !== null && trim((string) $dobRaw) !== '') {
+            $dob = substr(trim((string) $dobRaw), 0, 10);
+        }
+
+        $age = PayrollComplianceGuard::resolveUnder18($dob, $tarih);
+        if ($age['missing_dob']) {
+            JsonResponse::error(
+                422,
+                PayrollComplianceGuard::BLOCKER_DOGUM_TARIHI_REQUIRED,
+                'Dogum tarihi olmadan fazla calisma veya gece calismasi islemi yapilamaz.'
+            );
+        }
+
+        if (!$age['under_18']) {
+            return;
+        }
+
+        if ($isNight) {
+            JsonResponse::error(
+                409,
+                PayrollComplianceGuard::BLOCKER_ONSEKIZ_YAS_GECE,
+                '18 yasini doldurmamis personelde gece calismasi yapilamaz.'
+            );
+        }
+
+        JsonResponse::error(
+            409,
+            PayrollComplianceGuard::BLOCKER_ONSEKIZ_YAS_FAZLA_CALISMA,
+            '18 yasini doldurmamis personelde fazla calisma (Mesai_Yaz) yapilamaz.'
+        );
+    }
+
+    /** @param array<string, mixed> $values */
+    private static function valuesInvolveOvertime(array $values): bool
+    {
+        $hesap = isset($values['hesap_etkisi']) ? (string) $values['hesap_etkisi'] : '';
+        if ($hesap === 'Mesai_Yaz') {
+            return true;
+        }
+
+        // Esdeger mesai alanlari (gelecek kolon / legacy alias)
+        foreach (['mesai_dakika', 'fazla_mesai_dakika', 'fazla_calisma_dakika'] as $field) {
+            if (isset($values[$field]) && (int) $values[$field] > 0) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * TS geceBandinaGiriyor parity: gece bandi [00:00, 06:00) U [20:00, 24:00).
+     */
+    private static function geceBandinaGiriyor(?string $giris, ?string $cikis): bool
+    {
+        $girisMin = self::parseTimeToMinutes($giris);
+        $cikisMin = self::parseTimeToMinutes($cikis);
+
+        if ($girisMin !== null && $girisMin < 6 * 60) {
+            return true;
+        }
+        if ($cikisMin !== null && $cikisMin >= 20 * 60) {
+            return true;
+        }
+
+        return false;
+    }
+
+    private static function parseTimeToMinutes(?string $value): ?int
+    {
+        if ($value === null || trim($value) === '') {
+            return null;
+        }
+        if (!preg_match('/^(\d{1,2}):(\d{2})/', trim($value), $m)) {
+            return null;
+        }
+        $hours = (int) $m[1];
+        $minutes = (int) $m[2];
+        if ($hours < 0 || $hours > 23 || $minutes < 0 || $minutes > 59) {
+            return null;
+        }
+
+        return $hours * 60 + $minutes;
     }
 
     private static function assertSubeExists(PDO $pdo, $subeId)

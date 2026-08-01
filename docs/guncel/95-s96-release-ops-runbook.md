@@ -135,3 +135,16 @@ Script login sonrası **POST/PUT/PATCH/DELETE çağırmaz**. Personel listesi ok
 - [ ] Production write bu koşuda yapılmadı / ayrı onaylı koşuya bırakıldı
 
 Kayıt şablonu `DEPLOY_CHECKLIST.md` smoke sonuç kaydı ile birleştirilir.
+
+---
+
+## 7) S87 — Payroll compliance preflight (bordro kesinleştirme öncesi)
+
+Canlı bordro aday / kesinleştirme öncesi:
+
+1. Migration `043_payroll_compliance_critical_gaps.sql` uygulandı mı?
+2. Şirket politikası `NORMAL_HASTALIK_ILK_IKI_GUN_ISVEREN_ODEMESI = HAYIR` çözülüyor mu?
+3. Preflight blocker’lar temiz mi: ödeme tercihi KARAR_BEKLIYOR, SZ imzalı talep kanıtı, 18 yaş, yıllık 270 saat, hastalık politikası?
+4. Motor-UI parity: izinsiz devamsızlıkta fiili + HT hak kaybı **ayrı** EKSI satırları; RAPOR/IZIN HT hak kaybı üretmez.
+
+Referans: `docs/guncel/99-payroll-compliance-critical-gaps-kapanis.md`.

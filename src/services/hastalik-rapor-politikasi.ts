@@ -97,6 +97,25 @@ function isIsKazasiSureci(surec: HastalikRaporSureci): boolean {
   return altTur === "Raporlu_Is_Kazasi" || altTur === "IS_KAZASI";
 }
 
+function isMeslekHastaligiSureci(surec: HastalikRaporSureci): boolean {
+  const altTur = normalizeText(surec.alt_tur).toUpperCase().replace(/[\s-]/g, "_");
+  return (
+    altTur === "MESLEK_HASTALIGI" ||
+    altTur === "RAPORLU_MESLEK_HASTALIGI" ||
+    altTur === "RAPORLU_MESLEK_HASTALIĞI"
+  );
+}
+
+function isAnalikSureci(surec: HastalikRaporSureci): boolean {
+  const altTur = normalizeText(surec.alt_tur).toUpperCase().replace(/[\s-]/g, "_");
+  const surecTuru = normalizeText(surec.surec_turu).toUpperCase();
+  return (
+    surecTuru === "ANALIK" ||
+    altTur === "ANALIK" ||
+    altTur === "RAPORLU_ANALIK"
+  );
+}
+
 function tarihSurecAraligindaMi(surec: HastalikRaporSureci, tarih: string): boolean {
   const basMs = parseUtcDayMs(surec.baslangic_tarihi);
   const hedefMs = parseUtcDayMs(tarih);
@@ -119,7 +138,8 @@ function tarihSurecAraligindaMi(surec: HastalikRaporSureci, tarih: string): bool
 
 function cozumleTekEslesme(
   surec: HastalikRaporSureci,
-  tarih: string
+  tarih: string,
+  sirketPolitikaIlkIkiGunOderMi?: boolean
 ): HastalikRaporGunuCozumu {
   const gun_sirasi = hesaplaTakvimGunSirasi(surec.baslangic_tarihi, tarih);
   if (gun_sirasi === null) {
@@ -172,6 +192,20 @@ function cozumleTekEslesme(
     };
   }
 
+  // firmaOderRaw null: SIRKET_KARARI varsayilanı (yalnız açıkça false geçilince)
+  if (sirketPolitikaIlkIkiGunOderMi === false) {
+    return {
+      eslesme_var_mi: true,
+      coklu_eslesme_mi: false,
+      manuel_inceleme_gerekli_mi: false,
+      surec_id: surec.id ?? null,
+      gun_sirasi,
+      ilk_iki_gun_mu: true,
+      firma_oder_mi: false,
+      ucret_policy: "KESINTI_ADAYI"
+    };
+  }
+
   return {
     eslesme_var_mi: true,
     coklu_eslesme_mi: false,
@@ -193,6 +227,10 @@ export function cozumleHastalikRaporGunu(
   input: {
     personelId: number;
     tarih: string;
+    /** SIRKET_KARARI: şirket politikası ilk 2 gün öder mi? Yalnız false iken null surec alanını KESINTI_ADAYI yapar. */
+    sirket_politika_ilk_iki_gun_oder_mi?: boolean;
+    /** companyDefault alias for sirket_politika_ilk_iki_gun_oder_mi */
+    companyDefault?: boolean;
   }
 ): HastalikRaporGunuCozumu {
   if (parseUtcDayMs(input.tarih) === null) {
@@ -207,6 +245,8 @@ export function cozumleHastalikRaporGunu(
     if (surec.personel_id !== input.personelId) return false;
     if (isIptalSurec(surec)) return false;
     if (isIsKazasiSureci(surec)) return false;
+    if (isMeslekHastaligiSureci(surec)) return false;
+    if (isAnalikSureci(surec)) return false;
     if (!isHastalikRaporSureci(surec)) return false;
     return tarihSurecAraligindaMi(surec, input.tarih);
   });
@@ -228,5 +268,10 @@ export function cozumleHastalikRaporGunu(
     };
   }
 
-  return cozumleTekEslesme(eslesenler[0], input.tarih);
+  const sirketPolitika =
+    input.sirket_politika_ilk_iki_gun_oder_mi !== undefined
+      ? input.sirket_politika_ilk_iki_gun_oder_mi
+      : input.companyDefault;
+
+  return cozumleTekEslesme(eslesenler[0], input.tarih, sirketPolitika);
 }

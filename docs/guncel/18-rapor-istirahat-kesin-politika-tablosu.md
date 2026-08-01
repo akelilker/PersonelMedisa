@@ -224,6 +224,10 @@ Yonetimsel destek, ozel odeme, yardim, maas tamamlama ve insiyatif odemeleri man
 
 Genel rapor / istirahat hatti tamamen kod fazina hazir degildir. Sadece netlesen minimum politika alanlari ileride ayri teshisle implementasyona konu olabilir.
 
+### S87 notu (otoriter motor)
+
+SIRKET_KARARI: normal hastalik ilk 2 gun isveren odemez → engine EKSI `NORMAL_HASTALIK_ILK_2_GUN_ODENMEDI` (gun_sirasi<=2, is kazasi degil). Gun 3+ BILGI / fail-closed; SGK mahsup icat edilmez. Karar matrisi: `99-payroll-compliance-critical-gaps-kapanis.md`.
+
 Sonraki onerilen faz:
 
 1. Netlesen minimum politika alanlari icin ayri implementasyon teshisi hazirlamak
@@ -235,5 +239,6 @@ Sonraki onerilen faz:
 
 | Tarih | Not |
 |---|---|
+| 2026-08-01 | S87: normal hastalik ilk 2 gun odemez motor kalemi notu. |
 | 2026-05-17 | Rapor / istirahat politika tablosu ilk taslagi eklendi. |
 | 2026-05-18 | Minimum sistem politikasi, acik kalan kararlar ve manuel yonetim karari ayrimi islendi. |

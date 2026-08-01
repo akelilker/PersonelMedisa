@@ -25,15 +25,17 @@ test.describe("Genel Yonetici bildirim onay paneli", () => {
     await expect(page.getByText("Genel Yönetici onayı için şube seçin.")).toBeVisible();
     expect(getRequests).toEqual([]);
 
+    await page.locator("[name='aylik-bildirim-onay-ay']").fill("2026-07");
     await page.getByLabel("Şube").selectOption("1");
     await expect(page.getByLabel("Birim Amiri")).toHaveValue("1");
     await expect(page.getByTestId("genel-yonetici-bildirim-onay-ozet")).toBeVisible();
-    await expect(page.getByText("Aylık Bildirim Onay ID")).toBeVisible();
+    await expect(page.getByText("Aylık Bildirim Onay Durumu")).toBeVisible();
     await expect(page.getByText("Henüz onaylanmadı")).toBeVisible();
     await expect(page.getByTestId("genel-yonetici-bildirim-onay-approve")).toBeEnabled();
-    expect(getRequests).toHaveLength(1);
-    expect(getRequests[0]).toContain("sube_id=1");
-    expect(getRequests[0]).toContain("birim_amiri_user_id=1");
+    expect(getRequests.length).toBeGreaterThanOrEqual(1);
+    expect(getRequests.some((url) => url.includes("sube_id=1"))).toBe(true);
+    expect(getRequests.some((url) => url.includes("birim_amiri_user_id=1"))).toBe(true);
+    expect(getRequests.some((url) => url.includes("ay=2026-07"))).toBe(true);
   });
 
   test("modal ile tek POST gonderir, sonucu yeniler ve duplicate aksiyonunu kapatir", async ({ page }) => {
@@ -43,6 +45,7 @@ test.describe("Genel Yonetici bildirim onay paneli", () => {
     });
 
     await openBildirimler(page, "GENEL_YONETICI");
+    await page.locator("[name='aylik-bildirim-onay-ay']").fill("2026-07");
     await page.getByLabel("Şube").selectOption("1");
     const approveButton = page.getByTestId("genel-yonetici-bildirim-onay-approve");
     await expect(approveButton).toBeEnabled();
@@ -64,6 +67,7 @@ test.describe("Genel Yonetici bildirim onay paneli", () => {
 
   test("sube degisince BA ve eski ozet temizlenir", async ({ page }) => {
     await openBildirimler(page, "GENEL_YONETICI");
+    await page.locator("[name='aylik-bildirim-onay-ay']").fill("2026-07");
     await page.getByLabel("Şube").selectOption("1");
     await expect(page.getByTestId("genel-yonetici-bildirim-onay-ozet")).toBeVisible();
     await page.getByLabel("Şube").selectOption("2");

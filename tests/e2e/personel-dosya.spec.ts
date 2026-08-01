@@ -18,6 +18,33 @@ async function assertGatewayStateCleared(page: Page) {
   await expect(page.getByText(/Zimmet işlemi merkez ekrana taşınıyor/i)).toHaveCount(0);
 }
 
+function surecTimeline(page: Page) {
+  return page.locator("#personel-kart-panel-surec-gecmisi").locator("[data-testid='personel-surec-timeline']");
+}
+
+/**
+ * Timeline süreç ve zimmet geçmişini birleştirir; iki istek bağımsız çözüldüğü için
+ * satır sayısı iki adımda büyüyebilir. Ölçüm ancak sayı sabitlendikten sonra güvenilir.
+ */
+async function readSettledSurecTimelineCount(page: Page): Promise<number> {
+  const timeline = surecTimeline(page);
+  await expect(timeline).toBeVisible({ timeout: 15_000 });
+
+  const rows = timeline.locator("li");
+  let previous = -1;
+  let current = await rows.count();
+  const deadline = Date.now() + 10_000;
+
+  while (current !== previous && Date.now() < deadline) {
+    previous = current;
+    await page.waitForTimeout(300);
+    current = await rows.count();
+  }
+
+  expect(current).toBeGreaterThan(0);
+  return current;
+}
+
 async function openKartDuzenleFromActions(page: Page) {
   await page.getByRole("button", { name: "Islemler" }).click();
   await page.getByRole("button", { name: "Kartı Düzenle" }).click();
@@ -766,17 +793,18 @@ test.describe("personel dosyasi surec akisi", () => {
     await expect(page).toHaveURL(/\/personeller\/1$/);
 
     await page.getByRole("tab", { name: "Süreç Geçmişi" }).click();
-    const timelineBefore = page.locator("#personel-kart-panel-surec-gecmisi").locator("[data-testid='personel-surec-timeline']");
-    const countBefore = await timelineBefore.locator("li").count();
+    const countBefore = await readSettledSurecTimelineCount(page);
 
     await openKartDuzenleFromActions(page);
     await page.getByRole("button", { name: "Kaydet" }).click();
 
+    // Düzenleme formunun kapanması kaydın tamamlandığını gösterir.
+    await expect(page.locator('[name="edit-departman"]')).toHaveCount(0, { timeout: 15_000 });
     await expect(page.locator(".personel-create-error")).toHaveCount(0);
 
     await page.getByRole("tab", { name: "Süreç Geçmişi" }).click();
-    const timelineAfter = page.locator("#personel-kart-panel-surec-gecmisi").locator("[data-testid='personel-surec-timeline']");
-    await expect(timelineAfter.locator("li")).toHaveCount(countBefore);
+    const timelineAfter = surecTimeline(page);
+    await expect(timelineAfter.locator("li")).toHaveCount(countBefore, { timeout: 15_000 });
     await expect(timelineAfter).not.toContainText("Mock otomatik org gecmis kaydi");
   });
 
@@ -800,17 +828,17 @@ test.describe("personel dosyasi surec akisi", () => {
     await expect(belgelerPanel).toContainText(/Belge Durumu/i);
     await expect(belgelerPanel).toContainText(/Kimlik/i);
     await expect(belgelerPanel).toContainText(/Yok/i);
-    await expect(belgelerPanel).toContainText(/Eğitim & Sertifikalar/i);
+    await expect(belgelerPanel).toContainText(/Personel Belgeleri/i);
     await expect(belgelerPanel.getByTestId("personel-belge-kayit-list")).toBeVisible();
     await expect(belgelerPanel.getByTestId("personel-belge-kayit-list")).toContainText(/Forklift Operatör Belgesi/i);
     await expect(belgelerPanel.getByTestId("personel-belge-kayit-list")).toContainText(/B Sınıfı Ehliyet/i);
     const belgeListesi = belgelerPanel.getByTestId("personel-belge-kayit-list");
-    await expect(belgeListesi.getByRole("row", { name: /Süresi Dolmuş Belge/i })).toContainText(/Süresi dolmuş/i);
+    await expect(belgeListesi.getByRole("row", { name: /Süresi Dolmuş Belge/i })).toContainText("Süresi doldu");
     await expect(belgeListesi.getByRole("row", { name: /Sınırdan Bir Gün Önce Belgesi/i })).toContainText(
-      /Yakında doluyor/i
+      "Süresi yaklaşıyor"
     );
-    await expect(belgeListesi.getByRole("row", { name: /B Sınıfı Ehliyet/i })).toContainText(/Yakında doluyor/i);
-    await expect(belgeListesi.getByRole("row", { name: /Forklift Operatör Belgesi/i })).toContainText(/Geçerli/i);
+    await expect(belgeListesi.getByRole("row", { name: /B Sınıfı Ehliyet/i })).toContainText("Süresi yaklaşıyor");
+    await expect(belgeListesi.getByRole("row", { name: /Forklift Operatör Belgesi/i })).toContainText("Aktif");
     await expect(belgelerPanel.locator('input[type="radio"]')).toHaveCount(0);
     await expect(belgelerPanel.getByRole("button", { name: "Kaydet" })).toHaveCount(0);
   });

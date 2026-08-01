@@ -245,7 +245,9 @@ try {
     $pdo->exec('CREATE TABLE puantaj_aylik_muhurleri (
         id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY, sube_id INT UNSIGNED NOT NULL,
         yil SMALLINT UNSIGNED NOT NULL, ay TINYINT UNSIGNED NOT NULL,
-        UNIQUE KEY uniq_test_seal (sube_id, yil, ay)
+        durum VARCHAR(32) NOT NULL DEFAULT \'MUHURLENDI\',
+        revision_no INT UNSIGNED NOT NULL DEFAULT 1,
+        UNIQUE KEY uniq_test_seal (sube_id, yil, ay, revision_no)
     ) ENGINE=InnoDB');
     $pdo->exec('CREATE TABLE gunluk_puantaj (
         id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY, personel_id INT UNSIGNED NOT NULL,

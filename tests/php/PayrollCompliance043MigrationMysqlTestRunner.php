@@ -114,13 +114,13 @@ try {
 
     $files = s87mMigrationFiles();
     s87mAssert($files !== [] && $files[0] === '001_initial_schema.sql', 'zincir 001 ile baslar');
-    s87mAssert(end($files) === '043_payroll_compliance_critical_gaps.sql', 'zincir 043 ile biter');
+    s87mAssert(end($files) === '044_puantaj_aylik_muhur_revision_reopen.sql', 'zincir 044 ile biter');
     s87mAssert(in_array('042_sgk_resmi_kaynakli_kisitli_katalog.sql', $files, true), '042 SGK korunur');
 
     foreach ($files as $file) {
         s87mApplyFile($pdo, $file);
     }
-    s87mAssert(true, '001-043 ilk apply tamam');
+    s87mAssert(true, '001-044 ilk apply tamam');
 
     $secondOk = true;
     $secondError = '';

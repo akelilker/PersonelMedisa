@@ -431,7 +431,7 @@ try {
 
     $files = pbMigrationFiles();
     pbAssert($files !== [] && $files[0] === '001_initial_schema.sql', 'zincir 001 ile baslar');
-    pbAssert(end($files) === '043_payroll_compliance_critical_gaps.sql', 'zincir 043 ile biter');
+    pbAssert(end($files) === '044_puantaj_aylik_muhur_revision_reopen.sql', 'zincir 044 ile biter');
     foreach ($files as $file) {
         pbApplyFile($pdo, $file);
     }

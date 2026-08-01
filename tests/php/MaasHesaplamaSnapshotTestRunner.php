@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../api/src/Services/BildirimDonemContextService.php';
 require_once __DIR__ . '/../../api/src/Services/PuantajDonemKilidiService.php';
+require_once __DIR__ . '/../../api/src/Services/PuantajDonemPeriodService.php';
+require_once __DIR__ . '/../../api/src/Services/PuantajDonemReopenException.php';
 require_once __DIR__ . '/../../api/src/Services/MaasHesaplamaException.php';
 require_once __DIR__ . '/../../api/src/Services/PersonelBordroKapsamService.php';
 require_once __DIR__ . '/../../api/src/Services/Payroll/SgkPrimGunuEngine.php';

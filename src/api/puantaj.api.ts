@@ -462,3 +462,86 @@ export async function muhurleAylikPuantaj(payload: MuhurlePayload): Promise<Muhu
 
   return response.data;
 }
+
+export type DonemSealHistory = {
+  period_state: string;
+  effective_seal_id: number | null;
+  effective_revision_no: number | null;
+  seals: Array<{
+    id: number;
+    revision_no: number;
+    durum: string;
+    effective: boolean;
+    source_hash: string | null;
+    parent_muhur_id: number | null;
+    created_at: string;
+  }>;
+  reopen_talepleri: Array<{
+    id: number;
+    talep_durumu: string;
+    gerekce: string;
+    requested_by: number;
+    approved_by: number | null;
+    rejected_by: number | null;
+  }>;
+  snapshots: Array<{
+    id: number;
+    muhur_id: number;
+    revision_no: number;
+    state: string;
+  }>;
+};
+
+export async function fetchDonemSealHistory(yil: number, ay: number): Promise<DonemSealHistory> {
+  const response = await apiRequest<ApiResponse<DonemSealHistory>>(
+    endpoints.puantaj.donemSealHistory(yil, ay),
+    { method: "GET" }
+  );
+  return response.data;
+}
+
+export async function createDonemReopenRequest(yil: number, ay: number, gerekce: string) {
+  const response = await apiRequest<ApiResponse<Record<string, unknown>>>(
+    endpoints.puantaj.donemReopenRequest(yil, ay),
+    { method: "POST", body: JSON.stringify({ gerekce }) }
+  );
+  return response.data;
+}
+
+export async function approveDonemReopenRequest(yil: number, ay: number, talepId: number, onayNotu?: string) {
+  const response = await apiRequest<ApiResponse<Record<string, unknown>>>(
+    endpoints.puantaj.donemReopenApprove(yil, ay),
+    { method: "POST", body: JSON.stringify({ talep_id: talepId, onay_notu: onayNotu ?? null }) }
+  );
+  return response.data;
+}
+
+export async function rejectDonemReopenRequest(yil: number, ay: number, talepId: number, rejectionReason: string) {
+  const response = await apiRequest<ApiResponse<Record<string, unknown>>>(
+    endpoints.puantaj.donemReopenReject(yil, ay),
+    {
+      method: "POST",
+      body: JSON.stringify({ talep_id: talepId, rejection_reason: rejectionReason })
+    }
+  );
+  return response.data;
+}
+
+export async function resealDonemPuantaj(
+  yil: number,
+  ay: number,
+  neden: string,
+  expectedPreviousSealId: number
+) {
+  const response = await apiRequest<ApiResponse<Record<string, unknown>>>(
+    endpoints.puantaj.donemReseal(yil, ay),
+    {
+      method: "POST",
+      body: JSON.stringify({
+        neden,
+        expected_previous_seal_id: expectedPreviousSealId
+      })
+    }
+  );
+  return response.data;
+}

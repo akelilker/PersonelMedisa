@@ -379,9 +379,9 @@ class BildirimPuantajEtkiManualApplyService
     $yil = (int) substr((string) $tarih, 0, 4);
     $ay = (int) substr((string) $tarih, 5, 2);
     $stmt = $pdo->prepare(
-      'SELECT id FROM puantaj_aylik_muhurleri
-             WHERE sube_id = :sube_id AND yil = :yil AND ay = :ay
-             LIMIT 1'
+      "SELECT id FROM puantaj_aylik_muhurleri
+             WHERE sube_id = :sube_id AND yil = :yil AND ay = :ay AND durum = 'MUHURLENDI'
+             LIMIT 1"
     );
     $stmt->execute([
       'sube_id' => (int) $subeId,

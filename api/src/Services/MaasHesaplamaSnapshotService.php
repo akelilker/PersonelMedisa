@@ -964,6 +964,14 @@ class MaasHesaplamaSnapshotService
         $pdo->beginTransaction();
         try {
             PuantajDonemKilidiService::acquire($pdo, $subeId, $yil, $ay);
+            if (PuantajDonemPeriodService::isPeriodReopened($pdo, $subeId, $yil, $ay)) {
+                $pdo->rollBack();
+                throw new MaasHesaplamaException(
+                    'PERIOD_REOPENED',
+                    'Donem reopen oturumunda; maas snapshot olusturulamaz.',
+                    409
+                );
+            }
             $resolution = self::resolveSources($pdo, $subeId, $yil, $ay, true);
             $requestHash = self::requestHash($user, $subeId, $yil, $ay, 'create', ['expected_preflight_hash' => $expectedPreflightHash]);
 
@@ -2275,14 +2283,7 @@ class MaasHesaplamaSnapshotService
     /** @return array<string, mixed>|null */
     private static function findSeal(PDO $pdo, $subeId, $yil, $ay, $forUpdate = false)
     {
-        $stmt = $pdo->prepare(
-            'SELECT * FROM puantaj_aylik_muhurleri
-             WHERE sube_id = :sube_id AND yil = :yil AND ay = :ay LIMIT 1' . ($forUpdate ? self::forUpdate($pdo) : '')
-        );
-        $stmt->execute(['sube_id' => (int) $subeId, 'yil' => (int) $yil, 'ay' => (int) $ay]);
-        $row = $stmt->fetch(PDO::FETCH_ASSOC);
-
-        return $row ?: null;
+        return PuantajDonemPeriodService::findEffectiveSeal($pdo, $subeId, $yil, $ay, $forUpdate);
     }
 
     /** @return array<string, mixed>|null */

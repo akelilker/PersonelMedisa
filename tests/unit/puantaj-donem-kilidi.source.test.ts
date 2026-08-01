@@ -34,7 +34,7 @@ describe("S74-D1/D3R puantaj period lock source contract", () => {
 
   it("keeps one 017 migration in the contiguous sequence", () => {
     const migrations = readdirSync(resolve(root, "api/migrations")).filter((name) => /^\d{3}_.*\.sql$/.test(name)).sort();
-    expect(migrations.at(-1)).toBe("043_payroll_compliance_critical_gaps.sql");
+    expect(migrations.at(-1)).toBe("044_puantaj_aylik_muhur_revision_reopen.sql");
     expect(migrations.filter((name) => name.startsWith("017_"))).toHaveLength(1);
   });
 
@@ -73,14 +73,18 @@ describe("S74-D1/D3R puantaj period lock source contract", () => {
     expect(generate.indexOf("PuantajDonemKilidiService::acquire")).toBeLessThan(generate.indexOf("fetchEligibleSources"));
     expect(generate.indexOf("PuantajDonemKilidiService::isSealed")).toBeLessThan(generate.indexOf("fetchGyById($pdo, $gyId, true)"));
     expect(seal.indexOf("PuantajDonemKilidiService::acquire")).toBeLessThan(seal.indexOf("selectRowsForSeal"));
-    expect(seal.indexOf("PuantajDonemKilidiService::acquire")).toBeLessThan(seal.indexOf("INSERT INTO puantaj_aylik_muhurleri"));
+    expect(seal.indexOf("PuantajDonemKilidiService::acquire")).toBeLessThan(seal.indexOf("insertSealHeader"));
   });
 
   it("serializes direct daily puantaj upsert with the same period lock", () => {
     const upsert = methodBlock(puantajController, "upsert", "muhurleAylik");
     expect(upsert.indexOf("$pdo->beginTransaction()")).toBeGreaterThanOrEqual(0);
-    expect(upsert.indexOf("PuantajDonemKilidiService::acquireForDate")).toBeLessThan(upsert.indexOf("PuantajDonemKilidiService::isSealed"));
-    expect(upsert.indexOf("PuantajDonemKilidiService::isSealed")).toBeLessThan(upsert.indexOf("findPuantajRow"));
+    expect(upsert.indexOf("PuantajDonemKilidiService::acquireForDate")).toBeLessThan(
+      upsert.indexOf("PuantajDonemPeriodService::assertCanonicalWriteAllowed")
+    );
+    expect(upsert.indexOf("PuantajDonemPeriodService::assertCanonicalWriteAllowed")).toBeLessThan(
+      upsert.indexOf("findPuantajRow")
+    );
     expect(upsert).toContain("$pdo->commit()");
     expect(upsert).toContain("$pdo->rollBack()");
   });

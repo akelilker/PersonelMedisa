@@ -1438,11 +1438,11 @@ class BildirimPuantajEtkiAdaylariController
     /** @return array<string, mixed>|false */
     private static function findMonthlySeal(PDO $pdo, $subeId, $yil, $ay)
     {
-        $stmt = $pdo->prepare('
+        $stmt = $pdo->prepare("
             SELECT * FROM puantaj_aylik_muhurleri
-            WHERE sube_id = :sube_id AND yil = :yil AND ay = :ay
+            WHERE sube_id = :sube_id AND yil = :yil AND ay = :ay AND durum = 'MUHURLENDI'
             LIMIT 1
-        ');
+        ");
         $stmt->execute([
             'sube_id' => (int) $subeId,
             'yil' => (int) $yil,

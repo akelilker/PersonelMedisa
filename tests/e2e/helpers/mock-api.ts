@@ -87,6 +87,62 @@ type MockAylikOzetPageState = {
 
 const aylikOzetStateByPage = new WeakMap<Page, MockAylikOzetPageState>();
 
+type MockSealReopenState = {
+  period_state: "ACIK" | "SEALED" | "REOPEN_PENDING" | "REOPENED";
+  seals: Array<{
+    id: number;
+    revision_no: number;
+    durum: string;
+    effective: boolean;
+    source_hash: string | null;
+    parent_muhur_id: number | null;
+    created_at: string;
+  }>;
+  reopen_talepleri: Array<{
+    id: number;
+    talep_durumu: string;
+    gerekce: string;
+    requested_by: number;
+    approved_by: number | null;
+    rejected_by: number | null;
+  }>;
+  snapshots: Array<{ id: number; muhur_id: number; revision_no: number; state: string }>;
+  nextTalepId: number;
+  nextSealId: number;
+  nextSnapshotId: number;
+  missingCanonicalDays: number;
+};
+
+const sealReopenStateByPage = new WeakMap<Page, MockSealReopenState>();
+
+function getSealReopenState(page: Page): MockSealReopenState {
+  let state = sealReopenStateByPage.get(page);
+  if (!state) {
+    state = {
+      period_state: "SEALED",
+      seals: [
+        {
+          id: 1,
+          revision_no: 1,
+          durum: "MUHURLENDI",
+          effective: true,
+          source_hash: "hash-rev1",
+          parent_muhur_id: null,
+          created_at: "2026-04-30T12:00:00Z"
+        }
+      ],
+      reopen_talepleri: [],
+      snapshots: [{ id: 1, muhur_id: 1, revision_no: 1, state: "OLUSTURULDU" }],
+      nextTalepId: 1,
+      nextSealId: 2,
+      nextSnapshotId: 2,
+      missingCanonicalDays: 2
+    };
+    sealReopenStateByPage.set(page, state);
+  }
+  return state;
+}
+
 function currentAylikOzetFixtureAy() {
   return `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`;
 }
@@ -10186,6 +10242,172 @@ let personelBelgeKaydiIdCounter = 903;
         200,
         okBody({ muhurlenen_kayit_sayisi: muhurlenenKayitSayisi, donem, muhur_id: 123 })
       );
+      return;
+    }
+
+    const sealState = getSealReopenState(page);
+    const actorUserId = MOCK_ROLE_USER_ID[role];
+
+    const donemSealHistoryMatch = path.match(/^\/api\/puantaj\/donemler\/(\d{4})\/(\d{1,2})\/seal-history$/);
+    if (donemSealHistoryMatch && method === "GET") {
+      if (await denyUnlessRolePermission(route, "puantaj.donem_seal.history")) {
+        return;
+      }
+      const effective = sealState.seals.find((s) => s.effective) ?? null;
+      await fulfillJson(
+        route,
+        200,
+        okBody({
+          period_state: sealState.period_state,
+          effective_seal_id: effective?.id ?? null,
+          effective_revision_no: effective?.revision_no ?? null,
+          seals: sealState.seals,
+          reopen_talepleri: sealState.reopen_talepleri,
+          snapshots: sealState.snapshots,
+          missing_canonical_days: sealState.missingCanonicalDays
+        })
+      );
+      return;
+    }
+
+    const donemReopenRequestMatch = path.match(/^\/api\/puantaj\/donemler\/(\d{4})\/(\d{1,2})\/reopen-request$/);
+    if (donemReopenRequestMatch && method === "POST") {
+      if (await denyUnlessRolePermission(route, "puantaj.donem_reopen.request")) {
+        return;
+      }
+      if (sealState.period_state !== "SEALED") {
+        await fulfillJson(route, 409, errorBody("REOPEN_REQUEST_ALREADY_EXISTS", "Acik talep var veya donem SEALED degil."));
+        return;
+      }
+      const payload = (request.postDataJSON() || {}) as { gerekce?: string };
+      if (!String(payload.gerekce ?? "").trim()) {
+        await fulfillJson(route, 400, errorBody("VALIDATION_ERROR", "Gerekce zorunludur.", "gerekce"));
+        return;
+      }
+      const talep = {
+        id: sealState.nextTalepId++,
+        talep_durumu: "ONAY_BEKLIYOR",
+        gerekce: String(payload.gerekce).trim(),
+        requested_by: actorUserId,
+        approved_by: null,
+        rejected_by: null
+      };
+      sealState.reopen_talepleri.push(talep);
+      sealState.period_state = "REOPEN_PENDING";
+      await fulfillJson(route, 201, okBody({ ...talep, period_state: sealState.period_state }));
+      return;
+    }
+
+    const donemReopenApproveMatch = path.match(/^\/api\/puantaj\/donemler\/(\d{4})\/(\d{1,2})\/reopen-approve$/);
+    if (donemReopenApproveMatch && method === "POST") {
+      if (await denyUnlessRolePermission(route, "puantaj.donem_reopen.approve")) {
+        return;
+      }
+      const payload = (request.postDataJSON() || {}) as { talep_id?: number };
+      const talep = sealState.reopen_talepleri.find((t) => t.id === Number(payload.talep_id));
+      if (!talep || talep.talep_durumu !== "ONAY_BEKLIYOR") {
+        await fulfillJson(route, 409, errorBody("REOPEN_REQUEST_NOT_PENDING", "Talep onay bekliyor degil."));
+        return;
+      }
+      if (talep.requested_by === actorUserId) {
+        await fulfillJson(route, 403, errorBody("REOPEN_SELF_APPROVAL_FORBIDDEN", "Self approval yasak."));
+        return;
+      }
+      talep.talep_durumu = "ONAYLANDI";
+      talep.approved_by = actorUserId;
+      sealState.period_state = "REOPENED";
+      await fulfillJson(route, 200, okBody({ ...talep, period_state: sealState.period_state }));
+      return;
+    }
+
+    const donemReopenRejectMatch = path.match(/^\/api\/puantaj\/donemler\/(\d{4})\/(\d{1,2})\/reopen-reject$/);
+    if (donemReopenRejectMatch && method === "POST") {
+      if (await denyUnlessRolePermission(route, "puantaj.donem_reopen.approve")) {
+        return;
+      }
+      const payload = (request.postDataJSON() || {}) as { talep_id?: number; rejection_reason?: string };
+      const talep = sealState.reopen_talepleri.find((t) => t.id === Number(payload.talep_id));
+      if (!talep || talep.talep_durumu !== "ONAY_BEKLIYOR") {
+        await fulfillJson(route, 409, errorBody("REOPEN_REQUEST_NOT_PENDING", "Talep onay bekliyor degil."));
+        return;
+      }
+      if (talep.requested_by === actorUserId) {
+        await fulfillJson(route, 403, errorBody("REOPEN_SELF_APPROVAL_FORBIDDEN", "Self reject yasak."));
+        return;
+      }
+      if (!String(payload.rejection_reason ?? "").trim()) {
+        await fulfillJson(route, 400, errorBody("VALIDATION_ERROR", "Red gerekcesi zorunludur.", "rejection_reason"));
+        return;
+      }
+      talep.talep_durumu = "REDDEDILDI";
+      talep.rejected_by = actorUserId;
+      sealState.period_state = "SEALED";
+      await fulfillJson(route, 200, okBody({ ...talep, period_state: sealState.period_state }));
+      return;
+    }
+
+    const donemResealMatch = path.match(/^\/api\/puantaj\/donemler\/(\d{4})\/(\d{1,2})\/reseal$/);
+    if (donemResealMatch && method === "POST") {
+      if (await denyUnlessRolePermission(route, "puantaj.donem_reseal")) {
+        return;
+      }
+      if (sealState.period_state !== "REOPENED") {
+        await fulfillJson(route, 409, errorBody("PERIOD_REOPEN_NOT_APPROVED", "Onayli reopen yok."));
+        return;
+      }
+      if (sealState.snapshots.some((s) => s.state === "OLUSTURULDU")) {
+        await fulfillJson(
+          route,
+          409,
+          errorBody("ACTIVE_SNAPSHOT_MUST_BE_CANCELLED", "Aktif snapshot iptal edilmeli.")
+        );
+        return;
+      }
+      if (sealState.missingCanonicalDays > 0) {
+        await fulfillJson(route, 409, errorBody("CANONICAL_CALENDAR_INCOMPLETE", "Canonical eksik."));
+        return;
+      }
+      const old = sealState.seals.find((s) => s.effective);
+      if (old) {
+        old.effective = false;
+        old.durum = "SUPERSEDED";
+      }
+      const newSeal = {
+        id: sealState.nextSealId++,
+        revision_no: (old?.revision_no ?? 0) + 1,
+        durum: "MUHURLENDI",
+        effective: true,
+        source_hash: "hash-rev2",
+        parent_muhur_id: old?.id ?? null,
+        created_at: new Date().toISOString()
+      };
+      sealState.seals.push(newSeal);
+      const openTalep = sealState.reopen_talepleri.find((t) => t.talep_durumu === "ONAYLANDI");
+      if (openTalep) {
+        openTalep.talep_durumu = "UYGULANDI";
+      }
+      sealState.period_state = "SEALED";
+      await fulfillJson(
+        route,
+        200,
+        okBody({ muhur_id: newSeal.id, revision_no: newSeal.revision_no, period_state: "SEALED" })
+      );
+      return;
+    }
+
+    // Test helper: cancel active snapshot for reopen e2e (synthetic fixture only)
+    if (path === "/api/test/seal-reopen/cancel-active-snapshot" && method === "POST") {
+      for (const snap of sealState.snapshots) {
+        if (snap.state === "OLUSTURULDU") {
+          snap.state = "IPTAL";
+        }
+      }
+      await fulfillJson(route, 200, okBody({ ok: true }));
+      return;
+    }
+    if (path === "/api/test/seal-reopen/complete-canonical" && method === "POST") {
+      sealState.missingCanonicalDays = 0;
+      await fulfillJson(route, 200, okBody({ ok: true }));
       return;
     }
 

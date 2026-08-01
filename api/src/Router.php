@@ -79,6 +79,21 @@ class Router
         if ($method === 'POST' && $path === '/puantaj/muhurle') {
             PuantajController::muhurleAylik($this->request);
         }
+        if ($method === 'POST' && preg_match('#^/puantaj/donemler/(\d{4})/(\d{1,2})/reopen-request$#', $path, $matches)) {
+            PuantajController::reopenRequest($this->request, $matches[1], $matches[2]);
+        }
+        if ($method === 'POST' && preg_match('#^/puantaj/donemler/(\d{4})/(\d{1,2})/reopen-approve$#', $path, $matches)) {
+            PuantajController::reopenApprove($this->request, $matches[1], $matches[2]);
+        }
+        if ($method === 'POST' && preg_match('#^/puantaj/donemler/(\d{4})/(\d{1,2})/reopen-reject$#', $path, $matches)) {
+            PuantajController::reopenReject($this->request, $matches[1], $matches[2]);
+        }
+        if ($method === 'POST' && preg_match('#^/puantaj/donemler/(\d{4})/(\d{1,2})/reseal$#', $path, $matches)) {
+            PuantajController::resealDonem($this->request, $matches[1], $matches[2]);
+        }
+        if ($method === 'GET' && preg_match('#^/puantaj/donemler/(\d{4})/(\d{1,2})/seal-history$#', $path, $matches)) {
+            PuantajController::sealHistory($this->request, $matches[1], $matches[2]);
+        }
         if ($path === '/puantaj/donem-kapanis-preflight' && $method === 'GET') {
             DonemKapanisController::summary($this->request);
         }

@@ -14,6 +14,9 @@ use Medisa\Api\Services\DonemKapanisAuditService;
 use Medisa\Api\Services\DonemKapanisPreflightService;
 use Medisa\Api\Services\Payroll\PayrollComplianceGuard;
 use Medisa\Api\Services\PuantajDonemKilidiService;
+use Medisa\Api\Services\PuantajDonemPeriodService;
+use Medisa\Api\Services\PuantajDonemReopenException;
+use Medisa\Api\Services\PuantajDonemReopenService;
 use Medisa\Api\Services\ResmiTatilTakvimProjectionService;
 use PDO;
 
@@ -91,13 +94,27 @@ class PuantajController
         try {
             $pdo->beginTransaction();
             $periodLock = PuantajDonemKilidiService::acquireForDate($pdo, (int) $personel['sube_id'], $tarih);
-            if (PuantajDonemKilidiService::isSealed($pdo, $periodLock)) {
+            try {
+                PuantajDonemPeriodService::assertCanonicalWriteAllowed(
+                    $pdo,
+                    (int) $periodLock['sube_id'],
+                    (int) $periodLock['yil'],
+                    (int) $periodLock['ay']
+                );
+            } catch (PuantajDonemReopenException $lockEx) {
                 $pdo->rollBack();
-                JsonResponse::error(409, 'PERIOD_LOCKED', 'Bu donem muhurlenmis, puantaj kaydi guncellenemez.');
+                JsonResponse::error($lockEx->getCode(), $lockEx->getErrorCode(), $lockEx->getMessage(), null, $lockEx->getMeta());
             }
 
             $existing = self::findPuantajRow($pdo, $personelId, $tarih);
-            if ($existing && (string) ($existing['state'] ?? 'ACIK') === 'MUHURLENDI') {
+            if ($existing && (string) ($existing['state'] ?? 'ACIK') === 'MUHURLENDI'
+                && !PuantajDonemPeriodService::isPeriodReopened(
+                    $pdo,
+                    (int) $periodLock['sube_id'],
+                    (int) $periodLock['yil'],
+                    (int) $periodLock['ay']
+                )
+            ) {
                 $pdo->rollBack();
                 JsonResponse::error(409, 'PERIOD_LOCKED', 'Bu donem muhurlenmis, puantaj kaydi guncellenemez.');
             }
@@ -148,6 +165,19 @@ class PuantajController
             $pdo->beginTransaction();
 
             PuantajDonemKilidiService::acquire($pdo, (int) $subeId, $yil, $ay);
+            $periodState = PuantajDonemPeriodService::resolvePeriodState($pdo, (int) $subeId, $yil, $ay);
+            if ($periodState === PuantajDonemPeriodService::STATE_REOPENED
+                || $periodState === PuantajDonemPeriodService::STATE_REOPEN_PENDING
+            ) {
+                $pdo->rollBack();
+                JsonResponse::error(
+                    409,
+                    $periodState === PuantajDonemPeriodService::STATE_REOPENED ? 'PERIOD_REOPENED' : 'PERIOD_LOCKED',
+                    $periodState === PuantajDonemPeriodService::STATE_REOPENED
+                        ? 'Reopen oturumunda ilk muhurleme yerine reseal kullanin.'
+                        : 'Reopen talebi beklerken muhurleme yapilamaz.'
+                );
+            }
             $existing = self::findMonthlySeal($pdo, (int) $subeId, $yil, $ay);
             if ($existing) {
                 $pdo->commit();
@@ -186,19 +216,18 @@ class PuantajController
                 self::periodCloseBlocked($preflight, $audit);
             }
 
-            $insertSeal = $pdo->prepare(
-                'INSERT INTO puantaj_aylik_muhurleri (sube_id, yil, ay, donem, durum, muhurlenen_kayit_sayisi, created_by)
-                 VALUES (:sube_id, :yil, :ay, :donem, :durum, 0, :created_by)'
+            $revisionNo = PuantajDonemPeriodService::nextRevisionNo($pdo, (int) $subeId, $yil, $ay);
+            $muhurId = self::insertSealHeader(
+                $pdo,
+                (int) $subeId,
+                $yil,
+                $ay,
+                $donem,
+                $revisionNo,
+                isset($user['id']) ? (int) $user['id'] : null,
+                null,
+                null
             );
-            $insertSeal->execute([
-                'sube_id' => (int) $subeId,
-                'yil' => $yil,
-                'ay' => $ay,
-                'donem' => $donem,
-                'durum' => 'MUHURLENDI',
-                'created_by' => isset($user['id']) ? (int) $user['id'] : null,
-            ]);
-            $muhurId = (int) $pdo->lastInsertId();
 
             $rows = self::selectRowsForSeal($pdo, (int) $subeId, $firstDay, $lastDay);
             self::insertSealRows($pdo, $muhurId, $rows);
@@ -210,15 +239,8 @@ class PuantajController
                 self::markRowsSealed($pdo, $muhurId, $ids);
             }
 
-            $updateSeal = $pdo->prepare(
-                'UPDATE puantaj_aylik_muhurleri
-                 SET muhurlenen_kayit_sayisi = :muhurlenen_kayit_sayisi
-                 WHERE id = :id'
-            );
-            $updateSeal->execute([
-                'muhurlenen_kayit_sayisi' => count($rows),
-                'id' => $muhurId,
-            ]);
+            $sourceHash = self::computeSealSourceHash($rows);
+            self::finalizeSealHeader($pdo, $muhurId, count($rows), $sourceHash);
 
             $audit = DonemKapanisAuditService::recordSuccess(
                 $pdo,
@@ -567,18 +589,339 @@ class PuantajController
     /** @return array<string, mixed>|false */
     private static function findMonthlySeal(PDO $pdo, $subeId, $yil, $ay)
     {
-        $stmt = $pdo->prepare(
-            'SELECT * FROM puantaj_aylik_muhurleri
-             WHERE sube_id = :sube_id AND yil = :yil AND ay = :ay
-             LIMIT 1'
-        );
-        $stmt->execute([
-            'sube_id' => $subeId,
-            'yil' => $yil,
-            'ay' => $ay,
-        ]);
+        $row = PuantajDonemPeriodService::findEffectiveSeal($pdo, $subeId, $yil, $ay);
 
-        return $stmt->fetch(PDO::FETCH_ASSOC);
+        return $row ?: false;
+    }
+
+    /** @param list<array<string, mixed>> $rows */
+    private static function computeSealSourceHash(array $rows)
+    {
+        $payload = [];
+        foreach ($rows as $row) {
+            $payload[] = [
+                'personel_id' => (int) ($row['personel_id'] ?? 0),
+                'tarih' => (string) ($row['tarih'] ?? ''),
+                'gun_tipi' => (string) ($row['gun_tipi'] ?? ''),
+                'hareket_durumu' => (string) ($row['hareket_durumu'] ?? ''),
+                'dayanak' => (string) ($row['dayanak'] ?? ''),
+                'net_calisma_suresi_dakika' => (int) ($row['net_calisma_suresi_dakika'] ?? 0),
+                'hafta_tatili_hak_kazandi_mi' => $row['hafta_tatili_hak_kazandi_mi'] ?? null,
+            ];
+        }
+
+        return PuantajDonemPeriodService::hashCanonical($payload);
+    }
+
+    public static function reopenRequest(Request $request, $yil, $ay)
+    {
+        $user = AuthMiddleware::authenticate($request, true);
+        RolePermissions::assert($user, 'puantaj.donem_reopen.request');
+        $payload = $request->getJsonBody();
+        $yil = (int) $yil;
+        $ay = (int) $ay;
+        $pdo = self::getConnection();
+        $subeId = self::resolvePeriodSube($user, $request, $payload);
+
+        try {
+            $pdo->beginTransaction();
+            $result = PuantajDonemReopenService::createReopenRequest(
+                $pdo,
+                $user,
+                $subeId,
+                $yil,
+                $ay,
+                (string) ($payload['gerekce'] ?? '')
+            );
+            $pdo->commit();
+            JsonResponse::success($result, [], 201);
+        } catch (PuantajDonemReopenException $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            JsonResponse::error($e->getCode(), $e->getErrorCode(), $e->getMessage(), null, $e->getMeta());
+        } catch (\Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            JsonResponse::serverError('Reopen talebi olusturulamadi.');
+        }
+    }
+
+    public static function reopenApprove(Request $request, $yil, $ay)
+    {
+        $user = AuthMiddleware::authenticate($request, true);
+        RolePermissions::assert($user, 'puantaj.donem_reopen.approve');
+        $payload = $request->getJsonBody();
+        $talepId = (int) ($payload['talep_id'] ?? 0);
+        if ($talepId < 1) {
+            JsonResponse::badRequest('talep_id zorunludur.', 'VALIDATION_ERROR', 'talep_id');
+        }
+        $pdo = self::getConnection();
+        $subeId = self::resolvePeriodSube($user, $request, $payload);
+
+        try {
+            $pdo->beginTransaction();
+            $result = PuantajDonemReopenService::approveReopenRequest(
+                $pdo,
+                $user,
+                $subeId,
+                (int) $yil,
+                (int) $ay,
+                $talepId,
+                $payload['onay_notu'] ?? null
+            );
+            $pdo->commit();
+            JsonResponse::success($result);
+        } catch (PuantajDonemReopenException $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            JsonResponse::error($e->getCode(), $e->getErrorCode(), $e->getMessage(), null, $e->getMeta());
+        } catch (\Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            JsonResponse::serverError('Reopen talebi onaylanamadi.');
+        }
+    }
+
+    public static function reopenReject(Request $request, $yil, $ay)
+    {
+        $user = AuthMiddleware::authenticate($request, true);
+        RolePermissions::assert($user, 'puantaj.donem_reopen.approve');
+        $payload = $request->getJsonBody();
+        $talepId = (int) ($payload['talep_id'] ?? 0);
+        if ($talepId < 1) {
+            JsonResponse::badRequest('talep_id zorunludur.', 'VALIDATION_ERROR', 'talep_id');
+        }
+        $pdo = self::getConnection();
+        $subeId = self::resolvePeriodSube($user, $request, $payload);
+
+        try {
+            $pdo->beginTransaction();
+            $result = PuantajDonemReopenService::rejectReopenRequest(
+                $pdo,
+                $user,
+                $subeId,
+                (int) $yil,
+                (int) $ay,
+                $talepId,
+                (string) ($payload['rejection_reason'] ?? '')
+            );
+            $pdo->commit();
+            JsonResponse::success($result);
+        } catch (PuantajDonemReopenException $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            JsonResponse::error($e->getCode(), $e->getErrorCode(), $e->getMessage(), null, $e->getMeta());
+        } catch (\Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            JsonResponse::serverError('Reopen talebi reddedilemedi.');
+        }
+    }
+
+    public static function resealDonem(Request $request, $yil, $ay)
+    {
+        $user = AuthMiddleware::authenticate($request, true);
+        RolePermissions::assert($user, 'puantaj.donem_reseal');
+        $payload = $request->getJsonBody();
+        $yil = (int) $yil;
+        $ay = (int) $ay;
+        $pdo = self::getConnection();
+        $subeId = self::resolvePeriodSube($user, $request, $payload);
+        $expectedPrevious = (int) ($payload['expected_previous_seal_id'] ?? 0);
+
+        try {
+            $pdo->beginTransaction();
+            $result = PuantajDonemReopenService::reseal(
+                $pdo,
+                $user,
+                $subeId,
+                $yil,
+                $ay,
+                (string) ($payload['neden'] ?? ''),
+                $expectedPrevious,
+                static function (PDO $pdo, $subeId, $yil, $ay, $revisionNo, $parentMuhurId, $reopenTalepId) use ($user) {
+                    return self::createSealRevisionCopy(
+                        $pdo,
+                        $user,
+                        (int) $subeId,
+                        (int) $yil,
+                        (int) $ay,
+                        (int) $revisionNo,
+                        (int) $parentMuhurId,
+                        (int) $reopenTalepId
+                    );
+                }
+            );
+            $pdo->commit();
+            JsonResponse::success($result, [], 201);
+        } catch (PuantajDonemReopenException $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            JsonResponse::error($e->getCode(), $e->getErrorCode(), $e->getMessage(), null, $e->getMeta());
+        } catch (\Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            JsonResponse::serverError('Donem yeniden muhurlenemedi.');
+        }
+    }
+
+    public static function sealHistory(Request $request, $yil, $ay)
+    {
+        $user = AuthMiddleware::authenticate($request, true);
+        RolePermissions::assert($user, 'puantaj.donem_seal.history');
+        $pdo = self::getConnection();
+        $subeId = self::resolvePeriodSube($user, $request, []);
+        JsonResponse::success(PuantajDonemReopenService::sealHistoryPayload($pdo, $subeId, (int) $yil, (int) $ay));
+    }
+
+    /**
+     * @param array<string, mixed> $user
+     * @param array<string, mixed> $payload
+     */
+    private static function resolvePeriodSube(array $user, Request $request, array $payload)
+    {
+        $scoped = SubeScope::resolveScope($user, $request);
+        if ($scoped !== null) {
+            return (int) $scoped;
+        }
+        $fromBody = (int) ($payload['sube_id'] ?? 0);
+        if ($fromBody > 0) {
+            SubeScope::assertPersonelAccess($user, $request, $fromBody);
+
+            return $fromBody;
+        }
+        JsonResponse::badRequest('Aktif sube secilmelidir.', 'VALIDATION_ERROR', 'sube_id');
+    }
+
+    /**
+     * @param array<string, mixed> $user
+     * @return array{rows: list<array<string, mixed>>, source_hash: string, muhur_id: int}
+     */
+    private static function createSealRevisionCopy(
+        PDO $pdo,
+        array $user,
+        $subeId,
+        $yil,
+        $ay,
+        $revisionNo,
+        $parentMuhurId,
+        $reopenTalepId
+    ) {
+        $donem = sprintf('%04d-%02d', $yil, $ay);
+        $firstDay = sprintf('%04d-%02d-01', $yil, $ay);
+        $lastDay = date('Y-m-t', strtotime($firstDay));
+
+        $muhurId = self::insertSealHeader(
+            $pdo,
+            (int) $subeId,
+            (int) $yil,
+            (int) $ay,
+            $donem,
+            (int) $revisionNo,
+            isset($user['id']) ? (int) $user['id'] : null,
+            (int) $parentMuhurId,
+            (int) $reopenTalepId
+        );
+
+        $rows = self::selectRowsForSeal($pdo, (int) $subeId, $firstDay, $lastDay);
+        self::insertSealRows($pdo, $muhurId, $rows);
+        $ids = array_map(static function ($row) {
+            return (int) $row['id'];
+        }, $rows);
+        if ($ids) {
+            self::markRowsSealed($pdo, $muhurId, $ids);
+        }
+        $sourceHash = self::computeSealSourceHash($rows);
+        self::finalizeSealHeader($pdo, $muhurId, count($rows), $sourceHash);
+
+        return [
+            'rows' => $rows,
+            'source_hash' => $sourceHash,
+            'muhur_id' => $muhurId,
+        ];
+    }
+
+    /** @return int */
+    private static function insertSealHeader(
+        PDO $pdo,
+        $subeId,
+        $yil,
+        $ay,
+        $donem,
+        $revisionNo,
+        $createdBy,
+        $parentMuhurId,
+        $reopenTalepId
+    ) {
+        try {
+            $insertSeal = $pdo->prepare(
+                'INSERT INTO puantaj_aylik_muhurleri (
+                    sube_id, yil, ay, revision_no, donem, durum, muhurlenen_kayit_sayisi,
+                    created_by, parent_muhur_id, reopen_talep_id
+                 ) VALUES (
+                    :sube_id, :yil, :ay, :revision_no, :donem, :durum, 0,
+                    :created_by, :parent_muhur_id, :reopen_talep_id
+                 )'
+            );
+            $insertSeal->execute([
+                'sube_id' => (int) $subeId,
+                'yil' => (int) $yil,
+                'ay' => (int) $ay,
+                'revision_no' => (int) $revisionNo,
+                'donem' => (string) $donem,
+                'durum' => 'MUHURLENDI',
+                'created_by' => $createdBy,
+                'parent_muhur_id' => $parentMuhurId,
+                'reopen_talep_id' => $reopenTalepId,
+            ]);
+        } catch (\PDOException $e) {
+            $msg = $e->getMessage();
+            $unknownColumn = stripos($msg, 'Unknown column') !== false
+                || stripos($msg, 'no such column') !== false;
+            if (!$unknownColumn) {
+                throw $e;
+            }
+            // Yalniz pre-044 gelistirme semasi: revision kolonlari yoksa fallback.
+            $insertSeal = $pdo->prepare(
+                'INSERT INTO puantaj_aylik_muhurleri (sube_id, yil, ay, donem, durum, muhurlenen_kayit_sayisi, created_by)
+                 VALUES (:sube_id, :yil, :ay, :donem, :durum, 0, :created_by)'
+            );
+            $insertSeal->execute([
+                'sube_id' => (int) $subeId,
+                'yil' => (int) $yil,
+                'ay' => (int) $ay,
+                'donem' => (string) $donem,
+                'durum' => 'MUHURLENDI',
+                'created_by' => $createdBy,
+            ]);
+        }
+
+        return (int) $pdo->lastInsertId();
+    }
+
+    private static function finalizeSealHeader(PDO $pdo, $muhurId, $count, $sourceHash)
+    {
+        try {
+            $upd = $pdo->prepare(
+                'UPDATE puantaj_aylik_muhurleri
+                 SET muhurlenen_kayit_sayisi = :cnt, source_hash = :hash
+                 WHERE id = :id'
+            );
+            $upd->execute(['cnt' => (int) $count, 'hash' => (string) $sourceHash, 'id' => (int) $muhurId]);
+        } catch (\Throwable $e) {
+            $upd = $pdo->prepare(
+                'UPDATE puantaj_aylik_muhurleri SET muhurlenen_kayit_sayisi = :cnt WHERE id = :id'
+            );
+            $upd->execute(['cnt' => (int) $count, 'id' => (int) $muhurId]);
+        }
     }
 
     /** @param array<string, mixed> $payload @param array<string, mixed> $existing @return array<string, mixed> */

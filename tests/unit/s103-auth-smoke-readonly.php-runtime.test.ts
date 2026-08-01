@@ -28,7 +28,7 @@ describe("S103 source contracts", () => {
     const migrations = readdirSync(resolve("api/migrations"))
       .filter((n) => n.endsWith(".sql"))
       .sort();
-    expect(migrations.at(-1)).toBe("043_payroll_compliance_critical_gaps.sql");
+    expect(migrations.at(-1)).toBe("044_puantaj_aylik_muhur_revision_reopen.sql");
     expect(migrations).toContain("041_auth_smoke_readonly_role.sql");
     const sql = readFileSync("api/migrations/041_auth_smoke_readonly_role.sql", "utf8");
     expect(sql).toContain("AUTH_SMOKE_READONLY");

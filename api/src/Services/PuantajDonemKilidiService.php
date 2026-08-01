@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Medisa\Api\Services;
 
+require_once __DIR__ . '/PuantajDonemPeriodService.php';
+
 use PDO;
 
 /**
@@ -51,20 +53,37 @@ class PuantajDonemKilidiService
         return ['sube_id' => $subeId, 'yil' => $yil, 'ay' => $ay];
     }
 
-    /** @param array{sube_id: int, yil: int, ay: int} $lock */
+    /**
+     * Operational seal for PERIOD_LOCKED on non-canonical paths:
+     * effective muhur var ve donem REOPENED degil.
+     * Bildirim apply / FM tercih gibi yollar icin ayrica
+     * PuantajDonemPeriodService::isOperationallySealed kullanin.
+     *
+     * @param array{sube_id: int, yil: int, ay: int} $lock
+     */
     public static function isSealed(PDO $pdo, array $lock)
     {
-        $stmt = $pdo->prepare(
-            'SELECT id FROM puantaj_aylik_muhurleri
-             WHERE sube_id = :sube_id AND yil = :yil AND ay = :ay LIMIT 1'
+        return PuantajDonemPeriodService::isWriteLocked(
+            $pdo,
+            (int) $lock['sube_id'],
+            (int) $lock['yil'],
+            (int) $lock['ay']
         );
-        $stmt->execute([
-            'sube_id' => (int) $lock['sube_id'],
-            'yil' => (int) $lock['yil'],
-            'ay' => (int) $lock['ay'],
-        ]);
+    }
 
-        return $stmt->fetch(PDO::FETCH_ASSOC) !== false;
+    /**
+     * Effective muhur var mi (REOPENED dahil kilitli operasyonlar icin).
+     *
+     * @param array{sube_id: int, yil: int, ay: int} $lock
+     */
+    public static function hasEffectiveSeal(PDO $pdo, array $lock)
+    {
+        return PuantajDonemPeriodService::hasEffectiveSeal(
+            $pdo,
+            (int) $lock['sube_id'],
+            (int) $lock['yil'],
+            (int) $lock['ay']
+        );
     }
 
     /** @return array{sube_id: int, yil: int, ay: int} */

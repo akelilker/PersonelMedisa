@@ -133,23 +133,14 @@ function mhsChildMode(array $argv): void
     if ($action === 'create') {
         [$sube, $yil, $ay] = [(int) $argv[3], (int) $argv[4], (int) $argv[5]];
         $mode = (string) ($argv[7] ?? 'fresh');
-        $preflight = $mode === 'stale' ? null : Svc::buildPreflight($pdo, $sube, $yil, $ay);
         $hash = $mode === 'stale'
             ? str_repeat('0', 64)
-            : (string) $preflight['preflight_hash'];
+            : (string) Svc::buildPreflight($pdo, $sube, $yil, $ay)['preflight_hash'];
         try {
             $result = Svc::createSnapshot($pdo, $sube, $yil, $ay, $hash, $actor);
             echo ($result['idempotent'] ? 'EXISTING:' : 'CREATED:') . (int) $result['snapshot']['id'] . PHP_EOL;
         } catch (MaasHesaplamaException $e) {
-            $codes = [];
-            if (is_array($preflight)) {
-                foreach (($preflight['items'] ?? []) as $item) {
-                    if (($item['severity'] ?? '') === 'BLOCKER') {
-                        $codes[] = (string) ($item['code'] ?? 'UNKNOWN');
-                    }
-                }
-            }
-            echo $e->getCodeString() . ($codes !== [] ? ':' . implode(',', $codes) : '') . PHP_EOL;
+            echo $e->getCodeString() . PHP_EOL;
         }
 
         return;

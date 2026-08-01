@@ -87,9 +87,9 @@ class MaasHesaplamaSnapshotService
         $items = array_merge($items, $sgk['items']);
 
         // S87 write-path: yas / 270 saat / odeme tercihi blockers (snapshot create hard block)
-        $personelIds = array_map(static function (array $p) {
+        $personelIds = array_values(array_map(static function (array $p) {
             return (int) $p['personel_id'];
-        }, $personeller);
+        }, $personeller));
         if ($personelIds !== []) {
             $compliance = PayrollComplianceGuard::collectPeriodBlockers(
                 $pdo,

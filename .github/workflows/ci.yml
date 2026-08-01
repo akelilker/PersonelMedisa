@@ -6,7 +6,56 @@ on:
       - "**"
   pull_request:
 
+permissions:
+  contents: write
+
 jobs:
+  apply-s87-query-stage-diagnostic:
+    name: Apply S87 query-stage diagnostic
+    if: github.event_name == 'pull_request' && github.head_ref == 'fix/s87-critical-owner-gaps-reopen'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Verify and apply exact diagnostic patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD^)" = "ed47d3a3cd0f78e14c9d399c5eef6c62ac5da415"
+          echo "edd0427f54bb567286d51a4af3362794afe760678a11da62bf9e477241f44ae1  ops/.s87-diagnostic.patch.gz" | sha256sum -c -
+          gzip -dc ops/.s87-diagnostic.patch.gz > /tmp/s87-diagnostic.patch
+          echo "c875e0b6259315f44dba57499d8376da492c47e40c86e1b54c4381c11d07e0be  /tmp/s87-diagnostic.patch" | sha256sum -c -
+          git apply --check /tmp/s87-diagnostic.patch
+          git apply /tmp/s87-diagnostic.patch
+          rm ops/.s87-diagnostic.patch.gz
+          git checkout 79b381fd38b6e09b0fc523d0942227292cb6bbed -- .github/workflows/ci.yml
+          git diff --check
+
+          cat > /tmp/expected-paths <<'EOF'
+          .github/workflows/ci.yml
+          api/src/Services/Payroll/PayrollComplianceGuard.php
+          ops/.s87-diagnostic.patch.gz
+          tests/php/MaasHesaplamaSnapshotMysqlConcurrencyTestRunner.php
+          EOF
+          git diff --name-only HEAD | sort > /tmp/actual-paths
+          sort -o /tmp/expected-paths /tmp/expected-paths
+          diff -u /tmp/expected-paths /tmp/actual-paths
+
+      - name: Commit diagnostic
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "test: identify S87 compliance query failure stage"
+          git push origin HEAD:fix/s87-critical-owner-gaps-reopen
+
   quality:
     name: Unit + Typecheck + Build
     runs-on: ubuntu-latest

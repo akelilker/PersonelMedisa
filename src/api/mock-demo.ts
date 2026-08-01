@@ -6293,6 +6293,63 @@ export function resolveDemoApiResponse(
     return ok({ muhurlenen_kayit_sayisi: count, donem: donemPrefix });
   }
 
+  const donemSealHistoryMatch = pathname.match(/^\/puantaj\/donemler\/(\d{4})\/(\d{1,2})\/seal-history$/);
+  if (donemSealHistoryMatch && method === "GET") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(actor, "puantaj.donem_seal.history");
+    if (permissionError) {
+      return permissionError;
+    }
+    return ok({
+      period_state: "ACIK",
+      effective_seal_id: null,
+      effective_revision_no: null,
+      seals: [],
+      reopen_talepleri: [],
+      snapshots: []
+    });
+  }
+
+  const donemReopenRequestMatch = pathname.match(/^\/puantaj\/donemler\/(\d{4})\/(\d{1,2})\/reopen-request$/);
+  if (donemReopenRequestMatch && method === "POST") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(actor, "puantaj.donem_reopen.request");
+    if (permissionError) {
+      return permissionError;
+    }
+    return ok({ id: 1, talep_durumu: "ONAY_BEKLIYOR", period_state: "REOPEN_PENDING" });
+  }
+
+  const donemReopenApproveMatch = pathname.match(/^\/puantaj\/donemler\/(\d{4})\/(\d{1,2})\/reopen-approve$/);
+  if (donemReopenApproveMatch && method === "POST") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(actor, "puantaj.donem_reopen.approve");
+    if (permissionError) {
+      return permissionError;
+    }
+    return ok({ id: toNumber(body.talep_id) ?? 1, talep_durumu: "ONAYLANDI", period_state: "REOPENED" });
+  }
+
+  const donemReopenRejectMatch = pathname.match(/^\/puantaj\/donemler\/(\d{4})\/(\d{1,2})\/reopen-reject$/);
+  if (donemReopenRejectMatch && method === "POST") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(actor, "puantaj.donem_reopen.approve");
+    if (permissionError) {
+      return permissionError;
+    }
+    return ok({ id: toNumber(body.talep_id) ?? 1, talep_durumu: "REDDEDILDI", period_state: "SEALED" });
+  }
+
+  const donemResealMatch = pathname.match(/^\/puantaj\/donemler\/(\d{4})\/(\d{1,2})\/reseal$/);
+  if (donemResealMatch && method === "POST") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(actor, "puantaj.donem_reseal");
+    if (permissionError) {
+      return permissionError;
+    }
+    return ok({ muhur_id: 2, revision_no: 2, period_state: "SEALED" });
+  }
+
   if (pathname === "/haftalik-kapanis/revizyon-kaynaklar" && method === "GET") {
     const actor = readDemoRevizyonActor(init);
     const permissionError = enforceDemoRevizyonPermission(

@@ -30,7 +30,8 @@ function createIntegrationSchema(PDO $pdo): void
     )');
     $pdo->exec('CREATE TABLE puantaj_aylik_muhurleri (
         id INTEGER PRIMARY KEY AUTOINCREMENT, sube_id INTEGER NOT NULL, yil INTEGER NOT NULL, ay INTEGER NOT NULL,
-        UNIQUE (sube_id, yil, ay)
+        durum TEXT NOT NULL DEFAULT \'MUHURLENDI\', revision_no INTEGER NOT NULL DEFAULT 1,
+        UNIQUE (sube_id, yil, ay, revision_no)
     )');
     $pdo->exec('CREATE TABLE gunluk_puantaj (
         id INTEGER PRIMARY KEY AUTOINCREMENT, personel_id INTEGER, tarih TEXT, state TEXT,
@@ -104,7 +105,7 @@ try {
 
     $first->beginTransaction();
     PuantajDonemKilidiService::acquire($first, 1, 2026, 5);
-    $first->exec("INSERT INTO puantaj_aylik_muhurleri (sube_id, yil, ay) VALUES (1, 2026, 5)");
+    $first->exec("INSERT INTO puantaj_aylik_muhurleri (sube_id, yil, ay, durum, revision_no) VALUES (1, 2026, 5, 'MUHURLENDI', 1)");
 
     $blocked = false;
     try {

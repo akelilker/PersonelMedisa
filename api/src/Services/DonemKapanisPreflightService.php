@@ -504,7 +504,7 @@ class DonemKapanisPreflightService
     private static function findMonthlySeal(PDO $pdo, $subeId, $yil, $ay)
     {
         $stmt = $pdo->prepare(
-            'SELECT * FROM puantaj_aylik_muhurleri WHERE sube_id = :sube_id AND yil = :yil AND ay = :ay LIMIT 1'
+            "SELECT * FROM puantaj_aylik_muhurleri WHERE sube_id = :sube_id AND yil = :yil AND ay = :ay AND durum = 'MUHURLENDI' LIMIT 1"
         );
         $stmt->execute(['sube_id' => $subeId, 'yil' => $yil, 'ay' => $ay]);
 

@@ -22,6 +22,7 @@ import { KapanisAuditPaneli } from "../components/donem-kapanis/KapanisAuditPane
 import { KapanisIssueListesi } from "../components/donem-kapanis/KapanisIssueListesi";
 import { KapanisOzetKartlari } from "../components/donem-kapanis/KapanisOzetKartlari";
 import { KapanisPersonelDetayModal } from "../components/donem-kapanis/KapanisPersonelDetayModal";
+import { DonemSealReopenPanel } from "../components/donem-kapanis/DonemSealReopenPanel";
 
 const DONEM_MUHUR_ONAY_MESAJI =
   "Seçili dönem mühürlenecek. Mühür sonrası puantaj kayıtları düzenlenemez. Devam edilsin mi?";
@@ -252,6 +253,17 @@ export function DonemKapanisMerkeziPage() {
             errorMessage={auditsErrorMessage}
             onRetry={() => void refetchAudits()}
           />
+          {parsedAy && subeId ? (
+            <DonemSealReopenPanel
+              yil={parsedAy.yil}
+              ay={parsedAy.ay}
+              enabled={Boolean(parsedAy && subeId)}
+              onChanged={() => {
+                void refetch();
+                void refetchAudits();
+              }}
+            />
+          ) : null}
         </>
       ) : null}
 

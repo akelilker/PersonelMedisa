@@ -201,6 +201,15 @@ class MaasHesaplamaController
         }
         self::assertSnapshotScope($user, $request, (int) $row['sube_id']);
 
+        if (\Medisa\Api\Services\PuantajDonemPeriodService::isPeriodReopened(
+            $pdo,
+            (int) $row['sube_id'],
+            (int) $row['yil'],
+            (int) $row['ay']
+        )) {
+            JsonResponse::error(409, 'PERIOD_REOPENED', 'Donem reopen oturumunda; maas hesaplama yapilamaz.');
+        }
+
         $body = $request->getJsonBody();
         $expected = trim((string) ($body['expected_calculation_input_hash'] ?? ''));
         if ($expected === '' || !preg_match('/^[a-f0-9]{64}$/', $expected)) {

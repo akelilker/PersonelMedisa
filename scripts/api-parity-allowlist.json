@@ -72,6 +72,24 @@
       "reason": "CSV export helper; download path may bypass standard apiRequest inventory.",
       "owner": "BildirimEtkiRapor",
       "introducedOrConfirmedAt": "2026-07-18"
+    },
+    {
+      "method": "POST",
+      "path": "/test/seal-reopen/cancel-active-snapshot",
+      "category": "test_only",
+      "gapId": "E2E-S87-SEAL-01",
+      "reason": "Playwright-only fixture helper for S87 seal reopen dual-control e2e; not a production API.",
+      "owner": "tests/e2e/s87-seal-revision-reopen.spec.ts",
+      "introducedOrConfirmedAt": "2026-08-02"
+    },
+    {
+      "method": "POST",
+      "path": "/test/seal-reopen/complete-canonical",
+      "category": "test_only",
+      "gapId": "E2E-S87-SEAL-02",
+      "reason": "Playwright-only fixture helper for S87 seal reopen dual-control e2e; not a production API.",
+      "owner": "tests/e2e/s87-seal-revision-reopen.spec.ts",
+      "introducedOrConfirmedAt": "2026-08-02"
     }
   ]
 }

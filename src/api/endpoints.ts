@@ -78,6 +78,15 @@ export const endpoints = {
     detail: (personelId: number | string, tarih: string) =>
       `/gunluk-puantaj/${personelId}/${encodeURIComponent(tarih)}`,
     muhurle: "/puantaj/muhurle",
+    donemReopenRequest: (yil: number | string, ay: number | string) =>
+      `/puantaj/donemler/${yil}/${ay}/reopen-request`,
+    donemReopenApprove: (yil: number | string, ay: number | string) =>
+      `/puantaj/donemler/${yil}/${ay}/reopen-approve`,
+    donemReopenReject: (yil: number | string, ay: number | string) =>
+      `/puantaj/donemler/${yil}/${ay}/reopen-reject`,
+    donemReseal: (yil: number | string, ay: number | string) => `/puantaj/donemler/${yil}/${ay}/reseal`,
+    donemSealHistory: (yil: number | string, ay: number | string) =>
+      `/puantaj/donemler/${yil}/${ay}/seal-history`,
     bildirimEtkiAdaylari: {
       list: "/puantaj/bildirim-etki-adaylari",
       ozet: "/puantaj/bildirim-etki-adaylari/ozet",

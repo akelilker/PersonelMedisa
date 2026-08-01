@@ -518,7 +518,7 @@ class FazlaCalismaOdemeTercihiController
         $kilitli = false;
         try {
             if (self::tableExists($pdo, 'puantaj_aylik_muhurleri')) {
-                $kilitli = PuantajDonemKilidiService::isSealed($pdo, [
+                $kilitli = PuantajDonemKilidiService::hasEffectiveSeal($pdo, [
                     'sube_id' => $subeId,
                     'yil' => $yil,
                     'ay' => $ay,
@@ -605,7 +605,7 @@ class FazlaCalismaOdemeTercihiController
                     self::rollbackConflict($pdo, 'PERIOD_STATE_UNKNOWN', 'Puantaj donem durumu belirlenemedi.');
                 }
                 $lock = PuantajDonemKilidiService::acquire($pdo, $subeId, $month['yil'], $month['ay']);
-                if (PuantajDonemKilidiService::isSealed($pdo, $lock)) {
+                if (PuantajDonemKilidiService::hasEffectiveSeal($pdo, $lock)) {
                     self::rollbackConflict(
                         $pdo,
                         'PERIOD_LOCKED',

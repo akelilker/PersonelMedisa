@@ -60,7 +60,8 @@ function createPreflightSchema(PDO $pdo): void
         kaynak TEXT, aciklama TEXT
     )');
     $pdo->exec('CREATE TABLE puantaj_aylik_muhurleri (
-        id INTEGER PRIMARY KEY AUTOINCREMENT, sube_id INTEGER NOT NULL, yil INTEGER NOT NULL, ay INTEGER NOT NULL
+        id INTEGER PRIMARY KEY AUTOINCREMENT, sube_id INTEGER NOT NULL, yil INTEGER NOT NULL, ay INTEGER NOT NULL,
+        durum TEXT NOT NULL DEFAULT \'MUHURLENDI\', revision_no INTEGER NOT NULL DEFAULT 1
     )');
     $pdo->exec('CREATE TABLE ek_odeme_kesinti (
         id INTEGER PRIMARY KEY, personel_id INTEGER NOT NULL, donem TEXT NOT NULL, state TEXT NOT NULL
@@ -302,7 +303,7 @@ try {
     assertPreflight(hasWarningCode($futureSalary, 'FINANCE_SALARY_MISSING'), 'future-only salary warns for past period end');
 
     resetPreflightData($pdo);
-    $pdo->exec('INSERT INTO puantaj_aylik_muhurleri (sube_id, yil, ay) VALUES (1, 2026, 6)');
+    $pdo->exec("INSERT INTO puantaj_aylik_muhurleri (sube_id, yil, ay, durum, revision_no) VALUES (1, 2026, 6, 'MUHURLENDI', 1)");
     $sealed = DonemKapanisPreflightService::evaluate($pdo, 1, 2026, 6);
     assertPreflight($sealed['muhur_state'] === 'MUHURLENDI', 'sealed period reports MUHURLENDI');
     assertPreflight($sealed['donem_state'] === 'MUHURLU', 'sealed period reports MUHURLU');

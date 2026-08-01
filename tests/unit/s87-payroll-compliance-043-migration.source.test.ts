@@ -5,12 +5,13 @@ import { describe, expect, it } from "vitest";
 const MIGRATION = "api/migrations/043_payroll_compliance_critical_gaps.sql";
 
 describe("S87 migration 043 source contracts", () => {
-  it("exists and is tip of chain", () => {
+  it("exists and remains in chain before tip", () => {
     expect(existsSync(resolve(MIGRATION))).toBe(true);
     const files = readdirSync(resolve("api/migrations"))
       .filter((n) => /^\d{3}_.+\.sql$/.test(n))
       .sort();
-    expect(files.at(-1)).toBe("043_payroll_compliance_critical_gaps.sql");
+    expect(files).toContain("043_payroll_compliance_critical_gaps.sql");
+    expect(files.at(-1)).toBe("044_puantaj_aylik_muhur_revision_reopen.sql");
   });
 
   it("is additive: alters tercih + audit, creates yillik kilit, references surecler belge id", () => {

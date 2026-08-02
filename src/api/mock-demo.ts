@@ -5063,6 +5063,16 @@ export function resolveDemoApiResponse(
       });
     });
 
+    const canApply = dataRows.length > 0 && hatali === 0 && gecerli === dataRows.length;
+    const normalizedCsv = csvText.replace(/^\uFEFF/, "");
+    let hashAcc = 2166136261;
+    for (let i = 0; i < normalizedCsv.length; i += 1) {
+      hashAcc ^= normalizedCsv.charCodeAt(i);
+      hashAcc = Math.imul(hashAcc, 16777619);
+    }
+    const sourceSha = (Math.abs(hashAcc).toString(16) + "cafebabe".repeat(8)).slice(0, 64);
+    const manifestHash = ((canApply ? "a" : "b") + sourceSha.slice(1)).slice(0, 64);
+
     return ok({
       ozet: {
         toplam_satir: dataRows.length,
@@ -5073,12 +5083,107 @@ export function resolveDemoApiResponse(
         veritabaninda_mevcut: mevcut
       },
       satirlar,
+      source_sha256: sourceSha,
+      manifest_hash: manifestHash,
+      schema_version: "personel-import-v1",
+      row_count: dataRows.length,
+      valid_row_count: gecerli,
+      can_apply: canApply,
       yazma: {
         personel_write: false,
         salary_write: false,
         wage_model_assumption: false
       }
     });
+  }
+
+  if (pathname === "/personeller/import/apply" && method === "POST") {
+    // Demo/mock apply never mutates the durable personel list.
+    // E2E may use this deterministic synthetic response only.
+    const csvText = toStringValue(body.csv) ?? toStringValue(body.csv_text) ?? "";
+    const confirmation = toStringValue(body.confirmation) ?? toStringValue(body.onay) ?? "";
+    const idempotencyKey = toStringValue(body.idempotency_key) ?? "";
+    const manifestHash = toStringValue(body.manifest_hash) ?? "";
+    if (confirmation !== "PERSONEL_IMPORT_ONAYLIYORUM") {
+      return demoRevizyonError("PERSONEL_IMPORT_CONFIRMATION_REQUIRED", "Import onayi zorunludur.");
+    }
+    if (!/^[A-Za-z0-9._:-]{8,128}$/.test(idempotencyKey)) {
+      return demoRevizyonError(
+        "PERSONEL_IMPORT_IDEMPOTENCY_KEY_INVALID",
+        "idempotency_key 8-128 karakter olmali."
+      );
+    }
+    if (!/^[0-9a-f]{64}$/i.test(manifestHash)) {
+      return demoRevizyonError("PERSONEL_IMPORT_MANIFEST_REQUIRED", "manifest_hash zorunludur.");
+    }
+    if (!csvText.trim()) {
+      return demoRevizyonError("PERSONEL_IMPORT_DOSYA_GECERSIZ", "CSV dosyasi veya csv alani zorunludur.");
+    }
+    if (/maas_tutari|ucret_tipi_id|ucret_modeli|aylik_ucret|gunluk_ucret|saatlik_ucret|ucret_turu|bordro_kapsami/i.test(csvText)) {
+      return demoRevizyonError(
+        "PERSONEL_IMPORT_UCRET_KARARI_BEKLENIYOR",
+        "Bu asama ucret/bordro alanlarini kabul etmez."
+      );
+    }
+
+    const prior = (demoState as { personelImportApplyByKey?: Record<string, Record<string, unknown>> })
+      .personelImportApplyByKey;
+    const store =
+      prior ??
+      ((demoState as { personelImportApplyByKey?: Record<string, Record<string, unknown>> }).personelImportApplyByKey =
+        {});
+    if (store[idempotencyKey]) {
+      const previous = store[idempotencyKey];
+      if (String(previous.manifest_hash) !== manifestHash.toLowerCase()) {
+        return demoRevizyonError(
+          "PERSONEL_IMPORT_IDEMPOTENCY_CONFLICT",
+          "Ayni idempotency_key farkli source/manifest ile kullanilmis."
+        );
+      }
+      return ok({ ...previous, idempotent_replay: true });
+    }
+
+    const lines = csvText
+      .replace(/^\uFEFF/, "")
+      .split(/\r\n|\n|\r/)
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0);
+    const dataRows = lines.slice(1);
+    const created = dataRows.map((line, index) => {
+      const cells = line.split(";").map((c) => c.trim());
+      const tc = cells[0] ?? "";
+      const masked =
+        tc.length >= 5
+          ? `${tc.slice(0, 3)}${"*".repeat(tc.length - 5)}${tc.slice(-2)}`
+          : "***********";
+      return {
+        satir_no: index + 2,
+        personel_id: 900000 + index + 1,
+        sicil_no: cells[1] ?? `DEMO-${index + 1}`,
+        ad: cells[2] ?? "Demo",
+        soyad: cells[3] ?? "Personel",
+        tc_kimlik_no_masked: masked
+      };
+    });
+    const payload = {
+      import_id: 7000 + Object.keys(store).length + 1,
+      status: "COMPLETED",
+      idempotent_replay: false,
+      source_sha256: manifestHash.toLowerCase(),
+      manifest_hash: manifestHash.toLowerCase(),
+      created_count: created.length,
+      created,
+      yazma: {
+        personel_write: true,
+        salary_write: false,
+        bordro_scope_write: false,
+        carryover_write: false,
+        sgk_status_write: false,
+        wage_model_assumption: false
+      }
+    };
+    store[idempotencyKey] = payload;
+    return ok(payload);
   }
 
   if (pathname === "/personeller" && method === "POST") {

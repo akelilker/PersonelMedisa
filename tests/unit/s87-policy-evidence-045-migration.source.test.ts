@@ -6,7 +6,7 @@ import { resolve } from "node:path";
 const MIGRATION = "api/migrations/045_sirket_politikasi_kanit_owner.sql";
 
 describe("S87 policy evidence 045 migration source", () => {
-  it("is additive, idempotent-patterned, and last in chain", () => {
+  it("is additive, idempotent-patterned, and before tip 046", () => {
     const sql = readFileSync(resolve(process.cwd(), MIGRATION), "utf8");
     expect(sql).toContain("belge_id");
     expect(sql).toContain("belge_sha256");
@@ -22,7 +22,8 @@ describe("S87 policy evidence 045 migration source", () => {
     const migrations = readdirSync(resolve(process.cwd(), "api/migrations"))
       .filter((name) => /^\d{3}_.+\.sql$/.test(name))
       .sort();
-    expect(migrations.at(-1)).toBe("045_sirket_politikasi_kanit_owner.sql");
+    expect(migrations).toContain("045_sirket_politikasi_kanit_owner.sql");
+    expect(migrations.at(-1)).toBe("046_personel_import_apply_owner.sql");
   });
 
   it("reports bytes and sha256 for the migration artifact", () => {

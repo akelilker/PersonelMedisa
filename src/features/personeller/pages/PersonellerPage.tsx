@@ -198,6 +198,7 @@ export function PersonellerPage() {
   const { hasPermission } = useRoleAccess();
   const canOpenDetail = hasPermission("personeller.detail.view");
   const canCreatePersonel = hasPermission("personeller.create");
+  const canApplyPersonelImport = hasPermission("personeller.import.apply");
   const canViewPuantaj = hasPermission("puantaj.view");
   const canViewBildirimler = hasPermission("bildirimler.view");
   const canViewRevizyon = hasPermission("revizyon.view");
@@ -659,6 +660,10 @@ export function PersonellerPage() {
       <PersonelImportDryRunModal
         open={importModalOpen}
         onClose={() => setImportModalOpen(false)}
+        canApply={canApplyPersonelImport}
+        onApplied={() => {
+          void refetch();
+        }}
       />
     </section>
   );

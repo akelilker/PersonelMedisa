@@ -9,12 +9,16 @@ use PDO;
 use RuntimeException;
 
 /**
- * S97-A: Personel ana veri CSV dry-run (no INSERT/UPDATE/DELETE).
+ * S97-A/B: Personel ana veri CSV dry-run + shared analyze/manifest owner.
+ * Dry-run path performs no INSERT/UPDATE/DELETE.
  */
 final class PersonelImportDryRunService
 {
     public const MAX_ROWS = 500;
     public const MAX_BYTES = 2097152; // 2 MB
+    public const SCHEMA_VERSION = 'personel-import-v1';
+    public const PARSER_VERSION = 'personel-import-parser-v1';
+    public const IMPORT_MODE = 'CREATE_ONLY_ALL_OR_NOTHING';
 
     public const TEMPLATE_COLUMNS = [
         'tc_kimlik_no',
@@ -65,6 +69,10 @@ final class PersonelImportDryRunService
         'ucret_turu',
         'net_maas_tutari',
         'brut_maas_tutari',
+        'bordro_kapsami',
+        'sgk_statu',
+        'sgk_durumu',
+        'sgk_statu_kodu',
         'onceki_kumulatif_gelir_vergisi_matrahi',
         'onceki_kumulatif_gelir_vergisi',
         'onceki_kumulatif_sgk_matrahi',
@@ -104,6 +112,30 @@ final class PersonelImportDryRunService
      */
     public static function dryRun(PDO $pdo, $csvContent, array $user, $activeSubeHeader = null)
     {
+        $analysis = self::analyze($pdo, $csvContent, $user, $activeSubeHeader);
+
+        return self::toPublicDryRunResult($analysis);
+    }
+
+    /**
+     * Shared parse/validate/manifest pipeline for dry-run and apply.
+     *
+     * @param array<string, mixed> $user
+     * @return array{
+     *   source_sha256: string,
+     *   manifest_hash: string,
+     *   schema_version: string,
+     *   headers: list<string>,
+     *   allowed_sube_ids: list<int>,
+     *   active_sube_id: ?int,
+     *   ozet: array<string, int>,
+     *   satirlar: list<array<string, mixed>>,
+     *   candidates: list<array<string, mixed>>,
+     *   can_apply: bool
+     * }
+     */
+    public static function analyze(PDO $pdo, $csvContent, array $user, $activeSubeHeader = null)
+    {
         if (!is_string($csvContent)) {
             throw new PersonelImportException('PERSONEL_IMPORT_DOSYA_GECERSIZ', 'CSV icerigi okunamadi.', 400);
         }
@@ -117,11 +149,13 @@ final class PersonelImportDryRunService
             );
         }
 
-        if (strncmp($csvContent, "\xEF\xBB\xBF", 3) === 0) {
-            $csvContent = substr($csvContent, 3);
+        $normalizedCsv = $csvContent;
+        if (strncmp($normalizedCsv, "\xEF\xBB\xBF", 3) === 0) {
+            $normalizedCsv = substr($normalizedCsv, 3);
         }
+        $sourceSha256 = hash('sha256', $normalizedCsv);
 
-        $lines = preg_split("/\r\n|\n|\r/", $csvContent);
+        $lines = preg_split("/\r\n|\n|\r/", $normalizedCsv);
         if ($lines === false) {
             throw new PersonelImportException('PERSONEL_IMPORT_DOSYA_GECERSIZ', 'CSV icerigi okunamadi.', 400);
         }
@@ -164,6 +198,8 @@ final class PersonelImportDryRunService
         $seenTc = [];
         $seenSicil = [];
         $satirlar = [];
+        $candidates = [];
+        $manifestRows = [];
         $gecerli = 0;
         $hatali = 0;
         $warningSayisi = 0;
@@ -204,7 +240,6 @@ final class PersonelImportDryRunService
             $sicilRaw = trim((string) ($rowMap['sicil_no'] ?? ''));
             $maskedTc = PersonelCanonicalValidator::maskTcKimlikNo($tcRaw);
 
-            // Resolve references first (exact unique name match).
             $resolved = self::resolveReferences($rowMap, $refCatalog, $hataKodlari);
 
             $importBody = [
@@ -275,10 +310,43 @@ final class PersonelImportDryRunService
 
             $hataKodlari = array_values(array_unique($hataKodlari));
             $isValid = count($hataKodlari) === 0;
-            if ($isValid) {
+            $payload = is_array($fieldResult['payload'] ?? null) ? $fieldResult['payload'] : null;
+            if ($isValid && $payload !== null) {
                 $gecerli++;
                 $aday++;
                 $durum = 'GECERLI';
+                // Ham TC yalniz bellek-ici manifest hesabina girer; saklanmaz/response'a cikmaz.
+                $manifestRows[] = [
+                    'satir_no' => $satirNo,
+                    'tc_kimlik_no' => (string) $payload['tc_kimlik_no'],
+                    'sicil_no' => (string) $payload['sicil_no'],
+                    'ad' => (string) $payload['ad'],
+                    'soyad' => (string) $payload['soyad'],
+                    'dogum_tarihi' => (string) $payload['dogum_tarihi'],
+                    'ise_giris_tarihi' => (string) $payload['ise_giris_tarihi'],
+                    'telefon' => (string) $payload['telefon'],
+                    'acil_durum_kisi' => (string) $payload['acil_durum_kisi'],
+                    'acil_durum_telefon' => (string) $payload['acil_durum_telefon'],
+                    'dogum_yeri' => $payload['dogum_yeri'],
+                    'kan_grubu' => $payload['kan_grubu'],
+                    'sube_id' => (int) $payload['sube_id'],
+                    'departman_id' => (int) $payload['departman_id'],
+                    'gorev_id' => (int) $payload['gorev_id'],
+                    'personel_tipi_id' => (int) $payload['personel_tipi_id'],
+                    'aktif_durum' => (string) $payload['aktif_durum'],
+                ];
+                $candidates[] = [
+                    'satir_no' => $satirNo,
+                    'payload' => $payload,
+                    'sicil_no' => (string) $payload['sicil_no'],
+                    'ad' => (string) $payload['ad'],
+                    'soyad' => (string) $payload['soyad'],
+                    'tc_kimlik_no_masked' => $maskedTc,
+                    'sube_id' => (int) $payload['sube_id'],
+                    'departman_id' => (int) $payload['departman_id'],
+                    'gorev_id' => (int) $payload['gorev_id'],
+                    'personel_tipi_id' => (int) $payload['personel_tipi_id'],
+                ];
             } else {
                 $hatali++;
                 $durum = in_array('PERSONEL_IMPORT_TC_MEVCUT', $hataKodlari, true)
@@ -297,7 +365,41 @@ final class PersonelImportDryRunService
             ];
         }
 
+        $sortedAllowed = array_values($allowedSubeIds);
+        sort($sortedAllowed, SORT_NUMERIC);
+
+        $manifestHash = self::buildManifestHash([
+            'schema_version' => self::SCHEMA_VERSION,
+            'parser_version' => self::PARSER_VERSION,
+            'import_mode' => self::IMPORT_MODE,
+            'headers' => $headers,
+            'active_sube_id' => $activeSubeId,
+            'allowed_sube_ids' => $sortedAllowed,
+            'rows' => $manifestRows,
+        ]);
+
+        // row_hash TC'den bagimsiz: manifest_hash | satir_no | sicil | resolved refs
+        foreach ($candidates as $index => $candidate) {
+            $candidates[$index]['row_hash'] = self::buildRowHash(
+                $manifestHash,
+                (int) $candidate['satir_no'],
+                (string) $candidate['sicil_no'],
+                (int) $candidate['sube_id'],
+                (int) $candidate['departman_id'],
+                (int) $candidate['gorev_id'],
+                (int) $candidate['personel_tipi_id']
+            );
+        }
+
+        $canApply = count($dataLines) > 0 && $hatali === 0 && $gecerli === count($dataLines);
+
         return [
+            'source_sha256' => $sourceSha256,
+            'manifest_hash' => $manifestHash,
+            'schema_version' => self::SCHEMA_VERSION,
+            'headers' => $headers,
+            'allowed_sube_ids' => $sortedAllowed,
+            'active_sube_id' => $activeSubeId,
             'ozet' => [
                 'toplam_satir' => count($dataLines),
                 'gecerli_satir' => $gecerli,
@@ -307,12 +409,77 @@ final class PersonelImportDryRunService
                 'veritabaninda_mevcut' => $mevcut,
             ],
             'satirlar' => $satirlar,
+            'candidates' => $candidates,
+            'can_apply' => $canApply,
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $analysis
+     * @return array<string, mixed>
+     */
+    public static function toPublicDryRunResult(array $analysis)
+    {
+        $ozet = is_array($analysis['ozet'] ?? null) ? $analysis['ozet'] : [];
+
+        return [
+            'ozet' => $ozet,
+            'satirlar' => $analysis['satirlar'] ?? [],
+            'source_sha256' => (string) ($analysis['source_sha256'] ?? ''),
+            'manifest_hash' => (string) ($analysis['manifest_hash'] ?? ''),
+            'schema_version' => (string) ($analysis['schema_version'] ?? self::SCHEMA_VERSION),
+            'row_count' => (int) ($ozet['toplam_satir'] ?? 0),
+            'valid_row_count' => (int) ($ozet['gecerli_satir'] ?? 0),
+            'can_apply' => (bool) ($analysis['can_apply'] ?? false),
             'yazma' => [
                 'personel_write' => false,
                 'salary_write' => false,
                 'wage_model_assumption' => false,
             ],
         ];
+    }
+
+    /**
+     * TC-independent durable row fingerprint for audit rows.
+     * SHA256(manifest_hash | row_number | sicil_no | resolved_reference_ids)
+     */
+    public static function buildRowHash(
+        string $manifestHash,
+        int $satirNo,
+        string $sicilNo,
+        int $subeId,
+        int $departmanId,
+        int $gorevId,
+        int $personelTipiId
+    ): string {
+        $material = implode('|', [
+            strtolower($manifestHash),
+            (string) $satirNo,
+            $sicilNo,
+            (string) $subeId,
+            (string) $departmanId,
+            (string) $gorevId,
+            (string) $personelTipiId,
+        ]);
+
+        return hash('sha256', $material);
+    }
+
+    /** @param array<string, mixed> $manifest */
+    public static function buildManifestHash(array $manifest): string
+    {
+        return hash('sha256', self::canonicalJson($manifest));
+    }
+
+    /** @param array<string, mixed> $value */
+    public static function canonicalJson(array $value): string
+    {
+        $encoded = json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        if (!is_string($encoded)) {
+            throw new RuntimeException('Manifest JSON encode failed.');
+        }
+
+        return $encoded;
     }
 
     /** @param list<string> $headers */

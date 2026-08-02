@@ -367,9 +367,42 @@ export type PersonelImportDryRunResult = {
     veritabaninda_mevcut: number;
   };
   satirlar: PersonelImportDryRunRow[];
+  source_sha256: string;
+  manifest_hash: string;
+  schema_version: string;
+  row_count: number;
+  valid_row_count: number;
+  can_apply: boolean;
   yazma: {
     personel_write: boolean;
     salary_write: boolean;
+    wage_model_assumption: boolean;
+  };
+};
+
+export type PersonelImportApplyCreatedRow = {
+  satir_no: number;
+  personel_id: number;
+  sicil_no: string;
+  ad: string;
+  soyad: string;
+  tc_kimlik_no_masked: string;
+};
+
+export type PersonelImportApplyResult = {
+  import_id: number;
+  status: "COMPLETED" | string;
+  idempotent_replay: boolean;
+  source_sha256: string;
+  manifest_hash: string;
+  created_count: number;
+  created: PersonelImportApplyCreatedRow[];
+  yazma: {
+    personel_write: boolean;
+    salary_write: boolean;
+    bordro_scope_write: boolean;
+    carryover_write: boolean;
+    sgk_status_write: boolean;
     wage_model_assumption: boolean;
   };
 };
@@ -379,12 +412,15 @@ function normalizeImportDryRunResult(value: unknown): PersonelImportDryRunResult
   const ozet = toRecord(record.ozet) ?? {};
   const yazma = toRecord(record.yazma) ?? {};
   const satirlarRaw = Array.isArray(record.satirlar) ? record.satirlar : [];
+  const toplam = Number(ozet.toplam_satir ?? 0);
+  const gecerli = Number(ozet.gecerli_satir ?? 0);
+  const hatali = Number(ozet.hatali_satir ?? 0);
 
   return {
     ozet: {
-      toplam_satir: Number(ozet.toplam_satir ?? 0),
-      gecerli_satir: Number(ozet.gecerli_satir ?? 0),
-      hatali_satir: Number(ozet.hatali_satir ?? 0),
+      toplam_satir: toplam,
+      gecerli_satir: gecerli,
+      hatali_satir: hatali,
       warning_sayisi: Number(ozet.warning_sayisi ?? 0),
       kayit_olusturulacak_aday: Number(ozet.kayit_olusturulacak_aday ?? 0),
       veritabaninda_mevcut: Number(ozet.veritabaninda_mevcut ?? 0)
@@ -402,9 +438,49 @@ function normalizeImportDryRunResult(value: unknown): PersonelImportDryRunResult
         uyarilar: Array.isArray(r.uyarilar) ? r.uyarilar.map((u) => String(u)) : []
       };
     }),
+    source_sha256: String(record.source_sha256 ?? ""),
+    manifest_hash: String(record.manifest_hash ?? ""),
+    schema_version: String(record.schema_version ?? ""),
+    row_count: Number(record.row_count ?? toplam),
+    valid_row_count: Number(record.valid_row_count ?? gecerli),
+    can_apply: Boolean(record.can_apply ?? (toplam > 0 && hatali === 0 && gecerli === toplam)),
     yazma: {
       personel_write: Boolean(yazma.personel_write),
       salary_write: Boolean(yazma.salary_write),
+      wage_model_assumption: Boolean(yazma.wage_model_assumption)
+    }
+  };
+}
+
+function normalizeImportApplyResult(value: unknown): PersonelImportApplyResult {
+  const record = toRecord(value) ?? {};
+  const yazma = toRecord(record.yazma) ?? {};
+  const createdRaw = Array.isArray(record.created) ? record.created : [];
+
+  return {
+    import_id: Number(record.import_id ?? 0),
+    status: String(record.status ?? ""),
+    idempotent_replay: Boolean(record.idempotent_replay),
+    source_sha256: String(record.source_sha256 ?? ""),
+    manifest_hash: String(record.manifest_hash ?? ""),
+    created_count: Number(record.created_count ?? 0),
+    created: createdRaw.map((row) => {
+      const r = toRecord(row) ?? {};
+      return {
+        satir_no: Number(r.satir_no ?? 0),
+        personel_id: Number(r.personel_id ?? 0),
+        sicil_no: String(r.sicil_no ?? ""),
+        ad: String(r.ad ?? ""),
+        soyad: String(r.soyad ?? ""),
+        tc_kimlik_no_masked: String(r.tc_kimlik_no_masked ?? "***********")
+      };
+    }),
+    yazma: {
+      personel_write: Boolean(yazma.personel_write),
+      salary_write: Boolean(yazma.salary_write),
+      bordro_scope_write: Boolean(yazma.bordro_scope_write),
+      carryover_write: Boolean(yazma.carryover_write),
+      sgk_status_write: Boolean(yazma.sgk_status_write),
       wage_model_assumption: Boolean(yazma.wage_model_assumption)
     }
   };
@@ -474,4 +550,33 @@ export async function dryRunPersonelImport(file: File): Promise<PersonelImportDr
   }
 
   return normalizeImportDryRunResult(response.data);
+}
+
+export async function applyPersonelImport(
+  file: File,
+  input: {
+    manifest_hash: string;
+    source_sha256: string;
+    idempotency_key: string;
+    confirmation: "PERSONEL_IMPORT_ONAYLIYORUM";
+  }
+): Promise<PersonelImportApplyResult> {
+  const csv = await file.text();
+  const response = await apiRequest<ApiResponse<unknown>>(endpoints.personeller.importApply, {
+    method: "POST",
+    body: JSON.stringify({
+      csv,
+      manifest_hash: input.manifest_hash,
+      source_sha256: input.source_sha256,
+      idempotency_key: input.idempotency_key,
+      confirmation: input.confirmation
+    })
+  });
+
+  if (Array.isArray(response.errors) && response.errors.length > 0) {
+    const first = response.errors[0];
+    throw new ApiRequestError(first?.message ?? "Personel import apply başarısız.", 400, first);
+  }
+
+  return normalizeImportApplyResult(response.data);
 }

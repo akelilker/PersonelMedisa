@@ -4750,6 +4750,9 @@ let personelBelgeKaydiIdCounter = 903;
       });
       const gecerli = satirlar.filter((row) => row.hata_kodlari.length === 0).length;
       const hatali = satirlar.length - gecerli;
+      const canApply = satirlar.length > 0 && hatali === 0 && gecerli === satirlar.length;
+      const sourceSha = `${"c".repeat(63)}${canApply ? "1" : "0"}`;
+      const manifestHash = `${"d".repeat(63)}${canApply ? "1" : "0"}`;
       await fulfillJson(
         route,
         200,
@@ -4763,9 +4766,99 @@ let personelBelgeKaydiIdCounter = 903;
             veritabaninda_mevcut: 0
           },
           satirlar,
+          source_sha256: sourceSha,
+          manifest_hash: manifestHash,
+          schema_version: "personel-import-v1",
+          row_count: satirlar.length,
+          valid_row_count: gecerli,
+          can_apply: canApply,
           yazma: {
             personel_write: false,
             salary_write: false,
+            wage_model_assumption: false
+          }
+        })
+      );
+      return;
+    }
+
+    if (path === "/api/personeller/import/apply" && method === "POST") {
+      if (!["GENEL_YONETICI", "BOLUM_YONETICISI", "MUHASEBE"].includes(role)) {
+        await fulfillJson(route, 403, errorBody("FORBIDDEN", "Bu islem icin yetkiniz yok."));
+        return;
+      }
+      const payload = request.postDataJSON() as {
+        csv?: string;
+        confirmation?: string;
+        idempotency_key?: string;
+        manifest_hash?: string;
+      };
+      if (String(payload.confirmation ?? "") !== "PERSONEL_IMPORT_ONAYLIYORUM") {
+        await fulfillJson(
+          route,
+          400,
+          errorBody("PERSONEL_IMPORT_CONFIRMATION_REQUIRED", "Import onayi zorunludur.")
+        );
+        return;
+      }
+      const idempotencyKey = String(payload.idempotency_key ?? "");
+      const manifestHash = String(payload.manifest_hash ?? "").toLowerCase();
+      if (!/^[A-Za-z0-9._:-]{8,128}$/.test(idempotencyKey)) {
+        await fulfillJson(
+          route,
+          400,
+          errorBody("PERSONEL_IMPORT_IDEMPOTENCY_KEY_INVALID", "idempotency_key gecersiz.")
+        );
+        return;
+      }
+      if (!/^[0-9a-f]{64}$/.test(manifestHash)) {
+        await fulfillJson(
+          route,
+          400,
+          errorBody("PERSONEL_IMPORT_MANIFEST_REQUIRED", "manifest_hash zorunludur.")
+        );
+        return;
+      }
+      const csvText = String(payload.csv ?? "");
+      const lines = csvText
+        .replace(/^\uFEFF/, "")
+        .split(/\r\n|\n|\r/)
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0);
+      const dataRows = lines.slice(1);
+      const created = dataRows.map((line, index) => {
+        const cells = line.split(";").map((c) => c.trim());
+        const tc = cells[0] ?? "";
+        const masked =
+          tc.length >= 5
+            ? `${tc.slice(0, 3)}${"*".repeat(Math.max(0, tc.length - 5))}${tc.slice(-2)}`
+            : "***********";
+        return {
+          satir_no: index + 2,
+          personel_id: 800000 + index + 1,
+          sicil_no: cells[1] ?? `E2E-${index + 1}`,
+          ad: cells[2] ?? "E2E",
+          soyad: cells[3] ?? "Personel",
+          tc_kimlik_no_masked: masked
+        };
+      });
+      await fulfillJson(
+        route,
+        201,
+        okBody({
+          import_id: 42,
+          status: "COMPLETED",
+          idempotent_replay: false,
+          source_sha256: manifestHash,
+          manifest_hash: manifestHash,
+          created_count: created.length,
+          created,
+          yazma: {
+            personel_write: true,
+            salary_write: false,
+            bordro_scope_write: false,
+            carryover_write: false,
+            sgk_status_write: false,
             wage_model_assumption: false
           }
         })

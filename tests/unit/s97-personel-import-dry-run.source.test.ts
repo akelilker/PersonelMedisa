@@ -9,7 +9,7 @@ function read(path: string) {
 }
 
 describe("S97 personel import dry-run source locks", () => {
-  it("keeps UI dry-run only without commit/apply action", () => {
+  it("keeps dry-run entry and forbids commit endpoint alias", () => {
     const modal = read("src/features/personeller/components/PersonelImportDryRunModal.tsx");
     const page = read("src/features/personeller/pages/PersonellerPage.tsx");
     const endpoints = read("src/api/endpoints.ts");
@@ -20,7 +20,6 @@ describe("S97 personel import dry-run source locks", () => {
     expect(modal).toContain("Bu aşama yalnız doğrulama yapar. Personel, ücret veya bordro kaydı oluşturmaz.");
     expect(modal).toContain("personel-import-dry-run-run");
     expect(modal).toContain("tc_kimlik_no_masked");
-    expect(modal).not.toMatch(/Sisteme aktar|commit|apply/i);
     expect(endpoints).toContain('importDryRun: "/personeller/import/dry-run"');
     expect(endpoints).toContain('importTemplate: "/personeller/import/template.csv"');
     expect(endpoints).not.toContain("/personeller/import/commit");

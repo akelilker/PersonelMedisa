@@ -7,6 +7,9 @@ import { PersonelImportDryRunModal } from "../../src/features/personeller/compon
 
 vi.mock("../../src/api/personeller.api", () => ({
   downloadPersonelImportTemplateCsv: vi.fn(async () => undefined),
+  applyPersonelImport: vi.fn(async () => {
+    throw new Error("apply should not run in error dry-run case");
+  }),
   dryRunPersonelImport: vi.fn(async () => ({
     ozet: {
       toplam_satir: 1,
@@ -26,6 +29,12 @@ vi.mock("../../src/api/personeller.api", () => ({
         uyarilar: []
       }
     ],
+    source_sha256: "a".repeat(64),
+    manifest_hash: "b".repeat(64),
+    schema_version: "personel-import-v1",
+    row_count: 1,
+    valid_row_count: 0,
+    can_apply: false,
     yazma: {
       personel_write: false,
       salary_write: false,
@@ -53,7 +62,7 @@ describe("PersonelImportDryRunModal", () => {
     expect(
       screen.getByText("Bu aşama yalnız doğrulama yapar. Personel, ücret veya bordro kaydı oluşturmaz.")
     ).toBeInTheDocument();
-    expect(screen.queryByText(/Sisteme aktar/i)).toBeNull();
+    expect(screen.queryByTestId("personel-import-apply-open")).toBeNull();
 
     const file = new File(
       [

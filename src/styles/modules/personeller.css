@@ -1293,6 +1293,23 @@
   font-size: 18px;
 }
 
+.personel-import-ready {
+  margin: 0 0 var(--space-3, 12px);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--txt-primary, #1f2937);
+}
+
+.personel-import-apply-success {
+  margin: 0 0 var(--space-3, 12px);
+  font-size: 13px;
+}
+
+.personel-import-apply-success ul {
+  margin: 8px 0 0;
+  padding-left: 18px;
+}
+
 .personel-import-errors-header {
   display: flex;
   align-items: center;

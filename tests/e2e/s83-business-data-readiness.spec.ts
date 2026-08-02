@@ -77,8 +77,15 @@ test.describe("S83 Business Data Readiness", () => {
     await page.getByLabel("Fazla Sürelerle Çalışma Çarpanı").fill("1.25");
     await page.getByLabel("UBGT Çarpanı").fill("2");
     await page.getByLabel("UBGT Hesap Modu").fill("GUNLUK_ILAVE");
+    const policyEvidenceSha = "a".repeat(64);
+    await page.getByLabel("Karar Belge ID").fill("TEST-FORM91-MERKEZ-2026-03-R1");
+    await page.getByLabel("Karar Belge SHA256").fill(policyEvidenceSha);
     await page.getByTestId("bordro-politika-taslak-olustur").click();
-    await page.getByTestId("bordro-politika-submit-1").click();
+
+    const submitButton = page.getByTestId("bordro-politika-submit-1");
+    await expect(submitButton).toBeVisible();
+    await expect(submitButton).toBeEnabled();
+    await submitButton.click();
 
     await mockApi(page, "GENEL_YONETICI");
     await openRaporlarPanel(page, "GENEL_YONETICI", "bordro-hazirlik");
@@ -90,7 +97,15 @@ test.describe("S83 Business Data Readiness", () => {
 
     await page.getByTestId("bordro-hazirlik-tab-politika").click();
     await expect(page.getByTestId("bordro-politika-karar-ozeti")).toBeVisible();
-    await expect(page.getByTestId("bordro-politika-approve-1")).toBeVisible();
+    await expect(page.getByTestId("bordro-politika-karar-belge-id")).toContainText(
+      "TEST-FORM91-MERKEZ-2026-03-R1"
+    );
+    await expect(page.getByTestId("bordro-politika-karar-belge-sha")).toContainText(policyEvidenceSha);
+    const approveButton = page.getByTestId("bordro-politika-approve-1");
+    await expect(approveButton).toBeVisible();
+    // Mock draft sets hazirlayan_id=1 (GENEL_YONETICI); self-approval gate must keep approve disabled.
+    await expect(approveButton).toBeDisabled();
+    await expect(approveButton).toHaveAttribute("title", "Hazırlayan onaylayamaz");
   });
 
   test("BIRIM_AMIRI: bordro yetkisiz", async ({ page }) => {

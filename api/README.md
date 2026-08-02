@@ -36,6 +36,11 @@ asagidaki runtime yuzeyini gonderir:
 `config.local.php`, `migrations/` ve `seeds/` workflow tarafindan gonderilmez.
 Migration dosyalari canlida otomatik calistirilmaz.
 
+`api/.htaccess`, canli `config.local.php` ile backup/temp turevlerini
+(`config.local.php.*`, `config.local.php~`, slash-path) web'den fail-closed engeller.
+Config yedegi web root icinde olusturulmaz; private dizin (or. `~/.private-config-backups/`,
+`0700`) ve dosya izni `0600` kullanilir.
+
 ## Yapilandirma
 
 1. `api/src/Config/config.example.php` dosyasini referans alin.

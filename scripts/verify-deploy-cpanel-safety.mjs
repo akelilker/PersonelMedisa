@@ -20,6 +20,23 @@ function check(condition, message) {
   if (!condition) failures.push(message);
 }
 
+/** @returns {string|null} */
+function extractRewritePattern(ruleLine) {
+  const match = ruleLine.match(/RewriteRule\s+(\S+)\s+/);
+  return match?.[1] ?? null;
+}
+
+/**
+ * Simulate Apache RewriteRule path match with optional NC flag.
+ * @param {string} pattern
+ * @param {string} path
+ * @param {{ nc?: boolean }} [options]
+ */
+function apacheRewriteMatches(pattern, path, options = {}) {
+  const flags = options.nc === false ? '' : 'i';
+  return new RegExp(pattern, flags).test(path);
+}
+
 check(/REMOTE_TARGET_DIR:\s*\./.test(workflow), 'REMOTE_TARGET_DIR must remain FTP root (.)');
 check(Boolean(staticMirror), 'static root mirror command was not found');
 check(!/--delete\b/.test(staticMirror), 'static root mirror must not use --delete');
@@ -42,7 +59,49 @@ check(
   /\[F,\s*L(?:,\s*NC)?\]/.test(configLocalDenyRule),
   'api/config.local.php deny rule must use [F,L] or [F,L,NC] security semantics',
 );
+check(/\bNC\b/.test(configLocalDenyRule), 'api/config.local.php deny rule must be case-insensitive [NC]');
 check(!/\bR=\d+\b/.test(configLocalDenyRule), 'api/config.local.php deny rule must not redirect sensitive path');
+
+const configDenyPattern = extractRewritePattern(configLocalDenyRule);
+check(Boolean(configDenyPattern), 'api/config.local.php deny RewriteRule pattern could not be parsed');
+
+const denyPaths = [
+  'config.local.php',
+  'config.local.php.s86bak.20260722165032',
+  'config.local.php.bak',
+  'config.local.php.backup',
+  'config.local.php.old',
+  'config.local.php.orig',
+  'config.local.php.save',
+  'config.local.php.tmp',
+  'config.local.php~',
+  'CONFIG.LOCAL.PHP.BAK',
+  'config.local.php/foo',
+  'config.local.php/anything',
+];
+const allowPaths = [
+  'config.php',
+  'configuration.local.php',
+  'public/index.php',
+  'health',
+  'auth/login',
+  'src/Router.php',
+];
+
+if (configDenyPattern) {
+  for (const path of denyPaths) {
+    check(
+      apacheRewriteMatches(configDenyPattern, path, { nc: true }),
+      `config deny pattern must DENY path: ${path}`,
+    );
+  }
+  for (const path of allowPaths) {
+    check(
+      !apacheRewriteMatches(configDenyPattern, path, { nc: true }),
+      `config deny pattern must ALLOW path: ${path}`,
+    );
+  }
+}
 
 const configLocalDenyIndex = htaccessLines.findIndex((line) =>
   /RewriteRule\s+\^config\\\.local\\\.php/.test(line),
@@ -53,6 +112,35 @@ const routerFallbackIndex = htaccessLines.findIndex((line) =>
 check(
   configLocalDenyIndex !== -1 && routerFallbackIndex !== -1 && configLocalDenyIndex < routerFallbackIndex,
   'api/config.local.php deny rule must precede router fallback',
+);
+
+const broadPhpDenyRules = htaccessLines.filter(
+  (line) =>
+    /RewriteRule\s+\^/.test(line) &&
+    /\\\.php/.test(line) &&
+    !/RewriteRule\s+\^config\\\.local\\\.php/.test(line) &&
+    /\[\s*F\b/.test(line),
+);
+check(broadPhpDenyRules.length === 0, 'broad .php deny rule must not block normal PHP/API paths');
+check(
+  /RewriteRule\s+\^\s+public\/index\.php\s+\[L,\s*QSA\]/.test(apiHtaccess),
+  'api/public/index.php router fallback must remain intact',
+);
+
+check(
+  !/(?:put|mirror)\b[^\n]*config\.local\.php/.test(workflow),
+  'deploy payload must not upload config.local.php or config.local.php.*',
+);
+check(
+  !/mirror\s+-R\s+--verbose\s+api\/config\.local\.php/.test(workflow),
+  'deploy must not mirror api/config.local.php',
+);
+check(
+  /put\s+-O\s+api\s+api\/\.htaccess/.test(workflow) &&
+    /mirror\s+-R\s+--verbose\s+api\/public\s+api\/public/.test(workflow) &&
+    /mirror\s+-R\s+--verbose\s+api\/src\s+api\/src/.test(workflow) &&
+    !/put\s+-O\s+api\s+api\/config\.local\.php/.test(workflow),
+  'deploy payload must stay limited to .htaccess + public + src (no config.local.php~ / backups)',
 );
 
 const unsafeSecretEchoes = lines.filter(

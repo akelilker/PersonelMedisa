@@ -12,6 +12,16 @@ const staticMirror = lines.find(
   (line) => /\bmirror\s+-R\b/.test(line) && /\s\.\s+\.;\s*$/.test(line),
 ) ?? '';
 
+function extractRewritePattern(ruleLine: string): string | null {
+  const match = ruleLine.match(/RewriteRule\s+(\S+)\s+/);
+  return match?.[1] ?? null;
+}
+
+function apacheRewriteMatches(pattern: string, path: string, options: { nc?: boolean } = {}): boolean {
+  const flags = options.nc === false ? '' : 'i';
+  return new RegExp(pattern, flags).test(path);
+}
+
 describe('cPanel deploy server-state safety contract', () => {
   it('keeps the dedicated FTP account root target explicit', () => {
     expect(workflow).toMatch(/REMOTE_TARGET_DIR:\s*\./);
@@ -40,6 +50,7 @@ describe('cPanel deploy server-state safety contract', () => {
     expect(workflow).toMatch(/put\s+-O\s+api\s+api\/\.htaccess/);
     expect(workflow).toMatch(/mirror\s+-R\s+--verbose\s+api\/public\s+api\/public/);
     expect(workflow).toMatch(/mirror\s+-R\s+--verbose\s+api\/src\s+api\/src/);
+    expect(workflow).not.toMatch(/(?:put|mirror)\b[^\n]*config\.local\.php/);
   });
 
   it('does not echo FTP secret values', () => {
@@ -53,12 +64,15 @@ describe('cPanel deploy server-state safety contract', () => {
 describe('api/.htaccess config.local.php web deny contract', () => {
   const configLocalDenyRule =
     htaccessLines.find((line) => /RewriteRule\s+\^config\\\.local\\\.php/.test(line)) ?? '';
+  const configDenyPattern = extractRewritePattern(configLocalDenyRule);
 
   it('denies direct web access to config.local.php with explicit RewriteRule', () => {
     expect(apiHtaccess).toBeTruthy();
     expect(configLocalDenyRule).not.toBe('');
     expect(configLocalDenyRule).toMatch(/\[.*\bF\b.*\bL\b/);
     expect(configLocalDenyRule).toMatch(/\[.*\bNC\b/);
+    expect(configLocalDenyRule).not.toMatch(/\bR=\d+\b/);
+    expect(configDenyPattern).toBeTruthy();
   });
 
   it('places the config deny rule before the router fallback', () => {
@@ -75,14 +89,50 @@ describe('api/.htaccess config.local.php web deny contract', () => {
   });
 
   it('does not add a broad PHP deny that blocks api/public/index.php', () => {
-    const broadPhpDenyRules = htaccessLines.filter((line) =>
-      /RewriteRule\s+\^.*\\\.php/.test(line) &&
-      !/RewriteRule\s+\^config\\\.local\\\.php/.test(line) &&
-      /\[.*\bF\b/.test(line),
+    const broadPhpDenyRules = htaccessLines.filter(
+      (line) =>
+        /RewriteRule\s+\^/.test(line) &&
+        /\\\.php/.test(line) &&
+        !/RewriteRule\s+\^config\\\.local\\\.php/.test(line) &&
+        /\[\s*F\b/.test(line),
     );
 
     expect(broadPhpDenyRules).toEqual([]);
     expect(apiHtaccess).toMatch(/RewriteRule\s+\^\s+public\/index\.php/);
+  });
+
+  it('matches deny/allow path semantics for config backup derivatives', () => {
+    expect(configDenyPattern).toBeTruthy();
+    const pattern = configDenyPattern as string;
+
+    const denyPaths = [
+      'config.local.php',
+      'config.local.php.s86bak.20260722165032',
+      'config.local.php.bak',
+      'config.local.php.backup',
+      'config.local.php.old',
+      'config.local.php.orig',
+      'config.local.php.save',
+      'config.local.php.tmp',
+      'config.local.php~',
+      'CONFIG.LOCAL.PHP.BAK',
+      'config.local.php/foo',
+    ] as const;
+
+    const allowPaths = [
+      'config.php',
+      'configuration.local.php',
+      'public/index.php',
+      'health',
+      'auth/login',
+    ] as const;
+
+    for (const path of denyPaths) {
+      expect(apacheRewriteMatches(pattern, path, { nc: true }), `expected DENY for ${path}`).toBe(true);
+    }
+    for (const path of allowPaths) {
+      expect(apacheRewriteMatches(pattern, path, { nc: true }), `expected ALLOW for ${path}`).toBe(false);
+    }
   });
 
   it('keeps deploy config protection and uploads api/.htaccess', () => {

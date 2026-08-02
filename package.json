@@ -23,6 +23,7 @@
     "e2e:ui": "playwright test --ui",
     "icons:generate": "node scripts/generate-icons.mjs",
     "smoke:live": "node scripts/post-deploy-smoke.mjs",
+    "verify:deploy-cpanel-safety": "node scripts/verify-deploy-cpanel-safety.mjs",
     "release:gate": "node scripts/release-readiness-gate.mjs"
   },
   "dependencies": {

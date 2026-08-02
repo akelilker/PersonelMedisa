@@ -10,6 +10,7 @@ import { usePersoneller } from "../../../hooks/usePersoneller";
 import { formatAktifDurumLabel } from "../../../lib/display/enum-display";
 import type { Personel } from "../../../types/personel";
 import type { IdOption } from "../../../types/referans";
+import { PersonelImportDryRunModal } from "../components/PersonelImportDryRunModal";
 
 function IconSearch(props: { className?: string }) {
   return (
@@ -196,6 +197,7 @@ export function PersonellerPage() {
 
   const { hasPermission } = useRoleAccess();
   const canOpenDetail = hasPermission("personeller.detail.view");
+  const canCreatePersonel = hasPermission("personeller.create");
   const canViewPuantaj = hasPermission("puantaj.view");
   const canViewBildirimler = hasPermission("bildirimler.view");
   const canViewRevizyon = hasPermission("revizyon.view");
@@ -205,6 +207,7 @@ export function PersonellerPage() {
   const [filterExpanded, setFilterExpanded] = useState(false);
   const [moduleMenuOpen, setModuleMenuOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"list" | "grid">("grid");
+  const [importModalOpen, setImportModalOpen] = useState(false);
 
   const { draft } = listQuery;
   const page = listQuery.page;
@@ -289,6 +292,16 @@ export function PersonellerPage() {
             </button>
           </div>
           <div className="personeller-toolbar-right">
+            {canCreatePersonel ? (
+              <button
+                type="button"
+                className="universal-btn-aux personeller-import-action"
+                data-testid="personeller-import-dry-run-open"
+                onClick={() => setImportModalOpen(true)}
+              >
+                Toplu Personel Hazırlama
+              </button>
+            ) : null}
             <button
               type="button"
               className="personeller-icon-btn"
@@ -642,6 +655,11 @@ export function PersonellerPage() {
           Sonraki
         </button>
       </div>
+
+      <PersonelImportDryRunModal
+        open={importModalOpen}
+        onClose={() => setImportModalOpen(false)}
+      />
     </section>
   );
 }

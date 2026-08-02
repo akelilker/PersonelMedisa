@@ -4899,6 +4899,188 @@ export function resolveDemoApiResponse(
     );
   }
 
+  if (pathname === "/personeller/import/template.csv" && method === "GET") {
+    const header =
+      "tc_kimlik_no;sicil_no;ad;soyad;dogum_tarihi;dogum_yeri;telefon;kan_grubu;acil_durum_kisi;acil_durum_telefon;ise_giris_tarihi;sube;departman;gorev;personel_tipi";
+    return ok(`\uFEFF${header}\r\n`);
+  }
+
+  if (pathname === "/personeller/import/dry-run" && method === "POST") {
+    const csvText = toStringValue(body.csv) ?? toStringValue(body.csv_text) ?? "";
+    if (!csvText.trim()) {
+      return demoRevizyonError("PERSONEL_IMPORT_DOSYA_GECERSIZ", "CSV dosyasi veya csv alani zorunludur.");
+    }
+    if (/maas_tutari|ucret_tipi_id|ucret_modeli|aylik_ucret|gunluk_ucret|saatlik_ucret|ucret_turu/i.test(csvText)) {
+      return demoRevizyonError(
+        "PERSONEL_IMPORT_UCRET_KARARI_BEKLENIYOR",
+        "Bu asama ucret/bordro alanlarini kabul etmez. Ucret modeli karari bekleniyor."
+      );
+    }
+
+    const lines = csvText
+      .replace(/^\uFEFF/, "")
+      .split(/\r\n|\n|\r/)
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0);
+    if (lines.length === 0) {
+      return demoRevizyonError("PERSONEL_IMPORT_EKSIK_ZORUNLU_KOLON", "CSV baslik satiri zorunludur.");
+    }
+
+    const delimiter = (lines[0].match(/;/g)?.length ?? 0) >= (lines[0].match(/,/g)?.length ?? 0) ? ";" : ",";
+    const headers = lines[0].split(delimiter).map((h) => h.trim());
+    const required = [
+      "tc_kimlik_no",
+      "sicil_no",
+      "ad",
+      "soyad",
+      "dogum_tarihi",
+      "telefon",
+      "acil_durum_kisi",
+      "acil_durum_telefon",
+      "ise_giris_tarihi",
+      "sube",
+      "departman",
+      "gorev",
+      "personel_tipi"
+    ];
+    for (const col of required) {
+      if (!headers.includes(col)) {
+        return demoRevizyonError("PERSONEL_IMPORT_EKSIK_ZORUNLU_KOLON", `Eksik zorunlu kolon: ${col}`);
+      }
+    }
+    const allowed = new Set([...required, "dogum_yeri", "kan_grubu"]);
+    for (const header of headers) {
+      if (!allowed.has(header)) {
+        return demoRevizyonError("PERSONEL_IMPORT_BILINMEYEN_KOLON", `Bilinmeyen kolon: ${header}`);
+      }
+    }
+
+    const dataRows = lines.slice(1);
+    if (dataRows.length > 500) {
+      return demoRevizyonError("PERSONEL_IMPORT_SATIR_SINIRI", "CSV en fazla 500 satir icerebilir.");
+    }
+
+    const subeByName = new Map<string, number[]>();
+    for (const sube of demoState.subeler) {
+      const list = subeByName.get(sube.ad) ?? [];
+      list.push(sube.id);
+      subeByName.set(sube.ad, list);
+    }
+    const departmanByName = new Map<string, number[]>();
+    for (const dep of demoState.departmanlar) {
+      const list = departmanByName.get(dep.ad) ?? [];
+      list.push(dep.id);
+      departmanByName.set(dep.ad, list);
+    }
+    const gorevByName = new Map<string, number[]>();
+    for (const [id, ad] of Object.entries(DEMO_GOREV_LABELS)) {
+      const list = gorevByName.get(ad) ?? [];
+      list.push(Number(id));
+      gorevByName.set(ad, list);
+    }
+    const tipByName = new Map<string, number[]>();
+    for (const [id, ad] of Object.entries(DEMO_PERSONEL_TIPI_LABELS)) {
+      const list = tipByName.get(ad) ?? [];
+      list.push(Number(id));
+      tipByName.set(ad, list);
+    }
+
+    const seenTc = new Set<string>();
+    const seenSicil = new Set<string>();
+    const satirlar: Array<Record<string, unknown>> = [];
+    let gecerli = 0;
+    let hatali = 0;
+    let mevcut = 0;
+
+    dataRows.forEach((line, index) => {
+      const cells = line.split(delimiter).map((c) => c.trim());
+      const row: Record<string, string> = {};
+      headers.forEach((header, i) => {
+        row[header] = cells[i] ?? "";
+      });
+      const hataKodlari: string[] = [];
+      const tc = row.tc_kimlik_no ?? "";
+      const sicil = row.sicil_no ?? "";
+      const masked =
+        tc.length >= 5
+          ? `${tc.slice(0, 3)}${"*".repeat(tc.length - 5)}${tc.slice(-2)}`
+          : tc.length >= 2
+            ? `${"*".repeat(Math.max(0, tc.length - 2))}${tc.slice(-2)}`
+            : "***********";
+
+      if (!/^\d{11}$/.test(tc)) {
+        hataKodlari.push(tc ? "PERSONEL_IMPORT_GECERSIZ_TC" : "PERSONEL_IMPORT_EKSIK_ALAN");
+      }
+      if (!sicil) hataKodlari.push("PERSONEL_IMPORT_EKSIK_ALAN");
+      if (!row.ad || !row.soyad) hataKodlari.push("PERSONEL_IMPORT_EKSIK_ALAN");
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(row.dogum_tarihi ?? "")) {
+        hataKodlari.push("PERSONEL_IMPORT_GECERSIZ_TARIH");
+      }
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(row.ise_giris_tarihi ?? "")) {
+        hataKodlari.push("PERSONEL_IMPORT_GECERSIZ_TARIH");
+      }
+
+      const resolve = (name: string, map: Map<string, number[]>) => {
+        const ids = map.get(name);
+        if (!name) return;
+        if (!ids || ids.length === 0) hataKodlari.push("PERSONEL_IMPORT_REFERANS_BULUNAMADI");
+        else if (ids.length > 1) hataKodlari.push("PERSONEL_IMPORT_REFERANS_BELIRSIZ");
+      };
+      resolve(row.sube ?? "", subeByName);
+      resolve(row.departman ?? "", departmanByName);
+      resolve(row.gorev ?? "", gorevByName);
+      resolve(row.personel_tipi ?? "", tipByName);
+
+      if (tc && seenTc.has(tc)) hataKodlari.push("PERSONEL_IMPORT_DOSYA_ICI_DUPLICATE_TC");
+      if (tc) seenTc.add(tc);
+      if (sicil && seenSicil.has(sicil.toLowerCase())) hataKodlari.push("PERSONEL_IMPORT_DOSYA_ICI_DUPLICATE_SICIL");
+      if (sicil) seenSicil.add(sicil.toLowerCase());
+
+      const dbTc = demoState.personeller.some((p) => p.tc_kimlik_no === tc);
+      const dbSicil = demoState.personeller.some(
+        (p) => (p.sicil_no ?? "").toLowerCase() === sicil.toLowerCase()
+      );
+      if (dbTc) {
+        hataKodlari.push("PERSONEL_IMPORT_TC_MEVCUT");
+        mevcut += 1;
+      } else if (dbSicil) {
+        hataKodlari.push("PERSONEL_IMPORT_SICIL_MEVCUT");
+        mevcut += 1;
+      }
+
+      const uniqueErrors = Array.from(new Set(hataKodlari));
+      const isValid = uniqueErrors.length === 0;
+      if (isValid) gecerli += 1;
+      else hatali += 1;
+
+      satirlar.push({
+        satir_no: index + 2,
+        sicil_no: sicil,
+        tc_kimlik_no_masked: masked,
+        durum: isValid ? "GECERLI" : dbTc || dbSicil ? "MEVCUT" : "HATALI",
+        hata_kodlari: uniqueErrors,
+        uyarilar: []
+      });
+    });
+
+    return ok({
+      ozet: {
+        toplam_satir: dataRows.length,
+        gecerli_satir: gecerli,
+        hatali_satir: hatali,
+        warning_sayisi: 0,
+        kayit_olusturulacak_aday: gecerli,
+        veritabaninda_mevcut: mevcut
+      },
+      satirlar,
+      yazma: {
+        personel_write: false,
+        salary_write: false,
+        wage_model_assumption: false
+      }
+    });
+  }
+
   if (pathname === "/personeller" && method === "POST") {
     const subeId = toNumber(body.sube_id);
     if (subeId === null) {

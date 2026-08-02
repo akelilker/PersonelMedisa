@@ -10,6 +10,10 @@ use Medisa\Api\Database\Connection;
 use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
 use Medisa\Api\Scope\SubeScope;
+use Medisa\Api\Services\Personel\PersonelCanonicalValidator;
+use Medisa\Api\Services\Personel\PersonelImportDryRunService;
+use Medisa\Api\Services\Personel\PersonelImportException;
+use Medisa\Api\Services\Personel\PersonelValidationException;
 use Medisa\Api\Services\PersonelUcretException;
 use Medisa\Api\Services\PersonelUcretService;
 use PDO;
@@ -174,7 +178,11 @@ class PersonellerController
         if ($hasSalary && !RolePermissions::has($user, 'personeller.ucret.manage')) {
             JsonResponse::error(403, 'SALARY_ACCESS_FORBIDDEN', 'Ucret bilgisi yonetme yetkiniz yok.');
         }
-        $payload = self::normalizeAndValidateCreatePayload($body);
+        try {
+            $payload = PersonelCanonicalValidator::normalizeAndValidateCreatePayload($body);
+        } catch (PersonelValidationException $e) {
+            JsonResponse::error(422, $e->getCodeString(), $e->getMessage(), $e->getField());
+        }
         if ($hasSalary && ($payload['maas_tutari'] === null || (float) $payload['maas_tutari'] <= 0)) {
             JsonResponse::error(400, 'SALARY_AMOUNT_INVALID', 'Ücret tutarı sıfırdan büyük olmalıdır.', 'maas_tutari');
         }
@@ -242,7 +250,11 @@ class PersonellerController
         if ($hasSalary && !RolePermissions::has($user, 'personeller.ucret.manage')) {
             JsonResponse::error(403, 'SALARY_ACCESS_FORBIDDEN', 'Ucret bilgisi yonetme yetkiniz yok.');
         }
-        $payload = self::normalizeAndValidateUpdatePayload($body);
+        try {
+            $payload = PersonelCanonicalValidator::normalizeAndValidateUpdatePayload($body);
+        } catch (PersonelValidationException $e) {
+            JsonResponse::error(422, $e->getCodeString(), $e->getMessage(), $e->getField());
+        }
         if ($hasSalary && (!array_key_exists('maas_tutari', $payload) || $payload['maas_tutari'] === null || (float) $payload['maas_tutari'] <= 0)) {
             JsonResponse::error(400, 'SALARY_AMOUNT_INVALID', 'Ücret tutarı sıfırdan büyük olmalıdır.', 'maas_tutari');
         }
@@ -311,159 +323,87 @@ class PersonellerController
         }
     }
 
-    /** @param array<string, mixed> $body @return array<string, mixed> */
-    private static function normalizeAndValidateUpdatePayload(array $body)
+    public static function importTemplate(Request $request)
     {
-        $payload = [];
+        $user = AuthMiddleware::authenticate($request, true);
+        RolePermissions::assert($user, 'personeller.create');
 
-        if (array_key_exists('effective_date', $body) && $body['effective_date'] !== null && trim((string) $body['effective_date']) !== '') {
-            $effectiveDate = trim((string) $body['effective_date']);
-            if (!self::isValidDateString($effectiveDate)) {
-                self::validationError('effective_date', 'Gecerli bir tarih olmalidir.');
-            }
+        $csv = PersonelImportDryRunService::buildTemplateCsv();
+        if (!headers_sent()) {
+            header('Content-Type: text/csv; charset=utf-8');
+            header('Content-Disposition: attachment; filename="personel-import-sablon.csv"');
+            http_response_code(200);
         }
-
-        if (array_key_exists('tc_kimlik_no', $body)) {
-            $tcKimlikNo = trim((string) $body['tc_kimlik_no']);
-            if (!preg_match('/^\d{11}$/', $tcKimlikNo)) {
-                self::validationError('tc_kimlik_no', 'T.C. Kimlik No 11 hane olmalidir.');
-            }
-            $payload['tc_kimlik_no'] = $tcKimlikNo;
-        }
-
-        foreach (['ad', 'soyad', 'telefon', 'acil_durum_kisi', 'acil_durum_telefon', 'sicil_no'] as $field) {
-            if (array_key_exists($field, $body)) {
-                $payload[$field] = self::requireTrimmedString($body, $field, 'Gecersiz deger.');
-            }
-        }
-
-        foreach (['dogum_tarihi', 'ise_giris_tarihi'] as $field) {
-            if (array_key_exists($field, $body)) {
-                $payload[$field] = self::requireValidDate($body, $field, 'Gecerli bir tarih olmalidir.');
-            }
-        }
-
-        foreach (['dogum_yeri', 'kan_grubu'] as $field) {
-            if (array_key_exists($field, $body)) {
-                $payload[$field] = self::optionalTrimmedString($body, $field);
-            }
-        }
-
-        if (array_key_exists('kan_grubu', $payload) && $payload['kan_grubu'] !== null && !in_array($payload['kan_grubu'], self::validKanGruplari(), true)) {
-            self::validationError('kan_grubu', 'Gecersiz kan grubu.');
-        }
-
-        if (array_key_exists('sube_id', $body)) {
-            $payload['sube_id'] = self::requirePositiveInt($body, 'sube_id', 'Sube secilmelidir.');
-        }
-
-        foreach (['departman_id', 'gorev_id', 'bagli_amir_id', 'personel_tipi_id'] as $field) {
-            if (array_key_exists($field, $body)) {
-                $payload[$field] = self::optionalPositiveInt($body, $field);
-            }
-        }
-
-        foreach (['ucret_tipi_id', 'prim_kurali_id'] as $field) {
-            if (array_key_exists($field, $body)) {
-                $value = self::optionalPositiveInt($body, $field);
-                if ($value !== null && !in_array($value, [1, 2, 3], true)) {
-                    self::validationError($field, 'Gecersiz deger.');
-                }
-                $payload[$field] = $value;
-            }
-        }
-
-        if (array_key_exists('net_maas_tutari', $body) || array_key_exists('maas_tutari', $body)) {
-            $payload['maas_tutari'] = self::resolveMaasTutariFromBody($body);
-        }
-
-        if (array_key_exists('aktif_durum', $body)) {
-            $aktifDurum = strtoupper(trim((string) $body['aktif_durum']));
-            if (!in_array($aktifDurum, ['AKTIF', 'PASIF'], true)) {
-                self::validationError('aktif_durum', 'Aktif durum AKTIF veya PASIF olmalidir.');
-            }
-            $payload['aktif_durum'] = $aktifDurum;
-        }
-
-        return $payload;
+        echo $csv;
+        exit;
     }
 
-    /** @param array<string, mixed> $body @return array<string, mixed> */
-    private static function normalizeAndValidateCreatePayload(array $body)
+    public static function importDryRun(Request $request)
     {
-        if (!array_key_exists('tc_kimlik_no', $body) || trim((string) $body['tc_kimlik_no']) === '') {
-            self::validationError('tc_kimlik_no', 'T.C. Kimlik No zorunludur.');
+        $user = AuthMiddleware::authenticate($request, true);
+        RolePermissions::assert($user, 'personeller.create');
+
+        try {
+            $pdo = Connection::get();
+        } catch (\Throwable $e) {
+            JsonResponse::serverError('Veritabani baglantisi kurulamadi.');
         }
 
-        $tcKimlikNo = trim((string) $body['tc_kimlik_no']);
-        if (!preg_match('/^\d{11}$/', $tcKimlikNo)) {
-            self::validationError('tc_kimlik_no', 'T.C. Kimlik No 11 hane olmalidir.');
+        $csvContent = self::readImportCsvContent($request);
+        $activeSube = $request->getHeader('x-active-sube-id');
+
+        try {
+            $result = PersonelImportDryRunService::dryRun($pdo, $csvContent, $user, $activeSube);
+        } catch (PersonelImportException $e) {
+            $message = $e->getMessage();
+            if (preg_match('/\d{11}/', $message)) {
+                $message = 'Personel import dogrulama hatasi.';
+            }
+            JsonResponse::error($e->getHttpStatus(), $e->getCodeString(), $message);
         }
 
-        $ad = self::requireTrimmedString($body, 'ad', 'Ad zorunludur.');
-        $soyad = self::requireTrimmedString($body, 'soyad', 'Soyad zorunludur.');
+        JsonResponse::success($result);
+    }
 
-        $dogumTarihi = self::requireValidDate($body, 'dogum_tarihi', 'Dogum tarihi zorunludur.');
-        $telefon = self::requireTrimmedString($body, 'telefon', 'Telefon zorunludur.');
-        $acilDurumKisi = self::requireTrimmedString($body, 'acil_durum_kisi', 'Acil durum kisi zorunludur.');
-        $acilDurumTelefon = self::requireTrimmedString($body, 'acil_durum_telefon', 'Acil durum telefonu zorunludur.');
-        $sicilNo = self::requireTrimmedString($body, 'sicil_no', 'Sicil no zorunludur.');
-        $iseGirisTarihi = self::requireValidDate($body, 'ise_giris_tarihi', 'Ise giris tarihi zorunludur.');
+    /** @return string */
+    private static function readImportCsvContent(Request $request)
+    {
+        if (isset($_FILES['file']) && is_array($_FILES['file'])) {
+            $file = $_FILES['file'];
+            $error = (int) ($file['error'] ?? UPLOAD_ERR_NO_FILE);
+            if ($error !== UPLOAD_ERR_OK) {
+                JsonResponse::error(400, 'PERSONEL_IMPORT_DOSYA_GECERSIZ', 'CSV dosyasi yuklenemedi.');
+            }
+            $size = (int) ($file['size'] ?? 0);
+            if ($size > PersonelImportDryRunService::MAX_BYTES) {
+                JsonResponse::error(400, 'PERSONEL_IMPORT_DOSYA_BOYUTU', 'CSV dosyasi en fazla 2 MB olabilir.');
+            }
+            $tmp = (string) ($file['tmp_name'] ?? '');
+            if ($tmp === '' || !is_uploaded_file($tmp)) {
+                JsonResponse::error(400, 'PERSONEL_IMPORT_DOSYA_GECERSIZ', 'CSV dosyasi yuklenemedi.');
+            }
+            $content = file_get_contents($tmp);
+            if ($content === false) {
+                JsonResponse::error(400, 'PERSONEL_IMPORT_DOSYA_GECERSIZ', 'CSV dosyasi okunamadi.');
+            }
 
-        $subeId = self::requirePositiveInt($body, 'sube_id', 'Sube secilmelidir.');
-        $departmanId = self::requirePositiveInt($body, 'departman_id', 'Departman secilmelidir.');
-        $gorevId = self::requirePositiveInt($body, 'gorev_id', 'Gorev secilmelidir.');
-        $personelTipiId = self::requirePositiveInt($body, 'personel_tipi_id', 'Personel tipi secilmelidir.');
-
-        if (!array_key_exists('aktif_durum', $body)) {
-            self::validationError('aktif_durum', 'Aktif durum zorunludur.');
-        }
-        $aktifDurum = strtoupper(trim((string) $body['aktif_durum']));
-        if (!in_array($aktifDurum, ['AKTIF', 'PASIF'], true)) {
-            self::validationError('aktif_durum', 'Aktif durum AKTIF veya PASIF olmalidir.');
-        }
-
-        $dogumYeri = self::optionalTrimmedString($body, 'dogum_yeri');
-        $kanGrubu = self::optionalTrimmedString($body, 'kan_grubu');
-        if ($kanGrubu !== null && !in_array($kanGrubu, self::validKanGruplari(), true)) {
-            self::validationError('kan_grubu', 'Gecersiz kan grubu.');
-        }
-
-        $bagliAmirId = self::optionalPositiveInt($body, 'bagli_amir_id');
-        $ucretTipiId = self::optionalPositiveInt($body, 'ucret_tipi_id');
-        if ($ucretTipiId !== null && !in_array($ucretTipiId, [1, 2, 3], true)) {
-            self::validationError('ucret_tipi_id', 'Gecersiz ucret tipi.');
+            return $content;
         }
 
-        $primKuraliId = self::optionalPositiveInt($body, 'prim_kurali_id');
-        if ($primKuraliId !== null && !in_array($primKuraliId, [1, 2, 3], true)) {
-            self::validationError('prim_kurali_id', 'Gecersiz prim kurali.');
+        $body = $request->getJsonBody();
+        if (isset($body['csv']) && is_string($body['csv'])) {
+            return $body['csv'];
+        }
+        if (isset($body['csv_text']) && is_string($body['csv_text'])) {
+            return $body['csv_text'];
         }
 
-        $maasTutari = self::resolveMaasTutariFromBody($body);
+        $contentType = strtolower((string) $request->getHeader('content-type', ''));
+        if (strpos($contentType, 'text/csv') !== false || strpos($contentType, 'text/plain') !== false) {
+            return $request->getRawBody();
+        }
 
-        return [
-            'tc_kimlik_no' => $tcKimlikNo,
-            'ad' => $ad,
-            'soyad' => $soyad,
-            'dogum_tarihi' => $dogumTarihi,
-            'telefon' => $telefon,
-            'acil_durum_kisi' => $acilDurumKisi,
-            'acil_durum_telefon' => $acilDurumTelefon,
-            'sicil_no' => $sicilNo,
-            'ise_giris_tarihi' => $iseGirisTarihi,
-            'sube_id' => $subeId,
-            'departman_id' => $departmanId,
-            'gorev_id' => $gorevId,
-            'personel_tipi_id' => $personelTipiId,
-            'aktif_durum' => $aktifDurum,
-            'dogum_yeri' => $dogumYeri,
-            'kan_grubu' => $kanGrubu,
-            'bagli_amir_id' => $bagliAmirId,
-            'ucret_tipi_id' => $ucretTipiId,
-            'maas_tutari' => $maasTutari,
-            'prim_kurali_id' => $primKuraliId,
-        ];
+        JsonResponse::error(400, 'PERSONEL_IMPORT_DOSYA_GECERSIZ', 'CSV dosyasi veya csv alani zorunludur.');
     }
 
     /** @param array<string, mixed> $user */
@@ -743,154 +683,9 @@ class PersonellerController
         return strpos($message, 'uq_personeller_tc') !== false || strpos($message, 'tc_kimlik_no') !== false;
     }
 
-    /** @param array<string, mixed> $body */
-    private static function requireTrimmedString(array $body, $field, $message)
-    {
-        if (!array_key_exists($field, $body)) {
-            self::validationError((string) $field, $message);
-        }
-
-        $value = trim((string) $body[$field]);
-        if ($value === '') {
-            self::validationError((string) $field, $message);
-        }
-
-        return $value;
-    }
-
-    /** @param array<string, mixed> $body */
-    private static function requireValidDate(array $body, $field, $missingMessage)
-    {
-        if (!array_key_exists($field, $body) || trim((string) $body[$field]) === '') {
-            self::validationError((string) $field, $missingMessage);
-        }
-
-        $value = trim((string) $body[$field]);
-        if (!self::isValidDateString($value)) {
-            self::validationError((string) $field, 'Gecerli bir tarih olmalidir.');
-        }
-
-        return $value;
-    }
-
-    /** @param array<string, mixed> $body */
-    private static function requirePositiveInt(array $body, $field, $message)
-    {
-        if (!array_key_exists($field, $body)) {
-            self::validationError((string) $field, $message);
-        }
-
-        $value = self::parsePositiveInt($body[$field]);
-        if ($value === null) {
-            self::validationError((string) $field, $message);
-        }
-
-        return $value;
-    }
-
-    /** @param array<string, mixed> $body */
-    private static function optionalTrimmedString(array $body, $field)
-    {
-        if (!array_key_exists($field, $body) || $body[$field] === null) {
-            return null;
-        }
-
-        $value = trim((string) $body[$field]);
-
-        return $value === '' ? null : $value;
-    }
-
-    /** @param array<string, mixed> $body */
-    private static function optionalPositiveInt(array $body, $field)
-    {
-        if (!array_key_exists($field, $body) || $body[$field] === null || $body[$field] === '') {
-            return null;
-        }
-
-        $value = self::parsePositiveInt($body[$field]);
-        if ($value === null) {
-            self::validationError((string) $field, 'Gecersiz deger.');
-        }
-
-        return $value;
-    }
-
-    /** @param array<string, mixed> $body */
-    private static function optionalNonNegativeNumber(array $body, $field)
-    {
-        if (!array_key_exists($field, $body) || $body[$field] === null || $body[$field] === '') {
-            return null;
-        }
-
-        if (!is_numeric($body[$field])) {
-            self::validationError((string) $field, 'Maas tutari sayisal olmalidir.');
-        }
-
-        $value = (float) $body[$field];
-        if ($value < 0) {
-            self::validationError((string) $field, 'Maas tutari sifirdan kucuk olamaz.');
-        }
-
-        return $value;
-    }
-
-    /** @param mixed $value */
-    private static function parsePositiveInt($value)
-    {
-        if ($value === null || $value === '') {
-            return null;
-        }
-
-        if (is_string($value) && trim($value) !== $value) {
-            return null;
-        }
-
-        if (!is_numeric($value)) {
-            return null;
-        }
-
-        $parsed = (int) $value;
-        if ($parsed <= 0 || (string) $parsed !== trim((string) $value)) {
-            return null;
-        }
-
-        return $parsed;
-    }
-
-    private static function isValidDateString($value)
-    {
-        if (!is_string($value) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $value)) {
-            return false;
-        }
-
-        [$year, $month, $day] = array_map('intval', explode('-', $value));
-
-        return checkdate($month, $day, $year);
-    }
-
-    /** @return array<int, string> */
-    private static function validKanGruplari()
-    {
-        return ['A Rh+', 'A Rh-', 'B Rh+', 'B Rh-', 'AB Rh+', 'AB Rh-', '0 Rh+', '0 Rh-'];
-    }
-
     private static function validationError($field, $message)
     {
         JsonResponse::error(422, 'VALIDATION_ERROR', $message, $field);
-    }
-
-    /** @param array<string, mixed> $body */
-    private static function resolveMaasTutariFromBody(array $body)
-    {
-        if (array_key_exists('net_maas_tutari', $body)) {
-            return self::optionalNonNegativeNumber($body, 'net_maas_tutari');
-        }
-
-        if (array_key_exists('maas_tutari', $body)) {
-            return self::optionalNonNegativeNumber($body, 'maas_tutari');
-        }
-
-        return null;
     }
 
     /** @param mixed $value */

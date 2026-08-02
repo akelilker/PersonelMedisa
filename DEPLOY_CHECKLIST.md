@@ -116,6 +116,10 @@ GitHub Actions deploy workflow'u şu dosyaları ayrıca gönderir:
 
 Canlı `config.local.php` sunucuda kalmalı; gerçek DB secret bilgileri repodan gelmemelidir.
 
+`api/.htaccess` canlı `config.local.php` ve backup/temp türevlerini (`*.bak`, `*.old`, `*.tmp`, `~`,
+suffix/path varyantları) web’den engeller. Config yedeği yalnız web root dışında tutulur
+(private dizin `0700`, yedek dosya `0600`); web root içinde `config.local.php.*` / `~` oluşturulmaz.
+
 ## Deploy Sonrası Canlı Smoke Checklist
 
 Deploy cPanel workflow **success** sonrası aşağıdaki adımları sırayla uygula. `<BASE_URL>` yerine canlı host adresini kullan.

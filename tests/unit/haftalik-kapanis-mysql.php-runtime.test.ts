@@ -56,7 +56,7 @@ describe("HaftalikKapanisController MariaDB", () => {
     const migrations = readdirSync(resolve(process.cwd(), "api/migrations"))
       .filter((name) => name.endsWith(".sql"))
       .sort();
-    expect(migrations.at(-1)).toBe("044_puantaj_aylik_muhur_revision_reopen.sql");
+    expect(migrations.at(-1)).toBe("045_sirket_politikasi_kanit_owner.sql");
   });
 
   it("runs HTTP haftalik kapanis acceptance on MariaDB", () => {

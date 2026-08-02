@@ -53,6 +53,6 @@ describe("016_donem_kapanis_auditleri migration source", () => {
       .filter((name) => /^\d{3}_.*\.sql$/.test(name))
       .sort();
     expect(migrations).toContain("016_donem_kapanis_auditleri.sql");
-    expect(migrations.at(-1)).toBe("044_puantaj_aylik_muhur_revision_reopen.sql");
+    expect(migrations.at(-1)).toBe("045_sirket_politikasi_kanit_owner.sql");
   });
 });

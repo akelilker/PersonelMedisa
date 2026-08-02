@@ -125,6 +125,8 @@ class SirketCalismaPolitikasiService
             $hashDegisecek = (string) $onceki['policy_version_hash'] !== (string) $detail['policy_version_hash'];
         }
 
+        $evidenceStatus = (string) ($detail['evidence_status'] ?? 'MISSING');
+
         return [
             'politika_id' => (int) $detail['id'],
             'revision_no' => (int) $detail['revision_no'],
@@ -132,6 +134,11 @@ class SirketCalismaPolitikasiService
             'gecerlilik_baslangic' => (string) $detail['gecerlilik_baslangic'],
             'gecerlilik_bitis' => $detail['gecerlilik_bitis'],
             'policy_version_hash' => $detail['policy_version_hash'],
+            'belge_id' => $detail['belge_id'] ?? null,
+            'belge_sha256' => $detail['belge_sha256'] ?? null,
+            'evidence_status' => $evidenceStatus,
+            'evidence_ready_for_approval' => $evidenceStatus === 'PRESENT_VALID',
+            'hazirlayan_id' => $detail['hazirlayan_id'] ?? null,
             'zorunlu_parametreler' => $required,
             'eksik_parametreler' => $eksik,
             'onceki_onayli' => $onceki,
@@ -252,10 +259,10 @@ class SirketCalismaPolitikasiService
             $ins = $pdo->prepare(
                 'INSERT INTO sirket_calisma_politikalari (
                     revision_no, parent_politika_id, state, gecerlilik_baslangic, gecerlilik_bitis,
-                    aciklama, hazirlayan_id, created_by, updated_by
+                    aciklama, belge_id, belge_sha256, hazirlayan_id, created_by, updated_by
                  ) VALUES (
                     :revision_no, :parent_id, \'TASLAK\', :baslangic, :bitis,
-                    :aciklama, :hazirlayan, :created_by, :updated_by
+                    :aciklama, :belge_id, :belge_sha256, :hazirlayan, :created_by, :updated_by
                  )'
             );
             $ins->execute([
@@ -264,6 +271,8 @@ class SirketCalismaPolitikasiService
                 'baslangic' => $data['gecerlilik_baslangic'],
                 'bitis' => $data['gecerlilik_bitis'],
                 'aciklama' => $data['aciklama'],
+                'belge_id' => $data['belge_id'],
+                'belge_sha256' => $data['belge_sha256'],
                 'hazirlayan' => self::actorId($actor),
                 'created_by' => self::actorId($actor),
                 'updated_by' => self::actorId($actor),
@@ -303,12 +312,15 @@ class SirketCalismaPolitikasiService
             $upd = $pdo->prepare(
                 'UPDATE sirket_calisma_politikalari SET
                     gecerlilik_baslangic = :baslangic, gecerlilik_bitis = :bitis, aciklama = :aciklama,
+                    belge_id = :belge_id, belge_sha256 = :belge_sha256,
                     updated_by = :updated_by WHERE id = :id'
             );
             $upd->execute([
                 'baslangic' => $data['gecerlilik_baslangic'],
                 'bitis' => $data['gecerlilik_bitis'],
                 'aciklama' => $data['aciklama'],
+                'belge_id' => $data['belge_id'],
+                'belge_sha256' => $data['belge_sha256'],
                 'updated_by' => self::actorId($actor),
                 'id' => (int) $id,
             ]);
@@ -342,6 +354,7 @@ class SirketCalismaPolitikasiService
                 throw new SirketCalismaPolitikasiException('POLICY_INVALID_STATE', 'Yalniz taslak politika onaya gonderilebilir.', 409);
             }
             self::assertCompleteDegerler($pdo, (int) $id);
+            self::assertEvidenceComplete($pdo, (int) $id);
             $onceki = self::mapPolitika($row);
             $pdo->prepare("UPDATE sirket_calisma_politikalari SET state = 'ONAY_BEKLIYOR', updated_by = :u WHERE id = :id")
                 ->execute(['u' => self::actorId($actor), 'id' => (int) $id]);
@@ -371,6 +384,16 @@ class SirketCalismaPolitikasiService
                 throw new SirketCalismaPolitikasiException('POLICY_INVALID_STATE', 'Yalniz onay bekleyen politika onaylanabilir.', 409);
             }
             self::assertCompleteDegerler($pdo, (int) $id);
+            self::assertEvidenceComplete($pdo, (int) $id);
+            $hazirlayanId = $row['hazirlayan_id'] !== null ? (int) $row['hazirlayan_id'] : null;
+            $actorId = self::actorId($actor);
+            if ($hazirlayanId !== null && $actorId !== null && $hazirlayanId === $actorId) {
+                throw new SirketCalismaPolitikasiException(
+                    'POLICY_SELF_APPROVAL_FORBIDDEN',
+                    'Hazirlayan kullanici politikayi onaylayamaz.',
+                    409
+                );
+            }
             $openApproved = $pdo->query(
                 "SELECT id FROM sirket_calisma_politikalari WHERE state = 'ONAYLANDI' AND gecerlilik_bitis IS NULL LIMIT 1 FOR UPDATE"
             )->fetch(PDO::FETCH_ASSOC);
@@ -466,13 +489,119 @@ class SirketCalismaPolitikasiService
         if (!is_array($degerler) || count($degerler) === 0) {
             throw new SirketCalismaPolitikasiException('VALIDATION_ERROR', 'degerler zorunludur.', 400);
         }
+        $evidence = self::normalizeEvidenceFields($payload);
 
         return [
             'gecerlilik_baslangic' => $baslangic,
             'gecerlilik_bitis' => $bitis,
             'aciklama' => isset($payload['aciklama']) ? trim((string) $payload['aciklama']) : null,
+            'belge_id' => $evidence['belge_id'],
+            'belge_sha256' => $evidence['belge_sha256'],
             'degerler' => $degerler,
         ];
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @return array{belge_id: ?string, belge_sha256: ?string}
+     */
+    private static function normalizeEvidenceFields(array $payload)
+    {
+        $rawId = array_key_exists('belge_id', $payload) ? $payload['belge_id'] : null;
+        $rawSha = array_key_exists('belge_sha256', $payload) ? $payload['belge_sha256'] : null;
+
+        $idTrim = $rawId === null ? '' : trim((string) $rawId);
+        $shaTrim = $rawSha === null ? '' : trim((string) $rawSha);
+        $idPresent = $idTrim !== '';
+        $shaPresent = $shaTrim !== '';
+
+        if (!$idPresent && !$shaPresent) {
+            return ['belge_id' => null, 'belge_sha256' => null];
+        }
+
+        if ($idPresent xor $shaPresent) {
+            throw new SirketCalismaPolitikasiException(
+                'POLICY_EVIDENCE_INCOMPLETE',
+                'belge_id ve belge_sha256 birlikte verilmelidir.',
+                400
+            );
+        }
+
+        if (strlen($idTrim) > 160) {
+            throw new SirketCalismaPolitikasiException(
+                'POLICY_EVIDENCE_INCOMPLETE',
+                'belge_id en fazla 160 karakter olabilir.',
+                400
+            );
+        }
+
+        $sha = strtolower($shaTrim);
+        $placeholders = ['tbd', 'pending', 'unknown', str_repeat('0', 64)];
+        if (in_array($sha, $placeholders, true) || !preg_match('/^[0-9a-f]{64}$/', $sha)) {
+            throw new SirketCalismaPolitikasiException(
+                'POLICY_EVIDENCE_HASH_INVALID',
+                'belge_sha256 gecersiz.',
+                400
+            );
+        }
+
+        return ['belge_id' => $idTrim, 'belge_sha256' => $sha];
+    }
+
+    private static function assertEvidenceComplete(PDO $pdo, $politikaId)
+    {
+        $row = self::fetchPolitika($pdo, (int) $politikaId, false);
+        if (!$row) {
+            throw new SirketCalismaPolitikasiException('POLICY_NOT_FOUND', 'Politika bulunamadi.', 404);
+        }
+        $status = self::resolveEvidenceStatus($row);
+        if ($status === 'MISSING' || $status === 'LEGACY_MISSING') {
+            throw new SirketCalismaPolitikasiException(
+                'POLICY_EVIDENCE_REQUIRED',
+                'Onaya gondermek icin karar belgesi kaniti zorunludur.',
+                409,
+                ['evidence_status' => $status]
+            );
+        }
+        if ($status !== 'PRESENT_VALID') {
+            throw new SirketCalismaPolitikasiException(
+                'POLICY_EVIDENCE_INVALID',
+                'Karar belgesi kaniti gecersiz.',
+                409,
+                ['evidence_status' => $status]
+            );
+        }
+    }
+
+    /** @param array<string, mixed> $row */
+    private static function resolveEvidenceStatus(array $row)
+    {
+        if (!array_key_exists('belge_id', $row) || !array_key_exists('belge_sha256', $row)) {
+            return ((string) ($row['state'] ?? '')) === 'ONAYLANDI' ? 'LEGACY_MISSING' : 'MISSING';
+        }
+
+        $idRaw = $row['belge_id'];
+        $shaRaw = $row['belge_sha256'];
+        $idEmpty = $idRaw === null || trim((string) $idRaw) === '';
+        $shaEmpty = $shaRaw === null || trim((string) $shaRaw) === '';
+
+        if ($idEmpty && $shaEmpty) {
+            return ((string) ($row['state'] ?? '')) === 'ONAYLANDI' ? 'LEGACY_MISSING' : 'MISSING';
+        }
+        if ($idEmpty xor $shaEmpty) {
+            return 'INVALID';
+        }
+
+        $id = trim((string) $idRaw);
+        $sha = strtolower(trim((string) $shaRaw));
+        if (strlen($id) > 160 || $id === '') {
+            return 'INVALID';
+        }
+        if (!preg_match('/^[0-9a-f]{64}$/', $sha) || $sha === str_repeat('0', 64)) {
+            return 'INVALID';
+        }
+
+        return 'PRESENT_VALID';
     }
 
     /** @param array<int, array<string, mixed>> $degerler */
@@ -582,6 +711,11 @@ class SirketCalismaPolitikasiService
     /** @param array<string, mixed> $row @return array<string, mixed> */
     private static function mapPolitika(array $row)
     {
+        $belgeId = array_key_exists('belge_id', $row) && $row['belge_id'] !== null
+            ? (string) $row['belge_id'] : null;
+        $belgeSha = array_key_exists('belge_sha256', $row) && $row['belge_sha256'] !== null
+            ? (string) $row['belge_sha256'] : null;
+
         return [
             'id' => (int) $row['id'],
             'revision_no' => (int) $row['revision_no'],
@@ -590,6 +724,9 @@ class SirketCalismaPolitikasiService
             'gecerlilik_baslangic' => (string) $row['gecerlilik_baslangic'],
             'gecerlilik_bitis' => $row['gecerlilik_bitis'] !== null ? (string) $row['gecerlilik_bitis'] : null,
             'aciklama' => $row['aciklama'] !== null ? (string) $row['aciklama'] : null,
+            'belge_id' => $belgeId,
+            'belge_sha256' => $belgeSha,
+            'evidence_status' => self::resolveEvidenceStatus($row),
             'policy_version_hash' => $row['policy_version_hash'] !== null ? (string) $row['policy_version_hash'] : null,
             'hazirlayan_id' => $row['hazirlayan_id'] !== null ? (int) $row['hazirlayan_id'] : null,
             'hazirlayan_ad' => $row['hazirlayan_ad'] ?? null,

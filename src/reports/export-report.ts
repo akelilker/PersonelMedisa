@@ -4,7 +4,11 @@ export function toCsvValue(value: unknown): string {
   if (value === null || value === undefined) {
     return "";
   }
-  const s = typeof value === "object" ? JSON.stringify(value) : String(value);
+  let s = typeof value === "object" ? JSON.stringify(value) : String(value);
+  // Excel formula injection guard (mirror api/src/Http/CsvResponse.php).
+  if (/^[=+\-@]/.test(s)) {
+    s = `'${s}`;
+  }
   const needsQuote = /[",\n\r]/.test(s);
   const escaped = s.replace(/"/g, '""');
   return needsQuote ? `"${escaped}"` : escaped;

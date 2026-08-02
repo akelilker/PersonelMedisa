@@ -4625,6 +4625,154 @@ let personelBelgeKaydiIdCounter = 903;
       return;
     }
 
+    if (path === "/api/personeller/import/template.csv" && method === "GET") {
+      if (!["GENEL_YONETICI", "BOLUM_YONETICISI", "MUHASEBE"].includes(role)) {
+        await fulfillJson(route, 403, errorBody("FORBIDDEN", "Bu islem icin yetkiniz yok."));
+        return;
+      }
+      const header =
+        "tc_kimlik_no;sicil_no;ad;soyad;dogum_tarihi;dogum_yeri;telefon;kan_grubu;acil_durum_kisi;acil_durum_telefon;ise_giris_tarihi;sube;departman;gorev;personel_tipi\r\n";
+      await route.fulfill({
+        status: 200,
+        contentType: "text/csv; charset=utf-8",
+        body: `\uFEFF${header}`
+      });
+      return;
+    }
+
+    if (path === "/api/personeller/import/dry-run" && method === "POST") {
+      if (!["GENEL_YONETICI", "BOLUM_YONETICISI", "MUHASEBE"].includes(role)) {
+        await fulfillJson(route, 403, errorBody("FORBIDDEN", "Bu islem icin yetkiniz yok."));
+        return;
+      }
+      const payload = request.postDataJSON() as { csv?: string; csv_text?: string };
+      const csvText = String(payload.csv ?? payload.csv_text ?? "");
+      if (!csvText.trim()) {
+        await fulfillJson(route, 400, errorBody("PERSONEL_IMPORT_DOSYA_GECERSIZ", "CSV dosyasi veya csv alani zorunludur."));
+        return;
+      }
+      if (/maas_tutari|ucret_tipi_id|ucret_modeli|aylik_ucret|gunluk_ucret|saatlik_ucret|ucret_turu/i.test(csvText)) {
+        await fulfillJson(
+          route,
+          400,
+          errorBody(
+            "PERSONEL_IMPORT_UCRET_KARARI_BEKLENIYOR",
+            "Bu asama ucret/bordro alanlarini kabul etmez. Ucret modeli karari bekleniyor."
+          )
+        );
+        return;
+      }
+
+      const lines = csvText
+        .replace(/^\uFEFF/, "")
+        .split(/\r\n|\n|\r/)
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0);
+      if (lines.length === 0) {
+        await fulfillJson(route, 400, errorBody("PERSONEL_IMPORT_EKSIK_ZORUNLU_KOLON", "CSV baslik satiri zorunludur."));
+        return;
+      }
+      const delimiter =
+        (lines[0].match(/;/g)?.length ?? 0) >= (lines[0].match(/,/g)?.length ?? 0) ? ";" : ",";
+      const headers = lines[0].split(delimiter).map((h) => h.trim());
+      const required = [
+        "tc_kimlik_no",
+        "sicil_no",
+        "ad",
+        "soyad",
+        "dogum_tarihi",
+        "telefon",
+        "acil_durum_kisi",
+        "acil_durum_telefon",
+        "ise_giris_tarihi",
+        "sube",
+        "departman",
+        "gorev",
+        "personel_tipi"
+      ];
+      for (const col of required) {
+        if (!headers.includes(col)) {
+          await fulfillJson(
+            route,
+            400,
+            errorBody("PERSONEL_IMPORT_EKSIK_ZORUNLU_KOLON", `Eksik zorunlu kolon: ${col}`)
+          );
+          return;
+        }
+      }
+      const allowed = new Set([...required, "dogum_yeri", "kan_grubu"]);
+      for (const header of headers) {
+        if (!allowed.has(header)) {
+          await fulfillJson(route, 400, errorBody("PERSONEL_IMPORT_BILINMEYEN_KOLON", `Bilinmeyen kolon: ${header}`));
+          return;
+        }
+      }
+
+      const dataRows = lines.slice(1);
+      if (dataRows.length > 500) {
+        await fulfillJson(route, 400, errorBody("PERSONEL_IMPORT_SATIR_SINIRI", "CSV en fazla 500 satir icerebilir."));
+        return;
+      }
+
+      const satirlar = dataRows.map((line, index) => {
+        const cells = line.split(delimiter).map((c) => c.trim());
+        const row: Record<string, string> = {};
+        headers.forEach((header, i) => {
+          row[header] = cells[i] ?? "";
+        });
+        const hataKodlari: string[] = [];
+        const tc = row.tc_kimlik_no ?? "";
+        const sicil = row.sicil_no ?? "";
+        const masked =
+          tc.length >= 5
+            ? `${tc.slice(0, 3)}${"*".repeat(tc.length - 5)}${tc.slice(-2)}`
+            : tc.length >= 2
+              ? `${"*".repeat(Math.max(0, tc.length - 2))}${tc.slice(-2)}`
+              : "***********";
+        if (!/^\d{11}$/.test(tc)) {
+          hataKodlari.push(tc ? "PERSONEL_IMPORT_GECERSIZ_TC" : "PERSONEL_IMPORT_EKSIK_ALAN");
+        }
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(row.dogum_tarihi ?? "")) {
+          hataKodlari.push("PERSONEL_IMPORT_GECERSIZ_TARIH");
+        }
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(row.ise_giris_tarihi ?? "")) {
+          hataKodlari.push("PERSONEL_IMPORT_GECERSIZ_TARIH");
+        }
+        const uniqueErrors = Array.from(new Set(hataKodlari));
+        return {
+          satir_no: index + 2,
+          sicil_no: sicil,
+          tc_kimlik_no_masked: masked,
+          durum: uniqueErrors.length === 0 ? "GECERLI" : "HATALI",
+          hata_kodlari: uniqueErrors,
+          uyarilar: []
+        };
+      });
+      const gecerli = satirlar.filter((row) => row.hata_kodlari.length === 0).length;
+      const hatali = satirlar.length - gecerli;
+      await fulfillJson(
+        route,
+        200,
+        okBody({
+          ozet: {
+            toplam_satir: satirlar.length,
+            gecerli_satir: gecerli,
+            hatali_satir: hatali,
+            warning_sayisi: 0,
+            kayit_olusturulacak_aday: gecerli,
+            veritabaninda_mevcut: 0
+          },
+          satirlar,
+          yazma: {
+            personel_write: false,
+            salary_write: false,
+            wage_model_assumption: false
+          }
+        })
+      );
+      return;
+    }
+
     if (path === "/api/personeller" && method === "POST") {
       const payload = request.postDataJSON() as Record<string, unknown>;
       const tcKimlikNo = String(payload.tc_kimlik_no ?? "").trim();

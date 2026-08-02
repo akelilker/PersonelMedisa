@@ -2,7 +2,7 @@ import type { ApiResponse, PaginatedResult } from "../types/api";
 import type { Personel, PersonelAktifDurum } from "../types/personel";
 import { appendQueryParams } from "../utils/append-query-params";
 import { logAction } from "../audit/audit-service";
-import { apiRequest } from "./api-client";
+import { ApiRequestError, apiRequest } from "./api-client";
 import { endpoints } from "./endpoints";
 import { normalizePaginatedList } from "./response-normalizers";
 
@@ -346,4 +346,132 @@ export async function updatePersonel(
   const updated = normalizePersonel(response.data);
   logAction({ action: "PERSONEL_UPDATE", payload: { personel_id: updated.id } });
   return updated;
+}
+
+export type PersonelImportDryRunRow = {
+  satir_no: number;
+  sicil_no: string;
+  tc_kimlik_no_masked: string;
+  durum: "GECERLI" | "HATALI" | "MEVCUT" | string;
+  hata_kodlari: string[];
+  uyarilar: string[];
+};
+
+export type PersonelImportDryRunResult = {
+  ozet: {
+    toplam_satir: number;
+    gecerli_satir: number;
+    hatali_satir: number;
+    warning_sayisi: number;
+    kayit_olusturulacak_aday: number;
+    veritabaninda_mevcut: number;
+  };
+  satirlar: PersonelImportDryRunRow[];
+  yazma: {
+    personel_write: boolean;
+    salary_write: boolean;
+    wage_model_assumption: boolean;
+  };
+};
+
+function normalizeImportDryRunResult(value: unknown): PersonelImportDryRunResult {
+  const record = toRecord(value) ?? {};
+  const ozet = toRecord(record.ozet) ?? {};
+  const yazma = toRecord(record.yazma) ?? {};
+  const satirlarRaw = Array.isArray(record.satirlar) ? record.satirlar : [];
+
+  return {
+    ozet: {
+      toplam_satir: Number(ozet.toplam_satir ?? 0),
+      gecerli_satir: Number(ozet.gecerli_satir ?? 0),
+      hatali_satir: Number(ozet.hatali_satir ?? 0),
+      warning_sayisi: Number(ozet.warning_sayisi ?? 0),
+      kayit_olusturulacak_aday: Number(ozet.kayit_olusturulacak_aday ?? 0),
+      veritabaninda_mevcut: Number(ozet.veritabaninda_mevcut ?? 0)
+    },
+    satirlar: satirlarRaw.map((row) => {
+      const r = toRecord(row) ?? {};
+      return {
+        satir_no: Number(r.satir_no ?? 0),
+        sicil_no: String(r.sicil_no ?? ""),
+        tc_kimlik_no_masked: String(r.tc_kimlik_no_masked ?? "***********"),
+        durum: String(r.durum ?? "HATALI"),
+        hata_kodlari: Array.isArray(r.hata_kodlari)
+          ? r.hata_kodlari.map((code) => String(code))
+          : [],
+        uyarilar: Array.isArray(r.uyarilar) ? r.uyarilar.map((u) => String(u)) : []
+      };
+    }),
+    yazma: {
+      personel_write: Boolean(yazma.personel_write),
+      salary_write: Boolean(yazma.salary_write),
+      wage_model_assumption: Boolean(yazma.wage_model_assumption)
+    }
+  };
+}
+
+export async function downloadPersonelImportTemplateCsv(): Promise<void> {
+  const { ApiRequestError, buildApiUrl, shouldPreferDemoApi } = await import("./api-client");
+  const { getAuthTokenForApi } = await import("../auth/auth-token-provider");
+  const { getActiveSubeIdForApiHeader } = await import("../auth/auth-manager");
+  const filename = "personel-import-sablon.csv";
+
+  if (shouldPreferDemoApi()) {
+    const { resolveDemoApiResponse } = await import("./mock-demo");
+    const demoResponse = resolveDemoApiResponse(endpoints.personeller.importTemplate, {
+      method: "GET"
+    });
+    if (demoResponse !== null) {
+      const csvContent =
+        typeof demoResponse.data === "string"
+          ? demoResponse.data
+          : "tc_kimlik_no;sicil_no;ad;soyad;dogum_tarihi;dogum_yeri;telefon;kan_grubu;acil_durum_kisi;acil_durum_telefon;ise_giris_tarihi;sube;departman;gorev;personel_tipi\r\n";
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = filename;
+      anchor.click();
+      URL.revokeObjectURL(url);
+      return;
+    }
+  }
+
+  const headers = new Headers();
+  const token = getAuthTokenForApi();
+  if (token) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+  const subeHeader = getActiveSubeIdForApiHeader();
+  if (subeHeader) {
+    headers.set("X-Active-Sube-Id", subeHeader);
+  }
+
+  const response = await fetch(buildApiUrl(endpoints.personeller.importTemplate), { headers });
+  if (!response.ok) {
+    throw new ApiRequestError("Personel import şablonu indirilemedi.", response.status);
+  }
+
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
+export async function dryRunPersonelImport(file: File): Promise<PersonelImportDryRunResult> {
+  const csv = await file.text();
+  const response = await apiRequest<ApiResponse<unknown>>(endpoints.personeller.importDryRun, {
+    method: "POST",
+    body: JSON.stringify({ csv })
+  });
+
+  if (Array.isArray(response.errors) && response.errors.length > 0) {
+    const first = response.errors[0];
+    throw new ApiRequestError(first?.message ?? "Personel import dry-run başarısız.", 400, first);
+  }
+
+  return normalizeImportDryRunResult(response.data);
 }

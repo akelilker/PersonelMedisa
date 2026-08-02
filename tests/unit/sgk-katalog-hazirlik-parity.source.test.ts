@@ -48,7 +48,7 @@ describe("S85-C1 SGK katalog hazirlik parity", () => {
     expect(migrationNames.some((name) => name.startsWith("039_"))).toBe(true);
     expect(migrationNames.some((name) => name.startsWith("040_"))).toBe(true);
     expect(migrationNames.some((name) => name.startsWith("041_"))).toBe(true);
-    expect(migrationNames.filter((n) => n.endsWith(".sql")).sort().at(-1)).toBe("044_puantaj_aylik_muhur_revision_reopen.sql");
+    expect(migrationNames.filter((n) => n.endsWith(".sql")).sort().at(-1)).toBe("045_sirket_politikasi_kanit_owner.sql");
 
     expect(reader).toContain("SGK_KAYNAK_MANIFEST_STORAGE_HATASI");
     expect(reader).toContain("formatSanitizedRuntimeLog");

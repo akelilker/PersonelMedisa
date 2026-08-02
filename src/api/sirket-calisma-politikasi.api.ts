@@ -3,6 +3,12 @@ import { appendQueryParams } from "../utils/append-query-params";
 import { apiRequest } from "./api-client";
 import { endpoints } from "./endpoints";
 
+export type SirketPolitikaEvidenceStatus =
+  | "PRESENT_VALID"
+  | "MISSING"
+  | "LEGACY_MISSING"
+  | "INVALID";
+
 export type SirketPolitikaDeger = {
   id?: number;
   parametre_kodu: string;
@@ -22,12 +28,83 @@ export type SirketCalismaPolitikasi = {
   gecerlilik_baslangic: string;
   gecerlilik_bitis: string | null;
   aciklama: string | null;
+  belge_id: string | null;
+  belge_sha256: string | null;
+  evidence_status: SirketPolitikaEvidenceStatus;
   policy_version_hash: string | null;
+  hazirlayan_id?: number | null;
   hazirlayan_ad?: string | null;
   onaylayan_ad?: string | null;
   onay_zamani?: string | null;
   degerler?: SirketPolitikaDeger[];
 };
+
+export type SirketPolitikaDraftPayload = {
+  gecerlilik_baslangic: string;
+  gecerlilik_bitis?: string | null;
+  aciklama?: string | null;
+  belge_id?: string | null;
+  belge_sha256?: string | null;
+  degerler: Array<{
+    parametre_kodu: string;
+    sayisal_deger?: string;
+    metin_deger?: string;
+    mevcut_deger?: string;
+  }>;
+};
+
+const ZERO_HASH = "0".repeat(64);
+const PLACEHOLDER_HASHES = new Set(["tbd", "pending", "unknown", ZERO_HASH]);
+
+/** Client-side evidence validation helper (server remains owner). */
+export function normalizePolitikaEvidenceInput(belgeId: string, belgeSha256: string): {
+  ok: boolean;
+  belge_id: string | null;
+  belge_sha256: string | null;
+  error: string | null;
+} {
+  const id = belgeId.trim();
+  const shaRaw = belgeSha256.trim();
+  const sha = shaRaw.toLowerCase();
+  if (!id && !shaRaw) {
+    return { ok: true, belge_id: null, belge_sha256: null, error: null };
+  }
+  if ((!id && shaRaw) || (id && !shaRaw)) {
+    return {
+      ok: false,
+      belge_id: null,
+      belge_sha256: null,
+      error: "Karar Belge ID ve SHA256 birlikte doldurulmalıdır."
+    };
+  }
+  if (id.length > 160) {
+    return { ok: false, belge_id: null, belge_sha256: null, error: "Karar Belge ID en fazla 160 karakter olabilir." };
+  }
+  if (PLACEHOLDER_HASHES.has(sha) || !/^[0-9a-f]{64}$/.test(sha)) {
+    return {
+      ok: false,
+      belge_id: null,
+      belge_sha256: null,
+      error: "Karar Belge SHA256 exact 64 hexadecimal karakter olmalıdır."
+    };
+  }
+  return { ok: true, belge_id: id, belge_sha256: sha, error: null };
+}
+
+export function evidenceStatusLabel(status: SirketPolitikaEvidenceStatus | string | null | undefined): string {
+  switch (status) {
+    case "PRESENT_VALID":
+      return "Kanıt geçerli";
+    case "MISSING":
+      return "Kanıt eksik";
+    case "LEGACY_MISSING":
+      return "Tarihsel kayıt — kanıt alanı migration öncesinde bulunmuyordu";
+    case "INVALID":
+      return "Kanıt geçersiz";
+    default:
+      return "Kanıt durumu bilinmiyor";
+  }
+}
 
 function unwrapData<T>(payload: ApiResponse<T> | T, fallback: string): T {
   if (typeof payload === "object" && payload !== null && "data" in payload) {
@@ -60,17 +137,7 @@ export async function fetchSirketPolitikaDetail(id: number) {
   return unwrapData(response, "Politika detayi alinamadi.");
 }
 
-export async function createSirketPolitikaDraft(payload: {
-  gecerlilik_baslangic: string;
-  gecerlilik_bitis?: string | null;
-  aciklama?: string | null;
-  degerler: Array<{
-    parametre_kodu: string;
-    sayisal_deger?: string;
-    metin_deger?: string;
-    mevcut_deger?: string;
-  }>;
-}) {
+export async function createSirketPolitikaDraft(payload: SirketPolitikaDraftPayload) {
   const response = await apiRequest<ApiResponse<SirketCalismaPolitikasi> | SirketCalismaPolitikasi>(
     endpoints.sirketCalismaPolitikalari.list,
     {
@@ -82,20 +149,7 @@ export async function createSirketPolitikaDraft(payload: {
   return unwrapData(response, "Politika taslagı olusturulamadi.");
 }
 
-export async function updateSirketPolitikaDraft(
-  id: number,
-  payload: {
-    gecerlilik_baslangic: string;
-    gecerlilik_bitis?: string | null;
-    aciklama?: string | null;
-    degerler: Array<{
-      parametre_kodu: string;
-      sayisal_deger?: string;
-      metin_deger?: string;
-      mevcut_deger?: string;
-    }>;
-  }
-) {
+export async function updateSirketPolitikaDraft(id: number, payload: SirketPolitikaDraftPayload) {
   const response = await apiRequest<ApiResponse<SirketCalismaPolitikasi> | SirketCalismaPolitikasi>(
     endpoints.sirketCalismaPolitikalari.detail(id),
     {
@@ -138,6 +192,11 @@ export type SirketPolitikaKararOzeti = {
   gecerlilik_baslangic: string;
   gecerlilik_bitis: string | null;
   policy_version_hash: string | null;
+  belge_id: string | null;
+  belge_sha256: string | null;
+  evidence_status: string;
+  evidence_ready_for_approval: boolean;
+  hazirlayan_id?: number | null;
   zorunlu_parametreler: string[];
   eksik_parametreler: string[];
   onceki_onayli: Record<string, unknown> | null;

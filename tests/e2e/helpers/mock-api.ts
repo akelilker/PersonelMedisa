@@ -9792,12 +9792,24 @@ let personelBelgeKaydiIdCounter = 903;
         return;
       }
       const body = request.postDataJSON() as Record<string, unknown>;
+      const belgeId = typeof body.belge_id === "string" && body.belge_id.trim() !== "" ? body.belge_id.trim() : null;
+      const belgeSha =
+        typeof body.belge_sha256 === "string" && body.belge_sha256.trim() !== ""
+          ? String(body.belge_sha256).trim().toLowerCase()
+          : null;
+      const evidenceStatus =
+        belgeId && belgeSha && /^[0-9a-f]{64}$/.test(belgeSha) ? "PRESENT_VALID" : "MISSING";
       const politika = {
         id: ++maasBordroState.sirketPolitikaNextId,
+        revision_no: 1,
         state: "TASLAK",
         gecerlilik_baslangic: body.gecerlilik_baslangic ?? "2026-03-01",
         gecerlilik_bitis: null,
         aciklama: body.aciklama ?? null,
+        belge_id: belgeId,
+        belge_sha256: belgeSha,
+        evidence_status: evidenceStatus,
+        hazirlayan_id: 1,
         policy_version_hash: "mock-policy-hash",
         degerler: body.degerler ?? []
       };
@@ -9815,6 +9827,10 @@ let personelBelgeKaydiIdCounter = 903;
       const politika = sirketPolitikalari.find((item) => item.id === id);
       if (!politika) {
         await fulfillJson(route, 404, errorBody("NOT_FOUND", "Politika bulunamadi."));
+        return;
+      }
+      if (politika.evidence_status !== "PRESENT_VALID") {
+        await fulfillJson(route, 409, errorBody("POLICY_EVIDENCE_REQUIRED", "Onaya gondermek icin karar belgesi kaniti zorunludur."));
         return;
       }
       politika.state = "ONAY_BEKLIYOR";
@@ -9856,6 +9872,11 @@ let personelBelgeKaydiIdCounter = 903;
         gecerlilik_baslangic: politika.gecerlilik_baslangic,
         gecerlilik_bitis: politika.gecerlilik_bitis ?? null,
         policy_version_hash: politika.policy_version_hash ?? null,
+        belge_id: politika.belge_id ?? null,
+        belge_sha256: politika.belge_sha256 ?? null,
+        evidence_status: politika.evidence_status ?? "MISSING",
+        evidence_ready_for_approval: (politika.evidence_status ?? "MISSING") === "PRESENT_VALID",
+        hazirlayan_id: politika.hazirlayan_id ?? 1,
         zorunlu_parametreler: [
           "NORMAL_AY_GUN_SAYISI",
           "GUNLUK_CALISMA_SAATI",

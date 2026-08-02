@@ -19,9 +19,11 @@ import {
 import {
   approveSirketPolitika,
   createSirketPolitikaDraft,
+  evidenceStatusLabel,
   fetchSirketPolitikaKararOzeti,
   fetchSirketPolitikaKatalog,
   fetchSirketPolitikalari,
+  normalizePolitikaEvidenceInput,
   submitSirketPolitika,
   type SirketCalismaPolitikasi,
   type SirketPolitikaDeger,
@@ -115,6 +117,9 @@ export function BordroHazirlikMerkeziPage() {
   const [politikalar, setPolitikalar] = useState<SirketCalismaPolitikasi[]>([]);
   const [katalog, setKatalog] = useState<SirketPolitikaDeger[]>([]);
   const [policyForm, setPolicyForm] = useState<Record<string, string>>({});
+  const [policyBelgeId, setPolicyBelgeId] = useState("");
+  const [policyBelgeSha256, setPolicyBelgeSha256] = useState("");
+  const [policyEvidenceError, setPolicyEvidenceError] = useState<string | null>(null);
   const [kararOzeti, setKararOzeti] = useState<SirketPolitikaKararOzeti | null>(null);
   const [selectedAdayId, setSelectedAdayId] = useState<number | null>(null);
   const [selectedKalemler, setSelectedKalemler] = useState<Awaited<ReturnType<typeof fetchMaasHesaplamaAdayKalemler>> | null>(null);
@@ -252,6 +257,12 @@ export function BordroHazirlikMerkeziPage() {
   async function handleCreatePolicyDraft() {
     if (!canManagePolicy) return;
     setActionMessage(null);
+    setPolicyEvidenceError(null);
+    const evidence = normalizePolitikaEvidenceInput(policyBelgeId, policyBelgeSha256);
+    if (!evidence.ok) {
+      setPolicyEvidenceError(evidence.error);
+      return;
+    }
     try {
       const degerler = katalog.map((item) => ({
         parametre_kodu: item.parametre_kodu,
@@ -262,9 +273,13 @@ export function BordroHazirlikMerkeziPage() {
       await createSirketPolitikaDraft({
         gecerlilik_baslangic: `${yil}-${String(ay).padStart(2, "0")}-01`,
         aciklama: "S83 bordro hazırlık politikası taslağı",
+        belge_id: evidence.belge_id,
+        belge_sha256: evidence.belge_sha256,
         degerler
       });
       setActionMessage("Politika taslağı oluşturuldu.");
+      setPolicyBelgeId("");
+      setPolicyBelgeSha256("");
       await loadData();
       setActiveTab("politika");
     } catch (error) {
@@ -273,15 +288,43 @@ export function BordroHazirlikMerkeziPage() {
   }
 
   async function handleSubmitPolicy(id: number) {
-    await submitSirketPolitika(id);
-    setActionMessage("Politika onaya gönderildi.");
-    await loadData();
+    const politika = politikalar.find((item) => item.id === id);
+    if (politika && politika.evidence_status !== "PRESENT_VALID") {
+      setErrorMessage(
+        `Onaya göndermek için karar belgesi kanıtı zorunludur (durum: ${evidenceStatusLabel(politika.evidence_status)}).`
+      );
+      return;
+    }
+    try {
+      await submitSirketPolitika(id);
+      setActionMessage("Politika onaya gönderildi.");
+      await loadData();
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Politika onaya gönderilemedi.");
+    }
   }
 
   async function handleApprovePolicy(id: number) {
-    await approveSirketPolitika(id);
-    setActionMessage("Politika onaylandı.");
-    await loadData();
+    const politika = politikalar.find((item) => item.id === id);
+    const currentUserId = session?.user?.id ?? null;
+    if (politika?.evidence_status !== "PRESENT_VALID" && kararOzeti?.evidence_status !== "PRESENT_VALID") {
+      setErrorMessage("Kanıt geçerli değil; onay kapalı.");
+      return;
+    }
+    if (
+      currentUserId != null &&
+      (politika?.hazirlayan_id === currentUserId || kararOzeti?.hazirlayan_id === currentUserId)
+    ) {
+      setErrorMessage("Hazırlayan kullanıcı politikayı onaylayamaz.");
+      return;
+    }
+    try {
+      await approveSirketPolitika(id);
+      setActionMessage("Politika onaylandı.");
+      await loadData();
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Politika onaylanamadı.");
+    }
   }
 
   async function handleCalculateCandidate() {
@@ -647,6 +690,39 @@ export function BordroHazirlikMerkeziPage() {
                   />
                 </label>
               ))}
+              <p className="personel-puantaj-summary-note" data-testid="bordro-politika-evidence-help">
+                İmzalı veya e-imzalı karar belgesinin değişmez referans numarası ve dosyanın SHA256 özeti. Belge dosyası
+                bu alana yüklenmez.
+              </p>
+              <label>
+                Karar Belge ID
+                <input
+                  data-testid="bordro-politika-belge-id"
+                  value={policyBelgeId}
+                  onChange={(event) => {
+                    setPolicyBelgeId(event.target.value);
+                    setPolicyEvidenceError(null);
+                  }}
+                  placeholder="FORM91-…"
+                />
+              </label>
+              <label>
+                Karar Belge SHA256
+                <input
+                  data-testid="bordro-politika-belge-sha256"
+                  className="font-mono"
+                  style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" }}
+                  value={policyBelgeSha256}
+                  onChange={(event) => {
+                    setPolicyBelgeSha256(event.target.value.trim().toLowerCase());
+                    setPolicyEvidenceError(null);
+                  }}
+                  placeholder="64 hex"
+                />
+              </label>
+              {policyEvidenceError ? (
+                <p data-testid="bordro-politika-evidence-error">{policyEvidenceError}</p>
+              ) : null}
               <button type="button" className="universal-btn-save" data-testid="bordro-politika-taslak-olustur" onClick={() => void handleCreatePolicyDraft()}>
                 Taslak Oluştur
               </button>
@@ -660,6 +736,18 @@ export function BordroHazirlikMerkeziPage() {
                 Revizyon #{kararOzeti.revision_no} · {kararOzeti.gecerlilik_baslangic}
                 {kararOzeti.gecerlilik_bitis ? ` → ${kararOzeti.gecerlilik_bitis}` : ""}
               </p>
+              <p data-testid="bordro-politika-karar-belge-id">Belge ID: {kararOzeti.belge_id ?? "—"}</p>
+              <p data-testid="bordro-politika-karar-belge-sha" style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" }}>
+                SHA256: {kararOzeti.belge_sha256 ?? "—"}
+              </p>
+              <p data-testid="bordro-politika-karar-evidence-status">
+                Kanıt: {evidenceStatusLabel(kararOzeti.evidence_status)}
+              </p>
+              {session?.user?.id != null && kararOzeti.hazirlayan_id === session.user.id ? (
+                <p data-testid="bordro-politika-self-approval-warning">
+                  Hazırlayan kullanıcı ile aynı oturumdasınız; onay sunucu tarafından reddedilir.
+                </p>
+              ) : null}
               <p>Etkilenen personel (şube): {kararOzeti.etkilenen_personel_sayisi}</p>
               <p>{kararOzeti.etkilenen_donem_ipucu}</p>
               <p>{kararOzeti.aday_snapshot_etki_notu}</p>
@@ -678,33 +766,74 @@ export function BordroHazirlikMerkeziPage() {
               <tr>
                 <th>ID</th>
                 <th>Durum</th>
+                <th>Kanıt</th>
+                <th>Belge</th>
                 <th>Geçerlilik</th>
                 <th>İşlem</th>
               </tr>
             </thead>
             <tbody>
-              {politikalar.map((politika) => (
-                <tr key={politika.id} data-testid={`bordro-politika-row-${politika.id}`}>
-                  <td>{politika.id}</td>
-                  <td>{politika.state}</td>
-                  <td>
-                    {politika.gecerlilik_baslangic}
-                    {politika.gecerlilik_bitis ? ` → ${politika.gecerlilik_bitis}` : ""}
-                  </td>
-                  <td>
-                    {canManagePolicy && politika.state === "TASLAK" ? (
-                      <button type="button" data-testid={`bordro-politika-submit-${politika.id}`} onClick={() => void handleSubmitPolicy(politika.id)}>
-                        Onaya Gönder
-                      </button>
-                    ) : null}
-                    {canApprove && politika.state === "ONAY_BEKLIYOR" ? (
-                      <button type="button" data-testid={`bordro-politika-approve-${politika.id}`} onClick={() => void handleApprovePolicy(politika.id)}>
-                        Onayla
-                      </button>
-                    ) : null}
-                  </td>
-                </tr>
-              ))}
+              {politikalar.map((politika) => {
+                const evidenceReady = politika.evidence_status === "PRESENT_VALID";
+                const selfApprover =
+                  session?.user?.id != null && politika.hazirlayan_id === session.user.id;
+                const approveDisabled =
+                  !evidenceReady || selfApprover || (kararOzeti?.evidence_ready_for_approval === false);
+                return (
+                  <tr key={politika.id} data-testid={`bordro-politika-row-${politika.id}`}>
+                    <td>{politika.id}</td>
+                    <td>{politika.state}</td>
+                    <td data-testid={`bordro-politika-evidence-${politika.id}`}>
+                      {evidenceStatusLabel(politika.evidence_status)}
+                    </td>
+                    <td>
+                      <span data-testid={`bordro-politika-belge-id-${politika.id}`}>{politika.belge_id ?? "—"}</span>
+                      {politika.belge_sha256 ? (
+                        <div
+                          data-testid={`bordro-politika-belge-sha-${politika.id}`}
+                          style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace", fontSize: "0.85em" }}
+                        >
+                          {politika.belge_sha256}
+                        </div>
+                      ) : null}
+                    </td>
+                    <td>
+                      {politika.gecerlilik_baslangic}
+                      {politika.gecerlilik_bitis ? ` → ${politika.gecerlilik_bitis}` : ""}
+                    </td>
+                    <td>
+                      {canManagePolicy && politika.state === "TASLAK" ? (
+                        <button
+                          type="button"
+                          data-testid={`bordro-politika-submit-${politika.id}`}
+                          disabled={!evidenceReady}
+                          title={!evidenceReady ? "Karar belgesi kanıtı gerekli" : undefined}
+                          onClick={() => void handleSubmitPolicy(politika.id)}
+                        >
+                          Onaya Gönder
+                        </button>
+                      ) : null}
+                      {canApprove && politika.state === "ONAY_BEKLIYOR" ? (
+                        <button
+                          type="button"
+                          data-testid={`bordro-politika-approve-${politika.id}`}
+                          disabled={approveDisabled}
+                          title={
+                            selfApprover
+                              ? "Hazırlayan onaylayamaz"
+                              : !evidenceReady
+                                ? "Kanıt geçerli değil"
+                                : undefined
+                          }
+                          onClick={() => void handleApprovePolicy(politika.id)}
+                        >
+                          Onayla
+                        </button>
+                      ) : null}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </section>

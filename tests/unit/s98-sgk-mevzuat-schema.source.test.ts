@@ -98,6 +98,6 @@ describe("S98 SGK mevzuat schema hardening", () => {
   it("migration sequence ends with 040 and parity last file updated", () => {
     const names = readdirSync(resolve("api/migrations")).filter((n) => n.endsWith(".sql")).sort();
     expect(names.some((n) => n.startsWith("040_"))).toBe(true);
-    expect(names.at(-1)).toBe("044_puantaj_aylik_muhur_revision_reopen.sql");
+    expect(names.at(-1)).toBe("045_sirket_politikasi_kanit_owner.sql");
   });
 });

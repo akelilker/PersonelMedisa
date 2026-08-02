@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { loginAsMockRole } from "./helpers/auth";
-import { mockApi, resetMaasBordroPageState } from "./helpers/mock-api";
+import { resetMaasBordroPageState } from "./helpers/mock-api";
 import { openRaporlarPanel } from "./helpers/raporlar-panel";
 
 const PANEL_AY = "2026-03";
@@ -63,9 +63,14 @@ test.describe("S83 Business Data Readiness", () => {
   });
 
   test("GENEL_YONETICI: readiness + politika karar özeti + S81 deep-link", async ({ page }) => {
-    await mockApi(page, "MUHASEBE");
-    await openRaporlarPanel(page, "MUHASEBE", "bordro-hazirlik");
+    // Create as GENEL_YONETICI so hazirlayan_id matches approver and self-approval stays rejected.
+    await openRaporlarPanel(page, "GENEL_YONETICI", "bordro-hazirlik");
     await submitBordroFilters(page);
+
+    await page.getByTestId("bordro-hazirlik-tab-veri-hazirlik").click();
+    await expect(page.getByTestId("bordro-readiness-domain-s81_final_onay")).toBeVisible();
+    await expect(page.getByTestId("bordro-readiness-link-s81_final_onay")).toHaveAttribute("href", /bildirimler/);
+
     await page.getByTestId("bordro-hazirlik-tab-politika").click();
     await page.getByLabel("Normal Ay Gün Sayısı").fill("30");
     await page.getByLabel("Günlük Çalışma Saati").fill("7.5");
@@ -87,15 +92,6 @@ test.describe("S83 Business Data Readiness", () => {
     await expect(submitButton).toBeEnabled();
     await submitButton.click();
 
-    await mockApi(page, "GENEL_YONETICI");
-    await openRaporlarPanel(page, "GENEL_YONETICI", "bordro-hazirlik");
-    await submitBordroFilters(page);
-
-    await page.getByTestId("bordro-hazirlik-tab-veri-hazirlik").click();
-    await expect(page.getByTestId("bordro-readiness-domain-s81_final_onay")).toBeVisible();
-    await expect(page.getByTestId("bordro-readiness-link-s81_final_onay")).toHaveAttribute("href", /bildirimler/);
-
-    await page.getByTestId("bordro-hazirlik-tab-politika").click();
     await expect(page.getByTestId("bordro-politika-karar-ozeti")).toBeVisible();
     await expect(page.getByTestId("bordro-politika-karar-belge-id")).toContainText(
       "TEST-FORM91-MERKEZ-2026-03-R1"
@@ -103,7 +99,6 @@ test.describe("S83 Business Data Readiness", () => {
     await expect(page.getByTestId("bordro-politika-karar-belge-sha")).toContainText(policyEvidenceSha);
     const approveButton = page.getByTestId("bordro-politika-approve-1");
     await expect(approveButton).toBeVisible();
-    // Mock draft sets hazirlayan_id=1 (GENEL_YONETICI); self-approval gate must keep approve disabled.
     await expect(approveButton).toBeDisabled();
     await expect(approveButton).toHaveAttribute("title", "Hazırlayan onaylayamaz");
   });

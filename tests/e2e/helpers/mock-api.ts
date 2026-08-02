@@ -9809,7 +9809,7 @@ let personelBelgeKaydiIdCounter = 903;
         belge_id: belgeId,
         belge_sha256: belgeSha,
         evidence_status: evidenceStatus,
-        hazirlayan_id: 1,
+        hazirlayan_id: MOCK_ROLE_USER_ID[role],
         policy_version_hash: "mock-policy-hash",
         degerler: body.degerler ?? []
       };

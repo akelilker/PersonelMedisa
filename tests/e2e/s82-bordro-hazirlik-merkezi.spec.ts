@@ -4,6 +4,8 @@ import { mockApi, resetMaasBordroPageState } from "./helpers/mock-api";
 import { openRaporlarPanel } from "./helpers/raporlar-panel";
 
 const PANEL_AY = "2026-03";
+const POLICY_EVIDENCE_ID = "TEST-FORM91-MERKEZ-2026-03-S82-R1";
+const POLICY_EVIDENCE_SHA = "b".repeat(64);
 
 async function applyBordroFilters(page: import("@playwright/test").Page) {
   await page.getByLabel("Ay", { exact: true }).first().fill(PANEL_AY);
@@ -32,6 +34,8 @@ async function fillPolicyDraft(page: import("@playwright/test").Page) {
   await page.getByLabel("Fazla Sürelerle Çalışma Çarpanı").fill("1.25");
   await page.getByLabel("UBGT Çarpanı").fill("2");
   await page.getByLabel("UBGT Hesap Modu").fill("GUNLUK_ILAVE");
+  await page.getByLabel("Karar Belge ID").fill(POLICY_EVIDENCE_ID);
+  await page.getByLabel("Karar Belge SHA256").fill(POLICY_EVIDENCE_SHA);
 }
 
 test.describe("S82 Bordro Hazirlik Merkezi", () => {
@@ -55,15 +59,23 @@ test.describe("S82 Bordro Hazirlik Merkezi", () => {
     await fillPolicyDraft(page);
     await page.getByTestId("bordro-politika-taslak-olustur").click();
     await expect(page.getByTestId("bordro-politika-row-1")).toBeVisible();
-    await page.getByTestId("bordro-politika-submit-1").scrollIntoViewIfNeeded();
-    await page.getByTestId("bordro-politika-submit-1").click({ force: true });
+    const submitButton = page.getByTestId("bordro-politika-submit-1");
+    await submitButton.scrollIntoViewIfNeeded();
+    await expect(submitButton).toBeVisible();
+    await expect(submitButton).toBeEnabled();
+    await submitButton.click();
 
     await mockApi(page, "GENEL_YONETICI");
     await login(page, MOCK_ROLE_LOGIN.GENEL_YONETICI);
     await page.goto("/raporlar?panel=bordro-hazirlik");
     await submitBordroFilters(page);
     await openPolitikaTab(page);
-    await page.getByTestId("bordro-politika-approve-1").click();
+    await expect(page.getByTestId("bordro-politika-karar-belge-id")).toContainText(POLICY_EVIDENCE_ID);
+    await expect(page.getByTestId("bordro-politika-karar-belge-sha")).toContainText(POLICY_EVIDENCE_SHA);
+    const approveButton = page.getByTestId("bordro-politika-approve-1");
+    await expect(approveButton).toBeVisible();
+    await expect(approveButton).toBeEnabled();
+    await approveButton.click();
 
     await mockApi(page, "MUHASEBE");
     await login(page, MOCK_ROLE_LOGIN.MUHASEBE);
@@ -94,14 +106,22 @@ test.describe("S82 Bordro Hazirlik Merkezi", () => {
     await openPolitikaTab(page);
     await fillPolicyDraft(page);
     await page.getByTestId("bordro-politika-taslak-olustur").click();
-    await page.getByTestId("bordro-politika-submit-1").click();
+    const submitButton = page.getByTestId("bordro-politika-submit-1");
+    await expect(submitButton).toBeVisible();
+    await expect(submitButton).toBeEnabled();
+    await submitButton.click();
 
     await mockApi(page, "GENEL_YONETICI");
     await login(page, MOCK_ROLE_LOGIN.GENEL_YONETICI);
     await page.goto("/raporlar?panel=bordro-hazirlik");
     await submitBordroFilters(page);
     await openPolitikaTab(page);
-    await page.getByTestId("bordro-politika-approve-1").click();
+    await expect(page.getByTestId("bordro-politika-karar-belge-id")).toContainText(POLICY_EVIDENCE_ID);
+    await expect(page.getByTestId("bordro-politika-karar-belge-sha")).toContainText(POLICY_EVIDENCE_SHA);
+    const approveButton = page.getByTestId("bordro-politika-approve-1");
+    await expect(approveButton).toBeVisible();
+    await expect(approveButton).toBeEnabled();
+    await approveButton.click();
 
     await mockApi(page, "MUHASEBE");
     await login(page, MOCK_ROLE_LOGIN.MUHASEBE);

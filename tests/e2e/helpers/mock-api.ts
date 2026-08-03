@@ -46,6 +46,8 @@ const MOCK_ROLE_USER_ID: Record<MockUserRole, number> = {
 
 type MockApiOptions = {
   belgeReferenceDate?: Date;
+  /** S97-C: seed synthetic completed import history for filled-state E2E. */
+  personelImportHistorySeed?: "empty" | "completed";
 };
 
 function isoDateDaysFrom(referenceDate: Date, days: number): string {
@@ -1896,6 +1898,51 @@ function resolveMockIlkIkiGunFirmaOderMi(
 export async function mockApi(page: Page, role: MockUserRole, options: MockApiOptions = {}) {
   const bildirimPageState = getBildirimPageState(page);
   const bildirimler = bildirimPageState.items;
+  const shaA = "a".repeat(64);
+  const shaB = "b".repeat(64);
+  const personelImportHistoryRuns: Array<Record<string, unknown>> =
+    options.personelImportHistorySeed === "completed"
+      ? [
+          {
+            import_id: 91001,
+            status: "COMPLETED",
+            status_label: "Tamamlandı",
+            schema_version: "personel-import-v1",
+            import_mode: "CREATE_ONLY_ALL_OR_NOTHING",
+            row_count: 1,
+            valid_row_count: 1,
+            created_count: 1,
+            failed_row_count: 0,
+            actor_id: MOCK_ROLE_USER_ID[role],
+            actor_display_name: "E2E Hazırlayan",
+            scope_summary: "Merkez",
+            active_sube_id: 1,
+            source_sha256: shaA,
+            manifest_hash: shaB,
+            idempotency_fingerprint: "c0ffeeabcdef",
+            idempotency_key_raw_hidden: "pir-e2e-hidden-key",
+            created_at: "2026-08-01 10:00:00.000",
+            completed_at: "2026-08-01 10:00:01.000",
+            failed_at: null,
+            duration_ms: 1000,
+            failure_code: null,
+            failure_message: null,
+            idempotent_replay: null,
+            satirlar: [
+              {
+                row_number: 1,
+                personel_id: 910001,
+                sicil_no: "E2E-IMP-1",
+                tc_kimlik_no_masked: "100******46",
+                row_hash: shaA,
+                row_status: "CREATED",
+                personel_display_name: "E2E Ayşe",
+                personel_detail_path: "/personeller/910001"
+              }
+            ]
+          }
+        ]
+      : [];
   const bagliAmirReferanslari: Array<{ id: number; ad: string; sube_id: number; departman_id: number }> = [
     { id: 9, ad: "Demo Amir", sube_id: 1, departman_id: 3 },
     { id: 10, ad: "İkinci Amir", sube_id: 2, departman_id: 6 }
@@ -4863,6 +4910,104 @@ let personelBelgeKaydiIdCounter = 903;
           }
         })
       );
+      return;
+    }
+
+    if (path === "/api/personeller/import/runs" && method === "GET") {
+      if (!["GENEL_YONETICI", "BOLUM_YONETICISI", "MUHASEBE"].includes(role)) {
+        await fulfillJson(route, 403, errorBody("FORBIDDEN", "Bu islem icin yetkiniz yok."));
+        return;
+      }
+      const status = String(url.searchParams.get("status") ?? "");
+      const items = personelImportHistoryRuns
+        .filter((run) => !status || String(run.status) === status)
+        .map((run) => {
+          const {
+            satirlar: _satirlar,
+            idempotency_key_raw_hidden: _hidden,
+            failure_message: _fm,
+            failed_row_count: _frc,
+            idempotent_replay: _ir,
+            ...summary
+          } = run;
+          return summary;
+        });
+      await fulfillJson(
+        route,
+        200,
+        JSON.stringify({
+          data: { items },
+          meta: { next_cursor: null },
+          errors: []
+        })
+      );
+      return;
+    }
+
+    const importRunMatch = path.match(/^\/api\/personeller\/import\/runs\/(\d+)$/);
+    if (importRunMatch && method === "GET") {
+      if (!["GENEL_YONETICI", "BOLUM_YONETICISI", "MUHASEBE"].includes(role)) {
+        await fulfillJson(route, 403, errorBody("FORBIDDEN", "Bu islem icin yetkiniz yok."));
+        return;
+      }
+      const importId = Number(importRunMatch[1]);
+      const run = personelImportHistoryRuns.find((item) => Number(item.import_id) === importId);
+      if (!run) {
+        await fulfillJson(route, 404, errorBody("NOT_FOUND", "Import kaydi bulunamadi."));
+        return;
+      }
+      const { idempotency_key_raw_hidden: _hidden, ...detail } = run;
+      await fulfillJson(route, 200, okBody(detail));
+      return;
+    }
+
+    const evidenceMatch = path.match(/^\/api\/personeller\/import\/runs\/(\d+)\/evidence\.csv$/);
+    if (evidenceMatch && method === "GET") {
+      if (!["GENEL_YONETICI", "BOLUM_YONETICISI", "MUHASEBE"].includes(role)) {
+        await fulfillJson(route, 403, errorBody("FORBIDDEN", "Bu islem icin yetkiniz yok."));
+        return;
+      }
+      const importId = Number(evidenceMatch[1]);
+      const run = personelImportHistoryRuns.find((item) => Number(item.import_id) === importId);
+      if (!run) {
+        await fulfillJson(route, 404, errorBody("NOT_FOUND", "Import kaydi bulunamadi."));
+        return;
+      }
+      const satirlar = Array.isArray(run.satirlar) ? run.satirlar : [];
+      const header =
+        "import_id;status;created_at;completed_at;actor;scope;source_sha256;manifest_hash;idempotency_fingerprint;row_number;personel_id;sicil_no;ad_soyad;tc_kimlik_no_masked;row_hash;row_status";
+      const lines = [header];
+      for (const row of satirlar as Array<Record<string, unknown>>) {
+        lines.push(
+          [
+            String(run.import_id),
+            String(run.status),
+            String(run.created_at ?? ""),
+            String(run.completed_at ?? ""),
+            String(run.actor_display_name ?? ""),
+            String(run.scope_summary ?? ""),
+            String(run.source_sha256 ?? ""),
+            String(run.manifest_hash ?? ""),
+            String(run.idempotency_fingerprint ?? ""),
+            String(row.row_number ?? ""),
+            String(row.personel_id ?? ""),
+            String(row.sicil_no ?? ""),
+            String(row.personel_display_name ?? row.ad_soyad ?? ""),
+            String(row.tc_kimlik_no_masked ?? ""),
+            String(row.row_hash ?? ""),
+            String(row.row_status ?? "")
+          ].join(";")
+        );
+      }
+      const csv = `\uFEFF${lines.join("\r\n")}\r\n`;
+      await route.fulfill({
+        status: 200,
+        headers: {
+          "Content-Type": "text/csv; charset=utf-8",
+          "Content-Disposition": `attachment; filename="personel-import-kaniti-${importId}.csv"`
+        },
+        body: csv
+      });
       return;
     }
 

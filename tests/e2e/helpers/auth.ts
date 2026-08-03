@@ -103,9 +103,10 @@ export async function login(page: Page, options: LoginOptions): Promise<void> {
 export async function loginAsMockRole(
   page: Page,
   role: MockUserRole,
-  credentials: MockRoleCredentials = MOCK_ROLE_LOGIN[role]
+  credentials: MockRoleCredentials = MOCK_ROLE_LOGIN[role],
+  mockOptions?: Parameters<typeof mockApi>[2]
 ): Promise<void> {
-  await mockApi(page, role);
+  await mockApi(page, role, mockOptions);
   await login(page, credentials);
   await waitForAuthSession(page, role);
 }

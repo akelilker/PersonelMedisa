@@ -5186,6 +5186,56 @@ export function resolveDemoApiResponse(
     return ok(payload);
   }
 
+  if (pathname === "/personeller/import/runs" && method === "GET") {
+    const seed = (demoState as { personelImportHistoryRuns?: Array<Record<string, unknown>> })
+      .personelImportHistoryRuns;
+    const runs = Array.isArray(seed) ? seed : [];
+    const status = toStringValue(requestUrl.searchParams.get("status")) ?? "";
+    const items = runs
+      .filter((run) => !status || String(run.status) === status)
+      .map((run) => {
+        const copy = { ...run };
+        delete copy.satirlar;
+        delete copy.idempotency_key;
+        return copy;
+      });
+    return {
+      data: { items },
+      meta: { next_cursor: null },
+      errors: []
+    };
+  }
+
+  const importRunDemoMatch = pathname.match(/^\/personeller\/import\/runs\/(\d+)$/);
+  if (importRunDemoMatch && method === "GET") {
+    const seed = (demoState as { personelImportHistoryRuns?: Array<Record<string, unknown>> })
+      .personelImportHistoryRuns;
+    const runs = Array.isArray(seed) ? seed : [];
+    const importId = Number(importRunDemoMatch[1]);
+    const run = runs.find((item) => Number(item.import_id) === importId);
+    if (!run) {
+      return demoRevizyonError("NOT_FOUND", "Import kaydi bulunamadi.");
+    }
+    const copy = { ...run };
+    delete copy.idempotency_key;
+    return ok(copy);
+  }
+
+  const evidenceDemoMatch = pathname.match(/^\/personeller\/import\/runs\/(\d+)\/evidence\.csv$/);
+  if (evidenceDemoMatch && method === "GET") {
+    const seed = (demoState as { personelImportHistoryRuns?: Array<Record<string, unknown>> })
+      .personelImportHistoryRuns;
+    const runs = Array.isArray(seed) ? seed : [];
+    const importId = Number(evidenceDemoMatch[1]);
+    const run = runs.find((item) => Number(item.import_id) === importId);
+    if (!run) {
+      return demoRevizyonError("NOT_FOUND", "Import kaydi bulunamadi.");
+    }
+    const header =
+      "import_id;status;created_at;completed_at;actor;scope;source_sha256;manifest_hash;idempotency_fingerprint;row_number;personel_id;sicil_no;ad_soyad;tc_kimlik_no_masked;row_hash;row_status";
+    return ok(`\uFEFF${header}\r\n`);
+  }
+
   if (pathname === "/personeller" && method === "POST") {
     const subeId = toNumber(body.sube_id);
     if (subeId === null) {

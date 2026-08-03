@@ -11,6 +11,7 @@ import { formatAktifDurumLabel } from "../../../lib/display/enum-display";
 import type { Personel } from "../../../types/personel";
 import type { IdOption } from "../../../types/referans";
 import { PersonelImportDryRunModal } from "../components/PersonelImportDryRunModal";
+import { PersonelImportHistoryModal } from "../components/PersonelImportHistoryModal";
 
 function IconSearch(props: { className?: string }) {
   return (
@@ -209,6 +210,7 @@ export function PersonellerPage() {
   const [moduleMenuOpen, setModuleMenuOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"list" | "grid">("grid");
   const [importModalOpen, setImportModalOpen] = useState(false);
+  const [historyModalOpen, setHistoryModalOpen] = useState(false);
 
   const { draft } = listQuery;
   const page = listQuery.page;
@@ -301,6 +303,16 @@ export function PersonellerPage() {
                 onClick={() => setImportModalOpen(true)}
               >
                 Toplu Personel Hazırlama
+              </button>
+            ) : null}
+            {canApplyPersonelImport ? (
+              <button
+                type="button"
+                className="universal-btn-aux personeller-import-action"
+                data-testid="personeller-import-history-open"
+                onClick={() => setHistoryModalOpen(true)}
+              >
+                Import Geçmişi
               </button>
             ) : null}
             <button
@@ -664,6 +676,10 @@ export function PersonellerPage() {
         onApplied={() => {
           void refetch();
         }}
+      />
+      <PersonelImportHistoryModal
+        open={historyModalOpen}
+        onClose={() => setHistoryModalOpen(false)}
       />
     </section>
   );

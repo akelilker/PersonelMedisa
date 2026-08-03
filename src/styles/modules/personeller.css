@@ -1337,5 +1337,47 @@
 .personel-import-errors-table-wrap td {
   border: 1px solid var(--line-soft);
   padding: 6px 8px;
+}
+
+.personel-import-history-modal .personel-import-history-filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: var(--space-2, 8px);
+  margin-bottom: var(--space-3, 12px);
+  align-items: end;
+}
+
+.personel-import-history-modal .personel-import-history-filters label {
+  display: grid;
+  gap: 4px;
+  font-size: 13px;
+}
+
+.personel-import-history-table-wrap {
+  overflow-x: auto;
+}
+
+.personel-import-history-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.personel-import-history-table th,
+.personel-import-history-table td {
+  border: 1px solid var(--line-soft);
+  padding: 6px 8px;
   text-align: left;
+  vertical-align: top;
+}
+
+.personel-import-history-summary {
+  display: grid;
+  gap: 6px;
+  margin-bottom: var(--space-3, 12px);
+  font-size: 14px;
+}
+
+.personel-import-history-summary p {
+  margin: 0;
 }

@@ -580,3 +580,242 @@ export async function applyPersonelImport(
 
   return normalizeImportApplyResult(response.data);
 }
+
+export type PersonelImportHistoryStatus = "COMPLETED" | "BASARISIZ" | "CLAIMED" | string;
+
+export type PersonelImportRunSummary = {
+  import_id: number;
+  status: PersonelImportHistoryStatus;
+  status_label: string;
+  schema_version: string;
+  import_mode: string;
+  row_count: number;
+  valid_row_count: number;
+  created_count: number;
+  actor_id: number;
+  actor_display_name: string;
+  scope_summary: string;
+  active_sube_id: number | null;
+  source_sha256: string;
+  manifest_hash: string;
+  idempotency_fingerprint: string;
+  created_at: string | null;
+  completed_at: string | null;
+  failed_at: string | null;
+  duration_ms: number | null;
+  failure_code: string | null;
+};
+
+export type PersonelImportRunRow = {
+  row_number: number;
+  personel_id: number | null;
+  sicil_no: string;
+  ad_soyad: string | null;
+  tc_kimlik_no_masked: string;
+  row_hash: string;
+  row_status: string;
+  personel_display_name: string | null;
+  personel_detail_path: string | null;
+};
+
+export type PersonelImportRunDetail = PersonelImportRunSummary & {
+  failed_row_count: number;
+  failure_message: string | null;
+  idempotent_replay: boolean | null;
+  satirlar: PersonelImportRunRow[];
+};
+
+export type PersonelImportRunsListResult = {
+  items: PersonelImportRunSummary[];
+  next_cursor: string | null;
+};
+
+export type PersonelImportRunsListQuery = {
+  cursor?: string | null;
+  limit?: number;
+  status?: string;
+  sube_id?: number | null;
+  date_from?: string;
+  date_to?: string;
+};
+
+function asNullableString(value: unknown): string | null {
+  if (value === null || value === undefined || value === "") {
+    return null;
+  }
+  return String(value);
+}
+
+function asNullableNumber(value: unknown): number | null {
+  if (value === null || value === undefined || value === "") {
+    return null;
+  }
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+function normalizeImportRunSummary(value: unknown): PersonelImportRunSummary {
+  const row = (value && typeof value === "object" ? value : {}) as Record<string, unknown>;
+  return {
+    import_id: Number(row.import_id ?? 0),
+    status: String(row.status ?? ""),
+    status_label: String(row.status_label ?? row.status ?? ""),
+    schema_version: String(row.schema_version ?? ""),
+    import_mode: String(row.import_mode ?? "CREATE_ONLY_ALL_OR_NOTHING"),
+    row_count: Number(row.row_count ?? 0),
+    valid_row_count: Number(row.valid_row_count ?? 0),
+    created_count: Number(row.created_count ?? 0),
+    actor_id: Number(row.actor_id ?? 0),
+    actor_display_name: String(row.actor_display_name ?? ""),
+    scope_summary: String(row.scope_summary ?? ""),
+    active_sube_id: asNullableNumber(row.active_sube_id),
+    source_sha256: String(row.source_sha256 ?? ""),
+    manifest_hash: String(row.manifest_hash ?? ""),
+    idempotency_fingerprint: String(row.idempotency_fingerprint ?? ""),
+    created_at: asNullableString(row.created_at),
+    completed_at: asNullableString(row.completed_at),
+    failed_at: asNullableString(row.failed_at),
+    duration_ms: asNullableNumber(row.duration_ms),
+    failure_code: asNullableString(row.failure_code)
+  };
+}
+
+function normalizeImportRunRow(value: unknown): PersonelImportRunRow {
+  const row = (value && typeof value === "object" ? value : {}) as Record<string, unknown>;
+  return {
+    row_number: Number(row.row_number ?? 0),
+    personel_id: asNullableNumber(row.personel_id),
+    sicil_no: String(row.sicil_no ?? ""),
+    ad_soyad: asNullableString(row.ad_soyad ?? row.personel_display_name),
+    tc_kimlik_no_masked: String(row.tc_kimlik_no_masked ?? ""),
+    row_hash: String(row.row_hash ?? ""),
+    row_status: String(row.row_status ?? ""),
+    personel_display_name: asNullableString(row.personel_display_name ?? row.ad_soyad),
+    personel_detail_path: asNullableString(row.personel_detail_path)
+  };
+}
+
+function normalizeImportRunDetail(value: unknown): PersonelImportRunDetail {
+  const row = (value && typeof value === "object" ? value : {}) as Record<string, unknown>;
+  const summary = normalizeImportRunSummary(row);
+  const satirlar = Array.isArray(row.satirlar) ? row.satirlar.map(normalizeImportRunRow) : [];
+  return {
+    ...summary,
+    failed_row_count: Number(row.failed_row_count ?? 0),
+    failure_message: asNullableString(row.failure_message),
+    idempotent_replay:
+      row.idempotent_replay === null || row.idempotent_replay === undefined
+        ? null
+        : Boolean(row.idempotent_replay),
+    satirlar
+  };
+}
+
+export async function listPersonelImportRuns(
+  query: PersonelImportRunsListQuery = {}
+): Promise<PersonelImportRunsListResult> {
+  const params = new URLSearchParams();
+  if (query.cursor) {
+    params.set("cursor", query.cursor);
+  }
+  if (query.limit !== undefined) {
+    params.set("limit", String(query.limit));
+  }
+  if (query.status) {
+    params.set("status", query.status);
+  }
+  if (query.sube_id !== undefined && query.sube_id !== null) {
+    params.set("sube_id", String(query.sube_id));
+  }
+  if (query.date_from) {
+    params.set("date_from", query.date_from);
+  }
+  if (query.date_to) {
+    params.set("date_to", query.date_to);
+  }
+  const qs = params.toString();
+  const path = qs ? `${endpoints.personeller.importRuns}?${qs}` : endpoints.personeller.importRuns;
+  const response = await apiRequest<ApiResponse<{ items?: unknown[] }>>(path, { method: "GET" });
+
+  if (Array.isArray(response.errors) && response.errors.length > 0) {
+    const first = response.errors[0];
+    throw new ApiRequestError(first?.message ?? "Personel import geçmişi yüklenemedi.", 400, first);
+  }
+
+  const items = Array.isArray(response.data?.items)
+    ? response.data.items.map(normalizeImportRunSummary)
+    : [];
+  const nextCursor =
+    response.meta && typeof response.meta === "object" && "next_cursor" in response.meta
+      ? asNullableString((response.meta as { next_cursor?: unknown }).next_cursor)
+      : null;
+
+  return { items, next_cursor: nextCursor };
+}
+
+export async function getPersonelImportRunDetail(id: number | string): Promise<PersonelImportRunDetail> {
+  const response = await apiRequest<ApiResponse<unknown>>(
+    endpoints.personeller.importRunDetail(id),
+    { method: "GET" }
+  );
+
+  if (Array.isArray(response.errors) && response.errors.length > 0) {
+    const first = response.errors[0];
+    throw new ApiRequestError(first?.message ?? "Personel import detayı yüklenemedi.", 400, first);
+  }
+
+  return normalizeImportRunDetail(response.data);
+}
+
+export async function downloadPersonelImportEvidenceCsv(id: number | string): Promise<void> {
+  const { ApiRequestError, buildApiUrl, shouldPreferDemoApi } = await import("./api-client");
+  const { getAuthTokenForApi } = await import("../auth/auth-token-provider");
+  const { getActiveSubeIdForApiHeader } = await import("../auth/auth-manager");
+  const filename = `personel-import-kaniti-${id}.csv`;
+
+  if (shouldPreferDemoApi()) {
+    const { resolveDemoApiResponse } = await import("./mock-demo");
+    const demoResponse = resolveDemoApiResponse(endpoints.personeller.importRunEvidenceCsv(id), {
+      method: "GET"
+    });
+    if (demoResponse !== null) {
+      const csvContent =
+        typeof demoResponse.data === "string"
+          ? demoResponse.data
+          : "import_id;status;created_at;completed_at;actor;scope;source_sha256;manifest_hash;row_number;personel_id;sicil_no;ad_soyad;tc_kimlik_no_masked;row_hash;row_status\r\n";
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = filename;
+      anchor.click();
+      URL.revokeObjectURL(url);
+      return;
+    }
+  }
+
+  const headers = new Headers();
+  const token = getAuthTokenForApi();
+  if (token) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+  const subeHeader = getActiveSubeIdForApiHeader();
+  if (subeHeader) {
+    headers.set("X-Active-Sube-Id", subeHeader);
+  }
+
+  const response = await fetch(buildApiUrl(endpoints.personeller.importRunEvidenceCsv(id)), {
+    headers
+  });
+  if (!response.ok) {
+    throw new ApiRequestError("Personel import kanıt CSV indirilemedi.", response.status);
+  }
+
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}

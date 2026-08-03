@@ -8,7 +8,10 @@ export const endpoints = {
     belgeDurumu: (id: number | string) => `/personeller/${id}/belge-durumu`,
     importTemplate: "/personeller/import/template.csv",
     importDryRun: "/personeller/import/dry-run",
-    importApply: "/personeller/import/apply"
+    importApply: "/personeller/import/apply",
+    importRuns: "/personeller/import/runs",
+    importRunDetail: (id: number | string) => `/personeller/import/runs/${id}`,
+    importRunEvidenceCsv: (id: number | string) => `/personeller/import/runs/${id}/evidence.csv`
   },
   personelUcretleri: {
     list: (personelId: number | string) => `/personeller/${personelId}/ucretler`,

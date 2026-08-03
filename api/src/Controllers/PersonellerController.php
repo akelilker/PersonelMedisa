@@ -15,6 +15,7 @@ use Medisa\Api\Services\Personel\PersonelCreateService;
 use Medisa\Api\Services\Personel\PersonelImportApplyService;
 use Medisa\Api\Services\Personel\PersonelImportDryRunService;
 use Medisa\Api\Services\Personel\PersonelImportException;
+use Medisa\Api\Services\Personel\PersonelImportHistoryService;
 use Medisa\Api\Services\Personel\PersonelValidationException;
 use Medisa\Api\Services\PersonelUcretException;
 use Medisa\Api\Services\PersonelUcretService;
@@ -411,6 +412,131 @@ class PersonellerController
         }
 
         JsonResponse::success($result, [], 201);
+    }
+
+    public static function importRunsList(Request $request)
+    {
+        $user = AuthMiddleware::authenticate($request, true);
+        RolePermissions::assert($user, 'personeller.import.apply');
+
+        try {
+            $pdo = Connection::get();
+        } catch (\Throwable $e) {
+            JsonResponse::serverError('Veritabani baglantisi kurulamadi.');
+        }
+
+        $scope = SubeScope::resolveScope($user, $request);
+        $allowedSubeIds = SubeScope::allowedSubeIds($user);
+        $query = [
+            'cursor' => $request->getQuery('cursor'),
+            'limit' => $request->getQuery('limit'),
+            'status' => $request->getQuery('status'),
+            'date_from' => $request->getQuery('date_from'),
+            'date_to' => $request->getQuery('date_to'),
+        ];
+
+        try {
+            $result = PersonelImportHistoryService::listRuns(
+                $pdo,
+                $user,
+                $query,
+                $scope,
+                $allowedSubeIds
+            );
+        } catch (PersonelImportException $e) {
+            JsonResponse::error($e->getHttpStatus(), $e->getCodeString(), $e->getMessage());
+        }
+
+        $encoded = json_encode($result, JSON_UNESCAPED_UNICODE);
+        if (is_string($encoded) && (
+            preg_match('/"tc_kimlik_no"\s*:/', $encoded)
+            || preg_match('/\btc_sha256\b/', $encoded)
+            || preg_match('/"idempotency_key"\s*:/', $encoded)
+        )) {
+            JsonResponse::serverError('Personel import history response scrub hatasi.');
+        }
+
+        JsonResponse::success(
+            ['items' => $result['items']],
+            ['next_cursor' => $result['next_cursor']]
+        );
+    }
+
+    public static function importRunDetail(Request $request, $id)
+    {
+        $user = AuthMiddleware::authenticate($request, true);
+        RolePermissions::assert($user, 'personeller.import.apply');
+
+        try {
+            $pdo = Connection::get();
+        } catch (\Throwable $e) {
+            JsonResponse::serverError('Veritabani baglantisi kurulamadi.');
+        }
+
+        $scope = SubeScope::resolveScope($user, $request);
+        $allowedSubeIds = SubeScope::allowedSubeIds($user);
+
+        try {
+            $result = PersonelImportHistoryService::getRun(
+                $pdo,
+                $user,
+                $id,
+                $scope,
+                $allowedSubeIds
+            );
+        } catch (PersonelImportException $e) {
+            JsonResponse::error($e->getHttpStatus(), $e->getCodeString(), $e->getMessage());
+        }
+
+        $encoded = json_encode($result, JSON_UNESCAPED_UNICODE);
+        if (is_string($encoded) && (
+            preg_match('/"tc_kimlik_no"\s*:/', $encoded)
+            || preg_match('/\btc_sha256\b/', $encoded)
+            || preg_match('/"idempotency_key"\s*:/', $encoded)
+        )) {
+            JsonResponse::serverError('Personel import history response scrub hatasi.');
+        }
+
+        JsonResponse::success($result);
+    }
+
+    public static function importRunEvidenceCsv(Request $request, $id)
+    {
+        $user = AuthMiddleware::authenticate($request, true);
+        RolePermissions::assert($user, 'personeller.import.apply');
+
+        try {
+            $pdo = Connection::get();
+        } catch (\Throwable $e) {
+            JsonResponse::serverError('Veritabani baglantisi kurulamadi.');
+        }
+
+        $scope = SubeScope::resolveScope($user, $request);
+        $allowedSubeIds = SubeScope::allowedSubeIds($user);
+
+        try {
+            $result = PersonelImportHistoryService::buildEvidenceCsv(
+                $pdo,
+                $user,
+                $id,
+                $scope,
+                $allowedSubeIds
+            );
+        } catch (PersonelImportException $e) {
+            JsonResponse::error($e->getHttpStatus(), $e->getCodeString(), $e->getMessage());
+        }
+
+        if (!headers_sent()) {
+            header('Content-Type: text/csv; charset=utf-8');
+            header(
+                'Content-Disposition: attachment; filename="'
+                . preg_replace('/[^A-Za-z0-9._-]+/', '-', (string) $result['filename'])
+                . '"'
+            );
+            http_response_code(200);
+        }
+        echo $result['csv'];
+        exit;
     }
 
     /** @return string */

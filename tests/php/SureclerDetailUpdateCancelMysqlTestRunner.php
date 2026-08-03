@@ -220,6 +220,7 @@ function bootstrapSurecSchema(PDO $pdo): void
           baslangic_tarihi DATE NOT NULL,
           bitis_tarihi DATE NULL,
           ucretli_mi TINYINT(1) NOT NULL DEFAULT 0,
+          tam_gun_mu TINYINT(1) NULL,
           ilk_iki_gun_firma_oder_mi TINYINT(1) NULL,
           aciklama TEXT NULL,
           state VARCHAR(32) NOT NULL DEFAULT 'AKTIF',

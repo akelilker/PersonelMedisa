@@ -254,7 +254,8 @@ try {
     $pdo->exec("CREATE TABLE surecler (
         id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY, personel_id INT UNSIGNED NOT NULL,
         surec_turu VARCHAR(64) NOT NULL, alt_tur VARCHAR(64) NULL, baslangic_tarihi DATE NOT NULL,
-        bitis_tarihi DATE NULL, ucretli_mi TINYINT(1) NOT NULL DEFAULT 0, aciklama TEXT NULL,
+        bitis_tarihi DATE NULL, ucretli_mi TINYINT(1) NOT NULL DEFAULT 0, tam_gun_mu TINYINT(1) NULL,
+        aciklama TEXT NULL,
         ilk_iki_gun_firma_oder_mi TINYINT(1) NULL,
         state VARCHAR(32) NOT NULL DEFAULT 'AKTIF', created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
     ) ENGINE=InnoDB");

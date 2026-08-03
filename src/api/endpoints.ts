@@ -210,6 +210,9 @@ export const endpoints = {
     bildirimDonemiPreview: "/sgk-katalog-hazirlik/bildirim-donemi/preview",
     onayValidate: "/sgk-katalog-hazirlik/onay/validate"
   },
+  sgkManuelKodOverride: {
+    create: "/sgk-manuel-kod-override"
+  },
   sirketCalismaPolitikalari: {
     katalog: "/sirket-calisma-politikalari/katalog",
     list: "/sirket-calisma-politikalari",

@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace Medisa\Api\Services;
 
+use Medisa\Api\Services\Payroll\SgkManuelKodOverrideService;
 use Medisa\Api\Services\Payroll\SgkPrimGunuEngine;
 use PDO;
 use PDOException;
+
+require_once __DIR__ . '/Payroll/SgkManuelKodOverrideService.php';
 
 /** S85-B SGK kaynak cozumleme, snapshot persistence ve read-only query owner'i. */
 final class SgkPrimGunuService
@@ -28,42 +31,30 @@ final class SgkPrimGunuService
         );
         [$dailyLower, $dailyUpper, $limitVersion] = self::resolvePekLimits($resolution['legal']);
 
+        $overrides = SgkManuelKodOverrideService::loadCurrentOverridesForPersonnel(
+            $pdo,
+            array_keys($resolution['personeller']),
+            $periodStart,
+            $periodEnd
+        );
+
         $attendanceByPerson = [];
         foreach ($resolution['attendance']['rows'] ?? [] as $row) {
             $attendanceByPerson[(int) $row['personel_id']][] = MaasHesaplamaSnapshotService::attendancePayload($row);
         }
         $processByPerson = [];
         foreach ($resolution['izinler'] ?? [] as $row) {
-            $process = MaasHesaplamaSnapshotService::leavePayload($row);
-            $rawKey = self::mappingKey((string) $process['surec_turu'], $process['alt_tur']);
-            $wildcardKey = self::mappingKey((string) $process['surec_turu'], null);
-            $map = $mapping[$rawKey] ?? $mapping[$wildcardKey] ?? null;
-            if (is_array($map)) {
-                $process['canonical_surec_turu'] = (string) $map['canonical_surec_turu'];
-                $process['eksik_gun_kodu'] = $map['eksik_gun_kodu'] !== null && $map['eksik_gun_kodu'] !== ''
-                    ? (string) $map['eksik_gun_kodu']
-                    : null;
-                $process['prim_gunu_etkisi'] = (string) $map['prim_gunu_etkisi'];
-                $conditions = json_decode((string) ($map['kosullar_json'] ?? ''), true);
-                if (is_array($conditions)) {
-                    $process['kosullar_json'] = $conditions;
-                    if (isset($conditions['cozulmus_prim_gunu_etkisi'])) {
-                        $process['cozulmus_prim_gunu_etkisi'] = (string) $conditions['cozulmus_prim_gunu_etkisi'];
-                    }
-                }
-            } else {
-                $process['canonical_surec_turu'] = 'DIGER_MANUEL_INCELEME';
-                $process['prim_gunu_etkisi'] = 'MANUEL';
-                $process['eksik_gun_kodu'] = null;
-            }
-            // Mazeret: surecler.ucretli_mi is the wage-cut decision equivalent (true=DAHIL).
+            $process = self::enrichProcessFromMapping($row, $mapping);
             if (array_key_exists('ucretli_mi', $row)) {
                 $process['ucretli_mi'] = (bool) $row['ucretli_mi'];
+            }
+            if (array_key_exists('tam_gun_mu', $row)) {
+                $process['tam_gun_mu'] = $row['tam_gun_mu'] !== null ? (bool) ((int) $row['tam_gun_mu']) : null;
             }
             if (!empty($row['sgk_eksik_gun_neden_tipi'])) {
                 $process['sgk_eksik_gun_neden_tipi'] = (string) $row['sgk_eksik_gun_neden_tipi'];
             }
-            $process['tam_gun_mu'] = self::isFullDayProcess($row);            $docRows = $documents[(int) $process['surec_id']] ?? [];
+            $docRows = $documents[(int) $process['surec_id']] ?? [];
             $process['kaynak_belge_idleri'] = array_values(array_map(static function (array $doc) {
                 return (int) $doc['id'];
             }, $docRows));
@@ -74,6 +65,27 @@ final class SgkPrimGunuService
             $process['belge_hash_uyusmazligi_mi'] = count(array_filter($docRows, static function (array $doc) {
                 return preg_match('/^[0-9a-f]{64}$/', (string) $doc['dosya_hash']) !== 1;
             })) > 0;
+            SgkManuelKodOverrideService::resolveForProcess($process, $overrides);
+            $processByPerson[(int) $process['personel_id']][] = $process;
+        }
+
+        foreach ($resolution['attendance']['rows'] ?? [] as $attRow) {
+            if (empty($attRow['sgk_eksik_gun_neden_tipi'])) {
+                continue;
+            }
+            $process = self::enrichProcessFromMapping([
+                'id' => null,
+                'personel_id' => (int) $attRow['personel_id'],
+                'surec_turu' => 'PUANTAJ_EKSIK_GUN',
+                'alt_tur' => '*',
+                'baslangic_tarihi' => (string) $attRow['tarih'],
+                'bitis_tarihi' => (string) $attRow['tarih'],
+                'sgk_eksik_gun_neden_tipi' => (string) $attRow['sgk_eksik_gun_neden_tipi'],
+            ], $mapping);
+            $process['surec_id'] = null;
+            $process['muhur_satir_id'] = (int) ($attRow['id'] ?? 0);
+            $process['sgk_eksik_gun_neden_tipi'] = (string) $attRow['sgk_eksik_gun_neden_tipi'];
+            SgkManuelKodOverrideService::resolveForAttendance($process, $overrides);
             $processByPerson[(int) $process['personel_id']][] = $process;
         }
 
@@ -100,12 +112,17 @@ final class SgkPrimGunuService
             }
             $allowanceStatus = self::allowanceStatus($reportPresent, $financeSummary);
             $policyHash = null;
-            if ($companyPolicy['politika'] !== null
-                && (!$reportPresent || isset($companyPolicy['degerler']['SGK_ODENEK_MAHSUP_MODU']))) {
+            if ($companyPolicy['politika'] !== null && !$reportPresent) {
                 $policyHash = (string) $companyPolicy['politika']['politika_hash'];
+            } elseif ($companyPolicy['politika'] !== null && $reportPresent) {
+                if (($companyPolicy['degerler']['SGK_ODENEK_MAHSUP_MODU'] ?? '') === 'UCRET_MODELINE_GORE') {
+                    $policyHash = (string) $companyPolicy['politika']['politika_hash'];
+                } else {
+                    $policyHash = null;
+                }
             }
 
-            $result = SgkPrimGunuEngine::calculate([
+            $engineInput = [
                 'donem_baslangic' => $periodStart,
                 'donem_bitis' => $periodEnd,
                 'bildirim_donem_tipi' => $status !== null && (string) $status['bildirim_donem_tipi'] !== 'SIRKET_POLITIKASINDAN'
@@ -123,9 +140,39 @@ final class SgkPrimGunuService
                 'gunluk_alt_sinir' => $dailyLower,
                 'gunluk_ust_sinir' => $dailyUpper,
                 'sinir_mevzuat_surumu' => $limitVersion,
-                // 0 prim gununde true/false bilinmiyorsa engine fail-closed kalir; tahmin uretilmez.
                 'sifir_kazanc_mi' => null,
-            ]);
+            ];
+
+            if ((string) ($personelInput['sozlesme_turu'] ?? '') === 'KISMI_SURELI') {
+                $totalMinutes = 0;
+                foreach ($attendanceByPerson[(int) $personelId] ?? [] as $attRow) {
+                    $totalMinutes += (int) ($attRow['net_calisma_suresi_dakika'] ?? 0);
+                }
+                $engineInput['kismi_aylik_calisma_saati'] = $totalMinutes / 60.0;
+                $personelInput['yazili_kismi_sureli_sozlesme_var_mi'] = self::loadWrittenPartialContract(
+                    $pdo,
+                    (int) $personelId,
+                    $periodStart,
+                    $periodEnd
+                );
+                $engineInput['personel'] = $personelInput;
+            }
+
+            $result = SgkPrimGunuEngine::calculate($engineInput);
+            if ($reportPresent && $companyPolicy['politika'] !== null
+                && ($companyPolicy['degerler']['SGK_ODENEK_MAHSUP_MODU'] ?? '') !== 'UCRET_MODELINE_GORE') {
+                $result = self::appendBlocker($result, [
+                    'severity' => 'BLOCKER',
+                    'code' => 'SGK_SIRKET_POLITIKASI_GECERSIZ',
+                    'message' => 'Raporlu donem icin SGK_ODENEK_MAHSUP_MODU tam olarak UCRET_MODELINE_GORE olmalidir.',
+                    'domain' => 'SGK',
+                    'tarih_baslangic' => $periodStart,
+                    'tarih_bitis' => $periodEnd,
+                    'kaynak_surec_id' => null,
+                    'kaynak_belge_id' => null,
+                    'cozum_onerisi' => 'Sirket politikasinda SGK_ODENEK_MAHSUP_MODU=UCRET_MODELINE_GORE onaylayin.',
+                ]);
+            }
             if (count($statusRows) !== 1) {
                 $result = self::appendBlocker($result, [
                     'severity' => 'BLOCKER',
@@ -659,20 +706,62 @@ final class SgkPrimGunuService
         return [1 => 'MAKTU_AYLIK', 2 => 'GUNLUK', 3 => 'SAATLIK'][(int) $id] ?? 'BELIRSIZ';
     }
 
-    /** Full calendar-day process heuristic for mazeret unpaid SGK day drop. */
-    private static function isFullDayProcess(array $row): bool
+    /** @param array<string, array<string, mixed>> $mapping @return array<string, mixed> */
+    private static function enrichProcessFromMapping(array $row, array $mapping): array
     {
-        $from = (string) ($row['baslangic_tarihi'] ?? '');
-        $to = (string) ($row['bitis_tarihi'] ?? $row['baslangic_tarihi'] ?? '');
-        if ($from === '' || $to === '') {
-            return true;
+        $process = MaasHesaplamaSnapshotService::leavePayload(array_merge($row, [
+            'id' => (int) ($row['id'] ?? 0),
+            'ucretli_mi' => (int) ($row['ucretli_mi'] ?? 0),
+            'state' => (string) ($row['state'] ?? 'AKTIF'),
+        ]));
+        if ((int) ($row['id'] ?? 0) === 0) {
+            $process['surec_id'] = 0;
         }
-        // Same-day or multi-day leave without partial-hour markers → full day for SGK.
-        if (!empty($row['kismi_saat']) || !empty($row['saatlik_mi'])) {
-            return false;
+        $rawKey = self::mappingKey((string) $process['surec_turu'], $process['alt_tur']);
+        $wildcardKey = self::mappingKey((string) $process['surec_turu'], null);
+        $map = $mapping[$rawKey] ?? $mapping[$wildcardKey] ?? null;
+        if (is_array($map)) {
+            $process['canonical_surec_turu'] = (string) $map['canonical_surec_turu'];
+            $process['eksik_gun_kodu'] = $map['eksik_gun_kodu'] !== null && $map['eksik_gun_kodu'] !== ''
+                ? (string) $map['eksik_gun_kodu']
+                : null;
+            $process['prim_gunu_etkisi'] = (string) $map['prim_gunu_etkisi'];
+            $conditions = json_decode((string) ($map['kosullar_json'] ?? ''), true);
+            if (is_array($conditions)) {
+                $process['kosullar_json'] = $conditions;
+                if (isset($conditions['cozulmus_prim_gunu_etkisi'])) {
+                    $process['cozulmus_prim_gunu_etkisi'] = (string) $conditions['cozulmus_prim_gunu_etkisi'];
+                }
+            }
+        } else {
+            $process['canonical_surec_turu'] = 'DIGER_MANUEL_INCELEME';
+            $process['prim_gunu_etkisi'] = 'MANUEL';
+            $process['eksik_gun_kodu'] = null;
         }
 
-        return true;
+        return $process;
+    }
+
+    private static function loadWrittenPartialContract(PDO $pdo, int $personelId, string $from, string $to): bool
+    {
+        $statuses = self::loadPersonnelStatuses($pdo, [$personelId], $from, $to);
+        foreach ($statuses[$personelId] ?? [] as $status) {
+            if ((string) ($status['sozlesme_turu'] ?? '') === 'KISMI_SURELI') {
+                return true;
+            }
+        }
+        try {
+            $stmt = $pdo->prepare(
+                "SELECT COUNT(*) FROM surecler
+                 WHERE personel_id = :pid AND surec_turu = 'BELGE' AND state = 'AKTIF'
+                   AND JSON_UNQUOTE(JSON_EXTRACT(aciklama, '$.belge_turu')) = 'IS_SOZLESMESI'"
+            );
+            $stmt->execute(['pid' => $personelId]);
+
+            return (int) $stmt->fetchColumn() > 0;
+        } catch (PDOException $e) {
+            return false;
+        }
     }
 
     private static function mappingKey($type, $subtype)

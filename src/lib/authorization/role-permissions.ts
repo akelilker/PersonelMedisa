@@ -89,6 +89,7 @@ export type AppPermission =
   | "revizyon.reject"
   | "revizyon.view_finance_effect"
   | "revizyon.view_audit_history"
+  | "sgk.manuel_kod_override"
   | "ops.auth_smoke.read";
 
 const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
@@ -164,7 +165,8 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "revizyon.approve",
     "revizyon.reject",
     "revizyon.view_finance_effect",
-    "revizyon.view_audit_history"
+    "revizyon.view_audit_history",
+    "sgk.manuel_kod_override"
   ],
   BOLUM_YONETICISI: [
     "personeller.view",
@@ -270,7 +272,8 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "revizyon.submit",
     "revizyon.cancel",
     "revizyon.view_finance_effect",
-    "revizyon.view_audit_history"
+    "revizyon.view_audit_history",
+    "sgk.manuel_kod_override"
   ],
   BIRIM_AMIRI: [
     "personeller.view.sube",

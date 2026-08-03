@@ -13,6 +13,7 @@ use Medisa\Api\Controllers\BildirimlerController;
 use Medisa\Api\Controllers\BildirimPuantajEtkiAdaylariController;
 use Medisa\Api\Controllers\BordroHazirlikController;
 use Medisa\Api\Controllers\SgkKatalogHazirlikController;
+use Medisa\Api\Controllers\SgkManuelKodOverrideController;
 use Medisa\Api\Controllers\SirketCalismaPolitikasiController;
 use Medisa\Api\Controllers\DonemKapanisController;
 use Medisa\Api\Controllers\HaftalikBildirimMutabakatlariController;
@@ -439,6 +440,9 @@ class Router
         }
         if ($path === '/sgk-katalog-hazirlik/onay/validate' && $method === 'POST') {
             SgkKatalogHazirlikController::onayValidate($this->request);
+        }
+        if ($path === '/sgk-manuel-kod-override' && $method === 'POST') {
+            SgkManuelKodOverrideController::create($this->request);
         }
 
         if ($path === '/sirket-calisma-politikalari/katalog' && $method === 'GET') {

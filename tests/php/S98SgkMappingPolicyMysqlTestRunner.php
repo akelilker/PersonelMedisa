@@ -108,7 +108,18 @@ try {
     $pdo->exec('CREATE TABLE users (id INT UNSIGNED NOT NULL PRIMARY KEY) ENGINE=InnoDB');
     $pdo->exec("CREATE TABLE subeler (id INT UNSIGNED NOT NULL PRIMARY KEY, kod VARCHAR(32) NOT NULL, ad VARCHAR(120) NOT NULL, durum ENUM('AKTIF','PASIF') NOT NULL DEFAULT 'AKTIF') ENGINE=InnoDB");
     $pdo->exec('CREATE TABLE personeller (id INT UNSIGNED NOT NULL PRIMARY KEY, ad VARCHAR(80) NOT NULL) ENGINE=InnoDB');
-    $pdo->exec('CREATE TABLE surecler (id INT UNSIGNED NOT NULL PRIMARY KEY, personel_id INT UNSIGNED NOT NULL) ENGINE=InnoDB');
+    $pdo->exec('CREATE TABLE surecler (
+        id INT UNSIGNED NOT NULL PRIMARY KEY,
+        personel_id INT UNSIGNED NOT NULL,
+        ucretli_mi TINYINT(1) NOT NULL DEFAULT 0
+    ) ENGINE=InnoDB');
+    $pdo->exec('CREATE TABLE puantaj_aylik_muhur_satirlari (
+        id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        muhur_id INT UNSIGNED NOT NULL,
+        personel_id INT UNSIGNED NOT NULL,
+        tarih DATE NOT NULL,
+        hesap_etkisi VARCHAR(40) NULL
+    ) ENGINE=InnoDB');
     $pdo->exec('CREATE TABLE maas_hesaplama_donem_snapshotlari (id INT UNSIGNED NOT NULL PRIMARY KEY) ENGINE=InnoDB');
     $pdo->exec('CREATE TABLE maas_hesaplama_personel_snapshotlari (id INT UNSIGNED NOT NULL PRIMARY KEY) ENGINE=InnoDB');
     // Stub for migration 047 (sgk_eksik_gun_neden_tipi AFTER hesap_etkisi).
@@ -321,6 +332,21 @@ try {
          WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'gunluk_puantaj' AND COLUMN_NAME = 'sgk_eksik_gun_neden_tipi'"
     )->fetchColumn();
     s98Assert($col047 === 1, 'migration 047 applied + idempotent (sgk_eksik_gun_neden_tipi)');
+    $sealCol047 = (int) $pdo->query(
+        "SELECT COUNT(*) FROM information_schema.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'puantaj_aylik_muhur_satirlari' AND COLUMN_NAME = 'sgk_eksik_gun_neden_tipi'"
+    )->fetchColumn();
+    s98Assert($sealCol047 === 1, 'migration 047 seal sgk_eksik_gun_neden_tipi');
+    $tamGun047 = (int) $pdo->query(
+        "SELECT COUNT(*) FROM information_schema.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'surecler' AND COLUMN_NAME = 'tam_gun_mu'"
+    )->fetchColumn();
+    s98Assert($tamGun047 === 1, 'migration 047 surecler.tam_gun_mu');
+    $idempotency047 = (int) $pdo->query(
+        "SELECT COUNT(*) FROM information_schema.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'sgk_manuel_kod_override_auditleri' AND COLUMN_NAME = 'idempotency_key'"
+    )->fetchColumn();
+    s98Assert($idempotency047 === 1, 'migration 047 override idempotency_key');
     $audit047 = (int) $pdo->query(
         "SELECT COUNT(*) FROM information_schema.TABLES
          WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'sgk_manuel_kod_override_auditleri'"
@@ -387,8 +413,18 @@ try {
             'kaynak_referansi' => 'SGK_EK9_APHB_20260722',
         ],
         [
+            'surec_turu' => 'IZIN', 'alt_tur' => 'MAZERET_IZNI', 'canonical_surec_turu' => 'MAZERET_IZNI',
+            'karar_kurali' => 'UCRET_KESINTISI_SECIMINE_GORE', 'kod_secim_modu' => 'KOD_YOK', 'eksik_gun_kodu' => '',
+            'kaynak_referansi' => 'SGK_EK9_APHB_20260722',
+        ],
+        [
             'surec_turu' => 'IZIN', 'alt_tur' => 'UCRETSIZ_IZIN', 'canonical_surec_turu' => 'UCRETSIZ_IZIN',
             'karar_kurali' => 'HER_ZAMAN_DUSUR', 'kod_secim_modu' => 'SABIT_KOD', 'eksik_gun_kodu' => '21',
+            'kaynak_referansi' => 'SGK_EK9_APHB_20260722',
+        ],
+        [
+            'surec_turu' => 'RAPOR', 'alt_tur' => 'Raporlu_Hastalik', 'canonical_surec_turu' => 'HASTALIK',
+            'karar_kurali' => 'UCRET_MODELINE_GORE', 'kod_secim_modu' => 'KOD_YOK', 'eksik_gun_kodu' => '',
             'kaynak_referansi' => 'SGK_EK9_APHB_20260722',
         ],
         [
@@ -432,6 +468,11 @@ try {
             'kaynak_referansi' => 'SGK_EK9_APHB_20260722',
         ],
         [
+            'surec_turu' => 'PUANTAJ_EKSIK_GUN', 'alt_tur' => '*', 'canonical_surec_turu' => 'PUANTAJ_EKSIK_GUN',
+            'karar_kurali' => 'OLAY_NEDENINE_GORE', 'kod_secim_modu' => 'OLAYDAN_TURET', 'eksik_gun_kodu' => '',
+            'kaynak_referansi' => 'SGK_EK9_APHB_20260722',
+        ],
+        [
             'surec_turu' => 'KISMI', 'alt_tur' => '*', 'canonical_surec_turu' => 'KISMI_SURELI_CALISMA',
             'karar_kurali' => 'YAZILI_KISMI_SOZLESME_ZORUNLU', 'kod_secim_modu' => 'SABIT_KOD', 'eksik_gun_kodu' => '06',
             'kaynak_referansi' => 'SGK_EK9_APHB_20260722',
@@ -443,7 +484,37 @@ try {
         'rows' => $fixtureRows,
     ]);
     s98Assert(!empty($fixtureDry['apply_yapilabilir_mi']), 'fixture-like rows dry-run applyable');
-    s98Assert(count($fixtureDry['canonical_rows'] ?? []) >= 11, 'fixture-like canonical row count');
+    s98Assert(count($fixtureDry['canonical_rows'] ?? []) === 14, 'fixture canonical row count === 14');
+    $expectedFixture = [
+        'IZIN|YILLIK_IZIN' => ['YILLIK_IZIN', 'HER_ZAMAN_DAHIL', 'KOD_YOK', null],
+        'IZIN|MAZERET_IZNI' => ['MAZERET_IZNI', 'UCRET_KESINTISI_SECIMINE_GORE', 'KOD_YOK', null],
+        'IZIN|UCRETSIZ_IZIN' => ['UCRETSIZ_IZIN', 'HER_ZAMAN_DUSUR', 'SABIT_KOD', '21'],
+        'RAPOR|Raporlu_Hastalik' => ['HASTALIK', 'UCRET_MODELINE_GORE', 'KOD_YOK', null],
+        'RAPOR|Raporlu_Meslek_Hastaligi' => ['MESLEK_HASTALIGI', 'HER_ZAMAN_DUSUR', 'SABIT_KOD', '01'],
+        'RAPOR|Raporlu_Analik' => ['ANALIK', 'HER_ZAMAN_DUSUR', 'SABIT_KOD', '01'],
+        'IS_KAZASI|IS_KAZASI_BILDIRIMI' => ['IS_KAZASI', 'HER_ZAMAN_DUSUR', 'SABIT_KOD', '01'],
+        'DEVAMSIZLIK|IZINSIZ_GELMEDI' => ['MAZERETSIZ_DEVAMSIZLIK', 'HER_ZAMAN_DUSUR', 'SABIT_KOD', '15'],
+        'DEVAMSIZLIK|MAZERETLI_GEC_GELDI' => ['KISMI_SURE_DEVAMSIZLIK', 'HER_ZAMAN_DAHIL', 'KOD_YOK', null],
+        'DEVAMSIZLIK|MAZERETSIZ_GEC_GELDI' => ['KISMI_SURE_DEVAMSIZLIK', 'HER_ZAMAN_DAHIL', 'KOD_YOK', null],
+        'DEVAMSIZLIK|MAZERETLI_ERKEN_CIKTI' => ['KISMI_SURE_DEVAMSIZLIK', 'HER_ZAMAN_DAHIL', 'KOD_YOK', null],
+        'DEVAMSIZLIK|MAZERETSIZ_ERKEN_CIKTI' => ['KISMI_SURE_DEVAMSIZLIK', 'HER_ZAMAN_DAHIL', 'KOD_YOK', null],
+        'PUANTAJ_EKSIK_GUN|*' => ['PUANTAJ_EKSIK_GUN', 'OLAY_NEDENINE_GORE', 'OLAYDAN_TURET', null],
+        'KISMI|*' => ['KISMI_SURELI_CALISMA', 'YAZILI_KISMI_SOZLESME_ZORUNLU', 'SABIT_KOD', '06'],
+    ];
+    foreach ($fixtureDry['canonical_rows'] ?? [] as $row) {
+        $key = (string) ($row['surec_turu'] ?? '') . '|' . (string) ($row['alt_tur'] ?? '');
+        s98Assert(isset($expectedFixture[$key]), 'fixture unexpected key ' . $key);
+        [$expCanon, $expRule, $expMode, $expCode] = $expectedFixture[$key];
+        $gotCode = $row['eksik_gun_kodu'] ?? null;
+        if ($gotCode === '') {
+            $gotCode = null;
+        }
+        s98Assert((string) ($row['canonical_surec_turu'] ?? '') === $expCanon, 'fixture canonical ' . $key);
+        s98Assert((string) ($row['karar_kurali'] ?? '') === $expRule, 'fixture rule ' . $key);
+        s98Assert((string) ($row['kod_secim_modu'] ?? '') === $expMode, 'fixture mode ' . $key);
+        s98Assert($gotCode === $expCode, 'fixture code ' . $key);
+    }
+    s98Assert(count($expectedFixture) === 14, 'expected fixture map has exact 14 keys');
 
     $policyBadValue = SgkSirketPolitikaImportValidator::dryRun($pdo, [
         'sube_id' => 1,
@@ -520,6 +591,66 @@ try {
         []
     );
     s98Assert($mazUcretsiz['effect'] === 'DUSUR' && $mazUcretsiz['code'] === '21', 'resolveRuntime mazeret ucretsiz→DUSUR/21');
+
+    $mazPartial = SgkEslemeKararContract::resolveRuntime(
+        [
+            'kosullar_json' => ['karar_kurali' => 'UCRET_KESINTISI_SECIMINE_GORE', 'kod_secim_modu' => 'KOD_YOK'],
+            'canonical_surec_turu' => 'MAZERET_IZNI',
+            'ucretli_mi' => false,
+            'tam_gun_mu' => false,
+            'eksik_gun_kodu' => null,
+        ],
+        []
+    );
+    s98Assert($mazPartial['effect'] === 'DAHIL' && $mazPartial['code'] === null, 'resolveRuntime mazeret partial→DAHIL');
+
+    $mazTamGunNull = SgkEslemeKararContract::resolveRuntime(
+        [
+            'kosullar_json' => ['karar_kurali' => 'UCRET_KESINTISI_SECIMINE_GORE', 'kod_secim_modu' => 'KOD_YOK'],
+            'canonical_surec_turu' => 'MAZERET_IZNI',
+            'ucretli_mi' => false,
+            'tam_gun_mu' => null,
+            'eksik_gun_kodu' => null,
+        ],
+        []
+    );
+    s98Assert(
+        $mazTamGunNull['effect'] === 'MANUEL'
+        && in_array('MAZERET_TAM_GUN_KARARI_EKSIK', array_column($mazTamGunNull['blockers'], 'code'), true),
+        'resolveRuntime mazeret tam_gun null→blocker'
+    );
+
+    $pdo->exec("DELETE FROM sgk_eksik_gun_kodlari WHERE katalog_surum_id = $parentId AND eksik_gun_kodu = '15'");
+    $catalogMissing = SgkSurecEslemeImportValidator::dryRun($pdo, [
+        'parent_surum_kodu' => 'S98-PARENT',
+        'rows' => [[
+            'surec_turu' => 'PUANTAJ_EKSIK_GUN',
+            'alt_tur' => '*',
+            'canonical_surec_turu' => 'PUANTAJ_EKSIK_GUN',
+            'karar_kurali' => 'OLAY_NEDENINE_GORE',
+            'kod_secim_modu' => 'OLAYDAN_TURET',
+            'eksik_gun_kodu' => '',
+            'kaynak_referansi' => 'SGK_EK9_APHB_20260722',
+        ]],
+    ]);
+    s98Assert(empty($catalogMissing['apply_yapilabilir_mi']), 'required catalog codes missing blocks apply');
+    $catErrs = $catalogMissing['hatali_satirlar'][0]['errors'] ?? [];
+    s98Assert(in_array('PARENT_KATALOG_GEREKEN_KOD_YOK', $catErrs, true), 'PARENT_KATALOG_GEREKEN_KOD_YOK');
+
+    $olayManuelReject = SgkEslemeKararContract::normalize([
+        'karar_kurali' => 'OLAY_NEDENINE_GORE',
+        'kod_secim_modu' => 'YETKILI_MANUEL',
+        'eksik_gun_kodu' => '01',
+    ]);
+    s98Assert(in_array('OLAY_NEDENI_YETKILI_MANUEL_YASAK', $olayManuelReject['errors'], true), 'OLAY rejects YETKILI_MANUEL mapping mode');
+
+    $pdo->exec("INSERT INTO gunluk_puantaj (personel_id, tarih, hesap_etkisi, sgk_eksik_gun_neden_tipi)
+        VALUES (7, '2026-03-01', 'Yevmiye_Kes', 'ISTIRAHAT')
+        ON DUPLICATE KEY UPDATE sgk_eksik_gun_neden_tipi = 'ISTIRAHAT'");
+    $sealedReason = (string) $pdo->query(
+        "SELECT sgk_eksik_gun_neden_tipi FROM gunluk_puantaj WHERE personel_id = 7 AND tarih = '2026-03-01'"
+    )->fetchColumn();
+    s98Assert($sealedReason === 'ISTIRAHAT', 'gunluk_puantaj sgk_eksik_gun_neden_tipi persistence smoke');
 
     $mazMissing = SgkEslemeKararContract::resolveRuntime(
         [

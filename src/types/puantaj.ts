@@ -36,6 +36,13 @@ export type PuantajHesapEtkisi =
   | "Mesai_Yaz"
   | "Telafi";
 
+export type SgkEksikGunNedenTipi =
+  | "ISTIRAHAT"
+  | "KISMI_ISTIHDAM"
+  | "TAM_GUN_DEVAMSIZLIK"
+  | "GENEL_UCRETSIZ_IZIN"
+  | "BILINMIYOR";
+
 /** Birim amirinin günlük kayda baktığına dair görünürlük (zorunlu onay kapısı değil). */
 export type PuantajAmirKontrolDurumu = "BEKLIYOR" | "AMIR_KONTROL_ETTI";
 
@@ -48,6 +55,7 @@ export type GunlukPuantaj = {
   durumu_bildirdi_mi?: boolean | null;
   durum_bildirim_aciklamasi?: string;
   hesap_etkisi?: PuantajHesapEtkisi;
+  sgk_eksik_gun_neden_tipi?: SgkEksikGunNedenTipi | null;
   beklenen_giris_saati?: string;
   beklenen_cikis_saati?: string;
   giris_saati?: string;
@@ -97,5 +105,6 @@ export type UpsertGunlukPuantajPayload = {
   gec_kalma_dakika?: number;
   erken_cikis_dakika?: number;
   gercek_mola_dakika?: number;
+  sgk_eksik_gun_neden_tipi?: SgkEksikGunNedenTipi | null;
   kontrol_durumu?: PuantajAmirKontrolDurumu;
 };

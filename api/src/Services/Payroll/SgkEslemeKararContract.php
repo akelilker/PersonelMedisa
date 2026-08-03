@@ -6,7 +6,7 @@ namespace Medisa\Api\Services\Payroll;
 
 /**
  * S98-R1: Normalize mapping decision rules into kosullar_json + prim effect.
- * Free-form JSON is never accepted from import; only enum-controlled fields.
+ * Strict RULE×MODE matrix; free-form JSON is never accepted from import.
  */
 final class SgkEslemeKararContract
 {
@@ -53,39 +53,60 @@ final class SgkEslemeKararContract
             $kod = null;
         } elseif ($kural === 'HER_ZAMAN_DUSUR') {
             $prim = 'DUSUR';
-            if ($kodModu === 'KOD_YOK') {
+            if ($kodModu !== 'SABIT_KOD') {
+                $errors[] = 'DUSUR_ICIN_SABIT_KOD_ZORUNLU';
+            }
+            if ($kod === null) {
                 $errors[] = 'DUSUR_ICIN_KOD_ZORUNLU';
             }
-            if ($kodModu === 'SABIT_KOD' && $kod === null) {
-                $errors[] = 'DUSUR_ICIN_KOD_ZORUNLU';
-            }
-            if ($kodModu === 'OLAYDAN_TURET') {
-                $kod = null;
-            }
-        } elseif (in_array($kural, ['UCRET_MODELINE_GORE', 'UCRET_KESINTISI_SECIMINE_GORE', 'OLAY_NEDENINE_GORE', 'YAZILI_KISMI_SOZLESME_ZORUNLU'], true)) {
+        } elseif ($kural === 'UCRET_MODELINE_GORE') {
             $prim = 'KOSULLU';
-            if ($kural === 'OLAY_NEDENINE_GORE' && $kodModu !== 'OLAYDAN_TURET' && $kodModu !== 'YETKILI_MANUEL') {
-                $errors[] = 'OLAY_NEDENI_ICIN_OLAYDAN_TURET_VEYA_MANUEL';
+            if ($kodModu !== 'KOD_YOK') {
+                $errors[] = 'UCRET_MODELI_ICIN_KOD_YOK_ZORUNLU';
             }
-            if ($kural === 'YAZILI_KISMI_SOZLESME_ZORUNLU' && $kodModu === 'SABIT_KOD' && $kod === null) {
-                $errors[] = 'DUSUR_ICIN_KOD_ZORUNLU';
+            if ($kod !== null) {
+                $errors[] = 'KOSULLU_KURAL_SABIT_KOD_YASAK';
             }
-            if ($kural === 'UCRET_MODELINE_GORE' || $kural === 'UCRET_KESINTISI_SECIMINE_GORE') {
-                if ($kodModu === 'SABIT_KOD') {
-                    $errors[] = 'KOSULLU_KURAL_SABIT_KOD_YASAK';
-                }
-                // Conditional codes resolved at runtime; template may leave empty.
-                $kod = null;
+            $kod = null;
+        } elseif ($kural === 'UCRET_KESINTISI_SECIMINE_GORE') {
+            $prim = 'KOSULLU';
+            if ($kodModu !== 'KOD_YOK') {
+                $errors[] = 'UCRET_KESINTISI_ICIN_KOD_YOK_ZORUNLU';
             }
-            if ($kural === 'OLAY_NEDENINE_GORE' && $kodModu === 'OLAYDAN_TURET') {
-                $kod = null;
+            if ($kod !== null) {
+                $errors[] = 'KOSULLU_KURAL_SABIT_KOD_YASAK';
+            }
+            $kod = null;
+        } elseif ($kural === 'OLAY_NEDENINE_GORE') {
+            $prim = 'KOSULLU';
+            if ($kodModu !== 'OLAYDAN_TURET') {
+                $errors[] = 'OLAY_NEDENI_ICIN_OLAYDAN_TURET_ZORUNLU';
+            }
+            if ($kodModu === 'YETKILI_MANUEL') {
+                $errors[] = 'OLAY_NEDENI_YETKILI_MANUEL_YASAK';
+            }
+            $kod = null;
+        } elseif ($kural === 'YAZILI_KISMI_SOZLESME_ZORUNLU') {
+            $prim = 'KOSULLU';
+            if ($kodModu !== 'SABIT_KOD') {
+                $errors[] = 'KISMI_SOZLESME_ICIN_SABIT_KOD_ZORUNLU';
+            }
+            if ($kod !== '06') {
+                $errors[] = 'KISMI_SOZLESME_KOD_06_ZORUNLU';
+            }
+        } else {
+            if ($kural !== '') {
+                $errors[] = 'GECERSIZ_KARAR_KURALI';
             }
         }
+
+        $requiredCodes = self::requiredCatalogCodes($kural, $kod);
 
         $kosullar = [
             'contract_version' => self::CONTRACT_VERSION,
             'karar_kurali' => $kural,
             'kod_secim_modu' => $kodModu,
+            'required_catalog_codes' => $requiredCodes,
         ];
         if ($kural === 'OLAY_NEDENINE_GORE') {
             $kosullar['olay_neden_kod_haritasi'] = SgkKatalogContracts::OLAY_NEDEN_KOD_HARITASI;
@@ -103,8 +124,26 @@ final class SgkEslemeKararContract
         ];
     }
 
+    /** @return list<string> */
+    public static function requiredCatalogCodes(string $kural, ?string $kod): array
+    {
+        $kural = strtoupper(trim($kural));
+        $kod = $kod !== null && $kod !== '' ? strtoupper(trim($kod)) : null;
+
+        return match ($kural) {
+            'UCRET_MODELINE_GORE' => ['01'],
+            'UCRET_KESINTISI_SECIMINE_GORE' => ['21'],
+            'OLAY_NEDENINE_GORE' => ['01', '06', '15', '21'],
+            'YAZILI_KISMI_SOZLESME_ZORUNLU' => ['06'],
+            'HER_ZAMAN_DUSUR' => $kod !== null ? [$kod] : [],
+            'HER_ZAMAN_DAHIL' => [],
+            default => [],
+        };
+    }
+
     /**
      * Resolve runtime effect + code from mapping + personel/process context.
+     * Manual override is applied by SgkManuelKodOverrideService after this call.
      *
      * @param array<string,mixed> $process enriched process row
      * @param array<string,mixed> $personel
@@ -123,13 +162,11 @@ final class SgkEslemeKararContract
         }
 
         $kural = strtoupper(trim((string) ($conditions['karar_kurali'] ?? '')));
-        $kodModu = strtoupper(trim((string) ($conditions['kod_secim_modu'] ?? '')));
         $canonical = strtoupper(trim((string) ($process['canonical_surec_turu'] ?? '')));
         $mappedCode = isset($process['eksik_gun_kodu']) && $process['eksik_gun_kodu'] !== null && $process['eksik_gun_kodu'] !== ''
             ? strtoupper(trim((string) $process['eksik_gun_kodu']))
             : null;
 
-        // Legacy rows without karar_kurali: fall back to stored prim_gunu_etkisi.
         if ($kural === '') {
             $effect = strtoupper((string) ($process['prim_gunu_etkisi'] ?? ''));
             if ($effect === 'KOSULLU') {
@@ -143,7 +180,7 @@ final class SgkEslemeKararContract
             return ['effect' => 'DAHIL', 'code' => null, 'blockers' => $blockers];
         }
         if ($kural === 'HER_ZAMAN_DUSUR') {
-            if ($mappedCode === null && $kodModu !== 'OLAYDAN_TURET') {
+            if ($mappedCode === null) {
                 $blockers[] = ['code' => 'SGK_EKSIK_GUN_KODU_BULUNAMADI', 'message' => 'DUSUR karari icin sabit kod yok.'];
             }
 
@@ -169,14 +206,15 @@ final class SgkEslemeKararContract
 
                 return ['effect' => 'MANUEL', 'code' => null, 'blockers' => $blockers];
             }
-            $ucretli = (bool) $process['ucretli_mi'];
-            if ($ucretli) {
+            if ((bool) $process['ucretli_mi']) {
                 return ['effect' => 'DAHIL', 'code' => null, 'blockers' => $blockers];
             }
+            if (!array_key_exists('tam_gun_mu', $process) || $process['tam_gun_mu'] === null) {
+                $blockers[] = ['code' => 'MAZERET_TAM_GUN_KARARI_EKSIK', 'message' => 'Mazeret tam gun mu karari yok.'];
 
-            // Tam gun unpaid mazeret → code 21. Partial-hour SGK day reduction denied.
-            $tamGun = !empty($process['tam_gun_mu']);
-            if ($tamGun === false && array_key_exists('tam_gun_mu', $process)) {
+                return ['effect' => 'MANUEL', 'code' => null, 'blockers' => $blockers];
+            }
+            if ((bool) $process['tam_gun_mu'] === false) {
                 return ['effect' => 'DAHIL', 'code' => null, 'blockers' => $blockers];
             }
 
@@ -188,20 +226,6 @@ final class SgkEslemeKararContract
             $map = is_array($conditions['olay_neden_kod_haritasi'] ?? null)
                 ? $conditions['olay_neden_kod_haritasi']
                 : SgkKatalogContracts::OLAY_NEDEN_KOD_HARITASI;
-            if ($kodModu === 'YETKILI_MANUEL') {
-                if ($mappedCode === null) {
-                    $blockers[] = ['code' => 'SGK_EKSIK_GUN_KODU_BULUNAMADI', 'message' => 'Manuel override kodu yok.'];
-
-                    return ['effect' => 'MANUEL', 'code' => null, 'blockers' => $blockers];
-                }
-                if (empty($process['manuel_override_audit_ok_mi'])) {
-                    $blockers[] = ['code' => 'SGK_MANUEL_OVERRIDE_AUDIT_EKSIK', 'message' => 'Manuel kod override audit/gerekce/belge eksik.'];
-
-                    return ['effect' => 'MANUEL', 'code' => null, 'blockers' => $blockers];
-                }
-
-                return ['effect' => 'DUSUR', 'code' => $mappedCode, 'blockers' => $blockers];
-            }
             if ($neden === '' || $neden === 'BILINMIYOR' || !isset($map[$neden])) {
                 $blockers[] = ['code' => 'SGK_OLAY_NEDENI_BELIRSIZ', 'message' => 'Puantaj eksik gun neden tipi cozulemedi.'];
 
@@ -222,8 +246,13 @@ final class SgkEslemeKararContract
 
                 return ['effect' => 'MANUEL', 'code' => null, 'blockers' => $blockers];
             }
+            if ($mappedCode !== '06') {
+                $blockers[] = ['code' => 'SGK_EKSIK_GUN_KODU_BULUNAMADI', 'message' => 'Kismi sureli icin eksik gun kodu 06 olmalidir.'];
 
-            return ['effect' => 'DUSUR', 'code' => $mappedCode ?? '06', 'blockers' => $blockers];
+                return ['effect' => 'MANUEL', 'code' => null, 'blockers' => $blockers];
+            }
+
+            return ['effect' => 'DUSUR', 'code' => '06', 'blockers' => $blockers];
         }
 
         $blockers[] = ['code' => 'SGK_PRIM_GUNU_HESAPLANAMADI', 'message' => 'Karar kurali cozulemedi.'];

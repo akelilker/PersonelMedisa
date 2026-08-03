@@ -30,6 +30,7 @@ import {
   type SgkKatalogImportDryRun,
   type SgkKatalogTamlik
 } from "../../../api/sgk-katalog-hazirlik.api";
+import { createSgkManuelKodOverride } from "../../../api/sgk-manuel-kod-override.api";
 import { AppActionDialog } from "../../../components/modal/AppActionDialog";
 import { ErrorState } from "../../../components/states/ErrorState";
 import { LoadingState } from "../../../components/states/LoadingState";
@@ -57,6 +58,7 @@ type DialogKind =
   | "politika-draft"
   | "politika-submit"
   | "politika-approve"
+  | "manuel-override"
   | null;
 
 const ESLEME_DRAFT_CONFIRM = "SUREC_ESLEME_DRAFT_ONAY";
@@ -178,6 +180,15 @@ export function SgkKatalogHazirlikPanel() {
   const [dialogFieldValue, setDialogFieldValue] = useState("");
   const [dialogSubmitting, setDialogSubmitting] = useState(false);
   const [dialogError, setDialogError] = useState<string | null>(null);
+
+  const [overridePersonelId, setOverridePersonelId] = useState("");
+  const [overrideTargetType, setOverrideTargetType] = useState<"SUREC" | "GUNLUK_PUANTAJ">("SUREC");
+  const [overrideTargetId, setOverrideTargetId] = useState("");
+  const [overrideTarih, setOverrideTarih] = useState("");
+  const [overrideYeniKod, setOverrideYeniKod] = useState("");
+  const [overrideGerekce, setOverrideGerekce] = useState("");
+  const [overrideBelgeId, setOverrideBelgeId] = useState("");
+  const [overrideResult, setOverrideResult] = useState<Record<string, unknown> | null>(null);
 
   const [attestationResmi, setAttestationResmi] = useState(false);
   const [attestationBelirsiz, setAttestationBelirsiz] = useState(false);
@@ -432,6 +443,27 @@ export function SgkKatalogHazirlikPanel() {
         });
         setPolitikaActionResult(result);
         setPolitikaSurumState(String(result.state ?? "ONAYLANDI"));
+        closeDialog();
+      } else if (dialog === "manuel-override") {
+        const personelId = Number.parseInt(overridePersonelId, 10);
+        const targetId = Number.parseInt(overrideTargetId, 10);
+        const belgeId = Number.parseInt(overrideBelgeId, 10);
+        if (!personelId || !targetId || !belgeId || !overrideTarih || !overrideYeniKod.trim() || !overrideGerekce.trim()) {
+          setDialogError("Tüm zorunlu alanları doldurun.");
+          return;
+        }
+        const idempotencyKey = `sgk-mko-${overrideTargetType}-${targetId}-${Date.now()}`;
+        const result = await createSgkManuelKodOverride({
+          target_type: overrideTargetType,
+          target_id: targetId,
+          personel_id: personelId,
+          tarih: overrideTarih,
+          yeni_eksik_gun_kodu: overrideYeniKod.trim(),
+          gerekce: overrideGerekce.trim(),
+          belge_id: belgeId,
+          idempotency_key: idempotencyKey
+        });
+        setOverrideResult(result as unknown as Record<string, unknown>);
         closeDialog();
       }
     } catch (err) {
@@ -880,6 +912,49 @@ export function SgkKatalogHazirlikPanel() {
             Kod×belge matrisi resmi olarak kanıtlanmadı. Belge gereksinimleri katalog seed olmadan gösterilmez.
           </p>
           <BlockerList items={(tamlik?.blocker_detaylari ?? []).filter((b) => b.code === "SGK_KATALOG_TAMLIK_KANITI_EKSIK")} />
+          <div className="sgk-manuel-override-form" data-testid="sgk-manuel-kod-override-form">
+            <h4>SGK manuel kod override</h4>
+            <label>
+              Personel ID
+              <input value={overridePersonelId} onChange={(e) => setOverridePersonelId(e.target.value)} data-testid="sgk-override-personel-id" />
+            </label>
+            <label>
+              Hedef türü
+              <select value={overrideTargetType} onChange={(e) => setOverrideTargetType(e.target.value as "SUREC" | "GUNLUK_PUANTAJ")} data-testid="sgk-override-target-type">
+                <option value="SUREC">SUREC</option>
+                <option value="GUNLUK_PUANTAJ">GUNLUK_PUANTAJ (mühür satır id)</option>
+              </select>
+            </label>
+            <label>
+              Hedef ID
+              <input value={overrideTargetId} onChange={(e) => setOverrideTargetId(e.target.value)} data-testid="sgk-override-target-id" />
+            </label>
+            <label>
+              Tarih
+              <input type="date" value={overrideTarih} onChange={(e) => setOverrideTarih(e.target.value)} data-testid="sgk-override-tarih" />
+            </label>
+            <label>
+              Yeni eksik gün kodu
+              <input value={overrideYeniKod} onChange={(e) => setOverrideYeniKod(e.target.value)} data-testid="sgk-override-yeni-kod" />
+            </label>
+            <label>
+              Gerekçe
+              <textarea value={overrideGerekce} onChange={(e) => setOverrideGerekce(e.target.value)} data-testid="sgk-override-gerekce" />
+            </label>
+            <label>
+              Belge ID (doğrulanmış SGK belgesi)
+              <input value={overrideBelgeId} onChange={(e) => setOverrideBelgeId(e.target.value)} data-testid="sgk-override-belge-id" />
+            </label>
+            <button
+              type="button"
+              className="universal-btn-save"
+              data-testid="sgk-manuel-kod-override-open"
+              onClick={() => openDialog("manuel-override")}
+            >
+              Manuel override kaydet
+            </button>
+            {overrideResult ? <pre data-testid="sgk-manuel-kod-override-result">{JSON.stringify(overrideResult, null, 2)}</pre> : null}
+          </div>
         </div>
       ) : null}
 
@@ -1036,6 +1111,21 @@ export function SgkKatalogHazirlikPanel() {
           description="Onaylayan hazırlayan farklı olmalı."
           confirmLabel="Onayla"
           submitLabel="Onaylanıyor..."
+          isSubmitting={dialogSubmitting}
+          errorMessage={dialogError}
+          onConfirm={() => void runDialogAction()}
+          onCancel={closeDialog}
+        />
+      ) : null}
+
+      {dialog === "manuel-override" ? (
+        <AppActionDialog
+          open
+          testId="sgk-manuel-kod-override-dialog"
+          title="SGK Manuel Kod Override"
+          description="Yetkili manuel eksik gün kodu override kaydı oluşturulacak. Önceki aktif kayıt SUPERSEDED olur."
+          confirmLabel="Kaydet"
+          submitLabel="Kaydediliyor..."
           isSubmitting={dialogSubmitting}
           errorMessage={dialogError}
           onConfirm={() => void runDialogAction()}

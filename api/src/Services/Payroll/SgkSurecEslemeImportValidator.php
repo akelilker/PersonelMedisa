@@ -212,6 +212,19 @@ final class SgkSurecEslemeImportValidator
             if ($resolvedKod !== null && $parentCodes !== [] && !isset($parentCodes[$resolvedKod])) {
                 $errors[] = 'PARENT_KATALOG_KODU_YOK';
             }
+            $requiredCodes = is_array($normalized['kosullar_json']['required_catalog_codes'] ?? null)
+                ? $normalized['kosullar_json']['required_catalog_codes']
+                : SgkEslemeKararContract::requiredCatalogCodes($kararKurali, $resolvedKod);
+            foreach ($requiredCodes as $reqCode) {
+                $req = strtoupper(trim((string) $reqCode));
+                if ($req === '') {
+                    continue;
+                }
+                if ($parentCodes !== [] && !isset($parentCodes[$req])) {
+                    $errors[] = 'PARENT_KATALOG_GEREKEN_KOD_YOK';
+                    break;
+                }
+            }
             if ($kaynakRef === '') {
                 $errors[] = 'KAYNAK_REFERANSI_ZORUNLU';
             } elseif (!isset($manifestIndex[$kaynakRef])) {

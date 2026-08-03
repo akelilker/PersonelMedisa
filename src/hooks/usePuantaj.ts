@@ -50,7 +50,8 @@ import type {
   PuantajDayanak,
   PuantajGunTipi,
   PuantajHareketDurumu,
-  PuantajHesapEtkisi
+  PuantajHesapEtkisi,
+  SgkEksikGunNedenTipi
 } from "../types/puantaj";
 
 type ActiveQuery = {
@@ -90,6 +91,7 @@ export type GunlukPuantajFormState = {
   entryGirisSaati: string;
   entryCikisSaati: string;
   entryGercekMolaDakika: string;
+  entrySgkEksikGunNedenTipi: SgkEksikGunNedenTipi | "";
 };
 
 function toPuantajFormState(
@@ -107,6 +109,7 @@ function toPuantajFormState(
   | "entryGirisSaati"
   | "entryCikisSaati"
   | "entryGercekMolaDakika"
+  | "entrySgkEksikGunNedenTipi"
 > {
   const effectiveTarih = puantaj?.tarih ?? fallbackTarih;
 
@@ -126,7 +129,8 @@ function toPuantajFormState(
     entryGirisSaati: puantaj?.giris_saati ?? "",
     entryCikisSaati: puantaj?.cikis_saati ?? "",
     entryGercekMolaDakika:
-      puantaj?.gercek_mola_dakika !== undefined ? String(puantaj.gercek_mola_dakika) : ""
+      puantaj?.gercek_mola_dakika !== undefined ? String(puantaj.gercek_mola_dakika) : "",
+    entrySgkEksikGunNedenTipi: puantaj?.sgk_eksik_gun_neden_tipi ?? ""
   };
 }
 
@@ -193,7 +197,8 @@ const INITIAL_FORM: GunlukPuantajFormState = {
   entryBeklenenCikisSaati: "",
   entryGirisSaati: "",
   entryCikisSaati: "",
-  entryGercekMolaDakika: ""
+  entryGercekMolaDakika: "",
+  entrySgkEksikGunNedenTipi: ""
 };
 
 /** Pazartesi başlangıcından itibaren 7 gün YYYY-MM-DD. */
@@ -1055,7 +1060,8 @@ export function usePuantaj() {
           cikis_saati: hareketDurumuSaatGerekliMi(hareketDurumu) ? cikisSaati : undefined,
           gercek_mola_dakika: hareketDurumuSaatGerekliMi(hareketDurumu)
             ? parseOptionalNonNegativeInt(formState.entryGercekMolaDakika)
-            : undefined
+            : undefined,
+          sgk_eksik_gun_neden_tipi: formState.entrySgkEksikGunNedenTipi || null
         };
 
         const dogumTarihi = await loadPersonelDogumTarihi(activeSube, activeQuery.personelId);

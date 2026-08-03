@@ -2,6 +2,10 @@ import type { CreateSurecPayload, UpdateSurecPayload } from "../../api/surecler.
 import type { SurecFormState } from "../../hooks/useSurecler";
 import type { Surec } from "../../types/surec";
 
+export function isMazeretIzniSureci(surecTuru: string, altTur: string) {
+  return surecTuru.trim() === "IZIN" && altTur.trim() === "MAZERET_IZNI";
+}
+
 export function isHastalikRaporSureci(surecTuru: string, altTur: string) {
   return surecTuru.trim() === "RAPOR" && altTur.trim() === "Raporlu_Hastalik";
 }
@@ -38,8 +42,23 @@ export function toSurecFormState(surec: Surec): SurecFormState {
     baslangicTarihi: surec.baslangic_tarihi ?? "",
     bitisTarihi: surec.bitis_tarihi ?? "",
     ucretliMi: surec.ucretli_mi ?? true,
+    tamGunMu: surec.tam_gun_mu ?? null,
     ilkIkiGunFirmaOderMi: surec.ilk_iki_gun_firma_oder_mi ?? null,
     aciklama: surec.aciklama ?? ""
+  };
+}
+
+function appendMazeretTamGunPayload<T extends CreateSurecPayload | UpdateSurecPayload>(
+  payload: T,
+  form: SurecFormState
+): T {
+  if (!isMazeretIzniSureci(form.surecTuru, form.altTur)) {
+    return payload;
+  }
+
+  return {
+    ...payload,
+    tam_gun_mu: form.tamGunMu
   };
 }
 
@@ -58,7 +77,8 @@ function appendIlkIkiGunFirmaOderMiPayload<T extends CreateSurecPayload | Update
 }
 
 export function buildCreateSurecPayload(form: SurecFormState): CreateSurecPayload {
-  return appendIlkIkiGunFirmaOderMiPayload(
+  return appendMazeretTamGunPayload(
+    appendIlkIkiGunFirmaOderMiPayload(
     {
       personel_id: parseRequiredPositiveInt(form.personelId, "Personel ID"),
       surec_turu: parseRequiredSurecTuru(form.surecTuru),
@@ -69,11 +89,14 @@ export function buildCreateSurecPayload(form: SurecFormState): CreateSurecPayloa
       aciklama: form.aciklama.trim() || undefined
     },
     form
+  ),
+    form
   );
 }
 
 export function buildUpdateSurecPayload(form: SurecFormState): UpdateSurecPayload {
-  return appendIlkIkiGunFirmaOderMiPayload(
+  return appendMazeretTamGunPayload(
+    appendIlkIkiGunFirmaOderMiPayload(
     {
       personel_id: parseRequiredPositiveInt(form.personelId, "Personel ID"),
       surec_turu: parseRequiredSurecTuru(form.surecTuru),
@@ -83,6 +106,8 @@ export function buildUpdateSurecPayload(form: SurecFormState): UpdateSurecPayloa
       ucretli_mi: form.ucretliMi,
       aciklama: form.aciklama.trim() || undefined
     },
+    form
+  ),
     form
   );
 }

@@ -72,9 +72,9 @@ describe("S97-C personel import history source locks", () => {
     expect(history).not.toMatch(/SELECT[\s\S]{0,400}AS tc_sha256/);
   });
 
-  it("does not add migration 047", () => {
+  it("does not add import_history migration", () => {
     const files = readdirSync(resolve(root, "api/migrations"));
-    expect(files.some((name) => String(name).startsWith("047"))).toBe(false);
     expect(files.some((name) => String(name).includes("import_history"))).toBe(false);
+    expect(files.some((name) => String(name).startsWith("047_sgk_real_decision_contract"))).toBe(true);
   });
 });

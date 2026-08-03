@@ -291,7 +291,7 @@ export function SurecFormFields({
   const ucretliFieldNode = showUcretliField
     ? useOperationControls
       ? renderSegmentedButtons(
-          "Ücretli mi?",
+          "Ücretli mi? (Hayır = ücret kesilsin / SGK günü düşürülebilir)",
           "surec-create-ucret",
           form.ucretliMi ? "evet" : "hayir",
           UCRETLI_SELECT_OPTIONS,
@@ -300,7 +300,7 @@ export function SurecFormFields({
       : (
           <FormField
             as="select"
-            label="Ücretli mi?"
+              label="Ücretli mi? (Hayır = ücret kesilsin / SGK günü düşürülebilir)"
             name="surec-create-ucret"
             value={form.ucretliMi ? "evet" : "hayir"}
             onChange={(value) => setForm((prev) => ({ ...prev, ucretliMi: value === "evet" }))}

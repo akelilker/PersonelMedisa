@@ -246,7 +246,9 @@ final class SgkSurecEslemeWriteService
                 'surec_turu' => (string) $row['surec_turu'],
                 'alt_tur' => (string) $row['alt_tur'],
                 'canonical_surec_turu' => (string) $row['canonical_surec_turu'],
-                'eksik_gun_kodu' => (string) $row['eksik_gun_kodu'],
+                'eksik_gun_kodu' => isset($row['eksik_gun_kodu']) && $row['eksik_gun_kodu'] !== null && $row['eksik_gun_kodu'] !== ''
+                    ? (string) $row['eksik_gun_kodu']
+                    : null,
                 'prim_gunu_etkisi' => (string) $row['prim_gunu_etkisi'],
                 'kosullar_json' => $kosullarJson,
                 'kaynak_manifest_id' => (int) $row['kaynak_manifest_id'],

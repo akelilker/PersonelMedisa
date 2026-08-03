@@ -43,10 +43,38 @@ final class SgkKatalogContracts
         'ANALIK',
         'UCRETSIZ_IZIN',
         'YILLIK_IZIN',
+        'MAZERET_IZNI',
         'MAZERETSIZ_DEVAMSIZLIK',
         'KISMI_SURELI_CALISMA',
+        'KISMI_SURE_DEVAMSIZLIK',
         'PUANTAJ_EKSIK_GUN',
         'DIGER_MANUEL_INCELEME',
+    ];
+
+    /** S98-R1: enum-controlled mapping decision rules (no free-form JSON import). */
+    public const KARAR_KURALLARI = [
+        'HER_ZAMAN_DAHIL',
+        'HER_ZAMAN_DUSUR',
+        'UCRET_MODELINE_GORE',
+        'UCRET_KESINTISI_SECIMINE_GORE',
+        'OLAY_NEDENINE_GORE',
+        'YAZILI_KISMI_SOZLESME_ZORUNLU',
+    ];
+
+    /** S98-R1: how eksik_gun_kodu is selected. */
+    public const KOD_SECIM_MODLARI = [
+        'KOD_YOK',
+        'SABIT_KOD',
+        'OLAYDAN_TURET',
+        'YETKILI_MANUEL',
+    ];
+
+    /** Puantaj eksik gun neden → resmi kod (OLAYDAN_TURET). */
+    public const OLAY_NEDEN_KOD_HARITASI = [
+        'ISTIRAHAT' => '01',
+        'KISMI_ISTIHDAM' => '06',
+        'TAM_GUN_DEVAMSIZLIK' => '15',
+        'GENEL_UCRETSIZ_IZIN' => '21',
     ];
 
     /** @var list<string> */

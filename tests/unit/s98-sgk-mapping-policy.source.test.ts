@@ -7,12 +7,15 @@ function read(path: string): string {
 }
 
 describe("S98 SGK mapping + policy source guards", () => {
-  it("no migration 047+ and owners present", () => {
+  it("migration 047 real decision contract present", () => {
     const names = readdirSync(resolve("api/migrations")).filter((n) => n.endsWith(".sql")).sort();
-    expect(names.some((n) => /^047_/.test(n))).toBe(false);
-    expect(read("api/src/Services/Payroll/SgkSurecEslemeImportValidator.php")).toContain("dryRun");
+    expect(names.some((n) => /^047_sgk_real_decision_contract\.sql$/.test(n))).toBe(true);
+    expect(read("api/migrations/047_sgk_real_decision_contract.sql")).toContain("MAZERET_IZNI");
+    expect(read("api/migrations/047_sgk_real_decision_contract.sql")).toContain("KISMI_SURE_DEVAMSIZLIK");
+    expect(read("api/src/Services/Payroll/SgkEslemeKararContract.php")).toContain("HER_ZAMAN_DAHIL");
+    expect(read("api/src/Services/Payroll/SgkSurecEslemeImportValidator.php")).toContain("karar_kurali");
     expect(read("api/src/Services/Payroll/SgkSurecEslemeWriteService.php")).toContain("SUREC_ESLEME_DRAFT_ONAY");
-    expect(read("api/src/Services/Payroll/SgkSirketPolitikaCatalog.php")).toContain("SGK_ODENEK_MAHSUP_MODU");
+    expect(read("api/src/Services/Payroll/SgkSirketPolitikaCatalog.php")).toContain("UCRET_MODELINE_GORE");
     expect(read("api/src/Services/Payroll/SgkSirketPolitikaWriteService.php")).toContain("SGK_POLITIKA_DRAFT_ONAY");
   });
 
@@ -59,7 +62,28 @@ describe("S98 SGK mapping + policy source guards", () => {
     const catalog = read("api/src/Services/Payroll/SgkSirketPolitikaCatalog.php");
     expect(catalog).toContain("bildirim_donem_tipi");
     expect(catalog).toContain("sgk_sirket_politika_surumleri");
+    expect(catalog).toContain("UCRET_MODELINE_GORE");
     expect(catalog).not.toContain("'default'");
+  });
+
+  it("S98-R1 decision enums and no-code DAHIL contract", () => {
+    const contracts = read("api/src/Services/Payroll/SgkKatalogContracts.php");
+    const karar = read("api/src/Services/Payroll/SgkEslemeKararContract.php");
+    const validator = read("api/src/Services/Payroll/SgkSurecEslemeImportValidator.php");
+    const engine = read("api/src/Services/Payroll/SgkPrimGunuEngine.php");
+    const write = read("api/src/Services/Payroll/SgkSurecEslemeWriteService.php");
+    expect(contracts).toContain("MAZERET_IZNI");
+    expect(contracts).toContain("KISMI_SURE_DEVAMSIZLIK");
+    expect(contracts).toContain("KOD_YOK");
+    expect(karar).toContain("DAHIL_ILE_KOD_CELISKISI");
+    expect(karar).toContain("UCRET_MODELINE_GORE");
+    expect(karar).toContain("roundPartialPrimDays");
+    expect(validator).toContain("karar_kurali");
+    expect(validator).toContain("kod_secim_modu");
+    expect(write).toContain("eksik_gun_kodu") && expect(write).toContain("null");
+    expect(engine).toContain("S98R1_SGK_PRIM_GUNU_CONTRACT_V1");
+    expect(engine).toContain("KISMI_SURE_DEVAMSIZLIK");
+    expect(engine).toContain("kismi_aylik_calisma_saati");
   });
 
   it("UI panel wires S98 testids, AppActionDialog, and download helpers", () => {
@@ -88,6 +112,9 @@ describe("S98 SGK mapping + policy source guards", () => {
     expect(panel).toContain("importSgkSirketPolitikasi");
     expect(panel).toContain("submitSgkSirketPolitikasi");
     expect(panel).toContain("approveSgkSirketPolitikasi");
+    expect(panel).toContain('data-testid="sgk-esleme-decision-rules-note"');
+    expect(panel).toContain("Kod kullanılmaz");
+    expect(panel).toContain("Ücret modeline göre");
     expect(api).toContain("downloadSgkSurecEslemeSablonCsv");
     expect(api).toContain("downloadSgkSirketPolitikasiSablonCsv");
     expect(api).toContain("surecEslemeSablonCsv");

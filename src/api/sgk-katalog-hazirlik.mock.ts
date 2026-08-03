@@ -222,7 +222,7 @@ export function buildSgkSirketPolitikasiSubmitSuccessMock(surumKodu: string) {
 }
 
 export const SGK_SUREC_ESLEME_SABLON_CSV =
-  "\uFEFFsurec_turu;alt_tur;canonical_surec_turu;eksik_gun_kodu;prim_gunu_etkisi;cozulmus_prim_gunu_etkisi;kaynak_referansi\r\n";
+  "\uFEFFsurec_turu;alt_tur;canonical_surec_turu;karar_kurali;kod_secim_modu;eksik_gun_kodu;kaynak_referansi\r\n";
 
 export const SGK_SIRKET_POLITIKASI_SABLON_CSV =
   "\uFEFFsube;surum_kodu;gecerlilik_baslangic;gecerlilik_bitis;bildirim_donem_tipi;politika_kodu;deger;aciklama\r\n";

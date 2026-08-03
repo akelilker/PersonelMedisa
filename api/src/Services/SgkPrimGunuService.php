@@ -40,18 +40,30 @@ final class SgkPrimGunuService
             $map = $mapping[$rawKey] ?? $mapping[$wildcardKey] ?? null;
             if (is_array($map)) {
                 $process['canonical_surec_turu'] = (string) $map['canonical_surec_turu'];
-                $process['eksik_gun_kodu'] = $map['eksik_gun_kodu'] !== null ? (string) $map['eksik_gun_kodu'] : null;
+                $process['eksik_gun_kodu'] = $map['eksik_gun_kodu'] !== null && $map['eksik_gun_kodu'] !== ''
+                    ? (string) $map['eksik_gun_kodu']
+                    : null;
                 $process['prim_gunu_etkisi'] = (string) $map['prim_gunu_etkisi'];
                 $conditions = json_decode((string) ($map['kosullar_json'] ?? ''), true);
-                if (is_array($conditions) && isset($conditions['cozulmus_prim_gunu_etkisi'])) {
-                    $process['cozulmus_prim_gunu_etkisi'] = (string) $conditions['cozulmus_prim_gunu_etkisi'];
+                if (is_array($conditions)) {
+                    $process['kosullar_json'] = $conditions;
+                    if (isset($conditions['cozulmus_prim_gunu_etkisi'])) {
+                        $process['cozulmus_prim_gunu_etkisi'] = (string) $conditions['cozulmus_prim_gunu_etkisi'];
+                    }
                 }
             } else {
                 $process['canonical_surec_turu'] = 'DIGER_MANUEL_INCELEME';
                 $process['prim_gunu_etkisi'] = 'MANUEL';
                 $process['eksik_gun_kodu'] = null;
             }
-            $docRows = $documents[(int) $process['surec_id']] ?? [];
+            // Mazeret: surecler.ucretli_mi is the wage-cut decision equivalent (true=DAHIL).
+            if (array_key_exists('ucretli_mi', $row)) {
+                $process['ucretli_mi'] = (bool) $row['ucretli_mi'];
+            }
+            if (!empty($row['sgk_eksik_gun_neden_tipi'])) {
+                $process['sgk_eksik_gun_neden_tipi'] = (string) $row['sgk_eksik_gun_neden_tipi'];
+            }
+            $process['tam_gun_mu'] = self::isFullDayProcess($row);            $docRows = $documents[(int) $process['surec_id']] ?? [];
             $process['kaynak_belge_idleri'] = array_values(array_map(static function (array $doc) {
                 return (int) $doc['id'];
             }, $docRows));
@@ -645,6 +657,22 @@ final class SgkPrimGunuService
     private static function wageModel($id)
     {
         return [1 => 'MAKTU_AYLIK', 2 => 'GUNLUK', 3 => 'SAATLIK'][(int) $id] ?? 'BELIRSIZ';
+    }
+
+    /** Full calendar-day process heuristic for mazeret unpaid SGK day drop. */
+    private static function isFullDayProcess(array $row): bool
+    {
+        $from = (string) ($row['baslangic_tarihi'] ?? '');
+        $to = (string) ($row['bitis_tarihi'] ?? $row['baslangic_tarihi'] ?? '');
+        if ($from === '' || $to === '') {
+            return true;
+        }
+        // Same-day or multi-day leave without partial-hour markers → full day for SGK.
+        if (!empty($row['kismi_saat']) || !empty($row['saatlik_mi'])) {
+            return false;
+        }
+
+        return true;
     }
 
     private static function mappingKey($type, $subtype)

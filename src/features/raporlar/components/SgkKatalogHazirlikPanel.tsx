@@ -642,6 +642,10 @@ export function SgkKatalogHazirlikPanel() {
           <p data-testid="sgk-esleme-immutable-note" className="muted">
             Onaylanmış katalog sürümü (parent) değiştirilemez; eşleme yalnızca successor TASLAK sürümüne yazılır.
           </p>
+          <p data-testid="sgk-esleme-decision-rules-note" className="muted">
+            Karar kuralları: Kod kullanılmaz (DAHIL) · Ücret modeline göre · Ücret kesilsin mi seçimine göre ·
+            Olay nedeninden türet · Yazılı kısmi sözleşme gerekli. DUSUR için kod zorunlu; DAHIL ile kod çelişki.
+          </p>
           {eslemePreflightBlocker ? (
             <p data-testid="sgk-esleme-preflight-note" className="yonetim-error">
               Preflight: {eslemePreflightBlocker.message}

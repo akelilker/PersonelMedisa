@@ -1,0 +1,79 @@
+{
+    "fixture_version": 1,
+    "parent_sha": "f9fd2af1390550a18ad4b8c89cd397c9724614d8",
+    "parent_subject": "feat(personnel): add import audit center",
+    "provenance": "Frozen from parent commit via git show during local generation; not from current HEAD.",
+    "input_fixture_id": "s97d-parity-valid-row-v1",
+    "schema_version": "personel-import-v1",
+    "source_sha256": "a33482fbe52d94133e202381fbe859d17857c4442df06d2bb2e4448c40f07a32",
+    "manifest_hash": "a9f3fd0db3897ee8f4499aaa1e5669e3ab54a6bec3f31b2fab5a995ff9ac35e6",
+    "headers": [
+        "tc_kimlik_no",
+        "sicil_no",
+        "ad",
+        "soyad",
+        "dogum_tarihi",
+        "dogum_yeri",
+        "telefon",
+        "kan_grubu",
+        "acil_durum_kisi",
+        "acil_durum_telefon",
+        "ise_giris_tarihi",
+        "sube",
+        "departman",
+        "gorev",
+        "personel_tipi"
+    ],
+    "allowed_sube_ids": [],
+    "active_sube_id": null,
+    "ozet": {
+        "toplam_satir": 1,
+        "gecerli_satir": 1,
+        "hatali_satir": 0,
+        "warning_sayisi": 0,
+        "kayit_olusturulacak_aday": 1,
+        "veritabaninda_mevcut": 0
+    },
+    "can_apply": true,
+    "satir_count": 1,
+    "satirlar": [
+        {
+            "satir_no": 2,
+            "durum": "GECERLI",
+            "hata_kodlari": [],
+            "uyarilar": []
+        }
+    ],
+    "resolved": {
+        "sube_id": 1,
+        "departman_id": 1,
+        "gorev_id": 2,
+        "personel_tipi_id": 1
+    },
+    "candidate_payload": {
+        "tc_kimlik_no": "10000000146",
+        "ad": "Ayşe",
+        "soyad": "Yılmaz",
+        "dogum_tarihi": "1990-05-15",
+        "telefon": "0532 111 22 33",
+        "acil_durum_kisi": "Ali Yılmaz",
+        "acil_durum_telefon": "0532 444 55 66",
+        "sicil_no": "IMP-PARITY-001",
+        "ise_giris_tarihi": "2024-01-10",
+        "sube_id": 1,
+        "departman_id": 1,
+        "gorev_id": 2,
+        "personel_tipi_id": 1,
+        "aktif_durum": "AKTIF",
+        "dogum_yeri": "Ankara",
+        "kan_grubu": "A Rh+",
+        "bagli_amir_id": null,
+        "ucret_tipi_id": null,
+        "maas_tutari": null,
+        "prim_kurali_id": null
+    },
+    "candidate_payload_sha256": "1261582dd6531ea55c15298f2f0e8d4c322623a6e36d5a1ccc5c32ab047da44b",
+    "template_sha256": "9fd15716c45eb7cc9a578c624f3141b29b2b926af4af091ff7e0dfa62f9c9797",
+    "template_byte_length": 200,
+    "template_bytes_base64": "77u/dGNfa2ltbGlrX25vO3NpY2lsX25vO2FkO3NveWFkO2RvZ3VtX3RhcmloaTtkb2d1bV95ZXJpO3RlbGVmb247a2FuX2dydWJ1O2FjaWxfZHVydW1fa2lzaTthY2lsX2R1cnVtX3RlbGVmb247aXNlX2dpcmlzX3RhcmloaTtzdWJlO2RlcGFydG1hbjtnb3JldjtwZXJzb25lbF90aXBpDQo7Ozs7WVlZWS1NTS1ERDs7Ozs7O1lZWVktTU0tREQ7Ozs7DQo="
+}

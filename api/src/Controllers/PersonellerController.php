@@ -16,6 +16,7 @@ use Medisa\Api\Services\Personel\PersonelImportApplyService;
 use Medisa\Api\Services\Personel\PersonelImportDryRunService;
 use Medisa\Api\Services\Personel\PersonelImportException;
 use Medisa\Api\Services\Personel\PersonelImportHistoryService;
+use Medisa\Api\Services\Personel\PersonelImportReferenceCatalogService;
 use Medisa\Api\Services\Personel\PersonelValidationException;
 use Medisa\Api\Services\PersonelUcretException;
 use Medisa\Api\Services\PersonelUcretService;
@@ -339,6 +340,53 @@ class PersonellerController
         if (!headers_sent()) {
             header('Content-Type: text/csv; charset=utf-8');
             header('Content-Disposition: attachment; filename="personel-import-sablon.csv"');
+            http_response_code(200);
+        }
+        echo $csv;
+        exit;
+    }
+
+    public static function importReferencesCsv(Request $request)
+    {
+        $user = AuthMiddleware::authenticate($request, true);
+        RolePermissions::assert($user, 'personeller.create');
+
+        try {
+            $pdo = Connection::get();
+        } catch (\Throwable $e) {
+            JsonResponse::serverError('Veritabani baglantisi kurulamadi.');
+        }
+
+        $activeSube = $request->getHeader('x-active-sube-id');
+
+        try {
+            $result = PersonelImportReferenceCatalogService::buildExport($pdo, $user, $activeSube);
+        } catch (PersonelImportException $e) {
+            $message = $e->getMessage();
+            if (preg_match('/SQLSTATE|stack|trace|mysqli|PDO/i', $message)) {
+                $message = 'Personel import referans paketi hazirlanamadi.';
+            }
+            JsonResponse::error($e->getHttpStatus(), $e->getCodeString(), $message);
+        }
+
+        $csv = (string) $result['csv'];
+        if (
+            preg_match('/\btc_kimlik_no\b/i', $csv)
+            || preg_match('/idempotency_key/i', $csv)
+            || preg_match('/\d{11}/', $csv)
+        ) {
+            JsonResponse::serverError('Personel import referans response scrub hatasi.');
+        }
+
+        if (!headers_sent()) {
+            header('Content-Type: text/csv; charset=utf-8');
+            header(
+                'Content-Disposition: attachment; filename="'
+                . preg_replace('/[^A-Za-z0-9._-]+/', '-', (string) $result['filename'])
+                . '"'
+            );
+            header(PersonelImportReferenceCatalogService::SHA_HEADER . ': ' . $result['sha256']);
+            header('ETag: "' . $result['sha256'] . '"');
             http_response_code(200);
         }
         echo $csv;

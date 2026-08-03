@@ -191,7 +191,7 @@ final class PersonelImportDryRunService
         $allowedSubeIds = SubeScope::allowedSubeIds($user);
         $activeSubeId = self::parsePositiveInt($activeSubeHeader);
 
-        $refCatalog = self::loadReferenceCatalog($pdo);
+        $refCatalog = PersonelImportReferenceCatalogService::loadCatalogForDryRun($pdo);
         $existingTc = self::loadExistingTcSet($pdo);
         $existingSicil = self::loadExistingSicilSet($pdo);
 
@@ -302,7 +302,7 @@ final class PersonelImportDryRunService
                 }
                 if (
                     $resolved['departman_id'] !== null
-                    && !self::isSubeDepartmanLinked($subeId, (int) $resolved['departman_id'], $refCatalog)
+                    && !PersonelImportReferenceCatalogService::isSubeDepartmanLinked($subeId, (int) $resolved['departman_id'], $refCatalog)
                 ) {
                     $hataKodlari[] = 'PERSONEL_IMPORT_SUBE_DEPARTMAN_ILISKISI';
                 }
@@ -555,10 +555,30 @@ final class PersonelImportDryRunService
      */
     private static function resolveReferences(array $rowMap, array $catalog, array &$hataKodlari)
     {
-        $subeId = self::resolveExactUnique($rowMap['sube'] ?? '', $catalog['sube'], 'sube', $hataKodlari);
-        $departmanId = self::resolveExactUnique($rowMap['departman'] ?? '', $catalog['departman'], 'departman', $hataKodlari);
-        $gorevId = self::resolveExactUnique($rowMap['gorev'] ?? '', $catalog['gorev'], 'gorev', $hataKodlari);
-        $personelTipiId = self::resolveExactUnique($rowMap['personel_tipi'] ?? '', $catalog['personel_tipi'], 'personel_tipi', $hataKodlari);
+        $subeId = PersonelImportReferenceCatalogService::resolveExactUnique(
+            $rowMap['sube'] ?? '',
+            $catalog['sube'],
+            'sube',
+            $hataKodlari
+        );
+        $departmanId = PersonelImportReferenceCatalogService::resolveExactUnique(
+            $rowMap['departman'] ?? '',
+            $catalog['departman'],
+            'departman',
+            $hataKodlari
+        );
+        $gorevId = PersonelImportReferenceCatalogService::resolveExactUnique(
+            $rowMap['gorev'] ?? '',
+            $catalog['gorev'],
+            'gorev',
+            $hataKodlari
+        );
+        $personelTipiId = PersonelImportReferenceCatalogService::resolveExactUnique(
+            $rowMap['personel_tipi'] ?? '',
+            $catalog['personel_tipi'],
+            'personel_tipi',
+            $hataKodlari
+        );
 
         return [
             'sube_id' => $subeId,
@@ -566,106 +586,6 @@ final class PersonelImportDryRunService
             'gorev_id' => $gorevId,
             'personel_tipi_id' => $personelTipiId,
         ];
-    }
-
-    /**
-     * @param array<string, list<int>> $index
-     * @param list<string> $hataKodlari
-     */
-    private static function resolveExactUnique($name, array $index, $field, array &$hataKodlari)
-    {
-        $key = trim((string) $name);
-        if ($key === '') {
-            return null;
-        }
-        if (!isset($index[$key])) {
-            $hataKodlari[] = 'PERSONEL_IMPORT_REFERANS_BULUNAMADI';
-            return null;
-        }
-        $ids = $index[$key];
-        if (count($ids) !== 1) {
-            $hataKodlari[] = 'PERSONEL_IMPORT_REFERANS_BELIRSIZ';
-            return null;
-        }
-
-        return (int) $ids[0];
-    }
-
-    /** @return array<string, mixed> */
-    private static function loadReferenceCatalog(PDO $pdo)
-    {
-        return [
-            'sube' => self::loadNameIndex($pdo, 'subeler'),
-            'departman' => self::loadNameIndex($pdo, 'departmanlar'),
-            'gorev' => self::loadNameIndex($pdo, 'gorevler'),
-            'personel_tipi' => self::loadNameIndex($pdo, 'personel_tipleri'),
-            'sube_departman' => self::loadSubeDepartmanPairs($pdo),
-        ];
-    }
-
-    /**
-     * @return array<string, list<int>>
-     */
-    private static function loadNameIndex(PDO $pdo, $table)
-    {
-        $allowed = ['subeler', 'departmanlar', 'gorevler', 'personel_tipleri'];
-        if (!in_array($table, $allowed, true)) {
-            throw new RuntimeException('Invalid reference table.');
-        }
-
-        $stmt = $pdo->query("SELECT id, ad FROM $table WHERE durum = 'AKTIF'");
-        $index = [];
-        if (!$stmt) {
-            return $index;
-        }
-        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
-            $name = (string) ($row['ad'] ?? '');
-            if ($name === '') {
-                continue;
-            }
-            if (!isset($index[$name])) {
-                $index[$name] = [];
-            }
-            $index[$name][] = (int) $row['id'];
-        }
-
-        return $index;
-    }
-
-    /** @return array<string, true> */
-    private static function loadSubeDepartmanPairs(PDO $pdo)
-    {
-        $pairs = [];
-        try {
-            $stmt = $pdo->query('SELECT sube_id, departman_id FROM sube_departmanlar');
-            if (!$stmt) {
-                return $pairs;
-            }
-            foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
-                $key = ((int) $row['sube_id']) . ':' . ((int) $row['departman_id']);
-                $pairs[$key] = true;
-            }
-        } catch (\Throwable $e) {
-            return $pairs;
-        }
-
-        return $pairs;
-    }
-
-    /**
-     * @param array<string, mixed> $catalog
-     */
-    private static function isSubeDepartmanLinked($subeId, $departmanId, array $catalog)
-    {
-        $pairs = $catalog['sube_departman'] ?? [];
-        if (!is_array($pairs) || count($pairs) === 0) {
-            // No mapping rows → treat as open (matches create which only checks AKTIF FKs).
-            return true;
-        }
-
-        $key = ((int) $subeId) . ':' . ((int) $departmanId);
-
-        return isset($pairs[$key]);
     }
 
     /** @return array<string, true> */

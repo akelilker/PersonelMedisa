@@ -4,6 +4,7 @@ export type AppPermission =
   | "personeller.view"
   | "personeller.view.sube"
   | "personeller.create"
+  | "personeller.import.apply"
   | "personeller.update"
   | "personeller.detail.view"
   | "personeller.ucret.view"
@@ -95,6 +96,7 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "personeller.view",
     "personeller.view.sube",
     "personeller.create",
+    "personeller.import.apply",
     "personeller.update",
     "personeller.detail.view",
     "personeller.ucret.view",
@@ -168,6 +170,7 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "personeller.view",
     "personeller.view.sube",
     "personeller.create",
+    "personeller.import.apply",
     "personeller.update",
     "personeller.detail.view",
     "surecler.view",
@@ -214,6 +217,7 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "personeller.view",
     "personeller.view.sube",
     "personeller.create",
+    "personeller.import.apply",
     "personeller.update",
     "personeller.detail.view",
     "personeller.ucret.view",

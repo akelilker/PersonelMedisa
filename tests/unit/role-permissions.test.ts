@@ -54,6 +54,10 @@ function extractPhpRolePermissions(role: string): string[] {
 describe("role permissions", () => {
   it("grants management roles full personel and process actions", () => {
     expect(hasRolePermission("GENEL_YONETICI", "personeller.create")).toBe(true);
+    expect(hasRolePermission("GENEL_YONETICI", "personeller.import.apply")).toBe(true);
+    expect(hasRolePermission("BOLUM_YONETICISI", "personeller.import.apply")).toBe(true);
+    expect(hasRolePermission("MUHASEBE", "personeller.import.apply")).toBe(true);
+    expect(hasRolePermission("BIRIM_AMIRI", "personeller.import.apply")).toBe(false);
     expect(hasRolePermission("BOLUM_YONETICISI", "surecler.cancel")).toBe(true);
     expect(hasRolePermission("MUHASEBE", "bildirimler.update")).toBe(true);
     expect(hasRolePermission("GENEL_YONETICI", "raporlar.view")).toBe(true);

@@ -60,6 +60,6 @@ describe("015_bildirim_puantaj_etki_cakisma_cozumleri migration source", () => {
     const migrations = readdirSync(resolve(process.cwd(), "api/migrations"))
       .filter((name) => /^\d{3}_.*\.sql$/.test(name))
       .sort();
-    expect(migrations.at(-1)).toBe("045_sirket_politikasi_kanit_owner.sql");
+    expect(migrations.at(-1)).toBe("046_personel_import_apply_owner.sql");
   });
 });

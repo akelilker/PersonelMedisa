@@ -11,6 +11,8 @@ use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
 use Medisa\Api\Scope\SubeScope;
 use Medisa\Api\Services\Personel\PersonelCanonicalValidator;
+use Medisa\Api\Services\Personel\PersonelCreateService;
+use Medisa\Api\Services\Personel\PersonelImportApplyService;
 use Medisa\Api\Services\Personel\PersonelImportDryRunService;
 use Medisa\Api\Services\Personel\PersonelImportException;
 use Medisa\Api\Services\Personel\PersonelValidationException;
@@ -194,12 +196,16 @@ class PersonellerController
         }
 
         self::assertCreateSubeScope($user, $request, $payload['sube_id']);
-        self::validateCreateReferences($pdo, $payload);
+        try {
+            PersonelCreateService::validateCreateReferences($pdo, $payload);
+        } catch (PersonelValidationException $e) {
+            JsonResponse::error(422, $e->getCodeString(), $e->getMessage(), $e->getField());
+        }
         self::assertTcAvailable($pdo, $payload['tc_kimlik_no']);
 
         $pdo->beginTransaction();
         try {
-            $insertId = self::insertPersonel($pdo, $payload);
+            $insertId = PersonelCreateService::insertPersonel($pdo, $payload);
             if ($hasSalary && $payload['maas_tutari'] !== null) {
                 PersonelUcretService::createSalaryRecord($pdo, $insertId, [
                     'ucret_tutari' => $payload['maas_tutari'],
@@ -227,7 +233,7 @@ class PersonellerController
                 $pdo->rollBack();
             }
 
-            if (self::isDuplicateTcException($e)) {
+            if (PersonelCreateService::isDuplicateTcException($e) || self::isDuplicateTcException($e)) {
                 self::duplicateTcResponse();
             }
 
@@ -363,6 +369,48 @@ class PersonellerController
         }
 
         JsonResponse::success($result);
+    }
+
+    public static function importApply(Request $request)
+    {
+        $user = AuthMiddleware::authenticate($request, true);
+        RolePermissions::assert($user, 'personeller.import.apply');
+
+        try {
+            $pdo = Connection::get();
+        } catch (\Throwable $e) {
+            JsonResponse::serverError('Veritabani baglantisi kurulamadi.');
+        }
+
+        $csvContent = self::readImportCsvContent($request);
+        $body = $request->getJsonBody();
+        if (!is_array($body)) {
+            $body = [];
+        }
+        // Multipart form fields may carry apply metadata alongside file upload.
+        foreach (['manifest_hash', 'idempotency_key', 'confirmation', 'onay'] as $field) {
+            if ((!isset($body[$field]) || $body[$field] === '') && isset($_POST[$field])) {
+                $body[$field] = $_POST[$field];
+            }
+        }
+        $activeSube = $request->getHeader('x-active-sube-id');
+
+        try {
+            $result = PersonelImportApplyService::apply($pdo, $csvContent, $user, $body, $activeSube);
+        } catch (PersonelImportException $e) {
+            $message = $e->getMessage();
+            if (preg_match('/\d{11}/', $message)) {
+                $message = 'Personel import apply hatasi.';
+            }
+            JsonResponse::error($e->getHttpStatus(), $e->getCodeString(), $message);
+        }
+
+        $encoded = json_encode($result, JSON_UNESCAPED_UNICODE);
+        if (is_string($encoded) && preg_match('/"tc_kimlik_no"\s*:/', $encoded)) {
+            JsonResponse::serverError('Personel import response scrub hatasi.');
+        }
+
+        JsonResponse::success($result, [], 201);
     }
 
     /** @return string */
@@ -520,9 +568,7 @@ class PersonellerController
 
     private static function assertTcAvailable(PDO $pdo, $tcKimlikNo)
     {
-        $stmt = $pdo->prepare('SELECT id FROM personeller WHERE tc_kimlik_no = :tc_kimlik_no LIMIT 1');
-        $stmt->execute(['tc_kimlik_no' => (string) $tcKimlikNo]);
-        if ($stmt->fetch(PDO::FETCH_ASSOC)) {
+        if (PersonelCreateService::tcExists($pdo, (string) $tcKimlikNo)) {
             self::duplicateTcResponse();
         }
     }
@@ -537,47 +583,6 @@ class PersonellerController
         if ($stmt->fetch(PDO::FETCH_ASSOC)) {
             self::duplicateTcResponse();
         }
-    }
-
-    /** @param array<string, mixed> $payload */
-    private static function insertPersonel(PDO $pdo, array $payload)
-    {
-        $sql = '
-            INSERT INTO personeller (
-                tc_kimlik_no, ad, soyad, dogum_tarihi, telefon, acil_durum_kisi, acil_durum_telefon,
-                sicil_no, ise_giris_tarihi, sube_id, departman_id, gorev_id, personel_tipi_id,
-                bagli_amir_id, aktif_durum, dogum_yeri, kan_grubu, ucret_tipi_id, maas_tutari, prim_kurali_id
-            ) VALUES (
-                :tc_kimlik_no, :ad, :soyad, :dogum_tarihi, :telefon, :acil_durum_kisi, :acil_durum_telefon,
-                :sicil_no, :ise_giris_tarihi, :sube_id, :departman_id, :gorev_id, :personel_tipi_id,
-                :bagli_amir_id, :aktif_durum, :dogum_yeri, :kan_grubu, :ucret_tipi_id, :maas_tutari, :prim_kurali_id
-            )
-        ';
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute([
-            'tc_kimlik_no' => $payload['tc_kimlik_no'],
-            'ad' => $payload['ad'],
-            'soyad' => $payload['soyad'],
-            'dogum_tarihi' => $payload['dogum_tarihi'],
-            'telefon' => $payload['telefon'],
-            'acil_durum_kisi' => $payload['acil_durum_kisi'],
-            'acil_durum_telefon' => $payload['acil_durum_telefon'],
-            'sicil_no' => $payload['sicil_no'],
-            'ise_giris_tarihi' => $payload['ise_giris_tarihi'],
-            'sube_id' => $payload['sube_id'],
-            'departman_id' => $payload['departman_id'],
-            'gorev_id' => $payload['gorev_id'],
-            'personel_tipi_id' => $payload['personel_tipi_id'],
-            'bagli_amir_id' => $payload['bagli_amir_id'],
-            'aktif_durum' => $payload['aktif_durum'],
-            'dogum_yeri' => $payload['dogum_yeri'],
-            'kan_grubu' => $payload['kan_grubu'],
-            'ucret_tipi_id' => $payload['ucret_tipi_id'],
-            'maas_tutari' => $payload['maas_tutari'],
-            'prim_kurali_id' => $payload['prim_kurali_id'],
-        ]);
-
-        return (int) $pdo->lastInsertId();
     }
 
     /** @param array<string, mixed> $payload */

@@ -154,6 +154,9 @@ class Router
         if ($path === '/personeller/import/dry-run' && $method === 'POST') {
             PersonellerController::importDryRun($this->request);
         }
+        if ($path === '/personeller/import/apply' && $method === 'POST') {
+            PersonellerController::importApply($this->request);
+        }
         if ($method === 'GET' && preg_match('#^/personeller/(\d+)$#', $path, $matches)) {
             PersonellerController::detail($this->request, $matches[1]);
         }

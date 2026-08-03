@@ -35,6 +35,8 @@ describe("S97 personel import dry-run MariaDB", () => {
     expect(routerSource).toContain("/personeller/import/template.csv");
     expect(routerSource).toContain("/personeller/import/dry-run");
     expect(routerSource).not.toContain("/personeller/import/commit");
+    expect(serviceSource).toContain("manifest_hash");
+    expect(serviceSource).toContain("can_apply");
   });
 
   it("runs personel import dry-run acceptance on MariaDB", () => {

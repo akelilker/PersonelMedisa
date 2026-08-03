@@ -259,3 +259,127 @@ export async function approveSgkKatalog(body: Record<string, unknown>) {
   );
   return unwrapData(response);
 }
+
+export async function dryRunSgkSurecEsleme(body: Record<string, unknown>) {
+  const response = await apiRequest<ApiResponse<Record<string, unknown>> | Record<string, unknown>>(
+    endpoints.sgkKatalogHazirlik.surecEslemeDryRun,
+    { method: "POST", body: JSON.stringify(body) }
+  );
+  return unwrapData(response);
+}
+
+export async function importSgkSurecEsleme(body: Record<string, unknown>) {
+  const response = await apiRequest<ApiResponse<Record<string, unknown>> | Record<string, unknown>>(
+    endpoints.sgkKatalogHazirlik.surecEslemeImport,
+    { method: "POST", body: JSON.stringify(body) }
+  );
+  return unwrapData(response);
+}
+
+export async function dryRunSgkSirketPolitikasi(body: Record<string, unknown>) {
+  const response = await apiRequest<ApiResponse<Record<string, unknown>> | Record<string, unknown>>(
+    endpoints.sgkKatalogHazirlik.sirketPolitikasiDryRun,
+    { method: "POST", body: JSON.stringify(body) }
+  );
+  return unwrapData(response);
+}
+
+export async function importSgkSirketPolitikasi(body: Record<string, unknown>) {
+  const response = await apiRequest<ApiResponse<Record<string, unknown>> | Record<string, unknown>>(
+    endpoints.sgkKatalogHazirlik.sirketPolitikasiImport,
+    { method: "POST", body: JSON.stringify(body) }
+  );
+  return unwrapData(response);
+}
+
+export async function submitSgkSirketPolitikasi(body: Record<string, unknown>) {
+  const response = await apiRequest<ApiResponse<Record<string, unknown>> | Record<string, unknown>>(
+    endpoints.sgkKatalogHazirlik.sirketPolitikasiSubmit,
+    { method: "POST", body: JSON.stringify(body) }
+  );
+  return unwrapData(response);
+}
+
+export async function approveSgkSirketPolitikasi(body: Record<string, unknown>) {
+  const response = await apiRequest<ApiResponse<Record<string, unknown>> | Record<string, unknown>>(
+    endpoints.sgkKatalogHazirlik.sirketPolitikasiApprove,
+    { method: "POST", body: JSON.stringify(body) }
+  );
+  return unwrapData(response);
+}
+
+async function downloadAuthenticatedCsv(path: string, filename: string, demoFallbackCsv: string): Promise<void> {
+  const { ApiRequestError, buildApiUrl, shouldPreferDemoApi } = await import("./api-client");
+  const { getAuthTokenForApi } = await import("../auth/auth-token-provider");
+  const { getActiveSubeIdForApiHeader } = await import("../auth/auth-manager");
+
+  if (shouldPreferDemoApi()) {
+    const { resolveDemoApiResponse } = await import("./mock-demo");
+    const demoResponse = resolveDemoApiResponse(path, { method: "GET" });
+    if (demoResponse !== null) {
+      const csvContent =
+        typeof demoResponse.data === "string" ? demoResponse.data : demoFallbackCsv;
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = filename;
+      anchor.click();
+      URL.revokeObjectURL(url);
+      return;
+    }
+  }
+
+  const headers = new Headers();
+  const token = getAuthTokenForApi();
+  if (token) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+  const subeHeader = getActiveSubeIdForApiHeader();
+  if (subeHeader) {
+    headers.set("X-Active-Sube-Id", subeHeader);
+  }
+
+  const response = await fetch(buildApiUrl(path), { headers });
+  if (!response.ok) {
+    let message = "SGK şablon dosyası indirilemedi.";
+    try {
+      const payload = (await response.json()) as {
+        errors?: Array<{ message?: string; code?: string }>;
+      };
+      const first = Array.isArray(payload.errors) ? payload.errors[0] : undefined;
+      if (first?.message) {
+        message = first.message;
+      }
+    } catch {
+      // keep default
+    }
+    throw new ApiRequestError(message, response.status);
+  }
+
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
+export async function downloadSgkSurecEslemeSablonCsv(): Promise<void> {
+  const { SGK_SUREC_ESLEME_SABLON_CSV } = await import("./sgk-katalog-hazirlik.mock");
+  await downloadAuthenticatedCsv(
+    endpoints.sgkKatalogHazirlik.surecEslemeSablonCsv,
+    "sgk-surec-esleme-sablon.csv",
+    SGK_SUREC_ESLEME_SABLON_CSV
+  );
+}
+
+export async function downloadSgkSirketPolitikasiSablonCsv(): Promise<void> {
+  const { SGK_SIRKET_POLITIKASI_SABLON_CSV } = await import("./sgk-katalog-hazirlik.mock");
+  await downloadAuthenticatedCsv(
+    endpoints.sgkKatalogHazirlik.sirketPolitikasiSablonCsv,
+    "sgk-sirket-politikasi-sablon.csv",
+    SGK_SIRKET_POLITIKASI_SABLON_CSV
+  );
+}

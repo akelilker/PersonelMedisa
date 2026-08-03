@@ -117,3 +117,112 @@ export function buildSgkKatalogBlockerRaporuMock() {
     response_hash: "demo-sgk-katalog-blocker-hash"
   };
 }
+
+export function buildSgkSurecEslemeDryRunMock() {
+  return {
+    mode: "DRY_RUN",
+    hatali_satirlar: [],
+    uyari_satirlari: [{ row_index: 0, warnings: ["KARAR_BEKLIYOR"] }],
+    canonical_rows: [],
+    esleme_payload_hash: "demo-sgk-esleme-empty-hash",
+    parent_surum: null,
+    apply_yapilabilir_mi: false,
+    decision_pending_count: 1,
+    response_hash: "demo-sgk-esleme-dry-run"
+  };
+}
+
+export function buildSgkSurecEslemeDryRunReadyMock() {
+  return {
+    mode: "DRY_RUN",
+    hatali_satirlar: [],
+    uyari_satirlari: [],
+    canonical_rows: [{ surec_turu: "RAPOR", alt_tur: "Raporlu_Hastalik", eksik_gun_kodu: "01" }],
+    esleme_payload_hash: "demo-sgk-esleme-ready-hash",
+    parent_surum: { surum_kodu: "DEMO-KATALOG-2026", state: "ONAYLANDI", parent_immutable_mi: true },
+    apply_yapilabilir_mi: true,
+    decision_pending_count: 0,
+    response_hash: "demo-sgk-esleme-dry-run-ready"
+  };
+}
+
+export function buildSgkSurecEslemeImportSuccessMock(surumKodu = "DEMO-KATALOG-2026-ESLEME") {
+  return {
+    surum_id: 9801,
+    surum_kodu: surumKodu,
+    state: "TASLAK",
+    esleme_payload_hash: "demo-sgk-esleme-ready-hash",
+    parent_immutable_mi: true,
+    response_hash: "demo-sgk-esleme-import-ok"
+  };
+}
+
+export function buildSgkKatalogSubmitSuccessMock(surumKodu: string) {
+  return {
+    surum_id: 9801,
+    surum_kodu: surumKodu,
+    state: "ONAY_BEKLIYOR",
+    tamlik_durumu: "RESMI_KAYNAKLI_KISITLI",
+    response_hash: "demo-sgk-katalog-submit-ok"
+  };
+}
+
+export function buildSgkSirketPolitikasiDryRunMock() {
+  return {
+    mode: "DRY_RUN",
+    hatali_satirlar: [{ row_index: -1, errors: ["SUBE_BULUNAMADI_VEYA_PASIF"] }],
+    uyari_satirlari: [],
+    canonical_payload: null,
+    politika_hash: "demo-sgk-politika-empty-hash",
+    import_yapilabilir_mi: false,
+    overlap_var_mi: false,
+    response_hash: "demo-sgk-politika-dry-run"
+  };
+}
+
+export function buildSgkSirketPolitikasiDryRunReadyMock() {
+  return {
+    mode: "DRY_RUN",
+    hatali_satirlar: [],
+    uyari_satirlari: [],
+    canonical_payload: {
+      sube_id: 1,
+      surum_kodu: "DEMO-SGK-POLITIKA-2026",
+      gecerlilik_baslangic: "2026-01-01",
+      gecerlilik_bitis: null,
+      bildirim_donem_tipi: "AY_15_SONRAKI_AY_14",
+      degerler: []
+    },
+    politika_hash: "demo-sgk-politika-ready-hash",
+    import_yapilabilir_mi: true,
+    overlap_var_mi: false,
+    response_hash: "demo-sgk-politika-dry-run-ready"
+  };
+}
+
+export function buildSgkSirketPolitikasiImportSuccessMock(surumKodu = "DEMO-SGK-POLITIKA-2026") {
+  return {
+    surum_id: 9901,
+    surum_kodu: surumKodu,
+    sube_id: 1,
+    state: "TASLAK",
+    politika_hash: "demo-sgk-politika-ready-hash",
+    response_hash: "demo-sgk-politika-import-ok"
+  };
+}
+
+export function buildSgkSirketPolitikasiSubmitSuccessMock(surumKodu: string) {
+  return {
+    surum_id: 9901,
+    surum_kodu: surumKodu,
+    state: "ONAY_BEKLIYOR",
+    politika_hash: "demo-sgk-politika-ready-hash",
+    response_hash: "demo-sgk-politika-submit-ok"
+  };
+}
+
+export const SGK_SUREC_ESLEME_SABLON_CSV =
+  "\uFEFFsurec_turu;alt_tur;canonical_surec_turu;eksik_gun_kodu;prim_gunu_etkisi;cozulmus_prim_gunu_etkisi;kaynak_referansi\r\n";
+
+export const SGK_SIRKET_POLITIKASI_SABLON_CSV =
+  "\uFEFFsube;surum_kodu;gecerlilik_baslangic;gecerlilik_bitis;bildirim_donem_tipi;politika_kodu;deger;aciklama\r\n";

@@ -26,7 +26,17 @@ import {
 import {
   buildSgkKatalogBlockerRaporuMock,
   buildSgkKatalogImportDryRunMock,
-  buildSgkKatalogTamlikMock
+  buildSgkKatalogSubmitSuccessMock,
+  buildSgkKatalogTamlikMock,
+  buildSgkSirketPolitikasiDryRunMock,
+  buildSgkSirketPolitikasiDryRunReadyMock,
+  buildSgkSirketPolitikasiImportSuccessMock,
+  buildSgkSirketPolitikasiSubmitSuccessMock,
+  buildSgkSurecEslemeDryRunMock,
+  buildSgkSurecEslemeDryRunReadyMock,
+  buildSgkSurecEslemeImportSuccessMock,
+  SGK_SIRKET_POLITIKASI_SABLON_CSV,
+  SGK_SUREC_ESLEME_SABLON_CSV
 } from "../../../src/api/sgk-katalog-hazirlik.mock";
 
 export type MockUserRole =
@@ -48,6 +58,8 @@ type MockApiOptions = {
   belgeReferenceDate?: Date;
   /** S97-C: seed synthetic completed import history for filled-state E2E. */
   personelImportHistorySeed?: "empty" | "completed";
+  /** S98: allow mapping/policy write flow mocks to return success shapes. */
+  sgkMappingPolicyFlow?: "default" | "writable";
 };
 
 function isoDateDaysFrom(referenceDate: Date, days: number): string {
@@ -1896,6 +1908,13 @@ function resolveMockIlkIkiGunFirmaOderMi(
 }
 
 export async function mockApi(page: Page, role: MockUserRole, options: MockApiOptions = {}) {
+  const sgkWritableFlow = options.sgkMappingPolicyFlow === "writable";
+  const sgkFlowState = {
+    eslemeSuccessorKodu: "E2E-ESLEME-SUCCESSOR",
+    eslemeState: "NONE" as "NONE" | "TASLAK" | "ONAY_BEKLIYOR" | "ONAYLANDI",
+    politikaSurumKodu: "E2E-SGK-POLITIKA",
+    politikaState: "NONE" as "NONE" | "TASLAK" | "ONAY_BEKLIYOR" | "ONAYLANDI"
+  };
   const bildirimPageState = getBildirimPageState(page);
   const bildirimler = bildirimPageState.items;
   const shaA = "a".repeat(64);
@@ -10108,6 +10127,24 @@ let personelBelgeKaydiIdCounter = 903;
       await fulfillJson(route, 200, okBody(buildSgkKatalogImportDryRunMock()));
       return;
     }
+    if (path === "/api/sgk-katalog-hazirlik/import" && method === "POST") {
+      if (role !== "GENEL_YONETICI") {
+        await fulfillJson(route, 403, errorBody("SGK_KATALOG_WRITE_FORBIDDEN", "SGK katalog yazma yalniz GENEL_YONETICI icindir."));
+        return;
+      }
+      if (!sgkWritableFlow) {
+        await fulfillJson(route, 400, errorBody("SGK_KATALOG_IMPORT_HAZIR_DEGIL", "E2E default: katalog import kapali."));
+        return;
+      }
+      await fulfillJson(route, 200, okBody({
+        code: "SGK_KATALOG_IMPORT_OK",
+        message: "E2E katalog import mock",
+        state: "TASLAK",
+        surum_kodu: String((JSON.parse(route.request().postData() ?? "{}") as Record<string, unknown>).katalog_surumu ?? "E2E-KATALOG"),
+        idempotent_mi: false
+      }));
+      return;
+    }
     if (path === "/api/sgk-katalog-hazirlik/surec-esleme/validate" && method === "POST") {
       if (await denyUnlessRolePermission(route, "bordro_on_izleme.view")) return;
       await fulfillJson(route, 200, okBody({
@@ -10118,6 +10155,134 @@ let personelBelgeKaydiIdCounter = 903;
         gecerli_mi: false,
         response_hash: "e2e-sgk-esleme"
       }));
+      return;
+    }
+    if (path === "/api/sgk-katalog-hazirlik/surec-esleme/sablon.csv" && method === "GET") {
+      if (await denyUnlessRolePermission(route, "mevzuat_parametreleri.view")) return;
+      await route.fulfill({
+        status: 200,
+        contentType: "text/csv; charset=utf-8",
+        body: SGK_SUREC_ESLEME_SABLON_CSV
+      });
+      return;
+    }
+    if (path === "/api/sgk-katalog-hazirlik/surec-esleme/dry-run" && method === "POST") {
+      if (await denyUnlessRolePermission(route, "mevzuat_parametreleri.view")) return;
+      await fulfillJson(
+        route,
+        200,
+        okBody(sgkWritableFlow ? buildSgkSurecEslemeDryRunReadyMock() : buildSgkSurecEslemeDryRunMock())
+      );
+      return;
+    }
+    if (path === "/api/sgk-katalog-hazirlik/surec-esleme/import" && method === "POST") {
+      if (role !== "GENEL_YONETICI") {
+        await fulfillJson(route, 403, errorBody("SGK_KATALOG_WRITE_FORBIDDEN", "SGK esleme yazma yalniz GENEL_YONETICI icindir."));
+        return;
+      }
+      if (!sgkWritableFlow) {
+        await fulfillJson(route, 400, errorBody("SGK_ESLEME_IMPORT_HAZIR_DEGIL", "E2E default: esleme import kapali."));
+        return;
+      }
+      const payload = JSON.parse(route.request().postData() ?? "{}") as Record<string, unknown>;
+      const kod = String(payload.successor_surum_kodu ?? sgkFlowState.eslemeSuccessorKodu);
+      sgkFlowState.eslemeSuccessorKodu = kod;
+      sgkFlowState.eslemeState = "TASLAK";
+      await fulfillJson(route, 200, okBody(buildSgkSurecEslemeImportSuccessMock(kod)));
+      return;
+    }
+    if (path === "/api/sgk-katalog-hazirlik/submit" && method === "POST") {
+      if (role !== "GENEL_YONETICI") {
+        await fulfillJson(route, 403, errorBody("SGK_KATALOG_WRITE_FORBIDDEN", "Submit yalniz GENEL_YONETICI."));
+        return;
+      }
+      if (!sgkWritableFlow) {
+        await fulfillJson(route, 400, errorBody("SGK_KATALOG_SUBMIT_STATE", "E2E default: submit kapali."));
+        return;
+      }
+      const payload = JSON.parse(route.request().postData() ?? "{}") as Record<string, unknown>;
+      const kod = String(payload.surum_kodu ?? sgkFlowState.eslemeSuccessorKodu);
+      sgkFlowState.eslemeState = "ONAY_BEKLIYOR";
+      await fulfillJson(route, 200, okBody(buildSgkKatalogSubmitSuccessMock(kod)));
+      return;
+    }
+    if (path === "/api/sgk-katalog-hazirlik/approve" && method === "POST") {
+      if (role !== "GENEL_YONETICI") {
+        await fulfillJson(route, 403, errorBody("SGK_KATALOG_WRITE_FORBIDDEN", "Approve yalniz GENEL_YONETICI."));
+        return;
+      }
+      if (!sgkWritableFlow) {
+        await fulfillJson(route, 400, errorBody("SGK_KATALOG_APPROVE_STATE", "E2E default: approve kapali."));
+        return;
+      }
+      const payload = JSON.parse(route.request().postData() ?? "{}") as Record<string, unknown>;
+      const kod = String(payload.surum_kodu ?? sgkFlowState.eslemeSuccessorKodu);
+      sgkFlowState.eslemeState = "ONAYLANDI";
+      await fulfillJson(route, 200, okBody({ surum_kodu: kod, state: "ONAYLANDI", response_hash: "e2e-sgk-katalog-approve-ok" }));
+      return;
+    }
+    if (path === "/api/sgk-katalog-hazirlik/sirket-politikasi/sablon.csv" && method === "GET") {
+      if (await denyUnlessRolePermission(route, "mevzuat_parametreleri.view")) return;
+      await route.fulfill({
+        status: 200,
+        contentType: "text/csv; charset=utf-8",
+        body: SGK_SIRKET_POLITIKASI_SABLON_CSV
+      });
+      return;
+    }
+    if (path === "/api/sgk-katalog-hazirlik/sirket-politikasi/dry-run" && method === "POST") {
+      if (await denyUnlessRolePermission(route, "mevzuat_parametreleri.view")) return;
+      await fulfillJson(
+        route,
+        200,
+        okBody(sgkWritableFlow ? buildSgkSirketPolitikasiDryRunReadyMock() : buildSgkSirketPolitikasiDryRunMock())
+      );
+      return;
+    }
+    if (path === "/api/sgk-katalog-hazirlik/sirket-politikasi/import" && method === "POST") {
+      if (role !== "GENEL_YONETICI") {
+        await fulfillJson(route, 403, errorBody("SGK_KATALOG_WRITE_FORBIDDEN", "Politika yazma yalniz GENEL_YONETICI."));
+        return;
+      }
+      if (!sgkWritableFlow) {
+        await fulfillJson(route, 400, errorBody("SGK_POLITIKA_IMPORT_HAZIR_DEGIL", "E2E default: politika import kapali."));
+        return;
+      }
+      const payload = JSON.parse(route.request().postData() ?? "{}") as Record<string, unknown>;
+      const kod = String(payload.surum_kodu ?? sgkFlowState.politikaSurumKodu);
+      sgkFlowState.politikaSurumKodu = kod;
+      sgkFlowState.politikaState = "TASLAK";
+      await fulfillJson(route, 200, okBody(buildSgkSirketPolitikasiImportSuccessMock(kod)));
+      return;
+    }
+    if (path === "/api/sgk-katalog-hazirlik/sirket-politikasi/submit" && method === "POST") {
+      if (role !== "GENEL_YONETICI") {
+        await fulfillJson(route, 403, errorBody("SGK_KATALOG_WRITE_FORBIDDEN", "Politika submit yalniz GENEL_YONETICI."));
+        return;
+      }
+      if (!sgkWritableFlow) {
+        await fulfillJson(route, 400, errorBody("SGK_POLITIKA_SUBMIT_STATE", "E2E default: politika submit kapali."));
+        return;
+      }
+      const payload = JSON.parse(route.request().postData() ?? "{}") as Record<string, unknown>;
+      const kod = String(payload.surum_kodu ?? sgkFlowState.politikaSurumKodu);
+      sgkFlowState.politikaState = "ONAY_BEKLIYOR";
+      await fulfillJson(route, 200, okBody(buildSgkSirketPolitikasiSubmitSuccessMock(kod)));
+      return;
+    }
+    if (path === "/api/sgk-katalog-hazirlik/sirket-politikasi/approve" && method === "POST") {
+      if (role !== "GENEL_YONETICI") {
+        await fulfillJson(route, 403, errorBody("SGK_KATALOG_WRITE_FORBIDDEN", "Politika approve yalniz GENEL_YONETICI."));
+        return;
+      }
+      if (!sgkWritableFlow) {
+        await fulfillJson(route, 400, errorBody("SGK_POLITIKA_APPROVE_STATE", "E2E default: politika approve kapali."));
+        return;
+      }
+      const payload = JSON.parse(route.request().postData() ?? "{}") as Record<string, unknown>;
+      const kod = String(payload.surum_kodu ?? sgkFlowState.politikaSurumKodu);
+      sgkFlowState.politikaState = "ONAYLANDI";
+      await fulfillJson(route, 200, okBody({ surum_kodu: kod, state: "ONAYLANDI", response_hash: "e2e-sgk-politika-approve-ok" }));
       return;
     }
     if (path === "/api/sgk-katalog-hazirlik/coklu-neden/validate" && method === "POST") {

@@ -76,6 +76,15 @@ final class SgkKatalogOnayService
             if ($state !== 'ONAY_BEKLIYOR') {
                 $blockers[] = self::stateBlocker('APPROVE yalniz ONAY_BEKLIYOR uzerinden.');
             }
+            $hazirlayanId = (int) ($input['hazirlayan_id'] ?? 0);
+            $actorId = (int) ($input['actor_id'] ?? 0);
+            if ($hazirlayanId > 0 && $actorId > 0 && $hazirlayanId === $actorId) {
+                $blockers[] = SgkKatalogContracts::blocker(
+                    'SELF_APPROVAL',
+                    'Hazirlayan kendi katalog surumunu onaylayamaz (dual-control).',
+                    'Farkli bir GENEL_YONETICI onaylayicisi secin.'
+                );
+            }
             if (empty($input['resmi_kaynaklar_incelendi_mi'])) {
                 $blockers[] = SgkKatalogContracts::blocker(
                     SgkKatalogContracts::BLOCKER_ATTESTATION,

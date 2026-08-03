@@ -19,7 +19,12 @@ use Medisa\Api\Services\Payroll\SgkKaynakManifestReader;
 use Medisa\Api\Services\Payroll\SgkKatalogWriteService;
 use Medisa\Api\Services\Payroll\SgkOperasyonelKanitBase64Guard;
 use Medisa\Api\Services\Payroll\SgkOperasyonelKanitValidator;
+use Medisa\Api\Services\Payroll\SgkSirketPolitikaImportValidator;
+use Medisa\Api\Services\Payroll\SgkSirketPolitikaWriteService;
+use Medisa\Api\Services\Payroll\SgkSurecEslemeImportValidator;
+use Medisa\Api\Services\Payroll\SgkSurecEslemeWriteService;
 use Medisa\Api\Services\Payroll\SgkSurecKodEslemeValidator;
+use Medisa\Api\Http\CsvResponse;
 use PDO;
 use RuntimeException;
 
@@ -199,6 +204,126 @@ class SgkKatalogHazirlikController
         $status = (int) ($result['http_status'] ?? 200);
         if ($status >= 400) {
             JsonResponse::error($status, (string) ($result['code'] ?? 'SGK_KATALOG_APPROVE_HATASI'), (string) ($result['message'] ?? 'Approve basarisiz.'), null, $result);
+        }
+        JsonResponse::success($result);
+    }
+
+    public static function surecEslemeSablonCsv(Request $request)
+    {
+        self::context($request, 'mevzuat_parametreleri.view');
+        $export = SgkSurecEslemeImportValidator::buildTemplateExport();
+        if (!headers_sent()) {
+            header('Content-Type: text/csv; charset=utf-8');
+            header('Content-Disposition: attachment; filename="' . $export['filename'] . '"');
+            header(SgkSurecEslemeImportValidator::SHA_HEADER . ': ' . $export['sha256']);
+            http_response_code(200);
+        }
+        echo $export['csv'];
+        exit;
+    }
+
+    public static function surecEslemeDryRun(Request $request)
+    {
+        [$pdo] = self::context($request, 'mevzuat_parametreleri.view');
+        $body = self::jsonBody($request);
+        if (empty($body['manifests'])) {
+            $body['manifests'] = self::loadManifests($pdo, 'surec_esleme_dry_run');
+        }
+        JsonResponse::success(SgkSurecEslemeImportValidator::dryRun($pdo, $body));
+    }
+
+    public static function surecEslemeImport(Request $request)
+    {
+        [$pdo, $user] = self::writeContext($request);
+        $body = self::jsonBody($request);
+        if (empty($body['manifests'])) {
+            $body['manifests'] = self::loadManifests($pdo, 'surec_esleme_import');
+        }
+        try {
+            $result = SgkSurecEslemeWriteService::import($pdo, $user, $body);
+        } catch (RuntimeException $e) {
+            if ($e->getMessage() === 'SGK_KATALOG_WRITE_FORBIDDEN') {
+                JsonResponse::error(403, 'SGK_KATALOG_WRITE_FORBIDDEN', 'SGK esleme yazma yalniz GENEL_YONETICI icindir.');
+            }
+            throw $e;
+        }
+        $status = (int) ($result['http_status'] ?? 200);
+        if ($status >= 400) {
+            JsonResponse::error($status, (string) ($result['code'] ?? 'SGK_ESLEME_IMPORT_HATASI'), (string) ($result['message'] ?? 'Import basarisiz.'), null, $result);
+        }
+        JsonResponse::success($result);
+    }
+
+    public static function sirketPolitikasiSablonCsv(Request $request)
+    {
+        [$pdo, $user] = self::context($request, 'mevzuat_parametreleri.view');
+        $export = SgkSirketPolitikaImportValidator::buildTemplateExport($pdo, $user);
+        if (!headers_sent()) {
+            header('Content-Type: text/csv; charset=utf-8');
+            header('Content-Disposition: attachment; filename="' . $export['filename'] . '"');
+            header(SgkSirketPolitikaImportValidator::SHA_HEADER . ': ' . $export['sha256']);
+            http_response_code(200);
+        }
+        echo $export['csv'];
+        exit;
+    }
+
+    public static function sirketPolitikasiDryRun(Request $request)
+    {
+        [$pdo] = self::context($request, 'mevzuat_parametreleri.view');
+        JsonResponse::success(SgkSirketPolitikaImportValidator::dryRun($pdo, self::jsonBody($request)));
+    }
+
+    public static function sirketPolitikasiImport(Request $request)
+    {
+        [$pdo, $user] = self::writeContext($request);
+        try {
+            $result = SgkSirketPolitikaWriteService::import($pdo, $user, self::jsonBody($request));
+        } catch (RuntimeException $e) {
+            if ($e->getMessage() === 'SGK_KATALOG_WRITE_FORBIDDEN') {
+                JsonResponse::error(403, 'SGK_KATALOG_WRITE_FORBIDDEN', 'SGK politika yazma yalniz GENEL_YONETICI icindir.');
+            }
+            throw $e;
+        }
+        $status = (int) ($result['http_status'] ?? 200);
+        if ($status >= 400) {
+            JsonResponse::error($status, (string) ($result['code'] ?? 'SGK_POLITIKA_IMPORT_HATASI'), (string) ($result['message'] ?? 'Import basarisiz.'), null, $result);
+        }
+        JsonResponse::success($result);
+    }
+
+    public static function sirketPolitikasiSubmit(Request $request)
+    {
+        [$pdo, $user] = self::writeContext($request);
+        try {
+            $result = SgkSirketPolitikaWriteService::submit($pdo, $user, self::jsonBody($request));
+        } catch (RuntimeException $e) {
+            if ($e->getMessage() === 'SGK_KATALOG_WRITE_FORBIDDEN') {
+                JsonResponse::error(403, 'SGK_KATALOG_WRITE_FORBIDDEN', 'SGK politika yazma yalniz GENEL_YONETICI icindir.');
+            }
+            throw $e;
+        }
+        $status = (int) ($result['http_status'] ?? 200);
+        if ($status >= 400) {
+            JsonResponse::error($status, (string) ($result['code'] ?? 'SGK_POLITIKA_SUBMIT_HATASI'), (string) ($result['message'] ?? 'Submit basarisiz.'), null, $result);
+        }
+        JsonResponse::success($result);
+    }
+
+    public static function sirketPolitikasiApprove(Request $request)
+    {
+        [$pdo, $user] = self::writeContext($request);
+        try {
+            $result = SgkSirketPolitikaWriteService::approve($pdo, $user, self::jsonBody($request));
+        } catch (RuntimeException $e) {
+            if ($e->getMessage() === 'SGK_KATALOG_WRITE_FORBIDDEN') {
+                JsonResponse::error(403, 'SGK_KATALOG_WRITE_FORBIDDEN', 'SGK politika yazma yalniz GENEL_YONETICI icindir.');
+            }
+            throw $e;
+        }
+        $status = (int) ($result['http_status'] ?? 200);
+        if ($status >= 400) {
+            JsonResponse::error($status, (string) ($result['code'] ?? 'SGK_POLITIKA_APPROVE_HATASI'), (string) ($result['message'] ?? 'Approve basarisiz.'), null, $result);
         }
         JsonResponse::success($result);
     }

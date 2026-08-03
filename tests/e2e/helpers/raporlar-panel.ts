@@ -22,9 +22,10 @@ export async function openRaporlarPanel(
   page: Page,
   role: MockUserRole,
   panel: RaporlarPanel,
-  credentials?: MockRoleCredentials
+  credentials?: MockRoleCredentials,
+  mockOptions?: Parameters<typeof loginAsMockRole>[3]
 ) {
-  await loginAsMockRole(page, role, credentials);
+  await loginAsMockRole(page, role, credentials, mockOptions);
   if (panel === "standart") {
     await page.goto("/raporlar");
     await expect(page.getByTestId("raporlar-panel-nav")).toBeVisible();

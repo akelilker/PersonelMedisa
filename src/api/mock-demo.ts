@@ -14,7 +14,9 @@ import { hasRolePermission, type AppPermission } from "../lib/authorization/role
 import {
   buildSgkKatalogBlockerRaporuMock,
   buildSgkKatalogImportDryRunMock,
-  buildSgkKatalogTamlikMock
+  buildSgkKatalogTamlikMock,
+  buildSgkSurecEslemeDryRunMock,
+  buildSgkSirketPolitikasiDryRunMock
 } from "./sgk-katalog-hazirlik.mock";
 import { isMondayIsoDate, resolveHaftalikMutabakatApproval } from "../lib/bildirim/haftalik-mutabakat";
 import {
@@ -9513,6 +9515,27 @@ export function resolveDemoApiResponse(
     if (mevzuatError) return mevzuatError;
     return ok(buildSgkKatalogImportDryRunMock());
   }
+  if (pathname === "/sgk-katalog-hazirlik/import" && method === "POST") {
+    const actor = readDemoApiActor(init);
+    if (String(actor.role ?? "").toUpperCase() !== "GENEL_YONETICI") {
+      return demoRevizyonError("SGK_KATALOG_WRITE_FORBIDDEN", "SGK katalog yazma yalniz GENEL_YONETICI icindir.");
+    }
+    return demoRevizyonError("SGK_KATALOG_IMPORT_HAZIR_DEGIL", "Demo modda katalog import kapali; dry-run bos doner.");
+  }
+  if (pathname === "/sgk-katalog-hazirlik/submit" && method === "POST") {
+    const actor = readDemoApiActor(init);
+    if (String(actor.role ?? "").toUpperCase() !== "GENEL_YONETICI") {
+      return demoRevizyonError("SGK_KATALOG_WRITE_FORBIDDEN", "SGK katalog yazma yalniz GENEL_YONETICI icindir.");
+    }
+    return demoRevizyonError("SGK_KATALOG_SUBMIT_STATE", "Demo modda katalog submit kapali.");
+  }
+  if (pathname === "/sgk-katalog-hazirlik/approve" && method === "POST") {
+    const actor = readDemoApiActor(init);
+    if (String(actor.role ?? "").toUpperCase() !== "GENEL_YONETICI") {
+      return demoRevizyonError("SGK_KATALOG_WRITE_FORBIDDEN", "SGK katalog yazma yalniz GENEL_YONETICI icindir.");
+    }
+    return demoRevizyonError("SGK_KATALOG_SELF_APPROVAL_DENIED", "Demo modda katalog approve kapali; hazirlayan kendi paketini onaylayamaz.");
+  }
   if (pathname === "/sgk-katalog-hazirlik/surec-esleme/validate" && method === "POST") {
     const actor = readDemoApiActor(init);
     const viewError = enforceDemoPermission(actor, "bordro_on_izleme.view");
@@ -9535,6 +9558,62 @@ export function resolveDemoApiResponse(
       gecerli_mi: false,
       response_hash: "demo-sgk-esleme"
     });
+  }
+  if (pathname === "/sgk-katalog-hazirlik/surec-esleme/sablon.csv" && method === "GET") {
+    const actor = readDemoApiActor(init);
+    const mevzuatError = enforceDemoPermission(actor, "mevzuat_parametreleri.view");
+    if (mevzuatError) return mevzuatError;
+    return ok(
+      "\uFEFFsurec_turu;alt_tur;canonical_surec_turu;eksik_gun_kodu;prim_gunu_etkisi;cozulmus_prim_gunu_etkisi;kaynak_referansi\r\n"
+    );
+  }
+  if (pathname === "/sgk-katalog-hazirlik/surec-esleme/dry-run" && method === "POST") {
+    const actor = readDemoApiActor(init);
+    const mevzuatError = enforceDemoPermission(actor, "mevzuat_parametreleri.view");
+    if (mevzuatError) return mevzuatError;
+    return ok(buildSgkSurecEslemeDryRunMock());
+  }
+  if (pathname === "/sgk-katalog-hazirlik/surec-esleme/import" && method === "POST") {
+    const actor = readDemoApiActor(init);
+    if (String(actor.role ?? "").toUpperCase() !== "GENEL_YONETICI") {
+      return demoRevizyonError("SGK_KATALOG_WRITE_FORBIDDEN", "SGK esleme yazma yalniz GENEL_YONETICI icindir.");
+    }
+    return demoRevizyonError("SGK_ESLEME_IMPORT_HAZIR_DEGIL", "Demo modda esleme import kapali; dry-run bos doner.");
+  }
+  if (pathname === "/sgk-katalog-hazirlik/sirket-politikasi/sablon.csv" && method === "GET") {
+    const actor = readDemoApiActor(init);
+    const mevzuatError = enforceDemoPermission(actor, "mevzuat_parametreleri.view");
+    if (mevzuatError) return mevzuatError;
+    return ok(
+      "\uFEFFsube;surum_kodu;gecerlilik_baslangic;gecerlilik_bitis;bildirim_donem_tipi;politika_kodu;deger;aciklama\r\n"
+    );
+  }
+  if (pathname === "/sgk-katalog-hazirlik/sirket-politikasi/dry-run" && method === "POST") {
+    const actor = readDemoApiActor(init);
+    const mevzuatError = enforceDemoPermission(actor, "mevzuat_parametreleri.view");
+    if (mevzuatError) return mevzuatError;
+    return ok(buildSgkSirketPolitikasiDryRunMock());
+  }
+  if (pathname === "/sgk-katalog-hazirlik/sirket-politikasi/import" && method === "POST") {
+    const actor = readDemoApiActor(init);
+    if (String(actor.role ?? "").toUpperCase() !== "GENEL_YONETICI") {
+      return demoRevizyonError("SGK_KATALOG_WRITE_FORBIDDEN", "SGK politika yazma yalniz GENEL_YONETICI icindir.");
+    }
+    return demoRevizyonError("SGK_POLITIKA_IMPORT_HAZIR_DEGIL", "Demo modda politika import kapali.");
+  }
+  if (pathname === "/sgk-katalog-hazirlik/sirket-politikasi/submit" && method === "POST") {
+    const actor = readDemoApiActor(init);
+    if (String(actor.role ?? "").toUpperCase() !== "GENEL_YONETICI") {
+      return demoRevizyonError("SGK_KATALOG_WRITE_FORBIDDEN", "SGK politika yazma yalniz GENEL_YONETICI icindir.");
+    }
+    return demoRevizyonError("SGK_POLITIKA_SUBMIT_STATE", "Demo modda politika submit kapali.");
+  }
+  if (pathname === "/sgk-katalog-hazirlik/sirket-politikasi/approve" && method === "POST") {
+    const actor = readDemoApiActor(init);
+    if (String(actor.role ?? "").toUpperCase() !== "GENEL_YONETICI") {
+      return demoRevizyonError("SGK_KATALOG_WRITE_FORBIDDEN", "SGK politika yazma yalniz GENEL_YONETICI icindir.");
+    }
+    return demoRevizyonError("SGK_POLITIKA_APPROVE_STATE", "Demo modda politika approve kapali.");
   }
   if (pathname === "/sgk-katalog-hazirlik/coklu-neden/validate" && method === "POST") {
     const actor = readDemoApiActor(init);

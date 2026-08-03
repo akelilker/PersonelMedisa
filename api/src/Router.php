@@ -398,6 +398,30 @@ class Router
         if ($path === '/sgk-katalog-hazirlik/surec-esleme/validate' && $method === 'POST') {
             SgkKatalogHazirlikController::surecEslemeValidate($this->request);
         }
+        if ($path === '/sgk-katalog-hazirlik/surec-esleme/sablon.csv' && $method === 'GET') {
+            SgkKatalogHazirlikController::surecEslemeSablonCsv($this->request);
+        }
+        if ($path === '/sgk-katalog-hazirlik/surec-esleme/dry-run' && $method === 'POST') {
+            SgkKatalogHazirlikController::surecEslemeDryRun($this->request);
+        }
+        if ($path === '/sgk-katalog-hazirlik/surec-esleme/import' && $method === 'POST') {
+            SgkKatalogHazirlikController::surecEslemeImport($this->request);
+        }
+        if ($path === '/sgk-katalog-hazirlik/sirket-politikasi/sablon.csv' && $method === 'GET') {
+            SgkKatalogHazirlikController::sirketPolitikasiSablonCsv($this->request);
+        }
+        if ($path === '/sgk-katalog-hazirlik/sirket-politikasi/dry-run' && $method === 'POST') {
+            SgkKatalogHazirlikController::sirketPolitikasiDryRun($this->request);
+        }
+        if ($path === '/sgk-katalog-hazirlik/sirket-politikasi/import' && $method === 'POST') {
+            SgkKatalogHazirlikController::sirketPolitikasiImport($this->request);
+        }
+        if ($path === '/sgk-katalog-hazirlik/sirket-politikasi/submit' && $method === 'POST') {
+            SgkKatalogHazirlikController::sirketPolitikasiSubmit($this->request);
+        }
+        if ($path === '/sgk-katalog-hazirlik/sirket-politikasi/approve' && $method === 'POST') {
+            SgkKatalogHazirlikController::sirketPolitikasiApprove($this->request);
+        }
         if ($path === '/sgk-katalog-hazirlik/coklu-neden/validate' && $method === 'POST') {
             SgkKatalogHazirlikController::cokluNedenValidate($this->request);
         }

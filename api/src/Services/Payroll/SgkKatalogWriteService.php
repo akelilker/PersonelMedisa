@@ -248,12 +248,23 @@ final class SgkKatalogWriteService
             return self::result(404, 'SGK_KATALOG_SURUM_BULUNAMADI', 'Katalog surumu bulunamadi.');
         }
 
+        $actorId = (int) ($actor['id'] ?? 0);
+        $hazirlayanId = (int) ($existing['hazirlayan_id'] ?? 0);
+        if ($hazirlayanId > 0 && $actorId > 0 && $hazirlayanId === $actorId) {
+            return self::result(403, 'SGK_KATALOG_SELF_APPROVAL_DENIED', 'Hazirlayan kendi katalog surumunu onaylayamaz.');
+        }
+
+        if (self::hasApprovedCatalogOverlap($pdo, $existing)) {
+            return self::result(409, 'SGK_KATALOG_TARIH_CAKISMA', 'Onay oncesi baska ONAYLANDI katalog ile tarih cakismasi var.');
+        }
+
         $tamlik = self::resolveTamlikForTransition($pdo, $existing, $payload);
 
         $transition = SgkKatalogOnayService::validateTransition([
             'current_state' => (string) ($existing['state'] ?? 'TASLAK'),
             'action' => 'APPROVE',
-            'actor_id' => (int) ($actor['id'] ?? 0),
+            'actor_id' => $actorId,
+            'hazirlayan_id' => $hazirlayanId > 0 ? $hazirlayanId : null,
             'tamlik' => $tamlik,
             'katalog_hash' => (string) ($existing['katalog_payload_hash'] ?? ''),
             'manifest_set_hash' => (string) ($existing['manifest_set_hash'] ?? ''),
@@ -267,8 +278,6 @@ final class SgkKatalogWriteService
                 'transition' => $transition,
             ]);
         }
-
-        $actorId = (int) ($actor['id'] ?? 0);
 
         try {
             $pdo->beginTransaction();
@@ -315,6 +324,45 @@ final class SgkKatalogWriteService
     {
         if (strtoupper((string) ($actor['rol'] ?? '')) !== 'GENEL_YONETICI') {
             throw new RuntimeException('SGK_KATALOG_WRITE_FORBIDDEN');
+        }
+    }
+
+    /** @param array<string,mixed> $existing */
+    private static function hasApprovedCatalogOverlap(PDO $pdo, array $existing): bool
+    {
+        $id = (int) ($existing['id'] ?? 0);
+        $bas = (string) ($existing['gecerlilik_baslangic'] ?? '');
+        if ($id <= 0 || $bas === '' || !SgkKatalogContracts::isDate($bas)) {
+            return false;
+        }
+        $bit = $existing['gecerlilik_bitis'] ?? null;
+        $end = is_string($bit) && $bit !== '' ? $bit : '9999-12-31';
+
+        $excludeIds = [$id];
+        $aciklama = (string) ($existing['aciklama'] ?? '');
+        if (preg_match('/parent=([A-Za-z0-9._-]+)/', $aciklama, $matches) === 1) {
+            $parent = self::fetchSurumByKodu($pdo, (string) $matches[1]);
+            if ($parent !== null) {
+                $excludeIds[] = (int) ($parent['id'] ?? 0);
+            }
+        }
+        $excludeIds = array_values(array_unique(array_filter($excludeIds, static fn (int $v) => $v > 0)));
+        $notIn = implode(',', array_fill(0, count($excludeIds), '?'));
+
+        try {
+            $stmt = $pdo->prepare(
+                "SELECT id FROM sgk_eksik_gun_katalog_surumleri
+                 WHERE state = 'ONAYLANDI' AND id NOT IN ($notIn)
+                   AND gecerlilik_baslangic <= ?
+                   AND (gecerlilik_bitis IS NULL OR gecerlilik_bitis >= ?)
+                 LIMIT 1"
+            );
+            $params = array_merge($excludeIds, [$end, $bas]);
+            $stmt->execute($params);
+
+            return $stmt->fetchColumn() !== false;
+        } catch (PDOException $e) {
+            return false;
         }
     }
 

@@ -86,6 +86,37 @@ describe("S98 SGK mapping + policy source guards", () => {
     expect(engine).toContain("kismi_aylik_calisma_saati");
   });
 
+  it("mapping bootstrap stays PHP 7.4-safe and ships required require_once targets", () => {
+    const bootstrapFiles = [
+      "api/src/Services/Payroll/SgkEslemeKararContract.php",
+      "api/src/Services/Payroll/SgkSurecEslemeImportValidator.php",
+      "api/src/Services/Payroll/SgkKatalogContracts.php",
+      "api/src/Http/CsvResponse.php",
+    ];
+    for (const path of bootstrapFiles) {
+      const src = read(path);
+      // Forbid PHP 8 match-expression form: `match (` (comments/docs may mention it).
+      expect(src.replace(/\/\/.*$/gm, "").replace(/\/\*[\s\S]*?\*\//g, ""), path).not.toMatch(
+        /\bmatch\s*\(/,
+      );
+      expect(src, path).not.toMatch(/\breadonly\s+/);
+      expect(src, path).not.toMatch(/\benum\s+\w/);
+    }
+    const validator = read("api/src/Services/Payroll/SgkSurecEslemeImportValidator.php");
+    expect(validator).toContain("require_once __DIR__ . '/SgkEslemeKararContract.php'");
+    expect(validator).toContain("require_once __DIR__ . '/SgkKatalogContracts.php'");
+    for (const rel of [
+      "api/src/Services/Payroll/SgkEslemeKararContract.php",
+      "api/src/Services/Payroll/SgkKatalogContracts.php",
+      "api/src/Services/Payroll/SgkSurecEslemeImportValidator.php",
+      "api/src/Http/CsvResponse.php",
+      "api/src/Controllers/SgkKatalogHazirlikController.php",
+      "api/src/Router.php",
+    ]) {
+      expect(read(rel).length).toBeGreaterThan(100);
+    }
+  });
+
   it("UI panel wires S98 testids, AppActionDialog, and download helpers", () => {
     const panel = read("src/features/raporlar/components/SgkKatalogHazirlikPanel.tsx");
     const api = read("src/api/sgk-katalog-hazirlik.api.ts");

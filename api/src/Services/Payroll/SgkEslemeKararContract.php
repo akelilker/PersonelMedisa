@@ -130,15 +130,23 @@ final class SgkEslemeKararContract
         $kural = strtoupper(trim($kural));
         $kod = $kod !== null && $kod !== '' ? strtoupper(trim($kod)) : null;
 
-        return match ($kural) {
-            'UCRET_MODELINE_GORE' => ['01'],
-            'UCRET_KESINTISI_SECIMINE_GORE' => ['21'],
-            'OLAY_NEDENINE_GORE' => ['01', '06', '15', '21'],
-            'YAZILI_KISMI_SOZLESME_ZORUNLU' => ['06'],
-            'HER_ZAMAN_DUSUR' => $kod !== null ? [$kod] : [],
-            'HER_ZAMAN_DAHIL' => [],
-            default => [],
-        };
+        // PHP 7.4-compatible (production MultiPHP ea-php74); avoid PHP 8.0 expression switch syntax.
+        switch ($kural) {
+            case 'UCRET_MODELINE_GORE':
+                return ['01'];
+            case 'UCRET_KESINTISI_SECIMINE_GORE':
+                return ['21'];
+            case 'OLAY_NEDENINE_GORE':
+                return ['01', '06', '15', '21'];
+            case 'YAZILI_KISMI_SOZLESME_ZORUNLU':
+                return ['06'];
+            case 'HER_ZAMAN_DUSUR':
+                return $kod !== null ? [$kod] : [];
+            case 'HER_ZAMAN_DAHIL':
+                return [];
+            default:
+                return [];
+        }
     }
 
     /**

@@ -30,6 +30,7 @@ describe("S97-D personel import reference MariaDB", () => {
     expect(result.status, result.stderr || result.stdout).toBe(0);
     expect(result.stdout).toContain("verify-s97d-personel-import-reference-mysql: OK");
     expect(result.stdout).toContain("[PASS] MANIFEST_PARITY_WITH_PARENT = EXACT");
+    expect(result.stdout).toContain("[PASS] PARENT_PARITY_RUNTIME = HERMETIC");
     expect(result.stdout).toContain("[PASS] EXPORT_USABILITY = DRY_RUN_RESOLUTION_RESULT");
     expect(result.stdout).toContain("[PASS] MAPPING_EMPTY_ERROR_DISTINCTION = VERIFIED");
     expect(result.stdout).toContain("[PASS] PERSONELLER_TABLE_READ = NO");

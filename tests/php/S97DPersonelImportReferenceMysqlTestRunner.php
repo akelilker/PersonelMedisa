@@ -230,20 +230,16 @@ try {
     s97dAssert(CsvResponse::cell('hello;world', ',') === 'hello;world', 'comma CSV does not quote bare semicolon');
     s97dAssert(CsvResponse::cell('hello;world', ';') === '"hello;world"', 'semicolon CSV quotes delimiter');
 
-    // Parent manifest parity: load parent dry-run owner beside current shared-catalog owner.
-    $parentSha = 'f9fd2af1390550a18ad4b8c89cd397c9724614d8';
-    $parentCmd = 'git show ' . $parentSha . ':api/src/Services/Personel/PersonelImportDryRunService.php';
-    $parentRaw = shell_exec($parentCmd);
-    s97dAssert(is_string($parentRaw) && strpos($parentRaw, 'class PersonelImportDryRunService') !== false, 'parent dry-run source loaded');
-    $parentPhp = str_replace(
-        'final class PersonelImportDryRunService',
-        'final class PersonelImportDryRunServiceParent',
-        $parentRaw
-    );
-    $parentTmp = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 's97d_parent_dry_run_' . bin2hex(random_bytes(4)) . '.php';
-    file_put_contents($parentTmp, $parentPhp);
-    require_once $parentTmp;
-    @unlink($parentTmp);
+    // Hermetic parent parity: frozen golden from parent f9fd2af (no runtime VCS object lookup).
+    $goldenPath = __DIR__ . '/../fixtures/s97d/personel-import-dry-run-parent-f9fd2af.golden.json';
+    s97dAssert(is_file($goldenPath), 'frozen golden fixture present');
+    $goldenRaw = file_get_contents($goldenPath);
+    s97dAssert(is_string($goldenRaw) && $goldenRaw !== '', 'frozen golden fixture readable');
+    $golden = json_decode($goldenRaw, true);
+    s97dAssert(is_array($golden), 'frozen golden fixture JSON parse');
+    s97dAssert(($golden['parent_sha'] ?? '') === 'f9fd2af1390550a18ad4b8c89cd397c9724614d8', 'golden parent_sha exact');
+    s97dAssert(($golden['fixture_version'] ?? 0) === 1, 'golden fixture_version');
+    s97dAssert(($golden['input_fixture_id'] ?? '') === 's97d-parity-valid-row-v1', 'golden input_fixture_id');
 
     $parityCsv = implode(';', PersonelImportDryRunService::TEMPLATE_COLUMNS) . "\r\n"
         . implode(';', [
@@ -263,48 +259,59 @@ try {
             'Asistan',
             'Tam Zamanli',
         ]) . "\r\n";
-    $parentDry = \Medisa\Api\Services\Personel\PersonelImportDryRunServiceParent::analyze($pdo, $parityCsv, $gyUser, null);
     $currentDry = PersonelImportDryRunService::analyze($pdo, $parityCsv, $gyUser, null);
     if (($currentDry['satirlar'][0]['durum'] ?? '') !== 'GECERLI') {
         fwrite(STDERR, 'parity debug hata=' . json_encode($currentDry['satirlar'][0]['hata_kodlari'] ?? [], JSON_UNESCAPED_UNICODE) . PHP_EOL);
     }
-    s97dAssert(($parentDry['source_sha256'] ?? '') === ($currentDry['source_sha256'] ?? ''), 'MANIFEST_PARITY source_sha256');
-    s97dAssert(($parentDry['manifest_hash'] ?? '') === ($currentDry['manifest_hash'] ?? ''), 'MANIFEST_PARITY manifest_hash');
-    s97dAssert(($parentDry['schema_version'] ?? '') === ($currentDry['schema_version'] ?? ''), 'MANIFEST_PARITY schema_version');
-    s97dAssert(($parentDry['headers'] ?? null) === ($currentDry['headers'] ?? null), 'MANIFEST_PARITY headers');
-    s97dAssert(($parentDry['allowed_sube_ids'] ?? null) === ($currentDry['allowed_sube_ids'] ?? null), 'MANIFEST_PARITY allowed_sube_ids');
-    s97dAssert(($parentDry['active_sube_id'] ?? null) === ($currentDry['active_sube_id'] ?? null), 'MANIFEST_PARITY active_sube_id');
-    s97dAssert(($parentDry['can_apply'] ?? null) === ($currentDry['can_apply'] ?? null), 'MANIFEST_PARITY can_apply');
-    s97dAssert(count($parentDry['satirlar'] ?? []) === count($currentDry['satirlar'] ?? []), 'MANIFEST_PARITY satir count');
-    $p0 = $parentDry['satirlar'][0] ?? [];
+    s97dAssert(($currentDry['source_sha256'] ?? '') === (string) ($golden['source_sha256'] ?? ''), 'MANIFEST_PARITY source_sha256');
+    s97dAssert(($currentDry['manifest_hash'] ?? '') === (string) ($golden['manifest_hash'] ?? ''), 'MANIFEST_PARITY manifest_hash');
+    s97dAssert(($currentDry['schema_version'] ?? '') === (string) ($golden['schema_version'] ?? ''), 'MANIFEST_PARITY schema_version');
+    s97dAssert(($currentDry['headers'] ?? null) === ($golden['headers'] ?? null), 'MANIFEST_PARITY headers');
+    s97dAssert(($currentDry['allowed_sube_ids'] ?? null) === ($golden['allowed_sube_ids'] ?? null), 'MANIFEST_PARITY allowed_sube_ids');
+    s97dAssert(($currentDry['active_sube_id'] ?? null) === ($golden['active_sube_id'] ?? null), 'MANIFEST_PARITY active_sube_id');
+    s97dAssert(($currentDry['can_apply'] ?? null) === ($golden['can_apply'] ?? null), 'MANIFEST_PARITY can_apply');
+    s97dAssert(($currentDry['ozet'] ?? null) === ($golden['ozet'] ?? null), 'MANIFEST_PARITY ozet');
+    s97dAssert(count($currentDry['satirlar'] ?? []) === (int) ($golden['satir_count'] ?? -1), 'MANIFEST_PARITY satir count');
     $c0 = $currentDry['satirlar'][0] ?? [];
-    s97dAssert(($p0['durum'] ?? null) === ($c0['durum'] ?? null), 'MANIFEST_PARITY satir durum');
-    s97dAssert(($p0['hata_kodlari'] ?? null) === ($c0['hata_kodlari'] ?? null), 'MANIFEST_PARITY hata_kodlari');
-    s97dAssert(($p0['durum'] ?? '') === 'GECERLI', 'MANIFEST_PARITY row GECERLI for golden fixture');
-    $pc = $parentDry['candidates'][0] ?? null;
+    $g0 = $golden['satirlar'][0] ?? [];
+    s97dAssert(($c0['durum'] ?? null) === ($g0['durum'] ?? null), 'MANIFEST_PARITY satir durum');
+    s97dAssert(($c0['hata_kodlari'] ?? null) === ($g0['hata_kodlari'] ?? null), 'MANIFEST_PARITY hata_kodlari');
+    s97dAssert(($c0['uyarilar'] ?? null) === ($g0['uyarilar'] ?? null), 'MANIFEST_PARITY uyarilar');
+    s97dAssert(($c0['durum'] ?? '') === 'GECERLI', 'MANIFEST_PARITY row GECERLI for golden fixture');
     $cc = $currentDry['candidates'][0] ?? null;
-    s97dAssert($pc !== null && $cc !== null, 'MANIFEST_PARITY candidates present');
+    s97dAssert($cc !== null, 'MANIFEST_PARITY candidates present');
+    $resolved = $golden['resolved'] ?? [];
     s97dAssert(
         [
-            (int) ($pc['sube_id'] ?? 0),
-            (int) ($pc['departman_id'] ?? 0),
-            (int) ($pc['gorev_id'] ?? 0),
-            (int) ($pc['personel_tipi_id'] ?? 0),
-        ] === [
             (int) ($cc['sube_id'] ?? 0),
             (int) ($cc['departman_id'] ?? 0),
             (int) ($cc['gorev_id'] ?? 0),
             (int) ($cc['personel_tipi_id'] ?? 0),
+        ] === [
+            (int) ($resolved['sube_id'] ?? 0),
+            (int) ($resolved['departman_id'] ?? 0),
+            (int) ($resolved['gorev_id'] ?? 0),
+            (int) ($resolved['personel_tipi_id'] ?? 0),
         ],
         'MANIFEST_PARITY resolved reference IDs'
     );
-    s97dAssert(($pc['payload'] ?? null) === ($cc['payload'] ?? null), 'MANIFEST_PARITY candidate payloads');
-    $parentTemplate = \Medisa\Api\Services\Personel\PersonelImportDryRunServiceParent::buildTemplateCsv();
+    s97dAssert(($cc['payload'] ?? null) === ($golden['candidate_payload'] ?? null), 'MANIFEST_PARITY candidate payloads');
+    $payloadJson = json_encode($cc['payload'] ?? null, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    s97dAssert(
+        hash('sha256', (string) $payloadJson) === (string) ($golden['candidate_payload_sha256'] ?? ''),
+        'MANIFEST_PARITY candidate payload sha'
+    );
     $currentTemplate = PersonelImportDryRunService::buildTemplateCsv();
-    s97dAssert($parentTemplate === $currentTemplate, 'CsvResponse/template parent byte-identical');
+    s97dAssert(
+        hash('sha256', $currentTemplate) === (string) ($golden['template_sha256'] ?? ''),
+        'MANIFEST_PARITY template sha'
+    );
+    s97dAssert(strlen($currentTemplate) === (int) ($golden['template_byte_length'] ?? -1), 'MANIFEST_PARITY template length');
+    $goldenTemplate = base64_decode((string) ($golden['template_bytes_base64'] ?? ''), true);
+    s97dAssert(is_string($goldenTemplate) && $currentTemplate === $goldenTemplate, 'MANIFEST_PARITY template bytes');
     echo '[PASS] MANIFEST_PARITY_WITH_PARENT = EXACT' . PHP_EOL;
+    echo '[PASS] PARENT_PARITY_RUNTIME = HERMETIC' . PHP_EOL;
 
-    $joinedSql = '';
     // Prove PERSONELLER_TABLE_READ=NO from catalog SQL inventory (export never queries personeller).
     $catalogSrc = file_get_contents(__DIR__ . '/../../api/src/Services/Personel/PersonelImportReferenceCatalogService.php');
     s97dAssert(is_string($catalogSrc) && !preg_match('/\bFROM\s+personeller\b|\bJOIN\s+personeller\b/i', $catalogSrc), 'PERSONELLER_TABLE_READ = NO');

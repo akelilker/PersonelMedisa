@@ -76,4 +76,34 @@ describe("S97-D personel import reference pack source locks", () => {
     expect(api).toContain("downloadPersonelImportReferencesCsv");
     expect(api).toContain("personel-import-referanslari.csv");
   });
+
+  it("keeps parent parity hermetic via frozen golden fixture", () => {
+    const runner = read("tests/php/S97DPersonelImportReferenceMysqlTestRunner.php");
+    const golden = JSON.parse(
+      read("tests/fixtures/s97d/personel-import-dry-run-parent-f9fd2af.golden.json")
+    );
+    const runtime = read("tests/unit/s97d-personel-import-reference-mysql.php-runtime.test.ts");
+
+    expect(runner).not.toMatch(/\bgit\s+show\b/);
+    expect(runner).not.toMatch(/\bgit\s+fetch\b/);
+    expect(runner).not.toMatch(/\bshell_exec\s*\(/);
+    expect(runner).not.toMatch(/(?<![>-])\bexec\s*\(/);
+    expect(runner).not.toMatch(/PersonelImportDryRunServiceParent/);
+    expect(runner).toContain("personel-import-dry-run-parent-f9fd2af.golden.json");
+    expect(runner).toContain("PARENT_PARITY_RUNTIME = HERMETIC");
+    expect(runner).toContain("MANIFEST_PARITY_WITH_PARENT = EXACT");
+    expect(runner).toContain("candidate_payload");
+    expect(runner).toContain("template_sha256");
+    expect(runner).not.toMatch(/process\.env\.CI|CI\s*===\s*['\"]true['\"]|skipIf.*CI/i);
+    expect(runtime).not.toMatch(/skipIf|describe\.skip|it\.skip/);
+    expect(golden.parent_sha).toBe("f9fd2af1390550a18ad4b8c89cd397c9724614d8");
+    expect(golden.fixture_version).toBe(1);
+    expect(String(golden.provenance)).toMatch(/parent commit/i);
+    expect(String(golden.provenance)).toMatch(/not from current HEAD/i);
+    expect(golden.input_fixture_id).toBe("s97d-parity-valid-row-v1");
+    expect(golden.manifest_hash).toMatch(/^[a-f0-9]{64}$/);
+    expect(golden.source_sha256).toMatch(/^[a-f0-9]{64}$/);
+    expect(golden.template_sha256).toMatch(/^[a-f0-9]{64}$/);
+    expect(golden.candidate_payload_sha256).toMatch(/^[a-f0-9]{64}$/);
+  });
 });

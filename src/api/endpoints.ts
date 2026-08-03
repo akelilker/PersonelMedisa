@@ -7,6 +7,7 @@ export const endpoints = {
     detail: (id: number | string) => `/personeller/${id}`,
     belgeDurumu: (id: number | string) => `/personeller/${id}/belge-durumu`,
     importTemplate: "/personeller/import/template.csv",
+    importReferences: "/personeller/import/references.csv",
     importDryRun: "/personeller/import/dry-run",
     importApply: "/personeller/import/apply",
     importRuns: "/personeller/import/runs",

@@ -151,6 +151,9 @@ class Router
         if ($path === '/personeller/import/template.csv' && $method === 'GET') {
             PersonellerController::importTemplate($this->request);
         }
+        if ($path === '/personeller/import/references.csv' && $method === 'GET') {
+            PersonellerController::importReferencesCsv($this->request);
+        }
         if ($path === '/personeller/import/dry-run' && $method === 'POST') {
             PersonellerController::importDryRun($this->request);
         }

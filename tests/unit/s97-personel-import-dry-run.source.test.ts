@@ -22,6 +22,7 @@ describe("S97 personel import dry-run source locks", () => {
     expect(modal).toContain("tc_kimlik_no_masked");
     expect(endpoints).toContain('importDryRun: "/personeller/import/dry-run"');
     expect(endpoints).toContain('importTemplate: "/personeller/import/template.csv"');
+    expect(endpoints).toContain('importReferences: "/personeller/import/references.csv"');
     expect(endpoints).not.toContain("/personeller/import/commit");
   });
 
@@ -37,6 +38,7 @@ describe("S97 personel import dry-run source locks", () => {
     expect(service).toContain("'maas_tutari'");
     expect(service).toContain("'ucret_modeli'");
     expect(service).toContain("PERSONEL_IMPORT_SATIR_KOLON_UYUMSUZ");
+    expect(service).toContain("PersonelImportReferenceCatalogService::loadCatalogForDryRun");
     expect(service).toContain("mb_strtolower");
     expect(controller).toContain("RolePermissions::assert($user, 'personeller.create')");
     expect(exportReport).toMatch(/\[\=\+\\?\-@\]/);

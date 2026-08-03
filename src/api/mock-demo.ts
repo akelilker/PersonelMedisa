@@ -4905,6 +4905,20 @@ export function resolveDemoApiResponse(
     return ok(`\uFEFF${header}\r\n`);
   }
 
+  if (pathname === "/personeller/import/references.csv" && method === "GET") {
+    const header =
+      "referans_turu;deger;bagli_sube;kullanilabilir;eslesme_sayisi;uyari_kodu;aciklama";
+    const rows = [
+      "SUBE;Demo Merkez;;EVET;1;;",
+      "DEPARTMAN;Demo Idari;TUM_YETKILI_SUBELER;EVET;1;;",
+      "DEPARTMAN;'=BelirsizDept;;HAYIR;2;PERSONEL_IMPORT_REFERANS_BELIRSIZ;Bu değer birden fazla aktif kayıtla eşleştiği için importta kullanılamaz.",
+      "GOREV;Demo Asistan;;EVET;1;;",
+      "PERSONEL_TIPI;Demo Tam Zamanli;;EVET;1;;"
+    ];
+    const body = `${header}\r\n${rows.join("\r\n")}\r\n`;
+    return ok(`\uFEFF${body}`);
+  }
+
   if (pathname === "/personeller/import/dry-run" && method === "POST") {
     const csvText = toStringValue(body.csv) ?? toStringValue(body.csv_text) ?? "";
     if (!csvText.trim()) {

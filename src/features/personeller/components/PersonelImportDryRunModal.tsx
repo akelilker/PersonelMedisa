@@ -3,6 +3,7 @@ import { AppModal } from "../../../components/modal/AppModal";
 import { AppActionDialog } from "../../../components/modal/AppActionDialog";
 import {
   applyPersonelImport,
+  downloadPersonelImportReferencesCsv,
   downloadPersonelImportTemplateCsv,
   dryRunPersonelImport,
   type PersonelImportApplyResult,
@@ -20,6 +21,12 @@ type PersonelImportDryRunModalProps = {
 
 const INFO_MESSAGE =
   "Bu aşama yalnız doğrulama yapar. Personel, ücret veya bordro kaydı oluşturmaz.";
+
+const REFERENCE_MATCH_MESSAGE =
+  "CSV’de şube, departman, görev ve personel tipi değerlerini referans dosyasında göründüğü şekilde yazın. Bu alanlarda tam eşleşme kullanılır.";
+
+const REFERENCE_FRESHNESS_MESSAGE =
+  "Referans listesi güncel sistem kayıtlarından hazırlanır. Dosya hazırlandıktan sonra sistem kayıtları değişirse dry-run işlemini yeniden çalıştırın.";
 
 const APPLY_CONFIRM_MESSAGE =
   "Bu işlem yalnız personel ana kayıtlarını oluşturur. Ücret, bordro kapsamı ve SGK statüsü oluşturmaz.";
@@ -40,9 +47,11 @@ export function PersonelImportDryRunModal({
   onApplied
 }: PersonelImportDryRunModalProps) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const referencesDownloadGuardRef = useRef(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isRunning, setIsRunning] = useState(false);
   const [isApplying, setIsApplying] = useState(false);
+  const [isDownloadingReferences, setIsDownloadingReferences] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [result, setResult] = useState<PersonelImportDryRunResult | null>(null);
   const [applyResult, setApplyResult] = useState<PersonelImportApplyResult | null>(null);
@@ -71,6 +80,8 @@ export function PersonelImportDryRunModal({
     setSelectedFile(null);
     setIsRunning(false);
     setIsApplying(false);
+    setIsDownloadingReferences(false);
+    referencesDownloadGuardRef.current = false;
     setErrorMessage(null);
     setResult(null);
     setApplyResult(null);
@@ -83,7 +94,7 @@ export function PersonelImportDryRunModal({
   }
 
   function handleClose() {
-    if (isRunning || isApplying) {
+    if (isRunning || isApplying || isDownloadingReferences) {
       return;
     }
     resetState();
@@ -99,8 +110,29 @@ export function PersonelImportDryRunModal({
     }
   }
 
+  async function handleDownloadReferences() {
+    if (isDownloadingReferences || referencesDownloadGuardRef.current || isRunning || isApplying) {
+      return;
+    }
+    referencesDownloadGuardRef.current = true;
+    setIsDownloadingReferences(true);
+    setErrorMessage(null);
+    try {
+      await downloadPersonelImportReferencesCsv();
+    } catch (error) {
+      if (error instanceof ApiRequestError) {
+        setErrorMessage(error.message);
+      } else {
+        setErrorMessage(error instanceof Error ? error.message : "Referans paketi indirilemedi.");
+      }
+    } finally {
+      setIsDownloadingReferences(false);
+      referencesDownloadGuardRef.current = false;
+    }
+  }
+
   async function handleDryRun() {
-    if (!selectedFile || isRunning || isApplying) {
+    if (!selectedFile || isRunning || isApplying || isDownloadingReferences) {
       return;
     }
     setIsRunning(true);
@@ -176,7 +208,7 @@ export function PersonelImportDryRunModal({
   }
 
   const ozet = result?.ozet;
-  const busy = isRunning || isApplying;
+  const busy = isRunning || isApplying || isDownloadingReferences;
 
   return (
     <>
@@ -221,6 +253,18 @@ export function PersonelImportDryRunModal({
         >
           {INFO_MESSAGE}
         </p>
+        <p
+          className="personel-import-dry-run-info"
+          data-testid="personel-import-reference-match-info"
+        >
+          {REFERENCE_MATCH_MESSAGE}
+        </p>
+        <p
+          className="personel-import-dry-run-info"
+          data-testid="personel-import-reference-freshness-info"
+        >
+          {REFERENCE_FRESHNESS_MESSAGE}
+        </p>
 
         <div className="personel-import-dry-run-actions form-field-grid">
           <button
@@ -231,6 +275,16 @@ export function PersonelImportDryRunModal({
             disabled={busy}
           >
             CSV şablonunu indir
+          </button>
+
+          <button
+            type="button"
+            className="universal-btn-aux"
+            data-testid="personel-import-references-download"
+            onClick={() => void handleDownloadReferences()}
+            disabled={busy}
+          >
+            {isDownloadingReferences ? "Referanslar indiriliyor..." : "Geçerli Referansları İndir"}
           </button>
 
           <label className="personel-import-file-label">

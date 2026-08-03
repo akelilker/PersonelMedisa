@@ -537,6 +537,69 @@ export async function downloadPersonelImportTemplateCsv(): Promise<void> {
   URL.revokeObjectURL(url);
 }
 
+export async function downloadPersonelImportReferencesCsv(): Promise<void> {
+  const { ApiRequestError, buildApiUrl, shouldPreferDemoApi } = await import("./api-client");
+  const { getAuthTokenForApi } = await import("../auth/auth-token-provider");
+  const { getActiveSubeIdForApiHeader } = await import("../auth/auth-manager");
+  const filename = "personel-import-referanslari.csv";
+
+  if (shouldPreferDemoApi()) {
+    const { resolveDemoApiResponse } = await import("./mock-demo");
+    const demoResponse = resolveDemoApiResponse(endpoints.personeller.importReferences, {
+      method: "GET"
+    });
+    if (demoResponse !== null) {
+      const csvContent =
+        typeof demoResponse.data === "string"
+          ? demoResponse.data
+          : "\uFEFFreferans_turu;deger;bagli_sube;kullanilabilir;eslesme_sayisi;uyari_kodu;aciklama\r\n";
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = filename;
+      anchor.click();
+      URL.revokeObjectURL(url);
+      return;
+    }
+  }
+
+  const headers = new Headers();
+  const token = getAuthTokenForApi();
+  if (token) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+  const subeHeader = getActiveSubeIdForApiHeader();
+  if (subeHeader) {
+    headers.set("X-Active-Sube-Id", subeHeader);
+  }
+
+  const response = await fetch(buildApiUrl(endpoints.personeller.importReferences), { headers });
+  if (!response.ok) {
+    let message = "Personel import referans paketi indirilemedi.";
+    try {
+      const payload = (await response.json()) as {
+        errors?: Array<{ message?: string; code?: string }>;
+      };
+      const first = Array.isArray(payload.errors) ? payload.errors[0] : undefined;
+      if (first?.message) {
+        message = first.message;
+      }
+    } catch {
+      // keep default
+    }
+    throw new ApiRequestError(message, response.status);
+  }
+
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
 export async function dryRunPersonelImport(file: File): Promise<PersonelImportDryRunResult> {
   const csv = await file.text();
   const response = await apiRequest<ApiResponse<unknown>>(endpoints.personeller.importDryRun, {

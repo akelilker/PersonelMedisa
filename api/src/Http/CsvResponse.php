@@ -23,21 +23,49 @@ class CsvResponse
     /** @param array<int, string> $columns @param array<int, array<string, mixed>> $rows */
     public static function build(array $columns, array $rows)
     {
+        return self::buildDelimited($columns, $rows, ',');
+    }
+
+    /**
+     * Semicolon CSV body without BOM (CRLF). Used by personel import reference pack.
+     *
+     * @param array<int, string> $columns
+     * @param array<int, array<string, mixed>> $rows
+     */
+    public static function buildSemicolon(array $columns, array $rows)
+    {
+        return self::buildDelimited($columns, $rows, ';');
+    }
+
+    /**
+     * @param array<int, string> $columns
+     * @param array<int, array<string, mixed>> $rows
+     */
+    public static function buildDelimited(array $columns, array $rows, $delimiter)
+    {
+        $delimiter = (string) $delimiter;
         $lines = [];
-        $lines[] = implode(',', array_map([self::class, 'cell'], $columns));
+        $lines[] = implode($delimiter, array_map(static function ($column) use ($delimiter) {
+            return self::cell($column, $delimiter);
+        }, $columns));
         foreach ($rows as $row) {
             $cells = [];
             foreach ($columns as $column) {
-                $cells[] = self::cell(isset($row[$column]) ? $row[$column] : '');
+                $cells[] = self::cell(isset($row[$column]) ? $row[$column] : '', $delimiter);
             }
-            $lines[] = implode(',', $cells);
+            $lines[] = implode($delimiter, $cells);
         }
 
         return implode("\r\n", $lines);
     }
 
-    /** @param mixed $value */
-    private static function cell($value)
+    /**
+     * Canonical CSV cell encoder (formula injection + quoting).
+     * Delimiter-aware quoting preserves comma-CSV byte contracts for existing exports.
+     *
+     * @param mixed $value
+     */
+    public static function cell($value, $delimiter = ',')
     {
         if ($value === null) {
             $text = '';
@@ -49,11 +77,23 @@ class CsvResponse
             $text = json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         }
 
-        if ($text !== '' && preg_match('/^[=+\-@]/', $text)) {
+        // First meaningful char after leading spaces (spaces only; tab/CR/LF are formula chars).
+        $probe = ltrim($text, ' ');
+        $first = $probe !== '' ? $probe[0] : '';
+        if (
+            $first === '='
+            || $first === '+'
+            || $first === '-'
+            || $first === '@'
+            || $first === "\t"
+            || $first === "\r"
+            || $first === "\n"
+        ) {
             $text = "'" . $text;
         }
 
-        $needsQuote = strpbrk($text, ",\"\n\r") !== false;
+        $quoteNeedles = $delimiter . "\"\n\r";
+        $needsQuote = strpbrk($text, $quoteNeedles) !== false;
         $escaped = str_replace('"', '""', $text);
 
         return $needsQuote ? '"' . $escaped . '"' : $escaped;

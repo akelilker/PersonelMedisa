@@ -600,7 +600,7 @@ class MaasHesaplamaSnapshotService
         $turPlaceholders = implode(', ', array_fill(0, count(self::IZIN_SUREC_TURLERI), '?'));
         $stmt = $pdo->prepare(
             "SELECT id, personel_id, surec_turu, alt_tur, baslangic_tarihi, bitis_tarihi,
-                    ucretli_mi, ilk_iki_gun_firma_oder_mi, aciklama, state, created_at
+                    ucretli_mi, tam_gun_mu, ilk_iki_gun_firma_oder_mi, aciklama, state, created_at
              FROM surecler
              WHERE personel_id IN ($placeholders)
                AND surec_turu IN ($turPlaceholders)
@@ -1971,6 +1971,8 @@ class MaasHesaplamaSnapshotService
             'durumu_bildirdi_mi' => $row['durumu_bildirdi_mi'] !== null ? (int) $row['durumu_bildirdi_mi'] : null,
             'durum_bildirim_aciklamasi' => $row['durum_bildirim_aciklamasi'] !== null ? (string) $row['durum_bildirim_aciklamasi'] : null,
             'hesap_etkisi' => $row['hesap_etkisi'] !== null ? (string) $row['hesap_etkisi'] : null,
+            'sgk_eksik_gun_neden_tipi' => isset($row['sgk_eksik_gun_neden_tipi']) && $row['sgk_eksik_gun_neden_tipi'] !== null
+                ? (string) $row['sgk_eksik_gun_neden_tipi'] : null,
             'beklenen_giris_saati' => $row['beklenen_giris_saati'] !== null ? (string) $row['beklenen_giris_saati'] : null,
             'beklenen_cikis_saati' => $row['beklenen_cikis_saati'] !== null ? (string) $row['beklenen_cikis_saati'] : null,
             'giris_saati' => $row['giris_saati'] !== null ? (string) $row['giris_saati'] : null,
@@ -2021,6 +2023,8 @@ class MaasHesaplamaSnapshotService
             'baslangic_tarihi' => (string) $izin['baslangic_tarihi'],
             'bitis_tarihi' => $izin['bitis_tarihi'] !== null ? (string) $izin['bitis_tarihi'] : null,
             'ucretli_mi' => (int) $izin['ucretli_mi'],
+            'tam_gun_mu' => array_key_exists('tam_gun_mu', $izin) && $izin['tam_gun_mu'] !== null
+                ? (bool) ((int) $izin['tam_gun_mu']) : null,
             'ilk_iki_gun_firma_oder_mi' => $izin['ilk_iki_gun_firma_oder_mi'] !== null
                 ? (bool) $izin['ilk_iki_gun_firma_oder_mi'] : null,
             'aciklama' => $izin['aciklama'] !== null ? (string) $izin['aciklama'] : null,

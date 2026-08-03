@@ -365,6 +365,9 @@ function normalizeGunlukPuantaj(
       "absence_report_note"
     ]),
     hesap_etkisi: hesapEtkisi,
+    sgk_eksik_gun_neden_tipi: pickString(record, ["sgk_eksik_gun_neden_tipi", "sgkEksikGunNedenTipi"]) as
+      | GunlukPuantaj["sgk_eksik_gun_neden_tipi"]
+      | undefined,
     beklenen_giris_saati: beklenenGirisSaati,
     beklenen_cikis_saati: beklenenCikisSaati,
     giris_saati: girisSaati,

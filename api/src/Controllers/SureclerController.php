@@ -77,7 +77,7 @@ class SureclerController
             $offset = ($page - 1) * $limit;
             $sql = "
                 SELECT sc.id, sc.personel_id, sc.surec_turu, sc.alt_tur, sc.baslangic_tarihi, sc.bitis_tarihi,
-                       sc.ucretli_mi, sc.ilk_iki_gun_firma_oder_mi, sc.aciklama, sc.state
+                       sc.ucretli_mi, sc.tam_gun_mu, sc.ilk_iki_gun_firma_oder_mi, sc.aciklama, sc.state
                 FROM surecler sc
                 INNER JOIN personeller p ON p.id = sc.personel_id
                 WHERE $whereSql
@@ -229,6 +229,7 @@ class SureclerController
                     baslangic_tarihi = :baslangic_tarihi,
                     bitis_tarihi = :bitis_tarihi,
                     ucretli_mi = :ucretli_mi,
+                    tam_gun_mu = :tam_gun_mu,
                     ilk_iki_gun_firma_oder_mi = :ilk_iki_gun_firma_oder_mi,
                     aciklama = :aciklama
                 WHERE id = :id
@@ -240,6 +241,7 @@ class SureclerController
                 'baslangic_tarihi' => $payload['baslangic_tarihi'],
                 'bitis_tarihi' => $payload['bitis_tarihi'],
                 'ucretli_mi' => $payload['ucretli_mi'] ? 1 : 0,
+                'tam_gun_mu' => $payload['tam_gun_mu'] === null ? null : ($payload['tam_gun_mu'] ? 1 : 0),
                 'ilk_iki_gun_firma_oder_mi' => $payload['ilk_iki_gun_firma_oder_mi'] === null
                     ? null
                     : ($payload['ilk_iki_gun_firma_oder_mi'] ? 1 : 0),
@@ -367,6 +369,7 @@ class SureclerController
             'baslangic_tarihi',
             'bitis_tarihi',
             'ucretli_mi',
+            'tam_gun_mu',
             'ilk_iki_gun_firma_oder_mi',
             'aciklama',
         ];
@@ -407,6 +410,9 @@ class SureclerController
             'ucretli_mi' => array_key_exists('ucretli_mi', $body)
                 ? $body['ucretli_mi']
                 : (bool) ((int) ($existing['ucretli_mi'] ?? 0)),
+            'tam_gun_mu' => array_key_exists('tam_gun_mu', $body)
+                ? $body['tam_gun_mu']
+                : self::mapNullableBoolean($existing['tam_gun_mu'] ?? null),
             'aciklama' => array_key_exists('aciklama', $body)
                 ? $body['aciklama']
                 : $existing['aciklama'],
@@ -459,6 +465,11 @@ class SureclerController
             $ucretliMi = self::normalizeBoolean($body['ucretli_mi']);
         }
 
+        $tamGunMu = null;
+        if (array_key_exists('tam_gun_mu', $body) && $body['tam_gun_mu'] !== null && $body['tam_gun_mu'] !== '') {
+            $tamGunMu = self::normalizeBoolean($body['tam_gun_mu']);
+        }
+
         $altTur = self::optionalTrimmedString($body, 'alt_tur');
 
         return [
@@ -468,6 +479,7 @@ class SureclerController
             'baslangic_tarihi' => $baslangicTarihi,
             'bitis_tarihi' => $bitisTarihi,
             'ucretli_mi' => $ucretliMi,
+            'tam_gun_mu' => $tamGunMu,
             'ilk_iki_gun_firma_oder_mi' => self::resolveIlkIkiGunFirmaOderMi($surecTuru, $altTur, $body),
             'aciklama' => self::optionalTrimmedString($body, 'aciklama'),
         ];
@@ -498,10 +510,10 @@ class SureclerController
         $sql = '
             INSERT INTO surecler (
                 personel_id, surec_turu, alt_tur, baslangic_tarihi, bitis_tarihi,
-                ucretli_mi, ilk_iki_gun_firma_oder_mi, aciklama, state
+                ucretli_mi, tam_gun_mu, ilk_iki_gun_firma_oder_mi, aciklama, state
             ) VALUES (
                 :personel_id, :surec_turu, :alt_tur, :baslangic_tarihi, :bitis_tarihi,
-                :ucretli_mi, :ilk_iki_gun_firma_oder_mi, :aciklama, :state
+                :ucretli_mi, :tam_gun_mu, :ilk_iki_gun_firma_oder_mi, :aciklama, :state
             )
         ';
         $stmt = $pdo->prepare($sql);
@@ -512,6 +524,7 @@ class SureclerController
             'baslangic_tarihi' => $payload['baslangic_tarihi'],
             'bitis_tarihi' => $payload['bitis_tarihi'],
             'ucretli_mi' => $payload['ucretli_mi'] ? 1 : 0,
+            'tam_gun_mu' => $payload['tam_gun_mu'] === null ? null : ($payload['tam_gun_mu'] ? 1 : 0),
             'ilk_iki_gun_firma_oder_mi' => $payload['ilk_iki_gun_firma_oder_mi'] === null
                 ? null
                 : ($payload['ilk_iki_gun_firma_oder_mi'] ? 1 : 0),
@@ -533,7 +546,7 @@ class SureclerController
     {
         $stmt = $pdo->prepare('
             SELECT id, personel_id, surec_turu, alt_tur, baslangic_tarihi, bitis_tarihi,
-                   ucretli_mi, ilk_iki_gun_firma_oder_mi, aciklama, state
+                   ucretli_mi, tam_gun_mu, ilk_iki_gun_firma_oder_mi, aciklama, state
             FROM surecler
             WHERE id = :id
             LIMIT 1
@@ -549,7 +562,7 @@ class SureclerController
     {
         $stmt = $pdo->prepare('
             SELECT sc.id, sc.personel_id, sc.surec_turu, sc.alt_tur, sc.baslangic_tarihi, sc.bitis_tarihi,
-                   sc.ucretli_mi, sc.ilk_iki_gun_firma_oder_mi, sc.aciklama, sc.state,
+                   sc.ucretli_mi, sc.tam_gun_mu, sc.ilk_iki_gun_firma_oder_mi, sc.aciklama, sc.state,
                    p.sube_id AS personel_sube_id
             FROM surecler sc
             INNER JOIN personeller p ON p.id = sc.personel_id
@@ -723,6 +736,7 @@ class SureclerController
             'baslangic_tarihi' => (string) $row['baslangic_tarihi'],
             'bitis_tarihi' => $row['bitis_tarihi'] !== null ? (string) $row['bitis_tarihi'] : null,
             'ucretli_mi' => (bool) ((int) ($row['ucretli_mi'] ?? 0)),
+            'tam_gun_mu' => self::mapNullableBoolean($row['tam_gun_mu'] ?? null),
             'ilk_iki_gun_firma_oder_mi' => self::mapNullableBoolean($row['ilk_iki_gun_firma_oder_mi'] ?? null),
             'aciklama' => self::mapSurecAciklama($row),
             'state' => (string) $row['state'],

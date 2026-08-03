@@ -9680,6 +9680,18 @@ export function resolveDemoApiResponse(
     });
   }
 
+  if (pathname === "/sgk-manuel-kod-override" && method === "POST") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(actor, "mevzuat_parametreleri.manage");
+    if (permissionError) return permissionError;
+    return ok({
+      id: 1,
+      state: "AKTIF",
+      supersedes_id: null,
+      idempotent_mi: false
+    });
+  }
+
   if (pathname === "/bordro-hazirlik/readiness" && method === "GET") {
     const actor = readDemoApiActor(init);
     const permissionError = enforceDemoPermission(actor, "bordro_on_izleme.view");

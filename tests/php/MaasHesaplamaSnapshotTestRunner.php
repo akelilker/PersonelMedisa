@@ -42,6 +42,7 @@ function createSnapshotSchema(PDO $pdo): void
     $pdo->exec('CREATE TABLE surecler (
         id INTEGER PRIMARY KEY, personel_id INTEGER NOT NULL, surec_turu TEXT NOT NULL, alt_tur TEXT,
         baslangic_tarihi TEXT NOT NULL, bitis_tarihi TEXT, ucretli_mi INTEGER NOT NULL DEFAULT 0,
+        tam_gun_mu INTEGER,
         ilk_iki_gun_firma_oder_mi INTEGER,
         aciklama TEXT, state TEXT NOT NULL DEFAULT \'AKTIF\',
         created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP

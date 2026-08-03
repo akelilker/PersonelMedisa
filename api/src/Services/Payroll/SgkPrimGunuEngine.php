@@ -8,6 +8,8 @@ use DateInterval;
 use DatePeriod;
 use DateTimeImmutable;
 
+require_once __DIR__ . '/SgkEslemeKararContract.php';
+
 /**
  * S85-B authoritative, side-effect-free SGK prim gunu owner'i.
  *
@@ -16,12 +18,12 @@ use DateTimeImmutable;
  */
 final class SgkPrimGunuEngine
 {
-    public const ENGINE_VERSION = 'S85B_SGK_PRIM_GUNU_ENGINE_V1';
-    public const CONTRACT_VERSION = 'S85B_SGK_PRIM_GUNU_CONTRACT_V1';
+    public const ENGINE_VERSION = 'S98R1_SGK_PRIM_GUNU_ENGINE_V1';
+    public const CONTRACT_VERSION = 'S98R1_SGK_PRIM_GUNU_CONTRACT_V1';
 
     private const UCRET_MODELLERI = ['MAKTU_AYLIK', 'GUNLUK', 'SAATLIK', 'DIGER'];
     private const RAPOR_TURLERI = ['HASTALIK', 'IS_KAZASI', 'MESLEK_HASTALIGI', 'ANALIK'];
-    private const DAHIL_TURLER = ['YILLIK_IZIN'];
+    private const DAHIL_TURLER = ['YILLIK_IZIN', 'MAZERET_IZNI', 'KISMI_SURE_DEVAMSIZLIK'];
     private const DUSUREN_TURLER = [
         'UCRETSIZ_IZIN',
         'MAZERETSIZ_DEVAMSIZLIK',
@@ -29,6 +31,7 @@ final class SgkPrimGunuEngine
         'IS_KAZASI',
         'MESLEK_HASTALIGI',
         'ANALIK',
+        'KISMI_SURELI_CALISMA',
     ];
 
     /** @return array<string, mixed> */
@@ -178,17 +181,28 @@ final class SgkPrimGunuEngine
                         $decision['kaynak_surec_idleri'][] = $processId;
                     }
 
-                    $effect = strtoupper((string) ($process['prim_gunu_etkisi'] ?? ''));
-                    if ($effect === 'KOSULLU') {
-                        $effect = strtoupper((string) ($process['cozulmus_prim_gunu_etkisi'] ?? ''));
+                    $resolved = SgkEslemeKararContract::resolveRuntime($process, $personel);
+                    foreach ($resolved['blockers'] as $b) {
+                        $blockers[] = self::issue(
+                            (string) ($b['code'] ?? 'SGK_PRIM_GUNU_HESAPLANAMADI'),
+                            (string) ($b['message'] ?? 'Karar cozulemedi.'),
+                            $dateString,
+                            $dateString,
+                            $processId
+                        );
                     }
-                    if ($effect === '' && in_array($canonical, self::DAHIL_TURLER, true)) {
-                        $effect = 'DAHIL';
-                    } elseif ($effect === '' && in_array($canonical, self::DUSUREN_TURLER, true)) {
-                        $effect = 'DUSUR';
+                    $effect = strtoupper((string) ($resolved['effect'] ?? ''));
+                    if ($resolved['code'] !== null && $resolved['code'] !== '') {
+                        $process['eksik_gun_kodu'] = (string) $resolved['code'];
+                    } elseif (($resolved['effect'] ?? '') === 'DAHIL') {
+                        $process['eksik_gun_kodu'] = null;
                     }
 
-                    if ($canonical === 'HASTALIK') {
+                    // Legacy HASTALIK ilk-iki-gun only when no S98-R1 karar_kurali.
+                    $legacyKosullar = is_array($process['kosullar_json'] ?? null) ? $process['kosullar_json'] : [];
+                    $hasR1 = is_array($legacyKosullar) && isset($legacyKosullar['karar_kurali']);
+
+                    if ($canonical === 'HASTALIK' && !$hasR1) {
                         $reportSeen = true;
                         $policy = array_key_exists('ilk_iki_gun_firma_oder_mi', $process)
                             ? $process['ilk_iki_gun_firma_oder_mi']
@@ -210,6 +224,13 @@ final class SgkPrimGunuEngine
                             $reportDay = ((int) $process['__from']->diff($date)->format('%a')) + 1;
                             $effect = $reportDay <= 2 && $policy === true ? 'DAHIL' : 'DUSUR';
                         }
+                    } elseif ($canonical === 'HASTALIK') {
+                        $reportSeen = true;
+                        $policySummary[] = [
+                            'surec_id' => $processId,
+                            'karar_kurali' => $legacyKosullar['karar_kurali'] ?? null,
+                            'ucret_modeli' => $personel['ucret_modeli'] ?? null,
+                        ];
                     } elseif (in_array($canonical, ['IS_KAZASI', 'MESLEK_HASTALIGI', 'ANALIK'], true)) {
                         $reportSeen = true;
                         if (array_key_exists('ilk_iki_gun_firma_oder_mi', $process) && $process['ilk_iki_gun_firma_oder_mi'] !== null) {
@@ -223,12 +244,18 @@ final class SgkPrimGunuEngine
                         }
                     }
 
+                    // KISMI_SURE_DEVAMSIZLIK: never reduce SGK day (even if hours >= 7.5).
+                    if ($canonical === 'KISMI_SURE_DEVAMSIZLIK') {
+                        $effect = 'DAHIL';
+                        $process['eksik_gun_kodu'] = null;
+                    }
+
                     if ($canonical === 'KISMI_SURELI_CALISMA') {
                         if ((string) ($personel['sozlesme_turu'] ?? '') !== 'KISMI_SURELI') {
                             $blockers[] = self::issue('SGK_KAYNAK_SUREC_CELISKILI', 'Kismi sureli hesap icin canonical sozlesme turu yok.', $dateString, $dateString, $processId);
                             $effect = 'MANUEL';
                         }
-                        if (empty($process['sozlesme_belgesi_dogrulandi_mi'])) {
+                        if (empty($process['sozlesme_belgesi_dogrulandi_mi']) && empty($personel['yazili_kismi_sureli_sozlesme_var_mi'])) {
                             $blockers[] = self::issue('SGK_EKSIK_GUN_BELGESI_EKSIK', 'Kismi sureli sozlesme belgesi dogrulanmadi.', $dateString, $dateString, $processId);
                             $effect = 'MANUEL';
                         }
@@ -300,10 +327,12 @@ final class SgkPrimGunuEngine
 
         if ((string) ($personel['sozlesme_turu'] ?? '') === 'KISMI_SURELI') {
             $explicitPartialDay = $input['kismi_sureli_prim_gunu'] ?? null;
-            if (!is_int($explicitPartialDay) || $explicitPartialDay < 0 || $explicitPartialDay > 30) {
-                $blockers[] = self::issue('SGK_PRIM_GUNU_HESAPLANAMADI', 'Kismi sureli prim gunu ayri owner tarafindan kesinlestirilmedi.', $employmentStart->format('Y-m-d'), $employmentEnd->format('Y-m-d'), null);
-            } else {
+            if (is_int($explicitPartialDay) && $explicitPartialDay >= 0 && $explicitPartialDay <= 30) {
                 $primDay = $explicitPartialDay;
+            } elseif (isset($input['kismi_aylik_calisma_saati']) && is_numeric($input['kismi_aylik_calisma_saati'])) {
+                $primDay = SgkEslemeKararContract::roundPartialPrimDays((float) $input['kismi_aylik_calisma_saati']);
+            } else {
+                $blockers[] = self::issue('SGK_PRIM_GUNU_HESAPLANAMADI', 'Kismi sureli prim gunu ayri owner tarafindan kesinlestirilmedi.', $employmentStart->format('Y-m-d'), $employmentEnd->format('Y-m-d'), null);
             }
         }
 
@@ -358,6 +387,9 @@ final class SgkPrimGunuEngine
             'is_goremezlik_finans_ozeti' => is_array($input['is_goremezlik_finans_ozeti'] ?? null) ? $input['is_goremezlik_finans_ozeti'] : [],
             'gunluk_alt_sinir' => $dailyLower,
             'gunluk_ust_sinir' => $dailyUpper,
+            'kismi_aylik_calisma_saati' => $input['kismi_aylik_calisma_saati'] ?? null,
+            'kismi_sureli_prim_gunu' => $input['kismi_sureli_prim_gunu'] ?? null,
+            'decision_contract_version' => SgkEslemeKararContract::CONTRACT_VERSION,
         ]);
 
         $result = [

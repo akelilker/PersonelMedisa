@@ -125,6 +125,8 @@ final class SgkSirketPolitikaImportValidator
                 $val = trim((string) ($degerler[$requiredCode] ?? ''));
                 if ($val === '') {
                     $hatali[] = ['row_index' => -1, 'errors' => ['ZORUNLU_POLITIKA_DEGERI_EKSIK:' . $requiredCode]];
+                } elseif (!empty($def['allowed_values']) && is_array($def['allowed_values']) && !in_array($val, $def['allowed_values'], true)) {
+                    $hatali[] = ['row_index' => -1, 'errors' => ['GECERSIZ_POLITIKA_DEGERI:' . $requiredCode]];
                 }
             }
         }

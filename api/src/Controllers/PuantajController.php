@@ -52,6 +52,15 @@ class PuantajController
     /** @var string[] */
     private static $kontrolDurumlari = ['BEKLIYOR', 'AMIR_KONTROL_ETTI'];
 
+    /** @var string[] */
+    private static $sgkEksikGunNedenTipleri = [
+        'ISTIRAHAT',
+        'KISMI_ISTIHDAM',
+        'TAM_GUN_DEVAMSIZLIK',
+        'GENEL_UCRETSIZ_IZIN',
+        'BILINMIYOR',
+    ];
+
     public static function detail(Request $request, $personelId, $tarih)
     {
         $user = AuthMiddleware::authenticate($request, true);
@@ -607,6 +616,7 @@ class PuantajController
                 'dayanak' => (string) ($row['dayanak'] ?? ''),
                 'net_calisma_suresi_dakika' => (int) ($row['net_calisma_suresi_dakika'] ?? 0),
                 'hafta_tatili_hak_kazandi_mi' => $row['hafta_tatili_hak_kazandi_mi'] ?? null,
+                'sgk_eksik_gun_neden_tipi' => $row['sgk_eksik_gun_neden_tipi'] ?? null,
             ];
         }
 
@@ -946,6 +956,12 @@ class PuantajController
                 self::existingValue($existing, 'durum_bildirim_aciklamasi')
             ),
             'hesap_etkisi' => self::readEnum($payload, 'hesap_etkisi', self::$hesapEtkileri, self::existingValue($existing, 'hesap_etkisi')),
+            'sgk_eksik_gun_neden_tipi' => self::readEnum(
+                $payload,
+                'sgk_eksik_gun_neden_tipi',
+                self::$sgkEksikGunNedenTipleri,
+                self::existingValue($existing, 'sgk_eksik_gun_neden_tipi')
+            ),
             'beklenen_giris_saati' => self::readTime($payload, 'beklenen_giris_saati', self::existingValue($existing, 'beklenen_giris_saati')),
             'beklenen_cikis_saati' => self::readTime($payload, 'beklenen_cikis_saati', self::existingValue($existing, 'beklenen_cikis_saati')),
             'giris_saati' => self::readTime($payload, 'giris_saati', self::existingValue($existing, 'giris_saati')),
@@ -1150,7 +1166,7 @@ class PuantajController
         $stmt = $pdo->prepare(
             'INSERT INTO gunluk_puantaj
              (personel_id, tarih, state, gun_tipi, hareket_durumu, dayanak, durumu_bildirdi_mi,
-              durum_bildirim_aciklamasi, hesap_etkisi, beklenen_giris_saati, beklenen_cikis_saati,
+              durum_bildirim_aciklamasi, hesap_etkisi, sgk_eksik_gun_neden_tipi, beklenen_giris_saati, beklenen_cikis_saati,
               giris_saati, cikis_saati, gec_kalma_dakika, erken_cikis_dakika, gercek_mola_dakika, hesaplanan_mola_dakika,
               net_calisma_suresi_dakika, gunluk_brut_sure_dakika, hafta_tatili_hak_kazandi_mi,
               kontrol_durumu, kaynak, aciklama, muhur_id,
@@ -1159,7 +1175,7 @@ class PuantajController
               tatil_donemi_brut_calisma_dakika, tatil_donemi_ara_dinlenme_dakika, tatil_donemi_net_calisma_dakika)
              VALUES
              (:personel_id, :tarih, :state, :gun_tipi, :hareket_durumu, :dayanak, :durumu_bildirdi_mi,
-              :durum_bildirim_aciklamasi, :hesap_etkisi, :beklenen_giris_saati, :beklenen_cikis_saati,
+              :durum_bildirim_aciklamasi, :hesap_etkisi, :sgk_eksik_gun_neden_tipi, :beklenen_giris_saati, :beklenen_cikis_saati,
               :giris_saati, :cikis_saati, :gec_kalma_dakika, :erken_cikis_dakika, :gercek_mola_dakika, :hesaplanan_mola_dakika,
               :net_calisma_suresi_dakika, :gunluk_brut_sure_dakika, :hafta_tatili_hak_kazandi_mi,
               :kontrol_durumu, :kaynak, :aciklama, :muhur_id,
@@ -1182,6 +1198,7 @@ class PuantajController
             'durumu_bildirdi_mi' => $values['durumu_bildirdi_mi'],
             'durum_bildirim_aciklamasi' => $values['durum_bildirim_aciklamasi'],
             'hesap_etkisi' => $values['hesap_etkisi'],
+            'sgk_eksik_gun_neden_tipi' => $values['sgk_eksik_gun_neden_tipi'],
             'beklenen_giris_saati' => $values['beklenen_giris_saati'],
             'beklenen_cikis_saati' => $values['beklenen_cikis_saati'],
             'giris_saati' => $values['giris_saati'],
@@ -1210,6 +1227,7 @@ class PuantajController
                  durumu_bildirdi_mi = :durumu_bildirdi_mi,
                  durum_bildirim_aciklamasi = :durum_bildirim_aciklamasi,
                  hesap_etkisi = :hesap_etkisi,
+                 sgk_eksik_gun_neden_tipi = :sgk_eksik_gun_neden_tipi,
                  beklenen_giris_saati = :beklenen_giris_saati,
                  beklenen_cikis_saati = :beklenen_cikis_saati,
                  giris_saati = :giris_saati,
@@ -1270,7 +1288,7 @@ class PuantajController
         $stmt = $pdo->prepare(
             'INSERT INTO puantaj_aylik_muhur_satirlari
              (muhur_id, personel_id, tarih, gun_tipi, hareket_durumu, dayanak, durumu_bildirdi_mi,
-              durum_bildirim_aciklamasi, hesap_etkisi, beklenen_giris_saati, beklenen_cikis_saati,
+              durum_bildirim_aciklamasi, hesap_etkisi, sgk_eksik_gun_neden_tipi, beklenen_giris_saati, beklenen_cikis_saati,
               giris_saati, cikis_saati, gec_kalma_dakika, erken_cikis_dakika, gercek_mola_dakika, hesaplanan_mola_dakika,
               net_calisma_suresi_dakika, gunluk_brut_sure_dakika, hafta_tatili_hak_kazandi_mi,
               kontrol_durumu, kaynak, aciklama,
@@ -1279,7 +1297,7 @@ class PuantajController
               tatil_donemi_brut_calisma_dakika, tatil_donemi_ara_dinlenme_dakika, tatil_donemi_net_calisma_dakika)
              VALUES
              (:muhur_id, :personel_id, :tarih, :gun_tipi, :hareket_durumu, :dayanak, :durumu_bildirdi_mi,
-              :durum_bildirim_aciklamasi, :hesap_etkisi, :beklenen_giris_saati, :beklenen_cikis_saati,
+              :durum_bildirim_aciklamasi, :hesap_etkisi, :sgk_eksik_gun_neden_tipi, :beklenen_giris_saati, :beklenen_cikis_saati,
               :giris_saati, :cikis_saati, :gec_kalma_dakika, :erken_cikis_dakika, :gercek_mola_dakika, :hesaplanan_mola_dakika,
               :net_calisma_suresi_dakika, :gunluk_brut_sure_dakika, :hafta_tatili_hak_kazandi_mi,
               :kontrol_durumu, :kaynak, :aciklama,
@@ -1299,6 +1317,7 @@ class PuantajController
                 'durumu_bildirdi_mi' => $row['durumu_bildirdi_mi'],
                 'durum_bildirim_aciklamasi' => $row['durum_bildirim_aciklamasi'],
                 'hesap_etkisi' => $row['hesap_etkisi'],
+                'sgk_eksik_gun_neden_tipi' => $row['sgk_eksik_gun_neden_tipi'] ?? null,
                 'beklenen_giris_saati' => $row['beklenen_giris_saati'],
                 'beklenen_cikis_saati' => $row['beklenen_cikis_saati'],
                 'giris_saati' => $row['giris_saati'],
@@ -1345,6 +1364,7 @@ class PuantajController
             'durumu_bildirdi_mi' => self::mapNullableBool($row['durumu_bildirdi_mi'] ?? null),
             'durum_bildirim_aciklamasi' => $row['durum_bildirim_aciklamasi'] ?? null,
             'hesap_etkisi' => $row['hesap_etkisi'],
+            'sgk_eksik_gun_neden_tipi' => $row['sgk_eksik_gun_neden_tipi'] ?? null,
             'beklenen_giris_saati' => $row['beklenen_giris_saati'] ?? null,
             'beklenen_cikis_saati' => $row['beklenen_cikis_saati'] ?? null,
             'giris_saati' => $row['giris_saati'],

@@ -42,7 +42,15 @@ test.describe("S98 SGK mapping + policy preflight", () => {
         {
           parent_surum_kodu: "DEMO-KATALOG-2026",
           successor_surum_kodu: "E2E-ESLEME-SUCCESSOR",
-          rows: [{ surec_turu: "RAPOR", alt_tur: "Raporlu_Hastalik", eksik_gun_kodu: "01" }]
+          rows: [{
+            surec_turu: "RAPOR",
+            alt_tur: "Raporlu_Hastalik",
+            canonical_surec_turu: "HASTALIK",
+            karar_kurali: "UCRET_MODELINE_GORE",
+            kod_secim_modu: "KOD_YOK",
+            eksik_gun_kodu: "",
+            kaynak_referansi: "SGK_EK9_APHB_20260722"
+          }]
         },
         null,
         2
@@ -141,7 +149,15 @@ test.describe("S98 SGK mapping + policy preflight", () => {
         {
           parent_surum_kodu: "DEMO-KATALOG-2026",
           successor_surum_kodu: "E2E-ESLEME-SUCCESSOR",
-          rows: [{ surec_turu: "RAPOR", alt_tur: "Raporlu_Hastalik", eksik_gun_kodu: "01" }]
+          rows: [{
+            surec_turu: "RAPOR",
+            alt_tur: "Raporlu_Hastalik",
+            canonical_surec_turu: "HASTALIK",
+            karar_kurali: "UCRET_MODELINE_GORE",
+            kod_secim_modu: "KOD_YOK",
+            eksik_gun_kodu: "",
+            kaynak_referansi: "SGK_EK9_APHB_20260722"
+          }]
         },
         null,
         2

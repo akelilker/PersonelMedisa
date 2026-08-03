@@ -19,9 +19,9 @@ final class SgkSirketPolitikaCatalog
         'SGK_ODENEK_MAHSUP_MODU' => [
             'deger_turu' => 'METIN',
             'zorunlu' => true,
-            'allowed_values' => [],
-            'aciklama' => 'IK/muhasebe raporlu donemlerde odenek-mahsup kararini belirler; varsayilan deger yoktur.',
-            'engine_kullanimi' => 'SgkPrimGunuEngine yalnizca varligini kontrol eder; icerik IK kararidir.',
+            'allowed_values' => ['UCRET_MODELINE_GORE'],
+            'aciklama' => 'Gunluk/saatlik: raporlu gun ucreti odenmez. Maktu aylik: aylik tam odenir, SGK odenegi mahsup edilir. Varsayilan yok.',
+            'engine_kullanimi' => 'SgkPrimGunuEngine politika hash + allowed value dogrular; icerik UCRET_MODELINE_GORE olmalidir.',
         ],
     ];
 

@@ -83,6 +83,7 @@ class RolePermissions
             'revizyon.reject',
             'revizyon.view_finance_effect',
             'revizyon.view_audit_history',
+            'sgk.manuel_kod_override',
         ],
         'BOLUM_YONETICISI' => [
             'personeller.view',
@@ -189,6 +190,7 @@ class RolePermissions
             'revizyon.cancel',
             'revizyon.view_finance_effect',
             'revizyon.view_audit_history',
+            'sgk.manuel_kod_override',
         ],
         'BIRIM_AMIRI' => [
             'personeller.view.sube',

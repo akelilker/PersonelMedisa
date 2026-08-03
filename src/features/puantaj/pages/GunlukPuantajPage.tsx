@@ -672,6 +672,27 @@ export function GunlukPuantajPage() {
             </div>
           ) : null}
 
+          <FormField
+            as="select"
+            label="SGK eksik gün neden tipi"
+            name="puantaj-sgk-eksik-gun-neden"
+            value={formState.entrySgkEksikGunNedenTipi}
+            onChange={(value) =>
+              patchFormState({
+                entrySgkEksikGunNedenTipi: value as typeof formState.entrySgkEksikGunNedenTipi
+              })
+            }
+            placeholderOption={{ value: "", label: "Boş — uygulanmaz" }}
+            selectOptions={[
+              { value: "ISTIRAHAT", label: "İstirahat" },
+              { value: "KISMI_ISTIHDAM", label: "Kısmi istihdam" },
+              { value: "TAM_GUN_DEVAMSIZLIK", label: "Tam gün devamsızlık" },
+              { value: "GENEL_UCRETSIZ_IZIN", label: "Genel ücretsiz izin" },
+              { value: "BILINMIYOR", label: "Bilinmiyor" }
+            ]}
+            disabled={isLoading}
+          />
+
           <div className="form-field-grid">
             <FormField
               label="Giriş Saati"

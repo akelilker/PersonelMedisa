@@ -10191,6 +10191,15 @@ let personelBelgeKaydiIdCounter = 903;
       await fulfillJson(route, 200, okBody(buildSgkSurecEslemeImportSuccessMock(kod)));
       return;
     }
+    if (path === "/api/sgk-manuel-kod-override" && method === "POST") {
+      if (await denyUnlessRolePermission(route, "mevzuat_parametreleri.manage")) return;
+      await fulfillJson(
+        route,
+        200,
+        okBody({ id: 1, state: "AKTIF", supersedes_id: null, idempotent_mi: false })
+      );
+      return;
+    }
     if (path === "/api/sgk-katalog-hazirlik/submit" && method === "POST") {
       if (role !== "GENEL_YONETICI") {
         await fulfillJson(route, 403, errorBody("SGK_KATALOG_WRITE_FORBIDDEN", "Submit yalniz GENEL_YONETICI."));

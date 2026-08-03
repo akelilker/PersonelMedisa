@@ -2,7 +2,7 @@ import type { Dispatch, ReactNode, SetStateAction } from "react";
 import { FormField } from "../../../components/form/FormField";
 import type { SurecFormState } from "../../../hooks/useSurecler";
 import type { KeyOption } from "../../../types/referans";
-import { isHastalikRaporSureci } from "../surec-form-utils";
+import { isHastalikRaporSureci, isMazeretIzniSureci } from "../surec-form-utils";
 
 type PersonelOption = {
   value: string;
@@ -240,6 +240,27 @@ export function SurecFormFields({
   }
 
   const showIlkIkiGunFirmaOderMi = isHastalikRaporSureci(form.surecTuru, form.altTur);
+  const showTamGunMu = isMazeretIzniSureci(form.surecTuru, form.altTur);
+
+  const tamGunMuFieldNode = showTamGunMu ? (
+    <FormField
+      as="select"
+      label="Tam gün mü? (SGK eksik gün kararı)"
+      name="surec-tam-gun-mu"
+      value={form.tamGunMu === null ? "" : form.tamGunMu ? "evet" : "hayir"}
+      onChange={(value) =>
+        setForm((prev) => ({
+          ...prev,
+          tamGunMu: value === "" ? null : value === "evet"
+        }))
+      }
+      placeholderOption={{ value: "", label: "Boş — karar bekliyor" }}
+      selectOptions={[
+        { value: "evet", label: "Evet — tam gün" },
+        { value: "hayir", label: "Hayır — kısmi gün" }
+      ]}
+    />
+  ) : null;
 
   const ilkIkiGunFirmaOderMiFieldNode = showIlkIkiGunFirmaOderMi ? (
     <FormField
@@ -291,7 +312,7 @@ export function SurecFormFields({
   const ucretliFieldNode = showUcretliField
     ? useOperationControls
       ? renderSegmentedButtons(
-          "Ücretli mi?",
+          "Ücretli mi? (Hayır = ücret kesilsin / SGK günü düşürülebilir)",
           "surec-create-ucret",
           form.ucretliMi ? "evet" : "hayir",
           UCRETLI_SELECT_OPTIONS,
@@ -300,7 +321,7 @@ export function SurecFormFields({
       : (
           <FormField
             as="select"
-            label="Ücretli mi?"
+              label="Ücretli mi? (Hayır = ücret kesilsin / SGK günü düşürülebilir)"
             name="surec-create-ucret"
             value={form.ucretliMi ? "evet" : "hayir"}
             onChange={(value) => setForm((prev) => ({ ...prev, ucretliMi: value === "evet" }))}
@@ -338,6 +359,9 @@ export function SurecFormFields({
           {ucretliFieldNode ? (
             <div className="surec-form-layout-section surec-form-layout-section--ucret">{ucretliFieldNode}</div>
           ) : null}
+          {tamGunMuFieldNode ? (
+            <div className="surec-form-layout-section surec-form-layout-section--operation">{tamGunMuFieldNode}</div>
+          ) : null}
           <div className="surec-form-layout-section surec-form-layout-section--dates">{dateFields}</div>
           <div className="surec-form-layout-section surec-form-layout-section--notes">{aciklamaField}</div>
           {errorMessage ? <p className="surec-form-error">{errorMessage}</p> : null}
@@ -349,6 +373,7 @@ export function SurecFormFields({
           {ilkIkiGunFirmaOderMiFieldNode}
           {dateFields}
           {ucretliFieldNode}
+          {tamGunMuFieldNode}
           {aciklamaField}
           {errorMessage ? <p className="surec-form-error">{errorMessage}</p> : null}
           {referenceError ? <p className="surec-form-error">{referenceError}</p> : null}

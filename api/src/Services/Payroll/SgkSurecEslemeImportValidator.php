@@ -8,8 +8,12 @@ use Medisa\Api\Http\CsvResponse;
 use PDO;
 use PDOException;
 
+require_once __DIR__ . '/SgkEslemeKararContract.php';
+require_once __DIR__ . '/SgkKatalogContracts.php';
+
 /**
- * S98: Deterministic süreç→SGK mapping import dry-run (no write).
+ * S98-R1: Deterministic süreç→SGK mapping import dry-run (no write).
+ * Supports no-code DAHIL, conditional wage/mazeret rules, dynamic codes.
  * Never mutates ONAYLANDI parent catalog rows.
  */
 final class SgkSurecEslemeImportValidator
@@ -22,14 +26,11 @@ final class SgkSurecEslemeImportValidator
         'surec_turu',
         'alt_tur',
         'canonical_surec_turu',
+        'karar_kurali',
+        'kod_secim_modu',
         'eksik_gun_kodu',
-        'prim_gunu_etkisi',
-        'cozulmus_prim_gunu_etkisi',
         'kaynak_referansi',
     ];
-
-    /** @var list<string> */
-    private const PRIM_GUNU_ETKISI = ['DAHIL', 'DUSUR', 'KOSULLU', 'MANUEL'];
 
     /**
      * Hardcoded raw inventory from kayit-surec-constants (+ PUANTAJ_EKSIK_GUN / KISMI wildcards).
@@ -68,9 +69,9 @@ final class SgkSurecEslemeImportValidator
         foreach (self::rawSurecInventory() as $item) {
             $rows[] = array_merge($item, [
                 'canonical_surec_turu' => '',
+                'karar_kurali' => '',
+                'kod_secim_modu' => '',
                 'eksik_gun_kodu' => '',
-                'prim_gunu_etkisi' => '',
-                'cozulmus_prim_gunu_etkisi' => '',
                 'kaynak_referansi' => '',
             ]);
         }
@@ -160,12 +161,29 @@ final class SgkSurecEslemeImportValidator
             }
 
             $canonicalTur = strtoupper(trim((string) ($row['canonical_surec_turu'] ?? '')));
+            $kararKurali = strtoupper(trim((string) ($row['karar_kurali'] ?? '')));
+            $kodModu = strtoupper(trim((string) ($row['kod_secim_modu'] ?? '')));
             $eksikKod = strtoupper(trim((string) ($row['eksik_gun_kodu'] ?? '')));
-            $primEtki = strtoupper(trim((string) ($row['prim_gunu_etkisi'] ?? '')));
-            $cozulmus = strtoupper(trim((string) ($row['cozulmus_prim_gunu_etkisi'] ?? '')));
             $kaynakRef = trim((string) ($row['kaynak_referansi'] ?? ''));
 
-            $decisionEmpty = $canonicalTur === '' && $eksikKod === '' && $primEtki === '' && $kaynakRef === '';
+            // Legacy CSV compatibility: map old prim_gunu_etkisi columns if new columns empty.
+            if ($kararKurali === '' && $kodModu === '') {
+                $legacyPrim = strtoupper(trim((string) ($row['prim_gunu_etkisi'] ?? '')));
+                $legacyCozulmus = strtoupper(trim((string) ($row['cozulmus_prim_gunu_etkisi'] ?? '')));
+                if ($legacyPrim === 'DAHIL') {
+                    $kararKurali = 'HER_ZAMAN_DAHIL';
+                    $kodModu = 'KOD_YOK';
+                } elseif ($legacyPrim === 'DUSUR') {
+                    $kararKurali = 'HER_ZAMAN_DUSUR';
+                    $kodModu = 'SABIT_KOD';
+                } elseif ($legacyPrim === 'KOSULLU' && $legacyCozulmus !== '') {
+                    $kararKurali = 'HER_ZAMAN_DUSUR';
+                    $kodModu = $eksikKod !== '' ? 'SABIT_KOD' : 'KOD_YOK';
+                    $warnings[] = 'LEGACY_KOSULLU_SATIRI_YENI_KURALA_CEVIRIN';
+                }
+            }
+
+            $decisionEmpty = $canonicalTur === '' && $kararKurali === '' && $kodModu === '' && $eksikKod === '' && $kaynakRef === '';
             if ($decisionEmpty) {
                 $decisionPending++;
                 $warnings[] = 'KARAR_BEKLIYOR';
@@ -181,18 +199,31 @@ final class SgkSurecEslemeImportValidator
             if ($canonicalTur === '' || !in_array($canonicalTur, SgkKatalogContracts::CANONICAL_SUREC_TURLERI, true)) {
                 $errors[] = 'GECERSIZ_CANONICAL_SUREC_TURU';
             }
-            if ($eksikKod === '') {
-                $errors[] = 'EKSIK_GUN_KODU_ZORUNLU';
-            } elseif ($parentCodes !== [] && !isset($parentCodes[$eksikKod])) {
+
+            $normalized = SgkEslemeKararContract::normalize([
+                'karar_kurali' => $kararKurali,
+                'kod_secim_modu' => $kodModu,
+                'eksik_gun_kodu' => $eksikKod,
+            ]);
+            foreach ($normalized['errors'] as $normErr) {
+                $errors[] = $normErr;
+            }
+            $resolvedKod = $normalized['eksik_gun_kodu'];
+            if ($resolvedKod !== null && $parentCodes !== [] && !isset($parentCodes[$resolvedKod])) {
                 $errors[] = 'PARENT_KATALOG_KODU_YOK';
             }
-            if ($primEtki === '' || !in_array($primEtki, self::PRIM_GUNU_ETKISI, true)) {
-                $errors[] = 'GECERSIZ_PRIM_GUNU_ETKISI';
-            }
-            if ($primEtki === 'KOSULLU' && $cozulmus === '') {
-                $errors[] = 'KOSULLU_COZULMUS_ETKI_ZORUNLU';
-            } elseif ($cozulmus !== '' && !in_array($cozulmus, ['DAHIL', 'DUSUR', 'MANUEL'], true)) {
-                $errors[] = 'GECERSIZ_COZULMUS_PRIM_GUNU_ETKISI';
+            $requiredCodes = is_array($normalized['kosullar_json']['required_catalog_codes'] ?? null)
+                ? $normalized['kosullar_json']['required_catalog_codes']
+                : SgkEslemeKararContract::requiredCatalogCodes($kararKurali, $resolvedKod);
+            foreach ($requiredCodes as $reqCode) {
+                $req = strtoupper(trim((string) $reqCode));
+                if ($req === '') {
+                    continue;
+                }
+                if ($parentCodes !== [] && !isset($parentCodes[$req])) {
+                    $errors[] = 'PARENT_KATALOG_GEREKEN_KOD_YOK';
+                    break;
+                }
             }
             if ($kaynakRef === '') {
                 $errors[] = 'KAYNAK_REFERANSI_ZORUNLU';
@@ -223,21 +254,17 @@ final class SgkSurecEslemeImportValidator
                 continue;
             }
 
-            $kosullar = null;
-            if ($primEtki === 'KOSULLU') {
-                $kosullar = ['cozulmus_prim_gunu_etkisi' => $cozulmus];
-            }
-
             $canonical[] = [
                 'surec_turu' => $surec,
                 'alt_tur' => $alt,
                 'canonical_surec_turu' => $canonicalTur,
-                'eksik_gun_kodu' => $eksikKod,
-                'prim_gunu_etkisi' => $primEtki,
-                'cozulmus_prim_gunu_etkisi' => $cozulmus !== '' ? $cozulmus : null,
+                'karar_kurali' => $kararKurali,
+                'kod_secim_modu' => $kodModu,
+                'eksik_gun_kodu' => $resolvedKod,
+                'prim_gunu_etkisi' => $normalized['prim_gunu_etkisi'],
                 'kaynak_referansi' => $kaynakRef,
                 'kaynak_manifest_id' => (int) $manifestIndex[$kaynakRef]['id'],
-                'kosullar_json' => $kosullar,
+                'kosullar_json' => $normalized['kosullar_json'],
             ];
 
             if ($warnings !== []) {

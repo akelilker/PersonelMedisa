@@ -157,6 +157,15 @@ class Router
         if ($path === '/personeller/import/apply' && $method === 'POST') {
             PersonellerController::importApply($this->request);
         }
+        if ($path === '/personeller/import/runs' && $method === 'GET') {
+            PersonellerController::importRunsList($this->request);
+        }
+        if ($method === 'GET' && preg_match('#^/personeller/import/runs/(\d+)/evidence\.csv$#', $path, $matches)) {
+            PersonellerController::importRunEvidenceCsv($this->request, $matches[1]);
+        }
+        if ($method === 'GET' && preg_match('#^/personeller/import/runs/(\d+)$#', $path, $matches)) {
+            PersonellerController::importRunDetail($this->request, $matches[1]);
+        }
         if ($method === 'GET' && preg_match('#^/personeller/(\d+)$#', $path, $matches)) {
             PersonellerController::detail($this->request, $matches[1]);
         }

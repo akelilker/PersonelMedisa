@@ -64,6 +64,27 @@ describe("S98 SGK mapping + policy source guards", () => {
     expect(write).toContain("manifests alone must NOT force empty-package re-evaluation");
   });
 
+  it("HF2: payroll catalog resolver prefers eşleme successor over parent overlap", () => {
+    const svc = read("api/src/Services/SgkPrimGunuService.php");
+    expect(svc).toContain("selectEffectiveCatalogVersion");
+    expect(svc).toContain("isApprovedCatalogAncestor");
+    expect(svc).toContain("-ESLEME-");
+    expect(svc).toContain("function loadCatalog");
+    // loadCatalog must not hard-fail on parent+successor count===2
+    expect(svc).toMatch(/\$version = self::selectEffectiveCatalogVersion\(\$rows\);/);
+    const write = read("api/src/Services/Payroll/SgkKatalogWriteService.php");
+    expect(write).toContain("parent=");
+    expect(write).toContain("hasApprovedCatalogOverlap");
+  });
+
+  it("HF2: unsealed preflight suppresses sealed-attendance CANONICAL_TAKVIM cascade", () => {
+    const snap = read("api/src/Services/MaasHesaplamaSnapshotService.php");
+    expect(snap).toContain("cascade of PERIOD_NOT_SEALED");
+    expect(snap).toContain("muhurlu canonical puantaj kaydi yok");
+    expect(snap).toContain("PERIOD_NOT_SEALED");
+    expect(snap).toContain("PAYROLL_PERIOD_NOT_SEALED");
+  });
+
   it("routes and client endpoints wired", () => {
     const router = read("api/src/Router.php");
     const endpoints = read("src/api/endpoints.ts");

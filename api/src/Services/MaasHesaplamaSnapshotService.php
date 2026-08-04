@@ -84,6 +84,24 @@ class MaasHesaplamaSnapshotService
             'izinler' => $izinler,
             'legal' => $legal,
         ]);
+        // Unsealed periods intentionally load empty sealed attendance. Day-level
+        // CANONICAL_TAKVIM_EKSIK ("muhurlu canonical puantaj kaydi yok") is then a
+        // cascade of PERIOD_NOT_SEALED, not independent calendar data readiness.
+        // Keep PERIOD_NOT_SEALED / calculation seal gates; suppress only that cascade
+        // so preflight can still surface catalog/personnel/policy blockers.
+        if (!$muhur) {
+            $sgk['items'] = array_values(array_filter($sgk['items'] ?? [], static function ($item) {
+                if (!is_array($item)) {
+                    return false;
+                }
+                if ((string) ($item['code'] ?? '') !== 'CANONICAL_TAKVIM_EKSIK') {
+                    return true;
+                }
+                $message = (string) ($item['message'] ?? '');
+
+                return strpos($message, 'muhurlu canonical puantaj kaydi yok') === false;
+            }));
+        }
         $items = array_merge($items, $sgk['items']);
 
         // S87 write-path: yas / 270 saat / odeme tercihi blockers (snapshot create hard block)

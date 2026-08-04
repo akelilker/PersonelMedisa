@@ -331,6 +331,63 @@ final class SgkPrimGunuService
         return array_map([self::class, 'mapSnapshotRow'], $stmt->fetchAll(PDO::FETCH_ASSOC));
     }
 
+    /**
+     * Parent + eşleme successor may both remain ONAYLANDI (approve overlap excludes parent).
+     * Prefer the newest lineage head; fail-closed on unrelated overlapping catalogs.
+     *
+     * @param list<array<string, mixed>> $rows
+     * @return array<string, mixed>|null
+     */
+    public static function selectEffectiveCatalogVersion(array $rows)
+    {
+        if (count($rows) === 0) {
+            return null;
+        }
+        if (count($rows) === 1) {
+            return $rows[0];
+        }
+
+        usort($rows, static function (array $a, array $b) {
+            $idCmp = ((int) ($b['id'] ?? 0)) <=> ((int) ($a['id'] ?? 0));
+            if ($idCmp !== 0) {
+                return $idCmp;
+            }
+
+            return strcmp((string) ($b['gecerlilik_baslangic'] ?? ''), (string) ($a['gecerlilik_baslangic'] ?? ''));
+        });
+
+        $chosen = $rows[0];
+        for ($i = 1, $n = count($rows); $i < $n; $i++) {
+            if (!self::isApprovedCatalogAncestor($rows[$i], $chosen)) {
+                return null;
+            }
+        }
+
+        return $chosen;
+    }
+
+    /**
+     * @param array<string, mixed> $candidateParent
+     * @param array<string, mixed> $successor
+     */
+    public static function isApprovedCatalogAncestor(array $candidateParent, array $successor)
+    {
+        $parentKodu = (string) ($candidateParent['surum_kodu'] ?? '');
+        $successorKodu = (string) ($successor['surum_kodu'] ?? '');
+        if ($parentKodu === '' || $successorKodu === '') {
+            return false;
+        }
+        if (strpos($successorKodu, $parentKodu . '-ESLEME-') === 0) {
+            return true;
+        }
+        $aciklama = (string) ($successor['aciklama'] ?? '');
+        if ($aciklama !== '' && preg_match('/parent=' . preg_quote($parentKodu, '/') . '(?:\s|$)/', $aciklama) === 1) {
+            return true;
+        }
+
+        return false;
+    }
+
     /** @return array<string, mixed> */
     private static function loadCatalog(PDO $pdo, $from, $to)
     {
@@ -348,7 +405,8 @@ final class SgkPrimGunuService
         } catch (PDOException $e) {
             $rows = [];
         }
-        if (count($rows) !== 1) {
+        $version = self::selectEffectiveCatalogVersion($rows);
+        if ($version === null) {
             return [
                 'surum_id' => null,
                 'surum_kodu' => null,
@@ -359,7 +417,6 @@ final class SgkPrimGunuService
                 'cakismalar' => [],
             ];
         }
-        $version = $rows[0];
         // RESMI_KAYNAKLI_KISITLI rows keep legacy aktif_mi=0 (PORTAL_TEYIT_BEKLIYOR);
         // still load them so fail-closed engine rules (YASAK/TEYITSIZ/BELIRLENEMEDI) can fire.
         // Fall back to aktif_mi-only when aktiflik_durumu column is absent (pre-040 fixtures).

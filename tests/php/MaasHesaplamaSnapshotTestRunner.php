@@ -415,6 +415,16 @@ try {
     $preflight = Svc::buildPreflight($pdo, 1, 2026, 3);
     snapAssert(issueByCode($preflight, 'PERIOD_NOT_SEALED') !== null, 'muhursuz donem PERIOD_NOT_SEALED blocker');
     snapAssert($preflight['snapshot_olusturulabilir_mi'] === false, 'muhursuz donem snapshot olusturamaz');
+    $cascadeTakvim = 0;
+    foreach ($preflight['items'] as $item) {
+        if (
+            (string) ($item['code'] ?? '') === 'CANONICAL_TAKVIM_EKSIK'
+            && strpos((string) ($item['message'] ?? ''), 'muhurlu canonical puantaj kaydi yok') !== false
+        ) {
+            $cascadeTakvim++;
+        }
+    }
+    snapAssert($cascadeTakvim === 0, 'HF2 muhursuz preflight sealed-attendance CANONICAL_TAKVIM cascade yok');
 
     $blockedEx = null;
     try {

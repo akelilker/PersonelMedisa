@@ -20,7 +20,7 @@ final class SgkKatalogWriteService
      */
     public static function import(PDO $pdo, array $actor, array $payload): array
     {
-        self::assertPrepare($actor);
+        self::assertPrepare($pdo, $actor);
 
         $dry = SgkKatalogImportValidator::dryRun($payload);
         if (($dry['hatali_satirlar'] ?? []) !== []) {
@@ -173,7 +173,7 @@ final class SgkKatalogWriteService
      */
     public static function submit(PDO $pdo, array $actor, array $payload): array
     {
-        self::assertPrepare($actor);
+        self::assertPrepare($pdo, $actor);
 
         $surumKodu = (string) ($payload['katalog_surumu'] ?? $payload['surum_kodu'] ?? '');
         if ($surumKodu === '') {
@@ -236,7 +236,7 @@ final class SgkKatalogWriteService
      */
     public static function approve(PDO $pdo, array $actor, array $payload): array
     {
-        self::assertApprove($actor);
+        self::assertApprove($pdo, $actor);
 
         $surumKodu = (string) ($payload['katalog_surumu'] ?? $payload['surum_kodu'] ?? '');
         if ($surumKodu === '') {
@@ -325,17 +325,17 @@ final class SgkKatalogWriteService
     /**
      * @param array{id?: int, rol?: string, username?: string, durum?: string, sube_ids?: list<int>} $actor
      */
-    private static function assertPrepare(array $actor): void
+    private static function assertPrepare(PDO $pdo, array $actor): void
     {
-        SgkKararPaketiAuthz::assertPrepare($actor);
+        SgkKararPaketiAuthz::assertPrepare($pdo, $actor);
     }
 
     /**
-     * @param array{id?: int, rol?: string, username?: string, durum?: string, sube_ids?: list<int>} $actor
+     * @param array{id?: int, rol?: string, username?: string, durum?: string, sube_ids?: list<int>, personel_id?: int|null} $actor
      */
-    private static function assertApprove(array $actor): void
+    private static function assertApprove(PDO $pdo, array $actor): void
     {
-        SgkKararPaketiAuthz::assertApprove($actor);
+        SgkKararPaketiAuthz::assertApprove($pdo, $actor);
     }
 
     /** @param array<string,mixed> $existing */

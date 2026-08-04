@@ -472,7 +472,12 @@ class SgkKatalogHazirlikController
             'SGK_SELF_APPROVAL_FORBIDDEN' => 'Hazirlayan kendi kaydini onaylayamaz.',
             'SGK_SAME_PERSON_DUAL_CONTROL_FORBIDDEN' => 'Ayni gercek kisi dual-control icin kullanilamaz.',
             'SGK_ACTOR_INACTIVE' => 'Actor pasif; islem reddedildi.',
+            'SGK_ACTOR_IDENTITY_INVALID' => 'Actor kimligi gecersiz.',
             'SGK_ACTOR_IDENTITY_NOT_READY' => 'Generic/shared hesap formal SGK actor olarak hazir degil.',
+            'SGK_ACTOR_PERSONEL_LINK_REQUIRED' => 'Actor personel_id bagi zorunlu.',
+            'SGK_PREPARER_PERSONEL_LINK_REQUIRED' => 'Hazirlayan personel_id bagi zorunlu.',
+            'SGK_ACTOR_PERSONEL_SCHEMA_REQUIRED' => 'users.personel_id semasi formal SGK yazimi icin zorunlu.',
+            'SGK_ACTOR_SCOPE_NOT_READY' => 'Actor sube kapsami tanimli degil.',
             'SGK_ACTOR_SCOPE_FORBIDDEN' => 'Actor sube kapsaminda degil.',
             'SGK_KATALOG_WRITE_FORBIDDEN' => 'SGK yazma yetkisi yok.',
         ];

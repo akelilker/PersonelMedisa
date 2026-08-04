@@ -34,6 +34,12 @@ describe("S98 SGK mapping + policy source guards", () => {
     expect(authz).toContain("sgk_karar_paketi.prepare");
     expect(authz).toContain("sgk_karar_paketi.approve");
     expect(authz).toContain("SGK_SAME_PERSON_DUAL_CONTROL_FORBIDDEN");
+    expect(authz).toContain("SGK_ACTOR_PERSONEL_LINK_REQUIRED");
+    expect(authz).toContain("SGK_PREPARER_PERSONEL_LINK_REQUIRED");
+    expect(authz).toContain("SGK_ACTOR_PERSONEL_SCHEMA_REQUIRED");
+    expect(authz).toContain("SGK_ACTOR_SCOPE_NOT_READY");
+    expect(authz).toContain("SGK_ACTOR_IDENTITY_INVALID");
+    expect(authz).not.toContain("static $cached");
     expect(onay).toContain("SELF_APPROVAL");
     expect(eslemeWrite).toContain("Never touch parent");
   });

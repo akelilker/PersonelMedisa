@@ -996,8 +996,8 @@ export function SgkKatalogHazirlikPanel() {
           <p data-testid="sgk-katalog-onay-disabled-note">
             Onay/approve {approveAktif ? "tamlık izin veriyorsa mümkün" : "kapalı"}. DOGRULANMIS_TAM seçeneği sunulmaz.
           </p>
-          <button type="button" className="universal-btn-secondary" data-testid="sgk-katalog-approve" disabled={!approveAktif || !canOnayValidate}>
-            Onayla {approveAktif ? "(attestation gerekir)" : "(disabled)"}
+          <button type="button" className="universal-btn-secondary" data-testid="sgk-katalog-approve" disabled={!approveAktif || !canApprove}>
+            Onayla {approveAktif && canApprove ? "(attestation gerekir)" : "(disabled)"}
           </button>
           <button
             type="button"

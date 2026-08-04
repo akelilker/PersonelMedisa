@@ -14,6 +14,15 @@ describe("S98 SGK mapping + policy MariaDB acceptance", () => {
     expect(result.status, result.stderr || result.stdout).toBe(0);
     expect(result.stdout).toContain("verify-s98-mapping-policy: OK");
     expect(result.stdout).toContain("migration 047 applied + idempotent");
+    expect(result.stdout).toContain("migration 048 personel_id applied + idempotent");
+    expect(result.stdout).toContain("linked scoped prepare/approve PASS");
+    expect(result.stdout).toContain("distinct persons dual-control PASS");
+    expect(result.stdout).toContain("missing actor personel link code");
+    expect(result.stdout).toContain("missing preparer personel link");
+    expect(result.stdout).toContain("missing schema prepare code");
+    expect(result.stdout).toContain("empty scope code");
+    expect(result.stdout).toContain("wrong scope code");
+    expect(result.stdout).toContain("duplicate personel_id unique rejected");
     expect(result.stdout).toContain("DAHIL + NULL code insert PASS");
     expect(result.stdout).toContain("fixture-like rows dry-run applyable");
     expect(result.stdout).toContain("roundPartialPrimDays(225)=30 cap");

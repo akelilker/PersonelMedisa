@@ -21,7 +21,7 @@ final class SgkSurecEslemeWriteService
      */
     public static function import(PDO $pdo, array $actor, array $payload): array
     {
-        self::assertPrepare($actor);
+        self::assertPrepare($pdo, $actor);
 
         if ((string) ($payload['confirmation_text'] ?? '') !== self::CONFIRMATION_TEXT) {
             return self::result(400, 'SGK_ESLEME_ONAY_METNI_GECERSIZ', 'confirmation_text SUREC_ESLEME_DRAFT_ONAY olmalidir.');
@@ -175,11 +175,11 @@ final class SgkSurecEslemeWriteService
     }
 
     /**
-     * @param array{id?: int, rol?: string, username?: string, durum?: string, sube_ids?: list<int>} $actor
+     * @param array{id?: int, rol?: string, username?: string, durum?: string, sube_ids?: list<int>, personel_id?: int|null} $actor
      */
-    private static function assertPrepare(array $actor): void
+    private static function assertPrepare(PDO $pdo, array $actor): void
     {
-        SgkKararPaketiAuthz::assertPrepare($actor);
+        SgkKararPaketiAuthz::assertPrepare($pdo, $actor);
     }
 
     /** @return array<string,mixed>|null */

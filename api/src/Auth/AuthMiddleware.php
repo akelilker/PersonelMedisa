@@ -69,6 +69,7 @@ class AuthMiddleware
             'username' => (string) $row['username'],
             'ad_soyad' => (string) $row['ad_soyad'],
             'rol' => (string) $row['rol'],
+            'durum' => (string) ($row['durum'] ?? ''),
             'sube_ids' => $subeIds,
         ];
         if (array_key_exists('personel_id', $row) && $row['personel_id'] !== null && $row['personel_id'] !== '') {
@@ -81,22 +82,21 @@ class AuthMiddleware
 
     private static function usersSelectSql(PDO $pdo)
     {
-        static $sql = null;
-        if (is_string($sql)) {
-            return $sql;
-        }
+        // No process-level schema cache — same risk as SgkKararPaketiAuthz::personelLinkSupported.
         $hasPersonel = false;
         try {
             $col = $pdo->query("SHOW COLUMNS FROM users LIKE 'personel_id'");
             $hasPersonel = $col !== false && $col->fetch(PDO::FETCH_ASSOC) !== false;
+            if ($col !== false) {
+                $col->closeCursor();
+            }
         } catch (\Throwable $e) {
             $hasPersonel = false;
         }
-        $sql = $hasPersonel
+
+        return $hasPersonel
             ? 'SELECT id, username, ad_soyad, rol, durum, personel_id FROM users WHERE id = :id LIMIT 1'
             : 'SELECT id, username, ad_soyad, rol, durum FROM users WHERE id = :id LIMIT 1';
-
-        return $sql;
     }
 
     /** @return array<int, int> */

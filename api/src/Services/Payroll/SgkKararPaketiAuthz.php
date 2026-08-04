@@ -11,6 +11,8 @@ use RuntimeException;
 /**
  * S98 least-privilege SGK karar paketi prepare/approve authz (PHP 7.4-safe).
  * Actor always comes from authenticated session — never from request payload.
+ *
+ * Formal write: identity + permission + personel link + explicit scope are fail-closed.
  */
 final class SgkKararPaketiAuthz
 {
@@ -29,21 +31,24 @@ final class SgkKararPaketiAuthz
     /**
      * @param array<string,mixed> $actor
      */
-    public static function assertPrepare(array $actor): void
+    public static function assertPrepare(PDO $pdo, array $actor): void
     {
-        self::assertActorActive($actor);
+        // Deterministic order: identity → permission → personel schema/link
+        self::assertFormalActorIdentity($actor);
         self::assertPermission($actor, self::PERM_PREPARE, 'SGK_PREPARE_FORBIDDEN');
-        self::assertFormalActorReady($actor);
+        self::assertPersonelSchemaRequired($pdo);
+        self::assertActorPersonelLinked($actor);
     }
 
     /**
      * @param array<string,mixed> $actor
      */
-    public static function assertApprove(array $actor): void
+    public static function assertApprove(PDO $pdo, array $actor): void
     {
-        self::assertActorActive($actor);
+        self::assertFormalActorIdentity($actor);
         self::assertPermission($actor, self::PERM_APPROVE, 'SGK_APPROVE_FORBIDDEN');
-        self::assertFormalActorReady($actor);
+        self::assertPersonelSchemaRequired($pdo);
+        self::assertActorPersonelLinked($actor);
     }
 
     /**
@@ -55,9 +60,12 @@ final class SgkKararPaketiAuthz
         if ($subeId <= 0) {
             return;
         }
-        $subeIds = isset($actor['sube_ids']) && is_array($actor['sube_ids']) ? $actor['sube_ids'] : [];
+        if (!isset($actor['sube_ids']) || !is_array($actor['sube_ids'])) {
+            throw new RuntimeException('SGK_ACTOR_SCOPE_NOT_READY');
+        }
+        $subeIds = $actor['sube_ids'];
         if ($subeIds === []) {
-            return;
+            throw new RuntimeException('SGK_ACTOR_SCOPE_NOT_READY');
         }
         $allowed = [];
         foreach ($subeIds as $id) {
@@ -88,7 +96,7 @@ final class SgkKararPaketiAuthz
     }
 
     /**
-     * Same real person via users.personel_id when column and both links exist.
+     * Same real person via users.personel_id — fail-closed when schema/link missing.
      *
      * @param array<string,mixed> $actor
      * @return array{ok: bool, code?: string, message?: string, link_supported?: bool}
@@ -97,19 +105,48 @@ final class SgkKararPaketiAuthz
     {
         $hazirlayanId = (int) $hazirlayanId;
         $actorId = (int) ($actor['id'] ?? 0);
-        if ($hazirlayanId <= 0 || $actorId <= 0 || $hazirlayanId === $actorId) {
+        if ($hazirlayanId <= 0 || $actorId <= 0) {
+            return [
+                'ok' => false,
+                'code' => 'SGK_PREPARER_PERSONEL_LINK_REQUIRED',
+                'message' => 'Hazirlayan kimlik bagi cozumlenemedi.',
+                'link_supported' => self::personelLinkSupported($pdo),
+            ];
+        }
+        if ($hazirlayanId === $actorId) {
+            // Self-approval is owned by denySelfApproval; do not double-fire same-person here.
             return ['ok' => true, 'link_supported' => self::personelLinkSupported($pdo)];
         }
 
         if (!self::personelLinkSupported($pdo)) {
-            return ['ok' => true, 'link_supported' => false];
+            return [
+                'ok' => false,
+                'code' => 'SGK_ACTOR_PERSONEL_SCHEMA_REQUIRED',
+                'message' => 'users.personel_id semasi formal dual-control icin zorunlu.',
+                'link_supported' => false,
+            ];
         }
 
         $actorPersonel = self::resolvePersonelId($pdo, $actorId, $actor);
-        $hazirlayanPersonel = self::resolvePersonelId($pdo, $hazirlayanId, null);
-        if ($actorPersonel === null || $hazirlayanPersonel === null) {
-            return ['ok' => true, 'link_supported' => true];
+        if ($actorPersonel === null) {
+            return [
+                'ok' => false,
+                'code' => 'SGK_ACTOR_PERSONEL_LINK_REQUIRED',
+                'message' => 'Onaylayan hesabin personel_id bagi zorunlu.',
+                'link_supported' => true,
+            ];
         }
+
+        $hazirlayanPersonel = self::resolvePersonelId($pdo, $hazirlayanId, null);
+        if ($hazirlayanPersonel === null) {
+            return [
+                'ok' => false,
+                'code' => 'SGK_PREPARER_PERSONEL_LINK_REQUIRED',
+                'message' => 'Hazirlayan hesabin personel_id bagi zorunlu.',
+                'link_supported' => true,
+            ];
+        }
+
         if ($actorPersonel === $hazirlayanPersonel) {
             return [
                 'ok' => false,
@@ -122,27 +159,30 @@ final class SgkKararPaketiAuthz
         return ['ok' => true, 'link_supported' => true];
     }
 
+    /**
+     * Schema probe without process-level static cache (safe across PDO / schema states).
+     */
     public static function personelLinkSupported(PDO $pdo): bool
     {
-        static $cached = null;
-        if ($cached !== null) {
-            return $cached;
-        }
         try {
             $stmt = $pdo->query("SHOW COLUMNS FROM users LIKE 'personel_id'");
-            $cached = $stmt !== false && $stmt->fetch(PDO::FETCH_ASSOC) !== false;
-        } catch (\Throwable $e) {
-            $cached = false;
-        }
+            if ($stmt === false) {
+                return false;
+            }
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+            $stmt->closeCursor();
 
-        return $cached;
+            return $row !== false;
+        } catch (\Throwable $e) {
+            return false;
+        }
     }
 
     /**
      * @param array<string,mixed>|null $actorHint
      * @return int|null
      */
-    private static function resolvePersonelId(PDO $pdo, $userId, $actorHint)
+    public static function resolvePersonelId(PDO $pdo, $userId, $actorHint)
     {
         $userId = (int) $userId;
         if (is_array($actorHint) && array_key_exists('personel_id', $actorHint) && $actorHint['personel_id'] !== null && $actorHint['personel_id'] !== '') {
@@ -150,7 +190,7 @@ final class SgkKararPaketiAuthz
 
             return $pid > 0 ? $pid : null;
         }
-        if (!self::personelLinkSupported($pdo)) {
+        if ($userId <= 0 || !self::personelLinkSupported($pdo)) {
             return null;
         }
         $stmt = $pdo->prepare('SELECT personel_id FROM users WHERE id = :id LIMIT 1');
@@ -167,39 +207,48 @@ final class SgkKararPaketiAuthz
     /**
      * @param array<string,mixed> $actor
      */
-    private static function assertPermission(array $actor, $permission, $denyCode): void
+    private static function assertFormalActorIdentity(array $actor): void
     {
-        if (!RolePermissions::has($actor, $permission)) {
-            throw new RuntimeException((string) $denyCode);
+        $actorId = (int) ($actor['id'] ?? 0);
+        if ($actorId <= 0) {
+            throw new RuntimeException('SGK_ACTOR_IDENTITY_INVALID');
         }
-    }
 
-    /**
-     * @param array<string,mixed> $actor
-     */
-    private static function assertActorActive(array $actor): void
-    {
-        if (!array_key_exists('durum', $actor)) {
-            return;
+        $username = strtolower(trim((string) ($actor['username'] ?? '')));
+        if ($username === '' || in_array($username, self::$genericUsernames, true)) {
+            throw new RuntimeException('SGK_ACTOR_IDENTITY_NOT_READY');
         }
-        if (strtoupper(trim((string) $actor['durum'])) !== 'AKTIF') {
+
+        if (!array_key_exists('durum', $actor) || strtoupper(trim((string) $actor['durum'])) !== 'AKTIF') {
             throw new RuntimeException('SGK_ACTOR_INACTIVE');
         }
     }
 
     /**
-     * Generic/shared role-named accounts cannot be formal S98 preparer/approver.
-     *
      * @param array<string,mixed> $actor
      */
-    private static function assertFormalActorReady(array $actor): void
+    private static function assertActorPersonelLinked(array $actor): void
     {
-        $username = strtolower(trim((string) ($actor['username'] ?? '')));
-        if ($username === '') {
-            return;
+        $pid = isset($actor['personel_id']) ? (int) $actor['personel_id'] : 0;
+        if ($pid <= 0) {
+            throw new RuntimeException('SGK_ACTOR_PERSONEL_LINK_REQUIRED');
         }
-        if (in_array($username, self::$genericUsernames, true)) {
-            throw new RuntimeException('SGK_ACTOR_IDENTITY_NOT_READY');
+    }
+
+    private static function assertPersonelSchemaRequired(PDO $pdo): void
+    {
+        if (!self::personelLinkSupported($pdo)) {
+            throw new RuntimeException('SGK_ACTOR_PERSONEL_SCHEMA_REQUIRED');
+        }
+    }
+
+    /**
+     * @param array<string,mixed> $actor
+     */
+    private static function assertPermission(array $actor, $permission, $denyCode): void
+    {
+        if (!RolePermissions::has($actor, $permission)) {
+            throw new RuntimeException((string) $denyCode);
         }
     }
 }

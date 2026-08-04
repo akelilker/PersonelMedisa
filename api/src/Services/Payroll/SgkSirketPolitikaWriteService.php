@@ -21,7 +21,7 @@ final class SgkSirketPolitikaWriteService
      */
     public static function import(PDO $pdo, array $actor, array $payload): array
     {
-        self::assertPrepare($actor);
+        self::assertPrepare($pdo, $actor);
 
         if ((string) ($payload['confirmation_text'] ?? '') !== self::CONFIRMATION_TEXT) {
             return self::result(400, 'SGK_POLITIKA_ONAY_METNI_GECERSIZ', 'confirmation_text SGK_POLITIKA_DRAFT_ONAY olmalidir.');
@@ -146,7 +146,7 @@ final class SgkSirketPolitikaWriteService
      */
     public static function submit(PDO $pdo, array $actor, array $payload): array
     {
-        self::assertPrepare($actor);
+        self::assertPrepare($pdo, $actor);
 
         $surum = self::resolveSurum($pdo, $payload);
         if ($surum === null) {
@@ -203,7 +203,7 @@ final class SgkSirketPolitikaWriteService
      */
     public static function approve(PDO $pdo, array $actor, array $payload): array
     {
-        self::assertApprove($actor);
+        self::assertApprove($pdo, $actor);
 
         $surum = self::resolveSurum($pdo, $payload);
         if ($surum === null) {
@@ -282,17 +282,17 @@ final class SgkSirketPolitikaWriteService
     /**
      * @param array{id?: int, rol?: string, username?: string, durum?: string, sube_ids?: list<int>} $actor
      */
-    private static function assertPrepare(array $actor): void
+    private static function assertPrepare(PDO $pdo, array $actor): void
     {
-        SgkKararPaketiAuthz::assertPrepare($actor);
+        SgkKararPaketiAuthz::assertPrepare($pdo, $actor);
     }
 
     /**
-     * @param array{id?: int, rol?: string, username?: string, durum?: string, sube_ids?: list<int>} $actor
+     * @param array{id?: int, rol?: string, username?: string, durum?: string, sube_ids?: list<int>, personel_id?: int|null} $actor
      */
-    private static function assertApprove(array $actor): void
+    private static function assertApprove(PDO $pdo, array $actor): void
     {
-        SgkKararPaketiAuthz::assertApprove($actor);
+        SgkKararPaketiAuthz::assertApprove($pdo, $actor);
     }
 
     /** @param array<string,mixed> $payload @return array<string,mixed>|null */

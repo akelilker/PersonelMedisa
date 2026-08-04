@@ -10128,8 +10128,7 @@ let personelBelgeKaydiIdCounter = 903;
       return;
     }
     if (path === "/api/sgk-katalog-hazirlik/import" && method === "POST") {
-      if (role !== "GENEL_YONETICI") {
-        await fulfillJson(route, 403, errorBody("SGK_KATALOG_WRITE_FORBIDDEN", "SGK katalog yazma yalniz GENEL_YONETICI icindir."));
+      if (await denyUnlessRolePermission(route, "sgk_karar_paketi.prepare")) {
         return;
       }
       if (!sgkWritableFlow) {
@@ -10176,8 +10175,7 @@ let personelBelgeKaydiIdCounter = 903;
       return;
     }
     if (path === "/api/sgk-katalog-hazirlik/surec-esleme/import" && method === "POST") {
-      if (role !== "GENEL_YONETICI") {
-        await fulfillJson(route, 403, errorBody("SGK_KATALOG_WRITE_FORBIDDEN", "SGK esleme yazma yalniz GENEL_YONETICI icindir."));
+      if (await denyUnlessRolePermission(route, "sgk_karar_paketi.prepare")) {
         return;
       }
       if (!sgkWritableFlow) {
@@ -10201,8 +10199,7 @@ let personelBelgeKaydiIdCounter = 903;
       return;
     }
     if (path === "/api/sgk-katalog-hazirlik/submit" && method === "POST") {
-      if (role !== "GENEL_YONETICI") {
-        await fulfillJson(route, 403, errorBody("SGK_KATALOG_WRITE_FORBIDDEN", "Submit yalniz GENEL_YONETICI."));
+      if (await denyUnlessRolePermission(route, "sgk_karar_paketi.prepare")) {
         return;
       }
       if (!sgkWritableFlow) {
@@ -10216,8 +10213,7 @@ let personelBelgeKaydiIdCounter = 903;
       return;
     }
     if (path === "/api/sgk-katalog-hazirlik/approve" && method === "POST") {
-      if (role !== "GENEL_YONETICI") {
-        await fulfillJson(route, 403, errorBody("SGK_KATALOG_WRITE_FORBIDDEN", "Approve yalniz GENEL_YONETICI."));
+      if (await denyUnlessRolePermission(route, "sgk_karar_paketi.approve")) {
         return;
       }
       if (!sgkWritableFlow) {
@@ -10249,8 +10245,7 @@ let personelBelgeKaydiIdCounter = 903;
       return;
     }
     if (path === "/api/sgk-katalog-hazirlik/sirket-politikasi/import" && method === "POST") {
-      if (role !== "GENEL_YONETICI") {
-        await fulfillJson(route, 403, errorBody("SGK_KATALOG_WRITE_FORBIDDEN", "Politika yazma yalniz GENEL_YONETICI."));
+      if (await denyUnlessRolePermission(route, "sgk_karar_paketi.prepare")) {
         return;
       }
       if (!sgkWritableFlow) {
@@ -10265,8 +10260,7 @@ let personelBelgeKaydiIdCounter = 903;
       return;
     }
     if (path === "/api/sgk-katalog-hazirlik/sirket-politikasi/submit" && method === "POST") {
-      if (role !== "GENEL_YONETICI") {
-        await fulfillJson(route, 403, errorBody("SGK_KATALOG_WRITE_FORBIDDEN", "Politika submit yalniz GENEL_YONETICI."));
+      if (await denyUnlessRolePermission(route, "sgk_karar_paketi.prepare")) {
         return;
       }
       if (!sgkWritableFlow) {
@@ -10280,8 +10274,7 @@ let personelBelgeKaydiIdCounter = 903;
       return;
     }
     if (path === "/api/sgk-katalog-hazirlik/sirket-politikasi/approve" && method === "POST") {
-      if (role !== "GENEL_YONETICI") {
-        await fulfillJson(route, 403, errorBody("SGK_KATALOG_WRITE_FORBIDDEN", "Politika approve yalniz GENEL_YONETICI."));
+      if (await denyUnlessRolePermission(route, "sgk_karar_paketi.approve")) {
         return;
       }
       if (!sgkWritableFlow) {

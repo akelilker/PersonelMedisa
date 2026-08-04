@@ -6,7 +6,6 @@ namespace Medisa\Api\Services\Payroll;
 
 use PDO;
 use PDOException;
-use RuntimeException;
 
 /**
  * S98: Transactional süreç→SGK mapping import into TASLAK successor catalog (parent ONAYLANDI immutable).
@@ -22,7 +21,7 @@ final class SgkSurecEslemeWriteService
      */
     public static function import(PDO $pdo, array $actor, array $payload): array
     {
-        self::assertGenelYonetici($actor);
+        self::assertPrepare($actor);
 
         if ((string) ($payload['confirmation_text'] ?? '') !== self::CONFIRMATION_TEXT) {
             return self::result(400, 'SGK_ESLEME_ONAY_METNI_GECERSIZ', 'confirmation_text SUREC_ESLEME_DRAFT_ONAY olmalidir.');
@@ -176,13 +175,11 @@ final class SgkSurecEslemeWriteService
     }
 
     /**
-     * @param array{id?: int, rol?: string} $actor
+     * @param array{id?: int, rol?: string, username?: string, durum?: string, sube_ids?: list<int>} $actor
      */
-    private static function assertGenelYonetici(array $actor): void
+    private static function assertPrepare(array $actor): void
     {
-        if (strtoupper((string) ($actor['rol'] ?? '')) !== 'GENEL_YONETICI') {
-            throw new RuntimeException('SGK_KATALOG_WRITE_FORBIDDEN');
-        }
+        SgkKararPaketiAuthz::assertPrepare($actor);
     }
 
     /** @return array<string,mixed>|null */

@@ -6,7 +6,6 @@ namespace Medisa\Api\Services\Payroll;
 
 use PDO;
 use PDOException;
-use RuntimeException;
 
 /**
  * S98: Company SGK policy draft import / submit / approve (dual-control, overlap guard).
@@ -22,7 +21,7 @@ final class SgkSirketPolitikaWriteService
      */
     public static function import(PDO $pdo, array $actor, array $payload): array
     {
-        self::assertGenelYonetici($actor);
+        self::assertPrepare($actor);
 
         if ((string) ($payload['confirmation_text'] ?? '') !== self::CONFIRMATION_TEXT) {
             return self::result(400, 'SGK_POLITIKA_ONAY_METNI_GECERSIZ', 'confirmation_text SGK_POLITIKA_DRAFT_ONAY olmalidir.');
@@ -42,6 +41,7 @@ final class SgkSirketPolitikaWriteService
 
         $canonical = $dry['canonical_payload'] ?? [];
         $subeId = (int) ($canonical['sube_id'] ?? 0);
+        SgkKararPaketiAuthz::assertSubeScope($actor, $subeId);
         $surumKodu = (string) ($canonical['surum_kodu'] ?? '');
         $politikaHash = (string) ($dry['politika_hash'] ?? '');
         $actorId = (int) ($actor['id'] ?? 0);
@@ -146,12 +146,13 @@ final class SgkSirketPolitikaWriteService
      */
     public static function submit(PDO $pdo, array $actor, array $payload): array
     {
-        self::assertGenelYonetici($actor);
+        self::assertPrepare($actor);
 
         $surum = self::resolveSurum($pdo, $payload);
         if ($surum === null) {
             return self::result(404, 'SGK_POLITIKA_SURUM_BULUNAMADI', 'Politika surumu bulunamadi.');
         }
+        SgkKararPaketiAuthz::assertSubeScope($actor, (int) ($surum['sube_id'] ?? 0));
         if ((string) ($surum['state'] ?? '') !== 'TASLAK') {
             return self::result(400, 'SGK_POLITIKA_SUBMIT_STATE', 'Submit yalniz TASLAK uzerinden.');
         }
@@ -202,20 +203,26 @@ final class SgkSirketPolitikaWriteService
      */
     public static function approve(PDO $pdo, array $actor, array $payload): array
     {
-        self::assertGenelYonetici($actor);
+        self::assertApprove($actor);
 
         $surum = self::resolveSurum($pdo, $payload);
         if ($surum === null) {
             return self::result(404, 'SGK_POLITIKA_SURUM_BULUNAMADI', 'Politika surumu bulunamadi.');
         }
+        SgkKararPaketiAuthz::assertSubeScope($actor, (int) ($surum['sube_id'] ?? 0));
         if ((string) ($surum['state'] ?? '') !== 'ONAY_BEKLIYOR') {
             return self::result(400, 'SGK_POLITIKA_APPROVE_STATE', 'Approve yalniz ONAY_BEKLIYOR uzerinden.');
         }
 
         $actorId = (int) ($actor['id'] ?? 0);
         $hazirlayanId = (int) ($surum['hazirlayan_id'] ?? 0);
-        if ($hazirlayanId > 0 && $actorId > 0 && $hazirlayanId === $actorId) {
-            return self::result(403, 'SGK_POLITIKA_SELF_APPROVAL_DENIED', 'Hazirlayan kendi politikasini onaylayamaz.');
+        $self = SgkKararPaketiAuthz::denySelfApproval($actor, $hazirlayanId);
+        if (empty($self['ok'])) {
+            return self::result(403, (string) $self['code'], (string) $self['message']);
+        }
+        $samePerson = SgkKararPaketiAuthz::denySamePerson($pdo, $actor, $hazirlayanId);
+        if (empty($samePerson['ok'])) {
+            return self::result(403, (string) $samePerson['code'], (string) $samePerson['message']);
         }
 
         $expectedHash = (string) ($payload['politika_hash'] ?? '');
@@ -273,13 +280,19 @@ final class SgkSirketPolitikaWriteService
     }
 
     /**
-     * @param array{id?: int, rol?: string} $actor
+     * @param array{id?: int, rol?: string, username?: string, durum?: string, sube_ids?: list<int>} $actor
      */
-    private static function assertGenelYonetici(array $actor): void
+    private static function assertPrepare(array $actor): void
     {
-        if (strtoupper((string) ($actor['rol'] ?? '')) !== 'GENEL_YONETICI') {
-            throw new RuntimeException('SGK_KATALOG_WRITE_FORBIDDEN');
-        }
+        SgkKararPaketiAuthz::assertPrepare($actor);
+    }
+
+    /**
+     * @param array{id?: int, rol?: string, username?: string, durum?: string, sube_ids?: list<int>} $actor
+     */
+    private static function assertApprove(array $actor): void
+    {
+        SgkKararPaketiAuthz::assertApprove($actor);
     }
 
     /** @param array<string,mixed> $payload @return array<string,mixed>|null */

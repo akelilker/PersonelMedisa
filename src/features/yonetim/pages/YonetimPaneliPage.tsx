@@ -75,7 +75,9 @@ const ROLE_LABELS: Record<UserRole, string> = {
   BIRIM_AMIRI: "Birim Amiri",
   MUHASEBE: "Muhasebe",
   PATRON: "Patron",
-  AUTH_SMOKE_READONLY: "Teknik Smoke — Salt Okuma"
+  AUTH_SMOKE_READONLY: "Teknik Smoke — Salt Okuma",
+  IK_BORDRO: "İK / Bordro",
+  SGK_KARAR_ONAY_YETKILISI: "SGK Karar Onay Yetkilisi"
 };
 
 const KULLANICI_TIPI_LABELS: Record<KullaniciTipi, string> = {

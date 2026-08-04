@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/../../api/src/Auth/RolePermissions.php';
+require_once __DIR__ . '/../../api/src/Services/Payroll/SgkKararPaketiAuthz.php';
 require_once __DIR__ . '/../../api/src/Services/Payroll/SgkKatalogContracts.php';
 require_once __DIR__ . '/../../api/src/Services/Payroll/SgkEslemeKararContract.php';
 require_once __DIR__ . '/../../api/src/Services/Payroll/SgkKatalogTamlikService.php';
@@ -254,6 +256,7 @@ try {
         'kisitli_kullanim_kabul_edildi_mi' => true,
     ]);
     s98Assert(($selfApprove['http_status'] ?? 0) === 403, 'catalog self-approve denied');
+    s98Assert(($selfApprove['code'] ?? '') === 'SGK_SELF_APPROVAL_FORBIDDEN', 'catalog self-approve code');
 
     $transition = SgkKatalogOnayService::validateTransition([
         'current_state' => 'ONAY_BEKLIYOR',
@@ -310,6 +313,7 @@ try {
 
     $polSelf = SgkSirketPolitikaWriteService::approve($pdo, $gy1, ['sube_id' => 1, 'surum_kodu' => 'POL-2026', 'politika_hash' => $politikaHash]);
     s98Assert(($polSelf['http_status'] ?? 0) === 403, 'policy self-approve denied');
+    s98Assert(($polSelf['code'] ?? '') === 'SGK_SELF_APPROVAL_FORBIDDEN', 'policy self-approve code');
 
     $polApprove = SgkSirketPolitikaWriteService::approve($pdo, $gy2, ['sube_id' => 1, 'surum_kodu' => 'POL-2026', 'politika_hash' => $politikaHash]);
     s98Assert(($polApprove['http_status'] ?? 0) === 200, 'policy approved by other user');

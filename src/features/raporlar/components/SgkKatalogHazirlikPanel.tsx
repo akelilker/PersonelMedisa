@@ -140,14 +140,15 @@ function summarizeHataliSatirlar(rows: unknown): string {
 }
 
 export function SgkKatalogHazirlikPanel() {
-  const { hasPermission, hasRole } = useRoleAccess();
+  const { hasPermission } = useRoleAccess();
   const { session } = useAuth();
   const actorId = session?.user?.id ?? null;
 
   const canView = hasPermission("bordro_on_izleme.view");
   const canMevzuat = hasPermission("mevzuat_parametreleri.view");
   const canOnayValidate = hasPermission("mevzuat_parametreleri.manage");
-  const canWrite = hasRole("GENEL_YONETICI");
+  const canPrepare = hasPermission("sgk_karar_paketi.prepare");
+  const canApprove = hasPermission("sgk_karar_paketi.approve");
 
   const [subTab, setSubTab] = useState<SubTab>("tamlik");
   const [loading, setLoading] = useState(false);
@@ -168,12 +169,14 @@ export function SgkKatalogHazirlikPanel() {
   const [eslemeDryRun, setEslemeDryRun] = useState<Record<string, unknown> | null>(null);
   const [eslemeSuccessorKodu, setEslemeSuccessorKodu] = useState("");
   const [eslemeSuccessorState, setEslemeSuccessorState] = useState<string | null>(null);
+  const [eslemeHazirlayanId, setEslemeHazirlayanId] = useState<number | null>(null);
   const [eslemeActionResult, setEslemeActionResult] = useState<Record<string, unknown> | null>(null);
 
   const [politikaPackageText, setPolitikaPackageText] = useState(DEFAULT_POLITIKA_PACKAGE);
   const [politikaDryRun, setPolitikaDryRun] = useState<Record<string, unknown> | null>(null);
   const [politikaSurumKodu, setPolitikaSurumKodu] = useState("");
   const [politikaSurumState, setPolitikaSurumState] = useState<string | null>(null);
+  const [politikaHazirlayanId, setPolitikaHazirlayanId] = useState<number | null>(null);
   const [politikaActionResult, setPolitikaActionResult] = useState<Record<string, unknown> | null>(null);
 
   const [dialog, setDialog] = useState<DialogKind>(null);
@@ -236,6 +239,10 @@ export function SgkKatalogHazirlikPanel() {
   const eslemeApproved = eslemeSuccessorState === "ONAYLANDI";
   const politikaImportReady = politikaDryRun?.import_yapilabilir_mi === true;
   const politikaApproved = politikaSurumState === "ONAYLANDI";
+  const eslemeSelfApproval =
+    actorId !== null && eslemeHazirlayanId !== null && actorId === eslemeHazirlayanId;
+  const politikaSelfApproval =
+    actorId !== null && politikaHazirlayanId !== null && actorId === politikaHazirlayanId;
 
   function openDialog(kind: DialogKind) {
     setDialog(kind);
@@ -360,6 +367,7 @@ export function SgkKatalogHazirlikPanel() {
         const kod = String(result.surum_kodu ?? body.successor_surum_kodu ?? "");
         setEslemeSuccessorKodu(kod);
         setEslemeSuccessorState(String(result.state ?? "TASLAK"));
+        setEslemeHazirlayanId(actorId);
         closeDialog();
       } else if (dialog === "esleme-submit") {
         const kod = eslemeSuccessorKodu.trim();
@@ -417,6 +425,7 @@ export function SgkKatalogHazirlikPanel() {
         setPolitikaActionResult(result);
         setPolitikaSurumKodu(String(result.surum_kodu ?? body.surum_kodu ?? ""));
         setPolitikaSurumState(String(result.state ?? "TASLAK"));
+        setPolitikaHazirlayanId(actorId);
         closeDialog();
       } else if (dialog === "politika-submit") {
         const kod = politikaSurumKodu.trim();
@@ -654,10 +663,10 @@ export function SgkKatalogHazirlikPanel() {
             type="button"
             className="universal-btn-secondary"
             data-testid="sgk-katalog-import-write"
-            disabled={!importWriteAktif || !canWrite || !importResult?.import_yapilabilir_mi}
+            disabled={!importWriteAktif || !canPrepare || !importResult?.import_yapilabilir_mi}
             onClick={() => openDialog("katalog-import")}
           >
-            Import yaz {importWriteAktif && canWrite ? "(GENEL_YONETICI)" : "(kapalı)"}
+            Import yaz {importWriteAktif && canPrepare ? "(prepare)" : "(kapalı)"}
           </button>
           {importResult ? (
             <div data-testid="sgk-katalog-import-result">
@@ -735,7 +744,7 @@ export function SgkKatalogHazirlikPanel() {
               type="button"
               className="universal-btn-secondary"
               data-testid="sgk-esleme-draft"
-              disabled={!canWrite || !eslemeApplyReady || eslemeApproved}
+              disabled={!canPrepare || !eslemeApplyReady || eslemeApproved}
               onClick={() => openDialog("esleme-draft")}
             >
               TASLAK import
@@ -744,7 +753,7 @@ export function SgkKatalogHazirlikPanel() {
               type="button"
               className="universal-btn-secondary"
               data-testid="sgk-esleme-submit"
-              disabled={!canWrite || !eslemeSuccessorKodu || eslemeApproved || eslemeSuccessorState === "ONAY_BEKLIYOR"}
+              disabled={!canPrepare || !eslemeSuccessorKodu || eslemeApproved || eslemeSuccessorState === "ONAY_BEKLIYOR"}
               onClick={() => openDialog("esleme-submit")}
             >
               Submit successor
@@ -754,7 +763,8 @@ export function SgkKatalogHazirlikPanel() {
               className="universal-btn-secondary"
               data-testid="sgk-esleme-approve"
               disabled={
-                !canWrite ||
+                !canApprove ||
+                eslemeSelfApproval ||
                 eslemeApproved ||
                 eslemeSuccessorState !== "ONAY_BEKLIYOR" ||
                 !attestationResmi ||
@@ -853,7 +863,7 @@ export function SgkKatalogHazirlikPanel() {
               type="button"
               className="universal-btn-secondary"
               data-testid="sgk-politika-draft"
-              disabled={!canWrite || !politikaImportReady || politikaApproved}
+              disabled={!canPrepare || !politikaImportReady || politikaApproved}
               onClick={() => openDialog("politika-draft")}
             >
               TASLAK import
@@ -862,7 +872,7 @@ export function SgkKatalogHazirlikPanel() {
               type="button"
               className="universal-btn-secondary"
               data-testid="sgk-politika-submit"
-              disabled={!canWrite || !politikaSurumKodu || politikaApproved || politikaSurumState === "ONAY_BEKLIYOR"}
+              disabled={!canPrepare || !politikaSurumKodu || politikaApproved || politikaSurumState === "ONAY_BEKLIYOR"}
               onClick={() => openDialog("politika-submit")}
             >
               Submit
@@ -871,7 +881,12 @@ export function SgkKatalogHazirlikPanel() {
               type="button"
               className="universal-btn-secondary"
               data-testid="sgk-politika-approve"
-              disabled={!canWrite || politikaApproved || politikaSurumState !== "ONAY_BEKLIYOR"}
+              disabled={
+                !canApprove ||
+                politikaSelfApproval ||
+                politikaApproved ||
+                politikaSurumState !== "ONAY_BEKLIYOR"
+              }
               onClick={() => openDialog("politika-approve")}
             >
               Approve

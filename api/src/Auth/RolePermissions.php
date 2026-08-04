@@ -84,6 +84,8 @@ class RolePermissions
             'revizyon.view_finance_effect',
             'revizyon.view_audit_history',
             'sgk.manuel_kod_override',
+            'sgk_karar_paketi.prepare',
+            'sgk_karar_paketi.approve',
         ],
         'BOLUM_YONETICISI' => [
             'personeller.view',
@@ -230,6 +232,24 @@ class RolePermissions
         ],
         'AUTH_SMOKE_READONLY' => [
             'ops.auth_smoke.read',
+        ],
+        // Prepare-only: SGK karar paketi hazirlama (approve yok). Production atama bu fazda yok.
+        'IK_BORDRO' => [
+            'personeller.view',
+            'personeller.view.sube',
+            'personeller.detail.view',
+            'personeller.ucret.view',
+            'mevzuat_parametreleri.view',
+            'bordro_on_izleme.view',
+            'raporlar.view',
+            'sgk_karar_paketi.prepare',
+        ],
+        // Approve-only: submitted SGK paket onay/red (prepare yok). Production atama bu fazda yok.
+        'SGK_KARAR_ONAY_YETKILISI' => [
+            'mevzuat_parametreleri.view',
+            'bordro_on_izleme.view',
+            'raporlar.view',
+            'sgk_karar_paketi.approve',
         ],
     ];
 

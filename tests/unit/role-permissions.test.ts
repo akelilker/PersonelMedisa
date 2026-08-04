@@ -311,6 +311,20 @@ describe("role permissions", () => {
     expect(ALL_ROLES).toContain("AUTH_SMOKE_READONLY");
   });
 
+  it("locks S98 dual-control prepare/approve permissions", () => {
+    expect(hasRolePermission("GENEL_YONETICI", "sgk_karar_paketi.prepare")).toBe(true);
+    expect(hasRolePermission("GENEL_YONETICI", "sgk_karar_paketi.approve")).toBe(true);
+    expect(hasRolePermission("IK_BORDRO", "sgk_karar_paketi.prepare")).toBe(true);
+    expect(hasRolePermission("IK_BORDRO", "sgk_karar_paketi.approve")).toBe(false);
+    expect(hasRolePermission("SGK_KARAR_ONAY_YETKILISI", "sgk_karar_paketi.approve")).toBe(true);
+    expect(hasRolePermission("SGK_KARAR_ONAY_YETKILISI", "sgk_karar_paketi.prepare")).toBe(false);
+    expect(hasRolePermission("MUHASEBE", "sgk_karar_paketi.prepare")).toBe(false);
+    expect(hasRolePermission("MUHASEBE", "sgk_karar_paketi.approve")).toBe(false);
+    expect(hasRolePermission("BOLUM_YONETICISI", "sgk_karar_paketi.prepare")).toBe(false);
+    expect(ALL_ROLES).toContain("IK_BORDRO");
+    expect(ALL_ROLES).toContain("SGK_KARAR_ONAY_YETKILISI");
+  });
+
   it("keeps TS and PHP role permission matrices in parity (S70B-1)", () => {
     for (const role of ALL_ROLES) {
       const tsPermissions = [...getRolePermissions(role)].sort();

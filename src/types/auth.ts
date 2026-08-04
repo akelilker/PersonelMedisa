@@ -4,7 +4,9 @@ export type UserRole =
   | "MUHASEBE"
   | "BIRIM_AMIRI"
   | "PATRON"
-  | "AUTH_SMOKE_READONLY";
+  | "AUTH_SMOKE_READONLY"
+  | "IK_BORDRO"
+  | "SGK_KARAR_ONAY_YETKILISI";
 
 export type UiProfile = "yonetim" | "birim_amiri";
 
@@ -53,12 +55,16 @@ export const ASSIGNABLE_USER_ROLES: UserRole[] = [
   "BOLUM_YONETICISI",
   "MUHASEBE",
   "BIRIM_AMIRI",
-  "PATRON"
+  "PATRON",
+  "IK_BORDRO",
+  "SGK_KARAR_ONAY_YETKILISI"
 ];
 
 export const ALL_ROLES: UserRole[] = [
   ...MANAGEMENT_ROLES,
   "BIRIM_AMIRI",
   "PATRON",
-  "AUTH_SMOKE_READONLY"
+  "AUTH_SMOKE_READONLY",
+  "IK_BORDRO",
+  "SGK_KARAR_ONAY_YETKILISI"
 ];

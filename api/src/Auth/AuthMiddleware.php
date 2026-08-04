@@ -52,9 +52,8 @@ class AuthMiddleware
             JsonResponse::serverError('Veritabani baglantisi kurulamadi.');
         }
 
-        $stmt = $pdo->prepare(
-            'SELECT id, username, ad_soyad, rol, durum FROM users WHERE id = :id LIMIT 1'
-        );
+        $selectSql = self::usersSelectSql($pdo);
+        $stmt = $pdo->prepare($selectSql);
         $stmt->execute(['id' => $userId]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!$row || ($row['durum'] ?? '') !== 'AKTIF') {
@@ -72,8 +71,32 @@ class AuthMiddleware
             'rol' => (string) $row['rol'],
             'sube_ids' => $subeIds,
         ];
+        if (array_key_exists('personel_id', $row) && $row['personel_id'] !== null && $row['personel_id'] !== '') {
+            $pid = (int) $row['personel_id'];
+            self::$user['personel_id'] = $pid > 0 ? $pid : null;
+        }
 
         return self::$user;
+    }
+
+    private static function usersSelectSql(PDO $pdo)
+    {
+        static $sql = null;
+        if (is_string($sql)) {
+            return $sql;
+        }
+        $hasPersonel = false;
+        try {
+            $col = $pdo->query("SHOW COLUMNS FROM users LIKE 'personel_id'");
+            $hasPersonel = $col !== false && $col->fetch(PDO::FETCH_ASSOC) !== false;
+        } catch (\Throwable $e) {
+            $hasPersonel = false;
+        }
+        $sql = $hasPersonel
+            ? 'SELECT id, username, ad_soyad, rol, durum, personel_id FROM users WHERE id = :id LIMIT 1'
+            : 'SELECT id, username, ad_soyad, rol, durum FROM users WHERE id = :id LIMIT 1';
+
+        return $sql;
     }
 
     /** @return array<int, int> */

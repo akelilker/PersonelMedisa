@@ -233,7 +233,7 @@ class RolePermissions
         'AUTH_SMOKE_READONLY' => [
             'ops.auth_smoke.read',
         ],
-        // Prepare-only: SGK karar paketi hazirlama (approve yok). Production atama bu fazda yok.
+        // Prepare-only: SGK karar paketi + sirket calisma politikasi hazirlama (approve yok).
         'IK_BORDRO' => [
             'personeller.view',
             'personeller.view.sube',
@@ -242,13 +242,17 @@ class RolePermissions
             'mevzuat_parametreleri.view',
             'bordro_on_izleme.view',
             'raporlar.view',
+            'sirket_parametreleri.view',
+            'sirket_parametreleri.manage',
             'sgk_karar_paketi.prepare',
         ],
-        // Approve-only: submitted SGK paket onay/red (prepare yok). Production atama bu fazda yok.
+        // Approve-only: SGK paket + sirket calisma politikasi onay (prepare yok).
         'SGK_KARAR_ONAY_YETKILISI' => [
             'mevzuat_parametreleri.view',
             'bordro_on_izleme.view',
             'raporlar.view',
+            'sirket_parametreleri.view',
+            'bordro_kesinlestirme.approve',
             'sgk_karar_paketi.approve',
         ],
     ];

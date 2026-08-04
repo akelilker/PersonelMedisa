@@ -324,12 +324,16 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "mevzuat_parametreleri.view",
     "bordro_on_izleme.view",
     "raporlar.view",
+    "sirket_parametreleri.view",
+    "sirket_parametreleri.manage",
     "sgk_karar_paketi.prepare"
   ],
   SGK_KARAR_ONAY_YETKILISI: [
     "mevzuat_parametreleri.view",
     "bordro_on_izleme.view",
     "raporlar.view",
+    "sirket_parametreleri.view",
+    "bordro_kesinlestirme.approve",
     "sgk_karar_paketi.approve"
   ]
 };

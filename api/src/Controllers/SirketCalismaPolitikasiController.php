@@ -46,7 +46,13 @@ class SirketCalismaPolitikasiController
     public static function kararOzeti(Request $request, $id)
     {
         $user = AuthMiddleware::authenticate($request);
-        RolePermissions::assert($user, 'bordro_kesinlestirme.approve');
+        // Preparer (manage) or approver may open decision summary before dual-control submit/approve.
+        if (
+            !RolePermissions::has($user, 'bordro_kesinlestirme.approve')
+            && !RolePermissions::has($user, 'sirket_parametreleri.manage')
+        ) {
+            JsonResponse::forbidden();
+        }
         $pdo = Connection::get();
         $subeId = null;
         $rawSube = $request->getQuery('sube_id', '');

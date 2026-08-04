@@ -316,8 +316,14 @@ describe("role permissions", () => {
     expect(hasRolePermission("GENEL_YONETICI", "sgk_karar_paketi.approve")).toBe(true);
     expect(hasRolePermission("IK_BORDRO", "sgk_karar_paketi.prepare")).toBe(true);
     expect(hasRolePermission("IK_BORDRO", "sgk_karar_paketi.approve")).toBe(false);
+    expect(hasRolePermission("IK_BORDRO", "sirket_parametreleri.view")).toBe(true);
+    expect(hasRolePermission("IK_BORDRO", "sirket_parametreleri.manage")).toBe(true);
+    expect(hasRolePermission("IK_BORDRO", "bordro_kesinlestirme.approve")).toBe(false);
     expect(hasRolePermission("SGK_KARAR_ONAY_YETKILISI", "sgk_karar_paketi.approve")).toBe(true);
     expect(hasRolePermission("SGK_KARAR_ONAY_YETKILISI", "sgk_karar_paketi.prepare")).toBe(false);
+    expect(hasRolePermission("SGK_KARAR_ONAY_YETKILISI", "sirket_parametreleri.view")).toBe(true);
+    expect(hasRolePermission("SGK_KARAR_ONAY_YETKILISI", "sirket_parametreleri.manage")).toBe(false);
+    expect(hasRolePermission("SGK_KARAR_ONAY_YETKILISI", "bordro_kesinlestirme.approve")).toBe(true);
     expect(hasRolePermission("MUHASEBE", "sgk_karar_paketi.prepare")).toBe(false);
     expect(hasRolePermission("MUHASEBE", "sgk_karar_paketi.approve")).toBe(false);
     expect(hasRolePermission("BOLUM_YONETICISI", "sgk_karar_paketi.prepare")).toBe(false);

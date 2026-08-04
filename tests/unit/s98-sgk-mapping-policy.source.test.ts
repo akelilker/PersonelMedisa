@@ -47,6 +47,23 @@ describe("S98 SGK mapping + policy source guards", () => {
     expect(eslemeWrite).toContain("Never touch parent");
   });
 
+  it("HF1: successor submit trusts persisted parent evidence, not request manifests", () => {
+    const write = read("api/src/Services/Payroll/SgkKatalogWriteService.php");
+    const authApi = read("src/api/auth.api.ts");
+    expect(authApi).toContain('normalized === "IK_BORDRO"');
+    expect(authApi).toContain('normalized === "SGK_KARAR_ONAY_YETKILISI"');
+    expect(write).toContain("hasExplicitRows");
+    expect(write).toContain("resolveStoredSurumTamlik");
+    expect(write).toContain("assertEslemeSuccessorParentEvidence");
+    expect(write).toContain("PERSISTED_APPROVED_PARENT_CATALOG");
+    expect(write).toContain("parent source-hash");
+    expect(write).not.toMatch(/package_id\s*=\s*2/);
+    expect(write).not.toContain("SGK-EKSIK-GUN-RESMI-2026-07-ESLEME-S98-R1");
+    expect(write).toContain("SgkKatalogContracts::BLOCKER_TAMLIK");
+    // Manifests alone must not force empty-package re-eval
+    expect(write).toContain("manifests alone must NOT force empty-package re-evaluation");
+  });
+
   it("routes and client endpoints wired", () => {
     const router = read("api/src/Router.php");
     const endpoints = read("src/api/endpoints.ts");

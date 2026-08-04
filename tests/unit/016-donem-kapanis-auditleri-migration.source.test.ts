@@ -53,6 +53,6 @@ describe("016_donem_kapanis_auditleri migration source", () => {
       .filter((name) => /^\d{3}_.*\.sql$/.test(name))
       .sort();
     expect(migrations).toContain("016_donem_kapanis_auditleri.sql");
-    expect(migrations.at(-1)).toBe("048_sgk_dual_control_actor_roles.sql");
+    expect(migrations.at(-1)).toBe("049_personel_acil_durum_nullable.sql");
   });
 });

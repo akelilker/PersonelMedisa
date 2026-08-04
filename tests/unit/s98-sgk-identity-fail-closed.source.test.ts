@@ -7,20 +7,29 @@ function read(path: string): string {
 }
 
 describe("S98 SGK dual-control identity fail-closed", () => {
-  it("authz service is fail-closed for missing personel link/schema/scope", () => {
+  it("authz service is fail-closed for missing actor identity/schema/scope", () => {
     const authz = read("api/src/Services/Payroll/SgkKararPaketiAuthz.php");
-    expect(authz).toContain("SGK_ACTOR_PERSONEL_LINK_REQUIRED");
-    expect(authz).toContain("SGK_PREPARER_PERSONEL_LINK_REQUIRED");
-    expect(authz).toContain("SGK_ACTOR_PERSONEL_SCHEMA_REQUIRED");
+    expect(authz).toContain("SGK_ACTOR_IDENTITY_LINK_REQUIRED");
+    expect(authz).toContain("SGK_PREPARER_ACTOR_IDENTITY_REQUIRED");
+    expect(authz).toContain("SGK_APPROVER_ACTOR_IDENTITY_REQUIRED");
+    expect(authz).toContain("SGK_ACTOR_IDENTITY_SCHEMA_REQUIRED");
+    expect(authz).toContain("SGK_ACTOR_IDENTITY_NOT_FOUND");
+    expect(authz).toContain("SGK_ACTOR_IDENTITY_NOT_VERIFIED");
+    expect(authz).toContain("SGK_SAME_ACTOR_IDENTITY_FORBIDDEN");
+    expect(authz).toContain("SGK_ACTOR_IDENTITY_CONFLICT");
     expect(authz).toContain("SGK_ACTOR_SCOPE_NOT_READY");
     expect(authz).toContain("SGK_ACTOR_IDENTITY_INVALID");
-    expect(authz).toContain("assertPersonelSchemaRequired");
-    expect(authz).toContain("assertActorPersonelLinked");
+    expect(authz).toContain("assertActorIdentitySchemaRequired");
+    expect(authz).toContain("assertActorIdentityLinkedAndVerified");
+    expect(authz).toContain("actor_identity_id");
+    expect(authz).not.toContain("SGK_ACTOR_PERSONEL_LINK_REQUIRED");
+    expect(authz).not.toContain("SGK_PREPARER_PERSONEL_LINK_REQUIRED");
+    expect(authz).not.toContain("SGK_ACTOR_PERSONEL_SCHEMA_REQUIRED");
     expect(authz).not.toMatch(/static\s+\$cached/);
     // Empty sube_ids must deny (no global bypass)
     expect(authz).toMatch(/subeIds === \[\][\s\S]*SGK_ACTOR_SCOPE_NOT_READY/);
     // Missing schema must deny same-person path
-    expect(authz).toMatch(/!self::personelLinkSupported\(\$pdo\)[\s\S]*SGK_ACTOR_PERSONEL_SCHEMA_REQUIRED/);
+    expect(authz).toMatch(/!self::actorIdentitySchemaSupported\(\$pdo\)[\s\S]*SGK_ACTOR_IDENTITY_SCHEMA_REQUIRED/);
   });
 
   it("write services pass PDO into prepare/approve authz", () => {
@@ -42,11 +51,14 @@ describe("S98 SGK dual-control identity fail-closed", () => {
 
   it("controller maps new identity error codes without leaking internals", () => {
     const controller = read("api/src/Controllers/SgkKatalogHazirlikController.php");
-    expect(controller).toContain("SGK_ACTOR_PERSONEL_LINK_REQUIRED");
-    expect(controller).toContain("SGK_PREPARER_PERSONEL_LINK_REQUIRED");
-    expect(controller).toContain("SGK_ACTOR_PERSONEL_SCHEMA_REQUIRED");
+    expect(controller).toContain("SGK_ACTOR_IDENTITY_LINK_REQUIRED");
+    expect(controller).toContain("SGK_PREPARER_ACTOR_IDENTITY_REQUIRED");
+    expect(controller).toContain("SGK_ACTOR_IDENTITY_SCHEMA_REQUIRED");
+    expect(controller).toContain("SGK_ACTOR_IDENTITY_NOT_VERIFIED");
+    expect(controller).toContain("SGK_SAME_ACTOR_IDENTITY_FORBIDDEN");
     expect(controller).toContain("SGK_ACTOR_SCOPE_NOT_READY");
     expect(controller).toContain("SGK_ACTOR_IDENTITY_INVALID");
+    expect(controller).not.toContain("SGK_ACTOR_PERSONEL_LINK_REQUIRED");
     expect(controller).not.toContain("stack trace");
     expect(controller).not.toContain("SQLSTATE");
   });
@@ -63,25 +75,36 @@ describe("S98 SGK dual-control identity fail-closed", () => {
     expect(panel).not.toContain('rol === "GENEL_YONETICI"');
   });
 
-  it("migration 048 keeps ENUM superset and unsigned personel_id", () => {
+  it("migration 048 keeps ENUM superset and actor_identities registry", () => {
     const mig = read("api/migrations/048_sgk_dual_control_actor_roles.sql");
     expect(mig).toContain("GENEL_YONETICI");
     expect(mig).toContain("MUHASEBE");
     expect(mig).toContain("AUTH_SMOKE_READONLY");
     expect(mig).toContain("IK_BORDRO");
     expect(mig).toContain("SGK_KARAR_ONAY_YETKILISI");
-    expect(mig).toContain("personel_id INT UNSIGNED NULL");
-    expect(mig).toContain("uq_users_personel_id");
-    expect(mig).toContain("fk_users_personel");
+    expect(mig).toContain("CREATE TABLE IF NOT EXISTS actor_identities");
+    expect(mig).toContain("actor_identity_id INT UNSIGNED NULL");
+    expect(mig).toContain("uq_users_actor_identity_id");
+    expect(mig).toContain("fk_users_actor_identity");
+    expect(mig).toContain("PENDING");
+    expect(mig).toContain("VERIFIED");
+    expect(mig).toContain("REVOKED");
+    expect(mig).toContain("ON DELETE SET NULL");
+    expect(mig).not.toContain("uq_users_personel_id");
+    expect(mig).not.toContain("fk_users_personel");
+    expect(mig).not.toMatch(/ADD COLUMN personel_id/i);
     expect(mig).not.toMatch(/ON DELETE CASCADE/i);
-    const initial = read("api/migrations/001_initial_schema.sql");
-    expect(initial).toMatch(/CREATE TABLE IF NOT EXISTS personeller[\s\S]*?id INT UNSIGNED NOT NULL AUTO_INCREMENT/);
+    // No production actor seed / real names
+    expect(mig).not.toMatch(/INSERT\s+INTO\s+actor_identities/i);
+    expect(mig).not.toMatch(/INSERT\s+INTO\s+users/i);
   });
 
-  it("auth session exposes durum + personel_id for fail-closed SGK actor checks", () => {
+  it("auth session exposes durum + actor_identity_id for fail-closed SGK actor checks", () => {
     const auth = read("api/src/Auth/AuthMiddleware.php");
     expect(auth).toContain("'durum' => (string) ($row['durum'] ?? '')");
-    expect(auth).toContain("self::$user['personel_id']");
+    expect(auth).toContain("self::$user['actor_identity_id']");
+    expect(auth).toContain("self::$user['actor_identity_status']");
+    expect(auth).not.toContain("self::$user['personel_id']");
     expect(auth).not.toMatch(/static\s+\$sql\s*=\s*null/);
   });
 
@@ -92,7 +115,7 @@ describe("S98 SGK dual-control identity fail-closed", () => {
     expect(controller).toContain("$result = SgkKatalogWriteService::approve($pdo, $user, $body)");
     expect(controller).toContain("$result = SgkSirketPolitikaWriteService::approve($pdo, $user, self::jsonBody($request))");
     expect(controller).not.toMatch(/\$body\[['"]actor_id['"]\]/);
-    expect(controller).not.toMatch(/\$body\[['"]personel_id['"]\]/);
+    expect(controller).not.toMatch(/\$body\[['"]actor_identity_id['"]\]/);
     expect(controller).not.toMatch(/actor_id.*\$body|\$body.*as.*actor/);
   });
 

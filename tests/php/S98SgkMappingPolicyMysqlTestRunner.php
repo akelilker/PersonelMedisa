@@ -147,21 +147,35 @@ try {
     ) ENGINE=InnoDB');
     $pdo->exec("INSERT INTO users (id, username, rol, durum) VALUES
         (1, 'hazirlayan.s98', 'GENEL_YONETICI', 'AKTIF'),
-        (2, 'onaylayan.s98', 'GENEL_YONETICI', 'AKTIF')");
+        (2, 'onaylayan.s98', 'GENEL_YONETICI', 'AKTIF'),
+        (8, 'unlinked.s98', 'GENEL_YONETICI', 'AKTIF')");
     $pdo->exec("INSERT INTO subeler VALUES (1, 'MRK', 'Merkez', 'AKTIF')");
-    $pdo->exec("INSERT INTO personeller VALUES (1, 'Hazirlayan'), (2, 'Onaylayan'), (7, 'Test Personel')");
+    $pdo->exec("INSERT INTO personeller VALUES (1, 'Fixture A'), (2, 'Fixture B'), (7, 'Test Personel')");
 
     applyS98Migration($pdo, '048_sgk_dual_control_actor_roles.sql');
     applyS98Migration($pdo, '048_sgk_dual_control_actor_roles.sql');
-    $pdo->exec('UPDATE users SET personel_id = 1 WHERE id = 1');
-    $pdo->exec('UPDATE users SET personel_id = 2 WHERE id = 2');
+    $pdo->exec("INSERT INTO actor_identities
+        (id, identity_code, display_name, normalized_name, status, verification_source, personel_id)
+        VALUES
+        (1, 'TEST_PREPARER_PERSON', 'Test Preparer Person', 'test preparer person', 'VERIFIED', 'HUMAN_CONFIRMED', NULL),
+        (2, 'TEST_APPROVER_PERSON', 'Test Approver Person', 'test approver person', 'VERIFIED', 'HUMAN_CONFIRMED', NULL),
+        (3, 'TEST_PENDING_PERSON', 'Test Pending Person', 'test pending person', 'PENDING', 'HUMAN_CONFIRMED', NULL),
+        (4, 'TEST_REVOKED_PERSON', 'Test Revoked Person', 'test revoked person', 'REVOKED', 'HUMAN_CONFIRMED', NULL)");
+    $pdo->exec('UPDATE users SET actor_identity_id = 1 WHERE id = 1');
+    $pdo->exec('UPDATE users SET actor_identity_id = 2 WHERE id = 2');
     $col048 = (int) $pdo->query(
         "SELECT COUNT(*) FROM information_schema.COLUMNS
-         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'personel_id'"
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'actor_identity_id'"
     )->fetchColumn();
-    s98Assert($col048 === 1, 'migration 048 personel_id applied + idempotent');
+    $tbl048 = (int) $pdo->query(
+        "SELECT COUNT(*) FROM information_schema.TABLES
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'actor_identities'"
+    )->fetchColumn();
+    s98Assert($col048 === 1 && $tbl048 === 1, 'migration 048 actor_identity applied + idempotent');
     $enum048 = (string) $pdo->query("SHOW COLUMNS FROM users LIKE 'rol'")->fetch(PDO::FETCH_ASSOC)['Type'];
     s98Assert(strpos($enum048, 'IK_BORDRO') !== false && strpos($enum048, 'SGK_KARAR_ONAY_YETKILISI') !== false, 'migration 048 ENUM superset roles');
+    $user8 = $pdo->query('SELECT id, actor_identity_id FROM users WHERE id = 8')->fetch(PDO::FETCH_ASSOC);
+    s98Assert(is_array($user8) && (int) $user8['id'] === 8 && ($user8['actor_identity_id'] === null || $user8['actor_identity_id'] === ''), 'existing users preserved after 048 without auto-backfill');
 
     // --- S98 identity fail-closed authz matrix (service-level) ---
     $prepOk = [
@@ -169,7 +183,8 @@ try {
         'rol' => 'IK_BORDRO',
         'username' => 'hazirlayan.s98',
         'durum' => 'AKTIF',
-        'personel_id' => 1,
+        'actor_identity_id' => 1,
+        'actor_identity_status' => 'VERIFIED',
         'sube_ids' => [1],
     ];
     $apprOk = [
@@ -177,7 +192,8 @@ try {
         'rol' => 'SGK_KARAR_ONAY_YETKILISI',
         'username' => 'onaylayan.s98',
         'durum' => 'AKTIF',
-        'personel_id' => 2,
+        'actor_identity_id' => 2,
+        'actor_identity_status' => 'VERIFIED',
         'sube_ids' => [1],
     ];
     SgkKararPaketiAuthz::assertPrepare($pdo, $prepOk);
@@ -185,26 +201,56 @@ try {
     SgkKararPaketiAuthz::assertSubeScope($apprOk, 1);
     s98Assert(true, 'linked scoped prepare/approve PASS');
 
+    // Optional personel bridge NULL must not block formal actor
+    s98Assert(
+        (int) $pdo->query('SELECT COUNT(*) FROM actor_identities WHERE id IN (1,2) AND personel_id IS NULL')->fetchColumn() === 2,
+        'verified actor identities work with NULL personel bridge'
+    );
+
     $samePerson = SgkKararPaketiAuthz::denySamePerson($pdo, $apprOk, 1);
     s98Assert(!empty($samePerson['ok']), 'distinct persons dual-control PASS');
 
-    $samePersonDeny = SgkKararPaketiAuthz::denySamePerson($pdo, array_merge($apprOk, ['personel_id' => 1]), 1);
-    s98Assert(($samePersonDeny['code'] ?? '') === 'SGK_SAME_PERSON_DUAL_CONTROL_FORBIDDEN', 'same person dual-control denied');
+    $samePersonDeny = SgkKararPaketiAuthz::denySamePerson($pdo, array_merge($apprOk, ['actor_identity_id' => 1]), 1);
+    s98Assert(($samePersonDeny['code'] ?? '') === 'SGK_SAME_ACTOR_IDENTITY_FORBIDDEN', 'same actor identity dual-control denied');
 
     $self = SgkKararPaketiAuthz::denySelfApproval($prepOk, 1);
     s98Assert(($self['code'] ?? '') === 'SGK_SELF_APPROVAL_FORBIDDEN', 'same user self-approve denied');
 
     try {
-        SgkKararPaketiAuthz::assertPrepare($pdo, array_merge($prepOk, ['personel_id' => null]));
-        s98Assert(false, 'missing actor personel link should deny');
+        SgkKararPaketiAuthz::assertPrepare($pdo, array_merge($prepOk, ['actor_identity_id' => null]));
+        s98Assert(false, 'missing actor identity link should deny');
     } catch (RuntimeException $e) {
-        s98Assert($e->getMessage() === 'SGK_ACTOR_PERSONEL_LINK_REQUIRED', 'missing actor personel link code');
+        s98Assert($e->getMessage() === 'SGK_ACTOR_IDENTITY_LINK_REQUIRED', 'missing actor identity link code');
+    }
+    try {
+        SgkKararPaketiAuthz::assertPrepare($pdo, array_merge($prepOk, [
+            'actor_identity_id' => 3,
+            'actor_identity_status' => 'PENDING',
+        ]));
+        s98Assert(false, 'pending identity should deny');
+    } catch (RuntimeException $e) {
+        s98Assert($e->getMessage() === 'SGK_ACTOR_IDENTITY_NOT_VERIFIED', 'pending identity code');
+    }
+    try {
+        SgkKararPaketiAuthz::assertPrepare($pdo, array_merge($prepOk, [
+            'actor_identity_id' => 4,
+            'actor_identity_status' => 'REVOKED',
+        ]));
+        s98Assert(false, 'revoked identity should deny');
+    } catch (RuntimeException $e) {
+        s98Assert($e->getMessage() === 'SGK_ACTOR_IDENTITY_NOT_VERIFIED', 'revoked identity code');
     }
     try {
         SgkKararPaketiAuthz::assertPrepare($pdo, array_merge($prepOk, ['username' => 'genel_yonetici']));
         s98Assert(false, 'generic account prepare should deny');
     } catch (RuntimeException $e) {
         s98Assert($e->getMessage() === 'SGK_ACTOR_IDENTITY_NOT_READY', 'generic account prepare code');
+    }
+    try {
+        SgkKararPaketiAuthz::assertPrepare($pdo, array_merge($prepOk, ['username' => 'smoke.actor']));
+        s98Assert(false, 'smoke account prepare should deny');
+    } catch (RuntimeException $e) {
+        s98Assert($e->getMessage() === 'SGK_ACTOR_IDENTITY_NOT_READY', 'smoke account prepare code');
     }
     try {
         SgkKararPaketiAuthz::assertPrepare($pdo, array_merge($prepOk, ['durum' => 'PASIF']));
@@ -236,7 +282,8 @@ try {
             'rol' => 'MUHASEBE',
             'username' => 'muhasebe.ali',
             'durum' => 'AKTIF',
-            'personel_id' => 7,
+            'actor_identity_id' => 1,
+            'actor_identity_status' => 'VERIFIED',
             'sube_ids' => [1],
         ]);
         s98Assert(false, 'MUHASEBE prepare should deny');
@@ -257,7 +304,7 @@ try {
     }
 
     $prepNoLink = SgkKararPaketiAuthz::denySamePerson($pdo, $apprOk, 99);
-    s98Assert(($prepNoLink['code'] ?? '') === 'SGK_PREPARER_PERSONEL_LINK_REQUIRED', 'missing preparer personel link');
+    s98Assert(($prepNoLink['code'] ?? '') === 'SGK_PREPARER_ACTOR_IDENTITY_REQUIRED', 'missing preparer actor identity link');
 
     try {
         SgkKararPaketiAuthz::assertApprove($pdo, [
@@ -265,7 +312,8 @@ try {
             'rol' => 'MUHASEBE',
             'username' => 'muhasebe.ali',
             'durum' => 'AKTIF',
-            'personel_id' => 7,
+            'actor_identity_id' => 1,
+            'actor_identity_status' => 'VERIFIED',
             'sube_ids' => [1],
         ]);
         s98Assert(false, 'MUHASEBE approve should deny');
@@ -273,47 +321,72 @@ try {
         s98Assert($e->getMessage() === 'SGK_APPROVE_FORBIDDEN', 'MUHASEBE approve code');
     }
 
-    // Schema-missing fail-closed (drop personel_id, assert, re-apply 048)
-    $pdo->exec('ALTER TABLE users DROP FOREIGN KEY fk_users_personel');
-    $pdo->exec('ALTER TABLE users DROP INDEX uq_users_personel_id');
-    $pdo->exec('ALTER TABLE users DROP COLUMN personel_id');
-    s98Assert(SgkKararPaketiAuthz::personelLinkSupported($pdo) === false, 'personelLinkSupported false after drop');
+    // Schema-missing fail-closed (drop actor_identity link + table, assert, re-apply 048)
+    $pdo->exec('ALTER TABLE users DROP FOREIGN KEY fk_users_actor_identity');
+    $pdo->exec('ALTER TABLE users DROP INDEX uq_users_actor_identity_id');
+    $pdo->exec('ALTER TABLE users DROP COLUMN actor_identity_id');
+    $pdo->exec('DROP TABLE actor_identities');
+    s98Assert(SgkKararPaketiAuthz::actorIdentitySchemaSupported($pdo) === false, 'actorIdentitySchemaSupported false after drop');
     try {
         SgkKararPaketiAuthz::assertPrepare($pdo, $prepOk);
-        s98Assert(false, 'missing personel schema should deny prepare');
+        s98Assert(false, 'missing actor identity schema should deny prepare');
     } catch (RuntimeException $e) {
-        s98Assert($e->getMessage() === 'SGK_ACTOR_PERSONEL_SCHEMA_REQUIRED', 'missing schema prepare code');
+        s98Assert($e->getMessage() === 'SGK_ACTOR_IDENTITY_SCHEMA_REQUIRED', 'missing schema prepare code');
     }
     $schemaDeny = SgkKararPaketiAuthz::denySamePerson($pdo, $apprOk, 1);
-    s98Assert(($schemaDeny['code'] ?? '') === 'SGK_ACTOR_PERSONEL_SCHEMA_REQUIRED', 'missing schema same-person deny');
+    s98Assert(($schemaDeny['code'] ?? '') === 'SGK_ACTOR_IDENTITY_SCHEMA_REQUIRED', 'missing schema same-person deny');
     applyS98Migration($pdo, '048_sgk_dual_control_actor_roles.sql');
-    $pdo->exec('UPDATE users SET personel_id = 1 WHERE id = 1');
-    $pdo->exec('UPDATE users SET personel_id = 2 WHERE id = 2');
-    s98Assert(SgkKararPaketiAuthz::personelLinkSupported($pdo) === true, 'personelLinkSupported true after re-apply');
+    $pdo->exec("INSERT INTO actor_identities
+        (id, identity_code, display_name, normalized_name, status, verification_source, personel_id)
+        VALUES
+        (1, 'TEST_PREPARER_PERSON', 'Test Preparer Person', 'test preparer person', 'VERIFIED', 'HUMAN_CONFIRMED', NULL),
+        (2, 'TEST_APPROVER_PERSON', 'Test Approver Person', 'test approver person', 'VERIFIED', 'HUMAN_CONFIRMED', NULL),
+        (3, 'TEST_PENDING_PERSON', 'Test Pending Person', 'test pending person', 'PENDING', 'HUMAN_CONFIRMED', NULL),
+        (4, 'TEST_REVOKED_PERSON', 'Test Revoked Person', 'test revoked person', 'REVOKED', 'HUMAN_CONFIRMED', NULL)");
+    $pdo->exec('UPDATE users SET actor_identity_id = 1 WHERE id = 1');
+    $pdo->exec('UPDATE users SET actor_identity_id = 2 WHERE id = 2');
+    s98Assert(SgkKararPaketiAuthz::actorIdentitySchemaSupported($pdo) === true, 'actorIdentitySchemaSupported true after re-apply');
 
-    // Duplicate non-null personel_id rejected
+    // Unlinked user still preserved after drop/reapply (no auto-backfill)
+    $unlinkedAid = $pdo->query('SELECT actor_identity_id FROM users WHERE id = 8')->fetchColumn();
+    s98Assert($unlinkedAid === null || $unlinkedAid === false || $unlinkedAid === '', 'unlinked user preserved without actor identity');
+
+    // Duplicate non-null actor_identity_id rejected
     try {
-        $pdo->exec('UPDATE users SET personel_id = 1 WHERE id = 2');
-        s98Assert(false, 'duplicate personel_id should fail');
+        $pdo->exec('UPDATE users SET actor_identity_id = 1 WHERE id = 2');
+        s98Assert(false, 'duplicate actor_identity_id should fail');
     } catch (PDOException $e) {
-        s98Assert(true, 'duplicate personel_id unique rejected');
-        $pdo->exec('UPDATE users SET personel_id = 2 WHERE id = 2');
+        s98Assert(true, 'duplicate actor_identity_id unique rejected');
+        $pdo->exec('UPDATE users SET actor_identity_id = 2 WHERE id = 2');
     }
 
     // Orphan FK rejected
     try {
-        $pdo->exec('UPDATE users SET personel_id = 99999 WHERE id = 2');
-        s98Assert(false, 'orphan personel_id FK should fail');
+        $pdo->exec('UPDATE users SET actor_identity_id = 99999 WHERE id = 2');
+        s98Assert(false, 'orphan actor_identity_id FK should fail');
     } catch (PDOException $e) {
-        s98Assert(true, 'orphan personel_id FK rejected');
-        $pdo->exec('UPDATE users SET personel_id = 2 WHERE id = 2');
+        s98Assert(true, 'orphan actor_identity_id FK rejected');
+        $pdo->exec('UPDATE users SET actor_identity_id = 2 WHERE id = 2');
     }
 
+    // Optional personel bridge unique + ON DELETE SET NULL
+    $pdo->exec('UPDATE actor_identities SET personel_id = 1 WHERE id = 1');
+    try {
+        $pdo->exec('UPDATE actor_identities SET personel_id = 1 WHERE id = 2');
+        s98Assert(false, 'duplicate personel bridge should fail');
+    } catch (PDOException $e) {
+        s98Assert(true, 'duplicate personel bridge unique rejected');
+    }
+    $pdo->exec('DELETE FROM personeller WHERE id = 1');
+    $bridgeAfterDelete = $pdo->query('SELECT personel_id FROM actor_identities WHERE id = 1')->fetchColumn();
+    s98Assert($bridgeAfterDelete === null || $bridgeAfterDelete === false || $bridgeAfterDelete === '', 'personel delete SET NULL on actor bridge');
+    $pdo->exec("INSERT INTO personeller VALUES (1, 'Fixture A')");
+
     // Parent/child signedness: both INT UNSIGNED
-    $pidType = (string) $pdo->query("SHOW COLUMNS FROM personeller LIKE 'id'")->fetch(PDO::FETCH_ASSOC)['Type'];
-    $upidType = (string) $pdo->query("SHOW COLUMNS FROM users LIKE 'personel_id'")->fetch(PDO::FETCH_ASSOC)['Type'];
-    s98Assert(stripos($pidType, 'int') !== false && stripos($pidType, 'unsigned') !== false, 'personeller.id INT UNSIGNED');
-    s98Assert(stripos($upidType, 'int') !== false && stripos($upidType, 'unsigned') !== false, 'users.personel_id INT UNSIGNED');
+    $aidType = (string) $pdo->query("SHOW COLUMNS FROM actor_identities LIKE 'id'")->fetch(PDO::FETCH_ASSOC)['Type'];
+    $uaidType = (string) $pdo->query("SHOW COLUMNS FROM users LIKE 'actor_identity_id'")->fetch(PDO::FETCH_ASSOC)['Type'];
+    s98Assert(stripos($aidType, 'int') !== false && stripos($aidType, 'unsigned') !== false, 'actor_identities.id INT UNSIGNED');
+    s98Assert(stripos($uaidType, 'int') !== false && stripos($uaidType, 'unsigned') !== false, 'users.actor_identity_id INT UNSIGNED');
 
     applyS98Migration($pdo, '036_sgk_prim_gunu_owner.sql');
     applyS98Migration($pdo, '037_sgk_resmi_kaynak_manifesti_v1.sql');
@@ -410,7 +483,8 @@ try {
         'rol' => 'GENEL_YONETICI',
         'username' => 'hazirlayan.s98',
         'durum' => 'AKTIF',
-        'personel_id' => 1,
+        'actor_identity_id' => 1,
+        'actor_identity_status' => 'VERIFIED',
         'sube_ids' => [1],
     ];
     $gy2 = [
@@ -418,7 +492,8 @@ try {
         'rol' => 'GENEL_YONETICI',
         'username' => 'onaylayan.s98',
         'durum' => 'AKTIF',
-        'personel_id' => 2,
+        'actor_identity_id' => 2,
+        'actor_identity_status' => 'VERIFIED',
         'sube_ids' => [1],
     ];
 

@@ -15,7 +15,9 @@ describe("S98 SGK mapping + policy source guards", () => {
     expect(read("api/migrations/047_sgk_real_decision_contract.sql")).toContain("KISMI_SURE_DEVAMSIZLIK");
     expect(read("api/migrations/048_sgk_dual_control_actor_roles.sql")).toContain("IK_BORDRO");
     expect(read("api/migrations/048_sgk_dual_control_actor_roles.sql")).toContain("SGK_KARAR_ONAY_YETKILISI");
-    expect(read("api/migrations/048_sgk_dual_control_actor_roles.sql")).toContain("personel_id");
+    expect(read("api/migrations/048_sgk_dual_control_actor_roles.sql")).toContain("actor_identities");
+    expect(read("api/migrations/048_sgk_dual_control_actor_roles.sql")).toContain("actor_identity_id");
+    expect(read("api/migrations/048_sgk_dual_control_actor_roles.sql")).not.toContain("uq_users_personel_id");
     expect(read("api/src/Services/Payroll/SgkEslemeKararContract.php")).toContain("HER_ZAMAN_DAHIL");
     expect(read("api/src/Services/Payroll/SgkSurecEslemeImportValidator.php")).toContain("karar_kurali");
     expect(read("api/src/Services/Payroll/SgkSurecEslemeWriteService.php")).toContain("SUREC_ESLEME_DRAFT_ONAY");
@@ -33,12 +35,13 @@ describe("S98 SGK mapping + policy source guards", () => {
     expect(write).toContain("SGK_KATALOG_TARIH_CAKISMA");
     expect(authz).toContain("sgk_karar_paketi.prepare");
     expect(authz).toContain("sgk_karar_paketi.approve");
-    expect(authz).toContain("SGK_SAME_PERSON_DUAL_CONTROL_FORBIDDEN");
-    expect(authz).toContain("SGK_ACTOR_PERSONEL_LINK_REQUIRED");
-    expect(authz).toContain("SGK_PREPARER_PERSONEL_LINK_REQUIRED");
-    expect(authz).toContain("SGK_ACTOR_PERSONEL_SCHEMA_REQUIRED");
+    expect(authz).toContain("SGK_SAME_ACTOR_IDENTITY_FORBIDDEN");
+    expect(authz).toContain("SGK_ACTOR_IDENTITY_LINK_REQUIRED");
+    expect(authz).toContain("SGK_PREPARER_ACTOR_IDENTITY_REQUIRED");
+    expect(authz).toContain("SGK_ACTOR_IDENTITY_SCHEMA_REQUIRED");
     expect(authz).toContain("SGK_ACTOR_SCOPE_NOT_READY");
     expect(authz).toContain("SGK_ACTOR_IDENTITY_INVALID");
+    expect(authz).not.toContain("SGK_ACTOR_PERSONEL_LINK_REQUIRED");
     expect(authz).not.toContain("static $cached");
     expect(onay).toContain("SELF_APPROVAL");
     expect(eslemeWrite).toContain("Never touch parent");

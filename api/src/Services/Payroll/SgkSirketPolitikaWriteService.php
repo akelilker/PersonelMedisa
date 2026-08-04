@@ -288,7 +288,7 @@ final class SgkSirketPolitikaWriteService
     }
 
     /**
-     * @param array{id?: int, rol?: string, username?: string, durum?: string, sube_ids?: list<int>, personel_id?: int|null} $actor
+     * @param array{id?: int, rol?: string, username?: string, durum?: string, sube_ids?: list<int>, actor_identity_id?: int|null, actor_identity_status?: string|null} $actor
      */
     private static function assertApprove(PDO $pdo, array $actor): void
     {

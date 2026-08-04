@@ -161,8 +161,8 @@ try {
           soyad VARCHAR(80) NOT NULL,
           dogum_tarihi DATE NOT NULL,
           telefon VARCHAR(32) NOT NULL,
-          acil_durum_kisi VARCHAR(120) NOT NULL,
-          acil_durum_telefon VARCHAR(32) NOT NULL,
+          acil_durum_kisi VARCHAR(120) NULL,
+          acil_durum_telefon VARCHAR(32) NULL,
           sicil_no VARCHAR(32) NOT NULL,
           ise_giris_tarihi DATE NOT NULL,
           sube_id INT UNSIGNED NOT NULL,
@@ -310,6 +310,43 @@ try {
     $mixedHeader = strtoupper(s97HeaderCsv()) . "\r\n" . s97ValidRow() . "\r\n";
     $mixed = PersonelImportDryRunService::dryRun($pdo, $mixedHeader, $gyUser, null);
     s97Assert(($mixed['ozet']['gecerli_satir'] ?? 0) === 1, 'mixed-case headers accepted');
+
+    // Emergency contact optional: both empty → PASS (NULL), no placeholder
+    $emptyAcilCsv = s97HeaderCsv() . "\r\n" . s97ValidRow([
+        'tc_kimlik_no' => '10000000170',
+        'sicil_no' => 'ACIL-EMPTY',
+        'acil_durum_kisi' => '',
+        'acil_durum_telefon' => '',
+    ]) . "\r\n";
+    $emptyAcil = PersonelImportDryRunService::dryRun($pdo, $emptyAcilCsv, $gyUser, null);
+    s97Assert(($emptyAcil['ozet']['gecerli_satir'] ?? 0) === 1, 'empty emergency contact dry-run PASS');
+    s97Assert(($emptyAcil['ozet']['hatali_satir'] ?? 1) === 0, 'empty emergency contact no errors');
+    s97Assert(($emptyAcil['can_apply'] ?? false) === true, 'empty emergency contact can_apply');
+
+    // One filled / one empty still PASS
+    $partialAcilCsv = s97HeaderCsv() . "\r\n" . s97ValidRow([
+        'tc_kimlik_no' => '10000000188',
+        'sicil_no' => 'ACIL-PARTIAL',
+        'acil_durum_kisi' => 'Ayşe Veli',
+        'acil_durum_telefon' => '',
+    ]) . "\r\n";
+    $partialAcil = PersonelImportDryRunService::dryRun($pdo, $partialAcilCsv, $gyUser, null);
+    s97Assert(($partialAcil['ozet']['gecerli_satir'] ?? 0) === 1, 'partial emergency contact dry-run PASS');
+
+    // Both filled preserved
+    $fullAcilCsv = s97HeaderCsv() . "\r\n" . s97ValidRow([
+        'tc_kimlik_no' => '10000000196',
+        'sicil_no' => 'ACIL-FULL',
+        'acil_durum_kisi' => 'Ali Yılmaz',
+        'acil_durum_telefon' => '0532 444 55 66',
+    ]) . "\r\n";
+    $fullAcil = PersonelImportDryRunService::dryRun($pdo, $fullAcilCsv, $gyUser, null);
+    s97Assert(($fullAcil['ozet']['gecerli_satir'] ?? 0) === 1, 'full emergency contact dry-run PASS');
+
+    // Deterministic: empty-acil dry-run twice → identical manifest
+    $emptyA = PersonelImportDryRunService::dryRun($pdo, $emptyAcilCsv, $gyUser, null);
+    $emptyB = PersonelImportDryRunService::dryRun($pdo, $emptyAcilCsv, $gyUser, null);
+    s97Assert($emptyA['manifest_hash'] === $emptyB['manifest_hash'], 'empty emergency contact manifest deterministic');
 
     // Jagged row fail-closed
     $jagged = s97HeaderCsv() . "\r\n" . s97ValidRow() . ";EXTRA\r\n";

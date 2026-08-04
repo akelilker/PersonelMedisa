@@ -45,8 +45,6 @@ final class PersonelImportDryRunService
         'soyad',
         'dogum_tarihi',
         'telefon',
-        'acil_durum_kisi',
-        'acil_durum_telefon',
         'ise_giris_tarihi',
         'sube',
         'departman',
@@ -57,6 +55,8 @@ final class PersonelImportDryRunService
     private const OPTIONAL_COLUMNS = [
         'dogum_yeri',
         'kan_grubu',
+        'acil_durum_kisi',
+        'acil_durum_telefon',
     ];
 
     private const FORBIDDEN_UCRET_COLUMNS = [
@@ -325,8 +325,12 @@ final class PersonelImportDryRunService
                     'dogum_tarihi' => (string) $payload['dogum_tarihi'],
                     'ise_giris_tarihi' => (string) $payload['ise_giris_tarihi'],
                     'telefon' => (string) $payload['telefon'],
-                    'acil_durum_kisi' => (string) $payload['acil_durum_kisi'],
-                    'acil_durum_telefon' => (string) $payload['acil_durum_telefon'],
+                    'acil_durum_kisi' => $payload['acil_durum_kisi'] === null || $payload['acil_durum_kisi'] === ''
+                        ? null
+                        : (string) $payload['acil_durum_kisi'],
+                    'acil_durum_telefon' => $payload['acil_durum_telefon'] === null || $payload['acil_durum_telefon'] === ''
+                        ? null
+                        : (string) $payload['acil_durum_telefon'],
                     'dogum_yeri' => $payload['dogum_yeri'],
                     'kan_grubu' => $payload['kan_grubu'],
                     'sube_id' => (int) $payload['sube_id'],

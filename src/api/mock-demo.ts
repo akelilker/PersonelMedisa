@@ -4951,8 +4951,6 @@ export function resolveDemoApiResponse(
       "soyad",
       "dogum_tarihi",
       "telefon",
-      "acil_durum_kisi",
-      "acil_durum_telefon",
       "ise_giris_tarihi",
       "sube",
       "departman",
@@ -4964,7 +4962,13 @@ export function resolveDemoApiResponse(
         return demoRevizyonError("PERSONEL_IMPORT_EKSIK_ZORUNLU_KOLON", `Eksik zorunlu kolon: ${col}`);
       }
     }
-    const allowed = new Set([...required, "dogum_yeri", "kan_grubu"]);
+    const allowed = new Set([
+      ...required,
+      "dogum_yeri",
+      "kan_grubu",
+      "acil_durum_kisi",
+      "acil_durum_telefon"
+    ]);
     for (const header of headers) {
       if (!allowed.has(header)) {
         return demoRevizyonError("PERSONEL_IMPORT_BILINMEYEN_KOLON", `Bilinmeyen kolon: ${header}`);

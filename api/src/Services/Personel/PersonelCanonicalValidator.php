@@ -87,8 +87,9 @@ final class PersonelCanonicalValidator
 
         $dogumTarihi = self::requireValidDate($body, 'dogum_tarihi', 'Dogum tarihi zorunludur.');
         $telefon = self::requireTrimmedString($body, 'telefon', 'Telefon zorunludur.');
-        $acilDurumKisi = self::requireTrimmedString($body, 'acil_durum_kisi', 'Acil durum kisi zorunludur.');
-        $acilDurumTelefon = self::requireTrimmedString($body, 'acil_durum_telefon', 'Acil durum telefonu zorunludur.');
+        // Emergency contact is optional for initial master create/import; empty → NULL.
+        $acilDurumKisi = self::optionalTrimmedString($body, 'acil_durum_kisi');
+        $acilDurumTelefon = self::optionalTrimmedString($body, 'acil_durum_telefon');
         $sicilNo = self::requireTrimmedString($body, 'sicil_no', 'Sicil no zorunludur.');
         $iseGirisTarihi = self::requireValidDate($body, 'ise_giris_tarihi', 'Ise giris tarihi zorunludur.');
 
@@ -171,9 +172,15 @@ final class PersonelCanonicalValidator
             $payload['tc_kimlik_no'] = $tcKimlikNo;
         }
 
-        foreach (['ad', 'soyad', 'telefon', 'acil_durum_kisi', 'acil_durum_telefon', 'sicil_no'] as $field) {
+        foreach (['ad', 'soyad', 'telefon', 'sicil_no'] as $field) {
             if (array_key_exists($field, $body)) {
                 $payload[$field] = self::requireTrimmedString($body, $field, 'Gecersiz deger.');
+            }
+        }
+
+        foreach (['acil_durum_kisi', 'acil_durum_telefon'] as $field) {
+            if (array_key_exists($field, $body)) {
+                $payload[$field] = self::optionalTrimmedString($body, $field);
             }
         }
 
@@ -275,8 +282,6 @@ final class PersonelCanonicalValidator
                 'ad' => 'Ad zorunludur.',
                 'soyad' => 'Soyad zorunludur.',
                 'telefon' => 'Telefon zorunludur.',
-                'acil_durum_kisi' => 'Acil durum kisi zorunludur.',
-                'acil_durum_telefon' => 'Acil durum telefonu zorunludur.',
                 'sicil_no' => 'Sicil no zorunludur.',
             ] as $field => $message
         ) {
@@ -286,6 +291,12 @@ final class PersonelCanonicalValidator
             } else {
                 $payload[$field] = $value;
             }
+        }
+
+        // Optional emergency contact: present value kept; empty → NULL. No placeholders.
+        foreach (['acil_durum_kisi', 'acil_durum_telefon'] as $field) {
+            $value = trim((string) ($row[$field] ?? ''));
+            $payload[$field] = $value === '' ? null : $value;
         }
 
         foreach (['dogum_tarihi', 'ise_giris_tarihi'] as $field) {

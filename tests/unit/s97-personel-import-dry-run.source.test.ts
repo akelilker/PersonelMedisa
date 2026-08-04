@@ -43,4 +43,25 @@ describe("S97 personel import dry-run source locks", () => {
     expect(controller).toContain("RolePermissions::assert($user, 'personeller.create')");
     expect(exportReport).toMatch(/\[\=\+\\?\-@\]/);
   });
+
+  it("makes emergency-contact columns optional for initial import", () => {
+    const service = read("api/src/Services/Personel/PersonelImportDryRunService.php");
+    const validator = read("api/src/Services/Personel/PersonelCanonicalValidator.php");
+    const migration = read("api/migrations/049_personel_acil_durum_nullable.sql");
+    const panel = read("src/features/personeller/components/personel-dosya/PersonelKartPanelGenelBilgiler.tsx");
+
+    expect(service).toContain("'acil_durum_kisi'");
+    expect(service).toContain("'acil_durum_telefon'");
+    expect(service).toMatch(/OPTIONAL_COLUMNS[\s\S]*acil_durum_kisi[\s\S]*acil_durum_telefon/);
+    expect(service).not.toMatch(
+      /REQUIRED_COLUMNS\s*=\s*\[[^\]]*acil_durum_kisi[^\]]*acil_durum_telefon/
+    );
+    expect(validator).toContain("optionalTrimmedString($body, 'acil_durum_kisi')");
+    expect(validator).toContain("optionalTrimmedString($body, 'acil_durum_telefon')");
+    expect(validator).not.toContain("Acil durum kisi zorunludur.");
+    expect(validator).not.toContain("Acil durum telefonu zorunludur.");
+    expect(migration).toContain("MODIFY COLUMN acil_durum_kisi VARCHAR(120) NULL");
+    expect(migration).toContain("MODIFY COLUMN acil_durum_telefon VARCHAR(32) NULL");
+    expect(panel).toContain("Acil durum bilgisi eksik");
+  });
 });

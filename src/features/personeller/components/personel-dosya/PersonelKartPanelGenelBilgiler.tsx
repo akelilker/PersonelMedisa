@@ -63,6 +63,12 @@ export function PersonelKartPanelGenelBilgiler({
         <DossierRecord label="Bağlı Amir" value={formatReferenceValue(personel.bagli_amir_adi, personel.bagli_amir_id)} />
         <DossierRecord label="Acil Durum Kişisi" value={formatDetailValue(personel.acil_durum_kisi)} />
         <DossierRecord label="Acil Durum Telefonu" value={formatDetailValue(personel.acil_durum_telefon)} />
+        {!String(personel.acil_durum_kisi ?? "").trim() || !String(personel.acil_durum_telefon ?? "").trim() ? (
+          <DossierRecord
+            label="Profil Tamlık"
+            value="Acil durum bilgisi eksik — personel kartından tamamlanabilir (import/bordro engeli değildir)."
+          />
+        ) : null}
         <DossierRecord label="Pasiflik Etiketi" value={formatDetailValue(personel.pasiflik_durumu_etiketi)} />
       </DossierSection>
 

@@ -517,6 +517,43 @@ try {
     $submit = SgkKatalogWriteService::submit($pdo, $gy1, ['surum_kodu' => 'S98-SUCCESSOR']);
     s98Assert(($submit['http_status'] ?? 0) === 200, 'successor submit');
 
+    // HF1: controller-style manifests-only payload must still trust persisted parent evidence
+    $pdo->exec("UPDATE sgk_eksik_gun_katalog_surumleri SET state = 'TASLAK' WHERE surum_kodu = 'S98-SUCCESSOR'");
+    $submitWithManifests = SgkKatalogWriteService::submit($pdo, $gy1, [
+        'surum_kodu' => 'S98-SUCCESSOR',
+        'manifests' => [
+            [
+                'kaynak_id' => 'FAKE_MANIFEST',
+                'durum' => 'AKTIF',
+                'icerik_sha256' => str_repeat('a', 64),
+            ],
+        ],
+    ]);
+    s98Assert(($submitWithManifests['http_status'] ?? 0) === 200, 'successor submit with injected manifests still PASS');
+    s98Assert(($submitWithManifests['state'] ?? '') === 'ONAY_BEKLIYOR', 'successor state ONAY_BEKLIYOR after manifests-only submit');
+
+    // Parent hash drift must deny successor submit
+    $parentHashBeforeDrift = (string) $pdo->query(
+        "SELECT katalog_payload_hash FROM sgk_eksik_gun_katalog_surumleri WHERE surum_kodu = 'S98-PARENT'"
+    )->fetchColumn();
+    $pdo->exec("UPDATE sgk_eksik_gun_katalog_surumleri SET state = 'TASLAK' WHERE surum_kodu = 'S98-SUCCESSOR'");
+    $pdo->exec("UPDATE sgk_eksik_gun_katalog_surumleri SET katalog_payload_hash = '" . str_repeat('b', 64) . "' WHERE surum_kodu = 'S98-PARENT'");
+    $drift = SgkKatalogWriteService::submit($pdo, $gy1, [
+        'surum_kodu' => 'S98-SUCCESSOR',
+        'manifests' => [
+            [
+                'kaynak_id' => 'X',
+                'durum' => 'AKTIF',
+                'icerik_sha256' => str_repeat('c', 64),
+            ],
+        ],
+    ]);
+    s98Assert(($drift['http_status'] ?? 0) === 400, 'parent hash drift denies submit');
+    s98Assert(($drift['code'] ?? '') === 'SGK_KATALOG_TAMLIK_KANITI_EKSIK', 'parent hash drift uses tamlik blocker');
+    $pdo->prepare("UPDATE sgk_eksik_gun_katalog_surumleri SET katalog_payload_hash = :h WHERE surum_kodu = 'S98-PARENT'")
+        ->execute(['h' => $parentHashBeforeDrift]);
+    $pdo->exec("UPDATE sgk_eksik_gun_katalog_surumleri SET state = 'ONAY_BEKLIYOR' WHERE surum_kodu = 'S98-SUCCESSOR'");
+
     $selfApprove = SgkKatalogWriteService::approve($pdo, $gy1, [
         'surum_kodu' => 'S98-SUCCESSOR',
         'resmi_kaynaklar_incelendi_mi' => true,

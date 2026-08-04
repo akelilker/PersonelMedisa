@@ -50,7 +50,9 @@ function normalizeRole(value: unknown): AuthSession["user"]["rol"] | null {
     normalized === "MUHASEBE" ||
     normalized === "BIRIM_AMIRI" ||
     normalized === "PATRON" ||
-    normalized === "AUTH_SMOKE_READONLY"
+    normalized === "AUTH_SMOKE_READONLY" ||
+    normalized === "IK_BORDRO" ||
+    normalized === "SGK_KARAR_ONAY_YETKILISI"
   ) {
     return normalized;
   }
@@ -279,6 +281,12 @@ export async function login(credentials: LoginCredentials): Promise<AuthSession>
       throw new ApiRequestError(backendMessage, 200);
     }
 
+    // Real auth payload that failed role/session normalization must fail-closed.
+    // Never invent a demo session over an unusable 200 login body.
+    if (responseLooksLikeAuthPayload(response)) {
+      throw new ApiRequestError("Login yaniti beklenen oturum formatinda degil.", 200);
+    }
+
     if (DEMO_LOGIN_ENABLED) {
       return createDemoSession(credentials);
     }
@@ -291,4 +299,18 @@ export async function login(credentials: LoginCredentials): Promise<AuthSession>
 
     throw error;
   }
+}
+
+function responseLooksLikeAuthPayload(payload: unknown): boolean {
+  const root = toRecord(payload);
+  if (!root) {
+    return false;
+  }
+  const source = toRecord(root.data) ?? root;
+  const token =
+    readString(source.token) ??
+    readString(source.access_token) ??
+    readString(source.accessToken) ??
+    readString(source.jwt);
+  return token !== null;
 }

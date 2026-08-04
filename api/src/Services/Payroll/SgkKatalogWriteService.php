@@ -419,8 +419,11 @@ final class SgkKatalogWriteService
     }
 
     /**
-     * Submit/approve may send only katalog_surumu. Prefer explicit package evaluation;
-     * otherwise trust the imported surum snapshot already stored in DB.
+     * Submit/approve may send only katalog_surumu.
+     * Explicit kod/package rows trigger fresh tamlik evaluation (initial catalog import path).
+     * Controller-injected manifests alone must NOT force empty-package re-evaluation —
+     * that breaks esleme successor submit which already carries persisted parent evidence.
+     * Request manifests are never the security owner for successor transitions.
      *
      * @param array<string,mixed> $existing
      * @param array<string,mixed> $payload
@@ -432,22 +435,53 @@ final class SgkKatalogWriteService
             return SgkKatalogTamlikService::evaluate($payload['tamlik_input']);
         }
 
-        $hasPackage = !empty($payload['manifests']) || !empty($payload['rows']);
-        if ($hasPackage) {
+        // Require explicit package rows/kodlar — manifests-only (controller inject) uses stored path.
+        $hasExplicitRows = !empty($payload['rows']) || !empty($payload['kod_satirlari']);
+        if ($hasExplicitRows) {
             $flags = is_array($payload['tamlik'] ?? null) ? $payload['tamlik'] : [];
+            $kodSatirlari = !empty($payload['rows']) && is_array($payload['rows'])
+                ? $payload['rows']
+                : (is_array($payload['kod_satirlari'] ?? null) ? $payload['kod_satirlari'] : []);
 
             return SgkKatalogTamlikService::evaluate(array_merge($flags, [
                 'katalog_surumu' => (string) ($existing['surum_kodu'] ?? ''),
                 'manifests' => $payload['manifests'] ?? [],
-                'kod_satirlari' => $payload['rows'] ?? [],
+                'kod_satirlari' => $kodSatirlari,
             ]));
         }
 
+        return self::resolveStoredSurumTamlik($pdo, $existing);
+    }
+
+    /**
+     * Trust persisted surum tamlik + kod snapshot. For esleme successors, also require
+     * approved parent catalog evidence and combined source-hash continuity.
+     *
+     * @param array<string,mixed> $existing
+     * @return array<string,mixed>
+     */
+    private static function resolveStoredSurumTamlik(PDO $pdo, array $existing): array
+    {
         $stored = strtoupper((string) ($existing['tamlik_durumu'] ?? 'TASLAK'));
         $approved = in_array($stored, ['RESMI_KAYNAKLI_KISITLI', 'DOGRULANMIS_TAM'], true);
+        $surumId = (int) ($existing['id'] ?? 0);
+
         $stmt = $pdo->prepare('SELECT COUNT(*) FROM sgk_eksik_gun_kodlari WHERE katalog_surum_id = :id');
-        $stmt->execute(['id' => (int) ($existing['id'] ?? 0)]);
+        $stmt->execute(['id' => $surumId]);
         $kodSayisi = (int) $stmt->fetchColumn();
+
+        $eslemeSayisi = 0;
+        if ($surumId > 0) {
+            try {
+                $eslemeStmt = $pdo->prepare(
+                    'SELECT COUNT(*) FROM sgk_surec_neden_eslemeleri WHERE katalog_surum_id = :id'
+                );
+                $eslemeStmt->execute(['id' => $surumId]);
+                $eslemeSayisi = (int) $eslemeStmt->fetchColumn();
+            } catch (PDOException $e) {
+                $eslemeSayisi = 0;
+            }
+        }
 
         $blockers = [];
         if (!$approved || $kodSayisi <= 0) {
@@ -458,18 +492,107 @@ final class SgkKatalogWriteService
             );
         }
 
+        if ($eslemeSayisi > 0) {
+            $parentEvidence = self::assertEslemeSuccessorParentEvidence($pdo, $existing);
+            if (empty($parentEvidence['ok'])) {
+                foreach ($parentEvidence['blockers'] as $blocker) {
+                    $blockers[] = $blocker;
+                }
+            }
+        }
+
+        $onaylanabilir = $approved && $kodSayisi > 0 && $blockers === [];
+
         return [
             'tamlik_durumu' => $stored,
             'katalog_surumu' => (string) ($existing['surum_kodu'] ?? ''),
             'manifest_set_hash' => (string) ($existing['manifest_set_hash'] ?? ''),
             'kod_sayisi' => $kodSayisi,
-            'blocker_kodlari' => array_values(array_map(static fn (array $b) => $b['code'], $blockers)),
+            'esleme_sayisi' => $eslemeSayisi,
+            'blocker_kodlari' => array_values(array_map(static function (array $b) {
+                return $b['code'];
+            }, $blockers)),
             'blocker_detaylari' => $blockers,
-            'onaylanabilir_mi' => $approved && $kodSayisi > 0,
+            'onaylanabilir_mi' => $onaylanabilir,
             'dogrulanmis_tam_secilebilir_mi' => $stored === 'DOGRULANMIS_TAM',
             'import_yazma_aktif_mi' => $approved,
             'approve_aktif_mi' => $approved,
+            'successor_evidence_owner' => $eslemeSayisi > 0 ? 'PERSISTED_APPROVED_PARENT_CATALOG' : 'STORED_SURUM_SNAPSHOT',
         ];
+    }
+
+    /**
+     * Esleme successor packages store parent + esleme hash in aciklama at import time.
+     * Completeness owner is the persisted approved parent — not request manifests.
+     *
+     * @param array<string,mixed> $existing
+     * @return array{ok: bool, blockers: list<array<string,mixed>>}
+     */
+    private static function assertEslemeSuccessorParentEvidence(PDO $pdo, array $existing): array
+    {
+        $blockers = [];
+        $aciklama = (string) ($existing['aciklama'] ?? '');
+        $parentKodu = '';
+        $eslemeHash = '';
+        if (preg_match('/parent=([A-Za-z0-9._\\-]+)/', $aciklama, $parentMatch)) {
+            $parentKodu = (string) $parentMatch[1];
+        }
+        if (preg_match('/esleme=([a-f0-9]{64})/i', $aciklama, $eslemeMatch)) {
+            $eslemeHash = strtolower((string) $eslemeMatch[1]);
+        }
+
+        if ($parentKodu === '') {
+            $blockers[] = SgkKatalogContracts::blocker(
+                SgkKatalogContracts::BLOCKER_TAMLIK,
+                'Esleme successor parent iliskisi cozulemedi.',
+                'Parent katalog referansi kayitli aciklamada bulunamadi.'
+            );
+
+            return ['ok' => false, 'blockers' => $blockers];
+        }
+
+        $parent = self::fetchSurumByKodu($pdo, $parentKodu);
+        if ($parent === null) {
+            $blockers[] = SgkKatalogContracts::blocker(
+                SgkKatalogContracts::BLOCKER_TAMLIK,
+                'Esleme successor parent katalog bulunamadi.',
+                'Parent katalog kaydini dogrulayin.'
+            );
+
+            return ['ok' => false, 'blockers' => $blockers];
+        }
+
+        if ((string) ($parent['state'] ?? '') !== 'ONAYLANDI') {
+            $blockers[] = SgkKatalogContracts::blocker(
+                SgkKatalogContracts::BLOCKER_TAMLIK,
+                'Esleme successor parent katalog ONAYLANDI degil.',
+                'Parent katalog onayli olmadan successor submit/approve yapilamaz.'
+            );
+        }
+
+        $parentTamlik = strtoupper((string) ($parent['tamlik_durumu'] ?? ''));
+        if (!in_array($parentTamlik, ['RESMI_KAYNAKLI_KISITLI', 'DOGRULANMIS_TAM'], true)) {
+            $blockers[] = SgkKatalogContracts::blocker(
+                SgkKatalogContracts::BLOCKER_TAMLIK,
+                'Esleme successor parent katalog tamlik kaniti eksik.',
+                'Parent katalog RESMI_KAYNAKLI_KISITLI veya DOGRULANMIS_TAM olmalidir.'
+            );
+        }
+
+        $parentHash = (string) ($parent['katalog_payload_hash'] ?? '');
+        $successorHash = (string) ($existing['katalog_payload_hash'] ?? '');
+        if ($eslemeHash !== '' && $parentHash !== '' && $successorHash !== '') {
+            $expected = hash('sha256', $parentHash . '|' . $eslemeHash);
+            if (!hash_equals($expected, $successorHash)) {
+                $blockers[] = SgkKatalogContracts::blocker(
+                    SgkKatalogContracts::BLOCKER_TAMLIK,
+                    'Esleme successor parent source-hash uyusmuyor.',
+                    'Parent katalog hash drift; yeni successor import gerekli.'
+                );
+            }
+        }
+
+        return ['ok' => $blockers === [], 'blockers' => $blockers];
     }
 
     private static function countManifestLinks(PDO $pdo, int $surumId): int

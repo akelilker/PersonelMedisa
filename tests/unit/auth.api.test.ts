@@ -154,4 +154,111 @@ describe("auth.api login", () => {
     expect(session.user.rol).toBe("PATRON");
     expect(session.ui_profile).toBe("yonetim");
   });
+
+  it("accepts IK_BORDRO from successful login without demoting role", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        createJsonResponse({
+          data: {
+            token: "ik-token",
+            ui_profile: "yonetim",
+            user: {
+              id: 8,
+              ad_soyad: "Fixture Preparer",
+              rol: "IK_BORDRO",
+              sube_ids: [1, 2]
+            },
+            active_sube_id: 1
+          },
+          meta: {},
+          errors: []
+        })
+      )
+    );
+
+    const session = await login({ username: "hazirlayan", password: "secret" });
+    expect(session.token).toBe("ik-token");
+    expect(session.user.rol).toBe("IK_BORDRO");
+    expect(session.ui_profile).toBe("yonetim");
+    expect(session.user.sube_ids).toEqual([1, 2]);
+    expect(session.active_sube_id).toBe(1);
+  });
+
+  it("accepts SGK_KARAR_ONAY_YETKILISI from successful login without demoting role", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        createJsonResponse({
+          data: {
+            token: "appr-token",
+            ui_profile: "yonetim",
+            user: {
+              id: 9,
+              ad_soyad: "Fixture Approver",
+              rol: "SGK_KARAR_ONAY_YETKILISI",
+              sube_ids: [1, 2]
+            },
+            active_sube_id: 1
+          },
+          meta: {},
+          errors: []
+        })
+      )
+    );
+
+    const session = await login({ username: "onaylayan", password: "secret" });
+    expect(session.token).toBe("appr-token");
+    expect(session.user.rol).toBe("SGK_KARAR_ONAY_YETKILISI");
+    expect(session.ui_profile).toBe("yonetim");
+  });
+
+  it("fail-closes unknown role even when login HTTP 200", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        createJsonResponse({
+          data: {
+            token: "bad-role-token",
+            ui_profile: "yonetim",
+            user: {
+              id: 99,
+              ad_soyad: "Unknown Role User",
+              rol: "HAYALI_ROL"
+            }
+          },
+          meta: {},
+          errors: []
+        })
+      )
+    );
+
+    await expect(login({ username: "x", password: "y" })).rejects.toMatchObject({
+      message: "Login yaniti beklenen oturum formatinda degil."
+    });
+  });
+
+  it("fail-closes empty role even when login HTTP 200", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        createJsonResponse({
+          data: {
+            token: "empty-role-token",
+            user: {
+              id: 99,
+              ad_soyad: "Empty Role User",
+              rol: ""
+            }
+          },
+          meta: {},
+          errors: []
+        })
+      )
+    );
+
+    await expect(login({ username: "x", password: "y" })).rejects.toMatchObject({
+      message: "Login yaniti beklenen oturum formatinda degil."
+    });
+  });
 });

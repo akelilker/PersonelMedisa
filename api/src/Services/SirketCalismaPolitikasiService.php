@@ -256,6 +256,15 @@ class SirketCalismaPolitikasiService
             if ($open) {
                 throw new SirketCalismaPolitikasiException('POLICY_DRAFT_EXISTS', 'Aktif taslak politika zaten mevcut.', 409);
             }
+            $openApproved = $pdo->query(
+                "SELECT id, revision_no FROM sirket_calisma_politikalari
+                 WHERE state = 'ONAYLANDI' AND gecerlilik_bitis IS NULL
+                 ORDER BY id DESC LIMIT 1 FOR UPDATE"
+            )->fetch(PDO::FETCH_ASSOC);
+            if ($openApproved) {
+                $parentId = (int) $openApproved['id'];
+                $revision = ((int) $openApproved['revision_no']) + 1;
+            }
             $ins = $pdo->prepare(
                 'INSERT INTO sirket_calisma_politikalari (
                     revision_no, parent_politika_id, state, gecerlilik_baslangic, gecerlilik_bitis,
@@ -395,10 +404,16 @@ class SirketCalismaPolitikasiService
                 );
             }
             $openApproved = $pdo->query(
-                "SELECT id FROM sirket_calisma_politikalari WHERE state = 'ONAYLANDI' AND gecerlilik_bitis IS NULL LIMIT 1 FOR UPDATE"
+                "SELECT id, gecerlilik_baslangic FROM sirket_calisma_politikalari
+                 WHERE state = 'ONAYLANDI' AND gecerlilik_bitis IS NULL LIMIT 1 FOR UPDATE"
             )->fetch(PDO::FETCH_ASSOC);
             if ($openApproved) {
+                // Predecessor end = new_start - 1 day, clamped to predecessor start (same-day supersede).
                 $end = (new \DateTimeImmutable((string) $row['gecerlilik_baslangic']))->modify('-1 day')->format('Y-m-d');
+                $prevStart = (string) $openApproved['gecerlilik_baslangic'];
+                if ($end < $prevStart) {
+                    $end = $prevStart;
+                }
                 $pdo->prepare(
                     "UPDATE sirket_calisma_politikalari SET gecerlilik_bitis = :bitis, updated_by = :u WHERE id = :id"
                 )->execute(['bitis' => $end, 'u' => self::actorId($actor), 'id' => (int) $openApproved['id']]);

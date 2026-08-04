@@ -723,7 +723,8 @@ assertTrue(strpos($contractsSrc, 'GECERLILIK_TARIH_DURUMU') !== false, 'contract
 
 $writeSrc = file_get_contents(__DIR__ . '/../../api/src/Services/Payroll/SgkKatalogWriteService.php');
 assertTrue(strpos($writeSrc, 'beginTransaction') !== false, 'write service transaction');
-assertTrue(strpos($writeSrc, 'GENEL_YONETICI') !== false, 'write service rol kontrol');
+assertTrue(strpos($writeSrc, 'SgkKararPaketiAuthz::assertPrepare') !== false, 'write service prepare authz');
+assertTrue(strpos($writeSrc, 'SgkKararPaketiAuthz::assertApprove') !== false, 'write service approve authz');
 
 $routerSrc = file_get_contents(__DIR__ . '/../../api/src/Router.php');
 assertTrue(strpos($routerSrc, '/sgk-katalog-hazirlik/import') !== false, 'router import route');

@@ -24,6 +24,7 @@ use Medisa\Api\Services\Payroll\SgkSirketPolitikaWriteService;
 use Medisa\Api\Services\Payroll\SgkSurecEslemeImportValidator;
 use Medisa\Api\Services\Payroll\SgkSurecEslemeWriteService;
 use Medisa\Api\Services\Payroll\SgkSurecKodEslemeValidator;
+use Medisa\Api\Services\Payroll\SgkKararPaketiAuthz;
 use Medisa\Api\Http\CsvResponse;
 use PDO;
 use RuntimeException;
@@ -144,7 +145,7 @@ class SgkKatalogHazirlikController
 
     public static function import(Request $request)
     {
-        [$pdo, $user] = self::writeContext($request);
+        [$pdo, $user] = self::writeContext($request, SgkKararPaketiAuthz::PERM_PREPARE);
         $body = self::jsonBody($request);
         if (empty($body['manifests'])) {
             $body['manifests'] = self::loadManifests($pdo, 'import');
@@ -152,10 +153,7 @@ class SgkKatalogHazirlikController
         try {
             $result = SgkKatalogWriteService::import($pdo, $user, $body);
         } catch (RuntimeException $e) {
-            if ($e->getMessage() === 'SGK_KATALOG_WRITE_FORBIDDEN') {
-                JsonResponse::error(403, 'SGK_KATALOG_WRITE_FORBIDDEN', 'SGK katalog yazma yalniz GENEL_YONETICI icindir.');
-            }
-            throw $e;
+            self::mapAuthzException($e);
         }
         $status = (int) ($result['http_status'] ?? 200);
         if ($status >= 400) {
@@ -166,7 +164,7 @@ class SgkKatalogHazirlikController
 
     public static function submit(Request $request)
     {
-        [$pdo, $user] = self::writeContext($request);
+        [$pdo, $user] = self::writeContext($request, SgkKararPaketiAuthz::PERM_PREPARE);
         $body = self::jsonBody($request);
         if (empty($body['manifests'])) {
             $body['manifests'] = self::loadManifests($pdo, 'submit');
@@ -174,10 +172,7 @@ class SgkKatalogHazirlikController
         try {
             $result = SgkKatalogWriteService::submit($pdo, $user, $body);
         } catch (RuntimeException $e) {
-            if ($e->getMessage() === 'SGK_KATALOG_WRITE_FORBIDDEN') {
-                JsonResponse::error(403, 'SGK_KATALOG_WRITE_FORBIDDEN', 'SGK katalog yazma yalniz GENEL_YONETICI icindir.');
-            }
-            throw $e;
+            self::mapAuthzException($e);
         }
         $status = (int) ($result['http_status'] ?? 200);
         if ($status >= 400) {
@@ -188,7 +183,7 @@ class SgkKatalogHazirlikController
 
     public static function approve(Request $request)
     {
-        [$pdo, $user] = self::writeContext($request);
+        [$pdo, $user] = self::writeContext($request, SgkKararPaketiAuthz::PERM_APPROVE);
         $body = self::jsonBody($request);
         if (empty($body['manifests'])) {
             $body['manifests'] = self::loadManifests($pdo, 'approve');
@@ -196,10 +191,7 @@ class SgkKatalogHazirlikController
         try {
             $result = SgkKatalogWriteService::approve($pdo, $user, $body);
         } catch (RuntimeException $e) {
-            if ($e->getMessage() === 'SGK_KATALOG_WRITE_FORBIDDEN') {
-                JsonResponse::error(403, 'SGK_KATALOG_WRITE_FORBIDDEN', 'SGK katalog yazma yalniz GENEL_YONETICI icindir.');
-            }
-            throw $e;
+            self::mapAuthzException($e);
         }
         $status = (int) ($result['http_status'] ?? 200);
         if ($status >= 400) {
@@ -234,7 +226,7 @@ class SgkKatalogHazirlikController
 
     public static function surecEslemeImport(Request $request)
     {
-        [$pdo, $user] = self::writeContext($request);
+        [$pdo, $user] = self::writeContext($request, SgkKararPaketiAuthz::PERM_PREPARE);
         $body = self::jsonBody($request);
         if (empty($body['manifests'])) {
             $body['manifests'] = self::loadManifests($pdo, 'surec_esleme_import');
@@ -242,10 +234,7 @@ class SgkKatalogHazirlikController
         try {
             $result = SgkSurecEslemeWriteService::import($pdo, $user, $body);
         } catch (RuntimeException $e) {
-            if ($e->getMessage() === 'SGK_KATALOG_WRITE_FORBIDDEN') {
-                JsonResponse::error(403, 'SGK_KATALOG_WRITE_FORBIDDEN', 'SGK esleme yazma yalniz GENEL_YONETICI icindir.');
-            }
-            throw $e;
+            self::mapAuthzException($e);
         }
         $status = (int) ($result['http_status'] ?? 200);
         if ($status >= 400) {
@@ -276,14 +265,11 @@ class SgkKatalogHazirlikController
 
     public static function sirketPolitikasiImport(Request $request)
     {
-        [$pdo, $user] = self::writeContext($request);
+        [$pdo, $user] = self::writeContext($request, SgkKararPaketiAuthz::PERM_PREPARE);
         try {
             $result = SgkSirketPolitikaWriteService::import($pdo, $user, self::jsonBody($request));
         } catch (RuntimeException $e) {
-            if ($e->getMessage() === 'SGK_KATALOG_WRITE_FORBIDDEN') {
-                JsonResponse::error(403, 'SGK_KATALOG_WRITE_FORBIDDEN', 'SGK politika yazma yalniz GENEL_YONETICI icindir.');
-            }
-            throw $e;
+            self::mapAuthzException($e);
         }
         $status = (int) ($result['http_status'] ?? 200);
         if ($status >= 400) {
@@ -294,14 +280,11 @@ class SgkKatalogHazirlikController
 
     public static function sirketPolitikasiSubmit(Request $request)
     {
-        [$pdo, $user] = self::writeContext($request);
+        [$pdo, $user] = self::writeContext($request, SgkKararPaketiAuthz::PERM_PREPARE);
         try {
             $result = SgkSirketPolitikaWriteService::submit($pdo, $user, self::jsonBody($request));
         } catch (RuntimeException $e) {
-            if ($e->getMessage() === 'SGK_KATALOG_WRITE_FORBIDDEN') {
-                JsonResponse::error(403, 'SGK_KATALOG_WRITE_FORBIDDEN', 'SGK politika yazma yalniz GENEL_YONETICI icindir.');
-            }
-            throw $e;
+            self::mapAuthzException($e);
         }
         $status = (int) ($result['http_status'] ?? 200);
         if ($status >= 400) {
@@ -312,14 +295,11 @@ class SgkKatalogHazirlikController
 
     public static function sirketPolitikasiApprove(Request $request)
     {
-        [$pdo, $user] = self::writeContext($request);
+        [$pdo, $user] = self::writeContext($request, SgkKararPaketiAuthz::PERM_APPROVE);
         try {
             $result = SgkSirketPolitikaWriteService::approve($pdo, $user, self::jsonBody($request));
         } catch (RuntimeException $e) {
-            if ($e->getMessage() === 'SGK_KATALOG_WRITE_FORBIDDEN') {
-                JsonResponse::error(403, 'SGK_KATALOG_WRITE_FORBIDDEN', 'SGK politika yazma yalniz GENEL_YONETICI icindir.');
-            }
-            throw $e;
+            self::mapAuthzException($e);
         }
         $status = (int) ($result['http_status'] ?? 200);
         if ($status >= 400) {
@@ -465,16 +445,51 @@ class SgkKatalogHazirlikController
     }
 
     /** @return array{0:PDO,1:array} */
-    private static function writeContext(Request $request): array
+    private static function writeContext(Request $request, string $requiredPermission): array
     {
         $user = AuthMiddleware::authenticate($request, true);
-        if (strtoupper((string) ($user['rol'] ?? '')) !== 'GENEL_YONETICI') {
-            JsonResponse::error(403, 'SGK_KATALOG_WRITE_FORBIDDEN', 'SGK katalog yazma yalniz GENEL_YONETICI icindir.');
+        if (!RolePermissions::has($user, $requiredPermission)) {
+            $code = $requiredPermission === SgkKararPaketiAuthz::PERM_APPROVE
+                ? 'SGK_APPROVE_FORBIDDEN'
+                : 'SGK_PREPARE_FORBIDDEN';
+            $message = $requiredPermission === SgkKararPaketiAuthz::PERM_APPROVE
+                ? 'SGK karar paketi onay yetkisi yok.'
+                : 'SGK karar paketi hazirlama yetkisi yok.';
+            JsonResponse::error(403, $code, $message);
         }
         $pdo = Connection::get();
         SubeScope::resolveScope($user, $request);
 
         return [$pdo, $user];
+    }
+
+    private static function mapAuthzException(RuntimeException $e): void
+    {
+        $code = $e->getMessage();
+        $messages = [
+            'SGK_PREPARE_FORBIDDEN' => 'SGK karar paketi hazirlama yetkisi yok.',
+            'SGK_APPROVE_FORBIDDEN' => 'SGK karar paketi onay yetkisi yok.',
+            'SGK_SELF_APPROVAL_FORBIDDEN' => 'Hazirlayan kendi kaydini onaylayamaz.',
+            'SGK_SAME_ACTOR_IDENTITY_FORBIDDEN' => 'Ayni actor identity dual-control icin kullanilamaz.',
+            'SGK_SAME_PERSON_DUAL_CONTROL_FORBIDDEN' => 'Ayni actor identity dual-control icin kullanilamaz.',
+            'SGK_ACTOR_INACTIVE' => 'Actor pasif; islem reddedildi.',
+            'SGK_ACTOR_IDENTITY_INVALID' => 'Actor kimligi gecersiz.',
+            'SGK_ACTOR_IDENTITY_NOT_READY' => 'Generic/shared hesap formal SGK actor olarak hazir degil.',
+            'SGK_ACTOR_IDENTITY_SCHEMA_REQUIRED' => 'actor_identities / users.actor_identity_id semasi formal SGK yazimi icin zorunlu.',
+            'SGK_ACTOR_IDENTITY_LINK_REQUIRED' => 'Actor identity bagi zorunlu.',
+            'SGK_ACTOR_IDENTITY_NOT_FOUND' => 'Actor identity kaydi bulunamadi.',
+            'SGK_ACTOR_IDENTITY_NOT_VERIFIED' => 'Actor identity dogrulanmamis veya iptal edilmis.',
+            'SGK_PREPARER_ACTOR_IDENTITY_REQUIRED' => 'Hazirlayan actor identity bagi zorunlu.',
+            'SGK_APPROVER_ACTOR_IDENTITY_REQUIRED' => 'Onaylayan actor identity bagi zorunlu.',
+            'SGK_ACTOR_IDENTITY_CONFLICT' => 'Ayni actor identity birden fazla hesaba bagli; islem reddedildi.',
+            'SGK_ACTOR_SCOPE_NOT_READY' => 'Actor sube kapsami tanimli degil.',
+            'SGK_ACTOR_SCOPE_FORBIDDEN' => 'Actor sube kapsaminda degil.',
+            'SGK_KATALOG_WRITE_FORBIDDEN' => 'SGK yazma yetkisi yok.',
+        ];
+        if (isset($messages[$code])) {
+            JsonResponse::error(403, $code, $messages[$code]);
+        }
+        throw $e;
     }
 
     /** @return array{0:PDO,1:array,2:?int} */

@@ -10,8 +10,14 @@ describe("S98 SGK mapping + policy source guards", () => {
   it("migration 047 real decision contract present", () => {
     const names = readdirSync(resolve("api/migrations")).filter((n) => n.endsWith(".sql")).sort();
     expect(names.some((n) => /^047_sgk_real_decision_contract\.sql$/.test(n))).toBe(true);
+    expect(names.some((n) => /^048_sgk_dual_control_actor_roles\.sql$/.test(n))).toBe(true);
     expect(read("api/migrations/047_sgk_real_decision_contract.sql")).toContain("MAZERET_IZNI");
     expect(read("api/migrations/047_sgk_real_decision_contract.sql")).toContain("KISMI_SURE_DEVAMSIZLIK");
+    expect(read("api/migrations/048_sgk_dual_control_actor_roles.sql")).toContain("IK_BORDRO");
+    expect(read("api/migrations/048_sgk_dual_control_actor_roles.sql")).toContain("SGK_KARAR_ONAY_YETKILISI");
+    expect(read("api/migrations/048_sgk_dual_control_actor_roles.sql")).toContain("actor_identities");
+    expect(read("api/migrations/048_sgk_dual_control_actor_roles.sql")).toContain("actor_identity_id");
+    expect(read("api/migrations/048_sgk_dual_control_actor_roles.sql")).not.toContain("uq_users_personel_id");
     expect(read("api/src/Services/Payroll/SgkEslemeKararContract.php")).toContain("HER_ZAMAN_DAHIL");
     expect(read("api/src/Services/Payroll/SgkSurecEslemeImportValidator.php")).toContain("karar_kurali");
     expect(read("api/src/Services/Payroll/SgkSurecEslemeWriteService.php")).toContain("SUREC_ESLEME_DRAFT_ONAY");
@@ -23,8 +29,20 @@ describe("S98 SGK mapping + policy source guards", () => {
     const write = read("api/src/Services/Payroll/SgkKatalogWriteService.php");
     const onay = read("api/src/Services/Payroll/SgkKatalogOnayService.php");
     const eslemeWrite = read("api/src/Services/Payroll/SgkSurecEslemeWriteService.php");
-    expect(write).toContain("SGK_KATALOG_SELF_APPROVAL_DENIED");
+    const authz = read("api/src/Services/Payroll/SgkKararPaketiAuthz.php");
+    expect(authz).toContain("SGK_SELF_APPROVAL_FORBIDDEN");
+    expect(write).toContain("denySelfApproval");
     expect(write).toContain("SGK_KATALOG_TARIH_CAKISMA");
+    expect(authz).toContain("sgk_karar_paketi.prepare");
+    expect(authz).toContain("sgk_karar_paketi.approve");
+    expect(authz).toContain("SGK_SAME_ACTOR_IDENTITY_FORBIDDEN");
+    expect(authz).toContain("SGK_ACTOR_IDENTITY_LINK_REQUIRED");
+    expect(authz).toContain("SGK_PREPARER_ACTOR_IDENTITY_REQUIRED");
+    expect(authz).toContain("SGK_ACTOR_IDENTITY_SCHEMA_REQUIRED");
+    expect(authz).toContain("SGK_ACTOR_SCOPE_NOT_READY");
+    expect(authz).toContain("SGK_ACTOR_IDENTITY_INVALID");
+    expect(authz).not.toContain("SGK_ACTOR_PERSONEL_LINK_REQUIRED");
+    expect(authz).not.toContain("static $cached");
     expect(onay).toContain("SELF_APPROVAL");
     expect(eslemeWrite).toContain("Never touch parent");
   });
@@ -42,9 +60,20 @@ describe("S98 SGK mapping + policy source guards", () => {
     expect(api).toContain("approveSgkSirketPolitikasi");
   });
 
-  it("GENEL_YONETICI write and parent immutability comments", () => {
+  it("least-privilege prepare/approve replaces GENEL_YONETICI write hardcode", () => {
     const eslemeWrite = read("api/src/Services/Payroll/SgkSurecEslemeWriteService.php");
-    expect(eslemeWrite).toContain("GENEL_YONETICI");
+    const controller = read("api/src/Controllers/SgkKatalogHazirlikController.php");
+    const perms = read("api/src/Auth/RolePermissions.php");
+    expect(eslemeWrite).toContain("SgkKararPaketiAuthz::assertPrepare");
+    expect(eslemeWrite).not.toContain("assertGenelYonetici");
+    expect(controller).toContain("SgkKararPaketiAuthz::PERM_PREPARE");
+    expect(controller).toContain("SgkKararPaketiAuthz::PERM_APPROVE");
+    expect(controller).not.toContain("rol === 'GENEL_YONETICI'");
+    expect(controller).not.toContain('!== \'GENEL_YONETICI\'');
+    expect(perms).toContain("sgk_karar_paketi.prepare");
+    expect(perms).toContain("sgk_karar_paketi.approve");
+    expect(perms).toContain("IK_BORDRO");
+    expect(perms).toContain("SGK_KARAR_ONAY_YETKILISI");
     expect(eslemeWrite).toContain("Never touch parent");
     expect(eslemeWrite).toContain("parent_immutable_mi");
   });
@@ -92,6 +121,11 @@ describe("S98 SGK mapping + policy source guards", () => {
       "api/src/Services/Payroll/SgkSurecEslemeImportValidator.php",
       "api/src/Services/Payroll/SgkKatalogContracts.php",
       "api/src/Http/CsvResponse.php",
+      "api/src/Services/Payroll/SgkKararPaketiAuthz.php",
+      "api/src/Services/Payroll/SgkSurecEslemeWriteService.php",
+      "api/src/Services/Payroll/SgkSirketPolitikaWriteService.php",
+      "api/src/Services/Payroll/SgkKatalogWriteService.php",
+      "api/src/Controllers/SgkKatalogHazirlikController.php",
     ];
     for (const path of bootstrapFiles) {
       const src = read(path);
@@ -134,7 +168,9 @@ describe("S98 SGK mapping + policy source guards", () => {
     expect(panel).toContain('data-testid="sgk-politika-approve"');
     expect(panel).toContain("SUREC_ESLEME_DRAFT_ONAY");
     expect(panel).toContain("SGK_POLITIKA_DRAFT_ONAY");
-    expect(panel).toContain("hasRole(\"GENEL_YONETICI\")");
+    expect(panel).toContain('hasPermission("sgk_karar_paketi.prepare")');
+    expect(panel).toContain('hasPermission("sgk_karar_paketi.approve")');
+    expect(panel).not.toContain("hasRole(\"GENEL_YONETICI\")");
     expect(panel).toContain("dryRunSgkSurecEsleme");
     expect(panel).toContain("importSgkSurecEsleme");
     expect(panel).toContain("submitSgkKatalog");

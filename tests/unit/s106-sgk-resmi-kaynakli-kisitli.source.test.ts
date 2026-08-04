@@ -80,11 +80,11 @@ describe("S106 RESMI_KAYNAKLI_KISITLI katalog", () => {
     expect(migration042).not.toMatch(/\b(?:DELETE\s+FROM|TRUNCATE|DROP\s+TABLE)\b/i);
   });
 
-  it("migration sequence ends with 043", () => {
+  it("migration sequence ends with 048", () => {
     const names = readdirSync(resolve("api/migrations"))
       .filter((n) => n.endsWith(".sql"))
       .sort();
-    expect(names.at(-1)).toBe("047_sgk_real_decision_contract.sql");
+    expect(names.at(-1)).toBe("048_sgk_dual_control_actor_roles.sql");
   });
 
   it("contracts/validators expose S106 enums and write path", () => {
@@ -101,7 +101,8 @@ describe("S106 RESMI_KAYNAKLI_KISITLI katalog", () => {
     expect(writeSvc).toContain("function import");
     expect(writeSvc).toContain("function submit");
     expect(writeSvc).toContain("function approve");
-    expect(writeSvc).toContain("GENEL_YONETICI");
+    expect(writeSvc).toContain("SgkKararPaketiAuthz::assertPrepare");
+    expect(writeSvc).toContain("SgkKararPaketiAuthz::assertApprove");
     expect(engine).toContain("RESMI_KAYNAKLI_KISITLI");
     expect(engine).toContain("BELIRLENEMEDI");
   });

@@ -90,6 +90,8 @@ export type AppPermission =
   | "revizyon.view_finance_effect"
   | "revizyon.view_audit_history"
   | "sgk.manuel_kod_override"
+  | "sgk_karar_paketi.prepare"
+  | "sgk_karar_paketi.approve"
   | "ops.auth_smoke.read";
 
 const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
@@ -166,7 +168,9 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "revizyon.reject",
     "revizyon.view_finance_effect",
     "revizyon.view_audit_history",
-    "sgk.manuel_kod_override"
+    "sgk.manuel_kod_override",
+    "sgk_karar_paketi.prepare",
+    "sgk_karar_paketi.approve"
   ],
   BOLUM_YONETICISI: [
     "personeller.view",
@@ -311,7 +315,23 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "patron_ack.view",
     "patron_ack.mark_seen"
   ],
-  AUTH_SMOKE_READONLY: ["ops.auth_smoke.read"]
+  AUTH_SMOKE_READONLY: ["ops.auth_smoke.read"],
+  IK_BORDRO: [
+    "personeller.view",
+    "personeller.view.sube",
+    "personeller.detail.view",
+    "personeller.ucret.view",
+    "mevzuat_parametreleri.view",
+    "bordro_on_izleme.view",
+    "raporlar.view",
+    "sgk_karar_paketi.prepare"
+  ],
+  SGK_KARAR_ONAY_YETKILISI: [
+    "mevzuat_parametreleri.view",
+    "bordro_on_izleme.view",
+    "raporlar.view",
+    "sgk_karar_paketi.approve"
+  ]
 };
 
 const EMPTY_PERMISSIONS: readonly AppPermission[] = [];

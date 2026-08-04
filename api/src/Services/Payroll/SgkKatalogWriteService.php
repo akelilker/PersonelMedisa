@@ -20,7 +20,7 @@ final class SgkKatalogWriteService
      */
     public static function import(PDO $pdo, array $actor, array $payload): array
     {
-        self::assertGenelYonetici($actor);
+        self::assertPrepare($pdo, $actor);
 
         $dry = SgkKatalogImportValidator::dryRun($payload);
         if (($dry['hatali_satirlar'] ?? []) !== []) {
@@ -173,7 +173,7 @@ final class SgkKatalogWriteService
      */
     public static function submit(PDO $pdo, array $actor, array $payload): array
     {
-        self::assertGenelYonetici($actor);
+        self::assertPrepare($pdo, $actor);
 
         $surumKodu = (string) ($payload['katalog_surumu'] ?? $payload['surum_kodu'] ?? '');
         if ($surumKodu === '') {
@@ -236,7 +236,7 @@ final class SgkKatalogWriteService
      */
     public static function approve(PDO $pdo, array $actor, array $payload): array
     {
-        self::assertGenelYonetici($actor);
+        self::assertApprove($pdo, $actor);
 
         $surumKodu = (string) ($payload['katalog_surumu'] ?? $payload['surum_kodu'] ?? '');
         if ($surumKodu === '') {
@@ -250,8 +250,13 @@ final class SgkKatalogWriteService
 
         $actorId = (int) ($actor['id'] ?? 0);
         $hazirlayanId = (int) ($existing['hazirlayan_id'] ?? 0);
-        if ($hazirlayanId > 0 && $actorId > 0 && $hazirlayanId === $actorId) {
-            return self::result(403, 'SGK_KATALOG_SELF_APPROVAL_DENIED', 'Hazirlayan kendi katalog surumunu onaylayamaz.');
+        $self = SgkKararPaketiAuthz::denySelfApproval($actor, $hazirlayanId);
+        if (empty($self['ok'])) {
+            return self::result(403, (string) $self['code'], (string) $self['message']);
+        }
+        $samePerson = SgkKararPaketiAuthz::denySamePerson($pdo, $actor, $hazirlayanId);
+        if (empty($samePerson['ok'])) {
+            return self::result(403, (string) $samePerson['code'], (string) $samePerson['message']);
         }
 
         if (self::hasApprovedCatalogOverlap($pdo, $existing)) {
@@ -318,13 +323,19 @@ final class SgkKatalogWriteService
     }
 
     /**
-     * @param array{id?: int, rol?: string} $actor
+     * @param array{id?: int, rol?: string, username?: string, durum?: string, sube_ids?: list<int>} $actor
      */
-    private static function assertGenelYonetici(array $actor): void
+    private static function assertPrepare(PDO $pdo, array $actor): void
     {
-        if (strtoupper((string) ($actor['rol'] ?? '')) !== 'GENEL_YONETICI') {
-            throw new RuntimeException('SGK_KATALOG_WRITE_FORBIDDEN');
-        }
+        SgkKararPaketiAuthz::assertPrepare($pdo, $actor);
+    }
+
+    /**
+     * @param array{id?: int, rol?: string, username?: string, durum?: string, sube_ids?: list<int>, actor_identity_id?: int|null, actor_identity_status?: string|null} $actor
+     */
+    private static function assertApprove(PDO $pdo, array $actor): void
+    {
+        SgkKararPaketiAuthz::assertApprove($pdo, $actor);
     }
 
     /** @param array<string,mixed> $existing */

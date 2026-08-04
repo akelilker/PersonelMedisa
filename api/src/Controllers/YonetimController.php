@@ -769,6 +769,8 @@ class YonetimController
         'MUHASEBE',
         'BIRIM_AMIRI',
         'AUTH_SMOKE_READONLY',
+        'IK_BORDRO',
+        'SGK_KARAR_ONAY_YETKILISI',
     ];
 
     private static function isAuthSmokeReadonlyRole($rol)

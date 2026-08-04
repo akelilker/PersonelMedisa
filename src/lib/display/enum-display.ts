@@ -11,7 +11,9 @@ const USER_ROLE_LABELS: Record<UserRole, string> = {
   MUHASEBE: "Muhasebe",
   BIRIM_AMIRI: "Birim Amiri Rolü",
   PATRON: "Patron",
-  AUTH_SMOKE_READONLY: "Teknik Smoke — Salt Okuma"
+  AUTH_SMOKE_READONLY: "Teknik Smoke — Salt Okuma",
+  IK_BORDRO: "İK / Bordro",
+  SGK_KARAR_ONAY_YETKILISI: "SGK Karar Onay Yetkilisi"
 };
 
 const UI_PROFILE_LABELS: Record<UiProfile, string> = {

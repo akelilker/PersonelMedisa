@@ -60,6 +60,6 @@ describe("015_bildirim_puantaj_etki_cakisma_cozumleri migration source", () => {
     const migrations = readdirSync(resolve(process.cwd(), "api/migrations"))
       .filter((name) => /^\d{3}_.*\.sql$/.test(name))
       .sort();
-    expect(migrations.at(-1)).toBe("047_sgk_real_decision_contract.sql");
+    expect(migrations.at(-1)).toBe("048_sgk_dual_control_actor_roles.sql");
   });
 });

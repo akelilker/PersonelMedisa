@@ -60,6 +60,6 @@ describe("015_bildirim_puantaj_etki_cakisma_cozumleri migration source", () => {
     const migrations = readdirSync(resolve(process.cwd(), "api/migrations"))
       .filter((name) => /^\d{3}_.*\.sql$/.test(name))
       .sort();
-    expect(migrations.at(-1)).toBe("049_personel_acil_durum_nullable.sql");
+    expect(migrations.at(-1)).toBe("050_gorevler_ad_unique.sql");
   });
 });

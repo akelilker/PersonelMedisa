@@ -249,6 +249,9 @@ class Router
         if ($path === '/referans/gorevler' && $method === 'GET') {
             ReferansController::gorevler($this->request);
         }
+        if ($path === '/referans/gorevler' && $method === 'POST') {
+            ReferansController::createGorev($this->request);
+        }
         if ($path === '/referans/personel-tipleri' && $method === 'GET') {
             ReferansController::personelTipleri($this->request);
         }

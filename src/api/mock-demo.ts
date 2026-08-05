@@ -395,6 +395,11 @@ const DEMO_GOREV_LABELS: Record<number, string> = DEMO_GOREVLER.reduce(
   {} as Record<number, string>
 );
 
+function getGorevAd(id: number | null | undefined): string | null {
+  if (id == null) return null;
+  return demoState.gorevler.find((g) => g.id === id)?.ad ?? DEMO_GOREV_LABELS[id] ?? null;
+}
+
 type DemoAylikDurum = {
   ay: string;
   personel_id: number;
@@ -424,6 +429,7 @@ const demoState: {
   bakimKayitlari: DemoMakineBakimKaydi[];
   yonetimKullanicilari: DemoYonetimKullanici[];
   departmanlar: DemoDepartman[];
+  gorevler: Array<{ id: number; ad: string }>;
   subeler: DemoSube[];
   aylikDurumMap: Record<string, DemoAylikDurum>;
   belgeDurumByPersonelId: Record<
@@ -472,6 +478,7 @@ const demoState: {
     kullanici: number;
     sube: number;
     departman: number;
+    gorev: number;
   };
 } = {
   personeller: [
@@ -855,6 +862,7 @@ const demoState: {
     }
   ],
   departmanlar: [...DEMO_DEPARTMANLAR],
+  gorevler: [...DEMO_GOREVLER],
   subeler: [
     {
       id: 1,
@@ -920,7 +928,8 @@ const demoState: {
     revizyonCorrection: 1,
     kullanici: 3,
     sube: 2,
-    departman: 12
+    departman: 12,
+    gorev: 15
   }
 };
 
@@ -2177,7 +2186,7 @@ function enrichDemoBildirim(item: DemoBildirim): DemoBildirim {
     ...item,
     personel_ad_soyad: `${personel.ad} ${personel.soyad}`.trim(),
     sicil_no: personel.sicil_no ?? null,
-    gorev_adi: personel.gorev_id != null ? DEMO_GOREV_LABELS[personel.gorev_id] ?? null : null,
+    gorev_adi: getGorevAd(personel.gorev_id),
     departman_adi:
       personel.departman_id != null
         ? demoState.departmanlar.find((d) => d.id === personel.departman_id)?.ad ?? null
@@ -4105,7 +4114,7 @@ function buildDemoPersonelDetail(personel: DemoPersonel) {
     referans_adlari: {
       sube: getSubeLabel(personel.sube_id),
       departman: getDepartmanLabel(personel.departman_id),
-      gorev: getLabel(DEMO_GOREV_LABELS, personel.gorev_id),
+      gorev: demoState.gorevler.find((g) => g.id === personel.gorev_id)?.ad ?? null,
       personel_tipi: getLabel(DEMO_PERSONEL_TIPI_LABELS, personel.personel_tipi_id),
       bagli_amir: getLabel(DEMO_BAGLI_AMIR_LABELS, personel.bagli_amir_id)
     }
@@ -4881,7 +4890,7 @@ export function resolveDemoApiResponse(
       ...item,
       sube_adi: getSubeLabel(item.sube_id),
       departman_adi: getDepartmanLabel(item.departman_id),
-      gorev_adi: getLabel(DEMO_GOREV_LABELS, item.gorev_id),
+      gorev_adi: getGorevAd(item.gorev_id),
       personel_tipi_adi: getLabel(DEMO_PERSONEL_TIPI_LABELS, item.personel_tipi_id),
       bagli_amir_adi: getLabel(DEMO_BAGLI_AMIR_LABELS, item.bagli_amir_id)
     }));
@@ -4993,10 +5002,10 @@ export function resolveDemoApiResponse(
       departmanByName.set(dep.ad, list);
     }
     const gorevByName = new Map<string, number[]>();
-    for (const [id, ad] of Object.entries(DEMO_GOREV_LABELS)) {
-      const list = gorevByName.get(ad) ?? [];
-      list.push(Number(id));
-      gorevByName.set(ad, list);
+    for (const gorev of demoState.gorevler) {
+      const list = gorevByName.get(gorev.ad) ?? [];
+      list.push(gorev.id);
+      gorevByName.set(gorev.ad, list);
     }
     const tipByName = new Map<string, number[]>();
     for (const [id, ad] of Object.entries(DEMO_PERSONEL_TIPI_LABELS)) {
@@ -5290,7 +5299,7 @@ export function resolveDemoApiResponse(
       ...next,
       sube_adi: getSubeLabel(next.sube_id),
       departman_adi: getDepartmanLabel(next.departman_id),
-      gorev_adi: getLabel(DEMO_GOREV_LABELS, next.gorev_id),
+      gorev_adi: getGorevAd(next.gorev_id),
       personel_tipi_adi: getLabel(DEMO_PERSONEL_TIPI_LABELS, next.personel_tipi_id),
       bagli_amir_adi: getLabel(DEMO_BAGLI_AMIR_LABELS, next.bagli_amir_id)
     });
@@ -6202,7 +6211,7 @@ export function resolveDemoApiResponse(
         personel_id: personel.id,
         ad_soyad: `${personel.ad} ${personel.soyad}`.trim(),
         sicil_no: personel.sicil_no ?? null,
-        gorev_adi: personel.gorev_id != null ? DEMO_GOREV_LABELS[personel.gorev_id] ?? null : null,
+        gorev_adi: getGorevAd(personel.gorev_id),
         departman_adi:
           personel.departman_id != null
             ? demoState.departmanlar.find((d) => d.id === personel.departman_id)?.ad ?? null
@@ -8013,13 +8022,96 @@ export function resolveDemoApiResponse(
     return ok(created);
   }
 
+  if (pathname === "/referans/gorevler" && method === "POST") {
+    if (!Object.prototype.hasOwnProperty.call(body, "ad")) {
+      return {
+        data: null,
+        meta: {},
+        errors: [
+          {
+            code: "GOREV_NAME_REQUIRED",
+            message: "Görev adı zorunludur.",
+            field: "ad"
+          }
+        ]
+      };
+    }
+
+    if (typeof body.ad !== "string") {
+      return {
+        data: null,
+        meta: {},
+        errors: [
+          {
+            code: "VALIDATION_ERROR",
+            message: "Görev adı metin olmalıdır.",
+            field: "ad"
+          }
+        ]
+      };
+    }
+
+    const ad = body.ad.trim();
+    if (!ad) {
+      return {
+        data: null,
+        meta: {},
+        errors: [
+          {
+            code: "GOREV_NAME_REQUIRED",
+            message: "Görev adı zorunludur.",
+            field: "ad"
+          }
+        ]
+      };
+    }
+
+    if (ad.length > 120) {
+      return {
+        data: null,
+        meta: {},
+        errors: [
+          {
+            code: "VALIDATION_ERROR",
+            message: "Ad en fazla 120 karakter olabilir.",
+            field: "ad"
+          }
+        ]
+      };
+    }
+
+    const existing = demoState.gorevler.find(
+      (item) => item.ad.localeCompare(ad, "en", { sensitivity: "accent" }) === 0
+    );
+    if (existing) {
+      return {
+        data: null,
+        meta: {},
+        errors: [
+          {
+            code: "GOREV_ZATEN_VAR",
+            message: "Bu görev adı zaten kayıtlı.",
+            field: "ad"
+          }
+        ]
+      };
+    }
+
+    const created = {
+      id: ++demoState.nextIds.gorev,
+      ad
+    };
+    demoState.gorevler.push(created);
+    return ok(created);
+  }
+
   if (pathname.startsWith("/referans/") && method === "GET") {
     if (pathname === "/referans/departmanlar") {
       return ok(demoState.departmanlar);
     }
 
     if (pathname === "/referans/gorevler") {
-      return ok(DEMO_GOREVLER);
+      return ok(demoState.gorevler);
     }
 
     if (pathname === "/referans/personel-tipleri") {

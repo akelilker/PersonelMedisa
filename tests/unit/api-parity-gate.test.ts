@@ -261,11 +261,17 @@ describe("api-parity integration (canonical repo)", () => {
     expect(hasPhp("POST", "/zimmetler")).toBe(true);
     expect(hasPhp("GET", "/zimmetler")).toBe(true);
     expect(hasPhp("POST", "/referans/departmanlar")).toBe(true);
+    expect(hasPhp("POST", "/referans/gorevler")).toBe(true);
 
     const departman = report.results.find(
       (r) => r.method === "POST" && r.normalizedPath === "/referans/departmanlar"
     );
     expect(departman?.classification).toBe("FULL_PARITY");
+
+    const gorev = report.results.find(
+      (r) => r.method === "POST" && r.normalizedPath === "/referans/gorevler"
+    );
+    expect(gorev?.classification).toBe("FULL_PARITY");
 
     for (const [method, path] of [
       ["GET", "/surecler/:id"],

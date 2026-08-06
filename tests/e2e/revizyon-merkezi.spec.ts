@@ -63,13 +63,19 @@ async function createApprovedCorrection(page: Page, label: string) {
 }
 
 test.describe("S80 Revizyon Merkezi final UI kabul", () => {
-  test("Kayıt ve Süreç gateway → Revizyon Merkezi (GY)", async ({ page }) => {
+  test("Global Modüller menüsü → Revizyon Merkezi (GY)", async ({ page }) => {
     await loginAsMockRole(page, "GENEL_YONETICI");
     await page.goto("/");
     await page.getByTestId("menu-kayit-surec").click();
-    await expect(page.getByTestId("kayit-surec-ops-links")).toBeVisible();
-    await expect(page.getByTestId("kayit-surec-revizyon-merkezi-link")).toBeVisible();
-    await page.getByTestId("kayit-surec-revizyon-merkezi-link").click();
+    await expect(page.getByRole("dialog", { name: "Kayıt ve Süreç İşlemleri" })).toBeVisible();
+    await expect(page.getByTestId("kayit-surec-ops-links")).toHaveCount(0);
+    await expect(page.getByTestId("kayit-surec-revizyon-merkezi-link")).toHaveCount(0);
+    await expect(page.getByTestId("overlay-modules-toggle")).toHaveCount(0);
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("dialog", { name: "Kayıt ve Süreç İşlemleri" })).toHaveCount(0);
+
+    await page.getByTestId("header-modules-toggle").click();
+    await page.getByTestId("shell-header-module-link-revizyon-merkezi").click();
     await expect(page.getByTestId("revizyon-merkezi-page")).toBeVisible();
   });
 
@@ -160,9 +166,13 @@ test.describe("S80 Revizyon Merkezi final UI kabul", () => {
     const nativeDialogs = trackNativeDialogs(page);
     await loginAsMockRole(page, "GENEL_YONETICI");
     await page.goto("/");
-    await expect(page.getByTestId("kayit-surec-revizyon-merkezi-link")).toHaveCount(0);
     await page.getByTestId("menu-kayit-surec").click();
-    await page.getByTestId("kayit-surec-revizyon-merkezi-link").click();
+    await expect(page.getByRole("dialog", { name: "Kayıt ve Süreç İşlemleri" })).toBeVisible();
+    await expect(page.getByTestId("kayit-surec-revizyon-merkezi-link")).toHaveCount(0);
+    await expect(page.getByTestId("kayit-surec-ops-links")).toHaveCount(0);
+    await page.keyboard.press("Escape");
+    await page.getByTestId("header-modules-toggle").click();
+    await page.getByTestId("shell-header-module-link-revizyon-merkezi").click();
     await expect(page.getByTestId("revizyon-merkezi-page")).toBeVisible();
     await expect(page.getByTestId("revizyon-tab-onay")).toBeVisible();
 

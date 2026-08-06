@@ -110,7 +110,8 @@ test.describe("e2e smoke", () => {
 
     await page.getByTestId("menu-personel-karti").click();
     await expect(page).toHaveURL(/\/personeller$/);
-    await page.getByRole("link", { name: "Günlük Kayıt" }).click();
+    await page.getByTestId("overlay-modules-toggle").click();
+    await page.getByTestId("shell-overlay-module-link-gunluk-kayit").click();
     await expect(page).toHaveURL(/\/bildirimler$/);
     await expect(page.locator(".modal-header h2").first()).toContainText("Günlük Kayıt Merkezi");
     await page.getByRole("button", { name: /Günlük Kayıt Ekle|Günlük Kayıt Gir|Yeni Günlük Kayıt/i }).first().click();

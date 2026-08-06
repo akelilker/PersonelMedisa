@@ -33,6 +33,7 @@ api/.env.*
 *.rej
 .tmp/
 tmp/
+.tmp-ops/
 .codex-*.log
 
 # Editor / OS state

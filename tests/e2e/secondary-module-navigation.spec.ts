@@ -67,6 +67,8 @@ test.describe("Secondary module navigation", () => {
     await expect(page.getByTestId("personeller-belge-takip-link")).toHaveCount(0);
     await expect(page.getByRole("link", { name: "Puantaj" })).toHaveCount(0);
     await expect(page.getByRole("link", { name: "Günlük Kayıt" })).toHaveCount(0);
+    await expect(page.getByLabel("Modül menü")).toHaveCount(0);
+    await expect(page.locator("#personeller-module-menu")).toHaveCount(0);
 
     const overlayToggle = page.getByTestId("overlay-modules-toggle");
     await expect(overlayToggle).toBeVisible();

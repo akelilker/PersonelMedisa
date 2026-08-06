@@ -112,25 +112,6 @@ function IconBack(props: { className?: string }) {
   );
 }
 
-function IconMenu(props: { className?: string }) {
-  return (
-    <svg
-      className={props.className}
-      width="20"
-      height="20"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-    >
-      <path d="M4 6h16M4 12h16M4 18h16" />
-    </svg>
-  );
-}
-
 function toSelectOptions(options: IdOption[]) {
   return options.map((option) => ({ value: String(option.id), label: option.label }));
 }
@@ -203,7 +184,6 @@ export function PersonellerPage() {
   const navigate = useNavigate();
   const [searchExpanded, setSearchExpanded] = useState(false);
   const [filterExpanded, setFilterExpanded] = useState(false);
-  const [moduleMenuOpen, setModuleMenuOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"list" | "grid">("grid");
   const [importModalOpen, setImportModalOpen] = useState(false);
   const [historyModalOpen, setHistoryModalOpen] = useState(false);
@@ -281,35 +261,6 @@ export function PersonellerPage() {
             >
               {viewMode === "grid" ? <IconList /> : <IconGrid />}
             </button>
-            <div className="personeller-toolbar-menu-host">
-              <button
-                type="button"
-                className="personeller-icon-btn"
-                aria-expanded={moduleMenuOpen}
-                aria-controls="personeller-module-menu"
-                aria-haspopup="true"
-                aria-label="Modül menü"
-                onClick={() => setModuleMenuOpen((open) => !open)}
-              >
-                <IconMenu />
-              </button>
-              {moduleMenuOpen ? (
-                <div
-                  id="personeller-module-menu"
-                  className="personeller-module-flyout"
-                  role="menu"
-                >
-                  <Link
-                    to="/surecler"
-                    className="personeller-module-flyout-link"
-                    role="menuitem"
-                    onClick={() => setModuleMenuOpen(false)}
-                  >
-                    Süreç takibi
-                  </Link>
-                </div>
-              ) : null}
-            </div>
           </div>
         </div>
       </div>

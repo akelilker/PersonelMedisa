@@ -4,6 +4,8 @@ React + Vite + TypeScript tabanlı PersonelMedisa uygulaması. Ana kapsam person
 
 ## Durum
 
+> Ürünün tek güncel durum kaynağı [`CURRENT_STATE.md`](CURRENT_STATE.md) dosyasıdır. Eski S-serisi raporlar ve yerel ops çıktıları tarihsel kanıttır; güncel backlog olarak yorumlanmaz.
+
 - React + Vite + TypeScript araç zinciri çalışır durumda.
 - Login, auth guard ve rol bazlı görünürlük aktif.
 - Şube/rol farkındalığı uygulama akışında korunur.
@@ -33,6 +35,7 @@ React + Vite + TypeScript tabanlı PersonelMedisa uygulaması. Ana kapsam person
 
 Güncel ürün ve teknik dokümanlar `docs/guncel/` altında tutulur:
 
+- `CURRENT_STATE.md` (repo kökü; güncel karar ve freeze owner'ı)
 - `00-sistem-genel-bakis.md`
 - `01-urun-anayasasi.md`
 - `02-mvp-veri-kapsami.md`

@@ -53,11 +53,22 @@ describe('cPanel deploy server-state safety contract', () => {
     expect(workflow).not.toMatch(/(?:put|mirror)\b[^\n]*config\.local\.php/);
   });
 
-  it('does not echo FTP secret values', () => {
+  it('does not echo deploy or smoke secret values', () => {
     const unsafeSecretEchoes = lines.filter(
-      (line) => /\becho\b[^\n]*\$\{?(FTP_SERVER|FTP_USERNAME|FTP_PASSWORD)\}?/.test(line),
+      (line) =>
+        /\becho\b[^\n]*\$\{?(FTP_SERVER|FTP_USERNAME|FTP_PASSWORD|SMOKE_AUTH_USERNAME|SMOKE_AUTH_PASSWORD)\}?/.test(
+          line,
+        ),
     );
     expect(unsafeSecretEchoes).toEqual([]);
+  });
+
+  it('does not cancel an active production mirror and verifies the deployed app', () => {
+    expect(workflow).toMatch(/cancel-in-progress:\s*false/);
+    expect(workflow).toMatch(/timeout-minutes:\s*30/);
+    expect(workflow).toContain('SMOKE_AUTH_USERNAME: ${{ secrets.SMOKE_AUTH_USERNAME }}');
+    expect(workflow).toContain('SMOKE_AUTH_PASSWORD: ${{ secrets.SMOKE_AUTH_PASSWORD }}');
+    expect(workflow).toContain('run: npm run smoke:live');
   });
 });
 

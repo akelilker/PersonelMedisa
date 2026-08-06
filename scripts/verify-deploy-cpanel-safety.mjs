@@ -144,9 +144,20 @@ check(
 );
 
 const unsafeSecretEchoes = lines.filter(
-  (line) => /\becho\b[^\n]*\$\{?(FTP_SERVER|FTP_USERNAME|FTP_PASSWORD)\}?/.test(line),
+  (line) =>
+    /\becho\b[^\n]*\$\{?(FTP_SERVER|FTP_USERNAME|FTP_PASSWORD|SMOKE_AUTH_USERNAME|SMOKE_AUTH_PASSWORD)\}?/.test(
+      line,
+    ),
 );
-check(unsafeSecretEchoes.length === 0, 'FTP secret values must not be echoed');
+check(unsafeSecretEchoes.length === 0, 'deploy and smoke secret values must not be echoed');
+check(/cancel-in-progress:\s*false/.test(workflow), 'active production deploy must not be cancelled by a newer run');
+check(/timeout-minutes:\s*30/.test(workflow), 'deploy job must keep the bounded 30 minute timeout');
+check(
+  /SMOKE_AUTH_USERNAME:\s*\$\{\{ secrets\.SMOKE_AUTH_USERNAME \}\}/.test(workflow) &&
+    /SMOKE_AUTH_PASSWORD:\s*\$\{\{ secrets\.SMOKE_AUTH_PASSWORD \}\}/.test(workflow),
+  'deploy workflow must use dedicated authenticated smoke secrets',
+);
+check(/run:\s*npm run smoke:live/.test(workflow), 'deploy workflow must run post-deploy smoke');
 
 if (failures.length > 0) {
   for (const failure of failures) {

@@ -184,8 +184,12 @@ function isActivationKey(event: KeyboardEvent<HTMLElement>) {
   return event.key === "Enter" || event.key === " ";
 }
 
-function roleOptions() {
-  return ASSIGNABLE_USER_ROLES.map((value) => ({
+function roleOptions(currentRole?: UserRole) {
+  const roles = currentRole === "AUTH_SMOKE_READONLY"
+    ? [currentRole, ...ASSIGNABLE_USER_ROLES]
+    : ASSIGNABLE_USER_ROLES;
+
+  return roles.map((value) => ({
     value,
     label: ROLE_LABELS[value]
   }));
@@ -1034,7 +1038,8 @@ export function YonetimPaneliPage() {
                 name="yonetim-kullanici-rol"
                 value={kullaniciForm.rol}
                 onChange={(value) => setKullaniciForm((prev) => ({ ...prev, rol: value as UserRole }))}
-                selectOptions={roleOptions()}
+                selectOptions={roleOptions(kullaniciForm.rol)}
+                disabled={kullaniciForm.rol === "AUTH_SMOKE_READONLY"}
               />
               <FormField
                 as="select"

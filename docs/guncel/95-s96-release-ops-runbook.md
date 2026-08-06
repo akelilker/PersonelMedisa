@@ -1,6 +1,6 @@
-# S96 — Release Ops Runbook (Nihai Ürün Kabul Kapıları)
+# Release Ops Runbook (Nihai Canlı Kabul Kapıları)
 
-**Durum:** Kod tarafı S95 ile hazır. Bu runbook, dış girdiler geldiğinde **yeni geliştirme olmadan** kontrollü canlı kabulü tamamlamak içindir.
+**Güncel ürün kararı:** Repo kökündeki `CURRENT_STATE.md` tek durum kaynağıdır. Ürün beyni frozen, görsel aşama `GO` durumundadır. Bu runbook ürün backlog'u değil; her yayın ve production operasyonu için canlı kabul protokolüdür.
 
 **Kesin yasak (bu runbook çalıştırılırken bile, açık onay satırı yazılmadan):**
 
@@ -9,8 +9,8 @@
 - Production bordro kesinleştir / dönem mühür write (nihai kabul senaryosu hariç ve ayrı onay ile)
 - Credential’ların repo/commit/log’a yazılması
 
-Baz SHA (S95 kapanış): `f35da0d826e5267efb9b6a3f778393ab92f4d0bf`  
-Güncel main SHA operasyon anında `git rev-parse origin/main` ile doğrulanır.
+Tarihsel S95 baz SHA: `f35da0d826e5267efb9b6a3f778393ab92f4d0bf`.
+Ürün beyni baseline SHA ve freeze kararı `CURRENT_STATE.md` içindedir. Güncel main SHA operasyon anında `git rev-parse origin/main` ile ayrıca doğrulanır.
 
 ---
 
@@ -51,11 +51,11 @@ npm run smoke:live
 | Production write yetkisi | `RELEASE_GATE_PROD_WRITE_APPROVED=ready` | İmza / ticket / rol onayı | Hayır (işaret); gerçek write ayrı adım |
 | Auth smoke hesabı | `RELEASE_GATE_AUTH_SMOKE_CREDENTIAL=ready` | Güvenli, mümkünse read-focused test kullanıcısı | Hayır |
 
-Kod fail-closed referansları:
+Güncel fail-closed referansları:
 
-- `api/src/Controllers/SgkKatalogHazirlikController.php` — seed/write activation yok
-- `api/src/Services/Payroll/SgkKatalogTamlikService.php` — `approve_aktif_mi => false`
-- Router’da SGK import yalnız `/sgk-katalog-hazirlik/import/dry-run`
+- `api/src/Controllers/SgkKatalogHazirlikController.php` — import, submit ve approve girdilerini yetki ve kanıt kontratlarıyla doğrular.
+- `api/src/Services/Payroll/SgkKatalogTamlikService.php` — `DOGRULANMIS_TAM` yalnız tam resmî kanıtla seçilebilir; aksi durumda `RESMI_KAYNAKLI_KISITLI` korunur.
+- `api/src/Router.php` — dry-run, import ve approve route'ları mevcuttur; production write yetkisi ve dual-control ayrı kapılardır.
 
 ---
 
@@ -63,12 +63,13 @@ Kod fail-closed referansları:
 
 1. Kaynak birincil mi doğrula (SGK / Resmî Gazete / e-Bildirge; blog kabul edilmez).
 2. `94` talep paketindeki dosya adı + SHA256 standardını uygula.
-3. Lokal dry-run ile `DOGRULANMIS_TAM` adaylığını değerlendir; production’a yazma.
+3. Lokal dry-run ile `RESMI_KAYNAKLI_KISITLI` veya `DOGRULANMIS_TAM` adaylığını değerlendir; production’a yazma.
 4. `RELEASE_GATE_SGK_OFFICIAL_SOURCE=ready npm run release:gate`
-5. Write için ayrıca `RELEASE_GATE_PROD_WRITE_APPROVED=ready` + açık insan onayı gerekir.
-6. Write açıldığında (ayrı koşu): önce dry-run, sonra tek transaction/commit, sonra tamlık/blocker paneli read-back.
+5. Write için ayrıca `RELEASE_GATE_PROD_WRITE_APPROVED=ready`, uygun rol ve açık insan onayı gerekir.
+6. Ayrı onaylı koşuda: dry-run → import → dual-control submit/approve → tamlık/blocker paneli read-back sırasını uygula.
+7. Tam tarih/kullanım kanıtı yoksa `DOGRULANMIS_TAM` seçme; kısıtlı katalog fail-closed kalır.
 
-> Not: Mevcut PHP katmanı import write route’unu bilerek kapalı tutar. Write endpoint aktivasyonu **ayrı onaylı kod/değişiklik** gerektirir; bu runbook endpoint’i sessizce açmaz.
+> Not: Route'un mevcut olması write yetkisi değildir. Secret, insan onayı, rol, dual-control ve kanıt kapıları tamamlanmadan production yazma yapılmaz.
 
 ---
 
@@ -130,7 +131,7 @@ Script login sonrası **POST/PUT/PATCH/DELETE çağırmaz**. Personel listesi ok
 - [ ] Deploy cPanel SUCCESS (deploy head SHA = main)
 - [ ] `npm run release:gate` → CODE_READY veya FULL_READY
 - [ ] `smoke:live` OK
-- [ ] (Opsiyonel) authenticated smoke OK
+- [ ] Dedicated `AUTH_SMOKE_READONLY` hesabıyla authenticated smoke OK
 - [ ] Dört dış kapı için acknowledgement veya bilinçli OPEN notu
 - [ ] Production write bu koşuda yapılmadı / ayrı onaylı koşuya bırakıldı
 

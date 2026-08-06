@@ -67,6 +67,34 @@ test.describe("yonetim kullanicilar API (S44)", () => {
     await expect(page.locator(".yonetim-card-grid--users")).toContainText(/E2e MUHASEBE/i);
   });
 
+  test("existing AUTH_SMOKE_READONLY role is visible but cannot be reassigned in the human role picker", async ({ page }) => {
+    await mockApi(page, "GENEL_YONETICI");
+    await login(page, { username: "yonetici", password: "secret" });
+
+    const created = await apiFetch(page, "/api/yonetim/kullanicilar", {
+      method: "POST",
+      body: {
+        username: "pm_smoke_ro_e2e",
+        password: "GeciciSifre2026",
+        ad_soyad: "Otomatik Smoke E2E",
+        kullanici_tipi: "HARICI",
+        rol: "AUTH_SMOKE_READONLY",
+        sube_ids: [1],
+        varsayilan_sube_id: 1,
+        durum: "AKTIF"
+      }
+    });
+    expect(created.status).toBe(200);
+
+    await page.goto("/yonetim-paneli?tab=kullanicilar");
+    await page.getByRole("button", { name: /Otomatik Smoke E2E/i }).click();
+
+    const role = page.getByLabel("Rol");
+    await expect(role).toHaveValue("AUTH_SMOKE_READONLY");
+    await expect(role).toBeDisabled();
+    await expect(role.locator('option[value="AUTH_SMOKE_READONLY"]')).toHaveText("Teknik Smoke — Salt Okuma");
+  });
+
   test("duplicate username returns 409", async ({ page }) => {
     await mockApi(page, "GENEL_YONETICI");
     await login(page, { username: "yonetici", password: "secret" });

@@ -71,4 +71,11 @@ describe("S103 source contracts", () => {
     expect(smoke).toContain("SMOKE_AUTH_USERNAME");
     expect(smoke).toContain("SMOKE_AUTH_PASSWORD");
   });
+
+  it("management UI preserves and locks the technical role while editing", () => {
+    const page = readFileSync("src/features/yonetim/pages/YonetimPaneliPage.tsx", "utf8");
+    expect(page).toContain('currentRole === "AUTH_SMOKE_READONLY"');
+    expect(page).toContain('selectOptions={roleOptions(kullaniciForm.rol)}');
+    expect(page).toContain('disabled={kullaniciForm.rol === "AUTH_SMOKE_READONLY"}');
+  });
 });

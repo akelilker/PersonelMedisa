@@ -1,5 +1,5 @@
 /**
- * S96 — Release readiness gate (code + ops dependency status).
+ * Release readiness gate (frozen product contracts + ops dependency status).
  *
  * Default: verifies repo/code contracts that unlock final ops acceptance.
  * External ops gates are reported as WAITING unless explicitly acknowledged
@@ -164,6 +164,12 @@ function checkCodeContracts() {
     ok("ops runbook");
   }
 
+  if (!existsSync(resolve(repoRoot, "CURRENT_STATE.md"))) {
+    fail("canonical current state", "CURRENT_STATE.md missing");
+  } else {
+    ok("canonical current state");
+  }
+
   const pkg = JSON.parse(readRepo("package.json"));
   if (pkg.scripts?.["smoke:live"] !== "node scripts/post-deploy-smoke.mjs") {
     fail("package.json smoke:live", "unexpected smoke:live script");
@@ -240,7 +246,7 @@ function runLiveSmokeIfRequested() {
 }
 
 function main() {
-  console.log("PersonelMedisa S96 release readiness gate");
+  console.log("PersonelMedisa release readiness gate");
   console.log(`Repo: ${repoRoot}`);
   console.log("");
 

@@ -200,10 +200,6 @@ export function PersonellerPage() {
   const canOpenDetail = hasPermission("personeller.detail.view");
   const canCreatePersonel = hasPermission("personeller.create");
   const canApplyPersonelImport = hasPermission("personeller.import.apply");
-  const canViewPuantaj = hasPermission("puantaj.view");
-  const canViewBildirimler = hasPermission("bildirimler.view");
-  const canViewRevizyon = hasPermission("revizyon.view");
-  const canViewBelgeTakip = canOpenDetail;
   const navigate = useNavigate();
   const [searchExpanded, setSearchExpanded] = useState(false);
   const [filterExpanded, setFilterExpanded] = useState(false);
@@ -216,7 +212,6 @@ export function PersonellerPage() {
   const page = listQuery.page;
   const departmanFilterOptions = toSelectOptions(refs.departmanOptions);
   const personelTipiFilterOptions = toSelectOptions(refs.personelTipiOptions);
-  const hasModuleLinks = canViewPuantaj || canViewBildirimler || canViewRevizyon || canViewBelgeTakip;
 
   return (
     <section className="personeller-page" aria-labelledby="personeller-page-heading">
@@ -224,46 +219,7 @@ export function PersonellerPage() {
         Personeller
       </h2>
 
-      <div
-        className={`personeller-toolbar${
-          hasModuleLinks ? " personeller-toolbar--has-module-links" : ""
-        }`}
-      >
-        {hasModuleLinks ? (
-          <nav className="personeller-toolbar-top" aria-label="Personel kartı ilişkili modüller">
-            <div className="personeller-toolbar-module-links">
-              {canViewPuantaj ? (
-                <Link className="personeller-toolbar-module-link" to="/puantaj">
-                  Puantaj
-                </Link>
-              ) : null}
-              {canViewBildirimler ? (
-                <Link className="personeller-toolbar-module-link" to="/bildirimler">
-                  Günlük Kayıt
-                </Link>
-              ) : null}
-              {canViewRevizyon ? (
-                <Link
-                  className="personeller-toolbar-module-link"
-                  to="/haftalik-kapanis/revizyonlar"
-                  data-testid="personeller-revizyon-merkezi-link"
-                >
-                  Revizyon Merkezi
-                </Link>
-              ) : null}
-              {canViewBelgeTakip ? (
-                <Link
-                  className="personeller-toolbar-module-link"
-                  to="/personeller/belge-takip"
-                  data-testid="personeller-belge-takip-link"
-                >
-                  Belge Takip
-                </Link>
-              ) : null}
-            </div>
-          </nav>
-        ) : null}
-
+      <div className="personeller-toolbar">
         <div className="personeller-toolbar-main">
           <div className="personeller-toolbar-left">
             <Link

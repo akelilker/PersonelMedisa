@@ -28,17 +28,6 @@
   background: rgba(0, 0, 0, 0.15);
 }
 
-.personeller-toolbar-top {
-  padding-top: var(--space-1, 4px);
-}
-
-.personeller-toolbar-module-links {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-3, 12px);
-}
-
 .personeller-toolbar-module-link {
   font-size: 13px;
   font-weight: 700;
@@ -60,10 +49,6 @@
   justify-content: space-between;
   gap: var(--space-2);
   min-height: 44px;
-}
-
-.personeller-toolbar--has-module-links .personeller-toolbar-main {
-  margin-top: 12px;
 }
 
 .personeller-toolbar-back-link {

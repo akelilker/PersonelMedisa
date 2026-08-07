@@ -7,7 +7,12 @@ type KayitSurecTabHeaderProps = {
 
 export function KayitSurecTabHeader({ activeTab, onTabChange }: KayitSurecTabHeaderProps) {
   return (
-    <div className="kayit-workspace-tabs" role="tablist" aria-label="Kayıt ve süreç sekmeleri">
+    <div
+      className="kayit-workspace-tabs"
+      role="tablist"
+      aria-label="Kayıt ve süreç sekmeleri"
+      data-testid="kayit-workspace-tabs"
+    >
       <button
         type="button"
         data-testid="kayit-tab-yeni-kayit"

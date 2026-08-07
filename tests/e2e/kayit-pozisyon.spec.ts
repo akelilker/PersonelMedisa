@@ -34,8 +34,9 @@ test.describe("Kayit Surec Pozisyon", () => {
     await kayitModal.locator("#pozisyon-gorev-panel").getByRole("button", { name: "Üretim Müdürü" }).click();
     await kayitModal.getByLabel("Geçerlilik Tarihi").fill("2026-08-01");
 
-    const pozisyonKaydet = kayitModal.locator("form.surec-position-form").getByRole("button", { name: "Kaydet" });
+    const pozisyonKaydet = kayitModal.getByTestId("kayit-modal-footer-primary");
     await expect(pozisyonKaydet).toBeEnabled({ timeout: 5000 });
+    await expect(pozisyonKaydet).toHaveAttribute("form", "kayit-surec-pozisyon-form");
 
     const putPromise = page.waitForResponse(
       (r) => r.url().includes("/api/personeller/1") && r.request().method() === "PUT"
@@ -103,8 +104,9 @@ test.describe("Kayit Surec Pozisyon", () => {
     await kayitModal.locator("#pozisyon-gorev-panel").getByRole("button", { name: "Üretim Müdürü" }).click();
     await kayitModal.getByLabel("Geçerlilik Tarihi").fill("2026-08-01");
 
-    const pozisyonKaydet = kayitModal.locator("form.surec-position-form").getByRole("button", { name: "Kaydet" });
+    const pozisyonKaydet = kayitModal.getByTestId("kayit-modal-footer-primary");
     await expect(pozisyonKaydet).toBeEnabled({ timeout: 5000 });
+    await expect(pozisyonKaydet).toHaveAttribute("form", "kayit-surec-pozisyon-form");
     await pozisyonKaydet.click();
 
     await expect(kayitModal.getByRole("combobox", { name: "Görev / Unvan" })).toContainText("Üretim Müdürü");

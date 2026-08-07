@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Outlet, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { BackBar } from "../components/BackBar";
 import { AppFooter } from "../components/footer/AppFooter";
@@ -7,6 +7,10 @@ import type { KayitTab } from "../components/main-menu/MainMenu";
 import { AppModal } from "../components/modal/AppModal";
 import { ShellHeaderActions } from "../components/shell/ShellHeaderActions";
 import { ShellModuleMenu } from "../components/shell/ShellModuleMenu";
+import {
+  KayitModalFooter,
+  type KayitModalFooterModel
+} from "../features/kayit/components/KayitModalFooter";
 import { KayitSurecWorkspace } from "../features/kayit/components/KayitSurecWorkspace";
 import { useKayitModalController } from "../features/kayit/hooks/useKayitModalController";
 import { hasRolePermission } from "../lib/authorization/role-permissions";
@@ -203,6 +207,17 @@ export function AppShell() {
     closeKayitModal
   } = useKayitModalController(pathname, state);
 
+  const [kayitFooterModel, setKayitFooterModel] = useState<KayitModalFooterModel | null>(null);
+  const handleKayitFooterModelChange = useCallback((model: KayitModalFooterModel | null) => {
+    setKayitFooterModel(model);
+  }, []);
+
+  useEffect(() => {
+    if (!isKayitModalOpen) {
+      setKayitFooterModel(null);
+    }
+  }, [isKayitModalOpen]);
+
   useEffect(() => {
     document.body.classList.toggle("app-home-route", isHomeRoute && !isLoginRoute);
 
@@ -256,6 +271,7 @@ export function AppShell() {
           className="modal-container--kayit-surec"
           bodyClassName="modal-body--kayit-surec"
           titleVariant="premium"
+          footer={kayitFooterModel ? <KayitModalFooter model={kayitFooterModel} /> : undefined}
         >
           <KayitSurecWorkspace
             activeTab={kayitTab}
@@ -266,6 +282,7 @@ export function AppShell() {
             initialReturnTo={kayitEntryReturnTo}
             primaryActionLabel={kayitPrimaryLabel}
             primaryFormId={kayitPrimaryFormId}
+            onFooterModelChange={handleKayitFooterModelChange}
           />
         </AppModal>
       ) : null}

@@ -112,25 +112,6 @@ function IconBack(props: { className?: string }) {
   );
 }
 
-function IconMenu(props: { className?: string }) {
-  return (
-    <svg
-      className={props.className}
-      width="20"
-      height="20"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-    >
-      <path d="M4 6h16M4 12h16M4 18h16" />
-    </svg>
-  );
-}
-
 function toSelectOptions(options: IdOption[]) {
   return options.map((option) => ({ value: String(option.id), label: option.label }));
 }
@@ -200,14 +181,9 @@ export function PersonellerPage() {
   const canOpenDetail = hasPermission("personeller.detail.view");
   const canCreatePersonel = hasPermission("personeller.create");
   const canApplyPersonelImport = hasPermission("personeller.import.apply");
-  const canViewPuantaj = hasPermission("puantaj.view");
-  const canViewBildirimler = hasPermission("bildirimler.view");
-  const canViewRevizyon = hasPermission("revizyon.view");
-  const canViewBelgeTakip = canOpenDetail;
   const navigate = useNavigate();
   const [searchExpanded, setSearchExpanded] = useState(false);
   const [filterExpanded, setFilterExpanded] = useState(false);
-  const [moduleMenuOpen, setModuleMenuOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"list" | "grid">("grid");
   const [importModalOpen, setImportModalOpen] = useState(false);
   const [historyModalOpen, setHistoryModalOpen] = useState(false);
@@ -216,7 +192,6 @@ export function PersonellerPage() {
   const page = listQuery.page;
   const departmanFilterOptions = toSelectOptions(refs.departmanOptions);
   const personelTipiFilterOptions = toSelectOptions(refs.personelTipiOptions);
-  const hasModuleLinks = canViewPuantaj || canViewBildirimler || canViewRevizyon || canViewBelgeTakip;
 
   return (
     <section className="personeller-page" aria-labelledby="personeller-page-heading">
@@ -224,46 +199,7 @@ export function PersonellerPage() {
         Personeller
       </h2>
 
-      <div
-        className={`personeller-toolbar${
-          hasModuleLinks ? " personeller-toolbar--has-module-links" : ""
-        }`}
-      >
-        {hasModuleLinks ? (
-          <nav className="personeller-toolbar-top" aria-label="Personel kartı ilişkili modüller">
-            <div className="personeller-toolbar-module-links">
-              {canViewPuantaj ? (
-                <Link className="personeller-toolbar-module-link" to="/puantaj">
-                  Puantaj
-                </Link>
-              ) : null}
-              {canViewBildirimler ? (
-                <Link className="personeller-toolbar-module-link" to="/bildirimler">
-                  Günlük Kayıt
-                </Link>
-              ) : null}
-              {canViewRevizyon ? (
-                <Link
-                  className="personeller-toolbar-module-link"
-                  to="/haftalik-kapanis/revizyonlar"
-                  data-testid="personeller-revizyon-merkezi-link"
-                >
-                  Revizyon Merkezi
-                </Link>
-              ) : null}
-              {canViewBelgeTakip ? (
-                <Link
-                  className="personeller-toolbar-module-link"
-                  to="/personeller/belge-takip"
-                  data-testid="personeller-belge-takip-link"
-                >
-                  Belge Takip
-                </Link>
-              ) : null}
-            </div>
-          </nav>
-        ) : null}
-
+      <div className="personeller-toolbar">
         <div className="personeller-toolbar-main">
           <div className="personeller-toolbar-left">
             <Link
@@ -325,35 +261,6 @@ export function PersonellerPage() {
             >
               {viewMode === "grid" ? <IconList /> : <IconGrid />}
             </button>
-            <div className="personeller-toolbar-menu-host">
-              <button
-                type="button"
-                className="personeller-icon-btn"
-                aria-expanded={moduleMenuOpen}
-                aria-controls="personeller-module-menu"
-                aria-haspopup="true"
-                aria-label="Modül menü"
-                onClick={() => setModuleMenuOpen((open) => !open)}
-              >
-                <IconMenu />
-              </button>
-              {moduleMenuOpen ? (
-                <div
-                  id="personeller-module-menu"
-                  className="personeller-module-flyout"
-                  role="menu"
-                >
-                  <Link
-                    to="/surecler"
-                    className="personeller-module-flyout-link"
-                    role="menuitem"
-                    onClick={() => setModuleMenuOpen(false)}
-                  >
-                    Süreç takibi
-                  </Link>
-                </div>
-              ) : null}
-            </div>
           </div>
         </div>
       </div>

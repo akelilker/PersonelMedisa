@@ -257,7 +257,6 @@ export function AppShell() {
           bodyClassName="modal-body--kayit-surec"
           titleVariant="premium"
         >
-          <OverlayModulesMenu pathname={pathname} />
           <KayitSurecWorkspace
             activeTab={kayitTab}
             onTabChange={setKayitTab}

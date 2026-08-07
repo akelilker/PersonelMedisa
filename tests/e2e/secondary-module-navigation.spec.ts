@@ -63,6 +63,12 @@ test.describe("Secondary module navigation", () => {
     await page.getByTestId("menu-personel-karti").click();
     await expect(page).toHaveURL(/\/personeller$/);
     await expect(page.getByRole("dialog", { name: "Personel Kartı" })).toBeVisible();
+    await expect(page.getByTestId("personeller-revizyon-merkezi-link")).toHaveCount(0);
+    await expect(page.getByTestId("personeller-belge-takip-link")).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "Puantaj" })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "Günlük Kayıt" })).toHaveCount(0);
+    await expect(page.getByLabel("Modül menü")).toHaveCount(0);
+    await expect(page.locator("#personeller-module-menu")).toHaveCount(0);
 
     const overlayToggle = page.getByTestId("overlay-modules-toggle");
     await expect(overlayToggle).toBeVisible();
@@ -88,17 +94,19 @@ test.describe("Secondary module navigation", () => {
     await expect(page.getByRole("dialog", { name: "Günlük Kayıt Merkezi" })).toHaveCount(0);
   });
 
-  test("Kayıt modal shows overlay Modules with unique header/overlay ids", async ({ page }) => {
+  test("Kayıt modal does not show overlay Modules; header Modules remains", async ({ page }) => {
     await mockApi(page, "GENEL_YONETICI");
     await login(page, MOCK_ROLE_LOGIN.GENEL_YONETICI);
 
     await page.getByTestId("menu-kayit-surec").click();
     await expect(page.getByRole("dialog", { name: "Kayıt ve Süreç İşlemleri" })).toBeVisible();
-    await expect(page.getByTestId("overlay-modules-toggle")).toBeVisible();
+    await expect(page.getByTestId("overlay-modules-toggle")).toHaveCount(0);
+    await expect(page.getByTestId("kayit-surec-ops-links")).toHaveCount(0);
+    await expect(page.getByTestId("kayit-surec-puantaj-link")).toHaveCount(0);
+    await expect(page.getByTestId("kayit-surec-revizyon-merkezi-link")).toHaveCount(0);
     await expect(page.getByTestId("header-modules-toggle")).toBeVisible();
-
     await expect(page.locator("#shell-header-modules-menu")).toHaveCount(1);
-    await expect(page.locator("#shell-overlay-modules-menu")).toHaveCount(1);
+    await expect(page.locator("#shell-overlay-modules-menu")).toHaveCount(0);
   });
 
   test("correction route marks only Revizyon Merkezi active in overlay menu", async ({ page }) => {

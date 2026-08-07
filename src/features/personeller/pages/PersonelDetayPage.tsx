@@ -210,7 +210,6 @@ export function PersonelDetayPage() {
               canCreateRevizyon={canCreateRevizyon}
               canCreateZimmet={canCreateZimmet}
               canAccessSurecler={canAccessSurecler}
-              canCreateSurec={canCreateSurec}
               canViewFinans={canViewFinans}
               canViewBordro={canViewBordro}
               canViewUcret={canViewUcret}
@@ -219,7 +218,6 @@ export function PersonelDetayPage() {
               canManageBordroKapsam={canManageBordroKapsam}
               canApproveBordroKapsam={canApproveBordroKapsam}
               onOpenZimmetCreate={handleOpenPersonelZimmetGateway}
-              onOpenCreateSurecModal={handleOpenSurecModal}
             />
           )}
         </div>

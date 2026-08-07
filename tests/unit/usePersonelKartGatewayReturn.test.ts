@@ -155,4 +155,32 @@ describe("usePersonelKartGatewayReturn", () => {
       }
     });
   });
+
+  it("handleOpenSurecModal navigates with surec tab and personel preselect contract", () => {
+    const navigate = vi.fn() as NavigateFunction;
+
+    const { result } = renderHook(() =>
+      usePersonelKartGatewayReturn({
+        location: makeLocation("/personeller/3", null),
+        navigate,
+        parsedPersonelId: 3,
+        canEditPersonel: true,
+        canCreateZimmet: true,
+        setActiveTab: vi.fn(),
+        setIsEditing: vi.fn(),
+        openZimmetModal: vi.fn()
+      })
+    );
+
+    result.current.handleOpenSurecModal();
+
+    expect(navigate).toHaveBeenCalledWith("/", {
+      state: {
+        kayitModal: {
+          tab: "surec",
+          personelId: 3
+        }
+      }
+    });
+  });
 });

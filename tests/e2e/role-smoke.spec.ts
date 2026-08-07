@@ -97,6 +97,7 @@ test.describe("Rol bazli smoke", () => {
     await expect(page).toHaveURL(/\/personeller\/1$/);
     await expect(page.locator(".personel-dosya-hero")).toContainText(/Ayşe Yılmaz/i);
     await expect(page.getByRole("button", { name: "Süreç Ekle" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Süreçte İşlem Yap" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Kartı Düzenle" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Yeni Zimmet Ekle" })).toHaveCount(0);
 

@@ -1,4 +1,4 @@
-import { Link, Route, Routes, useOutletContext } from "react-router-dom";
+import { Link, Navigate, Route, Routes, useOutletContext } from "react-router-dom";
 import { AppShell, type AppShellOutletContext } from "./AppShell";
 import { MainMenu } from "../components/main-menu/MainMenu";
 import { ProtectedRoute } from "../router/ProtectedRoute";
@@ -143,6 +143,14 @@ export function AppRoutes() {
           element={
             <ProtectedRoute requirePermission={ROUTE_PERMISSION.haftalikKapanisPage}>
               <HaftalikKapanisPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="revizyon-merkezi"
+          element={
+            <ProtectedRoute requirePermission={ROUTE_PERMISSION.haftalikKapanisPage}>
+              <Navigate to="/haftalik-kapanis/revizyonlar" replace />
             </ProtectedRoute>
           }
         />

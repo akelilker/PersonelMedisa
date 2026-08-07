@@ -28,7 +28,7 @@ test.describe("Kayit Surec Ayrilma sekmesi", () => {
     await kayitModal.locator("[name='surec-create-bitis']").fill("2026-05-01");
     await kayitModal.locator("[name='surec-create-aciklama']").fill("E2E Kayit Ayrilma surec");
 
-    await kayitModal.locator(".workspace-form-actions").getByRole("button", { name: "Kaydet" }).click();
+    await kayitModal.getByTestId("kayit-modal-footer-primary").click();
 
     await expect(kayitModal.locator(".workspace-success--inline")).toContainText(/Süreç kaydı eklendi/i, {
       timeout: 15_000
@@ -129,7 +129,7 @@ test.describe("Kayit Surec Ayrilma sekmesi", () => {
       });
     });
 
-    await kayitModal.locator(".workspace-form-actions").getByRole("button", { name: "Kaydet" }).click();
+    await kayitModal.getByTestId("kayit-modal-footer-primary").click();
     await expect(kayitModal.locator(".workspace-success--inline")).toContainText(/Süreç kaydı eklendi/i, {
       timeout: 15_000
     });

@@ -1,4 +1,5 @@
 .modal-container--kayit-surec .modal-header {
+  flex: none;
   min-height: 60px;
   padding: 0 20px;
   align-items: center;
@@ -9,14 +10,34 @@
   display: flex;
   flex-direction: column;
   align-items: stretch;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
   padding: 10px clamp(12px, 2vw, 18px) 12px;
 }
 
 .modal-container--kayit-surec .modal-body {
-  justify-items: center;
+  justify-items: stretch;
+}
+
+.modal-container--kayit-surec .modal-footer {
+  flex: none;
+  padding: 12px clamp(12px, 2vw, 18px) calc(12px + env(safe-area-inset-bottom, 0px));
+}
+
+.modal-container--kayit-surec .modal-footer .workspace-form-actions {
+  margin-top: 0;
+  width: min(100%, 960px);
+  margin-inline: auto;
 }
 
 @media (max-width: 560px) {
+  .modal-container--kayit-surec .modal-footer .workspace-form-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
   .kayit-workspace-tabs {
     gap: 12px;
   }
@@ -28,11 +49,13 @@
 }
 
 .kayit-workspace {
-  display: grid;
-  grid-auto-rows: max-content;
-  align-content: start;
+  display: flex;
+  flex-direction: column;
+  align-content: stretch;
   gap: 12px;
+  flex: 1;
   min-height: 0;
+  height: 100%;
   width: min(100%, 960px);
   margin-inline: auto;
 }
@@ -50,17 +73,27 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   align-items: flex-end;
+  flex: none;
   gap: 24px;
-  position: sticky;
-  top: -10px;
+  position: relative;
   z-index: 12;
   margin: 0;
   padding: 0 0 6px;
-  transform: translateY(-10px);
   border: none;
   border-bottom: 1px solid rgba(255, 255, 255, 0.14);
   background: linear-gradient(180deg, rgba(7, 10, 18, 0.98) 0%, rgba(7, 10, 18, 0.94) 100%);
   box-shadow: none;
+}
+
+.kayit-workspace-scroll-body {
+  flex: 1;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: inherit;
+  overscroll-behavior: contain;
 }
 
 .kayit-workspace-tab {

@@ -42,6 +42,7 @@ import { PersonelCreateFields } from "../../../features/personeller/components/P
 import { PersonelZimmetCreateForm } from "../../../features/personeller/components/PersonelZimmetCreateForm";
 import { KayitBelgeKayitlariSection } from "./KayitBelgeKayitlariSection";
 import { KayitGatewayRedirectPanel } from "./KayitGatewayRedirectPanel";
+import { type KayitModalFooterModel } from "./KayitModalFooter";
 import { KayitSurecPersonelFinansPanel } from "./KayitSurecPersonelFinansPanel";
 import { KayitSurecPozisyonReferencePicker } from "./KayitSurecPozisyonReferencePicker";
 import { KayitSurecTabHeader } from "./KayitSurecTabHeader";
@@ -77,6 +78,7 @@ import {
   KAYIT_SUREC_CEZA_FORM_ID,
   KAYIT_SUREC_MALI_FORM_ID,
   KAYIT_SUREC_PERSONEL_FORM_ID,
+  KAYIT_SUREC_POZISYON_FORM_ID,
   KAYIT_SUREC_SUREC_FORM_ID,
   KAYIT_SUREC_ZIMMET_FORM_ID,
   PERSONEL_SUREC_TABS,
@@ -135,6 +137,7 @@ type KayitSurecWorkspaceProps = {
   initialReturnTo?: string | null;
   primaryActionLabel: string;
   primaryFormId: string;
+  onFooterModelChange?: (model: KayitModalFooterModel | null) => void;
 };
 
 const EMPTY_REFS: PersonelReferenceBundle = {
@@ -154,7 +157,8 @@ export function KayitSurecWorkspace({
   initialIntent,
   initialReturnTo,
   primaryActionLabel,
-  primaryFormId
+  primaryFormId,
+  onFooterModelChange
 }: KayitSurecWorkspaceProps) {
   const { hasPermission } = useRoleAccess();
   const canCreatePersonel = hasPermission("personeller.create");
@@ -961,6 +965,173 @@ export function KayitSurecWorkspace({
     .filter(Boolean)
     .join(" ");
 
+  const resetPozisyonForm = useCallback(() => {
+    setPozisyonForm(createPozisyonFormFromPersonel(selectedSurecPersonel));
+  }, [selectedSurecPersonel]);
+
+  const footerModel = useMemo((): KayitModalFooterModel | null => {
+    if (bootstrapLoading || bootstrapError) {
+      return null;
+    }
+
+    if (activeTab === "yeni-kayit") {
+      if (showGatewayMessage) {
+        return null;
+      }
+
+      return {
+        primaryLabel: primaryActionLabel,
+        primaryFormId,
+        primaryDisabled: personelSubmitting,
+        secondaryLabel: "Vazgeç",
+        onSecondaryClick: onClose
+      };
+    }
+
+    if (classicSurecFormLayout) {
+      return {
+        primaryLabel: primaryActionLabel,
+        primaryFormId,
+        primaryDisabled: surecSubmitting,
+        secondaryLabel: "Kapat",
+        onSecondaryClick: onClose
+      };
+    }
+
+    if (!selectedSurecPersonel) {
+      return null;
+    }
+
+    if (activePersonelTab === "izin-devamsizlik") {
+      if (isSelectedPersonelPasif || !devamsizlikSubId) {
+        return null;
+      }
+
+      return {
+        primaryLabel: "Kaydet",
+        primaryFormId,
+        primaryDisabled: surecSubmitting,
+        secondaryLabel: "Vazgeç",
+        onSecondaryClick: onClose
+      };
+    }
+
+    if (activePersonelTab === "pozisyon") {
+      if (isSelectedPersonelPasif || !canSubmitPozisyon) {
+        return null;
+      }
+
+      return {
+        primaryLabel: "Kaydet",
+        primaryFormId: KAYIT_SUREC_POZISYON_FORM_ID,
+        primaryDisabled: pozisyonSubmitting || !hasPozisyonDiff,
+        secondaryLabel: "Vazgeç",
+        onSecondaryClick: resetPozisyonForm
+      };
+    }
+
+    if (activePersonelTab === "mali") {
+      if (isSelectedPersonelPasif || !canCreateFinans) {
+        return null;
+      }
+
+      return {
+        primaryLabel: isMaliSubmitting ? "Kaydediliyor..." : "Kaydet",
+        primaryFormId: KAYIT_SUREC_MALI_FORM_ID,
+        primaryDisabled: isMaliSubmitting
+      };
+    }
+
+    if (activePersonelTab === "zimmet") {
+      if (isSelectedPersonelPasif) {
+        return null;
+      }
+
+      return {
+        primaryLabel: isZimmetSubmitting ? "Kaydediliyor..." : "Kaydet",
+        primaryFormId: KAYIT_SUREC_ZIMMET_FORM_ID,
+        primaryDisabled: isZimmetSubmitting || !canCreateZimmet
+      };
+    }
+
+    if (activePersonelTab === "ayrilma") {
+      if (selectedSurecPersonel.aktif_durum === "PASIF") {
+        return null;
+      }
+
+      return {
+        primaryLabel: "Kaydet",
+        primaryFormId,
+        primaryDisabled: surecSubmitting,
+        secondaryLabel: "Vazgeç",
+        onSecondaryClick: onClose
+      };
+    }
+
+    if (activePersonelTab === "ceza") {
+      if (isSelectedPersonelPasif || !canCreateFinans) {
+        return null;
+      }
+
+      return {
+        primaryLabel: isCezaSubmitting ? "Kaydediliyor..." : "Kaydet",
+        primaryFormId: KAYIT_SUREC_CEZA_FORM_ID,
+        primaryDisabled: isCezaSubmitting
+      };
+    }
+
+    if (activePersonelTab === "belgeler") {
+      if (selectedSurecPersonel.aktif_durum === "PASIF" || !canCreateSurec) {
+        return null;
+      }
+
+      return {
+        primaryLabel: belgeDurumSaving ? "Kaydediliyor..." : "Kaydet",
+        primaryFormId: KAYIT_SUREC_BELGELER_FORM_ID,
+        primaryDisabled: belgeDurumSaving || belgeDurumLoading
+      };
+    }
+
+    return null;
+  }, [
+    activePersonelTab,
+    activeTab,
+    belgeDurumLoading,
+    belgeDurumSaving,
+    bootstrapError,
+    bootstrapLoading,
+    canCreateFinans,
+    canCreateSurec,
+    canCreateZimmet,
+    canSubmitPozisyon,
+    classicSurecFormLayout,
+    devamsizlikSubId,
+    hasPozisyonDiff,
+    isCezaSubmitting,
+    isMaliSubmitting,
+    isSelectedPersonelPasif,
+    isZimmetSubmitting,
+    onClose,
+    personelSubmitting,
+    pozisyonSubmitting,
+    primaryActionLabel,
+    primaryFormId,
+    resetPozisyonForm,
+    selectedSurecPersonel,
+    showGatewayMessage,
+    surecSubmitting
+  ]);
+
+  useLayoutEffect(() => {
+    onFooterModelChange?.(footerModel);
+  }, [footerModel, onFooterModelChange]);
+
+  useLayoutEffect(() => {
+    return () => {
+      onFooterModelChange?.(null);
+    };
+  }, [onFooterModelChange]);
+
   return (
     <div
       className={`kayit-workspace${activeTab === "yeni-kayit" ? " kayit-workspace--personel-kayit" : ""}${
@@ -969,6 +1140,7 @@ export function KayitSurecWorkspace({
     >
       <KayitSurecTabHeader activeTab={activeTab} onTabChange={onTabChange} />
 
+      <div className="kayit-workspace-scroll-body" data-testid="kayit-workspace-scroll-body">
       {activeTab === "surec" && !classicSurecFormLayout && !selectedSurecPersonel ? (
         <div className="surec-workspace-toolbar" ref={surecSearchToolbarRef}>
           <div className={`surec-workspace-search-field${surecSearchExpanded ? " is-expanded" : ""}`}>
@@ -1061,14 +1233,6 @@ export function KayitSurecWorkspace({
                       />
                     </form>
                     {personelInfo ? <p className="workspace-success">{personelInfo}</p> : null}
-                    <div className="universal-btn-group workspace-form-actions">
-                      <button type="submit" form={primaryFormId} className="universal-btn-save" disabled={personelSubmitting}>
-                        {primaryActionLabel}
-                      </button>
-                      <button type="button" className="universal-btn-cancel" onClick={onClose}>
-                        Vazgeç
-                      </button>
-                    </div>
                   </>
                 )}
               </>
@@ -1123,14 +1287,6 @@ export function KayitSurecWorkspace({
                         </button>
                       ) : null}
                       {surecInfo ? <p className="workspace-success workspace-success--inline">{surecInfo}</p> : null}
-                    </div>
-                    <div className="universal-btn-group workspace-form-actions">
-                      <button type="submit" form={primaryFormId} className="universal-btn-save" disabled={surecSubmitting}>
-                        {primaryActionLabel}
-                      </button>
-                      <button type="button" className="universal-btn-cancel" onClick={onClose}>
-                        Kapat
-                      </button>
                     </div>
                   </>
                 ) : (
@@ -1304,14 +1460,6 @@ export function KayitSurecWorkspace({
                                   <div className="workspace-inline-actions">
                                     {surecInfo ? <p className="workspace-success workspace-success--inline">{surecInfo}</p> : null}
                                   </div>
-                                  <div className="universal-btn-group workspace-form-actions">
-                                    <button type="submit" form={primaryFormId} className="universal-btn-save" disabled={surecSubmitting}>
-                                      Kaydet
-                                    </button>
-                                    <button type="button" className="universal-btn-cancel" onClick={onClose}>
-                                      Vazgeç
-                                    </button>
-                                  </div>
                                 </>
                               ) : null}
                             </div>
@@ -1326,7 +1474,11 @@ export function KayitSurecWorkspace({
                             </div>
                           ) : canSubmitPozisyon ? (
                             <div className="surec-position-panel">
-                              <form className="workspace-form surec-position-form" onSubmit={handlePozisyonSubmit}>
+                              <form
+                                id={KAYIT_SUREC_POZISYON_FORM_ID}
+                                className="workspace-form surec-position-form"
+                                onSubmit={handlePozisyonSubmit}
+                              >
                                 <div className="surec-position-grid">
                                   <KayitSurecPozisyonReferencePicker
                                     label="Bölüm"
@@ -1390,23 +1542,6 @@ export function KayitSurecWorkspace({
 
                                 {pozisyonError ? <p className="workspace-error">{pozisyonError}</p> : null}
                                 {pozisyonInfo ? <p className="workspace-success">{pozisyonInfo}</p> : null}
-
-                                <div className="universal-btn-group workspace-form-actions">
-                                  <button
-                                    type="submit"
-                                    className="universal-btn-save"
-                                    disabled={pozisyonSubmitting || !hasPozisyonDiff}
-                                  >
-                                    Kaydet
-                                  </button>
-                                  <button
-                                    type="button"
-                                    className="universal-btn-cancel"
-                                    onClick={() => setPozisyonForm(createPozisyonFormFromPersonel(selectedSurecPersonel))}
-                                  >
-                                    Vazgeç
-                                  </button>
-                                </div>
                               </form>
                             </div>
                           ) : (
@@ -1438,6 +1573,7 @@ export function KayitSurecWorkspace({
                                 onSubmit={createPersonelFinansHandler}
                                 errorMessage={maliCreateErrorMessage}
                                 isSubmitting={isMaliSubmitting}
+                                hideActions
                               />
                             ) : (
                               <div className="surec-person-placeholder">
@@ -1467,16 +1603,6 @@ export function KayitSurecWorkspace({
                                 onSubmit={createZimmetHandler}
                                 zimmetCreateErrorMessage={zimmetCreateErrorMessage}
                               />
-                              <div className="universal-btn-group workspace-form-actions">
-                                <button
-                                  type="submit"
-                                  form={KAYIT_SUREC_ZIMMET_FORM_ID}
-                                  className="universal-btn-save"
-                                  disabled={isZimmetSubmitting || !canCreateZimmet}
-                                >
-                                  {isZimmetSubmitting ? "Kaydediliyor..." : "Kaydet"}
-                                </button>
-                              </div>
                             </div>
                             )
                           ) : (
@@ -1523,20 +1649,6 @@ export function KayitSurecWorkspace({
                                       className="workspace-form-stack workspace-form-stack--compact"
                                     />
                                   </form>
-
-                                  <div className="universal-btn-group workspace-form-actions">
-                                    <button
-                                      type="submit"
-                                      form={primaryFormId}
-                                      className="universal-btn-save"
-                                      disabled={surecSubmitting}
-                                    >
-                                      Kaydet
-                                    </button>
-                                    <button type="button" className="universal-btn-cancel" onClick={onClose}>
-                                      Vazgeç
-                                    </button>
-                                  </div>
                                 </div>
                               )}
                             </>
@@ -1565,6 +1677,7 @@ export function KayitSurecWorkspace({
                                 errorMessage={cezaCreateErrorMessage}
                                 isSubmitting={isCezaSubmitting}
                                 isKalemLocked
+                                hideActions
                               />
                             ) : (
                               <div className="surec-person-placeholder">
@@ -1642,16 +1755,6 @@ export function KayitSurecWorkspace({
                                 {belgeDurumInfo ? (
                                   <p className="workspace-success workspace-success--inline">{belgeDurumInfo}</p>
                                 ) : null}
-                                <div className="universal-btn-group workspace-form-actions">
-                                  <button
-                                    type="submit"
-                                    form={KAYIT_SUREC_BELGELER_FORM_ID}
-                                    className="universal-btn-save"
-                                    disabled={belgeDurumSaving || belgeDurumLoading}
-                                  >
-                                    {belgeDurumSaving ? "Kaydediliyor..." : "Kaydet"}
-                                  </button>
-                                </div>
 
                                 <div className="belge-kayit-section-divider" aria-hidden="true" />
 
@@ -1687,6 +1790,7 @@ export function KayitSurecWorkspace({
 
         </div>
       )}
+      </div>
     </div>
   );
 }

@@ -13,6 +13,8 @@ type KayitSurecPersonelFinansPanelProps = {
   errorMessage: string | null;
   isSubmitting: boolean;
   isKalemLocked?: boolean;
+  /** When true, submit control is owned by the modal footer (I2 layout). */
+  hideActions?: boolean;
 };
 
 export function KayitSurecPersonelFinansPanel({
@@ -25,7 +27,8 @@ export function KayitSurecPersonelFinansPanel({
   onSubmit,
   errorMessage,
   isSubmitting,
-  isKalemLocked = false
+  isKalemLocked = false,
+  hideActions = false
 }: KayitSurecPersonelFinansPanelProps) {
   return (
     <div>
@@ -76,11 +79,13 @@ export function KayitSurecPersonelFinansPanel({
         />
         {errorMessage ? <p className="finans-form-error">{errorMessage}</p> : null}
       </form>
-      <div className="universal-btn-group workspace-form-actions">
-        <button type="submit" form={formId} className="universal-btn-save" disabled={isSubmitting}>
-          {isSubmitting ? "Kaydediliyor..." : "Kaydet"}
-        </button>
-      </div>
+      {hideActions ? null : (
+        <div className="universal-btn-group workspace-form-actions">
+          <button type="submit" form={formId} className="universal-btn-save" disabled={isSubmitting}>
+            {isSubmitting ? "Kaydediliyor..." : "Kaydet"}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

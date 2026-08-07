@@ -126,6 +126,36 @@ describe("usePersonelKartGatewayReturn", () => {
     });
   });
 
+  it("handleOpenPersonelZimmetGateway navigates with zimmet gateway contract", () => {
+    const navigate = vi.fn() as NavigateFunction;
+
+    const { result } = renderHook(() =>
+      usePersonelKartGatewayReturn({
+        location: makeLocation("/personeller/2", null),
+        navigate,
+        parsedPersonelId: 2,
+        canEditPersonel: true,
+        canCreateZimmet: true,
+        setActiveTab: vi.fn(),
+        setIsEditing: vi.fn(),
+        openZimmetModal: vi.fn()
+      })
+    );
+
+    result.current.handleOpenPersonelZimmetGateway();
+
+    expect(navigate).toHaveBeenCalledWith("/", {
+      state: {
+        kayitModal: {
+          tab: "yeni-kayit",
+          personelId: 2,
+          intent: "personel-zimmet-gateway",
+          returnTo: "/personeller/2"
+        }
+      }
+    });
+  });
+
   it("handleOpenSurecModal navigates with surec tab and personel preselect contract", () => {
     const navigate = vi.fn() as NavigateFunction;
 

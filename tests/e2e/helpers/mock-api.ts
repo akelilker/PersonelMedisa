@@ -2475,6 +2475,7 @@ export async function mockApi(page: Page, role: MockUserRole, options: MockApiOp
   >();
   let nextRevizyonTalebiId = 1;
   const closedRevizyonWeeks = new Set<string>(["2024-01-01|2024-01-07"]);
+  const closedHaftalikKapanisScopes = new Set<string>();
   const revizyonCorrectionById = new Map<
     number,
     {
@@ -11018,24 +11019,90 @@ let personelBelgeKaydiIdCounter = 903;
     if (path === "/api/haftalik-kapanis" && method === "POST") {
       if (await denyUnlessRolePermission(route, "puantaj.muhurle")) return;
 
-      const payload = request.postDataJSON() as {
+      const payload = (request.postDataJSON() ?? {}) as {
         hafta_baslangic?: string;
         hafta_bitis?: string;
         departman_id?: number;
+        sube_id?: unknown;
+        created_by?: unknown;
+        actor_id?: unknown;
+        user_id?: unknown;
+        state?: unknown;
       };
 
-      const kapanisId = 99;
-      const hafta_baslangic = payload.hafta_baslangic ?? "2026-04-06";
-      const hafta_bitis = payload.hafta_bitis ?? "2026-04-12";
-      const departman_id = payload.departman_id ?? 3;
+      if (
+        payload.sube_id !== undefined ||
+        payload.created_by !== undefined ||
+        payload.actor_id !== undefined ||
+        payload.user_id !== undefined ||
+        payload.state !== undefined
+      ) {
+        await fulfillJson(
+          route,
+          422,
+          errorBody("VALIDATION_ERROR", "Server-owned alanlar client tarafindan gonderilemez.")
+        );
+        return;
+      }
+
+      const hafta_baslangic = payload.hafta_baslangic ?? "";
+      const hafta_bitis = payload.hafta_bitis ?? "";
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(hafta_baslangic) || !/^\d{4}-\d{2}-\d{2}$/.test(hafta_bitis)) {
+        await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "Hafta alanlari gecersiz."));
+        return;
+      }
+
+      const mondayCheck = new Date(`${hafta_baslangic}T00:00:00Z`);
+      if (Number.isNaN(mondayCheck.getTime()) || mondayCheck.getUTCDay() !== 1) {
+        await fulfillJson(
+          route,
+          422,
+          errorBody("VALIDATION_ERROR", "Hafta baslangici Pazartesi olmalidir.")
+        );
+        return;
+      }
+
+      const hasDepartmanKey = Object.prototype.hasOwnProperty.call(payload, "departman_id");
+      const departman_id =
+        hasDepartmanKey && payload.departman_id !== undefined && payload.departman_id !== null
+          ? Number(payload.departman_id)
+          : undefined;
+      if (hasDepartmanKey && (departman_id === undefined || !Number.isFinite(departman_id) || departman_id < 1)) {
+        await fulfillJson(
+          route,
+          422,
+          errorBody("VALIDATION_ERROR", "departman_id pozitif tam sayi olmalidir.")
+        );
+        return;
+      }
+
+      const scopeKey = `${hafta_baslangic}|${departman_id ?? "all"}`;
+      if (closedHaftalikKapanisScopes.has(scopeKey)) {
+        await fulfillJson(
+          route,
+          409,
+          errorBody(
+            "STATE_CONFLICT",
+            "Bu sube, hafta ve departman kapsami icin haftalik kapanis zaten olusturulmus."
+          )
+        );
+        return;
+      }
+      closedHaftalikKapanisScopes.add(scopeKey);
+
+      const kapanisId = 99000 + closedHaftalikKapanisScopes.size;
       const yilMatch = /^(\d{4})-/.exec(hafta_baslangic);
       const yil = yilMatch ? Number.parseInt(yilMatch[1], 10) : undefined;
       const hesaplama_zamani = new Date().toISOString();
-      const snapshot_satirlari = personeller.map((personel, index) => ({
+      const scopedPersoneller =
+        departman_id !== undefined
+          ? personeller.filter((personel) => personel.departman_id === departman_id)
+          : personeller;
+      const snapshot_satirlari = scopedPersoneller.map((personel, index) => ({
         snapshot_id: kapanisId * 1000 + index + 1,
         kapanis_id: kapanisId,
         personel_id: personel.id,
-        departman_id,
+        ...(departman_id !== undefined ? { departman_id } : {}),
         hafta_baslangic,
         hafta_bitis,
         yil,
@@ -11071,15 +11138,15 @@ let personelBelgeKaydiIdCounter = 903;
 
       await fulfillJson(
         route,
-        200,
+        201,
         okBody({
           id: kapanisId,
           kapanis_id: kapanisId,
           hafta_baslangic,
           hafta_bitis,
-          departman_id,
+          ...(departman_id !== undefined ? { departman_id } : {}),
           state: "KAPANDI",
-          personel_sayisi: 24,
+          personel_sayisi: scopedPersoneller.length,
           snapshot_satir_sayisi: snapshot_satirlari.length,
           snapshot_satirlari
         })

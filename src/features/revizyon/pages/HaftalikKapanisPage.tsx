@@ -8,6 +8,7 @@ import { LoadingState } from "../../../components/states/LoadingState";
 import { useRoleAccess } from "../../../hooks/use-role-access";
 import { ROUTE_PERMISSION } from "../../../lib/authorization/role-permissions";
 import type { Personel } from "../../../types/personel";
+import { HaftalikKapanisClosePanel } from "../components/HaftalikKapanisClosePanel";
 import {
   buildRevizyonTalebiCreatePath,
   formatRevizyonDeger,
@@ -162,6 +163,8 @@ export function HaftalikKapanisPage() {
               </Link>
             ) : null}
           </div>
+
+          <HaftalikKapanisClosePanel />
 
           {canCreate ? (
             <div style={{ marginTop: "1.5rem" }} data-testid="hk-kaynak-prefill-panel">

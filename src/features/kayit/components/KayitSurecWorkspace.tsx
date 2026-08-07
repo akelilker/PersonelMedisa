@@ -70,6 +70,7 @@ import {
 } from "../../../types/belgeler";
 import { useKayitGatewayIntent } from "../hooks/useKayitGatewayIntent";
 import { refetchPersonelDetailAfterIstenAyrilma, refetchSurecCachesForPersonel } from "../kayit-surec-cache";
+import { executePozisyonPersonnelUpdate } from "../kayit-surec-pozisyon";
 import {
   createPozisyonFormFromPersonel,
   DEVAMSIZLIK_ALT_TUR_CONFIG,
@@ -91,9 +92,9 @@ import {
   formatMoneyField,
   formatPersonelLabel,
   getPersonelInitials,
+  hasPozisyonOrganizationalDiff,
   normalizePersonelSearchText,
   optionLabel,
-  parsePozisyonId,
   resetSurecFormKeepingPersonel,
   resolveDevamsizlikSurecTuru,
   toOptionalIdValue
@@ -420,12 +421,10 @@ export function KayitSurecWorkspace({
   const selectedSurecPersonelLabel = selectedSurecPersonel ? formatPersonelLabel(selectedSurecPersonel) : "Seçiniz";
 
   const hasPozisyonDiff = Boolean(
-    selectedSurecPersonel &&
-      (pozisyonForm.departmanId !== toOptionalIdValue(selectedSurecPersonel.departman_id) ||
-        pozisyonForm.gorevId !== toOptionalIdValue(selectedSurecPersonel.gorev_id) ||
-        pozisyonForm.bagliAmirId !== toOptionalIdValue(selectedSurecPersonel.bagli_amir_id) ||
-        pozisyonForm.personelTipiId !== toOptionalIdValue(selectedSurecPersonel.personel_tipi_id))
+    selectedSurecPersonel && hasPozisyonOrganizationalDiff(pozisyonForm, selectedSurecPersonel)
   );
+  const selectedSurecPersonelIdRef = useRef<number | null>(null);
+  selectedSurecPersonelIdRef.current = selectedSurecPersonel?.id ?? null;
 
   const selectedPersonelGeneralColumns = useMemo(() => {
     if (!selectedSurecPersonel) {
@@ -848,92 +847,110 @@ export function KayitSurecWorkspace({
       return;
     }
 
-    if (selectedSurecPersonel.aktif_durum === "PASIF") {
-      setPozisyonInfo(null);
-      setPozisyonError("Bu personel pasif; pozisyon değişikliği yapılamaz.");
-      return;
-    }
+    const submitPersonelId = selectedSurecPersonel.id;
+    const submitForm = { ...pozisyonForm };
+    const submitBaseline = selectedSurecPersonel;
 
-    if (!hasPozisyonDiff) {
-      setPozisyonError(null);
-      setPozisyonInfo("Pozisyon bilgisi değişmedi.");
-      return;
-    }
+    const changes = [
+      {
+        label: "Bölüm",
+        before: formatGeneralField(submitBaseline.departman_adi),
+        after: optionLabel(refs.departmanOptions, submitForm.departmanId, formatGeneralField(submitBaseline.departman_adi)),
+        changed: submitForm.departmanId !== toOptionalIdValue(submitBaseline.departman_id)
+      },
+      {
+        label: "Görev / Unvan",
+        before: formatGeneralField(submitBaseline.gorev_adi),
+        after: optionLabel(refs.gorevOptions, submitForm.gorevId, formatGeneralField(submitBaseline.gorev_adi)),
+        changed: submitForm.gorevId !== toOptionalIdValue(submitBaseline.gorev_id)
+      },
+      {
+        label: "Bağlı Amir",
+        before: formatGeneralField(submitBaseline.bagli_amir_adi),
+        after: optionLabel(refs.bagliAmirOptions, submitForm.bagliAmirId, formatGeneralField(submitBaseline.bagli_amir_adi)),
+        changed: submitForm.bagliAmirId !== toOptionalIdValue(submitBaseline.bagli_amir_id)
+      },
+      {
+        label: "Çalışma Tipi",
+        before: formatGeneralField(submitBaseline.personel_tipi_adi),
+        after: optionLabel(
+          refs.personelTipiOptions,
+          submitForm.personelTipiId,
+          formatGeneralField(submitBaseline.personel_tipi_adi)
+        ),
+        changed: submitForm.personelTipiId !== toOptionalIdValue(submitBaseline.personel_tipi_id)
+      }
+    ].filter((item) => item.changed);
 
-    if (!pozisyonForm.effectiveDate) {
-      setPozisyonInfo(null);
-      setPozisyonError("Değişikliğin geçerli olacağı tarihi seç.");
-      return;
-    }
-
-    if (!pozisyonForm.departmanId || !pozisyonForm.gorevId || !pozisyonForm.personelTipiId) {
-      setPozisyonInfo(null);
-      setPozisyonError("Bölüm, görev / unvan ve çalışma tipi boş bırakılamaz.");
-      return;
-    }
+    const changeSummary = changes.map((item) => `${item.label}: ${item.before} -> ${item.after}`).join("; ");
+    const aciklama = [changeSummary, submitForm.aciklama.trim()].filter(Boolean).join(" | ");
 
     setPozisyonSubmitting(true);
     setPozisyonError(null);
     setPozisyonInfo(null);
 
-    const changes = [
-      {
-        label: "Bölüm",
-        before: formatGeneralField(selectedSurecPersonel.departman_adi),
-        after: optionLabel(refs.departmanOptions, pozisyonForm.departmanId, formatGeneralField(selectedSurecPersonel.departman_adi)),
-        changed: pozisyonForm.departmanId !== toOptionalIdValue(selectedSurecPersonel.departman_id)
-      },
-      {
-        label: "Görev / Unvan",
-        before: formatGeneralField(selectedSurecPersonel.gorev_adi),
-        after: optionLabel(refs.gorevOptions, pozisyonForm.gorevId, formatGeneralField(selectedSurecPersonel.gorev_adi)),
-        changed: pozisyonForm.gorevId !== toOptionalIdValue(selectedSurecPersonel.gorev_id)
-      },
-      {
-        label: "Bağlı Amir",
-        before: formatGeneralField(selectedSurecPersonel.bagli_amir_adi),
-        after: optionLabel(refs.bagliAmirOptions, pozisyonForm.bagliAmirId, formatGeneralField(selectedSurecPersonel.bagli_amir_adi)),
-        changed: pozisyonForm.bagliAmirId !== toOptionalIdValue(selectedSurecPersonel.bagli_amir_id)
-      },
-      {
-        label: "Çalışma Tipi",
-        before: formatGeneralField(selectedSurecPersonel.personel_tipi_adi),
-        after: optionLabel(refs.personelTipiOptions, pozisyonForm.personelTipiId, formatGeneralField(selectedSurecPersonel.personel_tipi_adi)),
-        changed: pozisyonForm.personelTipiId !== toOptionalIdValue(selectedSurecPersonel.personel_tipi_id)
-      }
-    ].filter((item) => item.changed);
-
-    const changeSummary = changes.map((item) => `${item.label}: ${item.before} -> ${item.after}`).join("; ");
-    const aciklama = [changeSummary, pozisyonForm.aciklama.trim()].filter(Boolean).join(" | ");
-
     try {
-      const updated = await updatePersonel(selectedSurecPersonel.id, {
-        departman_id: parsePozisyonId(pozisyonForm.departmanId),
-        gorev_id: parsePozisyonId(pozisyonForm.gorevId),
-        bagli_amir_id: parsePozisyonId(pozisyonForm.bagliAmirId),
-        personel_tipi_id: parsePozisyonId(pozisyonForm.personelTipiId) ?? undefined,
-        effective_date: pozisyonForm.effectiveDate
+      const result = await executePozisyonPersonnelUpdate({
+        personel: submitBaseline,
+        form: submitForm,
+        aciklama,
+        deps: {
+          updatePersonel,
+          createSurec
+        }
       });
 
-      await createSurec({
-        personel_id: selectedSurecPersonel.id,
-        surec_turu: "POZISYON_DEGISTI",
-        baslangic_tarihi: pozisyonForm.effectiveDate,
-        aciklama
-      });
+      if (selectedSurecPersonelIdRef.current !== submitPersonelId) {
+        return;
+      }
+
+      if (result.status === "no_op") {
+        setPozisyonError(null);
+        setPozisyonInfo("Pozisyon bilgisi değişmedi.");
+        return;
+      }
+
+      if (result.status === "validation_error") {
+        setPozisyonInfo(null);
+        setPozisyonError(result.message);
+        return;
+      }
+
+      if (result.status === "update_failed") {
+        setPozisyonInfo(null);
+        setPozisyonError(getApiErrorMessage(result.error, "Pozisyon güncellenemedi."));
+        return;
+      }
+
+      if (result.status === "partial_surec_failed") {
+        commitPersonelUpdateToCaches(result.updated);
+        setPersoneller((prev) => prev.map((item) => (item.id === result.updated.id ? result.updated : item)));
+        setPozisyonForm(createPozisyonFormFromPersonel(result.updated));
+        try {
+          await refetchSurecCachesForPersonel(submitPersonelId);
+        } catch {
+          /* Önbellek yenilemesi başarısız. */
+        }
+        setPozisyonInfo(null);
+        setPozisyonError(
+          getApiErrorMessage(
+            result.error,
+            "Personel güncellendi ancak pozisyon süreç kaydı oluşturulamadı. Tekrar kaydetmeden önce durumu kontrol edin."
+          )
+        );
+        return;
+      }
 
       try {
-        await refetchSurecCachesForPersonel(selectedSurecPersonel.id);
+        await refetchSurecCachesForPersonel(submitPersonelId);
       } catch {
         /* Önbellek yenilemesi başarısız. */
       }
 
-      commitPersonelUpdateToCaches(updated);
-      setPersoneller((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
-      setPozisyonForm(createPozisyonFormFromPersonel(updated));
+      commitPersonelUpdateToCaches(result.updated);
+      setPersoneller((prev) => prev.map((item) => (item.id === result.updated.id ? result.updated : item)));
+      setPozisyonForm(createPozisyonFormFromPersonel(result.updated));
       setPozisyonInfo("Pozisyon güncellendi.");
-    } catch (error) {
-      setPozisyonError(getApiErrorMessage(error, "Pozisyon güncellenemedi."));
     } finally {
       setPozisyonSubmitting(false);
     }
@@ -956,7 +973,10 @@ export function KayitSurecWorkspace({
   } = useKayitGatewayIntent({ activeTab, initialIntent, initialReturnTo, onClose });
 
   const hasInitialSurecPersonel = typeof initialSurecPersonelId === "string" && initialSurecPersonelId.length > 0;
-  const classicSurecFormLayout = editingSurec !== null || hasInitialSurecPersonel;
+  /** Gateway keeps classic process form on Genel; other personel tabs (Pozisyon…) use shell ops. */
+  const classicSurecFormLayout =
+    editingSurec !== null || (hasInitialSurecPersonel && activePersonelTab === "genel");
+  const showGatewayPersonelTabs = hasInitialSurecPersonel && editingSurec === null && Boolean(selectedSurecPersonel);
 
   const surecWorkspaceGridClassName = [
     "surec-workspace-grid",
@@ -1256,6 +1276,25 @@ export function KayitSurecWorkspace({
               <>
                 {classicSurecFormLayout ? (
                   <>
+                    {showGatewayPersonelTabs ? (
+                      <div className="surec-person-tabs" role="tablist" aria-label="Personel işlem sekmeleri">
+                        {PERSONEL_SUREC_TABS.map((tab) => {
+                          const isActive = activePersonelTab === tab.id;
+                          return (
+                            <button
+                              key={tab.id}
+                              type="button"
+                              role="tab"
+                              aria-selected={isActive}
+                              className={`surec-person-tab${isActive ? " is-active" : ""}`}
+                              onClick={() => selectPersonelTab(tab.id)}
+                            >
+                              {tab.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : null}
                     <form id={KAYIT_SUREC_SUREC_FORM_ID} className="workspace-form" onSubmit={handleSurecSubmit}>
                       <SurecFormFields
                         form={surecForm}

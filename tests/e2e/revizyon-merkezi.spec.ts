@@ -77,6 +77,26 @@ test.describe("S80 Revizyon Merkezi final UI kabul", () => {
     await page.getByTestId("header-modules-toggle").click();
     await page.getByTestId("shell-header-module-link-revizyon-merkezi").click();
     await expect(page.getByTestId("revizyon-merkezi-page")).toBeVisible();
+    await expect(page).toHaveURL(/\/haftalik-kapanis\/revizyonlar$/);
+  });
+
+  test("legacy /revizyon-merkezi redirects to canonical with replace", async ({ page }) => {
+    await loginAsMockRole(page, "GENEL_YONETICI");
+    await page.goto("/revizyon-merkezi");
+    await expect(page).toHaveURL(/\/haftalik-kapanis\/revizyonlar$/);
+    await expect(page.getByTestId("revizyon-merkezi-page")).toBeVisible();
+    await expect(page.getByTestId("yetkisiz-page")).toHaveCount(0);
+
+    await page.goBack();
+    await expect(page).not.toHaveURL(/\/revizyon-merkezi$/);
+    await expect(page.getByTestId("revizyon-merkezi-page")).toHaveCount(0);
+  });
+
+  test("canonical /haftalik-kapanis/revizyonlar loads without redirect", async ({ page }) => {
+    await loginAsMockRole(page, "GENEL_YONETICI");
+    await page.goto("/haftalik-kapanis/revizyonlar");
+    await expect(page).toHaveURL(/\/haftalik-kapanis\/revizyonlar$/);
+    await expect(page.getByTestId("revizyon-merkezi-page")).toBeVisible();
   });
 
   test("BIRIM_AMIRI: create/submit + finans/onay yok + prefill", async ({ page }) => {
@@ -510,6 +530,14 @@ test.describe("S80 Revizyon Merkezi final UI kabul", () => {
     await expect(page.getByTestId("yetkisiz-page")).toBeVisible();
     await expect(page.getByTestId("revizyon-merkezi-page")).toHaveCount(0);
     await expect(page.getByTestId("kayit-surec-revizyon-merkezi-link")).toHaveCount(0);
+  });
+
+  test("PATRON: legacy /revizyon-merkezi permission bypass üretmez", async ({ page }) => {
+    await loginAsMockRole(page, "PATRON");
+    await page.goto("/revizyon-merkezi");
+    await expect(page.getByTestId("yetkisiz-page")).toBeVisible();
+    await expect(page.getByTestId("revizyon-merkezi-page")).toHaveCount(0);
+    await expect(page).not.toHaveURL(/\/haftalik-kapanis\/revizyonlar/);
   });
 
   test("server-owned onceki_deger: UI canonical + sahte payload reddedilir", async ({ page }) => {

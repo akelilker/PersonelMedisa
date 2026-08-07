@@ -30,6 +30,12 @@ describe("secondary-module-nav", () => {
     ]);
   });
 
+  it("keeps Revizyon Merkezi global nav on the canonical path", () => {
+    const revizyon = SECONDARY_MODULE_CATALOG.find((item) => item.id === "revizyon-merkezi");
+    expect(revizyon?.to).toBe("/haftalik-kapanis/revizyonlar");
+    expect(SECONDARY_MODULE_CATALOG.some((item) => item.to === "/revizyon-merkezi")).toBe(false);
+  });
+
   it("returns all modules for GENEL_YONETICI", () => {
     const modules = resolveSecondaryModules(permissionGate("GENEL_YONETICI"));
     expect(modules.map((item) => item.label)).toEqual([

@@ -126,14 +126,14 @@ describe("usePersonelKartGatewayReturn", () => {
     });
   });
 
-  it("handleOpenPersonelZimmetGateway navigates with zimmet gateway contract", () => {
+  it("handleOpenSurecModal navigates with surec tab and personel preselect contract", () => {
     const navigate = vi.fn() as NavigateFunction;
 
     const { result } = renderHook(() =>
       usePersonelKartGatewayReturn({
-        location: makeLocation("/personeller/2", null),
+        location: makeLocation("/personeller/3", null),
         navigate,
-        parsedPersonelId: 2,
+        parsedPersonelId: 3,
         canEditPersonel: true,
         canCreateZimmet: true,
         setActiveTab: vi.fn(),
@@ -142,15 +142,13 @@ describe("usePersonelKartGatewayReturn", () => {
       })
     );
 
-    result.current.handleOpenPersonelZimmetGateway();
+    result.current.handleOpenSurecModal();
 
     expect(navigate).toHaveBeenCalledWith("/", {
       state: {
         kayitModal: {
-          tab: "yeni-kayit",
-          personelId: 2,
-          intent: "personel-zimmet-gateway",
-          returnTo: "/personeller/2"
+          tab: "surec",
+          personelId: 3
         }
       }
     });

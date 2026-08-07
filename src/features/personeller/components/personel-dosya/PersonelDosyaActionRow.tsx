@@ -30,8 +30,8 @@ export function PersonelDosyaActionRow({
 
     if (canCreateSurec) {
       items.push({
-        id: "surec-ekle",
-        label: "Süreç Ekle",
+        id: "surecte-islem-yap",
+        label: "Süreçte İşlem Yap",
         onSelect: () => {
           onCloseActionMenu();
           onOpenSurecModal();
@@ -101,7 +101,12 @@ export function PersonelDosyaActionRow({
         </button>
         <div className={`settings-dropdown personel-dosya-action-menu${isActionMenuOpen ? " open" : ""}`}>
           {actionItems.map((item) => (
-            <button key={item.id} type="button" onClick={item.onSelect}>
+            <button
+              key={item.id}
+              type="button"
+              data-testid={`personel-dosya-action-${item.id}`}
+              onClick={item.onSelect}
+            >
               {item.label}
             </button>
           ))}

@@ -361,7 +361,7 @@ test.describe("personel dosyasi surec akisi", () => {
     await expect(page.locator(".personel-dosya-hero")).toContainText(/Ayşe Yılmaz/i);
 
     await page.getByRole("button", { name: "Islemler" }).click();
-    await page.getByRole("button", { name: "Süreç Ekle" }).click();
+    await page.getByRole("button", { name: "Süreçte İşlem Yap" }).click();
 
     const surecModal = kayitSurecModal(page);
     await expect(surecModal).toBeVisible();
@@ -446,7 +446,7 @@ test.describe("personel dosyasi surec akisi", () => {
     await expect(page.getByTestId("izin-bakiye-infobox")).toBeVisible();
 
     await page.getByRole("button", { name: "Islemler" }).click();
-    await page.getByRole("button", { name: "Süreç Ekle" }).click();
+    await page.getByRole("button", { name: "Süreçte İşlem Yap" }).click();
 
     const surecModal = page.locator(".modal-container").last();
     await expect(surecModal).toBeVisible();
@@ -614,7 +614,7 @@ test.describe("personel dosyasi surec akisi", () => {
 
     await expect(page.getByRole("button", { name: "Kartı Düzenle" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Yeni Zimmet Ekle" })).toHaveCount(0);
-    await expect(page.getByRole("button", { name: "Süreç Ekle" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Süreçte İşlem Yap" })).toHaveCount(0);
 
     await page.getByRole("tab", { name: "Disiplin" }).click();
     const disiplinPanel = page.locator("#personel-kart-panel-disiplin");
@@ -887,7 +887,7 @@ test.describe("personel dosyasi surec akisi", () => {
     await expect(disiplinPanel.getByTestId("personel-disiplin-surec-signals")).toContainText(/Devamsızlık/i);
     await expect(disiplinPanel.getByTestId("personel-disiplin-surec-list")).toContainText(/Demo devamsizlik sinyali/i);
     await expect(disiplinPanel.getByRole("button", { name: "Kaydet" })).toHaveCount(0);
-    await expect(disiplinPanel.getByRole("button", { name: "Süreç Ekle" })).toHaveCount(0);
+    await expect(disiplinPanel.getByRole("button", { name: "Süreçte İşlem Yap" })).toHaveCount(0);
 
     await disiplinPanel.getByRole("button", { name: "Süreç Geçmişi'nde gör" }).click();
     await expect(page.locator("#personel-kart-panel-surec-gecmisi")).toBeVisible();

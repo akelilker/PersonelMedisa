@@ -7,23 +7,19 @@ import { buildPersonelTimeline } from "./personel-timeline-utils";
 export function PersonelSurecGecmisiPanel({
   personel,
   canAccessSurecler,
-  canCreateSurec,
   isLoading,
   errorMessage,
   surecler,
   surecHistoryHasMore,
-  zimmetler,
-  onOpenCreateModal
+  zimmetler
 }: {
   personel: Personel;
   canAccessSurecler: boolean;
-  canCreateSurec: boolean;
   isLoading: boolean;
   errorMessage: string | null;
   surecler: Surec[];
   surecHistoryHasMore: boolean;
   zimmetler: Zimmet[];
-  onOpenCreateModal: () => void;
 }) {
   const timeline = useMemo(
     () => buildPersonelTimeline(personel, surecler, zimmetler),
@@ -46,11 +42,6 @@ export function PersonelSurecGecmisiPanel({
           <h3>Süreç Geçmişi</h3>
           <p>Süreç kayıtları ve zimmet hareketleri tek akışta, en yeniden eskiye sıralanır.</p>
         </div>
-        {canCreateSurec ? (
-          <button type="button" className="universal-btn-aux" onClick={onOpenCreateModal}>
-            Süreç Ekle
-          </button>
-        ) : null}
       </div>
 
       {!isLoading && !errorMessage && surecHistoryHasMore ? (

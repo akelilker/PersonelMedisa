@@ -25,7 +25,6 @@ export type PersonelDosyaTabPanelsProps = {
   canCreateRevizyon?: boolean;
   canCreateZimmet: boolean;
   canAccessSurecler: boolean;
-  canCreateSurec: boolean;
   canViewFinans: boolean;
   canViewBordro?: boolean;
   canViewUcret: boolean;
@@ -34,7 +33,6 @@ export type PersonelDosyaTabPanelsProps = {
   canManageBordroKapsam?: boolean;
   canApproveBordroKapsam?: boolean;
   onOpenZimmetCreate: () => void;
-  onOpenCreateSurecModal: () => void;
 };
 
 export function PersonelDosyaTabPanels({
@@ -54,7 +52,6 @@ export function PersonelDosyaTabPanels({
   canCreateRevizyon = false,
   canCreateZimmet,
   canAccessSurecler,
-  canCreateSurec,
   canViewFinans,
   canViewBordro = false,
   canViewUcret,
@@ -62,8 +59,7 @@ export function PersonelDosyaTabPanels({
   canViewBordroKapsam = false,
   canManageBordroKapsam = false,
   canApproveBordroKapsam = false,
-  onOpenZimmetCreate,
-  onOpenCreateSurecModal
+  onOpenZimmetCreate
 }: PersonelDosyaTabPanelsProps) {
   function handleOpenSurecHistory() {
     onTabChange("surec-gecmisi");
@@ -154,13 +150,11 @@ export function PersonelDosyaTabPanels({
         <PersonelSurecGecmisiPanel
           personel={personel}
           canAccessSurecler={canAccessSurecler}
-          canCreateSurec={canCreateSurec}
           isLoading={isSurecHistoryLoading}
           errorMessage={surecHistoryErrorMessage}
           surecler={surecler}
           surecHistoryHasMore={surecHistoryHasMore}
           zimmetler={zimmetler}
-          onOpenCreateModal={onOpenCreateSurecModal}
         />
       </div>
     </>

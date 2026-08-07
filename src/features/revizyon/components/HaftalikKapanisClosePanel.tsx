@@ -37,6 +37,21 @@ function buildClosePayload(
   return payload;
 }
 
+/** Local success/duplicate identity — includes active branch; never sent in POST body. */
+function buildCloseSelectionKey(params: {
+  activeSubeId: number | null;
+  haftaBaslangic: string;
+  haftaBitis: string;
+  scopeMode: CloseScopeMode;
+  departmanId: string;
+}): string | null {
+  if (params.activeSubeId == null || !params.haftaBaslangic || !params.haftaBitis) {
+    return null;
+  }
+  const scopeToken = params.scopeMode === "departman" ? params.departmanId : "all";
+  return `${params.activeSubeId}|${params.haftaBaslangic}|${params.haftaBitis}|${params.scopeMode}|${scopeToken}`;
+}
+
 export function HaftalikKapanisClosePanel() {
   const { hasPermission } = useRoleAccess();
   const { session } = useAuth();
@@ -64,6 +79,19 @@ export function HaftalikKapanisClosePanel() {
   const [closedSelectionKey, setClosedSelectionKey] = useState<string | null>(null);
 
   const submitLockRef = useRef(false);
+  const activeSubeIdRef = useRef(activeSubeId);
+  activeSubeIdRef.current = activeSubeId;
+
+  useEffect(() => {
+    setSuccessResult(null);
+    setSuccessScopeLabel("");
+    setClosedSelectionKey(null);
+    setPanelError(null);
+    setDialogError(null);
+    if (!submitLockRef.current) {
+      setConfirmOpen(false);
+    }
+  }, [activeSubeId]);
 
   useEffect(() => {
     if (!canClose) {
@@ -111,14 +139,18 @@ export function HaftalikKapanisClosePanel() {
     scopeMode === "departman" &&
     (!departmanId || !Number.isFinite(Number.parseInt(departmanId, 10)));
 
-  const selectionKey =
-    weekEnd && closeHaftaBaslangic
-      ? `${closeHaftaBaslangic}|${weekEnd}|${scopeMode}|${scopeMode === "departman" ? departmanId : "all"}`
-      : null;
+  const selectionKey = buildCloseSelectionKey({
+    activeSubeId,
+    haftaBaslangic: closeHaftaBaslangic,
+    haftaBitis: weekEnd ?? "",
+    scopeMode,
+    departmanId
+  });
 
   const sameSelectionAlreadyClosed =
     Boolean(successResult) &&
     Boolean(closedSelectionKey) &&
+    Boolean(selectionKey) &&
     closedSelectionKey === selectionKey;
 
   const closeDisabled =
@@ -166,10 +198,11 @@ export function HaftalikKapanisClosePanel() {
   }
 
   async function confirmClose() {
-    if (closeDisabled || !weekEnd || submitLockRef.current) {
+    if (closeDisabled || !weekEnd || activeSubeId == null || submitLockRef.current) {
       return;
     }
 
+    const confirmSubeId = activeSubeId;
     submitLockRef.current = true;
     setIsClosing(true);
     setDialogError(null);
@@ -177,19 +210,30 @@ export function HaftalikKapanisClosePanel() {
 
     const payload = buildClosePayload(closeHaftaBaslangic, weekEnd, scopeMode, departmanId);
     const scopeLabel = selectedDepartmanLabel;
+    const successKey = buildCloseSelectionKey({
+      activeSubeId: confirmSubeId,
+      haftaBaslangic: payload.hafta_baslangic,
+      haftaBitis: payload.hafta_bitis,
+      scopeMode,
+      departmanId: scopeMode === "departman" ? String(payload.departman_id) : ""
+    });
 
     try {
       const result = await createHaftalikKapanis(payload);
+      if (activeSubeIdRef.current !== confirmSubeId) {
+        setConfirmOpen(false);
+        return;
+      }
       setSuccessResult(result);
       setSuccessScopeLabel(scopeLabel);
-      setClosedSelectionKey(
-        `${payload.hafta_baslangic}|${payload.hafta_bitis}|${scopeMode}|${
-          scopeMode === "departman" ? String(payload.departman_id) : "all"
-        }`
-      );
+      setClosedSelectionKey(successKey);
       setConfirmOpen(false);
     } catch (error) {
       const message = getApiErrorMessage(error, "Haftalık kapanış oluşturulamadı.");
+      if (activeSubeIdRef.current !== confirmSubeId) {
+        setConfirmOpen(false);
+        return;
+      }
       setDialogError(message);
       setPanelError(message);
       setSuccessResult(null);

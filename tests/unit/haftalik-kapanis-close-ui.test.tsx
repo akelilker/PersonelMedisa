@@ -15,8 +15,11 @@ const useRoleAccessMock = vi.hoisted(() => vi.fn());
 
 const authSession = vi.hoisted(() => ({
   active_sube_id: 1 as number | null,
-  sube_list: [{ id: 1, ad: "Merkez" }],
-  user: { id: 1, rol: "GENEL_YONETICI" as UserRole, sube_ids: [1] }
+  sube_list: [
+    { id: 1, ad: "Merkez" },
+    { id: 2, ad: "Giresun" }
+  ],
+  user: { id: 1, rol: "GENEL_YONETICI" as UserRole, sube_ids: [1, 2] }
 }));
 
 vi.mock("../../src/hooks/use-role-access", () => ({
@@ -75,7 +78,11 @@ describe("HaftalikKapanisClosePanel UI", () => {
   beforeEach(() => {
     authSession.active_sube_id = 1;
     authSession.user.rol = "GENEL_YONETICI";
-    authSession.user.sube_ids = [1];
+    authSession.user.sube_ids = [1, 2];
+    authSession.sube_list = [
+      { id: 1, ad: "Merkez" },
+      { id: 2, ad: "Giresun" }
+    ];
     useRoleAccessMock.mockReturnValue(permissionsForRole("GENEL_YONETICI"));
     fetchDepartmanOptionsMock.mockResolvedValue([
       { id: 3, label: "Operasyon" },
@@ -280,5 +287,61 @@ describe("HaftalikKapanisClosePanel UI", () => {
     expect(screen.getByTestId("hk-onay-bekleyenler-link")).toBeTruthy();
     expect(screen.getByTestId("hk-corrections-link")).toBeTruthy();
     expect(screen.getByTestId("hk-revizyon-talebi-ac")).toBeTruthy();
+  });
+
+  it("scopes local success/duplicate guard by active_sube_id", async () => {
+    const view = renderPage();
+    await waitFor(() => expect(screen.getByTestId("hk-close-open")).toBeTruthy());
+    await fillValidMondayAndOpenConfirm();
+    fireEvent.click(screen.getByTestId("hk-close-confirm-dialog-confirm"));
+    await waitFor(() => expect(screen.getByTestId("hk-close-success")).toBeTruthy());
+    expect((screen.getByTestId("hk-close-open") as HTMLButtonElement).disabled).toBe(true);
+    expect(createHaftalikKapanisMock).toHaveBeenCalledTimes(1);
+
+    authSession.active_sube_id = 2;
+    view.rerender(
+      <MemoryRouter>
+        <HaftalikKapanisPage />
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.queryByTestId("hk-close-success")).toBeNull();
+    });
+    expect(screen.getByTestId("hk-close-active-sube").textContent).toMatch(/Giresun/);
+    expect((screen.getByTestId("hk-close-open") as HTMLButtonElement).disabled).toBe(false);
+
+    fireEvent.click(screen.getByTestId("hk-close-open"));
+    await waitFor(() => expect(screen.getByTestId("hk-close-confirm-dialog")).toBeTruthy());
+    fireEvent.click(screen.getByTestId("hk-close-confirm-dialog-confirm"));
+    await waitFor(() => expect(createHaftalikKapanisMock).toHaveBeenCalledTimes(2));
+
+    const secondPayload = createHaftalikKapanisMock.mock.calls[1]![0] as Record<string, unknown>;
+    expect(secondPayload).toEqual({
+      hafta_baslangic: "2026-04-06",
+      hafta_bitis: "2026-04-12"
+    });
+    expect(Object.prototype.hasOwnProperty.call(secondPayload, "sube_id")).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(secondPayload, "active_sube_id")).toBe(false);
+    await waitFor(() => expect(screen.getByTestId("hk-close-success")).toBeTruthy());
+  });
+
+  it("closes idle confirm dialog when active branch changes without POST", async () => {
+    const view = renderPage();
+    await waitFor(() => expect(screen.getByTestId("hk-close-open")).toBeTruthy());
+    await fillValidMondayAndOpenConfirm();
+    expect(createHaftalikKapanisMock).not.toHaveBeenCalled();
+
+    authSession.active_sube_id = 2;
+    view.rerender(
+      <MemoryRouter>
+        <HaftalikKapanisPage />
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.queryByTestId("hk-close-confirm-dialog")).toBeNull();
+    });
+    expect(createHaftalikKapanisMock).not.toHaveBeenCalled();
   });
 });

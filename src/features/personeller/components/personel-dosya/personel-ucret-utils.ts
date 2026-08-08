@@ -1,9 +1,58 @@
-import type { PersonelUcretKaydi, UcretDurum, UcretKaynak, UcretTuru } from "../../../../types/ucret";
+import type {
+  CreatePersonelUcretPayload,
+  PersonelUcretKaydi,
+  UcretDurum,
+  UcretKaynak,
+  UcretTuru
+} from "../../../../types/ucret";
 import { formatIsoDateDetail } from "./personel-dosya-format-utils";
 
 export const UCRET_KAYIT_YOK_MESAJI = "Bu personel için henüz ücret dönemi kaydı bulunmuyor.";
 export const UCRET_GUNCEL_YOK_MESAJI = "Bugün için geçerli bir ücret kaydı bulunmuyor.";
 export const UCRET_IPTAL_ONAY_MESAJI = "Bu ücret kaydını iptal etmek istediğinize emin misiniz?";
+
+export type PersonelUcretFormInput = {
+  ucretTutari: string;
+  ucretTuru: UcretTuru;
+  paraBirimi: string;
+  gecerlilikBaslangic: string;
+  gecerlilikBitis: string;
+  aciklama: string;
+};
+
+export type PersonelUcretFormBuildResult =
+  | { ok: true; payload: CreatePersonelUcretPayload }
+  | { ok: false; message: string };
+
+/** Client-side salary period create validation (server rules remain authoritative). */
+export function buildPersonelUcretCreatePayload(form: PersonelUcretFormInput): PersonelUcretFormBuildResult {
+  const tutar = Number.parseFloat(form.ucretTutari.replace(",", "."));
+  if (!Number.isFinite(tutar) || tutar <= 0) {
+    return { ok: false, message: "Ücret tutarı sıfırdan büyük olmalıdır." };
+  }
+
+  if (!form.gecerlilikBaslangic) {
+    return { ok: false, message: "Geçerlilik başlangıç tarihi zorunludur." };
+  }
+
+  if (form.gecerlilikBitis && form.gecerlilikBitis < form.gecerlilikBaslangic) {
+    return { ok: false, message: "Bitiş tarihi başlangıç tarihinden önce olamaz." };
+  }
+
+  const payload: CreatePersonelUcretPayload = {
+    ucret_tutari: tutar,
+    ucret_turu: form.ucretTuru,
+    para_birimi: form.paraBirimi.trim().toUpperCase() || "TRY",
+    gecerlilik_baslangic: form.gecerlilikBaslangic,
+    gecerlilik_bitis: form.gecerlilikBitis || null
+  };
+  const aciklama = form.aciklama.trim();
+  if (aciklama) {
+    payload.aciklama = aciklama;
+  }
+
+  return { ok: true, payload };
+}
 
 const UCRET_TURU_LABELS: Record<UcretTuru, string> = {
   BRUT: "Brüt",

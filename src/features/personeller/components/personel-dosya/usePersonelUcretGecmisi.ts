@@ -14,11 +14,13 @@ import { sortUcretKayitlari } from "./personel-ucret-utils";
 export function usePersonelUcretGecmisi({
   personel,
   canViewUcret,
-  isActive
+  isActive,
+  onBusyChange
 }: {
   personel: Personel;
   canViewUcret: boolean;
   isActive: boolean;
+  onBusyChange?: (busy: boolean) => void;
 }) {
   const [ucretler, setUcretler] = useState<PersonelUcretKaydi[]>([]);
   const [aktifUcret, setAktifUcret] = useState<PersonelUcretKaydi | null>(null);
@@ -93,6 +95,7 @@ export function usePersonelUcretGecmisi({
     }
 
     setIsSubmitting(true);
+    onBusyChange?.(true);
     setSubmitErrorMessage(null);
 
     try {
@@ -105,6 +108,7 @@ export function usePersonelUcretGecmisi({
       return false;
     } finally {
       setIsSubmitting(false);
+      onBusyChange?.(false);
     }
   }
 
@@ -114,6 +118,7 @@ export function usePersonelUcretGecmisi({
     }
 
     setCancellingUcretId(ucretId);
+    onBusyChange?.(true);
     setCancelErrorMessage(null);
 
     try {
@@ -126,6 +131,7 @@ export function usePersonelUcretGecmisi({
       return false;
     } finally {
       setCancellingUcretId(null);
+      onBusyChange?.(false);
     }
   }
 

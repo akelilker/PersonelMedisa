@@ -18,11 +18,13 @@ import { usePersonelUcretGecmisi } from "./usePersonelUcretGecmisi";
 export function PersonelUcretGecmisiSection({
   personel,
   canManageUcret,
-  isActive
+  isActive,
+  onBusyChange
 }: {
   personel: Personel;
   canManageUcret: boolean;
   isActive: boolean;
+  onBusyChange?: (busy: boolean) => void;
 }) {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [pendingCancelUcretId, setPendingCancelUcretId] = useState<number | null>(null);
@@ -41,7 +43,7 @@ export function PersonelUcretGecmisiSection({
     cancellingUcretId,
     cancelErrorMessage,
     cancelUcret
-  } = usePersonelUcretGecmisi({ personel, canViewUcret: true, isActive });
+  } = usePersonelUcretGecmisi({ personel, canViewUcret: true, isActive, onBusyChange });
 
   const showLoading = canFetch && isLoading;
   const showError = canFetch && fetchResolved && !isLoading && Boolean(errorMessage);

@@ -28,6 +28,9 @@ const OWNERS = {
   personelUcretCreateModal: readOwner(
     "src/features/personeller/components/personel-dosya/PersonelUcretCreateModal.tsx"
   ),
+  personelUcretUtils: readOwner(
+    "src/features/personeller/components/personel-dosya/personel-ucret-utils.ts"
+  ),
   personelZimmetCreate: readOwner("src/hooks/usePersonelZimmetCreate.ts")
 } as const;
 
@@ -47,7 +50,7 @@ describe("S93-E2D-A ucret ve zimmet canonical mesaj parity", () => {
       expect(source).toContain(CANONICAL.ucretTuru);
     }
     expect(OWNERS.personellerController).toContain(CANONICAL.ucretTutari);
-    expect(OWNERS.personelUcretCreateModal).toContain(CANONICAL.ucretTutari);
+    expect(OWNERS.personelUcretUtils).toContain(CANONICAL.ucretTutari);
   });
 
   it("demo, e2e mock, PHP ve FE zimmet ownerlari canonical urun turu mesajini tutar", () => {

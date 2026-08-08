@@ -1,4 +1,4 @@
-export { PersonelBelgelerPanel } from "./PersonelBelgelerPanel";
+export { PersonelBelgelerPanel, type PersonelBelgelerPanelProps } from "./PersonelBelgelerPanel";
 export { PersonelDisiplinPanel } from "./PersonelDisiplinPanel";
 export { PersonelDosyaActionRow } from "./PersonelDosyaActionRow";
 export { PersonelDosyaHero } from "./PersonelDosyaHero";

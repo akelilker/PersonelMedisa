@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 const OWNER_PATHS = [
   "src/features/yonetim/pages/YonetimPaneliPage.tsx",
   "src/features/yonetim/components/MevzuatParametreleriPanel.tsx",
-  "src/features/kayit/components/KayitBelgeKayitlariSection.tsx"
+  "src/features/personeller/components/personel-dosya/PersonelBelgelerPanel.tsx"
 ] as const;
 
 function findNativeDialogCalls(relativePath: string): string[] {

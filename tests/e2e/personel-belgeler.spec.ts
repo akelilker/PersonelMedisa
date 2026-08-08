@@ -114,23 +114,24 @@ test.describe("personel belgeler API contract", () => {
     await kayitModal.getByRole("option", { name: /Ayşe Yılmaz/i }).click();
 
     await kayitModal.getByTestId("kayit-surec-subtab-belgeler").click();
-    await expect(kayitModal.getByTestId("kayit-belge-kayitlari-section")).toBeVisible();
+    await expect(kayitModal.getByTestId("personel-belgeler-panel")).toBeVisible();
     await expect(kayitModal.getByText(/API request failed: 404/i)).toHaveCount(0);
 
-    await kayitModal.locator('[name="belge-kayit-tipi"]').selectOption("SERTIFIKA");
-    await kayitModal.locator('[name="belge-kayit-ad"]').fill(uniqueAd);
-    await kayitModal.locator('[name="belge-kayit-baslangic"]').fill("2026-06-30");
-    await kayitModal.locator('[name="belge-kayit-aciklama"]').fill(aciklama);
+    await kayitModal.getByTestId("personel-belge-yeni-btn").click();
+    await page.getByTestId("personel-belge-ad").fill(uniqueAd);
+    await page.locator("#personel-belge-tipi").selectOption("SERTIFIKA");
+    await page.locator("#personel-belge-baslangic").fill("2026-06-30");
+    await page.locator("#personel-belge-aciklama").fill(aciklama);
 
     const postResponse = page.waitForResponse(
       (response) =>
         response.url().includes("/api/personeller/1/belge-kayitlari") &&
         response.request().method() === "POST"
     );
-    await kayitModal.locator('button[type="submit"][form="kayit-surec-belge-kayitlari-form"]').click();
+    await page.getByTestId("personel-belge-create-submit").click();
     expect((await postResponse).status()).toBe(201);
     await expect(kayitModal.getByText(/Belge kaydı eklendi/i)).toBeVisible({ timeout: 15_000 });
-    await expect(kayitModal.getByTestId("kayit-belge-kayitlari-list")).toContainText(uniqueAd);
+    await expect(kayitModal.getByTestId("personel-belge-kayit-list")).toContainText(uniqueAd);
 
     await kayitModal.getByRole("button", { name: "Kapat" }).click();
     await page.getByTestId("menu-personel-karti").click();

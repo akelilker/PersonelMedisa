@@ -1,4 +1,4 @@
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { AppActionDialog } from "../../../../components/modal/AppActionDialog";
 import { AppModal } from "../../../../components/modal/AppModal";
@@ -36,6 +36,15 @@ import {
 import { DossierRecord, DossierSection } from "./personel-dosya-dossier";
 import { formatIsoDateDetail } from "./personel-dosya-format-utils";
 
+export type PersonelBelgelerPanelProps = {
+  personel: Personel;
+  isActive: boolean;
+  /** Card shows RO belge durumu; Süreç keeps its own RW status form. */
+  showBelgeDurumu?: boolean;
+  showBelgeTakipLink?: boolean;
+  onBusyChange?: (busy: boolean) => void;
+};
+
 const CREATE_FORM_ID = "personel-belge-create-form";
 const EDIT_FORM_ID = "personel-belge-edit-form";
 const PERSONEL_BELGE_IPTAL_ONAY_MESAJI = "Belge kaydı iptal edilecek. Hard delete yoktur.";
@@ -71,11 +80,11 @@ function formatAuditLabel(islem: string) {
 
 export function PersonelBelgelerPanel({
   personel,
-  isActive
-}: {
-  personel: Personel;
-  isActive: boolean;
-}) {
+  isActive,
+  showBelgeDurumu = true,
+  showBelgeTakipLink = true,
+  onBusyChange
+}: PersonelBelgelerPanelProps) {
   const { hasPermission } = useRoleAccess();
   const canCreate = hasPermission("surecler.create");
   const canUpdate = hasPermission("surecler.update");
@@ -127,6 +136,33 @@ export function PersonelBelgelerPanel({
 
   const [downloadingId, setDownloadingId] = useState<number | null>(null);
 
+  const onBusyChangeRef = useRef(onBusyChange);
+  onBusyChangeRef.current = onBusyChange;
+
+  const createSavingRef = useRef(false);
+  const editSavingRef = useRef(false);
+  const replaceSavingRef = useRef(false);
+  const cancelSavingRef = useRef(false);
+
+  function publishFileBusy(
+    nextCreate: boolean,
+    nextEdit: boolean,
+    nextReplace: boolean,
+    nextCancel: boolean
+  ) {
+    createSavingRef.current = nextCreate;
+    editSavingRef.current = nextEdit;
+    replaceSavingRef.current = nextReplace;
+    cancelSavingRef.current = nextCancel;
+    onBusyChangeRef.current?.(nextCreate || nextEdit || nextReplace || nextCancel);
+  }
+
+  const fileBusy = isCreateSaving || isEditSaving || isReplaceSaving || isCancelSaving;
+
+  useEffect(() => {
+    publishFileBusy(isCreateSaving, isEditSaving, isReplaceSaving, isCancelSaving);
+  }, [isCreateSaving, isEditSaving, isReplaceSaving, isCancelSaving]);
+
   const isPasif = personel.aktif_durum === "PASIF";
   const readOnly = isPasif || !canWrite;
 
@@ -163,7 +199,7 @@ export function PersonelBelgelerPanel({
   useEffect(() => {
     let isCancelled = false;
 
-    if (!isActive) {
+    if (!isActive || !showBelgeDurumu) {
       return;
     }
 
@@ -191,7 +227,7 @@ export function PersonelBelgelerPanel({
     return () => {
       isCancelled = true;
     };
-  }, [isActive, personel.id]);
+  }, [isActive, personel.id, showBelgeDurumu]);
 
   useEffect(() => {
     if (!isActive) {
@@ -258,6 +294,7 @@ export function PersonelBelgelerPanel({
     }
 
     setIsCreateSaving(true);
+    publishFileBusy(true, editSavingRef.current, replaceSavingRef.current, cancelSavingRef.current);
     setCreateModalError(null);
     setActionError(null);
     setActionMessage(null);
@@ -292,6 +329,7 @@ export function PersonelBelgelerPanel({
       setCreateModalError(getApiErrorMessage(err, "Belge kaydı eklenemedi."));
     } finally {
       setIsCreateSaving(false);
+      publishFileBusy(false, editSavingRef.current, replaceSavingRef.current, cancelSavingRef.current);
     }
   }
 
@@ -308,6 +346,7 @@ export function PersonelBelgelerPanel({
     }
 
     setIsEditSaving(true);
+    publishFileBusy(createSavingRef.current, true, replaceSavingRef.current, cancelSavingRef.current);
     setEditModalError(null);
     setActionError(null);
     setActionMessage(null);
@@ -330,6 +369,7 @@ export function PersonelBelgelerPanel({
       setEditModalError(getApiErrorMessage(err, "Belge güncellenemedi."));
     } finally {
       setIsEditSaving(false);
+      publishFileBusy(createSavingRef.current, false, replaceSavingRef.current, cancelSavingRef.current);
     }
   }
 
@@ -339,6 +379,7 @@ export function PersonelBelgelerPanel({
     }
 
     setIsReplaceSaving(true);
+    publishFileBusy(createSavingRef.current, editSavingRef.current, true, cancelSavingRef.current);
     setReplaceModalError(null);
     setActionError(null);
     setActionMessage(null);
@@ -355,11 +396,12 @@ export function PersonelBelgelerPanel({
       setReplaceModalError(getApiErrorMessage(err, "Belge dosyası değiştirilemedi."));
     } finally {
       setIsReplaceSaving(false);
+      publishFileBusy(createSavingRef.current, editSavingRef.current, false, cancelSavingRef.current);
     }
   }
 
   function openCancelDialog(kayit: PersonelBelgeKaydi) {
-    if (isCancelSaving) {
+    if (isCancelSaving || fileBusy) {
       return;
     }
     setCancelKayit(kayit);
@@ -390,6 +432,7 @@ export function PersonelBelgelerPanel({
     }
 
     setIsCancelSaving(true);
+    publishFileBusy(createSavingRef.current, editSavingRef.current, replaceSavingRef.current, true);
     setCancelModalError(null);
     setCancelFieldError(null);
     setActionError(null);
@@ -404,6 +447,7 @@ export function PersonelBelgelerPanel({
       setCancelModalError(getApiErrorMessage(err, "Belge kaydı iptal edilemedi."));
     } finally {
       setIsCancelSaving(false);
+      publishFileBusy(createSavingRef.current, editSavingRef.current, replaceSavingRef.current, false);
     }
   }
 
@@ -449,51 +493,61 @@ export function PersonelBelgelerPanel({
 
   return (
     <div className="personel-dosya-sections" data-testid="personel-belgeler-panel">
-      <DossierSection
-        title="Belge Durumu"
-        description="Personel dosyasındaki zorunlu belgeler salt okunur izlenir; düzenleme kayıt ve süreç ekranından yapılır."
-      >
-        {isPasif ? (
-          <DossierRecord label="Durum" value="Bu personel pasif; belge durumu salt okunur gösterilir." />
-        ) : null}
+      {showBelgeDurumu ? (
+        <DossierSection
+          title="Belge Durumu"
+          description="Personel dosyasındaki zorunlu belgeler salt okunur izlenir; düzenleme kayıt ve süreç ekranından yapılır."
+        >
+          {isPasif ? (
+            <DossierRecord label="Durum" value="Bu personel pasif; belge durumu salt okunur gösterilir." />
+          ) : null}
 
-        {isLoading ? <DossierRecord label="Durum" value="Belgeler yükleniyor..." /> : null}
-        {!isLoading && errorMessage ? <DossierRecord label="Durum" value={errorMessage} /> : null}
+          {isLoading ? <DossierRecord label="Durum" value="Belgeler yükleniyor..." /> : null}
+          {!isLoading && errorMessage ? <DossierRecord label="Durum" value={errorMessage} /> : null}
 
-        {!isLoading && !errorMessage ? (
-          <>
-            {!hasAnyBelge ? (
-              <DossierRecord label="Kayıt" value="Henüz VAR olarak işaretlenmiş belge yok." />
-            ) : null}
-            {BELGE_TURU_KEYS.map((tur) => {
-              const item = items.find((row) => row.belge_turu === tur);
-              const durum = item?.durum ?? "YOK";
-              return (
-                <DossierRecord
-                  key={tur}
-                  label={BELGE_TURU_LABELS[tur]}
-                  value={formatBelgeDurumLabel(durum)}
-                />
-              );
-            })}
-          </>
-        ) : null}
-      </DossierSection>
+          {!isLoading && !errorMessage ? (
+            <>
+              {!hasAnyBelge ? (
+                <DossierRecord label="Kayıt" value="Henüz VAR olarak işaretlenmiş belge yok." />
+              ) : null}
+              {BELGE_TURU_KEYS.map((tur) => {
+                const item = items.find((row) => row.belge_turu === tur);
+                const durum = item?.durum ?? "YOK";
+                return (
+                  <DossierRecord
+                    key={tur}
+                    label={BELGE_TURU_LABELS[tur]}
+                    value={formatBelgeDurumLabel(durum)}
+                  />
+                );
+              })}
+            </>
+          ) : null}
+        </DossierSection>
+      ) : null}
 
       <DossierSection
         title="Personel Belgeleri"
         description="Eğitim, sertifika ve resmi belge kayıtları bu bölümde yönetilir."
       >
         <div className="personel-belge-panel-head">
-          <Link className="personeller-toolbar-module-link" to="/personeller/belge-takip" data-testid="personel-belge-takip-link">
-            Belge Takip
-          </Link>
+          {showBelgeTakipLink ? (
+            <Link className="personeller-toolbar-module-link" to="/personeller/belge-takip" data-testid="personel-belge-takip-link">
+              Belge Takip
+            </Link>
+          ) : (
+            <span />
+          )}
           {canCreate && !isPasif ? (
             <button
               type="button"
               className="universal-btn-aux"
               data-testid="personel-belge-yeni-btn"
+              disabled={fileBusy}
               onClick={() => {
+                if (fileBusy) {
+                  return;
+                }
                 setCreateDraft(createEmptyBelgeKaydiDraft());
                 setCreateFile(null);
                 setCreateFileError(null);
@@ -585,7 +639,13 @@ export function PersonelBelgelerPanel({
                             type="button"
                             className="universal-btn-aux"
                             data-testid={`personel-belge-duzenle-${kayit.id}`}
-                            onClick={() => openEditModal(kayit)}
+                            disabled={fileBusy}
+                            onClick={() => {
+                              if (fileBusy) {
+                                return;
+                              }
+                              openEditModal(kayit);
+                            }}
                           >
                             Düzenle
                           </button>
@@ -595,7 +655,11 @@ export function PersonelBelgelerPanel({
                             type="button"
                             className="universal-btn-aux"
                             data-testid={`personel-belge-dosya-degistir-${kayit.id}`}
+                            disabled={fileBusy}
                             onClick={() => {
+                              if (fileBusy) {
+                                return;
+                              }
                               setReplaceKayit(kayit);
                               setReplaceFile(null);
                               setReplaceFileError(null);
@@ -610,6 +674,7 @@ export function PersonelBelgelerPanel({
                             type="button"
                             className="universal-btn-aux"
                             data-testid={`personel-belge-iptal-${kayit.id}`}
+                            disabled={fileBusy}
                             onClick={() => openCancelDialog(kayit)}
                           >
                             İptal

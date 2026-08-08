@@ -41,7 +41,7 @@ import { fetchPersonelBelgeDurumu, putPersonelBelgeDurumu } from "../../../api/b
 import { getApiErrorDetail, getApiErrorMessage } from "../../../api/api-client";
 import { PersonelCreateFields } from "../../../features/personeller/components/PersonelCreateFields";
 import { PersonelZimmetCreateForm } from "../../../features/personeller/components/PersonelZimmetCreateForm";
-import { KayitBelgeKayitlariSection } from "./KayitBelgeKayitlariSection";
+import { PersonelBelgelerPanel } from "../../../features/personeller/components/personel-dosya/PersonelBelgelerPanel";
 import { KayitGatewayRedirectPanel } from "./KayitGatewayRedirectPanel";
 import { type KayitModalFooterModel } from "./KayitModalFooter";
 import { KayitSurecPersonelFinansPanel } from "./KayitSurecPersonelFinansPanel";
@@ -166,12 +166,19 @@ export function KayitSurecWorkspace({
   const { hasPermission } = useRoleAccess();
   const canCreatePersonel = hasPermission("personeller.create");
   const canCreateSurec = hasPermission("surecler.create");
+  const canEditSurec = hasPermission("surecler.update");
+  const canViewSurec =
+    hasPermission("surecler.view") ||
+    hasPermission("surecler.view.sube") ||
+    hasPermission("surecler.detail.view");
+  const canViewPersonelDetail = hasPermission("personeller.detail.view");
+  const canViewBelgeler = canViewSurec || canViewPersonelDetail;
+  const canWriteBelgeDurum = canCreateSurec || canEditSurec;
   const canUpdatePersonel = hasPermission("personeller.update");
   const canViewUcret = hasPermission("personeller.ucret.view");
   const canManageUcret = hasPermission("personeller.ucret.manage");
   const canCreateZimmet = canUpdatePersonel;
   const canCreateFinans = hasPermission("finans.create");
-  const canEditSurec = hasPermission("surecler.update");
   /** Pozisyon: `updatePersonel` + `createSurec(POZISYON_DEGISTI)` — ikisi de zorunlu. */
   const canSubmitPozisyon = canUpdatePersonel && canCreateSurec;
 
@@ -208,7 +215,7 @@ export function KayitSurecWorkspace({
   const [pozisyonForm, setPozisyonForm] = useState<PozisyonFormState>(createPozisyonFormFromPersonel(null));
   const [pozisyonSubmitting, setPozisyonSubmitting] = useState(false);
   const [ucretMutating, setUcretMutating] = useState(false);
-  const personelContextLocked = pozisyonSubmitting || ucretMutating;
+  const [belgeFileMutating, setBelgeFileMutating] = useState(false);
   const [pozisyonError, setPozisyonError] = useState<string | null>(null);
   const [pozisyonInfo, setPozisyonInfo] = useState<string | null>(null);
   const [openPozisyonPicker, setOpenPozisyonPicker] = useState<string | null>(null);
@@ -220,6 +227,8 @@ export function KayitSurecWorkspace({
   const [belgeDurumError, setBelgeDurumError] = useState<string | null>(null);
   const [belgeDurumInfo, setBelgeDurumInfo] = useState<string | null>(null);
   const [belgeDurumSaving, setBelgeDurumSaving] = useState(false);
+  const personelContextLocked =
+    pozisyonSubmitting || ucretMutating || belgeDurumSaving || belgeFileMutating;
 
   const personelOptions = useMemo(
     () =>
@@ -668,10 +677,10 @@ export function KayitSurecWorkspace({
 
   async function handleBelgeDurumSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!selectedSurecPersonel || selectedSurecPersonel.aktif_durum === "PASIF" || !canCreateSurec) {
+    if (!selectedSurecPersonel || selectedSurecPersonel.aktif_durum === "PASIF" || !canWriteBelgeDurum) {
       return;
     }
-    if (belgeDurumSaving || belgeDurumLoading) {
+    if (belgeDurumSaving || belgeDurumLoading || belgeFileMutating) {
       return;
     }
 
@@ -701,7 +710,7 @@ export function KayitSurecWorkspace({
       return;
     }
 
-    if (!selectedSurecPersonel || selectedSurecPersonel.aktif_durum === "PASIF") {
+    if (!canWriteBelgeDurum || !selectedSurecPersonel || selectedSurecPersonel.aktif_durum === "PASIF") {
       setBelgeDurumDraft(createDefaultBelgeDurumDraft());
       setBelgeDurumLoading(false);
       setBelgeDurumError(null);
@@ -737,7 +746,7 @@ export function KayitSurecWorkspace({
     return () => {
       cancelled = true;
     };
-  }, [activePersonelTab, selectedSurecPersonel?.id, selectedSurecPersonel?.aktif_durum]);
+  }, [activePersonelTab, canWriteBelgeDurum, selectedSurecPersonel?.id, selectedSurecPersonel?.aktif_durum]);
 
   useEffect(() => {
     if (!initialSurecPersonelId) {
@@ -1144,14 +1153,14 @@ export function KayitSurecWorkspace({
     }
 
     if (activePersonelTab === "belgeler") {
-      if (selectedSurecPersonel.aktif_durum === "PASIF" || !canCreateSurec) {
+      if (selectedSurecPersonel.aktif_durum === "PASIF" || !canWriteBelgeDurum) {
         return null;
       }
 
       return {
         primaryLabel: belgeDurumSaving ? "Kaydediliyor..." : "Kaydet",
         primaryFormId: KAYIT_SUREC_BELGELER_FORM_ID,
-        primaryDisabled: belgeDurumSaving || belgeDurumLoading
+        primaryDisabled: belgeDurumSaving || belgeDurumLoading || belgeFileMutating
       };
     }
 
@@ -1161,12 +1170,14 @@ export function KayitSurecWorkspace({
     activeTab,
     belgeDurumLoading,
     belgeDurumSaving,
+    belgeFileMutating,
     bootstrapError,
     bootstrapLoading,
     canCreateFinans,
     canCreateSurec,
     canCreateZimmet,
     canSubmitPozisyon,
+    canWriteBelgeDurum,
     classicSurecFormLayout,
     devamsizlikSubId,
     hasPozisyonDiff,
@@ -1803,78 +1814,84 @@ export function KayitSurecWorkspace({
                                 <strong>Belgeler</strong>
                                 <p>Bu personel pasif; belge durumu güncellenmez.</p>
                               </div>
-                            ) : canCreateSurec ? (
-                              <div>
-                                <p className="workspace-empty-hint">
-                                  <strong>Dosya Evrak Durumu</strong> — {selectedSurecPersonelLabel}
-                                </p>
-                                {belgeDurumLoading ? (
-                                  <p className="workspace-empty-hint">Belgeler yükleniyor…</p>
-                                ) : null}
-                                {belgeDurumError ? <p className="workspace-error">{belgeDurumError}</p> : null}
-                                {!belgeDurumLoading ? (
-                                  <form
-                                    id={KAYIT_SUREC_BELGELER_FORM_ID}
-                                    className="workspace-form belge-durum-form"
-                                    onSubmit={handleBelgeDurumSubmit}
-                                  >
-                                    {BELGE_TURU_KEYS.map((tur) => (
-                                      <div key={tur} className="form-section belge-durum-row">
-                                        <div className="form-label" id={`belge-label-${tur}`}>
-                                          {BELGE_TURU_LABELS[tur]}
-                                        </div>
-                                        <div
-                                          className="belge-durum-radios"
-                                          role="radiogroup"
-                                          aria-labelledby={`belge-label-${tur}`}
-                                        >
-                                          <label className="belge-durum-radio">
-                                            <input
-                                              type="radio"
-                                              name={`belge-durum-${tur}`}
-                                              value="VAR"
-                                              checked={belgeDurumDraft[tur] === "VAR"}
-                                              onChange={() =>
-                                                setBelgeDurumDraft((prev) => ({ ...prev, [tur]: "VAR" }))
-                                              }
-                                            />{" "}
-                                            VAR
-                                          </label>
-                                          <label className="belge-durum-radio">
-                                            <input
-                                              type="radio"
-                                              name={`belge-durum-${tur}`}
-                                              value="YOK"
-                                              checked={belgeDurumDraft[tur] === "YOK"}
-                                              onChange={() =>
-                                                setBelgeDurumDraft((prev) => ({ ...prev, [tur]: "YOK" }))
-                                              }
-                                            />{" "}
-                                            YOK
-                                          </label>
-                                        </div>
-                                      </div>
-                                    ))}
-                                  </form>
-                                ) : null}
-                                {belgeDurumInfo ? (
-                                  <p className="workspace-success workspace-success--inline">{belgeDurumInfo}</p>
-                                ) : null}
-
-                                <div className="belge-kayit-section-divider" aria-hidden="true" />
-
-                                <KayitBelgeKayitlariSection
-                                  personelId={selectedSurecPersonel.id}
-                                  personelLabel={selectedSurecPersonelLabel}
-                                  isPersonelPasif={false}
-                                  canWrite={canCreateSurec}
-                                  isActive={activePersonelTab === "belgeler"}
-                                />
-                              </div>
-                            ) : (
+                            ) : !canViewBelgeler ? (
                               <div className="surec-person-placeholder">
                                 <strong>Belgeler</strong>
                                 <p>Bu işlem için yetkin yok.</p>
+                              </div>
+                            ) : (
+                              <div data-testid="kayit-surec-belgeler-panel">
+                                {canWriteBelgeDurum ? (
+                                  <>
+                                    <p className="workspace-empty-hint">
+                                      <strong>Dosya Evrak Durumu</strong> — {selectedSurecPersonelLabel}
+                                    </p>
+                                    {belgeDurumLoading ? (
+                                      <p className="workspace-empty-hint">Belgeler yükleniyor…</p>
+                                    ) : null}
+                                    {belgeDurumError ? <p className="workspace-error">{belgeDurumError}</p> : null}
+                                    {!belgeDurumLoading ? (
+                                      <form
+                                        id={KAYIT_SUREC_BELGELER_FORM_ID}
+                                        className="workspace-form belge-durum-form"
+                                        onSubmit={handleBelgeDurumSubmit}
+                                      >
+                                        {BELGE_TURU_KEYS.map((tur) => (
+                                          <div key={tur} className="form-section belge-durum-row">
+                                            <div className="form-label" id={`belge-label-${tur}`}>
+                                              {BELGE_TURU_LABELS[tur]}
+                                            </div>
+                                            <div
+                                              className="belge-durum-radios"
+                                              role="radiogroup"
+                                              aria-labelledby={`belge-label-${tur}`}
+                                            >
+                                              <label className="belge-durum-radio">
+                                                <input
+                                                  type="radio"
+                                                  name={`belge-durum-${tur}`}
+                                                  value="VAR"
+                                                  checked={belgeDurumDraft[tur] === "VAR"}
+                                                  disabled={belgeDurumSaving || belgeFileMutating}
+                                                  onChange={() =>
+                                                    setBelgeDurumDraft((prev) => ({ ...prev, [tur]: "VAR" }))
+                                                  }
+                                                />{" "}
+                                                VAR
+                                              </label>
+                                              <label className="belge-durum-radio">
+                                                <input
+                                                  type="radio"
+                                                  name={`belge-durum-${tur}`}
+                                                  value="YOK"
+                                                  checked={belgeDurumDraft[tur] === "YOK"}
+                                                  disabled={belgeDurumSaving || belgeFileMutating}
+                                                  onChange={() =>
+                                                    setBelgeDurumDraft((prev) => ({ ...prev, [tur]: "YOK" }))
+                                                  }
+                                                />{" "}
+                                                YOK
+                                              </label>
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </form>
+                                    ) : null}
+                                    {belgeDurumInfo ? (
+                                      <p className="workspace-success workspace-success--inline">{belgeDurumInfo}</p>
+                                    ) : null}
+
+                                    <div className="belge-kayit-section-divider" aria-hidden="true" />
+                                  </>
+                                ) : null}
+
+                                <PersonelBelgelerPanel
+                                  personel={selectedSurecPersonel}
+                                  isActive={activePersonelTab === "belgeler"}
+                                  showBelgeDurumu={!canWriteBelgeDurum}
+                                  showBelgeTakipLink
+                                  onBusyChange={setBelgeFileMutating}
+                                />
                               </div>
                             )
                           ) : (

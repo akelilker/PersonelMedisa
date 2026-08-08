@@ -91,3 +91,61 @@ export function optionLabel(options: Array<{ id: number; label: string }>, value
 export function parsePozisyonId(value: string) {
   return value ? Number.parseInt(value, 10) : null;
 }
+
+export function hasPozisyonOrganizationalDiff(
+  form: { departmanId: string; gorevId: string; bagliAmirId: string; personelTipiId: string },
+  personel: Personel
+) {
+  return (
+    form.departmanId !== toOptionalIdValue(personel.departman_id) ||
+    form.gorevId !== toOptionalIdValue(personel.gorev_id) ||
+    form.bagliAmirId !== toOptionalIdValue(personel.bagli_amir_id) ||
+    form.personelTipiId !== toOptionalIdValue(personel.personel_tipi_id)
+  );
+}
+
+/** Sparse PUT body: only changed organizational fields + effective_date. */
+export function buildSparsePozisyonUpdatePayload(
+  form: {
+    departmanId: string;
+    gorevId: string;
+    bagliAmirId: string;
+    personelTipiId: string;
+    effectiveDate: string;
+  },
+  personel: Personel
+): {
+  departman_id?: number | null;
+  gorev_id?: number | null;
+  bagli_amir_id?: number | null;
+  personel_tipi_id?: number;
+  effective_date: string;
+} {
+  const payload: {
+    departman_id?: number | null;
+    gorev_id?: number | null;
+    bagli_amir_id?: number | null;
+    personel_tipi_id?: number;
+    effective_date: string;
+  } = {
+    effective_date: form.effectiveDate
+  };
+
+  if (form.departmanId !== toOptionalIdValue(personel.departman_id)) {
+    payload.departman_id = parsePozisyonId(form.departmanId);
+  }
+  if (form.gorevId !== toOptionalIdValue(personel.gorev_id)) {
+    payload.gorev_id = parsePozisyonId(form.gorevId);
+  }
+  if (form.bagliAmirId !== toOptionalIdValue(personel.bagli_amir_id)) {
+    payload.bagli_amir_id = parsePozisyonId(form.bagliAmirId);
+  }
+  if (form.personelTipiId !== toOptionalIdValue(personel.personel_tipi_id)) {
+    const parsedTip = parsePozisyonId(form.personelTipiId);
+    if (parsedTip != null) {
+      payload.personel_tipi_id = parsedTip;
+    }
+  }
+
+  return payload;
+}

@@ -20,6 +20,7 @@ type SurecFormFieldsProps = {
   surecTuruOptions: KeyOption[];
   personelOptions?: PersonelOption[];
   showPersonelField?: boolean;
+  personelFieldDisabled?: boolean;
   showSurecTuruField?: boolean;
   altTurField?: AltTurFieldConfig;
   useOperationControls?: boolean;
@@ -90,6 +91,7 @@ export function SurecFormFields({
   surecTuruOptions,
   personelOptions = [],
   showPersonelField = true,
+  personelFieldDisabled = false,
   showSurecTuruField = true,
   altTurField,
   useOperationControls = false,
@@ -125,6 +127,7 @@ export function SurecFormFields({
             value={form.personelId}
             onChange={(value) => setForm((prev) => ({ ...prev, personelId: value }))}
             required
+            disabled={personelFieldDisabled}
             placeholderOption={{ value: "", label: "Seçiniz" }}
             selectOptions={personelOptions}
           />
@@ -138,6 +141,7 @@ export function SurecFormFields({
             value={form.personelId}
             onChange={(value) => setForm((prev) => ({ ...prev, personelId: value }))}
             required
+            disabled={personelFieldDisabled}
           />
         )
     : null;

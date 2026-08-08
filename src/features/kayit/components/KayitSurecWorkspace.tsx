@@ -1891,6 +1891,7 @@ export function KayitSurecWorkspace({
                                   showBelgeDurumu={!canWriteBelgeDurum}
                                   showBelgeTakipLink
                                   onBusyChange={setBelgeFileMutating}
+                                  externalBusy={belgeDurumSaving}
                                 />
                               </div>
                             )

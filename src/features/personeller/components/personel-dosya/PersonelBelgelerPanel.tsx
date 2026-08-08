@@ -43,6 +43,8 @@ export type PersonelBelgelerPanelProps = {
   showBelgeDurumu?: boolean;
   showBelgeTakipLink?: boolean;
   onBusyChange?: (busy: boolean) => void;
+  /** External document mutation (e.g. Süreç belge durumu PUT) blocks file writes. */
+  externalBusy?: boolean;
 };
 
 const CREATE_FORM_ID = "personel-belge-create-form";
@@ -83,7 +85,8 @@ export function PersonelBelgelerPanel({
   isActive,
   showBelgeDurumu = true,
   showBelgeTakipLink = true,
-  onBusyChange
+  onBusyChange,
+  externalBusy = false
 }: PersonelBelgelerPanelProps) {
   const { hasPermission } = useRoleAccess();
   const canCreate = hasPermission("surecler.create");
@@ -158,6 +161,7 @@ export function PersonelBelgelerPanel({
   }
 
   const fileBusy = isCreateSaving || isEditSaving || isReplaceSaving || isCancelSaving;
+  const writeLocked = externalBusy || fileBusy;
 
   useEffect(() => {
     publishFileBusy(isCreateSaving, isEditSaving, isReplaceSaving, isCancelSaving);
@@ -283,7 +287,7 @@ export function PersonelBelgelerPanel({
 
   async function handleCreateSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!canCreate || isPasif) {
+    if (!canCreate || isPasif || externalBusy || isCreateSaving) {
       return;
     }
 
@@ -335,7 +339,7 @@ export function PersonelBelgelerPanel({
 
   async function handleEditSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!canUpdate || !editingKayit || isPasif) {
+    if (!canUpdate || !editingKayit || isPasif || externalBusy || isEditSaving) {
       return;
     }
 
@@ -374,7 +378,7 @@ export function PersonelBelgelerPanel({
   }
 
   async function handleReplaceConfirm() {
-    if (!canUpdate || !replaceKayit || !replaceFile || isPasif) {
+    if (!canUpdate || !replaceKayit || !replaceFile || isPasif || externalBusy || isReplaceSaving) {
       return;
     }
 
@@ -401,7 +405,7 @@ export function PersonelBelgelerPanel({
   }
 
   function openCancelDialog(kayit: PersonelBelgeKaydi) {
-    if (isCancelSaving || fileBusy) {
+    if (writeLocked) {
       return;
     }
     setCancelKayit(kayit);
@@ -421,7 +425,7 @@ export function PersonelBelgelerPanel({
   }
 
   async function confirmCancelBelge() {
-    if (!canCancel || !cancelKayit || isPasif || isCancelSaving) {
+    if (!canCancel || !cancelKayit || isPasif || externalBusy || isCancelSaving) {
       return;
     }
 
@@ -467,6 +471,9 @@ export function PersonelBelgelerPanel({
   }
 
   function openEditModal(kayit: PersonelBelgeKaydi) {
+    if (writeLocked) {
+      return;
+    }
     setEditingKayit(kayit);
     setEditModalError(null);
     setEditDraft({
@@ -479,6 +486,27 @@ export function PersonelBelgelerPanel({
       ek_ref: kayit.ek_ref ?? "",
       aciklama: kayit.aciklama ?? ""
     });
+  }
+
+  function openReplaceModal(kayit: PersonelBelgeKaydi) {
+    if (writeLocked) {
+      return;
+    }
+    setReplaceKayit(kayit);
+    setReplaceFile(null);
+    setReplaceFileError(null);
+    setReplaceModalError(null);
+  }
+
+  function openCreateModal() {
+    if (writeLocked) {
+      return;
+    }
+    setCreateDraft(createEmptyBelgeKaydiDraft());
+    setCreateFile(null);
+    setCreateFileError(null);
+    setCreateModalError(null);
+    setIsCreateOpen(true);
   }
 
   function handleCreateFileChange(file: File | null) {
@@ -543,17 +571,8 @@ export function PersonelBelgelerPanel({
               type="button"
               className="universal-btn-aux"
               data-testid="personel-belge-yeni-btn"
-              disabled={fileBusy}
-              onClick={() => {
-                if (fileBusy) {
-                  return;
-                }
-                setCreateDraft(createEmptyBelgeKaydiDraft());
-                setCreateFile(null);
-                setCreateFileError(null);
-                setCreateModalError(null);
-                setIsCreateOpen(true);
-              }}
+              disabled={writeLocked}
+              onClick={() => openCreateModal()}
             >
               Yeni belge ekle
             </button>
@@ -639,13 +658,8 @@ export function PersonelBelgelerPanel({
                             type="button"
                             className="universal-btn-aux"
                             data-testid={`personel-belge-duzenle-${kayit.id}`}
-                            disabled={fileBusy}
-                            onClick={() => {
-                              if (fileBusy) {
-                                return;
-                              }
-                              openEditModal(kayit);
-                            }}
+                            disabled={writeLocked}
+                            onClick={() => openEditModal(kayit)}
                           >
                             Düzenle
                           </button>
@@ -655,16 +669,8 @@ export function PersonelBelgelerPanel({
                             type="button"
                             className="universal-btn-aux"
                             data-testid={`personel-belge-dosya-degistir-${kayit.id}`}
-                            disabled={fileBusy}
-                            onClick={() => {
-                              if (fileBusy) {
-                                return;
-                              }
-                              setReplaceKayit(kayit);
-                              setReplaceFile(null);
-                              setReplaceFileError(null);
-                              setReplaceModalError(null);
-                            }}
+                            disabled={writeLocked}
+                            onClick={() => openReplaceModal(kayit)}
                           >
                             Dosya değiştir
                           </button>
@@ -674,7 +680,7 @@ export function PersonelBelgelerPanel({
                             type="button"
                             className="universal-btn-aux"
                             data-testid={`personel-belge-iptal-${kayit.id}`}
-                            disabled={fileBusy}
+                            disabled={writeLocked}
                             onClick={() => openCancelDialog(kayit)}
                           >
                             İptal
@@ -758,7 +764,7 @@ export function PersonelBelgelerPanel({
               type="submit"
               form={CREATE_FORM_ID}
               className="universal-btn-save"
-              disabled={isCreateSaving || Boolean(createFileError)}
+              disabled={externalBusy || isCreateSaving || Boolean(createFileError)}
               data-testid="personel-belge-create-submit"
             >
               {isCreateSaving ? "Kaydediliyor..." : "Kaydet"}
@@ -829,7 +835,7 @@ export function PersonelBelgelerPanel({
               type="submit"
               form={EDIT_FORM_ID}
               className="universal-btn-save"
-              disabled={isEditSaving}
+              disabled={externalBusy || isEditSaving}
               data-testid="personel-belge-edit-submit"
             >
               {isEditSaving ? "Kaydediliyor..." : "Güncelle"}
@@ -877,7 +883,7 @@ export function PersonelBelgelerPanel({
             <button
               type="button"
               className="universal-btn-save"
-              disabled={isReplaceSaving || !replaceFile || Boolean(replaceFileError)}
+              disabled={externalBusy || isReplaceSaving || !replaceFile || Boolean(replaceFileError)}
               data-testid="personel-belge-replace-submit"
               onClick={() => void handleReplaceConfirm()}
             >
@@ -928,7 +934,7 @@ export function PersonelBelgelerPanel({
           confirmLabel="İptali onayla"
           submitLabel="İptal ediliyor..."
           destructive
-          isSubmitting={isCancelSaving}
+          isSubmitting={isCancelSaving || externalBusy}
           errorMessage={cancelModalError}
           onConfirm={confirmCancelBelge}
           onCancel={closeCancelDialog}

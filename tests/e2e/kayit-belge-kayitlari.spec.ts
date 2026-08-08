@@ -295,6 +295,18 @@ test.describe("Kayit Surec belge kayitlari", () => {
     await kayitModal.getByRole("option", { name: /Ayşe Yılmaz/i }).click();
     await kayitModal.getByTestId("kayit-surec-subtab-belgeler").click();
 
+    let fileWriteCount = 0;
+    let statusWriteCount = 0;
+    page.on("request", (request) => {
+      const path = new URL(request.url()).pathname;
+      if (request.method() === "POST" && /\/api\/personeller\/\d+\/belge-kayitlari$/.test(path)) {
+        fileWriteCount += 1;
+      }
+      if (request.method() === "PUT" && /\/api\/personeller\/\d+\/belge-durumu$/.test(path)) {
+        statusWriteCount += 1;
+      }
+    });
+
     await page.route("**/api/personeller/*/belge-kayitlari", async (route) => {
       if (route.request().method() !== "POST") {
         await route.fallback();
@@ -311,7 +323,99 @@ test.describe("Kayit Surec belge kayitlari", () => {
 
     const personelCombo = kayitModal.getByRole("combobox", { name: "Personel" });
     await expect(personelCombo).toBeDisabled({ timeout: 5_000 });
+    await expect(kayitModal.locator('input[name="belge-durum-KIMLIK"][value="VAR"]')).toBeDisabled();
+    await expect(kayitModal.getByTestId("kayit-modal-footer-primary")).toBeDisabled();
+
+    await kayitModal.locator('input[name="belge-durum-KIMLIK"][value="VAR"]').check({ force: true }).catch(() => undefined);
+    await kayitModal.getByTestId("kayit-modal-footer-primary").click({ force: true }).catch(() => undefined);
+    expect(statusWriteCount).toBe(0);
+
     await expect(kayitModal.getByText(/Belge kaydı eklendi/i)).toBeVisible({ timeout: 20_000 });
     await expect(personelCombo).toBeEnabled({ timeout: 10_000 });
+    expect(fileWriteCount).toBe(1);
+    expect(statusWriteCount).toBe(0);
+  });
+
+  test("belge durumu PUT sirasinda file write ve personel context kilitlenir", async ({ page }) => {
+    await mockApi(page, "GENEL_YONETICI");
+    await login(page, { username: "yonetici", password: "secret" });
+
+    const kayitModal = await openSurecBelgeler(page, "Ayşe", /Ayşe Yılmaz/i);
+    const panel = kayitModal.getByTestId("personel-belgeler-panel");
+    await expect(panel).toBeVisible();
+    await expect(panel.getByTestId("personel-belge-yeni-btn")).toBeEnabled();
+
+    let statusWriteCount = 0;
+    let fileWriteCount = 0;
+    page.on("request", (request) => {
+      const path = new URL(request.url()).pathname;
+      const method = request.method();
+      if (method === "PUT" && /\/api\/personeller\/\d+\/belge-durumu$/.test(path)) {
+        statusWriteCount += 1;
+      }
+      if (
+        (method === "POST" && /\/api\/personeller\/\d+\/belge-kayitlari$/.test(path)) ||
+        (method === "PUT" && /\/api\/belge-kayitlari\/\d+$/.test(path)) ||
+        (method === "POST" && /\/api\/belge-kayitlari\/\d+\/dosya-degistir$/.test(path)) ||
+        (method === "POST" && /\/api\/belge-kayitlari\/\d+\/iptal$/.test(path))
+      ) {
+        fileWriteCount += 1;
+      }
+    });
+
+    await page.route("**/api/personeller/*/belge-durumu", async (route) => {
+      if (route.request().method() !== "PUT") {
+        await route.fallback();
+        return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      await route.fallback();
+    });
+
+    await kayitModal.locator('input[name="belge-durum-KIMLIK"][value="VAR"]').check();
+    await kayitModal.getByTestId("kayit-modal-footer-primary").click();
+
+    const personelCombo = kayitModal.getByRole("combobox", { name: "Personel" });
+    await expect(personelCombo).toBeDisabled({ timeout: 5_000 });
+    await expect(kayitModal.getByTestId("kayit-surec-subtab-mali")).toBeDisabled();
+    await expect(panel.getByTestId("personel-belge-yeni-btn")).toBeDisabled();
+
+    const duzenleButtons = panel.locator('[data-testid^="personel-belge-duzenle-"]');
+    if ((await duzenleButtons.count()) > 0) {
+      await expect(duzenleButtons.first()).toBeDisabled();
+    }
+    const replaceButtons = panel.locator('[data-testid^="personel-belge-dosya-degistir-"]');
+    if ((await replaceButtons.count()) > 0) {
+      await expect(replaceButtons.first()).toBeDisabled();
+    }
+    const cancelButtons = panel.locator('[data-testid^="personel-belge-iptal-"]');
+    if ((await cancelButtons.count()) > 0) {
+      await expect(cancelButtons.first()).toBeDisabled();
+    }
+
+    await panel.getByTestId("personel-belge-yeni-btn").click({ force: true });
+    await expect(page.getByTestId("personel-belge-create-submit")).toHaveCount(0);
+    if ((await duzenleButtons.count()) > 0) {
+      await duzenleButtons.first().click({ force: true });
+      await expect(page.getByTestId("personel-belge-edit-submit")).toHaveCount(0);
+    }
+    if ((await replaceButtons.count()) > 0) {
+      await replaceButtons.first().click({ force: true });
+      await expect(page.getByTestId("personel-belge-replace-submit")).toHaveCount(0);
+    }
+    if ((await cancelButtons.count()) > 0) {
+      await cancelButtons.first().click({ force: true });
+      await expect(page.getByTestId("personel-belge-action-dialog")).toHaveCount(0);
+    }
+
+    expect(fileWriteCount).toBe(0);
+
+    await expect(kayitModal.getByText(/Belge durumu kaydedildi/i)).toBeVisible({ timeout: 20_000 });
+    expect(statusWriteCount).toBe(1);
+    expect(fileWriteCount).toBe(0);
+
+    await expect(personelCombo).toBeEnabled({ timeout: 10_000 });
+    await expect(kayitModal.getByTestId("kayit-surec-subtab-mali")).toBeEnabled();
+    await expect(panel.getByTestId("personel-belge-yeni-btn")).toBeEnabled();
   });
 });

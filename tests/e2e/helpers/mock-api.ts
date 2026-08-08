@@ -5631,12 +5631,31 @@ let personelBelgeKaydiIdCounter = 903;
       if (await denyUnlessRolePermission(route, "personeller.ucret.manage")) return;
       const personelId = Number.parseInt(personelUcretCancelMatch[1] ?? "0", 10);
       const ucretId = Number.parseInt(personelUcretCancelMatch[2] ?? "0", 10);
+      const personel = personeller.find((item) => item.id === personelId);
       const record = personelUcretleri.find((item) => item.id === ucretId && item.personel_id === personelId);
       if (!record) {
         await fulfillJson(route, 404, errorBody("SALARY_RECORD_NOT_FOUND", "Ucret kaydi bulunamadi."));
         return;
       }
       record.state = "IPTAL";
+      // Mirror production syncLegacySalary: current-day active amount or null.
+      if (personel) {
+        const today = new Date().toISOString().slice(0, 10);
+        const current = personelUcretleri.find(
+          (item) =>
+            item.personel_id === personelId &&
+            item.state === "AKTIF" &&
+            item.gecerlilik_baslangic <= today &&
+            (item.gecerlilik_bitis === null || today <= item.gecerlilik_bitis)
+        );
+        if (current) {
+          personel.maas_tutari = current.ucret_tutari;
+          personel.net_maas_tutari = current.ucret_tutari;
+        } else {
+          personel.maas_tutari = undefined;
+          personel.net_maas_tutari = undefined;
+        }
+      }
       await fulfillJson(route, 200, okBody(record));
       return;
     }

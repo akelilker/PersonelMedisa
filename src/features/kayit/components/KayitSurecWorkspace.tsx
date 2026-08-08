@@ -558,6 +558,12 @@ export function KayitSurecWorkspace({
   }
 
   function selectPersonelTab(tabId: PersonelSurecTab) {
+    // Keep wage/pozisyon panel mounted until in-flight mutation settles so
+    // personel-context lock cannot drop early via unmount.
+    if (personelContextLocked && tabId !== activePersonelTab) {
+      return;
+    }
+
     setActivePersonelTab(tabId);
     setSurecError(null);
     setSurecInfo(null);
@@ -1323,6 +1329,8 @@ export function KayitSurecWorkspace({
                               type="button"
                               role="tab"
                               aria-selected={isActive}
+                              aria-disabled={personelContextLocked && !isActive}
+                              disabled={personelContextLocked && !isActive}
                               className={`surec-person-tab${isActive ? " is-active" : ""}`}
                               onClick={() => selectPersonelTab(tab.id)}
                             >
@@ -1447,6 +1455,8 @@ export function KayitSurecWorkspace({
                                 role="tab"
                                 data-testid={`kayit-surec-subtab-${tab.id}`}
                                 aria-selected={isActive}
+                                aria-disabled={personelContextLocked && !isActive}
+                                disabled={personelContextLocked && !isActive}
                                 className={`surec-person-tab${isActive ? " is-active" : ""}${tab.id === "izin-devamsizlik" ? " surec-shell-action-tile" : ""}`}
                                 onClick={() => selectPersonelTab(tab.id)}
                               >

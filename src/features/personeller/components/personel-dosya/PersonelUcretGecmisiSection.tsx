@@ -19,12 +19,17 @@ export function PersonelUcretGecmisiSection({
   personel,
   canManageUcret,
   isActive,
-  onBusyChange
+  onBusyChange,
+  onSalaryMutationSuccess,
+  externalBusy = false
 }: {
   personel: Personel;
   canManageUcret: boolean;
   isActive: boolean;
   onBusyChange?: (busy: boolean) => void;
+  onSalaryMutationSuccess?: (updated: Personel) => void;
+  /** Parent wage mutation (e.g. ücret tipi PUT) — disables salary actions. Card default false. */
+  externalBusy?: boolean;
 }) {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [pendingCancelUcretId, setPendingCancelUcretId] = useState<number | null>(null);
@@ -43,8 +48,15 @@ export function PersonelUcretGecmisiSection({
     cancellingUcretId,
     cancelErrorMessage,
     cancelUcret
-  } = usePersonelUcretGecmisi({ personel, canViewUcret: true, isActive, onBusyChange });
+  } = usePersonelUcretGecmisi({
+    personel,
+    canViewUcret: true,
+    isActive,
+    onBusyChange,
+    onSalaryMutationSuccess
+  });
 
+  const wageActionsLocked = externalBusy || isSubmitting || cancellingUcretId !== null;
   const showLoading = canFetch && isLoading;
   const showError = canFetch && fetchResolved && !isLoading && Boolean(errorMessage);
   const showEmpty =
@@ -53,12 +65,15 @@ export function PersonelUcretGecmisiSection({
     canFetch && fetchResolved && !isLoading && !errorMessage && ucretler.length > 0;
 
   function handleOpenCreateModal() {
+    if (wageActionsLocked) {
+      return;
+    }
     clearSubmitError();
     setIsCreateModalOpen(true);
   }
 
   function openCancelUcretDialog(ucretId: number) {
-    if (cancellingUcretId !== null) {
+    if (wageActionsLocked) {
       return;
     }
     setCancelDialogError(null);
@@ -74,7 +89,7 @@ export function PersonelUcretGecmisiSection({
   }
 
   async function confirmCancelUcret() {
-    if (pendingCancelUcretId == null || cancellingUcretId !== null) {
+    if (pendingCancelUcretId == null || cancellingUcretId !== null || externalBusy) {
       return;
     }
     setCancelDialogError(null);
@@ -84,6 +99,13 @@ export function PersonelUcretGecmisiSection({
       return;
     }
     setCancelDialogError("Ücret kaydı iptal edilemedi.");
+  }
+
+  async function handleCreate(payload: Parameters<typeof submitUcret>[0]) {
+    if (externalBusy) {
+      return false;
+    }
+    return submitUcret(payload);
   }
 
   return (
@@ -102,6 +124,7 @@ export function PersonelUcretGecmisiSection({
           type="button"
           className="universal-btn-aux"
           onClick={handleOpenCreateModal}
+          disabled={wageActionsLocked}
           data-testid="personel-ucret-yeni-donem"
         >
           Yeni Ücret Dönemi Başlat
@@ -164,7 +187,7 @@ export function PersonelUcretGecmisiSection({
                   type="button"
                   className="universal-btn-cancel"
                   onClick={() => openCancelUcretDialog(item.id as number)}
-                  disabled={cancellingUcretId !== null}
+                  disabled={wageActionsLocked}
                   data-testid={`personel-ucret-iptal-${item.id}`}
                 >
                   {cancellingUcretId === item.id ? "İptal ediliyor..." : "İptal Et"}
@@ -179,7 +202,7 @@ export function PersonelUcretGecmisiSection({
         <PersonelUcretCreateModal
           isOpen={isCreateModalOpen}
           onClose={() => setIsCreateModalOpen(false)}
-          onCreate={submitUcret}
+          onCreate={handleCreate}
           isSubmitting={isSubmitting}
           submitErrorMessage={submitErrorMessage}
         />

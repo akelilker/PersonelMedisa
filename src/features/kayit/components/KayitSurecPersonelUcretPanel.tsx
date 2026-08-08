@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { FormField } from "../../../components/form/FormField";
 import { dataCacheKeys, deleteCacheEntry, getActiveSube } from "../../../data/data-manager";
 import { updatePersonel } from "../../../api/personeller.api";
@@ -34,7 +34,13 @@ export function KayitSurecPersonelUcretPanel({
   const [tipiInfo, setTipiInfo] = useState<string | null>(null);
   const [historyBusy, setHistoryBusy] = useState(false);
 
+  const tipiSubmittingRef = useRef(false);
+  const historyBusyRef = useRef(false);
+  const onBusyChangeRef = useRef(onBusyChange);
+  onBusyChangeRef.current = onBusyChange;
+
   const canEditUcretTipi = canManageUcret && canUpdatePersonel;
+  const wageBusy = tipiSubmitting || historyBusy;
   const hasUcretTipiDiff = ucretTipiId !== toOptionalIdValue(personel.ucret_tipi_id);
   const ucretTipiSelectOptions = mapUcretTipiSelectOptions(ucretTipiOptions);
 
@@ -44,21 +50,29 @@ export function KayitSurecPersonelUcretPanel({
     setTipiInfo(null);
   }, [personel.id, personel.ucret_tipi_id]);
 
-  function reportBusy(nextHistoryBusy: boolean, nextTipiBusy = tipiSubmitting) {
-    setHistoryBusy(nextHistoryBusy);
-    onBusyChange?.(nextHistoryBusy || nextTipiBusy);
+  function publishBusy(nextTipi: boolean, nextHistory: boolean) {
+    tipiSubmittingRef.current = nextTipi;
+    historyBusyRef.current = nextHistory;
+    onBusyChangeRef.current?.(nextTipi || nextHistory);
   }
 
   useEffect(() => {
-    return () => {
-      onBusyChange?.(false);
-    };
-  }, [onBusyChange]);
+    publishBusy(tipiSubmitting, historyBusy);
+  }, [tipiSubmitting, historyBusy]);
+
+  function handleHistoryBusy(busy: boolean) {
+    setHistoryBusy(busy);
+    // Publish immediately via refs so unmount cannot leave parent stuck/unlocked early.
+    publishBusy(tipiSubmittingRef.current, busy);
+  }
+
+  // Do NOT clear parent lock on unmount — in-flight wage mutations must keep
+  // personel context locked until their own finally/publishBusy settles.
 
   async function handleUcretTipiSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (!canEditUcretTipi || tipiSubmitting || !hasUcretTipiDiff) {
+    if (!canEditUcretTipi || tipiSubmitting || historyBusy || !hasUcretTipiDiff) {
       return;
     }
 
@@ -69,7 +83,7 @@ export function KayitSurecPersonelUcretPanel({
     }
 
     setTipiSubmitting(true);
-    onBusyChange?.(true);
+    publishBusy(true, historyBusyRef.current);
     setTipiError(null);
     setTipiInfo(null);
 
@@ -84,7 +98,8 @@ export function KayitSurecPersonelUcretPanel({
       setTipiError(getApiErrorMessage(error, "Ücret tipi güncellenemedi."));
     } finally {
       setTipiSubmitting(false);
-      onBusyChange?.(historyBusy);
+      // Publish from refs so unmount/tab switch cannot drop lock via stale closure.
+      publishBusy(false, historyBusyRef.current);
     }
   }
 
@@ -112,7 +127,7 @@ export function KayitSurecPersonelUcretPanel({
             setTipiError(null);
             setTipiInfo(null);
           }}
-          disabled={!canEditUcretTipi || tipiSubmitting || historyBusy}
+          disabled={!canEditUcretTipi || wageBusy}
           placeholderOption={{ value: "", label: "Seçiniz" }}
           selectOptions={ucretTipiSelectOptions}
         />
@@ -121,7 +136,7 @@ export function KayitSurecPersonelUcretPanel({
             <button
               type="submit"
               className="universal-btn-aux"
-              disabled={tipiSubmitting || historyBusy || !hasUcretTipiDiff}
+              disabled={wageBusy || !hasUcretTipiDiff}
               data-testid="kayit-surec-ucret-tipi-kaydet"
             >
               {tipiSubmitting ? "Kaydediliyor..." : "Ücret Tipini Kaydet"}
@@ -144,7 +159,9 @@ export function KayitSurecPersonelUcretPanel({
         personel={personel}
         canManageUcret={canManageUcret}
         isActive={isActive}
-        onBusyChange={(busy) => reportBusy(busy)}
+        externalBusy={tipiSubmitting}
+        onBusyChange={handleHistoryBusy}
+        onSalaryMutationSuccess={onPersonelUpdated}
       />
     </div>
   );

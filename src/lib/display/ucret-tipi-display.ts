@@ -1,9 +1,10 @@
 import type { IdOption } from "../../types/referans";
 
-/** Demo / sık eşleme: API id’leri korunur, yalnızca görünen metin sadeleştirilir. */
-const ID_TO_SIMPLE: Record<number, "Aylık" | "Günlük"> = {
+/** PHP ReferansController::ucretTipleri — id korunur, görünen etiket katalogla hizalı. */
+const ID_TO_LABEL: Record<number, "Aylık" | "Günlük" | "Saatlik"> = {
   1: "Aylık",
-  2: "Günlük"
+  2: "Günlük",
+  3: "Saatlik"
 };
 
 function normalizeForMatch(value: string) {
@@ -15,12 +16,12 @@ function normalizeForMatch(value: string) {
 }
 
 /**
- * Ücret tipi için kullanıcı yüzünde yalnızca `Aylık` veya `Günlük` gösterilir;
- * `value` (id) ve ham `ad` bozulmadan API’de kalır.
+ * Ücret tipi etiketi: Aylık / Günlük / Saatlik ayrı tutulur.
+ * `value` (id) ve ham `ad` API tarafında bozulmaz.
  */
 export function displayUcretTipiLabel(raw: string | null | undefined, id?: number): string {
-  if (id !== undefined && ID_TO_SIMPLE[id] !== undefined) {
-    return ID_TO_SIMPLE[id];
+  if (id !== undefined && ID_TO_LABEL[id] !== undefined) {
+    return ID_TO_LABEL[id];
   }
 
   const s = (raw ?? "").trim();
@@ -30,14 +31,11 @@ export function displayUcretTipiLabel(raw: string | null | undefined, id?: numbe
 
   const n = normalizeForMatch(s);
 
-  if (
-    n.includes("saatlik") ||
-    n.includes("gunluk") ||
-    n.includes("günlük") ||
-    n.includes("yevmiye") ||
-    n.includes("daily") ||
-    n.includes("hourly")
-  ) {
+  if (n.includes("saatlik") || n.includes("hourly")) {
+    return "Saatlik";
+  }
+
+  if (n.includes("gunluk") || n.includes("günlük") || n.includes("yevmiye") || n.includes("daily")) {
     return "Günlük";
   }
 

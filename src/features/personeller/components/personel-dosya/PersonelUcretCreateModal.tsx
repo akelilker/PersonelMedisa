@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { FormField } from "../../../../components/form/FormField";
 import { AppModal } from "../../../../components/modal/AppModal";
 import type { CreatePersonelUcretPayload, UcretTuru } from "../../../../types/ucret";
+import { buildPersonelUcretCreatePayload } from "./personel-ucret-utils";
 
 const PERSONEL_UCRET_FORM_ID = "personel-ucret-form";
 
@@ -62,37 +63,15 @@ export function PersonelUcretCreateModal({
       return;
     }
 
-    const tutar = Number.parseFloat(form.ucretTutari.replace(",", "."));
-    if (!Number.isFinite(tutar) || tutar <= 0) {
-      setValidationMessage("Ücret tutarı sıfırdan büyük olmalıdır.");
-      return;
-    }
-
-    if (!form.gecerlilikBaslangic) {
-      setValidationMessage("Geçerlilik başlangıç tarihi zorunludur.");
-      return;
-    }
-
-    if (form.gecerlilikBitis && form.gecerlilikBitis < form.gecerlilikBaslangic) {
-      setValidationMessage("Bitiş tarihi başlangıç tarihinden önce olamaz.");
+    const built = buildPersonelUcretCreatePayload(form);
+    if (!built.ok) {
+      setValidationMessage(built.message);
       return;
     }
 
     setValidationMessage(null);
 
-    const payload: CreatePersonelUcretPayload = {
-      ucret_tutari: tutar,
-      ucret_turu: form.ucretTuru,
-      para_birimi: form.paraBirimi.trim().toUpperCase() || "TRY",
-      gecerlilik_baslangic: form.gecerlilikBaslangic,
-      gecerlilik_bitis: form.gecerlilikBitis || null
-    };
-    const aciklama = form.aciklama.trim();
-    if (aciklama) {
-      payload.aciklama = aciklama;
-    }
-
-    const success = await onCreate(payload);
+    const success = await onCreate(built.payload);
     if (success) {
       setForm(INITIAL_UCRET_FORM);
       onClose();

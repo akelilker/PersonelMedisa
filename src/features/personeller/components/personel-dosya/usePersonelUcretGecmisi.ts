@@ -6,7 +6,15 @@ import {
   fetchPersonelUcretList,
   getUcretApiErrorMessage
 } from "../../../../api/ucretler.api";
-import { dataCacheKeys, deleteCacheEntry, getActiveSube } from "../../../../data/data-manager";
+import { fetchPersonelDetail } from "../../../../api/personeller.api";
+import {
+  commitPersonelUpdateToCaches,
+  dataCacheKeys,
+  deleteCacheEntry,
+  fetchWithCacheMerge,
+  getActiveSube
+} from "../../../../data/data-manager";
+import { runDeduped } from "../../../../lib/in-flight-dedupe";
 import type { CreatePersonelUcretPayload, PersonelUcretKaydi } from "../../../../types/ucret";
 import type { Personel } from "../../../../types/personel";
 import { sortUcretKayitlari } from "./personel-ucret-utils";
@@ -14,11 +22,16 @@ import { sortUcretKayitlari } from "./personel-ucret-utils";
 export function usePersonelUcretGecmisi({
   personel,
   canViewUcret,
-  isActive
+  isActive,
+  onBusyChange,
+  onSalaryMutationSuccess
 }: {
   personel: Personel;
   canViewUcret: boolean;
   isActive: boolean;
+  onBusyChange?: (busy: boolean) => void;
+  /** Optional; Process workspace reconciles local personel. Card may omit. */
+  onSalaryMutationSuccess?: (updated: Personel) => void;
 }) {
   const [ucretler, setUcretler] = useState<PersonelUcretKaydi[]>([]);
   const [aktifUcret, setAktifUcret] = useState<PersonelUcretKaydi | null>(null);
@@ -82,22 +95,38 @@ export function usePersonelUcretGecmisi({
     setReloadKey((prev) => prev + 1);
   }
 
-  /** Ücret mutasyonu legacy personeller.maas_tutari alanını da etkiler; detay cache'i tazelenmeli. */
-  function invalidatePersonelDetailCache() {
-    deleteCacheEntry(dataCacheKeys.personelDetail(getActiveSube(), personel.id));
+  /**
+   * Salary mutations sync legacy personeller.maas_tutari on the server.
+   * Re-read Personel SoT (no client-invented maas) and reconcile caches.
+   */
+  async function reconcilePersonelAfterSalaryMutation(): Promise<void> {
+    const personelId = personel.id;
+    const activeSube = getActiveSube();
+    const detailKey = dataCacheKeys.personelDetail(activeSube, personelId);
+    deleteCacheEntry(detailKey);
+    const updated = await fetchWithCacheMerge(detailKey, () =>
+      runDeduped(detailKey, () => fetchPersonelDetail(personelId))
+    );
+    commitPersonelUpdateToCaches(updated);
+    onSalaryMutationSuccess?.(updated);
   }
 
   async function submitUcret(payload: CreatePersonelUcretPayload): Promise<boolean> {
-    if (isSubmitting) {
+    if (isSubmitting || cancellingUcretId !== null) {
       return false;
     }
 
     setIsSubmitting(true);
+    onBusyChange?.(true);
     setSubmitErrorMessage(null);
 
     try {
       await createPersonelUcret(personel.id, payload);
-      invalidatePersonelDetailCache();
+      try {
+        await reconcilePersonelAfterSalaryMutation();
+      } catch {
+        /* Salary write succeeded; personel SoT refresh is best-effort. */
+      }
       refetch();
       return true;
     } catch (err) {
@@ -105,20 +134,26 @@ export function usePersonelUcretGecmisi({
       return false;
     } finally {
       setIsSubmitting(false);
+      onBusyChange?.(false);
     }
   }
 
   async function cancelUcret(ucretId: number): Promise<boolean> {
-    if (cancellingUcretId !== null) {
+    if (cancellingUcretId !== null || isSubmitting) {
       return false;
     }
 
     setCancellingUcretId(ucretId);
+    onBusyChange?.(true);
     setCancelErrorMessage(null);
 
     try {
       await cancelPersonelUcret(personel.id, ucretId);
-      invalidatePersonelDetailCache();
+      try {
+        await reconcilePersonelAfterSalaryMutation();
+      } catch {
+        /* Cancel succeeded; personel SoT refresh is best-effort. */
+      }
       refetch();
       return true;
     } catch (err) {
@@ -126,6 +161,7 @@ export function usePersonelUcretGecmisi({
       return false;
     } finally {
       setCancellingUcretId(null);
+      onBusyChange?.(false);
     }
   }
 

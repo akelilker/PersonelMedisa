@@ -45,6 +45,7 @@ import { KayitBelgeKayitlariSection } from "./KayitBelgeKayitlariSection";
 import { KayitGatewayRedirectPanel } from "./KayitGatewayRedirectPanel";
 import { type KayitModalFooterModel } from "./KayitModalFooter";
 import { KayitSurecPersonelFinansPanel } from "./KayitSurecPersonelFinansPanel";
+import { KayitSurecPersonelUcretPanel } from "./KayitSurecPersonelUcretPanel";
 import { KayitSurecPozisyonReferencePicker } from "./KayitSurecPozisyonReferencePicker";
 import { KayitSurecTabHeader } from "./KayitSurecTabHeader";
 import { buildCreatePersonelPayload } from "../../../features/personeller/personel-create-utils";
@@ -166,6 +167,7 @@ export function KayitSurecWorkspace({
   const canCreatePersonel = hasPermission("personeller.create");
   const canCreateSurec = hasPermission("surecler.create");
   const canUpdatePersonel = hasPermission("personeller.update");
+  const canViewUcret = hasPermission("personeller.ucret.view");
   const canManageUcret = hasPermission("personeller.ucret.manage");
   const canCreateZimmet = canUpdatePersonel;
   const canCreateFinans = hasPermission("finans.create");
@@ -205,6 +207,8 @@ export function KayitSurecWorkspace({
   const [devamsizlikSubId, setDevamsizlikSubId] = useState<DevamsizlikSubId | null>(null);
   const [pozisyonForm, setPozisyonForm] = useState<PozisyonFormState>(createPozisyonFormFromPersonel(null));
   const [pozisyonSubmitting, setPozisyonSubmitting] = useState(false);
+  const [ucretMutating, setUcretMutating] = useState(false);
+  const personelContextLocked = pozisyonSubmitting || ucretMutating;
   const [pozisyonError, setPozisyonError] = useState<string | null>(null);
   const [pozisyonInfo, setPozisyonInfo] = useState<string | null>(null);
   const [openPozisyonPicker, setOpenPozisyonPicker] = useState<string | null>(null);
@@ -465,12 +469,15 @@ export function KayitSurecWorkspace({
               )
             )
           },
-          { label: "Net Maaş", value: formatMoneyField(selectedSurecPersonel.maas_tutari) },
+          {
+            label: "Maaş (uyumluluk)",
+            value: canViewUcret ? formatMoneyField(selectedSurecPersonel.maas_tutari) : "-"
+          },
           { label: "Prim Kuralı", value: formatGeneralField(selectedSurecPersonel.prim_kurali_adi) }
         ]
       }
     ];
-  }, [selectedSurecPersonel]);
+  }, [canViewUcret, selectedSurecPersonel]);
 
   const resolvedDevamsizlikSurecTuruKey = useMemo(() => {
     if (!devamsizlikSubId) {
@@ -521,7 +528,7 @@ export function KayitSurecWorkspace({
   }, [selectedSurecPersonel]);
 
   function selectSurecPersonel(personelId: string) {
-    if (pozisyonSubmitting) {
+    if (personelContextLocked) {
       return;
     }
 
@@ -538,14 +545,25 @@ export function KayitSurecWorkspace({
   function setSurecFormGuarded(updater: SetStateAction<SurecFormState>) {
     setSurecForm((prev) => {
       const next = typeof updater === "function" ? updater(prev) : updater;
-      if (pozisyonSubmitting && next.personelId !== prev.personelId) {
+      if (personelContextLocked && next.personelId !== prev.personelId) {
         return prev;
       }
       return next;
     });
   }
 
+  function applyPersonelUpdateLocally(updated: Personel) {
+    commitPersonelUpdateToCaches(updated);
+    setPersoneller((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
+  }
+
   function selectPersonelTab(tabId: PersonelSurecTab) {
+    // Keep wage/pozisyon panel mounted until in-flight mutation settles so
+    // personel-context lock cannot drop early via unmount.
+    if (personelContextLocked && tabId !== activePersonelTab) {
+      return;
+    }
+
     setActivePersonelTab(tabId);
     setSurecError(null);
     setSurecInfo(null);
@@ -1311,6 +1329,8 @@ export function KayitSurecWorkspace({
                               type="button"
                               role="tab"
                               aria-selected={isActive}
+                              aria-disabled={personelContextLocked && !isActive}
+                              disabled={personelContextLocked && !isActive}
                               className={`surec-person-tab${isActive ? " is-active" : ""}`}
                               onClick={() => selectPersonelTab(tab.id)}
                             >
@@ -1326,7 +1346,7 @@ export function KayitSurecWorkspace({
                         setForm={setSurecFormGuarded}
                         surecTuruOptions={surecTuruOptions}
                         personelOptions={personelOptions}
-                        personelFieldDisabled={pozisyonSubmitting}
+                        personelFieldDisabled={personelContextLocked}
                         errorMessage={surecError}
                         referenceError={null}
                         className="workspace-form-stack workspace-form-stack--compact"
@@ -1372,10 +1392,10 @@ export function KayitSurecWorkspace({
                             aria-labelledby="surec-personel-combobox-label"
                             aria-expanded={surecPersonelPickerOpen}
                             aria-controls="surec-personel-combobox-list"
-                            aria-disabled={pozisyonSubmitting}
-                            disabled={pozisyonSubmitting}
+                            aria-disabled={personelContextLocked}
+                            disabled={personelContextLocked}
                             onClick={() => {
-                              if (pozisyonSubmitting) {
+                              if (personelContextLocked) {
                                 return;
                               }
 
@@ -1394,7 +1414,7 @@ export function KayitSurecWorkspace({
                             <span aria-hidden="true">⌄</span>
                           </button>
 
-                          {surecPersonelPickerOpen && !pozisyonSubmitting ? (
+                          {surecPersonelPickerOpen && !personelContextLocked ? (
                             <div className="surec-personel-combobox-panel" id="surec-personel-combobox-list">
                               <div className="surec-personel-combobox-options" role="listbox" aria-label="Personel listesi">
                                 {filteredSurecPersonelOptions.length > 0 ? (
@@ -1435,6 +1455,8 @@ export function KayitSurecWorkspace({
                                 role="tab"
                                 data-testid={`kayit-surec-subtab-${tab.id}`}
                                 aria-selected={isActive}
+                                aria-disabled={personelContextLocked && !isActive}
+                                disabled={personelContextLocked && !isActive}
                                 className={`surec-person-tab${isActive ? " is-active" : ""}${tab.id === "izin-devamsizlik" ? " surec-shell-action-tile" : ""}`}
                                 onClick={() => selectPersonelTab(tab.id)}
                               >
@@ -1630,19 +1652,34 @@ export function KayitSurecWorkspace({
                                 <strong>Mali İşlemler</strong>
                                 <p>Bu personel pasif; mali kayıt eklenmez.</p>
                               </div>
-                            ) : canCreateFinans ? (
-                              <KayitSurecPersonelFinansPanel
-                                title="Mali İşlemler"
-                                personelLabel={selectedSurecPersonelLabel}
-                                formId={KAYIT_SUREC_MALI_FORM_ID}
-                                fieldNamePrefix="kayit-mali"
-                                fields={maliFields}
-                                setFields={setMaliFields}
-                                onSubmit={createPersonelFinansHandler}
-                                errorMessage={maliCreateErrorMessage}
-                                isSubmitting={isMaliSubmitting}
-                                hideActions
-                              />
+                            ) : canViewUcret || canCreateFinans ? (
+                              <div className="surec-shell-panel" data-testid="kayit-surec-mali-stack">
+                                {canViewUcret ? (
+                                  <KayitSurecPersonelUcretPanel
+                                    personel={selectedSurecPersonel}
+                                    canManageUcret={canManageUcret}
+                                    canUpdatePersonel={canUpdatePersonel}
+                                    ucretTipiOptions={refs.ucretTipiOptions}
+                                    isActive={activePersonelTab === "mali"}
+                                    onBusyChange={setUcretMutating}
+                                    onPersonelUpdated={applyPersonelUpdateLocally}
+                                  />
+                                ) : null}
+                                {canCreateFinans ? (
+                                  <KayitSurecPersonelFinansPanel
+                                    title="Mali İşlemler"
+                                    personelLabel={selectedSurecPersonelLabel}
+                                    formId={KAYIT_SUREC_MALI_FORM_ID}
+                                    fieldNamePrefix="kayit-mali"
+                                    fields={maliFields}
+                                    setFields={setMaliFields}
+                                    onSubmit={createPersonelFinansHandler}
+                                    errorMessage={maliCreateErrorMessage}
+                                    isSubmitting={isMaliSubmitting}
+                                    hideActions
+                                  />
+                                ) : null}
+                              </div>
                             ) : (
                               <div className="surec-person-placeholder">
                                 <strong>Mali İşlemler</strong>

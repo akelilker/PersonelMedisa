@@ -2053,7 +2053,7 @@ export async function mockApi(page: Page, role: MockUserRole, options: MockApiOp
       gorev_adi: "Üretim Müdürü",
       personel_tipi_adi: "Yarı Zamanlı",
       bagli_amir_adi: "Demo Amir",
-      ucret_tipi_id: 2,
+      ucret_tipi_id: 3,
       ucret_tipi_adi: "Saatlik",
       maas_tutari: 25000,
       prim_kurali_id: 8,
@@ -3448,7 +3448,8 @@ export async function mockApi(page: Page, role: MockUserRole, options: MockApiOp
 
   const ucretTipiReferans: Array<{ id: number; ad: string }> = [
     { id: 1, ad: "Aylık" },
-    { id: 2, ad: "Saatlik" }
+    { id: 2, ad: "Günlük" },
+    { id: 3, ad: "Saatlik" }
   ];
 
   const primKuraliReferans: Array<{ id: number; ad: string }> = [
@@ -5149,7 +5150,8 @@ let personelBelgeKaydiIdCounter = 903;
         personel_tipi_id: personelTipiId,
         bagli_amir_id: parseId(payload.bagli_amir_id),
         ucret_tipi_id: ucretTipiId,
-        ucret_tipi_adi: ucretTipiId === 1 ? "Aylık" : ucretTipiId === 2 ? "Saatlik" : undefined,
+        ucret_tipi_adi:
+          ucretTipiId === 1 ? "Aylık" : ucretTipiId === 2 ? "Günlük" : ucretTipiId === 3 ? "Saatlik" : undefined,
         maas_tutari: parseMaas(payload.net_maas_tutari) ?? parseMaas(payload.maas_tutari),
         net_maas_tutari: parseMaas(payload.net_maas_tutari) ?? parseMaas(payload.maas_tutari),
         sube_adi: getSubeLabel(subeId),
@@ -5629,12 +5631,31 @@ let personelBelgeKaydiIdCounter = 903;
       if (await denyUnlessRolePermission(route, "personeller.ucret.manage")) return;
       const personelId = Number.parseInt(personelUcretCancelMatch[1] ?? "0", 10);
       const ucretId = Number.parseInt(personelUcretCancelMatch[2] ?? "0", 10);
+      const personel = personeller.find((item) => item.id === personelId);
       const record = personelUcretleri.find((item) => item.id === ucretId && item.personel_id === personelId);
       if (!record) {
         await fulfillJson(route, 404, errorBody("SALARY_RECORD_NOT_FOUND", "Ucret kaydi bulunamadi."));
         return;
       }
       record.state = "IPTAL";
+      // Mirror production syncLegacySalary: current-day active amount or null.
+      if (personel) {
+        const today = new Date().toISOString().slice(0, 10);
+        const current = personelUcretleri.find(
+          (item) =>
+            item.personel_id === personelId &&
+            item.state === "AKTIF" &&
+            item.gecerlilik_baslangic <= today &&
+            (item.gecerlilik_bitis === null || today <= item.gecerlilik_bitis)
+        );
+        if (current) {
+          personel.maas_tutari = current.ucret_tutari;
+          personel.net_maas_tutari = current.ucret_tutari;
+        } else {
+          personel.maas_tutari = undefined;
+          personel.net_maas_tutari = undefined;
+        }
+      }
       await fulfillJson(route, 200, okBody(record));
       return;
     }

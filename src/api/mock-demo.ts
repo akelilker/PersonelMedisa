@@ -8152,7 +8152,8 @@ export function resolveDemoApiResponse(
     if (pathname === "/referans/ucret-tipleri") {
       return ok([
         { id: 1, ad: "Aylık" },
-        { id: 2, ad: "Günlük" }
+        { id: 2, ad: "Günlük" },
+        { id: 3, ad: "Saatlik" }
       ]);
     }
 

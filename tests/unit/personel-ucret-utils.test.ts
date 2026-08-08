@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildPersonelUcretCreatePayload,
   formatUcretGecerlilikAraligi,
   formatUcretOzeti,
   formatUcretTutar,
@@ -57,5 +58,60 @@ describe("personel-ucret-utils", () => {
     expect(isUcretKaydiIptalEdilebilir(buildKayit())).toBe(true);
     expect(isUcretKaydiIptalEdilebilir(buildKayit({ durum: "IPTAL" }))).toBe(false);
     expect(isUcretKaydiIptalEdilebilir(buildKayit({ id: null }))).toBe(false);
+  });
+
+  it("buildPersonelUcretCreatePayload validates amount, start, end and normalizes currency", () => {
+    expect(
+      buildPersonelUcretCreatePayload({
+        ucretTutari: "0",
+        ucretTuru: "NET",
+        paraBirimi: "try",
+        gecerlilikBaslangic: "2026-08-01",
+        gecerlilikBitis: "",
+        aciklama: ""
+      }).ok
+    ).toBe(false);
+
+    expect(
+      buildPersonelUcretCreatePayload({
+        ucretTutari: "42000",
+        ucretTuru: "BRUT",
+        paraBirimi: "try",
+        gecerlilikBaslangic: "",
+        gecerlilikBitis: "",
+        aciklama: ""
+      }).ok
+    ).toBe(false);
+
+    expect(
+      buildPersonelUcretCreatePayload({
+        ucretTutari: "42000",
+        ucretTuru: "NET",
+        paraBirimi: "try",
+        gecerlilikBaslangic: "2026-08-10",
+        gecerlilikBitis: "2026-08-01",
+        aciklama: ""
+      }).ok
+    ).toBe(false);
+
+    const built = buildPersonelUcretCreatePayload({
+      ucretTutari: "42500.5",
+      ucretTuru: "BRUT",
+      paraBirimi: " try ",
+      gecerlilikBaslangic: "2026-08-01",
+      gecerlilikBitis: "2026-12-31",
+      aciklama: "  Not  "
+    });
+    expect(built.ok).toBe(true);
+    if (built.ok) {
+      expect(built.payload).toEqual({
+        ucret_tutari: 42500.5,
+        ucret_turu: "BRUT",
+        para_birimi: "TRY",
+        gecerlilik_baslangic: "2026-08-01",
+        gecerlilik_bitis: "2026-12-31",
+        aciklama: "Not"
+      });
+    }
   });
 });

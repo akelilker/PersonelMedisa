@@ -88,24 +88,28 @@ test.describe("S93-E3C Yönetim ve Kayıt action dialogs", () => {
     await kayitModal.getByTestId("kayit-surec-subtab-belgeler").click();
 
     const uniqueAd = `E3C Belge ${Date.now()}`;
-    await kayitModal.locator('[name="belge-kayit-tipi"]').selectOption("SERTIFIKA");
-    await kayitModal.locator('[name="belge-kayit-ad"]').fill(uniqueAd);
-    await kayitModal.locator('[name="belge-kayit-baslangic"]').fill("2026-01-01");
-    await kayitModal.locator('[name="belge-kayit-bitis"]').fill("2027-01-01");
-    await kayitModal.locator('button[type="submit"][form="kayit-surec-belge-kayitlari-form"]').click();
+    const panel = kayitModal.getByTestId("personel-belgeler-panel");
+    await panel.getByTestId("personel-belge-yeni-btn").click();
+    await page.getByTestId("personel-belge-ad").fill(uniqueAd);
+    await page.locator("#personel-belge-tipi").selectOption("SERTIFIKA");
+    await page.locator("#personel-belge-baslangic").fill("2026-01-01");
+    await page.locator("#personel-belge-bitis").fill("2027-01-01");
+    await page.getByTestId("personel-belge-create-submit").click();
     await expect(kayitModal.getByText(/Belge kaydı eklendi/i)).toBeVisible();
 
-    const uniqueRow = kayitModal.getByTestId("kayit-belge-kayitlari-list").locator("tr", { hasText: uniqueAd });
-    await uniqueRow.getByRole("button", { name: "İptal" }).click();
+    const uniqueRow = panel.getByTestId("personel-belge-kayit-list").locator("tr", { hasText: uniqueAd });
+    const rowTestId = await uniqueRow.getAttribute("data-testid");
+    const kayitId = rowTestId?.replace("personel-belge-kayit-row-", "") ?? "";
+    await uniqueRow.getByTestId(`personel-belge-iptal-${kayitId}`).click();
 
-    await expect(page.getByTestId("belge-kayit-action-dialog")).toBeVisible();
-    await expect(page.getByTestId("belge-kayit-action-dialog-cancel")).toBeFocused();
+    await expect(page.getByTestId("personel-belge-action-dialog")).toBeVisible();
+    await expect(page.getByTestId("personel-belge-action-dialog-cancel")).toBeFocused();
     expect(nativeDialogs).toEqual([]);
 
     await page.getByLabel("İptal nedeni").fill("E3C iptal nedeni");
-    await page.getByTestId("belge-kayit-action-dialog-confirm").click();
+    await page.getByTestId("personel-belge-action-dialog-confirm").click();
     await expect(kayitModal.getByText(/Belge kaydı iptal edildi/i)).toBeVisible();
-    await expect(page.getByTestId("belge-kayit-action-dialog")).toHaveCount(0);
+    await expect(page.getByTestId("personel-belge-action-dialog")).toHaveCount(0);
     expect(nativeDialogs).toEqual([]);
   });
 });

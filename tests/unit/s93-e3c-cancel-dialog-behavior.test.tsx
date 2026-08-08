@@ -3,9 +3,10 @@
 import "@testing-library/jest-dom/vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { KayitBelgeKayitlariSection } from "../../src/features/kayit/components/KayitBelgeKayitlariSection";
+import { PersonelBelgelerPanel } from "../../src/features/personeller/components/personel-dosya/PersonelBelgelerPanel";
 import { MevzuatParametreleriPanel } from "../../src/features/yonetim/components/MevzuatParametreleriPanel";
 import type { MevzuatParametresi } from "../../src/types/mevzuat";
+import type { Personel } from "../../src/types/personel";
 import type { PersonelBelgeKaydi } from "../../src/types/personel-belge-kaydi";
 
 const cancelMevzuatParametresiMock = vi.hoisted(() => vi.fn());
@@ -13,6 +14,12 @@ const fetchMevzuatParametreleriMock = vi.hoisted(() => vi.fn());
 const cancelPersonelBelgeKaydiMock = vi.hoisted(() => vi.fn());
 const fetchPersonelBelgeKayitlariMock = vi.hoisted(() => vi.fn());
 const createPersonelBelgeKaydiMock = vi.hoisted(() => vi.fn());
+const fetchPersonelBelgeHistoryMock = vi.hoisted(() => vi.fn());
+const downloadPersonelBelgeDosyaMock = vi.hoisted(() => vi.fn());
+const replacePersonelBelgeDosyaMock = vi.hoisted(() => vi.fn());
+const updatePersonelBelgeKaydiMock = vi.hoisted(() => vi.fn());
+const fetchPersonelBelgeDurumuMock = vi.hoisted(() => vi.fn());
+const useRoleAccessMock = vi.hoisted(() => vi.fn());
 
 vi.mock("../../src/api/mevzuat.api", () => ({
   cancelMevzuatParametresi: cancelMevzuatParametresiMock,
@@ -24,12 +31,39 @@ vi.mock("../../src/api/mevzuat.api", () => ({
 vi.mock("../../src/api/personel-belge-kayitlari.api", () => ({
   cancelPersonelBelgeKaydi: cancelPersonelBelgeKaydiMock,
   createPersonelBelgeKaydi: createPersonelBelgeKaydiMock,
-  fetchPersonelBelgeKayitlari: fetchPersonelBelgeKayitlariMock
+  downloadPersonelBelgeDosya: downloadPersonelBelgeDosyaMock,
+  fetchPersonelBelgeHistory: fetchPersonelBelgeHistoryMock,
+  fetchPersonelBelgeKayitlari: fetchPersonelBelgeKayitlariMock,
+  replacePersonelBelgeDosya: replacePersonelBelgeDosyaMock,
+  updatePersonelBelgeKaydi: updatePersonelBelgeKaydiMock
+}));
+
+vi.mock("../../src/api/belgeler.api", () => ({
+  fetchPersonelBelgeDurumu: fetchPersonelBelgeDurumuMock
+}));
+
+vi.mock("../../src/hooks/use-role-access", () => ({
+  useRoleAccess: useRoleAccessMock
+}));
+
+vi.mock("react-router-dom", () => ({
+  Link: ({ children, to, ...rest }: { children?: unknown; to: string; [key: string]: unknown }) => (
+    <a href={typeof to === "string" ? to : "#"} {...rest}>
+      {children as never}
+    </a>
+  )
 }));
 
 vi.mock("../../src/api/api-client", () => ({
   getApiErrorMessage: (_error: unknown, fallback: string) => fallback
 }));
+
+const testPersonel = {
+  id: 1,
+  ad: "Ayşe",
+  soyad: "Yılmaz",
+  aktif_durum: "AKTIF"
+} as Personel;
 
 function makeMevzuat(overrides: Partial<MevzuatParametresi> = {}): MevzuatParametresi {
   return {
@@ -68,6 +102,12 @@ function makeBelge(overrides: Partial<PersonelBelgeKaydi> = {}): PersonelBelgeKa
   };
 }
 
+function renderBelgelerPanel() {
+  return render(
+    <PersonelBelgelerPanel personel={testPersonel} isActive showBelgeDurumu={false} />
+  );
+}
+
 describe("S93-E3C cancel dialog behavior", () => {
   afterEach(() => {
     cleanup();
@@ -77,10 +117,23 @@ describe("S93-E3C cancel dialog behavior", () => {
   });
 
   beforeEach(() => {
+    useRoleAccessMock.mockReturnValue({
+      hasPermission: (permission: string) =>
+        permission === "surecler.create" ||
+        permission === "surecler.update" ||
+        permission === "surecler.cancel"
+    });
     fetchMevzuatParametreleriMock.mockResolvedValue([makeMevzuat()]);
     cancelMevzuatParametresiMock.mockResolvedValue(undefined);
-    fetchPersonelBelgeKayitlariMock.mockResolvedValue({ items: [makeBelge()], pagination: null });
+    fetchPersonelBelgeKayitlariMock.mockImplementation((_id: number, opts?: { state?: string }) => {
+      if (opts?.state === "IPTAL") {
+        return Promise.resolve({ items: [], pagination: null });
+      }
+      return Promise.resolve({ items: [makeBelge()], pagination: null });
+    });
     cancelPersonelBelgeKaydiMock.mockResolvedValue(makeBelge({ durum: "IPTAL" }));
+    fetchPersonelBelgeHistoryMock.mockResolvedValue([]);
+    fetchPersonelBelgeDurumuMock.mockResolvedValue([]);
   });
 
   it("mevzuat iptal: native dialog yok, AppActionDialog açılır ve API çağrılır", async () => {
@@ -117,49 +170,33 @@ describe("S93-E3C cancel dialog behavior", () => {
 
   it("belge iptal: prompt yerine field dialog açılır ve payload korunur", async () => {
     const promptSpy = vi.spyOn(window, "prompt");
-    render(
-      <KayitBelgeKayitlariSection
-        personelId={1}
-        personelLabel="Ayşe Yılmaz"
-        isPersonelPasif={false}
-        canWrite
-        isActive
-      />
-    );
+    renderBelgelerPanel();
 
-    await screen.findByTestId("kayit-belge-kayit-iptal-55");
-    fireEvent.click(screen.getByTestId("kayit-belge-kayit-iptal-55"));
+    await screen.findByTestId("personel-belge-iptal-55");
+    fireEvent.click(screen.getByTestId("personel-belge-iptal-55"));
 
-    expect(await screen.findByTestId("belge-kayit-action-dialog")).toBeVisible();
+    expect(await screen.findByTestId("personel-belge-action-dialog")).toBeVisible();
     expect(promptSpy).not.toHaveBeenCalled();
 
     fireEvent.change(screen.getByLabelText(/İptal nedeni/i), {
       target: { value: "E2E iptal nedeni" }
     });
-    fireEvent.click(screen.getByTestId("belge-kayit-action-dialog-confirm"));
+    fireEvent.click(screen.getByTestId("personel-belge-action-dialog-confirm"));
 
     await waitFor(() =>
       expect(cancelPersonelBelgeKaydiMock).toHaveBeenCalledWith(55, {
         iptal_nedeni: "E2E iptal nedeni"
       })
     );
-    await waitFor(() => expect(screen.queryByTestId("belge-kayit-action-dialog")).toBeNull());
+    await waitFor(() => expect(screen.queryByTestId("personel-belge-action-dialog")).toBeNull());
   });
 
   it("belge iptal: boş neden ile confirm disabled kalır", async () => {
-    render(
-      <KayitBelgeKayitlariSection
-        personelId={1}
-        personelLabel="Ayşe Yılmaz"
-        isPersonelPasif={false}
-        canWrite
-        isActive
-      />
-    );
+    renderBelgelerPanel();
 
-    await screen.findByTestId("kayit-belge-kayit-iptal-55");
-    fireEvent.click(screen.getByTestId("kayit-belge-kayit-iptal-55"));
-    const confirm = await screen.findByTestId("belge-kayit-action-dialog-confirm");
+    await screen.findByTestId("personel-belge-iptal-55");
+    fireEvent.click(screen.getByTestId("personel-belge-iptal-55"));
+    const confirm = await screen.findByTestId("personel-belge-action-dialog-confirm");
     expect(confirm).toBeDisabled();
     expect(cancelPersonelBelgeKaydiMock).not.toHaveBeenCalled();
   });

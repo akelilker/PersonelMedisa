@@ -335,8 +335,14 @@ export async function fetchPersonelBelgeHistory(id: number | string): Promise<Pe
     return [];
   }
 
-  const items = (data as Record<string, unknown>).items;
-  if (!Array.isArray(items)) {
+  const record = data as Record<string, unknown>;
+  // Backend contract: { surumler, auditler }. Demo/mock may still use { items }.
+  const items = Array.isArray(record.auditler)
+    ? record.auditler
+    : Array.isArray(record.items)
+      ? record.items
+      : null;
+  if (!items) {
     return [];
   }
 

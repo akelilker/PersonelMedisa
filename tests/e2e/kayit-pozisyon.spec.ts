@@ -274,10 +274,7 @@ test.describe("Kayit Surec Pozisyon", () => {
 
     await page.goto("/personeller/1");
     await expect(page).toHaveURL(/\/personeller\/1$/);
-    const islemler = page.getByRole("button", { name: /Islemler|İşlemler/i });
-    if (await islemler.count()) {
-      await islemler.first().click();
-    }
+    await page.getByRole("button", { name: "Islemler" }).click();
     await page.getByRole("button", { name: "Süreçte İşlem Yap" }).click();
 
     const kayitModal = page.locator(".modal-container--kayit-surec").last();
@@ -289,6 +286,67 @@ test.describe("Kayit Surec Pozisyon", () => {
     await expect(kayitModal.getByRole("combobox", { name: "Görev / Unvan" })).toContainText(/Genel Müdür|Genel Mudur/i);
     await expect(kayitModal.getByRole("combobox", { name: "Bağlı Amir" })).toContainText(/Demo Amir/i);
     await expect(kayitModal.getByRole("combobox", { name: "Çalışma Tipi" })).toContainText(/Tam Zamanlı|Tam Zamanli/i);
+  });
+
+  test("pozisyon submit inflight iken personel picker kilitli kalir ve context sabit kalir", async ({ page }) => {
+    await mockApi(page, "GENEL_YONETICI");
+    await login(page, { username: "yonetici", password: "secret" });
+
+    const kayitModal = await openPozisyonForAyse(page);
+    await kayitModal.getByRole("combobox", { name: "Görev / Unvan" }).click();
+    await kayitModal.locator("#pozisyon-gorev-panel").getByRole("button", { name: "Üretim Müdürü" }).click();
+    await kayitModal.getByLabel("Geçerlilik Tarihi").fill("2026-08-01");
+
+    let putCount = 0;
+    let postCount = 0;
+    await page.route(/\/api\/personeller\/1$/, async (route) => {
+      if (route.request().method() === "PUT") {
+        putCount += 1;
+        await new Promise((resolve) => setTimeout(resolve, 2500));
+      }
+      await route.fallback();
+    });
+    page.on("request", (request) => {
+      if (!request.url().includes("/api/surecler") || request.method() !== "POST") {
+        return;
+      }
+      try {
+        if (request.postDataJSON()?.surec_turu === "POZISYON_DEGISTI") {
+          postCount += 1;
+        }
+      } catch {
+        /* ignore malformed bodies */
+      }
+    });
+
+    const personelCombo = kayitModal.getByRole("combobox", { name: "Personel" });
+    await expect(personelCombo).toContainText(/Ayşe Yılmaz/i);
+    await expect(personelCombo).toBeEnabled();
+
+    const pozisyonKaydet = kayitModal.getByTestId("kayit-modal-footer-primary");
+    await expect(pozisyonKaydet).toBeEnabled({ timeout: 5000 });
+    await expect(pozisyonKaydet).toHaveAttribute("form", "kayit-surec-pozisyon-form");
+
+    const putPromise = page.waitForResponse(isPersonelPut);
+    const postSurecPromise = page.waitForResponse(isPozisyonSurecPost);
+    await pozisyonKaydet.click();
+
+    await expect(personelCombo).toBeDisabled();
+    await expect(pozisyonKaydet).toBeDisabled();
+    await expect(personelCombo).toContainText(/Ayşe Yılmaz/i);
+    await personelCombo.click({ force: true });
+    await expect(kayitModal.getByRole("listbox", { name: "Personel listesi" })).toHaveCount(0);
+    await expect(kayitModal.getByRole("option", { name: /Mehmet Kaya/i })).toHaveCount(0);
+
+    const [putResp, postResp] = await Promise.all([putPromise, postSurecPromise]);
+    expect(putResp.ok()).toBe(true);
+    expect(postResp.ok()).toBe(true);
+
+    await expect(personelCombo).toBeEnabled({ timeout: 5000 });
+    await expect(personelCombo).toContainText(/Ayşe Yılmaz/i);
+    await expect(kayitModal.getByRole("combobox", { name: "Görev / Unvan" })).toContainText("Üretim Müdürü");
+    expect(putCount).toBe(1);
+    expect(postCount).toBe(1);
   });
 
   test("Personel Karti acikken pozisyon update sonrasi liste cache guncellenir", async ({ page }) => {

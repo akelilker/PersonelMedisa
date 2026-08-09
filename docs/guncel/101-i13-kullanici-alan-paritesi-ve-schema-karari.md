@@ -173,10 +173,53 @@ Rejected for now: architecture aesthetics without proven multi-owner profile req
 
 Approve for a future **I13-B** implementation package (not this PR):
 
-1. Persist `varsayilan_sube_id` durably (recommended owner: nullable `users.varsayilan_sube_id` FK to `subeler`, constrained to membership in `user_subeler` at write time).
+1. Persist `varsayilan_sube_id` durably under the locked schema + membership contracts below.
 2. Keep Yönetim real UI stripped of deferred profile fields until a later gated package.
 3. Leave `actor_identity_id` ownership unchanged (ADR-0001).
 4. Do not invent classifications or personnel links for existing rows.
+5. Do not backfill existing users’ default branch preference (`EXISTING_USER_DEFAULT_BACKFILL = NONE`).
+
+### Locked future schema owner
+
+```text
+FUTURE_SCHEMA_OWNER =
+  users.varsayilan_sube_id INT UNSIGNED NULL
+  FOREIGN KEY → subeler(id)
+  ON DELETE SET NULL
+  Index: normal / FK-required index on varsayilan_sube_id
+```
+
+**WHY `ON DELETE SET NULL`:** `user_subeler.sube_id` already uses `ON DELETE CASCADE`. A default-preference FK must **not** turn an otherwise valid branch delete into `RESTRICT` / `NO ACTION` failure. When a `subeler` row is deleted, any `users.varsayilan_sube_id` referencing it becomes `NULL`, preserving branch-delete semantics and the membership invariant.
+
+**Explicitly reject** for this FK: `ON DELETE RESTRICT` / `NO ACTION`.
+
+### Locked membership / transaction invariant
+
+DB FK only proves `varsayilan_sube_id` references an existing `subeler` row. It does **not** prove membership in the same user’s `user_subeler`.
+
+```text
+MEMBERSHIP_OWNER =
+  YonetimController transactional write contract
+```
+
+Create/update must evaluate the **FINAL intended state**:
+
+- `FINAL_SUBE_IDS`
+- `FINAL_VARSAYILAN_SUBE_ID`
+
+Invariant:
+
+- `FINAL_VARSAYILAN_SUBE_ID IS NULL`
+- **OR** `FINAL_VARSAYILAN_SUBE_ID ∈ FINAL_SUBE_IDS`
+
+Scope + default changes must commit atomically in the **same** DB transaction. No transient committed state may leave `default ∉ user_subeler`.
+
+If a scope update removes the existing default:
+
+- **A)** explicit valid replacement default supplied → persist replacement
+- **otherwise B)** persist `varsayilan_sube_id = NULL`
+
+Do **not** silently choose another branch and store it as a persisted preference.
 
 ## Field-by-field disposition
 
@@ -198,20 +241,38 @@ Approve for a future **I13-B** implementation package (not this PR):
 
 ## Default branch invariant
 
-Future I13-B (if approved) must implement:
+### Stored default vs resolved active (API semantics)
 
-- `varsayilan_sube_id IS NULL` **OR**
-- `varsayilan_sube_id` belongs to the same user’s `user_subeler`.
+These are distinct:
 
-Recommended runtime resolution (document now; implement later):
+| Surface | Field | Meaning |
+| --- | --- | --- |
+| Yönetim GET user | `varsayilan_sube_id` | **Actual persisted** `users.varsayilan_sube_id` |
+| Login / session | `active_sube_id` | **Runtime resolution** of initial active branch |
 
-1. Persisted valid default → use it
-2. Exactly one allowed branch + no default → that branch
-3. Multiple allowed + no default → deterministic runtime fallback (e.g. min `sube_id`)
-4. Fallback must **not** pretend it was a persisted user choice in admin GET semantics (distinguish “resolved active” vs “stored default” if needed)
-5. If scope update removes current default → clear it unless a new valid default is explicitly supplied
+**Yönetim GET user (I13-B):**
 
-**AUTH_SMOKE_READONLY** exact-one-sube contract remains intact: if default is set, it must equal the sole scoped sube.
+- Return the stored column value.
+- If DB value is `NULL` → return `NULL`.
+- Do **not** return `min(sube_id)` / ASC-first as if it were a persisted default.
+- `ADMIN_GET_SYNTHETIC_FALLBACK_AS_DEFAULT = NO`
+
+**Login resolution (I13-B):**
+
+1. Persisted default exists **AND** belongs to allowed `sube_ids` → `active_sube_id = persisted default`
+2. Exactly one allowed sube → `active_sube_id = sole sube`
+3. Multiple allowed + persisted default `NULL` → deterministic runtime fallback (current min / ASC-first behavior acceptable)
+4. Unrestricted / global existing semantics → preserve current behavior
+
+`active_sube_id` runtime resolution **≠** `varsayilan_sube_id` persisted preference.
+
+### Membership + scope-removal (repeat)
+
+- Stored preference must be `NULL` or ∈ same user’s `user_subeler` (transactional app contract).
+- Invalid default on scope removal → clear to `NULL` unless an explicit valid replacement is supplied.
+- Do not silently reassign another scoped branch into the stored column.
+
+**AUTH_SMOKE_READONLY** exact-one-sube contract remains intact: if a default is set, it must equal the sole scoped sube; with `NULL` default, sole-sube runtime fallback remains correct.
 
 No implementation in I13-A.
 
@@ -226,11 +287,26 @@ Explicitly **reject**:
 
 Existing rows must **not** receive invented classifications.
 
-For `varsayilan_sube_id` backfill (I13-B):
+### Canonical default-branch backfill (locked)
 
-- Prefer leave **NULL** for multi-scope users (honest “no persisted default”)
-- Optional deterministic fill only when `COUNT(user_subeler)=1` (that sole sube) — still a runtime-compatible default, not a fabricated preference history
-- Never invent phone / tip / personel / notes from demo heuristics
+```text
+EXISTING_USER_DEFAULT_BACKFILL = NONE
+EXISTING_USER_DEFAULT_INITIAL_VALUE = NULL
+```
+
+I13-B migration adds the nullable column only. **All** existing users remain `users.varsayilan_sube_id = NULL`.
+
+Do **not** infer a persisted preference from:
+
+- `min(sube_id)`
+- first `user_subeler` row
+- sole sube
+- current active branch
+- prior response-echo of `varsayilan_sube_id`
+
+**Reason:** existing data contains no durable evidence that a user explicitly selected a default branch. Even one-scope users do not need backfill because login runtime resolution already deterministically resolves their only allowed branch. AUTH_SMOKE_READONLY remains correct through exact-one-sube runtime fallback.
+
+Never invent phone / tip / personel / notes from demo heuristics.
 
 ## Security and PII implications
 
@@ -246,21 +322,36 @@ For `varsayilan_sube_id` backfill (I13-B):
 - Extended profile table for aesthetics (Option C)
 - Treating `user_subeler` insert order as durable default (already false under `ORDER BY sube_id ASC`)
 - Using response-echo of `varsayilan_sube_id` as “done”
+- Returning ASC/`min(sube_id)` on Yönetim GET as if it were stored default
+- Silently rewriting stored default to another scoped branch on scope shrink
+- Inferring / backfilling existing users’ `varsayilan_sube_id` from sole-sube, min id, active branch, or echo
+- `ON DELETE RESTRICT` / `NO ACTION` for `users.varsayilan_sube_id → subeler(id)`
 - Replacing `actor_identity_id` with `personel_id`
 - Demo-driven backfill of tip/personel/phone onto production users
+
+## Future migration / rollback safety contract
+
+I13-B migration expectation (document only; **do not apply in I13-A**):
+
+- Additive nullable column only (`users.varsayilan_sube_id`)
+- No production user-value backfill (`EXISTING_USER_DEFAULT_BACKFILL = NONE`)
+- No table rewrite beyond the required `ALTER`
+- FK `ON DELETE SET NULL` to `subeler(id)`
+- Schema verifier / test must prove column presence + FK delete semantics (`SET NULL`)
+
+**Down migration convention:** repository `api/migrations/*` are forward-only numbered SQL files; **no down migrations exist**. Do not invent a down migration for I13-B. Rollback, if ever required, is an ops/manual reverse plan outside the additive migration chain.
 
 ## Future implementation package
 
 **NEXT_IMPLEMENTATION = I13B_APPROVED_USER_FIELD_PARITY_IMPLEMENTATION** (only after this ADR is accepted)
 
-If `varsayilan_sube_id` approved:
-
-| Concern | Future owner (expected) |
+| Concern | Future owner (locked expectation) |
 | --- | --- |
-| FUTURE_SCHEMA_OWNER | likely `users.varsayilan_sube_id` nullable FK → `subeler` (+ write-time membership check vs `user_subeler`); evidence-backed alternative only if schema discovery disproves |
-| FUTURE_BACKEND | `YonetimController` map/load/persist; `LoginController` (+ possibly AuthMiddleware session) to honor persisted default for `active_sube_id` |
-| FUTURE_FRONTEND | keep sanitizer strips for deferred fields; stop treating default as “already real-complete”; adjust any UX that assumes list GET preserves choice |
-| FUTURE_TESTS | create/update persistence; fresh GET; fresh login; scope-removal clears invalid default; AUTH_SMOKE_READONLY regression |
+| FUTURE_SCHEMA_OWNER | `users.varsayilan_sube_id INT UNSIGNED NULL` FK → `subeler(id)` `ON DELETE SET NULL` + index |
+| MEMBERSHIP_OWNER | `YonetimController` transactional write: final scope ∪ default invariant; atomic commit |
+| FUTURE_BACKEND | `YonetimController` persist/GET stored default only; `LoginController` (+ possibly AuthMiddleware) resolve `active_sube_id` with persisted-default priority then runtime fallback |
+| FUTURE_FRONTEND | keep sanitizer strips for deferred fields; treat GET `NULL` as honest “no stored default” |
+| FUTURE_TESTS | create/update persistence; fresh GET returns stored/NULL; fresh login honors persisted default; scope-removal clears to NULL unless explicit replacement; FK delete → SET NULL; AUTH_SMOKE_READONLY regression; no backfill assertion |
 
 Create **none** of these runtime changes in I13-A.
 
@@ -269,9 +360,9 @@ Create **none** of these runtime changes in I13-A.
 I13-A (this package):
 
 - [x] Discovery against exact main base
-- [x] Decision doc committed
-- [x] Draft PR only
-- [ ] Exact-head CI SUCCESS (PR workflow)
+- [x] Decision doc committed (+ final clarification lock)
+- [x] Draft PR only (`#134`)
+- [ ] Exact-head CI SUCCESS (PR workflow) on latest clarification commit
 - [x] `MIGRATION_CREATED = NO`
 - [x] `BACKEND_RUNTIME_CHANGED = NO`
 - [x] `FRONTEND_RUNTIME_CHANGED = NO`
@@ -279,11 +370,15 @@ I13-A (this package):
 - [x] `PRODUCTION_WRITE = NO`
 - [x] `FULL_E2E_RERUN = NO`
 - [x] `I13_MERGED = NO` / `I13_DEPLOYED = NO`
+- [x] `ADR_STATUS = PROPOSED` (not ACCEPTED until user final review)
 
 I13-B (future, after user accepts this ADR):
 
-- Migration + backend + login resolution + focused tests
-- No automatic personnel/name backfill
+- Additive nullable column + `ON DELETE SET NULL` FK
+- Transactional membership enforcement
+- Login persisted-default priority + runtime fallback
+- `EXISTING_USER_DEFAULT_BACKFILL = NONE`
 - AUTH_SMOKE_READONLY intact
+- No automatic personnel/name backfill
 
-**NEXT_ACTION = USER_REVIEW_I13_SCHEMA_DECISION**
+**NEXT_ACTION = USER_REVIEW_I13_FINAL_DECISION**

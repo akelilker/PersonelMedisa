@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { getApiErrorMessage } from "../../../api/api-client";
 import { fetchPersonelDetail, updatePersonel } from "../../../api/personeller.api";
 import { createSurec } from "../../../api/surecler.api";
@@ -20,7 +20,7 @@ import {
   buildBagliAmirSurecPayloads,
   buildPersonelUpdatePayload,
   personelToEditForm,
-  pickLifecycleFormFields,
+  pickGenelLifecycleFormFields,
   type BagliAmirContext,
   type EditPersonelFormState
 } from "../../personeller/personel-edit-utils";
@@ -29,9 +29,9 @@ import { formatGeneralField, formatMoneyField, getPersonelInitials } from "../ka
 type KayitSurecPersonelGenelPanelProps = {
   personel: Personel;
   canUpdatePersonel: boolean;
-  canManageUcret: boolean;
   canViewUcret: boolean;
   personelRefs: PersonelReferenceBundle;
+  onBusyChange?: (busy: boolean) => void;
   onPersonelUpdated: (updated: Personel) => void;
 };
 
@@ -47,9 +47,9 @@ async function fetchBagliAmirContext(amirId: number): Promise<BagliAmirContext |
 export function KayitSurecPersonelGenelPanel({
   personel,
   canUpdatePersonel,
-  canManageUcret,
   canViewUcret,
   personelRefs,
+  onBusyChange,
   onPersonelUpdated
 }: KayitSurecPersonelGenelPanelProps) {
   const { session } = useAuth();
@@ -63,6 +63,17 @@ export function KayitSurecPersonelGenelPanel({
   const [editInfoMessage, setEditInfoMessage] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<EditPersonelFormState>(() => personelToEditForm(personel));
   const [editBagliAmirContext, setEditBagliAmirContext] = useState<BagliAmirContext | null>(null);
+
+  const personelIdRef = useRef(personel.id);
+  personelIdRef.current = personel.id;
+  const isSubmittingRef = useRef(false);
+  const onBusyChangeRef = useRef(onBusyChange);
+  onBusyChangeRef.current = onBusyChange;
+
+  function publishBusy(next: boolean) {
+    isSubmittingRef.current = next;
+    onBusyChangeRef.current?.(next);
+  }
 
   useEffect(() => {
     setEditForm(personelToEditForm(personel));
@@ -93,9 +104,18 @@ export function KayitSurecPersonelGenelPanel({
     };
   }, [personel.bagli_amir_id]);
 
+  useEffect(() => {
+    publishBusy(isSubmitting);
+  }, [isSubmitting]);
+
+  const genelLifecycleFields = useMemo(
+    () => pickGenelLifecycleFormFields(editForm, personel),
+    [editForm, personel]
+  );
+
   const hasLifecycleDiff = useMemo(
-    () => computeHasLifecycleDiff(personel, pickLifecycleFormFields(editForm)),
-    [personel, editForm]
+    () => computeHasLifecycleDiff(personel, genelLifecycleFields),
+    [personel, genelLifecycleFields]
   );
 
   const editBagliAmirGuidance = useMemo(
@@ -186,7 +206,7 @@ export function KayitSurecPersonelGenelPanel({
 
   async function handleEditSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!canEdit || isSubmitting) {
+    if (!canEdit || isSubmittingRef.current) {
       return;
     }
 
@@ -198,10 +218,15 @@ export function KayitSurecPersonelGenelPanel({
       return;
     }
 
+    const requestPersonelId = personel.id;
     setIsSubmitting(true);
+    publishBusy(true);
+
     const previousPersonel = personel;
-    const body = buildPersonelUpdatePayload(editForm, hasLifecycleDiff);
-    const lifecycleSnap = snapshotFromLifecycleForm(pickLifecycleFormFields(editForm));
+    const body = buildPersonelUpdatePayload(editForm, hasLifecycleDiff, {
+      includeWageFields: false
+    });
+    const lifecycleSnap = snapshotFromLifecycleForm(genelLifecycleFields);
     const optimistic: Personel = {
       ...personel,
       ad: body.ad ?? personel.ad,
@@ -212,8 +237,12 @@ export function KayitSurecPersonelGenelPanel({
     onPersonelUpdated(optimistic);
 
     try {
-      const updated = await updatePersonel(personel.id, body);
-      deleteCacheEntry(dataCacheKeys.personelDetail(getActiveSube(), personel.id));
+      const updated = await updatePersonel(requestPersonelId, body);
+      // Stale-response guard: person switched while PUT was in flight.
+      if (personelIdRef.current !== requestPersonelId) {
+        return;
+      }
+      deleteCacheEntry(dataCacheKeys.personelDetail(getActiveSube(), requestPersonelId));
       onPersonelUpdated(updated);
       setEditForm(personelToEditForm(updated));
       setIsEditing(false);
@@ -231,10 +260,14 @@ export function KayitSurecPersonelGenelPanel({
         }
       }
     } catch (error) {
-      onPersonelUpdated(previousPersonel);
-      setEditErrorMessage(getApiErrorMessage(error, "Personel kaydı güncellenemedi."));
+      if (personelIdRef.current === requestPersonelId) {
+        onPersonelUpdated(previousPersonel);
+        setEditErrorMessage(getApiErrorMessage(error, "Personel kaydı güncellenemedi."));
+      }
     } finally {
       setIsSubmitting(false);
+      // Publish from refs so unmount/tab switch cannot drop lock via stale closure.
+      publishBusy(false);
     }
   }
 
@@ -263,6 +296,7 @@ export function KayitSurecPersonelGenelPanel({
             type="button"
             className="universal-btn-aux"
             data-testid="kayit-surec-personel-duzenle"
+            disabled={isSubmitting}
             onClick={() => {
               setEditErrorMessage(null);
               setEditInfoMessage(null);
@@ -291,7 +325,6 @@ export function KayitSurecPersonelGenelPanel({
           hasLifecycleDiff={hasLifecycleDiff}
           editErrorMessage={editErrorMessage}
           isSubmitting={isSubmitting}
-          canManageUcret={canManageUcret}
           onSubmit={(event) => void handleEditSubmit(event)}
           onDiscard={discardEdit}
         />

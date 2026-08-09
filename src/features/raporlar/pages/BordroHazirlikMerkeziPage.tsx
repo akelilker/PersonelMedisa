@@ -199,36 +199,46 @@ export function BordroHazirlikMerkeziPage() {
     }
   }, [searchParams]);
 
-  const loadKapsamPersonel = useCallback(async (rawId: string) => {
-    const parsed = Number.parseInt(rawId.trim(), 10);
-    if (!Number.isFinite(parsed) || parsed < 1) {
-      setKapsamPersonel(null);
-      setKapsamPersonelError("Geçerli bir personel ID girin.");
-      return;
-    }
+  const loadKapsamPersonel = useCallback(
+    async (rawId: string) => {
+      if (!canViewBordroKapsam) {
+        setKapsamPersonel(null);
+        setKapsamPersonelError(null);
+        setKapsamPersonelLoading(false);
+        return;
+      }
 
-    setKapsamPersonelLoading(true);
-    setKapsamPersonelError(null);
-    try {
-      const personel = await fetchPersonelDetail(parsed);
-      setKapsamPersonel(personel);
-    } catch (error) {
-      setKapsamPersonel(null);
-      setKapsamPersonelError(getApiErrorMessage(error, "Personel yüklenemedi."));
-    } finally {
-      setKapsamPersonelLoading(false);
-    }
-  }, []);
+      const parsed = Number.parseInt(rawId.trim(), 10);
+      if (!Number.isFinite(parsed) || parsed < 1) {
+        setKapsamPersonel(null);
+        setKapsamPersonelError("Geçerli bir personel ID girin.");
+        return;
+      }
+
+      setKapsamPersonelLoading(true);
+      setKapsamPersonelError(null);
+      try {
+        const personel = await fetchPersonelDetail(parsed);
+        setKapsamPersonel(personel);
+      } catch (error) {
+        setKapsamPersonel(null);
+        setKapsamPersonelError(getApiErrorMessage(error, "Personel yüklenemedi."));
+      } finally {
+        setKapsamPersonelLoading(false);
+      }
+    },
+    [canViewBordroKapsam]
+  );
 
   useEffect(() => {
-    if (activeTab !== "personel-kapsam") {
+    if (activeTab !== "personel-kapsam" || !canViewBordroKapsam) {
       return;
     }
     const fromQuery = searchParams.get("personelId");
     if (fromQuery) {
       void loadKapsamPersonel(fromQuery);
     }
-  }, [activeTab, loadKapsamPersonel, searchParams]);
+  }, [activeTab, canViewBordroKapsam, loadKapsamPersonel, searchParams]);
 
   useEffect(() => {
     const sessionSubeler = (session?.sube_list ?? []).map((sube) => ({ id: sube.id, label: sube.ad }));

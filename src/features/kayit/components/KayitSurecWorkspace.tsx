@@ -212,6 +212,7 @@ export function KayitSurecWorkspace({
   const [devamsizlikSubId, setDevamsizlikSubId] = useState<DevamsizlikSubId | null>(null);
   const [pozisyonForm, setPozisyonForm] = useState<PozisyonFormState>(createPozisyonFormFromPersonel(null));
   const [pozisyonSubmitting, setPozisyonSubmitting] = useState(false);
+  const [genelMutating, setGenelMutating] = useState(false);
   const [ucretMutating, setUcretMutating] = useState(false);
   const [belgeFileMutating, setBelgeFileMutating] = useState(false);
   const [pozisyonError, setPozisyonError] = useState<string | null>(null);
@@ -226,7 +227,11 @@ export function KayitSurecWorkspace({
   const [belgeDurumInfo, setBelgeDurumInfo] = useState<string | null>(null);
   const [belgeDurumSaving, setBelgeDurumSaving] = useState(false);
   const personelContextLocked =
-    pozisyonSubmitting || ucretMutating || belgeDurumSaving || belgeFileMutating;
+    genelMutating ||
+    pozisyonSubmitting ||
+    ucretMutating ||
+    belgeDurumSaving ||
+    belgeFileMutating;
 
   const personelOptions = useMemo(
     () =>
@@ -1329,9 +1334,9 @@ export function KayitSurecWorkspace({
                       <KayitSurecPersonelGenelPanel
                         personel={selectedSurecPersonel}
                         canUpdatePersonel={canUpdatePersonel}
-                        canManageUcret={canManageUcret}
                         canViewUcret={canViewUcret}
                         personelRefs={refs}
+                        onBusyChange={setGenelMutating}
                         onPersonelUpdated={applyPersonelUpdateLocally}
                       />
                     ) : null}
@@ -1432,9 +1437,9 @@ export function KayitSurecWorkspace({
                           <KayitSurecPersonelGenelPanel
                             personel={selectedSurecPersonel}
                             canUpdatePersonel={canUpdatePersonel}
-                            canManageUcret={canManageUcret}
                             canViewUcret={canViewUcret}
                             personelRefs={refs}
+                            onBusyChange={setGenelMutating}
                             onPersonelUpdated={applyPersonelUpdateLocally}
                           />
                         ) : null}

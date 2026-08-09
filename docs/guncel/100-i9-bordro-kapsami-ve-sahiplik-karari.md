@@ -47,7 +47,7 @@ I9 bu sınırları açıkça ayırır; uygulama (I10+) için net sözleşmeyi b�
 | S77-C snapshot (`83`) | Girdi freeze / hash / preflight |
 | S77-D motor (`85`) | Saf motor + aday orkestrasyonu + canlı okuma yasağı |
 | S77-D2 engine V2 (`88`) | Paralel motor yok; motor sürüm evrimi |
-| S82 bordro hazırlık / ön izleme | Preflight aggregation + muhasebe/GY onay akışı (kod) |
+| S82 bordro hazırlık / ön izleme | Preflight aggregation + kontrol submission / finalize-return (permission-based; kod) |
 | S85-B SGK prim günü (`93`) | Prim günü compute/resolve owner ayrımı |
 | S87 compliance gaps (`99`) | Kritik uyum guard’ları |
 
@@ -72,7 +72,7 @@ I9 bu sınırları açıkça ayırır; uygulama (I10+) için net sözleşmeyi b�
 | LEGAL_PARAMETER_OWNER | Live: `mevzuat_parametreleri` / `MevzuatParametreService`; katalog: `MaasHesaplamaLegalParameterCatalog`; freeze: snapshot `MEVZUAT` | `81`, `85` |
 | SGK_PRIM_GUNU_OWNER | Compute: `Payroll/SgkPrimGunuEngine`; resolve/persist: `SgkPrimGunuService` | `93` |
 | PAYROLL_UI_OWNER | `MaasHesaplamaMerkeziPage` + `BordroHazirlikMerkeziPage` (Raporlar) | `RaporlarPage.tsx` |
-| PAYROLL_APPROVAL_OWNER | **CURRENT:** `BordroOnIzlemeService` (muhasebe kontrol → GY kesinleştir/geri gönder). `85` §9’daki “faz dışı” ifadesi superseded. | Migration `034`, S82 |
+| PAYROLL_APPROVAL_OWNER | **CURRENT:** `BordroOnIzlemeService` + `BordroHazirlikController`. Kontrol submission: `maas_hesaplama_adaylari.manage`. Geri gönderme / kesinleştirme: `bordro_kesinlestirme.approve` (role hard-code yok). `85` §9’daki “faz dışı” ifadesi superseded. | Migration `034`, S82 |
 | PAYROLL_OUTPUT_OWNER | **FUTURE** (PDF/Excel bordro, banka dosyası, SGK bildirgesi). **Partial CURRENT:** readiness CSV / SGK sonuç CSV (ops export). | `85` §9, controllers |
 | AUDIT_OWNER | Split: snapshot auditleri, aday auditleri, ücret auditleri, SGK immutable audits | migrations `018`/`020`/`023`/`034` |
 
@@ -92,7 +92,7 @@ deterministic payroll engine (MaasHesaplamaEngine)  ← no live DB reads
         ↓
 calculation candidate (MaasHesaplamaAdayService persist)
         ↓
-approval (BordroOnIzlemeService) / later output phases
+approval (BordroOnIzlemeService + BordroHazirlikController) / later output phases
 ```
 
 Wording note: snapshot oluşturma sırasında kaynak tablolar okunur ve dondurulur. Motor çalışırken canlı master/puantaj/ücret/finans yeniden okunmaz.
@@ -118,8 +118,8 @@ I9 UI taşımaz. Maaş hesaplama UI konumu kilitlidir: **Raporlar → Maaş Hesa
 | Puantaj upsert / mühür | `PuantajController` | Motor canlı puantaj okumaz |
 | Snapshot create/cancel | `maas_hesaplama.manage` | Freeze |
 | Hesapla / aday | `maas_hesaplama_adaylari.manage` | Engine invoke |
-| Muhasebe kontrol gönder | `maas_hesaplama_adaylari.manage` | Onay kuyruğu |
-| GY kesinleştir / geri gönder | `bordro_kesinlestirme.approve` | S82 |
+| Muhasebe kontrol gönder | `maas_hesaplama_adaylari.manage` | Onay kuyruğu (`submitKontrol`) |
+| Kesinleştir / geri gönder | `bordro_kesinlestirme.approve` | S82 (`kesinlestir` / `geriGonder`) |
 | Finans ek ödeme/kesinti | Finans / `ek_odeme_kesinti` | Input; payroll result değil |
 | `MAAS` finans kalemi | **BLOCKER** | Duplicate salary yasak |
 
@@ -142,8 +142,8 @@ I9 UI taşımaz. Maaş hesaplama UI konumu kilitlidir: **Raporlar → Maaş Hesa
 **PAYROLL_MANAGE_PERMISSION (dual):**
 
 - `maas_hesaplama.manage` — snapshot create/cancel
-- `maas_hesaplama_adaylari.manage` — hesapla / muhasebe kontrol
-- Kesinleştirme: `bordro_kesinlestirme.approve`
+- `maas_hesaplama_adaylari.manage` — hesapla / kontrol submission (`submitKontrol`)
+- Kesinleştir / geri gönder: `bordro_kesinlestirme.approve` (`kesinlestir` / `geriGonder`)
 
 **PAYROLL_ROLE_MATRIX (code truth — `api/src/Auth/RolePermissions.php` + FE mirror):**
 
@@ -186,7 +186,8 @@ I9 şunları **yapmaz**:
 - Downstream işler (I10+) Süreç/Kart write cleanup yaparken payroll execution’a dokunmaz.
 - Bordro hazırlık ikinci motor olamaz; readiness/preflight/onay yüzeyidir.
 - Doküman sürüm string’leri kod ile çelişirse kod + bu ADR güncel çözüm olur; `85` historical V1 etiketi korunabilir.
-- Onay akışı “future” değil; S82 `BordroOnIzlemeService` current’tır. Çıktı ürünleri hâlâ future’dır.
+- Onay/finalization akışı “future” değil; S82 `BordroOnIzlemeService` + `BordroHazirlikController` current’tır (permission-based: kontrol = `maas_hesaplama_adaylari.manage`, finalize/return = `bordro_kesinlestirme.approve`). Çıktı ürünleri hâlâ future’dır.
+- `BordroHazirlikPreflightService` içindeki “Genel yönetici final onayı” readiness/input blocker’ıdır; `bordro_kesinlestirme.approve` finalization permission’ı ile karıştırılmaz.
 
 ## 14. Follow-on phases
 
@@ -211,7 +212,7 @@ Bu sorular I9’u bloklamaz; PROPOSED ADR mevcut kod + kilitli sözleşmelerle m
 | Engine version string | Code/tests `S91C2_PAYROLL_ENGINE_V2` | `85` `S77D_PAYROLL_ENGINE_V1` | Code wins; `85` historical |
 | Candidate contract name | Code `S85B_PAYROLL_CANDIDATE_V1` | `88` `S77D_PAYROLL_CANDIDATE_V2` naming | Code contract id |
 | Permission keys | Dual `maas_hesaplama*` + `maas_hesaplama_adaylari*` + bordro onay | `85`/`83` tek anahtar seti | Code matrix |
-| Muhasebe/GY onay | Implemented S82 `BordroOnIzlemeService` | `85` §9 “faz dışı” | Current = S82; `85` superseded on approval |
+| S82 approval/finalization | Implemented S82 `BordroOnIzlemeService` + `BordroHazirlikController` (kontrol = `maas_hesaplama_adaylari.manage`; finalize/return = `bordro_kesinlestirme.approve`) | `85` §9 “faz dışı” | Current = S82 permission-based; `85` superseded on approval |
 
 ## Key paths
 
@@ -222,6 +223,7 @@ api/src/Services/MaasHesaplamaSnapshotService.php
 api/src/Services/MaasHesaplamaAdayService.php
 api/src/Services/BordroHazirlikPreflightService.php
 api/src/Services/BordroOnIzlemeService.php
+api/src/Controllers/BordroHazirlikController.php
 api/src/Services/SgkPrimGunuService.php
 api/src/Services/PersonelUcretService.php
 api/src/Controllers/MaasHesaplamaController.php

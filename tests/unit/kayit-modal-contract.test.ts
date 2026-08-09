@@ -18,44 +18,22 @@ describe("resolveKayitModalRouteConfig", () => {
       })
     ).toEqual({
       tab: "surec",
-      personelId: "42",
-      intent: null,
-      returnTo: null
+      personelId: "42"
     });
   });
 
-  it("routes legacy personel edit gateway intent into surec tab", () => {
+  it("normalizes unknown tab to yeni-kayit and ignores stale legacy fields", () => {
     expect(
       resolveKayitModalRouteConfig({
         kayitModal: {
-          tab: "yeni-kayit",
-          personelId: 7,
+          tab: "invalid",
           intent: "personel-edit-gateway",
           returnTo: "/personeller/7"
         }
       })
     ).toEqual({
-      tab: "surec",
-      personelId: "7",
-      intent: "personel-edit-gateway",
-      returnTo: "/personeller/7"
-    });
-  });
-
-  it("normalizes unknown tab to yeni-kayit and ignores invalid intent", () => {
-    expect(
-      resolveKayitModalRouteConfig({
-        kayitModal: {
-          tab: "invalid",
-          intent: "other",
-          returnTo: "  "
-        }
-      })
-    ).toEqual({
       tab: "yeni-kayit",
-      personelId: null,
-      intent: null,
-      returnTo: null
+      personelId: null
     });
   });
 });

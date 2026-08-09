@@ -32,7 +32,6 @@ export type PersonelDosyaTabPanelsProps = {
   canViewBordroKapsam?: boolean;
   canManageBordroKapsam?: boolean;
   canApproveBordroKapsam?: boolean;
-  onOpenZimmetCreate?: () => void;
 };
 
 export function PersonelDosyaTabPanels({
@@ -58,8 +57,7 @@ export function PersonelDosyaTabPanels({
   canManageUcret,
   canViewBordroKapsam = false,
   canManageBordroKapsam = false,
-  canApproveBordroKapsam = false,
-  onOpenZimmetCreate
+  canApproveBordroKapsam = false
 }: PersonelDosyaTabPanelsProps) {
   function handleOpenSurecHistory() {
     onTabChange("surec-gecmisi");
@@ -140,7 +138,6 @@ export function PersonelDosyaTabPanels({
           errorMessage={zimmetHistoryErrorMessage}
           zimmetler={zimmetler}
           zimmetHistoryHasMore={zimmetHistoryHasMore}
-          onOpenCreateModal={onOpenZimmetCreate}
         />
       </div>
 

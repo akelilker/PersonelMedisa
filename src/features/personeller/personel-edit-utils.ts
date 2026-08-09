@@ -166,6 +166,22 @@ export function pickLifecycleFormFields(form: EditPersonelFormState): LifecycleF
   };
 }
 
+/** Süreç → Genel: ücret alanlarını personelden kilitle (Mali owner). */
+export function pickGenelLifecycleFormFields(
+  form: EditPersonelFormState,
+  personel: Personel
+): LifecycleFormFields {
+  const resolvedMaas = resolvePersonelMaasTutari(personel);
+  return {
+    departmanId: form.departmanId,
+    gorevId: form.gorevId,
+    bagliAmirId: form.bagliAmirId,
+    ucretTipiId: personel.ucret_tipi_id != null ? String(personel.ucret_tipi_id) : "",
+    maasTutari: resolvedMaas != null ? String(resolvedMaas) : "",
+    primKuraliId: form.primKuraliId
+  };
+}
+
 export function personelToEditForm(personel: Personel): EditPersonelFormState {
   const resolvedMaas = resolvePersonelMaasTutari(personel);
   return {
@@ -182,10 +198,17 @@ export function personelToEditForm(personel: Personel): EditPersonelFormState {
   };
 }
 
+export type BuildPersonelUpdatePayloadOptions = {
+  /** Default true. Genel panel must pass false — ücret write owner is Süreç → Mali. */
+  includeWageFields?: boolean;
+};
+
 export function buildPersonelUpdatePayload(
   editForm: EditPersonelFormState,
-  hasLifecycleDiff: boolean
+  hasLifecycleDiff: boolean,
+  options: BuildPersonelUpdatePayloadOptions = {}
 ): UpdatePersonelPayload {
+  const includeWageFields = options.includeWageFields !== false;
   const payload: UpdatePersonelPayload = {
     ad: normalizePersonelAd(editForm.ad),
     soyad: normalizePersonelSoyad(editForm.soyad),
@@ -217,15 +240,18 @@ export function buildPersonelUpdatePayload(
   setOptionalId("departman_id", editForm.departmanId);
   setOptionalId("gorev_id", editForm.gorevId);
   setOptionalId("bagli_amir_id", editForm.bagliAmirId);
-  setOptionalId("ucret_tipi_id", editForm.ucretTipiId);
   setOptionalId("prim_kurali_id", editForm.primKuraliId);
 
-  const maasRaw = editForm.maasTutari.trim();
-  if (maasRaw === "") {
-    Object.assign(idPayload, buildMaasPayloadFields(null));
-  } else {
-    const parsed = Number.parseFloat(maasRaw.replace(",", "."));
-    Object.assign(idPayload, buildMaasPayloadFields(Number.isFinite(parsed) ? parsed : null));
+  if (includeWageFields) {
+    setOptionalId("ucret_tipi_id", editForm.ucretTipiId);
+
+    const maasRaw = editForm.maasTutari.trim();
+    if (maasRaw === "") {
+      Object.assign(idPayload, buildMaasPayloadFields(null));
+    } else {
+      const parsed = Number.parseFloat(maasRaw.replace(",", "."));
+      Object.assign(idPayload, buildMaasPayloadFields(Number.isFinite(parsed) ? parsed : null));
+    }
   }
 
   payload.effective_date = editForm.effectiveDate.trim();

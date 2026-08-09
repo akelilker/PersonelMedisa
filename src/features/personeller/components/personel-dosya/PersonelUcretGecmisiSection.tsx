@@ -115,8 +115,9 @@ export function PersonelUcretGecmisiSection({
     >
       <span className="personel-puantaj-summary-kicker">Ücret Geçmişi</span>
       <p className="personel-puantaj-summary-note">
-        Ücret dönemleri buradan yönetilir; personel kartındaki maaş alanı yalnızca uyumluluk için
-        senkron tutulur.
+        {canManageUcret
+          ? "Ücret dönemleri buradan yönetilir; personel kartındaki maaş alanı yalnızca uyumluluk için senkron tutulur."
+          : "Ücret geçmişi burada salt okunur izlenir; dönem ekleme/iptal Süreç → Mali İşlemler üzerinden yapılır."}
       </p>
 
       {canManageUcret ? (

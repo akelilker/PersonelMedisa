@@ -33,6 +33,7 @@ import {
   fetchDepartmanOptions,
   fetchGorevOptions,
   fetchPersonelTipiOptions,
+  fetchPrimKuraliOptions,
   fetchSurecTuruOptions,
   fetchUcretTipiOptions
 } from "../../../api/referans.api";
@@ -42,9 +43,9 @@ import { getApiErrorDetail, getApiErrorMessage } from "../../../api/api-client";
 import { PersonelCreateFields } from "../../../features/personeller/components/PersonelCreateFields";
 import { PersonelZimmetCreateForm } from "../../../features/personeller/components/PersonelZimmetCreateForm";
 import { PersonelBelgelerPanel } from "../../../features/personeller/components/personel-dosya/PersonelBelgelerPanel";
-import { KayitGatewayRedirectPanel } from "./KayitGatewayRedirectPanel";
 import { type KayitModalFooterModel } from "./KayitModalFooter";
 import { KayitSurecPersonelFinansPanel } from "./KayitSurecPersonelFinansPanel";
+import { KayitSurecPersonelGenelPanel } from "./KayitSurecPersonelGenelPanel";
 import { KayitSurecPersonelUcretPanel } from "./KayitSurecPersonelUcretPanel";
 import { KayitSurecPozisyonReferencePicker } from "./KayitSurecPozisyonReferencePicker";
 import { KayitSurecTabHeader } from "./KayitSurecTabHeader";
@@ -58,7 +59,6 @@ import { usePersonelFinansCreate } from "../../../hooks/useFinans";
 import { INITIAL_CREATE_PERSONEL_FORM, usePersonelZimmetCreate, type CreatePersonelFormState } from "../../../hooks/usePersoneller";
 import { INITIAL_SUREC_FORM, type SurecFormState } from "../../../hooks/useSurecler";
 import { useRoleAccess } from "../../../hooks/use-role-access";
-import { displayUcretTipiLabel } from "../../../lib/display/ucret-tipi-display";
 import type { Personel } from "../../../types/personel";
 import type { IdOption, KeyOption } from "../../../types/referans";
 import type { Surec } from "../../../types/surec";
@@ -91,9 +91,7 @@ import {
 } from "../kayit-surec-constants";
 import {
   formatGeneralField,
-  formatMoneyField,
   formatPersonelLabel,
-  getPersonelInitials,
   hasPozisyonOrganizationalDiff,
   normalizePersonelSearchText,
   optionLabel,
@@ -158,7 +156,7 @@ export function KayitSurecWorkspace({
   onClose,
   initialSurecPersonelId,
   initialIntent,
-  initialReturnTo,
+  initialReturnTo: _initialReturnTo,
   primaryActionLabel,
   primaryFormId,
   onFooterModelChange
@@ -214,6 +212,7 @@ export function KayitSurecWorkspace({
   const [devamsizlikSubId, setDevamsizlikSubId] = useState<DevamsizlikSubId | null>(null);
   const [pozisyonForm, setPozisyonForm] = useState<PozisyonFormState>(createPozisyonFormFromPersonel(null));
   const [pozisyonSubmitting, setPozisyonSubmitting] = useState(false);
+  const [genelMutating, setGenelMutating] = useState(false);
   const [ucretMutating, setUcretMutating] = useState(false);
   const [belgeFileMutating, setBelgeFileMutating] = useState(false);
   const [pozisyonError, setPozisyonError] = useState<string | null>(null);
@@ -228,7 +227,11 @@ export function KayitSurecWorkspace({
   const [belgeDurumInfo, setBelgeDurumInfo] = useState<string | null>(null);
   const [belgeDurumSaving, setBelgeDurumSaving] = useState(false);
   const personelContextLocked =
-    pozisyonSubmitting || ucretMutating || belgeDurumSaving || belgeFileMutating;
+    genelMutating ||
+    pozisyonSubmitting ||
+    ucretMutating ||
+    belgeDurumSaving ||
+    belgeFileMutating;
 
   const personelOptions = useMemo(
     () =>
@@ -440,54 +443,6 @@ export function KayitSurecWorkspace({
   const selectedSurecPersonelIdRef = useRef<number | null>(null);
   selectedSurecPersonelIdRef.current = selectedSurecPersonel?.id ?? null;
 
-  const selectedPersonelGeneralColumns = useMemo(() => {
-    if (!selectedSurecPersonel) {
-      return [];
-    }
-
-    return [
-      {
-        items: [
-          { label: "T.C. Kimlik No", value: formatGeneralField(selectedSurecPersonel.tc_kimlik_no) },
-          { label: "Doğum Tarihi", value: formatGeneralField(selectedSurecPersonel.dogum_tarihi) },
-          { label: "Doğum Yeri", value: formatGeneralField(selectedSurecPersonel.dogum_yeri) },
-          { label: "Telefon", value: formatGeneralField(selectedSurecPersonel.telefon) },
-          { label: "Kan Grubu", value: formatGeneralField(selectedSurecPersonel.kan_grubu) }
-        ]
-      },
-      {
-        items: [
-          { label: "Acil Durum Kişisi", value: formatGeneralField(selectedSurecPersonel.acil_durum_kisi) },
-          { label: "Acil Durum Telefon", value: formatGeneralField(selectedSurecPersonel.acil_durum_telefon) },
-          { label: "Bölüm", value: formatGeneralField(selectedSurecPersonel.departman_adi) },
-          { label: "Görev / Unvan", value: formatGeneralField(selectedSurecPersonel.gorev_adi) },
-          { label: "Bağlı Amir", value: formatGeneralField(selectedSurecPersonel.bagli_amir_adi) }
-        ]
-      },
-      {
-        items: [
-          { label: "Sicil No", value: formatGeneralField(selectedSurecPersonel.sicil_no) },
-          { label: "İşe Giriş Tarihi", value: formatGeneralField(selectedSurecPersonel.ise_giris_tarihi) },
-          { label: "Personel Tipi", value: formatGeneralField(selectedSurecPersonel.personel_tipi_adi) },
-          {
-            label: "Ücret Tipi",
-            value: formatGeneralField(
-              displayUcretTipiLabel(
-                selectedSurecPersonel.ucret_tipi_adi,
-                selectedSurecPersonel.ucret_tipi_id
-              )
-            )
-          },
-          {
-            label: "Maaş (uyumluluk)",
-            value: canViewUcret ? formatMoneyField(selectedSurecPersonel.maas_tutari) : "-"
-          },
-          { label: "Prim Kuralı", value: formatGeneralField(selectedSurecPersonel.prim_kurali_adi) }
-        ]
-      }
-    ];
-  }, [canViewUcret, selectedSurecPersonel]);
-
   const resolvedDevamsizlikSurecTuruKey = useMemo(() => {
     if (!devamsizlikSubId) {
       return null;
@@ -636,6 +591,7 @@ export function KayitSurecWorkspace({
         personelTipiOptions,
         bagliAmirOptions,
         ucretTipiOptions,
+        primKuraliOptions,
         surecTurleri,
         personelList,
         subeler
@@ -645,6 +601,7 @@ export function KayitSurecWorkspace({
         fetchPersonelTipiOptions(),
         fetchBagliAmirOptions(),
         fetchUcretTipiOptions(),
+        fetchPrimKuraliOptions(),
         fetchSurecTuruOptions(),
         fetchPersonellerList({ page: 1, limit: 250, aktiflik: "tum" }),
         fetchYonetimSubeleri()
@@ -663,7 +620,7 @@ export function KayitSurecWorkspace({
         personelTipiOptions,
         bagliAmirOptions,
         ucretTipiOptions,
-        primKuraliOptions: []
+        primKuraliOptions
       });
       setSurecTuruOptions(surecTurleri);
       setPersoneller(personelList.items);
@@ -1017,12 +974,16 @@ export function KayitSurecWorkspace({
     setSurecForm(resetSurecFormKeepingPersonel(surecForm.personelId));
   }
 
-  const {
-    showGatewayMessage,
-    gatewayActionLabel,
-    gatewayInfoMessage,
-    handleGatewayReturn
-  } = useKayitGatewayIntent({ activeTab, initialIntent, initialReturnTo, onClose });
+  const selectLegacyPersonelTab = useCallback((tab: PersonelSurecTab) => {
+    setActivePersonelTab(tab);
+    setDevamsizlikSubId(null);
+  }, []);
+
+  useKayitGatewayIntent({
+    activeTab,
+    initialIntent,
+    onSelectPersonelTab: selectLegacyPersonelTab
+  });
 
   const hasInitialSurecPersonel = typeof initialSurecPersonelId === "string" && initialSurecPersonelId.length > 0;
   /** Gateway keeps classic process form on Genel; other personel tabs (Pozisyon…) use shell ops. */
@@ -1047,10 +1008,6 @@ export function KayitSurecWorkspace({
     }
 
     if (activeTab === "yeni-kayit") {
-      if (showGatewayMessage) {
-        return null;
-      }
-
       return {
         primaryLabel: primaryActionLabel,
         primaryFormId,
@@ -1192,7 +1149,6 @@ export function KayitSurecWorkspace({
     primaryFormId,
     resetPozisyonForm,
     selectedSurecPersonel,
-    showGatewayMessage,
     surecSubmitting
   ]);
 
@@ -1273,42 +1229,31 @@ export function KayitSurecWorkspace({
 
             {!bootstrapLoading && !bootstrapError ? (
               <>
-                {showGatewayMessage ? (
-                  <KayitGatewayRedirectPanel
-                    infoMessage={gatewayInfoMessage}
-                    actionLabel={gatewayActionLabel}
-                    onReturn={handleGatewayReturn}
-                    onClose={onClose}
+                <form id={KAYIT_SUREC_PERSONEL_FORM_ID} className="workspace-form" onSubmit={handlePersonelSubmit}>
+                  <PersonelCreateFields
+                    form={personelForm}
+                    setForm={setPersonelForm}
+                    refs={refs}
+                    subeOptions={subeOptions}
+                    subeLoadError={subeLoadError}
+                    createErrorMessage={personelError}
+                    fieldErrors={personelFieldErrors}
+                    onFieldErrorClear={(field) => {
+                      setPersonelFieldErrors((prev) => {
+                        if (!prev[field]) {
+                          return prev;
+                        }
+                        const next = { ...prev };
+                        delete next[field];
+                        return next;
+                      });
+                    }}
+                    referenceError={null}
+                    className="workspace-form-stack"
+                    canManageUcret={canManageUcret}
                   />
-                ) : (
-                  <>
-                    <form id={KAYIT_SUREC_PERSONEL_FORM_ID} className="workspace-form" onSubmit={handlePersonelSubmit}>
-                      <PersonelCreateFields
-                        form={personelForm}
-                        setForm={setPersonelForm}
-                        refs={refs}
-                        subeOptions={subeOptions}
-                        subeLoadError={subeLoadError}
-                        createErrorMessage={personelError}
-                        fieldErrors={personelFieldErrors}
-                        onFieldErrorClear={(field) => {
-                          setPersonelFieldErrors((prev) => {
-                            if (!prev[field]) {
-                              return prev;
-                            }
-                            const next = { ...prev };
-                            delete next[field];
-                            return next;
-                          });
-                        }}
-                        referenceError={null}
-                        className="workspace-form-stack"
-                        canManageUcret={canManageUcret}
-                      />
-                    </form>
-                    {personelInfo ? <p className="workspace-success">{personelInfo}</p> : null}
-                  </>
-                )}
+                </form>
+                {personelInfo ? <p className="workspace-success">{personelInfo}</p> : null}
               </>
             ) : null}
           </section>
@@ -1384,6 +1329,17 @@ export function KayitSurecWorkspace({
                       ) : null}
                       {surecInfo ? <p className="workspace-success workspace-success--inline">{surecInfo}</p> : null}
                     </div>
+
+                    {selectedSurecPersonel && activePersonelTab === "genel" ? (
+                      <KayitSurecPersonelGenelPanel
+                        personel={selectedSurecPersonel}
+                        canUpdatePersonel={canUpdatePersonel}
+                        canViewUcret={canViewUcret}
+                        personelRefs={refs}
+                        onBusyChange={setGenelMutating}
+                        onPersonelUpdated={applyPersonelUpdateLocally}
+                      />
+                    ) : null}
                   </>
                 ) : (
                   <>
@@ -1478,39 +1434,14 @@ export function KayitSurecWorkspace({
                         </div>
 
                         {activePersonelTab === "genel" ? (
-                          <div className="surec-person-general-panel">
-                            <div className="surec-person-general-head">
-                              <div>
-                                <p className="surec-shell-summary-kicker">Genel bilgiler</p>
-                                <h4 className="surec-person-general-title">
-                                  {selectedSurecPersonel.ad} {selectedSurecPersonel.soyad}
-                                </h4>
-                              </div>
-                              <div className="surec-person-photo-box" aria-label="Personel fotoğrafı">
-                                <div className="surec-person-photo-avatar" aria-hidden="true">
-                                  {getPersonelInitials(selectedSurecPersonel)}
-                                </div>
-                                <button type="button" className="surec-person-photo-action" disabled>
-                                  Fotoğraf yükle
-                                </button>
-                              </div>
-                            </div>
-
-                            <div className="surec-person-general-columns">
-                              {selectedPersonelGeneralColumns.map((column, columnIndex) => (
-                                <section key={`personel-general-column-${columnIndex}`} className="surec-person-general-column">
-                                  <div className="surec-shell-summary-grid">
-                                    {column.items.map((item) => (
-                                      <div key={`${columnIndex}-${item.label}`} className="surec-shell-summary-item">
-                                        <span className="surec-shell-summary-label">{item.label}</span>
-                                        <strong className="surec-shell-summary-value">{item.value}</strong>
-                                      </div>
-                                    ))}
-                                  </div>
-                                </section>
-                              ))}
-                            </div>
-                          </div>
+                          <KayitSurecPersonelGenelPanel
+                            personel={selectedSurecPersonel}
+                            canUpdatePersonel={canUpdatePersonel}
+                            canViewUcret={canViewUcret}
+                            personelRefs={refs}
+                            onBusyChange={setGenelMutating}
+                            onPersonelUpdated={applyPersonelUpdateLocally}
+                          />
                         ) : null}
 
                         {activePersonelTab === "izin-devamsizlik" ? (

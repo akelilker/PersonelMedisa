@@ -32,7 +32,7 @@ export type PersonelDosyaTabPanelsProps = {
   canViewBordroKapsam?: boolean;
   canManageBordroKapsam?: boolean;
   canApproveBordroKapsam?: boolean;
-  onOpenZimmetCreate: () => void;
+  onOpenZimmetCreate?: () => void;
 };
 
 export function PersonelDosyaTabPanels({
@@ -101,7 +101,11 @@ export function PersonelDosyaTabPanels({
         aria-labelledby="personel-kart-tab-egitim-belgeler"
         hidden={activeTab !== "egitim-belgeler"}
       >
-        <PersonelBelgelerPanel personel={personel} isActive={activeTab === "egitim-belgeler"} />
+        <PersonelBelgelerPanel
+          personel={personel}
+          isActive={activeTab === "egitim-belgeler"}
+          allowMutations={false}
+        />
       </div>
 
       <div

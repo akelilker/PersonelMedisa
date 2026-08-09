@@ -66,7 +66,7 @@ export function PersonelKartPanelGenelBilgiler({
         {!String(personel.acil_durum_kisi ?? "").trim() || !String(personel.acil_durum_telefon ?? "").trim() ? (
           <DossierRecord
             label="Profil Tamlık"
-            value="Acil durum bilgisi eksik — personel kartından tamamlanabilir (import/bordro engeli değildir)."
+            value="Acil durum bilgisi eksik — Süreç → Genel üzerinden tamamlanabilir (import/bordro engeli değildir)."
           />
         ) : null}
         <DossierRecord label="Pasiflik Etiketi" value={formatDetailValue(personel.pasiflik_durumu_etiketi)} />

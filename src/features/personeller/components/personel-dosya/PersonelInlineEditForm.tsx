@@ -1,7 +1,6 @@
 import { type Dispatch, type FormEvent, type SetStateAction } from "react";
 import { FormField } from "../../../../components/form/FormField";
 import type { PersonelReferenceBundle } from "../../../../data/app-data.types";
-import { mapUcretTipiSelectOptions } from "../../../../lib/display/ucret-tipi-display";
 import type { IdOption } from "../../../../types/referans";
 import type { BagliAmirFormGuidance, EditPersonelFormState } from "../../personel-edit-utils";
 
@@ -19,7 +18,6 @@ export type PersonelInlineEditFormProps = {
   hasLifecycleDiff: boolean;
   editErrorMessage: string | null;
   isSubmitting: boolean;
-  canManageUcret: boolean;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onDiscard: () => void;
 };
@@ -34,12 +32,11 @@ export function PersonelInlineEditForm({
   hasLifecycleDiff,
   editErrorMessage,
   isSubmitting,
-  canManageUcret,
   onSubmit,
   onDiscard
 }: PersonelInlineEditFormProps) {
   return (
-    <form className="personel-edit-form" onSubmit={onSubmit}>
+    <form className="personel-edit-form" onSubmit={onSubmit} data-testid="personel-inline-edit-form">
       <div className="form-field-grid">
         <FormField
           label="Ad"
@@ -120,28 +117,12 @@ export function PersonelInlineEditForm({
         ) : (
           <p className="personel-create-error">Görev / Unvan listesi yüklenemedi.</p>
         )}
-        {personelRefs.ucretTipiOptions.length > 0 ? (
-          <FormField
-            as="select"
-            label="Ücret tipi"
-            name="edit-ucret-tipi-id"
-            value={editForm.ucretTipiId}
-            onChange={(value) => setEditForm((prev) => ({ ...prev, ucretTipiId: value }))}
-            placeholderOption={{ value: "", label: "Seçiniz" }}
-            selectOptions={mapUcretTipiSelectOptions(personelRefs.ucretTipiOptions)}
-          />
-        ) : (
-          <p className="personel-create-error">Ücret tipi listesi yüklenemedi.</p>
-        )}
-        {canManageUcret ? (
-          <p
-            className="personel-form-note personel-form-note--info"
-            data-testid="personel-edit-ucret-yonlendirme"
-          >
-            Maaş bilgisi artık Genel sekmesindeki Ücret Geçmişi bölümünden yönetilir; yeni tutar
-            için oradan yeni ücret dönemi başlatın.
-          </p>
-        ) : null}
+        <p
+          className="personel-form-note personel-form-note--info"
+          data-testid="personel-edit-ucret-yonlendirme"
+        >
+          Ücret tipi ve maaş Süreç → Mali İşlemler üzerinden yönetilir; Genel düzenleme ücret yazmaz.
+        </p>
         {personelRefs.primKuraliOptions.length > 0 ? (
           <FormField
             as="select"

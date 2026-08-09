@@ -24,7 +24,7 @@ describe("resolveKayitModalRouteConfig", () => {
     });
   });
 
-  it("resolves personel edit gateway contract", () => {
+  it("routes legacy personel edit gateway intent into surec tab", () => {
     expect(
       resolveKayitModalRouteConfig({
         kayitModal: {
@@ -35,7 +35,7 @@ describe("resolveKayitModalRouteConfig", () => {
         }
       })
     ).toEqual({
-      tab: "yeni-kayit",
+      tab: "surec",
       personelId: "7",
       intent: "personel-edit-gateway",
       returnTo: "/personeller/7"

@@ -49,15 +49,22 @@ async function submitMaasFilters(page: Page) {
 }
 
 test.describe("S93-E3D personel ve maaş action dialogs", () => {
-  test("MUHASEBE: ücret iptal dialogu native confirm oluşturmaz", async ({ page }) => {
+  test("MUHASEBE: ücret iptal dialogu native confirm oluşturmaz (Süreç Mali)", async ({ page }) => {
     const nativeDialogs = trackNativeDialogs(page);
     await loginAsMockRole(page, "MUHASEBE");
-    await openPersonelKart(page, /Ayşe Yılmaz.*kişisinin kartını aç/i);
 
-    await expect(page.getByTestId("personel-ucret-gecmisi-card")).toBeVisible();
-    const cancelButton = page.locator('[data-testid^="personel-ucret-iptal-"]').first();
+    await page.getByTestId("menu-kayit-surec").click();
+    const kayitModal = page.locator(".modal-container--kayit-surec");
+    await kayitModal.getByTestId("kayit-tab-surec").click();
+    await kayitModal.getByRole("combobox", { name: "Personel" }).click();
+    await kayitModal.getByPlaceholder("Personel ara").fill("Ayşe");
+    await kayitModal.getByRole("option", { name: /Ayşe Yılmaz/i }).click();
+    await kayitModal.getByRole("tab", { name: "Mali İşlemler" }).click();
+
+    await expect(kayitModal.getByTestId("personel-ucret-gecmisi-card")).toBeVisible();
+    const cancelButton = kayitModal.locator('[data-testid^="personel-ucret-iptal-"]').first();
     if ((await cancelButton.count()) === 0) {
-      await page.getByTestId("personel-ucret-yeni-donem").click();
+      await kayitModal.getByTestId("personel-ucret-yeni-donem").click();
       const modal = page
         .locator(".modal-container")
         .filter({ has: page.getByRole("heading", { name: /Yeni Ücret Dönemi Başlat/i }) })
@@ -65,10 +72,10 @@ test.describe("S93-E3D personel ve maaş action dialogs", () => {
       await modal.locator('[name="ucret-tutar"]').fill("41000");
       await modal.locator('[name="ucret-baslangic"]').fill("2026-01-01");
       await modal.getByTestId("personel-ucret-form-kaydet").click();
-      await expect(page.locator('[data-testid^="personel-ucret-iptal-"]').first()).toBeVisible();
+      await expect(kayitModal.locator('[data-testid^="personel-ucret-iptal-"]').first()).toBeVisible();
     }
 
-    await page.locator('[data-testid^="personel-ucret-iptal-"]').first().click();
+    await kayitModal.locator('[data-testid^="personel-ucret-iptal-"]').first().click();
     await expect(page.getByTestId("personel-ucret-action-dialog")).toBeVisible();
     await expect(page.getByTestId("personel-ucret-action-dialog-cancel")).toBeFocused();
     expect(nativeDialogs).toEqual([]);
@@ -78,12 +85,12 @@ test.describe("S93-E3D personel ve maaş action dialogs", () => {
     expect(nativeDialogs).toEqual([]);
   });
 
-  test("MUHASEBE: bordro kapsam iptal dialogu field ile neden alır", async ({ page }) => {
+  test("MUHASEBE: bordro kapsam iptal dialogu field ile neden alır (Bordro Hazırlık)", async ({ page }) => {
     const nativeDialogs = trackNativeDialogs(page);
     await loginAsMockRole(page, "MUHASEBE");
-    await openPersonelKart(page, /Ayşe Yılmaz.*kişisinin kartını aç/i);
+    await page.goto("/raporlar?panel=bordro-hazirlik&tab=personel-kapsam&personelId=1");
+    await expect(page.getByTestId("personel-bordro-kapsam-card")).toBeVisible({ timeout: 15_000 });
 
-    await expect(page.getByTestId("personel-bordro-kapsam-card")).toBeVisible();
     if ((await page.locator('[data-testid^="personel-bordro-kapsam-cancel-"]').count()) === 0) {
       await page.getByTestId("personel-bordro-kapsam-yeni").click();
       const modal = page

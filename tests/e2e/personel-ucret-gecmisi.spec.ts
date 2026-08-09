@@ -41,7 +41,7 @@ async function createMaassizPersonel(page: Page) {
   await expect(kayitModal.getByRole("heading", { name: /Ucret ADAY/i })).toBeVisible({
     timeout: 15_000
   });
-  await kayitModal.getByRole("button", { name: "Kapat" }).click();
+  await kayitModal.getByLabel("Kapat").click();
 }
 
 async function openPersonelKart(page: Page, namePattern: RegExp) {
@@ -71,7 +71,7 @@ function maasUyumlulukValue(modal: Locator) {
 }
 
 test.describe("S77-B personel ücret geçmişi", () => {
-  test("yetkili kullanıcı ücret geçmişini görür, ekler, overlap engeller", async ({ page }) => {
+  test("yetkili kullanıcı ücret geçmişini kartta RO görür, ekleme Surec Mali üzerinden yapılır", async ({ page }) => {
     const pageErrors = trackPageErrors(page);
     await mockApi(page, "MUHASEBE");
     await login(page, { username: "muhasebe", password: "demo123" });
@@ -81,25 +81,36 @@ test.describe("S77-B personel ücret geçmişi", () => {
 
     await expect(page.getByTestId("personel-ucret-gecmisi-card")).toBeVisible();
     await expect(page.getByTestId("personel-ucret-bos")).toBeVisible();
+    await expect(page.getByTestId("personel-ucret-yeni-donem")).toHaveCount(0);
 
-    await page.getByTestId("personel-ucret-yeni-donem").click();
+    await page.getByRole("button", { name: "Islemler" }).click();
+    await page.getByTestId("personel-dosya-action-surecte-islem-yap").click();
+    const kayitModal = page.locator(".modal-container--kayit-surec");
+    await expect(kayitModal.getByRole("heading", { name: /Kayıt ve Süreç İşlemleri/i })).toBeVisible();
+    await kayitModal.getByRole("tab", { name: "Mali İşlemler" }).click();
+    await expect(kayitModal.getByTestId("kayit-surec-ucret-panel")).toBeVisible();
+    await expect(kayitModal.getByTestId("personel-ucret-yeni-donem")).toBeVisible();
+
+    await kayitModal.getByTestId("personel-ucret-yeni-donem").click();
     await fillUcretModal(page, "42000", "2026-01-10");
-    await expect(page.getByTestId("personel-ucret-guncel")).toContainText(/42/);
-    await expect(page.getByTestId("personel-ucret-list").locator("li")).toHaveCount(1);
+    await expect(kayitModal.getByTestId("personel-ucret-guncel")).toContainText(/42/);
+    await expect(kayitModal.getByTestId("personel-ucret-list").locator("li")).toHaveCount(1);
 
-    await page.getByTestId("personel-ucret-yeni-donem").click();
+    await kayitModal.getByTestId("personel-ucret-yeni-donem").click();
     await fillUcretModal(page, "45000", "2026-08-01");
-    await expect(page.getByTestId("personel-ucret-list").locator("li")).toHaveCount(2);
+    await expect(kayitModal.getByTestId("personel-ucret-list").locator("li")).toHaveCount(2);
 
-    await page.getByTestId("personel-ucret-yeni-donem").click();
+    await kayitModal.getByTestId("personel-ucret-yeni-donem").click();
     const overlapModal = await fillUcretModal(page, "46000", "2026-08-01");
     await expect(overlapModal.getByTestId("personel-ucret-form-hata")).toContainText(
       "Bu personel için seçilen tarih aralığında başka bir ücret kaydı bulunmaktadır."
     );
+    await overlapModal.getByLabel("Kapat").click();
 
-    await page.reload();
-    await page.getByRole("tab", { name: "Genel" }).click();
+    await kayitModal.getByLabel("Kapat").click();
+    await openPersonelKart(page, /Ucret Aday.*kişisinin kartını aç/i);
     await expect(page.getByTestId("personel-ucret-list").locator("li")).toHaveCount(2);
+    await expect(page.getByTestId("personel-ucret-yeni-donem")).toHaveCount(0);
     expect(pageErrors).toEqual([]);
   });
 
@@ -213,7 +224,7 @@ test.describe("S77-B personel ücret geçmişi", () => {
     await kayitModal.getByTestId("kayit-surec-subtab-genel").click();
     await expect(maasUyumlulukValue(kayitModal)).toHaveText("-");
 
-    await kayitModal.getByRole("button", { name: "Kapat" }).click();
+    await kayitModal.getByLabel("Kapat").click();
     await openPersonelKart(page, /Ucret Aday.*kişisinin kartını aç/i);
     await expect(page.getByTestId("personel-ucret-gecmisi-card")).toBeVisible();
     await expect(page.getByTestId("personel-ucret-list").locator("li")).toHaveCount(1);

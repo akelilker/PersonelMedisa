@@ -1,27 +1,19 @@
 import { useMemo } from "react";
 
 export function PersonelDosyaActionRow({
-  canEditPersonel,
-  canCreateZimmet,
   canAccessSurecler,
   canCreateSurec,
   isActionMenuOpen,
   onToggleActionMenu,
   onCloseActionMenu,
-  onStartEdit,
-  onOpenZimmetCreate,
   onOpenSurecModal,
   onOpenSurecHistory
 }: {
-  canEditPersonel: boolean;
-  canCreateZimmet: boolean;
   canAccessSurecler: boolean;
   canCreateSurec: boolean;
   isActionMenuOpen: boolean;
   onToggleActionMenu: () => void;
   onCloseActionMenu: () => void;
-  onStartEdit: () => void;
-  onOpenZimmetCreate: () => void;
   onOpenSurecModal: () => void;
   onOpenSurecHistory: () => void;
 }) {
@@ -48,39 +40,13 @@ export function PersonelDosyaActionRow({
       });
     }
 
-    if (canEditPersonel) {
-      items.push({
-        id: "duzenle",
-        label: "Kartı Düzenle",
-        onSelect: () => {
-          onCloseActionMenu();
-          onStartEdit();
-        }
-      });
-    }
-
-    if (canCreateZimmet) {
-      items.push({
-        id: "zimmet-ekle",
-        label: "Yeni Zimmet Ekle",
-        onSelect: () => {
-          onCloseActionMenu();
-          onOpenZimmetCreate();
-        }
-      });
-    }
-
     return items;
   }, [
     canAccessSurecler,
     canCreateSurec,
-    canCreateZimmet,
-    canEditPersonel,
     onCloseActionMenu,
     onOpenSurecHistory,
-    onOpenSurecModal,
-    onOpenZimmetCreate,
-    onStartEdit
+    onOpenSurecModal
   ]);
 
   if (actionItems.length === 0) {

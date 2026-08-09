@@ -2,7 +2,7 @@
 
 ## 1. Status
 
-**PROPOSED / REVIEW** — henüz ACCEPTED değildir.
+**ACCEPTED — 2026-08-09**
 
 Bu belge docs-only’dir. Runtime kod, API, migration veya production yazma içermez.
 
@@ -203,7 +203,7 @@ I9 şunları **yapmaz**:
 2. Readiness/SGK CSV “payroll output” sayılacak mı, yoksa ops export olarak mı ayrılacak?
 3. Formal actor identity (`actor_identities`, S98 ADR) ile `personeller` master ayrımı bordro snapshot kimlik alanında ileride genişletilecek mi?
 
-Bu sorular I9’u bloklamaz; PROPOSED ADR mevcut kod + kilitli sözleşmelerle merge-review’e gidebilir.
+Bu sorular I9’u bloklamaz; ACCEPTED ADR mevcut kod + kilitli sözleşmelerle bağlayıcıdır.
 
 ## Conflicts (explicit)
 

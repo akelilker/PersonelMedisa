@@ -12,6 +12,18 @@ function kayitSurecModal(page: Page) {
   });
 }
 
+async function closeKayitSurecModal(page: Page) {
+  const kayitModal = kayitSurecModal(page);
+  // Prefer accessible close (×); Genel/footer-null modes have no footer secondary.
+  await kayitModal.getByLabel("Kapat").click();
+  await expect(kayitSurecModal(page)).toHaveCount(0);
+}
+
+async function reopenPersonelKart(page: Page, personelId = 1) {
+  await page.goto(`/personeller/${personelId}`);
+  await expect(page).toHaveURL(new RegExp(`/personeller/${personelId}$`));
+}
+
 async function assertGatewayStateCleared(page: Page) {
   await expect(kayitSurecModal(page)).toHaveCount(0);
   await expect(page.getByText(/Kart düzenleme işlemi merkez ekrana taşınıyor/i)).toHaveCount(0);
@@ -507,7 +519,8 @@ test.describe("personel dosyasi surec akisi", () => {
     await kayitModal.locator("[name='personel-zimmet-teslim-durumu']").selectOption("YENI");
     await kayitModal.locator("[name='personel-zimmet-aciklama']").fill("Seri No: TEL-900");
     await kayitModal.locator('button[type="submit"][form="kayit-surec-zimmet-form"]').click();
-    await kayitModal.getByRole("button", { name: "Kapat" }).click();
+    await closeKayitSurecModal(page);
+    await reopenPersonelKart(page);
 
     await page.getByRole("tab", { name: "Zimmet" }).click();
     const telefonRow = zimmetRow(/Telefon/i);
@@ -665,7 +678,7 @@ test.describe("personel dosyasi surec akisi", () => {
 
     await kayitModal.locator('button[type="submit"][form="kayit-surec-zimmet-form"]').click();
 
-    await kayitModal.getByRole("button", { name: "Kapat" }).click();
+    await closeKayitSurecModal(page);
     await expect(page).toHaveURL("/");
 
     await page.getByTestId("menu-personel-karti").click();
@@ -711,7 +724,8 @@ test.describe("personel dosyasi surec akisi", () => {
     await kayitModal.locator(".personel-edit-form").getByRole("button", { name: "Kaydet" }).click();
     await expect(kayitModal.locator(".personel-create-error")).toHaveCount(0);
     await expect(kayitModal.locator('[name="edit-departman"]')).toHaveCount(0, { timeout: 15_000 });
-    await kayitModal.getByRole("button", { name: "Kapat" }).click();
+    await closeKayitSurecModal(page);
+    await reopenPersonelKart(page);
 
     await expect(page.locator(".personel-dosya-hero")).toContainText(/Finans/i);
 
@@ -740,7 +754,8 @@ test.describe("personel dosyasi surec akisi", () => {
     }
     await kayitModal.locator(".personel-edit-form").getByRole("button", { name: "Kaydet" }).click();
     await expect(kayitModal.locator('[name="edit-departman"]')).toHaveCount(0, { timeout: 15_000 });
-    await kayitModal.getByRole("button", { name: "Kapat" }).click();
+    await closeKayitSurecModal(page);
+    await reopenPersonelKart(page);
 
     await page.locator("#personel-kart-tab-surec-gecmisi").click();
     const timeline = page.locator("#personel-kart-panel-surec-gecmisi").locator("[data-testid='personel-surec-timeline']");
@@ -768,7 +783,8 @@ test.describe("personel dosyasi surec akisi", () => {
 
     await expect(kayitModal.locator('[name="edit-departman"]')).toHaveCount(0, { timeout: 15_000 });
     await expect(kayitModal.locator(".personel-create-error")).toHaveCount(0);
-    await kayitModal.getByRole("button", { name: "Kapat" }).click();
+    await closeKayitSurecModal(page);
+    await reopenPersonelKart(page);
 
     await page.getByRole("tab", { name: "Süreç Geçmişi" }).click();
     const timelineAfter = surecTimeline(page);
@@ -836,7 +852,7 @@ test.describe("personel dosyasi surec akisi", () => {
     await kayitModal.locator('[name="kayit-ceza-aciklama"]').fill(uniqueAciklama);
     await kayitModal.locator('button[type="submit"][form="kayit-surec-ceza-form"]').click();
     await expect(kayitModal.locator('[name="kayit-ceza-tutar"]')).toHaveValue("", { timeout: 15_000 });
-    await kayitModal.getByRole("button", { name: "Kapat" }).click();
+    await closeKayitSurecModal(page);
 
     await page.getByTestId("menu-personel-karti").click();
     await expect(page).toHaveURL(/\/personeller$/);

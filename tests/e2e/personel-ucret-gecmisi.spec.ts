@@ -41,7 +41,7 @@ async function createMaassizPersonel(page: Page) {
   await expect(kayitModal.getByRole("heading", { name: /Ucret ADAY/i })).toBeVisible({
     timeout: 15_000
   });
-  await kayitModal.getByRole("button", { name: "Kapat" }).click();
+  await kayitModal.getByLabel("Kapat").click();
 }
 
 async function openPersonelKart(page: Page, namePattern: RegExp) {
@@ -83,7 +83,12 @@ test.describe("S77-B personel ücret geçmişi", () => {
     await expect(page.getByTestId("personel-ucret-bos")).toBeVisible();
     await expect(page.getByTestId("personel-ucret-yeni-donem")).toHaveCount(0);
 
-    const kayitModal = await openSurecMaliForPersonel(page, "Ucret", /Ucret Aday/i);
+    await page.getByRole("button", { name: "Islemler" }).click();
+    await page.getByTestId("personel-dosya-action-surecte-islem-yap").click();
+    const kayitModal = page.locator(".modal-container--kayit-surec");
+    await expect(kayitModal.getByRole("heading", { name: /Kayıt ve Süreç İşlemleri/i })).toBeVisible();
+    await kayitModal.getByRole("tab", { name: "Mali İşlemler" }).click();
+    await expect(kayitModal.getByTestId("kayit-surec-ucret-panel")).toBeVisible();
     await expect(kayitModal.getByTestId("personel-ucret-yeni-donem")).toBeVisible();
 
     await kayitModal.getByTestId("personel-ucret-yeni-donem").click();
@@ -100,8 +105,9 @@ test.describe("S77-B personel ücret geçmişi", () => {
     await expect(overlapModal.getByTestId("personel-ucret-form-hata")).toContainText(
       "Bu personel için seçilen tarih aralığında başka bir ücret kaydı bulunmaktadır."
     );
+    await overlapModal.getByLabel("Kapat").click();
 
-    await kayitModal.getByRole("button", { name: "Kapat" }).click();
+    await kayitModal.getByLabel("Kapat").click();
     await openPersonelKart(page, /Ucret Aday.*kişisinin kartını aç/i);
     await expect(page.getByTestId("personel-ucret-list").locator("li")).toHaveCount(2);
     await expect(page.getByTestId("personel-ucret-yeni-donem")).toHaveCount(0);
@@ -218,7 +224,7 @@ test.describe("S77-B personel ücret geçmişi", () => {
     await kayitModal.getByTestId("kayit-surec-subtab-genel").click();
     await expect(maasUyumlulukValue(kayitModal)).toHaveText("-");
 
-    await kayitModal.getByRole("button", { name: "Kapat" }).click();
+    await kayitModal.getByLabel("Kapat").click();
     await openPersonelKart(page, /Ucret Aday.*kişisinin kartını aç/i);
     await expect(page.getByTestId("personel-ucret-gecmisi-card")).toBeVisible();
     await expect(page.getByTestId("personel-ucret-list").locator("li")).toHaveCount(1);

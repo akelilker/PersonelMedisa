@@ -39,6 +39,10 @@ describe("i11 raporlar IA source contracts", () => {
     expect(nav).toContain("buildVisibleRaporlarNavGroups");
     expect(nav).toContain('data-testid="raporlar-panel-nav"');
     expect(nav).not.toContain("Liste ve aylık özet");
+    expect(nav).toContain("<ul");
+    expect(nav).toContain("<li key={item.id}>");
+    expect(nav).not.toContain('role="listitem"');
+    expect(nav).not.toContain('role="list"');
   });
 
   it("does not mount inactive panel owners together", () => {

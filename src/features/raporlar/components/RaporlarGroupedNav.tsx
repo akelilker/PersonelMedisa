@@ -27,27 +27,26 @@ export function RaporlarGroupedNav({
           <p className="raporlar-panel-nav-group-label" id={`raporlar-nav-group-${group.id}-label`}>
             {group.label}
           </p>
-          <div
+          <ul
             className="raporlar-panel-nav-group-items"
-            role="list"
             aria-labelledby={`raporlar-nav-group-${group.id}-label`}
           >
             {group.items.map((item) => {
               const active = isRaporlarNavItemActive(item, surface);
               return (
-                <Link
-                  key={item.id}
-                  role="listitem"
-                  to={buildRaporlarNavHrefForItem(item)}
-                  aria-current={active ? "page" : undefined}
-                  data-testid={item.testId}
-                  className={active ? "is-active" : undefined}
-                >
-                  {item.label}
-                </Link>
+                <li key={item.id}>
+                  <Link
+                    to={buildRaporlarNavHrefForItem(item)}
+                    aria-current={active ? "page" : undefined}
+                    data-testid={item.testId}
+                    className={active ? "is-active" : undefined}
+                  >
+                    {item.label}
+                  </Link>
+                </li>
               );
             })}
-          </div>
+          </ul>
         </div>
       ))}
     </nav>

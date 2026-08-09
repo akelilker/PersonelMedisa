@@ -239,6 +239,13 @@
   align-items: flex-start;
   gap: 0.35rem;
   min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.raporlar-panel-nav-group-items > li {
+  max-width: 100%;
 }
 
 .raporlar-panel-nav a {

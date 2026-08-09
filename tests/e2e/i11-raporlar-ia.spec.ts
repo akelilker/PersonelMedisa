@@ -8,7 +8,15 @@ test.describe("I11 raporlar information architecture", () => {
     await expect(page.getByTestId("raporlar-nav-group-raporlar")).toBeVisible();
     await expect(page.getByTestId("raporlar-nav-group-kapanis")).toBeVisible();
     await expect(page.getByTestId("raporlar-nav-group-bordro")).toBeVisible();
+    await expect(page.getByRole("link", { name: "Liste Raporları" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Aylık Kapanış Özeti" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Maaş Hesaplama Merkezi" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Liste Raporları" })).toHaveAttribute(
+      "aria-current",
+      "page"
+    );
     await expect(page.getByTestId("raporlar-panel-liste")).toHaveAttribute("aria-current", "page");
+    await expect(page.getByTestId("raporlar-panel-liste")).not.toHaveAttribute("role", "listitem");
     await expect(page.getByTestId("raporlar-liste-panel")).toBeVisible();
     await expect(page.getByTestId("aylik-kapanis-ozeti-section")).toHaveCount(0);
     await expect(page.getByText("Liste ve aylık özet")).toHaveCount(0);

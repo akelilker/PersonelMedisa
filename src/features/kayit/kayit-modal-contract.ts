@@ -24,11 +24,16 @@ export function resolveKayitModalRouteConfig(state: unknown): KayitModalRouteCon
   const rawIntent = (kayitModal as { intent?: unknown }).intent;
   const rawReturnTo = (kayitModal as { returnTo?: unknown }).returnTo;
 
+  const intent: KayitModalIntent | null =
+    rawIntent === "personel-edit-gateway" || rawIntent === "personel-zimmet-gateway" ? rawIntent : null;
+
+  // Legacy edit/zimmet gateway intents open Süreç (not yeni-kayit bounce theater).
+  const tab = intent != null || rawTab === "surec" ? "surec" : "yeni-kayit";
+
   return {
-    tab: rawTab === "surec" ? "surec" : "yeni-kayit",
+    tab,
     personelId: rawPersonelId === undefined || rawPersonelId === null ? null : String(rawPersonelId),
-    intent:
-      rawIntent === "personel-edit-gateway" || rawIntent === "personel-zimmet-gateway" ? rawIntent : null,
+    intent,
     returnTo: typeof rawReturnTo === "string" && rawReturnTo.trim() ? rawReturnTo.trim() : null
   };
 }

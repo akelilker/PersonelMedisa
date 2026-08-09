@@ -44,6 +44,10 @@ import { useMaasHesaplama } from "../../../hooks/useMaasHesaplama";
 import { currentMonthParts, parseAyValue } from "../../../lib/donem-kapanis/display";
 import { useAuth } from "../../../state/auth.store";
 import type { IdOption } from "../../../types/referans";
+import { fetchPersonelDetail } from "../../../api/personeller.api";
+import { getApiErrorMessage } from "../../../api/api-client";
+import type { Personel } from "../../../types/personel";
+import { PersonelBordroKapsamSection } from "../../personeller/components/personel-dosya/PersonelBordroKapsamSection";
 import { FazlaCalismaOdemeTercihiPanel } from "../components/FazlaCalismaOdemeTercihiPanel";
 import { MaasHesaplamaMerkeziPage } from "./MaasHesaplamaMerkeziPage";
 import { SgkKatalogHazirlikPanel } from "../components/SgkKatalogHazirlikPanel";
@@ -59,7 +63,8 @@ type TabKey =
   | "on-izleme"
   | "hesaplama"
   | "sgk-katalog"
-  | "fm-odeme-tercihi";
+  | "fm-odeme-tercihi"
+  | "personel-kapsam";
 
 type FilterState = {
   ay: string;
@@ -79,7 +84,8 @@ const TAB_LABELS: Record<TabKey, string> = {
   "on-izleme": "Bordro Ön İzleme",
   hesaplama: "Maaş Hesaplama",
   "sgk-katalog": "SGK Katalog Hazırlık",
-  "fm-odeme-tercihi": "FM Ödeme Tercihi"
+  "fm-odeme-tercihi": "FM Ödeme Tercihi",
+  "personel-kapsam": "Personel Bordro Kapsam"
 };
 
 function blockerItems(items: MaasHesaplamaIssue[]) {
@@ -104,12 +110,19 @@ export function BordroHazirlikMerkeziPage() {
   const canApprove = hasPermission("bordro_kesinlestirme.approve");
   const canViewFinance = hasPermission("finans.view");
   const canEditOdemeTercihi = hasPermission("puantaj.muhurle");
+  const canViewBordroKapsam = hasPermission("personel_bordro_kapsam.view");
+  const canManageBordroKapsam = hasPermission("personel_bordro_kapsam.manage");
+  const canApproveBordroKapsam = hasPermission("personel_bordro_kapsam.approve");
 
   const [filters, setFilters] = useState<FilterState>(INITIAL_FILTERS);
   const [subeOptions, setSubeOptions] = useState<IdOption[]>([]);
   const [activeTab, setActiveTab] = useState<TabKey>("veri-hazirlik");
   const [fmSnapshotIdInput, setFmSnapshotIdInput] = useState("");
   const [fmActiveSnapshotId, setFmActiveSnapshotId] = useState<number | null>(null);
+  const [kapsamPersonelIdInput, setKapsamPersonelIdInput] = useState("");
+  const [kapsamPersonel, setKapsamPersonel] = useState<Personel | null>(null);
+  const [kapsamPersonelLoading, setKapsamPersonelLoading] = useState(false);
+  const [kapsamPersonelError, setKapsamPersonelError] = useState<string | null>(null);
   const [preflight, setPreflight] = useState<Awaited<ReturnType<typeof fetchBordroHazirlikPreflight>> | null>(null);
   const [onIzleme, setOnIzleme] = useState<BordroOnIzlemeOzet | null>(null);
   const [devirler, setDevirler] = useState<BordroDevirListItem[]>([]);
@@ -169,11 +182,53 @@ export function BordroHazirlikMerkeziPage() {
       tab === "on-izleme" ||
       tab === "hesaplama" ||
       tab === "sgk-katalog" ||
-      tab === "fm-odeme-tercihi"
+      tab === "fm-odeme-tercihi" ||
+      tab === "personel-kapsam"
     ) {
       setActiveTab(tab);
     }
+
+    const personelIdRaw = searchParams.get("personelId");
+    if (personelIdRaw) {
+      setKapsamPersonelIdInput(personelIdRaw);
+    }
+
+    const subeFromQuery = searchParams.get("subeId");
+    if (subeFromQuery) {
+      setFilters((prev) => (prev.subeId === subeFromQuery ? prev : { ...prev, subeId: subeFromQuery }));
+    }
   }, [searchParams]);
+
+  const loadKapsamPersonel = useCallback(async (rawId: string) => {
+    const parsed = Number.parseInt(rawId.trim(), 10);
+    if (!Number.isFinite(parsed) || parsed < 1) {
+      setKapsamPersonel(null);
+      setKapsamPersonelError("Geçerli bir personel ID girin.");
+      return;
+    }
+
+    setKapsamPersonelLoading(true);
+    setKapsamPersonelError(null);
+    try {
+      const personel = await fetchPersonelDetail(parsed);
+      setKapsamPersonel(personel);
+    } catch (error) {
+      setKapsamPersonel(null);
+      setKapsamPersonelError(getApiErrorMessage(error, "Personel yüklenemedi."));
+    } finally {
+      setKapsamPersonelLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeTab !== "personel-kapsam") {
+      return;
+    }
+    const fromQuery = searchParams.get("personelId");
+    if (fromQuery) {
+      void loadKapsamPersonel(fromQuery);
+    }
+  }, [activeTab, loadKapsamPersonel, searchParams]);
 
   useEffect(() => {
     const sessionSubeler = (session?.sube_list ?? []).map((sube) => ({ id: sube.id, label: sube.ad }));
@@ -502,7 +557,8 @@ export function BordroHazirlikMerkeziPage() {
             "on-izleme",
             "hesaplama",
             "sgk-katalog",
-            "fm-odeme-tercihi"
+            "fm-odeme-tercihi",
+            "personel-kapsam"
           ] as TabKey[]
         ).map((tab) => (
           <button
@@ -1131,6 +1187,67 @@ export function BordroHazirlikMerkeziPage() {
               canEdit={canEditOdemeTercihi}
             />
           ) : null}
+        </section>
+      ) : null}
+
+      {activeTab === "personel-kapsam" ? (
+        <section data-testid="bordro-personel-kapsam-panel">
+          {!canViewBordroKapsam ? (
+            <ErrorState message="Personel bordro kapsamını görüntüleme yetkiniz yok." />
+          ) : (
+            <>
+              <form
+                className="kapanis-filters"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  void loadKapsamPersonel(kapsamPersonelIdInput);
+                }}
+              >
+                <div className="form-field-grid">
+                  <div className="form-section">
+                    <label className="form-label" htmlFor="bordro-kapsam-personel-id">
+                      Personel ID
+                    </label>
+                    <input
+                      id="bordro-kapsam-personel-id"
+                      name="bordro-kapsam-personel-id"
+                      type="number"
+                      className="form-input"
+                      min={1}
+                      value={kapsamPersonelIdInput}
+                      data-testid="bordro-kapsam-personel-id"
+                      onChange={(event) => setKapsamPersonelIdInput(event.target.value)}
+                    />
+                  </div>
+                </div>
+                <div className="form-actions-row">
+                  <button type="submit" className="universal-btn-save" data-testid="bordro-kapsam-personel-yukle">
+                    Yükle
+                  </button>
+                </div>
+              </form>
+
+              {kapsamPersonelLoading ? <LoadingState label="Personel yükleniyor..." /> : null}
+              {kapsamPersonelError ? (
+                <p className="yonetim-error" data-testid="bordro-kapsam-personel-hata">
+                  {kapsamPersonelError}
+                </p>
+              ) : null}
+              {!kapsamPersonelLoading && !kapsamPersonel && !kapsamPersonelError ? (
+                <p className="personel-puantaj-summary-note" data-testid="bordro-kapsam-personel-bos">
+                  Personel bordro kapsamını yönetmek için bir personel ID girip yükleyin.
+                </p>
+              ) : null}
+              {kapsamPersonel ? (
+                <PersonelBordroKapsamSection
+                  personel={kapsamPersonel}
+                  canManage={canManageBordroKapsam}
+                  canApprove={canApproveBordroKapsam}
+                  isActive={activeTab === "personel-kapsam"}
+                />
+              ) : null}
+            </>
+          )}
         </section>
       ) : null}
 

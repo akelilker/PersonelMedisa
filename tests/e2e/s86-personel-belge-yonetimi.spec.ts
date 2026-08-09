@@ -7,18 +7,29 @@ const users = {
   birimAmiri: { username: "birim", password: "demo123" }
 };
 
+async function openSurecBelgelerForAyse(page: import("@playwright/test").Page) {
+  await page.getByTestId("menu-kayit-surec").click();
+  const kayitModal = page.locator(".modal-container--kayit-surec");
+  await expect(kayitModal.getByRole("heading", { name: /Kayıt ve Süreç İşlemleri/i })).toBeVisible();
+  await kayitModal.getByTestId("kayit-tab-surec").click();
+  await kayitModal.getByRole("combobox", { name: "Personel" }).click();
+  await kayitModal.getByPlaceholder("Personel ara").fill("Ayşe");
+  await kayitModal.getByRole("option", { name: /Ayşe Yılmaz/i }).click();
+  await kayitModal.getByRole("tab", { name: "Belgeler" }).click();
+  return kayitModal;
+}
+
 test.describe("S86 personel belge yönetimi", () => {
-  test("yetkili kullanıcı belge ekler, günceller, dosya değiştirir, iptal eder", async ({ page }) => {
+  test("yetkili kullanıcı Surec Belgeler üzerinden belge ekler, günceller, dosya değiştirir, iptal eder", async ({
+    page
+  }) => {
     await mockApi(page, "GENEL_YONETICI");
     await login(page, users.genelYonetici);
 
     const uniqueAd = `S86 Belge ${Date.now()}`;
+    const kayitModal = await openSurecBelgelerForAyse(page);
+    const panel = kayitModal;
 
-    await page.getByTestId("menu-personel-karti").click();
-    await page.getByRole("link", { name: /Ayşe Yılmaz.*kişisinin kartını aç/i }).first().click();
-    await page.getByRole("tab", { name: "Eğitim / Belgeler" }).click();
-
-    const panel = page.locator("#personel-kart-panel-egitim-belgeler");
     await panel.getByTestId("personel-belge-yeni-btn").click();
     await page.getByTestId("personel-belge-ad").fill(uniqueAd);
     await page.locator("#personel-belge-tipi").selectOption("SERTIFIKA");
@@ -58,6 +69,21 @@ test.describe("S86 personel belge yönetimi", () => {
     await expect(panel.getByTestId("personel-belge-kayit-list")).not.toContainText(updatedAd);
   });
 
+  test("Personel Kartı belge paneli salt okunur (allowMutations=false)", async ({ page }) => {
+    await mockApi(page, "GENEL_YONETICI");
+    await login(page, users.genelYonetici);
+
+    await page.getByTestId("menu-personel-karti").click();
+    await page.getByRole("link", { name: /Ayşe Yılmaz.*kişisinin kartını aç/i }).first().click();
+    await page.getByRole("tab", { name: "Eğitim / Belgeler" }).click();
+
+    const panel = page.locator("#personel-kart-panel-egitim-belgeler");
+    await expect(panel.getByTestId("personel-belge-yeni-btn")).toHaveCount(0);
+    await expect(panel.locator('[data-testid^="personel-belge-duzenle-"]')).toHaveCount(0);
+    await expect(panel.locator('[data-testid^="personel-belge-iptal-"]')).toHaveCount(0);
+    await expect(panel.getByTestId("personel-belge-kayit-list")).toBeVisible();
+  });
+
   test("BIRIM_AMIRI yazma butonlarını göremez", async ({ page }) => {
     await mockApi(page, "BIRIM_AMIRI");
     await login(page, users.birimAmiri);
@@ -94,12 +120,8 @@ test.describe("S86 personel belge yönetimi", () => {
     await mockApi(page, "GENEL_YONETICI");
     await login(page, users.genelYonetici);
 
-    await page.getByTestId("menu-personel-karti").click();
-    await page.getByRole("link", { name: /Ayşe Yılmaz.*kişisinin kartını aç/i }).first().click();
-    await page.getByRole("tab", { name: "Eğitim / Belgeler" }).click();
-
-    const panel = page.locator("#personel-kart-panel-egitim-belgeler");
-    await panel.getByTestId("personel-belge-yeni-btn").click();
+    const kayitModal = await openSurecBelgelerForAyse(page);
+    await kayitModal.getByTestId("personel-belge-yeni-btn").click();
     await page.getByTestId("personel-belge-create-dosya").setInputFiles({
       name: "virus.exe",
       mimeType: "application/octet-stream",

@@ -45,56 +45,38 @@ async function readSettledSurecTimelineCount(page: Page): Promise<number> {
   return current;
 }
 
-async function openKartDuzenleFromActions(page: Page) {
+async function openPersonelEditFromSurec(page: Page) {
   await page.getByRole("button", { name: "Islemler" }).click();
-  await page.getByRole("button", { name: "Kartı Düzenle" }).click();
+  await page.getByTestId("personel-dosya-action-surecte-islem-yap").click();
 
   const kayitModal = kayitSurecModal(page);
-  await expect(kayitModal.getByText(/Kart düzenleme işlemi merkez ekrana taşınıyor/i)).toBeVisible({
+  await expect(kayitModal.getByRole("heading", { name: /Kayıt ve Süreç İşlemleri/i })).toBeVisible({
     timeout: 5000
   });
+  await expect(kayitModal.getByTestId("kayit-tab-surec")).toHaveAttribute("aria-selected", "true");
 
-  const gatewayButton = page.getByRole("button", {
-    name: /Personel Kart[iı]na D[oö]n ve D[uü]zenle|Personel Kartina Don ve Duzenle/i
-  }).first();
+  const genelTab = kayitModal.getByRole("tab", { name: "Genel" });
+  if ((await genelTab.count()) > 0) {
+    await genelTab.click();
+  }
 
-  await gatewayButton.click();
-
-  await expect(page).toHaveURL(/\/personeller\/\d+$/);
-  await assertGatewayStateCleared(page);
-  await expect(page.locator('[name="edit-departman"]')).toBeVisible({ timeout: 10000 });
+  await kayitModal.getByTestId("kayit-surec-personel-duzenle").click();
+  await expect(kayitModal.locator('[name="edit-departman"]')).toBeVisible({ timeout: 10000 });
+  return kayitModal;
 }
 
-async function openZimmetCreateFromPersonelDosya(page: Page) {
+async function openZimmetCreateFromSurec(page: Page) {
   await page.getByRole("button", { name: "Islemler" }).click();
-  await page
-    .locator(".personel-dosya-action-menu")
-    .getByRole("button", { name: "Yeni Zimmet Ekle" })
-    .click();
+  await page.getByTestId("personel-dosya-action-surecte-islem-yap").click();
 
   const kayitModal = kayitSurecModal(page);
-  await expect(kayitModal.getByText(/Zimmet işlemi merkez ekrana taşınıyor/i)).toBeVisible({
+  await expect(kayitModal.getByRole("heading", { name: /Kayıt ve Süreç İşlemleri/i })).toBeVisible({
     timeout: 5000
   });
-
-  const gatewayButton = page.getByRole("button", {
-    name: /Personel Kart[iı]na D[oö]n ve Zimmet Ekle|Personel Kartina Don ve Zimmet Ekle/i
-  }).first();
-
-  await gatewayButton.click();
-
-  await expect(page).toHaveURL(/\/personeller\/\d+$/);
-  await assertGatewayStateCleared(page);
-  await expect(page.getByRole("tab", { name: "Zimmet" })).toHaveAttribute("aria-selected", "true");
-  await expect(page.getByRole("tab", { name: "Genel" })).not.toHaveAttribute("aria-selected", "true");
-
-  const zimmetModal = page
-    .locator(".modal-container")
-    .filter({ has: page.getByRole("heading", { name: /Yeni Zimmet Ekle/i }) })
-    .last();
-  await expect(zimmetModal).toBeVisible({ timeout: 10000 });
-  await expect(zimmetModal.locator("[name='personel-zimmet-urun-turu']")).toBeVisible();
-  return zimmetModal;
+  await expect(kayitModal.getByTestId("kayit-tab-surec")).toHaveAttribute("aria-selected", "true");
+  await kayitModal.getByRole("tab", { name: "Zimmet" }).click();
+  await expect(kayitModal.locator("[name='personel-zimmet-urun-turu']")).toBeVisible({ timeout: 10000 });
+  return kayitModal;
 }
 
 const PERSONEL_KART_TAB_NAMES = ["Genel", "Eğitim / Belgeler", "Disiplin", "Zimmet", "Süreç Geçmişi"] as const;
@@ -492,7 +474,7 @@ test.describe("personel dosyasi surec akisi", () => {
     await expect(timeline).toContainText("Is akdi sonlandirildi");
   });
 
-  test("yonetici zimmet ekler ve zimmet tablosunda kaydi gorur", async ({ page }) => {
+  test("yonetici surec uzerinden zimmet ekler ve kartta kaydi gorur", async ({ page }) => {
     await mockApi(page, "GENEL_YONETICI");
 
     await login(page, { username: "yonetici", password: "secret" });
@@ -515,46 +497,26 @@ test.describe("personel dosyasi surec akisi", () => {
     const iadeRow = zimmetRow(/Kulak/i);
     await expect(iadeRow).toHaveCount(1);
     await expect(iadeRow.getByTestId("zimmet-durum")).toContainText(/Edildi/);
+    await expect(page.getByRole("button", { name: "Yeni Zimmet Ekle" })).toHaveCount(0);
 
-    const zimmetModal = await openZimmetCreateFromPersonelDosya(page);
+    const kayitModal = await openZimmetCreateFromSurec(page);
 
-    await zimmetModal.locator("[name='personel-zimmet-urun-turu']").selectOption("TELEFON");
-    await zimmetModal.locator("[name='personel-zimmet-teslim-tarihi']").fill("2026-04-12");
-    await zimmetModal.locator("[name='personel-zimmet-teslim-eden']").fill("IK Gorevlisi");
-    await zimmetModal.locator("[name='personel-zimmet-teslim-durumu']").selectOption("YENI");
-    await zimmetModal.locator("[name='personel-zimmet-aciklama']").fill("Seri No: TEL-900");
-    await zimmetModal.getByRole("button", { name: "Kaydet" }).click();
+    await kayitModal.locator("[name='personel-zimmet-urun-turu']").selectOption("TELEFON");
+    await kayitModal.locator("[name='personel-zimmet-teslim-tarihi']").fill("2026-04-12");
+    await kayitModal.locator("[name='personel-zimmet-teslim-eden']").fill("IK Gorevlisi");
+    await kayitModal.locator("[name='personel-zimmet-teslim-durumu']").selectOption("YENI");
+    await kayitModal.locator("[name='personel-zimmet-aciklama']").fill("Seri No: TEL-900");
+    await kayitModal.locator('button[type="submit"][form="kayit-surec-zimmet-form"]').click();
+    await kayitModal.getByRole("button", { name: "Kapat" }).click();
 
+    await page.getByRole("tab", { name: "Zimmet" }).click();
     const telefonRow = zimmetRow(/Telefon/i);
     await expect(telefonRow).toHaveCount(1);
     await expect(telefonRow.getByTestId("zimmet-durum")).toContainText(/Aktif/);
     await expect(telefonRow.locator(".personel-zimmet-note-cell")).toContainText(/TEL-900/);
   });
 
-  test("zimmet gateway donusu zimmet sekmesini acar kayit modalini kapatir ve F5 sonrasi tekrar acmaz", async ({
-    page
-  }) => {
-    await mockApi(page, "GENEL_YONETICI");
-
-    await login(page, { username: "yonetici", password: "secret" });
-
-    await page.getByTestId("menu-personel-karti").click();
-    await expect(page).toHaveURL(/\/personeller$/);
-
-    await page.getByRole("link", { name: /Mehmet Kaya.*kişisinin kartını aç/i }).first().click();
-    await expect(page).toHaveURL(/\/personeller\/2$/);
-
-    await openZimmetCreateFromPersonelDosya(page);
-
-    await page.reload({ waitUntil: "domcontentloaded" });
-    await expect(page).toHaveURL(/\/personeller\/2$/);
-    await assertGatewayStateCleared(page);
-    await expect(
-      page.locator(".modal-container").filter({ has: page.getByRole("heading", { name: /Yeni Zimmet Ekle/i }) })
-    ).toHaveCount(0);
-  });
-
-  test("kart duzenle gateway donusu kayit modalini kapatir ve genel duzenleme modunu acar", async ({ page }) => {
+  test("personel karti yazma aksiyonlarini gostermez surecte islem yap kalir", async ({ page }) => {
     await mockApi(page, "GENEL_YONETICI");
 
     await login(page, { username: "yonetici", password: "secret" });
@@ -563,10 +525,15 @@ test.describe("personel dosyasi surec akisi", () => {
     await page.getByRole("link", { name: /Ayşe Yılmaz.*kişisinin kartını aç/i }).first().click();
     await expect(page).toHaveURL(/\/personeller\/1$/);
 
-    await openKartDuzenleFromActions(page);
+    await page.getByRole("button", { name: "Islemler" }).click();
+    await expect(page.getByRole("button", { name: "Kartı Düzenle" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Yeni Zimmet Ekle" })).toHaveCount(0);
+    await expect(page.getByTestId("personel-dosya-action-surecte-islem-yap")).toBeVisible();
+    await expect(page.getByText(/Kart düzenleme işlemi merkez ekrana taşınıyor/i)).toHaveCount(0);
+    await expect(page.getByText(/Zimmet işlemi merkez ekrana taşınıyor/i)).toHaveCount(0);
   });
 
-  test("kart duzenle gateway reload sonrasi kayit modalini ve gateway state tekrar acmaz", async ({ page }) => {
+  test("surec genel panelinden personel duzenleme formu acilir", async ({ page }) => {
     await mockApi(page, "GENEL_YONETICI");
 
     await login(page, { username: "yonetici", password: "secret" });
@@ -575,12 +542,9 @@ test.describe("personel dosyasi surec akisi", () => {
     await page.getByRole("link", { name: /Ayşe Yılmaz.*kişisinin kartını aç/i }).first().click();
     await expect(page).toHaveURL(/\/personeller\/1$/);
 
-    await openKartDuzenleFromActions(page);
-
-    await page.reload({ waitUntil: "domcontentloaded" });
-    await expect(page).toHaveURL(/\/personeller\/1$/);
-    await assertGatewayStateCleared(page);
-    await expect(page.locator('[name="edit-departman"]')).toHaveCount(0);
+    const kayitModal = await openPersonelEditFromSurec(page);
+    await expect(kayitModal.locator('[name="edit-departman"]')).toBeVisible();
+    await expect(page.locator(".personel-detail-card [name='edit-departman']")).toHaveCount(0);
   });
 
   test("personel karti maas eksik uyarisini gosterir", async ({ page }) => {
@@ -737,16 +701,18 @@ test.describe("personel dosyasi surec akisi", () => {
     await page.getByRole("link", { name: /Ayşe Yılmaz.*kişisinin kartını aç/i }).first().click();
     await expect(page).toHaveURL(/\/personeller\/1$/);
 
-    await openKartDuzenleFromActions(page);
+    const kayitModal = await openPersonelEditFromSurec(page);
 
-    await page.locator('[name="edit-departman"]').selectOption("2");
-    const effectiveDateInput = page.locator('[name="edit-effective-date"]');
+    await kayitModal.locator('[name="edit-departman"]').selectOption("2");
+    const effectiveDateInput = kayitModal.locator('[name="edit-effective-date"]');
     if (await effectiveDateInput.count()) {
       await effectiveDateInput.fill("2026-06-01");
     }
-    await page.getByRole("button", { name: "Kaydet" }).click();
+    await kayitModal.locator(".personel-edit-form").getByRole("button", { name: "Kaydet" }).click();
+    await expect(kayitModal.locator(".personel-create-error")).toHaveCount(0);
+    await expect(kayitModal.locator('[name="edit-departman"]')).toHaveCount(0, { timeout: 15_000 });
+    await kayitModal.getByRole("button", { name: "Kapat" }).click();
 
-    await expect(page.locator(".personel-create-error")).toHaveCount(0);
     await expect(page.locator(".personel-dosya-hero")).toContainText(/Finans/i);
 
     await page.getByRole("tab", { name: "Süreç Geçmişi" }).click();
@@ -765,14 +731,16 @@ test.describe("personel dosyasi surec akisi", () => {
     await page.locator('a[href="/personeller/1"]').first().click();
     await expect(page).toHaveURL(/\/personeller\/1$/);
 
-    await openKartDuzenleFromActions(page);
+    const kayitModal = await openPersonelEditFromSurec(page);
 
-    await page.locator('[name="edit-bagli-amir"]').selectOption("10");
-    const effectiveDateInput = page.locator('[name="edit-effective-date"]');
+    await kayitModal.locator('[name="edit-bagli-amir"]').selectOption("10");
+    const effectiveDateInput = kayitModal.locator('[name="edit-effective-date"]');
     if (await effectiveDateInput.count()) {
       await effectiveDateInput.fill("2026-06-15");
     }
-    await page.getByRole("button", { name: "Kaydet" }).click();
+    await kayitModal.locator(".personel-edit-form").getByRole("button", { name: "Kaydet" }).click();
+    await expect(kayitModal.locator('[name="edit-departman"]')).toHaveCount(0, { timeout: 15_000 });
+    await kayitModal.getByRole("button", { name: "Kapat" }).click();
 
     await page.locator("#personel-kart-tab-surec-gecmisi").click();
     const timeline = page.locator("#personel-kart-panel-surec-gecmisi").locator("[data-testid='personel-surec-timeline']");
@@ -795,12 +763,12 @@ test.describe("personel dosyasi surec akisi", () => {
     await page.getByRole("tab", { name: "Süreç Geçmişi" }).click();
     const countBefore = await readSettledSurecTimelineCount(page);
 
-    await openKartDuzenleFromActions(page);
-    await page.getByRole("button", { name: "Kaydet" }).click();
+    const kayitModal = await openPersonelEditFromSurec(page);
+    await kayitModal.locator(".personel-edit-form").getByRole("button", { name: "Kaydet" }).click();
 
-    // Düzenleme formunun kapanması kaydın tamamlandığını gösterir.
-    await expect(page.locator('[name="edit-departman"]')).toHaveCount(0, { timeout: 15_000 });
-    await expect(page.locator(".personel-create-error")).toHaveCount(0);
+    await expect(kayitModal.locator('[name="edit-departman"]')).toHaveCount(0, { timeout: 15_000 });
+    await expect(kayitModal.locator(".personel-create-error")).toHaveCount(0);
+    await kayitModal.getByRole("button", { name: "Kapat" }).click();
 
     await page.getByRole("tab", { name: "Süreç Geçmişi" }).click();
     const timelineAfter = surecTimeline(page);

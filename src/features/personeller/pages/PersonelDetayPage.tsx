@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useState } from "react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { EmptyState } from "../../../components/states/EmptyState";
 import { ErrorState } from "../../../components/states/ErrorState";
@@ -10,8 +10,6 @@ import {
   PersonelDosyaActionRow,
   PersonelDosyaHero,
   PersonelDosyaTabPanels,
-  PersonelInlineEditForm,
-  PersonelZimmetCreateModal,
   type PersonelDosyaTabId
 } from "../components/personel-dosya";
 import { usePersonelKartGatewayReturn } from "../hooks/usePersonelKartGatewayReturn";
@@ -31,21 +29,15 @@ export function PersonelDetayPage() {
   const parsedPersonelId = Number.parseInt(personelId ?? "", 10);
   const hasValidId = !Number.isNaN(parsedPersonelId) && parsedPersonelId > 0;
   const { hasPermission } = useRoleAccess();
-  const canEditPersonel = hasPermission("personeller.update");
   const canCreateSurec = hasPermission("surecler.create");
   const canViewSurecler = hasPermission("surecler.view") || hasPermission("surecler.view.sube");
   const canAccessSurecler = canCreateSurec || canViewSurecler;
   const canViewPuantaj = hasPermission("puantaj.view");
   const canViewRevizyon = hasPermission("revizyon.view");
-  const canCreateRevizyon = hasPermission("revizyon.create");
   const canViewFinans = hasPermission("finans.view");
   const canViewBordro = hasPermission("bordro_on_izleme.view");
   const canViewUcret = hasPermission("personeller.ucret.view");
-  const canManageUcret = hasPermission("personeller.ucret.manage");
   const canViewBordroKapsam = hasPermission("personel_bordro_kapsam.view");
-  const canManageBordroKapsam = hasPermission("personel_bordro_kapsam.manage");
-  const canApproveBordroKapsam = hasPermission("personel_bordro_kapsam.approve");
-  const canCreateZimmet = canEditPersonel;
 
   const initialTab = resolvePersonelTab(searchParams.get("tab")) ?? "genel-bilgiler";
   const [activeTab, setActiveTab] = useState<PersonelDosyaTabId>(initialTab);
@@ -54,7 +46,7 @@ export function PersonelDetayPage() {
   const detail = usePersonelDetail(parsedPersonelId, hasValidId, {
     canViewSurecler,
     canCreateSurec,
-    canCreateZimmet
+    canCreateZimmet: false
   });
 
   const {
@@ -62,26 +54,6 @@ export function PersonelDetayPage() {
     isLoading,
     errorMessage,
     refetch,
-    isEditing,
-    isSubmitting,
-    editErrorMessage,
-    editForm,
-    setEditForm,
-    handleEditDepartmanChange,
-    handleEditBagliAmirChange,
-    editBagliAmirGuidance,
-    discardEdit,
-    updatePersonelHandler,
-    hasLifecycleDiff,
-    personelRefs,
-    isZimmetModalOpen,
-    openZimmetModal,
-    closeZimmetModal,
-    zimmetForm,
-    setZimmetForm,
-    createZimmetHandler,
-    isZimmetSubmitting,
-    zimmetCreateErrorMessage,
     surecHistory,
     surecHistoryHasMore,
     isSurecHistoryLoading,
@@ -92,47 +64,16 @@ export function PersonelDetayPage() {
     zimmetHistoryErrorMessage
   } = detail;
 
-  const { handleOpenSurecModal, handleOpenPersonelEditGateway, handleOpenPersonelZimmetGateway } =
-    usePersonelKartGatewayReturn({
-      location,
-      navigate,
-      parsedPersonelId,
-      canEditPersonel,
-      canCreateZimmet,
-      setActiveTab,
-      setIsEditing: detail.setIsEditing,
-      openZimmetModal
-    });
+  const { handleOpenSurecModal } = usePersonelKartGatewayReturn({
+    navigate,
+    parsedPersonelId
+  });
 
   useEffect(() => {
-    const routeState = location.state as {
-      openPersonelEdit?: boolean;
-      openPersonelZimmet?: boolean;
-    } | null;
-
-    if (routeState?.openPersonelEdit || routeState?.openPersonelZimmet) {
-      setIsActionMenuOpen(false);
-      return;
-    }
-
     const fromQuery = resolvePersonelTab(searchParams.get("tab"));
     setActiveTab(fromQuery ?? "genel-bilgiler");
     setIsActionMenuOpen(false);
-  }, [parsedPersonelId, searchParams]);
-
-  useEffect(() => {
-    if (isEditing || isZimmetModalOpen) {
-      setIsActionMenuOpen(false);
-    }
-  }, [isEditing, isZimmetModalOpen]);
-
-  function handleEditSubmit(event: FormEvent<HTMLFormElement>) {
-    void updatePersonelHandler(event, canEditPersonel);
-  }
-
-  function handleZimmetCreateSubmit(event: FormEvent<HTMLFormElement>) {
-    void createZimmetHandler(event);
-  }
+  }, [parsedPersonelId, searchParams, location.pathname]);
 
   function handleOpenSurecHistory() {
     setActiveTab("surec-gecmisi");
@@ -161,78 +102,42 @@ export function PersonelDetayPage() {
         <div className="personel-detail-card">
           <PersonelDosyaHero personel={personel} canViewUcret={canViewUcret} />
 
-          {!isEditing ? (
-            <PersonelDosyaActionRow
-              canEditPersonel={canEditPersonel}
-              canCreateZimmet={canCreateZimmet}
-              canAccessSurecler={canAccessSurecler}
-              canCreateSurec={canCreateSurec}
-              isActionMenuOpen={isActionMenuOpen}
-              onToggleActionMenu={() => setIsActionMenuOpen((prev) => !prev)}
-              onCloseActionMenu={() => setIsActionMenuOpen(false)}
-              onStartEdit={handleOpenPersonelEditGateway}
-              onOpenZimmetCreate={handleOpenPersonelZimmetGateway}
-              onOpenSurecModal={handleOpenSurecModal}
-              onOpenSurecHistory={handleOpenSurecHistory}
-            />
-          ) : null}
+          <PersonelDosyaActionRow
+            canAccessSurecler={canAccessSurecler}
+            canCreateSurec={canCreateSurec}
+            isActionMenuOpen={isActionMenuOpen}
+            onToggleActionMenu={() => setIsActionMenuOpen((prev) => !prev)}
+            onCloseActionMenu={() => setIsActionMenuOpen(false)}
+            onOpenSurecModal={handleOpenSurecModal}
+            onOpenSurecHistory={handleOpenSurecHistory}
+          />
 
-          {isEditing ? (
-            <PersonelInlineEditForm
-              editForm={editForm}
-              setEditForm={setEditForm}
-              handleEditDepartmanChange={handleEditDepartmanChange}
-              handleEditBagliAmirChange={handleEditBagliAmirChange}
-              editBagliAmirGuidance={editBagliAmirGuidance}
-              personelRefs={personelRefs}
-              hasLifecycleDiff={hasLifecycleDiff}
-              editErrorMessage={editErrorMessage}
-              isSubmitting={isSubmitting}
-              canManageUcret={canManageUcret}
-              onSubmit={handleEditSubmit}
-              onDiscard={discardEdit}
-            />
-          ) : (
-            <PersonelDosyaTabPanels
-              activeTab={activeTab}
-              onTabChange={setActiveTab}
-              personel={personel}
-              surecler={surecHistory}
-              surecHistoryHasMore={surecHistoryHasMore}
-              zimmetler={zimmetHistory}
-              zimmetHistoryHasMore={zimmetHistoryHasMore}
-              isSurecHistoryLoading={isSurecHistoryLoading}
-              surecHistoryErrorMessage={surecHistoryErrorMessage}
-              isZimmetHistoryLoading={isZimmetHistoryLoading}
-              zimmetHistoryErrorMessage={zimmetHistoryErrorMessage}
-              canViewPuantaj={canViewPuantaj}
-              canViewRevizyon={canViewRevizyon}
-              canCreateRevizyon={canCreateRevizyon}
-              canCreateZimmet={canCreateZimmet}
-              canAccessSurecler={canAccessSurecler}
-              canViewFinans={canViewFinans}
-              canViewBordro={canViewBordro}
-              canViewUcret={canViewUcret}
-              canManageUcret={canManageUcret}
-              canViewBordroKapsam={canViewBordroKapsam}
-              canManageBordroKapsam={canManageBordroKapsam}
-              canApproveBordroKapsam={canApproveBordroKapsam}
-              onOpenZimmetCreate={handleOpenPersonelZimmetGateway}
-            />
-          )}
+          <PersonelDosyaTabPanels
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+            personel={personel}
+            surecler={surecHistory}
+            surecHistoryHasMore={surecHistoryHasMore}
+            zimmetler={zimmetHistory}
+            zimmetHistoryHasMore={zimmetHistoryHasMore}
+            isSurecHistoryLoading={isSurecHistoryLoading}
+            surecHistoryErrorMessage={surecHistoryErrorMessage}
+            isZimmetHistoryLoading={isZimmetHistoryLoading}
+            zimmetHistoryErrorMessage={zimmetHistoryErrorMessage}
+            canViewPuantaj={canViewPuantaj}
+            canViewRevizyon={canViewRevizyon}
+            canCreateRevizyon={false}
+            canCreateZimmet={false}
+            canAccessSurecler={canAccessSurecler}
+            canViewFinans={canViewFinans}
+            canViewBordro={canViewBordro}
+            canViewUcret={canViewUcret}
+            canManageUcret={false}
+            canViewBordroKapsam={canViewBordroKapsam}
+            canManageBordroKapsam={false}
+            canApproveBordroKapsam={false}
+          />
         </div>
-      ) : null}
-
-      {personel && canCreateZimmet ? (
-        <PersonelZimmetCreateModal
-          isOpen={isZimmetModalOpen}
-          onClose={closeZimmetModal}
-          onSubmit={handleZimmetCreateSubmit}
-          zimmetForm={zimmetForm}
-          setZimmetForm={setZimmetForm}
-          isSubmitting={isZimmetSubmitting}
-          zimmetCreateErrorMessage={zimmetCreateErrorMessage}
-        />
       ) : null}
     </section>
   );

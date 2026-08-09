@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import type { Personel } from "../../../../types/personel";
 import { AppActionDialog } from "../../../../components/modal/AppActionDialog";
 import { formatDetailValue } from "./personel-dosya-format-utils";
@@ -66,10 +67,15 @@ export function PersonelBordroKapsamSection({
     canFetch && fetchResolved && !isLoading && !errorMessage && kayitlar.length === 0;
   const showList =
     canFetch && fetchResolved && !isLoading && !errorMessage && kayitlar.length > 0;
+  const isReadOnlySurface = !canManage && !canApprove;
 
   const aktifOnayliHaric = kayitlar.find(
     (k) => k.state === "ONAYLANDI" && k.durum === "HARIC" && !k.gecerlilik_bitis
   );
+
+  const bordroHazirlikHref = `/raporlar?panel=bordro-hazirlik&tab=personel-kapsam&personelId=${personel.id}${
+    personel.sube_id != null ? `&subeId=${personel.sube_id}` : ""
+  }`;
 
   function openCancelDialog(kapsamId: number) {
     if (isCancelling) {
@@ -121,8 +127,9 @@ export function PersonelBordroKapsamSection({
     >
       <span className="personel-puantaj-summary-kicker">Bordro Kapsam</span>
       <p className="personel-puantaj-summary-note">
-        Personelin tarih aralığında maaş/bordro hesaplama kapsamına dahil veya hariç olduğu
-        kararlar burada yönetilir. Mevcut snapshot satırları değiştirilmez.
+        {isReadOnlySurface
+          ? "Bordro kapsam kararları burada salt okunur izlenir; yönetim Raporlar → Bordro Hazırlık üzerinden yapılır."
+          : "Personelin tarih aralığında maaş/bordro hesaplama kapsamına dahil veya hariç olduğu kararlar burada yönetilir. Mevcut snapshot satırları değiştirilmez."}
       </p>
 
       <p className="personel-puantaj-summary-note" data-testid="personel-bordro-kapsam-ozet">
@@ -131,6 +138,16 @@ export function PersonelBordroKapsamSection({
           ? `HARİÇ (${formatNeden(aktifOnayliHaric.neden_kodu)})`
           : "DAHİL (varsayılan)"}
       </p>
+
+      {isReadOnlySurface ? (
+        <Link
+          className="universal-btn-aux"
+          to={bordroHazirlikHref}
+          data-testid="personel-bordro-kapsam-hazirlik-link"
+        >
+          Bordro Hazırlıkta Gör
+        </Link>
+      ) : null}
 
       {canManage ? (
         <button

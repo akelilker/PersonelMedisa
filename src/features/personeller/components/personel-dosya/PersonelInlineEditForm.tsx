@@ -138,8 +138,8 @@ export function PersonelInlineEditForm({
             className="personel-form-note personel-form-note--info"
             data-testid="personel-edit-ucret-yonlendirme"
           >
-            Maaş bilgisi artık Genel sekmesindeki Ücret Geçmişi bölümünden yönetilir; yeni tutar
-            için oradan yeni ücret dönemi başlatın.
+            Maaş bilgisi Süreç → Mali İşlemler ücret geçmişinden yönetilir; yeni tutar için oradan
+            yeni ücret dönemi başlatın.
           </p>
         ) : null}
         {personelRefs.primKuraliOptions.length > 0 ? (

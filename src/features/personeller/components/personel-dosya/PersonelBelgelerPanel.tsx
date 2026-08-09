@@ -45,6 +45,8 @@ export type PersonelBelgelerPanelProps = {
   onBusyChange?: (busy: boolean) => void;
   /** External document mutation (e.g. Süreç belge durumu PUT) blocks file writes. */
   externalBusy?: boolean;
+  /** Card mounts with false; Süreç keeps default true for create/update/cancel. */
+  allowMutations?: boolean;
 };
 
 const CREATE_FORM_ID = "personel-belge-create-form";
@@ -86,7 +88,8 @@ export function PersonelBelgelerPanel({
   showBelgeDurumu = true,
   showBelgeTakipLink = true,
   onBusyChange,
-  externalBusy = false
+  externalBusy = false,
+  allowMutations = true
 }: PersonelBelgelerPanelProps) {
   const { hasPermission } = useRoleAccess();
   const canCreate = hasPermission("surecler.create");
@@ -168,7 +171,7 @@ export function PersonelBelgelerPanel({
   }, [isCreateSaving, isEditSaving, isReplaceSaving, isCancelSaving]);
 
   const isPasif = personel.aktif_durum === "PASIF";
-  const readOnly = isPasif || !canWrite;
+  const readOnly = isPasif || !canWrite || !allowMutations;
 
   const loadBelgeKayitlari = useCallback(async () => {
     setIsBelgeKayitlariLoading(true);
@@ -556,7 +559,11 @@ export function PersonelBelgelerPanel({
 
       <DossierSection
         title="Personel Belgeleri"
-        description="Eğitim, sertifika ve resmi belge kayıtları bu bölümde yönetilir."
+        description={
+          allowMutations
+            ? "Eğitim, sertifika ve resmi belge kayıtları bu bölümde yönetilir."
+            : "Belge kayıtları burada salt okunur izlenir; ekleme ve değişiklik Süreç → Belgeler üzerinden yapılır."
+        }
       >
         <div className="personel-belge-panel-head">
           {showBelgeTakipLink ? (
@@ -566,7 +573,7 @@ export function PersonelBelgelerPanel({
           ) : (
             <span />
           )}
-          {canCreate && !isPasif ? (
+          {!readOnly && canCreate ? (
             <button
               type="button"
               className="universal-btn-aux"
@@ -580,7 +587,14 @@ export function PersonelBelgelerPanel({
         </div>
 
         {readOnly && !isPasif ? (
-          <DossierRecord label="Yetki" value="Bu personel için belge düzenleme yetkiniz yok." />
+          <DossierRecord
+            label="Yetki"
+            value={
+              !allowMutations
+                ? "Belge kayıtları Personel Kartında salt okunur; düzenleme Süreç → Belgeler üzerinden yapılır."
+                : "Bu personel için belge düzenleme yetkiniz yok."
+            }
+          />
         ) : null}
 
         {actionMessage ? <DossierRecord label="Bilgi" value={actionMessage} /> : null}
@@ -653,7 +667,7 @@ export function PersonelBelgelerPanel({
                         >
                           Geçmiş
                         </button>
-                        {canUpdate && !isPasif ? (
+                        {!readOnly && canUpdate ? (
                           <button
                             type="button"
                             className="universal-btn-aux"
@@ -664,7 +678,7 @@ export function PersonelBelgelerPanel({
                             Düzenle
                           </button>
                         ) : null}
-                        {canUpdate && !isPasif ? (
+                        {!readOnly && canUpdate ? (
                           <button
                             type="button"
                             className="universal-btn-aux"
@@ -675,7 +689,7 @@ export function PersonelBelgelerPanel({
                             Dosya değiştir
                           </button>
                         ) : null}
-                        {canCancel && !isPasif ? (
+                        {!readOnly && canCancel ? (
                           <button
                             type="button"
                             className="universal-btn-aux"

@@ -4,19 +4,17 @@ import { loginAsMockRole } from "./helpers/auth";
 test.describe("S84-R2 payroll scope", () => {
   test.setTimeout(120_000);
 
-  async function openPersonelKart(page: Page, namePattern: RegExp) {
-    await page.getByTestId("menu-personel-karti").click();
-    await expect(page).toHaveURL(/\/personeller$/);
-    await page.getByRole("link", { name: namePattern }).first().click();
-    await expect(page).toHaveURL(/\/personeller\/\d+$/);
-    await page.getByRole("tab", { name: "Genel" }).click();
+  async function openBordroHazirlikPersonelKapsam(page: Page, personelId: number) {
+    await page.goto(`/raporlar?panel=bordro-hazirlik&tab=personel-kapsam&personelId=${personelId}`);
+    await expect(page.getByTestId("bordro-hazirlik-tab-personel-kapsam")).toHaveClass(/is-active/);
+    await expect(page.getByTestId("bordro-personel-kapsam-panel")).toBeVisible();
+    await expect(page.getByTestId("personel-bordro-kapsam-card")).toBeVisible({ timeout: 15_000 });
   }
 
-  test("MUHASEBE: kapsam kartı, dry-run ve taslak oluşturma", async ({ page }) => {
+  test("MUHASEBE: kapsam kartı, dry-run ve taslak oluşturma (Bordro Hazırlık)", async ({ page }) => {
     await loginAsMockRole(page, "MUHASEBE");
-    await openPersonelKart(page, /Ayşe Yılmaz.*kişisinin kartını aç/i);
+    await openBordroHazirlikPersonelKapsam(page, 1);
 
-    await expect(page.getByTestId("personel-bordro-kapsam-card")).toBeVisible();
     await expect(page.getByTestId("personel-bordro-kapsam-bos")).toBeVisible();
 
     await page.getByTestId("personel-bordro-kapsam-yeni").click();
@@ -44,11 +42,10 @@ test.describe("S84-R2 payroll scope", () => {
     await expect(page.getByTestId("personel-bordro-kapsam-liste")).toContainText(/TASLAK/);
   });
 
-  test("GENEL_YONETICI: onay yolu", async ({ page }) => {
+  test("GENEL_YONETICI: onay yolu (Bordro Hazırlık)", async ({ page }) => {
     await loginAsMockRole(page, "GENEL_YONETICI");
-    await openPersonelKart(page, /Ayşe Yılmaz.*kişisinin kartını aç/i);
+    await openBordroHazirlikPersonelKapsam(page, 1);
 
-    await expect(page.getByTestId("personel-bordro-kapsam-card")).toBeVisible();
     await page.getByTestId("personel-bordro-kapsam-yeni").click();
     const modal = page.locator(".modal-container").filter({
       has: page.getByRole("heading", { name: /Bordro Kapsam Kararı/i })
@@ -66,5 +63,16 @@ test.describe("S84-R2 payroll scope", () => {
 
     await expect(page.getByTestId("personel-bordro-kapsam-liste")).toBeVisible();
     await expect(page.getByTestId("personel-bordro-kapsam-liste")).toContainText(/ONAYLANDI/);
+  });
+
+  test("Personel Kartı bordro kapsam RO + Bordro Hazırlıkta Gör linki", async ({ page }) => {
+    await loginAsMockRole(page, "MUHASEBE");
+    await page.getByTestId("menu-personel-karti").click();
+    await page.getByRole("link", { name: /Ayşe Yılmaz.*kişisinin kartını aç/i }).first().click();
+    await page.getByRole("tab", { name: "Genel" }).click();
+
+    await expect(page.getByTestId("personel-bordro-kapsam-card")).toBeVisible();
+    await expect(page.getByTestId("personel-bordro-kapsam-yeni")).toHaveCount(0);
+    await expect(page.getByTestId("personel-bordro-kapsam-hazirlik-link")).toBeVisible();
   });
 });

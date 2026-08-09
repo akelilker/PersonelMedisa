@@ -1,60 +1,44 @@
-import { useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useMemo } from "react";
 import type { KayitModalIntent } from "../kayit-modal-contract";
+import type { PersonelSurecTab } from "../kayit-surec-constants";
 
 type UseKayitGatewayIntentArgs = {
   activeTab: "yeni-kayit" | "surec";
   initialIntent?: KayitModalIntent | null;
-  initialReturnTo?: string | null;
-  onClose: () => void;
+  onSelectPersonelTab?: (tab: PersonelSurecTab) => void;
 };
 
+/**
+ * Stale legacy intents (personel-edit/zimmet-gateway) must land in Süreç with the
+ * correct personel tab — no bounce-back-to-card write theater.
+ */
 export function useKayitGatewayIntent({
   activeTab,
   initialIntent,
-  initialReturnTo,
-  onClose
+  onSelectPersonelTab
 }: UseKayitGatewayIntentArgs) {
-  const navigate = useNavigate();
+  const legacyPersonelTab = useMemo((): PersonelSurecTab | null => {
+    if (initialIntent === "personel-zimmet-gateway") {
+      return "zimmet";
+    }
+    if (initialIntent === "personel-edit-gateway") {
+      return "genel";
+    }
+    return null;
+  }, [initialIntent]);
 
-  const showGatewayMessage = useMemo(
-    () =>
-      activeTab === "yeni-kayit" &&
-      (initialIntent === "personel-edit-gateway" || initialIntent === "personel-zimmet-gateway") &&
-      typeof initialReturnTo === "string" &&
-      initialReturnTo.length > 0,
-    [activeTab, initialIntent, initialReturnTo]
-  );
-
-  const gatewayActionLabel =
-    initialIntent === "personel-zimmet-gateway"
-      ? "Personel Kartına dön ve zimmet ekle"
-      : "Personel Kartına dön ve düzenle";
-
-  const gatewayInfoMessage =
-    initialIntent === "personel-zimmet-gateway"
-      ? "Zimmet işlemi merkez ekrana taşınıyor. Bu geçişte zimmet formu personel kartında çalışmaya devam eder."
-      : "Kart düzenleme işlemi merkez ekrana taşınıyor. Bu geçişte düzenleme formu personel kartında çalışmaya devam eder.";
-
-  const handleGatewayReturn = () => {
-    if (!initialReturnTo) {
+  useEffect(() => {
+    if (activeTab !== "surec" || !legacyPersonelTab || !onSelectPersonelTab) {
       return;
     }
-
-    onClose();
-
-    navigate(initialReturnTo, {
-      state:
-        initialIntent === "personel-zimmet-gateway"
-          ? { openPersonelZimmet: true }
-          : { openPersonelEdit: true }
-    });
-  };
+    onSelectPersonelTab(legacyPersonelTab);
+  }, [activeTab, legacyPersonelTab, onSelectPersonelTab]);
 
   return {
-    showGatewayMessage,
-    gatewayActionLabel,
-    gatewayInfoMessage,
-    handleGatewayReturn
+    legacyPersonelTab,
+    showGatewayMessage: false as const,
+    gatewayActionLabel: "",
+    gatewayInfoMessage: "",
+    handleGatewayReturn: () => undefined
   };
 }

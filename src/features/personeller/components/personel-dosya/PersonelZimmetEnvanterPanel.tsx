@@ -19,16 +19,20 @@ export function PersonelZimmetEnvanterPanel({
   errorMessage: string | null;
   zimmetler: Zimmet[];
   zimmetHistoryHasMore: boolean;
-  onOpenCreateModal: () => void;
+  onOpenCreateModal?: () => void;
 }) {
   return (
     <div className="personel-zimmet-panel">
       <div className="personel-zimmet-head">
         <div>
           <h3>Zimmet ve Envanter Kayıtları</h3>
-          <p>Kullanıcıya teslim edilen ekipmanlar ve geri alınmış kayıtlar bu listede izlenir.</p>
+          <p>
+            {canCreateZimmet
+              ? "Kullanıcıya teslim edilen ekipmanlar ve geri alınmış kayıtlar bu listede izlenir."
+              : "Zimmet kayıtları burada salt okunur izlenir; ekleme ve iade Süreç → Zimmet üzerinden yönetilir."}
+          </p>
         </div>
-        {canCreateZimmet ? (
+        {canCreateZimmet && onOpenCreateModal ? (
           <button type="button" className="universal-btn-aux" onClick={onOpenCreateModal}>
             Yeni Zimmet Ekle
           </button>

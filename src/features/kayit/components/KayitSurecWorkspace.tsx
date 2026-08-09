@@ -70,7 +70,6 @@ import {
   type BelgeDurumuItem,
   type BelgeTuru
 } from "../../../types/belgeler";
-import { useKayitGatewayIntent } from "../hooks/useKayitGatewayIntent";
 import { refetchPersonelDetailAfterIstenAyrilma, refetchSurecCachesForPersonel } from "../kayit-surec-cache";
 import { executePozisyonPersonnelUpdate } from "../kayit-surec-pozisyon";
 import {
@@ -134,8 +133,6 @@ type KayitSurecWorkspaceProps = {
   onTabChange: (tab: KayitTab) => void;
   onClose: () => void;
   initialSurecPersonelId?: string | null;
-  initialIntent?: "personel-edit-gateway" | "personel-zimmet-gateway" | null;
-  initialReturnTo?: string | null;
   primaryActionLabel: string;
   primaryFormId: string;
   onFooterModelChange?: (model: KayitModalFooterModel | null) => void;
@@ -155,8 +152,6 @@ export function KayitSurecWorkspace({
   onTabChange,
   onClose,
   initialSurecPersonelId,
-  initialIntent,
-  initialReturnTo: _initialReturnTo,
   primaryActionLabel,
   primaryFormId,
   onFooterModelChange
@@ -973,17 +968,6 @@ export function KayitSurecWorkspace({
     setDevamsizlikSubId(null);
     setSurecForm(resetSurecFormKeepingPersonel(surecForm.personelId));
   }
-
-  const selectLegacyPersonelTab = useCallback((tab: PersonelSurecTab) => {
-    setActivePersonelTab(tab);
-    setDevamsizlikSubId(null);
-  }, []);
-
-  useKayitGatewayIntent({
-    activeTab,
-    initialIntent,
-    onSelectPersonelTab: selectLegacyPersonelTab
-  });
 
   const hasInitialSurecPersonel = typeof initialSurecPersonelId === "string" && initialSurecPersonelId.length > 0;
   /** Gateway keeps classic process form on Genel; other personel tabs (Pozisyon…) use shell ops. */

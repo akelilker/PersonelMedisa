@@ -11,5 +11,4 @@ export { PersonelPuantajOzetSection } from "./PersonelPuantajOzetSection";
 export { PersonelSurecGecmisiPanel } from "./PersonelSurecGecmisiPanel";
 export { PersonelUcretCreateModal, type PersonelUcretCreateModalProps } from "./PersonelUcretCreateModal";
 export { PersonelUcretGecmisiSection } from "./PersonelUcretGecmisiSection";
-export { PersonelZimmetCreateModal, type PersonelZimmetCreateModalProps } from "./PersonelZimmetCreateModal";
 export { PersonelZimmetEnvanterPanel } from "./PersonelZimmetEnvanterPanel";

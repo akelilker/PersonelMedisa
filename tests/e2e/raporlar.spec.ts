@@ -178,8 +178,8 @@ test.describe("raporlar aylik ozet koprusu", () => {
       runtimeErrors.push(error.message);
     });
 
-    await page.goto("/raporlar");
-    await expect(page).toHaveURL(/\/raporlar(?:\?.*)?$/);
+    await page.goto("/raporlar?view=aylik-kapanis");
+    await expect(page).toHaveURL(/\/raporlar\?view=aylik-kapanis/);
     await expect(page.locator(".modal-header h2").first()).toContainText("Raporlar");
 
     const aylikSection = page.getByTestId("aylik-kapanis-ozeti-section");
@@ -227,8 +227,8 @@ test.describe("raporlar aylik ozet koprusu", () => {
       }
     });
 
-    await page.goto("/raporlar");
-    await expect(page).toHaveURL(/\/raporlar(?:\?.*)?$/);
+    await page.goto("/raporlar?view=aylik-kapanis");
+    await expect(page).toHaveURL(/\/raporlar\?view=aylik-kapanis/);
 
     const aylikSection = page.getByTestId("aylik-kapanis-ozeti-section");
     await expect(aylikSection).toBeVisible();
@@ -617,6 +617,9 @@ test.describe("raporlar detayli liste smoke", () => {
       runtimeErrors.push(error.message);
     });
 
+    await page.goto("/raporlar?view=aylik-kapanis");
+    await expect(page).toHaveURL(/\/raporlar\?view=aylik-kapanis/);
+
     const aylikSection = page.getByTestId("aylik-kapanis-ozeti-section");
     await expect(aylikSection).toBeVisible();
     await expect(aylikSection.locator("h2")).toContainText("Aylık Kapanış Özeti");
@@ -655,18 +658,18 @@ test.describe("raporlar rol ve aylik filtre smoke", () => {
 
       await mockApi(page, role);
       await login(page, ROLE_LOGIN[role]);
-      await page.goto("/raporlar");
-      await expect(page).toHaveURL(/\/raporlar$/);
+      await page.goto("/raporlar?view=aylik-kapanis");
+      await expect(page).toHaveURL(/\/raporlar\?view=aylik-kapanis/);
       await expect(page.locator(".modal-header h2").first()).toContainText("Raporlar");
-
-      await expect(page.locator('[name="rapor-turu"]')).toBeVisible();
-      await expect(page.getByTestId("raporlar-submit-run")).toBeVisible();
 
       const aylikSection = page.getByTestId("aylik-kapanis-ozeti-section");
       if (ROLE_AYLIK_SECTION_VISIBLE[role]) {
         await expect(aylikSection).toBeVisible();
+        await expect(page.getByTestId("raporlar-liste-panel")).toHaveCount(0);
       } else {
         await expect(aylikSection).toHaveCount(0);
+        await expect(page.locator('[name="rapor-turu"]')).toBeVisible();
+        await expect(page.getByTestId("raporlar-submit-run")).toBeVisible();
       }
 
       expect(runtimeErrors).toEqual([]);
@@ -683,8 +686,8 @@ test.describe("raporlar rol ve aylik filtre smoke", () => {
 
     await mockApi(page, "GENEL_YONETICI");
     await login(page, ROLE_LOGIN.GENEL_YONETICI);
-    await page.goto("/raporlar");
-    await expect(page).toHaveURL(/\/raporlar$/);
+    await page.goto("/raporlar?view=aylik-kapanis");
+    await expect(page).toHaveURL(/\/raporlar\?view=aylik-kapanis/);
 
     const aylikSection = page.getByTestId("aylik-kapanis-ozeti-section");
     await expect(aylikSection).toBeVisible();
@@ -750,8 +753,8 @@ test.describe("raporlar rol ve aylik filtre smoke", () => {
 
     await mockApi(page, "GENEL_YONETICI");
     await login(page, ROLE_LOGIN.GENEL_YONETICI);
-    await page.goto("/raporlar");
-    await expect(page).toHaveURL(/\/raporlar$/);
+    await page.goto("/raporlar?view=aylik-kapanis");
+    await expect(page).toHaveURL(/\/raporlar\?view=aylik-kapanis/);
 
     const aylikSection = page.getByTestId("aylik-kapanis-ozeti-section");
     await expect(aylikSection).toBeVisible();
@@ -784,8 +787,8 @@ test.describe("raporlar rol ve aylik filtre smoke", () => {
 
     await mockApi(page, "GENEL_YONETICI");
     await login(page, ROLE_LOGIN.GENEL_YONETICI);
-    await page.goto("/raporlar");
-    await expect(page).toHaveURL(/\/raporlar$/);
+    await page.goto("/raporlar?view=aylik-kapanis");
+    await expect(page).toHaveURL(/\/raporlar\?view=aylik-kapanis/);
 
     const aylikSection = page.getByTestId("aylik-kapanis-ozeti-section");
     await expect(aylikSection).toBeVisible();
@@ -816,8 +819,8 @@ test.describe("raporlar rol ve aylik filtre smoke", () => {
 
       await mockApi(page, role);
       await login(page, ROLE_LOGIN[role]);
-      await page.goto("/raporlar");
-      await expect(page).toHaveURL(/\/raporlar$/);
+      await page.goto("/raporlar?view=aylik-kapanis");
+      await expect(page).toHaveURL(/\/raporlar\?view=aylik-kapanis/);
 
       const aylikSection = page.getByTestId("aylik-kapanis-ozeti-section");
       await expect(aylikSection).toBeVisible();

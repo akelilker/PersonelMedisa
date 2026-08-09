@@ -2,9 +2,10 @@
 
 ## Status
 
-**PROPOSED** — I13-A decision-only (docs). Runtime kod, migration, API davranışı, production yazma yok.
+**PROPOSED** — I13-A decision-only (docs). Runtime kod, migration, API davranışı, production yazma yok. Not ACCEPTED until final user review after default-branch invariant clarification.
 
-**Base main:** `733f98092da9f6106e4d5cb3220259b8128fb39d`
+**Base main:** `733f98092da9f6106e4d5cb3220259b8128fb39d`  
+**PR:** `#134` (Draft)
 
 ## Context
 

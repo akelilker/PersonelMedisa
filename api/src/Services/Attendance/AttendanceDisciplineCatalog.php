@@ -139,6 +139,8 @@ final class AttendanceDisciplineCatalog
     /** @return array<int, string> */
     public static function ikReviewRoles()
     {
-        return ['IK_BORDRO', 'GENEL_YONETICI', 'MUHASEBE', 'BOLUM_YONETICISI'];
+        // Canonical review ownership is RolePermissions::disiplin.review.
+        // Keep helper aligned: IK review + GY support review only.
+        return ['IK_BORDRO', 'GENEL_YONETICI'];
     }
 }

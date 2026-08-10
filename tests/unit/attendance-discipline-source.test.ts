@@ -31,6 +31,25 @@ describe("attendance discipline source contract", () => {
     expect(getRolePermissions("BOLUM_YONETICISI")).toContain("puantaj.olay_karar.decide");
     expect(getRolePermissions("IK_BORDRO")).not.toContain("disiplin.final_decision");
     expect(getRolePermissions("IK_BORDRO")).not.toContain("puantaj.olay_karar.decide");
+    expect(getRolePermissions("MUHASEBE")).not.toContain("disiplin.review");
+    expect(getRolePermissions("MUHASEBE")).toContain("disiplin.view");
+  });
+
+  it("requires decision reason in UI and wires closeNoAction to final_decision only", () => {
+    const panel = readFileSync(
+      resolve(root, "src/features/puantaj/components/PuantajOlayKararPanel.tsx"),
+      "utf8"
+    );
+    expect(panel).toContain("Karar gerekçesi zorunludur");
+    expect(panel).not.toContain("İsteğe bağlı gerekçe");
+    expect(panel).toContain("disabled={isSaving || !gerekce.trim()}");
+
+    const vakaPanel = readFileSync(
+      resolve(root, "src/features/surecler/components/DisiplinVakaPanel.tsx"),
+      "utf8"
+    );
+    expect(vakaPanel).toContain("const canCloseNoAction = canFinalDecision");
+    expect(vakaPanel).not.toContain("canReview || canFinalDecision");
   });
 
   it("keeps migration tip at 052 and audit table in migration", () => {
@@ -61,6 +80,7 @@ describe("attendance discipline source contract", () => {
     const snapshot = readFileSync(resolve(root, "api/src/Services/MaasHesaplamaSnapshotService.php"), "utf8");
     expect(snapshot).toContain("attachAttendanceDecisions");
     expect(snapshot).toContain("ATTENDANCE_DECISION_PENDING");
+    expect(snapshot).toContain("ATTENDANCE_OFFICIAL_PROCESS_PENDING");
     expect(snapshot).toContain("olay_kararlari");
 
     const aday = readFileSync(resolve(root, "api/src/Services/MaasHesaplamaAdayService.php"), "utf8");

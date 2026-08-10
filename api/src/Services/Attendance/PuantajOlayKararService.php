@@ -42,16 +42,19 @@ final class PuantajOlayKararService
         $tarih = trim((string) ($payload['tarih'] ?? ''));
         $olayTuru = strtoupper(trim((string) ($payload['olay_turu'] ?? '')));
         $karar = strtoupper(trim((string) ($payload['karar'] ?? '')));
-        $gerekce = isset($payload['gerekce']) ? trim((string) $payload['gerekce']) : null;
-        if ($gerekce === '') {
-            $gerekce = null;
-        }
+        $gerekce = isset($payload['gerekce']) ? trim((string) $payload['gerekce']) : '';
 
         if ($personelId < 1 || $tarih === '' || !in_array($olayTuru, AttendanceDisciplineCatalog::olayTurleri(), true)) {
             throw new RuntimeException('Gecersiz olay karar payload.');
         }
         if (!in_array($karar, AttendanceDisciplineCatalog::kararTurleri(), true)) {
             throw new RuntimeException('Gecersiz karar degeri.');
+        }
+        if ($karar === AttendanceDisciplineCatalog::KARAR_BEKLIYOR) {
+            throw new RuntimeException('VALIDATION_ERROR: BEKLIYOR manager decision olarak yazilamaz.');
+        }
+        if ($gerekce === '') {
+            throw new RuntimeException('VALIDATION_ERROR: karar gerekcesi zorunludur.');
         }
 
         $puantaj = self::loadCanonicalPuantaj($pdo, $personelId, $tarih);
@@ -73,14 +76,22 @@ final class PuantajOlayKararService
 
         self::assertKararAllowedForEvent($olayTuru, $karar, $canonicalRaw);
 
-        $durumuBildirdi = array_key_exists('durumu_bildirdi_mi', $payload)
-            ? self::nullableBool($payload['durumu_bildirdi_mi'])
-            : self::nullableBool($puantaj['durumu_bildirdi_mi'] ?? null);
+        $canonicalNotice = self::nullableBool($puantaj['durumu_bildirdi_mi'] ?? null);
+        if (array_key_exists('durumu_bildirdi_mi', $payload) && $payload['durumu_bildirdi_mi'] !== '') {
+            $clientNotice = self::nullableBool($payload['durumu_bildirdi_mi']);
+            if ($clientNotice !== $canonicalNotice) {
+                throw new RuntimeException('VALIDATION_ERROR: durumu_bildirdi_mi canonical degerle eslesmiyor.');
+            }
+        }
 
         $gunlukPuantajId = (int) $puantaj['id'];
-        $gunlukBildirimId = isset($payload['gunluk_bildirim_id']) ? (int) $payload['gunluk_bildirim_id'] : null;
-        if ($gunlukBildirimId !== null && $gunlukBildirimId < 1) {
-            $gunlukBildirimId = null;
+        $gunlukBildirimId = null;
+        if (isset($payload['gunluk_bildirim_id']) && $payload['gunluk_bildirim_id'] !== null && $payload['gunluk_bildirim_id'] !== '') {
+            $candidateBildirimId = (int) $payload['gunluk_bildirim_id'];
+            if ($candidateBildirimId > 0) {
+                self::assertBildirimOwnership($pdo, $candidateBildirimId, $personelId, $tarih);
+                $gunlukBildirimId = $candidateBildirimId;
+            }
         }
 
         $sourceHash = self::computeSourceHash([
@@ -93,13 +104,14 @@ final class PuantajOlayKararService
         $actorId = isset($user['id']) ? (int) $user['id'] : null;
         $existing = self::getByPersonelTarihOlay($pdo, $personelId, $tarih, $olayTuru);
 
-        // Idempotent no-op: same karar + same hash + same actor snapshot → no audit duplicate.
+        // Exact idempotent retry only: same karar/raw/gerekce/actor/hash → no duplicate audit.
         if (
             $existing
             && (string) $existing['karar'] === $karar
             && (string) $existing['source_hash'] === $sourceHash
             && (int) $existing['raw_dakika'] === $canonicalRaw
-            && (string) ($existing['gerekce'] ?? '') === (string) ($gerekce ?? '')
+            && (string) ($existing['gerekce'] ?? '') === $gerekce
+            && (int) ($existing['karar_veren_user_id'] ?? 0) === (int) ($actorId ?? 0)
         ) {
             return $existing;
         }
@@ -121,7 +133,7 @@ final class PuantajOlayKararService
                 );
                 $stmt->execute([
                     'raw_dakika' => $canonicalRaw,
-                    'durumu_bildirdi_mi' => $durumuBildirdi,
+                    'durumu_bildirdi_mi' => $canonicalNotice,
                     'karar' => $karar,
                     'karar_veren_user_id' => $actorId,
                     'gerekce' => $gerekce,
@@ -166,7 +178,7 @@ final class PuantajOlayKararService
                 'gunluk_bildirim_id' => $gunlukBildirimId,
                 'olay_turu' => $olayTuru,
                 'raw_dakika' => $canonicalRaw,
-                'durumu_bildirdi_mi' => $durumuBildirdi,
+                'durumu_bildirdi_mi' => $canonicalNotice,
                 'karar' => $karar,
                 'karar_veren_user_id' => $actorId,
                 'gerekce' => $gerekce,
@@ -332,6 +344,23 @@ final class PuantajOlayKararService
                     . ' dakika icin gecerlidir.'
                 );
             }
+        }
+    }
+
+    private static function assertBildirimOwnership(PDO $pdo, $bildirimId, $personelId, $tarih)
+    {
+        $stmt = $pdo->prepare(
+            'SELECT id FROM gunluk_bildirimler
+             WHERE id = :id AND personel_id = :personel_id AND tarih = :tarih
+             LIMIT 1'
+        );
+        $stmt->execute([
+            'id' => (int) $bildirimId,
+            'personel_id' => (int) $personelId,
+            'tarih' => (string) $tarih,
+        ]);
+        if ($stmt->fetchColumn() === false) {
+            throw new RuntimeException('VALIDATION_ERROR: gunluk_bildirim_id personel/tarih ile eslesmiyor.');
         }
     }
 

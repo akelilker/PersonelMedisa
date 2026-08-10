@@ -293,7 +293,6 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "revizyon.view_audit_history",
     "sgk.manuel_kod_override",
     "disiplin.view",
-    "disiplin.review",
     "puantaj.olay_karar.view"
   ],
   BIRIM_AMIRI: [

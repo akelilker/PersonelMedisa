@@ -71,7 +71,7 @@ export function DisiplinVakaPanel({ surecId }: { surecId: number }) {
   const canReview = hasPermission("disiplin.review");
   const canDefenseManage = hasPermission("disiplin.defense_manage");
   const canFinalDecision = hasPermission("disiplin.final_decision");
-  const canCloseNoAction = canReview || canFinalDecision;
+  const canCloseNoAction = canFinalDecision;
 
   const [vaka, setVaka] = useState<DisiplinVaka | null>(null);
   const [isLoading, setIsLoading] = useState(true);

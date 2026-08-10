@@ -113,10 +113,10 @@ final class DisiplinAdayProjectionService
     public static function evaluateDailyCandidateKinds(array $row)
     {
         $kinds = [];
-        $bildirdi = self::isTruthy($row['durumu_bildirdi_mi'] ?? null);
         $gec = isset($row['gec_kalma_dakika']) ? (int) $row['gec_kalma_dakika'] : 0;
 
-        if ($gec > 0 && !$bildirdi) {
+        // Tri-state: only explicit 0 is unannounced. NULL/unknown ≠ unannounced.
+        if ($gec > 0 && self::isExplicitlyUnannounced($row['durumu_bildirdi_mi'] ?? null)) {
             $kinds[] = AttendanceDisciplineCatalog::CANDIDATE_GEC_KALMA;
         }
 
@@ -346,22 +346,19 @@ final class DisiplinAdayProjectionService
     /** @param array<string, mixed> $row */
     private static function isUnannouncedFullDayAbsence(array $row)
     {
-        if (self::isTruthy($row['durumu_bildirdi_mi'] ?? null)) {
+        // Automatic candidate requires explicit unauthorized evidence — never fabricate from unknowns.
+        if (!self::isExplicitlyUnannounced($row['durumu_bildirdi_mi'] ?? null)) {
             return false;
         }
 
         $dayanak = trim((string) ($row['dayanak'] ?? ''));
-        if (AttendanceDisciplineCatalog::isAuthorizedAbsenceDayanak($dayanak)) {
-            return false;
-        }
-        // Only unannounced unauthorized absence (Yok_Izinsiz or empty dayanak with absence signals).
-        if ($dayanak !== '' && $dayanak !== 'Yok_Izinsiz') {
+        if ($dayanak !== 'Yok_Izinsiz') {
             return false;
         }
 
         $gunTipi = strtoupper(trim((string) ($row['gun_tipi'] ?? '')));
         if ($gunTipi === 'TAM_GUN_DEVAMSIZLIK') {
-            return $dayanak === 'Yok_Izinsiz' || $dayanak === '';
+            return true;
         }
 
         $hareket = self::normalizeToken($row['hareket_durumu'] ?? null);
@@ -369,14 +366,24 @@ final class DisiplinAdayProjectionService
             $gec = isset($row['gec_kalma_dakika']) ? (int) $row['gec_kalma_dakika'] : 0;
             $erken = isset($row['erken_cikis_dakika']) ? (int) $row['erken_cikis_dakika'] : 0;
             $net = isset($row['net_calisma_suresi_dakika']) ? (int) $row['net_calisma_suresi_dakika'] : 0;
-            if (!($gec === 0 && $erken === 0 && $net === 0)) {
-                return false;
-            }
 
-            return $dayanak === 'Yok_Izinsiz' || $dayanak === '';
+            return $gec === 0 && $erken === 0 && $net === 0;
         }
 
         return false;
+    }
+
+    /** Explicit 0 only — NULL/unknown is not unannounced. @param mixed $value */
+    private static function isExplicitlyUnannounced($value)
+    {
+        if ($value === null || $value === '') {
+            return false;
+        }
+        if (is_bool($value)) {
+            return $value === false;
+        }
+
+        return (int) $value === 0;
     }
 
     /** @param mixed $value */

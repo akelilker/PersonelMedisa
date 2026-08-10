@@ -677,10 +677,16 @@ class MaasHesaplamaSnapshotService
                 $gec = isset($row['gec_kalma_dakika']) ? (int) $row['gec_kalma_dakika'] : 0;
                 $erken = isset($row['erken_cikis_dakika']) ? (int) $row['erken_cikis_dakika'] : 0;
                 if ($gec > 0 || $erken > 0) {
+                    $lateReason = (string) ($row['attendance_late_block_reason'] ?? '');
+                    $earlyReason = (string) ($row['attendance_early_block_reason'] ?? '');
+                    $isOfficialPending = $lateReason === 'OFFICIAL_PROCESS_PENDING'
+                        || $earlyReason === 'OFFICIAL_PROCESS_PENDING';
                     $items[] = self::issue(
                         self::SEVERITY_BLOCKER,
-                        'ATTENDANCE_DECISION_PENDING',
-                        'Onceden bildirilmis gec kalma/erken cikis icin yonetici karari bekleniyor.',
+                        $isOfficialPending ? 'ATTENDANCE_OFFICIAL_PROCESS_PENDING' : 'ATTENDANCE_DECISION_PENDING',
+                        $isOfficialPending
+                            ? 'Resmi surec kaniti olmadan OFFICIAL_PROCESS_REQUIRED kararinda bordro olusturulamaz.'
+                            : 'Onceden bildirilmis gec kalma/erken cikis icin yonetici karari bekleniyor.',
                         'puantaj',
                         isset($row['id']) ? (int) $row['id'] : null,
                         $personelId,
@@ -688,6 +694,8 @@ class MaasHesaplamaSnapshotService
                             'tarih' => $tarih,
                             'gec_kalma_dakika' => $gec,
                             'erken_cikis_dakika' => $erken,
+                            'late_reason' => $lateReason !== '' ? $lateReason : null,
+                            'early_reason' => $earlyReason !== '' ? $earlyReason : null,
                         ]
                     );
                 }

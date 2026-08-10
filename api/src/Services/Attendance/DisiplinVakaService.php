@@ -125,6 +125,13 @@ final class DisiplinVakaService
         if ($deadlineAt === '' || $yer === '' || $konu === '') {
             throw new RuntimeException('Savunma talebi icin deadline_at, yer ve konu zorunludur.');
         }
+        $deadlineTs = strtotime($deadlineAt);
+        if ($deadlineTs === false) {
+            throw new RuntimeException('VALIDATION_ERROR: deadline_at gecerli bir tarih/saat olmali.');
+        }
+        if ($deadlineTs <= time()) {
+            throw new RuntimeException('VALIDATION_ERROR: deadline_at gelecekte olmali.');
+        }
 
         $vaka = self::requireVaka($pdo, (int) $vakaId);
         self::resolveDeadlineState($pdo, $vaka, null);
@@ -290,11 +297,7 @@ final class DisiplinVakaService
      */
     public static function closeNoAction(PDO $pdo, array $user, $vakaId, $gerekce = null)
     {
-        if (!RolePermissions::has($user, 'disiplin.final_decision')
-            && !RolePermissions::has($user, 'disiplin.review')
-        ) {
-            throw new RuntimeException('Islemsiz kapatma yetkisi yok.');
-        }
+        self::assertFinalDecisionActor($user);
 
         $vaka = self::requireVaka($pdo, (int) $vakaId);
         $from = (string) $vaka['lifecycle_state'];
@@ -359,27 +362,42 @@ final class DisiplinVakaService
             return $vaka;
         }
 
-        $stmt = $pdo->prepare(
-            'UPDATE ' . self::TABLE . '
-             SET lifecycle_state = :to_state
-             WHERE id = :id AND lifecycle_state = :from_state'
-        );
-        $stmt->execute([
-            'to_state' => AttendanceDisciplineCatalog::LIFECYCLE_SAVUNMA_SUNULMADI,
-            'from_state' => AttendanceDisciplineCatalog::LIFECYCLE_SAVUNMA_BEKLENIYOR,
-            'id' => (int) $vaka['id'],
-        ]);
-        if ($stmt->rowCount() > 0) {
-            self::writeAudit(
-                $pdo,
-                (int) $vaka['id'],
-                'SAVUNMA_DEADLINE_GECDI',
-                AttendanceDisciplineCatalog::LIFECYCLE_SAVUNMA_BEKLENIYOR,
-                AttendanceDisciplineCatalog::LIFECYCLE_SAVUNMA_SUNULMADI,
-                $actorUserId,
-                ['deadline_at' => $deadline]
+        $ownsTx = !$pdo->inTransaction();
+        if ($ownsTx) {
+            $pdo->beginTransaction();
+        }
+        try {
+            $stmt = $pdo->prepare(
+                'UPDATE ' . self::TABLE . '
+                 SET lifecycle_state = :to_state
+                 WHERE id = :id AND lifecycle_state = :from_state'
             );
-            self::advanceToKararBekliyor($pdo, (int) $vaka['id'], $actorUserId);
+            $stmt->execute([
+                'to_state' => AttendanceDisciplineCatalog::LIFECYCLE_SAVUNMA_SUNULMADI,
+                'from_state' => AttendanceDisciplineCatalog::LIFECYCLE_SAVUNMA_BEKLENIYOR,
+                'id' => (int) $vaka['id'],
+            ]);
+            if ($stmt->rowCount() > 0) {
+                self::writeAudit(
+                    $pdo,
+                    (int) $vaka['id'],
+                    'SAVUNMA_DEADLINE_GECDI',
+                    AttendanceDisciplineCatalog::LIFECYCLE_SAVUNMA_BEKLENIYOR,
+                    AttendanceDisciplineCatalog::LIFECYCLE_SAVUNMA_SUNULMADI,
+                    $actorUserId,
+                    ['deadline_at' => $deadline]
+                );
+                // Stay at SAVUNMA_SUNULMADI: no automatic punishment / forfeiture.
+                // Late defense may still arrive; BOLUM may decide from this state.
+            }
+            if ($ownsTx) {
+                $pdo->commit();
+            }
+        } catch (\Throwable $e) {
+            if ($ownsTx && $pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $e;
         }
 
         return $vaka;

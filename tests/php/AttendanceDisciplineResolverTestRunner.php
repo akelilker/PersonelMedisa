@@ -58,12 +58,37 @@ $r6 = adrLate([
 ]);
 adrAssert($r6['block'] === true, 'S6 notified BEKLIYOR blocks');
 
-// Scenario 7: OFFICIAL_PROCESS_REQUIRED → effective 0
+// Scenario 7: OFFICIAL_PROCESS_REQUIRED without evidence → BLOCK
 $r7 = adrLate([
     'gec_kalma_dakika' => 45,
     'puantaj_olay_karar' => AttendanceDisciplineCatalog::KARAR_OFFICIAL_PROCESS_REQUIRED,
 ]);
-adrAssert($r7['effective'] === 0, 'S7 OFFICIAL_PROCESS effective 0');
+adrAssert($r7['block'] === true, 'S7 OFFICIAL without evidence blocks');
+adrAssert($r7['reason'] === 'OFFICIAL_PROCESS_PENDING', 'S7 OFFICIAL pending reason');
+adrAssert($r7['effective'] === 0, 'S7 OFFICIAL pending effective 0 interim');
+
+// Scenario 7b: OFFICIAL with canonical approved evidence → no block, zero deduction
+$r7b = adrLate([
+    'gec_kalma_dakika' => 45,
+    'dayanak' => 'Yillik_Izin',
+    'puantaj_olay_karar' => AttendanceDisciplineCatalog::KARAR_OFFICIAL_PROCESS_REQUIRED,
+]);
+adrAssert($r7b['block'] === false, 'S7b OFFICIAL with evidence not blocked');
+adrAssert($r7b['effective'] === 0, 'S7b approved official no duplicate deduction');
+
+$r7c = adrEarly([
+    'erken_cikis_dakika' => 30,
+    'puantaj_olay_karar' => AttendanceDisciplineCatalog::KARAR_OFFICIAL_PROCESS_REQUIRED,
+]);
+adrAssert($r7c['block'] === true, 'S7c early OFFICIAL without evidence blocks');
+
+$r7d = adrEarly([
+    'erken_cikis_dakika' => 30,
+    'dayanak' => 'Ucretli_Izinli',
+    'puantaj_olay_karar' => AttendanceDisciplineCatalog::KARAR_OFFICIAL_PROCESS_REQUIRED,
+]);
+adrAssert($r7d['block'] === false, 'S7d early OFFICIAL with evidence not blocked');
+adrAssert($r7d['effective'] === 0, 'S7d early approved official no duplicate deduction');
 
 // Scenario 8: zero raw late
 $r8 = adrLate(['gec_kalma_dakika' => 0]);
@@ -145,6 +170,46 @@ adrAssert(
     in_array(AttendanceDisciplineCatalog::CANDIDATE_TAM_GUN_DEVAMSIZLIK, $kUnauthorized, true),
     'Yok_Izinsiz unannounced full-day candidate'
 );
+
+$kEmptyDayanak = DisiplinAdayProjectionService::evaluateDailyCandidateKinds([
+    'personel_id' => 1,
+    'tarih' => '2026-08-04',
+    'hareket_durumu' => 'Gelmedi',
+    'dayanak' => '',
+    'gec_kalma_dakika' => 0,
+    'erken_cikis_dakika' => 0,
+    'net_calisma_suresi_dakika' => 0,
+    'durumu_bildirdi_mi' => 0,
+]);
+adrAssert($kEmptyDayanak === [], 'empty dayanak no full-day candidate');
+
+$kNullNoticeFull = DisiplinAdayProjectionService::evaluateDailyCandidateKinds([
+    'personel_id' => 1,
+    'tarih' => '2026-08-04',
+    'hareket_durumu' => 'Gelmedi',
+    'dayanak' => 'Yok_Izinsiz',
+    'gec_kalma_dakika' => 0,
+    'erken_cikis_dakika' => 0,
+    'net_calisma_suresi_dakika' => 0,
+    'durumu_bildirdi_mi' => null,
+]);
+adrAssert($kNullNoticeFull === [], 'Yok_Izinsiz + notice NULL no candidate');
+
+$kNullNoticeLate = DisiplinAdayProjectionService::evaluateDailyCandidateKinds([
+    'personel_id' => 1,
+    'tarih' => '2026-08-01',
+    'gec_kalma_dakika' => 20,
+    'durumu_bildirdi_mi' => null,
+]);
+adrAssert($kNullNoticeLate === [], 'NULL notice late no habersiz candidate');
+
+$kAnnouncedLate = DisiplinAdayProjectionService::evaluateDailyCandidateKinds([
+    'personel_id' => 1,
+    'tarih' => '2026-08-01',
+    'gec_kalma_dakika' => 20,
+    'durumu_bildirdi_mi' => 1,
+]);
+adrAssert($kAnnouncedLate === [], 'announced late no habersiz candidate');
 
 foreach (['Ucretli_Izinli', 'Raporlu_Hastalik', 'Raporlu_Is_Kazasi', 'Gorevde_Calisma'] as $authorizedDayanak) {
     $k = DisiplinAdayProjectionService::evaluateDailyCandidateKinds([
@@ -243,5 +308,17 @@ $liveKesinti = [
 ];
 $reverseAnnotated = AttendancePayrollEffectResolver::annotatePuantajlar([$reverseSealed], $liveKesinti);
 adrAssert((int) $reverseAnnotated[0]['gec_kalma_effective_dakika'] === 0, 'sealed TOLERANS survives live KESINTI change');
+
+// sealed notice must not be overwritten by decision metadata
+$noticeSealed = AttendancePayrollEffectResolver::applyToPuantajRow(
+    ['gec_kalma_dakika' => 20, 'erken_cikis_dakika' => 0, 'durumu_bildirdi_mi' => 1],
+    [
+        'karar' => AttendanceDisciplineCatalog::KARAR_KESINTI_UYGULA,
+        'olay_turu' => AttendanceDisciplineCatalog::OLAY_GEC_KALMA,
+        'durumu_bildirdi_mi' => 0,
+    ]
+);
+adrAssert((int) $noticeSealed['durumu_bildirdi_mi'] === 1, 'sealed notice not overwritten by decision');
+adrAssert((int) $noticeSealed['gec_kalma_effective_dakika'] === 20, 'kesinti still applies with sealed notice');
 
 echo 'verify-attendance-discipline-resolver: OK' . PHP_EOL;

@@ -107,6 +107,11 @@ export function PuantajOlayKararPanel({ personelId, tarih, puantaj }: PuantajOla
     if (!canDecide) {
       return;
     }
+    const reason = gerekce.trim();
+    if (!reason) {
+      setErrorMessage("Karar gerekçesi zorunludur.");
+      return;
+    }
     setIsSaving(true);
     setErrorMessage(null);
     setSuccessMessage(null);
@@ -117,8 +122,7 @@ export function PuantajOlayKararPanel({ personelId, tarih, puantaj }: PuantajOla
         olay_turu: olayTuru,
         raw_dakika: rawDakika,
         karar,
-        gerekce: gerekce.trim() || undefined,
-        durumu_bildirdi_mi: puantaj?.durumu_bildirdi_mi ?? null
+        gerekce: reason
       });
       setSuccessMessage("Olay kararı kaydedildi.");
       setGerekce("");
@@ -213,7 +217,7 @@ export function PuantajOlayKararPanel({ personelId, tarih, puantaj }: PuantajOla
                     key={action}
                     type="button"
                     className="universal-btn-aux"
-                    disabled={isSaving}
+                    disabled={isSaving || !gerekce.trim()}
                     data-testid={`puantaj-olay-karar-action-${action}`}
                     onClick={() => void submitKarar(event.olayTuru, event.rawDakika, action)}
                   >
@@ -234,7 +238,8 @@ export function PuantajOlayKararPanel({ personelId, tarih, puantaj }: PuantajOla
           value={gerekce}
           onChange={setGerekce}
           rows={2}
-          placeholder="İsteğe bağlı gerekçe"
+          required
+          placeholder="Zorunlu gerekçe"
         />
       ) : null}
     </div>

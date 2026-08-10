@@ -7,6 +7,7 @@ namespace Medisa\Api\Services\Attendance;
 /**
  * Pure attendance payroll effect resolver — no DB access.
  * Raw gec_kalma_dakika / erken_cikis_dakika are never mutated.
+ * Sealed/canonical puantaj notice fact is never overwritten by decision metadata.
  */
 final class AttendancePayrollEffectResolver
 {
@@ -19,6 +20,7 @@ final class AttendancePayrollEffectResolver
         $raw = isset($row['gec_kalma_dakika']) ? (int) $row['gec_kalma_dakika'] : 0;
         $karar = self::normalizeKarar($row);
         $bildirdi = self::isTruthy($row['durumu_bildirdi_mi'] ?? null);
+        $approved = self::hasApprovedOfficialProcess($row);
 
         if (
             $karar === AttendanceDisciplineCatalog::KARAR_TOLERANS_UYGULA
@@ -27,17 +29,23 @@ final class AttendancePayrollEffectResolver
             return self::result($raw, 0, $karar, false, 'TOLERANS_UYGULA');
         }
         if ($karar === AttendanceDisciplineCatalog::KARAR_TOLERANS_UYGULA) {
-            // Invalid tolerance (>35): fall through to actual raw deduction.
             $karar = AttendanceDisciplineCatalog::KARAR_KESINTI_UYGULA;
         }
         if ($karar === AttendanceDisciplineCatalog::KARAR_KESINTI_UYGULA) {
             return self::result($raw, $raw, $karar, false, 'KESINTI_UYGULA');
         }
+        if ($karar === AttendanceDisciplineCatalog::KARAR_OFFICIAL_PROCESS_REQUIRED) {
+            if ($approved) {
+                return self::result($raw, 0, $karar, false, 'OFFICIAL_PROCESS_APPROVED');
+            }
+
+            return self::result($raw, 0, $karar, true, 'OFFICIAL_PROCESS_PENDING');
+        }
+        if ($approved && $raw > 0) {
+            return self::result($raw, 0, $karar, false, 'OFFICIAL_PROCESS_APPROVED');
+        }
         if ($bildirdi && ($karar === null || $karar === AttendanceDisciplineCatalog::KARAR_BEKLIYOR)) {
             return self::result($raw, 0, $karar, true, 'PENDING_MANAGER_DECISION');
-        }
-        if ($karar === AttendanceDisciplineCatalog::KARAR_OFFICIAL_PROCESS_REQUIRED) {
-            return self::result($raw, 0, $karar, false, 'OFFICIAL_PROCESS_REQUIRED');
         }
 
         return self::result($raw, $raw > 0 ? $raw : 0, $karar, false, null);
@@ -52,9 +60,17 @@ final class AttendancePayrollEffectResolver
         $raw = isset($row['erken_cikis_dakika']) ? (int) $row['erken_cikis_dakika'] : 0;
         $karar = self::normalizeKarar($row);
         $bildirdi = self::isTruthy($row['durumu_bildirdi_mi'] ?? null);
+        $approved = self::hasApprovedOfficialProcess($row);
 
-        if ($karar === AttendanceDisciplineCatalog::KARAR_OFFICIAL_PROCESS_REQUIRED || self::hasApprovedLeaveFlag($row)) {
-            return self::result($raw, 0, $karar, false, 'OFFICIAL_OR_APPROVED_LEAVE');
+        if ($karar === AttendanceDisciplineCatalog::KARAR_OFFICIAL_PROCESS_REQUIRED) {
+            if ($approved) {
+                return self::result($raw, 0, $karar, false, 'OFFICIAL_PROCESS_APPROVED');
+            }
+
+            return self::result($raw, 0, $karar, true, 'OFFICIAL_PROCESS_PENDING');
+        }
+        if ($approved && $raw > 0) {
+            return self::result($raw, 0, $karar, false, 'OFFICIAL_PROCESS_APPROVED');
         }
         // TOLERANS_UYGULA is never valid for early exit — ignore and use actual.
         if ($karar === AttendanceDisciplineCatalog::KARAR_TOLERANS_UYGULA) {
@@ -87,17 +103,8 @@ final class AttendancePayrollEffectResolver
             }
         }
 
+        // Sealed/canonical notice fact is authoritative — never overwrite from decision metadata.
         $merged = $row;
-        $bildirdi = null;
-        if (is_array($lateKararRow) && array_key_exists('durumu_bildirdi_mi', $lateKararRow)) {
-            $bildirdi = $lateKararRow['durumu_bildirdi_mi'];
-        }
-        if (is_array($earlyKararRow) && array_key_exists('durumu_bildirdi_mi', $earlyKararRow)) {
-            $bildirdi = $earlyKararRow['durumu_bildirdi_mi'];
-        }
-        if ($bildirdi !== null) {
-            $merged['durumu_bildirdi_mi'] = $bildirdi;
-        }
 
         $lateKarar = is_array($lateKararRow) && isset($lateKararRow['karar'])
             ? (string) $lateKararRow['karar']
@@ -129,6 +136,8 @@ final class AttendancePayrollEffectResolver
         $merged['attendance_early_raw_dakika'] = $early['raw'];
         $merged['attendance_late_karar'] = $late['karar'];
         $merged['attendance_early_karar'] = $early['karar'];
+        $merged['attendance_late_block_reason'] = $late['reason'];
+        $merged['attendance_early_block_reason'] = $early['reason'];
         if (is_array($lateKararRow) && isset($lateKararRow['id'])) {
             $merged['attendance_late_karar_id'] = (int) $lateKararRow['id'];
         }
@@ -190,12 +199,16 @@ final class AttendancePayrollEffectResolver
             return $aday;
         }
 
+        // Prefer canonical aday/puantaj notice fact over decision-table copy.
         $pseudoRow = [
             'gec_kalma_dakika' => $tur === 'GEC_KALMA_DAKIKA' ? (int) ($aday['etki_miktari'] ?? 0) : 0,
             'erken_cikis_dakika' => $tur === 'ERKEN_CIKIS_DAKIKA' ? (int) ($aday['etki_miktari'] ?? 0) : 0,
-            'durumu_bildirdi_mi' => is_array($kararRow) && array_key_exists('durumu_bildirdi_mi', $kararRow)
-                ? $kararRow['durumu_bildirdi_mi']
-                : ($aday['durumu_bildirdi_mi'] ?? null),
+            'durumu_bildirdi_mi' => array_key_exists('durumu_bildirdi_mi', $aday)
+                ? $aday['durumu_bildirdi_mi']
+                : null,
+            'dayanak' => $aday['dayanak'] ?? null,
+            'onayli_izin_var' => $aday['onayli_izin_var'] ?? null,
+            'approved_leave' => $aday['approved_leave'] ?? null,
         ];
         if (is_array($kararRow) && isset($kararRow['karar'])) {
             $pseudoRow['puantaj_olay_karar'] = (string) $kararRow['karar'];
@@ -213,6 +226,7 @@ final class AttendancePayrollEffectResolver
             $meta['attendance_karar'] = $resolved['karar'];
             $meta['attendance_raw_dakika'] = $resolved['raw'];
             $meta['attendance_effective_dakika'] = $resolved['effective'];
+            $meta['attendance_block_reason'] = $resolved['reason'];
             $aday['metadata'] = $meta;
         }
 
@@ -245,8 +259,6 @@ final class AttendancePayrollEffectResolver
                 ? (string) $kararRow['karar_at'] : null,
             'gerekce' => isset($kararRow['gerekce']) && $kararRow['gerekce'] !== null
                 ? (string) $kararRow['gerekce'] : null,
-            'durumu_bildirdi_mi' => array_key_exists('durumu_bildirdi_mi', $kararRow) && $kararRow['durumu_bildirdi_mi'] !== null
-                ? (int) $kararRow['durumu_bildirdi_mi'] : null,
             'source_hash' => isset($kararRow['source_hash']) ? (string) $kararRow['source_hash'] : null,
         ];
     }
@@ -280,18 +292,18 @@ final class AttendancePayrollEffectResolver
         return (int) $value === 1;
     }
 
-    /** @param array<string, mixed> $row */
-    private static function hasApprovedLeaveFlag(array $row)
+    /**
+     * Canonical approved official process evidence only — no broad string heuristics.
+     *
+     * @param array<string, mixed> $row
+     */
+    public static function hasApprovedOfficialProcess(array $row)
     {
         if (!empty($row['onayli_izin_var']) || !empty($row['approved_leave'])) {
             return true;
         }
-        $dayanak = strtoupper(trim((string) ($row['dayanak'] ?? '')));
-        if ($dayanak === '') {
-            return false;
-        }
 
-        return strpos($dayanak, 'IZIN') !== false || strpos($dayanak, 'RAPOR') !== false;
+        return AttendanceDisciplineCatalog::isAuthorizedAbsenceDayanak($row['dayanak'] ?? null);
     }
 
     /** @return array{raw:int,effective:int,karar:?string,block:bool,reason:?string} */

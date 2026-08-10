@@ -26,4 +26,13 @@ describe("puantaj olay karar UI policy", () => {
     expect(getRolePermissions("BOLUM_YONETICISI")).toContain("puantaj.olay_karar.decide");
     expect(getRolePermissions("GENEL_YONETICI")).not.toContain("puantaj.olay_karar.decide");
   });
+
+  it("renders tri-state notice without treating null as Hayır", () => {
+    expect(puantajOlayKararUiHelpers.formatNotice(1)).toBe("Evet");
+    expect(puantajOlayKararUiHelpers.formatNotice(true)).toBe("Evet");
+    expect(puantajOlayKararUiHelpers.formatNotice(0)).toBe("Hayır");
+    expect(puantajOlayKararUiHelpers.formatNotice(false)).toBe("Hayır");
+    expect(puantajOlayKararUiHelpers.formatNotice(null)).toBe("Bilinmiyor");
+    expect(puantajOlayKararUiHelpers.formatNotice(undefined)).toBe("Bilinmiyor");
+  });
 });

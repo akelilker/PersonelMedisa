@@ -7,6 +7,7 @@ require_once __DIR__ . '/../../api/src/bootstrap.php';
 use Medisa\Api\Services\Attendance\AttendanceDisciplineCatalog;
 use Medisa\Api\Services\Attendance\AttendancePayrollEffectResolver;
 use Medisa\Api\Services\Attendance\DisiplinAdayProjectionService;
+use Medisa\Api\Services\Attendance\PuantajOlayKararService;
 
 function adrAssert(bool $condition, string $name): void
 {
@@ -320,5 +321,67 @@ $noticeSealed = AttendancePayrollEffectResolver::applyToPuantajRow(
 );
 adrAssert((int) $noticeSealed['durumu_bildirdi_mi'] === 1, 'sealed notice not overwritten by decision');
 adrAssert((int) $noticeSealed['gec_kalma_effective_dakika'] === 20, 'kesinti still applies with sealed notice');
+
+// source binding: decision raw must match canonical + hash
+$hash20 = PuantajOlayKararService::computeSourceHash([
+    'personel_id' => 10,
+    'tarih' => '2026-08-23',
+    'olay_turu' => AttendanceDisciplineCatalog::OLAY_GEC_KALMA,
+    'raw_dakika' => 20,
+]);
+$match = PuantajOlayKararService::sourceBindingMismatch(
+    [
+        'personel_id' => 10,
+        'tarih' => '2026-08-23',
+        'olay_turu' => AttendanceDisciplineCatalog::OLAY_GEC_KALMA,
+        'raw_dakika' => 20,
+        'source_hash' => $hash20,
+    ],
+    ['personel_id' => 10, 'tarih' => '2026-08-23', 'gec_kalma_dakika' => 20, 'erken_cikis_dakika' => 0]
+);
+adrAssert($match === null, 'source binding matches raw20');
+
+$stale40 = PuantajOlayKararService::sourceBindingMismatch(
+    [
+        'personel_id' => 10,
+        'tarih' => '2026-08-23',
+        'olay_turu' => AttendanceDisciplineCatalog::OLAY_GEC_KALMA,
+        'raw_dakika' => 20,
+        'source_hash' => $hash20,
+    ],
+    ['personel_id' => 10, 'tarih' => '2026-08-23', 'gec_kalma_dakika' => 40, 'erken_cikis_dakika' => 0]
+);
+adrAssert(is_array($stale40), 'source binding mismatch raw20 vs canonical40');
+adrAssert((int) $stale40['decision_raw'] === 20, 'mismatch metadata decision_raw');
+adrAssert((int) $stale40['canonical_raw'] === 40, 'mismatch metadata canonical_raw');
+
+$hashMismatch = PuantajOlayKararService::sourceBindingMismatch(
+    [
+        'personel_id' => 10,
+        'tarih' => '2026-08-23',
+        'olay_turu' => AttendanceDisciplineCatalog::OLAY_GEC_KALMA,
+        'raw_dakika' => 20,
+        'source_hash' => 'deadbeef',
+    ],
+    ['personel_id' => 10, 'tarih' => '2026-08-23', 'gec_kalma_dakika' => 20, 'erken_cikis_dakika' => 0]
+);
+adrAssert(is_array($hashMismatch), 'source_hash mismatch blocks');
+
+$reverse = PuantajOlayKararService::sourceBindingMismatch(
+    [
+        'personel_id' => 10,
+        'tarih' => '2026-08-23',
+        'olay_turu' => AttendanceDisciplineCatalog::OLAY_GEC_KALMA,
+        'raw_dakika' => 40,
+        'source_hash' => PuantajOlayKararService::computeSourceHash([
+            'personel_id' => 10,
+            'tarih' => '2026-08-23',
+            'olay_turu' => AttendanceDisciplineCatalog::OLAY_GEC_KALMA,
+            'raw_dakika' => 40,
+        ]),
+    ],
+    ['personel_id' => 10, 'tarih' => '2026-08-23', 'gec_kalma_dakika' => 20, 'erken_cikis_dakika' => 0]
+);
+adrAssert(is_array($reverse), 'decision raw40 vs canonical20 blocks');
 
 echo 'verify-attendance-discipline-resolver: OK' . PHP_EOL;

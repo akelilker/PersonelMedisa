@@ -642,7 +642,49 @@ class MaasHesaplamaSnapshotService
             );
         }
 
-        $annotated = AttendancePayrollEffectResolver::annotatePuantajlar($rows, $kararIndex);
+        // Bind decisions to sealed row raw/source_hash; never apply stale decisions silently.
+        $rowByPersonelTarih = [];
+        foreach ($rows as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $pid = isset($row['personel_id']) ? (int) $row['personel_id'] : 0;
+            $tarihKey = (string) ($row['tarih'] ?? '');
+            if ($pid > 0 && $tarihKey !== '') {
+                $rowByPersonelTarih[$pid . '|' . $tarihKey] = $row;
+            }
+        }
+
+        $validKararIndex = [];
+        foreach ($kararIndex as $key => $decision) {
+            if (!is_array($decision)) {
+                continue;
+            }
+            $pid = isset($decision['personel_id']) ? (int) $decision['personel_id'] : 0;
+            $tarihKey = (string) ($decision['tarih'] ?? '');
+            $sealed = isset($rowByPersonelTarih[$pid . '|' . $tarihKey])
+                ? $rowByPersonelTarih[$pid . '|' . $tarihKey]
+                : null;
+            if (!is_array($sealed)) {
+                continue;
+            }
+            $mismatch = PuantajOlayKararService::sourceBindingMismatch($decision, $sealed);
+            if ($mismatch !== null) {
+                $items[] = self::issue(
+                    self::SEVERITY_BLOCKER,
+                    'ATTENDANCE_DECISION_SOURCE_CHANGED',
+                    'Puantaj olay karari mevcut canonical event fact ile eslesmiyor; yonetici yeniden karar vermelidir.',
+                    'puantaj',
+                    isset($sealed['id']) ? (int) $sealed['id'] : null,
+                    $pid,
+                    $mismatch
+                );
+                continue;
+            }
+            $validKararIndex[$key] = $decision;
+        }
+
+        $annotated = AttendancePayrollEffectResolver::annotatePuantajlar($rows, $validKararIndex);
         $outRows = [];
         foreach ($annotated as $idx => $row) {
             if (!is_array($row)) {
@@ -661,13 +703,13 @@ class MaasHesaplamaSnapshotService
                 $tarih,
                 AttendanceDisciplineCatalog::OLAY_ERKEN_CIKIS
             );
-            if (isset($kararIndex[$lateKey]) && is_array($kararIndex[$lateKey])) {
+            if (isset($validKararIndex[$lateKey]) && is_array($validKararIndex[$lateKey])) {
                 $olayKararlari[AttendanceDisciplineCatalog::OLAY_GEC_KALMA] =
-                    AttendancePayrollEffectResolver::sealKararPayload($kararIndex[$lateKey]);
+                    AttendancePayrollEffectResolver::sealKararPayload($validKararIndex[$lateKey]);
             }
-            if (isset($kararIndex[$earlyKey]) && is_array($kararIndex[$earlyKey])) {
+            if (isset($validKararIndex[$earlyKey]) && is_array($validKararIndex[$earlyKey])) {
                 $olayKararlari[AttendanceDisciplineCatalog::OLAY_ERKEN_CIKIS] =
-                    AttendancePayrollEffectResolver::sealKararPayload($kararIndex[$earlyKey]);
+                    AttendancePayrollEffectResolver::sealKararPayload($validKararIndex[$earlyKey]);
             }
             if ($olayKararlari !== []) {
                 $row['olay_kararlari'] = $olayKararlari;

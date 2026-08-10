@@ -43,6 +43,8 @@ describe("attendance discipline source contract", () => {
     expect(panel).toContain("Karar gerekçesi zorunludur");
     expect(panel).not.toContain("İsteğe bağlı gerekçe");
     expect(panel).toContain("disabled={isSaving || !gerekce.trim()}");
+    expect(panel).toContain('return "Bilinmiyor"');
+    expect(panel).not.toContain('puantaj?.durumu_bildirdi_mi ? "Evet" : "Hayır"');
 
     const vakaPanel = readFileSync(
       resolve(root, "src/features/surecler/components/DisiplinVakaPanel.tsx"),
@@ -81,7 +83,34 @@ describe("attendance discipline source contract", () => {
     expect(snapshot).toContain("attachAttendanceDecisions");
     expect(snapshot).toContain("ATTENDANCE_DECISION_PENDING");
     expect(snapshot).toContain("ATTENDANCE_OFFICIAL_PROCESS_PENDING");
+    expect(snapshot).toContain("ATTENDANCE_DECISION_SOURCE_CHANGED");
     expect(snapshot).toContain("olay_kararlari");
+    expect(snapshot).toContain("sourceBindingMismatch");
+
+    const kararService = readFileSync(
+      resolve(root, "api/src/Services/Attendance/PuantajOlayKararService.php"),
+      "utf8"
+    );
+    expect(kararService).toContain("FOR UPDATE");
+    expect(kararService).toContain("$ownsTx");
+    expect(kararService).toContain("SCHEMA_NOT_READY");
+
+    const olayController = readFileSync(
+      resolve(root, "api/src/Controllers/PuantajOlayKararController.php"),
+      "utf8"
+    );
+    expect(olayController).toContain("auditTableExists");
+
+    const disiplinController = readFileSync(
+      resolve(root, "api/src/Controllers/DisiplinVakaController.php"),
+      "utf8"
+    );
+    expect(disiplinController).toMatch(
+      /function islemsizKapat[\s\S]*RolePermissions::assert\(\$user, 'disiplin\.final_decision'\)/
+    );
+    expect(disiplinController).not.toMatch(
+      /islemsizKapat[\s\S]*assertAny\(\$user, \['disiplin\.review'/
+    );
 
     const aday = readFileSync(resolve(root, "api/src/Services/MaasHesaplamaAdayService.php"), "utf8");
     expect(aday).toContain("indexSealedAttendanceKararlar");

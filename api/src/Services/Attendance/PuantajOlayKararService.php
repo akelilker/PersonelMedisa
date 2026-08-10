@@ -6,8 +6,8 @@ namespace Medisa\Api\Services\Attendance;
 
 use Medisa\Api\Auth\RolePermissions;
 use PDO;
-use PDOException;
 use RuntimeException;
+use Throwable;
 
 final class PuantajOlayKararService
 {
@@ -27,6 +27,50 @@ final class PuantajOlayKararService
         ];
 
         return hash('sha256', implode('|', $parts));
+    }
+
+    /**
+     * Decision must bind to sealed/canonical event fact. Returns mismatch metadata or null.
+     *
+     * @param array<string, mixed> $decision
+     * @param array<string, mixed> $sealedRow
+     * @return array<string, mixed>|null
+     */
+    public static function sourceBindingMismatch(array $decision, array $sealedRow)
+    {
+        $olayTuru = strtoupper(trim((string) ($decision['olay_turu'] ?? '')));
+        $canonicalRaw = self::resolveCanonicalRawDakika($sealedRow, $olayTuru);
+        $decisionRaw = isset($decision['raw_dakika']) ? (int) $decision['raw_dakika'] : null;
+        $personelId = isset($decision['personel_id'])
+            ? (int) $decision['personel_id']
+            : (isset($sealedRow['personel_id']) ? (int) $sealedRow['personel_id'] : 0);
+        $tarih = isset($decision['tarih'])
+            ? (string) $decision['tarih']
+            : (string) ($sealedRow['tarih'] ?? '');
+
+        $expectedHash = self::computeSourceHash([
+            'personel_id' => $personelId,
+            'tarih' => $tarih,
+            'olay_turu' => $olayTuru,
+            'raw_dakika' => $canonicalRaw !== null ? $canonicalRaw : 0,
+        ]);
+        $decisionHash = isset($decision['source_hash']) ? (string) $decision['source_hash'] : '';
+
+        $rawMatches = $canonicalRaw !== null && $decisionRaw !== null && $decisionRaw === $canonicalRaw;
+        $hashMatches = $decisionHash !== '' && hash_equals($expectedHash, $decisionHash);
+        if ($rawMatches && $hashMatches) {
+            return null;
+        }
+
+        return [
+            'personel_id' => $personelId,
+            'tarih' => $tarih,
+            'olay_turu' => $olayTuru,
+            'decision_raw' => $decisionRaw,
+            'canonical_raw' => $canonicalRaw,
+            'decision_source_hash' => $decisionHash !== '' ? $decisionHash : null,
+            'expected_source_hash' => $expectedHash,
+        ];
     }
 
     /**
@@ -57,66 +101,80 @@ final class PuantajOlayKararService
             throw new RuntimeException('VALIDATION_ERROR: karar gerekcesi zorunludur.');
         }
 
-        $puantaj = self::loadCanonicalPuantaj($pdo, $personelId, $tarih);
-        if ($puantaj === null) {
-            throw new RuntimeException('VALIDATION_ERROR: gunluk_puantaj satiri bulunamadi.');
-        }
-
-        $canonicalRaw = self::resolveCanonicalRawDakika($puantaj, $olayTuru);
-        if ($canonicalRaw === null || $canonicalRaw < 1) {
-            throw new RuntimeException('VALIDATION_ERROR: ilgili olay icin canonical raw dakika yok.');
-        }
-
-        if (array_key_exists('raw_dakika', $payload) && $payload['raw_dakika'] !== null && $payload['raw_dakika'] !== '') {
-            $clientRaw = (int) $payload['raw_dakika'];
-            if ($clientRaw !== $canonicalRaw) {
-                throw new RuntimeException('VALIDATION_ERROR: raw_dakika canonical degerle eslesmiyor.');
-            }
-        }
-
-        self::assertKararAllowedForEvent($olayTuru, $karar, $canonicalRaw);
-
-        $canonicalNotice = self::nullableBool($puantaj['durumu_bildirdi_mi'] ?? null);
-        if (array_key_exists('durumu_bildirdi_mi', $payload) && $payload['durumu_bildirdi_mi'] !== '') {
-            $clientNotice = self::nullableBool($payload['durumu_bildirdi_mi']);
-            if ($clientNotice !== $canonicalNotice) {
-                throw new RuntimeException('VALIDATION_ERROR: durumu_bildirdi_mi canonical degerle eslesmiyor.');
-            }
-        }
-
-        $gunlukPuantajId = (int) $puantaj['id'];
-        $gunlukBildirimId = null;
-        if (isset($payload['gunluk_bildirim_id']) && $payload['gunluk_bildirim_id'] !== null && $payload['gunluk_bildirim_id'] !== '') {
-            $candidateBildirimId = (int) $payload['gunluk_bildirim_id'];
-            if ($candidateBildirimId > 0) {
-                self::assertBildirimOwnership($pdo, $candidateBildirimId, $personelId, $tarih);
-                $gunlukBildirimId = $candidateBildirimId;
-            }
-        }
-
-        $sourceHash = self::computeSourceHash([
-            'personel_id' => $personelId,
-            'tarih' => $tarih,
-            'olay_turu' => $olayTuru,
-            'raw_dakika' => $canonicalRaw,
-        ]);
-
-        $actorId = isset($user['id']) ? (int) $user['id'] : null;
-        $existing = self::getByPersonelTarihOlay($pdo, $personelId, $tarih, $olayTuru);
-
-        // Exact idempotent retry only: same karar/raw/gerekce/actor/hash → no duplicate audit.
-        if (
-            $existing
-            && (string) $existing['karar'] === $karar
-            && (string) $existing['source_hash'] === $sourceHash
-            && (int) $existing['raw_dakika'] === $canonicalRaw
-            && (string) ($existing['gerekce'] ?? '') === $gerekce
-            && (int) ($existing['karar_veren_user_id'] ?? 0) === (int) ($actorId ?? 0)
-        ) {
-            return $existing;
+        $ownsTx = !$pdo->inTransaction();
+        if ($ownsTx) {
+            $pdo->beginTransaction();
         }
 
         try {
+            if (!self::tableExists($pdo) || !self::auditTableExists($pdo)) {
+                throw new RuntimeException('SCHEMA_NOT_READY: puantaj olay karar/audit semasi hazir degil.');
+            }
+
+            // Lock canonical puantaj before resolving raw — serialize concurrent puantaj edits.
+            $puantaj = self::loadCanonicalPuantaj($pdo, $personelId, $tarih, true);
+            if ($puantaj === null) {
+                throw new RuntimeException('VALIDATION_ERROR: gunluk_puantaj satiri bulunamadi.');
+            }
+
+            $canonicalRaw = self::resolveCanonicalRawDakika($puantaj, $olayTuru);
+            if ($canonicalRaw === null || $canonicalRaw < 1) {
+                throw new RuntimeException('VALIDATION_ERROR: ilgili olay icin canonical raw dakika yok.');
+            }
+
+            if (array_key_exists('raw_dakika', $payload) && $payload['raw_dakika'] !== null && $payload['raw_dakika'] !== '') {
+                $clientRaw = (int) $payload['raw_dakika'];
+                if ($clientRaw !== $canonicalRaw) {
+                    throw new RuntimeException('VALIDATION_ERROR: raw_dakika canonical degerle eslesmiyor.');
+                }
+            }
+
+            self::assertKararAllowedForEvent($olayTuru, $karar, $canonicalRaw);
+
+            $canonicalNotice = self::nullableBool($puantaj['durumu_bildirdi_mi'] ?? null);
+            if (array_key_exists('durumu_bildirdi_mi', $payload) && $payload['durumu_bildirdi_mi'] !== '') {
+                $clientNotice = self::nullableBool($payload['durumu_bildirdi_mi']);
+                if ($clientNotice !== $canonicalNotice) {
+                    throw new RuntimeException('VALIDATION_ERROR: durumu_bildirdi_mi canonical degerle eslesmiyor.');
+                }
+            }
+
+            $gunlukPuantajId = (int) $puantaj['id'];
+            $gunlukBildirimId = null;
+            if (isset($payload['gunluk_bildirim_id']) && $payload['gunluk_bildirim_id'] !== null && $payload['gunluk_bildirim_id'] !== '') {
+                $candidateBildirimId = (int) $payload['gunluk_bildirim_id'];
+                if ($candidateBildirimId > 0) {
+                    self::assertBildirimOwnership($pdo, $candidateBildirimId, $personelId, $tarih);
+                    $gunlukBildirimId = $candidateBildirimId;
+                }
+            }
+
+            $sourceHash = self::computeSourceHash([
+                'personel_id' => $personelId,
+                'tarih' => $tarih,
+                'olay_turu' => $olayTuru,
+                'raw_dakika' => $canonicalRaw,
+            ]);
+
+            $actorId = isset($user['id']) ? (int) $user['id'] : null;
+            $existing = self::getByPersonelTarihOlay($pdo, $personelId, $tarih, $olayTuru, true);
+
+            // Exact idempotent retry only: same karar/raw/gerekce/actor/hash → no duplicate audit.
+            if (
+                $existing
+                && (string) $existing['karar'] === $karar
+                && (string) $existing['source_hash'] === $sourceHash
+                && (int) $existing['raw_dakika'] === $canonicalRaw
+                && (string) ($existing['gerekce'] ?? '') === $gerekce
+                && (int) ($existing['karar_veren_user_id'] ?? 0) === (int) ($actorId ?? 0)
+            ) {
+                if ($ownsTx) {
+                    $pdo->commit();
+                }
+
+                return $existing;
+            }
+
             if ($existing) {
                 $stmt = $pdo->prepare(
                     'UPDATE ' . self::TABLE . '
@@ -157,6 +215,10 @@ final class PuantajOlayKararService
                     'source_hash' => $sourceHash,
                 ]);
 
+                if ($ownsTx) {
+                    $pdo->commit();
+                }
+
                 return $updated;
             }
 
@@ -185,24 +247,35 @@ final class PuantajOlayKararService
                 'source_hash' => $sourceHash,
             ]);
 
-            $created = self::getById($pdo, (int) $pdo->lastInsertId()) ?? [];
-            if ($created !== []) {
-                self::writeAudit($pdo, [
-                    'puantaj_olay_karar_id' => (int) $created['id'],
-                    'personel_id' => $personelId,
-                    'tarih' => $tarih,
-                    'olay_turu' => $olayTuru,
-                    'raw_dakika' => $canonicalRaw,
-                    'onceki_karar' => null,
-                    'yeni_karar' => $karar,
-                    'actor_user_id' => $actorId,
-                    'gerekce' => $gerekce,
-                    'source_hash' => $sourceHash,
-                ]);
+            $created = self::getById($pdo, (int) $pdo->lastInsertId());
+            if ($created === null) {
+                throw new RuntimeException('Olay karari kaydedilemedi.');
+            }
+            self::writeAudit($pdo, [
+                'puantaj_olay_karar_id' => (int) $created['id'],
+                'personel_id' => $personelId,
+                'tarih' => $tarih,
+                'olay_turu' => $olayTuru,
+                'raw_dakika' => $canonicalRaw,
+                'onceki_karar' => null,
+                'yeni_karar' => $karar,
+                'actor_user_id' => $actorId,
+                'gerekce' => $gerekce,
+                'source_hash' => $sourceHash,
+            ]);
+
+            if ($ownsTx) {
+                $pdo->commit();
             }
 
             return $created;
-        } catch (PDOException $e) {
+        } catch (Throwable $e) {
+            if ($ownsTx && $pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            if ($e instanceof RuntimeException) {
+                throw $e;
+            }
             throw new RuntimeException('Olay karari kaydedilemedi.', 0, $e);
         }
     }
@@ -257,13 +330,15 @@ final class PuantajOlayKararService
     }
 
     /** @return array<string, mixed>|null */
-    public static function getByPersonelTarihOlay(PDO $pdo, $personelId, $tarih, $olayTuru)
+    public static function getByPersonelTarihOlay(PDO $pdo, $personelId, $tarih, $olayTuru, $forUpdate = false)
     {
-        $stmt = $pdo->prepare(
-            'SELECT * FROM ' . self::TABLE . '
+        $sql = 'SELECT * FROM ' . self::TABLE . '
              WHERE personel_id = :personel_id AND tarih = :tarih AND olay_turu = :olay_turu
-             LIMIT 1'
-        );
+             LIMIT 1';
+        if ($forUpdate) {
+            $sql .= self::forUpdateClause($pdo);
+        }
+        $stmt = $pdo->prepare($sql);
         $stmt->execute([
             'personel_id' => (int) $personelId,
             'tarih' => (string) $tarih,
@@ -309,6 +384,11 @@ final class PuantajOlayKararService
         $stmt->execute(['t' => (string) $table]);
 
         return ((int) $stmt->fetchColumn()) > 0;
+    }
+
+    private static function forUpdateClause(PDO $pdo)
+    {
+        return $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite' ? '' : ' FOR UPDATE';
     }
 
     /** @param array<string, mixed> $user */
@@ -365,14 +445,16 @@ final class PuantajOlayKararService
     }
 
     /** @return array<string, mixed>|null */
-    private static function loadCanonicalPuantaj(PDO $pdo, $personelId, $tarih)
+    private static function loadCanonicalPuantaj(PDO $pdo, $personelId, $tarih, $forUpdate = false)
     {
-        $stmt = $pdo->prepare(
-            'SELECT id, personel_id, tarih, gec_kalma_dakika, erken_cikis_dakika, durumu_bildirdi_mi
+        $sql = 'SELECT id, personel_id, tarih, gec_kalma_dakika, erken_cikis_dakika, durumu_bildirdi_mi
              FROM gunluk_puantaj
              WHERE personel_id = :personel_id AND tarih = :tarih
-             LIMIT 1'
-        );
+             LIMIT 1';
+        if ($forUpdate) {
+            $sql .= self::forUpdateClause($pdo);
+        }
+        $stmt = $pdo->prepare($sql);
         $stmt->execute(['personel_id' => (int) $personelId, 'tarih' => (string) $tarih]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -401,7 +483,7 @@ final class PuantajOlayKararService
     private static function writeAudit(PDO $pdo, array $audit)
     {
         if (!self::auditTableExists($pdo)) {
-            return;
+            throw new RuntimeException('SCHEMA_NOT_READY: puantaj_olay_karar_auditleri tablosu hazir degil.');
         }
         $stmt = $pdo->prepare(
             'INSERT INTO ' . self::AUDIT_TABLE . ' (

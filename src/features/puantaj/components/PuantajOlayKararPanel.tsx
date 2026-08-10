@@ -43,6 +43,13 @@ function formatKarar(karar: string | null | undefined): string {
   }
 }
 
+/** Tri-state notice display — null/undefined is unknown, never "Hayır". */
+function formatNotice(value: boolean | number | null | undefined): string {
+  if (value === true || value === 1) return "Evet";
+  if (value === false || value === 0) return "Hayır";
+  return "Bilinmiyor";
+}
+
 function availableActions(olayTuru: PuantajOlayTuru, rawDakika: number): PuantajOlayKararDegeri[] {
   if (olayTuru === "ERKEN_CIKIS") {
     return ["KESINTI_UYGULA", "OFFICIAL_PROCESS_REQUIRED"];
@@ -185,7 +192,7 @@ export function PuantajOlayKararPanel({ personelId, tarih, puantaj }: PuantajOla
               <div className="form-field">
                 <span className="form-label">Önceden bildirdi mi</span>
                 <div className="form-input puantaj-readonly-value">
-                  {puantaj?.durumu_bildirdi_mi ? "Evet" : "Hayır"}
+                  {formatNotice(puantaj?.durumu_bildirdi_mi)}
                 </div>
               </div>
               <div className="form-field">
@@ -250,5 +257,6 @@ export function PuantajOlayKararPanel({ personelId, tarih, puantaj }: PuantajOla
 export const puantajOlayKararUiHelpers = {
   LATE_TOLERANCE_MAX_MINUTE,
   availableActions,
-  formatKarar
+  formatKarar,
+  formatNotice
 };

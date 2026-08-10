@@ -13,6 +13,7 @@ use Medisa\Api\Services\Attendance\AttendanceDisciplineCatalog;
 use Medisa\Api\Services\Attendance\DisiplinAdayProjectionService;
 use Medisa\Api\Services\Attendance\DisiplinVakaService;
 use Medisa\Api\Services\Attendance\PuantajOlayKararService;
+use Medisa\Api\Services\MaasHesaplamaSnapshotService;
 
 function ad052Assert(bool $ok, string $name): void
 {
@@ -500,6 +501,260 @@ try {
         $missingFailed = strpos($e->getMessage(), 'VALIDATION_ERROR') !== false;
     }
     ad052Assert($missingFailed, 'missing canonical event rejected');
+
+    // --- decision + audit atomicity ---
+    $pdo->exec('DELETE FROM puantaj_olay_karar_auditleri');
+    $pdo->exec('DELETE FROM puantaj_olay_kararlari');
+    ad052InsertPuantaj($pdo, '2026-08-21', 20, 1);
+    $beforeCreate = (int) $pdo->query('SELECT COUNT(*) FROM puantaj_olay_kararlari')->fetchColumn();
+    PuantajOlayKararService::upsertDecision($pdo, $userBolum, [
+        'personel_id' => 10,
+        'tarih' => '2026-08-21',
+        'olay_turu' => AttendanceDisciplineCatalog::OLAY_GEC_KALMA,
+        'raw_dakika' => 20,
+        'karar' => AttendanceDisciplineCatalog::KARAR_TOLERANS_UYGULA,
+        'gerekce' => 'atomic create',
+    ]);
+    $afterCreate = (int) $pdo->query('SELECT COUNT(*) FROM puantaj_olay_kararlari')->fetchColumn();
+    $auditCreate = (int) $pdo->query('SELECT COUNT(*) FROM puantaj_olay_karar_auditleri')->fetchColumn();
+    ad052Assert($afterCreate === $beforeCreate + 1, 'decision create inserts row');
+    ad052Assert($auditCreate === 1, 'decision create writes corresponding audit');
+
+    PuantajOlayKararService::upsertDecision($pdo, $userBolum, [
+        'personel_id' => 10,
+        'tarih' => '2026-08-21',
+        'olay_turu' => AttendanceDisciplineCatalog::OLAY_GEC_KALMA,
+        'raw_dakika' => 20,
+        'karar' => AttendanceDisciplineCatalog::KARAR_KESINTI_UYGULA,
+        'gerekce' => 'atomic update',
+    ]);
+    $kararAfterUpdate = (string) $pdo->query(
+        'SELECT karar FROM puantaj_olay_kararlari WHERE personel_id = 10 AND tarih = \'2026-08-21\''
+    )->fetchColumn();
+    $auditUpdate = (int) $pdo->query('SELECT COUNT(*) FROM puantaj_olay_karar_auditleri')->fetchColumn();
+    ad052Assert($kararAfterUpdate === AttendanceDisciplineCatalog::KARAR_KESINTI_UYGULA, 'decision update writes karar');
+    ad052Assert($auditUpdate === 2, 'decision update writes audit');
+
+    // audit insert failure rolls back decision INSERT
+    $pdo->exec('DELETE FROM puantaj_olay_karar_auditleri');
+    $pdo->exec('DELETE FROM puantaj_olay_kararlari');
+    ad052InsertPuantaj($pdo, '2026-08-22', 18, 1);
+    $pdo->exec(
+        'CREATE TRIGGER ad052_fail_audit_insert BEFORE INSERT ON puantaj_olay_karar_auditleri
+         FOR EACH ROW SIGNAL SQLSTATE \'45000\' SET MESSAGE_TEXT = \'forced audit fail\''
+    );
+    $insertRolledBack = false;
+    try {
+        PuantajOlayKararService::upsertDecision($pdo, $userBolum, [
+            'personel_id' => 10,
+            'tarih' => '2026-08-22',
+            'olay_turu' => AttendanceDisciplineCatalog::OLAY_GEC_KALMA,
+            'raw_dakika' => 18,
+            'karar' => AttendanceDisciplineCatalog::KARAR_KESINTI_UYGULA,
+            'gerekce' => 'should rollback',
+        ]);
+    } catch (Throwable $e) {
+        $insertRolledBack = true;
+    }
+    $pdo->exec('DROP TRIGGER IF EXISTS ad052_fail_audit_insert');
+    ad052Assert($insertRolledBack, 'audit fail during create throws');
+    ad052Assert(
+        (int) $pdo->query('SELECT COUNT(*) FROM puantaj_olay_kararlari WHERE tarih = \'2026-08-22\'')->fetchColumn() === 0,
+        'audit failure rolls back decision INSERT'
+    );
+
+    // audit fail during UPDATE leaves old decision unchanged
+    PuantajOlayKararService::upsertDecision($pdo, $userBolum, [
+        'personel_id' => 10,
+        'tarih' => '2026-08-21',
+        'olay_turu' => AttendanceDisciplineCatalog::OLAY_GEC_KALMA,
+        'raw_dakika' => 20,
+        'karar' => AttendanceDisciplineCatalog::KARAR_TOLERANS_UYGULA,
+        'gerekce' => 'baseline before audit fail',
+    ]);
+    $pdo->exec(
+        'CREATE TRIGGER ad052_fail_audit_update BEFORE INSERT ON puantaj_olay_karar_auditleri
+         FOR EACH ROW SIGNAL SQLSTATE \'45000\' SET MESSAGE_TEXT = \'forced audit fail update\''
+    );
+    $updateRolledBack = false;
+    try {
+        PuantajOlayKararService::upsertDecision($pdo, $userBolum, [
+            'personel_id' => 10,
+            'tarih' => '2026-08-21',
+            'olay_turu' => AttendanceDisciplineCatalog::OLAY_GEC_KALMA,
+            'raw_dakika' => 20,
+            'karar' => AttendanceDisciplineCatalog::KARAR_KESINTI_UYGULA,
+            'gerekce' => 'should not stick',
+        ]);
+    } catch (Throwable $e) {
+        $updateRolledBack = true;
+    }
+    $pdo->exec('DROP TRIGGER IF EXISTS ad052_fail_audit_update');
+    ad052Assert($updateRolledBack, 'audit fail during update throws');
+    $kararUnchanged = (string) $pdo->query(
+        'SELECT karar FROM puantaj_olay_kararlari WHERE personel_id = 10 AND tarih = \'2026-08-21\''
+    )->fetchColumn();
+    ad052Assert(
+        $kararUnchanged === AttendanceDisciplineCatalog::KARAR_TOLERANS_UYGULA,
+        'audit failure rolls back decision UPDATE'
+    );
+
+    // missing audit table fail-closed
+    $pdo->exec('RENAME TABLE puantaj_olay_karar_auditleri TO puantaj_olay_karar_auditleri_bak');
+    $missingAuditFailed = false;
+    try {
+        PuantajOlayKararService::upsertDecision($pdo, $userBolum, [
+            'personel_id' => 10,
+            'tarih' => '2026-08-21',
+            'olay_turu' => AttendanceDisciplineCatalog::OLAY_GEC_KALMA,
+            'raw_dakika' => 20,
+            'karar' => AttendanceDisciplineCatalog::KARAR_KESINTI_UYGULA,
+            'gerekce' => 'no audit table',
+        ]);
+    } catch (RuntimeException $e) {
+        $missingAuditFailed = strpos($e->getMessage(), 'SCHEMA_NOT_READY') !== false;
+    }
+    $pdo->exec('RENAME TABLE puantaj_olay_karar_auditleri_bak TO puantaj_olay_karar_auditleri');
+    ad052Assert($missingAuditFailed, 'missing audit table fail-closed');
+    ad052Assert(
+        (string) $pdo->query(
+            'SELECT karar FROM puantaj_olay_kararlari WHERE personel_id = 10 AND tarih = \'2026-08-21\''
+        )->fetchColumn() === AttendanceDisciplineCatalog::KARAR_TOLERANS_UYGULA,
+        'missing audit table does not mutate decision'
+    );
+
+    // --- source binding via attachAttendanceDecisions ---
+    $pdo->exec('DELETE FROM puantaj_olay_karar_auditleri');
+    $pdo->exec('DELETE FROM puantaj_olay_kararlari');
+    $pdo->exec('DELETE FROM gunluk_puantaj WHERE personel_id = 10 AND tarih = \'2026-08-23\'');
+    ad052InsertPuantaj($pdo, '2026-08-23', 20, 1);
+    PuantajOlayKararService::upsertDecision($pdo, $userBolum, [
+        'personel_id' => 10,
+        'tarih' => '2026-08-23',
+        'olay_turu' => AttendanceDisciplineCatalog::OLAY_GEC_KALMA,
+        'raw_dakika' => 20,
+        'karar' => AttendanceDisciplineCatalog::KARAR_TOLERANS_UYGULA,
+        'gerekce' => 'bound to 20',
+    ]);
+    $boundItems = [];
+    $boundAttendance = [
+        'rows' => [[
+            'id' => 1,
+            'personel_id' => 10,
+            'tarih' => '2026-08-23',
+            'gec_kalma_dakika' => 20,
+            'erken_cikis_dakika' => 0,
+            'durumu_bildirdi_mi' => 1,
+        ]],
+        'by_personel' => [10 => 1],
+    ];
+    $boundOut = MaasHesaplamaSnapshotService::attachAttendanceDecisions(
+        $pdo,
+        $boundAttendance,
+        '2026-08-01',
+        '2026-08-31',
+        $boundItems
+    );
+    $boundCodes = array_column($boundItems, 'code');
+    ad052Assert(!in_array('ATTENDANCE_DECISION_SOURCE_CHANGED', $boundCodes, true), 'raw20 decision matches sealed raw20');
+    ad052Assert((int) $boundOut['rows'][0]['gec_kalma_effective_dakika'] === 0, 'matching TOLERANS applied');
+
+    $staleItems = [];
+    $staleAttendance = [
+        'rows' => [[
+            'id' => 1,
+            'personel_id' => 10,
+            'tarih' => '2026-08-23',
+            'gec_kalma_dakika' => 40,
+            'erken_cikis_dakika' => 0,
+            'durumu_bildirdi_mi' => 0,
+        ]],
+        'by_personel' => [10 => 1],
+    ];
+    $staleOut = MaasHesaplamaSnapshotService::attachAttendanceDecisions(
+        $pdo,
+        $staleAttendance,
+        '2026-08-01',
+        '2026-08-31',
+        $staleItems
+    );
+    $staleCodes = array_column($staleItems, 'code');
+    ad052Assert(in_array('ATTENDANCE_DECISION_SOURCE_CHANGED', $staleCodes, true), 'raw20 decision vs sealed raw40 blocks');
+    ad052Assert(
+        (int) $staleOut['rows'][0]['gec_kalma_effective_dakika'] === 40,
+        'stale TOLERANS not silently applied to raw40'
+    );
+
+    // reverse: decision 40 vs canonical 20
+    $pdo->exec('DELETE FROM puantaj_olay_karar_auditleri');
+    $pdo->exec('DELETE FROM puantaj_olay_kararlari');
+    $pdo->prepare('UPDATE gunluk_puantaj SET gec_kalma_dakika = 40 WHERE personel_id = 10 AND tarih = :t')
+        ->execute(['t' => '2026-08-23']);
+    PuantajOlayKararService::upsertDecision($pdo, $userBolum, [
+        'personel_id' => 10,
+        'tarih' => '2026-08-23',
+        'olay_turu' => AttendanceDisciplineCatalog::OLAY_GEC_KALMA,
+        'raw_dakika' => 40,
+        'karar' => AttendanceDisciplineCatalog::KARAR_KESINTI_UYGULA,
+        'gerekce' => 'bound to 40',
+    ]);
+    $pdo->prepare('UPDATE gunluk_puantaj SET gec_kalma_dakika = 20 WHERE personel_id = 10 AND tarih = :t')
+        ->execute(['t' => '2026-08-23']);
+    $revItems = [];
+    MaasHesaplamaSnapshotService::attachAttendanceDecisions(
+        $pdo,
+        [
+            'rows' => [[
+                'id' => 1,
+                'personel_id' => 10,
+                'tarih' => '2026-08-23',
+                'gec_kalma_dakika' => 20,
+                'erken_cikis_dakika' => 0,
+                'durumu_bildirdi_mi' => 1,
+            ]],
+            'by_personel' => [10 => 1],
+        ],
+        '2026-08-01',
+        '2026-08-31',
+        $revItems
+    );
+    ad052Assert(
+        in_array('ATTENDANCE_DECISION_SOURCE_CHANGED', array_column($revItems, 'code'), true),
+        'decision raw40 vs canonical raw20 blocks'
+    );
+
+    // re-decide current raw clears source blocker
+    PuantajOlayKararService::upsertDecision($pdo, $userBolum, [
+        'personel_id' => 10,
+        'tarih' => '2026-08-23',
+        'olay_turu' => AttendanceDisciplineCatalog::OLAY_GEC_KALMA,
+        'raw_dakika' => 20,
+        'karar' => AttendanceDisciplineCatalog::KARAR_KESINTI_UYGULA,
+        'gerekce' => 'redecide current 20',
+    ]);
+    $clearItems = [];
+    $clearOut = MaasHesaplamaSnapshotService::attachAttendanceDecisions(
+        $pdo,
+        [
+            'rows' => [[
+                'id' => 1,
+                'personel_id' => 10,
+                'tarih' => '2026-08-23',
+                'gec_kalma_dakika' => 20,
+                'erken_cikis_dakika' => 0,
+                'durumu_bildirdi_mi' => 1,
+            ]],
+            'by_personel' => [10 => 1],
+        ],
+        '2026-08-01',
+        '2026-08-31',
+        $clearItems
+    );
+    ad052Assert(
+        !in_array('ATTENDANCE_DECISION_SOURCE_CHANGED', array_column($clearItems, 'code'), true),
+        'redecision clears source blocker'
+    );
+    ad052Assert((int) $clearOut['rows'][0]['gec_kalma_effective_dakika'] === 20, 'redecision KESINTI applies');
 
     // audit table exists and empty of business seed after migration (checked via re-apply path)
     ad052Assert(PuantajOlayKararService::auditTableExists($pdo), 'puantaj_olay_karar_auditleri exists');

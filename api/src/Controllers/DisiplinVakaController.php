@@ -244,7 +244,7 @@ class DisiplinVakaController
     public static function islemsizKapat(Request $request, $id)
     {
         $user = AuthMiddleware::authenticate($request, true);
-        RolePermissions::assertAny($user, ['disiplin.review', 'disiplin.final_decision']);
+        RolePermissions::assert($user, 'disiplin.final_decision');
 
         $payload = $request->getJsonBody();
         $gerekce = is_array($payload) && isset($payload['gerekce']) ? trim((string) $payload['gerekce']) : null;

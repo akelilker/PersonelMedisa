@@ -67,6 +67,9 @@ class PuantajOlayKararController
         if (!PuantajOlayKararService::tableExists($pdo)) {
             JsonResponse::error(503, 'SCHEMA_NOT_READY', 'puantaj_olay_kararlari tablosu hazir degil.');
         }
+        if (!PuantajOlayKararService::auditTableExists($pdo)) {
+            JsonResponse::error(503, 'SCHEMA_NOT_READY', 'puantaj_olay_karar_auditleri tablosu hazir degil.');
+        }
     }
 
     /** @param array<string, mixed> $user */

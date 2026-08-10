@@ -247,17 +247,23 @@ class MaasHesaplamaAdayService
                     continue;
                 }
                 if ($sinif === 'DOGRULANDI' && MaasHesaplamaEngine::resolveUbgtGunKapsami($row) === 'YARIM_GUN') {
-                    if (!isset($row['tatil_donemi_net_calisma_dakika']) || $row['tatil_donemi_net_calisma_dakika'] === null) {
-                        $items[] = self::issue(
-                            'BLOCKER',
-                            ResmiTatilTakvimProjectionService::TATIL_DONEMI_CALISMA_INTERVALI_EKSIK,
-                            'Yarim gun UBGT icin guvenilir calisma/ara dinlenmesi interval owner bulunamadi; tatil donemi net dakika uretilemedi.',
-                            'puantaj',
-                            isset($row['muhur_satir_id']) ? (int) $row['muhur_satir_id'] : null,
-                            $pid,
-                            ['tarih' => $row['tarih'] ?? null],
-                            $personel['ad_soyad'] ?? null
-                        );
+                    $netDk = max(0, (int) ($row['net_calisma_suresi_dakika'] ?? 0));
+                    // net=0 → premium yok; authoritative dakika gerekmez.
+                    if ($netDk > 0) {
+                        $donemiNet = MaasHesaplamaEngine::resolveTatilDonemiNetMinutes($row);
+                        $intervalOk = MaasHesaplamaEngine::hasHalfDayHolidayInterval($row);
+                        if (!$intervalOk || $donemiNet === null || $donemiNet > $netDk) {
+                            $items[] = self::issue(
+                                'BLOCKER',
+                                ResmiTatilTakvimProjectionService::TATIL_DONEMI_CALISMA_INTERVALI_EKSIK,
+                                'Yarım günlük resmî tatil için tatil dönemi çalışma süresi güvenilir çözülemedi; manuel inceleme gerekli.',
+                                'puantaj',
+                                isset($row['muhur_satir_id']) ? (int) $row['muhur_satir_id'] : null,
+                                $pid,
+                                ['tarih' => $row['tarih'] ?? null],
+                                $personel['ad_soyad'] ?? null
+                            );
+                        }
                     }
                 }
             }

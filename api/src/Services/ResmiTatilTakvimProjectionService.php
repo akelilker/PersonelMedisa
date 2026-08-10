@@ -75,10 +75,11 @@ class ResmiTatilTakvimProjectionService
             $out['tatil_interval_bitis'] = $calendar['tatil_interval_bitis'];
             $out['tatil_kaynak_referansi'] = (string) $calendar['kaynak_referansi'];
             $out['tatil_siniflandirma_durumu'] = 'DOGRULANDI';
-            // DB yalnizca tek mola dakikasi tutar; coklu interval olmadan donem dakikasi hesaplanmaz.
-            $out['tatil_donemi_brut_calisma_dakika'] = null;
-            $out['tatil_donemi_ara_dinlenme_dakika'] = null;
-            $out['tatil_donemi_net_calisma_dakika'] = null;
+
+            $donemi = self::resolveTatilDonemiMinutes($row, $out);
+            $out['tatil_donemi_brut_calisma_dakika'] = $donemi['brut'];
+            $out['tatil_donemi_ara_dinlenme_dakika'] = $donemi['mola'];
+            $out['tatil_donemi_net_calisma_dakika'] = $donemi['net'];
             $out['tatil_snapshot_hash'] = self::snapshotHash($out);
 
             return $out;
@@ -88,6 +89,140 @@ class ResmiTatilTakvimProjectionService
         $out['tatil_snapshot_hash'] = self::snapshotHash($out);
 
         return $out;
+    }
+
+    /**
+     * Narrowest safe tatil-donemi dakika cozumu.
+     * - Authoritative payload/existing deger varsa koru.
+     * - Giris/cikis + genel mola ile rastgele dagitim YAPMA.
+     * - Yalniz guvenli kapsama durumlarinda uret.
+     *
+     * @param array<string, mixed> $row
+     * @param array<string, mixed> $projection
+     * @return array{brut: int|null, mola: int|null, net: int|null}
+     */
+    public static function resolveTatilDonemiMinutes(array $row, array $projection)
+    {
+        $existingNet = array_key_exists('tatil_donemi_net_calisma_dakika', $row)
+            ? $row['tatil_donemi_net_calisma_dakika'] : null;
+        $existingBrut = array_key_exists('tatil_donemi_brut_calisma_dakika', $row)
+            ? $row['tatil_donemi_brut_calisma_dakika'] : null;
+        $existingMola = array_key_exists('tatil_donemi_ara_dinlenme_dakika', $row)
+            ? $row['tatil_donemi_ara_dinlenme_dakika'] : null;
+        if ($existingNet !== null) {
+            return [
+                'brut' => $existingBrut !== null ? max(0, (int) $existingBrut) : null,
+                'mola' => $existingMola !== null ? max(0, (int) $existingMola) : null,
+                'net' => max(0, (int) $existingNet),
+            ];
+        }
+
+        $kapsam = strtoupper(trim((string) ($projection['tatil_gun_kapsami'] ?? '')));
+        $netDk = isset($row['net_calisma_suresi_dakika']) && $row['net_calisma_suresi_dakika'] !== null
+            ? max(0, (int) $row['net_calisma_suresi_dakika']) : null;
+        $brutDk = isset($row['gunluk_brut_sure_dakika']) && $row['gunluk_brut_sure_dakika'] !== null
+            ? max(0, (int) $row['gunluk_brut_sure_dakika']) : null;
+        $molaDk = isset($row['gercek_mola_dakika']) && $row['gercek_mola_dakika'] !== null
+            ? max(0, (int) $row['gercek_mola_dakika']) : 0;
+
+        // Fiili calisma yok → tatil donemi net 0 (tahmin degil).
+        if ($netDk === 0) {
+            return ['brut' => 0, 'mola' => 0, 'net' => 0];
+        }
+
+        if ($kapsam === 'TAM_GUN') {
+            // Tam gun: tatil donemi = gunun tamamindaki fiili net (varsa).
+            if ($netDk === null) {
+                return ['brut' => null, 'mola' => null, 'net' => null];
+            }
+
+            return [
+                'brut' => $brutDk,
+                'mola' => $molaDk,
+                'net' => $netDk,
+            ];
+        }
+
+        if ($kapsam !== 'YARIM_GUN') {
+            return ['brut' => null, 'mola' => null, 'net' => null];
+        }
+
+        $intervalStart = self::timeToMinutes($projection['tatil_interval_baslangic'] ?? null);
+        $intervalEnd = self::timeToMinutes($projection['tatil_interval_bitis'] ?? null);
+        if ($intervalStart === null || $intervalEnd === null || $intervalStart >= $intervalEnd) {
+            return ['brut' => null, 'mola' => null, 'net' => null];
+        }
+
+        $giris = self::timeToMinutes($row['giris_saati'] ?? null);
+        $cikis = self::timeToMinutes($row['cikis_saati'] ?? null);
+        if ($giris === null || $cikis === null) {
+            // Giris/cikis yokken net>0 tahmin edilmez.
+            return ['brut' => null, 'mola' => null, 'net' => null];
+        }
+        if ($cikis <= $giris) {
+            // Gece vardiyasi / coklu interval: guvenli degil.
+            return ['brut' => null, 'mola' => null, 'net' => null];
+        }
+
+        $overlap = self::overlapMinutes($giris, $cikis, $intervalStart, $intervalEnd);
+        if ($overlap === 0) {
+            return ['brut' => 0, 'mola' => 0, 'net' => 0];
+        }
+
+        $fullyInside = $giris >= $intervalStart && $cikis <= $intervalEnd;
+        $fullyOutsideHolidayBreakAmbiguous = !$fullyInside && $molaDk > 0;
+        if ($fullyOutsideHolidayBreakAmbiguous) {
+            // Genel mola hangi bolume dustu bilinmiyor → rastgele dagitim yok.
+            return ['brut' => null, 'mola' => null, 'net' => null];
+        }
+
+        if ($fullyInside) {
+            // Tum calisma + mola tatil intervalinde → net = satirdaki net (authoritative).
+            if ($netDk === null) {
+                $computedNet = max(0, $overlap - $molaDk);
+
+                return ['brut' => $overlap, 'mola' => $molaDk, 'net' => $computedNet];
+            }
+
+            return ['brut' => $brutDk !== null ? $brutDk : $overlap, 'mola' => $molaDk, 'net' => $netDk];
+        }
+
+        // Kismi overlap + mola=0: overlap brut=net (mola dagitimi gerekmez).
+        if ($molaDk === 0) {
+            return ['brut' => $overlap, 'mola' => 0, 'net' => $overlap];
+        }
+
+        return ['brut' => null, 'mola' => null, 'net' => null];
+    }
+
+    /** @param mixed $value */
+    private static function timeToMinutes($value)
+    {
+        if ($value === null) {
+            return null;
+        }
+        $raw = trim((string) $value);
+        if ($raw === '') {
+            return null;
+        }
+        if (preg_match('/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/', $raw, $m) !== 1) {
+            return null;
+        }
+        $h = (int) $m[1];
+        $i = (int) $m[2];
+        if ($h > 23 || $i > 59) {
+            return null;
+        }
+
+        return $h * 60 + $i;
+    }
+
+    private static function overlapMinutes($aStart, $aEnd, $bStart, $bEnd)
+    {
+        $start = max((int) $aStart, (int) $bStart);
+        $end = min((int) $aEnd, (int) $bEnd);
+
+        return max(0, $end - $start);
     }
 
     /** @param array<string, mixed> $fields */

@@ -84,7 +84,9 @@ function s87p045FullDegerler(): array
         if (($meta['deger_tipi'] ?? '') === 'METIN') {
             $val = $code === 'TATIL_FSC_FM_CAKISMA_HESAP_MODU'
                 ? 'YARGITAY_7_5_SAAT_AYRIMI'
-                : ($code === 'NORMAL_HASTALIK_ILK_IKI_GUN_ISVEREN_ODEMESI' ? 'HAYIR' : 'GUNLUK_ILAVE');
+                : ($code === 'NORMAL_HASTALIK_ILK_IKI_GUN_ISVEREN_ODEMESI'
+                    ? 'HAYIR'
+                    : ($code === 'HAFTA_TATILI_GUNLERI' ? '0' : 'GUNLUK_ILAVE'));
             $out[] = ['parametre_kodu' => $code, 'metin_deger' => $val];
         } else {
             $defaults = [

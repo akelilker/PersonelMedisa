@@ -172,12 +172,34 @@ final class PayrollComplianceGuard
         ];
     }
 
-    /** 225 saat × 60 = 13500 dk/ay; haftalik 2700 ile tutarlilik (contract). */
+    /**
+     * Effective haftalik normal dk: policy HAFTALIK_NORMAL_CALISMA_DAKIKA varsa onu kullan,
+     * yoksa production default 2700. Yasal 270 saat limiti bu metodun kapsami disinda.
+     *
+     * @param array<string, mixed> $params
+     */
+    public static function resolveHaftalikNormalCalismaDakika(array $params = []): int
+    {
+        if (isset($params[self::POLICY_HAFTALIK_NORMAL_DAKIKA]) && $params[self::POLICY_HAFTALIK_NORMAL_DAKIKA] !== '') {
+            $raw = trim((string) $params[self::POLICY_HAFTALIK_NORMAL_DAKIKA]);
+            if (strpos($raw, '.') !== false) {
+                $raw = explode('.', $raw, 2)[0];
+            }
+            $v = (int) $raw;
+            if ($v > 0) {
+                return $v;
+            }
+        }
+
+        return self::HAFTALIK_NORMAL_CALISMA_DAKIKA;
+    }
+
+    /** 225 saat × 60 = 13500 dk/ay; haftalik 2700 ile tutarlilik (production default contract). */
     public static function assertWeeklyMonthlyParity(): bool
     {
         $weeklyHours = (float) self::HAFTALIK_NORMAL_CALISMA_DAKIKA / 60.0;
         $dailyHours = (float) self::GUNLUK_CALISMA_SAATI;
-        $weeklyFromDaily = $dailyHours * 6.0; // 6 is gunu × 7.5 = 45
+        $weeklyFromDaily = $dailyHours * 6.0; // production default: 6 is gunu × 7.5 = 45
         $monthlyDk = self::AYLIK_NORMAL_CALISMA_SAATI * 60;
         $fiveWeekDk = self::HAFTALIK_NORMAL_CALISMA_DAKIKA * 5;
 
@@ -188,18 +210,21 @@ final class PayrollComplianceGuard
     }
 
     /**
-     * SIRKET_KARARI: sozlesme haftalik sure her zaman 2700 dk; %25 FSC bandi olusmaz.
+     * SIRKET_KARARI odeme bantlari: FSC yok; esik uzeri %50 FM.
+     * Eşik authoritative policy HAFTALIK_NORMAL_CALISMA_DAKIKA'dan gelir (default 2700).
      *
      * @return array{fs_dk:int, fm_dk:int}
      */
-    public static function hesaplaHaftalikBantlarSirketKarari(int $totalDk): array
+    public static function hesaplaHaftalikBantlarSirketKarari(int $totalDk, ?int $haftalikNormalDk = null): array
     {
-        $contract = self::HAFTALIK_NORMAL_CALISMA_DAKIKA;
+        $contract = ($haftalikNormalDk !== null && $haftalikNormalDk > 0)
+            ? $haftalikNormalDk
+            : self::HAFTALIK_NORMAL_CALISMA_DAKIKA;
         if ($totalDk <= $contract) {
             return ['fs_dk' => 0, 'fm_dk' => 0];
         }
 
-        // SIRKET_KARARI: FSC (%25) kullanilmaz; 45 saat uzeri tamamen %50 FM.
+        // SIRKET_KARARI: FSC (%25) kullanilmaz; normal esik uzeri tamamen %50 FM.
         return [
             'fs_dk' => 0,
             'fm_dk' => $totalDk - $contract,

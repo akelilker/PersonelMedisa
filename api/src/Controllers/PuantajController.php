@@ -997,6 +997,21 @@ class PuantajController
                 'hafta_tatili_hak_kazandi_mi',
                 self::existingValue($existing, 'hafta_tatili_hak_kazandi_mi')
             ),
+            'tatil_donemi_brut_calisma_dakika' => self::readNullableInt(
+                $payload,
+                'tatil_donemi_brut_calisma_dakika',
+                self::existingValue($existing, 'tatil_donemi_brut_calisma_dakika')
+            ),
+            'tatil_donemi_ara_dinlenme_dakika' => self::readNullableInt(
+                $payload,
+                'tatil_donemi_ara_dinlenme_dakika',
+                self::existingValue($existing, 'tatil_donemi_ara_dinlenme_dakika')
+            ),
+            'tatil_donemi_net_calisma_dakika' => self::readNullableInt(
+                $payload,
+                'tatil_donemi_net_calisma_dakika',
+                self::existingValue($existing, 'tatil_donemi_net_calisma_dakika')
+            ),
             'kontrol_durumu' => self::readEnum(
                 $payload,
                 'kontrol_durumu',

@@ -58,83 +58,79 @@ jobs:
         run: |
           set -euo pipefail
 
-          write_pass1() {
-            local use_ftps="$1"
-            cat > /tmp/cleanup-pass1.lftp <<EOF
-          set cmd:fail-exit false
-          set cmd:verbose on
-          set net:max-retries 2
-          set net:timeout 20
-          set ftp:passive-mode on
-          set ftp:ssl-allow ${use_ftps}
-          set ftp:ssl-force ${use_ftps}
-          set ftp:ssl-protect-data ${use_ftps}
-          set ssl:verify-certificate no
-          set ssl:check-hostname no
-          cd .
-          rm api/src/Router.php.pr120-pre.bak
-          rm api/src/Router.php.pr120.tmp
-          rm api/src/Router.php.s36c-before
-          rm api/src/Controllers/PuantajController.php.s36c-before
-          rm api/src/Controllers/ReferansController.php.pr120-pre.bak
-          rm api/src/Controllers/ReferansController.php.pr120.tmp
-          rm api/src/Controllers/ReferansController.php.pr120probe
-          rm api/public/error_log
-          rm api/public/_s77d_migrate.php
-          rm api/README.md
-          rm api/.env.example
-          rmdir api/migrations
-          rmdir api/seeds
-          cls -1 assets/ > /tmp/remote-assets.txt
-          bye
-          EOF
-            # Strip YAML/script leading indentation from heredoc body
-            sed -i 's/^[[:space:]]*//' /tmp/cleanup-pass1.lftp
-          }
-
-          write_pass2() {
-            local use_ftps="$1"
-            {
-              echo "set cmd:fail-exit false"
-              echo "set cmd:verbose on"
-              echo "set net:max-retries 2"
-              echo "set net:timeout 20"
-              echo "set ftp:passive-mode on"
-              echo "set ftp:ssl-allow ${use_ftps}"
-              echo "set ftp:ssl-force ${use_ftps}"
-              echo "set ftp:ssl-protect-data ${use_ftps}"
-              echo "set ssl:verify-certificate no"
-              echo "set ssl:check-hostname no"
-              echo "cd ."
-              while IFS= read -r f || [[ -n "$f" ]]; do
-                f="${f%$'\r'}"
-                f="${f%/}"
-                base=$(basename "$f")
-                [[ -z "$base" || "$base" == "." || "$base" == ".." ]] && continue
-                if grep -Fxq "$base" /tmp/keep-assets.txt; then
-                  echo "!echo KEEP $base"
-                else
-                  echo "rm assets/$base"
-                  echo "!echo DELETED $base"
-                fi
-              done < /tmp/remote-assets.txt
-              echo "bye"
-            } > /tmp/cleanup-pass2.lftp
-          }
-
           run_mode() {
             local mode_name="$1"
             local use_ftps="$2"
             echo "Cleanup modu: ${mode_name}"
-            write_pass1 "$use_ftps"
-            lftp -u "${FTP_USERNAME}","${FTP_PASSWORD}" -p "${FTP_PORT}" "ftp://${FTP_SERVER}" -f /tmp/cleanup-pass1.lftp
-            test -s /tmp/remote-assets.txt || (echo "assets listing missing/empty" && return 1)
+
+            rm -f /tmp/remote-assets.txt
+            lftp -u "${FTP_USERNAME}","${FTP_PASSWORD}" -p "${FTP_PORT}" "ftp://${FTP_SERVER}" -e "
+              set cmd:fail-exit false;
+              set cmd:verbose on;
+              set net:max-retries 2;
+              set net:timeout 20;
+              set ftp:passive-mode on;
+              set ftp:ssl-allow ${use_ftps};
+              set ftp:ssl-force ${use_ftps};
+              set ftp:ssl-protect-data ${use_ftps};
+              set ssl:verify-certificate no;
+              set ssl:check-hostname no;
+              cd .;
+              rm api/src/Router.php.pr120-pre.bak;
+              rm api/src/Router.php.pr120.tmp;
+              rm api/src/Router.php.s36c-before;
+              rm api/src/Controllers/PuantajController.php.s36c-before;
+              rm api/src/Controllers/ReferansController.php.pr120-pre.bak;
+              rm api/src/Controllers/ReferansController.php.pr120.tmp;
+              rm api/src/Controllers/ReferansController.php.pr120probe;
+              rm api/public/error_log;
+              rm api/public/_s77d_migrate.php;
+              rm api/README.md;
+              rm api/.env.example;
+              rmdir api/migrations;
+              rmdir api/seeds;
+              cls -1 assets/ > /tmp/remote-assets.txt;
+              bye
+            "
+
+            if [[ ! -s /tmp/remote-assets.txt ]]; then
+              echo "assets listing missing/empty"
+              return 1
+            fi
+
             echo "Remote assets before prune:"
             cat /tmp/remote-assets.txt
-            write_pass2 "$use_ftps"
-            echo "Pass2 plan:"
-            grep -E '^(rm |!echo)' /tmp/cleanup-pass2.lftp || true
-            lftp -u "${FTP_USERNAME}","${FTP_PASSWORD}" -p "${FTP_PORT}" "ftp://${FTP_SERVER}" -f /tmp/cleanup-pass2.lftp
+
+            local rm_cmds=""
+            while IFS= read -r f || [[ -n "$f" ]]; do
+              f="${f%$'\r'}"
+              f="${f%/}"
+              local base
+              base=$(basename "$f")
+              [[ -z "$base" || "$base" == "." || "$base" == ".." ]] && continue
+              if grep -Fxq "$base" /tmp/keep-assets.txt; then
+                echo "KEEP $base"
+              else
+                echo "DELETE $base"
+                rm_cmds="${rm_cmds}rm assets/${base}; "
+              fi
+            done < /tmp/remote-assets.txt
+
+            lftp -u "${FTP_USERNAME}","${FTP_PASSWORD}" -p "${FTP_PORT}" "ftp://${FTP_SERVER}" -e "
+              set cmd:fail-exit false;
+              set cmd:verbose on;
+              set net:max-retries 2;
+              set net:timeout 20;
+              set ftp:passive-mode on;
+              set ftp:ssl-allow ${use_ftps};
+              set ftp:ssl-force ${use_ftps};
+              set ftp:ssl-protect-data ${use_ftps};
+              set ssl:verify-certificate no;
+              set ssl:check-hostname no;
+              cd .;
+              ${rm_cmds}
+              bye
+            "
           }
 
           echo "Explicit FTPS port 21 deneniyor..."

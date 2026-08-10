@@ -1,0 +1,45 @@
+name: I14 Prod Readonly Smoke
+
+on:
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    name: I14 production read-only smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run I14 production read-only smoke
+        env:
+          SMOKE_BASE_URL: https://www.karmotors.com.tr
+          SMOKE_APP_PREFIX: /personelmedisa
+          SMOKE_AUTH_USERNAME: ${{ secrets.SMOKE_AUTH_USERNAME }}
+          SMOKE_AUTH_PASSWORD: ${{ secrets.SMOKE_AUTH_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "$SMOKE_AUTH_USERNAME"
+          test -n "$SMOKE_AUTH_PASSWORD"
+          mkdir -p /tmp/i14-smoke
+          node scripts/i14-prod-readonly-smoke.mjs | tee /tmp/i14-smoke/smoke.log
+
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: i14-prod-readonly-smoke
+          path: /tmp/i14-smoke
+          if-no-files-found: warn

@@ -12,7 +12,8 @@ export type RealYonetimKullaniciApiPayload = Omit<
   (typeof REAL_API_UNSUPPORTED_KULLANICI_FIELDS)[number]
 >;
 
-/** Production / real API: unsupported extended kullanici fields are not persisted (V1, no migration). */
+/** Production / real API: deferred profile fields are not persisted (telefon/personel_id/notlar/kullanici_tipi).
+ *  varsayilan_sube_id is part of the real canonical contract (I13-B). */
 export function isRealYonetimKullaniciApi(): boolean {
   const mode = (import.meta.env.VITE_API_MODE ?? "").trim().toLowerCase();
   if (mode === "real") {

@@ -7,6 +7,7 @@ namespace Medisa\Api\Controllers;
 use Medisa\Api\Auth\AuthMiddleware;
 use Medisa\Api\Auth\RolePermissions;
 use Medisa\Api\Database\Connection;
+use Medisa\Api\Database\UsersSchema;
 use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
 use Medisa\Api\Scope\SubeScope;
@@ -832,11 +833,11 @@ class YonetimController
             JsonResponse::serverError('Veritabani baglantisi kurulamadi.');
         }
 
-        $stmt = $pdo->query(
-            'SELECT id, username, ad_soyad, rol, durum
-             FROM users
-             ORDER BY id ASC'
-        );
+        $hasVarsayilan = UsersSchema::hasVarsayilanSubeId($pdo);
+        $selectSql = $hasVarsayilan
+            ? 'SELECT id, username, ad_soyad, rol, durum, varsayilan_sube_id FROM users ORDER BY id ASC'
+            : 'SELECT id, username, ad_soyad, rol, durum FROM users ORDER BY id ASC';
+        $stmt = $pdo->query($selectSql);
         $rows = $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
         $userIds = [];
         foreach ($rows as $row) {
@@ -847,7 +848,7 @@ class YonetimController
         $items = [];
         foreach ($rows as $row) {
             $id = (int) $row['id'];
-            $items[] = self::mapKullaniciRow($row, $subeIdsByUser[$id] ?? []);
+            $items[] = self::mapKullaniciRow($row, $subeIdsByUser[$id] ?? [], $hasVarsayilan);
         }
 
         JsonResponse::success(['items' => $items]);
@@ -864,8 +865,8 @@ class YonetimController
         $adSoyad = trim((string) ($body['ad_soyad'] ?? ''));
         $rol = strtoupper(trim((string) ($body['rol'] ?? '')));
         $durum = strtoupper(trim((string) ($body['durum'] ?? 'AKTIF')));
-        $subeIds = self::parseSubeIds(isset($body['sube_ids']) ? $body['sube_ids'] : []);
-        $varsayilanSubeId = self::parseOptionalInt($body['varsayilan_sube_id'] ?? null);
+        $finalSubeIds = self::parseSubeIds(isset($body['sube_ids']) ? $body['sube_ids'] : []);
+        $finalVarsayilanSubeId = self::parseOptionalInt($body['varsayilan_sube_id'] ?? null);
 
         if ($username === '') {
             JsonResponse::badRequest('Kullanici adi zorunludur.', 'VALIDATION_ERROR', 'username');
@@ -893,35 +894,57 @@ class YonetimController
             JsonResponse::error(409, 'DUPLICATE_USERNAME', 'Bu kullanici adi zaten kayitli.', 'username');
         }
 
-        self::assertSubeIdsExist($pdo, $subeIds);
-        self::assertVarsayilanSubeInScope($varsayilanSubeId, $subeIds);
-        if ($varsayilanSubeId !== null) {
-            $subeIds = self::normalizeSubeIdsWithVarsayilan($subeIds, $varsayilanSubeId);
+        self::assertSubeIdsExist($pdo, $finalSubeIds);
+        self::assertVarsayilanSubeInScope($finalVarsayilanSubeId, $finalSubeIds);
+        self::assertAuthSmokeReadonlyContract($username, $rol, $finalSubeIds, $finalVarsayilanSubeId);
+
+        $hasVarsayilan = UsersSchema::hasVarsayilanSubeId($pdo);
+        if ($finalVarsayilanSubeId !== null && !$hasVarsayilan) {
+            JsonResponse::error(
+                409,
+                'SCHEMA_NOT_READY',
+                'Varsayilan sube semasi hazir degil.',
+                'varsayilan_sube_id'
+            );
         }
-        self::assertAuthSmokeReadonlyContract($username, $rol, $subeIds, $varsayilanSubeId);
 
         $pdo->beginTransaction();
         try {
-            $stmt = $pdo->prepare(
-                'INSERT INTO users (username, password_hash, ad_soyad, rol, durum)
-                 VALUES (:username, :password_hash, :ad_soyad, :rol, :durum)'
-            );
-            $stmt->execute([
-                'username' => $username,
-                'password_hash' => password_hash($password, PASSWORD_BCRYPT),
-                'ad_soyad' => $adSoyad,
-                'rol' => $rol,
-                'durum' => $durum,
-            ]);
+            if ($hasVarsayilan) {
+                $stmt = $pdo->prepare(
+                    'INSERT INTO users (username, password_hash, ad_soyad, rol, durum, varsayilan_sube_id)
+                     VALUES (:username, :password_hash, :ad_soyad, :rol, :durum, :varsayilan_sube_id)'
+                );
+                $stmt->execute([
+                    'username' => $username,
+                    'password_hash' => password_hash($password, PASSWORD_BCRYPT),
+                    'ad_soyad' => $adSoyad,
+                    'rol' => $rol,
+                    'durum' => $durum,
+                    'varsayilan_sube_id' => $finalVarsayilanSubeId,
+                ]);
+            } else {
+                $stmt = $pdo->prepare(
+                    'INSERT INTO users (username, password_hash, ad_soyad, rol, durum)
+                     VALUES (:username, :password_hash, :ad_soyad, :rol, :durum)'
+                );
+                $stmt->execute([
+                    'username' => $username,
+                    'password_hash' => password_hash($password, PASSWORD_BCRYPT),
+                    'ad_soyad' => $adSoyad,
+                    'rol' => $rol,
+                    'durum' => $durum,
+                ]);
+            }
             $userId = (int) $pdo->lastInsertId();
-            self::replaceUserSubeler($pdo, $userId, $subeIds);
+            self::replaceUserSubeler($pdo, $userId, $finalSubeIds);
             $pdo->commit();
         } catch (\Throwable $e) {
             $pdo->rollBack();
             JsonResponse::serverError('Kullanici kaydi olusturulamadi.');
         }
 
-        $created = self::findKullaniciById($pdo, $userId, $varsayilanSubeId);
+        $created = self::findKullaniciById($pdo, $userId);
         if ($created === null) {
             JsonResponse::serverError('Kullanici kaydi olusturulamadi.');
         }
@@ -964,12 +987,23 @@ class YonetimController
         $durum = array_key_exists('durum', $body)
             ? strtoupper(trim((string) $body['durum']))
             : (string) $existing['durum'];
-        $subeIds = array_key_exists('sube_ids', $body)
-            ? self::parseSubeIds($body['sube_ids'])
-            : null;
-        $varsayilanSubeId = array_key_exists('varsayilan_sube_id', $body)
-            ? self::parseOptionalInt($body['varsayilan_sube_id'])
-            : null;
+
+        $subeIdsProvided = array_key_exists('sube_ids', $body);
+        $varsayilanProvided = array_key_exists('varsayilan_sube_id', $body);
+        $requestedVarsayilan = $varsayilanProvided ? self::parseOptionalInt($body['varsayilan_sube_id']) : null;
+
+        $currentSubeIds = self::loadSubeIdsByUserIds($pdo, [$kullaniciId])[$kullaniciId] ?? [];
+        $currentStoredDefault = self::readStoredVarsayilanFromRow($existing);
+
+        $finalSubeIds = $subeIdsProvided ? self::parseSubeIds($body['sube_ids']) : $currentSubeIds;
+        $finalVarsayilanSubeId = $currentStoredDefault;
+        if ($varsayilanProvided) {
+            $finalVarsayilanSubeId = $requestedVarsayilan;
+        } elseif ($subeIdsProvided) {
+            if ($currentStoredDefault !== null && !in_array($currentStoredDefault, $finalSubeIds, true)) {
+                $finalVarsayilanSubeId = null;
+            }
+        }
 
         if ($username === '') {
             JsonResponse::badRequest('Kullanici adi zorunludur.', 'VALIDATION_ERROR', 'username');
@@ -987,31 +1021,26 @@ class YonetimController
             JsonResponse::error(409, 'DUPLICATE_USERNAME', 'Bu kullanici adi zaten kayitli.', 'username');
         }
 
-        if ($subeIds !== null) {
-            self::assertSubeIdsExist($pdo, $subeIds);
-            self::assertVarsayilanSubeInScope($varsayilanSubeId, $subeIds);
-            if ($varsayilanSubeId !== null) {
-                $subeIds = self::normalizeSubeIdsWithVarsayilan($subeIds, $varsayilanSubeId);
+        if ($subeIdsProvided) {
+            self::assertSubeIdsExist($pdo, $finalSubeIds);
+        }
+        self::assertVarsayilanSubeInScope($finalVarsayilanSubeId, $finalSubeIds);
+        self::assertAuthSmokeReadonlyContract($username, $rol, $finalSubeIds, $finalVarsayilanSubeId);
+
+        $hasVarsayilan = UsersSchema::hasVarsayilanSubeId($pdo);
+        $needsVarsayilanWrite = $varsayilanProvided
+            || ($subeIdsProvided && $finalVarsayilanSubeId !== $currentStoredDefault);
+        if ($needsVarsayilanWrite && !$hasVarsayilan) {
+            if ($finalVarsayilanSubeId !== null) {
+                JsonResponse::error(
+                    409,
+                    'SCHEMA_NOT_READY',
+                    'Varsayilan sube semasi hazir degil.',
+                    'varsayilan_sube_id'
+                );
             }
-        } elseif (array_key_exists('varsayilan_sube_id', $body) && $varsayilanSubeId !== null) {
-            $currentSubeIds = self::loadSubeIdsByUserIds($pdo, [$kullaniciId])[$kullaniciId] ?? [];
-            self::assertVarsayilanSubeInScope($varsayilanSubeId, $currentSubeIds);
-            $subeIds = self::normalizeSubeIdsWithVarsayilan($currentSubeIds, $varsayilanSubeId);
-        }
-
-        $effectiveSubeIds = $subeIds;
-        if ($effectiveSubeIds === null) {
-            $effectiveSubeIds = self::loadSubeIdsByUserIds($pdo, [$kullaniciId])[$kullaniciId] ?? [];
-        }
-        $effectiveVarsayilan = $varsayilanSubeId;
-        if ($effectiveVarsayilan === null && count($effectiveSubeIds) > 0) {
-            $effectiveVarsayilan = $effectiveSubeIds[0];
-        }
-        self::assertAuthSmokeReadonlyContract($username, $rol, $effectiveSubeIds, $effectiveVarsayilan);
-
-        $responseVarsayilanSubeId = $varsayilanSubeId;
-        if ($responseVarsayilanSubeId === null && $subeIds !== null && count($subeIds) > 0) {
-            $responseVarsayilanSubeId = $subeIds[0];
+            // Explicit NULL / cleared default with schema absent: legacy-compatible no-op on column.
+            $needsVarsayilanWrite = false;
         }
 
         $pdo->beginTransaction();
@@ -1028,12 +1057,16 @@ class YonetimController
                 $sql .= ', password_hash = :password_hash';
                 $params['password_hash'] = password_hash($password, PASSWORD_BCRYPT);
             }
+            if ($hasVarsayilan && ($needsVarsayilanWrite || $varsayilanProvided || $subeIdsProvided)) {
+                $sql .= ', varsayilan_sube_id = :varsayilan_sube_id';
+                $params['varsayilan_sube_id'] = $finalVarsayilanSubeId;
+            }
             $sql .= ' WHERE id = :id';
             $stmt = $pdo->prepare($sql);
             $stmt->execute($params);
 
-            if ($subeIds !== null) {
-                self::replaceUserSubeler($pdo, $kullaniciId, $subeIds);
+            if ($subeIdsProvided) {
+                self::replaceUserSubeler($pdo, $kullaniciId, $finalSubeIds);
             }
 
             $pdo->commit();
@@ -1042,7 +1075,7 @@ class YonetimController
             JsonResponse::serverError('Kullanici kaydi guncellenemedi.');
         }
 
-        $updated = self::findKullaniciById($pdo, $kullaniciId, $responseVarsayilanSubeId);
+        $updated = self::findKullaniciById($pdo, $kullaniciId);
         if ($updated === null) {
             JsonResponse::serverError('Kullanici kaydi guncellenemedi.');
         }
@@ -1056,21 +1089,18 @@ class YonetimController
         RolePermissions::assert($user, 'yonetim-paneli.manage');
     }
 
-  /** @param array<string, mixed> $row @param array<int, int> $subeIds @return array<string, mixed> */
-    private static function mapKullaniciRow(array $row, array $subeIds, $varsayilanSubeId = null)
+    /**
+     * @param array<string, mixed> $row
+     * @param array<int, int> $subeIds
+     * @return array<string, mixed>
+     */
+    private static function mapKullaniciRow(array $row, array $subeIds, $hasVarsayilanColumn = false)
     {
-        $resolvedVarsayilan = null;
-        $orderedSubeIds = $subeIds;
-
-        if ($varsayilanSubeId !== null && in_array($varsayilanSubeId, $subeIds, true)) {
-            $resolvedVarsayilan = $varsayilanSubeId;
-            $orderedSubeIds = self::normalizeSubeIdsWithVarsayilan($subeIds, $varsayilanSubeId);
-        } elseif (count($subeIds) > 0) {
-            $resolvedVarsayilan = $subeIds[0];
-            $orderedSubeIds = $subeIds;
-        }
-
         $rol = (string) $row['rol'];
+        $storedDefault = null;
+        if ($hasVarsayilanColumn) {
+            $storedDefault = self::readStoredVarsayilanFromRow($row);
+        }
 
         return [
             'id' => (int) $row['id'],
@@ -1078,14 +1108,26 @@ class YonetimController
             'ad_soyad' => (string) $row['ad_soyad'],
             'rol' => $rol,
             'durum' => (string) $row['durum'],
-            'sube_ids' => $orderedSubeIds,
-            'varsayilan_sube_id' => $resolvedVarsayilan,
+            'sube_ids' => $subeIds,
+            'varsayilan_sube_id' => $storedDefault,
             'telefon' => null,
             'personel_id' => null,
             'personel_ad_soyad' => null,
             'kullanici_tipi' => $rol === 'GENEL_YONETICI' ? 'HARICI' : 'IC_PERSONEL',
             'notlar' => null,
         ];
+    }
+
+    /** @param array<string, mixed> $row */
+    private static function readStoredVarsayilanFromRow(array $row)
+    {
+        if (!array_key_exists('varsayilan_sube_id', $row) || $row['varsayilan_sube_id'] === null || $row['varsayilan_sube_id'] === '') {
+            return null;
+        }
+
+        $parsed = (int) $row['varsayilan_sube_id'];
+
+        return $parsed > 0 ? $parsed : null;
     }
 
     /** @param array<int, int> $userIds @return array<int, array<int, int>> */
@@ -1115,9 +1157,11 @@ class YonetimController
     /** @return array<string, mixed>|null */
     private static function findKullaniciRowById(PDO $pdo, $userId)
     {
-        $stmt = $pdo->prepare(
-            'SELECT id, username, ad_soyad, rol, durum FROM users WHERE id = :id LIMIT 1'
-        );
+        $hasVarsayilan = UsersSchema::hasVarsayilanSubeId($pdo);
+        $sql = $hasVarsayilan
+            ? 'SELECT id, username, ad_soyad, rol, durum, varsayilan_sube_id FROM users WHERE id = :id LIMIT 1'
+            : 'SELECT id, username, ad_soyad, rol, durum FROM users WHERE id = :id LIMIT 1';
+        $stmt = $pdo->prepare($sql);
         $stmt->execute(['id' => $userId]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -1125,16 +1169,17 @@ class YonetimController
     }
 
     /** @return array<string, mixed>|null */
-    private static function findKullaniciById(PDO $pdo, $userId, $varsayilanSubeId = null)
+    private static function findKullaniciById(PDO $pdo, $userId)
     {
         $row = self::findKullaniciRowById($pdo, $userId);
         if ($row === null) {
             return null;
         }
 
+        $hasVarsayilan = UsersSchema::hasVarsayilanSubeId($pdo);
         $subeIds = self::loadSubeIdsByUserIds($pdo, [(int) $userId])[(int) $userId] ?? [];
 
-        return self::mapKullaniciRow($row, $subeIds, $varsayilanSubeId);
+        return self::mapKullaniciRow($row, $subeIds, $hasVarsayilan);
     }
 
     private static function usernameExists(PDO $pdo, $username, $excludeUserId = null)
@@ -1213,23 +1258,6 @@ class YonetimController
         if (!in_array($varsayilanSubeId, $subeIds, true)) {
             JsonResponse::badRequest('Varsayilan sube yetki verilen subeler icinde olmalidir.', 'VALIDATION_ERROR', 'varsayilan_sube_id');
         }
-    }
-
-    /** @param array<int, int> $subeIds @param int|null $varsayilanSubeId @return array<int, int> */
-    private static function normalizeSubeIdsWithVarsayilan(array $subeIds, $varsayilanSubeId)
-    {
-        if ($varsayilanSubeId === null || count($subeIds) === 0) {
-            return $subeIds;
-        }
-
-        $others = [];
-        foreach ($subeIds as $subeId) {
-            if ((int) $subeId !== (int) $varsayilanSubeId) {
-                $others[] = (int) $subeId;
-            }
-        }
-
-        return array_merge([(int) $varsayilanSubeId], $others);
     }
 
     /** @param array<int, int> $subeIds */

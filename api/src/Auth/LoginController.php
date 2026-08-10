@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Medisa\Api\Auth;
 
 use Medisa\Api\Database\Connection;
+use Medisa\Api\Database\UsersSchema;
 use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
 use Medisa\Api\Scope\SubeScope;
@@ -32,9 +33,11 @@ class LoginController
             JsonResponse::serverError('Veritabani baglantisi kurulamadi.');
         }
 
-        $stmt = $pdo->prepare(
-            'SELECT id, username, password_hash, ad_soyad, rol, durum FROM users WHERE username = :username LIMIT 1'
-        );
+        $hasVarsayilan = UsersSchema::hasVarsayilanSubeId($pdo);
+        $selectSql = $hasVarsayilan
+            ? 'SELECT id, username, password_hash, ad_soyad, rol, durum, varsayilan_sube_id FROM users WHERE username = :username LIMIT 1'
+            : 'SELECT id, username, password_hash, ad_soyad, rol, durum FROM users WHERE username = :username LIMIT 1';
+        $stmt = $pdo->prepare($selectSql);
         $stmt->execute(['username' => $username]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -56,7 +59,12 @@ class LoginController
             );
         }
         $subeList = self::loadSubeList($pdo, $subeIds);
-        $activeSubeId = SubeScope::resolveInitialActiveSubeId($subeIds);
+        $preferredSubeId = null;
+        if ($hasVarsayilan && array_key_exists('varsayilan_sube_id', $user) && $user['varsayilan_sube_id'] !== null && $user['varsayilan_sube_id'] !== '') {
+            $preferred = (int) $user['varsayilan_sube_id'];
+            $preferredSubeId = $preferred > 0 ? $preferred : null;
+        }
+        $activeSubeId = SubeScope::resolveInitialActiveSubeId($subeIds, $preferredSubeId);
 
         $ttl = (int) medisa_config('jwt_ttl_seconds', 86400);
         $token = Jwt::encode([

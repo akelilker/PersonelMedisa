@@ -53,7 +53,7 @@ describe("RevizyonController MariaDB", () => {
     const migrations = readdirSync(resolve(process.cwd(), "api/migrations"))
       .filter((name) => name.endsWith(".sql"))
       .sort();
-    expect(migrations.at(-1)).toBe("050_gorevler_ad_unique.sql");
+    expect(migrations.at(-1)).toBe("051_users_varsayilan_sube_id.sql");
   });
 
   it("runs HTTP revizyon talebi acceptance on MariaDB", () => {

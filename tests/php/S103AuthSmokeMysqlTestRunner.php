@@ -284,6 +284,18 @@ try {
     s103ApplyFile($pdo, '041_auth_smoke_readonly_role.sql');
     s103Assert(true, '041 ikinci apply idempotent');
 
+    s103ApplyFile($pdo, '051_users_varsayilan_sube_id.sql');
+    s103Assert(true, '051 ilk apply');
+    s103ApplyFile($pdo, '051_users_varsayilan_sube_id.sql');
+    s103Assert(true, '051 ikinci apply idempotent');
+    s103Assert(
+        (int) $pdo->query(
+            "SELECT COUNT(*) FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'varsayilan_sube_id'"
+        )->fetchColumn() === 1,
+        '051 varsayilan_sube_id column'
+    );
+
     $colType = (string) $pdo->query(
         "SELECT COLUMN_TYPE FROM information_schema.COLUMNS
          WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'rol'"

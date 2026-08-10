@@ -431,7 +431,7 @@ try {
 
     $files = pbMigrationFiles();
     pbAssert($files !== [] && $files[0] === '001_initial_schema.sql', 'zincir 001 ile baslar');
-    pbAssert(end($files) === '050_gorevler_ad_unique.sql', 'zincir 050 ile biter');
+    pbAssert(end($files) === '051_users_varsayilan_sube_id.sql', 'zincir 051 ile biter');
     foreach ($files as $file) {
         pbApplyFile($pdo, $file);
     }

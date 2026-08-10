@@ -90,11 +90,25 @@ class SubeScope
         }
     }
 
-    /** @param array<int, int> $subeIds */
-    public static function resolveInitialActiveSubeId(array $subeIds)
+    /**
+     * Resolve initial login active_sube_id.
+     * Preferred persisted default is used only when it belongs to allowed scope.
+     * Callers with one argument keep prior ASC-first / sole-sube behavior.
+     *
+     * @param array<int, int> $subeIds
+     * @param int|null $preferredSubeId
+     */
+    public static function resolveInitialActiveSubeId(array $subeIds, $preferredSubeId = null)
     {
         if (count($subeIds) === 0) {
             return null;
+        }
+
+        if ($preferredSubeId !== null && $preferredSubeId !== '') {
+            $preferred = (int) $preferredSubeId;
+            if ($preferred > 0 && in_array($preferred, $subeIds, true)) {
+                return $preferred;
+            }
         }
 
         if (count($subeIds) === 1) {

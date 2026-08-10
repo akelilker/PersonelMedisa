@@ -124,7 +124,7 @@ test.describe("yonetim kullanicilar API (S44)", () => {
     await expect(apiFetch(page, "/api/yonetim/kullanicilar")).resolves.toMatchObject({ status: 403 });
   });
 
-  test("create user with varsayilan_sube_id returns consistent sube_ids order", async ({ page }) => {
+  test("create user with varsayilan_sube_id persists stored default and ASC sube_ids", async ({ page }) => {
     await mockApi(page, "GENEL_YONETICI");
     await login(page, { username: "yonetici", password: "secret" });
 
@@ -145,11 +145,18 @@ test.describe("yonetim kullanicilar API (S44)", () => {
     expect(result.status).toBe(200);
     const data = result.json.data as Record<string, unknown>;
     expect(data.varsayilan_sube_id).toBe(2);
-    expect(data.sube_ids).toEqual([2, 1]);
+    expect(data.sube_ids).toEqual([1, 2]);
     expect(JSON.stringify(result.json)).not.toContain("password_hash");
+
+    const list = await apiFetch(page, "/api/yonetim/kullanicilar");
+    expect(list.status).toBe(200);
+    const items = (list.json.data as { items?: Array<Record<string, unknown>> })?.items ?? [];
+    const created = items.find((item) => item.username === "sube_sira_test");
+    expect(created?.varsayilan_sube_id).toBe(2);
+    expect(created?.sube_ids).toEqual([1, 2]);
   });
 
-  test("update user with varsayilan_sube_id returns consistent response", async ({ page }) => {
+  test("update user with varsayilan_sube_id persists and fresh GET matches", async ({ page }) => {
     await mockApi(page, "GENEL_YONETICI");
     await login(page, { username: "yonetici", password: "secret" });
 
@@ -170,7 +177,53 @@ test.describe("yonetim kullanicilar API (S44)", () => {
     expect(result.status).toBe(200);
     const data = result.json.data as Record<string, unknown>;
     expect(data.varsayilan_sube_id).toBe(2);
-    expect(data.sube_ids).toEqual([2, 1]);
+    expect(data.sube_ids).toEqual([1, 2]);
+
+    const clear = await apiFetch(page, "/api/yonetim/kullanicilar/3", {
+      method: "PUT",
+      body: {
+        username: "birim_amiri",
+        ad_soyad: "Ayşe Yılmaz",
+        kullanici_tipi: "IC_PERSONEL",
+        rol: "BIRIM_AMIRI",
+        personel_id: 1,
+        sube_ids: [1, 2],
+        varsayilan_sube_id: null,
+        durum: "AKTIF"
+      }
+    });
+    expect(clear.status).toBe(200);
+    expect((clear.json.data as Record<string, unknown>).varsayilan_sube_id).toBeNull();
+
+    const shrink = await apiFetch(page, "/api/yonetim/kullanicilar/3", {
+      method: "PUT",
+      body: {
+        username: "birim_amiri",
+        ad_soyad: "Ayşe Yılmaz",
+        kullanici_tipi: "IC_PERSONEL",
+        rol: "BIRIM_AMIRI",
+        personel_id: 1,
+        sube_ids: [1, 2],
+        varsayilan_sube_id: 2,
+        durum: "AKTIF"
+      }
+    });
+    expect(shrink.status).toBe(200);
+    const shrinkScope = await apiFetch(page, "/api/yonetim/kullanicilar/3", {
+      method: "PUT",
+      body: {
+        username: "birim_amiri",
+        ad_soyad: "Ayşe Yılmaz",
+        kullanici_tipi: "IC_PERSONEL",
+        rol: "BIRIM_AMIRI",
+        personel_id: 1,
+        sube_ids: [1],
+        durum: "AKTIF"
+      }
+    });
+    expect(shrinkScope.status).toBe(200);
+    expect((shrinkScope.json.data as Record<string, unknown>).varsayilan_sube_id).toBeNull();
+    expect((shrinkScope.json.data as Record<string, unknown>).sube_ids).toEqual([1]);
   });
 
   test("invalid varsayilan_sube_id returns validation error", async ({ page }) => {

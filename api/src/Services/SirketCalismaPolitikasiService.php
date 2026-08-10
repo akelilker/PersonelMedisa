@@ -685,7 +685,7 @@ class SirketCalismaPolitikasiService
 
     private static function assertCompleteDegerler(PDO $pdo, $politikaId)
     {
-        self::ensureLegacyDefaultDegerler($pdo, (int) $politikaId);
+        $legacyInserted = self::ensureLegacyDefaultDegerler($pdo, (int) $politikaId);
         $existing = self::listDegerler($pdo, (int) $politikaId);
         $codes = array_map(static function (array $row) {
             return (string) $row['parametre_kodu'];
@@ -697,9 +697,16 @@ class SirketCalismaPolitikasiService
             ]);
         }
         self::assertWorkweekSetConsistency($pdo, (int) $politikaId);
+        // Write-path backfill degisti ise stored fingerprint ayni transaction'da canonicalize edilmeli.
+        if ($legacyInserted) {
+            self::persistPolicyVersionHash($pdo, (int) $politikaId);
+        }
     }
 
-    /** Legacy rows: HAFTA_TATILI_GUNLERI yoksa Pazar ('0') ekle — production davranisi ayni. */
+    /**
+     * Legacy rows: HAFTA_TATILI_GUNLERI yoksa Pazar ('0') ekle — yalniz write transition (submit/approve).
+     * Pure read path cagirmaz. Return: en az bir default INSERT yapildi mi.
+     */
     private static function ensureLegacyDefaultDegerler(PDO $pdo, $politikaId)
     {
         $existing = self::listDegerler($pdo, (int) $politikaId);
@@ -712,6 +719,7 @@ class SirketCalismaPolitikasiService
                 politika_id, parametre_kodu, deger_tipi, sayisal_deger, metin_deger, birim
              ) VALUES (:pid, :kod, :tip, NULL, :metin, :birim)'
         );
+        $inserted = false;
         foreach (SirketCalismaPolitikasiCatalog::legacyDefaultValues() as $code => $defaultMetin) {
             if (isset($have[$code])) {
                 continue;
@@ -727,7 +735,19 @@ class SirketCalismaPolitikasiService
                 'metin' => $defaultMetin,
                 'birim' => $meta['birim'],
             ]);
+            $inserted = true;
         }
+
+        return $inserted;
+    }
+
+    private static function persistPolicyVersionHash(PDO $pdo, $politikaId)
+    {
+        $hash = self::computePolicyHash($pdo, (int) $politikaId);
+        $pdo->prepare('UPDATE sirket_calisma_politikalari SET policy_version_hash = :h WHERE id = :id')
+            ->execute(['h' => $hash, 'id' => (int) $politikaId]);
+
+        return $hash;
     }
 
     private static function assertWorkweekSetConsistency(PDO $pdo, $politikaId)

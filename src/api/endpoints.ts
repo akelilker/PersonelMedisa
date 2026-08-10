@@ -261,5 +261,19 @@ export const endpoints = {
     aylikOzet: "/yonetim/aylik-ozet",
     aylikOzetBolumOnay: "/yonetim/aylik-ozet/bolum-onay",
     aylikOzetKapat: "/yonetim/aylik-ozet/ay-kapat"
+  },
+  disiplinVakalar: {
+    list: "/disiplin-vakalar",
+    generate: "/disiplin-vakalar/generate",
+    detail: (id: number | string) => `/disiplin-vakalar/${id}`,
+    ikInceleme: (id: number | string) => `/disiplin-vakalar/${id}/ik-inceleme`,
+    savunmaTalep: (id: number | string) => `/disiplin-vakalar/${id}/savunma-talep`,
+    savunmaBelge: (id: number | string) => `/disiplin-vakalar/${id}/savunma-belge`,
+    nihaiKarar: (id: number | string) => `/disiplin-vakalar/${id}/nihai-karar`,
+    islemsizKapat: (id: number | string) => `/disiplin-vakalar/${id}/islemsiz-kapat`
+  },
+  puantajOlayKararlari: {
+    list: "/puantaj-olay-kararlari",
+    upsert: "/puantaj-olay-kararlari"
   }
 };

@@ -889,6 +889,16 @@ final class MaasHesaplamaEngine
             $haftalikIsGunu,
             $params[self::HOLIDAY_OVERTIME_POLICY_CODE] ?? null
         );
+        foreach ($input['puantajlar'] as $pendingRow) {
+            if (!empty($pendingRow['attendance_decision_pending'])) {
+                return [
+                    'error' => [
+                        'code' => 'ATTENDANCE_DECISION_PENDING',
+                        'message' => 'Puantaj olay karari bekleyen gunler var; maas hesabi durduruldu.',
+                    ],
+                ];
+            }
+        }
         if ($holidayOvertimeConflict['has_conflict']) {
             $reason = (string) ($holidayOvertimeConflict['reason'] ?? '');
             if (
@@ -1030,11 +1040,29 @@ final class MaasHesaplamaEngine
                 if ($tarih !== '' && isset($absenceDates[$tarih])) {
                     continue;
                 }
-                $tutar = $hourly->mulDiv($miktar, 60);
+                if (!empty($aday['pending_decision'])) {
+                    return [
+                        'error' => [
+                            'code' => 'ATTENDANCE_DECISION_PENDING',
+                            'message' => 'Etki adayi icin puantaj olay karari bekleniyor.',
+                        ],
+                    ];
+                }
+                $effectiveMiktar = isset($aday['effective_miktar']) ? (int) $aday['effective_miktar'] : $miktar;
+                if ($effectiveMiktar <= 0) {
+                    continue;
+                }
+                $tutar = $hourly->mulDiv($effectiveMiktar, 60);
                 $grossDeduct = $grossDeduct->add($tutar);
                 $sira++;
                 $kod = $tur === 'GEC_KALMA_DAKIKA' ? 'GEC_KALMA_KESINTISI' : 'ERKEN_CIKIS_KESINTISI';
-                $kalemler[] = self::line($sira, 'DEVAMSIZLIK', $kod, 'EKSI', $miktar, 'DAKIKA', null, $hourly->toDecimalString(), $tutar, 'ETKI_ADAYI', isset($aday['aday_id']) ? (int) $aday['aday_id'] : null, $kod, ['etki_turu' => $tur]);
+                $payloadMeta = [
+                    'etki_turu' => $tur,
+                    'raw_dakika' => isset($aday['raw_miktar']) ? (int) $aday['raw_miktar'] : $miktar,
+                    'effective_dakika' => $effectiveMiktar,
+                    'karar' => is_array($meta) && isset($meta['attendance_karar']) ? $meta['attendance_karar'] : null,
+                ];
+                $kalemler[] = self::line($sira, 'DEVAMSIZLIK', $kod, 'EKSI', $effectiveMiktar, 'DAKIKA', null, $hourly->toDecimalString(), $tutar, 'ETKI_ADAYI', isset($aday['aday_id']) ? (int) $aday['aday_id'] : null, $kod, $payloadMeta);
             } elseif ($tur === 'NORMAL_HASTALIK_ILK_2_GUN' || self::isNormalHastalikIlkIkiGunOdenmedi($tur, $meta, $aday)) {
                 $gun = $miktar > 0 ? $miktar : 1;
                 $tutar = $daily->mulDiv($gun, 1);
@@ -1094,8 +1122,14 @@ final class MaasHesaplamaEngine
             $tarih = (string) ($row['tarih'] ?? '');
             $gunTipi = (string) ($row['gun_tipi'] ?? '');
             $netDk = isset($row['net_calisma_suresi_dakika']) ? (int) $row['net_calisma_suresi_dakika'] : 0;
-            $gec = isset($row['gec_kalma_dakika']) ? (int) $row['gec_kalma_dakika'] : 0;
-            $erken = isset($row['erken_cikis_dakika']) ? (int) $row['erken_cikis_dakika'] : 0;
+            $gec = array_key_exists('gec_kalma_effective_dakika', $row)
+                ? (int) $row['gec_kalma_effective_dakika']
+                : (isset($row['gec_kalma_dakika']) ? (int) $row['gec_kalma_dakika'] : 0);
+            $erken = array_key_exists('erken_cikis_effective_dakika', $row)
+                ? (int) $row['erken_cikis_effective_dakika']
+                : (isset($row['erken_cikis_dakika']) ? (int) $row['erken_cikis_dakika'] : 0);
+            $gecRaw = isset($row['gec_kalma_dakika']) ? (int) $row['gec_kalma_dakika'] : (isset($row['attendance_late_raw_dakika']) ? (int) $row['attendance_late_raw_dakika'] : $gec);
+            $erkenRaw = isset($row['erken_cikis_dakika']) ? (int) $row['erken_cikis_dakika'] : (isset($row['attendance_early_raw_dakika']) ? (int) $row['attendance_early_raw_dakika'] : $erken);
             $class = self::classifyHolidayDay($row);
 
             if ($tarih !== '' && !isset($absenceDates[$tarih])) {
@@ -1103,13 +1137,49 @@ final class MaasHesaplamaEngine
                     $tutar = $hourly->mulDiv($gec, 60);
                     $grossDeduct = $grossDeduct->add($tutar);
                     $sira++;
-                    $kalemler[] = self::line($sira, 'DEVAMSIZLIK', 'GEC_KALMA_KESINTISI', 'EKSI', $gec, 'DAKIKA', null, $hourly->toDecimalString(), $tutar, 'PUANTAJ', isset($row['muhur_satir_id']) ? (int) $row['muhur_satir_id'] : null, 'Gec kalma', []);
+                    $kalemler[] = self::line(
+                        $sira,
+                        'DEVAMSIZLIK',
+                        'GEC_KALMA_KESINTISI',
+                        'EKSI',
+                        $gec,
+                        'DAKIKA',
+                        null,
+                        $hourly->toDecimalString(),
+                        $tutar,
+                        'PUANTAJ',
+                        isset($row['muhur_satir_id']) ? (int) $row['muhur_satir_id'] : null,
+                        'Gec kalma',
+                        [
+                            'raw_dakika' => $gecRaw,
+                            'effective_dakika' => $gec,
+                            'karar' => $row['attendance_late_karar'] ?? null,
+                        ]
+                    );
                 }
                 if ($erken > 0) {
                     $tutar = $hourly->mulDiv($erken, 60);
                     $grossDeduct = $grossDeduct->add($tutar);
                     $sira++;
-                    $kalemler[] = self::line($sira, 'DEVAMSIZLIK', 'ERKEN_CIKIS_KESINTISI', 'EKSI', $erken, 'DAKIKA', null, $hourly->toDecimalString(), $tutar, 'PUANTAJ', isset($row['muhur_satir_id']) ? (int) $row['muhur_satir_id'] : null, 'Erken cikis', []);
+                    $kalemler[] = self::line(
+                        $sira,
+                        'DEVAMSIZLIK',
+                        'ERKEN_CIKIS_KESINTISI',
+                        'EKSI',
+                        $erken,
+                        'DAKIKA',
+                        null,
+                        $hourly->toDecimalString(),
+                        $tutar,
+                        'PUANTAJ',
+                        isset($row['muhur_satir_id']) ? (int) $row['muhur_satir_id'] : null,
+                        'Erken cikis',
+                        [
+                            'raw_dakika' => $erkenRaw,
+                            'effective_dakika' => $erken,
+                            'karar' => $row['attendance_early_karar'] ?? null,
+                        ]
+                    );
                 }
             }
 

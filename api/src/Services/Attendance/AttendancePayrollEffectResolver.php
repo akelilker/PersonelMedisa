@@ -1,0 +1,261 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Medisa\Api\Services\Attendance;
+
+/**
+ * Pure attendance payroll effect resolver — no DB access.
+ * Raw gec_kalma_dakika / erken_cikis_dakika are never mutated.
+ */
+final class AttendancePayrollEffectResolver
+{
+    /**
+     * @param array<string, mixed> $row
+     * @return array{raw:int,effective:int,karar:?string,block:bool,reason:?string}
+     */
+    public static function resolveLateDeduction(array $row)
+    {
+        $raw = isset($row['gec_kalma_dakika']) ? (int) $row['gec_kalma_dakika'] : 0;
+        $karar = self::normalizeKarar($row);
+        $bildirdi = self::isTruthy($row['durumu_bildirdi_mi'] ?? null);
+
+        if ($karar === AttendanceDisciplineCatalog::KARAR_TOLERANS_UYGULA) {
+            return self::result($raw, 0, $karar, false, 'TOLERANS_UYGULA');
+        }
+        if ($karar === AttendanceDisciplineCatalog::KARAR_KESINTI_UYGULA) {
+            return self::result($raw, $raw, $karar, false, 'KESINTI_UYGULA');
+        }
+        if ($bildirdi && ($karar === null || $karar === AttendanceDisciplineCatalog::KARAR_BEKLIYOR)) {
+            return self::result($raw, 0, $karar, true, 'PENDING_MANAGER_DECISION');
+        }
+        if ($karar === AttendanceDisciplineCatalog::KARAR_OFFICIAL_PROCESS_REQUIRED) {
+            return self::result($raw, 0, $karar, false, 'OFFICIAL_PROCESS_REQUIRED');
+        }
+
+        return self::result($raw, $raw > 0 ? $raw : 0, $karar, false, null);
+    }
+
+    /**
+     * @param array<string, mixed> $row
+     * @return array{raw:int,effective:int,karar:?string,block:bool,reason:?string}
+     */
+    public static function resolveEarlyDeduction(array $row)
+    {
+        $raw = isset($row['erken_cikis_dakika']) ? (int) $row['erken_cikis_dakika'] : 0;
+        $karar = self::normalizeKarar($row);
+        $bildirdi = self::isTruthy($row['durumu_bildirdi_mi'] ?? null);
+
+        if ($karar === AttendanceDisciplineCatalog::KARAR_OFFICIAL_PROCESS_REQUIRED || self::hasApprovedLeaveFlag($row)) {
+            return self::result($raw, 0, $karar, false, 'OFFICIAL_OR_APPROVED_LEAVE');
+        }
+        if ($karar === AttendanceDisciplineCatalog::KARAR_TOLERANS_UYGULA) {
+            return self::result($raw, 0, $karar, false, 'TOLERANS_UYGULA');
+        }
+        if ($karar === AttendanceDisciplineCatalog::KARAR_KESINTI_UYGULA) {
+            return self::result($raw, $raw, $karar, false, 'KESINTI_UYGULA');
+        }
+        if ($bildirdi && ($karar === null || $karar === AttendanceDisciplineCatalog::KARAR_BEKLIYOR)) {
+            return self::result($raw, 0, $karar, true, 'PENDING_MANAGER_DECISION');
+        }
+
+        return self::result($raw, $raw > 0 ? $raw : 0, $karar, false, null);
+    }
+
+    /**
+     * @param array<string, mixed> $row
+     * @param array<string, mixed>|null $lateKararRow
+     * @param array<string, mixed>|null $earlyKararRow
+     * @return array<string, mixed>
+     */
+    public static function applyToPuantajRow(array $row, $lateKararRow = null, $earlyKararRow = null)
+    {
+        // Backward-compatible single kararRow call: applyToPuantajRow($row, $kararRow)
+        if (func_num_args() === 2 && is_array($lateKararRow) && isset($lateKararRow['olay_turu'])) {
+            $olay = strtoupper((string) $lateKararRow['olay_turu']);
+            if ($olay === AttendanceDisciplineCatalog::OLAY_ERKEN_CIKIS) {
+                $earlyKararRow = $lateKararRow;
+                $lateKararRow = null;
+            }
+        }
+
+        $merged = $row;
+        $bildirdi = null;
+        if (is_array($lateKararRow) && array_key_exists('durumu_bildirdi_mi', $lateKararRow)) {
+            $bildirdi = $lateKararRow['durumu_bildirdi_mi'];
+        }
+        if (is_array($earlyKararRow) && array_key_exists('durumu_bildirdi_mi', $earlyKararRow)) {
+            $bildirdi = $earlyKararRow['durumu_bildirdi_mi'];
+        }
+        if ($bildirdi !== null) {
+            $merged['durumu_bildirdi_mi'] = $bildirdi;
+        }
+
+        $lateKarar = is_array($lateKararRow) && isset($lateKararRow['karar'])
+            ? (string) $lateKararRow['karar']
+            : null;
+        $earlyKarar = is_array($earlyKararRow) && isset($earlyKararRow['karar'])
+            ? (string) $earlyKararRow['karar']
+            : null;
+
+        $lateRow = $merged;
+        if ($lateKarar !== null) {
+            $lateRow['puantaj_olay_karar'] = $lateKarar;
+        } else {
+            unset($lateRow['puantaj_olay_karar']);
+        }
+        $earlyRow = $merged;
+        if ($earlyKarar !== null) {
+            $earlyRow['puantaj_olay_karar'] = $earlyKarar;
+        } else {
+            unset($earlyRow['puantaj_olay_karar']);
+        }
+
+        $late = self::resolveLateDeduction($lateRow);
+        $early = self::resolveEarlyDeduction($earlyRow);
+
+        $merged['gec_kalma_effective_dakika'] = $late['effective'];
+        $merged['erken_cikis_effective_dakika'] = $early['effective'];
+        $merged['attendance_decision_pending'] = $late['block'] || $early['block'];
+        $merged['attendance_late_raw_dakika'] = $late['raw'];
+        $merged['attendance_early_raw_dakika'] = $early['raw'];
+        $merged['attendance_late_karar'] = $late['karar'];
+        $merged['attendance_early_karar'] = $early['karar'];
+        if (is_array($lateKararRow) && isset($lateKararRow['id'])) {
+            $merged['attendance_late_karar_id'] = (int) $lateKararRow['id'];
+        }
+        if (is_array($earlyKararRow) && isset($earlyKararRow['id'])) {
+            $merged['attendance_early_karar_id'] = (int) $earlyKararRow['id'];
+        }
+
+        return $merged;
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $puantajlar
+     * @param array<string, array<string, mixed>> $kararByKey personelId|tarih|olay => karar row
+     * @return array<int, array<string, mixed>>
+     */
+    public static function annotatePuantajlar(array $puantajlar, array $kararByKey)
+    {
+        $out = [];
+        foreach ($puantajlar as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $personelId = isset($row['personel_id']) ? (int) $row['personel_id'] : 0;
+            $tarih = (string) ($row['tarih'] ?? '');
+            $lateKey = self::kararKey($personelId, $tarih, AttendanceDisciplineCatalog::OLAY_GEC_KALMA);
+            $earlyKey = self::kararKey($personelId, $tarih, AttendanceDisciplineCatalog::OLAY_ERKEN_CIKIS);
+            $lateKarar = isset($kararByKey[$lateKey]) ? $kararByKey[$lateKey] : null;
+            $earlyKarar = isset($kararByKey[$earlyKey]) ? $kararByKey[$earlyKey] : null;
+            $out[] = self::applyToPuantajRow($row, $lateKarar, $earlyKarar);
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param array<string, mixed> $aday
+     * @param array<string, mixed>|null $kararRow
+     * @return array<string, mixed>
+     */
+    public static function enrichEtkiAday(array $aday, $kararRow)
+    {
+        if (!is_array($aday)) {
+            return $aday;
+        }
+        $tur = strtoupper((string) ($aday['etki_turu'] ?? ''));
+        if ($tur !== 'GEC_KALMA_DAKIKA' && $tur !== 'ERKEN_CIKIS_DAKIKA') {
+            return $aday;
+        }
+
+        $pseudoRow = [
+            'gec_kalma_dakika' => $tur === 'GEC_KALMA_DAKIKA' ? (int) ($aday['etki_miktari'] ?? 0) : 0,
+            'erken_cikis_dakika' => $tur === 'ERKEN_CIKIS_DAKIKA' ? (int) ($aday['etki_miktari'] ?? 0) : 0,
+            'durumu_bildirdi_mi' => is_array($kararRow) && array_key_exists('durumu_bildirdi_mi', $kararRow)
+                ? $kararRow['durumu_bildirdi_mi']
+                : ($aday['durumu_bildirdi_mi'] ?? null),
+        ];
+        if (is_array($kararRow) && isset($kararRow['karar'])) {
+            $pseudoRow['puantaj_olay_karar'] = (string) $kararRow['karar'];
+        }
+
+        $resolved = $tur === 'GEC_KALMA_DAKIKA'
+            ? self::resolveLateDeduction($pseudoRow)
+            : self::resolveEarlyDeduction($pseudoRow);
+
+        $aday['effective_miktar'] = $resolved['effective'];
+        $aday['raw_miktar'] = $resolved['raw'];
+        $aday['pending_decision'] = $resolved['block'];
+        if ($resolved['karar'] !== null) {
+            $meta = is_array($aday['metadata'] ?? null) ? $aday['metadata'] : [];
+            $meta['attendance_karar'] = $resolved['karar'];
+            $meta['attendance_raw_dakika'] = $resolved['raw'];
+            $meta['attendance_effective_dakika'] = $resolved['effective'];
+            $aday['metadata'] = $meta;
+        }
+
+        return $aday;
+    }
+
+    public static function kararKey($personelId, $tarih, $olayTuru)
+    {
+        return (int) $personelId . '|' . trim((string) $tarih) . '|' . strtoupper(trim((string) $olayTuru));
+    }
+
+    /** @param array<string, mixed> $row */
+    private static function normalizeKarar(array $row)
+    {
+        $karar = null;
+        if (isset($row['puantaj_olay_karar'])) {
+            $karar = strtoupper(trim((string) $row['puantaj_olay_karar']));
+        } elseif (isset($row['karar'])) {
+            $karar = strtoupper(trim((string) $row['karar']));
+        }
+        if ($karar === '') {
+            return null;
+        }
+
+        return $karar;
+    }
+
+    /** @param mixed $value */
+    private static function isTruthy($value)
+    {
+        if ($value === null) {
+            return false;
+        }
+        if (is_bool($value)) {
+            return $value;
+        }
+
+        return (int) $value === 1;
+    }
+
+    /** @param array<string, mixed> $row */
+    private static function hasApprovedLeaveFlag(array $row)
+    {
+        if (!empty($row['onayli_izin_var']) || !empty($row['approved_leave'])) {
+            return true;
+        }
+        $dayanak = strtoupper(trim((string) ($row['dayanak'] ?? '')));
+        if ($dayanak === '') {
+            return false;
+        }
+
+        return strpos($dayanak, 'IZIN') !== false || strpos($dayanak, 'RAPOR') !== false;
+    }
+
+    /** @return array{raw:int,effective:int,karar:?string,block:bool,reason:?string} */
+    private static function result($raw, $effective, $karar, $block, $reason)
+    {
+        return [
+            'raw' => (int) $raw,
+            'effective' => (int) $effective,
+            'karar' => $karar,
+            'block' => (bool) $block,
+            'reason' => $reason,
+        ];
+    }
+}

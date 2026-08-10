@@ -13,6 +13,7 @@ import { formatSurecStateLabel, formatSurecTuruLabel } from "../../../lib/displa
 import type { KeyOption } from "../../../types/referans";
 import type { Surec } from "../../../types/surec";
 import { SurecChoiceGroup, UCRETLI_SELECT_OPTIONS } from "../components/SurecFormFields";
+import { DisiplinAdaylariSection } from "../components/DisiplinAdaylariSection";
 
 const SUREC_CREATE_FORM_ID = "surec-create-form";
 const SUREC_EDIT_FORM_ID = "surec-edit-form";
@@ -69,6 +70,7 @@ export function SurecTakipPage() {
   const canEditSurec = hasPermission("surecler.update");
   const canCancelSurec = hasPermission("surecler.cancel");
   const canOpenSurecDetail = hasPermission("surecler.detail.view");
+  const canViewDisiplin = hasPermission("disiplin.view");
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -129,6 +131,8 @@ export function SurecTakipPage() {
       </div>
 
       <SubeDetailListNotice />
+
+      {canViewDisiplin ? <DisiplinAdaylariSection /> : null}
 
       <form className="form-filter-panel" onSubmit={submitFilters}>
         <div className="form-field-grid">

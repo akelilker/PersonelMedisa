@@ -26,7 +26,8 @@ export function isDisiplinSurecSignal(surec: Surec) {
     haystack.includes("DEVAMSIZ") ||
     haystack.includes("GELMEDI") ||
     haystack.includes("CEZA") ||
-    normalizeSurecTypeToken(surec.surec_turu) === "UYARI"
+    normalizeSurecTypeToken(surec.surec_turu) === "UYARI" ||
+    normalizeSurecTypeToken(surec.surec_turu) === "DISIPLIN"
   );
 }
 

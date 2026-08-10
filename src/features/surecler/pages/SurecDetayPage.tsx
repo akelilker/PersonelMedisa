@@ -8,6 +8,7 @@ import {
   formatSurecTuruLabel,
   formatUcretliMiLabel
 } from "../../../lib/display/enum-display";
+import { DisiplinVakaPanel } from "../components/DisiplinVakaPanel";
 
 export function SurecDetayPage() {
   const { surecId } = useParams();
@@ -60,6 +61,10 @@ export function SurecDetayPage() {
             <strong>Açıklama:</strong> {surec.aciklama ?? "-"}
           </p>
         </div>
+      ) : null}
+
+      {!isLoading && !errorMessage && surec?.surec_turu === "DISIPLIN" ? (
+        <DisiplinVakaPanel surecId={surec.id} />
       ) : null}
 
       <div className="module-links">

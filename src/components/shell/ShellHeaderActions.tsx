@@ -145,6 +145,10 @@ export function ShellHeaderActions({ contextLabel, minimal = false }: ShellHeade
   const canViewYonetimPanel = hasPermission("yonetim-paneli.view");
   const canManageYonetimPanel = hasPermission("yonetim-paneli.manage");
   const canViewMevzuat = hasPermission("mevzuat_parametreleri.view");
+  const canViewSaklama =
+    hasPermission("legal_hold.manage") ||
+    hasPermission("retention.destruction.approve") ||
+    (hasPermission("retention.view") && canViewYonetimPanel);
   const canViewResmiTatilTakvimi = hasPermission("resmi_tatil_takvimi.view");
 
   const secondaryModules = useMemo(
@@ -610,6 +614,17 @@ export function ShellHeaderActions({ contextLabel, minimal = false }: ShellHeade
               }}
             >
               Mevzuat Parametreleri
+            </button>
+          ) : null}
+          {canViewSaklama ? (
+            <button
+              type="button"
+              data-testid="settings-saklama-legal-hold"
+              onClick={() => {
+                navigateTo("/yonetim-paneli?tab=saklama");
+              }}
+            >
+              Saklama / Legal Hold
             </button>
           ) : null}
           {canViewResmiTatilTakvimi ? (

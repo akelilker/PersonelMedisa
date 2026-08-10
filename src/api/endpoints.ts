@@ -275,5 +275,20 @@ export const endpoints = {
   puantajOlayKararlari: {
     list: "/puantaj-olay-kararlari",
     upsert: "/puantaj-olay-kararlari"
+  },
+  arsiv: {
+    personeller: "/arsiv/personeller",
+    personelDetail: (id: number | string) => `/arsiv/personeller/${id}`
+  },
+  legalHoldlar: {
+    list: "/legal-holdlar",
+    create: "/legal-holdlar",
+    release: (id: number | string) => `/legal-holdlar/${id}/release`
+  },
+  retention: {
+    eligibility: "/retention/eligibility",
+    imhaTalepleri: "/retention/imha-talepleri",
+    imhaApprove: (id: number | string) => `/retention/imha-talepleri/${id}/approve`,
+    imhaAuditleri: "/retention/imha-auditleri"
   }
 };

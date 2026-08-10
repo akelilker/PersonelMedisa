@@ -32,11 +32,11 @@ describe("I13-B default branch persistence source locks", () => {
     expect(scope).toContain("in_array($preferred, $subeIds, true)");
   });
 
-  it("migration tip ends at 051", () => {
+  it("migration tip ends at 053", () => {
     const migrations = readdirSync(resolve("api/migrations"))
       .filter((name) => /^\d{3}_.+\.sql$/.test(name))
       .sort();
     expect(migrations[0]).toBe("001_initial_schema.sql");
-    expect(migrations.at(-1)).toBe("052_puantaj_tolerans_ve_disiplin.sql");
+    expect(migrations.at(-1)).toBe("053_retention_legal_hold_arsiv.sql");
   });
 });

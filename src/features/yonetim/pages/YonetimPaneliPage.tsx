@@ -20,6 +20,7 @@ import {
 } from "../../../api/yonetim.api";
 import { useRoleAccess } from "../../../hooks/use-role-access";
 import { MevzuatParametreleriPanel } from "../components/MevzuatParametreleriPanel";
+import { SaklamaLegalHoldPanel } from "../components/SaklamaLegalHoldPanel";
 import { isRealYonetimKullaniciApi } from "../../../lib/yonetim/kullanici-api-contract";
 import type { UserRole } from "../../../types/auth";
 import { ASSIGNABLE_USER_ROLES } from "../../../types/auth";
@@ -34,7 +35,7 @@ import type {
   YonetimSube
 } from "../../../types/yonetim";
 
-type ActiveTab = "kullanicilar" | "subeler" | "mevzuat";
+type ActiveTab = "kullanicilar" | "subeler" | "mevzuat" | "saklama";
 type YonetimViewMode = "card" | "list";
 
 function resolveYonetimActiveTab(tabParam: string | null): ActiveTab {
@@ -44,6 +45,9 @@ function resolveYonetimActiveTab(tabParam: string | null): ActiveTab {
   }
   if (normalized === "mevzuat") {
     return "mevzuat";
+  }
+  if (normalized === "saklama" || normalized === "legal-hold" || normalized === "retention") {
+    return "saklama";
   }
   return "kullanicilar";
 }
@@ -77,7 +81,9 @@ const ROLE_LABELS: Record<UserRole, string> = {
   PATRON: "Patron",
   AUTH_SMOKE_READONLY: "Teknik Smoke — Salt Okuma",
   IK_BORDRO: "İK / Bordro",
-  SGK_KARAR_ONAY_YETKILISI: "SGK Karar Onay Yetkilisi"
+  SGK_KARAR_ONAY_YETKILISI: "SGK Karar Onay Yetkilisi",
+  IDARI_ISLER: "İdari İşler",
+  SISTEM_YONETICISI: "Sistem Yöneticisi"
 };
 
 const KULLANICI_TIPI_LABELS: Record<KullaniciTipi, string> = {
@@ -448,9 +454,18 @@ export function YonetimPaneliPage() {
   const canManageYonetimPanel = hasPermission("yonetim-paneli.manage");
   const canViewMevzuat = hasPermission("mevzuat_parametreleri.view");
   const canManageMevzuat = hasPermission("mevzuat_parametreleri.manage");
+  const canViewSaklama =
+    hasPermission("legal_hold.manage") ||
+    hasPermission("retention.destruction.approve") ||
+    (hasPermission("retention.view") && hasPermission("yonetim-paneli.view"));
   const realKullaniciApi = isRealYonetimKullaniciApi();
   const requestedTab = resolveYonetimActiveTab(searchParams.get("tab"));
-  const activeTab: ActiveTab = requestedTab === "mevzuat" && !canViewMevzuat ? "kullanicilar" : requestedTab;
+  let activeTab: ActiveTab = requestedTab;
+  if (requestedTab === "mevzuat" && !canViewMevzuat) {
+    activeTab = "kullanicilar";
+  } else if (requestedTab === "saklama" && !canViewSaklama) {
+    activeTab = "kullanicilar";
+  }
 
   const [kullaniciViewMode, setKullaniciViewMode] = useState<YonetimViewMode>("card");
   const [subeViewMode, setSubeViewMode] = useState<YonetimViewMode>("card");
@@ -987,6 +1002,10 @@ export function YonetimPaneliPage() {
 
       {!isLoading && !errorMessage && activeTab === "mevzuat" && canViewMevzuat ? (
         <MevzuatParametreleriPanel canManage={canManageMevzuat} />
+      ) : null}
+
+      {!isLoading && !errorMessage && activeTab === "saklama" && canViewSaklama ? (
+        <SaklamaLegalHoldPanel />
       ) : null}
 
       {isKullaniciFormOpen ? (

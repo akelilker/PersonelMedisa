@@ -48,4 +48,18 @@ export type Personel = {
   model_versiyonu?: string | null;
   prim_kurali_id?: number;
   prim_kurali_adi?: string;
+  /** Phase C archive markers (PASIF + arsiv.view). */
+  arsiv_modu?: boolean;
+  read_only_archive?: boolean;
+  policy_note?: string;
+  legal_hold_active?: boolean;
+  retention_summary?: {
+    category?: string;
+    trigger_type?: string;
+    trigger_date?: string;
+    retention_until?: string;
+    earliest_destruction_review_date?: string;
+    policy_note?: string;
+    code?: string;
+  } | null;
 };

@@ -90,6 +90,14 @@ class RolePermissions
             'disiplin.review',
             'disiplin.defense_manage',
             'puantaj.olay_karar.view',
+            'arsiv.view',
+            'arsiv.download',
+            'arsiv.audit.view',
+            'retention.view',
+            'legal_hold.manage',
+            'retention.destruction.request',
+            'retention.destruction.approve',
+            'retention.destruction.view',
         ],
         'BOLUM_YONETICISI' => [
             'personeller.view',
@@ -261,6 +269,9 @@ class RolePermissions
             'surecler.view',
             'surecler.view.sube',
             'surecler.detail.view',
+            'arsiv.view',
+            'arsiv.download',
+            'retention.view',
         ],
         // Approve-only: SGK paket + sirket calisma politikasi onay (prepare yok).
         'SGK_KARAR_ONAY_YETKILISI' => [
@@ -270,6 +281,27 @@ class RolePermissions
             'sirket_parametreleri.view',
             'bordro_kesinlestirme.approve',
             'sgk_karar_paketi.approve',
+        ],
+        // Idari isler: arsiv okuma + dar personel/surec/rapor goruntuleme (legal hold / imha onayi yok).
+        'IDARI_ISLER' => [
+            'personeller.view',
+            'personeller.detail.view',
+            'surecler.view',
+            'raporlar.view',
+            'arsiv.view',
+            'arsiv.download',
+            'retention.view',
+        ],
+        // Teknik: arsiv/retention goruntuleme (legal_hold.manage ve destruction.approve yok).
+        'SISTEM_YONETICISI' => [
+            'personeller.view',
+            'personeller.view.sube',
+            'personeller.detail.view',
+            'arsiv.view',
+            'arsiv.download',
+            'arsiv.audit.view',
+            'retention.view',
+            'retention.destruction.view',
         ],
     ];
 

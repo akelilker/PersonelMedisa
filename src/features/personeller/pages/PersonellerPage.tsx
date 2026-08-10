@@ -181,6 +181,7 @@ export function PersonellerPage() {
   const canOpenDetail = hasPermission("personeller.detail.view");
   const canCreatePersonel = hasPermission("personeller.create");
   const canApplyPersonelImport = hasPermission("personeller.import.apply");
+  const canViewArsiv = hasPermission("arsiv.view");
   const navigate = useNavigate();
   const [searchExpanded, setSearchExpanded] = useState(false);
   const [filterExpanded, setFilterExpanded] = useState(false);
@@ -189,6 +190,7 @@ export function PersonellerPage() {
   const [historyModalOpen, setHistoryModalOpen] = useState(false);
 
   const { draft } = listQuery;
+  const isArchiveMode = canViewArsiv && draft.aktiflik === "pasif";
   const page = listQuery.page;
   const departmanFilterOptions = toSelectOptions(refs.departmanOptions);
   const personelTipiFilterOptions = toSelectOptions(refs.personelTipiOptions);
@@ -198,6 +200,12 @@ export function PersonellerPage() {
       <h2 id="personeller-page-heading" className="personeller-sr-only">
         Personeller
       </h2>
+
+      {isArchiveMode ? (
+        <p className="personeller-archive-banner" data-testid="personeller-arsiv-banner" role="status">
+          Arşiv — Medisa saklama politikası
+        </p>
+      ) : null}
 
       <div className="personeller-toolbar">
         <div className="personeller-toolbar-main">
@@ -351,21 +359,23 @@ export function PersonellerPage() {
                       />
                       <span>Aktif</span>
                     </label>
-                    <label className="personeller-checkbox-inline">
-                      <input
-                        type="checkbox"
-                        name="personel-filter-pasif"
-                        checked={draft.aktiflik === "pasif"}
-                        onChange={(event) => {
-                          if (event.target.checked) {
-                            setDraftAktiflik("pasif");
-                          } else if (draft.aktiflik === "pasif") {
-                            setDraftAktiflik("tum");
-                          }
-                        }}
-                      />
-                      <span>Pasif</span>
-                    </label>
+                    {canViewArsiv ? (
+                      <label className="personeller-checkbox-inline">
+                        <input
+                          type="checkbox"
+                          name="personel-filter-pasif"
+                          checked={draft.aktiflik === "pasif"}
+                          onChange={(event) => {
+                            if (event.target.checked) {
+                              setDraftAktiflik("pasif");
+                            } else if (draft.aktiflik === "pasif") {
+                              setDraftAktiflik("tum");
+                            }
+                          }}
+                        />
+                        <span>Arşiv</span>
+                      </label>
+                    ) : null}
                   </div>
                 </div>
               </div>

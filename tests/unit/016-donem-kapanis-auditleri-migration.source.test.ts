@@ -53,6 +53,6 @@ describe("016_donem_kapanis_auditleri migration source", () => {
       .filter((name) => /^\d{3}_.*\.sql$/.test(name))
       .sort();
     expect(migrations).toContain("016_donem_kapanis_auditleri.sql");
-    expect(migrations.at(-1)).toBe("052_puantaj_tolerans_ve_disiplin.sql");
+    expect(migrations.at(-1)).toBe("053_retention_legal_hold_arsiv.sql");
   });
 });

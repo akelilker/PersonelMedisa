@@ -54,11 +54,12 @@ describe("attendance discipline source contract", () => {
     expect(vakaPanel).not.toContain("canReview || canFinalDecision");
   });
 
-  it("keeps migration tip at 052 and audit table in migration", () => {
+  it("keeps migration tip at 053 while 052 attendance file remains unchanged", () => {
     const migrations = readdirSync(resolve(root, "api/migrations"))
       .filter((name) => name.endsWith(".sql"))
       .sort();
-    expect(migrations.at(-1)).toBe("052_puantaj_tolerans_ve_disiplin.sql");
+    expect(migrations.at(-1)).toBe("053_retention_legal_hold_arsiv.sql");
+    expect(migrations).toContain("052_puantaj_tolerans_ve_disiplin.sql");
     const sql = readFileSync(resolve(root, "api/migrations/052_puantaj_tolerans_ve_disiplin.sql"), "utf8");
     expect(sql).toContain("puantaj_olay_karar_auditleri");
     expect(sql).toContain("puantaj_olay_kararlari");

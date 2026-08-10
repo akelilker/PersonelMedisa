@@ -6,7 +6,9 @@ export type UserRole =
   | "PATRON"
   | "AUTH_SMOKE_READONLY"
   | "IK_BORDRO"
-  | "SGK_KARAR_ONAY_YETKILISI";
+  | "SGK_KARAR_ONAY_YETKILISI"
+  | "IDARI_ISLER"
+  | "SISTEM_YONETICISI";
 
 export type UiProfile = "yonetim" | "birim_amiri";
 
@@ -58,6 +60,7 @@ export const ASSIGNABLE_USER_ROLES: UserRole[] = [
   "PATRON",
   "IK_BORDRO",
   "SGK_KARAR_ONAY_YETKILISI"
+  // IDARI_ISLER / SISTEM_YONETICISI: additive schema roles — no seed; not in assignable UI.
 ];
 
 export const ALL_ROLES: UserRole[] = [
@@ -66,5 +69,7 @@ export const ALL_ROLES: UserRole[] = [
   "PATRON",
   "AUTH_SMOKE_READONLY",
   "IK_BORDRO",
-  "SGK_KARAR_ONAY_YETKILISI"
+  "SGK_KARAR_ONAY_YETKILISI",
+  "IDARI_ISLER",
+  "SISTEM_YONETICISI"
 ];

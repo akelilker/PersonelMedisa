@@ -13,7 +13,9 @@ const USER_ROLE_LABELS: Record<UserRole, string> = {
   PATRON: "Patron",
   AUTH_SMOKE_READONLY: "Teknik Smoke — Salt Okuma",
   IK_BORDRO: "İK / Bordro",
-  SGK_KARAR_ONAY_YETKILISI: "SGK Karar Onay Yetkilisi"
+  SGK_KARAR_ONAY_YETKILISI: "SGK Karar Onay Yetkilisi",
+  IDARI_ISLER: "İdari İşler",
+  SISTEM_YONETICISI: "Sistem Yöneticisi"
 };
 
 const UI_PROFILE_LABELS: Record<UiProfile, string> = {

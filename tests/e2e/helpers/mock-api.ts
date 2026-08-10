@@ -12002,9 +12002,11 @@ let personelBelgeKaydiIdCounter = 903;
               password?: string;
               password_hash?: string;
             };
+            const sortedSubeIds = [...item.sube_ids].sort((a, b) => a - b);
             return {
               ...safe,
-              sube_ids: normalizeMockSubeIdsWithVarsayilan(item.sube_ids, item.varsayilan_sube_id),
+              sube_ids: sortedSubeIds,
+              varsayilan_sube_id: item.varsayilan_sube_id ?? null,
               personel_ad_soyad:
                 item.personel_id != null
                   ? personeller.find((personel) => personel.id === item.personel_id)
@@ -12062,12 +12064,13 @@ let personelBelgeKaydiIdCounter = 903;
       const linkedPersonel =
         payload.personel_id != null ? personeller.find((item) => item.id === payload.personel_id) ?? null : null;
 
-      const normalizedSubeIds = normalizeMockSubeIdsWithVarsayilan(
-        payload.sube_ids ?? [],
-        payload.varsayilan_sube_id ?? null
-      );
+      const sortedSubeIds = [...(payload.sube_ids ?? [])]
+        .map((id) => Number(id))
+        .filter((id) => Number.isFinite(id) && id > 0)
+        .sort((a, b) => a - b);
+      const uniqueSubeIds = Array.from(new Set(sortedSubeIds));
       const resolvedVarsayilan =
-        payload.varsayilan_sube_id ?? (normalizedSubeIds.length > 0 ? normalizedSubeIds[0] : null);
+        payload.varsayilan_sube_id === undefined ? null : payload.varsayilan_sube_id ?? null;
 
       const created = {
         id: ++kullaniciIdCounter,
@@ -12077,7 +12080,7 @@ let personelBelgeKaydiIdCounter = 903;
         kullanici_tipi: payload.kullanici_tipi,
         rol: payload.rol,
         personel_id: payload.personel_id ?? null,
-        sube_ids: normalizedSubeIds,
+        sube_ids: uniqueSubeIds,
         varsayilan_sube_id: resolvedVarsayilan,
         durum: payload.durum,
         notlar: payload.notlar
@@ -12131,9 +12134,25 @@ let personelBelgeKaydiIdCounter = 903;
         return;
       }
 
-      const nextSubeIds = payload.sube_ids ?? target.sube_ids;
-      const nextVarsayilan =
-        payload.varsayilan_sube_id !== undefined ? payload.varsayilan_sube_id : target.varsayilan_sube_id;
+      const subeIdsProvided = payload.sube_ids !== undefined;
+      const varsayilanProvided = payload.varsayilan_sube_id !== undefined;
+      let nextSubeIds = subeIdsProvided
+        ? Array.from(
+            new Set(
+              (payload.sube_ids ?? [])
+                .map((id) => Number(id))
+                .filter((id) => Number.isFinite(id) && id > 0)
+            )
+          ).sort((a, b) => a - b)
+        : [...target.sube_ids].sort((a, b) => a - b);
+      let nextVarsayilan = target.varsayilan_sube_id ?? null;
+      if (varsayilanProvided) {
+        nextVarsayilan = payload.varsayilan_sube_id ?? null;
+      } else if (subeIdsProvided) {
+        if (nextVarsayilan != null && !nextSubeIds.includes(nextVarsayilan)) {
+          nextVarsayilan = null;
+        }
+      }
       const scopeError = assertMockVarsayilanSubeInScope(nextVarsayilan, nextSubeIds);
       if (scopeError) {
         await fulfillJson(route, 400, errorBody("VALIDATION_ERROR", scopeError, "varsayilan_sube_id"));
@@ -12143,9 +12162,6 @@ let personelBelgeKaydiIdCounter = 903;
       const linkedPersonel =
         payload.personel_id != null ? personeller.find((item) => item.id === payload.personel_id) ?? null : null;
 
-      const normalizedSubeIds = normalizeMockSubeIdsWithVarsayilan(nextSubeIds, nextVarsayilan);
-      const resolvedVarsayilan = nextVarsayilan ?? (normalizedSubeIds.length > 0 ? normalizedSubeIds[0] : null);
-
       Object.assign(target, {
         username: nextUsername,
         ad_soyad: payload.ad_soyad ?? target.ad_soyad,
@@ -12153,8 +12169,8 @@ let personelBelgeKaydiIdCounter = 903;
         kullanici_tipi: payload.kullanici_tipi ?? target.kullanici_tipi,
         rol: payload.rol ?? target.rol,
         personel_id: payload.personel_id ?? null,
-        sube_ids: normalizedSubeIds,
-        varsayilan_sube_id: resolvedVarsayilan,
+        sube_ids: nextSubeIds,
+        varsayilan_sube_id: nextVarsayilan,
         durum: payload.durum ?? target.durum,
         notlar: payload.notlar ?? target.notlar
       });
@@ -12281,7 +12297,7 @@ let personelBelgeKaydiIdCounter = 903;
 
         kullanici.sube_ids = kullanici.sube_ids.filter((id) => id !== subeId);
         if (kullanici.varsayilan_sube_id === subeId) {
-          kullanici.varsayilan_sube_id = kullanici.sube_ids[0] ?? null;
+          kullanici.varsayilan_sube_id = null;
         }
       });
 

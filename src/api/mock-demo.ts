@@ -7826,7 +7826,7 @@ export function resolveDemoApiResponse(
 
       kullanici.sube_ids = kullanici.sube_ids.filter((subeId) => subeId !== id);
       if (kullanici.varsayilan_sube_id === id) {
-        kullanici.varsayilan_sube_id = kullanici.sube_ids[0] ?? null;
+        kullanici.varsayilan_sube_id = null;
       }
     });
 

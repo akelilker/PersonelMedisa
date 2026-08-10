@@ -29,6 +29,6 @@ describe("017_donem_kapanis_ve_etki_rapor_indexleri migration source", () => {
       .filter((name) => /^\d{3}_.*\.sql$/.test(name))
       .sort();
     expect(migrations).toContain("017_donem_kapanis_ve_etki_rapor_indexleri.sql");
-    expect(migrations.at(-1)).toBe("050_gorevler_ad_unique.sql");
+    expect(migrations.at(-1)).toBe("051_users_varsayilan_sube_id.sql");
   });
 });

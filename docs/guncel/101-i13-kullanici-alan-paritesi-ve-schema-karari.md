@@ -2,10 +2,39 @@
 
 ## Status
 
-**PROPOSED** — I13-A decision-only (docs). Runtime kod, migration, API davranışı, production yazma yok. Not ACCEPTED until final user review after default-branch invariant clarification.
+**ACCEPTED — Option B / Minimal safe parity**
 
-**Base main:** `733f98092da9f6106e4d5cb3220259b8128fb39d`  
-**PR:** `#134` (Draft)
+`USER_DECISION_ACCEPTED = YES`
+
+I13-A remains docs-only for this ADR package. Runtime persistence of `varsayilan_sube_id` is the separate I13-B implementation package.
+
+**Base main (decision PR base):** `733f98092da9f6106e4d5cb3220259b8128fb39d`  
+**PR:** `#134`
+
+### Accepted canonical decisions
+
+| Key | Value |
+| --- | --- |
+| DEFAULT_BRANCH_SCHEMA_OWNER | `users.varsayilan_sube_id` |
+| TYPE | `INT UNSIGNED NULL` |
+| FK | `subeler(id)` |
+| ON_DELETE | `SET NULL` |
+| MEMBERSHIP_OWNER | `YonetimController` transactional application contract |
+| DEFAULT_SCOPE_AND_PREFERENCE_ATOMIC | YES |
+| INVALID_DEFAULT_ON_SCOPE_REMOVAL | CLEAR_TO_NULL_UNLESS_EXPLICIT_VALID_REPLACEMENT |
+| EXISTING_USER_DEFAULT_BACKFILL | NONE |
+| EXISTING_USER_INITIAL_DEFAULT | NULL |
+| ADMIN_GET_RETURNS_STORED_DEFAULT | YES |
+| ADMIN_GET_SYNTHETIC_FALLBACK | NO |
+| LOGIN_PERSISTED_DEFAULT_PRIORITY | YES |
+| ACTIVE_SUBE_RUNTIME_RESOLUTION_DISTINCT_FROM_STORED_DEFAULT | YES |
+| TELEFON | DEFER_WITH_GATE |
+| KULLANICI_TIPI | DEFER_WITH_GATE |
+| PERSONEL_ID | DEFER_WITH_GATE |
+| NOTLAR | DEFER_WITH_GATE |
+| ACTOR_IDENTITY_OWNER | `actor_identity_id` |
+| PERSONEL_ID_FORMAL_DUAL_CONTROL_OWNER | NO |
+| AUTO_NAME_LINK | NO |
 
 ## Context
 
@@ -371,9 +400,9 @@ I13-A (this package):
 - [x] `PRODUCTION_WRITE = NO`
 - [x] `FULL_E2E_RERUN = NO`
 - [x] `I13_MERGED = NO` / `I13_DEPLOYED = NO`
-- [x] `ADR_STATUS = PROPOSED` (not ACCEPTED until user final review)
+- [x] `ADR_STATUS = ACCEPTED` (user acceptance received; Option B)
 
-I13-B (future, after user accepts this ADR):
+I13-B (implementation package after this ADR merge):
 
 - Additive nullable column + `ON DELETE SET NULL` FK
 - Transactional membership enforcement
@@ -382,4 +411,4 @@ I13-B (future, after user accepts this ADR):
 - AUTH_SMOKE_READONLY intact
 - No automatic personnel/name backfill
 
-**NEXT_ACTION = USER_REVIEW_I13_FINAL_DECISION**
+**NEXT_ACTION = I13B_DEFAULT_BRANCH_PERSISTENCE_IMPLEMENTATION**

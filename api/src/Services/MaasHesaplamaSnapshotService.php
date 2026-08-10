@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Medisa\Api\Services;
 
+use Medisa\Api\Services\Attendance\AttendanceDisciplineCatalog;
+use Medisa\Api\Services\Attendance\AttendancePayrollEffectResolver;
+use Medisa\Api\Services\Attendance\PuantajOlayKararService;
 use Medisa\Api\Services\Payroll\PayrollComplianceGuard;
 use PDO;
 use PDOException;
@@ -70,6 +73,7 @@ class MaasHesaplamaSnapshotService
         $personeller = self::resolvePersonnelSet($pdo, $subeId, $donemBaslangic, $donemBitis, $muhur ? (int) $muhur['id'] : null, $items);
         $salaries = self::resolveSalarySegments($pdo, $personeller, $items);
         $attendance = $muhur ? self::resolveSealedAttendance($pdo, $muhur, $items) : ['rows' => [], 'by_personel' => []];
+        $attendance = self::attachAttendanceDecisions($pdo, $attendance, $donemBaslangic, $donemBitis, $items);
         $izinler = self::resolveLeaveSources($pdo, $personeller, $donemBaslangic, $donemBitis);
         $finance = self::resolveFinanceInputs($pdo, $subeId, $donem, $donemBaslangic, $donemBitis, $personeller, $muhur, $items);
         $legal = self::resolveLegalParameters($pdo, $donemBaslangic, $donemBitis, $items);
@@ -600,6 +604,151 @@ class MaasHesaplamaSnapshotService
         }
 
         return ['rows' => $rows, 'by_personel' => $byPersonel];
+    }
+
+    /**
+     * Capture manager attendance decisions into sealed attendance rows before fingerprint.
+     * Fail-closed on advance-notified lateness/early-exit without resolved decision.
+     *
+     * @param array{rows: array<int, array<string, mixed>>, by_personel: array<int, int>} $attendance
+     * @param array<int, array<string, mixed>> $items
+     * @return array{rows: array<int, array<string, mixed>>, by_personel: array<int, int>}
+     */
+    public static function attachAttendanceDecisions(PDO $pdo, array $attendance, $from, $to, array &$items)
+    {
+        $rows = isset($attendance['rows']) && is_array($attendance['rows']) ? $attendance['rows'] : [];
+        if ($rows === []) {
+            return $attendance;
+        }
+
+        $personelIds = [];
+        foreach ($rows as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $pid = isset($row['personel_id']) ? (int) $row['personel_id'] : 0;
+            if ($pid > 0) {
+                $personelIds[$pid] = $pid;
+            }
+        }
+
+        $kararIndex = [];
+        if ($personelIds !== [] && PuantajOlayKararService::tableExists($pdo)) {
+            $kararIndex = PuantajOlayKararService::indexKararlarForPeriod(
+                $pdo,
+                array_values($personelIds),
+                $from,
+                $to
+            );
+        }
+
+        // Bind decisions to sealed row raw/source_hash; never apply stale decisions silently.
+        $rowByPersonelTarih = [];
+        foreach ($rows as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $pid = isset($row['personel_id']) ? (int) $row['personel_id'] : 0;
+            $tarihKey = (string) ($row['tarih'] ?? '');
+            if ($pid > 0 && $tarihKey !== '') {
+                $rowByPersonelTarih[$pid . '|' . $tarihKey] = $row;
+            }
+        }
+
+        $validKararIndex = [];
+        foreach ($kararIndex as $key => $decision) {
+            if (!is_array($decision)) {
+                continue;
+            }
+            $pid = isset($decision['personel_id']) ? (int) $decision['personel_id'] : 0;
+            $tarihKey = (string) ($decision['tarih'] ?? '');
+            $sealed = isset($rowByPersonelTarih[$pid . '|' . $tarihKey])
+                ? $rowByPersonelTarih[$pid . '|' . $tarihKey]
+                : null;
+            if (!is_array($sealed)) {
+                continue;
+            }
+            $mismatch = PuantajOlayKararService::sourceBindingMismatch($decision, $sealed);
+            if ($mismatch !== null) {
+                $items[] = self::issue(
+                    self::SEVERITY_BLOCKER,
+                    'ATTENDANCE_DECISION_SOURCE_CHANGED',
+                    'Puantaj olay karari mevcut canonical event fact ile eslesmiyor; yonetici yeniden karar vermelidir.',
+                    'puantaj',
+                    isset($sealed['id']) ? (int) $sealed['id'] : null,
+                    $pid,
+                    $mismatch
+                );
+                continue;
+            }
+            $validKararIndex[$key] = $decision;
+        }
+
+        $annotated = AttendancePayrollEffectResolver::annotatePuantajlar($rows, $validKararIndex);
+        $outRows = [];
+        foreach ($annotated as $idx => $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $personelId = isset($row['personel_id']) ? (int) $row['personel_id'] : 0;
+            $tarih = (string) ($row['tarih'] ?? '');
+            $olayKararlari = [];
+            $lateKey = AttendancePayrollEffectResolver::kararKey(
+                $personelId,
+                $tarih,
+                AttendanceDisciplineCatalog::OLAY_GEC_KALMA
+            );
+            $earlyKey = AttendancePayrollEffectResolver::kararKey(
+                $personelId,
+                $tarih,
+                AttendanceDisciplineCatalog::OLAY_ERKEN_CIKIS
+            );
+            if (isset($validKararIndex[$lateKey]) && is_array($validKararIndex[$lateKey])) {
+                $olayKararlari[AttendanceDisciplineCatalog::OLAY_GEC_KALMA] =
+                    AttendancePayrollEffectResolver::sealKararPayload($validKararIndex[$lateKey]);
+            }
+            if (isset($validKararIndex[$earlyKey]) && is_array($validKararIndex[$earlyKey])) {
+                $olayKararlari[AttendanceDisciplineCatalog::OLAY_ERKEN_CIKIS] =
+                    AttendancePayrollEffectResolver::sealKararPayload($validKararIndex[$earlyKey]);
+            }
+            if ($olayKararlari !== []) {
+                $row['olay_kararlari'] = $olayKararlari;
+            }
+
+            if (!empty($row['attendance_decision_pending'])) {
+                $gec = isset($row['gec_kalma_dakika']) ? (int) $row['gec_kalma_dakika'] : 0;
+                $erken = isset($row['erken_cikis_dakika']) ? (int) $row['erken_cikis_dakika'] : 0;
+                if ($gec > 0 || $erken > 0) {
+                    $lateReason = (string) ($row['attendance_late_block_reason'] ?? '');
+                    $earlyReason = (string) ($row['attendance_early_block_reason'] ?? '');
+                    $isOfficialPending = $lateReason === 'OFFICIAL_PROCESS_PENDING'
+                        || $earlyReason === 'OFFICIAL_PROCESS_PENDING';
+                    $items[] = self::issue(
+                        self::SEVERITY_BLOCKER,
+                        $isOfficialPending ? 'ATTENDANCE_OFFICIAL_PROCESS_PENDING' : 'ATTENDANCE_DECISION_PENDING',
+                        $isOfficialPending
+                            ? 'Resmi surec kaniti olmadan OFFICIAL_PROCESS_REQUIRED kararinda bordro olusturulamaz.'
+                            : 'Onceden bildirilmis gec kalma/erken cikis icin yonetici karari bekleniyor.',
+                        'puantaj',
+                        isset($row['id']) ? (int) $row['id'] : null,
+                        $personelId,
+                        [
+                            'tarih' => $tarih,
+                            'gec_kalma_dakika' => $gec,
+                            'erken_cikis_dakika' => $erken,
+                            'late_reason' => $lateReason !== '' ? $lateReason : null,
+                            'early_reason' => $earlyReason !== '' ? $earlyReason : null,
+                        ]
+                    );
+                }
+            }
+
+            $outRows[] = $row;
+        }
+
+        $attendance['rows'] = $outRows;
+
+        return $attendance;
     }
 
     /**
@@ -2026,8 +2175,29 @@ class MaasHesaplamaSnapshotService
                 ? (int) $row['tatil_donemi_net_calisma_dakika'] : null,
             'ht_ubgt_ayni_gun_mi' => $htUbgtSameDay ? 1 : 0,
             'gun_siniflandirmalari' => $gunSiniflandirmalari,
+            'olay_kararlari' => self::attendanceOlayKararlariPayload($row),
             'created_at' => self::normalizeTimestamp($row['created_at'] ?? null),
         ];
+    }
+
+    /**
+     * @param array<string, mixed> $row
+     * @return array<string, array<string, mixed>>|null
+     */
+    private static function attendanceOlayKararlariPayload(array $row)
+    {
+        if (!isset($row['olay_kararlari']) || !is_array($row['olay_kararlari']) || $row['olay_kararlari'] === []) {
+            return null;
+        }
+        $out = [];
+        foreach ($row['olay_kararlari'] as $olay => $karar) {
+            if (!is_array($karar)) {
+                continue;
+            }
+            $out[(string) $olay] = AttendancePayrollEffectResolver::sealKararPayload($karar);
+        }
+
+        return $out === [] ? null : $out;
     }
 
     /** @param array<string, mixed> $izin @return array<string, mixed> */

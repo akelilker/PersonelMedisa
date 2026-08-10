@@ -86,6 +86,10 @@ class RolePermissions
             'sgk.manuel_kod_override',
             'sgk_karar_paketi.prepare',
             'sgk_karar_paketi.approve',
+            'disiplin.view',
+            'disiplin.review',
+            'disiplin.defense_manage',
+            'puantaj.olay_karar.view',
         ],
         'BOLUM_YONETICISI' => [
             'personeller.view',
@@ -133,6 +137,10 @@ class RolePermissions
             'revizyon.cancel',
             'revizyon.view_finance_effect',
             'revizyon.view_audit_history',
+            'disiplin.view',
+            'disiplin.final_decision',
+            'puantaj.olay_karar.decide',
+            'puantaj.olay_karar.view',
         ],
         'MUHASEBE' => [
             'personeller.view',
@@ -193,6 +201,8 @@ class RolePermissions
             'revizyon.view_finance_effect',
             'revizyon.view_audit_history',
             'sgk.manuel_kod_override',
+            'disiplin.view',
+            'puantaj.olay_karar.view',
         ],
         'BIRIM_AMIRI' => [
             'personeller.view.sube',
@@ -245,6 +255,12 @@ class RolePermissions
             'sirket_parametreleri.view',
             'sirket_parametreleri.manage',
             'sgk_karar_paketi.prepare',
+            'disiplin.view',
+            'disiplin.review',
+            'disiplin.defense_manage',
+            'surecler.view',
+            'surecler.view.sube',
+            'surecler.detail.view',
         ],
         // Approve-only: SGK paket + sirket calisma politikasi onay (prepare yok).
         'SGK_KARAR_ONAY_YETKILISI' => [

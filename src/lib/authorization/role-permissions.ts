@@ -39,6 +39,12 @@ export type AppPermission =
   | "puantaj.donem_kapanis.export"
   | "puantaj.bildirim_etki.rapor.view"
   | "puantaj.bildirim_etki.rapor.export"
+  | "puantaj.olay_karar.view"
+  | "puantaj.olay_karar.decide"
+  | "disiplin.view"
+  | "disiplin.review"
+  | "disiplin.defense_manage"
+  | "disiplin.final_decision"
   | "maas_hesaplama.view"
   | "maas_hesaplama.manage"
   | "maas_hesaplama_adaylari.view"
@@ -170,7 +176,11 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "revizyon.view_audit_history",
     "sgk.manuel_kod_override",
     "sgk_karar_paketi.prepare",
-    "sgk_karar_paketi.approve"
+    "sgk_karar_paketi.approve",
+    "disiplin.view",
+    "disiplin.review",
+    "disiplin.defense_manage",
+    "puantaj.olay_karar.view"
   ],
   BOLUM_YONETICISI: [
     "personeller.view",
@@ -217,7 +227,11 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "revizyon.submit",
     "revizyon.cancel",
     "revizyon.view_finance_effect",
-    "revizyon.view_audit_history"
+    "revizyon.view_audit_history",
+    "disiplin.view",
+    "disiplin.final_decision",
+    "puantaj.olay_karar.decide",
+    "puantaj.olay_karar.view"
   ],
   MUHASEBE: [
     "personeller.view",
@@ -277,7 +291,9 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "revizyon.cancel",
     "revizyon.view_finance_effect",
     "revizyon.view_audit_history",
-    "sgk.manuel_kod_override"
+    "sgk.manuel_kod_override",
+    "disiplin.view",
+    "puantaj.olay_karar.view"
   ],
   BIRIM_AMIRI: [
     "personeller.view.sube",
@@ -326,7 +342,13 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "raporlar.view",
     "sirket_parametreleri.view",
     "sirket_parametreleri.manage",
-    "sgk_karar_paketi.prepare"
+    "sgk_karar_paketi.prepare",
+    "disiplin.view",
+    "disiplin.review",
+    "disiplin.defense_manage",
+    "surecler.view",
+    "surecler.view.sube",
+    "surecler.detail.view"
   ],
   SGK_KARAR_ONAY_YETKILISI: [
     "mevzuat_parametreleri.view",

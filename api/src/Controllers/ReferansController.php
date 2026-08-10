@@ -305,6 +305,7 @@ class ReferansController
                 ['key' => 'ISTEN_AYRILMA', 'label' => 'İşten Ayrılma'],
                 ['key' => 'GOREV_DEGISIKLIGI', 'label' => 'Görev Değişikliği'],
                 ['key' => 'UCRET_DEGISIKLIGI', 'label' => 'Ücret Değişikliği'],
+                ['key' => 'DISIPLIN', 'label' => 'Disiplin'],
             ],
         ]);
     }

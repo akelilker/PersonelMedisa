@@ -9,6 +9,8 @@ use Medisa\Api\Services\Payroll\MaasHesaplamaEngine;
 use Medisa\Api\Services\Payroll\MaasHesaplamaLegalParameterCatalog;
 use Medisa\Api\Services\Payroll\PayrollComplianceGuard;
 use Medisa\Api\Services\Payroll\SirketCalismaPolitikasiCatalog;
+use Medisa\Api\Services\Attendance\AttendancePayrollEffectResolver;
+use Medisa\Api\Services\Attendance\PuantajOlayKararService;
 use Medisa\Api\Services\ResmiTatilTakvimProjectionService;
 use PDO;
 use PDOException;
@@ -594,6 +596,11 @@ class MaasHesaplamaAdayService
                 $bundle['mevzuat_by_code'],
                 SirketCalismaPolitikasiService::toEngineParams($policy['degerler_by_code'] ?? [])
             );
+            $personelIds = array_map(static function (array $p) {
+                return (int) $p['personel_id'];
+            }, $bundle['personeller']);
+            // Build karar index only from sealed snapshot PUANTAJ payloads (immutable).
+            $kararIndex = self::indexSealedAttendanceKararlar($bundle['puantaj_by_personel'] ?? []);
             $results = [];
             $correctionSnapshots = [];
             foreach ($bundle['personeller'] as $personel) {
@@ -602,6 +609,10 @@ class MaasHesaplamaAdayService
                 $appliedProjection = MaasHesaplamaCorrectionProjectionService::applyToPuantajlar(
                     $puantajlar,
                     $projection['projections_by_personel'][$pid] ?? []
+                );
+                $annotatedPuantajlar = AttendancePayrollEffectResolver::annotatePuantajlar(
+                    $appliedProjection['puantajlar'],
+                    $kararIndex
                 );
                 $correctionSnapshots[$pid] = $appliedProjection['applied'];
                 $odemeMap = self::buildEngineOdemeTercihiMap(
@@ -619,10 +630,11 @@ class MaasHesaplamaAdayService
                     $bundle['etki_by_personel'][$pid] ?? [],
                     $hastalikPolitika
                 );
+                $etkiAdaylari = self::enrichEtkiAdaylariAttendance($etkiAdaylari, $kararIndex, $pid);
                 $engineInput = [
                     'personel' => $personel,
                     'ucret_segmentleri' => $bundle['ucret_by_personel'][$pid] ?? [],
-                    'puantajlar' => $appliedProjection['puantajlar'],
+                    'puantajlar' => $annotatedPuantajlar,
                     'izinler' => $bundle['izin_by_personel'][$pid] ?? [],
                     'etki_adaylari' => $etkiAdaylari,
                     'finanslar' => $bundle['finans_by_personel'][$pid] ?? [],
@@ -1287,6 +1299,80 @@ class MaasHesaplamaAdayService
             }
             $aday['metadata'] = $meta;
             $out[] = $aday;
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param array<int, int> $personelIds
+     * @return array<string, array<string, mixed>>
+     */
+    private static function loadAttendanceKararIndex(PDO $pdo, array $personelIds, $from, $to)
+    {
+        // Legacy helper retained for non-calc callers; calc must use sealed snapshot payloads.
+        if (!PuantajOlayKararService::tableExists($pdo)) {
+            return [];
+        }
+
+        return PuantajOlayKararService::indexKararlarForPeriod($pdo, $personelIds, $from, $to);
+    }
+
+    /**
+     * @param array<int, array<int, array<string, mixed>>> $puantajByPersonel
+     * @return array<string, array<string, mixed>>
+     */
+    private static function indexSealedAttendanceKararlar(array $puantajByPersonel)
+    {
+        $index = [];
+        foreach ($puantajByPersonel as $rows) {
+            if (!is_array($rows)) {
+                continue;
+            }
+            foreach ($rows as $row) {
+                if (!is_array($row) || !isset($row['olay_kararlari']) || !is_array($row['olay_kararlari'])) {
+                    continue;
+                }
+                $personelId = isset($row['personel_id']) ? (int) $row['personel_id'] : 0;
+                $tarih = (string) ($row['tarih'] ?? '');
+                foreach ($row['olay_kararlari'] as $olay => $karar) {
+                    if (!is_array($karar)) {
+                        continue;
+                    }
+                    $olayTuru = strtoupper((string) ($karar['olay_turu'] ?? $olay));
+                    $key = AttendancePayrollEffectResolver::kararKey($personelId, $tarih, $olayTuru);
+                    $index[$key] = $karar;
+                }
+            }
+        }
+
+        return $index;
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $adaylar
+     * @param array<string, array<string, mixed>> $kararIndex
+     * @return array<int, array<string, mixed>>
+     */
+    private static function enrichEtkiAdaylariAttendance(array $adaylar, array $kararIndex, $personelId)
+    {
+        $out = [];
+        foreach ($adaylar as $aday) {
+            if (!is_array($aday)) {
+                continue;
+            }
+            $tur = strtoupper((string) ($aday['etki_turu'] ?? ''));
+            if ($tur !== 'GEC_KALMA_DAKIKA' && $tur !== 'ERKEN_CIKIS_DAKIKA') {
+                $out[] = $aday;
+                continue;
+            }
+            $tarih = (string) ($aday['tarih'] ?? '');
+            $olay = $tur === 'GEC_KALMA_DAKIKA'
+                ? 'GEC_KALMA'
+                : 'ERKEN_CIKIS';
+            $key = AttendancePayrollEffectResolver::kararKey((int) $personelId, $tarih, $olay);
+            $kararRow = isset($kararIndex[$key]) ? $kararIndex[$key] : null;
+            $out[] = AttendancePayrollEffectResolver::enrichEtkiAday($aday, $kararRow);
         }
 
         return $out;

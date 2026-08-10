@@ -15,7 +15,9 @@ use Medisa\Api\Controllers\BordroHazirlikController;
 use Medisa\Api\Controllers\SgkKatalogHazirlikController;
 use Medisa\Api\Controllers\SgkManuelKodOverrideController;
 use Medisa\Api\Controllers\SirketCalismaPolitikasiController;
+use Medisa\Api\Controllers\DisiplinVakaController;
 use Medisa\Api\Controllers\DonemKapanisController;
+use Medisa\Api\Controllers\PuantajOlayKararController;
 use Medisa\Api\Controllers\HaftalikBildirimMutabakatlariController;
 use Medisa\Api\Controllers\HaftalikKapanisController;
 use Medisa\Api\Controllers\EkOdemeKesintiController;
@@ -136,6 +138,36 @@ class Router
         }
         if ($method === 'GET' && preg_match('#^/puantaj/bildirim-etki-adaylari/(\d+)$#', $path, $matches)) {
             BildirimPuantajEtkiAdaylariController::detail($this->request, $matches[1]);
+        }
+        if ($path === '/puantaj-olay-kararlari' && $method === 'GET') {
+            PuantajOlayKararController::list($this->request);
+        }
+        if ($path === '/puantaj-olay-kararlari' && $method === 'POST') {
+            PuantajOlayKararController::upsert($this->request);
+        }
+        if ($path === '/disiplin-vakalar' && $method === 'GET') {
+            DisiplinVakaController::list($this->request);
+        }
+        if ($path === '/disiplin-vakalar/generate' && $method === 'POST') {
+            DisiplinVakaController::generate($this->request);
+        }
+        if ($method === 'GET' && preg_match('#^/disiplin-vakalar/(\d+)$#', $path, $matches)) {
+            DisiplinVakaController::detail($this->request, $matches[1]);
+        }
+        if ($method === 'POST' && preg_match('#^/disiplin-vakalar/(\d+)/ik-inceleme$#', $path, $matches)) {
+            DisiplinVakaController::ikInceleme($this->request, $matches[1]);
+        }
+        if ($method === 'POST' && preg_match('#^/disiplin-vakalar/(\d+)/savunma-talep$#', $path, $matches)) {
+            DisiplinVakaController::savunmaTalep($this->request, $matches[1]);
+        }
+        if ($method === 'POST' && preg_match('#^/disiplin-vakalar/(\d+)/savunma-belge$#', $path, $matches)) {
+            DisiplinVakaController::savunmaBelge($this->request, $matches[1]);
+        }
+        if ($method === 'POST' && preg_match('#^/disiplin-vakalar/(\d+)/nihai-karar$#', $path, $matches)) {
+            DisiplinVakaController::nihaiKarar($this->request, $matches[1]);
+        }
+        if ($method === 'POST' && preg_match('#^/disiplin-vakalar/(\d+)/islemsiz-kapat$#', $path, $matches)) {
+            DisiplinVakaController::islemsizKapat($this->request, $matches[1]);
         }
         if ($method === 'POST' && $path === '/yonetim/aylik-ozet/bolum-onay') {
             YonetimController::aylikOzetBolumOnay($this->request);

@@ -51,6 +51,16 @@ pcgAssert($b1['fs_dk'] === 0 && $b1['fm_dk'] === 0, '2700 tam normal');
 $b2 = PayrollComplianceGuard::hesaplaHaftalikBantlarSirketKarari(2701);
 pcgAssert($b2['fs_dk'] === 0 && $b2['fm_dk'] === 1, '2701 FM; FSC yok');
 
+$b3 = PayrollComplianceGuard::hesaplaHaftalikBantlarSirketKarari(2300, 2250);
+pcgAssert($b3['fs_dk'] === 0 && $b3['fm_dk'] === 50, 'future policy esik 2250');
+
+$resolved = PayrollComplianceGuard::resolveHaftalikNormalCalismaDakika([
+    PayrollComplianceGuard::POLICY_HAFTALIK_NORMAL_DAKIKA => '2250',
+]);
+pcgAssert($resolved === 2250, 'resolveHaftalikNormalCalismaDakika policy');
+$resolvedDefault = PayrollComplianceGuard::resolveHaftalikNormalCalismaDakika([]);
+pcgAssert($resolvedDefault === 2700, 'resolveHaftalikNormalCalismaDakika default 2700');
+
 pcgAssert(PayrollComplianceGuard::assertWeeklyMonthlyParity() === true, '225s / 2700dk parity');
 
 // Serbest zaman kanit

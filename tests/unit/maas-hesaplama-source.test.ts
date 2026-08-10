@@ -150,7 +150,7 @@ describe("S77-C/S77-D maas hesaplama source contract", () => {
       "Resmî tatilin tam gün veya yarım gün kapsamı doğrulanamadığı için otomatik hesaplama yapılamıyor"
     );
     expect(frontendEngine).toContain(
-      "Yarım günlük resmî tatil çalışma hesabı için tatil dönemi net çalışma süresi ve yetkili hesap politikası eksik"
+      "Yarım günlük resmî tatil çalışma hesabı için tatil dönemi net çalışma süresi güvenilir çözülemedi"
     );
     expect(frontendEngine).toContain(
       "Sözleşme haftalık çalışma süresi 2700 dakikalık üst sınırı aşıyor"

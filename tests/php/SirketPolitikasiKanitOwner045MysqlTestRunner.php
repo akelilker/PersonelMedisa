@@ -10,6 +10,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../api/src/bootstrap.php';
 
+use Medisa\Api\Services\Payroll\MaasHesaplamaEngine;
 use Medisa\Api\Services\Payroll\SirketCalismaPolitikasiCatalog;
 use Medisa\Api\Services\SirketCalismaPolitikasiException;
 use Medisa\Api\Services\SirketCalismaPolitikasiService;
@@ -20,6 +21,23 @@ function s87p045Assert(bool $ok, string $name): void
         throw new RuntimeException('[FAIL] ' . $name);
     }
     echo '[PASS] ' . $name . PHP_EOL;
+}
+
+function s87p045RecomputePolicyHash(PDO $pdo, int $politikaId): string
+{
+    $stmt = $pdo->prepare(
+        'SELECT parametre_kodu, deger_tipi, sayisal_deger, metin_deger
+         FROM sirket_calisma_politika_degerleri WHERE politika_id = :id'
+    );
+    $stmt->execute(['id' => $politikaId]);
+    $map = [];
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $deger) {
+        $map[(string) $deger['parametre_kodu']] = $deger['deger_tipi'] === 'METIN'
+            ? (string) $deger['metin_deger']
+            : (string) $deger['sayisal_deger'];
+    }
+
+    return MaasHesaplamaEngine::hashCanonical($map);
 }
 
 function s87p045RootPdo(): PDO
@@ -84,7 +102,9 @@ function s87p045FullDegerler(): array
         if (($meta['deger_tipi'] ?? '') === 'METIN') {
             $val = $code === 'TATIL_FSC_FM_CAKISMA_HESAP_MODU'
                 ? 'YARGITAY_7_5_SAAT_AYRIMI'
-                : ($code === 'NORMAL_HASTALIK_ILK_IKI_GUN_ISVEREN_ODEMESI' ? 'HAYIR' : 'GUNLUK_ILAVE');
+                : ($code === 'NORMAL_HASTALIK_ILK_IKI_GUN_ISVEREN_ODEMESI'
+                    ? 'HAYIR'
+                    : ($code === 'HAFTA_TATILI_GUNLERI' ? '0' : 'GUNLUK_ILAVE'));
             $out[] = ['parametre_kodu' => $code, 'metin_deger' => $val];
         } else {
             $defaults = [
@@ -369,6 +389,222 @@ try {
         'degerler' => $degerler,
     ], $actor1, hash('sha256', 'd3b'));
     s87p045Assert((string) $d3b['policy_version_hash'] === $hashA, 'same values + different evidence => same policy_version_hash');
+
+    // Close leftover open draft from evidence-hash invariant before Phase A hash scenarios
+    SirketCalismaPolitikasiService::cancel($root, $d3['id'], 'phase-a-hash-cleanup', $actor1, hash('sha256', 'cancel-d3'));
+
+    // --- Phase A final: legacy HAFTA_TATILI_GUNLERI backfill hash integrity ---
+    $legacyDraftDegerler = array_values(array_filter($degerler, static function (array $row) {
+        return (string) $row['parametre_kodu'] !== 'HAFTA_TATILI_GUNLERI';
+    }));
+    s87p045Assert(count($legacyDraftDegerler) === count($degerler) - 1, 'legacy fixture omits HAFTA_TATILI_GUNLERI');
+
+    $legacyDraft = SirketCalismaPolitikasiService::createDraft($root, [
+        'gecerlilik_baslangic' => '2027-06-01',
+        'belge_id' => 'SYNTH-LEGACY-SUBMIT',
+        'belge_sha256' => s87p045SyntheticSha('legacy-submit'),
+        'degerler' => $legacyDraftDegerler,
+    ], $actor1, hash('sha256', 'legacy-draft'));
+    // createDraft upsertDegerler only inserts provided codes; ensure code absent
+    $missingBeforeSubmit = (int) $root->query(
+        "SELECT COUNT(*) FROM sirket_calisma_politika_degerleri
+         WHERE politika_id = {$legacyDraft['id']} AND parametre_kodu = 'HAFTA_TATILI_GUNLERI'"
+    )->fetchColumn();
+    s87p045Assert($missingBeforeSubmit === 0, 'legacy TASLAK has no HAFTA_TATILI_GUNLERI row');
+    $hashBeforeSubmit = (string) $legacyDraft['policy_version_hash'];
+    $recomputedBefore = s87p045RecomputePolicyHash($root, (int) $legacyDraft['id']);
+    s87p045Assert($hashBeforeSubmit === $recomputedBefore, 'createDraft hash canonical without rest-day code');
+
+    $submittedLegacy = SirketCalismaPolitikasiService::submitForApproval(
+        $root,
+        $legacyDraft['id'],
+        $actor1,
+        hash('sha256', 'legacy-submit-ok')
+    );
+    s87p045Assert($submittedLegacy['state'] === 'ONAY_BEKLIYOR', 'legacy submit => ONAY_BEKLIYOR');
+    $restCountAfterSubmit = (int) $root->query(
+        "SELECT COUNT(*) FROM sirket_calisma_politika_degerleri
+         WHERE politika_id = {$legacyDraft['id']} AND parametre_kodu = 'HAFTA_TATILI_GUNLERI'"
+    )->fetchColumn();
+    s87p045Assert($restCountAfterSubmit === 1, 'submit backfills HAFTA_TATILI_GUNLERI exactly once');
+    $restVal = (string) $root->query(
+        "SELECT metin_deger FROM sirket_calisma_politika_degerleri
+         WHERE politika_id = {$legacyDraft['id']} AND parametre_kodu = 'HAFTA_TATILI_GUNLERI' LIMIT 1"
+    )->fetchColumn();
+    s87p045Assert($restVal === '0', 'submit backfill default is Pazar/0');
+    $hashAfterSubmit = (string) $root->query(
+        "SELECT policy_version_hash FROM sirket_calisma_politikalari WHERE id = {$legacyDraft['id']}"
+    )->fetchColumn();
+    $recomputedAfterSubmit = s87p045RecomputePolicyHash($root, (int) $legacyDraft['id']);
+    s87p045Assert($hashAfterSubmit !== $hashBeforeSubmit, 'submit changes stored hash after legacy backfill');
+    s87p045Assert($hashAfterSubmit === $recomputedAfterSubmit, 'submit stored hash == recomputed canonical');
+    s87p045Assert((string) $submittedLegacy['policy_version_hash'] === $hashAfterSubmit, 'submit detail hash matches stored');
+    // Clear open draft so subsequent createDraft can run
+    SirketCalismaPolitikasiService::approve(
+        $root,
+        $legacyDraft['id'],
+        $actor2,
+        hash('sha256', 'legacy-submit-approve-clear')
+    );
+
+    // ONAY_BEKLIYOR missing code: delete after submit, approve must backfill + rehash
+    $approveLegacy = SirketCalismaPolitikasiService::createDraft($root, [
+        'gecerlilik_baslangic' => '2027-07-01',
+        'belge_id' => 'SYNTH-LEGACY-APPROVE',
+        'belge_sha256' => s87p045SyntheticSha('legacy-approve'),
+        'degerler' => $legacyDraftDegerler,
+    ], $actor1, hash('sha256', 'legacy-approve-draft'));
+    SirketCalismaPolitikasiService::submitForApproval($root, $approveLegacy['id'], $actor1, hash('sha256', 'legacy-approve-submit'));
+    $root->exec(
+        "DELETE FROM sirket_calisma_politika_degerleri
+         WHERE politika_id = {$approveLegacy['id']} AND parametre_kodu = 'HAFTA_TATILI_GUNLERI'"
+    );
+    $storedAfterDelete = (string) $root->query(
+        "SELECT policy_version_hash FROM sirket_calisma_politikalari WHERE id = {$approveLegacy['id']}"
+    )->fetchColumn();
+    $recomputedMissing = s87p045RecomputePolicyHash($root, (int) $approveLegacy['id']);
+    s87p045Assert(
+        $storedAfterDelete !== $recomputedMissing,
+        'deleted rest-day code leaves stored hash stale vs canonical values'
+    );
+    $approvedLegacy = SirketCalismaPolitikasiService::approve(
+        $root,
+        $approveLegacy['id'],
+        $actor2,
+        hash('sha256', 'legacy-approve-ok')
+    );
+    s87p045Assert($approvedLegacy['state'] === 'ONAYLANDI', 'legacy approve => ONAYLANDI');
+    $restCountAfterApprove = (int) $root->query(
+        "SELECT COUNT(*) FROM sirket_calisma_politika_degerleri
+         WHERE politika_id = {$approveLegacy['id']} AND parametre_kodu = 'HAFTA_TATILI_GUNLERI'"
+    )->fetchColumn();
+    s87p045Assert($restCountAfterApprove === 1, 'approve backfills HAFTA_TATILI_GUNLERI exactly once');
+    $hashAfterApprove = (string) $root->query(
+        "SELECT policy_version_hash FROM sirket_calisma_politikalari WHERE id = {$approveLegacy['id']}"
+    )->fetchColumn();
+    $recomputedAfterApprove = s87p045RecomputePolicyHash($root, (int) $approveLegacy['id']);
+    s87p045Assert($hashAfterApprove === $recomputedAfterApprove, 'approve stored hash == recomputed canonical');
+    s87p045Assert($hashAfterApprove !== $recomputedMissing, 'approve hash repaired away from missing-code set');
+
+    // Default already present: no duplicate + deterministic hash
+    $fullDraft = SirketCalismaPolitikasiService::createDraft($root, [
+        'gecerlilik_baslangic' => '2027-08-01',
+        'belge_id' => 'SYNTH-FULL',
+        'belge_sha256' => s87p045SyntheticSha('full'),
+        'degerler' => $degerler,
+    ], $actor1, hash('sha256', 'full-draft'));
+    $hashFullBefore = (string) $fullDraft['policy_version_hash'];
+    $submittedFull = SirketCalismaPolitikasiService::submitForApproval($root, $fullDraft['id'], $actor1, hash('sha256', 'full-submit'));
+    $restDup = (int) $root->query(
+        "SELECT COUNT(*) FROM sirket_calisma_politika_degerleri
+         WHERE politika_id = {$fullDraft['id']} AND parametre_kodu = 'HAFTA_TATILI_GUNLERI'"
+    )->fetchColumn();
+    s87p045Assert($restDup === 1, 'existing default not duplicated on submit');
+    s87p045Assert((string) $submittedFull['policy_version_hash'] === $hashFullBefore, 'no unnecessary hash mutation when default present');
+    SirketCalismaPolitikasiService::approve($root, $fullDraft['id'], $actor2, hash('sha256', 'full-approve-clear'));
+
+    // Pure read: legacy approved without HAFTA_TATILI_GUNLERI must not write
+    $root->exec("UPDATE sirket_calisma_politikalari SET gecerlilik_bitis = '2027-12-31'
+                 WHERE state = 'ONAYLANDI' AND gecerlilik_bitis IS NULL");
+    $root->exec("INSERT INTO sirket_calisma_politikalari (
+        revision_no, state, gecerlilik_baslangic, gecerlilik_bitis, aciklama,
+        policy_version_hash, hazirlayan_id, onaylayan_id, onay_zamani, created_by, updated_by,
+        belge_id, belge_sha256
+      ) VALUES (
+        99, 'ONAYLANDI', '2028-01-01', NULL, 'Read-only legacy approved',
+        '" . str_repeat('a', 64) . "',
+        1, 2, '2028-01-01 00:00:00', 1, 1,
+        'SYNTH-READ', '" . s87p045SyntheticSha('read') . "'
+      )");
+    $readOnlyId = (int) $root->lastInsertId();
+    foreach ($legacyDraftDegerler as $deg) {
+        $meta = SirketCalismaPolitikasiCatalog::meta($deg['parametre_kodu']);
+        $isMetin = ($meta['deger_tipi'] ?? '') === 'METIN';
+        $root->prepare(
+            'INSERT INTO sirket_calisma_politika_degerleri
+             (politika_id, parametre_kodu, deger_tipi, sayisal_deger, metin_deger, birim)
+             VALUES (:pid, :kod, :tip, :sayisal, :metin, :birim)'
+        )->execute([
+            'pid' => $readOnlyId,
+            'kod' => $deg['parametre_kodu'],
+            'tip' => $isMetin ? 'METIN' : 'SAYISAL',
+            'sayisal' => $isMetin ? null : ($deg['sayisal_deger'] ?? null),
+            'metin' => $isMetin ? ($deg['metin_deger'] ?? null) : null,
+            'birim' => $meta['birim'] ?? null,
+        ]);
+    }
+    $beforeReadCount = (int) $root->query(
+        "SELECT COUNT(*) FROM sirket_calisma_politika_degerleri
+         WHERE politika_id = {$readOnlyId} AND parametre_kodu = 'HAFTA_TATILI_GUNLERI'"
+    )->fetchColumn();
+    s87p045Assert($beforeReadCount === 0, 'read-only fixture missing rest-day code');
+    $resolved = SirketCalismaPolitikasiService::resolveApprovedForPeriod($root, '2028-01-15', '2028-01-31');
+    $detailRead = SirketCalismaPolitikasiService::getPolitikaDetail($root, $readOnlyId);
+    $afterReadCount = (int) $root->query(
+        "SELECT COUNT(*) FROM sirket_calisma_politika_degerleri
+         WHERE politika_id = {$readOnlyId} AND parametre_kodu = 'HAFTA_TATILI_GUNLERI'"
+    )->fetchColumn();
+    s87p045Assert($afterReadCount === 0, 'pure read does not INSERT legacy default');
+    s87p045Assert($resolved['politika'] !== null && (int) $resolved['politika']['id'] === $readOnlyId, 'resolveApprovedForPeriod reads legacy approved');
+    s87p045Assert(isset($detailRead['id']), 'getPolitikaDetail read-only ok');
+    $fallback = SirketCalismaPolitikasiCatalog::parseHaftaTatiliGunleri(
+        SirketCalismaPolitikasiCatalog::LEGACY_HAFTA_TATILI_GUNLERI
+    );
+    s87p045Assert(!empty($fallback['ok']) && $fallback['days'] === [0], 'runtime fallback Pazar/0');
+
+    // updateDraft: changing HAFTA_TATILI_GUNLERI changes hash
+    $updDraft = SirketCalismaPolitikasiService::createDraft($root, [
+        'gecerlilik_baslangic' => '2029-01-01',
+        'belge_id' => 'SYNTH-UPD',
+        'belge_sha256' => s87p045SyntheticSha('upd'),
+        'degerler' => $degerler,
+    ], $actor1, hash('sha256', 'upd-hash-draft'));
+    $hashUpdBefore = (string) $updDraft['policy_version_hash'];
+    $degerlerSatSun = [];
+    foreach ($degerler as $deg) {
+        if ((string) $deg['parametre_kodu'] === 'HAFTA_TATILI_GUNLERI') {
+            $deg['metin_deger'] = '6,0';
+        }
+        if ((string) $deg['parametre_kodu'] === 'HAFTALIK_IS_GUNU_SAYISI') {
+            $deg['sayisal_deger'] = '5';
+        }
+        if ((string) $deg['parametre_kodu'] === 'HAFTALIK_NORMAL_CALISMA_DAKIKA') {
+            $deg['sayisal_deger'] = '2250';
+        }
+        $degerlerSatSun[] = $deg;
+    }
+    $updAfter = SirketCalismaPolitikasiService::updateDraft($root, $updDraft['id'], [
+        'gecerlilik_baslangic' => '2029-01-01',
+        'belge_id' => 'SYNTH-UPD',
+        'belge_sha256' => s87p045SyntheticSha('upd'),
+        'degerler' => $degerlerSatSun,
+    ], $actor1, hash('sha256', 'upd-hash-change'));
+    s87p045Assert((string) $updAfter['policy_version_hash'] !== $hashUpdBefore, 'updateDraft rest-day change updates hash');
+    s87p045Assert(
+        (string) $updAfter['policy_version_hash'] === s87p045RecomputePolicyHash($root, (int) $updDraft['id']),
+        'updateDraft hash canonical'
+    );
+
+    // Workweek inconsistency fail-closed
+    $badDegerler = [];
+    foreach ($degerler as $deg) {
+        if ((string) $deg['parametre_kodu'] === 'HAFTALIK_NORMAL_CALISMA_DAKIKA') {
+            $deg['sayisal_deger'] = '9999';
+        }
+        $badDegerler[] = $deg;
+    }
+    $badBlocked = false;
+    try {
+        SirketCalismaPolitikasiService::updateDraft($root, $updDraft['id'], [
+            'gecerlilik_baslangic' => '2029-01-01',
+            'belge_id' => 'SYNTH-UPD',
+            'belge_sha256' => s87p045SyntheticSha('upd'),
+            'degerler' => $badDegerler,
+        ], $actor1, hash('sha256', 'bad-ww'));
+    } catch (SirketCalismaPolitikasiException $e) {
+        $badBlocked = $e->getErrorCode() === 'VALIDATION_ERROR';
+    }
+    s87p045Assert($badBlocked, 'inconsistent workweek fail-closed');
 
     echo 'SirketPolitikasiKanitOwner045MysqlTestRunner: ALL PASS' . PHP_EOL;
 } finally {

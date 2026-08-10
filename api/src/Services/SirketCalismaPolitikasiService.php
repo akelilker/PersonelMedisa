@@ -652,6 +652,18 @@ class SirketCalismaPolitikasiService
                         400
                     );
                 }
+                if ($code === 'HAFTA_TATILI_GUNLERI') {
+                    $parsed = SirketCalismaPolitikasiCatalog::parseHaftaTatiliGunleri($metin);
+                    if (!$parsed['ok']) {
+                        throw new SirketCalismaPolitikasiException(
+                            'VALIDATION_ERROR',
+                            (string) ($parsed['error'] ?? 'HAFTA_TATILI_GUNLERI gecersiz.'),
+                            400
+                        );
+                    }
+                    // Canonical form: sorted unique weekday digits
+                    $metin = implode(',', $parsed['days']);
+                }
             } else {
                 $raw = $deger['sayisal_deger'] ?? $deger['mevcut_deger'] ?? null;
                 if ($raw === null || $raw === '') {
@@ -668,10 +680,12 @@ class SirketCalismaPolitikasiService
                 'birim' => $meta['birim'],
             ]);
         }
+        self::assertWorkweekSetConsistency($pdo, (int) $politikaId);
     }
 
     private static function assertCompleteDegerler(PDO $pdo, $politikaId)
     {
+        $legacyInserted = self::ensureLegacyDefaultDegerler($pdo, (int) $politikaId);
         $existing = self::listDegerler($pdo, (int) $politikaId);
         $codes = array_map(static function (array $row) {
             return (string) $row['parametre_kodu'];
@@ -681,6 +695,99 @@ class SirketCalismaPolitikasiService
             throw new SirketCalismaPolitikasiException('POLICY_INCOMPLETE', 'Eksik politika degerleri var.', 409, [
                 'eksik_kodlar' => array_values($missing),
             ]);
+        }
+        self::assertWorkweekSetConsistency($pdo, (int) $politikaId);
+        // Write-path backfill degisti ise stored fingerprint ayni transaction'da canonicalize edilmeli.
+        if ($legacyInserted) {
+            self::persistPolicyVersionHash($pdo, (int) $politikaId);
+        }
+    }
+
+    /**
+     * Legacy rows: HAFTA_TATILI_GUNLERI yoksa Pazar ('0') ekle — yalniz write transition (submit/approve).
+     * Pure read path cagirmaz. Return: en az bir default INSERT yapildi mi.
+     */
+    private static function ensureLegacyDefaultDegerler(PDO $pdo, $politikaId)
+    {
+        $existing = self::listDegerler($pdo, (int) $politikaId);
+        $have = [];
+        foreach ($existing as $row) {
+            $have[(string) $row['parametre_kodu']] = true;
+        }
+        $ins = $pdo->prepare(
+            'INSERT INTO sirket_calisma_politika_degerleri (
+                politika_id, parametre_kodu, deger_tipi, sayisal_deger, metin_deger, birim
+             ) VALUES (:pid, :kod, :tip, NULL, :metin, :birim)'
+        );
+        $inserted = false;
+        foreach (SirketCalismaPolitikasiCatalog::legacyDefaultValues() as $code => $defaultMetin) {
+            if (isset($have[$code])) {
+                continue;
+            }
+            $meta = SirketCalismaPolitikasiCatalog::meta($code);
+            if ($meta === null || $meta['deger_tipi'] !== 'METIN') {
+                continue;
+            }
+            $ins->execute([
+                'pid' => (int) $politikaId,
+                'kod' => $code,
+                'tip' => 'METIN',
+                'metin' => $defaultMetin,
+                'birim' => $meta['birim'],
+            ]);
+            $inserted = true;
+        }
+
+        return $inserted;
+    }
+
+    private static function persistPolicyVersionHash(PDO $pdo, $politikaId)
+    {
+        $hash = self::computePolicyHash($pdo, (int) $politikaId);
+        $pdo->prepare('UPDATE sirket_calisma_politikalari SET policy_version_hash = :h WHERE id = :id')
+            ->execute(['h' => $hash, 'id' => (int) $politikaId]);
+
+        return $hash;
+    }
+
+    private static function assertWorkweekSetConsistency(PDO $pdo, $politikaId)
+    {
+        $byCode = [];
+        foreach (self::listDegerler($pdo, (int) $politikaId) as $row) {
+            $byCode[(string) $row['parametre_kodu']] = $row;
+        }
+        $need = ['GUNLUK_CALISMA_SAATI', 'HAFTALIK_IS_GUNU_SAYISI', 'HAFTALIK_NORMAL_CALISMA_DAKIKA', 'HAFTA_TATILI_GUNLERI'];
+        foreach ($need as $code) {
+            if (!isset($byCode[$code])) {
+                return; // incomplete set handled elsewhere
+            }
+        }
+        $gunlukSaat = (string) ($byCode['GUNLUK_CALISMA_SAATI']['sayisal_deger'] ?? '');
+        $gunlukDk = MaasHesaplamaEngine::decimalHoursToMinutes($gunlukSaat);
+        $haftalikIs = (int) ((string) ($byCode['HAFTALIK_IS_GUNU_SAYISI']['sayisal_deger'] ?? '0'));
+        $haftalikNormal = (int) ((string) ($byCode['HAFTALIK_NORMAL_CALISMA_DAKIKA']['sayisal_deger'] ?? '0'));
+        $restRaw = (string) ($byCode['HAFTA_TATILI_GUNLERI']['metin_deger']
+            ?? SirketCalismaPolitikasiCatalog::LEGACY_HAFTA_TATILI_GUNLERI);
+        $parsed = SirketCalismaPolitikasiCatalog::parseHaftaTatiliGunleri($restRaw);
+        if (!$parsed['ok']) {
+            throw new SirketCalismaPolitikasiException(
+                'VALIDATION_ERROR',
+                (string) ($parsed['error'] ?? 'HAFTA_TATILI_GUNLERI gecersiz.'),
+                400
+            );
+        }
+        $check = SirketCalismaPolitikasiCatalog::assertWorkweekAtomicConsistency(
+            $gunlukDk,
+            $haftalikIs,
+            $haftalikNormal,
+            $parsed['days']
+        );
+        if (!$check['ok']) {
+            throw new SirketCalismaPolitikasiException(
+                'VALIDATION_ERROR',
+                (string) ($check['error'] ?? 'Workweek policy tutarsiz.'),
+                400
+            );
         }
     }
 

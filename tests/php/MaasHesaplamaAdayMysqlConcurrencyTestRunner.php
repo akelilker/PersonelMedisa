@@ -228,6 +228,7 @@ function mhacSeedApprovedPolicy(PDO $pdo): void
         // S87 SIRKET_KARARI
         'HAFTALIK_NORMAL_CALISMA_DAKIKA' => '2700',
         'NORMAL_HASTALIK_ILK_IKI_GUN_ISVEREN_ODEMESI' => 'HAYIR',
+        'HAFTA_TATILI_GUNLERI' => '0',
     ];
     $pdo->exec(
         "INSERT INTO sirket_calisma_politikalari (

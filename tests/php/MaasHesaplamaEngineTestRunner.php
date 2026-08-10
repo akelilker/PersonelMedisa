@@ -606,34 +606,176 @@ $halfDayPolicy = MaasHesaplamaEngine::calculate(engineInput('BRUT', '45000.00', 
         'gun_tipi' => 'UBGT_Resmi_Tatil',
         'net_calisma_suresi_dakika' => 120,
         'ubgt_gun_kapsami' => 'YARIM_GUN',
-        'yarim_gun_tatil_interval_dakika' => 240,
+        'tatil_interval_baslangic' => '13:00:00',
+        'tatil_interval_bitis' => '16:45:00',
+        // authoritative dakika yok → fail-closed
     ]],
 ]));
 engineAssert(
     empty($halfDayPolicy['ok'])
         && (string) $halfDayPolicy['error_code'] === MaasHesaplamaEngine::HALF_DAY_UBGT_POLICY_ERROR_CODE
         && (string) $halfDayPolicy['error_message'] === MaasHesaplamaEngine::HALF_DAY_UBGT_POLICY_ERROR_MESSAGE,
-    'yarim gun UBGT tum net sureler fail-closed'
+    'yarim gun UBGT authoritative dakika eksik fail-closed'
 );
 
-foreach ([1, 225, 450, 600] as $halfNet) {
+$halfDayZeroWork = MaasHesaplamaEngine::calculate(engineInput('BRUT', '45000.00', [
+    'mevzuat' => mevzuatFixture($yargitayMode),
+    'puantajlar' => [[
+        'muhur_satir_id' => 949,
+        'tarih' => '2026-03-03',
+        'gun_tipi' => 'UBGT_Resmi_Tatil',
+        'net_calisma_suresi_dakika' => 0,
+        'ubgt_gun_kapsami' => 'YARIM_GUN',
+        'tatil_interval_baslangic' => '13:00:00',
+        'tatil_interval_bitis' => '16:45:00',
+        'tatil_donemi_net_calisma_dakika' => 0,
+    ]],
+]));
+engineAssert(
+    !empty($halfDayZeroWork['ok']) && count(findKalemler($halfDayZeroWork, 'UBGT_ODEMESI')) === 0,
+    'YARIM_GUN + 0 dk → premium yok'
+);
+
+foreach ([1, 60, 120, 180, 225, 450] as $halfNet) {
     $halfMatrix = MaasHesaplamaEngine::calculate(engineInput('BRUT', '45000.00', [
-        'mevzuat' => mevzuatFixture($yargitayMode),
+        'mevzuat' => mevzuatFixture($yargitayMode + [
+            'GUNLUK_CALISMA_SAATI' => '7.5',
+            'HAFTALIK_IS_GUNU_SAYISI' => '6',
+            'HAFTALIK_NORMAL_CALISMA_DAKIKA' => '2700',
+        ]),
         'puantajlar' => [[
             'muhur_satir_id' => 951,
             'tarih' => '2026-03-03',
             'gun_tipi' => 'UBGT_Resmi_Tatil',
             'net_calisma_suresi_dakika' => $halfNet,
             'ubgt_gun_kapsami' => 'YARIM_GUN',
-            'yarim_gun_tatil_interval_dakika' => 240,
+            'tatil_interval_baslangic' => '13:00:00',
+            'tatil_interval_bitis' => '16:45:00',
+            'tatil_donemi_net_calisma_dakika' => $halfNet,
+        ]],
+    ]));
+    $ubgtHalf = findKalemler($halfMatrix, 'UBGT_ODEMESI');
+    engineAssert(
+        !empty($halfMatrix['ok'])
+            && count($ubgtHalf) === 1
+            && (string) $ubgtHalf[0]['miktar'] === MaasHesaplamaEngine::HALF_DAY_UBGT_PREMIUM_GUN
+            && (string) ($ubgtHalf[0]['payload_json']['ubgt_gun_kapsami'] ?? '') === 'YARIM_GUN',
+        'YARIM_GUN UBGT net ' . $halfNet . ' => +0.5 gun premium'
+    );
+}
+
+$halfDay451 = MaasHesaplamaEngine::calculate(engineInput('BRUT', '45000.00', [
+    'mevzuat' => mevzuatFixture($yargitayMode + [
+        'GUNLUK_CALISMA_SAATI' => '7.5',
+        'HAFTALIK_IS_GUNU_SAYISI' => '6',
+        'HAFTALIK_NORMAL_CALISMA_DAKIKA' => '2700',
+    ]),
+    'odeme_tercihi_by_iso_hafta' => ucretOdemeTercihiByIsoHafta('2026-03-02', '2026-03-08'),
+    'puantajlar' => [
+        [
+            'muhur_satir_id' => 952,
+            'tarih' => '2026-03-02',
+            'gun_tipi' => 'Normal_Is_Gunu',
+            'net_calisma_suresi_dakika' => 2700,
+        ],
+        [
+            'muhur_satir_id' => 953,
+            'tarih' => '2026-03-03',
+            'gun_tipi' => 'UBGT_Resmi_Tatil',
+            'net_calisma_suresi_dakika' => 451,
+            'ubgt_gun_kapsami' => 'YARIM_GUN',
+            'tatil_interval_baslangic' => '13:00:00',
+            'tatil_interval_bitis' => '16:45:00',
+            'tatil_donemi_net_calisma_dakika' => 225,
+        ],
+    ],
+]));
+$ubgt451 = findKalemler($halfDay451, 'UBGT_ODEMESI');
+$fm451 = findKalemler($halfDay451, 'FAZLA_MESAI_ODEMESI');
+engineAssert(
+    !empty($halfDay451['ok'])
+        && count($ubgt451) === 1
+        && (string) $ubgt451[0]['miktar'] === '0.5'
+        && count($fm451) === 1
+        && (int) $fm451[0]['payload_json']['ham_fazla_calisma_dk'] === 1,
+    'YARIM_GUN 451 dk => +0.5 premium + FM 1 (cift sayim yok)'
+);
+
+$halfMissingInterval = MaasHesaplamaEngine::calculate(engineInput('BRUT', '45000.00', [
+    'mevzuat' => mevzuatFixture($yargitayMode),
+    'puantajlar' => [[
+        'muhur_satir_id' => 954,
+        'tarih' => '2026-03-03',
+        'gun_tipi' => 'UBGT_Resmi_Tatil',
+        'net_calisma_suresi_dakika' => 60,
+        'ubgt_gun_kapsami' => 'YARIM_GUN',
+        'tatil_donemi_net_calisma_dakika' => 60,
+    ]],
+]));
+engineAssert(
+    empty($halfMissingInterval['ok'])
+        && (string) $halfMissingInterval['error_code'] === MaasHesaplamaEngine::HALF_DAY_UBGT_POLICY_ERROR_CODE,
+    'YARIM_GUN missing interval fail-closed'
+);
+
+foreach (['KAYNAK_EKSIK', 'CAKISMA'] as $badSinif) {
+    $blocked = MaasHesaplamaEngine::calculate(engineInput('BRUT', '45000.00', [
+        'mevzuat' => mevzuatFixture($yargitayMode),
+        'puantajlar' => [[
+            'muhur_satir_id' => 955,
+            'tarih' => '2026-03-03',
+            'gun_tipi' => 'UBGT_Resmi_Tatil',
+            'net_calisma_suresi_dakika' => 60,
+            'ubgt_gun_kapsami' => 'YARIM_GUN',
+            'tatil_siniflandirma_durumu' => $badSinif,
+            'tatil_interval_baslangic' => '13:00:00',
+            'tatil_interval_bitis' => '16:45:00',
+            'tatil_donemi_net_calisma_dakika' => 60,
         ]],
     ]));
     engineAssert(
-        empty($halfMatrix['ok'])
-            && (string) $halfMatrix['error_code'] === MaasHesaplamaEngine::HALF_DAY_UBGT_POLICY_ERROR_CODE,
-        'YARIM_GUN UBGT net ' . $halfNet . ' fail-closed'
+        empty($blocked['ok'])
+            && (string) $blocked['error_code'] === MaasHesaplamaEngine::UBGT_DAY_SCOPE_ERROR_CODE,
+        'YARIM_GUN ' . $badSinif . ' fail-closed'
     );
 }
+
+// Workweek policy helpers
+$restPazar = SirketCalismaPolitikasiCatalog::parseHaftaTatiliGunleri('0');
+$restSatSun = SirketCalismaPolitikasiCatalog::parseHaftaTatiliGunleri('6,0');
+$restLegacy = SirketCalismaPolitikasiCatalog::parseHaftaTatiliGunleri('PAZAR');
+engineAssert(!empty($restPazar['ok']) && $restPazar['days'] === [0], 'rest day Pazar');
+engineAssert(!empty($restSatSun['ok']) && $restSatSun['days'] === [0, 6], 'rest day Cumartesi+Pazar');
+engineAssert(!empty($restLegacy['ok']) && $restLegacy['days'] === [0], 'legacy PAZAR token');
+$ww6 = SirketCalismaPolitikasiCatalog::assertWorkweekAtomicConsistency(450, 6, 2700, [0]);
+$ww5 = SirketCalismaPolitikasiCatalog::assertWorkweekAtomicConsistency(450, 5, 2250, [0, 6]);
+$wwBad = SirketCalismaPolitikasiCatalog::assertWorkweekAtomicConsistency(450, 5, 2700, [0, 6]);
+engineAssert(!empty($ww6['ok']), 'production 6-day workweek consistent');
+engineAssert(!empty($ww5['ok']), 'future 5-day workweek consistent');
+engineAssert(empty($wwBad['ok']), 'inconsistent workweek fail-closed');
+
+$bandsFuture = PayrollComplianceGuard::hesaplaHaftalikBantlarSirketKarari(2300, 2250);
+engineAssert($bandsFuture['fm_dk'] === 50 && $bandsFuture['fs_dk'] === 0, 'future weekly threshold 2250 FM');
+$bandsDefault = PayrollComplianceGuard::hesaplaHaftalikBantlarSirketKarari(2701);
+engineAssert($bandsDefault['fm_dk'] === 1, 'default 2700 threshold FM');
+
+$halfOutsideInterval = MaasHesaplamaEngine::calculate(engineInput('BRUT', '45000.00', [
+    'mevzuat' => mevzuatFixture($yargitayMode),
+    'puantajlar' => [[
+        'muhur_satir_id' => 956,
+        'tarih' => '2026-03-03',
+        'gun_tipi' => 'UBGT_Resmi_Tatil',
+        'net_calisma_suresi_dakika' => 180,
+        'ubgt_gun_kapsami' => 'YARIM_GUN',
+        'tatil_interval_baslangic' => '13:00:00',
+        'tatil_interval_bitis' => '16:45:00',
+        'tatil_donemi_net_calisma_dakika' => 0,
+    ]],
+]));
+engineAssert(
+    !empty($halfOutsideInterval['ok']) && count(findKalemler($halfOutsideInterval, 'UBGT_ODEMESI')) === 0,
+    'YARIM_GUN tatil intervalinde 0 dk → premium yok'
+);
 
 foreach ([null, '', ' ', 'TAM', 'FULL_DAY'] as $idx => $badScope) {
     $row = [

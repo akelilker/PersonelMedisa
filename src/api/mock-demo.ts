@@ -1533,6 +1533,20 @@ const SIRKET_POLITIKA_KATALOG = [
     deger_tipi: "METIN",
     birim: "MOD",
     zorunlu: true
+  },
+  {
+    parametre_kodu: "HAFTALIK_NORMAL_CALISMA_DAKIKA",
+    etiket: "Haftalık Normal Çalışma Dakikası",
+    deger_tipi: "SAYISAL",
+    birim: "DAKIKA",
+    zorunlu: true
+  },
+  {
+    parametre_kodu: "HAFTA_TATILI_GUNLERI",
+    etiket: "Hafta Tatili / Dinlenme Günleri",
+    deger_tipi: "METIN",
+    birim: "GUN_KODU",
+    zorunlu: true
   }
 ];
 

@@ -2036,7 +2036,7 @@ describe("hesaplaTatilEkOdemeOzeti", () => {
     expect(o!.ek_odeme_tutari).toBe(1000);
   });
 
-  it("UBGT kapsam yok veya YARIM_GUN → payable gizlenir", () => {
+  it("UBGT kapsam yok veya YARIM_GUN eksik girdi → payable gizlenir; authoritative ile +0.5", () => {
     expect(
       hesaplaTatilEkOdemeOzeti(maas, {
         gun_tipi: "UBGT_Resmi_Tatil",
@@ -2054,6 +2054,20 @@ describe("hesaplaTatilEkOdemeOzeti", () => {
         ubgt_gun_kapsami: "YARIM_GUN"
       })
     ).toBeNull();
+    const half = hesaplaTatilEkOdemeOzeti(maas, {
+      gun_tipi: "UBGT_Resmi_Tatil",
+      hesap_etkisi: "Mesai_Yaz",
+      giris_saati: "13:00",
+      cikis_saati: "15:00",
+      ubgt_gun_kapsami: "YARIM_GUN",
+      tatil_interval_baslangic: "13:00:00",
+      tatil_interval_bitis: "16:45:00",
+      tatil_donemi_net_calisma_dakika: 120
+    });
+    expect(half).not.toBeNull();
+    expect(half!.tur).toBe("UBGT");
+    expect(half!.carpani).toBe(0.5);
+    expect(half!.ek_odeme_tutari).toBe(500);
   });
 
   it("Hafta tatili + Mesai_Yaz + saat + hak var → çarpan 1,5 ve pazar kararı", () => {
@@ -2496,14 +2510,15 @@ describe("hesaplaHaftalikPuantajUcretOzeti", () => {
   });
 
   it.each([1, 225, 450, 600])(
-    "YARIM_GUN UBGT net %i dk YARGITAY onaylı olsa bile fail-closed",
+    "YARIM_GUN UBGT net %i dk authoritative dakika yoksa fail-closed",
     (netDk) => {
       const o = hesaplaHaftalikPuantajUcretOzeti(
         [
           {
             ...gunlukSatir(1, "2026-04-14", netDk, "UBGT_Resmi_Tatil"),
             ubgt_gun_kapsami: "YARIM_GUN",
-            yarim_gun_tatil_interval_dakika: 240
+            tatil_interval_baslangic: "13:00:00",
+            tatil_interval_bitis: "16:45:00"
           }
         ],
         ref,
@@ -2516,6 +2531,83 @@ describe("hesaplaHaftalikPuantajUcretOzeti", () => {
       expect(o.toplam_fazla_calisma_tutari).toBe(0);
     }
   );
+
+  it.each([1, 60, 120, 180, 225, 450])(
+    "YARIM_GUN UBGT tatil donemi %i dk → hesaplanabilir (FM havuzu)",
+    (netDk) => {
+      const o = hesaplaHaftalikPuantajUcretOzeti(
+        [
+          {
+            ...gunlukSatir(1, "2026-04-14", netDk, "UBGT_Resmi_Tatil"),
+            ubgt_gun_kapsami: "YARIM_GUN",
+            tatil_interval_baslangic: "13:00:00",
+            tatil_interval_bitis: "16:45:00",
+            tatil_donemi_net_calisma_dakika: netDk
+          }
+        ],
+        ref,
+        maas,
+        {
+          ...yargitayPolitika,
+          gunluk_calisma_saati: 7.5,
+          haftalik_is_gunu_sayisi: 6,
+          haftalik_normal_calisma_dakika: 2700
+        }
+      );
+      expect(o.hesaplanabilir_mi).toBe(true);
+      expect(o.hata_kodu).toBeNull();
+      expect(o.fazla_calisma_dakika).toBe(Math.max(0, netDk - 450));
+    }
+  );
+
+  it("YARIM_GUN 451 → FM 1", () => {
+    const o = hesaplaHaftalikPuantajUcretOzeti(
+      [
+        gunlukSatir(1, "2026-04-13", 2700),
+        {
+          ...gunlukSatir(1, "2026-04-14", 451, "UBGT_Resmi_Tatil"),
+          ubgt_gun_kapsami: "YARIM_GUN",
+          tatil_interval_baslangic: "13:00:00",
+          tatil_interval_bitis: "16:45:00",
+          tatil_donemi_net_calisma_dakika: 225
+        }
+      ],
+      ref,
+      maas,
+      {
+        ...yargitayPolitika,
+        gunluk_calisma_saati: 7.5,
+        haftalik_is_gunu_sayisi: 6,
+        haftalik_normal_calisma_dakika: 2700
+      }
+    );
+    expect(o.hesaplanabilir_mi).toBe(true);
+    expect(o.fazla_calisma_dakika).toBe(1);
+  });
+
+  it("Cumartesi+Pazar rest day seti deriveGunTipi", () => {
+    expect(deriveGunTipi("2026-04-11", undefined, [6, 0])).toBe("Hafta_Tatili_Pazar");
+    expect(deriveGunTipi("2026-04-12", undefined, [6, 0])).toBe("Hafta_Tatili_Pazar");
+    expect(deriveGunTipi("2026-04-13", undefined, [6, 0])).toBe("Normal_Is_Gunu");
+  });
+
+  it("future 5-day policy esik hard-coded ×6 bozmaz", () => {
+    const o = hesaplaHaftalikPuantajUcretOzeti(
+      [gunlukSatir(1, "2026-04-13", 2300)],
+      ref,
+      maas,
+      {
+        ...yargitayPolitika,
+        gunluk_calisma_saati: 7.5,
+        haftalik_is_gunu_sayisi: 5,
+        haftalik_normal_calisma_dakika: 2250,
+        hafta_tatili_gunleri: [6, 0]
+      }
+    );
+    expect(o.hesaplanabilir_mi).toBe(true);
+    expect(o.haftalik_esik_dakika).toBe(2250);
+    expect(o.fazla_calisma_dakika).toBe(50);
+  });
 
   it.each([undefined, "", " ", "FULL_DAY", "tam"])(
     "UBGT bilinmeyen kapsam %j → UBGT_DAY_SCOPE_REQUIRED",

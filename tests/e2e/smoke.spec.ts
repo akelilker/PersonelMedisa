@@ -94,10 +94,14 @@ test.describe("e2e smoke", () => {
     await page.goto("/raporlar");
     await expect(page).toHaveURL(/\/raporlar$/);
     await expect(page.locator(".modal-header h2").first()).toContainText("Raporlar");
-    await expect(page.getByTestId("aylik-kapanis-ozeti-section")).toBeVisible();
+    await expect(page.getByTestId("raporlar-liste-panel")).toBeVisible();
     await page.getByTestId("raporlar-submit-run").click();
     await expect(page.getByTestId("raporlar-resmi-sonuc")).toContainText("1");
     await expect(page.getByTestId("raporlar-resmi-sonuc")).toContainText("SGK Prim Gün");
+
+    await page.getByRole("link", { name: "Aylık Kapanış Özeti" }).click();
+    await expect(page).toHaveURL(/view=aylik-kapanis/);
+    await expect(page.getByTestId("aylik-kapanis-ozeti-section")).toBeVisible();
   });
 
   test("birim amiri gunluk kayit girer ama puantaj ve kapanis tarafinda read-only kalir", async ({ page }) => {

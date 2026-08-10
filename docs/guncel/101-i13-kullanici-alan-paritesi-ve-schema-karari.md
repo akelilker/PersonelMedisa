@@ -8,7 +8,7 @@
 
 I13-A remains docs-only for this ADR package. Runtime persistence of `varsayilan_sube_id` is the separate I13-B implementation package.
 
-**Base main (decision PR base):** `733f98092da9f6106e4d5cb3220259b8128fb39d`  
+**Base main (decision PR base):** `733f98092da9f6106e4d5cb3220259b8128fb39d`
 **PR:** `#134`
 
 ### Accepted canonical decisions

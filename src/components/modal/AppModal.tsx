@@ -278,12 +278,6 @@ export function AppModal({
         return;
       }
 
-      const explicit = dialogEl.querySelector<HTMLElement>('[data-modal-initial-focus="true"]');
-      if (isSafeFocusTarget(explicit)) {
-        explicit.focus({ preventScroll: true });
-        return;
-      }
-
       const activeElement = document.activeElement;
       if (
         activeElement instanceof HTMLElement &&
@@ -291,7 +285,13 @@ export function AppModal({
         activeElement !== dialogEl &&
         isSafeFocusTarget(activeElement)
       ) {
-        // Preserve React autoFocus (or other intentional in-dialog focus).
+        // Preserve intentional in-dialog focus (e.g. Playwright fill before rAF).
+        return;
+      }
+
+      const explicit = dialogEl.querySelector<HTMLElement>('[data-modal-initial-focus="true"]');
+      if (isSafeFocusTarget(explicit)) {
+        explicit.focus({ preventScroll: true });
         return;
       }
 

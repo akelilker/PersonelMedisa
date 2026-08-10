@@ -134,8 +134,9 @@ function ad052ClearCases(PDO $pdo): void
     $pdo->exec('DELETE FROM disiplin_vaka_auditleri');
     $pdo->exec('DELETE FROM disiplin_vakalar');
     $pdo->exec('DELETE FROM surecler');
-    $pdo->exec('DELETE FROM gunluk_puantaj');
+    $pdo->exec('DELETE FROM puantaj_olay_karar_auditleri');
     $pdo->exec('DELETE FROM puantaj_olay_kararlari');
+    $pdo->exec('DELETE FROM gunluk_puantaj');
 }
 
 /** @return array<string, mixed> */
@@ -256,6 +257,7 @@ try {
     );
 
     // TOLERANS olay karar does not mutate gunluk_puantaj.gec_kalma_dakika
+    $pdo->exec('DELETE FROM puantaj_olay_karar_auditleri');
     $pdo->exec('DELETE FROM puantaj_olay_kararlari');
     $gpId = ad052InsertPuantaj($pdo, '2026-08-15', 33, 1);
     PuantajOlayKararService::upsertDecision($pdo, $userBolum, [
@@ -271,6 +273,109 @@ try {
         'SELECT gec_kalma_dakika FROM gunluk_puantaj WHERE id = ' . (int) $gpId
     )->fetchColumn();
     ad052Assert($rawAfter === 33, 'TOLERANS does not update gec_kalma_dakika');
+
+    $auditCount = (int) $pdo->query('SELECT COUNT(*) FROM puantaj_olay_karar_auditleri')->fetchColumn();
+    ad052Assert($auditCount >= 1, 'decision create writes audit');
+
+    // late 36 TOLERANS rejected
+    $pdo->exec('DELETE FROM puantaj_olay_karar_auditleri');
+    $pdo->exec('DELETE FROM puantaj_olay_kararlari');
+    ad052InsertPuantaj($pdo, '2026-08-16', 36, 1);
+    $late36Failed = false;
+    try {
+        PuantajOlayKararService::upsertDecision($pdo, $userBolum, [
+            'personel_id' => 10,
+            'tarih' => '2026-08-16',
+            'olay_turu' => AttendanceDisciplineCatalog::OLAY_GEC_KALMA,
+            'raw_dakika' => 36,
+            'karar' => AttendanceDisciplineCatalog::KARAR_TOLERANS_UYGULA,
+        ]);
+    } catch (RuntimeException $e) {
+        $late36Failed = strpos($e->getMessage(), 'VALIDATION_ERROR') !== false;
+    }
+    ad052Assert($late36Failed, 'late 36 TOLERANS rejected');
+
+    // early TOLERANS rejected
+    $pdo->prepare(
+        'INSERT INTO gunluk_puantaj (personel_id, tarih, state, durumu_bildirdi_mi, gec_kalma_dakika, erken_cikis_dakika)
+         VALUES (10, :tarih, \'ACIK\', 0, 0, 12)'
+    )->execute(['tarih' => '2026-08-17']);
+    $earlyFailed = false;
+    try {
+        PuantajOlayKararService::upsertDecision($pdo, $userBolum, [
+            'personel_id' => 10,
+            'tarih' => '2026-08-17',
+            'olay_turu' => AttendanceDisciplineCatalog::OLAY_ERKEN_CIKIS,
+            'raw_dakika' => 12,
+            'karar' => AttendanceDisciplineCatalog::KARAR_TOLERANS_UYGULA,
+        ]);
+    } catch (RuntimeException $e) {
+        $earlyFailed = strpos($e->getMessage(), 'VALIDATION_ERROR') !== false;
+    }
+    ad052Assert($earlyFailed, 'early TOLERANS rejected');
+
+    // client raw mismatch rejected
+    $mismatchFailed = false;
+    try {
+        PuantajOlayKararService::upsertDecision($pdo, $userBolum, [
+            'personel_id' => 10,
+            'tarih' => '2026-08-15',
+            'olay_turu' => AttendanceDisciplineCatalog::OLAY_GEC_KALMA,
+            'raw_dakika' => 10,
+            'karar' => AttendanceDisciplineCatalog::KARAR_KESINTI_UYGULA,
+        ]);
+    } catch (RuntimeException $e) {
+        $mismatchFailed = strpos($e->getMessage(), 'VALIDATION_ERROR') !== false;
+    }
+    ad052Assert($mismatchFailed, 'client raw mismatch rejected');
+
+    // GENEL_YONETICI cannot decide tolerance / final discipline
+    $gyDecideFailed = false;
+    try {
+        PuantajOlayKararService::upsertDecision($pdo, $userGenel, [
+            'personel_id' => 10,
+            'tarih' => '2026-08-15',
+            'olay_turu' => AttendanceDisciplineCatalog::OLAY_GEC_KALMA,
+            'raw_dakika' => 33,
+            'karar' => AttendanceDisciplineCatalog::KARAR_TOLERANS_UYGULA,
+        ]);
+    } catch (RuntimeException $e) {
+        $gyDecideFailed = strpos($e->getMessage(), 'yetkisi yok') !== false;
+    }
+    ad052Assert($gyDecideFailed, 'GENEL_YONETICI cannot olay karar decide');
+
+    ad052ClearCases($pdo);
+    ad052InsertPuantaj($pdo, '2026-08-18', 22, 0);
+    $projGy = DisiplinAdayProjectionService::projectForMonth($pdo, $userGenel, '2026-08', 1, 10);
+    $vakaGy = (int) $projGy['items'][0]['id'];
+    $pdo->prepare(
+        'UPDATE disiplin_vakalar SET lifecycle_state = :state WHERE id = :id'
+    )->execute(['state' => AttendanceDisciplineCatalog::LIFECYCLE_KARAR_BEKLIYOR, 'id' => $vakaGy]);
+    $gyFinalFailed = false;
+    try {
+        DisiplinVakaService::finalDecision($pdo, $userGenel, $vakaGy, AttendanceDisciplineCatalog::NIHAI_KARAR_UYARI, 'x');
+    } catch (RuntimeException $e) {
+        $gyFinalFailed = strpos($e->getMessage(), 'Nihai karar yetkisi yok') !== false;
+    }
+    ad052Assert($gyFinalFailed, 'GENEL_YONETICI cannot final discipline');
+
+    // missing event cannot create decision
+    $missingFailed = false;
+    try {
+        PuantajOlayKararService::upsertDecision($pdo, $userBolum, [
+            'personel_id' => 10,
+            'tarih' => '2099-01-01',
+            'olay_turu' => AttendanceDisciplineCatalog::OLAY_GEC_KALMA,
+            'raw_dakika' => 5,
+            'karar' => AttendanceDisciplineCatalog::KARAR_KESINTI_UYGULA,
+        ]);
+    } catch (RuntimeException $e) {
+        $missingFailed = strpos($e->getMessage(), 'VALIDATION_ERROR') !== false;
+    }
+    ad052Assert($missingFailed, 'missing canonical event rejected');
+
+    // audit table exists and empty of business seed after migration (checked via re-apply path)
+    ad052Assert(PuantajOlayKararService::auditTableExists($pdo), 'puantaj_olay_karar_auditleri exists');
 
     // no statutory hardcode strings in Attendance services
     $attendanceDir = __DIR__ . '/../../api/src/Services/Attendance';

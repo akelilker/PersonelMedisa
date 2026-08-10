@@ -93,3 +93,26 @@ CREATE TABLE IF NOT EXISTS disiplin_vaka_auditleri (
   CONSTRAINT fk_dva_vaka FOREIGN KEY (disiplin_vaka_id) REFERENCES disiplin_vakalar (id) ON DELETE RESTRICT ON UPDATE RESTRICT,
   CONSTRAINT fk_dva_actor FOREIGN KEY (actor_user_id) REFERENCES users (id) ON DELETE SET NULL ON UPDATE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS puantaj_olay_karar_auditleri (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  puantaj_olay_karar_id INT UNSIGNED NOT NULL,
+  personel_id INT UNSIGNED NOT NULL,
+  tarih DATE NOT NULL,
+  olay_turu ENUM('GEC_KALMA', 'ERKEN_CIKIS') NOT NULL,
+  raw_dakika INT UNSIGNED NOT NULL,
+  onceki_karar ENUM('BEKLIYOR', 'KESINTI_UYGULA', 'TOLERANS_UYGULA', 'OFFICIAL_PROCESS_REQUIRED') NULL,
+  yeni_karar ENUM('BEKLIYOR', 'KESINTI_UYGULA', 'TOLERANS_UYGULA', 'OFFICIAL_PROCESS_REQUIRED') NOT NULL,
+  actor_user_id INT UNSIGNED NULL,
+  gerekce TEXT NULL,
+  source_hash CHAR(64) NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_poka_karar (puantaj_olay_karar_id),
+  KEY idx_poka_personel_tarih (personel_id, tarih),
+  KEY idx_poka_created (created_at),
+  CONSTRAINT fk_poka_karar FOREIGN KEY (puantaj_olay_karar_id) REFERENCES puantaj_olay_kararlari (id) ON DELETE RESTRICT ON UPDATE RESTRICT,
+  CONSTRAINT fk_poka_personel FOREIGN KEY (personel_id) REFERENCES personeller (id) ON DELETE RESTRICT ON UPDATE RESTRICT,
+  CONSTRAINT fk_poka_actor FOREIGN KEY (actor_user_id) REFERENCES users (id) ON DELETE SET NULL ON UPDATE RESTRICT,
+  CONSTRAINT chk_poka_source_hash CHECK (source_hash REGEXP '^[0-9a-f]{64}$')
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

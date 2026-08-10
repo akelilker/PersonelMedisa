@@ -18,6 +18,7 @@ import {
   UBGT_DAY_SCOPE_ERROR_CODE
 } from "../../../services/puantaj-hesap-motoru";
 import { BildirimPuantajEtkiAdaylariSection } from "../components/BildirimPuantajEtkiAdaylariSection";
+import { PuantajOlayKararPanel } from "../components/PuantajOlayKararPanel";
 import { formatComplianceLevelLabel } from "../../../lib/display/enum-display";
 import type {
   PuantajGunTipi,
@@ -863,6 +864,12 @@ export function GunlukPuantajPage() {
         </div>
         </AppModal>
       ) : null}
+
+      <PuantajOlayKararPanel
+        personelId={activeQuery ? Number(activeQuery.personelId) : 0}
+        tarih={activeQuery?.tarih ?? ""}
+        puantaj={puantaj}
+      />
 
       <BildirimPuantajEtkiAdaylariSection />
 

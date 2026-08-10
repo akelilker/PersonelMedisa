@@ -11,6 +11,10 @@ require_once __DIR__ . '/../../api/src/Services/PersonelBordroKapsamService.php'
 require_once __DIR__ . '/../../api/src/Services/Payroll/SgkPrimGunuEngine.php';
 require_once __DIR__ . '/../../api/src/Services/SgkPrimGunuService.php';
 require_once __DIR__ . '/../../api/src/Services/Payroll/PayrollComplianceGuard.php';
+require_once __DIR__ . '/../../api/src/Auth/RolePermissions.php';
+require_once __DIR__ . '/../../api/src/Services/Attendance/AttendanceDisciplineCatalog.php';
+require_once __DIR__ . '/../../api/src/Services/Attendance/AttendancePayrollEffectResolver.php';
+require_once __DIR__ . '/../../api/src/Services/Attendance/PuantajOlayKararService.php';
 require_once __DIR__ . '/../../api/src/Services/MaasHesaplamaSnapshotService.php';
 
 use Medisa\Api\Services\MaasHesaplamaException;

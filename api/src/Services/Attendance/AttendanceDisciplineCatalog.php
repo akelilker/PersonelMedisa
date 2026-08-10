@@ -36,6 +36,8 @@ final class AttendanceDisciplineCatalog
 
     public const MONTHLY_LATE_MINUTES = 60;
     public const MONTHLY_LATE_EVENT_THRESHOLD = 3;
+    /** Max raw late minutes for which TOLERANS_UYGULA is valid (inclusive). */
+    public const LATE_TOLERANCE_MAX_MINUTE = 35;
 
     /** @return array<int, string> */
     public static function olayTurleri()
@@ -93,13 +95,45 @@ final class AttendanceDisciplineCatalog
     /** @return array<int, string> */
     public static function olayKararDecideRoles()
     {
-        return ['BOLUM_YONETICISI', 'GENEL_YONETICI'];
+        return ['BOLUM_YONETICISI'];
     }
 
     /** @return array<int, string> */
     public static function finalDecisionRoles()
     {
-        return ['BOLUM_YONETICISI', 'GENEL_YONETICI'];
+        return ['BOLUM_YONETICISI'];
+    }
+
+    /**
+     * Authorized full-day absence dayanak values — never auto discipline candidates.
+     *
+     * @return array<int, string>
+     */
+    public static function authorizedAbsenceDayanaklari()
+    {
+        return [
+            'Ucretli_Izinli',
+            'Yillik_Izin',
+            'Raporlu_Hastalik',
+            'Raporlu_Is_Kazasi',
+            'Gorevde_Calisma',
+            'Telafi_Calismasi',
+        ];
+    }
+
+    public static function isAuthorizedAbsenceDayanak($dayanak)
+    {
+        $token = trim((string) $dayanak);
+        if ($token === '') {
+            return false;
+        }
+
+        return in_array($token, self::authorizedAbsenceDayanaklari(), true);
+    }
+
+    public static function isLateToleranceAllowed($rawDakika)
+    {
+        return (int) $rawDakika >= 0 && (int) $rawDakika <= self::LATE_TOLERANCE_MAX_MINUTE;
     }
 
     /** @return array<int, string> */

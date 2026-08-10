@@ -89,8 +89,6 @@ class RolePermissions
             'disiplin.view',
             'disiplin.review',
             'disiplin.defense_manage',
-            'disiplin.final_decision',
-            'puantaj.olay_karar.decide',
             'puantaj.olay_karar.view',
         ],
         'BOLUM_YONETICISI' => [

@@ -93,18 +93,73 @@ $r16 = adrEarly(['erken_cikis_dakika' => 25, 'durumu_bildirdi_mi' => 1]);
 adrAssert($r16['block'] === true, 'S16 early notified blocks');
 adrAssert($r16['effective'] === 0, 'S16 early notified effective 0');
 
-// Scenario 17: early TOLERANS → effective 0
+// Scenario 17: early TOLERANS is forbidden at resolver — actual minutes kept
 $r17 = adrEarly([
     'erken_cikis_dakika' => 25,
     'puantaj_olay_karar' => AttendanceDisciplineCatalog::KARAR_TOLERANS_UYGULA,
 ]);
-adrAssert($r17['effective'] === 0, 'S17 early TOLERANS effective 0');
+adrAssert($r17['effective'] === 25, 'S17 early TOLERANS ignored -> actual 25');
+
+// Scenario 17b: late TOLERANS only <=35
+$r17b = adrLate([
+    'gec_kalma_dakika' => 35,
+    'puantaj_olay_karar' => AttendanceDisciplineCatalog::KARAR_TOLERANS_UYGULA,
+]);
+adrAssert($r17b['effective'] === 0, 'S17b late 35 TOLERANS effective 0');
+$r17c = adrLate([
+    'gec_kalma_dakika' => 36,
+    'puantaj_olay_karar' => AttendanceDisciplineCatalog::KARAR_TOLERANS_UYGULA,
+]);
+adrAssert($r17c['effective'] === 36, 'S17c late 36 TOLERANS rejected -> actual 36');
 
 // Scenario 18: early 40/90 no rounding
 $r18a = adrEarly(['erken_cikis_dakika' => 40]);
 adrAssert($r18a['effective'] === 40, 'S18 early 40 no rounding');
 $r18b = adrEarly(['erken_cikis_dakika' => 90]);
 adrAssert($r18b['effective'] === 90, 'S18 early 90 no rounding');
+
+// Authorized absence must not become full-day candidate
+$kAuth = DisiplinAdayProjectionService::evaluateDailyCandidateKinds([
+    'personel_id' => 1,
+    'tarih' => '2026-08-03',
+    'hareket_durumu' => 'Gelmedi',
+    'dayanak' => 'Yillik_Izin',
+    'gec_kalma_dakika' => 0,
+    'erken_cikis_dakika' => 0,
+    'net_calisma_suresi_dakika' => 0,
+    'durumu_bildirdi_mi' => 0,
+]);
+adrAssert($kAuth === [], 'authorized Yillik_Izin no full-day candidate');
+
+$kUnauthorized = DisiplinAdayProjectionService::evaluateDailyCandidateKinds([
+    'personel_id' => 1,
+    'tarih' => '2026-08-04',
+    'hareket_durumu' => 'Gelmedi',
+    'dayanak' => 'Yok_Izinsiz',
+    'gec_kalma_dakika' => 0,
+    'erken_cikis_dakika' => 0,
+    'net_calisma_suresi_dakika' => 0,
+    'durumu_bildirdi_mi' => 0,
+]);
+adrAssert(
+    in_array(AttendanceDisciplineCatalog::CANDIDATE_TAM_GUN_DEVAMSIZLIK, $kUnauthorized, true),
+    'Yok_Izinsiz unannounced full-day candidate'
+);
+
+foreach (['Ucretli_Izinli', 'Raporlu_Hastalik', 'Raporlu_Is_Kazasi', 'Gorevde_Calisma'] as $authorizedDayanak) {
+    $k = DisiplinAdayProjectionService::evaluateDailyCandidateKinds([
+        'personel_id' => 1,
+        'tarih' => '2026-08-05',
+        'gun_tipi' => 'TAM_GUN_DEVAMSIZLIK',
+        'dayanak' => $authorizedDayanak,
+        'durumu_bildirdi_mi' => 0,
+    ]);
+    adrAssert($k === [], 'authorized ' . $authorizedDayanak . ' no candidate');
+}
+
+adrAssert(AttendanceDisciplineCatalog::olayKararDecideRoles() === ['BOLUM_YONETICISI'], 'decide owner BOLUM only');
+adrAssert(AttendanceDisciplineCatalog::finalDecisionRoles() === ['BOLUM_YONETICISI'], 'final owner BOLUM only');
+adrAssert(AttendanceDisciplineCatalog::LATE_TOLERANCE_MAX_MINUTE === 35, 'late tolerance max 35');
 
 // Scenario 33: daily candidate kinds include unannounced late
 $k33 = DisiplinAdayProjectionService::evaluateDailyCandidateKinds([
@@ -148,5 +203,45 @@ $applied = AttendancePayrollEffectResolver::applyToPuantajRow(
 );
 adrAssert((int) $applied['gec_kalma_effective_dakika'] === 0, 'applyToPuantajRow TOLERANS effective');
 adrAssert((int) $applied['attendance_late_raw_dakika'] === 20, 'applyToPuantajRow raw preserved');
+
+// Sealed snapshot karar must dominate live index after decision change simulation
+$sealedRow = [
+    'personel_id' => 7,
+    'tarih' => '2026-08-20',
+    'gec_kalma_dakika' => 20,
+    'erken_cikis_dakika' => 0,
+    'olay_kararlari' => [
+        AttendanceDisciplineCatalog::OLAY_GEC_KALMA => [
+            'id' => 99,
+            'olay_turu' => AttendanceDisciplineCatalog::OLAY_GEC_KALMA,
+            'karar' => AttendanceDisciplineCatalog::KARAR_KESINTI_UYGULA,
+            'raw_dakika' => 20,
+        ],
+    ],
+];
+$liveIndex = [
+    AttendancePayrollEffectResolver::kararKey(7, '2026-08-20', AttendanceDisciplineCatalog::OLAY_GEC_KALMA) => [
+        'id' => 99,
+        'olay_turu' => AttendanceDisciplineCatalog::OLAY_GEC_KALMA,
+        'karar' => AttendanceDisciplineCatalog::KARAR_TOLERANS_UYGULA,
+        'raw_dakika' => 20,
+    ],
+];
+$sealedAnnotated = AttendancePayrollEffectResolver::annotatePuantajlar([$sealedRow], $liveIndex);
+adrAssert((int) $sealedAnnotated[0]['gec_kalma_effective_dakika'] === 20, 'sealed KESINTI survives live TOLERANS change');
+
+$reverseSealed = $sealedRow;
+$reverseSealed['olay_kararlari'][AttendanceDisciplineCatalog::OLAY_GEC_KALMA]['karar'] =
+    AttendanceDisciplineCatalog::KARAR_TOLERANS_UYGULA;
+$liveKesinti = [
+    AttendancePayrollEffectResolver::kararKey(7, '2026-08-20', AttendanceDisciplineCatalog::OLAY_GEC_KALMA) => [
+        'id' => 99,
+        'olay_turu' => AttendanceDisciplineCatalog::OLAY_GEC_KALMA,
+        'karar' => AttendanceDisciplineCatalog::KARAR_KESINTI_UYGULA,
+        'raw_dakika' => 20,
+    ],
+];
+$reverseAnnotated = AttendancePayrollEffectResolver::annotatePuantajlar([$reverseSealed], $liveKesinti);
+adrAssert((int) $reverseAnnotated[0]['gec_kalma_effective_dakika'] === 0, 'sealed TOLERANS survives live KESINTI change');
 
 echo 'verify-attendance-discipline-resolver: OK' . PHP_EOL;

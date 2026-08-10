@@ -20,8 +20,15 @@ final class AttendancePayrollEffectResolver
         $karar = self::normalizeKarar($row);
         $bildirdi = self::isTruthy($row['durumu_bildirdi_mi'] ?? null);
 
-        if ($karar === AttendanceDisciplineCatalog::KARAR_TOLERANS_UYGULA) {
+        if (
+            $karar === AttendanceDisciplineCatalog::KARAR_TOLERANS_UYGULA
+            && AttendanceDisciplineCatalog::isLateToleranceAllowed($raw)
+        ) {
             return self::result($raw, 0, $karar, false, 'TOLERANS_UYGULA');
+        }
+        if ($karar === AttendanceDisciplineCatalog::KARAR_TOLERANS_UYGULA) {
+            // Invalid tolerance (>35): fall through to actual raw deduction.
+            $karar = AttendanceDisciplineCatalog::KARAR_KESINTI_UYGULA;
         }
         if ($karar === AttendanceDisciplineCatalog::KARAR_KESINTI_UYGULA) {
             return self::result($raw, $raw, $karar, false, 'KESINTI_UYGULA');
@@ -49,8 +56,9 @@ final class AttendancePayrollEffectResolver
         if ($karar === AttendanceDisciplineCatalog::KARAR_OFFICIAL_PROCESS_REQUIRED || self::hasApprovedLeaveFlag($row)) {
             return self::result($raw, 0, $karar, false, 'OFFICIAL_OR_APPROVED_LEAVE');
         }
+        // TOLERANS_UYGULA is never valid for early exit — ignore and use actual.
         if ($karar === AttendanceDisciplineCatalog::KARAR_TOLERANS_UYGULA) {
-            return self::result($raw, 0, $karar, false, 'TOLERANS_UYGULA');
+            $karar = AttendanceDisciplineCatalog::KARAR_KESINTI_UYGULA;
         }
         if ($karar === AttendanceDisciplineCatalog::KARAR_KESINTI_UYGULA) {
             return self::result($raw, $raw, $karar, false, 'KESINTI_UYGULA');
@@ -149,6 +157,18 @@ final class AttendancePayrollEffectResolver
             $earlyKey = self::kararKey($personelId, $tarih, AttendanceDisciplineCatalog::OLAY_ERKEN_CIKIS);
             $lateKarar = isset($kararByKey[$lateKey]) ? $kararByKey[$lateKey] : null;
             $earlyKarar = isset($kararByKey[$earlyKey]) ? $kararByKey[$earlyKey] : null;
+
+            // Prefer sealed snapshot karar payload when present (immutable payroll input).
+            if (isset($row['olay_kararlari']) && is_array($row['olay_kararlari'])) {
+                $sealed = $row['olay_kararlari'];
+                if (isset($sealed[AttendanceDisciplineCatalog::OLAY_GEC_KALMA]) && is_array($sealed[AttendanceDisciplineCatalog::OLAY_GEC_KALMA])) {
+                    $lateKarar = $sealed[AttendanceDisciplineCatalog::OLAY_GEC_KALMA];
+                }
+                if (isset($sealed[AttendanceDisciplineCatalog::OLAY_ERKEN_CIKIS]) && is_array($sealed[AttendanceDisciplineCatalog::OLAY_ERKEN_CIKIS])) {
+                    $earlyKarar = $sealed[AttendanceDisciplineCatalog::OLAY_ERKEN_CIKIS];
+                }
+            }
+
             $out[] = self::applyToPuantajRow($row, $lateKarar, $earlyKarar);
         }
 
@@ -202,6 +222,33 @@ final class AttendancePayrollEffectResolver
     public static function kararKey($personelId, $tarih, $olayTuru)
     {
         return (int) $personelId . '|' . trim((string) $tarih) . '|' . strtoupper(trim((string) $olayTuru));
+    }
+
+    /**
+     * Snapshot-safe karar subset for attendancePayload / source hash.
+     *
+     * @param array<string, mixed> $kararRow
+     * @return array<string, mixed>
+     */
+    public static function sealKararPayload(array $kararRow)
+    {
+        return [
+            'id' => isset($kararRow['id']) ? (int) $kararRow['id'] : null,
+            'personel_id' => isset($kararRow['personel_id']) ? (int) $kararRow['personel_id'] : null,
+            'tarih' => isset($kararRow['tarih']) ? (string) $kararRow['tarih'] : null,
+            'olay_turu' => isset($kararRow['olay_turu']) ? (string) $kararRow['olay_turu'] : null,
+            'raw_dakika' => isset($kararRow['raw_dakika']) ? (int) $kararRow['raw_dakika'] : null,
+            'karar' => isset($kararRow['karar']) ? (string) $kararRow['karar'] : null,
+            'karar_veren_user_id' => isset($kararRow['karar_veren_user_id']) && $kararRow['karar_veren_user_id'] !== null
+                ? (int) $kararRow['karar_veren_user_id'] : null,
+            'karar_at' => isset($kararRow['karar_at']) && $kararRow['karar_at'] !== null
+                ? (string) $kararRow['karar_at'] : null,
+            'gerekce' => isset($kararRow['gerekce']) && $kararRow['gerekce'] !== null
+                ? (string) $kararRow['gerekce'] : null,
+            'durumu_bildirdi_mi' => array_key_exists('durumu_bildirdi_mi', $kararRow) && $kararRow['durumu_bildirdi_mi'] !== null
+                ? (int) $kararRow['durumu_bildirdi_mi'] : null,
+            'source_hash' => isset($kararRow['source_hash']) ? (string) $kararRow['source_hash'] : null,
+        ];
     }
 
     /** @param array<string, mixed> $row */

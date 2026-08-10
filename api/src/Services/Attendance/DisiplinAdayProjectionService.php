@@ -350,9 +350,18 @@ final class DisiplinAdayProjectionService
             return false;
         }
 
+        $dayanak = trim((string) ($row['dayanak'] ?? ''));
+        if (AttendanceDisciplineCatalog::isAuthorizedAbsenceDayanak($dayanak)) {
+            return false;
+        }
+        // Only unannounced unauthorized absence (Yok_Izinsiz or empty dayanak with absence signals).
+        if ($dayanak !== '' && $dayanak !== 'Yok_Izinsiz') {
+            return false;
+        }
+
         $gunTipi = strtoupper(trim((string) ($row['gun_tipi'] ?? '')));
         if ($gunTipi === 'TAM_GUN_DEVAMSIZLIK') {
-            return true;
+            return $dayanak === 'Yok_Izinsiz' || $dayanak === '';
         }
 
         $hareket = self::normalizeToken($row['hareket_durumu'] ?? null);
@@ -360,8 +369,11 @@ final class DisiplinAdayProjectionService
             $gec = isset($row['gec_kalma_dakika']) ? (int) $row['gec_kalma_dakika'] : 0;
             $erken = isset($row['erken_cikis_dakika']) ? (int) $row['erken_cikis_dakika'] : 0;
             $net = isset($row['net_calisma_suresi_dakika']) ? (int) $row['net_calisma_suresi_dakika'] : 0;
+            if (!($gec === 0 && $erken === 0 && $net === 0)) {
+                return false;
+            }
 
-            return $gec === 0 && $erken === 0 && $net === 0;
+            return $dayanak === 'Yok_Izinsiz' || $dayanak === '';
         }
 
         return false;

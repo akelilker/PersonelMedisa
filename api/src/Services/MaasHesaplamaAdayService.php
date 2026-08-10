@@ -599,12 +599,8 @@ class MaasHesaplamaAdayService
             $personelIds = array_map(static function (array $p) {
                 return (int) $p['personel_id'];
             }, $bundle['personeller']);
-            $kararIndex = self::loadAttendanceKararIndex(
-                $pdo,
-                $personelIds,
-                (string) $bundle['snapshot']['donem_baslangic'],
-                (string) $bundle['snapshot']['donem_bitis']
-            );
+            // Build karar index only from sealed snapshot PUANTAJ payloads (immutable).
+            $kararIndex = self::indexSealedAttendanceKararlar($bundle['puantaj_by_personel'] ?? []);
             $results = [];
             $correctionSnapshots = [];
             foreach ($bundle['personeller'] as $personel) {
@@ -1314,11 +1310,43 @@ class MaasHesaplamaAdayService
      */
     private static function loadAttendanceKararIndex(PDO $pdo, array $personelIds, $from, $to)
     {
+        // Legacy helper retained for non-calc callers; calc must use sealed snapshot payloads.
         if (!PuantajOlayKararService::tableExists($pdo)) {
             return [];
         }
 
         return PuantajOlayKararService::indexKararlarForPeriod($pdo, $personelIds, $from, $to);
+    }
+
+    /**
+     * @param array<int, array<int, array<string, mixed>>> $puantajByPersonel
+     * @return array<string, array<string, mixed>>
+     */
+    private static function indexSealedAttendanceKararlar(array $puantajByPersonel)
+    {
+        $index = [];
+        foreach ($puantajByPersonel as $rows) {
+            if (!is_array($rows)) {
+                continue;
+            }
+            foreach ($rows as $row) {
+                if (!is_array($row) || !isset($row['olay_kararlari']) || !is_array($row['olay_kararlari'])) {
+                    continue;
+                }
+                $personelId = isset($row['personel_id']) ? (int) $row['personel_id'] : 0;
+                $tarih = (string) ($row['tarih'] ?? '');
+                foreach ($row['olay_kararlari'] as $olay => $karar) {
+                    if (!is_array($karar)) {
+                        continue;
+                    }
+                    $olayTuru = strtoupper((string) ($karar['olay_turu'] ?? $olay));
+                    $key = AttendancePayrollEffectResolver::kararKey($personelId, $tarih, $olayTuru);
+                    $index[$key] = $karar;
+                }
+            }
+        }
+
+        return $index;
     }
 
     /**

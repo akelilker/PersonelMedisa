@@ -24,7 +24,48 @@ describe("attendance discipline source contract", () => {
       expect(permissions).toContain(key);
     }
     expect(getRolePermissions("GENEL_YONETICI")).toContain("disiplin.view");
+    expect(getRolePermissions("GENEL_YONETICI")).not.toContain("disiplin.final_decision");
+    expect(getRolePermissions("GENEL_YONETICI")).not.toContain("puantaj.olay_karar.decide");
+    expect(getRolePermissions("GENEL_YONETICI")).toContain("puantaj.olay_karar.view");
     expect(getRolePermissions("BOLUM_YONETICISI")).toContain("disiplin.final_decision");
+    expect(getRolePermissions("BOLUM_YONETICISI")).toContain("puantaj.olay_karar.decide");
+    expect(getRolePermissions("IK_BORDRO")).not.toContain("disiplin.final_decision");
+    expect(getRolePermissions("IK_BORDRO")).not.toContain("puantaj.olay_karar.decide");
+  });
+
+  it("keeps migration tip at 052 and audit table in migration", () => {
+    const migrations = readdirSync(resolve(root, "api/migrations"))
+      .filter((name) => name.endsWith(".sql"))
+      .sort();
+    expect(migrations.at(-1)).toBe("052_puantaj_tolerans_ve_disiplin.sql");
+    const sql = readFileSync(resolve(root, "api/migrations/052_puantaj_tolerans_ve_disiplin.sql"), "utf8");
+    expect(sql).toContain("puantaj_olay_karar_auditleri");
+    expect(sql).toContain("puantaj_olay_kararlari");
+  });
+
+  it("exposes minimum tolerance UI helpers without early/>35 tolerance", () => {
+    const panel = readFileSync(
+      resolve(root, "src/features/puantaj/components/PuantajOlayKararPanel.tsx"),
+      "utf8"
+    );
+    expect(panel).toContain("LATE_TOLERANCE_MAX_MINUTE = 35");
+    expect(panel).toContain('olayTuru === "ERKEN_CIKIS"');
+    expect(panel).toContain('return ["KESINTI_UYGULA", "OFFICIAL_PROCESS_REQUIRED"]');
+    expect(panel).toContain("puantaj.olay_karar.decide");
+
+    const page = readFileSync(resolve(root, "src/features/puantaj/pages/GunlukPuantajPage.tsx"), "utf8");
+    expect(page).toContain("PuantajOlayKararPanel");
+  });
+
+  it("captures attendance decisions in snapshot payload and avoids live calc read", () => {
+    const snapshot = readFileSync(resolve(root, "api/src/Services/MaasHesaplamaSnapshotService.php"), "utf8");
+    expect(snapshot).toContain("attachAttendanceDecisions");
+    expect(snapshot).toContain("ATTENDANCE_DECISION_PENDING");
+    expect(snapshot).toContain("olay_kararlari");
+
+    const aday = readFileSync(resolve(root, "api/src/Services/MaasHesaplamaAdayService.php"), "utf8");
+    expect(aday).toContain("indexSealedAttendanceKararlar");
+    expect(aday).not.toMatch(/\$kararIndex = self::loadAttendanceKararIndex\(/);
   });
 
   it("keeps PersonelDisiplinPanel read-only without createSurec", () => {

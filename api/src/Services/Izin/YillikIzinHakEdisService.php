@@ -6,7 +6,14 @@ namespace Medisa\Api\Services\Izin;
 
 /**
  * FE `izin-hesap-motoru.ts` hak ediş motorunun PHP portu.
- * LEGAL_ENTITLEMENT_SEMANTIC = current service-year band (yillik_izin_gun), NOT cumulative.
+ *
+ * Owner A — ANNUAL_SERVICE_YEAR_ENTITLEMENT (`yillik_izin_gun` / mevcut band):
+ *   current service-year statutory band (14/20/26 + age exception).
+ *
+ * Owner B — CUMULATIVE_ACCRUED_ENTITLEMENT (`birikmis_yasal_hak_gun`):
+ *   sum of Owner A evaluated at each completed service-year anniversary <= referans_tarih.
+ *   Age exception is evaluated per anniversary (not multiplied from current age).
+ *   Pre-first anniversary = 0. No partial-year prorating.
  */
 class YillikIzinHakEdisService
 {
@@ -38,6 +45,103 @@ class YillikIzinHakEdisService
             'yillik_izin_gun' => (int) $gunSonuc['gun'],
             'yas_istisna_uygulandi' => (bool) $gunSonuc['yas_istisna_uygulandi'],
         ];
+    }
+
+    /**
+     * Cumulative statutory accrued entitlement through referans_tarih.
+     * Does NOT rewrite annual-band owner; loops completed anniversaries and sums Owner A.
+     *
+     * @param array{ise_giris_tarihi:string, dogum_tarihi?:string|null, referans_tarih?:string|null} $girdi
+     * @return array{
+     *   kidem_yil:int,
+     *   yas:int|null,
+     *   mevcut_yillik_hak_gun:int,
+     *   birikmis_yasal_hak_gun:int,
+     *   yas_istisna_uygulandi:bool,
+     *   accrual_breakdown:array<int, array{completed_year:int, anniversary:string, gun:int, yas:int|null, yas_istisna_uygulandi:bool}>
+     * }
+     */
+    public static function hesaplaBirikmisYasalHak(array $girdi)
+    {
+        $iseGiris = isset($girdi['ise_giris_tarihi']) ? (string) $girdi['ise_giris_tarihi'] : '';
+        $dogum = isset($girdi['dogum_tarihi']) && $girdi['dogum_tarihi'] !== null && $girdi['dogum_tarihi'] !== ''
+            ? (string) $girdi['dogum_tarihi']
+            : null;
+        $refRaw = isset($girdi['referans_tarih']) && $girdi['referans_tarih'] !== null && $girdi['referans_tarih'] !== ''
+            ? (string) $girdi['referans_tarih']
+            : null;
+
+        $current = self::hesaplaIzinHakEdis([
+            'ise_giris_tarihi' => $iseGiris,
+            'dogum_tarihi' => $dogum,
+            'referans_tarih' => $refRaw,
+        ]);
+
+        $giris = self::parseDate($iseGiris);
+        $ref = $refRaw !== null ? self::parseDate($refRaw) : self::today();
+        if ($giris === null || $ref === null || $ref < $giris) {
+            return [
+                'kidem_yil' => (int) $current['kidem_yil'],
+                'yas' => $current['yas'],
+                'mevcut_yillik_hak_gun' => (int) $current['yillik_izin_gun'],
+                'birikmis_yasal_hak_gun' => 0,
+                'yas_istisna_uygulandi' => (bool) $current['yas_istisna_uygulandi'],
+                'accrual_breakdown' => [],
+            ];
+        }
+
+        $kidemYil = (int) $current['kidem_yil'];
+        $birikmis = 0;
+        $breakdown = [];
+
+        for ($completedYear = 1; $completedYear <= $kidemYil; $completedYear++) {
+            $anniversary = self::anniversaryDate($giris, $completedYear);
+            if ($anniversary === null) {
+                continue;
+            }
+            $anniversaryKey = $anniversary->format('Y-m-d');
+            if ($anniversary > $ref) {
+                continue;
+            }
+
+            $band = self::hesaplaYillikIzinGun([
+                'ise_giris_tarihi' => $iseGiris,
+                'dogum_tarihi' => $dogum,
+                'referans_tarih' => $anniversaryKey,
+            ]);
+            $yasAtAnniversary = $dogum !== null ? self::hesaplaYas($dogum, $anniversaryKey) : null;
+            $gun = (int) $band['gun'];
+            $birikmis += $gun;
+            $breakdown[] = [
+                'completed_year' => $completedYear,
+                'anniversary' => $anniversaryKey,
+                'gun' => $gun,
+                'yas' => $yasAtAnniversary,
+                'yas_istisna_uygulandi' => (bool) $band['yas_istisna_uygulandi'],
+            ];
+        }
+
+        return [
+            'kidem_yil' => $kidemYil,
+            'yas' => $current['yas'],
+            'mevcut_yillik_hak_gun' => (int) $current['yillik_izin_gun'],
+            'birikmis_yasal_hak_gun' => $birikmis,
+            'yas_istisna_uygulandi' => (bool) $current['yas_istisna_uygulandi'],
+            'accrual_breakdown' => $breakdown,
+        ];
+    }
+
+    /**
+     * @return \DateTimeImmutable|null
+     */
+    private static function anniversaryDate(\DateTimeImmutable $hire, $completedYears)
+    {
+        $completedYears = (int) $completedYears;
+        if ($completedYears < 1) {
+            return null;
+        }
+
+        return $hire->modify('+' . $completedYears . ' years');
     }
 
     /**

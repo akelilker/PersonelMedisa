@@ -16,6 +16,7 @@ use PDO;
 class YillikIzinKullanimService
 {
     /**
+     * @param string|null $referansTarih YYYY-MM-DD as-of; only leave days <= this date count.
      * @return array{
      *   kullanilan_gun:int|null,
      *   sayilan_normal_gun:int,
@@ -25,11 +26,11 @@ class YillikIzinKullanimService
      *   eksik_takvim_tarihleri:array<int,string>
      * }
      */
-    public static function computeForPersonel(PDO $pdo, $personelId)
+    public static function computeForPersonel(PDO $pdo, $personelId, $referansTarih = null)
     {
         $personelId = (int) $personelId;
         $surecler = self::fetchYillikIzinSurecler($pdo, $personelId);
-        $tarihler = self::collectInclusiveDates($surecler);
+        $tarihler = self::collectInclusiveDates($surecler, $referansTarih);
         if (count($tarihler) === 0) {
             return self::emptyOzet(true);
         }
@@ -43,6 +44,7 @@ class YillikIzinKullanimService
     /**
      * @param array<int, array<string, mixed>> $surecler
      * @param array<string, string> $canonicalGunTipiByDate
+     * @param string|null $referansTarih only dates <= referans participate; future days ignored (no fail-closed)
      * @return array{
      *   kullanilan_gun:int|null,
      *   sayilan_normal_gun:int,
@@ -52,9 +54,9 @@ class YillikIzinKullanimService
      *   eksik_takvim_tarihleri:array<int,string>
      * }
      */
-    public static function classifyFromSurecler(array $surecler, array $canonicalGunTipiByDate = [])
+    public static function classifyFromSurecler(array $surecler, array $canonicalGunTipiByDate = [], $referansTarih = null)
     {
-        $tarihler = self::collectInclusiveDates($surecler);
+        $tarihler = self::collectInclusiveDates($surecler, $referansTarih);
         if (count($tarihler) === 0) {
             return self::emptyOzet(true);
         }
@@ -243,10 +245,16 @@ class YillikIzinKullanimService
 
     /**
      * @param array<int, array<string, mixed>> $surecler
+     * @param string|null $referansTarih when set, only dates <= referans are included
      * @return array<int, string>
      */
-    private static function collectInclusiveDates(array $surecler)
+    private static function collectInclusiveDates(array $surecler, $referansTarih = null)
     {
+        $asOf = null;
+        if ($referansTarih !== null && trim((string) $referansTarih) !== '') {
+            $asOf = self::parseDateKey((string) $referansTarih);
+        }
+
         $set = [];
         foreach ($surecler as $surec) {
             if (strtoupper((string) ($surec['surec_turu'] ?? '')) !== 'IZIN') {
@@ -269,7 +277,16 @@ class YillikIzinKullanimService
             if ($bit === null) {
                 $bit = $bas;
             }
+            if ($asOf !== null && $bas > $asOf) {
+                continue;
+            }
+            if ($asOf !== null && $bit > $asOf) {
+                $bit = $asOf;
+            }
             foreach (self::listInclusiveDateKeys($bas, $bit) as $tarih) {
+                if ($asOf !== null && $tarih > $asOf) {
+                    continue;
+                }
                 $set[$tarih] = true;
             }
         }

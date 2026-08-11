@@ -78,13 +78,27 @@ export function normalizeYillikIzinBakiye(data: unknown): YillikIzinBakiye {
     ? record.eksik_takvim_tarihleri.filter((item): item is string => typeof item === "string")
     : [];
 
+  const birikmis =
+    toNumber(record.birikmis_yasal_hak_gun) ??
+    toNumber(record.yasal_hak_gun) ??
+    0;
+  const mevcut =
+    toNumber(record.mevcut_yillik_hak_gun) ??
+    toNumber(record.yillik_izin_gun) ??
+    0;
+
   return {
     personel_id: personelId,
     contract_version: toStringValue(record.contract_version) ?? "",
+    referans_tarih: toStringValue(record.referans_tarih) ?? null,
+    annual_band_semantic: toStringValue(record.annual_band_semantic),
+    balance_legal_semantic: toStringValue(record.balance_legal_semantic),
     kidem_yil: toNumber(record.kidem_yil) ?? 0,
     yas: toNumber(record.yas) ?? null,
     yas_istisna_uygulandi: Boolean(record.yas_istisna_uygulandi),
-    yasal_hak_gun: toNumber(record.yasal_hak_gun) ?? 0,
+    mevcut_yillik_hak_gun: mevcut,
+    birikmis_yasal_hak_gun: birikmis,
+    yasal_hak_gun: birikmis,
     manuel_duzeltme_gun: toNumber(record.manuel_duzeltme_gun) ?? 0,
     efektif_hak_gun: toNumber(record.efektif_hak_gun) ?? 0,
     kullanilan_gun: kullanilanRaw === null || kullanilanRaw === undefined ? null : (toNumber(kullanilanRaw) ?? null),

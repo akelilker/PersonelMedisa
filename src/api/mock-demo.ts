@@ -50,7 +50,7 @@ import type { RevizyonTalebi, RevizyonTipi } from "../types/revizyon-talebi";
 import { REVIZYON_TIPLERI } from "../types/revizyon-talebi";
 import { hesaplaAylikSgkPuantajOzetleri } from "../services/dashboard-rapor-servisi";
 import {
-  hesaplaIzinHakEdis,
+  hesaplaBirikmisYasalHak,
   hesaplaKullanilanIzinOzeti
 } from "../services/izin-hesap-motoru";
 import { buildHaftalikKapanisSnapshot } from "../services/haftalik-kapanis-snapshot";
@@ -3432,15 +3432,30 @@ function serializeDemoYillikIzinHakDuzeltme(row: DemoYillikIzinHakDuzeltme) {
   };
 }
 
-function buildDemoYillikIzinBakiye(personelId: number) {
+function buildDemoYillikIzinBakiye(personelId: number, referansTarih?: string) {
+  const ref =
+    referansTarih && /^\d{4}-\d{2}-\d{2}$/.test(referansTarih)
+      ? referansTarih
+      : (() => {
+          const now = new Date();
+          return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(
+            now.getDate()
+          ).padStart(2, "0")}`;
+        })();
+
   const personel = demoState.personeller.find((item) => item.id === personelId);
   if (!personel?.ise_giris_tarihi) {
     return {
       personel_id: personelId,
-      contract_version: "S2B_YILLIK_IZIN_BAKIYE_V1",
+      contract_version: "s2c-v1",
+      referans_tarih: ref,
+      annual_band_semantic: "CURRENT_SERVICE_YEAR_BAND",
+      balance_legal_semantic: "CUMULATIVE_STATUTORY_ACCRUAL_AS_OF_REFERENCE_DATE",
       kidem_yil: 0,
       yas: null,
       yas_istisna_uygulandi: false,
+      mevcut_yillik_hak_gun: 0,
+      birikmis_yasal_hak_gun: 0,
       yasal_hak_gun: 0,
       manuel_duzeltme_gun: 0,
       efektif_hak_gun: 0,
@@ -3457,13 +3472,15 @@ function buildDemoYillikIzinBakiye(personelId: number) {
     };
   }
 
-  const hakEdis = hesaplaIzinHakEdis({
+  const birikmis = hesaplaBirikmisYasalHak({
     ise_giris_tarihi: personel.ise_giris_tarihi,
-    dogum_tarihi: personel.dogum_tarihi
+    dogum_tarihi: personel.dogum_tarihi,
+    referans_tarih: ref
   });
-  const manuel = demoState.yillikIzinHakDuzeltmeleri
-    .filter((item) => item.personel_id === personelId)
-    .reduce((sum, item) => sum + item.gun_delta, 0);
+  const manuelRows = demoState.yillikIzinHakDuzeltmeleri.filter(
+    (item) => item.personel_id === personelId && item.effective_date <= ref
+  );
+  const manuel = manuelRows.reduce((sum, item) => sum + item.gun_delta, 0);
   const surecler = demoState.surecler.filter((item) => item.personel_id === personelId) as Array<{
     id: number;
     personel_id: number;
@@ -3476,19 +3493,24 @@ function buildDemoYillikIzinBakiye(personelId: number) {
   const takvim = Object.values(demoState.puantajMap)
     .filter((item) => item.personel_id === personelId && item.gun_tipi)
     .map((item) => ({ tarih: item.tarih, gun_tipi: item.gun_tipi! }));
-  const kullanim = hesaplaKullanilanIzinOzeti(surecler as never, takvim);
+  const kullanim = hesaplaKullanilanIzinOzeti(surecler as never, takvim, ref);
   const used = kullanim.kullanilan_gun;
-  const effective = hakEdis.yillik_izin_gun + manuel;
+  const effective = birikmis.birikmis_yasal_hak_gun + manuel;
   const raw = used === null ? null : effective - used;
   const remaining = raw === null ? null : Math.max(raw, 0);
 
   return {
     personel_id: personelId,
-    contract_version: "S2B_YILLIK_IZIN_BAKIYE_V1",
-    kidem_yil: hakEdis.kidem_yil,
-    yas: hakEdis.yas,
-    yas_istisna_uygulandi: hakEdis.yas_istisna_uygulandi,
-    yasal_hak_gun: hakEdis.yillik_izin_gun,
+    contract_version: "s2c-v1",
+    referans_tarih: ref,
+    annual_band_semantic: "CURRENT_SERVICE_YEAR_BAND",
+    balance_legal_semantic: "CUMULATIVE_STATUTORY_ACCRUAL_AS_OF_REFERENCE_DATE",
+    kidem_yil: birikmis.kidem_yil,
+    yas: birikmis.yas,
+    yas_istisna_uygulandi: birikmis.yas_istisna_uygulandi,
+    mevcut_yillik_hak_gun: birikmis.mevcut_yillik_hak_gun,
+    birikmis_yasal_hak_gun: birikmis.birikmis_yasal_hak_gun,
+    yasal_hak_gun: birikmis.birikmis_yasal_hak_gun,
     manuel_duzeltme_gun: manuel,
     efektif_hak_gun: effective,
     kullanilan_gun: used,
@@ -3499,8 +3521,7 @@ function buildDemoYillikIzinBakiye(personelId: number) {
     sayilan_normal_gun: kullanim.sayilan_normal_gun,
     haric_tutulan_hafta_tatili_gun: kullanim.haric_tutulan_hafta_tatili_gun,
     haric_tutulan_ubgt_gun: kullanim.haric_tutulan_ubgt_gun,
-    duzeltme_adet: demoState.yillikIzinHakDuzeltmeleri.filter((item) => item.personel_id === personelId)
-      .length
+    duzeltme_adet: manuelRows.length
   };
 }
 
@@ -5809,7 +5830,11 @@ export function resolveDemoApiResponse(
       "Personel detayini goruntuleme yetkiniz yok."
     );
     if (permissionError) return permissionError;
-    return ok(buildDemoYillikIzinBakiye(personelId));
+    const rawRef = toStringValue(requestUrl.searchParams.get("referans_tarih"));
+    if (rawRef !== null && !/^\d{4}-\d{2}-\d{2}$/.test(rawRef)) {
+      return demoRevizyonError("VALIDATION_ERROR", "referans_tarih YYYY-MM-DD olmali.");
+    }
+    return ok(buildDemoYillikIzinBakiye(personelId, rawRef ?? undefined));
   }
 
   const yillikIzinHakListMatch = pathname.match(/^\/personeller\/(\d+)\/yillik-izin-hak-duzeltmeleri$/);

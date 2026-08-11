@@ -31,6 +31,6 @@ describe("S2B yillik izin legal parity PHP runtime", () => {
     const result = spawnSync(phpPath, phpArgs, { encoding: "utf8", cwd: process.cwd() });
 
     expect(result.status, result.stderr || result.stdout).toBe(0);
-    expect(result.stdout).toContain("S2B legal parity OK");
+    expect(result.stdout).toMatch(/S2B(\/S2C)? legal parity OK/);
   });
 });

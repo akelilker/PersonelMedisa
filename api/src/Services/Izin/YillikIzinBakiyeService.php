@@ -7,15 +7,62 @@ namespace Medisa\Api\Services\Izin;
 use PDO;
 
 /**
- * Effective annual leave balance assembly (S2B).
+ * Effective annual leave balance assembly (S2C).
  *
- * remaining = max(raw, 0) when used resolved; null when calendar fail-closed.
- * LEGAL_ENTITLEMENT_SEMANTIC = CURRENT_SERVICE_YEAR_BAND (not cumulative).
+ * Formula (as-of single referans_tarih):
+ *   raw = cumulative_statutory + effective_manual − used_as_of
+ *   remaining = max(raw, 0) when used resolved; null when calendar fail-closed.
+ *
+ * ANNUAL_BAND_SEMANTIC = CURRENT_SERVICE_YEAR_BAND (mevcut_yillik_hak_gun)
+ * BALANCE_LEGAL_OWNER  = CUMULATIVE_STATUTORY_ACCRUAL_AS_OF_REFERENCE_DATE (birikmis_yasal_hak_gun)
+ *
+ * Compatibility: yasal_hak_gun === birikmis_yasal_hak_gun (cumulative; NOT current-year band).
  */
 class YillikIzinBakiyeService
 {
-    public const LEGAL_ENTITLEMENT_SEMANTIC = 'CURRENT_SERVICE_YEAR_BAND';
-    public const CONTRACT_VERSION = 's2b-v1';
+    public const ANNUAL_BAND_SEMANTIC = 'CURRENT_SERVICE_YEAR_BAND';
+    public const BALANCE_LEGAL_SEMANTIC = 'CUMULATIVE_STATUTORY_ACCRUAL_AS_OF_REFERENCE_DATE';
+    /** @deprecated use BALANCE_LEGAL_SEMANTIC; kept for readers that still check this key */
+    public const LEGAL_ENTITLEMENT_SEMANTIC = self::BALANCE_LEGAL_SEMANTIC;
+    public const CONTRACT_VERSION = 's2c-v1';
+    public const REVERSAL_EFFECTIVE_SEMANTIC = 'RESTATEMENT_FROM_ORIGINAL_EFFECTIVE_DATE';
+
+    /**
+     * Resolve canonical reference date once at the service boundary.
+     * Absent/empty → today. Explicit malformed → VALIDATION_ERROR 422 (no silent today).
+     *
+     * @param mixed $referansTarih
+     * @return string YYYY-MM-DD
+     */
+    public static function resolveReferansTarih($referansTarih)
+    {
+        if ($referansTarih === null) {
+            return date('Y-m-d');
+        }
+        $raw = trim((string) $referansTarih);
+        if ($raw === '') {
+            return date('Y-m-d');
+        }
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $raw)) {
+            throw new YillikIzinHakDuzeltmeException(
+                'VALIDATION_ERROR',
+                'referans_tarih YYYY-MM-DD olmali.',
+                422,
+                'referans_tarih'
+            );
+        }
+        $dt = \DateTimeImmutable::createFromFormat('!Y-m-d', $raw);
+        if ($dt === false || $dt->format('Y-m-d') !== $raw) {
+            throw new YillikIzinHakDuzeltmeException(
+                'VALIDATION_ERROR',
+                'referans_tarih gecersiz.',
+                422,
+                'referans_tarih'
+            );
+        }
+
+        return $raw;
+    }
 
     /**
      * @return array<string, mixed>
@@ -28,11 +75,9 @@ class YillikIzinBakiyeService
             throw new YillikIzinHakDuzeltmeException('NOT_FOUND', 'Personel bulunamadi.', 404);
         }
 
-        $ref = $referansTarih !== null && trim((string) $referansTarih) !== ''
-            ? trim((string) $referansTarih)
-            : date('Y-m-d');
+        $ref = self::resolveReferansTarih($referansTarih);
 
-        $legal = YillikIzinHakEdisService::hesaplaIzinHakEdis([
+        $legal = YillikIzinHakEdisService::hesaplaBirikmisYasalHak([
             'ise_giris_tarihi' => (string) ($personel['ise_giris_tarihi'] ?? ''),
             'dogum_tarihi' => isset($personel['dogum_tarihi']) && $personel['dogum_tarihi'] !== null
                 ? (string) $personel['dogum_tarihi']
@@ -40,9 +85,9 @@ class YillikIzinBakiyeService
             'referans_tarih' => $ref,
         ]);
 
-        $manualNet = YillikIzinHakDuzeltmeLedgerService::netSum($pdo, $personelId);
-        $duzeltmeAdet = YillikIzinHakDuzeltmeLedgerService::countByPersonel($pdo, $personelId);
-        $usedOzeti = YillikIzinKullanimService::computeForPersonel($pdo, $personelId);
+        $manualNet = YillikIzinHakDuzeltmeLedgerService::netSumAsOf($pdo, $personelId, $ref);
+        $duzeltmeAdet = YillikIzinHakDuzeltmeLedgerService::countByPersonelAsOf($pdo, $personelId, $ref);
+        $usedOzeti = YillikIzinKullanimService::computeForPersonel($pdo, $personelId, $ref);
 
         return self::buildResponse($personelId, $ref, $legal, $manualNet, $usedOzeti, $duzeltmeAdet);
     }
@@ -50,7 +95,14 @@ class YillikIzinBakiyeService
     /**
      * Pure assembly helper for unit tests (no DB).
      *
-     * @param array{kidem_yil:int, yas:int|null, yillik_izin_gun:int, yas_istisna_uygulandi:bool} $legal
+     * @param array{
+     *   kidem_yil:int,
+     *   yas:int|null,
+     *   mevcut_yillik_hak_gun?:int,
+     *   birikmis_yasal_hak_gun?:int,
+     *   yillik_izin_gun?:int,
+     *   yas_istisna_uygulandi:bool
+     * } $legal
      * @param array{
      *   kullanilan_gun:int|null,
      *   sayilan_normal_gun?:int,
@@ -61,13 +113,13 @@ class YillikIzinBakiyeService
      * } $usedOzeti
      * @return array<string, mixed>
      */
-    public static function assembleFromParts(array $legal, $manualNet, array $usedOzeti, $duzeltmeAdet = 0)
+    public static function assembleFromParts(array $legal, $manualNet, array $usedOzeti, $duzeltmeAdet = 0, $referansTarih = null)
     {
-        return self::buildResponse(0, null, $legal, $manualNet, $usedOzeti, (int) $duzeltmeAdet);
+        return self::buildResponse(0, $referansTarih, $legal, $manualNet, $usedOzeti, (int) $duzeltmeAdet);
     }
 
     /**
-     * @param array{kidem_yil:int, yas:int|null, yillik_izin_gun:int, yas_istisna_uygulandi:bool} $legal
+     * @param array<string, mixed> $legal
      * @param array{
      *   kullanilan_gun:int|null,
      *   sayilan_normal_gun?:int,
@@ -81,9 +133,14 @@ class YillikIzinBakiyeService
     private static function buildResponse($personelId, $referansTarih, array $legal, $manualNet, array $usedOzeti, $duzeltmeAdet)
     {
         $used = array_key_exists('kullanilan_gun', $usedOzeti) ? $usedOzeti['kullanilan_gun'] : null;
-        $legalGun = (int) $legal['yillik_izin_gun'];
+        $mevcut = array_key_exists('mevcut_yillik_hak_gun', $legal)
+            ? (int) $legal['mevcut_yillik_hak_gun']
+            : (int) ($legal['yillik_izin_gun'] ?? 0);
+        $birikmis = array_key_exists('birikmis_yasal_hak_gun', $legal)
+            ? (int) $legal['birikmis_yasal_hak_gun']
+            : (int) ($legal['yillik_izin_gun'] ?? 0);
         $manual = (int) $manualNet;
-        $efektif = $legalGun + $manual;
+        $efektif = $birikmis + $manual;
         $rawRemaining = null;
         $remaining = null;
         if ($used !== null) {
@@ -99,11 +156,17 @@ class YillikIzinBakiyeService
             'personel_id' => (int) $personelId,
             'contract_version' => self::CONTRACT_VERSION,
             'referans_tarih' => $referansTarih,
-            'legal_entitlement_semantic' => self::LEGAL_ENTITLEMENT_SEMANTIC,
+            'annual_band_semantic' => self::ANNUAL_BAND_SEMANTIC,
+            'balance_legal_semantic' => self::BALANCE_LEGAL_SEMANTIC,
+            'legal_entitlement_semantic' => self::BALANCE_LEGAL_SEMANTIC,
+            'reversal_effective_semantic' => self::REVERSAL_EFFECTIVE_SEMANTIC,
             'kidem_yil' => (int) ($legal['kidem_yil'] ?? 0),
             'yas' => array_key_exists('yas', $legal) ? $legal['yas'] : null,
             'yas_istisna_uygulandi' => (bool) ($legal['yas_istisna_uygulandi'] ?? false),
-            'yasal_hak_gun' => $legalGun,
+            'mevcut_yillik_hak_gun' => $mevcut,
+            'birikmis_yasal_hak_gun' => $birikmis,
+            // Compatibility: cumulative statutory (S2C balance legal owner), NOT current-year band.
+            'yasal_hak_gun' => $birikmis,
             'manuel_duzeltme_gun' => $manual,
             'efektif_hak_gun' => $efektif,
             'kullanilan_gun' => $used,
@@ -115,8 +178,8 @@ class YillikIzinBakiyeService
             'haric_tutulan_hafta_tatili_gun' => (int) ($usedOzeti['haric_tutulan_hafta_tatili_gun'] ?? 0),
             'haric_tutulan_ubgt_gun' => (int) ($usedOzeti['haric_tutulan_ubgt_gun'] ?? 0),
             'duzeltme_adet' => (int) $duzeltmeAdet,
-            // Internal / pure-test aliases (kept for parity fixtures)
-            'legal_entitlement' => $legalGun,
+            // Internal / pure-test aliases
+            'legal_entitlement' => $birikmis,
             'manual_net' => $manual,
             'used' => $used,
             'raw_remaining' => $rawRemaining,

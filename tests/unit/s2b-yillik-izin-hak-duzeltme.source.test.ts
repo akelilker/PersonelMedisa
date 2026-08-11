@@ -111,8 +111,12 @@ describe("S2B yillik izin hak duzeltme (source invariants)", () => {
   it("PersonelIzinOzetSection uses server bakiye, not local hesaplaIzinBakiye", () => {
     const section = read("src/features/personeller/components/personel-dosya/PersonelIzinOzetSection.tsx");
     expect(section).toContain("fetchYillikIzinBakiye");
+    expect(section).toContain("Birikmiş Yasal Hak");
+    expect(section).toContain("mevcut_yillik_hak_gun");
+    expect(section).toContain("birikmis_yasal_hak_gun");
     expect(section).not.toContain("hesaplaIzinBakiye");
     expect(section).not.toContain("hesaplaIzinHakEdis");
+    expect(section).not.toContain("hesaplaBirikmisYasalHak");
   });
 
   it("KayitSurecWorkspace gates hak duzeltme tile on yillik_izin_hak_duzeltme.manage", () => {
@@ -123,6 +127,25 @@ describe("S2B yillik izin hak duzeltme (source invariants)", () => {
     expect(workspace).toContain('hasPermission("yillik_izin_hak_duzeltme.manage")');
     expect(workspace).toContain('data-testid="yillik-izin-hak-duzeltme-tile"');
     expect(workspace).toContain("canManageYillikIzinHak");
+  });
+
+  it("Süreç-only entitlement write: panel not rendered on Kayıt (yeni-kayit) tab", () => {
+    const workspace = read("src/features/kayit/components/KayitSurecWorkspace.tsx");
+    // Panel appears only inside surec branch with selected personel + hakDuzeltmeOpen.
+    expect(workspace).toMatch(/activeTab === ["']surec["']/);
+    expect(workspace).toContain("hakDuzeltmeOpen && selectedSurecPersonel");
+    expect(workspace).toContain("<YillikIzinHakDuzeltmePanel");
+
+    // Kayıt first-create tab block must not mount the entitlement write panel.
+    const kayitBlockStart = workspace.indexOf('activeTab === "yeni-kayit"');
+    expect(kayitBlockStart).toBeGreaterThan(-1);
+    const surecBlockStart = workspace.indexOf('activeTab === "surec"', kayitBlockStart + 1);
+    const kayitBlock =
+      surecBlockStart > kayitBlockStart
+        ? workspace.slice(kayitBlockStart, surecBlockStart)
+        : workspace.slice(kayitBlockStart);
+    expect(kayitBlock).not.toContain("YillikIzinHakDuzeltmePanel");
+    expect(kayitBlock).not.toContain("yillik-izin-hak-duzeltme-tile");
   });
 
   it("PHP Izin service owners exist under Medisa\\Api\\Services\\Izin", () => {
@@ -137,7 +160,23 @@ describe("S2B yillik izin hak duzeltme (source invariants)", () => {
     }
 
     const bakiye = read("api/src/Services/Izin/YillikIzinBakiyeService.php");
+    expect(bakiye).toContain("CUMULATIVE_STATUTORY_ACCRUAL_AS_OF_REFERENCE_DATE");
     expect(bakiye).toContain("CURRENT_SERVICE_YEAR_BAND");
+    expect(bakiye).toContain("hesaplaBirikmisYasalHak");
+    expect(bakiye).toContain("netSumAsOf");
+    expect(bakiye).toContain("resolveReferansTarih");
     expect(bakiye).toContain("max($rawRemaining, 0)");
+
+    const hakEdis = read("api/src/Services/Izin/YillikIzinHakEdisService.php");
+    expect(hakEdis).toContain("function hesaplaBirikmisYasalHak");
+    expect(hakEdis).toContain("function hesaplaYillikIzinGun");
+
+    const ledger = read("api/src/Services/Izin/YillikIzinHakDuzeltmeLedgerService.php");
+    expect(ledger).toContain("function netSumAsOf");
+    expect(ledger).toContain("function countByPersonelAsOf");
+    expect(ledger).toContain("effective_date <=");
+
+    const kullanim = read("api/src/Services/Izin/YillikIzinKullanimService.php");
+    expect(kullanim).toContain("referansTarih");
   });
 });

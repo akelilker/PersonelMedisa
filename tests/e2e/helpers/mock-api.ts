@@ -5975,22 +5975,33 @@ let personelBelgeKaydiIdCounter = 903;
         await fulfillJson(route, 404, errorBody("PERSONEL_NOT_FOUND", "Personel bulunamadi."));
         return;
       }
-      const manuel = yillikIzinHakDuzeltmeleri
-        .filter((item) => item.personel_id === personelId)
-        .reduce((sum, item) => sum + item.gun_delta, 0);
-      const yasal = 14;
-      const efektif = yasal + manuel;
+      const now = new Date();
+      const ref = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(
+        now.getDate()
+      ).padStart(2, "0")}`;
+      const manuelRows = yillikIzinHakDuzeltmeleri.filter(
+        (item) => item.personel_id === personelId && item.effective_date <= ref
+      );
+      const manuel = manuelRows.reduce((sum, item) => sum + item.gun_delta, 0);
+      const mevcut = 14;
+      const birikmis = 28;
+      const efektif = birikmis + manuel;
       const kullanilan = 0;
       await fulfillJson(
         route,
         200,
         okBody({
           personel_id: personelId,
-          contract_version: "s2b-v1",
+          contract_version: "s2c-v1",
+          referans_tarih: ref,
+          annual_band_semantic: "CURRENT_SERVICE_YEAR_BAND",
+          balance_legal_semantic: "CUMULATIVE_STATUTORY_ACCRUAL_AS_OF_REFERENCE_DATE",
           kidem_yil: 2,
           yas: 30,
           yas_istisna_uygulandi: false,
-          yasal_hak_gun: yasal,
+          mevcut_yillik_hak_gun: mevcut,
+          birikmis_yasal_hak_gun: birikmis,
+          yasal_hak_gun: birikmis,
           manuel_duzeltme_gun: manuel,
           efektif_hak_gun: efektif,
           kullanilan_gun: kullanilan,
@@ -6001,8 +6012,7 @@ let personelBelgeKaydiIdCounter = 903;
           sayilan_normal_gun: kullanilan,
           haric_tutulan_hafta_tatili_gun: 0,
           haric_tutulan_ubgt_gun: 0,
-          duzeltme_adet: yillikIzinHakDuzeltmeleri.filter((item) => item.personel_id === personelId)
-            .length
+          duzeltme_adet: manuelRows.length
         })
       );
       return;

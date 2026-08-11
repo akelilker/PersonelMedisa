@@ -41,6 +41,13 @@ function formatSigned(value: number): string {
   return value > 0 ? `+${value}` : String(value);
 }
 
+function todayIsoDate(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(
+    now.getDate()
+  ).padStart(2, "0")}`;
+}
+
 function formatGunOrUnresolved(value: number | null): string {
   return value === null ? "Kesinleştirilemedi" : `${value} gün`;
 }
@@ -165,8 +172,11 @@ export function YillikIzinHakDuzeltmePanel({
 
       {bakiye ? (
         <div className="personel-izin-infobox" data-testid="yillik-izin-hak-context">
-          <p>
-            <strong>Hesaplanan / Yasal Hak:</strong> {bakiye.yasal_hak_gun} gün
+          <p data-testid="yihd-mevcut-hak">
+            <strong>Bu Yıl / Mevcut Hak Ediş:</strong> {bakiye.mevcut_yillik_hak_gun} gün
+          </p>
+          <p data-testid="yihd-birikmis-hak">
+            <strong>Birikmiş Yasal Hak:</strong> {bakiye.birikmis_yasal_hak_gun} gün
           </p>
           <p>
             <strong>Manuel Düzeltmeler:</strong> {formatSigned(bakiye.manuel_duzeltme_gun)} gün
@@ -265,10 +275,13 @@ export function YillikIzinHakDuzeltmePanel({
           <p>Kayıtlı hak düzeltmesi yok.</p>
         ) : (
           <ul className="personel-surec-list">
-            {history.map((row) => (
+            {history.map((row) => {
+              const isFuture = row.effective_date > todayIsoDate();
+              return (
               <li key={row.id} className="personel-surec-card" data-testid={`yihd-row-${row.id}`}>
                 <span>
                   {row.effective_date} · {row.kategori} · {formatSigned(row.gun_delta)} gün
+                  {isFuture ? " · İleri tarihli" : ""}
                   {row.is_reversed ? " · terslendi" : ""}
                   {row.reverses_id ? ` · #${row.reverses_id} tersi` : ""}
                 </span>
@@ -318,7 +331,8 @@ export function YillikIzinHakDuzeltmePanel({
                   )
                 ) : null}
               </li>
-            ))}
+              );
+            })}
           </ul>
         )}
       </div>

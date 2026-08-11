@@ -181,6 +181,87 @@ export function hesaplaIzinHakEdis(girdi: IzinHesapGirdisi): IzinHakEdis {
   };
 }
 
+export type BirikmisYasalHak = {
+  kidem_yil: number;
+  yas: number | null;
+  mevcut_yillik_hak_gun: number;
+  birikmis_yasal_hak_gun: number;
+  yas_istisna_uygulandi: boolean;
+  accrual_breakdown: Array<{
+    completed_year: number;
+    anniversary: string;
+    gun: number;
+    yas: number | null;
+    yas_istisna_uygulandi: boolean;
+  }>;
+};
+
+function formatDateKey(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
+    date.getDate()
+  ).padStart(2, "0")}`;
+}
+
+function anniversaryDate(hire: Date, completedYears: number): Date {
+  return new Date(hire.getFullYear() + completedYears, hire.getMonth(), hire.getDate());
+}
+
+/**
+ * Owner B — cumulative statutory accrued entitlement through referans_tarih.
+ * Sums Owner A (annual band) at each completed service-year anniversary.
+ * Age exception is evaluated per anniversary. Pre-first anniversary = 0.
+ */
+export function hesaplaBirikmisYasalHak(girdi: IzinHesapGirdisi): BirikmisYasalHak {
+  const current = hesaplaIzinHakEdis(girdi);
+  const giris = parseDate(girdi.ise_giris_tarihi);
+  const ref = girdi.referans_tarih ? parseDate(girdi.referans_tarih) ?? today() : today();
+
+  if (!giris || ref < giris) {
+    return {
+      kidem_yil: current.kidem_yil,
+      yas: current.yas,
+      mevcut_yillik_hak_gun: current.yillik_izin_gun,
+      birikmis_yasal_hak_gun: 0,
+      yas_istisna_uygulandi: current.yas_istisna_uygulandi,
+      accrual_breakdown: []
+    };
+  }
+
+  let birikmis = 0;
+  const breakdown: BirikmisYasalHak["accrual_breakdown"] = [];
+
+  for (let completedYear = 1; completedYear <= current.kidem_yil; completedYear += 1) {
+    const anniversary = anniversaryDate(giris, completedYear);
+    if (anniversary > ref) continue;
+    const anniversaryKey = formatDateKey(anniversary);
+    const band = hesaplaYillikIzinGun({
+      ise_giris_tarihi: girdi.ise_giris_tarihi,
+      dogum_tarihi: girdi.dogum_tarihi,
+      referans_tarih: anniversaryKey
+    });
+    const yasAtAnniversary = girdi.dogum_tarihi
+      ? hesaplaYas(girdi.dogum_tarihi, anniversaryKey)
+      : null;
+    birikmis += band.gun;
+    breakdown.push({
+      completed_year: completedYear,
+      anniversary: anniversaryKey,
+      gun: band.gun,
+      yas: yasAtAnniversary,
+      yas_istisna_uygulandi: band.yas_istisna_uygulandi
+    });
+  }
+
+  return {
+    kidem_yil: current.kidem_yil,
+    yas: current.yas,
+    mevcut_yillik_hak_gun: current.yillik_izin_gun,
+    birikmis_yasal_hak_gun: birikmis,
+    yas_istisna_uygulandi: current.yas_istisna_uygulandi,
+    accrual_breakdown: breakdown
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Süreç listesinden kullanılan yıllık izin günü hesaplama
 //
@@ -232,13 +313,16 @@ function buildCanonicalTakvimMap(
 
 export function hesaplaKullanilanIzinOzeti(
   surecler: Surec[],
-  canonicalTakvimGunleri: readonly CanonicalIzinTakvimGunu[] = []
+  canonicalTakvimGunleri: readonly CanonicalIzinTakvimGunu[] = [],
+  referansTarih?: string
 ): IzinKullanimOzeti {
   let sayilanNormalGun = 0;
   let haricTutulanHaftaTatiliGun = 0;
   let haricTutulanUbgtGun = 0;
   const eksikTakvimTarihleri = new Set<string>();
   const canonicalTakvim = buildCanonicalTakvimMap(canonicalTakvimGunleri);
+  const asOf = referansTarih ? parseDate(referansTarih) : null;
+  const asOfKey = asOf ? formatDateKey(asOf) : null;
 
   for (const surec of surecler) {
     if (surec.surec_turu !== "IZIN") continue;
@@ -249,9 +333,13 @@ export function hesaplaKullanilanIzinOzeti(
     const bit = surec.bitis_tarihi ? parseDate(surec.bitis_tarihi) : null;
 
     if (!bas) continue;
+    if (asOf && bas > asOf) continue;
 
-    const tarihler = listInclusiveDateKeys(bas, bit ?? bas);
+    const effectiveBit = bit ?? bas;
+    const cappedBit = asOf && effectiveBit > asOf ? asOf : effectiveBit;
+    const tarihler = listInclusiveDateKeys(bas, cappedBit);
     for (const tarih of tarihler) {
+      if (asOfKey && tarih > asOfKey) continue;
       const gunTipi = canonicalTakvim.get(tarih);
       if (!gunTipi) {
         eksikTakvimTarihleri.add(tarih);

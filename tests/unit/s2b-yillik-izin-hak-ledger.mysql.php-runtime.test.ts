@@ -40,6 +40,8 @@ describe("S2B yillik izin ledger mysql/php runtime", () => {
     expect(result.stdout).toContain("S2B ledger mysql runner OK");
     expect(result.stdout).toContain("create DEVIR +8");
     expect(result.stdout).toContain("zero delta rejected");
+    expect(result.stdout).toContain("FUTURE_DATED_LEDGER as-of Aug11 = +4");
+    expect(result.stdout).toContain("netSumAsOf 2026-08-11 excludes future");
     expect(result.stdout).not.toContain("sqlite driver missing");
   });
 });

@@ -97,4 +97,23 @@ s2bParityAssert(
     'missing DOB → band-only 14'
 );
 
-fwrite(STDOUT, "S2B legal parity OK\n");
+// S2C cumulative accrual parity anchors
+$cum5 = YillikIzinHakEdisService::hesaplaBirikmisYasalHak([
+    'ise_giris_tarihi' => '2021-04-13',
+    'referans_tarih' => $ref,
+]);
+s2bParityAssert(
+    $cum5['birikmis_yasal_hak_gun'] === 70 && $cum5['mevcut_yillik_hak_gun'] === 14,
+    'cumulative exact 5y = 70 / band 14'
+);
+
+$cum15 = YillikIzinHakEdisService::hesaplaBirikmisYasalHak([
+    'ise_giris_tarihi' => '2011-04-13',
+    'referans_tarih' => $ref,
+]);
+s2bParityAssert(
+    $cum15['birikmis_yasal_hak_gun'] === 276 && $cum15['mevcut_yillik_hak_gun'] === 26,
+    'cumulative exact 15y = 276 / band 26'
+);
+
+fwrite(STDOUT, "S2B/S2C legal parity OK\n");

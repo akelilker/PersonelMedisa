@@ -80,20 +80,23 @@ export function PersonelIzinOzetSection({
                 <strong>Yaş:</strong> {bakiye.yas}
               </p>
             ) : null}
-            <p>
-              <strong>Yasal / Yıllık Hak:</strong> {bakiye.yasal_hak_gun} gün
+            <p data-testid="izin-mevcut-hak">
+              <strong>Bu Yıl / Mevcut Hak Ediş:</strong> {bakiye.mevcut_yillik_hak_gun} gün
               {bakiye.yas_istisna_uygulandi ? (
                 <span className="personel-izin-istisna-badge"> (yaş istisnası)</span>
               ) : null}
             </p>
+            <p data-testid="izin-birikmis-yasal-hak">
+              <strong>Birikmiş Yasal Hak:</strong> {bakiye.birikmis_yasal_hak_gun} gün
+            </p>
             <p data-testid="izin-manuel-duzeltme">
               <strong>Manuel Hak Düzeltmeleri:</strong> {formatSigned(bakiye.manuel_duzeltme_gun)} gün
             </p>
-            <p>
+            <p data-testid="izin-kullanilan">
               <strong>Kullanılan:</strong>{" "}
               {bakiye.kullanilan_gun === null ? "Kesinleştirilemedi" : `${bakiye.kullanilan_gun} gün`}
             </p>
-            <p className="personel-izin-kalan">
+            <p className="personel-izin-kalan" data-testid="izin-kalan">
               <strong>Kalan İzin:</strong>{" "}
               {bakiye.kalan_gun === null ? "Kesinleştirilemedi" : `${bakiye.kalan_gun} gün`}
             </p>

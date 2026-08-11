@@ -7,47 +7,13 @@ namespace Medisa\Api\Services\Izin;
 use PDO;
 use PDOException;
 
-class YillikIzinHakDuzeltmeException extends \RuntimeException
-{
-    /** @var string */
-    private $errorCode;
-
-    /** @var int */
-    private $httpStatus;
-
-    /** @var string|null */
-    private $field;
-
-    public function __construct($code, $message, $httpStatus = 400, $field = null)
-    {
-        parent::__construct((string) $message, (int) $httpStatus);
-        $this->errorCode = (string) $code;
-        $this->httpStatus = (int) $httpStatus;
-        $this->field = $field !== null && (string) $field !== '' ? (string) $field : null;
-    }
-
-    public function getErrorCode()
-    {
-        return $this->errorCode;
-    }
-
-    public function getHttpStatus()
-    {
-        $code = (int) $this->httpStatus;
-
-        return $code >= 400 && $code < 600 ? $code : 400;
-    }
-
-    /** @return string|null */
-    public function getField()
-    {
-        return $this->field;
-    }
-}
-
 /**
  * Append-only yıllık izin hak düzeltme ledger (S2B).
  * D2=A: no approval workflow. Signed deltas OK; zero rejected.
+ *
+ * Reversal effective-date semantic (S2C): TERS_KAYIT copies original effective_date
+ * so AS-OF balance restates business history (RESTATEMENT_FROM_ORIGINAL_EFFECTIVE_DATE).
+ * Prefer netSumAsOf for balance; netSum remains full-history for list/history consumers.
  */
 class YillikIzinHakDuzeltmeLedgerService
 {
@@ -211,7 +177,11 @@ class YillikIzinHakDuzeltmeLedgerService
         return array_map([self::class, 'mapRow'], $stmt->fetchAll(PDO::FETCH_ASSOC) ?: []);
     }
 
-    /** @return int */
+    /**
+     * Full-history signed net (all rows). Prefer netSumAsOf for balance reads.
+     *
+     * @return int
+     */
     public static function netSum(PDO $pdo, $personelId)
     {
         $stmt = $pdo->prepare(
@@ -220,6 +190,31 @@ class YillikIzinHakDuzeltmeLedgerService
              WHERE personel_id = :pid'
         );
         $stmt->execute(['pid' => (int) $personelId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        return (int) ($row['net'] ?? 0);
+    }
+
+    /**
+     * AS-OF signed net: only rows with effective_date <= $asOfDate (YYYY-MM-DD).
+     * Uses idx_yihd_personel_effective (personel_id, effective_date, id).
+     * Reversal semantic: TERS_KAYIT copies original effective_date, so AS-OF restates history.
+     *
+     * @return int
+     */
+    public static function netSumAsOf(PDO $pdo, $personelId, $asOfDate)
+    {
+        $asOf = self::assertAsOfDate($asOfDate);
+        $stmt = $pdo->prepare(
+            'SELECT COALESCE(SUM(gun_delta), 0) AS net
+             FROM yillik_izin_hak_duzeltmeleri
+             WHERE personel_id = :pid
+               AND effective_date <= :as_of'
+        );
+        $stmt->execute([
+            'pid' => (int) $personelId,
+            'as_of' => $asOf,
+        ]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
         return (int) ($row['net'] ?? 0);
@@ -237,6 +232,54 @@ class YillikIzinHakDuzeltmeLedgerService
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
         return (int) ($row['cnt'] ?? 0);
+    }
+
+    /**
+     * Effective adjustment count as of reference date (balance response).
+     *
+     * @return int
+     */
+    public static function countByPersonelAsOf(PDO $pdo, $personelId, $asOfDate)
+    {
+        $asOf = self::assertAsOfDate($asOfDate);
+        $stmt = $pdo->prepare(
+            'SELECT COUNT(*) AS cnt
+             FROM yillik_izin_hak_duzeltmeleri
+             WHERE personel_id = :pid
+               AND effective_date <= :as_of'
+        );
+        $stmt->execute([
+            'pid' => (int) $personelId,
+            'as_of' => $asOf,
+        ]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        return (int) ($row['cnt'] ?? 0);
+    }
+
+    /** @return string */
+    private static function assertAsOfDate($asOfDate)
+    {
+        $asOf = trim((string) $asOfDate);
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $asOf)) {
+            throw new YillikIzinHakDuzeltmeException(
+                'VALIDATION_ERROR',
+                'referans_tarih YYYY-MM-DD olmali.',
+                422,
+                'referans_tarih'
+            );
+        }
+        $dt = \DateTimeImmutable::createFromFormat('!Y-m-d', $asOf);
+        if ($dt === false || $dt->format('Y-m-d') !== $asOf) {
+            throw new YillikIzinHakDuzeltmeException(
+                'VALIDATION_ERROR',
+                'referans_tarih gecersiz.',
+                422,
+                'referans_tarih'
+            );
+        }
+
+        return $asOf;
     }
 
     /**

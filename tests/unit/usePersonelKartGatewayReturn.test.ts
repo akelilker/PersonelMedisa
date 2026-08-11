@@ -38,9 +38,34 @@ describe("usePersonelKartGatewayReturn", () => {
     );
 
     expect(result.current).toEqual({
-      handleOpenSurecModal: expect.any(Function)
+      handleOpenSurecModal: expect.any(Function),
+      handleOpenYillikIzinHakDuzeltme: expect.any(Function)
     });
     expect(result.current).not.toHaveProperty("handleOpenPersonelEditGateway");
     expect(result.current).not.toHaveProperty("handleOpenPersonelZimmetGateway");
+  });
+
+  it("handleOpenYillikIzinHakDuzeltme navigates with izin tab and hak-duzeltme operation", () => {
+    const navigate = vi.fn() as NavigateFunction;
+
+    const { result } = renderHook(() =>
+      usePersonelKartGatewayReturn({
+        navigate,
+        parsedPersonelId: 9
+      })
+    );
+
+    result.current.handleOpenYillikIzinHakDuzeltme();
+
+    expect(navigate).toHaveBeenCalledWith("/", {
+      state: {
+        kayitModal: {
+          tab: "surec",
+          personelId: 9,
+          personelTab: "izin-devamsizlik",
+          operation: "yillik-izin-hak-duzeltme"
+        }
+      }
+    });
   });
 });

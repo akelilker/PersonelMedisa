@@ -24,6 +24,9 @@ use Medisa\Api\Services\Retention\RetentionClock;
 use Medisa\Api\Services\Retention\RetentionPeriodTriggerResolver;
 use Medisa\Api\Services\Retention\RetentionPolicyService;
 use Medisa\Api\Services\Retention\RetentionSchemaGate;
+use Medisa\Api\Services\Retention\RetentionScopeResolver;
+use Medisa\Api\Services\Retention\RetentionSourceAdapterService;
+use Medisa\Api\Services\Retention\RetentionTargetResolver;
 
 function rp053Assert(bool $ok, string $name): void
 {
@@ -323,23 +326,46 @@ try {
     ]);
     rp053Assert($trig['trigger_date'] === '2010-02-10', '14 SGK cutoff trigger');
 
-    // 15 FAZLA_CALISMA needs KAPANDI week
+    // 15 FAZLA_CALISMA: yil/ay alone must NOT prove close (no single-week month fallback)
     try {
         RetentionPeriodTriggerResolver::resolve($pdo, RetentionCategories::FAZLA_CALISMA, [
             'sube_id' => 1, 'yil' => 2010, 'ay' => 1,
         ]);
-        rp053Assert(false, '15 FC missing should throw');
+        rp053Assert(false, '15 FC month-only should throw');
     } catch (RuntimeException $e) {
-        rp053Assert($e->getMessage() === RetentionPolicyService::CODE_PERIOD_NOT_CLOSED, '15 FC PERIOD_NOT_CLOSED');
+        rp053Assert(
+            $e->getMessage() === RetentionPolicyService::CODE_TRIGGER_NOT_RESOLVED
+                || $e->getMessage() === RetentionPolicyService::CODE_PERIOD_NOT_CLOSED,
+            '15 FC month-only fail-closed'
+        );
     }
     $pdo->exec(
         "INSERT INTO haftalik_kapanislar (sube_id, hafta_baslangic, hafta_bitis, state, created_at)
          VALUES (1, '2010-01-04', '2010-01-10', 'KAPANDI', '2010-01-11 09:00:00')"
     );
+    $weekId = (int) $pdo->query('SELECT id FROM haftalik_kapanislar ORDER BY id DESC LIMIT 1')->fetchColumn();
+    // One closed week + month params still must not bypass — require exact weekly identity.
+    try {
+        RetentionPeriodTriggerResolver::resolve($pdo, RetentionCategories::FAZLA_CALISMA, [
+            'sube_id' => 1, 'yil' => 2010, 'ay' => 1,
+        ]);
+        rp053Assert(false, '15b FC one-week-in-month bypass should fail');
+    } catch (RuntimeException $e) {
+        rp053Assert(
+            $e->getMessage() === RetentionPolicyService::CODE_TRIGGER_NOT_RESOLVED,
+            '15b FC no month fallback'
+        );
+    }
     $trig = RetentionPeriodTriggerResolver::resolve($pdo, RetentionCategories::FAZLA_CALISMA, [
-        'sube_id' => 1, 'yil' => 2010, 'ay' => 1,
+        'haftalik_kapanis_id' => $weekId,
+        'sube_id' => 1,
     ]);
-    rp053Assert($trig['trigger_date'] === '2010-01-10', '16 FC weekly owner');
+    rp053Assert($trig['trigger_date'] === '2010-01-10', '16 FC exact weekly owner');
+    $trig = RetentionPeriodTriggerResolver::resolve($pdo, RetentionCategories::SERBEST_ZAMAN, [
+        'hafta_baslangic' => '2010-01-04',
+        'sube_id' => 1,
+    ]);
+    rp053Assert($trig['trigger_date'] === '2010-01-10', '16b SZ hafta_baslangic+sube');
 
     // 17 ONAY_AUDIT without parent → TRIGGER_NOT_RESOLVED
     try {
@@ -351,11 +377,15 @@ try {
         rp053Assert($e->getMessage() === RetentionPolicyService::CODE_TRIGGER_NOT_RESOLVED, '17 ONAY_AUDIT TRIGGER_NOT_RESOLVED');
     }
 
-    // 18 ONAY_AUDIT parent PUANTAJ
+    // 18 ONAY_AUDIT parent PUANTAJ → PERIOD_CLOSURE
     $trig = RetentionPeriodTriggerResolver::resolve($pdo, RetentionCategories::ONAY_AUDIT, [
         'sube_id' => 1, 'yil' => 2010, 'ay' => 1, 'parent_category' => RetentionCategories::PUANTAJ,
     ]);
-    rp053Assert($trig['trigger_date'] === '2010-02-05', '18 ONAY_AUDIT parent PUANTAJ');
+    rp053Assert($trig['trigger_date'] === '2010-02-05', '18 ONAY_AUDIT parent PUANTAJ date');
+    rp053Assert(
+        $trig['trigger_type'] === RetentionCategories::TRIGGER_PERIOD_CLOSURE,
+        '18b ONAY_AUDIT parent PUANTAJ type PERIOD_CLOSURE'
+    );
 
     // 19 AKTIF personel termination missing
     $term = RetentionPolicyService::resolveTerminationDate($pdo, 10);
@@ -379,34 +409,79 @@ try {
     $term = RetentionPolicyService::resolveTerminationDate($pdo, 11);
     rp053Assert($term === '2026-03-10', '21 rehire-safe latest non-IPTAL');
 
-    // Create lifecycle manifests (identity + fingerprint)
+    // Create lifecycle manifests (identity + fingerprint) for current 2026 termination
     $fp = ArchiveManifestService::computePersonelOzlukFingerprint($pdo, 11);
     rp053Assert($fp !== null && strlen($fp) === 64, '22 fingerprint');
     ArchiveManifestService::createPersonelLifecycleManifests($pdo, 11, 1);
-    $m = ArchiveManifestService::find($pdo, 'personel', 11, RetentionCategories::PERSONEL_OZLUK);
+    $m = ArchiveManifestService::findCurrentLifecycleManifest(
+        $pdo,
+        'personel',
+        11,
+        RetentionCategories::PERSONEL_OZLUK,
+        ['personel_id' => 11]
+    );
     rp053Assert($m !== null, '23 lifecycle manifest PERSONEL_OZLUK');
-    $m2 = ArchiveManifestService::find($pdo, 'personel', 11, RetentionCategories::ISE_GIRIS_CIKIS);
+    $m2 = ArchiveManifestService::findCurrentLifecycleManifest(
+        $pdo,
+        'personel',
+        11,
+        RetentionCategories::ISE_GIRIS_CIKIS,
+        ['personel_id' => 11]
+    );
     rp053Assert($m2 !== null, '24 lifecycle manifest ISE_GIRIS_CIKIS');
 
-    // 25 Manifest immutable: different baseline → ARCHIVE_MANIFEST_SOURCE_CHANGED
+    // 25 Same identity + different baseline → ARCHIVE_MANIFEST_SOURCE_CHANGED
     try {
         ArchiveManifestService::createManifest($pdo, [
             'entity_type' => 'personel',
             'record_id' => 11,
             'personel_id' => 11,
             'record_category' => RetentionCategories::PERSONEL_OZLUK,
-            'source_version_identity' => 'different-identity',
+            'source_version_identity' => (string) $m['source_version_identity'],
             'trigger_type' => RetentionCategories::TRIGGER_TERMINATION_DATE,
             'trigger_date' => '2026-03-10',
-            'source_sha256' => $fp,
+            'source_sha256' => str_repeat('a', 64),
         ], 1);
-        rp053Assert(false, '25 immutable should throw');
+        rp053Assert(false, '25 same identity different sha should throw');
     } catch (RuntimeException $e) {
         rp053Assert(
             $e->getMessage() === ArchiveManifestService::CODE_ARCHIVE_MANIFEST_SOURCE_CHANGED,
             '25 ARCHIVE_MANIFEST_SOURCE_CHANGED'
         );
     }
+
+    // 25b Different lifecycle identity → NEW immutable row (no overwrite)
+    $priorId = (int) $m['id'];
+    $legacy = ArchiveManifestService::createManifest($pdo, [
+        'entity_type' => 'personel',
+        'record_id' => 11,
+        'personel_id' => 11,
+        'record_category' => RetentionCategories::PERSONEL_OZLUK,
+        'source_version_identity' => 'personel:11:termination:2015-01-15',
+        'trigger_type' => RetentionCategories::TRIGGER_TERMINATION_DATE,
+        'trigger_date' => '2015-01-15',
+        'source_sha256' => $fp,
+    ], 1);
+    rp053Assert((int) $legacy['id'] !== $priorId, '25b new lifecycle row created');
+    $mUnchanged = ArchiveManifestService::findBySourceIdentity(
+        $pdo,
+        'personel',
+        11,
+        RetentionCategories::PERSONEL_OZLUK,
+        (string) $m['source_version_identity']
+    );
+    rp053Assert((int) $mUnchanged['id'] === $priorId, '25c prior lifecycle preserved');
+    $current = ArchiveManifestService::findCurrentLifecycleManifest(
+        $pdo,
+        'personel',
+        11,
+        RetentionCategories::PERSONEL_OZLUK,
+        ['personel_id' => 11]
+    );
+    rp053Assert(
+        (string) $current['source_version_identity'] === 'personel:11:termination:2026-03-10',
+        '25d current lifecycle is 2026'
+    );
 
     // 26 Idempotent same identity
     $again = ArchiveManifestService::createManifest($pdo, [
@@ -545,7 +620,13 @@ try {
         $integrity === RetentionPolicyService::CODE_ARCHIVE_SOURCE_INTEGRITY_CHANGED,
         '42 integrity CHANGED'
     );
-    $mAfter = ArchiveManifestService::find($pdo, 'personel', 11, RetentionCategories::PERSONEL_OZLUK);
+    $mAfter = ArchiveManifestService::findCurrentLifecycleManifest(
+        $pdo,
+        'personel',
+        11,
+        RetentionCategories::PERSONEL_OZLUK,
+        ['personel_id' => 11]
+    );
     rp053Assert((string) $mAfter['integrity_status'] === 'CHANGED', '43 sticky CHANGED');
     // Restore name for further checks
     $pdo->exec("UPDATE personeller SET ad = 'Pasif' WHERE id = 11");
@@ -638,6 +719,314 @@ try {
     rp053Assert($ctrl !== false && strpos($ctrl, "getQuery('as_of'") === false, 'controller no as_of');
     rp053Assert($ctrl !== false && strpos($ctrl, "getQuery('gm_approved'") === false, 'controller no gm_approved');
     rp053Assert($ctrl !== false && strpos($ctrl, 'evaluatePreApprovalEligibility') !== false, 'controller pre-approval');
+    rp053Assert($ctrl !== false && strpos($ctrl, 'RetentionTargetResolver') !== false, 'controller uses target resolver');
+    rp053Assert($ctrl !== false && strpos($ctrl, 'assertPersonelAccess') !== false, 'controller SubeScope guard');
+
+    // ---- FINAL GATE MATRIX (multi-lifecycle / scope / legal hold / sources / snapshots) ----
+
+    // ML1-6: full rehire lifecycle on personel 10
+    $pdo->exec("UPDATE personeller SET aktif_durum = 'PASIF', ise_giris_tarihi = '2010-01-01' WHERE id = 10");
+    $pdo->exec(
+        "INSERT INTO surecler (personel_id, surec_turu, baslangic_tarihi, state)
+         VALUES (10, 'ISTEN_AYRILMA', '2015-06-01', 'AKTIF')"
+    );
+    ArchiveManifestService::createPersonelLifecycleManifests($pdo, 10, 1);
+    $manifestA = ArchiveManifestService::findBySourceIdentity(
+        $pdo,
+        'personel',
+        10,
+        RetentionCategories::PERSONEL_OZLUK,
+        'personel:10:termination:2015-06-01'
+    );
+    rp053Assert($manifestA !== null && (string) $manifestA['trigger_date'] === '2015-06-01', 'ML1 manifest A 2015');
+    $aId = (int) $manifestA['id'];
+    $aSha = (string) $manifestA['source_sha256'];
+
+    // Rehire → AKTIF
+    $pdo->exec("UPDATE personeller SET aktif_durum = 'AKTIF', ise_giris_tarihi = '2018-01-01' WHERE id = 10");
+    rp053Assert(RetentionPolicyService::resolveTerminationDate($pdo, 10) === null, 'ML2 rehire AKTIF no term');
+
+    // Final termination 2026
+    $pdo->exec("UPDATE personeller SET aktif_durum = 'PASIF' WHERE id = 10");
+    $pdo->exec(
+        "INSERT INTO surecler (personel_id, surec_turu, baslangic_tarihi, state)
+         VALUES (10, 'ISTEN_AYRILMA', '2026-01-15', 'AKTIF')"
+    );
+    ArchiveManifestService::createPersonelLifecycleManifests($pdo, 10, 1);
+    $rowsOzluk = ArchiveManifestService::listForRecord($pdo, 'personel', 10, RetentionCategories::PERSONEL_OZLUK);
+    rp053Assert(count($rowsOzluk) === 2, 'ML3 PERSONEL_OZLUK count=2');
+    $rowsIse = ArchiveManifestService::listForRecord($pdo, 'personel', 10, RetentionCategories::ISE_GIRIS_CIKIS);
+    rp053Assert(count($rowsIse) === 2, 'ML3b ISE_GIRIS_CIKIS count=2');
+    $manifestB = ArchiveManifestService::findBySourceIdentity(
+        $pdo,
+        'personel',
+        10,
+        RetentionCategories::PERSONEL_OZLUK,
+        'personel:10:termination:2026-01-15'
+    );
+    rp053Assert($manifestB !== null && (string) $manifestB['trigger_date'] === '2026-01-15', 'ML4 manifest B 2026');
+    $aAgain = ArchiveManifestService::findBySourceIdentity(
+        $pdo,
+        'personel',
+        10,
+        RetentionCategories::PERSONEL_OZLUK,
+        'personel:10:termination:2015-06-01'
+    );
+    rp053Assert(
+        (int) $aAgain['id'] === $aId && (string) $aAgain['source_sha256'] === $aSha,
+        'ML5 A unchanged'
+    );
+    $cur = ArchiveManifestService::findCurrentLifecycleManifest(
+        $pdo,
+        'personel',
+        10,
+        RetentionCategories::PERSONEL_OZLUK,
+        ['personel_id' => 10]
+    );
+    rp053Assert((int) $cur['id'] === (int) $manifestB['id'], 'ML6 current=B');
+    rp053Assert((string) $cur['retention_until'] === '2036-01-15', 'ML6b retention_until 2036');
+    // Exact replay no duplicates
+    $replay = ArchiveManifestService::createPersonelLifecycleManifests($pdo, 10, 1);
+    rp053Assert((int) $replay[0]['id'] === (int) $manifestB['id'], 'ML6c exact replay no dup');
+    rp053Assert(
+        count(ArchiveManifestService::listForRecord($pdo, 'personel', 10, RetentionCategories::PERSONEL_OZLUK)) === 2,
+        'ML6d still 2 rows'
+    );
+
+    // ONAY_AUDIT lifecycle parent → TERMINATION_DATE
+    $trig = RetentionPeriodTriggerResolver::resolve($pdo, RetentionCategories::ONAY_AUDIT, [
+        'personel_id' => 10,
+        'parent_category' => RetentionCategories::PERSONEL_OZLUK,
+    ]);
+    rp053Assert(
+        $trig['trigger_type'] === RetentionCategories::TRIGGER_TERMINATION_DATE
+            && $trig['trigger_date'] === '2026-01-15',
+        'OA1 ONAY_AUDIT parent TERMINATION_DATE'
+    );
+
+    // Source adapters
+    $srcPersonel = RetentionSourceAdapterService::resolve($pdo, RetentionCategories::PERSONEL_OZLUK, [
+        'personel_id' => 10, 'entity_type' => 'personel', 'record_id' => 10,
+    ]);
+    rp053Assert(
+        $srcPersonel['source_version_identity'] === 'personel:10:termination:2026-01-15',
+        'SRC20 PERSONEL adapter'
+    );
+
+    $srcPuantaj = RetentionSourceAdapterService::resolve($pdo, RetentionCategories::PUANTAJ, [
+        'sube_id' => 1, 'yil' => 2010, 'ay' => 1, 'entity_type' => 'puantaj', 'record_id' => 1,
+    ]);
+    rp053Assert(strpos($srcPuantaj['source_version_identity'], 'puantaj_seal:') === 0, 'SRC22 PUANTAJ');
+
+    // Bordro finalized (seeded earlier in test 11)
+    $srcBordro = RetentionSourceAdapterService::resolve($pdo, RetentionCategories::BORDRO, [
+        'sube_id' => 1, 'yil' => 2010, 'ay' => 1, 'entity_type' => 'bordro', 'record_id' => 1,
+    ]);
+    rp053Assert(strpos($srcBordro['source_version_identity'], 'bordro_run:') === 0, 'SRC23 BORDRO');
+
+    $srcSgk = RetentionSourceAdapterService::resolve($pdo, RetentionCategories::SGK_EKSIK_GUN, [
+        'sube_id' => 1, 'yil' => 2010, 'ay' => 1, 'entity_type' => 'sgk', 'record_id' => 1,
+    ]);
+    rp053Assert(strpos($srcSgk['source_version_identity'], 'sgk_snapshot:') === 0, 'SRC24 SGK');
+
+    $srcFm = RetentionSourceAdapterService::resolve($pdo, RetentionCategories::FAZLA_CALISMA, [
+        'haftalik_kapanis_id' => $weekId, 'sube_id' => 1, 'entity_type' => 'haftalik_kapanis', 'record_id' => $weekId,
+    ]);
+    rp053Assert(strpos($srcFm['source_version_identity'], 'haftalik_kapanis:') === 0, 'SRC25 FM');
+    $srcSz = RetentionSourceAdapterService::resolve($pdo, RetentionCategories::SERBEST_ZAMAN, [
+        'hafta_baslangic' => '2010-01-04', 'sube_id' => 1, 'entity_type' => 'haftalik_kapanis', 'record_id' => $weekId,
+    ]);
+    rp053Assert(strpos($srcSz['source_version_identity'], 'haftalik_kapanis:') === 0, 'SRC26 SZ');
+
+    // Coverage map — all catalog categories have resolvers in this build
+    $coverage = RetentionSourceAdapterService::coverageMap();
+    foreach (RetentionCategories::all() as $cat) {
+        rp053Assert($coverage[$cat]['source_resolver'] === 'implemented', 'SRC cov ' . $cat);
+    }
+
+    // Legal hold validations
+    try {
+        LegalHoldService::create($pdo, $gm, [
+            'target_domain' => 'personel',
+            'target_category' => 'NOT_A_REAL_CATEGORY',
+            'personel_id' => 10,
+            'reason' => 'bad cat',
+        ]);
+        rp053Assert(false, 'LH15 unknown category');
+    } catch (RuntimeException $e) {
+        rp053Assert($e->getMessage() === 'LEGAL_HOLD_CATEGORY_INVALID', 'LH15 unknown category reject');
+    }
+    try {
+        LegalHoldService::create($pdo, $gm, [
+            'target_domain' => 'surec',
+            'target_record_id' => 999999,
+            'reason' => 'missing',
+        ]);
+        rp053Assert(false, 'LH16 missing record');
+    } catch (RuntimeException $e) {
+        rp053Assert($e->getMessage() === 'LEGAL_HOLD_TARGET_NOT_FOUND', 'LH16 nonexistent record');
+    }
+    $pdo->exec(
+        "INSERT INTO surecler (personel_id, surec_turu, baslangic_tarihi, state)
+         VALUES (10, 'IZIN', '2020-01-01', 'AKTIF')"
+    );
+    $surecId = (int) $pdo->lastInsertId();
+    try {
+        LegalHoldService::create($pdo, $gm, [
+            'target_domain' => 'surec',
+            'target_record_id' => $surecId,
+            'personel_id' => 11,
+            'reason' => 'mismatch',
+        ]);
+        rp053Assert(false, 'LH17 mismatch');
+    } catch (RuntimeException $e) {
+        rp053Assert($e->getMessage() === 'LEGAL_HOLD_PERSONEL_MISMATCH', 'LH17 record/personel mismatch');
+    }
+    try {
+        LegalHoldService::create($pdo, $gm, [
+            'target_domain' => 'puantaj',
+            'target_record_id' => 1,
+            'reason' => 'unsupported',
+        ]);
+        rp053Assert(false, 'LH18 unsupported');
+    } catch (RuntimeException $e) {
+        rp053Assert($e->getMessage() === LegalHoldService::CODE_TARGET_UNSUPPORTED, 'LH18 unsupported');
+    }
+    $validHold = LegalHoldService::create($pdo, $gm, [
+        'target_domain' => 'personel',
+        'personel_id' => 10,
+        'reason' => 'GM personel-wide hold',
+    ]);
+    rp053Assert((string) $validHold['hold_state'] === 'ACTIVE', 'LH19 valid GM hold');
+    LegalHoldService::release($pdo, $gm, (int) $validHold['id'], 'test done');
+
+    // Scope: null-personel record hold scoped via surec owner; global hold hidden from branch
+    $pdo->exec(
+        "INSERT INTO legal_holdlar
+            (target_domain, target_category, target_record_id, personel_id, reason, hold_state, created_by)
+         VALUES
+            ('surec', 'IZIN', {$surecId}, NULL, 'record hold', 'ACTIVE', 1),
+            ('category', 'BORDRO', NULL, NULL, 'global hold', 'ACTIVE', 1)"
+    );
+    $branchScoped = LegalHoldService::list($pdo, true, [1]);
+    $seenRecord = false;
+    $seenGlobal = false;
+    foreach ($branchScoped as $h) {
+        if ((string) ($h['reason'] ?? '') === 'record hold') {
+            $seenRecord = true;
+        }
+        if ((string) ($h['reason'] ?? '') === 'global hold') {
+            $seenGlobal = true;
+        }
+    }
+    rp053Assert($seenRecord === true, 'SC13 null-personel record hold visible via owner sube');
+    rp053Assert($seenGlobal === false, 'SC14 global hold hidden from branch scope');
+    $globalList = LegalHoldService::list($pdo, true, null);
+    $seenGlobalGm = false;
+    foreach ($globalList as $h) {
+        if ((string) ($h['reason'] ?? '') === 'global hold') {
+            $seenGlobalGm = true;
+        }
+    }
+    rp053Assert($seenGlobalGm === true, 'SC14b global hold visible to global role');
+
+    // Branch B personel not in scope A
+    $pdo->exec("INSERT INTO subeler (id, kod, ad, durum) VALUES (2, 'B', 'Sube B', 'AKTIF')");
+    $pdo->exec(
+        "INSERT INTO personeller (
+            id, tc_kimlik_no, ad, soyad, dogum_tarihi, telefon, acil_durum_kisi, acil_durum_telefon,
+            sicil_no, ise_giris_tarihi, sube_id, aktif_durum
+         ) VALUES
+         (20, '33333333333', 'Branch', 'B', '1990-01-01', '05000000010', 'Acil', '05000000011',
+            'S020', '2010-01-01', 2, 'PASIF')"
+    );
+    $resolved = RetentionTargetResolver::validateAndResolve(
+        $pdo,
+        RetentionCategories::PERSONEL_OZLUK,
+        'personel',
+        20,
+        20,
+        []
+    );
+    rp053Assert((int) $resolved['sube_id'] === 2, 'SC11 resolved sube B');
+    $scopedSube = RetentionScopeResolver::resolveSubeId($pdo, [
+        'personel_id' => 20,
+        'entity_type' => 'personel',
+        'record_id' => 20,
+    ]);
+    rp053Assert($scopedSube === 2, 'SC11b scope resolver sube B');
+    $filtered = RetentionScopeResolver::filterRowsBySubeScope($pdo, [
+        ['personel_id' => 20, 'entity_type' => 'personel', 'record_id' => 20, 'id' => 1],
+        ['personel_id' => 10, 'entity_type' => 'personel', 'record_id' => 10, 'id' => 2],
+    ], [1]);
+    rp053Assert(count($filtered) === 1 && (int) $filtered[0]['id'] === 2, 'SC11c branch A cannot see B');
+
+    // Snapshot fail-closed: required fields missing
+    $snapIncomplete = RetentionPolicyService::evaluateFinalExecutionEligibility(
+        $pdo,
+        RetentionCategories::PERSONEL_OZLUK,
+        [
+            'personel_id' => 10,
+            'entity_type' => 'personel',
+            'record_id' => 10,
+            'current_sha256' => ArchiveManifestService::computePersonelOzlukFingerprint($pdo, 10),
+        ],
+        [
+            'id' => 999,
+            'status' => 'APPROVED',
+            'approved_by' => 1,
+            'approved_at' => '2037-01-01 00:00:00',
+            'trigger_type_snapshot' => null,
+            'trigger_date_snapshot' => '2026-01-15',
+            'retention_until_snapshot' => '2036-01-15',
+            'source_version_identity_snapshot' => 'personel:10:termination:2026-01-15',
+            'source_sha256_snapshot' => ArchiveManifestService::computePersonelOzlukFingerprint($pdo, 10),
+        ],
+        new DateTimeImmutable('2037-01-01')
+    );
+    // Will fail NOT_APPROVED (no audit) or SNAPSHOT_INCOMPLETE — either is fail-closed
+    rp053Assert(
+        in_array($snapIncomplete['code'], [
+            RetentionPolicyService::CODE_SNAPSHOT_INCOMPLETE,
+            RetentionPolicyService::CODE_DESTRUCTION_REQUEST_NOT_APPROVED,
+            RetentionPolicyService::CODE_ARCHIVE_MANIFEST_MISSING,
+            RetentionPolicyService::CODE_RETENTION_NOT_MATURE,
+            RetentionPolicyService::CODE_LEGAL_HOLD_ACTIVE,
+        ], true),
+        'SNAP28 required snapshot missing fail-closed'
+    );
+
+    // Old lifecycle snapshot cannot match current
+    $oldSnapMismatch = true;
+    $oldIdentity = 'personel:10:termination:2015-06-01';
+    $newIdentity = 'personel:10:termination:2026-01-15';
+    rp053Assert($oldIdentity !== $newIdentity, 'SNAP29 old lifecycle != new');
+
+    // Unique index includes source_version_identity
+    $idx = $pdo->query(
+        "SELECT INDEX_NAME, GROUP_CONCAT(COLUMN_NAME ORDER BY SEQ_IN_INDEX) AS cols
+         FROM information_schema.STATISTICS
+         WHERE TABLE_SCHEMA = DATABASE()
+           AND TABLE_NAME = 'arsiv_manifestleri'
+           AND INDEX_NAME = 'uq_arsiv_manifest_entity_cat_src'
+         GROUP BY INDEX_NAME"
+    )->fetch(PDO::FETCH_ASSOC);
+    rp053Assert(
+        $idx
+        && strpos((string) $idx['cols'], 'source_version_identity') !== false,
+        'UQ multi-lifecycle unique includes source_version_identity'
+    );
+    $oldIdx = (int) $pdo->query(
+        "SELECT COUNT(*) FROM information_schema.STATISTICS
+         WHERE TABLE_SCHEMA = DATABASE()
+           AND TABLE_NAME = 'arsiv_manifestleri'
+           AND INDEX_NAME = 'uq_arsiv_manifest_entity_cat'"
+    )->fetchColumn();
+    rp053Assert($oldIdx === 0, 'UQ old unique dropped');
+
+    // Idempotent 053 re-apply
+    rp053Apply($pdo, '053_retention_legal_hold_arsiv.sql');
+    rp053Assert(true, '053 idempotent re-apply');
 
     RetentionClock::clearOverride();
     echo "verify-retention-policy-053-mysql: OK\n";

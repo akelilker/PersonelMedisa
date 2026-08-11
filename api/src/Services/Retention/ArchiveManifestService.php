@@ -11,6 +11,7 @@ use RuntimeException;
 /**
  * Immutable-baseline archive manifests + source integrity verification.
  * createManifest is INSERT-only (idempotent same identity; never UPDATE baseline).
+ * Multi-lifecycle: unique on (entity_type, record_id, record_category, source_version_identity).
  */
 class ArchiveManifestService
 {
@@ -19,10 +20,12 @@ class ArchiveManifestService
     public const INTEGRITY_UNKNOWN = 'UNKNOWN';
     public const CODE_ARCHIVE_MANIFEST_MISSING = 'ARCHIVE_MANIFEST_MISSING';
     public const CODE_ARCHIVE_MANIFEST_SOURCE_CHANGED = 'ARCHIVE_MANIFEST_SOURCE_CHANGED';
+    public const CODE_ARCHIVE_MANIFEST_MISSING_CURRENT_LIFECYCLE = 'ARCHIVE_MANIFEST_MISSING_CURRENT_LIFECYCLE';
 
     /**
      * INSERT-only. Same unique key + identical baseline → return existing.
-     * Different baseline on conflict → ARCHIVE_MANIFEST_SOURCE_CHANGED (no UPDATE).
+     * Same unique key + different baseline → ARCHIVE_MANIFEST_SOURCE_CHANGED (no UPDATE).
+     * Different source_version_identity → new immutable lifecycle row.
      *
      * @param array<string, mixed> $payload
      * @return array<string, mixed>
@@ -67,7 +70,7 @@ class ArchiveManifestService
             $retentionUntil = RetentionPolicyService::calculateRetentionUntil($dt);
         }
 
-        $existing = self::find($pdo, $entityType, $recordId, $category);
+        $existing = self::findBySourceIdentity($pdo, $entityType, $recordId, $category, $sourceIdentity);
         if ($existing) {
             $sameIdentity = (string) ($existing['source_version_identity'] ?? '') === $sourceIdentity
                 && (string) ($existing['trigger_type'] ?? '') === $triggerType
@@ -108,7 +111,7 @@ class ArchiveManifestService
             'created_by' => $createdBy,
         ]);
 
-        return self::find($pdo, $entityType, $recordId, $category);
+        return self::findBySourceIdentity($pdo, $entityType, $recordId, $category, $sourceIdentity);
     }
 
     /**
@@ -139,19 +142,35 @@ class ArchiveManifestService
     }
 
     /**
+     * Ambiguous across lifecycles — prefer findBySourceIdentity / findCurrentLifecycleManifest.
+     *
      * @return array<string, mixed>|null
      */
     public static function find(PDO $pdo, $entityType, $recordId, $category)
     {
+        return self::findCurrentLifecycleManifest($pdo, $entityType, $recordId, $category, []);
+    }
+
+    /**
+     * Exact lifecycle lookup by source_version_identity.
+     *
+     * @return array<string, mixed>|null
+     */
+    public static function findBySourceIdentity(PDO $pdo, $entityType, $recordId, $category, $sourceVersionIdentity)
+    {
         $stmt = $pdo->prepare(
             'SELECT * FROM arsiv_manifestleri
-             WHERE entity_type = :entity_type AND record_id = :record_id AND record_category = :category
+             WHERE entity_type = :entity_type
+               AND record_id = :record_id
+               AND record_category = :category
+               AND source_version_identity = :source_identity
              LIMIT 1'
         );
         $stmt->execute([
             'entity_type' => (string) $entityType,
             'record_id' => (int) $recordId,
             'category' => (string) $category,
+            'source_identity' => (string) $sourceVersionIdentity,
         ]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -159,15 +178,96 @@ class ArchiveManifestService
     }
 
     /**
-     * Compare stored sha256 with current. Missing manifest → ARCHIVE_MANIFEST_MISSING.
-     * Empty stored sha → INTEGRITY_UNKNOWN (fail-closed for destruction).
+     * Current effective lifecycle for the target.
+     * For PERSONEL_OZLUK / ISE_GIRIS_CIKIS: derives personel:{id}:termination:{effective_date}.
+     * Older lifecycle-only → null (caller maps to ARCHIVE_MANIFEST_MISSING_CURRENT_LIFECYCLE).
      *
-     * @return string OK|UNKNOWN|ARCHIVE_MANIFEST_MISSING|ARCHIVE_SOURCE_INTEGRITY_CHANGED
+     * @param array<string, mixed> $context
+     * @return array<string, mixed>|null
      */
-    public static function verifySourceIntegrity(PDO $pdo, $entityType, $recordId, $category, $currentSha256 = null)
+    public static function findCurrentLifecycleManifest(PDO $pdo, $entityType, $recordId, $category, array $context = [])
     {
-        $manifest = self::find($pdo, $entityType, $recordId, $category);
+        $entityType = (string) $entityType;
+        $recordId = (int) $recordId;
+        $category = (string) $category;
+        if ($entityType === 'personeller') {
+            $entityType = 'personel';
+        }
+
+        $identity = null;
+        try {
+            $ctx = $context;
+            $ctx['entity_type'] = $entityType;
+            $ctx['record_id'] = $recordId;
+            if (!isset($ctx['personel_id']) && $entityType === 'personel') {
+                $ctx['personel_id'] = $recordId;
+            }
+            $source = RetentionSourceAdapterService::resolve($pdo, $category, $ctx);
+            $identity = $source['source_version_identity'];
+        } catch (RuntimeException $e) {
+            // Fall through — try latest row only for non-lifecycle ambiguity diagnostics.
+            $identity = null;
+        }
+
+        if ($identity !== null && $identity !== '') {
+            return self::findBySourceIdentity($pdo, $entityType, $recordId, $category, $identity);
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public static function listForRecord(PDO $pdo, $entityType, $recordId, $category = null)
+    {
+        $sql = 'SELECT * FROM arsiv_manifestleri
+                WHERE entity_type = :entity_type AND record_id = :record_id';
+        $params = [
+            'entity_type' => (string) $entityType,
+            'record_id' => (int) $recordId,
+        ];
+        if ($category !== null && $category !== '') {
+            $sql .= ' AND record_category = :category';
+            $params['category'] = (string) $category;
+        }
+        $sql .= ' ORDER BY trigger_date ASC, id ASC';
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+
+        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+
+    /**
+     * Compare stored sha256 with current for the CURRENT lifecycle manifest.
+     * Missing current lifecycle (older only) → ARCHIVE_MANIFEST_MISSING_CURRENT_LIFECYCLE.
+     *
+     * @param array<string, mixed> $context
+     * @return string OK|UNKNOWN|ARCHIVE_MANIFEST_MISSING|ARCHIVE_MANIFEST_MISSING_CURRENT_LIFECYCLE|ARCHIVE_SOURCE_INTEGRITY_CHANGED
+     */
+    public static function verifySourceIntegrity(
+        PDO $pdo,
+        $entityType,
+        $recordId,
+        $category,
+        $currentSha256 = null,
+        array $context = []
+    ) {
+        $entityType = $entityType === 'personeller' ? 'personel' : (string) $entityType;
+        $recordId = (int) $recordId;
+        $category = (string) $category;
+
+        $ctx = $context;
+        $ctx['entity_type'] = $entityType;
+        $ctx['record_id'] = $recordId;
+
+        $manifest = self::findCurrentLifecycleManifest($pdo, $entityType, $recordId, $category, $ctx);
         if (!$manifest) {
+            $any = self::listForRecord($pdo, $entityType, $recordId, $category);
+            if (count($any) > 0) {
+                return self::CODE_ARCHIVE_MANIFEST_MISSING_CURRENT_LIFECYCLE;
+            }
+
             return self::CODE_ARCHIVE_MANIFEST_MISSING;
         }
 
@@ -226,6 +326,7 @@ class ArchiveManifestService
 
     /**
      * Create PERSONEL_OZLUK (+ ISE_GIRIS_CIKIS) manifests at PASIF transition.
+     * New employment lifecycle → new row; prior lifecycle rows remain immutable.
      *
      * @return array<int, array<string, mixed>>
      */

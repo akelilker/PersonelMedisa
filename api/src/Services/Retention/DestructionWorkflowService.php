@@ -67,11 +67,22 @@ class DestructionWorkflowService
         $entityType = (string) $context['entity_type'];
         $recordId = (int) $context['record_id'];
 
-        // Server-side fingerprint for personel targets.
-        if (($entityType === 'personel' || $entityType === 'personeller') && $recordId > 0) {
-            $fp = ArchiveManifestService::computePersonelOzlukFingerprint($pdo, $recordId);
-            if ($fp !== null) {
-                $context['current_sha256'] = $fp;
+        // Server-side fingerprint / source identity via canonical adapter.
+        try {
+            $source = RetentionSourceAdapterService::resolve($pdo, $category, $context);
+            $context['source_version_identity'] = $source['source_version_identity'];
+            if ($source['source_sha256'] !== null) {
+                $context['current_sha256'] = $source['source_sha256'];
+            }
+        } catch (RuntimeException $e) {
+            if (strpos($e->getMessage(), RetentionSourceAdapterService::CODE_NOT_IMPLEMENTED) === 0) {
+                throw $e;
+            }
+            if (($entityType === 'personel' || $entityType === 'personeller') && $recordId > 0) {
+                $fp = ArchiveManifestService::computePersonelOzlukFingerprint($pdo, $recordId);
+                if ($fp !== null) {
+                    $context['current_sha256'] = $fp;
+                }
             }
         }
 
@@ -81,6 +92,12 @@ class DestructionWorkflowService
             $context,
             null
         );
+        if (!empty($eligibility['source_version_identity'])) {
+            $context['source_version_identity'] = $eligibility['source_version_identity'];
+        }
+        if (!empty($eligibility['source_sha256'])) {
+            $context['current_sha256'] = $eligibility['source_sha256'];
+        }
 
         $snapshots = self::buildSnapshots($pdo, $category, $context, $eligibility);
         $status = (($eligibility['code'] ?? '') === RetentionPolicyService::CODE_ELIGIBLE_FOR_DESTRUCTION_REQUEST)
@@ -212,12 +229,20 @@ class DestructionWorkflowService
             }
 
             $context = self::contextFromTalep($talep);
-            if (($context['entity_type'] === 'personel' || $context['entity_type'] === 'personeller')
-                && (int) $context['record_id'] > 0
-            ) {
-                $fp = ArchiveManifestService::computePersonelOzlukFingerprint($pdo, (int) $context['record_id']);
-                if ($fp !== null) {
-                    $context['current_sha256'] = $fp;
+            try {
+                $source = RetentionSourceAdapterService::resolve($pdo, (string) $talep['category'], $context);
+                $context['source_version_identity'] = $source['source_version_identity'];
+                if ($source['source_sha256'] !== null) {
+                    $context['current_sha256'] = $source['source_sha256'];
+                }
+            } catch (RuntimeException $e) {
+                if (($context['entity_type'] === 'personel' || $context['entity_type'] === 'personeller')
+                    && (int) $context['record_id'] > 0
+                ) {
+                    $fp = ArchiveManifestService::computePersonelOzlukFingerprint($pdo, (int) $context['record_id']);
+                    if ($fp !== null) {
+                        $context['current_sha256'] = $fp;
+                    }
                 }
             }
 
@@ -228,8 +253,19 @@ class DestructionWorkflowService
                 $context,
                 RetentionClock::now()
             );
+            if (!empty($eligibility['source_version_identity'])) {
+                $context['source_version_identity'] = $eligibility['source_version_identity'];
+            }
+            if (!empty($eligibility['source_sha256'])) {
+                $context['current_sha256'] = $eligibility['source_sha256'];
+            }
             if (($eligibility['code'] ?? '') !== RetentionPolicyService::CODE_ELIGIBLE_FOR_DESTRUCTION_REQUEST) {
                 throw new RuntimeException((string) $eligibility['code']);
+            }
+
+            // Required snapshots must be present (fail-closed).
+            if (self::requiredSnapshotsIncomplete($talep, $context)) {
+                throw new RuntimeException(RetentionPolicyService::CODE_SNAPSHOT_INCOMPLETE);
             }
 
             // Snapshot vs current canonical context.
@@ -291,12 +327,20 @@ class DestructionWorkflowService
         }
 
         $context = self::contextFromTalep($talep);
-        if (($context['entity_type'] === 'personel' || $context['entity_type'] === 'personeller')
-            && (int) $context['record_id'] > 0
-        ) {
-            $fp = ArchiveManifestService::computePersonelOzlukFingerprint($pdo, (int) $context['record_id']);
-            if ($fp !== null) {
-                $context['current_sha256'] = $fp;
+        try {
+            $source = RetentionSourceAdapterService::resolve($pdo, (string) $talep['category'], $context);
+            $context['source_version_identity'] = $source['source_version_identity'];
+            if ($source['source_sha256'] !== null) {
+                $context['current_sha256'] = $source['source_sha256'];
+            }
+        } catch (RuntimeException $e) {
+            if (($context['entity_type'] === 'personel' || $context['entity_type'] === 'personeller')
+                && (int) $context['record_id'] > 0
+            ) {
+                $fp = ArchiveManifestService::computePersonelOzlukFingerprint($pdo, (int) $context['record_id']);
+                if ($fp !== null) {
+                    $context['current_sha256'] = $fp;
+                }
             }
         }
 
@@ -339,17 +383,6 @@ class DestructionWorkflowService
         $params = [];
         $where = [];
 
-        if (is_array($allowedSubeIds) && count($allowedSubeIds) > 0) {
-            $sql .= ' LEFT JOIN personeller p ON p.id = t.personel_id';
-            $placeholders = [];
-            foreach (array_values($allowedSubeIds) as $i => $sid) {
-                $key = 'sube_' . $i;
-                $placeholders[] = ':' . $key;
-                $params[$key] = (int) $sid;
-            }
-            $where[] = '(t.personel_id IS NULL OR p.sube_id IN (' . implode(',', $placeholders) . '))';
-        }
-
         if ($status !== null && $status !== '') {
             $where[] = 't.status = :status';
             $params['status'] = (string) $status;
@@ -361,8 +394,9 @@ class DestructionWorkflowService
         $sql .= ' ORDER BY t.id DESC LIMIT 200';
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
-        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        return RetentionScopeResolver::filterRowsBySubeScope($pdo, $rows, $allowedSubeIds);
     }
 
     /**
@@ -372,25 +406,12 @@ class DestructionWorkflowService
     public static function listAudits(PDO $pdo, $limit = 200, $allowedSubeIds = null)
     {
         $limit = max(1, min(500, (int) $limit));
-        $sql = 'SELECT a.* FROM retention_imha_auditleri a';
-        $params = [];
-
-        if (is_array($allowedSubeIds) && count($allowedSubeIds) > 0) {
-            $sql .= ' LEFT JOIN personeller p ON p.id = a.personel_id';
-            $placeholders = [];
-            foreach (array_values($allowedSubeIds) as $i => $sid) {
-                $key = 'sube_' . $i;
-                $placeholders[] = ':' . $key;
-                $params[$key] = (int) $sid;
-            }
-            $sql .= ' WHERE (a.personel_id IS NULL OR p.sube_id IN (' . implode(',', $placeholders) . '))';
-        }
-
-        $sql .= ' ORDER BY a.id DESC LIMIT ' . $limit;
+        $sql = 'SELECT a.* FROM retention_imha_auditleri a ORDER BY a.id DESC LIMIT ' . $limit;
         $stmt = $pdo->prepare($sql);
-        $stmt->execute($params);
+        $stmt->execute([]);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
-        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        return RetentionScopeResolver::filterRowsBySubeScope($pdo, $rows, $allowedSubeIds);
     }
 
     /**
@@ -420,24 +441,31 @@ class DestructionWorkflowService
         $recordId = (int) ($context['record_id'] ?? 0);
         $manifest = null;
         if ($entityType !== '' && $recordId > 0) {
-            $manifest = ArchiveManifestService::find(
+            $manifest = ArchiveManifestService::findCurrentLifecycleManifest(
                 $pdo,
                 $entityType === 'personeller' ? 'personel' : $entityType,
                 $recordId,
-                $category
+                $category,
+                $context
             );
         }
 
         $sourceIdentity = null;
-        if ($manifest) {
+        if (!empty($context['source_version_identity'])) {
+            $sourceIdentity = (string) $context['source_version_identity'];
+        } elseif ($manifest) {
             $sourceIdentity = (string) ($manifest['source_version_identity'] ?? '');
-        } elseif (isset($context['sube_id'], $context['yil'], $context['ay'])) {
-            $sourceIdentity = sprintf(
-                'sube:%d:%d:%d',
-                (int) $context['sube_id'],
-                (int) $context['yil'],
-                (int) $context['ay']
-            );
+        } elseif (!empty($eligibility['source_version_identity'])) {
+            $sourceIdentity = (string) $eligibility['source_version_identity'];
+        }
+
+        $sha = null;
+        if ($manifest && !empty($manifest['source_sha256'])) {
+            $sha = (string) $manifest['source_sha256'];
+        } elseif (isset($context['current_sha256'])) {
+            $sha = (string) $context['current_sha256'];
+        } elseif (!empty($eligibility['source_sha256'])) {
+            $sha = (string) $eligibility['source_sha256'];
         }
 
         return [
@@ -445,12 +473,8 @@ class DestructionWorkflowService
             'source_identity_snapshot' => $sourceIdentity,
             'trigger_type_snapshot' => $eligibility['trigger_type'] ?? null,
             'trigger_date_snapshot' => $eligibility['trigger_date'] ?? null,
-            'source_version_identity_snapshot' => $manifest
-                ? (string) ($manifest['source_version_identity'] ?? '')
-                : $sourceIdentity,
-            'source_sha256_snapshot' => $manifest && !empty($manifest['source_sha256'])
-                ? (string) $manifest['source_sha256']
-                : (isset($context['current_sha256']) ? (string) $context['current_sha256'] : null),
+            'source_version_identity_snapshot' => $sourceIdentity,
+            'source_sha256_snapshot' => $sha,
             'canonical_sube_id' => isset($context['sube_id']) ? (int) $context['sube_id'] : null,
             'period_yil' => isset($context['yil']) ? (int) $context['yil'] : null,
             'period_ay' => isset($context['ay']) ? (int) $context['ay'] : null,
@@ -467,6 +491,7 @@ class DestructionWorkflowService
             'personel_id' => $talep['personel_id'] !== null ? (int) $talep['personel_id'] : null,
             'entity_type' => (string) $talep['entity_type'],
             'record_id' => (int) $talep['record_id'],
+            'category' => (string) ($talep['category'] ?? ''),
         ];
         if (!empty($talep['canonical_sube_id'])) {
             $context['sube_id'] = (int) $talep['canonical_sube_id'];
@@ -477,16 +502,37 @@ class DestructionWorkflowService
         if (!empty($talep['period_ay'])) {
             $context['ay'] = (int) $talep['period_ay'];
         }
-        if (empty($context['sube_id'])
-            && !empty($talep['source_identity_snapshot'])
-            && preg_match('/^sube:(\d+):(\d{4}):(\d{1,2})$/', (string) $talep['source_identity_snapshot'], $m)
-        ) {
-            $context['sube_id'] = (int) $m[1];
-            $context['yil'] = (int) $m[2];
-            $context['ay'] = (int) $m[3];
+        if (!empty($talep['source_version_identity_snapshot'])) {
+            $context['source_version_identity'] = (string) $talep['source_version_identity_snapshot'];
         }
 
         return $context;
+    }
+
+    /**
+     * @param array<string, mixed> $talep
+     * @param array<string, mixed> $context
+     */
+    private static function requiredSnapshotsIncomplete(array $talep, array $context)
+    {
+        foreach ([
+            'trigger_type_snapshot',
+            'trigger_date_snapshot',
+            'retention_until_snapshot',
+            'source_version_identity_snapshot',
+        ] as $col) {
+            if (!array_key_exists($col, $talep) || $talep[$col] === null || $talep[$col] === '') {
+                return true;
+            }
+        }
+        $entityType = isset($context['entity_type']) ? strtolower((string) $context['entity_type']) : '';
+        if (in_array($entityType, ['personel', 'personeller'], true)
+            && empty($talep['source_sha256_snapshot'])
+        ) {
+            return true;
+        }
+
+        return false;
     }
 
     /**
@@ -496,18 +542,20 @@ class DestructionWorkflowService
      */
     private static function snapshotsMismatch(array $talep, array $eligibility, array $context)
     {
-        if (!empty($talep['trigger_type_snapshot'])
-            && (string) $talep['trigger_type_snapshot'] !== (string) ($eligibility['trigger_type'] ?? '')
-        ) {
+        if ((string) $talep['trigger_type_snapshot'] !== (string) ($eligibility['trigger_type'] ?? '')) {
             return true;
         }
-        if (!empty($talep['trigger_date_snapshot'])
-            && (string) $talep['trigger_date_snapshot'] !== (string) ($eligibility['trigger_date'] ?? '')
-        ) {
+        if ((string) $talep['trigger_date_snapshot'] !== (string) ($eligibility['trigger_date'] ?? '')) {
             return true;
         }
-        if (!empty($talep['retention_until_snapshot'])
-            && (string) $talep['retention_until_snapshot'] !== (string) ($eligibility['retention_until'] ?? '')
+        if ((string) $talep['retention_until_snapshot'] !== (string) ($eligibility['retention_until'] ?? '')) {
+            return true;
+        }
+        $currentIdentity = isset($context['source_version_identity'])
+            ? (string) $context['source_version_identity']
+            : (string) ($eligibility['source_version_identity'] ?? '');
+        if ($currentIdentity !== ''
+            && (string) $talep['source_version_identity_snapshot'] !== $currentIdentity
         ) {
             return true;
         }

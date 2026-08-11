@@ -121,6 +121,67 @@ describe("retention policy source contract (053)", () => {
     expect(sql053).toContain("trigger_type_snapshot");
     expect(sql053).toContain("source_sha256_snapshot");
     expect(sql053).toContain("canonical_sube_id");
+    expect(sql053).toContain("uq_arsiv_manifest_entity_cat_src");
+    expect(sql053).toContain("source_version_identity");
+  });
+
+  it("multi-lifecycle and scope integrity source contracts", () => {
+    const manifest = readFileSync(
+      resolve(root, "api/src/Services/Retention/ArchiveManifestService.php"),
+      "utf8"
+    );
+    expect(manifest).toContain("findBySourceIdentity");
+    expect(manifest).toContain("findCurrentLifecycleManifest");
+    expect(manifest).toContain("ARCHIVE_MANIFEST_MISSING_CURRENT_LIFECYCLE");
+    expect(manifest).not.toMatch(/UPDATE\s+arsiv_manifestleri\s+SET\s+source_version_identity/i);
+
+    const period = readFileSync(
+      resolve(root, "api/src/Services/Retention/RetentionPeriodTriggerResolver.php"),
+      "utf8"
+    );
+    expect(period).toContain("loadCanonicalHaftalik");
+    expect(period).not.toMatch(/hafta_baslangic\s*<=\s*:month_end/);
+    expect(period).toContain("TRIGGER_TERMINATION_DATE");
+
+    const ctrl = readFileSync(
+      resolve(root, "api/src/Controllers/RetentionController.php"),
+      "utf8"
+    );
+    expect(ctrl).toContain("RetentionTargetResolver::validateAndResolve");
+    expect(ctrl).toContain("assertPersonelAccess");
+    expect(ctrl).toContain("TARGET_MISMATCH");
+
+    const legal = readFileSync(
+      resolve(root, "api/src/Services/Retention/LegalHoldService.php"),
+      "utf8"
+    );
+    expect(legal).toContain("LEGAL_HOLD_CATEGORY_INVALID");
+    expect(legal).toContain("LEGAL_HOLD_PERSONEL_MISMATCH");
+    expect(legal).toContain("LEGAL_HOLD_TARGET_UNSUPPORTED");
+    expect(legal).toContain("RetentionScopeResolver::filterRowsBySubeScope");
+    expect(legal).not.toContain("personel_id IS NULL OR");
+
+    const destr = readFileSync(
+      resolve(root, "api/src/Services/Retention/DestructionWorkflowService.php"),
+      "utf8"
+    );
+    expect(destr).toContain("requiredSnapshotsIncomplete");
+    expect(destr).toContain("SNAPSHOT_INCOMPLETE");
+    expect(destr).not.toContain("personel_id IS NULL OR");
+
+    const surec = readFileSync(
+      resolve(root, "api/src/Controllers/SureclerController.php"),
+      "utf8"
+    );
+    expect(surec).toMatch(/catch\s*\(\s*\\Throwable/);
+
+    const adapter = readFileSync(
+      resolve(root, "api/src/Services/Retention/RetentionSourceAdapterService.php"),
+      "utf8"
+    );
+    expect(adapter).toContain("RETENTION_SOURCE_HANDLER_NOT_IMPLEMENTED");
+    expect(adapter).toContain("personel_belge_dosya_surumleri");
+    expect(adapter).toContain("coverageMap");
   });
 
   it("wires retention roles and permissions parity", () => {

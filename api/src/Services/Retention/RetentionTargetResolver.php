@@ -101,22 +101,44 @@ class RetentionTargetResolver
                 $context['sube_id'] = (int) $pRow['sube_id'];
             }
         } elseif ($entityType === 'belge' || $entityType === 'belge_kaydi' || $entityType === 'personel_belge_kayitlari') {
-            // Soft existence: if table missing, still allow with provided personel.
-            if (self::tableExists($pdo, 'personel_belge_kayitlari')) {
-                $stmt = $pdo->prepare(
-                    'SELECT id, personel_id FROM personel_belge_kayitlari WHERE id = :id LIMIT 1'
-                );
-                $stmt->execute(['id' => $recordId]);
-                $row = $stmt->fetch(PDO::FETCH_ASSOC);
-                if (!$row) {
-                    throw new RuntimeException('RETENTION_TARGET_ENTITY_NOT_FOUND');
-                }
-                $belgePersonel = (int) $row['personel_id'];
-                if ($personelId !== null && $personelId !== $belgePersonel) {
-                    throw new RuntimeException('RETENTION_TARGET_PERSONEL_MISMATCH');
-                }
-                $context['personel_id'] = $belgePersonel;
+            // Canonical belge kaydı = surecler BELGE row (+ dosya sürümü SHA owner).
+            if (!self::tableExists($pdo, 'surecler')) {
+                throw new RuntimeException('RETENTION_TARGET_ENTITY_NOT_FOUND');
             }
+            $stmt = $pdo->prepare('SELECT id, personel_id FROM surecler WHERE id = :id LIMIT 1');
+            $stmt->execute(['id' => $recordId]);
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$row) {
+                throw new RuntimeException('RETENTION_TARGET_ENTITY_NOT_FOUND');
+            }
+            $belgePersonel = (int) $row['personel_id'];
+            if ($personelId !== null && $personelId !== $belgePersonel) {
+                throw new RuntimeException('RETENTION_TARGET_PERSONEL_MISMATCH');
+            }
+            $context['personel_id'] = $belgePersonel;
+            $context['entity_type'] = 'surec';
+            $pStmt = $pdo->prepare('SELECT sube_id FROM personeller WHERE id = :id LIMIT 1');
+            $pStmt->execute(['id' => $belgePersonel]);
+            $pRow = $pStmt->fetch(PDO::FETCH_ASSOC);
+            if ($pRow) {
+                $context['sube_id'] = (int) $pRow['sube_id'];
+            }
+        } elseif (in_array($entityType, ['haftalik_kapanis', 'haftalik_kapanislar'], true)) {
+            if (!self::tableExists($pdo, 'haftalik_kapanislar')) {
+                throw new RuntimeException('RETENTION_TARGET_ENTITY_NOT_FOUND');
+            }
+            $stmt = $pdo->prepare(
+                'SELECT id, sube_id, hafta_baslangic, state FROM haftalik_kapanislar WHERE id = :id LIMIT 1'
+            );
+            $stmt->execute(['id' => $recordId]);
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$row) {
+                throw new RuntimeException('RETENTION_TARGET_ENTITY_NOT_FOUND');
+            }
+            $context['sube_id'] = (int) $row['sube_id'];
+            $context['haftalik_kapanis_id'] = (int) $row['id'];
+            $context['hafta_baslangic'] = (string) $row['hafta_baslangic'];
+            $context['entity_type'] = 'haftalik_kapanis';
         }
 
         // Never accept client-trusted integrity fields into canonical context.

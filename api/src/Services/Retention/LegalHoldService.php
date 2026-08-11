@@ -17,6 +17,7 @@ class LegalHoldService
 {
     public const STATE_ACTIVE = 'ACTIVE';
     public const STATE_RELEASED = 'RELEASED';
+    public const CODE_TARGET_UNSUPPORTED = 'LEGAL_HOLD_TARGET_UNSUPPORTED';
 
     /** @var array<int, string> */
     private static $knownDomains = [
@@ -65,6 +66,9 @@ class LegalHoldService
         ) {
             throw new RuntimeException('LEGAL_HOLD_DOMAIN_INVALID');
         }
+        if ($category !== null && !RetentionCategories::isKnown($category)) {
+            throw new RuntimeException('LEGAL_HOLD_CATEGORY_INVALID');
+        }
         if ($personelId === null && $targetRecordId === null && $category === null) {
             throw new RuntimeException('LEGAL_HOLD_TARGET_REQUIRED');
         }
@@ -78,7 +82,9 @@ class LegalHoldService
         }
 
         if ($targetRecordId !== null) {
-            self::assertTargetRecordExists($pdo, $domain, $targetRecordId);
+            self::assertTargetRecordExistsAndMatches($pdo, $domain, $category, $targetRecordId, $personelId);
+        } elseif ($category !== null && $personelId === null) {
+            // Category-wide company hold without personel/record — allowed for GM only (already asserted).
         }
 
         $actorId = (int) ($user['id'] ?? 0);
@@ -189,17 +195,6 @@ class LegalHoldService
         $params = [];
         $where = [];
 
-        if (is_array($allowedSubeIds) && count($allowedSubeIds) > 0) {
-            $sql .= ' LEFT JOIN personeller p ON p.id = h.personel_id';
-            $placeholders = [];
-            foreach (array_values($allowedSubeIds) as $i => $sid) {
-                $key = 'sube_' . $i;
-                $placeholders[] = ':' . $key;
-                $params[$key] = (int) $sid;
-            }
-            $where[] = '(h.personel_id IS NULL OR p.sube_id IN (' . implode(',', $placeholders) . '))';
-        }
-
         if ($activeOnly) {
             $where[] = "h.hold_state = 'ACTIVE'";
         }
@@ -210,8 +205,9 @@ class LegalHoldService
         $sql .= ' ORDER BY h.id DESC';
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
-        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        return RetentionScopeResolver::filterRowsBySubeScope($pdo, $rows, $allowedSubeIds);
     }
 
     /**
@@ -242,31 +238,92 @@ class LegalHoldService
         }
     }
 
-    private static function assertTargetRecordExists(PDO $pdo, $domain, $recordId)
-    {
+    private static function assertTargetRecordExistsAndMatches(
+        PDO $pdo,
+        $domain,
+        $category,
+        $recordId,
+        $personelId
+    ) {
         $domain = strtolower(trim((string) $domain));
-        $table = null;
-        if (in_array($domain, ['personel', 'personeller'], true)) {
-            $table = 'personeller';
-        } elseif (in_array($domain, ['surec', 'surecler'], true)) {
-            $table = 'surecler';
-        } elseif (in_array($domain, ['belge', 'belge_kaydi'], true)) {
-            $table = 'personel_belge_kayitlari';
-        } elseif ($domain === 'retention') {
-            $table = 'retention_imha_talepleri';
-        }
+        $recordId = (int) $recordId;
 
-        if ($table === null) {
+        if (in_array($domain, ['personel', 'personeller'], true)) {
+            $stmt = $pdo->prepare('SELECT id FROM personeller WHERE id = :id LIMIT 1');
+            $stmt->execute(['id' => $recordId]);
+            if (!$stmt->fetch(PDO::FETCH_ASSOC)) {
+                throw new RuntimeException('LEGAL_HOLD_TARGET_NOT_FOUND');
+            }
+            if ($personelId !== null && $personelId !== $recordId) {
+                throw new RuntimeException('LEGAL_HOLD_PERSONEL_MISMATCH');
+            }
+
             return;
         }
-        if (!self::tableExists($pdo, $table)) {
-            throw new RuntimeException('LEGAL_HOLD_TARGET_NOT_FOUND');
+
+        if (in_array($domain, ['surec', 'surecler'], true)) {
+            if (!self::tableExists($pdo, 'surecler')) {
+                throw new RuntimeException(self::CODE_TARGET_UNSUPPORTED);
+            }
+            $stmt = $pdo->prepare('SELECT id, personel_id FROM surecler WHERE id = :id LIMIT 1');
+            $stmt->execute(['id' => $recordId]);
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$row) {
+                throw new RuntimeException('LEGAL_HOLD_TARGET_NOT_FOUND');
+            }
+            if ($personelId !== null && (int) $row['personel_id'] !== $personelId) {
+                throw new RuntimeException('LEGAL_HOLD_PERSONEL_MISMATCH');
+            }
+
+            return;
         }
-        $stmt = $pdo->prepare('SELECT id FROM `' . $table . '` WHERE id = :id LIMIT 1');
-        $stmt->execute(['id' => (int) $recordId]);
-        if (!$stmt->fetch(PDO::FETCH_ASSOC)) {
-            throw new RuntimeException('LEGAL_HOLD_TARGET_NOT_FOUND');
+
+        if (in_array($domain, ['belge', 'belge_kaydi'], true)) {
+            // Canonical belge kaydı = surecler BELGE + dosya sürümü.
+            if (!self::tableExists($pdo, 'surecler')) {
+                throw new RuntimeException(self::CODE_TARGET_UNSUPPORTED);
+            }
+            $stmt = $pdo->prepare(
+                "SELECT id, personel_id, surec_turu FROM surecler WHERE id = :id LIMIT 1"
+            );
+            $stmt->execute(['id' => $recordId]);
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$row) {
+                throw new RuntimeException('LEGAL_HOLD_TARGET_NOT_FOUND');
+            }
+            if ($personelId !== null && (int) $row['personel_id'] !== $personelId) {
+                throw new RuntimeException('LEGAL_HOLD_PERSONEL_MISMATCH');
+            }
+
+            return;
         }
+
+        if ($domain === 'retention') {
+            if (!self::tableExists($pdo, 'retention_imha_talepleri')) {
+                throw new RuntimeException(self::CODE_TARGET_UNSUPPORTED);
+            }
+            $stmt = $pdo->prepare('SELECT id, personel_id FROM retention_imha_talepleri WHERE id = :id LIMIT 1');
+            $stmt->execute(['id' => $recordId]);
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$row) {
+                throw new RuntimeException('LEGAL_HOLD_TARGET_NOT_FOUND');
+            }
+            if ($personelId !== null
+                && $row['personel_id'] !== null
+                && (int) $row['personel_id'] !== $personelId
+            ) {
+                throw new RuntimeException('LEGAL_HOLD_PERSONEL_MISMATCH');
+            }
+
+            return;
+        }
+
+        if (in_array($domain, ['puantaj', 'bordro', 'category'], true)) {
+            // Domain known but no record-level resolver for arbitrary IDs.
+            throw new RuntimeException(self::CODE_TARGET_UNSUPPORTED);
+        }
+
+        throw new RuntimeException(self::CODE_TARGET_UNSUPPORTED);
     }
 
     private static function tableExists(PDO $pdo, $table)

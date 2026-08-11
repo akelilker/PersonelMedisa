@@ -12,6 +12,8 @@ use RuntimeException;
 /**
  * Explicit per-category PERIOD_CLOSURE trigger owners.
  * Never uses generic puantaj seal for all period categories.
+ * Weekly FM/SZ: exact haftalik_kapanis_id or exact hafta_baslangic+sube only —
+ * no single-week-in-month fallback.
  */
 class RetentionPeriodTriggerResolver
 {
@@ -164,7 +166,7 @@ class RetentionPeriodTriggerResolver
     }
 
     /**
-     * Prefer haftalık kapanış owner over puantaj seal.
+     * Exact weekly close identity only — no yil/ay single-week month fallback.
      *
      * @param array<string, mixed> $context
      * @return array{trigger_type: string, trigger_date: string}
@@ -175,98 +177,10 @@ class RetentionPeriodTriggerResolver
             throw new RuntimeException(RetentionPolicyService::CODE_PERIOD_NOT_CLOSED);
         }
 
-        $haftalikId = isset($context['haftalik_kapanis_id']) ? (int) $context['haftalik_kapanis_id'] : 0;
-        $haftaBaslangic = isset($context['hafta_baslangic']) ? trim((string) $context['hafta_baslangic']) : '';
-
-        if ($haftalikId > 0) {
-            $stmt = $pdo->prepare(
-                "SELECT hafta_bitis, created_at FROM haftalik_kapanislar
-                 WHERE id = :id AND state = 'KAPANDI' LIMIT 1"
-            );
-            $stmt->execute(['id' => $haftalikId]);
-            $row = $stmt->fetch(PDO::FETCH_ASSOC);
-            if (!$row) {
-                throw new RuntimeException(RetentionPolicyService::CODE_PERIOD_NOT_CLOSED);
-            }
-            $raw = !empty($row['hafta_bitis'])
-                ? (string) $row['hafta_bitis']
-                : (string) ($row['created_at'] ?? '');
-            $date = self::toDateYmd($raw);
-            if ($date === null) {
-                throw new RuntimeException(RetentionPolicyService::CODE_TRIGGER_NOT_RESOLVED);
-            }
-
-            return [
-                'trigger_type' => RetentionCategories::TRIGGER_PERIOD_CLOSURE,
-                'trigger_date' => $date,
-            ];
-        }
-
-        if ($haftaBaslangic !== '') {
-            $subeId = isset($context['sube_id']) ? (int) $context['sube_id'] : 0;
-            $sql = "SELECT hafta_bitis, created_at FROM haftalik_kapanislar
-                    WHERE hafta_baslangic = :hb AND state = 'KAPANDI'";
-            $params = ['hb' => $haftaBaslangic];
-            if ($subeId > 0) {
-                $sql .= ' AND sube_id = :sube_id';
-                $params['sube_id'] = $subeId;
-            }
-            $sql .= ' ORDER BY id DESC LIMIT 1';
-            $stmt = $pdo->prepare($sql);
-            $stmt->execute($params);
-            $row = $stmt->fetch(PDO::FETCH_ASSOC);
-            if (!$row) {
-                throw new RuntimeException(RetentionPolicyService::CODE_PERIOD_NOT_CLOSED);
-            }
-            $raw = !empty($row['hafta_bitis'])
-                ? (string) $row['hafta_bitis']
-                : (string) ($row['created_at'] ?? '');
-            $date = self::toDateYmd($raw);
-            if ($date === null) {
-                throw new RuntimeException(RetentionPolicyService::CODE_TRIGGER_NOT_RESOLVED);
-            }
-
-            return [
-                'trigger_type' => RetentionCategories::TRIGGER_PERIOD_CLOSURE,
-                'trigger_date' => $date,
-            ];
-        }
-
-        $subeId = isset($context['sube_id']) ? (int) $context['sube_id'] : 0;
-        $yil = isset($context['yil']) ? (int) $context['yil'] : 0;
-        $ay = isset($context['ay']) ? (int) $context['ay'] : 0;
-        if ($subeId <= 0 || $yil < 2000 || $ay < 1 || $ay > 12) {
-            throw new RuntimeException(RetentionPolicyService::CODE_TRIGGER_NOT_RESOLVED);
-        }
-
-        $monthStart = sprintf('%04d-%02d-01', $yil, $ay);
-        $monthEndDt = DateTimeImmutable::createFromFormat('Y-m-d', $monthStart);
-        if (!$monthEndDt) {
-            throw new RuntimeException(RetentionPolicyService::CODE_TRIGGER_NOT_RESOLVED);
-        }
-        $monthEnd = $monthEndDt->modify('last day of this month')->format('Y-m-d');
-
-        $stmt = $pdo->prepare(
-            "SELECT hafta_bitis, created_at FROM haftalik_kapanislar
-             WHERE sube_id = :sube_id AND state = 'KAPANDI'
-               AND hafta_baslangic <= :month_end
-               AND hafta_bitis >= :month_start
-             ORDER BY hafta_bitis DESC, id DESC
-             LIMIT 1"
-        );
-        $stmt->execute([
-            'sube_id' => $subeId,
-            'month_start' => $monthStart,
-            'month_end' => $monthEnd,
-        ]);
-        $row = $stmt->fetch(PDO::FETCH_ASSOC);
-        if (!$row) {
-            throw new RuntimeException(RetentionPolicyService::CODE_PERIOD_NOT_CLOSED);
-        }
-
+        $row = RetentionSourceAdapterService::loadCanonicalHaftalik($pdo, $context);
         $raw = !empty($row['hafta_bitis'])
             ? (string) $row['hafta_bitis']
-            : (string) ($row['created_at'] ?? '');
+            : '';
         $date = self::toDateYmd($raw);
         if ($date === null) {
             throw new RuntimeException(RetentionPolicyService::CODE_TRIGGER_NOT_RESOLVED);
@@ -279,7 +193,7 @@ class RetentionPeriodTriggerResolver
     }
 
     /**
-     * ONAY_AUDIT binds to parent_category trigger — never universal puantaj seal.
+     * ONAY_AUDIT inherits BOTH parent trigger date and parent trigger type.
      *
      * @param array<string, mixed> $context
      * @return array{trigger_type: string, trigger_date: string}
@@ -294,9 +208,14 @@ class RetentionPeriodTriggerResolver
             throw new RuntimeException(RetentionPolicyService::CODE_TRIGGER_NOT_RESOLVED);
         }
 
-        $triggerType = RetentionCategories::triggerTypeForCategory($parent);
-        if ($triggerType === RetentionCategories::TRIGGER_PERIOD_CLOSURE) {
-            return self::resolve($pdo, $parent, $context);
+        $parentTriggerType = RetentionCategories::triggerTypeForCategory($parent);
+        if ($parentTriggerType === RetentionCategories::TRIGGER_PERIOD_CLOSURE) {
+            $parentResolved = self::resolve($pdo, $parent, $context);
+
+            return [
+                'trigger_type' => $parentResolved['trigger_type'],
+                'trigger_date' => $parentResolved['trigger_date'],
+            ];
         }
 
         $personelId = isset($context['personel_id']) ? (int) $context['personel_id'] : 0;
@@ -309,7 +228,7 @@ class RetentionPeriodTriggerResolver
         }
 
         return [
-            'trigger_type' => RetentionCategories::TRIGGER_PERIOD_CLOSURE,
+            'trigger_type' => RetentionCategories::TRIGGER_TERMINATION_DATE,
             'trigger_date' => $termination,
         ];
     }

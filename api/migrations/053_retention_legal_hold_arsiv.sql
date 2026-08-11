@@ -38,11 +38,41 @@ CREATE TABLE IF NOT EXISTS arsiv_manifestleri (
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   created_by INT UNSIGNED NULL,
   PRIMARY KEY (id),
-  UNIQUE KEY uq_arsiv_manifest_entity_cat (entity_type, record_id, record_category),
+  UNIQUE KEY uq_arsiv_manifest_entity_cat_src (entity_type, record_id, record_category, source_version_identity),
   KEY idx_arsiv_manifest_personel (personel_id),
   KEY idx_arsiv_manifest_retention (retention_until),
-  KEY idx_arsiv_manifest_category (record_category)
+  KEY idx_arsiv_manifest_category (record_category),
+  KEY idx_arsiv_manifest_entity_cat (entity_type, record_id, record_category)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Multi-lifecycle: replace pre-correction unique (entity, record, category) when present.
+SET @idx_exists := (
+  SELECT COUNT(*)
+  FROM information_schema.STATISTICS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'arsiv_manifestleri'
+    AND INDEX_NAME = 'uq_arsiv_manifest_entity_cat'
+);
+SET @sql := IF(
+  @idx_exists > 0,
+  'ALTER TABLE arsiv_manifestleri DROP INDEX uq_arsiv_manifest_entity_cat',
+  'SELECT 1'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @idx_exists := (
+  SELECT COUNT(*)
+  FROM information_schema.STATISTICS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'arsiv_manifestleri'
+    AND INDEX_NAME = 'uq_arsiv_manifest_entity_cat_src'
+);
+SET @sql := IF(
+  @idx_exists = 0,
+  'ALTER TABLE arsiv_manifestleri ADD UNIQUE KEY uq_arsiv_manifest_entity_cat_src (entity_type, record_id, record_category, source_version_identity)',
+  'SELECT 1'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 CREATE TABLE IF NOT EXISTS legal_holdlar (
   id INT UNSIGNED NOT NULL AUTO_INCREMENT,

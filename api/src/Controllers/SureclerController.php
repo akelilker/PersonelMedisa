@@ -171,9 +171,16 @@ class SureclerController
 
             $pdo->commit();
             JsonResponse::success(self::mapSurecRow($row), [], 201);
-        } catch (\PDOException $e) {
+        } catch (\Throwable $e) {
             if ($pdo->inTransaction()) {
                 $pdo->rollBack();
+            }
+
+            if ($e instanceof \RuntimeException
+                && $e->getMessage() !== ''
+                && strpos($e->getMessage(), 'ARCHIVE_') === 0
+            ) {
+                JsonResponse::badRequest($e->getMessage(), $e->getMessage());
             }
 
             JsonResponse::serverError('Kayit olusturulamadi.');

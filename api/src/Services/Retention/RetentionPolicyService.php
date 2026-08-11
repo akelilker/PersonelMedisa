@@ -28,15 +28,18 @@ class RetentionPolicyService
     public const CODE_NO_GM_APPROVAL = 'NO_GM_APPROVAL';
     public const CODE_ARCHIVE_SOURCE_INTEGRITY_CHANGED = 'ARCHIVE_SOURCE_INTEGRITY_CHANGED';
     public const CODE_ARCHIVE_MANIFEST_MISSING = 'ARCHIVE_MANIFEST_MISSING';
+    public const CODE_ARCHIVE_MANIFEST_MISSING_CURRENT_LIFECYCLE = 'ARCHIVE_MANIFEST_MISSING_CURRENT_LIFECYCLE';
     public const CODE_INTEGRITY_UNKNOWN = 'INTEGRITY_UNKNOWN';
     public const CODE_ARCHIVE_AUDIT_UNAVAILABLE = 'ARCHIVE_AUDIT_UNAVAILABLE';
     public const CODE_SCHEMA_NOT_READY = 'SCHEMA_NOT_READY';
     public const CODE_SOURCE_CONTEXT_CHANGED = 'SOURCE_CONTEXT_CHANGED';
+    public const CODE_SNAPSHOT_INCOMPLETE = 'SNAPSHOT_INCOMPLETE';
     public const CODE_ARCHIVED_PERSONEL_READ_ONLY = 'ARCHIVED_PERSONEL_READ_ONLY';
     public const CODE_ELIGIBLE_FOR_DESTRUCTION_REQUEST = 'ELIGIBLE_FOR_DESTRUCTION_REQUEST';
     public const CODE_EXECUTION_HANDLER_NOT_IMPLEMENTED = 'EXECUTION_HANDLER_NOT_IMPLEMENTED';
     public const CODE_APPROVED_FOR_DESTRUCTION = 'APPROVED_FOR_DESTRUCTION';
     public const CODE_DESTRUCTION_REQUEST_NOT_APPROVED = 'DESTRUCTION_REQUEST_NOT_APPROVED';
+    public const CODE_RETENTION_SOURCE_HANDLER_NOT_IMPLEMENTED = 'RETENTION_SOURCE_HANDLER_NOT_IMPLEMENTED';
 
     /**
      * @param array<string, mixed> $context
@@ -231,6 +234,14 @@ class RetentionPolicyService
             return $result;
         }
 
+        // Expose server-derived source identity for snapshot/compare callers.
+        if (isset($context['source_version_identity'])) {
+            $result['source_version_identity'] = $context['source_version_identity'];
+        }
+        if (isset($context['current_sha256'])) {
+            $result['source_sha256'] = $context['current_sha256'];
+        }
+
         $result['eligible'] = true;
         $result['code'] = self::CODE_ELIGIBLE_FOR_DESTRUCTION_REQUEST;
         $result['message'] = self::codeMessage(self::CODE_ELIGIBLE_FOR_DESTRUCTION_REQUEST);
@@ -258,6 +269,13 @@ class RetentionPolicyService
             return $pre;
         }
 
+        if (!empty($pre['source_version_identity'])) {
+            $context['source_version_identity'] = $pre['source_version_identity'];
+        }
+        if (!empty($pre['source_sha256'])) {
+            $context['current_sha256'] = $pre['source_sha256'];
+        }
+
         if (!is_array($approvedRequest)
             || (string) ($approvedRequest['status'] ?? '') !== DestructionWorkflowService::STATUS_APPROVED
             || empty($approvedRequest['approved_by'])
@@ -266,6 +284,25 @@ class RetentionPolicyService
             $pre['eligible'] = false;
             $pre['code'] = self::CODE_DESTRUCTION_REQUEST_NOT_APPROVED;
             $pre['message'] = self::codeMessage(self::CODE_DESTRUCTION_REQUEST_NOT_APPROVED);
+
+            return $pre;
+        }
+
+        // GM-owned approval provenance: APPROVE audit must exist for this request.
+        if (!self::hasGmApprovalAudit($pdo, $approvedRequest)) {
+            $pre['eligible'] = false;
+            $pre['code'] = self::CODE_DESTRUCTION_REQUEST_NOT_APPROVED;
+            $pre['message'] = self::codeMessage(self::CODE_DESTRUCTION_REQUEST_NOT_APPROVED);
+
+            return $pre;
+        }
+
+        // Required snapshots missing → fail-closed (never skip comparison).
+        $snapCode = self::requiredSnapshotsMissingCode($approvedRequest, $context);
+        if ($snapCode !== null) {
+            $pre['eligible'] = false;
+            $pre['code'] = $snapCode;
+            $pre['message'] = self::codeMessage($snapCode);
 
             return $pre;
         }
@@ -385,15 +422,18 @@ class RetentionPolicyService
             self::CODE_NO_GM_APPROVAL => 'Genel yonetici imha onayi yok.',
             self::CODE_ARCHIVE_SOURCE_INTEGRITY_CHANGED => 'Arsiv kaynak butunlugu degismis.',
             self::CODE_ARCHIVE_MANIFEST_MISSING => 'Arsiv manifesti zorunlu; bulunamadi.',
+            self::CODE_ARCHIVE_MANIFEST_MISSING_CURRENT_LIFECYCLE => 'Guncel istihdam donemi arsiv manifesti yok.',
             self::CODE_INTEGRITY_UNKNOWN => 'Arsiv butunlugu dogrulanamadi.',
             self::CODE_ARCHIVE_AUDIT_UNAVAILABLE => 'Arsiv erisim audit tablosu hazir degil.',
             self::CODE_SCHEMA_NOT_READY => 'Saklama semasi hazir degil.',
             self::CODE_SOURCE_CONTEXT_CHANGED => 'Kaynak baglam snapshot ile uyusmuyor.',
+            self::CODE_SNAPSHOT_INCOMPLETE => 'Imha talebi snapshot alanlari eksik.',
             self::CODE_ARCHIVED_PERSONEL_READ_ONLY => 'Pasif (arsiv) personel yalnizca okunabilir.',
             self::CODE_ELIGIBLE_FOR_DESTRUCTION_REQUEST => 'Imha talebi icin uygun (onay bekler).',
             self::CODE_DESTRUCTION_REQUEST_NOT_APPROVED => 'Onaylanmis imha talebi yok.',
             self::CODE_EXECUTION_HANDLER_NOT_IMPLEMENTED => 'Fiziksel imha handler uygulanmadi (guvenli).',
             self::CODE_APPROVED_FOR_DESTRUCTION => 'Imha icin uygun (handler henuz yok).',
+            self::CODE_RETENTION_SOURCE_HANDLER_NOT_IMPLEMENTED => 'Saklama kaynak adapteri uygulanmadi.',
         ];
 
         return isset($map[$code]) ? $map[$code] : 'Saklama degerlendirmesi basarisiz.';
@@ -403,7 +443,11 @@ class RetentionPolicyService
      * @param array<string, mixed> $context
      * @return string|null blocker code
      */
-    private static function checkMandatoryIntegrity(PDO $pdo, $category, array $context)
+    /**
+     * @param array<string, mixed> $context
+     * @return string|null blocker code
+     */
+    private static function checkMandatoryIntegrity(PDO $pdo, $category, array &$context)
     {
         $entityType = isset($context['entity_type']) ? (string) $context['entity_type'] : '';
         $recordId = isset($context['record_id']) ? (int) $context['record_id'] : 0;
@@ -418,19 +462,40 @@ class RetentionPolicyService
         }
 
         $currentSha = null;
-        if ($entityType === 'personel' || $entityType === 'personeller') {
-            $currentSha = ArchiveManifestService::computePersonelOzlukFingerprint($pdo, $recordId);
-        } elseif (isset($context['current_sha256']) && is_string($context['current_sha256'])) {
-            // Only when server already computed and injected — not client HTTP.
-            $currentSha = (string) $context['current_sha256'];
+        $normalizedEntity = $entityType === 'personeller' ? 'personel' : $entityType;
+        try {
+            $source = RetentionSourceAdapterService::resolve($pdo, $category, $context);
+            $currentSha = $source['source_sha256'];
+            $context['source_version_identity'] = $source['source_version_identity'];
+            if ($currentSha !== null) {
+                $context['current_sha256'] = $currentSha;
+            }
+        } catch (RuntimeException $e) {
+            $msg = $e->getMessage();
+            if (strpos($msg, RetentionSourceAdapterService::CODE_NOT_IMPLEMENTED) === 0
+                || $msg === self::CODE_RETENTION_SOURCE_HANDLER_NOT_IMPLEMENTED
+            ) {
+                return self::CODE_RETENTION_SOURCE_HANDLER_NOT_IMPLEMENTED;
+            }
+            if (isset($context['current_sha256']) && is_string($context['current_sha256'])) {
+                $currentSha = (string) $context['current_sha256'];
+            } elseif ($normalizedEntity === 'personel') {
+                $currentSha = ArchiveManifestService::computePersonelOzlukFingerprint($pdo, $recordId);
+                if ($currentSha !== null) {
+                    $context['current_sha256'] = $currentSha;
+                }
+            } else {
+                return self::CODE_INTEGRITY_UNKNOWN;
+            }
         }
 
         $integrity = ArchiveManifestService::verifySourceIntegrity(
             $pdo,
-            $entityType === 'personeller' ? 'personel' : $entityType,
+            $normalizedEntity,
             $recordId,
             $category,
-            $currentSha
+            $currentSha,
+            $context
         );
 
         if ($integrity === ArchiveManifestService::INTEGRITY_OK) {
@@ -438,6 +503,11 @@ class RetentionPolicyService
         }
         if ($integrity === RetentionPolicyService::CODE_ARCHIVE_SOURCE_INTEGRITY_CHANGED) {
             return self::CODE_ARCHIVE_SOURCE_INTEGRITY_CHANGED;
+        }
+        if ($integrity === ArchiveManifestService::CODE_ARCHIVE_MANIFEST_MISSING_CURRENT_LIFECYCLE
+            || $integrity === self::CODE_ARCHIVE_MANIFEST_MISSING_CURRENT_LIFECYCLE
+        ) {
+            return self::CODE_ARCHIVE_MANIFEST_MISSING_CURRENT_LIFECYCLE;
         }
         if ($integrity === self::CODE_ARCHIVE_MANIFEST_MISSING
             || $integrity === ArchiveManifestService::CODE_ARCHIVE_MANIFEST_MISSING
@@ -455,6 +525,54 @@ class RetentionPolicyService
 
     /**
      * @param array<string, mixed> $request
+     */
+    private static function hasGmApprovalAudit(PDO $pdo, array $request)
+    {
+        $talepId = isset($request['id']) ? (int) $request['id'] : 0;
+        if ($talepId <= 0 || !self::tableExists($pdo, 'retention_imha_auditleri')) {
+            return false;
+        }
+        $stmt = $pdo->prepare(
+            "SELECT id FROM retention_imha_auditleri
+             WHERE imha_talep_id = :id AND action = 'APPROVE'
+             LIMIT 1"
+        );
+        $stmt->execute(['id' => $talepId]);
+
+        return (bool) $stmt->fetch(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * @param array<string, mixed> $request
+     * @param array<string, mixed> $context
+     * @return string|null
+     */
+    private static function requiredSnapshotsMissingCode(array $request, array $context)
+    {
+        $required = [
+            'trigger_type_snapshot',
+            'trigger_date_snapshot',
+            'retention_until_snapshot',
+            'source_version_identity_snapshot',
+        ];
+        foreach ($required as $col) {
+            if (!array_key_exists($col, $request) || $request[$col] === null || $request[$col] === '') {
+                return self::CODE_SNAPSHOT_INCOMPLETE;
+            }
+        }
+
+        $entityType = isset($context['entity_type']) ? strtolower((string) $context['entity_type']) : '';
+        if (in_array($entityType, ['personel', 'personeller'], true)) {
+            if (empty($request['source_sha256_snapshot'])) {
+                return self::CODE_SNAPSHOT_INCOMPLETE;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param array<string, mixed> $request
      * @param array<string, mixed> $eligibility
      * @param array<string, mixed> $context
      */
@@ -466,10 +584,28 @@ class RetentionPolicyService
             'retention_until_snapshot' => $eligibility['retention_until'] ?? null,
         ];
         foreach ($fields as $col => $expected) {
-            if (!array_key_exists($col, $request) || $request[$col] === null || $request[$col] === '') {
-                continue;
-            }
             if ((string) $request[$col] !== (string) $expected) {
+                return true;
+            }
+        }
+
+        // Old lifecycle snapshot cannot approve new lifecycle.
+        if (!empty($request['source_version_identity_snapshot'])) {
+            $currentIdentity = isset($context['source_version_identity'])
+                ? (string) $context['source_version_identity']
+                : '';
+            if ($currentIdentity !== ''
+                && (string) $request['source_version_identity_snapshot'] !== $currentIdentity
+            ) {
+                return true;
+            }
+        }
+
+        if (!empty($request['source_sha256_snapshot']) && !empty($context['current_sha256'])) {
+            if (!hash_equals(
+                strtolower((string) $request['source_sha256_snapshot']),
+                strtolower((string) $context['current_sha256'])
+            )) {
                 return true;
             }
         }

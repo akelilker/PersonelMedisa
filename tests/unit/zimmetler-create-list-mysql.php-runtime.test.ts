@@ -43,7 +43,7 @@ describe("ZimmetlerController create/list MariaDB", () => {
     const migrations = readdirSync(resolve(process.cwd(), "api/migrations"))
       .filter((name) => name.endsWith(".sql"))
       .sort();
-    expect(migrations.at(-1)).toBe("055_yillik_izin_hak_duzeltmeleri.sql");
+    expect(migrations.at(-1)).toBe("056_users_personel_binding.sql");
   });
 
   it("runs HTTP create/list acceptance on MariaDB", () => {

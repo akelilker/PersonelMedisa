@@ -156,6 +156,16 @@ function normalizeAuthSession(payload: unknown): AuthSession | null {
     readNumber(source.active_sube_id) ??
     readNumber(source.activeSubeId);
 
+  const personelIdRaw =
+    readNumber(userSource.personel_id) ??
+    readNumber(userSource.personelId) ??
+    readNumber(source.personel_id) ??
+    readNumber(source.personelId);
+  const personel_id =
+    userSource.personel_id === null || userSource.personelId === null
+      ? null
+      : personelIdRaw;
+
   const draft: AuthSession = {
     token,
     ui_profile: uiProfile,
@@ -165,7 +175,8 @@ function normalizeAuthSession(payload: unknown): AuthSession | null {
       id: userId,
       ad_soyad: fullName,
       rol: role,
-      sube_ids
+      sube_ids,
+      ...(personel_id !== undefined ? { personel_id } : {})
     }
   };
 

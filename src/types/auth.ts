@@ -21,6 +21,8 @@ export type AuthUser = {
   rol: UserRole;
   /** Bos ise tum subelere erisim (yonetim); dolu ise yalnizca bu id'ler */
   sube_ids: number[];
+  /** Optional self-service binding from login payload (DB-authoritative on /me). */
+  personel_id?: number | null;
 };
 
 export type AuthSession = {

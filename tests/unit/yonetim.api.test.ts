@@ -166,6 +166,7 @@ describe("kullanici-api-contract", () => {
       password: "GeciciSifre2026",
       ad_soyad: "Test Muhasebe",
       rol: "MUHASEBE",
+      personel_id: 1,
       sube_ids: [1, 2],
       varsayilan_sube_id: 2,
       durum: "AKTIF"

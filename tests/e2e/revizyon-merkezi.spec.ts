@@ -524,7 +524,7 @@ test.describe("S80 Revizyon Merkezi final UI kabul", () => {
   test("PERSONEL: gateway yok + doğrudan route yetkisiz", async ({ page }) => {
     await loginAsMockRole(page, "PERSONEL");
     await page.goto("/");
-    await expect(page.getByTestId("personel-placeholder-page")).toBeVisible();
+    await expect(page.getByTestId("personel-unbound-page")).toBeVisible();
     await expect(page.getByTestId("menu-kayit-surec")).toHaveCount(0);
     await expect(page.getByTestId("menu-personel-karti")).toHaveCount(0);
     await page.goto("/haftalik-kapanis/revizyonlar");

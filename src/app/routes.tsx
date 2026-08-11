@@ -15,6 +15,7 @@ import { FinansPage } from "../features/finans/pages/FinansPage";
 import { YonetimPaneliPage } from "../features/yonetim/pages/YonetimPaneliPage";
 import { ResmiTatilTakvimiPage } from "../features/yonetim/pages/ResmiTatilTakvimiPage";
 import { LoginPage } from "../features/auth/pages/LoginPage";
+import { PersonelSelfServiceHomePage } from "../features/self-service/pages/PersonelSelfServiceHomePage";
 import { InternalDiagnosticsPage } from "./InternalDiagnosticsPage";
 import { HaftalikKapanisPage } from "../features/revizyon/pages/HaftalikKapanisPage";
 import { RevizyonMerkeziPage } from "../features/revizyon/pages/RevizyonMerkeziPage";
@@ -36,12 +37,7 @@ function HomeIndexMainMenu() {
   const ctx = useOutletContext<AppShellOutletContext>();
   const { session } = useAuth();
   if (session?.user.rol === "PERSONEL") {
-    return (
-      <section className="states-page" data-testid="personel-placeholder-page">
-        <h2>Personel ekranı henüz aktif değil.</h2>
-        <p>Personel self-service ve mobil yüzey sonraki fazda açılacaktır.</p>
-      </section>
-    );
+    return <PersonelSelfServiceHomePage />;
   }
   return ctx.showMainMenu ? <MainMenu onKayitOpen={ctx.onKayitOpen} /> : null;
 }

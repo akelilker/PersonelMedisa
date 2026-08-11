@@ -251,9 +251,14 @@ describe("S1 canonical role consolidation", () => {
     }
   });
 
-  it("PERSONEL has zero business access", () => {
+  it("PERSONEL has self_service read only (no business access)", () => {
     expect(ASSIGNABLE_USER_ROLES).toContain("PERSONEL");
-    expect(getRolePermissions("PERSONEL")).toEqual([]);
+    expect(getRolePermissions("PERSONEL")).toEqual([
+      "self_service.view",
+      "self_service.puantaj.view",
+      "self_service.yillik_izin.view",
+      "self_service.fazla_calisma.view"
+    ]);
     expect(hasRolePermission("PERSONEL", "personeller.view")).toBe(false);
     expect(hasRolePermission("PERSONEL", "puantaj.view")).toBe(false);
     expect(hasRolePermission("PERSONEL", "finans.view")).toBe(false);
@@ -316,7 +321,7 @@ describe("S1 canonical role consolidation", () => {
     expect(migrations).toContain("053_retention_legal_hold_arsiv.sql");
     expect(migrations).toContain("054_canonical_role_consolidation.sql");
     expect(migrations).toContain("055_yillik_izin_hak_duzeltmeleri.sql");
-    expect(migrations.at(-1)).toBe("055_yillik_izin_hak_duzeltmeleri.sql");
+    expect(migrations.at(-1)).toBe("056_users_personel_binding.sql");
 
     const sql = readFileSync(MIG_054, "utf8");
     expect(sql).toContain("PERSONEL");

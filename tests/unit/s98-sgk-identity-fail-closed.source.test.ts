@@ -104,7 +104,7 @@ describe("S98 SGK dual-control identity fail-closed", () => {
     expect(auth).toContain("'durum' => (string) ($row['durum'] ?? '')");
     expect(auth).toContain("self::$user['actor_identity_id']");
     expect(auth).toContain("self::$user['actor_identity_status']");
-    expect(auth).not.toContain("self::$user['personel_id']");
+    // S3B may expose users.personel_id as identity binding; SGK actor bridge remains separate.
     expect(auth).not.toMatch(/static\s+\$sql\s*=\s*null/);
   });
 

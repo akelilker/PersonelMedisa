@@ -11,7 +11,9 @@ use Medisa\Api\Database\UsersSchema;
 use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
 use Medisa\Api\Scope\SubeScope;
+use Medisa\Api\Services\Auth\UserPersonelBindingService;
 use PDO;
+use PDOException;
 
 class YonetimController
 {
@@ -835,9 +837,15 @@ class YonetimController
         }
 
         $hasVarsayilan = UsersSchema::hasVarsayilanSubeId($pdo);
-        $selectSql = $hasVarsayilan
-            ? 'SELECT id, username, ad_soyad, rol, durum, varsayilan_sube_id FROM users ORDER BY id ASC'
-            : 'SELECT id, username, ad_soyad, rol, durum FROM users ORDER BY id ASC';
+        $hasPersonelId = UsersSchema::hasPersonelId($pdo);
+        $selectCols = ['id', 'username', 'ad_soyad', 'rol', 'durum'];
+        if ($hasVarsayilan) {
+            $selectCols[] = 'varsayilan_sube_id';
+        }
+        if ($hasPersonelId) {
+            $selectCols[] = 'personel_id';
+        }
+        $selectSql = 'SELECT ' . implode(', ', $selectCols) . ' FROM users ORDER BY id ASC';
         $stmt = $pdo->query($selectSql);
         $rows = $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
         $userIds = [];
@@ -845,11 +853,18 @@ class YonetimController
             $userIds[] = (int) $row['id'];
         }
         $subeIdsByUser = self::loadSubeIdsByUserIds($pdo, $userIds);
+        $personelAdById = $hasPersonelId ? self::loadPersonelAdSoyadByIds($pdo, $rows) : [];
 
         $items = [];
         foreach ($rows as $row) {
             $id = (int) $row['id'];
-            $items[] = self::mapKullaniciRow($row, $subeIdsByUser[$id] ?? [], $hasVarsayilan);
+            $items[] = self::mapKullaniciRow(
+                $row,
+                $subeIdsByUser[$id] ?? [],
+                $hasVarsayilan,
+                $hasPersonelId,
+                $personelAdById
+            );
         }
 
         JsonResponse::success(['items' => $items]);
@@ -868,6 +883,8 @@ class YonetimController
         $durum = strtoupper(trim((string) ($body['durum'] ?? 'AKTIF')));
         $finalSubeIds = self::parseSubeIds(isset($body['sube_ids']) ? $body['sube_ids'] : []);
         $finalVarsayilanSubeId = self::parseOptionalInt($body['varsayilan_sube_id'] ?? null);
+        $personelIdProvided = array_key_exists('personel_id', $body);
+        $requestedPersonelId = $personelIdProvided ? self::parseOptionalInt($body['personel_id']) : null;
 
         if ($username === '') {
             JsonResponse::badRequest('Kullanici adi zorunludur.', 'VALIDATION_ERROR', 'username');
@@ -900,6 +917,7 @@ class YonetimController
         self::assertAuthSmokeReadonlyContract($username, $rol, $finalSubeIds, $finalVarsayilanSubeId);
 
         $hasVarsayilan = UsersSchema::hasVarsayilanSubeId($pdo);
+        $hasPersonelId = UsersSchema::hasPersonelId($pdo);
         if ($finalVarsayilanSubeId !== null && !$hasVarsayilan) {
             JsonResponse::error(
                 409,
@@ -908,6 +926,16 @@ class YonetimController
                 'varsayilan_sube_id'
             );
         }
+        if ($personelIdProvided && $requestedPersonelId !== null && !$hasPersonelId) {
+            JsonResponse::error(
+                409,
+                'SCHEMA_NOT_READY',
+                'Personel baglama semasi hazir degil.',
+                'personel_id'
+            );
+        }
+
+        $actorUserId = isset($user['id']) ? (int) $user['id'] : 0;
 
         $pdo->beginTransaction();
         try {
@@ -939,9 +967,28 @@ class YonetimController
             }
             $userId = (int) $pdo->lastInsertId();
             self::replaceUserSubeler($pdo, $userId, $finalSubeIds);
+            if ($hasPersonelId && $personelIdProvided) {
+                UserPersonelBindingService::applyBinding($pdo, $userId, $requestedPersonelId, $actorUserId);
+            }
             $pdo->commit();
+        } catch (PDOException $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            $driverCode = isset($e->errorInfo[1]) ? (int) $e->errorInfo[1] : 0;
+            if ($driverCode === 1062 || stripos($e->getMessage(), 'uq_users_personel_id') !== false) {
+                JsonResponse::error(
+                    409,
+                    'PERSONEL_ALREADY_BOUND',
+                    'Bu personel kaydi baska bir kullaniciya bagli.',
+                    'personel_id'
+                );
+            }
+            JsonResponse::serverError('Kullanici kaydi olusturulamadi.');
         } catch (\Throwable $e) {
-            $pdo->rollBack();
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
             JsonResponse::serverError('Kullanici kaydi olusturulamadi.');
         }
 
@@ -992,6 +1039,8 @@ class YonetimController
         $subeIdsProvided = array_key_exists('sube_ids', $body);
         $varsayilanProvided = array_key_exists('varsayilan_sube_id', $body);
         $requestedVarsayilan = $varsayilanProvided ? self::parseOptionalInt($body['varsayilan_sube_id']) : null;
+        $personelIdProvided = array_key_exists('personel_id', $body);
+        $requestedPersonelId = $personelIdProvided ? self::parseOptionalInt($body['personel_id']) : null;
 
         $currentSubeIds = self::loadSubeIdsByUserIds($pdo, [$kullaniciId])[$kullaniciId] ?? [];
         $currentStoredDefault = self::readStoredVarsayilanFromRow($existing);
@@ -1029,6 +1078,7 @@ class YonetimController
         self::assertAuthSmokeReadonlyContract($username, $rol, $finalSubeIds, $finalVarsayilanSubeId);
 
         $hasVarsayilan = UsersSchema::hasVarsayilanSubeId($pdo);
+        $hasPersonelId = UsersSchema::hasPersonelId($pdo);
         $needsVarsayilanWrite = $varsayilanProvided
             || ($subeIdsProvided && $finalVarsayilanSubeId !== $currentStoredDefault);
         if ($needsVarsayilanWrite && !$hasVarsayilan) {
@@ -1043,6 +1093,20 @@ class YonetimController
             // Explicit NULL / cleared default with schema absent: legacy-compatible no-op on column.
             $needsVarsayilanWrite = false;
         }
+        if ($personelIdProvided && !$hasPersonelId) {
+            if ($requestedPersonelId !== null) {
+                JsonResponse::error(
+                    409,
+                    'SCHEMA_NOT_READY',
+                    'Personel baglama semasi hazir degil.',
+                    'personel_id'
+                );
+            }
+            // Explicit null clear with schema absent: no-op.
+            $personelIdProvided = false;
+        }
+
+        $actorUserId = isset($user['id']) ? (int) $user['id'] : 0;
 
         $pdo->beginTransaction();
         try {
@@ -1070,9 +1134,34 @@ class YonetimController
                 self::replaceUserSubeler($pdo, $kullaniciId, $finalSubeIds);
             }
 
+            if ($hasPersonelId && $personelIdProvided) {
+                UserPersonelBindingService::applyBinding(
+                    $pdo,
+                    $kullaniciId,
+                    $requestedPersonelId,
+                    $actorUserId
+                );
+            }
+
             $pdo->commit();
+        } catch (PDOException $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            $driverCode = isset($e->errorInfo[1]) ? (int) $e->errorInfo[1] : 0;
+            if ($driverCode === 1062 || stripos($e->getMessage(), 'uq_users_personel_id') !== false) {
+                JsonResponse::error(
+                    409,
+                    'PERSONEL_ALREADY_BOUND',
+                    'Bu personel kaydi baska bir kullaniciya bagli.',
+                    'personel_id'
+                );
+            }
+            JsonResponse::serverError('Kullanici kaydi guncellenemedi.');
         } catch (\Throwable $e) {
-            $pdo->rollBack();
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
             JsonResponse::serverError('Kullanici kaydi guncellenemedi.');
         }
 
@@ -1093,14 +1182,29 @@ class YonetimController
     /**
      * @param array<string, mixed> $row
      * @param array<int, int> $subeIds
+     * @param array<int, string> $personelAdById
      * @return array<string, mixed>
      */
-    private static function mapKullaniciRow(array $row, array $subeIds, $hasVarsayilanColumn = false)
-    {
+    private static function mapKullaniciRow(
+        array $row,
+        array $subeIds,
+        $hasVarsayilanColumn = false,
+        $hasPersonelIdColumn = false,
+        array $personelAdById = []
+    ) {
         $rol = (string) $row['rol'];
         $storedDefault = null;
         if ($hasVarsayilanColumn) {
             $storedDefault = self::readStoredVarsayilanFromRow($row);
+        }
+
+        $personelId = null;
+        $personelAdSoyad = null;
+        if ($hasPersonelIdColumn) {
+            $personelId = self::readStoredPersonelIdFromRow($row);
+            if ($personelId !== null && isset($personelAdById[$personelId])) {
+                $personelAdSoyad = $personelAdById[$personelId];
+            }
         }
 
         return [
@@ -1112,8 +1216,8 @@ class YonetimController
             'sube_ids' => $subeIds,
             'varsayilan_sube_id' => $storedDefault,
             'telefon' => null,
-            'personel_id' => null,
-            'personel_ad_soyad' => null,
+            'personel_id' => $personelId,
+            'personel_ad_soyad' => $personelAdSoyad,
             'kullanici_tipi' => $rol === 'GENEL_YONETICI' ? 'HARICI' : 'IC_PERSONEL',
             'notlar' => null,
         ];
@@ -1129,6 +1233,49 @@ class YonetimController
         $parsed = (int) $row['varsayilan_sube_id'];
 
         return $parsed > 0 ? $parsed : null;
+    }
+
+    /** @param array<string, mixed> $row */
+    private static function readStoredPersonelIdFromRow(array $row)
+    {
+        if (!array_key_exists('personel_id', $row) || $row['personel_id'] === null || $row['personel_id'] === '') {
+            return null;
+        }
+
+        $parsed = (int) $row['personel_id'];
+
+        return $parsed > 0 ? $parsed : null;
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $userRows
+     * @return array<int, string>
+     */
+    private static function loadPersonelAdSoyadByIds(PDO $pdo, array $userRows)
+    {
+        $ids = [];
+        foreach ($userRows as $row) {
+            $pid = self::readStoredPersonelIdFromRow($row);
+            if ($pid !== null) {
+                $ids[] = $pid;
+            }
+        }
+        $ids = array_values(array_unique($ids));
+        if (count($ids) === 0) {
+            return [];
+        }
+
+        $placeholders = implode(', ', array_fill(0, count($ids), '?'));
+        $stmt = $pdo->prepare(
+            "SELECT id, ad, soyad FROM personeller WHERE id IN ($placeholders)"
+        );
+        $stmt->execute($ids);
+        $map = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $map[(int) $row['id']] = trim((string) $row['ad'] . ' ' . (string) $row['soyad']);
+        }
+
+        return $map;
     }
 
     /** @param array<int, int> $userIds @return array<int, array<int, int>> */
@@ -1159,9 +1306,15 @@ class YonetimController
     private static function findKullaniciRowById(PDO $pdo, $userId)
     {
         $hasVarsayilan = UsersSchema::hasVarsayilanSubeId($pdo);
-        $sql = $hasVarsayilan
-            ? 'SELECT id, username, ad_soyad, rol, durum, varsayilan_sube_id FROM users WHERE id = :id LIMIT 1'
-            : 'SELECT id, username, ad_soyad, rol, durum FROM users WHERE id = :id LIMIT 1';
+        $hasPersonelId = UsersSchema::hasPersonelId($pdo);
+        $cols = ['id', 'username', 'ad_soyad', 'rol', 'durum'];
+        if ($hasVarsayilan) {
+            $cols[] = 'varsayilan_sube_id';
+        }
+        if ($hasPersonelId) {
+            $cols[] = 'personel_id';
+        }
+        $sql = 'SELECT ' . implode(', ', $cols) . ' FROM users WHERE id = :id LIMIT 1';
         $stmt = $pdo->prepare($sql);
         $stmt->execute(['id' => $userId]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -1178,9 +1331,11 @@ class YonetimController
         }
 
         $hasVarsayilan = UsersSchema::hasVarsayilanSubeId($pdo);
+        $hasPersonelId = UsersSchema::hasPersonelId($pdo);
         $subeIds = self::loadSubeIdsByUserIds($pdo, [(int) $userId])[(int) $userId] ?? [];
+        $personelAdById = $hasPersonelId ? self::loadPersonelAdSoyadByIds($pdo, [$row]) : [];
 
-        return self::mapKullaniciRow($row, $subeIds, $hasVarsayilan);
+        return self::mapKullaniciRow($row, $subeIds, $hasVarsayilan, $hasPersonelId, $personelAdById);
     }
 
     private static function usernameExists(PDO $pdo, $username, $excludeUserId = null)

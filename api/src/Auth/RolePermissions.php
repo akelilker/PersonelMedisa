@@ -325,8 +325,13 @@ class RolePermissions
             'retention.view',
             'retention.destruction.view',
         ],
-        // Future self-service — zero business permissions this phase.
-        'PERSONEL' => [],
+        // Self-service read surfaces (S3B). No broad personeller.* / puantaj.view.
+        'PERSONEL' => [
+            'self_service.view',
+            'self_service.puantaj.view',
+            'self_service.yillik_izin.view',
+            'self_service.fazla_calisma.view',
+        ],
         'AUTH_SMOKE_READONLY' => [
             'ops.auth_smoke.read',
         ],

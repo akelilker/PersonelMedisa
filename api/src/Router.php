@@ -27,6 +27,7 @@ use Medisa\Api\Controllers\EkOdemeKesintiController;
 use Medisa\Api\Controllers\FazlaCalismaOdemeTercihiController;
 use Medisa\Api\Controllers\SerbestZamanController;
 use Medisa\Api\Controllers\MaasHesaplamaController;
+use Medisa\Api\Controllers\MeController;
 use Medisa\Api\Controllers\MevzuatParametreController;
 use Medisa\Api\Controllers\PersonelBelgelerController;
 use Medisa\Api\Controllers\PersonelBordroKapsamController;
@@ -75,6 +76,19 @@ class Router
         }
         if ($path === '/auth/smoke-read' && $method === 'GET') {
             AuthSmokeController::smokeRead($this->request);
+        }
+
+        if ($path === '/me' && $method === 'GET') {
+            MeController::me($this->request);
+        }
+        if ($path === '/me/puantaj' && $method === 'GET') {
+            MeController::puantaj($this->request);
+        }
+        if ($path === '/me/yillik-izin-bakiye' && $method === 'GET') {
+            MeController::yillikIzinBakiye($this->request);
+        }
+        if ($path === '/me/fazla-calisma' && $method === 'GET') {
+            MeController::fazlaCalisma($this->request);
         }
 
         if ($method === 'PUT' && preg_match('#^/personeller/(\d+)$#', $path, $matches)) {

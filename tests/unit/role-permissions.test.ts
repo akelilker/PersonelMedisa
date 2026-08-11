@@ -155,7 +155,7 @@ describe("role permissions", () => {
     );
     expect(RAPORLAR_ALLOWED_ROLES).not.toContain("PATRON");
     expect(FINANS_ALLOWED_ROLES).toEqual(
-      expect.arrayContaining(["GENEL_YONETICI", "BOLUM_YONETICISI", "MUHASEBE"])
+      expect.arrayContaining(["GENEL_YONETICI", "BOLUM_YONETICISI", "MUHASEBE", "SISTEM_YONETICISI"])
     );
   });
 

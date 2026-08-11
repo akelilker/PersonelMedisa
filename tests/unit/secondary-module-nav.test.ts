@@ -64,6 +64,18 @@ describe("secondary-module-nav", () => {
     expect(resolveSecondaryModules(permissionGate("PERSONEL"))).toEqual([]);
   });
 
+  it("exposes troubleshooting secondary modules for SISTEM_YONETICISI", () => {
+    const modules = resolveSecondaryModules(permissionGate("SISTEM_YONETICISI"));
+    expect(modules.map((item) => item.id)).toEqual([
+      "puantaj",
+      "gunluk-kayit",
+      "haftalik-kapanis",
+      "revizyon-merkezi",
+      "belge-takip",
+      "finans"
+    ]);
+  });
+
   it("filters to a partial permission set", () => {
     const modules = resolveSecondaryModules(
       (permission) => permission === "puantaj.view" || permission === "finans.view"

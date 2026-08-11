@@ -48,9 +48,25 @@ No: olay decide, disiplin final, SGK approve, bordro kesinleştirme, GY approval
 
 ## SYSTEM_ADMIN_INVARIANT
 
-SISTEM_YONETICISI is **assignable**.  
-DENY: all business `*.approve`, `puantaj.olay_karar.decide`, `disiplin.final_decision`, `legal_hold.manage`, `retention.destruction.approve`, `yonetim-paneli.manage`.  
-ALLOW: technical/archive/retention **view**.
+SISTEM_YONETICISI is **assignable** technical owner (IT Müdürü).
+
+**ALLOW (S1B hardening):**
+- Broad troubleshooting READ across personel/süreç/bildirim/puantaj/rapor/finans/bordro/SGK-read surfaces/revizyon/mevzuat/şirket/resmi tatil/ISG/arsiv/retention
+- `yonetim-paneli.view` + `yonetim-paneli.manage` for user/role/sube/katalog technical administration  
+  (existing key is safe: does **not** gate business policy / approvals)
+
+**DENY:**
+- all business `*.approve` / final decisions
+- `puantaj.olay_karar.decide`, `disiplin.final_decision`
+- `sgk_karar_paketi.prepare|approve`, `bordro_kesinlestirme.approve`
+- `revizyon.approve|reject`
+- `legal_hold.manage`, `retention.destruction.approve|request`
+- `patron_ack.mark_seen`
+- `sirket_parametreleri.manage`, `mevzuat_parametreleri.manage`, `resmi_tatil_takvimi.manage`
+- domain operational writes (personel/ucret/puantaj/finans/maas manage)
+
+**NEW_PERMISSION_ADDED = NO**  
+**WHY_EXISTING_PERMISSION_UNSAFE = N/A** (`yonetim-paneli.manage` only covers users/subeler/referans catalog)
 
 ## PERSONEL_ZERO_BUSINESS_ACCESS
 

@@ -180,24 +180,71 @@ describe("S1 canonical role consolidation", () => {
     expect(hasRolePermission("GENEL_YONETICI", "patron_ack.mark_seen")).toBe(true);
   });
 
-  it("SISTEM_YONETICISI is assignable but never business approver", () => {
+  it("SISTEM_YONETICISI is assignable technical admin, never business approver", () => {
     expect(ASSIGNABLE_USER_ROLES).toContain("SISTEM_YONETICISI");
+
+    const troubleshootingReads = [
+      "personeller.view",
+      "personeller.ucret.view",
+      "surecler.view",
+      "bildirimler.view",
+      "puantaj.view",
+      "puantaj.olay_karar.view",
+      "disiplin.view",
+      "raporlar.view",
+      "finans.view",
+      "maas_hesaplama.view",
+      "bordro_on_izleme.view",
+      "personel_bordro_kapsam.view",
+      "revizyon.view",
+      "revizyon.view_audit_history",
+      "mevzuat_parametreleri.view",
+      "sirket_parametreleri.view",
+      "resmi_tatil_takvimi.view",
+      "isg.view",
+      "aylik-ozet.view",
+      "arsiv.audit.view",
+      "retention.view",
+      "retention.destruction.view",
+      "yonetim-paneli.view"
+    ] as const;
+    for (const p of troubleshootingReads) {
+      expect(hasRolePermission("SISTEM_YONETICISI", p)).toBe(true);
+    }
+
+    expect(hasRolePermission("SISTEM_YONETICISI", "yonetim-paneli.manage")).toBe(true);
+
     const denied = [
       "puantaj.olay_karar.decide",
       "disiplin.final_decision",
-      "sgk_karar_paketi.approve",
-      "bordro_kesinlestirme.approve",
+      "aylik_bolum_onayi.approve",
+      "aylik_bildirim_onayi.approve",
       "genel_yonetici_onayi.approve",
+      "genel_yonetici_bildirim_onayi.approve",
+      "bordro_kesinlestirme.approve",
+      "sgk_karar_paketi.prepare",
+      "sgk_karar_paketi.approve",
+      "revizyon.approve",
+      "revizyon.reject",
       "legal_hold.manage",
       "retention.destruction.approve",
+      "retention.destruction.request",
       "patron_ack.mark_seen",
-      "yonetim-paneli.manage"
+      "sirket_parametreleri.manage",
+      "mevzuat_parametreleri.manage",
+      "resmi_tatil_takvimi.manage",
+      "personeller.create",
+      "personeller.update",
+      "personeller.ucret.manage",
+      "puantaj.update",
+      "finans.create",
+      "maas_hesaplama.manage",
+      "personel_bordro_kapsam.manage",
+      "personel_bordro_kapsam.approve"
     ] as const;
     for (const p of denied) {
       expect(hasRolePermission("SISTEM_YONETICISI", p)).toBe(false);
     }
-    expect(hasRolePermission("SISTEM_YONETICISI", "arsiv.audit.view")).toBe(true);
-    expect(hasRolePermission("SISTEM_YONETICISI", "retention.view")).toBe(true);
   });
 
   it("PERSONEL has zero business access", () => {

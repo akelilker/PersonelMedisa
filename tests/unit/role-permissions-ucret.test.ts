@@ -5,11 +5,12 @@ import {
 } from "../../src/lib/authorization/role-permissions";
 
 describe("ucret ve mevzuat yetki matrisi (S77-B)", () => {
-  it("personeller.ucret.view GENEL_YONETICI, MUHASEBE ve IK_SORUMLUSU icindir", () => {
+  it("personeller.ucret.view GENEL_YONETICI, MUHASEBE, IK_SORUMLUSU ve SISTEM_YONETICISI icindir", () => {
     expect(getRolesWithPermission("personeller.ucret.view").sort()).toEqual([
       "GENEL_YONETICI",
       "IK_SORUMLUSU",
-      "MUHASEBE"
+      "MUHASEBE",
+      "SISTEM_YONETICISI"
     ]);
   });
 
@@ -19,11 +20,12 @@ describe("ucret ve mevzuat yetki matrisi (S77-B)", () => {
     ]);
   });
 
-  it("mevzuat_parametreleri.view prepare rollerini kapsar; manage yalnizca GENEL_YONETICI", () => {
+  it("mevzuat_parametreleri.view prepare + teknik read rollerini kapsar; manage yalnizca GENEL_YONETICI", () => {
     expect(getRolesWithPermission("mevzuat_parametreleri.view").sort()).toEqual([
       "GENEL_YONETICI",
       "IK_SORUMLUSU",
-      "MUHASEBE"
+      "MUHASEBE",
+      "SISTEM_YONETICISI"
     ]);
     expect(getRolesWithPermission("mevzuat_parametreleri.manage")).toEqual(["GENEL_YONETICI"]);
   });

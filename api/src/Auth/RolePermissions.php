@@ -235,6 +235,7 @@ class RolePermissions
             'surecler.detail.view',
             'bildirimler.view',
             'bildirimler.detail.view',
+            'haftalik_mutabakat.view',
             'puantaj.view',
             'puantaj.donem_reopen.request',
             'puantaj.donem_reseal',

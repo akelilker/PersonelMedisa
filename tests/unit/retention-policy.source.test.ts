@@ -84,10 +84,43 @@ describe("retention policy source contract (053)", () => {
     );
     expect(policy).toContain("modify('+' . RetentionCategories::POLICY_RETENTION_YEARS . ' years')");
     expect(policy).toContain("EXECUTION_HANDLER_NOT_IMPLEMENTED");
+    expect(policy).toContain("ELIGIBLE_FOR_DESTRUCTION_REQUEST");
+    expect(policy).toContain("evaluatePreApprovalEligibility");
     expect(policy).not.toMatch(/DELETE\s+FROM\s+personeller/i);
-    expect(policy).toContain("findEffectiveSeal");
+    expect(policy).toContain("RetentionPeriodTriggerResolver");
     expect(policy).toContain("ISTEN_AYRILMA");
     expect(policy).not.toMatch(/codeMessage[\s\S]*kanunen/i);
+    expect(policy).not.toMatch(/\$context\['as_of'\]/);
+    expect(policy).not.toMatch(/\$context\['gm_approved'\]|empty\(\$context\['gm_approved'\]\)/);
+
+    const resolver = readFileSync(
+      resolve(root, "api/src/Services/Retention/RetentionPeriodTriggerResolver.php"),
+      "utf8"
+    );
+    expect(resolver).toContain("maas_hesaplama_calistirmalari");
+    expect(resolver).toContain("KESINLESTI");
+    expect(resolver).toContain("haftalik_kapanislar");
+    expect(resolver).toContain("parent_category");
+
+    const ctrl = readFileSync(
+      resolve(root, "api/src/Controllers/RetentionController.php"),
+      "utf8"
+    );
+    expect(ctrl).not.toMatch(/getQuery\('as_of'/);
+    expect(ctrl).not.toMatch(/getQuery\('gm_approved'/);
+    expect(ctrl).toContain("evaluatePreApprovalEligibility");
+
+    const apiTs = readFileSync(resolve(root, "src/api/retention.api.ts"), "utf8");
+    expect(apiTs).not.toContain("as_of");
+    expect(apiTs).not.toContain("gm_approved");
+
+    const sql053 = readFileSync(
+      resolve(root, "api/migrations/053_retention_legal_hold_arsiv.sql"),
+      "utf8"
+    );
+    expect(sql053).toContain("trigger_type_snapshot");
+    expect(sql053).toContain("source_sha256_snapshot");
+    expect(sql053).toContain("canonical_sube_id");
   });
 
   it("wires retention roles and permissions parity", () => {

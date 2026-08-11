@@ -37,6 +37,42 @@ describe("retention archive gate source contract", () => {
     expect(belge).toContain("ARCHIVE_DOWNLOAD_REQUIRED");
     expect(belge).toContain("ArchiveAccessService::ACTION_DOWNLOAD");
     expect(belge).toContain("PersonelArchiveGate::effectiveListAktiflik");
+    expect(belge).toContain("PersonelArchiveGate::assertBusinessWriteAllowed");
+    expect(belge).toContain("ARCHIVE_AUDIT_UNAVAILABLE");
+  });
+
+  it("PASIF write gate and lifecycle manifests on ISTEN_AYRILMA", () => {
+    const gate = readFileSync(
+      resolve(root, "api/src/Services/Retention/PersonelArchiveGate.php"),
+      "utf8"
+    );
+    expect(gate).toContain("assertBusinessWriteAllowed");
+    expect(gate).toContain("ARCHIVED_PERSONEL_READ_ONLY");
+
+    const surec = readFileSync(
+      resolve(root, "api/src/Controllers/SureclerController.php"),
+      "utf8"
+    );
+    expect(surec).toContain("createPersonelLifecycleManifests");
+    expect(surec).toContain("PersonelArchiveGate::assertBusinessWriteAllowed");
+
+    const personeller = readFileSync(
+      resolve(root, "api/src/Controllers/PersonellerController.php"),
+      "utf8"
+    );
+    expect(personeller).toContain("PersonelArchiveGate::assertBusinessWriteAllowed");
+
+    const zimmet = readFileSync(
+      resolve(root, "api/src/Controllers/ZimmetlerController.php"),
+      "utf8"
+    );
+    expect(zimmet).toContain("PersonelArchiveGate::assertBusinessWriteAllowed");
+
+    const ucret = readFileSync(
+      resolve(root, "api/src/Controllers/PersonelUcretController.php"),
+      "utf8"
+    );
+    expect(ucret).toContain("PersonelArchiveGate::assertBusinessWriteAllowed");
   });
 
   it("registers arsiv / legal-hold / retention routes", () => {

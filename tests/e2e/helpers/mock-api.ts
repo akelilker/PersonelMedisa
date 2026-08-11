@@ -4082,6 +4082,7 @@ let personelBelgeKaydiIdCounter = 903;
 
   function buildPersonelDetail(personel: (typeof personeller)[number]) {
     const sgkOzeti = hesaplaAylikSgkPuantajOzetleri(getPuantajRowsForPersonel(personel.id))[0] ?? null;
+    const isPasif = personel.aktif_durum === "PASIF";
 
     return {
       ana_kart: {
@@ -4124,7 +4125,7 @@ let personelBelgeKaydiIdCounter = 903;
       },
       pasiflik_durumu: {
         aktif_durum: personel.aktif_durum,
-        etiket: personel.aktif_durum === "PASIF" ? "İşten Ayrıldı" : null
+        etiket: isPasif ? "İşten Ayrıldı" : null
       },
       referans_adlari: {
         sube: personel.sube_adi,
@@ -4132,7 +4133,22 @@ let personelBelgeKaydiIdCounter = 903;
         gorev: personel.gorev_adi,
         personel_tipi: personel.personel_tipi_adi,
         bagli_amir: personel.bagli_amir_adi
-      }
+      },
+      ...(isPasif
+        ? {
+            arsiv_modu: true,
+            legal_hold_active: false,
+            policy_note: "Medisa saklama politikası",
+            retention_summary: {
+              category: "PERSONEL_OZLUK",
+              trigger_type: "TERMINATION_DATE",
+              trigger_date: "2022-01-10",
+              retention_until: "2032-01-10",
+              earliest_destruction_review_date: "2032-01-10",
+              policy_note: "Medisa saklama politikası"
+            }
+          }
+        : {})
     };
   }
 
@@ -4625,7 +4641,10 @@ let personelBelgeKaydiIdCounter = 903;
       const search = (url.searchParams.get("search") ?? "").toLowerCase();
       const departmanId = Number.parseInt(url.searchParams.get("departman_id") ?? "", 10);
       const personelTipiId = Number.parseInt(url.searchParams.get("personel_tipi_id") ?? "", 10);
-      const aktiflik = url.searchParams.get("aktiflik") ?? "tum";
+      const aktiflikRaw = url.searchParams.get("aktiflik") ?? "tum";
+      const canViewArsiv = hasRolePermission(role, "arsiv.view");
+      // Mirror PersonelArchiveGate: without arsiv.view, never expose PASIF via list.
+      const aktiflik = canViewArsiv ? aktiflikRaw : "aktif";
       const subeScope = getRequestSubeScope(request, url);
 
       if (subeScope !== null && mockUserSubeIds.length > 0 && !mockUserSubeIds.includes(subeScope)) {
@@ -5445,6 +5464,15 @@ let personelBelgeKaydiIdCounter = 903;
 
       if (personel && subeScope !== null && personel.sube_id !== subeScope) {
         await fulfillJson(route, 403, errorBody("FORBIDDEN", SUBE_SCOPE_MISMATCH_MESSAGE));
+        return;
+      }
+
+      if (personel && personel.aktif_durum === "PASIF" && !hasRolePermission(role, "arsiv.view")) {
+        await fulfillJson(
+          route,
+          403,
+          errorBody("ARCHIVE_ACCESS_REQUIRED", "Pasif personel arsiv erisimi icin arsiv.view yetkisi gerekir.")
+        );
         return;
       }
 

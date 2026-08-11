@@ -108,11 +108,121 @@ CREATE TABLE IF NOT EXISTS retention_imha_talepleri (
   approval_reason TEXT NULL,
   retention_until_snapshot DATE NULL,
   source_identity_snapshot VARCHAR(191) NULL,
+  trigger_type_snapshot VARCHAR(32) NULL,
+  trigger_date_snapshot DATE NULL,
+  source_version_identity_snapshot VARCHAR(191) NULL,
+  source_sha256_snapshot CHAR(64) NULL,
+  canonical_sube_id INT UNSIGNED NULL,
+  period_yil SMALLINT UNSIGNED NULL,
+  period_ay TINYINT UNSIGNED NULL,
   PRIMARY KEY (id),
   KEY idx_retention_imha_status (status),
   KEY idx_retention_imha_record (entity_type, record_id, category),
-  KEY idx_retention_imha_personel (personel_id)
+  KEY idx_retention_imha_personel (personel_id),
+  KEY idx_retention_imha_trigger_date (trigger_date_snapshot),
+  KEY idx_retention_imha_canonical_sube (canonical_sube_id),
+  KEY idx_retention_imha_period (period_yil, period_ay),
+  KEY idx_retention_imha_source_sha (source_sha256_snapshot)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Disposable DBs that already applied the older CREATE without snapshot cols.
+SET @col_exists := (
+  SELECT COUNT(*)
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'retention_imha_talepleri'
+    AND COLUMN_NAME = 'trigger_type_snapshot'
+);
+SET @sql := IF(
+  @col_exists = 0,
+  'ALTER TABLE retention_imha_talepleri ADD COLUMN trigger_type_snapshot VARCHAR(32) NULL AFTER source_identity_snapshot',
+  'SELECT 1'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @col_exists := (
+  SELECT COUNT(*)
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'retention_imha_talepleri'
+    AND COLUMN_NAME = 'trigger_date_snapshot'
+);
+SET @sql := IF(
+  @col_exists = 0,
+  'ALTER TABLE retention_imha_talepleri ADD COLUMN trigger_date_snapshot DATE NULL AFTER trigger_type_snapshot',
+  'SELECT 1'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @col_exists := (
+  SELECT COUNT(*)
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'retention_imha_talepleri'
+    AND COLUMN_NAME = 'source_version_identity_snapshot'
+);
+SET @sql := IF(
+  @col_exists = 0,
+  'ALTER TABLE retention_imha_talepleri ADD COLUMN source_version_identity_snapshot VARCHAR(191) NULL AFTER trigger_date_snapshot',
+  'SELECT 1'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @col_exists := (
+  SELECT COUNT(*)
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'retention_imha_talepleri'
+    AND COLUMN_NAME = 'source_sha256_snapshot'
+);
+SET @sql := IF(
+  @col_exists = 0,
+  'ALTER TABLE retention_imha_talepleri ADD COLUMN source_sha256_snapshot CHAR(64) NULL AFTER source_version_identity_snapshot',
+  'SELECT 1'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @col_exists := (
+  SELECT COUNT(*)
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'retention_imha_talepleri'
+    AND COLUMN_NAME = 'canonical_sube_id'
+);
+SET @sql := IF(
+  @col_exists = 0,
+  'ALTER TABLE retention_imha_talepleri ADD COLUMN canonical_sube_id INT UNSIGNED NULL AFTER source_sha256_snapshot',
+  'SELECT 1'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @col_exists := (
+  SELECT COUNT(*)
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'retention_imha_talepleri'
+    AND COLUMN_NAME = 'period_yil'
+);
+SET @sql := IF(
+  @col_exists = 0,
+  'ALTER TABLE retention_imha_talepleri ADD COLUMN period_yil SMALLINT UNSIGNED NULL AFTER canonical_sube_id',
+  'SELECT 1'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @col_exists := (
+  SELECT COUNT(*)
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'retention_imha_talepleri'
+    AND COLUMN_NAME = 'period_ay'
+);
+SET @sql := IF(
+  @col_exists = 0,
+  'ALTER TABLE retention_imha_talepleri ADD COLUMN period_ay TINYINT UNSIGNED NULL AFTER period_yil',
+  'SELECT 1'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 CREATE TABLE IF NOT EXISTS retention_imha_auditleri (
   id INT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -233,6 +343,36 @@ SET @fk_exists := (
 SET @sql := IF(
   @fk_exists = 0 AND @personeller_exists > 0,
   'ALTER TABLE retention_imha_talepleri ADD CONSTRAINT fk_retention_imha_personel FOREIGN KEY (personel_id) REFERENCES personeller (id) ON DELETE SET NULL',
+  'SELECT 1'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @fk_exists := (
+  SELECT COUNT(*)
+  FROM information_schema.TABLE_CONSTRAINTS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'retention_imha_talepleri'
+    AND CONSTRAINT_NAME = 'fk_retention_imha_requested_by'
+    AND CONSTRAINT_TYPE = 'FOREIGN KEY'
+);
+SET @sql := IF(
+  @fk_exists = 0 AND @users_exists > 0,
+  'ALTER TABLE retention_imha_talepleri ADD CONSTRAINT fk_retention_imha_requested_by FOREIGN KEY (requested_by) REFERENCES users (id) ON DELETE RESTRICT',
+  'SELECT 1'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @fk_exists := (
+  SELECT COUNT(*)
+  FROM information_schema.TABLE_CONSTRAINTS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'retention_imha_talepleri'
+    AND CONSTRAINT_NAME = 'fk_retention_imha_approved_by'
+    AND CONSTRAINT_TYPE = 'FOREIGN KEY'
+);
+SET @sql := IF(
+  @fk_exists = 0 AND @users_exists > 0,
+  'ALTER TABLE retention_imha_talepleri ADD CONSTRAINT fk_retention_imha_approved_by FOREIGN KEY (approved_by) REFERENCES users (id) ON DELETE RESTRICT',
   'SELECT 1'
 );
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;

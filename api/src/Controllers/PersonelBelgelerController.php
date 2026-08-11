@@ -42,10 +42,7 @@ class PersonelBelgelerController
         $pdo = self::getConnection();
         $personel = self::fetchPersonelForScope($pdo, $personelId);
         self::assertPersonelReadable($user, $request, $personel);
-
-        if (strtoupper((string) $personel['aktif_durum']) === 'PASIF') {
-            self::validationError('personel_id', 'Pasif personelin belge durumu güncellenemez.');
-        }
+        PersonelArchiveGate::assertBusinessWriteAllowed($pdo, (int) $personel['id']);
 
         $items = self::normalizeBelgeDurumuPayload($request->getJsonBody());
 
@@ -183,10 +180,7 @@ class PersonelBelgelerController
         $pdo = self::getConnection();
         $personel = self::fetchPersonelForScope($pdo, $personelId);
         self::assertPersonelReadable($user, $request, $personel);
-
-        if (strtoupper((string) $personel['aktif_durum']) === 'PASIF') {
-            self::validationError('personel_id', 'Pasif personele belge kaydı eklenemez.');
-        }
+        PersonelArchiveGate::assertBusinessWriteAllowed($pdo, (int) $personel['id']);
 
         $body = $request->getJsonBody();
         if (!is_array($body)) {
@@ -346,10 +340,7 @@ class PersonelBelgelerController
 
         $personel = self::fetchPersonelForScope($pdo, (int) $row['personel_id']);
         self::assertPersonelReadable($user, $request, $personel);
-
-        if (strtoupper((string) $personel['aktif_durum']) === 'PASIF') {
-            self::validationError('personel_id', 'Pasif personelin belge kaydi guncellenemez.');
-        }
+        PersonelArchiveGate::assertBusinessWriteAllowed($pdo, (int) $personel['id']);
 
         if (strtoupper((string) ($row['state'] ?? '')) === 'IPTAL') {
             JsonResponse::error(409, 'CONFLICT', 'Iptal edilmis belge kaydi guncellenemez.');
@@ -457,10 +448,7 @@ class PersonelBelgelerController
 
         $personel = self::fetchPersonelForScope($pdo, (int) $row['personel_id']);
         self::assertPersonelReadable($user, $request, $personel);
-
-        if (strtoupper((string) $personel['aktif_durum']) === 'PASIF') {
-            self::validationError('personel_id', 'Pasif personelin belge dosyasi degistirilemez.');
-        }
+        PersonelArchiveGate::assertBusinessWriteAllowed($pdo, (int) $personel['id']);
 
         if (strtoupper((string) ($row['state'] ?? '')) === 'IPTAL') {
             JsonResponse::error(409, 'CONFLICT', 'Iptal edilmis belge kaydinin dosyasi degistirilemez.');
@@ -673,16 +661,26 @@ class PersonelBelgelerController
         }
 
         if ($isPasifArchive) {
-            ArchiveAccessService::writeAccessAudit(
-                $pdo,
-                $user,
-                ArchiveAccessService::ACTION_DOWNLOAD,
-                'belge_kaydi',
-                $kayitId,
-                (int) $personel['id'],
-                '/belge-kayitlari/{id}/indir',
-                ['surum_id' => isset($version['id']) ? (int) $version['id'] : $surumId]
-            );
+            try {
+                ArchiveAccessService::writeAccessAudit(
+                    $pdo,
+                    $user,
+                    ArchiveAccessService::ACTION_DOWNLOAD,
+                    'belge_kaydi',
+                    $kayitId,
+                    (int) $personel['id'],
+                    '/belge-kayitlari/{id}/indir',
+                    ['surum_id' => isset($version['id']) ? (int) $version['id'] : $surumId]
+                );
+            } catch (RuntimeException $e) {
+                JsonResponse::error(
+                    503,
+                    $e->getMessage() === 'ARCHIVE_AUDIT_UNAVAILABLE'
+                        ? 'ARCHIVE_AUDIT_UNAVAILABLE'
+                        : 'ARCHIVE_AUDIT_FAILED',
+                    'Arsiv erisim audit yazilamadi; indirme engellendi.'
+                );
+            }
         }
 
         $filename = self::sanitizeDownloadFilename((string) $version['orijinal_dosya_adi']);

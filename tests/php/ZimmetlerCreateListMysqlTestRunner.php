@@ -442,7 +442,11 @@ $missingList = invokeZimmetHttp($pdo, $gy, 'GET', '/zimmetler', [], [], ['person
 zimmetAssert($missingList['status'] === 404, 'list missing personel → 404');
 
 $pasif = invokeZimmetHttp($pdo, $gy, 'POST', '/zimmetler', array_merge($createPayload, ['personel_id' => 30]));
-zimmetAssert($pasif['status'] === 422, 'pasif personel create → 422');
+zimmetAssert($pasif['status'] === 409, 'pasif personel create → 409 ARCHIVED_PERSONEL_READ_ONLY');
+zimmetAssert(
+    ($pasif['payload']['errors'][0]['code'] ?? '') === 'ARCHIVED_PERSONEL_READ_ONLY',
+    'pasif personel create code ARCHIVED_PERSONEL_READ_ONLY'
+);
 
 // Soft-delete: existing zimmets remain AKTIF and listable; new create rejected.
 $pdo->exec("UPDATE personeller SET aktif_durum = 'PASIF' WHERE id = 10");
@@ -453,7 +457,11 @@ foreach ($pasifList['payload']['data']['items'] as $item) {
     zimmetAssert(($item['zimmet_durumu'] ?? '') === 'AKTIF', 'pasif does not auto-iade zimmet');
 }
 $pasifCreateAfter = invokeZimmetHttp($pdo, $gy, 'POST', '/zimmetler', $createPayload);
-zimmetAssert($pasifCreateAfter['status'] === 422, 'soft-deleted personel create → 422');
+zimmetAssert($pasifCreateAfter['status'] === 409, 'soft-deleted personel create → 409 ARCHIVED_PERSONEL_READ_ONLY');
+zimmetAssert(
+    ($pasifCreateAfter['payload']['errors'][0]['code'] ?? '') === 'ARCHIVED_PERSONEL_READ_ONLY',
+    'soft-deleted personel create code ARCHIVED_PERSONEL_READ_ONLY'
+);
 $pdo->exec("UPDATE personeller SET aktif_durum = 'AKTIF' WHERE id = 10");
 
 // Hard delete blocked by FK; zimmet + personel rows preserved.

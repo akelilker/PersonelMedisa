@@ -5,13 +5,65 @@ declare(strict_types=1);
 namespace Medisa\Api\Services\Retention;
 
 use DateTime;
+use Medisa\Api\Http\JsonResponse;
 use PDO;
+use RuntimeException;
 
 /**
  * Helpers used by PersonellerController for archive gating + markers.
+ * PASIF personel business writes → ARCHIVED_PERSONEL_READ_ONLY.
  */
 class PersonelArchiveGate
 {
+    /**
+     * Block business writes against PASIF (archived) personel.
+     * Callers that perform retention/legal-hold ops should skip this gate.
+     */
+    public static function assertBusinessWriteAllowed(PDO $pdo, $personelId)
+    {
+        $personelId = (int) $personelId;
+        if ($personelId <= 0) {
+            return;
+        }
+
+        $stmt = $pdo->prepare('SELECT aktif_durum FROM personeller WHERE id = :id LIMIT 1');
+        $stmt->execute(['id' => $personelId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$row) {
+            return;
+        }
+
+        if (strtoupper(trim((string) ($row['aktif_durum'] ?? ''))) === 'PASIF') {
+            JsonResponse::error(
+                409,
+                RetentionPolicyService::CODE_ARCHIVED_PERSONEL_READ_ONLY,
+                RetentionPolicyService::codeMessage(RetentionPolicyService::CODE_ARCHIVED_PERSONEL_READ_ONLY)
+            );
+        }
+    }
+
+    /**
+     * Throw variant for services that do not emit HTTP directly.
+     */
+    public static function assertBusinessWriteAllowedOrThrow(PDO $pdo, $personelId)
+    {
+        $personelId = (int) $personelId;
+        if ($personelId <= 0) {
+            return;
+        }
+
+        $stmt = $pdo->prepare('SELECT aktif_durum FROM personeller WHERE id = :id LIMIT 1');
+        $stmt->execute(['id' => $personelId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$row) {
+            return;
+        }
+
+        if (strtoupper(trim((string) ($row['aktif_durum'] ?? ''))) === 'PASIF') {
+            throw new RuntimeException(RetentionPolicyService::CODE_ARCHIVED_PERSONEL_READ_ONLY);
+        }
+    }
+
     /**
      * Users without arsiv.view must never see PASIF via aktiflik=pasif|tum.
      *
@@ -121,11 +173,15 @@ class PersonelArchiveGate
         }
 
         $personelId = (int) ($personelRow['id'] ?? 0);
-        $markers['legal_hold_active'] = RetentionPolicyService::hasActiveLegalHold(
-            $pdo,
-            RetentionCategories::PERSONEL_OZLUK,
-            ['personel_id' => $personelId, 'entity_type' => 'personel', 'record_id' => $personelId]
-        );
+        try {
+            $markers['legal_hold_active'] = RetentionPolicyService::hasActiveLegalHold(
+                $pdo,
+                RetentionCategories::PERSONEL_OZLUK,
+                ['personel_id' => $personelId, 'entity_type' => 'personel', 'record_id' => $personelId]
+            );
+        } catch (\Throwable $e) {
+            $markers['legal_hold_active'] = true;
+        }
 
         try {
             $trigger = RetentionPolicyService::resolveTrigger(

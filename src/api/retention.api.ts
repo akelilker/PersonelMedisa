@@ -93,8 +93,8 @@ export async function fetchRetentionEligibility(params: {
   sube_id?: number;
   yil?: number;
   ay?: number;
-  as_of?: string;
-  gm_approved?: boolean;
+  talep_id?: number;
+  parent_category?: string;
 }): Promise<RetentionEligibility> {
   const path = appendQueryParams(endpoints.retention.eligibility, {
     category: params.category,
@@ -104,8 +104,8 @@ export async function fetchRetentionEligibility(params: {
     sube_id: params.sube_id,
     yil: params.yil,
     ay: params.ay,
-    as_of: params.as_of,
-    gm_approved: params.gm_approved ? 1 : undefined
+    talep_id: params.talep_id,
+    parent_category: params.parent_category
   });
   const response = await apiRequest<
     ApiResponse<{ eligibility?: RetentionEligibility; policy_note?: string }>

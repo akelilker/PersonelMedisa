@@ -11,12 +11,26 @@ use RuntimeException;
 
 /**
  * Legal hold create/release — GENEL_YONETICI only (legal_hold.manage).
- * Release does not delete anything.
+ * Release does not delete anything. Schema gate before create.
  */
 class LegalHoldService
 {
     public const STATE_ACTIVE = 'ACTIVE';
     public const STATE_RELEASED = 'RELEASED';
+
+    /** @var array<int, string> */
+    private static $knownDomains = [
+        'personel',
+        'personeller',
+        'surec',
+        'surecler',
+        'belge',
+        'belge_kaydi',
+        'retention',
+        'category',
+        'puantaj',
+        'bordro',
+    ];
 
     /**
      * @param array<string, mixed> $user
@@ -26,6 +40,7 @@ class LegalHoldService
     public static function create(PDO $pdo, array $user, array $payload)
     {
         self::assertManage($user);
+        RetentionSchemaGate::assertReady($pdo, RetentionSchemaGate::legalHoldTables());
 
         $domain = trim((string) ($payload['target_domain'] ?? ''));
         $category = isset($payload['target_category']) ? trim((string) $payload['target_category']) : null;
@@ -45,8 +60,25 @@ class LegalHoldService
         if ($domain === '' || $reason === '') {
             throw new RuntimeException('LEGAL_HOLD_INVALID_PAYLOAD');
         }
+        if (!in_array(strtolower($domain), self::$knownDomains, true)
+            && !RetentionCategories::isKnown($domain)
+        ) {
+            throw new RuntimeException('LEGAL_HOLD_DOMAIN_INVALID');
+        }
         if ($personelId === null && $targetRecordId === null && $category === null) {
             throw new RuntimeException('LEGAL_HOLD_TARGET_REQUIRED');
+        }
+
+        if ($personelId !== null) {
+            $stmt = $pdo->prepare('SELECT id FROM personeller WHERE id = :id LIMIT 1');
+            $stmt->execute(['id' => $personelId]);
+            if (!$stmt->fetch(PDO::FETCH_ASSOC)) {
+                throw new RuntimeException('LEGAL_HOLD_PERSONEL_NOT_FOUND');
+            }
+        }
+
+        if ($targetRecordId !== null) {
+            self::assertTargetRecordExists($pdo, $domain, $targetRecordId);
         }
 
         $actorId = (int) ($user['id'] ?? 0);
@@ -96,6 +128,7 @@ class LegalHoldService
     public static function release(PDO $pdo, array $user, $holdId, $releaseReason)
     {
         self::assertManage($user);
+        RetentionSchemaGate::assertReady($pdo, RetentionSchemaGate::legalHoldTables());
 
         $holdId = (int) $holdId;
         $releaseReason = trim((string) $releaseReason);
@@ -147,18 +180,38 @@ class LegalHoldService
     }
 
     /**
+     * @param array<int>|null $allowedSubeIds
      * @return array<int, array<string, mixed>>
      */
-    public static function list(PDO $pdo, $activeOnly = true)
+    public static function list(PDO $pdo, $activeOnly = true, $allowedSubeIds = null)
     {
-        $sql = 'SELECT * FROM legal_holdlar';
-        if ($activeOnly) {
-            $sql .= " WHERE hold_state = 'ACTIVE'";
-        }
-        $sql .= ' ORDER BY id DESC';
-        $stmt = $pdo->query($sql);
+        $sql = 'SELECT h.* FROM legal_holdlar h';
+        $params = [];
+        $where = [];
 
-        return $stmt ? ($stmt->fetchAll(PDO::FETCH_ASSOC) ?: []) : [];
+        if (is_array($allowedSubeIds) && count($allowedSubeIds) > 0) {
+            $sql .= ' LEFT JOIN personeller p ON p.id = h.personel_id';
+            $placeholders = [];
+            foreach (array_values($allowedSubeIds) as $i => $sid) {
+                $key = 'sube_' . $i;
+                $placeholders[] = ':' . $key;
+                $params[$key] = (int) $sid;
+            }
+            $where[] = '(h.personel_id IS NULL OR p.sube_id IN (' . implode(',', $placeholders) . '))';
+        }
+
+        if ($activeOnly) {
+            $where[] = "h.hold_state = 'ACTIVE'";
+        }
+
+        if (count($where) > 0) {
+            $sql .= ' WHERE ' . implode(' AND ', $where);
+        }
+        $sql .= ' ORDER BY h.id DESC';
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+
+        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
     }
 
     /**
@@ -187,6 +240,44 @@ class LegalHoldService
         if ($role !== 'GENEL_YONETICI') {
             JsonResponse::forbidden('Legal hold yalnizca genel yonetici tarafindan yonetilir.');
         }
+    }
+
+    private static function assertTargetRecordExists(PDO $pdo, $domain, $recordId)
+    {
+        $domain = strtolower(trim((string) $domain));
+        $table = null;
+        if (in_array($domain, ['personel', 'personeller'], true)) {
+            $table = 'personeller';
+        } elseif (in_array($domain, ['surec', 'surecler'], true)) {
+            $table = 'surecler';
+        } elseif (in_array($domain, ['belge', 'belge_kaydi'], true)) {
+            $table = 'personel_belge_kayitlari';
+        } elseif ($domain === 'retention') {
+            $table = 'retention_imha_talepleri';
+        }
+
+        if ($table === null) {
+            return;
+        }
+        if (!self::tableExists($pdo, $table)) {
+            throw new RuntimeException('LEGAL_HOLD_TARGET_NOT_FOUND');
+        }
+        $stmt = $pdo->prepare('SELECT id FROM `' . $table . '` WHERE id = :id LIMIT 1');
+        $stmt->execute(['id' => (int) $recordId]);
+        if (!$stmt->fetch(PDO::FETCH_ASSOC)) {
+            throw new RuntimeException('LEGAL_HOLD_TARGET_NOT_FOUND');
+        }
+    }
+
+    private static function tableExists(PDO $pdo, $table)
+    {
+        $stmt = $pdo->prepare(
+            'SELECT 1 FROM information_schema.TABLES
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :t LIMIT 1'
+        );
+        $stmt->execute(['t' => (string) $table]);
+
+        return (bool) $stmt->fetchColumn();
     }
 
     /**

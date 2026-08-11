@@ -9,6 +9,7 @@ use Medisa\Api\Auth\RolePermissions;
 use Medisa\Api\Database\Connection;
 use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
+use Medisa\Api\Scope\SubeScope;
 use Medisa\Api\Services\Retention\LegalHoldService;
 use RuntimeException;
 use Throwable;
@@ -27,7 +28,14 @@ class LegalHoldController
         }
 
         $activeOnly = strtolower((string) $request->getQuery('active_only', '1')) !== '0';
-        JsonResponse::success(['items' => LegalHoldService::list($pdo, $activeOnly)]);
+        $allowed = SubeScope::allowedSubeIds($user);
+        JsonResponse::success([
+            'items' => LegalHoldService::list(
+                $pdo,
+                $activeOnly,
+                count($allowed) > 0 ? $allowed : null
+            ),
+        ]);
     }
 
     public static function create(Request $request)

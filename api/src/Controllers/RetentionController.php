@@ -9,6 +9,7 @@ use Medisa\Api\Auth\RolePermissions;
 use Medisa\Api\Database\Connection;
 use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
+use Medisa\Api\Scope\SubeScope;
 use Medisa\Api\Services\Retention\DestructionWorkflowService;
 use Medisa\Api\Services\Retention\RetentionCategories;
 use Medisa\Api\Services\Retention\RetentionPolicyService;
@@ -22,6 +23,7 @@ class RetentionController
         $user = AuthMiddleware::authenticate($request, true);
         RolePermissions::assert($user, 'retention.view');
 
+        // as_of / gm_approved query params are intentionally ignored (never trusted).
         $category = trim((string) $request->getQuery('category', ''));
         $context = [
             'personel_id' => self::optionalInt($request->getQuery('personel_id')),
@@ -30,23 +32,45 @@ class RetentionController
             'sube_id' => self::optionalInt($request->getQuery('sube_id')),
             'yil' => self::optionalInt($request->getQuery('yil')),
             'ay' => self::optionalInt($request->getQuery('ay')),
-            'as_of' => trim((string) $request->getQuery('as_of', '')) ?: null,
-            'gm_approved' => strtolower((string) $request->getQuery('gm_approved', '0')) === '1',
-            'has_gm_approval' => strtolower((string) $request->getQuery('gm_approved', '0')) === '1',
+            'parent_category' => trim((string) $request->getQuery('parent_category', '')) ?: null,
+            'haftalik_kapanis_id' => self::optionalInt($request->getQuery('haftalik_kapanis_id')),
+            'hafta_baslangic' => trim((string) $request->getQuery('hafta_baslangic', '')) ?: null,
         ];
-        if ($context['as_of'] === null) {
-            unset($context['as_of']);
+        if ($context['parent_category'] === null) {
+            unset($context['parent_category']);
+        }
+        if ($context['hafta_baslangic'] === null) {
+            unset($context['hafta_baslangic']);
         }
 
         try {
             $pdo = Connection::get();
-            $result = RetentionPolicyService::evaluateDestructionEligibility($pdo, $category, $context);
+            if (($context['entity_type'] === 'personel' || $context['entity_type'] === 'personeller')
+                && (int) $context['record_id'] > 0
+            ) {
+                $fp = \Medisa\Api\Services\Retention\ArchiveManifestService::computePersonelOzlukFingerprint(
+                    $pdo,
+                    (int) $context['record_id']
+                );
+                if ($fp !== null) {
+                    $context['current_sha256'] = $fp;
+                }
+            }
+            $result = RetentionPolicyService::evaluatePreApprovalEligibility($pdo, $category, $context, null);
+
+            $approvalStatus = null;
+            $talepId = self::optionalInt($request->getQuery('talep_id'));
+            if ($talepId !== null) {
+                $talep = DestructionWorkflowService::getById($pdo, $talepId);
+                $approvalStatus = $talep ? (string) ($talep['status'] ?? '') : null;
+            }
         } catch (Throwable $e) {
             JsonResponse::serverError('Saklama uygunlugu degerlendirilemedi.');
         }
 
         JsonResponse::success([
             'eligibility' => $result,
+            'approval_status' => $approvalStatus,
             'policy_note' => RetentionCategories::POLICY_NOTE,
         ]);
     }
@@ -116,8 +140,13 @@ class RetentionController
         }
 
         $status = trim((string) $request->getQuery('status', ''));
+        $allowed = SubeScope::allowedSubeIds($user);
         JsonResponse::success([
-            'items' => DestructionWorkflowService::listRequests($pdo, $status !== '' ? $status : null),
+            'items' => DestructionWorkflowService::listRequests(
+                $pdo,
+                $status !== '' ? $status : null,
+                count($allowed) > 0 ? $allowed : null
+            ),
             'policy_note' => RetentionCategories::POLICY_NOTE,
         ]);
     }
@@ -138,7 +167,14 @@ class RetentionController
         }
 
         $limit = (int) ($request->getQuery('limit', 200) ?: 200);
-        JsonResponse::success(['items' => DestructionWorkflowService::listAudits($pdo, $limit)]);
+        $allowed = SubeScope::allowedSubeIds($user);
+        JsonResponse::success([
+            'items' => DestructionWorkflowService::listAudits(
+                $pdo,
+                $limit,
+                count($allowed) > 0 ? $allowed : null
+            ),
+        ]);
     }
 
     /** @param mixed $value */

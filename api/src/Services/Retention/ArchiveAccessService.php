@@ -7,9 +7,11 @@ namespace Medisa\Api\Services\Retention;
 use Medisa\Api\Auth\RolePermissions;
 use Medisa\Api\Http\JsonResponse;
 use PDO;
+use RuntimeException;
 
 /**
  * Archive access checks + append-only access audit (VIEW/DOWNLOAD/LIST).
+ * Missing audit table / insert failure → throw (never silent).
  */
 class ArchiveAccessService
 {
@@ -61,18 +63,24 @@ class ArchiveAccessService
         $routeSource,
         $metadata = null
     ) {
-        if (!self::tableExists($pdo, 'arsiv_erisim_auditleri')) {
-            return;
+        try {
+            RetentionSchemaGate::assertReady($pdo, RetentionSchemaGate::archiveAccessTables());
+        } catch (RuntimeException $e) {
+            throw new RuntimeException(
+                RetentionPolicyService::CODE_ARCHIVE_AUDIT_UNAVAILABLE,
+                0,
+                $e
+            );
         }
 
         $action = strtoupper(trim((string) $action));
         if (!in_array($action, [self::ACTION_VIEW, self::ACTION_DOWNLOAD, self::ACTION_LIST], true)) {
-            return;
+            throw new RuntimeException('ARCHIVE_AUDIT_ACTION_INVALID');
         }
 
         $actorId = (int) ($user['id'] ?? 0);
         if ($actorId <= 0) {
-            return;
+            throw new RuntimeException('ARCHIVE_AUDIT_ACTOR_REQUIRED');
         }
 
         $personelId = $personelId !== null ? (int) $personelId : null;
@@ -95,16 +103,5 @@ class ArchiveAccessService
             'route_source' => (string) $routeSource,
             'metadata' => $metadata !== null ? json_encode($metadata, JSON_UNESCAPED_UNICODE) : null,
         ]);
-    }
-
-    private static function tableExists(PDO $pdo, $table)
-    {
-        $stmt = $pdo->prepare(
-            'SELECT 1 FROM information_schema.TABLES
-             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :t LIMIT 1'
-        );
-        $stmt->execute(['t' => (string) $table]);
-
-        return (bool) $stmt->fetchColumn();
     }
 }

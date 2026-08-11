@@ -297,6 +297,7 @@ class PersonellerController
             JsonResponse::notFound();
         }
 
+        PersonelArchiveGate::assertBusinessWriteAllowed($pdo, $personelId);
         self::assertUpdateSubeScope($user, $request, (int) $current['sube_id'], $payload);
         self::assertAktifDurumNotChanged($current, $payload);
         self::validateUpdateReferences($pdo, $payload);

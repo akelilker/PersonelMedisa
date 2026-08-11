@@ -205,7 +205,7 @@ try {
     RetentionClock::clearOverride();
 
     $files = rp053MigrationFiles();
-    rp053Assert(end($files) === '054_canonical_role_consolidation.sql', '1 tip ends at 054');
+    rp053Assert(end($files) === '055_yillik_izin_hak_duzeltmeleri.sql', '1 tip ends at 054');
     rp053Assert(in_array('052_puantaj_tolerans_ve_disiplin.sql', $files, true), '1b 052 still present');
 
     rp053Apply($pdo, '001_initial_schema.sql');

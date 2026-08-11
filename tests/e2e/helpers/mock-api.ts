@@ -3699,6 +3699,19 @@ let personelBelgeKaydiIdCounter = 903;
   const personelUcretleri: MockPersonelUcret[] = [];
   const personelBordroKapsamlari: MockPersonelBordroKapsam[] = [];
   const mevzuatParametreleri: MockMevzuatParametresi[] = [];
+  type MockYillikIzinHakDuzeltme = {
+    id: number;
+    personel_id: number;
+    gun_delta: number;
+    kategori: "DEVIR" | "EK_HAK" | "DUZELTME" | "TERS_KAYIT";
+    aciklama: string;
+    effective_date: string;
+    created_by: number;
+    created_at: string;
+    reverses_id: number | null;
+  };
+  const yillikIzinHakDuzeltmeleri: MockYillikIzinHakDuzeltme[] = [];
+  let nextYillikIzinHakDuzeltmeId = 1;
 
   function rangesOverlapInclusive(
     startA: string,
@@ -5940,6 +5953,205 @@ let personelBelgeKaydiIdCounter = 903;
           ...record,
           sicil_no: personel.sicil_no ?? null,
           ad_soyad: `${personel.ad} ${personel.soyad}`.trim()
+        })
+      );
+      return;
+    }
+
+    const yillikIzinBakiyeMatch = path.match(/^\/api\/personeller\/(\d+)\/yillik-izin-bakiye$/);
+    if (yillikIzinBakiyeMatch && method === "GET") {
+      if (
+        await denyUnlessAnyRolePermission(route, [
+          "personeller.detail.view",
+          "personeller.view",
+          "personeller.view.sube"
+        ])
+      ) {
+        return;
+      }
+      const personelId = Number.parseInt(yillikIzinBakiyeMatch[1] ?? "0", 10);
+      const personel = personeller.find((item) => item.id === personelId);
+      if (!personel) {
+        await fulfillJson(route, 404, errorBody("PERSONEL_NOT_FOUND", "Personel bulunamadi."));
+        return;
+      }
+      const now = new Date();
+      const ref = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(
+        now.getDate()
+      ).padStart(2, "0")}`;
+      const manuelRows = yillikIzinHakDuzeltmeleri.filter(
+        (item) => item.personel_id === personelId && item.effective_date <= ref
+      );
+      const manuel = manuelRows.reduce((sum, item) => sum + item.gun_delta, 0);
+      const mevcut = 14;
+      const birikmis = 28;
+      const efektif = birikmis + manuel;
+      const kullanilan = 0;
+      await fulfillJson(
+        route,
+        200,
+        okBody({
+          personel_id: personelId,
+          contract_version: "s2c-v1",
+          referans_tarih: ref,
+          annual_band_semantic: "CURRENT_SERVICE_YEAR_BAND",
+          balance_legal_semantic: "CUMULATIVE_STATUTORY_ACCRUAL_AS_OF_REFERENCE_DATE",
+          kidem_yil: 2,
+          yas: 30,
+          yas_istisna_uygulandi: false,
+          mevcut_yillik_hak_gun: mevcut,
+          birikmis_yasal_hak_gun: birikmis,
+          yasal_hak_gun: birikmis,
+          manuel_duzeltme_gun: manuel,
+          efektif_hak_gun: efektif,
+          kullanilan_gun: kullanilan,
+          ham_kalan_gun: efektif - kullanilan,
+          kalan_gun: Math.max(efektif - kullanilan, 0),
+          takvim_dogrulandi_mi: true,
+          eksik_takvim_tarihleri: [],
+          sayilan_normal_gun: kullanilan,
+          haric_tutulan_hafta_tatili_gun: 0,
+          haric_tutulan_ubgt_gun: 0,
+          duzeltme_adet: manuelRows.length
+        })
+      );
+      return;
+    }
+
+    const yillikIzinHakListMatch = path.match(/^\/api\/personeller\/(\d+)\/yillik-izin-hak-duzeltmeleri$/);
+    if (yillikIzinHakListMatch && method === "GET") {
+      if (
+        await denyUnlessAnyRolePermission(route, [
+          "personeller.detail.view",
+          "personeller.view",
+          "personeller.view.sube"
+        ])
+      ) {
+        return;
+      }
+      const personelId = Number.parseInt(yillikIzinHakListMatch[1] ?? "0", 10);
+      const personel = personeller.find((item) => item.id === personelId);
+      if (!personel) {
+        await fulfillJson(route, 404, errorBody("PERSONEL_NOT_FOUND", "Personel bulunamadi."));
+        return;
+      }
+      const items = yillikIzinHakDuzeltmeleri
+        .filter((item) => item.personel_id === personelId)
+        .sort((a, b) => {
+          if (a.effective_date === b.effective_date) return b.id - a.id;
+          return a.effective_date < b.effective_date ? 1 : -1;
+        })
+        .map((item) => ({
+          ...item,
+          is_reversed: yillikIzinHakDuzeltmeleri.some((row) => row.reverses_id === item.id),
+          created_by_display: `mock-user-${item.created_by}`
+        }));
+      await fulfillJson(route, 200, okBody({ items, manual_net: items.reduce((s, i) => s + i.gun_delta, 0) }));
+      return;
+    }
+
+    if (yillikIzinHakListMatch && method === "POST") {
+      if (await denyUnlessRolePermission(route, "yillik_izin_hak_duzeltme.manage")) return;
+      const personelId = Number.parseInt(yillikIzinHakListMatch[1] ?? "0", 10);
+      const personel = personeller.find((item) => item.id === personelId);
+      if (!personel) {
+        await fulfillJson(route, 404, errorBody("PERSONEL_NOT_FOUND", "Personel bulunamadi."));
+        return;
+      }
+      const payload = (request.postDataJSON() as Record<string, unknown>) ?? {};
+      const kategori = String(payload.kategori ?? "").toUpperCase();
+      if (!["DEVIR", "EK_HAK", "DUZELTME"].includes(kategori)) {
+        await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "Gecersiz kategori."));
+        return;
+      }
+      const gunDelta = Number(payload.gun_delta ?? payload.gunDelta);
+      if (!Number.isInteger(gunDelta) || gunDelta === 0) {
+        await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "gun_delta sifirdan farkli tam sayi olmali."));
+        return;
+      }
+      const aciklama = String(payload.aciklama ?? "").trim();
+      if (!aciklama) {
+        await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "aciklama zorunlu."));
+        return;
+      }
+      const effectiveDate = String(payload.effective_date ?? payload.effectiveDate ?? "");
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(effectiveDate)) {
+        await fulfillJson(route, 422, errorBody("VALIDATION_ERROR", "effective_date gecersiz."));
+        return;
+      }
+      const next: MockYillikIzinHakDuzeltme = {
+        id: nextYillikIzinHakDuzeltmeId++,
+        personel_id: personelId,
+        gun_delta: gunDelta,
+        kategori: kategori as MockYillikIzinHakDuzeltme["kategori"],
+        aciklama,
+        effective_date: effectiveDate,
+        created_by: mockUserId,
+        created_at: new Date().toISOString(),
+        reverses_id: null
+      };
+      yillikIzinHakDuzeltmeleri.push(next);
+      await fulfillJson(
+        route,
+        201,
+        okBody({
+          ...next,
+          is_reversed: false,
+          created_by_display: `mock-user-${next.created_by}`
+        })
+      );
+      return;
+    }
+
+    const yillikIzinHakReverseMatch = path.match(
+      /^\/api\/personeller\/(\d+)\/yillik-izin-hak-duzeltmeleri\/(\d+)\/ters-kayit$/
+    );
+    if (yillikIzinHakReverseMatch && method === "POST") {
+      if (await denyUnlessRolePermission(route, "yillik_izin_hak_duzeltme.manage")) return;
+      const personelId = Number.parseInt(yillikIzinHakReverseMatch[1] ?? "0", 10);
+      const duzeltmeId = Number.parseInt(yillikIzinHakReverseMatch[2] ?? "0", 10);
+      const personel = personeller.find((item) => item.id === personelId);
+      if (!personel) {
+        await fulfillJson(route, 404, errorBody("PERSONEL_NOT_FOUND", "Personel bulunamadi."));
+        return;
+      }
+      const original = yillikIzinHakDuzeltmeleri.find(
+        (item) => item.id === duzeltmeId && item.personel_id === personelId
+      );
+      if (!original) {
+        await fulfillJson(route, 404, errorBody("NOT_FOUND", "Duzeltme kaydi bulunamadi."));
+        return;
+      }
+      if (original.kategori === "TERS_KAYIT") {
+        await fulfillJson(route, 409, errorBody("INVALID_REVERSAL_TARGET", "Ters kayit tekrar terslenemez."));
+        return;
+      }
+      if (yillikIzinHakDuzeltmeleri.some((item) => item.reverses_id === duzeltmeId)) {
+        await fulfillJson(route, 409, errorBody("ALREADY_REVERSED", "Bu duzeltme zaten terslenmis."));
+        return;
+      }
+      const payload = (request.postDataJSON() as Record<string, unknown>) ?? {};
+      const aciklama =
+        String(payload.aciklama ?? "").trim() || `Ters kayit #${duzeltmeId} icin otomatik telafi.`;
+      const next: MockYillikIzinHakDuzeltme = {
+        id: nextYillikIzinHakDuzeltmeId++,
+        personel_id: personelId,
+        gun_delta: -original.gun_delta,
+        kategori: "TERS_KAYIT",
+        aciklama,
+        effective_date: original.effective_date,
+        created_by: mockUserId,
+        created_at: new Date().toISOString(),
+        reverses_id: duzeltmeId
+      };
+      yillikIzinHakDuzeltmeleri.push(next);
+      await fulfillJson(
+        route,
+        201,
+        okBody({
+          ...next,
+          is_reversed: false,
+          created_by_display: `mock-user-${next.created_by}`
         })
       );
       return;

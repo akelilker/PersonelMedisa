@@ -1,10 +1,15 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { fetchYillikIzinBakiye } from "../../../../api/yillik-izin-hak-duzeltme.api";
 import { formatSurecStateLabel, formatSurecTuruLabel } from "../../../../lib/display/enum-display";
-import { hesaplaIzinBakiye } from "../../../../services/izin-hesap-motoru";
+import type { YillikIzinBakiye } from "../../../../types/yillik-izin-hak-duzeltme";
 import type { Personel } from "../../../../types/personel";
 import type { Surec } from "../../../../types/surec";
 import { DossierSection } from "./personel-dosya-dossier";
 import { formatIsoDateDetail } from "./personel-dosya-format-utils";
+
+function formatSigned(value: number): string {
+  return value > 0 ? `+${value}` : String(value);
+}
 
 export function PersonelIzinOzetSection({
   personel,
@@ -15,16 +20,35 @@ export function PersonelIzinOzetSection({
   surecler: Surec[];
   onOpenSurecHistory?: () => void;
 }) {
-  const bakiye = useMemo(() => {
-    if (!personel.ise_giris_tarihi) return null;
-    return hesaplaIzinBakiye(
-      {
-        ise_giris_tarihi: personel.ise_giris_tarihi,
-        dogum_tarihi: personel.dogum_tarihi
-      },
-      surecler
-    );
-  }, [personel.ise_giris_tarihi, personel.dogum_tarihi, surecler]);
+  const [bakiye, setBakiye] = useState<YillikIzinBakiye | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    void fetchYillikIzinBakiye(personel.id)
+      .then((result) => {
+        if (!cancelled) {
+          setBakiye(result);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setBakiye(null);
+          setError("İzin bakiyesi sunucudan alınamadı.");
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [personel.id]);
 
   const izinSurecleri = useMemo(
     () =>
@@ -41,43 +65,52 @@ export function PersonelIzinOzetSection({
   return (
     <DossierSection
       title="İzin Özeti"
-      description="Yıllık izin bakiyesi ve son hareketler burada özetlenir; detaylı izin geçmişi Süreç Geçmişi sekmesindedir."
+      description="Yıllık izin bakiyesi sunucu modelinden okunur; detaylı izin geçmişi Süreç Geçmişi sekmesindedir."
     >
       <div data-testid="personel-izin-ozet-section">
-        {bakiye ? (
+        {loading ? <p data-testid="izin-bakiye-loading">İzin bakiyesi yükleniyor…</p> : null}
+        {error ? <p data-testid="izin-bakiye-error">{error}</p> : null}
+        {!loading && !error && bakiye ? (
           <div className="personel-izin-infobox" data-testid="izin-bakiye-infobox">
             <p>
-              <strong>Kıdem:</strong> {bakiye.hak_edis.kidem_yil} yıl
+              <strong>Kıdem:</strong> {bakiye.kidem_yil} yıl
             </p>
-            {bakiye.hak_edis.yas !== null ? (
+            {bakiye.yas !== null ? (
               <p>
-                <strong>Yaş:</strong> {bakiye.hak_edis.yas}
+                <strong>Yaş:</strong> {bakiye.yas}
               </p>
             ) : null}
-            <p>
-              <strong>Yıllık İzin Hakkı:</strong> {bakiye.hak_edis.yillik_izin_gun} gün
-              {bakiye.hak_edis.yas_istisna_uygulandi ? (
+            <p data-testid="izin-mevcut-hak">
+              <strong>Bu Yıl / Mevcut Hak Ediş:</strong> {bakiye.mevcut_yillik_hak_gun} gün
+              {bakiye.yas_istisna_uygulandi ? (
                 <span className="personel-izin-istisna-badge"> (yaş istisnası)</span>
               ) : null}
             </p>
-            <p>
+            <p data-testid="izin-birikmis-yasal-hak">
+              <strong>Birikmiş Yasal Hak:</strong> {bakiye.birikmis_yasal_hak_gun} gün
+            </p>
+            <p data-testid="izin-manuel-duzeltme">
+              <strong>Manuel Hak Düzeltmeleri:</strong> {formatSigned(bakiye.manuel_duzeltme_gun)} gün
+            </p>
+            <p data-testid="izin-kullanilan">
               <strong>Kullanılan:</strong>{" "}
               {bakiye.kullanilan_gun === null ? "Kesinleştirilemedi" : `${bakiye.kullanilan_gun} gün`}
             </p>
-            <p className="personel-izin-kalan">
+            <p className="personel-izin-kalan" data-testid="izin-kalan">
               <strong>Kalan İzin:</strong>{" "}
               {bakiye.kalan_gun === null ? "Kesinleştirilemedi" : `${bakiye.kalan_gun} gün`}
             </p>
-            {!bakiye.kullanim_ozeti.takvim_dogrulandi_mi ? (
+            {!bakiye.takvim_dogrulandi_mi ? (
               <p data-testid="izin-takvim-eksik-uyarisi">
-                Canonical çalışma takviminde {bakiye.kullanim_ozeti.eksik_takvim_tarihleri.length} tarih
+                Canonical çalışma takviminde {bakiye.eksik_takvim_tarihleri.length} tarih
                 sınıflandırılmadığı için kullanılan ve kalan izin kesinleştirilemedi.
               </p>
             ) : null}
           </div>
-        ) : (
+        ) : null}
+        {!loading && !error && !bakiye ? (
           <p>İşe giriş tarihi bilgisi eksik; izin hakkı hesaplanamadı.</p>
-        )}
+        ) : null}
 
         {sonIzinHareketleri.length > 0 ? (
           <ul className="personel-surec-list personel-izin-list" data-testid="izin-hareket-listesi">

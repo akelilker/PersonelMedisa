@@ -23,7 +23,7 @@ describe("S84-R2 payroll scope sources", () => {
     const files = readdirSync("api/migrations")
       .filter((name) => /^\d{3}_/.test(name))
       .sort();
-    expect(files[files.length - 1]).toBe("054_canonical_role_consolidation.sql");
+    expect(files[files.length - 1]).toBe("055_yillik_izin_hak_duzeltmeleri.sql");
   });
 
   it("service contract version is S84R2_PAYROLL_SCOPE_V1", () => {

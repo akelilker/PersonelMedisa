@@ -18,7 +18,27 @@ describe("resolveKayitModalRouteConfig", () => {
       })
     ).toEqual({
       tab: "surec",
-      personelId: "42"
+      personelId: "42",
+      personelTab: null,
+      operation: null
+    });
+  });
+
+  it("resolves annual-leave entitlement adjustment operation preselect", () => {
+    expect(
+      resolveKayitModalRouteConfig({
+        kayitModal: {
+          tab: "surec",
+          personelId: 7,
+          personelTab: "izin-devamsizlik",
+          operation: "yillik-izin-hak-duzeltme"
+        }
+      })
+    ).toEqual({
+      tab: "surec",
+      personelId: "7",
+      personelTab: "izin-devamsizlik",
+      operation: "yillik-izin-hak-duzeltme"
     });
   });
 
@@ -33,7 +53,9 @@ describe("resolveKayitModalRouteConfig", () => {
       })
     ).toEqual({
       tab: "yeni-kayit",
-      personelId: null
+      personelId: null,
+      personelTab: null,
+      operation: null
     });
   });
 });

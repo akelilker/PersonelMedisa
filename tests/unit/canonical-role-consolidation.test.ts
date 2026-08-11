@@ -308,14 +308,15 @@ describe("S1 canonical role consolidation", () => {
     }
   });
 
-  it("migration 054 is staged-safe and 052/053 remain present", () => {
+  it("migration 054 is staged-safe and 052/053 remain present; 055 is additive tip", () => {
     const migrations = readdirSync(resolve(root, "api/migrations"))
       .filter((name) => /^\d{3}_.+\.sql$/.test(name))
       .sort();
     expect(migrations).toContain("052_puantaj_tolerans_ve_disiplin.sql");
     expect(migrations).toContain("053_retention_legal_hold_arsiv.sql");
     expect(migrations).toContain("054_canonical_role_consolidation.sql");
-    expect(migrations.at(-1)).toBe("054_canonical_role_consolidation.sql");
+    expect(migrations).toContain("055_yillik_izin_hak_duzeltmeleri.sql");
+    expect(migrations.at(-1)).toBe("055_yillik_izin_hak_duzeltmeleri.sql");
 
     const sql = readFileSync(MIG_054, "utf8");
     expect(sql).toContain("PERSONEL");
@@ -326,5 +327,18 @@ describe("S1 canonical role consolidation", () => {
     expect(sql).not.toMatch(/UPDATE users SET rol = .+ WHERE rol = 'IDARI_ISLER'/);
     expect(sql).toContain("SGK_KARAR_ONAY_YETKILISI");
     expect(sql).toContain("IDARI_ISLER");
+  });
+
+  it("S2B yillik_izin_hak_duzeltme.manage is GY+IK only; surecler.create uses RolePermissions", () => {
+    expect(hasRolePermission("GENEL_YONETICI", "yillik_izin_hak_duzeltme.manage")).toBe(true);
+    expect(hasRolePermission("IK_SORUMLUSU", "yillik_izin_hak_duzeltme.manage")).toBe(true);
+    expect(hasRolePermission("BOLUM_YONETICISI", "yillik_izin_hak_duzeltme.manage")).toBe(false);
+    expect(hasRolePermission("MUHASEBE", "yillik_izin_hak_duzeltme.manage")).toBe(false);
+    expect(hasRolePermission("SISTEM_YONETICISI", "yillik_izin_hak_duzeltme.manage")).toBe(false);
+
+    const surecler = readFileSync(resolve(root, "api/src/Controllers/SureclerController.php"), "utf8");
+    expect(surecler).toContain("RolePermissions::assert($user, 'surecler.create')");
+    expect(surecler).not.toContain("function assertCreateRole");
+    expect(surecler).not.toMatch(/\$allowedRoles\s*=\s*\[['"]GENEL_YONETICI['"]/);
   });
 });

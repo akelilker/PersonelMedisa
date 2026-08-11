@@ -59,7 +59,7 @@ describe("attendance discipline source contract", () => {
     const migrations = readdirSync(resolve(root, "api/migrations"))
       .filter((name) => name.endsWith(".sql"))
       .sort();
-    expect(migrations.at(-1)).toBe("054_canonical_role_consolidation.sql");
+    expect(migrations.at(-1)).toBe("055_yillik_izin_hak_duzeltmeleri.sql");
     expect(migrations).toContain("052_puantaj_tolerans_ve_disiplin.sql");
     expect(migrations).toContain("053_retention_legal_hold_arsiv.sql");
     const sql = readFileSync(resolve(root, "api/migrations/052_puantaj_tolerans_ve_disiplin.sql"), "utf8");

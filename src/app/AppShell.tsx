@@ -199,6 +199,8 @@ export function AppShell() {
     kayitTab,
     setKayitTab,
     kayitInitialSurecPersonelId,
+    kayitInitialPersonelTab,
+    kayitInitialOperation,
     kayitPrimaryLabel,
     kayitPrimaryFormId,
     openKayitModal,
@@ -276,6 +278,8 @@ export function AppShell() {
             onTabChange={setKayitTab}
             onClose={closeKayitModal}
             initialSurecPersonelId={kayitInitialSurecPersonelId}
+            initialPersonelTab={kayitInitialPersonelTab}
+            initialOperation={kayitInitialOperation}
             primaryActionLabel={kayitPrimaryLabel}
             primaryFormId={kayitPrimaryFormId}
             onFooterModelChange={handleKayitFooterModelChange}

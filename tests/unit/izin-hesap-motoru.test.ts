@@ -4,6 +4,7 @@ import {
   hesaplaYas,
   hesaplaYillikIzinGun,
   hesaplaIzinHakEdis,
+  hesaplaBirikmisYasalHak,
   hesaplaKullanilanIzinGun,
   hesaplaKullanilanIzinOzeti,
   hesaplaIzinBakiye,
@@ -519,5 +520,125 @@ describe("hesaplaIzinBakiye", () => {
     expect(sonuc.hak_edis.yillik_izin_gun).toBe(20);
     expect(sonuc.kullanilan_gun).toBe(0);
     expect(sonuc.kalan_gun).toBe(20);
+  });
+});
+
+describe("hesaplaBirikmisYasalHak (S2C cumulative accrual)", () => {
+  it("hire today / before first anniversary → 0", () => {
+    expect(
+      hesaplaBirikmisYasalHak({
+        ise_giris_tarihi: "2026-08-11",
+        referans_tarih: "2026-08-11"
+      }).birikmis_yasal_hak_gun
+    ).toBe(0);
+    expect(
+      hesaplaBirikmisYasalHak({
+        ise_giris_tarihi: "2025-08-12",
+        referans_tarih: "2026-08-11"
+      }).birikmis_yasal_hak_gun
+    ).toBe(0);
+  });
+
+  it("exact 1st / 5th / 6th / 15th anniversary totals", () => {
+    expect(
+      hesaplaBirikmisYasalHak({
+        ise_giris_tarihi: "2025-08-11",
+        referans_tarih: "2026-08-11"
+      }).birikmis_yasal_hak_gun
+    ).toBe(14);
+    expect(
+      hesaplaBirikmisYasalHak({
+        ise_giris_tarihi: "2021-04-13",
+        referans_tarih: "2026-04-13"
+      }).birikmis_yasal_hak_gun
+    ).toBe(70);
+    expect(
+      hesaplaBirikmisYasalHak({
+        ise_giris_tarihi: "2020-04-13",
+        referans_tarih: "2026-04-13"
+      }).birikmis_yasal_hak_gun
+    ).toBe(90);
+    expect(
+      hesaplaBirikmisYasalHak({
+        ise_giris_tarihi: "2011-04-13",
+        referans_tarih: "2026-04-13"
+      }).birikmis_yasal_hak_gun
+    ).toBe(276);
+  });
+
+  it("age crossing evaluates exception per anniversary", () => {
+    const cross19 = hesaplaBirikmisYasalHak({
+      ise_giris_tarihi: "2023-01-01",
+      dogum_tarihi: "2006-06-01",
+      referans_tarih: "2026-01-01"
+    });
+    expect(cross19.birikmis_yasal_hak_gun).toBe(54);
+    expect(cross19.accrual_breakdown.map((row) => row.gun)).toEqual([20, 20, 14]);
+
+    const cross50 = hesaplaBirikmisYasalHak({
+      ise_giris_tarihi: "2020-01-01",
+      dogum_tarihi: "1974-06-01",
+      referans_tarih: "2025-01-01"
+    });
+    expect(cross50.birikmis_yasal_hak_gun).toBe(76);
+  });
+
+  it("PERIOD_MISMATCH_REGRESSION: cumulative not current-band minus lifetime used", () => {
+    const legal = hesaplaBirikmisYasalHak({
+      ise_giris_tarihi: "2023-01-01",
+      referans_tarih: "2026-08-11"
+    });
+    expect(legal.mevcut_yillik_hak_gun).toBe(14);
+    expect(legal.birikmis_yasal_hak_gun).toBe(42);
+    expect(Math.max(14 - 30, 0)).toBe(0);
+    expect(Math.max(legal.birikmis_yasal_hak_gun - 30, 0)).toBe(12);
+  });
+});
+
+describe("hesaplaKullanilanIzinOzeti as-of referans_tarih", () => {
+  const surec: Surec = {
+    id: 1,
+    personel_id: 1,
+    surec_turu: "IZIN",
+    alt_tur: "YILLIK_IZIN",
+    baslangic_tarihi: "2026-08-10",
+    bitis_tarihi: "2026-08-20",
+    state: "AKTIF"
+  };
+
+  it("counts only days <= referans mid-interval", () => {
+    const ozet = hesaplaKullanilanIzinOzeti(
+      [surec],
+      canonicalTakvimAraligi("2026-08-10", "2026-08-20"),
+      "2026-08-15"
+    );
+    expect(ozet.kullanilan_gun).toBe(6);
+  });
+
+  it("before start = 0; after end = full", () => {
+    expect(
+      hesaplaKullanilanIzinOzeti(
+        [surec],
+        canonicalTakvimAraligi("2026-08-10", "2026-08-20"),
+        "2026-08-09"
+      ).kullanilan_gun
+    ).toBe(0);
+    expect(
+      hesaplaKullanilanIzinOzeti(
+        [surec],
+        canonicalTakvimAraligi("2026-08-10", "2026-08-20"),
+        "2026-08-21"
+      ).kullanilan_gun
+    ).toBe(11);
+  });
+
+  it("FUTURE_LEAVE_REGRESSION: missing future calendar does not fail-closed", () => {
+    const ozet = hesaplaKullanilanIzinOzeti(
+      [surec],
+      canonicalTakvimAraligi("2026-08-10", "2026-08-15"),
+      "2026-08-15"
+    );
+    expect(ozet.takvim_dogrulandi_mi).toBe(true);
+    expect(ozet.kullanilan_gun).toBe(6);
   });
 });

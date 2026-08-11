@@ -107,7 +107,8 @@ export type AppPermission =
   | "legal_hold.manage"
   | "retention.destruction.request"
   | "retention.destruction.approve"
-  | "retention.destruction.view";
+  | "retention.destruction.view"
+  | "yillik_izin_hak_duzeltme.manage";
 
 const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
   GENEL_YONETICI: [
@@ -187,6 +188,7 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "sgk.manuel_kod_override",
     "sgk_karar_paketi.prepare",
     "sgk_karar_paketi.approve",
+    "yillik_izin_hak_duzeltme.manage",
     "disiplin.view",
     "disiplin.review",
     "disiplin.defense_manage",
@@ -364,6 +366,7 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "revizyon.view_finance_effect",
     "revizyon.view_audit_history",
     "sgk_karar_paketi.prepare",
+    "yillik_izin_hak_duzeltme.manage",
     "arsiv.view",
     "arsiv.download",
     "retention.view"

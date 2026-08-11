@@ -114,7 +114,7 @@ class SureclerController
     public static function create(Request $request)
     {
         $user = AuthMiddleware::authenticate($request, true);
-        self::assertCreateRole($user);
+        RolePermissions::assert($user, 'surecler.create');
 
         $body = $request->getJsonBody();
         $payload = self::normalizeAndValidateCreatePayload($body);
@@ -514,15 +514,6 @@ class SureclerController
             'ilk_iki_gun_firma_oder_mi' => self::resolveIlkIkiGunFirmaOderMi($surecTuru, $altTur, $body),
             'aciklama' => self::optionalTrimmedString($body, 'aciklama'),
         ];
-    }
-
-    /** @param array<string, mixed> $user */
-    private static function assertCreateRole(array $user)
-    {
-        $allowedRoles = ['GENEL_YONETICI', 'BOLUM_YONETICISI', 'MUHASEBE'];
-        if (!in_array((string) ($user['rol'] ?? ''), $allowedRoles, true)) {
-            JsonResponse::forbidden();
-        }
     }
 
     /** @return array<string, mixed>|null */

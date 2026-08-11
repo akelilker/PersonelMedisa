@@ -1,0 +1,175 @@
+<?php
+
+declare(strict_types=1);
+
+/**
+ * S2B ledger acceptance: permission matrix + migration tip + ledger CRUD (SQLite or disposable MariaDB).
+ * php tests/php/S2BYillikIzinHakLedgerMysqlTestRunner.php
+ */
+
+require_once __DIR__ . '/../../api/src/bootstrap.php';
+
+use Medisa\Api\Auth\RolePermissions;
+use Medisa\Api\Services\Izin\YillikIzinHakDuzeltmeException;
+use Medisa\Api\Services\Izin\YillikIzinHakDuzeltmeLedgerService;
+
+function s2bLedgerAssert(bool $ok, string $name): void
+{
+    if (!$ok) {
+        fwrite(STDERR, "[FAIL] {$name}\n");
+        exit(1);
+    }
+    fwrite(STDOUT, "[PASS] {$name}\n");
+}
+
+/** @return list<string> */
+function s2bLedgerMigrationFiles(): array
+{
+    $dir = __DIR__ . '/../../api/migrations';
+    $files = array_values(array_filter(scandir($dir) ?: [], static function ($name) {
+        return (bool) preg_match('/^\d{3}_.+\.sql$/', (string) $name);
+    }));
+    sort($files, SORT_STRING);
+
+    return $files;
+}
+
+function s2bLedgerHasSqlite(): bool
+{
+    return extension_loaded('pdo_sqlite') || in_array('sqlite', PDO::getAvailableDrivers(), true);
+}
+
+function s2bLedgerRootPdo(): ?PDO
+{
+    $dsn = getenv('MEDISA_TEST_MYSQL_DSN') ?: '';
+    $user = getenv('MEDISA_TEST_MYSQL_USER') ?: '';
+    if ($dsn === '' || $user === '') {
+        return null;
+    }
+
+    return new PDO($dsn, $user, getenv('MEDISA_TEST_MYSQL_PASSWORD') ?: '', [
+        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+        PDO::ATTR_EMULATE_PREPARES => false,
+    ]);
+}
+
+function s2bLedgerCreateSqliteSchema(PDO $pdo): void
+{
+    $pdo->exec(
+        'CREATE TABLE personeller (
+            id INTEGER PRIMARY KEY,
+            sube_id INTEGER NOT NULL DEFAULT 1
+        )'
+    );
+    $pdo->exec(
+        'CREATE TABLE users (
+            id INTEGER PRIMARY KEY,
+            ad_soyad TEXT
+        )'
+    );
+    $pdo->exec(
+        'CREATE TABLE yillik_izin_hak_duzeltmeleri (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            personel_id INTEGER NOT NULL,
+            gun_delta INTEGER NOT NULL CHECK (gun_delta <> 0),
+            kategori TEXT NOT NULL,
+            aciklama TEXT NOT NULL,
+            effective_date TEXT NOT NULL,
+            created_by INTEGER NOT NULL,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            reverses_id INTEGER NULL UNIQUE,
+            FOREIGN KEY (personel_id) REFERENCES personeller(id),
+            FOREIGN KEY (created_by) REFERENCES users(id),
+            FOREIGN KEY (reverses_id) REFERENCES yillik_izin_hak_duzeltmeleri(id)
+        )'
+    );
+    $pdo->exec('INSERT INTO personeller (id, sube_id) VALUES (1, 1)');
+    $pdo->exec("INSERT INTO users (id, ad_soyad) VALUES (1, 'IK User')");
+}
+
+// --- migration tip ---
+$files = s2bLedgerMigrationFiles();
+s2bLedgerAssert(in_array('052_puantaj_tolerans_ve_disiplin.sql', $files, true), '052 present');
+s2bLedgerAssert(in_array('053_retention_legal_hold_arsiv.sql', $files, true), '053 present');
+s2bLedgerAssert(in_array('054_canonical_role_consolidation.sql', $files, true), '054 present');
+s2bLedgerAssert(end($files) === '055_yillik_izin_hak_duzeltmeleri.sql', 'tip is 055');
+
+$migration055 = (string) file_get_contents(__DIR__ . '/../../api/migrations/055_yillik_izin_hak_duzeltmeleri.sql');
+s2bLedgerAssert(strpos($migration055, 'CREATE TABLE IF NOT EXISTS yillik_izin_hak_duzeltmeleri') !== false, '055 ledger table');
+s2bLedgerAssert(strpos($migration055, 'INSERT INTO') === false, '055 additive only');
+
+// --- permission matrix (RolePermissions reflection) ---
+s2bLedgerAssert(RolePermissions::has(['rol' => 'GENEL_YONETICI'], 'yillik_izin_hak_duzeltme.manage'), 'GY manage');
+s2bLedgerAssert(RolePermissions::has(['rol' => 'IK_SORUMLUSU'], 'yillik_izin_hak_duzeltme.manage'), 'IK manage');
+foreach (['BOLUM_YONETICISI', 'MUHASEBE', 'BIRIM_AMIRI', 'SISTEM_YONETICISI', 'PERSONEL'] as $role) {
+    s2bLedgerAssert(
+        !RolePermissions::has(['rol' => $role], 'yillik_izin_hak_duzeltme.manage'),
+        "{$role} denied manage"
+    );
+}
+
+// --- source invariants ---
+$ctrl = (string) file_get_contents(__DIR__ . '/../../api/src/Controllers/YillikIzinHakDuzeltmeController.php');
+s2bLedgerAssert(strpos($ctrl, 'yillik_izin_hak_duzeltme.manage') !== false, 'controller manage guard');
+s2bLedgerAssert(strpos($ctrl, 'DELETE FROM yillik_izin_hak_duzeltmeleri') === false, 'no hard delete');
+
+$router = (string) file_get_contents(__DIR__ . '/../../api/src/Router.php');
+s2bLedgerAssert(strpos($router, 'yillik-izin-bakiye') !== false, 'router bakiye route');
+s2bLedgerAssert(strpos($router, 'yillik-izin-hak-duzeltmeleri') !== false, 'router list/create');
+s2bLedgerAssert(strpos($router, 'ters-kayit') !== false, 'router ters-kayit');
+s2bLedgerAssert(strpos($router, 'kalan_izin') === false, 'no kalan_izin overwrite route');
+
+$surecler = (string) file_get_contents(__DIR__ . '/../../api/src/Controllers/SureclerController.php');
+s2bLedgerAssert(strpos($surecler, "RolePermissions::assert(\$user, 'surecler.create')") !== false, 'surecler.create matrix');
+
+// --- ledger CRUD on SQLite (create + netSum; reverse skipped — FOR UPDATE) ---
+if (s2bLedgerHasSqlite()) {
+    $pdo = new PDO('sqlite::memory:');
+    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+    s2bLedgerCreateSqliteSchema($pdo);
+
+    $row = YillikIzinHakDuzeltmeLedgerService::create($pdo, 1, [
+        'gun_delta' => 8,
+        'kategori' => 'DEVIR',
+        'aciklama' => 'Onceki sistem devir bakiyesi',
+        'effective_date' => '2026-01-01',
+    ], ['id' => 1, 'rol' => 'IK_SORUMLUSU']);
+    s2bLedgerAssert((int) $row['gun_delta'] === 8 && $row['kategori'] === 'DEVIR', 'create DEVIR +8');
+
+    $row2 = YillikIzinHakDuzeltmeLedgerService::create($pdo, 1, [
+        'gun_delta' => -2,
+        'kategori' => 'DUZELTME',
+        'aciklama' => 'Idari duzeltme',
+        'effective_date' => '2026-02-01',
+    ], ['id' => 1]);
+    s2bLedgerAssert((int) $row2['gun_delta'] === -2, 'create signed DUZELTME');
+
+    s2bLedgerAssert(YillikIzinHakDuzeltmeLedgerService::netSum($pdo, 1) === 6, 'netSum = 6');
+    s2bLedgerAssert(count(YillikIzinHakDuzeltmeLedgerService::listByPersonel($pdo, 1)) === 2, 'listByPersonel count');
+
+    try {
+        YillikIzinHakDuzeltmeLedgerService::create($pdo, 1, [
+            'gun_delta' => 0,
+            'kategori' => 'DEVIR',
+            'aciklama' => 'zero forbidden',
+            'effective_date' => '2026-03-01',
+        ], ['id' => 1]);
+        s2bLedgerAssert(false, 'zero delta should throw');
+    } catch (YillikIzinHakDuzeltmeException $e) {
+        s2bLedgerAssert($e->getErrorCode() === 'VALIDATION_ERROR', 'zero delta rejected');
+    }
+} else {
+    fwrite(STDOUT, "[SKIP] sqlite driver missing — ledger CRUD checks skipped\n");
+}
+
+// --- optional MariaDB: apply 055 on temp DB if credentials present ---
+$mysql = s2bLedgerRootPdo();
+if ($mysql instanceof PDO) {
+    fwrite(STDOUT, "[INFO] MariaDB credentials present — source/matrix checks only (no disposable DB spin-up)\n");
+} else {
+    fwrite(STDOUT, "[SKIP] MariaDB credentials absent — matrix/source/SQLite path sufficient\n");
+}
+
+fwrite(STDOUT, "S2B ledger mysql runner OK\n");

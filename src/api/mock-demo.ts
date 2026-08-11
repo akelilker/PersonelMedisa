@@ -49,6 +49,10 @@ import type { RevizyonCorrectionEvent } from "../types/revizyon-correction";
 import type { RevizyonTalebi, RevizyonTipi } from "../types/revizyon-talebi";
 import { REVIZYON_TIPLERI } from "../types/revizyon-talebi";
 import { hesaplaAylikSgkPuantajOzetleri } from "../services/dashboard-rapor-servisi";
+import {
+  hesaplaIzinHakEdis,
+  hesaplaKullanilanIzinOzeti
+} from "../services/izin-hesap-motoru";
 import { buildHaftalikKapanisSnapshot } from "../services/haftalik-kapanis-snapshot";
 import {
   hesaplaSerbestZamanBakiye,
@@ -241,6 +245,18 @@ type DemoPersonelBordroKapsamKaydi = {
   contract_version: string;
 };
 
+type DemoYillikIzinHakDuzeltme = {
+  id: number;
+  personel_id: number;
+  gun_delta: number;
+  kategori: "DEVIR" | "EK_HAK" | "DUZELTME" | "TERS_KAYIT";
+  aciklama: string;
+  effective_date: string;
+  reverses_id: number | null;
+  created_by: number | null;
+  created_at: string;
+};
+
 type DemoMevzuatParametresi = {
   id: number;
   parametre_kodu: string;
@@ -423,6 +439,7 @@ const demoState: {
   finansKalemleri: DemoFinansKalem[];
   personelUcretleri: DemoPersonelUcretKaydi[];
   personelBordroKapsamlari: DemoPersonelBordroKapsamKaydi[];
+  yillikIzinHakDuzeltmeleri: DemoYillikIzinHakDuzeltme[];
   mevzuatParametreleri: DemoMevzuatParametresi[];
   puantajMap: Record<string, DemoPuantaj>;
   makineler: DemoMakine[];
@@ -469,6 +486,7 @@ const demoState: {
     finans: number;
     personelUcret: number;
     personelBordroKapsam: number;
+    yillikIzinHakDuzeltme: number;
     mevzuatParametre: number;
     kapanis: number;
     odemeTercihi: number;
@@ -696,6 +714,7 @@ const demoState: {
   ],
   personelUcretleri: [],
   personelBordroKapsamlari: [],
+  yillikIzinHakDuzeltmeleri: [],
   mevzuatParametreleri: [],
   puantajMap: {
     "1|2026-04-09": buildDemoPuantaj({
@@ -920,6 +939,7 @@ const demoState: {
     finans: 950,
     personelUcret: 0,
     personelBordroKapsam: 0,
+    yillikIzinHakDuzeltme: 0,
     mevzuatParametre: 0,
     kapanis: 1000,
     odemeTercihi: 1,
@@ -3401,6 +3421,89 @@ function serializeDemoBordroKapsam(
   };
 }
 
+function serializeDemoYillikIzinHakDuzeltme(row: DemoYillikIzinHakDuzeltme) {
+  const isReversed = demoState.yillikIzinHakDuzeltmeleri.some(
+    (item) => item.reverses_id === row.id
+  );
+  return {
+    ...row,
+    is_reversed: isReversed,
+    created_by_display: row.created_by ? `demo-user-${row.created_by}` : null
+  };
+}
+
+function buildDemoYillikIzinBakiye(personelId: number) {
+  const personel = demoState.personeller.find((item) => item.id === personelId);
+  if (!personel?.ise_giris_tarihi) {
+    return {
+      personel_id: personelId,
+      contract_version: "S2B_YILLIK_IZIN_BAKIYE_V1",
+      kidem_yil: 0,
+      yas: null,
+      yas_istisna_uygulandi: false,
+      yasal_hak_gun: 0,
+      manuel_duzeltme_gun: 0,
+      efektif_hak_gun: 0,
+      kullanilan_gun: null,
+      ham_kalan_gun: null,
+      kalan_gun: null,
+      takvim_dogrulandi_mi: false,
+      eksik_takvim_tarihleri: [],
+      sayilan_normal_gun: 0,
+      haric_tutulan_hafta_tatili_gun: 0,
+      haric_tutulan_ubgt_gun: 0,
+      duzeltme_adet: 0,
+      hesap_engeli: "ISE_GIRIS_EKSIK"
+    };
+  }
+
+  const hakEdis = hesaplaIzinHakEdis({
+    ise_giris_tarihi: personel.ise_giris_tarihi,
+    dogum_tarihi: personel.dogum_tarihi
+  });
+  const manuel = demoState.yillikIzinHakDuzeltmeleri
+    .filter((item) => item.personel_id === personelId)
+    .reduce((sum, item) => sum + item.gun_delta, 0);
+  const surecler = demoState.surecler.filter((item) => item.personel_id === personelId) as Array<{
+    id: number;
+    personel_id: number;
+    surec_turu: string;
+    alt_tur?: string;
+    baslangic_tarihi?: string;
+    bitis_tarihi?: string;
+    state?: string;
+  }>;
+  const takvim = Object.values(demoState.puantajMap)
+    .filter((item) => item.personel_id === personelId && item.gun_tipi)
+    .map((item) => ({ tarih: item.tarih, gun_tipi: item.gun_tipi! }));
+  const kullanim = hesaplaKullanilanIzinOzeti(surecler as never, takvim);
+  const used = kullanim.kullanilan_gun;
+  const effective = hakEdis.yillik_izin_gun + manuel;
+  const raw = used === null ? null : effective - used;
+  const remaining = raw === null ? null : Math.max(raw, 0);
+
+  return {
+    personel_id: personelId,
+    contract_version: "S2B_YILLIK_IZIN_BAKIYE_V1",
+    kidem_yil: hakEdis.kidem_yil,
+    yas: hakEdis.yas,
+    yas_istisna_uygulandi: hakEdis.yas_istisna_uygulandi,
+    yasal_hak_gun: hakEdis.yillik_izin_gun,
+    manuel_duzeltme_gun: manuel,
+    efektif_hak_gun: effective,
+    kullanilan_gun: used,
+    ham_kalan_gun: raw,
+    kalan_gun: remaining,
+    takvim_dogrulandi_mi: kullanim.takvim_dogrulandi_mi,
+    eksik_takvim_tarihleri: kullanim.eksik_takvim_tarihleri,
+    sayilan_normal_gun: kullanim.sayilan_normal_gun,
+    haric_tutulan_hafta_tatili_gun: kullanim.haric_tutulan_hafta_tatili_gun,
+    haric_tutulan_ubgt_gun: kullanim.haric_tutulan_ubgt_gun,
+    duzeltme_adet: demoState.yillikIzinHakDuzeltmeleri.filter((item) => item.personel_id === personelId)
+      .length
+  };
+}
+
 function buildDemoBordroKapsamDryRun(
   personel: DemoPersonel,
   body: Record<string, unknown>,
@@ -5688,6 +5791,150 @@ export function resolveDemoApiResponse(
     };
     demoState.personelBordroKapsamlari.push(next);
     return ok(serializeDemoBordroKapsam(next, personel));
+  }
+
+  const yillikIzinBakiyeMatch = pathname.match(/^\/personeller\/(\d+)\/yillik-izin-bakiye$/);
+  if (yillikIzinBakiyeMatch && method === "GET") {
+    const actor = readDemoApiActor(init);
+    const personelId = Number.parseInt(yillikIzinBakiyeMatch[1], 10);
+    const personel = demoState.personeller.find((item) => item.id === personelId);
+    if (!personel) {
+      return demoRevizyonError("PERSONEL_NOT_FOUND", "Personel bulunamadi.");
+    }
+    const scopeError = demoPersonelSubeScopeError(actor, personel);
+    if (scopeError) return scopeError;
+    const permissionError = enforceDemoPermission(
+      actor,
+      "personeller.detail.view",
+      "Personel detayini goruntuleme yetkiniz yok."
+    );
+    if (permissionError) return permissionError;
+    return ok(buildDemoYillikIzinBakiye(personelId));
+  }
+
+  const yillikIzinHakListMatch = pathname.match(/^\/personeller\/(\d+)\/yillik-izin-hak-duzeltmeleri$/);
+  if (yillikIzinHakListMatch && method === "GET") {
+    const actor = readDemoApiActor(init);
+    const personelId = Number.parseInt(yillikIzinHakListMatch[1], 10);
+    const personel = demoState.personeller.find((item) => item.id === personelId);
+    if (!personel) {
+      return demoRevizyonError("PERSONEL_NOT_FOUND", "Personel bulunamadi.");
+    }
+    const scopeError = demoPersonelSubeScopeError(actor, personel);
+    if (scopeError) return scopeError;
+    const permissionError = enforceDemoPermission(
+      actor,
+      "personeller.detail.view",
+      "Personel detayini goruntuleme yetkiniz yok."
+    );
+    if (permissionError) return permissionError;
+    const items = demoState.yillikIzinHakDuzeltmeleri
+      .filter((item) => item.personel_id === personelId)
+      .sort((a, b) => {
+        if (a.effective_date === b.effective_date) return b.id - a.id;
+        return a.effective_date < b.effective_date ? 1 : -1;
+      })
+      .map(serializeDemoYillikIzinHakDuzeltme);
+    return ok({ items, contract_version: "S2B_YILLIK_IZIN_HAK_DUZELTME_V1" });
+  }
+
+  if (yillikIzinHakListMatch && method === "POST") {
+    const actor = readDemoApiActor(init);
+    const personelId = Number.parseInt(yillikIzinHakListMatch[1], 10);
+    const personel = demoState.personeller.find((item) => item.id === personelId);
+    if (!personel) {
+      return demoRevizyonError("PERSONEL_NOT_FOUND", "Personel bulunamadi.");
+    }
+    const scopeError = demoPersonelSubeScopeError(actor, personel);
+    if (scopeError) return scopeError;
+    const permissionError = enforceDemoPermission(
+      actor,
+      "yillik_izin_hak_duzeltme.manage",
+      "Yillik izin hak duzeltme yetkiniz yok."
+    );
+    if (permissionError) return permissionError;
+
+    const kategori = (toStringValue(body.kategori) ?? "").toUpperCase();
+    if (!["DEVIR", "EK_HAK", "DUZELTME"].includes(kategori)) {
+      return demoRevizyonError("VALIDATION_ERROR", "Gecersiz kategori.");
+    }
+    const gunDelta = toNumber(body.gun_delta ?? body.gunDelta);
+    if (gunDelta === null || !Number.isInteger(gunDelta) || gunDelta === 0) {
+      return demoRevizyonError("VALIDATION_ERROR", "Gun degisimi sifirdan farkli tam sayi olmalidir.");
+    }
+    const aciklama = (toStringValue(body.aciklama) ?? "").trim();
+    if (aciklama.length < 3) {
+      return demoRevizyonError("VALIDATION_ERROR", "Aciklama en az 3 karakter olmalidir.");
+    }
+    const effectiveDate = toStringValue(body.effective_date ?? body.effectiveDate) ?? "";
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(effectiveDate)) {
+      return demoRevizyonError("VALIDATION_ERROR", "Gecerli bir tarih giriniz.");
+    }
+
+    const next: DemoYillikIzinHakDuzeltme = {
+      id: ++demoState.nextIds.yillikIzinHakDuzeltme,
+      personel_id: personelId,
+      gun_delta: gunDelta,
+      kategori: kategori as DemoYillikIzinHakDuzeltme["kategori"],
+      aciklama,
+      effective_date: effectiveDate,
+      reverses_id: null,
+      created_by: actor.userId,
+      created_at: new Date().toISOString()
+    };
+    demoState.yillikIzinHakDuzeltmeleri.push(next);
+    return ok(serializeDemoYillikIzinHakDuzeltme(next));
+  }
+
+  const yillikIzinHakReverseMatch = pathname.match(
+    /^\/personeller\/(\d+)\/yillik-izin-hak-duzeltmeleri\/(\d+)\/ters-kayit$/
+  );
+  if (yillikIzinHakReverseMatch && method === "POST") {
+    const actor = readDemoApiActor(init);
+    const personelId = Number.parseInt(yillikIzinHakReverseMatch[1], 10);
+    const duzeltmeId = Number.parseInt(yillikIzinHakReverseMatch[2], 10);
+    const personel = demoState.personeller.find((item) => item.id === personelId);
+    if (!personel) {
+      return demoRevizyonError("PERSONEL_NOT_FOUND", "Personel bulunamadi.");
+    }
+    const scopeError = demoPersonelSubeScopeError(actor, personel);
+    if (scopeError) return scopeError;
+    const permissionError = enforceDemoPermission(
+      actor,
+      "yillik_izin_hak_duzeltme.manage",
+      "Yillik izin hak duzeltme yetkiniz yok."
+    );
+    if (permissionError) return permissionError;
+
+    const original = demoState.yillikIzinHakDuzeltmeleri.find(
+      (item) => item.id === duzeltmeId && item.personel_id === personelId
+    );
+    if (!original) {
+      return demoRevizyonError("NOT_FOUND", "Duzeltme kaydi bulunamadi.");
+    }
+    if (original.kategori === "TERS_KAYIT") {
+      return demoRevizyonError("INVALID_REVERSAL_TARGET", "Ters kayit tekrar terslenemez.");
+    }
+    if (demoState.yillikIzinHakDuzeltmeleri.some((item) => item.reverses_id === duzeltmeId)) {
+      return demoRevizyonError("ALREADY_REVERSED", "Bu kayit zaten terslenmis.");
+    }
+    const aciklama = (toStringValue(body.aciklama) ?? "").trim();
+    if (aciklama.length < 3) {
+      return demoRevizyonError("VALIDATION_ERROR", "Aciklama en az 3 karakter olmalidir.");
+    }
+    const next: DemoYillikIzinHakDuzeltme = {
+      id: ++demoState.nextIds.yillikIzinHakDuzeltme,
+      personel_id: personelId,
+      gun_delta: -original.gun_delta,
+      kategori: "TERS_KAYIT",
+      aciklama,
+      effective_date: original.effective_date,
+      reverses_id: original.id,
+      created_by: actor.userId,
+      created_at: new Date().toISOString()
+    };
+    demoState.yillikIzinHakDuzeltmeleri.push(next);
+    return ok(serializeDemoYillikIzinHakDuzeltme(next));
   }
 
   const personelBordroKapsamDryRunMatch = pathname.match(

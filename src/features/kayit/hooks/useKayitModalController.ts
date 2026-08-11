@@ -12,6 +12,12 @@ export function useKayitModalController(pathname: string, locationState: unknown
   const [isKayitModalOpen, setIsKayitModalOpen] = useState(false);
   const [kayitTab, setKayitTab] = useState<KayitTab>("yeni-kayit");
   const [kayitInitialSurecPersonelId, setKayitInitialSurecPersonelId] = useState<string | null>(null);
+  const [kayitInitialPersonelTab, setKayitInitialPersonelTab] = useState<"izin-devamsizlik" | null>(
+    null
+  );
+  const [kayitInitialOperation, setKayitInitialOperation] = useState<
+    "yillik-izin-hak-duzeltme" | null
+  >(null);
 
   const kayitRouteConfig = useMemo(() => resolveKayitModalRouteConfig(locationState), [locationState]);
 
@@ -22,12 +28,16 @@ export function useKayitModalController(pathname: string, locationState: unknown
 
     setKayitTab(kayitRouteConfig.tab);
     setKayitInitialSurecPersonelId(kayitRouteConfig.personelId);
+    setKayitInitialPersonelTab(kayitRouteConfig.personelTab);
+    setKayitInitialOperation(kayitRouteConfig.operation);
     setIsKayitModalOpen(true);
     navigate(pathname, { replace: true, state: null });
   }, [kayitRouteConfig, navigate, pathname]);
 
   const resetKayitEntryContext = useCallback(() => {
     setKayitInitialSurecPersonelId(null);
+    setKayitInitialPersonelTab(null);
+    setKayitInitialOperation(null);
   }, []);
 
   const closeKayitModal = useCallback(() => {
@@ -53,6 +63,8 @@ export function useKayitModalController(pathname: string, locationState: unknown
     kayitTab,
     setKayitTab,
     kayitInitialSurecPersonelId,
+    kayitInitialPersonelTab,
+    kayitInitialOperation,
     kayitPrimaryLabel,
     kayitPrimaryFormId,
     openKayitModal,

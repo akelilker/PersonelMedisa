@@ -19,7 +19,21 @@ export function usePersonelKartGatewayReturn({
     });
   }, [navigate, parsedPersonelId]);
 
+  const handleOpenYillikIzinHakDuzeltme = useCallback(() => {
+    navigate("/", {
+      state: {
+        kayitModal: {
+          tab: "surec",
+          personelId: parsedPersonelId,
+          personelTab: "izin-devamsizlik",
+          operation: "yillik-izin-hak-duzeltme"
+        }
+      }
+    });
+  }, [navigate, parsedPersonelId]);
+
   return {
-    handleOpenSurecModal
+    handleOpenSurecModal,
+    handleOpenYillikIzinHakDuzeltme
   };
 }

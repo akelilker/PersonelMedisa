@@ -38,6 +38,7 @@ use Medisa\Api\Controllers\ReferansController;
 use Medisa\Api\Controllers\ResmiTatilTakvimiController;
 use Medisa\Api\Controllers\RevizyonController;
 use Medisa\Api\Controllers\SureclerController;
+use Medisa\Api\Controllers\YillikIzinHakDuzeltmeController;
 use Medisa\Api\Controllers\YonetimController;
 use Medisa\Api\Controllers\ZimmetlerController;
 use Medisa\Api\Http\JsonResponse;
@@ -238,6 +239,18 @@ class Router
         }
         if ($method === 'GET' && preg_match('#^/personeller/(\d+)$#', $path, $matches)) {
             PersonellerController::detail($this->request, $matches[1]);
+        }
+        if ($method === 'GET' && preg_match('#^/personeller/(\d+)/yillik-izin-bakiye$#', $path, $matches)) {
+            YillikIzinHakDuzeltmeController::bakiye($this->request, $matches[1]);
+        }
+        if ($method === 'GET' && preg_match('#^/personeller/(\d+)/yillik-izin-hak-duzeltmeleri$#', $path, $matches)) {
+            YillikIzinHakDuzeltmeController::list($this->request, $matches[1]);
+        }
+        if ($method === 'POST' && preg_match('#^/personeller/(\d+)/yillik-izin-hak-duzeltmeleri$#', $path, $matches)) {
+            YillikIzinHakDuzeltmeController::create($this->request, $matches[1]);
+        }
+        if ($method === 'POST' && preg_match('#^/personeller/(\d+)/yillik-izin-hak-duzeltmeleri/(\d+)/ters-kayit$#', $path, $matches)) {
+            YillikIzinHakDuzeltmeController::tersKayit($this->request, $matches[1], $matches[2]);
         }
         if ($method === 'GET' && preg_match('#^/personeller/(\d+)/ucretler$#', $path, $matches)) {
             PersonelUcretController::list($this->request, $matches[1]);

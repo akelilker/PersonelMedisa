@@ -53,6 +53,6 @@ describe("016_donem_kapanis_auditleri migration source", () => {
       .filter((name) => /^\d{3}_.*\.sql$/.test(name))
       .sort();
     expect(migrations).toContain("016_donem_kapanis_auditleri.sql");
-    expect(migrations.at(-1)).toBe("054_canonical_role_consolidation.sql");
+    expect(migrations.at(-1)).toBe("055_yillik_izin_hak_duzeltmeleri.sql");
   });
 });

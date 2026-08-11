@@ -34,6 +34,13 @@ export const endpoints = {
     cancel: (personelId: number | string, kapsamId: number | string) =>
       `/personeller/${personelId}/bordro-kapsamlari/${kapsamId}/iptal`
   },
+  yillikIzinHak: {
+    balance: (personelId: number | string) => `/personeller/${personelId}/yillik-izin-bakiye`,
+    list: (personelId: number | string) => `/personeller/${personelId}/yillik-izin-hak-duzeltmeleri`,
+    create: (personelId: number | string) => `/personeller/${personelId}/yillik-izin-hak-duzeltmeleri`,
+    reverse: (personelId: number | string, duzeltmeId: number | string) =>
+      `/personeller/${personelId}/yillik-izin-hak-duzeltmeleri/${duzeltmeId}/ters-kayit`
+  },
   mevzuatParametreleri: {
     list: "/mevzuat-parametreleri",
     create: "/mevzuat-parametreleri",

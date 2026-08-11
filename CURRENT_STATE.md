@@ -68,6 +68,14 @@ Bu kapılardan birinin açık olması yeni ürün özelliği gerektiği anlamın
 - `.tmp-ops/**`: yerel ve tarihsel operasyon çıktısıdır; silinmez, fakat güncel backlog veya ürün durumu sayılmaz.
 - Eski S-numaralı checkpoint belgeleri yalnız ait oldukları commit/dönem için kanıttır.
 
+## Okuma — hesaplama cevap haritası
+
+Kodun *neyi nasıl hesapladığını* tek bakışta görmek için:
+
+- `docs/guncel/102-hesaplama-cevap-haritasi.md`
+
+Bu dosya ürün freeze’i açmaz; backlog değildir. Toplantı / denetim / yeni gelen okuma haritasıdır. Canlı parametre ve yayın kapıları yine bu `CURRENT_STATE.md` dosyasına bağlıdır.
+
 ## Sonraki ürün aşaması
 
 Görsel sistem çalışmaları başlayabilir. Öncelik; ortak tasarım tokenları, layout, tipografi, component tutarlılığı, responsive davranış ve erişilebilirliktir. Canlı yayın yine bu dosyadaki yayın kabul kapılarından geçer.

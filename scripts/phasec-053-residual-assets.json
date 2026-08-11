@@ -1,0 +1,91 @@
+{
+  "sha": "5969a777ffd9d59f315139c57b86ee76402084943ce97f26a97f11521947d1af",
+  "creates": {
+    "arsiv_manifestleri": "CREATE TABLE IF NOT EXISTS arsiv_manifestleri (\n  id INT UNSIGNED NOT NULL AUTO_INCREMENT,\n  entity_type VARCHAR(64) NOT NULL,\n  record_id INT UNSIGNED NOT NULL,\n  personel_id INT UNSIGNED NULL,\n  record_category VARCHAR(64) NOT NULL,\n  source_version_identity VARCHAR(191) NOT NULL,\n  trigger_type ENUM('PERIOD_CLOSURE', 'TERMINATION_DATE') NOT NULL,\n  trigger_date DATE NOT NULL,\n  retention_until DATE NOT NULL,\n  source_sha256 CHAR(64) NULL,\n  integrity_status ENUM('OK', 'CHANGED', 'UNKNOWN') NOT NULL DEFAULT 'UNKNOWN',\n  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,\n  created_by INT UNSIGNED NULL,\n  PRIMARY KEY (id),\n  UNIQUE KEY uq_arsiv_manifest_entity_cat_src (entity_type, record_id, record_category, source_version_identity),\n  KEY idx_arsiv_manifest_personel (personel_id),\n  KEY idx_arsiv_manifest_retention (retention_until),\n  KEY idx_arsiv_manifest_category (record_category),\n  KEY idx_arsiv_manifest_entity_cat (entity_type, record_id, record_category)\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;",
+    "legal_holdlar": "CREATE TABLE IF NOT EXISTS legal_holdlar (\n  id INT UNSIGNED NOT NULL AUTO_INCREMENT,\n  target_domain VARCHAR(64) NOT NULL,\n  target_category VARCHAR(64) NULL,\n  target_record_id INT UNSIGNED NULL,\n  personel_id INT UNSIGNED NULL,\n  reason TEXT NOT NULL,\n  hold_state ENUM('ACTIVE', 'RELEASED') NOT NULL DEFAULT 'ACTIVE',\n  created_by INT UNSIGNED NOT NULL,\n  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,\n  released_by INT UNSIGNED NULL,\n  released_at TIMESTAMP NULL DEFAULT NULL,\n  release_reason TEXT NULL,\n  PRIMARY KEY (id),\n  KEY idx_legal_hold_state (hold_state),\n  KEY idx_legal_hold_personel (personel_id),\n  KEY idx_legal_hold_target (target_domain, target_category, target_record_id)\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;",
+    "legal_hold_auditleri": "CREATE TABLE IF NOT EXISTS legal_hold_auditleri (\n  id INT UNSIGNED NOT NULL AUTO_INCREMENT,\n  legal_hold_id INT UNSIGNED NOT NULL,\n  action VARCHAR(64) NOT NULL,\n  actor_user_id INT UNSIGNED NOT NULL,\n  reason TEXT NULL,\n  metadata_json JSON NULL,\n  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,\n  PRIMARY KEY (id),\n  KEY idx_legal_hold_audit_hold (legal_hold_id),\n  KEY idx_legal_hold_audit_actor (actor_user_id),\n  CONSTRAINT fk_legal_hold_audit_hold FOREIGN KEY (legal_hold_id) REFERENCES legal_holdlar (id) ON DELETE RESTRICT\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;",
+    "arsiv_erisim_auditleri": "CREATE TABLE IF NOT EXISTS arsiv_erisim_auditleri (\n  id INT UNSIGNED NOT NULL AUTO_INCREMENT,\n  actor_user_id INT UNSIGNED NOT NULL,\n  target_type VARCHAR(64) NOT NULL,\n  target_id INT UNSIGNED NOT NULL,\n  personel_id INT UNSIGNED NULL,\n  action ENUM('VIEW', 'DOWNLOAD', 'LIST') NOT NULL,\n  route_source VARCHAR(191) NOT NULL,\n  metadata_json JSON NULL,\n  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,\n  PRIMARY KEY (id),\n  KEY idx_arsiv_erisim_actor (actor_user_id),\n  KEY idx_arsiv_erisim_personel (personel_id),\n  KEY idx_arsiv_erisim_created (created_at)\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;",
+    "retention_imha_talepleri": "CREATE TABLE IF NOT EXISTS retention_imha_talepleri (\n  id INT UNSIGNED NOT NULL AUTO_INCREMENT,\n  category VARCHAR(64) NOT NULL,\n  entity_type VARCHAR(64) NOT NULL,\n  record_id INT UNSIGNED NOT NULL,\n  personel_id INT UNSIGNED NULL,\n  reason TEXT NOT NULL,\n  status ENUM('REQUESTED', 'APPROVED', 'REJECTED', 'BLOCKED') NOT NULL DEFAULT 'REQUESTED',\n  requested_by INT UNSIGNED NOT NULL,\n  requested_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,\n  approved_by INT UNSIGNED NULL,\n  approved_at TIMESTAMP NULL DEFAULT NULL,\n  approval_reason TEXT NULL,\n  retention_until_snapshot DATE NULL,\n  source_identity_snapshot VARCHAR(191) NULL,\n  trigger_type_snapshot VARCHAR(32) NULL,\n  trigger_date_snapshot DATE NULL,\n  source_version_identity_snapshot VARCHAR(191) NULL,\n  source_sha256_snapshot CHAR(64) NULL,\n  canonical_sube_id INT UNSIGNED NULL,\n  period_yil SMALLINT UNSIGNED NULL,\n  period_ay TINYINT UNSIGNED NULL,\n  PRIMARY KEY (id),\n  KEY idx_retention_imha_status (status),\n  KEY idx_retention_imha_record (entity_type, record_id, category),\n  KEY idx_retention_imha_personel (personel_id),\n  KEY idx_retention_imha_trigger_date (trigger_date_snapshot),\n  KEY idx_retention_imha_canonical_sube (canonical_sube_id),\n  KEY idx_retention_imha_period (period_yil, period_ay),\n  KEY idx_retention_imha_source_sha (source_sha256_snapshot)\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;",
+    "retention_imha_auditleri": "CREATE TABLE IF NOT EXISTS retention_imha_auditleri (\n  id INT UNSIGNED NOT NULL AUTO_INCREMENT,\n  imha_talep_id INT UNSIGNED NULL,\n  category VARCHAR(64) NOT NULL,\n  entity_type VARCHAR(64) NOT NULL,\n  record_id INT UNSIGNED NOT NULL,\n  personel_id INT UNSIGNED NULL,\n  action VARCHAR(64) NOT NULL,\n  actor_user_id INT UNSIGNED NOT NULL,\n  reason TEXT NULL,\n  result_code VARCHAR(64) NULL,\n  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,\n  PRIMARY KEY (id),\n  KEY idx_retention_imha_audit_talep (imha_talep_id),\n  KEY idx_retention_imha_audit_record (entity_type, record_id),\n  KEY idx_retention_imha_audit_created (created_at)\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;"
+  },
+  "fks": [
+    {
+      "table": "arsiv_manifestleri",
+      "name": "fk_arsiv_manifest_personel",
+      "needs": "personeller",
+      "sql": "ALTER TABLE arsiv_manifestleri ADD CONSTRAINT fk_arsiv_manifest_personel FOREIGN KEY (personel_id) REFERENCES personeller (id) ON DELETE SET NULL"
+    },
+    {
+      "table": "arsiv_manifestleri",
+      "name": "fk_arsiv_manifest_created_by",
+      "needs": "users",
+      "sql": "ALTER TABLE arsiv_manifestleri ADD CONSTRAINT fk_arsiv_manifest_created_by FOREIGN KEY (created_by) REFERENCES users (id) ON DELETE SET NULL"
+    },
+    {
+      "table": "legal_holdlar",
+      "name": "fk_legal_hold_personel",
+      "needs": "personeller",
+      "sql": "ALTER TABLE legal_holdlar ADD CONSTRAINT fk_legal_hold_personel FOREIGN KEY (personel_id) REFERENCES personeller (id) ON DELETE SET NULL"
+    },
+    {
+      "table": "legal_holdlar",
+      "name": "fk_legal_hold_created_by",
+      "needs": "users",
+      "sql": "ALTER TABLE legal_holdlar ADD CONSTRAINT fk_legal_hold_created_by FOREIGN KEY (created_by) REFERENCES users (id) ON DELETE RESTRICT"
+    },
+    {
+      "table": "arsiv_erisim_auditleri",
+      "name": "fk_arsiv_erisim_actor",
+      "needs": "users",
+      "sql": "ALTER TABLE arsiv_erisim_auditleri ADD CONSTRAINT fk_arsiv_erisim_actor FOREIGN KEY (actor_user_id) REFERENCES users (id) ON DELETE RESTRICT"
+    },
+    {
+      "table": "retention_imha_talepleri",
+      "name": "fk_retention_imha_personel",
+      "needs": "personeller",
+      "sql": "ALTER TABLE retention_imha_talepleri ADD CONSTRAINT fk_retention_imha_personel FOREIGN KEY (personel_id) REFERENCES personeller (id) ON DELETE SET NULL"
+    },
+    {
+      "table": "retention_imha_talepleri",
+      "name": "fk_retention_imha_requested_by",
+      "needs": "users",
+      "sql": "ALTER TABLE retention_imha_talepleri ADD CONSTRAINT fk_retention_imha_requested_by FOREIGN KEY (requested_by) REFERENCES users (id) ON DELETE RESTRICT"
+    },
+    {
+      "table": "retention_imha_talepleri",
+      "name": "fk_retention_imha_approved_by",
+      "needs": "users",
+      "sql": "ALTER TABLE retention_imha_talepleri ADD CONSTRAINT fk_retention_imha_approved_by FOREIGN KEY (approved_by) REFERENCES users (id) ON DELETE RESTRICT"
+    }
+  ],
+  "snapCols": [
+    "retention_until_snapshot",
+    "source_identity_snapshot",
+    "trigger_type_snapshot",
+    "trigger_date_snapshot",
+    "source_version_identity_snapshot",
+    "source_sha256_snapshot",
+    "canonical_sube_id",
+    "period_yil",
+    "period_ay"
+  ],
+  "requiredRoles": [
+    "GENEL_YONETICI",
+    "MUHASEBE",
+    "BIRIM_AMIRI",
+    "BOLUM_YONETICISI",
+    "PATRON",
+    "AUTH_SMOKE_READONLY",
+    "IK_BORDRO",
+    "SGK_KARAR_ONAY_YETKILISI",
+    "IDARI_ISLER",
+    "SISTEM_YONETICISI"
+  ],
+  "missingTables": [
+    "legal_holdlar",
+    "legal_hold_auditleri",
+    "arsiv_erisim_auditleri",
+    "retention_imha_talepleri",
+    "retention_imha_auditleri"
+  ]
+}

@@ -100,9 +100,14 @@ describe("retention archive gate source contract", () => {
     ]) {
       expect(php).toContain(key);
     }
-    expect(php).toContain("'IDARI_ISLER'");
     expect(php).toContain("'SISTEM_YONETICISI'");
+    expect(php).toContain("'GENEL_YONETICI'");
+    expect(php).not.toContain("'IDARI_ISLER' =>");
     expect(hasRolePermission("GENEL_YONETICI", "arsiv.view")).toBe(true);
+    expect(hasRolePermission("GENEL_YONETICI", "retention.destruction.approve")).toBe(true);
+    expect(hasRolePermission("SISTEM_YONETICISI", "arsiv.audit.view")).toBe(true);
+    expect(hasRolePermission("SISTEM_YONETICISI", "retention.destruction.view")).toBe(true);
+    expect(hasRolePermission("SISTEM_YONETICISI", "legal_hold.manage")).toBe(false);
     expect(hasRolePermission("MUHASEBE", "arsiv.view")).toBe(false);
   });
 

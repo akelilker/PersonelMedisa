@@ -1,14 +1,12 @@
 export type UserRole =
-  | "GENEL_YONETICI"
-  | "BOLUM_YONETICISI"
+  | "PERSONEL"
   | "MUHASEBE"
+  | "IK_SORUMLUSU"
   | "BIRIM_AMIRI"
-  | "PATRON"
-  | "AUTH_SMOKE_READONLY"
-  | "IK_BORDRO"
-  | "SGK_KARAR_ONAY_YETKILISI"
-  | "IDARI_ISLER"
-  | "SISTEM_YONETICISI";
+  | "BOLUM_YONETICISI"
+  | "GENEL_YONETICI"
+  | "SISTEM_YONETICISI"
+  | "AUTH_SMOKE_READONLY";
 
 export type UiProfile = "yonetim" | "birim_amiri";
 
@@ -51,25 +49,21 @@ export const MANAGEMENT_ROLES: UserRole[] = [
   "MUHASEBE"
 ];
 
-/** Insan kullanici olusturma / rol picker icin atanabilir roller (teknik rol haric). */
+/** Insan kullanici olusturma / rol picker — exact 7 canonical human roles. */
 export const ASSIGNABLE_USER_ROLES: UserRole[] = [
-  "GENEL_YONETICI",
-  "BOLUM_YONETICISI",
+  "PERSONEL",
   "MUHASEBE",
+  "IK_SORUMLUSU",
   "BIRIM_AMIRI",
-  "PATRON",
-  "IK_BORDRO",
-  "SGK_KARAR_ONAY_YETKILISI"
-  // IDARI_ISLER / SISTEM_YONETICISI: additive schema roles — no seed; not in assignable UI.
+  "BOLUM_YONETICISI",
+  "GENEL_YONETICI",
+  "SISTEM_YONETICISI"
 ];
 
+/** Technical-only; not in role picker. */
+export const TECHNICAL_ROLES: UserRole[] = ["AUTH_SMOKE_READONLY"];
+
 export const ALL_ROLES: UserRole[] = [
-  ...MANAGEMENT_ROLES,
-  "BIRIM_AMIRI",
-  "PATRON",
-  "AUTH_SMOKE_READONLY",
-  "IK_BORDRO",
-  "SGK_KARAR_ONAY_YETKILISI",
-  "IDARI_ISLER",
-  "SISTEM_YONETICISI"
+  ...ASSIGNABLE_USER_ROLES,
+  ...TECHNICAL_ROLES
 ];

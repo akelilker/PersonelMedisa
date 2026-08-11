@@ -328,7 +328,7 @@ function seedSzFixtures(PDO $pdo): void
         INSERT INTO users (id, username, password_hash, ad_soyad, rol, durum) VALUES
           (1, 'gy', 'x', 'Genel Yonetici', 'GENEL_YONETICI', 'AKTIF'),
           (2, 'ba', 'x', 'Birim Amiri', 'BIRIM_AMIRI', 'AKTIF'),
-          (3, 'patron', 'x', 'Patron', 'PATRON', 'AKTIF'),
+          (3, 'personel', 'x', 'Personel', 'PERSONEL', 'AKTIF'),
           (4, 'muh', 'x', 'Muhasebe', 'MUHASEBE', 'AKTIF'),
           (5, 'bolum', 'x', 'Bolum Yoneticisi', 'BOLUM_YONETICISI', 'AKTIF')
     ");
@@ -727,7 +727,7 @@ assertSzSchemaPostconditions($pdo);
 
 $gy = ['id' => 1, 'rol' => 'GENEL_YONETICI', 'sube_ids' => []];
 $ba = ['id' => 2, 'rol' => 'BIRIM_AMIRI', 'sube_ids' => [1]];
-$patron = ['id' => 3, 'rol' => 'PATRON', 'sube_ids' => []];
+$personel = ['id' => 3, 'rol' => 'PERSONEL', 'sube_ids' => []];
 $muhasebe = ['id' => 4, 'rol' => 'MUHASEBE', 'sube_ids' => [1]];
 $subeHeader = ['x-active-sube-id' => '1'];
 
@@ -753,10 +753,10 @@ $unauth = invokeSzHttp($pdo, null, 'GET', '/serbest-zaman/events', [], $subeHead
 ]);
 szAssert($unauth['status'] === 401, 'unauthenticated → 401');
 
-$patronGet = invokeSzHttp($pdo, $patron, 'GET', '/serbest-zaman/events', [], $subeHeader, [
+$personelGet = invokeSzHttp($pdo, $personel, 'GET', '/serbest-zaman/events', [], $subeHeader, [
     'personel_id' => '10',
 ]);
-szAssert($patronGet['status'] === 403, 'PATRON GET events → 403');
+szAssert($personelGet['status'] === 403, 'PERSONEL GET events → 403');
 
 $gyEmpty = invokeSzHttp($pdo, $gy, 'GET', '/serbest-zaman/events', [], $subeHeader, [
     'personel_id' => '10',
@@ -968,10 +968,10 @@ $baWrite = invokeSzHttp($pdo, $ba, 'POST', '/serbest-zaman/kullanim', [
 ], $subeHeader);
 szAssert($baWrite['status'] === 403, 'BIRIM_AMIRI POST kullanim → 403');
 
-$patronWrite = invokeSzHttp($pdo, $patron, 'POST', '/serbest-zaman/olusum', [
+$personelWrite = invokeSzHttp($pdo, $personel, 'POST', '/serbest-zaman/olusum', [
     'odeme_tercihi_id' => 1,
 ], $subeHeader);
-szAssert($patronWrite['status'] === 403, 'PATRON POST olusum → 403');
+szAssert($personelWrite['status'] === 403, 'PERSONEL POST olusum → 403');
 
 $unauthWrite = invokeSzHttp($pdo, null, 'POST', '/serbest-zaman/olusum', [
     'odeme_tercihi_id' => 1,

@@ -161,13 +161,13 @@ test.describe("S80 Revizyon Merkezi final UI kabul", () => {
     expect(nativeDialogs).toEqual([]);
   });
 
-  test("MUHASEBE: finans görünür, onay/correction yok", async ({ page }) => {
+  test("IK_SORUMLUSU: finans görünür, onay/correction yok", async ({ page }) => {
     const nativeDialogs = trackNativeDialogs(page);
-    await loginAsMockRole(page, "MUHASEBE");
+    await loginAsMockRole(page, "IK_SORUMLUSU");
     await openCreateFromKaynakRow(page, "1");
     await expect(page.getByTestId("revizyon-bordro-etki-alani")).toBeVisible();
     await fillCreateAndSave(page, {
-      gerekce: "S80 Muhasebe talep",
+      gerekce: "S80 IK talep",
       yeniDeger: "08:00-16:00",
       submit: false
     });
@@ -521,19 +521,20 @@ test.describe("S80 Revizyon Merkezi final UI kabul", () => {
     }
   });
 
-  test("PATRON: gateway yok + doğrudan route yetkisiz", async ({ page }) => {
-    await loginAsMockRole(page, "PATRON");
+  test("PERSONEL: gateway yok + doğrudan route yetkisiz", async ({ page }) => {
+    await loginAsMockRole(page, "PERSONEL");
     await page.goto("/");
-    await expect(page.getByTestId("menu-kayit-surec")).toBeDisabled();
-    await expect(page.getByTestId("menu-personel-karti")).toBeDisabled();
+    await expect(page.getByTestId("personel-placeholder-page")).toBeVisible();
+    await expect(page.getByTestId("menu-kayit-surec")).toHaveCount(0);
+    await expect(page.getByTestId("menu-personel-karti")).toHaveCount(0);
     await page.goto("/haftalik-kapanis/revizyonlar");
     await expect(page.getByTestId("yetkisiz-page")).toBeVisible();
     await expect(page.getByTestId("revizyon-merkezi-page")).toHaveCount(0);
     await expect(page.getByTestId("kayit-surec-revizyon-merkezi-link")).toHaveCount(0);
   });
 
-  test("PATRON: legacy /revizyon-merkezi permission bypass üretmez", async ({ page }) => {
-    await loginAsMockRole(page, "PATRON");
+  test("PERSONEL: legacy /revizyon-merkezi permission bypass üretmez", async ({ page }) => {
+    await loginAsMockRole(page, "PERSONEL");
     await page.goto("/revizyon-merkezi");
     await expect(page.getByTestId("yetkisiz-page")).toBeVisible();
     await expect(page.getByTestId("revizyon-merkezi-page")).toHaveCount(0);
@@ -586,6 +587,7 @@ test.describe("S80 Revizyon Merkezi final UI kabul", () => {
     "BIRIM_AMIRI",
     "BOLUM_YONETICISI",
     "MUHASEBE",
+    "IK_SORUMLUSU",
     "GENEL_YONETICI"
   ] as MockUserRole[]) {
     test(`${role} Revizyon Merkezi erişir`, async ({ page }) => {

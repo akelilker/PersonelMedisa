@@ -198,8 +198,8 @@ test.describe("Kayit Surec belge kayitlari", () => {
   });
 
   test("yetkisiz rol Belgeler paneline ulasamazsa belge-kayitlari fetch olmaz", async ({ page }) => {
-    await mockApi(page, "PATRON");
-    await login(page, MOCK_ROLE_LOGIN.PATRON);
+    await mockApi(page, "PERSONEL");
+    await login(page, MOCK_ROLE_LOGIN.PERSONEL);
 
     let belgeKayitlariFetchCount = 0;
     page.on("request", (request) => {

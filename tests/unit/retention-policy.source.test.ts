@@ -8,12 +8,13 @@ import { ALL_ROLES, ASSIGNABLE_USER_ROLES } from "../../src/types/auth";
 const root = process.cwd();
 
 describe("retention policy source contract (053)", () => {
-  it("keeps migration tip at 053 and leaves 052 file unchanged", () => {
+  it("keeps migration tip at 054 and leaves 052/053 present", () => {
     const migrations = readdirSync(resolve(root, "api/migrations"))
       .filter((name) => /^\d{3}_.+\.sql$/.test(name))
       .sort();
-    expect(migrations.at(-1)).toBe("053_retention_legal_hold_arsiv.sql");
+    expect(migrations.at(-1)).toBe("054_canonical_role_consolidation.sql");
     expect(migrations).toContain("052_puantaj_tolerans_ve_disiplin.sql");
+    expect(migrations).toContain("053_retention_legal_hold_arsiv.sql");
 
     const sql052 = readFileSync(
       resolve(root, "api/migrations/052_puantaj_tolerans_ve_disiplin.sql"),
@@ -185,16 +186,16 @@ describe("retention policy source contract (053)", () => {
   });
 
   it("wires retention roles and permissions parity", () => {
-    expect(ALL_ROLES).toContain("IDARI_ISLER");
     expect(ALL_ROLES).toContain("SISTEM_YONETICISI");
+    expect(ALL_ROLES).not.toContain("IDARI_ISLER");
+    expect(ASSIGNABLE_USER_ROLES).toContain("SISTEM_YONETICISI");
     expect(ASSIGNABLE_USER_ROLES).not.toContain("IDARI_ISLER");
-    expect(ASSIGNABLE_USER_ROLES).not.toContain("SISTEM_YONETICISI");
 
     expect(hasRolePermission("GENEL_YONETICI", "legal_hold.manage")).toBe(true);
     expect(hasRolePermission("GENEL_YONETICI", "retention.destruction.approve")).toBe(true);
-    expect(hasRolePermission("IK_BORDRO", "arsiv.view")).toBe(true);
-    expect(hasRolePermission("IK_BORDRO", "legal_hold.manage")).toBe(false);
-    expect(hasRolePermission("IDARI_ISLER", "arsiv.download")).toBe(true);
+    expect(hasRolePermission("IK_SORUMLUSU", "arsiv.view")).toBe(true);
+    expect(hasRolePermission("IK_SORUMLUSU", "legal_hold.manage")).toBe(false);
+    expect(hasRolePermission("IDARI_ISLER", "arsiv.download")).toBe(false);
     expect(hasRolePermission("IDARI_ISLER", "legal_hold.manage")).toBe(false);
     expect(hasRolePermission("IDARI_ISLER", "retention.destruction.approve")).toBe(false);
     expect(hasRolePermission("SISTEM_YONETICISI", "arsiv.audit.view")).toBe(true);

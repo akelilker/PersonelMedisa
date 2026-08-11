@@ -29,10 +29,11 @@ describe("attendance discipline source contract", () => {
     expect(getRolePermissions("GENEL_YONETICI")).toContain("puantaj.olay_karar.view");
     expect(getRolePermissions("BOLUM_YONETICISI")).toContain("disiplin.final_decision");
     expect(getRolePermissions("BOLUM_YONETICISI")).toContain("puantaj.olay_karar.decide");
-    expect(getRolePermissions("IK_BORDRO")).not.toContain("disiplin.final_decision");
-    expect(getRolePermissions("IK_BORDRO")).not.toContain("puantaj.olay_karar.decide");
+    expect(getRolePermissions("IK_SORUMLUSU")).not.toContain("disiplin.final_decision");
+    expect(getRolePermissions("IK_SORUMLUSU")).not.toContain("puantaj.olay_karar.decide");
+    expect(getRolePermissions("IK_SORUMLUSU")).toContain("disiplin.review");
     expect(getRolePermissions("MUHASEBE")).not.toContain("disiplin.review");
-    expect(getRolePermissions("MUHASEBE")).toContain("disiplin.view");
+    expect(getRolePermissions("MUHASEBE")).not.toContain("disiplin.view");
   });
 
   it("requires decision reason in UI and wires closeNoAction to final_decision only", () => {
@@ -54,12 +55,13 @@ describe("attendance discipline source contract", () => {
     expect(vakaPanel).not.toContain("canReview || canFinalDecision");
   });
 
-  it("keeps migration tip at 053 while 052 attendance file remains unchanged", () => {
+  it("keeps 052 attendance migration immutable while tip advances to 054", () => {
     const migrations = readdirSync(resolve(root, "api/migrations"))
       .filter((name) => name.endsWith(".sql"))
       .sort();
-    expect(migrations.at(-1)).toBe("053_retention_legal_hold_arsiv.sql");
+    expect(migrations.at(-1)).toBe("054_canonical_role_consolidation.sql");
     expect(migrations).toContain("052_puantaj_tolerans_ve_disiplin.sql");
+    expect(migrations).toContain("053_retention_legal_hold_arsiv.sql");
     const sql = readFileSync(resolve(root, "api/migrations/052_puantaj_tolerans_ve_disiplin.sql"), "utf8");
     expect(sql).toContain("puantaj_olay_karar_auditleri");
     expect(sql).toContain("puantaj_olay_kararlari");

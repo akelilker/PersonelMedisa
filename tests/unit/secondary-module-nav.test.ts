@@ -60,8 +60,20 @@ describe("secondary-module-nav", () => {
     expect(modules.some((item) => item.id === "finans")).toBe(false);
   });
 
-  it("returns an empty list for PATRON with no secondary permissions", () => {
-    expect(resolveSecondaryModules(permissionGate("PATRON"))).toEqual([]);
+  it("returns an empty list for PERSONEL with no secondary permissions", () => {
+    expect(resolveSecondaryModules(permissionGate("PERSONEL"))).toEqual([]);
+  });
+
+  it("exposes troubleshooting secondary modules for SISTEM_YONETICISI", () => {
+    const modules = resolveSecondaryModules(permissionGate("SISTEM_YONETICISI"));
+    expect(modules.map((item) => item.id)).toEqual([
+      "puantaj",
+      "gunluk-kayit",
+      "haftalik-kapanis",
+      "revizyon-merkezi",
+      "belge-takip",
+      "finans"
+    ]);
   });
 
   it("filters to a partial permission set", () => {

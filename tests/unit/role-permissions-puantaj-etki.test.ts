@@ -2,10 +2,18 @@ import { describe, expect, it } from "vitest";
 import { hasRolePermission } from "../../src/lib/authorization/role-permissions";
 
 describe("puantaj bildirim etki permissions", () => {
-  it("MUHASEBE view ve dismiss yetkisine sahiptir", () => {
-    expect(hasRolePermission("MUHASEBE", "puantaj.bildirim_etki.view")).toBe(true);
-    expect(hasRolePermission("MUHASEBE", "puantaj.bildirim_etki.dismiss")).toBe(true);
-    expect(hasRolePermission("MUHASEBE", "puantaj.bildirim_etki.resolve_conflict")).toBe(true);
+  it("IK_SORUMLUSU view ve dismiss yetkisine sahiptir", () => {
+    expect(hasRolePermission("IK_SORUMLUSU", "puantaj.bildirim_etki.view")).toBe(true);
+    expect(hasRolePermission("IK_SORUMLUSU", "puantaj.bildirim_etki.dismiss")).toBe(true);
+    expect(hasRolePermission("IK_SORUMLUSU", "puantaj.bildirim_etki.resolve_conflict")).toBe(true);
+    expect(hasRolePermission("IK_SORUMLUSU", "puantaj.bildirim_etki.generate")).toBe(true);
+  });
+
+  it("MUHASEBE operational etki write yetkilerine sahip degildir", () => {
+    expect(hasRolePermission("MUHASEBE", "puantaj.bildirim_etki.view")).toBe(false);
+    expect(hasRolePermission("MUHASEBE", "puantaj.bildirim_etki.dismiss")).toBe(false);
+    expect(hasRolePermission("MUHASEBE", "puantaj.bildirim_etki.resolve_conflict")).toBe(false);
+    expect(hasRolePermission("MUHASEBE", "puantaj.bildirim_etki.generate")).toBe(false);
   });
 
   it("BIRIM_AMIRI panel yetkisine sahip degildir", () => {
@@ -20,9 +28,9 @@ describe("puantaj bildirim etki permissions", () => {
     expect(hasRolePermission("BOLUM_YONETICISI", "puantaj.bildirim_etki.resolve_conflict")).toBe(false);
   });
 
-  it("PATRON panel yetkisine sahip degildir", () => {
-    expect(hasRolePermission("PATRON", "puantaj.bildirim_etki.view")).toBe(false);
-    expect(hasRolePermission("PATRON", "puantaj.bildirim_etki.dismiss")).toBe(false);
+  it("PERSONEL panel yetkisine sahip degildir", () => {
+    expect(hasRolePermission("PERSONEL", "puantaj.bildirim_etki.view")).toBe(false);
+    expect(hasRolePermission("PERSONEL", "puantaj.bildirim_etki.dismiss")).toBe(false);
   });
 
   it("GENEL_YONETICI view gorur ancak dismiss yapamaz", () => {

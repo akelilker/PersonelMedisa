@@ -56,7 +56,7 @@ describe("HaftalikKapanisController MariaDB", () => {
     const migrations = readdirSync(resolve(process.cwd(), "api/migrations"))
       .filter((name) => name.endsWith(".sql"))
       .sort();
-    expect(migrations.at(-1)).toBe("053_retention_legal_hold_arsiv.sql");
+    expect(migrations.at(-1)).toBe("054_canonical_role_consolidation.sql");
   });
 
   it("runs HTTP haftalik kapanis acceptance on MariaDB", () => {
@@ -65,7 +65,7 @@ describe("HaftalikKapanisController MariaDB", () => {
     expect(result.stdout).toContain("verify-haftalik-kapanis-mysql: OK");
     expect(result.stdout).toContain("[PASS] partial existing haftalik_kapanislar → migration fails");
     expect(result.stdout).toContain("[PASS] unauthenticated POST → 401");
-    expect(result.stdout).toContain("[PASS] PATRON (no puantaj.muhurle) POST → 403");
+    expect(result.stdout).toContain("[PASS] PERSONEL (no puantaj.muhurle) POST → 403");
     expect(result.stdout).toContain("[PASS] MUHASEBE (has view, no muhurle) POST → 403");
     expect(result.stdout).toContain("[PASS] GY without active sube header → 422");
     expect(result.stdout).toContain("[PASS] GY POST without mutabakat → 409 STATE_CONFLICT");
@@ -100,8 +100,8 @@ describe("HaftalikKapanisController MariaDB", () => {
     expect(result.stdout).toContain("[PASS] MUHASEBE YFC scope içi → 200");
     expect(result.stdout).toContain("[PASS] BIRIM_AMIRI detail scope içi → 200");
     expect(result.stdout).toContain("[PASS] BIRIM_AMIRI YFC scope içi → 200");
-    expect(result.stdout).toContain("[PASS] PATRON detail → 403");
-    expect(result.stdout).toContain("[PASS] PATRON YFC → 403");
+    expect(result.stdout).toContain("[PASS] PERSONEL detail → 403");
+    expect(result.stdout).toContain("[PASS] PERSONEL YFC → 403");
     expect(result.stdout).toContain("[PASS] BA empty allowedSubeIds global YFC → 403");
     expect(result.stdout).toContain("[PASS] open GONDERILDI blocks genel kapanis → 409");
     expect(result.stdout).toContain(

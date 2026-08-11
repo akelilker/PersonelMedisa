@@ -765,13 +765,14 @@ class YonetimController
 
     /** @var array<int, string> */
     private static $validRoles = [
-        'GENEL_YONETICI',
-        'BOLUM_YONETICISI',
+        'PERSONEL',
         'MUHASEBE',
+        'IK_SORUMLUSU',
         'BIRIM_AMIRI',
+        'BOLUM_YONETICISI',
+        'GENEL_YONETICI',
+        'SISTEM_YONETICISI',
         'AUTH_SMOKE_READONLY',
-        'IK_BORDRO',
-        'SGK_KARAR_ONAY_YETKILISI',
     ];
 
     private static function isAuthSmokeReadonlyRole($rol)

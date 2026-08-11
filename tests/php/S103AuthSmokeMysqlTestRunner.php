@@ -312,8 +312,10 @@ try {
     s103Assert(!RolePermissions::has(['rol' => 'AUTH_SMOKE_READONLY'], 'personeller.view.sube'), 'smoke no personeller.view.sube');
     s103Assert(!RolePermissions::has(['rol' => 'AUTH_SMOKE_READONLY'], 'personeller.detail.view'), 'smoke no detail.view');
     s103Assert(!RolePermissions::has(['rol' => 'AUTH_SMOKE_READONLY'], 'personeller.create'), 'smoke no create');
-    s103Assert(!RolePermissions::has(['rol' => 'PATRON'], 'personeller.view'), 'patron no personeller.view');
-    s103Assert(!RolePermissions::has(['rol' => 'PATRON'], 'personeller.detail.view'), 'patron no detail.view');
+    s103Assert(RolePermissions::has(['rol' => 'PATRON'], 'personeller.view'), 'legacy PATRON aliases to GENEL_YONETICI personeller.view');
+    s103Assert(RolePermissions::normalizeRole('PATRON') === 'GENEL_YONETICI', 'PATRON normalizes to GENEL_YONETICI');
+    s103Assert(RolePermissions::normalizeRole('PERSONEL') === 'PERSONEL', 'PERSONEL canonical');
+    s103Assert(!RolePermissions::has(['rol' => 'PERSONEL'], 'personeller.view'), 'PERSONEL no personeller.view');
 
     $phpMatrix = (new ReflectionClass(RolePermissions::class))->getStaticPropertyValue('matrix');
     s103Assert(isset($phpMatrix['AUTH_SMOKE_READONLY']) && count($phpMatrix['AUTH_SMOKE_READONLY']) === 1, 'smoke permission count = 1');
@@ -345,9 +347,12 @@ try {
     $ba = ['id' => 4, 'username' => 'ba', 'ad_soyad' => 'BA', 'rol' => 'BIRIM_AMIRI', 'sube_ids' => [1]];
     $smoke0 = ['id' => 5, 'username' => 'pm_smoke_ro_bad0', 'ad_soyad' => 'Bad0', 'rol' => 'AUTH_SMOKE_READONLY', 'sube_ids' => []];
     $smoke2 = ['id' => 6, 'username' => 'pm_smoke_ro_bad2', 'ad_soyad' => 'Bad2', 'rol' => 'AUTH_SMOKE_READONLY', 'sube_ids' => [1, 2]];
+    $personel = ['id' => 7, 'username' => 'personel', 'ad_soyad' => 'Personel', 'rol' => 'PERSONEL', 'sube_ids' => []];
 
     $r = s103Http($pdo, $patron, 'personeller_list');
-    s103Assert($r['status'] === 403, 'PATRON list 403');
+    s103Assert($r['status'] === 200, 'legacy PATRON aliases to GENEL_YONETICI list 200');
+    $r = s103Http($pdo, $personel, 'personeller_list');
+    s103Assert($r['status'] === 403, 'PERSONEL list 403');
     $r = s103Http($pdo, $smoke, 'personeller_list');
     s103Assert($r['status'] === 403, 'AUTH_SMOKE_READONLY list 403');
     $r = s103Http($pdo, $gy, 'personeller_list');
@@ -357,8 +362,8 @@ try {
     $items = $r['payload']['data']['items'] ?? [];
     s103Assert(is_array($items) && count($items) === 1 && (int) $items[0]['id'] === 10, 'BIRIM_AMIRI yalnız kendi şubesi');
 
-    $r = s103Http($pdo, $patron, 'personeller_detail', ['id' => 10]);
-    s103Assert($r['status'] === 403, 'PATRON detail 403');
+    $r = s103Http($pdo, $personel, 'personeller_detail', ['id' => 10]);
+    s103Assert($r['status'] === 403, 'PERSONEL detail 403');
     $r = s103Http($pdo, $smoke, 'personeller_detail', ['id' => 10]);
     s103Assert($r['status'] === 403, 'AUTH_SMOKE_READONLY detail 403');
     $r = s103Http($pdo, $gy, 'personeller_detail', ['id' => 10]);

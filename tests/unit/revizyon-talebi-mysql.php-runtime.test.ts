@@ -53,7 +53,7 @@ describe("RevizyonController MariaDB", () => {
     const migrations = readdirSync(resolve(process.cwd(), "api/migrations"))
       .filter((name) => name.endsWith(".sql"))
       .sort();
-    expect(migrations.at(-1)).toBe("053_retention_legal_hold_arsiv.sql");
+    expect(migrations.at(-1)).toBe("054_canonical_role_consolidation.sql");
   });
 
   it("runs HTTP revizyon talebi acceptance on MariaDB", () => {
@@ -67,7 +67,7 @@ describe("RevizyonController MariaDB", () => {
     expect(result.stdout).toContain("[PASS] acik_talep_slot generated column present");
     expect(result.stdout).toContain("[PASS] uq_hkrt_acik_kaynak present");
     expect(result.stdout).toContain("[PASS] unauthenticated GET → 401");
-    expect(result.stdout).toContain("[PASS] PATRON GET talepleri → 403");
+    expect(result.stdout).toContain("[PASS] PERSONEL GET talepleri → 403");
     expect(result.stdout).toContain("[PASS] GY GET list → 200 empty");
     expect(result.stdout).toContain("[PASS] GY GET list has items");
     expect(result.stdout).toContain("[PASS] GET detail missing → 404 NOT_FOUND");

@@ -339,7 +339,7 @@ function seedHkFixtures(PDO $pdo): void
         INSERT INTO users (id, username, password_hash, ad_soyad, rol, durum) VALUES
           (1, 'gy', 'x', 'Genel Yonetici', 'GENEL_YONETICI', 'AKTIF'),
           (2, 'ba', 'x', 'Birim Amiri', 'BIRIM_AMIRI', 'AKTIF'),
-          (3, 'patron', 'x', 'Patron', 'PATRON', 'AKTIF'),
+          (3, 'personel', 'x', 'Personel', 'PERSONEL', 'AKTIF'),
           (4, 'muh', 'x', 'Muhasebe', 'MUHASEBE', 'AKTIF'),
           (5, 'bolum', 'x', 'Bolum Yoneticisi', 'BOLUM_YONETICISI', 'AKTIF')
     ");
@@ -599,7 +599,7 @@ assertHkSchemaPostconditions($pdo);
 
 $gy = ['id' => 1, 'rol' => 'GENEL_YONETICI', 'sube_ids' => []];
 $ba = ['id' => 2, 'rol' => 'BIRIM_AMIRI', 'sube_ids' => [1]];
-$patron = ['id' => 3, 'rol' => 'PATRON', 'sube_ids' => []];
+$personel = ['id' => 3, 'rol' => 'PERSONEL', 'sube_ids' => []];
 $muhasebe = ['id' => 4, 'rol' => 'MUHASEBE', 'sube_ids' => [1]];
 
 $subeHeader = ['x-active-sube-id' => '1'];
@@ -611,8 +611,8 @@ $weekPayload = [
 $unauth = invokeHkHttp($pdo, null, 'POST', '/haftalik-kapanis', $weekPayload, $subeHeader);
 hkAssert($unauth['status'] === 401, 'unauthenticated POST → 401');
 
-$patronPost = invokeHkHttp($pdo, $patron, 'POST', '/haftalik-kapanis', $weekPayload, $subeHeader);
-hkAssert($patronPost['status'] === 403, 'PATRON (no puantaj.muhurle) POST → 403');
+$personelPost = invokeHkHttp($pdo, $personel, 'POST', '/haftalik-kapanis', $weekPayload, $subeHeader);
+hkAssert($personelPost['status'] === 403, 'PERSONEL (no puantaj.muhurle) POST → 403');
 
 $muhPost = invokeHkHttp($pdo, $muhasebe, 'POST', '/haftalik-kapanis', $weekPayload, $subeHeader);
 hkAssert($muhPost['status'] === 403, 'MUHASEBE (has view, no muhurle) POST → 403');
@@ -853,13 +853,13 @@ $baYfc = invokeHkHttp($pdo, $ba, 'GET', '/haftalik-kapanis/yillik-fazla-calisma'
 ]);
 hkAssert($baYfc['status'] === 200, 'BIRIM_AMIRI YFC scope içi → 200');
 
-$patronDetail = invokeHkHttp($pdo, $patron, 'GET', '/haftalik-kapanis/' . $createdId, [], $subeHeader);
-hkAssert($patronDetail['status'] === 403, 'PATRON detail → 403');
-$patronYfc = invokeHkHttp($pdo, $patron, 'GET', '/haftalik-kapanis/yillik-fazla-calisma', [], $subeHeader, [
+$personelDetail = invokeHkHttp($pdo, $personel, 'GET', '/haftalik-kapanis/' . $createdId, [], $subeHeader);
+hkAssert($personelDetail['status'] === 403, 'PERSONEL detail → 403');
+$personelYfc = invokeHkHttp($pdo, $personel, 'GET', '/haftalik-kapanis/yillik-fazla-calisma', [], $subeHeader, [
     'personel_id' => '10',
     'yil' => '2026',
 ]);
-hkAssert($patronYfc['status'] === 403, 'PATRON YFC → 403');
+hkAssert($personelYfc['status'] === 403, 'PERSONEL YFC → 403');
 
 $baEmpty = ['id' => 2, 'rol' => 'BIRIM_AMIRI', 'sube_ids' => []];
 $baEmptyYfc = invokeHkHttp($pdo, $baEmpty, 'GET', '/haftalik-kapanis/yillik-fazla-calisma', [], [], [

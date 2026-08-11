@@ -16,7 +16,9 @@ export const MOCK_ROLE_LOGIN: Record<MockUserRole, MockRoleCredentials> = {
   BOLUM_YONETICISI: { username: "bolum_yoneticisi", password: "demo123" },
   MUHASEBE: { username: "muhasebe", password: "demo123" },
   BIRIM_AMIRI: { username: "birim_amiri", password: "demo123" },
-  PATRON: { username: "patron", password: "demo123" }
+  IK_SORUMLUSU: { username: "ik_sorumlusu", password: "demo123" },
+  PERSONEL: { username: "personel", password: "demo123" },
+  SISTEM_YONETICISI: { username: "sistem_yoneticisi", password: "demo123" }
 };
 
 async function ensureLoginForm(page: Page): Promise<void> {

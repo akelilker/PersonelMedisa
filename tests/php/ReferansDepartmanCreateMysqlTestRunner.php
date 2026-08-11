@@ -295,7 +295,7 @@ try {
     mysqlAssert($httpNum['status'] === 400, 'HTTP numeric → 400');
     mysqlAssert(($httpNum['payload']['errors'][0]['code'] ?? '') === 'VALIDATION_ERROR', 'HTTP numeric code');
 
-    foreach (['BIRIM_AMIRI', 'MUHASEBE', 'IK', 'PATRON'] as $rol) {
+    foreach (['BIRIM_AMIRI', 'MUHASEBE', 'IK', 'PERSONEL'] as $rol) {
         $forbiddenUser = ['id' => 2, 'username' => 'x', 'ad_soyad' => 'x', 'rol' => $rol, 'sube_ids' => []];
         $httpForbidden = invokeCreateDepartmanHttp($pdo, $forbiddenUser, ['ad' => 'Yetkisiz ' . $rol]);
         mysqlAssert($httpForbidden['status'] === 403, 'HTTP ' . $rol . ' → 403');

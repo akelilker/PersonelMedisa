@@ -331,7 +331,7 @@ type DemoYonetimKullanici = {
   ad_soyad: string;
   telefon?: string;
   kullanici_tipi: "IC_PERSONEL" | "HARICI";
-  rol: "GENEL_YONETICI" | "BOLUM_YONETICISI" | "MUHASEBE" | "BIRIM_AMIRI";
+  rol: UserRole;
   personel_id?: number | null;
   sube_ids: number[];
   varsayilan_sube_id: number | null;
@@ -1962,11 +1962,13 @@ function buildMaasHesaplamaPreflight(
 }
 
 const DEMO_USER_ROLES: readonly UserRole[] = [
-  "GENEL_YONETICI",
-  "BOLUM_YONETICISI",
+  "PERSONEL",
   "MUHASEBE",
+  "IK_SORUMLUSU",
   "BIRIM_AMIRI",
-  "PATRON"
+  "BOLUM_YONETICISI",
+  "GENEL_YONETICI",
+  "SISTEM_YONETICISI"
 ];
 
 function isDemoUserRole(value: string): value is UserRole {
@@ -3758,8 +3760,17 @@ function resolveDemoRole(username: string) {
   if (normalized.includes("bolum") || normalized.includes("bölüm")) {
     return "BOLUM_YONETICISI";
   }
+  if (normalized.includes("ik") || normalized.includes("bordro")) {
+    return "IK_SORUMLUSU";
+  }
+  if (normalized.includes("personel")) {
+    return "PERSONEL";
+  }
+  if (normalized.includes("sistem")) {
+    return "SISTEM_YONETICISI";
+  }
   if (normalized.includes("patron")) {
-    return "PATRON";
+    return "GENEL_YONETICI";
   }
 
   return "GENEL_YONETICI";
@@ -7699,10 +7710,13 @@ export function resolveDemoApiResponse(
       telefon: toStringValue(body.telefon) ?? linkedPersonel?.telefon ?? undefined,
       kullanici_tipi: body.kullanici_tipi === "HARICI" ? "HARICI" : "IC_PERSONEL",
       rol:
-        body.rol === "GENEL_YONETICI" ||
-        body.rol === "BOLUM_YONETICISI" ||
+        body.rol === "PERSONEL" ||
         body.rol === "MUHASEBE" ||
-        body.rol === "BIRIM_AMIRI"
+        body.rol === "IK_SORUMLUSU" ||
+        body.rol === "BIRIM_AMIRI" ||
+        body.rol === "BOLUM_YONETICISI" ||
+        body.rol === "GENEL_YONETICI" ||
+        body.rol === "SISTEM_YONETICISI"
           ? body.rol
           : "BIRIM_AMIRI",
       personel_id: personelId,
@@ -7740,10 +7754,13 @@ export function resolveDemoApiResponse(
       telefon: toStringValue(body.telefon) ?? linkedPersonel?.telefon ?? target.telefon,
       kullanici_tipi: body.kullanici_tipi === "HARICI" ? "HARICI" : "IC_PERSONEL",
       rol:
-        body.rol === "GENEL_YONETICI" ||
-        body.rol === "BOLUM_YONETICISI" ||
+        body.rol === "PERSONEL" ||
         body.rol === "MUHASEBE" ||
-        body.rol === "BIRIM_AMIRI"
+        body.rol === "IK_SORUMLUSU" ||
+        body.rol === "BIRIM_AMIRI" ||
+        body.rol === "BOLUM_YONETICISI" ||
+        body.rol === "GENEL_YONETICI" ||
+        body.rol === "SISTEM_YONETICISI"
           ? body.rol
           : target.rol,
       personel_id: personelId,

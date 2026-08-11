@@ -16,6 +16,7 @@ require_once __DIR__ . '/../../api/src/Services/Payroll/SgkSurecEslemeImportVali
 require_once __DIR__ . '/../../api/src/Services/Payroll/SgkSurecEslemeWriteService.php';
 require_once __DIR__ . '/../../api/src/Http/CsvResponse.php';
 
+use Medisa\Api\Auth\RolePermissions;
 use Medisa\Api\Services\Payroll\SgkEslemeKararContract;
 use Medisa\Api\Services\Payroll\SgkKararPaketiAuthz;
 use Medisa\Api\Services\Payroll\SgkKatalogOnayService;
@@ -189,17 +190,37 @@ try {
     ];
     $apprOk = [
         'id' => 2,
-        'rol' => 'SGK_KARAR_ONAY_YETKILISI',
+        'rol' => 'GENEL_YONETICI',
         'username' => 'onaylayan.s98',
         'durum' => 'AKTIF',
         'actor_identity_id' => 2,
         'actor_identity_status' => 'VERIFIED',
         'sube_ids' => [1],
     ];
+    // IK_BORDRO safely aliases → IK_SORUMLUSU (prepare OK; approve still denied below)
     SgkKararPaketiAuthz::assertPrepare($pdo, $prepOk);
     SgkKararPaketiAuthz::assertApprove($pdo, $apprOk);
     SgkKararPaketiAuthz::assertSubeScope($apprOk, 1);
     s98Assert(true, 'linked scoped prepare/approve PASS');
+
+    // S1E: SGK approve shared across GENEL_YONETICI + BOLUM_YONETICISI (permission-first)
+    s98Assert(RolePermissions::has(['rol' => 'GENEL_YONETICI'], 'sgk_karar_paketi.approve'), 'GY sgk approve YES');
+    s98Assert(RolePermissions::has(['rol' => 'BOLUM_YONETICISI'], 'sgk_karar_paketi.approve'), 'BOLUM sgk approve YES');
+    s98Assert(RolePermissions::has(['rol' => 'IK_SORUMLUSU'], 'sgk_karar_paketi.prepare'), 'IK prepare YES');
+    s98Assert(!RolePermissions::has(['rol' => 'IK_SORUMLUSU'], 'sgk_karar_paketi.approve'), 'IK approve NO');
+    s98Assert(!RolePermissions::has(['rol' => 'BIRIM_AMIRI'], 'sgk_karar_paketi.approve'), 'BIRIM approve NO');
+    s98Assert(!RolePermissions::has(['rol' => 'MUHASEBE'], 'sgk_karar_paketi.approve'), 'MUHASEBE approve NO');
+    s98Assert(!RolePermissions::has(['rol' => 'SISTEM_YONETICISI'], 'sgk_karar_paketi.approve'), 'SISTEM approve NO');
+    s98Assert(!RolePermissions::has(['rol' => 'PERSONEL'], 'sgk_karar_paketi.approve'), 'PERSONEL approve NO');
+    s98Assert(!RolePermissions::has(['rol' => 'SGK_KARAR_ONAY_YETKILISI'], 'sgk_karar_paketi.approve'), 'legacy SGK role fail-closed');
+    s98Assert(!RolePermissions::has(['rol' => 'BOLUM_YONETICISI'], 'legal_hold.manage'), 'BOLUM no legal_hold inherit');
+    s98Assert(!RolePermissions::has(['rol' => 'BOLUM_YONETICISI'], 'genel_yonetici_onayi.approve'), 'BOLUM no GY final inherit');
+    SgkKararPaketiAuthz::assertApprove($pdo, array_merge($apprOk, [
+        'id' => 2,
+        'rol' => 'BOLUM_YONETICISI',
+        'username' => 'onaylayan.s98',
+    ]));
+    s98Assert(true, 'BOLUM_YONETICISI linked scoped approve PASS');
 
     // Optional personel bridge NULL must not block formal actor
     s98Assert(

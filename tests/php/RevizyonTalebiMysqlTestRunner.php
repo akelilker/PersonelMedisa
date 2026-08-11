@@ -357,11 +357,12 @@ function seedRtFixtures(PDO $pdo): void
         INSERT INTO users (id, username, password_hash, ad_soyad, rol, durum) VALUES
           (1, 'gy', 'x', 'Genel Yonetici', 'GENEL_YONETICI', 'AKTIF'),
           (2, 'ba', 'x', 'Birim Amiri', 'BIRIM_AMIRI', 'AKTIF'),
-          (3, 'patron', 'x', 'Patron', 'PATRON', 'AKTIF'),
+          (3, 'personel', 'x', 'Personel', 'PERSONEL', 'AKTIF'),
           (4, 'muh', 'x', 'Muhasebe', 'MUHASEBE', 'AKTIF'),
-          (5, 'bolum', 'x', 'Bolum Yoneticisi', 'BOLUM_YONETICISI', 'AKTIF')
+          (5, 'bolum', 'x', 'Bolum Yoneticisi', 'BOLUM_YONETICISI', 'AKTIF'),
+          (6, 'ik', 'x', 'IK Sorumlusu', 'IK_SORUMLUSU', 'AKTIF')
     ");
-    $pdo->exec('INSERT INTO user_subeler (user_id, sube_id) VALUES (2, 1), (4, 1), (5, 1)');
+    $pdo->exec('INSERT INTO user_subeler (user_id, sube_id) VALUES (2, 1), (4, 1), (5, 1), (6, 1)');
     $pdo->exec('INSERT INTO sube_departmanlar (sube_id, departman_id) VALUES (1, 3)');
     $pdo->exec("
         INSERT INTO personeller (
@@ -705,9 +706,10 @@ assertRtSchemaPostconditions($pdo);
 
 $gy = ['id' => 1, 'rol' => 'GENEL_YONETICI', 'sube_ids' => []];
 $ba = ['id' => 2, 'rol' => 'BIRIM_AMIRI', 'sube_ids' => [1]];
-$patron = ['id' => 3, 'rol' => 'PATRON', 'sube_ids' => []];
+$personel = ['id' => 3, 'rol' => 'PERSONEL', 'sube_ids' => []];
 $muhasebe = ['id' => 4, 'rol' => 'MUHASEBE', 'sube_ids' => [1]];
 $bolum = ['id' => 5, 'rol' => 'BOLUM_YONETICISI', 'sube_ids' => [1]];
+$ik = ['id' => 6, 'rol' => 'IK_SORUMLUSU', 'sube_ids' => [1]];
 $subeHeader = ['x-active-sube-id' => '1'];
 
 $puantaj07 = rtPuantajId($pdo, 10, '2026-04-07');
@@ -721,8 +723,8 @@ $puantajOpenWeek = rtPuantajId($pdo, 10, '2026-06-03');
 $unauth = invokeRtHttp($pdo, null, 'GET', '/haftalik-kapanis/revizyon-talepleri', [], $subeHeader);
 rtAssert($unauth['status'] === 401, 'unauthenticated GET → 401');
 
-$patronGet = invokeRtHttp($pdo, $patron, 'GET', '/haftalik-kapanis/revizyon-talepleri', [], $subeHeader);
-rtAssert($patronGet['status'] === 403, 'PATRON GET talepleri → 403');
+$personelGet = invokeRtHttp($pdo, $personel, 'GET', '/haftalik-kapanis/revizyon-talepleri', [], $subeHeader);
+rtAssert($personelGet['status'] === 403, 'PERSONEL GET talepleri → 403');
 
 $gyEmpty = invokeRtHttp($pdo, $gy, 'GET', '/haftalik-kapanis/revizyon-talepleri', [], $subeHeader);
 rtAssert($gyEmpty['status'] === 200, 'GY GET list → 200 empty');
@@ -1046,22 +1048,28 @@ $muhCreate = invokeRtHttp($pdo, $muhasebe, 'POST', '/haftalik-kapanis/revizyon-t
     rtCreateBody(10, $puantaj06, '2026-04-06', '2026-04-06', '2026-04-12'),
     ['bordro_etki_var_mi' => true, 'bordro_etki_notu' => 'muhasebe notu']
 ), $subeHeader);
-rtAssert($muhCreate['status'] === 201, 'MUHASEBE create → 201');
-$muhCreateId = (int) ($muhCreate['payload']['data']['id'] ?? 0);
-$muhGonder = invokeRtHttp($pdo, $muhasebe, 'POST', '/haftalik-kapanis/revizyon-talepleri/' . $muhCreateId . '/gonder', [], $subeHeader);
-rtAssert($muhGonder['status'] === 200, 'MUHASEBE gonder → 200');
-$muhIptal = invokeRtHttp($pdo, $muhasebe, 'POST', '/haftalik-kapanis/revizyon-talepleri/' . $muhCreateId . '/iptal', [], $subeHeader);
-rtAssert($muhIptal['status'] === 200, 'MUHASEBE iptal own → 200');
+rtAssert($muhCreate['status'] === 403, 'MUHASEBE create → 403');
+
+$ikCreate = invokeRtHttp($pdo, $ik, 'POST', '/haftalik-kapanis/revizyon-talepleri', array_merge(
+    rtCreateBody(10, $puantaj06, '2026-04-06', '2026-04-06', '2026-04-12'),
+    ['bordro_etki_var_mi' => true, 'bordro_etki_notu' => 'ik notu']
+), $subeHeader);
+rtAssert($ikCreate['status'] === 201, 'IK_SORUMLUSU create → 201');
+$ikCreateId = (int) ($ikCreate['payload']['data']['id'] ?? 0);
+$ikGonder = invokeRtHttp($pdo, $ik, 'POST', '/haftalik-kapanis/revizyon-talepleri/' . $ikCreateId . '/gonder', [], $subeHeader);
+rtAssert($ikGonder['status'] === 200, 'IK_SORUMLUSU gonder → 200');
+$ikIptal = invokeRtHttp($pdo, $ik, 'POST', '/haftalik-kapanis/revizyon-talepleri/' . $ikCreateId . '/iptal', [], $subeHeader);
+rtAssert($ikIptal['status'] === 200, 'IK_SORUMLUSU iptal own → 200');
 
 foreach (['GET' => '/haftalik-kapanis/revizyon-talepleri', 'POST' => '/haftalik-kapanis/revizyon-talepleri'] as $method => $path) {
-    $patronAct = invokeRtHttp($pdo, $patron, $method, $path, $method === 'POST' ? rtCreateBody(
+    $personelAct = invokeRtHttp($pdo, $personel, $method, $path, $method === 'POST' ? rtCreateBody(
         10,
         $puantaj06,
         '2026-04-06',
         '2026-04-06',
         '2026-04-12'
     ) : [], $subeHeader);
-    rtAssert($patronAct['status'] === 403, 'PATRON ' . $method . ' → 403');
+    rtAssert($personelAct['status'] === 403, 'PERSONEL ' . $method . ' → 403');
 }
 $unauthCreate = invokeRtHttp($pdo, null, 'POST', '/haftalik-kapanis/revizyon-talepleri', rtCreateBody(
     10,

@@ -204,11 +204,12 @@ try {
     $proj = DisiplinAdayProjectionService::projectForMonth($pdo, $userGenel, '2026-08', 1, 10);
     ad052Assert(count($proj['items']) >= 1, 'lifecycle seed vaka');
     $vakaId = (int) $proj['items'][0]['id'];
+    // IK_BORDRO safely aliases → IK_SORUMLUSU (review/defense OK)
     $userIk = ad052User(2, 'IK_BORDRO');
     $userBolum = ad052User(1, 'BOLUM_YONETICISI');
 
     $vaka = DisiplinVakaService::ikReview($pdo, $userIk, $vakaId);
-    ad052Assert($vaka['lifecycle_state'] === AttendanceDisciplineCatalog::LIFECYCLE_IK_INCELEME, 'ikReview state');
+    ad052Assert($vaka['lifecycle_state'] === AttendanceDisciplineCatalog::LIFECYCLE_IK_INCELEME, 'ikReview state (IK_BORDRO alias)');
 
     $pastDeadlineFailed = false;
     try {

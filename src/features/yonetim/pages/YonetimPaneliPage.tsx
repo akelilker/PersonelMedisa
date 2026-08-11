@@ -74,16 +74,14 @@ type SubeFormState = {
 };
 
 const ROLE_LABELS: Record<UserRole, string> = {
-  GENEL_YONETICI: "Genel Yönetici",
-  BOLUM_YONETICISI: "Bölüm Yöneticisi",
-  BIRIM_AMIRI: "Birim Amiri",
+  PERSONEL: "Personel",
   MUHASEBE: "Muhasebe",
-  PATRON: "Patron",
-  AUTH_SMOKE_READONLY: "Teknik Smoke — Salt Okuma",
-  IK_BORDRO: "İK / Bordro",
-  SGK_KARAR_ONAY_YETKILISI: "SGK Karar Onay Yetkilisi",
-  IDARI_ISLER: "İdari İşler",
-  SISTEM_YONETICISI: "Sistem Yöneticisi"
+  IK_SORUMLUSU: "İK Sorumlusu",
+  BIRIM_AMIRI: "Birim Amiri",
+  BOLUM_YONETICISI: "Bölüm Yöneticisi",
+  GENEL_YONETICI: "Genel Yönetici",
+  SISTEM_YONETICISI: "Sistem Yöneticisi",
+  AUTH_SMOKE_READONLY: "Teknik Smoke — Salt Okuma"
 };
 
 const KULLANICI_TIPI_LABELS: Record<KullaniciTipi, string> = {

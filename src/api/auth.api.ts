@@ -1,4 +1,5 @@
 import { finalizeAuthSessionSube } from "../auth/auth-session-sube";
+import { canonicalizeUserRole } from "../lib/authorization/canonicalize-user-role";
 import type { AuthSession, LoginCredentials } from "../types/auth";
 import { apiRequest, ApiRequestError } from "./api-client";
 import { endpoints } from "./endpoints";
@@ -38,28 +39,7 @@ function readNumber(value: unknown): number | null {
 }
 
 function normalizeRole(value: unknown): AuthSession["user"]["rol"] | null {
-  const raw = readString(value);
-  if (!raw) {
-    return null;
-  }
-
-  const normalized = raw.trim().toUpperCase().replace(/-/g, "_");
-  if (
-    normalized === "GENEL_YONETICI" ||
-    normalized === "BOLUM_YONETICISI" ||
-    normalized === "MUHASEBE" ||
-    normalized === "BIRIM_AMIRI" ||
-    normalized === "PATRON" ||
-    normalized === "AUTH_SMOKE_READONLY" ||
-    normalized === "IK_BORDRO" ||
-    normalized === "SGK_KARAR_ONAY_YETKILISI" ||
-    normalized === "IDARI_ISLER" ||
-    normalized === "SISTEM_YONETICISI"
-  ) {
-    return normalized;
-  }
-
-  return null;
+  return canonicalizeUserRole(value);
 }
 
 function deriveUiProfile(role: AuthSession["user"]["rol"]): AuthSession["ui_profile"] {
@@ -203,8 +183,17 @@ function resolveDemoRole(username: string): AuthSession["user"]["rol"] {
   if (normalized.includes("bolum") || normalized.includes("bölüm")) {
     return "BOLUM_YONETICISI";
   }
+  if (normalized.includes("ik") || normalized.includes("bordro")) {
+    return "IK_SORUMLUSU";
+  }
+  if (normalized.includes("personel")) {
+    return "PERSONEL";
+  }
+  if (normalized.includes("sistem")) {
+    return "SISTEM_YONETICISI";
+  }
   if (normalized.includes("patron")) {
-    return "PATRON";
+    return "GENEL_YONETICI";
   }
 
   return "GENEL_YONETICI";

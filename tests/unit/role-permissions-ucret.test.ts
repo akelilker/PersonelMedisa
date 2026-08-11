@@ -5,27 +5,27 @@ import {
 } from "../../src/lib/authorization/role-permissions";
 
 describe("ucret ve mevzuat yetki matrisi (S77-B)", () => {
-  it("personeller.ucret.view GENEL_YONETICI, MUHASEBE ve IK_BORDRO icindir", () => {
+  it("personeller.ucret.view GENEL_YONETICI, MUHASEBE, IK_SORUMLUSU ve SISTEM_YONETICISI icindir", () => {
     expect(getRolesWithPermission("personeller.ucret.view").sort()).toEqual([
       "GENEL_YONETICI",
-      "IK_BORDRO",
-      "MUHASEBE"
+      "IK_SORUMLUSU",
+      "MUHASEBE",
+      "SISTEM_YONETICISI"
     ]);
   });
 
-  it("personeller.ucret.manage yalnizca GENEL_YONETICI ve MUHASEBE icindir", () => {
+  it("personeller.ucret.manage yalnizca GENEL_YONETICI icindir", () => {
     expect(getRolesWithPermission("personeller.ucret.manage").sort()).toEqual([
-      "GENEL_YONETICI",
-      "MUHASEBE"
+      "GENEL_YONETICI"
     ]);
   });
 
-  it("mevzuat_parametreleri.view prepare/approve rollerini kapsar; manage yalnizca GENEL_YONETICI", () => {
+  it("mevzuat_parametreleri.view prepare + teknik read rollerini kapsar; manage yalnizca GENEL_YONETICI", () => {
     expect(getRolesWithPermission("mevzuat_parametreleri.view").sort()).toEqual([
       "GENEL_YONETICI",
-      "IK_BORDRO",
+      "IK_SORUMLUSU",
       "MUHASEBE",
-      "SGK_KARAR_ONAY_YETKILISI"
+      "SISTEM_YONETICISI"
     ]);
     expect(getRolesWithPermission("mevzuat_parametreleri.manage")).toEqual(["GENEL_YONETICI"]);
   });
@@ -36,8 +36,9 @@ describe("ucret ve mevzuat yetki matrisi (S77-B)", () => {
     expect(hasRolePermission("BOLUM_YONETICISI", "personeller.ucret.view")).toBe(false);
     expect(hasRolePermission("BOLUM_YONETICISI", "personeller.ucret.manage")).toBe(false);
     expect(hasRolePermission("BOLUM_YONETICISI", "mevzuat_parametreleri.view")).toBe(false);
-    expect(hasRolePermission("PATRON", "personeller.ucret.view")).toBe(false);
-    expect(hasRolePermission("IK_BORDRO", "personeller.ucret.manage")).toBe(false);
+    expect(hasRolePermission("PERSONEL", "personeller.ucret.view")).toBe(false);
+    expect(hasRolePermission("IK_SORUMLUSU", "personeller.ucret.manage")).toBe(false);
     expect(hasRolePermission("SGK_KARAR_ONAY_YETKILISI", "personeller.ucret.view")).toBe(false);
+    expect(hasRolePermission("MUHASEBE", "personeller.ucret.manage")).toBe(false);
   });
 });

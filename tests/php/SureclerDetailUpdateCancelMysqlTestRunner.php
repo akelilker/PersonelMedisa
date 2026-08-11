@@ -271,6 +271,7 @@ $pdo = surecPdo(preg_replace('/dbname=[^;]+/', 'dbname=' . $dbName, $dsn));
 $gy = ['id' => 1, 'rol' => 'GENEL_YONETICI', 'sube_ids' => []];
 $ba = ['id' => 3, 'rol' => 'BIRIM_AMIRI', 'sube_ids' => [1]];
 $muhasebe = ['id' => 2, 'rol' => 'MUHASEBE', 'sube_ids' => []];
+$ik = ['id' => 8, 'rol' => 'IK_SORUMLUSU', 'sube_ids' => []];
 
 $detail = invokeSurecHttp($pdo, $gy, 'GET', '/surecler/100');
 surecAssert($detail['status'] === 200, 'HTTP detail → 200');
@@ -370,7 +371,10 @@ $baCancel = invokeSurecHttp($pdo, $ba, 'POST', '/surecler/101/iptal');
 surecAssert($baCancel['status'] === 403, 'HTTP BA cancel other → 403');
 
 $muhCancelOwnScope = invokeSurecHttp($pdo, $muhasebe, 'POST', '/surecler/101/iptal');
-surecAssert($muhCancelOwnScope['status'] === 200, 'HTTP MUHASEBE cancel → 200');
+surecAssert($muhCancelOwnScope['status'] === 403, 'HTTP MUHASEBE cancel → 403 (operational write narrowed)');
+
+$ikCancelOwnScope = invokeSurecHttp($pdo, $ik, 'POST', '/surecler/101/iptal');
+surecAssert($ikCancelOwnScope['status'] === 200, 'HTTP IK_SORUMLUSU cancel → 200');
 
 // Seed a fresh AKTIF row for last-write-wins / cancel race checks.
 $pdo->exec("

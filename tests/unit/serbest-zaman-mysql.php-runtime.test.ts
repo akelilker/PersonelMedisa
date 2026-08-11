@@ -49,7 +49,7 @@ describe("SerbestZamanController MariaDB", () => {
     const migrations = readdirSync(resolve(process.cwd(), "api/migrations"))
       .filter((name) => name.endsWith(".sql"))
       .sort();
-    expect(migrations.at(-1)).toBe("053_retention_legal_hold_arsiv.sql");
+    expect(migrations.at(-1)).toBe("054_canonical_role_consolidation.sql");
   });
 
   it("runs HTTP serbest zaman acceptance on MariaDB", () => {
@@ -63,7 +63,7 @@ describe("SerbestZamanController MariaDB", () => {
     expect(result.stdout).toContain("[PASS] controller NO PERIOD_LOCKED");
     expect(result.stdout).toContain("[PASS] controller NO PERIOD_STATE_UNKNOWN");
     expect(result.stdout).toContain("[PASS] unauthenticated → 401");
-    expect(result.stdout).toContain("[PASS] PATRON GET events → 403");
+    expect(result.stdout).toContain("[PASS] PERSONEL GET events → 403");
     expect(result.stdout).toContain("[PASS] GY GET events personel 10 → 200 empty items");
     expect(result.stdout).toContain("[PASS] MUHASEBE GET → 200");
     expect(result.stdout).toContain("[PASS] MUHASEBE POST olusum → 403");
@@ -91,7 +91,7 @@ describe("SerbestZamanController MariaDB", () => {
     expect(result.stdout).toContain("[PASS] partial existing serbest_zaman_events → migration fails");
     expect(result.stdout).toContain("[PASS] partial existing serbest_zaman_aktif_olusumlar → migration fails");
     expect(result.stdout).toContain("[PASS] BIRIM_AMIRI POST kullanim → 403");
-    expect(result.stdout).toContain("[PASS] PATRON POST olusum → 403");
+    expect(result.stdout).toContain("[PASS] PERSONEL POST olusum → 403");
     expect(result.stdout).toContain("[PASS] unauthenticated POST → 401");
     expect(result.stdout).toContain("[PASS] BOLUM_YONETICISI scope içi POST olusum → 200");
     expect(result.stdout).toContain("[PASS] BOLUM_YONETICISI scope dışı GET → 403");

@@ -57,7 +57,7 @@ function s90InvokeChild(string $mode, string $method, string $path, array $heade
     file_put_contents($payloadFile, json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
 
     $phpArgs = [];
-    if (PHP_OS_FAMILY === 'Windows') {
+    if (PHP_OS_FAMILY === 'Windows' && !extension_loaded('pdo_mysql')) {
         $extensionDir = ini_get('extension_dir');
         if (is_string($extensionDir) && $extensionDir !== '') {
             $phpArgs[] = '-d';

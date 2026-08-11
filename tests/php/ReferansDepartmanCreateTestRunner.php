@@ -73,10 +73,12 @@ departmanAssert(
 );
 
 departmanAssert(RolePermissions::has(['rol' => 'GENEL_YONETICI'], 'yonetim-paneli.manage'), 'GENEL_YONETICI manage');
+departmanAssert(RolePermissions::has(['rol' => 'SISTEM_YONETICISI'], 'yonetim-paneli.manage'), 'SISTEM_YONETICISI manage');
 departmanAssert(!RolePermissions::has(['rol' => 'BIRIM_AMIRI'], 'yonetim-paneli.manage'), 'BIRIM_AMIRI forbidden');
 departmanAssert(!RolePermissions::has(['rol' => 'MUHASEBE'], 'yonetim-paneli.manage'), 'MUHASEBE forbidden');
 departmanAssert(!RolePermissions::has(['rol' => 'IK'], 'yonetim-paneli.manage'), 'IK forbidden');
-departmanAssert(!RolePermissions::has(['rol' => 'PATRON'], 'yonetim-paneli.manage'), 'PATRON forbidden');
+departmanAssert(!RolePermissions::has(['rol' => 'PERSONEL'], 'yonetim-paneli.manage'), 'PERSONEL forbidden');
+departmanAssert(RolePermissions::has(['rol' => 'PATRON'], 'yonetim-paneli.manage'), 'legacy PATRON aliases to GY manage');
 
 $pdo = createDepartmanSqlitePdo();
 

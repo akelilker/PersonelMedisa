@@ -369,7 +369,7 @@ function seedRtFixtures(PDO $pdo): void
         INSERT INTO users (id, username, password_hash, ad_soyad, rol, durum) VALUES
           (1, 'gy', 'x', 'Genel Yonetici', 'GENEL_YONETICI', 'AKTIF'),
           (2, 'ba', 'x', 'Birim Amiri', 'BIRIM_AMIRI', 'AKTIF'),
-          (3, 'patron', 'x', 'Patron', 'PATRON', 'AKTIF'),
+          (3, 'personel', 'x', 'Personel', 'PERSONEL', 'AKTIF'),
           (4, 'muh', 'x', 'Muhasebe', 'MUHASEBE', 'AKTIF'),
           (5, 'bolum', 'x', 'Bolum Yoneticisi', 'BOLUM_YONETICISI', 'AKTIF')
     ");
@@ -737,7 +737,7 @@ rtAssert(stripos($talepCreatePost, 'uq_hkrt_correction_event') !== false, 'UNIQU
 $gy = ['id' => 1, 'rol' => 'GENEL_YONETICI', 'sube_ids' => []];
 $ba = ['id' => 2, 'rol' => 'BIRIM_AMIRI', 'sube_ids' => [1]];
 $baOther = ['id' => 2, 'rol' => 'BIRIM_AMIRI', 'sube_ids' => [2]];
-$patron = ['id' => 3, 'rol' => 'PATRON', 'sube_ids' => []];
+$personel = ['id' => 3, 'rol' => 'PERSONEL', 'sube_ids' => []];
 $muhasebe = ['id' => 4, 'rol' => 'MUHASEBE', 'sube_ids' => [1]];
 $bolum = ['id' => 5, 'rol' => 'BOLUM_YONETICISI', 'sube_ids' => [1]];
 $subeHeader = ['x-active-sube-id' => '1'];
@@ -769,8 +769,8 @@ function rcApproveTalep(PDO $pdo, array $ba, array $gy, array $body, array $head
 $unauth = invokeRtHttp($pdo, null, 'GET', '/haftalik-kapanis/revizyon-corrections', [], $subeHeader);
 rtAssert($unauth['status'] === 401, 'unauthenticated GET corrections → 401');
 
-$patronGet = invokeRtHttp($pdo, $patron, 'GET', '/haftalik-kapanis/revizyon-corrections', [], $subeHeader);
-rtAssert($patronGet['status'] === 403 || (($patronGet['status'] === 200) && count($patronGet['payload']['data']['items'] ?? ['x']) === 0), 'PATRON GET → 403');
+$personelGet = invokeRtHttp($pdo, $personel, 'GET', '/haftalik-kapanis/revizyon-corrections', [], $subeHeader);
+rtAssert($personelGet['status'] === 403, 'PERSONEL GET → 403');
 
 $gyListEmpty = invokeRtHttp($pdo, $gy, 'GET', '/haftalik-kapanis/revizyon-corrections', [], $subeHeader);
 rtAssert($gyListEmpty['status'] === 200, 'GY GET list → 200');

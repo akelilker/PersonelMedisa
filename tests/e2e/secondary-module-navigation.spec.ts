@@ -130,7 +130,7 @@ test.describe("Secondary module navigation", () => {
     ).toHaveCount(1);
   });
 
-  test("BIRIM_AMIRI overlay menu hides Finans; PATRON has no toggle", async ({ page }) => {
+  test("BIRIM_AMIRI overlay menu hides Finans; PERSONEL has no toggle", async ({ page }) => {
     await mockApi(page, "BIRIM_AMIRI");
     await login(page, MOCK_ROLE_LOGIN.BIRIM_AMIRI);
     await page.goto("/personeller");
@@ -138,8 +138,8 @@ test.describe("Secondary module navigation", () => {
     await expect(page.getByTestId("shell-overlay-module-link-gunluk-kayit")).toBeVisible();
     await expect(page.getByTestId("shell-overlay-module-link-finans")).toHaveCount(0);
 
-    await mockApi(page, "PATRON");
-    await login(page, MOCK_ROLE_LOGIN.PATRON);
+    await mockApi(page, "PERSONEL");
+    await login(page, MOCK_ROLE_LOGIN.PERSONEL);
     await expect(page.getByTestId("header-modules-toggle")).toHaveCount(0);
     await page.goto("/raporlar");
     await expect(page.getByTestId("overlay-modules-toggle")).toHaveCount(0);

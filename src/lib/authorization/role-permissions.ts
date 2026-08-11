@@ -1,4 +1,5 @@
 import type { AuthSession, UserRole } from "../../types/auth";
+import { canonicalizeUserRole } from "./canonicalize-user-role";
 
 export type AppPermission =
   | "personeller.view"
@@ -165,6 +166,7 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "genel_yonetici_bildirim_onayi.view",
     "genel_yonetici_bildirim_onayi.approve",
     "patron_ack.view",
+    "patron_ack.mark_seen",
     "sirket_parametreleri.view",
     "sirket_parametreleri.manage",
     "resmi_tatil_takvimi.view",
@@ -247,69 +249,38 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "disiplin.view",
     "disiplin.final_decision",
     "puantaj.olay_karar.decide",
-    "puantaj.olay_karar.view"
+    "puantaj.olay_karar.view",
+    // Explicit SGK final approve only — does not inherit GENEL_YONETICI matrix.
+    "sgk_karar_paketi.approve"
   ],
+  /** External accountant: finalized mali/bordro read + export. No operational write. */
   MUHASEBE: [
     "personeller.view",
     "personeller.view.sube",
-    "personeller.create",
-    "personeller.import.apply",
-    "personeller.update",
     "personeller.detail.view",
     "personeller.ucret.view",
-    "personeller.ucret.manage",
     "mevzuat_parametreleri.view",
     "surecler.view",
     "surecler.view.sube",
-    "surecler.create",
-    "surecler.update",
-    "surecler.cancel",
     "surecler.detail.view",
-    "bildirimler.view",
-    "bildirimler.create",
-    "bildirimler.update",
-    "bildirimler.cancel",
-    "bildirimler.detail.view",
     "puantaj.view",
-    "puantaj.update",
-    "puantaj.donem_reopen.request",
-    "puantaj.donem_reseal",
     "puantaj.donem_seal.history",
-    "puantaj.bildirim_etki.view",
-    "puantaj.bildirim_etki.generate",
-    "puantaj.bildirim_etki.apply",
-    "puantaj.bildirim_etki.dismiss",
-    "puantaj.bildirim_etki.resolve_conflict",
     "puantaj.donem_kapanis.view",
     "puantaj.donem_kapanis.export",
     "puantaj.bildirim_etki.rapor.view",
     "puantaj.bildirim_etki.rapor.export",
     "maas_hesaplama.view",
-    "maas_hesaplama.manage",
     "maas_hesaplama_adaylari.view",
-    "maas_hesaplama_adaylari.manage",
     "raporlar.view",
     "finans.view",
-    "finans.create",
-    "finans.update",
-    "finans.cancel",
     "haftalik_mutabakat.view",
-    "aylik_bildirim_onayi.view",
     "bordro_on_izleme.view",
     "sirket_parametreleri.view",
-    "sirket_parametreleri.manage",
     "resmi_tatil_takvimi.view",
     "personel_bordro_kapsam.view",
-    "personel_bordro_kapsam.manage",
     "revizyon.view",
-    "revizyon.create",
-    "revizyon.submit",
-    "revizyon.cancel",
     "revizyon.view_finance_effect",
-    "revizyon.view_audit_history",
-    "sgk.manuel_kod_override",
-    "disiplin.view",
-    "puantaj.olay_karar.view"
+    "revizyon.view_audit_history"
   ],
   BIRIM_AMIRI: [
     "personeller.view.sube",
@@ -342,74 +313,131 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "aylik_bildirim_onayi.view",
     "aylik_bildirim_onayi.approve"
   ],
-  PATRON: [
+  /** IK operational owner (successor of IK_BORDRO). Prepare-only for SGK; no final approve. */
+  IK_SORUMLUSU: [
+    "personeller.view",
+    "personeller.view.sube",
+    "personeller.create",
+    "personeller.import.apply",
+    "personeller.update",
+    "personeller.detail.view",
+    "personeller.ucret.view",
+    "mevzuat_parametreleri.view",
+    "surecler.view",
+    "surecler.view.sube",
+    "surecler.create",
+    "surecler.update",
+    "surecler.cancel",
+    "surecler.detail.view",
+    "bildirimler.view",
+    "bildirimler.detail.view",
+    "haftalik_mutabakat.view",
+    "puantaj.view",
+    "puantaj.donem_reopen.request",
+    "puantaj.donem_reseal",
+    "puantaj.donem_seal.history",
+    "puantaj.bildirim_etki.view",
+    "puantaj.bildirim_etki.generate",
+    "puantaj.bildirim_etki.apply",
+    "puantaj.bildirim_etki.dismiss",
+    "puantaj.bildirim_etki.resolve_conflict",
+    "puantaj.donem_kapanis.view",
+    "puantaj.bildirim_etki.rapor.view",
+    "puantaj.olay_karar.view",
+    "disiplin.view",
+    "disiplin.review",
+    "disiplin.defense_manage",
+    "maas_hesaplama.view",
+    "maas_hesaplama.manage",
+    "maas_hesaplama_adaylari.view",
+    "maas_hesaplama_adaylari.manage",
     "raporlar.view",
-    "patron_ack.view",
-    "patron_ack.mark_seen"
+    "bordro_on_izleme.view",
+    "sirket_parametreleri.view",
+    "sirket_parametreleri.manage",
+    "personel_bordro_kapsam.view",
+    "personel_bordro_kapsam.manage",
+    "revizyon.view",
+    "revizyon.create",
+    "revizyon.submit",
+    "revizyon.cancel",
+    "revizyon.view_finance_effect",
+    "revizyon.view_audit_history",
+    "sgk_karar_paketi.prepare",
+    "arsiv.view",
+    "arsiv.download",
+    "retention.view"
   ],
-  AUTH_SMOKE_READONLY: ["ops.auth_smoke.read"],
-  IK_BORDRO: [
+  /**
+   * IT Müdürü / teknik uygulama yöneticisi.
+   * Broad troubleshooting READ + yonetim-paneli.manage (users/roles/subeler).
+   * Never business approver / policy owner / domain data writer.
+   */
+  SISTEM_YONETICISI: [
     "personeller.view",
     "personeller.view.sube",
     "personeller.detail.view",
     "personeller.ucret.view",
     "mevzuat_parametreleri.view",
-    "bordro_on_izleme.view",
-    "raporlar.view",
-    "sirket_parametreleri.view",
-    "sirket_parametreleri.manage",
-    "sgk_karar_paketi.prepare",
-    "disiplin.view",
-    "disiplin.review",
-    "disiplin.defense_manage",
     "surecler.view",
     "surecler.view.sube",
     "surecler.detail.view",
-    "arsiv.view",
-    "arsiv.download",
-    "retention.view"
-  ],
-  SGK_KARAR_ONAY_YETKILISI: [
-    "mevzuat_parametreleri.view",
-    "bordro_on_izleme.view",
+    "bildirimler.view",
+    "bildirimler.detail.view",
+    "puantaj.view",
+    "puantaj.donem_seal.history",
+    "puantaj.bildirim_etki.view",
+    "puantaj.donem_kapanis.view",
+    "puantaj.donem_kapanis.export",
+    "puantaj.bildirim_etki.rapor.view",
+    "puantaj.bildirim_etki.rapor.export",
+    "puantaj.olay_karar.view",
+    "disiplin.view",
+    "maas_hesaplama.view",
+    "maas_hesaplama_adaylari.view",
     "raporlar.view",
+    "finans.view",
+    "isg.view",
+    "yonetim-paneli.view",
+    "yonetim-paneli.manage",
+    "aylik-ozet.view",
+    "haftalik_mutabakat.view",
+    "aylik_bildirim_onayi.view",
+    "aylik_bolum_onayi.view",
+    "genel_yonetici_onayi.view",
+    "genel_yonetici_bildirim_onayi.view",
+    "patron_ack.view",
     "sirket_parametreleri.view",
-    "bordro_kesinlestirme.approve",
-    "sgk_karar_paketi.approve"
-  ],
-  IDARI_ISLER: [
-    "personeller.view",
-    "personeller.detail.view",
-    "surecler.view",
-    "raporlar.view",
-    "arsiv.view",
-    "arsiv.download",
-    "retention.view"
-  ],
-  SISTEM_YONETICISI: [
-    "personeller.view",
-    "personeller.view.sube",
-    "personeller.detail.view",
+    "resmi_tatil_takvimi.view",
+    "bordro_on_izleme.view",
+    "personel_bordro_kapsam.view",
+    "revizyon.view",
+    "revizyon.view_finance_effect",
+    "revizyon.view_audit_history",
     "arsiv.view",
     "arsiv.download",
     "arsiv.audit.view",
     "retention.view",
     "retention.destruction.view"
-  ]
+  ],
+  /** Future self-service; intentionally zero business permissions in this phase. */
+  PERSONEL: [],
+  AUTH_SMOKE_READONLY: ["ops.auth_smoke.read"]
 };
 
 const EMPTY_PERMISSIONS: readonly AppPermission[] = [];
 
-export function getRolePermissions(role?: UserRole | null): readonly AppPermission[] {
-  if (!role) {
+export function getRolePermissions(role?: UserRole | string | null): readonly AppPermission[] {
+  const canonical = canonicalizeUserRole(role ?? null);
+  if (!canonical) {
     return EMPTY_PERMISSIONS;
   }
 
-  return ROLE_PERMISSIONS[role] ?? EMPTY_PERMISSIONS;
+  return ROLE_PERMISSIONS[canonical] ?? EMPTY_PERMISSIONS;
 }
 
 export function hasRolePermission(
-  role: UserRole | null | undefined,
+  role: UserRole | string | null | undefined,
   permission: AppPermission
 ): boolean {
   return getRolePermissions(role).includes(permission);

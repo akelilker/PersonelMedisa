@@ -19,8 +19,8 @@ test.describe("S83 Business Data Readiness", () => {
     resetMaasBordroPageState(page);
   });
 
-  test("MUHASEBE: Veri Hazırlık, blockers, net maaş, şablon, dry-run, candidate disabled", async ({ page }) => {
-    await openRaporlarPanel(page, "MUHASEBE", "bordro-hazirlik");
+  test("IK_SORUMLUSU: Veri Hazırlık, blockers, net maaş, şablon, dry-run, candidate disabled", async ({ page }) => {
+    await openRaporlarPanel(page, "IK_SORUMLUSU", "bordro-hazirlik");
     await submitBordroFilters(page);
 
     await expect(page.getByTestId("bordro-hazirlik-tab-veri-hazirlik")).toBeVisible();
@@ -115,8 +115,8 @@ test.describe("S83 Business Data Readiness", () => {
     await expect(page).toHaveURL(/\/yetkisiz/);
   });
 
-  test("PATRON: bordro yetkisiz", async ({ page }) => {
-    await loginAsMockRole(page, "PATRON");
+  test("PERSONEL: bordro yetkisiz", async ({ page }) => {
+    await loginAsMockRole(page, "PERSONEL");
     await page.goto("/raporlar?panel=bordro-hazirlik");
     await expect(page).toHaveURL(/\/yetkisiz/);
   });

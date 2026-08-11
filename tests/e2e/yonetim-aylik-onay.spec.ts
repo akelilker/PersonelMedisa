@@ -2,7 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { login } from "./helpers/auth";
 import { mockApi, type MockUserRole } from "./helpers/mock-api";
 
-const ROLE_LOGIN: Record<MockUserRole, { username: string; password: string }> = {
+const ROLE_LOGIN: Partial<Record<MockUserRole, { username: string; password: string }>> = {
   GENEL_YONETICI: { username: "genel_yonetici", password: "demo123" },
   BOLUM_YONETICISI: { username: "bolum_yoneticisi", password: "demo123" },
   MUHASEBE: { username: "muhasebe", password: "demo123" },

@@ -141,6 +141,6 @@ final class AttendanceDisciplineCatalog
     {
         // Canonical review ownership is RolePermissions::disiplin.review.
         // Keep helper aligned: IK review + GY support review only.
-        return ['IK_BORDRO', 'GENEL_YONETICI'];
+        return ['IK_SORUMLUSU', 'GENEL_YONETICI'];
     }
 }

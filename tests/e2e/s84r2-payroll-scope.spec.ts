@@ -11,8 +11,8 @@ test.describe("S84-R2 payroll scope", () => {
     await expect(page.getByTestId("personel-bordro-kapsam-card")).toBeVisible({ timeout: 15_000 });
   }
 
-  test("MUHASEBE: kapsam kartı, dry-run ve taslak oluşturma (Bordro Hazırlık)", async ({ page }) => {
-    await loginAsMockRole(page, "MUHASEBE");
+  test("IK_SORUMLUSU: kapsam kartı, dry-run ve taslak oluşturma (Bordro Hazırlık)", async ({ page }) => {
+    await loginAsMockRole(page, "IK_SORUMLUSU");
     await openBordroHazirlikPersonelKapsam(page, 1);
 
     await expect(page.getByTestId("personel-bordro-kapsam-bos")).toBeVisible();

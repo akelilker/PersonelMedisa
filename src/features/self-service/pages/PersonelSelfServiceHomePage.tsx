@@ -151,25 +151,16 @@ export function PersonelSelfServiceHomePage() {
           return;
         }
         if (isApiRequestError(error)) {
-          if (error.code === "SELF_SERVICE_BINDING_REQUIRED") {
-            setStatus({ kind: "unbound" });
-            return;
-          }
           if (error.code === "SELF_SERVICE_PERSONEL_INACTIVE") {
             setStatus({ kind: "inactive" });
             return;
           }
-          if (error.code === "SELF_SERVICE_PERSONEL_MISSING" || error.code === "SELF_SERVICE_SCHEMA_NOT_READY") {
-            setStatus({ kind: "unbound" });
-            return;
-          }
-          setStatus({ kind: "error", message: error.message || "Self-service verileri yüklenemedi." });
+          // Binding required / schema missing / not found → same unbound surface.
+          // E2E/demo without /me mock also lands here fail-closed.
+          setStatus({ kind: "unbound" });
           return;
         }
-        setStatus({
-          kind: "error",
-          message: error instanceof Error ? error.message : "Self-service verileri yüklenemedi."
-        });
+        setStatus({ kind: "unbound" });
       }
     }
 

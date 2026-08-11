@@ -26,11 +26,20 @@ describe("S2B yillik izin ledger mysql/php runtime", () => {
 
     const isWindows = process.platform === "win32";
     const phpArgs = isWindows
-      ? ["-d", `extension_dir=${resolve(dirname(phpPath), "ext")}`, runnerPath]
-      : [runnerPath];
+      ? [
+          "-d",
+          `extension_dir=${resolve(dirname(phpPath), "ext")}`,
+          "-d",
+          "extension=php_pdo_sqlite.dll",
+          runnerPath
+        ]
+      : ["-d", "extension=pdo_sqlite", runnerPath];
     const result = spawnSync(phpPath, phpArgs, { encoding: "utf8", cwd: process.cwd() });
 
     expect(result.status, result.stderr || result.stdout).toBe(0);
     expect(result.stdout).toContain("S2B ledger mysql runner OK");
+    expect(result.stdout).toContain("create DEVIR +8");
+    expect(result.stdout).toContain("zero delta rejected");
+    expect(result.stdout).not.toContain("sqlite driver missing");
   });
 });

@@ -160,6 +160,66 @@ if (s2bLedgerHasSqlite()) {
     } catch (YillikIzinHakDuzeltmeException $e) {
         s2bLedgerAssert($e->getErrorCode() === 'VALIDATION_ERROR', 'zero delta rejected');
     }
+
+    $ek = YillikIzinHakDuzeltmeLedgerService::create($pdo, 1, [
+        'gun_delta' => 3,
+        'kategori' => 'EK_HAK',
+        'aciklama' => 'Sirket ekstra hak',
+        'effective_date' => '2026-03-15',
+    ], ['id' => 1]);
+    s2bLedgerAssert((int) $ek['gun_delta'] === 3 && $ek['kategori'] === 'EK_HAK', 'create EK_HAK +3');
+    s2bLedgerAssert(YillikIzinHakDuzeltmeLedgerService::netSum($pdo, 1) === 9, 'netSum after EK_HAK = 9');
+
+    $rev = YillikIzinHakDuzeltmeLedgerService::reverse($pdo, 1, (int) $row['id'], ['id' => 1], 'Telafi');
+    s2bLedgerAssert($rev['kategori'] === 'TERS_KAYIT' && (int) $rev['gun_delta'] === -8, 'reverse creates TERS_KAYIT -8');
+    s2bLedgerAssert((int) $rev['reverses_id'] === (int) $row['id'], 'reverse link');
+    s2bLedgerAssert(YillikIzinHakDuzeltmeLedgerService::netSum($pdo, 1) === 1, 'netSum after reverse = 1');
+
+    try {
+        YillikIzinHakDuzeltmeLedgerService::reverse($pdo, 1, (int) $row['id'], ['id' => 1], 'again');
+        s2bLedgerAssert(false, 'double reverse should throw');
+    } catch (YillikIzinHakDuzeltmeException $e) {
+        s2bLedgerAssert($e->getErrorCode() === 'ALREADY_REVERSED', 'double reverse rejected');
+    }
+
+    try {
+        YillikIzinHakDuzeltmeLedgerService::reverse($pdo, 1, (int) $rev['id'], ['id' => 1], 'rev-of-rev');
+        s2bLedgerAssert(false, 'reverse-of-reversal should throw');
+    } catch (YillikIzinHakDuzeltmeException $e) {
+        s2bLedgerAssert($e->getErrorCode() === 'INVALID_REVERSAL_TARGET', 'reversal-of-TERS rejected');
+    }
+
+    $pdo->exec('INSERT INTO personeller (id, sube_id) VALUES (2, 1)');
+    try {
+        YillikIzinHakDuzeltmeLedgerService::reverse($pdo, 2, (int) $row2['id'], ['id' => 1], 'cross');
+        s2bLedgerAssert(false, 'cross-personel reverse should throw');
+    } catch (YillikIzinHakDuzeltmeException $e) {
+        s2bLedgerAssert($e->getErrorCode() === 'NOT_FOUND', 'cross-personel reverse rejected');
+    }
+
+    try {
+        YillikIzinHakDuzeltmeLedgerService::create($pdo, 1, [
+            'gun_delta' => 1,
+            'kategori' => 'XYZ',
+            'aciklama' => 'bad cat',
+            'effective_date' => '2026-04-01',
+        ], ['id' => 1]);
+        s2bLedgerAssert(false, 'invalid category should throw');
+    } catch (YillikIzinHakDuzeltmeException $e) {
+        s2bLedgerAssert($e->getErrorCode() === 'VALIDATION_ERROR', 'invalid category rejected');
+    }
+
+    try {
+        YillikIzinHakDuzeltmeLedgerService::create($pdo, 1, [
+            'gun_delta' => 1,
+            'kategori' => 'DEVIR',
+            'aciklama' => '',
+            'effective_date' => '2026-04-01',
+        ], ['id' => 1]);
+        s2bLedgerAssert(false, 'empty reason should throw');
+    } catch (YillikIzinHakDuzeltmeException $e) {
+        s2bLedgerAssert($e->getErrorCode() === 'VALIDATION_ERROR', 'empty reason rejected');
+    }
 } else {
     fwrite(STDOUT, "[SKIP] sqlite driver missing — ledger CRUD checks skipped\n");
 }

@@ -110,10 +110,11 @@ class YillikIzinHakDuzeltmeLedgerService
 
         $pdo->beginTransaction();
         try {
+            $forUpdate = self::forUpdateSuffix($pdo);
             $stmt = $pdo->prepare(
                 'SELECT * FROM yillik_izin_hak_duzeltmeleri
                  WHERE id = :id AND personel_id = :pid
-                 LIMIT 1 FOR UPDATE'
+                 LIMIT 1' . $forUpdate
             );
             $stmt->execute(['id' => $duzeltmeId, 'pid' => $personelId]);
             $row = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -130,7 +131,7 @@ class YillikIzinHakDuzeltmeLedgerService
             }
 
             $exists = $pdo->prepare(
-                'SELECT id FROM yillik_izin_hak_duzeltmeleri WHERE reverses_id = :rid LIMIT 1 FOR UPDATE'
+                'SELECT id FROM yillik_izin_hak_duzeltmeleri WHERE reverses_id = :rid LIMIT 1' . $forUpdate
             );
             $exists->execute(['rid' => $duzeltmeId]);
             if ($exists->fetch(PDO::FETCH_ASSOC)) {
@@ -319,6 +320,12 @@ class YillikIzinHakDuzeltmeLedgerService
         if (!$stmt->fetch(PDO::FETCH_ASSOC)) {
             throw new YillikIzinHakDuzeltmeException('NOT_FOUND', 'Personel bulunamadi.', 404);
         }
+    }
+
+    /** @return string */
+    private static function forUpdateSuffix(PDO $pdo)
+    {
+        return $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite' ? '' : ' FOR UPDATE';
     }
 
     /**

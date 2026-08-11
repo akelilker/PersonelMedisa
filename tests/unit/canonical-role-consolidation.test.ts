@@ -163,12 +163,16 @@ describe("S1 canonical role consolidation", () => {
     expect(hasRolePermission("IK_SORUMLUSU", "surecler.create")).toBe(true);
   });
 
-  it("preserves BOLUM_YONETICISI business decisions without GY finals", () => {
+  it("preserves BOLUM_YONETICISI business decisions + explicit SGK approve without GY inheritance", () => {
     expect(hasRolePermission("BOLUM_YONETICISI", "puantaj.olay_karar.decide")).toBe(true);
     expect(hasRolePermission("BOLUM_YONETICISI", "disiplin.final_decision")).toBe(true);
+    expect(hasRolePermission("BOLUM_YONETICISI", "sgk_karar_paketi.approve")).toBe(true);
+    expect(hasRolePermission("BOLUM_YONETICISI", "sgk_karar_paketi.prepare")).toBe(false);
     expect(hasRolePermission("BOLUM_YONETICISI", "genel_yonetici_onayi.approve")).toBe(false);
     expect(hasRolePermission("BOLUM_YONETICISI", "bordro_kesinlestirme.approve")).toBe(false);
-    expect(hasRolePermission("BOLUM_YONETICISI", "sgk_karar_paketi.approve")).toBe(false);
+    expect(hasRolePermission("BOLUM_YONETICISI", "legal_hold.manage")).toBe(false);
+    expect(hasRolePermission("BOLUM_YONETICISI", "retention.destruction.approve")).toBe(false);
+    expect(hasRolePermission("BOLUM_YONETICISI", "yonetim-paneli.manage")).toBe(false);
   });
 
   it("GENEL_YONETICI owns final approvals including patron_ack.mark_seen", () => {
@@ -256,12 +260,51 @@ describe("S1 canonical role consolidation", () => {
     expect(hasRolePermission("PERSONEL", "yonetim-paneli.view")).toBe(false);
   });
 
-  it("SGK owner split: prepare IK / approve GY; others neither", () => {
+  it("SGK owner split: prepare IK; approve GY + BOLUM; deny others", () => {
     expect(hasRolePermission("IK_SORUMLUSU", "sgk_karar_paketi.prepare")).toBe(true);
+    expect(hasRolePermission("IK_SORUMLUSU", "sgk_karar_paketi.approve")).toBe(false);
+    expect(hasRolePermission("GENEL_YONETICI", "sgk_karar_paketi.prepare")).toBe(true);
     expect(hasRolePermission("GENEL_YONETICI", "sgk_karar_paketi.approve")).toBe(true);
-    for (const role of ["MUHASEBE", "BOLUM_YONETICISI", "BIRIM_AMIRI", "PERSONEL", "SISTEM_YONETICISI"] as const) {
+    expect(hasRolePermission("BOLUM_YONETICISI", "sgk_karar_paketi.approve")).toBe(true);
+    expect(hasRolePermission("BOLUM_YONETICISI", "sgk_karar_paketi.prepare")).toBe(false);
+    for (const role of ["MUHASEBE", "BIRIM_AMIRI", "PERSONEL", "SISTEM_YONETICISI"] as const) {
       expect(hasRolePermission(role, "sgk_karar_paketi.prepare")).toBe(false);
       expect(hasRolePermission(role, "sgk_karar_paketi.approve")).toBe(false);
+    }
+  });
+
+  it("manual canonical role assignment: exact 7 picker; no legacy/smoke; GY+BOLUM selectable", () => {
+    expect(ASSIGNABLE_USER_ROLES).toHaveLength(7);
+    expect(ASSIGNABLE_USER_ROLES).toEqual(expect.arrayContaining(HUMAN_7));
+    expect(ASSIGNABLE_USER_ROLES).toContain("GENEL_YONETICI");
+    expect(ASSIGNABLE_USER_ROLES).toContain("BOLUM_YONETICISI");
+    expect(ASSIGNABLE_USER_ROLES).not.toContain("AUTH_SMOKE_READONLY");
+    expect(ASSIGNABLE_USER_ROLES).not.toContain("SGK_KARAR_ONAY_YETKILISI");
+    expect(ASSIGNABLE_USER_ROLES).not.toContain("IDARI_ISLER");
+    expect(ASSIGNABLE_USER_ROLES).not.toContain("PATRON");
+    expect(ASSIGNABLE_USER_ROLES).not.toContain("IK_BORDRO");
+
+    const panel = readFileSync(resolve(root, "src/features/yonetim/pages/YonetimPaneliPage.tsx"), "utf8");
+    expect(panel).toContain("ASSIGNABLE_USER_ROLES");
+    expect(panel).toContain("roleOptions");
+    expect(panel).not.toContain("SGK_KARAR_ONAY_YETKILISI");
+    expect(panel).not.toContain("IDARI_ISLER");
+  });
+
+  it("forbids person/username/id specific role mapping in migration and auth owners", () => {
+    const sql = readFileSync(MIG_054, "utf8");
+    const php = readFileSync(PHP_PATH, "utf8");
+    const feCanon = readFileSync(resolve(root, "src/lib/authorization/canonicalize-user-role.ts"), "utf8");
+
+    expect(sql).not.toMatch(/WHERE\s+username\s*=/i);
+    expect(sql).not.toMatch(/WHERE\s+id\s*=/i);
+    expect(sql).not.toMatch(/ad_soyad/i);
+    expect(sql).not.toMatch(/UPDATE users SET rol = .+ WHERE rol = 'SGK_KARAR_ONAY_YETKILISI'/);
+    expect(sql).not.toMatch(/UPDATE users SET rol = .+ WHERE rol = 'IDARI_ISLER'/);
+
+    for (const src of [php, feCanon, sql]) {
+      expect(src).not.toMatch(/WHERE\s+username\s*=\s*['"]/i);
+      expect(src).not.toMatch(/ad_soyad\s*=\s*['"][^'"]+['"]/);
     }
   });
 

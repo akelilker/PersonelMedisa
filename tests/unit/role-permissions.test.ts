@@ -354,6 +354,8 @@ describe("role permissions", () => {
   it("locks S98 dual-control prepare/approve permissions", () => {
     expect(hasRolePermission("GENEL_YONETICI", "sgk_karar_paketi.prepare")).toBe(true);
     expect(hasRolePermission("GENEL_YONETICI", "sgk_karar_paketi.approve")).toBe(true);
+    expect(hasRolePermission("BOLUM_YONETICISI", "sgk_karar_paketi.approve")).toBe(true);
+    expect(hasRolePermission("BOLUM_YONETICISI", "sgk_karar_paketi.prepare")).toBe(false);
     expect(hasRolePermission("IK_SORUMLUSU", "sgk_karar_paketi.prepare")).toBe(true);
     expect(hasRolePermission("IK_SORUMLUSU", "sgk_karar_paketi.approve")).toBe(false);
     expect(hasRolePermission("IK_SORUMLUSU", "sirket_parametreleri.view")).toBe(true);
@@ -365,7 +367,9 @@ describe("role permissions", () => {
     expect(hasRolePermission("SGK_KARAR_ONAY_YETKILISI", "sgk_karar_paketi.prepare")).toBe(false);
     expect(hasRolePermission("MUHASEBE", "sgk_karar_paketi.prepare")).toBe(false);
     expect(hasRolePermission("MUHASEBE", "sgk_karar_paketi.approve")).toBe(false);
-    expect(hasRolePermission("BOLUM_YONETICISI", "sgk_karar_paketi.prepare")).toBe(false);
+    expect(hasRolePermission("BIRIM_AMIRI", "sgk_karar_paketi.approve")).toBe(false);
+    expect(hasRolePermission("SISTEM_YONETICISI", "sgk_karar_paketi.approve")).toBe(false);
+    expect(hasRolePermission("PERSONEL", "sgk_karar_paketi.approve")).toBe(false);
     expect(ALL_ROLES).toContain("IK_SORUMLUSU");
     expect(ALL_ROLES).not.toContain("IK_BORDRO");
     expect(ALL_ROLES).not.toContain("SGK_KARAR_ONAY_YETKILISI");

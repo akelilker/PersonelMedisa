@@ -123,6 +123,7 @@ describe("S98 SGK dual-control identity fail-closed", () => {
     const perms = read("api/src/Auth/RolePermissions.php");
     expect(perms).toMatch(/'IK_SORUMLUSU'\s*=>\s*\[[\s\S]*?'sgk_karar_paketi\.prepare'/);
     expect(perms).toMatch(/'GENEL_YONETICI'\s*=>\s*\[[\s\S]*?'sgk_karar_paketi\.approve'/);
+    expect(perms).toMatch(/'BOLUM_YONETICISI'\s*=>\s*\[[\s\S]*?'sgk_karar_paketi\.approve'/);
     expect(perms).toContain("'IK_BORDRO' => 'IK_SORUMLUSU'");
     expect(perms).not.toMatch(/'SGK_KARAR_ONAY_YETKILISI'\s*=>\s*\[/);
     const ikStart = perms.indexOf("'IK_SORUMLUSU' => [");
@@ -139,5 +140,15 @@ describe("S98 SGK dual-control identity fail-closed", () => {
     );
     expect(gyBlock).toContain("sgk_karar_paketi.approve");
     expect(gyBlock).toContain("sgk_karar_paketi.prepare");
+    const bolumBlock = perms.slice(
+      perms.indexOf("'BOLUM_YONETICISI' => ["),
+      perms.indexOf("'MUHASEBE' => [")
+    );
+    expect(bolumBlock).toContain("sgk_karar_paketi.approve");
+    expect(bolumBlock).not.toContain("sgk_karar_paketi.prepare");
+    expect(bolumBlock).not.toContain("legal_hold.manage");
+    expect(bolumBlock).not.toContain("retention.destruction.approve");
+    expect(bolumBlock).not.toContain("genel_yonetici_onayi.approve");
+    expect(bolumBlock).not.toContain("bordro_kesinlestirme.approve");
   });
 });

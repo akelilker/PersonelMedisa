@@ -156,6 +156,8 @@ class RolePermissions
             'disiplin.final_decision',
             'puantaj.olay_karar.decide',
             'puantaj.olay_karar.view',
+            // Explicit SGK final approve only — does not inherit GENEL_YONETICI matrix.
+            'sgk_karar_paketi.approve',
         ],
         // External accountant: finalized mali/bordro read + export. No operational write.
         'MUHASEBE' => [

@@ -249,7 +249,9 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "disiplin.view",
     "disiplin.final_decision",
     "puantaj.olay_karar.decide",
-    "puantaj.olay_karar.view"
+    "puantaj.olay_karar.view",
+    // Explicit SGK final approve only — does not inherit GENEL_YONETICI matrix.
+    "sgk_karar_paketi.approve"
   ],
   /** External accountant: finalized mali/bordro read + export. No operational write. */
   MUHASEBE: [

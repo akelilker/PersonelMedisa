@@ -366,7 +366,8 @@ $bolum = ['id' => 4, 'rol' => 'BOLUM_YONETICISI', 'sube_ids' => [1]];
 $ba = ['id' => 3, 'rol' => 'BIRIM_AMIRI', 'sube_ids' => [1]];
 $baEmpty = ['id' => 31, 'rol' => 'BIRIM_AMIRI', 'sube_ids' => []];
 $muhasebe = ['id' => 2, 'rol' => 'MUHASEBE', 'sube_ids' => [1, 2]];
-$patron = ['id' => 9, 'rol' => 'PATRON', 'sube_ids' => []];
+$ik = ['id' => 8, 'rol' => 'IK_SORUMLUSU', 'sube_ids' => [1, 2]];
+$personel = ['id' => 9, 'rol' => 'PERSONEL', 'sube_ids' => []];
 
 $createPayload = [
     'personel_id' => 10,
@@ -518,16 +519,19 @@ $baEmptyGlobal = invokeZimmetHttp($pdo, $baEmpty, 'GET', '/zimmetler', [], [], [
 zimmetAssert($baEmptyGlobal['status'] === 403, 'BA empty allowedSubeIds global list → 403');
 
 $muhCreate = invokeZimmetHttp($pdo, $muhasebe, 'POST', '/zimmetler', array_merge($createPayload, ['personel_id' => 20]));
-zimmetAssert($muhCreate['status'] === 201, 'MUHASEBE create → 201');
+zimmetAssert($muhCreate['status'] === 403, 'MUHASEBE create → 403 (operational write narrowed)');
+
+$ikCreate = invokeZimmetHttp($pdo, $ik, 'POST', '/zimmetler', array_merge($createPayload, ['personel_id' => 20]));
+zimmetAssert($ikCreate['status'] === 201, 'IK_SORUMLUSU create → 201');
 
 $muhList = invokeZimmetHttp($pdo, $muhasebe, 'GET', '/zimmetler', [], [], []);
 zimmetAssert($muhList['status'] === 200, 'MUHASEBE multi-sube list → 200');
 
-$patronCreate = invokeZimmetHttp($pdo, $patron, 'POST', '/zimmetler', $createPayload);
-zimmetAssert($patronCreate['status'] === 403, 'PATRON create → 403');
+$personelCreate = invokeZimmetHttp($pdo, $personel, 'POST', '/zimmetler', $createPayload);
+zimmetAssert($personelCreate['status'] === 403, 'PERSONEL create → 403');
 
-$patronList = invokeZimmetHttp($pdo, $patron, 'GET', '/zimmetler', [], [], []);
-zimmetAssert($patronList['status'] === 403, 'PATRON list → 403');
+$personelList = invokeZimmetHttp($pdo, $personel, 'GET', '/zimmetler', [], [], []);
+zimmetAssert($personelList['status'] === 403, 'PERSONEL list → 403');
 
 $unauth = invokeZimmetHttp($pdo, null, 'POST', '/zimmetler', $createPayload);
 zimmetAssert($unauth['status'] === 401, 'unauthenticated → 401');

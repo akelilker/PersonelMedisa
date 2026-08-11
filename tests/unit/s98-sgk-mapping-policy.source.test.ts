@@ -50,8 +50,13 @@ describe("S98 SGK mapping + policy source guards", () => {
   it("HF1: successor submit trusts persisted parent evidence, not request manifests", () => {
     const write = read("api/src/Services/Payroll/SgkKatalogWriteService.php");
     const authApi = read("src/api/auth.api.ts");
-    expect(authApi).toContain('normalized === "IK_BORDRO"');
-    expect(authApi).toContain('normalized === "SGK_KARAR_ONAY_YETKILISI"');
+    const canonicalize = read("src/lib/authorization/canonicalize-user-role.ts");
+    expect(authApi).toContain("canonicalizeUserRole");
+    expect(authApi).toContain("IK_SORUMLUSU");
+    expect(authApi).not.toContain('normalized === "IK_BORDRO"');
+    expect(authApi).not.toContain('normalized === "SGK_KARAR_ONAY_YETKILISI"');
+    expect(canonicalize).toContain('IK_BORDRO: "IK_SORUMLUSU"');
+    expect(canonicalize).toContain('PATRON: "GENEL_YONETICI"');
     expect(write).toContain("hasExplicitRows");
     expect(write).toContain("resolveStoredSurumTamlik");
     expect(write).toContain("assertEslemeSuccessorParentEvidence");
@@ -110,8 +115,10 @@ describe("S98 SGK mapping + policy source guards", () => {
     expect(controller).not.toContain('!== \'GENEL_YONETICI\'');
     expect(perms).toContain("sgk_karar_paketi.prepare");
     expect(perms).toContain("sgk_karar_paketi.approve");
-    expect(perms).toContain("IK_BORDRO");
+    expect(perms).toContain("IK_SORUMLUSU");
+    expect(perms).toContain("'IK_BORDRO' => 'IK_SORUMLUSU'");
     expect(perms).toContain("SGK_KARAR_ONAY_YETKILISI");
+    expect(perms).not.toMatch(/'SGK_KARAR_ONAY_YETKILISI'\s*=>\s*\[/);
     expect(eslemeWrite).toContain("Never touch parent");
     expect(eslemeWrite).toContain("parent_immutable_mi");
   });

@@ -184,8 +184,14 @@ describe("S74-B backend permission matrix (RolePermissions.php)", () => {
     expect(block).not.toContain("'puantaj.bildirim_etki.generate'");
   });
 
-  it("MUHASEBE view yes / generate yes", () => {
+  it("MUHASEBE view no / generate no (narrowed)", () => {
     const block = roleBlock("MUHASEBE");
+    expect(block).not.toContain("'puantaj.bildirim_etki.view'");
+    expect(block).not.toContain("'puantaj.bildirim_etki.generate'");
+  });
+
+  it("IK_SORUMLUSU view yes / generate yes", () => {
+    const block = roleBlock("IK_SORUMLUSU");
     expect(block).toContain("'puantaj.bildirim_etki.view'");
     expect(block).toContain("'puantaj.bildirim_etki.generate'");
   });
@@ -196,8 +202,8 @@ describe("S74-B backend permission matrix (RolePermissions.php)", () => {
     expect(block).not.toContain("'puantaj.bildirim_etki.generate'");
   });
 
-  it("PATRON view no / generate no", () => {
-    const block = roleBlock("PATRON");
+  it("PERSONEL view no / generate no", () => {
+    const block = roleBlock("PERSONEL");
     expect(block).not.toContain("'puantaj.bildirim_etki.view'");
     expect(block).not.toContain("'puantaj.bildirim_etki.generate'");
   });
@@ -211,8 +217,14 @@ describe("S74-C1 backend permission matrix (RolePermissions.php)", () => {
     return rolePermissionsSource.slice(start, end);
   }
 
-  it("MUHASEBE apply yes / dismiss yes", () => {
+  it("MUHASEBE apply no / dismiss no (narrowed)", () => {
     const block = roleBlock("MUHASEBE");
+    expect(block).not.toContain("'puantaj.bildirim_etki.apply'");
+    expect(block).not.toContain("'puantaj.bildirim_etki.dismiss'");
+  });
+
+  it("IK_SORUMLUSU apply yes / dismiss yes", () => {
+    const block = roleBlock("IK_SORUMLUSU");
     expect(block).toContain("'puantaj.bildirim_etki.apply'");
     expect(block).toContain("'puantaj.bildirim_etki.dismiss'");
   });
@@ -235,8 +247,8 @@ describe("S74-C1 backend permission matrix (RolePermissions.php)", () => {
     expect(block).not.toContain("'puantaj.bildirim_etki.dismiss'");
   });
 
-  it("PATRON apply no / dismiss no", () => {
-    const block = roleBlock("PATRON");
+  it("PERSONEL apply no / dismiss no", () => {
+    const block = roleBlock("PERSONEL");
     expect(block).not.toContain("'puantaj.bildirim_etki.apply'");
     expect(block).not.toContain("'puantaj.bildirim_etki.dismiss'");
   });

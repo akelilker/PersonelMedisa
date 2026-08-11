@@ -95,7 +95,7 @@ describe("legacy revizyon-merkezi route remap", () => {
   });
 
   it("does not permission-bypass unauthorized roles via the legacy alias", () => {
-    window.localStorage.setItem(MEDISA_AUTH_SESSION_KEY, JSON.stringify(buildSession("PATRON")));
+    window.localStorage.setItem(MEDISA_AUTH_SESSION_KEY, JSON.stringify(buildSession("PERSONEL")));
 
     render(<RemapFixture initialEntry="/revizyon-merkezi" />);
 

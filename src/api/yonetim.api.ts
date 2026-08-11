@@ -14,6 +14,7 @@ import type {
   YonetimSube
 } from "../types/yonetim";
 import type { UserRole } from "../types/auth";
+import { canonicalizeUserRole } from "../lib/authorization/canonicalize-user-role";
 import { SUBE_DELETE_BLOCKED_ERROR_CODE } from "../lib/yonetim/sube-delete";
 import { sanitizeYonetimKullaniciPayloadForApi } from "../lib/yonetim/kullanici-api-contract";
 import { appendQueryParams } from "../utils/append-query-params";
@@ -83,20 +84,7 @@ function normalizeKullaniciTipi(value: unknown): KullaniciTipi {
 }
 
 function normalizeUserRole(value: unknown): UserRole {
-  if (
-    value === "GENEL_YONETICI" ||
-    value === "BOLUM_YONETICISI" ||
-    value === "MUHASEBE" ||
-    value === "BIRIM_AMIRI" ||
-    value === "PATRON" ||
-    value === "AUTH_SMOKE_READONLY" ||
-    value === "IK_BORDRO" ||
-    value === "SGK_KARAR_ONAY_YETKILISI"
-  ) {
-    return value;
-  }
-
-  return "BIRIM_AMIRI";
+  return canonicalizeUserRole(value) ?? "BIRIM_AMIRI";
 }
 
 function readNumberArray(value: unknown): number[] {

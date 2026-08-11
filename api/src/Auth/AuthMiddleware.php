@@ -64,11 +64,12 @@ class AuthMiddleware
         }
 
         $subeIds = self::loadUserSubeIds($pdo, $userId);
+        $rolCanonical = RolePermissions::normalizeRole((string) $row['rol']);
         self::$user = [
             'id' => (int) $row['id'],
             'username' => (string) $row['username'],
             'ad_soyad' => (string) $row['ad_soyad'],
-            'rol' => (string) $row['rol'],
+            'rol' => $rolCanonical !== '' ? $rolCanonical : (string) $row['rol'],
             'durum' => (string) ($row['durum'] ?? ''),
             'sube_ids' => $subeIds,
         ];

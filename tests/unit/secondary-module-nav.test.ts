@@ -60,8 +60,8 @@ describe("secondary-module-nav", () => {
     expect(modules.some((item) => item.id === "finans")).toBe(false);
   });
 
-  it("returns an empty list for PATRON with no secondary permissions", () => {
-    expect(resolveSecondaryModules(permissionGate("PATRON"))).toEqual([]);
+  it("returns an empty list for PERSONEL with no secondary permissions", () => {
+    expect(resolveSecondaryModules(permissionGate("PERSONEL"))).toEqual([]);
   });
 
   it("filters to a partial permission set", () => {

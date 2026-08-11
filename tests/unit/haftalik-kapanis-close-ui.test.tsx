@@ -115,7 +115,7 @@ describe("HaftalikKapanisClosePanel UI", () => {
     ["BOLUM_YONETICISI", true],
     ["MUHASEBE", false],
     ["BIRIM_AMIRI", false],
-    ["PATRON", false]
+    ["PERSONEL", false]
   ] as const)("%s close action visibility = %s", async (role, visible) => {
     useRoleAccessMock.mockReturnValue(permissionsForRole(role));
     authSession.user.rol = role;

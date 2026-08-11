@@ -229,9 +229,16 @@ s84r2Assert(
     'GENEL_YONETICI has approve'
 );
 s84r2Assert(
-    RolePermissions::has(['rol' => 'MUHASEBE'], 'personel_bordro_kapsam.manage')
+    RolePermissions::has(['rol' => 'MUHASEBE'], 'personel_bordro_kapsam.view')
+        && !RolePermissions::has(['rol' => 'MUHASEBE'], 'personel_bordro_kapsam.manage')
         && !RolePermissions::has(['rol' => 'MUHASEBE'], 'personel_bordro_kapsam.approve'),
-    'MUHASEBE has manage not approve'
+    'MUHASEBE has view not manage/approve'
+);
+
+s84r2Assert(
+    RolePermissions::has(['rol' => 'IK_SORUMLUSU'], 'personel_bordro_kapsam.view')
+        && !RolePermissions::has(['rol' => 'IK_SORUMLUSU'], 'personel_bordro_kapsam.approve'),
+    'IK_SORUMLUSU has view without approve'
 );
 s84r2Assert(
     !RolePermissions::has(['rol' => 'BIRIM_AMIRI'], 'personel_bordro_kapsam.view')

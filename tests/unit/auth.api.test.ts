@@ -136,7 +136,7 @@ describe("auth.api login", () => {
     expect(session.active_sube_id).toBeNull();
   });
 
-  it("maps demo username containing patron to PATRON role", async () => {
+  it("maps demo username containing patron to GENEL_YONETICI (safe alias)", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async () =>
@@ -151,11 +151,11 @@ describe("auth.api login", () => {
     );
 
     const session = await login({ username: "patron", password: "demo123" });
-    expect(session.user.rol).toBe("PATRON");
+    expect(session.user.rol).toBe("GENEL_YONETICI");
     expect(session.ui_profile).toBe("yonetim");
   });
 
-  it("accepts IK_BORDRO from successful login without demoting role", async () => {
+  it("canonicalizes IK_BORDRO login payload to IK_SORUMLUSU", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async () =>
@@ -179,13 +179,13 @@ describe("auth.api login", () => {
 
     const session = await login({ username: "hazirlayan", password: "secret" });
     expect(session.token).toBe("ik-token");
-    expect(session.user.rol).toBe("IK_BORDRO");
+    expect(session.user.rol).toBe("IK_SORUMLUSU");
     expect(session.ui_profile).toBe("yonetim");
     expect(session.user.sube_ids).toEqual([1, 2]);
     expect(session.active_sube_id).toBe(1);
   });
 
-  it("accepts SGK_KARAR_ONAY_YETKILISI from successful login without demoting role", async () => {
+  it("fail-closes unresolved SGK_KARAR_ONAY_YETKILISI login role", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async () =>
@@ -207,10 +207,9 @@ describe("auth.api login", () => {
       )
     );
 
-    const session = await login({ username: "onaylayan", password: "secret" });
-    expect(session.token).toBe("appr-token");
-    expect(session.user.rol).toBe("SGK_KARAR_ONAY_YETKILISI");
-    expect(session.ui_profile).toBe("yonetim");
+    await expect(login({ username: "onaylayan", password: "secret" })).rejects.toMatchObject({
+      message: "Login yaniti beklenen oturum formatinda degil."
+    });
   });
 
   it("fail-closes unknown role even when login HTTP 200", async () => {

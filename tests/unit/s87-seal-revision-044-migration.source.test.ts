@@ -10,7 +10,7 @@ describe("S87 migration 044 seal revision reopen source contracts", () => {
     const files = readdirSync(resolve("api/migrations"))
       .filter((n) => /^\d{3}_.+\.sql$/.test(n))
       .sort();
-    expect(files.at(-1)).toBe("053_retention_legal_hold_arsiv.sql");
+    expect(files.at(-1)).toBe("054_canonical_role_consolidation.sql");
   });
 
   it("is additive revision + dual-control reopen without destructive rewrite", () => {

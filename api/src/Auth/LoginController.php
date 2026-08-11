@@ -50,8 +50,16 @@ class LoginController
         }
 
         $subeIds = self::loadUserSubeIds($pdo, (int) $user['id']);
-        $rol = (string) $user['rol'];
-        if (strtoupper(trim($rol)) === 'AUTH_SMOKE_READONLY' && count($subeIds) !== 1) {
+        $rolRaw = (string) $user['rol'];
+        $rol = RolePermissions::normalizeRole($rolRaw);
+        if ($rol === '') {
+            JsonResponse::error(
+                403,
+                'ROLE_UNRESOLVED',
+                'Kullanici rolu canonical modele cozulemedi. Manuel rol eslemesi gerekir.'
+            );
+        }
+        if ($rol === 'AUTH_SMOKE_READONLY' && count($subeIds) !== 1) {
             JsonResponse::error(
                 403,
                 'AUTH_SMOKE_SCOPE_INVALID',

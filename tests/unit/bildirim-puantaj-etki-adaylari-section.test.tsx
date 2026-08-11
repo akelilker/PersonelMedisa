@@ -210,9 +210,9 @@ describe("BildirimPuantajEtkiAdaylariSection", () => {
     await waitFor(() => expect(fetchBirimAmiriMock).not.toHaveBeenCalled());
   });
 
-  it("PATRON paneli render etmez ve birim amiri secenekleri cagrilmaz", async () => {
+  it("PERSONEL paneli render etmez ve birim amiri secenekleri cagrilmaz", async () => {
     mockPermissions([]);
-    mockSession({ active_sube_id: null, user: { rol: "PATRON", sube_ids: [] } });
+    mockSession({ active_sube_id: null, user: { rol: "PERSONEL", sube_ids: [] } });
     const { container } = render(<BildirimPuantajEtkiAdaylariSection />);
     expect(container.innerHTML).toBe("");
     await waitFor(() => expect(fetchBirimAmiriMock).not.toHaveBeenCalled());

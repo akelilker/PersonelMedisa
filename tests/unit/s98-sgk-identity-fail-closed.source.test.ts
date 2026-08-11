@@ -121,13 +121,23 @@ describe("S98 SGK dual-control identity fail-closed", () => {
 
   it("permission matrix matches dedicated preparer/approver contract", () => {
     const perms = read("api/src/Auth/RolePermissions.php");
-    expect(perms).toMatch(/'IK_BORDRO'\s*=>\s*\[[\s\S]*?'sgk_karar_paketi\.prepare'/);
-    expect(perms).toMatch(/'SGK_KARAR_ONAY_YETKILISI'\s*=>\s*\[[\s\S]*?'sgk_karar_paketi\.approve'/);
-    const ikBlock = perms.slice(perms.indexOf("'IK_BORDRO'"), perms.indexOf("'SGK_KARAR_ONAY_YETKILISI'"));
+    expect(perms).toMatch(/'IK_SORUMLUSU'\s*=>\s*\[[\s\S]*?'sgk_karar_paketi\.prepare'/);
+    expect(perms).toMatch(/'GENEL_YONETICI'\s*=>\s*\[[\s\S]*?'sgk_karar_paketi\.approve'/);
+    expect(perms).toContain("'IK_BORDRO' => 'IK_SORUMLUSU'");
+    expect(perms).not.toMatch(/'SGK_KARAR_ONAY_YETKILISI'\s*=>\s*\[/);
+    const ikStart = perms.indexOf("'IK_SORUMLUSU' => [");
+    const ikEnd = perms.indexOf("'SISTEM_YONETICISI' => [");
+    expect(ikStart).toBeGreaterThan(-1);
+    expect(ikEnd).toBeGreaterThan(ikStart);
+    const ikBlock = perms.slice(ikStart, ikEnd);
     expect(ikBlock).toContain("personeller.ucret.view");
+    expect(ikBlock).toContain("sgk_karar_paketi.prepare");
     expect(ikBlock).not.toContain("sgk_karar_paketi.approve");
-    const apprBlock = perms.slice(perms.indexOf("'SGK_KARAR_ONAY_YETKILISI'"), perms.indexOf("];", perms.indexOf("'SGK_KARAR_ONAY_YETKILISI'")) + 2);
-    expect(apprBlock).not.toContain("sgk_karar_paketi.prepare");
-    expect(apprBlock).not.toContain("personeller.ucret.view");
+    const gyBlock = perms.slice(
+      perms.indexOf("'GENEL_YONETICI' => ["),
+      perms.indexOf("'BOLUM_YONETICISI' => [")
+    );
+    expect(gyBlock).toContain("sgk_karar_paketi.approve");
+    expect(gyBlock).toContain("sgk_karar_paketi.prepare");
   });
 });

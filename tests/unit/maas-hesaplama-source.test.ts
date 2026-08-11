@@ -52,23 +52,25 @@ describe("S77-C/S77-D maas hesaplama source contract", () => {
     }
   });
 
-  it("grants view/manage only to muhasebe and genel yonetici", () => {
+  it("grants maas view to muhasebe (read) and manage to ik/gy", () => {
     expect(getRolePermissions("MUHASEBE")).toContain("maas_hesaplama.view");
-    expect(getRolePermissions("MUHASEBE")).toContain("maas_hesaplama.manage");
+    expect(getRolePermissions("MUHASEBE")).not.toContain("maas_hesaplama.manage");
+    expect(getRolePermissions("IK_SORUMLUSU")).toContain("maas_hesaplama.manage");
     expect(getRolePermissions("GENEL_YONETICI")).toContain("maas_hesaplama.manage");
     expect(getRolePermissions("BIRIM_AMIRI")).not.toContain("maas_hesaplama.view");
     expect(getRolePermissions("BOLUM_YONETICISI")).not.toContain("maas_hesaplama.view");
-    expect(getRolePermissions("PATRON")).not.toContain("maas_hesaplama.view");
+    expect(getRolePermissions("PERSONEL")).not.toContain("maas_hesaplama.view");
   });
 
-  it("grants aday view/manage only to muhasebe and genel yonetici", () => {
+  it("grants aday view to muhasebe and manage to ik/gy", () => {
     expect(getRolePermissions("MUHASEBE")).toContain("maas_hesaplama_adaylari.view");
-    expect(getRolePermissions("MUHASEBE")).toContain("maas_hesaplama_adaylari.manage");
+    expect(getRolePermissions("MUHASEBE")).not.toContain("maas_hesaplama_adaylari.manage");
+    expect(getRolePermissions("IK_SORUMLUSU")).toContain("maas_hesaplama_adaylari.manage");
     expect(getRolePermissions("GENEL_YONETICI")).toContain("maas_hesaplama_adaylari.view");
     expect(getRolePermissions("GENEL_YONETICI")).toContain("maas_hesaplama_adaylari.manage");
     expect(getRolePermissions("BIRIM_AMIRI")).not.toContain("maas_hesaplama_adaylari.view");
     expect(getRolePermissions("BOLUM_YONETICISI")).not.toContain("maas_hesaplama_adaylari.view");
-    expect(getRolePermissions("PATRON")).not.toContain("maas_hesaplama_adaylari.view");
+    expect(getRolePermissions("PERSONEL")).not.toContain("maas_hesaplama_adaylari.view");
   });
 
   it("keeps Money and engine source free of float casts", () => {

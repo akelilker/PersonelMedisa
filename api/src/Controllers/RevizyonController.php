@@ -867,8 +867,6 @@ class RevizyonController
             $where[] = 't.bordro_etki_var_mi = 1';
         } elseif ($rol === 'BIRIM_AMIRI') {
             // Sube filter above; BA sees personel in allowed subeler.
-        } elseif ($rol === 'PATRON') {
-            return [];
         }
 
         $sql = 'SELECT t.*,
@@ -1096,9 +1094,6 @@ class RevizyonController
     private static function assertCanViewTalep(array $user, Request $request, array $row): void
     {
         $rol = (string) ($user['rol'] ?? '');
-        if ($rol === 'PATRON') {
-            JsonResponse::error(403, 'REVISION_SCOPE_DENIED', 'Revizyon talebi kapsam disi.');
-        }
 
         $allowed = SubeScope::allowedSubeIds($user);
         if (count($allowed) === 0 && $rol !== 'GENEL_YONETICI') {
@@ -1130,7 +1125,7 @@ class RevizyonController
             return;
         }
 
-        if ($rol === 'BIRIM_AMIRI') {
+        if ($rol === 'BIRIM_AMIRI' || $rol === 'IK_SORUMLUSU') {
             return;
         }
 
@@ -1149,9 +1144,6 @@ class RevizyonController
         $bordroEtkiNotu
     ): void {
         $rol = (string) ($user['rol'] ?? '');
-        if ($rol === 'PATRON') {
-            JsonResponse::error(403, 'REVISION_SCOPE_DENIED', 'Revizyon talebi kapsam disi.');
-        }
 
         $allowed = SubeScope::allowedSubeIds($user);
         if (count($allowed) === 0 && $rol !== 'GENEL_YONETICI') {
@@ -1181,7 +1173,7 @@ class RevizyonController
             return;
         }
 
-        if ($rol === 'BIRIM_AMIRI') {
+        if ($rol === 'BIRIM_AMIRI' || $rol === 'IK_SORUMLUSU') {
             return;
         }
 
@@ -1583,8 +1575,6 @@ class RevizyonController
             $where[] = 'p.departman_id IN (' . implode(', ', $placeholders) . ')';
         } elseif ($rol === 'MUHASEBE') {
             $where[] = 'c.bordro_etki_var_mi = 1';
-        } elseif ($rol === 'PATRON') {
-            return [];
         }
 
         $sql = 'SELECT c.*,
@@ -1730,9 +1720,6 @@ class RevizyonController
     private static function assertCanViewCorrectionFromTalep(array $user, Request $request, array $talep): void
     {
         $rol = (string) ($user['rol'] ?? '');
-        if ($rol === 'PATRON') {
-            JsonResponse::error(403, 'CORRECTION_SCOPE_DENIED', 'Revizyon correction kapsam disi.');
-        }
 
         $allowed = SubeScope::allowedSubeIds($user);
         if (count($allowed) === 0 && $rol !== 'GENEL_YONETICI') {
@@ -1781,7 +1768,7 @@ class RevizyonController
             return;
         }
 
-        if ($rol === 'BIRIM_AMIRI') {
+        if ($rol === 'BIRIM_AMIRI' || $rol === 'IK_SORUMLUSU') {
             return;
         }
 

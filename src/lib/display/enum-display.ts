@@ -6,16 +6,14 @@ import type { AylikOzetAggregateState, KullaniciTipi } from "../../types/yonetim
 const TR_LOCALE = "tr-TR";
 
 const USER_ROLE_LABELS: Record<UserRole, string> = {
-  GENEL_YONETICI: "Genel Yönetici",
-  BOLUM_YONETICISI: "Bölüm Yöneticisi",
+  PERSONEL: "Personel",
   MUHASEBE: "Muhasebe",
+  IK_SORUMLUSU: "İK Sorumlusu",
   BIRIM_AMIRI: "Birim Amiri Rolü",
-  PATRON: "Patron",
-  AUTH_SMOKE_READONLY: "Teknik Smoke — Salt Okuma",
-  IK_BORDRO: "İK / Bordro",
-  SGK_KARAR_ONAY_YETKILISI: "SGK Karar Onay Yetkilisi",
-  IDARI_ISLER: "İdari İşler",
-  SISTEM_YONETICISI: "Sistem Yöneticisi"
+  BOLUM_YONETICISI: "Bölüm Yöneticisi",
+  GENEL_YONETICI: "Genel Yönetici",
+  SISTEM_YONETICISI: "Sistem Yöneticisi",
+  AUTH_SMOKE_READONLY: "Teknik Smoke — Salt Okuma"
 };
 
 const UI_PROFILE_LABELS: Record<UiProfile, string> = {

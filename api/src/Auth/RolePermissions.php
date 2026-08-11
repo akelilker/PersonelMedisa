@@ -8,6 +8,12 @@ use Medisa\Api\Http\JsonResponse;
 
 class RolePermissions
 {
+    /** @var array<string, string> */
+    private static $safeAliases = [
+        'PATRON' => 'GENEL_YONETICI',
+        'IK_BORDRO' => 'IK_SORUMLUSU',
+    ];
+
     /** @var array<string, array<int, string>> */
     private static $matrix = [
         'GENEL_YONETICI' => [
@@ -66,6 +72,7 @@ class RolePermissions
             'genel_yonetici_bildirim_onayi.view',
             'genel_yonetici_bildirim_onayi.approve',
             'patron_ack.view',
+            'patron_ack.mark_seen',
             'sirket_parametreleri.view',
             'sirket_parametreleri.manage',
             'resmi_tatil_takvimi.view',
@@ -150,67 +157,34 @@ class RolePermissions
             'puantaj.olay_karar.decide',
             'puantaj.olay_karar.view',
         ],
+        // External accountant: finalized mali/bordro read + export. No operational write.
         'MUHASEBE' => [
             'personeller.view',
             'personeller.view.sube',
-            'personeller.create',
-            'personeller.import.apply',
-            'personeller.update',
             'personeller.detail.view',
             'personeller.ucret.view',
-            'personeller.ucret.manage',
             'maas_hesaplama.view',
-            'maas_hesaplama.manage',
             'maas_hesaplama_adaylari.view',
-            'maas_hesaplama_adaylari.manage',
             'mevzuat_parametreleri.view',
             'surecler.view',
             'surecler.view.sube',
-            'surecler.create',
-            'surecler.update',
-            'surecler.cancel',
             'surecler.detail.view',
-            'bildirimler.view',
-            'bildirimler.create',
-            'bildirimler.update',
-            'bildirimler.cancel',
-            'bildirimler.detail.view',
             'puantaj.view',
-            'puantaj.update',
-            'puantaj.donem_reopen.request',
-            'puantaj.donem_reseal',
             'puantaj.donem_seal.history',
-            'puantaj.bildirim_etki.view',
-            'puantaj.bildirim_etki.generate',
-            'puantaj.bildirim_etki.apply',
-            'puantaj.bildirim_etki.dismiss',
-            'puantaj.bildirim_etki.resolve_conflict',
             'puantaj.donem_kapanis.view',
             'puantaj.donem_kapanis.export',
             'puantaj.bildirim_etki.rapor.view',
             'puantaj.bildirim_etki.rapor.export',
             'raporlar.view',
             'finans.view',
-            'finans.create',
-            'finans.update',
-            'finans.cancel',
             'haftalik_mutabakat.view',
-            'aylik_bildirim_onayi.view',
             'bordro_on_izleme.view',
             'sirket_parametreleri.view',
-            'sirket_parametreleri.manage',
             'resmi_tatil_takvimi.view',
             'personel_bordro_kapsam.view',
-            'personel_bordro_kapsam.manage',
             'revizyon.view',
-            'revizyon.create',
-            'revizyon.submit',
-            'revizyon.cancel',
             'revizyon.view_finance_effect',
             'revizyon.view_audit_history',
-            'sgk.manuel_kod_override',
-            'disiplin.view',
-            'puantaj.olay_karar.view',
         ],
         'BIRIM_AMIRI' => [
             'personeller.view.sube',
@@ -243,65 +217,75 @@ class RolePermissions
             'aylik_bildirim_onayi.view',
             'aylik_bildirim_onayi.approve',
         ],
-        'PATRON' => [
-            'raporlar.view',
-            'patron_ack.view',
-            'patron_ack.mark_seen',
-        ],
-        'AUTH_SMOKE_READONLY' => [
-            'ops.auth_smoke.read',
-        ],
-        // Prepare-only: SGK karar paketi + sirket calisma politikasi hazirlama (approve yok).
-        'IK_BORDRO' => [
+        // IK operational owner. SGK prepare-only; no final approve / business decision.
+        'IK_SORUMLUSU' => [
             'personeller.view',
             'personeller.view.sube',
+            'personeller.create',
+            'personeller.import.apply',
+            'personeller.update',
             'personeller.detail.view',
             'personeller.ucret.view',
             'mevzuat_parametreleri.view',
-            'bordro_on_izleme.view',
-            'raporlar.view',
-            'sirket_parametreleri.view',
-            'sirket_parametreleri.manage',
-            'sgk_karar_paketi.prepare',
+            'surecler.view',
+            'surecler.view.sube',
+            'surecler.create',
+            'surecler.update',
+            'surecler.cancel',
+            'surecler.detail.view',
+            'bildirimler.view',
+            'bildirimler.detail.view',
+            'puantaj.view',
+            'puantaj.donem_reopen.request',
+            'puantaj.donem_reseal',
+            'puantaj.donem_seal.history',
+            'puantaj.bildirim_etki.view',
+            'puantaj.bildirim_etki.generate',
+            'puantaj.bildirim_etki.apply',
+            'puantaj.bildirim_etki.dismiss',
+            'puantaj.bildirim_etki.resolve_conflict',
+            'puantaj.donem_kapanis.view',
+            'puantaj.bildirim_etki.rapor.view',
+            'puantaj.olay_karar.view',
             'disiplin.view',
             'disiplin.review',
             'disiplin.defense_manage',
-            'surecler.view',
-            'surecler.view.sube',
-            'surecler.detail.view',
-            'arsiv.view',
-            'arsiv.download',
-            'retention.view',
-        ],
-        // Approve-only: SGK paket + sirket calisma politikasi onay (prepare yok).
-        'SGK_KARAR_ONAY_YETKILISI' => [
-            'mevzuat_parametreleri.view',
+            'maas_hesaplama.view',
+            'maas_hesaplama.manage',
+            'maas_hesaplama_adaylari.view',
+            'maas_hesaplama_adaylari.manage',
+            'raporlar.view',
             'bordro_on_izleme.view',
-            'raporlar.view',
             'sirket_parametreleri.view',
-            'bordro_kesinlestirme.approve',
-            'sgk_karar_paketi.approve',
-        ],
-        // Idari isler: arsiv okuma + dar personel/surec/rapor goruntuleme (legal hold / imha onayi yok).
-        'IDARI_ISLER' => [
-            'personeller.view',
-            'personeller.detail.view',
-            'surecler.view',
-            'raporlar.view',
+            'sirket_parametreleri.manage',
+            'personel_bordro_kapsam.view',
+            'revizyon.view',
+            'revizyon.create',
+            'revizyon.submit',
+            'revizyon.cancel',
+            'revizyon.view_audit_history',
+            'sgk_karar_paketi.prepare',
             'arsiv.view',
             'arsiv.download',
             'retention.view',
         ],
-        // Teknik: arsiv/retention goruntuleme (legal_hold.manage ve destruction.approve yok).
+        // Technical visibility — never business approver / legal_hold.manage / destruction.approve.
         'SISTEM_YONETICISI' => [
             'personeller.view',
             'personeller.view.sube',
             'personeller.detail.view',
+            'surecler.view',
+            'raporlar.view',
             'arsiv.view',
             'arsiv.download',
             'arsiv.audit.view',
             'retention.view',
             'retention.destruction.view',
+        ],
+        // Future self-service — zero business permissions this phase.
+        'PERSONEL' => [],
+        'AUTH_SMOKE_READONLY' => [
+            'ops.auth_smoke.read',
         ],
     ];
 
@@ -344,10 +328,25 @@ class RolePermissions
         JsonResponse::forbidden();
     }
 
-    private static function normalizeRole($role)
+    /**
+     * Single BE normalization boundary.
+     * Safe aliases: PATRON→GENEL_YONETICI, IK_BORDRO→IK_SORUMLUSU.
+     * Unresolved legacy (SGK_KARAR_ONAY_YETKILISI, IDARI_ISLER) → '' (fail-closed).
+     *
+     * @return string
+     */
+    public static function normalizeRole($role)
     {
         $normalized = strtoupper(trim((string) $role));
         if ($normalized === '') {
+            return '';
+        }
+
+        if (isset(self::$safeAliases[$normalized])) {
+            $normalized = self::$safeAliases[$normalized];
+        }
+
+        if ($normalized === 'SGK_KARAR_ONAY_YETKILISI' || $normalized === 'IDARI_ISLER') {
             return '';
         }
 

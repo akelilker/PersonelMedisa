@@ -26,6 +26,7 @@ import {
   ROUTE_PERMISSION,
   SURECLER_LIST_ANY
 } from "../lib/authorization/role-permissions";
+import { useAuth } from "../state/auth.store";
 
 function AppLayout() {
   return <AppShell />;
@@ -33,6 +34,15 @@ function AppLayout() {
 
 function HomeIndexMainMenu() {
   const ctx = useOutletContext<AppShellOutletContext>();
+  const { session } = useAuth();
+  if (session?.user.rol === "PERSONEL") {
+    return (
+      <section className="states-page" data-testid="personel-placeholder-page">
+        <h2>Personel ekranı henüz aktif değil.</h2>
+        <p>Personel self-service ve mobil yüzey sonraki fazda açılacaktır.</p>
+      </section>
+    );
+  }
   return ctx.showMainMenu ? <MainMenu onKayitOpen={ctx.onKayitOpen} /> : null;
 }
 

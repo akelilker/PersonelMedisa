@@ -52,7 +52,7 @@ if (($argv[1] ?? '') === '--child') {
 function spawnSalaryChild(array $args, string $dsn): array
 {
     $phpArgs = [];
-    if (PHP_OS_FAMILY === 'Windows') {
+    if (PHP_OS_FAMILY === 'Windows' && !extension_loaded('pdo_mysql')) {
         $extensionDir = ini_get('extension_dir');
         if (is_string($extensionDir) && $extensionDir !== '') {
             $phpArgs[] = '-d';
@@ -83,8 +83,14 @@ function finishSalaryChild(array $child): string
     if ($status !== 0) {
         throw new RuntimeException('Child failed: ' . $stderr);
     }
+    // Ignore PHP startup warnings that may pollute stdout on Windows.
+    $lines = preg_split("/\r\n|\n|\r/", $stdout) ?: [];
+    $meaningful = array_values(array_filter($lines, static function (string $line): bool {
+        $line = trim($line);
+        return $line !== '' && stripos($line, 'Warning:') !== 0;
+    }));
 
-    return $stdout;
+    return $meaningful === [] ? '' : (string) end($meaningful);
 }
 
 $adminDsn = getenv('MEDISA_TEST_MYSQL_DSN') ?: '';

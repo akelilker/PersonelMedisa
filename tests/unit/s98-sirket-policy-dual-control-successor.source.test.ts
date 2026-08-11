@@ -19,17 +19,20 @@ describe("S98 sirket calisma dual-control successor", () => {
   });
 
   it("grants prepare/approve split for company policy dual-control actors", () => {
-    const ikBlock = roles.slice(roles.indexOf("'IK_BORDRO'"), roles.indexOf("'SGK_KARAR_ONAY_YETKILISI'"));
-    const apprBlock = roles.slice(
-      roles.indexOf("'SGK_KARAR_ONAY_YETKILISI'"),
-      roles.indexOf("];", roles.indexOf("'SGK_KARAR_ONAY_YETKILISI'")) + 2
+    const ikBlock = roles.slice(
+      roles.indexOf("'IK_SORUMLUSU' => ["),
+      roles.indexOf("'SISTEM_YONETICISI' => [")
+    );
+    const gyBlock = roles.slice(
+      roles.indexOf("'GENEL_YONETICI' => ["),
+      roles.indexOf("'BOLUM_YONETICISI' => [")
     );
     expect(ikBlock).toContain("sirket_parametreleri.view");
     expect(ikBlock).toContain("sirket_parametreleri.manage");
     expect(ikBlock).not.toContain("bordro_kesinlestirme.approve");
-    expect(apprBlock).toContain("sirket_parametreleri.view");
-    expect(apprBlock).toContain("bordro_kesinlestirme.approve");
-    expect(apprBlock).not.toContain("sirket_parametreleri.manage");
+    expect(gyBlock).toContain("sirket_parametreleri.view");
+    expect(gyBlock).toContain("sirket_parametreleri.manage");
+    expect(gyBlock).toContain("bordro_kesinlestirme.approve");
   });
 
   it("allows preparer or approver to open karar ozeti", () => {

@@ -420,7 +420,7 @@ function seedFcotFixtures(PDO $pdo): void
         INSERT INTO users (id, username, password_hash, ad_soyad, rol, durum) VALUES
           (1, 'gy', 'x', 'Genel Yonetici', 'GENEL_YONETICI', 'AKTIF'),
           (2, 'ba', 'x', 'Birim Amiri', 'BIRIM_AMIRI', 'AKTIF'),
-          (3, 'patron', 'x', 'Patron', 'PATRON', 'AKTIF'),
+          (3, 'personel', 'x', 'Personel', 'PERSONEL', 'AKTIF'),
           (4, 'muh', 'x', 'Muhasebe', 'MUHASEBE', 'AKTIF'),
           (5, 'bolum', 'x', 'Bolum Yoneticisi', 'BOLUM_YONETICISI', 'AKTIF')
     ");
@@ -598,7 +598,7 @@ assertFcotSchemaPostconditions($pdo);
 
 $gy = ['id' => 1, 'rol' => 'GENEL_YONETICI', 'sube_ids' => []];
 $ba = ['id' => 2, 'rol' => 'BIRIM_AMIRI', 'sube_ids' => [1]];
-$patron = ['id' => 3, 'rol' => 'PATRON', 'sube_ids' => []];
+$personel = ['id' => 3, 'rol' => 'PERSONEL', 'sube_ids' => []];
 $muhasebe = ['id' => 4, 'rol' => 'MUHASEBE', 'sube_ids' => [1]];
 $bolum = ['id' => 5, 'rol' => 'BOLUM_YONETICISI', 'sube_ids' => [1]];
 $subeHeader = ['x-active-sube-id' => '1'];
@@ -641,15 +641,15 @@ $unauthPut = invokeFcotHttp($pdo, null, 'PUT', '/fazla-calisma-odeme-tercihi', [
 ], $subeHeader);
 fcotAssert($unauthPut['status'] === 401, 'unauthenticated PUT → 401');
 
-$patronGet = invokeFcotHttp($pdo, $patron, 'GET', '/fazla-calisma-odeme-tercihi', [], $subeHeader, [
+$personelGet = invokeFcotHttp($pdo, $personel, 'GET', '/fazla-calisma-odeme-tercihi', [], $subeHeader, [
     'snapshot_id' => (string) $snapshotId,
 ]);
-fcotAssert($patronGet['status'] === 403, 'PATRON GET → 403');
-$patronPut = invokeFcotHttp($pdo, $patron, 'PUT', '/fazla-calisma-odeme-tercihi', [
+fcotAssert($personelGet['status'] === 403, 'PERSONEL GET → 403');
+$personelPut = invokeFcotHttp($pdo, $personel, 'PUT', '/fazla-calisma-odeme-tercihi', [
     'snapshot_id' => $snapshotId,
     'odeme_tipi' => 'UCRET',
 ], $subeHeader);
-fcotAssert($patronPut['status'] === 403, 'PATRON PUT → 403');
+fcotAssert($personelPut['status'] === 403, 'PERSONEL PUT → 403');
 
 $gyGet = invokeFcotHttp($pdo, $gy, 'GET', '/fazla-calisma-odeme-tercihi', [], $subeHeader, [
     'snapshot_id' => (string) $snapshotId,

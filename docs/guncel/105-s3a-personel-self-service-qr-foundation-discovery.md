@@ -1,9 +1,10 @@
-# 104 — S3A Personel Self-Service + QR Attendance Foundation Discovery
+# 105 — S3A Personel Self-Service + QR Attendance Foundation Discovery
 
-**Branch:** `feat/personel-self-service-qr-foundation`  
-**Baseline:** `origin/main` = `f58da7c19551cdf52829f0a796da919f88dc9f3a` (S2 / PR #143 merge)  
-**Status:** Discovery only — no runtime code, no migration 056, no production write  
+**Branch:** `feat/personel-self-service-qr-foundation`
+**Baseline:** `origin/main` = `f58da7c19551cdf52829f0a796da919f88dc9f3a` (S2 / PR #143 merge)
+**Status:** Decisions locked (D1–D6). Doc renumbered from colliding `104` → `105` (main already had `104-s2a-…`). S3B implements binding + `/me` read on this branch; QR remains S3C+.
 **PR #142:** Untouched (`docs/hesaplama-cevap-haritasi`)
+**DOC_NUMBER_COLLISION:** FIXED (`104-s3a-…` → `105-s3a-…`)
 
 ---
 
@@ -443,49 +444,67 @@ Fazlama:
 
 Tek mega migration/PR önerilmez. Raw attendance evidence production’a retention owner olmadan çıkmamalı.
 
-`PRODUCTION_BINDING_BACKFILL = NO`  
+`PRODUCTION_BINDING_BACKFILL = NO`
 `SELF_REGISTRATION = NO`
 
 Provisioning: Yönetim → user create → PERSONEL → bağlı personel seç → credentials. Existing login/password reuse; QR login değildir.
 
 ---
 
-## 15. Unresolved decisions (yalnız gerçek blokerlar)
+## 15. Locked decisions (D1–D6) — bağlayıcı
 
-### D1 — QR tipi
+S3B decision blockers: **NONE**. QR implementation remains S3C+.
 
-- OPTIONS: `STATIC` \| `DYNAMIC_SIGNED`
-- RECOMMENDATION: `DYNAMIC_SIGNED`
-
-### D2 — Hareket yönü
-
-- OPTIONS: `AUTO_TOGGLE` \| `EXPLICIT_GIRIS_CIKIS` \| `TWO_QR`
-- RECOMMENDATION: `EXPLICIT_GIRIS_CIKIS`
-
-### D3 — Başka şube scan
-
-- OPTIONS: `DENY` \| `ASSIGNMENT_BASED_ALLOW`
-- RECOMMENDATION: `DENY` (assignment model yok)
-
-### D4 — İşten ayrılan PERSONEL geçmiş self-read
-
-- OPTIONS: `DENY_ALL` \| `READ_HISTORY_ONLY` (QR her durumda DENY önerisi)
-- RECOMMENDATION: kullanıcı/HR kararı — teknik default önerisi `QR=DENY`; history ayrı
-
-### D5 — Missing scan correction owner/tip
-
-- OPTIONS: reuse `GIRIS_CIKIS_DUZELTME` revizyon \| yeni QR incomplete tip + `olay_karar` \| hybrid
-- RECOMMENDATION: v1 reuse revizyon giris/cikis; QR-specific tip S3E’de netleştir
-
-### D6 — Dynamic QR display hardware
-
-- OPTIONS: authenticated kiosk page \| secret public rotating display URL \| physical print (static — önerilmez)
-- RECOMMENDATION: workplace display gerekir; generation config `SISTEM_YONETICISI` / `yonetim-paneli.manage` veya dar `self_service.qr.display.manage` teknik permission
+### D1 — QR tipi — LOCKED
 
 ```
-RECOMMENDED_QR_TTL = 30–120s band (hardware test öncesi hardcode kilitlenmez)
-QR_TTL_DECISION_REQUIRED = YES (operasyonel)
+D1_QR_MODEL = DYNAMIC_SIGNED
 ```
+
+### D2 — Hareket yönü — LOCKED
+
+```
+D2_EVENT_DIRECTION = EXPLICIT_GIRIS_CIKIS
+```
+
+Scan → token validate → user explicitly chooses GİRİŞ or ÇIKIŞ.
+AUTO_TOGGLE = NO. TWO_QR = NO.
+
+### D3 — Başka şube scan — LOCKED
+
+```
+D3_CROSS_BRANCH = DENY
+```
+
+v1: personel may only use their current şube QR. Temporary assignment model may change this later.
+
+### D4 — İşten ayrılan / PASIF personel self-service — LOCKED
+
+```
+D4_TERMINATED_SELF_SERVICE = DENY_ALL
+```
+
+`personeller.aktif_durum != AKTIF` → self-service data DENY + future QR DENY.
+Binding may remain in DB for audit; no “eski çalışan portalı” in S3.
+
+### D5 — Missing scan correction — LOCKED
+
+```
+D5_MISSING_SCAN_CORRECTION = REUSE_GIRIS_CIKIS_DUZELTME_REVIZYON
+```
+
+No parallel correction workflow. S3E may add QR provenance metadata onto existing revision records.
+
+### D6 — QR display / TTL — LOCKED
+
+```
+D6_DISPLAY_MODEL = AUTHENTICATED_KIOSK
+D6_TTL_DEFAULT_SECONDS = 60
+D6_TTL_CONFIGURABLE_RANGE = 30-120
+```
+
+TTL via server config. Secret public rotating URL = NO (v1). Static printed QR = NO (v1).
+**S3B does not implement QR code** — decisions recorded for S3C only.
 
 ---
 

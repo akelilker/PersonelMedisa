@@ -6,6 +6,7 @@ import { AppModal } from "../../../components/modal/AppModal";
 import { EmptyState } from "../../../components/states/EmptyState";
 import { ErrorState } from "../../../components/states/ErrorState";
 import { LoadingState } from "../../../components/states/LoadingState";
+import { isApiRequestError } from "../../../api/api-client";
 import { fetchPersonellerList } from "../../../api/personeller.api";
 import { createDepartmanOption, fetchDepartmanOptions } from "../../../api/referans.api";
 import { createSurec, type CreateSurecPayload } from "../../../api/surecler.api";
@@ -117,7 +118,8 @@ const INITIAL_SUBE_FORM: SubeFormState = {
 
 const YONETIM_KULLANICI_FORM_ID = "yonetim-kullanici-form";
 const YONETIM_SUBE_FORM_ID = "yonetim-sube-form";
-const REAL_KULLANICI_API_UNSUPPORTED_HINT = "Bu alan V1 canlı API'de desteklenmiyor.";
+const REAL_KULLANICI_API_UNSUPPORTED_HINT =
+  "Telefon, notlar ve kullanıcı tipi V1 canlı API'de desteklenmiyor. Bağlı personel eşlemesi kaydedilir.";
 const BIRIM_AMIRI_ATANDI_SUREC_TURU = "BIRIM_AMIRI_ATANDI";
 const BIRIM_AMIRI_ATAMASI_KALDIRILDI_SUREC_TURU = "BIRIM_AMIRI_ATAMASI_KALDIRILDI";
 const SUBE_YETKISI_DEGISTI_SUREC_TURU = "SUBE_YETKISI_DEGISTI";
@@ -322,9 +324,10 @@ function toKullaniciPayload(form: KullaniciFormState, isEdit: boolean): UpsertYo
     durum: form.durum
   };
 
+  payload.personel_id = form.personelId ? Number.parseInt(form.personelId, 10) : null;
+
   if (!realKullaniciApi) {
     payload.telefon = normalizeTelefonDigits(form.telefon) || undefined;
-    payload.personel_id = form.personelId ? Number.parseInt(form.personelId, 10) : null;
     payload.notlar = form.notlar.trim() || undefined;
   }
 
@@ -492,12 +495,26 @@ export function YonetimPaneliPage() {
 
   const personelOptions = useMemo(
     () =>
-      personeller.map((personel) => ({
-        value: String(personel.id),
-        label: formatAdSoyad(`${personel.ad} ${personel.soyad}`)
-      })),
-    [personeller]
+      personeller
+        .filter(
+          (personel) =>
+            personel.aktif_durum === "AKTIF" || String(personel.id) === kullaniciForm.personelId
+        )
+        .map((personel) => {
+          const name = formatAdSoyad(`${personel.ad} ${personel.soyad}`);
+          const meta = [personel.departman_adi, personel.gorev_adi].filter(Boolean).join(" / ");
+          return {
+            value: String(personel.id),
+            label: meta ? `${name} — ${meta}` : name
+          };
+        }),
+    [personeller, kullaniciForm.personelId]
   );
+
+  const showBagliPersonelSelector =
+    realKullaniciApi ||
+    kullaniciForm.kullaniciTipi === "IC_PERSONEL" ||
+    kullaniciForm.rol === "PERSONEL";
 
   const subeNameMap = useMemo(() => new Map(subeler.map((sube) => [sube.id, sube.ad])), [subeler]);
   const personelDisplayNameMap = useMemo(
@@ -705,7 +722,11 @@ export function YonetimPaneliPage() {
       resetKullaniciEditor();
       await loadPanel();
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Kullanıcı kaydı kaydedilemedi.");
+      if (isApiRequestError(error) && error.code === "PERSONEL_ALREADY_BOUND") {
+        setErrorMessage("Bu personel kaydı başka bir kullanıcıya bağlı.");
+      } else {
+        setErrorMessage(error instanceof Error ? error.message : "Kullanıcı kaydı kaydedilemedi.");
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -1071,14 +1092,17 @@ export function YonetimPaneliPage() {
                   {REAL_KULLANICI_API_UNSUPPORTED_HINT}
                 </p>
               ) : null}
-              {!realKullaniciApi && kullaniciForm.kullaniciTipi === "IC_PERSONEL" ? (
+              {showBagliPersonelSelector ? (
                 <FormField
                   as="select"
                   label="Bağlı Personel"
                   name="yonetim-kullanici-personel"
                   value={kullaniciForm.personelId}
                   onChange={(value) => setKullaniciForm((prev) => ({ ...prev, personelId: value }))}
-                  placeholderOption={{ value: "", label: "Seçiniz" }}
+                  placeholderOption={{
+                    value: "",
+                    label: realKullaniciApi ? "Bağlantı yok" : "Seçiniz"
+                  }}
                   selectOptions={personelOptions}
                 />
               ) : null}

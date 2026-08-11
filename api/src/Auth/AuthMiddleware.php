@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Medisa\Api\Auth;
 
 use Medisa\Api\Database\Connection;
+use Medisa\Api\Database\UsersSchema;
 use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
 use PDO;
@@ -80,6 +81,13 @@ class AuthMiddleware
             self::$user['actor_identity_id'] = null;
         }
 
+        if (array_key_exists('personel_id', $row) && $row['personel_id'] !== null && $row['personel_id'] !== '') {
+            $pid = (int) $row['personel_id'];
+            self::$user['personel_id'] = $pid > 0 ? $pid : null;
+        } else {
+            self::$user['personel_id'] = null;
+        }
+
         if (!empty(self::$user['actor_identity_id'])) {
             self::$user['actor_identity_status'] = self::loadActorIdentityStatus($pdo, (int) self::$user['actor_identity_id']);
         } else {
@@ -103,9 +111,17 @@ class AuthMiddleware
             $hasActorIdentity = false;
         }
 
-        return $hasActorIdentity
-            ? 'SELECT id, username, ad_soyad, rol, durum, actor_identity_id FROM users WHERE id = :id LIMIT 1'
-            : 'SELECT id, username, ad_soyad, rol, durum FROM users WHERE id = :id LIMIT 1';
+        $hasPersonelId = UsersSchema::hasPersonelId($pdo);
+
+        $cols = ['id', 'username', 'ad_soyad', 'rol', 'durum'];
+        if ($hasActorIdentity) {
+            $cols[] = 'actor_identity_id';
+        }
+        if ($hasPersonelId) {
+            $cols[] = 'personel_id';
+        }
+
+        return 'SELECT ' . implode(', ', $cols) . ' FROM users WHERE id = :id LIMIT 1';
     }
 
     /** @return string|null */

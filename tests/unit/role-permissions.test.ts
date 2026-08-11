@@ -221,11 +221,18 @@ describe("role permissions", () => {
     expect(hasRolePermission("BIRIM_AMIRI", "revizyon.view_finance_effect")).toBe(false);
   });
 
-  it("keeps PERSONEL with zero business permissions", () => {
+  it("keeps PERSONEL limited to self_service read permissions", () => {
     expect(ALL_ROLES).toContain("PERSONEL");
-    expect(getRolePermissions("PERSONEL")).toEqual([]);
+    expect(getRolePermissions("PERSONEL")).toEqual([
+      "self_service.view",
+      "self_service.puantaj.view",
+      "self_service.yillik_izin.view",
+      "self_service.fazla_calisma.view"
+    ]);
     expect(hasRolePermission("PERSONEL", "raporlar.view")).toBe(false);
     expect(hasRolePermission("PERSONEL", "patron_ack.view")).toBe(false);
+    expect(hasRolePermission("PERSONEL", "personeller.view")).toBe(false);
+    expect(hasRolePermission("PERSONEL", "puantaj.view")).toBe(false);
   });
 
   it("safe-aliases PATRON to GENEL_YONETICI permissions", () => {

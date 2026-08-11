@@ -1,0 +1,92 @@
+import type { UserRole } from "./auth";
+import type { YillikIzinBakiye } from "./yillik-izin-hak-duzeltme";
+
+export type MePersonelSummary = {
+  id: number;
+  ad: string;
+  soyad: string;
+  ad_soyad: string;
+  sube_id: number;
+  sube_ad: string;
+  departman_id: number | null;
+  departman_ad: string | null;
+  gorev_id: number | null;
+  gorev_ad: string | null;
+  aktif_durum: string;
+};
+
+export type MeIdentity = {
+  user_id: number;
+  username: string;
+  ad_soyad: string;
+  rol: UserRole | string;
+  personel_id: number;
+  personel: MePersonelSummary;
+};
+
+export type MePuantajGun = {
+  tarih: string;
+  gun_tipi: string | null;
+  giris_saati: string | null;
+  cikis_saati: string | null;
+  net_calisma_suresi_dakika: number | null;
+  gunluk_brut_sure_dakika: number | null;
+  gec_kalma_dakika: number | null;
+  erken_cikis_dakika: number | null;
+  fazla_calisma_dakika: number | null;
+};
+
+export type MePuantajOzet = {
+  calisma_gun_adet: number;
+  gec_kalma_adet: number;
+  gec_kalma_dakika_toplam: number;
+  erken_cikis_adet: number;
+  erken_cikis_dakika_toplam: number;
+  fazla_calisma_dakika_toplam: number;
+};
+
+export type MePuantajResponse = {
+  personel_id: number;
+  from: string;
+  to: string;
+  items: MePuantajGun[];
+  ozet: MePuantajOzet;
+};
+
+export type MeYillikIzinBakiye = YillikIzinBakiye;
+
+export type MeFazlaCalismaYillik = {
+  personel_id: number;
+  yil: number;
+  yillik_limit_dakika: number;
+  yaklasma_esik_dakika: number;
+  kullanilan_dakika: number;
+  kalan_dakika: number;
+  limit_asildi_mi: boolean;
+  limit_yaklasiyor_mu: boolean;
+  kapanan_hafta_sayisi: number;
+  atlanan_duplicate_hafta_sayisi: number;
+  atlanan_eksik_hafta_sayisi: number;
+};
+
+export type MeFazlaCalismaResponse = {
+  personel_id: number;
+  yil: number;
+  from: string;
+  to: string;
+  donem_ozet: {
+    fazla_calisma_dakika_toplam: number;
+    calisma_gun_adet: number;
+  } | null;
+  yillik: MeFazlaCalismaYillik;
+};
+
+export const SELF_SERVICE_ERROR_CODES = [
+  "SELF_SERVICE_BINDING_REQUIRED",
+  "SELF_SERVICE_PERSONEL_INACTIVE",
+  "SELF_SERVICE_PERSONEL_MISSING",
+  "SELF_SERVICE_SCHEMA_NOT_READY",
+  "PERSONEL_ALREADY_BOUND"
+] as const;
+
+export type SelfServiceErrorCode = (typeof SELF_SERVICE_ERROR_CODES)[number];

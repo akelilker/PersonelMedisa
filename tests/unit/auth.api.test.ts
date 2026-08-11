@@ -45,7 +45,8 @@ describe("auth.api login", () => {
         id: 1,
         ad_soyad: "Ilker A",
         rol: "GENEL_YONETICI",
-        sube_ids: []
+        sube_ids: [],
+        personel_id: null
       }
     });
   });
@@ -74,7 +75,8 @@ describe("auth.api login", () => {
         id: 12,
         ad_soyad: "Birim Kullanici",
         rol: "BIRIM_AMIRI",
-        sube_ids: []
+        sube_ids: [],
+        personel_id: null
       }
     });
   });

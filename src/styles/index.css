@@ -34,6 +34,7 @@
 @import "./modules/finans.css";
 @import "./modules/yonetim.css";
 @import "./modules/auth.css";
+@import "../features/self-service/self-service.css";
 
 @import "./platform/mobile.css";
 @import "./platform/desktop.css";

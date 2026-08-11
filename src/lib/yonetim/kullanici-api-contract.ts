@@ -2,7 +2,6 @@ import type { UpsertYonetimKullaniciPayload } from "../../types/yonetim";
 
 const REAL_API_UNSUPPORTED_KULLANICI_FIELDS = [
   "telefon",
-  "personel_id",
   "notlar",
   "kullanici_tipi"
 ] as const;
@@ -12,7 +11,7 @@ export type RealYonetimKullaniciApiPayload = Omit<
   (typeof REAL_API_UNSUPPORTED_KULLANICI_FIELDS)[number]
 >;
 
-/** Production / real API: deferred profile fields are not persisted (telefon/personel_id/notlar/kullanici_tipi).
+/** Production / real API: telefon/notlar/kullanici_tipi are deferred; personel_id is persisted (S3B).
  *  varsayilan_sube_id is part of the real canonical contract (I13-B). */
 export function isRealYonetimKullaniciApi(): boolean {
   const mode = (import.meta.env.VITE_API_MODE ?? "").trim().toLowerCase();
@@ -52,7 +51,8 @@ export function sanitizeYonetimKullaniciPayloadForApi(
     rol: payload.rol,
     sube_ids: payload.sube_ids,
     varsayilan_sube_id: payload.varsayilan_sube_id,
-    durum: payload.durum
+    durum: payload.durum,
+    personel_id: payload.personel_id ?? null
   };
 
   return sanitized;

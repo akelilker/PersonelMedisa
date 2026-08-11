@@ -37,6 +37,6 @@ describe("I13-B default branch persistence source locks", () => {
       .filter((name) => /^\d{3}_.+\.sql$/.test(name))
       .sort();
     expect(migrations[0]).toBe("001_initial_schema.sql");
-    expect(migrations.at(-1)).toBe("055_yillik_izin_hak_duzeltmeleri.sql");
+    expect(migrations.at(-1)).toBe("056_users_personel_binding.sql");
   });
 });

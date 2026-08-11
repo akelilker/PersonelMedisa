@@ -2,6 +2,12 @@ export const endpoints = {
   auth: {
     login: "/auth/login"
   },
+  me: {
+    identity: "/me",
+    puantaj: "/me/puantaj",
+    yillikIzinBakiye: "/me/yillik-izin-bakiye",
+    fazlaCalisma: "/me/fazla-calisma"
+  },
   personeller: {
     list: "/personeller",
     detail: (id: number | string) => `/personeller/${id}`,

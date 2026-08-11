@@ -108,7 +108,11 @@ export type AppPermission =
   | "retention.destruction.request"
   | "retention.destruction.approve"
   | "retention.destruction.view"
-  | "yillik_izin_hak_duzeltme.manage";
+  | "yillik_izin_hak_duzeltme.manage"
+  | "self_service.view"
+  | "self_service.puantaj.view"
+  | "self_service.yillik_izin.view"
+  | "self_service.fazla_calisma.view";
 
 const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
   GENEL_YONETICI: [
@@ -423,8 +427,13 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "retention.view",
     "retention.destruction.view"
   ],
-  /** Future self-service; intentionally zero business permissions in this phase. */
-  PERSONEL: [],
+  /** Self-service read surfaces (S3B). No broad personeller.* / puantaj.view. */
+  PERSONEL: [
+    "self_service.view",
+    "self_service.puantaj.view",
+    "self_service.yillik_izin.view",
+    "self_service.fazla_calisma.view"
+  ],
   AUTH_SMOKE_READONLY: ["ops.auth_smoke.read"]
 };
 

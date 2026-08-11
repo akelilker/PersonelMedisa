@@ -34,9 +34,15 @@ class LoginController
         }
 
         $hasVarsayilan = UsersSchema::hasVarsayilanSubeId($pdo);
-        $selectSql = $hasVarsayilan
-            ? 'SELECT id, username, password_hash, ad_soyad, rol, durum, varsayilan_sube_id FROM users WHERE username = :username LIMIT 1'
-            : 'SELECT id, username, password_hash, ad_soyad, rol, durum FROM users WHERE username = :username LIMIT 1';
+        $hasPersonelId = UsersSchema::hasPersonelId($pdo);
+        $loginCols = ['id', 'username', 'password_hash', 'ad_soyad', 'rol', 'durum'];
+        if ($hasVarsayilan) {
+            $loginCols[] = 'varsayilan_sube_id';
+        }
+        if ($hasPersonelId) {
+            $loginCols[] = 'personel_id';
+        }
+        $selectSql = 'SELECT ' . implode(', ', $loginCols) . ' FROM users WHERE username = :username LIMIT 1';
         $stmt = $pdo->prepare($selectSql);
         $stmt->execute(['username' => $username]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -82,14 +88,25 @@ class LoginController
             'exp' => time() + $ttl,
         ]);
 
+        $personelIdPayload = null;
+        if ($hasPersonelId && array_key_exists('personel_id', $user) && $user['personel_id'] !== null && $user['personel_id'] !== '') {
+            $parsedPersonel = (int) $user['personel_id'];
+            $personelIdPayload = $parsedPersonel > 0 ? $parsedPersonel : null;
+        }
+
+        $userPayload = [
+            'id' => (int) $user['id'],
+            'ad_soyad' => (string) $user['ad_soyad'],
+            'rol' => $rol,
+            'sube_ids' => $subeIds,
+        ];
+        if ($hasPersonelId) {
+            $userPayload['personel_id'] = $personelIdPayload;
+        }
+
         JsonResponse::success([
             'token' => $token,
-            'user' => [
-                'id' => (int) $user['id'],
-                'ad_soyad' => (string) $user['ad_soyad'],
-                'rol' => $rol,
-                'sube_ids' => $subeIds,
-            ],
+            'user' => $userPayload,
             'ui_profile' => $rol === 'BIRIM_AMIRI' ? 'birim_amiri' : 'yonetim',
             'sube_list' => $subeList,
             'active_sube_id' => $activeSubeId,

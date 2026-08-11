@@ -261,6 +261,8 @@ surecAssert(strpos($routerSource, 'SureclerController::cancel') !== false, 'rout
 surecAssert(strpos($controllerSource, "RolePermissions::assert(\$user, 'surecler.detail.view')") !== false, 'detail permission');
 surecAssert(strpos($controllerSource, "RolePermissions::assert(\$user, 'surecler.update')") !== false, 'update permission');
 surecAssert(strpos($controllerSource, "RolePermissions::assert(\$user, 'surecler.cancel')") !== false, 'cancel permission');
+surecAssert(strpos($controllerSource, "RolePermissions::assert(\$user, 'surecler.create')") !== false, 'create permission matrix');
+surecAssert(strpos($controllerSource, 'function assertCreateRole') === false, 'no hardcoded create allowlist method');
 surecAssert(strpos($controllerSource, 'DELETE FROM surecler') === false, 'no hard delete');
 
 $root = surecPdo($dsn);

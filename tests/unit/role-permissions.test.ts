@@ -375,6 +375,18 @@ describe("role permissions", () => {
     expect(ALL_ROLES).not.toContain("SGK_KARAR_ONAY_YETKILISI");
   });
 
+  it("locks S2B yillik_izin_hak_duzeltme.manage to GY+IK only (D1=B)", () => {
+    expect(hasRolePermission("GENEL_YONETICI", "yillik_izin_hak_duzeltme.manage")).toBe(true);
+    expect(hasRolePermission("IK_SORUMLUSU", "yillik_izin_hak_duzeltme.manage")).toBe(true);
+    expect(extractPhpRolePermissions("GENEL_YONETICI")).toContain("yillik_izin_hak_duzeltme.manage");
+    expect(extractPhpRolePermissions("IK_SORUMLUSU")).toContain("yillik_izin_hak_duzeltme.manage");
+
+    for (const role of ["BOLUM_YONETICISI", "MUHASEBE", "BIRIM_AMIRI", "SISTEM_YONETICISI", "PERSONEL"] as const) {
+      expect(hasRolePermission(role, "yillik_izin_hak_duzeltme.manage")).toBe(false);
+      expect(extractPhpRolePermissions(role)).not.toContain("yillik_izin_hak_duzeltme.manage");
+    }
+  });
+
   it("keeps TS and PHP role permission matrices in parity (S70B-1)", () => {
     for (const role of ALL_ROLES) {
       const tsPermissions = [...getRolePermissions(role)].sort();

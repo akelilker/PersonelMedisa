@@ -15,9 +15,12 @@ use Medisa\Api\Controllers\BordroHazirlikController;
 use Medisa\Api\Controllers\SgkKatalogHazirlikController;
 use Medisa\Api\Controllers\SgkManuelKodOverrideController;
 use Medisa\Api\Controllers\SirketCalismaPolitikasiController;
+use Medisa\Api\Controllers\ArsivController;
 use Medisa\Api\Controllers\DisiplinVakaController;
 use Medisa\Api\Controllers\DonemKapanisController;
+use Medisa\Api\Controllers\LegalHoldController;
 use Medisa\Api\Controllers\PuantajOlayKararController;
+use Medisa\Api\Controllers\RetentionController;
 use Medisa\Api\Controllers\HaftalikBildirimMutabakatlariController;
 use Medisa\Api\Controllers\HaftalikKapanisController;
 use Medisa\Api\Controllers\EkOdemeKesintiController;
@@ -174,6 +177,37 @@ class Router
         }
         if ($method === 'POST' && $path === '/yonetim/aylik-ozet/ay-kapat') {
             YonetimController::aylikOzetAyKapat($this->request);
+        }
+        // Phase C — arsiv / legal hold / retention
+        if ($path === '/arsiv/personeller' && $method === 'GET') {
+            ArsivController::listPasifPersoneller($this->request);
+        }
+        if ($method === 'GET' && preg_match('#^/arsiv/personeller/(\d+)$#', $path, $matches)) {
+            ArsivController::detailPasifPersonel($this->request, $matches[1]);
+        }
+        if ($path === '/legal-holdlar' && $method === 'GET') {
+            LegalHoldController::list($this->request);
+        }
+        if ($path === '/legal-holdlar' && $method === 'POST') {
+            LegalHoldController::create($this->request);
+        }
+        if ($method === 'POST' && preg_match('#^/legal-holdlar/(\d+)/release$#', $path, $matches)) {
+            LegalHoldController::release($this->request, $matches[1]);
+        }
+        if ($path === '/retention/eligibility' && $method === 'GET') {
+            RetentionController::eligibility($this->request);
+        }
+        if ($path === '/retention/imha-talepleri' && $method === 'GET') {
+            RetentionController::listRequests($this->request);
+        }
+        if ($path === '/retention/imha-talepleri' && $method === 'POST') {
+            RetentionController::requestDestruction($this->request);
+        }
+        if ($method === 'POST' && preg_match('#^/retention/imha-talepleri/(\d+)/approve$#', $path, $matches)) {
+            RetentionController::approveDestruction($this->request, $matches[1]);
+        }
+        if ($path === '/retention/imha-auditleri' && $method === 'GET') {
+            RetentionController::listAudits($this->request);
         }
         if ($path === '/personeller' && $method === 'GET') {
             PersonellerController::list($this->request);

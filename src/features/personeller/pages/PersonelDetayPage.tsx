@@ -64,6 +64,12 @@ export function PersonelDetayPage() {
     zimmetHistoryErrorMessage
   } = detail;
 
+  const isArchived = personel?.aktif_durum === "PASIF" || personel?.arsiv_modu === true;
+  const canCreateSurecEffective = Boolean(canCreateSurec && !isArchived);
+  const canAccessSureclerEffective = Boolean(
+    !isArchived && (canCreateSurecEffective || canViewSurecler)
+  );
+
   const { handleOpenSurecModal } = usePersonelKartGatewayReturn({
     navigate,
     parsedPersonelId
@@ -84,6 +90,11 @@ export function PersonelDetayPage() {
       ? `${personel.ad} ${personel.soyad} — Personel kartı detay alanı`
       : "Personel kartı detay alanı";
 
+  const earliestReview =
+    personel?.retention_summary?.earliest_destruction_review_date ??
+    personel?.retention_summary?.retention_until ??
+    null;
+
   return (
     <section className="personel-detay-page personel-dosya-page" aria-label={pageHeading}>
       <h2 className="personeller-sr-only">{pageHeading}</h2>
@@ -100,17 +111,30 @@ export function PersonelDetayPage() {
 
       {!isLoading && !errorMessage && personel ? (
         <div className="personel-detail-card">
+          {isArchived ? (
+            <div className="personel-archive-banner" data-testid="personel-arsiv-badge" role="status">
+              <strong>Arşiv (salt okunur)</strong>
+              <span> — Medisa saklama politikası</span>
+              {personel.legal_hold_active ? <span> — Legal hold aktif</span> : null}
+              {earliestReview ? (
+                <span> — En erken imha değerlendirme tarihi: {earliestReview}</span>
+              ) : null}
+            </div>
+          ) : null}
+
           <PersonelDosyaHero personel={personel} canViewUcret={canViewUcret} />
 
-          <PersonelDosyaActionRow
-            canAccessSurecler={canAccessSurecler}
-            canCreateSurec={canCreateSurec}
-            isActionMenuOpen={isActionMenuOpen}
-            onToggleActionMenu={() => setIsActionMenuOpen((prev) => !prev)}
-            onCloseActionMenu={() => setIsActionMenuOpen(false)}
-            onOpenSurecModal={handleOpenSurecModal}
-            onOpenSurecHistory={handleOpenSurecHistory}
-          />
+          {!isArchived ? (
+            <PersonelDosyaActionRow
+              canAccessSurecler={canAccessSureclerEffective}
+              canCreateSurec={canCreateSurecEffective}
+              isActionMenuOpen={isActionMenuOpen}
+              onToggleActionMenu={() => setIsActionMenuOpen((prev) => !prev)}
+              onCloseActionMenu={() => setIsActionMenuOpen(false)}
+              onOpenSurecModal={handleOpenSurecModal}
+              onOpenSurecHistory={handleOpenSurecHistory}
+            />
+          ) : null}
 
           <PersonelDosyaTabPanels
             activeTab={activeTab}
@@ -124,16 +148,16 @@ export function PersonelDetayPage() {
             surecHistoryErrorMessage={surecHistoryErrorMessage}
             isZimmetHistoryLoading={isZimmetHistoryLoading}
             zimmetHistoryErrorMessage={zimmetHistoryErrorMessage}
-            canViewPuantaj={canViewPuantaj}
-            canViewRevizyon={canViewRevizyon}
+            canViewPuantaj={canViewPuantaj && !isArchived}
+            canViewRevizyon={canViewRevizyon && !isArchived}
             canCreateRevizyon={false}
             canCreateZimmet={false}
-            canAccessSurecler={canAccessSurecler}
-            canViewFinans={canViewFinans}
-            canViewBordro={canViewBordro}
+            canAccessSurecler={canAccessSureclerEffective || (isArchived && canViewSurecler)}
+            canViewFinans={canViewFinans && !isArchived}
+            canViewBordro={canViewBordro && !isArchived}
             canViewUcret={canViewUcret}
             canManageUcret={false}
-            canViewBordroKapsam={canViewBordroKapsam}
+            canViewBordroKapsam={canViewBordroKapsam && !isArchived}
             canManageBordroKapsam={false}
             canApproveBordroKapsam={false}
           />

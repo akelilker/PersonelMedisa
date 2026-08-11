@@ -158,9 +158,10 @@ class ZimmetlerController
 
         SubeScope::assertPersonelAccess($user, $request, (int) $personel['sube_id']);
 
-        if (strtoupper((string) $personel['aktif_durum']) === 'PASIF') {
-            self::validationError('personel_id', 'Pasif personele zimmet kaydi eklenemez.');
-        }
+        \Medisa\Api\Services\Retention\PersonelArchiveGate::assertBusinessWriteAllowed(
+            $pdo,
+            (int) $payload['personel_id']
+        );
 
         try {
             $stmt = $pdo->prepare('

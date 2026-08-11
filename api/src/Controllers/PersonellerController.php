@@ -20,6 +20,7 @@ use Medisa\Api\Services\Personel\PersonelImportReferenceCatalogService;
 use Medisa\Api\Services\Personel\PersonelValidationException;
 use Medisa\Api\Services\PersonelUcretException;
 use Medisa\Api\Services\PersonelUcretService;
+use Medisa\Api\Services\Retention\PersonelArchiveGate;
 use PDO;
 
 class PersonellerController
@@ -37,7 +38,11 @@ class PersonellerController
         $page = max(1, (int) ($request->getQuery('page', 1) ?: 1));
         $limit = max(1, min(250, (int) ($request->getQuery('limit', 10) ?: 10)));
         $search = strtolower(trim((string) $request->getQuery('search', '')));
-        $aktiflik = (string) $request->getQuery('aktiflik', 'tum');
+        // Without arsiv.view: always AKTIF (blocks pasif|tum bypass).
+        $aktiflik = PersonelArchiveGate::effectiveListAktiflik(
+            $user,
+            (string) $request->getQuery('aktiflik', 'tum')
+        );
         $departmanId = (int) ($request->getQuery('departman_id', 0) ?: 0);
         $personelTipiId = (int) ($request->getQuery('personel_tipi_id', 0) ?: 0);
 
@@ -117,6 +122,8 @@ class PersonellerController
             $items[] = self::mapPersonelRow($row, $user);
         }
 
+        PersonelArchiveGate::maybeWriteListAudit($pdo, $user, $items, '/personeller');
+
         JsonResponse::success(
             ['items' => $items],
             [
@@ -143,13 +150,14 @@ class PersonellerController
             JsonResponse::serverError('Veritabani baglantisi kurulamadi.');
         }
 
-        $stmt = $pdo->prepare('SELECT sube_id FROM personeller WHERE id = :id LIMIT 1');
+        $stmt = $pdo->prepare('SELECT sube_id, aktif_durum FROM personeller WHERE id = :id LIMIT 1');
         $stmt->execute(['id' => $personelId]);
         $exists = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!$exists) {
             JsonResponse::notFound();
         }
 
+        PersonelArchiveGate::assertDetailAccess($user, $exists);
         SubeScope::assertPersonelAccess($user, $request, (int) $exists['sube_id']);
 
         $sql = "
@@ -169,7 +177,18 @@ class PersonellerController
             JsonResponse::notFound();
         }
 
-        JsonResponse::success(self::mapPersonelRow($row, $user));
+        PersonelArchiveGate::writeViewAuditIfPasif($pdo, $user, $row, '/personeller/{id}');
+        $mapped = self::mapPersonelRow($row, $user);
+        if (strtoupper((string) $row['aktif_durum']) === 'PASIF') {
+            $markers = PersonelArchiveGate::buildArchiveMarkers($pdo, $row);
+            $mapped['arsiv_modu'] = true;
+            $mapped['policy_note'] = $markers['policy_note'];
+            $mapped['retention_summary'] = $markers['retention_summary'];
+            $mapped['legal_hold_active'] = $markers['legal_hold_active'];
+            $mapped['read_only_archive'] = true;
+        }
+
+        JsonResponse::success($mapped);
     }
 
     public static function create(Request $request)
@@ -278,6 +297,7 @@ class PersonellerController
             JsonResponse::notFound();
         }
 
+        PersonelArchiveGate::assertBusinessWriteAllowed($pdo, $personelId);
         self::assertUpdateSubeScope($user, $request, (int) $current['sube_id'], $payload);
         self::assertAktifDurumNotChanged($current, $payload);
         self::validateUpdateReferences($pdo, $payload);

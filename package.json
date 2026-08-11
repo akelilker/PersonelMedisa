@@ -19,6 +19,7 @@
     "e2e:s82": "playwright test tests/e2e/s82-bordro-hazirlik-merkezi.spec.ts",
     "e2e:s83": "playwright test tests/e2e/s83-business-data-readiness.spec.ts",
     "e2e:s84r2": "playwright test tests/e2e/s84r2-payroll-scope.spec.ts",
+    "e2e:phase-c": "playwright test tests/e2e/phase-c-retention-archive.spec.ts",
     "e2e:headed": "playwright test --headed",
     "e2e:ui": "playwright test --ui",
     "icons:generate": "node scripts/generate-icons.mjs",

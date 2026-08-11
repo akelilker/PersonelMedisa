@@ -132,8 +132,13 @@ class SureclerController
 
         SubeScope::assertPersonelAccess($user, $request, (int) $personel['sube_id']);
 
+        // ISTEN_AYRILMA while still AKTIF is the archive transition path — do not block.
+        // Ordinary surec against already-PASIF personel is read-only.
         if (strtoupper((string) $personel['aktif_durum']) === 'PASIF') {
-            self::validationError('personel_id', 'Pasif personele süreç kaydı eklenemez.');
+            \Medisa\Api\Services\Retention\PersonelArchiveGate::assertBusinessWriteAllowed(
+                $pdo,
+                (int) $payload['personel_id']
+            );
         }
 
         $pdo->beginTransaction();
@@ -141,6 +146,21 @@ class SureclerController
             $insertId = self::insertSurec($pdo, $payload);
             if ($payload['surec_turu'] === 'ISTEN_AYRILMA') {
                 self::deactivatePersonel($pdo, $payload['personel_id']);
+                $actorId = (int) ($user['id'] ?? 0);
+                try {
+                    \Medisa\Api\Services\Retention\ArchiveManifestService::createPersonelLifecycleManifests(
+                        $pdo,
+                        (int) $payload['personel_id'],
+                        $actorId
+                    );
+                } catch (\RuntimeException $e) {
+                    // Pre-053 environments: do not block PASIF transition when Phase C tables absent.
+                    if ($e->getMessage() !== \Medisa\Api\Services\Retention\RetentionSchemaGate::CODE_SCHEMA_NOT_READY
+                        && $e->getMessage() !== \Medisa\Api\Services\Retention\RetentionPolicyService::CODE_SCHEMA_NOT_READY
+                    ) {
+                        throw $e;
+                    }
+                }
             }
 
             $row = self::fetchSurecRowById($pdo, $insertId);
@@ -151,9 +171,16 @@ class SureclerController
 
             $pdo->commit();
             JsonResponse::success(self::mapSurecRow($row), [], 201);
-        } catch (\PDOException $e) {
+        } catch (\Throwable $e) {
             if ($pdo->inTransaction()) {
                 $pdo->rollBack();
+            }
+
+            if ($e instanceof \RuntimeException
+                && $e->getMessage() !== ''
+                && strpos($e->getMessage(), 'ARCHIVE_') === 0
+            ) {
+                JsonResponse::badRequest($e->getMessage(), $e->getMessage());
             }
 
             JsonResponse::serverError('Kayit olusturulamadi.');
@@ -217,6 +244,10 @@ class SureclerController
         }
 
         SubeScope::assertPersonelAccess($user, $request, (int) $existing['personel_sube_id']);
+        \Medisa\Api\Services\Retention\PersonelArchiveGate::assertBusinessWriteAllowed(
+            $pdo,
+            (int) $existing['personel_id']
+        );
 
         $payload = self::normalizeAndValidateUpdatePayload($body, $existing);
 

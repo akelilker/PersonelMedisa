@@ -296,7 +296,11 @@ function normalizePersonel(data: unknown): Personel {
       "prim_kurali_adi",
       "primKuraliAdi",
       "prim_kurali"
-    )
+    ),
+    arsiv_modu: Boolean(pickValue([root], ["arsiv_modu"]) ?? false) || undefined,
+    legal_hold_active: Boolean(pickValue([root], ["legal_hold_active"]) ?? false) || undefined,
+    retention_summary: (toRecord(root.retention_summary) as Personel["retention_summary"]) ?? undefined,
+    policy_note: readNullableString([root], "policy_note") ?? undefined
   };
 }
 

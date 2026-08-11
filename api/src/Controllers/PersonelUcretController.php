@@ -12,6 +12,7 @@ use Medisa\Api\Http\Request;
 use Medisa\Api\Scope\SubeScope;
 use Medisa\Api\Services\PersonelUcretException;
 use Medisa\Api\Services\PersonelUcretService;
+use Medisa\Api\Services\Retention\PersonelArchiveGate;
 use PDO;
 
 class PersonelUcretController
@@ -36,6 +37,7 @@ class PersonelUcretController
     public static function create(Request $request, $personelId)
     {
         [$pdo, $user, $personelId] = self::context($request, $personelId, 'personeller.ucret.manage');
+        PersonelArchiveGate::assertBusinessWriteAllowed($pdo, $personelId);
         try {
             $record = PersonelUcretService::createSalaryRecord(
                 $pdo,
@@ -55,6 +57,7 @@ class PersonelUcretController
     public static function update(Request $request, $personelId, $recordId)
     {
         [$pdo, $user, $personelId] = self::context($request, $personelId, 'personeller.ucret.manage');
+        PersonelArchiveGate::assertBusinessWriteAllowed($pdo, $personelId);
         self::assertRecordOwner($pdo, $recordId, $personelId);
         try {
             $record = PersonelUcretService::updateFutureSalaryRecord(
@@ -75,6 +78,7 @@ class PersonelUcretController
     public static function iptal(Request $request, $personelId, $recordId)
     {
         [$pdo, $user, $personelId] = self::context($request, $personelId, 'personeller.ucret.manage');
+        PersonelArchiveGate::assertBusinessWriteAllowed($pdo, $personelId);
         self::assertRecordOwner($pdo, $recordId, $personelId);
         try {
             $record = PersonelUcretService::cancelSalaryRecord(

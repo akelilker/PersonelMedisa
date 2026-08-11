@@ -98,7 +98,15 @@ export type AppPermission =
   | "sgk.manuel_kod_override"
   | "sgk_karar_paketi.prepare"
   | "sgk_karar_paketi.approve"
-  | "ops.auth_smoke.read";
+  | "ops.auth_smoke.read"
+  | "arsiv.view"
+  | "arsiv.download"
+  | "arsiv.audit.view"
+  | "retention.view"
+  | "legal_hold.manage"
+  | "retention.destruction.request"
+  | "retention.destruction.approve"
+  | "retention.destruction.view";
 
 const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
   GENEL_YONETICI: [
@@ -180,7 +188,15 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "disiplin.view",
     "disiplin.review",
     "disiplin.defense_manage",
-    "puantaj.olay_karar.view"
+    "puantaj.olay_karar.view",
+    "arsiv.view",
+    "arsiv.download",
+    "arsiv.audit.view",
+    "retention.view",
+    "legal_hold.manage",
+    "retention.destruction.request",
+    "retention.destruction.approve",
+    "retention.destruction.view"
   ],
   BOLUM_YONETICISI: [
     "personeller.view",
@@ -348,7 +364,10 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "disiplin.defense_manage",
     "surecler.view",
     "surecler.view.sube",
-    "surecler.detail.view"
+    "surecler.detail.view",
+    "arsiv.view",
+    "arsiv.download",
+    "retention.view"
   ],
   SGK_KARAR_ONAY_YETKILISI: [
     "mevzuat_parametreleri.view",
@@ -357,6 +376,25 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "sirket_parametreleri.view",
     "bordro_kesinlestirme.approve",
     "sgk_karar_paketi.approve"
+  ],
+  IDARI_ISLER: [
+    "personeller.view",
+    "personeller.detail.view",
+    "surecler.view",
+    "raporlar.view",
+    "arsiv.view",
+    "arsiv.download",
+    "retention.view"
+  ],
+  SISTEM_YONETICISI: [
+    "personeller.view",
+    "personeller.view.sube",
+    "personeller.detail.view",
+    "arsiv.view",
+    "arsiv.download",
+    "arsiv.audit.view",
+    "retention.view",
+    "retention.destruction.view"
   ]
 };
 

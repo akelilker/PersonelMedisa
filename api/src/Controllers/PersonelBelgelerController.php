@@ -14,6 +14,8 @@ use Medisa\Api\Services\PersonelBelge\PersonelBelgeBase64Guard;
 use Medisa\Api\Services\PersonelBelge\PersonelBelgeContracts;
 use Medisa\Api\Services\PersonelBelge\PersonelBelgeKayitRepository;
 use Medisa\Api\Services\PersonelBelge\PersonelBelgeStorageService;
+use Medisa\Api\Services\Retention\ArchiveAccessService;
+use Medisa\Api\Services\Retention\PersonelArchiveGate;
 use PDO;
 use RuntimeException;
 
@@ -40,10 +42,7 @@ class PersonelBelgelerController
         $pdo = self::getConnection();
         $personel = self::fetchPersonelForScope($pdo, $personelId);
         self::assertPersonelReadable($user, $request, $personel);
-
-        if (strtoupper((string) $personel['aktif_durum']) === 'PASIF') {
-            self::validationError('personel_id', 'Pasif personelin belge durumu güncellenemez.');
-        }
+        PersonelArchiveGate::assertBusinessWriteAllowed($pdo, (int) $personel['id']);
 
         $items = self::normalizeBelgeDurumuPayload($request->getJsonBody());
 
@@ -181,10 +180,7 @@ class PersonelBelgelerController
         $pdo = self::getConnection();
         $personel = self::fetchPersonelForScope($pdo, $personelId);
         self::assertPersonelReadable($user, $request, $personel);
-
-        if (strtoupper((string) $personel['aktif_durum']) === 'PASIF') {
-            self::validationError('personel_id', 'Pasif personele belge kaydı eklenemez.');
-        }
+        PersonelArchiveGate::assertBusinessWriteAllowed($pdo, (int) $personel['id']);
 
         $body = $request->getJsonBody();
         if (!is_array($body)) {
@@ -344,10 +340,7 @@ class PersonelBelgelerController
 
         $personel = self::fetchPersonelForScope($pdo, (int) $row['personel_id']);
         self::assertPersonelReadable($user, $request, $personel);
-
-        if (strtoupper((string) $personel['aktif_durum']) === 'PASIF') {
-            self::validationError('personel_id', 'Pasif personelin belge kaydi guncellenemez.');
-        }
+        PersonelArchiveGate::assertBusinessWriteAllowed($pdo, (int) $personel['id']);
 
         if (strtoupper((string) ($row['state'] ?? '')) === 'IPTAL') {
             JsonResponse::error(409, 'CONFLICT', 'Iptal edilmis belge kaydi guncellenemez.');
@@ -455,10 +448,7 @@ class PersonelBelgelerController
 
         $personel = self::fetchPersonelForScope($pdo, (int) $row['personel_id']);
         self::assertPersonelReadable($user, $request, $personel);
-
-        if (strtoupper((string) $personel['aktif_durum']) === 'PASIF') {
-            self::validationError('personel_id', 'Pasif personelin belge dosyasi degistirilemez.');
-        }
+        PersonelArchiveGate::assertBusinessWriteAllowed($pdo, (int) $personel['id']);
 
         if (strtoupper((string) ($row['state'] ?? '')) === 'IPTAL') {
             JsonResponse::error(409, 'CONFLICT', 'Iptal edilmis belge kaydinin dosyasi degistirilemez.');
@@ -641,6 +631,15 @@ class PersonelBelgelerController
         $personel = self::fetchPersonelForScope($pdo, (int) $row['personel_id']);
         self::assertPersonelReadable($user, $request, $personel);
 
+        $isPasifArchive = strtoupper((string) ($personel['aktif_durum'] ?? '')) === 'PASIF';
+        if ($isPasifArchive && !ArchiveAccessService::canDownloadArchive($user)) {
+            JsonResponse::error(
+                403,
+                'ARCHIVE_DOWNLOAD_REQUIRED',
+                'Pasif personel belge indirme icin arsiv.download yetkisi gerekir.'
+            );
+        }
+
         $surumId = self::parsePositiveInt($request->getQuery('surum_id'));
         $version = null;
         if ($surumId !== null) {
@@ -659,6 +658,29 @@ class PersonelBelgelerController
             $path = PersonelBelgeStorageService::resolvePath((string) $version['storage_key']);
         } catch (RuntimeException $e) {
             self::respondStorageError($e, 404);
+        }
+
+        if ($isPasifArchive) {
+            try {
+                ArchiveAccessService::writeAccessAudit(
+                    $pdo,
+                    $user,
+                    ArchiveAccessService::ACTION_DOWNLOAD,
+                    'belge_kaydi',
+                    $kayitId,
+                    (int) $personel['id'],
+                    '/belge-kayitlari/{id}/indir',
+                    ['surum_id' => isset($version['id']) ? (int) $version['id'] : $surumId]
+                );
+            } catch (RuntimeException $e) {
+                JsonResponse::error(
+                    503,
+                    $e->getMessage() === 'ARCHIVE_AUDIT_UNAVAILABLE'
+                        ? 'ARCHIVE_AUDIT_UNAVAILABLE'
+                        : 'ARCHIVE_AUDIT_FAILED',
+                    'Arsiv erisim audit yazilamadi; indirme engellendi.'
+                );
+            }
         }
 
         $filename = self::sanitizeDownloadFilename((string) $version['orijinal_dosya_adi']);
@@ -734,6 +756,7 @@ class PersonelBelgelerController
         if (!in_array($personelAktiflik, ['aktif', 'pasif', 'tum'], true)) {
             self::validationError('personel_aktiflik', 'Gecersiz personel aktiflik filtresi.');
         }
+        $personelAktiflik = PersonelArchiveGate::effectiveListAktiflik($user, $personelAktiflik);
 
         if ($kayitTipi !== '' && !PersonelBelgeContracts::isValidKayitTipi($kayitTipi)) {
             self::validationError('kayit_tipi', 'Kayit tipi gecerli degil.');

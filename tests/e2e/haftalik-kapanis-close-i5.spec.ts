@@ -155,11 +155,11 @@ test.describe("I5 haftalik kapanis close UI", () => {
   });
 
   test("roles without puantaj.muhurle hide close action", async ({ page }) => {
-    for (const role of ["MUHASEBE", "BIRIM_AMIRI", "PATRON"] as const) {
+    for (const role of ["MUHASEBE", "BIRIM_AMIRI", "PERSONEL"] as const) {
       await loginAsMockRole(page, role, MOCK_ROLE_LOGIN[role]);
       await page.goto("/haftalik-kapanis", { waitUntil: "domcontentloaded" });
-      if (role === "PATRON") {
-        // PATRON may lack revizyon.view — still must not expose close action.
+      if (role === "PERSONEL") {
+        // PERSONEL has zero business permissions — still must not expose close action.
         await expect(page.getByTestId("hk-close-open")).toHaveCount(0);
         await expect(page.getByTestId("hk-close-panel")).toHaveCount(0);
       } else {

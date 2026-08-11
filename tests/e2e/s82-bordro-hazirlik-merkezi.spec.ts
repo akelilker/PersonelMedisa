@@ -45,8 +45,8 @@ test.describe("S82 Bordro Hazirlik Merkezi", () => {
     resetMaasBordroPageState(page);
   });
 
-  test("MUHASEBE: preflight blocker, politika, devir, candidate, kontrol; kesinlestirme yok", async ({ page }) => {
-    await openRaporlarPanel(page, "MUHASEBE", "bordro-hazirlik");
+  test("IK_SORUMLUSU: preflight blocker, politika, devir, candidate, kontrol; kesinlestirme yok", async ({ page }) => {
+    await openRaporlarPanel(page, "IK_SORUMLUSU", "bordro-hazirlik");
     await submitBordroFilters(page);
 
     await expect(page.getByTestId("bordro-hazirlik-merkezi")).toBeVisible();
@@ -77,8 +77,8 @@ test.describe("S82 Bordro Hazirlik Merkezi", () => {
     await expect(approveButton).toBeEnabled();
     await approveButton.click();
 
-    await mockApi(page, "MUHASEBE");
-    await login(page, MOCK_ROLE_LOGIN.MUHASEBE);
+    await mockApi(page, "IK_SORUMLUSU");
+    await login(page, MOCK_ROLE_LOGIN.IK_SORUMLUSU);
     await page.goto("/raporlar?panel=bordro-hazirlik");
     await submitBordroFilters(page);
 
@@ -99,8 +99,8 @@ test.describe("S82 Bordro Hazirlik Merkezi", () => {
   });
 
   test("GENEL_YONETICI: politika onaylar, ozet gorur, geri gonderir ve kesinlestirir", async ({ page }) => {
-    await mockApi(page, "MUHASEBE");
-    await login(page, MOCK_ROLE_LOGIN.MUHASEBE);
+    await mockApi(page, "IK_SORUMLUSU");
+    await login(page, MOCK_ROLE_LOGIN.IK_SORUMLUSU);
     await page.goto("/raporlar?panel=bordro-hazirlik");
     await submitBordroFilters(page);
     await openPolitikaTab(page);
@@ -123,8 +123,8 @@ test.describe("S82 Bordro Hazirlik Merkezi", () => {
     await expect(approveButton).toBeEnabled();
     await approveButton.click();
 
-    await mockApi(page, "MUHASEBE");
-    await login(page, MOCK_ROLE_LOGIN.MUHASEBE);
+    await mockApi(page, "IK_SORUMLUSU");
+    await login(page, MOCK_ROLE_LOGIN.IK_SORUMLUSU);
     await page.goto("/raporlar?panel=bordro-hazirlik");
     await submitBordroFilters(page);
 
@@ -167,8 +167,8 @@ test.describe("S82 Bordro Hazirlik Merkezi", () => {
     await expect(page).toHaveURL(/\/yetkisiz/);
   });
 
-  test("PATRON: bordro route erisemez", async ({ page }) => {
-    await loginAsMockRole(page, "PATRON");
+  test("PERSONEL: bordro route erisemez", async ({ page }) => {
+    await loginAsMockRole(page, "PERSONEL");
     await page.goto("/raporlar?panel=bordro-hazirlik");
     await expect(page).toHaveURL(/\/yetkisiz/);
   });

@@ -53,12 +53,18 @@ test.describe("S81 Bildirim ve Onay Zinciri", () => {
     await expect(page.getByTestId("aylik-bildirim-onay-approve")).toHaveCount(0);
   });
 
-  test("MUHASEBE: sayfa gorunur, create ve haftalik onay yok", async ({ page }) => {
-    await loginAsMockRole(page, "MUHASEBE");
+  test("IK_SORUMLUSU: sayfa gorunur, create ve haftalik onay yok", async ({ page }) => {
+    await loginAsMockRole(page, "IK_SORUMLUSU");
     await page.goto("/bildirimler");
     await expect(page.getByTestId("bildirim-panel-context")).toBeVisible();
     await expect(page.getByRole("button", { name: /Günlük Kayıt Ekle/ })).toHaveCount(0);
     await expect(page.getByTestId("haftalik-mutabakat-approve")).toHaveCount(0);
+  });
+
+  test("MUHASEBE: /bildirimler yetkisiz", async ({ page }) => {
+    await loginAsMockRole(page, "MUHASEBE");
+    await page.goto("/bildirimler");
+    await expect(page).toHaveURL(/\/yetkisiz/);
   });
 
   test("GENEL_YONETICI: panel baglami + GY paneli; bloklu approve disabled", async ({ page }) => {
@@ -72,8 +78,8 @@ test.describe("S81 Bildirim ve Onay Zinciri", () => {
     }
   });
 
-  test("PATRON: /bildirimler yetkisiz", async ({ page }) => {
-    await loginAsMockRole(page, "PATRON");
+  test("PERSONEL: /bildirimler yetkisiz", async ({ page }) => {
+    await loginAsMockRole(page, "PERSONEL");
     await page.goto("/bildirimler");
     await expect(page).toHaveURL(/\/yetkisiz/);
   });

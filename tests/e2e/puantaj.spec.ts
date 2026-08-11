@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import { login, waitForAuthSession } from "./helpers/auth";
 import { mockApi, type MockUserRole } from "./helpers/mock-api";
 
-const ROLE_LOGIN: Record<MockUserRole, { username: string; password: string }> = {
+const ROLE_LOGIN: Partial<Record<MockUserRole, { username: string; password: string }>> = {
   GENEL_YONETICI: { username: "yonetici", password: "secret" },
   BOLUM_YONETICISI: { username: "bolum_yoneticisi", password: "demo123" },
   MUHASEBE: { username: "muhasebe", password: "demo123" },
@@ -16,7 +16,7 @@ const MUHUR_ROLE_CASES: MockUserRole[] = [
   "BIRIM_AMIRI"
 ];
 
-const ROLE_MUHUR_VISIBLE: Record<MockUserRole, boolean> = {
+const ROLE_MUHUR_VISIBLE: Partial<Record<MockUserRole, boolean>> = {
   GENEL_YONETICI: true,
   BOLUM_YONETICISI: true,
   MUHASEBE: false,

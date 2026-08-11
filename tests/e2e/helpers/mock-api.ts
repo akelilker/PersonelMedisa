@@ -1,4 +1,4 @@
-﻿import { createHash } from "node:crypto";
+import { createHash } from "node:crypto";
 import type { Page, Route } from "@playwright/test";
 import type { GunlukPuantaj } from "../../../src/types/puantaj";
 import { hesaplaAylikSgkPuantajOzetleri } from "../../../src/services/dashboard-rapor-servisi";
@@ -44,14 +44,18 @@ export type MockUserRole =
   | "BOLUM_YONETICISI"
   | "MUHASEBE"
   | "BIRIM_AMIRI"
-  | "PATRON";
+  | "IK_SORUMLUSU"
+  | "PERSONEL"
+  | "SISTEM_YONETICISI";
 
 const MOCK_ROLE_USER_ID: Record<MockUserRole, number> = {
   GENEL_YONETICI: 1,
   MUHASEBE: 2,
   BIRIM_AMIRI: 3,
   BOLUM_YONETICISI: 4,
-  PATRON: 5
+  IK_SORUMLUSU: 5,
+  PERSONEL: 6,
+  SISTEM_YONETICISI: 7
 };
 
 type MockApiOptions = {
@@ -3725,8 +3729,8 @@ let personelBelgeKaydiIdCounter = 903;
       h1 = Math.imul(h1, 0x01000193);
       h2 = Math.imul(h2 ^ c, 0x01000193);
     }
-    const a = (h1 >>> 0).toString(16).padStart(8, "0");
-    const b = (h2 >>> 0).toString(16).padStart(8, "0");
+    const a = (h1 >> 0).toString(16).padStart(8, "0");
+    const b = (h2 >> 0).toString(16).padStart(8, "0");
     return `${a}${b}${"0".repeat(48)}`.slice(0, 64);
   }
 

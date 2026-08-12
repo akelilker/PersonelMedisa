@@ -273,6 +273,22 @@ class BordroOnIzlemeService
                 ->execute($params);
             $pdo->prepare('UPDATE maas_hesaplama_adaylari SET bordro_onay_durumu = :to WHERE calistirma_id = :id')
                 ->execute(['to' => (string) $to, 'id' => (int) $calistirmaId]);
+
+            if ($to === 'KESINLESTI') {
+                if (\Medisa\Api\Services\Retention\ArchiveManifestService::isLifecycleRetentionHost($pdo)) {
+                    \Medisa\Api\Services\Retention\ArchiveManifestService::requireManifestSideEffect($pdo, static function () use ($pdo, $row, $calistirmaId, $actor) {
+                        \Medisa\Api\Services\Retention\ArchiveManifestService::createBordroPeriodManifests(
+                            $pdo,
+                            (int) $row['sube_id'],
+                            (int) $row['yil'],
+                            (int) $row['ay'],
+                            (int) $calistirmaId,
+                            self::actorId($actor)
+                        );
+                    });
+                }
+            }
+
             $pdo->commit();
             $fresh = $pdo->prepare('SELECT * FROM maas_hesaplama_calistirmalari WHERE id = :id');
             $fresh->execute(['id' => (int) $calistirmaId]);

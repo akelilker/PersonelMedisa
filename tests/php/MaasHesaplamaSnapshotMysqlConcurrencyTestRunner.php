@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/../../api/src/bootstrap.php';
 require_once __DIR__ . '/../../api/src/Services/BildirimDonemContextService.php';
 require_once __DIR__ . '/../../api/src/Services/PuantajDonemKilidiService.php';
 require_once __DIR__ . '/../../api/src/Services/MaasHesaplamaException.php';
@@ -359,6 +360,24 @@ try {
         yil SMALLINT UNSIGNED NOT NULL, locked_at DATETIME NOT NULL, locked_by INT UNSIGNED NULL,
         UNIQUE KEY uq_mhs_yfck_personel_yil (personel_id, yil)
     ) ENGINE=InnoDB");
+
+    // Pack1 retention side-effect (053) — required for SGK snapshot mint fail-closed contract
+    $pdo->exec("CREATE TABLE arsiv_manifestleri (
+        id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        entity_type VARCHAR(64) NOT NULL,
+        record_id INT UNSIGNED NOT NULL,
+        personel_id INT UNSIGNED NULL,
+        record_category VARCHAR(64) NOT NULL,
+        source_version_identity VARCHAR(191) NOT NULL,
+        trigger_type ENUM('PERIOD_CLOSURE', 'TERMINATION_DATE') NOT NULL,
+        trigger_date DATE NOT NULL,
+        retention_until DATE NOT NULL,
+        source_sha256 CHAR(64) NULL,
+        integrity_status ENUM('OK', 'CHANGED', 'UNKNOWN') NOT NULL DEFAULT 'UNKNOWN',
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        created_by INT UNSIGNED NULL,
+        UNIQUE KEY uq_arsiv_manifest_entity_cat_src (entity_type, record_id, record_category, source_version_identity)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 
     $pdo->exec("INSERT INTO subeler VALUES (1, 'MRK', 'Merkez'), (2, 'SB2', 'Sube 2')");
     $pdo->exec('INSERT INTO users VALUES (1), (11), (12), (13), (14), (15), (16), (17), (18), (19), (20), (99)');

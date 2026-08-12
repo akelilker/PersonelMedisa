@@ -133,6 +133,13 @@ describe("S3F QR puantaj candidate review / apply", () => {
     expect(apply).toContain("giris_saati");
     expect(apply).toContain("cikis_saati");
     expect(decide).toContain("function decide");
+    expect(decide).toContain("createQrPuantajDecisionOnayAuditManifest");
+
+    const retentionAdapter = read(
+      "api/src/Services/Retention/RetentionSourceAdapterService.php"
+    );
+    expect(retentionAdapter).toContain("QR_PUANTAJ_CANDIDATE_DECISION");
+    expect(retentionAdapter).toContain("computeQrPuantajDecisionLedgerFingerprint");
 
     // Production call sites must use the 3-arg V2 signature.
     for (const path of [

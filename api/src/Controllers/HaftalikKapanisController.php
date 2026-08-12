@@ -154,6 +154,16 @@ class HaftalikKapanisController
                 $index += 1;
             }
 
+            \Medisa\Api\Services\Retention\ArchiveManifestService::requireManifestSideEffect($pdo, static function () use ($pdo, $kapanisId, $subeId, $haftaBaslangic, $actorId) {
+                \Medisa\Api\Services\Retention\ArchiveManifestService::createHaftalikPeriodManifests(
+                    $pdo,
+                    (int) $kapanisId,
+                    (int) $subeId,
+                    (string) $haftaBaslangic,
+                    (int) $actorId
+                );
+            });
+
             $pdo->commit();
 
             JsonResponse::success([

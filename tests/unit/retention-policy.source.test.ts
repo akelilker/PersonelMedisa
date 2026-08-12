@@ -183,6 +183,61 @@ describe("retention policy source contract (053)", () => {
     expect(adapter).toContain("RETENTION_SOURCE_HANDLER_NOT_IMPLEMENTED");
     expect(adapter).toContain("personel_belge_dosya_surumleri");
     expect(adapter).toContain("coverageMap");
+    expect(adapter).toContain("QR_PUANTAJ_CANDIDATE_DECISION");
+    expect(adapter).toContain("computeQrPuantajDecisionLedgerFingerprint");
+    expect(adapter).toContain("disiplin_vakalar");
+
+    const manifestSvc = readFileSync(
+      resolve(root, "api/src/Services/Retention/ArchiveManifestService.php"),
+      "utf8"
+    );
+    expect(manifestSvc).toContain("createResolvedManifest");
+    expect(manifestSvc).toContain("createPuantajPeriodManifests");
+    expect(manifestSvc).toContain("createBordroPeriodManifests");
+    expect(manifestSvc).toContain("createSgkPeriodManifest");
+    expect(manifestSvc).toContain("createHaftalikPeriodManifests");
+    expect(manifestSvc).toContain("createQrPuantajDecisionOnayAuditManifest");
+    expect(manifestSvc).toContain("createTerminationScopedManifests");
+
+    const decisionSvc = readFileSync(
+      resolve(root, "api/src/Services/Qr/QrPuantajCandidateDecisionService.php"),
+      "utf8"
+    );
+    expect(decisionSvc).toContain("createQrPuantajDecisionOnayAuditManifest");
+    expect(decisionSvc).toContain("requireManifestSideEffect");
+    expect(decisionSvc).not.toMatch(/runIfSchemaReady/);
+  });
+
+  it("coverageMap wires all 15 manifest creators in source", () => {
+    const adapter = readFileSync(
+      resolve(root, "api/src/Services/Retention/RetentionSourceAdapterService.php"),
+      "utf8"
+    );
+    // After MAN-001: $manifestWired = $implemented (full catalog)
+    expect(adapter).toMatch(/\$manifestWired\s*=\s*\$implemented/);
+    expect(adapter).toContain("verifyDecisionHash");
+  });
+
+  it("Pack1 lifecycle owners use required schema path (no silent SCHEMA_NOT_READY skip)", () => {
+    const requiredEffect = [
+      "api/src/Controllers/PuantajController.php",
+      "api/src/Controllers/HaftalikKapanisController.php",
+      "api/src/Services/BordroOnIzlemeService.php",
+      "api/src/Services/MaasHesaplamaSnapshotService.php",
+      "api/src/Services/Qr/QrPuantajCandidateDecisionService.php"
+    ];
+    for (const rel of requiredEffect) {
+      const src = readFileSync(resolve(root, rel), "utf8");
+      expect(src, rel).toContain("requireManifestSideEffect");
+      expect(src, rel).not.toMatch(/runIfSchemaReady\s*\(/);
+    }
+    const surecler = readFileSync(
+      resolve(root, "api/src/Controllers/SureclerController.php"),
+      "utf8"
+    );
+    expect(surecler).toContain("createPersonelLifecycleManifests");
+    expect(surecler).not.toMatch(/runIfSchemaReady\s*\(/);
+    expect(surecler).not.toContain("Pre-053 environments");
   });
 
   it("wires retention roles and permissions parity", () => {

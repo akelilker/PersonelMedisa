@@ -194,12 +194,42 @@ class RetentionPeriodTriggerResolver
 
     /**
      * ONAY_AUDIT inherits BOTH parent trigger date and parent trigger type.
+     * Typed S3F ledger path uses candidate_date (PERIOD_CLOSURE) without requiring seal.
      *
      * @param array<string, mixed> $context
      * @return array{trigger_type: string, trigger_date: string}
      */
     private static function resolveOnayAudit(PDO $pdo, array $context)
     {
+        $auditSource = isset($context['audit_source_type'])
+            ? strtoupper(trim((string) $context['audit_source_type']))
+            : '';
+        if ($auditSource === RetentionSourceAdapterService::AUDIT_SOURCE_QR_PUANTAJ_CANDIDATE_DECISION) {
+            $date = isset($context['candidate_date']) ? trim((string) $context['candidate_date']) : '';
+            if ($date === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+                $ledgerId = isset($context['ledger_id']) ? (int) $context['ledger_id'] : 0;
+                if ($ledgerId <= 0) {
+                    $ledgerId = isset($context['record_id']) ? (int) $context['record_id'] : 0;
+                }
+                if ($ledgerId > 0 && self::tableExists($pdo, 'qr_puantaj_candidate_decision_ledger')) {
+                    $stmt = $pdo->prepare(
+                        'SELECT candidate_date FROM qr_puantaj_candidate_decision_ledger WHERE id = :id LIMIT 1'
+                    );
+                    $stmt->execute(['id' => $ledgerId]);
+                    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+                    $date = $row ? substr((string) ($row['candidate_date'] ?? ''), 0, 10) : '';
+                }
+            }
+            if ($date === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+                throw new RuntimeException(RetentionPolicyService::CODE_TRIGGER_NOT_RESOLVED);
+            }
+
+            return [
+                'trigger_type' => RetentionCategories::TRIGGER_PERIOD_CLOSURE,
+                'trigger_date' => $date,
+            ];
+        }
+
         $parent = isset($context['parent_category']) ? trim((string) $context['parent_category']) : '';
         if ($parent === '' || $parent === RetentionCategories::ONAY_AUDIT) {
             throw new RuntimeException(RetentionPolicyService::CODE_TRIGGER_NOT_RESOLVED);

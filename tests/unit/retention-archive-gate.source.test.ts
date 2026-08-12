@@ -56,6 +56,18 @@ describe("retention archive gate source contract", () => {
     expect(surec).toContain("createPersonelLifecycleManifests");
     expect(surec).toContain("PersonelArchiveGate::assertBusinessWriteAllowed");
 
+    const puantaj = readFileSync(
+      resolve(root, "api/src/Controllers/PuantajController.php"),
+      "utf8"
+    );
+    expect(puantaj).toContain("createPuantajPeriodManifests");
+
+    const haftalik = readFileSync(
+      resolve(root, "api/src/Controllers/HaftalikKapanisController.php"),
+      "utf8"
+    );
+    expect(haftalik).toContain("createHaftalikPeriodManifests");
+
     const personeller = readFileSync(
       resolve(root, "api/src/Controllers/PersonellerController.php"),
       "utf8"

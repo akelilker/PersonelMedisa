@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/../../api/src/bootstrap.php';
 require_once __DIR__ . '/../../api/src/Services/BildirimDonemContextService.php';
 require_once __DIR__ . '/../../api/src/Services/PuantajDonemKilidiService.php';
 require_once __DIR__ . '/../../api/src/Services/PuantajDonemPeriodService.php';
@@ -16,6 +17,11 @@ require_once __DIR__ . '/../../api/src/Services/Attendance/AttendanceDisciplineC
 require_once __DIR__ . '/../../api/src/Services/Attendance/AttendancePayrollEffectResolver.php';
 require_once __DIR__ . '/../../api/src/Services/Attendance/PuantajOlayKararService.php';
 require_once __DIR__ . '/../../api/src/Services/MaasHesaplamaSnapshotService.php';
+
+/**
+ * Isolated SQLite unit contract: payroll snapshot logic without 053 retention DDL.
+ * Retention side-effects are MySQL/MariaDB-only (ArchiveManifestService::isLifecycleRetentionHost).
+ */
 
 use Medisa\Api\Services\MaasHesaplamaException;
 use Medisa\Api\Services\MaasHesaplamaSnapshotService as Svc;

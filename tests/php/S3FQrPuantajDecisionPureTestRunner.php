@@ -13,6 +13,7 @@ use Medisa\Api\Services\Qr\QrPuantajCandidateDecisionLedgerService;
 use Medisa\Api\Services\Qr\QrPuantajCandidateDecisionPolicy;
 use Medisa\Api\Services\Qr\QrPuantajCandidateHashService;
 use Medisa\Api\Services\Qr\QrPuantajCandidateProjectionService;
+use Medisa\Api\Services\Retention\RetentionSourceAdapterService;
 
 function s3fPureAssert(bool $ok, string $name): void
 {
@@ -396,4 +397,80 @@ s3fPureAssert(
     'dependent guard lists populated fields'
 );
 
+// Retention ONAY_AUDIT ledger fingerprint (MG-RET-S3F-001) — pure, no DB
+$ledgerRow = [
+    'id' => 42,
+    'personel_id' => 7,
+    'sube_id' => 1,
+    'candidate_date' => '2026-08-12',
+    'candidate_hash' => str_repeat('ab', 32),
+    'decision_type' => 'KEEP_CANONICAL',
+    'decision_reason' => 'canonical remains authoritative',
+    'puantaj_id' => 99,
+    'algorithm_version' => 'QR_PUANTAJ_CANDIDATE_V1',
+    'interval_algorithm_version' => 'QR_INTERVAL_V1',
+    'decision_algorithm_version' => 'QR_PUANTAJ_DECISION_V1',
+    'decided_by_user_id' => 3,
+    'request_nonce' => 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
+    'supersedes_decision_id' => null,
+    'previous_decision_hash' => null,
+    'decision_hash' => str_repeat('cd', 32),
+    'created_at' => '2026-08-12 10:00:00.123456',
+];
+$fp1 = RetentionSourceAdapterService::computeQrPuantajDecisionLedgerFingerprint($ledgerRow);
+s3fPureAssert(strlen($fp1) === 64 && ctype_xdigit($fp1), 'retention ledger fp length');
+$ledgerRowChanged = $ledgerRow;
+$ledgerRowChanged['decision_reason'] = 'changed reason';
+$fp2 = RetentionSourceAdapterService::computeQrPuantajDecisionLedgerFingerprint($ledgerRowChanged);
+s3fPureAssert($fp1 !== $fp2, 'retention ledger fp changes with material');
+$fp1b = RetentionSourceAdapterService::computeQrPuantajDecisionLedgerFingerprint($ledgerRow);
+s3fPureAssert($fp1 === $fp1b, 'retention ledger fp deterministic');
+
+// Decision hash owner covers JSON snapshots — tamper invalidates verify
+$ledgerWithSnap = [
+    'candidate_hash' => str_repeat('ab', 32),
+    'decision_type' => 'KEEP_CANONICAL',
+    'decision_reason' => 'canonical remains authoritative',
+    'decided_by_user_id' => 3,
+    'personel_id' => 7,
+    'sube_id' => 1,
+    'candidate_date' => '2026-08-12',
+    'puantaj_id' => 99,
+    'algorithm_version' => 'QR_PUANTAJ_CANDIDATE_V1',
+    'interval_algorithm_version' => 'QR_INTERVAL_V1',
+    'decision_algorithm_version' => 'QR_PUANTAJ_DECISION_V1',
+    'candidate_snapshot' => ['candidate_hash' => str_repeat('ab', 32), 'x' => 1],
+    'before_puantaj_snapshot' => ['giris_saati' => '09:00'],
+    'after_puantaj_snapshot' => null,
+    'request_nonce' => 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
+    'supersedes_decision_id' => null,
+    'previous_decision_hash' => null,
+    'created_at' => '2026-08-12 10:00:00.123456',
+];
+$dh = QrPuantajCandidateDecisionLedgerService::computeDecisionHash($ledgerWithSnap);
+$ledgerWithSnap['decision_hash'] = $dh;
+s3fPureAssert(
+    QrPuantajCandidateDecisionLedgerService::verifyDecisionHash($ledgerWithSnap) === true,
+    'S3F_DECISION_HASH_RECOMPUTE_VERIFY ok'
+);
+$ledgerWithSnap['candidate_snapshot'] = ['candidate_hash' => str_repeat('ab', 32), 'x' => 2];
+s3fPureAssert(
+    QrPuantajCandidateDecisionLedgerService::verifyDecisionHash($ledgerWithSnap) === false,
+    'S3F_SNAPSHOT_TAMPER candidate_snapshot fails verify'
+);
+$ledgerWithSnap['candidate_snapshot'] = ['candidate_hash' => str_repeat('ab', 32), 'x' => 1];
+$ledgerWithSnap['before_puantaj_snapshot'] = ['giris_saati' => '09:01'];
+s3fPureAssert(
+    QrPuantajCandidateDecisionLedgerService::verifyDecisionHash($ledgerWithSnap) === false,
+    'S3F_SNAPSHOT_TAMPER before_puantaj_snapshot fails verify'
+);
+$ledgerWithSnap['before_puantaj_snapshot'] = ['giris_saati' => '09:00'];
+$ledgerWithSnap['after_puantaj_snapshot'] = ['cikis_saati' => '19:00'];
+s3fPureAssert(
+    QrPuantajCandidateDecisionLedgerService::verifyDecisionHash($ledgerWithSnap) === false,
+    'S3F_SNAPSHOT_TAMPER after_puantaj_snapshot fails verify'
+);
+
+echo 'S3F_DECISION_HASH_RECOMPUTE_VERIFY=PASS' . PHP_EOL;
+echo 'S3F_SNAPSHOT_TAMPER_TEST=PASS' . PHP_EOL;
 echo 'S3F pure decision tests OK' . PHP_EOL;

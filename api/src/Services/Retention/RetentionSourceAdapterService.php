@@ -16,6 +16,9 @@ class RetentionSourceAdapterService
 {
     public const CODE_NOT_IMPLEMENTED = 'RETENTION_SOURCE_HANDLER_NOT_IMPLEMENTED';
 
+    /** Typed ONAY_AUDIT source — S3F QR puantaj candidate decision ledger. */
+    public const AUDIT_SOURCE_QR_PUANTAJ_CANDIDATE_DECISION = 'QR_PUANTAJ_CANDIDATE_DECISION';
+
     /**
      * @param array<string, mixed> $context
      * @return array{source_version_identity: string, source_sha256: string|null}
@@ -46,9 +49,11 @@ class RetentionSourceAdapterService
             case RetentionCategories::RAPOR:
             case RetentionCategories::IS_KAZASI:
             case RetentionCategories::DISIPLIN:
-            case RetentionCategories::OLAY:
-            case RetentionCategories::SAVUNMA:
                 return self::resolveSurecLifecycle($pdo, $category, $context);
+            case RetentionCategories::OLAY:
+                return self::resolveDisiplinOlay($pdo, $context);
+            case RetentionCategories::SAVUNMA:
+                return self::resolveDisiplinSavunma($pdo, $context);
             default:
                 throw new RuntimeException(self::CODE_NOT_IMPLEMENTED . ':' . $category);
         }
@@ -83,10 +88,8 @@ class RetentionSourceAdapterService
             RetentionCategories::OLAY,
             RetentionCategories::SAVUNMA,
         ];
-        $manifestWired = [
-            RetentionCategories::PERSONEL_OZLUK,
-            RetentionCategories::ISE_GIRIS_CIKIS,
-        ];
+        // Manifest creators are lifecycle-wired for the full catalog (MG-RET-MAN-001).
+        $manifestWired = $implemented;
         $map = [];
         foreach (RetentionCategories::all() as $cat) {
             $ok = in_array($cat, $implemented, true);
@@ -411,11 +414,22 @@ class RetentionSourceAdapterService
     }
 
     /**
+     * Generic ONAY_AUDIT derives from parent category.
+     * Typed S3F path (audit_source_type=QR_PUANTAJ_CANDIDATE_DECISION) folds ledger material
+     * without requiring a sealed PUANTAJ period (MG-RET-S3F-001).
+     *
      * @param array<string, mixed> $context
      * @return array{source_version_identity: string, source_sha256: string|null}
      */
     private static function resolveOnayAudit(PDO $pdo, array $context)
     {
+        $auditSource = isset($context['audit_source_type'])
+            ? strtoupper(trim((string) $context['audit_source_type']))
+            : '';
+        if ($auditSource === self::AUDIT_SOURCE_QR_PUANTAJ_CANDIDATE_DECISION) {
+            return self::resolveQrPuantajCandidateDecisionOnayAudit($pdo, $context);
+        }
+
         $parent = isset($context['parent_category']) ? trim((string) $context['parent_category']) : '';
         if ($parent === '' || $parent === RetentionCategories::ONAY_AUDIT || !RetentionCategories::isKnown($parent)) {
             throw new RuntimeException(RetentionPolicyService::CODE_TRIGGER_NOT_RESOLVED);
@@ -428,6 +442,246 @@ class RetentionSourceAdapterService
                 ? hash('sha256', 'onay_audit|' . $parent . '|' . $parentSource['source_sha256'])
                 : null,
         ];
+    }
+
+    /**
+     * Server-owned S3F ledger → ONAY_AUDIT identity + fingerprint.
+     * Client cannot supply ledger fields; row is loaded by ledger_id.
+     * Stored decision_hash is recomputed via QrPuantajCandidateDecisionLedgerService
+     * (includes JSON snapshots) before retention fingerprint is trusted.
+     *
+     * @param array<string, mixed> $context
+     * @return array{source_version_identity: string, source_sha256: string|null}
+     */
+    private static function resolveQrPuantajCandidateDecisionOnayAudit(PDO $pdo, array $context)
+    {
+        $parent = isset($context['parent_category']) ? trim((string) $context['parent_category']) : '';
+        if ($parent === '') {
+            $parent = RetentionCategories::PUANTAJ;
+        }
+        if ($parent !== RetentionCategories::PUANTAJ) {
+            throw new RuntimeException(RetentionPolicyService::CODE_TRIGGER_NOT_RESOLVED);
+        }
+
+        $ledgerId = isset($context['ledger_id']) ? (int) $context['ledger_id'] : 0;
+        if ($ledgerId <= 0) {
+            $ledgerId = isset($context['record_id']) ? (int) $context['record_id'] : 0;
+        }
+        if ($ledgerId <= 0 || !self::tableExists($pdo, 'qr_puantaj_candidate_decision_ledger')) {
+            throw new RuntimeException(RetentionPolicyService::CODE_TRIGGER_NOT_RESOLVED);
+        }
+
+        $stmt = $pdo->prepare(
+            'SELECT id, personel_id, sube_id, candidate_date, candidate_hash, decision_type,
+                    decision_reason, puantaj_id, algorithm_version, interval_algorithm_version,
+                    decision_algorithm_version, candidate_snapshot, before_puantaj_snapshot,
+                    after_puantaj_snapshot, decided_by_user_id, request_nonce,
+                    supersedes_decision_id, previous_decision_hash, decision_hash, created_at
+             FROM qr_puantaj_candidate_decision_ledger
+             WHERE id = :id LIMIT 1'
+        );
+        $stmt->execute(['id' => $ledgerId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$row) {
+            throw new RuntimeException('RETENTION_TARGET_ENTITY_NOT_FOUND');
+        }
+
+        $ctxPersonel = isset($context['personel_id']) ? (int) $context['personel_id'] : 0;
+        $ctxSube = isset($context['sube_id']) ? (int) $context['sube_id'] : 0;
+        $ctxDate = isset($context['candidate_date']) ? trim((string) $context['candidate_date']) : '';
+        if ($ctxPersonel > 0 && $ctxPersonel !== (int) $row['personel_id']) {
+            throw new RuntimeException(RetentionPolicyService::CODE_TRIGGER_NOT_RESOLVED);
+        }
+        if ($ctxSube > 0 && $ctxSube !== (int) $row['sube_id']) {
+            throw new RuntimeException(RetentionPolicyService::CODE_TRIGGER_NOT_RESOLVED);
+        }
+        if ($ctxDate !== '' && $ctxDate !== substr((string) $row['candidate_date'], 0, 10)) {
+            throw new RuntimeException(RetentionPolicyService::CODE_TRIGGER_NOT_RESOLVED);
+        }
+
+        $decisionHash = strtolower(trim((string) ($row['decision_hash'] ?? '')));
+        if ($decisionHash === '' || !preg_match('/^[0-9a-f]{64}$/', $decisionHash)) {
+            throw new RuntimeException(RetentionPolicyService::CODE_ARCHIVE_SOURCE_INTEGRITY_CHANGED);
+        }
+
+        // Authoritative S3F owner — includes candidate/before/after JSON snapshots.
+        if (!\Medisa\Api\Services\Qr\QrPuantajCandidateDecisionLedgerService::verifyDecisionHash($row)) {
+            throw new RuntimeException(RetentionPolicyService::CODE_ARCHIVE_SOURCE_INTEGRITY_CHANGED);
+        }
+
+        // Fingerprint uses verified decision_hash (covers snapshot material) + typed identity.
+        $ledgerFp = self::computeQrPuantajDecisionLedgerFingerprint($row);
+        $identity = sprintf(
+            'onay_audit:qr_pc_decision:%d:parent:%s:dh:%s',
+            (int) $row['id'],
+            RetentionCategories::PUANTAJ,
+            $decisionHash
+        );
+
+        return [
+            'source_version_identity' => $identity,
+            'source_sha256' => hash(
+                'sha256',
+                'onay_audit|' . RetentionCategories::PUANTAJ . '|qr_pc_decision|' . $ledgerFp
+            ),
+        ];
+    }
+
+    /**
+     * Canonical retention fingerprint material for an S3F ledger row.
+     * Must only be used after verifyDecisionHash succeeds — verified decision_hash
+     * already binds candidate_snapshot / before_puantaj_snapshot / after_puantaj_snapshot.
+     *
+     * @param array<string, mixed> $row
+     */
+    public static function computeQrPuantajDecisionLedgerFingerprint(array $row)
+    {
+        $payload = implode('|', [
+            (string) ((int) ($row['id'] ?? 0)),
+            (string) ((int) ($row['personel_id'] ?? 0)),
+            (string) ((int) ($row['sube_id'] ?? 0)),
+            substr((string) ($row['candidate_date'] ?? ''), 0, 10),
+            strtolower((string) ($row['candidate_hash'] ?? '')),
+            strtoupper((string) ($row['decision_type'] ?? '')),
+            (string) ($row['decision_reason'] ?? ''),
+            isset($row['puantaj_id']) && $row['puantaj_id'] !== null ? (string) ((int) $row['puantaj_id']) : '',
+            (string) ($row['algorithm_version'] ?? ''),
+            (string) ($row['interval_algorithm_version'] ?? ''),
+            (string) ($row['decision_algorithm_version'] ?? ''),
+            (string) ((int) ($row['decided_by_user_id'] ?? 0)),
+            strtolower((string) ($row['request_nonce'] ?? '')),
+            isset($row['supersedes_decision_id']) && $row['supersedes_decision_id'] !== null
+                ? (string) ((int) $row['supersedes_decision_id'])
+                : '',
+            isset($row['previous_decision_hash']) && $row['previous_decision_hash'] !== null
+                ? strtolower((string) $row['previous_decision_hash'])
+                : '',
+            strtolower((string) ($row['decision_hash'] ?? '')),
+            self::normalizeLedgerCreatedAt((string) ($row['created_at'] ?? '')),
+        ]);
+
+        return hash('sha256', $payload);
+    }
+
+    private static function normalizeLedgerCreatedAt($raw)
+    {
+        $raw = trim((string) $raw);
+        if ($raw === '') {
+            return '';
+        }
+        if (preg_match('/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})(\.(\d{1,6}))?$/', $raw, $m)) {
+            $frac = isset($m[3]) ? str_pad($m[3], 6, '0') : '000000';
+
+            return $m[1] . '.' . $frac;
+        }
+
+        return $raw;
+    }
+
+    /**
+     * OLAY: canonical owner = disiplin_vakalar (attendance discipline event).
+     *
+     * @param array<string, mixed> $context
+     * @return array{source_version_identity: string, source_sha256: string|null}
+     */
+    private static function resolveDisiplinOlay(PDO $pdo, array $context)
+    {
+        $row = self::loadDisiplinVaka($pdo, $context);
+        $identity = sprintf(
+            'disiplin_vaka:%d:olay:%s:state:%s',
+            (int) $row['id'],
+            (string) ($row['olay_turu'] ?? ''),
+            (string) ($row['lifecycle_state'] ?? '')
+        );
+        $fpPayload = implode('|', [
+            $identity,
+            (string) ((int) ($row['personel_id'] ?? 0)),
+            (string) ((int) ($row['surec_id'] ?? 0)),
+            substr((string) ($row['tarih'] ?? ''), 0, 10),
+            strtolower((string) ($row['source_hash'] ?? '')),
+            (string) ($row['nihai_karar'] ?? ''),
+            (string) ($row['updated_at'] ?? $row['created_at'] ?? ''),
+        ]);
+
+        return [
+            'source_version_identity' => $identity,
+            'source_sha256' => hash('sha256', $fpPayload),
+        ];
+    }
+
+    /**
+     * SAVUNMA: same disiplin_vakalar row; fingerprint focuses on defense lifecycle fields.
+     *
+     * @param array<string, mixed> $context
+     * @return array{source_version_identity: string, source_sha256: string|null}
+     */
+    private static function resolveDisiplinSavunma(PDO $pdo, array $context)
+    {
+        $row = self::loadDisiplinVaka($pdo, $context);
+        $identity = sprintf(
+            'disiplin_vaka:%d:savunma:state:%s',
+            (int) $row['id'],
+            (string) ($row['lifecycle_state'] ?? '')
+        );
+        $fpPayload = implode('|', [
+            $identity,
+            (string) ((int) ($row['personel_id'] ?? 0)),
+            substr((string) ($row['savunma_talep_tarihi'] ?? ''), 0, 10),
+            (string) ($row['savunma_deadline_at'] ?? ''),
+            (string) ($row['savunma_yer'] ?? ''),
+            (string) ($row['savunma_konu'] ?? ''),
+            isset($row['savunma_belge_surec_id']) && $row['savunma_belge_surec_id'] !== null
+                ? (string) ((int) $row['savunma_belge_surec_id'])
+                : '',
+            (string) ($row['savunma_received_at'] ?? ''),
+            (string) ($row['updated_at'] ?? $row['created_at'] ?? ''),
+        ]);
+
+        return [
+            'source_version_identity' => $identity,
+            'source_sha256' => hash('sha256', $fpPayload),
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $context
+     * @return array<string, mixed>
+     */
+    private static function loadDisiplinVaka(PDO $pdo, array $context)
+    {
+        if (!self::tableExists($pdo, 'disiplin_vakalar')) {
+            throw new RuntimeException(self::CODE_NOT_IMPLEMENTED . ':' . RetentionCategories::OLAY);
+        }
+
+        $recordId = isset($context['record_id']) ? (int) $context['record_id'] : 0;
+        $entityType = isset($context['entity_type']) ? strtolower((string) $context['entity_type']) : '';
+        $vakaId = isset($context['disiplin_vaka_id']) ? (int) $context['disiplin_vaka_id'] : 0;
+
+        if ($vakaId <= 0 && in_array($entityType, ['disiplin_vaka', 'disiplin_vakalar'], true) && $recordId > 0) {
+            $vakaId = $recordId;
+        }
+
+        $row = null;
+        if ($vakaId > 0) {
+            $stmt = $pdo->prepare('SELECT * FROM disiplin_vakalar WHERE id = :id LIMIT 1');
+            $stmt->execute(['id' => $vakaId]);
+            $row = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+        } elseif (in_array($entityType, ['surec', 'surecler'], true) && $recordId > 0) {
+            $stmt = $pdo->prepare('SELECT * FROM disiplin_vakalar WHERE surec_id = :surec_id LIMIT 1');
+            $stmt->execute(['surec_id' => $recordId]);
+            $row = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+        }
+
+        if (!$row) {
+            throw new RuntimeException('RETENTION_TARGET_ENTITY_NOT_FOUND');
+        }
+
+        $ctxPersonel = isset($context['personel_id']) ? (int) $context['personel_id'] : 0;
+        if ($ctxPersonel > 0 && $ctxPersonel !== (int) $row['personel_id']) {
+            throw new RuntimeException(RetentionPolicyService::CODE_TRIGGER_NOT_RESOLVED);
+        }
+
+        return $row;
     }
 
     /**

@@ -147,20 +147,12 @@ class SureclerController
             if ($payload['surec_turu'] === 'ISTEN_AYRILMA') {
                 self::deactivatePersonel($pdo, $payload['personel_id']);
                 $actorId = (int) ($user['id'] ?? 0);
-                try {
-                    \Medisa\Api\Services\Retention\ArchiveManifestService::createPersonelLifecycleManifests(
-                        $pdo,
-                        (int) $payload['personel_id'],
-                        $actorId
-                    );
-                } catch (\RuntimeException $e) {
-                    // Pre-053 environments: do not block PASIF transition when Phase C tables absent.
-                    if ($e->getMessage() !== \Medisa\Api\Services\Retention\RetentionSchemaGate::CODE_SCHEMA_NOT_READY
-                        && $e->getMessage() !== \Medisa\Api\Services\Retention\RetentionPolicyService::CODE_SCHEMA_NOT_READY
-                    ) {
-                        throw $e;
-                    }
-                }
+                // Baseline tip 058: retention schema (053) is required — SCHEMA_NOT_READY fails closed.
+                \Medisa\Api\Services\Retention\ArchiveManifestService::createPersonelLifecycleManifests(
+                    $pdo,
+                    (int) $payload['personel_id'],
+                    $actorId
+                );
             }
 
             $row = self::fetchSurecRowById($pdo, $insertId);

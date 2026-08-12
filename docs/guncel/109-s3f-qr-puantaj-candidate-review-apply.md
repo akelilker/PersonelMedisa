@@ -189,9 +189,15 @@ Locks: period `acquireForDate` + canonical row `FOR UPDATE`; APPLY re-asserts `a
 
 Preferred classification: **`ONAY_AUDIT`** with `parent_category = PUANTAJ`.
 
-Compatible with existing `RetentionCategories` / `RetentionPeriodTriggerResolver` (ONAY_AUDIT inherits parent period-closure trigger). No new retention category. No legal-hold change.
+Compatible with existing `RetentionCategories` / `RetentionPeriodTriggerResolver`. Typed path:
+`audit_source_type = QR_PUANTAJ_CANDIDATE_DECISION` folds ledger material into ONAY_AUDIT identity/fingerprint
+without requiring a sealed PUANTAJ period. Manifest mint runs in the **same decision transaction** via
+`ArchiveManifestService::requireManifestSideEffect` + `createQrPuantajDecisionOnayAuditManifest`
+(schema required; `SCHEMA_NOT_READY` rolls back ledger). Before fingerprinting, stored `decision_hash` is
+recomputed/verified via `QrPuantajCandidateDecisionLedgerService::verifyDecisionHash` (covers JSON snapshots).
 
-**RETENTION_GAP (documented, not invented):** Phase-C `ArchiveManifestService` manifest creator is still only wired for PERSONEL_OZLUK / ISE_GIRIS_CIKIS; ONAY_AUDIT (and this ledger table) are not yet included in archive fingerprint manifests. Policy/trigger classification is valid; destruction executor work is out of scope. Do not claim full archive coverage for this table yet.
+**Closed:** `MG-RET-S3F-001` (ledger fingerprint integrity). Physical destruction remains `MG-RET-PHYS-001`.
+Historical pre-wiring ledger rows may lack manifests → ops backfill (not auto-run).
 
 ---
 

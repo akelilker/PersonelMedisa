@@ -139,6 +139,51 @@ class RetentionTargetResolver
             $context['haftalik_kapanis_id'] = (int) $row['id'];
             $context['hafta_baslangic'] = (string) $row['hafta_baslangic'];
             $context['entity_type'] = 'haftalik_kapanis';
+        } elseif (in_array($entityType, ['disiplin_vaka', 'disiplin_vakalar'], true)) {
+            if (!self::tableExists($pdo, 'disiplin_vakalar')) {
+                throw new RuntimeException('RETENTION_TARGET_ENTITY_NOT_FOUND');
+            }
+            $stmt = $pdo->prepare(
+                'SELECT id, personel_id, sube_id FROM disiplin_vakalar WHERE id = :id LIMIT 1'
+            );
+            $stmt->execute(['id' => $recordId]);
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$row) {
+                throw new RuntimeException('RETENTION_TARGET_ENTITY_NOT_FOUND');
+            }
+            $vakaPersonel = (int) $row['personel_id'];
+            if ($personelId !== null && $personelId !== $vakaPersonel) {
+                throw new RuntimeException('RETENTION_TARGET_PERSONEL_MISMATCH');
+            }
+            $context['personel_id'] = $vakaPersonel;
+            $context['disiplin_vaka_id'] = (int) $row['id'];
+            $context['entity_type'] = 'disiplin_vaka';
+            if (!empty($row['sube_id'])) {
+                $context['sube_id'] = (int) $row['sube_id'];
+            }
+        } elseif (in_array($entityType, ['qr_pc_decision', 'qr_puantaj_candidate_decision_ledger'], true)) {
+            if (!self::tableExists($pdo, 'qr_puantaj_candidate_decision_ledger')) {
+                throw new RuntimeException('RETENTION_TARGET_ENTITY_NOT_FOUND');
+            }
+            $stmt = $pdo->prepare(
+                'SELECT id, personel_id, sube_id, candidate_date FROM qr_puantaj_candidate_decision_ledger WHERE id = :id LIMIT 1'
+            );
+            $stmt->execute(['id' => $recordId]);
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$row) {
+                throw new RuntimeException('RETENTION_TARGET_ENTITY_NOT_FOUND');
+            }
+            $ledgerPersonel = (int) $row['personel_id'];
+            if ($personelId !== null && $personelId !== $ledgerPersonel) {
+                throw new RuntimeException('RETENTION_TARGET_PERSONEL_MISMATCH');
+            }
+            $context['personel_id'] = $ledgerPersonel;
+            $context['sube_id'] = (int) $row['sube_id'];
+            $context['candidate_date'] = substr((string) $row['candidate_date'], 0, 10);
+            $context['ledger_id'] = (int) $row['id'];
+            $context['entity_type'] = 'qr_pc_decision';
+            $context['parent_category'] = RetentionCategories::PUANTAJ;
+            $context['audit_source_type'] = RetentionSourceAdapterService::AUDIT_SOURCE_QR_PUANTAJ_CANDIDATE_DECISION;
         }
 
         // Never accept client-trusted integrity fields into canonical context.

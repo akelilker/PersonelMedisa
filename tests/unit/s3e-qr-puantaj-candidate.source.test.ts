@@ -6,6 +6,7 @@ import { ensureDisposableMariaDbEnv, runPhpMysqlRunner } from "../scripts/dispos
 import { hasRolePermission } from "../../src/lib/authorization/role-permissions";
 
 const pureRunner = resolve(process.cwd(), "tests/php/S3EQrPuantajCandidateTestRunner.php");
+const periodMysqlRunner = resolve(process.cwd(), "tests/php/S3EQrPuantajPeriodContextMysqlTestRunner.php");
 const s3dPureRunner = resolve(process.cwd(), "tests/php/S3DQrIntervalDerivationTestRunner.php");
 const s3dRangeRunner = resolve(process.cwd(), "tests/php/S3DQrIntervalRangeMysqlTestRunner.php");
 const s3cMigrationRunner = resolve(process.cwd(), "tests/php/S3C057QrAttendanceMysqlTestRunner.php");
@@ -43,11 +44,14 @@ describe("S3E QR puantaj candidate projection", () => {
     expect(projection).toContain("REVIEW_CROSS_MIDNIGHT");
     expect(projection).toContain("REVIEW_ANOMALY");
     expect(projection).toContain("qr_matched_seconds");
+    expect(projection).toContain("period_write_locked");
+    expect(projection).toContain("canonical_write_block_code");
     expect(projection).not.toMatch(/INSERT\s+INTO\s+gunluk_puantaj/i);
     expect(projection).not.toMatch(/UPDATE\s+gunluk_puantaj/i);
 
     expect(readSvc).toContain("MAX_RANGE_DAYS_INCLUSIVE = 62");
-    expect(readSvc).toContain("loadEventsWithBoundaryContext");
+    expect(readSvc).toContain("resolveCanonicalWriteContext");
+    expect(readSvc).toContain("buildPeriodContextByDate");
     expect(readSvc).not.toMatch(/INSERT\s+INTO\s+gunluk_puantaj/i);
     expect(readSvc).not.toMatch(/UPDATE\s+gunluk_puantaj/i);
     expect(readSvc).not.toMatch(/INSERT\s+INTO\s+haftalik_kapanis_revizyon/i);
@@ -81,6 +85,10 @@ describe("S3E QR puantaj candidate projection", () => {
     expect(result.status).toBe(0);
     expect(result.stdout).toContain("S3E pure candidate tests OK");
   });
+
+  it("runs S3E MariaDB period context runner", async () => {
+    await runPhpMysqlRunner(periodMysqlRunner);
+  }, 120_000);
 
   it("S3D regression — pure derivation unchanged", () => {
     const result = runPhpRunner(s3dPureRunner);

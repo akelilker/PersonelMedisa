@@ -142,6 +142,53 @@ class PuantajDonemPeriodService
     }
 
     /**
+     * Read-only mirror of assertCanonicalWriteAllowed (S3E candidate period metadata).
+     *
+     * @return array{
+     *   state: string,
+     *   period_write_locked: bool,
+     *   canonical_write_open: bool,
+     *   canonical_write_block_code: string|null
+     * }
+     */
+    public static function resolveCanonicalWriteContext(PDO $pdo, $subeId, $yil, $ay)
+    {
+        $state = self::resolvePeriodState($pdo, $subeId, $yil, $ay);
+        if ($state === self::STATE_ACIK) {
+            return [
+                'state' => $state,
+                'period_write_locked' => false,
+                'canonical_write_open' => true,
+                'canonical_write_block_code' => null,
+            ];
+        }
+        if ($state === self::STATE_SEALED || $state === self::STATE_REOPEN_PENDING) {
+            return [
+                'state' => $state,
+                'period_write_locked' => true,
+                'canonical_write_open' => false,
+                'canonical_write_block_code' => 'PERIOD_LOCKED',
+            ];
+        }
+        $snap = self::findActivePayrollSnapshot($pdo, $subeId, $yil, $ay);
+        if ($snap !== null) {
+            return [
+                'state' => $state,
+                'period_write_locked' => false,
+                'canonical_write_open' => false,
+                'canonical_write_block_code' => 'ACTIVE_SNAPSHOT_MUST_BE_CANCELLED',
+            ];
+        }
+
+        return [
+            'state' => $state,
+            'period_write_locked' => false,
+            'canonical_write_open' => true,
+            'canonical_write_block_code' => null,
+        ];
+    }
+
+    /**
      * @throws PuantajDonemReopenException
      */
     public static function assertCanonicalWriteAllowed(PDO $pdo, $subeId, $yil, $ay)

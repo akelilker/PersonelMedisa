@@ -194,7 +194,7 @@ class QrPuantajCandidateReadService
     /**
      * @return array<string, array<string,mixed>>
      */
-    private static function buildPeriodContextByDate(PDO $pdo, $subeId, $from, $to)
+    public static function buildPeriodContextByDate(PDO $pdo, $subeId, $from, $to)
     {
         $cache = [];
         $out = [];
@@ -207,15 +207,12 @@ class QrPuantajCandidateReadService
             $ay = (int) $cursor->format('n');
             $monthKey = $yil . '-' . $ay;
             if (!isset($cache[$monthKey])) {
-                $state = PuantajDonemPeriodService::resolvePeriodState($pdo, $subeId, $yil, $ay);
-                $writeLocked = PuantajDonemPeriodService::isWriteLocked($pdo, $subeId, $yil, $ay);
-                $canonicalWriteOpen = $state === PuantajDonemPeriodService::STATE_ACIK
-                    || $state === PuantajDonemPeriodService::STATE_REOPENED;
-                $cache[$monthKey] = [
-                    'state' => $state,
-                    'canonical_write_open' => $canonicalWriteOpen,
-                    'revision_required' => $writeLocked,
-                ];
+                $cache[$monthKey] = PuantajDonemPeriodService::resolveCanonicalWriteContext(
+                    $pdo,
+                    $subeId,
+                    $yil,
+                    $ay
+                );
             }
             $out[$ymd] = $cache[$monthKey];
             $cursor = $cursor->modify('+1 day');

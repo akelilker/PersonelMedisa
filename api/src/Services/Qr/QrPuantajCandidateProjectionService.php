@@ -164,14 +164,23 @@ class QrPuantajCandidateProjectionService
         }
 
         $periodState = (string) ($periodContext['state'] ?? '');
+        $periodWriteLocked = !empty($periodContext['period_write_locked']);
         $canonicalWriteOpen = !empty($periodContext['canonical_write_open']);
-        $revisionRequired = !empty($periodContext['revision_required']);
+        $canonicalWriteBlockCode = array_key_exists('canonical_write_block_code', $periodContext)
+            ? $periodContext['canonical_write_block_code']
+            : null;
+        if ($canonicalWriteBlockCode !== null) {
+            $canonicalWriteBlockCode = (string) $canonicalWriteBlockCode;
+        }
+        $revisionRequired = $comparisonStatus === self::COMPARE_PERIOD_REQUIRES_REVISION;
+        $hasSafeProposal = $classification === self::CLASS_READY_SINGLE_INTERVAL
+            && $proposed['giris_saati'] !== null
+            && $proposed['cikis_saati'] !== null;
         $futureAction = self::resolveFutureAction(
             $canonicalWriteOpen,
-            $revisionRequired,
             $comparisonStatus,
-            $autoApplicable,
-            $canonical
+            $correctionPresent,
+            $hasSafeProposal
         );
 
         $sourceEventIds = self::collectSourceEventIds($intervals, $anomalies);
@@ -200,7 +209,9 @@ class QrPuantajCandidateProjectionService
             'canonical' => self::mapCanonical($canonical),
             'period' => [
                 'state' => $periodState,
+                'period_write_locked' => $periodWriteLocked,
                 'canonical_write_open' => $canonicalWriteOpen,
+                'canonical_write_block_code' => $canonicalWriteBlockCode,
                 'revision_required' => $revisionRequired,
                 'revision_hint' => $revisionRequired ? self::REVISION_HINT : null,
                 'correction_hint' => $revisionRequired ? self::CORRECTION_HINT : null,
@@ -309,7 +320,7 @@ class QrPuantajCandidateProjectionService
         }
 
         if ($canonical === null) {
-            if (!empty($periodContext['revision_required'])) {
+            if (!empty($periodContext['period_write_locked'])) {
                 return self::COMPARE_PERIOD_REQUIRES_REVISION;
             }
 
@@ -323,7 +334,7 @@ class QrPuantajCandidateProjectionService
             return self::COMPARE_MATCHES_CANONICAL_TIME;
         }
 
-        if (!empty($periodContext['revision_required'])) {
+        if (!empty($periodContext['period_write_locked'])) {
             return self::COMPARE_PERIOD_REQUIRES_REVISION;
         }
 
@@ -332,19 +343,21 @@ class QrPuantajCandidateProjectionService
 
     private static function resolveFutureAction(
         $canonicalWriteOpen,
-        $revisionRequired,
         $comparisonStatus,
-        $autoApplicable,
-        $canonical
+        $correctionPresent,
+        $hasSafeProposal
     ) {
-        if ($revisionRequired) {
+        if ($correctionPresent || !$canonicalWriteOpen || !$hasSafeProposal) {
             return null;
         }
-        if ($canonicalWriteOpen && $autoApplicable && $canonical === null) {
-            return 'DIRECT_PUANTAJ_REVIEW';
+        if ($comparisonStatus === self::COMPARE_MATCHES_CANONICAL_TIME
+            || $comparisonStatus === self::COMPARE_PERIOD_REQUIRES_REVISION
+            || $comparisonStatus === self::COMPARE_NO_SAFE_TIME_PROPOSAL
+            || $comparisonStatus === self::COMPARE_APPROVED_CORRECTION_PRESENT) {
+            return null;
         }
-        if ($canonicalWriteOpen
-            && $comparisonStatus === self::COMPARE_DIFFERS_CANONICAL_TIME) {
+        if ($comparisonStatus === self::COMPARE_NO_CANONICAL_ROW
+            || $comparisonStatus === self::COMPARE_DIFFERS_CANONICAL_TIME) {
             return 'DIRECT_PUANTAJ_REVIEW';
         }
 

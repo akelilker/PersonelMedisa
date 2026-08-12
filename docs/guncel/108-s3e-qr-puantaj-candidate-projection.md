@@ -110,12 +110,49 @@ Time compare: QR local `HH:MM` vs canonical `VARCHAR` time (seconds ignored).
 
 Period owner: **`PuantajDonemPeriodService`**
 
-- `canonical_write_open` when state `ACIK` or `REOPENED`
-- `revision_required` when write locked (`SEALED` / `REOPEN_PENDING`) and canonical change implied
-- Hints only: `PUANTAJ_GIRIS_CIKIS_DUZELTME` / `GIRIS_CIKIS_DUZELTME`
-- **No** revision/correction writes; **no** `correctionUret`
+Read metadata owner: **`PuantajDonemPeriodService::resolveCanonicalWriteContext`** (parity mirror of `assertCanonicalWriteAllowed`).
 
-Open period + structurally safe + no row → `future_action = DIRECT_PUANTAJ_REVIEW` (metadata only).
+### Period fields (separated)
+
+| Field | Meaning |
+|-------|---------|
+| `state` | `ACIK` / `SEALED` / `REOPEN_PENDING` / `REOPENED` |
+| `period_write_locked` | Raw period lock (`SEALED` / `REOPEN_PENDING` only) |
+| `canonical_write_open` | Whether canonical upsert would be allowed **right now** |
+| `canonical_write_block_code` | `PERIOD_LOCKED` or `ACTIVE_SNAPSHOT_MUST_BE_CANCELLED` or null |
+| `revision_required` | **Candidate-level** — not equal to `period_write_locked` |
+
+**Important:** `period_write_locked != revision_required`.
+
+### Canonical write parity
+
+| State | `period_write_locked` | `canonical_write_open` | `canonical_write_block_code` |
+|-------|----------------------|------------------------|------------------------------|
+| ACIK | NO | YES | null |
+| SEALED | YES | NO | `PERIOD_LOCKED` |
+| REOPEN_PENDING | YES | NO | `PERIOD_LOCKED` |
+| REOPENED (no active snapshot) | NO | YES | null |
+| REOPENED (active payroll snapshot) | NO | NO | `ACTIVE_SNAPSHOT_MUST_BE_CANCELLED` |
+
+REOPENED + active snapshot: period is not “write locked”, but canonical write is still blocked until snapshot cancelled. **No revision hint** — reopen already exists.
+
+### Candidate-level `revision_required`
+
+True only when:
+
+- safe single-interval proposal exists, **and**
+- canonical mutation is implied (`PERIOD_REQUIRES_REVISION` comparison), **and**
+- `period_write_locked == YES`
+
+False when: canonical already matches, no safe proposal, anomaly/multi-interval/cross-midnight, approved correction present, or REOPENED+snapshot block.
+
+Hints (`PUANTAJ_GIRIS_CIKIS_DUZELTME` / `GIRIS_CIKIS_DUZELTME`) only when `revision_required == true`.
+
+### `future_action = DIRECT_PUANTAJ_REVIEW`
+
+Only when canonical review is needed, `canonical_write_open == YES`, safe proposal exists, no correction ambiguity. Never when period locked, snapshot blocked, already matching, or no safe proposal.
+
+- **No** revision/correction writes; **no** `correctionUret`
 
 ---
 
@@ -195,6 +232,7 @@ S3F (`S3F_QR_PUANTAJ_CANDIDATE_REVIEW_APPLY`) will decide:
 ## Tests
 
 - `tests/php/S3EQrPuantajCandidateTestRunner.php` (pure)
+- `tests/php/S3EQrPuantajPeriodContextMysqlTestRunner.php` (MariaDB period parity + candidate semantics)
 - `tests/unit/s3e-qr-puantaj-candidate.source.test.ts`
 - S3D + S3C targeted regression runners
 

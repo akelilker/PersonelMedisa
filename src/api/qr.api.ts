@@ -1,7 +1,10 @@
 import type { ApiResponse } from "../types/api";
 import type {
+  MeQrAraliklariResponse,
   MeQrAttendanceEvent,
   MeQrHareketleriResponse,
+  MeQrInterval,
+  MeQrIntervalAnomaly,
   MeQrScanResponse,
   QrEventType,
   QrKioskTokenResponse
@@ -148,6 +151,137 @@ export async function fetchMeQrHareketleri(params?: {
     from: readString(data.from) ?? "",
     to: readString(data.to) ?? "",
     items: itemsRaw.map((item) => normalizeEvent(item))
+  };
+}
+
+function normalizeSube(raw: unknown): { id: number; ad: string } {
+  const sube = toRecord(raw) ?? {};
+  const id = readNumber(sube.id);
+  if (id == null) {
+    throw new ApiRequestError("QR sube yaniti gecersiz.", 500, { code: "INVALID_RESPONSE" });
+  }
+  return { id, ad: readString(sube.ad) ?? "" };
+}
+
+function normalizeInterval(raw: unknown): MeQrInterval {
+  const row = toRecord(raw);
+  if (!row) {
+    throw new ApiRequestError("QR interval yaniti gecersiz.", 500, { code: "INVALID_RESPONSE" });
+  }
+  const entryEventId = readNumber(row.entry_event_id);
+  const exitEventId = readNumber(row.exit_event_id);
+  const entryAt = readString(row.entry_at);
+  const exitAt = readString(row.exit_at);
+  const entryLocalDate = readString(row.entry_local_date);
+  const exitLocalDate = readString(row.exit_local_date);
+  const durationSeconds = readNumber(row.duration_seconds);
+  if (
+    entryEventId == null ||
+    exitEventId == null ||
+    !entryAt ||
+    !exitAt ||
+    !entryLocalDate ||
+    !exitLocalDate ||
+    durationSeconds == null
+  ) {
+    throw new ApiRequestError("QR interval alanlari eksik.", 500, { code: "INVALID_RESPONSE" });
+  }
+  return {
+    entry_event_id: entryEventId,
+    exit_event_id: exitEventId,
+    entry_at: entryAt,
+    exit_at: exitAt,
+    entry_local_date: entryLocalDate,
+    exit_local_date: exitLocalDate,
+    spans_local_midnight: Boolean(row.spans_local_midnight),
+    duration_seconds: durationSeconds,
+    sube: normalizeSube(row.sube)
+  };
+}
+
+function normalizeAnomaly(raw: unknown): MeQrIntervalAnomaly {
+  const row = toRecord(raw);
+  if (!row) {
+    throw new ApiRequestError("QR anomaly yaniti gecersiz.", 500, { code: "INVALID_RESPONSE" });
+  }
+  const type = readString(row.type);
+  const reason = readString(row.reason) ?? type ?? "";
+  const correctionHint = readString(row.correction_hint) ?? "GIRIS_CIKIS_DUZELTME";
+  const occurredAt = readString(row.occurred_at) ?? "";
+  const localDate = readString(row.local_date) ?? "";
+  if (type === "BRANCH_MISMATCH") {
+    const entryEventId = readNumber(row.entry_event_id);
+    const exitEventId = readNumber(row.exit_event_id);
+    if (entryEventId == null || exitEventId == null) {
+      throw new ApiRequestError("BRANCH_MISMATCH alanlari eksik.", 500, {
+        code: "INVALID_RESPONSE"
+      });
+    }
+    return {
+      type: "BRANCH_MISMATCH",
+      reason,
+      entry_event_id: entryEventId,
+      exit_event_id: exitEventId,
+      occurred_at: occurredAt,
+      local_date: localDate,
+      entry_sube: normalizeSube(row.entry_sube),
+      exit_sube: normalizeSube(row.exit_sube),
+      correction_hint: correctionHint
+    };
+  }
+  if (type !== "MISSING_CIKIS" && type !== "MISSING_GIRIS") {
+    throw new ApiRequestError("QR anomaly type gecersiz.", 500, { code: "INVALID_RESPONSE" });
+  }
+  const eventId = readNumber(row.event_id);
+  if (eventId == null) {
+    throw new ApiRequestError("QR anomaly event_id eksik.", 500, { code: "INVALID_RESPONSE" });
+  }
+  return {
+    type,
+    reason,
+    event_id: eventId,
+    event_type: readString(row.event_type) ?? "",
+    occurred_at: occurredAt,
+    local_date: localDate,
+    sube: normalizeSube(row.sube),
+    correction_hint: correctionHint
+  };
+}
+
+export async function fetchMeQrAraliklari(params?: {
+  from?: string;
+  to?: string;
+}): Promise<MeQrAraliklariResponse> {
+  if (shouldPreferDemoApi()) {
+    demoUnavailable();
+  }
+  const path = appendQueryParams(endpoints.me.qrAraliklari, {
+    from: params?.from,
+    to: params?.to
+  });
+  const response = await apiRequest<ApiResponse<unknown>>(path);
+  const data = toRecord(unwrapData(response, "/me/qr-araliklari yaniti gecersiz."));
+  if (!data) {
+    throw new ApiRequestError("/me/qr-araliklari yaniti gecersiz.", 500, {
+      code: "INVALID_RESPONSE"
+    });
+  }
+  const summary = toRecord(data.summary) ?? {};
+  const intervalsRaw = Array.isArray(data.intervals) ? data.intervals : [];
+  const anomaliesRaw = Array.isArray(data.anomalies) ? data.anomalies : [];
+  return {
+    from: readString(data.from) ?? "",
+    to: readString(data.to) ?? "",
+    algorithm_version: readString(data.algorithm_version) ?? "QR_INTERVAL_V1",
+    intervals: intervalsRaw.map((item) => normalizeInterval(item)),
+    anomalies: anomaliesRaw.map((item) => normalizeAnomaly(item)),
+    summary: {
+      complete_interval_count: readNumber(summary.complete_interval_count) ?? 0,
+      anomaly_count: readNumber(summary.anomaly_count) ?? 0,
+      complete_duration_seconds: readNumber(summary.complete_duration_seconds) ?? 0
+    },
+    source_event_count: readNumber(data.source_event_count) ?? 0,
+    source_max_event_id: readNumber(data.source_max_event_id)
   };
 }
 

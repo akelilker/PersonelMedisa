@@ -104,6 +104,61 @@ export type MeQrHareketleriResponse = {
   items: MeQrAttendanceEvent[];
 };
 
+export type MeQrIntervalSube = {
+  id: number;
+  ad: string;
+};
+
+export type MeQrInterval = {
+  entry_event_id: number;
+  exit_event_id: number;
+  entry_at: string;
+  exit_at: string;
+  entry_local_date: string;
+  exit_local_date: string;
+  spans_local_midnight: boolean;
+  duration_seconds: number;
+  sube: MeQrIntervalSube;
+};
+
+export type MeQrIntervalAnomaly =
+  | {
+      type: "MISSING_CIKIS" | "MISSING_GIRIS";
+      reason: string;
+      event_id: number;
+      event_type: QrEventType | string;
+      occurred_at: string;
+      local_date: string;
+      sube: MeQrIntervalSube;
+      correction_hint: string;
+    }
+  | {
+      type: "BRANCH_MISMATCH";
+      reason: string;
+      entry_event_id: number;
+      exit_event_id: number;
+      occurred_at: string;
+      local_date: string;
+      entry_sube: MeQrIntervalSube;
+      exit_sube: MeQrIntervalSube;
+      correction_hint: string;
+    };
+
+export type MeQrAraliklariResponse = {
+  from: string;
+  to: string;
+  algorithm_version: string;
+  intervals: MeQrInterval[];
+  anomalies: MeQrIntervalAnomaly[];
+  summary: {
+    complete_interval_count: number;
+    anomaly_count: number;
+    complete_duration_seconds: number;
+  };
+  source_event_count: number;
+  source_max_event_id: number | null;
+};
+
 export type QrKioskTokenResponse = {
   token: string;
   issued_at: number;

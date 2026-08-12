@@ -97,6 +97,9 @@ class Router
         if ($path === '/me/qr-hareketleri' && $method === 'GET') {
             MeController::qrHareketleri($this->request);
         }
+        if ($path === '/me/qr-araliklari' && $method === 'GET') {
+            MeController::qrAraliklari($this->request);
+        }
         if ($path === '/qr-kiosk/token' && $method === 'GET') {
             QrKioskController::token($this->request);
         }

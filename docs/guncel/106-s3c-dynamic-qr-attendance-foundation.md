@@ -2,7 +2,7 @@
 
 **Branch:** `feat/dynamic-qr-attendance-foundation`
 **Baseline:** `origin/main` = `0020f7dbf27322583785099258c8df687fbcb9ac` (S3B + PR #142 docs merge)
-**Status:** S3C-R1 hardening on draft PR #145 — **no production secret / migration apply / merge / deploy**
+**Status:** S3C **CLOSED in production** (PR #145 merged). Interval derivation is **S3D** — see `107-s3d-qr-interval-derivation.md`.
 **PR #142:** Merged on main (docs only); S3C does not rewrite `102` / `CURRENT_STATE` / `README`
 
 ---
@@ -36,7 +36,7 @@ File: `api/migrations/057_qr_attendance_events.sql`
 - No intervals / no gunluk_puantaj writes
 - No backfill / no business manifest INSERT
 
-052–056 immutable. 057 staged only (not production-applied).
+052–056 immutable. 057 applied in production (S3C close). Next schema number remains **058+** (not created by S3D).
 
 ---
 

@@ -8,7 +8,8 @@ export const endpoints = {
     yillikIzinBakiye: "/me/yillik-izin-bakiye",
     fazlaCalisma: "/me/fazla-calisma",
     qrScan: "/me/qr-scan",
-    qrHareketleri: "/me/qr-hareketleri"
+    qrHareketleri: "/me/qr-hareketleri",
+    qrAraliklari: "/me/qr-araliklari"
   },
   qrKiosk: {
     token: "/qr-kiosk/token"

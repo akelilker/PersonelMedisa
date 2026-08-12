@@ -13,12 +13,13 @@ use Medisa\Api\Services\Izin\YillikIzinBakiyeService;
 use Medisa\Api\Services\Izin\YillikIzinHakDuzeltmeException;
 use Medisa\Api\Services\Qr\QrAttendanceEventService;
 use Medisa\Api\Services\Qr\QrAttendanceException;
+use Medisa\Api\Services\Qr\QrAttendanceIntervalReadService;
 use Medisa\Api\Services\SelfService\SelfPersonelContext;
 use Medisa\Api\Services\SelfService\SelfPuantajReadService;
 use PDO;
 
 /**
- * Self-service /me surfaces (S3B reads + S3C QR scan/history).
+ * Self-service /me surfaces (S3B reads + S3C QR scan/history + S3D QR intervals).
  * Self-scope only; no arbitrary personel_id / client timestamp.
  */
 class MeController
@@ -219,6 +220,33 @@ class MeController
             JsonResponse::error($e->getHttpStatus(), $e->getErrorCode(), $e->getMessage(), $e->getField());
         } catch (\Throwable $e) {
             JsonResponse::serverError('QR hareketleri yuklenemedi.');
+        }
+    }
+
+    public static function qrAraliklari(Request $request)
+    {
+        $user = AuthMiddleware::authenticate($request, true);
+        RolePermissions::assert($user, 'self_service.qr.events.view');
+
+        try {
+            $pdo = Connection::get();
+        } catch (\Throwable $e) {
+            JsonResponse::serverError('Veritabani baglantisi kurulamadi.');
+        }
+
+        $ctx = SelfPersonelContext::resolveForSelfService($user, $pdo, true);
+        $defaults = QrAttendanceEventService::defaultMonthRange();
+        $from = $request->getQuery('from', $defaults['from']);
+        $to = $request->getQuery('to', $defaults['to']);
+
+        try {
+            JsonResponse::success(
+                QrAttendanceIntervalReadService::listForSelf($pdo, (int) $ctx['personel_id'], $from, $to)
+            );
+        } catch (QrAttendanceException $e) {
+            JsonResponse::error($e->getHttpStatus(), $e->getErrorCode(), $e->getMessage(), $e->getField());
+        } catch (\Throwable $e) {
+            JsonResponse::serverError('QR eslesmeleri yuklenemedi.');
         }
     }
 

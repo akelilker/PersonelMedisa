@@ -536,6 +536,7 @@ class QrPuantajCandidateProjectionService
                 'cikis_saati' => null,
                 'state' => null,
                 'kontrol_durumu' => null,
+                'updated_at' => null,
             ];
         }
 
@@ -546,6 +547,7 @@ class QrPuantajCandidateProjectionService
             'cikis_saati' => self::normalizeCanonicalTime($canonical['cikis_saati'] ?? null),
             'state' => isset($canonical['state']) ? (string) $canonical['state'] : null,
             'kontrol_durumu' => isset($canonical['kontrol_durumu']) ? (string) $canonical['kontrol_durumu'] : null,
+            'updated_at' => isset($canonical['updated_at']) ? (string) $canonical['updated_at'] : null,
         ];
     }
 

@@ -104,6 +104,10 @@ export const endpoints = {
     detail: (personelId: number | string, tarih: string) =>
       `/gunluk-puantaj/${personelId}/${encodeURIComponent(tarih)}`,
     qrAdaylari: (personelId: number | string) => `/puantaj/qr-adaylari/${personelId}`,
+    qrAdayKarar: (personelId: number | string, candidateDate: string) =>
+      `/puantaj/qr-adaylari/${personelId}/${encodeURIComponent(candidateDate)}/karar`,
+    qrAdayKararlar: (personelId: number | string, candidateDate: string) =>
+      `/puantaj/qr-adaylari/${personelId}/${encodeURIComponent(candidateDate)}/kararlar`,
     muhurle: "/puantaj/muhurle",
     donemReopenRequest: (yil: number | string, ay: number | string) =>
       `/puantaj/donemler/${yil}/${ay}/reopen-request`,

@@ -11,13 +11,15 @@ use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
 use Medisa\Api\Services\Izin\YillikIzinBakiyeService;
 use Medisa\Api\Services\Izin\YillikIzinHakDuzeltmeException;
+use Medisa\Api\Services\Qr\QrAttendanceEventService;
+use Medisa\Api\Services\Qr\QrAttendanceException;
 use Medisa\Api\Services\SelfService\SelfPersonelContext;
 use Medisa\Api\Services\SelfService\SelfPuantajReadService;
 use PDO;
 
 /**
- * Self-service /me read surfaces (S3B). Self-scope only; no arbitrary personel_id.
- * QR endpoints are intentionally out of scope (S3C+).
+ * Self-service /me surfaces (S3B reads + S3C QR scan/history).
+ * Self-scope only; no arbitrary personel_id / client timestamp.
  */
 class MeController
 {
@@ -161,6 +163,63 @@ class MeController
                 : null,
             'yillik' => $yillik,
         ]);
+    }
+
+    public static function qrScan(Request $request)
+    {
+        $user = AuthMiddleware::authenticate($request, true);
+        RolePermissions::assert($user, 'self_service.qr.scan');
+
+        try {
+            $pdo = Connection::get();
+        } catch (\Throwable $e) {
+            JsonResponse::serverError('Veritabani baglantisi kurulamadi.');
+        }
+
+        $body = $request->getJsonBody();
+        if (!is_array($body)) {
+            $body = [];
+        }
+
+        try {
+            $result = QrAttendanceEventService::scan($pdo, $user, $body);
+            $status = !empty($result['idempotent']) ? 200 : 201;
+            JsonResponse::success([
+                'event' => $result['event'],
+                'idempotent' => (bool) $result['idempotent'],
+            ], [], $status);
+        } catch (QrAttendanceException $e) {
+            JsonResponse::error($e->getHttpStatus(), $e->getErrorCode(), $e->getMessage(), $e->getField());
+        } catch (\Throwable $e) {
+            JsonResponse::serverError('QR kaydi olusturulamadi.');
+        }
+    }
+
+    public static function qrHareketleri(Request $request)
+    {
+        $user = AuthMiddleware::authenticate($request, true);
+        RolePermissions::assert($user, 'self_service.qr.events.view');
+
+        try {
+            $pdo = Connection::get();
+        } catch (\Throwable $e) {
+            JsonResponse::serverError('Veritabani baglantisi kurulamadi.');
+        }
+
+        $ctx = SelfPersonelContext::resolveForSelfService($user, $pdo, true);
+        $defaults = QrAttendanceEventService::defaultMonthRange();
+        $from = $request->getQuery('from', $defaults['from']);
+        $to = $request->getQuery('to', $defaults['to']);
+
+        try {
+            JsonResponse::success(
+                QrAttendanceEventService::listForSelf($pdo, (int) $ctx['personel_id'], $from, $to)
+            );
+        } catch (QrAttendanceException $e) {
+            JsonResponse::error($e->getHttpStatus(), $e->getErrorCode(), $e->getMessage(), $e->getField());
+        } catch (\Throwable $e) {
+            JsonResponse::serverError('QR hareketleri yuklenemedi.');
+        }
     }
 
     /**

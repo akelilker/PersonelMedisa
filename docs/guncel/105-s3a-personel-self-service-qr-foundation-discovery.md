@@ -1,9 +1,8 @@
 # 105 — S3A Personel Self-Service + QR Attendance Foundation Discovery
-
-**Branch:** `feat/personel-self-service-qr-foundation`
-**Baseline:** `origin/main` = `f58da7c19551cdf52829f0a796da919f88dc9f3a` (S2 / PR #143 merge)
-**Status:** Decisions locked (D1–D6). Doc renumbered from colliding `104` → `105` (main already had `104-s2a-…`). S3B implements binding + `/me` read on this branch; QR remains S3C+.
-**PR #142:** Untouched (`docs/hesaplama-cevap-haritasi`)
+**Branch:** `feat/personel-self-service-qr-foundation` (historical S3A/S3B discovery)
+**Baseline (docs refresh):** current `origin/main` = `0020f7dbf27322583785099258c8df687fbcb9ac` (includes S3B + merged PR #142 hesaplama docs)
+**Status:** Decisions locked (D1–D6). Doc renumbered from colliding `104` → `105`. **S3B closed in production** (PR #144 merged; migration 056 applied/immutable; bindings 0). **S3C** implements dynamic QR + raw events on `feat/dynamic-qr-attendance-foundation` / draft PR #145 (see `106-s3c-dynamic-qr-attendance-foundation.md`).
+**PR #142:** Merged on main (`docs/hesaplama-cevap-haritasi` / `102`); S3C must not regress those files.
 **DOC_NUMBER_COLLISION:** FIXED (`104-s3a-…` → `105-s3a-…`)
 
 ---

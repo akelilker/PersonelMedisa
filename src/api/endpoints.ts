@@ -6,7 +6,12 @@ export const endpoints = {
     identity: "/me",
     puantaj: "/me/puantaj",
     yillikIzinBakiye: "/me/yillik-izin-bakiye",
-    fazlaCalisma: "/me/fazla-calisma"
+    fazlaCalisma: "/me/fazla-calisma",
+    qrScan: "/me/qr-scan",
+    qrHareketleri: "/me/qr-hareketleri"
+  },
+  qrKiosk: {
+    token: "/qr-kiosk/token"
   },
   personeller: {
     list: "/personeller",

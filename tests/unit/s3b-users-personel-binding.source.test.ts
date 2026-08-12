@@ -17,13 +17,12 @@ describe("S3B users.personel_id binding foundation", () => {
     await ensureDisposableMariaDbEnv();
   }, 90_000);
 
-  it("locks migration 056 + owners + no QR half-impl + doc renumber", () => {
+  it("locks migration 056 + owners + doc renumber (tip 057)", () => {
     const migrations = readdirSync(resolve("api/migrations"))
       .filter((name) => /^\d{3}_.+\.sql$/.test(name))
       .sort();
     expect(migrations).toContain("055_yillik_izin_hak_duzeltmeleri.sql");
-    expect(migrations.at(-1)).toBe("056_users_personel_binding.sql");
-    expect(migrations).not.toContain("057_");
+    expect(migrations.at(-1)).toBe("057_qr_attendance_events.sql");
 
     const sql = read("api/migrations/056_users_personel_binding.sql");
     expect(sql).toContain("personel_id");
@@ -73,15 +72,12 @@ describe("S3B users.personel_id binding foundation", () => {
       expect(permsPhp).toContain(`'${p}'`);
       expect(permsTs).toContain(`"${p}"`);
     }
-    expect(permsPhp).not.toContain("self_service.qr");
-    expect(permsTs).not.toContain("self_service.qr");
 
     const router = read("api/src/Router.php");
     expect(router).toContain("'/me'");
     expect(router).toContain("'/me/puantaj'");
     expect(router).toContain("'/me/yillik-izin-bakiye'");
     expect(router).toContain("'/me/fazla-calisma'");
-    expect(router).not.toMatch(/\/me\/qr|qr-scan|BarcodeDetector/i);
 
     const me = read("api/src/Controllers/MeController.php");
     expect(me).not.toMatch(/\$request->getJsonBody\(\).*personel_id|getQuery\(\s*['\"]personel_id/);
@@ -103,7 +99,6 @@ describe("S3B users.personel_id binding foundation", () => {
     expect(shell).toContain("personel-self-service-page");
     expect(shell).toContain("personel-unbound-page");
     expect(shell).toContain("personel-inactive-page");
-    expect(shell).not.toMatch(/QR|BarcodeDetector|getUserMedia/i);
 
     const contract = read("src/lib/yonetim/kullanici-api-contract.ts");
     expect(contract).toContain("personel_id: payload.personel_id");

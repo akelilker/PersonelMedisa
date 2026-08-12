@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent, type KeyboardEvent } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { FormField } from "../../../components/form/FormField";
 import { AppActionDialog } from "../../../components/modal/AppActionDialog";
 import { AppModal } from "../../../components/modal/AppModal";
@@ -835,6 +835,13 @@ export function YonetimPaneliPage() {
       {isLoading ? <LoadingState label="Yönetim paneli yükleniyor..." /> : null}
       {!isLoading && errorMessage ? <ErrorState message={errorMessage} onRetry={() => void loadPanel()} /> : null}
       {!isLoading && successMessage ? <p className="yonetim-success">{successMessage}</p> : null}
+      {!isLoading && !errorMessage ? (
+        <p className="yonetim-kiosk-link">
+          <Link to="/qr-kiosk" data-testid="yonetim-qr-kiosk-link">
+            QR Kiosk
+          </Link>
+        </p>
+      ) : null}
 
       {!isLoading && !errorMessage && activeTab === "kullanicilar" ? (
         <section className="yonetim-list-surface" aria-label="Kullanıcı yönetimi" data-testid="yonetim-section-kullanicilar">

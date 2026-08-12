@@ -16,6 +16,9 @@ import { YonetimPaneliPage } from "../features/yonetim/pages/YonetimPaneliPage";
 import { ResmiTatilTakvimiPage } from "../features/yonetim/pages/ResmiTatilTakvimiPage";
 import { LoginPage } from "../features/auth/pages/LoginPage";
 import { PersonelSelfServiceHomePage } from "../features/self-service/pages/PersonelSelfServiceHomePage";
+import { PersonelQrScanPage } from "../features/self-service/pages/PersonelQrScanPage";
+import { PersonelQrHistoryPage } from "../features/self-service/pages/PersonelQrHistoryPage";
+import { QrKioskPage } from "../features/self-service/pages/QrKioskPage";
 import { InternalDiagnosticsPage } from "./InternalDiagnosticsPage";
 import { HaftalikKapanisPage } from "../features/revizyon/pages/HaftalikKapanisPage";
 import { RevizyonMerkeziPage } from "../features/revizyon/pages/RevizyonMerkeziPage";
@@ -80,6 +83,30 @@ export function AppRoutes() {
         }
       >
         <Route index element={<HomeIndexMainMenu />} />
+        <Route
+          path="self/qr-okut"
+          element={
+            <ProtectedRoute requirePermission="self_service.qr.scan">
+              <PersonelQrScanPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="self/qr-hareketleri"
+          element={
+            <ProtectedRoute requirePermission="self_service.qr.events.view">
+              <PersonelQrHistoryPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="qr-kiosk"
+          element={
+            <ProtectedRoute requirePermission={ROUTE_PERMISSION.qrKioskPage}>
+              <QrKioskPage />
+            </ProtectedRoute>
+          }
+        />
         <Route
           path="personeller"
           element={

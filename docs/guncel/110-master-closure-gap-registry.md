@@ -111,33 +111,25 @@ Aşağıdakiler CURRENT MAIN’de bozulmuş değilse OPEN yapılmaz:
 
 | Alan | Değer |
 | --- | --- |
-| Statü | **CODE_GAP** |
+| Statü | **CLOSED** |
 | Öncelik | **P1** |
 | Domain | Retention |
-| Mevcut | `coverageMap`: resolver/fingerprint **15/15**; `manifest_creator` yalnız `PERSONEL_OZLUK` + `ISE_GIRIS_CIKIS`; auto mint yalnız `ISTEN_AYRILMA` → `createPersonelLifecycleManifests` |
-| Beklenen | Her kategori için lifecycle/period trigger’da manifest **persist** (CREATE wiring) |
-| Kanıt | `RetentionSourceAdapterService::coverageMap`; `ArchiveManifestService::createPersonelLifecycleManifests`; `SureclerController` ISTEN_AYRILMA |
-| Eksik kategoriler | PERSONEL_BELGE, PUANTAJ, BORDRO, SGK_EKSIK_GUN, FAZLA_CALISMA, SERBEST_ZAMAN, ONAY_AUDIT, IZIN, RAPOR, IS_KAZASI, DISIPLIN, OLAY, SAVUNMA |
-| Ayrım | Bu gap = **manifest creator/lifecycle wiring**. S3F ledger material fingerprint ayrı: `MG-RET-S3F-001`. Manifest creator eklense bile S3F ledger integrity otomatik çözülmez. |
-| Runtime | Destruction eligibility integrity fail (`ARCHIVE_MANIFEST_MISSING*`) |
-| KVKK | Arşiv bütünlüğü eksik |
-| Owner | Retention |
-| Kapanış sırası | PHYS-001’den önce veya birlikte; S3F fingerprint ayrı iş |
-| Acceptance | coverageMap `manifest_creator=implemented` tüm katalog + lifecycle test |
+| Kapanış | Retention Integrity Pack 1 (`fix/retention-manifest-integrity`) |
+| Mevcut | `coverageMap`: resolver/fingerprint/manifest_creator **15/15**; period creators at PUANTAJ mühür/reseal, BORDRO KESINLESTI, SGK snapshot create, haftalık KAPANDI; termination creators expand `createPersonelLifecycleManifests` (BELGE/surec/OLAY/SAVUNMA); ONAY_AUDIT parent mint + S3F typed mint |
+| Acceptance | coverageMap `manifest_creator=implemented` tüm katalog + lifecycle/MySQL tests |
+| Ayrım | Physical destroy ayrı: `MG-RET-PHYS-001`. Historical backfill: OPS (bu turda production backfill yok). |
 
 ### MG-RET-S3F-001 — ONAY_AUDIT fingerprint material vs S3F decision ledger
 
 | Alan | Değer |
 | --- | --- |
-| Statü | **CODE_GAP** |
+| Statü | **CLOSED** |
 | Öncelik | **P1** |
 | Domain | Retention / QR |
-| Mevcut | `resolveOnayAudit` yalnız **parent category** source fingerprint’inden türetir; `qr_puantaj_candidate_decision_ledger` material’ini fingerprint’e katmaz; Qr paketinde Retention wire yok |
-| Beklenen | Preferred class `ONAY_AUDIT` + parent PUANTAJ iken ledger satırlarının material fingerprint + integrity’ye dahil edilmesi |
-| Kanıt | `109` RETENTION_GAP; `RetentionSourceAdapterService::resolveOnayAudit`; `QrPuantajCandidateDecisionLedgerService` |
-| Ayrım | `MG-RET-MAN-001` = kategori manifest CREATE. Bu ID = **ledger material’in ONAY_AUDIT fingerprint/integrity’ye girmemesi**. Manifest creator wiring tek başına bu gap’i kapatmaz. |
-| Owner | Retention + QR |
-| Acceptance | Ledger material fingerprint integrity’de; destruction eligibility ledger için geçebilir |
+| Kapanış | Retention Integrity Pack 1 |
+| Mevcut | `resolveOnayAudit` typed path `QR_PUANTAJ_CANDIDATE_DECISION` loads ledger server-side; fingerprint material = immutable ledger fields; decision txn → `createQrPuantajDecisionOnayAuditManifest` |
+| Acceptance | Ledger material fingerprint integrity’de; nonce idempotent; parent mismatch fail-closed |
+| Ayrım | Physical destroy ayrı: `MG-RET-PHYS-001`. |
 
 ### MG-SZ-6M-001 — Serbest zaman 6 aylık deadline compliance / operational follow-up
 
@@ -301,6 +293,8 @@ Aşağıdakiler CURRENT MAIN’de bozulmuş değilse OPEN yapılmaz:
 | MG-DOC-101-001 | `101` I13 checkpoint | **CLOSED** | `HISTORICAL_SNAPSHOT_PRESERVED` | Bugün SoT değil; bilinçli tarihsel |
 | MG-DOC-103-001 | `103` role consolidation checkpoint | **CLOSED** | `HISTORICAL_SNAPSHOT_PRESERVED` | Bugün SoT değil |
 | MG-DOC-105-TIP | `105` S3A discovery header tip | **CLOSED** | `HISTORICAL_SNAPSHOT_PRESERVED` | Faz anı korunur |
+| MG-RET-MAN-001 | Archive manifest CREATE/LIFECYCLE 15/15 | **CLOSED** | — | Integrity Pack 1 |
+| MG-RET-S3F-001 | S3F ledger → ONAY_AUDIT fingerprint | **CLOSED** | — | Integrity Pack 1 |
 
 **CANONICAL_DOC_STALE = 0.** Historical snapshot’larda eski bilgi final completion blocker değildir.
 
@@ -361,7 +355,7 @@ Import contract (kod, değişmedi):
 2. Business inputs: `MG-SGK-1514`, `MG-OT-YEAR-POL`, `MG-IMPORT-MAP`, `MG-ORG-ATTR`, `MG-ZORUNLU`
 3. Code P1: `MG-OT-YEAR-PATH-001` (policy sonrası veya tutarlılık fix)
 4. Code P1: `MG-SZ-6M-001`
-5. Code P1: `MG-RET-MAN-001` → `MG-RET-S3F-001` → `MG-RET-PHYS-001`
+5. Code P1: `MG-RET-PHYS-001` (MAN+S3F CLOSED — Pack 1)
 6. Code P1: `MG-ORG-LOC-001`
 7. Ops: UBGT seed, SGK catalog, org seed, dataset completion, personel import, binding, QR employee
 8. Defer pack: QR correction UX, I13 fields, ENUM shrink, payroll self-view, pay outputs
@@ -409,22 +403,20 @@ Historical snapshot belgeleri (`HISTORICAL_SNAPSHOT_PRESERVED`) blocker sayılma
 
 | Statü | Adet (unique registry ID) | IDs |
 | --- | --- | --- |
-| **CODE_GAP** | **6** | RET-PHYS, RET-MAN, RET-S3F, SZ-6M, OT-YEAR-PATH, ORG-LOC |
+| **CODE_GAP** | **4** | RET-PHYS, SZ-6M, OT-YEAR-PATH, ORG-LOC |
 | **BUSINESS_DECISION_REQUIRED** | **5** | OT-YEAR-POL, SGK-1514, ZORUNLU, ORG-ATTR, IMPORT-MAP |
 | **OPS_ROLLOUT** | **10** | OPS-PERSONEL, IMPORT-DATA, OPS-ORG, OPS-BIND, OPS-QR, OPS-SGK-CAT, OPS-UBGT, OPS-POLICY, OPS-ENUM-INV, OPS-DEPLOY |
 | **INTENTIONAL_DEFER** | **7** | QR-CORR, PAY-SELF, I13, ENUM, FSC, PAY-OUT, RET-HTTP |
 | **NOT_APPLICABLE** | **4** | SECOND-ENGINE, AUTO-QR-CORR, AUTO-APPLY, IMPORT-UCRET |
 | **DOC_STALE** | **0** | — |
-| **CLOSED** (registry section 9) | **6** | ORG-MODEL, DOC-CS, DOC-102, DOC-101, DOC-103, DOC-105 |
+| **CLOSED** (registry section 9 + retention pack) | **8** | ORG-MODEL, DOC-CS, DOC-102, DOC-101, DOC-103, DOC-105, RET-MAN, RET-S3F |
 | Closed systems (section 3) | 18 | yeniden açılmadı |
 
 **MUST_FIX_NOW (= CODE_GAP P1 listesi):**
-1. `MG-RET-MAN-001`
-2. `MG-RET-S3F-001`
-3. `MG-RET-PHYS-001`
-4. `MG-SZ-6M-001`
-5. `MG-OT-YEAR-PATH-001`
-6. `MG-ORG-LOC-001`
+1. `MG-RET-PHYS-001`
+2. `MG-SZ-6M-001`
+3. `MG-OT-YEAR-PATH-001`
+4. `MG-ORG-LOC-001`
 
 P2 BUSINESS (`MG-ORG-ATTR`, `MG-ZORUNLU`) final completion için açık kalabilir ama CODE_GAP değildir; karar sonrası gerekirse CODE_GAP’e çevrilir.
 

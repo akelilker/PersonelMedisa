@@ -183,6 +183,36 @@ describe("retention policy source contract (053)", () => {
     expect(adapter).toContain("RETENTION_SOURCE_HANDLER_NOT_IMPLEMENTED");
     expect(adapter).toContain("personel_belge_dosya_surumleri");
     expect(adapter).toContain("coverageMap");
+    expect(adapter).toContain("QR_PUANTAJ_CANDIDATE_DECISION");
+    expect(adapter).toContain("computeQrPuantajDecisionLedgerFingerprint");
+    expect(adapter).toContain("disiplin_vakalar");
+
+    const manifestSvc = readFileSync(
+      resolve(root, "api/src/Services/Retention/ArchiveManifestService.php"),
+      "utf8"
+    );
+    expect(manifestSvc).toContain("createResolvedManifest");
+    expect(manifestSvc).toContain("createPuantajPeriodManifests");
+    expect(manifestSvc).toContain("createBordroPeriodManifests");
+    expect(manifestSvc).toContain("createSgkPeriodManifest");
+    expect(manifestSvc).toContain("createHaftalikPeriodManifests");
+    expect(manifestSvc).toContain("createQrPuantajDecisionOnayAuditManifest");
+    expect(manifestSvc).toContain("createTerminationScopedManifests");
+
+    const decisionSvc = readFileSync(
+      resolve(root, "api/src/Services/Qr/QrPuantajCandidateDecisionService.php"),
+      "utf8"
+    );
+    expect(decisionSvc).toContain("createQrPuantajDecisionOnayAuditManifest");
+  });
+
+  it("coverageMap wires all 15 manifest creators in source", () => {
+    const adapter = readFileSync(
+      resolve(root, "api/src/Services/Retention/RetentionSourceAdapterService.php"),
+      "utf8"
+    );
+    // After MAN-001: $manifestWired = $implemented (full catalog)
+    expect(adapter).toMatch(/\$manifestWired\s*=\s*\$implemented/);
   });
 
   it("wires retention roles and permissions parity", () => {

@@ -33,7 +33,8 @@ Görsel sistem çalışmaları mevcut component/owner içinde yapılabilir. Yeni
 | `PERSONEL_BINDING_REAL_ROLLOUT` | **NOT_STARTED** (schema `056` mevcut) | `USER_GATED` |
 | `REAL_QR_EMPLOYEE_ROLLOUT` | **NOT_STARTED** | `USER_GATED` |
 | `RETENTION_PHYSICAL_DESTRUCTION` | **CODE_GAP** (`MG-RET-PHYS-001`) | — |
-| `RETENTION_MANIFEST_COVERAGE` | **CODE_GAP** (`MG-RET-MAN-001`) | S3F fingerprint ayrı `MG-RET-S3F-001` |
+| `RETENTION_MANIFEST_COVERAGE` | **CLOSED** (`MG-RET-MAN-001`) | Pack 1 — creators 15/15 |
+| `RETENTION_S3F_LEDGER_FINGERPRINT` | **CLOSED** (`MG-RET-S3F-001`) | Pack 1 — typed ONAY_AUDIT |
 | `SERBEST_ZAMAN_6_MONTH_TRACKING` | **CODE_GAP** (`MG-SZ-6M-001`) | deadline calc/bakiye var; ops/compliance follow-up eksik |
 | `SGK_15_14` | **BUSINESS_DECISION_REQUIRED** (`MG-SGK-1514-001`) | `CONDITIONAL_SCOPE`; preview BLOCKER_ONLY |
 | `YEAR_CROSSING_OT_POLICY` | **BUSINESS_DECISION_REQUIRED** (`MG-OT-YEAR-POL-001`) | — |
@@ -62,7 +63,7 @@ Görsel sistem çalışmaları mevcut component/owner içinde yapılabilir. Yeni
 | Ürün/domain beyni | Frozen | Hayır |
 | QR S3C–S3F | CLOSED_PRODUCTION | Hayır |
 | Canonical docs / gap registry | Güncel (`110`); `CANONICAL_DOC_STALE=0` | Hayır |
-| CODE_GAP (6 P1: retention×3, SZ deadline follow-up, OT path, org location) | Açık — `110` | Hayır (ürün “tamam” iddiasını engeller) |
+| CODE_GAP (4 P1: retention PHYS, SZ deadline follow-up, OT path, org location) | Açık — `110` | Hayır (ürün “tamam” iddiasını engeller) |
 | SGK/UBGT/hukuki kanıtlar | OPS_ROLLOUT + insan kararı | Hayır |
 | Gerçek personel / org rollout | USER_GATED OPS_ROLLOUT | Hayır |
 | Exact-SHA cPanel yayın | Ops / manuel upload | Tasarımı engellemez; canlıya çıkışı ops kapısına bağlar |

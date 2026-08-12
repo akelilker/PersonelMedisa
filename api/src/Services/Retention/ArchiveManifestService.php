@@ -458,7 +458,8 @@ class ArchiveManifestService
     }
 
     /**
-     * Create PERSONEL_OZLUK (+ ISE_GIRIS_CIKIS) manifests at PASIF transition.
+     * Create PERSONEL_OZLUK (+ ISE_GIRIS_CIKIS) and remaining TERMINATION_DATE category
+     * manifests at PASIF / ISTEN_AYRILMA transition.
      * New employment lifecycle → new row; prior lifecycle rows remain immutable.
      *
      * @return array<int, array<string, mixed>>
@@ -515,7 +516,338 @@ class ArchiveManifestService
             ], $actorId > 0 ? $actorId : null);
         }
 
+        foreach (self::createTerminationScopedManifests($pdo, $personelId, $actorId) as $row) {
+            $created[] = $row;
+        }
+
         return $created;
+    }
+
+    /**
+     * Mint TERMINATION_DATE category manifests for employment-file entities at PASIF.
+     * PERSONEL_BELGE / surec family / disiplin OLAY+SAVUNMA — only when source resolves.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public static function createTerminationScopedManifests(PDO $pdo, $personelId, $actorId)
+    {
+        $personelId = (int) $personelId;
+        $actorId = (int) $actorId;
+        $created = [];
+
+        // PERSONEL_BELGE + IZIN/RAPOR/IS_KAZASI/DISIPLIN via surecler
+        if (self::tableExistsLocal($pdo, 'surecler')) {
+            $surecTurMap = [
+                'BELGE' => RetentionCategories::PERSONEL_BELGE,
+                'IZIN' => RetentionCategories::IZIN,
+                'RAPOR' => RetentionCategories::RAPOR,
+                'IS_KAZASI' => RetentionCategories::IS_KAZASI,
+                'DISIPLIN' => RetentionCategories::DISIPLIN,
+            ];
+            $stmt = $pdo->prepare(
+                "SELECT id, surec_turu, state
+                 FROM surecler
+                 WHERE personel_id = :pid AND state <> 'IPTAL'
+                 ORDER BY id ASC"
+            );
+            $stmt->execute(['pid' => $personelId]);
+            while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+                $tur = strtoupper((string) ($row['surec_turu'] ?? ''));
+                if (!isset($surecTurMap[$tur])) {
+                    continue;
+                }
+                $category = $surecTurMap[$tur];
+                $surecId = (int) $row['id'];
+                try {
+                    $ctx = [
+                        'entity_type' => 'surec',
+                        'record_id' => $surecId,
+                        'personel_id' => $personelId,
+                    ];
+                    $created[] = self::createResolvedManifest(
+                        $pdo,
+                        $category,
+                        $ctx,
+                        $actorId > 0 ? $actorId : null
+                    );
+                } catch (RuntimeException $e) {
+                    // Skip sources that are not yet retention-trigger-resolved (e.g. belge without active file).
+                    if ($e->getMessage() === RetentionPolicyService::CODE_TRIGGER_NOT_RESOLVED
+                        || strpos($e->getMessage(), RetentionSourceAdapterService::CODE_NOT_IMPLEMENTED) === 0
+                    ) {
+                        continue;
+                    }
+                    throw $e;
+                }
+            }
+        }
+
+        // OLAY + SAVUNMA via disiplin_vakalar (canonical attendance discipline owner)
+        if (self::tableExistsLocal($pdo, 'disiplin_vakalar')) {
+            $stmt = $pdo->prepare(
+                'SELECT id FROM disiplin_vakalar WHERE personel_id = :pid ORDER BY id ASC'
+            );
+            $stmt->execute(['pid' => $personelId]);
+            while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+                $vakaId = (int) $row['id'];
+                $ctx = [
+                    'entity_type' => 'disiplin_vaka',
+                    'record_id' => $vakaId,
+                    'disiplin_vaka_id' => $vakaId,
+                    'personel_id' => $personelId,
+                ];
+                foreach ([RetentionCategories::OLAY, RetentionCategories::SAVUNMA] as $category) {
+                    $created[] = self::createResolvedManifest(
+                        $pdo,
+                        $category,
+                        $ctx,
+                        $actorId > 0 ? $actorId : null
+                    );
+                }
+            }
+        }
+
+        return $created;
+    }
+
+    /**
+     * Server-owned create: resolve identity/fingerprint + trigger, then INSERT-only mint.
+     *
+     * @param array<string, mixed> $context
+     * @return array<string, mixed>
+     */
+    public static function createResolvedManifest(PDO $pdo, $category, array $context, $createdBy = null)
+    {
+        $category = (string) $category;
+        if (!RetentionCategories::isKnown($category)) {
+            throw new RuntimeException(RetentionPolicyService::CODE_UNKNOWN_CATEGORY);
+        }
+
+        $source = RetentionSourceAdapterService::resolve($pdo, $category, $context);
+        $trigger = RetentionPolicyService::resolveTrigger($pdo, $category, $context);
+
+        $entityType = isset($context['entity_type']) ? strtolower(trim((string) $context['entity_type'])) : '';
+        $recordId = isset($context['record_id']) ? (int) $context['record_id'] : 0;
+        if ($entityType === 'personeller') {
+            $entityType = 'personel';
+        }
+        if ($entityType === 'surecler') {
+            $entityType = 'surec';
+        }
+        if ($entityType === 'disiplin_vakalar') {
+            $entityType = 'disiplin_vaka';
+        }
+        if ($entityType === 'haftalik_kapanislar') {
+            $entityType = 'haftalik_kapanis';
+        }
+        if ($entityType === '' || $recordId <= 0) {
+            throw new RuntimeException('ARCHIVE_MANIFEST_INVALID');
+        }
+
+        $personelId = isset($context['personel_id']) ? (int) $context['personel_id'] : null;
+        if ($personelId !== null && $personelId <= 0) {
+            $personelId = null;
+        }
+
+        $dt = DateTime::createFromFormat('Y-m-d', $trigger['trigger_date']);
+        if (!$dt) {
+            throw new RuntimeException(RetentionPolicyService::CODE_TRIGGER_NOT_RESOLVED);
+        }
+
+        return self::createManifest($pdo, [
+            'entity_type' => $entityType,
+            'record_id' => $recordId,
+            'personel_id' => $personelId,
+            'record_category' => $category,
+            'source_version_identity' => $source['source_version_identity'],
+            'trigger_type' => $trigger['trigger_type'],
+            'trigger_date' => $trigger['trigger_date'],
+            'retention_until' => RetentionPolicyService::calculateRetentionUntil($dt),
+            'source_sha256' => $source['source_sha256'],
+        ], $createdBy);
+    }
+
+    /**
+     * PUANTAJ (+ generic parent ONAY_AUDIT) at monthly seal / reseal.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public static function createPuantajPeriodManifests(PDO $pdo, $subeId, $yil, $ay, $sealId, $actorId)
+    {
+        $subeId = (int) $subeId;
+        $yil = (int) $yil;
+        $ay = (int) $ay;
+        $sealId = (int) $sealId;
+        $actorId = (int) $actorId;
+        $ctx = [
+            'entity_type' => 'puantaj',
+            'record_id' => $sealId,
+            'sube_id' => $subeId,
+            'yil' => $yil,
+            'ay' => $ay,
+            'parent_category' => RetentionCategories::PUANTAJ,
+        ];
+        $created = [];
+        $created[] = self::createResolvedManifest(
+            $pdo,
+            RetentionCategories::PUANTAJ,
+            $ctx,
+            $actorId > 0 ? $actorId : null
+        );
+        $created[] = self::createResolvedManifest(
+            $pdo,
+            RetentionCategories::ONAY_AUDIT,
+            $ctx,
+            $actorId > 0 ? $actorId : null
+        );
+
+        return $created;
+    }
+
+    /**
+     * BORDRO (+ parent ONAY_AUDIT) at kesinleştirme.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public static function createBordroPeriodManifests(PDO $pdo, $subeId, $yil, $ay, $runId, $actorId)
+    {
+        $ctx = [
+            'entity_type' => 'bordro',
+            'record_id' => (int) $runId,
+            'sube_id' => (int) $subeId,
+            'yil' => (int) $yil,
+            'ay' => (int) $ay,
+            'parent_category' => RetentionCategories::BORDRO,
+        ];
+        $actorId = (int) $actorId;
+        $created = [];
+        $created[] = self::createResolvedManifest(
+            $pdo,
+            RetentionCategories::BORDRO,
+            $ctx,
+            $actorId > 0 ? $actorId : null
+        );
+        $created[] = self::createResolvedManifest(
+            $pdo,
+            RetentionCategories::ONAY_AUDIT,
+            $ctx,
+            $actorId > 0 ? $actorId : null
+        );
+
+        return $created;
+    }
+
+    /**
+     * SGK_EKSIK_GUN at payroll period snapshot create (non-idempotent path).
+     *
+     * @return array<string, mixed>
+     */
+    public static function createSgkPeriodManifest(PDO $pdo, $subeId, $yil, $ay, $snapshotId, $actorId)
+    {
+        $actorId = (int) $actorId;
+
+        return self::createResolvedManifest($pdo, RetentionCategories::SGK_EKSIK_GUN, [
+            'entity_type' => 'sgk',
+            'record_id' => (int) $snapshotId,
+            'sube_id' => (int) $subeId,
+            'yil' => (int) $yil,
+            'ay' => (int) $ay,
+        ], $actorId > 0 ? $actorId : null);
+    }
+
+    /**
+     * FAZLA_CALISMA + SERBEST_ZAMAN at haftalık kapanış KAPANDI.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public static function createHaftalikPeriodManifests(PDO $pdo, $kapanisId, $subeId, $haftaBaslangic, $actorId)
+    {
+        $kapanisId = (int) $kapanisId;
+        $subeId = (int) $subeId;
+        $actorId = (int) $actorId;
+        $ctx = [
+            'entity_type' => 'haftalik_kapanis',
+            'record_id' => $kapanisId,
+            'haftalik_kapanis_id' => $kapanisId,
+            'sube_id' => $subeId,
+            'hafta_baslangic' => (string) $haftaBaslangic,
+        ];
+        $created = [];
+        foreach ([RetentionCategories::FAZLA_CALISMA, RetentionCategories::SERBEST_ZAMAN] as $category) {
+            $created[] = self::createResolvedManifest(
+                $pdo,
+                $category,
+                $ctx,
+                $actorId > 0 ? $actorId : null
+            );
+        }
+
+        return $created;
+    }
+
+    /**
+     * S3F decision ledger → ONAY_AUDIT manifest (same transaction as ledger append).
+     *
+     * @param array<string, mixed> $ledgerRow
+     * @return array<string, mixed>
+     */
+    public static function createQrPuantajDecisionOnayAuditManifest(PDO $pdo, array $ledgerRow, $actorId)
+    {
+        $ledgerId = (int) ($ledgerRow['id'] ?? 0);
+        if ($ledgerId <= 0) {
+            throw new RuntimeException('ARCHIVE_MANIFEST_INVALID');
+        }
+        $actorId = (int) $actorId;
+        $ctx = [
+            'entity_type' => 'qr_pc_decision',
+            'record_id' => $ledgerId,
+            'ledger_id' => $ledgerId,
+            'personel_id' => (int) ($ledgerRow['personel_id'] ?? 0),
+            'sube_id' => (int) ($ledgerRow['sube_id'] ?? 0),
+            'candidate_date' => substr((string) ($ledgerRow['candidate_date'] ?? ''), 0, 10),
+            'parent_category' => RetentionCategories::PUANTAJ,
+            'audit_source_type' => RetentionSourceAdapterService::AUDIT_SOURCE_QR_PUANTAJ_CANDIDATE_DECISION,
+        ];
+
+        return self::createResolvedManifest(
+            $pdo,
+            RetentionCategories::ONAY_AUDIT,
+            $ctx,
+            $actorId > 0 ? $actorId : null
+        );
+    }
+
+    /**
+     * Swallow only SCHEMA_NOT_READY — all other retention errors propagate (fail-closed).
+     *
+     * @param callable $fn
+     * @return mixed|null
+     */
+    public static function runIfSchemaReady(PDO $pdo, $fn)
+    {
+        try {
+            RetentionSchemaGate::assertReady($pdo, RetentionSchemaGate::manifestTables());
+
+            return $fn();
+        } catch (RuntimeException $e) {
+            if ($e->getMessage() === RetentionSchemaGate::CODE_SCHEMA_NOT_READY
+                || $e->getMessage() === RetentionPolicyService::CODE_SCHEMA_NOT_READY
+            ) {
+                return null;
+            }
+            throw $e;
+        }
+    }
+
+    private static function tableExistsLocal(PDO $pdo, $table)
+    {
+        $stmt = $pdo->prepare(
+            'SELECT 1 FROM information_schema.TABLES
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :t LIMIT 1'
+        );
+        $stmt->execute(['t' => (string) $table]);
+
+        return (bool) $stmt->fetchColumn();
     }
 
     private static function sameSha($a, $b)

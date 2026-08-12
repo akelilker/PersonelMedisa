@@ -13,6 +13,7 @@ use Medisa\Api\Services\Qr\QrPuantajCandidateDecisionLedgerService;
 use Medisa\Api\Services\Qr\QrPuantajCandidateDecisionPolicy;
 use Medisa\Api\Services\Qr\QrPuantajCandidateHashService;
 use Medisa\Api\Services\Qr\QrPuantajCandidateProjectionService;
+use Medisa\Api\Services\Retention\RetentionSourceAdapterService;
 
 function s3fPureAssert(bool $ok, string $name): void
 {
@@ -395,5 +396,34 @@ s3fPureAssert(
         && in_array('net_calisma_suresi_dakika', $guardBlocked['populated'], true),
     'dependent guard lists populated fields'
 );
+
+// Retention ONAY_AUDIT ledger fingerprint (MG-RET-S3F-001) — pure, no DB
+$ledgerRow = [
+    'id' => 42,
+    'personel_id' => 7,
+    'sube_id' => 1,
+    'candidate_date' => '2026-08-12',
+    'candidate_hash' => str_repeat('ab', 32),
+    'decision_type' => 'KEEP_CANONICAL',
+    'decision_reason' => 'canonical remains authoritative',
+    'puantaj_id' => 99,
+    'algorithm_version' => 'QR_PUANTAJ_CANDIDATE_V1',
+    'interval_algorithm_version' => 'QR_INTERVAL_V1',
+    'decision_algorithm_version' => 'QR_PUANTAJ_DECISION_V1',
+    'decided_by_user_id' => 3,
+    'request_nonce' => 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
+    'supersedes_decision_id' => null,
+    'previous_decision_hash' => null,
+    'decision_hash' => str_repeat('cd', 32),
+    'created_at' => '2026-08-12 10:00:00.123456',
+];
+$fp1 = RetentionSourceAdapterService::computeQrPuantajDecisionLedgerFingerprint($ledgerRow);
+s3fPureAssert(strlen($fp1) === 64 && ctype_xdigit($fp1), 'retention ledger fp length');
+$ledgerRowChanged = $ledgerRow;
+$ledgerRowChanged['decision_reason'] = 'changed reason';
+$fp2 = RetentionSourceAdapterService::computeQrPuantajDecisionLedgerFingerprint($ledgerRowChanged);
+s3fPureAssert($fp1 !== $fp2, 'retention ledger fp changes with material');
+$fp1b = RetentionSourceAdapterService::computeQrPuantajDecisionLedgerFingerprint($ledgerRow);
+s3fPureAssert($fp1 === $fp1b, 'retention ledger fp deterministic');
 
 echo 'S3F pure decision tests OK' . PHP_EOL;

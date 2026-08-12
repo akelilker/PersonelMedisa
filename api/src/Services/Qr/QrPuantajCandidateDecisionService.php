@@ -476,7 +476,7 @@ class QrPuantajCandidateDecisionService
 
         $snapshot = self::buildCandidateSnapshot($item, $currentHash);
 
-        return QrPuantajCandidateDecisionLedgerService::append($pdo, [
+        $ledger = QrPuantajCandidateDecisionLedgerService::append($pdo, [
             'personel_id' => (int) $personelId,
             'sube_id' => (int) $subeId,
             'candidate_date' => (string) $candidateDate,
@@ -495,6 +495,17 @@ class QrPuantajCandidateDecisionService
             'supersedes_decision_id' => $supersedesId,
             'previous_decision_hash' => $previousHash,
         ]);
+
+        // Retention ONAY_AUDIT mint in the same transaction — fail-closed (no silent ignore).
+        \Medisa\Api\Services\Retention\ArchiveManifestService::runIfSchemaReady($pdo, static function () use ($pdo, $ledger, $userId) {
+            \Medisa\Api\Services\Retention\ArchiveManifestService::createQrPuantajDecisionOnayAuditManifest(
+                $pdo,
+                $ledger,
+                (int) $userId
+            );
+        });
+
+        return $ledger;
     }
 
     /**

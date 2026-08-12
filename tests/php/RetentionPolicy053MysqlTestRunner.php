@@ -838,10 +838,58 @@ try {
     ]);
     rp053Assert(strpos($srcSz['source_version_identity'], 'haftalik_kapanis:') === 0, 'SRC26 SZ');
 
-    // Coverage map — all catalog categories have resolvers in this build
+    // Coverage map — all catalog categories have resolvers + manifest creators
     $coverage = RetentionSourceAdapterService::coverageMap();
     foreach (RetentionCategories::all() as $cat) {
         rp053Assert($coverage[$cat]['source_resolver'] === 'implemented', 'SRC cov ' . $cat);
+        rp053Assert($coverage[$cat]['manifest_creator'] === 'implemented', 'MAN cov ' . $cat);
+        rp053Assert($coverage[$cat]['server_integrity_fingerprint'] === 'implemented', 'FP cov ' . $cat);
+    }
+
+    // Manifest creators — period categories (idempotent)
+    $sealId = (int) $pdo->query(
+        "SELECT id FROM puantaj_aylik_muhurleri WHERE sube_id=1 AND yil=2010 AND ay=1 AND durum='MUHURLENDI' ORDER BY id DESC LIMIT 1"
+    )->fetchColumn();
+    $bordroRunId = (int) $pdo->query(
+        "SELECT id FROM maas_hesaplama_calistirmalari WHERE sube_id=1 AND yil=2010 AND ay=1 AND bordro_onay_durumu='KESINLESTI' ORDER BY id DESC LIMIT 1"
+    )->fetchColumn();
+    $sgkSnapId = (int) $pdo->query(
+        "SELECT id FROM maas_hesaplama_donem_snapshotlari WHERE sube_id=1 AND yil=2010 AND ay=1 AND state='OLUSTURULDU' ORDER BY id DESC LIMIT 1"
+    )->fetchColumn();
+    rp053Assert($sealId > 0 && $bordroRunId > 0 && $sgkSnapId > 0, 'MAN seed ids');
+
+    $puantajMan = ArchiveManifestService::createPuantajPeriodManifests($pdo, 1, 2010, 1, $sealId, 1);
+    rp053Assert(count($puantajMan) === 2, 'MAN PUANTAJ+ONAY_AUDIT count');
+    $puantajReplay = ArchiveManifestService::createPuantajPeriodManifests($pdo, 1, 2010, 1, $sealId, 1);
+    rp053Assert(
+        (int) $puantajMan[0]['id'] === (int) $puantajReplay[0]['id'],
+        'MAN PUANTAJ idempotent'
+    );
+    $srcCheck = RetentionSourceAdapterService::resolve($pdo, RetentionCategories::PUANTAJ, [
+        'sube_id' => 1, 'yil' => 2010, 'ay' => 1, 'entity_type' => 'puantaj', 'record_id' => $sealId,
+    ]);
+    rp053Assert(
+        (string) $puantajMan[0]['source_sha256'] === (string) $srcCheck['source_sha256'],
+        'MAN PUANTAJ fingerprint parity'
+    );
+
+    $bordroMan = ArchiveManifestService::createBordroPeriodManifests($pdo, 1, 2010, 1, $bordroRunId, 1);
+    rp053Assert(count($bordroMan) === 2, 'MAN BORDRO+ONAY_AUDIT count');
+    $sgkMan = ArchiveManifestService::createSgkPeriodManifest($pdo, 1, 2010, 1, $sgkSnapId, 1);
+    rp053Assert(strpos((string) $sgkMan['source_version_identity'], 'sgk_snapshot:') === 0, 'MAN SGK identity');
+    $haftalikMan = ArchiveManifestService::createHaftalikPeriodManifests($pdo, $weekId, 1, '2010-01-04', 1);
+    rp053Assert(count($haftalikMan) === 2, 'MAN FM+SZ count');
+
+    // Open period fail-closed
+    try {
+        ArchiveManifestService::createPuantajPeriodManifests($pdo, 1, 2099, 1, 999, 1);
+        rp053Assert(false, 'MAN open period reject');
+    } catch (RuntimeException $e) {
+        rp053Assert(
+            $e->getMessage() === RetentionPolicyService::CODE_PERIOD_NOT_CLOSED
+            || $e->getMessage() === RetentionPolicyService::CODE_TRIGGER_NOT_RESOLVED,
+            'MAN open period fail-closed'
+        );
     }
 
     // Legal hold validations
@@ -871,6 +919,17 @@ try {
          VALUES (10, 'IZIN', '2020-01-01', 'AKTIF')"
     );
     $surecId = (int) $pdo->lastInsertId();
+
+    $termScoped = ArchiveManifestService::createTerminationScopedManifests($pdo, 10, 1);
+    $seenIzin = false;
+    foreach ($termScoped as $m) {
+        if ((string) ($m['record_category'] ?? '') === RetentionCategories::IZIN) {
+            $seenIzin = true;
+            rp053Assert((int) $m['record_id'] === $surecId, 'MAN IZIN record_id');
+        }
+    }
+    rp053Assert($seenIzin === true, 'MAN IZIN termination-scoped');
+
     try {
         LegalHoldService::create($pdo, $gm, [
             'target_domain' => 'surec',

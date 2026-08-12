@@ -89,12 +89,6 @@ class QrPuantajCandidateDecisionService
 
             $canonical = QrPuantajCandidateApplyService::fetchForUpdate($pdo, $personelId, $candidateDate);
 
-            // Test-only overlap hold for concurrent race runners (never set in production).
-            $raceHoldMs = (int) (getenv('S3F_RACE_HOLD_MS') ?: '0');
-            if ($raceHoldMs > 0) {
-                usleep($raceHoldMs * 1000);
-            }
-
             // Post-lock nonce recheck: concurrent exact retry must resolve idempotently
             // after the winner commits, before recompute/stale evaluation.
             $lockedNonce = QrPuantajCandidateDecisionLedgerService::findByUserNonce($pdo, $userId, $nonce);

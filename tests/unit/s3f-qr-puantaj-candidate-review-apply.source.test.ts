@@ -90,21 +90,28 @@ describe("S3F QR puantaj candidate review / apply", () => {
     expect(policy).toContain("BLOCK_DEPENDENT_FIELDS");
     expect(decide).toContain("findByUserNonce");
     expect(decide).toContain("Post-lock nonce recheck");
+    // Source ordering: period lock → FOR UPDATE → post-lock nonce → recompute → stale → apply.
     // Post-lock nonce recheck must precede recompute/stale evaluation.
     const decideFnIdx = decide.indexOf("public static function decide");
     const acquireIdx = decide.indexOf("acquireForDate", decideFnIdx);
+    const forUpdateIdx = decide.indexOf("fetchForUpdate", decideFnIdx);
     const postLockFindIdx = decide.indexOf(
       "$lockedNonce = QrPuantajCandidateDecisionLedgerService::findByUserNonce",
       decideFnIdx
     );
     const recomputeIdx = decide.indexOf("self::recomputeSingleCandidate", decideFnIdx);
     const staleIdx = decide.indexOf("BLOCK_STALE", decideFnIdx);
+    const applyIdx = decide.indexOf("self::executeApply", decideFnIdx);
     expect(decideFnIdx).toBeGreaterThan(-1);
     expect(acquireIdx).toBeGreaterThan(decideFnIdx);
-    expect(postLockFindIdx).toBeGreaterThan(acquireIdx);
+    expect(forUpdateIdx).toBeGreaterThan(acquireIdx);
+    expect(postLockFindIdx).toBeGreaterThan(forUpdateIdx);
     expect(recomputeIdx).toBeGreaterThan(postLockFindIdx);
     expect(staleIdx).toBeGreaterThan(recomputeIdx);
-    expect(decide).toContain("S3F_RACE_HOLD_MS");
+    expect(applyIdx).toBeGreaterThan(staleIdx);
+    expect(decide).not.toContain("S3F_RACE_HOLD_MS");
+    expect(decide).not.toMatch(/test-only overlap hold/i);
+    expect(decide).not.toMatch(/usleep\s*\(/);
 
     expect(readSvc).toContain("gec_kalma_dakika");
     expect(readSvc).toContain("muhur_id");

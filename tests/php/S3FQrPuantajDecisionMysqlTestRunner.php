@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../api/src/bootstrap.php';
 
+use Medisa\Api\Services\PuantajDonemKilidiService;
 use Medisa\Api\Services\Qr\QrPuantajCandidateDecisionException;
 use Medisa\Api\Services\Qr\QrPuantajCandidateDecisionLedgerService;
 use Medisa\Api\Services\Qr\QrPuantajCandidateDecisionPolicy;
@@ -396,6 +397,7 @@ if (($argv[1] ?? '') === '--race-apply') {
     $nonce = trim((string) (getenv('S3F_RACE_NONCE') ?: ($argv[4] ?? '')));
     $reason = trim((string) (getenv('S3F_RACE_REASON') ?: 'Race apply denemesi.'));
     $barrier = trim((string) (getenv('S3F_RACE_BARRIER') ?: ''));
+    $ready = trim((string) (getenv('S3F_RACE_READY') ?: ''));
     if ($barrier !== '') {
         $deadline = microtime(true) + 10.0;
         while (!is_file($barrier)) {
@@ -406,31 +408,66 @@ if (($argv[1] ?? '') === '--race-apply') {
             usleep(20000);
         }
     }
+    // Signal parent that this child passed the start barrier and is entering decide()
+    // (will block on period lock held by the orchestrating parent transaction).
+    if ($ready !== '') {
+        file_put_contents($ready, 'ready');
+    }
     $pdo = s3fDecPdoForDb($database);
     try {
-        $result = s3fDecDecide($pdo, [
-            'action' => QrPuantajCandidateDecisionPolicy::ACTION_APPLY_EXISTING,
-            'candidate_hash' => $hash,
-            'request_nonce' => $nonce,
-            'gerekce' => $reason,
-        ]);
-        $idem = !empty($result['idempotent']) ? '1' : '0';
-        echo 'OK:' . (string) ($result['decision_id'] ?? 0) . ':' . $idem . PHP_EOL;
-        exit(0);
-    } catch (QrPuantajCandidateDecisionException $e) {
-        echo $e->getErrorCode() . PHP_EOL;
-        exit(0);
+        $pdo->exec('SET SESSION innodb_lock_wait_timeout = 30');
+        $pdo->exec('SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED');
     } catch (Throwable $e) {
-        fwrite(STDERR, $e->getMessage() . PHP_EOL);
-        exit(1);
+        // ignore
+    }
+    // Test-side only: InnoDB may deadlock the lock-wait herd when the parent
+    // releases the period lock; retry so the child re-enters decide() cleanly.
+    $attempts = 0;
+    $maxAttempts = 8;
+    while (true) {
+        $attempts++;
+        try {
+            $result = s3fDecDecide($pdo, [
+                'action' => QrPuantajCandidateDecisionPolicy::ACTION_APPLY_EXISTING,
+                'candidate_hash' => $hash,
+                'request_nonce' => $nonce,
+                'gerekce' => $reason,
+            ]);
+            $idem = !empty($result['idempotent']) ? '1' : '0';
+            echo 'OK:' . (string) ($result['decision_id'] ?? 0) . ':' . $idem . PHP_EOL;
+            exit(0);
+        } catch (QrPuantajCandidateDecisionException $e) {
+            echo $e->getErrorCode() . PHP_EOL;
+            exit(0);
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) {
+                try {
+                    $pdo->rollBack();
+                } catch (Throwable $ignore) {
+                    // ignore
+                }
+            }
+            if ($attempts < $maxAttempts && s3fDecIsDeadlock($e)) {
+                usleep(30000 * $attempts);
+                continue;
+            }
+            fwrite(STDERR, $e->getMessage() . PHP_EOL);
+            exit(1);
+        }
     }
 }
 
 /**
- * @return array{process:resource,pipes:array{0:resource,1:resource,2:resource},barrier:string}
+ * @return array{process:resource,pipes:array{0:resource,1:resource,2:resource},barrier:string,ready:string}
  */
-function s3fDecSpawnRace(string $database, string $hash, string $nonce, string $reason, string $barrier = '', int $holdMs = 0): array
-{
+function s3fDecSpawnRace(
+    string $database,
+    string $hash,
+    string $nonce,
+    string $reason,
+    string $barrier = '',
+    string $ready = ''
+): array {
     $phpArgs = [];
     if (PHP_OS_FAMILY === 'Windows') {
         $extensionDir = ini_get('extension_dir');
@@ -451,7 +488,7 @@ function s3fDecSpawnRace(string $database, string $hash, string $nonce, string $
     putenv('S3F_RACE_NONCE=' . $nonce);
     putenv('S3F_RACE_REASON=' . $reason);
     putenv('S3F_RACE_BARRIER=' . $barrier);
-    putenv('S3F_RACE_HOLD_MS=' . (string) max(0, $holdMs));
+    putenv('S3F_RACE_READY=' . $ready);
 
     $pipes = [];
     $process = proc_open(
@@ -467,7 +504,7 @@ function s3fDecSpawnRace(string $database, string $hash, string $nonce, string $
     }
     fclose($pipes[0]);
 
-    return ['process' => $process, 'pipes' => $pipes, 'barrier' => $barrier];
+    return ['process' => $process, 'pipes' => $pipes, 'barrier' => $barrier, 'ready' => $ready];
 }
 
 function s3fDecClearRaceEnv(): void
@@ -476,7 +513,7 @@ function s3fDecClearRaceEnv(): void
     putenv('S3F_RACE_NONCE');
     putenv('S3F_RACE_REASON');
     putenv('S3F_RACE_BARRIER');
-    putenv('S3F_RACE_HOLD_MS');
+    putenv('S3F_RACE_READY');
 }
 
 function s3fDecReleaseRaceBarrier(string $barrier): void
@@ -485,6 +522,98 @@ function s3fDecReleaseRaceBarrier(string $barrier): void
         return;
     }
     file_put_contents($barrier, 'go');
+}
+
+/** @param list<string> $readyFiles */
+function s3fDecWaitReadyFiles(array $readyFiles, float $timeoutSec = 10.0): void
+{
+    $deadline = microtime(true) + $timeoutSec;
+    while (true) {
+        $allReady = true;
+        foreach ($readyFiles as $file) {
+            if ($file === '' || !is_file($file)) {
+                $allReady = false;
+                break;
+            }
+        }
+        if ($allReady) {
+            return;
+        }
+        if (microtime(true) > $deadline) {
+            throw new RuntimeException('Race children ready-file sync timeout.');
+        }
+        usleep(20000);
+    }
+}
+
+function s3fDecIsDeadlock(Throwable $e): bool
+{
+    $msg = $e->getMessage();
+
+    return strpos($msg, '1213') !== false
+        || stripos($msg, 'Deadlock') !== false;
+}
+
+/**
+ * Hold period lock on a parent connection so both race children pass pre-tx nonce
+ * miss, open transactions, and block on the same period serialization lock.
+ *
+ * @return array{0:string,1:string}
+ */
+function s3fDecRunDbLockOrchestratedRace(
+    string $database,
+    string $date,
+    int $subeId,
+    string $hash,
+    string $nonce1,
+    string $nonce2,
+    string $reason
+): array {
+    // Commit lock-row existence first so children contend on SELECT FOR UPDATE,
+    // not on first-inserter races against an empty lock table.
+    $bootPdo = s3fDecPdoForDb($database);
+    $bootPdo->beginTransaction();
+    PuantajDonemKilidiService::acquireForDate($bootPdo, $subeId, $date);
+    $bootPdo->commit();
+
+    $lockPdo = s3fDecPdoForDb($database);
+    $lockPdo->beginTransaction();
+    PuantajDonemKilidiService::acquireForDate($lockPdo, $subeId, $date);
+
+    $barrier = tempnam(sys_get_temp_dir(), 's3f-race-');
+    if ($barrier === false) {
+        throw new RuntimeException('Race barrier temp file failed.');
+    }
+    unlink($barrier);
+    $ready1 = $barrier . '.ready1';
+    $ready2 = $barrier . '.ready2';
+
+    try {
+        $child1 = s3fDecSpawnRace($database, $hash, $nonce1, $reason, $barrier, $ready1);
+        $child2 = s3fDecSpawnRace($database, $hash, $nonce2, $reason, $barrier, $ready2);
+        usleep(100000);
+        s3fDecReleaseRaceBarrier($barrier);
+        s3fDecWaitReadyFiles([$ready1, $ready2], 10.0);
+        // Let both children reach acquireForDate and block on the parent-held lock.
+        usleep(200000);
+        $lockPdo->commit();
+
+        $out1 = s3fDecFinishRace($child1);
+        $out2 = s3fDecFinishRace($child2);
+        s3fDecClearRaceEnv();
+
+        return [$out1, $out2];
+    } catch (Throwable $e) {
+        if ($lockPdo->inTransaction()) {
+            $lockPdo->rollBack();
+        }
+        s3fDecClearRaceEnv();
+        throw $e;
+    } finally {
+        @unlink($barrier);
+        @unlink($ready1);
+        @unlink($ready2);
+    }
 }
 
 /** @param array{process:resource,pipes:array} $child */
@@ -783,6 +912,8 @@ try {
     s3fDecAssert(($resI['decision_type'] ?? '') === 'APPLY_EXISTING', 'i) REOPENED no snapshot APPLY ok');
 
     // (j) concurrent SAME nonce exact retry → one mutation, one ledger, both success, same decision_id
+    // DB-lock orchestration: parent holds period lock so both children pass pre-tx nonce miss
+    // then block on acquireForDate; after release, winner APPLY + loser post-lock idempotent.
     s3fDecResetDay($pdo);
     s3fDecSeedQrPair($pdo, '2026-08-12 05:00:00.000000', '2026-08-12 14:00:00.000000');
     s3fDecInsertPuantaj($pdo, ['giris_saati' => '09:00', 'cikis_saati' => '18:00']);
@@ -793,19 +924,15 @@ try {
     $ledgerBeforeJ = (int) $pdo->query(
         "SELECT COUNT(*) FROM qr_puantaj_candidate_decision_ledger WHERE decision_type='APPLY_EXISTING'"
     )->fetchColumn();
-    $barrierJ = tempnam(sys_get_temp_dir(), 's3f-race-j-');
-    if ($barrierJ === false) {
-        throw new RuntimeException('Race barrier temp file failed.');
-    }
-    unlink($barrierJ);
-    $childJ1 = s3fDecSpawnRace($db, $hashJ, $nonceJ, $reasonJ, $barrierJ, 350);
-    $childJ2 = s3fDecSpawnRace($db, $hashJ, $nonceJ, $reasonJ, $barrierJ, 350);
-    usleep(150000);
-    s3fDecReleaseRaceBarrier($barrierJ);
-    $outJ1 = s3fDecFinishRace($childJ1);
-    $outJ2 = s3fDecFinishRace($childJ2);
-    s3fDecClearRaceEnv();
-    @unlink($barrierJ);
+    [$outJ1, $outJ2] = s3fDecRunDbLockOrchestratedRace(
+        $db,
+        $date,
+        1,
+        $hashJ,
+        $nonceJ,
+        $nonceJ,
+        $reasonJ
+    );
     s3fDecAssert(strpos($outJ1, 'OK:') === 0, 'j) child1 success [' . $outJ1 . ']');
     s3fDecAssert(strpos($outJ2, 'OK:') === 0, 'j) child2 success [' . $outJ2 . ']');
     s3fDecAssert(
@@ -844,19 +971,15 @@ try {
     $itemK = s3fDecCandidateItem($pdo, $date);
     $hashK = (string) ($itemK['candidate_hash'] ?? '');
     $reasonK = 'Concurrent different nonce competing apply.';
-    $barrierK = tempnam(sys_get_temp_dir(), 's3f-race-k-');
-    if ($barrierK === false) {
-        throw new RuntimeException('Race barrier temp file failed.');
-    }
-    unlink($barrierK);
-    $childK1 = s3fDecSpawnRace($db, $hashK, s3fDecNonce(21), $reasonK, $barrierK, 350);
-    $childK2 = s3fDecSpawnRace($db, $hashK, s3fDecNonce(22), $reasonK, $barrierK, 350);
-    usleep(150000);
-    s3fDecReleaseRaceBarrier($barrierK);
-    $outK1 = s3fDecFinishRace($childK1);
-    $outK2 = s3fDecFinishRace($childK2);
-    s3fDecClearRaceEnv();
-    @unlink($barrierK);
+    [$outK1, $outK2] = s3fDecRunDbLockOrchestratedRace(
+        $db,
+        $date,
+        1,
+        $hashK,
+        s3fDecNonce(21),
+        s3fDecNonce(22),
+        $reasonK
+    );
     $okK = 0;
     $loseK = 0;
     foreach ([$outK1, $outK2] as $outK) {

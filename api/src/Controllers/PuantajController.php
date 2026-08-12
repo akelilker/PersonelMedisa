@@ -17,6 +17,7 @@ use Medisa\Api\Services\PuantajDonemKilidiService;
 use Medisa\Api\Services\PuantajDonemPeriodService;
 use Medisa\Api\Services\PuantajDonemReopenException;
 use Medisa\Api\Services\PuantajDonemReopenService;
+use Medisa\Api\Services\Qr\QrPuantajCandidateReadService;
 use Medisa\Api\Services\ResmiTatilTakvimProjectionService;
 use PDO;
 
@@ -60,6 +61,40 @@ class PuantajController
         'GENEL_UCRETSIZ_IZIN',
         'BILINMIYOR',
     ];
+
+    public static function qrAdaylari(Request $request, $personelId)
+    {
+        $user = AuthMiddleware::authenticate($request, true);
+        RolePermissions::assert($user, 'puantaj.view');
+
+        $personelId = (int) $personelId;
+        if ($personelId <= 0) {
+            JsonResponse::badRequest('Gecersiz personel parametresi.');
+        }
+
+        $pdo = self::getConnection();
+        $personel = self::loadPersonel($pdo, $personelId);
+        SubeScope::assertPersonelAccess($user, $request, (int) $personel['sube_id']);
+
+        $from = trim((string) $request->getQuery('from', ''));
+        $to = trim((string) $request->getQuery('to', ''));
+
+        try {
+            $payload = QrPuantajCandidateReadService::listForPersonel(
+                $pdo,
+                $personelId,
+                (int) $personel['sube_id'],
+                $from,
+                $to
+            );
+        } catch (\InvalidArgumentException $e) {
+            JsonResponse::badRequest($e->getMessage());
+        } catch (\Throwable $e) {
+            JsonResponse::serverError('QR puantaj adaylari okunamadi.');
+        }
+
+        JsonResponse::success($payload);
+    }
 
     public static function detail(Request $request, $personelId, $tarih)
     {

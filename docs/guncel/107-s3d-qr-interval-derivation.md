@@ -2,7 +2,7 @@
 
 **Branch:** `feat/qr-attendance-interval-derivation`  
 **Baseline main:** `db7df5d499d29845098bc7238b45d8279092aa50` (S3C closed / PR #145 merged)  
-**Status:** Draft implementation — **no production write / no migration 058 / no merge / no deploy**
+**Status:** **CLOSED PRODUCTION** (PR #146 merged @ `3b47f09c…`). S3E started on branch `feat/qr-puantaj-candidate-projection` — see [108](./108-s3e-qr-puantaj-candidate-projection.md).
 
 ---
 

@@ -113,6 +113,9 @@ class Router
         if ($method === 'POST' && $path === '/puantaj/muhurle') {
             PuantajController::muhurleAylik($this->request);
         }
+        if ($method === 'GET' && preg_match('#^/puantaj/qr-adaylari/(\d+)$#', $path, $matches)) {
+            PuantajController::qrAdaylari($this->request, $matches[1]);
+        }
         if ($method === 'POST' && preg_match('#^/puantaj/donemler/(\d{4})/(\d{1,2})/reopen-request$#', $path, $matches)) {
             PuantajController::reopenRequest($this->request, $matches[1], $matches[2]);
         }

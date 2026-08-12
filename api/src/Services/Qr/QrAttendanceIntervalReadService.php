@@ -26,7 +26,7 @@ class QrAttendanceIntervalReadService
             $personelId,
             $range['from_utc'],
             $range['to_exclusive_utc']
-        );
+        ); // also used by S3E candidate read
 
         $derived = QrAttendanceIntervalDerivationService::derive($events);
         $filtered = QrAttendanceIntervalDerivationService::filterToBusinessRange(
@@ -39,9 +39,11 @@ class QrAttendanceIntervalReadService
     }
 
     /**
+     * Indexed raw load with previous/next boundary context (S3D + S3E reuse).
+     *
      * @return list<array<string,mixed>>
      */
-    private static function loadEventsWithBoundaryContext(PDO $pdo, $personelId, $fromUtc, $toExclusiveUtc)
+    public static function loadEventsWithBoundaryContext(PDO $pdo, $personelId, $fromUtc, $toExclusiveUtc)
     {
         $personelId = (int) $personelId;
         $rows = [];

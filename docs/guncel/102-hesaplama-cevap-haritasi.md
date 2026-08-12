@@ -114,7 +114,7 @@ Canlıya `30` / `225` yazmak için onay formu: `91-bordro-hesaplama-calisma-poli
 | FM ücreti | `SERBEST_ZAMAN` seçildiyse FM `ARTI` üretilmez (çift etki yasak) |
 | Karar mercii | Çalışanın **imzalı yazılı talebi** zorunlu; kanıt yoksa blocker |
 | Event modeli | Oluşum / kullanım / düzeltme / iptal |
-| **6 ay içinde kullandırma takibi** | **CODE_GAP** — `son_kullanim_tarihi`/bakiye var; ürünleşmiş vade takibi/compliance yok (`110` MG-SZ-6M-001) |
+| **6 aylık deadline compliance / ops follow-up** | **CODE_GAP** (`110` MG-SZ-6M-001) — `son_kullanim_tarihi`/6ay calc/bakiye var; yaklaşan/overdue görünürlük + İK yüzeyi + compliance gate eksik |
 
 ---
 
@@ -254,7 +254,7 @@ Kaynak: masaüstü `puantaj resmi durum.docx` (toplantı mevzuat özeti).
 | 3 İzin yaş 20 gün | Var | Band + yaş min 20; bakiye owner kümülatif + ledger + kullanım (`YillikIzinBakiyeService` / doc `104`) |
 | 4 18 yaş FM/gece blok | Var | — |
 | 5 FM 1.5 + 270 saat | Var | FSC %25 **kapalı** |
-| 6 Serbest zaman | Var (dönüşüm+kanıt) | **6 ay vade takibi ürünleşmedi** (`110` CODE_GAP) |
+| 6 Serbest zaman | Var (dönüşüm+kanıt+son_kullanim) | **Deadline compliance/ops follow-up** CODE_GAP (`110` MG-SZ-6M-001) |
 | 7 UBGT | Var | Politika/mod onayı |
 | 8 HT / Pazar 1.5 | Var | — |
 | 9 Geç/erken | Var | Tolerans firma kararı |
@@ -269,9 +269,10 @@ Kaynak: masaüstü `puantaj resmi durum.docx` (toplantı mevzuat özeti).
 
 | Konu | Durum |
 | --- | --- |
-| Serbest zaman 6 ay kullanım vadesi | CODE_GAP (`110` MG-SZ-6M-001) — dönüşüm owner kapalı kalır |
-| Yıl değiştiren hafta / 270 saat yıl ataması | BUSINESS_DECISION_REQUIRED + path CODE_GAP (`110`) |
-| SGK 15–14 dönem | CONDITIONAL / BUSINESS_DECISION_REQUIRED — preview BLOCKER_ONLY |
+| Serbest zaman 6 aylık deadline compliance / ops follow-up | CODE_GAP (`110` MG-SZ-6M-001) — calc var; ops/compliance follow-up eksik |
+| Yıl değiştiren hafta FM politikası | BUSINESS_DECISION_REQUIRED (`110` MG-OT-YEAR-POL-001) |
+| Yıl değiştiren hafta FM path tutarlılığı | CODE_GAP (`110` MG-OT-YEAR-PATH-001) |
+| SGK 15–14 dönem | BUSINESS_DECISION_REQUIRED (`110` MG-SGK-1514-001); metadata CONDITIONAL_SCOPE; preview BLOCKER_ONLY |
 | FSC (%25) aktif bant | S87 ile kapalı (INTENTIONAL_DEFER) |
 | Zorunlu/olağanüstü çalışma istisna modeli | Bilinçli kapsam dışı / karar bekler |
 | Bordro PDF / banka dosyası / SGK bildirgesi çıktısı | FUTURE (kısmi CSV var) |

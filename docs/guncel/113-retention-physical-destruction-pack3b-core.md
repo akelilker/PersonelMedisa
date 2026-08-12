@@ -30,6 +30,7 @@
 | DECISION_05 | BORDRO | **B** — `personel_bordro_devirleri` out of scope |
 | DECISION_06 | SGK_EKSIK_GUN | **A** — nested SGK evidence only |
 | DECISION_07 | SGK header | **A** — keep `maas_hesaplama_donem_snapshotlari` unchanged |
+| DECISION_08 | PUANTAJ × payroll snapshot | **OPTION A** — snapshot-pinned seal/revision headers preserve; seal lines + daily PII destroy |
 
 Generic parent ONAY_AUDIT ve FAZLA_CALISMA / SERBEST_ZAMAN / DISIPLIN / RAPOR / IS_KAZASI bu Pack’te **çözülmedi**.
 
@@ -51,10 +52,35 @@ Canonical owners korunur: `PhysicalDestructionService`, registry, `DestructionHa
 
 ## Exact destroy scopes
 
-### PUANTAJ
-- Tüm `puantaj_aylik_muhurleri` (+ `_satirlari` CASCADE) for period
+### PUANTAJ (iki deterministic mode)
+
+Plan, `payroll_snapshot_pin_count` ve operation code ile mode’u açık gösterir.
+Evaluate→execute mode/pin drift → `DESTRUCTION_PLAN_CHANGED` (sessiz mode switch yok).
+
+#### Mode 1 — No payroll snapshot pin (`FULL_GRAPH_DELETE`)
+
+Operation: `PUANTAJ_FULL_REVISION_GRAPH_DELETE`
+
+- Tüm period `puantaj_aylik_muhurleri` (+ `_satirlari` CASCADE)
 - Period `gunluk_puantaj`
-- Period-linked `puantaj_donem_reopen_talepleri` (seal graph lifecycle)
+- Period-linked `puantaj_donem_reopen_talepleri` (seal DELETE için gerekli lifecycle)
+
+#### Mode 2 — Payroll snapshot pin (`SNAPSHOT_PINNED_EVIDENCE_HEADER_PRESERVE`)
+
+Operation: `PUANTAJ_SNAPSHOT_PINNED_SEAL_HEADERS_PRESERVE`
+
+Herhangi bir korunması gereken `maas_hesaplama_donem_snapshotlari.muhur_id` period seal graph üyesini pinliyorsa:
+
+**Korunan (evidence / FK bütünlüğü):**
+- `puantaj_aylik_muhurleri` header’ları (parent/superseded revision graph)
+- `maas_hesaplama_donem_snapshotlari` satırı ve `muhur_id` (NULL/mutate yok)
+- `puantaj_donem_reopen_talepleri` (header graph korunduğu için otomatik silinmez)
+
+**Fiziksel imha (policy-approved PII payload):**
+- Period `gunluk_puantaj`
+- Target seal graph `puantaj_aylik_muhur_satirlari`
+
+Source fingerprint = effective seal id + `created_at` (satır payload’a bağlı değil) → pinned execute sonrası idempotency / integrity bozulmaz; ikinci execute `ALREADY_EXECUTED` / mutation 0.
 
 ### BORDRO (run-leaf)
 - `maas_hesaplama_aday_kalemleri` → `maas_hesaplama_adaylari` → run-scoped `maas_hesaplama_auditleri` → `maas_hesaplama_calistirmalari`
@@ -73,7 +99,8 @@ Canonical owners korunur: `PhysicalDestructionService`, registry, `DestructionHa
 - `sgk_eksik_gun_belgeleri`, `personel_belge_*`, SGK catalogs/masters/policy/source manifests
 - Retention infra / archive manifests / imha talepleri / execution evidence
 - Typed `qr_puantaj_candidate_decision_ledger` (PUANTAJ asla silmez)
-- Owner-unclear RESTRICT children (etki aday/çakışma, payroll muhur FK, donem_kapanis) → **fail-closed**, auto-destroy yok
+- Owner-unclear RESTRICT children (etki aday/çakışma, donem_kapanis / snapshot-audit on full-delete path) → **fail-closed**, auto-destroy yok
+- Payroll snapshot pin → hard block değil; Mode 2 (header preserve)
 
 Fail-closed code: `PUANTAJ_BLOCKED_BY_QR_ONAY_AUDIT`
 
@@ -104,7 +131,7 @@ Migration **`060_retention_physical_destroy_trigger_gate.sql`** (additive; `059`
 | `npm run build` | PASS |
 | `git diff --check` | PASS |
 
-Pack 3B matrix covers: PUANTAJ success / full graph / daily delete / QR block / QR then success / payroll FK block / legal hold / plan hash / missing target / idempotency / unrelated period; BORDRO run-leaf / snapshot+SGK+devir preserve / direct DELETE blocked / child RESTRICT / idempotency; SGK nested delete / header preserve / run tree preserve / catalogs present / direct DELETE blocked / gated execute / hold / idempotency.
+Pack 3B matrix covers: PUANTAJ no-snapshot full graph / daily delete / QR block / QR then success / snapshot-pin effective + historical header preserve / lines+daily delete / snapshot+muhur_id unchanged / graph integrity / pinned+QR block then ONAY_AUDIT retry / pin mid-flight fail-closed / pinned idempotency / legal hold / plan hash / missing target / unrelated period; BORDRO run-leaf / snapshot+SGK+devir preserve / direct DELETE blocked / child RESTRICT / idempotency; SGK nested delete / header preserve / run tree preserve / catalogs present / direct DELETE blocked / gated execute / hold / idempotency.
 
 ---
 

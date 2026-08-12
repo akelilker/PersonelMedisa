@@ -626,29 +626,282 @@ try {
     );
     $passCount++;
 
-    // Payroll muhur FK unresolved → block (no auto destroy snapshot)
-    $blocked = p3bSeedBordroTree($pdo, 2011, 6, false, false);
-    ArchiveManifestService::createPuantajPeriodManifests($pdo, 1, 2011, 6, (int) $blocked['seal_id'], 1);
-    $apBlocked = p3bApprove($pdo, RetentionCategories::PUANTAJ, 'puantaj', (int) $blocked['seal_id'], 2011, 6);
-    $evalBlocked = PhysicalDestructionService::evaluate($pdo, p3bGm(), (int) $apBlocked['id']);
+    // ========== PUANTAJ snapshot-pin follow-up (OPTION A) ==========
+    // Payroll snapshot pins effective seal → headers preserved; lines + daily deleted
+    $pinned = p3bSeedBordroTree($pdo, 2011, 6, false, false);
+    // Attach daily + seal lines to the bordro-owned seal period
+    $dayPinned = '2011-06-15';
+    $pdo->exec(
+        "INSERT INTO gunluk_puantaj (personel_id, tarih, state, kontrol_durumu, muhur_id)
+         VALUES (10, '{$dayPinned}', 'MUHURLENDI', 'BEKLIYOR', " . (int) $pinned['seal_id'] . ")"
+    );
+    $pinnedDailyId = (int) $pdo->lastInsertId();
+    $pdo->exec(
+        "INSERT INTO puantaj_aylik_muhur_satirlari (muhur_id, personel_id, tarih, kontrol_durumu)
+         VALUES (" . (int) $pinned['seal_id'] . ", 10, '{$dayPinned}', 'BEKLIYOR')"
+    );
+    ArchiveManifestService::createPuantajPeriodManifests($pdo, 1, 2011, 6, (int) $pinned['seal_id'], 1);
+    $snapMuhurBefore = (int) $pdo->query(
+        'SELECT muhur_id FROM maas_hesaplama_donem_snapshotlari WHERE id=' . (int) $pinned['snapshot_id']
+    )->fetchColumn();
+    $apPinned = p3bApprove($pdo, RetentionCategories::PUANTAJ, 'puantaj', (int) $pinned['seal_id'], 2011, 6);
+    $evalPinned = PhysicalDestructionService::evaluate($pdo, p3bGm(), (int) $apPinned['id']);
+    p3bAssert(
+        in_array('PUANTAJ_SNAPSHOT_PINNED_SEAL_HEADERS_PRESERVE', $evalPinned['plan']['db_operation_codes'] ?? [], true),
+        'PUANTAJ pinned plan mode code'
+    );
+    $passCount++;
+    $resPinned = p3bEvalExecute($pdo, (int) $apPinned['id']);
+    p3bAssert(
+        ($resPinned['execution']['code'] ?? '') === PhysicalDestructionCodes::CODE_DESTRUCTION_EXECUTED,
+        'PUANTAJ snapshot-pinned execute success'
+    );
+    $passCount++;
+    p3bAssert(
+        (int) $pdo->query('SELECT COUNT(*) FROM puantaj_aylik_muhurleri WHERE id=' . (int) $pinned['seal_id'])->fetchColumn() === 1,
+        'PUANTAJ seal headers preserved when pinned'
+    );
+    $passCount++;
+    p3bAssert(
+        (int) $pdo->query(
+            'SELECT COUNT(*) FROM puantaj_aylik_muhur_satirlari WHERE muhur_id=' . (int) $pinned['seal_id']
+        )->fetchColumn() === 0,
+        'PUANTAJ seal lines deleted when pinned'
+    );
+    $passCount++;
+    p3bAssert(
+        (int) $pdo->query('SELECT COUNT(*) FROM gunluk_puantaj WHERE id=' . $pinnedDailyId)->fetchColumn() === 0,
+        'PUANTAJ daily deleted when pinned'
+    );
+    $passCount++;
+    p3bAssert(
+        (int) $pdo->query(
+            'SELECT COUNT(*) FROM maas_hesaplama_donem_snapshotlari WHERE id=' . (int) $pinned['snapshot_id']
+        )->fetchColumn() === 1,
+        'PUANTAJ snapshot row preserved when pinned'
+    );
+    $passCount++;
+    $snapMuhurAfter = (int) $pdo->query(
+        'SELECT muhur_id FROM maas_hesaplama_donem_snapshotlari WHERE id=' . (int) $pinned['snapshot_id']
+    )->fetchColumn();
+    p3bAssert($snapMuhurBefore === $snapMuhurAfter, 'PUANTAJ snapshot.muhur_id unchanged');
+    $passCount++;
+
+    // Idempotency after header preserve
+    $againPinned = PhysicalDestructionService::execute($pdo, p3bGm(), (int) $apPinned['id'], [
+        'expected_plan_hash' => (string) ($resPinned['plan']['plan_hash'] ?? p3bHash()),
+        'execution_nonce' => p3bNonce(),
+        'confirmation' => PhysicalDestructionCodes::CONFIRMATION_TOKEN,
+    ]);
+    p3bAssert(
+        ($againPinned['execution']['code'] ?? '') === PhysicalDestructionCodes::CODE_ALREADY_EXECUTED
+            && (int) ($againPinned['execution']['execution_id'] ?? 0) === (int) ($resPinned['execution']['execution_id'] ?? -1)
+            && (int) ($againPinned['execution']['mutation_count'] ?? 0) === 0,
+        'PUANTAJ pinned ALREADY_EXECUTED same id mutation 0'
+    );
+    $passCount++;
+
+    // Historical revision member pin → full header graph preserved
+    $hist = p3bSeedPuantajPeriod($pdo, 2011, 9, true);
+    $oldSeal = (int) $hist['seal_ids'][0];
+    $effSeal = (int) $hist['seal_ids'][1];
+    $parentBefore = $pdo->query(
+        'SELECT parent_muhur_id, superseded_by_id FROM puantaj_aylik_muhurleri WHERE id=' . $oldSeal
+    )->fetch(PDO::FETCH_ASSOC);
+    $h = p3bHash();
+    $pdo->exec(
+        "INSERT INTO maas_hesaplama_donem_snapshotlari (
+            sube_id, yil, ay, donem, donem_baslangic, donem_bitis, muhur_id, revision_no,
+            state, cutoff_at, preflight_hash, source_hash, snapshot_hash,
+            personel_sayisi, girdi_sayisi, created_by
+         ) VALUES (
+            1, 2011, 9, '2011-09', '2011-09-01', '2011-09-30', {$oldSeal}, 1,
+            'OLUSTURULDU', '2011-09-28 12:00:00', '{$h}', '{$h}', '{$h}',
+            1, 0, 1
+         )"
+    );
+    $histSnapId = (int) $pdo->lastInsertId();
+    $apHist = p3bApprove($pdo, RetentionCategories::PUANTAJ, 'puantaj', $effSeal, 2011, 9);
+    $resHist = p3bEvalExecute($pdo, (int) $apHist['id']);
+    p3bAssert(
+        ($resHist['execution']['code'] ?? '') === PhysicalDestructionCodes::CODE_DESTRUCTION_EXECUTED,
+        'PUANTAJ historical-pin execute success'
+    );
+    $passCount++;
+    $headersLeft = (int) $pdo->query(
+        'SELECT COUNT(*) FROM puantaj_aylik_muhurleri WHERE sube_id=1 AND yil=2011 AND ay=9'
+    )->fetchColumn();
+    p3bAssert($headersLeft === 2, 'PUANTAJ full header graph preserved when historical pin');
+    $passCount++;
+    $parentAfter = $pdo->query(
+        'SELECT parent_muhur_id, superseded_by_id FROM puantaj_aylik_muhurleri WHERE id=' . $oldSeal
+    )->fetch(PDO::FETCH_ASSOC);
+    p3bAssert(
+        (string) ($parentBefore['parent_muhur_id'] ?? '') === (string) ($parentAfter['parent_muhur_id'] ?? '')
+            && (string) ($parentBefore['superseded_by_id'] ?? '') === (string) ($parentAfter['superseded_by_id'] ?? ''),
+        'PUANTAJ parent/superseded graph unchanged when pinned'
+    );
+    $passCount++;
+    p3bAssert(
+        (int) $pdo->query(
+            'SELECT COUNT(*) FROM puantaj_aylik_muhur_satirlari WHERE muhur_id IN (' . $oldSeal . ',' . $effSeal . ')'
+        )->fetchColumn() === 0,
+        'PUANTAJ historical-pin seal lines deleted'
+    );
+    $passCount++;
+    p3bAssert(
+        (int) $pdo->query('SELECT muhur_id FROM maas_hesaplama_donem_snapshotlari WHERE id=' . $histSnapId)->fetchColumn() === $oldSeal,
+        'PUANTAJ historical snapshot.muhur_id unchanged'
+    );
+    $passCount++;
+
+    // Snapshot pinned + QR ledger → block; after ONAY_AUDIT → pinned success
+    $pinQr = p3bSeedBordroTree($pdo, 2011, 10, false, false);
+    $pdo->exec(
+        "INSERT INTO gunluk_puantaj (personel_id, tarih, state, kontrol_durumu, muhur_id)
+         VALUES (10, '2011-10-15', 'MUHURLENDI', 'BEKLIYOR', " . (int) $pinQr['seal_id'] . ")"
+    );
+    $pinQrDaily = (int) $pdo->lastInsertId();
+    $pdo->exec(
+        "INSERT INTO puantaj_aylik_muhur_satirlari (muhur_id, personel_id, tarih, kontrol_durumu)
+         VALUES (" . (int) $pinQr['seal_id'] . ", 10, '2011-10-15', 'BEKLIYOR')"
+    );
+    ArchiveManifestService::createPuantajPeriodManifests($pdo, 1, 2011, 10, (int) $pinQr['seal_id'], 1);
+    $ledgerRow2 = [
+        'personel_id' => 10,
+        'sube_id' => 1,
+        'candidate_date' => '2011-10-15',
+        'candidate_hash' => p3bHash(),
+        'decision_type' => 'KEEP_CANONICAL',
+        'decision_reason' => 'synthetic pinned',
+        'puantaj_id' => $pinQrDaily,
+        'algorithm_version' => 'QR_PUANTAJ_CANDIDATE_V1',
+        'interval_algorithm_version' => 'QR_INTERVAL_V1',
+        'decision_algorithm_version' => 'QR_PUANTAJ_DECISION_V1',
+        'candidate_snapshot' => '{}',
+        'before_puantaj_snapshot' => null,
+        'after_puantaj_snapshot' => null,
+        'decided_by_user_id' => 1,
+        'request_nonce' => '22222222-2222-4222-8222-222222222222',
+        'supersedes_decision_id' => null,
+        'previous_decision_hash' => null,
+        'created_at' => '2011-10-16 10:00:00.000000',
+    ];
+    $ledgerRow2['decision_hash'] = QrPuantajCandidateDecisionLedgerService::computeDecisionHash($ledgerRow2);
+    $pdo->exec(
+        "INSERT INTO qr_puantaj_candidate_decision_ledger (
+            personel_id, sube_id, candidate_date, candidate_hash, decision_type, decision_reason,
+            puantaj_id, algorithm_version, interval_algorithm_version, decision_algorithm_version,
+            candidate_snapshot, decided_by_user_id, request_nonce, decision_hash, created_at
+         ) VALUES (
+            10, 1, '2011-10-15', " . $pdo->quote($ledgerRow2['candidate_hash']) . ", 'KEEP_CANONICAL', 'synthetic pinned',
+            {$pinQrDaily}, 'QR_PUANTAJ_CANDIDATE_V1', 'QR_INTERVAL_V1', 'QR_PUANTAJ_DECISION_V1',
+            '{}', 1, '22222222-2222-4222-8222-222222222222', " . $pdo->quote($ledgerRow2['decision_hash']) . ",
+            '2011-10-16 10:00:00.000000'
+         )"
+    );
+    $pinQrLedgerId = (int) $pdo->lastInsertId();
+    ArchiveManifestService::createQrPuantajDecisionOnayAuditManifest($pdo, [
+        'id' => $pinQrLedgerId,
+        'personel_id' => 10,
+        'sube_id' => 1,
+        'candidate_date' => '2011-10-15',
+    ], 1);
+    $apPinQr = p3bApprove($pdo, RetentionCategories::PUANTAJ, 'puantaj', (int) $pinQr['seal_id'], 2011, 10);
+    $evalPinQr = PhysicalDestructionService::evaluate($pdo, p3bGm(), (int) $apPinQr['id']);
     try {
-        PhysicalDestructionService::execute($pdo, p3bGm(), (int) $apBlocked['id'], [
-            'expected_plan_hash' => (string) $evalBlocked['plan']['plan_hash'],
+        PhysicalDestructionService::execute($pdo, p3bGm(), (int) $apPinQr['id'], [
+            'expected_plan_hash' => (string) $evalPinQr['plan']['plan_hash'],
             'execution_nonce' => p3bNonce(),
             'confirmation' => PhysicalDestructionCodes::CONFIRMATION_TOKEN,
         ]);
-        p3bAssert(false, 'PUANTAJ should block on payroll muhur FK');
+        p3bAssert(false, 'PUANTAJ pinned+QR should block');
     } catch (RuntimeException $e) {
         p3bAssert(
-            $e->getMessage() === PhysicalDestructionCodes::CODE_DEPENDENT_RETENTION_RECORDS_REMAIN,
-            'PUANTAJ payroll snapshot FK blocks'
+            $e->getMessage() === PhysicalDestructionCodes::CODE_PUANTAJ_BLOCKED_BY_QR_ONAY_AUDIT,
+            'PUANTAJ pinned QR ledger blocks'
         );
         $passCount++;
     }
-    $snapStill = (int) $pdo->query(
-        'SELECT COUNT(*) FROM maas_hesaplama_donem_snapshotlari WHERE id=' . (int) $blocked['snapshot_id']
+    $reqPinLedger = DestructionWorkflowService::requestDestruction($pdo, p3bGm(), [
+        'category' => RetentionCategories::ONAY_AUDIT,
+        'entity_type' => 'qr_pc_decision',
+        'record_id' => $pinQrLedgerId,
+        'personel_id' => 10,
+        'reason' => 'Pack3B pinned QR first',
+    ]);
+    $apPinLedger = DestructionWorkflowService::approveDestruction(
+        $pdo,
+        p3bGm(),
+        (int) $reqPinLedger['item']['id'],
+        'GM',
+        true
+    );
+    p3bEvalExecute($pdo, (int) $apPinLedger['id']);
+    $resPinQrAfter = p3bEvalExecute($pdo, (int) $apPinQr['id']);
+    p3bAssert(
+        ($resPinQrAfter['execution']['code'] ?? '') === PhysicalDestructionCodes::CODE_DESTRUCTION_EXECUTED
+            && in_array(
+                'PUANTAJ_SNAPSHOT_PINNED_SEAL_HEADERS_PRESERVE',
+                $resPinQrAfter['plan']['db_operation_codes'] ?? [],
+                true
+            ),
+        'PUANTAJ pinned succeeds after ONAY_AUDIT'
+    );
+    $passCount++;
+
+    // Pin added between evaluate and execute → DESTRUCTION_PLAN_CHANGED
+    $flip = p3bSeedPuantajPeriod($pdo, 2011, 11, false);
+    $apFlip = p3bApprove($pdo, RetentionCategories::PUANTAJ, 'puantaj', (int) $flip['seal_ids'][0], 2011, 11);
+    $evalFlip = PhysicalDestructionService::evaluate($pdo, p3bGm(), (int) $apFlip['id']);
+    p3bAssert(
+        in_array('PUANTAJ_FULL_REVISION_GRAPH_DELETE', $evalFlip['plan']['db_operation_codes'] ?? [], true),
+        'PUANTAJ flip starts full-delete mode'
+    );
+    $passCount++;
+    $h2 = p3bHash();
+    $pdo->exec(
+        "INSERT INTO maas_hesaplama_donem_snapshotlari (
+            sube_id, yil, ay, donem, donem_baslangic, donem_bitis, muhur_id, revision_no,
+            state, cutoff_at, preflight_hash, source_hash, snapshot_hash,
+            personel_sayisi, girdi_sayisi, created_by
+         ) VALUES (
+            1, 2011, 11, '2011-11', '2011-11-01', '2011-11-30', " . (int) $flip['seal_ids'][0] . ", 1,
+            'OLUSTURULDU', '2011-11-28 12:00:00', '{$h2}', '{$h2}', '{$h2}',
+            0, 0, 1
+         )"
+    );
+    try {
+        PhysicalDestructionService::execute($pdo, p3bGm(), (int) $apFlip['id'], [
+            'expected_plan_hash' => (string) $evalFlip['plan']['plan_hash'],
+            'execution_nonce' => p3bNonce(),
+            'confirmation' => PhysicalDestructionCodes::CONFIRMATION_TOKEN,
+        ]);
+        p3bAssert(false, 'PUANTAJ mode flip should fail-closed');
+    } catch (RuntimeException $e) {
+        p3bAssert(
+            in_array($e->getMessage(), [
+                PhysicalDestructionCodes::CODE_DESTRUCTION_PLAN_CHANGED,
+                RetentionPolicyService::CODE_ARCHIVE_SOURCE_INTEGRITY_CHANGED,
+                RetentionPolicyService::CODE_SOURCE_CONTEXT_CHANGED,
+            ], true),
+            'PUANTAJ pin added mid-flight fail-closed (' . $e->getMessage() . ')'
+        );
+        $passCount++;
+    }
+    p3bAssert(
+        (int) $pdo->query(
+            'SELECT COUNT(*) FROM puantaj_aylik_muhurleri WHERE id=' . (int) $flip['seal_ids'][0]
+        )->fetchColumn() === 1,
+        'PUANTAJ flip failed without seal delete'
+    );
+    $passCount++;
+
+    // Unrelated month unchanged after pinned destroys
+    $unrel = (int) $pdo->query(
+        'SELECT COUNT(*) FROM puantaj_aylik_muhurleri WHERE sube_id=1 AND yil=2011 AND ay=4'
     )->fetchColumn();
-    p3bAssert($snapStill === 1, 'PUANTAJ did not auto-destroy payroll snapshot');
+    p3bAssert($unrel === 1, 'PUANTAJ unrelated month still intact after pinned runs');
     $passCount++;
 
     // Legal hold / plan hash / target missing for a clean PUANTAJ period 2011-7

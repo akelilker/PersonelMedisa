@@ -11,15 +11,23 @@ use PDO;
 use RuntimeException;
 
 /**
- * PUANTAJ (Pack 3B):
+ * PUANTAJ (Pack 3B + snapshot-pin follow-up):
  * - DECISION_01 OPTION B: full muhur revision graph for (sube, yil, ay)
  * - DECISION_02 OPTION A: hard-delete period gunluk_puantaj after dependents cleared
  * - DECISION_03 OPTION C: QR ledger RESTRICT → fail-closed (do not delete ledger)
+ * - PUANTAJ × PAYROLL SNAPSHOT OPTION A:
+ *   - no pin → FULL_GRAPH_DELETE
+ *   - pin via maas_hesaplama_donem_snapshotlari.muhur_id → preserve seal/revision headers;
+ *     delete only seal lines + gunluk_puantaj
  *
- * Never auto-destroys owner-unclear RESTRICT children (etki, payroll snapshot, donem_kapanis).
+ * Never auto-destroys owner-unclear RESTRICT children (etki, donem_kapanis).
+ * Never mutates payroll snapshots or snapshot.muhur_id.
  */
 final class PuantajDestructionHandler implements DestructionHandlerInterface
 {
+    public const MODE_FULL_GRAPH_DELETE = 'FULL_GRAPH_DELETE';
+    public const MODE_SNAPSHOT_PINNED_EVIDENCE_HEADER_PRESERVE = 'SNAPSHOT_PINNED_EVIDENCE_HEADER_PRESERVE';
+
     public function category()
     {
         return RetentionCategories::PUANTAJ;
@@ -39,18 +47,31 @@ final class PuantajDestructionHandler implements DestructionHandlerInterface
     {
         $period = $this->period($talep, $context);
         $scope = $this->resolveScope($pdo, $period);
+        $mode = $this->destructionMode($scope);
+
+        $codes = [
+            $mode === self::MODE_SNAPSHOT_PINNED_EVIDENCE_HEADER_PRESERVE
+                ? 'PUANTAJ_SNAPSHOT_PINNED_SEAL_HEADERS_PRESERVE'
+                : 'PUANTAJ_FULL_REVISION_GRAPH_DELETE',
+            'PUANTAJ_SEAL_LINES_DELETE',
+            'PUANTAJ_GUNLUK_HARD_DELETE',
+            'PUANTAJ_QR_LEDGER_BLOCK_IF_PRESENT',
+        ];
 
         return [
-            'db_operation_codes' => [
-                'PUANTAJ_FULL_REVISION_GRAPH_DELETE',
-                'PUANTAJ_GUNLUK_HARD_DELETE',
-                'PUANTAJ_QR_LEDGER_BLOCK_IF_PRESENT',
-            ],
+            'db_operation_codes' => $codes,
             'expected_row_counts' => [
+                'destruction_mode' => $mode === self::MODE_SNAPSHOT_PINNED_EVIDENCE_HEADER_PRESERVE ? 1 : 0,
                 'puantaj_aylik_muhurleri' => count($scope['seal_ids']),
+                'puantaj_aylik_muhurleri_delete' => $mode === self::MODE_FULL_GRAPH_DELETE
+                    ? count($scope['seal_ids'])
+                    : 0,
                 'puantaj_aylik_muhur_satirlari' => $scope['satir_count'],
                 'gunluk_puantaj' => count($scope['daily_ids']),
-                'puantaj_donem_reopen_talepleri' => $scope['reopen_talep_count'],
+                'puantaj_donem_reopen_talepleri' => $mode === self::MODE_FULL_GRAPH_DELETE
+                    ? $scope['reopen_talep_count']
+                    : 0,
+                'payroll_snapshot_pin_count' => $scope['payroll_snapshot_pin_count'],
                 'qr_puantaj_candidate_decision_ledger_blocking' => $scope['qr_blocking_count'],
             ],
             'external_file_count' => 0,
@@ -73,14 +94,10 @@ final class PuantajDestructionHandler implements DestructionHandlerInterface
             throw new RuntimeException(PhysicalDestructionCodes::CODE_TARGET_ALREADY_MISSING);
         }
 
-        $expectedSeals = isset($plan['expected_row_counts']['puantaj_aylik_muhurleri'])
-            ? (int) $plan['expected_row_counts']['puantaj_aylik_muhurleri']
-            : -1;
-        if ($expectedSeals >= 0 && count($scope['seal_ids']) !== $expectedSeals) {
-            throw new RuntimeException(PhysicalDestructionCodes::CODE_DESTRUCTION_PLAN_CHANGED);
-        }
+        $mode = $this->destructionMode($scope);
+        $this->assertPlanModeMatches($plan, $mode, $scope);
 
-        $blocker = $this->dependencyBlocker($pdo, $scope);
+        $blocker = $this->dependencyBlocker($pdo, $scope, $mode);
         if ($blocker === PhysicalDestructionCodes::CODE_PUANTAJ_BLOCKED_BY_QR_ONAY_AUDIT) {
             throw new RuntimeException(PhysicalDestructionCodes::CODE_PUANTAJ_BLOCKED_BY_QR_ONAY_AUDIT);
         }
@@ -88,6 +105,104 @@ final class PuantajDestructionHandler implements DestructionHandlerInterface
             throw new RuntimeException(PhysicalDestructionCodes::CODE_DEPENDENT_RETENTION_RECORDS_REMAIN);
         }
 
+        if ($mode === self::MODE_SNAPSHOT_PINNED_EVIDENCE_HEADER_PRESERVE) {
+            return $this->executePinnedPreserve($pdo, $period, $scope);
+        }
+
+        return $this->executeFullGraphDelete($pdo, $period, $scope);
+    }
+
+    /**
+     * @param array{sube_id:int,yil:int,ay:int} $period
+     * @param array<string, mixed> $scope
+     * @return array{result_code: string, summary: array<string, mixed>}
+     */
+    private function executePinnedPreserve(PDO $pdo, array $period, array $scope)
+    {
+        $deleted = [
+            'gunluk_puantaj' => 0,
+            'puantaj_aylik_muhur_satirlari' => 0,
+            'puantaj_aylik_muhurleri' => 0,
+            'puantaj_donem_reopen_talepleri' => 0,
+        ];
+
+        if (count($scope['daily_ids']) === 0 && (int) $scope['satir_count'] === 0) {
+            throw new RuntimeException(PhysicalDestructionCodes::CODE_TARGET_ALREADY_MISSING);
+        }
+
+        // Snapshot pin identity snapshot (must remain unchanged).
+        $pinBefore = $this->loadPinRows($pdo, $scope['seal_ids']);
+
+        // 1) Hard-delete period daily rows.
+        if (count($scope['daily_ids']) > 0) {
+            $placeholders = implode(',', array_fill(0, count($scope['daily_ids']), '?'));
+            $delDaily = $pdo->prepare("DELETE FROM gunluk_puantaj WHERE id IN ({$placeholders})");
+            $delDaily->execute($scope['daily_ids']);
+            $deleted['gunluk_puantaj'] = (int) $delDaily->rowCount();
+        }
+
+        // 2) Delete personal seal-line payload only — headers / revision graph stay.
+        $placeholders = implode(',', array_fill(0, count($scope['seal_ids']), '?'));
+        if ($this->tableExists($pdo, 'puantaj_aylik_muhur_satirlari')) {
+            $delLines = $pdo->prepare(
+                "DELETE FROM puantaj_aylik_muhur_satirlari WHERE muhur_id IN ({$placeholders})"
+            );
+            $delLines->execute($scope['seal_ids']);
+            $deleted['puantaj_aylik_muhur_satirlari'] = (int) $delLines->rowCount();
+        }
+
+        // Headers unchanged.
+        $c = $pdo->prepare(
+            "SELECT COUNT(*) FROM puantaj_aylik_muhurleri WHERE id IN ({$placeholders})"
+        );
+        $c->execute($scope['seal_ids']);
+        if ((int) $c->fetchColumn() !== count($scope['seal_ids'])) {
+            throw new RuntimeException('DESTRUCTION_HANDLER_INCOMPLETE');
+        }
+
+        $graph = $this->loadSealGraphLinks($pdo, $scope['seal_ids']);
+        foreach ($scope['seal_graph_links'] as $sealId => $links) {
+            if (!isset($graph[$sealId])
+                || $graph[$sealId]['parent_muhur_id'] !== $links['parent_muhur_id']
+                || $graph[$sealId]['superseded_by_id'] !== $links['superseded_by_id']
+            ) {
+                throw new RuntimeException('PUANTAJ_REVISION_GRAPH_MUTATED');
+            }
+        }
+
+        $pinAfter = $this->loadPinRows($pdo, $scope['seal_ids']);
+        if ($pinAfter !== $pinBefore) {
+            throw new RuntimeException('PAYROLL_SNAPSHOT_PIN_MUTATED');
+        }
+
+        return [
+            'result_code' => PhysicalDestructionCodes::CODE_DESTRUCTION_EXECUTED,
+            'summary' => [
+                'rows_deleted' => $deleted,
+                'files_deleted' => 0,
+                'destruction_mode' => self::MODE_SNAPSHOT_PINNED_EVIDENCE_HEADER_PRESERVE,
+                'preserved' => [
+                    'puantaj_aylik_muhurleri' => true,
+                    'revision_graph' => true,
+                    'maas_hesaplama_donem_snapshotlari' => true,
+                    'puantaj_donem_reopen_talepleri' => true,
+                ],
+                'period' => [
+                    'sube_id' => $period['sube_id'],
+                    'yil' => $period['yil'],
+                    'ay' => $period['ay'],
+                ],
+            ],
+        ];
+    }
+
+    /**
+     * @param array{sube_id:int,yil:int,ay:int} $period
+     * @param array<string, mixed> $scope
+     * @return array{result_code: string, summary: array<string, mixed>}
+     */
+    private function executeFullGraphDelete(PDO $pdo, array $period, array $scope)
+    {
         $deleted = [
             'gunluk_puantaj' => 0,
             'puantaj_donem_reopen_talepleri' => 0,
@@ -103,7 +218,7 @@ final class PuantajDestructionHandler implements DestructionHandlerInterface
             $deleted['gunluk_puantaj'] = (int) $delDaily->rowCount();
         }
 
-        // 2) Clear seal → reopen talep pointer, then delete period reopen tales.
+        // 2) Clear seal → reopen talep pointer, then delete period reopen tales (required for seal DELETE).
         if ($this->columnExists($pdo, 'puantaj_aylik_muhurleri', 'reopen_talep_id')) {
             $placeholders = implode(',', array_fill(0, count($scope['seal_ids']), '?'));
             $pdo->prepare(
@@ -157,6 +272,7 @@ final class PuantajDestructionHandler implements DestructionHandlerInterface
             'summary' => [
                 'rows_deleted' => $deleted,
                 'files_deleted' => 0,
+                'destruction_mode' => self::MODE_FULL_GRAPH_DELETE,
                 'period' => [
                     'sube_id' => $period['sube_id'],
                     'yil' => $period['yil'],
@@ -187,7 +303,9 @@ final class PuantajDestructionHandler implements DestructionHandlerInterface
      *   daily_ids:list<int>,
      *   satir_count:int,
      *   reopen_talep_count:int,
-     *   qr_blocking_count:int
+     *   qr_blocking_count:int,
+     *   payroll_snapshot_pin_count:int,
+     *   seal_graph_links:array<int, array{parent_muhur_id: ?int, superseded_by_id: ?int}>
      * }
      */
     private function resolveScope(PDO $pdo, array $period)
@@ -273,20 +391,98 @@ final class PuantajDestructionHandler implements DestructionHandlerInterface
             $qrBlocking = (int) $c->fetchColumn();
         }
 
+        $pinCount = 0;
+        if (count($sealIds) > 0 && $this->tableExists($pdo, 'maas_hesaplama_donem_snapshotlari')) {
+            $placeholders = implode(',', array_fill(0, count($sealIds), '?'));
+            $c = $pdo->prepare(
+                "SELECT COUNT(*) FROM maas_hesaplama_donem_snapshotlari
+                 WHERE muhur_id IN ({$placeholders})"
+            );
+            $c->execute($sealIds);
+            $pinCount = (int) $c->fetchColumn();
+        }
+
         return [
             'seal_ids' => $sealIds,
             'daily_ids' => $dailyIds,
             'satir_count' => $satirCount,
             'reopen_talep_count' => $reopenCount,
             'qr_blocking_count' => $qrBlocking,
+            'payroll_snapshot_pin_count' => $pinCount,
+            'seal_graph_links' => $this->loadSealGraphLinks($pdo, $sealIds),
         ];
+    }
+
+    /**
+     * @param array<string, mixed> $scope
+     */
+    private function destructionMode(array $scope)
+    {
+        return ((int) ($scope['payroll_snapshot_pin_count'] ?? 0) > 0)
+            ? self::MODE_SNAPSHOT_PINNED_EVIDENCE_HEADER_PRESERVE
+            : self::MODE_FULL_GRAPH_DELETE;
+    }
+
+    /**
+     * @param array<string, mixed> $plan
+     * @param array<string, mixed> $scope
+     */
+    private function assertPlanModeMatches(array $plan, $mode, array $scope)
+    {
+        $codes = isset($plan['db_operation_codes']) && is_array($plan['db_operation_codes'])
+            ? $plan['db_operation_codes']
+            : [];
+        $plannedPinned = in_array('PUANTAJ_SNAPSHOT_PINNED_SEAL_HEADERS_PRESERVE', $codes, true);
+        $plannedFull = in_array('PUANTAJ_FULL_REVISION_GRAPH_DELETE', $codes, true);
+        if ($mode === self::MODE_SNAPSHOT_PINNED_EVIDENCE_HEADER_PRESERVE && !$plannedPinned) {
+            throw new RuntimeException(PhysicalDestructionCodes::CODE_DESTRUCTION_PLAN_CHANGED);
+        }
+        if ($mode === self::MODE_FULL_GRAPH_DELETE && !$plannedFull) {
+            throw new RuntimeException(PhysicalDestructionCodes::CODE_DESTRUCTION_PLAN_CHANGED);
+        }
+
+        $expectedModeFlag = isset($plan['expected_row_counts']['destruction_mode'])
+            ? (int) $plan['expected_row_counts']['destruction_mode']
+            : -1;
+        $actualModeFlag = $mode === self::MODE_SNAPSHOT_PINNED_EVIDENCE_HEADER_PRESERVE ? 1 : 0;
+        if ($expectedModeFlag >= 0 && $expectedModeFlag !== $actualModeFlag) {
+            throw new RuntimeException(PhysicalDestructionCodes::CODE_DESTRUCTION_PLAN_CHANGED);
+        }
+
+        $expectedPins = isset($plan['expected_row_counts']['payroll_snapshot_pin_count'])
+            ? (int) $plan['expected_row_counts']['payroll_snapshot_pin_count']
+            : -1;
+        if ($expectedPins >= 0 && $expectedPins !== (int) $scope['payroll_snapshot_pin_count']) {
+            throw new RuntimeException(PhysicalDestructionCodes::CODE_DESTRUCTION_PLAN_CHANGED);
+        }
+
+        $expectedSeals = isset($plan['expected_row_counts']['puantaj_aylik_muhurleri'])
+            ? (int) $plan['expected_row_counts']['puantaj_aylik_muhurleri']
+            : -1;
+        if ($expectedSeals >= 0 && $expectedSeals !== count($scope['seal_ids'])) {
+            throw new RuntimeException(PhysicalDestructionCodes::CODE_DESTRUCTION_PLAN_CHANGED);
+        }
+
+        $expectedLines = isset($plan['expected_row_counts']['puantaj_aylik_muhur_satirlari'])
+            ? (int) $plan['expected_row_counts']['puantaj_aylik_muhur_satirlari']
+            : -1;
+        if ($expectedLines >= 0 && $expectedLines !== (int) $scope['satir_count']) {
+            throw new RuntimeException(PhysicalDestructionCodes::CODE_DESTRUCTION_PLAN_CHANGED);
+        }
+
+        $expectedDaily = isset($plan['expected_row_counts']['gunluk_puantaj'])
+            ? (int) $plan['expected_row_counts']['gunluk_puantaj']
+            : -1;
+        if ($expectedDaily >= 0 && $expectedDaily !== count($scope['daily_ids'])) {
+            throw new RuntimeException(PhysicalDestructionCodes::CODE_DESTRUCTION_PLAN_CHANGED);
+        }
     }
 
     /**
      * @param array<string, mixed> $scope
      * @return string|null
      */
-    private function dependencyBlocker(PDO $pdo, array $scope)
+    private function dependencyBlocker(PDO $pdo, array $scope, $mode)
     {
         if ((int) ($scope['qr_blocking_count'] ?? 0) > 0) {
             return PhysicalDestructionCodes::CODE_PUANTAJ_BLOCKED_BY_QR_ONAY_AUDIT;
@@ -299,13 +495,12 @@ final class PuantajDestructionHandler implements DestructionHandlerInterface
             $placeholders = implode(',', array_fill(0, count($dailyIds), '?'));
 
             if ($this->tableExists($pdo, 'onayli_bildirim_puantaj_etki_adaylari')) {
-                $c = $pdo->prepare(
-                    "SELECT COUNT(*) FROM onayli_bildirim_puantaj_etki_adaylari
-                     WHERE mevcut_puantaj_id IN ({$placeholders})
-                        OR uygulanan_puantaj_id IN ({$placeholders})"
-                );
-                // uygulanan_puantaj_id may not exist on older schemas — detect columns.
                 if ($this->columnExists($pdo, 'onayli_bildirim_puantaj_etki_adaylari', 'uygulanan_puantaj_id')) {
+                    $c = $pdo->prepare(
+                        "SELECT COUNT(*) FROM onayli_bildirim_puantaj_etki_adaylari
+                         WHERE mevcut_puantaj_id IN ({$placeholders})
+                            OR uygulanan_puantaj_id IN ({$placeholders})"
+                    );
                     $c->execute(array_merge($dailyIds, $dailyIds));
                 } else {
                     $c = $pdo->prepare(
@@ -331,19 +526,9 @@ final class PuantajDestructionHandler implements DestructionHandlerInterface
             }
         }
 
-        if (count($sealIds) > 0) {
+        // Payroll snapshot pin is a MODE switch, not a hard block.
+        if ($mode === self::MODE_FULL_GRAPH_DELETE && count($sealIds) > 0) {
             $placeholders = implode(',', array_fill(0, count($sealIds), '?'));
-
-            if ($this->tableExists($pdo, 'maas_hesaplama_donem_snapshotlari')) {
-                $c = $pdo->prepare(
-                    "SELECT COUNT(*) FROM maas_hesaplama_donem_snapshotlari
-                     WHERE muhur_id IN ({$placeholders})"
-                );
-                $c->execute($sealIds);
-                if ((int) $c->fetchColumn() > 0) {
-                    return PhysicalDestructionCodes::CODE_DEPENDENT_RETENTION_RECORDS_REMAIN;
-                }
-            }
 
             if ($this->tableExists($pdo, 'donem_kapanis_auditleri')) {
                 $c = $pdo->prepare(
@@ -371,6 +556,65 @@ final class PuantajDestructionHandler implements DestructionHandlerInterface
         }
 
         return null;
+    }
+
+    /**
+     * @param list<int> $sealIds
+     * @return array<int, array{parent_muhur_id: ?int, superseded_by_id: ?int}>
+     */
+    private function loadSealGraphLinks(PDO $pdo, array $sealIds)
+    {
+        $out = [];
+        if (count($sealIds) === 0
+            || !$this->columnExists($pdo, 'puantaj_aylik_muhurleri', 'parent_muhur_id')
+        ) {
+            foreach ($sealIds as $id) {
+                $out[$id] = ['parent_muhur_id' => null, 'superseded_by_id' => null];
+            }
+
+            return $out;
+        }
+        $placeholders = implode(',', array_fill(0, count($sealIds), '?'));
+        $stmt = $pdo->prepare(
+            "SELECT id, parent_muhur_id, superseded_by_id
+             FROM puantaj_aylik_muhurleri WHERE id IN ({$placeholders})"
+        );
+        $stmt->execute($sealIds);
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            $id = (int) $row['id'];
+            $out[$id] = [
+                'parent_muhur_id' => $row['parent_muhur_id'] !== null ? (int) $row['parent_muhur_id'] : null,
+                'superseded_by_id' => $row['superseded_by_id'] !== null ? (int) $row['superseded_by_id'] : null,
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
+     * Deterministic pin fingerprint: id|muhur_id pairs sorted.
+     *
+     * @param list<int> $sealIds
+     * @return list<string>
+     */
+    private function loadPinRows(PDO $pdo, array $sealIds)
+    {
+        if (count($sealIds) === 0 || !$this->tableExists($pdo, 'maas_hesaplama_donem_snapshotlari')) {
+            return [];
+        }
+        $placeholders = implode(',', array_fill(0, count($sealIds), '?'));
+        $stmt = $pdo->prepare(
+            "SELECT id, muhur_id FROM maas_hesaplama_donem_snapshotlari
+             WHERE muhur_id IN ({$placeholders})
+             ORDER BY id ASC"
+        );
+        $stmt->execute($sealIds);
+        $rows = [];
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            $rows[] = (int) $row['id'] . ':' . (int) $row['muhur_id'];
+        }
+
+        return $rows;
     }
 
     private function tableExists(PDO $pdo, $table)

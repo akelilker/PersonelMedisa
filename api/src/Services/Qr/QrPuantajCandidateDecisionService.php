@@ -89,6 +89,22 @@ class QrPuantajCandidateDecisionService
 
             $canonical = QrPuantajCandidateApplyService::fetchForUpdate($pdo, $personelId, $candidateDate);
 
+            // Post-lock nonce recheck: concurrent exact retry must resolve idempotently
+            // after the winner commits, before recompute/stale evaluation.
+            $lockedNonce = QrPuantajCandidateDecisionLedgerService::findByUserNonce($pdo, $userId, $nonce);
+            if ($lockedNonce !== null) {
+                $pdo->rollBack();
+
+                return self::resolveIdempotentRetry(
+                    $lockedNonce,
+                    $action,
+                    $submittedHash,
+                    $reason,
+                    $personelId,
+                    $candidateDate
+                );
+            }
+
             // Recompute candidate inside transaction after locks
             $item = self::recomputeSingleCandidate($pdo, $personelId, $subeId, $candidateDate);
             if ($item === null) {
@@ -100,7 +116,7 @@ class QrPuantajCandidateDecisionService
                 );
             }
 
-            $currentHash = QrPuantajCandidateHashService::compute($personelId, $item);
+            $currentHash = QrPuantajCandidateHashService::compute($personelId, $subeId, $item);
             $item['candidate_hash'] = $currentHash;
 
             if (!hash_equals($submittedHash, $currentHash)) {

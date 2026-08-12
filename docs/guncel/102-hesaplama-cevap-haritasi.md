@@ -1,11 +1,11 @@
 # 102 — Hesaplama Cevap Haritası
 
-**Amaç:** Aylardır işlenen kodların *neyi nasıl hesapladığını* tek bakışta görmek.  
-**Durum kaynağı:** Ürün freeze ve yayın kapıları için `CURRENT_STATE.md` esas alınır. Bu belge backlog değildir; **okuma / toplantı / denetim haritasıdır**.  
-**Tarih:** 2026-08-11 (refresh 2026-08-12 — S1/S2/S3B sonrası owner doğrulaması)
+**Amaç:** Aylardır işlenen kodların *neyi nasıl hesapladığını* tek bakışta görmek.
+**Durum kaynağı:** Ürün freeze ve yayın kapıları için `CURRENT_STATE.md` esas alınır. Açık/kapalı backlog: `110-master-closure-gap-registry.md`. Bu belge backlog değildir; **okuma / toplantı / denetim haritasıdır**.
+**Tarih:** 2026-08-11 (refresh 2026-08-12 — master closure audit / S3F sonrası)
 **Motor sürümü (kod):** `S91C2_PAYROLL_ENGINE_V2`
 **Compliance kontratı:** `S87_PAYROLL_COMPLIANCE_V1`
-**Not:** Bu belge hesaplama haritasıdır. Production migration tip (2026-08-12): **056**; next **057+**. QR attendance henüz yok (S3C).
+**Not:** Bu belge hesaplama haritasıdır. Production migration tip: **058**. QR pipeline S3C–S3F **CLOSED_PRODUCTION** (algoritmalar: `QR_INTERVAL_V1`, `QR_PUANTAJ_CANDIDATE_V1`, `QR_PUANTAJ_DECISION_V1`, `QR_CANDIDATE_HASH_V2`).
 
 ---
 
@@ -19,9 +19,10 @@
 | 18 yaş / 270 saat / gece yasağı? | Evet |
 | Hangi dosya owner? | Evet |
 | Canlıda parametre dolduruldu mu? | Hayır → `91` formu + `95` runbook |
-| Görsel / deploy durumu? | Hayır → `CURRENT_STATE.md` |
+| Görsel / deploy / rollout flags? | Hayır → `CURRENT_STATE.md` |
+| Açık gap / backlog? | Hayır → `110-master-closure-gap-registry.md` |
 
-Derin teknik kural metni: `04-hesap-motoru-kurallari.md`  
+Derin teknik kural metni: `04-hesap-motoru-kurallari.md`
 Bordro sahiplik sınırı: `100-i9-bordro-kapsami-ve-sahiplik-karari.md`
 
 ---
@@ -58,8 +59,9 @@ Amir bildirimi / süreç / puantaj
 | UBGT / resmi tatil | `api/src/Services/ResmiTatilTakvimiService.php`, `ResmiTatilTakvimProjectionService.php` | Doc `94-s88-ubgt-tatil-takvimi-owner.md` |
 | Şirket çalışma politikası | `api/src/Services/SirketCalismaPolitikasiService.php` + `api/src/Services/Payroll/SirketCalismaPolitikasiCatalog.php` | Onaysız parametre yok |
 | Mevzuat parametreleri | `api/src/Services/MevzuatParametreService.php` + `MaasHesaplamaLegalParameterCatalog.php` | Eksikse blocker |
-| Saklama (10 yıl) | `api/src/Services/Retention/*` | Medisa saklama politikası |
-| PERSONEL self-service okuma | `api/src/Controllers/MeController.php` + `api/src/Services/SelfService/SelfPersonelContext.php` (mig `056` `users.personel_id`) | `/me` puantaj / izin bakiye / FM read. QR henüz yok |
+| Saklama (10 yıl) | `api/src/Services/Retention/*` | Medisa saklama politikası; fiziksel imha executor stub (`EXECUTION_HANDLER_NOT_IMPLEMENTED`) — `110` |
+| PERSONEL self-service okuma | `api/src/Controllers/MeController.php` + `api/src/Services/SelfService/SelfPersonelContext.php` (mig `056` `users.personel_id`) | `/me` puantaj / izin bakiye / FM / QR read. Maaş-bordro self-view OUT_OF_SCOPE |
+| QR attendance / interval / candidate / decision | `api/src/Services/Qr/*` (mig `057`/`058`) | S3C–S3F CLOSED_PRODUCTION; gerçek employee rollout USER_GATED |
 
 ---
 
@@ -112,7 +114,7 @@ Canlıya `30` / `225` yazmak için onay formu: `91-bordro-hesaplama-calisma-poli
 | FM ücreti | `SERBEST_ZAMAN` seçildiyse FM `ARTI` üretilmez (çift etki yasak) |
 | Karar mercii | Çalışanın **imzalı yazılı talebi** zorunlu; kanıt yoksa blocker |
 | Event modeli | Oluşum / kullanım / düzeltme / iptal |
-| **6 ay içinde kullandırma takibi** | **Henüz ürünleşmedi** (bilinçli açık) |
+| **6 ay içinde kullandırma takibi** | **CODE_GAP** — `son_kullanim_tarihi`/bakiye var; ürünleşmiş vade takibi/compliance yok (`110` MG-SZ-6M-001) |
 
 ---
 
@@ -224,9 +226,10 @@ Discovery: `docs/guncel/104-s2a-annual-leave-entitlement-adjustment-discovery.md
 | Önizleme / onay | Bordro Hazırlık Merkezi + Maaş Hesaplama Merkezi |
 | Mühür | Haftalık kapanış + dönem kapanış |
 | Kapalı dönem düzeltme | Revizyon talebi + correction (doğrudan sessiz edit yok) |
-| PERSONEL self okuma | `/me`, `/me/puantaj`, `/me/yillik-izin-bakiye`, `/me/fazla-calisma` (binding `users.personel_id`) |
+| PERSONEL self okuma | `/me`, `/me/puantaj`, `/me/yillik-izin-bakiye`, `/me/fazla-calisma`, QR self endpoints (binding `users.personel_id`) |
+| QR aday inceleme / apply | Puantaj QR aday yüzeyi + `qr_puantaj_candidate_decision_ledger` (S3F) |
 
-Yetki için kod owner: `api/src/Auth/RolePermissions.php` (canonical). `09-rol-yetki-matrisi.md` tarihsel/kısmi; `PERSONEL` self-service izinleri yalnız RolePermissions’ta. QR scan/kiosk henüz yok.
+Yetki için kod owner: `api/src/Auth/RolePermissions.php` (canonical). `09-rol-yetki-matrisi.md` tarihsel/kısmi; `PERSONEL` self-service izinleri yalnız RolePermissions’ta. QR pipeline kodda CLOSED; gerçek çalışan rollout USER_GATED (`110`).
 ---
 
 ## 16. Saklama / arşiv
@@ -236,7 +239,7 @@ Yetki için kod owner: `api/src/Auth/RolePermissions.php` (canonical). `09-rol-y
 | Süre | **10 yıl** (`POLICY_RETENTION_YEARS`) |
 | Dil | “Medisa saklama politikası” (kanunen iddia etmez; hedef 10 yıl) |
 | Kategoriler | Özlük, puantaj, bordro, izin, rapor, SGK, FM, serbest zaman, disiplin… |
-| İmha | Retention + legal hold + imha talebi workflow (süre dolmadan imha yok) |
+| İmha | Retention + legal hold + imha talebi/onay workflow var; fiziksel executor `EXECUTION_HANDLER_NOT_IMPLEMENTED`; manifest auto-wiring yalnız özlük + işe giriş/çıkış (`110`) |
 
 ---
 
@@ -251,7 +254,7 @@ Kaynak: masaüstü `puantaj resmi durum.docx` (toplantı mevzuat özeti).
 | 3 İzin yaş 20 gün | Var | Band + yaş min 20; bakiye owner kümülatif + ledger + kullanım (`YillikIzinBakiyeService` / doc `104`) |
 | 4 18 yaş FM/gece blok | Var | — |
 | 5 FM 1.5 + 270 saat | Var | FSC %25 **kapalı** |
-| 6 Serbest zaman | Var (dönüşüm+kanıt) | **6 ay vade takibi yok** |
+| 6 Serbest zaman | Var (dönüşüm+kanıt) | **6 ay vade takibi ürünleşmedi** (`110` CODE_GAP) |
 | 7 UBGT | Var | Politika/mod onayı |
 | 8 HT / Pazar 1.5 | Var | — |
 | 9 Geç/erken | Var | Tolerans firma kararı |
@@ -266,10 +269,14 @@ Kaynak: masaüstü `puantaj resmi durum.docx` (toplantı mevzuat özeti).
 
 | Konu | Durum |
 | --- | --- |
-| Serbest zaman 6 ay kullanım vadesi | Ürünleşmedi |
-| FSC (%25) aktif bant | S87 ile kapalı |
-| Zorunlu/olağanüstü çalışma istisna modeli | Bilinçli kapsam dışı |
+| Serbest zaman 6 ay kullanım vadesi | CODE_GAP (`110` MG-SZ-6M-001) — dönüşüm owner kapalı kalır |
+| Yıl değiştiren hafta / 270 saat yıl ataması | BUSINESS_DECISION_REQUIRED + path CODE_GAP (`110`) |
+| SGK 15–14 dönem | CONDITIONAL / BUSINESS_DECISION_REQUIRED — preview BLOCKER_ONLY |
+| FSC (%25) aktif bant | S87 ile kapalı (INTENTIONAL_DEFER) |
+| Zorunlu/olağanüstü çalışma istisna modeli | Bilinçli kapsam dışı / karar bekler |
 | Bordro PDF / banka dosyası / SGK bildirgesi çıktısı | FUTURE (kısmi CSV var) |
+| PERSONEL maaş/bordro self-view | OUT_OF_SCOPE (S3A) |
+| QR anomaly → revizyon kontrollü UX | INTENTIONAL_DEFER (hint only) |
 | İkinci bordro motoru | Yasak |
 
 ---
@@ -298,15 +305,16 @@ Detaylı compliance kapanış: `99-payroll-compliance-critical-gaps-kapanis.md`.
 
 ## 20. Okuma sırası (yeni gelen için)
 
-1. Bu belge (`102`) — neyin nasıl hesaplandığı  
-2. `CURRENT_STATE.md` — freeze / yayın  
-3. `100-i9-bordro-kapsami-ve-sahiplik-karari.md` — bordro sınırları  
-4. `04-hesap-motoru-kurallari.md` — derin kural metni  
-5. `91` + `95` — canlı parametre ve ops kapıları  
+1. Bu belge (`102`) — neyin nasıl hesaplandığı
+2. `CURRENT_STATE.md` — freeze / yayın / rollout flags
+3. `110-master-closure-gap-registry.md` — tek canonical açık/kapalı kayıt
+4. `100-i9-bordro-kapsami-ve-sahiplik-karari.md` — bordro sınırları
+5. `04-hesap-motoru-kurallari.md` — derin kural metni
+6. `91` + `95` — canlı parametre ve ops kapıları
 
 ---
 
 ## Sonuç
 
-Sistem; ücret bölenleri, FM, HT/UBGT, SGK prim günü, devamsızlık+HT kaybı, hastalık ilk 2 gün, 18 yaş blokları, 270 saat, serbest zaman dönüşümü ve 10 yıl saklama için **kodlanmış cevap** taşır.  
+Sistem; ücret bölenleri, FM, HT/UBGT, SGK prim günü, devamsızlık+HT kaybı, hastalık ilk 2 gün, 18 yaş blokları, 270 saat, serbest zaman dönüşümü ve 10 yıl saklama için **kodlanmış cevap** taşır.
 Elinde bu belgeyle “aylardır ne işledik?” sorusunun ürün cevabı okunabilir; canlı kesinleştirme ise ayrı operasyon/onay kapılarından geçer.

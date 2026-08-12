@@ -179,6 +179,17 @@ function s3eR1Schema(PDO $pdo): void
             giris_saati VARCHAR(16) NULL,
             cikis_saati VARCHAR(16) NULL,
             kontrol_durumu VARCHAR(32) NULL,
+            muhur_id INT UNSIGNED NULL,
+            updated_at DATETIME NULL,
+            gec_kalma_dakika INT UNSIGNED NULL,
+            erken_cikis_dakika INT UNSIGNED NULL,
+            gercek_mola_dakika INT UNSIGNED NULL,
+            hesaplanan_mola_dakika INT UNSIGNED NULL,
+            net_calisma_suresi_dakika INT UNSIGNED NULL,
+            gunluk_brut_sure_dakika INT UNSIGNED NULL,
+            tatil_donemi_brut_calisma_dakika INT UNSIGNED NULL,
+            tatil_donemi_ara_dinlenme_dakika INT UNSIGNED NULL,
+            tatil_donemi_net_calisma_dakika INT UNSIGNED NULL,
             UNIQUE KEY uq_personel_tarih (personel_id, tarih)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
     );
@@ -227,7 +238,7 @@ function s3eR1SeedQrPair(PDO $pdo, string $girisUtc, string $cikisUtc, int $base
              qr_version, qr_jti, qr_issued_at_utc, qr_expires_at_utc, request_nonce)
          VALUES
             (:personel_id, 10, 1, :event_type, :occurred_at_utc,
-             1, :jti, :occurred_at_utc, :occurred_at_utc, :nonce)'
+             1, :jti, :issued_at_utc, :expires_at_utc, :nonce)'
     );
     $nonce = static function (): string {
         return sprintf(
@@ -243,14 +254,18 @@ function s3eR1SeedQrPair(PDO $pdo, string $girisUtc, string $cikisUtc, int $base
         'personel_id' => 1,
         'event_type' => 'GIRIS',
         'occurred_at_utc' => $girisUtc,
-        'jti' => str_repeat('a', 32),
+        'issued_at_utc' => $girisUtc,
+        'expires_at_utc' => $girisUtc,
+        'jti' => bin2hex(random_bytes(16)),
         'nonce' => $nonce(),
     ]);
     $ins->execute([
         'personel_id' => 1,
         'event_type' => 'CIKIS',
         'occurred_at_utc' => $cikisUtc,
-        'jti' => str_repeat('b', 32),
+        'issued_at_utc' => $cikisUtc,
+        'expires_at_utc' => $cikisUtc,
+        'jti' => bin2hex(random_bytes(16)),
         'nonce' => $nonce(),
     ]);
 }
@@ -323,6 +338,7 @@ try {
 
     // REOPENED no snapshot
     $pdo->exec('DELETE FROM puantaj_donem_reopen_talepleri');
+    $pdo->exec('DELETE FROM puantaj_aylik_muhurleri');
     s3eR1SeedReopenApproved($pdo);
     $ctxReopened = PuantajDonemPeriodService::resolveCanonicalWriteContext($pdo, 1, 2026, 8);
     s3eR1Assert($ctxReopened['state'] === PuantajDonemPeriodService::STATE_REOPENED, 'REOPENED state');
@@ -341,6 +357,7 @@ try {
     // Candidate integration — reset to SEALED only
     $pdo->exec('DELETE FROM maas_hesaplama_donem_snapshotlari');
     $pdo->exec('DELETE FROM puantaj_donem_reopen_talepleri');
+    $pdo->exec('DELETE FROM puantaj_aylik_muhurleri');
     $pdo->exec('DELETE FROM gunluk_puantaj');
     $pdo->exec('DELETE FROM qr_attendance_events');
     s3eR1SeedSeal($pdo);
@@ -431,7 +448,7 @@ try {
         'MariaDB REOPENED active snapshot block code'
     );
     s3eR1Assert(($reopenedSnapDiff['period']['revision_required'] ?? true) === false, 'MariaDB REOPENED active snapshot revision_required NO');
-    s3eR1Assert(($reopenedSnapDiff['period']['future_action'] ?? 'x') === null, 'MariaDB REOPENED active snapshot future_action null');
+    s3eR1Assert(($reopenedSnapDiff['period']['future_action'] ?? null) === null, 'MariaDB REOPENED active snapshot future_action null');
 
     echo '[OK] S3EQrPuantajPeriodContextMysqlTestRunner' . PHP_EOL;
 } finally {

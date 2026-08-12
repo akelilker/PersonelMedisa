@@ -220,12 +220,9 @@ Self-service QR history unchanged (`/me/qr-araliklari`).
 
 ## S3F handoff
 
-S3F (`S3F_QR_PUANTAJ_CANDIDATE_REVIEW_APPLY`) will decide:
+S3F (`S3F_QR_PUANTAJ_CANDIDATE_REVIEW_APPLY`) **started** on branch `feat/qr-puantaj-candidate-review-apply` — see `docs/guncel/109-s3f-qr-puantaj-candidate-review-apply.md`.
 
-- human review owner
-- apply permission
-- open-period direct update vs sealed-period revision
-- audit/persistence / migration 058 necessity
+S3E evidence semantics remain the source candidate owner; S3F adds additive `candidate_hash` / `review` overlay + decision ledger (migration 058) without rewriting this S3E history.
 
 ---
 

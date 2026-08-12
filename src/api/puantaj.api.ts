@@ -549,14 +549,86 @@ export async function resealDonemPuantaj(
   return response.data;
 }
 
+export type QrPuantajCandidateReview = {
+  state?: string;
+  latest_decision_id?: number | null;
+  latest_decision_type?: string | null;
+  decided_at?: string | null;
+  can_apply?: boolean;
+  can_keep_canonical?: boolean;
+  can_reopen_review?: boolean;
+  action_required?: boolean;
+  blocking_code?: string | null;
+  decision_algorithm_version?: string;
+};
+
+export type QrPuantajCandidateItem = {
+  candidate_date: string;
+  candidate_hash?: string;
+  classification?: string;
+  comparison_status?: string;
+  proposed?: { giris_saati?: string | null; cikis_saati?: string | null };
+  canonical?: {
+    exists?: boolean;
+    puantaj_id?: number | null;
+    giris_saati?: string | null;
+    cikis_saati?: string | null;
+    state?: string | null;
+    kontrol_durumu?: string | null;
+    muhur_id?: number | null;
+    updated_at?: string | null;
+    gec_kalma_dakika?: number | null;
+    erken_cikis_dakika?: number | null;
+    gercek_mola_dakika?: number | null;
+    hesaplanan_mola_dakika?: number | null;
+    net_calisma_suresi_dakika?: number | null;
+    gunluk_brut_sure_dakika?: number | null;
+    tatil_donemi_brut_calisma_dakika?: number | null;
+    tatil_donemi_ara_dinlenme_dakika?: number | null;
+    tatil_donemi_net_calisma_dakika?: number | null;
+  };
+  qr?: {
+    matched_seconds?: number;
+    first_entry_at?: string | null;
+    last_exit_at?: string | null;
+    interval_count?: number;
+    anomaly_count?: number;
+  };
+  period?: {
+    state?: string;
+    period_write_locked?: boolean;
+    canonical_write_open?: boolean;
+    canonical_write_block_code?: string | null;
+    revision_required?: boolean;
+    revision_hint?: string | null;
+    correction_hint?: string | null;
+    future_action?: string | null;
+  };
+  provenance?: Record<string, unknown>;
+  review?: QrPuantajCandidateReview;
+};
+
 export type QrPuantajCandidateListResponse = {
   from: string;
   to: string;
   algorithm_version: string;
   interval_algorithm_version: string;
+  decision_algorithm_version?: string;
   personel_id: number;
-  items: Array<Record<string, unknown>>;
+  items: QrPuantajCandidateItem[];
   summary: Record<string, unknown>;
+};
+
+export type QrPuantajCandidateDecisionResult = {
+  decision_id: number;
+  decision_type: string;
+  candidate_hash: string;
+  decision_hash?: string;
+  puantaj_id: number | null;
+  idempotent: boolean;
+  before?: Record<string, unknown> | null;
+  after?: Record<string, unknown> | null;
+  created_at?: string;
 };
 
 export async function fetchQrPuantajAdaylari(
@@ -575,5 +647,32 @@ export async function fetchQrPuantajAdaylari(
   const response = await apiRequest<ApiResponse<QrPuantajCandidateListResponse>>(path, {
     method: "GET"
   });
+  return response.data;
+}
+
+export async function postQrPuantajAdayKarar(
+  personelId: number,
+  candidateDate: string,
+  payload: {
+    action: "APPLY_EXISTING" | "KEEP_CANONICAL" | "REOPEN_REVIEW";
+    candidate_hash: string;
+    request_nonce: string;
+    gerekce: string;
+  }
+) {
+  const response = await apiRequest<ApiResponse<QrPuantajCandidateDecisionResult>>(
+    endpoints.puantaj.qrAdayKarar(personelId, candidateDate),
+    {
+      method: "POST",
+      body: JSON.stringify(payload)
+    }
+  );
+  return response.data;
+}
+
+export async function fetchQrPuantajAdayKararlar(personelId: number, candidateDate: string) {
+  const response = await apiRequest<
+    ApiResponse<{ personel_id: number; candidate_date: string; items: Array<Record<string, unknown>> }>
+  >(endpoints.puantaj.qrAdayKararlar(personelId, candidateDate), { method: "GET" });
   return response.data;
 }

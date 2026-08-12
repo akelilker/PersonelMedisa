@@ -44,8 +44,9 @@ describe("S3C dynamic QR attendance foundation", () => {
     const migrations = readdirSync(resolve("api/migrations"))
       .filter((name) => /^\d{3}_.+\.sql$/.test(name))
       .sort();
-    expect(migrations.at(-1)).toBe("057_qr_attendance_events.sql");
+    expect(migrations).toContain("057_qr_attendance_events.sql");
     expect(migrations).toContain("056_users_personel_binding.sql");
+    // Tip of chain may advance (S3F owns 058); S3C still owns 057 content.
 
     for (const n of ["052", "053", "054", "055", "056"] as const) {
       expect(migrations.some((m) => m.startsWith(`${n}_`))).toBe(true);

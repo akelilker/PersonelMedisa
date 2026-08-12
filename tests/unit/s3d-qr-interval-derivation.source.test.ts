@@ -76,10 +76,15 @@ describe("S3D QR interval derivation", () => {
     );
   });
 
-  it("does not introduce migration 058", () => {
+  it("S3D stays interval-only; migration 058 is owned by S3F", () => {
     const files = readdirSync(resolve(process.cwd(), "api/migrations"));
-    expect(files.some((f) => /^058_/.test(f))).toBe(false);
+    expect(files.some((f) => /^058_qr_puantaj_candidate_decision_ledger\.sql$/.test(f))).toBe(true);
     expect(files.some((f) => /interval/i.test(f))).toBe(false);
+    const derivation = read(
+      "api/src/Services/Qr/QrAttendanceIntervalDerivationService.php"
+    );
+    expect(derivation).not.toMatch(/INSERT\s+INTO\s+gunluk_puantaj/i);
+    expect(derivation).not.toMatch(/UPDATE\s+gunluk_puantaj/i);
   });
 
   it("runs pure derivation PHP runner", () => {

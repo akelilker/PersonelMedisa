@@ -17,6 +17,9 @@ use Medisa\Api\Services\PuantajDonemKilidiService;
 use Medisa\Api\Services\PuantajDonemPeriodService;
 use Medisa\Api\Services\PuantajDonemReopenException;
 use Medisa\Api\Services\PuantajDonemReopenService;
+use Medisa\Api\Services\Qr\QrPuantajCandidateDecisionException;
+use Medisa\Api\Services\Qr\QrPuantajCandidateDecisionLedgerService;
+use Medisa\Api\Services\Qr\QrPuantajCandidateDecisionService;
 use Medisa\Api\Services\Qr\QrPuantajCandidateReadService;
 use Medisa\Api\Services\ResmiTatilTakvimProjectionService;
 use PDO;
@@ -94,6 +97,106 @@ class PuantajController
         }
 
         JsonResponse::success($payload);
+    }
+
+    public static function qrAdayKarar(Request $request, $personelId, $candidateDate)
+    {
+        $user = AuthMiddleware::authenticate($request, true);
+        RolePermissions::assert($user, 'puantaj.update');
+
+        $personelId = (int) $personelId;
+        $tarih = self::normalizeDate($candidateDate);
+        if ($personelId <= 0 || $tarih === null) {
+            JsonResponse::badRequest('Gecersiz personel veya tarih parametresi.');
+        }
+
+        $body = $request->getJsonBody();
+        if (!is_array($body)) {
+            $body = [];
+        }
+        $allowed = ['action', 'candidate_hash', 'request_nonce', 'gerekce'];
+        $filtered = [];
+        foreach ($allowed as $key) {
+            if (array_key_exists($key, $body)) {
+                $filtered[$key] = $body[$key];
+            }
+        }
+
+        $pdo = self::getConnection();
+        $personel = self::loadPersonel($pdo, $personelId);
+        SubeScope::assertPersonelAccess($user, $request, (int) $personel['sube_id']);
+
+        $userId = isset($user['id']) ? (int) $user['id'] : 0;
+        if ($userId < 1) {
+            JsonResponse::error(401, 'UNAUTHORIZED', 'Kullanici kimligi dogrulanamadi.');
+        }
+
+        try {
+            $result = QrPuantajCandidateDecisionService::decide(
+                $pdo,
+                $personelId,
+                (int) $personel['sube_id'],
+                $tarih,
+                $userId,
+                $filtered
+            );
+            JsonResponse::success($result);
+        } catch (QrPuantajCandidateDecisionException $e) {
+            $meta = $e->getMeta();
+            $field = is_array($meta) && isset($meta['field']) ? (string) $meta['field'] : null;
+            JsonResponse::error(
+                $e->getHttpStatus(),
+                $e->getErrorCode(),
+                $e->getMessage(),
+                $field,
+                is_array($meta) ? $meta : []
+            );
+        } catch (\InvalidArgumentException $e) {
+            JsonResponse::badRequest($e->getMessage());
+        } catch (\Throwable $e) {
+            JsonResponse::serverError('QR puantaj aday karari kaydedilemedi.');
+        }
+    }
+
+    public static function qrAdayKararlar(Request $request, $personelId, $candidateDate)
+    {
+        $user = AuthMiddleware::authenticate($request, true);
+        RolePermissions::assert($user, 'puantaj.view');
+
+        $personelId = (int) $personelId;
+        $tarih = self::normalizeDate($candidateDate);
+        if ($personelId <= 0 || $tarih === null) {
+            JsonResponse::badRequest('Gecersiz personel veya tarih parametresi.');
+        }
+
+        $pdo = self::getConnection();
+        $personel = self::loadPersonel($pdo, $personelId);
+        SubeScope::assertPersonelAccess($user, $request, (int) $personel['sube_id']);
+
+        try {
+            QrPuantajCandidateDecisionLedgerService::assertSchemaReady($pdo);
+            $rows = QrPuantajCandidateDecisionLedgerService::listForPersonelDate($pdo, $personelId, $tarih);
+            $items = [];
+            foreach ($rows as $row) {
+                $items[] = QrPuantajCandidateDecisionLedgerService::mapPublic($row);
+            }
+            JsonResponse::success([
+                'personel_id' => $personelId,
+                'candidate_date' => $tarih,
+                'items' => $items,
+            ]);
+        } catch (\RuntimeException $e) {
+            if ($e->getMessage() === 'QR_PUANTAJ_DECISION_LEDGER_MISSING') {
+                JsonResponse::success([
+                    'personel_id' => $personelId,
+                    'candidate_date' => $tarih,
+                    'items' => [],
+                ]);
+            }
+            JsonResponse::serverError('QR puantaj karar gecmisi okunamadi.');
+        } catch (\Throwable $e) {
+            JsonResponse::serverError('QR puantaj karar gecmisi okunamadi.');
+        }
     }
 
     public static function detail(Request $request, $personelId, $tarih)

@@ -62,15 +62,54 @@ class QrPuantajCandidateReadService
             $correctionPresentByDate
         );
 
+        $items = self::enrichWithDecisionOverlay($pdo, $personelId, $subeId, $items);
+
         return [
             'from' => $range['from'],
             'to' => $range['to'],
             'algorithm_version' => QrPuantajCandidateProjectionService::ALGORITHM_VERSION,
             'interval_algorithm_version' => QrPuantajCandidateProjectionService::INTERVAL_ALGORITHM_VERSION,
+            'decision_algorithm_version' => QrPuantajCandidateDecisionPolicy::DECISION_ALGORITHM_VERSION,
             'personel_id' => $personelId,
             'items' => $items,
             'summary' => QrPuantajCandidateProjectionService::buildSummary($items),
         ];
+    }
+
+    /**
+     * Server-owned candidate_hash + review overlay (S3F). Fail-open if ledger table absent.
+     *
+     * @param list<array<string,mixed>> $items
+     * @return list<array<string,mixed>>
+     */
+    public static function enrichWithDecisionOverlay(PDO $pdo, $personelId, $subeId, array $items)
+    {
+        $ledgerReady = false;
+        try {
+            QrPuantajCandidateDecisionLedgerService::assertSchemaReady($pdo);
+            $ledgerReady = true;
+        } catch (\Throwable $e) {
+            $ledgerReady = false;
+        }
+
+        $out = [];
+        foreach ($items as $item) {
+            $hash = QrPuantajCandidateHashService::compute($personelId, $subeId, $item);
+            $item['candidate_hash'] = $hash;
+            $latest = null;
+            if ($ledgerReady) {
+                $latest = QrPuantajCandidateDecisionLedgerService::findLatestForCandidateHash(
+                    $pdo,
+                    $personelId,
+                    (string) ($item['candidate_date'] ?? ''),
+                    $hash
+                );
+            }
+            $item['review'] = QrPuantajCandidateDecisionPolicy::buildReviewOverlay($item, $latest);
+            $out[] = $item;
+        }
+
+        return $out;
     }
 
     /**
@@ -130,7 +169,11 @@ class QrPuantajCandidateReadService
     private static function loadCanonicalByDate(PDO $pdo, $personelId, $from, $to)
     {
         $stmt = $pdo->prepare(
-            'SELECT id, tarih, giris_saati, cikis_saati, state, kontrol_durumu
+            'SELECT id, tarih, giris_saati, cikis_saati, state, kontrol_durumu, muhur_id, updated_at,
+                    gec_kalma_dakika, erken_cikis_dakika, gercek_mola_dakika, hesaplanan_mola_dakika,
+                    net_calisma_suresi_dakika, gunluk_brut_sure_dakika,
+                    tatil_donemi_brut_calisma_dakika, tatil_donemi_ara_dinlenme_dakika,
+                    tatil_donemi_net_calisma_dakika
              FROM gunluk_puantaj
              WHERE personel_id = :personel_id
                AND tarih >= :from_date

@@ -30,7 +30,7 @@ describe("S3E QR puantaj candidate projection", () => {
     await ensureDisposableMariaDbEnv();
   }, 90_000);
 
-  it("locks candidate owners, route, permission, and no write / no migration 058", () => {
+  it("locks candidate owners, route, permission, and projection/read remain non-writing", () => {
     const projection = read("api/src/Services/Qr/QrPuantajCandidateProjectionService.php");
     const readSvc = read("api/src/Services/Qr/QrPuantajCandidateReadService.php");
     const puantaj = read("api/src/Controllers/PuantajController.php");
@@ -75,9 +75,15 @@ describe("S3E QR puantaj candidate projection", () => {
     expect(hasRolePermission("PERSONEL", "self_service.qr.events.view")).toBe(true);
   });
 
-  it("does not introduce migration 058", () => {
+  it("acknowledges S3F owns migration 058 while S3E projection/read stay non-writing", () => {
     const files = readdirSync(resolve(process.cwd(), "api/migrations"));
-    expect(files.some((f) => /^058/.test(f))).toBe(false);
+    expect(files.some((f) => /^058_qr_puantaj_candidate_decision_ledger\.sql$/.test(f))).toBe(true);
+    const projection = read("api/src/Services/Qr/QrPuantajCandidateProjectionService.php");
+    const readSvc = read("api/src/Services/Qr/QrPuantajCandidateReadService.php");
+    expect(projection).not.toMatch(/INSERT\s+INTO\s+gunluk_puantaj/i);
+    expect(projection).not.toMatch(/UPDATE\s+gunluk_puantaj/i);
+    expect(readSvc).not.toMatch(/INSERT\s+INTO\s+gunluk_puantaj/i);
+    expect(readSvc).not.toMatch(/UPDATE\s+gunluk_puantaj/i);
   });
 
   it("runs S3E pure candidate PHP runner", () => {
@@ -87,7 +93,9 @@ describe("S3E QR puantaj candidate projection", () => {
   });
 
   it("runs S3E MariaDB period context runner", async () => {
-    await runPhpMysqlRunner(periodMysqlRunner);
+    const result = await runPhpMysqlRunner(periodMysqlRunner);
+    expect(result.status, result.stderr || result.stdout).toBe(0);
+    expect(result.stdout).toContain("[OK] S3EQrPuantajPeriodContextMysqlTestRunner");
   }, 120_000);
 
   it("S3D regression — pure derivation unchanged", () => {

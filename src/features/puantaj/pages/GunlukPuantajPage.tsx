@@ -19,6 +19,7 @@ import {
 } from "../../../services/puantaj-hesap-motoru";
 import { BildirimPuantajEtkiAdaylariSection } from "../components/BildirimPuantajEtkiAdaylariSection";
 import { PuantajOlayKararPanel } from "../components/PuantajOlayKararPanel";
+import { QrPuantajAdayiSection } from "../components/QrPuantajAdayiSection";
 import { formatComplianceLevelLabel } from "../../../lib/display/enum-display";
 import type {
   PuantajGunTipi,
@@ -869,6 +870,13 @@ export function GunlukPuantajPage() {
         personelId={activeQuery ? Number(activeQuery.personelId) : 0}
         tarih={activeQuery?.tarih ?? ""}
         puantaj={puantaj}
+      />
+
+      <QrPuantajAdayiSection
+        personelId={activeQuery ? Number(activeQuery.personelId) : 0}
+        tarih={activeQuery?.tarih ?? ""}
+        personelLabel={activeQuery?.personelId ? String(activeQuery.personelId) : undefined}
+        onApplied={() => void refetchActive()}
       />
 
       <BildirimPuantajEtkiAdaylariSection />

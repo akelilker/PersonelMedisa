@@ -119,7 +119,8 @@ class QrTokenService
         if ($iat > $now + self::IAT_FUTURE_SKEW_SECONDS) {
             throw new QrAttendanceException('QR_TOKEN_INVALID', 'QR token gecersiz.', 400, 'token');
         }
-        if ($exp < $now) {
+        // Standard expiry: valid while now < exp; exp == now is expired.
+        if ($now >= $exp) {
             throw new QrAttendanceException(
                 'QR_TOKEN_EXPIRED',
                 'QR suresi doldu, tekrar okutun.',

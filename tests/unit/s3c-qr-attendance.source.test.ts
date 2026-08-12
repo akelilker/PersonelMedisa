@@ -10,6 +10,18 @@ const migrationRunner = resolve(
   "tests/php/S3C057QrAttendanceMysqlTestRunner.php"
 );
 const tokenRunner = resolve(process.cwd(), "tests/php/S3CQrTokenServiceTestRunner.php");
+const businessDateRunner = resolve(
+  process.cwd(),
+  "tests/php/S3CQrBusinessDateRangeTestRunner.php"
+);
+const historyTimezoneRunner = resolve(
+  process.cwd(),
+  "tests/php/S3CQrHistoryTimezoneMysqlTestRunner.php"
+);
+const retentionLegacyRunner = resolve(
+  process.cwd(),
+  "tests/php/S3CRetentionLegacyCompatMysqlTestRunner.php"
+);
 
 function read(path: string): string {
   return readFileSync(path, "utf8");
@@ -82,16 +94,31 @@ describe("S3C dynamic QR attendance foundation", () => {
     expect(svc).not.toMatch(/INSERT\s+INTO\s+gunluk_puantaj/i);
     expect(svc).not.toMatch(/UPDATE\s+gunluk_puantaj/i);
     expect(svc).toContain("QR_CROSS_BRANCH_DENIED");
+    expect(svc).toContain("businessDateRangeToUtc");
+    expect(svc).toContain("Europe/Istanbul");
+    expect(svc).not.toContain("+03:00");
+    expect(svc).not.toMatch(/\$from\s*\.\s*' 00:00:00/);
 
     const retentionAdapter = read("api/src/Services/Retention/RetentionSourceAdapterService.php");
     expect(retentionAdapter).toContain("resolveIseGirisCikisLifecycle");
     expect(retentionAdapter).toContain("computeIseGirisCikisFingerprint");
+    expect(retentionAdapter).toContain("legacyIseGirisCikisIdentity");
+    expect(retentionAdapter).toContain("computePersonelOzlukFingerprint");
     const archive = read("api/src/Services/Retention/ArchiveManifestService.php");
     expect(archive).toContain("function computeIseGirisCikisFingerprint");
     expect(archive).toContain("ise_giris_cikis:empty:personel:");
     expect(archive).toContain("FROM qr_attendance_events");
+    expect(archive).toContain("UNIX_TIMESTAMP(created_at)");
+    expect(archive).toContain("qr_issued_at_utc");
+    expect(archive).toContain("qr_expires_at_utc");
+    expect(archive).toContain("function legacyIseGirisCikisIdentity");
+    expect(archive).toContain("function qrAwareIseGirisCikisIdentity");
     // PERSONEL_OZLUK fingerprint owner must remain distinct.
     expect(archive).toContain("function computePersonelOzlukFingerprint");
+
+    const tokenSvc = read("api/src/Services/Qr/QrTokenService.php");
+    expect(tokenSvc).toContain("$now >= $exp");
+    expect(tokenSvc).not.toMatch(/\$exp\s*<\s*\$now/);
 
     expect(existsSync(resolve("src/features/self-service/pages/PersonelQrScanPage.tsx"))).toBe(true);
     expect(existsSync(resolve("src/features/self-service/pages/PersonelQrHistoryPage.tsx"))).toBe(true);
@@ -115,5 +142,35 @@ describe("S3C dynamic QR attendance foundation", () => {
     expect(result.stdout).toContain("S3C QR token service runner OK");
     expect(result.stdout).toContain("[PASS] tampered payload DENY");
     expect(result.stdout).toContain("[PASS] missing secret QR_CONFIG_NOT_READY mint");
+    expect(result.stdout).toContain("[PASS] exp equals now EXPIRED");
+    expect(result.stdout).toContain("[PASS] exp now+1 valid");
+  });
+
+  it("business-date range converts Istanbul midnight via DateTimeZone", () => {
+    const result = runPhpRunner(businessDateRunner);
+    expect(result.status, result.stderr || result.stdout).toBe(0);
+    expect(result.stdout).toContain("S3C QR business date range runner OK");
+    expect(result.stdout).toContain("[PASS] 00:30 Istanbul IN");
+    expect(result.stdout).toContain("[PASS] 367-day window DENY");
+  });
+
+  it("listForSelf respects Istanbul business-day UTC bounds on MariaDB", () => {
+    const result = runPhpMysqlRunner(historyTimezoneRunner);
+    expect(result.status, result.stderr || result.stdout).toBe(0);
+    expect(result.stdout).toContain("S3C QR history timezone mysql runner OK");
+    expect(result.stdout).toContain("[PASS] 21:30 UTC included");
+    expect(result.stdout).toContain("[PASS] 20:59:59 UTC excluded");
+  });
+
+  it("legacy ISE manifest compatibility + QR fingerprint determinism", () => {
+    const result = runPhpMysqlRunner(retentionLegacyRunner);
+    expect(result.status, result.stderr || result.stdout).toBe(0);
+    expect(result.stdout).toContain("S3C retention legacy compat mysql runner OK");
+    expect(result.stdout).toContain("[PASS] A legacy ISE discoverable as current");
+    expect(result.stdout).toContain("[PASS] B legacy integrity OK");
+    expect(result.stdout).toContain("[PASS] C no false CHANGED via adapter path");
+    expect(result.stdout).toContain("[PASS] D new QR-aware identity");
+    expect(result.stdout).toContain("[PASS] fingerprint stable across session TZ");
+    expect(result.stdout).toContain("[PASS] G legal hold active for personel 21");
   });
 });

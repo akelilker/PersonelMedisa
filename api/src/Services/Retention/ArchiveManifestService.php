@@ -178,8 +178,33 @@ class ArchiveManifestService
     }
 
     /**
+     * Pre-S3C ISE_GIRIS_CIKIS identity (shared ozluk-style termination key).
+     */
+    public static function legacyIseGirisCikisIdentity($personelId, $terminationYmd)
+    {
+        return 'personel:' . (int) $personelId . ':termination:' . (string) $terminationYmd;
+    }
+
+    /**
+     * S3C QR-aware ISE_GIRIS_CIKIS identity.
+     */
+    public static function qrAwareIseGirisCikisIdentity($personelId, $terminationYmd)
+    {
+        return 'personel:' . (int) $personelId . ':ise_giris_cikis:termination:' . (string) $terminationYmd;
+    }
+
+    public static function isLegacyIseGirisCikisIdentity($identity)
+    {
+        $identity = (string) $identity;
+
+        return (bool) preg_match('/^personel:\d+:termination:\d{4}-\d{2}-\d{2}$/', $identity);
+    }
+
+    /**
      * Current effective lifecycle for the target.
-     * For PERSONEL_OZLUK / ISE_GIRIS_CIKIS: derives personel:{id}:termination:{effective_date}.
+     * PERSONEL_OZLUK: personel:{id}:termination:{effective_date}.
+     * ISE_GIRIS_CIKIS: prefer QR-aware identity; else same-termination legacy identity
+     * (no silent latest-row fallback across lifecycles).
      * Older lifecycle-only → null (caller maps to ARCHIVE_MANIFEST_MISSING_CURRENT_LIFECYCLE).
      *
      * @param array<string, mixed> $context
@@ -192,6 +217,34 @@ class ArchiveManifestService
         $category = (string) $category;
         if ($entityType === 'personeller') {
             $entityType = 'personel';
+        }
+
+        if ($category === RetentionCategories::ISE_GIRIS_CIKIS && $entityType === 'personel') {
+            $personelId = isset($context['personel_id']) && (int) $context['personel_id'] > 0
+                ? (int) $context['personel_id']
+                : $recordId;
+            $termination = RetentionPolicyService::resolveTerminationDate($pdo, $personelId);
+            if ($termination === null) {
+                return null;
+            }
+            $qrAware = self::findBySourceIdentity(
+                $pdo,
+                $entityType,
+                $recordId,
+                $category,
+                self::qrAwareIseGirisCikisIdentity($personelId, $termination)
+            );
+            if ($qrAware) {
+                return $qrAware;
+            }
+
+            return self::findBySourceIdentity(
+                $pdo,
+                $entityType,
+                $recordId,
+                $category,
+                self::legacyIseGirisCikisIdentity($personelId, $termination)
+            );
         }
 
         $identity = null;
@@ -326,7 +379,9 @@ class ArchiveManifestService
 
     /**
      * Deterministic fingerprint of QR raw attendance evidence for ISE_GIRIS_CIKIS.
-     * Empty / missing table → stable empty-state hash (does not throw).
+     * Empty table and missing table use distinct stable hashes (documented).
+     * created_at uses UNIX_TIMESTAMP (session-timezone independent).
+     * Includes qr_issued_at_utc / qr_expires_at_utc as immutable evidence.
      *
      * @return string|null
      */
@@ -346,12 +401,14 @@ class ArchiveManifestService
         }
 
         if (!$hasTable) {
+            // Distinct from empty-table hash: pre-057 rolling compatibility fail-safe.
             return hash('sha256', 'ise_giris_cikis:empty:personel:' . $personelId . ':no_table');
         }
 
         $stmt = $pdo->prepare(
             'SELECT id, personel_id, user_id, sube_id, event_type, occurred_at_utc,
-                    qr_version, qr_jti, created_at, request_nonce
+                    qr_version, qr_jti, qr_issued_at_utc, qr_expires_at_utc,
+                    UNIX_TIMESTAMP(created_at) AS created_at_unix, request_nonce
              FROM qr_attendance_events
              WHERE personel_id = :personel_id
              ORDER BY occurred_at_utc ASC, id ASC'
@@ -365,11 +422,13 @@ class ArchiveManifestService
                 (string) ($row['user_id'] ?? ''),
                 (string) ($row['sube_id'] ?? ''),
                 (string) ($row['event_type'] ?? ''),
-                (string) ($row['occurred_at_utc'] ?? ''),
+                self::normalizeUtcEvidence((string) ($row['occurred_at_utc'] ?? '')),
                 (string) ($row['qr_version'] ?? ''),
-                (string) ($row['qr_jti'] ?? ''),
-                (string) ($row['created_at'] ?? ''),
-                (string) ($row['request_nonce'] ?? ''),
+                strtolower((string) ($row['qr_jti'] ?? '')),
+                self::normalizeUtcEvidence((string) ($row['qr_issued_at_utc'] ?? '')),
+                self::normalizeUtcEvidence((string) ($row['qr_expires_at_utc'] ?? '')),
+                (string) ($row['created_at_unix'] ?? ''),
+                strtolower((string) ($row['request_nonce'] ?? '')),
             ]);
         }
 
@@ -378,6 +437,24 @@ class ArchiveManifestService
         }
 
         return hash('sha256', implode("\n", $parts));
+    }
+
+    /**
+     * Stable UTC datetime string for fingerprint (trim fractional noise consistently).
+     */
+    private static function normalizeUtcEvidence($raw)
+    {
+        $raw = trim((string) $raw);
+        if ($raw === '') {
+            return '';
+        }
+        try {
+            $dt = new \DateTimeImmutable($raw, new \DateTimeZone('UTC'));
+
+            return $dt->setTimezone(new \DateTimeZone('UTC'))->format('Y-m-d H:i:s.u');
+        } catch (\Throwable $e) {
+            return $raw;
+        }
     }
 
     /**
@@ -402,7 +479,8 @@ class ArchiveManifestService
         $ozlukFp = self::computePersonelOzlukFingerprint($pdo, $personelId);
         $girisCikisFp = self::computeIseGirisCikisFingerprint($pdo, $personelId);
         $ozlukIdentity = 'personel:' . $personelId . ':termination:' . $termination;
-        $girisCikisIdentity = 'personel:' . $personelId . ':ise_giris_cikis:termination:' . $termination;
+        // New PASIF transitions always mint QR-aware ISE identity (no legacy backfill).
+        $girisCikisIdentity = self::qrAwareIseGirisCikisIdentity($personelId, $termination);
         $dt = DateTime::createFromFormat('Y-m-d', $termination);
         if (!$dt) {
             throw new RuntimeException(RetentionPolicyService::CODE_TRIGGER_NOT_RESOLVED);

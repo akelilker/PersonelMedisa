@@ -180,17 +180,20 @@ class QrAttendanceEventService
     }
 
     /**
-     * @return array{from:string,to:string,items:array<int,array<string,mixed>>}
+     * Business calendar YMD (Europe/Istanbul) → UTC half-open bounds for occurred_at_utc.
+     * from inclusive local midnight; to exclusive = (to + 1 day) local midnight.
+     * Does not hardcode a fixed UTC offset; uses DateTimeZone Europe/Istanbul.
+     *
+     * @return array{from:string,to:string,from_utc:string,to_exclusive_utc:string,days:int}
      */
-    public static function listForSelf(PDO $pdo, $personelId, $from, $to)
+    public static function businessDateRangeToUtc($from, $to)
     {
-        self::assertSchemaReady($pdo);
-        $personelId = (int) $personelId;
         $from = self::assertDateYmd($from, 'from');
         $to = self::assertDateYmd($to, 'to');
         if ($from > $to) {
             throw new QrAttendanceException('VALIDATION_ERROR', 'from tarihi to tarihinden sonra olamaz.', 400, 'from');
         }
+
         $fromDt = \DateTimeImmutable::createFromFormat('!Y-m-d', $from);
         $toDt = \DateTimeImmutable::createFromFormat('!Y-m-d', $to);
         $days = (int) $fromDt->diff($toDt)->days + 1;
@@ -203,8 +206,31 @@ class QrAttendanceEventService
             );
         }
 
-        $fromUtc = $from . ' 00:00:00.000000';
-        $toExclusive = $toDt->modify('+1 day')->format('Y-m-d') . ' 00:00:00.000000';
+        $businessTz = new \DateTimeZone('Europe/Istanbul');
+        $utcTz = new \DateTimeZone('UTC');
+        $fromLocal = \DateTimeImmutable::createFromFormat('!Y-m-d', $from, $businessTz);
+        $toExclusiveLocal = \DateTimeImmutable::createFromFormat('!Y-m-d', $to, $businessTz)->modify('+1 day');
+        if (!$fromLocal || !$toExclusiveLocal) {
+            throw new QrAttendanceException('VALIDATION_ERROR', 'Tarih araligi cozumlenemedi.', 400, 'from');
+        }
+
+        return [
+            'from' => $from,
+            'to' => $to,
+            'from_utc' => $fromLocal->setTimezone($utcTz)->format('Y-m-d H:i:s.000000'),
+            'to_exclusive_utc' => $toExclusiveLocal->setTimezone($utcTz)->format('Y-m-d H:i:s.000000'),
+            'days' => $days,
+        ];
+    }
+
+    /**
+     * @return array{from:string,to:string,items:array<int,array<string,mixed>>}
+     */
+    public static function listForSelf(PDO $pdo, $personelId, $from, $to)
+    {
+        self::assertSchemaReady($pdo);
+        $personelId = (int) $personelId;
+        $range = self::businessDateRangeToUtc($from, $to);
 
         $stmt = $pdo->prepare(
             'SELECT e.id, e.event_type, e.occurred_at_utc, e.sube_id, e.created_at, s.ad AS sube_ad
@@ -217,8 +243,8 @@ class QrAttendanceEventService
         );
         $stmt->execute([
             'personel_id' => $personelId,
-            'from_utc' => $fromUtc,
-            'to_utc' => $toExclusive,
+            'from_utc' => $range['from_utc'],
+            'to_utc' => $range['to_exclusive_utc'],
         ]);
         $items = [];
         while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
@@ -234,8 +260,8 @@ class QrAttendanceEventService
         }
 
         return [
-            'from' => $from,
-            'to' => $to,
+            'from' => $range['from'],
+            'to' => $range['to'],
             'items' => $items,
         ];
     }

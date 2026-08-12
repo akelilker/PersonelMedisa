@@ -123,8 +123,9 @@ class RetentionSourceAdapterService
     }
 
     /**
-     * ISE_GIRIS_CIKIS covers raw QR attendance evidence (S3C).
-     * Empty history remains deterministic when table exists or is absent.
+     * ISE_GIRIS_CIKIS: QR-aware identity + fingerprint when present/new;
+     * same-termination pre-S3C legacy identity uses ozluk fingerprint semantics
+     * so existing manifests are not false-CHANGED / false-missing-current.
      *
      * @param array<string, mixed> $context
      * @return array{source_version_identity: string, source_sha256: string|null}
@@ -139,11 +140,42 @@ class RetentionSourceAdapterService
         if ($termination === null) {
             throw new RuntimeException(RetentionPolicyService::CODE_TERMINATION_DATE_MISSING);
         }
-        $fp = ArchiveManifestService::computeIseGirisCikisFingerprint($pdo, $personelId);
 
+        $qrAwareIdentity = ArchiveManifestService::qrAwareIseGirisCikisIdentity($personelId, $termination);
+        $qrAwareManifest = ArchiveManifestService::findBySourceIdentity(
+            $pdo,
+            'personel',
+            $personelId,
+            RetentionCategories::ISE_GIRIS_CIKIS,
+            $qrAwareIdentity
+        );
+        if ($qrAwareManifest) {
+            return [
+                'source_version_identity' => $qrAwareIdentity,
+                'source_sha256' => ArchiveManifestService::computeIseGirisCikisFingerprint($pdo, $personelId),
+            ];
+        }
+
+        $legacyIdentity = ArchiveManifestService::legacyIseGirisCikisIdentity($personelId, $termination);
+        $legacyManifest = ArchiveManifestService::findBySourceIdentity(
+            $pdo,
+            'personel',
+            $personelId,
+            RetentionCategories::ISE_GIRIS_CIKIS,
+            $legacyIdentity
+        );
+        if ($legacyManifest) {
+            // Legacy ISE manifests were fingerprinted with personel ozluk fields.
+            return [
+                'source_version_identity' => $legacyIdentity,
+                'source_sha256' => ArchiveManifestService::computePersonelOzlukFingerprint($pdo, $personelId),
+            ];
+        }
+
+        // No current-lifecycle manifest yet → mint/verify against QR-aware contract.
         return [
-            'source_version_identity' => 'personel:' . $personelId . ':ise_giris_cikis:termination:' . $termination,
-            'source_sha256' => $fp,
+            'source_version_identity' => $qrAwareIdentity,
+            'source_sha256' => ArchiveManifestService::computeIseGirisCikisFingerprint($pdo, $personelId),
         ];
     }
 

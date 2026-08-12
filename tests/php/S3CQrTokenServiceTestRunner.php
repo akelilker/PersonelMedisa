@@ -82,6 +82,29 @@ s3cQrAssert(s3cQrCatchCode(static function () use ($expiredToken) {
     QrTokenService::verify($expiredToken);
 }) === 'QR_TOKEN_EXPIRED', 'expired DENY');
 
+// exp == now → EXPIRED (no 1s replay edge)
+$expEqualsNowToken = s3cQrEncodeToken([
+    'v' => QrConfig::TOKEN_VERSION,
+    'sube_id' => 1,
+    'iat' => $now - 60,
+    'exp' => $now,
+    'jti' => str_repeat('1', 32),
+], $testSecret);
+s3cQrAssert(s3cQrCatchCode(static function () use ($expEqualsNowToken) {
+    QrTokenService::verify($expEqualsNowToken);
+}) === 'QR_TOKEN_EXPIRED', 'exp equals now EXPIRED');
+
+// exp == now + 1 → still valid
+$expPlusOneToken = s3cQrEncodeToken([
+    'v' => QrConfig::TOKEN_VERSION,
+    'sube_id' => 1,
+    'iat' => $now - 59,
+    'exp' => $now + 1,
+    'jti' => str_repeat('2', 32),
+], $testSecret);
+$verifiedPlusOne = QrTokenService::verify($expPlusOneToken);
+s3cQrAssert((int) $verifiedPlusOne['exp'] === $now + 1, 'exp now+1 valid');
+
 // Wrong version
 $wrongVersionToken = s3cQrEncodeToken([
     'v' => 99,

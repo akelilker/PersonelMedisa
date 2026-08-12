@@ -36,6 +36,7 @@ React + Vite + TypeScript tabanlı PersonelMedisa uygulaması. Ana kapsam person
 Güncel ürün ve teknik dokümanlar `docs/guncel/` altında tutulur:
 
 - `CURRENT_STATE.md` (repo kökü; güncel karar ve freeze owner'ı)
+- `102-hesaplama-cevap-haritasi.md` (neyin nasıl hesaplandığı — toplantı/okuma haritası)
 - `00-sistem-genel-bakis.md`
 - `01-urun-anayasasi.md`
 - `02-mvp-veri-kapsami.md`

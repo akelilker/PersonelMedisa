@@ -263,7 +263,7 @@ function s3fDecSeedQrPair(PDO $pdo, string $girisUtc, string $cikisUtc): void
              qr_version, qr_jti, qr_issued_at_utc, qr_expires_at_utc, request_nonce)
          VALUES
             (:personel_id, 10, 1, :event_type, :occurred_at_utc,
-             1, :jti, :occurred_at_utc, :occurred_at_utc, :nonce)'
+             1, :jti, :issued_at_utc, :expires_at_utc, :nonce)'
     );
     $nonce = static function (): string {
         return sprintf(
@@ -279,6 +279,8 @@ function s3fDecSeedQrPair(PDO $pdo, string $girisUtc, string $cikisUtc): void
         'personel_id' => 1,
         'event_type' => 'GIRIS',
         'occurred_at_utc' => $girisUtc,
+        'issued_at_utc' => $girisUtc,
+        'expires_at_utc' => $girisUtc,
         'jti' => bin2hex(random_bytes(16)),
         'nonce' => $nonce(),
     ]);
@@ -286,6 +288,8 @@ function s3fDecSeedQrPair(PDO $pdo, string $girisUtc, string $cikisUtc): void
         'personel_id' => 1,
         'event_type' => 'CIKIS',
         'occurred_at_utc' => $cikisUtc,
+        'issued_at_utc' => $cikisUtc,
+        'expires_at_utc' => $cikisUtc,
         'jti' => bin2hex(random_bytes(16)),
         'nonce' => $nonce(),
     ]);

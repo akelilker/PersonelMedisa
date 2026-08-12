@@ -91,12 +91,20 @@ describe("S3F QR puantaj candidate review / apply", () => {
     expect(decide).toContain("findByUserNonce");
     expect(decide).toContain("Post-lock nonce recheck");
     // Post-lock nonce recheck must precede recompute/stale evaluation.
-    const postLockIdx = decide.indexOf("Post-lock nonce recheck");
-    const recomputeIdx = decide.indexOf("recomputeSingleCandidate");
-    const staleIdx = decide.indexOf("BLOCK_STALE");
-    expect(postLockIdx).toBeGreaterThan(-1);
-    expect(recomputeIdx).toBeGreaterThan(postLockIdx);
+    const decideFnIdx = decide.indexOf("public static function decide");
+    const acquireIdx = decide.indexOf("acquireForDate", decideFnIdx);
+    const postLockFindIdx = decide.indexOf(
+      "$lockedNonce = QrPuantajCandidateDecisionLedgerService::findByUserNonce",
+      decideFnIdx
+    );
+    const recomputeIdx = decide.indexOf("self::recomputeSingleCandidate", decideFnIdx);
+    const staleIdx = decide.indexOf("BLOCK_STALE", decideFnIdx);
+    expect(decideFnIdx).toBeGreaterThan(-1);
+    expect(acquireIdx).toBeGreaterThan(decideFnIdx);
+    expect(postLockFindIdx).toBeGreaterThan(acquireIdx);
+    expect(recomputeIdx).toBeGreaterThan(postLockFindIdx);
     expect(staleIdx).toBeGreaterThan(recomputeIdx);
+    expect(decide).toContain("S3F_RACE_HOLD_MS");
 
     expect(readSvc).toContain("gec_kalma_dakika");
     expect(readSvc).toContain("muhur_id");

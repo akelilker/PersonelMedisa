@@ -81,6 +81,8 @@ Cosmetic UI labels / display branch names excluded.
 
 Pre-tx nonce check remains. After period + row locks and **before** recompute/stale, the service rechecks `(decided_by_user_id, request_nonce)` and returns the stored idempotent result when present. DB UNIQUE + PDO 1062 fallback remain ultimate guards. Exact concurrent retries must not surface as `QR_CANDIDATE_STALE`.
 
+MariaDB evidence uses two real PHP child processes with a shared start barrier + optional `S3F_RACE_HOLD_MS` post-lock hold so both pass the pre-tx nonce miss and truly compete on locks (not sequential second-call after the first finishes).
+
 ---
 
 ## APPLY_EXISTING policy

@@ -395,6 +395,17 @@ if (($argv[1] ?? '') === '--race-apply') {
     $hash = strtolower(trim((string) (getenv('S3F_RACE_HASH') ?: ($argv[3] ?? ''))));
     $nonce = trim((string) (getenv('S3F_RACE_NONCE') ?: ($argv[4] ?? '')));
     $reason = trim((string) (getenv('S3F_RACE_REASON') ?: 'Race apply denemesi.'));
+    $barrier = trim((string) (getenv('S3F_RACE_BARRIER') ?: ''));
+    if ($barrier !== '') {
+        $deadline = microtime(true) + 10.0;
+        while (!is_file($barrier)) {
+            if (microtime(true) > $deadline) {
+                fwrite(STDERR, "Race barrier timeout\n");
+                exit(1);
+            }
+            usleep(20000);
+        }
+    }
     $pdo = s3fDecPdoForDb($database);
     try {
         $result = s3fDecDecide($pdo, [
@@ -416,9 +427,9 @@ if (($argv[1] ?? '') === '--race-apply') {
 }
 
 /**
- * @return array{process:resource,pipes:array{0:resource,1:resource,2:resource}}
+ * @return array{process:resource,pipes:array{0:resource,1:resource,2:resource},barrier:string}
  */
-function s3fDecSpawnRace(string $database, string $hash, string $nonce, string $reason): array
+function s3fDecSpawnRace(string $database, string $hash, string $nonce, string $reason, string $barrier = '', int $holdMs = 0): array
 {
     $phpArgs = [];
     if (PHP_OS_FAMILY === 'Windows') {
@@ -439,19 +450,41 @@ function s3fDecSpawnRace(string $database, string $hash, string $nonce, string $
     putenv('S3F_RACE_HASH=' . $hash);
     putenv('S3F_RACE_NONCE=' . $nonce);
     putenv('S3F_RACE_REASON=' . $reason);
+    putenv('S3F_RACE_BARRIER=' . $barrier);
+    putenv('S3F_RACE_HOLD_MS=' . (string) max(0, $holdMs));
 
     $pipes = [];
     $process = proc_open(
         $command,
         [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
-        $pipes
+        $pipes,
+        null,
+        null,
+        ['bypass_shell' => true]
     );
     if (!is_resource($process)) {
         throw new RuntimeException('Race child could not be started.');
     }
     fclose($pipes[0]);
 
-    return ['process' => $process, 'pipes' => $pipes];
+    return ['process' => $process, 'pipes' => $pipes, 'barrier' => $barrier];
+}
+
+function s3fDecClearRaceEnv(): void
+{
+    putenv('S3F_RACE_HASH');
+    putenv('S3F_RACE_NONCE');
+    putenv('S3F_RACE_REASON');
+    putenv('S3F_RACE_BARRIER');
+    putenv('S3F_RACE_HOLD_MS');
+}
+
+function s3fDecReleaseRaceBarrier(string $barrier): void
+{
+    if ($barrier === '') {
+        return;
+    }
+    file_put_contents($barrier, 'go');
 }
 
 /** @param array{process:resource,pipes:array} $child */
@@ -760,10 +793,19 @@ try {
     $ledgerBeforeJ = (int) $pdo->query(
         "SELECT COUNT(*) FROM qr_puantaj_candidate_decision_ledger WHERE decision_type='APPLY_EXISTING'"
     )->fetchColumn();
-    $childJ1 = s3fDecSpawnRace($db, $hashJ, $nonceJ, $reasonJ);
-    $childJ2 = s3fDecSpawnRace($db, $hashJ, $nonceJ, $reasonJ);
+    $barrierJ = tempnam(sys_get_temp_dir(), 's3f-race-j-');
+    if ($barrierJ === false) {
+        throw new RuntimeException('Race barrier temp file failed.');
+    }
+    unlink($barrierJ);
+    $childJ1 = s3fDecSpawnRace($db, $hashJ, $nonceJ, $reasonJ, $barrierJ, 350);
+    $childJ2 = s3fDecSpawnRace($db, $hashJ, $nonceJ, $reasonJ, $barrierJ, 350);
+    usleep(150000);
+    s3fDecReleaseRaceBarrier($barrierJ);
     $outJ1 = s3fDecFinishRace($childJ1);
     $outJ2 = s3fDecFinishRace($childJ2);
+    s3fDecClearRaceEnv();
+    @unlink($barrierJ);
     s3fDecAssert(strpos($outJ1, 'OK:') === 0, 'j) child1 success [' . $outJ1 . ']');
     s3fDecAssert(strpos($outJ2, 'OK:') === 0, 'j) child2 success [' . $outJ2 . ']');
     s3fDecAssert(
@@ -802,10 +844,19 @@ try {
     $itemK = s3fDecCandidateItem($pdo, $date);
     $hashK = (string) ($itemK['candidate_hash'] ?? '');
     $reasonK = 'Concurrent different nonce competing apply.';
-    $childK1 = s3fDecSpawnRace($db, $hashK, s3fDecNonce(21), $reasonK);
-    $childK2 = s3fDecSpawnRace($db, $hashK, s3fDecNonce(22), $reasonK);
+    $barrierK = tempnam(sys_get_temp_dir(), 's3f-race-k-');
+    if ($barrierK === false) {
+        throw new RuntimeException('Race barrier temp file failed.');
+    }
+    unlink($barrierK);
+    $childK1 = s3fDecSpawnRace($db, $hashK, s3fDecNonce(21), $reasonK, $barrierK, 350);
+    $childK2 = s3fDecSpawnRace($db, $hashK, s3fDecNonce(22), $reasonK, $barrierK, 350);
+    usleep(150000);
+    s3fDecReleaseRaceBarrier($barrierK);
     $outK1 = s3fDecFinishRace($childK1);
     $outK2 = s3fDecFinishRace($childK2);
+    s3fDecClearRaceEnv();
+    @unlink($barrierK);
     $okK = 0;
     $loseK = 0;
     foreach ([$outK1, $outK2] as $outK) {

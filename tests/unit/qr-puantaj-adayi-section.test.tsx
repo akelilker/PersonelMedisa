@@ -1,5 +1,6 @@
 /** @vitest-environment jsdom */
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import { QrPuantajAdayiSection } from "../../src/features/puantaj/components/QrPuantajAdayiSection";
@@ -18,7 +19,7 @@ vi.mock("../../src/api/puantaj.api", () => ({
 }));
 
 vi.mock("../../src/components/modal/AppModal", () => ({
-  AppModal: ({ children, title }: { children: React.ReactNode; title: string }) => (
+  AppModal: ({ children, title }: { children: ReactNode; title: string }) => (
     <div data-testid="app-modal">
       <h2>{title}</h2>
       {children}

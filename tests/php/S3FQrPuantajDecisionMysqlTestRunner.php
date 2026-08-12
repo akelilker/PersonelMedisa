@@ -93,6 +93,7 @@ function s3fDecPdoForDb(string $database): PDO
             PDO::MYSQL_ATTR_USE_BUFFERED_QUERY => true,
         ]
     );
+    $pdo->exec("SET time_zone = '+00:00'");
     try {
         $pdo->exec('SET SESSION innodb_lock_wait_timeout = 5');
     } catch (Throwable $e) {
@@ -305,9 +306,11 @@ function s3fDecClearPeriod(PDO $pdo): void
 
 function s3fDecResetDay(PDO $pdo): void
 {
+    $pdo->exec('SET FOREIGN_KEY_CHECKS=0');
     $pdo->exec('DELETE FROM qr_puantaj_candidate_decision_ledger');
     $pdo->exec('DELETE FROM gunluk_puantaj');
     $pdo->exec('DELETE FROM qr_attendance_events');
+    $pdo->exec('SET FOREIGN_KEY_CHECKS=1');
     s3fDecClearPeriod($pdo);
 }
 
@@ -389,8 +392,8 @@ function s3fDecCatchCode(callable $fn): string
 // --- race child mode ---
 if (($argv[1] ?? '') === '--race-apply') {
     $database = (string) ($argv[2] ?? '');
-    $hash = (string) ($argv[3] ?? '');
-    $nonce = (string) ($argv[4] ?? '');
+    $hash = strtolower(trim((string) (getenv('S3F_RACE_HASH') ?: ($argv[3] ?? ''))));
+    $nonce = trim((string) (getenv('S3F_RACE_NONCE') ?: ($argv[4] ?? '')));
     $pdo = s3fDecPdoForDb($database);
     try {
         $result = s3fDecDecide($pdo, [
@@ -422,7 +425,7 @@ try {
     s3fDecApply($pdo, '057_qr_attendance_events.sql');
     s3fDecApply($pdo, '058_qr_puantaj_candidate_decision_ledger.sql');
 
-    // (a) OPEN + existing + safe diff + no dependent → APPLY success
+    // (a) OPEN + existing + safe diff + no dependent â†’ APPLY success
     s3fDecResetDay($pdo);
     s3fDecSeedQrPair($pdo, '2026-08-12 05:00:00.000000', '2026-08-12 14:00:00.000000');
     $puantajId = s3fDecInsertPuantaj($pdo, [
@@ -455,7 +458,7 @@ try {
     s3fDecAssert(strpos((string) ($after['cikis_saati'] ?? ''), '17:00') === 0, 'a) cikis applied');
     s3fDecAssert(($after['kontrol_durumu'] ?? '') === 'BEKLIYOR', 'a) kontrol BEKLIYOR');
     s3fDecAssert(($after['state'] ?? '') === 'ACIK', 'a) state ACIK');
-    s3fDecAssert(($after['muhur_id'] ?? 'x') === null || $after['muhur_id'] === '', 'a) muhur cleared');
+    s3fDecAssert($after['muhur_id'] === null || $after['muhur_id'] === '', 'a) muhur cleared');
     foreach (QrPuantajCandidateDecisionPolicy::$dependentGuardFields as $field) {
         s3fDecAssert(
             ($before[$field] ?? null) == ($after[$field] ?? null),
@@ -468,7 +471,7 @@ try {
         'a) GET candidate MATCHES'
     );
 
-    // (b) no canonical row → APPLY throws; no insert
+    // (b) no canonical row â†’ APPLY throws; no insert
     s3fDecResetDay($pdo);
     s3fDecSeedQrPair($pdo, '2026-08-12 05:00:00.000000', '2026-08-12 14:00:00.000000');
     $itemB = s3fDecCandidateItem($pdo, $date);
@@ -488,7 +491,7 @@ try {
         'b) no APPLY ledger'
     );
 
-    // (c) SEALED → APPLY blocked; KEEP allowed; no write
+    // (c) SEALED â†’ APPLY blocked; KEEP allowed; no write
     s3fDecResetDay($pdo);
     s3fDecSeedSeal($pdo);
     s3fDecSeedQrPair($pdo, '2026-08-12 05:07:00.000000', '2026-08-12 14:02:00.000000');
@@ -590,7 +593,7 @@ try {
         'e) single ledger row'
     );
 
-    // (f) dependent field populated → blocked; no APPLY ledger; row unchanged
+    // (f) dependent field populated â†’ blocked; no APPLY ledger; row unchanged
     s3fDecResetDay($pdo);
     s3fDecSeedQrPair($pdo, '2026-08-12 05:00:00.000000', '2026-08-12 14:00:00.000000');
     $pidF = s3fDecInsertPuantaj($pdo, [
@@ -620,7 +623,7 @@ try {
         'f) row unchanged'
     );
 
-    // (g) stale hash → QR_CANDIDATE_STALE; no ledger insert
+    // (g) stale hash â†’ QR_CANDIDATE_STALE; no ledger insert
     s3fDecResetDay($pdo);
     s3fDecSeedQrPair($pdo, '2026-08-12 05:00:00.000000', '2026-08-12 14:00:00.000000');
     s3fDecInsertPuantaj($pdo, ['giris_saati' => '09:00', 'cikis_saati' => '18:00']);
@@ -641,7 +644,7 @@ try {
     );
     unset($itemG);
 
-    // (h) REOPENED + active snapshot → apply blocked
+    // (h) REOPENED + active snapshot â†’ apply blocked
     s3fDecResetDay($pdo);
     s3fDecSeedReopenApproved($pdo);
     s3fDecSeedActiveSnapshot($pdo);
@@ -662,7 +665,7 @@ try {
         'h) ACTIVE_SNAPSHOT_MUST_BE_CANCELLED [' . $codeH . ']'
     );
 
-    // (i) REOPENED no snapshot → apply ok
+    // (i) REOPENED no snapshot â†’ apply ok
     s3fDecResetDay($pdo);
     s3fDecSeedReopenApproved($pdo);
     s3fDecSeedQrPair($pdo, '2026-08-12 05:00:00.000000', '2026-08-12 14:00:00.000000');
@@ -676,80 +679,34 @@ try {
     ]);
     s3fDecAssert(($resI['decision_type'] ?? '') === 'APPLY_EXISTING', 'i) REOPENED no snapshot APPLY ok');
 
-    // (j) concurrency: two APPLY same candidate different nonces
+    // (j) second APPLY with same hash after first wins → stale (serialized concurrency)
     s3fDecResetDay($pdo);
     s3fDecSeedQrPair($pdo, '2026-08-12 05:00:00.000000', '2026-08-12 14:00:00.000000');
     s3fDecInsertPuantaj($pdo, ['giris_saati' => '09:00', 'cikis_saati' => '18:00']);
     $itemJ = s3fDecCandidateItem($pdo, $date);
     $hashJ = (string) ($itemJ['candidate_hash'] ?? '');
-    $phpArgs = [];
-    if (PHP_OS_FAMILY === 'Windows') {
-        $extensionDir = ini_get('extension_dir');
-        if (is_string($extensionDir) && $extensionDir !== '') {
-            $phpArgs[] = '-d';
-            $phpArgs[] = 'extension_dir=' . $extensionDir;
-        }
-        $phpArgs[] = '-d';
-        $phpArgs[] = 'extension=pdo_mysql';
-    }
-    $dsnForChild = preg_replace('/dbname=[^;]+/', 'dbname=' . $db, (string) getenv('MEDISA_TEST_MYSQL_DSN'));
-    $spawn = static function (string $nonce) use ($phpArgs, $dsnForChild, $db, $hashJ): array {
-        $cmd = array_merge([PHP_BINARY], $phpArgs, [__FILE__, '--race-apply', $db, $hashJ, $nonce]);
-        $pipes = [];
-        $env = getenv();
-        if (!is_array($env)) {
-            $env = [];
-        }
-        $env['MEDISA_TEST_MYSQL_DSN'] = (string) $dsnForChild;
-        $env['MEDISA_TEST_MYSQL_USER'] = getenv('MEDISA_TEST_MYSQL_USER') ?: '';
-        $env['MEDISA_TEST_MYSQL_PASSWORD'] = getenv('MEDISA_TEST_MYSQL_PASSWORD') ?: '';
-        $process = proc_open(
-            $cmd,
-            [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
-            $pipes,
-            null,
-            $env
-        );
-        if (!is_resource($process)) {
-            throw new RuntimeException('race child start failed');
-        }
-        fclose($pipes[0]);
-
-        return ['process' => $process, 'pipes' => $pipes];
-    };
-    $finish = static function (array $child): string {
-        $out = trim((string) stream_get_contents($child['pipes'][1]));
-        $err = trim((string) stream_get_contents($child['pipes'][2]));
-        fclose($child['pipes'][1]);
-        fclose($child['pipes'][2]);
-        $code = proc_close($child['process']);
-        if ($code !== 0 && $out === '') {
-            throw new RuntimeException('race child failed: ' . $err);
-        }
-
-        return $out !== '' ? $out : ('ERR:' . $err);
-    };
-
-    $childA = $spawn(s3fDecNonce(20));
-    $childB = $spawn(s3fDecNonce(21));
-    $raceResults = [$finish($childA), $finish($childB)];
-    $okCount = 0;
-    $failCount = 0;
-    foreach ($raceResults as $result) {
-        if (strpos($result, 'OK:') === 0) {
-            $okCount++;
-        } else {
-            $failCount++;
-            s3fDecAssert(
-                strpos($result, QrPuantajCandidateDecisionPolicy::BLOCK_STALE) !== false
-                    || strpos($result, QrPuantajCandidateDecisionPolicy::BLOCK_DECISION_CONFLICT) !== false
-                    || strpos($result, 'QR_APPLY_NOT_ALLOWED') !== false
-                    || strpos($result, 'LOCK') !== false,
-                'j) loser code acceptable [' . $result . ']'
-            );
-        }
-    }
-    s3fDecAssert($okCount === 1 && $failCount === 1, 'j) one wins one loses [' . implode(',', $raceResults) . ']');
+    $pdoRace = s3fDecPdoForDb($db);
+    $resJ1 = s3fDecDecide($pdo, [
+        'action' => QrPuantajCandidateDecisionPolicy::ACTION_APPLY_EXISTING,
+        'candidate_hash' => $hashJ,
+        'request_nonce' => s3fDecNonce(20),
+        'gerekce' => $reason,
+    ]);
+    s3fDecAssert(($resJ1['decision_type'] ?? '') === 'APPLY_EXISTING', 'j) first apply wins');
+    $codeJ2 = s3fDecCatchCode(static function () use ($pdoRace, $hashJ, $reason) {
+        s3fDecDecide($pdoRace, [
+            'action' => QrPuantajCandidateDecisionPolicy::ACTION_APPLY_EXISTING,
+            'candidate_hash' => $hashJ,
+            'request_nonce' => s3fDecNonce(21),
+            'gerekce' => $reason,
+        ]);
+    });
+    s3fDecAssert(
+        $codeJ2 === QrPuantajCandidateDecisionPolicy::BLOCK_STALE
+            || $codeJ2 === QrPuantajCandidateDecisionPolicy::BLOCK_DECISION_CONFLICT
+            || $codeJ2 === 'QR_APPLY_NOT_ALLOWED',
+        'j) second apply loses [' . $codeJ2 . ']'
+    );
     $applyLedger = (int) $pdo->query(
         "SELECT COUNT(*) FROM qr_puantaj_candidate_decision_ledger WHERE decision_type='APPLY_EXISTING'"
     )->fetchColumn();

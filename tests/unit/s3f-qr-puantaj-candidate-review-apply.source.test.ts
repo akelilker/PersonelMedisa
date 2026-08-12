@@ -134,11 +134,15 @@ describe("S3F QR puantaj candidate review / apply", () => {
   });
 
   it("runs S3F 058 MariaDB ledger migration runner", async () => {
-    await runPhpMysqlRunner(migration058Runner);
+    const result = await runPhpMysqlRunner(migration058Runner);
+    expect(result.status, result.stderr || result.stdout).toBe(0);
+    expect(result.stdout).toContain("S3F 058 mysql runner OK");
   }, 120_000);
 
   it("runs S3F decision MariaDB runner", async () => {
-    await runPhpMysqlRunner(decisionMysqlRunner);
+    const result = await runPhpMysqlRunner(decisionMysqlRunner);
+    expect(result.status, result.stderr || result.stdout).toBe(0);
+    expect(result.stdout).toContain("S3F decision mysql tests OK");
   }, 180_000);
 
   it("S3E regression — pure candidate runner still passes", () => {
@@ -148,6 +152,8 @@ describe("S3F QR puantaj candidate review / apply", () => {
   });
 
   it("S3E regression — period context MariaDB runner still passes", async () => {
-    await runPhpMysqlRunner(s3ePeriodMysqlRunner);
+    const result = await runPhpMysqlRunner(s3ePeriodMysqlRunner);
+    expect(result.status, result.stderr || result.stdout).toBe(0);
+    expect(result.stdout).toContain("[OK] S3EQrPuantajPeriodContextMysqlTestRunner");
   }, 120_000);
 });

@@ -93,7 +93,9 @@ describe("S3E QR puantaj candidate projection", () => {
   });
 
   it("runs S3E MariaDB period context runner", async () => {
-    await runPhpMysqlRunner(periodMysqlRunner);
+    const result = await runPhpMysqlRunner(periodMysqlRunner);
+    expect(result.status, result.stderr || result.stdout).toBe(0);
+    expect(result.stdout).toContain("[OK] S3EQrPuantajPeriodContextMysqlTestRunner");
   }, 120_000);
 
   it("S3D regression — pure derivation unchanged", () => {

@@ -3,7 +3,6 @@
 **Baseline (docs refresh):** current `origin/main` = `0020f7dbf27322583785099258c8df687fbcb9ac` (includes S3B + merged PR #142 hesaplama docs)
 **Status:** Decisions locked (D1–D6). Doc renumbered from colliding `104` → `105`. **S3B closed in production** (PR #144 merged; migration 056 applied/immutable; bindings 0). **S3C** implements dynamic QR + raw events on `feat/dynamic-qr-attendance-foundation` / draft PR #145 (see `106-s3c-dynamic-qr-attendance-foundation.md`).
 **PR #142:** Merged on main (`docs/hesaplama-cevap-haritasi` / `102`); S3C must not regress those files.
-**PR #142:** Untouched (`docs/hesaplama-cevap-haritasi`)
 **DOC_NUMBER_COLLISION:** FIXED (`104-s3a-…` → `105-s3a-…`)
 
 ---

@@ -1,8 +1,8 @@
 # 108 — S3E QR Interval → Daily Puantaj Evidence Candidate (Read Model)
 
-**Branch:** `feat/qr-puantaj-candidate-projection`  
-**Baseline main:** `3b47f09c22346498449e54a9d20612dfca2a7155` (S3D closed / PR #146 merged)  
-**Status:** Draft implementation — **no production write / no migration 058 / no merge / no deploy**
+**Branch:** `feat/qr-puantaj-candidate-projection` (merged)  
+**Baseline main:** `3b47f09c22346498449e54a9d20612dfca2a7155` (S3D closed / PR #146)  
+**Status:** **CLOSED PRODUCTION** (PR #147 merged @ `830a34fd…`; Deploy cPanel #31585444775; migration tip **057** unchanged)
 
 ---
 

@@ -325,6 +325,62 @@ class ArchiveManifestService
     }
 
     /**
+     * Deterministic fingerprint of QR raw attendance evidence for ISE_GIRIS_CIKIS.
+     * Empty / missing table → stable empty-state hash (does not throw).
+     *
+     * @return string|null
+     */
+    public static function computeIseGirisCikisFingerprint(PDO $pdo, $personelId)
+    {
+        $personelId = (int) $personelId;
+        if ($personelId <= 0) {
+            return null;
+        }
+
+        $hasTable = false;
+        try {
+            $check = $pdo->query("SHOW TABLES LIKE 'qr_attendance_events'");
+            $hasTable = $check && (bool) $check->fetch(PDO::FETCH_NUM);
+        } catch (\Throwable $e) {
+            $hasTable = false;
+        }
+
+        if (!$hasTable) {
+            return hash('sha256', 'ise_giris_cikis:empty:personel:' . $personelId . ':no_table');
+        }
+
+        $stmt = $pdo->prepare(
+            'SELECT id, personel_id, user_id, sube_id, event_type, occurred_at_utc,
+                    qr_version, qr_jti, created_at, request_nonce
+             FROM qr_attendance_events
+             WHERE personel_id = :personel_id
+             ORDER BY occurred_at_utc ASC, id ASC'
+        );
+        $stmt->execute(['personel_id' => $personelId]);
+        $parts = [];
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            $parts[] = implode('|', [
+                (string) ($row['id'] ?? ''),
+                (string) ($row['personel_id'] ?? ''),
+                (string) ($row['user_id'] ?? ''),
+                (string) ($row['sube_id'] ?? ''),
+                (string) ($row['event_type'] ?? ''),
+                (string) ($row['occurred_at_utc'] ?? ''),
+                (string) ($row['qr_version'] ?? ''),
+                (string) ($row['qr_jti'] ?? ''),
+                (string) ($row['created_at'] ?? ''),
+                (string) ($row['request_nonce'] ?? ''),
+            ]);
+        }
+
+        if (count($parts) === 0) {
+            return hash('sha256', 'ise_giris_cikis:empty:personel:' . $personelId);
+        }
+
+        return hash('sha256', implode("\n", $parts));
+    }
+
+    /**
      * Create PERSONEL_OZLUK (+ ISE_GIRIS_CIKIS) manifests at PASIF transition.
      * New employment lifecycle → new row; prior lifecycle rows remain immutable.
      *
@@ -343,8 +399,10 @@ class ArchiveManifestService
             throw new RuntimeException(RetentionPolicyService::CODE_TERMINATION_DATE_MISSING);
         }
 
-        $fingerprint = self::computePersonelOzlukFingerprint($pdo, $personelId);
-        $identity = 'personel:' . $personelId . ':termination:' . $termination;
+        $ozlukFp = self::computePersonelOzlukFingerprint($pdo, $personelId);
+        $girisCikisFp = self::computeIseGirisCikisFingerprint($pdo, $personelId);
+        $ozlukIdentity = 'personel:' . $personelId . ':termination:' . $termination;
+        $girisCikisIdentity = 'personel:' . $personelId . ':ise_giris_cikis:termination:' . $termination;
         $dt = DateTime::createFromFormat('Y-m-d', $termination);
         if (!$dt) {
             throw new RuntimeException(RetentionPolicyService::CODE_TRIGGER_NOT_RESOLVED);
@@ -352,17 +410,30 @@ class ArchiveManifestService
         $until = RetentionPolicyService::calculateRetentionUntil($dt);
 
         $created = [];
-        foreach ([RetentionCategories::PERSONEL_OZLUK, RetentionCategories::ISE_GIRIS_CIKIS] as $category) {
+        foreach (
+            [
+                [
+                    'category' => RetentionCategories::PERSONEL_OZLUK,
+                    'identity' => $ozlukIdentity,
+                    'fp' => $ozlukFp,
+                ],
+                [
+                    'category' => RetentionCategories::ISE_GIRIS_CIKIS,
+                    'identity' => $girisCikisIdentity,
+                    'fp' => $girisCikisFp,
+                ],
+            ] as $spec
+        ) {
             $created[] = self::createManifest($pdo, [
                 'entity_type' => 'personel',
                 'record_id' => $personelId,
                 'personel_id' => $personelId,
-                'record_category' => $category,
-                'source_version_identity' => $identity,
+                'record_category' => $spec['category'],
+                'source_version_identity' => $spec['identity'],
                 'trigger_type' => RetentionCategories::TRIGGER_TERMINATION_DATE,
                 'trigger_date' => $termination,
                 'retention_until' => $until,
-                'source_sha256' => $fingerprint,
+                'source_sha256' => $spec['fp'],
             ], $actorId > 0 ? $actorId : null);
         }
 

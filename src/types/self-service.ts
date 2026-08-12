@@ -81,12 +81,55 @@ export type MeFazlaCalismaResponse = {
   yillik: MeFazlaCalismaYillik;
 };
 
+export type QrEventType = "GIRIS" | "CIKIS";
+
+export type MeQrAttendanceEvent = {
+  id: number;
+  event_type: QrEventType;
+  occurred_at: string;
+  sube: {
+    id: number;
+    ad: string;
+  };
+};
+
+export type MeQrScanResponse = {
+  event: MeQrAttendanceEvent;
+  idempotent: boolean;
+};
+
+export type MeQrHareketleriResponse = {
+  from: string;
+  to: string;
+  items: MeQrAttendanceEvent[];
+};
+
+export type QrKioskTokenResponse = {
+  token: string;
+  issued_at: number;
+  expires_at: number;
+  ttl_seconds: number;
+  sube: {
+    id: number;
+    ad: string;
+  };
+};
+
 export const SELF_SERVICE_ERROR_CODES = [
   "SELF_SERVICE_BINDING_REQUIRED",
   "SELF_SERVICE_PERSONEL_INACTIVE",
   "SELF_SERVICE_PERSONEL_MISSING",
   "SELF_SERVICE_SCHEMA_NOT_READY",
-  "PERSONEL_ALREADY_BOUND"
+  "PERSONEL_ALREADY_BOUND",
+  "QR_CONFIG_NOT_READY",
+  "QR_SCHEMA_NOT_READY",
+  "QR_TOKEN_INVALID",
+  "QR_TOKEN_EXPIRED",
+  "QR_TOKEN_VERSION_UNSUPPORTED",
+  "QR_CROSS_BRANCH_DENIED",
+  "QR_EVENT_TYPE_INVALID",
+  "QR_REQUEST_NONCE_INVALID",
+  "QR_IDEMPOTENCY_CONFLICT"
 ] as const;
 
 export type SelfServiceErrorCode = (typeof SELF_SERVICE_ERROR_CODES)[number];

@@ -331,6 +331,8 @@ class RolePermissions
             'self_service.puantaj.view',
             'self_service.yillik_izin.view',
             'self_service.fazla_calisma.view',
+            'self_service.qr.scan',
+            'self_service.qr.events.view',
         ],
         'AUTH_SMOKE_READONLY' => [
             'ops.auth_smoke.read',

@@ -29,6 +29,7 @@ use Medisa\Api\Controllers\SerbestZamanController;
 use Medisa\Api\Controllers\MaasHesaplamaController;
 use Medisa\Api\Controllers\MeController;
 use Medisa\Api\Controllers\MevzuatParametreController;
+use Medisa\Api\Controllers\QrKioskController;
 use Medisa\Api\Controllers\PersonelBelgelerController;
 use Medisa\Api\Controllers\PersonelBordroKapsamController;
 use Medisa\Api\Controllers\PersonellerController;
@@ -89,6 +90,15 @@ class Router
         }
         if ($path === '/me/fazla-calisma' && $method === 'GET') {
             MeController::fazlaCalisma($this->request);
+        }
+        if ($path === '/me/qr-scan' && $method === 'POST') {
+            MeController::qrScan($this->request);
+        }
+        if ($path === '/me/qr-hareketleri' && $method === 'GET') {
+            MeController::qrHareketleri($this->request);
+        }
+        if ($path === '/qr-kiosk/token' && $method === 'GET') {
+            QrKioskController::token($this->request);
         }
 
         if ($method === 'PUT' && preg_match('#^/personeller/(\d+)$#', $path, $matches)) {

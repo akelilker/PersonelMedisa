@@ -26,8 +26,9 @@ class RetentionSourceAdapterService
 
         switch ($category) {
             case RetentionCategories::PERSONEL_OZLUK:
+                return self::resolvePersonelOzlukLifecycle($pdo, $context);
             case RetentionCategories::ISE_GIRIS_CIKIS:
-                return self::resolvePersonelLifecycle($pdo, $context);
+                return self::resolveIseGirisCikisLifecycle($pdo, $context);
             case RetentionCategories::PERSONEL_BELGE:
                 return self::resolvePersonelBelge($pdo, $context);
             case RetentionCategories::PUANTAJ:
@@ -103,7 +104,7 @@ class RetentionSourceAdapterService
      * @param array<string, mixed> $context
      * @return array{source_version_identity: string, source_sha256: string|null}
      */
-    private static function resolvePersonelLifecycle(PDO $pdo, array $context)
+    private static function resolvePersonelOzlukLifecycle(PDO $pdo, array $context)
     {
         $personelId = self::personelIdFromContext($context);
         if ($personelId <= 0) {
@@ -119,6 +120,41 @@ class RetentionSourceAdapterService
             'source_version_identity' => 'personel:' . $personelId . ':termination:' . $termination,
             'source_sha256' => $fp,
         ];
+    }
+
+    /**
+     * ISE_GIRIS_CIKIS covers raw QR attendance evidence (S3C).
+     * Empty history remains deterministic when table exists or is absent.
+     *
+     * @param array<string, mixed> $context
+     * @return array{source_version_identity: string, source_sha256: string|null}
+     */
+    private static function resolveIseGirisCikisLifecycle(PDO $pdo, array $context)
+    {
+        $personelId = self::personelIdFromContext($context);
+        if ($personelId <= 0) {
+            throw new RuntimeException(RetentionPolicyService::CODE_TRIGGER_NOT_RESOLVED);
+        }
+        $termination = RetentionPolicyService::resolveTerminationDate($pdo, $personelId);
+        if ($termination === null) {
+            throw new RuntimeException(RetentionPolicyService::CODE_TERMINATION_DATE_MISSING);
+        }
+        $fp = ArchiveManifestService::computeIseGirisCikisFingerprint($pdo, $personelId);
+
+        return [
+            'source_version_identity' => 'personel:' . $personelId . ':ise_giris_cikis:termination:' . $termination,
+            'source_sha256' => $fp,
+        ];
+    }
+
+    /**
+     * @deprecated Kept for call-site compatibility during S3C transition; prefer explicit resolvers.
+     * @param array<string, mixed> $context
+     * @return array{source_version_identity: string, source_sha256: string|null}
+     */
+    private static function resolvePersonelLifecycle(PDO $pdo, array $context)
+    {
+        return self::resolvePersonelOzlukLifecycle($pdo, $context);
     }
 
     /**

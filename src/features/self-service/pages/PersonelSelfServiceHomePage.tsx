@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import {
   fetchMe,
   fetchMeFazlaCalisma,
@@ -222,6 +223,14 @@ export function PersonelSelfServiceHomePage() {
             .filter(Boolean)
             .join(" · ") || "Personel self-service"}
         </p>
+        <div className="self-service-home__actions">
+          <Link className="self-service-action" to="/self/qr-okut" data-testid="self-qr-scan-link">
+            QR Okut
+          </Link>
+          <Link className="self-service-action" to="/self/qr-hareketleri" data-testid="self-qr-history-link">
+            QR Hareketlerim
+          </Link>
+        </div>
       </header>
 
       {sectionErrors.length > 0 ? (

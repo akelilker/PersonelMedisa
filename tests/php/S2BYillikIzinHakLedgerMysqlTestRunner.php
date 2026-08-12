@@ -93,7 +93,7 @@ $files = s2bLedgerMigrationFiles();
 s2bLedgerAssert(in_array('052_puantaj_tolerans_ve_disiplin.sql', $files, true), '052 present');
 s2bLedgerAssert(in_array('053_retention_legal_hold_arsiv.sql', $files, true), '053 present');
 s2bLedgerAssert(in_array('054_canonical_role_consolidation.sql', $files, true), '054 present');
-s2bLedgerAssert(end($files) === '056_users_personel_binding.sql', 'tip is 055');
+s2bLedgerAssert(end($files) === '057_qr_attendance_events.sql', 'tip is 055');
 
 $migration055 = (string) file_get_contents(__DIR__ . '/../../api/migrations/055_yillik_izin_hak_duzeltmeleri.sql');
 s2bLedgerAssert(strpos($migration055, 'CREATE TABLE IF NOT EXISTS yillik_izin_hak_duzeltmeleri') !== false, '055 ledger table');

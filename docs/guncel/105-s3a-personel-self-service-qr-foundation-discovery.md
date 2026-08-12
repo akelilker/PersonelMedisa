@@ -2,7 +2,7 @@
 
 **Branch:** `feat/personel-self-service-qr-foundation`
 **Baseline:** `origin/main` = `f58da7c19551cdf52829f0a796da919f88dc9f3a` (S2 / PR #143 merge)
-**Status:** Decisions locked (D1–D6). Doc renumbered from colliding `104` → `105` (main already had `104-s2a-…`). S3B implements binding + `/me` read on this branch; QR remains S3C+.
+**Status:** Decisions locked (D1–D6). Doc renumbered from colliding `104` → `105`. **S3B closed in production** (PR #144 merged; migration 056 applied/immutable; bindings 0). **S3C** implements dynamic QR + raw events on `feat/dynamic-qr-attendance-foundation` (see `106-s3c-dynamic-qr-attendance-foundation.md`).
 **PR #142:** Untouched (`docs/hesaplama-cevap-haritasi`)
 **DOC_NUMBER_COLLISION:** FIXED (`104-s3a-…` → `105-s3a-…`)
 

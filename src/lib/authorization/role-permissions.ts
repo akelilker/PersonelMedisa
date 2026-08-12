@@ -112,7 +112,9 @@ export type AppPermission =
   | "self_service.view"
   | "self_service.puantaj.view"
   | "self_service.yillik_izin.view"
-  | "self_service.fazla_calisma.view";
+  | "self_service.fazla_calisma.view"
+  | "self_service.qr.scan"
+  | "self_service.qr.events.view";
 
 const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
   GENEL_YONETICI: [
@@ -432,7 +434,9 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "self_service.view",
     "self_service.puantaj.view",
     "self_service.yillik_izin.view",
-    "self_service.fazla_calisma.view"
+    "self_service.fazla_calisma.view",
+    "self_service.qr.scan",
+    "self_service.qr.events.view"
   ],
   AUTH_SMOKE_READONLY: ["ops.auth_smoke.read"]
 };
@@ -498,6 +502,7 @@ export const ROUTE_PERMISSION = {
   finansPage: "finans.view",
   isgPage: "isg.view",
   yonetimPaneliPage: "yonetim-paneli.view",
+  qrKioskPage: "yonetim-paneli.manage",
   resmiTatilTakvimiPage: "resmi_tatil_takvimi.view",
   aylikOzetPage: "aylik-ozet.view",
   haftalikKapanisPage: "revizyon.view"

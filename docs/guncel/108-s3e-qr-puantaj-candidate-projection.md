@@ -155,7 +155,7 @@ Frontend `revizyon-correction-overlay` is client-side for display; not authorita
 | Max range | **62** inclusive days |
 | Self `/me` | **Not** exposed — manager/HR operational surface |
 
-Roles with `puantaj.view`: `GENEL_YONETICI`, `SUBE_YONETICISI`, `MUHASEBE`, `BIRIM_AMIRI`, `IK`, `SISTEM_YONETICISI` (not `PERSONEL`).
+Roles with `puantaj.view`: `GENEL_YONETICI`, `BOLUM_YONETICISI`, `MUHASEBE`, `BIRIM_AMIRI`, `IK_SORUMLUSU`, `SISTEM_YONETICISI` (not `PERSONEL`).
 
 ---
 

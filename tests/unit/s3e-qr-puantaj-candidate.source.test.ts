@@ -59,7 +59,7 @@ describe("S3E QR puantaj candidate projection", () => {
     expect(puantaj).toContain("QrPuantajCandidateReadService::listForPersonel");
     expect(puantaj).not.toMatch(/INSERT\s+INTO\s+gunluk_puantaj[\s\S]*qrAdaylari/s);
 
-    expect(router).toContain("'/puantaj/qr-adaylari/");
+    expect(router).toContain("/puantaj/qr-adaylari/");
     expect(router).toContain("PuantajController::qrAdaylari");
 
     expect(endpoints).toContain("qrAdaylari:");

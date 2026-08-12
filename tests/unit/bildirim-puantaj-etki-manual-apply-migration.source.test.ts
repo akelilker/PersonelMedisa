@@ -42,6 +42,6 @@ describe("S74-D1 migration 013 bildirim puantaj etki manual apply", () => {
     expect(migrationFiles.filter((fileName) => fileName.startsWith("013_"))).toEqual([
       "013_bildirim_puantaj_etki_manual_apply.sql",
     ]);
-    expect(migrationFiles.at(-1)).toBe("057_qr_attendance_events.sql");
+    expect(migrationFiles.at(-1)).toBe("058_qr_puantaj_candidate_decision_ledger.sql");
   });
 });

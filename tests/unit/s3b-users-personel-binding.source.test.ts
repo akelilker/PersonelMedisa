@@ -17,12 +17,12 @@ describe("S3B users.personel_id binding foundation", () => {
     await ensureDisposableMariaDbEnv();
   }, 90_000);
 
-  it("locks migration 056 + owners + doc renumber (tip 057)", () => {
+  it("locks migration 056 + owners + doc renumber (tip 058)", () => {
     const migrations = readdirSync(resolve("api/migrations"))
       .filter((name) => /^\d{3}_.+\.sql$/.test(name))
       .sort();
     expect(migrations).toContain("055_yillik_izin_hak_duzeltmeleri.sql");
-    expect(migrations.at(-1)).toBe("057_qr_attendance_events.sql");
+    expect(migrations.at(-1)).toBe("058_qr_puantaj_candidate_decision_ledger.sql");
 
     const sql = read("api/migrations/056_users_personel_binding.sql");
     expect(sql).toContain("personel_id");

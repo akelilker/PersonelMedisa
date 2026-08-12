@@ -29,6 +29,6 @@ describe("017_donem_kapanis_ve_etki_rapor_indexleri migration source", () => {
       .filter((name) => /^\d{3}_.*\.sql$/.test(name))
       .sort();
     expect(migrations).toContain("017_donem_kapanis_ve_etki_rapor_indexleri.sql");
-    expect(migrations.at(-1)).toBe("057_qr_attendance_events.sql");
+    expect(migrations.at(-1)).toBe("058_qr_puantaj_candidate_decision_ledger.sql");
   });
 });

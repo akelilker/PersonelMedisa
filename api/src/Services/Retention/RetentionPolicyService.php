@@ -48,6 +48,8 @@ class RetentionPolicyService
     public const CODE_TARGET_ALREADY_MISSING = 'TARGET_ALREADY_MISSING';
     public const CODE_DEPENDENT_RETENTION_RECORDS_REMAIN = 'DEPENDENT_RETENTION_RECORDS_REMAIN';
     public const CODE_DESTRUCTION_EXECUTED = 'DESTRUCTION_EXECUTED';
+    /** Exact source already has EXECUTED physical destruction evidence (new request blocked). */
+    public const CODE_SOURCE_ALREADY_DESTROYED_AS_APPROVED = 'SOURCE_ALREADY_DESTROYED_AS_APPROVED';
 
     /**
      * @param array<string, mixed> $context
@@ -240,6 +242,23 @@ class RetentionPolicyService
             $result['message'] = self::codeMessage($integrityCode);
 
             return $result;
+        }
+
+        if ($category === RetentionCategories::PUANTAJ) {
+            $subeId = (int) ($context['sube_id'] ?? 0);
+            $yil = (int) ($context['yil'] ?? 0);
+            $ay = (int) ($context['ay'] ?? 0);
+            if (\Medisa\Api\Services\Retention\PhysicalDestruction\PuantajPhysicalDestructionGate::isPeriodDestroyed(
+                $pdo,
+                $subeId,
+                $yil,
+                $ay
+            )) {
+                $result['code'] = self::CODE_SOURCE_ALREADY_DESTROYED_AS_APPROVED;
+                $result['message'] = self::codeMessage(self::CODE_SOURCE_ALREADY_DESTROYED_AS_APPROVED);
+
+                return $result;
+            }
         }
 
         // Expose server-derived source identity for snapshot/compare callers.
@@ -452,6 +471,7 @@ class RetentionPolicyService
             self::CODE_TARGET_ALREADY_MISSING => 'Hedef kaynak ilk execute oncesi yok; fail-closed.',
             self::CODE_DEPENDENT_RETENTION_RECORDS_REMAIN => 'Bagimli saklama kayitlari hala mevcut.',
             self::CODE_DESTRUCTION_EXECUTED => 'Fiziksel imha tamamlandi.',
+            self::CODE_SOURCE_ALREADY_DESTROYED_AS_APPROVED => 'Kaynak daha once onayli fiziksel imha ile yok edildi.',
         ];
 
         return isset($map[$code]) ? $map[$code] : 'Saklama degerlendirmesi basarisiz.';

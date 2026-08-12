@@ -82,6 +82,17 @@ Herhangi bir korunması gereken `maas_hesaplama_donem_snapshotlari.muhur_id` per
 
 Source fingerprint = effective seal id + `created_at` (satır payload’a bağlı değil) → pinned execute sonrası idempotency / integrity bozulmaz; ikinci execute `ALREADY_EXECUTED` / mutation 0.
 
+#### OPTION A — post-destruction lifecycle (follow-up)
+
+Preserved seal headers are **evidence-only** after physical destruction (`DESTROYED_AS_APPROVED` via `retention_imha_executionlari`). They are not live PUANTAJ payload.
+
+- Owner: `PuantajPhysicalDestructionGate` — period destroyed = EXECUTED PUANTAJ evidence for `(canonical_sube_id, period_yil, period_ay)`
+- Reopen create / approve / reseal → `PUANTAJ_PERIOD_PHYSICALLY_DESTROYED` (HTTP 409)
+- Open reopen (`ONAY_BEKLIYOR` | `ONAYLANDI`) → physical destroy fail-closed `PUANTAJ_OPEN_REOPEN_REQUEST_EXISTS` (plan `open_reopen_talep_count`)
+- Terminal reopen (`REDDEDILDI` | `UYGULANDI`) does not block destroy; may remain as historical evidence in pinned mode
+- Lock order: destruction request `FOR UPDATE` → `PuantajDonemKilidiService::acquire(period)` → scope re-read / mutate. Reopen path: period lock only. Prevents destroy+reopen resurrection race.
+- New destruction request for already-destroyed period → `SOURCE_ALREADY_DESTROYED_AS_APPROVED` (no second request row). Same talep retry → `ALREADY_EXECUTED`.
+
 ### BORDRO (run-leaf)
 - `maas_hesaplama_aday_kalemleri` → `maas_hesaplama_adaylari` → run-scoped `maas_hesaplama_auditleri` → `maas_hesaplama_calistirmalari`
 
@@ -131,7 +142,7 @@ Migration **`060_retention_physical_destroy_trigger_gate.sql`** (additive; `059`
 | `npm run build` | PASS |
 | `git diff --check` | PASS |
 
-Pack 3B matrix covers: PUANTAJ no-snapshot full graph / daily delete / QR block / QR then success / snapshot-pin effective + historical header preserve / lines+daily delete / snapshot+muhur_id unchanged / graph integrity / pinned+QR block then ONAY_AUDIT retry / pin mid-flight fail-closed / pinned idempotency / legal hold / plan hash / missing target / unrelated period; BORDRO run-leaf / snapshot+SGK+devir preserve / direct DELETE blocked / child RESTRICT / idempotency; SGK nested delete / header preserve / run tree preserve / catalogs present / direct DELETE blocked / gated execute / hold / idempotency.
+Pack 3B matrix covers: PUANTAJ no-snapshot full graph / daily delete / QR block / QR then success / snapshot-pin effective + historical header preserve / lines+daily delete / snapshot+muhur_id unchanged / graph integrity / pinned+QR block then ONAY_AUDIT retry / pin mid-flight fail-closed / pinned idempotency / post-destroy reopen gate / open-reopen blocks destroy / terminal reopen allows destroy / duplicate request SOURCE_ALREADY_DESTROYED / legal hold / plan hash / missing target / unrelated period; destroy-vs-reopen concurrency; BORDRO run-leaf / snapshot+SGK+devir preserve / direct DELETE blocked / child RESTRICT / idempotency; SGK nested delete / header preserve / run tree preserve / catalogs present / direct DELETE blocked / gated execute / hold / idempotency.
 
 ---
 

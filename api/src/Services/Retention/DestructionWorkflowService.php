@@ -91,6 +91,10 @@ class DestructionWorkflowService
             $context,
             null
         );
+        if (($eligibility['code'] ?? '') === RetentionPolicyService::CODE_SOURCE_ALREADY_DESTROYED_AS_APPROVED) {
+            // Do not mint a second request lifecycle for an already-destroyed exact period/source.
+            throw new RuntimeException(RetentionPolicyService::CODE_SOURCE_ALREADY_DESTROYED_AS_APPROVED);
+        }
         if (!empty($eligibility['source_version_identity'])) {
             $context['source_version_identity'] = $eligibility['source_version_identity'];
         }

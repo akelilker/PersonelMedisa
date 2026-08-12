@@ -9,12 +9,16 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../api/src/bootstrap.php';
 
+use Medisa\Api\Services\PuantajDonemPeriodService;
+use Medisa\Api\Services\PuantajDonemReopenException;
+use Medisa\Api\Services\PuantajDonemReopenService;
 use Medisa\Api\Services\Qr\QrPuantajCandidateDecisionLedgerService;
 use Medisa\Api\Services\Retention\ArchiveManifestService;
 use Medisa\Api\Services\Retention\DestructionWorkflowService;
 use Medisa\Api\Services\Retention\LegalHoldService;
 use Medisa\Api\Services\Retention\PhysicalDestruction\PhysicalDestructionCodes;
 use Medisa\Api\Services\Retention\PhysicalDestruction\PhysicalDestructionService;
+use Medisa\Api\Services\Retention\PhysicalDestruction\PuantajPhysicalDestructionGate;
 use Medisa\Api\Services\Retention\PhysicalDestruction\RetentionDestructionHandlerRegistry;
 use Medisa\Api\Services\Retention\RetentionCategories;
 use Medisa\Api\Services\Retention\RetentionClock;
@@ -183,7 +187,8 @@ function p3bSeedBase(PDO $pdo): void
     $pdo->exec("INSERT INTO subeler (id, kod, ad, durum) VALUES (1, 'A', 'Sube A', 'AKTIF')");
     $pdo->exec(
         "INSERT INTO users (id, username, password_hash, ad_soyad, rol, durum) VALUES
-        (1, 'genel', '{$hash}', 'Genel Yon', 'GENEL_YONETICI', 'AKTIF')"
+        (1, 'genel', '{$hash}', 'Genel Yon', 'GENEL_YONETICI', 'AKTIF'),
+        (2, 'approver', '{$hash}', 'Approver Yon', 'GENEL_YONETICI', 'AKTIF')"
     );
     $pdo->exec(
         "INSERT INTO personeller (
@@ -1185,6 +1190,351 @@ try {
     foreach (LegalHoldService::list($pdo, true) as $h) {
         LegalHoldService::release($pdo, p3bGm(), (int) $h['id'], 'release');
     }
+
+    // ========== PUANTAJ post-destruction lifecycle hardening ==========
+    // A) snapshot-pinned destroy success (fresh period)
+    $life = p3bSeedBordroTree($pdo, 2014, 1, false, false);
+    $pdo->exec(
+        "INSERT INTO gunluk_puantaj (personel_id, tarih, state, kontrol_durumu, muhur_id)
+         VALUES (10, '2014-01-15', 'MUHURLENDI', 'BEKLIYOR', " . (int) $life['seal_id'] . ")"
+    );
+    $lifeDaily = (int) $pdo->lastInsertId();
+    $pdo->exec(
+        "INSERT INTO puantaj_aylik_muhur_satirlari (muhur_id, personel_id, tarih, kontrol_durumu)
+         VALUES (" . (int) $life['seal_id'] . ", 10, '2014-01-15', 'BEKLIYOR')"
+    );
+    ArchiveManifestService::createPuantajPeriodManifests($pdo, 1, 2014, 1, (int) $life['seal_id'], 1);
+    $apLife = p3bApprove($pdo, RetentionCategories::PUANTAJ, 'puantaj', (int) $life['seal_id'], 2014, 1);
+    $resLife = p3bEvalExecute($pdo, (int) $apLife['id']);
+    p3bAssert(
+        ($resLife['execution']['code'] ?? '') === PhysicalDestructionCodes::CODE_DESTRUCTION_EXECUTED,
+        'LIFECYCLE A: pinned destroy success'
+    );
+    $passCount++;
+    p3bAssert(
+        PuantajPhysicalDestructionGate::isPeriodDestroyed($pdo, 1, 2014, 1),
+        'LIFECYCLE A: gate sees destroyed period'
+    );
+    $passCount++;
+
+    // B) createReopen after destroy → blocked, no row
+    $pdo->beginTransaction();
+    try {
+        PuantajDonemReopenService::createReopenRequest($pdo, p3bGm(), 1, 2014, 1, 'post-destroy reopen');
+        $pdo->rollBack();
+        p3bAssert(false, 'LIFECYCLE B: createReopen should fail');
+    } catch (PuantajDonemReopenException $e) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        p3bAssert(
+            $e->getErrorCode() === PuantajPhysicalDestructionGate::CODE_PERIOD_PHYSICALLY_DESTROYED,
+            'LIFECYCLE B: createReopen blocked by destroyed gate'
+        );
+        $passCount++;
+    }
+    $reopenRows = (int) $pdo->query(
+        "SELECT COUNT(*) FROM puantaj_donem_reopen_talepleri
+         WHERE sube_id=1 AND yil=2014 AND ay=1 AND gerekce='post-destroy reopen'"
+    )->fetchColumn();
+    p3bAssert($reopenRows === 0, 'LIFECYCLE B: no reopen row inserted');
+    $passCount++;
+
+    // C) open ONAY_BEKLIYOR blocks destruction
+    $blockPending = p3bSeedBordroTree($pdo, 2014, 2, false, false);
+    $pdo->exec(
+        "INSERT INTO gunluk_puantaj (personel_id, tarih, state, kontrol_durumu, muhur_id)
+         VALUES (10, '2014-02-15', 'MUHURLENDI', 'BEKLIYOR', " . (int) $blockPending['seal_id'] . ")"
+    );
+    $pendingDaily = (int) $pdo->lastInsertId();
+    $pdo->exec(
+        "INSERT INTO puantaj_aylik_muhur_satirlari (muhur_id, personel_id, tarih, kontrol_durumu)
+         VALUES (" . (int) $blockPending['seal_id'] . ", 10, '2014-02-15', 'BEKLIYOR')"
+    );
+    ArchiveManifestService::createPuantajPeriodManifests($pdo, 1, 2014, 2, (int) $blockPending['seal_id'], 1);
+    $pdo->beginTransaction();
+    PuantajDonemReopenService::createReopenRequest($pdo, p3bGm(), 1, 2014, 2, 'pending blocks destroy');
+    $pdo->commit();
+    $apPending = p3bApprove($pdo, RetentionCategories::PUANTAJ, 'puantaj', (int) $blockPending['seal_id'], 2014, 2);
+    $evalPending = PhysicalDestructionService::evaluate($pdo, p3bGm(), (int) $apPending['id']);
+    p3bAssert(
+        (int) ($evalPending['plan']['expected_row_counts']['open_reopen_talep_count'] ?? -1) === 1,
+        'LIFECYCLE C: plan includes open_reopen_talep_count'
+    );
+    $passCount++;
+    try {
+        PhysicalDestructionService::execute($pdo, p3bGm(), (int) $apPending['id'], [
+            'expected_plan_hash' => (string) $evalPending['plan']['plan_hash'],
+            'execution_nonce' => p3bNonce(),
+            'confirmation' => PhysicalDestructionCodes::CONFIRMATION_TOKEN,
+        ]);
+        p3bAssert(false, 'LIFECYCLE C: destroy should block on open reopen');
+    } catch (RuntimeException $e) {
+        p3bAssert(
+            $e->getMessage() === PhysicalDestructionCodes::CODE_PUANTAJ_OPEN_REOPEN_REQUEST_EXISTS,
+            'LIFECYCLE C: open ONAY_BEKLIYOR blocks destroy'
+        );
+        $passCount++;
+    }
+    p3bAssert(
+        (int) $pdo->query('SELECT COUNT(*) FROM gunluk_puantaj WHERE id=' . $pendingDaily)->fetchColumn() === 1,
+        'LIFECYCLE C: payload untouched when open reopen blocks'
+    );
+    $passCount++;
+
+    // D) open ONAYLANDI blocks destruction
+    $blockApproved = p3bSeedBordroTree($pdo, 2014, 3, false, false);
+    $pdo->exec(
+        "INSERT INTO gunluk_puantaj (personel_id, tarih, state, kontrol_durumu, muhur_id)
+         VALUES (10, '2014-03-15', 'MUHURLENDI', 'BEKLIYOR', " . (int) $blockApproved['seal_id'] . ")"
+    );
+    $approvedDaily = (int) $pdo->lastInsertId();
+    $pdo->exec(
+        "INSERT INTO puantaj_aylik_muhur_satirlari (muhur_id, personel_id, tarih, kontrol_durumu)
+         VALUES (" . (int) $blockApproved['seal_id'] . ", 10, '2014-03-15', 'BEKLIYOR')"
+    );
+    ArchiveManifestService::createPuantajPeriodManifests($pdo, 1, 2014, 3, (int) $blockApproved['seal_id'], 1);
+    $pdo->beginTransaction();
+    $reopenApproved = PuantajDonemReopenService::createReopenRequest(
+        $pdo,
+        p3bGm(),
+        1,
+        2014,
+        3,
+        'approved blocks destroy'
+    );
+    $pdo->commit();
+    $pdo->beginTransaction();
+    PuantajDonemReopenService::approveReopenRequest(
+        $pdo,
+        ['id' => 2, 'rol' => 'GENEL_YONETICI'],
+        1,
+        2014,
+        3,
+        (int) $reopenApproved['id']
+    );
+    $pdo->commit();
+    $apApprovedBlock = p3bApprove(
+        $pdo,
+        RetentionCategories::PUANTAJ,
+        'puantaj',
+        (int) $blockApproved['seal_id'],
+        2014,
+        3
+    );
+    $evalApprovedBlock = PhysicalDestructionService::evaluate($pdo, p3bGm(), (int) $apApprovedBlock['id']);
+    try {
+        PhysicalDestructionService::execute($pdo, p3bGm(), (int) $apApprovedBlock['id'], [
+            'expected_plan_hash' => (string) $evalApprovedBlock['plan']['plan_hash'],
+            'execution_nonce' => p3bNonce(),
+            'confirmation' => PhysicalDestructionCodes::CONFIRMATION_TOKEN,
+        ]);
+        p3bAssert(false, 'LIFECYCLE D: destroy should block on ONAYLANDI');
+    } catch (RuntimeException $e) {
+        p3bAssert(
+            $e->getMessage() === PhysicalDestructionCodes::CODE_PUANTAJ_OPEN_REOPEN_REQUEST_EXISTS,
+            'LIFECYCLE D: open ONAYLANDI blocks destroy'
+        );
+        $passCount++;
+    }
+    p3bAssert(
+        (int) $pdo->query('SELECT COUNT(*) FROM gunluk_puantaj WHERE id=' . $approvedDaily)->fetchColumn() === 1,
+        'LIFECYCLE D: payload untouched when ONAYLANDI blocks'
+    );
+    $passCount++;
+
+    // E) terminal REDDEDILDI does not block pinned destroy; historical request preserved
+    $termReject = p3bSeedBordroTree($pdo, 2014, 4, false, false);
+    $pdo->exec(
+        "INSERT INTO gunluk_puantaj (personel_id, tarih, state, kontrol_durumu, muhur_id)
+         VALUES (10, '2014-04-15', 'MUHURLENDI', 'BEKLIYOR', " . (int) $termReject['seal_id'] . ")"
+    );
+    $pdo->exec(
+        "INSERT INTO puantaj_aylik_muhur_satirlari (muhur_id, personel_id, tarih, kontrol_durumu)
+         VALUES (" . (int) $termReject['seal_id'] . ", 10, '2014-04-15', 'BEKLIYOR')"
+    );
+    ArchiveManifestService::createPuantajPeriodManifests($pdo, 1, 2014, 4, (int) $termReject['seal_id'], 1);
+    $pdo->exec(
+        "INSERT INTO puantaj_donem_reopen_talepleri (
+            sube_id, yil, ay, kaynak_muhur_id, talep_durumu, gerekce,
+            requested_by, requested_at, request_hash, rejected_by, rejected_at, rejection_reason
+         ) VALUES (
+            1, 2014, 4, " . (int) $termReject['seal_id'] . ", '" . PuantajDonemPeriodService::TALEP_REDDEDILDI . "',
+            'historical rejected', 1, '2014-04-20 10:00:00', '" . p3bHash() . "',
+            2, '2014-04-21 10:00:00', 'no'
+         )"
+    );
+    $rejectedId = (int) $pdo->lastInsertId();
+    $apTermReject = p3bApprove($pdo, RetentionCategories::PUANTAJ, 'puantaj', (int) $termReject['seal_id'], 2014, 4);
+    $resTermReject = p3bEvalExecute($pdo, (int) $apTermReject['id']);
+    p3bAssert(
+        ($resTermReject['execution']['code'] ?? '') === PhysicalDestructionCodes::CODE_DESTRUCTION_EXECUTED,
+        'LIFECYCLE E: REDDEDILDI allows pinned destroy'
+    );
+    $passCount++;
+    p3bAssert(
+        (int) $pdo->query(
+            'SELECT COUNT(*) FROM puantaj_donem_reopen_talepleri WHERE id=' . $rejectedId
+        )->fetchColumn() === 1,
+        'LIFECYCLE E: historical REDDEDILDI preserved'
+    );
+    $passCount++;
+
+    // F) terminal UYGULANDI historical revision graph — pinned destroy proceeds; headers preserved
+    $termApplied = p3bSeedPuantajPeriod($pdo, 2014, 5, true);
+    $oldSealF = (int) $termApplied['seal_ids'][0];
+    $effSealF = (int) $termApplied['seal_ids'][1];
+    $hF = p3bHash();
+    $pdo->exec(
+        "INSERT INTO maas_hesaplama_donem_snapshotlari (
+            sube_id, yil, ay, donem, donem_baslangic, donem_bitis, muhur_id, revision_no,
+            state, cutoff_at, preflight_hash, source_hash, snapshot_hash,
+            personel_sayisi, girdi_sayisi, created_by
+         ) VALUES (
+            1, 2014, 5, '2014-05', '2014-05-01', '2014-05-31', {$effSealF}, 1,
+            'OLUSTURULDU', '2014-05-28 12:00:00', '{$hF}', '{$hF}', '{$hF}',
+            1, 0, 1
+         )"
+    );
+    $pdo->exec(
+        "INSERT INTO puantaj_donem_reopen_talepleri (
+            sube_id, yil, ay, kaynak_muhur_id, talep_durumu, gerekce,
+            requested_by, requested_at, request_hash, approved_by, approved_at,
+            applied_at, reseal_muhur_id
+         ) VALUES (
+            1, 2014, 5, {$oldSealF}, '" . PuantajDonemPeriodService::TALEP_UYGULANDI . "',
+            'historical applied', 1, '2014-05-10 10:00:00', '" . p3bHash() . "',
+            2, '2014-05-11 10:00:00', '2014-05-12 10:00:00', {$effSealF}
+         )"
+    );
+    $appliedId = (int) $pdo->lastInsertId();
+    $apTermApplied = p3bApprove($pdo, RetentionCategories::PUANTAJ, 'puantaj', $effSealF, 2014, 5);
+    $resTermApplied = p3bEvalExecute($pdo, (int) $apTermApplied['id']);
+    p3bAssert(
+        ($resTermApplied['execution']['code'] ?? '') === PhysicalDestructionCodes::CODE_DESTRUCTION_EXECUTED,
+        'LIFECYCLE F: UYGULANDI allows pinned destroy'
+    );
+    $passCount++;
+    p3bAssert(
+        (int) $pdo->query(
+            'SELECT COUNT(*) FROM puantaj_aylik_muhurleri WHERE sube_id=1 AND yil=2014 AND ay=5'
+        )->fetchColumn() === 2,
+        'LIFECYCLE F: revision headers preserved'
+    );
+    $passCount++;
+    p3bAssert(
+        (int) $pdo->query(
+            'SELECT COUNT(*) FROM puantaj_donem_reopen_talepleri WHERE id=' . $appliedId
+        )->fetchColumn() === 1,
+        'LIFECYCLE F: UYGULANDI talep preserved'
+    );
+    $passCount++;
+
+    // H/I) after destroy: stale approve + reseal blocked (synthetic open talep inserted)
+    $pdo->exec(
+        "INSERT INTO puantaj_donem_reopen_talepleri (
+            sube_id, yil, ay, kaynak_muhur_id, talep_durumu, gerekce,
+            requested_by, requested_at, request_hash
+         ) VALUES (
+            1, 2014, 1, " . (int) $life['seal_id'] . ", '" . PuantajDonemPeriodService::TALEP_ONAY_BEKLIYOR . "',
+            'stale after destroy', 1, '2014-01-20 10:00:00', '" . bin2hex(random_bytes(32)) . "'
+         )"
+    );
+    $stalePendingId = (int) $pdo->lastInsertId();
+    $pdo->beginTransaction();
+    try {
+        PuantajDonemReopenService::approveReopenRequest(
+            $pdo,
+            ['id' => 2, 'rol' => 'GENEL_YONETICI'],
+            1,
+            2014,
+            1,
+            $stalePendingId
+        );
+        $pdo->rollBack();
+        p3bAssert(false, 'LIFECYCLE H: approve after destroy should fail');
+    } catch (PuantajDonemReopenException $e) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        p3bAssert(
+            $e->getErrorCode() === PuantajPhysicalDestructionGate::CODE_PERIOD_PHYSICALLY_DESTROYED,
+            'LIFECYCLE H: approve stale blocked'
+        );
+        $passCount++;
+    }
+    $pdo->exec(
+        "UPDATE puantaj_donem_reopen_talepleri
+         SET talep_durumu = '" . PuantajDonemPeriodService::TALEP_ONAYLANDI . "',
+             approved_by = 2, approved_at = '2014-01-21 10:00:00'
+         WHERE id = {$stalePendingId}"
+    );
+    $pdo->beginTransaction();
+    try {
+        PuantajDonemReopenService::reseal(
+            $pdo,
+            p3bGm(),
+            1,
+            2014,
+            1,
+            'stale reseal',
+            (int) $life['seal_id'],
+            static function () {
+                throw new RuntimeException('reseal callback must not run');
+            }
+        );
+        $pdo->rollBack();
+        p3bAssert(false, 'LIFECYCLE I: reseal after destroy should fail');
+    } catch (PuantajDonemReopenException $e) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        p3bAssert(
+            $e->getErrorCode() === PuantajPhysicalDestructionGate::CODE_PERIOD_PHYSICALLY_DESTROYED,
+            'LIFECYCLE I: reseal stale blocked'
+        );
+        $passCount++;
+    }
+
+    // J) new destruction request for already-destroyed pinned source → rejected, no REQUESTED lifecycle
+    try {
+        DestructionWorkflowService::requestDestruction($pdo, p3bGm(), [
+            'category' => RetentionCategories::PUANTAJ,
+            'entity_type' => 'puantaj',
+            'record_id' => (int) $life['seal_id'],
+            'sube_id' => 1,
+            'yil' => 2014,
+            'ay' => 1,
+            'reason' => 'duplicate after destroy',
+        ]);
+        p3bAssert(false, 'LIFECYCLE J: new request should fail');
+    } catch (RuntimeException $e) {
+        p3bAssert(
+            $e->getMessage() === RetentionPolicyService::CODE_SOURCE_ALREADY_DESTROYED_AS_APPROVED,
+            'LIFECYCLE J: SOURCE_ALREADY_DESTROYED_AS_APPROVED'
+        );
+        $passCount++;
+    }
+    $dupCount = (int) $pdo->query(
+        "SELECT COUNT(*) FROM retention_imha_talepleri
+         WHERE category='PUANTAJ' AND period_yil=2014 AND period_ay=1 AND reason='duplicate after destroy'"
+    )->fetchColumn();
+    p3bAssert($dupCount === 0, 'LIFECYCLE J: no second request row');
+    $passCount++;
+
+    // K) same original request retry → ALREADY_EXECUTED
+    $againLife = PhysicalDestructionService::execute($pdo, p3bGm(), (int) $apLife['id'], [
+        'expected_plan_hash' => (string) ($resLife['plan']['plan_hash'] ?? p3bHash()),
+        'execution_nonce' => p3bNonce(),
+        'confirmation' => PhysicalDestructionCodes::CONFIRMATION_TOKEN,
+    ]);
+    p3bAssert(
+        ($againLife['execution']['code'] ?? '') === PhysicalDestructionCodes::CODE_ALREADY_EXECUTED
+            && (int) ($againLife['execution']['execution_id'] ?? 0) === (int) ($resLife['execution']['execution_id'] ?? -1)
+            && (int) ($againLife['execution']['mutation_count'] ?? 0) === 0,
+        'LIFECYCLE K: same request ALREADY_EXECUTED'
+    );
+    $passCount++;
 
     echo 'verify-retention-physical-pack3b-mysql: OK pass_count=' . $passCount . PHP_EOL;
 } finally {

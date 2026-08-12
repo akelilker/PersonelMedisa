@@ -26,6 +26,8 @@ final class PhysicalDestructionCodes
     public const CODE_DEPENDENT_RETENTION_RECORDS_REMAIN = 'DEPENDENT_RETENTION_RECORDS_REMAIN';
     /** PUANTAJ blocked while typed ONAY_AUDIT qr_pc_decision ledger still RESTRICTs period daily rows. */
     public const CODE_PUANTAJ_BLOCKED_BY_QR_ONAY_AUDIT = 'PUANTAJ_BLOCKED_BY_QR_ONAY_AUDIT';
+    /** PUANTAJ blocked while open reopen lifecycle (ONAY_BEKLIYOR|ONAYLANDI) remains. */
+    public const CODE_PUANTAJ_OPEN_REOPEN_REQUEST_EXISTS = 'PUANTAJ_OPEN_REOPEN_REQUEST_EXISTS';
     public const CODE_DESTRUCTION_CONFIRMATION_REQUIRED = 'DESTRUCTION_CONFIRMATION_REQUIRED';
     public const CODE_DESTRUCTION_EXECUTION_INVALID = 'DESTRUCTION_EXECUTION_INVALID';
     public const CODE_DESTRUCTION_SCHEMA_NOT_READY = 'DESTRUCTION_EXECUTION_SCHEMA_NOT_READY';
@@ -51,6 +53,7 @@ final class PhysicalDestructionCodes
             self::CODE_TARGET_ALREADY_MISSING => 'Hedef kaynak ilk execute oncesi yok; fail-closed.',
             self::CODE_DEPENDENT_RETENTION_RECORDS_REMAIN => 'Bagimli saklama kayitlari hala mevcut.',
             self::CODE_PUANTAJ_BLOCKED_BY_QR_ONAY_AUDIT => 'PUANTAJ imha, once typed ONAY_AUDIT (qr_pc_decision) imha gerektirir.',
+            self::CODE_PUANTAJ_OPEN_REOPEN_REQUEST_EXISTS => 'PUANTAJ imha, acik reopen talebi varken engellendi.',
             self::CODE_DESTRUCTION_CONFIRMATION_REQUIRED => 'Explicit confirmation gerekli.',
             self::CODE_DESTRUCTION_EXECUTION_INVALID => 'Imha execute istegi gecersiz.',
             self::CODE_DESTRUCTION_SCHEMA_NOT_READY => 'Imha execution semasi hazir degil.',

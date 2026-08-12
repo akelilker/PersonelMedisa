@@ -7,6 +7,7 @@ namespace Medisa\Api\Services\Retention\PhysicalDestruction;
 use Medisa\Api\Auth\RolePermissions;
 use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Services\Retention\DestructionWorkflowService;
+use Medisa\Api\Services\Retention\RetentionCategories;
 use Medisa\Api\Services\Retention\RetentionClock;
 use Medisa\Api\Services\Retention\RetentionPolicyService;
 use Medisa\Api\Services\Retention\RetentionSchemaGate;
@@ -314,6 +315,18 @@ final class PhysicalDestructionService
             }
 
             $context = self::enrichContextFromTalep($pdo, $talep);
+
+            // PUANTAJ: request FOR UPDATE (above) → period lock → plan/scope re-read.
+            // Serializes against reopen create/approve/reseal (period lock only).
+            if ((string) $talep['category'] === RetentionCategories::PUANTAJ) {
+                $subeId = (int) ($context['sube_id'] ?? $talep['canonical_sube_id'] ?? 0);
+                $yil = (int) ($context['yil'] ?? $talep['period_yil'] ?? 0);
+                $ay = (int) ($context['ay'] ?? $talep['period_ay'] ?? 0);
+                if ($subeId > 0 && $yil >= 2000 && $ay >= 1 && $ay <= 12) {
+                    \Medisa\Api\Services\PuantajDonemKilidiService::acquire($pdo, $subeId, $yil, $ay);
+                }
+            }
+
             $eligibility = RetentionPolicyService::evaluateFinalExecutionEligibility(
                 $pdo,
                 (string) $talep['category'],

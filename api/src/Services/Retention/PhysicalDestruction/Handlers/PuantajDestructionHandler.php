@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Medisa\Api\Services\Retention\PhysicalDestruction\Handlers;
 
+use Medisa\Api\Services\PuantajDonemKilidiService;
+use Medisa\Api\Services\PuantajDonemPeriodService;
 use Medisa\Api\Services\Retention\PhysicalDestruction\DestructionHandlerInterface;
 use Medisa\Api\Services\Retention\PhysicalDestruction\PhysicalDestructionCodes;
 use Medisa\Api\Services\Retention\RetentionCategories;
@@ -71,6 +73,7 @@ final class PuantajDestructionHandler implements DestructionHandlerInterface
                 'puantaj_donem_reopen_talepleri' => $mode === self::MODE_FULL_GRAPH_DELETE
                     ? $scope['reopen_talep_count']
                     : 0,
+                'open_reopen_talep_count' => $scope['open_reopen_talep_count'],
                 'payroll_snapshot_pin_count' => $scope['payroll_snapshot_pin_count'],
                 'qr_puantaj_candidate_decision_ledger_blocking' => $scope['qr_blocking_count'],
             ],
@@ -89,6 +92,10 @@ final class PuantajDestructionHandler implements DestructionHandlerInterface
             throw new RuntimeException(PhysicalDestructionCodes::CODE_TARGET_ALREADY_MISSING);
         }
 
+        // Lock order (documented): destruction request FOR UPDATE (service) → period lock → scope re-read.
+        // Reopen path acquires period lock only. Serializes destroy vs reopen create/approve/reseal.
+        PuantajDonemKilidiService::acquire($pdo, $period['sube_id'], $period['yil'], $period['ay']);
+
         $scope = $this->resolveScope($pdo, $period);
         if (count($scope['seal_ids']) === 0) {
             throw new RuntimeException(PhysicalDestructionCodes::CODE_TARGET_ALREADY_MISSING);
@@ -100,6 +107,9 @@ final class PuantajDestructionHandler implements DestructionHandlerInterface
         $blocker = $this->dependencyBlocker($pdo, $scope, $mode);
         if ($blocker === PhysicalDestructionCodes::CODE_PUANTAJ_BLOCKED_BY_QR_ONAY_AUDIT) {
             throw new RuntimeException(PhysicalDestructionCodes::CODE_PUANTAJ_BLOCKED_BY_QR_ONAY_AUDIT);
+        }
+        if ($blocker === PhysicalDestructionCodes::CODE_PUANTAJ_OPEN_REOPEN_REQUEST_EXISTS) {
+            throw new RuntimeException(PhysicalDestructionCodes::CODE_PUANTAJ_OPEN_REOPEN_REQUEST_EXISTS);
         }
         if ($blocker !== null) {
             throw new RuntimeException(PhysicalDestructionCodes::CODE_DEPENDENT_RETENTION_RECORDS_REMAIN);
@@ -303,6 +313,7 @@ final class PuantajDestructionHandler implements DestructionHandlerInterface
      *   daily_ids:list<int>,
      *   satir_count:int,
      *   reopen_talep_count:int,
+     *   open_reopen_talep_count:int,
      *   qr_blocking_count:int,
      *   payroll_snapshot_pin_count:int,
      *   seal_graph_links:array<int, array{parent_muhur_id: ?int, superseded_by_id: ?int}>
@@ -369,15 +380,32 @@ final class PuantajDestructionHandler implements DestructionHandlerInterface
         }
 
         $reopenCount = 0;
-        if (count($sealIds) > 0 && $this->tableExists($pdo, 'puantaj_donem_reopen_talepleri')) {
-            $placeholders = implode(',', array_fill(0, count($sealIds), '?'));
-            $c = $pdo->prepare(
-                "SELECT COUNT(*) FROM puantaj_donem_reopen_talepleri
-                 WHERE kaynak_muhur_id IN ({$placeholders})
-                    OR reseal_muhur_id IN ({$placeholders})"
+        $openReopenCount = 0;
+        if ($this->tableExists($pdo, 'puantaj_donem_reopen_talepleri')) {
+            if (count($sealIds) > 0) {
+                $placeholders = implode(',', array_fill(0, count($sealIds), '?'));
+                $c = $pdo->prepare(
+                    "SELECT COUNT(*) FROM puantaj_donem_reopen_talepleri
+                     WHERE kaynak_muhur_id IN ({$placeholders})
+                        OR reseal_muhur_id IN ({$placeholders})"
+                );
+                $c->execute(array_merge($sealIds, $sealIds));
+                $reopenCount = (int) $c->fetchColumn();
+            }
+
+            $open = $pdo->prepare(
+                'SELECT COUNT(*) FROM puantaj_donem_reopen_talepleri
+                 WHERE sube_id = :sube_id AND yil = :yil AND ay = :ay
+                   AND talep_durumu IN (:pending, :approved)'
             );
-            $c->execute(array_merge($sealIds, $sealIds));
-            $reopenCount = (int) $c->fetchColumn();
+            $open->execute([
+                'sube_id' => $period['sube_id'],
+                'yil' => $period['yil'],
+                'ay' => $period['ay'],
+                'pending' => PuantajDonemPeriodService::TALEP_ONAY_BEKLIYOR,
+                'approved' => PuantajDonemPeriodService::TALEP_ONAYLANDI,
+            ]);
+            $openReopenCount = (int) $open->fetchColumn();
         }
 
         $qrBlocking = 0;
@@ -407,6 +435,7 @@ final class PuantajDestructionHandler implements DestructionHandlerInterface
             'daily_ids' => $dailyIds,
             'satir_count' => $satirCount,
             'reopen_talep_count' => $reopenCount,
+            'open_reopen_talep_count' => $openReopenCount,
             'qr_blocking_count' => $qrBlocking,
             'payroll_snapshot_pin_count' => $pinCount,
             'seal_graph_links' => $this->loadSealGraphLinks($pdo, $sealIds),
@@ -476,6 +505,13 @@ final class PuantajDestructionHandler implements DestructionHandlerInterface
         if ($expectedDaily >= 0 && $expectedDaily !== count($scope['daily_ids'])) {
             throw new RuntimeException(PhysicalDestructionCodes::CODE_DESTRUCTION_PLAN_CHANGED);
         }
+
+        $expectedOpenReopen = isset($plan['expected_row_counts']['open_reopen_talep_count'])
+            ? (int) $plan['expected_row_counts']['open_reopen_talep_count']
+            : -1;
+        if ($expectedOpenReopen >= 0 && $expectedOpenReopen !== (int) $scope['open_reopen_talep_count']) {
+            throw new RuntimeException(PhysicalDestructionCodes::CODE_DESTRUCTION_PLAN_CHANGED);
+        }
     }
 
     /**
@@ -486,6 +522,10 @@ final class PuantajDestructionHandler implements DestructionHandlerInterface
     {
         if ((int) ($scope['qr_blocking_count'] ?? 0) > 0) {
             return PhysicalDestructionCodes::CODE_PUANTAJ_BLOCKED_BY_QR_ONAY_AUDIT;
+        }
+
+        if ((int) ($scope['open_reopen_talep_count'] ?? 0) > 0) {
+            return PhysicalDestructionCodes::CODE_PUANTAJ_OPEN_REOPEN_REQUEST_EXISTS;
         }
 
         $dailyIds = $scope['daily_ids'];

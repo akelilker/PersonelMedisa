@@ -251,13 +251,15 @@ describe("S1 canonical role consolidation", () => {
     }
   });
 
-  it("PERSONEL has self_service read only (no business access)", () => {
+  it("PERSONEL has self_service read + QR scan only (no business access)", () => {
     expect(ASSIGNABLE_USER_ROLES).toContain("PERSONEL");
     expect(getRolePermissions("PERSONEL")).toEqual([
       "self_service.view",
       "self_service.puantaj.view",
       "self_service.yillik_izin.view",
-      "self_service.fazla_calisma.view"
+      "self_service.fazla_calisma.view",
+      "self_service.qr.scan",
+      "self_service.qr.events.view"
     ]);
     expect(hasRolePermission("PERSONEL", "personeller.view")).toBe(false);
     expect(hasRolePermission("PERSONEL", "puantaj.view")).toBe(false);

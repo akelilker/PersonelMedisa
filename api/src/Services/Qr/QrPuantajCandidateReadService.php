@@ -62,7 +62,7 @@ class QrPuantajCandidateReadService
             $correctionPresentByDate
         );
 
-        $items = self::enrichWithDecisionOverlay($pdo, $personelId, $items);
+        $items = self::enrichWithDecisionOverlay($pdo, $personelId, $subeId, $items);
 
         return [
             'from' => $range['from'],
@@ -82,7 +82,7 @@ class QrPuantajCandidateReadService
      * @param list<array<string,mixed>> $items
      * @return list<array<string,mixed>>
      */
-    public static function enrichWithDecisionOverlay(PDO $pdo, $personelId, array $items)
+    public static function enrichWithDecisionOverlay(PDO $pdo, $personelId, $subeId, array $items)
     {
         $ledgerReady = false;
         try {
@@ -94,7 +94,7 @@ class QrPuantajCandidateReadService
 
         $out = [];
         foreach ($items as $item) {
-            $hash = QrPuantajCandidateHashService::compute($personelId, $item);
+            $hash = QrPuantajCandidateHashService::compute($personelId, $subeId, $item);
             $item['candidate_hash'] = $hash;
             $latest = null;
             if ($ledgerReady) {
@@ -169,7 +169,11 @@ class QrPuantajCandidateReadService
     private static function loadCanonicalByDate(PDO $pdo, $personelId, $from, $to)
     {
         $stmt = $pdo->prepare(
-            'SELECT id, tarih, giris_saati, cikis_saati, state, kontrol_durumu, updated_at
+            'SELECT id, tarih, giris_saati, cikis_saati, state, kontrol_durumu, muhur_id, updated_at,
+                    gec_kalma_dakika, erken_cikis_dakika, gercek_mola_dakika, hesaplanan_mola_dakika,
+                    net_calisma_suresi_dakika, gunluk_brut_sure_dakika,
+                    tatil_donemi_brut_calisma_dakika, tatil_donemi_ara_dinlenme_dakika,
+                    tatil_donemi_net_calisma_dakika
              FROM gunluk_puantaj
              WHERE personel_id = :personel_id
                AND tarih >= :from_date

@@ -528,27 +528,45 @@ class QrPuantajCandidateProjectionService
      */
     private static function mapCanonical($canonical)
     {
+        $dependentNulls = [];
+        foreach (QrPuantajCandidateDecisionPolicy::$dependentGuardFields as $field) {
+            $dependentNulls[$field] = null;
+        }
+
         if ($canonical === null) {
-            return [
+            return array_merge([
                 'exists' => false,
                 'puantaj_id' => null,
                 'giris_saati' => null,
                 'cikis_saati' => null,
                 'state' => null,
                 'kontrol_durumu' => null,
+                'muhur_id' => null,
                 'updated_at' => null,
-            ];
+            ], $dependentNulls);
         }
 
-        return [
+        $mapped = [
             'exists' => true,
             'puantaj_id' => (int) ($canonical['id'] ?? 0),
             'giris_saati' => self::normalizeCanonicalTime($canonical['giris_saati'] ?? null),
             'cikis_saati' => self::normalizeCanonicalTime($canonical['cikis_saati'] ?? null),
             'state' => isset($canonical['state']) ? (string) $canonical['state'] : null,
             'kontrol_durumu' => isset($canonical['kontrol_durumu']) ? (string) $canonical['kontrol_durumu'] : null,
+            'muhur_id' => array_key_exists('muhur_id', $canonical) && $canonical['muhur_id'] !== null && $canonical['muhur_id'] !== ''
+                ? (int) $canonical['muhur_id']
+                : null,
             'updated_at' => isset($canonical['updated_at']) ? (string) $canonical['updated_at'] : null,
         ];
+        foreach (QrPuantajCandidateDecisionPolicy::$dependentGuardFields as $field) {
+            if (!array_key_exists($field, $canonical) || $canonical[$field] === null || $canonical[$field] === '') {
+                $mapped[$field] = null;
+            } else {
+                $mapped[$field] = (int) $canonical[$field];
+            }
+        }
+
+        return $mapped;
     }
 
     /**

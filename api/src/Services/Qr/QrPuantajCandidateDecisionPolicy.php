@@ -126,6 +126,14 @@ class QrPuantajCandidateDecisionPolicy
         } else {
             $canKeep = self::isKeepStructurallyAllowed($item);
             $canApply = self::isApplyStructurallyAllowed($item);
+            $dependentBlocked = false;
+            if ($canApply) {
+                $guard = self::evaluateDependentFieldGuard(self::canonicalMapAsGuardRow($canonical));
+                if (!$guard['ok']) {
+                    $canApply = false;
+                    $dependentBlocked = true;
+                }
+            }
             if ($keptActive) {
                 $state = self::REVIEW_CANONICAL_KEPT;
                 $actionRequired = false;
@@ -136,9 +144,15 @@ class QrPuantajCandidateDecisionPolicy
             } elseif ($reopened) {
                 $state = self::REVIEW_REVIEW_REOPENED;
                 $actionRequired = true;
+                if ($dependentBlocked) {
+                    $blockingCode = self::BLOCK_DEPENDENT_FIELDS;
+                }
             } else {
                 $state = self::REVIEW_UNREVIEWED;
                 $actionRequired = $canApply || $canKeep;
+                if ($dependentBlocked) {
+                    $blockingCode = self::BLOCK_DEPENDENT_FIELDS;
+                }
             }
         }
 
@@ -248,6 +262,27 @@ class QrPuantajCandidateDecisionPolicy
         // DIFFERS or PERIOD_REQUIRES_REVISION (sealed/reopen-pending safe diff)
         return $comparison === QrPuantajCandidateProjectionService::COMPARE_DIFFERS_CANONICAL_TIME
             || $comparison === QrPuantajCandidateProjectionService::COMPARE_PERIOD_REQUIRES_REVISION;
+    }
+
+    /**
+     * Map candidate.canonical projection fields into a row shape for dependent guard.
+     *
+     * @param array<string,mixed>|null $canonical
+     * @return array<string,mixed>
+     */
+    public static function canonicalMapAsGuardRow($canonical)
+    {
+        $row = [];
+        if (!is_array($canonical)) {
+            return $row;
+        }
+        foreach (self::$dependentGuardFields as $field) {
+            if (array_key_exists($field, $canonical)) {
+                $row[$field] = $canonical[$field];
+            }
+        }
+
+        return $row;
     }
 
     /**

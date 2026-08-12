@@ -2,9 +2,10 @@
 
 **Amaç:** Aylardır işlenen kodların *neyi nasıl hesapladığını* tek bakışta görmek.  
 **Durum kaynağı:** Ürün freeze ve yayın kapıları için `CURRENT_STATE.md` esas alınır. Bu belge backlog değildir; **okuma / toplantı / denetim haritasıdır**.  
-**Tarih:** 2026-08-11  
-**Motor sürümü (kod):** `S91C2_PAYROLL_ENGINE_V2`  
+**Tarih:** 2026-08-11 (refresh 2026-08-12 — S1/S2/S3B sonrası owner doğrulaması)
+**Motor sürümü (kod):** `S91C2_PAYROLL_ENGINE_V2`
 **Compliance kontratı:** `S87_PAYROLL_COMPLIANCE_V1`
+**Not:** Bu belge hesaplama haritasıdır. Production migration tip (2026-08-12): **056**; next **057+**. QR attendance henüz yok (S3C).
 
 ---
 
@@ -45,17 +46,20 @@ Amir bildirimi / süreç / puantaj
 | Alan | Owner (kod) | Not |
 | --- | --- | --- |
 | Günlük süre / mola / gece / HT hak / önizleme | `src/services/puantaj-hesap-motoru.ts` | FE parity + UI önizleme |
-| Yıllık izin gün hakkı | `src/services/izin-hesap-motoru.ts` | ≤18 / ≥50 → min 20 gün |
-| Serbest zaman dönüşüm | `src/services/serbest-zaman-donusum.ts` + event motoru | 1 saat FM → 1.5 saat SZ |
+| Yıllık izin (band / birikmiş / kullanım / manuel / bakiye) | BE: `api/src/Services/Izin/YillikIzinHakEdisService.php`, `YillikIzinKullanimService.php`, `YillikIzinHakDuzeltmeLedgerService.php`, `YillikIzinBakiyeService.php` (+ `YillikIzinHakDuzeltmeController`, mig `055`) | FE parity: `src/services/izin-hesap-motoru.ts`. Otoriter bakiye BE assemble. ≤18 / ≥50 → band min 20 |
+| Serbest zaman dönüşüm | `src/services/serbest-zaman-donusum.ts` + `src/services/serbest-zaman-event-motoru.ts`; BE `api/src/Controllers/SerbestZamanController.php` | 1 saat FM → 1.5 saat SZ |
+| Fazla çalışma ödeme tercihi / haftalık kapanış | `api/src/Controllers/FazlaCalismaOdemeTercihiController.php`; `api/src/Controllers/HaftalikKapanisController.php`; FE `src/services/yillik-fazla-calisma-aggregate.ts` | FM limitleri compliance guard |
 | Otoriter bordro motoru | `api/src/Services/Payroll/MaasHesaplamaEngine.php` | Saf hesap |
 | Compliance / bloklar | `api/src/Services/Payroll/PayrollComplianceGuard.php` | Fail-closed |
 | Snapshot | `api/src/Services/MaasHesaplamaSnapshotService.php` | Girdi freeze |
 | Aday / hesap preflight | `api/src/Services/MaasHesaplamaAdayService.php` | |
 | Bordro hazırlık readiness | `api/src/Services/BordroHazirlikPreflightService.php` | |
-| SGK prim günü | `api/src/Services/Payroll/SgkPrimGunuEngine.php` | |
-| Şirket çalışma politikası | `SirketCalismaPolitikasiService` + katalog | Onaysız parametre yok |
-| Mevzuat parametreleri | `MevzuatParametreService` + legal katalog | Eksikse blocker |
+| SGK prim günü | compute `api/src/Services/Payroll/SgkPrimGunuEngine.php`; persist `api/src/Services/SgkPrimGunuService.php` | |
+| UBGT / resmi tatil | `api/src/Services/ResmiTatilTakvimiService.php`, `ResmiTatilTakvimProjectionService.php` | Doc `94-s88-ubgt-tatil-takvimi-owner.md` |
+| Şirket çalışma politikası | `api/src/Services/SirketCalismaPolitikasiService.php` + `api/src/Services/Payroll/SirketCalismaPolitikasiCatalog.php` | Onaysız parametre yok |
+| Mevzuat parametreleri | `api/src/Services/MevzuatParametreService.php` + `MaasHesaplamaLegalParameterCatalog.php` | Eksikse blocker |
 | Saklama (10 yıl) | `api/src/Services/Retention/*` | Medisa saklama politikası |
+| PERSONEL self-service okuma | `api/src/Controllers/MeController.php` + `api/src/Services/SelfService/SelfPersonelContext.php` (mig `056` `users.personel_id`) | `/me` puantaj / izin bakiye / FM read. QR henüz yok |
 
 ---
 
@@ -187,15 +191,26 @@ Owner ayrımı: compute = `SgkPrimGunuEngine`; persist/resolve = `SgkPrimGunuSer
 
 ---
 
-## 14. Yıllık izin (yaş kuralı)
+## 14. Yıllık izin (yaş kuralı + bakiye owner)
 
 | Koşul | Hak |
 | --- | --- |
-| Kıdem bandı | 1–5 yıl → 14; 5–15 → 20; 15+ → 26 (klasik tablo) |
+| Kıdem bandı (mevcut hizmet yılı) | 1–5 (5 dahil) → 14; **>5 ve <15** → 20; 15+ → 26 |
 | Yaş ≤ 18 veya ≥ 50 | Alt sınır **en az 20 gün** (daha az verilemez) |
 | Firma daha fazla verir | Serbest (üst sınır bu kuralı bozmaz) |
 
-Owner: `src/services/izin-hesap-motoru.ts`.
+**Owner ayrımı (S2 / PR #143):**
+
+| Katman | Owner |
+| --- | --- |
+| Yıllık band / birikmiş yasal hak | `api/src/Services/Izin/YillikIzinHakEdisService.php` (`hesaplaBirikmisYasalHak`) |
+| Kullanım (as-of) | `api/src/Services/Izin/YillikIzinKullanimService.php` |
+| Manuel hak düzeltme ledger | `api/src/Services/Izin/YillikIzinHakDuzeltmeLedgerService.php` (+ `YillikIzinHakDuzeltmeController`, mig `055`) |
+| Otoriter efektif bakiye | `api/src/Services/Izin/YillikIzinBakiyeService.php` — `birikmis + manuel_as_of − kullanilan_as_of` |
+| FE parity / önizleme | `src/services/izin-hesap-motoru.ts` (ikinci otoriter bakiye motoru **değil**) |
+| Self-service okuma | `MeController::yillikIzinBakiye` → aynı `YillikIzinBakiyeService::assemble` |
+
+Discovery: `docs/guncel/104-s2a-annual-leave-entitlement-adjustment-discovery.md`.
 
 ---
 
@@ -209,9 +224,9 @@ Owner: `src/services/izin-hesap-motoru.ts`.
 | Önizleme / onay | Bordro Hazırlık Merkezi + Maaş Hesaplama Merkezi |
 | Mühür | Haftalık kapanış + dönem kapanış |
 | Kapalı dönem düzeltme | Revizyon talebi + correction (doğrudan sessiz edit yok) |
+| PERSONEL self okuma | `/me`, `/me/puantaj`, `/me/yillik-izin-bakiye`, `/me/fazla-calisma` (binding `users.personel_id`) |
 
-Yetki matrisi: `09-rol-yetki-matrisi.md` + `RolePermissions`.
-
+Yetki için kod owner: `api/src/Auth/RolePermissions.php` (canonical). `09-rol-yetki-matrisi.md` tarihsel/kısmi; `PERSONEL` self-service izinleri yalnız RolePermissions’ta. QR scan/kiosk henüz yok.
 ---
 
 ## 16. Saklama / arşiv
@@ -233,7 +248,7 @@ Kaynak: masaüstü `puantaj resmi durum.docx` (toplantı mevzuat özeti).
 | --- | --- | --- |
 | 1 Ücret /30 /225 / brüt | Var (parametreli) | Canlı onay formu |
 | 2 SGK gün + 01/15/07 | Var | Resmî katalog ops kapısı |
-| 3 İzin yaş 20 gün | Var | — |
+| 3 İzin yaş 20 gün | Var | Band + yaş min 20; bakiye owner kümülatif + ledger + kullanım (`YillikIzinBakiyeService` / doc `104`) |
 | 4 18 yaş FM/gece blok | Var | — |
 | 5 FM 1.5 + 270 saat | Var | FSC %25 **kapalı** |
 | 6 Serbest zaman | Var (dönüşüm+kanıt) | **6 ay vade takibi yok** |
@@ -270,6 +285,11 @@ npm run test -- tests/unit/izin-hesap-motoru.test.ts
 php tests/php/MaasHesaplamaEngineTestRunner.php
 php tests/php/PayrollComplianceGuardTestRunner.php
 php tests/php/SgkPrimGunuEngineTestRunner.php
+
+# Yıllık izin S2 (parity + ledger)
+php tests/php/YillikIzinHakEdisPureTestRunner.php
+php tests/php/S2BYillikIzinHakParityTestRunner.php
+php tests/php/S2BYillikIzinHakLedgerMysqlTestRunner.php
 ```
 
 Detaylı compliance kapanış: `99-payroll-compliance-critical-gaps-kapanis.md`.

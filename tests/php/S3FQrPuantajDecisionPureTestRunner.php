@@ -197,6 +197,15 @@ s3fPureAssert(
     'source branch identity material change → different hash'
 );
 
+$midnightChanged = s3fPureBaseItem([
+    'qr' => ['spans_local_midnight' => true],
+    'provenance' => ['spans_local_midnight' => true],
+]);
+s3fPureAssert(
+    QrPuantajCandidateHashService::compute($personelId, $subeId, $midnightChanged) !== $hash1,
+    'spans_local_midnight change → different hash'
+);
+
 $correctionChanged = s3fPureBaseItem([
     'comparison_status' => QrPuantajCandidateProjectionService::COMPARE_APPROVED_CORRECTION_PRESENT,
 ]);
@@ -204,6 +213,49 @@ s3fPureAssert(
     QrPuantajCandidateHashService::compute($personelId, $subeId, $correctionChanged) !== $hash1,
     'approved correction ambiguity change → different hash'
 );
+
+s3fPureAssert(
+    !defined('Medisa\\Api\\Services\\Qr\\QrPuantajCandidateHashService::QR_CANDIDATE_HASH_V1')
+        && QrPuantajCandidateHashService::HASH_SCHEMA_VERSION !== 'QR_CANDIDATE_HASH_V1',
+    'V1 is not the active hash schema constant'
+);
+$hashSvcSource = file_get_contents(__DIR__ . '/../../api/src/Services/Qr/QrPuantajCandidateHashService.php');
+s3fPureAssert(
+    is_string($hashSvcSource)
+        && strpos($hashSvcSource, "HASH_SCHEMA_VERSION = 'QR_CANDIDATE_HASH_V2'") !== false
+        && preg_match("/HASH_SCHEMA_VERSION\\s*=\\s*'QR_CANDIDATE_HASH_V1'/", $hashSvcSource) !== 1,
+    'active HASH_SCHEMA_VERSION assignment is V2 only (V1 comment-only allowed)'
+);
+
+// Material payload must expose full V2 context keys.
+foreach ([
+    'hash_schema_version',
+    'personel_id',
+    'sube_id',
+    'candidate_date',
+    'algorithm_version',
+    'interval_algorithm_version',
+    'decision_algorithm_version',
+    'classification',
+    'comparison_status',
+    'proposed',
+    'canonical',
+    'period',
+    'source_event_ids',
+    'source_max_event_id',
+    'source_interval_count',
+    'source_anomaly_count',
+    'qr_matched_seconds',
+    'spans_local_midnight',
+    'source_sube_ids',
+] as $materialKey) {
+    s3fPureAssert(array_key_exists($materialKey, $material), 'V2 material has ' . $materialKey);
+}
+s3fPureAssert(array_key_exists('period_write_locked', $material['period']), 'V2 material period_write_locked');
+s3fPureAssert(array_key_exists('muhur_id', $material['canonical']), 'V2 material muhur_id');
+foreach (QrPuantajCandidateDecisionPolicy::$dependentGuardFields as $depField) {
+    s3fPureAssert(array_key_exists($depField, $material['canonical']), 'V2 material dependent ' . $depField);
+}
 
 $ledgerRow = [
     'candidate_hash' => $hash1,
@@ -256,6 +308,26 @@ s3fPureAssert(
     ($overlayDep['blocking_code'] ?? '') === QrPuantajCandidateDecisionPolicy::BLOCK_DEPENDENT_FIELDS,
     'dependent populated → blocking DEPENDENT_FIELDS'
 );
+
+$dependentZeroItem = s3fPureBaseItem([
+    'canonical' => ['gec_kalma_dakika' => 0],
+]);
+$overlayDepZero = QrPuantajCandidateDecisionPolicy::buildReviewOverlay($dependentZeroItem, null);
+s3fPureAssert(empty($overlayDepZero['can_apply']), 'dependent 0 is material populated → can_apply false');
+s3fPureAssert(
+    ($overlayDepZero['blocking_code'] ?? '') === QrPuantajCandidateDecisionPolicy::BLOCK_DEPENDENT_FIELDS,
+    'dependent 0 → blocking DEPENDENT_FIELDS'
+);
+$guardZero = QrPuantajCandidateDecisionPolicy::evaluateDependentFieldGuard(['gec_kalma_dakika' => 0]);
+s3fPureAssert($guardZero['ok'] === false, 'guard treats 0 as populated (nullable schema; 0 is material)');
+s3fPureAssert(
+    in_array('gec_kalma_dakika', $guardZero['populated'], true),
+    'guard lists zeroed dependent field'
+);
+
+$nullDependentItem = s3fPureBaseItem();
+$overlayNullDep = QrPuantajCandidateDecisionPolicy::buildReviewOverlay($nullDependentItem, null);
+s3fPureAssert(!empty($overlayNullDep['can_apply']), 'all dependent NULL → apply capability open');
 
 $keepDecision = [
     'id' => 1,

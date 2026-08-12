@@ -114,6 +114,14 @@ Changing entry/exit without authoritative shift-based recalculation would stale 
 Code: `QR_APPLY_DEPENDENT_FIELDS_REQUIRE_MANUAL_REVIEW`  
 No silent clear / no invented recalculation.
 
+Read-time UI copy (operational): when `blocking_code` is the dependent-fields code, Apply is hidden and an explicit Turkish explanation is shown; KEEP remains available if server capability allows.
+
+**Nullable vs zero:** schema columns are nullable. `NULL`/`''` are not populated. Numeric `0` **is** material populated for both hash and apply guard (locked by pure tests).
+
+### Candidate GET → decision UI nonce contract
+
+`QrPuantajAdayiSection` generates a fresh `request_nonce` per user-initiated `runDecision()` call. The shared API client has **no automatic HTTP transport retry**, so persisting a nonce across client retries is not required. Exact same-nonce concurrency is covered server-side (post-lock recheck + UNIQUE). `QR_CANDIDATE_STALE` responses do not auto-resubmit the old hash; the section reloads candidates after success (and surfaces the error after failure without silent re-apply).
+
 ### Canonical mutation (narrow)
 
 May change only:

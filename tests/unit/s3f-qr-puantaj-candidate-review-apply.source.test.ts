@@ -83,11 +83,20 @@ describe("S3F QR puantaj candidate review / apply", () => {
     expect(hashSvc).toContain("qr_matched_seconds");
     expect(hashSvc).toContain("source_sube_ids");
     expect(hashSvc).toMatch(/function compute\(\$personelId,\s*\$subeId/);
+    expect(hashSvc).toMatch(/HASH_SCHEMA_VERSION = 'QR_CANDIDATE_HASH_V2'/);
+    expect(hashSvc).not.toMatch(/HASH_SCHEMA_VERSION\s*=\s*'QR_CANDIDATE_HASH_V1'/);
 
     expect(policy).toContain("canonicalMapAsGuardRow");
     expect(policy).toContain("BLOCK_DEPENDENT_FIELDS");
     expect(decide).toContain("findByUserNonce");
     expect(decide).toContain("Post-lock nonce recheck");
+    // Post-lock nonce recheck must precede recompute/stale evaluation.
+    const postLockIdx = decide.indexOf("Post-lock nonce recheck");
+    const recomputeIdx = decide.indexOf("recomputeSingleCandidate");
+    const staleIdx = decide.indexOf("BLOCK_STALE");
+    expect(postLockIdx).toBeGreaterThan(-1);
+    expect(recomputeIdx).toBeGreaterThan(postLockIdx);
+    expect(staleIdx).toBeGreaterThan(recomputeIdx);
 
     expect(readSvc).toContain("gec_kalma_dakika");
     expect(readSvc).toContain("muhur_id");
@@ -95,6 +104,10 @@ describe("S3F QR puantaj candidate review / apply", () => {
     expect(projection).toContain("dependentGuardFields");
     expect(ui).toContain("QR_APPLY_DEPENDENT_FIELDS_REQUIRE_MANUAL_REVIEW");
     expect(ui).toContain("qr-puantaj-aday-dependent-review");
+    expect(ui).toContain("Manuel puantaj incelemesi gerekir");
+    expect(ui).toContain("newNonce()");
+    expect(ui).not.toContain("nonceRef");
+    expect(ui).not.toContain("lastNonce");
     expect(policy).toContain("QR_PUANTAJ_DECISION_V1");
     expect(policy).toContain("APPLY_EXISTING");
     expect(policy).toContain("KEEP_CANONICAL");
@@ -105,6 +118,17 @@ describe("S3F QR puantaj candidate review / apply", () => {
     expect(apply).toContain("giris_saati");
     expect(apply).toContain("cikis_saati");
     expect(decide).toContain("function decide");
+
+    // Production call sites must use the 3-arg V2 signature.
+    for (const path of [
+      "api/src/Services/Qr/QrPuantajCandidateDecisionService.php",
+      "api/src/Services/Qr/QrPuantajCandidateReadService.php",
+      "tests/php/S3FQrPuantajDecisionPureTestRunner.php"
+    ] as const) {
+      const src = read(path);
+      expect(src).not.toMatch(/QrPuantajCandidateHashService::compute\(\s*\$[a-zA-Z0-9_]+\s*,\s*\$[a-zA-Z0-9_]+\s*\)/);
+      expect(src).toMatch(/QrPuantajCandidateHashService::compute\([^)]+,[^)]+,[^)]+\)/);
+    }
 
     expect(puantaj).toContain("function qrAdaylari");
     expect(puantaj).toContain("function qrAdayKarar");

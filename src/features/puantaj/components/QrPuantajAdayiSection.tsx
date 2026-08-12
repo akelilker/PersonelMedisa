@@ -227,7 +227,8 @@ export function QrPuantajAdayiSection({ personelId, tarih, personelLabel, onAppl
 
           {dependentManualReview ? (
             <p className="puantaj-form-readonly" data-testid="qr-puantaj-aday-dependent-review">
-              Bağımlı türetilmiş alanlar dolu. QR saatleri doğrudan uygulanamaz; manuel inceleme gerekir.
+              Mevcut puantajda giriş/çıkış saatlerine bağlı hesaplanmış alanlar bulunduğu için QR saatleri
+              doğrudan uygulanamaz. Manuel puantaj incelemesi gerekir.
             </p>
           ) : null}
 

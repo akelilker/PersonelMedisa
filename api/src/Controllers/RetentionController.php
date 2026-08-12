@@ -157,6 +157,54 @@ class RetentionController
         JsonResponse::success(['item' => $item]);
     }
 
+    public static function evaluateExecution(Request $request, $id)
+    {
+        $user = AuthMiddleware::authenticate($request, true);
+
+        try {
+            $pdo = Connection::get();
+            $result = DestructionWorkflowService::evaluateExecution($pdo, $user, $id);
+        } catch (RuntimeException $e) {
+            $code = $e->getMessage();
+            if ($code === 'DESTRUCTION_REQUEST_NOT_FOUND') {
+                JsonResponse::notFound('Imha talebi bulunamadi.');
+            }
+            JsonResponse::badRequest($code, $code);
+        } catch (Throwable $e) {
+            JsonResponse::serverError('Imha execute degerlendirmesi yapilamadi.');
+        }
+
+        JsonResponse::success($result);
+    }
+
+    public static function executeDestruction(Request $request, $id)
+    {
+        $user = AuthMiddleware::authenticate($request, true);
+
+        $body = $request->getJsonBody();
+        if (!is_array($body)) {
+            $body = [];
+        }
+
+        try {
+            $pdo = Connection::get();
+            $result = DestructionWorkflowService::executePhysicalDestruction($pdo, $user, $id, $body);
+        } catch (RuntimeException $e) {
+            $code = $e->getMessage();
+            if ($code === 'DESTRUCTION_REQUEST_NOT_FOUND') {
+                JsonResponse::notFound('Imha talebi bulunamadi.');
+            }
+            if ($code === 'DESTRUCTION_EXECUTION_DISABLED') {
+                JsonResponse::error(423, $code, $code);
+            }
+            JsonResponse::badRequest($code, $code);
+        } catch (Throwable $e) {
+            JsonResponse::serverError('Fiziksel imha yurutulemedi.');
+        }
+
+        JsonResponse::success($result);
+    }
+
     public static function listRequests(Request $request)
     {
         $user = AuthMiddleware::authenticate($request, true);

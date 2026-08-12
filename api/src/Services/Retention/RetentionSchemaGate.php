@@ -41,6 +41,14 @@ class RetentionSchemaGate
     }
 
     /** @return array<int, string> */
+    public static function physicalDestructionTables()
+    {
+        return array_merge(self::destructionTables(), [
+            'retention_imha_executionlari',
+        ]);
+    }
+
+    /** @return array<int, string> */
     public static function manifestTables()
     {
         return ['arsiv_manifestleri'];

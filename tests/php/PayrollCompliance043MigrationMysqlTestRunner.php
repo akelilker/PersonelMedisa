@@ -114,7 +114,7 @@ try {
 
     $files = s87mMigrationFiles();
     s87mAssert($files !== [] && $files[0] === '001_initial_schema.sql', 'zincir 001 ile baslar');
-    s87mAssert(end($files) === '058_qr_puantaj_candidate_decision_ledger.sql', 'zincir 053 ile biter');
+    s87mAssert(end($files) === '059_retention_physical_destruction_execution.sql', 'zincir 053 ile biter');
     s87mAssert(in_array('042_sgk_resmi_kaynakli_kisitli_katalog.sql', $files, true), '042 SGK korunur');
 
     foreach ($files as $file) {

@@ -92,20 +92,21 @@ Aşağıdakiler CURRENT MAIN’de bozulmuş değilse OPEN yapılmaz:
 | Statü | **CODE_GAP** |
 | Öncelik | **P1** |
 | Domain | Retention / KVKK |
-| Mevcut | Request → GM approve → eligibility CLOSED; `RetentionPolicyService::executeDestruction` her zaman `EXECUTION_HANDLER_NOT_IMPLEMENTED`; HTTP execute route yok |
-| Beklenen | Onay sonrası kategoriye özel fiziksel delete/anonymize handler + audit |
-| Kanıt | `api/src/Services/Retention/RetentionPolicyService.php` (`CODE_EXECUTION_HANDLER_NOT_IMPLEMENTED`); `DestructionWorkflowService.php`; `RetentionController` / `Router` (eligibility/request/approve only) |
-| Neden açık | Altyapı var; fiziksel executor stub — ürün kapanışı için kod eksiği |
-| Runtime | İmha tamamlanamaz (fail-closed) |
-| Payroll / SGK | Yok |
-| KVKK/retention | Fiziksel imha yok |
-| Prod veri | Write yok (güvenli) |
-| İnsan kararı | Handler politikası (delete vs anonymize) için evet |
-| Migration | Muhtemel audit/evidence tabloları — tasarım sonrası |
-| Prod write | Hayır (bu tur) |
+| Pack 2 | `fix/retention-physical-destruction` / `112` — framework + 7 supported handlers + `059` evidence; feature flag default OFF |
+| Mevcut | Plan/execute + registry + HTTP evaluate/execute; **POLICY_DECISION_REQUIRED** kalan: PUANTAJ, BORDRO, SGK_EKSIK_GUN, FAZLA_CALISMA, SERBEST_ZAMAN, DISIPLIN, RAPOR, IS_KAZASI (+ generic ONAY_AUDIT parent) |
+| Beklenen | Tüm mandatory category strategy’leri executable (policy kararları kapanmış) + OPS feature enable ayrı kapı |
+| Kanıt | `PhysicalDestructionService`; `RetentionDestructionHandlerRegistry`; mig `059`; `112` |
+| Neden açık | Framework hazır; birkaç kategori için delete/anonymize/co-destroy iş kararı repo’dan kesin çıkmıyor |
+| Runtime | Flag OFF → `DESTRUCTION_EXECUTION_DISABLED`; policy kategori → `DESTRUCTION_HANDLER_POLICY_UNRESOLVED` |
+| Payroll / SGK | Policy blockers (BORDRO/SGK/PUANTAJ) |
+| KVKK/retention | Desteklenen kategorilerde test DB imha mümkün; production kapalı |
+| Prod veri | Write yok (bu tur) |
+| İnsan kararı | Evet — POLICY satırları (`112` BUSINESS_DECISIONS) |
+| Migration | `059` dosya eklendi; **production apply YOK** |
+| Prod write | Hayır |
 | Owner | Retention |
-| Kapanış sırası | Manifest + S3F fingerprint coverage sonrası |
-| Acceptance | Onaylı talepte kategori handler çalışır; audit yazılır; yanlış kategori fail-closed |
+| Kapanış sırası | Policy kararları → kalan handler’lar → OPS enable |
+| Acceptance | Onaylı talepte desteklenen kategori handler çalışır; audit/evidence; policy fail-closed; flag default OFF |
 
 ### MG-RET-MAN-001 — Archive manifest CREATE/LIFECYCLE wiring (13 kategori)
 
@@ -268,7 +269,7 @@ Aşağıdakiler CURRENT MAIN’de bozulmuş değilse OPEN yapılmaz:
 | MG-DEF-ENUM-001 | Legacy role ENUM shrink | P2 | `054` “Does NOT shrink”; 055–058 dokunmaz | Runtime canonical doğru; teknik borç |
 | MG-DEF-FSC-001 | FSC %25 aktif bant | P3 | S87 kapalı | — |
 | MG-DEF-PAY-OUT-001 | Bordro PDF / banka / SGK bildirgesi çıktısı | P3 | `100` / `102` FUTURE | Kısmi CSV var |
-| MG-DEF-RET-HTTP-001 | Destruction evaluate HTTP route | P3 | Service-only; test çağırır | PHYS-001 ile birlikte |
+| MG-DEF-RET-HTTP-001 | Destruction evaluate/execute HTTP | P3 | `GET .../evaluate`, `POST .../execute` Pack 2 | **CLOSED** (`112`) |
 
 ---
 

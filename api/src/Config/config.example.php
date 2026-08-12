@@ -16,4 +16,6 @@ return [
     'qr_ttl_seconds' => 60,
     'cors_allowed_origins' => '',
     'personel_belge_storage_root' => '',
+    // Physical destruction OPS gate — default OFF. Tests may override via env.
+    'retention_physical_destruction_enabled' => false,
 ];

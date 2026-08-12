@@ -107,6 +107,7 @@ export type AppPermission =
   | "legal_hold.manage"
   | "retention.destruction.request"
   | "retention.destruction.approve"
+  | "retention.destruction.execute"
   | "retention.destruction.view"
   | "yillik_izin_hak_duzeltme.manage"
   | "self_service.view"
@@ -206,6 +207,7 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "legal_hold.manage",
     "retention.destruction.request",
     "retention.destruction.approve",
+    "retention.destruction.execute",
     "retention.destruction.view"
   ],
   BOLUM_YONETICISI: [

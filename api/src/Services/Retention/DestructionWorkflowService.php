@@ -10,9 +10,8 @@ use PDO;
 use RuntimeException;
 
 /**
- * Destruction request / GM approve / evaluate execution.
- * No automatic delete. REQUESTED only when pre-approval passes.
- * Physical execute always returns EXECUTION_HANDLER_NOT_IMPLEMENTED.
+ * Destruction request / GM approve / evaluate orchestration.
+ * Physical mutation owned by PhysicalDestructionService (feature-flagged, plan-hash gated).
  */
 class DestructionWorkflowService
 {
@@ -311,66 +310,64 @@ class DestructionWorkflowService
     }
 
     /**
+     * Non-destructive evaluate: eligibility + plan (no physical mutation).
+     *
      * @param array<string, mixed> $user
      * @return array<string, mixed>
      */
     public static function evaluateExecution(PDO $pdo, array $user, $talepId)
     {
-        RolePermissions::assertAny($user, [
-            'retention.destruction.approve',
-            'retention.destruction.view',
-        ]);
-
-        $talep = self::getById($pdo, (int) $talepId);
-        if (!$talep) {
-            throw new RuntimeException('DESTRUCTION_REQUEST_NOT_FOUND');
-        }
-
-        $context = self::contextFromTalep($talep);
-        try {
-            $source = RetentionSourceAdapterService::resolve($pdo, (string) $talep['category'], $context);
-            $context['source_version_identity'] = $source['source_version_identity'];
-            if ($source['source_sha256'] !== null) {
-                $context['current_sha256'] = $source['source_sha256'];
-            }
-        } catch (RuntimeException $e) {
-            if (($context['entity_type'] === 'personel' || $context['entity_type'] === 'personeller')
-                && (int) $context['record_id'] > 0
-            ) {
-                $fp = ArchiveManifestService::computePersonelOzlukFingerprint($pdo, (int) $context['record_id']);
-                if ($fp !== null) {
-                    $context['current_sha256'] = $fp;
-                }
-            }
-        }
-
-        $result = RetentionPolicyService::executeDestruction(
+        return \Medisa\Api\Services\Retention\PhysicalDestruction\PhysicalDestructionService::evaluate(
             $pdo,
-            (string) $talep['category'],
-            $context,
-            $talep
+            $user,
+            $talepId
         );
+    }
 
-        $actorId = (int) ($user['id'] ?? 0);
-        if ($actorId > 0) {
-            self::appendAudit(
-                $pdo,
-                (int) $talep['id'],
-                (string) $talep['category'],
-                (string) $talep['entity_type'],
-                (int) $talep['record_id'],
-                $talep['personel_id'] !== null ? (int) $talep['personel_id'] : null,
-                'EVALUATE_EXECUTION',
-                $actorId,
-                null,
-                $result['code'] ?? null
-            );
-        }
+    /**
+     * Physical execute — delegates to PhysicalDestructionService.
+     *
+     * @param array<string, mixed> $user
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
+    public static function executePhysicalDestruction(PDO $pdo, array $user, $talepId, array $payload)
+    {
+        return \Medisa\Api\Services\Retention\PhysicalDestruction\PhysicalDestructionService::execute(
+            $pdo,
+            $user,
+            $talepId,
+            $payload
+        );
+    }
 
-        return [
-            'item' => $talep,
-            'execution' => $result,
-        ];
+    /**
+     * Public audit append for PhysicalDestructionService (same table owner).
+     */
+    public static function appendAuditPublic(
+        PDO $pdo,
+        $talepId,
+        $category,
+        $entityType,
+        $recordId,
+        $personelId,
+        $action,
+        $actorUserId,
+        $reason,
+        $resultCode
+    ) {
+        self::appendAudit(
+            $pdo,
+            $talepId,
+            $category,
+            $entityType,
+            $recordId,
+            $personelId,
+            $action,
+            $actorUserId,
+            $reason,
+            $resultCode
+        );
     }
 
     /**

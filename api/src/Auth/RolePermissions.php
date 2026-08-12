@@ -105,6 +105,7 @@ class RolePermissions
             'legal_hold.manage',
             'retention.destruction.request',
             'retention.destruction.approve',
+            'retention.destruction.execute',
             'retention.destruction.view',
         ],
         'BOLUM_YONETICISI' => [

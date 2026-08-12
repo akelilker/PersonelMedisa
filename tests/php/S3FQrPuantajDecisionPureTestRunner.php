@@ -28,6 +28,11 @@ function s3fPureAssert(bool $ok, string $name): void
  */
 function s3fPureBaseItem(array $overrides = [])
 {
+    $dependent = [];
+    foreach (QrPuantajCandidateDecisionPolicy::$dependentGuardFields as $field) {
+        $dependent[$field] = null;
+    }
+
     $item = [
         'candidate_date' => '2026-08-12',
         'classification' => QrPuantajCandidateProjectionService::CLASS_READY_SINGLE_INTERVAL,
@@ -36,19 +41,27 @@ function s3fPureBaseItem(array $overrides = [])
             'giris_saati' => '08:00',
             'cikis_saati' => '17:00',
         ],
-        'canonical' => [
+        'canonical' => array_merge([
             'exists' => true,
             'puantaj_id' => 42,
             'giris_saati' => '09:00',
             'cikis_saati' => '18:00',
             'state' => 'ACIK',
             'kontrol_durumu' => 'BEKLIYOR',
+            'muhur_id' => null,
             'updated_at' => '2026-08-12 10:00:00',
-        ],
+        ], $dependent),
         'period' => [
             'state' => 'ACIK',
+            'period_write_locked' => false,
             'canonical_write_open' => true,
             'canonical_write_block_code' => null,
+        ],
+        'qr' => [
+            'matched_seconds' => 32400,
+            'spans_local_midnight' => false,
+            'source_sube_ids' => [1],
+            'source_sube_names' => ['Merkez'],
         ],
         'provenance' => [
             'algorithm_version' => QrPuantajCandidateProjectionService::ALGORITHM_VERSION,
@@ -58,6 +71,7 @@ function s3fPureBaseItem(array $overrides = [])
             'source_interval_count' => 1,
             'source_anomaly_count' => 0,
             'qr_matched_seconds' => 32400,
+            'spans_local_midnight' => false,
         ],
         'ui_label' => 'cosmetic-A',
         'display_hint' => 'ignore-me',
@@ -75,10 +89,85 @@ function s3fPureBaseItem(array $overrides = [])
 }
 
 $personelId = 7;
+$subeId = 1;
 $base = s3fPureBaseItem();
-$hash1 = QrPuantajCandidateHashService::compute($personelId, $base);
-$hash1b = QrPuantajCandidateHashService::compute($personelId, $base);
+$hash1 = QrPuantajCandidateHashService::compute($personelId, $subeId, $base);
+$hash1b = QrPuantajCandidateHashService::compute($personelId, $subeId, $base);
 s3fPureAssert($hash1 === $hash1b && strlen($hash1) === 64, 'candidate hash stable for same material');
+s3fPureAssert(
+    QrPuantajCandidateHashService::HASH_SCHEMA_VERSION === 'QR_CANDIDATE_HASH_V2',
+    'hash schema is QR_CANDIDATE_HASH_V2'
+);
+
+$cosmetic = s3fPureBaseItem([
+    'ui_label' => 'cosmetic-B',
+    'display_hint' => 'still-ignored',
+    'qr' => ['source_sube_names' => ['Other Display Name']],
+]);
+s3fPureAssert(
+    QrPuantajCandidateHashService::compute($personelId, $subeId, $cosmetic) === $hash1,
+    'cosmetic label change → same hash'
+);
+
+s3fPureAssert(
+    QrPuantajCandidateHashService::compute($personelId, 2, $base) !== $hash1,
+    'sube_id change → different hash'
+);
+
+$material = QrPuantajCandidateHashService::materialPayload($personelId, $subeId, $base);
+s3fPureAssert(
+    ($material['decision_algorithm_version'] ?? '') === QrPuantajCandidateDecisionPolicy::DECISION_ALGORITHM_VERSION,
+    'hash binds decision algorithm version'
+);
+$materialAlt = $material;
+$materialAlt['decision_algorithm_version'] = 'QR_PUANTAJ_DECISION_X';
+s3fPureAssert(
+    hash('sha256', QrPuantajCandidateHashService::canonicalJson($materialAlt)) !== $hash1,
+    'decision algorithm material change → different hash'
+);
+
+$muhurChanged = s3fPureBaseItem([
+    'canonical' => ['muhur_id' => 9],
+]);
+s3fPureAssert(
+    QrPuantajCandidateHashService::compute($personelId, $subeId, $muhurChanged) !== $hash1,
+    'muhur_id change → different hash'
+);
+
+$depZero = s3fPureBaseItem([
+    'canonical' => ['gec_kalma_dakika' => 0],
+]);
+$hashDepZero = QrPuantajCandidateHashService::compute($personelId, $subeId, $depZero);
+s3fPureAssert($hashDepZero !== $hash1, 'dependent NULL → 0 → different hash');
+
+$depNonZero = s3fPureBaseItem([
+    'canonical' => ['gec_kalma_dakika' => 5],
+]);
+s3fPureAssert(
+    QrPuantajCandidateHashService::compute($personelId, $subeId, $depNonZero) !== $hashDepZero,
+    'dependent 0 → non-zero → different hash'
+);
+
+$periodLocked = s3fPureBaseItem([
+    'period' => [
+        'period_write_locked' => true,
+        'canonical_write_open' => false,
+        'canonical_write_block_code' => 'PERIOD_LOCKED',
+        'state' => 'SEALED',
+    ],
+]);
+s3fPureAssert(
+    QrPuantajCandidateHashService::compute($personelId, $subeId, $periodLocked) !== $hash1,
+    'period_write_locked change → different hash'
+);
+
+$updatedAtChanged = s3fPureBaseItem([
+    'canonical' => ['updated_at' => '2026-08-12 11:00:00'],
+]);
+s3fPureAssert(
+    QrPuantajCandidateHashService::compute($personelId, $subeId, $updatedAtChanged) !== $hash1,
+    'canonical updated_at change → different hash'
+);
 
 $srcChanged = s3fPureBaseItem([
     'provenance' => [
@@ -87,37 +176,33 @@ $srcChanged = s3fPureBaseItem([
     ],
 ]);
 s3fPureAssert(
-    QrPuantajCandidateHashService::compute($personelId, $srcChanged) !== $hash1,
+    QrPuantajCandidateHashService::compute($personelId, $subeId, $srcChanged) !== $hash1,
     'source event change → different hash'
 );
 
-$updatedAtChanged = s3fPureBaseItem([
-    'canonical' => ['updated_at' => '2026-08-12 11:00:00'],
+$matchedChanged = s3fPureBaseItem([
+    'provenance' => ['qr_matched_seconds' => 100],
+    'qr' => ['matched_seconds' => 100],
 ]);
 s3fPureAssert(
-    QrPuantajCandidateHashService::compute($personelId, $updatedAtChanged) !== $hash1,
-    'canonical updated_at change → different hash'
+    QrPuantajCandidateHashService::compute($personelId, $subeId, $matchedChanged) !== $hash1,
+    'QR matched seconds material change → different hash'
 );
 
-$periodChanged = s3fPureBaseItem([
-    'period' => [
-        'state' => 'SEALED',
-        'canonical_write_open' => false,
-        'canonical_write_block_code' => 'PERIOD_LOCKED',
-    ],
+$branchChanged = s3fPureBaseItem([
+    'qr' => ['source_sube_ids' => [1, 2]],
 ]);
 s3fPureAssert(
-    QrPuantajCandidateHashService::compute($personelId, $periodChanged) !== $hash1,
-    'period block change → different hash'
+    QrPuantajCandidateHashService::compute($personelId, $subeId, $branchChanged) !== $hash1,
+    'source branch identity material change → different hash'
 );
 
-$cosmetic = s3fPureBaseItem([
-    'ui_label' => 'cosmetic-B',
-    'display_hint' => 'still-ignored',
+$correctionChanged = s3fPureBaseItem([
+    'comparison_status' => QrPuantajCandidateProjectionService::COMPARE_APPROVED_CORRECTION_PRESENT,
 ]);
 s3fPureAssert(
-    QrPuantajCandidateHashService::compute($personelId, $cosmetic) === $hash1,
-    'cosmetic label change → same hash'
+    QrPuantajCandidateHashService::compute($personelId, $subeId, $correctionChanged) !== $hash1,
+    'approved correction ambiguity change → different hash'
 );
 
 $ledgerRow = [
@@ -126,7 +211,7 @@ $ledgerRow = [
     'decision_reason' => 'Mevcut saatler korunacak.',
     'decided_by_user_id' => 10,
     'personel_id' => $personelId,
-    'sube_id' => 1,
+    'sube_id' => $subeId,
     'candidate_date' => '2026-08-12',
     'puantaj_id' => 42,
     'algorithm_version' => QrPuantajCandidateProjectionService::ALGORITHM_VERSION,
@@ -160,6 +245,17 @@ s3fPureAssert($overlayOpen['state'] === QrPuantajCandidateDecisionPolicy::REVIEW
 s3fPureAssert(!empty($overlayOpen['can_apply']), 'OPEN can_apply');
 s3fPureAssert(!empty($overlayOpen['can_keep_canonical']), 'OPEN can_keep');
 s3fPureAssert(empty($overlayOpen['can_reopen_review']), 'OPEN cannot reopen');
+
+$dependentItem = s3fPureBaseItem([
+    'canonical' => ['gec_kalma_dakika' => 12],
+]);
+$overlayDep = QrPuantajCandidateDecisionPolicy::buildReviewOverlay($dependentItem, null);
+s3fPureAssert(empty($overlayDep['can_apply']), 'dependent populated → can_apply false');
+s3fPureAssert(!empty($overlayDep['can_keep_canonical']), 'dependent populated → KEEP still allowed');
+s3fPureAssert(
+    ($overlayDep['blocking_code'] ?? '') === QrPuantajCandidateDecisionPolicy::BLOCK_DEPENDENT_FIELDS,
+    'dependent populated → blocking DEPENDENT_FIELDS'
+);
 
 $keepDecision = [
     'id' => 1,
@@ -196,6 +292,7 @@ $sealedItem = s3fPureBaseItem([
     'comparison_status' => QrPuantajCandidateProjectionService::COMPARE_PERIOD_REQUIRES_REVISION,
     'period' => [
         'state' => 'SEALED',
+        'period_write_locked' => true,
         'canonical_write_open' => false,
         'canonical_write_block_code' => 'PERIOD_LOCKED',
     ],

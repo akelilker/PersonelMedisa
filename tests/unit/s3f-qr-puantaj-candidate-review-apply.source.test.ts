@@ -65,14 +65,36 @@ describe("S3F QR puantaj candidate review / apply", () => {
     const ledger = read("api/src/Services/Qr/QrPuantajCandidateDecisionLedgerService.php");
     const apply = read("api/src/Services/Qr/QrPuantajCandidateApplyService.php");
     const decide = read("api/src/Services/Qr/QrPuantajCandidateDecisionService.php");
+    const readSvc = read("api/src/Services/Qr/QrPuantajCandidateReadService.php");
+    const projection = read("api/src/Services/Qr/QrPuantajCandidateProjectionService.php");
     const puantaj = read("api/src/Controllers/PuantajController.php");
     const router = read("api/src/Router.php");
     const endpoints = read("src/api/endpoints.ts");
     const puantajApi = read("src/api/puantaj.api.ts");
+    const ui = read("src/features/puantaj/components/QrPuantajAdayiSection.tsx");
     const permsTs = read("src/lib/authorization/role-permissions.ts");
     const permsPhp = read("api/src/Auth/RolePermissions.php");
 
-    expect(hashSvc).toContain("QR_CANDIDATE_HASH_V1");
+    expect(hashSvc).toContain("QR_CANDIDATE_HASH_V2");
+    expect(hashSvc).toContain("sube_id");
+    expect(hashSvc).toContain("decision_algorithm_version");
+    expect(hashSvc).toContain("period_write_locked");
+    expect(hashSvc).toContain("muhur_id");
+    expect(hashSvc).toContain("qr_matched_seconds");
+    expect(hashSvc).toContain("source_sube_ids");
+    expect(hashSvc).toMatch(/function compute\(\$personelId,\s*\$subeId/);
+
+    expect(policy).toContain("canonicalMapAsGuardRow");
+    expect(policy).toContain("BLOCK_DEPENDENT_FIELDS");
+    expect(decide).toContain("findByUserNonce");
+    expect(decide).toContain("Post-lock nonce recheck");
+
+    expect(readSvc).toContain("gec_kalma_dakika");
+    expect(readSvc).toContain("muhur_id");
+    expect(projection).toContain("muhur_id");
+    expect(projection).toContain("dependentGuardFields");
+    expect(ui).toContain("QR_APPLY_DEPENDENT_FIELDS_REQUIRE_MANUAL_REVIEW");
+    expect(ui).toContain("qr-puantaj-aday-dependent-review");
     expect(policy).toContain("QR_PUANTAJ_DECISION_V1");
     expect(policy).toContain("APPLY_EXISTING");
     expect(policy).toContain("KEEP_CANONICAL");

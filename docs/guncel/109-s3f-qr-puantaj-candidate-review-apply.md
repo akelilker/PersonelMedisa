@@ -55,12 +55,31 @@ No `AUTO_APPLY`, `CREATE_PUANTAJ`, `CREATE_REVISION`, `FIX_RAW_EVENT`.
 
 ## Candidate hash / stale protection
 
-- Server-owned `candidate_hash` (`QR_CANDIDATE_HASH_V1`) on candidate GET
+- Server-owned `candidate_hash` (`QR_CANDIDATE_HASH_V2`) on candidate GET
+- `QR_CANDIDATE_HASH_V1` was the pre-production S3F draft only (never applied in prod); V2 is the locked hardening material contract
 - Client **must not** compute it; must send it on karar
 - Action endpoint recomputes candidate **inside transaction** after locks
 - Mismatch → `409 QR_CANDIDATE_STALE` (no ledger insert, no puantaj write)
 
-Hash covers material decision state (personel, date, algorithms, classification, comparison, proposed times, canonical id/times/state/kontrol/updated_at, period write context, correction flag, source event ids/counts). Cosmetic UI labels excluded.
+Hash binds material decision state (server-owned):
+
+- identity: `personel_id`, `sube_id`, `candidate_date`
+- algorithms: hash schema V2, `QR_PUANTAJ_CANDIDATE_V1`, `QR_INTERVAL_V1`, `QR_PUANTAJ_DECISION_V1`
+- candidate: classification, comparison_status, proposed giris/cikis
+- canonical: id, giris/cikis, state, kontrol_durumu, muhur_id, updated_at, dependent guard fields
+- period: state, period_write_locked, canonical_write_open, canonical_write_block_code
+- correction ambiguity flag
+- QR provenance: source_event_ids / max id / interval+anomaly counts, qr_matched_seconds, spans_local_midnight, source_sube_ids
+
+Cosmetic UI labels / display branch names excluded.
+
+### Read-time capability parity
+
+`review.can_apply` evaluates the dependent-field guard against loaded canonical context so UI capability matches apply gate. Transaction-time guard remains authoritative. KEEP is not blocked by dependent fields (no canonical write).
+
+### Concurrent exact-nonce idempotency
+
+Pre-tx nonce check remains. After period + row locks and **before** recompute/stale, the service rechecks `(decided_by_user_id, request_nonce)` and returns the stored idempotent result when present. DB UNIQUE + PDO 1062 fallback remain ultimate guards. Exact concurrent retries must not surface as `QR_CANDIDATE_STALE`.
 
 ---
 

@@ -575,6 +575,17 @@ export type QrPuantajCandidateItem = {
     cikis_saati?: string | null;
     state?: string | null;
     kontrol_durumu?: string | null;
+    muhur_id?: number | null;
+    updated_at?: string | null;
+    gec_kalma_dakika?: number | null;
+    erken_cikis_dakika?: number | null;
+    gercek_mola_dakika?: number | null;
+    hesaplanan_mola_dakika?: number | null;
+    net_calisma_suresi_dakika?: number | null;
+    gunluk_brut_sure_dakika?: number | null;
+    tatil_donemi_brut_calisma_dakika?: number | null;
+    tatil_donemi_ara_dinlenme_dakika?: number | null;
+    tatil_donemi_net_calisma_dakika?: number | null;
   };
   qr?: {
     matched_seconds?: number;

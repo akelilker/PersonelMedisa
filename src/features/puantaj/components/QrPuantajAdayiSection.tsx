@@ -99,6 +99,8 @@ export function QrPuantajAdayiSection({ personelId, tarih, personelLabel, onAppl
   const noRow = item?.comparison_status === "NO_CANONICAL_ROW";
   const revisionRequired =
     item?.comparison_status === "PERIOD_REQUIRES_REVISION" || review?.state === "REVISION_REQUIRED";
+  const dependentManualReview =
+    review?.blocking_code === "QR_APPLY_DEPENDENT_FIELDS_REQUIRE_MANUAL_REVIEW";
   const anomaly = anomalyHints(item ?? { candidate_date: tarih });
 
   async function runDecision(action: "APPLY_EXISTING" | "KEEP_CANONICAL" | "REOPEN_REVIEW") {
@@ -220,6 +222,12 @@ export function QrPuantajAdayiSection({ personelId, tarih, personelLabel, onAppl
                   <Link to="/haftalik-kapanis/revizyonlar/yeni">Revizyon merkezine git</Link>
                 </>
               ) : null}
+            </p>
+          ) : null}
+
+          {dependentManualReview ? (
+            <p className="puantaj-form-readonly" data-testid="qr-puantaj-aday-dependent-review">
+              Bağımlı türetilmiş alanlar dolu. QR saatleri doğrudan uygulanamaz; manuel inceleme gerekir.
             </p>
           ) : null}
 

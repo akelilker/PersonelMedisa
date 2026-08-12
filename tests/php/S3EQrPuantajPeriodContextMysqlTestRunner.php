@@ -179,7 +179,17 @@ function s3eR1Schema(PDO $pdo): void
             giris_saati VARCHAR(16) NULL,
             cikis_saati VARCHAR(16) NULL,
             kontrol_durumu VARCHAR(32) NULL,
+            muhur_id INT UNSIGNED NULL,
             updated_at DATETIME NULL,
+            gec_kalma_dakika INT UNSIGNED NULL,
+            erken_cikis_dakika INT UNSIGNED NULL,
+            gercek_mola_dakika INT UNSIGNED NULL,
+            hesaplanan_mola_dakika INT UNSIGNED NULL,
+            net_calisma_suresi_dakika INT UNSIGNED NULL,
+            gunluk_brut_sure_dakika INT UNSIGNED NULL,
+            tatil_donemi_brut_calisma_dakika INT UNSIGNED NULL,
+            tatil_donemi_ara_dinlenme_dakika INT UNSIGNED NULL,
+            tatil_donemi_net_calisma_dakika INT UNSIGNED NULL,
             UNIQUE KEY uq_personel_tarih (personel_id, tarih)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
     );

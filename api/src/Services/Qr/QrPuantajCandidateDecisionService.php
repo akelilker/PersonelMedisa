@@ -496,8 +496,8 @@ class QrPuantajCandidateDecisionService
             'previous_decision_hash' => $previousHash,
         ]);
 
-        // Retention ONAY_AUDIT mint in the same transaction — fail-closed (no silent ignore).
-        \Medisa\Api\Services\Retention\ArchiveManifestService::runIfSchemaReady($pdo, static function () use ($pdo, $ledger, $userId) {
+        // Retention ONAY_AUDIT mint in the same transaction — schema required (fail-closed).
+        \Medisa\Api\Services\Retention\ArchiveManifestService::requireManifestSideEffect($pdo, static function () use ($pdo, $ledger, $userId) {
             \Medisa\Api\Services\Retention\ArchiveManifestService::createQrPuantajDecisionOnayAuditManifest(
                 $pdo,
                 $ledger,

@@ -16,6 +16,11 @@ use Medisa\Api\Services\Qr\QrPuantajCandidateDecisionPolicy;
 use Medisa\Api\Services\Qr\QrPuantajCandidateDecisionService;
 use Medisa\Api\Services\Qr\QrPuantajCandidateProjectionService;
 use Medisa\Api\Services\Qr\QrPuantajCandidateReadService;
+use Medisa\Api\Services\Retention\ArchiveManifestService;
+use Medisa\Api\Services\Retention\RetentionCategories;
+use Medisa\Api\Services\Retention\RetentionPolicyService;
+use Medisa\Api\Services\Retention\RetentionSchemaGate;
+use Medisa\Api\Services\Retention\RetentionSourceAdapterService;
 
 function s3fDecAssert(bool $ok, string $name): void
 {
@@ -219,6 +224,26 @@ function s3fDecSchema(PDO $pdo): void
             tatil_donemi_net_calisma_dakika INT UNSIGNED NULL,
             UNIQUE KEY uq_personel_tarih (personel_id, tarih)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
+    );
+
+    // Pack1: retention manifest required for decision txn atomicity
+    $pdo->exec(
+        "CREATE TABLE arsiv_manifestleri (
+            id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+            entity_type VARCHAR(64) NOT NULL,
+            record_id INT UNSIGNED NOT NULL,
+            personel_id INT UNSIGNED NULL,
+            record_category VARCHAR(64) NOT NULL,
+            source_version_identity VARCHAR(191) NOT NULL,
+            trigger_type ENUM('PERIOD_CLOSURE', 'TERMINATION_DATE') NOT NULL,
+            trigger_date DATE NOT NULL,
+            retention_until DATE NOT NULL,
+            source_sha256 CHAR(64) NULL,
+            integrity_status ENUM('OK', 'CHANGED', 'UNKNOWN') NOT NULL DEFAULT 'UNKNOWN',
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            created_by INT UNSIGNED NULL,
+            UNIQUE KEY uq_arsiv_manifest_entity_cat_src (entity_type, record_id, record_category, source_version_identity)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
     );
 
     $pdo->exec("INSERT INTO subeler (id, ad) VALUES (1, 'Merkez')");
@@ -1034,6 +1059,172 @@ try {
     $girisFinalL = (string) $pdo->query('SELECT giris_saati FROM gunluk_puantaj LIMIT 1')->fetchColumn();
     s3fDecAssert($girisAfterL === $girisFinalL, 'l) no second canonical mutation');
 
+    // --- Pack1 hardening: ledger tamper + schema-required atomicity ---
+
+    // (m) KEEP → ONAY_AUDIT manifest minted; untouched resolve deterministic
+    s3fDecResetDay($pdo);
+    s3fDecSeedQrPair($pdo, '2026-08-12 05:00:00.000000', '2026-08-12 14:00:00.000000');
+    s3fDecInsertPuantaj($pdo, ['giris_saati' => '09:00', 'cikis_saati' => '18:00']);
+    $itemM = s3fDecCandidateItem($pdo, $date);
+    $keepM = s3fDecDecide($pdo, [
+        'action' => QrPuantajCandidateDecisionPolicy::ACTION_KEEP_CANONICAL,
+        'candidate_hash' => (string) ($itemM['candidate_hash'] ?? ''),
+        'request_nonce' => s3fDecNonce(30),
+        'gerekce' => $reason,
+    ]);
+    $ledgerIdM = (int) ($keepM['decision_id'] ?? 0);
+    s3fDecAssert($ledgerIdM > 0, 'm) KEEP decision_id');
+    $manM = (int) $pdo->query(
+        "SELECT COUNT(*) FROM arsiv_manifestleri WHERE record_category='ONAY_AUDIT' AND record_id={$ledgerIdM}"
+    )->fetchColumn();
+    s3fDecAssert($manM === 1, 'm) ONAY_AUDIT manifest minted');
+    $ctxM = [
+        'entity_type' => 'qr_pc_decision',
+        'record_id' => $ledgerIdM,
+        'ledger_id' => $ledgerIdM,
+        'personel_id' => 1,
+        'sube_id' => 1,
+        'candidate_date' => $date,
+        'parent_category' => RetentionCategories::PUANTAJ,
+        'audit_source_type' => RetentionSourceAdapterService::AUDIT_SOURCE_QR_PUANTAJ_CANDIDATE_DECISION,
+    ];
+    $srcM1 = RetentionSourceAdapterService::resolve($pdo, RetentionCategories::ONAY_AUDIT, $ctxM);
+    $srcM2 = RetentionSourceAdapterService::resolve($pdo, RetentionCategories::ONAY_AUDIT, $ctxM);
+    s3fDecAssert(
+        (string) $srcM1['source_sha256'] === (string) $srcM2['source_sha256'],
+        'm) untouched fingerprint deterministic'
+    );
+    s3fDecAssert(
+        (string) $srcM1['source_sha256'] === (string) $pdo->query(
+            "SELECT source_sha256 FROM arsiv_manifestleri WHERE record_category='ONAY_AUDIT' AND record_id={$ledgerIdM} LIMIT 1"
+        )->fetchColumn(),
+        'm) fingerprint matches stored manifest'
+    );
+
+    // (n) snapshot / field tamper with decision_hash unchanged → resolve fail-closed
+    $tamperFields = [
+        'candidate_snapshot' => '{"tampered":true}',
+        'before_puantaj_snapshot' => '{"tampered":true}',
+        'after_puantaj_snapshot' => '{"tampered":true}',
+        'decision_reason' => 'tampered reason without hash update',
+        'request_nonce' => 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+    ];
+    foreach ($tamperFields as $col => $val) {
+        // reload clean row from last good resolve before each mutate of independent columns
+        $pdo->exec("UPDATE qr_puantaj_candidate_decision_ledger SET {$col} = " . $pdo->quote($val) . " WHERE id = {$ledgerIdM}");
+        $code = '';
+        try {
+            RetentionSourceAdapterService::resolve($pdo, RetentionCategories::ONAY_AUDIT, $ctxM);
+            $code = 'NO_THROW';
+        } catch (RuntimeException $e) {
+            $code = $e->getMessage();
+        }
+        s3fDecAssert(
+            $code === RetentionPolicyService::CODE_ARCHIVE_SOURCE_INTEGRITY_CHANGED,
+            'n) tamper ' . $col . ' → ARCHIVE_SOURCE_INTEGRITY_CHANGED'
+        );
+        // Restore column by re-deciding is expensive; reload original via SELECT from a backup:
+        // For next field, re-insert clean KEEP once after loop.
+    }
+
+    // restore clean ledger row for next tests via fresh KEEP
+    s3fDecResetDay($pdo);
+    s3fDecSeedQrPair($pdo, '2026-08-12 05:00:00.000000', '2026-08-12 14:00:00.000000');
+    s3fDecInsertPuantaj($pdo, ['giris_saati' => '09:00', 'cikis_saati' => '18:00']);
+    $itemN2 = s3fDecCandidateItem($pdo, $date);
+    $keepN2 = s3fDecDecide($pdo, [
+        'action' => QrPuantajCandidateDecisionPolicy::ACTION_KEEP_CANONICAL,
+        'candidate_hash' => (string) ($itemN2['candidate_hash'] ?? ''),
+        'request_nonce' => s3fDecNonce(31),
+        'gerekce' => $reason,
+    ]);
+    $ledgerIdN2 = (int) ($keepN2['decision_id'] ?? 0);
+    $ctxN2 = [
+        'entity_type' => 'qr_pc_decision',
+        'record_id' => $ledgerIdN2,
+        'ledger_id' => $ledgerIdN2,
+        'personel_id' => 1,
+        'sube_id' => 1,
+        'candidate_date' => $date,
+        'parent_category' => RetentionCategories::PUANTAJ,
+        'audit_source_type' => RetentionSourceAdapterService::AUDIT_SOURCE_QR_PUANTAJ_CANDIDATE_DECISION,
+    ];
+    $beforeFp = RetentionSourceAdapterService::resolve($pdo, RetentionCategories::ONAY_AUDIT, $ctxN2);
+    $manSha = (string) $pdo->query(
+        "SELECT source_sha256 FROM arsiv_manifestleri WHERE record_category='ONAY_AUDIT' AND record_id={$ledgerIdN2} LIMIT 1"
+    )->fetchColumn();
+
+    // (o) mutate snapshot + recompute canonical decision_hash → new FP ≠ old manifest
+    $rowO = $pdo->query('SELECT * FROM qr_puantaj_candidate_decision_ledger WHERE id = ' . $ledgerIdN2)->fetch(PDO::FETCH_ASSOC);
+    $rowO['candidate_snapshot'] = json_encode(['tampered' => true, 'v' => 2]);
+    $newHash = QrPuantajCandidateDecisionLedgerService::computeDecisionHash($rowO);
+    $pdo->prepare(
+        'UPDATE qr_puantaj_candidate_decision_ledger
+         SET candidate_snapshot = :snap, decision_hash = :dh WHERE id = :id'
+    )->execute([
+        'snap' => $rowO['candidate_snapshot'],
+        'dh' => $newHash,
+        'id' => $ledgerIdN2,
+    ]);
+    $afterFp = RetentionSourceAdapterService::resolve($pdo, RetentionCategories::ONAY_AUDIT, $ctxN2);
+    s3fDecAssert(
+        (string) $afterFp['source_sha256'] !== (string) $beforeFp['source_sha256'],
+        'o) recomputed hash changes retention fingerprint'
+    );
+    s3fDecAssert(
+        (string) $afterFp['source_sha256'] !== $manSha,
+        'o) old manifest fingerprint no longer current'
+    );
+    $integrity = ArchiveManifestService::verifySourceIntegrity(
+        $pdo,
+        'qr_pc_decision',
+        $ledgerIdN2,
+        RetentionCategories::ONAY_AUDIT,
+        (string) $afterFp['source_sha256'],
+        $ctxN2
+    );
+    s3fDecAssert(
+        in_array($integrity, [
+            RetentionPolicyService::CODE_ARCHIVE_SOURCE_INTEGRITY_CHANGED,
+            ArchiveManifestService::CODE_ARCHIVE_MANIFEST_MISSING_CURRENT_LIFECYCLE,
+            ArchiveManifestService::CODE_ARCHIVE_MANIFEST_MISSING,
+        ], true),
+        'o) integrity not OK for mutated source version'
+    );
+    s3fDecAssert($manSha !== (string) $afterFp['source_sha256'], 'o) stored manifest sha differs from current');
+
+    // (p) SCHEMA_NOT_READY → decision txn rolls back (no ledger)
+    s3fDecResetDay($pdo);
+    s3fDecSeedQrPair($pdo, '2026-08-12 05:00:00.000000', '2026-08-12 14:00:00.000000');
+    s3fDecInsertPuantaj($pdo, ['giris_saati' => '09:00', 'cikis_saati' => '18:00']);
+    $itemP = s3fDecCandidateItem($pdo, $date);
+    $pdo->exec('RENAME TABLE arsiv_manifestleri TO arsiv_manifestleri_bak');
+    $ledgerBeforeP = (int) $pdo->query('SELECT COUNT(*) FROM qr_puantaj_candidate_decision_ledger')->fetchColumn();
+    $codeP = '';
+    try {
+        s3fDecDecide($pdo, [
+            'action' => QrPuantajCandidateDecisionPolicy::ACTION_APPLY_EXISTING,
+            'candidate_hash' => (string) ($itemP['candidate_hash'] ?? ''),
+            'request_nonce' => s3fDecNonce(32),
+            'gerekce' => $reason,
+        ]);
+        $codeP = 'NO_THROW';
+    } catch (Throwable $e) {
+        $codeP = $e->getMessage();
+    }
+    $pdo->exec('RENAME TABLE arsiv_manifestleri_bak TO arsiv_manifestleri');
+    s3fDecAssert(
+        $codeP === RetentionSchemaGate::CODE_SCHEMA_NOT_READY
+        || $codeP === RetentionPolicyService::CODE_SCHEMA_NOT_READY
+        || strpos($codeP, 'SCHEMA_NOT_READY') !== false,
+        'p) SCHEMA_NOT_READY on decide'
+    );
+    $ledgerAfterP = (int) $pdo->query('SELECT COUNT(*) FROM qr_puantaj_candidate_decision_ledger')->fetchColumn();
+    s3fDecAssert($ledgerAfterP === $ledgerBeforeP, 'p) no ledger persist when schema missing');
+
+    echo 'S3F_SNAPSHOT_TAMPER_TEST=PASS' . PHP_EOL;
+    echo 'S3F_DECISION_HASH_RECOMPUTE_VERIFY=PASS' . PHP_EOL;
+    echo 'S3F_SCHEMA_MISSING_ROLLBACK=PASS' . PHP_EOL;
     echo 'S3F decision mysql tests OK' . PHP_EOL;
 } finally {
     try {

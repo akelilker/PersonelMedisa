@@ -389,7 +389,7 @@ class PuantajController
             $sourceHash = self::computeSealSourceHash($rows);
             self::finalizeSealHeader($pdo, $muhurId, count($rows), $sourceHash);
 
-            \Medisa\Api\Services\Retention\ArchiveManifestService::runIfSchemaReady($pdo, static function () use ($pdo, $subeId, $yil, $ay, $muhurId, $user) {
+            \Medisa\Api\Services\Retention\ArchiveManifestService::requireManifestSideEffect($pdo, static function () use ($pdo, $subeId, $yil, $ay, $muhurId, $user) {
                 \Medisa\Api\Services\Retention\ArchiveManifestService::createPuantajPeriodManifests(
                     $pdo,
                     (int) $subeId,
@@ -1001,7 +1001,7 @@ class PuantajController
         $sourceHash = self::computeSealSourceHash($rows);
         self::finalizeSealHeader($pdo, $muhurId, count($rows), $sourceHash);
 
-        \Medisa\Api\Services\Retention\ArchiveManifestService::runIfSchemaReady($pdo, static function () use ($pdo, $subeId, $yil, $ay, $muhurId, $user) {
+        \Medisa\Api\Services\Retention\ArchiveManifestService::requireManifestSideEffect($pdo, static function () use ($pdo, $subeId, $yil, $ay, $muhurId, $user) {
             \Medisa\Api\Services\Retention\ArchiveManifestService::createPuantajPeriodManifests(
                 $pdo,
                 (int) $subeId,

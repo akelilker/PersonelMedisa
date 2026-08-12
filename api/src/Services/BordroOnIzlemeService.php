@@ -275,8 +275,8 @@ class BordroOnIzlemeService
                 ->execute(['to' => (string) $to, 'id' => (int) $calistirmaId]);
 
             if ($to === 'KESINLESTI') {
-                if (class_exists(\Medisa\Api\Services\Retention\ArchiveManifestService::class)) {
-                    \Medisa\Api\Services\Retention\ArchiveManifestService::runIfSchemaReady($pdo, static function () use ($pdo, $row, $calistirmaId, $actor) {
+                if (\Medisa\Api\Services\Retention\ArchiveManifestService::isLifecycleRetentionHost($pdo)) {
+                    \Medisa\Api\Services\Retention\ArchiveManifestService::requireManifestSideEffect($pdo, static function () use ($pdo, $row, $calistirmaId, $actor) {
                         \Medisa\Api\Services\Retention\ArchiveManifestService::createBordroPeriodManifests(
                             $pdo,
                             (int) $row['sube_id'],

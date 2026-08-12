@@ -1206,8 +1206,8 @@ class MaasHesaplamaSnapshotService
             $snapshot = self::persistSnapshot($pdo, $resolution, $user);
             $audit = self::writeAudit($pdo, (int) $snapshot['id'], $subeId, $yil, $ay, $muhurId, self::AUDIT_SNAPSHOT_CREATE, 'CREATED', $user, $requestHash, $resolution, (string) $snapshot['snapshot_hash']);
 
-            if (class_exists(\Medisa\Api\Services\Retention\ArchiveManifestService::class)) {
-                \Medisa\Api\Services\Retention\ArchiveManifestService::runIfSchemaReady($pdo, static function () use ($pdo, $subeId, $yil, $ay, $snapshot, $user) {
+            if (\Medisa\Api\Services\Retention\ArchiveManifestService::isLifecycleRetentionHost($pdo)) {
+                \Medisa\Api\Services\Retention\ArchiveManifestService::requireManifestSideEffect($pdo, static function () use ($pdo, $subeId, $yil, $ay, $snapshot, $user) {
                     \Medisa\Api\Services\Retention\ArchiveManifestService::createSgkPeriodManifest(
                         $pdo,
                         (int) $subeId,

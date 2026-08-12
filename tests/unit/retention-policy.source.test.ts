@@ -204,6 +204,8 @@ describe("retention policy source contract (053)", () => {
       "utf8"
     );
     expect(decisionSvc).toContain("createQrPuantajDecisionOnayAuditManifest");
+    expect(decisionSvc).toContain("requireManifestSideEffect");
+    expect(decisionSvc).not.toMatch(/runIfSchemaReady/);
   });
 
   it("coverageMap wires all 15 manifest creators in source", () => {
@@ -213,6 +215,29 @@ describe("retention policy source contract (053)", () => {
     );
     // After MAN-001: $manifestWired = $implemented (full catalog)
     expect(adapter).toMatch(/\$manifestWired\s*=\s*\$implemented/);
+    expect(adapter).toContain("verifyDecisionHash");
+  });
+
+  it("Pack1 lifecycle owners use required schema path (no silent SCHEMA_NOT_READY skip)", () => {
+    const requiredEffect = [
+      "api/src/Controllers/PuantajController.php",
+      "api/src/Controllers/HaftalikKapanisController.php",
+      "api/src/Services/BordroOnIzlemeService.php",
+      "api/src/Services/MaasHesaplamaSnapshotService.php",
+      "api/src/Services/Qr/QrPuantajCandidateDecisionService.php"
+    ];
+    for (const rel of requiredEffect) {
+      const src = readFileSync(resolve(root, rel), "utf8");
+      expect(src, rel).toContain("requireManifestSideEffect");
+      expect(src, rel).not.toMatch(/runIfSchemaReady\s*\(/);
+    }
+    const surecler = readFileSync(
+      resolve(root, "api/src/Controllers/SureclerController.php"),
+      "utf8"
+    );
+    expect(surecler).toContain("createPersonelLifecycleManifests");
+    expect(surecler).not.toMatch(/runIfSchemaReady\s*\(/);
+    expect(surecler).not.toContain("Pre-053 environments");
   });
 
   it("wires retention roles and permissions parity", () => {

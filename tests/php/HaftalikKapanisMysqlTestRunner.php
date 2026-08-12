@@ -329,6 +329,25 @@ function createHkParentTables(PDO $pdo): void
           CONSTRAINT fk_hbm_onaylayan FOREIGN KEY (onaylayan_user_id) REFERENCES users (id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     ");
+    // Pack1 retention side-effect (053) — required for haftalık KAPANDI manifest mint
+    $pdo->exec("
+        CREATE TABLE arsiv_manifestleri (
+          id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+          entity_type VARCHAR(64) NOT NULL,
+          record_id INT UNSIGNED NOT NULL,
+          personel_id INT UNSIGNED NULL,
+          record_category VARCHAR(64) NOT NULL,
+          source_version_identity VARCHAR(191) NOT NULL,
+          trigger_type ENUM('PERIOD_CLOSURE', 'TERMINATION_DATE') NOT NULL,
+          trigger_date DATE NOT NULL,
+          retention_until DATE NOT NULL,
+          source_sha256 CHAR(64) NULL,
+          integrity_status ENUM('OK', 'CHANGED', 'UNKNOWN') NOT NULL DEFAULT 'UNKNOWN',
+          created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          created_by INT UNSIGNED NULL,
+          UNIQUE KEY uq_arsiv_manifest_entity_cat_src (entity_type, record_id, record_category, source_version_identity)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ");
 }
 
 function seedHkFixtures(PDO $pdo): void

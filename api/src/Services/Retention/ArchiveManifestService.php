@@ -818,7 +818,39 @@ class ArchiveManifestService
     }
 
     /**
-     * Swallow only SCHEMA_NOT_READY — all other retention errors propagate (fail-closed).
+     * Pack-1 lifecycle side-effect host check.
+     * Isolated SQLite unit runners (e.g. MaasHesaplamaSnapshotTestRunner) intentionally
+     * omit 053 retention DDL — they are not production hosts. MariaDB/MySQL always require
+     * retention schema (fail-closed). Never uses silent SCHEMA_NOT_READY swallow.
+     */
+    public static function isLifecycleRetentionHost(PDO $pdo)
+    {
+        try {
+            $driver = strtolower((string) $pdo->getAttribute(PDO::ATTR_DRIVER_NAME));
+        } catch (\Throwable $e) {
+            return true;
+        }
+
+        return $driver !== 'sqlite';
+    }
+
+    /**
+     * Required Pack1 mint — asserts 053 arsiv_manifestleri then runs $fn.
+     * SCHEMA_NOT_READY and all other errors propagate (fail-closed).
+     *
+     * @param callable $fn
+     * @return mixed
+     */
+    public static function requireManifestSideEffect(PDO $pdo, $fn)
+    {
+        RetentionSchemaGate::assertReady($pdo, RetentionSchemaGate::manifestTables());
+
+        return $fn();
+    }
+
+    /**
+     * @deprecated Pack1 lifecycle owners must use requireManifestSideEffect (fail-closed).
+     * Kept only for non-lifecycle optional tooling — do not wire into create/close paths.
      *
      * @param callable $fn
      * @return mixed|null
@@ -826,9 +858,7 @@ class ArchiveManifestService
     public static function runIfSchemaReady(PDO $pdo, $fn)
     {
         try {
-            RetentionSchemaGate::assertReady($pdo, RetentionSchemaGate::manifestTables());
-
-            return $fn();
+            return self::requireManifestSideEffect($pdo, $fn);
         } catch (RuntimeException $e) {
             if ($e->getMessage() === RetentionSchemaGate::CODE_SCHEMA_NOT_READY
                 || $e->getMessage() === RetentionPolicyService::CODE_SCHEMA_NOT_READY

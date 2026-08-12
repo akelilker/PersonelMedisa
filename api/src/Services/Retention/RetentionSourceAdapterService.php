@@ -447,6 +447,8 @@ class RetentionSourceAdapterService
     /**
      * Server-owned S3F ledger → ONAY_AUDIT identity + fingerprint.
      * Client cannot supply ledger fields; row is loaded by ledger_id.
+     * Stored decision_hash is recomputed via QrPuantajCandidateDecisionLedgerService
+     * (includes JSON snapshots) before retention fingerprint is trusted.
      *
      * @param array<string, mixed> $context
      * @return array{source_version_identity: string, source_sha256: string|null}
@@ -472,7 +474,8 @@ class RetentionSourceAdapterService
         $stmt = $pdo->prepare(
             'SELECT id, personel_id, sube_id, candidate_date, candidate_hash, decision_type,
                     decision_reason, puantaj_id, algorithm_version, interval_algorithm_version,
-                    decision_algorithm_version, decided_by_user_id, request_nonce,
+                    decision_algorithm_version, candidate_snapshot, before_puantaj_snapshot,
+                    after_puantaj_snapshot, decided_by_user_id, request_nonce,
                     supersedes_decision_id, previous_decision_hash, decision_hash, created_at
              FROM qr_puantaj_candidate_decision_ledger
              WHERE id = :id LIMIT 1'
@@ -498,9 +501,15 @@ class RetentionSourceAdapterService
 
         $decisionHash = strtolower(trim((string) ($row['decision_hash'] ?? '')));
         if ($decisionHash === '' || !preg_match('/^[0-9a-f]{64}$/', $decisionHash)) {
-            throw new RuntimeException(RetentionPolicyService::CODE_TRIGGER_NOT_RESOLVED);
+            throw new RuntimeException(RetentionPolicyService::CODE_ARCHIVE_SOURCE_INTEGRITY_CHANGED);
         }
 
+        // Authoritative S3F owner — includes candidate/before/after JSON snapshots.
+        if (!\Medisa\Api\Services\Qr\QrPuantajCandidateDecisionLedgerService::verifyDecisionHash($row)) {
+            throw new RuntimeException(RetentionPolicyService::CODE_ARCHIVE_SOURCE_INTEGRITY_CHANGED);
+        }
+
+        // Fingerprint uses verified decision_hash (covers snapshot material) + typed identity.
         $ledgerFp = self::computeQrPuantajDecisionLedgerFingerprint($row);
         $identity = sprintf(
             'onay_audit:qr_pc_decision:%d:parent:%s:dh:%s',
@@ -519,8 +528,9 @@ class RetentionSourceAdapterService
     }
 
     /**
-     * Canonical retention fingerprint material for an S3F ledger row (immutable audit fields).
-     * Uses stored decision_hash + stable identity fields — never client-supplied hashes.
+     * Canonical retention fingerprint material for an S3F ledger row.
+     * Must only be used after verifyDecisionHash succeeds — verified decision_hash
+     * already binds candidate_snapshot / before_puantaj_snapshot / after_puantaj_snapshot.
      *
      * @param array<string, mixed> $row
      */

@@ -930,6 +930,196 @@ try {
     }
     rp053Assert($seenIzin === true, 'MAN IZIN termination-scoped');
 
+    // Termination family creators: RAPOR / IS_KAZASI / DISIPLIN (+ BELGE skip without file)
+    $pdo->exec(
+        "INSERT INTO surecler (personel_id, surec_turu, baslangic_tarihi, state) VALUES
+         (10, 'RAPOR', '2020-02-01', 'AKTIF'),
+         (10, 'IS_KAZASI', '2020-03-01', 'AKTIF'),
+         (10, 'DISIPLIN', '2020-04-01', 'AKTIF')"
+    );
+    $term2 = ArchiveManifestService::createTerminationScopedManifests($pdo, 10, 1);
+    $seenTerm = [
+        RetentionCategories::RAPOR => false,
+        RetentionCategories::IS_KAZASI => false,
+        RetentionCategories::DISIPLIN => false,
+    ];
+    foreach ($term2 as $m) {
+        $cat = (string) ($m['record_category'] ?? '');
+        if (isset($seenTerm[$cat])) {
+            $seenTerm[$cat] = true;
+        }
+    }
+    foreach ($seenTerm as $cat => $ok) {
+        rp053Assert($ok === true, 'MAN term creator ' . $cat);
+    }
+
+    // PERSONEL_BELGE: stub dosya sürümü + surec BELGE
+    $pdo->exec(
+        "CREATE TABLE IF NOT EXISTS personel_belge_dosya_surumleri (
+            id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+            surec_id INT UNSIGNED NOT NULL,
+            surum_no INT UNSIGNED NOT NULL,
+            sha256 CHAR(64) NOT NULL,
+            aktif_mi TINYINT(1) NOT NULL DEFAULT 1
+         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
+    );
+    $pdo->exec(
+        "INSERT INTO surecler (personel_id, surec_turu, baslangic_tarihi, state)
+         VALUES (10, 'BELGE', '2020-05-01', 'AKTIF')"
+    );
+    $belgeSurecId = (int) $pdo->lastInsertId();
+    $belgeSha = str_repeat('ef', 32);
+    $pdo->exec(
+        "INSERT INTO personel_belge_dosya_surumleri (surec_id, surum_no, sha256, aktif_mi)
+         VALUES ({$belgeSurecId}, 1, '{$belgeSha}', 1)"
+    );
+    $belgeMan = ArchiveManifestService::createResolvedManifest($pdo, RetentionCategories::PERSONEL_BELGE, [
+        'entity_type' => 'surec',
+        'record_id' => $belgeSurecId,
+        'personel_id' => 10,
+    ], 1);
+    rp053Assert(strpos((string) $belgeMan['source_version_identity'], 'belge_surec:') === 0, 'MAN PERSONEL_BELGE identity');
+    rp053Assert(strtolower((string) $belgeMan['source_sha256']) === $belgeSha, 'MAN PERSONEL_BELGE fp parity');
+
+    // OLAY / SAVUNMA via disiplin_vakalar stub
+    $pdo->exec(
+        "CREATE TABLE IF NOT EXISTS disiplin_vakalar (
+            id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+            surec_id INT UNSIGNED NOT NULL,
+            personel_id INT UNSIGNED NOT NULL,
+            sube_id INT UNSIGNED NULL,
+            tarih DATE NOT NULL,
+            ay CHAR(7) NOT NULL,
+            olay_turu VARCHAR(64) NOT NULL,
+            lifecycle_state VARCHAR(32) NOT NULL,
+            source_identity VARCHAR(160) NOT NULL,
+            source_hash CHAR(64) NOT NULL,
+            savunma_talep_tarihi DATE NULL,
+            savunma_deadline_at DATETIME NULL,
+            savunma_yer VARCHAR(255) NULL,
+            savunma_konu VARCHAR(500) NULL,
+            savunma_belge_surec_id INT UNSIGNED NULL,
+            savunma_received_at DATETIME NULL,
+            nihai_karar VARCHAR(64) NULL,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
+    );
+    $disiplinSurecId = (int) $pdo->query(
+        "SELECT id FROM surecler WHERE personel_id=10 AND surec_turu='DISIPLIN' ORDER BY id DESC LIMIT 1"
+    )->fetchColumn();
+    $pdo->exec(
+        "INSERT INTO disiplin_vakalar (
+            surec_id, personel_id, sube_id, tarih, ay, olay_turu, lifecycle_state,
+            source_identity, source_hash
+         ) VALUES (
+            {$disiplinSurecId}, 10, 1, '2020-04-01', '2020-04', 'GEC_KALMA', 'KAPANDI',
+            'test-source', '" . str_repeat('ab', 32) . "'
+         )"
+    );
+    $vakaId = (int) $pdo->lastInsertId();
+    $olayMan = ArchiveManifestService::createResolvedManifest($pdo, RetentionCategories::OLAY, [
+        'entity_type' => 'disiplin_vaka',
+        'record_id' => $vakaId,
+        'disiplin_vaka_id' => $vakaId,
+        'personel_id' => 10,
+    ], 1);
+    $savMan = ArchiveManifestService::createResolvedManifest($pdo, RetentionCategories::SAVUNMA, [
+        'entity_type' => 'disiplin_vaka',
+        'record_id' => $vakaId,
+        'disiplin_vaka_id' => $vakaId,
+        'personel_id' => 10,
+    ], 1);
+    rp053Assert(strpos((string) $olayMan['source_version_identity'], 'disiplin_vaka:') === 0, 'MAN OLAY identity');
+    rp053Assert(strpos((string) $savMan['source_version_identity'], 'disiplin_vaka:') === 0, 'MAN SAVUNMA identity');
+
+    // Post-trigger mutation: IZIN surec update after mint → integrity CHANGED, no overwrite
+    $izinMan = null;
+    foreach ($termScoped as $m) {
+        if ((string) ($m['record_category'] ?? '') === RetentionCategories::IZIN) {
+            $izinMan = $m;
+            break;
+        }
+    }
+    rp053Assert($izinMan !== null, 'MAN IZIN baseline exists');
+    $pdo->exec("UPDATE surecler SET state = 'TAMAMLANDI', updated_at = '2030-01-01 00:00:00' WHERE id = {$surecId}");
+    $izinCtx = [
+        'entity_type' => 'surec',
+        'record_id' => $surecId,
+        'personel_id' => 10,
+    ];
+    $izinNow = RetentionSourceAdapterService::resolve($pdo, RetentionCategories::IZIN, $izinCtx);
+    rp053Assert(
+        (string) $izinNow['source_sha256'] !== (string) ($izinMan['source_sha256'] ?? ''),
+        'MAN post-trigger mutation changes fingerprint'
+    );
+    $izinIntegrity = ArchiveManifestService::verifySourceIntegrity(
+        $pdo,
+        'surec',
+        $surecId,
+        RetentionCategories::IZIN,
+        (string) $izinNow['source_sha256'],
+        $izinCtx
+    );
+    rp053Assert(
+        $izinIntegrity === RetentionPolicyService::CODE_ARCHIVE_SOURCE_INTEGRITY_CHANGED
+        || $izinIntegrity === ArchiveManifestService::CODE_ARCHIVE_MANIFEST_MISSING_CURRENT_LIFECYCLE,
+        'MAN post-trigger → not OK (CHANGED or missing current lifecycle)'
+    );
+    $izinCount = (int) $pdo->query(
+        "SELECT COUNT(*) FROM arsiv_manifestleri WHERE record_category='IZIN' AND record_id={$surecId}"
+    )->fetchColumn();
+    rp053Assert($izinCount === 1, 'MAN post-trigger does not overwrite/create duplicate baseline');
+
+    // Schema missing fail-closed on required Pack1 path
+    $pdo->exec('RENAME TABLE arsiv_manifestleri TO arsiv_manifestleri_bak_rp');
+    try {
+        ArchiveManifestService::requireManifestSideEffect($pdo, static function () {
+            return true;
+        });
+        rp053Assert(false, 'SCHEMA required path should throw');
+    } catch (RuntimeException $e) {
+        rp053Assert(
+            $e->getMessage() === RetentionSchemaGate::CODE_SCHEMA_NOT_READY,
+            'RETENTION_SCHEMA_MISSING_FAIL_CLOSED'
+        );
+    }
+    $pdo->exec('RENAME TABLE arsiv_manifestleri_bak_rp TO arsiv_manifestleri');
+
+    // Lifecycle creator paths fail-closed when 053 missing (same assertReady as Pack1 wires)
+    $pdo->exec('RENAME TABLE arsiv_manifestleri TO arsiv_manifestleri_bak_rp2');
+    $schemaMissingCases = [
+        'PUANTAJ_SCHEMA_MISSING_ROLLBACK' => static function () use ($pdo, $sealId) {
+            ArchiveManifestService::createPuantajPeriodManifests($pdo, 1, 2010, 1, $sealId, 1);
+        },
+        'HAFTALIK_SCHEMA_MISSING_ROLLBACK' => static function () use ($pdo, $weekId) {
+            ArchiveManifestService::createHaftalikPeriodManifests($pdo, $weekId, 1, '2010-01-04', 1);
+        },
+        'BORDRO_SCHEMA_MISSING_BEHAVIOR' => static function () use ($pdo, $bordroRunId) {
+            ArchiveManifestService::createBordroPeriodManifests($pdo, 1, 2010, 1, $bordroRunId, 1);
+        },
+        'SGK_SCHEMA_MISSING_BEHAVIOR' => static function () use ($pdo, $sgkSnapId) {
+            ArchiveManifestService::createSgkPeriodManifest($pdo, 1, 2010, 1, $sgkSnapId, 1);
+        },
+        'ISTEN_AYRILMA_SCHEMA_MISSING_BEHAVIOR' => static function () use ($pdo) {
+            ArchiveManifestService::createPersonelLifecycleManifests($pdo, 10, 1);
+        },
+    ];
+    foreach ($schemaMissingCases as $flag => $fn) {
+        $code = '';
+        try {
+            $fn();
+            $code = 'NO_THROW';
+        } catch (RuntimeException $e) {
+            $code = $e->getMessage();
+        }
+        rp053Assert($code === RetentionSchemaGate::CODE_SCHEMA_NOT_READY, $flag);
+        echo $flag . '=PASS' . PHP_EOL;
+    }
+    $pdo->exec('RENAME TABLE arsiv_manifestleri_bak_rp2 TO arsiv_manifestleri');
+    echo 'RETENTION_SCHEMA_MISSING_FAIL_CLOSED=PASS' . PHP_EOL;
+    echo 'TERMINATION_POST_TRIGGER_MUTATION_RESULT=CHANGED_NO_OVERWRITE' . PHP_EOL;
+
     try {
         LegalHoldService::create($pdo, $gm, [
             'target_domain' => 'surec',

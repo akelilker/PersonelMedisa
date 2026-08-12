@@ -8,13 +8,14 @@ import { ALL_ROLES, ASSIGNABLE_USER_ROLES } from "../../src/types/auth";
 const root = process.cwd();
 
 describe("retention policy source contract (053)", () => {
-  it("keeps migration tip at 054 and leaves 052/053 present", () => {
+  it("keeps migration tip at 059 and leaves 052/053 present", () => {
     const migrations = readdirSync(resolve(root, "api/migrations"))
       .filter((name) => /^\d{3}_.+\.sql$/.test(name))
       .sort();
-    expect(migrations.at(-1)).toBe("058_qr_puantaj_candidate_decision_ledger.sql");
+    expect(migrations.at(-1)).toBe("059_retention_physical_destruction_execution.sql");
     expect(migrations).toContain("052_puantaj_tolerans_ve_disiplin.sql");
     expect(migrations).toContain("053_retention_legal_hold_arsiv.sql");
+    expect(migrations).toContain("058_qr_puantaj_candidate_decision_ledger.sql");
 
     const sql052 = readFileSync(
       resolve(root, "api/migrations/052_puantaj_tolerans_ve_disiplin.sql"),
@@ -24,6 +25,42 @@ describe("retention policy source contract (053)", () => {
     // Content fingerprint — 052 must not be modified by Phase C.
     const hash = createHash("sha256").update(sql052).digest("hex");
     expect(hash.length).toBe(64);
+  });
+
+  it("059 has retention_imha_executionlari, UNIQUE talep, no INSERT seed", () => {
+    const sql = readFileSync(
+      resolve(root, "api/migrations/059_retention_physical_destruction_execution.sql"),
+      "utf8"
+    );
+    expect(sql).toContain("retention_imha_executionlari");
+    expect(sql).toContain("uq_retention_imha_execution_talep");
+    expect(sql).toMatch(/UNIQUE\s+KEY\s+uq_retention_imha_execution_talep\s*\(\s*imha_talep_id\s*\)/i);
+    expect(sql).not.toMatch(/^\s*INSERT\s+/im);
+  });
+
+  it("wires PhysicalDestructionService + RETENTION_PHYSICAL_V1 + execute permission", () => {
+    const svc = readFileSync(
+      resolve(root, "api/src/Services/Retention/PhysicalDestruction/PhysicalDestructionService.php"),
+      "utf8"
+    );
+    expect(svc).toContain("class PhysicalDestructionService");
+    expect(svc).toContain("retention.destruction.execute");
+
+    const codes = readFileSync(
+      resolve(root, "api/src/Services/Retention/PhysicalDestruction/PhysicalDestructionCodes.php"),
+      "utf8"
+    );
+    expect(codes).toContain("RETENTION_PHYSICAL_V1");
+
+    const cfg = readFileSync(resolve(root, "api/src/Config/config.example.php"), "utf8");
+    expect(cfg).toMatch(/['\"]retention_physical_destruction_enabled['\"]\s*=>\s*false/);
+
+    const handlersDir = resolve(root, "api/src/Services/Retention/PhysicalDestruction/Handlers");
+    for (const name of readdirSync(handlersDir).filter((n) => n.endsWith(".php"))) {
+      const src = readFileSync(resolve(handlersDir, name), "utf8");
+      // Typed handlers must not use interpolated generic DELETE FROM {$table} patterns.
+      expect(src, name).not.toMatch(/DELETE\s+FROM\s+\{\$/i);
+    }
   });
 
   it("053 has retention tables, new roles, no seed, Medisa policy wording", () => {

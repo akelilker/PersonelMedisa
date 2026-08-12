@@ -205,7 +205,7 @@ try {
     RetentionClock::clearOverride();
 
     $files = rp053MigrationFiles();
-    rp053Assert(end($files) === '058_qr_puantaj_candidate_decision_ledger.sql', '1 tip ends at 054');
+    rp053Assert(end($files) === '059_retention_physical_destruction_execution.sql', '1 tip ends at 054');
     rp053Assert(in_array('052_puantaj_tolerans_ve_disiplin.sql', $files, true), '1b 052 still present');
 
     rp053Apply($pdo, '001_initial_schema.sql');
@@ -599,11 +599,12 @@ try {
     );
     rp053Assert((string) $approved['status'] === 'APPROVED', '40 approve GM');
 
-    // 41 Final execution → EXECUTION_HANDLER_NOT_IMPLEMENTED
+    // 41 Final evaluate with feature flag default OFF → DESTRUCTION_EXECUTION_DISABLED (no mutation)
     $eval = DestructionWorkflowService::evaluateExecution($pdo, $gm, (int) $approved['id']);
     rp053Assert(
-        ($eval['execution']['code'] ?? '') === RetentionPolicyService::CODE_EXECUTION_HANDLER_NOT_IMPLEMENTED,
-        '41 EXECUTION_HANDLER_NOT_IMPLEMENTED'
+        ($eval['execution']['code'] ?? '') === 'DESTRUCTION_EXECUTION_DISABLED'
+            || ($eval['execution']['code'] ?? '') === RetentionPolicyService::CODE_DESTRUCTION_EXECUTION_DISABLED,
+        '41 DESTRUCTION_EXECUTION_DISABLED when flag OFF'
     );
 
     // 42 Integrity mismatch sticky CHANGED

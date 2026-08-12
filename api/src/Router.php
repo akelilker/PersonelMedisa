@@ -243,6 +243,12 @@ class Router
         if ($method === 'POST' && preg_match('#^/retention/imha-talepleri/(\d+)/approve$#', $path, $matches)) {
             RetentionController::approveDestruction($this->request, $matches[1]);
         }
+        if ($method === 'GET' && preg_match('#^/retention/imha-talepleri/(\d+)/evaluate$#', $path, $matches)) {
+            RetentionController::evaluateExecution($this->request, $matches[1]);
+        }
+        if ($method === 'POST' && preg_match('#^/retention/imha-talepleri/(\d+)/execute$#', $path, $matches)) {
+            RetentionController::executeDestruction($this->request, $matches[1]);
+        }
         if ($path === '/retention/imha-auditleri' && $method === 'GET') {
             RetentionController::listAudits($this->request);
         }

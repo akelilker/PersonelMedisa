@@ -11,7 +11,8 @@ use RuntimeException;
 
 /**
  * Canonical owner for Medisa saklama politikası retention evaluation.
- * Fail-closed. Never auto-deletes. Physical execute always returns EXECUTION_HANDLER_NOT_IMPLEMENTED.
+ * Fail-closed. Never auto-deletes. Physical mutation is owned by PhysicalDestructionService
+ * (feature-flagged; default OFF).
  *
  * Pre-approval eligibility ≠ final execution eligibility.
  * Client as_of / gm_approved are NEVER trusted for business decisions.
@@ -40,6 +41,13 @@ class RetentionPolicyService
     public const CODE_APPROVED_FOR_DESTRUCTION = 'APPROVED_FOR_DESTRUCTION';
     public const CODE_DESTRUCTION_REQUEST_NOT_APPROVED = 'DESTRUCTION_REQUEST_NOT_APPROVED';
     public const CODE_RETENTION_SOURCE_HANDLER_NOT_IMPLEMENTED = 'RETENTION_SOURCE_HANDLER_NOT_IMPLEMENTED';
+    public const CODE_DESTRUCTION_EXECUTION_DISABLED = 'DESTRUCTION_EXECUTION_DISABLED';
+    public const CODE_DESTRUCTION_HANDLER_POLICY_UNRESOLVED = 'DESTRUCTION_HANDLER_POLICY_UNRESOLVED';
+    public const CODE_DESTRUCTION_PLAN_CHANGED = 'DESTRUCTION_PLAN_CHANGED';
+    public const CODE_ALREADY_EXECUTED = 'ALREADY_EXECUTED';
+    public const CODE_TARGET_ALREADY_MISSING = 'TARGET_ALREADY_MISSING';
+    public const CODE_DEPENDENT_RETENTION_RECORDS_REMAIN = 'DEPENDENT_RETENTION_RECORDS_REMAIN';
+    public const CODE_DESTRUCTION_EXECUTED = 'DESTRUCTION_EXECUTED';
 
     /**
      * @param array<string, mixed> $context
@@ -325,8 +333,8 @@ class RetentionPolicyService
     }
 
     /**
-     * Physical execute path — always fail-closed with EXECUTION_HANDLER_NOT_IMPLEMENTED
-     * after final eligibility. Never performs generic DELETE.
+     * Legacy service entry: final eligibility only (no physical mutation).
+     * Physical execute must go through PhysicalDestructionService::execute / HTTP execute.
      *
      * @param array<string, mixed> $context
      * @param array<string, mixed>|null $approvedRequest
@@ -345,16 +353,19 @@ class RetentionPolicyService
             return $eligibility;
         }
 
-        return [
-            'eligible' => false,
-            'code' => self::CODE_EXECUTION_HANDLER_NOT_IMPLEMENTED,
-            'category' => (string) $category,
-            'trigger_type' => $eligibility['trigger_type'] ?? null,
-            'trigger_date' => $eligibility['trigger_date'] ?? null,
-            'retention_until' => $eligibility['retention_until'] ?? null,
-            'policy_note' => RetentionCategories::POLICY_NOTE,
-            'message' => self::codeMessage(self::CODE_EXECUTION_HANDLER_NOT_IMPLEMENTED),
-        ];
+        if (!\Medisa\Api\Services\Retention\PhysicalDestruction\PhysicalDestructionService::isEnabled()) {
+            $eligibility['eligible'] = false;
+            $eligibility['code'] = self::CODE_DESTRUCTION_EXECUTION_DISABLED;
+            $eligibility['message'] = self::codeMessage(self::CODE_DESTRUCTION_EXECUTION_DISABLED);
+
+            return $eligibility;
+        }
+
+        // Eligible for physical path — caller must use plan/execute with plan_hash.
+        $eligibility['handler_version'] = \Medisa\Api\Services\Retention\PhysicalDestruction\PhysicalDestructionCodes::HANDLER_VERSION;
+        $eligibility['message'] = 'Onayli imha; fiziksel execute plan_hash ile ayridir.';
+
+        return $eligibility;
     }
 
     /**
@@ -432,8 +443,15 @@ class RetentionPolicyService
             self::CODE_ELIGIBLE_FOR_DESTRUCTION_REQUEST => 'Imha talebi icin uygun (onay bekler).',
             self::CODE_DESTRUCTION_REQUEST_NOT_APPROVED => 'Onaylanmis imha talebi yok.',
             self::CODE_EXECUTION_HANDLER_NOT_IMPLEMENTED => 'Fiziksel imha handler uygulanmadi (guvenli).',
-            self::CODE_APPROVED_FOR_DESTRUCTION => 'Imha icin uygun (handler henuz yok).',
+            self::CODE_APPROVED_FOR_DESTRUCTION => 'Imha icin uygun (fiziksel execute ayri).',
             self::CODE_RETENTION_SOURCE_HANDLER_NOT_IMPLEMENTED => 'Saklama kaynak adapteri uygulanmadi.',
+            self::CODE_DESTRUCTION_EXECUTION_DISABLED => 'Fiziksel imha feature flag kapali.',
+            self::CODE_DESTRUCTION_HANDLER_POLICY_UNRESOLVED => 'Kategori imha politikasi cozumlenmedi.',
+            self::CODE_DESTRUCTION_PLAN_CHANGED => 'Imha plani degisti; execute reddedildi.',
+            self::CODE_ALREADY_EXECUTED => 'Imha talebi daha once yurutuldu.',
+            self::CODE_TARGET_ALREADY_MISSING => 'Hedef kaynak ilk execute oncesi yok; fail-closed.',
+            self::CODE_DEPENDENT_RETENTION_RECORDS_REMAIN => 'Bagimli saklama kayitlari hala mevcut.',
+            self::CODE_DESTRUCTION_EXECUTED => 'Fiziksel imha tamamlandi.',
         ];
 
         return isset($map[$code]) ? $map[$code] : 'Saklama degerlendirmesi basarisiz.';

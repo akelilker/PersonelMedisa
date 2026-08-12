@@ -11,11 +11,12 @@ Her registry kaydı **tek** zorunlu statü taşır: `CLOSED` · `CODE_GAP` · `B
 
 - **Ürün beyni:** `FROZEN` (domain owner / paralel motor yalnız ayrı teşhis + açık onay)
 - **Görsel düzenleme aşaması:** `GO`
-- **Production migration tip:** `058`
+- **Production migration tip:** `058` (kodda `059` dosyası Pack 2 ile eklendi; production apply **YOK**)
 - **S3F:** `CLOSED_PRODUCTION` (PR #148 merge `9e1b5c85049d5f2aada84ae59b2be926f0bc6441`; docs closure `72818720ae9dad9a77c31c933806a72acdc7bafd`)
 - **QR pipeline:** S3C–S3F `CLOSED`
 - **QR algorithms (locked):** `QR_INTERVAL_V1`, `QR_PUANTAJ_CANDIDATE_V1`, `QR_PUANTAJ_DECISION_V1`, `QR_CANDIDATE_HASH_V2`
 - **Master closure audit:** 2026-08-12 (`chore/master-closure-audit`); classification hardening aynı PR’da
+- **Retention Pack 2:** physical destruction framework shipped (`112`); `MG-RET-PHYS-001` still **CODE_GAP** (policy blockers)
 
 Görsel sistem çalışmaları mevcut component/owner içinde yapılabilir. Yeni domain özelliği freeze kapısından geçer.
 
@@ -23,7 +24,7 @@ Görsel sistem çalışmaları mevcut component/owner içinde yapılabilir. Yeni
 
 | Flag | Statü / değer | Metadata |
 | --- | --- | --- |
-| `PRODUCTION_MIGRATION_TIP` | **058** | — |
+| `PRODUCTION_MIGRATION_TIP` | **058** | kod ucu `059` mevcut; production apply YOK |
 | `S3F` | **CLOSED_PRODUCTION** | — |
 | `QR_PIPELINE` | **S3C–S3F CLOSED** | — |
 | `REAL_REFERENCE_DATA` | NOT_YET_ROLLED_OUT | `USER_GATED` |
@@ -32,7 +33,7 @@ Görsel sistem çalışmaları mevcut component/owner içinde yapılabilir. Yeni
 | `SOURCE_DATA_REQUIRES_COMPLETION` | yes | ops details outside public repo |
 | `PERSONEL_BINDING_REAL_ROLLOUT` | **NOT_STARTED** (schema `056` mevcut) | `USER_GATED` |
 | `REAL_QR_EMPLOYEE_ROLLOUT` | **NOT_STARTED** | `USER_GATED` |
-| `RETENTION_PHYSICAL_DESTRUCTION` | **CODE_GAP** (`MG-RET-PHYS-001`) | — |
+| `RETENTION_PHYSICAL_DESTRUCTION` | **CODE_GAP** (`MG-RET-PHYS-001`) | Pack 2 framework PARTIAL — policy blockers; flag default OFF |
 | `RETENTION_MANIFEST_COVERAGE` | **CLOSED** (`MG-RET-MAN-001`) | Pack 1 — creators 15/15 |
 | `RETENTION_S3F_LEDGER_FINGERPRINT` | **CLOSED** (`MG-RET-S3F-001`) | Pack 1 — typed ONAY_AUDIT |
 | `SERBEST_ZAMAN_6_MONTH_TRACKING` | **CODE_GAP** (`MG-SZ-6M-001`) | deadline calc/bakiye var; ops/compliance follow-up eksik |
@@ -50,8 +51,8 @@ Görsel sistem çalışmaları mevcut component/owner içinde yapılabilir. Yeni
 ## Doğrulanmış teknik temel
 
 - `main` / `origin/main` audit baseline: `72818720ae9dad9a77c31c933806a72acdc7bafd`.
-- Migration dosya ucu kodda: `058_qr_puantaj_candidate_decision_ledger.sql`.
-- SGK, şirket politikası kanıtı, bordro preflight, personel importu, revizyon, dual-control, retention request/approve, QR S3C–S3F owner’ları mevcut ve fail-closed çalışır.
+- Migration dosya ucu kodda: `059_retention_physical_destruction_execution.sql` (production tip hâlâ **058**; apply yok).
+- SGK, şirket politikası kanıtı, bordro preflight, personel importu, revizyon, dual-control, retention request/approve/evaluate/execute (flag OFF), QR S3C–S3F owner’ları mevcut ve fail-closed çalışır.
 - PERSONEL self-service: `/me` puantaj / yıllık izin / FM / QR yüzeyleri; maaş/bordro self-view **OUT_OF_SCOPE** (S3A).
 - Smoke/test personeller korunur; gerçek personel dataset’i **kullanıcı onayı olmadan import edilmez**.
 - Public repo’ya PII / exact personnel tallies yazılmaz.

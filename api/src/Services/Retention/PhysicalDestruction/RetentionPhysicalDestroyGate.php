@@ -1,0 +1,119 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Medisa\Api\Services\Retention\PhysicalDestruction;
+
+use Medisa\Api\Services\Retention\RetentionCategories;
+use PDO;
+use RuntimeException;
+
+/**
+ * Transaction-scoped, retention-only DELETE gate for immutable BORDRO/SGK tables.
+ *
+ * Opened only by PhysicalDestructionService after feature flag + eligibility + PREPARED evidence.
+ * Triggers allow DELETE solely when CONNECTION_ID() has an open gate tied to PREPARED execution.
+ * Connection reuse must not leak: close() deletes the gate row before commit/rollback cleanup.
+ */
+final class RetentionPhysicalDestroyGate
+{
+    /**
+     * Categories whose target tables have BEFORE DELETE immutability triggers.
+     *
+     * @return list<string>
+     */
+    public static function gatedCategories()
+    {
+        return [
+            RetentionCategories::BORDRO,
+            RetentionCategories::SGK_EKSIK_GUN,
+        ];
+    }
+
+    public static function requiresGate($category)
+    {
+        return in_array((string) $category, self::gatedCategories(), true);
+    }
+
+    /**
+     * @throws RuntimeException when gate schema missing for a gated category
+     */
+    public static function open(PDO $pdo, $executionId, $imhaTalepId, $category)
+    {
+        $category = (string) $category;
+        if (!self::requiresGate($category)) {
+            return;
+        }
+        if (!self::tableExists($pdo, 'retention_physical_destroy_gates')
+            || !self::tableExists($pdo, 'retention_imha_executionlari')
+        ) {
+            throw new RuntimeException('TECHNICAL_BLOCKER_TRIGGER_POLICY');
+        }
+
+        $executionId = (int) $executionId;
+        $imhaTalepId = (int) $imhaTalepId;
+        if ($executionId <= 0 || $imhaTalepId <= 0) {
+            throw new RuntimeException(PhysicalDestructionCodes::CODE_DESTRUCTION_EXECUTION_INVALID);
+        }
+
+        // Fail-closed: gate only while PREPARED evidence exists for this execution + category.
+        $chk = $pdo->prepare(
+            "SELECT e.id
+             FROM retention_imha_executionlari e
+             INNER JOIN retention_imha_talepleri t ON t.id = e.imha_talep_id
+             WHERE e.id = :eid
+               AND e.imha_talep_id = :tid
+               AND e.execution_state = 'PREPARED'
+               AND t.category = :category
+             LIMIT 1"
+        );
+        $chk->execute([
+            'eid' => $executionId,
+            'tid' => $imhaTalepId,
+            'category' => $category,
+        ]);
+        if (!$chk->fetchColumn()) {
+            throw new RuntimeException(PhysicalDestructionCodes::CODE_DESTRUCTION_EXECUTION_INVALID);
+        }
+
+        self::close($pdo);
+
+        $token = hash(
+            'sha256',
+            $executionId . '|' . $imhaTalepId . '|' . $category . '|' . bin2hex(random_bytes(16))
+        );
+        $ins = $pdo->prepare(
+            'INSERT INTO retention_physical_destroy_gates
+                (connection_id, execution_id, imha_talep_id, category, token_hash)
+             VALUES
+                (CONNECTION_ID(), :eid, :tid, :category, :token)'
+        );
+        $ins->execute([
+            'eid' => $executionId,
+            'tid' => $imhaTalepId,
+            'category' => $category,
+            'token' => $token,
+        ]);
+    }
+
+    public static function close(PDO $pdo)
+    {
+        if (!self::tableExists($pdo, 'retention_physical_destroy_gates')) {
+            return;
+        }
+        $pdo->exec(
+            'DELETE FROM retention_physical_destroy_gates WHERE connection_id = CONNECTION_ID()'
+        );
+    }
+
+    private static function tableExists(PDO $pdo, $table)
+    {
+        $stmt = $pdo->prepare(
+            'SELECT 1 FROM information_schema.TABLES
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :t LIMIT 1'
+        );
+        $stmt->execute(['t' => (string) $table]);
+
+        return (bool) $stmt->fetchColumn();
+    }
+}

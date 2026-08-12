@@ -93,10 +93,11 @@ Aşağıdakiler CURRENT MAIN’de bozulmuş değilse OPEN yapılmaz:
 | Öncelik | **P1** |
 | Domain | Retention / KVKK |
 | Pack 2 | `fix/retention-physical-destruction` / `112` — framework + 7 supported handlers + `059` evidence; feature flag default OFF |
-| Mevcut | Plan/execute + registry + HTTP evaluate/execute; **POLICY_DECISION_REQUIRED** kalan: PUANTAJ, BORDRO, SGK_EKSIK_GUN, FAZLA_CALISMA, SERBEST_ZAMAN, DISIPLIN, RAPOR, IS_KAZASI (+ generic ONAY_AUDIT parent) |
+| Pack 3B | `fix/retention-physical-pack3b-core` / `113` — typed executable: **PUANTAJ**, **BORDRO**, **SGK_EKSIK_GUN** + mig `060` retention-only DELETE gate; flag still OFF |
+| Mevcut | Plan/execute + registry + HTTP evaluate/execute; **POLICY_DECISION_REQUIRED** kalan: FAZLA_CALISMA, SERBEST_ZAMAN, DISIPLIN, RAPOR, IS_KAZASI (+ generic ONAY_AUDIT parent) |
 | Beklenen | Tüm mandatory category strategy’leri executable (policy kararları kapanmış) + OPS feature enable ayrı kapı |
-| Kanıt | `PhysicalDestructionService`; `RetentionDestructionHandlerRegistry`; mig `059`; `112` |
-| Neden açık | Framework hazır; birkaç kategori için delete/anonymize/co-destroy iş kararı repo’dan kesin çıkmıyor |
+| Kanıt | `PhysicalDestructionService`; `RetentionDestructionHandlerRegistry`; mig `059`/`060`; `112`/`113` |
+| Neden açık | Framework + 10 executable kategori; 5 (+ generic ONAY_AUDIT) policy kararı hâlâ açık |
 | Runtime | Flag OFF → `DESTRUCTION_EXECUTION_DISABLED`; policy kategori → `DESTRUCTION_HANDLER_POLICY_UNRESOLVED` |
 | Payroll / SGK | Policy blockers (BORDRO/SGK/PUANTAJ) |
 | KVKK/retention | Desteklenen kategorilerde test DB imha mümkün; production kapalı |

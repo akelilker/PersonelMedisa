@@ -420,8 +420,10 @@ try {
     rpdFlagOff();
 
     $files = rpdMigrationFiles();
-    rpdAssert(end($files) === '059_retention_physical_destruction_execution.sql', 'tip ends at 059');
+    rpdAssert(end($files) === '060_retention_physical_destroy_trigger_gate.sql', 'tip ends at 060');
     rpdAssert(in_array('053_retention_legal_hold_arsiv.sql', $files, true), '053 present');
+    rpdAssert(in_array('059_retention_physical_destruction_execution.sql', $files, true), '059 present');
+    rpdAssert(in_array('060_retention_physical_destroy_trigger_gate.sql', $files, true), '060 present');
     foreach ($files as $file) {
         rpdApply($pdo, $file);
     }
@@ -815,7 +817,7 @@ try {
         'M failed execute leaves no EXECUTED evidence'
     );
 
-    // K — POLICY categories evaluate → DESTRUCTION_HANDLER_POLICY_UNRESOLVED
+    // K — Pack 3B: PUANTAJ/BORDRO executable; remaining policy categories still fail-closed
     $pdo->exec(
         "INSERT INTO puantaj_aylik_muhurleri (sube_id, yil, ay, donem, durum, muhurlenen_kayit_sayisi, created_by, created_at)
          VALUES (1, 2010, 1, '2010-01', 'MUHURLENDI', 1, 1, '2010-02-05 10:00:00')"
@@ -859,15 +861,16 @@ try {
         'sube_id' => 1,
         'yil' => 2010,
         'ay' => 1,
-        'reason' => 'Pack2 policy PUANTAJ',
+        'reason' => 'Pack2/3B PUANTAJ executable',
     ]);
     rpdAssert((string) $reqP['item']['status'] === 'REQUESTED', 'K PUANTAJ REQUESTED');
     $apP = DestructionWorkflowService::approveDestruction($pdo, $gm, (int) $reqP['item']['id'], 'GM', true);
     $evalP = PhysicalDestructionService::evaluate($pdo, $gm, (int) $apP['id']);
     rpdAssert(
-        ($evalP['execution']['code'] ?? '') === PhysicalDestructionCodes::CODE_DESTRUCTION_HANDLER_POLICY_UNRESOLVED,
-        'K PUANTAJ DESTRUCTION_HANDLER_POLICY_UNRESOLVED'
+        ($evalP['execution']['code'] ?? '') === RetentionPolicyService::CODE_APPROVED_FOR_DESTRUCTION,
+        'K PUANTAJ APPROVED_FOR_DESTRUCTION (Pack 3B executable)'
     );
+    rpdAssert(is_array($evalP['plan'] ?? null) && !empty($evalP['plan']['plan_hash']), 'K PUANTAJ plan_hash');
 
     $reqB = DestructionWorkflowService::requestDestruction($pdo, $gm, [
         'category' => RetentionCategories::BORDRO,
@@ -876,15 +879,28 @@ try {
         'sube_id' => 1,
         'yil' => 2010,
         'ay' => 1,
-        'reason' => 'Pack2 policy BORDRO',
+        'reason' => 'Pack2/3B BORDRO executable',
     ]);
     rpdAssert((string) $reqB['item']['status'] === 'REQUESTED', 'K BORDRO REQUESTED');
     $apB = DestructionWorkflowService::approveDestruction($pdo, $gm, (int) $reqB['item']['id'], 'GM', true);
     $evalB = PhysicalDestructionService::evaluate($pdo, $gm, (int) $apB['id']);
     rpdAssert(
-        ($evalB['execution']['code'] ?? '') === PhysicalDestructionCodes::CODE_DESTRUCTION_HANDLER_POLICY_UNRESOLVED,
-        'K BORDRO DESTRUCTION_HANDLER_POLICY_UNRESOLVED'
+        ($evalB['execution']['code'] ?? '') === RetentionPolicyService::CODE_APPROVED_FOR_DESTRUCTION,
+        'K BORDRO APPROVED_FOR_DESTRUCTION (Pack 3B executable)'
     );
+    rpdAssert(is_array($evalB['plan'] ?? null) && !empty($evalB['plan']['plan_hash']), 'K BORDRO plan_hash');
+
+    $policyLeft = [
+        RetentionCategories::FAZLA_CALISMA,
+        RetentionCategories::SERBEST_ZAMAN,
+        RetentionCategories::DISIPLIN,
+        RetentionCategories::RAPOR,
+        RetentionCategories::IS_KAZASI,
+    ];
+    foreach ($policyLeft as $policyCat) {
+        $handler = \Medisa\Api\Services\Retention\PhysicalDestruction\RetentionDestructionHandlerRegistry::forCategory($policyCat);
+        rpdAssert($handler->isExecutable() === false, 'K remaining policy ' . $policyCat);
+    }
 
     // Q — PERSONEL_OZLUK with dependent QR → DEPENDENT_RETENTION_RECORDS_REMAIN
     $reqO = DestructionWorkflowService::requestDestruction($pdo, $gm, [

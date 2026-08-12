@@ -23,7 +23,7 @@ describe("S84-R2 payroll scope sources", () => {
     const files = readdirSync("api/migrations")
       .filter((name) => /^\d{3}_/.test(name))
       .sort();
-    expect(files[files.length - 1]).toBe("059_retention_physical_destruction_execution.sql");
+    expect(files[files.length - 1]).toBe("060_retention_physical_destroy_trigger_gate.sql");
   });
 
   it("service contract version is S84R2_PAYROLL_SCOPE_V1", () => {

@@ -49,7 +49,7 @@ describe("SerbestZamanController MariaDB", () => {
     const migrations = readdirSync(resolve(process.cwd(), "api/migrations"))
       .filter((name) => name.endsWith(".sql"))
       .sort();
-    expect(migrations.at(-1)).toBe("059_retention_physical_destruction_execution.sql");
+    expect(migrations.at(-1)).toBe("060_retention_physical_destroy_trigger_gate.sql");
   });
 
   it("runs HTTP serbest zaman acceptance on MariaDB", () => {

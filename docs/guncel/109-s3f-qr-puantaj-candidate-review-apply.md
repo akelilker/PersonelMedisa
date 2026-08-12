@@ -1,8 +1,8 @@
 # 109 — S3F QR Puantaj Candidate Review + Controlled Apply V1
 
-**Branch:** `feat/qr-puantaj-candidate-review-apply`  
-**Baseline main:** `cfc633769888263e0f3600acaa36f855bca551c4` (S3E closed / PR #147)  
-**Status:** DRAFT PR — **production migration 058 NOT applied**
+**Branch:** `feat/qr-puantaj-candidate-review-apply` (merged)  
+**Baseline main (pre-merge):** `cfc633769888263e0f3600acaa36f855bca551c4` (S3E closed / PR #147)  
+**Status:** **S3F CLOSED in production** (PR #148 merged @ `9e1b5c85…`; migration tip **058**; Deploy cPanel #31607113010)
 
 ---
 
@@ -28,7 +28,7 @@ S3E candidates were recomputable (no persistence). S3F introduces **human decisi
 | 057 | Raw QR attendance events (immutable tip before S3F) |
 | **058** | `qr_puantaj_candidate_decision_ledger` |
 
-052–057 remain immutable. **Do not apply 058 to production** until explicit later approval + fresh pre-058 backup.
+052–057 remain immutable. Migration **058** was applied to production after explicit approval + fresh pre-058 backup (`karmotor_medisa_pre_058_20260812-171759.sql`).
 
 ---
 
@@ -219,4 +219,20 @@ Algorithm versions: `QR_PUANTAJ_CANDIDATE_V1`, `QR_INTERVAL_V1`, decision `QR_PU
 
 ## Production
 
-**NOT applied.** Ends at draft PR + exact-head CI. No prod DB write / backup-yet / merge / deploy.
+**S3F CLOSED in production.**
+
+| Item | Value |
+|------|-------|
+| PR | #148 merged |
+| Approved head | `0bdf5feb3a0fd1ff1734cc8c628a679bf5bdc853` |
+| Pre-merge exact-head CI | [#31599301967](https://github.com/akelilker/PersonelMedisa/actions/runs/31599301967) success |
+| MERGE_SHA | `9e1b5c85049d5f2aada84ae59b2be926f0bc6441` |
+| First main CI | [#31606849977](https://github.com/akelilker/PersonelMedisa/actions/runs/31606849977) success |
+| First Deploy cPanel | [#31607113010](https://github.com/akelilker/PersonelMedisa/actions/runs/31607113010) success (exact MERGE_SHA) |
+| Migration 058 | Applied on production; tip **058** |
+| Hash contract | `QR_CANDIDATE_HASH_V2` |
+| Concurrency evidence | DB-lock orchestrated (no production `S3F_RACE_HOLD_MS` / test-only usleep hook) |
+| Live smoke | Anonymous + authenticated read-only PASS; no synthetic S3F decision/business write |
+| Dependent guard / KEEP / REOPEN / no-row auto-create | Preserved as designed |
+
+Retention gap above remains honest backlog — ledger is ONAY_AUDIT classification only; archive manifest wiring is **not** claimed complete.

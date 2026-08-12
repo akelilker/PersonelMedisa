@@ -548,3 +548,32 @@ export async function resealDonemPuantaj(
   );
   return response.data;
 }
+
+export type QrPuantajCandidateListResponse = {
+  from: string;
+  to: string;
+  algorithm_version: string;
+  interval_algorithm_version: string;
+  personel_id: number;
+  items: Array<Record<string, unknown>>;
+  summary: Record<string, unknown>;
+};
+
+export async function fetchQrPuantajAdaylari(
+  personelId: number,
+  params?: { from?: string; to?: string }
+) {
+  const search = new URLSearchParams();
+  if (params?.from) {
+    search.set("from", params.from);
+  }
+  if (params?.to) {
+    search.set("to", params.to);
+  }
+  const qs = search.toString();
+  const path = endpoints.puantaj.qrAdaylari(personelId) + (qs ? `?${qs}` : "");
+  const response = await apiRequest<ApiResponse<QrPuantajCandidateListResponse>>(path, {
+    method: "GET"
+  });
+  return response.data;
+}

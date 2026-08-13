@@ -843,8 +843,8 @@ try {
     }
     $tip = end($files);
     p4bAssert(
-        is_string($tip) && $tip === '064_personel_org_location_model.sql',
-        'migration tip ends with 064_personel_org_location_model.sql'
+        is_string($tip) && $tip === '065_personel_org_structure.sql',
+        'migration tip ends with 065_personel_org_structure.sql'
     );
     p4bAssert(
         in_array('061_serbest_zaman_kullanim_tahsisleri.sql', $files, true),

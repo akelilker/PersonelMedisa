@@ -153,12 +153,21 @@ export function buildCreatePersonelPayload(form: CreatePersonelFormState): Creat
     ise_giris_tarihi: form.iseGirisTarihi,
     sube_id: subeId,
     departman_id: parseRequiredPositiveInt(form.departmanId, "Departman"),
-    gorev_id: parseRequiredPositiveInt(form.gorevId, "Görev"),
+    gorev_id: parseRequiredPositiveInt(form.gorevId, "Unvan"),
     personel_tipi_id: parseRequiredPositiveInt(form.personelTipiId, "Personel Tipi"),
     aktif_durum: "AKTIF",
     ...(form.dogumYeri.trim() ? { dogum_yeri: form.dogumYeri.trim() } : {}),
     ...(form.kanGrubu.trim() ? { kan_grubu: form.kanGrubu.trim() } : {}),
     ...(bagliAmirId !== undefined ? { bagli_amir_id: bagliAmirId } : {}),
+    ...(parseOptionalPositiveInt(form.bolumId) !== undefined
+      ? { bolum_id: parseOptionalPositiveInt(form.bolumId)! }
+      : {}),
+    ...(parseOptionalPositiveInt(form.birimId) !== undefined
+      ? { birim_id: parseOptionalPositiveInt(form.birimId)! }
+      : {}),
+    ...(parseOptionalPositiveInt(form.pozisyonId) !== undefined
+      ? { pozisyon_id: parseOptionalPositiveInt(form.pozisyonId)! }
+      : {}),
     ...(ucretTipiId !== undefined ? { ucret_tipi_id: ucretTipiId } : {}),
     ...(primKuraliId !== undefined ? { prim_kurali_id: primKuraliId } : {}),
     ...(maasTutari !== undefined ? { net_maas_tutari: maasTutari, maas_tutari: maasTutari } : {}),

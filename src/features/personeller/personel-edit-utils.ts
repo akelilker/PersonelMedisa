@@ -32,7 +32,10 @@ export type EditPersonelFormState = {
   soyad: string;
   telefon: string;
   departmanId: string;
+  bolumId: string;
+  birimId: string;
   gorevId: string;
+  pozisyonId: string;
   bagliAmirId: string;
   ucretTipiId: string;
   maasTutari: string;
@@ -158,7 +161,10 @@ export function buildBagliAmirSurecPayloads(
 export function pickLifecycleFormFields(form: EditPersonelFormState): LifecycleFormFields {
   return {
     departmanId: form.departmanId,
+    bolumId: form.bolumId,
+    birimId: form.birimId,
     gorevId: form.gorevId,
+    pozisyonId: form.pozisyonId,
     bagliAmirId: form.bagliAmirId,
     ucretTipiId: form.ucretTipiId,
     maasTutari: form.maasTutari,
@@ -174,7 +180,10 @@ export function pickGenelLifecycleFormFields(
   const resolvedMaas = resolvePersonelMaasTutari(personel);
   return {
     departmanId: form.departmanId,
+    bolumId: form.bolumId,
+    birimId: form.birimId,
     gorevId: form.gorevId,
+    pozisyonId: form.pozisyonId,
     bagliAmirId: form.bagliAmirId,
     ucretTipiId: personel.ucret_tipi_id != null ? String(personel.ucret_tipi_id) : "",
     maasTutari: resolvedMaas != null ? String(resolvedMaas) : "",
@@ -189,7 +198,10 @@ export function personelToEditForm(personel: Personel): EditPersonelFormState {
     soyad: personel.soyad,
     telefon: personel.telefon ?? "",
     departmanId: personel.departman_id != null ? String(personel.departman_id) : "",
+    bolumId: personel.bolum_id != null ? String(personel.bolum_id) : "",
+    birimId: personel.birim_id != null ? String(personel.birim_id) : "",
     gorevId: personel.gorev_id != null ? String(personel.gorev_id) : "",
+    pozisyonId: personel.pozisyon_id != null ? String(personel.pozisyon_id) : "",
     bagliAmirId: personel.bagli_amir_id != null ? String(personel.bagli_amir_id) : "",
     ucretTipiId: personel.ucret_tipi_id != null ? String(personel.ucret_tipi_id) : "",
     maasTutari: resolvedMaas != null ? String(resolvedMaas) : "",
@@ -201,6 +213,11 @@ export function personelToEditForm(personel: Personel): EditPersonelFormState {
 export type BuildPersonelUpdatePayloadOptions = {
   /** Default true. Genel panel must pass false — ücret write owner is Süreç → Mali. */
   includeWageFields?: boolean;
+  /**
+   * When true, include bolum_id/birim_id/pozisyon_id (empty → null clear).
+   * Default false so pre-065 forms omit keys (no ORG_STRUCTURE_SCHEMA_NOT_READY).
+   */
+  includeOrgStructureFields?: boolean;
 };
 
 export function buildPersonelUpdatePayload(
@@ -209,6 +226,7 @@ export function buildPersonelUpdatePayload(
   options: BuildPersonelUpdatePayloadOptions = {}
 ): UpdatePersonelPayload {
   const includeWageFields = options.includeWageFields !== false;
+  const includeOrgStructureFields = options.includeOrgStructureFields === true;
   const payload: UpdatePersonelPayload = {
     ad: normalizePersonelAd(editForm.ad),
     soyad: normalizePersonelSoyad(editForm.soyad),
@@ -222,10 +240,18 @@ export function buildPersonelUpdatePayload(
   const idPayload = payload as Record<string, number | null | undefined>;
 
   const setOptionalId = (
-    key: "departman_id" | "gorev_id" | "bagli_amir_id" | "prim_kurali_id" | "ucret_tipi_id",
-    raw: string
+    key:
+      | "departman_id"
+      | "gorev_id"
+      | "bagli_amir_id"
+      | "prim_kurali_id"
+      | "ucret_tipi_id"
+      | "bolum_id"
+      | "birim_id"
+      | "pozisyon_id",
+    raw: string | null | undefined
   ) => {
-    const trimmed = raw.trim();
+    const trimmed = String(raw ?? "").trim();
     if (trimmed === "") {
       idPayload[key] = null;
       return;
@@ -241,6 +267,12 @@ export function buildPersonelUpdatePayload(
   setOptionalId("gorev_id", editForm.gorevId);
   setOptionalId("bagli_amir_id", editForm.bagliAmirId);
   setOptionalId("prim_kurali_id", editForm.primKuraliId);
+
+  if (includeOrgStructureFields) {
+    setOptionalId("bolum_id", editForm.bolumId);
+    setOptionalId("birim_id", editForm.birimId);
+    setOptionalId("pozisyon_id", editForm.pozisyonId);
+  }
 
   if (includeWageFields) {
     setOptionalId("ucret_tipi_id", editForm.ucretTipiId);

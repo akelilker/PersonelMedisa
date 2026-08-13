@@ -396,7 +396,7 @@ export function PersonelCreateFields({
           {refs.departmanOptions.length > 0 ? (
             <>
               <PersonelCreateSelect
-                label="Bölüm"
+                label="Departman"
                 name="create-departman"
                 value={form.departmanId}
                 onChange={
@@ -416,11 +416,55 @@ export function PersonelCreateFields({
               ) : null}
             </>
           ) : (
-            refMissingNote("Bölüm", true)
+            refMissingNote("Departman", true)
           )}
+          {refs.bolumOptions.length > 0 ? (
+            <PersonelCreateSelect
+              label="Bölüm"
+              name="create-bolum"
+              value={form.bolumId}
+              onChange={(value) => {
+                const nextBirimId =
+                  value &&
+                  form.birimId &&
+                  refs.birimOptions.some(
+                    (opt) => String(opt.id) === form.birimId && String(opt.parentId ?? "") === value
+                  )
+                    ? form.birimId
+                    : "";
+                setForm((prev) => ({ ...prev, bolumId: value, birimId: nextBirimId }));
+              }}
+              placeholderOption={{ value: "", label: "Seçiniz" }}
+              options={toSelectOptions(
+                refs.bolumOptions.filter(
+                  (opt) => !form.departmanId || String(opt.parentId ?? "") === form.departmanId
+                )
+              )}
+              isOpen={openSelectName === "create-bolum"}
+              onOpenChange={(isOpen) => setSelectOpen("create-bolum", isOpen)}
+              disabled={!form.departmanId}
+            />
+          ) : null}
+          {refs.birimOptions.length > 0 ? (
+            <PersonelCreateSelect
+              label="Birim"
+              name="create-birim"
+              value={form.birimId}
+              onChange={(value) => setForm((prev) => ({ ...prev, birimId: value }))}
+              placeholderOption={{ value: "", label: "Seçiniz" }}
+              options={toSelectOptions(
+                refs.birimOptions.filter(
+                  (opt) => !form.bolumId || String(opt.parentId ?? "") === form.bolumId
+                )
+              )}
+              isOpen={openSelectName === "create-birim"}
+              onOpenChange={(isOpen) => setSelectOpen("create-birim", isOpen)}
+              disabled={!form.bolumId}
+            />
+          ) : null}
           {refs.gorevOptions.length > 0 ? (
             <PersonelCreateSelect
-              label="Görev / Unvan"
+              label="Unvan"
               name="create-gorev"
               value={form.gorevId}
               onChange={(value) => setForm((prev) => ({ ...prev, gorevId: value }))}
@@ -431,8 +475,20 @@ export function PersonelCreateFields({
               onOpenChange={(isOpen) => setSelectOpen("create-gorev", isOpen)}
             />
           ) : (
-            refMissingNote("Görev / Unvan", true)
+            refMissingNote("Unvan", true)
           )}
+          {refs.pozisyonOptions.length > 0 ? (
+            <PersonelCreateSelect
+              label="Pozisyon"
+              name="create-pozisyon"
+              value={form.pozisyonId}
+              onChange={(value) => setForm((prev) => ({ ...prev, pozisyonId: value }))}
+              placeholderOption={{ value: "", label: "Seçiniz" }}
+              options={toSelectOptions(refs.pozisyonOptions)}
+              isOpen={openSelectName === "create-pozisyon"}
+              onOpenChange={(isOpen) => setSelectOpen("create-pozisyon", isOpen)}
+            />
+          ) : null}
           {refs.personelTipiOptions.length > 0 ? (
             <PersonelCreateSelect
               label="Personel Tipi"

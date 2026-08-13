@@ -27,7 +27,10 @@ export type CacheEnvelope<T> = {
 
 export type PersonelReferenceBundle = {
   departmanOptions: IdOption[];
+  bolumOptions: IdOption[];
+  birimOptions: IdOption[];
   gorevOptions: IdOption[];
+  pozisyonOptions: IdOption[];
   personelTipiOptions: IdOption[];
   bagliAmirOptions: IdOption[];
   ucretTipiOptions: IdOption[];

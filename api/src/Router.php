@@ -373,6 +373,24 @@ class Router
         if ($path === '/referans/gorevler' && $method === 'POST') {
             ReferansController::createGorev($this->request);
         }
+        if ($path === '/referans/bolumler' && $method === 'GET') {
+            ReferansController::bolumler($this->request);
+        }
+        if ($path === '/referans/bolumler' && $method === 'POST') {
+            ReferansController::createBolum($this->request);
+        }
+        if ($path === '/referans/birimler' && $method === 'GET') {
+            ReferansController::birimler($this->request);
+        }
+        if ($path === '/referans/birimler' && $method === 'POST') {
+            ReferansController::createBirim($this->request);
+        }
+        if ($path === '/referans/pozisyonlar' && $method === 'GET') {
+            ReferansController::pozisyonlar($this->request);
+        }
+        if ($path === '/referans/pozisyonlar' && $method === 'POST') {
+            ReferansController::createPozisyon($this->request);
+        }
         if ($path === '/referans/personel-tipleri' && $method === 'GET') {
             ReferansController::personelTipleri($this->request);
         }

@@ -98,7 +98,7 @@ export function timestampValue(value: string | null | undefined) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-export function formatReferenceValue(label?: string, id?: number) {
+export function formatReferenceValue(label?: string | null, id?: number | null) {
   if (label) {
     return label;
   }

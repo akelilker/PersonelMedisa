@@ -31,8 +31,8 @@ async function fillRequiredPersonelFields(modal: Locator, options?: { tcKimlikNo
   await modal.locator('[name="create-ise-giris"]').fill("2026-06-15");
 
   await selectCreateOption(modal, "Şube", options?.sube ?? "Merkez");
-  await selectCreateOption(modal, "Bölüm", "Döşeme");
-  await selectCreateOption(modal, "Görev / Unvan", "Genel Müdür");
+  await selectCreateOption(modal, "Departman", "Döşeme");
+  await selectCreateOption(modal, "Unvan", "Genel Müdür");
   await selectCreateOption(modal, "Personel Tipi", "Tam Zamanlı");
 }
 
@@ -88,8 +88,9 @@ test.describe("Kayit personel hata senaryolari", () => {
 
   test("sube mismatch 403 hatasinda modal acik kalir, sube alanina inline hata ve focus verir", async ({ page }) => {
     const runtimeSignals = trackRuntimeSignals(page);
-    await mockApi(page, "MUHASEBE");
-    await login(page, { username: "muhasebe", password: "demo123" });
+    // MUHASEBE no longer has personeller.create; IK_SORUMLUSU is create-capable with multi-sube mock scope [1,2].
+    await mockApi(page, "IK_SORUMLUSU");
+    await login(page, { username: "ik_sorumlusu", password: "demo123" });
     await expectThreeButtonMainMenu(page, true);
 
     const kayitModal = await openKayitModal(page);

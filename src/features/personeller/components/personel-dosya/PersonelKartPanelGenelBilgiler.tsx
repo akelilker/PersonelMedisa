@@ -57,6 +57,25 @@ export function PersonelKartPanelGenelBilgiler({
         description="Bağlı organizasyon, yönetim hattı ve acil durum bilgileri burada tutulur."
       >
         <DossierRecord
+          label="SGK İşvereni"
+          value={formatReferenceValue(personel.sgk_isveren_adi, personel.sgk_isveren_id)}
+        />
+        <DossierRecord
+          label="Çalışma Lokasyonu"
+          value={formatReferenceValue(personel.calisma_lokasyonu_adi, personel.calisma_lokasyonu_id)}
+        />
+        <DossierRecord
+          label="Departman"
+          value={formatReferenceValue(personel.departman_adi, personel.departman_id)}
+        />
+        <DossierRecord label="Bölüm" value={formatReferenceValue(personel.bolum_adi, personel.bolum_id)} />
+        <DossierRecord label="Birim" value={formatReferenceValue(personel.birim_adi, personel.birim_id)} />
+        <DossierRecord label="Unvan" value={formatReferenceValue(personel.gorev_adi, personel.gorev_id)} />
+        <DossierRecord
+          label="Pozisyon"
+          value={formatReferenceValue(personel.pozisyon_adi, personel.pozisyon_id)}
+        />
+        <DossierRecord
           label="Personel Tipi"
           value={formatReferenceValue(personel.personel_tipi_adi, personel.personel_tipi_id)}
         />

@@ -8,9 +8,12 @@ import {
 } from "../api/personeller.api";
 import {
   fetchBagliAmirOptions,
+  fetchBirimOptions,
+  fetchBolumOptions,
   fetchDepartmanOptions,
   fetchGorevOptions,
   fetchPersonelTipiOptions,
+  fetchPozisyonOptions,
   fetchPrimKuraliOptions,
   fetchUcretTipiOptions
 } from "../api/referans.api";
@@ -66,7 +69,10 @@ export type CreatePersonelFormState = {
   iseGirisTarihi: string;
   subeId: string;
   departmanId: string;
+  bolumId: string;
+  birimId: string;
   gorevId: string;
+  pozisyonId: string;
   personelTipiId: string;
   dogumYeri: string;
   kanGrubu: string;
@@ -88,7 +94,10 @@ export const INITIAL_CREATE_PERSONEL_FORM: CreatePersonelFormState = {
   iseGirisTarihi: "",
   subeId: "",
   departmanId: "",
+  bolumId: "",
+  birimId: "",
   gorevId: "",
+  pozisyonId: "",
   personelTipiId: "",
   dogumYeri: "",
   kanGrubu: "",
@@ -164,7 +173,10 @@ export function usePersoneller() {
     return (
       getCacheEntry<PersonelReferenceBundle>(dataCacheKeys.referansPersonel()) ?? {
         departmanOptions: [],
+        bolumOptions: [],
+        birimOptions: [],
         gorevOptions: [],
+        pozisyonOptions: [],
         personelTipiOptions: [],
         bagliAmirOptions: [],
         ucretTipiOptions: [],
@@ -255,14 +267,20 @@ export function usePersoneller() {
           runDeduped(dataCacheKeys.referansPersonel(), async () => {
             const [
               departmanOptions,
+              bolumOptions,
+              birimOptions,
               gorevOptions,
+              pozisyonOptions,
               personelTipiOptions,
               bagliAmirOptions,
               ucretTipiOptions,
               primKuraliOptions
             ] = await Promise.all([
               fetchDepartmanOptions(),
+              fetchBolumOptions(),
+              fetchBirimOptions(),
               fetchGorevOptions(),
+              fetchPozisyonOptions(),
               fetchPersonelTipiOptions(),
               fetchBagliAmirOptions(),
               fetchUcretTipiOptions(),
@@ -270,7 +288,10 @@ export function usePersoneller() {
             ]);
             return {
               departmanOptions,
+              bolumOptions,
+              birimOptions,
               gorevOptions,
+              pozisyonOptions,
               personelTipiOptions,
               bagliAmirOptions,
               ucretTipiOptions,
@@ -349,8 +370,39 @@ export function usePersoneller() {
   }, []);
 
   const handleCreateDepartmanChange = useCallback((departmanId: string) => {
-    setCreateForm((prev) => ({ ...prev, departmanId }));
-  }, []);
+    setCreateForm((prev) => {
+      const nextBolumId =
+        prev.bolumId &&
+        refs.bolumOptions.some(
+          (opt) => String(opt.id) === prev.bolumId && String(opt.parentId ?? "") === departmanId
+        )
+          ? prev.bolumId
+          : "";
+      const nextBirimId =
+        nextBolumId &&
+        prev.birimId &&
+        refs.birimOptions.some(
+          (opt) => String(opt.id) === prev.birimId && String(opt.parentId ?? "") === nextBolumId
+        )
+          ? prev.birimId
+          : "";
+      return { ...prev, departmanId, bolumId: nextBolumId, birimId: nextBirimId };
+    });
+  }, [refs.birimOptions, refs.bolumOptions]);
+
+  const handleCreateBolumChange = useCallback((bolumId: string) => {
+    setCreateForm((prev) => {
+      const nextBirimId =
+        bolumId &&
+        prev.birimId &&
+        refs.birimOptions.some(
+          (opt) => String(opt.id) === prev.birimId && String(opt.parentId ?? "") === bolumId
+        )
+          ? prev.birimId
+          : "";
+      return { ...prev, bolumId, birimId: nextBirimId };
+    });
+  }, [refs.birimOptions]);
 
   const handleCreateBagliAmirChange = useCallback((bagliAmirId: string) => {
     setCreateForm((prev) => ({ ...prev, bagliAmirId }));
@@ -465,6 +517,7 @@ export function usePersoneller() {
     createForm,
     setCreateForm,
     handleCreateDepartmanChange,
+    handleCreateBolumChange,
     handleCreateBagliAmirChange,
     createBagliAmirGuidance,
     createPersonelHandler,

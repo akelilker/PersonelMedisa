@@ -41,8 +41,15 @@ export function PersonelDosyaHero({
         <DossierField label="Ad" value={personel.ad} />
         <DossierField label="Soyad" value={personel.soyad} />
         <DossierField label="Sicil No" value={formatDetailValue(personel.sicil_no)} />
-        <DossierField label="Departman / Birim" value={formatReferenceValue(personel.departman_adi, personel.departman_id)} />
-        <DossierField label="Görev / Unvan" value={formatReferenceValue(personel.gorev_adi, personel.gorev_id)} />
+        <DossierField label="Departman" value={formatReferenceValue(personel.departman_adi, personel.departman_id)} />
+        <DossierField label="Bölüm" value={formatReferenceValue(personel.bolum_adi, personel.bolum_id)} />
+        <DossierField label="Birim" value={formatReferenceValue(personel.birim_adi, personel.birim_id)} />
+        <DossierField label="Unvan" value={formatReferenceValue(personel.gorev_adi, personel.gorev_id)} />
+        <DossierField label="Pozisyon" value={formatReferenceValue(personel.pozisyon_adi, personel.pozisyon_id)} />
+        <DossierField
+          label="Personel Tipi"
+          value={formatReferenceValue(personel.personel_tipi_adi, personel.personel_tipi_id)}
+        />
         <DossierField
           label="Çalışma Durumu"
           value={durumLabel}

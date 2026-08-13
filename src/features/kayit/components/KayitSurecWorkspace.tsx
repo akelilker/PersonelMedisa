@@ -30,9 +30,12 @@ import {
 import { fetchYonetimSubeleri } from "../../../api/yonetim.api";
 import {
   fetchBagliAmirOptions,
+  fetchBirimOptions,
+  fetchBolumOptions,
   fetchDepartmanOptions,
   fetchGorevOptions,
   fetchPersonelTipiOptions,
+  fetchPozisyonOptions,
   fetchPrimKuraliOptions,
   fetchSurecTuruOptions,
   fetchUcretTipiOptions
@@ -143,7 +146,10 @@ type KayitSurecWorkspaceProps = {
 
 const EMPTY_REFS: PersonelReferenceBundle = {
   departmanOptions: [],
+  bolumOptions: [],
+  birimOptions: [],
   gorevOptions: [],
+  pozisyonOptions: [],
   personelTipiOptions: [],
   bagliAmirOptions: [],
   ucretTipiOptions: [],
@@ -593,7 +599,10 @@ export function KayitSurecWorkspace({
     try {
       const [
         departmanOptions,
+        bolumOptions,
+        birimOptions,
         gorevOptions,
+        pozisyonOptions,
         personelTipiOptions,
         bagliAmirOptions,
         ucretTipiOptions,
@@ -603,7 +612,10 @@ export function KayitSurecWorkspace({
         subeler
       ] = await Promise.all([
         fetchDepartmanOptions(),
+        fetchBolumOptions(),
+        fetchBirimOptions(),
         fetchGorevOptions(),
+        fetchPozisyonOptions(),
         fetchPersonelTipiOptions(),
         fetchBagliAmirOptions(),
         fetchUcretTipiOptions(),
@@ -622,7 +634,10 @@ export function KayitSurecWorkspace({
 
       setRefs({
         departmanOptions,
+        bolumOptions,
+        birimOptions,
         gorevOptions,
+        pozisyonOptions,
         personelTipiOptions,
         bagliAmirOptions,
         ucretTipiOptions,
@@ -865,13 +880,13 @@ export function KayitSurecWorkspace({
 
     const changes = [
       {
-        label: "Bölüm",
+        label: "Departman",
         before: formatGeneralField(submitBaseline.departman_adi),
         after: optionLabel(refs.departmanOptions, submitForm.departmanId, formatGeneralField(submitBaseline.departman_adi)),
         changed: submitForm.departmanId !== toOptionalIdValue(submitBaseline.departman_id)
       },
       {
-        label: "Görev / Unvan",
+        label: "Unvan",
         before: formatGeneralField(submitBaseline.gorev_adi),
         after: optionLabel(refs.gorevOptions, submitForm.gorevId, formatGeneralField(submitBaseline.gorev_adi)),
         changed: submitForm.gorevId !== toOptionalIdValue(submitBaseline.gorev_id)
@@ -1544,7 +1559,7 @@ export function KayitSurecWorkspace({
                               >
                                 <div className="surec-position-grid">
                                   <KayitSurecPozisyonReferencePicker
-                                    label="Bölüm"
+                                    label="Departman"
                                     name="pozisyon-departman"
                                     value={pozisyonForm.departmanId}
                                     options={refs.departmanOptions}
@@ -1554,7 +1569,7 @@ export function KayitSurecWorkspace({
                                     required
                                   />
                                   <KayitSurecPozisyonReferencePicker
-                                    label="Görev / Unvan"
+                                    label="Unvan"
                                     name="pozisyon-gorev"
                                     value={pozisyonForm.gorevId}
                                     options={refs.gorevOptions}

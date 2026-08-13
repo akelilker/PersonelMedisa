@@ -3,7 +3,10 @@ import { resolvePersonelMaasTutari } from "../features/personeller/personel-crea
 
 export type LifecycleSnapshot = {
   departman_id: number | null;
+  bolum_id: number | null;
+  birim_id: number | null;
   gorev_id: number | null;
+  pozisyon_id: number | null;
   bagli_amir_id: number | null;
   ucret_tipi_id: number | null;
   maas_tutari: number | null;
@@ -12,7 +15,10 @@ export type LifecycleSnapshot = {
 
 export type LifecycleFormFields = {
   departmanId: string;
+  bolumId: string;
+  birimId: string;
   gorevId: string;
+  pozisyonId: string;
   bagliAmirId: string;
   ucretTipiId: string;
   maasTutari: string;
@@ -79,7 +85,10 @@ function normalizeOptionalMoney(value: unknown): number | null {
 export function snapshotFromPersonel(personel: Personel): LifecycleSnapshot {
   return {
     departman_id: normalizeOptionalId(personel.departman_id),
+    bolum_id: normalizeOptionalId(personel.bolum_id),
+    birim_id: normalizeOptionalId(personel.birim_id),
     gorev_id: normalizeOptionalId(personel.gorev_id),
+    pozisyon_id: normalizeOptionalId(personel.pozisyon_id),
     bagli_amir_id: normalizeOptionalId(personel.bagli_amir_id),
     ucret_tipi_id: normalizeOptionalId(personel.ucret_tipi_id),
     maas_tutari: normalizeOptionalMoney(resolvePersonelMaasTutari(personel)),
@@ -90,7 +99,10 @@ export function snapshotFromPersonel(personel: Personel): LifecycleSnapshot {
 export function snapshotFromLifecycleForm(form: LifecycleFormFields): LifecycleSnapshot {
   return {
     departman_id: normalizeOptionalId(form.departmanId),
+    bolum_id: normalizeOptionalId(form.bolumId),
+    birim_id: normalizeOptionalId(form.birimId),
     gorev_id: normalizeOptionalId(form.gorevId),
+    pozisyon_id: normalizeOptionalId(form.pozisyonId),
     bagli_amir_id: normalizeOptionalId(form.bagliAmirId),
     ucret_tipi_id: normalizeOptionalId(form.ucretTipiId),
     maas_tutari: normalizeOptionalMoney(form.maasTutari),
@@ -101,7 +113,10 @@ export function snapshotFromLifecycleForm(form: LifecycleFormFields): LifecycleS
 function snapshotsEqual(left: LifecycleSnapshot, right: LifecycleSnapshot): boolean {
   return (
     left.departman_id === right.departman_id &&
+    left.bolum_id === right.bolum_id &&
+    left.birim_id === right.birim_id &&
     left.gorev_id === right.gorev_id &&
+    left.pozisyon_id === right.pozisyon_id &&
     left.bagli_amir_id === right.bagli_amir_id &&
     left.ucret_tipi_id === right.ucret_tipi_id &&
     left.maas_tutari === right.maas_tutari &&
@@ -116,7 +131,10 @@ export function computeHasLifecycleDiff(personel: Personel, form: LifecycleFormF
 export function lifecycleSnapshotToPersonelPatch(snap: LifecycleSnapshot): Partial<Personel> {
   return {
     departman_id: snap.departman_id ?? undefined,
+    bolum_id: snap.bolum_id,
+    birim_id: snap.birim_id,
     gorev_id: snap.gorev_id ?? undefined,
+    pozisyon_id: snap.pozisyon_id,
     bagli_amir_id: snap.bagli_amir_id ?? undefined,
     ucret_tipi_id: snap.ucret_tipi_id ?? undefined,
     maas_tutari: snap.maas_tutari ?? undefined,

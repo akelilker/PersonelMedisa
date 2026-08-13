@@ -138,8 +138,8 @@ export function KayitSurecPersonelGenelPanel({
         items: [
           { label: "Acil Durum Kişisi", value: formatGeneralField(personel.acil_durum_kisi) },
           { label: "Acil Durum Telefon", value: formatGeneralField(personel.acil_durum_telefon) },
-          { label: "Bölüm", value: formatGeneralField(personel.departman_adi) },
-          { label: "Görev / Unvan", value: formatGeneralField(personel.gorev_adi) },
+          { label: "Departman", value: formatGeneralField(personel.departman_adi) },
+          { label: "Unvan", value: formatGeneralField(personel.gorev_adi) },
           { label: "Bağlı Amir", value: formatGeneralField(personel.bagli_amir_adi) }
         ]
       },
@@ -224,7 +224,11 @@ export function KayitSurecPersonelGenelPanel({
 
     const previousPersonel = personel;
     const body = buildPersonelUpdatePayload(editForm, hasLifecycleDiff, {
-      includeWageFields: false
+      includeWageFields: false,
+      includeOrgStructureFields:
+        personelRefs.bolumOptions.length > 0 ||
+        personelRefs.birimOptions.length > 0 ||
+        personelRefs.pozisyonOptions.length > 0
     });
     const lifecycleSnap = snapshotFromLifecycleForm(genelLifecycleFields);
     const optimistic: Personel = {

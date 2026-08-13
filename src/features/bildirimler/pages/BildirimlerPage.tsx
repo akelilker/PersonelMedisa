@@ -112,8 +112,8 @@ function PersonelContextCard({ personel }: PersonelContextCardProps) {
         {personel.ad} {personel.soyad}
       </strong>
       <p>
-        Bölüm: {personel.departman_adi ?? "-"}
-        {personel.gorev_adi ? ` | Görev: ${personel.gorev_adi}` : ""}
+        Departman: {personel.departman_adi ?? "-"}
+        {personel.gorev_adi ? ` | Unvan: ${personel.gorev_adi}` : ""}
       </p>
       <p>
         Telefon: {personel.telefon ?? "-"}
@@ -1344,7 +1344,7 @@ export function BildirimlerPage() {
                       (personel ? `${personel.ad} ${personel.soyad}` : "—")}
                   </p>
                   <p>
-                    Bölüm:{" "}
+                    Departman:{" "}
                     {formatDepartmanLabel(
                       bildirim.departman_id,
                       bildirim.departman_adi ?? personel?.departman_adi,
@@ -1504,7 +1504,7 @@ export function BildirimlerPage() {
 
             {personelSelectOptions.length > 0 ? (
               <FormField
-                label="Bölüm"
+                label="Departman"
                 name="bildirim-create-departman-info"
                 value={formatDepartmanLabel(
                   selectedCreatePersonel?.departman_id,
@@ -1615,7 +1615,7 @@ export function BildirimlerPage() {
 
             {personelSelectOptions.length > 0 ? (
               <FormField
-                label="Bölüm"
+                label="Departman"
                 name="bildirim-edit-departman-info"
                 value={formatDepartmanLabel(
                   selectedEditPersonel?.departman_id,
@@ -1627,7 +1627,7 @@ export function BildirimlerPage() {
               />
             ) : (
               <FormField
-                label="Bölüm"
+                label="Departman"
                 name="bildirim-edit-departman-readonly"
                 value={
                   editingBildirim?.departman_adi ??

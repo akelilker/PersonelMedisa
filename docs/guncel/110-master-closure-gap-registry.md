@@ -40,8 +40,8 @@
 
 | Invariant | Değer |
 | --- | --- |
-| PRODUCTION_MIGRATION_TIP | **064** (rollout `118`, 2026-08-13; was **058** at master-closure audit) |
-| CODE_MIGRATION_TIP | **064** |
+| PRODUCTION_MIGRATION_TIP | **064** (rollout `118`; Pack6 `065` not yet applied — `120`) |
+| CODE_MIGRATION_TIP | **065** |
 | S3F | **CLOSED_PRODUCTION** |
 | QR_PIPELINE | S3C–S3F **CLOSED** |
 | QR algorithms | `QR_INTERVAL_V1`, `QR_PUANTAJ_CANDIDATE_V1`, `QR_PUANTAJ_DECISION_V1`, `QR_CANDIDATE_HASH_V2` |
@@ -233,27 +233,34 @@ Aşağıdakiler CURRENT MAIN’de bozulmuş değilse OPEN yapılmaz:
 
 | Alan | Değer |
 | --- | --- |
-| Statü | **BUSINESS_DECISION_REQUIRED** |
-| Öncelik | **P2** |
+| Statü | **CLOSED** |
+| Öncelik | **P2** → closed |
 | Domain | Personel org model |
-| Mevcut | Native: `departman`, `gorev`, `personel_tipi`, `sube`, `bagli_amir_id`. Bölüm / birim / pozisyon native yok |
-| Soru | Bu üç seviye native canonical org alanı mı tutulacak, yoksa mevcut Departman / Görev / Personel Tipi mapping yeterli mi? |
-| Agent recommendation (`119`) | **OPTION_B_NATIVE_FIELDS_REQUIRED** — source Departman/Bölüm/Birim/Unvan/Pozisyon distinct; collapsing loses hierarchy. **Not approved** until user decision. |
-| Not | Çalışma **lokasyonu** kilitli gereksinim → refs seeded (`119`); personnel mapping still gated. Bu ID lokasyonu kapsamaz. |
-| Kanıt | `001_initial_schema.sql`; `src/types/personel.ts`; import columns; private HR source aggregates in `119` |
-| Acceptance | Yazılı kullanıcı onayı; gerekirse sonra CODE_GAP’e çevrilir |
+| Karar | Native fields required (no lossy collapse). Unvan owner = existing `gorev_id`. |
+| Implementation | Pack6 code/schema `065` (`120`). Production apply tracked by `MG-ORG-ATTR-ROLL-001`. |
+| Kanıt | user business decision 2026-08-14; `120`; `065_personel_org_structure.sql` |
+
+### MG-ORG-ATTR-ROLL-001 — Pack6 schema/ops rollout
+
+| Alan | Değer |
+| --- | --- |
+| Statü | **OPS_ROLLOUT** |
+| Metadata | `USER_GATED` |
+| Domain | Personel org model |
+| Mevcut | Code tip `065` ready; production tip still `064`; no taxonomy seed / branch rename / personnel mapping in Pack6 PR |
+| Acceptance | Explicit prod authorization for Steps 1–10 in `120` |
 
 ### MG-IMPORT-MAP-001 — Kaynak Excel → import contract eşlemesi
 
 | Alan | Değer |
 | --- | --- |
-| Statü | **BUSINESS_DECISION_REQUIRED** |
+| Statü | **CLOSED** (business mapping) — remaining gaps → `MG-IMPORT-DATA-001` |
 | Öncelik | **P1** |
 | Domain | Personel import |
-| Sorular | Kaynak sıra/no alanı sicil mi? Ad Soyad split kuralı? Departman→Departman / Unvan→Görev / Grup→Personel Tipi onay mı? Eksik şirket listeleri nasıl tamamlanır? `SGK Dosyası=Diğer` nasıl çözülür? Bare production `Merkez` hangi SGK işverenine ait? |
-| Progress (`119`) | Source matrix drafted (private HR workbooks). Optional `sgk_isveren` / `calisma_lokasyonu` columns now have production reference rows. Core REQUIRED contract **not** weakened. Open decisions remain. |
+| Closed mapping | Departman→departman; Bölüm→bolum; Birim→birim; Unvan→gorev; Pozisyon→pozisyon; central MRK display **Medisa** |
+| Remaining data work | Sicil uniqueness proof / Ad-Soyad completion / Grup exact transform / SGK Dosyası=Diğer / şube assignment under locked branch set |
 | Yasak | Validator gevşetme; sicil uydurma; güvenilmez auto-split; telefon/doğum uydurma; ücret/SGK’yı master import’a zorlama; PII’nin public repo’ya yazılması |
-| Kanıt contract | `PersonelImportDryRunService` REQUIRED: tc, sicil, ad, soyad, dogum_tarihi, telefon, ise_giris, sube, departman, gorev, personel_tipi; OPTIONAL: dogum_yeri, kan_grubu, acil_*, sgk_isveren, calisma_lokasyonu; FORBIDDEN: ücret/SGK payroll/devir kolonları |
+| Kanıt contract | `PersonelImportDryRunService` REQUIRED unchanged; OPTIONAL adds `bolum`/`birim`/`pozisyon` (blank-safe pre-065) |
 
 ---
 
@@ -263,7 +270,7 @@ Aşağıdakiler CURRENT MAIN’de bozulmuş değilse OPEN yapılmaz:
 | --- | --- | --- | --- | --- | --- |
 | MG-OPS-PERSONEL-001 | Gerçek personel import | P0 | `USER_GATED` | Onay olmadan import yok; `REAL_PERSONNEL_IMPORTED=NO` | Ops + kullanıcı |
 | MG-IMPORT-DATA-001 | Kaynak personel dataset completion | P1 | `USER_GATED_DATA_COMPLETION` | Required alanlar kaynakta tamamlanır; validator gevşetilmez; veri uydurulmaz; exact tallies public repo dışı | Ops + İK |
-| MG-OPS-ORG-001 | Gerçek org/şube/referans rollout | P0 | `USER_GATED` | **PARTIAL** — SGK 3 + verified locations 7 seeded (`119`); remaining: bare `Merkez` company decision; locked system-branch set incomplete in prod; personnel mapping gated | Ops |
+| MG-OPS-ORG-001 | Gerçek org/şube/referans rollout | P0 | `USER_GATED` | **PARTIAL** — SGK 3 + verified locations 7 seeded (`119`); Pack6 locked branch model + MRK=`Medisa` decision (`120`); prod `065`/taxonomy/branch ownership/personnel mapping still gated | Ops |
 | MG-OPS-BIND-001 | PERSONEL binding gerçek rollout | P1 | `USER_GATED` | Schema `056` var; rollout NOT_STARTED | Ops / İK |
 | MG-OPS-QR-001 | Gerçek çalışan QR rollout | P1 | `USER_GATED` | Pipeline CLOSED; employee rollout NOT_STARTED | Ops |
 | MG-OPS-SGK-CAT-001 | SGK resmi katalog / DOGRULANMIS_TAM / şirket politikası | P0 | `VERIFY_REQUIRED` | Code fail-closed; prod state repo’dan doğrulanmaz | Ops + `94`/`95` |
@@ -321,12 +328,12 @@ Aşağıdakiler CURRENT MAIN’de bozulmuş değilse OPEN yapılmaz:
 2. Karyapı — SGK merkezi = Konya
 3. Şenay Mobilya — kendi SGK yapısı
 
-**Operasyonel sistem şubeleri:**
-MEDİSA: Merkez Karabük, Kayseri, Giresun, Ankara, İstanbul
-KARYAPI: Merkez Konya, Ankara, Kayseri, İstanbul
+**Operasyonel sistem şubeleri (hedef model — Pack6 `120`; production rename henüz uygulanmadı):**
+MEDİSA: Medisa (`MRK`), Medisa Kayseri, Giresun, Medisa Ankara, Medisa İstanbul
+KARYAPI: Karyapı, Karyapı Ankara, Karyapı Kayseri, Karyapı İstanbul
 DİĞER: Şenay Mobilya
 
-**Çalışma lokasyonu ayrı kavramdır** (ör. İzmir çalışır / SGK Karabük / sistem şubesi Merkez Karabük). Sakarya ayrı SGK işyeri veya otomatik ayrı sistem şubesi değildir.
+**Çalışma lokasyonu ayrı kavramdır** (ör. İzmir çalışır / SGK Karabük / sistem şubesi Medisa). Sakarya ayrı SGK işyeri veya otomatik ayrı sistem şubesi değildir.
 
 ---
 
@@ -335,21 +342,22 @@ DİĞER: Şenay Mobilya
 ```text
 MG-ORG-MODEL-001 (CLOSED — karar kilitli)
   → MG-ORG-LOC-001 (OPS_ROLLOUT — schema `064`/`118`; refs seeded `119`; personnel mapping USER_GATED)
-  → MG-ORG-ATTR-001 (BUSINESS_DECISION_REQUIRED — bölüm/birim/pozisyon; OPTION_B recommended in `119`)
-  → MG-OPS-ORG-001 (OPS_ROLLOUT PARTIAL — SGK+verified locations seeded `119`; branch/company decisions remain)
-  → MG-IMPORT-MAP-001 (BUSINESS_DECISION_REQUIRED — matrix in `119`)
+  → MG-ORG-ATTR-001 (CLOSED — native Bölüm/Birim/Pozisyon + Unvan=gorev; `120`)
+  → MG-ORG-ATTR-ROLL-001 (OPS_ROLLOUT / USER_GATED — code tip `065`; prod apply not done)
+  → MG-OPS-ORG-001 (OPS_ROLLOUT PARTIAL — SGK+locations seeded `119`; branch ownership/rename USER_GATED)
+  → MG-IMPORT-MAP-001 (CLOSED business mapping — remaining → MG-IMPORT-DATA-001)
   → MG-IMPORT-DATA-001 (OPS_ROLLOUT — USER_GATED_DATA_COMPLETION)
   → MG-OPS-PERSONEL-001 (real personnel import, USER_GATED)
   → MG-OPS-BIND-001 → MG-OPS-QR-001
 ```
 
-Import contract (kod, değişmedi):
+Import contract (kod):
 
 | | Alanlar |
 | --- | --- |
 | REQUIRED | tc_kimlik_no, sicil_no, ad, soyad, dogum_tarihi, telefon, ise_giris_tarihi, sube, departman, gorev, personel_tipi |
-| OPTIONAL | dogum_yeri, kan_grubu, acil_durum_kisi, acil_durum_telefon |
-| FORBIDDEN | maaş/ücret/SGK/devir kolonları |
+| OPTIONAL | dogum_yeri, kan_grubu, acil_durum_kisi, acil_durum_telefon, sgk_isveren, calisma_lokasyonu, bolum, birim, pozisyon |
+| FORBIDDEN | maaş/ücret/devir kolonları |
 
 ---
 

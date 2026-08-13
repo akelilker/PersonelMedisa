@@ -125,7 +125,7 @@ final class PersonelCanonicalValidator
 
         $maasTutari = self::resolveMaasTutariFromBody($body);
 
-        return [
+        $payload = [
             'tc_kimlik_no' => $tcKimlikNo,
             'ad' => $ad,
             'soyad' => $soyad,
@@ -147,6 +147,16 @@ final class PersonelCanonicalValidator
             'maas_tutari' => $maasTutari,
             'prim_kurali_id' => $primKuraliId,
         ];
+
+        // Optional Pack5 org refs — key present means write intent (blank → NULL).
+        if (array_key_exists('sgk_isveren_id', $body)) {
+            $payload['sgk_isveren_id'] = self::optionalPositiveInt($body, 'sgk_isveren_id');
+        }
+        if (array_key_exists('calisma_lokasyonu_id', $body)) {
+            $payload['calisma_lokasyonu_id'] = self::optionalPositiveInt($body, 'calisma_lokasyonu_id');
+        }
+
+        return $payload;
     }
 
     /**
@@ -204,7 +214,7 @@ final class PersonelCanonicalValidator
             $payload['sube_id'] = self::requirePositiveInt($body, 'sube_id', 'Sube secilmelidir.');
         }
 
-        foreach (['departman_id', 'gorev_id', 'bagli_amir_id', 'personel_tipi_id'] as $field) {
+        foreach (['departman_id', 'gorev_id', 'bagli_amir_id', 'personel_tipi_id', 'sgk_isveren_id', 'calisma_lokasyonu_id'] as $field) {
             if (array_key_exists($field, $body)) {
                 $payload[$field] = self::optionalPositiveInt($body, $field);
             }
@@ -333,6 +343,23 @@ final class PersonelCanonicalValidator
             $id = self::parsePositiveInt($row[$field]);
             if ($id === null) {
                 $errors[] = self::importError('PERSONEL_IMPORT_EKSIK_ALAN', $field, 'Referans zorunludur.');
+            } else {
+                $payload[$field] = $id;
+            }
+        }
+
+        // Optional Pack5 org refs — only when import row explicitly carries keys.
+        foreach (['sgk_isveren_id', 'calisma_lokasyonu_id'] as $field) {
+            if (!array_key_exists($field, $row)) {
+                continue;
+            }
+            if ($row[$field] === null || $row[$field] === '') {
+                $payload[$field] = null;
+                continue;
+            }
+            $id = self::parsePositiveInt($row[$field]);
+            if ($id === null) {
+                $errors[] = self::importError('PERSONEL_IMPORT_EKSIK_ALAN', $field, 'Gecersiz referans.');
             } else {
                 $payload[$field] = $id;
             }

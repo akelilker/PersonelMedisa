@@ -17,6 +17,7 @@ use Medisa\Api\Services\Personel\PersonelImportDryRunService;
 use Medisa\Api\Services\Personel\PersonelImportException;
 use Medisa\Api\Services\Personel\PersonelImportHistoryService;
 use Medisa\Api\Services\Personel\PersonelImportReferenceCatalogService;
+use Medisa\Api\Services\Personel\PersonelOrgLocationSchema;
 use Medisa\Api\Services\Personel\PersonelValidationException;
 use Medisa\Api\Services\PersonelUcretException;
 use Medisa\Api\Services\PersonelUcretService;
@@ -217,6 +218,15 @@ class PersonellerController
         }
 
         self::assertCreateSubeScope($user, $request, $payload['sube_id']);
+        if (PersonelOrgLocationSchema::payloadRequestsOrgFields($payload)
+            && !PersonelOrgLocationSchema::isReady($pdo)
+        ) {
+            JsonResponse::error(
+                409,
+                PersonelOrgLocationSchema::ERROR_CODE,
+                'Org location schema hazir degil; sgk_isveren_id / calisma_lokasyonu_id yazilamaz.'
+            );
+        }
         try {
             PersonelCreateService::validateCreateReferences($pdo, $payload);
         } catch (PersonelValidationException $e) {
@@ -300,6 +310,15 @@ class PersonellerController
         PersonelArchiveGate::assertBusinessWriteAllowed($pdo, $personelId);
         self::assertUpdateSubeScope($user, $request, (int) $current['sube_id'], $payload);
         self::assertAktifDurumNotChanged($current, $payload);
+        if (PersonelOrgLocationSchema::payloadRequestsOrgFields($payload)
+            && !PersonelOrgLocationSchema::isReady($pdo)
+        ) {
+            JsonResponse::error(
+                409,
+                PersonelOrgLocationSchema::ERROR_CODE,
+                'Org location schema hazir degil; sgk_isveren_id / calisma_lokasyonu_id yazilamaz.'
+            );
+        }
         self::validateUpdateReferences($pdo, $payload);
 
         if (array_key_exists('tc_kimlik_no', $payload)) {
@@ -751,6 +770,17 @@ class PersonellerController
             self::validationError('personel_tipi_id', 'Gecersiz personel tipi.');
         }
 
+        if (array_key_exists('sgk_isveren_id', $payload) && $payload['sgk_isveren_id'] !== null) {
+            if (!PersonelOrgLocationSchema::existsActiveSgkIsveren($pdo, (int) $payload['sgk_isveren_id'])) {
+                self::validationError('sgk_isveren_id', 'Gecersiz SGK isveren.');
+            }
+        }
+        if (array_key_exists('calisma_lokasyonu_id', $payload) && $payload['calisma_lokasyonu_id'] !== null) {
+            if (!PersonelOrgLocationSchema::existsActiveCalismaLokasyonu($pdo, (int) $payload['calisma_lokasyonu_id'])) {
+                self::validationError('calisma_lokasyonu_id', 'Gecersiz calisma lokasyonu.');
+            }
+        }
+
         if (array_key_exists('bagli_amir_id', $payload) && $payload['bagli_amir_id'] !== null) {
             $stmt = $pdo->prepare("SELECT id FROM users WHERE id = :id AND durum = 'AKTIF' LIMIT 1");
             $stmt->execute(['id' => (int) $payload['bagli_amir_id']]);
@@ -797,6 +827,8 @@ class PersonellerController
             'sicil_no',
             'ise_giris_tarihi',
             'sube_id',
+            'sgk_isveren_id',
+            'calisma_lokasyonu_id',
             'departman_id',
             'gorev_id',
             'personel_tipi_id',
@@ -808,6 +840,15 @@ class PersonellerController
             'maas_tutari',
             'prim_kurali_id',
         ];
+
+        if (!PersonelOrgLocationSchema::isReady($pdo)) {
+            $allowedColumns = array_values(array_filter(
+                $allowedColumns,
+                static function (string $c): bool {
+                    return $c !== 'sgk_isveren_id' && $c !== 'calisma_lokasyonu_id';
+                }
+            ));
+        }
 
         $set = [];
         $params = ['id' => (int) $personelId];
@@ -914,6 +955,12 @@ class PersonellerController
             'soyad' => (string) $row['soyad'],
             'aktif_durum' => (string) $row['aktif_durum'],
             'sube_id' => (int) $row['sube_id'],
+            'sgk_isveren_id' => array_key_exists('sgk_isveren_id', $row) && $row['sgk_isveren_id'] !== null
+                ? (int) $row['sgk_isveren_id']
+                : null,
+            'calisma_lokasyonu_id' => array_key_exists('calisma_lokasyonu_id', $row) && $row['calisma_lokasyonu_id'] !== null
+                ? (int) $row['calisma_lokasyonu_id']
+                : null,
             'telefon' => $row['telefon'],
             'dogum_tarihi' => $row['dogum_tarihi'],
             'sicil_no' => $row['sicil_no'],

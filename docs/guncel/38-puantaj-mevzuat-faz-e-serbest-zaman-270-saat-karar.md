@@ -179,3 +179,7 @@ Faz E yeniden açıldığında önerilen sıra: **veri altyapısı → E1 → E3
 ## S87 eki — 270 saat + SZ bordro bağları
 
 Yıllık 270 saat (16200 dk) preflight ve SZ kanıt/FM bastırma otoriter payroll hattında kapandı (`PayrollComplianceGuard`, migration `043`). Karar matrisi: `99-payroll-compliance-critical-gaps-kapanis.md`.
+
+## Pack5 eki — rolling 12 ay actual-date policy
+
+ISO week-year **270 saat hard compliance owner değildir**. Canonical policy: `ROLLING_12_MONTH_ACTUAL_DATE_V1` (`FazlaCalismaYillikLimitService`, migration `063`, `117-final-code-gap-pack5.md`). Haftalık FM miktarı mevcut motorla kalır; yalnızca actual-date provenance + rolling hard guard eklenir.

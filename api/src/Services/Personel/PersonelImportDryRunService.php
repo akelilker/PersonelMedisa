@@ -57,6 +57,13 @@ final class PersonelImportDryRunService
         'kan_grubu',
         'acil_durum_kisi',
         'acil_durum_telefon',
+        'sgk_isveren',
+        'calisma_lokasyonu',
+    ];
+
+    private const ORG_LOCATION_OPTIONAL_COLUMNS = [
+        'sgk_isveren',
+        'calisma_lokasyonu',
     ];
 
     private const FORBIDDEN_UCRET_COLUMNS = [
@@ -179,6 +186,21 @@ final class PersonelImportDryRunService
 
         self::assertHeaderContract($headers);
 
+        $requestsOrgCols = false;
+        foreach (self::ORG_LOCATION_OPTIONAL_COLUMNS as $orgCol) {
+            if (in_array($orgCol, $headers, true)) {
+                $requestsOrgCols = true;
+                break;
+            }
+        }
+        if ($requestsOrgCols && !PersonelOrgLocationSchema::isReady($pdo)) {
+            throw new PersonelImportException(
+                PersonelOrgLocationSchema::ERROR_CODE,
+                'Org location schema hazir degil; sgk_isveren / calisma_lokasyonu kolonlari kabul edilmez.',
+                409
+            );
+        }
+
         $dataLines = array_slice($nonEmpty, 1);
         if (count($dataLines) > self::MAX_ROWS) {
             throw new PersonelImportException(
@@ -239,8 +261,9 @@ final class PersonelImportDryRunService
             $tcRaw = trim((string) ($rowMap['tc_kimlik_no'] ?? ''));
             $sicilRaw = trim((string) ($rowMap['sicil_no'] ?? ''));
             $maskedTc = PersonelCanonicalValidator::maskTcKimlikNo($tcRaw);
+            $hasOrgCols = in_array('sgk_isveren', $headers, true) || in_array('calisma_lokasyonu', $headers, true);
 
-            $resolved = self::resolveReferences($rowMap, $refCatalog, $hataKodlari);
+            $resolved = self::resolveReferences($rowMap, $refCatalog, $hataKodlari, $hasOrgCols);
 
             $importBody = [
                 'tc_kimlik_no' => $tcRaw,
@@ -259,6 +282,10 @@ final class PersonelImportDryRunService
                 'gorev_id' => $resolved['gorev_id'],
                 'personel_tipi_id' => $resolved['personel_tipi_id'],
             ];
+            if ($hasOrgCols) {
+                $importBody['sgk_isveren_id'] = $resolved['sgk_isveren_id'];
+                $importBody['calisma_lokasyonu_id'] = $resolved['calisma_lokasyonu_id'];
+            }
 
             $fieldResult = PersonelCanonicalValidator::validateImportAnaVeriRow($importBody);
             foreach ($fieldResult['errors'] as $err) {
@@ -339,6 +366,10 @@ final class PersonelImportDryRunService
                     'personel_tipi_id' => (int) $payload['personel_tipi_id'],
                     'aktif_durum' => (string) $payload['aktif_durum'],
                 ];
+                if ($hasOrgCols) {
+                    $manifestRows[count($manifestRows) - 1]['sgk_isveren_id'] = $payload['sgk_isveren_id'] ?? null;
+                    $manifestRows[count($manifestRows) - 1]['calisma_lokasyonu_id'] = $payload['calisma_lokasyonu_id'] ?? null;
+                }
                 $candidates[] = [
                     'satir_no' => $satirNo,
                     'payload' => $payload,
@@ -351,6 +382,15 @@ final class PersonelImportDryRunService
                     'gorev_id' => (int) $payload['gorev_id'],
                     'personel_tipi_id' => (int) $payload['personel_tipi_id'],
                 ];
+                if ($hasOrgCols) {
+                    $candidates[count($candidates) - 1]['sgk_isveren_id'] = isset($payload['sgk_isveren_id']) && $payload['sgk_isveren_id'] !== null
+                        ? (int) $payload['sgk_isveren_id']
+                        : null;
+                    $candidates[count($candidates) - 1]['calisma_lokasyonu_id'] = isset($payload['calisma_lokasyonu_id']) && $payload['calisma_lokasyonu_id'] !== null
+                        ? (int) $payload['calisma_lokasyonu_id']
+                        : null;
+                    $candidates[count($candidates) - 1]['_org_refs_in_hash'] = true;
+                }
             } else {
                 $hatali++;
                 $durum = in_array('PERSONEL_IMPORT_TC_MEVCUT', $hataKodlari, true)
@@ -384,15 +424,28 @@ final class PersonelImportDryRunService
 
         // row_hash TC'den bagimsiz: manifest_hash | satir_no | sicil | resolved refs
         foreach ($candidates as $index => $candidate) {
-            $candidates[$index]['row_hash'] = self::buildRowHash(
-                $manifestHash,
-                (int) $candidate['satir_no'],
-                (string) $candidate['sicil_no'],
-                (int) $candidate['sube_id'],
-                (int) $candidate['departman_id'],
-                (int) $candidate['gorev_id'],
-                (int) $candidate['personel_tipi_id']
-            );
+            $candidates[$index]['row_hash'] = !empty($candidate['_org_refs_in_hash'])
+                ? self::buildRowHash(
+                    $manifestHash,
+                    (int) $candidate['satir_no'],
+                    (string) $candidate['sicil_no'],
+                    (int) $candidate['sube_id'],
+                    (int) $candidate['departman_id'],
+                    (int) $candidate['gorev_id'],
+                    (int) $candidate['personel_tipi_id'],
+                    isset($candidate['sgk_isveren_id']) ? $candidate['sgk_isveren_id'] : null,
+                    isset($candidate['calisma_lokasyonu_id']) ? $candidate['calisma_lokasyonu_id'] : null
+                )
+                : self::buildRowHashLegacy(
+                    $manifestHash,
+                    (int) $candidate['satir_no'],
+                    (string) $candidate['sicil_no'],
+                    (int) $candidate['sube_id'],
+                    (int) $candidate['departman_id'],
+                    (int) $candidate['gorev_id'],
+                    (int) $candidate['personel_tipi_id']
+                );
+            unset($candidates[$index]['_org_refs_in_hash']);
         }
 
         $canApply = count($dataLines) > 0 && $hatali === 0 && $gecerli === count($dataLines);
@@ -447,7 +500,10 @@ final class PersonelImportDryRunService
      * TC-independent durable row fingerprint for audit rows.
      * SHA256(manifest_hash | row_number | sicil_no | resolved_reference_ids)
      */
-    public static function buildRowHash(
+    /**
+     * Legacy row fingerprint (pre-org-columns CSV) — preserves historical golden hashes.
+     */
+    public static function buildRowHashLegacy(
         string $manifestHash,
         int $satirNo,
         string $sicilNo,
@@ -464,6 +520,32 @@ final class PersonelImportDryRunService
             (string) $departmanId,
             (string) $gorevId,
             (string) $personelTipiId,
+        ]);
+
+        return hash('sha256', $material);
+    }
+
+    public static function buildRowHash(
+        string $manifestHash,
+        int $satirNo,
+        string $sicilNo,
+        int $subeId,
+        int $departmanId,
+        int $gorevId,
+        int $personelTipiId,
+        $sgkIsverenId = null,
+        $calismaLokasyonuId = null
+    ): string {
+        $material = implode('|', [
+            strtolower($manifestHash),
+            (string) $satirNo,
+            $sicilNo,
+            (string) $subeId,
+            (string) $departmanId,
+            (string) $gorevId,
+            (string) $personelTipiId,
+            $sgkIsverenId === null ? '0' : (string) (int) $sgkIsverenId,
+            $calismaLokasyonuId === null ? '0' : (string) (int) $calismaLokasyonuId,
         ]);
 
         return hash('sha256', $material);
@@ -555,9 +637,16 @@ final class PersonelImportDryRunService
      * @param array<string, string> $rowMap
      * @param array<string, mixed> $catalog
      * @param list<string> $hataKodlari
-     * @return array{sube_id: ?int, departman_id: ?int, gorev_id: ?int, personel_tipi_id: ?int}
+     * @return array{
+     *   sube_id: ?int,
+     *   departman_id: ?int,
+     *   gorev_id: ?int,
+     *   personel_tipi_id: ?int,
+     *   sgk_isveren_id: ?int,
+     *   calisma_lokasyonu_id: ?int
+     * }
      */
-    private static function resolveReferences(array $rowMap, array $catalog, array &$hataKodlari)
+    private static function resolveReferences(array $rowMap, array $catalog, array &$hataKodlari, bool $hasOrgCols = false)
     {
         $subeId = PersonelImportReferenceCatalogService::resolveExactUnique(
             $rowMap['sube'] ?? '',
@@ -584,11 +673,42 @@ final class PersonelImportDryRunService
             $hataKodlari
         );
 
+        $sgkIsverenId = null;
+        $calismaLokasyonuId = null;
+        if ($hasOrgCols) {
+            if (array_key_exists('sgk_isveren', $rowMap)) {
+                $raw = trim((string) $rowMap['sgk_isveren']);
+                if ($raw !== '') {
+                    $sgkIsverenId = PersonelImportReferenceCatalogService::resolveExactUnique(
+                        $raw,
+                        isset($catalog['sgk_isveren']) && is_array($catalog['sgk_isveren']) ? $catalog['sgk_isveren'] : [],
+                        'sgk_isveren',
+                        $hataKodlari
+                    );
+                }
+            }
+            if (array_key_exists('calisma_lokasyonu', $rowMap)) {
+                $raw = trim((string) $rowMap['calisma_lokasyonu']);
+                if ($raw !== '') {
+                    $calismaLokasyonuId = PersonelImportReferenceCatalogService::resolveExactUnique(
+                        $raw,
+                        isset($catalog['calisma_lokasyonu']) && is_array($catalog['calisma_lokasyonu'])
+                            ? $catalog['calisma_lokasyonu']
+                            : [],
+                        'calisma_lokasyonu',
+                        $hataKodlari
+                    );
+                }
+            }
+        }
+
         return [
             'sube_id' => $subeId,
             'departman_id' => $departmanId,
             'gorev_id' => $gorevId,
             'personel_tipi_id' => $personelTipiId,
+            'sgk_isveren_id' => $sgkIsverenId,
+            'calisma_lokasyonu_id' => $calismaLokasyonuId,
         ];
     }
 

@@ -8,11 +8,11 @@ import { ALL_ROLES, ASSIGNABLE_USER_ROLES } from "../../src/types/auth";
 const root = process.cwd();
 
 describe("retention policy source contract (053)", () => {
-  it("keeps migration tip at 062 and leaves 052/053/059 present", () => {
+  it("keeps migration tip at 064 and leaves 052/053/059 present", () => {
     const migrations = readdirSync(resolve(root, "api/migrations"))
       .filter((name) => /^\d{3}_.+\.sql$/.test(name))
       .sort();
-    expect(migrations.at(-1)).toBe("062_serbest_zaman_retention_destroy_gate.sql");
+    expect(migrations.at(-1)).toBe("064_personel_org_location_model.sql");
     expect(migrations).toContain("052_puantaj_tolerans_ve_disiplin.sql");
     expect(migrations).toContain("053_retention_legal_hold_arsiv.sql");
     expect(migrations).toContain("058_qr_puantaj_candidate_decision_ledger.sql");

@@ -29,7 +29,7 @@ describe("S87 payroll compliance 043 MariaDB migration", () => {
       .filter((name) => /^\d{3}_.+\.sql$/.test(name))
       .sort();
     expect(migrations[0]).toBe("001_initial_schema.sql");
-    expect(migrations.at(-1)).toBe("062_serbest_zaman_retention_destroy_gate.sql");
+    expect(migrations.at(-1)).toBe("064_personel_org_location_model.sql");
     expect(migrations).toContain("042_sgk_resmi_kaynakli_kisitli_katalog.sql");
   });
 

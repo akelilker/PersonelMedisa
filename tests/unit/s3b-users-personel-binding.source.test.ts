@@ -22,7 +22,7 @@ describe("S3B users.personel_id binding foundation", () => {
       .filter((name) => /^\d{3}_.+\.sql$/.test(name))
       .sort();
     expect(migrations).toContain("055_yillik_izin_hak_duzeltmeleri.sql");
-    expect(migrations.at(-1)).toBe("062_serbest_zaman_retention_destroy_gate.sql");
+    expect(migrations.at(-1)).toBe("064_personel_org_location_model.sql");
 
     const sql = read("api/migrations/056_users_personel_binding.sql");
     expect(sql).toContain("personel_id");

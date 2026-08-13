@@ -7,6 +7,7 @@ namespace Medisa\Api\Services;
 use Medisa\Api\Services\Payroll\FinanceKalemCatalog;
 use Medisa\Api\Services\Payroll\MaasHesaplamaEngine;
 use Medisa\Api\Services\Payroll\MaasHesaplamaLegalParameterCatalog;
+use Medisa\Api\Services\Payroll\FazlaCalismaYillikLimitService;
 use Medisa\Api\Services\Payroll\PayrollComplianceGuard;
 use Medisa\Api\Services\Payroll\SirketCalismaPolitikasiCatalog;
 use Medisa\Api\Services\Attendance\AttendancePayrollEffectResolver;
@@ -360,8 +361,7 @@ class MaasHesaplamaAdayService
             );
         }
 
-        // Yillik 270 saat (16200 dk) kontrolu — donemde FM olan personeller
-        $donemYil = (int) $snapshot['yil'];
+        // Rolling 12-month 270 saat (16200 dk) — donemde FM olan personeller
         $donemBas = (string) $bundle['snapshot']['donem_baslangic'];
         $donemBit = (string) $bundle['snapshot']['donem_bitis'];
         if (!$complianceSchemaUnavailable) {
@@ -371,17 +371,15 @@ class MaasHesaplamaAdayService
                 if ($periodOt < 1) {
                     continue;
                 }
-                $kapanmis = PayrollComplianceGuard::loadKapanmisYillikFazlaCalisma($pdo, $pid, $donemYil);
                 $periodWeekKeys = self::periodHaftaBaslangicKeys($pdo, $pid, $donemBas, $donemBit);
-                $kapanmisExPeriod = [];
-                foreach ($kapanmis as $row) {
-                    $hb = (string) ($row['hafta_baslangic'] ?? '');
-                    if ($hb !== '' && isset($periodWeekKeys[$hb])) {
-                        continue;
-                    }
-                    $kapanmisExPeriod[] = $row;
-                }
-                $eval = PayrollComplianceGuard::evaluateYillikLimit($kapanmisExPeriod, $periodOt);
+                $eval = \Medisa\Api\Services\Payroll\FazlaCalismaYillikLimitService::evaluatePendingAgainstRolling(
+                    $pdo,
+                    $pid,
+                    $donemBit,
+                    $periodOt,
+                    null,
+                    array_keys($periodWeekKeys)
+                );
                 if ($eval['asildi']) {
                     $items[] = self::issue(
                         'BLOCKER',
@@ -393,8 +391,9 @@ class MaasHesaplamaAdayService
                         [
                             'kullanilan_dk' => $eval['kullanilan'],
                             'projected_dk' => $eval['projected'],
-                            'limit_dk' => PayrollComplianceGuard::YILLIK_FAZLA_CALISMA_LIMIT_DAKIKA,
+                            'limit_dk' => \Medisa\Api\Services\Payroll\FazlaCalismaYillikLimitService::LIMIT_DAKIKA,
                             'period_ot_dk' => $periodOt,
+                            'compliance_policy' => \Medisa\Api\Services\Payroll\FazlaCalismaYillikLimitService::POLICY_CODE,
                         ],
                         $personel['ad_soyad'] ?? null
                     );

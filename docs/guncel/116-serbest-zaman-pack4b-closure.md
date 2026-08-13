@@ -48,7 +48,7 @@
 | `MG-RET-PHYS-001` | CODE_GAP | **OPS_ROLLOUT** | `USER_GATED` (prod apply + feature enable) |
 | `MG-SZ-6M-001` | CODE_GAP | **OPS_ROLLOUT** | `USER_GATED` (schema rollout / ops follow-up) |
 
-Remaining CODE_GAP (2): `MG-OT-YEAR-PATH-001`, `MG-ORG-LOC-001`.
+Remaining CODE_GAP (0 after Pack5): see `117`. Pack5 closed `MG-OT-YEAR-PATH-001`; `MG-ORG-LOC-001` → OPS_ROLLOUT.
 
 ## Migration tips
 

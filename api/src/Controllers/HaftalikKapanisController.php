@@ -10,6 +10,7 @@ use Medisa\Api\Database\Connection;
 use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
 use Medisa\Api\Scope\SubeScope;
+use Medisa\Api\Services\Payroll\FazlaCalismaYillikLimitService;
 use Medisa\Api\Services\Payroll\PayrollComplianceGuard;
 use PDO;
 use PDOException;
@@ -85,9 +86,8 @@ class HaftalikKapanisController
             $puantajByPersonel = self::loadPuantajForWeek($pdo, $personeller, $haftaBaslangic, $haftaBitis);
 
             $actorId = self::userId($user);
-            $yil = (int) substr($haftaBaslangic, 0, 4);
 
-            // Compliance hard-block: 18 yas alti FM + yillik 270 saat (insert oncesi)
+            // Compliance hard-block: 18 yas alti FM + rolling 12-month 270 saat (insert oncesi)
             foreach ($personeller as $personel) {
                 $preview = self::buildSnapshotSatir(
                     0,
@@ -104,11 +104,16 @@ class HaftalikKapanisController
                 }
 
                 self::assertHaftalikAgeCompliance($pdo, $personel, $haftaBitis);
+                $pendingDist = is_array($preview['fazla_calisma_tarih_dagilimi'] ?? null)
+                    ? $preview['fazla_calisma_tarih_dagilimi']
+                    : null;
                 self::assertHaftalikYillikLimit(
                     $pdo,
                     (int) $personel['id'],
-                    $yil,
+                    $haftaBaslangic,
+                    $haftaBitis,
                     $fazlaDk,
+                    $pendingDist,
                     $actorId > 0 ? $actorId : null
                 );
             }
@@ -568,6 +573,21 @@ class HaftalikKapanisController
                 'Eksik haftalik puantaj gunu (' . $kaynakGun . '/7); UBGT ve 18 yas alti haftalik uyarilari uretilmedi.',
             ];
 
+        // Provenance only — does not change weekly FM amount from existing motor.
+        $dailyNet = [];
+        foreach ($tarihler as $tarih) {
+            if (!isset($gunlerByTarih[$tarih])) {
+                $dailyNet[$tarih] = 0;
+                continue;
+            }
+            $dailyNet[$tarih] = self::safeNonNegInt($gunlerByTarih[$tarih]['net_calisma_suresi_dakika'] ?? 0);
+        }
+        $dagilim = FazlaCalismaYillikLimitService::allocateActualDateProvenance(
+            $dailyNet,
+            $fazla,
+            self::HAFTALIK_ESIK_DAKIKA
+        );
+
         $personelDepartman = $personel['departman_id'] !== null ? (int) $personel['departman_id'] : null;
 
         return [
@@ -577,6 +597,7 @@ class HaftalikKapanisController
             'departman_id' => $departmanId !== null ? (int) $departmanId : $personelDepartman,
             'hafta_baslangic' => $haftaBaslangic,
             'hafta_bitis' => $haftaBitis,
+            // ISO week identity for display/reporting only — NOT 270h compliance owner.
             'yil' => $iso['yil'] ?? $yilFallback,
             'hafta_no' => $iso['hafta_no'] ?? null,
             'state' => 'KAPANDI',
@@ -584,6 +605,10 @@ class HaftalikKapanisController
             'toplam_net_dakika' => $toplam,
             'normal_calisma_dakika' => $normal,
             'fazla_calisma_dakika' => $fazla,
+            'fazla_calisma_tarih_dagilimi' => $dagilim,
+            'fazla_calisma_tarih_dagilim_policy' => $fazla > 0
+                ? FazlaCalismaYillikLimitService::POLICY_CODE
+                : null,
             'fazla_surelerle_calisma_dakika' => 0,
             'tam_hafta_verisi' => $tamHafta ? 1 : 0,
             'compliance_uyarilari' => [],
@@ -598,26 +623,14 @@ class HaftalikKapanisController
     /** @param array<string, mixed> $satir */
     private static function insertSatir(PDO $pdo, array $satir)
     {
-        $stmt = $pdo->prepare('
-            INSERT INTO haftalik_kapanis_satirlari (
-                kapanis_id, personel_id, departman_id,
-                hafta_baslangic, hafta_bitis, yil, hafta_no,
-                state, kaynak_versiyon,
-                toplam_net_dakika, normal_calisma_dakika, fazla_calisma_dakika,
-                fazla_surelerle_calisma_dakika, tam_hafta_verisi,
-                compliance_uyarilari_json, compliance_uyari_sayisi, kritik_uyari_var_mi,
-                hesaplama_zamani, kaynak_gun_sayisi, notlar_json
-            ) VALUES (
-                :kapanis_id, :personel_id, :departman_id,
-                :hafta_baslangic, :hafta_bitis, :yil, :hafta_no,
-                :state, :kaynak_versiyon,
-                :toplam_net_dakika, :normal_calisma_dakika, :fazla_calisma_dakika,
-                :fazla_surelerle_calisma_dakika, :tam_hafta_verisi,
-                :compliance_uyarilari_json, :compliance_uyari_sayisi, :kritik_uyari_var_mi,
-                :hesaplama_zamani, :kaynak_gun_sayisi, :notlar_json
-            )
-        ');
-        $stmt->execute([
+        $hasProvenance = FazlaCalismaYillikLimitService::provenanceSchemaReady($pdo);
+        $cols = [
+            'kapanis_id', 'personel_id', 'departman_id',
+            'hafta_baslangic', 'hafta_bitis', 'yil', 'hafta_no',
+            'state', 'kaynak_versiyon',
+            'toplam_net_dakika', 'normal_calisma_dakika', 'fazla_calisma_dakika',
+        ];
+        $params = [
             'kapanis_id' => $satir['kapanis_id'],
             'personel_id' => $satir['personel_id'],
             'departman_id' => $satir['departman_id'],
@@ -630,17 +643,40 @@ class HaftalikKapanisController
             'toplam_net_dakika' => $satir['toplam_net_dakika'],
             'normal_calisma_dakika' => $satir['normal_calisma_dakika'],
             'fazla_calisma_dakika' => $satir['fazla_calisma_dakika'],
-            'fazla_surelerle_calisma_dakika' => $satir['fazla_surelerle_calisma_dakika'],
-            'tam_hafta_verisi' => $satir['tam_hafta_verisi'],
-            'compliance_uyarilari_json' => json_encode($satir['compliance_uyarilari'], JSON_UNESCAPED_UNICODE),
-            'compliance_uyari_sayisi' => $satir['compliance_uyari_sayisi'],
-            'kritik_uyari_var_mi' => $satir['kritik_uyari_var_mi'],
-            'hesaplama_zamani' => $satir['hesaplama_zamani'],
-            'kaynak_gun_sayisi' => $satir['kaynak_gun_sayisi'],
-            'notlar_json' => $satir['notlar'] === null
-                ? null
-                : json_encode($satir['notlar'], JSON_UNESCAPED_UNICODE),
+        ];
+        if ($hasProvenance) {
+            $cols[] = 'fazla_calisma_tarih_dagilimi_json';
+            $cols[] = 'fazla_calisma_tarih_dagilim_policy';
+            $dist = is_array($satir['fazla_calisma_tarih_dagilimi'] ?? null)
+                ? $satir['fazla_calisma_tarih_dagilimi']
+                : [];
+            $params['fazla_calisma_tarih_dagilimi_json'] = FazlaCalismaYillikLimitService::encodeDistributionJson($dist);
+            $params['fazla_calisma_tarih_dagilim_policy'] = $satir['fazla_calisma_tarih_dagilim_policy'] ?? null;
+        }
+        $cols = array_merge($cols, [
+            'fazla_surelerle_calisma_dakika', 'tam_hafta_verisi',
+            'compliance_uyarilari_json', 'compliance_uyari_sayisi', 'kritik_uyari_var_mi',
+            'hesaplama_zamani', 'kaynak_gun_sayisi', 'notlar_json',
         ]);
+        $params['fazla_surelerle_calisma_dakika'] = $satir['fazla_surelerle_calisma_dakika'];
+        $params['tam_hafta_verisi'] = $satir['tam_hafta_verisi'];
+        $params['compliance_uyarilari_json'] = json_encode($satir['compliance_uyarilari'], JSON_UNESCAPED_UNICODE);
+        $params['compliance_uyari_sayisi'] = $satir['compliance_uyari_sayisi'];
+        $params['kritik_uyari_var_mi'] = $satir['kritik_uyari_var_mi'];
+        $params['hesaplama_zamani'] = $satir['hesaplama_zamani'];
+        $params['kaynak_gun_sayisi'] = $satir['kaynak_gun_sayisi'];
+        $params['notlar_json'] = $satir['notlar'] === null
+            ? null
+            : json_encode($satir['notlar'], JSON_UNESCAPED_UNICODE);
+
+        $placeholders = array_map(static function (string $c): string {
+            return ':' . $c;
+        }, $cols);
+        $stmt = $pdo->prepare(
+            'INSERT INTO haftalik_kapanis_satirlari (' . implode(', ', $cols) . ')
+             VALUES (' . implode(', ', $placeholders) . ')'
+        );
+        $stmt->execute($params);
         $satir['id'] = (int) $pdo->lastInsertId();
     }
 
@@ -713,6 +749,8 @@ class HaftalikKapanisController
                 'toplam_net_dakika' => $satir['toplam_net_dakika'],
                 'normal_calisma_dakika' => $satir['normal_calisma_dakika'],
                 'fazla_calisma_dakika' => $satir['fazla_calisma_dakika'],
+                'fazla_calisma_tarih_dagilimi' => $satir['fazla_calisma_tarih_dagilimi'] ?? null,
+                'fazla_calisma_tarih_dagilim_policy' => $satir['fazla_calisma_tarih_dagilim_policy'] ?? null,
                 'fazla_surelerle_calisma_dakika' => $satir['fazla_surelerle_calisma_dakika'],
                 'tam_hafta_verisi' => (bool) $satir['tam_hafta_verisi'],
                 'compliance_uyarilari' => $satir['compliance_uyarilari'],
@@ -734,6 +772,20 @@ class HaftalikKapanisController
             $notlar = is_array($decoded) ? $decoded : null;
         }
 
+        $dagilim = null;
+        $dagilimPolicy = null;
+        if (array_key_exists('fazla_calisma_tarih_dagilimi_json', $satir)) {
+            $dagilim = FazlaCalismaYillikLimitService::decodeDistributionJson(
+                $satir['fazla_calisma_tarih_dagilimi_json'] !== null
+                    ? (string) $satir['fazla_calisma_tarih_dagilimi_json']
+                    : null
+            );
+            $rawPolicy = $satir['fazla_calisma_tarih_dagilim_policy'] ?? null;
+            $dagilimPolicy = $rawPolicy !== null && trim((string) $rawPolicy) !== ''
+                ? (string) $rawPolicy
+                : null;
+        }
+
         $dbId = (int) $satir['id'];
         $kapanisId = (int) $satir['kapanis_id'];
 
@@ -751,6 +803,8 @@ class HaftalikKapanisController
             'toplam_net_dakika' => (int) $satir['toplam_net_dakika'],
             'normal_calisma_dakika' => (int) $satir['normal_calisma_dakika'],
             'fazla_calisma_dakika' => (int) $satir['fazla_calisma_dakika'],
+            'fazla_calisma_tarih_dagilimi' => $dagilim,
+            'fazla_calisma_tarih_dagilim_policy' => $dagilimPolicy,
             'fazla_surelerle_calisma_dakika' => (int) $satir['fazla_surelerle_calisma_dakika'],
             'tam_hafta_verisi' => ((int) $satir['tam_hafta_verisi']) === 1,
             'compliance_uyarilari' => $compliance,
@@ -816,9 +870,14 @@ class HaftalikKapanisController
         $limit = self::YILLIK_LIMIT_DAKIKA;
         $yaklasma = self::YILLIK_YAKLASMA_ESIK_DAKIKA;
 
+        // ISO/calendar year aggregate is DISPLAY/REPORTING only.
+        // Hard 270h compliance owner = ROLLING_12_MONTH_ACTUAL_DATE_V1.
         return [
             'personel_id' => (int) $personelId,
             'yil' => (int) $yil,
+            'aggregate_semantics' => 'ISO_WEEK_YEAR_DISPLAY',
+            'compliance_policy' => FazlaCalismaYillikLimitService::POLICY_CODE,
+            'compliance_owner' => 'ROLLING_12_MONTH_NOT_THIS_AGGREGATE',
             'yillik_limit_dakika' => $limit,
             'yaklasma_esik_dakika' => $yaklasma,
             'kullanilan_dakika' => $kullanilan,
@@ -946,13 +1005,21 @@ class HaftalikKapanisController
     private static function assertHaftalikYillikLimit(
         PDO $pdo,
         int $personelId,
-        int $yil,
+        string $haftaBaslangic,
+        string $haftaBitis,
         int $pendingFazlaDk,
+        ?array $pendingDistribution,
         ?int $actorId
     ): void {
-        PayrollComplianceGuard::acquireYillikLock($pdo, $personelId, $yil, $actorId);
-        $kapanmis = PayrollComplianceGuard::loadKapanmisYillikFazlaCalisma($pdo, $personelId, $yil);
-        $eval = PayrollComplianceGuard::evaluateYillikLimit($kapanmis, $pendingFazlaDk);
+        FazlaCalismaYillikLimitService::acquirePersonelRollingLock($pdo, $personelId, $actorId);
+        $eval = FazlaCalismaYillikLimitService::evaluatePendingAgainstRolling(
+            $pdo,
+            $personelId,
+            $haftaBitis,
+            $pendingFazlaDk,
+            $pendingDistribution,
+            [$haftaBaslangic]
+        );
         if ($eval['asildi']) {
             self::rollbackConflict(
                 $pdo,

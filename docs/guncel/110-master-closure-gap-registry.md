@@ -155,31 +155,30 @@ Aşağıdakiler CURRENT MAIN’de bozulmuş değilse OPEN yapılmaz:
 
 | Alan | Değer |
 | --- | --- |
-| Statü | **CODE_GAP** |
-| Öncelik | **P1** |
+| Statü | **CLOSED** |
+| Öncelik | **P1** (closed) |
 | Domain | Fazla çalışma / 270 saat |
-| Mevcut (kod yolları) | **A)** `HaftalikKapanisController::create` — 270 saat pre-write guard: `$yil = (int) substr($haftaBaslangic, 0, 4)` → **calendar start year**. **B)** `buildSnapshotSatir` / `hesaplaIsoHaftaNo` — persist `yil` → **ISO week-year** (`format('o')`). **C)** `aggregateYillik` / FE aggregate — öncelikle persisted `s.yil` → **ISO year**. **D)** `PayrollComplianceGuard::loadKapanmisYillikFazlaCalisma` — `hafta_baslangic` BETWEEN `yil-01-01` AND `yil-12-31` → **calendar-start filter**. |
-| Örnek | Hafta `2025-12-29`–`2026-01-04`: create guard 2025; snapshot/aggregate ISO 2026; compliance calendar filter path’e göre 2025 veya 2026’dan dışlanma riski |
-| Beklenen | Tek tutarlı yıl atama kuralı (policy `MG-OT-YEAR-POL-001` ile aynı) |
-| Kanıt | `HaftalikKapanisController.php` (~88, ~553–858); `PayrollComplianceGuard` load SQL; `yillik-fazla-calisma-aggregate.ts` |
-| İnsan kararı | Atama politikası ayrı: `MG-OT-YEAR-POL-001` |
-| Owner | Haftalık kapanış / Payroll compliance |
-| Acceptance | Create guard, persisted `yil`, aggregate ve compliance load aynı haftayı aynı yıla sayar |
+| Karar / policy | `ROLLING_12_MONTH_ACTUAL_DATE_V1` (`MG-OT-YEAR-POL-001`) |
+| Owner | `FazlaCalismaYillikLimitService` |
+| Persist | Migration `063` — `fazla_calisma_tarih_dagilimi_json` + policy (nullable; legacy rewrite yok) |
+| Hard guard | Rolling 12 month; ISO/`yil` display only |
+| Kanıt | `117-final-code-gap-pack5.md`; Pack5 MariaDB A1–A10 |
+| Acceptance | Create/compliance/payroll paths aynı rolling owner; whole-week ISO assignment yok |
 
 ### MG-ORG-LOC-001 — SGK işveren / sistem şubesi / çalışma lokasyonu schema ayrımı
 
 | Alan | Değer |
 | --- | --- |
-| Statü | **CODE_GAP** |
+| Statü | **OPS_ROLLOUT** |
+| Metadata | `USER_GATED` |
 | Öncelik | **P1** |
 | Domain | Organizasyon / SGK |
-| Mevcut | `subeler` + `personeller.sube_id`; ayrı `sgk_isveren` / `lokasyon` entity yok |
-| Beklenen | Kilitli iş modeline (`MG-ORG-MODEL-001` CLOSED) uygun ayrı temsil: SGK işveren, sistem şubesi, çalışma lokasyonu |
-| Kanıt | `001_initial_schema.sql`; import contract’ta lokasyon yok |
-| Runtime | Çalışma lokasyonu sistem şubesi / SGK merkezi ile karışabilir |
-| Migration | Evet (implementation turu) |
-| Owner | Org / Personel |
-| Acceptance | Personel kaydı üç kavramı kaybetmeden taşıyabilir |
+| Code/schema | Migration `064` — `sgk_isverenler`, `calisma_lokasyonlari`; `personeller` nullable FKs; `sube_id` korunur |
+| Pre-064 | Explicit new-field write → `409 ORG_LOCATION_SCHEMA_NOT_READY` |
+| Production | tip **058**; `064` unapplied; real org seed **NO** |
+| Kanıt | `117-final-code-gap-pack5.md`; Pack5 MariaDB B1–B11 |
+| Acceptance (code) | Üç kavram bağımsız persist; SubeScope `sube_id` |
+| Remaining ops | Real org seed = `MG-OPS-ORG-001` USER_GATED |
 
 ---
 
@@ -189,12 +188,17 @@ Aşağıdakiler CURRENT MAIN’de bozulmuş değilse OPEN yapılmaz:
 
 | Alan | Değer |
 | --- | --- |
-| Statü | **BUSINESS_DECISION_REQUIRED** |
-| Öncelik | **P1** |
+| Statü | **CLOSED** |
+| Öncelik | **P1** (closed) |
 | Domain | 270 saat |
-| Soru | Günlük takvim yılına split mi, yoksa tüm hafta hafta-başı/ISO yıla mı? |
-| Mevcut kod | Bütün haftalık FM tek `fazla_calisma_dakika`; path’ler tutarsız → `MG-OT-YEAR-PATH-001` |
-| Acceptance | Yazılı şirket/İK kararı + tek owner kuralı |
+| Karar | **ROLLING_12_MONTH_ACTUAL_DATE_V1** |
+| ISO_WEEK_YEAR_AS_270H_OWNER | **NO** |
+| WHOLE_CROSS_YEAR_WEEK_ASSIGNMENT | **NO** |
+| ACTUAL_DATE_PROVENANCE | **YES** |
+| ROLLING_12_MONTH_HARD_GUARD | **YES** |
+| LEGAL_CHARACTER | **CONSERVATIVE_COMPANY_COMPLIANCE_POLICY** |
+| Kanıt | `117-final-code-gap-pack5.md` |
+| Path owner | `MG-OT-YEAR-PATH-001` CLOSED |
 
 ### MG-SGK-1514-001 — Ücret/SGK çalışma dönemi 1–son vs 15–14
 
@@ -410,22 +414,21 @@ Destroy eligibility: Pack 3C (`114`) — **15/15 typed handlers**; SERBEST used-
 
 | Statü | Adet (unique registry ID) | IDs |
 | --- | --- | --- |
-| **CODE_GAP** | **2** | OT-YEAR-PATH, ORG-LOC |
-| **BUSINESS_DECISION_REQUIRED** | **5** | OT-YEAR-POL, SGK-1514, ZORUNLU, ORG-ATTR, IMPORT-MAP |
-| **OPS_ROLLOUT** | **12** | OPS-PERSONEL, IMPORT-DATA, OPS-ORG, OPS-BIND, OPS-QR, OPS-SGK-CAT, OPS-UBGT, OPS-POLICY, OPS-ENUM-INV, OPS-DEPLOY, **RET-PHYS**, **SZ-6M** |
+| **CODE_GAP** | **0** | — |
+| **BUSINESS_DECISION_REQUIRED** | **4** | SGK-1514, ZORUNLU, ORG-ATTR, IMPORT-MAP |
+| **OPS_ROLLOUT** | **13** | OPS-PERSONEL, IMPORT-DATA, OPS-ORG, OPS-BIND, OPS-QR, OPS-SGK-CAT, OPS-UBGT, OPS-POLICY, OPS-ENUM-INV, OPS-DEPLOY, **RET-PHYS**, **SZ-6M**, **ORG-LOC** |
 | **INTENTIONAL_DEFER** | **7** | QR-CORR, PAY-SELF, I13, ENUM, FSC, PAY-OUT, RET-HTTP |
 | **NOT_APPLICABLE** | **4** | SECOND-ENGINE, AUTO-QR-CORR, AUTO-APPLY, IMPORT-UCRET |
 | **DOC_STALE** | **0** | — |
-| **CLOSED** (registry section 9 + retention pack) | **8** | ORG-MODEL, DOC-CS, DOC-102, DOC-101, DOC-103, DOC-105, RET-MAN, RET-S3F |
+| **CLOSED** (registry section 9 + retention + Pack5 OT) | **10** | ORG-MODEL, DOC-CS, DOC-102, DOC-101, DOC-103, DOC-105, RET-MAN, RET-S3F, **OT-YEAR-POL**, **OT-YEAR-PATH** |
 | Closed systems (section 3) | 18 | yeniden açılmadı |
 
-**MUST_FIX_NOW (= CODE_GAP P1 listesi):**
-1. `MG-OT-YEAR-PATH-001`
-2. `MG-ORG-LOC-001`
+**MUST_FIX_NOW (= CODE_GAP P1 listesi):** *(empty — Pack5 closed code gaps)*
 
 **OPS_ROLLOUT (code closed, prod gated):**
 - `MG-RET-PHYS-001` — Pack 4B code closure (`116`); prod migrate + feature enable `USER_GATED`
 - `MG-SZ-6M-001` — Pack 4B ops surface (`116`); prod schema/ops follow-up `USER_GATED`
+- `MG-ORG-LOC-001` — Pack5 schema/code (`117`); prod `064` + real org seed `USER_GATED`
 
 P2 BUSINESS (`MG-ORG-ATTR`, `MG-ZORUNLU`) final completion için açık kalabilir ama CODE_GAP değildir; karar sonrası gerekirse CODE_GAP’e çevrilir.
 

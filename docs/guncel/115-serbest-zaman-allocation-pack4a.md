@@ -1,9 +1,12 @@
 # 115 — Serbest Zaman Allocation Pack 4A
 
-**Tür:** Foundation (ledger + write-path + tests); **gaps not closed**  
-**Branch:** `fix/serbest-zaman-allocation-pack4a`  
-**Tarih:** 2026-08-13  
-**Gaps:** `MG-RET-PHYS-001` = **CODE_GAP** · `MG-SZ-6M-001` = **CODE_GAP**
+**Tür:** Foundation (ledger + write-path + tests); **historical code snapshot**
+**Branch:** `fix/serbest-zaman-allocation-pack4a`
+**Tarih:** 2026-08-13
+**Gaps (at Pack 4A close):** `MG-RET-PHYS-001` = **CODE_GAP** · `MG-SZ-6M-001` = **CODE_GAP**
+
+> **Current production tip:** **064** — see [`118-production-migration-rollout-059-064.md`](118-production-migration-rollout-059-064.md).
+> Body below preserves Pack 4A historical state (including “production apply YOK” as of that checkpoint).
 
 ---
 

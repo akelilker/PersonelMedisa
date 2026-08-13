@@ -36,11 +36,12 @@
 
 ---
 
-## 2. Production baseline (invariants — değiştirilmez)
+## 2. Production baseline (current invariants)
 
 | Invariant | Değer |
 | --- | --- |
-| PRODUCTION_MIGRATION_TIP | **058** |
+| PRODUCTION_MIGRATION_TIP | **064** (rollout `118`, 2026-08-13; was **058** at master-closure audit) |
+| CODE_MIGRATION_TIP | **064** |
 | S3F | **CLOSED_PRODUCTION** |
 | QR_PIPELINE | S3C–S3F **CLOSED** |
 | QR algorithms | `QR_INTERVAL_V1`, `QR_PUANTAJ_CANDIDATE_V1`, `QR_PUANTAJ_DECISION_V1`, `QR_CANDIDATE_HASH_V2` |
@@ -51,6 +52,10 @@
 | NO_PII_COMMITTED | **YES** |
 | PERSONEL_BINDING_REAL_ROLLOUT | NOT_STARTED (schema `056` mevcut) |
 | REAL_QR_EMPLOYEE_ROLLOUT | NOT_STARTED |
+| RETENTION_PHYSICAL_SCHEMA | PRODUCTION_READY (`059`/`060`/`062`); feature **OFF**; real destruction **NO** |
+| SERBEST_ZAMAN_ALLOCATION_SCHEMA | PRODUCTION_READY (`061`/`062`) |
+| OT_ACTUAL_DATE_PROVENANCE_SCHEMA | PRODUCTION_READY (`063`); legacy backfill **NO** |
+| ORG_LOCATION_SCHEMA | PRODUCTION_READY (`064`); real seed/mapping **USER_GATED** |
 
 Smoke/test personeller korunur; gerçek personel sayılmaz. Yetkisiz eski gerçek personel importu geri alınmıştır. Gerçek personel kullanıcı onayı olmadan import edilmez.
 
@@ -99,13 +104,13 @@ Aşağıdakiler CURRENT MAIN’de bozulmuş değilse OPEN yapılmaz:
 | Pack 4A | `115` — OPTION_A lot ledger foundation (`061` + write-path) |
 | Pack 4B | `116` — allocation-aware SERBEST destroy + `062` retention-gated tahsis DELETE + scope fingerprint |
 | Mevcut | Plan/execute + registry + HTTP; 15/15 typed handlers; SERBEST allocation-aware destroy (legacy/cross-scope/invariant fail-closed); Pack 4A append-only tahsis ledger; Pack 4B gated DELETE |
-| Beklenen | OPS: production migrate `059`/`060`/`061`/`062` + feature enable (ayrı kapı); gerçek destroy yalnız onaylı talepte |
-| Kanıt | `PhysicalDestructionService`; `SerbestZamanDestructionHandler`; `RetentionPhysicalDestroyGate`; mig `059`/`060`/`061`/`062`; `112`/`113`/`114`/`115`/`116` |
-| Neden OPS | Code gap kapandı; production apply + flag enable henüz yok |
+| Beklenen | OPS: feature enable (ayrı kapı) + gerçek destroy yalnız onaylı talepte; schema `059`/`060`/`061`/`062` production-applied (`118`) |
+| Kanıt | `PhysicalDestructionService`; `SerbestZamanDestructionHandler`; `RetentionPhysicalDestroyGate`; mig `059`/`060`/`061`/`062`; `112`/`113`/`114`/`115`/`116`; rollout `118` |
+| Neden OPS | Code + production schema hazır; feature flag OFF; real destruction henüz yok |
 | Runtime | Flag OFF → `DESTRUCTION_EXECUTION_DISABLED`; legacy unallocated → `SERBEST_ZAMAN_USAGE_ALLOCATION_UNRESOLVED`; cross-scope → `SERBEST_ZAMAN_CROSS_SCOPE_ALLOCATION_REMAINS` |
-| Prod veri | Write yok (bu tur) |
-| Migration | `059`/`060`/`061`/`062` dosya mevcut; **production apply YOK** (prod tip hâlâ **058**) |
-| Prod write | Hayır |
+| Prod veri | Write yok (rollout mutation yok); execution rows = 0; open destroy gates = 0 |
+| Migration | `059`/`060`/`061`/`062` **production-applied** (`118`); tip **064** |
+| Prod write | Schema-only rollout; feature enable / real destroy **NO** |
 | Owner | Retention |
 | Acceptance | Onaylı talepte güvenli kategoriler imha edilir; SERBEST lot-provenance destroy veya legacy fail-closed; audit/evidence; flag default OFF |
 
@@ -145,8 +150,8 @@ Aşağıdakiler CURRENT MAIN’de bozulmuş değilse OPEN yapılmaz:
 | Pack 4B | `116` — `SerbestZamanDeadlineService` + `GET /serbest-zaman/deadline-takip` + Raporlar `serbest-zaman-takip` |
 | Mevcut (var) | `son_kullanim_tarihi`; 6 ay hesabı; bakiye; Pack 4A lots; Pack 4B ops surface (warning 30g, EXPIRED visibility, ALLOCATION_UNRESOLVED) |
 | Compliance | `WARNING_AND_OPERATIONAL_FOLLOWUP`; **PAYROLL_HARD_BLOCK = NO** |
-| Beklenen | OPS: production schema rollout (allocation ledger) + İK operasyonel follow-up kullanımı |
-| Kanıt | `SerbestZamanDeadlineService`; `SerbestZamanTakipPage`; `102` §7; `116` |
+| Beklenen | OPS: İK operasyonel follow-up kullanımı; production allocation schema `061`/`062` **COMPLETE** (`118`) |
+| Kanıt | `SerbestZamanDeadlineService`; `SerbestZamanTakipPage`; `102` §7; `116`; rollout `118` |
 | Payroll | Vade aşımında otomatik compliance block yok |
 | Owner | Serbest zaman / Payroll compliance |
 | Acceptance | Lot bazlı yaklaşan/overdue görünür + raporlanır; compliance warning/operational; payroll hard block yok |
@@ -160,9 +165,9 @@ Aşağıdakiler CURRENT MAIN’de bozulmuş değilse OPEN yapılmaz:
 | Domain | Fazla çalışma / 270 saat |
 | Karar / policy | `ROLLING_12_MONTH_ACTUAL_DATE_V1` (`MG-OT-YEAR-POL-001`) |
 | Owner | `FazlaCalismaYillikLimitService` |
-| Persist | Migration `063` — `fazla_calisma_tarih_dagilimi_json` + policy (nullable; legacy rewrite yok) |
+| Persist | Migration `063` — `fazla_calisma_tarih_dagilimi_json` + policy (nullable; legacy rewrite yok); production-applied (`118`) |
 | Hard guard | Rolling 12 month; ISO/`yil` display only |
-| Kanıt | `117-final-code-gap-pack5.md`; Pack5 MariaDB A1–A10 |
+| Kanıt | `117-final-code-gap-pack5.md`; Pack5 MariaDB A1–A10; rollout `118` |
 | Acceptance | Create/compliance/payroll paths aynı rolling owner; whole-week ISO assignment yok |
 
 ### MG-ORG-LOC-001 — SGK işveren / sistem şubesi / çalışma lokasyonu schema ayrımı
@@ -175,10 +180,10 @@ Aşağıdakiler CURRENT MAIN’de bozulmuş değilse OPEN yapılmaz:
 | Domain | Organizasyon / SGK |
 | Code/schema | Migration `064` — `sgk_isverenler`, `calisma_lokasyonlari`; `personeller` nullable FKs; `sube_id` korunur |
 | Pre-064 | Explicit new-field write → `409 ORG_LOCATION_SCHEMA_NOT_READY` |
-| Production | tip **058**; `064` unapplied; real org seed **NO** |
-| Kanıt | `117-final-code-gap-pack5.md`; Pack5 MariaDB B1–B11 |
+| Production | tip **064** (`118`); schema applied; real org seed **NO**; personnel org mapping **NO** |
+| Kanıt | `117-final-code-gap-pack5.md`; Pack5 MariaDB B1–B11; rollout `118` |
 | Acceptance (code) | Üç kavram bağımsız persist; SubeScope `sube_id` |
-| Remaining ops | Real org seed = `MG-OPS-ORG-001` USER_GATED |
+| Remaining ops | Real org seed = `MG-OPS-ORG-001` USER_GATED; personnel mapping/backfill ayrı kapı |
 
 ---
 
@@ -233,7 +238,7 @@ Aşağıdakiler CURRENT MAIN’de bozulmuş değilse OPEN yapılmaz:
 | Domain | Personel org model |
 | Mevcut | Native: `departman`, `gorev`, `personel_tipi`, `sube`, `bagli_amir_id`. Bölüm / birim / pozisyon native yok |
 | Soru | Bu üç seviye native canonical org alanı mı tutulacak, yoksa mevcut Departman / Görev / Personel Tipi mapping yeterli mi? |
-| Not | Çalışma **lokasyonu** kilitli gereksinim → `MG-ORG-LOC-001` OPS_ROLLOUT (USER_GATED; Pack5 schema code closed). Bu ID lokasyonu kapsamaz. |
+| Not | Çalışma **lokasyonu** kilitli gereksinim → `MG-ORG-LOC-001` OPS_ROLLOUT (USER_GATED; schema production-ready `118`). Bu ID lokasyonu kapsamaz. |
 | Kanıt | `001_initial_schema.sql`; `src/types/personel.ts`; import columns |
 | Acceptance | Yazılı karar; gerekirse sonra CODE_GAP’e çevrilir |
 
@@ -327,7 +332,7 @@ DİĞER: Şenay Mobilya
 
 ```text
 MG-ORG-MODEL-001 (CLOSED — karar kilitli)
-  → MG-ORG-LOC-001 (CODE_GAP — schema)
+  → MG-ORG-LOC-001 (OPS_ROLLOUT — schema production-ready `064`/`118`; real seed USER_GATED)
   → MG-ORG-ATTR-001 (BUSINESS_DECISION_REQUIRED — bölüm/birim/pozisyon)
   → MG-OPS-ORG-001 (referans seed, USER_GATED)
   → MG-IMPORT-MAP-001 (BUSINESS_DECISION_REQUIRED)
@@ -351,8 +356,8 @@ Import contract (kod, değişmedi):
 1. CODE_GAP = 0 olmadan “ürün tamam” denmez.
 2. `CANONICAL_DOC_STALE = 0` (sağlandı).
 3. Gerçek personel/org/SGK/UBGT write yalnız `95` + kullanıcı onayı.
-4. Migration tip production = 058; yeni migration yalnız ayrı onay.
-5. Physical destruction yalnız manifest + S3F fingerprint coverage + handler + legal review sonrası.
+4. Migration tip production = **064** (`118`); yeni migration yalnız ayrı onay.
+5. Physical destruction yalnız feature enable + manifest + S3F fingerprint coverage + handler + legal review sonrası (schema ready; flag OFF).
 6. Stash / force-push / hard reset yasak (audit protokolü).
 7. Public repo’ya PII / exact personnel tallies yazılmaz.
 
@@ -363,9 +368,9 @@ Import contract (kod, değişmedi):
 1. Canonical docs (PR #149): `CURRENT_STATE` + `102` + bu registry
 2. Business inputs: `MG-SGK-1514`, `MG-OT-YEAR-POL`, `MG-IMPORT-MAP`, `MG-ORG-ATTR`, `MG-ZORUNLU`
 3. Code P1: `MG-OT-YEAR-PATH-001` (policy sonrası veya tutarlılık fix)
-4. Ops P1: `MG-SZ-6M-001` — **OPS_ROLLOUT** / `USER_GATED` (Pack 4B code closed `116`; prod schema/ops pending)
-5. Ops P1: `MG-RET-PHYS-001` — **OPS_ROLLOUT** / `USER_GATED` (Pack 4B code closed `116`; prod apply + feature enable pending)
-6. Code P1: `MG-ORG-LOC-001`
+4. Ops P1: `MG-SZ-6M-001` — **OPS_ROLLOUT** / `USER_GATED` (schema `061`/`062` production-ready `118`; İK ops follow-up açık)
+5. Ops P1: `MG-RET-PHYS-001` — **OPS_ROLLOUT** / `USER_GATED` (schema `059`/`060`/`062` production-ready `118`; feature enable + real destroy açık)
+6. Ops P1: `MG-ORG-LOC-001` — **OPS_ROLLOUT** / `USER_GATED` (schema `064` production-ready `118`; real org seed / mapping açık)
 7. Ops: UBGT seed, SGK catalog, org seed, dataset completion, personel import, binding, QR employee
 8. Defer pack: QR correction UX, I13 fields, ENUM shrink, payroll self-view, pay outputs
 
@@ -399,7 +404,7 @@ Destroy eligibility: Pack 3C (`114`) — **15/15 typed handlers**; SERBEST used-
 | BORDRO | CLOSED | CLOSED | CLOSED | CLOSED | CLOSED | CLOSED (Pack3B) |
 | SGK_EKSIK_GUN | CLOSED | CLOSED | CLOSED | CLOSED | CLOSED | CLOSED (Pack3B) |
 | FAZLA_CALISMA | CLOSED | CLOSED | CLOSED | CLOSED | CLOSED | CLOSED (Pack3C; shared notes preserved) |
-| SERBEST_ZAMAN | CLOSED | CLOSED | CLOSED | CLOSED | CLOSED | **OPS_ROLLOUT** Pack4B allocation-aware destroy code (`116`); legacy/cross-scope fail-closed; flag OFF; prod apply YOK |
+| SERBEST_ZAMAN | CLOSED | CLOSED | CLOSED | CLOSED | CLOSED | **OPS_ROLLOUT** Pack4B allocation-aware destroy code (`116`); schema `061`/`062` production-ready (`118`); legacy/cross-scope fail-closed; flag OFF; real destroy YOK |
 | ONAY_AUDIT | CLOSED | CLOSED | CLOSED | CLOSED | CLOSED | CLOSED (Pack2 typed + Pack3C generic no-op) |
 | IZIN | CLOSED | CLOSED | CLOSED | CLOSED | CLOSED | CLOSED (Pack2) |
 | RAPOR | CLOSED | CLOSED | CLOSED | CLOSED | CLOSED | CLOSED (Pack3C + PERSONEL_BELGE gate) |
@@ -426,9 +431,9 @@ Destroy eligibility: Pack 3C (`114`) — **15/15 typed handlers**; SERBEST used-
 **MUST_FIX_NOW (= CODE_GAP P1 listesi):** *(empty — Pack5 closed code gaps)*
 
 **OPS_ROLLOUT (code closed, prod gated):**
-- `MG-RET-PHYS-001` — Pack 4B code closure (`116`); prod migrate + feature enable `USER_GATED`
-- `MG-SZ-6M-001` — Pack 4B ops surface (`116`); prod schema/ops follow-up `USER_GATED`
-- `MG-ORG-LOC-001` — Pack5 schema/code (`117`); prod `064` + real org seed `USER_GATED`
+- `MG-RET-PHYS-001` — Pack 4B code + schema production-ready (`116`/`118`); feature enable + real destroy `USER_GATED`
+- `MG-SZ-6M-001` — Pack 4B ops surface (`116`); allocation schema production-ready (`118`); İK follow-up `USER_GATED`
+- `MG-ORG-LOC-001` — Pack5 schema production-ready (`117`/`118`); real org seed / personnel mapping `USER_GATED`
 
 P2 BUSINESS (`MG-ORG-ATTR`, `MG-ZORUNLU`) final completion için açık kalabilir ama CODE_GAP değildir; karar sonrası gerekirse CODE_GAP’e çevrilir.
 

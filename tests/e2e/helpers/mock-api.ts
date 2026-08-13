@@ -4395,7 +4395,13 @@ let personelBelgeKaydiIdCounter = 903;
   }
 
   const mockUserSubeIds =
-    role === "BIRIM_AMIRI" ? [1] : role === "MUHASEBE" ? [1, 2] : role === "BOLUM_YONETICISI" ? [2] : [];
+    role === "BIRIM_AMIRI"
+      ? [1]
+      : role === "MUHASEBE" || role === "IK_SORUMLUSU"
+        ? [1, 2]
+        : role === "BOLUM_YONETICISI"
+          ? [2]
+          : [];
   const mockUserId = 1;
 
   function resolveMockBildirimSubeId(personelId: number): number | undefined {
@@ -8176,6 +8182,21 @@ let personelBelgeKaydiIdCounter = 903;
     if (path.startsWith("/api/referans/") && method === "GET") {
       if (path === "/api/referans/departmanlar") {
         await fulfillJson(route, 200, okBody(departmanOptions));
+        return;
+      }
+
+      if (path === "/api/referans/bolumler") {
+        await fulfillJson(route, 200, okBody([]));
+        return;
+      }
+
+      if (path === "/api/referans/birimler") {
+        await fulfillJson(route, 200, okBody([]));
+        return;
+      }
+
+      if (path === "/api/referans/pozisyonlar") {
+        await fulfillJson(route, 200, okBody([]));
         return;
       }
 

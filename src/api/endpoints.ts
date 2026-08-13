@@ -271,6 +271,9 @@ export const endpoints = {
   referans: {
     departmanlar: "/referans/departmanlar",
     gorevler: "/referans/gorevler",
+    bolumler: "/referans/bolumler",
+    birimler: "/referans/birimler",
+    pozisyonlar: "/referans/pozisyonlar",
     personelTipleri: "/referans/personel-tipleri",
     bagliAmirler: "/referans/bagli-amirler",
     bildirimTurleri: "/referans/bildirim-turleri",

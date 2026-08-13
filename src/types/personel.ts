@@ -16,7 +16,13 @@ export type Personel = {
   acil_durum_kisi?: string;
   acil_durum_telefon?: string;
   departman_id?: number;
+  bolum_id?: number | null;
+  bolum_adi?: string | null;
+  birim_id?: number | null;
+  birim_adi?: string | null;
   gorev_id?: number;
+  pozisyon_id?: number | null;
+  pozisyon_adi?: string | null;
   personel_tipi_id?: number;
   bagli_amir_id?: number;
   sgk_isveren_id?: number | null;

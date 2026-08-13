@@ -9,6 +9,7 @@ use Medisa\Api\Auth\RolePermissions;
 use Medisa\Api\Database\Connection;
 use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
+use Medisa\Api\Services\Personel\PersonelOrgStructureSchema;
 use PDO;
 use PDOException;
 
@@ -106,7 +107,7 @@ class ReferansController
         $tooLongCode,
         $duplicateCode
     ) {
-        $allowedTables = ['departmanlar', 'gorevler'];
+        $allowedTables = ['departmanlar', 'gorevler', 'pozisyonlar'];
         if (!in_array($table, $allowedTables, true)) {
             throw new \InvalidArgumentException('CATALOG_TABLE_INVALID');
         }
@@ -178,6 +179,14 @@ class ReferansController
             $pdo = Connection::get();
         } catch (\Throwable $e) {
             JsonResponse::serverError('Veritabani baglantisi kurulamadi.');
+        }
+
+        if ($table === 'pozisyonlar' && !PersonelOrgStructureSchema::isReady($pdo)) {
+            JsonResponse::error(
+                409,
+                PersonelOrgStructureSchema::ERROR_CODE,
+                'Org structure schema hazir degil.'
+            );
         }
 
         try {
@@ -254,6 +263,81 @@ class ReferansController
     public static function gorevler(Request $request)
     {
         self::listByTable($request, 'gorevler');
+    }
+
+    public static function bolumler(Request $request)
+    {
+        self::listHierarchical($request, 'bolumler');
+    }
+
+    public static function createBolum(Request $request)
+    {
+        self::createHierarchicalNamedEntity(
+            $request,
+            'bolumler',
+            'departman_id',
+            'departmanlar',
+            'BOLUM_NAME_REQUIRED',
+            'BOLUM_NAME_TYPE',
+            'BOLUM_NAME_TOO_LONG',
+            'BOLUM_PARENT_REQUIRED',
+            'BOLUM_PARENT_INVALID',
+            'BOLUM_ZATEN_VAR',
+            'Bolum adi zorunludur.',
+            'Bolum adi metin olmalidir.',
+            'Departman zorunludur.',
+            'Gecersiz departman.',
+            'Bu bolum adi ayni departman altinda zaten kayitli.',
+            'Bolum kaydi olusturulamadi.'
+        );
+    }
+
+    public static function birimler(Request $request)
+    {
+        self::listHierarchical($request, 'birimler');
+    }
+
+    public static function createBirim(Request $request)
+    {
+        self::createHierarchicalNamedEntity(
+            $request,
+            'birimler',
+            'bolum_id',
+            'bolumler',
+            'BIRIM_NAME_REQUIRED',
+            'BIRIM_NAME_TYPE',
+            'BIRIM_NAME_TOO_LONG',
+            'BIRIM_PARENT_REQUIRED',
+            'BIRIM_PARENT_INVALID',
+            'BIRIM_ZATEN_VAR',
+            'Birim adi zorunludur.',
+            'Birim adi metin olmalidir.',
+            'Bolum zorunludur.',
+            'Gecersiz bolum.',
+            'Bu birim adi ayni bolum altinda zaten kayitli.',
+            'Birim kaydi olusturulamadi.'
+        );
+    }
+
+    public static function pozisyonlar(Request $request)
+    {
+        self::listByTable($request, 'pozisyonlar');
+    }
+
+    public static function createPozisyon(Request $request)
+    {
+        self::createCatalogNamedEntity(
+            $request,
+            'pozisyonlar',
+            'POZISYON_NAME_REQUIRED',
+            'POZISYON_NAME_TYPE',
+            'POZISYON_NAME_TOO_LONG',
+            'POZISYON_ZATEN_VAR',
+            'Pozisyon adi zorunludur.',
+            'Pozisyon adi metin olmalidir.',
+            'Bu pozisyon adi zaten kayitli.',
+            'Pozisyon kaydi olusturulamadi.'
+        );
     }
 
     public static function personelTipleri(Request $request)
@@ -357,7 +441,7 @@ class ReferansController
     {
         AuthMiddleware::authenticate($request, true);
 
-        $allowed = ['departmanlar', 'gorevler', 'personel_tipleri'];
+        $allowed = ['departmanlar', 'gorevler', 'personel_tipleri', 'pozisyonlar'];
         if (!in_array($table, $allowed, true)) {
             JsonResponse::notFound();
         }
@@ -366,6 +450,14 @@ class ReferansController
             $pdo = Connection::get();
         } catch (\Throwable $e) {
             JsonResponse::serverError('Veritabani baglantisi kurulamadi.');
+        }
+
+        if ($table === 'pozisyonlar' && !PersonelOrgStructureSchema::isReady($pdo)) {
+            JsonResponse::error(
+                409,
+                PersonelOrgStructureSchema::ERROR_CODE,
+                'Org structure schema hazir degil.'
+            );
         }
 
         $stmt = $pdo->query("SELECT id, ad FROM $table WHERE durum = 'AKTIF' ORDER BY ad ASC");
@@ -379,5 +471,167 @@ class ReferansController
         }
 
         JsonResponse::success(['items' => $items]);
+    }
+
+    private static function listHierarchical(Request $request, $table)
+    {
+        AuthMiddleware::authenticate($request, true);
+
+        $allowed = [
+            'bolumler' => 'departman_id',
+            'birimler' => 'bolum_id',
+        ];
+        if (!isset($allowed[$table])) {
+            JsonResponse::notFound();
+        }
+        $parentColumn = $allowed[$table];
+
+        try {
+            $pdo = Connection::get();
+        } catch (\Throwable $e) {
+            JsonResponse::serverError('Veritabani baglantisi kurulamadi.');
+        }
+
+        if (!PersonelOrgStructureSchema::isReady($pdo)) {
+            JsonResponse::error(
+                409,
+                PersonelOrgStructureSchema::ERROR_CODE,
+                'Org structure schema hazir degil.'
+            );
+        }
+
+        $parentId = (int) ($request->getQuery($parentColumn, 0) ?: 0);
+        if ($parentId > 0) {
+            $stmt = $pdo->prepare(
+                "SELECT id, ad, {$parentColumn}
+                 FROM {$table}
+                 WHERE durum = 'AKTIF' AND {$parentColumn} = :parent_id
+                 ORDER BY ad ASC"
+            );
+            $stmt->execute(['parent_id' => $parentId]);
+        } else {
+            $stmt = $pdo->query(
+                "SELECT id, ad, {$parentColumn}
+                 FROM {$table}
+                 WHERE durum = 'AKTIF'
+                 ORDER BY ad ASC"
+            );
+        }
+        $rows = $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
+        $items = [];
+        foreach ($rows as $row) {
+            $items[] = [
+                'id' => (int) $row['id'],
+                'ad' => (string) $row['ad'],
+                $parentColumn => (int) $row[$parentColumn],
+            ];
+        }
+
+        JsonResponse::success(['items' => $items]);
+    }
+
+    private static function createHierarchicalNamedEntity(
+        Request $request,
+        $table,
+        $parentColumn,
+        $parentTable,
+        $requiredCode,
+        $typeCode,
+        $tooLongCode,
+        $parentRequiredCode,
+        $parentInvalidCode,
+        $duplicateCode,
+        $requiredMessage,
+        $typeMessage,
+        $parentRequiredMessage,
+        $parentInvalidMessage,
+        $duplicateMessage,
+        $serverErrorMessage
+    ) {
+        $user = AuthMiddleware::authenticate($request, true);
+        RolePermissions::assert($user, 'yonetim-paneli.manage');
+
+        $body = $request->getJsonBody();
+        if (!is_array($body)) {
+            $body = [];
+        }
+
+        try {
+            $pdo = Connection::get();
+        } catch (\Throwable $e) {
+            JsonResponse::serverError('Veritabani baglantisi kurulamadi.');
+        }
+
+        if (!PersonelOrgStructureSchema::isReady($pdo)) {
+            JsonResponse::error(
+                409,
+                PersonelOrgStructureSchema::ERROR_CODE,
+                'Org structure schema hazir degil.'
+            );
+        }
+
+        if (!array_key_exists($parentColumn, $body) || $body[$parentColumn] === null || $body[$parentColumn] === '') {
+            JsonResponse::badRequest($parentRequiredMessage, $parentRequiredCode, $parentColumn);
+        }
+        $parentId = (int) $body[$parentColumn];
+        if ($parentId < 1) {
+            JsonResponse::badRequest($parentRequiredMessage, $parentRequiredCode, $parentColumn);
+        }
+        $parentStmt = $pdo->prepare(
+            "SELECT id FROM {$parentTable} WHERE id = :id AND durum = 'AKTIF' LIMIT 1"
+        );
+        $parentStmt->execute(['id' => $parentId]);
+        if (!$parentStmt->fetch(PDO::FETCH_ASSOC)) {
+            JsonResponse::badRequest($parentInvalidMessage, $parentInvalidCode, $parentColumn);
+        }
+
+        if (!array_key_exists('ad', $body)) {
+            JsonResponse::badRequest($requiredMessage, $requiredCode, 'ad');
+        }
+        if (!is_string($body['ad'])) {
+            JsonResponse::badRequest($typeMessage, 'VALIDATION_ERROR', 'ad');
+        }
+        $ad = trim($body['ad']);
+        if ($ad === '') {
+            JsonResponse::badRequest($requiredMessage, $requiredCode, 'ad');
+        }
+        if (self::utf8Length($ad) > self::CATALOG_AD_MAX_LENGTH) {
+            JsonResponse::badRequest(
+                'Ad en fazla ' . self::CATALOG_AD_MAX_LENGTH . ' karakter olabilir.',
+                'VALIDATION_ERROR',
+                'ad'
+            );
+        }
+
+        $dupStmt = $pdo->prepare(
+            "SELECT id FROM {$table} WHERE {$parentColumn} = :parent_id AND ad = :ad LIMIT 1"
+        );
+        $dupStmt->execute(['parent_id' => $parentId, 'ad' => $ad]);
+        if ($dupStmt->fetch(PDO::FETCH_ASSOC)) {
+            JsonResponse::error(409, $duplicateCode, $duplicateMessage, 'ad');
+        }
+
+        try {
+            $stmt = $pdo->prepare(
+                "INSERT INTO {$table} ({$parentColumn}, ad, durum) VALUES (:parent_id, :ad, 'AKTIF')"
+            );
+            $stmt->execute(['parent_id' => $parentId, 'ad' => $ad]);
+        } catch (PDOException $e) {
+            if (self::isDuplicateKeyException($e)) {
+                JsonResponse::error(409, $duplicateCode, $duplicateMessage, 'ad');
+            }
+            JsonResponse::serverError($serverErrorMessage);
+        }
+
+        $id = (int) $pdo->lastInsertId();
+        if ($id <= 0) {
+            JsonResponse::serverError($serverErrorMessage);
+        }
+
+        JsonResponse::success([
+            'id' => $id,
+            'ad' => $ad,
+            $parentColumn => $parentId,
+        ], [], 201);
     }
 }

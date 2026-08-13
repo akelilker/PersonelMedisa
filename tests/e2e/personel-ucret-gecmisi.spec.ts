@@ -34,8 +34,8 @@ async function createMaassizPersonel(page: Page) {
   await kayitModal.locator('[name="create-sicil"]').fill("E2E-UCRET-01");
   await kayitModal.locator('[name="create-ise-giris"]').fill("2026-01-10");
   await selectCreateOption(kayitModal, "Şube", "Merkez");
-  await selectCreateOption(kayitModal, "Bölüm", "Döşeme");
-  await selectCreateOption(kayitModal, "Görev / Unvan", "Genel Müdür");
+  await selectCreateOption(kayitModal, "Departman", "Döşeme");
+  await selectCreateOption(kayitModal, "Unvan", "Genel Müdür");
   await selectCreateOption(kayitModal, "Personel Tipi", "Tam Zamanlı");
   await kayitModal.getByRole("button", { name: "Kaydet" }).click();
   await expect(kayitModal.getByRole("heading", { name: /Ucret ADAY/i })).toBeVisible({

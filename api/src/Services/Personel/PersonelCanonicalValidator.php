@@ -156,6 +156,17 @@ final class PersonelCanonicalValidator
             $payload['calisma_lokasyonu_id'] = self::optionalPositiveInt($body, 'calisma_lokasyonu_id');
         }
 
+        // Optional Pack6 org-structure refs — key present means write intent (blank → NULL).
+        if (array_key_exists('bolum_id', $body)) {
+            $payload['bolum_id'] = self::optionalPositiveInt($body, 'bolum_id');
+        }
+        if (array_key_exists('birim_id', $body)) {
+            $payload['birim_id'] = self::optionalPositiveInt($body, 'birim_id');
+        }
+        if (array_key_exists('pozisyon_id', $body)) {
+            $payload['pozisyon_id'] = self::optionalPositiveInt($body, 'pozisyon_id');
+        }
+
         return $payload;
     }
 
@@ -214,7 +225,17 @@ final class PersonelCanonicalValidator
             $payload['sube_id'] = self::requirePositiveInt($body, 'sube_id', 'Sube secilmelidir.');
         }
 
-        foreach (['departman_id', 'gorev_id', 'bagli_amir_id', 'personel_tipi_id', 'sgk_isveren_id', 'calisma_lokasyonu_id'] as $field) {
+        foreach ([
+            'departman_id',
+            'gorev_id',
+            'bagli_amir_id',
+            'personel_tipi_id',
+            'sgk_isveren_id',
+            'calisma_lokasyonu_id',
+            'bolum_id',
+            'birim_id',
+            'pozisyon_id',
+        ] as $field) {
             if (array_key_exists($field, $body)) {
                 $payload[$field] = self::optionalPositiveInt($body, $field);
             }
@@ -350,6 +371,23 @@ final class PersonelCanonicalValidator
 
         // Optional Pack5 org refs — only when import row explicitly carries keys.
         foreach (['sgk_isveren_id', 'calisma_lokasyonu_id'] as $field) {
+            if (!array_key_exists($field, $row)) {
+                continue;
+            }
+            if ($row[$field] === null || $row[$field] === '') {
+                $payload[$field] = null;
+                continue;
+            }
+            $id = self::parsePositiveInt($row[$field]);
+            if ($id === null) {
+                $errors[] = self::importError('PERSONEL_IMPORT_EKSIK_ALAN', $field, 'Gecersiz referans.');
+            } else {
+                $payload[$field] = $id;
+            }
+        }
+
+        // Optional Pack6 org-structure refs — only when import row explicitly carries keys.
+        foreach (['bolum_id', 'birim_id', 'pozisyon_id'] as $field) {
             if (!array_key_exists($field, $row)) {
                 continue;
             }

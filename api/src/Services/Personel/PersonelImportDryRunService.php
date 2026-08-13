@@ -59,11 +59,20 @@ final class PersonelImportDryRunService
         'acil_durum_telefon',
         'sgk_isveren',
         'calisma_lokasyonu',
+        'bolum',
+        'birim',
+        'pozisyon',
     ];
 
     private const ORG_LOCATION_OPTIONAL_COLUMNS = [
         'sgk_isveren',
         'calisma_lokasyonu',
+    ];
+
+    private const ORG_STRUCTURE_OPTIONAL_COLUMNS = [
+        'bolum',
+        'birim',
+        'pozisyon',
     ];
 
     private const FORBIDDEN_UCRET_COLUMNS = [
@@ -227,6 +236,37 @@ final class PersonelImportDryRunService
             }
         }
 
+        // Pack6 org-structure gate — blank optional headers OK pre-065; nonblank → 409.
+        $orgStructHeaderIndexes = [];
+        foreach (self::ORG_STRUCTURE_OPTIONAL_COLUMNS as $orgCol) {
+            $idx = array_search($orgCol, $headers, true);
+            if ($idx !== false) {
+                $orgStructHeaderIndexes[] = (int) $idx;
+            }
+        }
+        if (count($orgStructHeaderIndexes) > 0 && !PersonelOrgStructureSchema::isReady($pdo)) {
+            $hasNonBlankOrgStructValue = false;
+            foreach ($dataLines as $entry) {
+                $cells = self::parseCsvLine($entry['line']);
+                foreach ($orgStructHeaderIndexes as $orgIdx) {
+                    if (!array_key_exists($orgIdx, $cells)) {
+                        continue;
+                    }
+                    if (trim((string) $cells[$orgIdx]) !== '') {
+                        $hasNonBlankOrgStructValue = true;
+                        break 2;
+                    }
+                }
+            }
+            if ($hasNonBlankOrgStructValue) {
+                throw new PersonelImportException(
+                    PersonelOrgStructureSchema::ERROR_CODE,
+                    'Org structure schema hazir degil; bolum / birim / pozisyon kolonlari kabul edilmez.',
+                    409
+                );
+            }
+        }
+
         $allowedSubeIds = SubeScope::allowedSubeIds($user);
         $activeSubeId = self::parsePositiveInt($activeSubeHeader);
 
@@ -279,8 +319,11 @@ final class PersonelImportDryRunService
             $sicilRaw = trim((string) ($rowMap['sicil_no'] ?? ''));
             $maskedTc = PersonelCanonicalValidator::maskTcKimlikNo($tcRaw);
             $hasOrgCols = in_array('sgk_isveren', $headers, true) || in_array('calisma_lokasyonu', $headers, true);
+            $hasOrgStructCols = in_array('bolum', $headers, true)
+                || in_array('birim', $headers, true)
+                || in_array('pozisyon', $headers, true);
 
-            $resolved = self::resolveReferences($rowMap, $refCatalog, $hataKodlari, $hasOrgCols);
+            $resolved = self::resolveReferences($rowMap, $refCatalog, $hataKodlari, $hasOrgCols, $hasOrgStructCols);
 
             $importBody = [
                 'tc_kimlik_no' => $tcRaw,
@@ -312,6 +355,19 @@ final class PersonelImportDryRunService
                 }
             } else {
                 $includeOrgRefs = false;
+            }
+            if ($hasOrgStructCols) {
+                $includeOrgStructRefs = PersonelOrgStructureSchema::isReady($pdo)
+                    || $resolved['bolum_id'] !== null
+                    || $resolved['birim_id'] !== null
+                    || $resolved['pozisyon_id'] !== null;
+                if ($includeOrgStructRefs) {
+                    $importBody['bolum_id'] = $resolved['bolum_id'];
+                    $importBody['birim_id'] = $resolved['birim_id'];
+                    $importBody['pozisyon_id'] = $resolved['pozisyon_id'];
+                }
+            } else {
+                $includeOrgStructRefs = false;
             }
 
             $fieldResult = PersonelCanonicalValidator::validateImportAnaVeriRow($importBody);
@@ -397,6 +453,11 @@ final class PersonelImportDryRunService
                     $manifestRows[count($manifestRows) - 1]['sgk_isveren_id'] = $payload['sgk_isveren_id'] ?? null;
                     $manifestRows[count($manifestRows) - 1]['calisma_lokasyonu_id'] = $payload['calisma_lokasyonu_id'] ?? null;
                 }
+                if ($includeOrgStructRefs) {
+                    $manifestRows[count($manifestRows) - 1]['bolum_id'] = $payload['bolum_id'] ?? null;
+                    $manifestRows[count($manifestRows) - 1]['birim_id'] = $payload['birim_id'] ?? null;
+                    $manifestRows[count($manifestRows) - 1]['pozisyon_id'] = $payload['pozisyon_id'] ?? null;
+                }
                 $candidates[] = [
                     'satir_no' => $satirNo,
                     'payload' => $payload,
@@ -417,6 +478,18 @@ final class PersonelImportDryRunService
                         ? (int) $payload['calisma_lokasyonu_id']
                         : null;
                     $candidates[count($candidates) - 1]['_org_refs_in_hash'] = true;
+                }
+                if ($includeOrgStructRefs) {
+                    $candidates[count($candidates) - 1]['bolum_id'] = isset($payload['bolum_id']) && $payload['bolum_id'] !== null
+                        ? (int) $payload['bolum_id']
+                        : null;
+                    $candidates[count($candidates) - 1]['birim_id'] = isset($payload['birim_id']) && $payload['birim_id'] !== null
+                        ? (int) $payload['birim_id']
+                        : null;
+                    $candidates[count($candidates) - 1]['pozisyon_id'] = isset($payload['pozisyon_id']) && $payload['pozisyon_id'] !== null
+                        ? (int) $payload['pozisyon_id']
+                        : null;
+                    $candidates[count($candidates) - 1]['_org_struct_refs_in_hash'] = true;
                 }
             } else {
                 $hatali++;
@@ -451,8 +524,23 @@ final class PersonelImportDryRunService
 
         // row_hash TC'den bagimsiz: manifest_hash | satir_no | sicil | resolved refs
         foreach ($candidates as $index => $candidate) {
-            $candidates[$index]['row_hash'] = !empty($candidate['_org_refs_in_hash'])
-                ? self::buildRowHash(
+            if (!empty($candidate['_org_struct_refs_in_hash'])) {
+                $candidates[$index]['row_hash'] = self::buildRowHashOrgStructure(
+                    $manifestHash,
+                    (int) $candidate['satir_no'],
+                    (string) $candidate['sicil_no'],
+                    (int) $candidate['sube_id'],
+                    (int) $candidate['departman_id'],
+                    (int) $candidate['gorev_id'],
+                    (int) $candidate['personel_tipi_id'],
+                    isset($candidate['sgk_isveren_id']) ? $candidate['sgk_isveren_id'] : null,
+                    isset($candidate['calisma_lokasyonu_id']) ? $candidate['calisma_lokasyonu_id'] : null,
+                    isset($candidate['bolum_id']) ? $candidate['bolum_id'] : null,
+                    isset($candidate['birim_id']) ? $candidate['birim_id'] : null,
+                    isset($candidate['pozisyon_id']) ? $candidate['pozisyon_id'] : null
+                );
+            } elseif (!empty($candidate['_org_refs_in_hash'])) {
+                $candidates[$index]['row_hash'] = self::buildRowHash(
                     $manifestHash,
                     (int) $candidate['satir_no'],
                     (string) $candidate['sicil_no'],
@@ -462,8 +550,9 @@ final class PersonelImportDryRunService
                     (int) $candidate['personel_tipi_id'],
                     isset($candidate['sgk_isveren_id']) ? $candidate['sgk_isveren_id'] : null,
                     isset($candidate['calisma_lokasyonu_id']) ? $candidate['calisma_lokasyonu_id'] : null
-                )
-                : self::buildRowHashLegacy(
+                );
+            } else {
+                $candidates[$index]['row_hash'] = self::buildRowHashLegacy(
                     $manifestHash,
                     (int) $candidate['satir_no'],
                     (string) $candidate['sicil_no'],
@@ -472,7 +561,8 @@ final class PersonelImportDryRunService
                     (int) $candidate['gorev_id'],
                     (int) $candidate['personel_tipi_id']
                 );
-            unset($candidates[$index]['_org_refs_in_hash']);
+            }
+            unset($candidates[$index]['_org_refs_in_hash'], $candidates[$index]['_org_struct_refs_in_hash']);
         }
 
         $canApply = count($dataLines) > 0 && $hatali === 0 && $gecerli === count($dataLines);
@@ -578,6 +668,38 @@ final class PersonelImportDryRunService
         return hash('sha256', $material);
     }
 
+    public static function buildRowHashOrgStructure(
+        string $manifestHash,
+        int $satirNo,
+        string $sicilNo,
+        int $subeId,
+        int $departmanId,
+        int $gorevId,
+        int $personelTipiId,
+        $sgkIsverenId = null,
+        $calismaLokasyonuId = null,
+        $bolumId = null,
+        $birimId = null,
+        $pozisyonId = null
+    ): string {
+        $material = implode('|', [
+            strtolower($manifestHash),
+            (string) $satirNo,
+            $sicilNo,
+            (string) $subeId,
+            (string) $departmanId,
+            (string) $gorevId,
+            (string) $personelTipiId,
+            $sgkIsverenId === null ? '0' : (string) (int) $sgkIsverenId,
+            $calismaLokasyonuId === null ? '0' : (string) (int) $calismaLokasyonuId,
+            $bolumId === null ? '0' : (string) (int) $bolumId,
+            $birimId === null ? '0' : (string) (int) $birimId,
+            $pozisyonId === null ? '0' : (string) (int) $pozisyonId,
+        ]);
+
+        return hash('sha256', $material);
+    }
+
     /** @param array<string, mixed> $manifest */
     public static function buildManifestHash(array $manifest): string
     {
@@ -670,11 +792,19 @@ final class PersonelImportDryRunService
      *   gorev_id: ?int,
      *   personel_tipi_id: ?int,
      *   sgk_isveren_id: ?int,
-     *   calisma_lokasyonu_id: ?int
+     *   calisma_lokasyonu_id: ?int,
+     *   bolum_id: ?int,
+     *   birim_id: ?int,
+     *   pozisyon_id: ?int
      * }
      */
-    private static function resolveReferences(array $rowMap, array $catalog, array &$hataKodlari, bool $hasOrgCols = false)
-    {
+    private static function resolveReferences(
+        array $rowMap,
+        array $catalog,
+        array &$hataKodlari,
+        bool $hasOrgCols = false,
+        bool $hasOrgStructCols = false
+    ) {
         $subeId = PersonelImportReferenceCatalogService::resolveExactUnique(
             $rowMap['sube'] ?? '',
             $catalog['sube'],
@@ -729,6 +859,51 @@ final class PersonelImportDryRunService
             }
         }
 
+        $bolumId = null;
+        $birimId = null;
+        $pozisyonId = null;
+        if ($hasOrgStructCols) {
+            if (array_key_exists('bolum', $rowMap)) {
+                $raw = trim((string) $rowMap['bolum']);
+                if ($raw !== '') {
+                    $bolumId = PersonelImportReferenceCatalogService::resolveExactUniqueWithinParent(
+                        $raw,
+                        isset($catalog['bolum_by_departman']) && is_array($catalog['bolum_by_departman'])
+                            ? $catalog['bolum_by_departman']
+                            : [],
+                        $departmanId,
+                        'bolum',
+                        $hataKodlari
+                    );
+                }
+            }
+            if (array_key_exists('birim', $rowMap)) {
+                $raw = trim((string) $rowMap['birim']);
+                if ($raw !== '') {
+                    $birimId = PersonelImportReferenceCatalogService::resolveExactUniqueWithinParent(
+                        $raw,
+                        isset($catalog['birim_by_bolum']) && is_array($catalog['birim_by_bolum'])
+                            ? $catalog['birim_by_bolum']
+                            : [],
+                        $bolumId,
+                        'birim',
+                        $hataKodlari
+                    );
+                }
+            }
+            if (array_key_exists('pozisyon', $rowMap)) {
+                $raw = trim((string) $rowMap['pozisyon']);
+                if ($raw !== '') {
+                    $pozisyonId = PersonelImportReferenceCatalogService::resolveExactUnique(
+                        $raw,
+                        isset($catalog['pozisyon']) && is_array($catalog['pozisyon']) ? $catalog['pozisyon'] : [],
+                        'pozisyon',
+                        $hataKodlari
+                    );
+                }
+            }
+        }
+
         return [
             'sube_id' => $subeId,
             'departman_id' => $departmanId,
@@ -736,6 +911,9 @@ final class PersonelImportDryRunService
             'personel_tipi_id' => $personelTipiId,
             'sgk_isveren_id' => $sgkIsverenId,
             'calisma_lokasyonu_id' => $calismaLokasyonuId,
+            'bolum_id' => $bolumId,
+            'birim_id' => $birimId,
+            'pozisyon_id' => $pozisyonId,
         ];
     }
 

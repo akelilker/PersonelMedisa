@@ -18,6 +18,7 @@ use Medisa\Api\Services\Personel\PersonelImportException;
 use Medisa\Api\Services\Personel\PersonelImportHistoryService;
 use Medisa\Api\Services\Personel\PersonelImportReferenceCatalogService;
 use Medisa\Api\Services\Personel\PersonelOrgLocationSchema;
+use Medisa\Api\Services\Personel\PersonelOrgStructureSchema;
 use Medisa\Api\Services\Personel\PersonelValidationException;
 use Medisa\Api\Services\PersonelUcretException;
 use Medisa\Api\Services\PersonelUcretService;
@@ -223,11 +224,24 @@ class PersonellerController
                 'Org location schema hazir degil; sgk_isveren_id / calisma_lokasyonu_id yazilamaz.'
             );
         }
+        if (PersonelOrgStructureSchema::payloadRequestsOrgStructureFields($payload)
+            && !PersonelOrgStructureSchema::isReady($pdo)
+        ) {
+            JsonResponse::error(
+                409,
+                PersonelOrgStructureSchema::ERROR_CODE,
+                'Org structure schema hazir degil; bolum_id / birim_id / pozisyon_id yazilamaz.'
+            );
+        }
         try {
             PersonelCreateService::validateCreateReferences($pdo, $payload);
         } catch (PersonelValidationException $e) {
-            $status = $e->getCodeString() === PersonelOrgLocationSchema::ERROR_CODE ? 409 : 422;
-            JsonResponse::error($status, $e->getCodeString(), $e->getMessage(), $e->getField());
+            $code = $e->getCodeString();
+            $status = (
+                $code === PersonelOrgLocationSchema::ERROR_CODE
+                || $code === PersonelOrgStructureSchema::ERROR_CODE
+            ) ? 409 : 422;
+            JsonResponse::error($status, $code, $e->getMessage(), $e->getField());
         }
         self::assertTcAvailable($pdo, $payload['tc_kimlik_no']);
 
@@ -316,7 +330,16 @@ class PersonellerController
                 'Org location schema hazir degil; sgk_isveren_id / calisma_lokasyonu_id yazilamaz.'
             );
         }
-        self::validateUpdateReferences($pdo, $payload);
+        if (PersonelOrgStructureSchema::payloadRequestsOrgStructureFields($payload)
+            && !PersonelOrgStructureSchema::isReady($pdo)
+        ) {
+            JsonResponse::error(
+                409,
+                PersonelOrgStructureSchema::ERROR_CODE,
+                'Org structure schema hazir degil; bolum_id / birim_id / pozisyon_id yazilamaz.'
+            );
+        }
+        self::validateUpdateReferences($pdo, $payload, $current);
 
         if (array_key_exists('tc_kimlik_no', $payload)) {
             self::assertTcAvailableForUpdate($pdo, $payload['tc_kimlik_no'], $personelId);
@@ -751,8 +774,8 @@ class PersonellerController
         }
     }
 
-    /** @param array<string, mixed> $payload */
-    private static function validateUpdateReferences(PDO $pdo, array $payload)
+    /** @param array<string, mixed> $payload @param array<string, mixed> $current */
+    private static function validateUpdateReferences(PDO $pdo, array $payload, array $current = [])
     {
         if (array_key_exists('sube_id', $payload) && !self::existsActiveRecord($pdo, 'subeler', (int) $payload['sube_id'])) {
             self::validationError('sube_id', 'Gecersiz sube.');
@@ -775,6 +798,38 @@ class PersonellerController
         if (array_key_exists('calisma_lokasyonu_id', $payload) && $payload['calisma_lokasyonu_id'] !== null) {
             if (!PersonelOrgLocationSchema::existsActiveCalismaLokasyonu($pdo, (int) $payload['calisma_lokasyonu_id'])) {
                 self::validationError('calisma_lokasyonu_id', 'Gecersiz calisma lokasyonu.');
+            }
+        }
+
+        if (array_key_exists('bolum_id', $payload) && $payload['bolum_id'] !== null) {
+            if (!PersonelOrgStructureSchema::existsActiveBolum($pdo, (int) $payload['bolum_id'])) {
+                self::validationError('bolum_id', 'Gecersiz bolum.');
+            }
+        }
+        if (array_key_exists('birim_id', $payload) && $payload['birim_id'] !== null) {
+            if (!PersonelOrgStructureSchema::existsActiveBirim($pdo, (int) $payload['birim_id'])) {
+                self::validationError('birim_id', 'Gecersiz birim.');
+            }
+        }
+        if (array_key_exists('pozisyon_id', $payload) && $payload['pozisyon_id'] !== null) {
+            if (!PersonelOrgStructureSchema::existsActivePozisyon($pdo, (int) $payload['pozisyon_id'])) {
+                self::validationError('pozisyon_id', 'Gecersiz pozisyon.');
+            }
+        }
+
+        if (PersonelOrgStructureSchema::isReady($pdo)
+            && (
+                PersonelOrgStructureSchema::payloadRequestsOrgStructureFields($payload)
+                || array_key_exists('departman_id', $payload)
+            )
+        ) {
+            try {
+                PersonelOrgStructureSchema::assertHierarchyConsistent(
+                    $pdo,
+                    PersonelOrgStructureSchema::mergeEffectiveOrgState($current, $payload)
+                );
+            } catch (PersonelValidationException $e) {
+                JsonResponse::error(422, $e->getCodeString(), $e->getMessage(), $e->getField());
             }
         }
 
@@ -827,7 +882,10 @@ class PersonellerController
             'sgk_isveren_id',
             'calisma_lokasyonu_id',
             'departman_id',
+            'bolum_id',
+            'birim_id',
             'gorev_id',
+            'pozisyon_id',
             'personel_tipi_id',
             'bagli_amir_id',
             'aktif_durum',
@@ -843,6 +901,14 @@ class PersonellerController
                 $allowedColumns,
                 static function (string $c): bool {
                     return $c !== 'sgk_isveren_id' && $c !== 'calisma_lokasyonu_id';
+                }
+            ));
+        }
+        if (!PersonelOrgStructureSchema::isReady($pdo)) {
+            $allowedColumns = array_values(array_filter(
+                $allowedColumns,
+                static function (string $c): bool {
+                    return $c !== 'bolum_id' && $c !== 'birim_id' && $c !== 'pozisyon_id';
                 }
             ));
         }
@@ -881,6 +947,14 @@ class PersonellerController
             $joins .= "
             LEFT JOIN sgk_isverenler si ON si.id = p.sgk_isveren_id
             LEFT JOIN calisma_lokasyonlari cl ON cl.id = p.calisma_lokasyonu_id
+            ";
+        }
+        if (PersonelOrgStructureSchema::isReady($pdo)) {
+            $columns .= ', b.ad AS bolum_adi, bi.ad AS birim_adi, poz.ad AS pozisyon_adi';
+            $joins .= "
+            LEFT JOIN bolumler b ON b.id = p.bolum_id
+            LEFT JOIN birimler bi ON bi.id = p.birim_id
+            LEFT JOIN pozisyonlar poz ON poz.id = p.pozisyon_id
             ";
         }
 
@@ -986,7 +1060,16 @@ class PersonellerController
             'acil_durum_kisi' => $row['acil_durum_kisi'],
             'acil_durum_telefon' => $row['acil_durum_telefon'],
             'departman_id' => $row['departman_id'] !== null ? (int) $row['departman_id'] : null,
+            'bolum_id' => array_key_exists('bolum_id', $row) && $row['bolum_id'] !== null
+                ? (int) $row['bolum_id']
+                : null,
+            'birim_id' => array_key_exists('birim_id', $row) && $row['birim_id'] !== null
+                ? (int) $row['birim_id']
+                : null,
             'gorev_id' => $row['gorev_id'] !== null ? (int) $row['gorev_id'] : null,
+            'pozisyon_id' => array_key_exists('pozisyon_id', $row) && $row['pozisyon_id'] !== null
+                ? (int) $row['pozisyon_id']
+                : null,
             'personel_tipi_id' => $row['personel_tipi_id'] !== null ? (int) $row['personel_tipi_id'] : null,
             'bagli_amir_id' => $row['bagli_amir_id'] !== null ? (int) $row['bagli_amir_id'] : null,
             'sube_adi' => $row['sube_adi'],
@@ -995,7 +1078,10 @@ class PersonellerController
                 ? $row['calisma_lokasyonu_adi']
                 : null,
             'departman_adi' => $row['departman_adi'],
+            'bolum_adi' => array_key_exists('bolum_adi', $row) ? $row['bolum_adi'] : null,
+            'birim_adi' => array_key_exists('birim_adi', $row) ? $row['birim_adi'] : null,
             'gorev_adi' => $row['gorev_adi'],
+            'pozisyon_adi' => array_key_exists('pozisyon_adi', $row) ? $row['pozisyon_adi'] : null,
             'personel_tipi_adi' => $row['personel_tipi_adi'],
             'referans_adlari' => [
                 'sube' => $row['sube_adi'],
@@ -1004,7 +1090,10 @@ class PersonellerController
                     ? $row['calisma_lokasyonu_adi']
                     : null,
                 'departman' => $row['departman_adi'],
+                'bolum' => array_key_exists('bolum_adi', $row) ? $row['bolum_adi'] : null,
+                'birim' => array_key_exists('birim_adi', $row) ? $row['birim_adi'] : null,
                 'gorev' => $row['gorev_adi'],
+                'pozisyon' => array_key_exists('pozisyon_adi', $row) ? $row['pozisyon_adi'] : null,
                 'personel_tipi' => $row['personel_tipi_adi'],
             ],
             'ucret_tipi_id' => $ucretTipiId,

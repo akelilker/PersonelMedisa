@@ -115,9 +115,9 @@ test.describe("I2 Kayit modal viewport layout", () => {
     await kayitModal.locator('[name="create-acil-tel"]').fill("05327778899");
     await kayitModal.locator('[name="create-sicil"]').fill("E2E-I2-01");
     await kayitModal.locator('[name="create-ise-giris"]').fill("2026-06-15");
-    await kayitModal.getByRole("combobox", { name: "Bölüm" }).click();
+    await kayitModal.getByRole("combobox", { name: "Departman" }).click();
     await kayitModal.getByRole("option", { name: "Döşeme" }).click();
-    await kayitModal.getByRole("combobox", { name: "Görev / Unvan" }).click();
+    await kayitModal.getByRole("combobox", { name: "Unvan" }).click();
     await kayitModal.getByRole("option", { name: "Genel Müdür" }).click();
     await kayitModal.getByRole("combobox", { name: "Personel Tipi" }).click();
     await kayitModal.getByRole("option", { name: "Tam Zamanlı" }).click();

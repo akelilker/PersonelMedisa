@@ -58,7 +58,7 @@ test.describe("Kayit Surec Pozisyon", () => {
 
     const kayitModal = await openPozisyonForAyse(page);
 
-    await kayitModal.getByRole("combobox", { name: "Görev / Unvan" }).click();
+    await kayitModal.getByRole("combobox", { name: "Unvan" }).click();
     await kayitModal.locator("#pozisyon-gorev-panel").getByRole("button", { name: "Üretim Müdürü" }).click();
     await kayitModal.getByLabel("Geçerlilik Tarihi").fill("2026-08-01");
 
@@ -86,7 +86,7 @@ test.describe("Kayit Surec Pozisyon", () => {
     expect(postBody.personel_id).toBe(1);
     expect(postBody.baslangic_tarihi).toBe("2026-08-01");
 
-    await expect(kayitModal.getByRole("combobox", { name: "Görev / Unvan" })).toContainText("Üretim Müdürü");
+    await expect(kayitModal.getByRole("combobox", { name: "Unvan" })).toContainText("Üretim Müdürü");
 
     await kayitModal.getByRole("button", { name: "Kapat" }).click();
     await expect(kayitModal).toHaveCount(0);
@@ -104,7 +104,7 @@ test.describe("Kayit Surec Pozisyon", () => {
     await login(page, { username: "yonetici", password: "secret" });
     const kayitModal = await openPozisyonForAyse(page);
 
-    await kayitModal.getByRole("combobox", { name: "Bölüm" }).click();
+    await kayitModal.getByRole("combobox", { name: "Departman" }).click();
     await kayitModal.locator("#pozisyon-departman-panel").getByRole("button", { name: "Finans" }).click();
     await kayitModal.getByLabel("Geçerlilik Tarihi").fill("2026-08-03");
 
@@ -189,9 +189,9 @@ test.describe("Kayit Surec Pozisyon", () => {
     await login(page, { username: "yonetici", password: "secret" });
     const kayitModal = await openPozisyonForAyse(page);
 
-    await kayitModal.getByRole("combobox", { name: "Bölüm" }).click();
+    await kayitModal.getByRole("combobox", { name: "Departman" }).click();
     await kayitModal.locator("#pozisyon-departman-panel").getByRole("button", { name: "Finans" }).click();
-    await kayitModal.getByRole("combobox", { name: "Görev / Unvan" }).click();
+    await kayitModal.getByRole("combobox", { name: "Unvan" }).click();
     await kayitModal.locator("#pozisyon-gorev-panel").getByRole("button", { name: "Üretim Müdürü" }).click();
     await kayitModal.getByRole("combobox", { name: "Bağlı Amir" }).click();
     await kayitModal.locator("#pozisyon-bagli-amir-panel").getByRole("button", { name: "İkinci Amir" }).click();
@@ -282,8 +282,8 @@ test.describe("Kayit Surec Pozisyon", () => {
     await expect(kayitModal.getByRole("combobox", { name: "Personel" })).toContainText(/Ayşe Yılmaz/i);
     await kayitModal.getByRole("tab", { name: "Pozisyon" }).click();
     await expect(kayitModal.locator("form.surec-position-form")).toBeVisible();
-    await expect(kayitModal.getByRole("combobox", { name: "Bölüm" })).toContainText(/Döşeme|Doseme/i);
-    await expect(kayitModal.getByRole("combobox", { name: "Görev / Unvan" })).toContainText(/Genel Müdür|Genel Mudur/i);
+    await expect(kayitModal.getByRole("combobox", { name: "Departman" })).toContainText(/Döşeme|Doseme/i);
+    await expect(kayitModal.getByRole("combobox", { name: "Unvan" })).toContainText(/Genel Müdür|Genel Mudur/i);
     await expect(kayitModal.getByRole("combobox", { name: "Bağlı Amir" })).toContainText(/Demo Amir/i);
     await expect(kayitModal.getByRole("combobox", { name: "Çalışma Tipi" })).toContainText(/Tam Zamanlı|Tam Zamanli/i);
   });
@@ -293,7 +293,7 @@ test.describe("Kayit Surec Pozisyon", () => {
     await login(page, { username: "yonetici", password: "secret" });
 
     const kayitModal = await openPozisyonForAyse(page);
-    await kayitModal.getByRole("combobox", { name: "Görev / Unvan" }).click();
+    await kayitModal.getByRole("combobox", { name: "Unvan" }).click();
     await kayitModal.locator("#pozisyon-gorev-panel").getByRole("button", { name: "Üretim Müdürü" }).click();
     await kayitModal.getByLabel("Geçerlilik Tarihi").fill("2026-08-01");
 
@@ -344,7 +344,7 @@ test.describe("Kayit Surec Pozisyon", () => {
 
     await expect(personelCombo).toBeEnabled({ timeout: 5000 });
     await expect(personelCombo).toContainText(/Ayşe Yılmaz/i);
-    await expect(kayitModal.getByRole("combobox", { name: "Görev / Unvan" })).toContainText("Üretim Müdürü");
+    await expect(kayitModal.getByRole("combobox", { name: "Unvan" })).toContainText("Üretim Müdürü");
     expect(putCount).toBe(1);
     expect(postCount).toBe(1);
   });
@@ -362,7 +362,7 @@ test.describe("Kayit Surec Pozisyon", () => {
     await page.goto("/");
 
     const kayitModal = await openPozisyonForAyse(page);
-    await kayitModal.getByRole("combobox", { name: "Görev / Unvan" }).click();
+    await kayitModal.getByRole("combobox", { name: "Unvan" }).click();
     await kayitModal.locator("#pozisyon-gorev-panel").getByRole("button", { name: "Üretim Müdürü" }).click();
     await kayitModal.getByLabel("Geçerlilik Tarihi").fill("2026-08-01");
 
@@ -371,7 +371,7 @@ test.describe("Kayit Surec Pozisyon", () => {
     await expect(pozisyonKaydet).toHaveAttribute("form", "kayit-surec-pozisyon-form");
     await pozisyonKaydet.click();
 
-    await expect(kayitModal.getByRole("combobox", { name: "Görev / Unvan" })).toContainText("Üretim Müdürü");
+    await expect(kayitModal.getByRole("combobox", { name: "Unvan" })).toContainText("Üretim Müdürü");
     await kayitModal.getByRole("button", { name: "Kapat" }).click();
     await expect(kayitModal).toHaveCount(0);
 

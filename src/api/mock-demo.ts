@@ -8475,6 +8475,18 @@ export function resolveDemoApiResponse(
       return ok(demoState.gorevler);
     }
 
+    if (pathname === "/referans/bolumler") {
+      return ok([]);
+    }
+
+    if (pathname === "/referans/birimler") {
+      return ok([]);
+    }
+
+    if (pathname === "/referans/pozisyonlar") {
+      return ok([]);
+    }
+
     if (pathname === "/referans/personel-tipleri") {
       return ok([
         { id: 1, ad: "Tam Zamanlı" },

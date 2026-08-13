@@ -36,6 +36,9 @@ export type CreatePersonelPayload = {
   bagli_amir_id?: number;
   sgk_isveren_id?: number | null;
   calisma_lokasyonu_id?: number | null;
+  bolum_id?: number | null;
+  birim_id?: number | null;
+  pozisyon_id?: number | null;
   ucret_tipi_id?: number;
   net_maas_tutari?: number;
   maas_tutari?: number;
@@ -44,11 +47,14 @@ export type CreatePersonelPayload = {
 
 export type UpdatePersonelPayload = Omit<
   Partial<CreatePersonelPayload>,
-  "departman_id" | "gorev_id" | "bagli_amir_id"
+  "departman_id" | "gorev_id" | "bagli_amir_id" | "bolum_id" | "birim_id" | "pozisyon_id"
 > & {
   departman_id?: number | null;
   gorev_id?: number | null;
   bagli_amir_id?: number | null;
+  bolum_id?: number | null;
+  birim_id?: number | null;
+  pozisyon_id?: number | null;
   ucret_tipi_id?: number | null;
   net_maas_tutari?: number | null;
   maas_tutari?: number | null;
@@ -244,7 +250,28 @@ function normalizePersonel(data: unknown): Personel {
     acil_durum_kisi: readString(baseSources, "acil_durum_kisi"),
     acil_durum_telefon: readString(baseSources, "acil_durum_telefon"),
     departman_id: readNumber(baseSources, "departman_id"),
+    bolum_id: readNullableNumber(baseSources, "bolum_id", "bolumId"),
+    bolum_adi: readNullableString(
+      [...baseSources, ...referenceSources],
+      "bolum_adi",
+      "bolumAdi",
+      "bolum"
+    ),
+    birim_id: readNullableNumber(baseSources, "birim_id", "birimId"),
+    birim_adi: readNullableString(
+      [...baseSources, ...referenceSources],
+      "birim_adi",
+      "birimAdi",
+      "birim"
+    ),
     gorev_id: readNumber(baseSources, "gorev_id"),
+    pozisyon_id: readNullableNumber(baseSources, "pozisyon_id", "pozisyonId"),
+    pozisyon_adi: readNullableString(
+      [...baseSources, ...referenceSources],
+      "pozisyon_adi",
+      "pozisyonAdi",
+      "pozisyon"
+    ),
     personel_tipi_id: readNumber(baseSources, "personel_tipi_id"),
     bagli_amir_id: readNumber(baseSources, "bagli_amir_id"),
     sgk_isveren_id: readNullableNumber(baseSources, "sgk_isveren_id", "sgkIsverenId"),

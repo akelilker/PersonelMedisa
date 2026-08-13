@@ -4,9 +4,12 @@ import { getApiErrorMessage, shouldQueueOfflineMutation } from "../api/api-clien
 import { fetchPersonelDetail, updatePersonel } from "../api/personeller.api";
 import {
   fetchBagliAmirOptions,
+  fetchBirimOptions,
+  fetchBolumOptions,
   fetchDepartmanOptions,
   fetchGorevOptions,
   fetchPersonelTipiOptions,
+  fetchPozisyonOptions,
   fetchPrimKuraliOptions,
   fetchUcretTipiOptions
 } from "../api/referans.api";
@@ -78,7 +81,10 @@ const INITIAL_EDIT_PERSONEL_FORM: EditPersonelFormState = {
   soyad: "",
   telefon: "",
   departmanId: "",
+  bolumId: "",
+  birimId: "",
   gorevId: "",
+  pozisyonId: "",
   bagliAmirId: "",
   ucretTipiId: "",
   maasTutari: "",
@@ -418,7 +424,10 @@ function usePersonelDetailEdit(
     return (
       getCacheEntry<PersonelReferenceBundle>(dataCacheKeys.referansPersonel()) ?? {
         departmanOptions: [],
+        bolumOptions: [],
+        birimOptions: [],
         gorevOptions: [],
+        pozisyonOptions: [],
         personelTipiOptions: [],
         bagliAmirOptions: [],
         ucretTipiOptions: [],
@@ -449,14 +458,20 @@ function usePersonelDetailEdit(
           runDeduped(dataCacheKeys.referansPersonel(), async () => {
             const [
               departmanOptions,
+              bolumOptions,
+              birimOptions,
               gorevOptions,
+              pozisyonOptions,
               personelTipiOptions,
               bagliAmirOptions,
               ucretTipiOptions,
               primKuraliOptions
             ] = await Promise.all([
               fetchDepartmanOptions(),
+              fetchBolumOptions(),
+              fetchBirimOptions(),
               fetchGorevOptions(),
+              fetchPozisyonOptions(),
               fetchPersonelTipiOptions(),
               fetchBagliAmirOptions(),
               fetchUcretTipiOptions(),
@@ -464,7 +479,10 @@ function usePersonelDetailEdit(
             ]);
             return {
               departmanOptions,
+              bolumOptions,
+              birimOptions,
               gorevOptions,
+              pozisyonOptions,
               personelTipiOptions,
               bagliAmirOptions,
               ucretTipiOptions,
@@ -527,8 +545,39 @@ function usePersonelDetailEdit(
   }, [personel]);
 
   const handleEditDepartmanChange = useCallback((departmanId: string) => {
-    setEditForm((prev) => ({ ...prev, departmanId }));
-  }, []);
+    setEditForm((prev) => {
+      const nextBolumId =
+        prev.bolumId &&
+        personelRefs.bolumOptions.some(
+          (opt) => String(opt.id) === prev.bolumId && String(opt.parentId ?? "") === departmanId
+        )
+          ? prev.bolumId
+          : "";
+      const nextBirimId =
+        nextBolumId &&
+        prev.birimId &&
+        personelRefs.birimOptions.some(
+          (opt) => String(opt.id) === prev.birimId && String(opt.parentId ?? "") === nextBolumId
+        )
+          ? prev.birimId
+          : "";
+      return { ...prev, departmanId, bolumId: nextBolumId, birimId: nextBirimId };
+    });
+  }, [personelRefs.birimOptions, personelRefs.bolumOptions]);
+
+  const handleEditBolumChange = useCallback((bolumId: string) => {
+    setEditForm((prev) => {
+      const nextBirimId =
+        bolumId &&
+        prev.birimId &&
+        personelRefs.birimOptions.some(
+          (opt) => String(opt.id) === prev.birimId && String(opt.parentId ?? "") === bolumId
+        )
+          ? prev.birimId
+          : "";
+      return { ...prev, bolumId, birimId: nextBirimId };
+    });
+  }, [personelRefs.birimOptions]);
 
   const handleEditBagliAmirChange = useCallback((bagliAmirId: string) => {
     setEditForm((prev) => ({ ...prev, bagliAmirId }));
@@ -574,7 +623,12 @@ function usePersonelDetailEdit(
         return;
       }
 
-      const body = buildPersonelUpdatePayload(editForm, hasLifecycleDiff);
+      const body = buildPersonelUpdatePayload(editForm, hasLifecycleDiff, {
+        includeOrgStructureFields:
+          personelRefs.bolumOptions.length > 0 ||
+          personelRefs.birimOptions.length > 0 ||
+          personelRefs.pozisyonOptions.length > 0
+      });
 
       const lifecycleSnap = snapshotFromLifecycleForm(pickLifecycleFormFields(editForm));
       const optimistic: Personel = {
@@ -689,6 +743,7 @@ function usePersonelDetailEdit(
     editForm,
     setEditForm,
     handleEditDepartmanChange,
+    handleEditBolumChange,
     handleEditBagliAmirChange,
     editBagliAmirGuidance,
     discardEdit,

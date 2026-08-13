@@ -299,7 +299,7 @@ export function PersonellerPage() {
                 {departmanFilterOptions.length > 0 ? (
                   <FormField
                     as="select"
-                    label="Bölüm"
+                    label="Departman"
                     name="personel-filter-departman"
                     value={draft.departmanId}
                     onChange={setDraftDepartmanId}
@@ -308,7 +308,7 @@ export function PersonellerPage() {
                   />
                 ) : (
                   <FormField
-                    label="Bölüm"
+                    label="Departman"
                     name="personel-filter-departman-num"
                     type="number"
                     min={1}
@@ -413,7 +413,7 @@ export function PersonellerPage() {
               <tr>
                 <th scope="col">Ad Soyad</th>
                 <th scope="col">Bölüm</th>
-                <th scope="col">Görev / Unvan</th>
+                <th scope="col">Unvan</th>
                 <th scope="col">Durum</th>
                 <th scope="col">Telefon</th>
                 <th scope="col" className="personeller-table-col-actions">

@@ -21,8 +21,11 @@ import {
 import {
   fetchBagliAmirOptions,
   fetchBildirimTuruOptions,
+  fetchBirimOptions,
+  fetchBolumOptions,
   fetchDepartmanOptions,
   fetchGorevOptions,
+  fetchPozisyonOptions,
   fetchPrimKuraliOptions,
   fetchPersonelTipiOptions,
   fetchUcretTipiOptions,
@@ -388,7 +391,10 @@ function resolveFallbackForKey(key: string): unknown {
   if (key.startsWith("referans:personel-bundle")) {
     return {
       departmanOptions: [],
+      bolumOptions: [],
+      birimOptions: [],
       gorevOptions: [],
+      pozisyonOptions: [],
       personelTipiOptions: [],
       bagliAmirOptions: [],
       ucretTipiOptions: [],
@@ -1345,7 +1351,10 @@ export async function loadDataFromServer(options?: LoadDataFromServerOptions): P
         try {
           const bundle: PersonelReferenceBundle = {
             departmanOptions: await fetchDepartmanOptions(),
+            bolumOptions: await fetchBolumOptions(),
+            birimOptions: await fetchBirimOptions(),
             gorevOptions: await fetchGorevOptions(),
+            pozisyonOptions: await fetchPozisyonOptions(),
             personelTipiOptions: await fetchPersonelTipiOptions(),
             bagliAmirOptions: await fetchBagliAmirOptions(),
             ucretTipiOptions: await fetchUcretTipiOptions(),

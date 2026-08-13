@@ -104,10 +104,53 @@ export function PersonelInlineEditForm({
         ) : (
           <p className="personel-create-error">Departman listesi yüklenemedi.</p>
         )}
+        {personelRefs.bolumOptions.length > 0 ? (
+          <FormField
+            as="select"
+            label="Bölüm"
+            name="edit-bolum"
+            value={editForm.bolumId}
+            onChange={(value) => {
+              const nextBirimId =
+                value &&
+                editForm.birimId &&
+                personelRefs.birimOptions.some(
+                  (opt) => String(opt.id) === editForm.birimId && String(opt.parentId ?? "") === value
+                )
+                  ? editForm.birimId
+                  : "";
+              setEditForm((prev) => ({ ...prev, bolumId: value, birimId: nextBirimId }));
+            }}
+            placeholderOption={{ value: "", label: "Seçiniz" }}
+            selectOptions={idOptionsToSelectOptions(
+              personelRefs.bolumOptions.filter(
+                (opt) =>
+                  !editForm.departmanId || String(opt.parentId ?? "") === editForm.departmanId
+              )
+            )}
+            disabled={!editForm.departmanId}
+          />
+        ) : null}
+        {personelRefs.birimOptions.length > 0 ? (
+          <FormField
+            as="select"
+            label="Birim"
+            name="edit-birim"
+            value={editForm.birimId}
+            onChange={(value) => setEditForm((prev) => ({ ...prev, birimId: value }))}
+            placeholderOption={{ value: "", label: "Seçiniz" }}
+            selectOptions={idOptionsToSelectOptions(
+              personelRefs.birimOptions.filter(
+                (opt) => !editForm.bolumId || String(opt.parentId ?? "") === editForm.bolumId
+              )
+            )}
+            disabled={!editForm.bolumId}
+          />
+        ) : null}
         {personelRefs.gorevOptions.length > 0 ? (
           <FormField
             as="select"
-            label="Görev / Unvan"
+            label="Unvan"
             name="edit-gorev"
             value={editForm.gorevId}
             onChange={(value) => setEditForm((prev) => ({ ...prev, gorevId: value }))}
@@ -115,8 +158,19 @@ export function PersonelInlineEditForm({
             selectOptions={idOptionsToSelectOptions(personelRefs.gorevOptions)}
           />
         ) : (
-          <p className="personel-create-error">Görev / Unvan listesi yüklenemedi.</p>
+          <p className="personel-create-error">Unvan listesi yüklenemedi.</p>
         )}
+        {personelRefs.pozisyonOptions.length > 0 ? (
+          <FormField
+            as="select"
+            label="Pozisyon"
+            name="edit-pozisyon"
+            value={editForm.pozisyonId}
+            onChange={(value) => setEditForm((prev) => ({ ...prev, pozisyonId: value }))}
+            placeholderOption={{ value: "", label: "Seçiniz" }}
+            selectOptions={idOptionsToSelectOptions(personelRefs.pozisyonOptions)}
+          />
+        ) : null}
         <p
           className="personel-form-note personel-form-note--info"
           data-testid="personel-edit-ucret-yonlendirme"

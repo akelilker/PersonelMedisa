@@ -17,9 +17,11 @@ final class PersonelCreateService
      */
     public static function insertPersonel(PDO $pdo, array $payload): int
     {
-        // Shared owner must not silently drop explicit org writes on pre-064 schema.
+        // Shared owner must not silently drop explicit org writes on pre-064 / pre-065 schema.
         PersonelOrgLocationSchema::assertReadyForOrgWrite($pdo, $payload);
+        PersonelOrgStructureSchema::assertReadyForOrgStructureWrite($pdo, $payload);
         $orgReady = PersonelOrgLocationSchema::isReady($pdo);
+        $orgStructReady = PersonelOrgStructureSchema::isReady($pdo);
         $cols = [
             'tc_kimlik_no', 'ad', 'soyad', 'dogum_tarihi', 'telefon', 'acil_durum_kisi', 'acil_durum_telefon',
             'sicil_no', 'ise_giris_tarihi', 'sube_id',
@@ -46,12 +48,24 @@ final class PersonelCreateService
                 ? $payload['calisma_lokasyonu_id']
                 : null;
         }
+        $cols[] = 'departman_id';
+        $params['departman_id'] = $payload['departman_id'];
+        if ($orgStructReady) {
+            $cols[] = 'bolum_id';
+            $cols[] = 'birim_id';
+            $params['bolum_id'] = array_key_exists('bolum_id', $payload) ? $payload['bolum_id'] : null;
+            $params['birim_id'] = array_key_exists('birim_id', $payload) ? $payload['birim_id'] : null;
+        }
+        $cols[] = 'gorev_id';
+        $params['gorev_id'] = $payload['gorev_id'];
+        if ($orgStructReady) {
+            $cols[] = 'pozisyon_id';
+            $params['pozisyon_id'] = array_key_exists('pozisyon_id', $payload) ? $payload['pozisyon_id'] : null;
+        }
         $cols = array_merge($cols, [
-            'departman_id', 'gorev_id', 'personel_tipi_id',
+            'personel_tipi_id',
             'bagli_amir_id', 'aktif_durum', 'dogum_yeri', 'kan_grubu', 'ucret_tipi_id', 'maas_tutari', 'prim_kurali_id',
         ]);
-        $params['departman_id'] = $payload['departman_id'];
-        $params['gorev_id'] = $payload['gorev_id'];
         $params['personel_tipi_id'] = $payload['personel_tipi_id'];
         $params['bagli_amir_id'] = $payload['bagli_amir_id'];
         $params['aktif_durum'] = $payload['aktif_durum'];
@@ -76,6 +90,7 @@ final class PersonelCreateService
     public static function validateCreateReferences(PDO $pdo, array $payload): void
     {
         PersonelOrgLocationSchema::assertReadyForOrgWrite($pdo, $payload);
+        PersonelOrgStructureSchema::assertReadyForOrgStructureWrite($pdo, $payload);
 
         if (!self::existsActiveRecord($pdo, 'subeler', (int) $payload['sube_id'])) {
             throw new PersonelValidationException('sube_id', 'Gecersiz sube.');
@@ -100,6 +115,29 @@ final class PersonelCreateService
                 throw new PersonelValidationException('calisma_lokasyonu_id', 'Gecersiz calisma lokasyonu.');
             }
         }
+
+        if (array_key_exists('bolum_id', $payload) && $payload['bolum_id'] !== null) {
+            if (!PersonelOrgStructureSchema::existsActiveBolum($pdo, (int) $payload['bolum_id'])) {
+                throw new PersonelValidationException('bolum_id', 'Gecersiz bolum.');
+            }
+        }
+        if (array_key_exists('birim_id', $payload) && $payload['birim_id'] !== null) {
+            if (!PersonelOrgStructureSchema::existsActiveBirim($pdo, (int) $payload['birim_id'])) {
+                throw new PersonelValidationException('birim_id', 'Gecersiz birim.');
+            }
+        }
+        if (array_key_exists('pozisyon_id', $payload) && $payload['pozisyon_id'] !== null) {
+            if (!PersonelOrgStructureSchema::existsActivePozisyon($pdo, (int) $payload['pozisyon_id'])) {
+                throw new PersonelValidationException('pozisyon_id', 'Gecersiz pozisyon.');
+            }
+        }
+
+        PersonelOrgStructureSchema::assertHierarchyConsistent($pdo, [
+            'departman_id' => $payload['departman_id'] ?? null,
+            'bolum_id' => $payload['bolum_id'] ?? null,
+            'birim_id' => $payload['birim_id'] ?? null,
+            'pozisyon_id' => $payload['pozisyon_id'] ?? null,
+        ]);
 
         $bagliAmirId = $payload['bagli_amir_id'] ?? null;
         if ($bagliAmirId !== null) {

@@ -180,10 +180,10 @@ Aşağıdakiler CURRENT MAIN’de bozulmuş değilse OPEN yapılmaz:
 | Domain | Organizasyon / SGK |
 | Code/schema | Migration `064` — `sgk_isverenler`, `calisma_lokasyonlari`; `personeller` nullable FKs; `sube_id` korunur |
 | Pre-064 | Explicit new-field write → `409 ORG_LOCATION_SCHEMA_NOT_READY` |
-| Production | tip **064** (`118`); schema applied; real org seed **NO**; personnel org mapping **NO** |
-| Kanıt | `117-final-code-gap-pack5.md`; Pack5 MariaDB B1–B11; rollout `118` |
+| Production | tip **064** (`118`); schema applied; SGK + verified location refs seeded (`119`); personnel org mapping **NO** |
+| Kanıt | `117-final-code-gap-pack5.md`; Pack5 MariaDB B1–B11; rollout `118`; org seed `119` |
 | Acceptance (code) | Üç kavram bağımsız persist; SubeScope `sube_id` |
-| Remaining ops | Real org seed = `MG-OPS-ORG-001` USER_GATED; personnel mapping/backfill ayrı kapı |
+| Remaining ops | Personnel mapping apply = `USER_GATED` (`MG-ORG-LOC-001` / preview in `119`); bare `Merkez` company decision + incomplete locked branch set tracked under `MG-OPS-ORG-001` |
 
 ---
 
@@ -238,9 +238,10 @@ Aşağıdakiler CURRENT MAIN’de bozulmuş değilse OPEN yapılmaz:
 | Domain | Personel org model |
 | Mevcut | Native: `departman`, `gorev`, `personel_tipi`, `sube`, `bagli_amir_id`. Bölüm / birim / pozisyon native yok |
 | Soru | Bu üç seviye native canonical org alanı mı tutulacak, yoksa mevcut Departman / Görev / Personel Tipi mapping yeterli mi? |
-| Not | Çalışma **lokasyonu** kilitli gereksinim → `MG-ORG-LOC-001` OPS_ROLLOUT (USER_GATED; schema production-ready `118`). Bu ID lokasyonu kapsamaz. |
-| Kanıt | `001_initial_schema.sql`; `src/types/personel.ts`; import columns |
-| Acceptance | Yazılı karar; gerekirse sonra CODE_GAP’e çevrilir |
+| Agent recommendation (`119`) | **OPTION_B_NATIVE_FIELDS_REQUIRED** — source Departman/Bölüm/Birim/Unvan/Pozisyon distinct; collapsing loses hierarchy. **Not approved** until user decision. |
+| Not | Çalışma **lokasyonu** kilitli gereksinim → refs seeded (`119`); personnel mapping still gated. Bu ID lokasyonu kapsamaz. |
+| Kanıt | `001_initial_schema.sql`; `src/types/personel.ts`; import columns; private HR source aggregates in `119` |
+| Acceptance | Yazılı kullanıcı onayı; gerekirse sonra CODE_GAP’e çevrilir |
 
 ### MG-IMPORT-MAP-001 — Kaynak Excel → import contract eşlemesi
 
@@ -249,9 +250,10 @@ Aşağıdakiler CURRENT MAIN’de bozulmuş değilse OPEN yapılmaz:
 | Statü | **BUSINESS_DECISION_REQUIRED** |
 | Öncelik | **P1** |
 | Domain | Personel import |
-| Sorular | Kaynak sıra/no alanı sicil mi? Ad Soyad split kuralı? Departman→Departman / Unvan→Görev / Grup→Personel Tipi onay mı? Eksik şirket listeleri nasıl tamamlanır? |
+| Sorular | Kaynak sıra/no alanı sicil mi? Ad Soyad split kuralı? Departman→Departman / Unvan→Görev / Grup→Personel Tipi onay mı? Eksik şirket listeleri nasıl tamamlanır? `SGK Dosyası=Diğer` nasıl çözülür? Bare production `Merkez` hangi SGK işverenine ait? |
+| Progress (`119`) | Source matrix drafted (private HR workbooks). Optional `sgk_isveren` / `calisma_lokasyonu` columns now have production reference rows. Core REQUIRED contract **not** weakened. Open decisions remain. |
 | Yasak | Validator gevşetme; sicil uydurma; güvenilmez auto-split; telefon/doğum uydurma; ücret/SGK’yı master import’a zorlama; PII’nin public repo’ya yazılması |
-| Kanıt contract | `PersonelImportDryRunService` REQUIRED: tc, sicil, ad, soyad, dogum_tarihi, telefon, ise_giris, sube, departman, gorev, personel_tipi; OPTIONAL: dogum_yeri, kan_grubu, acil_*; FORBIDDEN: ücret/SGK/devir kolonları |
+| Kanıt contract | `PersonelImportDryRunService` REQUIRED: tc, sicil, ad, soyad, dogum_tarihi, telefon, ise_giris, sube, departman, gorev, personel_tipi; OPTIONAL: dogum_yeri, kan_grubu, acil_*, sgk_isveren, calisma_lokasyonu; FORBIDDEN: ücret/SGK payroll/devir kolonları |
 
 ---
 
@@ -261,7 +263,7 @@ Aşağıdakiler CURRENT MAIN’de bozulmuş değilse OPEN yapılmaz:
 | --- | --- | --- | --- | --- | --- |
 | MG-OPS-PERSONEL-001 | Gerçek personel import | P0 | `USER_GATED` | Onay olmadan import yok; `REAL_PERSONNEL_IMPORTED=NO` | Ops + kullanıcı |
 | MG-IMPORT-DATA-001 | Kaynak personel dataset completion | P1 | `USER_GATED_DATA_COMPLETION` | Required alanlar kaynakta tamamlanır; validator gevşetilmez; veri uydurulmaz; exact tallies public repo dışı | Ops + İK |
-| MG-OPS-ORG-001 | Gerçek org/şube/referans rollout | P0 | `USER_GATED` | NOT_YET | Ops |
+| MG-OPS-ORG-001 | Gerçek org/şube/referans rollout | P0 | `USER_GATED` | **PARTIAL** — SGK 3 + verified locations 7 seeded (`119`); remaining: bare `Merkez` company decision; locked system-branch set incomplete in prod; personnel mapping gated | Ops |
 | MG-OPS-BIND-001 | PERSONEL binding gerçek rollout | P1 | `USER_GATED` | Schema `056` var; rollout NOT_STARTED | Ops / İK |
 | MG-OPS-QR-001 | Gerçek çalışan QR rollout | P1 | `USER_GATED` | Pipeline CLOSED; employee rollout NOT_STARTED | Ops |
 | MG-OPS-SGK-CAT-001 | SGK resmi katalog / DOGRULANMIS_TAM / şirket politikası | P0 | `VERIFY_REQUIRED` | Code fail-closed; prod state repo’dan doğrulanmaz | Ops + `94`/`95` |
@@ -332,10 +334,10 @@ DİĞER: Şenay Mobilya
 
 ```text
 MG-ORG-MODEL-001 (CLOSED — karar kilitli)
-  → MG-ORG-LOC-001 (OPS_ROLLOUT — schema production-ready `064`/`118`; real seed USER_GATED)
-  → MG-ORG-ATTR-001 (BUSINESS_DECISION_REQUIRED — bölüm/birim/pozisyon)
-  → MG-OPS-ORG-001 (referans seed, USER_GATED)
-  → MG-IMPORT-MAP-001 (BUSINESS_DECISION_REQUIRED)
+  → MG-ORG-LOC-001 (OPS_ROLLOUT — schema `064`/`118`; refs seeded `119`; personnel mapping USER_GATED)
+  → MG-ORG-ATTR-001 (BUSINESS_DECISION_REQUIRED — bölüm/birim/pozisyon; OPTION_B recommended in `119`)
+  → MG-OPS-ORG-001 (OPS_ROLLOUT PARTIAL — SGK+verified locations seeded `119`; branch/company decisions remain)
+  → MG-IMPORT-MAP-001 (BUSINESS_DECISION_REQUIRED — matrix in `119`)
   → MG-IMPORT-DATA-001 (OPS_ROLLOUT — USER_GATED_DATA_COMPLETION)
   → MG-OPS-PERSONEL-001 (real personnel import, USER_GATED)
   → MG-OPS-BIND-001 → MG-OPS-QR-001
@@ -370,7 +372,7 @@ Import contract (kod, değişmedi):
 3. Code P1: `MG-OT-YEAR-PATH-001` (policy sonrası veya tutarlılık fix)
 4. Ops P1: `MG-SZ-6M-001` — **OPS_ROLLOUT** / `USER_GATED` (schema `061`/`062` production-ready `118`; İK ops follow-up açık)
 5. Ops P1: `MG-RET-PHYS-001` — **OPS_ROLLOUT** / `USER_GATED` (schema `059`/`060`/`062` production-ready `118`; feature enable + real destroy açık)
-6. Ops P1: `MG-ORG-LOC-001` — **OPS_ROLLOUT** / `USER_GATED` (schema `064` production-ready `118`; real org seed / mapping açık)
+6. Ops P1: `MG-ORG-LOC-001` — **OPS_ROLLOUT** / `USER_GATED` (schema `064`/`118`; refs seeded `119`; personnel mapping açık)
 7. Ops: UBGT seed, SGK catalog, org seed, dataset completion, personel import, binding, QR employee
 8. Defer pack: QR correction UX, I13 fields, ENUM shrink, payroll self-view, pay outputs
 
@@ -433,7 +435,7 @@ Destroy eligibility: Pack 3C (`114`) — **15/15 typed handlers**; SERBEST used-
 **OPS_ROLLOUT (code closed, prod gated):**
 - `MG-RET-PHYS-001` — Pack 4B code + schema production-ready (`116`/`118`); feature enable + real destroy `USER_GATED`
 - `MG-SZ-6M-001` — Pack 4B ops surface (`116`); allocation schema production-ready (`118`); İK follow-up `USER_GATED`
-- `MG-ORG-LOC-001` — Pack5 schema production-ready (`117`/`118`); real org seed / personnel mapping `USER_GATED`
+- `MG-ORG-LOC-001` — Pack5 schema production-ready (`117`/`118`); refs seeded (`119`); personnel mapping `USER_GATED`
 
 P2 BUSINESS (`MG-ORG-ATTR`, `MG-ZORUNLU`) final completion için açık kalabilir ama CODE_GAP değildir; karar sonrası gerekirse CODE_GAP’e çevrilir.
 

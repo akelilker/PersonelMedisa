@@ -18,7 +18,8 @@ Her registry kaydı **tek** zorunlu statü taşır: `CLOSED` · `CODE_GAP` · `B
 - **Master closure audit:** 2026-08-12 (`chore/master-closure-audit`); classification hardening aynı PR’da
 - **Retention Pack 2–4B:** physical destruction **OPS_ROLLOUT** (`MG-RET-PHYS-001` / `112`+`113`+`114`+`115`+`116` + `118`); schema `059`/`060`/`062` production-ready; feature flag default **OFF**; real destruction **NO**
 - **Serbest Zaman Pack 4B:** allocation-aware destroy + 6M deadline ops surface (`061`/`062` + `116` + `118`); **OPS_ROLLOUT** (`MG-SZ-6M-001`); production schema rollout **COMPLETE**; ops follow-up `USER_GATED`
-- **Pack5 Final Code Gap:** rolling OT policy + org location schema (`063`/`064` + `117` + `118`); `MG-OT-YEAR-POL/PATH` CLOSED; `MG-ORG-LOC-001` OPS_ROLLOUT USER_GATED (schema production-ready; real seed/mapping still gated)
+- **Pack5 Final Code Gap:** rolling OT policy + org location schema (`063`/`064` + `117` + `118`); `MG-OT-YEAR-POL/PATH` CLOSED; `MG-ORG-LOC-001` OPS_ROLLOUT USER_GATED (schema production-ready; personnel mapping still gated)
+- **Org reference seed (`119`, 2026-08-13):** SGK employers `MEDISA`/`KARYAPI`/`SENAY_MOBILYA` + 7 verified work locations seeded; personnel org FK mapping **not** applied
 
 Görsel sistem çalışmaları mevcut component/owner içinde yapılabilir. Yeni domain özelliği freeze kapısından geçer.
 
@@ -30,7 +31,7 @@ Görsel sistem çalışmaları mevcut component/owner içinde yapılabilir. Yeni
 | `CODE_MIGRATION_TIP` | **064** | — |
 | `S3F` | **CLOSED_PRODUCTION** | — |
 | `QR_PIPELINE` | **S3C–S3F CLOSED** | — |
-| `REAL_REFERENCE_DATA` | NOT_YET_ROLLED_OUT | `USER_GATED` |
+| `REAL_REFERENCE_DATA` | **PARTIAL** — SGK employers + verified work locations seeded (`119`); personnel mapping still gated | `USER_GATED` |
 | `REAL_PERSONNEL_DATASET` | USER_GATED | `NO_PII_COMMITTED` |
 | `REAL_PERSONNEL_IMPORTED` | **NO** | `USER_GATED` |
 | `SOURCE_DATA_REQUIRES_COMPLETION` | yes | ops details outside public repo |
@@ -47,14 +48,17 @@ Görsel sistem çalışmaları mevcut component/owner içinde yapılabilir. Yeni
 | `UBGT_AUTHORITATIVE_CALENDAR` | **OPS_ROLLOUT** (`MG-OPS-UBGT-001`) | `USER_GATED` |
 | `SGK_OFFICIAL_CATALOG_PROD` | **OPS_ROLLOUT** (`MG-OPS-SGK-CAT-001`) | `VERIFY_REQUIRED` |
 | `ORG_BUSINESS_MODEL` | **CLOSED** (`MG-ORG-MODEL-001`) | karar kilitli 2026-08-12 |
-| `ORG_LOCATION_SCHEMA` | **OPS_ROLLOUT** (`MG-ORG-LOC-001`) | schema production-ready (`064` via `118`); real org seed / personnel mapping `USER_GATED` |
+| `ORG_LOCATION_SCHEMA` | **OPS_ROLLOUT** (`MG-ORG-LOC-001`) | schema production-ready (`064` via `118`); SGK + verified location refs seeded (`119`); personnel mapping `USER_GATED` |
+| `SGK_EMPLOYER_REAL_REFERENCE` | **PRODUCTION_READY** | codes `MEDISA`/`KARYAPI`/`SENAY_MOBILYA` (`119`) |
+| `WORK_LOCATION_REAL_REFERENCE` | **PRODUCTION_READY** | 7 verified location codes seeded (`119`) |
 | `ORG_ATTRIBUTES_BOLUM_BIRIM_POZISYON` | **BUSINESS_DECISION_REQUIRED** (`MG-ORG-ATTR-001`) | native mi / mapping yeterli mi? |
 | `CANONICAL_DOC_STALE` | **0** | historical snapshots preserved, not backlog |
 
 ## Doğrulanmış teknik temel
 
-- `main` / `origin/main` Pack5 merge baseline: `8b5a5955080bd2dfe21569480154ac4a76d5d199` (rollout docs: `118`).
+- `main` / `origin/main` canonical: `d88fa7650a92b23dcbf6739b24fa0a3f5d8e9a4b` (docs `118` merge; org seed evidence `119`).
 - Migration tip (code + production): **064** (`064_personel_org_location_model.sql` ucu; production apply `059`–`064` tamam — `118`).
+- Org references: `sgk_isverenler` = 3, `calisma_lokasyonlari` = 7 (verified); existing personnel org FKs remain NULL until mapping gate (`119`).
 - SGK, şirket politikası kanıtı, bordro preflight, personel importu, revizyon, dual-control, retention request/approve/evaluate/execute (flag OFF), QR S3C–S3F owner’ları mevcut ve fail-closed çalışır.
 - PERSONEL self-service: `/me` puantaj / yıllık izin / FM / QR yüzeyleri; maaş/bordro self-view **OUT_OF_SCOPE** (S3A).
 - Smoke/test personeller korunur; gerçek personel dataset’i **kullanıcı onayı olmadan import edilmez**.
@@ -107,6 +111,7 @@ Gerçek personel importu, SGK resmi katalog onayı, UBGT seed ve physical destru
 - `docs/guncel/115`: Pack 4A historical snapshot.
 - `docs/guncel/116`: Pack 4B code closure evidence.
 - `docs/guncel/118`: Production migration rollout `059`→`064` evidence (tip **064**).
+- `docs/guncel/119`: Org reference seed evidence (SGK employers + verified work locations; mapping preview-only).
 - `.tmp-ops/**`: yerel tarihsel ops çıktısı; güncel backlog sayılmaz.
 - Eski S-numaralı checkpoint’ler yalnız ait oldukları commit/dönem için kanıttır.
 

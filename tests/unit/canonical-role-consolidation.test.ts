@@ -323,7 +323,7 @@ describe("S1 canonical role consolidation", () => {
     expect(migrations).toContain("053_retention_legal_hold_arsiv.sql");
     expect(migrations).toContain("054_canonical_role_consolidation.sql");
     expect(migrations).toContain("055_yillik_izin_hak_duzeltmeleri.sql");
-    expect(migrations.at(-1)).toBe("061_serbest_zaman_kullanim_tahsisleri.sql");
+    expect(migrations.at(-1)).toBe("062_serbest_zaman_retention_destroy_gate.sql");
 
     const sql = readFileSync(MIG_054, "utf8");
     expect(sql).toContain("PERSONEL");

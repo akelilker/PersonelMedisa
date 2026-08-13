@@ -9,7 +9,7 @@ use PDO;
 use RuntimeException;
 
 /**
- * Transaction-scoped, retention-only DELETE gate for immutable BORDRO/SGK tables.
+ * Transaction-scoped, retention-only DELETE gate for immutable BORDRO/SGK/SERBEST tables.
  *
  * Opened only by PhysicalDestructionService after feature flag + eligibility + PREPARED evidence.
  * Triggers allow DELETE solely when CONNECTION_ID() has an open gate tied to PREPARED execution.
@@ -27,6 +27,7 @@ final class RetentionPhysicalDestroyGate
         return [
             RetentionCategories::BORDRO,
             RetentionCategories::SGK_EKSIK_GUN,
+            RetentionCategories::SERBEST_ZAMAN,
         ];
     }
 

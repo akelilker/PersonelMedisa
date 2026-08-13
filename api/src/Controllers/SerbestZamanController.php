@@ -13,6 +13,7 @@ use Medisa\Api\Scope\SubeScope;
 use Medisa\Api\Services\Payroll\PayrollComplianceGuard;
 use Medisa\Api\Services\PuantajDonemKilidiService;
 use Medisa\Api\Services\SerbestZaman\SerbestZamanAllocationService;
+use Medisa\Api\Services\SerbestZaman\SerbestZamanDeadlineService;
 use PDO;
 use PDOException;
 use RuntimeException;
@@ -22,7 +23,8 @@ use Throwable;
  * Serbest zaman event store owner (S79-D).
  *
  * Permissions (existing RolePermissions — no new keys):
- * - GET → puantaj.view
+ * - GET events/bakiye → puantaj.view
+ * - GET deadline-takip → raporlar.view (ops/İK surface)
  * - POST writes → puantaj.muhurle
  *
  * Period lock is NOT a write blocker; donem_* columns are audit metadata only.
@@ -144,6 +146,140 @@ class SerbestZamanController
             }
         }
         JsonResponse::success($bakiye);
+    }
+
+    /**
+     * Pack 4B: read-only 6-month deadline / ops follow-up surface.
+     * Permission: raporlar.view. SubeScope canonical. No write side effects.
+     */
+    public static function deadlineTakip(Request $request): void
+    {
+        $user = AuthMiddleware::authenticate($request, true);
+        RolePermissions::assert($user, 'raporlar.view');
+
+        $referans = $request->getQuery('referans_tarih');
+        if ($referans !== null && $referans !== '') {
+            if (!is_string($referans) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', trim($referans))) {
+                JsonResponse::badRequest('referans_tarih YYYY-MM-DD formatinda olmalidir.', 'INVALID_QUERY', 'referans_tarih');
+            }
+            $referans = trim($referans);
+        } else {
+            $referans = date('Y-m-d');
+        }
+
+        $personelIdFilter = null;
+        $rawPersonel = $request->getQuery('personel_id');
+        if ($rawPersonel !== null && $rawPersonel !== '') {
+            $personelIdFilter = self::parsePositiveInt($rawPersonel, 'personel_id', true);
+        }
+
+        $durumFilter = null;
+        $rawDurum = $request->getQuery('durum');
+        if ($rawDurum !== null && $rawDurum !== '') {
+            $durumFilter = strtoupper(trim((string) $rawDurum));
+            $allowed = [
+                SerbestZamanDeadlineService::DEADLINE_NORMAL,
+                SerbestZamanDeadlineService::DEADLINE_YAKLASIYOR,
+                SerbestZamanDeadlineService::DEADLINE_SURESI_DOLDU,
+                SerbestZamanDeadlineService::DEADLINE_ALLOCATION_UNRESOLVED,
+            ];
+            if (!in_array($durumFilter, $allowed, true)) {
+                JsonResponse::badRequest('durum gecersiz.', 'INVALID_QUERY', 'durum');
+            }
+        }
+
+        $page = 1;
+        $rawPage = $request->getQuery('page');
+        if ($rawPage !== null && $rawPage !== '') {
+            $page = self::parsePositiveInt($rawPage, 'page', true);
+        }
+        $limit = 25;
+        $rawLimit = $request->getQuery('limit');
+        if ($rawLimit !== null && $rawLimit !== '') {
+            $limit = self::parsePositiveInt($rawLimit, 'limit', true);
+            if ($limit > 100) {
+                $limit = 100;
+            }
+        }
+
+        $pdo = Connection::get();
+        self::assertSchemaReady($pdo);
+
+        $scope = SubeScope::resolveScope($user, $request);
+        $allowedSubeIds = SubeScope::allowedSubeIds($user);
+
+        $where = ['1=1'];
+        $params = [];
+        if ($personelIdFilter !== null) {
+            $where[] = 'p.id = :pid';
+            $params['pid'] = $personelIdFilter;
+        }
+        SubeScope::appendSubeFilter($where, $params, $scope, $allowedSubeIds, 'p.sube_id', 'sz_deadline');
+        $whereSql = implode(' AND ', $where);
+
+        $sql = "SELECT p.id, CONCAT(p.ad, ' ', p.soyad) AS ad_soyad, p.sicil_no, p.sube_id,
+                       s.ad AS sube_ad, d.ad AS bolum_ad
+                FROM personeller p
+                LEFT JOIN subeler s ON s.id = p.sube_id
+                LEFT JOIN departmanlar d ON d.id = p.departman_id
+                WHERE {$whereSql}
+                ORDER BY p.id ASC";
+
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+        $personeller = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+        $allRows = [];
+        foreach ($personeller as $personel) {
+            $pid = (int) $personel['id'];
+            if ($personelIdFilter !== null) {
+                SubeScope::assertPersonelAccess($user, $request, (int) $personel['sube_id']);
+            }
+            $events = self::loadPersonelEvents($pdo, $pid);
+            $rows = SerbestZamanDeadlineService::projectPersonelDeadlineRows(
+                $pdo,
+                $events,
+                $pid,
+                $referans,
+                [
+                    'ad_soyad' => (string) ($personel['ad_soyad'] ?? ''),
+                    'sicil_no' => (string) ($personel['sicil_no'] ?? ''),
+                    'sube_id' => (int) ($personel['sube_id'] ?? 0),
+                    'sube_ad' => (string) ($personel['sube_ad'] ?? ''),
+                    'bolum_ad' => (string) ($personel['bolum_ad'] ?? ''),
+                ]
+            );
+            foreach ($rows as $row) {
+                $allRows[] = $row;
+            }
+        }
+
+        if ($durumFilter !== null) {
+            $allRows = array_values(array_filter($allRows, static function ($row) use ($durumFilter) {
+                return (string) ($row['deadline_state'] ?? '') === $durumFilter;
+            }));
+        }
+
+        $allRows = SerbestZamanDeadlineService::sortDeadlineRows($allRows);
+        $summary = SerbestZamanDeadlineService::summarize($allRows, $referans);
+        $total = count($allRows);
+        $offset = ($page - 1) * $limit;
+        $pageItems = array_slice($allRows, $offset, $limit);
+        $totalPages = $limit > 0 ? (int) ceil($total / $limit) : 1;
+        if ($totalPages < 1) {
+            $totalPages = 1;
+        }
+
+        JsonResponse::success([
+            'items' => $pageItems,
+            'summary' => $summary,
+            'page' => $page,
+            'limit' => $limit,
+            'total' => $total,
+            'total_pages' => $totalPages,
+            'has_next_page' => $page < $totalPages,
+            'has_prev_page' => $page > 1,
+        ]);
     }
 
     public static function olusum(Request $request): void

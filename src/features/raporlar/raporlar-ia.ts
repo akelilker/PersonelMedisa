@@ -8,7 +8,8 @@ export const RAPORLAR_PANEL_IDS = [
   "donem-kapanis",
   "etki-adayi",
   "maas-hesaplama",
-  "bordro-hazirlik"
+  "bordro-hazirlik",
+  "serbest-zaman-takip"
 ] as const;
 
 export type RaporlarPanel = (typeof RAPORLAR_PANEL_IDS)[number];
@@ -23,7 +24,8 @@ export type RaporlarSurfaceId =
   | "donem-kapanis"
   | "etki-adayi"
   | "maas-hesaplama"
-  | "bordro-hazirlik";
+  | "bordro-hazirlik"
+  | "serbest-zaman-takip";
 
 export type RaporlarNavItemId = RaporlarSurfaceId;
 
@@ -57,6 +59,13 @@ export const RAPORLAR_NAV_ITEMS: RaporlarNavItemDef[] = [
     label: "Etki Adayı Raporu",
     testId: "raporlar-panel-etki-adayi",
     panel: "etki-adayi"
+  },
+  {
+    id: "serbest-zaman-takip",
+    group: "raporlar",
+    label: "Serbest Zaman Takibi",
+    testId: "raporlar-panel-serbest-zaman-takip",
+    panel: "serbest-zaman-takip"
   },
   {
     id: "aylik-kapanis",
@@ -94,6 +103,8 @@ export const RAPORLAR_SURFACE_LEADS: Record<RaporlarSurfaceId, string> = {
   "aylik-kapanis": "Ay sonu puantaj ve onay durumunu inceleyin.",
   "donem-kapanis": "Dönem kapanış ön kontrollerini ve mühür durumunu yönetin.",
   "etki-adayi": "Bildirim etki adayı kayıtlarını inceleyin.",
+  "serbest-zaman-takip":
+    "Serbest zaman 6 aylık kullanım deadline takibi (operasyonel uyarı; otomatik bordro blokajı yoktur).",
   "maas-hesaplama": "Deterministik maaş hesaplama çalıştırmalarını yönetin.",
   "bordro-hazirlik": "Bordro hazırlık, ön kontrol ve personel kapsamını yönetin."
 };
@@ -106,7 +117,8 @@ export function parseRaporlarPanel(value: string | null): RaporlarPanel {
     value === "donem-kapanis" ||
     value === "etki-adayi" ||
     value === "maas-hesaplama" ||
-    value === "bordro-hazirlik"
+    value === "bordro-hazirlik" ||
+    value === "serbest-zaman-takip"
   ) {
     return value;
   }
@@ -171,6 +183,7 @@ export type RaporlarNavVisibility = {
   canViewAylikOzet: boolean;
   canViewDonemKapanis: boolean;
   canViewEtkiAdayiRapor: boolean;
+  canViewSerbestZamanTakip: boolean;
   canViewMaasHesaplama: boolean;
   canViewBordroHazirlik: boolean;
 };
@@ -188,6 +201,8 @@ export function isRaporlarNavItemVisible(
       return visibility.canViewDonemKapanis;
     case "etki-adayi":
       return visibility.canViewEtkiAdayiRapor;
+    case "serbest-zaman-takip":
+      return visibility.canViewSerbestZamanTakip;
     case "maas-hesaplama":
       return visibility.canViewMaasHesaplama;
     case "bordro-hazirlik":
@@ -219,4 +234,19 @@ export function buildVisibleRaporlarNavGroups(
       };
     })
     .filter((group) => group.items.length > 0);
+}
+
+export function serbestZamanDeadlineStateLabel(state: string): string {
+  switch (state) {
+    case "YAKLASIYOR":
+      return "Yaklaşan";
+    case "SURESI_DOLDU":
+      return "Süresi dolmuş";
+    case "ALLOCATION_UNRESOLVED":
+      return "İnceleme gerekli";
+    case "NORMAL":
+      return "Normal";
+    default:
+      return state;
+  }
 }

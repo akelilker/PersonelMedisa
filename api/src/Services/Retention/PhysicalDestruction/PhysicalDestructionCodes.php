@@ -25,10 +25,23 @@ final class PhysicalDestructionCodes
     public const CODE_TARGET_ALREADY_MISSING = 'TARGET_ALREADY_MISSING';
     public const CODE_DEPENDENT_RETENTION_RECORDS_REMAIN = 'DEPENDENT_RETENTION_RECORDS_REMAIN';
     /**
-     * SERBEST_ZAMAN: personel has unallocated KULLANIM (global pool; no lot provenance).
+     * SERBEST_ZAMAN: personel has unallocated KULLANIM (legacy provenance unknown).
      * Week-owned OLUSUM destruction would corrupt cross-lot balance — fail-closed, no mutation.
      */
     public const CODE_SERBEST_ZAMAN_USAGE_ALLOCATION_UNRESOLVED = 'SERBEST_ZAMAN_USAGE_ALLOCATION_UNRESOLVED';
+    /**
+     * SERBEST_ZAMAN: a KULLANIM that touches target OLUSUM lots also retains allocation
+     * provenance outside the current approved destruction scope — fail-closed, no mutation.
+     */
+    public const CODE_SERBEST_ZAMAN_CROSS_SCOPE_ALLOCATION_REMAINS = 'SERBEST_ZAMAN_CROSS_SCOPE_ALLOCATION_REMAINS';
+    /**
+     * SERBEST_ZAMAN: allocation ledger invariant broken for affected personel — fail-closed.
+     */
+    public const CODE_SERBEST_ZAMAN_ALLOCATION_INVARIANT_BROKEN = 'SERBEST_ZAMAN_ALLOCATION_INVARIANT_BROKEN';
+    /**
+     * SERBEST_ZAMAN: required allocation / destroy-gate schema missing — fail-closed.
+     */
+    public const CODE_SERBEST_ZAMAN_ALLOCATION_SCHEMA_NOT_READY = 'SERBEST_ZAMAN_ALLOCATION_SCHEMA_NOT_READY';
     /** RAPOR/IS_KAZASI blocked while personel_belge_* rows still REFERENCE the surec (038 RESTRICT). */
     public const CODE_PERSONEL_BELGE_REMAINS = 'PERSONEL_BELGE_REMAINS';
     /** PUANTAJ blocked while typed ONAY_AUDIT qr_pc_decision ledger still RESTRICTs period daily rows. */
@@ -61,6 +74,12 @@ final class PhysicalDestructionCodes
             self::CODE_DEPENDENT_RETENTION_RECORDS_REMAIN => 'Bagimli saklama kayitlari hala mevcut.',
             self::CODE_SERBEST_ZAMAN_USAGE_ALLOCATION_UNRESOLVED =>
                 'SERBEST_ZAMAN KULLANIM lot tahsisi cozumlenmedi; OLUSUM imha engellendi.',
+            self::CODE_SERBEST_ZAMAN_CROSS_SCOPE_ALLOCATION_REMAINS =>
+                'SERBEST_ZAMAN KULLANIM hedef disi OLUSUM tahsisi tasiyor; capraz scope imha engellendi.',
+            self::CODE_SERBEST_ZAMAN_ALLOCATION_INVARIANT_BROKEN =>
+                'SERBEST_ZAMAN tahsis invariant bozuk; imha engellendi.',
+            self::CODE_SERBEST_ZAMAN_ALLOCATION_SCHEMA_NOT_READY =>
+                'SERBEST_ZAMAN tahsis / destroy gate semasi hazir degil; imha engellendi.',
             self::CODE_PERSONEL_BELGE_REMAINS =>
                 'PERSONEL_BELGE dosya/audit kayitlari surece bagli; once belge imha gerekir.',
             self::CODE_PUANTAJ_BLOCKED_BY_QR_ONAY_AUDIT => 'PUANTAJ imha, once typed ONAY_AUDIT (qr_pc_decision) imha gerektirir.',

@@ -20,6 +20,7 @@ describe("i11 raporlar IA source contracts", () => {
     expect(page).toContain("<EtkiAdayiRaporuPage");
     expect(page).toContain("<MaasHesaplamaMerkeziPage");
     expect(page).toContain("<BordroHazirlikMerkeziPage");
+    expect(page).toContain("<SerbestZamanTakipPage");
     expect(page).not.toContain("Liste ve aylık özet");
     expect(page).not.toContain("Detaylı Liste");
 
@@ -27,8 +28,10 @@ describe("i11 raporlar IA source contracts", () => {
     expect(ia).toContain('"etki-adayi"');
     expect(ia).toContain('"maas-hesaplama"');
     expect(ia).toContain('"bordro-hazirlik"');
+    expect(ia).toContain('"serbest-zaman-takip"');
     expect(ia).toContain('view=aylik-kapanis');
     expect(ia).toContain("Liste Raporları");
+    expect(ia).toContain("Serbest Zaman Takibi");
     expect(ia).toContain("Aylık Kapanış Özeti");
     expect(ia).toContain('group: "raporlar"');
     expect(ia).toContain('group: "kapanis"');
@@ -49,6 +52,7 @@ describe("i11 raporlar IA source contracts", () => {
     const page = readOwner("src/features/raporlar/pages/RaporlarPage.tsx");
     expect(page).toContain('activePanel === "donem-kapanis" && canViewDonemKapanis');
     expect(page).toContain('activePanel === "etki-adayi" && canViewEtkiAdayiRapor');
+    expect(page).toContain('activePanel === "serbest-zaman-takip" && canViewSerbestZamanTakip');
     expect(page).toContain('activePanel === "maas-hesaplama" && canViewMaasHesaplama');
     expect(page).toContain('activePanel === "bordro-hazirlik" && canViewBordroHazirlik');
     expect(page).not.toContain("<DonemKapanisMerkeziPage /><EtkiAdayiRaporuPage");

@@ -97,6 +97,14 @@ final class PhysicalDestructionService
                 && !(isset($handlerPlan['policy_blocker']) && $handlerPlan['policy_blocker'] !== null && $handlerPlan['policy_blocker'] !== ''),
         ];
 
+        // Optional SERBEST (and future) handler scope fingerprint — absent keeps other category hashes stable.
+        if (isset($handlerPlan['scope_fingerprint'])
+            && is_string($handlerPlan['scope_fingerprint'])
+            && $handlerPlan['scope_fingerprint'] !== ''
+        ) {
+            $plan['scope_fingerprint'] = $handlerPlan['scope_fingerprint'];
+        }
+
         // Normalize expected_row_counts to object-like assoc for stable JSON.
         if ($plan['expected_row_counts'] instanceof \stdClass) {
             $plan['expected_row_counts'] = [];
@@ -140,6 +148,14 @@ final class PhysicalDestructionService
                 ? (string) $plan['policy_blocker']
                 : null,
         ];
+
+        // Only when present: other category plan hashes remain identical when field absent.
+        if (isset($plan['scope_fingerprint'])
+            && is_string($plan['scope_fingerprint'])
+            && $plan['scope_fingerprint'] !== ''
+        ) {
+            $canonical['scope_fingerprint'] = (string) $plan['scope_fingerprint'];
+        }
 
         $json = json_encode($canonical, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
         if ($json === false) {

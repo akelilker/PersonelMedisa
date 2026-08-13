@@ -53,7 +53,7 @@ describe("S86 personel belge parity source", () => {
     expect(existsSync(resolve("api/migrations/040_sgk_mevzuat_canonical_schema.sql"))).toBe(true);
     expect(existsSync(resolve("api/migrations/042_sgk_resmi_kaynakli_kisitli_katalog.sql"))).toBe(true);
     expect(migrations.some((n) => n.startsWith("039_"))).toBe(true);
-    expect(migrations.at(-1)).toBe("061_serbest_zaman_kullanim_tahsisleri.sql");
+    expect(migrations.at(-1)).toBe("062_serbest_zaman_retention_destroy_gate.sql");
     expect(existsSync(resolve("src/features/personeller/pages/BelgeTakipPage.tsx"))).toBe(true);
   });
 });

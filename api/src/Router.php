@@ -734,6 +734,9 @@ class Router
         if ($path === '/serbest-zaman/bakiye' && $method === 'GET') {
             SerbestZamanController::bakiye($this->request);
         }
+        if ($path === '/serbest-zaman/deadline-takip' && $method === 'GET') {
+            SerbestZamanController::deadlineTakip($this->request);
+        }
         if ($path === '/serbest-zaman/olusum' && $method === 'POST') {
             SerbestZamanController::olusum($this->request);
         }

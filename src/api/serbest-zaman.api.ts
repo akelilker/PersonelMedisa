@@ -5,6 +5,10 @@ import type {
   PostSerbestZamanKullanimPayload,
   PostSerbestZamanOlusumPayload,
   SerbestZamanBakiye,
+  SerbestZamanDeadlineRow,
+  SerbestZamanDeadlineState,
+  SerbestZamanDeadlineSummary,
+  SerbestZamanDeadlineTakipResponse,
   SerbestZamanDuzeltmeEvent,
   SerbestZamanEvent,
   SerbestZamanEventTipi,
@@ -390,6 +394,126 @@ export async function fetchSerbestZamanBakiye(
   }
 
   return normalizeSerbestZamanBakiye(response.data, personel_id);
+}
+
+const DEADLINE_STATES: readonly SerbestZamanDeadlineState[] = [
+  "NORMAL",
+  "YAKLASIYOR",
+  "SURESI_DOLDU",
+  "ALLOCATION_UNRESOLVED"
+];
+
+function normalizeDeadlineState(value: unknown): SerbestZamanDeadlineState {
+  const raw = typeof value === "string" ? value.trim().toUpperCase() : "";
+  return (DEADLINE_STATES as readonly string[]).includes(raw)
+    ? (raw as SerbestZamanDeadlineState)
+    : "NORMAL";
+}
+
+function normalizeDeadlineRow(value: unknown): SerbestZamanDeadlineRow {
+  const record = toRecord(value) ?? {};
+  const available = toOptionalNumber(record.available_dakika);
+  const kalan = toOptionalNumber(record.kalan_gun);
+  const olusumId = toOptionalNumber(record.olusum_event_id);
+  const subeId = toOptionalNumber(record.sube_id);
+
+  return {
+    personel_id: toNonNegativeNumber(record.personel_id, 0),
+    ad_soyad: typeof record.ad_soyad === "string" ? record.ad_soyad : "",
+    sicil_no: typeof record.sicil_no === "string" ? record.sicil_no : "",
+    sube_id: subeId ?? null,
+    sube_ad: typeof record.sube_ad === "string" ? record.sube_ad : "",
+    bolum_ad: typeof record.bolum_ad === "string" ? record.bolum_ad : "",
+    allocation_state:
+      typeof record.allocation_state === "string" ? record.allocation_state : "NO_USAGE",
+    olusum_event_id: olusumId ?? null,
+    son_kullanim_tarihi:
+      typeof record.son_kullanim_tarihi === "string" ? record.son_kullanim_tarihi : null,
+    available_dakika: available ?? null,
+    kalan_gun: kalan ?? null,
+    deadline_state: normalizeDeadlineState(record.deadline_state),
+    compliance_action:
+      typeof record.compliance_action === "string" ? record.compliance_action : "NONE",
+    expiry_state: typeof record.expiry_state === "string" ? record.expiry_state : null
+  };
+}
+
+function normalizeDeadlineSummary(value: unknown, fallbackReferans: string): SerbestZamanDeadlineSummary {
+  const record = toRecord(value) ?? {};
+  return {
+    referans_tarih:
+      typeof record.referans_tarih === "string" && record.referans_tarih
+        ? record.referans_tarih
+        : fallbackReferans,
+    warning_days: toNonNegativeNumber(record.warning_days, 30),
+    compliance_mode:
+      typeof record.compliance_mode === "string"
+        ? record.compliance_mode
+        : "WARNING_AND_OPERATIONAL_FOLLOWUP",
+    payroll_hard_block: record.payroll_hard_block === true,
+    yaklasan_lot_sayisi: toNonNegativeNumber(record.yaklasan_lot_sayisi, 0),
+    yaklasan_dakika: toNonNegativeNumber(record.yaklasan_dakika, 0),
+    suresi_dolmus_lot_sayisi: toNonNegativeNumber(record.suresi_dolmus_lot_sayisi, 0),
+    suresi_dolmus_kullanilmamis_dakika: toNonNegativeNumber(
+      record.suresi_dolmus_kullanilmamis_dakika,
+      0
+    ),
+    allocation_unresolved_personel_sayisi: toNonNegativeNumber(
+      record.allocation_unresolved_personel_sayisi,
+      0
+    )
+  };
+}
+
+export type FetchSerbestZamanDeadlineTakipParams = {
+  referans_tarih?: string;
+  personel_id?: number | string;
+  durum?: SerbestZamanDeadlineState | string;
+  page?: number;
+  limit?: number;
+};
+
+export async function fetchSerbestZamanDeadlineTakip(
+  params: FetchSerbestZamanDeadlineTakipParams = {}
+): Promise<SerbestZamanDeadlineTakipResponse> {
+  const referans =
+    typeof params.referans_tarih === "string" && params.referans_tarih.trim()
+      ? params.referans_tarih.trim()
+      : undefined;
+  const path = appendQueryParams(endpoints.serbestZaman.deadlineTakip, {
+    referans_tarih: referans,
+    personel_id:
+      params.personel_id !== undefined
+        ? parsePositiveIntParam(params.personel_id, "personel_id")
+        : undefined,
+    durum: params.durum ? String(params.durum).trim().toUpperCase() : undefined,
+    page: params.page,
+    limit: params.limit
+  });
+
+  const response = await apiRequest<ApiResponse<unknown>>(path);
+
+  if (Array.isArray(response.errors) && response.errors.length > 0) {
+    throwFirstApiError(response.errors, "Serbest zaman deadline takip alinamadi.");
+  }
+
+  const record = toRecord(response.data) ?? {};
+  const itemsRaw = Array.isArray(record.items) ? record.items : [];
+  const page = toNonNegativeNumber(record.page, 1) || 1;
+  const limit = toNonNegativeNumber(record.limit, 25) || 25;
+  const total = toNonNegativeNumber(record.total, itemsRaw.length);
+  const totalPages = toNonNegativeNumber(record.total_pages, 1) || 1;
+
+  return {
+    items: itemsRaw.map((item) => normalizeDeadlineRow(item)),
+    summary: normalizeDeadlineSummary(record.summary, referans ?? ""),
+    page,
+    limit,
+    total,
+    total_pages: totalPages,
+    has_next_page: record.has_next_page === true || page < totalPages,
+    has_prev_page: record.has_prev_page === true || page > 1
+  };
 }
 
 export async function postSerbestZamanOlusum(

@@ -138,7 +138,7 @@ export function KayitSurecPersonelGenelPanel({
         items: [
           { label: "Acil Durum Kişisi", value: formatGeneralField(personel.acil_durum_kisi) },
           { label: "Acil Durum Telefon", value: formatGeneralField(personel.acil_durum_telefon) },
-          { label: "Bölüm", value: formatGeneralField(personel.departman_adi) },
+          { label: "Departman", value: formatGeneralField(personel.departman_adi) },
           { label: "Unvan", value: formatGeneralField(personel.gorev_adi) },
           { label: "Bağlı Amir", value: formatGeneralField(personel.bagli_amir_adi) }
         ]

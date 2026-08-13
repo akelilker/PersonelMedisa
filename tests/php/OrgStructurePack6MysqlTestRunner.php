@@ -634,6 +634,20 @@ try {
     }
     p6Assert($caughtA8 !== null && $caughtA8->getCodeString() === PersonelOrgStructureSchema::ERROR_CODE, 'A8 nonblank pre-065 409');
 
+    // Pre-065 reference bundle remains usable (legacy refs present; Pack6 absent)
+    $exportPre = PersonelImportReferenceCatalogService::buildExport($pdoPre, $gyUser, null);
+    $exportPreBody = (string) ($exportPre['body'] ?? '');
+    p6Assert(strpos($exportPreBody, 'DEPARTMAN') !== false, 'pre-065 reference bundle DEPARTMAN');
+    p6Assert(strpos($exportPreBody, 'GOREV') !== false, 'pre-065 reference bundle GOREV/Unvan');
+    p6Assert(strpos($exportPreBody, 'PERSONEL_TIPI') !== false, 'pre-065 reference bundle PERSONEL_TIPI');
+    p6Assert(strpos($exportPreBody, 'BOLUM;') === false, 'pre-065 no BOLUM rows');
+    p6Assert(strpos($exportPreBody, 'BIRIM;') === false, 'pre-065 no BIRIM rows');
+    p6Assert(strpos($exportPreBody, 'POZISYON;') === false, 'pre-065 no POZISYON rows');
+    $catalogPre = PersonelImportReferenceCatalogService::loadCatalogForDryRun($pdoPre);
+    p6Assert(count($catalogPre['departman'] ?? []) > 0, 'pre-065 dry-run departman catalog');
+    p6Assert(($catalogPre['bolum_by_departman'] ?? []) === [], 'pre-065 empty Pack6 bolum catalog');
+    p6Assert(($catalogPre['pozisyon'] ?? []) === [], 'pre-065 empty Pack6 pozisyon catalog');
+
     // A21 Pack5 regression: location gate still works
     $caughtLoc = null;
     try {
@@ -806,47 +820,280 @@ try {
     }
 }
 
-// ========== A3 partial-state convergence ==========
+// ========== A3 partial-state convergence (A3-1 .. A3-8) ==========
 $dbPartial = 'medisa_pack6_p_' . substr(bin2hex(random_bytes(4)), 0, 8);
 p6AssertSafeTarget($dbPartial);
 $root->exec('CREATE DATABASE `' . $dbPartial . '` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');
 $pdoP = p6PdoForDb($dbPartial);
 try {
+    // ----- A3-1: bolumler exists missing status/index/FK — 065 converges -----
     p6ApplyThrough($pdoP, $files, '064_personel_org_location_model.sql');
-    // C: bolumler exists but personel columns absent
     $pdoP->exec(
-        "CREATE TABLE IF NOT EXISTS bolumler (
+        "CREATE TABLE bolumler (
           id INT UNSIGNED NOT NULL AUTO_INCREMENT,
           departman_id INT UNSIGNED NOT NULL,
           ad VARCHAR(120) NOT NULL,
-          durum VARCHAR(16) NOT NULL DEFAULT 'AKTIF',
           created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
           updated_at TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
           PRIMARY KEY (id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
     );
-    p6Assert(p6TableExists($pdoP, 'bolumler') && !p6ColumnExists($pdoP, 'personeller', 'bolum_id'), 'A3C partial bolumler only');
+    p6Assert(p6ColumnExists($pdoP, 'bolumler', 'departman_id'), 'A3-1 fixture has departman_id');
+    p6Assert(!p6ColumnExists($pdoP, 'bolumler', 'durum'), 'A3-1 durum absent');
+    p6Assert(!p6FkExists($pdoP, 'bolumler', 'fk_bolumler_departman'), 'A3-1 FK absent');
+    p6Assert(!PersonelOrgStructureSchema::isReady($pdoP), 'A3-1 not ready before repair');
     p6Apply($pdoP, '065_personel_org_structure.sql');
-    p6Assert(PersonelOrgStructureSchema::isReady($pdoP), 'A3C converges to ready');
+    p6Assert(p6ColumnExists($pdoP, 'bolumler', 'durum'), 'A3-1 durum converged');
+    p6Assert(p6IndexExists($pdoP, 'bolumler', 'idx_bolumler_durum'), 'A3-1 durum index converged');
+    p6Assert(p6IndexExists($pdoP, 'bolumler', 'uq_bolumler_departman_ad'), 'A3-1 unique converged');
+    p6Assert(p6FkExists($pdoP, 'bolumler', 'fk_bolumler_departman'), 'A3-1 FK converged');
+    p6Assert(PersonelOrgStructureSchema::isReady($pdoP), 'A3-1 ready after 065');
 
-    // D/G: one column exists others absent — drop birim_id if present then re-add via migration
-    // E: subeler.sgk_isveren_id exists but FK absent
-    $dbPartial2 = 'medisa_pack6_p2_' . substr(bin2hex(random_bytes(4)), 0, 8);
-    p6AssertSafeTarget($dbPartial2);
-    $root->exec('CREATE DATABASE `' . $dbPartial2 . '` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');
-    $pdoP2 = p6PdoForDb($dbPartial2);
+    // ----- A3-2: birimler complete columns, missing parent FK/index -----
+    $dbA32 = 'medisa_pack6_a32_' . substr(bin2hex(random_bytes(4)), 0, 8);
+    p6AssertSafeTarget($dbA32);
+    $root->exec('CREATE DATABASE `' . $dbA32 . '` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');
+    $pdoA32 = p6PdoForDb($dbA32);
     try {
-        p6ApplyThrough($pdoP2, $files, '064_personel_org_location_model.sql');
-        $pdoP2->exec('ALTER TABLE subeler ADD COLUMN sgk_isveren_id INT UNSIGNED NULL AFTER ad');
-        p6Assert(p6ColumnExists($pdoP2, 'subeler', 'sgk_isveren_id'), 'A3E col exists');
-        p6Assert(!p6FkExists($pdoP2, 'subeler', 'fk_subeler_sgk_isveren'), 'A3E FK absent');
-        p6Apply($pdoP2, '065_personel_org_structure.sql');
-        p6Assert(p6FkExists($pdoP2, 'subeler', 'fk_subeler_sgk_isveren'), 'A3E FK converged');
-        p6Assert(p6IndexExists($pdoP2, 'subeler', 'idx_subeler_sgk_isveren'), 'A3F index converged');
-        p6Assert(PersonelOrgStructureSchema::isReady($pdoP2), 'A3D/G ready after opposite partial');
+        p6ApplyThrough($pdoA32, $files, '064_personel_org_location_model.sql');
+        $pdoA32->exec(
+            "CREATE TABLE bolumler (
+              id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+              departman_id INT UNSIGNED NOT NULL,
+              ad VARCHAR(120) NOT NULL,
+              durum VARCHAR(16) NOT NULL DEFAULT 'AKTIF',
+              created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              updated_at TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+              PRIMARY KEY (id),
+              UNIQUE KEY uq_bolumler_departman_ad (departman_id, ad)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+        );
+        $pdoA32->exec(
+            "ALTER TABLE bolumler
+               ADD CONSTRAINT fk_bolumler_departman
+                 FOREIGN KEY (departman_id) REFERENCES departmanlar (id) ON DELETE RESTRICT"
+        );
+        $pdoA32->exec(
+            "CREATE TABLE birimler (
+              id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+              bolum_id INT UNSIGNED NOT NULL,
+              ad VARCHAR(120) NOT NULL,
+              durum VARCHAR(16) NOT NULL DEFAULT 'AKTIF',
+              created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              updated_at TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+              PRIMARY KEY (id),
+              UNIQUE KEY uq_birimler_bolum_ad (bolum_id, ad)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+        );
+        p6Assert(!p6FkExists($pdoA32, 'birimler', 'fk_birimler_bolum'), 'A3-2 birim FK absent');
+        p6Assert(!p6IndexExists($pdoA32, 'birimler', 'idx_birimler_bolum'), 'A3-2 birim index absent');
+        p6Apply($pdoA32, '065_personel_org_structure.sql');
+        p6Assert(p6FkExists($pdoA32, 'birimler', 'fk_birimler_bolum'), 'A3-2 birim FK converged');
+        p6Assert(p6IndexExists($pdoA32, 'birimler', 'idx_birimler_bolum'), 'A3-2 birim index converged');
+        p6Assert(PersonelOrgStructureSchema::isReady($pdoA32), 'A3-2 ready after 065');
     } finally {
         try {
-            $root->exec('DROP DATABASE IF EXISTS `' . $dbPartial2 . '`');
+            $root->exec('DROP DATABASE IF EXISTS `' . $dbA32 . '`');
+        } catch (Throwable $e) {
+        }
+    }
+
+    // ----- A3-3: pozisyonlar missing unique/status index -----
+    $dbA33 = 'medisa_pack6_a33_' . substr(bin2hex(random_bytes(4)), 0, 8);
+    p6AssertSafeTarget($dbA33);
+    $root->exec('CREATE DATABASE `' . $dbA33 . '` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');
+    $pdoA33 = p6PdoForDb($dbA33);
+    try {
+        p6ApplyThrough($pdoA33, $files, '064_personel_org_location_model.sql');
+        $pdoA33->exec(
+            "CREATE TABLE pozisyonlar (
+              id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+              ad VARCHAR(120) NOT NULL,
+              durum VARCHAR(16) NOT NULL DEFAULT 'AKTIF',
+              created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              updated_at TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+              PRIMARY KEY (id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+        );
+        p6Assert(!p6IndexExists($pdoA33, 'pozisyonlar', 'uq_pozisyonlar_ad'), 'A3-3 unique absent');
+        p6Assert(!p6IndexExists($pdoA33, 'pozisyonlar', 'idx_pozisyonlar_durum'), 'A3-3 durum index absent');
+        p6Apply($pdoA33, '065_personel_org_structure.sql');
+        p6Assert(p6IndexExists($pdoA33, 'pozisyonlar', 'uq_pozisyonlar_ad'), 'A3-3 unique converged');
+        p6Assert(p6IndexExists($pdoA33, 'pozisyonlar', 'idx_pozisyonlar_durum'), 'A3-3 durum index converged');
+        p6Assert(PersonelOrgStructureSchema::isReady($pdoA33), 'A3-3 ready after 065');
+    } finally {
+        try {
+            $root->exec('DROP DATABASE IF EXISTS `' . $dbA33 . '`');
+        } catch (Throwable $e) {
+        }
+    }
+
+    // ----- A3-4: personeller has bolum_id only -----
+    $dbA34 = 'medisa_pack6_a34_' . substr(bin2hex(random_bytes(4)), 0, 8);
+    p6AssertSafeTarget($dbA34);
+    $root->exec('CREATE DATABASE `' . $dbA34 . '` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');
+    $pdoA34 = p6PdoForDb($dbA34);
+    try {
+        p6ApplyThrough($pdoA34, $files, '064_personel_org_location_model.sql');
+        $pdoA34->exec('ALTER TABLE personeller ADD COLUMN bolum_id INT UNSIGNED NULL AFTER departman_id');
+        p6Assert(p6ColumnExists($pdoA34, 'personeller', 'bolum_id'), 'A3-4 bolum_id present');
+        p6Assert(!p6ColumnExists($pdoA34, 'personeller', 'birim_id'), 'A3-4 birim_id absent');
+        p6Assert(!p6ColumnExists($pdoA34, 'personeller', 'pozisyon_id'), 'A3-4 pozisyon_id absent');
+        p6Apply($pdoA34, '065_personel_org_structure.sql');
+        p6Assert(p6ColumnExists($pdoA34, 'personeller', 'birim_id'), 'A3-4 birim_id converged');
+        p6Assert(p6ColumnExists($pdoA34, 'personeller', 'pozisyon_id'), 'A3-4 pozisyon_id converged');
+        p6Assert(p6FkExists($pdoA34, 'personeller', 'fk_personeller_birim'), 'A3-4 birim FK converged');
+        p6Assert(PersonelOrgStructureSchema::isReady($pdoA34), 'A3-4 ready after 065');
+    } finally {
+        try {
+            $root->exec('DROP DATABASE IF EXISTS `' . $dbA34 . '`');
+        } catch (Throwable $e) {
+        }
+    }
+
+    // ----- A3-5: subeler.sgk_isveren_id exists, FK absent -----
+    $dbA35 = 'medisa_pack6_a35_' . substr(bin2hex(random_bytes(4)), 0, 8);
+    p6AssertSafeTarget($dbA35);
+    $root->exec('CREATE DATABASE `' . $dbA35 . '` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');
+    $pdoA35 = p6PdoForDb($dbA35);
+    try {
+        p6ApplyThrough($pdoA35, $files, '064_personel_org_location_model.sql');
+        $pdoA35->exec('ALTER TABLE subeler ADD COLUMN sgk_isveren_id INT UNSIGNED NULL AFTER ad');
+        p6Assert(p6ColumnExists($pdoA35, 'subeler', 'sgk_isveren_id'), 'A3-5 col exists');
+        p6Assert(!p6FkExists($pdoA35, 'subeler', 'fk_subeler_sgk_isveren'), 'A3-5 FK absent');
+        p6Apply($pdoA35, '065_personel_org_structure.sql');
+        p6Assert(p6FkExists($pdoA35, 'subeler', 'fk_subeler_sgk_isveren'), 'A3-5 FK converged');
+        p6Assert(p6IndexExists($pdoA35, 'subeler', 'idx_subeler_sgk_isveren'), 'A3-5 index converged');
+        p6Assert(PersonelOrgStructureSchema::isReady($pdoA35), 'A3-5 ready after 065');
+    } finally {
+        try {
+            $root->exec('DROP DATABASE IF EXISTS `' . $dbA35 . '`');
+        } catch (Throwable $e) {
+        }
+    }
+
+    // ----- A3-6: all names/columns exist but critical constraint missing → not ready; 065 repairs -----
+    $dbA36 = 'medisa_pack6_a36_' . substr(bin2hex(random_bytes(4)), 0, 8);
+    p6AssertSafeTarget($dbA36);
+    $root->exec('CREATE DATABASE `' . $dbA36 . '` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');
+    $pdoA36 = p6PdoForDb($dbA36);
+    try {
+        p6ApplyThrough($pdoA36, $files, '064_personel_org_location_model.sql');
+        $pdoA36->exec(
+            "CREATE TABLE bolumler (
+              id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+              departman_id INT UNSIGNED NOT NULL,
+              ad VARCHAR(120) NOT NULL,
+              durum VARCHAR(16) NOT NULL DEFAULT 'AKTIF',
+              created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              updated_at TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+              PRIMARY KEY (id),
+              UNIQUE KEY uq_bolumler_departman_ad (departman_id, ad),
+              KEY idx_bolumler_departman (departman_id),
+              KEY idx_bolumler_durum (durum)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+        );
+        $pdoA36->exec(
+            "CREATE TABLE birimler (
+              id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+              bolum_id INT UNSIGNED NOT NULL,
+              ad VARCHAR(120) NOT NULL,
+              durum VARCHAR(16) NOT NULL DEFAULT 'AKTIF',
+              created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              updated_at TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+              PRIMARY KEY (id),
+              UNIQUE KEY uq_birimler_bolum_ad (bolum_id, ad),
+              KEY idx_birimler_bolum (bolum_id),
+              KEY idx_birimler_durum (durum)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+        );
+        $pdoA36->exec(
+            "CREATE TABLE pozisyonlar (
+              id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+              ad VARCHAR(120) NOT NULL,
+              durum VARCHAR(16) NOT NULL DEFAULT 'AKTIF',
+              created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              updated_at TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+              PRIMARY KEY (id),
+              UNIQUE KEY uq_pozisyonlar_ad (ad),
+              KEY idx_pozisyonlar_durum (durum)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+        );
+        $pdoA36->exec('ALTER TABLE personeller ADD COLUMN bolum_id INT UNSIGNED NULL AFTER departman_id');
+        $pdoA36->exec('ALTER TABLE personeller ADD COLUMN birim_id INT UNSIGNED NULL AFTER bolum_id');
+        $pdoA36->exec('ALTER TABLE personeller ADD COLUMN pozisyon_id INT UNSIGNED NULL AFTER gorev_id');
+        $pdoA36->exec('ALTER TABLE subeler ADD COLUMN sgk_isveren_id INT UNSIGNED NULL AFTER ad');
+        // Intentionally omit all Pack6 FKs — names+columns present, constraints incomplete.
+        p6Assert(p6TableExists($pdoA36, 'bolumler') && p6ColumnExists($pdoA36, 'personeller', 'bolum_id'), 'A3-6 names+cols exist');
+        p6Assert(!p6FkExists($pdoA36, 'bolumler', 'fk_bolumler_departman'), 'A3-6 critical FK missing');
+        p6Assert(!PersonelOrgStructureSchema::isReady($pdoA36), 'A3-6 isReady FALSE before repair');
+        p6Apply($pdoA36, '065_personel_org_structure.sql');
+        p6Assert(p6FkExists($pdoA36, 'bolumler', 'fk_bolumler_departman'), 'A3-6 bolum FK repaired');
+        p6Assert(p6FkExists($pdoA36, 'birimler', 'fk_birimler_bolum'), 'A3-6 birim FK repaired');
+        p6Assert(p6FkExists($pdoA36, 'personeller', 'fk_personeller_bolum'), 'A3-6 personel FK repaired');
+        p6Assert(p6FkExists($pdoA36, 'subeler', 'fk_subeler_sgk_isveren'), 'A3-6 sube FK repaired');
+        p6Assert(PersonelOrgStructureSchema::isReady($pdoA36), 'A3-6 isReady TRUE after repair');
+    } finally {
+        try {
+            $root->exec('DROP DATABASE IF EXISTS `' . $dbA36 . '`');
+        } catch (Throwable $e) {
+        }
+    }
+
+    // ----- A3-7: unsafe partial with rows — fail closed, no invent/backfill -----
+    $dbA37 = 'medisa_pack6_a37_' . substr(bin2hex(random_bytes(4)), 0, 8);
+    p6AssertSafeTarget($dbA37);
+    $root->exec('CREATE DATABASE `' . $dbA37 . '` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');
+    $pdoA37 = p6PdoForDb($dbA37);
+    try {
+        p6ApplyThrough($pdoA37, $files, '064_personel_org_location_model.sql');
+        $pdoA37->exec(
+            "CREATE TABLE bolumler (
+              id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+              PRIMARY KEY (id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+        );
+        $pdoA37->exec('INSERT INTO bolumler () VALUES ()');
+        p6Assert((int) $pdoA37->query('SELECT COUNT(*) FROM bolumler')->fetchColumn() === 1, 'A3-7 has rows');
+        $caughtA37 = null;
+        try {
+            p6Apply($pdoA37, '065_personel_org_structure.sql');
+        } catch (Throwable $e) {
+            $caughtA37 = $e;
+        }
+        p6Assert($caughtA37 !== null, 'A3-7 migration STOP/FAIL CLOSED');
+        p6Assert(
+            strpos($caughtA37->getMessage(), 'PACK6_065_BLOCKER') !== false
+                || strpos($caughtA37->getMessage(), 'departman_id') !== false,
+            'A3-7 deterministic blocker message'
+        );
+        p6Assert(!p6ColumnExists($pdoA37, 'bolumler', 'departman_id'), 'A3-7 did not invent departman_id');
+        p6Assert(!PersonelOrgStructureSchema::isReady($pdoA37), 'A3-7 remains not ready');
+    } finally {
+        try {
+            $root->exec('DROP DATABASE IF EXISTS `' . $dbA37 . '`');
+        } catch (Throwable $e) {
+        }
+    }
+
+    // ----- A3-8: full 065 reapply remains idempotent -----
+    $dbA38 = 'medisa_pack6_a38_' . substr(bin2hex(random_bytes(4)), 0, 8);
+    p6AssertSafeTarget($dbA38);
+    $root->exec('CREATE DATABASE `' . $dbA38 . '` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');
+    $pdoA38 = p6PdoForDb($dbA38);
+    try {
+        foreach ($files as $file) {
+            p6Apply($pdoA38, $file);
+        }
+        p6Assert(PersonelOrgStructureSchema::isReady($pdoA38), 'A3-8 ready after first 065');
+        p6Apply($pdoA38, '065_personel_org_structure.sql');
+        p6Apply($pdoA38, '065_personel_org_structure.sql');
+        p6Assert(PersonelOrgStructureSchema::isReady($pdoA38), 'A3-8 ready after reapply');
+        p6Assert(p6FkExists($pdoA38, 'bolumler', 'fk_bolumler_departman'), 'A3-8 FK stable');
+        p6Assert(p6IndexExists($pdoA38, 'pozisyonlar', 'uq_pozisyonlar_ad'), 'A3-8 unique stable');
+    } finally {
+        try {
+            $root->exec('DROP DATABASE IF EXISTS `' . $dbA38 . '`');
         } catch (Throwable $e) {
         }
     }

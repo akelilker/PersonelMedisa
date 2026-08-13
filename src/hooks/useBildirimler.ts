@@ -154,7 +154,7 @@ function resolveDepartmanIdForBildirim(
     return selected.departman_id;
   }
 
-  return parseRequiredPositiveInt(departmanIdValue, "Bölüm");
+  return parseRequiredPositiveInt(departmanIdValue, "Departman");
 }
 
 function resolveBildirimListDateParams(applied: BildirimListQueryState["applied"]) {

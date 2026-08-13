@@ -412,7 +412,7 @@ export function PersonellerPage() {
             <thead>
               <tr>
                 <th scope="col">Ad Soyad</th>
-                <th scope="col">Bölüm</th>
+                <th scope="col">Departman</th>
                 <th scope="col">Unvan</th>
                 <th scope="col">Durum</th>
                 <th scope="col">Telefon</th>

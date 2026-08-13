@@ -10,20 +10,94 @@ use PDO;
  * Pack6 — Bölüm / Birim / Pozisyon + subeler.sgk_isveren_id schema readiness owner.
  * Unconditional JOIN/SELECT/INSERT against new tables is forbidden until ready.
  * Does not weaken Pack5 ORG_LOCATION_SCHEMA_NOT_READY.
+ *
+ * Ready means usable structure: required columns, parent/personnel FKs, and
+ * uniqueness contracts — not merely table-name existence.
  */
 final class PersonelOrgStructureSchema
 {
     public const ERROR_CODE = 'ORG_STRUCTURE_SCHEMA_NOT_READY';
 
+    /** @var array<string, bool> */
+    private static $readyCache = [];
+
     public static function isReady(PDO $pdo): bool
     {
-        return self::tableExists($pdo, 'bolumler')
-            && self::tableExists($pdo, 'birimler')
-            && self::tableExists($pdo, 'pozisyonlar')
-            && self::columnExists($pdo, 'personeller', 'bolum_id')
-            && self::columnExists($pdo, 'personeller', 'birim_id')
-            && self::columnExists($pdo, 'personeller', 'pozisyon_id')
-            && self::columnExists($pdo, 'subeler', 'sgk_isveren_id');
+        $cacheKey = self::cacheKey($pdo);
+        if ($cacheKey !== null && array_key_exists($cacheKey, self::$readyCache)) {
+            return self::$readyCache[$cacheKey];
+        }
+
+        $ready = self::evaluateReady($pdo);
+        // Cache only positive readiness so pre-repair FALSE does not stick after 065 converges
+        // on the same PDO (tests / same-request migrate-then-check).
+        if ($ready && $cacheKey !== null) {
+            self::$readyCache[$cacheKey] = true;
+        }
+
+        return $ready;
+    }
+
+    /**
+     * Test/support hook — clears request-local readiness cache.
+     */
+    public static function clearReadyCache(): void
+    {
+        self::$readyCache = [];
+    }
+
+    private static function evaluateReady(PDO $pdo): bool
+    {
+        if (!self::tableExists($pdo, 'bolumler')
+            || !self::tableExists($pdo, 'birimler')
+            || !self::tableExists($pdo, 'pozisyonlar')
+        ) {
+            return false;
+        }
+
+        // Columns application SQL depends on (e.g. WHERE durum='AKTIF').
+        foreach (['id', 'departman_id', 'ad', 'durum'] as $col) {
+            if (!self::columnExists($pdo, 'bolumler', $col)) {
+                return false;
+            }
+        }
+        foreach (['id', 'bolum_id', 'ad', 'durum'] as $col) {
+            if (!self::columnExists($pdo, 'birimler', $col)) {
+                return false;
+            }
+        }
+        foreach (['id', 'ad', 'durum'] as $col) {
+            if (!self::columnExists($pdo, 'pozisyonlar', $col)) {
+                return false;
+            }
+        }
+        if (!self::columnExists($pdo, 'personeller', 'bolum_id')
+            || !self::columnExists($pdo, 'personeller', 'birim_id')
+            || !self::columnExists($pdo, 'personeller', 'pozisyon_id')
+            || !self::columnExists($pdo, 'subeler', 'sgk_isveren_id')
+        ) {
+            return false;
+        }
+
+        // Correctness-critical relationships + uniqueness for safe writes/import.
+        if (!self::foreignKeyExists($pdo, 'bolumler', 'fk_bolumler_departman')
+            || !self::foreignKeyExists($pdo, 'birimler', 'fk_birimler_bolum')
+            || !self::foreignKeyExists($pdo, 'personeller', 'fk_personeller_bolum')
+            || !self::foreignKeyExists($pdo, 'personeller', 'fk_personeller_birim')
+            || !self::foreignKeyExists($pdo, 'personeller', 'fk_personeller_pozisyon')
+            || !self::foreignKeyExists($pdo, 'subeler', 'fk_subeler_sgk_isveren')
+        ) {
+            return false;
+        }
+
+        if (!self::indexExists($pdo, 'bolumler', 'uq_bolumler_departman_ad')
+            || !self::indexExists($pdo, 'birimler', 'uq_birimler_bolum_ad')
+            || !self::indexExists($pdo, 'pozisyonlar', 'uq_pozisyonlar_ad')
+        ) {
+            return false;
+        }
+
+        return true;
     }
 
     /**
@@ -209,6 +283,18 @@ final class PersonelOrgStructureSchema
         return $v > 0 ? $v : null;
     }
 
+    private static function cacheKey(PDO $pdo): ?string
+    {
+        try {
+            $db = (string) $pdo->query('SELECT DATABASE()')->fetchColumn();
+
+            // spl_object_id keeps distinct PDO instances from contaminating each other in tests.
+            return spl_object_id($pdo) . '|' . $db;
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
     private static function tableExists(PDO $pdo, string $table): bool
     {
         try {
@@ -252,6 +338,44 @@ final class PersonelOrgStructureSchema
             $stmt->execute(['t' => $table, 'c' => $column]);
 
             return (int) $stmt->fetchColumn() === 1;
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    private static function foreignKeyExists(PDO $pdo, string $table, string $constraintName): bool
+    {
+        try {
+            if ($pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite') {
+                // Fail-closed: sqlite fixtures do not model Pack6 FK contract.
+                return false;
+            }
+            $stmt = $pdo->prepare(
+                "SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
+                 WHERE table_schema = DATABASE() AND table_name = :t
+                   AND constraint_name = :c AND constraint_type = 'FOREIGN KEY'"
+            );
+            $stmt->execute(['t' => $table, 'c' => $constraintName]);
+
+            return (int) $stmt->fetchColumn() === 1;
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    private static function indexExists(PDO $pdo, string $table, string $indexName): bool
+    {
+        try {
+            if ($pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite') {
+                return false;
+            }
+            $stmt = $pdo->prepare(
+                'SELECT COUNT(*) FROM information_schema.STATISTICS
+                 WHERE table_schema = DATABASE() AND table_name = :t AND index_name = :i'
+            );
+            $stmt->execute(['t' => $table, 'i' => $indexName]);
+
+            return (int) $stmt->fetchColumn() >= 1;
         } catch (\Throwable $e) {
             return false;
         }

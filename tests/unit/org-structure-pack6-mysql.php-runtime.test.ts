@@ -35,9 +35,17 @@ describe("Org Structure Pack6 MariaDB runtime", () => {
     expect(migration065).toContain("birimler");
     expect(migration065).toContain("pozisyonlar");
     expect(migration065).toContain("sgk_isveren_id");
+    expect(migration065).toContain("PACK6_065_BLOCKER");
+    expect(migration065).toContain("ADD COLUMN durum");
+    expect(migration065).toContain("idx_bolumler_durum");
+    expect(migration065).toContain("chk_bolumler_durum");
     expect(migration065).not.toContain("INSERT INTO");
+    expect(migration065).not.toContain("DROP TABLE");
     expect(orgStructSource).toContain("ORG_STRUCTURE_SCHEMA_NOT_READY");
     expect(orgStructSource).toContain("assertHierarchyConsistent");
+    expect(orgStructSource).toContain("fk_bolumler_departman");
+    expect(orgStructSource).toContain("uq_bolumler_departman_ad");
+    expect(orgStructSource).toContain("clearReadyCache");
   });
 
   it("runs Pack6 acceptance on MariaDB", () => {

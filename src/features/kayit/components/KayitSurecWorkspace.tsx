@@ -880,7 +880,7 @@ export function KayitSurecWorkspace({
 
     const changes = [
       {
-        label: "Bölüm",
+        label: "Departman",
         before: formatGeneralField(submitBaseline.departman_adi),
         after: optionLabel(refs.departmanOptions, submitForm.departmanId, formatGeneralField(submitBaseline.departman_adi)),
         changed: submitForm.departmanId !== toOptionalIdValue(submitBaseline.departman_id)

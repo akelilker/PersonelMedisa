@@ -38,7 +38,7 @@ export function validatePozisyonSubmit(
     return { ok: false, message: "Değişikliğin geçerli olacağı tarihi seç." };
   }
   if (!form.departmanId || !form.gorevId || !form.personelTipiId) {
-    return { ok: false, message: "Bölüm, görev / unvan ve çalışma tipi boş bırakılamaz." };
+    return { ok: false, message: "Departman, unvan ve çalışma tipi boş bırakılamaz." };
   }
   return { ok: true };
 }

@@ -49,7 +49,7 @@ describe("SerbestZamanController MariaDB", () => {
     const migrations = readdirSync(resolve(process.cwd(), "api/migrations"))
       .filter((name) => name.endsWith(".sql"))
       .sort();
-    expect(migrations.at(-1)).toBe("060_retention_physical_destroy_trigger_gate.sql");
+    expect(migrations.at(-1)).toBe("061_serbest_zaman_kullanim_tahsisleri.sql");
   });
 
   it("runs HTTP serbest zaman acceptance on MariaDB", () => {
@@ -74,6 +74,8 @@ describe("SerbestZamanController MariaDB", () => {
     expect(result.stdout).toContain("[PASS] guard row exists");
     expect(result.stdout).toContain("[PASS] olusum again ALREADY_EXISTS");
     expect(result.stdout).toContain("[PASS] sealed period POST kullanim → 200");
+    expect(result.stdout).toContain("[PASS] kullanim has allocation rows");
+    expect(result.stdout).toContain("[PASS] kullanim allocation SUM(delta)=dakika");
     expect(result.stdout).toContain("[PASS] kullanim donem_kilitli_miydi true");
     expect(result.stdout).toContain("[PASS] bakiye kalan 60");
     expect(result.stdout).toContain("[PASS] same islem_anahtari retry → 200");

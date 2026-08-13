@@ -220,8 +220,73 @@ if (($argv[1] ?? '') === '--http-child') {
     exit(3);
 }
 
+function applySzSqlFile(PDO $pdo, string $path): void
+{
+    $sql = (string) file_get_contents($path);
+    $statements = [];
+    $buffer = '';
+    $inTrigger = false;
+    $inSingle = false;
+    foreach (preg_split('/\r?\n/', $sql) ?: [] as $line) {
+        $trimmed = trim($line);
+        if (!$inSingle && ($trimmed === '' || strpos($trimmed, '--') === 0)) {
+            continue;
+        }
+        if (!$inTrigger && !$inSingle && preg_match('/^CREATE\s+TRIGGER/i', $trimmed)) {
+            $inTrigger = true;
+        }
+        $buffer .= $line . "\n";
+        $len = strlen($line);
+        for ($i = 0; $i < $len; $i++) {
+            if ($line[$i] !== "'") {
+                continue;
+            }
+            if ($inSingle && $i + 1 < $len && $line[$i + 1] === "'") {
+                $i++;
+                continue;
+            }
+            $inSingle = !$inSingle;
+        }
+        if ($inSingle) {
+            continue;
+        }
+        $endsWithSemicolon = substr($trimmed, -1) === ';';
+        if ($inTrigger) {
+            $isGuarded = (bool) preg_match('/\bTHEN\b/i', $buffer);
+            $complete = $isGuarded
+                ? (bool) preg_match('/^END\s+IF;$/i', $trimmed)
+                : $endsWithSemicolon;
+            if ($complete) {
+                $statements[] = trim($buffer);
+                $buffer = '';
+                $inTrigger = false;
+            }
+            continue;
+        }
+        if ($endsWithSemicolon) {
+            $statements[] = trim($buffer);
+            $buffer = '';
+        }
+    }
+    if (trim($buffer) !== '') {
+        $statements[] = trim($buffer);
+    }
+    foreach ($statements as $statement) {
+        if ($statement !== '') {
+            $pdo->exec($statement);
+        }
+    }
+}
+
 function applySqlFile(PDO $pdo, string $path): void
 {
+    if (substr($path, -strlen('061_serbest_zaman_kullanim_tahsisleri.sql'))
+        === '061_serbest_zaman_kullanim_tahsisleri.sql'
+    ) {
+        applySzSqlFile($pdo, $path);
+
+        return;
+    }
     $migration = (string) file_get_contents($path);
     foreach (preg_split('/;\s*\n/', $migration) as $stmt) {
         $trimmed = trim((string) $stmt);
@@ -647,6 +712,7 @@ function bootstrapSzSchema(PDO $pdo): string
     applySqlFile($pdo, __DIR__ . '/../../api/migrations/027_haftalik_kapanis.sql');
     applySqlFile($pdo, __DIR__ . '/../../api/migrations/028_fazla_calisma_odeme_tercihleri.sql');
     applySqlFile($pdo, __DIR__ . '/../../api/migrations/029_serbest_zaman_events.sql');
+    applySqlFile($pdo, __DIR__ . '/../../api/migrations/061_serbest_zaman_kullanim_tahsisleri.sql');
     applySzPayrollCompliance043($pdo);
     seedSzFixtures($pdo);
 
@@ -816,6 +882,16 @@ szAssert($kullanim['status'] === 200, 'sealed period POST kullanim → 200');
 szAssert(($kullanim['payload']['data']['donem_kilitli_miydi'] ?? false) === true, 'kullanim donem_kilitli_miydi true');
 $kullanimId = (int) ($kullanim['payload']['data']['id'] ?? 0);
 szAssert($kullanimId > 0, 'kullanim returns id');
+
+$tahsisRows = (int) $pdo->query(
+    'SELECT COUNT(*) FROM serbest_zaman_kullanim_tahsisleri WHERE kullanim_event_id = ' . $kullanimId
+)->fetchColumn();
+szAssert($tahsisRows > 0, 'kullanim has allocation rows');
+$tahsisSum = (int) $pdo->query(
+    'SELECT COALESCE(SUM(tahsis_delta_dakika), 0) FROM serbest_zaman_kullanim_tahsisleri
+     WHERE kullanim_event_id = ' . $kullanimId
+)->fetchColumn();
+szAssert($tahsisSum === 30, 'kullanim allocation SUM(delta)=dakika');
 
 $bakiyeAfter = invokeSzHttp($pdo, $gy, 'GET', '/serbest-zaman/bakiye', [], $subeHeader, [
     'personel_id' => '10',

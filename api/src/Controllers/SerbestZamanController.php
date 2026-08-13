@@ -12,8 +12,10 @@ use Medisa\Api\Http\Request;
 use Medisa\Api\Scope\SubeScope;
 use Medisa\Api\Services\Payroll\PayrollComplianceGuard;
 use Medisa\Api\Services\PuantajDonemKilidiService;
+use Medisa\Api\Services\SerbestZaman\SerbestZamanAllocationService;
 use PDO;
 use PDOException;
+use RuntimeException;
 use Throwable;
 
 /**
@@ -122,7 +124,26 @@ class SerbestZamanController
         self::assertPersonelScope($user, $request, (int) $personel['sube_id']);
 
         $events = self::loadPersonelEvents($pdo, $personelId);
-        JsonResponse::success(self::hesaplaBakiye($personelId, $events, $referans));
+        $bakiye = self::hesaplaBakiye($personelId, $events, $referans);
+        if (SerbestZamanAllocationService::tableExists($pdo)) {
+            $allocState = SerbestZamanAllocationService::personelAllocationState($pdo, $events, $personelId);
+            $bakiye['allocation_state'] = $allocState['state'];
+            $bakiye['allocation_policy'] = SerbestZamanAllocationService::POLICY_CONSUME;
+            $bakiye['legacy_unallocated_usage_count'] = $allocState['legacy_unallocated_usage_count'];
+            if ($allocState['state'] === SerbestZamanAllocationService::STATE_ALLOCATED
+                || $allocState['state'] === SerbestZamanAllocationService::STATE_NO_USAGE
+            ) {
+                $lots = SerbestZamanAllocationService::projectLots($pdo, $events, $personelId, $referans);
+                $lotSum = SerbestZamanAllocationService::summarizeLotBalance($lots);
+                $bakiye['lot_based_balance_available'] = $lotSum['usable_dakika'];
+                $bakiye['lot_based_expired_unused'] = $lotSum['expired_unused_dakika'];
+            } else {
+                // LEGACY / broken: do not invent lot remaining.
+                $bakiye['lot_based_balance_available'] = null;
+                $bakiye['lot_based_expired_unused'] = null;
+            }
+        }
+        JsonResponse::success($bakiye);
     }
 
     public static function olusum(Request $request): void
@@ -376,6 +397,13 @@ class SerbestZamanController
             }
 
             $events = self::loadPersonelEvents($pdo, $personelId);
+            try {
+                SerbestZamanAllocationService::assertSchemaReady($pdo);
+                SerbestZamanAllocationService::assertWritableForNewUsage($pdo, $events, $personelId);
+            } catch (RuntimeException $e) {
+                self::mapAllocationConflict($pdo, $e);
+            }
+
             $bakiye = self::hesaplaBakiye($personelId, $events, $eventTarihi);
             if ($bakiye['kalan_dakika'] <= 0) {
                 self::rollbackConflict($pdo, 'NO_ELIGIBLE_BALANCE', 'Kullanilabilir serbest zaman bakiyesi yok.');
@@ -415,6 +443,23 @@ class SerbestZamanController
             }
 
             $eventId = (int) $pdo->lastInsertId();
+            $eventsAfter = self::loadPersonelEvents($pdo, $personelId);
+            try {
+                SerbestZamanAllocationService::allocateConsume(
+                    $pdo,
+                    $eventsAfter,
+                    $personelId,
+                    $eventId,
+                    $eventId,
+                    $dakika,
+                    $eventTarihi
+                );
+                SerbestZamanAllocationService::assertUsageInvariant($pdo, $eventsAfter, $personelId, $eventId);
+                SerbestZamanAllocationService::assertLotInvariants($pdo, $eventsAfter, $personelId);
+            } catch (RuntimeException $e) {
+                self::mapAllocationConflict($pdo, $e);
+            }
+
             $pdo->commit();
             JsonResponse::success(self::mapEvent(self::loadEventById($pdo, $eventId)));
         } catch (Throwable $e) {
@@ -526,6 +571,25 @@ class SerbestZamanController
 
             // Capture before any DELETE — MariaDB/PDO lastInsertId resets to 0 after DELETE.
             $eventId = (int) $pdo->lastInsertId();
+
+            if ($hedefTipi === 'SERBEST_ZAMAN_KULLANIM'
+                && SerbestZamanAllocationService::tableExists($pdo)
+            ) {
+                $eventsAfter = self::loadPersonelEvents($pdo, $personelId);
+                try {
+                    SerbestZamanAllocationService::reconcileUsageToEffective(
+                        $pdo,
+                        $eventsAfter,
+                        $personelId,
+                        $hedefEventId,
+                        $eventId,
+                        0,
+                        $eventTarihi
+                    );
+                } catch (RuntimeException $e) {
+                    self::mapAllocationConflict($pdo, $e);
+                }
+            }
 
             if ($hedefTipi === 'SERBEST_ZAMAN_OLUSUM') {
                 $del = $pdo->prepare(
@@ -666,6 +730,26 @@ class SerbestZamanController
             }
 
             $eventId = (int) $pdo->lastInsertId();
+            if (SerbestZamanAllocationService::tableExists($pdo)) {
+                $eventsAfter = self::loadPersonelEvents($pdo, $personelId);
+                try {
+                    if ($hedefTipi === 'SERBEST_ZAMAN_KULLANIM') {
+                        SerbestZamanAllocationService::reconcileUsageToEffective(
+                            $pdo,
+                            $eventsAfter,
+                            $personelId,
+                            $hedefEventId,
+                            $eventId,
+                            $yeniDakika,
+                            $eventTarihi
+                        );
+                    } else {
+                        SerbestZamanAllocationService::assertLotInvariants($pdo, $eventsAfter, $personelId);
+                    }
+                } catch (RuntimeException $e) {
+                    self::mapAllocationConflict($pdo, $e);
+                }
+            }
             $pdo->commit();
             JsonResponse::success(self::mapEvent(self::loadEventById($pdo, $eventId)));
         } catch (Throwable $e) {
@@ -1064,6 +1148,43 @@ class SerbestZamanController
             $pdo->rollBack();
         }
         JsonResponse::error(409, $code, $message);
+    }
+
+    private static function mapAllocationConflict(PDO $pdo, RuntimeException $e): void
+    {
+        $code = $e->getMessage();
+        if ($code === 'INSUFFICIENT_BALANCE') {
+            self::rollbackConflict($pdo, 'INSUFFICIENT_BALANCE', 'Kullanim miktari mevcut bakiyeyi asiyor.');
+        }
+        if ($code === SerbestZamanAllocationService::CODE_LEGACY_ALLOCATION_REQUIRED) {
+            self::rollbackConflict(
+                $pdo,
+                SerbestZamanAllocationService::CODE_LEGACY_ALLOCATION_REQUIRED,
+                'Legacy KULLANIM tahsisi cozumlenmeden yeni kullanim yazilamaz.'
+            );
+        }
+        if ($code === SerbestZamanAllocationService::CODE_ALLOCATION_INVARIANT_BROKEN) {
+            self::rollbackConflict(
+                $pdo,
+                SerbestZamanAllocationService::CODE_ALLOCATION_INVARIANT_BROKEN,
+                'Serbest zaman tahsis invariant ihlali.'
+            );
+        }
+        if ($code === SerbestZamanAllocationService::CODE_OLUSUM_HAS_ALLOCATIONS) {
+            self::rollbackConflict(
+                $pdo,
+                SerbestZamanAllocationService::CODE_OLUSUM_HAS_ALLOCATIONS,
+                'Tahsis edilmis OLUSUM iptal edilemez.'
+            );
+        }
+        if ($code === SerbestZamanAllocationService::CODE_SCHEMA_NOT_READY) {
+            self::rollbackConflict(
+                $pdo,
+                SerbestZamanAllocationService::CODE_SCHEMA_NOT_READY,
+                'Serbest zaman tahsis semasi hazir degil.'
+            );
+        }
+        throw $e;
     }
 
     private static function rollbackValidation(PDO $pdo, string $code, string $message): void

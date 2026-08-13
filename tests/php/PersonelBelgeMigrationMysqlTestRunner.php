@@ -113,7 +113,7 @@ try {
 
     $files = pbmMigrationFiles();
     pbmAssert($files !== [] && $files[0] === '001_initial_schema.sql', 'zincir 001 ile baslar');
-    pbmAssert(end($files) === '060_retention_physical_destroy_trigger_gate.sql', 'zincir 053 ile biter');
+    pbmAssert(end($files) === '061_serbest_zaman_kullanim_tahsisleri.sql', 'zincir 053 ile biter');
     pbmAssert(!in_array('039_personel_belge_yonetimi.sql', $files, true), '039 personel belge yok');
 
     foreach ($files as $file) {

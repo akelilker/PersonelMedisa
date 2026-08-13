@@ -28,7 +28,7 @@ describe("S87 seal revision 044 MariaDB migration", () => {
       .filter((name) => /^\d{3}_.+\.sql$/.test(name))
       .sort();
     expect(migrations[0]).toBe("001_initial_schema.sql");
-    expect(migrations.at(-1)).toBe("060_retention_physical_destroy_trigger_gate.sql");
+    expect(migrations.at(-1)).toBe("061_serbest_zaman_kullanim_tahsisleri.sql");
   });
 
   it("applies tip 044 twice idempotently and preserves revision-1 seals", () => {

@@ -78,6 +78,12 @@ export type SerbestZamanEvent =
   | SerbestZamanIptalEvent
   | SerbestZamanDuzeltmeEvent;
 
+export type SerbestZamanAllocationState =
+  | "ALLOCATED"
+  | "LEGACY_UNALLOCATED"
+  | "INVARIANT_BROKEN"
+  | "NO_USAGE";
+
 export type SerbestZamanBakiye = {
   personel_id: number;
   toplam_hak_dakika: number;
@@ -85,6 +91,12 @@ export type SerbestZamanBakiye = {
   kalan_dakika: number;
   suresi_dolan_dakika: number;
   event_sayisi: number;
+  /** Pack 4A — present when allocation ledger table exists */
+  allocation_state?: SerbestZamanAllocationState;
+  allocation_policy?: string;
+  legacy_unallocated_usage_count?: number;
+  lot_based_balance_available?: number | null;
+  lot_based_expired_unused?: number | null;
 };
 
 export type PostSerbestZamanOlusumPayload = {

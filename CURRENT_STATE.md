@@ -64,7 +64,7 @@ Görsel sistem çalışmaları mevcut component/owner içinde yapılabilir. Yeni
 | Ürün/domain beyni | Frozen | Hayır |
 | QR S3C–S3F | CLOSED_PRODUCTION | Hayır |
 | Canonical docs / gap registry | Güncel (`110`); `CANONICAL_DOC_STALE=0` | Hayır |
-| CODE_GAP (3 P1: SZ deadline follow-up, OT path, org location) | Açık — `110` | Hayır (ürün “tamam” iddiasını engeller) |
+| CODE_GAP (4 P1: `MG-RET-PHYS-001`, `MG-SZ-6M-001`, `MG-OT-YEAR-PATH-001`, `MG-ORG-LOC-001`) | Açık — `110` | Hayır (ürün “tamam” iddiasını engeller) |
 | SGK/UBGT/hukuki kanıtlar | OPS_ROLLOUT + insan kararı | Hayır |
 | Gerçek personel / org rollout | USER_GATED OPS_ROLLOUT | Hayır |
 | Exact-SHA cPanel yayın | Ops / manuel upload | Tasarımı engellemez; canlıya çıkışı ops kapısına bağlar |

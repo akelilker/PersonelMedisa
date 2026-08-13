@@ -131,14 +131,14 @@ No-op overlay unchanged: `NO_PHYSICAL_ROWS` â‰  parent destroyed. Evidence c
 
 | Suite / assert | Result |
 | --- | --- |
-| Pack 2 MariaDB | regression required |
-| Pack 3B MariaDB | regression required |
-| Pack 3C MariaDB | required |
-| `SERBEST_UNALLOCATED_USAGE_BLOCK` | required PASS |
-| `SERBEST_BALANCE_UNCHANGED_ON_BLOCK` | required PASS |
-| `FAZLA_SHARED_NOTES_PRESERVED` | required PASS |
-| `RAPOR_PERSONEL_BELGE_GATE` | required PASS |
-| `IS_KAZASI_PERSONEL_BELGE_GATE` | required PASS |
+| Pack 2 MariaDB | PASS |
+| Pack 3B MariaDB | PASS |
+| Pack 3C MariaDB | PASS |
+| `SERBEST_UNALLOCATED_USAGE_BLOCK` | PASS |
+| `SERBEST_BALANCE_UNCHANGED_ON_BLOCK` | PASS |
+| `FAZLA_SHARED_NOTES_PRESERVED` | PASS |
+| `RAPOR_PERSONEL_BELGE_GATE` | PASS |
+| `IS_KAZASI_PERSONEL_BELGE_GATE` | PASS |
 | Feature flag default OFF | PASS |
 
 `NEW_MIGRATION = NO`

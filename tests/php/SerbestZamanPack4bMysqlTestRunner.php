@@ -9,9 +9,14 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../api/src/bootstrap.php';
 
+use Medisa\Api\Auth\AuthMiddleware;
+use Medisa\Api\Controllers\SerbestZamanController;
+use Medisa\Api\Database\Connection;
+use Medisa\Api\Http\Request;
 use Medisa\Api\Services\Payroll\PayrollComplianceGuard;
 use Medisa\Api\Services\Retention\ArchiveManifestService;
 use Medisa\Api\Services\Retention\DestructionWorkflowService;
+use Medisa\Api\Services\Retention\PhysicalDestruction\Handlers\SerbestZamanDestructionHandler;
 use Medisa\Api\Services\Retention\PhysicalDestruction\PhysicalDestructionCodes;
 use Medisa\Api\Services\Retention\PhysicalDestruction\PhysicalDestructionService;
 use Medisa\Api\Services\Retention\PhysicalDestruction\RetentionPhysicalDestroyGate;
@@ -537,6 +542,293 @@ function p4bAllocCount(PDO $pdo, ?int $kullanimId = null): int
     return (int) $stmt->fetchColumn();
 }
 
+function p4bApplyMigrationsUntil(PDO $pdo, int $maxInclusive): void
+{
+    foreach (p4bMigrationFiles() as $file) {
+        if (!preg_match('/^(\d{3})_/', $file, $m)) {
+            continue;
+        }
+        if ((int) $m[1] > $maxInclusive) {
+            break;
+        }
+        p4bApply($pdo, $file);
+    }
+}
+
+/**
+ * @return array{root:PDO,pdo:PDO,name:string}
+ */
+function p4bCreateDb(string $suffix): array
+{
+    $root = p4bRootPdo();
+    $safe = preg_replace('/[^a-z0-9_]/', '', strtolower($suffix)) ?: 'x';
+    $name = 'medisa_sz_p4b_' . $safe . '_' . substr(bin2hex(random_bytes(3)), 0, 6);
+    p4bAssertSafeTarget($name);
+    $root->exec('CREATE DATABASE `' . $name . '` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');
+
+    return [
+        'root' => $root,
+        'pdo' => p4bPdoForDb($name),
+        'name' => $name,
+    ];
+}
+
+function p4bDropDb(PDO $root, string $name): void
+{
+    try {
+        $root->exec('DROP DATABASE IF EXISTS `' . $name . '`');
+    } catch (Throwable $e) {
+        // ignore cleanup failures
+    }
+}
+
+function p4bSeedEmptyKapanis(PDO $pdo, int $subeId = 1): int
+{
+    $hb = p4bNextWeekStart();
+    $he = date('Y-m-d', strtotime($hb . ' +6 days'));
+    $pdo->exec(
+        "INSERT INTO haftalik_kapanislar
+            (sube_id, hafta_baslangic, hafta_bitis, state, personel_sayisi, snapshot_satir_sayisi, created_by)
+         VALUES ({$subeId}, '{$hb}', '{$he}', 'KAPANDI', 0, 0, 1)"
+    );
+
+    return (int) $pdo->lastInsertId();
+}
+
+function p4bExpectSzAllocSchemaNotReady(PDO $pdo, int $kapanisId, string $label): void
+{
+    $handler = new SerbestZamanDestructionHandler();
+    $caught = false;
+    try {
+        $handler->plan(
+            $pdo,
+            [
+                'record_id' => $kapanisId,
+                'category' => RetentionCategories::SERBEST_ZAMAN,
+            ],
+            ['haftalik_kapanis_id' => $kapanisId]
+        );
+    } catch (RuntimeException $e) {
+        $caught = $e->getMessage()
+            === PhysicalDestructionCodes::CODE_SERBEST_ZAMAN_ALLOCATION_SCHEMA_NOT_READY;
+    }
+    p4bAssert($caught, $label);
+}
+
+function p4bEventCount(PDO $pdo): int
+{
+    $exists = (int) $pdo->query(
+        "SELECT COUNT(*) FROM information_schema.TABLES
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'serbest_zaman_events'"
+    )->fetchColumn();
+    if ($exists === 0) {
+        return 0;
+    }
+
+    return (int) $pdo->query('SELECT COUNT(*) FROM serbest_zaman_events')->fetchColumn();
+}
+
+function setConnectionPdo(PDO $pdo): void
+{
+    $ref = new ReflectionClass(Connection::class);
+    $prop = $ref->getProperty('pdo');
+    $prop->setAccessible(true);
+    $prop->setValue(null, $pdo);
+}
+
+/** @param array<string, mixed>|null $user */
+function resetAuthUser($user): void
+{
+    $ref = new ReflectionClass(AuthMiddleware::class);
+    $prop = $ref->getProperty('user');
+    $prop->setAccessible(true);
+    $prop->setValue(null, $user);
+}
+
+function makeRequest(string $method, string $path, array $body = [], array $headers = []): Request
+{
+    $request = new Request();
+    $ref = new ReflectionClass($request);
+    foreach ([
+        'method' => strtoupper($method),
+        'path' => $path,
+        'headers' => array_change_key_case($headers, CASE_LOWER),
+        'jsonBody' => $body,
+    ] as $name => $value) {
+        $prop = $ref->getProperty($name);
+        $prop->setAccessible(true);
+        $prop->setValue($request, $value);
+    }
+
+    return $request;
+}
+
+/** @return list<string> */
+function phpMysqlArgs(): array
+{
+    $phpArgs = [];
+    if (PHP_OS_FAMILY === 'Windows') {
+        $extensionDir = ini_get('extension_dir');
+        if (is_string($extensionDir) && $extensionDir !== '') {
+            $phpArgs[] = '-d';
+            $phpArgs[] = 'extension_dir=' . $extensionDir;
+        }
+        $phpArgs[] = '-d';
+        $phpArgs[] = 'extension=pdo_mysql';
+    }
+
+    return $phpArgs;
+}
+
+/**
+ * @param array<string, mixed> $user
+ * @param array<string, mixed> $body
+ * @param array<string, string> $headers
+ * @param array<string, mixed> $query
+ * @return array{process:resource, pipes:array, status_file:string}
+ */
+function spawnSzHttp(
+    PDO $pdo,
+    $user,
+    string $method,
+    string $path,
+    array $body = [],
+    array $headers = [],
+    array $query = []
+): array {
+    setConnectionPdo($pdo);
+    resetAuthUser($user);
+
+    $statusFile = tempnam(sys_get_temp_dir(), 'p4b_http_');
+    if ($statusFile === false) {
+        throw new RuntimeException('tempnam failed');
+    }
+
+    $payload = json_encode([
+        'dsn' => getenv('MEDISA_TEST_MYSQL_DSN'),
+        'user' => getenv('MEDISA_TEST_MYSQL_USER'),
+        'password' => getenv('MEDISA_TEST_MYSQL_PASSWORD'),
+        'database' => $pdo->query('SELECT DATABASE()')->fetchColumn(),
+        'auth' => $user,
+        'method' => $method,
+        'path' => $path,
+        'body' => $body,
+        'headers' => $headers,
+        'query' => $query,
+        'status_file' => $statusFile,
+    ], JSON_UNESCAPED_UNICODE);
+
+    $cmd = array_merge([PHP_BINARY], phpMysqlArgs(), [__FILE__, '--http-child']);
+    $descriptors = [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
+    $env = getenv();
+    if (!is_array($env)) {
+        $env = [];
+    }
+    $process = proc_open($cmd, $descriptors, $pipes, null, array_merge($env, [
+        'MEDISA_TEST_MYSQL_DSN' => getenv('MEDISA_TEST_MYSQL_DSN') ?: '',
+        'MEDISA_TEST_MYSQL_USER' => getenv('MEDISA_TEST_MYSQL_USER') ?: '',
+        'MEDISA_TEST_MYSQL_PASSWORD' => getenv('MEDISA_TEST_MYSQL_PASSWORD') ?: '',
+    ]));
+    if (!is_resource($process)) {
+        throw new RuntimeException('http child failed to start');
+    }
+    fwrite($pipes[0], (string) $payload);
+    fclose($pipes[0]);
+
+    return ['process' => $process, 'pipes' => $pipes, 'status_file' => $statusFile];
+}
+
+/**
+ * @param array{process:resource, pipes:array, status_file:string} $child
+ * @return array{status:int, payload:array<string,mixed>}
+ */
+function finishSzHttp(array $child): array
+{
+    $stdout = (string) stream_get_contents($child['pipes'][1]);
+    $stderr = (string) stream_get_contents($child['pipes'][2]);
+    fclose($child['pipes'][1]);
+    fclose($child['pipes'][2]);
+    proc_close($child['process']);
+
+    $statusRaw = is_file($child['status_file']) ? trim((string) file_get_contents($child['status_file'])) : '';
+    @unlink($child['status_file']);
+    $status = (int) $statusRaw;
+
+    $jsonStart = strpos($stdout, '{');
+    $jsonSlice = $jsonStart === false ? $stdout : substr($stdout, $jsonStart);
+    $decoded = json_decode((string) $jsonSlice, true);
+    if (!is_array($decoded)) {
+        throw new RuntimeException('http child invalid json: ' . $stdout . ' / ' . $stderr);
+    }
+
+    return ['status' => $status, 'payload' => $decoded];
+}
+
+/**
+ * @param array<string, mixed> $user
+ * @param array<string, mixed> $body
+ * @param array<string, string> $headers
+ * @param array<string, mixed> $query
+ * @return array{status:int, payload:array<string,mixed>}
+ */
+function invokeSzHttp(
+    PDO $pdo,
+    $user,
+    string $method,
+    string $path,
+    array $body = [],
+    array $headers = [],
+    array $query = []
+): array {
+    return finishSzHttp(spawnSzHttp($pdo, $user, $method, $path, $body, $headers, $query));
+}
+
+if (($argv[1] ?? '') === '--http-child') {
+    $raw = stream_get_contents(STDIN);
+    $cfg = json_decode((string) $raw, true);
+    if (!is_array($cfg)) {
+        fwrite(STDERR, "bad child config\n");
+        exit(2);
+    }
+
+    $dsn = preg_replace('/dbname=[^;]+/', 'dbname=' . $cfg['database'], (string) $cfg['dsn']);
+    $pdo = new PDO(
+        (string) $dsn,
+        (string) $cfg['user'],
+        (string) $cfg['password'],
+        [
+            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+        ]
+    );
+    setConnectionPdo($pdo);
+    resetAuthUser($cfg['auth']);
+
+    $_GET = [];
+    if (is_array($cfg['query'] ?? null)) {
+        foreach ($cfg['query'] as $key => $value) {
+            $_GET[(string) $key] = $value;
+        }
+    }
+
+    register_shutdown_function(static function () use ($cfg): void {
+        file_put_contents((string) $cfg['status_file'], (string) http_response_code());
+    });
+
+    $method = strtoupper((string) ($cfg['method'] ?? 'GET'));
+    $path = (string) ($cfg['path'] ?? '');
+    $body = is_array($cfg['body'] ?? null) ? $cfg['body'] : [];
+    $headers = is_array($cfg['headers'] ?? null) ? $cfg['headers'] : [];
+    $request = makeRequest($method, $path, $body, $headers);
+
+    if ($method === 'GET' && $path === '/serbest-zaman/deadline-takip') {
+        SerbestZamanController::deadlineTakip($request);
+    }
+
+    fwrite(STDERR, "unhandled route\n");
+    exit(3);
+}
+
 // --- main ---
 $root = p4bRootPdo();
 $database = 'medisa_sz_pack4b_' . substr(bin2hex(random_bytes(4)), 0, 8);
@@ -563,7 +855,11 @@ try {
     RetentionClock::setOverride(new DateTimeImmutable('2037-01-01'));
     p4bFlagOn();
 
-    // ---------- L. Schema: gatedCategories includes SERBEST_ZAMAN ----------
+    // ---------- L. Pack4B readiness + gatedCategories ----------
+    p4bAssert(
+        RetentionPhysicalDestroyGate::isSerbestZamanPack4bReady($pdo) === true,
+        'L CASE3 isSerbestZamanPack4bReady === true on 062 DB'
+    );
     $gated = RetentionPhysicalDestroyGate::gatedCategories();
     p4bAssert(
         in_array(RetentionCategories::SERBEST_ZAMAN, $gated, true),
@@ -573,6 +869,134 @@ try {
         RetentionPhysicalDestroyGate::requiresGate(RetentionCategories::SERBEST_ZAMAN) === true,
         'L requiresGate(SERBEST_ZAMAN)'
     );
+    p4bAssert(
+        SerbestZamanDeadlineService::isSchemaReady($pdo) === true,
+        'L deadline isSchemaReady === true on 062 DB'
+    );
+
+    // ---------- Schema-missing CASE suites (disposable DBs) ----------
+    // CASE 1: tip < 061 (no allocation ledger / no 062 gate trigger)
+    $case1 = p4bCreateDb('c1');
+    try {
+        p4bApplyMigrationsUntil($case1['pdo'], 60);
+        p4bSeedBase($case1['pdo']);
+        p4bAssert(
+            RetentionPhysicalDestroyGate::isSerbestZamanPack4bReady($case1['pdo']) === false,
+            'CASE1 isSerbestZamanPack4bReady === false (tip<=060)'
+        );
+        $weekC1 = p4bSeedHaftalikGraph($case1['pdo'], null, 10, 300);
+        $evBeforeC1 = p4bEventCount($case1['pdo']);
+        p4bExpectSzAllocSchemaNotReady(
+            $case1['pdo'],
+            (int) $weekC1['kapanis_id'],
+            'CASE1 plan with OLUSUM → SERBEST_ZAMAN_ALLOCATION_SCHEMA_NOT_READY'
+        );
+        p4bAssert(
+            p4bEventCount($case1['pdo']) === $evBeforeC1,
+            'CASE1 no event mutation after plan fail'
+        );
+        $emptyC1 = p4bSeedEmptyKapanis($case1['pdo']);
+        $evBeforeEmptyC1 = p4bEventCount($case1['pdo']);
+        p4bExpectSzAllocSchemaNotReady(
+            $case1['pdo'],
+            $emptyC1,
+            'CASE1/CASE4 empty kapanis plan → SCHEMA_NOT_READY (not empty success)'
+        );
+        p4bAssert(
+            p4bEventCount($case1['pdo']) === $evBeforeEmptyC1,
+            'CASE4 empty-scope no event mutation'
+        );
+
+        // C2: deadline-takip HTTP on DB without 061
+        $c2User = ['id' => 1, 'rol' => 'GENEL_YONETICI', 'sube_ids' => []];
+        $c2Http = invokeSzHttp(
+            $case1['pdo'],
+            $c2User,
+            'GET',
+            '/serbest-zaman/deadline-takip',
+            [],
+            [],
+            ['referans_tarih' => '2020-07-01']
+        );
+        p4bAssert($c2Http['status'] === 409, 'C2 deadline-takip status 409 (not 200 empty)');
+        p4bAssert(
+            (string) ($c2Http['payload']['errors'][0]['code'] ?? '')
+                === SerbestZamanDeadlineService::CODE_SCHEMA_NOT_READY,
+            'C2 errors code SCHEMA_NOT_READY'
+        );
+        p4bAssert(
+            SerbestZamanDeadlineService::isSchemaReady($case1['pdo']) === false,
+            'C2 isSchemaReady === false without 061'
+        );
+    } finally {
+        p4bDropDb($case1['root'], $case1['name']);
+    }
+
+    // CASE 2: tip < 062 (061 present, Pack4A hard DELETE trigger)
+    $case2 = p4bCreateDb('c2');
+    try {
+        p4bApplyMigrationsUntil($case2['pdo'], 61);
+        p4bSeedBase($case2['pdo']);
+        p4bAssert(
+            RetentionPhysicalDestroyGate::isSerbestZamanPack4bReady($case2['pdo']) === false,
+            'CASE2 isSerbestZamanPack4bReady === false (061 hard DELETE, no 062)'
+        );
+        $weekC2 = p4bSeedHaftalikGraph($case2['pdo'], null, 10, 300);
+        $evBeforeC2 = p4bEventCount($case2['pdo']);
+        p4bExpectSzAllocSchemaNotReady(
+            $case2['pdo'],
+            (int) $weekC2['kapanis_id'],
+            'CASE2 plan → SERBEST_ZAMAN_ALLOCATION_SCHEMA_NOT_READY'
+        );
+        p4bAssert(
+            p4bEventCount($case2['pdo']) === $evBeforeC2,
+            'CASE2 no event mutation'
+        );
+        $emptyC2 = p4bSeedEmptyKapanis($case2['pdo']);
+        p4bExpectSzAllocSchemaNotReady(
+            $case2['pdo'],
+            $emptyC2,
+            'CASE2 empty scope still SCHEMA_NOT_READY'
+        );
+    } finally {
+        p4bDropDb($case2['root'], $case2['name']);
+    }
+
+    // CASE 5: full 062 then replace DELETE trigger with Pack4A hard SIGNAL-only
+    $case5 = p4bCreateDb('c5');
+    try {
+        p4bApplyMigrationsUntil($case5['pdo'], 62);
+        p4bSeedBase($case5['pdo']);
+        p4bAssert(
+            RetentionPhysicalDestroyGate::isSerbestZamanPack4bReady($case5['pdo']) === true,
+            'CASE5 baseline ready before trigger swap'
+        );
+        $case5['pdo']->exec('DROP TRIGGER IF EXISTS trg_szkt_no_delete');
+        $case5['pdo']->exec(
+            "CREATE TRIGGER trg_szkt_no_delete
+BEFORE DELETE ON serbest_zaman_kullanim_tahsisleri
+FOR EACH ROW
+SIGNAL SQLSTATE '45000'
+  SET MESSAGE_TEXT = 'SERBEST_ZAMAN_ALLOCATION_IMMUTABLE: tahsis satiri silinemez'"
+        );
+        p4bAssert(
+            RetentionPhysicalDestroyGate::isSerbestZamanPack4bReady($case5['pdo']) === false,
+            'CASE5 Pack4A-style hard DELETE → isSerbestZamanPack4bReady false'
+        );
+        $weekC5 = p4bSeedHaftalikGraph($case5['pdo'], null, 10, 300);
+        $evBeforeC5 = p4bEventCount($case5['pdo']);
+        p4bExpectSzAllocSchemaNotReady(
+            $case5['pdo'],
+            (int) $weekC5['kapanis_id'],
+            'CASE5 plan → SERBEST_ZAMAN_ALLOCATION_SCHEMA_NOT_READY'
+        );
+        p4bAssert(
+            p4bEventCount($case5['pdo']) === $evBeforeC5,
+            'CASE5 no event mutation'
+        );
+    } finally {
+        p4bDropDb($case5['root'], $case5['name']);
+    }
 
     // ---------- A. Migration 062 gate ----------
     $gateWeek = p4bSeedHaftalikGraph($pdo, null, 10, 300);
@@ -1075,11 +1499,10 @@ try {
     p4bAssert(count($rowsO) === 1, 'O one partial-consume deadline row');
     p4bAssert((int) ($rowsO[0]['available_dakika'] ?? 0) === 300, 'O available_dakika=300 only');
     $sumO = SerbestZamanDeadlineService::summarize($rowsO, $refO);
+    p4bAssert((int) ($sumO['yaklasan_dakika'] ?? 0) === 300, 'O yaklasan_dakika=300');
     p4bAssert(
-        (int) ($sumO['yaklasan_dakika'] ?? 0) === 300
-            || (int) ($sumO['suresi_dolmus_kullanilmamis_dakika'] ?? 0) === 300
-            || (int) ($rowsO[0]['available_dakika'] ?? 0) === 300,
-        'O summary reflects available only (not consumed)'
+        (int) ($sumO['suresi_dolmus_kullanilmamis_dakika'] ?? 0) === 0,
+        'O no expired in summary'
     );
 
     // P. fully consumed — no deadline row
@@ -1156,6 +1579,154 @@ try {
     );
     // Touch class so runtime autoload is exercised
     p4bAssert(class_exists(PayrollComplianceGuard::class), 'V PayrollComplianceGuard class loads');
+
+    // ---------- Deadline HTTP runtime (Pack4A-style child) ----------
+    $gyHttp = ['id' => 1, 'rol' => 'GENEL_YONETICI', 'sube_ids' => []];
+
+    // T. PERSONEL without raporlar.view → 403
+    $personelUser = ['id' => 99, 'rol' => 'PERSONEL', 'sube_ids' => [1]];
+    $httpT = invokeSzHttp(
+        $pdo,
+        $personelUser,
+        'GET',
+        '/serbest-zaman/deadline-takip',
+        [],
+        [],
+        ['referans_tarih' => '2020-07-20']
+    );
+    p4bAssert($httpT['status'] === 403, 'T PERSONEL deadline-takip → 403');
+    p4bAssert(
+        (string) ($httpT['payload']['errors'][0]['code'] ?? '') === 'FORBIDDEN',
+        'T FORBIDDEN code'
+    );
+
+    // S. SubeScope: sube_ids=[1] must not see personel on sube 2
+    $pdo->exec("INSERT INTO subeler (id, kod, ad, durum) VALUES (2, 'B', 'Sube B', 'AKTIF')");
+    $pdo->exec(
+        "INSERT INTO personeller (
+            id, tc_kimlik_no, ad, soyad, dogum_tarihi, telefon, acil_durum_kisi, acil_durum_telefon,
+            sicil_no, ise_giris_tarihi, sube_id, aktif_durum
+         ) VALUES
+         (50, '55555555550', 'Scope', 'Two', '1990-01-01', '05000000050', 'Acil', '05000000051',
+            'S050', '2010-01-01', 2, 'AKTIF')"
+    );
+    $sonS = '2020-12-15';
+    // Seed OLUSUM on sube 2 personel via temporary sube override on kapanis graph helpers:
+    // insert week on sube 1 scaffolding then move personel already on sube 2 — use direct inserts.
+    $haftaS = p4bNextWeekStart();
+    $haftaSBitis = date('Y-m-d', strtotime($haftaS . ' +6 days'));
+    $pdo->exec(
+        "INSERT INTO haftalik_kapanislar
+            (sube_id, hafta_baslangic, hafta_bitis, state, personel_sayisi, snapshot_satir_sayisi, created_by)
+         VALUES (2, '{$haftaS}', '{$haftaSBitis}', 'KAPANDI', 1, 1, 1)"
+    );
+    $kapanisS = (int) $pdo->lastInsertId();
+    $notlarS = str_replace("'", "''", P4B_NOTLAR_COMPLETENESS_SENTINEL);
+    $complianceS = str_replace("'", "''", P4B_COMPLIANCE_JSON);
+    $pdo->exec(
+        "INSERT INTO haftalik_kapanis_satirlari (
+            kapanis_id, personel_id, hafta_baslangic, hafta_bitis, state,
+            toplam_net_dakika, normal_calisma_dakika, fazla_calisma_dakika, fazla_surelerle_calisma_dakika,
+            tam_hafta_verisi, compliance_uyarilari_json, compliance_uyari_sayisi, kritik_uyari_var_mi,
+            hesaplama_zamani, kaynak_gun_sayisi, notlar_json
+         ) VALUES (
+            {$kapanisS}, 50, '{$haftaS}', '{$haftaSBitis}', 'KAPANDI',
+            3000, 2700, 300, 0,
+            0, '{$complianceS}', 1, 0,
+            '{$haftaS} 18:00:00', 5, '{$notlarS}'
+         )"
+    );
+    $satirS = (int) $pdo->lastInsertId();
+    $pdo->exec(
+        "INSERT INTO fazla_calisma_odeme_tercihleri (
+            snapshot_id, kapanis_id, personel_id, hafta_baslangic, hafta_bitis,
+            fazla_calisma_dakika, odeme_tipi, secim_zamani, secen_kullanici_id, gerekce
+         ) VALUES (
+            {$satirS}, {$kapanisS}, 50, '{$haftaS}', '{$haftaSBitis}',
+            300, 'SERBEST_ZAMAN', '{$haftaS} 19:00:00', 1, 'scope-s'
+         )"
+    );
+    $tercihS = (int) $pdo->lastInsertId();
+    $pdo->exec(
+        "INSERT INTO serbest_zaman_events (
+            personel_id, event_tipi, dakika, event_tarihi, son_kullanim_tarihi,
+            kaynak_snapshot_id, kaynak_odeme_tercihi_id, created_by
+         ) VALUES (
+            50, 'SERBEST_ZAMAN_OLUSUM', 300, '{$haftaS}', '{$sonS}',
+            {$satirS}, {$tercihS}, 1
+         )"
+    );
+    $olusumS = (int) $pdo->lastInsertId();
+    $pdo->exec(
+        "INSERT INTO serbest_zaman_aktif_olusumlar (odeme_tercihi_id, olusum_event_id)
+         VALUES ({$tercihS}, {$olusumS})"
+    );
+    ArchiveManifestService::createHaftalikPeriodManifests($pdo, $kapanisS, 2, $haftaS, 1);
+
+    $birimUser = ['id' => 3, 'rol' => 'BIRIM_AMIRI', 'sube_ids' => [1]];
+    $httpS = invokeSzHttp(
+        $pdo,
+        $birimUser,
+        'GET',
+        '/serbest-zaman/deadline-takip',
+        [],
+        [],
+        ['referans_tarih' => '2020-12-01']
+    );
+    p4bAssert($httpS['status'] === 200, 'S BIRIM_AMIRI deadline-takip → 200');
+    $itemsS = $httpS['payload']['data']['items'] ?? null;
+    p4bAssert(is_array($itemsS), 'S items array');
+    $seenPid50 = false;
+    foreach ($itemsS as $row) {
+        if ((int) ($row['personel_id'] ?? 0) === 50) {
+            $seenPid50 = true;
+            break;
+        }
+    }
+    p4bAssert(!$seenPid50, 'S items must not include personel_id 50 (sube 2)');
+
+    // U. Pagination: page=1 limit=2 returns 2; summary totals full filtered set
+    $refU = '2021-01-10';
+    $sonU = '2021-01-20'; // kalan_gun=10 → YAKLASIYOR
+    for ($i = 0; $i < 3; $i++) {
+        $pidU = 51 + $i;
+        $tc = '5565555555' . (string) $i;
+        $sicil = 'S05' . (string) (1 + $i);
+        $pdo->exec(
+            "INSERT INTO personeller (
+                id, tc_kimlik_no, ad, soyad, dogum_tarihi, telefon, acil_durum_kisi, acil_durum_telefon,
+                sicil_no, ise_giris_tarihi, sube_id, aktif_durum
+             ) VALUES
+             ({$pidU}, '{$tc}', 'Page', 'Lot{$i}', '1990-01-01', '0500000006{$i}', 'Acil', '0500000007{$i}',
+                '{$sicil}', '2010-01-01', 1, 'AKTIF')"
+        );
+        p4bSeedHaftalikGraph($pdo, null, $pidU, 300, $sonU);
+    }
+    $httpU = invokeSzHttp(
+        $pdo,
+        $gyHttp,
+        'GET',
+        '/serbest-zaman/deadline-takip',
+        [],
+        [],
+        [
+            'referans_tarih' => $refU,
+            'page' => 1,
+            'limit' => 2,
+            'durum' => SerbestZamanDeadlineService::DEADLINE_YAKLASIYOR,
+        ]
+    );
+    p4bAssert($httpU['status'] === 200, 'U deadline-takip → 200');
+    $dataU = $httpU['payload']['data'] ?? [];
+    $itemsU = $dataU['items'] ?? [];
+    p4bAssert(is_array($itemsU) && count($itemsU) === 2, 'U page=1 limit=2 → 2 items');
+    $totalU = (int) ($dataU['total'] ?? 0);
+    $sumU = $dataU['summary'] ?? [];
+    p4bAssert(
+        $totalU > 2
+            || (int) ($sumU['yaklasan_lot_sayisi'] ?? 0) > 2,
+        'U summary/total reflects full filtered set (>2)'
+    );
 
     echo "verify-serbest-zaman-pack4b-mysql: OK\n";
 } catch (Throwable $e) {

@@ -203,7 +203,15 @@ class SerbestZamanController
         }
 
         $pdo = Connection::get();
-        self::assertSchemaReady($pdo);
+        // Pack 4B: allocation ledger required — missing schema is not empty/clean success.
+        // Do NOT widen global assertSchemaReady() (preserves tip-058 listEvents/bakiye behavior).
+        if (!SerbestZamanDeadlineService::isSchemaReady($pdo)) {
+            JsonResponse::error(
+                409,
+                SerbestZamanDeadlineService::CODE_SCHEMA_NOT_READY,
+                'Serbest zaman deadline tahsis semasi hazir degil.'
+            );
+        }
 
         $scope = SubeScope::resolveScope($user, $request);
         $allowedSubeIds = SubeScope::allowedSubeIds($user);

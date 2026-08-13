@@ -37,6 +37,56 @@ final class RetentionPhysicalDestroyGate
     }
 
     /**
+     * Pack 4B SERBEST destroy readiness: allocation ledger + gate tables + 062-gated DELETE trigger.
+     * Distinguishes Pack 4A hard-block trg_szkt_no_delete from Pack 4B retention-gated variant.
+     */
+    public static function isSerbestZamanPack4bReady(PDO $pdo)
+    {
+        if (!self::tableExists($pdo, 'serbest_zaman_kullanim_tahsisleri')
+            || !self::tableExists($pdo, 'retention_physical_destroy_gates')
+            || !self::tableExists($pdo, 'retention_imha_executionlari')
+        ) {
+            return false;
+        }
+
+        $stmt = $pdo->prepare(
+            "SELECT ACTION_STATEMENT
+             FROM information_schema.TRIGGERS
+             WHERE TRIGGER_SCHEMA = DATABASE()
+               AND EVENT_OBJECT_TABLE = 'serbest_zaman_kullanim_tahsisleri'
+               AND ACTION_TIMING = 'BEFORE'
+               AND EVENT_MANIPULATION = 'DELETE'
+             LIMIT 1"
+        );
+        $stmt->execute();
+        $action = (string) $stmt->fetchColumn();
+        if ($action === '') {
+            return false;
+        }
+
+        // Semantic markers of 062 retention-gated DELETE (not Pack 4A hard SIGNAL-only).
+        foreach (['retention_physical_destroy_gates', 'SERBEST_ZAMAN', 'PREPARED'] as $marker) {
+            if (stripos($action, $marker) === false) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * @throws RuntimeException PhysicalDestructionCodes::CODE_SERBEST_ZAMAN_ALLOCATION_SCHEMA_NOT_READY
+     */
+    public static function assertSerbestZamanPack4bReady(PDO $pdo)
+    {
+        if (!self::isSerbestZamanPack4bReady($pdo)) {
+            throw new RuntimeException(
+                PhysicalDestructionCodes::CODE_SERBEST_ZAMAN_ALLOCATION_SCHEMA_NOT_READY
+            );
+        }
+    }
+
+    /**
      * @throws RuntimeException when gate schema missing for a gated category
      */
     public static function open(PDO $pdo, $executionId, $imhaTalepId, $category)

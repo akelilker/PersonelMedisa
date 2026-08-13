@@ -22,6 +22,20 @@ const controllerSource = readFileSync(
   resolve(process.cwd(), "api/src/Controllers/SerbestZamanController.php"),
   "utf8"
 );
+const destroyGateSource = readFileSync(
+  resolve(
+    process.cwd(),
+    "api/src/Services/Retention/PhysicalDestruction/RetentionPhysicalDestroyGate.php"
+  ),
+  "utf8"
+);
+const destroyHandlerSource = readFileSync(
+  resolve(
+    process.cwd(),
+    "api/src/Services/Retention/PhysicalDestruction/Handlers/SerbestZamanDestructionHandler.php"
+  ),
+  "utf8"
+);
 
 describe("SerbestZaman deadline API source locks (Pack4B)", () => {
   it("registers GET /serbest-zaman/deadline-takip on Router", () => {
@@ -31,6 +45,29 @@ describe("SerbestZaman deadline API source locks (Pack4B)", () => {
     );
     expect(controllerSource).toContain("function deadlineTakip");
     expect(controllerSource).toContain("raporlar.view");
+  });
+
+  it("deadlineTakip returns 409 SCHEMA_NOT_READY when !isSchemaReady", () => {
+    expect(controllerSource).toMatch(
+      /deadlineTakip\([\s\S]*?!SerbestZamanDeadlineService::isSchemaReady\(\$pdo\)/
+    );
+    expect(controllerSource).toMatch(
+      /JsonResponse::error\(\s*409,\s*SerbestZamanDeadlineService::CODE_SCHEMA_NOT_READY/
+    );
+    expect(controllerSource).not.toMatch(
+      /deadlineTakip\([\s\S]{0,900}SerbestZamanDeadlineService::assertSchemaReady/
+    );
+  });
+
+  it("locks Pack4B destroy readiness gate + pre-empty-scope assert", () => {
+    expect(destroyGateSource).toContain("function isSerbestZamanPack4bReady");
+    expect(destroyGateSource).toContain("function assertSerbestZamanPack4bReady");
+    expect(destroyGateSource).toContain(
+      "CODE_SERBEST_ZAMAN_ALLOCATION_SCHEMA_NOT_READY"
+    );
+    expect(destroyHandlerSource).toMatch(
+      /resolveDestroyScope\([\s\S]{0,280}assertSerbestZamanPack4bReady\(\$pdo\)/
+    );
   });
 
   it("exposes endpoints.serbestZaman.deadlineTakip", () => {

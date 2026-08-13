@@ -23,6 +23,8 @@ final class SerbestZamanDeadlineService
     public const COMPLIANCE_MODE = 'WARNING_AND_OPERATIONAL_FOLLOWUP';
     public const PAYROLL_HARD_BLOCK = false;
 
+    public const CODE_SCHEMA_NOT_READY = 'SCHEMA_NOT_READY';
+
     public const DEADLINE_NORMAL = 'NORMAL';
     public const DEADLINE_YAKLASIYOR = 'YAKLASIYOR';
     public const DEADLINE_SURESI_DOLDU = 'SURESI_DOLDU';
@@ -32,6 +34,26 @@ final class SerbestZamanDeadlineService
     public const ACTION_WARN_APPROACHING = 'WARN_APPROACHING';
     public const ACTION_MARK_EXPIRED_UNUSED = 'MARK_EXPIRED_UNUSED';
     public const ACTION_MANUAL_ALLOCATION_REVIEW = 'MANUAL_ALLOCATION_REVIEW';
+
+    /**
+     * Pack 4B deadline surface requires events + allocation ledger (061+).
+     * Missing ledger must NOT be treated as empty/clean NO_USAGE.
+     */
+    public static function isSchemaReady(PDO $pdo)
+    {
+        return self::tableExists($pdo, 'serbest_zaman_events')
+            && self::tableExists($pdo, 'serbest_zaman_kullanim_tahsisleri');
+    }
+
+    /**
+     * @throws \RuntimeException CODE_SCHEMA_NOT_READY
+     */
+    public static function assertSchemaReady(PDO $pdo)
+    {
+        if (!self::isSchemaReady($pdo)) {
+            throw new \RuntimeException(self::CODE_SCHEMA_NOT_READY);
+        }
+    }
 
     /**
      * @param list<array<string, mixed>> $events
@@ -44,15 +66,11 @@ final class SerbestZamanDeadlineService
         $referansTarih,
         array $personelMeta = []
     ) {
+        self::assertSchemaReady($pdo);
+
         $personelId = (int) $personelId;
         $referansTarih = (string) $referansTarih;
-        $allocState = SerbestZamanAllocationService::tableExists($pdo)
-            ? SerbestZamanAllocationService::personelAllocationState($pdo, $events, $personelId)
-            : [
-                'state' => SerbestZamanAllocationService::STATE_NO_USAGE,
-                'legacy_unallocated_usage_count' => 0,
-                'invariant_broken_count' => 0,
-            ];
+        $allocState = SerbestZamanAllocationService::personelAllocationState($pdo, $events, $personelId);
 
         $baseMeta = [
             'personel_id' => $personelId,
@@ -92,10 +110,6 @@ final class SerbestZamanDeadlineService
         if ($allocState['state'] !== SerbestZamanAllocationService::STATE_ALLOCATED
             && $allocState['state'] !== SerbestZamanAllocationService::STATE_NO_USAGE
         ) {
-            return [];
-        }
-
-        if (!SerbestZamanAllocationService::tableExists($pdo)) {
             return [];
         }
 
@@ -257,5 +271,16 @@ final class SerbestZamanDeadlineService
             default:
                 return 9;
         }
+    }
+
+    private static function tableExists(PDO $pdo, $table)
+    {
+        $stmt = $pdo->prepare(
+            'SELECT 1 FROM information_schema.TABLES
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :t LIMIT 1'
+        );
+        $stmt->execute(['t' => (string) $table]);
+
+        return (bool) $stmt->fetchColumn();
     }
 }

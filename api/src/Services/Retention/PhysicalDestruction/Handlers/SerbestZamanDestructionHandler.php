@@ -7,6 +7,7 @@ namespace Medisa\Api\Services\Retention\PhysicalDestruction\Handlers;
 use Medisa\Api\Services\Retention\PhysicalDestruction\DependentRetentionGate;
 use Medisa\Api\Services\Retention\PhysicalDestruction\DestructionHandlerInterface;
 use Medisa\Api\Services\Retention\PhysicalDestruction\PhysicalDestructionCodes;
+use Medisa\Api\Services\Retention\PhysicalDestruction\RetentionPhysicalDestroyGate;
 use Medisa\Api\Services\Retention\RetentionCategories;
 use Medisa\Api\Services\SerbestZaman\SerbestZamanAllocationService;
 use PDO;
@@ -223,6 +224,9 @@ final class SerbestZamanDestructionHandler implements DestructionHandlerInterfac
      */
     private function resolveDestroyScope(PDO $pdo, $kapanisId, $forExecute)
     {
+        // Pack 4B: readiness before empty-scope short-circuit — zero scope is not "legacy OK".
+        RetentionPhysicalDestroyGate::assertSerbestZamanPack4bReady($pdo);
+
         $base = $this->collectBaseScope($pdo, $kapanisId);
         $eventIds = $base['event_ids'];
         $aktifIds = $base['aktif_ids'];
@@ -239,21 +243,6 @@ final class SerbestZamanDestructionHandler implements DestructionHandlerInterfac
                 'olusum_ids' => [],
                 'scope_fingerprint' => $this->fingerprintScope([], [], []),
             ];
-        }
-
-        // Fail-closed: never assume pre-ledger legacy destroy is safe.
-        if (!SerbestZamanAllocationService::tableExists($pdo)) {
-            throw new RuntimeException(
-                PhysicalDestructionCodes::CODE_SERBEST_ZAMAN_ALLOCATION_SCHEMA_NOT_READY
-            );
-        }
-        if ($forExecute
-            && (!DependentRetentionGate::tableExists($pdo, 'retention_physical_destroy_gates')
-                || !DependentRetentionGate::tableExists($pdo, 'retention_imha_executionlari'))
-        ) {
-            throw new RuntimeException(
-                PhysicalDestructionCodes::CODE_SERBEST_ZAMAN_ALLOCATION_SCHEMA_NOT_READY
-            );
         }
 
         $targetOlusumSet = [];

@@ -55,4 +55,19 @@ describe("SerbestZamanDeadlineService source locks (Pack4B)", () => {
       /BLOCKER_.*SERBEST_ZAMAN.*(DEADLINE|EXPIR|SURESI|6M)/i
     );
   });
+
+  it("isSchemaReady requires events + allocation ledger and asserts before project", () => {
+    expect(deadlineSource).toContain("CODE_SCHEMA_NOT_READY = 'SCHEMA_NOT_READY'");
+    expect(deadlineSource).toContain("function isSchemaReady");
+    expect(deadlineSource).toContain("function assertSchemaReady");
+    expect(deadlineSource).toMatch(
+      /isSchemaReady[\s\S]{0,220}serbest_zaman_events[\s\S]{0,220}serbest_zaman_kullanim_tahsisleri/
+    );
+    expect(deadlineSource).toMatch(
+      /projectPersonelDeadlineRows\([\s\S]{0,200}assertSchemaReady\(\$pdo\)/
+    );
+    expect(deadlineSource).toMatch(
+      /assertSchemaReady[\s\S]{0,180}throw new \\RuntimeException\(self::CODE_SCHEMA_NOT_READY\)/
+    );
+  });
 });

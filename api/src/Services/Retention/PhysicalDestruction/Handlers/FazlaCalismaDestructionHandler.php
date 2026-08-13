@@ -16,7 +16,10 @@ use RuntimeException;
  *
  * Shared haftalik_kapanislar / satırlar headers preserved (co-identity with SERBEST_ZAMAN).
  * Gate: no remaining SERBEST_ZAMAN events/aktif_olusum for this kapanis.
- * Then: delete tercih audit → tercih; zero FM minute fields + clear notlar_json on satırlar.
+ * Then: delete tercih audit → tercih; zero FM-owned minute fields only
+ * (fazla_calisma_dakika, fazla_surelerle_calisma_dakika).
+ * notlar_json is weekly completeness (HaftalikKapanisController::buildSnapshotSatir) — NOT FM-owned;
+ * preserve notlar_json and shared weekly evidence (toplam/normal/compliance/tam_hafta/kaynak_gun).
  * imzali_talep_belge surec is PERSONEL_BELGE-owned — left intact (FK from tercih removed with delete).
  */
 final class FazlaCalismaDestructionHandler implements DestructionHandlerInterface
@@ -114,19 +117,17 @@ final class FazlaCalismaDestructionHandler implements DestructionHandlerInterfac
             $upd = $pdo->prepare(
                 "UPDATE haftalik_kapanis_satirlari SET
                     fazla_calisma_dakika = 0,
-                    fazla_surelerle_calisma_dakika = 0,
-                    notlar_json = NULL
+                    fazla_surelerle_calisma_dakika = 0
                  WHERE kapanis_id = :kid
                    AND (
                      fazla_calisma_dakika <> 0
                      OR fazla_surelerle_calisma_dakika <> 0
-                     OR notlar_json IS NOT NULL
                    )"
             );
             $upd->execute(['kid' => $kapanisId]);
             $anonymizedSatir = (int) $upd->rowCount();
 
-            // Ensure all satırlar touched for plan expectation even if already zeroed.
+            // Ensure all satırlar counted for plan expectation even if already zeroed.
             $all = $pdo->prepare(
                 'SELECT COUNT(*) FROM haftalik_kapanis_satirlari WHERE kapanis_id = :kid'
             );
@@ -137,8 +138,7 @@ final class FazlaCalismaDestructionHandler implements DestructionHandlerInterfac
                 $pdo->prepare(
                     "UPDATE haftalik_kapanis_satirlari SET
                         fazla_calisma_dakika = 0,
-                        fazla_surelerle_calisma_dakika = 0,
-                        notlar_json = NULL
+                        fazla_surelerle_calisma_dakika = 0
                      WHERE kapanis_id = :kid"
                 )->execute(['kid' => $kapanisId]);
                 $anonymizedSatir = $satirTotal;

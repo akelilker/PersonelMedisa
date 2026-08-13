@@ -40,7 +40,9 @@ final class DependentRetentionGate
     }
 
     /**
-     * Surec-linked SGK / finans / resmi etki dependents used by RAPOR/IS_KAZASI/IZIN-family.
+     * Surec-linked SGK / finans / resmi etki / PERSONEL_BELGE dependents
+     * used by RAPOR/IS_KAZASI (IZIN-family). PERSONEL_BELGE is typed
+     * (migration 038 ON DELETE RESTRICT) — never rely on raw FK exception.
      */
     public static function assertSurecLifecycleDependentsClear(PDO $pdo, $surecId)
     {
@@ -74,6 +76,36 @@ final class DependentRetentionGate
                 $pdo,
                 'SELECT COUNT(*) FROM onayli_bildirim_puantaj_etki_adaylari WHERE resmi_surec_id = :id',
                 ['id' => $surecId]
+            );
+        }
+        self::assertPersonelBelgeDependentsClear($pdo, $surecId);
+    }
+
+    /**
+     * personel_belge_dosya_surumleri / personel_belge_auditleri → surecler.id RESTRICT.
+     * Clear via PERSONEL_BELGE handler first — never cascade from RAPOR/IS_KAZASI.
+     */
+    public static function assertPersonelBelgeDependentsClear(PDO $pdo, $surecId)
+    {
+        $surecId = (int) $surecId;
+        if ($surecId <= 0) {
+            return;
+        }
+        $code = PhysicalDestructionCodes::CODE_PERSONEL_BELGE_REMAINS;
+        if (self::tableExists($pdo, 'personel_belge_dosya_surumleri')) {
+            self::assertNoRows(
+                $pdo,
+                'SELECT COUNT(*) FROM personel_belge_dosya_surumleri WHERE surec_id = :id',
+                ['id' => $surecId],
+                $code
+            );
+        }
+        if (self::tableExists($pdo, 'personel_belge_auditleri')) {
+            self::assertNoRows(
+                $pdo,
+                'SELECT COUNT(*) FROM personel_belge_auditleri WHERE surec_id = :id',
+                ['id' => $surecId],
+                $code
             );
         }
     }

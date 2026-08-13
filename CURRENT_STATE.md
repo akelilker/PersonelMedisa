@@ -16,7 +16,7 @@ Her registry kaydı **tek** zorunlu statü taşır: `CLOSED` · `CODE_GAP` · `B
 - **QR pipeline:** S3C–S3F `CLOSED`
 - **QR algorithms (locked):** `QR_INTERVAL_V1`, `QR_PUANTAJ_CANDIDATE_V1`, `QR_PUANTAJ_DECISION_V1`, `QR_CANDIDATE_HASH_V2`
 - **Master closure audit:** 2026-08-12 (`chore/master-closure-audit`); classification hardening aynı PR’da
-- **Retention Pack 2–3C:** physical destruction **CLOSED** (`MG-RET-PHYS-001` / `112`+`113`+`114`); feature flag default OFF; production apply/enable YOK
+- **Retention Pack 2–3C:** physical destruction **CODE_GAP** (`MG-RET-PHYS-001` / `112`+`113`+`114`); SERBEST used-entitlement fail-closed; feature flag default OFF; production apply/enable YOK
 
 Görsel sistem çalışmaları mevcut component/owner içinde yapılabilir. Yeni domain özelliği freeze kapısından geçer.
 
@@ -33,7 +33,7 @@ Görsel sistem çalışmaları mevcut component/owner içinde yapılabilir. Yeni
 | `SOURCE_DATA_REQUIRES_COMPLETION` | yes | ops details outside public repo |
 | `PERSONEL_BINDING_REAL_ROLLOUT` | **NOT_STARTED** (schema `056` mevcut) | `USER_GATED` |
 | `REAL_QR_EMPLOYEE_ROLLOUT` | **NOT_STARTED** | `USER_GATED` |
-| `RETENTION_PHYSICAL_DESTRUCTION` | **CLOSED** (`MG-RET-PHYS-001`) | Pack 3C 15/15 handlers; flag default OFF; prod enable YOK |
+| `RETENTION_PHYSICAL_DESTRUCTION` | **CODE_GAP** (`MG-RET-PHYS-001`) | Pack 3C typed handlers + SERBEST usage fail-closed; flag default OFF; prod enable YOK |
 | `RETENTION_MANIFEST_COVERAGE` | **CLOSED** (`MG-RET-MAN-001`) | Pack 1 — creators 15/15 |
 | `RETENTION_S3F_LEDGER_FINGERPRINT` | **CLOSED** (`MG-RET-S3F-001`) | Pack 1 — typed ONAY_AUDIT |
 | `SERBEST_ZAMAN_6_MONTH_TRACKING` | **CODE_GAP** (`MG-SZ-6M-001`) | deadline calc/bakiye var; ops/compliance follow-up eksik |

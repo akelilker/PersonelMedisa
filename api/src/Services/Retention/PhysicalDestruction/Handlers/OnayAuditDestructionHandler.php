@@ -14,8 +14,8 @@ use RuntimeException;
  * ONAY_AUDIT:
  * - Typed S3F (`qr_pc_decision`): chain-aware DELETE_ROWS (unchanged Pack 2).
  * - Generic parent overlay (puantaj/bordro entity, no ledger rows): executable no-op.
- *   Physical parent evidence is destroyed by PUANTAJ/BORDRO handlers; this closes the
- *   virtual ONAY_AUDIT retention obligation without inventing audit rows.
+ *   NO_PHYSICAL_ROWS ≠ parent data destroyed. Execution evidence closes only the virtual
+ *   ONAY_AUDIT obligation; PUANTAJ/BORDRO handlers destroy parent physical rows separately.
  * - Unknown entity/audit_source_type: fail-closed POLICY_UNRESOLVED.
  */
 final class OnayAuditDestructionHandler implements DestructionHandlerInterface

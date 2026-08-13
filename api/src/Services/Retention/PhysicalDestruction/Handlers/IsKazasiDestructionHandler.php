@@ -8,8 +8,9 @@ use Medisa\Api\Services\Retention\RetentionCategories;
 
 /**
  * IS_KAZASI: delete canonical IS_KAZASI surec only.
- * Same dependency gates as RAPOR/IZIN-family (SGK links, resmi etki, disiplin vaka).
+ * Same dependency gates as RAPOR (SGK links, resmi etki, disiplin vaka, PERSONEL_BELGE).
  * Attachment/BELGE surecler are separate PERSONEL_BELGE targets — not auto-cascaded.
+ * personel_belge_* rows referencing this surec → PERSONEL_BELGE_REMAINS (typed gate).
  */
 final class IsKazasiDestructionHandler extends SurecTurDestructionHandler
 {

@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../api/src/bootstrap.php';
 
+use Medisa\Api\Services\PersonelBelge\PersonelBelgeStorageService;
 use Medisa\Api\Services\Retention\ArchiveManifestService;
 use Medisa\Api\Services\Retention\DestructionWorkflowService;
 use Medisa\Api\Services\Retention\LegalHoldService;
@@ -18,6 +19,12 @@ use Medisa\Api\Services\Retention\PhysicalDestruction\RetentionDestructionHandle
 use Medisa\Api\Services\Retention\RetentionCategories;
 use Medisa\Api\Services\Retention\RetentionClock;
 use Medisa\Api\Services\Retention\RetentionPolicyService;
+
+/** Real builder semantics (HaftalikKapanisController::buildSnapshotSatir) — not FM-owned. */
+const P3C_NOTLAR_COMPLETENESS_SENTINEL =
+    '["Eksik haftalik puantaj gunu (5/7); UBGT ve 18 yas alti haftalik uyarilari uretilmedi."]';
+
+const P3C_COMPLIANCE_JSON = '[{"kod":"WEEKLY_COMPLETENESS","seviye":"INFO"}]';
 
 function p3cAssert(bool $ok, string $name): void
 {
@@ -201,7 +208,7 @@ function p3cSeedBase(PDO $pdo): void
 /**
  * @return array{kapanis_id:int,satir_id:int,tercih_id:int,olusum_id:int}
  */
-function p3cSeedHaftalikGraph(PDO $pdo, string $haftaBaslangic, int $personelId = 10): array
+function p3cSeedHaftalikGraph(PDO $pdo, string $haftaBaslangic, int $personelId = 10, int $olusumDakika = 300): array
 {
     $haftaBitis = date('Y-m-d', strtotime($haftaBaslangic . ' +6 days'));
     $pdo->exec(
@@ -210,14 +217,19 @@ function p3cSeedHaftalikGraph(PDO $pdo, string $haftaBaslangic, int $personelId 
          VALUES (1, '{$haftaBaslangic}', '{$haftaBitis}', 'KAPANDI', 1, 1, 1)"
     );
     $kapanisId = (int) $pdo->lastInsertId();
+    $notlar = str_replace("'", "''", P3C_NOTLAR_COMPLETENESS_SENTINEL);
+    $compliance = str_replace("'", "''", P3C_COMPLIANCE_JSON);
     $pdo->exec(
         "INSERT INTO haftalik_kapanis_satirlari (
             kapanis_id, personel_id, hafta_baslangic, hafta_bitis, state,
             toplam_net_dakika, normal_calisma_dakika, fazla_calisma_dakika, fazla_surelerle_calisma_dakika,
-            compliance_uyarilari_json, hesaplama_zamani, notlar_json
+            tam_hafta_verisi, compliance_uyarilari_json, compliance_uyari_sayisi, kritik_uyari_var_mi,
+            hesaplama_zamani, kaynak_gun_sayisi, notlar_json
          ) VALUES (
             {$kapanisId}, {$personelId}, '{$haftaBaslangic}', '{$haftaBitis}', 'KAPANDI',
-            3000, 2700, 300, 0, '[]', '{$haftaBaslangic} 18:00:00', '{\"note\":\"fm\"}'
+            3000, 2700, {$olusumDakika}, 0,
+            0, '{$compliance}', 1, 0,
+            '{$haftaBaslangic} 18:00:00', 5, '{$notlar}'
          )"
     );
     $satirId = (int) $pdo->lastInsertId();
@@ -227,7 +239,7 @@ function p3cSeedHaftalikGraph(PDO $pdo, string $haftaBaslangic, int $personelId 
             fazla_calisma_dakika, odeme_tipi, secim_zamani, secen_kullanici_id, gerekce
          ) VALUES (
             {$satirId}, {$kapanisId}, {$personelId}, '{$haftaBaslangic}', '{$haftaBitis}',
-            300, 'SERBEST_ZAMAN', '{$haftaBaslangic} 19:00:00', 1, 'synthetic-gerekce'
+            {$olusumDakika}, 'SERBEST_ZAMAN', '{$haftaBaslangic} 19:00:00', 1, 'synthetic-gerekce'
          )"
     );
     $tercihId = (int) $pdo->lastInsertId();
@@ -246,7 +258,7 @@ function p3cSeedHaftalikGraph(PDO $pdo, string $haftaBaslangic, int $personelId 
             personel_id, event_tipi, dakika, event_tarihi, son_kullanim_tarihi,
             kaynak_snapshot_id, kaynak_odeme_tercihi_id, created_by
          ) VALUES (
-            {$personelId}, 'SERBEST_ZAMAN_OLUSUM', 300, '{$haftaBaslangic}', '{$sonKullanim}',
+            {$personelId}, 'SERBEST_ZAMAN_OLUSUM', {$olusumDakika}, '{$haftaBaslangic}', '{$sonKullanim}',
             {$satirId}, {$tercihId}, 1
          )"
     );
@@ -263,6 +275,139 @@ function p3cSeedHaftalikGraph(PDO $pdo, string $haftaBaslangic, int $personelId 
         'tercih_id' => $tercihId,
         'olusum_id' => $olusumId,
     ];
+}
+
+/**
+ * Schema 029: KULLANIM must have NULL snapshot/tercih/hedef + non-null islem_anahtari.
+ */
+function p3cInsertKullanim(PDO $pdo, int $personelId, int $dakika, string $eventTarihi, string $anahtar): int
+{
+    $stmt = $pdo->prepare(
+        "INSERT INTO serbest_zaman_events (
+            personel_id, event_tipi, dakika, event_tarihi, islem_anahtari, created_by
+         ) VALUES (
+            :pid, 'SERBEST_ZAMAN_KULLANIM', :dakika, :tarih, :anahtar, 1
+         )"
+    );
+    $stmt->execute([
+        'pid' => $personelId,
+        'dakika' => $dakika,
+        'tarih' => $eventTarihi,
+        'anahtar' => $anahtar,
+    ]);
+
+    return (int) $pdo->lastInsertId();
+}
+
+/**
+ * Canonical bakiye (global pool): Σ OLUSUM − Σ KULLANIM (IPTAL of either skipped).
+ *
+ * @return array{toplam_hak:int,kullanilan:int,kalan:int}
+ */
+function p3cSzBalance(PDO $pdo, int $personelId): array
+{
+    $events = $pdo->prepare(
+        'SELECT id, event_tipi, dakika, yeni_dakika, hedef_event_id, hedef_event_tipi
+         FROM serbest_zaman_events WHERE personel_id = :pid ORDER BY id ASC'
+    );
+    $events->execute(['pid' => $personelId]);
+    $rows = $events->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    $iptal = [];
+    foreach ($rows as $e) {
+        if (($e['event_tipi'] ?? '') === 'SERBEST_ZAMAN_IPTAL' && (int) ($e['hedef_event_id'] ?? 0) > 0) {
+            $iptal[(int) $e['hedef_event_id']] = true;
+        }
+    }
+    $overrides = [];
+    foreach ($rows as $e) {
+        if (($e['event_tipi'] ?? '') === 'SERBEST_ZAMAN_DUZELTME'
+            && (int) ($e['hedef_event_id'] ?? 0) > 0
+            && !isset($iptal[(int) $e['id']])
+        ) {
+            $overrides[(int) $e['hedef_event_id']] = (int) $e['yeni_dakika'];
+        }
+    }
+    $toplam = 0;
+    $kullanilan = 0;
+    foreach ($rows as $e) {
+        $eid = (int) ($e['id'] ?? 0);
+        if (isset($iptal[$eid])) {
+            continue;
+        }
+        $tip = (string) ($e['event_tipi'] ?? '');
+        $dakika = isset($overrides[$eid]) ? $overrides[$eid] : (int) ($e['dakika'] ?? 0);
+        if ($tip === 'SERBEST_ZAMAN_OLUSUM') {
+            $toplam += $dakika;
+        } elseif ($tip === 'SERBEST_ZAMAN_KULLANIM') {
+            $kullanilan += $dakika;
+        }
+    }
+
+    return [
+        'toplam_hak' => $toplam,
+        'kullanilan' => $kullanilan,
+        'kalan' => max($toplam - $kullanilan, 0),
+    ];
+}
+
+/**
+ * Attach PERSONEL_BELGE file/meta to an arbitrary surec (038 FK → surecler.id).
+ *
+ * @return array{surum_id:int,storage_key:string}
+ */
+function p3cAttachBelge(PDO $pdo, int $surecId, int $personelId, string $label): array
+{
+    $fileMeta = PersonelBelgeStorageService::writeNewVersion('%PDF-1.4 pack3c-' . $label, 'pdf');
+    $insV = $pdo->prepare(
+        'INSERT INTO personel_belge_dosya_surumleri
+            (surec_id, personel_id, surum_no, aktif_mi, storage_key, orijinal_dosya_adi,
+             mime_type, uzanti, byte_boyutu, sha256, yukleyen_kullanici_id)
+         VALUES
+            (:sid, :pid, 1, 1, :key, :name, :mime, :ext, :bytes, :sha, 1)'
+    );
+    $insV->execute([
+        'sid' => $surecId,
+        'pid' => $personelId,
+        'key' => $fileMeta['storage_key'],
+        'name' => $label . '.pdf',
+        'mime' => 'application/pdf',
+        'ext' => 'pdf',
+        'bytes' => $fileMeta['byte_boyutu'],
+        'sha' => $fileMeta['sha256'],
+    ]);
+    $surumId = (int) $pdo->lastInsertId();
+    $pdo->prepare(
+        'INSERT INTO personel_belge_auditleri
+            (surec_id, personel_id, belge_surum_id, islem_turu, yapan_kullanici_id)
+         VALUES (:sid, :pid, :vid, \'CREATED\', 1)'
+    )->execute(['sid' => $surecId, 'pid' => $personelId, 'vid' => $surumId]);
+
+    return ['surum_id' => $surumId, 'storage_key' => (string) $fileMeta['storage_key']];
+}
+
+/**
+ * Clear PERSONEL_BELGE-owned leaf rows for a surec (no cascade of the parent surec).
+ * Mirrors PersonelBelgeDestructionHandler leaf order without requiring surec_turu=BELGE.
+ */
+function p3cClearBelgeLeaves(PDO $pdo, int $surecId): void
+{
+    $keys = $pdo->prepare(
+        'SELECT storage_key FROM personel_belge_dosya_surumleri WHERE surec_id = :sid'
+    );
+    $keys->execute(['sid' => $surecId]);
+    while ($key = $keys->fetchColumn()) {
+        $key = trim((string) $key);
+        if ($key === '') {
+            continue;
+        }
+        try {
+            PersonelBelgeStorageService::deleteKey($key);
+        } catch (Throwable $e) {
+            // absent file ok for cleanup
+        }
+    }
+    $pdo->prepare('DELETE FROM personel_belge_auditleri WHERE surec_id = :sid')->execute(['sid' => $surecId]);
+    $pdo->prepare('DELETE FROM personel_belge_dosya_surumleri WHERE surec_id = :sid')->execute(['sid' => $surecId]);
 }
 
 /**
@@ -335,6 +480,13 @@ p3cAssertSafeTarget($database);
 $root->exec('CREATE DATABASE `' . $database . '` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');
 $pdo = p3cPdoForDb($database);
 
+$storageRoot = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'medisa_p3c_belge_' . bin2hex(random_bytes(4));
+if (!mkdir($storageRoot, 0750, true) && !is_dir($storageRoot)) {
+    throw new RuntimeException('storage root create failed');
+}
+putenv('MEDISA_PERSONEL_BELGE_STORAGE_ROOT=' . $storageRoot);
+$_ENV['MEDISA_PERSONEL_BELGE_STORAGE_ROOT'] = $storageRoot;
+
 try {
     foreach (p3cMigrationFiles() as $file) {
         p3cApply($pdo, $file);
@@ -348,9 +500,17 @@ try {
         p3cAssert($h->isExecutable() === true, 'registry executable ' . $cat);
     }
 
-    // ---------- FAZLA × SERBEST ----------
+    // ---------- SERBEST A: OLUSUM only, no KULLANIM → destroy allowed ----------
     $weekA = p3cSeedHaftalikGraph($pdo, '2010-01-04', 10);
     $weekB = p3cSeedHaftalikGraph($pdo, '2010-01-11', 20); // isolation personel+period
+
+    // Snapshot shared weekly fields before FAZLA (after SERBEST) for exact-preserve asserts
+    $satirABeforeFm = $pdo->query(
+        'SELECT notlar_json, toplam_net_dakika, normal_calisma_dakika, tam_hafta_verisi,
+                compliance_uyarilari_json, compliance_uyari_sayisi, kritik_uyari_var_mi, kaynak_gun_sayisi,
+                fazla_calisma_dakika, fazla_surelerle_calisma_dakika
+         FROM haftalik_kapanis_satirlari WHERE id = ' . (int) $weekA['satir_id']
+    )->fetch(PDO::FETCH_ASSOC);
 
     // FAZLA blocked while SERBEST remains
     $apFazlaEarly = p3cApprove(
@@ -374,7 +534,7 @@ try {
     )->fetchColumn();
     p3cAssert($szEventsBefore === 1, 'SERBEST event untouched after FAZLA block');
 
-    // SERBEST happy path — only week A
+    // SERBEST happy path — only week A, no KULLANIM
     $apSz = p3cApprove(
         $pdo,
         RetentionCategories::SERBEST_ZAMAN,
@@ -385,7 +545,7 @@ try {
     $exSz = p3cEvalExecute($pdo, (int) $apSz['id']);
     p3cAssert(
         ($exSz['execution']['code'] ?? '') === PhysicalDestructionCodes::CODE_DESTRUCTION_EXECUTED,
-        'SERBEST executed'
+        'SERBEST_OLUSUM_ONLY_DESTROY_ALLOWED'
     );
     p3cAssert(
         (int) $pdo->query(
@@ -425,8 +585,7 @@ try {
         'SERBEST retry mutation_count=0'
     );
 
-    // FAZLA after SERBEST
-    // Re-approve path: previous FAZLA request still APPROVED but not executed — execute it now
+    // ---------- FAZLA: FM fields zero; shared weekly notes/compliance EXACT SAME ----------
     $exFc = p3cEvalExecute($pdo, (int) $apFazlaEarly['id']);
     p3cAssert(
         (int) $pdo->query(
@@ -435,13 +594,31 @@ try {
         'FAZLA tercih deleted'
     );
     $satirA = $pdo->query(
-        'SELECT fazla_calisma_dakika, notlar_json FROM haftalik_kapanis_satirlari WHERE id = ' . (int) $weekA['satir_id']
+        'SELECT notlar_json, toplam_net_dakika, normal_calisma_dakika, tam_hafta_verisi,
+                compliance_uyarilari_json, compliance_uyari_sayisi, kritik_uyari_var_mi, kaynak_gun_sayisi,
+                fazla_calisma_dakika, fazla_surelerle_calisma_dakika
+         FROM haftalik_kapanis_satirlari WHERE id = ' . (int) $weekA['satir_id']
     )->fetch(PDO::FETCH_ASSOC);
+    p3cAssert(is_array($satirA) && is_array($satirABeforeFm), 'FAZLA satır rows readable');
     p3cAssert(
-        is_array($satirA)
-            && (int) $satirA['fazla_calisma_dakika'] === 0
-            && $satirA['notlar_json'] === null,
-        'FAZLA satır FM anonymized'
+        (int) $satirA['fazla_calisma_dakika'] === 0
+            && (int) $satirA['fazla_surelerle_calisma_dakika'] === 0,
+        'FAZLA FM fields zeroed'
+    );
+    p3cAssert(
+        (string) $satirA['notlar_json'] === (string) $satirABeforeFm['notlar_json']
+            && (string) $satirA['notlar_json'] === P3C_NOTLAR_COMPLETENESS_SENTINEL,
+        'FAZLA_SHARED_NOTES_PRESERVED'
+    );
+    p3cAssert(
+        (int) $satirA['toplam_net_dakika'] === (int) $satirABeforeFm['toplam_net_dakika']
+            && (int) $satirA['normal_calisma_dakika'] === (int) $satirABeforeFm['normal_calisma_dakika']
+            && (int) $satirA['tam_hafta_verisi'] === (int) $satirABeforeFm['tam_hafta_verisi']
+            && (string) $satirA['compliance_uyarilari_json'] === (string) $satirABeforeFm['compliance_uyarilari_json']
+            && (int) $satirA['compliance_uyari_sayisi'] === (int) $satirABeforeFm['compliance_uyari_sayisi']
+            && (int) $satirA['kritik_uyari_var_mi'] === (int) $satirABeforeFm['kritik_uyari_var_mi']
+            && (int) $satirA['kaynak_gun_sayisi'] === (int) $satirABeforeFm['kaynak_gun_sayisi'],
+        'FAZLA shared weekly fields EXACT SAME'
     );
     p3cAssert(
         (int) $pdo->query(
@@ -454,6 +631,113 @@ try {
             'SELECT COUNT(*) FROM retention_imha_executionlari WHERE imha_talep_id = ' . (int) $apFazlaEarly['id']
         )->fetchColumn() === 1,
         'FAZLA execution evidence'
+    );
+
+    // ---------- SERBEST B: OLUSUM A+B + unallocated KULLANIM → A destroy BLOCKED ----------
+    $weekC = p3cSeedHaftalikGraph($pdo, '2010-01-18', 10, 300); // OLUSUM A
+    $weekD = p3cSeedHaftalikGraph($pdo, '2010-01-25', 10, 300); // OLUSUM B same personel
+    $kullanimId = p3cInsertKullanim($pdo, 10, 300, '2010-02-01', 'sz-p3c-kullanim-10');
+    $balBefore = p3cSzBalance($pdo, 10);
+    p3cAssert($balBefore['kalan'] === 300, 'SERBEST balance before block kalan=300');
+    $olusumCCount = (int) $pdo->query(
+        'SELECT COUNT(*) FROM serbest_zaman_events WHERE id = ' . (int) $weekC['olusum_id']
+    )->fetchColumn();
+    $olusumDCount = (int) $pdo->query(
+        'SELECT COUNT(*) FROM serbest_zaman_events WHERE id = ' . (int) $weekD['olusum_id']
+    )->fetchColumn();
+    $apSzBlock = p3cApprove(
+        $pdo,
+        RetentionCategories::SERBEST_ZAMAN,
+        'haftalik_kapanis',
+        (int) $weekC['kapanis_id'],
+        ['sube_id' => 1, 'hafta_baslangic' => '2010-01-18', 'haftalik_kapanis_id' => (int) $weekC['kapanis_id']]
+    );
+    try {
+        p3cEvalExecute($pdo, (int) $apSzBlock['id']);
+        p3cAssert(false, 'SERBEST should block on unallocated KULLANIM');
+    } catch (RuntimeException $e) {
+        p3cAssert(
+            $e->getMessage() === PhysicalDestructionCodes::CODE_SERBEST_ZAMAN_USAGE_ALLOCATION_UNRESOLVED,
+            'SERBEST_UNALLOCATED_USAGE_BLOCK'
+        );
+    }
+    p3cAssert(
+        (int) $pdo->query(
+            'SELECT COUNT(*) FROM serbest_zaman_events WHERE id = ' . (int) $weekC['olusum_id']
+        )->fetchColumn() === $olusumCCount
+            && (int) $pdo->query(
+                'SELECT COUNT(*) FROM serbest_zaman_events WHERE id = ' . (int) $weekD['olusum_id']
+            )->fetchColumn() === $olusumDCount
+            && (int) $pdo->query(
+                'SELECT COUNT(*) FROM serbest_zaman_events WHERE id = ' . $kullanimId
+            )->fetchColumn() === 1,
+        'SERBEST A/B/KULLANIM untouched on block'
+    );
+    $balAfter = p3cSzBalance($pdo, 10);
+    p3cAssert(
+        $balAfter['toplam_hak'] === $balBefore['toplam_hak']
+            && $balAfter['kullanilan'] === $balBefore['kullanilan']
+            && $balAfter['kalan'] === $balBefore['kalan'],
+        'SERBEST_BALANCE_UNCHANGED_ON_BLOCK'
+    );
+
+    // ---------- SERBEST C: KULLANIM correction/iptal chain → blocked ----------
+    $weekE = p3cSeedHaftalikGraph($pdo, '2010-02-01', 11, 300);
+    $kullanim11 = p3cInsertKullanim($pdo, 11, 120, '2010-02-05', 'sz-p3c-kullanim-11');
+    $pdo->exec(
+        "INSERT INTO serbest_zaman_events (
+            personel_id, event_tipi, yeni_dakika, event_tarihi, hedef_event_id, hedef_event_tipi,
+            islem_anahtari, aciklama, created_by
+         ) VALUES (
+            11, 'SERBEST_ZAMAN_DUZELTME', 90, '2010-02-06', {$kullanim11}, 'SERBEST_ZAMAN_KULLANIM',
+            'sz-p3c-duzeltme-11', 'correction chain', 1
+         )"
+    );
+    $apSzCorr = p3cApprove(
+        $pdo,
+        RetentionCategories::SERBEST_ZAMAN,
+        'haftalik_kapanis',
+        (int) $weekE['kapanis_id'],
+        ['sube_id' => 1, 'hafta_baslangic' => '2010-02-01', 'haftalik_kapanis_id' => (int) $weekE['kapanis_id']]
+    );
+    try {
+        p3cEvalExecute($pdo, (int) $apSzCorr['id']);
+        p3cAssert(false, 'SERBEST should block on KULLANIM correction chain');
+    } catch (RuntimeException $e) {
+        p3cAssert(
+            $e->getMessage() === PhysicalDestructionCodes::CODE_SERBEST_ZAMAN_USAGE_ALLOCATION_UNRESOLVED,
+            'SERBEST KULLANIM correction/iptal chain blocked'
+        );
+    }
+    p3cAssert(
+        (int) $pdo->query(
+            'SELECT COUNT(*) FROM serbest_zaman_events WHERE id = ' . (int) $weekE['olusum_id']
+        )->fetchColumn() === 1,
+        'SERBEST correction-chain OLUSUM untouched'
+    );
+
+    // ---------- SERBEST D/E: other personel KULLANIM does not block target; isolation ----------
+    // Destroy weekB SERBEST (personel 20, no KULLANIM) while personel 10 still has unallocated KULLANIM.
+    $apSzOther = p3cApprove(
+        $pdo,
+        RetentionCategories::SERBEST_ZAMAN,
+        'haftalik_kapanis',
+        (int) $weekB['kapanis_id'],
+        ['sube_id' => 1, 'hafta_baslangic' => '2010-01-11', 'haftalik_kapanis_id' => (int) $weekB['kapanis_id']]
+    );
+    $exSzOther = p3cEvalExecute($pdo, (int) $apSzOther['id']);
+    p3cAssert(
+        ($exSzOther['execution']['code'] ?? '') === PhysicalDestructionCodes::CODE_DESTRUCTION_EXECUTED,
+        'SERBEST other-personel KULLANIM does not block target'
+    );
+    p3cAssert(
+        (int) $pdo->query(
+            'SELECT COUNT(*) FROM serbest_zaman_events WHERE id = ' . (int) $weekC['olusum_id']
+        )->fetchColumn() === 1
+            && (int) $pdo->query(
+                'SELECT COUNT(*) FROM serbest_zaman_events WHERE id = ' . $kullanimId
+            )->fetchColumn() === 1,
+        'SERBEST other period/personel isolation preserved'
     );
 
     // ---------- DISIPLIN × OLAY × SAVUNMA ----------
@@ -480,7 +764,6 @@ try {
         "INSERT INTO disiplin_vaka_auditleri (disiplin_vaka_id, action, actor_user_id, detail_json)
          VALUES ({$vakaId}, 'CREATE', 1, '{\"x\":1}')"
     );
-    // Mint OLAY/SAVUNMA/DISIPLIN manifests via termination expand if needed
     ArchiveManifestService::createTerminationScopedManifests($pdo, 11, 1);
 
     $apDisEarly = p3cApprove(
@@ -521,7 +804,7 @@ try {
         'DISIPLIN request evidence retained'
     );
 
-    // ---------- RAPOR / IS_KAZASI ----------
+    // ---------- RAPOR / IS_KAZASI + PERSONEL_BELGE gate ----------
     $pdo->exec(
         "INSERT INTO surecler (personel_id, surec_turu, baslangic_tarihi, state)
          VALUES (11, 'RAPOR', '2015-04-01', 'AKTIF')"
@@ -546,11 +829,60 @@ try {
     ArchiveManifestService::createPersonelLifecycleManifests($pdo, 20, 1);
     ArchiveManifestService::createTerminationScopedManifests($pdo, 20, 1);
 
-    $apRapor = p3cApprove($pdo, RetentionCategories::RAPOR, 'surec', $raporId, ['personel_id' => 11]);
-    p3cEvalExecute($pdo, (int) $apRapor['id']);
+    $belgeRapor = p3cAttachBelge($pdo, $raporId, 11, 'rapor-attach');
+    $belgeKazasi = p3cAttachBelge($pdo, $kazasiId, 11, 'kazasi-attach');
+    $belgeOther = p3cAttachBelge($pdo, $raporOtherId, 20, 'other-rapor');
+
+    $apRaporBlocked = p3cApprove($pdo, RetentionCategories::RAPOR, 'surec', $raporId, ['personel_id' => 11]);
+    try {
+        p3cEvalExecute($pdo, (int) $apRaporBlocked['id']);
+        p3cAssert(false, 'RAPOR should gate on PERSONEL_BELGE');
+    } catch (RuntimeException $e) {
+        p3cAssert(
+            $e->getMessage() === PhysicalDestructionCodes::CODE_PERSONEL_BELGE_REMAINS,
+            'RAPOR_PERSONEL_BELGE_GATE'
+        );
+    }
+    p3cAssert(
+        (int) $pdo->query("SELECT COUNT(*) FROM surecler WHERE id = {$raporId}")->fetchColumn() === 1,
+        'RAPOR surec remains after belge gate'
+    );
+    p3cAssert(
+        (int) $pdo->query(
+            'SELECT COUNT(*) FROM personel_belge_dosya_surumleri WHERE surec_id = ' . $raporId
+        )->fetchColumn() === 1
+            && (int) $pdo->query(
+                'SELECT COUNT(*) FROM personel_belge_auditleri WHERE surec_id = ' . $raporId
+            )->fetchColumn() === 1,
+        'RAPOR belge file/meta remains'
+    );
+
+    $apKazBlocked = p3cApprove($pdo, RetentionCategories::IS_KAZASI, 'surec', $kazasiId, ['personel_id' => 11]);
+    try {
+        p3cEvalExecute($pdo, (int) $apKazBlocked['id']);
+        p3cAssert(false, 'IS_KAZASI should gate on PERSONEL_BELGE');
+    } catch (RuntimeException $e) {
+        p3cAssert(
+            $e->getMessage() === PhysicalDestructionCodes::CODE_PERSONEL_BELGE_REMAINS,
+            'IS_KAZASI_PERSONEL_BELGE_GATE'
+        );
+    }
+
+    // Cross-personel belge on 20 must not block clearing path for 11 after 11's belge removed.
+    // PERSONEL_BELGE-owned leaves cleared first (no RAPOR/IS_KAZASI cascade).
+    p3cClearBelgeLeaves($pdo, $raporId);
+    p3cClearBelgeLeaves($pdo, $kazasiId);
+    p3cAssert(
+        (int) $pdo->query(
+            'SELECT COUNT(*) FROM personel_belge_dosya_surumleri WHERE surec_id = ' . $raporOtherId
+        )->fetchColumn() === 1,
+        'cross-personel belge intact'
+    );
+
+    p3cEvalExecute($pdo, (int) $apRaporBlocked['id']);
     p3cAssert(
         (int) $pdo->query("SELECT COUNT(*) FROM surecler WHERE id = {$raporId}")->fetchColumn() === 0,
-        'RAPOR surec deleted'
+        'RAPOR surec deleted after PERSONEL_BELGE cleared'
     );
     p3cAssert(
         (int) $pdo->query("SELECT COUNT(*) FROM surecler WHERE id = {$kazasiId}")->fetchColumn() === 1,
@@ -561,14 +893,21 @@ try {
         'RAPOR other personel preserved'
     );
 
-    $apKaz = p3cApprove($pdo, RetentionCategories::IS_KAZASI, 'surec', $kazasiId, ['personel_id' => 11]);
-    p3cEvalExecute($pdo, (int) $apKaz['id']);
+    p3cEvalExecute($pdo, (int) $apKazBlocked['id']);
     p3cAssert(
         (int) $pdo->query("SELECT COUNT(*) FROM surecler WHERE id = {$kazasiId}")->fetchColumn() === 0,
-        'IS_KAZASI surec deleted'
+        'IS_KAZASI surec deleted after PERSONEL_BELGE cleared'
     );
+    p3cAssert(
+        (int) $pdo->query(
+            'SELECT COUNT(*) FROM personel_belge_dosya_surumleri WHERE surec_id = ' . $raporOtherId
+        )->fetchColumn() === 1,
+        'cross-personel belge still present (does not block target)'
+    );
+    unset($belgeRapor, $belgeKazasi, $belgeOther);
 
     // ---------- Generic ONAY_AUDIT ----------
+    // NO_PHYSICAL_ROWS ≠ parent destroyed; evidence closes virtual ONAY_AUDIT obligation only.
     $pdo->exec(
         "INSERT INTO puantaj_aylik_muhurleri
             (sube_id, yil, ay, revision_no, donem, durum, muhurlenen_kayit_sayisi, created_by, created_at)
@@ -586,13 +925,18 @@ try {
     $exOnay = p3cEvalExecute($pdo, (int) $apOnay['id']);
     p3cAssert(
         (int) $pdo->query('SELECT COUNT(*) FROM puantaj_aylik_muhurleri WHERE id = ' . $sealId)->fetchColumn() === 1,
-        'generic ONAY_AUDIT no-op preserves parent seal'
+        'generic ONAY_AUDIT NO_PHYSICAL_ROWS preserves parent seal'
     );
     $execRow = $pdo->query(
         'SELECT result_summary_json FROM retention_imha_executionlari WHERE imha_talep_id = ' . (int) $apOnay['id']
     )->fetch(PDO::FETCH_ASSOC);
     p3cAssert(is_array($execRow), 'generic ONAY_AUDIT evidence row');
     p3cAssert(!p3cJsonHasPii($execRow), 'generic ONAY_AUDIT evidence PII-free');
+    $summary = json_decode((string) ($execRow['result_summary_json'] ?? ''), true);
+    p3cAssert(
+        is_array($summary) && (int) ($summary['parent_overlay_no_physical_rows'] ?? 0) === 1,
+        'generic ONAY_AUDIT NO_PHYSICAL_ROWS ≠ parent destroyed'
+    );
 
     // Unknown ONAY_AUDIT entity fail-closed at plan
     $unknownHandler = RetentionDestructionHandlerRegistry::forCategory(RetentionCategories::ONAY_AUDIT);
@@ -605,15 +949,7 @@ try {
         'unknown ONAY_AUDIT policy_blocker'
     );
 
-    // Legal hold blocks FAZLA on week B
-    $apHold = p3cApprove(
-        $pdo,
-        RetentionCategories::SERBEST_ZAMAN,
-        'haftalik_kapanis',
-        (int) $weekB['kapanis_id'],
-        ['sube_id' => 1, 'hafta_baslangic' => '2010-01-11', 'haftalik_kapanis_id' => (int) $weekB['kapanis_id']]
-    );
-    p3cEvalExecute($pdo, (int) $apHold['id']);
+    // Legal hold blocks FAZLA on week B (SERBEST already destroyed above)
     $apFcHold = p3cApprove(
         $pdo,
         RetentionCategories::FAZLA_CALISMA,

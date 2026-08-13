@@ -23,7 +23,17 @@ describe("SerbestZamanAllocationService source locks (Pack4A)", () => {
     expect(serviceSource).toContain(
       "CODE_LEGACY_ALLOCATION_REQUIRED = 'SERBEST_ZAMAN_LEGACY_ALLOCATION_REQUIRED'"
     );
+    expect(serviceSource).toContain("CODE_OLUSUM_HAS_ALLOCATIONS");
+    expect(serviceSource).toContain("assertOlusumHasNoNetAllocation");
+    expect(serviceSource).toContain("assertOlusumEffectiveCoversAllocation");
     expect(serviceSource).toContain("assertWritableForNewUsage");
+  });
+
+  it("lot invariants do not skip zero-effective stranded lots", () => {
+    expect(serviceSource).toContain("assertLotInvariants");
+    expect(serviceSource).not.toMatch(
+      /assertLotInvariants[\s\S]{0,400}if\s*\(\s*\$effective\s*<=\s*0\s*\)\s*\{\s*continue;/
+    );
   });
 
   it("does not implement FIFO/LIFO auto-backfill language", () => {

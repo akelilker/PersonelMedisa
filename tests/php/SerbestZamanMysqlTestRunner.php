@@ -12,6 +12,7 @@ use Medisa\Api\Auth\AuthMiddleware;
 use Medisa\Api\Controllers\SerbestZamanController;
 use Medisa\Api\Database\Connection;
 use Medisa\Api\Http\Request;
+use Medisa\Api\Services\SerbestZaman\SerbestZamanAllocationService;
 
 function szAssert(bool $condition, string $name): void
 {
@@ -931,6 +932,20 @@ szAssert($insufficient['status'] === 409, 'kullanim dakika > bakiye → 409');
 szAssert(
     ($insufficient['payload']['errors'][0]['code'] ?? '') === 'INSUFFICIENT_BALANCE',
     'INSUFFICIENT_BALANCE'
+);
+
+// Pack4A: release usage allocation before OLUSUM IPTAL (net allocation fail-closed)
+$iptalKulBeforeOlusum = invokeSzHttp($pdo, $gy, 'POST', '/serbest-zaman/iptal', [
+    'personel_id' => 10,
+    'hedef_event_id' => $kullanimId,
+    'hedef_event_tipi' => 'SERBEST_ZAMAN_KULLANIM',
+    'event_tarihi' => '2026-04-19',
+    'islem_anahtari' => 'sz-iptal-kullanim-before-olusum',
+], $subeHeader);
+szAssert($iptalKulBeforeOlusum['status'] === 200, 'POST iptal KULLANIM before OLUSUM → 200');
+szAssert(
+    SerbestZamanAllocationService::netAllocatedToLot($pdo, $olusumId) === 0,
+    'OLUSUM net allocation 0 after KULLANIM iptal'
 );
 
 $iptal = invokeSzHttp($pdo, $gy, 'POST', '/serbest-zaman/iptal', [

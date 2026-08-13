@@ -405,10 +405,23 @@ class SerbestZamanController
             }
 
             $bakiye = self::hesaplaBakiye($personelId, $events, $eventTarihi);
-            if ($bakiye['kalan_dakika'] <= 0) {
+            $availableForWrite = (int) $bakiye['kalan_dakika'];
+            if (SerbestZamanAllocationService::tableExists($pdo)) {
+                $allocState = SerbestZamanAllocationService::personelAllocationState($pdo, $events, $personelId);
+                // Allocated / empty ledger mode: lot usable owns write capacity (global
+                // kalan still double-counts full expired OLUSUM dakika).
+                if ($allocState['state'] === SerbestZamanAllocationService::STATE_ALLOCATED
+                    || $allocState['state'] === SerbestZamanAllocationService::STATE_NO_USAGE
+                ) {
+                    $lots = SerbestZamanAllocationService::projectLots($pdo, $events, $personelId, $eventTarihi);
+                    $lotSum = SerbestZamanAllocationService::summarizeLotBalance($lots);
+                    $availableForWrite = (int) $lotSum['usable_dakika'];
+                }
+            }
+            if ($availableForWrite <= 0) {
                 self::rollbackConflict($pdo, 'NO_ELIGIBLE_BALANCE', 'Kullanilabilir serbest zaman bakiyesi yok.');
             }
-            if ($dakika > $bakiye['kalan_dakika']) {
+            if ($dakika > $availableForWrite) {
                 self::rollbackConflict($pdo, 'INSUFFICIENT_BALANCE', 'Kullanim miktari mevcut bakiyeyi asiyor.');
             }
 
@@ -536,6 +549,16 @@ class SerbestZamanController
             $iptalCheck->execute(['hid' => $hedefEventId]);
             if ($iptalCheck->fetch(PDO::FETCH_ASSOC) !== false) {
                 self::rollbackConflict($pdo, 'ALREADY_CANCELLED', 'Hedef event zaten iptal edilmis.');
+            }
+
+            if ($hedefTipi === 'SERBEST_ZAMAN_OLUSUM'
+                && SerbestZamanAllocationService::tableExists($pdo)
+            ) {
+                try {
+                    SerbestZamanAllocationService::assertOlusumHasNoNetAllocation($pdo, $hedefEventId);
+                } catch (RuntimeException $e) {
+                    self::mapAllocationConflict($pdo, $e);
+                }
             }
 
             $donem = self::resolveDonemMeta($pdo, (int) $personel['sube_id'], $eventTarihi);
@@ -694,6 +717,19 @@ class SerbestZamanController
                 $kullanilabilir = $bakiye['toplam_hak_dakika'] - $bakiye['suresi_dolan_dakika'];
                 if ($bakiye['kullanilan_dakika'] > $kullanilabilir) {
                     self::rollbackConflict($pdo, 'INSUFFICIENT_BALANCE', 'Kullanim duzeltmesi bakiyeyi asiyor.');
+                }
+            }
+            if ($hedefTipi === 'SERBEST_ZAMAN_OLUSUM'
+                && SerbestZamanAllocationService::tableExists($pdo)
+            ) {
+                try {
+                    SerbestZamanAllocationService::assertOlusumEffectiveCoversAllocation(
+                        $pdo,
+                        $hedefEventId,
+                        $yeniDakika
+                    );
+                } catch (RuntimeException $e) {
+                    self::mapAllocationConflict($pdo, $e);
                 }
             }
 
@@ -1174,7 +1210,7 @@ class SerbestZamanController
             self::rollbackConflict(
                 $pdo,
                 SerbestZamanAllocationService::CODE_OLUSUM_HAS_ALLOCATIONS,
-                'Tahsis edilmis OLUSUM iptal edilemez.'
+                'OLUSUM net tahsis varken iptal edilemez veya tahsisin altina dusurulemez.'
             );
         }
         if ($code === SerbestZamanAllocationService::CODE_SCHEMA_NOT_READY) {

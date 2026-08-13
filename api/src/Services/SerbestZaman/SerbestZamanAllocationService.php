@@ -111,16 +111,26 @@ final class SerbestZamanAllocationService
             }
             $eid = (int) ($event['id'] ?? 0);
             $effective = self::effectiveEventDakika($events, $eid, $personelId);
-            if ($effective <= 0) {
+            $net = self::netAllocatedForUsage($pdo, $eid);
+            // effective == 0 && net == 0 → valid cancelled/zeroed usage (ignore)
+            if ($effective === 0 && $net === 0) {
                 continue;
             }
-            $hasUsage = true;
-            $net = self::netAllocatedForUsage($pdo, $eid);
-            if ($net === 0) {
+            // effective > 0 && net == 0 → LEGACY_UNALLOCATED (pre-061 provenance missing)
+            if ($effective > 0 && $net === 0) {
+                $hasUsage = true;
                 $legacy++;
-            } elseif ($net !== $effective) {
-                $broken++;
+                continue;
             }
+            // net != 0 && effective != net → INVARIANT_BROKEN
+            // (includes effective == 0 with stranded net > 0)
+            if ($net !== $effective) {
+                $hasUsage = true;
+                $broken++;
+                continue;
+            }
+            // effective > 0 && net == effective → allocated valid
+            $hasUsage = true;
         }
 
         if ($broken > 0) {
@@ -362,11 +372,7 @@ final class SerbestZamanAllocationService
                 throw new RuntimeException(self::CODE_ALLOCATION_INVARIANT_BROKEN);
             }
             $effective = self::effectiveEventDakika($events, $olusumId, $personelId);
-            // Cancelled/zeroed OLUSUM may leave stranded historical deltas (pre-existing
-            // global-pool cancel semantics). Over-consume check only for active lots.
-            if ($effective <= 0) {
-                continue;
-            }
+            // Every allocation-bearing lot: 0 <= net <= effective OLUSUM (no stranded skip).
             if ($net > $effective) {
                 throw new RuntimeException(self::CODE_ALLOCATION_INVARIANT_BROKEN);
             }
@@ -377,6 +383,18 @@ final class SerbestZamanAllocationService
     {
         $net = self::netAllocatedToLot($pdo, (int) $olusumEventId);
         if ($net > 0) {
+            throw new RuntimeException(self::CODE_OLUSUM_HAS_ALLOCATIONS);
+        }
+    }
+
+    /**
+     * OLUSUM DUZELTME: new effective must cover current net allocation.
+     * yeni_dakika < net → SERBEST_ZAMAN_OLUSUM_HAS_ALLOCATIONS (fail-closed).
+     */
+    public static function assertOlusumEffectiveCoversAllocation(PDO $pdo, $olusumEventId, $yeniDakika)
+    {
+        $net = self::netAllocatedToLot($pdo, (int) $olusumEventId);
+        if ((int) $yeniDakika < $net) {
             throw new RuntimeException(self::CODE_OLUSUM_HAS_ALLOCATIONS);
         }
     }

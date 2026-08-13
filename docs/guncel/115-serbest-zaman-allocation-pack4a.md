@@ -64,6 +64,21 @@ Table `serbest_zaman_kullanim_tahsisleri`:
 
 Net allocated for a KULLANIM must equal effective dakika after IPTAL/DUZELTME chain.
 
+Allocated-mode **new KULLANIM** capacity check uses lot-based usable (`SUM available` on non-expired lots), not the legacy global `kalan_dakika` formula (which still treats full expired OLUSUM dakika as `suresi_dolan` and can understate remaining capacity after partial consume).
+
+### OLUSUM fail-closed (merge-blocker hardening)
+
+When an OLUSUM lot has **net allocation > 0**:
+
+- `SERBEST_ZAMAN_OLUSUM` **IPTAL** → HTTP 409 `SERBEST_ZAMAN_OLUSUM_HAS_ALLOCATIONS` (no IPTAL event, no `aktif_olusum` delete)
+- `SERBEST_ZAMAN_OLUSUM` **DUZELTME** to `yeni_dakika` **below** current net allocation → same conflict (no correction event)
+- Equal-to-allocation reduce is allowed; reduce above allocation is allowed
+- After KULLANIM IPTAL releases lot net to 0, OLUSUM IPTAL proceeds
+
+`assertLotInvariants` enforces `0 <= net <= effective OLUSUM` for **every** allocation-bearing lot (no stranded `effective<=0` skip).
+
+Usage `allocation_state`: effective usage `0` with stranded net allocation → `INVARIANT_BROKEN`.
+
 ---
 
 ## Gap status (explicit non-closure)

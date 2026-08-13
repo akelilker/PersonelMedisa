@@ -366,7 +366,17 @@ function p4aSeedBase(PDO $pdo): void
          (70, '77777777770', 'SixM', 'Yedi', '1990-01-01', '05000000014', 'Acil', '05000000015',
             'S070', '2010-01-01', 1, 'AKTIF'),
          (80, '88888888880', 'Cancel', 'Sekiz', '1990-01-01', '05000000016', 'Acil', '05000000017',
-            'S080', '2010-01-01', 1, 'AKTIF')"
+            'S080', '2010-01-01', 1, 'AKTIF'),
+         (90, '99999999990', 'Partial', 'Dokuz', '1990-01-01', '05000000018', 'Acil', '05000000019',
+            'S090', '2010-01-01', 1, 'AKTIF'),
+         (91, '10101010100', 'Olusum', 'Gate', '1990-01-01', '05000000020', 'Acil', '05000000021',
+            'S091', '2010-01-01', 1, 'AKTIF'),
+         (92, '12121212120', 'Olusum', 'Corr', '1990-01-01', '05000000022', 'Acil', '05000000023',
+            'S092', '2010-01-01', 1, 'AKTIF'),
+         (93, '13131313130', 'Olusum', 'After', '1990-01-01', '05000000024', 'Acil', '05000000025',
+            'S093', '2010-01-01', 1, 'AKTIF'),
+         (94, '14141414140', 'Inv', 'Broken', '1990-01-01', '05000000026', 'Acil', '05000000027',
+            'S094', '2010-01-01', 1, 'AKTIF')"
     );
 }
 
@@ -825,6 +835,273 @@ try {
     $lotsAfter = SerbestZamanAllocationService::projectLots($pdo, $events70, 70, $dayAfter);
     p4aAssert(($lotsOn[0]['expiry_state'] ?? '') === 'ACTIVE', '6m expiry_state ACTIVE on son day');
     p4aAssert(($lotsAfter[0]['expiry_state'] ?? '') === 'EXPIRED', '6m expiry_state EXPIRED after son');
+
+    // 6-month partially-consumed lots via real allocation ledger (not handcrafted summarize)
+    // While active: A300+B300 early, C300 later. usage400 → A300 B100; after early expiry usage50 → C50.
+    $earlySon = '2026-06-10';
+    $lateSon = '2026-12-31';
+    $activeRef = '2026-06-01';
+    $afterEarlyRef = '2026-06-11';
+    $pA = p4aSeedOlusum($pdo, 90, 300, $earlySon, '2026-01-01');
+    $pB = p4aSeedOlusum($pdo, 90, 300, $earlySon, '2026-01-02');
+    $pC = p4aSeedOlusum($pdo, 90, 300, $lateSon, '2026-01-03');
+    $partialKul = invokeSzHttp($pdo, $gy, 'POST', '/serbest-zaman/kullanim', [
+        'personel_id' => 90,
+        'dakika' => 400,
+        'event_tarihi' => $activeRef,
+        'islem_anahtari' => 'p4a-partial-400',
+    ], $subeHeader);
+    p4aAssert($partialKul['status'] === 200, 'partial 6m usage400 → 200');
+    $partialKid = (int) ($partialKul['payload']['data']['id'] ?? 0);
+    $partialNet = p4aNetByLotForUsage($pdo, $partialKid);
+    p4aAssert(($partialNet[(int) $pA['olusum_id']] ?? 0) === 300, 'partial A allocated 300');
+    p4aAssert(($partialNet[(int) $pB['olusum_id']] ?? 0) === 100, 'partial B allocated 100');
+    $partialKul2 = invokeSzHttp($pdo, $gy, 'POST', '/serbest-zaman/kullanim', [
+        'personel_id' => 90,
+        'dakika' => 50,
+        'event_tarihi' => $afterEarlyRef,
+        'islem_anahtari' => 'p4a-partial-50',
+    ], $subeHeader);
+    p4aAssert($partialKul2['status'] === 200, 'partial 6m usage50 after early expiry → 200');
+    $partialKid2 = (int) ($partialKul2['payload']['data']['id'] ?? 0);
+    $partialNet2 = p4aNetByLotForUsage($pdo, $partialKid2);
+    p4aAssert(($partialNet2[(int) $pC['olusum_id']] ?? 0) === 50, 'partial C allocated 50');
+    p4aAssert(($partialNet2[(int) $pB['olusum_id']] ?? 0) === 0, 'partial second usage skips expired B');
+    $bakiyePartial = invokeSzHttp($pdo, $gy, 'GET', '/serbest-zaman/bakiye', [], $subeHeader, [
+        'personel_id' => '90',
+        'referans_tarih' => $afterEarlyRef,
+    ]);
+    p4aAssert($bakiyePartial['status'] === 200, 'partial 6m bakiye → 200');
+    p4aAssert(
+        (int) ($bakiyePartial['payload']['data']['lot_based_expired_unused'] ?? -1) === 200,
+        'partial expired_unused=200 (B remaining)'
+    );
+    p4aAssert(
+        (int) ($bakiyePartial['payload']['data']['lot_based_balance_available'] ?? -1) === 250,
+        'partial usable=250 (C remaining)'
+    );
+    $events90 = $pdo->query('SELECT * FROM serbest_zaman_events WHERE personel_id = 90 ORDER BY id ASC')->fetchAll(PDO::FETCH_ASSOC);
+    $lots90 = SerbestZamanAllocationService::projectLots($pdo, $events90, 90, $afterEarlyRef);
+    $sum90 = SerbestZamanAllocationService::summarizeLotBalance($lots90);
+    p4aAssert((int) $sum90['expired_unused_dakika'] === 200, 'partial summarize expired_unused=200');
+    p4aAssert((int) $sum90['usable_dakika'] === 250, 'partial summarize usable=250');
+
+    // Merge-blocker A: OLUSUM IPTAL blocked while net allocation > 0
+    $gateA = p4aSeedOlusum($pdo, 91, 300, '2026-12-31');
+    $gateKul = invokeSzHttp($pdo, $gy, 'POST', '/serbest-zaman/kullanim', [
+        'personel_id' => 91,
+        'dakika' => 300,
+        'event_tarihi' => $referans,
+        'islem_anahtari' => 'p4a-gate-a-kul',
+    ], $subeHeader);
+    p4aAssert($gateKul['status'] === 200, 'gate A usage → 200');
+    $eventsBeforeGateIptal = (int) $pdo->query(
+        'SELECT COUNT(*) FROM serbest_zaman_events WHERE personel_id = 91'
+    )->fetchColumn();
+    $aktifBefore = (int) $pdo->query(
+        'SELECT COUNT(*) FROM serbest_zaman_aktif_olusumlar WHERE olusum_event_id = ' . (int) $gateA['olusum_id']
+    )->fetchColumn();
+    $allocBeforeGate = (int) $pdo->query(
+        'SELECT COALESCE(SUM(tahsis_delta_dakika),0) FROM serbest_zaman_kullanim_tahsisleri
+         WHERE olusum_event_id = ' . (int) $gateA['olusum_id']
+    )->fetchColumn();
+    $gateIptal = invokeSzHttp($pdo, $gy, 'POST', '/serbest-zaman/iptal', [
+        'personel_id' => 91,
+        'hedef_event_id' => (int) $gateA['olusum_id'],
+        'hedef_event_tipi' => 'SERBEST_ZAMAN_OLUSUM',
+        'event_tarihi' => $referans,
+        'islem_anahtari' => 'p4a-gate-a-iptal',
+    ], $subeHeader);
+    p4aAssert($gateIptal['status'] === 409, 'A OLUSUM IPTAL with allocation → 409');
+    p4aAssert(
+        ($gateIptal['payload']['errors'][0]['code'] ?? '') === SerbestZamanAllocationService::CODE_OLUSUM_HAS_ALLOCATIONS,
+        'A SERBEST_ZAMAN_OLUSUM_HAS_ALLOCATIONS'
+    );
+    $eventsAfterGateIptal = (int) $pdo->query(
+        'SELECT COUNT(*) FROM serbest_zaman_events WHERE personel_id = 91'
+    )->fetchColumn();
+    p4aAssert($eventsAfterGateIptal === $eventsBeforeGateIptal, 'A no IPTAL event persisted');
+    $aktifAfter = (int) $pdo->query(
+        'SELECT COUNT(*) FROM serbest_zaman_aktif_olusumlar WHERE olusum_event_id = ' . (int) $gateA['olusum_id']
+    )->fetchColumn();
+    p4aAssert($aktifAfter === $aktifBefore && $aktifAfter === 1, 'A aktif_olusum remains');
+    $allocAfterGate = (int) $pdo->query(
+        'SELECT COALESCE(SUM(tahsis_delta_dakika),0) FROM serbest_zaman_kullanim_tahsisleri
+         WHERE olusum_event_id = ' . (int) $gateA['olusum_id']
+    )->fetchColumn();
+    p4aAssert($allocAfterGate === $allocBeforeGate && $allocAfterGate === 300, 'A allocation unchanged');
+    $events91 = $pdo->query('SELECT * FROM serbest_zaman_events WHERE personel_id = 91 ORDER BY id ASC')->fetchAll(PDO::FETCH_ASSOC);
+    p4aAssert(
+        SerbestZamanAllocationService::effectiveEventDakika($events91, (int) $gateA['olusum_id'], 91) === 300,
+        'A OLUSUM effective remains 300'
+    );
+
+    // Merge-blocker B/C/D/E: OLUSUM DUZELTME vs net allocation
+    $corr = p4aSeedOlusum($pdo, 92, 300, '2026-12-31');
+    $corrKul = invokeSzHttp($pdo, $gy, 'POST', '/serbest-zaman/kullanim', [
+        'personel_id' => 92,
+        'dakika' => 200,
+        'event_tarihi' => $referans,
+        'islem_anahtari' => 'p4a-corr-kul',
+    ], $subeHeader);
+    p4aAssert($corrKul['status'] === 200, 'corr usage200 → 200');
+    $corrDown250 = invokeSzHttp($pdo, $gy, 'POST', '/serbest-zaman/duzeltme', [
+        'personel_id' => 92,
+        'hedef_event_id' => (int) $corr['olusum_id'],
+        'hedef_event_tipi' => 'SERBEST_ZAMAN_OLUSUM',
+        'yeni_dakika' => 250,
+        'event_tarihi' => $referans,
+        'islem_anahtari' => 'p4a-corr-250',
+        'aciklama' => 'olusum 300 to 250 allowed',
+    ], $subeHeader);
+    p4aAssert($corrDown250['status'] === 200, 'B OLUSUM correction 300→250 PASS');
+    $events92 = $pdo->query('SELECT * FROM serbest_zaman_events WHERE personel_id = 92 ORDER BY id ASC')->fetchAll(PDO::FETCH_ASSOC);
+    p4aAssert(
+        SerbestZamanAllocationService::effectiveEventDakika($events92, (int) $corr['olusum_id'], 92) === 250,
+        'B effective 250'
+    );
+    p4aAssert(
+        SerbestZamanAllocationService::netAllocatedToLot($pdo, (int) $corr['olusum_id']) === 200,
+        'B allocation still 200'
+    );
+    $corrDown200 = invokeSzHttp($pdo, $gy, 'POST', '/serbest-zaman/duzeltme', [
+        'personel_id' => 92,
+        'hedef_event_id' => (int) $corr['olusum_id'],
+        'hedef_event_tipi' => 'SERBEST_ZAMAN_OLUSUM',
+        'yeni_dakika' => 200,
+        'event_tarihi' => $referans,
+        'islem_anahtari' => 'p4a-corr-200',
+        'aciklama' => 'olusum 250 to 200 equal allocation allowed',
+    ], $subeHeader);
+    p4aAssert($corrDown200['status'] === 200, 'C OLUSUM correction →200 PASS');
+    $eventsBefore199 = (int) $pdo->query('SELECT COUNT(*) FROM serbest_zaman_events WHERE personel_id = 92')->fetchColumn();
+    $corrDown199 = invokeSzHttp($pdo, $gy, 'POST', '/serbest-zaman/duzeltme', [
+        'personel_id' => 92,
+        'hedef_event_id' => (int) $corr['olusum_id'],
+        'hedef_event_tipi' => 'SERBEST_ZAMAN_OLUSUM',
+        'yeni_dakika' => 199,
+        'event_tarihi' => $referans,
+        'islem_anahtari' => 'p4a-corr-199',
+        'aciklama' => 'olusum below allocation blocked',
+    ], $subeHeader);
+    p4aAssert($corrDown199['status'] === 409, 'D OLUSUM correction →199 BLOCK');
+    p4aAssert(
+        ($corrDown199['payload']['errors'][0]['code'] ?? '') === SerbestZamanAllocationService::CODE_OLUSUM_HAS_ALLOCATIONS,
+        'D OLUSUM_HAS_ALLOCATIONS'
+    );
+    p4aAssert(
+        (int) $pdo->query('SELECT COUNT(*) FROM serbest_zaman_events WHERE personel_id = 92')->fetchColumn()
+            === $eventsBefore199,
+        'D no correction event'
+    );
+    $events92b = $pdo->query('SELECT * FROM serbest_zaman_events WHERE personel_id = 92 ORDER BY id ASC')->fetchAll(PDO::FETCH_ASSOC);
+    p4aAssert(
+        SerbestZamanAllocationService::effectiveEventDakika($events92b, (int) $corr['olusum_id'], 92) === 200,
+        'D effective remains 200'
+    );
+    p4aAssert(
+        SerbestZamanAllocationService::netAllocatedToLot($pdo, (int) $corr['olusum_id']) === 200,
+        'D allocation remains 200'
+    );
+    $eventsBefore0 = $eventsBefore199; // same after blocked 199
+    $corrDown0 = invokeSzHttp($pdo, $gy, 'POST', '/serbest-zaman/duzeltme', [
+        'personel_id' => 92,
+        'hedef_event_id' => (int) $corr['olusum_id'],
+        'hedef_event_tipi' => 'SERBEST_ZAMAN_OLUSUM',
+        'yeni_dakika' => 0,
+        'event_tarihi' => $referans,
+        'islem_anahtari' => 'p4a-corr-0',
+        'aciklama' => 'olusum to zero blocked',
+    ], $subeHeader);
+    // yeni_dakika 0 may be validation (422) or allocation conflict — either must not persist
+    p4aAssert($corrDown0['status'] !== 200, 'E OLUSUM correction →0 BLOCK');
+    p4aAssert(
+        (int) $pdo->query('SELECT COUNT(*) FROM serbest_zaman_events WHERE personel_id = 92')->fetchColumn()
+            === $eventsBefore0,
+        'E no correction event for →0'
+    );
+
+    // Merge-blocker F: after usage IPTAL releases allocation, OLUSUM IPTAL PASS
+    $after = p4aSeedOlusum($pdo, 93, 300, '2026-12-31');
+    $afterKul = invokeSzHttp($pdo, $gy, 'POST', '/serbest-zaman/kullanim', [
+        'personel_id' => 93,
+        'dakika' => 200,
+        'event_tarihi' => $referans,
+        'islem_anahtari' => 'p4a-after-kul',
+    ], $subeHeader);
+    p4aAssert($afterKul['status'] === 200, 'F usage → 200');
+    $afterKid = (int) ($afterKul['payload']['data']['id'] ?? 0);
+    $afterKulIptal = invokeSzHttp($pdo, $gy, 'POST', '/serbest-zaman/iptal', [
+        'personel_id' => 93,
+        'hedef_event_id' => $afterKid,
+        'hedef_event_tipi' => 'SERBEST_ZAMAN_KULLANIM',
+        'event_tarihi' => $referans,
+        'islem_anahtari' => 'p4a-after-kul-iptal',
+    ], $subeHeader);
+    p4aAssert($afterKulIptal['status'] === 200, 'F usage IPTAL → 200');
+    p4aAssert(
+        SerbestZamanAllocationService::netAllocatedToLot($pdo, (int) $after['olusum_id']) === 0,
+        'F lot net allocation 0 after usage cancel'
+    );
+    $afterOlusumIptal = invokeSzHttp($pdo, $gy, 'POST', '/serbest-zaman/iptal', [
+        'personel_id' => 93,
+        'hedef_event_id' => (int) $after['olusum_id'],
+        'hedef_event_tipi' => 'SERBEST_ZAMAN_OLUSUM',
+        'event_tarihi' => $referans,
+        'islem_anahtari' => 'p4a-after-olusum-iptal',
+    ], $subeHeader);
+    p4aAssert($afterOlusumIptal['status'] === 200, 'F OLUSUM IPTAL after release → PASS');
+    $aktif93 = (int) $pdo->query(
+        'SELECT COUNT(*) FROM serbest_zaman_aktif_olusumlar WHERE olusum_event_id = ' . (int) $after['olusum_id']
+    )->fetchColumn();
+    p4aAssert($aktif93 === 0, 'F aktif_olusum removed');
+
+    // Merge-blocker G: effective usage 0 + stranded net allocation → INVARIANT_BROKEN
+    $inv = p4aSeedOlusum($pdo, 94, 300, '2026-12-31');
+    $invKul = invokeSzHttp($pdo, $gy, 'POST', '/serbest-zaman/kullanim', [
+        'personel_id' => 94,
+        'dakika' => 100,
+        'event_tarihi' => $referans,
+        'islem_anahtari' => 'p4a-inv-kul',
+    ], $subeHeader);
+    p4aAssert($invKul['status'] === 200, 'G usage → 200');
+    $invKid = (int) ($invKul['payload']['data']['id'] ?? 0);
+    // Synthetic IPTAL without release deltas (bypass controller) → stranded allocation
+    $pdo->exec(
+        "INSERT INTO serbest_zaman_events
+          (personel_id, event_tipi, event_tarihi, hedef_event_id, hedef_event_tipi,
+           islem_anahtari, aciklama, donem_yil, donem_ay, donem_kilitli_miydi, created_by)
+         VALUES
+          (94, 'SERBEST_ZAMAN_IPTAL', '{$referans}', {$invKid}, 'SERBEST_ZAMAN_KULLANIM',
+           'p4a-inv-sql-iptal', 'synthetic stranded', 2026, 5, 0, 1)"
+    );
+    $bakiyeInv = invokeSzHttp($pdo, $gy, 'GET', '/serbest-zaman/bakiye', [], $subeHeader, [
+        'personel_id' => '94',
+        'referans_tarih' => $referans,
+    ]);
+    p4aAssert($bakiyeInv['status'] === 200, 'G bakiye → 200');
+    p4aAssert(
+        ($bakiyeInv['payload']['data']['allocation_state'] ?? '') === SerbestZamanAllocationService::STATE_INVARIANT_BROKEN,
+        'G allocation_state INVARIANT_BROKEN'
+    );
+
+    // Merge-blocker H: assertLotInvariants — effective OLUSUM 0 + allocation > 0
+    $pdo->exec(
+        "INSERT INTO serbest_zaman_events
+          (personel_id, event_tipi, event_tarihi, hedef_event_id, hedef_event_tipi,
+           islem_anahtari, aciklama, donem_yil, donem_ay, donem_kilitli_miydi, created_by)
+         VALUES
+          (94, 'SERBEST_ZAMAN_IPTAL', '{$referans}', " . (int) $inv['olusum_id'] . ", 'SERBEST_ZAMAN_OLUSUM',
+           'p4a-inv-sql-olusum-iptal', 'synthetic lot cancel', 2026, 5, 0, 1)"
+    );
+    $events94 = $pdo->query('SELECT * FROM serbest_zaman_events WHERE personel_id = 94 ORDER BY id ASC')->fetchAll(PDO::FETCH_ASSOC);
+    $lotBroken = false;
+    try {
+        SerbestZamanAllocationService::assertLotInvariants($pdo, $events94, 94);
+    } catch (RuntimeException $e) {
+        $lotBroken = $e->getMessage() === SerbestZamanAllocationService::CODE_ALLOCATION_INVARIANT_BROKEN;
+    }
+    p4aAssert($lotBroken, 'H assertLotInvariants stranded lot → INVARIANT_BROKEN');
 
     // Trigger: UPDATE/DELETE blocked
     $anyId = (int) $pdo->query('SELECT id FROM serbest_zaman_kullanim_tahsisleri LIMIT 1')->fetchColumn();

@@ -23,6 +23,7 @@ final class SerbestZamanAllocationService
     public const STATE_ALLOCATED = 'ALLOCATED';
     public const STATE_LEGACY_UNALLOCATED = 'LEGACY_UNALLOCATED';
     public const STATE_INVARIANT_BROKEN = 'INVARIANT_BROKEN';
+    public const STATE_ZERO = 'ZERO';
     public const STATE_NO_USAGE = 'NO_USAGE';
 
     public const CODE_LEGACY_ALLOCATION_REQUIRED = 'SERBEST_ZAMAN_LEGACY_ALLOCATION_REQUIRED';
@@ -85,6 +86,54 @@ final class SerbestZamanAllocationService
     }
 
     /**
+     * Per-KULLANIM allocation provenance (event-level).
+     *
+     * effective > 0 && net == 0 → LEGACY_UNALLOCATED
+     * effective > 0 && net == effective → ALLOCATED
+     * effective == 0 && net == 0 → ZERO (cancelled / zeroed)
+     * net != effective && net != 0 → INVARIANT_BROKEN
+     * (also effective == 0 && net > 0 → INVARIANT_BROKEN)
+     *
+     * @param list<array<string, mixed>> $events
+     * @return array{state:string,effective:int,net:int}
+     */
+    public static function usageAllocationState(PDO $pdo, array $events, $personelId, $kullanimEventId)
+    {
+        $personelId = (int) $personelId;
+        $kullanimEventId = (int) $kullanimEventId;
+        $effective = self::effectiveEventDakika($events, $kullanimEventId, $personelId);
+        $net = self::tableExists($pdo) ? self::netAllocatedForUsage($pdo, $kullanimEventId) : 0;
+
+        if ($effective === 0 && $net === 0) {
+            return [
+                'state' => self::STATE_ZERO,
+                'effective' => 0,
+                'net' => 0,
+            ];
+        }
+        if ($effective > 0 && $net === 0) {
+            return [
+                'state' => self::STATE_LEGACY_UNALLOCATED,
+                'effective' => $effective,
+                'net' => 0,
+            ];
+        }
+        if ($effective > 0 && $net === $effective) {
+            return [
+                'state' => self::STATE_ALLOCATED,
+                'effective' => $effective,
+                'net' => $net,
+            ];
+        }
+
+        return [
+            'state' => self::STATE_INVARIANT_BROKEN,
+            'effective' => $effective,
+            'net' => $net,
+        ];
+    }
+
+    /**
      * @param list<array<string, mixed>> $events
      * @return array{state:string,legacy_unallocated_usage_count:int,invariant_broken_count:int}
      */
@@ -110,26 +159,21 @@ final class SerbestZamanAllocationService
                 continue;
             }
             $eid = (int) ($event['id'] ?? 0);
-            $effective = self::effectiveEventDakika($events, $eid, $personelId);
-            $net = self::netAllocatedForUsage($pdo, $eid);
-            // effective == 0 && net == 0 → valid cancelled/zeroed usage (ignore)
-            if ($effective === 0 && $net === 0) {
+            $usage = self::usageAllocationState($pdo, $events, $personelId, $eid);
+            if ($usage['state'] === self::STATE_ZERO) {
                 continue;
             }
-            // effective > 0 && net == 0 → LEGACY_UNALLOCATED (pre-061 provenance missing)
-            if ($effective > 0 && $net === 0) {
+            if ($usage['state'] === self::STATE_LEGACY_UNALLOCATED) {
                 $hasUsage = true;
                 $legacy++;
                 continue;
             }
-            // net != 0 && effective != net → INVARIANT_BROKEN
-            // (includes effective == 0 with stranded net > 0)
-            if ($net !== $effective) {
+            if ($usage['state'] === self::STATE_INVARIANT_BROKEN) {
                 $hasUsage = true;
                 $broken++;
                 continue;
             }
-            // effective > 0 && net == effective → allocated valid
+            // ALLOCATED
             $hasUsage = true;
         }
 
@@ -157,6 +201,36 @@ final class SerbestZamanAllocationService
             throw new RuntimeException(self::CODE_LEGACY_ALLOCATION_REQUIRED);
         }
         if ($state['state'] === self::STATE_INVARIANT_BROKEN) {
+            throw new RuntimeException(self::CODE_ALLOCATION_INVARIANT_BROKEN);
+        }
+    }
+
+    /**
+     * KULLANIM DUZELTME: block LEGACY_UNALLOCATED (no invented provenance) and INVARIANT_BROKEN.
+     *
+     * @param list<array<string, mixed>> $events
+     */
+    public static function assertUsageMutableForCorrection(PDO $pdo, array $events, $personelId, $kullanimEventId)
+    {
+        $usage = self::usageAllocationState($pdo, $events, $personelId, $kullanimEventId);
+        if ($usage['state'] === self::STATE_LEGACY_UNALLOCATED) {
+            throw new RuntimeException(self::CODE_LEGACY_ALLOCATION_REQUIRED);
+        }
+        if ($usage['state'] === self::STATE_INVARIANT_BROKEN) {
+            throw new RuntimeException(self::CODE_ALLOCATION_INVARIANT_BROKEN);
+        }
+    }
+
+    /**
+     * KULLANIM IPTAL: INVARIANT_BROKEN blocked (no auto-repair).
+     * LEGACY_UNALLOCATED may proceed (full cancel invents no lot provenance).
+     *
+     * @param list<array<string, mixed>> $events
+     */
+    public static function assertUsageMutableForCancel(PDO $pdo, array $events, $personelId, $kullanimEventId)
+    {
+        $usage = self::usageAllocationState($pdo, $events, $personelId, $kullanimEventId);
+        if ($usage['state'] === self::STATE_INVARIANT_BROKEN) {
             throw new RuntimeException(self::CODE_ALLOCATION_INVARIANT_BROKEN);
         }
     }
@@ -327,6 +401,37 @@ final class SerbestZamanAllocationService
     ) {
         $desiredEffective = (int) $desiredEffective;
         $kullanimEventId = (int) $kullanimEventId;
+        $kaynakEventId = (int) $kaynakEventId;
+        $personelId = (int) $personelId;
+
+        // Provenance against pre-mutation events (exclude the DUZELTME/IPTAL kaynak row).
+        $eventsPre = [];
+        foreach ($events as $event) {
+            if ((int) ($event['id'] ?? 0) === $kaynakEventId) {
+                continue;
+            }
+            $eventsPre[] = $event;
+        }
+        $pre = self::usageAllocationState($pdo, $eventsPre, $personelId, $kullanimEventId);
+        if ($pre['state'] === self::STATE_INVARIANT_BROKEN) {
+            throw new RuntimeException(self::CODE_ALLOCATION_INVARIANT_BROKEN);
+        }
+        if ($pre['state'] === self::STATE_LEGACY_UNALLOCATED) {
+            // Full IPTAL (desired 0, net 0) may proceed — no provenance invented.
+            // Any positive/reconcile-up path is forbidden (would invent lots).
+            if ($desiredEffective !== 0) {
+                throw new RuntimeException(self::CODE_LEGACY_ALLOCATION_REQUIRED);
+            }
+            $currentLegacy = self::netAllocatedForUsage($pdo, $kullanimEventId);
+            if ($currentLegacy !== 0) {
+                throw new RuntimeException(self::CODE_ALLOCATION_INVARIANT_BROKEN);
+            }
+            self::assertUsageInvariant($pdo, $events, $personelId, $kullanimEventId);
+            self::assertLotInvariants($pdo, $events, $personelId);
+
+            return;
+        }
+
         $current = self::netAllocatedForUsage($pdo, $kullanimEventId);
         $delta = $desiredEffective - $current;
         if ($delta > 0) {

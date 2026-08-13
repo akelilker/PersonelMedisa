@@ -376,7 +376,17 @@ function p4aSeedBase(PDO $pdo): void
          (93, '13131313130', 'Olusum', 'After', '1990-01-01', '05000000024', 'Acil', '05000000025',
             'S093', '2010-01-01', 1, 'AKTIF'),
          (94, '14141414140', 'Inv', 'Broken', '1990-01-01', '05000000026', 'Acil', '05000000027',
-            'S094', '2010-01-01', 1, 'AKTIF')"
+            'S094', '2010-01-01', 1, 'AKTIF'),
+         (95, '15151515150', 'Legacy', 'Mut', '1990-01-01', '05000000028', 'Acil', '05000000029',
+            'S095', '2010-01-01', 1, 'AKTIF'),
+         (96, '16161616160', 'Legacy', 'Cancel', '1990-01-01', '05000000030', 'Acil', '05000000031',
+            'S096', '2010-01-01', 1, 'AKTIF'),
+         (97, '17171717170', 'Inv', 'Mut', '1990-01-01', '05000000032', 'Acil', '05000000033',
+            'S097', '2010-01-01', 1, 'AKTIF'),
+         (98, '18181818180', 'Legacy', 'Multi', '1990-01-01', '05000000034', 'Acil', '05000000035',
+            'S098', '2010-01-01', 1, 'AKTIF'),
+         (99, '19191919190', 'Alloc', 'Valid', '1990-01-01', '05000000036', 'Acil', '05000000037',
+            'S099', '2010-01-01', 1, 'AKTIF')"
     );
 }
 
@@ -478,6 +488,31 @@ function p4aInsertLegacyKullanim(PDO $pdo, int $personelId, int $dakika, string 
     ]);
 
     return (int) $pdo->lastInsertId();
+}
+
+function p4aInsertAllocationDelta(
+    PDO $pdo,
+    int $personelId,
+    int $kullanimEventId,
+    int $olusumEventId,
+    int $kaynakEventId,
+    int $delta
+): void {
+    $stmt = $pdo->prepare(
+        'INSERT INTO serbest_zaman_kullanim_tahsisleri
+            (personel_id, kullanim_event_id, olusum_event_id, kaynak_event_id,
+             tahsis_delta_dakika, politika_kodu)
+         VALUES
+            (:pid, :kid, :oid, :sid, :delta, :politika)'
+    );
+    $stmt->execute([
+        'pid' => $personelId,
+        'kid' => $kullanimEventId,
+        'oid' => $olusumEventId,
+        'sid' => $kaynakEventId,
+        'delta' => $delta,
+        'politika' => SerbestZamanAllocationService::POLICY_CONSUME,
+    ]);
 }
 
 /** @return array<int,int> olusum_id => net */
@@ -1102,6 +1137,230 @@ try {
         $lotBroken = $e->getMessage() === SerbestZamanAllocationService::CODE_ALLOCATION_INVARIANT_BROKEN;
     }
     p4aAssert($lotBroken, 'H assertLotInvariants stranded lot → INVARIANT_BROKEN');
+
+    // --- Legacy KULLANIM mutation hardening (A–H + multi-legacy) ---
+
+    // A) legacy usage300 correction→200 → 409 LEGACY_ALLOCATION_REQUIRED, no event, no allocation
+    p4aSeedOlusum($pdo, 95, 600, '2026-12-31');
+    $legA = p4aInsertLegacyKullanim($pdo, 95, 300, $referans, 'p4a-leg-a-300');
+    $eventsBeforeA = (int) $pdo->query('SELECT COUNT(*) FROM serbest_zaman_events WHERE personel_id = 95')->fetchColumn();
+    $allocBeforeA = p4aAllocRowCount($pdo, $legA);
+    $corrA = invokeSzHttp($pdo, $gy, 'POST', '/serbest-zaman/duzeltme', [
+        'personel_id' => 95,
+        'hedef_event_id' => $legA,
+        'hedef_event_tipi' => 'SERBEST_ZAMAN_KULLANIM',
+        'yeni_dakika' => 200,
+        'event_tarihi' => $referans,
+        'islem_anahtari' => 'p4a-leg-a-corr-200',
+        'aciklama' => 'legacy correction blocked',
+    ], $subeHeader);
+    p4aAssert($corrA['status'] === 409, 'A legacy correction 300→200 → 409');
+    p4aAssert(
+        ($corrA['payload']['errors'][0]['code'] ?? '') === SerbestZamanAllocationService::CODE_LEGACY_ALLOCATION_REQUIRED,
+        'A SERBEST_ZAMAN_LEGACY_ALLOCATION_REQUIRED'
+    );
+    p4aAssert(
+        (int) $pdo->query('SELECT COUNT(*) FROM serbest_zaman_events WHERE personel_id = 95')->fetchColumn()
+            === $eventsBeforeA,
+        'A no correction event'
+    );
+    p4aAssert(p4aAllocRowCount($pdo, $legA) === $allocBeforeA && $allocBeforeA === 0, 'A no allocation invented');
+    $events95a = $pdo->query('SELECT * FROM serbest_zaman_events WHERE personel_id = 95 ORDER BY id ASC')->fetchAll(PDO::FETCH_ASSOC);
+    $usageA = SerbestZamanAllocationService::usageAllocationState($pdo, $events95a, 95, $legA);
+    p4aAssert($usageA['state'] === SerbestZamanAllocationService::STATE_LEGACY_UNALLOCATED, 'A still LEGACY_UNALLOCATED');
+    p4aAssert((int) $usageA['effective'] === 300, 'A effective remains 300');
+
+    // B) legacy usage300 correction→300 (same value) → same BLOCK
+    $eventsBeforeB = $eventsBeforeA;
+    $corrB = invokeSzHttp($pdo, $gy, 'POST', '/serbest-zaman/duzeltme', [
+        'personel_id' => 95,
+        'hedef_event_id' => $legA,
+        'hedef_event_tipi' => 'SERBEST_ZAMAN_KULLANIM',
+        'yeni_dakika' => 300,
+        'event_tarihi' => $referans,
+        'islem_anahtari' => 'p4a-leg-b-corr-300',
+        'aciklama' => 'legacy same-value correction blocked',
+    ], $subeHeader);
+    p4aAssert($corrB['status'] === 409, 'B legacy correction 300→300 → 409');
+    p4aAssert(
+        ($corrB['payload']['errors'][0]['code'] ?? '') === SerbestZamanAllocationService::CODE_LEGACY_ALLOCATION_REQUIRED,
+        'B LEGACY_ALLOCATION_REQUIRED'
+    );
+    p4aAssert(
+        (int) $pdo->query('SELECT COUNT(*) FROM serbest_zaman_events WHERE personel_id = 95')->fetchColumn()
+            === $eventsBeforeB,
+        'B no correction event'
+    );
+    p4aAssert(p4aAllocRowCount($pdo, $legA) === 0, 'B no allocation invented');
+
+    // C) legacy usage300 IPTAL → PASS, effective0, allocation rows0, no provenance
+    p4aSeedOlusum($pdo, 96, 600, '2026-12-31');
+    $legC = p4aInsertLegacyKullanim($pdo, 96, 300, $referans, 'p4a-leg-c-300');
+    $cancelC = invokeSzHttp($pdo, $gy, 'POST', '/serbest-zaman/iptal', [
+        'personel_id' => 96,
+        'hedef_event_id' => $legC,
+        'hedef_event_tipi' => 'SERBEST_ZAMAN_KULLANIM',
+        'event_tarihi' => $referans,
+        'islem_anahtari' => 'p4a-leg-c-iptal',
+    ], $subeHeader);
+    p4aAssert($cancelC['status'] === 200, 'C legacy IPTAL → PASS');
+    $events96 = $pdo->query('SELECT * FROM serbest_zaman_events WHERE personel_id = 96 ORDER BY id ASC')->fetchAll(PDO::FETCH_ASSOC);
+    p4aAssert(
+        SerbestZamanAllocationService::effectiveEventDakika($events96, $legC, 96) === 0,
+        'C effective usage 0'
+    );
+    p4aAssert(p4aAllocRowCount($pdo, $legC) === 0, 'C allocation rows 0 (no provenance invented)');
+    $usageC = SerbestZamanAllocationService::usageAllocationState($pdo, $events96, 96, $legC);
+    p4aAssert($usageC['state'] === SerbestZamanAllocationService::STATE_ZERO, 'C usage state ZERO');
+    $bakiyeC = invokeSzHttp($pdo, $gy, 'GET', '/serbest-zaman/bakiye', [], $subeHeader, [
+        'personel_id' => '96',
+        'referans_tarih' => $referans,
+    ]);
+    p4aAssert(
+        ($bakiyeC['payload']['data']['allocation_state'] ?? '') === SerbestZamanAllocationService::STATE_NO_USAGE,
+        'C personel NO_USAGE after sole legacy cancel'
+    );
+
+    // D) after C: new usage against current active lots → PASS with explicit allocation
+    $newD = invokeSzHttp($pdo, $gy, 'POST', '/serbest-zaman/kullanim', [
+        'personel_id' => 96,
+        'dakika' => 100,
+        'event_tarihi' => $referans,
+        'islem_anahtari' => 'p4a-leg-d-new',
+    ], $subeHeader);
+    p4aAssert($newD['status'] === 200, 'D new usage after legacy cancel → PASS');
+    $newDKid = (int) ($newD['payload']['data']['id'] ?? 0);
+    p4aAssert($newDKid > 0, 'D new usage id');
+    p4aAssert(p4aAllocRowCount($pdo, $newDKid) > 0, 'D new usage has explicit allocation');
+    p4aAssert(
+        SerbestZamanAllocationService::netAllocatedForUsage($pdo, $newDKid) === 100,
+        'D new usage net allocation 100'
+    );
+
+    // E/F) synthetic effective300 / net200 → DUZELTME and IPTAL blocked as INVARIANT_BROKEN
+    $invLot = p4aSeedOlusum($pdo, 97, 600, '2026-12-31');
+    $invKid = p4aInsertLegacyKullanim($pdo, 97, 300, $referans, 'p4a-inv-mut-300');
+    p4aInsertAllocationDelta($pdo, 97, $invKid, (int) $invLot['olusum_id'], $invKid, 200);
+    $events97 = $pdo->query('SELECT * FROM serbest_zaman_events WHERE personel_id = 97 ORDER BY id ASC')->fetchAll(PDO::FETCH_ASSOC);
+    $usageInv = SerbestZamanAllocationService::usageAllocationState($pdo, $events97, 97, $invKid);
+    p4aAssert($usageInv['state'] === SerbestZamanAllocationService::STATE_INVARIANT_BROKEN, 'E/F synthetic INVARIANT_BROKEN');
+    p4aAssert((int) $usageInv['effective'] === 300 && (int) $usageInv['net'] === 200, 'E/F effective300 net200');
+    $eventsBeforeE = (int) $pdo->query('SELECT COUNT(*) FROM serbest_zaman_events WHERE personel_id = 97')->fetchColumn();
+    $allocBeforeE = p4aAllocRowCount($pdo, $invKid);
+    $corrE = invokeSzHttp($pdo, $gy, 'POST', '/serbest-zaman/duzeltme', [
+        'personel_id' => 97,
+        'hedef_event_id' => $invKid,
+        'hedef_event_tipi' => 'SERBEST_ZAMAN_KULLANIM',
+        'yeni_dakika' => 250,
+        'event_tarihi' => $referans,
+        'islem_anahtari' => 'p4a-inv-mut-corr',
+        'aciklama' => 'invariant correction blocked',
+    ], $subeHeader);
+    p4aAssert($corrE['status'] === 409, 'E invariant DUZELTME → 409');
+    p4aAssert(
+        ($corrE['payload']['errors'][0]['code'] ?? '') === SerbestZamanAllocationService::CODE_ALLOCATION_INVARIANT_BROKEN,
+        'E SERBEST_ZAMAN_ALLOCATION_INVARIANT_BROKEN'
+    );
+    p4aAssert(
+        (int) $pdo->query('SELECT COUNT(*) FROM serbest_zaman_events WHERE personel_id = 97')->fetchColumn()
+            === $eventsBeforeE,
+        'E no correction mutation'
+    );
+    p4aAssert(p4aAllocRowCount($pdo, $invKid) === $allocBeforeE, 'E allocation unchanged');
+    $cancelF = invokeSzHttp($pdo, $gy, 'POST', '/serbest-zaman/iptal', [
+        'personel_id' => 97,
+        'hedef_event_id' => $invKid,
+        'hedef_event_tipi' => 'SERBEST_ZAMAN_KULLANIM',
+        'event_tarihi' => $referans,
+        'islem_anahtari' => 'p4a-inv-mut-iptal',
+    ], $subeHeader);
+    p4aAssert($cancelF['status'] === 409, 'F invariant IPTAL → 409');
+    p4aAssert(
+        ($cancelF['payload']['errors'][0]['code'] ?? '') === SerbestZamanAllocationService::CODE_ALLOCATION_INVARIANT_BROKEN,
+        'F INVARIANT_BROKEN on cancel'
+    );
+    p4aAssert(
+        (int) $pdo->query('SELECT COUNT(*) FROM serbest_zaman_events WHERE personel_id = 97')->fetchColumn()
+            === $eventsBeforeE,
+        'F no cancel mutation'
+    );
+    p4aAssert(p4aAllocRowCount($pdo, $invKid) === $allocBeforeE, 'F allocation unchanged');
+
+    // G) allocated valid usage: DUZELTME / IPTAL remain PASS
+    p4aSeedOlusum($pdo, 99, 600, '2026-12-31');
+    $allocKul = invokeSzHttp($pdo, $gy, 'POST', '/serbest-zaman/kullanim', [
+        'personel_id' => 99,
+        'dakika' => 300,
+        'event_tarihi' => $referans,
+        'islem_anahtari' => 'p4a-alloc-g-kul',
+    ], $subeHeader);
+    p4aAssert($allocKul['status'] === 200, 'G allocated usage → 200');
+    $allocKid = (int) ($allocKul['payload']['data']['id'] ?? 0);
+    $corrG = invokeSzHttp($pdo, $gy, 'POST', '/serbest-zaman/duzeltme', [
+        'personel_id' => 99,
+        'hedef_event_id' => $allocKid,
+        'hedef_event_tipi' => 'SERBEST_ZAMAN_KULLANIM',
+        'yeni_dakika' => 200,
+        'event_tarihi' => $referans,
+        'islem_anahtari' => 'p4a-alloc-g-corr',
+        'aciklama' => 'allocated correction allowed',
+    ], $subeHeader);
+    p4aAssert($corrG['status'] === 200, 'G allocated DUZELTME → PASS');
+    p4aAssert(
+        SerbestZamanAllocationService::netAllocatedForUsage($pdo, $allocKid) === 200,
+        'G net follows correction to 200'
+    );
+    $cancelG = invokeSzHttp($pdo, $gy, 'POST', '/serbest-zaman/iptal', [
+        'personel_id' => 99,
+        'hedef_event_id' => $allocKid,
+        'hedef_event_tipi' => 'SERBEST_ZAMAN_KULLANIM',
+        'event_tarihi' => $referans,
+        'islem_anahtari' => 'p4a-alloc-g-iptal',
+    ], $subeHeader);
+    p4aAssert($cancelG['status'] === 200, 'G allocated IPTAL → PASS');
+    p4aAssert(
+        SerbestZamanAllocationService::netAllocatedForUsage($pdo, $allocKid) === 0,
+        'G net 0 after cancel'
+    );
+
+    // H / multi-legacy: cancel one unresolved legacy, another remains → still LEGACY_UNALLOCATED
+    p4aSeedOlusum($pdo, 98, 900, '2026-12-31');
+    $legM1 = p4aInsertLegacyKullanim($pdo, 98, 100, $referans, 'p4a-multi-leg-1');
+    $legM2 = p4aInsertLegacyKullanim($pdo, 98, 150, $referans, 'p4a-multi-leg-2');
+    $cancelM1 = invokeSzHttp($pdo, $gy, 'POST', '/serbest-zaman/iptal', [
+        'personel_id' => 98,
+        'hedef_event_id' => $legM1,
+        'hedef_event_tipi' => 'SERBEST_ZAMAN_KULLANIM',
+        'event_tarihi' => $referans,
+        'islem_anahtari' => 'p4a-multi-leg-1-iptal',
+    ], $subeHeader);
+    p4aAssert($cancelM1['status'] === 200, 'multi cancel one legacy → PASS');
+    $bakiyeM = invokeSzHttp($pdo, $gy, 'GET', '/serbest-zaman/bakiye', [], $subeHeader, [
+        'personel_id' => '98',
+        'referans_tarih' => $referans,
+    ]);
+    p4aAssert(
+        ($bakiyeM['payload']['data']['allocation_state'] ?? '') === SerbestZamanAllocationService::STATE_LEGACY_UNALLOCATED,
+        'multi personel still LEGACY_UNALLOCATED'
+    );
+    p4aAssert(
+        (int) ($bakiyeM['payload']['data']['legacy_unallocated_usage_count'] ?? 0) === 1,
+        'multi remaining legacy count 1'
+    );
+    $newBlockedM = invokeSzHttp($pdo, $gy, 'POST', '/serbest-zaman/kullanim', [
+        'personel_id' => 98,
+        'dakika' => 50,
+        'event_tarihi' => $referans,
+        'islem_anahtari' => 'p4a-multi-new-blocked',
+    ], $subeHeader);
+    p4aAssert($newBlockedM['status'] === 409, 'multi new KULLANIM still BLOCKED');
+    p4aAssert(
+        ($newBlockedM['payload']['errors'][0]['code'] ?? '') === SerbestZamanAllocationService::CODE_LEGACY_ALLOCATION_REQUIRED,
+        'multi LEGACY_ALLOCATION_REQUIRED'
+    );
+    $events98 = $pdo->query('SELECT * FROM serbest_zaman_events WHERE personel_id = 98 ORDER BY id ASC')->fetchAll(PDO::FETCH_ASSOC);
+    $usageM2 = SerbestZamanAllocationService::usageAllocationState($pdo, $events98, 98, $legM2);
+    p4aAssert($usageM2['state'] === SerbestZamanAllocationService::STATE_LEGACY_UNALLOCATED, 'multi remaining usage LEGACY');
 
     // Trigger: UPDATE/DELETE blocked
     $anyId = (int) $pdo->query('SELECT id FROM serbest_zaman_kullanim_tahsisleri LIMIT 1')->fetchColumn();

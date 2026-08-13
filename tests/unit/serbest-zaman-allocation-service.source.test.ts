@@ -20,6 +20,7 @@ describe("SerbestZamanAllocationService source locks (Pack4A)", () => {
 
   it("exposes legacy fail-closed codes and states", () => {
     expect(serviceSource).toContain("STATE_LEGACY_UNALLOCATED = 'LEGACY_UNALLOCATED'");
+    expect(serviceSource).toContain("STATE_ZERO = 'ZERO'");
     expect(serviceSource).toContain(
       "CODE_LEGACY_ALLOCATION_REQUIRED = 'SERBEST_ZAMAN_LEGACY_ALLOCATION_REQUIRED'"
     );
@@ -27,6 +28,15 @@ describe("SerbestZamanAllocationService source locks (Pack4A)", () => {
     expect(serviceSource).toContain("assertOlusumHasNoNetAllocation");
     expect(serviceSource).toContain("assertOlusumEffectiveCoversAllocation");
     expect(serviceSource).toContain("assertWritableForNewUsage");
+    expect(serviceSource).toContain("function usageAllocationState");
+    expect(serviceSource).toContain("assertUsageMutableForCorrection");
+    expect(serviceSource).toContain("assertUsageMutableForCancel");
+  });
+
+  it("blocks legacy DUZELTME provenance invention in reconcile", () => {
+    expect(serviceSource).toMatch(
+      /reconcileUsageToEffective[\s\S]*STATE_LEGACY_UNALLOCATED[\s\S]*CODE_LEGACY_ALLOCATION_REQUIRED/
+    );
   });
 
   it("lot invariants do not skip zero-effective stranded lots", () => {

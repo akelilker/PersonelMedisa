@@ -561,6 +561,22 @@ class SerbestZamanController
                 }
             }
 
+            if ($hedefTipi === 'SERBEST_ZAMAN_KULLANIM'
+                && SerbestZamanAllocationService::tableExists($pdo)
+            ) {
+                $eventsBeforeCancel = self::loadPersonelEvents($pdo, $personelId);
+                try {
+                    SerbestZamanAllocationService::assertUsageMutableForCancel(
+                        $pdo,
+                        $eventsBeforeCancel,
+                        $personelId,
+                        $hedefEventId
+                    );
+                } catch (RuntimeException $e) {
+                    self::mapAllocationConflict($pdo, $e);
+                }
+            }
+
             $donem = self::resolveDonemMeta($pdo, (int) $personel['sube_id'], $eventTarihi);
             $userId = (int) ($user['id'] ?? 0);
             $ins = $pdo->prepare(
@@ -727,6 +743,20 @@ class SerbestZamanController
                         $pdo,
                         $hedefEventId,
                         $yeniDakika
+                    );
+                } catch (RuntimeException $e) {
+                    self::mapAllocationConflict($pdo, $e);
+                }
+            }
+            if ($hedefTipi === 'SERBEST_ZAMAN_KULLANIM'
+                && SerbestZamanAllocationService::tableExists($pdo)
+            ) {
+                try {
+                    SerbestZamanAllocationService::assertUsageMutableForCorrection(
+                        $pdo,
+                        $events,
+                        $personelId,
+                        $hedefEventId
                     );
                 } catch (RuntimeException $e) {
                     self::mapAllocationConflict($pdo, $e);
@@ -1196,7 +1226,7 @@ class SerbestZamanController
             self::rollbackConflict(
                 $pdo,
                 SerbestZamanAllocationService::CODE_LEGACY_ALLOCATION_REQUIRED,
-                'Legacy KULLANIM tahsisi cozumlenmeden yeni kullanim yazilamaz.'
+                'Legacy KULLANIM tahsisi cozumlenmeden kullanim duzeltmesi veya yeni kullanim yazilamaz.'
             );
         }
         if ($code === SerbestZamanAllocationService::CODE_ALLOCATION_INVARIANT_BROKEN) {

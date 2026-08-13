@@ -43,6 +43,25 @@ FIFO/LIFO as named product policies are **not** canonical contracts and are not 
 
 Pre-061 `SERBEST_ZAMAN_KULLANIM` rows without matching tahsis rows are **`LEGACY_UNALLOCATED`**.
 
+Event-level `usageAllocationState(...)`:
+
+| Condition | State |
+| --- | --- |
+| effective > 0 && net == 0 | `LEGACY_UNALLOCATED` |
+| effective > 0 && net == effective | `ALLOCATED` |
+| effective == 0 && net == 0 | `ZERO` |
+| net != effective && net != 0 | `INVARIANT_BROKEN` |
+
+Legacy KULLANIM mutation rules:
+
+- **Auto allocation / backfill YOK** — never invent historical lot provenance
+- **Positive DUZELTME YOK** until manual remediation (including same-value 300→300) → HTTP 409 `SERBEST_ZAMAN_LEGACY_ALLOCATION_REQUIRED` (no DUZELTME event, no allocation, no mutation)
+- **Full IPTAL allowed** — cancellation creates no provenance (allocation delta = 0); after cancel, usage is `ZERO`
+- After **all** legacy usages are fully cancelled, personel may become `NO_USAGE` and new KULLANIM uses explicit lot allocation normally
+- If another unresolved legacy usage remains after cancelling one → personel stays `LEGACY_UNALLOCATED`; new KULLANIM remains blocked
+
+`INVARIANT_BROKEN` usage (net ≠ effective with net ≠ 0): both DUZELTME and IPTAL → HTTP 409 `SERBEST_ZAMAN_ALLOCATION_INVARIANT_BROKEN`. Mutation must not auto-repair corruption.
+
 - New KULLANIM / allocation writes fail-closed: `SERBEST_ZAMAN_LEGACY_ALLOCATION_REQUIRED`
 - Migration `061` performs **no** event or allocation INSERT for existing data
 - No deterministic auto-backfill (global pool has no provenance; inventing lots would be false history)
@@ -78,6 +97,8 @@ When an OLUSUM lot has **net allocation > 0**:
 `assertLotInvariants` enforces `0 <= net <= effective OLUSUM` for **every** allocation-bearing lot (no stranded `effective<=0` skip).
 
 Usage `allocation_state`: effective usage `0` with stranded net allocation → `INVARIANT_BROKEN`.
+
+`usageAllocationState` is the event-level owner for KULLANIM DUZELTME/IPTAL pre-insert gates (`assertUsageMutableForCorrection` / `assertUsageMutableForCancel`).
 
 ---
 

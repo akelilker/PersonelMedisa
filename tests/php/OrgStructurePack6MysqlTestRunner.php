@@ -826,7 +826,7 @@ p6AssertSafeTarget($dbPartial);
 $root->exec('CREATE DATABASE `' . $dbPartial . '` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');
 $pdoP = p6PdoForDb($dbPartial);
 try {
-    // ----- A3-1: bolumler exists missing status/index/FK — 065 converges -----
+    // ----- A3-1 / T3: empty bolumler missing status/index/FK — 065 converges -----
     p6ApplyThrough($pdoP, $files, '064_personel_org_location_model.sql');
     $pdoP->exec(
         "CREATE TABLE bolumler (
@@ -840,6 +840,7 @@ try {
     );
     p6Assert(p6ColumnExists($pdoP, 'bolumler', 'departman_id'), 'A3-1 fixture has departman_id');
     p6Assert(!p6ColumnExists($pdoP, 'bolumler', 'durum'), 'A3-1 durum absent');
+    p6Assert((int) $pdoP->query('SELECT COUNT(*) FROM bolumler')->fetchColumn() === 0, 'A3-1/T3 empty table');
     p6Assert(!p6FkExists($pdoP, 'bolumler', 'fk_bolumler_departman'), 'A3-1 FK absent');
     p6Assert(!PersonelOrgStructureSchema::isReady($pdoP), 'A3-1 not ready before repair');
     p6Apply($pdoP, '065_personel_org_structure.sql');
@@ -1076,7 +1077,7 @@ try {
         }
     }
 
-    // ----- A3-8: full 065 reapply remains idempotent -----
+    // ----- A3-8 / T7: full 065 reapply remains idempotent -----
     $dbA38 = 'medisa_pack6_a38_' . substr(bin2hex(random_bytes(4)), 0, 8);
     p6AssertSafeTarget($dbA38);
     $root->exec('CREATE DATABASE `' . $dbA38 . '` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');
@@ -1094,6 +1095,270 @@ try {
     } finally {
         try {
             $root->exec('DROP DATABASE IF EXISTS `' . $dbA38 . '`');
+        } catch (Throwable $e) {
+        }
+    }
+
+    // ----- T1: existing bolumler rows missing durum => FAIL_CLOSED, no AKTIF fabricated -----
+    $dbT1 = 'medisa_pack6_t1_' . substr(bin2hex(random_bytes(4)), 0, 8);
+    p6AssertSafeTarget($dbT1);
+    $root->exec('CREATE DATABASE `' . $dbT1 . '` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');
+    $pdoT1 = p6PdoForDb($dbT1);
+    try {
+        p6ApplyThrough($pdoT1, $files, '064_personel_org_location_model.sql');
+        $pdoT1->exec("INSERT INTO departmanlar (id, ad, durum) VALUES (1, 'T1 Dep', 'AKTIF')");
+        $pdoT1->exec(
+            "CREATE TABLE bolumler (
+              id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+              departman_id INT UNSIGNED NOT NULL,
+              ad VARCHAR(120) NOT NULL,
+              created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              updated_at TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+              PRIMARY KEY (id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+        );
+        $pdoT1->exec("INSERT INTO bolumler (departman_id, ad) VALUES (1, 'Partial Bolum')");
+        p6Assert(!p6ColumnExists($pdoT1, 'bolumler', 'durum'), 'T1 durum absent');
+        p6Assert((int) $pdoT1->query('SELECT COUNT(*) FROM bolumler')->fetchColumn() === 1, 'T1 has rows');
+        $caughtT1 = null;
+        try {
+            p6Apply($pdoT1, '065_personel_org_structure.sql');
+        } catch (Throwable $e) {
+            $caughtT1 = $e;
+        }
+        p6Assert($caughtT1 !== null, 'T1 migration FAIL_CLOSED');
+        p6Assert(strpos($caughtT1->getMessage(), 'PACK6_065_BLOCKER') !== false, 'T1 PACK6_065_BLOCKER');
+        p6Assert(strpos($caughtT1->getMessage(), 'durum missing with rows') !== false, 'T1 durum blocker');
+        p6Assert(!p6ColumnExists($pdoT1, 'bolumler', 'durum'), 'T1 did not fabricate durum/AKTIF');
+        p6Assert(!PersonelOrgStructureSchema::isReady($pdoT1), 'T1 remains not ready');
+    } finally {
+        try {
+            $root->exec('DROP DATABASE IF EXISTS `' . $dbT1 . '`');
+        } catch (Throwable $e) {
+        }
+    }
+
+    // ----- T2: existing birimler rows missing created_at => FAIL_CLOSED -----
+    $dbT2 = 'medisa_pack6_t2_' . substr(bin2hex(random_bytes(4)), 0, 8);
+    p6AssertSafeTarget($dbT2);
+    $root->exec('CREATE DATABASE `' . $dbT2 . '` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');
+    $pdoT2 = p6PdoForDb($dbT2);
+    try {
+        p6ApplyThrough($pdoT2, $files, '064_personel_org_location_model.sql');
+        $pdoT2->exec("INSERT INTO departmanlar (id, ad, durum) VALUES (1, 'T2 Dep', 'AKTIF')");
+        $pdoT2->exec(
+            "CREATE TABLE bolumler (
+              id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+              departman_id INT UNSIGNED NOT NULL,
+              ad VARCHAR(120) NOT NULL,
+              durum VARCHAR(16) NOT NULL DEFAULT 'AKTIF',
+              created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              updated_at TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+              PRIMARY KEY (id),
+              UNIQUE KEY uq_bolumler_departman_ad (departman_id, ad)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+        );
+        $pdoT2->exec(
+            "ALTER TABLE bolumler
+               ADD CONSTRAINT fk_bolumler_departman
+                 FOREIGN KEY (departman_id) REFERENCES departmanlar (id) ON DELETE RESTRICT"
+        );
+        $pdoT2->exec("INSERT INTO bolumler (id, departman_id, ad, durum) VALUES (1, 1, 'Bolum', 'AKTIF')");
+        $pdoT2->exec(
+            "CREATE TABLE birimler (
+              id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+              bolum_id INT UNSIGNED NOT NULL,
+              ad VARCHAR(120) NOT NULL,
+              durum VARCHAR(16) NOT NULL DEFAULT 'AKTIF',
+              updated_at TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+              PRIMARY KEY (id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+        );
+        $pdoT2->exec("INSERT INTO birimler (bolum_id, ad, durum) VALUES (1, 'Partial Birim', 'AKTIF')");
+        p6Assert(!p6ColumnExists($pdoT2, 'birimler', 'created_at'), 'T2 created_at absent');
+        p6Assert((int) $pdoT2->query('SELECT COUNT(*) FROM birimler')->fetchColumn() === 1, 'T2 has rows');
+        $caughtT2 = null;
+        try {
+            p6Apply($pdoT2, '065_personel_org_structure.sql');
+        } catch (Throwable $e) {
+            $caughtT2 = $e;
+        }
+        p6Assert($caughtT2 !== null, 'T2 migration FAIL_CLOSED');
+        p6Assert(strpos($caughtT2->getMessage(), 'PACK6_065_BLOCKER') !== false, 'T2 PACK6_065_BLOCKER');
+        p6Assert(strpos($caughtT2->getMessage(), 'created_at missing with rows') !== false, 'T2 created_at blocker');
+        p6Assert(!p6ColumnExists($pdoT2, 'birimler', 'created_at'), 'T2 did not fabricate created_at');
+        p6Assert(!PersonelOrgStructureSchema::isReady($pdoT2), 'T2 remains not ready');
+    } finally {
+        try {
+            $root->exec('DROP DATABASE IF EXISTS `' . $dbT2 . '`');
+        } catch (Throwable $e) {
+        }
+    }
+
+    // ----- T4: same-named FK with wrong parent => readiness FALSE + migration FAIL_CLOSED -----
+    $dbT4 = 'medisa_pack6_t4_' . substr(bin2hex(random_bytes(4)), 0, 8);
+    p6AssertSafeTarget($dbT4);
+    $root->exec('CREATE DATABASE `' . $dbT4 . '` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');
+    $pdoT4 = p6PdoForDb($dbT4);
+    try {
+        p6ApplyThrough($pdoT4, $files, '064_personel_org_location_model.sql');
+        $pdoT4->exec("INSERT INTO departmanlar (id, ad, durum) VALUES (1, 'T4 Dep', 'AKTIF')");
+        $pdoT4->exec("INSERT INTO gorevler (id, ad, durum) VALUES (1, 'T4 Gorev', 'AKTIF')");
+        $pdoT4->exec(
+            "CREATE TABLE bolumler (
+              id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+              departman_id INT UNSIGNED NOT NULL,
+              ad VARCHAR(120) NOT NULL,
+              durum VARCHAR(16) NOT NULL DEFAULT 'AKTIF',
+              created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              updated_at TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+              PRIMARY KEY (id),
+              UNIQUE KEY uq_bolumler_departman_ad (departman_id, ad),
+              KEY idx_bolumler_departman (departman_id),
+              KEY idx_bolumler_durum (durum)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+        );
+        // Wrong parent: same expected name, references gorevler instead of departmanlar.
+        $pdoT4->exec(
+            "ALTER TABLE bolumler
+               ADD CONSTRAINT fk_bolumler_departman
+                 FOREIGN KEY (departman_id) REFERENCES gorevler (id) ON DELETE RESTRICT"
+        );
+        $pdoT4->exec(
+            "CREATE TABLE birimler (
+              id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+              bolum_id INT UNSIGNED NOT NULL,
+              ad VARCHAR(120) NOT NULL,
+              durum VARCHAR(16) NOT NULL DEFAULT 'AKTIF',
+              created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              updated_at TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+              PRIMARY KEY (id),
+              UNIQUE KEY uq_birimler_bolum_ad (bolum_id, ad),
+              KEY idx_birimler_bolum (bolum_id),
+              KEY idx_birimler_durum (durum)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+        );
+        $pdoT4->exec(
+            "CREATE TABLE pozisyonlar (
+              id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+              ad VARCHAR(120) NOT NULL,
+              durum VARCHAR(16) NOT NULL DEFAULT 'AKTIF',
+              created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              updated_at TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+              PRIMARY KEY (id),
+              UNIQUE KEY uq_pozisyonlar_ad (ad),
+              KEY idx_pozisyonlar_durum (durum)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+        );
+        $pdoT4->exec('ALTER TABLE personeller ADD COLUMN bolum_id INT UNSIGNED NULL AFTER departman_id');
+        $pdoT4->exec('ALTER TABLE personeller ADD COLUMN birim_id INT UNSIGNED NULL AFTER bolum_id');
+        $pdoT4->exec('ALTER TABLE personeller ADD COLUMN pozisyon_id INT UNSIGNED NULL AFTER gorev_id');
+        $pdoT4->exec('ALTER TABLE subeler ADD COLUMN sgk_isveren_id INT UNSIGNED NULL AFTER ad');
+        PersonelOrgStructureSchema::clearReadyCache();
+        p6Assert(p6FkExists($pdoT4, 'bolumler', 'fk_bolumler_departman'), 'T4 wrong-named FK present');
+        p6Assert(!PersonelOrgStructureSchema::isReady($pdoT4), 'T4 isReady FALSE for wrong FK semantics');
+        $caughtT4 = null;
+        try {
+            p6Apply($pdoT4, '065_personel_org_structure.sql');
+        } catch (Throwable $e) {
+            $caughtT4 = $e;
+        }
+        p6Assert($caughtT4 !== null, 'T4 migration FAIL_CLOSED');
+        p6Assert(strpos($caughtT4->getMessage(), 'PACK6_065_BLOCKER') !== false, 'T4 PACK6_065_BLOCKER');
+        p6Assert(strpos($caughtT4->getMessage(), 'fk_bolumler_departman wrong semantics') !== false, 'T4 wrong FK message');
+        $refT4 = $pdoT4->query(
+            "SELECT referenced_table_name FROM information_schema.KEY_COLUMN_USAGE
+             WHERE table_schema = DATABASE() AND table_name = 'bolumler'
+               AND constraint_name = 'fk_bolumler_departman'
+               AND referenced_table_name IS NOT NULL LIMIT 1"
+        )->fetchColumn();
+        p6Assert((string) $refT4 === 'gorevler', 'T4 did not silently replace wrong FK');
+        p6Assert(!PersonelOrgStructureSchema::isReady($pdoT4), 'T4 remains not ready');
+    } finally {
+        try {
+            $root->exec('DROP DATABASE IF EXISTS `' . $dbT4 . '`');
+        } catch (Throwable $e) {
+        }
+    }
+
+    // ----- T5: same-named unique with wrong composition / non-unique => FAIL_CLOSED -----
+    $dbT5 = 'medisa_pack6_t5_' . substr(bin2hex(random_bytes(4)), 0, 8);
+    p6AssertSafeTarget($dbT5);
+    $root->exec('CREATE DATABASE `' . $dbT5 . '` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');
+    $pdoT5 = p6PdoForDb($dbT5);
+    try {
+        p6ApplyThrough($pdoT5, $files, '064_personel_org_location_model.sql');
+        $pdoT5->exec(
+            "CREATE TABLE bolumler (
+              id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+              departman_id INT UNSIGNED NOT NULL,
+              ad VARCHAR(120) NOT NULL,
+              durum VARCHAR(16) NOT NULL DEFAULT 'AKTIF',
+              created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              updated_at TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+              PRIMARY KEY (id),
+              KEY uq_bolumler_departman_ad (ad),
+              KEY idx_bolumler_departman (departman_id),
+              KEY idx_bolumler_durum (durum)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+        );
+        $pdoT5->exec(
+            "ALTER TABLE bolumler
+               ADD CONSTRAINT fk_bolumler_departman
+                 FOREIGN KEY (departman_id) REFERENCES departmanlar (id) ON DELETE RESTRICT"
+        );
+        $pdoT5->exec(
+            "CREATE TABLE birimler (
+              id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+              bolum_id INT UNSIGNED NOT NULL,
+              ad VARCHAR(120) NOT NULL,
+              durum VARCHAR(16) NOT NULL DEFAULT 'AKTIF',
+              created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              updated_at TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+              PRIMARY KEY (id),
+              UNIQUE KEY uq_birimler_bolum_ad (bolum_id, ad),
+              KEY idx_birimler_bolum (bolum_id),
+              KEY idx_birimler_durum (durum)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+        );
+        $pdoT5->exec(
+            "CREATE TABLE pozisyonlar (
+              id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+              ad VARCHAR(120) NOT NULL,
+              durum VARCHAR(16) NOT NULL DEFAULT 'AKTIF',
+              created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              updated_at TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+              PRIMARY KEY (id),
+              UNIQUE KEY uq_pozisyonlar_ad (ad),
+              KEY idx_pozisyonlar_durum (durum)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+        );
+        $pdoT5->exec('ALTER TABLE personeller ADD COLUMN bolum_id INT UNSIGNED NULL AFTER departman_id');
+        $pdoT5->exec('ALTER TABLE personeller ADD COLUMN birim_id INT UNSIGNED NULL AFTER bolum_id');
+        $pdoT5->exec('ALTER TABLE personeller ADD COLUMN pozisyon_id INT UNSIGNED NULL AFTER gorev_id');
+        $pdoT5->exec('ALTER TABLE subeler ADD COLUMN sgk_isveren_id INT UNSIGNED NULL AFTER ad');
+        PersonelOrgStructureSchema::clearReadyCache();
+        p6Assert(p6IndexExists($pdoT5, 'bolumler', 'uq_bolumler_departman_ad'), 'T5 wrong-named index present');
+        p6Assert(!PersonelOrgStructureSchema::isReady($pdoT5), 'T5 isReady FALSE for wrong unique semantics');
+        $caughtT5 = null;
+        try {
+            p6Apply($pdoT5, '065_personel_org_structure.sql');
+        } catch (Throwable $e) {
+            $caughtT5 = $e;
+        }
+        p6Assert($caughtT5 !== null, 'T5 migration FAIL_CLOSED');
+        p6Assert(strpos($caughtT5->getMessage(), 'PACK6_065_BLOCKER') !== false, 'T5 PACK6_065_BLOCKER');
+        p6Assert(strpos($caughtT5->getMessage(), 'uq_bolumler_departman_ad wrong semantics') !== false, 'T5 wrong unique message');
+        $nonUniqueT5 = (int) $pdoT5->query(
+            "SELECT NON_UNIQUE FROM information_schema.STATISTICS
+             WHERE table_schema = DATABASE() AND table_name = 'bolumler'
+               AND index_name = 'uq_bolumler_departman_ad' LIMIT 1"
+        )->fetchColumn();
+        p6Assert($nonUniqueT5 === 1, 'T5 did not silently replace wrong index');
+        p6Assert(!PersonelOrgStructureSchema::isReady($pdoT5), 'T5 remains not ready');
+    } finally {
+        try {
+            $root->exec('DROP DATABASE IF EXISTS `' . $dbT5 . '`');
         } catch (Throwable $e) {
         }
     }

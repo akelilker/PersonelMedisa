@@ -9,6 +9,8 @@
 -- subeler.sgk_isveren_id = branch COMPANY / SGK employer owner (NOT auth; auth remains personeller.sube_id).
 -- NO SEED. NO PERSONNEL BACKFILL. NO BRANCH RENAME. NO PRODUCTION DATA WRITE.
 -- Idempotent / partial-state convergent / fail-closed on unsafe drift.
+-- NO synthetic durum/created_at on existing rows; empty tables may converge.
+-- Same-named FK/unique with wrong semantics => PACK6_065_BLOCKER (no drop/replace).
 -- MariaDB 10.6 / 11.4. PHP 7.4 compatible.
 --
 -- REQUIRED SCHEMA CONTRACT (A1):
@@ -130,15 +132,23 @@ PREPARE p6_stmt FROM @p6_bolum_ad_add_sql;
 EXECUTE p6_stmt;
 DEALLOCATE PREPARE p6_stmt;
 
--- durum (DEFAULT safe even with rows)
+-- durum: empty may converge; existing rows must not get fabricated AKTIF
 SET @p6_bolum_durum_miss := (
   SELECT COUNT(*) FROM information_schema.COLUMNS
   WHERE TABLE_SCHEMA = DATABASE()
     AND TABLE_NAME = 'bolumler'
     AND COLUMN_NAME = 'durum'
 );
+SET @p6_bolum_durum_fail_sql := IF(
+  @p6_bolum_durum_miss = 0 AND @p6_bolum_rows > 0,
+  'SIGNAL SQLSTATE ''45000'' SET MESSAGE_TEXT = ''PACK6_065_BLOCKER: bolumler.durum missing with rows''',
+  'DO 0'
+);
+PREPARE p6_stmt FROM @p6_bolum_durum_fail_sql;
+EXECUTE p6_stmt;
+DEALLOCATE PREPARE p6_stmt;
 SET @p6_bolum_durum_add_sql := IF(
-  @p6_bolum_durum_miss = 0,
+  @p6_bolum_durum_miss = 0 AND @p6_bolum_rows = 0,
   'ALTER TABLE bolumler ADD COLUMN durum VARCHAR(16) NOT NULL DEFAULT ''AKTIF'' AFTER ad',
   'DO 0'
 );
@@ -146,14 +156,23 @@ PREPARE p6_stmt FROM @p6_bolum_durum_add_sql;
 EXECUTE p6_stmt;
 DEALLOCATE PREPARE p6_stmt;
 
+-- created_at: empty may converge; existing rows must not get fabricated timestamps
 SET @p6_bolum_ca_miss := (
   SELECT COUNT(*) FROM information_schema.COLUMNS
   WHERE TABLE_SCHEMA = DATABASE()
     AND TABLE_NAME = 'bolumler'
     AND COLUMN_NAME = 'created_at'
 );
+SET @p6_bolum_ca_fail_sql := IF(
+  @p6_bolum_ca_miss = 0 AND @p6_bolum_rows > 0,
+  'SIGNAL SQLSTATE ''45000'' SET MESSAGE_TEXT = ''PACK6_065_BLOCKER: bolumler.created_at missing with rows''',
+  'DO 0'
+);
+PREPARE p6_stmt FROM @p6_bolum_ca_fail_sql;
+EXECUTE p6_stmt;
+DEALLOCATE PREPARE p6_stmt;
 SET @p6_bolum_ca_add_sql := IF(
-  @p6_bolum_ca_miss = 0,
+  @p6_bolum_ca_miss = 0 AND @p6_bolum_rows = 0,
   'ALTER TABLE bolumler ADD COLUMN created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP',
   'DO 0'
 );
@@ -161,6 +180,7 @@ PREPARE p6_stmt FROM @p6_bolum_ca_add_sql;
 EXECUTE p6_stmt;
 DEALLOCATE PREPARE p6_stmt;
 
+-- updated_at nullable NULL: safe even with rows (no historical business value fabricated)
 SET @p6_bolum_ua_miss := (
   SELECT COUNT(*) FROM information_schema.COLUMNS
   WHERE TABLE_SCHEMA = DATABASE()
@@ -176,14 +196,37 @@ PREPARE p6_stmt FROM @p6_bolum_ua_add_sql;
 EXECUTE p6_stmt;
 DEALLOCATE PREPARE p6_stmt;
 
-SET @p6_uq_bolum := (
+SET @p6_uq_bolum_exists := (
   SELECT COUNT(*) FROM information_schema.STATISTICS
   WHERE TABLE_SCHEMA = DATABASE()
     AND TABLE_NAME = 'bolumler'
     AND INDEX_NAME = 'uq_bolumler_departman_ad'
 );
+SET @p6_uq_bolum_ok := (
+  SELECT IFNULL((
+    SELECT IF(
+      COUNT(*) = 2
+      AND SUM(NON_UNIQUE) = 0
+      AND SUM(CASE WHEN SEQ_IN_INDEX = 1 AND COLUMN_NAME = 'departman_id' THEN 1 ELSE 0 END) = 1
+      AND SUM(CASE WHEN SEQ_IN_INDEX = 2 AND COLUMN_NAME = 'ad' THEN 1 ELSE 0 END) = 1,
+      1, 0
+    )
+    FROM information_schema.STATISTICS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'bolumler'
+      AND INDEX_NAME = 'uq_bolumler_departman_ad'
+  ), 0)
+);
+SET @p6_uq_bolum_bad_sql := IF(
+  @p6_uq_bolum_exists > 0 AND @p6_uq_bolum_ok = 0,
+  'SIGNAL SQLSTATE ''45000'' SET MESSAGE_TEXT = ''PACK6_065_BLOCKER: uq_bolumler_departman_ad wrong semantics''',
+  'DO 0'
+);
+PREPARE p6_stmt FROM @p6_uq_bolum_bad_sql;
+EXECUTE p6_stmt;
+DEALLOCATE PREPARE p6_stmt;
 SET @p6_uq_bolum_sql := IF(
-  @p6_uq_bolum = 0,
+  @p6_uq_bolum_exists = 0,
   'ALTER TABLE bolumler ADD UNIQUE KEY uq_bolumler_departman_ad (departman_id, ad)',
   'DO 0'
 );
@@ -236,14 +279,41 @@ PREPARE p6_stmt FROM @p6_chk_bolum_sql;
 EXECUTE p6_stmt;
 DEALLOCATE PREPARE p6_stmt;
 
-SET @p6_fk_bolum_dep := (
+SET @p6_fk_bolum_dep_exists := (
   SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
   WHERE TABLE_SCHEMA = DATABASE()
     AND TABLE_NAME = 'bolumler'
     AND CONSTRAINT_NAME = 'fk_bolumler_departman'
+    AND CONSTRAINT_TYPE = 'FOREIGN KEY'
 );
+SET @p6_fk_bolum_dep_ok := (
+  SELECT IFNULL((
+    SELECT IF(
+      COUNT(*) = 1
+      AND SUM(CASE
+            WHEN COLUMN_NAME = 'departman_id'
+             AND REFERENCED_TABLE_NAME = 'departmanlar'
+             AND REFERENCED_COLUMN_NAME = 'id'
+             AND ORDINAL_POSITION = 1 THEN 1 ELSE 0 END) = 1,
+      1, 0
+    )
+    FROM information_schema.KEY_COLUMN_USAGE
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'bolumler'
+      AND CONSTRAINT_NAME = 'fk_bolumler_departman'
+      AND REFERENCED_TABLE_NAME IS NOT NULL
+  ), 0)
+);
+SET @p6_fk_bolum_dep_bad_sql := IF(
+  @p6_fk_bolum_dep_exists > 0 AND @p6_fk_bolum_dep_ok = 0,
+  'SIGNAL SQLSTATE ''45000'' SET MESSAGE_TEXT = ''PACK6_065_BLOCKER: fk_bolumler_departman wrong semantics''',
+  'DO 0'
+);
+PREPARE p6_stmt FROM @p6_fk_bolum_dep_bad_sql;
+EXECUTE p6_stmt;
+DEALLOCATE PREPARE p6_stmt;
 SET @p6_fk_bolum_dep_sql := IF(
-  @p6_fk_bolum_dep = 0,
+  @p6_fk_bolum_dep_exists = 0,
   'ALTER TABLE bolumler
      ADD CONSTRAINT fk_bolumler_departman
        FOREIGN KEY (departman_id) REFERENCES departmanlar (id) ON DELETE RESTRICT',
@@ -360,8 +430,16 @@ SET @p6_birim_durum_miss := (
     AND TABLE_NAME = 'birimler'
     AND COLUMN_NAME = 'durum'
 );
+SET @p6_birim_durum_fail_sql := IF(
+  @p6_birim_durum_miss = 0 AND @p6_birim_rows > 0,
+  'SIGNAL SQLSTATE ''45000'' SET MESSAGE_TEXT = ''PACK6_065_BLOCKER: birimler.durum missing with rows''',
+  'DO 0'
+);
+PREPARE p6_stmt FROM @p6_birim_durum_fail_sql;
+EXECUTE p6_stmt;
+DEALLOCATE PREPARE p6_stmt;
 SET @p6_birim_durum_add_sql := IF(
-  @p6_birim_durum_miss = 0,
+  @p6_birim_durum_miss = 0 AND @p6_birim_rows = 0,
   'ALTER TABLE birimler ADD COLUMN durum VARCHAR(16) NOT NULL DEFAULT ''AKTIF'' AFTER ad',
   'DO 0'
 );
@@ -375,8 +453,16 @@ SET @p6_birim_ca_miss := (
     AND TABLE_NAME = 'birimler'
     AND COLUMN_NAME = 'created_at'
 );
+SET @p6_birim_ca_fail_sql := IF(
+  @p6_birim_ca_miss = 0 AND @p6_birim_rows > 0,
+  'SIGNAL SQLSTATE ''45000'' SET MESSAGE_TEXT = ''PACK6_065_BLOCKER: birimler.created_at missing with rows''',
+  'DO 0'
+);
+PREPARE p6_stmt FROM @p6_birim_ca_fail_sql;
+EXECUTE p6_stmt;
+DEALLOCATE PREPARE p6_stmt;
 SET @p6_birim_ca_add_sql := IF(
-  @p6_birim_ca_miss = 0,
+  @p6_birim_ca_miss = 0 AND @p6_birim_rows = 0,
   'ALTER TABLE birimler ADD COLUMN created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP',
   'DO 0'
 );
@@ -399,14 +485,37 @@ PREPARE p6_stmt FROM @p6_birim_ua_add_sql;
 EXECUTE p6_stmt;
 DEALLOCATE PREPARE p6_stmt;
 
-SET @p6_uq_birim := (
+SET @p6_uq_birim_exists := (
   SELECT COUNT(*) FROM information_schema.STATISTICS
   WHERE TABLE_SCHEMA = DATABASE()
     AND TABLE_NAME = 'birimler'
     AND INDEX_NAME = 'uq_birimler_bolum_ad'
 );
+SET @p6_uq_birim_ok := (
+  SELECT IFNULL((
+    SELECT IF(
+      COUNT(*) = 2
+      AND SUM(NON_UNIQUE) = 0
+      AND SUM(CASE WHEN SEQ_IN_INDEX = 1 AND COLUMN_NAME = 'bolum_id' THEN 1 ELSE 0 END) = 1
+      AND SUM(CASE WHEN SEQ_IN_INDEX = 2 AND COLUMN_NAME = 'ad' THEN 1 ELSE 0 END) = 1,
+      1, 0
+    )
+    FROM information_schema.STATISTICS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'birimler'
+      AND INDEX_NAME = 'uq_birimler_bolum_ad'
+  ), 0)
+);
+SET @p6_uq_birim_bad_sql := IF(
+  @p6_uq_birim_exists > 0 AND @p6_uq_birim_ok = 0,
+  'SIGNAL SQLSTATE ''45000'' SET MESSAGE_TEXT = ''PACK6_065_BLOCKER: uq_birimler_bolum_ad wrong semantics''',
+  'DO 0'
+);
+PREPARE p6_stmt FROM @p6_uq_birim_bad_sql;
+EXECUTE p6_stmt;
+DEALLOCATE PREPARE p6_stmt;
 SET @p6_uq_birim_sql := IF(
-  @p6_uq_birim = 0,
+  @p6_uq_birim_exists = 0,
   'ALTER TABLE birimler ADD UNIQUE KEY uq_birimler_bolum_ad (bolum_id, ad)',
   'DO 0'
 );
@@ -459,14 +568,41 @@ PREPARE p6_stmt FROM @p6_chk_birim_sql;
 EXECUTE p6_stmt;
 DEALLOCATE PREPARE p6_stmt;
 
-SET @p6_fk_birim_bolum := (
+SET @p6_fk_birim_bolum_exists := (
   SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
   WHERE TABLE_SCHEMA = DATABASE()
     AND TABLE_NAME = 'birimler'
     AND CONSTRAINT_NAME = 'fk_birimler_bolum'
+    AND CONSTRAINT_TYPE = 'FOREIGN KEY'
 );
+SET @p6_fk_birim_bolum_ok := (
+  SELECT IFNULL((
+    SELECT IF(
+      COUNT(*) = 1
+      AND SUM(CASE
+            WHEN COLUMN_NAME = 'bolum_id'
+             AND REFERENCED_TABLE_NAME = 'bolumler'
+             AND REFERENCED_COLUMN_NAME = 'id'
+             AND ORDINAL_POSITION = 1 THEN 1 ELSE 0 END) = 1,
+      1, 0
+    )
+    FROM information_schema.KEY_COLUMN_USAGE
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'birimler'
+      AND CONSTRAINT_NAME = 'fk_birimler_bolum'
+      AND REFERENCED_TABLE_NAME IS NOT NULL
+  ), 0)
+);
+SET @p6_fk_birim_bolum_bad_sql := IF(
+  @p6_fk_birim_bolum_exists > 0 AND @p6_fk_birim_bolum_ok = 0,
+  'SIGNAL SQLSTATE ''45000'' SET MESSAGE_TEXT = ''PACK6_065_BLOCKER: fk_birimler_bolum wrong semantics''',
+  'DO 0'
+);
+PREPARE p6_stmt FROM @p6_fk_birim_bolum_bad_sql;
+EXECUTE p6_stmt;
+DEALLOCATE PREPARE p6_stmt;
 SET @p6_fk_birim_bolum_sql := IF(
-  @p6_fk_birim_bolum = 0,
+  @p6_fk_birim_bolum_exists = 0,
   'ALTER TABLE birimler
      ADD CONSTRAINT fk_birimler_bolum
        FOREIGN KEY (bolum_id) REFERENCES bolumler (id) ON DELETE RESTRICT',
@@ -538,8 +674,16 @@ SET @p6_poz_durum_miss := (
     AND TABLE_NAME = 'pozisyonlar'
     AND COLUMN_NAME = 'durum'
 );
+SET @p6_poz_durum_fail_sql := IF(
+  @p6_poz_durum_miss = 0 AND @p6_poz_rows > 0,
+  'SIGNAL SQLSTATE ''45000'' SET MESSAGE_TEXT = ''PACK6_065_BLOCKER: pozisyonlar.durum missing with rows''',
+  'DO 0'
+);
+PREPARE p6_stmt FROM @p6_poz_durum_fail_sql;
+EXECUTE p6_stmt;
+DEALLOCATE PREPARE p6_stmt;
 SET @p6_poz_durum_add_sql := IF(
-  @p6_poz_durum_miss = 0,
+  @p6_poz_durum_miss = 0 AND @p6_poz_rows = 0,
   'ALTER TABLE pozisyonlar ADD COLUMN durum VARCHAR(16) NOT NULL DEFAULT ''AKTIF'' AFTER ad',
   'DO 0'
 );
@@ -553,8 +697,16 @@ SET @p6_poz_ca_miss := (
     AND TABLE_NAME = 'pozisyonlar'
     AND COLUMN_NAME = 'created_at'
 );
+SET @p6_poz_ca_fail_sql := IF(
+  @p6_poz_ca_miss = 0 AND @p6_poz_rows > 0,
+  'SIGNAL SQLSTATE ''45000'' SET MESSAGE_TEXT = ''PACK6_065_BLOCKER: pozisyonlar.created_at missing with rows''',
+  'DO 0'
+);
+PREPARE p6_stmt FROM @p6_poz_ca_fail_sql;
+EXECUTE p6_stmt;
+DEALLOCATE PREPARE p6_stmt;
 SET @p6_poz_ca_add_sql := IF(
-  @p6_poz_ca_miss = 0,
+  @p6_poz_ca_miss = 0 AND @p6_poz_rows = 0,
   'ALTER TABLE pozisyonlar ADD COLUMN created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP',
   'DO 0'
 );
@@ -577,14 +729,36 @@ PREPARE p6_stmt FROM @p6_poz_ua_add_sql;
 EXECUTE p6_stmt;
 DEALLOCATE PREPARE p6_stmt;
 
-SET @p6_uq_poz := (
+SET @p6_uq_poz_exists := (
   SELECT COUNT(*) FROM information_schema.STATISTICS
   WHERE TABLE_SCHEMA = DATABASE()
     AND TABLE_NAME = 'pozisyonlar'
     AND INDEX_NAME = 'uq_pozisyonlar_ad'
 );
+SET @p6_uq_poz_ok := (
+  SELECT IFNULL((
+    SELECT IF(
+      COUNT(*) = 1
+      AND SUM(NON_UNIQUE) = 0
+      AND SUM(CASE WHEN SEQ_IN_INDEX = 1 AND COLUMN_NAME = 'ad' THEN 1 ELSE 0 END) = 1,
+      1, 0
+    )
+    FROM information_schema.STATISTICS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'pozisyonlar'
+      AND INDEX_NAME = 'uq_pozisyonlar_ad'
+  ), 0)
+);
+SET @p6_uq_poz_bad_sql := IF(
+  @p6_uq_poz_exists > 0 AND @p6_uq_poz_ok = 0,
+  'SIGNAL SQLSTATE ''45000'' SET MESSAGE_TEXT = ''PACK6_065_BLOCKER: uq_pozisyonlar_ad wrong semantics''',
+  'DO 0'
+);
+PREPARE p6_stmt FROM @p6_uq_poz_bad_sql;
+EXECUTE p6_stmt;
+DEALLOCATE PREPARE p6_stmt;
 SET @p6_uq_poz_sql := IF(
-  @p6_uq_poz = 0,
+  @p6_uq_poz_exists = 0,
   'ALTER TABLE pozisyonlar ADD UNIQUE KEY uq_pozisyonlar_ad (ad)',
   'DO 0'
 );
@@ -771,14 +945,41 @@ SET @p6_col_poz2 := (
     AND COLUMN_NAME = 'pozisyon_id'
 );
 
-SET @p6_fk_p_bolum := (
+SET @p6_fk_p_bolum_exists := (
   SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
   WHERE TABLE_SCHEMA = DATABASE()
     AND TABLE_NAME = 'personeller'
     AND CONSTRAINT_NAME = 'fk_personeller_bolum'
+    AND CONSTRAINT_TYPE = 'FOREIGN KEY'
 );
+SET @p6_fk_p_bolum_ok := (
+  SELECT IFNULL((
+    SELECT IF(
+      COUNT(*) = 1
+      AND SUM(CASE
+            WHEN COLUMN_NAME = 'bolum_id'
+             AND REFERENCED_TABLE_NAME = 'bolumler'
+             AND REFERENCED_COLUMN_NAME = 'id'
+             AND ORDINAL_POSITION = 1 THEN 1 ELSE 0 END) = 1,
+      1, 0
+    )
+    FROM information_schema.KEY_COLUMN_USAGE
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'personeller'
+      AND CONSTRAINT_NAME = 'fk_personeller_bolum'
+      AND REFERENCED_TABLE_NAME IS NOT NULL
+  ), 0)
+);
+SET @p6_fk_p_bolum_bad_sql := IF(
+  @p6_fk_p_bolum_exists > 0 AND @p6_fk_p_bolum_ok = 0,
+  'SIGNAL SQLSTATE ''45000'' SET MESSAGE_TEXT = ''PACK6_065_BLOCKER: fk_personeller_bolum wrong semantics''',
+  'DO 0'
+);
+PREPARE p6_stmt FROM @p6_fk_p_bolum_bad_sql;
+EXECUTE p6_stmt;
+DEALLOCATE PREPARE p6_stmt;
 SET @p6_fk_p_bolum_sql := IF(
-  @p6_fk_p_bolum = 0 AND @p6_col_bolum2 > 0,
+  @p6_fk_p_bolum_exists = 0 AND @p6_col_bolum2 > 0,
   'ALTER TABLE personeller
      ADD CONSTRAINT fk_personeller_bolum
        FOREIGN KEY (bolum_id) REFERENCES bolumler (id) ON DELETE RESTRICT',
@@ -788,14 +989,41 @@ PREPARE p6_stmt FROM @p6_fk_p_bolum_sql;
 EXECUTE p6_stmt;
 DEALLOCATE PREPARE p6_stmt;
 
-SET @p6_fk_p_birim := (
+SET @p6_fk_p_birim_exists := (
   SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
   WHERE TABLE_SCHEMA = DATABASE()
     AND TABLE_NAME = 'personeller'
     AND CONSTRAINT_NAME = 'fk_personeller_birim'
+    AND CONSTRAINT_TYPE = 'FOREIGN KEY'
 );
+SET @p6_fk_p_birim_ok := (
+  SELECT IFNULL((
+    SELECT IF(
+      COUNT(*) = 1
+      AND SUM(CASE
+            WHEN COLUMN_NAME = 'birim_id'
+             AND REFERENCED_TABLE_NAME = 'birimler'
+             AND REFERENCED_COLUMN_NAME = 'id'
+             AND ORDINAL_POSITION = 1 THEN 1 ELSE 0 END) = 1,
+      1, 0
+    )
+    FROM information_schema.KEY_COLUMN_USAGE
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'personeller'
+      AND CONSTRAINT_NAME = 'fk_personeller_birim'
+      AND REFERENCED_TABLE_NAME IS NOT NULL
+  ), 0)
+);
+SET @p6_fk_p_birim_bad_sql := IF(
+  @p6_fk_p_birim_exists > 0 AND @p6_fk_p_birim_ok = 0,
+  'SIGNAL SQLSTATE ''45000'' SET MESSAGE_TEXT = ''PACK6_065_BLOCKER: fk_personeller_birim wrong semantics''',
+  'DO 0'
+);
+PREPARE p6_stmt FROM @p6_fk_p_birim_bad_sql;
+EXECUTE p6_stmt;
+DEALLOCATE PREPARE p6_stmt;
 SET @p6_fk_p_birim_sql := IF(
-  @p6_fk_p_birim = 0 AND @p6_col_birim2 > 0,
+  @p6_fk_p_birim_exists = 0 AND @p6_col_birim2 > 0,
   'ALTER TABLE personeller
      ADD CONSTRAINT fk_personeller_birim
        FOREIGN KEY (birim_id) REFERENCES birimler (id) ON DELETE RESTRICT',
@@ -805,14 +1033,41 @@ PREPARE p6_stmt FROM @p6_fk_p_birim_sql;
 EXECUTE p6_stmt;
 DEALLOCATE PREPARE p6_stmt;
 
-SET @p6_fk_p_poz := (
+SET @p6_fk_p_poz_exists := (
   SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
   WHERE TABLE_SCHEMA = DATABASE()
     AND TABLE_NAME = 'personeller'
     AND CONSTRAINT_NAME = 'fk_personeller_pozisyon'
+    AND CONSTRAINT_TYPE = 'FOREIGN KEY'
 );
+SET @p6_fk_p_poz_ok := (
+  SELECT IFNULL((
+    SELECT IF(
+      COUNT(*) = 1
+      AND SUM(CASE
+            WHEN COLUMN_NAME = 'pozisyon_id'
+             AND REFERENCED_TABLE_NAME = 'pozisyonlar'
+             AND REFERENCED_COLUMN_NAME = 'id'
+             AND ORDINAL_POSITION = 1 THEN 1 ELSE 0 END) = 1,
+      1, 0
+    )
+    FROM information_schema.KEY_COLUMN_USAGE
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'personeller'
+      AND CONSTRAINT_NAME = 'fk_personeller_pozisyon'
+      AND REFERENCED_TABLE_NAME IS NOT NULL
+  ), 0)
+);
+SET @p6_fk_p_poz_bad_sql := IF(
+  @p6_fk_p_poz_exists > 0 AND @p6_fk_p_poz_ok = 0,
+  'SIGNAL SQLSTATE ''45000'' SET MESSAGE_TEXT = ''PACK6_065_BLOCKER: fk_personeller_pozisyon wrong semantics''',
+  'DO 0'
+);
+PREPARE p6_stmt FROM @p6_fk_p_poz_bad_sql;
+EXECUTE p6_stmt;
+DEALLOCATE PREPARE p6_stmt;
 SET @p6_fk_p_poz_sql := IF(
-  @p6_fk_p_poz = 0 AND @p6_col_poz2 > 0,
+  @p6_fk_p_poz_exists = 0 AND @p6_col_poz2 > 0,
   'ALTER TABLE personeller
      ADD CONSTRAINT fk_personeller_pozisyon
        FOREIGN KEY (pozisyon_id) REFERENCES pozisyonlar (id) ON DELETE RESTRICT',
@@ -905,11 +1160,12 @@ PREPARE p6_stmt FROM @p6_sube_sgk_sql;
 EXECUTE p6_stmt;
 DEALLOCATE PREPARE p6_stmt;
 
-SET @p6_fk_sube_sgk := (
+SET @p6_fk_sube_sgk_exists := (
   SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
   WHERE TABLE_SCHEMA = DATABASE()
     AND TABLE_NAME = 'subeler'
     AND CONSTRAINT_NAME = 'fk_subeler_sgk_isveren'
+    AND CONSTRAINT_TYPE = 'FOREIGN KEY'
 );
 SET @p6_sube_sgk_col := (
   SELECT COUNT(*) FROM information_schema.COLUMNS
@@ -922,8 +1178,34 @@ SET @p6_sgk_tbl := (
   WHERE TABLE_SCHEMA = DATABASE()
     AND TABLE_NAME = 'sgk_isverenler'
 );
+SET @p6_fk_sube_sgk_ok := (
+  SELECT IFNULL((
+    SELECT IF(
+      COUNT(*) = 1
+      AND SUM(CASE
+            WHEN COLUMN_NAME = 'sgk_isveren_id'
+             AND REFERENCED_TABLE_NAME = 'sgk_isverenler'
+             AND REFERENCED_COLUMN_NAME = 'id'
+             AND ORDINAL_POSITION = 1 THEN 1 ELSE 0 END) = 1,
+      1, 0
+    )
+    FROM information_schema.KEY_COLUMN_USAGE
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'subeler'
+      AND CONSTRAINT_NAME = 'fk_subeler_sgk_isveren'
+      AND REFERENCED_TABLE_NAME IS NOT NULL
+  ), 0)
+);
+SET @p6_fk_sube_sgk_bad_sql := IF(
+  @p6_fk_sube_sgk_exists > 0 AND @p6_fk_sube_sgk_ok = 0,
+  'SIGNAL SQLSTATE ''45000'' SET MESSAGE_TEXT = ''PACK6_065_BLOCKER: fk_subeler_sgk_isveren wrong semantics''',
+  'DO 0'
+);
+PREPARE p6_stmt FROM @p6_fk_sube_sgk_bad_sql;
+EXECUTE p6_stmt;
+DEALLOCATE PREPARE p6_stmt;
 SET @p6_fk_sube_sgk_sql := IF(
-  @p6_fk_sube_sgk = 0 AND @p6_sube_sgk_col > 0 AND @p6_sgk_tbl > 0,
+  @p6_fk_sube_sgk_exists = 0 AND @p6_sube_sgk_col > 0 AND @p6_sgk_tbl > 0,
   'ALTER TABLE subeler
      ADD CONSTRAINT fk_subeler_sgk_isveren
        FOREIGN KEY (sgk_isveren_id) REFERENCES sgk_isverenler (id) ON DELETE RESTRICT',

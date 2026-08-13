@@ -11,8 +11,9 @@ use PDO;
  * Unconditional JOIN/SELECT/INSERT against new tables is forbidden until ready.
  * Does not weaken Pack5 ORG_LOCATION_SCHEMA_NOT_READY.
  *
- * Ready means usable structure: required columns, parent/personnel FKs, and
- * uniqueness contracts — not merely table-name existence.
+ * Ready means usable structure: required column shapes, parent/personnel FK
+ * semantics (not merely names), and uniqueness contracts — not table-name
+ * existence alone.
  */
 final class PersonelOrgStructureSchema
 {
@@ -55,44 +56,38 @@ final class PersonelOrgStructureSchema
             return false;
         }
 
-        // Columns application SQL depends on (e.g. WHERE durum='AKTIF').
-        foreach (['id', 'departman_id', 'ad', 'durum'] as $col) {
-            if (!self::columnExists($pdo, 'bolumler', $col)) {
-                return false;
-            }
-        }
-        foreach (['id', 'bolum_id', 'ad', 'durum'] as $col) {
-            if (!self::columnExists($pdo, 'birimler', $col)) {
-                return false;
-            }
-        }
-        foreach (['id', 'ad', 'durum'] as $col) {
-            if (!self::columnExists($pdo, 'pozisyonlar', $col)) {
-                return false;
-            }
-        }
-        if (!self::columnExists($pdo, 'personeller', 'bolum_id')
-            || !self::columnExists($pdo, 'personeller', 'birim_id')
-            || !self::columnExists($pdo, 'personeller', 'pozisyon_id')
-            || !self::columnExists($pdo, 'subeler', 'sgk_isveren_id')
+        // Required business / usability columns with compatible shapes.
+        if (!self::intUnsignedColumn($pdo, 'bolumler', 'departman_id', false)
+            || !self::varcharNotNullColumn($pdo, 'bolumler', 'ad')
+            || !self::varcharNotNullColumn($pdo, 'bolumler', 'durum')
+            || !self::intUnsignedColumn($pdo, 'birimler', 'bolum_id', false)
+            || !self::varcharNotNullColumn($pdo, 'birimler', 'ad')
+            || !self::varcharNotNullColumn($pdo, 'birimler', 'durum')
+            || !self::varcharNotNullColumn($pdo, 'pozisyonlar', 'ad')
+            || !self::varcharNotNullColumn($pdo, 'pozisyonlar', 'durum')
+            || !self::intUnsignedColumn($pdo, 'personeller', 'bolum_id', true)
+            || !self::intUnsignedColumn($pdo, 'personeller', 'birim_id', true)
+            || !self::intUnsignedColumn($pdo, 'personeller', 'pozisyon_id', true)
+            || !self::intUnsignedColumn($pdo, 'subeler', 'sgk_isveren_id', true)
         ) {
             return false;
         }
 
-        // Correctness-critical relationships + uniqueness for safe writes/import.
-        if (!self::foreignKeyExists($pdo, 'bolumler', 'fk_bolumler_departman')
-            || !self::foreignKeyExists($pdo, 'birimler', 'fk_birimler_bolum')
-            || !self::foreignKeyExists($pdo, 'personeller', 'fk_personeller_bolum')
-            || !self::foreignKeyExists($pdo, 'personeller', 'fk_personeller_birim')
-            || !self::foreignKeyExists($pdo, 'personeller', 'fk_personeller_pozisyon')
-            || !self::foreignKeyExists($pdo, 'subeler', 'fk_subeler_sgk_isveren')
+        // Correctness-critical FK semantics (KEY_COLUMN_USAGE), not name-only.
+        if (!self::foreignKeyMatches($pdo, 'bolumler', 'fk_bolumler_departman', 'departman_id', 'departmanlar', 'id')
+            || !self::foreignKeyMatches($pdo, 'birimler', 'fk_birimler_bolum', 'bolum_id', 'bolumler', 'id')
+            || !self::foreignKeyMatches($pdo, 'personeller', 'fk_personeller_bolum', 'bolum_id', 'bolumler', 'id')
+            || !self::foreignKeyMatches($pdo, 'personeller', 'fk_personeller_birim', 'birim_id', 'birimler', 'id')
+            || !self::foreignKeyMatches($pdo, 'personeller', 'fk_personeller_pozisyon', 'pozisyon_id', 'pozisyonlar', 'id')
+            || !self::foreignKeyMatches($pdo, 'subeler', 'fk_subeler_sgk_isveren', 'sgk_isveren_id', 'sgk_isverenler', 'id')
         ) {
             return false;
         }
 
-        if (!self::indexExists($pdo, 'bolumler', 'uq_bolumler_departman_ad')
-            || !self::indexExists($pdo, 'birimler', 'uq_birimler_bolum_ad')
-            || !self::indexExists($pdo, 'pozisyonlar', 'uq_pozisyonlar_ad')
+        // Unique index semantics: UNIQUE + exact ordered columns.
+        if (!self::uniqueIndexMatches($pdo, 'bolumler', 'uq_bolumler_departman_ad', ['departman_id', 'ad'])
+            || !self::uniqueIndexMatches($pdo, 'birimler', 'uq_birimler_bolum_ad', ['bolum_id', 'ad'])
+            || !self::uniqueIndexMatches($pdo, 'pozisyonlar', 'uq_pozisyonlar_ad', ['ad'])
         ) {
             return false;
         }
@@ -343,8 +338,56 @@ final class PersonelOrgStructureSchema
         }
     }
 
-    private static function foreignKeyExists(PDO $pdo, string $table, string $constraintName): bool
+    private static function intUnsignedColumn(PDO $pdo, string $table, string $column, bool $nullable): bool
     {
+        try {
+            if ($pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite') {
+                return self::columnExists($pdo, $table, $column);
+            }
+            $wantNull = $nullable ? 'YES' : 'NO';
+            $stmt = $pdo->prepare(
+                "SELECT COUNT(*) FROM information_schema.columns
+                 WHERE table_schema = DATABASE() AND table_name = :t AND column_name = :c
+                   AND data_type = 'int'
+                   AND column_type LIKE '%unsigned%'
+                   AND is_nullable = :n"
+            );
+            $stmt->execute(['t' => $table, 'c' => $column, 'n' => $wantNull]);
+
+            return (int) $stmt->fetchColumn() === 1;
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    private static function varcharNotNullColumn(PDO $pdo, string $table, string $column): bool
+    {
+        try {
+            if ($pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite') {
+                return self::columnExists($pdo, $table, $column);
+            }
+            $stmt = $pdo->prepare(
+                "SELECT COUNT(*) FROM information_schema.columns
+                 WHERE table_schema = DATABASE() AND table_name = :t AND column_name = :c
+                   AND data_type = 'varchar'
+                   AND is_nullable = 'NO'"
+            );
+            $stmt->execute(['t' => $table, 'c' => $column]);
+
+            return (int) $stmt->fetchColumn() === 1;
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    private static function foreignKeyMatches(
+        PDO $pdo,
+        string $table,
+        string $constraintName,
+        string $column,
+        string $refTable,
+        string $refColumn
+    ): bool {
         try {
             if ($pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite') {
                 // Fail-closed: sqlite fixtures do not model Pack6 FK contract.
@@ -356,26 +399,71 @@ final class PersonelOrgStructureSchema
                    AND constraint_name = :c AND constraint_type = 'FOREIGN KEY'"
             );
             $stmt->execute(['t' => $table, 'c' => $constraintName]);
+            if ((int) $stmt->fetchColumn() !== 1) {
+                return false;
+            }
 
-            return (int) $stmt->fetchColumn() === 1;
+            $stmt = $pdo->prepare(
+                'SELECT column_name, referenced_table_name, referenced_column_name, ordinal_position
+                 FROM information_schema.KEY_COLUMN_USAGE
+                 WHERE table_schema = DATABASE() AND table_name = :t
+                   AND constraint_name = :c
+                   AND referenced_table_name IS NOT NULL
+                 ORDER BY ordinal_position ASC'
+            );
+            $stmt->execute(['t' => $table, 'c' => $constraintName]);
+            $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+            if (count($rows) !== 1) {
+                return false;
+            }
+            $row = $rows[0];
+
+            return (string) ($row['column_name'] ?? '') === $column
+                && (string) ($row['referenced_table_name'] ?? '') === $refTable
+                && (string) ($row['referenced_column_name'] ?? '') === $refColumn
+                && (int) ($row['ordinal_position'] ?? 0) === 1;
         } catch (\Throwable $e) {
             return false;
         }
     }
 
-    private static function indexExists(PDO $pdo, string $table, string $indexName): bool
-    {
+    /**
+     * @param list<string> $orderedColumns
+     */
+    private static function uniqueIndexMatches(
+        PDO $pdo,
+        string $table,
+        string $indexName,
+        array $orderedColumns
+    ): bool {
         try {
             if ($pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite') {
                 return false;
             }
             $stmt = $pdo->prepare(
-                'SELECT COUNT(*) FROM information_schema.STATISTICS
-                 WHERE table_schema = DATABASE() AND table_name = :t AND index_name = :i'
+                'SELECT column_name, seq_in_index, non_unique
+                 FROM information_schema.STATISTICS
+                 WHERE table_schema = DATABASE() AND table_name = :t AND index_name = :i
+                 ORDER BY seq_in_index ASC'
             );
             $stmt->execute(['t' => $table, 'i' => $indexName]);
+            $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+            if (count($rows) !== count($orderedColumns)) {
+                return false;
+            }
+            foreach ($rows as $i => $row) {
+                if ((int) ($row['non_unique'] ?? 1) !== 0) {
+                    return false;
+                }
+                if ((int) ($row['seq_in_index'] ?? 0) !== ($i + 1)) {
+                    return false;
+                }
+                if ((string) ($row['column_name'] ?? '') !== $orderedColumns[$i]) {
+                    return false;
+                }
+            }
 
-            return (int) $stmt->fetchColumn() >= 1;
+            return true;
         } catch (\Throwable $e) {
             return false;
         }

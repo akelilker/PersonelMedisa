@@ -2,9 +2,12 @@
 
 **Tür:** Code closure evidence (historical checkpoint for Pack 4B).
 **Branch:** `fix/serbest-zaman-pack4b-closure`
-**Production migration apply:** **NO**
+**Production migration apply (at Pack 4B close):** **NO**
 **Retention feature enable:** **NO**
 **Real physical destruction:** **NO**
+
+> **Current production tip:** **064** — see [`118-production-migration-rollout-059-064.md`](118-production-migration-rollout-059-064.md).
+> Schema `061`/`062` production rollout is complete; feature enable / real destruction remain gated. Body below preserves Pack 4B historical code-closure claims.
 
 ## PACK4B_RESULT
 

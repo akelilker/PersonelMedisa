@@ -11,14 +11,14 @@ Her registry kaydı **tek** zorunlu statü taşır: `CLOSED` · `CODE_GAP` · `B
 
 - **Ürün beyni:** `FROZEN` (domain owner / paralel motor yalnız ayrı teşhis + açık onay)
 - **Görsel düzenleme aşaması:** `GO`
-- **Production migration tip:** `058` (kodda `059`–`064` dosyaları mevcut; production apply **YOK**)
+- **Production migration tip:** `064` (code tip `064`; rollout evidence `118`, 2026-08-13)
 - **S3F:** `CLOSED_PRODUCTION` (PR #148 merge `9e1b5c85049d5f2aada84ae59b2be926f0bc6441`; docs closure `72818720ae9dad9a77c31c933806a72acdc7bafd`)
 - **QR pipeline:** S3C–S3F `CLOSED`
 - **QR algorithms (locked):** `QR_INTERVAL_V1`, `QR_PUANTAJ_CANDIDATE_V1`, `QR_PUANTAJ_DECISION_V1`, `QR_CANDIDATE_HASH_V2`
 - **Master closure audit:** 2026-08-12 (`chore/master-closure-audit`); classification hardening aynı PR’da
-- **Retention Pack 2–4B:** physical destruction **OPS_ROLLOUT** (`MG-RET-PHYS-001` / `112`+`113`+`114`+`115`+`116`); allocation-aware SERBEST destroy code closed; feature flag default OFF; production apply/enable YOK
-- **Serbest Zaman Pack 4B:** allocation-aware destroy + 6M deadline ops surface (`062` + `116`); **OPS_ROLLOUT** (`MG-SZ-6M-001`); production schema rollout pending
-- **Pack5 Final Code Gap:** rolling OT policy + org location schema (`063`/`064` + `117`); `MG-OT-YEAR-POL/PATH` CLOSED; `MG-ORG-LOC-001` OPS_ROLLOUT USER_GATED
+- **Retention Pack 2–4B:** physical destruction **OPS_ROLLOUT** (`MG-RET-PHYS-001` / `112`+`113`+`114`+`115`+`116` + `118`); schema `059`/`060`/`062` production-ready; feature flag default **OFF**; real destruction **NO**
+- **Serbest Zaman Pack 4B:** allocation-aware destroy + 6M deadline ops surface (`061`/`062` + `116` + `118`); **OPS_ROLLOUT** (`MG-SZ-6M-001`); production schema rollout **COMPLETE**; ops follow-up `USER_GATED`
+- **Pack5 Final Code Gap:** rolling OT policy + org location schema (`063`/`064` + `117` + `118`); `MG-OT-YEAR-POL/PATH` CLOSED; `MG-ORG-LOC-001` OPS_ROLLOUT USER_GATED (schema production-ready; real seed/mapping still gated)
 
 Görsel sistem çalışmaları mevcut component/owner içinde yapılabilir. Yeni domain özelliği freeze kapısından geçer.
 
@@ -26,7 +26,8 @@ Görsel sistem çalışmaları mevcut component/owner içinde yapılabilir. Yeni
 
 | Flag | Statü / değer | Metadata |
 | --- | --- | --- |
-| `PRODUCTION_MIGRATION_TIP` | **058** | kod ucu `064` mevcut (Pack5); production apply YOK |
+| `PRODUCTION_MIGRATION_TIP` | **064** | code tip `064`; rollout `118` (2026-08-13) |
+| `CODE_MIGRATION_TIP` | **064** | — |
 | `S3F` | **CLOSED_PRODUCTION** | — |
 | `QR_PIPELINE` | **S3C–S3F CLOSED** | — |
 | `REAL_REFERENCE_DATA` | NOT_YET_ROLLED_OUT | `USER_GATED` |
@@ -35,25 +36,25 @@ Görsel sistem çalışmaları mevcut component/owner içinde yapılabilir. Yeni
 | `SOURCE_DATA_REQUIRES_COMPLETION` | yes | ops details outside public repo |
 | `PERSONEL_BINDING_REAL_ROLLOUT` | **NOT_STARTED** (schema `056` mevcut) | `USER_GATED` |
 | `REAL_QR_EMPLOYEE_ROLLOUT` | **NOT_STARTED** | `USER_GATED` |
-| `RETENTION_PHYSICAL_DESTRUCTION` | **OPS_ROLLOUT** (`MG-RET-PHYS-001`) | Pack 4B code closed (`116`); flag default OFF; migrations unapplied; prod enable YOK |
+| `RETENTION_PHYSICAL_DESTRUCTION` | **OPS_ROLLOUT** (`MG-RET-PHYS-001`) | schema production-ready (`059`/`060`/`062` via `118`); flag default **OFF**; real destruction **NO** |
 | `RETENTION_MANIFEST_COVERAGE` | **CLOSED** (`MG-RET-MAN-001`) | Pack 1 — creators 15/15 |
 | `RETENTION_S3F_LEDGER_FINGERPRINT` | **CLOSED** (`MG-RET-S3F-001`) | Pack 1 — typed ONAY_AUDIT |
-| `SERBEST_ZAMAN_6_MONTH_TRACKING` | **OPS_ROLLOUT** (`MG-SZ-6M-001`) | Pack 4B deadline/ops surface (`116`); production schema rollout pending |
+| `SERBEST_ZAMAN_6_MONTH_TRACKING` | **OPS_ROLLOUT** (`MG-SZ-6M-001`) | Pack 4B ops surface (`116`); allocation schema production-ready (`061`/`062` via `118`); ops follow-up `USER_GATED` |
 | `SGK_15_14` | **BUSINESS_DECISION_REQUIRED** (`MG-SGK-1514-001`) | `CONDITIONAL_SCOPE`; preview BLOCKER_ONLY |
 | `YEAR_CROSSING_OT_POLICY` | **CLOSED** (`MG-OT-YEAR-POL-001`) | `ROLLING_12_MONTH_ACTUAL_DATE_V1` |
-| `YEAR_CROSSING_OT_PATH` | **CLOSED** (`MG-OT-YEAR-PATH-001`) | Pack5 rolling owner (`117`) |
+| `YEAR_CROSSING_OT_PATH` | **CLOSED** (`MG-OT-YEAR-PATH-001`) | Pack5 rolling owner (`117`); provenance schema production-ready (`063` via `118`) |
 | `LEGACY_ROLE_ENUM_SHRINK` | **INTENTIONAL_DEFER** (`MG-DEF-ENUM-001`) | — |
 | `UBGT_AUTHORITATIVE_CALENDAR` | **OPS_ROLLOUT** (`MG-OPS-UBGT-001`) | `USER_GATED` |
 | `SGK_OFFICIAL_CATALOG_PROD` | **OPS_ROLLOUT** (`MG-OPS-SGK-CAT-001`) | `VERIFY_REQUIRED` |
 | `ORG_BUSINESS_MODEL` | **CLOSED** (`MG-ORG-MODEL-001`) | karar kilitli 2026-08-12 |
-| `ORG_LOCATION_SCHEMA` | **OPS_ROLLOUT** (`MG-ORG-LOC-001`) | Pack5 code/schema (`064`/`117`); prod apply + real seed USER_GATED |
+| `ORG_LOCATION_SCHEMA` | **OPS_ROLLOUT** (`MG-ORG-LOC-001`) | schema production-ready (`064` via `118`); real org seed / personnel mapping `USER_GATED` |
 | `ORG_ATTRIBUTES_BOLUM_BIRIM_POZISYON` | **BUSINESS_DECISION_REQUIRED** (`MG-ORG-ATTR-001`) | native mi / mapping yeterli mi? |
 | `CANONICAL_DOC_STALE` | **0** | historical snapshots preserved, not backlog |
 
 ## Doğrulanmış teknik temel
 
-- `main` / `origin/main` audit baseline: `72818720ae9dad9a77c31c933806a72acdc7bafd`.
-- Migration dosya ucu kodda: `064_personel_org_location_model.sql` (Pack5; production tip hâlâ **058**; apply yok).
+- `main` / `origin/main` Pack5 merge baseline: `8b5a5955080bd2dfe21569480154ac4a76d5d199` (rollout docs: `118`).
+- Migration tip (code + production): **064** (`064_personel_org_location_model.sql` ucu; production apply `059`–`064` tamam — `118`).
 - SGK, şirket politikası kanıtı, bordro preflight, personel importu, revizyon, dual-control, retention request/approve/evaluate/execute (flag OFF), QR S3C–S3F owner’ları mevcut ve fail-closed çalışır.
 - PERSONEL self-service: `/me` puantaj / yıllık izin / FM / QR yüzeyleri; maaş/bordro self-view **OUT_OF_SCOPE** (S3A).
 - Smoke/test personeller korunur; gerçek personel dataset’i **kullanıcı onayı olmadan import edilmez**.
@@ -67,7 +68,7 @@ Görsel sistem çalışmaları mevcut component/owner içinde yapılabilir. Yeni
 | QR S3C–S3F | CLOSED_PRODUCTION | Hayır |
 | Canonical docs / gap registry | Güncel (`110`); `CANONICAL_DOC_STALE=0` | Hayır |
 | CODE_GAP | **0** — Pack5 closed (`117`) | Hayır |
-| Retention / SZ-6M / Org-LOC | OPS_ROLLOUT (`USER_GATED`) — code closed | Hayır |
+| Retention / SZ-6M / Org-LOC | OPS_ROLLOUT (`USER_GATED`) — schema production-ready (`118`); feature/seed/mapping gated | Hayır |
 | SGK/UBGT/hukuki kanıtlar | OPS_ROLLOUT + insan kararı | Hayır |
 | Gerçek personel / org rollout | USER_GATED OPS_ROLLOUT | Hayır |
 | Exact-SHA cPanel yayın | Ops / manuel upload | Tasarımı engellemez; canlıya çıkışı ops kapısına bağlar |
@@ -105,6 +106,7 @@ Gerçek personel importu, SGK resmi katalog onayı, UBGT seed ve physical destru
 - `docs/guncel/105`–`109`: S3A–S3F faz kanıtı (`HISTORICAL_SNAPSHOT_PRESERVED`; DOC_STALE backlog değil).
 - `docs/guncel/115`: Pack 4A historical snapshot.
 - `docs/guncel/116`: Pack 4B code closure evidence.
+- `docs/guncel/118`: Production migration rollout `059`→`064` evidence (tip **064**).
 - `.tmp-ops/**`: yerel tarihsel ops çıktısı; güncel backlog sayılmaz.
 - Eski S-numaralı checkpoint’ler yalnız ait oldukları commit/dönem için kanıttır.
 

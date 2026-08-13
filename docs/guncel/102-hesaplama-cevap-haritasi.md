@@ -5,7 +5,7 @@
 **Tarih:** 2026-08-11 (refresh 2026-08-12 — master closure audit / S3F sonrası)
 **Motor sürümü (kod):** `S91C2_PAYROLL_ENGINE_V2`
 **Compliance kontratı:** `S87_PAYROLL_COMPLIANCE_V1`
-**Not:** Bu belge hesaplama haritasıdır. Production migration tip: **058**. QR pipeline S3C–S3F **CLOSED_PRODUCTION** (algoritmalar: `QR_INTERVAL_V1`, `QR_PUANTAJ_CANDIDATE_V1`, `QR_PUANTAJ_DECISION_V1`, `QR_CANDIDATE_HASH_V2`).
+**Not:** Bu belge hesaplama haritasıdır. Production migration tip: **064** (`118`). QR pipeline S3C–S3F **CLOSED_PRODUCTION** (algoritmalar: `QR_INTERVAL_V1`, `QR_PUANTAJ_CANDIDATE_V1`, `QR_PUANTAJ_DECISION_V1`, `QR_CANDIDATE_HASH_V2`).
 
 ---
 
@@ -114,7 +114,7 @@ Canlıya `30` / `225` yazmak için onay formu: `91-bordro-hesaplama-calisma-poli
 | FM ücreti | `SERBEST_ZAMAN` seçildiyse FM `ARTI` üretilmez (çift etki yasak) |
 | Karar mercii | Çalışanın **imzalı yazılı talebi** zorunlu; kanıt yoksa blocker |
 | Event modeli | Oluşum / kullanım / düzeltme / iptal |
-| **6 aylık deadline compliance / ops follow-up** | **OPS_ROLLOUT** (`110` MG-SZ-6M-001) — Pack 4B: `SerbestZamanDeadlineService` + `GET /serbest-zaman/deadline-takip` + Raporlar `serbest-zaman-takip`; warning 30g; `WARNING_AND_OPERATIONAL_FOLLOWUP`; payroll hard block **yok**; production schema rollout pending (`116`) |
+| **6 aylık deadline compliance / ops follow-up** | **OPS_ROLLOUT** (`110` MG-SZ-6M-001) — Pack 4B: `SerbestZamanDeadlineService` + `GET /serbest-zaman/deadline-takip` + Raporlar `serbest-zaman-takip`; warning 30g; `WARNING_AND_OPERATIONAL_FOLLOWUP`; payroll hard block **yok**; production allocation schema ready (`061`/`062` via `118`); İK ops follow-up `USER_GATED` |
 
 ---
 

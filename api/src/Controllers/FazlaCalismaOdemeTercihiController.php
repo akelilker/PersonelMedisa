@@ -258,12 +258,17 @@ class FazlaCalismaOdemeTercihiController
                     $personelId,
                     $userId > 0 ? $userId : null
                 );
+                $pendingDist = FazlaCalismaYillikLimitService::loadWeekPendingDistribution(
+                    $pdo,
+                    $personelId,
+                    $haftaBaslangic
+                );
                 $eval = FazlaCalismaYillikLimitService::evaluatePendingAgainstRolling(
                     $pdo,
                     $personelId,
                     $haftaBitis,
                     $fazlaDk,
-                    null,
+                    $pendingDist,
                     [$haftaBaslangic]
                 );
                 if ($eval['asildi']) {

@@ -148,6 +148,13 @@ final class PersonelImportReferenceCatalogService
         self::appendNameRows($rows, 'GOREV', $gorevIndex, null, '');
         self::appendNameRows($rows, 'PERSONEL_TIPI', $personelTipiIndex, null, '');
 
+        if (PersonelOrgLocationSchema::isReady($pdo)) {
+            $sgkIsverenIndex = self::loadNameIndex($pdo, 'sgk_isverenler');
+            $calismaLokasyonuIndex = self::loadNameIndex($pdo, 'calisma_lokasyonlari');
+            self::appendNameRows($rows, 'SGK_ISVEREN', $sgkIsverenIndex, null, '');
+            self::appendNameRows($rows, 'CALISMA_LOKASYONU', $calismaLokasyonuIndex, null, '');
+        }
+
         self::sortRows($rows);
 
         $body = CsvResponse::buildSemicolon(self::CSV_COLUMNS, $rows);

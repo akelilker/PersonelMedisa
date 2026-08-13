@@ -99,13 +99,11 @@ class PersonellerController
         $total = (int) ($countStmt->fetch(PDO::FETCH_ASSOC)['total'] ?? 0);
 
         $offset = ($page - 1) * $limit;
+        $select = self::personelSelectSql($pdo);
         $sql = "
-            SELECT p.*, s.ad AS sube_adi, d.ad AS departman_adi, g.ad AS gorev_adi, pt.ad AS personel_tipi_adi
+            SELECT {$select['columns']}
             FROM personeller p
-            LEFT JOIN subeler s ON s.id = p.sube_id
-            LEFT JOIN departmanlar d ON d.id = p.departman_id
-            LEFT JOIN gorevler g ON g.id = p.gorev_id
-            LEFT JOIN personel_tipleri pt ON pt.id = p.personel_tipi_id
+            {$select['joins']}
             WHERE $whereSql
             ORDER BY p.id ASC
             LIMIT :limit OFFSET :offset
@@ -161,13 +159,11 @@ class PersonellerController
         PersonelArchiveGate::assertDetailAccess($user, $exists);
         SubeScope::assertPersonelAccess($user, $request, (int) $exists['sube_id']);
 
+        $select = self::personelSelectSql($pdo);
         $sql = "
-            SELECT p.*, s.ad AS sube_adi, d.ad AS departman_adi, g.ad AS gorev_adi, pt.ad AS personel_tipi_adi
+            SELECT {$select['columns']}
             FROM personeller p
-            LEFT JOIN subeler s ON s.id = p.sube_id
-            LEFT JOIN departmanlar d ON d.id = p.departman_id
-            LEFT JOIN gorevler g ON g.id = p.gorev_id
-            LEFT JOIN personel_tipleri pt ON pt.id = p.personel_tipi_id
+            {$select['joins']}
             WHERE p.id = :id
             LIMIT 1
         ";
@@ -870,16 +866,35 @@ class PersonellerController
         $stmt->execute($params);
     }
 
-    /** @return array<string, mixed>|null */
-    private static function fetchPersonelRowById(PDO $pdo, $personelId)
+    /** @return array{columns:string,joins:string} */
+    private static function personelSelectSql(PDO $pdo)
     {
-        $sql = "
-            SELECT p.*, s.ad AS sube_adi, d.ad AS departman_adi, g.ad AS gorev_adi, pt.ad AS personel_tipi_adi
-            FROM personeller p
+        $columns = 'p.*, s.ad AS sube_adi, d.ad AS departman_adi, g.ad AS gorev_adi, pt.ad AS personel_tipi_adi';
+        $joins = "
             LEFT JOIN subeler s ON s.id = p.sube_id
             LEFT JOIN departmanlar d ON d.id = p.departman_id
             LEFT JOIN gorevler g ON g.id = p.gorev_id
             LEFT JOIN personel_tipleri pt ON pt.id = p.personel_tipi_id
+        ";
+        if (PersonelOrgLocationSchema::isReady($pdo)) {
+            $columns .= ', si.ad AS sgk_isveren_adi, cl.ad AS calisma_lokasyonu_adi';
+            $joins .= "
+            LEFT JOIN sgk_isverenler si ON si.id = p.sgk_isveren_id
+            LEFT JOIN calisma_lokasyonlari cl ON cl.id = p.calisma_lokasyonu_id
+            ";
+        }
+
+        return ['columns' => $columns, 'joins' => $joins];
+    }
+
+    /** @return array<string, mixed>|null */
+    private static function fetchPersonelRowById(PDO $pdo, $personelId)
+    {
+        $select = self::personelSelectSql($pdo);
+        $sql = "
+            SELECT {$select['columns']}
+            FROM personeller p
+            {$select['joins']}
             WHERE p.id = :id
             LIMIT 1
         ";
@@ -975,11 +990,19 @@ class PersonellerController
             'personel_tipi_id' => $row['personel_tipi_id'] !== null ? (int) $row['personel_tipi_id'] : null,
             'bagli_amir_id' => $row['bagli_amir_id'] !== null ? (int) $row['bagli_amir_id'] : null,
             'sube_adi' => $row['sube_adi'],
+            'sgk_isveren_adi' => array_key_exists('sgk_isveren_adi', $row) ? $row['sgk_isveren_adi'] : null,
+            'calisma_lokasyonu_adi' => array_key_exists('calisma_lokasyonu_adi', $row)
+                ? $row['calisma_lokasyonu_adi']
+                : null,
             'departman_adi' => $row['departman_adi'],
             'gorev_adi' => $row['gorev_adi'],
             'personel_tipi_adi' => $row['personel_tipi_adi'],
             'referans_adlari' => [
                 'sube' => $row['sube_adi'],
+                'sgk_isveren' => array_key_exists('sgk_isveren_adi', $row) ? $row['sgk_isveren_adi'] : null,
+                'calisma_lokasyonu' => array_key_exists('calisma_lokasyonu_adi', $row)
+                    ? $row['calisma_lokasyonu_adi']
+                    : null,
                 'departman' => $row['departman_adi'],
                 'gorev' => $row['gorev_adi'],
                 'personel_tipi' => $row['personel_tipi_adi'],

@@ -47,13 +47,39 @@ SET @p5_org_sgk := (
 SET @p5_org_sgk_sql := IF(
   @p5_org_sgk = 0,
   'ALTER TABLE personeller
-     ADD COLUMN sgk_isveren_id INT UNSIGNED NULL AFTER sube_id,
-     ADD COLUMN calisma_lokasyonu_id INT UNSIGNED NULL AFTER sgk_isveren_id',
+     ADD COLUMN sgk_isveren_id INT UNSIGNED NULL AFTER sube_id',
   'DO 0'
 );
 PREPARE p5_org_sgk_stmt FROM @p5_org_sgk_sql;
 EXECUTE p5_org_sgk_stmt;
 DEALLOCATE PREPARE p5_org_sgk_stmt;
+
+SET @p5_org_lok := (
+  SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'personeller'
+    AND COLUMN_NAME = 'calisma_lokasyonu_id'
+);
+SET @p5_org_sgk_now := (
+  SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'personeller'
+    AND COLUMN_NAME = 'sgk_isveren_id'
+);
+SET @p5_org_lok_sql := IF(
+  @p5_org_lok = 0,
+  IF(
+    @p5_org_sgk_now > 0,
+    'ALTER TABLE personeller
+       ADD COLUMN calisma_lokasyonu_id INT UNSIGNED NULL AFTER sgk_isveren_id',
+    'ALTER TABLE personeller
+       ADD COLUMN calisma_lokasyonu_id INT UNSIGNED NULL AFTER sube_id'
+  ),
+  'DO 0'
+);
+PREPARE p5_org_lok_stmt FROM @p5_org_lok_sql;
+EXECUTE p5_org_lok_stmt;
+DEALLOCATE PREPARE p5_org_lok_stmt;
 
 SET @p5_org_fk_sgk := (
   SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
@@ -61,32 +87,74 @@ SET @p5_org_fk_sgk := (
     AND TABLE_NAME = 'personeller'
     AND CONSTRAINT_NAME = 'fk_personeller_sgk_isveren'
 );
+SET @p5_org_col_sgk := (
+  SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'personeller'
+    AND COLUMN_NAME = 'sgk_isveren_id'
+);
 SET @p5_org_fk_sgk_sql := IF(
-  @p5_org_fk_sgk = 0,
+  @p5_org_fk_sgk = 0 AND @p5_org_col_sgk > 0,
   'ALTER TABLE personeller
      ADD CONSTRAINT fk_personeller_sgk_isveren
-       FOREIGN KEY (sgk_isveren_id) REFERENCES sgk_isverenler (id) ON DELETE RESTRICT,
-     ADD CONSTRAINT fk_personeller_calisma_lokasyonu
-       FOREIGN KEY (calisma_lokasyonu_id) REFERENCES calisma_lokasyonlari (id) ON DELETE RESTRICT',
+       FOREIGN KEY (sgk_isveren_id) REFERENCES sgk_isverenler (id) ON DELETE RESTRICT',
   'DO 0'
 );
 PREPARE p5_org_fk_sgk_stmt FROM @p5_org_fk_sgk_sql;
 EXECUTE p5_org_fk_sgk_stmt;
 DEALLOCATE PREPARE p5_org_fk_sgk_stmt;
 
-SET @p5_org_idx := (
+SET @p5_org_fk_lok := (
+  SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'personeller'
+    AND CONSTRAINT_NAME = 'fk_personeller_calisma_lokasyonu'
+);
+SET @p5_org_col_lok := (
+  SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'personeller'
+    AND COLUMN_NAME = 'calisma_lokasyonu_id'
+);
+SET @p5_org_fk_lok_sql := IF(
+  @p5_org_fk_lok = 0 AND @p5_org_col_lok > 0,
+  'ALTER TABLE personeller
+     ADD CONSTRAINT fk_personeller_calisma_lokasyonu
+       FOREIGN KEY (calisma_lokasyonu_id) REFERENCES calisma_lokasyonlari (id) ON DELETE RESTRICT',
+  'DO 0'
+);
+PREPARE p5_org_fk_lok_stmt FROM @p5_org_fk_lok_sql;
+EXECUTE p5_org_fk_lok_stmt;
+DEALLOCATE PREPARE p5_org_fk_lok_stmt;
+
+SET @p5_org_idx_sgk := (
   SELECT COUNT(*) FROM information_schema.STATISTICS
   WHERE TABLE_SCHEMA = DATABASE()
     AND TABLE_NAME = 'personeller'
     AND INDEX_NAME = 'idx_personeller_sgk_isveren'
 );
-SET @p5_org_idx_sql := IF(
-  @p5_org_idx = 0,
+SET @p5_org_idx_sgk_sql := IF(
+  @p5_org_idx_sgk = 0 AND @p5_org_col_sgk > 0,
   'ALTER TABLE personeller
-     ADD KEY idx_personeller_sgk_isveren (sgk_isveren_id),
+     ADD KEY idx_personeller_sgk_isveren (sgk_isveren_id)',
+  'DO 0'
+);
+PREPARE p5_org_idx_sgk_stmt FROM @p5_org_idx_sgk_sql;
+EXECUTE p5_org_idx_sgk_stmt;
+DEALLOCATE PREPARE p5_org_idx_sgk_stmt;
+
+SET @p5_org_idx_lok := (
+  SELECT COUNT(*) FROM information_schema.STATISTICS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'personeller'
+    AND INDEX_NAME = 'idx_personeller_calisma_lokasyonu'
+);
+SET @p5_org_idx_lok_sql := IF(
+  @p5_org_idx_lok = 0 AND @p5_org_col_lok > 0,
+  'ALTER TABLE personeller
      ADD KEY idx_personeller_calisma_lokasyonu (calisma_lokasyonu_id)',
   'DO 0'
 );
-PREPARE p5_org_idx_stmt FROM @p5_org_idx_sql;
-EXECUTE p5_org_idx_stmt;
-DEALLOCATE PREPARE p5_org_idx_stmt;
+PREPARE p5_org_idx_lok_stmt FROM @p5_org_idx_lok_sql;
+EXECUTE p5_org_idx_lok_stmt;
+DEALLOCATE PREPARE p5_org_idx_lok_stmt;

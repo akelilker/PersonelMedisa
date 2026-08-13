@@ -145,12 +145,18 @@ class MaasHesaplamaSnapshotService
                     }
                     $periodWeeks = self::periodHaftaKeys($pdo, $pid, $donemBaslangic, $donemBitis);
                     $exclude = array_keys($periodWeeks);
+                    $pendingDist = FazlaCalismaYillikLimitService::collectPendingDistributionForPeriod(
+                        $pdo,
+                        $pid,
+                        (string) $donemBaslangic,
+                        (string) $donemBitis
+                    );
                     $eval = FazlaCalismaYillikLimitService::evaluatePendingAgainstRolling(
                         $pdo,
                         $pid,
                         (string) $donemBitis,
                         $periodOt,
-                        null,
+                        $pendingDist !== [] ? $pendingDist : null,
                         $exclude
                     );
                     if ($eval['asildi']) {

@@ -391,12 +391,19 @@ class SerbestZamanController
                     (int) $tercih['personel_id'],
                     $userId > 0 ? $userId : null
                 );
+                $pendingDist = $haftaBas !== ''
+                    ? FazlaCalismaYillikLimitService::loadWeekPendingDistribution(
+                        $pdo,
+                        (int) $tercih['personel_id'],
+                        $haftaBas
+                    )
+                    : null;
                 $eval = FazlaCalismaYillikLimitService::evaluatePendingAgainstRolling(
                     $pdo,
                     (int) $tercih['personel_id'],
                     $haftaBit !== '' ? $haftaBit : $haftaBitis,
                     $fmPending,
-                    null,
+                    $pendingDist,
                     $haftaBas !== '' ? [$haftaBas] : []
                 );
                 if ($eval['asildi']) {

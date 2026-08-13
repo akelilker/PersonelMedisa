@@ -259,16 +259,25 @@ final class FazlaCalismaYillikLimitService
     }
 
     /**
+     * Canonical hard-guard: pending OT minutes are evaluated chronologically by
+     * actual date. Each pending date uses its own rolling 12-month window so an
+     * early-week / early-month OT date cannot drop valid historical FM that a
+     * later week_end / donem_bitis window would exclude.
+     *
      * @param list<array{tarih:string,dakika:int}>|null $pendingDistribution
      * @param list<string> $excludeHaftaBaslangic
      * @return array{
      *   kullanilan:int,
      *   pending:int,
      *   projected:int,
+     *   max_projected:int,
      *   asildi:bool,
      *   yaklasiyor:bool,
      *   window_start:string,
      *   window_end:string,
+     *   violation_date:?string,
+     *   violation_window_start:?string,
+     *   violation_window_end:?string,
      *   policy:string
      * }
      */
@@ -280,53 +289,270 @@ final class FazlaCalismaYillikLimitService
         ?array $pendingDistribution = null,
         array $excludeHaftaBaslangic = []
     ): array {
-        $loaded = self::loadRollingKapanmisFazlaCalisma(
-            $pdo,
-            $personelId,
-            $windowEnd,
-            $excludeHaftaBaslangic
-        );
-        $bounds = [
-            'start' => $loaded['window_start'],
-            'end' => $loaded['window_end'],
-        ];
+        $pendingDakika = max(0, $pendingDakika);
+        $normalized = self::normalizePendingDistribution($pendingDistribution);
+        $distTotal = self::sumDistributionMinutes($normalized);
 
-        $pending = max(0, $pendingDakika);
-        if ($pendingDistribution !== null) {
-            $pendingInWindow = 0;
-            $distTotal = 0;
-            foreach ($pendingDistribution as $row) {
-                $tarih = (string) ($row['tarih'] ?? '');
-                $dk = (int) ($row['dakika'] ?? 0);
-                if ($dk < 1 || $tarih === '') {
-                    continue;
-                }
-                $distTotal += $dk;
-                if ($tarih >= $bounds['start'] && $tarih <= $bounds['end']) {
-                    $pendingInWindow += $dk;
+        // Usable per-date provenance: sum matches weekly/period motor amount.
+        // Empty / incomplete / mismatched dist must NEVER under-count — fall back
+        // to single-lump evaluation on windowEnd with full pendingDakika.
+        $usePerDate = $normalized !== [] && $distTotal === $pendingDakika && $pendingDakika > 0;
+
+        if (!$usePerDate) {
+            $loaded = self::loadRollingKapanmisFazlaCalisma(
+                $pdo,
+                $personelId,
+                $windowEnd,
+                $excludeHaftaBaslangic
+            );
+            $pending = $pendingDakika;
+            if ($pendingDistribution !== null && $normalized !== []) {
+                // Partial dist present: never reduce below motor amount.
+                $pending = max($pendingDakika, $distTotal);
+            }
+            $projected = $loaded['kullanilan'] + $pending;
+            $asildi = $projected > self::LIMIT_DAKIKA;
+
+            return [
+                'kullanilan' => $loaded['kullanilan'],
+                'pending' => $pending,
+                'projected' => $projected,
+                'max_projected' => $projected,
+                'asildi' => $asildi,
+                'yaklasiyor' => $projected >= self::YAKLASMA_ESIK_DAKIKA,
+                'window_start' => $loaded['window_start'],
+                'window_end' => $loaded['window_end'],
+                'violation_date' => $asildi ? $loaded['window_end'] : null,
+                'violation_window_start' => $asildi ? $loaded['window_start'] : null,
+                'violation_window_end' => $asildi ? $loaded['window_end'] : null,
+                'policy' => self::POLICY_CODE,
+            ];
+        }
+
+        usort($normalized, static function (array $a, array $b): int {
+            return strcmp($a['tarih'], $b['tarih']);
+        });
+
+        $earlierPending = [];
+        $maxProjected = 0;
+        $lastKullanilan = 0;
+        $lastBounds = self::rollingWindowBounds($windowEnd);
+        $violationDate = null;
+        $violationWindowStart = null;
+        $violationWindowEnd = null;
+
+        foreach ($normalized as $item) {
+            $bounds = self::rollingWindowBounds($item['tarih']);
+            $loaded = self::loadRollingKapanmisFazlaCalisma(
+                $pdo,
+                $personelId,
+                $item['tarih'],
+                $excludeHaftaBaslangic
+            );
+            $pendingInWindow = (int) $item['dakika'];
+            foreach ($earlierPending as $prev) {
+                if ($prev['tarih'] >= $bounds['start'] && $prev['tarih'] <= $bounds['end']) {
+                    $pendingInWindow += (int) $prev['dakika'];
                 }
             }
-            // Trusted provenance (sum matches weekly motor): window-slice only.
-            // Empty / incomplete / mismatched dist must NEVER under-count vs pendingDakika.
-            if ($distTotal === $pending && $distTotal > 0) {
-                $pending = $pendingInWindow;
-            } else {
-                $pending = max($pending, $pendingInWindow);
+            $projected = $loaded['kullanilan'] + $pendingInWindow;
+            $lastKullanilan = $loaded['kullanilan'];
+            $lastBounds = $bounds;
+            if ($projected > $maxProjected) {
+                $maxProjected = $projected;
+            }
+            if ($projected > self::LIMIT_DAKIKA && $violationDate === null) {
+                $violationDate = $item['tarih'];
+                $violationWindowStart = $bounds['start'];
+                $violationWindowEnd = $bounds['end'];
+            }
+            $earlierPending[] = $item;
+        }
+
+        $asildi = $violationDate !== null || $maxProjected > self::LIMIT_DAKIKA;
+
+        return [
+            'kullanilan' => $lastKullanilan,
+            'pending' => $pendingDakika,
+            'projected' => $maxProjected,
+            'max_projected' => $maxProjected,
+            'asildi' => $asildi,
+            'yaklasiyor' => $maxProjected >= self::YAKLASMA_ESIK_DAKIKA,
+            'window_start' => $violationWindowStart !== null ? $violationWindowStart : $lastBounds['start'],
+            'window_end' => $violationWindowEnd !== null ? $violationWindowEnd : $lastBounds['end'],
+            'violation_date' => $violationDate,
+            'violation_window_start' => $violationWindowStart,
+            'violation_window_end' => $violationWindowEnd,
+            'policy' => self::POLICY_CODE,
+        ];
+    }
+
+    /**
+     * @param list<array{tarih:string,dakika:int}>|null $pendingDistribution
+     * @return list<array{tarih:string,dakika:int}>
+     */
+    private static function normalizePendingDistribution(?array $pendingDistribution): array
+    {
+        if ($pendingDistribution === null) {
+            return [];
+        }
+        $byDate = [];
+        foreach ($pendingDistribution as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $tarih = isset($row['tarih']) ? trim((string) $row['tarih']) : '';
+            $dk = isset($row['dakika']) ? (int) $row['dakika'] : 0;
+            if ($tarih === '' || $dk < 1 || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $tarih)) {
+                continue;
+            }
+            if (!isset($byDate[$tarih])) {
+                $byDate[$tarih] = 0;
+            }
+            $byDate[$tarih] += $dk;
+        }
+        $out = [];
+        foreach ($byDate as $tarih => $dk) {
+            $out[] = ['tarih' => (string) $tarih, 'dakika' => (int) $dk];
+        }
+
+        return $out;
+    }
+
+    /**
+     * Load exact-date distribution for one closed week when 063 provenance exists.
+     * Legacy missing JSON → null (caller may fall back to lump pending).
+     *
+     * @return list<array{tarih:string,dakika:int}>|null
+     */
+    public static function loadWeekPendingDistribution(
+        PDO $pdo,
+        int $personelId,
+        string $haftaBaslangic
+    ): ?array {
+        if (!self::tableExists($pdo, 'haftalik_kapanis_satirlari')) {
+            return null;
+        }
+        $hasProvenance = self::provenanceSchemaReady($pdo);
+        if (!$hasProvenance) {
+            return null;
+        }
+        $stmt = $pdo->prepare(
+            "SELECT fazla_calisma_dakika, fazla_calisma_tarih_dagilimi_json, fazla_calisma_tarih_dagilim_policy
+             FROM haftalik_kapanis_satirlari
+             WHERE personel_id = :pid
+               AND hafta_baslangic = :hb
+               AND state = 'KAPANDI'
+               AND tam_hafta_verisi = 1
+             ORDER BY kapanis_id DESC
+             LIMIT 1"
+        );
+        $stmt->execute(['pid' => $personelId, 'hb' => $haftaBaslangic]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$row || self::isLegacyMissingDistribution($row, true)) {
+            return null;
+        }
+        $dist = self::decodeDistributionJson(
+            isset($row['fazla_calisma_tarih_dagilimi_json'])
+                ? (string) $row['fazla_calisma_tarih_dagilimi_json']
+                : null
+        );
+
+        return $dist;
+    }
+
+    /**
+     * Build pending actual-date distribution for sealed OT inside a payroll period.
+     * Exact provenance used when present; legacy weeks contribute full FM on hafta_baslangic
+     * (conservative — never invent daily split, never under-count).
+     *
+     * @return list<array{tarih:string,dakika:int}>
+     */
+    public static function collectPendingDistributionForPeriod(
+        PDO $pdo,
+        int $personelId,
+        string $donemBaslangic,
+        string $donemBitis
+    ): array {
+        if (!self::tableExists($pdo, 'haftalik_kapanis_satirlari')) {
+            return [];
+        }
+        $hasProvenance = self::provenanceSchemaReady($pdo);
+        $selectExtra = $hasProvenance
+            ? ', s.fazla_calisma_tarih_dagilimi_json, s.fazla_calisma_tarih_dagilim_policy'
+            : ', NULL AS fazla_calisma_tarih_dagilimi_json, NULL AS fazla_calisma_tarih_dagilim_policy';
+        $stmt = $pdo->prepare(
+            "SELECT s.hafta_baslangic, s.hafta_bitis, s.fazla_calisma_dakika, s.kapanis_id
+                    {$selectExtra}
+             FROM haftalik_kapanis_satirlari s
+             WHERE s.personel_id = :pid
+               AND s.state = 'KAPANDI'
+               AND s.tam_hafta_verisi = 1
+               AND s.hafta_baslangic <= :donem_bit
+               AND s.hafta_bitis >= :donem_bas
+             ORDER BY s.hafta_baslangic ASC, s.kapanis_id DESC"
+        );
+        $stmt->execute([
+            'pid' => $personelId,
+            'donem_bas' => $donemBaslangic,
+            'donem_bit' => $donemBitis,
+        ]);
+        $byHafta = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) ?: [] as $row) {
+            $key = (string) $row['hafta_baslangic'];
+            if (isset($byHafta[$key])) {
+                continue;
+            }
+            $byHafta[$key] = $row;
+        }
+
+        $byDate = [];
+        foreach ($byHafta as $row) {
+            $weekFm = max(0, (int) ($row['fazla_calisma_dakika'] ?? 0));
+            if ($weekFm < 1) {
+                continue;
+            }
+            if (!$hasProvenance || self::isLegacyMissingDistribution($row, $hasProvenance)) {
+                $t = (string) $row['hafta_baslangic'];
+                if (!isset($byDate[$t])) {
+                    $byDate[$t] = 0;
+                }
+                $byDate[$t] += $weekFm;
+                continue;
+            }
+            $dist = self::decodeDistributionJson(
+                isset($row['fazla_calisma_tarih_dagilimi_json'])
+                    ? (string) $row['fazla_calisma_tarih_dagilimi_json']
+                    : null
+            );
+            if ($dist === null) {
+                $t = (string) $row['hafta_baslangic'];
+                if (!isset($byDate[$t])) {
+                    $byDate[$t] = 0;
+                }
+                $byDate[$t] += $weekFm;
+                continue;
+            }
+            foreach ($dist as $item) {
+                $t = $item['tarih'];
+                if ($t < $donemBaslangic || $t > $donemBitis) {
+                    continue;
+                }
+                if (!isset($byDate[$t])) {
+                    $byDate[$t] = 0;
+                }
+                $byDate[$t] += (int) $item['dakika'];
             }
         }
 
-        $projected = $loaded['kullanilan'] + $pending;
+        $out = [];
+        foreach ($byDate as $tarih => $dk) {
+            if ($dk > 0) {
+                $out[] = ['tarih' => (string) $tarih, 'dakika' => (int) $dk];
+            }
+        }
 
-        return [
-            'kullanilan' => $loaded['kullanilan'],
-            'pending' => $pending,
-            'projected' => $projected,
-            'asildi' => $projected > self::LIMIT_DAKIKA,
-            'yaklasiyor' => $projected >= self::YAKLASMA_ESIK_DAKIKA,
-            'window_start' => $bounds['start'],
-            'window_end' => $bounds['end'],
-            'policy' => self::POLICY_CODE,
-        ];
+        return $out;
     }
 
     /**

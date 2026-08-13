@@ -372,12 +372,18 @@ class MaasHesaplamaAdayService
                     continue;
                 }
                 $periodWeekKeys = self::periodHaftaBaslangicKeys($pdo, $pid, $donemBas, $donemBit);
+                $pendingDist = \Medisa\Api\Services\Payroll\FazlaCalismaYillikLimitService::collectPendingDistributionForPeriod(
+                    $pdo,
+                    $pid,
+                    $donemBas,
+                    $donemBit
+                );
                 $eval = \Medisa\Api\Services\Payroll\FazlaCalismaYillikLimitService::evaluatePendingAgainstRolling(
                     $pdo,
                     $pid,
                     $donemBit,
                     $periodOt,
-                    null,
+                    $pendingDist !== [] ? $pendingDist : null,
                     array_keys($periodWeekKeys)
                 );
                 if ($eval['asildi']) {

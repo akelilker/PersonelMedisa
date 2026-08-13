@@ -186,21 +186,6 @@ final class PersonelImportDryRunService
 
         self::assertHeaderContract($headers);
 
-        $requestsOrgCols = false;
-        foreach (self::ORG_LOCATION_OPTIONAL_COLUMNS as $orgCol) {
-            if (in_array($orgCol, $headers, true)) {
-                $requestsOrgCols = true;
-                break;
-            }
-        }
-        if ($requestsOrgCols && !PersonelOrgLocationSchema::isReady($pdo)) {
-            throw new PersonelImportException(
-                PersonelOrgLocationSchema::ERROR_CODE,
-                'Org location schema hazir degil; sgk_isveren / calisma_lokasyonu kolonlari kabul edilmez.',
-                409
-            );
-        }
-
         $dataLines = array_slice($nonEmpty, 1);
         if (count($dataLines) > self::MAX_ROWS) {
             throw new PersonelImportException(
@@ -208,6 +193,38 @@ final class PersonelImportDryRunService
                 'CSV en fazla ' . self::MAX_ROWS . ' satir icerebilir.',
                 400
             );
+        }
+
+        // Org gate: headers alone are not enough — only reject when a data cell has a non-blank
+        // sgk_isveren / calisma_lokasyonu value while schema is not ready.
+        $orgHeaderIndexes = [];
+        foreach (self::ORG_LOCATION_OPTIONAL_COLUMNS as $orgCol) {
+            $idx = array_search($orgCol, $headers, true);
+            if ($idx !== false) {
+                $orgHeaderIndexes[] = (int) $idx;
+            }
+        }
+        if (count($orgHeaderIndexes) > 0 && !PersonelOrgLocationSchema::isReady($pdo)) {
+            $hasNonBlankOrgValue = false;
+            foreach ($dataLines as $entry) {
+                $cells = self::parseCsvLine($entry['line']);
+                foreach ($orgHeaderIndexes as $orgIdx) {
+                    if (!array_key_exists($orgIdx, $cells)) {
+                        continue;
+                    }
+                    if (trim((string) $cells[$orgIdx]) !== '') {
+                        $hasNonBlankOrgValue = true;
+                        break 2;
+                    }
+                }
+            }
+            if ($hasNonBlankOrgValue) {
+                throw new PersonelImportException(
+                    PersonelOrgLocationSchema::ERROR_CODE,
+                    'Org location schema hazir degil; sgk_isveren / calisma_lokasyonu kolonlari kabul edilmez.',
+                    409
+                );
+            }
         }
 
         $allowedSubeIds = SubeScope::allowedSubeIds($user);

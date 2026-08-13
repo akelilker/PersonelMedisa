@@ -19,6 +19,10 @@ export type Personel = {
   gorev_id?: number;
   personel_tipi_id?: number;
   bagli_amir_id?: number;
+  sgk_isveren_id?: number | null;
+  sgk_isveren_adi?: string | null;
+  calisma_lokasyonu_id?: number | null;
+  calisma_lokasyonu_adi?: string | null;
   sube_adi?: string;
   departman_adi?: string;
   gorev_adi?: string;

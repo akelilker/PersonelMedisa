@@ -24,6 +24,13 @@ final class PhysicalDestructionCodes
     public const CODE_ALREADY_EXECUTED = 'ALREADY_EXECUTED';
     public const CODE_TARGET_ALREADY_MISSING = 'TARGET_ALREADY_MISSING';
     public const CODE_DEPENDENT_RETENTION_RECORDS_REMAIN = 'DEPENDENT_RETENTION_RECORDS_REMAIN';
+    /**
+     * SERBEST_ZAMAN: personel has unallocated KULLANIM (global pool; no lot provenance).
+     * Week-owned OLUSUM destruction would corrupt cross-lot balance — fail-closed, no mutation.
+     */
+    public const CODE_SERBEST_ZAMAN_USAGE_ALLOCATION_UNRESOLVED = 'SERBEST_ZAMAN_USAGE_ALLOCATION_UNRESOLVED';
+    /** RAPOR/IS_KAZASI blocked while personel_belge_* rows still REFERENCE the surec (038 RESTRICT). */
+    public const CODE_PERSONEL_BELGE_REMAINS = 'PERSONEL_BELGE_REMAINS';
     /** PUANTAJ blocked while typed ONAY_AUDIT qr_pc_decision ledger still RESTRICTs period daily rows. */
     public const CODE_PUANTAJ_BLOCKED_BY_QR_ONAY_AUDIT = 'PUANTAJ_BLOCKED_BY_QR_ONAY_AUDIT';
     /** PUANTAJ blocked while open reopen lifecycle (ONAY_BEKLIYOR|ONAYLANDI) remains. */
@@ -52,6 +59,10 @@ final class PhysicalDestructionCodes
             self::CODE_ALREADY_EXECUTED => 'Imha talebi daha once yurutuldu.',
             self::CODE_TARGET_ALREADY_MISSING => 'Hedef kaynak ilk execute oncesi yok; fail-closed.',
             self::CODE_DEPENDENT_RETENTION_RECORDS_REMAIN => 'Bagimli saklama kayitlari hala mevcut.',
+            self::CODE_SERBEST_ZAMAN_USAGE_ALLOCATION_UNRESOLVED =>
+                'SERBEST_ZAMAN KULLANIM lot tahsisi cozumlenmedi; OLUSUM imha engellendi.',
+            self::CODE_PERSONEL_BELGE_REMAINS =>
+                'PERSONEL_BELGE dosya/audit kayitlari surece bagli; once belge imha gerekir.',
             self::CODE_PUANTAJ_BLOCKED_BY_QR_ONAY_AUDIT => 'PUANTAJ imha, once typed ONAY_AUDIT (qr_pc_decision) imha gerektirir.',
             self::CODE_PUANTAJ_OPEN_REOPEN_REQUEST_EXISTS => 'PUANTAJ imha, acik reopen talebi varken engellendi.',
             self::CODE_DESTRUCTION_CONFIRMATION_REQUIRED => 'Explicit confirmation gerekli.',

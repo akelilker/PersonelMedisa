@@ -16,7 +16,7 @@ Her registry kaydı **tek** zorunlu statü taşır: `CLOSED` · `CODE_GAP` · `B
 - **QR pipeline:** S3C–S3F `CLOSED`
 - **QR algorithms (locked):** `QR_INTERVAL_V1`, `QR_PUANTAJ_CANDIDATE_V1`, `QR_PUANTAJ_DECISION_V1`, `QR_CANDIDATE_HASH_V2`
 - **Master closure audit:** 2026-08-12 (`chore/master-closure-audit`); classification hardening aynı PR’da
-- **Retention Pack 2:** physical destruction framework shipped (`112`); `MG-RET-PHYS-001` still **CODE_GAP** (policy blockers)
+- **Retention Pack 2–3C:** physical destruction **CODE_GAP** (`MG-RET-PHYS-001` / `112`+`113`+`114`); SERBEST used-entitlement fail-closed; feature flag default OFF; production apply/enable YOK
 
 Görsel sistem çalışmaları mevcut component/owner içinde yapılabilir. Yeni domain özelliği freeze kapısından geçer.
 
@@ -24,7 +24,7 @@ Görsel sistem çalışmaları mevcut component/owner içinde yapılabilir. Yeni
 
 | Flag | Statü / değer | Metadata |
 | --- | --- | --- |
-| `PRODUCTION_MIGRATION_TIP` | **058** | kod ucu `059` mevcut; production apply YOK |
+| `PRODUCTION_MIGRATION_TIP` | **058** | kod ucu `060` mevcut; production apply YOK |
 | `S3F` | **CLOSED_PRODUCTION** | — |
 | `QR_PIPELINE` | **S3C–S3F CLOSED** | — |
 | `REAL_REFERENCE_DATA` | NOT_YET_ROLLED_OUT | `USER_GATED` |
@@ -33,7 +33,7 @@ Görsel sistem çalışmaları mevcut component/owner içinde yapılabilir. Yeni
 | `SOURCE_DATA_REQUIRES_COMPLETION` | yes | ops details outside public repo |
 | `PERSONEL_BINDING_REAL_ROLLOUT` | **NOT_STARTED** (schema `056` mevcut) | `USER_GATED` |
 | `REAL_QR_EMPLOYEE_ROLLOUT` | **NOT_STARTED** | `USER_GATED` |
-| `RETENTION_PHYSICAL_DESTRUCTION` | **CODE_GAP** (`MG-RET-PHYS-001`) | Pack 2 framework PARTIAL — policy blockers; flag default OFF |
+| `RETENTION_PHYSICAL_DESTRUCTION` | **CODE_GAP** (`MG-RET-PHYS-001`) | Pack 3C typed handlers + SERBEST usage fail-closed; flag default OFF; prod enable YOK |
 | `RETENTION_MANIFEST_COVERAGE` | **CLOSED** (`MG-RET-MAN-001`) | Pack 1 — creators 15/15 |
 | `RETENTION_S3F_LEDGER_FINGERPRINT` | **CLOSED** (`MG-RET-S3F-001`) | Pack 1 — typed ONAY_AUDIT |
 | `SERBEST_ZAMAN_6_MONTH_TRACKING` | **CODE_GAP** (`MG-SZ-6M-001`) | deadline calc/bakiye var; ops/compliance follow-up eksik |
@@ -51,7 +51,7 @@ Görsel sistem çalışmaları mevcut component/owner içinde yapılabilir. Yeni
 ## Doğrulanmış teknik temel
 
 - `main` / `origin/main` audit baseline: `72818720ae9dad9a77c31c933806a72acdc7bafd`.
-- Migration dosya ucu kodda: `059_retention_physical_destruction_execution.sql` (production tip hâlâ **058**; apply yok).
+- Migration dosya ucu kodda: `060_retention_physical_destroy_trigger_gate.sql` (production tip hâlâ **058**; apply yok).
 - SGK, şirket politikası kanıtı, bordro preflight, personel importu, revizyon, dual-control, retention request/approve/evaluate/execute (flag OFF), QR S3C–S3F owner’ları mevcut ve fail-closed çalışır.
 - PERSONEL self-service: `/me` puantaj / yıllık izin / FM / QR yüzeyleri; maaş/bordro self-view **OUT_OF_SCOPE** (S3A).
 - Smoke/test personeller korunur; gerçek personel dataset’i **kullanıcı onayı olmadan import edilmez**.
@@ -64,7 +64,7 @@ Görsel sistem çalışmaları mevcut component/owner içinde yapılabilir. Yeni
 | Ürün/domain beyni | Frozen | Hayır |
 | QR S3C–S3F | CLOSED_PRODUCTION | Hayır |
 | Canonical docs / gap registry | Güncel (`110`); `CANONICAL_DOC_STALE=0` | Hayır |
-| CODE_GAP (4 P1: retention PHYS, SZ deadline follow-up, OT path, org location) | Açık — `110` | Hayır (ürün “tamam” iddiasını engeller) |
+| CODE_GAP (4 P1: `MG-RET-PHYS-001`, `MG-SZ-6M-001`, `MG-OT-YEAR-PATH-001`, `MG-ORG-LOC-001`) | Açık — `110` | Hayır (ürün “tamam” iddiasını engeller) |
 | SGK/UBGT/hukuki kanıtlar | OPS_ROLLOUT + insan kararı | Hayır |
 | Gerçek personel / org rollout | USER_GATED OPS_ROLLOUT | Hayır |
 | Exact-SHA cPanel yayın | Ops / manuel upload | Tasarımı engellemez; canlıya çıkışı ops kapısına bağlar |

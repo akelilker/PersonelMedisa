@@ -233,7 +233,7 @@ Aşağıdakiler CURRENT MAIN’de bozulmuş değilse OPEN yapılmaz:
 | Domain | Personel org model |
 | Mevcut | Native: `departman`, `gorev`, `personel_tipi`, `sube`, `bagli_amir_id`. Bölüm / birim / pozisyon native yok |
 | Soru | Bu üç seviye native canonical org alanı mı tutulacak, yoksa mevcut Departman / Görev / Personel Tipi mapping yeterli mi? |
-| Not | Çalışma **lokasyonu** kilitli gereksinim → `MG-ORG-LOC-001` CODE_GAP. Bu ID lokasyonu kapsamaz. |
+| Not | Çalışma **lokasyonu** kilitli gereksinim → `MG-ORG-LOC-001` OPS_ROLLOUT (USER_GATED; Pack5 schema code closed). Bu ID lokasyonu kapsamaz. |
 | Kanıt | `001_initial_schema.sql`; `src/types/personel.ts`; import columns |
 | Acceptance | Yazılı karar; gerekirse sonra CODE_GAP’e çevrilir |
 

@@ -350,6 +350,22 @@ function normalizeYillikFazlaCalismaOzeti(
   return {
     personel_id,
     yil,
+    aggregate_semantics:
+      typeof record.aggregate_semantics === "string" && record.aggregate_semantics.trim() !== ""
+        ? record.aggregate_semantics.trim()
+        : "ISO_WEEK_YEAR_DISPLAY",
+    compliance_policy:
+      typeof record.compliance_policy === "string" && record.compliance_policy.trim() !== ""
+        ? record.compliance_policy.trim()
+        : "ROLLING_12_MONTH_ACTUAL_DATE_V1",
+    compliance_owner:
+      typeof record.compliance_owner === "string" && record.compliance_owner.trim() !== ""
+        ? record.compliance_owner.trim()
+        : "ROLLING_12_MONTH_NOT_THIS_AGGREGATE",
+    compliance_status:
+      typeof record.compliance_status === "string" && record.compliance_status.trim() !== ""
+        ? record.compliance_status.trim()
+        : "DISPLAY_ONLY",
     yillik_limit_dakika,
     yaklasma_esik_dakika,
     kullanilan_dakika,

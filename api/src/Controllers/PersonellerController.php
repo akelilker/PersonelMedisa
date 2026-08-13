@@ -230,7 +230,8 @@ class PersonellerController
         try {
             PersonelCreateService::validateCreateReferences($pdo, $payload);
         } catch (PersonelValidationException $e) {
-            JsonResponse::error(422, $e->getCodeString(), $e->getMessage(), $e->getField());
+            $status = $e->getCodeString() === PersonelOrgLocationSchema::ERROR_CODE ? 409 : 422;
+            JsonResponse::error($status, $e->getCodeString(), $e->getMessage(), $e->getField());
         }
         self::assertTcAvailable($pdo, $payload['tc_kimlik_no']);
 

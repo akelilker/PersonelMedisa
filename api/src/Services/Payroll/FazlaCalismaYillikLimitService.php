@@ -294,17 +294,25 @@ final class FazlaCalismaYillikLimitService
         $pending = max(0, $pendingDakika);
         if ($pendingDistribution !== null) {
             $pendingInWindow = 0;
+            $distTotal = 0;
             foreach ($pendingDistribution as $row) {
                 $tarih = (string) ($row['tarih'] ?? '');
                 $dk = (int) ($row['dakika'] ?? 0);
                 if ($dk < 1 || $tarih === '') {
                     continue;
                 }
+                $distTotal += $dk;
                 if ($tarih >= $bounds['start'] && $tarih <= $bounds['end']) {
                     $pendingInWindow += $dk;
                 }
             }
-            $pending = $pendingInWindow;
+            // Trusted provenance (sum matches weekly motor): window-slice only.
+            // Empty / incomplete / mismatched dist must NEVER under-count vs pendingDakika.
+            if ($distTotal === $pending && $distTotal > 0) {
+                $pending = $pendingInWindow;
+            } else {
+                $pending = max($pending, $pendingInWindow);
+            }
         }
 
         $projected = $loaded['kullanilan'] + $pending;

@@ -17,6 +17,8 @@ final class PersonelCreateService
      */
     public static function insertPersonel(PDO $pdo, array $payload): int
     {
+        // Shared owner must not silently drop explicit org writes on pre-064 schema.
+        PersonelOrgLocationSchema::assertReadyForOrgWrite($pdo, $payload);
         $orgReady = PersonelOrgLocationSchema::isReady($pdo);
         $cols = [
             'tc_kimlik_no', 'ad', 'soyad', 'dogum_tarihi', 'telefon', 'acil_durum_kisi', 'acil_durum_telefon',
@@ -73,6 +75,8 @@ final class PersonelCreateService
     /** @param array<string, mixed> $payload */
     public static function validateCreateReferences(PDO $pdo, array $payload): void
     {
+        PersonelOrgLocationSchema::assertReadyForOrgWrite($pdo, $payload);
+
         if (!self::existsActiveRecord($pdo, 'subeler', (int) $payload['sube_id'])) {
             throw new PersonelValidationException('sube_id', 'Gecersiz sube.');
         }

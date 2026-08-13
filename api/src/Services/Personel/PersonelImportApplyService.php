@@ -304,6 +304,25 @@ final class PersonelImportApplyService
             if ($pdo->inTransaction()) {
                 $pdo->rollBack();
             }
+            if ($e->getCodeString() === PersonelOrgLocationSchema::ERROR_CODE) {
+                self::recordFailureAuditOutsideTx(
+                    $pdo,
+                    $idempotencyKey,
+                    $sourceSha,
+                    $manifestHash,
+                    $actorId,
+                    $actorRol,
+                    $activeSubeId,
+                    $toplamSatir,
+                    $gecerliSatir,
+                    PersonelOrgLocationSchema::ERROR_CODE
+                );
+                throw new PersonelImportException(
+                    PersonelOrgLocationSchema::ERROR_CODE,
+                    $e->getMessage(),
+                    409
+                );
+            }
             self::recordFailureAuditOutsideTx(
                 $pdo,
                 $idempotencyKey,

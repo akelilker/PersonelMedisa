@@ -45,6 +45,28 @@ final class PersonelOrgLocationSchema
         return false;
     }
 
+    /**
+     * Fail-closed gate for shared create/update owners.
+     * Explicit org-field write when schema is missing is not a generic validation miss.
+     *
+     * @param array<string, mixed> $payload
+     * @throws PersonelValidationException
+     */
+    public static function assertReadyForOrgWrite(PDO $pdo, array $payload): void
+    {
+        if (!self::payloadRequestsOrgFields($payload)) {
+            return;
+        }
+        if (self::isReady($pdo)) {
+            return;
+        }
+        throw new PersonelValidationException(
+            'sgk_isveren_id',
+            'Org location schema hazir degil; sgk_isveren_id / calisma_lokasyonu_id yazilamaz.',
+            self::ERROR_CODE
+        );
+    }
+
     public static function existsActiveSgkIsveren(PDO $pdo, int $id): bool
     {
         if ($id < 1 || !self::isReady($pdo)) {

@@ -489,21 +489,35 @@ try {
     p5Assert(($dryB2['ozet']['hatali_satir'] ?? -1) === 0, 'B2 pre-064 legacy CSV zero hatali');
     p5Assert(($dryB2['can_apply'] ?? false) === true, 'B2 pre-064 can_apply true');
 
-    // B3: explicit sgk_isveren_id on create → gate 409 / ERROR_CODE — no mutation
+    // B3: explicit sgk_isveren_id on create → shared owner throws ORG_LOCATION_SCHEMA_NOT_READY — no mutation
     $beforeB3 = p5CountPersonel($pdoPre);
     $payloadB3 = PersonelCanonicalValidator::normalizeAndValidateCreatePayload(p5CreatePayload([
         'tc_kimlik_no' => '10000000170',
         'sicil_no' => 'P5-B3',
         'sgk_isveren_id' => 1,
     ]));
-    $would409 = PersonelOrgLocationSchema::payloadRequestsOrgFields($payloadB3)
-        && !PersonelOrgLocationSchema::isReady($pdoPre);
-    p5Assert($would409, 'B3 create org field → ORG_LOCATION_SCHEMA_NOT_READY gate');
+    $b3Caught = null;
+    try {
+        PersonelCreateService::validateCreateReferences($pdoPre, $payloadB3);
+    } catch (PersonelValidationException $e) {
+        $b3Caught = $e;
+    }
+    p5Assert($b3Caught !== null, 'B3 create validate throws');
     p5Assert(
-        PersonelOrgLocationSchema::ERROR_CODE === 'ORG_LOCATION_SCHEMA_NOT_READY',
-        'B3 ERROR_CODE constant'
+        $b3Caught->getCodeString() === PersonelOrgLocationSchema::ERROR_CODE,
+        'B3 create ERROR_CODE ORG_LOCATION_SCHEMA_NOT_READY (not 422 FK)'
     );
-    // Do not insert when gate fires (mirror controller)
+    $b3InsertCaught = null;
+    try {
+        PersonelCreateService::insertPersonel($pdoPre, $payloadB3);
+    } catch (PersonelValidationException $e) {
+        $b3InsertCaught = $e;
+    }
+    p5Assert($b3InsertCaught !== null, 'B3 insertPersonel throws (no silent drop)');
+    p5Assert(
+        $b3InsertCaught->getCodeString() === PersonelOrgLocationSchema::ERROR_CODE,
+        'B3 insert ERROR_CODE'
+    );
     p5Assert(p5CountPersonel($pdoPre) === $beforeB3, 'B3 create no mutation');
 
     // B3: org CSV col → 409 import exception — no mutation
@@ -561,6 +575,7 @@ try {
     p5SeedPersonelMinimal($pdo, 30, '33333333330', 'S030');
     p5SeedPersonelMinimal($pdo, 40, '44444444440', 'S040');
     p5SeedPersonelMinimal($pdo, 50, '55555555550', 'S050');
+    p5SeedPersonelMinimal($pdo, 55, '55555555555', 'S055');
     p5SeedPersonelMinimal($pdo, 60, '66666666660', 'S060');
     p5SeedPersonelMinimal($pdo, 70, '77777777770', 'S070');
     p5SeedPersonelMinimal($pdo, 80, '88888888880', 'S080');
@@ -703,8 +718,46 @@ try {
     $evalA6 = FazlaCalismaYillikLimitService::evaluatePendingAgainstRolling($pdo, 50, '2026-01-15', 0);
     p5Assert((int) $evalA6['kullanilan'] === 16800, 'A6 rolling 280h (16800)');
     p5Assert($evalA6['asildi'] === true, 'A6 calendar-under-270 but rolling BLOCK');
-    // Calendar year slices each under 270h (sanity of fixture intent)
-    p5Assert(12000 < 16200 && 4800 < 16200, 'A6 each calendar bucket under 270h');
+    $loadedA6 = FazlaCalismaYillikLimitService::loadRollingKapanmisFazlaCalisma($pdo, 50, '2026-01-15');
+    $cal2025 = 0;
+    $cal2026 = 0;
+    foreach ($loadedA6['contributions'] as $c) {
+        $y = substr((string) ($c['hafta_baslangic'] ?? ''), 0, 4);
+        $dk = (int) ($c['fazla_calisma_dakika'] ?? 0);
+        if ($y === '2025') {
+            $cal2025 += $dk;
+        }
+        if ($y === '2026') {
+            $cal2026 += $dk;
+        }
+    }
+    p5Assert($cal2025 === 12000, 'A6 calendar-2025 slice from contributions = 12000');
+    p5Assert($cal2026 === 4800, 'A6 calendar-2026 slice from contributions = 4800');
+    p5Assert($cal2025 < 16200 && $cal2026 < 16200, 'A6 each calendar bucket under 270h (from data)');
+    p5Assert(($cal2025 + $cal2026) === 16800, 'A6 calendar slices sum to rolling total');
+
+    // Incomplete / empty pending distribution must not under-count weekly motor amount
+    p5InsertClosedWeek($pdo, 55, '2025-05-05', 16140, [
+        ['tarih' => '2025-05-07', 'dakika' => 16140],
+    ]);
+    $evalUnder = FazlaCalismaYillikLimitService::evaluatePendingAgainstRolling(
+        $pdo,
+        55,
+        '2025-12-01',
+        120,
+        [] // empty dist — previously zeroed pending → false open
+    );
+    p5Assert((int) $evalUnder['pending'] === 120, 'under-count guard: empty dist keeps pendingDakika');
+    p5Assert($evalUnder['asildi'] === true, 'under-count guard: empty dist still BLOCK');
+    $evalPartial = FazlaCalismaYillikLimitService::evaluatePendingAgainstRolling(
+        $pdo,
+        55,
+        '2025-12-01',
+        120,
+        [['tarih' => '2025-12-01', 'dakika' => 30]] // mismatched sum
+    );
+    p5Assert((int) $evalPartial['pending'] === 120, 'under-count guard: partial dist keeps pendingDakika');
+    p5Assert($evalPartial['asildi'] === true, 'under-count guard: partial dist still BLOCK');
 
     // ----- A7: legacy missing distribution — full week FM if overlaps; no fake split -----
     p5InsertClosedWeek($pdo, 60, '2025-08-04', 240, null); // NULL policy/json = legacy
@@ -730,9 +783,7 @@ try {
         'A7 no fake daily split invented'
     );
 
-    // ----- A9: concurrency FOR UPDATE serialization -----
-    // Practical: historical 16080 (268h) + pending 120 => projected 16200 asildi=false;
-    // after first inserts closed 120, second sees asildi=true.
+    // ----- A9: concurrency — second connection blocks on personel rolling lock (yil=0) -----
     $histA9 = 16080;
     p5InsertClosedWeek($pdo, 70, '2025-04-07', $histA9, [
         ['tarih' => '2025-04-09', 'dakika' => $histA9],
@@ -753,6 +804,38 @@ try {
 
     $pdo1->beginTransaction();
     FazlaCalismaYillikLimitService::acquirePersonelRollingLock($pdo1, 70, 1);
+    $lockRow = $pdo1->query(
+        'SELECT personel_id, yil FROM yillik_fazla_calisma_kilitleri
+         WHERE personel_id = 70 AND yil = ' . (int) FazlaCalismaYillikLimitService::PERSONEL_ROLLING_LOCK_YIL
+         . ' FOR UPDATE'
+    )->fetch(PDO::FETCH_ASSOC);
+    p5Assert(
+        $lockRow
+            && (int) $lockRow['personel_id'] === 70
+            && (int) $lockRow['yil'] === FazlaCalismaYillikLimitService::PERSONEL_ROLLING_LOCK_YIL,
+        'A9 lock row exists at sentinel yil=0'
+    );
+
+    $pdo2->exec('SET innodb_lock_wait_timeout = 1');
+    $pdo2->beginTransaction();
+    $blocked = null;
+    try {
+        FazlaCalismaYillikLimitService::acquirePersonelRollingLock($pdo2, 70, 1);
+    } catch (Throwable $e) {
+        $blocked = $e;
+    }
+    p5Assert($blocked !== null, 'A9 second connection blocked while first holds FOR UPDATE');
+    $blockedMsg = $blocked->getMessage();
+    p5Assert(
+        strpos($blockedMsg, 'Lock wait timeout') !== false
+            || strpos($blockedMsg, '1205') !== false
+            || strpos($blockedMsg, 'lock') !== false,
+        'A9 block is lock-wait (not logic skip)'
+    );
+    if ($pdo2->inTransaction()) {
+        $pdo2->rollBack();
+    }
+
     $evalFirst = FazlaCalismaYillikLimitService::evaluatePendingAgainstRolling(
         $pdo1,
         70,
@@ -762,7 +845,6 @@ try {
     );
     p5Assert($evalFirst['asildi'] === false, 'A9 first eval asildi=false (at limit)');
     p5Assert((int) $evalFirst['projected'] === 16200, 'A9 first projected 16200');
-    // "commit" by inserting closed week under lock, then commit txn
     p5InsertClosedWeek($pdo1, 70, '2025-12-15', 120, [
         ['tarih' => '2025-12-20', 'dakika' => 120],
     ]);
@@ -776,17 +858,32 @@ try {
         '2025-12-20',
         120,
         [['tarih' => '2025-12-20', 'dakika' => 120]],
-        [] // second attempt also pending 120 against updated history
+        []
     );
-    p5Assert((int) $evalSecond['kullanilan'] === 16200, 'A9 second sees first insert');
+    p5Assert((int) $evalSecond['kullanilan'] === 16200, 'A9 second sees first insert after unlock');
     p5Assert($evalSecond['asildi'] === true, 'A9 second eval asildi=true');
     $pdo2->commit();
 
-    // Aggregate response metadata from evaluate/load
+    // Aggregate / display contract: year path is not compliance owner
     p5Assert(
         ($evalFirst['policy'] ?? '') === 'ROLLING_12_MONTH_ACTUAL_DATE_V1'
             && ($loadedA7['policy'] ?? '') === 'ROLLING_12_MONTH_ACTUAL_DATE_V1',
         'A10 aggregate response policy metadata'
+    );
+    $hkSrc = (string) file_get_contents(
+        __DIR__ . '/../../api/src/Controllers/HaftalikKapanisController.php'
+    );
+    $meSrc = (string) file_get_contents(
+        __DIR__ . '/../../api/src/Controllers/MeController.php'
+    );
+    p5Assert(
+        strpos($hkSrc, "compliance_owner' => 'ROLLING_12_MONTH_NOT_THIS_AGGREGATE'") !== false
+            && strpos($meSrc, "compliance_owner' => 'ROLLING_12_MONTH_NOT_THIS_AGGREGATE'") !== false,
+        'A10 Me+Haftalik tag year aggregate as NOT compliance owner'
+    );
+    p5Assert(
+        strpos($meSrc, "compliance_status' => 'UNAVAILABLE'") !== false,
+        'A10 Me empty/error path marks compliance UNAVAILABLE'
     );
 
     // ========== Track B post-064 ==========
@@ -891,6 +988,11 @@ try {
     p5Assert((int) $rowB11['sube_id'] === 1, 'B11 location change does not change sube_id');
     p5Assert((int) $rowB11['calisma_lokasyonu_id'] === 1, 'B11 location updated');
 
+    // Personel on foreign sube with same org refs — scoped user of sube 1 must be denied
+    p5SeedPersonelMinimal($pdo, 9101, '10000000276', 'P5-B11X', 2);
+    $pdo->prepare(
+        'UPDATE personeller SET sgk_isveren_id = 2, calisma_lokasyonu_id = 2 WHERE id = 9101'
+    )->execute();
     $scopeSrc = (string) file_get_contents(__DIR__ . '/../../api/src/Scope/SubeScope.php');
     p5Assert(
         strpos($scopeSrc, 'sgk_isveren') === false && strpos($scopeSrc, 'calisma_lokasyonu') === false,
@@ -903,9 +1005,19 @@ try {
     SubeScope::appendSubeFilter($where, $params, $scope, SubeScope::allowedSubeIds($scopedUser), 'p.sube_id', 'b11');
     p5Assert(count($where) === 1 && strpos($where[0], 'p.sube_id') !== false, 'B11 filter keys on p.sube_id');
     p5Assert((int) ($params['b11_sube_id'] ?? 0) === 1, 'B11 scope param is sube_id=1');
-    // Personel with foreign org refs still scoped by sube_id=1 — allowed for scoped user of sube 1
     SubeScope::assertPersonelAccess($scopedUser, $req, (int) $rowB11['sube_id']);
-    p5Assert(true, 'B11 scoped user can access via sube_id despite foreign org refs');
+    $allowedB11 = SubeScope::allowedSubeIds($scopedUser);
+    p5Assert(
+        in_array(1, $allowedB11, true) && !in_array(2, $allowedB11, true),
+        'B11 scoped user allowed only sube 1 (org refs cannot expand scope)'
+    );
+    // Filtered list would exclude foreign-sube personel 91
+    $sqlB11 = 'SELECT id FROM personeller p WHERE 1=1 AND ' . $where[0];
+    $stB11 = $pdo->prepare($sqlB11);
+    $stB11->execute($params);
+    $idsB11 = array_map('intval', $stB11->fetchAll(PDO::FETCH_COLUMN));
+    p5Assert(in_array($idB11, $idsB11, true), 'B11 same-sube personel visible');
+    p5Assert(!in_array(9101, $idsB11, true), 'B11 foreign-sube personel hidden by sube_id filter');
 
     echo 'verify-final-code-gap-pack5-mysql: OK' . PHP_EOL;
 } finally {

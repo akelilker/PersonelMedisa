@@ -51,6 +51,10 @@ export type HaftalikKapanisSonuc = {
 export type YillikFazlaCalismaOzeti = {
   personel_id: number;
   yil: number;
+  aggregate_semantics?: string;
+  compliance_policy?: string;
+  compliance_owner?: string;
+  compliance_status?: string;
   yillik_limit_dakika: number;
   yaklasma_esik_dakika: number;
   kullanilan_dakika: number;

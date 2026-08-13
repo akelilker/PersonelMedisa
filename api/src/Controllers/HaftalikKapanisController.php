@@ -878,6 +878,7 @@ class HaftalikKapanisController
             'aggregate_semantics' => 'ISO_WEEK_YEAR_DISPLAY',
             'compliance_policy' => FazlaCalismaYillikLimitService::POLICY_CODE,
             'compliance_owner' => 'ROLLING_12_MONTH_NOT_THIS_AGGREGATE',
+            'compliance_status' => 'DISPLAY_ONLY',
             'yillik_limit_dakika' => $limit,
             'yaklasma_esik_dakika' => $yaklasma,
             'kullanilan_dakika' => $kullanilan,

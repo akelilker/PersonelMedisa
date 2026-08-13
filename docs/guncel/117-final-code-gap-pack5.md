@@ -38,9 +38,15 @@
 - Tables: `sgk_isverenler`, `calisma_lokasyonlari`
 - `personeller.sgk_isveren_id`, `personeller.calisma_lokasyonu_id` (nullable)
 - `subeler` remains SYSTEM BRANCH owner; `sube_id` preserved; SubeScope unchanged
-- Pre-064: explicit new-field write → `409 ORG_LOCATION_SCHEMA_NOT_READY` (no mutation)
+- Pre-064: explicit new-field write → `409 ORG_LOCATION_SCHEMA_NOT_READY` (no mutation); shared `PersonelCreateService` owner fail-closed (not silent column drop)
 - Import: optional `sgk_isveren` / `calisma_lokasyonu`; blank → NULL; exact unique resolve; row_hash includes resolved IDs
 - NO auto inference / backfill / real seed
+
+## Merge-blocker hardening (same PR)
+
+- Rolling pending: empty/mismatched distribution must not under-count vs weekly motor `pendingDakika`
+- Me + FE year aggregates tagged `ISO_WEEK_YEAR_DISPLAY` / `compliance_owner=ROLLING_12_MONTH_NOT_THIS_AGGREGATE`; Me error path `compliance_status=UNAVAILABLE`
+- Pack5 MariaDB: B3 create owner runtime 409; A6 calendar slices from contributions; A9 real lock-wait; B11 foreign-sube filter deny
 
 ## Gap reclassification
 

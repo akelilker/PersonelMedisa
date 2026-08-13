@@ -11,8 +11,12 @@ use PDO;
 use RuntimeException;
 
 /**
- * ONAY_AUDIT typed S3F ledger: chain-aware delete of the target decision and its superseding descendants.
- * Generic parent-only ONAY_AUDIT (no qr_pc_decision entity) → POLICY fail-closed (no standalone rows).
+ * ONAY_AUDIT:
+ * - Typed S3F (`qr_pc_decision`): chain-aware DELETE_ROWS (unchanged Pack 2).
+ * - Generic parent overlay (puantaj/bordro entity, no ledger rows): executable no-op.
+ *   Physical parent evidence is destroyed by PUANTAJ/BORDRO handlers; this closes the
+ *   virtual ONAY_AUDIT retention obligation without inventing audit rows.
+ * - Unknown entity/audit_source_type: fail-closed POLICY_UNRESOLVED.
  */
 final class OnayAuditDestructionHandler implements DestructionHandlerInterface
 {
@@ -34,31 +38,50 @@ final class OnayAuditDestructionHandler implements DestructionHandlerInterface
     public function plan(PDO $pdo, array $talep, array $context)
     {
         $entityType = strtolower((string) ($talep['entity_type'] ?? $context['entity_type'] ?? ''));
-        if ($entityType !== 'qr_pc_decision') {
+        if ($entityType === 'qr_pc_decision') {
+            $ledgerId = (int) ($talep['record_id'] ?? $context['record_id'] ?? 0);
+            $chain = $this->collectChainIds($pdo, $ledgerId);
+
             return [
-                'db_operation_codes' => ['POLICY_BLOCK_GENERIC_ONAY_AUDIT'],
-                'expected_row_counts' => [],
+                'db_operation_codes' => ['DELETE_QR_PC_DECISION_LEDGER_CHAIN_LEAF_FIRST'],
+                'expected_row_counts' => [
+                    'qr_puantaj_candidate_decision_ledger' => count($chain),
+                ],
                 'external_file_count' => 0,
-                'policy_blocker' => 'Generic parent ONAY_AUDIT has no standalone physical rows; destroy via parent category',
+                'policy_blocker' => null,
             ];
         }
 
-        $ledgerId = (int) ($talep['record_id'] ?? $context['record_id'] ?? 0);
-        $chain = $this->collectChainIds($pdo, $ledgerId);
+        if (in_array($entityType, ['puantaj', 'bordro'], true)) {
+            return [
+                'db_operation_codes' => ['NO_PHYSICAL_ROWS_PARENT_ONAY_AUDIT'],
+                'expected_row_counts' => [],
+                'external_file_count' => 0,
+                'policy_blocker' => null,
+            ];
+        }
 
         return [
-            'db_operation_codes' => ['DELETE_QR_PC_DECISION_LEDGER_CHAIN_LEAF_FIRST'],
-            'expected_row_counts' => [
-                'qr_puantaj_candidate_decision_ledger' => count($chain),
-            ],
+            'db_operation_codes' => ['POLICY_BLOCK_UNKNOWN_ONAY_AUDIT'],
+            'expected_row_counts' => [],
             'external_file_count' => 0,
-            'policy_blocker' => null,
+            'policy_blocker' => 'Unknown ONAY_AUDIT entity/audit_source_type — fail-closed',
         ];
     }
 
     public function execute(PDO $pdo, array $talep, array $context, array $plan)
     {
         $entityType = strtolower((string) ($talep['entity_type'] ?? $context['entity_type'] ?? ''));
+        if (in_array($entityType, ['puantaj', 'bordro'], true)) {
+            return [
+                'result_code' => PhysicalDestructionCodes::CODE_DESTRUCTION_EXECUTED,
+                'summary' => [
+                    'rows_deleted' => [],
+                    'files_deleted' => 0,
+                    'parent_overlay_no_physical_rows' => 1,
+                ],
+            ];
+        }
         if ($entityType !== 'qr_pc_decision') {
             throw new RuntimeException(PhysicalDestructionCodes::CODE_DESTRUCTION_HANDLER_POLICY_UNRESOLVED);
         }

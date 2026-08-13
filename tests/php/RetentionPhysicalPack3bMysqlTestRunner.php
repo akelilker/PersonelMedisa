@@ -493,7 +493,8 @@ try {
         RetentionCategories::RAPOR,
         RetentionCategories::IS_KAZASI,
     ] as $cat) {
-        p3bAssert(!RetentionDestructionHandlerRegistry::forCategory($cat)->isExecutable(), $cat . ' still policy');
+        // Pack 3C closed these as typed executable handlers (regression expects executable).
+        p3bAssert(RetentionDestructionHandlerRegistry::forCategory($cat)->isExecutable(), $cat . ' Pack3C executable');
         $passCount++;
     }
 

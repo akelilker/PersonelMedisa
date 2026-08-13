@@ -186,6 +186,17 @@ class RetentionTargetResolver
             $context['audit_source_type'] = RetentionSourceAdapterService::AUDIT_SOURCE_QR_PUANTAJ_CANDIDATE_DECISION;
         }
 
+        // Generic parent ONAY_AUDIT: entity_type encodes parent; rehydrate parent_category
+        // because talep row does not persist parent_category (Pack 3C).
+        if ($category === RetentionCategories::ONAY_AUDIT) {
+            $et = strtolower((string) ($context['entity_type'] ?? ''));
+            if ($et === 'puantaj' && empty($context['parent_category'])) {
+                $context['parent_category'] = RetentionCategories::PUANTAJ;
+            } elseif ($et === 'bordro' && empty($context['parent_category'])) {
+                $context['parent_category'] = RetentionCategories::BORDRO;
+            }
+        }
+
         // Never accept client-trusted integrity fields into canonical context.
         unset($context['source_identity'], $context['source_sha256'], $context['current_sha256']);
         unset($context['as_of'], $context['gm_approved'], $context['has_gm_approval']);

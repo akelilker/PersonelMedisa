@@ -890,16 +890,17 @@ try {
     );
     rpdAssert(is_array($evalB['plan'] ?? null) && !empty($evalB['plan']['plan_hash']), 'K BORDRO plan_hash');
 
-    $policyLeft = [
+    // Pack 3C: remaining categories are typed executable (leaf/dependency strategies).
+    $pack3cExecutable = [
         RetentionCategories::FAZLA_CALISMA,
         RetentionCategories::SERBEST_ZAMAN,
         RetentionCategories::DISIPLIN,
         RetentionCategories::RAPOR,
         RetentionCategories::IS_KAZASI,
     ];
-    foreach ($policyLeft as $policyCat) {
-        $handler = \Medisa\Api\Services\Retention\PhysicalDestruction\RetentionDestructionHandlerRegistry::forCategory($policyCat);
-        rpdAssert($handler->isExecutable() === false, 'K remaining policy ' . $policyCat);
+    foreach ($pack3cExecutable as $execCat) {
+        $handler = \Medisa\Api\Services\Retention\PhysicalDestruction\RetentionDestructionHandlerRegistry::forCategory($execCat);
+        rpdAssert($handler->isExecutable() === true, 'K Pack3C executable ' . $execCat);
     }
 
     // Q — PERSONEL_OZLUK with dependent QR → DEPENDENT_RETENTION_RECORDS_REMAIN

@@ -89,25 +89,23 @@ Aşağıdakiler CURRENT MAIN’de bozulmuş değilse OPEN yapılmaz:
 
 | Alan | Değer |
 | --- | --- |
-| Statü | **CODE_GAP** |
+| Statü | **CLOSED** |
 | Öncelik | **P1** |
 | Domain | Retention / KVKK |
-| Pack 2 | `fix/retention-physical-destruction` / `112` — framework + 7 supported handlers + `059` evidence; feature flag default OFF |
-| Pack 3B | `fix/retention-physical-pack3b-core` / `113` — typed executable: **PUANTAJ**, **BORDRO**, **SGK_EKSIK_GUN** + mig `060` retention-only DELETE gate; PUANTAJ×snapshot OPTION A (pinned header preserve); flag still OFF |
-| Mevcut | Plan/execute + registry + HTTP evaluate/execute; **POLICY_DECISION_REQUIRED** kalan: FAZLA_CALISMA, SERBEST_ZAMAN, DISIPLIN, RAPOR, IS_KAZASI (+ generic ONAY_AUDIT parent) |
-| Beklenen | Tüm mandatory category strategy’leri executable (policy kararları kapanmış) + OPS feature enable ayrı kapı |
-| Kanıt | `PhysicalDestructionService`; `RetentionDestructionHandlerRegistry`; mig `059`/`060`; `112`/`113` |
-| Neden açık | Framework + 10 executable kategori; 5 (+ generic ONAY_AUDIT) policy kararı hâlâ açık |
-| Runtime | Flag OFF → `DESTRUCTION_EXECUTION_DISABLED`; policy kategori → `DESTRUCTION_HANDLER_POLICY_UNRESOLVED` |
-| Payroll / SGK | BORDRO/SGK executable (snapshot preserve); PUANTAJ snapshot-pin → header-preserve mode |
-| KVKK/retention | Desteklenen kategorilerde test DB imha mümkün; production kapalı |
+| Pack 2 | `112` / PR #151 — framework + evidence `059` + 7 handlers; flag default OFF |
+| Pack 3B | `113` / PR #152 — PUANTAJ/BORDRO/SGK + `060` + snapshot-pin OPTION A + post-destroy reopen gate |
+| Pack 3C | `114` / `fix/retention-physical-pack3c-final` — FAZLA/SERBEST/DISIPLIN/RAPOR/IS_KAZASI + generic ONAY_AUDIT; 15/15 typed executable |
+| Mevcut | Plan/execute + registry + HTTP evaluate/execute; tüm katalog kategorileri typed handler ile executable; unknown ONAY_AUDIT entity fail-closed |
+| Beklenen | OPS feature enable ayrı kapı; production migration apply ayrı onay |
+| Kanıt | `PhysicalDestructionService`; `RetentionDestructionHandlerRegistry`; `DependentRetentionGate`; mig `059`/`060`; `112`/`113`/`114` |
+| Neden kapandı | Mandatory category strategies explicit + executable; shared-source leaf/dependency gates; feature default OFF; Pack3C MariaDB matrix |
+| Runtime | Flag OFF → `DESTRUCTION_EXECUTION_DISABLED`; unknown ONAY_AUDIT → `DESTRUCTION_HANDLER_POLICY_UNRESOLVED` |
 | Prod veri | Write yok (bu tur) |
-| İnsan kararı | Evet — POLICY satırları (`112` BUSINESS_DECISIONS) |
-| Migration | `059` dosya eklendi; **production apply YOK** |
+| İnsan kararı | Hayır — kalan açıklar OPS enable / production apply |
+| Migration | `059`/`060` dosya mevcut; **production apply YOK**; Pack3C NEW_MIGRATION=NO |
 | Prod write | Hayır |
 | Owner | Retention |
-| Kapanış sırası | Policy kararları → kalan handler’lar → OPS enable |
-| Acceptance | Onaylı talepte desteklenen kategori handler çalışır; audit/evidence; policy fail-closed; flag default OFF |
+| Acceptance | Onaylı talepte 15 kategori handler çalışır veya unknown fail-closed; audit/evidence; flag default OFF |
 
 ### MG-RET-MAN-001 — Archive manifest CREATE/LIFECYCLE wiring (13 kategori)
 
@@ -357,7 +355,7 @@ Import contract (kod, değişmedi):
 2. Business inputs: `MG-SGK-1514`, `MG-OT-YEAR-POL`, `MG-IMPORT-MAP`, `MG-ORG-ATTR`, `MG-ZORUNLU`
 3. Code P1: `MG-OT-YEAR-PATH-001` (policy sonrası veya tutarlılık fix)
 4. Code P1: `MG-SZ-6M-001`
-5. Code P1: `MG-RET-PHYS-001` (MAN+S3F CLOSED — Pack 1)
+5. Code P1: `MG-RET-PHYS-001` — **CLOSED** (Pack 2+3B+3C / `112`–`114`)
 6. Code P1: `MG-ORG-LOC-001`
 7. Ops: UBGT seed, SGK catalog, org seed, dataset completion, personel import, binding, QR employee
 8. Defer pack: QR correction UX, I13 fields, ENUM shrink, payroll self-view, pay outputs
@@ -381,23 +379,25 @@ Historical snapshot belgeleri (`HISTORICAL_SNAPSHOT_PRESERVED`) blocker sayılma
 
 ## 14. Coverage matrix — retention categories
 
+Destroy eligibility: Pack 3C (`114`) — **15/15 typed executable** (feature flag default OFF). Manifest creator: Pack 1 CLOSED (`MG-RET-MAN-001`).
+
 | Category | Resolver | Fingerprint | Manifest creator | Lifecycle trigger | Legal hold | Destroy eligibility |
 | --- | --- | --- | --- | --- | --- | --- |
-| PERSONEL_OZLUK | CLOSED | CLOSED | CLOSED | CLOSED | CLOSED | through approve; execute stub |
-| ISE_GIRIS_CIKIS | CLOSED | CLOSED | CLOSED | CLOSED | CLOSED | same |
-| PERSONEL_BELGE | CLOSED | CLOSED | **GAP** (MAN) | CLOSED | CLOSED | integrity fail |
-| PUANTAJ | CLOSED | CLOSED | **GAP** (MAN) | CLOSED | CLOSED | integrity fail |
-| BORDRO | CLOSED | CLOSED | **GAP** (MAN) | CLOSED | CLOSED | integrity fail |
-| SGK_EKSIK_GUN | CLOSED | CLOSED | **GAP** (MAN) | CLOSED | CLOSED | integrity fail |
-| FAZLA_CALISMA | CLOSED | CLOSED | **GAP** (MAN) | CLOSED | CLOSED | integrity fail |
-| SERBEST_ZAMAN | CLOSED | CLOSED | **GAP** (MAN) | CLOSED | CLOSED | integrity fail |
-| ONAY_AUDIT | CLOSED | **GAP** (S3F ledger material) | **GAP** (MAN) | CLOSED | CLOSED | integrity fail |
-| IZIN | CLOSED | CLOSED | **GAP** (MAN) | CLOSED | CLOSED | integrity fail |
-| RAPOR | CLOSED | CLOSED | **GAP** (MAN) | CLOSED | CLOSED | integrity fail |
-| IS_KAZASI | CLOSED | CLOSED | **GAP** (MAN) | CLOSED | CLOSED | integrity fail |
-| DISIPLIN | CLOSED | CLOSED | **GAP** (MAN) | CLOSED | CLOSED | integrity fail |
-| OLAY | CLOSED | CLOSED | **GAP** (MAN) | CLOSED | CLOSED | integrity fail |
-| SAVUNMA | CLOSED | CLOSED | **GAP** (MAN) | CLOSED | CLOSED | integrity fail |
+| PERSONEL_OZLUK | CLOSED | CLOSED | CLOSED | CLOSED | CLOSED | CLOSED (Pack2) |
+| ISE_GIRIS_CIKIS | CLOSED | CLOSED | CLOSED | CLOSED | CLOSED | CLOSED (Pack2) |
+| PERSONEL_BELGE | CLOSED | CLOSED | CLOSED | CLOSED | CLOSED | CLOSED (Pack2) |
+| PUANTAJ | CLOSED | CLOSED | CLOSED | CLOSED | CLOSED | CLOSED (Pack3B) |
+| BORDRO | CLOSED | CLOSED | CLOSED | CLOSED | CLOSED | CLOSED (Pack3B) |
+| SGK_EKSIK_GUN | CLOSED | CLOSED | CLOSED | CLOSED | CLOSED | CLOSED (Pack3B) |
+| FAZLA_CALISMA | CLOSED | CLOSED | CLOSED | CLOSED | CLOSED | CLOSED (Pack3C) |
+| SERBEST_ZAMAN | CLOSED | CLOSED | CLOSED | CLOSED | CLOSED | CLOSED (Pack3C) |
+| ONAY_AUDIT | CLOSED | CLOSED | CLOSED | CLOSED | CLOSED | CLOSED (Pack2 typed + Pack3C generic) |
+| IZIN | CLOSED | CLOSED | CLOSED | CLOSED | CLOSED | CLOSED (Pack2) |
+| RAPOR | CLOSED | CLOSED | CLOSED | CLOSED | CLOSED | CLOSED (Pack3C) |
+| IS_KAZASI | CLOSED | CLOSED | CLOSED | CLOSED | CLOSED | CLOSED (Pack3C) |
+| DISIPLIN | CLOSED | CLOSED | CLOSED | CLOSED | CLOSED | CLOSED (Pack3C) |
+| OLAY | CLOSED | CLOSED | CLOSED | CLOSED | CLOSED | CLOSED (Pack2) |
+| SAVUNMA | CLOSED | CLOSED | CLOSED | CLOSED | CLOSED | CLOSED (Pack2) |
 
 ---
 
@@ -405,20 +405,19 @@ Historical snapshot belgeleri (`HISTORICAL_SNAPSHOT_PRESERVED`) blocker sayılma
 
 | Statü | Adet (unique registry ID) | IDs |
 | --- | --- | --- |
-| **CODE_GAP** | **4** | RET-PHYS, SZ-6M, OT-YEAR-PATH, ORG-LOC |
+| **CODE_GAP** | **3** | SZ-6M, OT-YEAR-PATH, ORG-LOC |
 | **BUSINESS_DECISION_REQUIRED** | **5** | OT-YEAR-POL, SGK-1514, ZORUNLU, ORG-ATTR, IMPORT-MAP |
 | **OPS_ROLLOUT** | **10** | OPS-PERSONEL, IMPORT-DATA, OPS-ORG, OPS-BIND, OPS-QR, OPS-SGK-CAT, OPS-UBGT, OPS-POLICY, OPS-ENUM-INV, OPS-DEPLOY |
 | **INTENTIONAL_DEFER** | **7** | QR-CORR, PAY-SELF, I13, ENUM, FSC, PAY-OUT, RET-HTTP |
 | **NOT_APPLICABLE** | **4** | SECOND-ENGINE, AUTO-QR-CORR, AUTO-APPLY, IMPORT-UCRET |
 | **DOC_STALE** | **0** | — |
-| **CLOSED** (registry section 9 + retention pack) | **8** | ORG-MODEL, DOC-CS, DOC-102, DOC-101, DOC-103, DOC-105, RET-MAN, RET-S3F |
+| **CLOSED** (registry section 9 + retention pack) | **9** | ORG-MODEL, DOC-CS, DOC-102, DOC-101, DOC-103, DOC-105, RET-MAN, RET-S3F, **RET-PHYS** |
 | Closed systems (section 3) | 18 | yeniden açılmadı |
 
 **MUST_FIX_NOW (= CODE_GAP P1 listesi):**
-1. `MG-RET-PHYS-001`
-2. `MG-SZ-6M-001`
-3. `MG-OT-YEAR-PATH-001`
-4. `MG-ORG-LOC-001`
+1. `MG-SZ-6M-001`
+2. `MG-OT-YEAR-PATH-001`
+3. `MG-ORG-LOC-001`
 
 P2 BUSINESS (`MG-ORG-ATTR`, `MG-ZORUNLU`) final completion için açık kalabilir ama CODE_GAP değildir; karar sonrası gerekirse CODE_GAP’e çevrilir.
 

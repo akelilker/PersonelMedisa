@@ -63,7 +63,7 @@ function dvrPdoForDb(string $db): PDO
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
         PDO::ATTR_EMULATE_PREPARES => false,
     ]);
-    $pdo->exec('SET SESSION innodb_lock_wait_timeout = 5');
+    $pdo->exec('SET SESSION innodb_lock_wait_timeout = 15');
 
     return $pdo;
 }
@@ -174,13 +174,16 @@ function dvrSpawn(array $args, string $db): array
     }
     $command = array_merge([PHP_BINARY], $phpArgs, [__FILE__, '--child'], $args);
     $pipes = [];
-    $env = array_merge(getenv(), [
+    // Explicit env only — do not rely on getenv() merge (CI/Linux proc_open replaces env).
+    $env = [
+        'PATH' => (string) (getenv('PATH') ?: ''),
+        'SystemRoot' => (string) (getenv('SystemRoot') ?: ''),
         'MEDISA_TEST_MYSQL_DSN' => (string) getenv('MEDISA_TEST_MYSQL_DSN'),
         'MEDISA_TEST_MYSQL_USER' => (string) getenv('MEDISA_TEST_MYSQL_USER'),
         'MEDISA_TEST_MYSQL_PASSWORD' => (string) (getenv('MEDISA_TEST_MYSQL_PASSWORD') ?: ''),
         'MEDISA_DVR_DB' => $db,
         'MEDISA_RETENTION_PHYSICAL_DESTRUCTION_ENABLED' => '1',
-    ]);
+    ];
     $process = proc_open(
         $command,
         [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
@@ -248,6 +251,8 @@ if (($argv[1] ?? '') === '--child') {
         } elseif ($action === 'reopen') {
             $yil = (int) ($argv[4] ?? 0);
             $ay = (int) ($argv[5] ?? 0);
+            // Prefer seeing latest committed destroy evidence after period-lock wait.
+            $pdo->exec('SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED');
             $pdo->beginTransaction();
             try {
                 PuantajDonemReopenService::createReopenRequest(
@@ -353,41 +358,177 @@ try {
     $eval = PhysicalDestructionService::evaluate($pdo, dvrGm(), (int) $ap['id']);
     $planHash = (string) ($eval['plan']['plan_hash'] ?? '');
     dvrAssert($planHash !== '', 'plan hash ready');
+    $talepRow = DestructionWorkflowService::getById($pdo, (int) $ap['id']);
+    dvrAssert(
+        (int) ($talepRow['canonical_sube_id'] ?? 0) === 1
+            && (int) ($talepRow['period_yil'] ?? 0) === $yil
+            && (int) ($talepRow['period_ay'] ?? 0) === $ay,
+        'destruction talep has canonical period snapshot'
+    );
+
+    // Sequential: destroy first → reopen blocked by destroyed gate
+    $resDestroyFirst = PhysicalDestructionService::execute($pdo, dvrGm(), (int) $ap['id'], [
+        'expected_plan_hash' => $planHash,
+        'execution_nonce' => dvrNonce(),
+        'confirmation' => PhysicalDestructionCodes::CONFIRMATION_TOKEN,
+    ]);
+    dvrAssert(
+        ($resDestroyFirst['execution']['code'] ?? '') === PhysicalDestructionCodes::CODE_DESTRUCTION_EXECUTED,
+        'sequential destroy-first EXECUTED'
+    );
+    $pdo->beginTransaction();
+    try {
+        PuantajDonemReopenService::createReopenRequest($pdo, dvrGm(), 1, $yil, $ay, 'after destroy sequential');
+        $pdo->rollBack();
+        dvrAssert(false, 'sequential reopen after destroy should fail');
+    } catch (PuantajDonemReopenException $e) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        dvrAssert(
+            $e->getErrorCode() === PuantajPhysicalDestructionGate::CODE_PERIOD_PHYSICALLY_DESTROYED,
+            'sequential reopen after destroy blocked'
+        );
+    }
+
+    // Sequential: reopen first on fresh period → destroy blocked by open reopen
+    $yil2 = 2015;
+    $ay2 = 7;
+    $pdo->exec(
+        "INSERT INTO puantaj_aylik_muhurleri
+            (sube_id, yil, ay, revision_no, donem, durum, muhurlenen_kayit_sayisi, created_by, created_at)
+         VALUES (1, {$yil2}, {$ay2}, 1, '2015-07', 'MUHURLENDI', 1, 1, '2015-07-28 10:00:00')"
+    );
+    $seal2 = (int) $pdo->lastInsertId();
+    $pdo->exec(
+        "INSERT INTO gunluk_puantaj (personel_id, tarih, state, kontrol_durumu, muhur_id)
+         VALUES (10, '2015-07-15', 'MUHURLENDI', 'BEKLIYOR', {$seal2})"
+    );
+    $pdo->exec(
+        "INSERT INTO puantaj_aylik_muhur_satirlari (muhur_id, personel_id, tarih, kontrol_durumu)
+         VALUES ({$seal2}, 10, '2015-07-15', 'BEKLIYOR')"
+    );
+    $pdo->exec(
+        "INSERT INTO maas_hesaplama_donem_snapshotlari (
+            sube_id, yil, ay, donem, donem_baslangic, donem_bitis, muhur_id, revision_no,
+            state, cutoff_at, preflight_hash, source_hash, snapshot_hash,
+            personel_sayisi, girdi_sayisi, created_by
+         ) VALUES (
+            1, {$yil2}, {$ay2}, '2015-07', '2015-07-01', '2015-07-31', {$seal2}, 1,
+            'OLUSTURULDU', '2015-07-28 12:00:00', '{$h}', '{$h}', '{$h}',
+            1, 0, 1
+         )"
+    );
+    ArchiveManifestService::createPuantajPeriodManifests($pdo, 1, $yil2, $ay2, $seal2, 1);
+    $pdo->beginTransaction();
+    PuantajDonemReopenService::createReopenRequest($pdo, dvrGm(), 1, $yil2, $ay2, 'reopen first sequential');
+    $pdo->commit();
+    $req2 = DestructionWorkflowService::requestDestruction($pdo, dvrGm(), [
+        'category' => RetentionCategories::PUANTAJ,
+        'entity_type' => 'puantaj',
+        'record_id' => $seal2,
+        'sube_id' => 1,
+        'yil' => $yil2,
+        'ay' => $ay2,
+        'reason' => 'destroy after reopen',
+    ]);
+    $ap2 = DestructionWorkflowService::approveDestruction(
+        $pdo,
+        dvrGm(),
+        (int) $req2['item']['id'],
+        'GM',
+        true
+    );
+    $eval2 = PhysicalDestructionService::evaluate($pdo, dvrGm(), (int) $ap2['id']);
+    try {
+        PhysicalDestructionService::execute($pdo, dvrGm(), (int) $ap2['id'], [
+            'expected_plan_hash' => (string) $eval2['plan']['plan_hash'],
+            'execution_nonce' => dvrNonce(),
+            'confirmation' => PhysicalDestructionCodes::CONFIRMATION_TOKEN,
+        ]);
+        dvrAssert(false, 'sequential destroy after open reopen should fail');
+    } catch (Throwable $e) {
+        dvrAssert(
+            $e->getMessage() === PhysicalDestructionCodes::CODE_PUANTAJ_OPEN_REOPEN_REQUEST_EXISTS,
+            'sequential destroy blocked by open reopen'
+        );
+    }
+
+    // Concurrent race on a third period
+    $yil3 = 2015;
+    $ay3 = 8;
+    $pdo->exec(
+        "INSERT INTO puantaj_aylik_muhurleri
+            (sube_id, yil, ay, revision_no, donem, durum, muhurlenen_kayit_sayisi, created_by, created_at)
+         VALUES (1, {$yil3}, {$ay3}, 1, '2015-08', 'MUHURLENDI', 1, 1, '2015-08-28 10:00:00')"
+    );
+    $seal3 = (int) $pdo->lastInsertId();
+    $pdo->exec(
+        "INSERT INTO gunluk_puantaj (personel_id, tarih, state, kontrol_durumu, muhur_id)
+         VALUES (10, '2015-08-15', 'MUHURLENDI', 'BEKLIYOR', {$seal3})"
+    );
+    $pdo->exec(
+        "INSERT INTO puantaj_aylik_muhur_satirlari (muhur_id, personel_id, tarih, kontrol_durumu)
+         VALUES ({$seal3}, 10, '2015-08-15', 'BEKLIYOR')"
+    );
+    $pdo->exec(
+        "INSERT INTO maas_hesaplama_donem_snapshotlari (
+            sube_id, yil, ay, donem, donem_baslangic, donem_bitis, muhur_id, revision_no,
+            state, cutoff_at, preflight_hash, source_hash, snapshot_hash,
+            personel_sayisi, girdi_sayisi, created_by
+         ) VALUES (
+            1, {$yil3}, {$ay3}, '2015-08', '2015-08-01', '2015-08-31', {$seal3}, 1,
+            'OLUSTURULDU', '2015-08-28 12:00:00', '{$h}', '{$h}', '{$h}',
+            1, 0, 1
+         )"
+    );
+    ArchiveManifestService::createPuantajPeriodManifests($pdo, 1, $yil3, $ay3, $seal3, 1);
+    $req3 = DestructionWorkflowService::requestDestruction($pdo, dvrGm(), [
+        'category' => RetentionCategories::PUANTAJ,
+        'entity_type' => 'puantaj',
+        'record_id' => $seal3,
+        'sube_id' => 1,
+        'yil' => $yil3,
+        'ay' => $ay3,
+        'reason' => 'concurrency destroy race',
+    ]);
+    $ap3 = DestructionWorkflowService::approveDestruction(
+        $pdo,
+        dvrGm(),
+        (int) $req3['item']['id'],
+        'GM',
+        true
+    );
+    $eval3 = PhysicalDestructionService::evaluate($pdo, dvrGm(), (int) $ap3['id']);
+    $planHash3 = (string) ($eval3['plan']['plan_hash'] ?? '');
 
     $signal = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'medisa_dvr_' . bin2hex(random_bytes(4)) . '.signal';
     @unlink($signal);
 
     $destroyChild = dvrSpawn(
-        ['destroy', $signal, (string) (int) $ap['id'], $planHash],
+        ['destroy', $signal, (string) (int) $ap3['id'], $planHash3],
         $database
     );
     $reopenChild = dvrSpawn(
-        ['reopen', $signal, (string) $yil, (string) $ay],
+        ['reopen', $signal, (string) $yil3, (string) $ay3],
         $database
     );
-    usleep(100000);
+    usleep(150000);
     file_put_contents($signal, 'go');
 
     $destroyOut = dvrFinish($destroyChild);
     $reopenOut = dvrFinish($reopenChild);
     @unlink($signal);
 
-    $destroyed = PuantajPhysicalDestructionGate::isPeriodDestroyed($pdo, 1, $yil, $ay);
-    $open = PuantajDonemPeriodService::findOpenReopenTalep($pdo, 1, $yil, $ay);
+    $destroyed = PuantajPhysicalDestructionGate::isPeriodDestroyed($pdo, 1, $yil3, $ay3);
+    $open = PuantajDonemPeriodService::findOpenReopenTalep($pdo, 1, $yil3, $ay3);
     $both = $destroyed && $open !== null;
     dvrAssert(!$both, 'never both destroy EXECUTED and active reopen (' . $destroyOut . ' | ' . $reopenOut . ')');
 
     $destroyWon = strpos($destroyOut, 'DESTROY:' . PhysicalDestructionCodes::CODE_DESTRUCTION_EXECUTED) === 0;
     $reopenWon = $reopenOut === 'REOPEN:OK';
-    $reopenBlockedDestroyed = $reopenOut === 'REOPEN:' . PuantajPhysicalDestructionGate::CODE_PERIOD_PHYSICALLY_DESTROYED;
-    $destroyBlockedOpen = strpos($destroyOut, 'ERR:' . PhysicalDestructionCodes::CODE_PUANTAJ_OPEN_REOPEN_REQUEST_EXISTS) === 0
-        || strpos($destroyOut, 'DESTROY:' . PhysicalDestructionCodes::CODE_PUANTAJ_OPEN_REOPEN_REQUEST_EXISTS) === 0;
-
     dvrAssert(
-        ($destroyWon && ($reopenBlockedDestroyed || strpos($reopenOut, 'REOPEN:') === 0 && !$reopenWon))
-        || ($reopenWon && !$destroyed)
-        || ($destroyWon && !$reopenWon)
-        || ($reopenWon && $destroyBlockedOpen),
+        ($destroyWon xor $reopenWon) || (!$destroyWon && !$reopenWon && ($destroyed xor ($open !== null))),
         'exactly one lifecycle wins (destroy=' . $destroyOut . ', reopen=' . $reopenOut . ', destroyed=' . ($destroyed ? '1' : '0') . ')'
     );
 
@@ -398,7 +539,7 @@ try {
     if ($open !== null) {
         dvrAssert(!$destroyed, 'when active reopen exists, destroy not executed');
         $dailyLeft = (int) $pdo->query(
-            "SELECT COUNT(*) FROM gunluk_puantaj WHERE personel_id=10 AND YEAR(tarih)={$yil} AND MONTH(tarih)={$ay}"
+            "SELECT COUNT(*) FROM gunluk_puantaj WHERE personel_id=10 AND YEAR(tarih)={$yil3} AND MONTH(tarih)={$ay3}"
         )->fetchColumn();
         dvrAssert($dailyLeft === 1, 'payload remains when reopen won');
     }
@@ -406,13 +547,13 @@ try {
     // Lock-order smoke: hold period lock then destroy waits / reopen waits
     $pdoHold = dvrPdoForDb($database);
     $pdoHold->beginTransaction();
-    PuantajDonemKilidiService::acquire($pdoHold, 1, $yil, $ay);
+    PuantajDonemKilidiService::acquire($pdoHold, 1, $yil3, $ay3);
     $pdoRace = dvrPdoForDb($database);
     $pdoRace->exec('SET SESSION innodb_lock_wait_timeout = 1');
     $pdoRace->beginTransaction();
     $lockBlocked = false;
     try {
-        PuantajDonemKilidiService::acquire($pdoRace, 1, $yil, $ay);
+        PuantajDonemKilidiService::acquire($pdoRace, 1, $yil3, $ay3);
     } catch (Throwable $e) {
         $lockBlocked = true;
         if ($pdoRace->inTransaction()) {

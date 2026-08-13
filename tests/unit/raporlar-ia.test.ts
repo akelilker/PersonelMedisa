@@ -18,6 +18,7 @@ const FULL_VISIBILITY: RaporlarNavVisibility = {
   canViewAylikOzet: true,
   canViewDonemKapanis: true,
   canViewEtkiAdayiRapor: true,
+  canViewSerbestZamanTakip: true,
   canViewMaasHesaplama: true,
   canViewBordroHazirlik: true
 };
@@ -29,7 +30,8 @@ describe("raporlar-ia", () => {
       "donem-kapanis",
       "etki-adayi",
       "maas-hesaplama",
-      "bordro-hazirlik"
+      "bordro-hazirlik",
+      "serbest-zaman-takip"
     ]);
   });
 
@@ -43,7 +45,8 @@ describe("raporlar-ia", () => {
     ]);
     expect(groups[0].items.map((item) => item.label)).toEqual([
       "Liste Raporları",
-      "Etki Adayı Raporu"
+      "Etki Adayı Raporu",
+      "Serbest Zaman Takibi"
     ]);
     expect(groups[1].items.map((item) => item.label)).toEqual([
       "Aylık Kapanış Özeti",
@@ -70,6 +73,9 @@ describe("raporlar-ia", () => {
     expect(
       resolveRaporlarSurfaceFromSearch(new URLSearchParams("panel=maas-hesaplama"))
     ).toBe("maas-hesaplama");
+    expect(
+      resolveRaporlarSurfaceFromSearch(new URLSearchParams("panel=serbest-zaman-takip"))
+    ).toBe("serbest-zaman-takip");
   });
 
   it("builds nav hrefs without leaking child params and preserves panel ids", () => {
@@ -80,6 +86,9 @@ describe("raporlar-ia", () => {
     );
     expect(buildRaporlarNavHref({ panel: "donem-kapanis" })).toBe("/raporlar?panel=donem-kapanis");
     expect(buildRaporlarNavHref({ panel: "etki-adayi" })).toBe("/raporlar?panel=etki-adayi");
+    expect(buildRaporlarNavHref({ panel: "serbest-zaman-takip" })).toBe(
+      "/raporlar?panel=serbest-zaman-takip"
+    );
     expect(buildRaporlarNavHref({ panel: "maas-hesaplama" })).toBe("/raporlar?panel=maas-hesaplama");
     expect(buildRaporlarNavHref({ panel: "bordro-hazirlik" })).toBe(
       "/raporlar?panel=bordro-hazirlik"
@@ -92,11 +101,16 @@ describe("raporlar-ia", () => {
       canViewAylikOzet: false,
       canViewDonemKapanis: false,
       canViewEtkiAdayiRapor: true,
+      canViewSerbestZamanTakip: true,
       canViewMaasHesaplama: false,
       canViewBordroHazirlik: false
     });
     expect(groups.map((group) => group.id)).toEqual(["raporlar"]);
-    expect(groups[0].items.map((item) => item.id)).toEqual(["liste", "etki-adayi"]);
+    expect(groups[0].items.map((item) => item.id)).toEqual([
+      "liste",
+      "etki-adayi",
+      "serbest-zaman-takip"
+    ]);
   });
 
   it("preserves bordro kapsam deep-link panel contract", () => {

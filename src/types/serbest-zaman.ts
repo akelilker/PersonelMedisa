@@ -84,6 +84,58 @@ export type SerbestZamanAllocationState =
   | "INVARIANT_BROKEN"
   | "NO_USAGE";
 
+export type SerbestZamanDeadlineState =
+  | "NORMAL"
+  | "YAKLASIYOR"
+  | "SURESI_DOLDU"
+  | "ALLOCATION_UNRESOLVED";
+
+export type SerbestZamanDeadlineComplianceAction =
+  | "NONE"
+  | "WARN_APPROACHING"
+  | "MARK_EXPIRED_UNUSED"
+  | "MANUAL_ALLOCATION_REVIEW";
+
+export type SerbestZamanDeadlineRow = {
+  personel_id: number;
+  ad_soyad: string;
+  sicil_no: string;
+  sube_id: number | null;
+  sube_ad: string;
+  bolum_ad: string;
+  allocation_state: SerbestZamanAllocationState | string;
+  olusum_event_id: number | null;
+  son_kullanim_tarihi: string | null;
+  available_dakika: number | null;
+  kalan_gun: number | null;
+  deadline_state: SerbestZamanDeadlineState;
+  compliance_action: SerbestZamanDeadlineComplianceAction | string;
+  expiry_state?: string | null;
+};
+
+export type SerbestZamanDeadlineSummary = {
+  referans_tarih: string;
+  warning_days: number;
+  compliance_mode: string;
+  payroll_hard_block: boolean;
+  yaklasan_lot_sayisi: number;
+  yaklasan_dakika: number;
+  suresi_dolmus_lot_sayisi: number;
+  suresi_dolmus_kullanilmamis_dakika: number;
+  allocation_unresolved_personel_sayisi: number;
+};
+
+export type SerbestZamanDeadlineTakipResponse = {
+  items: SerbestZamanDeadlineRow[];
+  summary: SerbestZamanDeadlineSummary;
+  page: number;
+  limit: number;
+  total: number;
+  total_pages: number;
+  has_next_page: boolean;
+  has_prev_page: boolean;
+};
+
 export type SerbestZamanBakiye = {
   personel_id: number;
   toplam_hak_dakika: number;

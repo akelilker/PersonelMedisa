@@ -552,7 +552,7 @@ $referans = '2026-06-15';
 try {
     $files = p4aMigrationFiles();
     p4aAssert(count($files) >= 61, 'migrations 001→061 present');
-    p4aAssert(end($files) === '061_serbest_zaman_kullanim_tahsisleri.sql', 'tip ends with 061');
+    p4aAssert(end($files) === '062_serbest_zaman_retention_destroy_gate.sql', 'tip ends with 062');
     foreach ($files as $file) {
         p4aApply($pdo, $file);
     }

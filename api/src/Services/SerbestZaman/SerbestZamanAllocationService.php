@@ -645,6 +645,86 @@ final class SerbestZamanAllocationService
     }
 
     /**
+     * Pack 4B read helper: all allocation row ids for a usage (including zero-net history).
+     *
+     * @return list<int>
+     */
+    public static function allocationRowIdsForUsage(PDO $pdo, $kullanimEventId)
+    {
+        if (!self::tableExists($pdo)) {
+            return [];
+        }
+        $stmt = $pdo->prepare(
+            'SELECT id FROM serbest_zaman_kullanim_tahsisleri
+             WHERE kullanim_event_id = :kid
+             ORDER BY id ASC'
+        );
+        $stmt->execute(['kid' => (int) $kullanimEventId]);
+        $ids = [];
+        while ($id = $stmt->fetchColumn()) {
+            $ids[] = (int) $id;
+        }
+
+        return $ids;
+    }
+
+    /**
+     * Pack 4B read helper: distinct OLUSUM lot ids that appear in a usage's allocation history
+     * (including rows whose net later sums to zero — cross-scope history must not be erased lightly).
+     *
+     * @return list<int>
+     */
+    public static function allocationOlusumIdsForUsage(PDO $pdo, $kullanimEventId)
+    {
+        if (!self::tableExists($pdo)) {
+            return [];
+        }
+        $stmt = $pdo->prepare(
+            'SELECT DISTINCT olusum_event_id
+             FROM serbest_zaman_kullanim_tahsisleri
+             WHERE kullanim_event_id = :kid
+             ORDER BY olusum_event_id ASC'
+        );
+        $stmt->execute(['kid' => (int) $kullanimEventId]);
+        $ids = [];
+        while ($id = $stmt->fetchColumn()) {
+            $ids[] = (int) $id;
+        }
+
+        return $ids;
+    }
+
+    /**
+     * Pack 4B read helper: allocation rows whose olusum_event_id is in the given lot set.
+     *
+     * @param list<int> $olusumEventIds
+     * @return list<array<string, mixed>>
+     */
+    public static function allocationRowsForOlusumLots(PDO $pdo, array $olusumEventIds)
+    {
+        if (!self::tableExists($pdo) || count($olusumEventIds) === 0) {
+            return [];
+        }
+        $olusumEventIds = array_values(array_unique(array_map('intval', $olusumEventIds)));
+        sort($olusumEventIds);
+        $ph = implode(',', array_fill(0, count($olusumEventIds), '?'));
+        $stmt = $pdo->prepare(
+            "SELECT id, personel_id, kullanim_event_id, olusum_event_id, kaynak_event_id,
+                    tahsis_delta_dakika
+             FROM serbest_zaman_kullanim_tahsisleri
+             WHERE olusum_event_id IN ({$ph})
+             ORDER BY id ASC"
+        );
+        $stmt->execute($olusumEventIds);
+        $rows = [];
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            $rows[] = $row;
+        }
+
+        return $rows;
+    }
+
+    /**
      * @param list<array<string, mixed>> $events
      * @return list<array<string, mixed>>
      */

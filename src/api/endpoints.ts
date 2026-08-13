@@ -158,6 +158,7 @@ export const endpoints = {
   serbestZaman: {
     events: "/serbest-zaman/events",
     bakiye: "/serbest-zaman/bakiye",
+    deadlineTakip: "/serbest-zaman/deadline-takip",
     olusum: "/serbest-zaman/olusum",
     kullanim: "/serbest-zaman/kullanim",
     iptal: "/serbest-zaman/iptal",

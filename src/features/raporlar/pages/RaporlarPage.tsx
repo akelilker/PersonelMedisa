@@ -49,6 +49,7 @@ import { BordroHazirlikMerkeziPage } from "./BordroHazirlikMerkeziPage";
 import { DonemKapanisMerkeziPage } from "./DonemKapanisMerkeziPage";
 import { EtkiAdayiRaporuPage } from "./EtkiAdayiRaporuPage";
 import { MaasHesaplamaMerkeziPage } from "./MaasHesaplamaMerkeziPage";
+import { SerbestZamanTakipPage } from "./SerbestZamanTakipPage";
 
 type RaporFormState = {
   raporTipi: RaporTipi;
@@ -582,6 +583,7 @@ export function RaporlarPage() {
   const canViewAylikOzet = hasPermission("aylik-ozet.view");
   const canViewDonemKapanis = hasPermission("puantaj.donem_kapanis.view");
   const canViewEtkiAdayiRapor = hasPermission("puantaj.bildirim_etki.rapor.view");
+  const canViewSerbestZamanTakip = hasPermission("raporlar.view");
   const canViewMaasHesaplama = hasPermission("maas_hesaplama.view");
   const canViewBordroHazirlik = hasPermission("bordro_on_izleme.view");
   const [searchParams] = useSearchParams();
@@ -598,6 +600,7 @@ export function RaporlarPage() {
     canViewAylikOzet,
     canViewDonemKapanis,
     canViewEtkiAdayiRapor,
+    canViewSerbestZamanTakip,
     canViewMaasHesaplama,
     canViewBordroHazirlik
   };
@@ -736,6 +739,9 @@ export function RaporlarPage() {
 
       {activePanel === "donem-kapanis" && canViewDonemKapanis ? <DonemKapanisMerkeziPage /> : null}
       {activePanel === "etki-adayi" && canViewEtkiAdayiRapor ? <EtkiAdayiRaporuPage /> : null}
+      {activePanel === "serbest-zaman-takip" && canViewSerbestZamanTakip ? (
+        <SerbestZamanTakipPage />
+      ) : null}
       {activePanel === "maas-hesaplama" && canViewMaasHesaplama ? <MaasHesaplamaMerkeziPage /> : null}
       {activePanel === "bordro-hazirlik" && canViewBordroHazirlik ? <BordroHazirlikMerkeziPage /> : null}
 

@@ -7548,6 +7548,64 @@ export function resolveDemoApiResponse(
     return ok(bakiye);
   }
 
+  if (pathname === "/serbest-zaman/deadline-takip" && method === "GET") {
+    const actor = readDemoApiActor(init);
+    const permissionError = enforceDemoPermission(actor, "raporlar.view");
+    if (permissionError) return permissionError;
+
+    const referansRaw = toStringValue(requestUrl.searchParams.get("referans_tarih"));
+    const referans_tarih =
+      referansRaw && /^\d{4}-\d{2}-\d{2}$/.test(referansRaw)
+        ? referansRaw
+        : new Date().toISOString().slice(0, 10);
+    const durumRaw = toStringValue(requestUrl.searchParams.get("durum"));
+    const durum = durumRaw ? durumRaw.trim().toUpperCase() : "";
+    const personelFilter = toNumber(requestUrl.searchParams.get("personel_id"));
+    const page = Math.max(1, toNumber(requestUrl.searchParams.get("page")) ?? 1);
+    const limitRaw = toNumber(requestUrl.searchParams.get("limit"));
+    const limit = Math.min(100, Math.max(1, limitRaw ?? 25));
+
+    // Demo contract parity only — no allocation ledger; never invent usable/expired minutes.
+    const items: Array<Record<string, unknown>> = [];
+    if (personelFilter !== null && personelFilter >= 1) {
+      const personel = findDemoPersonelById(personelFilter);
+      if (personel) {
+        const scopeError = assertDemoSzPersonelScope(actor, personel);
+        if (scopeError) return scopeError;
+      }
+    }
+
+    const filtered =
+      durum && durum !== "NORMAL" && durum !== "YAKLASIYOR" && durum !== "SURESI_DOLDU"
+        ? items.filter((row) => String(row.deadline_state) === durum)
+        : items;
+    const total = filtered.length;
+    const totalPages = Math.max(1, Math.ceil(total / limit) || 1);
+    const offset = (page - 1) * limit;
+    const pageItems = filtered.slice(offset, offset + limit);
+
+    return ok({
+      items: pageItems,
+      summary: {
+        referans_tarih,
+        warning_days: 30,
+        compliance_mode: "WARNING_AND_OPERATIONAL_FOLLOWUP",
+        payroll_hard_block: false,
+        yaklasan_lot_sayisi: 0,
+        yaklasan_dakika: 0,
+        suresi_dolmus_lot_sayisi: 0,
+        suresi_dolmus_kullanilmamis_dakika: 0,
+        allocation_unresolved_personel_sayisi: 0
+      },
+      page,
+      limit,
+      total,
+      total_pages: totalPages,
+      has_next_page: page < totalPages,
+      has_prev_page: page > 1
+    });
+  }
+
   if (pathname === "/serbest-zaman/olusum" && method === "POST") {
     const actor = readDemoApiActor(init);
     const permissionError = enforceDemoPermission(actor, "puantaj.muhurle");

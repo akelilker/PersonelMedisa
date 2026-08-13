@@ -42,6 +42,11 @@ test.describe("I11 raporlar information architecture", () => {
     await page.getByTestId("raporlar-panel-bordro-hazirlik").click();
     await expect(page).toHaveURL(/panel=bordro-hazirlik/);
     await expect(page.getByTestId("bordro-hazirlik-merkezi")).toBeVisible();
+
+    await page.getByTestId("raporlar-panel-serbest-zaman-takip").click();
+    await expect(page).toHaveURL(/panel=serbest-zaman-takip/);
+    await expect(page.getByTestId("serbest-zaman-takip-page")).toBeVisible();
+    await expect(page.getByTestId("serbest-zaman-takip-summary")).toBeVisible();
   });
 
   test("Scenario C — browser history restores surfaces", async ({ page }) => {

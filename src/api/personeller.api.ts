@@ -34,6 +34,8 @@ export type CreatePersonelPayload = {
   dogum_yeri?: string;
   kan_grubu?: string;
   bagli_amir_id?: number;
+  sgk_isveren_id?: number | null;
+  calisma_lokasyonu_id?: number | null;
   ucret_tipi_id?: number;
   net_maas_tutari?: number;
   maas_tutari?: number;
@@ -245,6 +247,24 @@ function normalizePersonel(data: unknown): Personel {
     gorev_id: readNumber(baseSources, "gorev_id"),
     personel_tipi_id: readNumber(baseSources, "personel_tipi_id"),
     bagli_amir_id: readNumber(baseSources, "bagli_amir_id"),
+    sgk_isveren_id: readNullableNumber(baseSources, "sgk_isveren_id", "sgkIsverenId"),
+    sgk_isveren_adi: readNullableString(
+      [...baseSources, ...referenceSources],
+      "sgk_isveren_adi",
+      "sgkIsverenAdi",
+      "sgk_isveren"
+    ),
+    calisma_lokasyonu_id: readNullableNumber(
+      baseSources,
+      "calisma_lokasyonu_id",
+      "calismaLokasyonuId"
+    ),
+    calisma_lokasyonu_adi: readNullableString(
+      [...baseSources, ...referenceSources],
+      "calisma_lokasyonu_adi",
+      "calismaLokasyonuAdi",
+      "calisma_lokasyonu"
+    ),
     sube_adi: readString(referenceSources, "sube", "sube_adi", "subeAdi"),
     departman_adi: readString(referenceSources, "departman", "departman_adi", "departmanAdi"),
     gorev_adi: readString(referenceSources, "gorev", "gorev_adi", "gorevAdi"),

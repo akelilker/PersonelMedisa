@@ -7,6 +7,7 @@ namespace Medisa\Api\Services;
 use Medisa\Api\Services\Attendance\AttendanceDisciplineCatalog;
 use Medisa\Api\Services\Attendance\AttendancePayrollEffectResolver;
 use Medisa\Api\Services\Attendance\PuantajOlayKararService;
+use Medisa\Api\Services\Payroll\FazlaCalismaYillikLimitService;
 use Medisa\Api\Services\Payroll\PayrollComplianceGuard;
 use PDO;
 use PDOException;
@@ -142,17 +143,22 @@ class MaasHesaplamaSnapshotService
                     if ($periodOt < 1) {
                         continue;
                     }
-                    $kapanmis = PayrollComplianceGuard::loadKapanmisYillikFazlaCalisma($pdo, $pid, (int) $yil);
                     $periodWeeks = self::periodHaftaKeys($pdo, $pid, $donemBaslangic, $donemBitis);
-                    $exPeriod = [];
-                    foreach ($kapanmis as $row) {
-                        $hb = (string) ($row['hafta_baslangic'] ?? '');
-                        if ($hb !== '' && isset($periodWeeks[$hb])) {
-                            continue;
-                        }
-                        $exPeriod[] = $row;
-                    }
-                    $eval = PayrollComplianceGuard::evaluateYillikLimit($exPeriod, $periodOt);
+                    $exclude = array_keys($periodWeeks);
+                    $pendingDist = FazlaCalismaYillikLimitService::collectPendingDistributionForPeriod(
+                        $pdo,
+                        $pid,
+                        (string) $donemBaslangic,
+                        (string) $donemBitis
+                    );
+                    $eval = FazlaCalismaYillikLimitService::evaluatePendingAgainstRolling(
+                        $pdo,
+                        $pid,
+                        (string) $donemBitis,
+                        $periodOt,
+                        $pendingDist !== [] ? $pendingDist : null,
+                        $exclude
+                    );
                     if ($eval['asildi']) {
                         $items[] = self::issue(
                             self::SEVERITY_BLOCKER,
@@ -164,7 +170,8 @@ class MaasHesaplamaSnapshotService
                             [
                                 'kullanilan_dk' => $eval['kullanilan'],
                                 'projected_dk' => $eval['projected'],
-                                'limit_dk' => PayrollComplianceGuard::YILLIK_FAZLA_CALISMA_LIMIT_DAKIKA,
+                                'limit_dk' => FazlaCalismaYillikLimitService::LIMIT_DAKIKA,
+                                'compliance_policy' => FazlaCalismaYillikLimitService::POLICY_CODE,
                             ]
                         );
                     } elseif ($eval['yaklasiyor']) {
@@ -177,7 +184,8 @@ class MaasHesaplamaSnapshotService
                             $pid,
                             [
                                 'projected_dk' => $eval['projected'],
-                                'esik_dk' => PayrollComplianceGuard::YILLIK_FAZLA_CALISMA_YAKLASMA_ESIK_DAKIKA,
+                                'esik_dk' => FazlaCalismaYillikLimitService::YAKLASMA_ESIK_DAKIKA,
+                                'compliance_policy' => FazlaCalismaYillikLimitService::POLICY_CODE,
                             ]
                         );
                     }

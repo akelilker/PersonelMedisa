@@ -66,6 +66,12 @@ final class PersonelImportReferenceCatalogService
             'departman' => self::loadNameIndex($pdo, 'departmanlar'),
             'gorev' => self::loadNameIndex($pdo, 'gorevler'),
             'personel_tipi' => self::loadNameIndex($pdo, 'personel_tipleri'),
+            'sgk_isveren' => PersonelOrgLocationSchema::isReady($pdo)
+                ? self::loadNameIndex($pdo, 'sgk_isverenler')
+                : [],
+            'calisma_lokasyonu' => PersonelOrgLocationSchema::isReady($pdo)
+                ? self::loadNameIndex($pdo, 'calisma_lokasyonlari')
+                : [],
             'sube_departman' => $pairs,
         ];
     }
@@ -142,6 +148,13 @@ final class PersonelImportReferenceCatalogService
         self::appendNameRows($rows, 'GOREV', $gorevIndex, null, '');
         self::appendNameRows($rows, 'PERSONEL_TIPI', $personelTipiIndex, null, '');
 
+        if (PersonelOrgLocationSchema::isReady($pdo)) {
+            $sgkIsverenIndex = self::loadNameIndex($pdo, 'sgk_isverenler');
+            $calismaLokasyonuIndex = self::loadNameIndex($pdo, 'calisma_lokasyonlari');
+            self::appendNameRows($rows, 'SGK_ISVEREN', $sgkIsverenIndex, null, '');
+            self::appendNameRows($rows, 'CALISMA_LOKASYONU', $calismaLokasyonuIndex, null, '');
+        }
+
         self::sortRows($rows);
 
         $body = CsvResponse::buildSemicolon(self::CSV_COLUMNS, $rows);
@@ -203,7 +216,7 @@ final class PersonelImportReferenceCatalogService
      */
     public static function loadNameIndex(PDO $pdo, $table): array
     {
-        $allowed = ['subeler', 'departmanlar', 'gorevler', 'personel_tipleri'];
+        $allowed = ['subeler', 'departmanlar', 'gorevler', 'personel_tipleri', 'sgk_isverenler', 'calisma_lokasyonlari'];
         if (!in_array($table, $allowed, true)) {
             throw new RuntimeException('Invalid reference table.');
         }

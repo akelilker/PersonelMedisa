@@ -578,6 +578,9 @@ final class PayrollComplianceGuard
     /**
      * Kapali haftalik snapshot FM toplami (duplicate hafta: en yuksek kapanis_id).
      *
+     * @deprecated Pack5: hard 270h compliance uses FazlaCalismaYillikLimitService rolling window.
+     *             Kept for display/legacy callers that still need calendar-start year lists.
+     *
      * @return list<array{fazla_calisma_dakika:int, hafta_baslangic:string, kapanis_id:int}>
      */
     public static function loadKapanmisYillikFazlaCalisma(PDO $pdo, int $personelId, int $yil): array

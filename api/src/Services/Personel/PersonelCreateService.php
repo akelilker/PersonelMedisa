@@ -17,19 +17,14 @@ final class PersonelCreateService
      */
     public static function insertPersonel(PDO $pdo, array $payload): int
     {
-        $sql = '
-            INSERT INTO personeller (
-                tc_kimlik_no, ad, soyad, dogum_tarihi, telefon, acil_durum_kisi, acil_durum_telefon,
-                sicil_no, ise_giris_tarihi, sube_id, departman_id, gorev_id, personel_tipi_id,
-                bagli_amir_id, aktif_durum, dogum_yeri, kan_grubu, ucret_tipi_id, maas_tutari, prim_kurali_id
-            ) VALUES (
-                :tc_kimlik_no, :ad, :soyad, :dogum_tarihi, :telefon, :acil_durum_kisi, :acil_durum_telefon,
-                :sicil_no, :ise_giris_tarihi, :sube_id, :departman_id, :gorev_id, :personel_tipi_id,
-                :bagli_amir_id, :aktif_durum, :dogum_yeri, :kan_grubu, :ucret_tipi_id, :maas_tutari, :prim_kurali_id
-            )
-        ';
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute([
+        // Shared owner must not silently drop explicit org writes on pre-064 schema.
+        PersonelOrgLocationSchema::assertReadyForOrgWrite($pdo, $payload);
+        $orgReady = PersonelOrgLocationSchema::isReady($pdo);
+        $cols = [
+            'tc_kimlik_no', 'ad', 'soyad', 'dogum_tarihi', 'telefon', 'acil_durum_kisi', 'acil_durum_telefon',
+            'sicil_no', 'ise_giris_tarihi', 'sube_id',
+        ];
+        $params = [
             'tc_kimlik_no' => $payload['tc_kimlik_no'],
             'ad' => $payload['ad'],
             'soyad' => $payload['soyad'],
@@ -40,17 +35,39 @@ final class PersonelCreateService
             'sicil_no' => $payload['sicil_no'],
             'ise_giris_tarihi' => $payload['ise_giris_tarihi'],
             'sube_id' => $payload['sube_id'],
-            'departman_id' => $payload['departman_id'],
-            'gorev_id' => $payload['gorev_id'],
-            'personel_tipi_id' => $payload['personel_tipi_id'],
-            'bagli_amir_id' => $payload['bagli_amir_id'],
-            'aktif_durum' => $payload['aktif_durum'],
-            'dogum_yeri' => $payload['dogum_yeri'],
-            'kan_grubu' => $payload['kan_grubu'],
-            'ucret_tipi_id' => $payload['ucret_tipi_id'],
-            'maas_tutari' => $payload['maas_tutari'],
-            'prim_kurali_id' => $payload['prim_kurali_id'],
+        ];
+        if ($orgReady) {
+            $cols[] = 'sgk_isveren_id';
+            $cols[] = 'calisma_lokasyonu_id';
+            $params['sgk_isveren_id'] = array_key_exists('sgk_isveren_id', $payload)
+                ? $payload['sgk_isveren_id']
+                : null;
+            $params['calisma_lokasyonu_id'] = array_key_exists('calisma_lokasyonu_id', $payload)
+                ? $payload['calisma_lokasyonu_id']
+                : null;
+        }
+        $cols = array_merge($cols, [
+            'departman_id', 'gorev_id', 'personel_tipi_id',
+            'bagli_amir_id', 'aktif_durum', 'dogum_yeri', 'kan_grubu', 'ucret_tipi_id', 'maas_tutari', 'prim_kurali_id',
         ]);
+        $params['departman_id'] = $payload['departman_id'];
+        $params['gorev_id'] = $payload['gorev_id'];
+        $params['personel_tipi_id'] = $payload['personel_tipi_id'];
+        $params['bagli_amir_id'] = $payload['bagli_amir_id'];
+        $params['aktif_durum'] = $payload['aktif_durum'];
+        $params['dogum_yeri'] = $payload['dogum_yeri'];
+        $params['kan_grubu'] = $payload['kan_grubu'];
+        $params['ucret_tipi_id'] = $payload['ucret_tipi_id'];
+        $params['maas_tutari'] = $payload['maas_tutari'];
+        $params['prim_kurali_id'] = $payload['prim_kurali_id'];
+
+        $placeholders = array_map(static function (string $c): string {
+            return ':' . $c;
+        }, $cols);
+        $sql = 'INSERT INTO personeller (' . implode(', ', $cols) . ')
+                VALUES (' . implode(', ', $placeholders) . ')';
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
 
         return (int) $pdo->lastInsertId();
     }
@@ -58,6 +75,8 @@ final class PersonelCreateService
     /** @param array<string, mixed> $payload */
     public static function validateCreateReferences(PDO $pdo, array $payload): void
     {
+        PersonelOrgLocationSchema::assertReadyForOrgWrite($pdo, $payload);
+
         if (!self::existsActiveRecord($pdo, 'subeler', (int) $payload['sube_id'])) {
             throw new PersonelValidationException('sube_id', 'Gecersiz sube.');
         }
@@ -69,6 +88,17 @@ final class PersonelCreateService
         }
         if (!self::existsActiveRecord($pdo, 'personel_tipleri', (int) $payload['personel_tipi_id'])) {
             throw new PersonelValidationException('personel_tipi_id', 'Gecersiz personel tipi.');
+        }
+
+        if (array_key_exists('sgk_isveren_id', $payload) && $payload['sgk_isveren_id'] !== null) {
+            if (!PersonelOrgLocationSchema::existsActiveSgkIsveren($pdo, (int) $payload['sgk_isveren_id'])) {
+                throw new PersonelValidationException('sgk_isveren_id', 'Gecersiz SGK isveren.');
+            }
+        }
+        if (array_key_exists('calisma_lokasyonu_id', $payload) && $payload['calisma_lokasyonu_id'] !== null) {
+            if (!PersonelOrgLocationSchema::existsActiveCalismaLokasyonu($pdo, (int) $payload['calisma_lokasyonu_id'])) {
+                throw new PersonelValidationException('calisma_lokasyonu_id', 'Gecersiz calisma lokasyonu.');
+            }
         }
 
         $bagliAmirId = $payload['bagli_amir_id'] ?? null;

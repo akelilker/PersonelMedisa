@@ -326,9 +326,15 @@ class MeController
             $limit = self::YILLIK_LIMIT_DAKIKA;
             $yaklasma = self::YILLIK_YAKLASMA_ESIK_DAKIKA;
 
+            // ISO/calendar year aggregate is DISPLAY/REPORTING only.
+            // Hard 270h compliance owner = ROLLING_12_MONTH_ACTUAL_DATE_V1.
             return [
                 'personel_id' => (int) $personelId,
                 'yil' => (int) $yil,
+                'aggregate_semantics' => 'ISO_WEEK_YEAR_DISPLAY',
+                'compliance_policy' => 'ROLLING_12_MONTH_ACTUAL_DATE_V1',
+                'compliance_owner' => 'ROLLING_12_MONTH_NOT_THIS_AGGREGATE',
+                'compliance_status' => 'DISPLAY_ONLY',
                 'yillik_limit_dakika' => $limit,
                 'yaklasma_esik_dakika' => $yaklasma,
                 'kullanilan_dakika' => $kullanilan,
@@ -349,9 +355,14 @@ class MeController
     {
         $limit = self::YILLIK_LIMIT_DAKIKA;
 
+        // Error/unavailable path must not look like a clean compliance PASS.
         return [
             'personel_id' => (int) $personelId,
             'yil' => (int) $yil,
+            'aggregate_semantics' => 'ISO_WEEK_YEAR_DISPLAY',
+            'compliance_policy' => 'ROLLING_12_MONTH_ACTUAL_DATE_V1',
+            'compliance_owner' => 'ROLLING_12_MONTH_NOT_THIS_AGGREGATE',
+            'compliance_status' => 'UNAVAILABLE',
             'yillik_limit_dakika' => $limit,
             'yaklasma_esik_dakika' => self::YILLIK_YAKLASMA_ESIK_DAKIKA,
             'kullanilan_dakika' => 0,

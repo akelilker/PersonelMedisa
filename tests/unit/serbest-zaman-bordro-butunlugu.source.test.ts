@@ -47,7 +47,8 @@ describe("serbest zaman bordro butunlugu (S87)", () => {
   it("olusum route revalidates kanit + age + 270", () => {
     expect(sz).toContain("validateSerbestZamanKanit");
     expect(sz).toContain("resolveUnder18");
-    expect(sz).toContain("evaluateYillikLimit");
+    expect(sz).toContain("evaluatePendingAgainstRolling");
+    expect(sz).toContain("FazlaCalismaYillikLimitService");
     expect(sz).toContain("ALREADY_EXISTS");
   });
 

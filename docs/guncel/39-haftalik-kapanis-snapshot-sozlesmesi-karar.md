@@ -287,6 +287,8 @@ Mevcut `tests/unit/haftalik-kapanis.api.test.ts` yalnızca metadata normalize ed
 
 `docs/guncel/38-puantaj-mevzuat-faz-e-serbest-zaman-270-saat-karar.md` geçerliliğini korur: Faz E kodu açılmaz. Bu belge, Faz E sonrası **sıradaki teknik adayın** (snapshot sözleşmesi) karar zemini olarak okunur.
 
+**Pack5 notu (2026-08):** 270 saat hard compliance artık ISO week-year aggregate değildir. Canonical policy `ROLLING_12_MONTH_ACTUAL_DATE_V1` (`117`, migration `063`). Snapshot `yil`/`hafta_no` ISO identity olarak kalabilir; legal/compliance hesabı rolling actual-date owner’dadır.
+
 **Önerilen sıra (değişmedi):**
 
 1. Snapshot sözleşmesi kararı (bu belge) ✓

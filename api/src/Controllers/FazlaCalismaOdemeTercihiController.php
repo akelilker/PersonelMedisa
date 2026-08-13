@@ -10,6 +10,7 @@ use Medisa\Api\Database\Connection;
 use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
 use Medisa\Api\Scope\SubeScope;
+use Medisa\Api\Services\Payroll\FazlaCalismaYillikLimitService;
 use Medisa\Api\Services\Payroll\PayrollComplianceGuard;
 use Medisa\Api\Services\PuantajDonemKilidiService;
 use PDO;
@@ -252,30 +253,30 @@ class FazlaCalismaOdemeTercihiController
             }
 
             if ($odemeTipi === 'UCRET' || $odemeTipi === 'SERBEST_ZAMAN') {
-                $yil = (int) substr($haftaBaslangic, 0, 4);
-                if ($yil >= 1) {
-                    PayrollComplianceGuard::acquireYillikLock(
+                FazlaCalismaYillikLimitService::acquirePersonelRollingLock(
+                    $pdo,
+                    $personelId,
+                    $userId > 0 ? $userId : null
+                );
+                $pendingDist = FazlaCalismaYillikLimitService::loadWeekPendingDistribution(
+                    $pdo,
+                    $personelId,
+                    $haftaBaslangic
+                );
+                $eval = FazlaCalismaYillikLimitService::evaluatePendingAgainstRolling(
+                    $pdo,
+                    $personelId,
+                    $haftaBitis,
+                    $fazlaDk,
+                    $pendingDist,
+                    [$haftaBaslangic]
+                );
+                if ($eval['asildi']) {
+                    self::rollbackConflict(
                         $pdo,
-                        $personelId,
-                        $yil,
-                        $userId > 0 ? $userId : null
+                        PayrollComplianceGuard::BLOCKER_YILLIK_270_SAAT_ASIMI,
+                        'Yillik fazla calisma 270 saat limiti asiliyor.'
                     );
-                    $closed = PayrollComplianceGuard::loadKapanmisYillikFazlaCalisma($pdo, $personelId, $yil);
-                    $filtered = [];
-                    foreach ($closed as $row) {
-                        if ((string) ($row['hafta_baslangic'] ?? '') === $haftaBaslangic) {
-                            continue;
-                        }
-                        $filtered[] = $row;
-                    }
-                    $eval = PayrollComplianceGuard::evaluateYillikLimit($filtered, $fazlaDk);
-                    if ($eval['asildi']) {
-                        self::rollbackConflict(
-                            $pdo,
-                            PayrollComplianceGuard::BLOCKER_YILLIK_270_SAAT_ASIMI,
-                            'Yillik fazla calisma 270 saat limiti asiliyor.'
-                        );
-                    }
                 }
             }
 

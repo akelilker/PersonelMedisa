@@ -270,8 +270,9 @@ Kaynak: masaüstü `puantaj resmi durum.docx` (toplantı mevzuat özeti).
 | Konu | Durum |
 | --- | --- |
 | Serbest zaman 6 aylık deadline compliance / ops follow-up | OPS_ROLLOUT (`110` MG-SZ-6M-001) — Pack 4B code owner + Raporlar yüzeyi tamam; production schema/ops pending |
-| Yıl değiştiren hafta FM politikası | BUSINESS_DECISION_REQUIRED (`110` MG-OT-YEAR-POL-001) |
-| Yıl değiştiren hafta FM path tutarlılığı | CODE_GAP (`110` MG-OT-YEAR-PATH-001) |
+| Yıl değiştiren hafta FM politikası | CLOSED (`110` MG-OT-YEAR-POL-001) — `ROLLING_12_MONTH_ACTUAL_DATE_V1` (`117`) |
+| Yıl değiştiren hafta FM path tutarlılığı | CLOSED (`110` MG-OT-YEAR-PATH-001) — Pack5 rolling owner |
+| Org location schema | OPS_ROLLOUT (`110` MG-ORG-LOC-001) — Pack5 code/schema; prod apply + real seed USER_GATED |
 | SGK 15–14 dönem | BUSINESS_DECISION_REQUIRED (`110` MG-SGK-1514-001); metadata CONDITIONAL_SCOPE; preview BLOCKER_ONLY |
 | FSC (%25) aktif bant | S87 ile kapalı (INTENTIONAL_DEFER) |
 | Zorunlu/olağanüstü çalışma istisna modeli | Bilinçli kapsam dışı / karar bekler |

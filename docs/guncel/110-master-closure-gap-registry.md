@@ -95,17 +95,18 @@ Aşağıdakiler CURRENT MAIN’de bozulmuş değilse OPEN yapılmaz:
 | Pack 2 | `112` / PR #151 — framework + evidence `059` + 7 handlers; flag default OFF |
 | Pack 3B | `113` / PR #152 — PUANTAJ/BORDRO/SGK + `060` + snapshot-pin OPTION A + post-destroy reopen gate |
 | Pack 3C | `114` / PR #153 — FAZLA/SERBEST/DISIPLIN/RAPOR/IS_KAZASI + generic ONAY_AUDIT; merge-blocker hardening |
-| Mevcut | Plan/execute + registry + HTTP; 15/15 typed handlers; SERBEST unallocated KULLANIM → fail-closed `SERBEST_ZAMAN_USAGE_ALLOCATION_UNRESOLVED`; FAZLA preserves shared `notlar_json`; RAPOR/IS_KAZASI typed `PERSONEL_BELGE_REMAINS` |
-| Beklenen | SERBEST lot-allocation canonical model (OPTION_A / candidate `061` DESIGN) + write-path + safe destroy; OPS feature enable ayrı; production apply ayrı |
-| Kanıt | `PhysicalDestructionService`; handlers; `DependentRetentionGate`; mig `059`/`060`; `112`/`113`/`114` |
-| Neden açık | KULLANIM has no OLUSUM provenance (029 global pool); fail-closed gate ≠ full used-entitlement closure |
-| Runtime | Flag OFF → `DESTRUCTION_EXECUTION_DISABLED`; SERBEST used → `SERBEST_ZAMAN_USAGE_ALLOCATION_UNRESOLVED`; unknown ONAY_AUDIT → `DESTRUCTION_HANDLER_POLICY_UNRESOLVED` |
+| Pack 4A | `115` — OPTION_A lot ledger foundation (`061` + write-path); **not closed** |
+| Mevcut | Plan/execute + registry + HTTP; 15/15 typed handlers; SERBEST unallocated KULLANIM → fail-closed `SERBEST_ZAMAN_USAGE_ALLOCATION_UNRESOLVED`; FAZLA preserves shared `notlar_json`; RAPOR/IS_KAZASI typed `PERSONEL_BELGE_REMAINS`; Pack 4A append-only tahsis ledger + kullanim/duzeltme/iptal wiring |
+| Beklenen | Safe SERBEST destroy using lot provenance (Pack 4B) + OPS feature enable; production apply ayrı |
+| Kanıt | `PhysicalDestructionService`; handlers; `DependentRetentionGate`; mig `059`/`060`/`061`; `112`/`113`/`114`/`115` |
+| Neden açık | Pack 4A foundation ≠ full used-entitlement destroy closure; Pack 3C fail-closed gate still required for legacy/unallocated |
+| Runtime | Flag OFF → `DESTRUCTION_EXECUTION_DISABLED`; SERBEST used unallocated → `SERBEST_ZAMAN_USAGE_ALLOCATION_UNRESOLVED`; unknown ONAY_AUDIT → `DESTRUCTION_HANDLER_POLICY_UNRESOLVED` |
 | Prod veri | Write yok (bu tur) |
-| İnsan kararı | SERBEST allocation business semantics (FIFO/LIFO yok; OPTION_A preferred) |
-| Migration | `059`/`060` dosya mevcut; **production apply YOK**; Pack3C NEW_MIGRATION=NO; `061` DESIGN only |
+| İnsan kararı | SERBEST allocation business semantics (FIFO/LIFO yok; OPTION_A = Pack 4A policy) |
+| Migration | `059`/`060`/`061` dosya mevcut; **production apply YOK** |
 | Prod write | Hayır |
 | Owner | Retention |
-| Acceptance | Onaylı talepte güvenli kategoriler imha edilir; SERBEST used-entitlement fail-closed veya lot-provenance çözülür; audit/evidence; flag default OFF |
+| Acceptance | Onaylı talepte güvenli kategoriler imha edilir; SERBEST used-entitlement fail-closed veya lot-provenance + destroy çözülür; audit/evidence; flag default OFF |
 
 ### MG-RET-MAN-001 — Archive manifest CREATE/LIFECYCLE wiring (13 kategori)
 
@@ -138,10 +139,11 @@ Aşağıdakiler CURRENT MAIN’de bozulmuş değilse OPEN yapılmaz:
 | Statü | **CODE_GAP** |
 | Öncelik | **P1** |
 | Domain | Serbest zaman / compliance |
-| Mevcut (var) | `son_kullanim_tarihi` persist; 6 ay son tarih hesabı (`hesaplaSonKullanimTarihi`); bakiye + `suresi_dolan_dakika` teknik parçaları |
+| Pack 4A | `115` — lot projection foundation on bakiye (`lot_based_*`, expiry_state); **not closed** |
+| Mevcut (var) | `son_kullanim_tarihi` persist; 6 ay son tarih hesabı (`hesaplaSonKullanimTarihi`); bakiye + `suresi_dolan_dakika`; Pack 4A lot-based usable/expired_unused fields when ALLOCATED/NO_USAGE |
 | Eksik (gap) | Yaklaşan deadline görünürlüğü; overdue operasyonel görünürlük; İK/yönetici yüzeyi; raporlama; kararlaştırılacak compliance warning/block davranışı |
 | Beklenen | Operational follow-up + (karar sonrası) compliance gate; dönüşüm owner yeniden yazılmaz |
-| Kanıt | `serbest-zaman-event-motoru.ts`; `102` §7/§18; `PayrollComplianceGuard` SZ blocker’ları yalnız kanıt/çift etki |
+| Kanıt | `serbest-zaman-event-motoru.ts`; `SerbestZamanAllocationService::projectLots`; `102` §7/§18; `PayrollComplianceGuard` SZ blocker’ları yalnız kanıt/çift etki; `115` |
 | Payroll | Vade aşımında otomatik compliance block yok |
 | Owner | Serbest zaman / Payroll compliance |
 | Acceptance | Lot bazlı yaklaşan/overdue görünür + raporlanır; compliance davranışı kararlı ve testli |
@@ -354,8 +356,8 @@ Import contract (kod, değişmedi):
 1. Canonical docs (PR #149): `CURRENT_STATE` + `102` + bu registry
 2. Business inputs: `MG-SGK-1514`, `MG-OT-YEAR-POL`, `MG-IMPORT-MAP`, `MG-ORG-ATTR`, `MG-ZORUNLU`
 3. Code P1: `MG-OT-YEAR-PATH-001` (policy sonrası veya tutarlılık fix)
-4. Code P1: `MG-SZ-6M-001`
-5. Code P1: `MG-RET-PHYS-001` — **CODE_GAP** (Pack 2+3B+3C handlers + fail-closed SERBEST usage gate; lot provenance açık)
+4. Code P1: `MG-SZ-6M-001` — **CODE_GAP** (Pack 4A lot foundation `115`; ops/compliance yüzey açık)
+5. Code P1: `MG-RET-PHYS-001` — **CODE_GAP** (Pack 2+3B+3C + Pack 4A ledger foundation; destroy Pack 4B açık)
 6. Code P1: `MG-ORG-LOC-001`
 7. Ops: UBGT seed, SGK catalog, org seed, dataset completion, personel import, binding, QR employee
 8. Defer pack: QR correction UX, I13 fields, ENUM shrink, payroll self-view, pay outputs
@@ -390,7 +392,7 @@ Destroy eligibility: Pack 3C (`114`) — **15/15 typed handlers**; SERBEST used-
 | BORDRO | CLOSED | CLOSED | CLOSED | CLOSED | CLOSED | CLOSED (Pack3B) |
 | SGK_EKSIK_GUN | CLOSED | CLOSED | CLOSED | CLOSED | CLOSED | CLOSED (Pack3B) |
 | FAZLA_CALISMA | CLOSED | CLOSED | CLOSED | CLOSED | CLOSED | CLOSED (Pack3C; shared notes preserved) |
-| SERBEST_ZAMAN | CLOSED | CLOSED | CLOSED | CLOSED | CLOSED | **CODE_GAP** used-entitlement / fail-closed gate (Pack3C) |
+| SERBEST_ZAMAN | CLOSED | CLOSED | CLOSED | CLOSED | CLOSED | **CODE_GAP** used-entitlement (Pack3C fail-closed + Pack4A ledger; destroy Pack4B) |
 | ONAY_AUDIT | CLOSED | CLOSED | CLOSED | CLOSED | CLOSED | CLOSED (Pack2 typed + Pack3C generic no-op) |
 | IZIN | CLOSED | CLOSED | CLOSED | CLOSED | CLOSED | CLOSED (Pack2) |
 | RAPOR | CLOSED | CLOSED | CLOSED | CLOSED | CLOSED | CLOSED (Pack3C + PERSONEL_BELGE gate) |
@@ -418,7 +420,7 @@ Destroy eligibility: Pack 3C (`114`) — **15/15 typed handlers**; SERBEST used-
 1. `MG-SZ-6M-001`
 2. `MG-OT-YEAR-PATH-001`
 3. `MG-ORG-LOC-001`
-4. `MG-RET-PHYS-001` — SERBEST used-entitlement provenance / OPTION_A
+4. `MG-RET-PHYS-001` — SERBEST used-entitlement destroy (Pack 4A OPTION_A foundation landed; Pack 4B remaining)
 
 P2 BUSINESS (`MG-ORG-ATTR`, `MG-ZORUNLU`) final completion için açık kalabilir ama CODE_GAP değildir; karar sonrası gerekirse CODE_GAP’e çevrilir.
 

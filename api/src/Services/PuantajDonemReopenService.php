@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Medisa\Api\Services;
 
+use Medisa\Api\Services\Retention\PhysicalDestruction\PuantajPhysicalDestructionGate;
 use PDO;
 
 /**
@@ -35,6 +36,7 @@ class PuantajDonemReopenService
         }
 
         PuantajDonemKilidiService::acquire($pdo, (int) $subeId, (int) $yil, (int) $ay);
+        PuantajPhysicalDestructionGate::assertPeriodNotDestroyed($pdo, $subeId, $yil, $ay);
 
         $seal = PuantajDonemPeriodService::findEffectiveSeal($pdo, $subeId, $yil, $ay, true);
         if ($seal === null) {
@@ -165,6 +167,7 @@ class PuantajDonemReopenService
         }
 
         PuantajDonemKilidiService::acquire($pdo, (int) $subeId, (int) $yil, (int) $ay);
+        PuantajPhysicalDestructionGate::assertPeriodNotDestroyed($pdo, $subeId, $yil, $ay);
 
         $talep = self::findTalepById($pdo, $talepId, true);
         if ($talep === null
@@ -331,6 +334,7 @@ class PuantajDonemReopenService
         }
 
         PuantajDonemKilidiService::acquire($pdo, (int) $subeId, (int) $yil, (int) $ay);
+        PuantajPhysicalDestructionGate::assertPeriodNotDestroyed($pdo, $subeId, $yil, $ay);
 
         $talep = PuantajDonemPeriodService::findOpenReopenTalep($pdo, $subeId, $yil, $ay, true);
         if ($talep === null || (string) $talep['talep_durumu'] !== PuantajDonemPeriodService::TALEP_ONAYLANDI) {

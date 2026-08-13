@@ -7,10 +7,12 @@ namespace Medisa\Api\Services\Retention\PhysicalDestruction;
 use Medisa\Api\Auth\RolePermissions;
 use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Services\Retention\DestructionWorkflowService;
+use Medisa\Api\Services\Retention\RetentionCategories;
 use Medisa\Api\Services\Retention\RetentionClock;
 use Medisa\Api\Services\Retention\RetentionPolicyService;
 use Medisa\Api\Services\Retention\RetentionSchemaGate;
 use Medisa\Api\Services\Retention\RetentionSourceAdapterService;
+use Medisa\Api\Services\Retention\RetentionTargetResolver;
 use PDO;
 use RuntimeException;
 use Throwable;
@@ -313,6 +315,18 @@ final class PhysicalDestructionService
             }
 
             $context = self::enrichContextFromTalep($pdo, $talep);
+
+            // PUANTAJ: request FOR UPDATE (above) → period lock → plan/scope re-read.
+            // Serializes against reopen create/approve/reseal (period lock only).
+            if ((string) $talep['category'] === RetentionCategories::PUANTAJ) {
+                $subeId = (int) ($context['sube_id'] ?? $talep['canonical_sube_id'] ?? 0);
+                $yil = (int) ($context['yil'] ?? $talep['period_yil'] ?? 0);
+                $ay = (int) ($context['ay'] ?? $talep['period_ay'] ?? 0);
+                if ($subeId > 0 && $yil >= 2000 && $ay >= 1 && $ay <= 12) {
+                    \Medisa\Api\Services\PuantajDonemKilidiService::acquire($pdo, $subeId, $yil, $ay);
+                }
+            }
+
             $eligibility = RetentionPolicyService::evaluateFinalExecutionEligibility(
                 $pdo,
                 (string) $talep['category'],
@@ -408,7 +422,19 @@ final class PhysicalDestructionService
                 $executionId = (int) $existing['id'];
             }
 
-            $handlerResult = $handler->execute($pdo, $talep, $context, $plan);
+            $category = (string) $talep['category'];
+            if (RetentionPhysicalDestroyGate::requiresGate($category)) {
+                RetentionSchemaGate::assertReady($pdo, RetentionSchemaGate::physicalDestroyGateTables());
+            }
+
+            try {
+                RetentionPhysicalDestroyGate::open($pdo, $executionId, $talepId, $category);
+                $handlerResult = $handler->execute($pdo, $talep, $context, $plan);
+            } finally {
+                // Never leak bypass across commit/rollback or connection reuse.
+                RetentionPhysicalDestroyGate::close($pdo);
+            }
+
             $resultCode = (string) ($handlerResult['result_code'] ?? PhysicalDestructionCodes::CODE_DESTRUCTION_EXECUTED);
             $summary = isset($handlerResult['summary']) && is_array($handlerResult['summary'])
                 ? $handlerResult['summary']
@@ -452,6 +478,11 @@ final class PhysicalDestructionService
             $pdo->commit();
         } catch (Throwable $e) {
             if ($pdo->inTransaction()) {
+                try {
+                    RetentionPhysicalDestroyGate::close($pdo);
+                } catch (Throwable $ignored) {
+                    // ignore gate cleanup errors during rollback path
+                }
                 $pdo->rollBack();
             }
             throw $e;
@@ -526,6 +557,30 @@ final class PhysicalDestructionService
         }
         if (!empty($talep['source_version_identity_snapshot'])) {
             $context['source_version_identity'] = (string) $talep['source_version_identity_snapshot'];
+        }
+
+        try {
+            $resolved = RetentionTargetResolver::validateAndResolve(
+                $pdo,
+                (string) $talep['category'],
+                (string) $talep['entity_type'],
+                (int) $talep['record_id'],
+                $talep['personel_id'] !== null ? (int) $talep['personel_id'] : null,
+                array_filter([
+                    'sube_id' => $context['sube_id'] ?? null,
+                    'yil' => $context['yil'] ?? null,
+                    'ay' => $context['ay'] ?? null,
+                ], static function ($v) {
+                    return $v !== null && $v !== '';
+                })
+            );
+            foreach ($resolved as $key => $value) {
+                if ($value !== null && $value !== '') {
+                    $context[$key] = $value;
+                }
+            }
+        } catch (RuntimeException $e) {
+            // After physical destroy, source entity may be absent.
         }
 
         try {

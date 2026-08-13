@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Medisa\Api\Services\Retention\PhysicalDestruction;
 
+use Medisa\Api\Services\Retention\PhysicalDestruction\Handlers\BordroDestructionHandler;
 use Medisa\Api\Services\Retention\PhysicalDestruction\Handlers\IseGirisCikisDestructionHandler;
 use Medisa\Api\Services\Retention\PhysicalDestruction\Handlers\IzinDestructionHandler;
 use Medisa\Api\Services\Retention\PhysicalDestruction\Handlers\OlayDestructionHandler;
@@ -11,7 +12,9 @@ use Medisa\Api\Services\Retention\PhysicalDestruction\Handlers\OnayAuditDestruct
 use Medisa\Api\Services\Retention\PhysicalDestruction\Handlers\PersonelBelgeDestructionHandler;
 use Medisa\Api\Services\Retention\PhysicalDestruction\Handlers\PersonelOzlukDestructionHandler;
 use Medisa\Api\Services\Retention\PhysicalDestruction\Handlers\PolicyRequiredDestructionHandler;
+use Medisa\Api\Services\Retention\PhysicalDestruction\Handlers\PuantajDestructionHandler;
 use Medisa\Api\Services\Retention\PhysicalDestruction\Handlers\SavunmaDestructionHandler;
+use Medisa\Api\Services\Retention\PhysicalDestruction\Handlers\SgkEksikGunDestructionHandler;
 use Medisa\Api\Services\Retention\RetentionCategories;
 use RuntimeException;
 
@@ -58,18 +61,9 @@ final class RetentionDestructionHandlerRegistry
             new OlayDestructionHandler(),
             new SavunmaDestructionHandler(),
             new OnayAuditDestructionHandler(),
-            $policy(
-                RetentionCategories::PUANTAJ,
-                'Seal revision graph + gunluk_puantaj / S3F ledger / payroll muhur FK — delete vs period tombstone unresolved'
-            ),
-            $policy(
-                RetentionCategories::BORDRO,
-                'Payroll run/snapshot/aday/devir tree — hard-delete blast radius vs financial aggregate retention unresolved'
-            ),
-            $policy(
-                RetentionCategories::SGK_EKSIK_GUN,
-                'Period SGK snapshot vs personel belge/finans records scope unresolved; catalog masters must never be deleted'
-            ),
+            new PuantajDestructionHandler(),
+            new BordroDestructionHandler(),
+            new SgkEksikGunDestructionHandler(),
             $policy(
                 RetentionCategories::FAZLA_CALISMA,
                 'Shared haftalik_kapanis identity with SERBEST_ZAMAN — co-destroy vs category-scoped field policy unresolved'

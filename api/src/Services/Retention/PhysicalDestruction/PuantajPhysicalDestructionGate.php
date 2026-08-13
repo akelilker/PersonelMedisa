@@ -1,0 +1,177 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Medisa\Api\Services\Retention\PhysicalDestruction;
+
+use Medisa\Api\Services\PuantajDonemReopenException;
+use Medisa\Api\Services\Retention\RetentionCategories;
+use PDO;
+
+/**
+ * Post-destruction lifecycle gate for PUANTAJ periods.
+ *
+ * Source of truth: retention_imha_executionlari (EXECUTED) joined to
+ * retention_imha_talepleri (category=PUANTAJ, canonical period and/or seal record_id).
+ *
+ * Preserved seal headers after snapshot-pinned destroy are evidence-only;
+ * they must not re-enter reopen/reseal write lifecycle.
+ */
+final class PuantajPhysicalDestructionGate
+{
+    public const CODE_PERIOD_PHYSICALLY_DESTROYED = 'PUANTAJ_PERIOD_PHYSICALLY_DESTROYED';
+    public const CODE_OPEN_REOPEN_REQUEST_EXISTS = 'PUANTAJ_OPEN_REOPEN_REQUEST_EXISTS';
+    public const CODE_SOURCE_ALREADY_DESTROYED_AS_APPROVED = 'SOURCE_ALREADY_DESTROYED_AS_APPROVED';
+
+    /**
+     * @param string|null $sourceVersionIdentity optional exact identity parity check
+     */
+    public static function isPeriodDestroyed(PDO $pdo, $subeId, $yil, $ay, $sourceVersionIdentity = null)
+    {
+        return self::findExecutedEvidence($pdo, $subeId, $yil, $ay, $sourceVersionIdentity) !== null;
+    }
+
+    /**
+     * @throws PuantajDonemReopenException
+     */
+    public static function assertPeriodNotDestroyed(PDO $pdo, $subeId, $yil, $ay)
+    {
+        // Retention destruction schema absent ⇒ physical destroy not available; do not block reopen.
+        if (!self::destructionEvidenceSchemaReady($pdo)) {
+            return;
+        }
+        if (self::isPeriodDestroyed($pdo, $subeId, $yil, $ay)) {
+            throw new PuantajDonemReopenException(
+                self::CODE_PERIOD_PHYSICALLY_DESTROYED,
+                'Donem fiziksel imha edilmis; reopen/reseal yazimi engellendi.',
+                409,
+                [
+                    'sube_id' => (int) $subeId,
+                    'yil' => (int) $yil,
+                    'ay' => (int) $ay,
+                ]
+            );
+        }
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public static function findExecutedEvidence(PDO $pdo, $subeId, $yil, $ay, $sourceVersionIdentity = null)
+    {
+        $subeId = (int) $subeId;
+        $yil = (int) $yil;
+        $ay = (int) $ay;
+        if ($subeId <= 0 || $yil < 2000 || $ay < 1 || $ay > 12) {
+            return null;
+        }
+        if (!self::destructionEvidenceSchemaReady($pdo)) {
+            return null;
+        }
+
+        $lockSuffix = $pdo->inTransaction() ? ' FOR UPDATE' : '';
+
+        // 1) Canonical period columns on destruction talep.
+        $sql = "SELECT e.id AS execution_id, e.imha_talep_id, e.result_code,
+                       e.source_version_identity_snapshot AS execution_source_identity,
+                       t.source_version_identity_snapshot AS talep_source_identity,
+                       t.record_id, t.canonical_sube_id, t.period_yil, t.period_ay
+                FROM retention_imha_executionlari e
+                INNER JOIN retention_imha_talepleri t ON t.id = e.imha_talep_id
+                WHERE e.execution_state = :state
+                  AND t.category = :category
+                  AND t.canonical_sube_id = :sube_id
+                  AND t.period_yil = :yil
+                  AND t.period_ay = :ay";
+        $params = [
+            'state' => PhysicalDestructionCodes::STATE_EXECUTED,
+            'category' => RetentionCategories::PUANTAJ,
+            'sube_id' => $subeId,
+            'yil' => $yil,
+            'ay' => $ay,
+        ];
+
+        $sourceVersionIdentity = $sourceVersionIdentity !== null
+            ? trim((string) $sourceVersionIdentity)
+            : '';
+        if ($sourceVersionIdentity !== '') {
+            $sql .= ' AND (
+                t.source_version_identity_snapshot = :svi
+                OR e.source_version_identity_snapshot = :svi
+            )';
+            $params['svi'] = $sourceVersionIdentity;
+        }
+
+        $sql .= ' ORDER BY e.id DESC LIMIT 1' . $lockSuffix;
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($row) {
+            return $row;
+        }
+
+        // 2) Fallback: EXECUTED talep whose record_id is any seal in this period
+        //    (covers missing/null canonical period snapshot columns).
+        if (!self::tableExists($pdo, 'puantaj_aylik_muhurleri')) {
+            return null;
+        }
+        $sealSql = 'SELECT id FROM puantaj_aylik_muhurleri
+                    WHERE sube_id = :sube_id AND yil = :yil AND ay = :ay';
+        if ($pdo->inTransaction()) {
+            $sealSql .= ' FOR UPDATE';
+        }
+        $sealStmt = $pdo->prepare($sealSql);
+        $sealStmt->execute([
+            'sube_id' => $subeId,
+            'yil' => $yil,
+            'ay' => $ay,
+        ]);
+        $sealIds = [];
+        while ($id = $sealStmt->fetchColumn()) {
+            $sealIds[] = (int) $id;
+        }
+        if (count($sealIds) === 0) {
+            return null;
+        }
+
+        $placeholders = implode(',', array_fill(0, count($sealIds), '?'));
+        $fallback = $pdo->prepare(
+            "SELECT e.id AS execution_id, e.imha_talep_id, e.result_code,
+                    e.source_version_identity_snapshot AS execution_source_identity,
+                    t.source_version_identity_snapshot AS talep_source_identity,
+                    t.record_id, t.canonical_sube_id, t.period_yil, t.period_ay
+             FROM retention_imha_executionlari e
+             INNER JOIN retention_imha_talepleri t ON t.id = e.imha_talep_id
+             WHERE e.execution_state = ?
+               AND t.category = ?
+               AND t.record_id IN ({$placeholders})
+             ORDER BY e.id DESC
+             LIMIT 1" . $lockSuffix
+        );
+        $fallbackParams = array_merge(
+            [PhysicalDestructionCodes::STATE_EXECUTED, RetentionCategories::PUANTAJ],
+            $sealIds
+        );
+        $fallback->execute($fallbackParams);
+        $fallbackRow = $fallback->fetch(PDO::FETCH_ASSOC);
+
+        return $fallbackRow ?: null;
+    }
+
+    private static function destructionEvidenceSchemaReady(PDO $pdo)
+    {
+        return self::tableExists($pdo, 'retention_imha_executionlari')
+            && self::tableExists($pdo, 'retention_imha_talepleri');
+    }
+
+    private static function tableExists(PDO $pdo, $table)
+    {
+        $stmt = $pdo->prepare(
+            'SELECT 1 FROM information_schema.TABLES
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :t LIMIT 1'
+        );
+        $stmt->execute(['t' => (string) $table]);
+
+        return (bool) $stmt->fetchColumn();
+    }
+}

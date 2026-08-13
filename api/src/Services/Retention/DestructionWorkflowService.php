@@ -91,6 +91,10 @@ class DestructionWorkflowService
             $context,
             null
         );
+        if (($eligibility['code'] ?? '') === RetentionPolicyService::CODE_SOURCE_ALREADY_DESTROYED_AS_APPROVED) {
+            // Do not mint a second request lifecycle for an already-destroyed exact period/source.
+            throw new RuntimeException(RetentionPolicyService::CODE_SOURCE_ALREADY_DESTROYED_AS_APPROVED);
+        }
         if (!empty($eligibility['source_version_identity'])) {
             $context['source_version_identity'] = $eligibility['source_version_identity'];
         }
@@ -227,7 +231,7 @@ class DestructionWorkflowService
                 return self::getById($pdo, $talepId);
             }
 
-            $context = self::contextFromTalep($talep);
+            $context = self::contextFromTalep($pdo, $talep);
             try {
                 $source = RetentionSourceAdapterService::resolve($pdo, (string) $talep['category'], $context);
                 $context['source_version_identity'] = $source['source_version_identity'];
@@ -482,7 +486,7 @@ class DestructionWorkflowService
      * @param array<string, mixed> $talep
      * @return array<string, mixed>
      */
-    private static function contextFromTalep(array $talep)
+    private static function contextFromTalep(PDO $pdo, array $talep)
     {
         $context = [
             'personel_id' => $talep['personel_id'] !== null ? (int) $talep['personel_id'] : null,
@@ -501,6 +505,31 @@ class DestructionWorkflowService
         }
         if (!empty($talep['source_version_identity_snapshot'])) {
             $context['source_version_identity'] = (string) $talep['source_version_identity_snapshot'];
+        }
+
+        // Re-hydrate typed target fields (e.g. ONAY_AUDIT qr_pc_decision → audit_source_type).
+        try {
+            $resolved = RetentionTargetResolver::validateAndResolve(
+                $pdo,
+                (string) $talep['category'],
+                (string) $talep['entity_type'],
+                (int) $talep['record_id'],
+                $talep['personel_id'] !== null ? (int) $talep['personel_id'] : null,
+                array_filter([
+                    'sube_id' => $context['sube_id'] ?? null,
+                    'yil' => $context['yil'] ?? null,
+                    'ay' => $context['ay'] ?? null,
+                ], static function ($v) {
+                    return $v !== null && $v !== '';
+                })
+            );
+            foreach ($resolved as $key => $value) {
+                if ($value !== null && $value !== '') {
+                    $context[$key] = $value;
+                }
+            }
+        } catch (RuntimeException $e) {
+            // Keep snapshot identity; eligibility paths surface codes.
         }
 
         return $context;

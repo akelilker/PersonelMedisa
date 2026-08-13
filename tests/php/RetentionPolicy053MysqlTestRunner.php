@@ -205,7 +205,7 @@ try {
     RetentionClock::clearOverride();
 
     $files = rp053MigrationFiles();
-    rp053Assert(end($files) === '059_retention_physical_destruction_execution.sql', '1 tip ends at 054');
+    rp053Assert(end($files) === '060_retention_physical_destroy_trigger_gate.sql', '1 tip ends at 054');
     rp053Assert(in_array('052_puantaj_tolerans_ve_disiplin.sql', $files, true), '1b 052 still present');
 
     rp053Apply($pdo, '001_initial_schema.sql');

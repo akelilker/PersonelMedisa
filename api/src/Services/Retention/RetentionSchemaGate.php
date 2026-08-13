@@ -48,6 +48,12 @@ class RetentionSchemaGate
         ]);
     }
 
+    /** Pack 3B: gated DELETE for immutable BORDRO/SGK tables. */
+    public static function physicalDestroyGateTables()
+    {
+        return ['retention_physical_destroy_gates', 'retention_imha_executionlari'];
+    }
+
     /** @return array<int, string> */
     public static function manifestTables()
     {

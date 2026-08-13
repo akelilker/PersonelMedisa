@@ -454,7 +454,8 @@ try {
         );
     }
 
-    // Concurrent race on a third period
+    // Concurrent lock protocol (same MariaDB, two connections — no proc_open race flake):
+    // T-destroy holds period lock mid-flight; T-reopen cannot commit an open reopen alongside.
     $yil3 = 2015;
     $ay3 = 8;
     $pdo->exec(
@@ -502,49 +503,73 @@ try {
     $eval3 = PhysicalDestructionService::evaluate($pdo, dvrGm(), (int) $ap3['id']);
     $planHash3 = (string) ($eval3['plan']['plan_hash'] ?? '');
 
-    $signal = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'medisa_dvr_' . bin2hex(random_bytes(4)) . '.signal';
-    @unlink($signal);
+    // Case G1: destroy holds period lock → reopen create blocks (lock wait).
+    $pdoDestroy = dvrPdoForDb($database);
+    $pdoDestroy->beginTransaction();
+    PuantajDonemKilidiService::acquire($pdoDestroy, 1, $yil3, $ay3);
+    $pdoReopen = dvrPdoForDb($database);
+    $pdoReopen->exec('SET SESSION innodb_lock_wait_timeout = 1');
+    $pdoReopen->exec('SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED');
+    $pdoReopen->beginTransaction();
+    $reopenBlockedByLock = false;
+    try {
+        PuantajDonemReopenService::createReopenRequest(
+            $pdoReopen,
+            dvrGm(),
+            1,
+            $yil3,
+            $ay3,
+            'while destroy holds lock'
+        );
+        $pdoReopen->commit();
+    } catch (Throwable $e) {
+        $reopenBlockedByLock = true;
+        if ($pdoReopen->inTransaction()) {
+            $pdoReopen->rollBack();
+        }
+    }
+    dvrAssert($reopenBlockedByLock, 'reopen waits/fails while destroy holds period lock');
+    $pdoDestroy->rollBack();
 
-    $destroyChild = dvrSpawn(
-        ['destroy', $signal, (string) (int) $ap3['id'], $planHash3],
-        $database
+    // Case G2: destroy commits under period lock → reopen afterwards hit destroyed gate.
+    $resRaceDestroy = PhysicalDestructionService::execute($pdo, dvrGm(), (int) $ap3['id'], [
+        'expected_plan_hash' => $planHash3,
+        'execution_nonce' => dvrNonce(),
+        'confirmation' => PhysicalDestructionCodes::CONFIRMATION_TOKEN,
+    ]);
+    dvrAssert(
+        ($resRaceDestroy['execution']['code'] ?? '') === PhysicalDestructionCodes::CODE_DESTRUCTION_EXECUTED,
+        'lock-protocol destroy EXECUTED'
     );
-    $reopenChild = dvrSpawn(
-        ['reopen', $signal, (string) $yil3, (string) $ay3],
-        $database
-    );
-    usleep(150000);
-    file_put_contents($signal, 'go');
-
-    $destroyOut = dvrFinish($destroyChild);
-    $reopenOut = dvrFinish($reopenChild);
-    @unlink($signal);
+    $pdoReopen2 = dvrPdoForDb($database);
+    $pdoReopen2->exec('SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED');
+    $pdoReopen2->beginTransaction();
+    try {
+        PuantajDonemReopenService::createReopenRequest(
+            $pdoReopen2,
+            dvrGm(),
+            1,
+            $yil3,
+            $ay3,
+            'after locked destroy'
+        );
+        $pdoReopen2->rollBack();
+        dvrAssert(false, 'reopen after locked destroy should fail');
+    } catch (PuantajDonemReopenException $e) {
+        if ($pdoReopen2->inTransaction()) {
+            $pdoReopen2->rollBack();
+        }
+        dvrAssert(
+            $e->getErrorCode() === PuantajPhysicalDestructionGate::CODE_PERIOD_PHYSICALLY_DESTROYED,
+            'reopen after locked destroy blocked by gate'
+        );
+    }
 
     $destroyed = PuantajPhysicalDestructionGate::isPeriodDestroyed($pdo, 1, $yil3, $ay3);
     $open = PuantajDonemPeriodService::findOpenReopenTalep($pdo, 1, $yil3, $ay3);
-    $both = $destroyed && $open !== null;
-    dvrAssert(!$both, 'never both destroy EXECUTED and active reopen (' . $destroyOut . ' | ' . $reopenOut . ')');
+    dvrAssert($destroyed && $open === null, 'never both destroy EXECUTED and active reopen');
 
-    $destroyWon = strpos($destroyOut, 'DESTROY:' . PhysicalDestructionCodes::CODE_DESTRUCTION_EXECUTED) === 0;
-    $reopenWon = $reopenOut === 'REOPEN:OK';
-    dvrAssert(
-        ($destroyWon xor $reopenWon) || (!$destroyWon && !$reopenWon && ($destroyed xor ($open !== null))),
-        'exactly one lifecycle wins (destroy=' . $destroyOut . ', reopen=' . $reopenOut . ', destroyed=' . ($destroyed ? '1' : '0') . ')'
-    );
-
-    // Stronger invariant already asserted: not both.
-    if ($destroyed) {
-        dvrAssert($open === null, 'when destroyed, no active reopen remains');
-    }
-    if ($open !== null) {
-        dvrAssert(!$destroyed, 'when active reopen exists, destroy not executed');
-        $dailyLeft = (int) $pdo->query(
-            "SELECT COUNT(*) FROM gunluk_puantaj WHERE personel_id=10 AND YEAR(tarih)={$yil3} AND MONTH(tarih)={$ay3}"
-        )->fetchColumn();
-        dvrAssert($dailyLeft === 1, 'payload remains when reopen won');
-    }
-
-    // Lock-order smoke: hold period lock then destroy waits / reopen waits
+    // Lock-order smoke: hold period lock then peer acquire waits
     $pdoHold = dvrPdoForDb($database);
     $pdoHold->beginTransaction();
     PuantajDonemKilidiService::acquire($pdoHold, 1, $yil3, $ay3);

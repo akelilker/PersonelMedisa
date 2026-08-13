@@ -300,8 +300,18 @@ final class PersonelImportDryRunService
                 'personel_tipi_id' => $resolved['personel_tipi_id'],
             ];
             if ($hasOrgCols) {
-                $importBody['sgk_isveren_id'] = $resolved['sgk_isveren_id'];
-                $importBody['calisma_lokasyonu_id'] = $resolved['calisma_lokasyonu_id'];
+                // Pre-064 blank optional org columns are not write intent — omit keys so apply
+                // does not trip assertReadyForOrgWrite. Explicit API null still fails closed.
+                // Post-064 (schema ready): always include keys (blank → NULL persistence).
+                $includeOrgRefs = PersonelOrgLocationSchema::isReady($pdo)
+                    || $resolved['sgk_isveren_id'] !== null
+                    || $resolved['calisma_lokasyonu_id'] !== null;
+                if ($includeOrgRefs) {
+                    $importBody['sgk_isveren_id'] = $resolved['sgk_isveren_id'];
+                    $importBody['calisma_lokasyonu_id'] = $resolved['calisma_lokasyonu_id'];
+                }
+            } else {
+                $includeOrgRefs = false;
             }
 
             $fieldResult = PersonelCanonicalValidator::validateImportAnaVeriRow($importBody);
@@ -383,7 +393,7 @@ final class PersonelImportDryRunService
                     'personel_tipi_id' => (int) $payload['personel_tipi_id'],
                     'aktif_durum' => (string) $payload['aktif_durum'],
                 ];
-                if ($hasOrgCols) {
+                if ($includeOrgRefs) {
                     $manifestRows[count($manifestRows) - 1]['sgk_isveren_id'] = $payload['sgk_isveren_id'] ?? null;
                     $manifestRows[count($manifestRows) - 1]['calisma_lokasyonu_id'] = $payload['calisma_lokasyonu_id'] ?? null;
                 }
@@ -399,7 +409,7 @@ final class PersonelImportDryRunService
                     'gorev_id' => (int) $payload['gorev_id'],
                     'personel_tipi_id' => (int) $payload['personel_tipi_id'],
                 ];
-                if ($hasOrgCols) {
+                if ($includeOrgRefs) {
                     $candidates[count($candidates) - 1]['sgk_isveren_id'] = isset($payload['sgk_isveren_id']) && $payload['sgk_isveren_id'] !== null
                         ? (int) $payload['sgk_isveren_id']
                         : null;

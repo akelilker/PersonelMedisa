@@ -708,7 +708,7 @@ try {
     );
     p5Assert(p5CountPersonel($pdoPre) === $beforeB3, 'B3 create no mutation');
 
-    // B3a: org CSV headers present but ALL blank values → analyze PASS (no throw)
+    // B3a: org CSV headers present but ALL blank values → dry-run PASS + apply PASS (parity)
     $blankOrgCsv = p5OrgCsvHeader() . "\r\n" . p5OrgCsvRow([
         'tc_kimlik_no' => '10000000188',
         'sicil_no' => 'IMP-B3A',
@@ -719,7 +719,63 @@ try {
     p5Assert(($dryB3a['ozet']['gecerli_satir'] ?? 0) === 1, 'B3a blank-org CSV gecerli');
     p5Assert(($dryB3a['ozet']['hatali_satir'] ?? -1) === 0, 'B3a blank-org zero hatali');
     p5Assert(($dryB3a['can_apply'] ?? false) === true, 'B3a blank-org can_apply true');
-    p5Assert(p5CountPersonel($pdoPre) === $beforeB3, 'B3a blank-org no mutation');
+    $candB3aPayload = is_array($dryB3a['candidates'][0]['payload'] ?? null)
+        ? $dryB3a['candidates'][0]['payload']
+        : [];
+    p5Assert(
+        !array_key_exists('sgk_isveren_id', $candB3aPayload)
+            && !array_key_exists('calisma_lokasyonu_id', $candB3aPayload),
+        'B3a blank-org omit org keys from create payload (not null write intent)'
+    );
+    p5Assert(p5CountPersonel($pdoPre) === $beforeB3, 'B3a blank-org dry-run no mutation');
+
+    $beforeB3aApply = p5CountPersonel($pdoPre);
+    $applyB3a = null;
+    $applyB3aCaught = null;
+    try {
+        $applyB3a = PersonelImportApplyService::apply(
+            $pdoPre,
+            $blankOrgCsv,
+            $gyUser,
+            [
+                'confirmation' => PersonelImportApplyService::CONFIRMATION_TOKEN,
+                'idempotency_key' => 'p5.apply.blank.org.b3a.01',
+                'manifest_hash' => (string) ($dryB3a['manifest_hash'] ?? ''),
+            ],
+            null
+        );
+    } catch (Throwable $e) {
+        $applyB3aCaught = $e;
+    }
+    p5Assert($applyB3aCaught === null, 'B3a blank-org apply no schema throw');
+    p5Assert(($applyB3a['status'] ?? '') === 'COMPLETED', 'B3a blank-org apply COMPLETED');
+    p5Assert(($applyB3a['created_count'] ?? 0) === 1, 'B3a blank-org created_count 1');
+    p5Assert(p5CountPersonel($pdoPre) === $beforeB3aApply + 1, 'B3a blank-org personel +1');
+    $afterB3aApply = p5CountPersonel($pdoPre);
+    fwrite(STDOUT, "PRE064_BLANK_ORG_DRYRUN=PASS\n");
+    fwrite(STDOUT, "PRE064_BLANK_ORG_APPLY=PASS\n");
+    fwrite(STDOUT, "PRE064_BLANK_ORG_CREATED_COUNT=1\n");
+    fwrite(STDOUT, "PRE064_BLANK_ORG_SCHEMA_ERROR=NONE\n");
+
+    // B3a-null: explicit API sgk_isveren_id=null still fail-closed pre-064
+    $payloadB3aNull = PersonelCanonicalValidator::normalizeAndValidateCreatePayload(p5CreatePayload([
+        'tc_kimlik_no' => '10000000218',
+        'sicil_no' => 'P5-B3A-NULL',
+        'sgk_isveren_id' => null,
+    ]));
+    p5Assert(array_key_exists('sgk_isveren_id', $payloadB3aNull), 'B3a-null payload keeps explicit null key');
+    $b3aNullCaught = null;
+    try {
+        PersonelCreateService::insertPersonel($pdoPre, $payloadB3aNull);
+    } catch (PersonelValidationException $e) {
+        $b3aNullCaught = $e;
+    }
+    p5Assert($b3aNullCaught !== null, 'B3a-null explicit null create throws');
+    p5Assert(
+        $b3aNullCaught->getCodeString() === PersonelOrgLocationSchema::ERROR_CODE,
+        'B3a-null ERROR_CODE ORG_LOCATION_SCHEMA_NOT_READY'
+    );
+    p5Assert(p5CountPersonel($pdoPre) === $afterB3aApply, 'B3a-null create no mutation');
 
     // B3b: nonblank sgk_isveren → 409 ORG_LOCATION_SCHEMA_NOT_READY
     $sgkOnlyCsv = p5OrgCsvHeader() . "\r\n" . p5OrgCsvRow([
@@ -737,7 +793,7 @@ try {
     p5Assert($caughtB3b !== null, 'B3b nonblank sgk_isveren throws');
     p5Assert($caughtB3b->getCodeString() === PersonelOrgLocationSchema::ERROR_CODE, 'B3b ERROR_CODE');
     p5Assert($caughtB3b->getHttpStatus() === 409, 'B3b HTTP 409');
-    p5Assert(p5CountPersonel($pdoPre) === $beforeB3, 'B3b no mutation');
+    p5Assert(p5CountPersonel($pdoPre) === $afterB3aApply, 'B3b no mutation');
 
     // B3c: nonblank calisma_lokasyonu → same 409
     $lokOnlyCsv = p5OrgCsvHeader() . "\r\n" . p5OrgCsvRow([
@@ -755,7 +811,7 @@ try {
     p5Assert($caughtB3c !== null, 'B3c nonblank calisma_lokasyonu throws');
     p5Assert($caughtB3c->getCodeString() === PersonelOrgLocationSchema::ERROR_CODE, 'B3c ERROR_CODE');
     p5Assert($caughtB3c->getHttpStatus() === 409, 'B3c HTTP 409');
-    p5Assert(p5CountPersonel($pdoPre) === $beforeB3, 'B3c no mutation');
+    p5Assert(p5CountPersonel($pdoPre) === $afterB3aApply, 'B3c no mutation');
 
     // PRE064 controller runtime: list/detail/create/update old PASS; create with org → 409
     $httpListPre = p5InvokeHttp($pdoPre, $gyUser, 'GET', '/personeller', [], [], [

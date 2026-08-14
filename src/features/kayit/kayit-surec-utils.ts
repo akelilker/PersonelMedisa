@@ -7,9 +7,16 @@ export function normalizeEnumKey(value: string) {
   return value.trim().replace(/-/g, "_").toUpperCase();
 }
 
+export function formatPersonelAdSoyad(personel: { ad?: string | null; soyad?: string | null }) {
+  const ad = String(personel.ad ?? "").trim();
+  const soyad = String(personel.soyad ?? "").trim();
+  return [ad, soyad].filter(Boolean).join(" ");
+}
+
 export function formatPersonelLabel(personel: Personel) {
+  const name = formatPersonelAdSoyad(personel);
   const meta = [personel.departman_adi, personel.gorev_adi].filter(Boolean).join(" • ");
-  return meta ? `${personel.ad} ${personel.soyad} • ${meta}` : `${personel.ad} ${personel.soyad}`;
+  return meta ? `${name} • ${meta}` : name;
 }
 
 export function normalizePersonelSearchText(value: string | number | null | undefined) {
@@ -70,8 +77,8 @@ export function formatMoneyField(value: number | null | undefined) {
 }
 
 export function getPersonelInitials(personel: Personel) {
-  const adInitial = personel.ad.trim().charAt(0);
-  const soyadInitial = personel.soyad.trim().charAt(0);
+  const adInitial = String(personel.ad ?? "").trim().charAt(0);
+  const soyadInitial = String(personel.soyad ?? "").trim().charAt(0);
   return `${adInitial}${soyadInitial}`.toLocaleUpperCase("tr-TR");
 }
 

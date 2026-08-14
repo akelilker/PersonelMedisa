@@ -55,6 +55,13 @@ final class SgkManuelKodOverrideService
         if (!self::validateTargetScope($pdo, $targetType, $targetId, $personelId, $tarih)) {
             return self::error(422, 'TARGET_SCOPE_GECERSIZ', 'target personel/tarih ile uyusmuyor.');
         }
+        if (\Medisa\Api\Services\Personel\PersonelCalisanKapsamService::isDisKaynak($pdo, $personelId)) {
+            return self::error(
+                409,
+                \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::ERROR_OPERASYON,
+                'Bu personel dizin kaydidir (DIS_KAYNAK); operasyonel islem yapilamaz.'
+            );
+        }
 
         $canonicalPayload = [
             'target_type' => $targetType,

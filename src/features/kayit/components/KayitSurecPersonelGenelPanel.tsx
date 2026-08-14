@@ -281,7 +281,7 @@ export function KayitSurecPersonelGenelPanel({
         <div>
           <p className="surec-shell-summary-kicker">Genel bilgiler</p>
           <h4 className="surec-person-general-title">
-            {personel.ad} {personel.soyad}
+            {[personel.ad, personel.soyad].filter(Boolean).join(" ")}
           </h4>
         </div>
         <div className="surec-person-photo-box" aria-label="Personel fotoğrafı">

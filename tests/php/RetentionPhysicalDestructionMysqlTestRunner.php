@@ -420,7 +420,7 @@ try {
     rpdFlagOff();
 
     $files = rpdMigrationFiles();
-    rpdAssert(end($files) === '065_personel_org_structure.sql', 'tip ends at 065');
+    rpdAssert(end($files) === '066_personel_calisan_kapsami.sql', 'tip ends at 065');
     rpdAssert(in_array('053_retention_legal_hold_arsiv.sql', $files, true), '053 present');
     rpdAssert(in_array('059_retention_physical_destruction_execution.sql', $files, true), '059 present');
     rpdAssert(in_array('060_retention_physical_destroy_trigger_gate.sql', $files, true), '060 present');

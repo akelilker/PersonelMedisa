@@ -86,8 +86,8 @@ class ArsivController
             $items[] = [
                 'id' => (int) $row['id'],
                 'ad' => (string) $row['ad'],
-                'soyad' => (string) $row['soyad'],
-                'tc_kimlik_no' => (string) $row['tc_kimlik_no'],
+                'soyad' => $row['soyad'] !== null && $row['soyad'] !== '' ? (string) $row['soyad'] : null,
+                'tc_kimlik_no' => $row['tc_kimlik_no'] !== null && $row['tc_kimlik_no'] !== '' ? (string) $row['tc_kimlik_no'] : null,
                 'sicil_no' => $row['sicil_no'],
                 'aktif_durum' => (string) $row['aktif_durum'],
                 'sube_id' => (int) $row['sube_id'],
@@ -166,8 +166,8 @@ class ArsivController
         JsonResponse::success([
             'id' => (int) $row['id'],
             'ad' => (string) $row['ad'],
-            'soyad' => (string) $row['soyad'],
-            'tc_kimlik_no' => (string) $row['tc_kimlik_no'],
+            'soyad' => $row['soyad'] !== null && $row['soyad'] !== '' ? (string) $row['soyad'] : null,
+            'tc_kimlik_no' => $row['tc_kimlik_no'] !== null && $row['tc_kimlik_no'] !== '' ? (string) $row['tc_kimlik_no'] : null,
             'sicil_no' => $row['sicil_no'],
             'aktif_durum' => (string) $row['aktif_durum'],
             'sube_id' => (int) $row['sube_id'],

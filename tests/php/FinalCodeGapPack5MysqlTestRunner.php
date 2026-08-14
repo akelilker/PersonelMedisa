@@ -641,7 +641,7 @@ $root = p5RootPdo();
 $files = p5MigrationFiles();
 p5Assert(count($files) >= 64, 'migrations 001→064 present');
 p5Assert(in_array('064_personel_org_location_model.sql', $files, true), '064 present');
-p5Assert(end($files) === '065_personel_org_structure.sql', 'tip ends with 065_personel_org_structure.sql');
+p5Assert(end($files) === '066_personel_calisan_kapsami.sql', 'tip ends with 066_personel_calisan_kapsami.sql');
 
 $gyUser = ['id' => 1, 'rol' => 'GENEL_YONETICI', 'sube_ids' => []];
 $scopedUser = ['id' => 2, 'rol' => 'BOLUM_YONETICISI', 'sube_ids' => [1]];

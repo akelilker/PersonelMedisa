@@ -83,7 +83,7 @@ export function RevizyonTalebiCreatePage() {
     }
     void (async () => {
       try {
-        const list = await fetchPersonellerList();
+        const list = await fetchPersonellerList({ calisan_kapsami: "IC_PERSONEL", limit: 250 });
         setPersoneller(list.items);
       } catch (error) {
         setMetaError(error instanceof Error ? error.message : "Personel listesi yüklenemedi.");

@@ -69,7 +69,7 @@ export function HaftalikKapanisPage() {
     }
     void (async () => {
       try {
-        const list = await fetchPersonellerList();
+        const list = await fetchPersonellerList({ calisan_kapsami: "IC_PERSONEL", limit: 250 });
         setPersoneller(list.items);
         setPersonelId((current) => current || (list.items[0] ? String(list.items[0].id) : ""));
       } catch (error) {

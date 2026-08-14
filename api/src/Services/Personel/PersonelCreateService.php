@@ -38,6 +38,12 @@ final class PersonelCreateService
             'ise_giris_tarihi' => $payload['ise_giris_tarihi'],
             'sube_id' => $payload['sube_id'],
         ];
+        if (PersonelCalisanKapsamSchema::isReady($pdo)) {
+            $cols[] = 'calisan_kapsami';
+            $params['calisan_kapsami'] = isset($payload['calisan_kapsami'])
+                ? (string) $payload['calisan_kapsami']
+                : PersonelCalisanKapsamService::IC_PERSONEL;
+        }
         if ($orgReady) {
             $cols[] = 'sgk_isveren_id';
             $cols[] = 'calisma_lokasyonu_id';
@@ -151,8 +157,31 @@ final class PersonelCreateService
 
     public static function tcExists(PDO $pdo, string $tcKimlikNo): bool
     {
+        $tcKimlikNo = trim($tcKimlikNo);
+        if ($tcKimlikNo === '') {
+            return false;
+        }
         $stmt = $pdo->prepare('SELECT id FROM personeller WHERE tc_kimlik_no = :tc_kimlik_no LIMIT 1');
         $stmt->execute(['tc_kimlik_no' => $tcKimlikNo]);
+
+        return (bool) $stmt->fetch(PDO::FETCH_ASSOC);
+    }
+
+    public static function sicilExists(PDO $pdo, string $sicilNo, $exceptPersonelId = null): bool
+    {
+        $sicilNo = trim($sicilNo);
+        if ($sicilNo === '') {
+            return false;
+        }
+        if ($exceptPersonelId !== null && (int) $exceptPersonelId > 0) {
+            $stmt = $pdo->prepare(
+                'SELECT id FROM personeller WHERE sicil_no = :sicil_no AND id <> :id LIMIT 1'
+            );
+            $stmt->execute(['sicil_no' => $sicilNo, 'id' => (int) $exceptPersonelId]);
+        } else {
+            $stmt = $pdo->prepare('SELECT id FROM personeller WHERE sicil_no = :sicil_no LIMIT 1');
+            $stmt->execute(['sicil_no' => $sicilNo]);
+        }
 
         return (bool) $stmt->fetch(PDO::FETCH_ASSOC);
     }
@@ -175,5 +204,14 @@ final class PersonelCreateService
 
         return strpos($message, 'uq_personeller_tc') !== false
             || (strpos($message, 'Duplicate') !== false && strpos($message, 'tc_kimlik_no') !== false);
+    }
+
+    public static function isDuplicateSicilException(\PDOException $e): bool
+    {
+        $message = $e->getMessage();
+        $lower = strtolower($message);
+
+        return strpos($message, 'uq_personeller_sicil') !== false
+            || (strpos($lower, 'duplicate') !== false && strpos($lower, 'sicil_no') !== false);
     }
 }

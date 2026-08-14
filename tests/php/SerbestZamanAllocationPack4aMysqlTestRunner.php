@@ -553,7 +553,7 @@ try {
     $files = p4aMigrationFiles();
     p4aAssert(count($files) >= 61, 'migrations 001→061 present');
     p4aAssert(in_array('064_personel_org_location_model.sql', $files, true), '064 present');
-    p4aAssert(end($files) === '065_personel_org_structure.sql', 'tip ends with 065');
+    p4aAssert(end($files) === '066_personel_calisan_kapsami.sql', 'tip ends with 065');
     foreach ($files as $file) {
         p4aApply($pdo, $file);
     }

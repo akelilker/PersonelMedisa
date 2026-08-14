@@ -542,6 +542,7 @@ class MaasHesaplamaAdayService
                 $pdo->rollBack();
                 throw new MaasHesaplamaException('PAYROLL_CALCULATION_SNAPSHOT_INVALID', 'Snapshot bulunamadi.', 404);
             }
+            self::assertSnapshotOperationalScope($pdo, $snapshotId);
             PuantajDonemKilidiService::acquire($pdo, (int) $raw['sube_id'], (int) $raw['yil'], (int) $raw['ay']);
 
             $preflight = self::buildCalculationPreflight($pdo, $snapshotId);
@@ -828,6 +829,29 @@ class MaasHesaplamaAdayService
         }
     }
 
+    private static function assertSnapshotOperationalScope(PDO $pdo, int $snapshotId): void
+    {
+        if (!\Medisa\Api\Services\Personel\PersonelCalisanKapsamSchema::isReady($pdo)) {
+            return;
+        }
+        $stmt = $pdo->prepare(
+            "SELECT ps.personel_id
+             FROM maas_hesaplama_personel_snapshotlari ps
+             INNER JOIN personeller p ON p.id = ps.personel_id
+             WHERE ps.donem_snapshot_id = :id AND p.calisan_kapsami = 'DIS_KAYNAK'
+             LIMIT 1"
+        );
+        $stmt->execute(['id' => $snapshotId]);
+        if ($stmt->fetchColumn() === false) {
+            return;
+        }
+        throw new MaasHesaplamaException(
+            \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::ERROR_OPERASYON,
+            'DIS_KAYNAK personeli bulunan maaş snapshotı işleme alınamaz.',
+            409
+        );
+    }
+
     /**
      * @param array<string, mixed> $user
      * @return array{calistirma: array<string, mixed>, idempotent: bool, audit: array<string, mixed>|null}
@@ -921,7 +945,9 @@ class MaasHesaplamaAdayService
                     sgk.kaynak_manifest_hash AS sgk_manifest_hash
              FROM maas_hesaplama_adaylari a
              INNER JOIN maas_hesaplama_sgk_snapshotlari sgk ON sgk.personel_snapshot_id = a.personel_snapshot_id
-             WHERE a.calistirma_id = :id ORDER BY a.personel_id ASC'
+             INNER JOIN personeller p ON p.id = a.personel_id
+            WHERE a.calistirma_id = :id
+             ORDER BY a.personel_id ASC'
         );
         $stmt->execute(['id' => (int) $calistirmaId]);
 
@@ -941,7 +967,9 @@ class MaasHesaplamaAdayService
                     sgk.kaynak_manifest_hash AS sgk_manifest_hash
              FROM maas_hesaplama_adaylari a
              INNER JOIN maas_hesaplama_sgk_snapshotlari sgk ON sgk.personel_snapshot_id = a.personel_snapshot_id
-             WHERE a.id = :id LIMIT 1'
+             INNER JOIN personeller p ON p.id = a.personel_id
+            WHERE a.id = :id
+             LIMIT 1'
         );
         $stmt->execute(['id' => (int) $adayId]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);

@@ -70,8 +70,12 @@ function buildTelHref(value: string | null | undefined) {
   return digits ? `tel:${digits}` : null;
 }
 
+function formatPersonelName(personel: Personel) {
+  return [personel.ad, personel.soyad].filter(Boolean).join(" ");
+}
+
 function formatPersonelOptionLabel(personel: Personel) {
-  const title = `${personel.ad} ${personel.soyad}`;
+  const title = formatPersonelName(personel);
   const meta = [personel.departman_adi, personel.gorev_adi, personel.telefon]
     .filter(Boolean)
     .join(" | ");
@@ -109,7 +113,7 @@ function PersonelContextCard({ personel }: PersonelContextCardProps) {
   return (
     <div className="bildirim-personel-context">
       <strong>
-        {personel.ad} {personel.soyad}
+        {formatPersonelName(personel)}
       </strong>
       <p>
         Departman: {personel.departman_adi ?? "-"}
@@ -1341,7 +1345,7 @@ export function BildirimlerPage() {
                   <p>
                     Personel:{" "}
                     {bildirim.personel_ad_soyad ??
-                      (personel ? `${personel.ad} ${personel.soyad}` : "—")}
+                      (personel ? formatPersonelName(personel) : "—")}
                   </p>
                   <p>
                     Departman:{" "}
@@ -1605,7 +1609,7 @@ export function BildirimlerPage() {
                 value={
                   editingBildirim?.personel_ad_soyad ??
                   (selectedEditPersonel
-                    ? `${selectedEditPersonel.ad} ${selectedEditPersonel.soyad}`
+                    ? formatPersonelName(selectedEditPersonel)
                     : "—")
                 }
                 onChange={() => undefined}

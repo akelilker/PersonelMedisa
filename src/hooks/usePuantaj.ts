@@ -155,7 +155,7 @@ async function loadPersonelDogumTarihi(
   const personel = await fetchWithCacheMerge(detailKey, () =>
     runDeduped(detailKey, () => fetchPersonelDetail(personelId))
   );
-  return personel?.dogum_tarihi;
+  return personel?.dogum_tarihi ?? undefined;
 }
 
 function parseOptionalNonNegativeInt(value: string) {

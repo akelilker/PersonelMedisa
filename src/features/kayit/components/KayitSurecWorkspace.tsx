@@ -411,7 +411,13 @@ export function KayitSurecWorkspace({
   }, [selectedSurecPersonel]);
 
   const isSelectedPersonelPasif = selectedSurecPersonel?.aktif_durum === "PASIF";
-  const canSubmitShellFinansZimmet = Boolean(selectedSurecPersonel) && !isSelectedPersonelPasif;
+  const isSelectedPersonelDirectoryOnly = selectedSurecPersonel?.calisan_kapsami === "DIS_KAYNAK";
+  const visiblePersonelSurecTabs = isSelectedPersonelDirectoryOnly
+    ? PERSONEL_SUREC_TABS.filter((tab) => tab.id === "genel" || tab.id === "pozisyon" || tab.id === "belgeler")
+    : PERSONEL_SUREC_TABS;
+  const canSubmitShellFinansZimmet = Boolean(selectedSurecPersonel)
+    && !isSelectedPersonelPasif
+    && !isSelectedPersonelDirectoryOnly;
 
   const zimmetPersonelIdForHook = selectedSurecPersonel?.id ?? 0;
   const zimmetPersonelValid = Boolean(selectedSurecPersonel);
@@ -454,6 +460,12 @@ export function KayitSurecWorkspace({
   );
   const selectedSurecPersonelIdRef = useRef<number | null>(null);
   selectedSurecPersonelIdRef.current = selectedSurecPersonel?.id ?? null;
+
+  useEffect(() => {
+    if (isSelectedPersonelDirectoryOnly && !["genel", "pozisyon", "belgeler"].includes(activePersonelTab)) {
+      setActivePersonelTab("genel");
+    }
+  }, [activePersonelTab, isSelectedPersonelDirectoryOnly]);
 
   const resolvedDevamsizlikSurecTuruKey = useMemo(() => {
     if (!devamsizlikSubId) {
@@ -1294,7 +1306,7 @@ export function KayitSurecWorkspace({
                   <>
                     {showGatewayPersonelTabs ? (
                       <div className="surec-person-tabs" role="tablist" aria-label="Personel işlem sekmeleri">
-                        {PERSONEL_SUREC_TABS.map((tab) => {
+                        {visiblePersonelSurecTabs.map((tab) => {
                           const isActive = activePersonelTab === tab.id;
                           return (
                             <button
@@ -1329,7 +1341,7 @@ export function KayitSurecWorkspace({
                     {selectedSurecPersonel ? (
                       <div className="workspace-personel-preview workspace-personel-preview--compact">
                         <strong>
-                          {selectedSurecPersonel.ad} {selectedSurecPersonel.soyad}
+                          {formatPersonelLabel(selectedSurecPersonel)}
                         </strong>
                         <p>
                           {selectedSurecPersonel.departman_adi ?? "-"} • {selectedSurecPersonel.gorev_adi ?? "-"}
@@ -1351,7 +1363,7 @@ export function KayitSurecWorkspace({
                       <KayitSurecPersonelGenelPanel
                         personel={selectedSurecPersonel}
                         canUpdatePersonel={canUpdatePersonel}
-                        canViewUcret={canViewUcret}
+                        canViewUcret={canViewUcret && !isSelectedPersonelDirectoryOnly}
                         personelRefs={refs}
                         onBusyChange={setGenelMutating}
                         onPersonelUpdated={applyPersonelUpdateLocally}
@@ -1429,7 +1441,7 @@ export function KayitSurecWorkspace({
                     {selectedSurecPersonel ? (
                       <div className="surec-person-shell">
                         <div className="surec-person-tabs" role="tablist" aria-label="Personel işlem sekmeleri">
-                          {PERSONEL_SUREC_TABS.map((tab) => {
+                          {visiblePersonelSurecTabs.map((tab) => {
                             const isActive = activePersonelTab === tab.id;
 
                             return (
@@ -1454,7 +1466,7 @@ export function KayitSurecWorkspace({
                           <KayitSurecPersonelGenelPanel
                             personel={selectedSurecPersonel}
                             canUpdatePersonel={canUpdatePersonel}
-                            canViewUcret={canViewUcret}
+                            canViewUcret={canViewUcret && !isSelectedPersonelDirectoryOnly}
                             personelRefs={refs}
                             onBusyChange={setGenelMutating}
                             onPersonelUpdated={applyPersonelUpdateLocally}

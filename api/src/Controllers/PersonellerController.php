@@ -10,6 +10,8 @@ use Medisa\Api\Database\Connection;
 use Medisa\Api\Http\JsonResponse;
 use Medisa\Api\Http\Request;
 use Medisa\Api\Scope\SubeScope;
+use Medisa\Api\Services\Personel\PersonelCalisanKapsamSchema;
+use Medisa\Api\Services\Personel\PersonelCalisanKapsamService;
 use Medisa\Api\Services\Personel\PersonelCanonicalValidator;
 use Medisa\Api\Services\Personel\PersonelCreateService;
 use Medisa\Api\Services\Personel\PersonelImportApplyService;
@@ -47,6 +49,7 @@ class PersonellerController
         );
         $departmanId = (int) ($request->getQuery('departman_id', 0) ?: 0);
         $personelTipiId = (int) ($request->getQuery('personel_tipi_id', 0) ?: 0);
+        $calisanKapsami = strtoupper(trim((string) $request->getQuery('calisan_kapsami', '')));
 
         try {
             $pdo = Connection::get();
@@ -84,6 +87,19 @@ class PersonellerController
         if ($personelTipiId > 0) {
             $where[] = 'p.personel_tipi_id = :personel_tipi_id';
             $params['personel_tipi_id'] = $personelTipiId;
+        }
+
+        if ($calisanKapsami === PersonelCalisanKapsamService::IC_PERSONEL
+            || $calisanKapsami === PersonelCalisanKapsamService::DIS_KAYNAK
+        ) {
+            if (!PersonelCalisanKapsamSchema::isReady($pdo)) {
+                if ($calisanKapsami === PersonelCalisanKapsamService::DIS_KAYNAK) {
+                    $where[] = '1=0';
+                }
+            } else {
+                $where[] = 'p.calisan_kapsami = :calisan_kapsami';
+                $params['calisan_kapsami'] = $calisanKapsami;
+            }
         }
 
         if ($search !== '') {
@@ -234,16 +250,34 @@ class PersonellerController
             );
         }
         try {
+            PersonelCalisanKapsamSchema::assertReadyForDisKaynakWrite($pdo, $payload);
+        } catch (PersonelValidationException $e) {
+            JsonResponse::error(409, $e->getCodeString(), $e->getMessage(), $e->getField());
+        }
+        if (($payload['calisan_kapsami'] ?? PersonelCalisanKapsamService::IC_PERSONEL)
+            === PersonelCalisanKapsamService::DIS_KAYNAK
+            && $hasSalary
+        ) {
+            JsonResponse::error(
+                409,
+                PersonelCalisanKapsamService::ERROR_OPERASYON,
+                'DIS_KAYNAK personeline maas/bordro kaydi olusturulamaz.',
+                'calisan_kapsami'
+            );
+        }
+        try {
             PersonelCreateService::validateCreateReferences($pdo, $payload);
         } catch (PersonelValidationException $e) {
             $code = $e->getCodeString();
             $status = (
                 $code === PersonelOrgLocationSchema::ERROR_CODE
                 || $code === PersonelOrgStructureSchema::ERROR_CODE
+                || $code === PersonelCalisanKapsamSchema::ERROR_CODE
             ) ? 409 : 422;
             JsonResponse::error($status, $code, $e->getMessage(), $e->getField());
         }
-        self::assertTcAvailable($pdo, $payload['tc_kimlik_no']);
+        self::assertTcAvailable($pdo, $payload['tc_kimlik_no'] ?? null);
+        self::assertSicilAvailable($pdo, (string) $payload['sicil_no']);
 
         $pdo->beginTransaction();
         try {
@@ -277,6 +311,9 @@ class PersonellerController
 
             if (PersonelCreateService::isDuplicateTcException($e) || self::isDuplicateTcException($e)) {
                 self::duplicateTcResponse();
+            }
+            if (PersonelCreateService::isDuplicateSicilException($e) || self::isDuplicateSicilException($e)) {
+                self::duplicateSicilResponse();
             }
 
             JsonResponse::serverError('Kayit olusturulamadi.');
@@ -341,8 +378,58 @@ class PersonellerController
         }
         self::validateUpdateReferences($pdo, $payload, $current);
 
-        if (array_key_exists('tc_kimlik_no', $payload)) {
+        $resultingKapsam = array_key_exists('calisan_kapsami', $payload)
+            ? (string) $payload['calisan_kapsami']
+            : PersonelCalisanKapsamService::resolveFromRow($current);
+        try {
+            PersonelCalisanKapsamSchema::assertReadyForDisKaynakWrite($pdo, [
+                'calisan_kapsami' => $resultingKapsam,
+            ]);
+        } catch (PersonelValidationException $e) {
+            JsonResponse::error(409, $e->getCodeString(), $e->getMessage(), $e->getField());
+        }
+        $resultingTc = array_key_exists('tc_kimlik_no', $payload)
+            ? $payload['tc_kimlik_no']
+            : ($current['tc_kimlik_no'] ?? null);
+        if ($resultingKapsam === PersonelCalisanKapsamService::IC_PERSONEL) {
+            try {
+                PersonelCalisanKapsamService::assertInternalIdentityComplete([
+                    'tc_kimlik_no' => $resultingTc,
+                    'soyad' => array_key_exists('soyad', $payload) ? $payload['soyad'] : ($current['soyad'] ?? null),
+                    'dogum_tarihi' => array_key_exists('dogum_tarihi', $payload)
+                        ? $payload['dogum_tarihi']
+                        : ($current['dogum_tarihi'] ?? null),
+                    'telefon' => array_key_exists('telefon', $payload) ? $payload['telefon'] : ($current['telefon'] ?? null),
+                ]);
+            } catch (PersonelValidationException $e) {
+                JsonResponse::error(422, $e->getCodeString(), $e->getMessage(), $e->getField());
+            }
+        }
+        if ($resultingKapsam === PersonelCalisanKapsamService::DIS_KAYNAK) {
+            try {
+                PersonelCalisanKapsamService::assertSgkIsverenAllowed(
+                    $resultingKapsam,
+                    array_key_exists('sgk_isveren_id', $payload) ? $payload['sgk_isveren_id'] : null
+                );
+            } catch (PersonelValidationException $e) {
+                JsonResponse::error(422, $e->getCodeString(), $e->getMessage(), $e->getField());
+            }
+            $payload['sgk_isveren_id'] = null;
+            if ($hasSalary) {
+                JsonResponse::error(
+                    409,
+                    PersonelCalisanKapsamService::ERROR_OPERASYON,
+                    'DIS_KAYNAK personeline maas/bordro kaydi olusturulamaz.',
+                    'calisan_kapsami'
+                );
+            }
+        }
+
+        if (array_key_exists('tc_kimlik_no', $payload) && $payload['tc_kimlik_no'] !== null && $payload['tc_kimlik_no'] !== '') {
             self::assertTcAvailableForUpdate($pdo, $payload['tc_kimlik_no'], $personelId);
+        }
+        if (array_key_exists('sicil_no', $payload)) {
+            self::assertSicilAvailable($pdo, (string) $payload['sicil_no'], $personelId);
         }
 
         $salaryChanged = $hasSalary
@@ -384,6 +471,9 @@ class PersonellerController
             }
             if (self::isDuplicateTcException($e)) {
                 self::duplicateTcResponse();
+            }
+            if (PersonelCreateService::isDuplicateSicilException($e) || self::isDuplicateSicilException($e)) {
+                self::duplicateSicilResponse();
             }
 
             JsonResponse::serverError('Kayit guncellenemedi.');
@@ -844,16 +934,31 @@ class PersonellerController
 
     private static function assertTcAvailable(PDO $pdo, $tcKimlikNo)
     {
-        if (PersonelCreateService::tcExists($pdo, (string) $tcKimlikNo)) {
+        $tc = trim((string) $tcKimlikNo);
+        if ($tc === '') {
+            return;
+        }
+        if (PersonelCreateService::tcExists($pdo, $tc)) {
             self::duplicateTcResponse();
+        }
+    }
+
+    private static function assertSicilAvailable(PDO $pdo, $sicilNo, $exceptPersonelId = null)
+    {
+        if (PersonelCreateService::sicilExists($pdo, (string) $sicilNo, $exceptPersonelId)) {
+            JsonResponse::error(409, 'DUPLICATE_SICIL_NO', 'Bu sicil no ile kayit acilamaz.', 'sicil_no');
         }
     }
 
     private static function assertTcAvailableForUpdate(PDO $pdo, $tcKimlikNo, $personelId)
     {
+        $tc = trim((string) $tcKimlikNo);
+        if ($tc === '') {
+            return;
+        }
         $stmt = $pdo->prepare('SELECT id FROM personeller WHERE tc_kimlik_no = :tc_kimlik_no AND id <> :id LIMIT 1');
         $stmt->execute([
-            'tc_kimlik_no' => (string) $tcKimlikNo,
+            'tc_kimlik_no' => $tc,
             'id' => (int) $personelId,
         ]);
         if ($stmt->fetch(PDO::FETCH_ASSOC)) {
@@ -889,6 +994,7 @@ class PersonellerController
             'personel_tipi_id',
             'bagli_amir_id',
             'aktif_durum',
+            'calisan_kapsami',
             'dogum_yeri',
             'kan_grubu',
             'ucret_tipi_id',
@@ -896,6 +1002,14 @@ class PersonellerController
             'prim_kurali_id',
         ];
 
+        if (!PersonelCalisanKapsamSchema::isReady($pdo)) {
+            $allowedColumns = array_values(array_filter(
+                $allowedColumns,
+                static function (string $c): bool {
+                    return $c !== 'calisan_kapsami';
+                }
+            ));
+        }
         if (!PersonelOrgLocationSchema::isReady($pdo)) {
             $allowedColumns = array_values(array_filter(
                 $allowedColumns,
@@ -997,6 +1111,11 @@ class PersonellerController
         JsonResponse::error(409, 'DUPLICATE_TC_KIMLIK_NO', 'Bu T.C. Kimlik No ile kayıt açılamaz.', 'tc_kimlik_no');
     }
 
+    private static function duplicateSicilResponse()
+    {
+        JsonResponse::error(409, 'DUPLICATE_SICIL_NO', 'Bu sicil no ile kayit acilamaz.', 'sicil_no');
+    }
+
     private static function isDuplicateTcException(\PDOException $e)
     {
         if ($e->getCode() !== '23000') {
@@ -1011,6 +1130,22 @@ class PersonellerController
         $message = strtolower($e->getMessage());
 
         return strpos($message, 'uq_personeller_tc') !== false || strpos($message, 'tc_kimlik_no') !== false;
+    }
+
+    private static function isDuplicateSicilException(\PDOException $e)
+    {
+        if ($e->getCode() !== '23000') {
+            return false;
+        }
+
+        $errorInfo = $e->errorInfo;
+        if (!is_array($errorInfo) || !isset($errorInfo[1]) || (int) $errorInfo[1] !== 1062) {
+            return false;
+        }
+
+        $message = strtolower($e->getMessage());
+
+        return strpos($message, 'uq_personeller_sicil') !== false || strpos($message, 'sicil_no') !== false;
     }
 
     private static function validationError($field, $message)
@@ -1040,10 +1175,13 @@ class PersonellerController
 
         $mapped = [
             'id' => (int) $row['id'],
-            'tc_kimlik_no' => (string) $row['tc_kimlik_no'],
+            'tc_kimlik_no' => $row['tc_kimlik_no'] !== null && $row['tc_kimlik_no'] !== ''
+                ? (string) $row['tc_kimlik_no']
+                : null,
             'ad' => (string) $row['ad'],
-            'soyad' => (string) $row['soyad'],
+            'soyad' => $row['soyad'] !== null && $row['soyad'] !== '' ? (string) $row['soyad'] : null,
             'aktif_durum' => (string) $row['aktif_durum'],
+            'calisan_kapsami' => PersonelCalisanKapsamService::resolveFromRow($row),
             'sube_id' => (int) $row['sube_id'],
             'sgk_isveren_id' => array_key_exists('sgk_isveren_id', $row) && $row['sgk_isveren_id'] !== null
                 ? (int) $row['sgk_isveren_id']
@@ -1051,8 +1189,10 @@ class PersonellerController
             'calisma_lokasyonu_id' => array_key_exists('calisma_lokasyonu_id', $row) && $row['calisma_lokasyonu_id'] !== null
                 ? (int) $row['calisma_lokasyonu_id']
                 : null,
-            'telefon' => $row['telefon'],
-            'dogum_tarihi' => $row['dogum_tarihi'],
+            'telefon' => $row['telefon'] !== null && $row['telefon'] !== '' ? (string) $row['telefon'] : null,
+            'dogum_tarihi' => $row['dogum_tarihi'] !== null && $row['dogum_tarihi'] !== ''
+                ? (string) $row['dogum_tarihi']
+                : null,
             'sicil_no' => $row['sicil_no'],
             'dogum_yeri' => $row['dogum_yeri'],
             'kan_grubu' => $row['kan_grubu'],

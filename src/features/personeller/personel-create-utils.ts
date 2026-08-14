@@ -118,14 +118,40 @@ export function buildMaasPayloadFields(
 }
 
 export function buildCreatePersonelPayload(form: CreatePersonelFormState): CreatePersonelPayload {
+  const isDisKaynak = form.calisanKapsami === "DIS_KAYNAK";
   const tcKimlikNo = digitsOnly(form.tcKimlikNo);
-  const telefon = normalizeTurkishMobilePhone(form.telefon, "Telefon");
-  const acilDurumTelefon = normalizeTurkishMobilePhone(form.acilDurumTelefon, "Acil durum telefonu");
+  if (!isDisKaynak) {
+    validateTcKimlikNo(tcKimlikNo);
+  } else if (tcKimlikNo !== "") {
+    validateTcKimlikNo(tcKimlikNo);
+  }
 
-  validateTcKimlikNo(tcKimlikNo);
+  const telefonRaw = form.telefon.trim();
+  const telefon = telefonRaw === ""
+    ? null
+    : normalizeTurkishMobilePhone(form.telefon, "Telefon");
+  if (!isDisKaynak && telefon === null) {
+    throw new Error("Telefon zorunludur.");
+  }
+
+  const acilRaw = form.acilDurumTelefon.trim();
+  const acilDurumTelefon =
+    acilRaw === "" ? null : normalizeTurkishMobilePhone(form.acilDurumTelefon, "Acil durum telefonu");
+  if (!isDisKaynak && acilDurumTelefon === null) {
+    throw new Error("Acil durum telefonu 05xx xxx xx xx formatında olmalıdır.");
+  }
 
   if (!form.subeId.trim()) {
     throw new Error("Şube seçilmelidir.");
+  }
+  if (!form.ad.trim()) {
+    throw new Error("Ad zorunludur.");
+  }
+  if (!isDisKaynak && !form.soyad.trim()) {
+    throw new Error("Soyad zorunludur.");
+  }
+  if (!isDisKaynak && !form.dogumTarihi.trim()) {
+    throw new Error("Doğum tarihi zorunludur.");
   }
 
   const subeId = parseRequiredPositiveInt(form.subeId, "Şube");
@@ -142,12 +168,12 @@ export function buildCreatePersonelPayload(form: CreatePersonelFormState): Creat
         })();
 
   return {
-    tc_kimlik_no: tcKimlikNo,
+    tc_kimlik_no: tcKimlikNo === "" ? null : tcKimlikNo,
     ad: normalizePersonelAd(form.ad),
-    soyad: normalizePersonelSoyad(form.soyad),
-    dogum_tarihi: form.dogumTarihi,
+    soyad: form.soyad.trim() === "" ? null : normalizePersonelSoyad(form.soyad),
+    dogum_tarihi: form.dogumTarihi.trim() === "" ? null : form.dogumTarihi,
     telefon,
-    acil_durum_kisi: form.acilDurumKisi.trim(),
+    acil_durum_kisi: form.acilDurumKisi.trim() === "" ? null : form.acilDurumKisi.trim(),
     acil_durum_telefon: acilDurumTelefon,
     sicil_no: form.sicilNo.trim(),
     ise_giris_tarihi: form.iseGirisTarihi,
@@ -156,6 +182,7 @@ export function buildCreatePersonelPayload(form: CreatePersonelFormState): Creat
     gorev_id: parseRequiredPositiveInt(form.gorevId, "Unvan"),
     personel_tipi_id: parseRequiredPositiveInt(form.personelTipiId, "Personel Tipi"),
     aktif_durum: "AKTIF",
+    calisan_kapsami: isDisKaynak ? "DIS_KAYNAK" : "IC_PERSONEL",
     ...(form.dogumYeri.trim() ? { dogum_yeri: form.dogumYeri.trim() } : {}),
     ...(form.kanGrubu.trim() ? { kan_grubu: form.kanGrubu.trim() } : {}),
     ...(bagliAmirId !== undefined ? { bagli_amir_id: bagliAmirId } : {}),
@@ -168,8 +195,9 @@ export function buildCreatePersonelPayload(form: CreatePersonelFormState): Creat
     ...(parseOptionalPositiveInt(form.pozisyonId) !== undefined
       ? { pozisyon_id: parseOptionalPositiveInt(form.pozisyonId)! }
       : {}),
-    ...(ucretTipiId !== undefined ? { ucret_tipi_id: ucretTipiId } : {}),
-    ...(primKuraliId !== undefined ? { prim_kurali_id: primKuraliId } : {}),
-    ...(maasTutari !== undefined ? { net_maas_tutari: maasTutari, maas_tutari: maasTutari } : {}),
+    ...(isDisKaynak ? { sgk_isveren_id: null } : {}),
+    ...(!isDisKaynak && ucretTipiId !== undefined ? { ucret_tipi_id: ucretTipiId } : {}),
+    ...(!isDisKaynak && primKuraliId !== undefined ? { prim_kurali_id: primKuraliId } : {}),
+    ...(!isDisKaynak && maasTutari !== undefined ? { net_maas_tutari: maasTutari, maas_tutari: maasTutari } : {})
   };
 }

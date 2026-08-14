@@ -125,6 +125,10 @@ function buildTelHref(value: string | null | undefined) {
   return digits ? `tel:${digits}` : null;
 }
 
+function formatPersonelName(personel: Pick<Personel, "ad" | "soyad">) {
+  return [personel.ad, personel.soyad].map((part) => String(part ?? "").trim()).filter(Boolean).join(" ");
+}
+
 function formatReferenceValue(label: string | undefined, id: number | undefined) {
   if (label) {
     return label;
@@ -174,6 +178,7 @@ export function PersonellerPage() {
     setDraftAktiflik,
     setDraftDepartmanId,
     setDraftPersonelTipiId,
+    setDraftCalisanKapsami,
     setPage
   } = usePersoneller();
 
@@ -341,6 +346,20 @@ export function PersonellerPage() {
                     onChange={setDraftPersonelTipiId}
                   />
                 )}
+                <FormField
+                  as="select"
+                  label="Çalışan Kapsamı"
+                  name="personel-filter-calisan-kapsami"
+                  value={draft.calisanKapsami}
+                  onChange={(value) =>
+                    setDraftCalisanKapsami(value as "" | "IC_PERSONEL" | "DIS_KAYNAK")
+                  }
+                  selectOptions={[
+                    { value: "IC_PERSONEL", label: "İç Personel" },
+                    { value: "DIS_KAYNAK", label: "Dış Kaynak" }
+                  ]}
+                  placeholderOption={{ value: "", label: "Tümü" }}
+                />
                 <div className="personeller-aktiflik-group" role="group" aria-label="Aktiflik">
                   <span className="personeller-aktiflik-label">Aktiflik</span>
                   <div className="personeller-aktiflik-checks">
@@ -426,7 +445,8 @@ export function PersonellerPage() {
                 const personelCallHref = buildTelHref(personel.telefon);
                 const emergencyCallHref = buildTelHref(personel.acil_durum_telefon);
                 const detailTo = `/personeller/${personel.id}`;
-                const previewLabel = `${personel.ad} ${personel.soyad} kişisinin kartını aç`;
+                const personelName = formatPersonelName(personel);
+                const previewLabel = `${personelName} kişisinin kartını aç`;
 
                 function rowActivate() {
                   if (canOpenDetail) {
@@ -471,11 +491,14 @@ export function PersonellerPage() {
                           aria-label={previewLabel}
                           onClick={(event) => event.stopPropagation()}
                         >
-                          {`${personel.ad} ${personel.soyad}`}
+                          {personelName}
                         </Link>
                       ) : (
-                        `${personel.ad} ${personel.soyad}`
+                        personelName
                       )}
+                      {personel.calisan_kapsami === "DIS_KAYNAK" ? (
+                        <span className="personeller-status-badge">DIŞ KAYNAK</span>
+                      ) : null}
                     </td>
                     <td title={formatReferenceValue(personel.departman_adi, personel.departman_id)}>
                       {formatReferenceValue(personel.departman_adi, personel.departman_id)}
@@ -523,11 +546,15 @@ export function PersonellerPage() {
               const emergencyCallHref = buildTelHref(personel.acil_durum_telefon);
               const hasQuickActions = Boolean(personelCallHref || emergencyCallHref);
               const detailTo = `/personeller/${personel.id}`;
-              const previewLabel = `${personel.ad} ${personel.soyad} kişisinin kartını aç`;
+              const personelName = formatPersonelName(personel);
+              const previewLabel = `${personelName} kişisinin kartını aç`;
 
               const previewInner = (
                 <div className="personeller-item-content personeller-item-content--grid">
-                  <span className="personeller-card-title">{`${personel.ad} ${personel.soyad}`}</span>
+                  <span className="personeller-card-title">{personelName}</span>
+                  {personel.calisan_kapsami === "DIS_KAYNAK" ? (
+                    <span className="personeller-status-badge">DIŞ KAYNAK</span>
+                  ) : null}
                   <span className="personeller-card-sub">{personelGridSubtitle(personel)}</span>
                   <span className="personeller-card-muted">{personelGridMutedLine(personel)}</span>
                 </div>

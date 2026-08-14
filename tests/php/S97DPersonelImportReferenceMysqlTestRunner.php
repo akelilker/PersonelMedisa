@@ -334,7 +334,10 @@ try {
             $types[] = $tur;
         }
     }
-    s97dAssert($types === ['SUBE', 'DEPARTMAN', 'GOREV', 'PERSONEL_TIPI'], 'tur order SUBE/DEPARTMAN/GOREV/PERSONEL_TIPI');
+    s97dAssert(
+        $types === ['SUBE', 'DEPARTMAN', 'GOREV', 'PERSONEL_TIPI', 'CALISAN_KAPSAMI'],
+        'tur order SUBE/DEPARTMAN/GOREV/PERSONEL_TIPI/CALISAN_KAPSAMI'
+    );
 
     $usableSubeler = [];
     foreach ($parsed['rows'] as $row) {

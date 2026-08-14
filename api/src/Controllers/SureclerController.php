@@ -129,8 +129,12 @@ class SureclerController
         if (!$personel) {
             self::validationError('personel_id', 'Personel bulunamadı.');
         }
-
+        // Authorize branch access before applying operational (external) guards.
         SubeScope::assertPersonelAccess($user, $request, (int) $personel['sube_id']);
+        \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::assertOperationalEligible(
+            $pdo,
+            $payload['personel_id']
+        );
 
         // ISTEN_AYRILMA while still AKTIF is the archive transition path — do not block.
         // Ordinary surec against already-PASIF personel is read-only.
@@ -236,6 +240,10 @@ class SureclerController
         }
 
         SubeScope::assertPersonelAccess($user, $request, (int) $existing['personel_sube_id']);
+        \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::assertOperationalEligible(
+            $pdo,
+            (int) $existing['personel_id']
+        );
         \Medisa\Api\Services\Retention\PersonelArchiveGate::assertBusinessWriteAllowed(
             $pdo,
             (int) $existing['personel_id']

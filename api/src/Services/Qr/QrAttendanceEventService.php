@@ -41,6 +41,7 @@ class QrAttendanceEventService
 
         $ctx = SelfPersonelContext::resolveForSelfService($authUser, $pdo, true);
         $personelId = (int) $ctx['personel_id'];
+        \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::assertOperationalEligible($pdo, $personelId);
         $personelSubeId = (int) $ctx['sube_id'];
         $userId = (int) ($authUser['id'] ?? 0);
         if ($userId <= 0) {

@@ -39,11 +39,42 @@ export function PersonelInlineEditForm({
     <form className="personel-edit-form" onSubmit={onSubmit} data-testid="personel-inline-edit-form">
       <div className="form-field-grid">
         <FormField
+          as="select"
+          label="Çalışan Kapsamı"
+          name="edit-calisan-kapsami"
+          value={editForm.calisanKapsami}
+          onChange={(value) =>
+            setEditForm((prev) => ({
+              ...prev,
+              calisanKapsami: value as EditPersonelFormState["calisanKapsami"]
+            }))
+          }
+          selectOptions={[
+            { value: "IC_PERSONEL", label: "İç Personel" },
+            { value: "DIS_KAYNAK", label: "Dış Kaynak / SGK Başka İşverende" }
+          ]}
+        />
+        <FormField
+          label="T.C. Kimlik No"
+          name="edit-tc-kimlik-no"
+          value={editForm.tcKimlikNo}
+          onChange={(value) => setEditForm((prev) => ({ ...prev, tcKimlikNo: value }))}
+          required={editForm.calisanKapsami === "IC_PERSONEL"}
+        />
+        <FormField
           label="Ad"
           name="edit-ad"
           value={editForm.ad}
           onChange={(value) => setEditForm((prev) => ({ ...prev, ad: value }))}
-          required
+          required={editForm.calisanKapsami === "IC_PERSONEL"}
+        />
+        <FormField
+          label="Doğum Tarihi"
+          name="edit-dogum-tarihi"
+          type="date"
+          value={editForm.dogumTarihi}
+          onChange={(value) => setEditForm((prev) => ({ ...prev, dogumTarihi: value }))}
+          required={editForm.calisanKapsami === "IC_PERSONEL"}
         />
         <FormField
           label="Soyad"
@@ -58,6 +89,7 @@ export function PersonelInlineEditForm({
           type="tel"
           value={editForm.telefon}
           onChange={(value) => setEditForm((prev) => ({ ...prev, telefon: value }))}
+          required={editForm.calisanKapsami === "IC_PERSONEL"}
         />
         {personelRefs.bagliAmirOptions.length > 0 ? (
           <>

@@ -158,7 +158,8 @@ class BordroOnIzlemeService
              LEFT JOIN departmanlar d ON d.id = p.departman_id
              INNER JOIN maas_hesaplama_calistirmalari c ON c.id = a.calistirma_id
              INNER JOIN subeler ss ON ss.id = c.sube_id
-             WHERE a.id = :id LIMIT 1"
+             WHERE a.id = :id
+             LIMIT 1"
         );
         $stmt->execute(['id' => (int) $adayId]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -254,6 +255,7 @@ class BordroOnIzlemeService
             if (!$row) {
                 throw new MaasHesaplamaException('PAYROLL_CALCULATION_NOT_FOUND', 'Çalıştırma bulunamadı.', 404);
             }
+            self::assertCalistirmaOperationalScope($pdo, (int) $calistirmaId);
             if (!in_array((string) ($row['bordro_onay_durumu'] ?? 'HESAPLANDI'), $allowedFrom, true)) {
                 throw new MaasHesaplamaException('BORDRO_INVALID_STATE', 'Bordro onay durumu geçişe uygun değil.', 409, [
                     'mevcut' => (string) ($row['bordro_onay_durumu'] ?? 'HESAPLANDI'),
@@ -300,6 +302,29 @@ class BordroOnIzlemeService
             }
             throw $e;
         }
+    }
+
+    private static function assertCalistirmaOperationalScope(PDO $pdo, int $calistirmaId): void
+    {
+        if (!\Medisa\Api\Services\Personel\PersonelCalisanKapsamSchema::isReady($pdo)) {
+            return;
+        }
+        $stmt = $pdo->prepare(
+            "SELECT a.personel_id
+             FROM maas_hesaplama_adaylari a
+             INNER JOIN personeller p ON p.id = a.personel_id
+             WHERE a.calistirma_id = :id AND p.calisan_kapsami = 'DIS_KAYNAK'
+             LIMIT 1"
+        );
+        $stmt->execute(['id' => $calistirmaId]);
+        if ($stmt->fetchColumn() === false) {
+            return;
+        }
+        throw new MaasHesaplamaException(
+            \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::ERROR_OPERASYON,
+            'DIS_KAYNAK personeli bulunan bordro çalıştırması işleme alınamaz.',
+            409
+        );
     }
 
     /** @return array<string, mixed> */

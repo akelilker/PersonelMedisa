@@ -194,7 +194,7 @@ export function ShellHeaderActions({ contextLabel, minimal = false }: ShellHeade
         typeof item.personel_id === "number" ? headerPersonelMap.get(item.personel_id) ?? null : null;
       const tarihText = item.tarih ? `Tarih: ${item.tarih}` : "";
       const personelText = personel
-        ? `Personel: ${personel.ad} ${personel.soyad}`
+        ? `Personel: ${[personel.ad, personel.soyad].filter(Boolean).join(" ")}`
         : item.personel_id
           ? `Personel: ${item.personel_id}`
           : "";

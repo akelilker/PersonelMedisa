@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { getApiErrorMessage, shouldQueueOfflineMutation } from "../api/api-client";
 import {
   createPersonel,
@@ -47,17 +47,20 @@ export type PersonelListQueryState = {
     aktiflik: "aktif" | "pasif" | "tum";
     departmanId: string;
     personelTipiId: string;
+    calisanKapsami: "" | "IC_PERSONEL" | "DIS_KAYNAK";
   };
   applied: {
     search: string;
     aktiflik: "aktif" | "pasif" | "tum";
     departmanId: string;
     personelTipiId: string;
+    calisanKapsami: "" | "IC_PERSONEL" | "DIS_KAYNAK";
   };
   page: number;
 };
 
 export type CreatePersonelFormState = {
+  calisanKapsami: "IC_PERSONEL" | "DIS_KAYNAK";
   tcKimlikNo: string;
   ad: string;
   soyad: string;
@@ -83,6 +86,7 @@ export type CreatePersonelFormState = {
 };
 
 export const INITIAL_CREATE_PERSONEL_FORM: CreatePersonelFormState = {
+  calisanKapsami: "IC_PERSONEL",
   tcKimlikNo: "",
   ad: "",
   soyad: "",
@@ -119,8 +123,8 @@ async function fetchBagliAmirContext(amirId: number): Promise<BagliAmirContext |
 export function usePersoneller() {
   const revision = useAppDataRevision();
   const [listQuery, setListQuery] = useState<PersonelListQueryState>({
-    draft: { search: "", aktiflik: "tum", departmanId: "", personelTipiId: "" },
-    applied: { search: "", aktiflik: "tum", departmanId: "", personelTipiId: "" },
+    draft: { search: "", aktiflik: "tum", departmanId: "", personelTipiId: "", calisanKapsami: "" },
+    applied: { search: "", aktiflik: "tum", departmanId: "", personelTipiId: "", calisanKapsami: "" },
     page: 1
   });
 
@@ -148,13 +152,15 @@ export function usePersoneller() {
         appliedFilters.aktiflik,
         appliedFilters.departmanId,
         appliedFilters.personelTipiId,
-        listPage
+        listPage,
+        appliedFilters.calisanKapsami
       ),
     [
       activeSube,
       appliedFilters.aktiflik,
       appliedFilters.departmanId,
       appliedFilters.personelTipiId,
+      appliedFilters.calisanKapsami,
       appliedFilters.search,
       listPage
     ]
@@ -198,6 +204,7 @@ export function usePersoneller() {
           departman_id: parseOptionalPositiveInt(appliedFilters.departmanId),
           aktiflik: appliedFilters.aktiflik,
           personel_tipi_id: parseOptionalPositiveInt(appliedFilters.personelTipiId),
+          calisan_kapsami: appliedFilters.calisanKapsami || undefined,
           sube_id: getSubeIdForApiRequest(),
           page: listPage,
           limit: PAGE_SIZE
@@ -208,6 +215,7 @@ export function usePersoneller() {
     appliedFilters.aktiflik,
     appliedFilters.departmanId,
     appliedFilters.personelTipiId,
+    appliedFilters.calisanKapsami,
     appliedFilters.search,
     listKey,
     listPage
@@ -228,6 +236,7 @@ export function usePersoneller() {
               departman_id: parseOptionalPositiveInt(appliedFilters.departmanId),
               aktiflik: appliedFilters.aktiflik,
               personel_tipi_id: parseOptionalPositiveInt(appliedFilters.personelTipiId),
+              calisan_kapsami: appliedFilters.calisanKapsami || undefined,
               sube_id: getSubeIdForApiRequest(),
               page: listPage,
               limit: PAGE_SIZE
@@ -252,6 +261,7 @@ export function usePersoneller() {
     appliedFilters.aktiflik,
     appliedFilters.departmanId,
     appliedFilters.personelTipiId,
+    appliedFilters.calisanKapsami,
     appliedFilters.search,
     listKey,
     listPage
@@ -322,8 +332,8 @@ export function usePersoneller() {
 
   const clearFilters = useCallback(() => {
     setListQuery({
-      draft: { search: "", aktiflik: "tum", departmanId: "", personelTipiId: "" },
-      applied: { search: "", aktiflik: "tum", departmanId: "", personelTipiId: "" },
+      draft: { search: "", aktiflik: "tum", departmanId: "", personelTipiId: "", calisanKapsami: "" },
+      applied: { search: "", aktiflik: "tum", departmanId: "", personelTipiId: "", calisanKapsami: "" },
       page: 1
     });
   }, []);
@@ -342,6 +352,10 @@ export function usePersoneller() {
 
   const setDraftPersonelTipiId = useCallback((personelTipiId: string) => {
     setListQuery((prev) => ({ ...prev, draft: { ...prev.draft, personelTipiId } }));
+  }, []);
+
+  const setDraftCalisanKapsami = useCallback((calisanKapsami: "" | "IC_PERSONEL" | "DIS_KAYNAK") => {
+    setListQuery((prev) => ({ ...prev, draft: { ...prev.draft, calisanKapsami } }));
   }, []);
 
   const setPage = useCallback((next: number | ((p: number) => number)) => {
@@ -449,7 +463,8 @@ export function usePersoneller() {
           listQuery.applied.aktiflik,
           listQuery.applied.departmanId,
           listQuery.applied.personelTipiId,
-          1
+          1,
+          listQuery.applied.calisanKapsami
         );
 
         try {
@@ -465,6 +480,7 @@ export function usePersoneller() {
                 departman_id: parseOptionalPositiveInt(listQuery.applied.departmanId),
                 aktiflik: listQuery.applied.aktiflik,
                 personel_tipi_id: parseOptionalPositiveInt(listQuery.applied.personelTipiId),
+                calisan_kapsami: listQuery.applied.calisanKapsami || undefined,
                 sube_id: getSubeIdForApiRequest(),
                 page: 1,
                 limit: PAGE_SIZE
@@ -527,6 +543,7 @@ export function usePersoneller() {
     setDraftAktiflik,
     setDraftDepartmanId,
     setDraftPersonelTipiId,
+    setDraftCalisanKapsami,
     setPage
   };
 }

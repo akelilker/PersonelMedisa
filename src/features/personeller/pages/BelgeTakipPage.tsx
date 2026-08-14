@@ -87,7 +87,7 @@ export function BelgeTakipPage() {
           setPersonelOptions(
             result.items.map((personel) => ({
               id: personel.id,
-              label: `${personel.ad} ${personel.soyad}`
+              label: [personel.ad, personel.soyad].filter(Boolean).join(" ")
             }))
           );
         }

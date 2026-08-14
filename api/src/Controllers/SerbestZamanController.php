@@ -224,9 +224,10 @@ class SerbestZamanController
             $params['pid'] = $personelIdFilter;
         }
         SubeScope::appendSubeFilter($where, $params, $scope, $allowedSubeIds, 'p.sube_id', 'sz_deadline');
+        $where[] = \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::sqlIcPersonelPredicate($pdo, 'p');
         $whereSql = implode(' AND ', $where);
 
-        $sql = "SELECT p.id, CONCAT(p.ad, ' ', p.soyad) AS ad_soyad, p.sicil_no, p.sube_id,
+        $sql = "SELECT p.id, " . \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::sqlAdSoyadExpr('p') . " AS ad_soyad, p.sicil_no, p.sube_id,
                        s.ad AS sube_ad, d.ad AS bolum_ad
                 FROM personeller p
                 LEFT JOIN subeler s ON s.id = p.sube_id
@@ -331,6 +332,10 @@ class SerbestZamanController
                 self::rollbackNotFound($pdo, 'personel bulunamadi.');
             }
             self::assertPersonelScope($user, $request, (int) $personel['sube_id']);
+            \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::assertOperationalEligible(
+                $pdo,
+                (int) $personel['id']
+            );
 
             if ((string) $tercih['odeme_tipi'] !== 'SERBEST_ZAMAN') {
                 self::rollbackConflict($pdo, 'NOT_ELIGIBLE', 'Odeme tercihi SERBEST_ZAMAN degil; olusum eventi uretilemez.');
@@ -524,6 +529,10 @@ class SerbestZamanController
                 self::rollbackNotFound($pdo, 'personel bulunamadi.');
             }
             self::assertPersonelScope($user, $request, (int) $personel['sube_id']);
+            \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::assertOperationalEligible(
+                $pdo,
+                $personelId
+            );
 
             $existing = self::loadByIslemAnahtari($pdo, $personelId, $islemAnahtari, true);
             if ($existing !== null) {
@@ -659,6 +668,10 @@ class SerbestZamanController
                 self::rollbackNotFound($pdo, 'personel bulunamadi.');
             }
             self::assertPersonelScope($user, $request, (int) $personel['sube_id']);
+            \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::assertOperationalEligible(
+                $pdo,
+                $personelId
+            );
 
             $existing = self::loadByIslemAnahtari($pdo, $personelId, $islemAnahtari, true);
             if ($existing !== null) {
@@ -824,6 +837,10 @@ class SerbestZamanController
                 self::rollbackNotFound($pdo, 'personel bulunamadi.');
             }
             self::assertPersonelScope($user, $request, (int) $personel['sube_id']);
+            \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::assertOperationalEligible(
+                $pdo,
+                $personelId
+            );
 
             $existing = self::loadByIslemAnahtari($pdo, $personelId, $islemAnahtari, true);
             if ($existing !== null) {
@@ -1136,8 +1153,11 @@ class SerbestZamanController
         $stmt = $pdo->prepare($sql);
         $stmt->execute(['id' => $personelId]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($row === false) {
+            return null;
+        }
 
-        return $row === false ? null : $row;
+        return $row;
     }
 
     /** @param array<string, mixed> $user */

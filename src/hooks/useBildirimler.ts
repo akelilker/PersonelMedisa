@@ -327,6 +327,7 @@ export function useBildirimler() {
               fetchBildirimTuruOptions(),
               fetchPersonellerList({
                 aktiflik: "aktif",
+                calisan_kapsami: "IC_PERSONEL",
                 sube_id: getSubeIdForApiRequest(),
                 page: 1,
                 limit: BILDIRIM_PERSONEL_FETCH_LIMIT

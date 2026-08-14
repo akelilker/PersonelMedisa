@@ -9,6 +9,7 @@ use Medisa\Api\Services\Attendance\AttendancePayrollEffectResolver;
 use Medisa\Api\Services\Attendance\PuantajOlayKararService;
 use Medisa\Api\Services\Payroll\FazlaCalismaYillikLimitService;
 use Medisa\Api\Services\Payroll\PayrollComplianceGuard;
+use Medisa\Api\Services\Personel\PersonelCalisanKapsamService;
 use PDO;
 use PDOException;
 
@@ -339,6 +340,7 @@ class MaasHesaplamaSnapshotService
              LEFT JOIN gorevler g ON g.id = p.gorev_id
              LEFT JOIN personel_tipleri pt ON pt.id = p.personel_tipi_id
              WHERE p.sube_id = :sube_id
+             AND " . PersonelCalisanKapsamService::sqlIcPersonelPredicate($pdo, 'p') . "
              ORDER BY p.id ASC"
         );
         $stmt->execute(['sube_id' => $subeId]);
@@ -367,7 +369,7 @@ class MaasHesaplamaSnapshotService
             $personelId = (int) $row['id'];
             $iseGiris = (string) $row['ise_giris_tarihi'];
             $cikis = $row['cikis_tarihi'] !== null ? (string) $row['cikis_tarihi'] : null;
-            $adSoyad = trim((string) $row['ad'] . ' ' . (string) $row['soyad']);
+            $adSoyad = PersonelCalisanKapsamService::formatAdSoyad($row['ad'] ?? '', $row['soyad'] ?? null);
 
             if ($cikis !== null && $cikis < $iseGiris) {
                 $items[] = self::issue(self::SEVERITY_BLOCKER, 'EMPLOYMENT_DATE_INVALID', 'Istihdam tarih araligi gecersiz (cikis giristen once).', 'personel', $personelId, $personelId, [

@@ -1,14 +1,17 @@
 export type PersonelAktifDurum = "AKTIF" | "PASIF";
 
+export type PersonelCalisanKapsami = "IC_PERSONEL" | "DIS_KAYNAK";
+
 export type Personel = {
   id: number;
-  tc_kimlik_no: string;
+  tc_kimlik_no: string | null;
   ad: string;
-  soyad: string;
+  soyad: string | null;
   aktif_durum: PersonelAktifDurum;
+  calisan_kapsami?: PersonelCalisanKapsami;
   sube_id?: number;
-  telefon?: string;
-  dogum_tarihi?: string;
+  telefon?: string | null;
+  dogum_tarihi?: string | null;
   sicil_no?: string;
   dogum_yeri?: string;
   kan_grubu?: string;

@@ -12,18 +12,19 @@ export type PersonellerListParams = {
   sube_id?: number;
   aktiflik?: "aktif" | "pasif" | "tum";
   personel_tipi_id?: number;
+  calisan_kapsami?: "IC_PERSONEL" | "DIS_KAYNAK";
   page?: number;
   limit?: number;
 };
 
 export type CreatePersonelPayload = {
-  tc_kimlik_no: string;
+  tc_kimlik_no?: string | null;
   ad: string;
-  soyad: string;
-  dogum_tarihi: string;
-  telefon: string;
-  acil_durum_kisi: string;
-  acil_durum_telefon: string;
+  soyad?: string | null;
+  dogum_tarihi?: string | null;
+  telefon?: string | null;
+  acil_durum_kisi?: string | null;
+  acil_durum_telefon?: string | null;
   sicil_no: string;
   ise_giris_tarihi: string;
   sube_id: number;
@@ -31,6 +32,7 @@ export type CreatePersonelPayload = {
   gorev_id: number;
   personel_tipi_id: number;
   aktif_durum: "AKTIF" | "PASIF";
+  calisan_kapsami?: "IC_PERSONEL" | "DIS_KAYNAK";
   dogum_yeri?: string;
   kan_grubu?: string;
   bagli_amir_id?: number;
@@ -236,13 +238,16 @@ function normalizePersonel(data: unknown): Personel {
 
   return {
     id: readRequiredNumber(baseSources, "id", "id"),
-    tc_kimlik_no: readRequiredString(baseSources, "tc_kimlik_no", "tc_kimlik_no"),
+    tc_kimlik_no: readNullableString(baseSources, "tc_kimlik_no", "tcKimlikNo") ?? null,
     ad: readRequiredString(baseSources, "ad", "ad"),
-    soyad: readRequiredString(baseSources, "soyad", "soyad"),
+    soyad: readNullableString(baseSources, "soyad") ?? null,
     aktif_durum: aktifDurum,
+    calisan_kapsami: (readString(baseSources, "calisan_kapsami") === "DIS_KAYNAK"
+      ? "DIS_KAYNAK"
+      : "IC_PERSONEL") as Personel["calisan_kapsami"],
     sube_id: readNumber(baseSources, "sube_id"),
-    telefon: readString(baseSources, "telefon"),
-    dogum_tarihi: readString(baseSources, "dogum_tarihi"),
+    telefon: readNullableString(baseSources, "telefon") ?? undefined,
+    dogum_tarihi: readNullableString(baseSources, "dogum_tarihi") ?? undefined,
     sicil_no: readString(baseSources, "sicil_no"),
     dogum_yeri: readString(baseSources, "dogum_yeri"),
     kan_grubu: readString(baseSources, "kan_grubu"),
@@ -360,6 +365,7 @@ export async function fetchPersonellerList(
     sube_id: params?.sube_id,
     aktiflik: params?.aktiflik,
     personel_tipi_id: params?.personel_tipi_id,
+    calisan_kapsami: params?.calisan_kapsami,
     page: params?.page,
     limit: params?.limit
   });

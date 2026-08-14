@@ -77,8 +77,11 @@ export function resolveHistoryHasMore(
 }
 
 const INITIAL_EDIT_PERSONEL_FORM: EditPersonelFormState = {
+  calisanKapsami: "IC_PERSONEL",
+  tcKimlikNo: "",
   ad: "",
   soyad: "",
+  dogumTarihi: "",
   telefon: "",
   departmanId: "",
   bolumId: "",

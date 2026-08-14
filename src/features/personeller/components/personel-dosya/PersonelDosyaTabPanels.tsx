@@ -32,6 +32,7 @@ export type PersonelDosyaTabPanelsProps = {
   canViewBordroKapsam?: boolean;
   canManageBordroKapsam?: boolean;
   canApproveBordroKapsam?: boolean;
+  directoryOnly?: boolean;
 };
 
 export function PersonelDosyaTabPanels({
@@ -57,7 +58,8 @@ export function PersonelDosyaTabPanels({
   canManageUcret,
   canViewBordroKapsam = false,
   canManageBordroKapsam = false,
-  canApproveBordroKapsam = false
+  canApproveBordroKapsam = false,
+  directoryOnly = false
 }: PersonelDosyaTabPanelsProps) {
   function handleOpenSurecHistory() {
     onTabChange("surec-gecmisi");
@@ -65,9 +67,13 @@ export function PersonelDosyaTabPanels({
 
   return (
     <>
-      <PersonelDosyaTabList activeTab={activeTab} onTabChange={onTabChange} />
+      <PersonelDosyaTabList
+        activeTab={activeTab}
+        onTabChange={onTabChange}
+        directoryOnly={directoryOnly}
+      />
 
-      <div
+      {!directoryOnly ? <div
         id="personel-kart-panel-genel-bilgiler"
         role="tabpanel"
         className="personel-kart-panel"
@@ -90,9 +96,9 @@ export function PersonelDosyaTabPanels({
           isActive={activeTab === "genel-bilgiler"}
           onOpenSurecHistory={handleOpenSurecHistory}
         />
-      </div>
+      </div> : null}
 
-      <div
+      {!directoryOnly ? <div
         id="personel-kart-panel-egitim-belgeler"
         role="tabpanel"
         className="personel-kart-panel"
@@ -104,9 +110,9 @@ export function PersonelDosyaTabPanels({
           isActive={activeTab === "egitim-belgeler"}
           allowMutations={false}
         />
-      </div>
+      </div> : null}
 
-      <div
+      {!directoryOnly ? <div
         id="personel-kart-panel-disiplin"
         role="tabpanel"
         className="personel-kart-panel"
@@ -123,7 +129,7 @@ export function PersonelDosyaTabPanels({
           canAccessSurecler={canAccessSurecler}
           onOpenSurecHistory={handleOpenSurecHistory}
         />
-      </div>
+      </div> : null}
 
       <div
         id="personel-kart-panel-zimmet-envanter"

@@ -398,6 +398,10 @@ class MaasHesaplamaController
             self::validationError('personel_id', 'personel_id ve sube_id zorunludur.');
         }
         self::assertSnapshotScope($user, $request, $subeId);
+        \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::assertOperationalEligible(
+            $pdo,
+            $personelId
+        );
         $yil = self::readBodyInt($body, 'yil', 2000, 2100);
         $ay = self::readBodyInt($body, 'ay', 1, 12);
         if (!isset($body['onceki_kumulatif_gelir_vergisi_matrahi']) || !isset($body['onceki_kumulatif_gelir_vergisi'])) {

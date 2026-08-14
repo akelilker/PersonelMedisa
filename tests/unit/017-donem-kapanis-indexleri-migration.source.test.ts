@@ -29,6 +29,6 @@ describe("017_donem_kapanis_ve_etki_rapor_indexleri migration source", () => {
       .filter((name) => /^\d{3}_.*\.sql$/.test(name))
       .sort();
     expect(migrations).toContain("017_donem_kapanis_ve_etki_rapor_indexleri.sql");
-    expect(migrations.at(-1)).toBe("065_personel_org_structure.sql");
+    expect(migrations.at(-1)).toBe("066_personel_calisan_kapsami.sql");
   });
 });

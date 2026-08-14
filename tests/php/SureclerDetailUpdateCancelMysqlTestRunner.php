@@ -197,17 +197,18 @@ function bootstrapSurecSchema(PDO $pdo): void
     $pdo->exec("
         CREATE TABLE personeller (
           id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
-          tc_kimlik_no CHAR(11) NOT NULL,
+          tc_kimlik_no CHAR(11) NULL,
           ad VARCHAR(80) NOT NULL,
-          soyad VARCHAR(80) NOT NULL,
-          dogum_tarihi DATE NOT NULL,
-          telefon VARCHAR(32) NOT NULL DEFAULT '',
+          soyad VARCHAR(80) NULL,
+          dogum_tarihi DATE NULL,
+          telefon VARCHAR(32) NULL DEFAULT '',
           acil_durum_kisi VARCHAR(120) NOT NULL DEFAULT '',
           acil_durum_telefon VARCHAR(32) NOT NULL DEFAULT '',
           sicil_no VARCHAR(32) NOT NULL,
           ise_giris_tarihi DATE NOT NULL,
           sube_id INT UNSIGNED NOT NULL,
           aktif_durum ENUM('AKTIF','PASIF') NOT NULL DEFAULT 'AKTIF',
+          calisan_kapsami ENUM('IC_PERSONEL','DIS_KAYNAK') NOT NULL DEFAULT 'IC_PERSONEL',
           KEY idx_personel_sube (sube_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     ");
@@ -233,17 +234,21 @@ function bootstrapSurecSchema(PDO $pdo): void
     $pdo->exec("INSERT INTO subeler (id, kod, ad) VALUES (1, 'MRK', 'Merkez'), (2, 'SB2', 'Sube 2')");
     $pdo->exec("
         INSERT INTO personeller (
-          id, tc_kimlik_no, ad, soyad, dogum_tarihi, sicil_no, ise_giris_tarihi, sube_id, aktif_durum
+          id, tc_kimlik_no, ad, soyad, dogum_tarihi, sicil_no, ise_giris_tarihi, sube_id, aktif_durum, calisan_kapsami
         ) VALUES
-          (10, '11111111111', 'Ayse', 'Yilmaz', '1990-01-01', 'S10', '2020-01-01', 1, 'AKTIF'),
-          (20, '22222222222', 'Mehmet', 'Demir', '1988-01-01', 'S20', '2020-01-01', 2, 'AKTIF')
+          (10, '11111111111', 'Ayse', 'Yilmaz', '1990-01-01', 'S10', '2020-01-01', 1, 'AKTIF', 'IC_PERSONEL'),
+          (20, '22222222222', 'Mehmet', 'Demir', '1988-01-01', 'S20', '2020-01-01', 2, 'AKTIF', 'IC_PERSONEL'),
+          (30, NULL, 'ExternalOther', NULL, NULL, 'S30', '2026-01-01', 2, 'AKTIF', 'DIS_KAYNAK'),
+          (40, NULL, 'ExternalOwn', NULL, NULL, 'S40', '2026-01-01', 1, 'AKTIF', 'DIS_KAYNAK')
     ");
     $pdo->exec("
         INSERT INTO surecler (id, personel_id, surec_turu, alt_tur, baslangic_tarihi, bitis_tarihi, ucretli_mi, aciklama, state)
         VALUES
           (100, 10, 'IZIN', NULL, '2026-07-01', '2026-07-05', 1, 'Yillik izin', 'AKTIF'),
           (101, 20, 'RAPOR', 'Raporlu_Hastalik', '2026-07-02', NULL, 0, 'Rapor', 'AKTIF'),
-          (102, 10, 'IZIN', NULL, '2026-06-01', '2026-06-02', 1, 'Tamam', 'TAMAMLANDI')
+          (102, 10, 'IZIN', NULL, '2026-06-01', '2026-06-02', 1, 'Tamam', 'TAMAMLANDI'),
+          (103, 30, 'IZIN', NULL, '2026-07-03', '2026-07-04', 1, 'External other', 'AKTIF'),
+          (104, 40, 'IZIN', NULL, '2026-07-03', '2026-07-04', 1, 'External own', 'AKTIF')
     ");
 }
 
@@ -286,8 +291,24 @@ surecAssert($missing['status'] === 404, 'HTTP detail missing → 404');
 $baOther = invokeSurecHttp($pdo, $ba, 'GET', '/surecler/101');
 surecAssert($baOther['status'] === 403, 'HTTP BA other sube → 403');
 
+$baExternalOther = invokeSurecHttp($pdo, $ba, 'PUT', '/surecler/103', [
+    'surec_turu' => 'IZIN',
+    'baslangic_tarihi' => '2026-07-03',
+    'aciklama' => 'forbidden first',
+]);
+surecAssert($baExternalOther['status'] === 403, 'HTTP BA external other sube → 403 before external guard');
+surecAssert(($baExternalOther['payload']['errors'][0]['code'] ?? '') !== 'PERSONEL_OPERASYON_KAPSAM_DISI', 'HTTP BA external other does not leak external guard');
+
 $baOwn = invokeSurecHttp($pdo, $ba, 'GET', '/surecler/100');
 surecAssert($baOwn['status'] === 200, 'HTTP BA own sube detail → 200');
+
+$externalOwnUpdate = invokeSurecHttp($pdo, $gy, 'PUT', '/surecler/104', [
+    'surec_turu' => 'IZIN',
+    'baslangic_tarihi' => '2026-07-03',
+    'aciklama' => 'blocked external',
+]);
+surecAssert($externalOwnUpdate['status'] === 409, 'HTTP authorized external surec update → 409');
+surecAssert(($externalOwnUpdate['payload']['errors'][0]['code'] ?? '') === 'PERSONEL_OPERASYON_KAPSAM_DISI', 'HTTP authorized external surec update scope code');
 
 $baUpdate = invokeSurecHttp($pdo, $ba, 'PUT', '/surecler/100', [
     'surec_turu' => 'IZIN',

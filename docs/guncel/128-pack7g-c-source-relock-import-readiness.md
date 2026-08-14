@@ -1,9 +1,9 @@
 # 128 — Pack7G-C Source Re-lock + Full Preflight + Import Readiness
 
-**Tarih:** 2026-08-14  
-**Pack:** `Pack7G-C`  
-**Mode:** `SOURCE_RELOCK_FULL_PREFLIGHT_IMPORT_READINESS`  
-**Base commit:** `cee6e2d037af8d12f52c0af87578bd6260de0da3`  
+**Tarih:** 2026-08-14
+**Pack:** `Pack7G-C`
+**Mode:** `SOURCE_RELOCK_FULL_PREFLIGHT_IMPORT_READINESS`
+**Base commit:** `cee6e2d037af8d12f52c0af87578bd6260de0da3`
 **Production mutation:** `NO`
 
 ## Kaynak otoritesi ve lineage
@@ -137,11 +137,11 @@ BLOCKERS = 55 canonical identity records; 13 external organizational/reference r
 FINAL_STATUS = BLOCKED
 ```
 
-`PRODUCTION_MUTATED = NO`  
-`CANONICAL_122_IMPORT = NO`  
-`EXTERNAL_13_IMPORT = NO`  
-`IMPORT_APPLY = NO`  
-`MERGE = NO`  
+`PRODUCTION_MUTATED = NO`
+`CANONICAL_122_IMPORT = NO`
+`EXTERNAL_13_IMPORT = NO`
+`IMPORT_APPLY = NO`
+`MERGE = NO`
 `DEPLOY = NO`
 
 Next production operation, after explicit authorization and blocker resolution only: backup and verify the live database; rerun the complete read-only preflight and dry-run against the exact locked hashes; then execute one transaction containing `122` new `IC_PERSONEL` and `13` new `DIS_KAYNAK` rows, with zero existing-row overwrites and rollback of the entire personnel graph if any row/reference/constraint check fails before commit.

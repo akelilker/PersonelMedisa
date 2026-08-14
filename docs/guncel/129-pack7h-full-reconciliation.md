@@ -412,3 +412,136 @@ MERGE = NO
 DEPLOY = NO
 UNRELATED_CHANGE = NO
 ```
+
+## Final semantic reconciliation — 2026-08-15
+
+The previous continuation's literal `Fabrika` lookup was a semantic error. Pack6B's
+established mapping is `Medisa (Merkez Karabük) → MRK`; the live catalog now confirms
+that `MRK` is uniquely active as `id=1`, `kod=MRK`, `ad=Medisa`. No production branch
+row was renamed or changed.
+
+```text
+PACK = Pack7H
+MODE = FINAL_SEMANTIC_RECONCILIATION
+PREVIOUS_HEAD = 71ca3f2ba09a335f0f02ba982f2f8f31af4bfb3f
+PR = #168
+
+BRANCH_MAPPING_OWNER = Pack6B established canonical branch mapping
+EXTERNAL_BRANCH_REFERENCE = MRK / Medisa (id=1, AKTIF)
+EXTERNAL_SUBE_BLOCKERS_AFTER = 0
+EXTERNAL_LOCATION_REFERENCE = Karabük (unique active location)
+EXTERNAL_LOCATION_BLOCKERS_AFTER = 0
+```
+
+### Semantic column proof
+
+The supplemental workbook was reopened and joined to the canonical control population
+using exact TC only. The supplemental workbook has 146 personnel rows; 117 canonical
+rows joined exactly by TC. Its source-column coverage was:
+
+```text
+SEMANTIC_CONTROL_ROWS = 117
+SUPPLEMENTAL_UNVAN_ADI_NONEMPTY = 0 / 117
+SUPPLEMENTAL_DEPARTMAN_ADI_NONEMPTY = 48 / 117
+SUPPLEMENTAL_BOLUM_ADI_NONEMPTY = 0 / 117
+SUPPLEMENTAL_BIRIM_COLUMN_PRESENT = NO
+EXTERNAL_EXACT_SICIL_ROWS_IN_SUPPLEMENTAL = 10 / 13
+```
+
+Pack6B remains the authoritative application domain owner:
+
+```text
+SUPPLEMENTAL_UNVAN_TO_APPLICATION_GOREV = PROVEN_BY_PACK6B_DOMAIN_MAPPING
+UNVAN_TO_GOREV_PROVEN = YES
+SUPPLEMENTAL_GOREV_APPLICATION_OWNER = NO
+GOREV_COLUMN_ACTUAL_SEMANTICS = source operational/function description, not application gorevler
+DEPARTMAN_SOURCE_TO_APPLICATION_DEPARTMAN = NO_EXACT_CONTROL_PROOF
+BOLUM_SOURCE_TO_APPLICATION_BOLUM = NO_SOURCE_VALUE_FOR_EXTERNAL
+BIRIM_SOURCE_TO_APPLICATION_BIRIM = NO_SOURCE_COLUMN
+```
+
+Therefore values such as `İSKELETHANE`, `ÇAKIMA HAZIRLIK`, `DEPO VE SEVKİYAT ELE`,
+and `PVC + HERİŞ` were not inserted into or guessed against `gorevler`. External
+`Ünvan Adı` is empty in the exact supplemental rows, so the 13 job blockers remain
+genuine human/business-data blockers.
+
+```text
+EXTERNAL_GOREV_BLOCKERS_BEFORE = 13
+EXTERNAL_GOREV_BLOCKERS_AFTER = 13
+EXTERNAL_DEPARTMAN_BLOCKERS_AFTER = 13
+EXTERNAL_BOLUM_BLOCKERS_AFTER = 13
+EXTERNAL_BIRIM_BLOCKERS_AFTER = 13
+```
+
+### Personel tipi semantics
+
+```text
+ACTIVE_PERSONEL_TYPES = [Beyaz Yaka, Diğer, Mavi Yaka, Sozlesmeli, Tam Zamanli]
+EXTERNAL_PERSONEL_TYPE_SOURCE_FOUND = NO
+EXTERNAL_PERSONEL_TYPE_BLOCKERS_AFTER = 13
+EXTERNAL_PERSONEL_TYPE_USER_DECISION_REQUIRED = YES
+PROPOSED_COMMON_TYPE = NONE
+```
+
+The KBS/Jandarma phrase `Sürekli Personel` has no exact application `personel_tipleri`
+equivalent. No `Grup`, yaka, or employee-class source was found for these 13 rows, so
+one common type decision remains required; no new reference was created.
+
+### Actual v4 dry-run and staging proof
+
+The production dry-run used the deterministic v4 staging CSV, not the earlier raw/v2
+payload. It contains 122 canonical and 13 External rows, user-confirmed name splits,
+20 recovered sicils, `sube=Medisa` for External rows (the MRK display reference), and
+`calisma_lokasyonu=Karabük`.
+
+```text
+REAL_DRY_RUN_TOTAL = 135
+REAL_DRY_RUN_VALID_IC = 77
+REAL_DRY_RUN_INVALID_IC = 45
+REAL_DRY_RUN_VALID_DIS = 0
+REAL_DRY_RUN_INVALID_DIS = 13
+REAL_DRY_RUN_VALID_TOTAL = 77
+REAL_DRY_RUN_INVALID_TOTAL = 58
+ERROR_OCCURRENCES_PERSONEL_IMPORT_EKSIK_ALAN = 58
+ERROR_OCCURRENCES_PERSONEL_IMPORT_REFERANS_BULUNAMADI = 13
+CAN_APPLY = NO
+PRODUCTION_EXISTING_COUNT = 4
+PRODUCTION_MATCHES = 0
+PRODUCTION_COUNT_UNCHANGED = YES
+```
+
+The 58 invalid rows are 45 IC row failures plus 13 External row failures. Error
+occurrences are reported separately and are not treated as distinct-person counts.
+
+### Final human-required inputs
+
+```text
+CANONICAL_MISSING_SICIL = 4
+CANONICAL_MISSING_BIRTH_DATE = 5
+CANONICAL_MISSING_PHONE = 26
+CANONICAL_BLOCKED_DISTINCT = 26
+```
+
+The final decision workbook contains only human-required inputs: canonical identity
+fields, External department/bölüm/birim/job decisions, and one common External
+personel-type decision with exact active-catalog dropdown options. Resolved names,
+Karabük, and MRK are absent.
+
+```text
+ENRICHED_ARTIFACT_V4 = C:\Users\Akel\Documents\medisa-ops-tmp\personel-import-122\pack7h-final-reconciliation-v4.json
+ENRICHED_ARTIFACT_V4_HASH = 7A4F9D87C77375559F728C14B7D63EE0B0411A326681FA809C58793D7BAE9008
+USER_WORKBOOK_V3_CREATED = YES
+USER_WORKBOOK_V3_PATH = C:\Users\Akel\Documents\medisa-ops-tmp\personel-import-122\pack7h-kullanici-tamamlamasi-gerekenler-v3.xlsx
+USER_WORKBOOK_V3_ROWS = 88
+USER_WORKBOOK_V3_HASH = 7A499DC9C43CDAEDCD07072EA6FEE8AED9D7086755F32028891E7BFBB9AD173F
+```
+
+```text
+PRODUCTION_MUTATED = NO
+PRODUCTION_REFERENCE_MUTATED = NO
+IMPORT_APPLY = NO
+MERGE = NO
+DEPLOY = NO
+IMPORT_READY = NO
+FINAL_STATUS = BLOCKED
+```

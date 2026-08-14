@@ -147,16 +147,18 @@ Private apply-candidate pack retained outside repo (exact SGK proposals only for
 
 | ID | Status after this rollout |
 | --- | --- |
-| `MG-ORG-ATTR-ROLL-001` | **OPS_ROLLOUT** — production schema ready (`065`); personnel FK apply still `USER_GATED` |
-| `MG-OPS-ORG-001` | **PARTIAL→ADVANCED** — locked 10-branch model + ownership complete; taxonomy partial (Departman catalog gap); personnel mapping still gated |
+| `MG-ORG-ATTR-ROLL-001` | **OPS_ROLLOUT** at `121` close — later **CLOSED_REFERENCE_ROLLOUT** via `122` |
+| `MG-OPS-ORG-001` | **PARTIAL→ADVANCED** at `121` close — later **CLOSED_REFERENCE_ROLLOUT** via `122` |
 | `MG-ORG-LOC-001` | remains **OPS_ROLLOUT** / `USER_GATED` until personnel FK apply |
-| `MG-IMPORT-DATA-001` | remains **USER_GATED** (source completion + identity overlap) |
+| `MG-IMPORT-DATA-001` | remains **USER_GATED** (source completion + identity) — narrowed by `122` |
 | `MG-OPS-PERSONEL-001` | remains **USER_GATED** |
 
 ---
 
-## Recommended next user action
+## Forward status (Pack6B — see `122`)
 
-**“4 personelin doğrulanmış `sgk_isveren_id` alanını (branch owner EXACT) production’a yazalım mı?”**
+Canonical Departman/Unvan/PersonelTipi/Bölüm/Birim catalog completion and 122-row org-reference staging catch-up are recorded in **`122-canonical-hr-catalog-completion.md`**. This `121` evidence file is not rewritten historically.
 
-Location / Bölüm / Birim / Pozisyon exact apply is **not** ready for the current production personnel set (no TC/sicil overlap with private HR sources). Broader import remains blocked until identity overlap and Departman catalog completion.
+## Recommended next user action (superseded forward pointer)
+
+Historical prompt at close of `121` (smoke-personnel SGK write) remains **policy-skipped** for the 4 fixture rows. After `122`, next gate is **identity data completion** (sicil / name-split / birth / phone) then `MG-OPS-PERSONEL-001` import authorization — not smoke-personnel org FK apply.

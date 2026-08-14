@@ -281,3 +281,134 @@ USER_INPUT_WORKBOOK_PATH = C:\Users\Akel\Documents\medisa-ops-tmp\personel-impor
 ```
 
 The successor artifact contains all 122 canonical and 13 External rows, original/resolved values, source hash/row, strong identity key, reason, and confidence for supplemental enrichment. The user-input workbook contains only remaining unresolved fields and Turkish instructions; neither private artifact is committed.
+
+## Current authoritative continuation — 2026-08-15
+
+The following continuation records the user's authoritative business decisions without changing
+the canonical workbook or applying any production mutation:
+
+```text
+PACK = Pack7H
+MODE = USER_AUTHORITATIVE_COMPLETION
+BRANCH = feat/pack7h-full-reconciliation
+PR = #168
+PREVIOUS_HEAD = 1092594cad4ef5435ab040decc202bb84e8099aa
+
+USER_NAME_SPLITS_CONFIRMED = 23
+USER_NAME_SPLITS_APPLIED = 23
+UNRESOLVED_NAME_SPLIT_AFTER = 0
+NAME_SPLITS_RESOLVED_BY_USER = 23
+
+USER_EXTERNAL_FACTORY_CONFIRMED = 13
+USER_EXTERNAL_KARABUK_CONFIRMED = 13
+USER_EXTERNAL_SUREKLI_PERSONEL_CONFIRMED = 13
+EXACT_SUBE_REFERENCE = BLOCKED (no active Fabrika row)
+EXACT_LOCATION_REFERENCE = Karabük
+EXACT_PERSONEL_TIPI_REFERENCE = BLOCKED (no active Sürekli Personel row)
+EXTERNAL_SUBE_BLOCKERS_AFTER = 13
+EXTERNAL_LOCATION_BLOCKERS_AFTER = 0
+EXTERNAL_PERSONEL_TIPI_BLOCKERS_AFTER = 13
+EXTERNAL_ORG_BLOCKERS_AFTER = 13
+```
+
+The live read-only reference export returned one usable active `CALISMA_LOKASYONU=Karabük`
+row. It returned no active exact `SUBE=Fabrika` or `PERSONEL_TIPI=Sürekli Personel` row;
+no reference row was created and no fuzzy semantic mapping was used.
+
+### External task reconciliation
+
+The completion workbook contained 13 task rows, so the previous report of eight was stale.
+The live catalog and supplemental source were reconciled for every External worker:
+
+| SICIL | NAME | EXTERNAL_SUCCESSOR_RAW_GOREV | SUPPLEMENTAL_GOREV_KODU | SUPPLEMENTAL_GOREV_ADI | ACTIVE_GOREV_CATALOG_MATCH | FINAL_GOREV_REFERENCE | STATUS |
+| ---: | --- | --- | --- | --- | --- | --- | --- |
+| 176 | RAED FAWAZ | RAED FAWAZ | İSKELETHANE | — | NO | — | BLOCKED |
+| 197 | SAIF TAREQ JASIM AL-GBURI | SAIF TAREQ JASIM AL-GBURI | ÇAKIMA HAZIRLIK | — | NO | — | BLOCKED |
+| 201 | AHMED KHALIL ALSAMAR | AHMED KHALIL ALSAMAR | — | — | NO | — | BLOCKED |
+| 206 | MUHAMMED IRAKLI | MUHAMMED IRAKLI | DEPO VE SEVKİYAT ELE | — | NO | — | BLOCKED |
+| 213 | FETİYAN | FETİYAN | PVC + HERİŞ | — | NO | — | BLOCKED |
+| 275 | ALADDİN DEREBAŞI | ALADDİN DEREBAŞI | DEPO VE SEVKİYAT ELE | — | NO | — | BLOCKED |
+| 283 | ABDULLAH | ABDULLAH | DEPO VE SEVKİYAT ELE | — | NO | — | BLOCKED |
+| 285 | OKTAY ERSÖZ | OKTAY ERSÖZ | — | — | NO | — | BLOCKED |
+| 355 | SEFİNE ÖZCAN | SEFİNE ÖZCAN | — | — | NO | — | BLOCKED |
+| 375 | MUQTADA MAZIN KHALEE | MUQTADA MAZIN KHALEE | DEPO VE SEVKİYAT ELE | — | NO | — | BLOCKED |
+| 398 | MUHAMMAT FAWAZ | MUHAMMAT FAWAZ | — | — | NO | — | BLOCKED |
+| 407 | FAHRİ TAYLAN MERCAN | FAHRİ TAYLAN MERCAN | — | — | NO | — | BLOCKED |
+| 427 | MUSTAFA HAMİD | MUSTAFA HAMİD | — | — | NO | — | BLOCKED |
+
+```text
+EXTERNAL_GOREV_WORKBOOK_ROWS = 13
+EXTERNAL_GOREV_PREVIOUS_REPORTED_BLOCKERS = 8
+EXTERNAL_GOREV_TRUE_BLOCKERS_AFTER_RECONCILIATION = 13
+GOREV_BLOCKER_COUNT_INCONSISTENCY_RESOLVED = YES
+```
+
+The five rows 201, 285, 398, 407, and 427 have no valid exact supplemental task pair;
+their blank task fields are therefore genuine blockers, not generator omissions. Missing
+supplemental departments also remain unresolved where the exact sicil row has no department.
+
+### Authoritative result and projection
+
+```text
+CANONICAL_COUNT = 122
+EXTERNAL_COUNT = 13
+MISSING_SICIL_AFTER = 4
+MISSING_REQUIRED_BIRTH_DATE_AFTER = 5
+MISSING_REQUIRED_PHONE_AFTER = 26
+CANONICAL_BLOCKED_DISTINCT_AFTER = 26
+IDENTITY_CONFLICTS = 0
+AMBIGUOUS = 0
+
+PRODUCTION_EXISTING_COUNT = 4
+PRODUCTION_MATCHES = 0
+NEW_IC_PERSONEL = 122
+NEW_DIS_KAYNAK = 13
+EXPECTED_IC_PERSONEL_AFTER_IMPORT = 126
+EXPECTED_DIS_KAYNAK_AFTER_IMPORT = 13
+EXPECTED_TOTAL_AFTER_IMPORT = 139
+
+VALIDATION_BLOCKED = 58
+REFERENCE_INTEGRITY = FAIL
+IC_VALIDATION = FAIL
+DIS_VALIDATION = FAIL
+DRY_RUN = FAIL
+IMPORT_READY = NO
+FINAL_STATUS = BLOCKED
+```
+
+The real application dry-run returned HTTP 200 with `135` input rows, `77` valid rows,
+and `58` invalid rows. The 58 value is the importer diagnostic count (not the
+overlap-aware distinct canonical count plus External count); its error codes were
+`PERSONEL_IMPORT_EKSIK_ALAN=58` and `PERSONEL_IMPORT_REFERANS_BULUNAMADI=13`.
+
+The authoritative identity decisions remove all 23 name-split ambiguities. They do not
+invent the remaining canonical sicil, birth-date, or phone values, and they do not relax
+the IC contract. External location is resolved, while branch/personnel type and task
+references remain fail-closed against the active catalog.
+
+Private successor artifacts:
+
+```text
+ENRICHED_ARTIFACT_V3 = C:\Users\Akel\Documents\medisa-ops-tmp\personel-import-122\pack7h-final-reconciliation-v3.json
+ENRICHED_ARTIFACT_V3_HASH = 0601D16DA05D85C4A525C78BDC4E0BCD628E32597EDA265EAD20149698F1F820
+USER_INPUT_WORKBOOK_V2_CREATED = YES
+USER_INPUT_WORKBOOK_V2_PATH = C:\Users\Akel\Documents\medisa-ops-tmp\personel-import-122\pack7h-kullanici-tamamlamasi-gerekenler-v2.xlsx
+USER_INPUT_WORKBOOK_V2_HASH = 8032C7D50086F46A0A00D5DF86344ADF05734D2497EB75ADC4CD5B4C6767E0FF
+```
+
+The final workbook contains 81 unresolved-field rows: Telefon 26, Sicil 4, Doğum Tarihi
+5, Şube 13, Personel Türü 13, Görev Kodu + Görev Adı 13, and Departman 7. Resolved names
+and exact active Karabük location are intentionally absent.
+
+```text
+IMPORT_ATOMICITY = PASS
+IMPORT_IDEMPOTENCY = PASS
+DIS_KAYNAK_SGK_ISOLATED = YES
+DIS_KAYNAK_BORDRO_ISOLATED = YES
+DIS_KAYNAK_PUANTAJ_ISOLATED = YES
+PRODUCTION_MUTATED = NO
+IMPORT_APPLY = NO
+MERGE = NO
+DEPLOY = NO
+UNRELATED_CHANGE = NO
+```

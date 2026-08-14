@@ -32,13 +32,18 @@ describe("Pack7H full reconciliation source locks", () => {
     expect(evidence).toContain("No source workbook was modified");
   });
 
-  it("keeps current reconciliation fail-closed without freezing historical counts", () => {
+  it("preserves historical continuation counts while asserting the authoritative completion", () => {
     const evidence = read("docs/guncel/129-pack7h-full-reconciliation.md");
 
     expect(evidence).toContain("MISSING_SICIL_BEFORE = 24");
     expect(evidence).toContain("MISSING_SICIL_AFTER = 4");
     expect(evidence).toContain("CANONICAL_BLOCKED_DISTINCT_AFTER = 41");
     expect(evidence).toContain("VALIDATION_BLOCKED = 54");
+    expect(evidence).toContain("MODE = USER_AUTHORITATIVE_COMPLETION");
+    expect(evidence).toContain("UNRESOLVED_NAME_SPLIT_AFTER = 0");
+    expect(evidence).toContain("NAME_SPLITS_RESOLVED_BY_USER = 23");
+    expect(evidence).toContain("CANONICAL_BLOCKED_DISTINCT_AFTER = 26");
+    expect(evidence).toContain("VALIDATION_BLOCKED = 58");
     expect(evidence).toContain("IMPORT_READY = NO");
     expect(evidence).toContain("FINAL_STATUS = BLOCKED");
   });
@@ -46,11 +51,16 @@ describe("Pack7H full reconciliation source locks", () => {
   it("does not permit fuzzy task mapping or production mutation", () => {
     const evidence = read("docs/guncel/129-pack7h-full-reconciliation.md");
 
-    for (const sicil of ["176", "197", "206", "213", "275", "283", "355", "375"]) {
+    for (const sicil of ["176", "197", "201", "206", "213", "275", "283", "285", "355", "375", "398", "407", "427"]) {
       expect(evidence).toContain(`| ${sicil} |`);
     }
     expect(evidence).toContain("No fuzzy mapping");
     expect(evidence).toContain("No repository catalog row, fuzzy mapping");
+    expect(evidence).toContain("EXTERNAL_GOREV_TRUE_BLOCKERS_AFTER_RECONCILIATION = 13");
+    expect(evidence).toContain("GOREV_BLOCKER_COUNT_INCONSISTENCY_RESOLVED = YES");
+    expect(evidence).toContain("EXACT_LOCATION_REFERENCE = Karabük");
+    expect(evidence).toContain("EXACT_SUBE_REFERENCE = BLOCKED");
+    expect(evidence).toContain("EXACT_PERSONEL_TIPI_REFERENCE = BLOCKED");
     expect(evidence).toContain("PRODUCTION_MUTATED = NO");
     expect(evidence).toContain("IMPORT_APPLY = NO");
     expect(evidence).toContain("EXPECTED_TOTAL_AFTER_IMPORT = 139");

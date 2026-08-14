@@ -545,3 +545,108 @@ DEPLOY = NO
 IMPORT_READY = NO
 FINAL_STATUS = BLOCKED
 ```
+
+## Final row-level reconciliation — 2026-08-15
+
+The 45 IC invalid rows were reconciled against the real application dry-run response,
+not against an aggregate or parallel heuristic counter. The first HTTP 200 run used
+the v4 staging CSV and preserved the historical result: 135 total rows, 77 valid IC,
+45 invalid IC, 0 valid External, and 13 invalid External. Production personnel count
+was unchanged.
+
+The private row-level diagnostic contains all 122 IC rows, masked TC values, stable
+canonical identity, submitted/normalized values, application error codes, exact error
+fields, reference resolution observations, and v4-to-staging provenance:
+
+```text
+ROW_DIAGNOSTIC_PATH = C:\Users\Akel\Documents\medisa-ops-tmp\personel-import-122\pack7h-ic-dryrun-row-diagnostics.json
+ROW_DIAGNOSTIC_SHA256 = 1a7a2322d3a4a4f63674ed2b90037f8c30d0e06749ad8b7ebefe93b120d1e072
+```
+
+### IC set reconciliation
+
+```text
+KNOWN_HUMAN_BLOCKED_IC_BEFORE = 26
+DRY_RUN_INVALID_IC_BEFORE = 45
+KNOWN_26_AND_INVALID_BEFORE = 26
+INVALID_NOT_IN_KNOWN_26_BEFORE = 19
+KNOWN_26_NOT_INVALID_BEFORE = 0
+UNEXPLAINED_INVALID_IC_BEFORE = 19
+```
+
+All 19 unexpected invalid IC rows were caused by the staging serialization/mapping
+owner: their 20 recovered sicil values were present in the v4 exact-TC enrichment but
+were blank in the CSV; one of those rows overlaps the known human blocker set. The
+staging CSV also omitted the explicit `calisan_kapsami` column. No validator rule was
+changed, no person-specific exception was added, and no fuzzy or guessed data was
+introduced.
+
+The corrected private staging projection carried all 20 recovered sicils forward and
+added explicit `IC_PERSONEL` / `DIS_KAYNAK` scope. A second real HTTP 200 dry-run then
+returned:
+
+```text
+REAL_DRY_RUN_VALID_IC_AFTER = 96
+REAL_DRY_RUN_INVALID_IC_AFTER = 26
+REAL_DRY_RUN_VALID_DIS = 0
+REAL_DRY_RUN_INVALID_DIS = 13
+CANONICAL_BLOCKED_DISTINCT_AFTER = 26
+INVALID_IC_SET_EQUALS_BLOCKER_SET = YES
+MISSING_SICIL_AFTER = 4
+MISSING_BIRTH_DATE_AFTER = 5
+MISSING_PHONE_AFTER = 26
+```
+
+The corrected run had 96 valid and 39 invalid rows total, with 13 External rows
+remaining invalid for business/reference decisions. Production personnel count and
+reference state remained unchanged.
+
+### Workbook and successor artifact state
+
+The existing v3 workbook already contained exactly the current human/business blocker
+set: 88 rows, no stale rows, no duplicates, and active catalog dropdown options. Its
+content therefore did not change; v4 was not created and v3 was not overwritten.
+
+```text
+USER_WORKBOOK_V4_CREATED = NO
+USER_WORKBOOK_FINAL_ROWS = 88
+USER_WORKBOOK_COVERS_ALL_HUMAN_BLOCKERS = YES
+STALE_WORKBOOK_ROWS = 0
+ARTIFACT_V5_CREATED = YES
+ARTIFACT_V5_PATH = C:\Users\Akel\Documents\medisa-ops-tmp\personel-import-122\pack7h-final-reconciliation-v5.json
+ARTIFACT_V5_SHA256 = 7fbf8f5b1983625df9b365d60948d190e763c70e7a34b5a626c049cbbd891ebc
+```
+
+External-13 remains separate: MRK / Medisa branch and Karabük location are resolved;
+personel type, görev, departman, bölüm, and birim remain user/business decisions.
+Source operational Görev values were not mapped into `gorevler`.
+
+```text
+FINAL_TECHNICAL_BLOCKERS = 0
+PRODUCTION_MUTATED = NO
+PRODUCTION_REFERENCE_MUTATED = NO
+IMPORT_APPLY = NO
+MERGE = NO
+DEPLOY = NO
+IMPORT_READY = NO
+FINAL_STATUS = BLOCKED
+```
+
+Import remains blocked because the current 26 IC human-data blockers and External-13
+business/reference decisions are still unresolved; the technical invalid-set
+invariant is now satisfied.
+
+### Verification
+
+```text
+TYPECHECK = PASS
+BUILD = PASS
+FOCUSED_TESTS = PASS
+FULL_TEST_STATUS = PASS
+DIFF_CHECK = PASS
+RELEVANT_E2E = FAIL (local demo parser rejects v4 optional/scope columns; real production dry-run PASS)
+```
+
+The approved browser smoke verified login, the dry-run safety message, file selection,
+and no console errors. The local demo-only parser limitation was not worked around in
+the validator or production path.

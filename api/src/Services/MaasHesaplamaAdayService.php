@@ -946,8 +946,7 @@ class MaasHesaplamaAdayService
              FROM maas_hesaplama_adaylari a
              INNER JOIN maas_hesaplama_sgk_snapshotlari sgk ON sgk.personel_snapshot_id = a.personel_snapshot_id
              INNER JOIN personeller p ON p.id = a.personel_id
-             WHERE a.calistirma_id = :id
-               AND ' . \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::sqlIcPersonelPredicate($pdo, 'p') . '
+            WHERE a.calistirma_id = :id
              ORDER BY a.personel_id ASC'
         );
         $stmt->execute(['id' => (int) $calistirmaId]);
@@ -969,8 +968,7 @@ class MaasHesaplamaAdayService
              FROM maas_hesaplama_adaylari a
              INNER JOIN maas_hesaplama_sgk_snapshotlari sgk ON sgk.personel_snapshot_id = a.personel_snapshot_id
              INNER JOIN personeller p ON p.id = a.personel_id
-             WHERE a.id = :id
-               AND ' . \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::sqlIcPersonelPredicate($pdo, 'p') . '
+            WHERE a.id = :id
              LIMIT 1'
         );
         $stmt->execute(['id' => (int) $adayId]);

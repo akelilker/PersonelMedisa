@@ -40,6 +40,7 @@ describe("S97 personel import dry-run source locks", () => {
     expect(service).toContain("PERSONEL_IMPORT_SATIR_KOLON_UYUMSUZ");
     expect(service).toContain("PersonelImportReferenceCatalogService::loadCatalogForDryRun");
     expect(service).toContain("mb_strtolower");
+    expect(service).not.toContain("PERSONEL_IMPORT_SUBE_DEPARTMAN_ILISKISI");
     expect(controller).toContain("RolePermissions::assert($user, 'personeller.create')");
     expect(exportReport).toMatch(/\[\=\+\\?\-@\]/);
   });

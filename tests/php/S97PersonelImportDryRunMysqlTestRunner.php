@@ -296,6 +296,54 @@ try {
     $scope = PersonelImportDryRunService::dryRun($pdo, $scopeCsv, $scopedUser, 1);
     s97Assert(in_array('PERSONEL_IMPORT_SUBE_SCOPE_IHLALI', $scope['satirlar'][0]['hata_kodlari'], true), 'sube scope ihlali');
 
+    // Pack7B TEST_A: sparse matrix, ACTIVE branch + ACTIVE department without a pair.
+    $openPairCsv = s97HeaderCsv() . "\r\n" . s97ValidRow([
+        'tc_kimlik_no' => '10000000250',
+        'sicil_no' => 'OPEN-001',
+        'sube' => 'Sube 2',
+        'departman' => 'İdari İşler',
+        'gorev' => 'Asistan',
+    ]) . "\r\n";
+    $openPair = PersonelImportDryRunService::dryRun($pdo, $openPairCsv, $gyUser, null);
+    s97Assert(($openPair['ozet']['gecerli_satir'] ?? 0) === 1, 'open pair unmapped ACTIVE dry-run PASS');
+    s97Assert(($openPair['can_apply'] ?? false) === true, 'open pair unmapped ACTIVE can_apply');
+    s97Assert(
+        !in_array('PERSONEL_IMPORT_SUBE_DEPARTMAN_ILISKISI', $openPair['satirlar'][0]['hata_kodlari'] ?? [], true),
+        'no ILISKISI for unmapped ACTIVE pair'
+    );
+
+    // Pack7B TEST_B: open department model does not bypass branch scope / identity checks.
+    $openScope = PersonelImportDryRunService::dryRun($pdo, $openPairCsv, $scopedUser, 1);
+    s97Assert(
+        in_array('PERSONEL_IMPORT_SUBE_SCOPE_IHLALI', $openScope['satirlar'][0]['hata_kodlari'], true),
+        'open pair still sube scope ihlali'
+    );
+    $openDup = s97HeaderCsv() . "\r\n" . s97ValidRow([
+        'tc_kimlik_no' => '11111111110',
+        'sicil_no' => 'OPEN-DUP',
+        'sube' => 'Sube 2',
+        'departman' => 'İdari İşler',
+        'gorev' => 'Asistan',
+    ]) . "\r\n";
+    $openDupResult = PersonelImportDryRunService::dryRun($pdo, $openDup, $gyUser, null);
+    s97Assert(
+        in_array('PERSONEL_IMPORT_TC_MEVCUT', $openDupResult['satirlar'][0]['hata_kodlari'], true),
+        'open pair still existing TC'
+    );
+    $pdo->exec("INSERT INTO departmanlar (id, ad, durum) VALUES (9, 'Pasif Dep', 'PASIF')");
+    $pasifCsv = s97HeaderCsv() . "\r\n" . s97ValidRow([
+        'tc_kimlik_no' => '10000000268',
+        'sicil_no' => 'OPEN-PASIF',
+        'sube' => 'Sube 2',
+        'departman' => 'Pasif Dep',
+        'gorev' => 'Asistan',
+    ]) . "\r\n";
+    $pasifResult = PersonelImportDryRunService::dryRun($pdo, $pasifCsv, $gyUser, null);
+    s97Assert(
+        in_array('PERSONEL_IMPORT_REFERANS_BULUNAMADI', $pasifResult['satirlar'][0]['hata_kodlari'], true),
+        'open pair still rejects inactive department'
+    );
+
     // 12) Wage field reject (case + whitespace bypass blocked by header normalize)
     try {
         $wageCsv = "tc_kimlik_no;sicil_no;ad;soyad;dogum_tarihi;dogum_yeri;telefon;kan_grubu;acil_durum_kisi;acil_durum_telefon;ise_giris_tarihi;sube;departman;gorev;personel_tipi; Maas_Tutari \r\n"

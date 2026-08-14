@@ -32,7 +32,9 @@ describe("S97-D personel import reference MariaDB", () => {
     expect(result.stdout).toContain("[PASS] MANIFEST_PARITY_WITH_PARENT = EXACT");
     expect(result.stdout).toContain("[PASS] PARENT_PARITY_RUNTIME = HERMETIC");
     expect(result.stdout).toContain("[PASS] EXPORT_USABILITY = DRY_RUN_RESOLUTION_RESULT");
-    expect(result.stdout).toContain("[PASS] MAPPING_EMPTY_ERROR_DISTINCTION = VERIFIED");
+    expect(result.stdout).toContain("[PASS] REFERENCE_EXPORT_OPEN_MODEL = PASS");
+    expect(result.stdout).toContain("[PASS] IMPORT_REFERENCE_PARITY = PASS");
+    expect(result.stdout).toContain("[PASS] IMPORT_INDEPENDENT_OF_SUBE_DEPARTMANLAR = VERIFIED");
     expect(result.stdout).toContain("[PASS] PERSONELLER_TABLE_READ = NO");
     expect(result.stdout).toContain("[PASS] UTF-8 BOM present");
     expect(result.stdout).toContain("[PASS] deterministic same bytes");

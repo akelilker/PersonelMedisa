@@ -51,21 +51,18 @@ final class PersonelImportReferenceCatalogService
     ];
 
     /**
-     * Catalog shape used by dry-run resolve/link checks.
+     * Catalog shape used by dry-run exact-name resolution.
+     * Departments are independent personnel references (OPEN_BRANCH_DEPARTMENT).
      *
      * @return array{
      *   sube: array<string, list<int>>,
      *   departman: array<string, list<int>>,
      *   gorev: array<string, list<int>>,
-     *   personel_tipi: array<string, list<int>>,
-     *   sube_departman: array<string, true>
+     *   personel_tipi: array<string, list<int>>
      * }
      */
     public static function loadCatalogForDryRun(PDO $pdo): array
     {
-        // Mapping query failure must fail-closed (not silent open model).
-        $pairs = self::loadSubeDepartmanPairsStrict($pdo)['pairs'];
-
         $catalog = [
             'sube' => self::loadNameIndex($pdo, 'subeler'),
             'departman' => self::loadNameIndex($pdo, 'departmanlar'),
@@ -80,7 +77,6 @@ final class PersonelImportReferenceCatalogService
             'bolum_by_departman' => [],
             'birim_by_bolum' => [],
             'pozisyon' => [],
-            'sube_departman' => $pairs,
         ];
 
         if (PersonelOrgStructureSchema::isReady($pdo)) {
@@ -153,22 +149,11 @@ final class PersonelImportReferenceCatalogService
         $gorevIndex = self::loadNameIndex($pdo, 'gorevler');
         $personelTipiIndex = self::loadNameIndex($pdo, 'personel_tipleri');
 
-        $pairResult = self::loadSubeDepartmanPairsStrict($pdo);
-        $pairs = $pairResult['pairs'];
-        $mappingMode = count($pairs) === 0 ? 'open' : 'mapped';
-
-        $idToSubeName = self::buildIdToUniqueName($subeIndex);
         $rows = [];
 
         self::appendNameRows($rows, 'SUBE', $subeIndex, $scopeSubeIds, '');
-        self::appendDepartmanRows(
-            $rows,
-            $departmanIndex,
-            $scopeSubeIds,
-            $idToSubeName,
-            $pairs,
-            $mappingMode
-        );
+        // OPEN_BRANCH_DEPARTMENT: active departments are independent of sube_departmanlar.
+        self::appendNameRows($rows, 'DEPARTMAN', $departmanIndex, null, self::OPEN_BAGLI_SUBE);
         self::appendNameRows($rows, 'GOREV', $gorevIndex, null, '');
         self::appendNameRows($rows, 'PERSONEL_TIPI', $personelTipiIndex, null, '');
 
@@ -224,22 +209,6 @@ final class PersonelImportReferenceCatalogService
         }
 
         return (int) $ids[0];
-    }
-
-    /**
-     * @param array<string, mixed> $catalog
-     */
-    public static function isSubeDepartmanLinked($subeId, $departmanId, array $catalog): bool
-    {
-        $pairs = $catalog['sube_departman'] ?? [];
-        if (!is_array($pairs) || count($pairs) === 0) {
-            // No mapping rows → treat as open (matches create which only checks AKTIF FKs).
-            return true;
-        }
-
-        $key = ((int) $subeId) . ':' . ((int) $departmanId);
-
-        return isset($pairs[$key]);
     }
 
     /**
@@ -434,30 +403,6 @@ final class PersonelImportReferenceCatalogService
         }
     }
 
-    /** @return array{pairs: array<string, true>} */
-    public static function loadSubeDepartmanPairsStrict(PDO $pdo): array
-    {
-        try {
-            $stmt = $pdo->query('SELECT sube_id, departman_id FROM sube_departmanlar');
-            if (!$stmt) {
-                throw new RuntimeException('sube_departmanlar query failed');
-            }
-            $pairs = [];
-            foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
-                $key = ((int) $row['sube_id']) . ':' . ((int) $row['departman_id']);
-                $pairs[$key] = true;
-            }
-
-            return ['pairs' => $pairs];
-        } catch (Throwable $e) {
-            throw new PersonelImportException(
-                'PERSONEL_IMPORT_REFERANS_PAKETI_HAZIRLANAMADI',
-                'Personel import referans paketi hazirlanamadi.',
-                409
-            );
-        }
-    }
-
     /**
      * @param array<int, int> $allowedSubeIds
      * @return list<int>
@@ -523,87 +468,6 @@ final class PersonelImportReferenceCatalogService
     }
 
     /**
-     * @param list<array<string, mixed>> $rows
-     * @param array<string, list<int>> $departmanIndex
-     * @param list<int> $scopeSubeIds
-     * @param array<int, string> $idToSubeName
-     * @param array<string, true> $pairs
-     */
-    private static function appendDepartmanRows(
-        array &$rows,
-        array $departmanIndex,
-        array $scopeSubeIds,
-        array $idToSubeName,
-        array $pairs,
-        string $mappingMode
-    ): void {
-        if ($mappingMode === 'open') {
-            self::appendNameRows($rows, 'DEPARTMAN', $departmanIndex, null, self::OPEN_BAGLI_SUBE);
-
-            return;
-        }
-
-        $idToDepartmanName = self::buildIdToUniqueName($departmanIndex);
-        $ambiguousNames = [];
-        foreach ($departmanIndex as $name => $ids) {
-            if (count($ids) !== 1) {
-                $ambiguousNames[$name] = count($ids);
-            }
-        }
-
-        foreach ($ambiguousNames as $name => $count) {
-            $rows[] = [
-                'referans_turu' => 'DEPARTMAN',
-                'deger' => (string) $name,
-                'bagli_sube' => '',
-                'kullanilabilir' => 'HAYIR',
-                'eslesme_sayisi' => (string) (int) $count,
-                'uyari_kodu' => 'PERSONEL_IMPORT_REFERANS_BELIRSIZ',
-                'aciklama' => 'Bu değer birden fazla aktif kayıtla eşleştiği için importta kullanılamaz.',
-            ];
-        }
-
-        $emitted = [];
-        foreach ($scopeSubeIds as $subeId) {
-            $subeName = $idToSubeName[(int) $subeId] ?? null;
-            if ($subeName === null || $subeName === '') {
-                continue;
-            }
-            foreach ($pairs as $pairKey => $_) {
-                $parts = explode(':', (string) $pairKey, 2);
-                if (count($parts) !== 2) {
-                    continue;
-                }
-                if ((int) $parts[0] !== (int) $subeId) {
-                    continue;
-                }
-                $departmanId = (int) $parts[1];
-                $departmanName = $idToDepartmanName[$departmanId] ?? null;
-                if ($departmanName === null || $departmanName === '') {
-                    continue;
-                }
-                if (isset($ambiguousNames[$departmanName])) {
-                    continue;
-                }
-                $dedupe = $departmanName . "\0" . $subeName;
-                if (isset($emitted[$dedupe])) {
-                    continue;
-                }
-                $emitted[$dedupe] = true;
-                $rows[] = [
-                    'referans_turu' => 'DEPARTMAN',
-                    'deger' => $departmanName,
-                    'bagli_sube' => $subeName,
-                    'kullanilabilir' => 'EVET',
-                    'eslesme_sayisi' => '1',
-                    'uyari_kodu' => '',
-                    'aciklama' => '',
-                ];
-            }
-        }
-    }
-
-    /**
      * @param array<string, list<int>> $index
      * @param list<int> $ids
      * @return array<string, string>
@@ -632,23 +496,6 @@ final class PersonelImportReferenceCatalogService
             'uyari_kodu' => '',
             'aciklama' => '',
         ];
-    }
-
-    /**
-     * @param array<string, list<int>> $index
-     * @return array<int, string>
-     */
-    private static function buildIdToUniqueName(array $index): array
-    {
-        $map = [];
-        foreach ($index as $name => $ids) {
-            if (count($ids) !== 1) {
-                continue;
-            }
-            $map[(int) $ids[0]] = (string) $name;
-        }
-
-        return $map;
     }
 
     /** @param list<array<string, mixed>> $rows */

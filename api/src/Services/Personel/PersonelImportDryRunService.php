@@ -410,12 +410,6 @@ final class PersonelImportDryRunService
                 if (count($allowedSubeIds) > 0 && !in_array($subeId, $allowedSubeIds, true)) {
                     $hataKodlari[] = 'PERSONEL_IMPORT_SUBE_SCOPE_IHLALI';
                 }
-                if (
-                    $resolved['departman_id'] !== null
-                    && !PersonelImportReferenceCatalogService::isSubeDepartmanLinked($subeId, (int) $resolved['departman_id'], $refCatalog)
-                ) {
-                    $hataKodlari[] = 'PERSONEL_IMPORT_SUBE_DEPARTMAN_ILISKISI';
-                }
             }
 
             $hataKodlari = array_values(array_unique($hataKodlari));

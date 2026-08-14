@@ -8,6 +8,7 @@ import {
   type PersonelImportRunSummary
 } from "../../../api/personeller.api";
 import { ApiRequestError } from "../../../api/api-client";
+import { visibleImportError } from "../personel-import-error-messages";
 import { AppModal } from "../../../components/modal/AppModal";
 import { useAuth } from "../../../state/auth.store";
 
@@ -97,9 +98,7 @@ export function PersonelImportHistoryModal({ open, onClose }: PersonelImportHist
           setNextCursor(null);
           setErrorMessage("Personel import şeması henüz hazır değil.");
         } else {
-          setErrorMessage(
-            error instanceof Error ? error.message : "Personel import geçmişi yüklenemedi."
-          );
+          setErrorMessage(visibleImportError(error, "Personel import geçmişi yüklenemedi."));
         }
       } finally {
         setIsLoading(false);
@@ -138,9 +137,7 @@ export function PersonelImportHistoryModal({ open, onClose }: PersonelImportHist
       setDetail(result);
     } catch (error) {
       setDetail(null);
-      setDetailError(
-        error instanceof Error ? error.message : "Import detayı yüklenemedi."
-      );
+      setDetailError(visibleImportError(error, "Aktarım detayı yüklenemedi."));
     } finally {
       setDetailLoading(false);
     }
@@ -154,9 +151,7 @@ export function PersonelImportHistoryModal({ open, onClose }: PersonelImportHist
     try {
       await downloadPersonelImportEvidenceCsv(detail.import_id);
     } catch (error) {
-      setEvidenceError(
-        error instanceof Error ? error.message : "Kanıt CSV indirilemedi."
-      );
+      setEvidenceError(visibleImportError(error, "Kanıt CSV indirilemedi."));
     }
   }
 

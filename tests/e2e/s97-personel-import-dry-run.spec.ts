@@ -29,7 +29,7 @@ test.describe("S97 personel import dry-run UI", () => {
     await expect(page.getByTestId("personel-import-dry-run-summary")).toBeVisible();
     await expect(page.getByTestId("personel-import-dry-run-errors")).toBeVisible();
     await expect(page.getByText("*23")).toBeVisible();
-    await expect(page.getByText("PERSONEL_IMPORT_GECERSIZ_TC")).toBeVisible();
+    await expect(page.getByText("T.C. Kimlik No geçersiz.")).toBeVisible();
   });
 
   test("unauthorized role does not see import action", async ({ page }) => {

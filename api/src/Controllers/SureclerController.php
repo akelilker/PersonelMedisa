@@ -129,6 +129,10 @@ class SureclerController
         if (!$personel) {
             self::validationError('personel_id', 'Personel bulunamadı.');
         }
+        \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::assertOperationalEligible(
+            $pdo,
+            $payload['personel_id']
+        );
 
         SubeScope::assertPersonelAccess($user, $request, (int) $personel['sube_id']);
 
@@ -236,6 +240,10 @@ class SureclerController
         }
 
         SubeScope::assertPersonelAccess($user, $request, (int) $existing['personel_sube_id']);
+        \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::assertOperationalEligible(
+            $pdo,
+            (int) $existing['personel_id']
+        );
         \Medisa\Api\Services\Retention\PersonelArchiveGate::assertBusinessWriteAllowed(
             $pdo,
             (int) $existing['personel_id']

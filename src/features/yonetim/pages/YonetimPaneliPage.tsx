@@ -501,7 +501,7 @@ export function YonetimPaneliPage() {
             personel.aktif_durum === "AKTIF" || String(personel.id) === kullaniciForm.personelId
         )
         .map((personel) => {
-          const name = formatAdSoyad(`${personel.ad} ${personel.soyad}`);
+          const name = formatAdSoyad([personel.ad, personel.soyad].filter(Boolean).join(" "));
           const meta = [personel.departman_adi, personel.gorev_adi].filter(Boolean).join(" / ");
           return {
             value: String(personel.id),
@@ -518,7 +518,7 @@ export function YonetimPaneliPage() {
 
   const subeNameMap = useMemo(() => new Map(subeler.map((sube) => [sube.id, sube.ad])), [subeler]);
   const personelDisplayNameMap = useMemo(
-    () => new Map(personeller.map((personel) => [personel.id, formatAdSoyad(`${personel.ad} ${personel.soyad}`)])),
+    () => new Map(personeller.map((personel) => [personel.id, formatAdSoyad([personel.ad, personel.soyad].filter(Boolean).join(" "))])),
     [personeller]
   );
   const selectedDepartmanLabels = useMemo(
@@ -542,7 +542,7 @@ export function YonetimPaneliPage() {
     if (item.kullanici_tipi === "IC_PERSONEL" && item.personel_id != null) {
       const linkedPersonel = personeller.find((personel) => personel.id === item.personel_id);
       if (linkedPersonel) {
-        const personelLabel = `${linkedPersonel.ad} ${linkedPersonel.soyad}`.trim();
+        const personelLabel = [linkedPersonel.ad, linkedPersonel.soyad].filter(Boolean).join(" ");
         if (personelLabel && !isCorruptedDisplayText(personelLabel)) {
           return personelLabel;
         }
@@ -603,7 +603,7 @@ export function YonetimPaneliPage() {
 
     setKullaniciForm((prev) => ({
       ...prev,
-      adSoyad: formatAdSoyad(`${linkedPersonel.ad} ${linkedPersonel.soyad}`),
+      adSoyad: formatAdSoyad([linkedPersonel.ad, linkedPersonel.soyad].filter(Boolean).join(" ")),
       telefon: formatTelefon(linkedPersonel.telefon ?? prev.telefon)
     }));
   }, [kullaniciForm.kullaniciTipi, kullaniciForm.personelId, personeller]);

@@ -10,14 +10,20 @@ export type PersonelDosyaTabId = (typeof PERSONEL_DOSYA_TABS)[number]["id"];
 
 export function PersonelDosyaTabList({
   activeTab,
-  onTabChange
+  onTabChange,
+  directoryOnly = false
 }: {
   activeTab: PersonelDosyaTabId;
   onTabChange: (tabId: PersonelDosyaTabId) => void;
+  directoryOnly?: boolean;
 }) {
+  const tabs = directoryOnly
+    ? PERSONEL_DOSYA_TABS.filter((tab) => tab.id === "genel-bilgiler" || tab.id === "egitim-belgeler")
+    : PERSONEL_DOSYA_TABS;
+
   return (
     <div className="personel-kart-tablist" role="tablist" aria-label="Personel kartı sekmeleri">
-      {PERSONEL_DOSYA_TABS.map((tab) => (
+      {tabs.map((tab) => (
         <button
           key={tab.id}
           type="button"

@@ -61,6 +61,10 @@ class FazlaCalismaOdemeTercihiController
         if ($satir === null) {
             JsonResponse::error(404, 'NOT_FOUND', 'snapshot_id icin odeme tercihi veya kapanis satiri bulunamadi.');
         }
+        \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::assertOperationalEligible(
+            $pdo,
+            (int) $satir['personel_id']
+        );
 
         self::assertSnapshotScope($user, $request, $satir);
 
@@ -109,6 +113,10 @@ class FazlaCalismaOdemeTercihiController
         if ($satirProbe === null) {
             JsonResponse::error(404, 'NOT_FOUND', 'snapshot_id icin odeme tercihi veya kapanis satiri bulunamadi.');
         }
+        \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::assertOperationalEligible(
+            $pdo,
+            (int) $satirProbe['personel_id']
+        );
         self::assertSnapshotScope($user, $request, $satirProbe);
 
         $hasKanitCols = self::columnExists($pdo, 'fazla_calisma_odeme_tercihleri', 'talep_tarihi')
@@ -128,6 +136,7 @@ class FazlaCalismaOdemeTercihiController
 
             $subeId = (int) $satir['sube_id'];
             $personelId = (int) $satir['personel_id'];
+            \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::assertOperationalEligible($pdo, $personelId);
             $fazlaDk = (int) $satir['fazla_calisma_dakika'];
             $haftaBaslangic = (string) $satir['hafta_baslangic'];
             $haftaBitis = (string) $satir['hafta_bitis'];

@@ -17,6 +17,9 @@ final class SgkPrimGunuService
     /** @return array<string, mixed> */
     public static function calculateResolution(PDO $pdo, array $resolution)
     {
+        foreach (array_keys($resolution['personeller'] ?? []) as $pid) {
+            \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::assertOperationalEligible($pdo, $pid);
+        }
         $periodStart = (string) $resolution['donem_baslangic'];
         $periodEnd = (string) $resolution['donem_bitis'];
         $catalog = self::loadCatalog($pdo, $periodStart, $periodEnd);
@@ -324,6 +327,7 @@ final class SgkPrimGunuService
              INNER JOIN maas_hesaplama_donem_snapshotlari ds ON ds.id = sgk.donem_snapshot_id
              INNER JOIN personeller p ON p.id = sgk.personel_id
              WHERE ' . implode(' AND ', $where) . '
+               AND ' . \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::sqlIcPersonelPredicate($pdo, 'p') . '
              ORDER BY sgk.personel_id ASC'
         );
         $stmt->execute($params);

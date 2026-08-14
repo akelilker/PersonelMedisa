@@ -139,6 +139,14 @@ class PersonelUcretService
             if (!$personel) {
                 throw new PersonelUcretException('SALARY_RECORD_NOT_FOUND', 'Personel bulunamadi.', 404);
             }
+            try {
+                \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::assertOperationalEligibleOrThrow(
+                    $pdo,
+                    $personelId
+                );
+            } catch (\Medisa\Api\Services\Personel\PersonelValidationException $e) {
+                throw new PersonelUcretException($e->getCodeString(), $e->getMessage(), 409);
+            }
 
             $historyCount = $pdo->prepare('SELECT COUNT(*) FROM personel_ucret_gecmisi WHERE personel_id = :personel_id');
             $historyCount->execute(['personel_id' => $personelId]);

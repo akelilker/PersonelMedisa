@@ -237,6 +237,24 @@ export function PersonelCreateFields({
     <div className={className}>
       <div className="personel-form-columns">
         <div className="personel-form-column">
+          <PersonelCreateSelect
+            label="Çalışan Kapsamı"
+            name="create-calisan-kapsami"
+            value={form.calisanKapsami}
+            onChange={(value) =>
+              setForm((prev) => ({
+                ...prev,
+                calisanKapsami: value === "DIS_KAYNAK" ? "DIS_KAYNAK" : "IC_PERSONEL"
+              }))
+            }
+            required
+            options={[
+              { value: "IC_PERSONEL", label: "İç Personel" },
+              { value: "DIS_KAYNAK", label: "Dış Kaynak / SGK Başka İşverende" }
+            ]}
+            isOpen={openSelectName === "create-calisan-kapsami"}
+            onOpenChange={(isOpen) => setSelectOpen("create-calisan-kapsami", isOpen)}
+          />
           <FormField
             label="T.C. Kimlik No"
             name="create-tc"
@@ -246,7 +264,7 @@ export function PersonelCreateFields({
               onFieldErrorClear?.("tcKimlikNo");
             }}
             placeholder="Örn. 12345678122"
-            required
+            required={form.calisanKapsami !== "DIS_KAYNAK"}
           />
           {tcKimlikNoFieldError ? (
             <p className="personel-create-error" role="alert">
@@ -267,7 +285,7 @@ export function PersonelCreateFields({
             value={form.soyad}
             onChange={(value) => setForm((prev) => ({ ...prev, soyad: value }))}
             placeholder="Örn. AKEL"
-            required
+            required={form.calisanKapsami !== "DIS_KAYNAK"}
           />
           <FormField
             label="Doğum Tarihi"
@@ -275,7 +293,7 @@ export function PersonelCreateFields({
             type="date"
             value={form.dogumTarihi}
             onChange={(value) => setForm((prev) => ({ ...prev, dogumTarihi: value }))}
-            required
+            required={form.calisanKapsami !== "DIS_KAYNAK"}
           />
           <FormField
             label="Telefon"
@@ -284,7 +302,7 @@ export function PersonelCreateFields({
             value={form.telefon}
             onChange={(value) => setForm((prev) => ({ ...prev, telefon: value }))}
             placeholder="Örn. 0532 123 45 67"
-            required
+            required={form.calisanKapsami !== "DIS_KAYNAK"}
           />
           <FormField
             label="Acil Durum Kişisi"
@@ -292,7 +310,7 @@ export function PersonelCreateFields({
             value={form.acilDurumKisi}
             onChange={(value) => setForm((prev) => ({ ...prev, acilDurumKisi: value }))}
             placeholder="Örn. Serhan Köse"
-            required
+            required={form.calisanKapsami !== "DIS_KAYNAK"}
           />
           <FormField
             label="Acil Durum Telefon"
@@ -301,7 +319,7 @@ export function PersonelCreateFields({
             value={form.acilDurumTelefon}
             onChange={(value) => setForm((prev) => ({ ...prev, acilDurumTelefon: value }))}
             placeholder="Örn. 0532 123 45 67"
-            required
+            required={form.calisanKapsami !== "DIS_KAYNAK"}
           />
           <FormField
             label="Doğum Yeri"
@@ -504,7 +522,7 @@ export function PersonelCreateFields({
           ) : (
             refMissingNote("Personel Tipi", true)
           )}
-          {refs.ucretTipiOptions.length > 0 ? (
+          {form.calisanKapsami !== "DIS_KAYNAK" && refs.ucretTipiOptions.length > 0 ? (
             <PersonelCreateSelect
               label="Ücret Tipi"
               name="create-ucret-tipi"
@@ -517,7 +535,7 @@ export function PersonelCreateFields({
           ) : (
             refMissingNote("Ücret Tipi", false)
           )}
-          {canManageUcret ? (
+          {form.calisanKapsami !== "DIS_KAYNAK" && canManageUcret ? (
             <FormField
               label="Net Maaş"
               name="create-maas"

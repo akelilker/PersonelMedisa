@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/../../api/src/bootstrap.php';
 require_once __DIR__ . '/../../api/src/Services/PuantajDonemKilidiService.php';
 require_once __DIR__ . '/../../api/src/Services/BildirimDonemContextService.php';
 require_once __DIR__ . '/../../api/src/Services/DonemKapanisAuditService.php';

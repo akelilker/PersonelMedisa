@@ -65,9 +65,13 @@ export function PersonelDetayPage() {
   } = detail;
 
   const isArchived = personel?.aktif_durum === "PASIF" || personel?.arsiv_modu === true;
-  const canCreateSurecEffective = Boolean(canCreateSurec && !isArchived);
+  const isDirectoryOnly = personel?.calisan_kapsami === "DIS_KAYNAK";
+  const effectiveActiveTab = isDirectoryOnly && activeTab !== "genel-bilgiler" && activeTab !== "egitim-belgeler"
+    ? "genel-bilgiler"
+    : activeTab;
+  const canCreateSurecEffective = Boolean(canCreateSurec && !isArchived && !isDirectoryOnly);
   const canAccessSureclerEffective = Boolean(
-    !isArchived && (canCreateSurecEffective || canViewSurecler)
+    !isArchived && !isDirectoryOnly && (canCreateSurecEffective || canViewSurecler)
   );
 
   const { handleOpenSurecModal } = usePersonelKartGatewayReturn({
@@ -87,7 +91,7 @@ export function PersonelDetayPage() {
 
   const pageHeading =
     personel != null
-      ? `${personel.ad} ${personel.soyad} — Personel kartı detay alanı`
+      ? `${[personel.ad, personel.soyad].filter(Boolean).join(" ")} — Personel kartı detay alanı`
       : "Personel kartı detay alanı";
 
   const earliestReview =
@@ -124,7 +128,7 @@ export function PersonelDetayPage() {
 
           <PersonelDosyaHero personel={personel} canViewUcret={canViewUcret} />
 
-          {!isArchived ? (
+          {!isArchived && !isDirectoryOnly ? (
             <PersonelDosyaActionRow
               canAccessSurecler={canAccessSureclerEffective}
               canCreateSurec={canCreateSurecEffective}
@@ -137,7 +141,7 @@ export function PersonelDetayPage() {
           ) : null}
 
           <PersonelDosyaTabPanels
-            activeTab={activeTab}
+            activeTab={effectiveActiveTab}
             onTabChange={setActiveTab}
             personel={personel}
             surecler={surecHistory}
@@ -148,18 +152,19 @@ export function PersonelDetayPage() {
             surecHistoryErrorMessage={surecHistoryErrorMessage}
             isZimmetHistoryLoading={isZimmetHistoryLoading}
             zimmetHistoryErrorMessage={zimmetHistoryErrorMessage}
-            canViewPuantaj={canViewPuantaj && !isArchived}
-            canViewRevizyon={canViewRevizyon && !isArchived}
+            canViewPuantaj={canViewPuantaj && !isArchived && !isDirectoryOnly}
+            canViewRevizyon={canViewRevizyon && !isArchived && !isDirectoryOnly}
             canCreateRevizyon={false}
             canCreateZimmet={false}
             canAccessSurecler={canAccessSureclerEffective || (isArchived && canViewSurecler)}
-            canViewFinans={canViewFinans && !isArchived}
-            canViewBordro={canViewBordro && !isArchived}
-            canViewUcret={canViewUcret}
+            canViewFinans={canViewFinans && !isArchived && !isDirectoryOnly}
+            canViewBordro={canViewBordro && !isArchived && !isDirectoryOnly}
+            canViewUcret={canViewUcret && !isDirectoryOnly}
             canManageUcret={false}
-            canViewBordroKapsam={canViewBordroKapsam && !isArchived}
+            canViewBordroKapsam={canViewBordroKapsam && !isArchived && !isDirectoryOnly}
             canManageBordroKapsam={false}
             canApproveBordroKapsam={false}
+            directoryOnly={isDirectoryOnly}
           />
         </div>
       ) : null}

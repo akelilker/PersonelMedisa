@@ -274,7 +274,8 @@ class BordroHazirlikController
         $sql = "SELECT p.id, p.ad, p.soyad, p.sicil_no, p.departman_id, d.ad AS departman_ad
              FROM personeller p
              LEFT JOIN departmanlar d ON d.id = p.departman_id
-             WHERE p.sube_id = :sube AND p.aktif_durum = 'AKTIF'";
+             WHERE p.sube_id = :sube AND p.aktif_durum = 'AKTIF'
+               AND " . \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::sqlIcPersonelPredicate($pdo, 'p');
         $params = ['sube' => (int) $subeId];
         if ($departmanId !== null) {
             $sql .= ' AND p.departman_id = :departman_id';

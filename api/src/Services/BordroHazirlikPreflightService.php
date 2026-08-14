@@ -214,6 +214,7 @@ class BordroHazirlikPreflightService
                 LEFT JOIN gorevler g ON g.id = p.gorev_id
                 WHERE p.sube_id = :sube_id
                   AND p.aktif_durum = 'AKTIF'
+                  AND " . \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::sqlIcPersonelPredicate($pdo, 'p') . "
                   AND p.ise_giris_tarihi <= :donem_bitis2";
         $params = [
             'sube_id' => (int) $subeId,
@@ -241,6 +242,7 @@ class BordroHazirlikPreflightService
                  LEFT JOIN subeler s ON s.id = p.sube_id
                  LEFT JOIN departmanlar d ON d.id = p.departman_id
                  WHERE p.sube_id = :sube_id AND p.aktif_durum = 'AKTIF'
+                   AND " . \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::sqlIcPersonelPredicate($pdo, 'p') . "
                    AND p.ise_giris_tarihi <= :donem_bitis
                  ORDER BY p.ad ASC, p.soyad ASC"
             );
@@ -364,6 +366,7 @@ class BordroHazirlikPreflightService
             $stmt = $pdo->prepare(
                 "SELECT p.id FROM personeller p
                  WHERE p.sube_id = :sube AND p.aktif_durum = 'AKTIF'
+                   AND " . \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::sqlIcPersonelPredicate($pdo, 'p') . "
                    AND NOT EXISTS (
                      SELECT 1 FROM personel_bordro_devirleri d
                      WHERE d.personel_id = p.id AND d.yil = :yil AND d.ay = :ay AND d.state = 'AKTIF'

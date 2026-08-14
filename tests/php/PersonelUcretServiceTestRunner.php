@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/../../api/src/bootstrap.php';
 require_once __DIR__ . '/../../api/src/Services/PersonelUcretException.php';
 require_once __DIR__ . '/../../api/src/Services/PersonelUcretService.php';
 

@@ -555,6 +555,7 @@ class PuantajController
         if (!$personel) {
             JsonResponse::notFound('Personel bulunamadi.');
         }
+        \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::assertOperationalEligible($pdo, $personelId);
 
         return $personel;
     }
@@ -1443,6 +1444,7 @@ class PuantajController
              FROM gunluk_puantaj gp
              INNER JOIN personeller p ON p.id = gp.personel_id
              WHERE p.sube_id = :sube_id
+               AND ' . \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::sqlIcPersonelPredicate($pdo, 'p') . '
                AND gp.tarih BETWEEN :first_day AND :last_day
                AND gp.state <> :sealed_state
              ORDER BY gp.tarih ASC, gp.personel_id ASC'

@@ -318,7 +318,7 @@ class RaporlarController
       SELECT
         p.id AS personel_id,
         p.sube_id AS personel_sube_id,
-        CONCAT(p.ad, \' \', p.soyad) AS ad_soyad,
+        TRIM(CONCAT(COALESCE(p.ad, \'\'), \' \', COALESCE(p.soyad, \'\'))) AS ad_soyad,
         p.sicil_no,
         p.aktif_durum,
         s.ad AS sube,
@@ -376,7 +376,7 @@ class RaporlarController
       SELECT
         p.id AS personel_id,
         p.sube_id AS personel_sube_id,
-        CONCAT(p.ad, \' \', p.soyad) AS ad_soyad,
+        TRIM(CONCAT(COALESCE(p.ad, \'\'), \' \', COALESCE(p.soyad, \'\'))) AS ad_soyad,
         p.sicil_no,
         p.aktif_durum,
         s.ad AS sube,
@@ -442,7 +442,7 @@ class RaporlarController
     $sql = '
       SELECT
         p.id AS personel_id,
-        CONCAT(p.ad, \' \', p.soyad) AS ad_soyad,
+        TRIM(CONCAT(COALESCE(p.ad, \'\'), \' \', COALESCE(p.soyad, \'\'))) AS ad_soyad,
         snap.tarih AS baslangic_tarihi,
         snap.tarih AS bitis_tarihi,
         \'IZINSIZ\' AS alt_tur,
@@ -495,7 +495,7 @@ class RaporlarController
     $sql = '
       SELECT
         p.id AS personel_id,
-        CONCAT(p.ad, \' \', p.soyad) AS ad_soyad,
+        TRIM(CONCAT(COALESCE(p.ad, \'\'), \' \', COALESCE(p.soyad, \'\'))) AS ad_soyad,
         gp.tarih AS baslangic_tarihi,
         gp.tarih AS bitis_tarihi,
         \'IZINSIZ\' AS alt_tur,
@@ -557,7 +557,7 @@ class RaporlarController
     $sql = '
       SELECT
         p.id AS personel_id,
-        CONCAT(p.ad, \' \', p.soyad) AS ad_soyad,
+        TRIM(CONCAT(COALESCE(p.ad, \'\'), \' \', COALESCE(p.soyad, \'\'))) AS ad_soyad,
         snap.tarih AS baslangic_tarihi,
         snap.tarih AS bitis_tarihi,
         CASE snap.dayanak
@@ -614,7 +614,7 @@ class RaporlarController
     $sql = '
       SELECT
         p.id AS personel_id,
-        CONCAT(p.ad, \' \', p.soyad) AS ad_soyad,
+        TRIM(CONCAT(COALESCE(p.ad, \'\'), \' \', COALESCE(p.soyad, \'\'))) AS ad_soyad,
         gp.tarih AS baslangic_tarihi,
         gp.tarih AS bitis_tarihi,
         CASE gp.dayanak
@@ -670,7 +670,7 @@ class RaporlarController
     $sql = '
       SELECT
         p.id AS personel_id,
-        CONCAT(p.ad, \' \', p.soyad) AS ad_soyad,
+        TRIM(CONCAT(COALESCE(p.ad, \'\'), \' \', COALESCE(p.soyad, \'\'))) AS ad_soyad,
         sc.baslangic_tarihi,
         COALESCE(sc.bitis_tarihi, sc.baslangic_tarihi) AS bitis_tarihi,
         sc.aciklama,
@@ -734,7 +734,7 @@ class RaporlarController
         snap.tarih AS tarih,
         p.departman_id,
         p.id AS personel_id,
-        CONCAT(p.ad, \' \', p.soyad) AS ad_soyad,
+        TRIM(CONCAT(COALESCE(p.ad, \'\'), \' \', COALESCE(p.soyad, \'\'))) AS ad_soyad,
         snap.hareket_durumu,
         snap.dayanak,
         snap.durumu_bildirdi_mi,
@@ -791,7 +791,7 @@ class RaporlarController
         gp.tarih AS tarih,
         p.departman_id,
         p.id AS personel_id,
-        CONCAT(p.ad, \' \', p.soyad) AS ad_soyad,
+        TRIM(CONCAT(COALESCE(p.ad, \'\'), \' \', COALESCE(p.soyad, \'\'))) AS ad_soyad,
         gp.hareket_durumu,
         gp.dayanak,
         gp.durumu_bildirdi_mi,
@@ -919,7 +919,7 @@ class RaporlarController
     $sql = '
       SELECT
         p.id AS personel_id,
-        CONCAT(p.ad, \' \', p.soyad) AS ad_soyad,
+        TRIM(CONCAT(COALESCE(p.ad, \'\'), \' \', COALESCE(p.soyad, \'\'))) AS ad_soyad,
         fk.donem,
         COALESCE(MAX(fk.gun_sayisi), 0) AS gun_sayisi,
         SUM(fk.tutar) AS toplam_tutar,
@@ -956,7 +956,7 @@ class RaporlarController
     $sql = '
       SELECT
         p.id AS personel_id,
-        CONCAT(p.ad, \' \', p.soyad) AS ad_soyad,
+        TRIM(CONCAT(COALESCE(p.ad, \'\'), \' \', COALESCE(p.soyad, \'\'))) AS ad_soyad,
         fk.donem,
         fk.tutar,
         fk.aciklama,
@@ -1060,7 +1060,7 @@ class RaporlarController
 
     $whereSql = implode(' AND ', $where);
     $sql = "
-            SELECT p.id AS personel_id, CONCAT(p.ad, ' ', p.soyad) AS ad_soyad, p.sicil_no,
+            SELECT p.id AS personel_id, TRIM(CONCAT_WS(' ', p.ad, p.soyad)) AS ad_soyad, p.sicil_no,
                    s.ad AS sube, d.ad AS bolum
             FROM personeller p
             LEFT JOIN subeler s ON s.id = p.sube_id

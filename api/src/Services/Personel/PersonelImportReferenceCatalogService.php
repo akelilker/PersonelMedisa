@@ -47,7 +47,8 @@ final class PersonelImportReferenceCatalogService
         'PERSONEL_TIPI' => 7,
         'SGK_ISVEREN' => 8,
         'CALISMA_LOKASYONU' => 9,
-        'SABIT_DEGER' => 10,
+        'CALISAN_KAPSAMI' => 10,
+        'SABIT_DEGER' => 11,
     ];
 
     /**
@@ -170,6 +171,25 @@ final class PersonelImportReferenceCatalogService
             $pozisyonIndex = self::loadNameIndex($pdo, 'pozisyonlar');
             self::appendNameRows($rows, 'POZISYON', $pozisyonIndex, null, '');
         }
+
+        $rows[] = [
+            'referans_turu' => 'CALISAN_KAPSAMI',
+            'deger' => PersonelCalisanKapsamService::IC_PERSONEL,
+            'bagli_sube' => '',
+            'kullanilabilir' => 'EVET',
+            'eslesme_sayisi' => '1',
+            'uyari_kodu' => '',
+            'aciklama' => 'Ic Personel (varsayilan; kolon yoksa IC_PERSONEL).',
+        ];
+        $rows[] = [
+            'referans_turu' => 'CALISAN_KAPSAMI',
+            'deger' => PersonelCalisanKapsamService::DIS_KAYNAK,
+            'bagli_sube' => '',
+            'kullanilabilir' => 'EVET',
+            'eslesme_sayisi' => '1',
+            'uyari_kodu' => '',
+            'aciklama' => 'Dis Kaynak / SGK Baska Isverende. Dizin kaydi; TC/soyad/dogum/telefon opsiyonel.',
+        ];
 
         self::sortRows($rows);
 

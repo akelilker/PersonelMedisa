@@ -298,7 +298,7 @@ export function hesaplaOrtalamaKalanIzin(
     const personelSurecleri = surecler.filter((s) => s.personel_id === p.id);
     const personelTakvimGunleri = puantajKayitlari.filter((kayit) => kayit.personel_id === p.id);
     const bakiye = hesaplaIzinBakiye(
-      { ise_giris_tarihi: p.ise_giris_tarihi!, dogum_tarihi: p.dogum_tarihi },
+      { ise_giris_tarihi: p.ise_giris_tarihi!, dogum_tarihi: p.dogum_tarihi ?? undefined },
       personelSurecleri,
       personelTakvimGunleri
     );

@@ -337,6 +337,7 @@ class DonemKapanisPreflightService
     {
         $where = [
             'p.sube_id = :sube_id',
+            \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::sqlIcPersonelPredicate($pdo, 'p'),
             'gp.tarih BETWEEN :bas AND :bit',
             "gp.state <> 'MUHURLENDI'",
             "gp.kontrol_durumu = 'BEKLIYOR'",
@@ -601,7 +602,11 @@ class DonemKapanisPreflightService
     /** @param array<string, mixed> $filters */
     private static function fetchSalaryMissingPersonelIds(PDO $pdo, $subeId, $resolveDate, array $filters)
     {
-        $where = ['sube_id = :sube_id', "aktif_durum = 'AKTIF'"];
+        $where = [
+            'sube_id = :sube_id',
+            "aktif_durum = 'AKTIF'",
+            \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::sqlIcPersonelPredicate($pdo, 'personeller'),
+        ];
         $params = ['sube_id' => $subeId];
         if (isset($filters['departman_id']) && (int) $filters['departman_id'] > 0) {
             $where[] = 'departman_id = :departman_id';
@@ -637,7 +642,11 @@ class DonemKapanisPreflightService
     /** @param array<string, mixed> $filters */
     private static function countActivePersonelWithoutPuantaj(PDO $pdo, $subeId, $ayBaslangic, $ayBitis, array $filters)
     {
-        $where = ['p.sube_id = :sube_id', "p.aktif_durum = 'AKTIF'"];
+        $where = [
+            'p.sube_id = :sube_id',
+            "p.aktif_durum = 'AKTIF'",
+            \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::sqlIcPersonelPredicate($pdo, 'p'),
+        ];
         $params = ['sube_id' => $subeId, 'bas' => $ayBaslangic, 'bit' => $ayBitis];
         if (isset($filters['departman_id']) && (int) $filters['departman_id'] > 0) {
             $where[] = 'p.departman_id = :departman_id';

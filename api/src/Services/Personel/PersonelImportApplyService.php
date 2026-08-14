@@ -257,13 +257,15 @@ final class PersonelImportApplyService
                 }
 
                 PersonelCreateService::validateCreateReferences($pdo, $payload);
-                if (PersonelCreateService::tcExists($pdo, (string) $payload['tc_kimlik_no'])) {
+                $tcValue = $payload['tc_kimlik_no'] ?? null;
+                if ($tcValue !== null && $tcValue !== '' && PersonelCreateService::tcExists($pdo, (string) $tcValue)) {
                     throw new PersonelImportException(
                         'PERSONEL_IMPORT_ALREADY_EXISTS',
                         'Ayni T.C. Kimlik No ile personel zaten mevcut.',
                         409
                     );
                 }
+                PersonelCalisanKapsamSchema::assertReadyForDisKaynakWrite($pdo, $payload);
 
                 $personelId = PersonelCreateService::insertPersonel($pdo, $payload);
                 $created[] = [
@@ -304,7 +306,10 @@ final class PersonelImportApplyService
             if ($pdo->inTransaction()) {
                 $pdo->rollBack();
             }
-            if ($e->getCodeString() === PersonelOrgLocationSchema::ERROR_CODE) {
+            if ($e->getCodeString() === PersonelOrgLocationSchema::ERROR_CODE
+                || $e->getCodeString() === PersonelCalisanKapsamSchema::ERROR_CODE
+                || $e->getCodeString() === PersonelCalisanKapsamService::ERROR_SGK_YASAK
+            ) {
                 self::recordFailureAuditOutsideTx(
                     $pdo,
                     $idempotencyKey,
@@ -315,10 +320,10 @@ final class PersonelImportApplyService
                     $activeSubeId,
                     $toplamSatir,
                     $gecerliSatir,
-                    PersonelOrgLocationSchema::ERROR_CODE
+                    $e->getCodeString()
                 );
                 throw new PersonelImportException(
-                    PersonelOrgLocationSchema::ERROR_CODE,
+                    $e->getCodeString(),
                     $e->getMessage(),
                     409
                 );

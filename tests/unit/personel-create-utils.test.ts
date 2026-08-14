@@ -54,6 +54,32 @@ describe("personel-create-utils", () => {
     expect(payload.maas_tutari).toBe(35000);
   });
 
+  it("DIS_KAYNAK için nullable kimlik alanlarını uydurmadan gönderir", () => {
+    const payload = buildCreatePersonelPayload({
+      ...validForm,
+      calisanKapsami: "DIS_KAYNAK",
+      tcKimlikNo: "",
+      soyad: "",
+      dogumTarihi: "",
+      telefon: ""
+    });
+
+    expect(payload).toMatchObject({
+      calisan_kapsami: "DIS_KAYNAK",
+      tc_kimlik_no: null,
+      soyad: null,
+      dogum_tarihi: null,
+      telefon: null
+    });
+  });
+
+  it("IC_PERSONEL zorunlu kimlik sözleşmesini korur", () => {
+    expect(() => buildCreatePersonelPayload({ ...validForm, tcKimlikNo: "" })).toThrow();
+    expect(() => buildCreatePersonelPayload({ ...validForm, soyad: "" })).toThrow();
+    expect(() => buildCreatePersonelPayload({ ...validForm, dogumTarihi: "" })).toThrow();
+    expect(() => buildCreatePersonelPayload({ ...validForm, telefon: "" })).toThrow();
+  });
+
   it("buildMaasPayloadFields null ve undefined ayrımını korur", () => {
     expect(buildMaasPayloadFields(undefined)).toEqual({});
     expect(buildMaasPayloadFields(null)).toEqual({

@@ -243,6 +243,7 @@ class PersonelBordroDevirService
             "SELECT id, ad, soyad, sicil_no, sube_id, departman_id, durum
              FROM personeller
              WHERE UPPER(TRIM(sicil_no)) = :sicil
+               AND " . \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::sqlIcPersonelPredicate($pdo, 'personeller') . "
              LIMIT 1"
         );
         $stmt->execute(['sicil' => $canonical]);

@@ -28,8 +28,11 @@ const BAGLI_AMIR_DEGISTI_SUREC_TURU = "BAGLI_AMIR_DEGISTI";
 const BAGLI_AMIR_ATAMASI_KALDIRILDI_SUREC_TURU = "BAGLI_AMIR_ATAMASI_KALDIRILDI";
 
 export type EditPersonelFormState = {
+  calisanKapsami: "IC_PERSONEL" | "DIS_KAYNAK";
+  tcKimlikNo: string;
   ad: string;
   soyad: string;
+  dogumTarihi: string;
   telefon: string;
   departmanId: string;
   bolumId: string;
@@ -194,8 +197,11 @@ export function pickGenelLifecycleFormFields(
 export function personelToEditForm(personel: Personel): EditPersonelFormState {
   const resolvedMaas = resolvePersonelMaasTutari(personel);
   return {
+    calisanKapsami: personel.calisan_kapsami ?? "IC_PERSONEL",
+    tcKimlikNo: personel.tc_kimlik_no ?? "",
     ad: personel.ad,
-    soyad: personel.soyad,
+    soyad: personel.soyad ?? "",
+    dogumTarihi: personel.dogum_tarihi ?? "",
     telefon: personel.telefon ?? "",
     departmanId: personel.departman_id != null ? String(personel.departman_id) : "",
     bolumId: personel.bolum_id != null ? String(personel.bolum_id) : "",
@@ -227,10 +233,17 @@ export function buildPersonelUpdatePayload(
 ): UpdatePersonelPayload {
   const includeWageFields = options.includeWageFields !== false;
   const includeOrgStructureFields = options.includeOrgStructureFields === true;
+  const tcKimlikNo = String(editForm.tcKimlikNo ?? "").trim();
+  const soyad = String(editForm.soyad ?? "").trim();
+  const dogumTarihi = String(editForm.dogumTarihi ?? "").trim();
+  const telefon = String(editForm.telefon ?? "").trim();
   const payload: UpdatePersonelPayload = {
+    calisan_kapsami: editForm.calisanKapsami ?? "IC",
+    tc_kimlik_no: tcKimlikNo || null,
     ad: normalizePersonelAd(editForm.ad),
-    soyad: normalizePersonelSoyad(editForm.soyad),
-    telefon: normalizeTurkishMobilePhone(editForm.telefon, "Telefon")
+    soyad: soyad ? normalizePersonelSoyad(soyad) : null,
+    dogum_tarihi: dogumTarihi || null,
+    telefon: telefon ? normalizeTurkishMobilePhone(telefon, "Telefon") : null
   };
 
   if (!hasLifecycleDiff) {

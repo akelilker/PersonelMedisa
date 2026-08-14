@@ -547,7 +547,7 @@ if (($argv[1] ?? '') === '--p6-http-child') {
 
 $root = p6RootPdo();
 $files = p6MigrationFiles();
-p6Assert(end($files) === '065_personel_org_structure.sql', 'A0 tip ends with 065');
+p6Assert(end($files) === '066_personel_calisan_kapsami.sql', 'A0 tip ends with 066');
 $gyUser = ['id' => 1, 'rol' => 'GENEL_YONETICI', 'sube_ids' => []];
 $scopedUser = ['id' => 2, 'rol' => 'BOLUM_YONETICISI', 'sube_ids' => [1]];
 

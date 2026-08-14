@@ -73,20 +73,20 @@ final class PersonelCanonicalValidator
      */
     public static function normalizeAndValidateCreatePayload(array $body)
     {
-        if (!array_key_exists('tc_kimlik_no', $body) || trim((string) $body['tc_kimlik_no']) === '') {
-            throw new PersonelValidationException('tc_kimlik_no', 'T.C. Kimlik No zorunludur.');
-        }
-
-        $tcKimlikNo = trim((string) $body['tc_kimlik_no']);
-        if (!self::isValidTcKimlikNo($tcKimlikNo)) {
-            throw new PersonelValidationException('tc_kimlik_no', 'T.C. Kimlik No 11 hane olmalidir.');
-        }
+        $identity = PersonelCalisanKapsamService::normalizeCreateIdentity($body);
+        $kapsam = $identity['kapsam'];
+        $tcKimlikNo = $identity['tc'];
 
         $ad = self::requireTrimmedString($body, 'ad', 'Ad zorunludur.');
-        $soyad = self::requireTrimmedString($body, 'soyad', 'Soyad zorunludur.');
-
-        $dogumTarihi = self::requireValidDate($body, 'dogum_tarihi', 'Dogum tarihi zorunludur.');
-        $telefon = self::requireTrimmedString($body, 'telefon', 'Telefon zorunludur.');
+        if ($kapsam === PersonelCalisanKapsamService::IC_PERSONEL) {
+            $soyad = self::requireTrimmedString($body, 'soyad', 'Soyad zorunludur.');
+            $dogumTarihi = self::requireValidDate($body, 'dogum_tarihi', 'Dogum tarihi zorunludur.');
+            $telefon = self::requireTrimmedString($body, 'telefon', 'Telefon zorunludur.');
+        } else {
+            $soyad = self::optionalTrimmedString($body, 'soyad');
+            $dogumTarihi = self::optionalValidDate($body, 'dogum_tarihi');
+            $telefon = self::optionalTrimmedString($body, 'telefon');
+        }
         // Emergency contact is optional for initial master create/import; empty → NULL.
         $acilDurumKisi = self::optionalTrimmedString($body, 'acil_durum_kisi');
         $acilDurumTelefon = self::optionalTrimmedString($body, 'acil_durum_telefon');
@@ -140,6 +140,7 @@ final class PersonelCanonicalValidator
             'gorev_id' => $gorevId,
             'personel_tipi_id' => $personelTipiId,
             'aktif_durum' => $aktifDurum,
+            'calisan_kapsami' => $kapsam,
             'dogum_yeri' => $dogumYeri,
             'kan_grubu' => $kanGrubu,
             'bagli_amir_id' => $bagliAmirId,
@@ -167,6 +168,14 @@ final class PersonelCanonicalValidator
             $payload['pozisyon_id'] = self::optionalPositiveInt($body, 'pozisyon_id');
         }
 
+        PersonelCalisanKapsamService::assertSgkIsverenAllowed(
+            $kapsam,
+            $payload['sgk_isveren_id'] ?? null
+        );
+        if ($kapsam === PersonelCalisanKapsamService::DIS_KAYNAK) {
+            $payload['sgk_isveren_id'] = null;
+        }
+
         return $payload;
     }
 
@@ -187,15 +196,27 @@ final class PersonelCanonicalValidator
 
         if (array_key_exists('tc_kimlik_no', $body)) {
             $tcKimlikNo = trim((string) $body['tc_kimlik_no']);
-            if (!self::isValidTcKimlikNo($tcKimlikNo)) {
+            if ($tcKimlikNo === '') {
+                $payload['tc_kimlik_no'] = null;
+            } elseif (!self::isValidTcKimlikNo($tcKimlikNo)) {
                 throw new PersonelValidationException('tc_kimlik_no', 'T.C. Kimlik No 11 hane olmalidir.');
+            } else {
+                $payload['tc_kimlik_no'] = $tcKimlikNo;
             }
-            $payload['tc_kimlik_no'] = $tcKimlikNo;
         }
 
-        foreach (['ad', 'soyad', 'telefon', 'sicil_no'] as $field) {
+        if (array_key_exists('calisan_kapsami', $body)) {
+            $payload['calisan_kapsami'] = PersonelCalisanKapsamService::normalize($body['calisan_kapsami']);
+        }
+
+        foreach (['ad', 'sicil_no'] as $field) {
             if (array_key_exists($field, $body)) {
                 $payload[$field] = self::requireTrimmedString($body, $field, 'Gecersiz deger.');
+            }
+        }
+        foreach (['soyad', 'telefon'] as $field) {
+            if (array_key_exists($field, $body)) {
+                $payload[$field] = self::optionalTrimmedString($body, $field);
             }
         }
 
@@ -205,9 +226,15 @@ final class PersonelCanonicalValidator
             }
         }
 
-        foreach (['dogum_tarihi', 'ise_giris_tarihi'] as $field) {
-            if (array_key_exists($field, $body)) {
-                $payload[$field] = self::requireValidDate($body, $field, 'Gecerli bir tarih olmalidir.');
+        if (array_key_exists('ise_giris_tarihi', $body)) {
+            $payload['ise_giris_tarihi'] = self::requireValidDate($body, 'ise_giris_tarihi', 'Gecerli bir tarih olmalidir.');
+        }
+        if (array_key_exists('dogum_tarihi', $body)) {
+            $rawDogum = trim((string) ($body['dogum_tarihi'] ?? ''));
+            if ($rawDogum === '') {
+                $payload['dogum_tarihi'] = null;
+            } else {
+                $payload['dogum_tarihi'] = self::requireValidDate($body, 'dogum_tarihi', 'Gecerli bir tarih olmalidir.');
             }
         }
 
@@ -299,29 +326,62 @@ final class PersonelCanonicalValidator
             'prim_kurali_id' => null,
         ];
 
+        $scopeExplicit = array_key_exists('calisan_kapsami', $row);
+        try {
+            $kapsam = PersonelCalisanKapsamService::normalize($row['calisan_kapsami'] ?? PersonelCalisanKapsamService::IC_PERSONEL);
+        } catch (PersonelValidationException $e) {
+            $errors[] = self::importError('PERSONEL_IMPORT_EKSIK_ALAN', 'calisan_kapsami', $e->getMessage());
+            $kapsam = PersonelCalisanKapsamService::IC_PERSONEL;
+        }
+        if ($scopeExplicit) {
+            $payload['calisan_kapsami'] = $kapsam;
+        }
+
         $tc = trim((string) ($row['tc_kimlik_no'] ?? ''));
         if ($tc === '') {
-            $errors[] = self::importError('PERSONEL_IMPORT_EKSIK_ALAN', 'tc_kimlik_no', 'T.C. Kimlik No zorunludur.');
+            if ($kapsam === PersonelCalisanKapsamService::IC_PERSONEL) {
+                $errors[] = self::importError('PERSONEL_IMPORT_EKSIK_ALAN', 'tc_kimlik_no', 'T.C. Kimlik No zorunludur.');
+            } else {
+                $payload['tc_kimlik_no'] = null;
+            }
         } elseif (!self::isValidTcKimlikNo($tc)) {
             $errors[] = self::importError('PERSONEL_IMPORT_GECERSIZ_TC', 'tc_kimlik_no', 'T.C. Kimlik No 11 hane olmalidir.');
         } else {
             $payload['tc_kimlik_no'] = $tc;
         }
 
-        foreach (
-            [
-                'ad' => 'Ad zorunludur.',
-                'soyad' => 'Soyad zorunludur.',
-                'telefon' => 'Telefon zorunludur.',
-                'sicil_no' => 'Sicil no zorunludur.',
-            ] as $field => $message
-        ) {
-            $value = trim((string) ($row[$field] ?? ''));
-            if ($value === '') {
-                $errors[] = self::importError('PERSONEL_IMPORT_EKSIK_ALAN', $field, $message);
+        $ad = trim((string) ($row['ad'] ?? ''));
+        if ($ad === '') {
+            $errors[] = self::importError('PERSONEL_IMPORT_EKSIK_ALAN', 'ad', 'Ad zorunludur.');
+        } else {
+            $payload['ad'] = $ad;
+        }
+        $sicilNo = trim((string) ($row['sicil_no'] ?? ''));
+        if ($sicilNo === '') {
+            $errors[] = self::importError('PERSONEL_IMPORT_EKSIK_ALAN', 'sicil_no', 'Sicil no zorunludur.');
+        } else {
+            $payload['sicil_no'] = $sicilNo;
+        }
+
+        $soyad = trim((string) ($row['soyad'] ?? ''));
+        if ($soyad === '') {
+            if ($kapsam === PersonelCalisanKapsamService::IC_PERSONEL) {
+                $errors[] = self::importError('PERSONEL_IMPORT_EKSIK_ALAN', 'soyad', 'Soyad zorunludur.');
             } else {
-                $payload[$field] = $value;
+                $payload['soyad'] = null;
             }
+        } else {
+            $payload['soyad'] = $soyad;
+        }
+        $telefon = trim((string) ($row['telefon'] ?? ''));
+        if ($telefon === '') {
+            if ($kapsam === PersonelCalisanKapsamService::IC_PERSONEL) {
+                $errors[] = self::importError('PERSONEL_IMPORT_EKSIK_ALAN', 'telefon', 'Telefon zorunludur.');
+            } else {
+                $payload['telefon'] = null;
+            }
+        } else {
+            $payload['telefon'] = $telefon;
         }
 
         // Optional emergency contact: present value kept; empty → NULL. No placeholders.
@@ -330,17 +390,30 @@ final class PersonelCanonicalValidator
             $payload[$field] = $value === '' ? null : $value;
         }
 
-        foreach (['dogum_tarihi', 'ise_giris_tarihi'] as $field) {
-            $raw = trim((string) ($row[$field] ?? ''));
-            if ($raw === '') {
-                $errors[] = self::importError('PERSONEL_IMPORT_EKSIK_ALAN', $field, 'Tarih zorunludur.');
-                continue;
-            }
-            $canonical = self::normalizeDateToCanonical($raw);
-            if ($canonical === null) {
-                $errors[] = self::importError('PERSONEL_IMPORT_GECERSIZ_TARIH', $field, 'Gecerli bir tarih olmalidir.');
+        $iseGirisRaw = trim((string) ($row['ise_giris_tarihi'] ?? ''));
+        if ($iseGirisRaw === '') {
+            $errors[] = self::importError('PERSONEL_IMPORT_EKSIK_ALAN', 'ise_giris_tarihi', 'Tarih zorunludur.');
+        } else {
+            $canonicalGiris = self::normalizeDateToCanonical($iseGirisRaw);
+            if ($canonicalGiris === null) {
+                $errors[] = self::importError('PERSONEL_IMPORT_GECERSIZ_TARIH', 'ise_giris_tarihi', 'Gecerli bir tarih olmalidir.');
             } else {
-                $payload[$field] = $canonical;
+                $payload['ise_giris_tarihi'] = $canonicalGiris;
+            }
+        }
+        $dogumRaw = trim((string) ($row['dogum_tarihi'] ?? ''));
+        if ($dogumRaw === '') {
+            if ($kapsam === PersonelCalisanKapsamService::IC_PERSONEL) {
+                $errors[] = self::importError('PERSONEL_IMPORT_EKSIK_ALAN', 'dogum_tarihi', 'Tarih zorunludur.');
+            } else {
+                $payload['dogum_tarihi'] = null;
+            }
+        } else {
+            $canonicalDogum = self::normalizeDateToCanonical($dogumRaw);
+            if ($canonicalDogum === null) {
+                $errors[] = self::importError('PERSONEL_IMPORT_GECERSIZ_TARIH', 'dogum_tarihi', 'Gecerli bir tarih olmalidir.');
+            } else {
+                $payload['dogum_tarihi'] = $canonicalDogum;
             }
         }
 
@@ -409,11 +482,16 @@ final class PersonelCanonicalValidator
 
         try {
             $normalized = self::normalizeAndValidateCreatePayload($payload);
+            if (!$scopeExplicit) {
+                unset($normalized['calisan_kapsami']);
+            }
 
             return ['payload' => $normalized, 'errors' => []];
         } catch (PersonelValidationException $e) {
             $code = 'PERSONEL_IMPORT_EKSIK_ALAN';
-            if ($e->getField() === 'tc_kimlik_no') {
+            if ($e->getCodeString() === PersonelCalisanKapsamService::ERROR_SGK_YASAK) {
+                $code = PersonelCalisanKapsamService::ERROR_SGK_YASAK;
+            } elseif ($e->getField() === 'tc_kimlik_no') {
                 $code = 'PERSONEL_IMPORT_GECERSIZ_TC';
             } elseif (in_array($e->getField(), ['dogum_tarihi', 'ise_giris_tarihi'], true)) {
                 $code = 'PERSONEL_IMPORT_GECERSIZ_TARIH';
@@ -461,6 +539,27 @@ final class PersonelCanonicalValidator
         }
 
         $value = trim((string) $body[$field]);
+        if (!self::isValidDateString($value)) {
+            throw new PersonelValidationException((string) $field, 'Gecerli bir tarih olmalidir.');
+        }
+
+        return $value;
+    }
+
+    /**
+     * Blank/missing → NULL. Non-blank invalid date → reject (never coerced to NULL).
+     *
+     * @param array<string, mixed> $body
+     */
+    private static function optionalValidDate(array $body, $field)
+    {
+        if (!array_key_exists($field, $body) || $body[$field] === null) {
+            return null;
+        }
+        $value = trim((string) $body[$field]);
+        if ($value === '') {
+            return null;
+        }
         if (!self::isValidDateString($value)) {
             throw new PersonelValidationException((string) $field, 'Gecerli bir tarih olmalidir.');
         }

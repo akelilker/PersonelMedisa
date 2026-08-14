@@ -31,7 +31,7 @@ export function PersonelDosyaHero({
         <div className="personel-dosya-hero-copy">
           <p className="personel-dosya-kicker">Personel kartı</p>
           <h3>
-            {personel.ad} {personel.soyad}
+            {[personel.ad, personel.soyad].filter(Boolean).join(" ")}
           </h3>
           <p className="personel-dosya-sub">{heroSummary || "Kurumsal personel kaydı"}</p>
         </div>
@@ -39,7 +39,11 @@ export function PersonelDosyaHero({
 
       <div className="personel-dosya-hero-grid">
         <DossierField label="Ad" value={personel.ad} />
-        <DossierField label="Soyad" value={personel.soyad} />
+        <DossierField label="Soyad" value={formatDetailValue(personel.soyad)} />
+        <DossierField
+          label="Çalışan Kapsamı"
+          value={personel.calisan_kapsami === "DIS_KAYNAK" ? "DIŞ KAYNAK" : "İÇ PERSONEL"}
+        />
         <DossierField label="Sicil No" value={formatDetailValue(personel.sicil_no)} />
         <DossierField label="Departman" value={formatReferenceValue(personel.departman_adi, personel.departman_id)} />
         <DossierField label="Bölüm" value={formatReferenceValue(personel.bolum_adi, personel.bolum_id)} />

@@ -62,6 +62,7 @@ final class PersonelImportDryRunService
         'bolum',
         'birim',
         'pozisyon',
+        'calisan_kapsami',
     ];
 
     private const ORG_LOCATION_OPTIONAL_COLUMNS = [
@@ -322,6 +323,7 @@ final class PersonelImportDryRunService
             $hasOrgStructCols = in_array('bolum', $headers, true)
                 || in_array('birim', $headers, true)
                 || in_array('pozisyon', $headers, true);
+            $hasScopeColumn = in_array('calisan_kapsami', $headers, true);
 
             $resolved = self::resolveReferences($rowMap, $refCatalog, $hataKodlari, $hasOrgCols, $hasOrgStructCols);
 
@@ -342,6 +344,9 @@ final class PersonelImportDryRunService
                 'gorev_id' => $resolved['gorev_id'],
                 'personel_tipi_id' => $resolved['personel_tipi_id'],
             ];
+            if ($hasScopeColumn) {
+                $importBody['calisan_kapsami'] = $rowMap['calisan_kapsami'] ?? '';
+            }
             if ($hasOrgCols) {
                 // Pre-064 blank optional org columns are not write intent — omit keys so apply
                 // does not trip assertReadyForOrgWrite. Explicit API null still fails closed.
@@ -373,6 +378,11 @@ final class PersonelImportDryRunService
             $fieldResult = PersonelCanonicalValidator::validateImportAnaVeriRow($importBody);
             foreach ($fieldResult['errors'] as $err) {
                 $hataKodlari[] = (string) $err['code'];
+            }
+            try {
+                PersonelCalisanKapsamSchema::assertReadyForDisKaynakWrite($pdo, $importBody);
+            } catch (PersonelValidationException $e) {
+                $hataKodlari[] = $e->getCodeString();
             }
 
             if ($tcRaw !== '') {
@@ -422,13 +432,13 @@ final class PersonelImportDryRunService
                 // Ham TC yalniz bellek-ici manifest hesabina girer; saklanmaz/response'a cikmaz.
                 $manifestRows[] = [
                     'satir_no' => $satirNo,
-                    'tc_kimlik_no' => (string) $payload['tc_kimlik_no'],
+                    'tc_kimlik_no' => $payload['tc_kimlik_no'] === null ? '' : (string) $payload['tc_kimlik_no'],
                     'sicil_no' => (string) $payload['sicil_no'],
                     'ad' => (string) $payload['ad'],
-                    'soyad' => (string) $payload['soyad'],
-                    'dogum_tarihi' => (string) $payload['dogum_tarihi'],
+                    'soyad' => $payload['soyad'] === null ? '' : (string) $payload['soyad'],
+                    'dogum_tarihi' => $payload['dogum_tarihi'] === null ? '' : (string) $payload['dogum_tarihi'],
                     'ise_giris_tarihi' => (string) $payload['ise_giris_tarihi'],
-                    'telefon' => (string) $payload['telefon'],
+                    'telefon' => $payload['telefon'] === null ? '' : (string) $payload['telefon'],
                     'acil_durum_kisi' => $payload['acil_durum_kisi'] === null || $payload['acil_durum_kisi'] === ''
                         ? null
                         : (string) $payload['acil_durum_kisi'],
@@ -451,6 +461,9 @@ final class PersonelImportDryRunService
                     $manifestRows[count($manifestRows) - 1]['bolum_id'] = $payload['bolum_id'] ?? null;
                     $manifestRows[count($manifestRows) - 1]['birim_id'] = $payload['birim_id'] ?? null;
                     $manifestRows[count($manifestRows) - 1]['pozisyon_id'] = $payload['pozisyon_id'] ?? null;
+                }
+                if ($hasScopeColumn) {
+                    $manifestRows[count($manifestRows) - 1]['calisan_kapsami'] = (string) $payload['calisan_kapsami'];
                 }
                 $candidates[] = [
                     'satir_no' => $satirNo,

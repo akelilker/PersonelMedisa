@@ -263,8 +263,9 @@ export const dataCacheKeys = {
     aktiflik: string,
     departmanId: string,
     personelTipiId: string,
-    page: number
-  ) => `personeller:list:s${subeSeg(subeId)}:${search}|${aktiflik}|${departmanId}|${personelTipiId}|${page}`,
+    page: number,
+    calisanKapsami = ""
+  ) => `personeller:list:s${subeSeg(subeId)}:${search}|${aktiflik}|${departmanId}|${personelTipiId}|${page}${calisanKapsami ? `|${calisanKapsami}` : ""}`,
   personelDetail: (subeId: number | null, id: number) =>
     `personeller:detail:s${subeSeg(subeId)}:${id}`,
   referansPersonel: () => `referans:personel-bundle`,
@@ -680,11 +681,12 @@ type PersonellerListCacheFilters = {
   departmanId: string;
   personelTipiId: string;
   page: number;
+  calisanKapsami: string;
 };
 
 function parsePersonellerListCacheKeySuffix(suffix: string): PersonellerListCacheFilters | null {
   const parts = suffix.split("|");
-  if (parts.length !== 5) {
+  if (parts.length !== 5 && parts.length !== 6) {
     return null;
   }
 
@@ -698,7 +700,8 @@ function parsePersonellerListCacheKeySuffix(suffix: string): PersonellerListCach
     aktiflik: parts[1],
     departmanId: parts[2],
     personelTipiId: parts[3],
-    page
+    page,
+    calisanKapsami: parts[5] ?? ""
   };
 }
 
@@ -766,6 +769,10 @@ function personelMatchesListCacheFilters(created: Personel, filters: Personeller
     return false;
   }
 
+  if (filters.calisanKapsami && (created.calisan_kapsami ?? "IC_PERSONEL") !== filters.calisanKapsami) {
+    return false;
+  }
+
   return true;
 }
 
@@ -806,6 +813,10 @@ function personelMatchesListFiltersForUpdate(
   }
 
   if (!personelMatchesOptionalIdFilter(personel.personel_tipi_id, filters.personelTipiId)) {
+    return false;
+  }
+
+  if (filters.calisanKapsami && (personel.calisan_kapsami ?? "IC_PERSONEL") !== filters.calisanKapsami) {
     return false;
   }
 
@@ -879,12 +890,12 @@ export function removeQueuedTempPersonel(listKey: string, tempId: number): void 
 export function draftPersonelFromPayload(payload: CreatePersonelPayload, tempId: number): Personel {
   return {
     id: tempId,
-    tc_kimlik_no: payload.tc_kimlik_no,
+    tc_kimlik_no: payload.tc_kimlik_no ?? null,
     ad: payload.ad,
-    soyad: payload.soyad,
-    dogum_tarihi: payload.dogum_tarihi,
+    soyad: payload.soyad ?? null,
+    dogum_tarihi: payload.dogum_tarihi ?? null,
     sube_id: payload.sube_id,
-    telefon: payload.telefon,
+    telefon: payload.telefon ?? null,
     sicil_no: payload.sicil_no,
     ise_giris_tarihi: payload.ise_giris_tarihi,
     departman_id: payload.departman_id,
@@ -894,6 +905,7 @@ export function draftPersonelFromPayload(payload: CreatePersonelPayload, tempId:
     dogum_yeri: payload.dogum_yeri,
     kan_grubu: payload.kan_grubu,
     aktif_durum: payload.aktif_durum,
+    calisan_kapsami: payload.calisan_kapsami ?? "IC_PERSONEL",
     ucret_tipi_id: payload.ucret_tipi_id,
     net_maas_tutari: payload.net_maas_tutari ?? payload.maas_tutari,
     maas_tutari: payload.maas_tutari ?? payload.net_maas_tutari,
@@ -1030,7 +1042,11 @@ function parsePersonelRealtimePayload(p: unknown): Personel | null {
   if (!isRecord(p) || typeof p.id !== "number") {
     return null;
   }
-  if (typeof p.ad !== "string" || typeof p.soyad !== "string" || typeof p.tc_kimlik_no !== "string") {
+  if (
+    typeof p.ad !== "string" ||
+    (typeof p.soyad !== "string" && p.soyad !== null) ||
+    (typeof p.tc_kimlik_no !== "string" && p.tc_kimlik_no !== null)
+  ) {
     return null;
   }
   const ad = p.ad;
@@ -1382,6 +1398,7 @@ export async function loadDataFromServer(options?: LoadDataFromServerOptions): P
             fetchBildirimTuruOptions(),
             fetchPersonellerList({
               aktiflik: "aktif",
+              calisan_kapsami: "IC_PERSONEL",
               sube_id: subeQ,
               page: 1,
               limit: BILDIRIM_PERSONEL_FETCH_LIMIT

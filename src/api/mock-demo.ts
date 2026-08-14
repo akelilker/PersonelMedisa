@@ -82,6 +82,7 @@ type DemoPersonel = {
   ad: string;
   soyad: string;
   aktif_durum: "AKTIF" | "PASIF";
+  calisan_kapsami?: "IC_PERSONEL" | "DIS_KAYNAK";
   sube_id?: number;
   telefon?: string;
   dogum_tarihi?: string;
@@ -5009,6 +5010,7 @@ export function resolveDemoApiResponse(
     const subeId = toNumber(requestUrl.searchParams.get("sube_id"));
     const departmanId = toNumber(requestUrl.searchParams.get("departman_id"));
     const personelTipiId = toNumber(requestUrl.searchParams.get("personel_tipi_id"));
+    const calisanKapsami = toStringValue(requestUrl.searchParams.get("calisan_kapsami"));
 
     const filtered = demoState.personeller.filter((item) => {
       if (aktiflik === "aktif" && item.aktif_durum !== "AKTIF") {
@@ -5024,6 +5026,9 @@ export function resolveDemoApiResponse(
         return false;
       }
       if (personelTipiId !== null && item.personel_tipi_id !== personelTipiId) {
+        return false;
+      }
+      if (calisanKapsami && (item.calisan_kapsami ?? "IC_PERSONEL") !== calisanKapsami) {
         return false;
       }
       if (!search) {
@@ -5420,12 +5425,16 @@ export function resolveDemoApiResponse(
       return demoRevizyonError("VALIDATION_ERROR", "Şube seçilmelidir.");
     }
 
+    const calisanKapsami = toStringValue(body.calisan_kapsami) === "DIS_KAYNAK"
+      ? "DIS_KAYNAK"
+      : "IC_PERSONEL";
     const next: DemoPersonel = {
       id: ++demoState.nextIds.personel,
-      tc_kimlik_no: toStringValue(body.tc_kimlik_no) ?? "00000000000",
+      tc_kimlik_no: toStringValue(body.tc_kimlik_no) ?? (calisanKapsami === "DIS_KAYNAK" ? "" : "00000000000"),
       ad: toStringValue(body.ad) ?? "Yeni",
-      soyad: toStringValue(body.soyad) ?? "Personel",
+      soyad: toStringValue(body.soyad) ?? (calisanKapsami === "DIS_KAYNAK" ? "" : "Personel"),
       aktif_durum: (toStringValue(body.aktif_durum) as "AKTIF" | "PASIF") ?? "AKTIF",
+      calisan_kapsami: calisanKapsami,
       sube_id: subeId,
       telefon: toStringValue(body.telefon) ?? undefined,
       dogum_tarihi: toStringValue(body.dogum_tarihi) ?? undefined,

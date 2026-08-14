@@ -197,6 +197,10 @@ class BildirimlerController
         if (!$personel) {
             self::validationError('personel_id', 'Personel bulunamadi.');
         }
+        \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::assertOperationalEligible(
+            $pdo,
+            $payload['personel_id']
+        );
         if ((string) $personel['aktif_durum'] !== 'AKTIF') {
             self::validationError('personel_id', 'Personel aktif degil.');
         }

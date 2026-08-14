@@ -870,7 +870,7 @@ class RevizyonController
         }
 
         $sql = 'SELECT t.*,
-                       CONCAT(TRIM(p.ad), CHAR(32), TRIM(p.soyad)) AS personel_ad_soyad,
+                       TRIM(CONCAT(COALESCE(TRIM(p.ad), \'\'), CHAR(32), COALESCE(TRIM(p.soyad), \'\'))) AS personel_ad_soyad,
                        p.sicil_no AS sicil_no,
                        p.departman_id AS departman_id,
                        d.ad AS departman_adi,
@@ -1052,7 +1052,7 @@ class RevizyonController
         }
 
         $sql = 'SELECT t.*,
-                       CONCAT(TRIM(p.ad), CHAR(32), TRIM(p.soyad)) AS personel_ad_soyad,
+                       TRIM(CONCAT(COALESCE(TRIM(p.ad), \'\'), CHAR(32), COALESCE(TRIM(p.soyad), \'\'))) AS personel_ad_soyad,
                        p.sicil_no AS sicil_no,
                        p.departman_id AS departman_id,
                        d.ad AS departman_adi,
@@ -1578,7 +1578,7 @@ class RevizyonController
         }
 
         $sql = 'SELECT c.*,
-                       CONCAT(TRIM(p.ad), CHAR(32), TRIM(p.soyad)) AS personel_ad_soyad,
+                       TRIM(CONCAT(COALESCE(TRIM(p.ad), \'\'), CHAR(32), COALESCE(TRIM(p.soyad), \'\'))) AS personel_ad_soyad,
                        p.sicil_no AS sicil_no,
                        p.departman_id AS departman_id,
                        d.ad AS departman_adi,
@@ -1611,7 +1611,7 @@ class RevizyonController
         }
 
         $sql = 'SELECT c.*,
-                       CONCAT(TRIM(p.ad), CHAR(32), TRIM(p.soyad)) AS personel_ad_soyad,
+                       TRIM(CONCAT(COALESCE(TRIM(p.ad), \'\'), CHAR(32), COALESCE(TRIM(p.soyad), \'\'))) AS personel_ad_soyad,
                        p.sicil_no AS sicil_no,
                        p.departman_id AS departman_id,
                        d.ad AS departman_adi,

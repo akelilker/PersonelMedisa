@@ -78,6 +78,10 @@ class PuantajController
         $pdo = self::getConnection();
         $personel = self::loadPersonel($pdo, $personelId);
         SubeScope::assertPersonelAccess($user, $request, (int) $personel['sube_id']);
+        \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::assertOperationalEligible(
+            $pdo,
+            $personelId
+        );
 
         $from = trim((string) $request->getQuery('from', ''));
         $to = trim((string) $request->getQuery('to', ''));
@@ -125,6 +129,10 @@ class PuantajController
         $pdo = self::getConnection();
         $personel = self::loadPersonel($pdo, $personelId);
         SubeScope::assertPersonelAccess($user, $request, (int) $personel['sube_id']);
+        \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::assertOperationalEligible(
+            $pdo,
+            $personelId
+        );
 
         $userId = isset($user['id']) ? (int) $user['id'] : 0;
         if ($userId < 1) {
@@ -555,7 +563,6 @@ class PuantajController
         if (!$personel) {
             JsonResponse::notFound('Personel bulunamadi.');
         }
-        \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::assertOperationalEligible($pdo, $personelId);
 
         return $personel;
     }

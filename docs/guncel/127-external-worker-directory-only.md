@@ -20,6 +20,7 @@ Migration `066`:
 
 - `calisan_kapsami ENUM('IC_PERSONEL','DIS_KAYNAK') NOT NULL DEFAULT 'IC_PERSONEL'` ekler.
 - `tc_kimlik_no`, `soyad`, `dogum_tarihi`, `telefon` alanlarını nullable yapar.
+- `sicil_no` için idempotent UNIQUE anahtar `uq_personeller_sicil (sicil_no)` ekler (migration 066 sahibi).
 - mevcut satırları varsayılanla `IC_PERSONEL` tutar.
 - non-null TC unique indexini korur; InnoDB'nin birden çok `NULL` kabul eden unique semantiğini kullanır.
 
@@ -95,6 +96,8 @@ Odaklı testler migration `066` idempotency/default davranışını, schema `065
 - Production DB değişmedi.
 - Production personel verisi değişmedi.
 - Migration `066` production'a uygulanmadı.
+- Migration 066 production uygulanmadan önce operatörün doğrulaması gereken preflight:
+- DUPLICATE_NONBLANK_SICIL_GROUPS = 0
 - Canonical 122 veya external 13 import edilmedi.
 - Retention aktivasyonu veya fiziksel imha yapılmadı.
 - Pack7D docs PR #165 bu implementasyon PR'ından ayrı tutuldu ve merge edilmedi.

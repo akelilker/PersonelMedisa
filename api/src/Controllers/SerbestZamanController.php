@@ -332,6 +332,10 @@ class SerbestZamanController
                 self::rollbackNotFound($pdo, 'personel bulunamadi.');
             }
             self::assertPersonelScope($user, $request, (int) $personel['sube_id']);
+            \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::assertOperationalEligible(
+                $pdo,
+                (int) $personel['id']
+            );
 
             if ((string) $tercih['odeme_tipi'] !== 'SERBEST_ZAMAN') {
                 self::rollbackConflict($pdo, 'NOT_ELIGIBLE', 'Odeme tercihi SERBEST_ZAMAN degil; olusum eventi uretilemez.');
@@ -525,6 +529,10 @@ class SerbestZamanController
                 self::rollbackNotFound($pdo, 'personel bulunamadi.');
             }
             self::assertPersonelScope($user, $request, (int) $personel['sube_id']);
+            \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::assertOperationalEligible(
+                $pdo,
+                $personelId
+            );
 
             $existing = self::loadByIslemAnahtari($pdo, $personelId, $islemAnahtari, true);
             if ($existing !== null) {
@@ -660,6 +668,10 @@ class SerbestZamanController
                 self::rollbackNotFound($pdo, 'personel bulunamadi.');
             }
             self::assertPersonelScope($user, $request, (int) $personel['sube_id']);
+            \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::assertOperationalEligible(
+                $pdo,
+                $personelId
+            );
 
             $existing = self::loadByIslemAnahtari($pdo, $personelId, $islemAnahtari, true);
             if ($existing !== null) {
@@ -825,6 +837,10 @@ class SerbestZamanController
                 self::rollbackNotFound($pdo, 'personel bulunamadi.');
             }
             self::assertPersonelScope($user, $request, (int) $personel['sube_id']);
+            \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::assertOperationalEligible(
+                $pdo,
+                $personelId
+            );
 
             $existing = self::loadByIslemAnahtari($pdo, $personelId, $islemAnahtari, true);
             if ($existing !== null) {
@@ -1140,7 +1156,6 @@ class SerbestZamanController
         if ($row === false) {
             return null;
         }
-        \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::assertOperationalEligible($pdo, $personelId);
 
         return $row;
     }

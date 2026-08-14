@@ -102,3 +102,18 @@ SET @p7f_telefon_sql := IF(
 PREPARE p7f_telefon_stmt FROM @p7f_telefon_sql;
 EXECUTE p7f_telefon_stmt;
 DEALLOCATE PREPARE p7f_telefon_stmt;
+
+SET @p7f_sicil_idx := (
+  SELECT COUNT(*) FROM information_schema.STATISTICS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'personeller'
+    AND INDEX_NAME = 'uq_personeller_sicil'
+);
+SET @p7f_sicil_sql := IF(
+  @p7f_sicil_idx = 0,
+  'ALTER TABLE personeller ADD UNIQUE KEY uq_personeller_sicil (sicil_no)',
+  'DO 0'
+);
+PREPARE p7f_sicil_stmt FROM @p7f_sicil_sql;
+EXECUTE p7f_sicil_stmt;
+DEALLOCATE PREPARE p7f_sicil_stmt;

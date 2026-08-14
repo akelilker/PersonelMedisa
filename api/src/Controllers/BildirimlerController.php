@@ -197,6 +197,8 @@ class BildirimlerController
         if (!$personel) {
             self::validationError('personel_id', 'Personel bulunamadi.');
         }
+        // Authorize branch access before applying operational (external) guards.
+        SubeScope::assertPersonelAccess($user, $request, (int) $personel['sube_id']);
         \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::assertOperationalEligible(
             $pdo,
             $payload['personel_id']

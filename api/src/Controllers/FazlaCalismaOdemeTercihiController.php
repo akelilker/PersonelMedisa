@@ -61,12 +61,12 @@ class FazlaCalismaOdemeTercihiController
         if ($satir === null) {
             JsonResponse::error(404, 'NOT_FOUND', 'snapshot_id icin odeme tercihi veya kapanis satiri bulunamadi.');
         }
+        // Authorize snapshot/branch before operational guard.
+        self::assertSnapshotScope($user, $request, $satir);
         \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::assertOperationalEligible(
             $pdo,
             (int) $satir['personel_id']
         );
-
-        self::assertSnapshotScope($user, $request, $satir);
 
         $stored = self::loadTercihBySnapshot($pdo, $snapshotId);
         if ($stored !== null) {
@@ -113,11 +113,12 @@ class FazlaCalismaOdemeTercihiController
         if ($satirProbe === null) {
             JsonResponse::error(404, 'NOT_FOUND', 'snapshot_id icin odeme tercihi veya kapanis satiri bulunamadi.');
         }
+        // Authorize snapshot/branch before operational guard.
+        self::assertSnapshotScope($user, $request, $satirProbe);
         \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::assertOperationalEligible(
             $pdo,
             (int) $satirProbe['personel_id']
         );
-        self::assertSnapshotScope($user, $request, $satirProbe);
 
         $hasKanitCols = self::columnExists($pdo, 'fazla_calisma_odeme_tercihleri', 'talep_tarihi')
             && self::columnExists($pdo, 'fazla_calisma_odeme_tercihleri', 'imzali_talep_belge_id');

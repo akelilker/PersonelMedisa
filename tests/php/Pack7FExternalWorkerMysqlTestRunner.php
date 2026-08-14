@@ -75,7 +75,6 @@ try {
         aktif_durum ENUM('AKTIF','PASIF') NOT NULL DEFAULT 'AKTIF',
         PRIMARY KEY (id),
         UNIQUE KEY uq_personeller_tc (tc_kimlik_no),
-        UNIQUE KEY uq_personeller_sicil (sicil_no)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
     $pdo->exec("INSERT INTO personeller
         (tc_kimlik_no, ad, soyad, dogum_tarihi, telefon, sicil_no, ise_giris_tarihi)
@@ -103,6 +102,11 @@ try {
         WHERE table_schema = DATABASE() AND table_name = 'personeller'
           AND column_name = 'tc_kimlik_no' AND non_unique = 0")->fetchColumn();
     p7fAssert($tcUniqueCount >= 1, 'non-null TC unique index preserved');
+
+    $sicilUniqueCount = (int) $pdo->query("SELECT COUNT(*) FROM information_schema.statistics
+        WHERE table_schema = DATABASE() AND table_name = 'personeller'
+          AND column_name = 'sicil_no' AND non_unique = 0")->fetchColumn();
+    p7fAssert($sicilUniqueCount >= 1, 'sicil unique index created by migration 066');
 
     $external = PersonelCanonicalValidator::normalizeAndValidateCreatePayload([
         'calisan_kapsami' => 'DIS_KAYNAK', 'ad' => 'Tekad', 'sicil_no' => 'P7F-DIS-1',
@@ -136,17 +140,20 @@ try {
     } catch (PDOException $e) {
         p7fAssert($e->getCode() === '23000', 'duplicate non-null TC rejected');
     }
-    try {
-        $insert->execute(['tc' => null, 'ad' => 'SicilTekrar', 'soyad' => null, 'dogum' => null, 'telefon' => null,
-            'sicil' => 'P7F-DIS-2', 'giris' => '2026-08-01', 'kapsam' => 'DIS_KAYNAK']);
-        p7fAssert(false, 'duplicate sicil rejected');
-    } catch (PDOException $e) {
-        p7fAssert($e->getCode() === '23000', 'duplicate sicil rejected');
-    }
+    // Duplicate sicil uniqueness is provided by migration 066 and tested below.
     p7fAssert(PersonelCalisanKapsamService::isDisKaynak($pdo, $externalId), 'external row resolved');
     p7fAssert(PersonelCalisanKapsamService::formatAdSoyad('Tekad', null) === 'Tekad', 'single token name null safe');
     p7fAssert((int) $pdo->query("SELECT COUNT(*) FROM personeller
         WHERE calisan_kapsami = 'DIS_KAYNAK' AND LOWER(ad) LIKE '%tekad%'")->fetchColumn() === 1, 'external search by ad works');
+
+    // After migration created UNIQUE on sicil_no, duplicate sicil must be rejected by DB.
+    try {
+        $insert->execute(['tc' => null, 'ad' => 'SicilTekrar', 'soyad' => null, 'dogum' => null, 'telefon' => null,
+            'sicil' => 'P7F-DIS-2', 'giris' => '2026-08-01', 'kapsam' => 'DIS_KAYNAK']);
+        p7fAssert(false, 'duplicate sicil rejected by DB after migration');
+    } catch (PDOException $e) {
+        p7fAssert($e->getCode() === '23000', 'duplicate sicil rejected by DB after migration');
+    }
 
     try {
         PersonelCalisanKapsamService::assertOperationalEligibleOrThrow($pdo, $externalId);

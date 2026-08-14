@@ -245,6 +245,10 @@ class PuantajController
         $pdo = self::getConnection();
         $personel = self::loadPersonel($pdo, $personelId);
         SubeScope::assertPersonelAccess($user, $request, (int) $personel['sube_id']);
+        \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::assertOperationalEligible(
+            $pdo,
+            $personelId
+        );
 
         try {
             $pdo->beginTransaction();

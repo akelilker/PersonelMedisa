@@ -377,6 +377,7 @@ class PersonelUcretService
                 throw new PersonelUcretException('SALARY_RECORD_NOT_FOUND', 'Ucret kaydi bulunamadi.', 404);
             }
             $personel = self::lockPersonel($pdo, (int) $personelId);
+            self::assertPersonelOperationalEligible($pdo, (int) $personelId);
             $stmt = $pdo->prepare(
                 'SELECT * FROM personel_ucret_gecmisi WHERE id = :id LIMIT 1' . self::forUpdate($pdo)
             );
@@ -405,6 +406,18 @@ class PersonelUcretService
                 throw new PersonelUcretException('SALARY_DATE_OVERLAP', 'Ucret gecerlilik tarihleri mevcut kayitla cakisiyor.', 409);
             }
             throw $e;
+        }
+    }
+
+    private static function assertPersonelOperationalEligible(PDO $pdo, int $personelId): void
+    {
+        try {
+            \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::assertOperationalEligibleOrThrow(
+                $pdo,
+                $personelId
+            );
+        } catch (\Medisa\Api\Services\Personel\PersonelValidationException $e) {
+            throw new PersonelUcretException($e->getCodeString(), $e->getMessage(), 409);
         }
     }
 

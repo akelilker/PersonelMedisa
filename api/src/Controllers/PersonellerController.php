@@ -312,6 +312,9 @@ class PersonellerController
             if (PersonelCreateService::isDuplicateTcException($e) || self::isDuplicateTcException($e)) {
                 self::duplicateTcResponse();
             }
+            if (PersonelCreateService::isDuplicateSicilException($e) || self::isDuplicateSicilException($e)) {
+                self::duplicateSicilResponse();
+            }
 
             JsonResponse::serverError('Kayit olusturulamadi.');
         }
@@ -468,6 +471,9 @@ class PersonellerController
             }
             if (self::isDuplicateTcException($e)) {
                 self::duplicateTcResponse();
+            }
+            if (PersonelCreateService::isDuplicateSicilException($e) || self::isDuplicateSicilException($e)) {
+                self::duplicateSicilResponse();
             }
 
             JsonResponse::serverError('Kayit guncellenemedi.');
@@ -1105,6 +1111,11 @@ class PersonellerController
         JsonResponse::error(409, 'DUPLICATE_TC_KIMLIK_NO', 'Bu T.C. Kimlik No ile kayıt açılamaz.', 'tc_kimlik_no');
     }
 
+    private static function duplicateSicilResponse()
+    {
+        JsonResponse::error(409, 'DUPLICATE_SICIL_NO', 'Bu sicil no ile kayit acilamaz.', 'sicil_no');
+    }
+
     private static function isDuplicateTcException(\PDOException $e)
     {
         if ($e->getCode() !== '23000') {
@@ -1119,6 +1130,22 @@ class PersonellerController
         $message = strtolower($e->getMessage());
 
         return strpos($message, 'uq_personeller_tc') !== false || strpos($message, 'tc_kimlik_no') !== false;
+    }
+
+    private static function isDuplicateSicilException(\PDOException $e)
+    {
+        if ($e->getCode() !== '23000') {
+            return false;
+        }
+
+        $errorInfo = $e->errorInfo;
+        if (!is_array($errorInfo) || !isset($errorInfo[1]) || (int) $errorInfo[1] !== 1062) {
+            return false;
+        }
+
+        $message = strtolower($e->getMessage());
+
+        return strpos($message, 'uq_personeller_sicil') !== false || strpos($message, 'sicil_no') !== false;
     }
 
     private static function validationError($field, $message)

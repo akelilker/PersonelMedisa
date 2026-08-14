@@ -134,8 +134,7 @@ class BordroOnIzlemeService
                 LEFT JOIN departmanlar d ON d.id = p.departman_id
                 INNER JOIN maas_hesaplama_calistirmalari c ON c.id = a.calistirma_id
                 INNER JOIN subeler ss ON ss.id = c.sube_id
-                WHERE a.calistirma_id = :cid AND a.state = 'HESAPLANDI'
-                  AND " . \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::sqlIcPersonelPredicate($pdo, 'p');
+                WHERE a.calistirma_id = :cid AND a.state = 'HESAPLANDI'";
         $params = ['cid' => (int) $calistirmaId];
         if ($departmanId !== null) {
             $sql .= ' AND p.departman_id = :departman_id';
@@ -160,7 +159,6 @@ class BordroOnIzlemeService
              INNER JOIN maas_hesaplama_calistirmalari c ON c.id = a.calistirma_id
              INNER JOIN subeler ss ON ss.id = c.sube_id
              WHERE a.id = :id
-               AND " . \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::sqlIcPersonelPredicate($pdo, 'p') . "
              LIMIT 1"
         );
         $stmt->execute(['id' => (int) $adayId]);

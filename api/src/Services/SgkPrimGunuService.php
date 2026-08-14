@@ -327,7 +327,6 @@ final class SgkPrimGunuService
              INNER JOIN maas_hesaplama_donem_snapshotlari ds ON ds.id = sgk.donem_snapshot_id
              INNER JOIN personeller p ON p.id = sgk.personel_id
              WHERE ' . implode(' AND ', $where) . '
-               AND ' . \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::sqlIcPersonelPredicate($pdo, 'p') . '
              ORDER BY sgk.personel_id ASC'
         );
         $stmt->execute($params);

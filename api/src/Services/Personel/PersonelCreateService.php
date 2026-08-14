@@ -205,4 +205,13 @@ final class PersonelCreateService
         return strpos($message, 'uq_personeller_tc') !== false
             || (strpos($message, 'Duplicate') !== false && strpos($message, 'tc_kimlik_no') !== false);
     }
+
+    public static function isDuplicateSicilException(\PDOException $e): bool
+    {
+        $message = $e->getMessage();
+        $lower = strtolower($message);
+
+        return strpos($message, 'uq_personeller_sicil') !== false
+            || (strpos($lower, 'duplicate') !== false && strpos($lower, 'sicil_no') !== false);
+    }
 }

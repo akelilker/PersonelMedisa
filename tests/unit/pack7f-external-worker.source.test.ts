@@ -26,7 +26,7 @@ describe("Pack7F external worker source locks", () => {
       "api/src/Services/SgkPrimGunuService.php",
       "api/src/Controllers/HaftalikKapanisController.php"
     ].map(read).join("\n");
-    expect(files.match(/sqlIcPersonelPredicate/g)?.length ?? 0).toBeGreaterThanOrEqual(7);
+    expect(files.match(/sqlIcPersonelPredicate/g)?.length ?? 0).toBeGreaterThanOrEqual(6);
 
     for (const path of [
       "api/src/Services/Qr/QrAttendanceEventService.php",
@@ -42,15 +42,21 @@ describe("Pack7F external worker source locks", () => {
     }
 
     for (const path of [
-      "api/src/Services/BordroOnIzlemeService.php",
-      "api/src/Services/MaasHesaplamaAdayService.php",
       "api/src/Services/PersonelBordroDevirService.php",
       "api/src/Services/PuantajDonemReopenService.php",
-      "api/src/Services/DonemKapanisPreflightService.php",
-      "api/src/Services/SgkPrimGunuService.php"
+      "api/src/Services/DonemKapanisPreflightService.php"
     ]) {
       expect(read(path), path).toContain("sqlIcPersonelPredicate");
     }
+    for (const path of [
+      "api/src/Services/BordroOnIzlemeService.php",
+      "api/src/Services/MaasHesaplamaAdayService.php"
+    ]) {
+      expect(read(path), path).not.toContain("sqlIcPersonelPredicate");
+    }
+    expect(read("api/src/Services/SgkPrimGunuService.php")).not.toMatch(
+      /listCanonicalResults[\s\S]*sqlIcPersonelPredicate/
+    );
   });
 
   it("supports nullable identity, import default, list filter and UI badge", () => {

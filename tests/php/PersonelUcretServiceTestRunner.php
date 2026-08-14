@@ -32,7 +32,8 @@ $pdo = new PDO('sqlite::memory:');
 $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
 $pdo->exec('CREATE TABLE personeller (
-    id INTEGER PRIMARY KEY, sube_id INTEGER NOT NULL, maas_tutari REAL, ise_giris_tarihi TEXT
+    id INTEGER PRIMARY KEY, sube_id INTEGER NOT NULL, maas_tutari REAL, ise_giris_tarihi TEXT,
+    calisan_kapsami TEXT NOT NULL DEFAULT "IC_PERSONEL"
 )');
 $pdo->exec('CREATE TABLE personel_ucret_gecmisi (
     id INTEGER PRIMARY KEY AUTOINCREMENT, personel_id INTEGER NOT NULL, ucret_tutari REAL NOT NULL,
@@ -48,9 +49,10 @@ $pdo->exec('CREATE TABLE personel_ucret_auditleri (
     actor_rol TEXT, sube_id INTEGER, request_hash TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP
 )');
 $pdo->exec("INSERT INTO personeller VALUES
-    (1, 1, 12000, '2020-01-01'),
-    (2, 1, NULL, '2021-01-01'),
-    (3, 1, 9000, NULL)");
+    (1, 1, 12000, '2020-01-01', 'IC_PERSONEL'),
+    (2, 1, NULL, '2021-01-01', 'IC_PERSONEL'),
+    (3, 1, 9000, NULL, 'IC_PERSONEL'),
+    (4, 1, NULL, '2026-01-01', 'IC_PERSONEL')");
 
 $legacy = PersonelUcretService::resolveSalaryForDate($pdo, 1, '2024-06-01');
 salaryAssert(($legacy['virtual'] ?? false) === true && $legacy['ucret_turu'] === 'NET', 'legacy salary resolves as virtual NET');
@@ -90,5 +92,26 @@ $personOneHistory = PersonelUcretService::listSalaryHistory($pdo, 1);
 salaryAssert(count($personOneHistory) === 2 && $personOneHistory[1]['kaynak'] === 'PERSONEL_KAYDI_MIGRASYON', 'explicit create migrates legacy salary history');
 salaryAssert((float) PersonelUcretService::resolveSalaryForDate($pdo, 1, '2024-12-31')['ucret_tutari'] === 12000.0, 'legacy migration preserves past salary');
 salaryAssert((int) $pdo->query('SELECT COUNT(*) FROM personel_ucret_auditleri')->fetchColumn() >= 6, 'all salary mutations write audit rows');
+
+$externalFuture = PersonelUcretService::createSalaryRecord($pdo, 4, [
+    'ucret_tutari' => 21000,
+    'ucret_turu' => 'NET',
+    'gecerlilik_baslangic' => '2099-01-01',
+]);
+$pdo->exec("UPDATE personeller SET calisan_kapsami = 'DIS_KAYNAK' WHERE id = 4");
+salaryAssert(count(PersonelUcretService::listSalaryHistory($pdo, 4)) === 1, 'external historical salary read remains visible');
+salaryException(function () use ($pdo, $externalFuture): void {
+    PersonelUcretService::updateFutureSalaryRecord($pdo, (int) $externalFuture['id'], [
+        'ucret_tutari' => 22000,
+        'ucret_turu' => 'NET',
+        'gecerlilik_baslangic' => '2099-02-01',
+    ]);
+}, 'PERSONEL_OPERASYON_KAPSAM_DISI', 'external salary update rejected');
+salaryException(function () use ($pdo, $externalFuture): void {
+    PersonelUcretService::closeSalaryRecord($pdo, (int) $externalFuture['id'], '2099-12-31');
+}, 'PERSONEL_OPERASYON_KAPSAM_DISI', 'external salary close rejected');
+salaryException(function () use ($pdo, $externalFuture): void {
+    PersonelUcretService::cancelSalaryRecord($pdo, (int) $externalFuture['id']);
+}, 'PERSONEL_OPERASYON_KAPSAM_DISI', 'external salary cancel rejected');
 
 echo 'verify-personel-ucret-service: OK' . PHP_EOL;

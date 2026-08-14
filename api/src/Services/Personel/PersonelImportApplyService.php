@@ -349,7 +349,10 @@ final class PersonelImportApplyService
             if ($pdo->inTransaction()) {
                 $pdo->rollBack();
             }
-            $code = PersonelCreateService::isDuplicateTcException($e)
+            $code = (
+                PersonelCreateService::isDuplicateTcException($e)
+                || PersonelCreateService::isDuplicateSicilException($e)
+            )
                 ? 'PERSONEL_IMPORT_ALREADY_EXISTS'
                 : 'PERSONEL_IMPORT_TRANSACTION_FAILED';
             self::recordFailureAuditOutsideTx(
@@ -367,7 +370,7 @@ final class PersonelImportApplyService
             if ($code === 'PERSONEL_IMPORT_ALREADY_EXISTS') {
                 throw new PersonelImportException(
                     'PERSONEL_IMPORT_ALREADY_EXISTS',
-                    'Ayni T.C. Kimlik No ile personel zaten mevcut.',
+                    'TC veya sicil ile personel zaten mevcut.',
                     409
                 );
             }

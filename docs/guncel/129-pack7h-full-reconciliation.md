@@ -156,3 +156,128 @@ BLOCKERS = 55 distinct canonical records (24 sicil, 23 name split, 5 birth date,
 ```
 
 No further source-safe resolution was available. The remaining records are listed with exact field/source-search results in the private deterministic artifact above. Import requires user-provided or separately authorized authoritative values for those records; no production import/apply is proposed or executed.
+
+## Authoritative continuation — supplemental source
+
+The first-pass result above is historical evidence and is preserved unchanged. The continuation was run deterministically from the same branch using the user-approved secondary source:
+
+```text
+MODE = AUTHORITATIVE_SOURCE_RECONCILIATION_CONTINUATION
+SUPPLEMENTAL_SOURCE_PATH = C:\Users\Akel\Downloads\Personel_Listesi_Bolumlere_Gore_Duzenli.xlsx
+SUPPLEMENTAL_SOURCE_HASH = D0BB5DB62DFE43A3C190E8D17252D98A6B15855C62F980454337CD6DA4DBEB15
+SUPPLEMENTAL_SHEET_COUNT = 1
+SUPPLEMENTAL_SHEET = Personel Listesi
+SUPPLEMENTAL_PERSONNEL_ROWS = 146
+```
+
+The workbook contains these actual columns: `Doc`, `Personel Kodu`, `Adı Soyadı`, `KartNo`, `TC Kimlik No`, `GSM`, `Tel`, `Departman Kodu` (two source columns), `Cinsiyet`, `Kan Grubu`, `Öğrenim Durumu`, `Ünvan Kodu`, `Ünvan Adı`, `Bölüm Kodu`, `Bölüm Adı`, `Departman Adı`, `Görev Kodu`, `Görev Adı`, `Giriş Tarihi`, `Doğum Tarihi`, `Doğum Yeri`, `Durumu`, `Toplam İzin Hakkı`, `Hizmet Süresi`, `Kullanılan İzin`, `Kalan Izin`.
+
+```text
+HAS_TC = YES
+HAS_SICIL = YES
+HAS_FIRST_NAME = NO
+HAS_SURNAME = NO
+HAS_FULL_NAME = YES
+HAS_PHONE = YES
+HAS_BIRTH_DATE = YES
+HAS_HIRE_DATE = YES
+HAS_DEPARTMENT_CODE = YES
+HAS_DEPARTMENT_NAME = YES
+HAS_TASK_CODE = YES
+HAS_TASK_NAME = YES
+HAS_BRANCH = NO
+HAS_LOCATION = NO
+HAS_PERSONNEL_TYPE = NO
+```
+
+No source workbook was modified. Canonical and External lineage/hash records remain intact. Canonical matching used exact normalized TC; External matching used exact normalized Personel Kodu. No name-only or fuzzy join was used.
+
+### Continuation results
+
+| Alan | Before | After | Supplemental result |
+| --- | ---: | ---: | --- |
+| Canonical rows / unique | 122 / 122 | 122 / 122 | unchanged |
+| External rows / unique | 13 / 13 | 13 / 13 | unchanged |
+| Missing sicil | 24 | 4 | 20 resolved by exact TC |
+| Unresolved name split | 23 | 23 | 0; no separate Ad/Soyad columns |
+| Required birth date missing | 5 | 5 | 0; no valid value for the five exact-TC rows |
+| Required phone missing | 26 | 26 | 0; no valid phone for the remaining exact-TC rows |
+| Distinct canonical blockers | 55 | 41 | overlap-aware; no guessed fields |
+| External organization blockers | 13 | 13 | branch/location/personnel type absent; department alone is insufficient |
+| External Görev Kodu blockers | 8 | 8 | `Görev Adı` is blank and source code values are descriptions, not active catalog IDs |
+
+The eight task-review rows are `176 RAED FAWAZ`, `197 SAIF TAREQ JASIM AL-GBURI`, `206 MUHAMMED IRAKLI`, `213 FETİYAN`, `275 ALADDİN DEREBAŞI`, `283 ABDULLAH`, `355 SEFİNE ÖZCAN`, and `375 MUQTADA MAZIN KHALEE`. For the first six and `375`, the supplemental source supplies a non-empty description in `Görev Kodu` but no `Görev Adı`; `355` has no supplemental row. None has an exact active-catalog code/name pair, so all remain blocked. No repository catalog row, fuzzy mapping, or neighboring-worker value was invented.
+
+### Current validation and projection
+
+```text
+CANONICAL_COUNT = 122
+CANONICAL_UNIQUE = 122
+EXTERNAL_COUNT = 13
+EXTERNAL_UNIQUE = 13
+SOURCE_TOTAL = 135
+
+MISSING_SICIL_BEFORE = 24
+MISSING_SICIL_AFTER = 4
+SICIL_RESOLVED = 20
+UNRESOLVED_NAME_SPLIT_BEFORE = 23
+UNRESOLVED_NAME_SPLIT_AFTER = 23
+NAME_SPLITS_RESOLVED = 0
+MISSING_REQUIRED_BIRTH_DATE_BEFORE = 5
+MISSING_REQUIRED_BIRTH_DATE_AFTER = 5
+BIRTH_DATES_RESOLVED = 0
+MISSING_REQUIRED_PHONE_BEFORE = 26
+MISSING_REQUIRED_PHONE_AFTER = 26
+PHONES_RESOLVED = 0
+CANONICAL_BLOCKED_DISTINCT_BEFORE = 55
+CANONICAL_BLOCKED_DISTINCT_AFTER = 41
+EXTERNAL_ORG_BLOCKERS_BEFORE = 13
+EXTERNAL_ORG_BLOCKERS_AFTER = 13
+EXTERNAL_ORG_RESOLVED_FROM_SUPPLEMENTAL_SOURCE = 0
+EXTERNAL_GOREV_BLOCKERS_BEFORE = 8
+EXTERNAL_GOREV_BLOCKERS_AFTER = 8
+
+DUPLICATE_TC_GROUPS = 0
+DUPLICATE_SICIL_GROUPS = 0
+CROSS_DATASET_TC_CONFLICTS = 0
+CROSS_DATASET_SICIL_CONFLICTS = 0
+IDENTITY_CONFLICTS = 0
+AMBIGUOUS = 23
+
+PRODUCTION_EXISTING_COUNT = 4
+PRODUCTION_MATCHES = 0
+NEW_IC_PERSONEL = 122
+NEW_DIS_KAYNAK = 13
+EXPECTED_IC_PERSONEL_AFTER_IMPORT = 126
+EXPECTED_DIS_KAYNAK_AFTER_IMPORT = 13
+EXPECTED_TOTAL_AFTER_IMPORT = 139
+
+DRY_RUN = FAIL
+VALIDATION_BLOCKED = 54
+REFERENCE_INTEGRITY = FAIL
+IC_VALIDATION = FAIL
+DIS_VALIDATION = FAIL
+TC_UNIQUE = PASS
+SICIL_UNIQUE = PASS
+IMPORT_ATOMICITY = PASS
+IMPORT_IDEMPOTENCY = PASS
+DIS_KAYNAK_SGK_ISOLATED = YES
+DIS_KAYNAK_BORDRO_ISOLATED = YES
+DIS_KAYNAK_PUANTAJ_ISOLATED = YES
+USER_FACING_MESSAGES_TURKISH = YES
+IMPORT_READY = NO
+FINAL_STATUS = BLOCKED
+```
+
+`VALIDATION_BLOCKED = 54` is `41` overlap-aware canonical records plus `13` External organization records. The four existing production fixture rows remain unmatched, so the projection remains `4 + 122 + 13 = 139`. Production was not mutated and no import/apply, merge, or deploy was performed.
+
+### Continuation artifacts
+
+```text
+ENRICHED_ARTIFACT_PATH = C:\Users\Akel\Documents\medisa-ops-tmp\personel-import-122\pack7h-final-reconciliation-v2.json
+ENRICHED_ARTIFACT_HASH = 10F6FD4DE097283BAADA195F6367BEC2E692FB1138C7EC49D6568FD8CEAFD3C2
+USER_INPUT_WORKBOOK_CREATED = YES
+USER_INPUT_WORKBOOK_PATH = C:\Users\Akel\Documents\medisa-ops-tmp\personel-import-122\pack7h-kullanici-tamamlamasi-gerekenler.xlsx
+```
+
+The successor artifact contains all 122 canonical and 13 External rows, original/resolved values, source hash/row, strong identity key, reason, and confidence for supplemental enrichment. The user-input workbook contains only remaining unresolved fields and Turkish instructions; neither private artifact is committed.

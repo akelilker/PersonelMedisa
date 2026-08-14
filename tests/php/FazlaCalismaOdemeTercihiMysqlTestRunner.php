@@ -270,11 +270,11 @@ function createFcotParentTables(PDO $pdo): void
     $pdo->exec("
         CREATE TABLE personeller (
           id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
-          tc_kimlik_no CHAR(11) NOT NULL,
+          tc_kimlik_no CHAR(11) NULL,
           ad VARCHAR(80) NOT NULL,
-          soyad VARCHAR(80) NOT NULL,
-          dogum_tarihi DATE NOT NULL,
-          telefon VARCHAR(32) NOT NULL DEFAULT '',
+          soyad VARCHAR(80) NULL,
+          dogum_tarihi DATE NULL,
+          telefon VARCHAR(32) NULL DEFAULT '',
           acil_durum_kisi VARCHAR(120) NOT NULL DEFAULT '',
           acil_durum_telefon VARCHAR(32) NOT NULL DEFAULT '',
           sicil_no VARCHAR(32) NOT NULL,
@@ -282,6 +282,7 @@ function createFcotParentTables(PDO $pdo): void
           sube_id INT UNSIGNED NOT NULL,
           departman_id INT UNSIGNED NULL,
           aktif_durum ENUM('AKTIF','PASIF') NOT NULL DEFAULT 'AKTIF',
+          calisan_kapsami ENUM('IC_PERSONEL','DIS_KAYNAK') NOT NULL DEFAULT 'IC_PERSONEL',
           KEY idx_personel_sube (sube_id),
           CONSTRAINT fk_personeller_sube FOREIGN KEY (sube_id) REFERENCES subeler (id),
           CONSTRAINT fk_personeller_departman FOREIGN KEY (departman_id) REFERENCES departmanlar (id)
@@ -427,10 +428,10 @@ function seedFcotFixtures(PDO $pdo): void
     $pdo->exec('INSERT INTO user_subeler (user_id, sube_id) VALUES (2, 1), (4, 1), (5, 1)');
     $pdo->exec("
         INSERT INTO personeller (
-          id, tc_kimlik_no, ad, soyad, dogum_tarihi, sicil_no, ise_giris_tarihi, sube_id, departman_id, aktif_durum
+          id, tc_kimlik_no, ad, soyad, dogum_tarihi, sicil_no, ise_giris_tarihi, sube_id, departman_id, aktif_durum, calisan_kapsami
         ) VALUES
-          (10, '11111111111', 'Ayse', 'Yilmaz', '1990-01-01', 'S10', '2020-01-01', 1, 3, 'AKTIF'),
-          (20, '22222222222', 'Mehmet', 'Demir', '1988-01-01', 'S20', '2020-01-01', 2, NULL, 'AKTIF')
+          (10, '11111111111', 'Ayse', 'Yilmaz', '1990-01-01', 'S10', '2020-01-01', 1, 3, 'AKTIF', 'IC_PERSONEL'),
+          (20, '22222222222', 'Mehmet', 'Demir', '1988-01-01', 'S20', '2020-01-01', 2, NULL, 'AKTIF', 'IC_PERSONEL')
     ");
 }
 
@@ -1078,6 +1079,48 @@ $afterRollback = (int) $pdo->query('SELECT COUNT(*) FROM fazla_calisma_odeme_ter
 $afterAudit = (int) $pdo->query('SELECT COUNT(*) FROM fazla_calisma_odeme_tercihi_audit')->fetchColumn();
 fcotAssert($beforeRollback === $afterRollback, 'transaction rollback');
 fcotAssert($beforeAudit === $afterAudit, 'transaction rollback no audit');
+
+// Pack7F: historical GET reads materialized evidence; live DIS_KAYNAK blocks PUT only.
+$seedHistFm = seedSnapshot($pdo, 1, 10, '2026-10-05', '2026-10-11', 80);
+$histPut = invokeFcotHttp($pdo, $gy, 'PUT', '/fazla-calisma-odeme-tercihi', [
+    'snapshot_id' => $seedHistFm['snapshot_id'],
+    'odeme_tipi' => 'UCRET',
+    'gerekce' => 'Historical FM preference',
+], $subeHeader);
+fcotAssert($histPut['status'] === 200, 'Pack7F FM historical seed PUT → 200');
+$histTercihId = (int) ($histPut['payload']['data']['id'] ?? 0);
+$histGetBefore = invokeFcotHttp($pdo, $gy, 'GET', '/fazla-calisma-odeme-tercihi', [], $subeHeader, [
+    'snapshot_id' => (string) $seedHistFm['snapshot_id'],
+]);
+fcotAssert($histGetBefore['status'] === 200 && (int) ($histGetBefore['payload']['data']['id'] ?? 0) === $histTercihId, 'Pack7F FM historical GET before external → 200');
+$pdo->exec("UPDATE personeller SET calisan_kapsami = 'DIS_KAYNAK' WHERE id = 10");
+$histGetAfter = invokeFcotHttp($pdo, $gy, 'GET', '/fazla-calisma-odeme-tercihi', [], $subeHeader, [
+    'snapshot_id' => (string) $seedHistFm['snapshot_id'],
+]);
+fcotAssert($histGetAfter['status'] === 200 && (int) ($histGetAfter['payload']['data']['id'] ?? 0) === $histTercihId, 'Pack7F FM historical GET after external transition → 200');
+fcotAssert(($histGetAfter['payload']['data']['odeme_tipi'] ?? '') === 'UCRET', 'Pack7F FM historical GET preserves stored preference');
+$beforeExternalPut = $pdo->query('SELECT odeme_tipi, gerekce FROM fazla_calisma_odeme_tercihleri WHERE id = ' . $histTercihId)->fetch(PDO::FETCH_ASSOC);
+$externalPut = invokeFcotHttp($pdo, $gy, 'PUT', '/fazla-calisma-odeme-tercihi', [
+    'snapshot_id' => $seedHistFm['snapshot_id'],
+    'odeme_tipi' => 'KARAR_BEKLIYOR',
+], $subeHeader);
+fcotAssert($externalPut['status'] === 409, 'Pack7F FM external PUT → 409');
+fcotAssert(($externalPut['payload']['errors'][0]['code'] ?? '') === 'PERSONEL_OPERASYON_KAPSAM_DISI', 'Pack7F FM external PUT scope code');
+$afterExternalPut = $pdo->query('SELECT odeme_tipi, gerekce FROM fazla_calisma_odeme_tercihleri WHERE id = ' . $histTercihId)->fetch(PDO::FETCH_ASSOC);
+fcotAssert($beforeExternalPut == $afterExternalPut, 'Pack7F FM external PUT does not mutate preference');
+
+$pdo->exec("UPDATE personeller SET calisan_kapsami = 'DIS_KAYNAK' WHERE id = 20");
+$wrongBranchGet = invokeFcotHttp($pdo, $ba, 'GET', '/fazla-calisma-odeme-tercihi', [], $subeHeader, [
+    'snapshot_id' => (string) $snapshotOut,
+]);
+fcotAssert($wrongBranchGet['status'] === 403, 'Pack7F FM wrong-branch GET → 403');
+fcotAssert(($wrongBranchGet['payload']['errors'][0]['code'] ?? '') !== 'PERSONEL_OPERASYON_KAPSAM_DISI', 'Pack7F FM wrong-branch GET no scope leak');
+$wrongBranchPut = invokeFcotHttp($pdo, $bolum, 'PUT', '/fazla-calisma-odeme-tercihi', [
+    'snapshot_id' => $snapshotOut,
+    'odeme_tipi' => 'UCRET',
+], $subeHeader);
+fcotAssert($wrongBranchPut['status'] === 403, 'Pack7F FM wrong-branch PUT → 403');
+fcotAssert(($wrongBranchPut['payload']['errors'][0]['code'] ?? '') !== 'PERSONEL_OPERASYON_KAPSAM_DISI', 'Pack7F FM wrong-branch PUT no scope leak');
 
 $fk = $pdo->query("
     SELECT DELETE_RULE FROM information_schema.REFERENTIAL_CONSTRAINTS

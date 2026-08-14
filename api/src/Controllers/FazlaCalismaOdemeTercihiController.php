@@ -61,12 +61,8 @@ class FazlaCalismaOdemeTercihiController
         if ($satir === null) {
             JsonResponse::error(404, 'NOT_FOUND', 'snapshot_id icin odeme tercihi veya kapanis satiri bulunamadi.');
         }
-        // Authorize snapshot/branch before operational guard.
+        // Historical materialized reads remain visible after later calisan_kapsami changes.
         self::assertSnapshotScope($user, $request, $satir);
-        \Medisa\Api\Services\Personel\PersonelCalisanKapsamService::assertOperationalEligible(
-            $pdo,
-            (int) $satir['personel_id']
-        );
 
         $stored = self::loadTercihBySnapshot($pdo, $snapshotId);
         if ($stored !== null) {

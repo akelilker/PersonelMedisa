@@ -50,6 +50,69 @@ function p7fApplyMigration(PDO $pdo): void
     }
 }
 
+if (($argv[1] ?? '') === '--sicil-child') {
+    $pdo = p7fPdo((string) ($argv[2] ?? ''));
+    $sicil = (string) ($argv[3] ?? '');
+    $ad = (string) ($argv[4] ?? 'RaceChild');
+    try {
+        $stmt = $pdo->prepare("INSERT INTO personeller
+            (tc_kimlik_no, ad, soyad, dogum_tarihi, telefon, sicil_no, ise_giris_tarihi, calisan_kapsami)
+            VALUES (NULL, :ad, NULL, NULL, NULL, :sicil, '2026-08-01', 'DIS_KAYNAK')");
+        $stmt->execute(['ad' => $ad, 'sicil' => $sicil]);
+        echo 'OK' . PHP_EOL;
+    } catch (PDOException $e) {
+        if (PersonelCreateService::isDuplicateSicilException($e)) {
+            echo 'DUPLICATE_SICIL' . PHP_EOL;
+            exit(0);
+        }
+        throw $e;
+    }
+    exit(0);
+}
+
+/** @return array{process: resource, pipes: array<int, resource>} */
+function p7fSpawnSicilChild(string $childDsn, string $sicil, string $ad): array
+{
+    $phpArgs = [];
+    if (PHP_OS_FAMILY === 'Windows' && !extension_loaded('pdo_mysql')) {
+        $extensionDir = ini_get('extension_dir');
+        if (is_string($extensionDir) && $extensionDir !== '') {
+            $phpArgs[] = '-d';
+            $phpArgs[] = 'extension_dir=' . $extensionDir;
+        }
+        $phpArgs[] = '-d';
+        $phpArgs[] = 'extension=pdo_mysql';
+    }
+    $cmd = array_merge([PHP_BINARY], $phpArgs, [__FILE__, '--sicil-child', $childDsn, $sicil, $ad]);
+    $pipes = [];
+    $process = proc_open($cmd, [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, null, getenv());
+    if (!is_resource($process)) {
+        throw new RuntimeException('Sicil child process could not start.');
+    }
+    fclose($pipes[0]);
+
+    return ['process' => $process, 'pipes' => $pipes];
+}
+
+function p7fFinishSicilChild(array $child): string
+{
+    $stdout = trim((string) stream_get_contents($child['pipes'][1]));
+    $stderr = trim((string) stream_get_contents($child['pipes'][2]));
+    fclose($child['pipes'][1]);
+    fclose($child['pipes'][2]);
+    $status = proc_close($child['process']);
+    if ($status !== 0) {
+        throw new RuntimeException('Sicil child failed: ' . $stderr);
+    }
+    $lines = preg_split("/\r\n|\n|\r/", $stdout) ?: [];
+    $meaningful = array_values(array_filter($lines, static function (string $line): bool {
+        $line = trim($line);
+        return $line !== '' && stripos($line, 'Warning:') !== 0;
+    }));
+
+    return $meaningful === [] ? '' : (string) end($meaningful);
+}
+
 $dsn = getenv('MEDISA_TEST_MYSQL_DSN') ?: '';
 if ($dsn === '' || stripos($dsn, 'karmotor_medisa') !== false) {
     echo "SKIP: Disposable MariaDB credentials are required.\n";
@@ -161,25 +224,16 @@ try {
         p7fAssert($e->getCode() === '23000' && PersonelCreateService::isDuplicateSicilException($e), 'duplicate sicil rejected by DB after migration');
     }
 
-    $raceA = p7fPdo((preg_replace('/dbname=[^;]+/i', 'dbname=' . $db, $dsn) ?: $dsn));
-    $raceB = p7fPdo((preg_replace('/dbname=[^;]+/i', 'dbname=' . $db, $dsn) ?: $dsn));
     $raceSicil = 'P7F-RACE-' . bin2hex(random_bytes(3));
-    $raceInsertA = $raceA->prepare("INSERT INTO personeller
-        (tc_kimlik_no, ad, soyad, dogum_tarihi, telefon, sicil_no, ise_giris_tarihi, calisan_kapsami)
-        VALUES (NULL, 'RaceA', NULL, NULL, NULL, :sicil, '2026-08-01', 'DIS_KAYNAK')");
-    $raceInsertB = $raceB->prepare("INSERT INTO personeller
-        (tc_kimlik_no, ad, soyad, dogum_tarihi, telefon, sicil_no, ise_giris_tarihi, calisan_kapsami)
-        VALUES (NULL, 'RaceB', NULL, NULL, NULL, :sicil, '2026-08-01', 'DIS_KAYNAK')");
-    $raceInsertA->execute(['sicil' => $raceSicil]);
-    try {
-        $raceInsertB->execute(['sicil' => $raceSicil]);
-        p7fAssert(false, 'sicil race second writer rejected');
-    } catch (PDOException $e) {
-        p7fAssert(PersonelCreateService::isDuplicateSicilException($e), 'sicil race second writer rejected');
-    }
+    $childDsn = preg_replace('/dbname=[^;]+/i', 'dbname=' . $db, $dsn) ?: $dsn;
+    $sicilRaceA = p7fSpawnSicilChild($childDsn, $raceSicil, 'RaceA');
+    $sicilRaceB = p7fSpawnSicilChild($childDsn, $raceSicil, 'RaceB');
+    $sicilRaceResults = [p7fFinishSicilChild($sicilRaceA), p7fFinishSicilChild($sicilRaceB)];
+    sort($sicilRaceResults);
+    p7fAssert($sicilRaceResults === ['DUPLICATE_SICIL', 'OK'], 'parallel sicil writers allow one winner and one duplicate');
     $raceCountStmt = $pdo->prepare('SELECT COUNT(*) FROM personeller WHERE sicil_no = :sicil');
     $raceCountStmt->execute(['sicil' => $raceSicil]);
-    p7fAssert((int) $raceCountStmt->fetchColumn() === 1, 'sicil race leaves exactly one persistent row');
+    p7fAssert((int) $raceCountStmt->fetchColumn() === 1, 'parallel sicil race leaves exactly one persistent row');
 
     $uniqueA = 'P7F-NULL-TC-A-' . bin2hex(random_bytes(2));
     $uniqueB = 'P7F-NULL-TC-B-' . bin2hex(random_bytes(2));

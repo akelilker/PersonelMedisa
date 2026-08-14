@@ -183,7 +183,7 @@ Aşağıdakiler CURRENT MAIN’de bozulmuş değilse OPEN yapılmaz:
 | Production | tip **064** (`118`); schema applied; SGK + verified location refs seeded (`119`); personnel org mapping **NO** |
 | Kanıt | `117-final-code-gap-pack5.md`; Pack5 MariaDB B1–B11; rollout `118`; org seed `119` |
 | Acceptance (code) | Üç kavram bağımsız persist; SubeScope `sube_id` |
-| Remaining ops | Personnel mapping apply = `USER_GATED` (`MG-ORG-LOC-001` / preview in `119`); bare `Merkez` company decision + incomplete locked branch set tracked under `MG-OPS-ORG-001` |
+| Remaining ops | Personnel mapping apply / import = `USER_GATED` (`MG-ORG-LOC-001`); locked branch + catalog reference rollout completed (`121`/`122`) |
 
 ---
 
@@ -244,11 +244,12 @@ Aşağıdakiler CURRENT MAIN’de bozulmuş değilse OPEN yapılmaz:
 
 | Alan | Değer |
 | --- | --- |
-| Statü | **OPS_ROLLOUT** |
-| Metadata | production schema ready; personnel FK apply `USER_GATED` |
+| Statü | **CLOSED_REFERENCE_ROLLOUT** |
+| Metadata | production schema + canonical reference catalogs complete; personnel FK apply `USER_GATED` |
 | Domain | Personel org model |
-| Mevcut | Production tip `065` applied (`121`); taxonomy seeded (partial parents); locked 10-branch model + MRK=`Medisa` + ownership complete; personnel org FKs still NULL |
+| Mevcut | Production tip `065` (`121`); canonical Departman/Unvan/PersonelTipi/Bölüm/Birim/Pozisyon complete from 122-row workbook (`122`); locked 10-branch model + MRK=`Medisa` + ownership complete; personnel org FKs still NULL |
 | Acceptance | Explicit authorization for personnel exact FK apply / real import remains gated |
+| Kanıt | `121`; `122-canonical-hr-catalog-completion.md` |
 
 ### MG-IMPORT-MAP-001 — Kaynak Excel → import contract eşlemesi
 
@@ -258,7 +259,7 @@ Aşağıdakiler CURRENT MAIN’de bozulmuş değilse OPEN yapılmaz:
 | Öncelik | **P1** |
 | Domain | Personel import |
 | Closed mapping | Departman→departman; Bölüm→bolum; Birim→birim; Unvan→gorev; Pozisyon→pozisyon; central MRK display **Medisa** |
-| Remaining data work | Sicil uniqueness proof / Ad-Soyad completion / Grup exact transform / SGK Dosyası=Diğer / şube assignment under locked branch set |
+| Remaining data work | After `122`: org refs resolve 122/122. Remaining = `sicil_no` (missing in canonical workbook) + ambiguous Ad Soyad split + missing birth/phone subsets (`MG-IMPORT-DATA-001`) |
 | Yasak | Validator gevşetme; sicil uydurma; güvenilmez auto-split; telefon/doğum uydurma; ücret/SGK’yı master import’a zorlama; PII’nin public repo’ya yazılması |
 | Kanıt contract | `PersonelImportDryRunService` REQUIRED unchanged; OPTIONAL adds `bolum`/`birim`/`pozisyon` (blank-safe pre-065) |
 
@@ -269,8 +270,8 @@ Aşağıdakiler CURRENT MAIN’de bozulmuş değilse OPEN yapılmaz:
 | ID | Başlık | Öncelik | Metadata | Durum özeti | Owner |
 | --- | --- | --- | --- | --- | --- |
 | MG-OPS-PERSONEL-001 | Gerçek personel import | P0 | `USER_GATED` | Onay olmadan import yok; `REAL_PERSONNEL_IMPORTED=NO` | Ops + kullanıcı |
-| MG-IMPORT-DATA-001 | Kaynak personel dataset completion | P1 | `USER_GATED_DATA_COMPLETION` | Required alanlar kaynakta tamamlanır; validator gevşetilmez; veri uydurulmaz; exact tallies public repo dışı | Ops + İK |
-| MG-OPS-ORG-001 | Gerçek org/şube/referans rollout | P0 | `USER_GATED` | **ADVANCED** — SGK 3 + locations 7 (`119`); Pack6 `065` + locked 10 branches + ownership + MRK=`Medisa` (`121`); taxonomy partial (Departman catalog gap); personnel mapping still gated | Ops |
+| MG-IMPORT-DATA-001 | Kaynak personel dataset completion | P1 | `USER_GATED_DATA_COMPLETION` | After `122`: org taxonomy complete; remaining blockers = missing sicil (122) + ambiguous name split (23) + birth(15)/phone(35); validator gevşetilmez | Ops + İK |
+| MG-OPS-ORG-001 | Gerçek org/şube/referans rollout | P0 | `CLOSED_REFERENCE_ROLLOUT` | Canonical 122-row org catalogs resolve in production (`122`); personnel FK mapping/import remain under `MG-ORG-LOC-001` / `MG-OPS-PERSONEL-001` | Ops |
 | MG-OPS-BIND-001 | PERSONEL binding gerçek rollout | P1 | `USER_GATED` | Schema `056` var; rollout NOT_STARTED | Ops / İK |
 | MG-OPS-QR-001 | Gerçek çalışan QR rollout | P1 | `USER_GATED` | Pipeline CLOSED; employee rollout NOT_STARTED | Ops |
 | MG-OPS-SGK-CAT-001 | SGK resmi katalog / DOGRULANMIS_TAM / şirket politikası | P0 | `VERIFY_REQUIRED` | Code fail-closed; prod state repo’dan doğrulanmaz | Ops + `94`/`95` |
@@ -343,10 +344,10 @@ DİĞER: Şenay Mobilya
 MG-ORG-MODEL-001 (CLOSED — karar kilitli)
   → MG-ORG-LOC-001 (OPS_ROLLOUT — schema `064`/`118`; refs seeded `119`; personnel mapping USER_GATED)
   → MG-ORG-ATTR-001 (CLOSED — native Bölüm/Birim/Pozisyon + Unvan=gorev; `120`)
-  → MG-ORG-ATTR-ROLL-001 (OPS_ROLLOUT — prod schema `065`/`121` ready; personnel FK apply USER_GATED)
-  → MG-OPS-ORG-001 (OPS_ROLLOUT ADVANCED — locked branches+ownership `121`; Departman catalog / personnel mapping remain)
+  → MG-ORG-ATTR-ROLL-001 (CLOSED_REFERENCE_ROLLOUT — schema `065`/`121` + catalogs `122`; personnel FK apply USER_GATED)
+  → MG-OPS-ORG-001 (CLOSED_REFERENCE_ROLLOUT — catalogs+branches complete `121`/`122`; personnel mapping separate)
   → MG-IMPORT-MAP-001 (CLOSED business mapping — remaining → MG-IMPORT-DATA-001)
-  → MG-IMPORT-DATA-001 (OPS_ROLLOUT — USER_GATED_DATA_COMPLETION)
+  → MG-IMPORT-DATA-001 (OPS_ROLLOUT — USER_GATED_DATA_COMPLETION; identity blockers only after `122`)
   → MG-OPS-PERSONEL-001 (real personnel import, USER_GATED)
   → MG-OPS-BIND-001 → MG-OPS-QR-001
 ```
